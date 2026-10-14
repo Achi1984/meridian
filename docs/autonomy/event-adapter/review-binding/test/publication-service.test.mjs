@@ -333,3 +333,32 @@ test('invalid confirmation request or forged token is rejected before comment re
   assert.equal(s.writes(),0);
  }
 });
+
+
+function environmentSetup(){
+ const s=setup();s.config.environment='publisher-test';
+ s.config.subject='repo:Achi1984/meridian:environment:publisher-test';
+ const c=JSON.parse(Buffer.from(s.request.token.split('.')[1],'base64url'));
+ c.environment=s.config.environment;c.sub=s.config.subject;
+ function resign(claims){const raw=[{alg:'RS256',typ:'JWT',kid:jwk.kid},claims]
+  .map(x=>Buffer.from(JSON.stringify(x)).toString('base64url')).join('.');
+  s.request.token=raw+'.'+sign('RSA-SHA256',Buffer.from(raw),privateKey).toString('base64url');}
+ resign(c);return {...s,claims:c,resign};
+}
+test('service forwards trusted environment pin into actual signed token verification and reservation',async()=>{
+ const s=environmentSetup(),r=await reserveAdmission(s.request,s.config,s.deps);
+ assert.equal(r.kind,'INACTIVE_RESERVATION_RESULT');assert.equal(r.outcome,'ACKNOWLEDGED');assert.equal(s.calls(),1);
+ for(const k of ['authenticated','authorized','dispatchAllowed','mergeAllowed','durable','sendAllowed'])assert.equal(r[k],false);
+});
+test('environment service rejects downgrade missing wrong claims and unknown config before JWKS evidence or DB',async()=>{
+ for(const edit of [s=>delete s.claims.environment,s=>s.claims.environment='other',
+  s=>s.claims.sub='repo:Achi1984/meridian:ref:refs/heads/main',
+  s=>delete s.config.environment,s=>s.config.environment=null,
+  s=>s.config.extra=true,s=>s.claims.job_workflow_ref='other']){
+  const s=environmentSetup();edit(s);s.resign(s.claims);
+  let fetches=0,reads=0;s.deps.fetchFn=async()=>{fetches++;throw Error();};
+  s.deps.readEvidence=async()=>{reads++;throw Error();};
+  assert.equal((await reserveAdmission(s.request,s.config,s.deps)).kind,'ADMISSION_REJECTED');
+  assert.equal(fetches,0);assert.equal(reads,0);assert.equal(s.calls(),0);
+ }
+});

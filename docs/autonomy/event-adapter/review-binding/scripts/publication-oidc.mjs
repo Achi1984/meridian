@@ -15,12 +15,20 @@ function b64(s){need(typeof s==='string'&&/^[A-Za-z0-9_-]+$/.test(s));
 function parse(s){const x=JSON.parse(utf8.decode(b64(s)));need(object(x));return x;}
 function decimal(s){return typeof s==='string'&&/^[1-9][0-9]{0,15}$/.test(s)&&BigInt(s)<=9007199254740991n;}
 function pinCheck(p){
- need(object(p)&&Object.keys(p).sort().join()==='controlSha,ownerId,repositoryId,runId,subject');
+ need(object(p));
+ const environmentProfile=Object.hasOwn(p,'environment');
+ need(Object.keys(p).sort().join()===(environmentProfile
+  ?'controlSha,environment,ownerId,repositoryId,runId,subject'
+  :'controlSha,ownerId,repositoryId,runId,subject'));
+ if(environmentProfile)need(typeof p.environment==='string'&&/^[a-z][a-z0-9-]{0,63}$/.test(p.environment));
  need(['ownerId','repositoryId','runId'].every(k=>decimal(p[k])));
  need(typeof p.controlSha==='string'&&/^[a-f0-9]{40}$/.test(p.controlSha));
  // Require an explicit current subject; never guess legacy versus immutable form.
- const legacy='repo:'+REPOSITORY+':ref:refs/heads/main';
- const immutable=`repo:Achi1984@${p.ownerId}/meridian@${p.repositoryId}:ref:refs/heads/main`;
+ // Trusted pins select the profile, never token claims. Restrict names so no
+ // subject escaping, normalization or case-folding can change the binding.
+ const context=environmentProfile?'environment:'+p.environment:'ref:refs/heads/main';
+ const legacy='repo:'+REPOSITORY+':'+context;
+ const immutable=`repo:Achi1984@${p.ownerId}/meridian@${p.repositoryId}:${context}`;
  need(p.subject===legacy||p.subject===immutable);
 }
 function claimsCheck(c,p,now){
@@ -30,7 +38,9 @@ function claimsCheck(c,p,now){
  sha:p.controlSha,run_id:p.runId,run_attempt:'1',event_name:'workflow_dispatch',
  runner_environment:'github-hosted'};
  need(Object.entries(expected).every(([k,v])=>c[k]===v));
- need(!('job_workflow_ref' in c)&&!('job_workflow_sha' in c)&&!('environment' in c));
+ need(!('job_workflow_ref' in c)&&!('job_workflow_sha' in c));
+ if(Object.hasOwn(p,'environment'))need(c.environment===p.environment);
+ else need(!('environment' in c));
  need(typeof c.jti==='string'&&c.jti.length>0&&c.jti.length<=256);
  need(['iat','nbf','exp'].every(k=>Number.isSafeInteger(c[k]))&&Number.isSafeInteger(now));
  need(c.iat>0&&c.nbf>0&&c.iat<=now+30&&c.nbf<=now+30&&c.exp>now&&c.iat<c.exp);
@@ -84,3 +94,4 @@ export async function verifyPublicationToken(token,pins,{fetchFn=globalThis.fetc
     controlSha:pins.controlSha,validUntil:Math.min(claims.exp,claims.iat+301),...flags};
  }catch{return {kind:'TOKEN_REJECTED',tokenVerified:false,...flags};}
 }
+

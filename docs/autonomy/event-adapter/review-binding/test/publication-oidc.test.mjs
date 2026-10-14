@@ -103,3 +103,34 @@ test('stalled cleanup cannot delay completed key retrieval',async()=>{
  cancel:()=>new Promise(()=>{}),releaseLock(){}})}})};
  assert.equal((await check(token(),pins(),f)).tokenVerified,true);
 });
+
+
+function environmentPins(){return {...pins(),environment:'publisher-test',
+ subject:'repo:Achi1984/meridian:environment:publisher-test'};}
+function environmentClaims(p=environmentPins()){return {...claims(),sub:p.subject,environment:p.environment};}
+test('explicit environment profile verifies signed legacy and immutable subjects without authority',async()=>{
+ for(const immutable of [false,true]){
+  const p=environmentPins();if(immutable)p.subject=`repo:Achi1984@${p.ownerId}/meridian@${p.repositoryId}:environment:${p.environment}`;
+  const f=fetcher(),r=await check(token(environmentClaims(p)),p,f);
+  assert.equal(r.tokenVerified,true);assert.equal(f.calls.length,1);
+  for(const k of ['authenticated','authorized','dispatchAllowed','mergeAllowed','durable'])assert.equal(r[k],false);
+ }
+});
+test('environment mismatch missing claim downgrade and reusable workflow fail before JWKS',async()=>{
+ const missing=environmentClaims();delete missing.environment;
+ for(const c of [missing,claims(),{...environmentClaims(),environment:'other'},
+  {...environmentClaims(),environment:['publisher-test']},{...environmentClaims(),sub:pins().subject},
+  {...environmentClaims(),job_workflow_ref:'other'},{...environmentClaims(),job_workflow_sha:'a'.repeat(40)},
+  {...environmentClaims(),ref:'refs/heads/other'},{...environmentClaims(),run_attempt:'2'}]){
+  const f=fetcher();assert.equal((await check(token(c),environmentPins(),f)).tokenVerified,false);
+  assert.equal(f.calls.length,0);
+ }
+});
+test('environment profile cannot be inferred from token and invalid trusted pins never fetch keys',async()=>{
+ for(const p of [pins(),{...environmentPins(),subject:pins().subject},
+  ...[null,'','Publisher-test','a:b','a%3Ab','a/b','a'.repeat(65)].map(environment=>({...environmentPins(),environment})),
+  {...environmentPins(),authorized:true}]){
+  const f=fetcher();assert.equal((await check(token(environmentClaims()),p,f)).tokenVerified,false);
+  assert.equal(f.calls.length,0);
+ }
+});
