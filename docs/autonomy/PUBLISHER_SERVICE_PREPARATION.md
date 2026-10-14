@@ -36,8 +36,10 @@ freshness bound, not the duration of an owner approval or a lease.
 ## Unimplemented trust boundaries
 
 The reader's returned JSON and deployment config do not authenticate themselves.
-The real trusted-reader implementation, approval/run bootstrap and its persistence
-are still required before installing this composition. The owner must approve the
+The fixed-origin reader is now prepared separately in
+`PUBLISHER_GITHUB_READER_PREPARATION.md`; trusted deployment wiring,
+approval/run bootstrap and its persistence are still required before installing
+this composition. The owner must approve the
 actual body/policy/request/control/run binding; matching a comment digest only
 checks correspondence with that independently selected approval, not the semantic
 meaning or authority of arbitrary text. A replacement authenticated approval or
