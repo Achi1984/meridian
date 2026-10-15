@@ -1,0 +1,702 @@
+{
+  "schemaVersion": "MERIDIAN_HISTORICAL_TRIAL_LEDGER_V1",
+  "opId": "STRATEGY-TRIAL-LEDGER-20261015",
+  "sourceMainCommit": "6807d47e5c8f678534770f8d3758d95429b405c4",
+  "sourceProvenance": "ASSERTED_SOURCE_REFERENCES_NOT_AUTHENTICATED_EXECUTION",
+  "status": "BOUNDED_INVENTORY_INCOMPLETE",
+  "executionAuthorized": false,
+  "scope": {
+    "description": "Read-only inventory of documented strategy research results, workflow attempts, feature/data-validation evidence, and cited design/synthetic entries in the pinned sources below.",
+    "searchedSourceBoundary": "The 14 October reproduction protocol, challenge matrix, passports, evidence review, receipt verification, campaign draft, and the exact result/evidence files named below at sourceMainCommit; selected prospective workflow metadata cited in the evidence review.",
+    "excluded": [
+      "PR #811 was not merged at the pinned inventory base 6807d47e5c8f678534770f8d3758d95429b405c4; it later merged to main as a2eafbf3a9973afcace848713cad72ee31c7279c. This packet does not depend on or use PR #811 files as sources.",
+      "artifact downloads or raw market data",
+      "unreferenced GitHub Actions history, local/private records, manual/nonworkflow runs not represented by a cited source, and undocumented variants",
+      "any evaluator import, execution, PnL calculation, or strategy re-evaluation"
+    ],
+    "historicalInventoryComplete": false,
+    "absenceOfRecordMeansZero": false
+  },
+  "sources": [
+    {
+      "id": "protocol",
+      "path": "docs/strategy-lab/INDEPENDENT_BACKTEST_REPRODUCTION_PROTOCOL_20261014.md",
+      "sha": "ea5c9203b664c1ab35536bdb9fb70bddd90fe596",
+      "commit": "6807d47e5c8f678534770f8d3758d95429b405c4"
+    },
+    {
+      "id": "matrix",
+      "path": "docs/strategy-lab/reproduction-challenge-matrix-20261014.json",
+      "sha": "dc8b02d44bd2e6fc0dff60f4b6f19631eec7d5e9",
+      "commit": "6807d47e5c8f678534770f8d3758d95429b405c4"
+    },
+    {
+      "id": "passports",
+      "path": "docs/strategy-lab/FROZEN_STRATEGY_PASSPORTS_20261014.md",
+      "sha": "d59ebbf4ae67f47014fe03c18a55318dc7372858",
+      "commit": "6807d47e5c8f678534770f8d3758d95429b405c4"
+    },
+    {
+      "id": "evidence_review",
+      "path": "docs/strategy-lab/STRATEGY_EVIDENCE_REVIEW_20261014.md",
+      "sha": "fef3f0a0695152e4a7d4de5544020260fbe60f64",
+      "commit": "6807d47e5c8f678534770f8d3758d95429b405c4"
+    },
+    {
+      "id": "receipt_verification",
+      "path": "docs/strategy-lab/LOWVOL_RECEIPT_VERIFICATION_20261014.md",
+      "sha": "0ca51fdb18a443d7c65bf8773d9064ce6c9a40a3",
+      "commit": "6807d47e5c8f678534770f8d3758d95429b405c4"
+    },
+    {
+      "id": "campaign",
+      "path": "docs/strategy-lab/campaign-20261013.json",
+      "sha": "925df80ed748901f169cc898c66b320dab75e9c3",
+      "commit": "6807d47e5c8f678534770f8d3758d95429b405c4"
+    },
+    {
+      "id": "lowvol_v1",
+      "path": "research/CROSS-SECTIONAL-LOW-VOLATILITY-V1-DISCOVERY-EVIDENCE.md",
+      "sha": "e7bfadcd358faaf52d8cb4d7bea230ed820191a0",
+      "commit": "6807d47e5c8f678534770f8d3758d95429b405c4"
+    },
+    {
+      "id": "lowvol_v2_development",
+      "path": "research/LOW-VOLATILITY-RANK-WEIGHTED-V2-DEVELOPMENT-EVIDENCE.md",
+      "sha": "e9babe1566c8667a21eb6cae8388ca6dfb77385e",
+      "commit": "6807d47e5c8f678534770f8d3758d95429b405c4"
+    },
+    {
+      "id": "lowvol_v2_holdout",
+      "path": "research/LOW-VOLATILITY-RANK-WEIGHTED-V2-HOLDOUT-EVIDENCE.md",
+      "sha": "f3e6c329fe57b3a5d6a4ee03dde693c33d4aa85b",
+      "commit": "6807d47e5c8f678534770f8d3758d95429b405c4"
+    },
+    {
+      "id": "lowvol_v2_correction",
+      "path": "research/LOW-VOLATILITY-RANK-WEIGHTED-V2-FUNDING-TIMESTAMP-CORRECTION.md",
+      "sha": "ad5694309438c80aac0717700b7772fd94bc8f89",
+      "commit": "6807d47e5c8f678534770f8d3758d95429b405c4"
+    },
+    {
+      "id": "lowvol_v2_prospective_start",
+      "path": "research/LOW-VOLATILITY-RANK-WEIGHTED-V2-PROSPECTIVE-START-EVIDENCE.md",
+      "sha": "626f7bbc82f841a2862a3257d2f4a6e187f56e37",
+      "commit": "6807d47e5c8f678534770f8d3758d95429b405c4"
+    },
+    {
+      "id": "lowvol_v2_start_authorization",
+      "path": "research/LOW-VOLATILITY-RANK-WEIGHTED-V2-PROSPECTIVE-START-AUTHORIZATION.md",
+      "sha": "1d4ec4f2386005b7a5094ea3f4ea2d3143b9b9a7",
+      "commit": "6807d47e5c8f678534770f8d3758d95429b405c4"
+    },
+    {
+      "id": "crossvenue_v1_discovery",
+      "path": "research/CROSS-VENUE-FUNDING-SPREAD-V1-RESULT.md",
+      "sha": "d275a40644c06b2fa7dd84ea685588f24cdadc4b",
+      "commit": "6807d47e5c8f678534770f8d3758d95429b405c4"
+    },
+    {
+      "id": "crossvenue_v1_transfer",
+      "path": "research/CROSS-VENUE-FUNDING-SPREAD-V1-TRANSFER-HOLDOUT-RESULT.md",
+      "sha": "22cdbddcb4213295bc2810d6f1013cd250c923c3",
+      "commit": "6807d47e5c8f678534770f8d3758d95429b405c4"
+    },
+    {
+      "id": "crossvenue_v2",
+      "path": "research/CROSS-VENUE-FUNDING-SPREAD-V2-RESULT.md",
+      "sha": "9c39c0c700046b836e2426d23636098a61ce92f8",
+      "commit": "6807d47e5c8f678534770f8d3758d95429b405c4"
+    },
+    {
+      "id": "tsmom_v2",
+      "path": "research/PAPERBOT-PROFIT-TSMOM-V2-RESULT.md",
+      "sha": "471e4b3f44c2b7ea57d9aea64a49af0746402969",
+      "commit": "6807d47e5c8f678534770f8d3758d95429b405c4"
+    },
+    {
+      "id": "breakout_v1_discovery",
+      "path": "research/PAPERBOT-PROFIT-REGIME-TREND-BREAKOUT-V1-DISCOVERY-EVIDENCE.md",
+      "sha": "75cfb173c5d0e8681c00bafb634d11b0ba3490fb",
+      "commit": "6807d47e5c8f678534770f8d3758d95429b405c4"
+    },
+    {
+      "id": "breakout_v1_holdout",
+      "path": "research/PAPERBOT-PROFIT-REGIME-TREND-BREAKOUT-V1-HOLDOUT-EVIDENCE.md",
+      "sha": "40654266f711348d9577a424962327e23cf45a2d",
+      "commit": "6807d47e5c8f678534770f8d3758d95429b405c4"
+    },
+    {
+      "id": "takerflow_v1",
+      "path": "research/PERPETUAL-TAKER-ORDER-FLOW-V1-DEVELOPMENT-RESULT.md",
+      "sha": "cefbb9ee2e1f5a708f5a57e4617cbd913305c412",
+      "commit": "6807d47e5c8f678534770f8d3758d95429b405c4"
+    },
+    {
+      "id": "takerflow_v2",
+      "path": "research/PERPETUAL-TAKER-ORDER-FLOW-RELATIVE-STRENGTH-V2-EVIDENCE.md",
+      "sha": "a6775c5240e1d422b5dd4fc222e34fb79b967786",
+      "commit": "6807d47e5c8f678534770f8d3758d95429b405c4"
+    },
+    {
+      "id": "regime_grid_v2",
+      "path": "research/REGIME-GATED-GRID-V2-RESULT.md",
+      "sha": "f0c41ebcf5b30f6dd5a12bf4054eda151c1079f6",
+      "commit": "6807d47e5c8f678534770f8d3758d95429b405c4"
+    }
+  ],
+  "coverage": {
+    "complete": false,
+    "nonWorkflowAttempts": {
+      "status": "UNKNOWN_UNRECONCILED",
+      "sourceRefs": ["protocol", "matrix", "evidence_review"]
+    },
+    "gaps": [
+      {
+        "id": "unindexed-history",
+        "gap": "No canonical, complete source enumerates all historical trial and attempt records across main, manual execution, discarded work, and all branches.",
+        "blocks": "Completeness certification and cumulative historical usage.",
+        "closureSource": "An independently reconciled canonical ledger with exact source commits, run/attempt identities, and manual/discarded evidence.",
+        "blocksNumericBudget": true
+      },
+      {
+        "id": "budget-authority",
+        "gap": "The complete authorized cap and policy for counting candidate, manual, technical-invalid, and discarded attempts are not established by the bounded sources.",
+        "blocks": "Any remaining trial/diagnostic budget calculation.",
+        "closureSource": "The explicit authorized cap and its source, plus a complete reconciled consumed-attempt list under that policy.",
+        "blocksNumericBudget": true
+      },
+      {
+        "id": "attempt-outcomes",
+        "gap": "For some evidenced workflow IDs, attempt number, cancellation/abort/discard state, full logs, or a result artifact is not available in the cited pinned summary. No absence is interpreted as zero events.",
+        "blocks": "Full attempt/status reconciliation and result-to-attempt lineage for those cases.",
+        "closureSource": "Pinned workflow/run-attempt metadata and source-authenticated records for each unresolved identity.",
+        "blocksNumericBudget": true
+      },
+      {
+        "id": "design-and-synthetic-usage",
+        "gap": "PR #791 is explicitly partial; it reports the H5/H7 first-tranche ceiling and P1/C1 budget treatment but does not reconcile cumulative usage, full manual/failed/discarded items, or remaining slots. H5/H7/P1/C1/X1 are not empirical results here.",
+        "blocks": "Candidate-slot and campaign-capacity reconciliation.",
+        "closureSource": "A complete source-based candidate and trial ledger reconciling the exact PR #791/#795/#768/#757 heads with any subsequent authorized records; none is assumed.",
+        "blocksNumericBudget": true
+      },
+      {
+        "id": "manual-nonworkflow-identities",
+        "gap": "No cited source provides a complete set of manual or nonworkflow attempt identities with provenance in this inventory.",
+        "blocks": "Numeric remaining budget, even if every listed workflow run were otherwise reconciled.",
+        "closureSource": "A source-backed manual/nonworkflow attempt register reconciled under the authorized counting policy; absent records remain UNKNOWN.",
+        "blocksNumericBudget": true
+      }
+    ]
+  },
+  "resultRecords": [
+    {
+      "resultRecordId": "result-lowvol-v1-discovery",
+      "resultIdentity": "workflow:github_actions:37129972221:UNKNOWN:DISCOVERY",
+      "strategyIdentity": "CROSS-SECTIONAL-LOW-VOLATILITY-V1-FROZEN",
+      "resultKind": "FEATURE_EVIDENCE",
+      "recordedOutcome": "DISCOVERY_FAIL_RESEARCH_STOP",
+      "strategyPnlCalculated": false,
+      "runIdentity": { "provider": "github_actions", "runId": "37129972221", "runAttempt": "UNKNOWN" },
+      "attemptRef": "attempt-lowvol-v1-discovery",
+      "sourceRefs": ["lowvol_v1", "evidence_review"]
+    },
+    {
+      "resultRecordId": "result-lowvol-v2-development",
+      "resultIdentity": "workflow:github_actions:37132394717:UNKNOWN:DEVELOPMENT",
+      "strategyIdentity": "LOW-VOLATILITY-RANK-WEIGHTED-V2-FROZEN",
+      "resultKind": "STRATEGY_PNL_RESULT",
+      "recordedOutcome": "DEVELOPMENT_PASS_HOLDOUT_REQUIRED",
+      "strategyPnlCalculated": true,
+      "runIdentity": { "provider": "github_actions", "runId": "37132394717", "runAttempt": "UNKNOWN" },
+      "attemptRef": "attempt-lowvol-v2-development",
+      "sourceRefs": ["lowvol_v2_development", "matrix", "receipt_verification"]
+    },
+    {
+      "resultRecordId": "result-lowvol-v2-holdout",
+      "resultIdentity": "workflow:github_actions:37133809945:UNKNOWN:HISTORICAL_HOLDOUT",
+      "strategyIdentity": "LOW-VOLATILITY-RANK-WEIGHTED-V2-FROZEN",
+      "resultKind": "STRATEGY_PNL_RESULT",
+      "recordedOutcome": "HOLDOUT_PASS_PROSPECTIVE_PAPER_REVIEW_ONLY",
+      "strategyPnlCalculated": true,
+      "runIdentity": { "provider": "github_actions", "runId": "37133809945", "runAttempt": "UNKNOWN" },
+      "attemptRef": "attempt-lowvol-v2-holdout",
+      "sourceRefs": ["lowvol_v2_holdout", "matrix", "receipt_verification"]
+    },
+    {
+      "resultRecordId": "result-crossvenue-v1-discovery",
+      "resultIdentity": "workflow:github_actions:36526460897:UNKNOWN:DISCOVERY",
+      "strategyIdentity": "CROSS-VENUE-FUNDING-SPREAD-V1-FROZEN",
+      "resultKind": "STRATEGY_PNL_RESULT",
+      "recordedOutcome": "DISCOVERY_PASS_HOLDOUT_REQUIRED",
+      "strategyPnlCalculated": true,
+      "runIdentity": { "provider": "github_actions", "runId": "36526460897", "runAttempt": "UNKNOWN" },
+      "attemptRef": "attempt-crossvenue-v1-discovery",
+      "sourceRefs": ["crossvenue_v1_discovery", "matrix", "evidence_review"]
+    },
+    {
+      "resultRecordId": "result-crossvenue-v1-transfer",
+      "resultIdentity": "workflow:github_actions:36527605999:UNKNOWN:TRANSFER_HOLDOUT",
+      "strategyIdentity": "CROSS-VENUE-FUNDING-SPREAD-V1-FROZEN",
+      "resultKind": "STRATEGY_PNL_RESULT",
+      "recordedOutcome": "HOLDOUT_FAIL_RESEARCH_REDESIGN",
+      "strategyPnlCalculated": true,
+      "runIdentity": { "provider": "github_actions", "runId": "36527605999", "runAttempt": "UNKNOWN" },
+      "attemptRef": "attempt-crossvenue-v1-transfer",
+      "sourceRefs": ["crossvenue_v1_transfer", "matrix", "evidence_review"]
+    },
+    {
+      "resultRecordId": "result-crossvenue-v2-validation",
+      "resultIdentity": "workflow:github_actions:36563826168:UNKNOWN:VALIDATION",
+      "strategyIdentity": "CROSS-VENUE-FUNDING-SPREAD-V2-FROZEN",
+      "resultKind": "STRATEGY_PNL_RESULT",
+      "recordedOutcome": "VALIDATION_FAIL_RESEARCH_REDESIGN",
+      "strategyPnlCalculated": true,
+      "runIdentity": { "provider": "github_actions", "runId": "36563826168", "runAttempt": "UNKNOWN" },
+      "attemptRef": "attempt-crossvenue-v2-validation",
+      "sourceRefs": ["crossvenue_v2", "matrix", "evidence_review"]
+    },
+    {
+      "resultRecordId": "result-tsmom-v2-discovery",
+      "resultIdentity": "workflow:github_actions:36748128411:UNKNOWN:DISCOVERY",
+      "strategyIdentity": "PAPER-PROFIT-TSMOM-V2",
+      "resultKind": "STRATEGY_PNL_RESULT",
+      "recordedOutcome": "TSMOM_V2_DISCOVERY_FAIL",
+      "strategyPnlCalculated": true,
+      "runIdentity": { "provider": "github_actions", "runId": "36748128411", "runAttempt": "UNKNOWN" },
+      "attemptRef": "attempt-tsmom-v2-discovery",
+      "sourceRefs": ["tsmom_v2", "matrix", "evidence_review"]
+    },
+    {
+      "resultRecordId": "result-breakout-v1-discovery",
+      "resultIdentity": "workflow:github_actions:37102449505:UNKNOWN:DISCOVERY",
+      "strategyIdentity": "PAPER-PROFIT-REGIME-TREND-BREAKOUT-V1",
+      "resultKind": "STRATEGY_PNL_RESULT",
+      "recordedOutcome": "REGIME_TREND_BREAKOUT_V1_DISCOVERY_PASS_HOLDOUT_REQUIRED",
+      "strategyPnlCalculated": true,
+      "runIdentity": { "provider": "github_actions", "runId": "37102449505", "runAttempt": "UNKNOWN" },
+      "attemptRef": "attempt-breakout-v1-discovery",
+      "sourceRefs": ["breakout_v1_discovery", "matrix"]
+    },
+    {
+      "resultRecordId": "result-breakout-v1-holdout",
+      "resultIdentity": "workflow:github_actions:37113947919:UNKNOWN:HISTORICAL_HOLDOUT",
+      "strategyIdentity": "PAPER-PROFIT-REGIME-TREND-BREAKOUT-V1",
+      "resultKind": "STRATEGY_PNL_RESULT",
+      "recordedOutcome": "REGIME_TREND_BREAKOUT_V1_HOLDOUT_FAIL",
+      "strategyPnlCalculated": true,
+      "runIdentity": { "provider": "github_actions", "runId": "37113947919", "runAttempt": "UNKNOWN" },
+      "attemptRef": "attempt-breakout-v1-holdout",
+      "sourceRefs": ["breakout_v1_holdout", "matrix", "evidence_review"]
+    },
+    {
+      "resultRecordId": "result-takerflow-v1-development",
+      "resultIdentity": "workflow:github_actions:36609900324:UNKNOWN:DEVELOPMENT",
+      "strategyIdentity": "PERPETUAL-TAKER-ORDER-FLOW-V1-FROZEN",
+      "resultKind": "STRATEGY_PNL_RESULT",
+      "recordedOutcome": "DEVELOPMENT_FAIL_RESEARCH_REDESIGN",
+      "strategyPnlCalculated": true,
+      "runIdentity": { "provider": "github_actions", "runId": "36609900324", "runAttempt": "UNKNOWN" },
+      "attemptRef": "attempt-takerflow-v1-development",
+      "sourceRefs": ["takerflow_v1", "matrix"]
+    },
+    {
+      "resultRecordId": "result-takerflow-v2-feature-validation",
+      "resultIdentity": "workflow:github_actions:37115162706:UNKNOWN:FEATURE_VALIDATION",
+      "strategyIdentity": "PERPETUAL-TAKER-ORDER-FLOW-RELATIVE-STRENGTH-V2-FROZEN",
+      "resultKind": "DATA_VALIDATION_RESULT",
+      "recordedOutcome": "FEATURE_VALIDATION_FAIL_RESEARCH_STOP",
+      "strategyPnlCalculated": false,
+      "runIdentity": { "provider": "github_actions", "runId": "37115162706", "runAttempt": "UNKNOWN" },
+      "attemptRef": "attempt-takerflow-v2-feature-validation",
+      "sourceRefs": ["takerflow_v2", "matrix"]
+    },
+    {
+      "resultRecordId": "result-regime-grid-v2-discovery",
+      "resultIdentity": "workflow:github_actions:36547247431:UNKNOWN:DISCOVERY",
+      "strategyIdentity": "REGIME-GATED-GRID-V2-FROZEN",
+      "resultKind": "STRATEGY_PNL_RESULT",
+      "recordedOutcome": "DISCOVERY_FAIL_RESEARCH_REDESIGN",
+      "strategyPnlCalculated": true,
+      "runIdentity": { "provider": "github_actions", "runId": "36547247431", "runAttempt": "UNKNOWN" },
+      "attemptRef": "attempt-regime-grid-v2-discovery",
+      "sourceRefs": ["regime_grid_v2", "matrix"]
+    }
+  ],
+  "attempts": [
+    {
+      "attemptId": "attempt-lowvol-v1-discovery",
+      "strategyIdentity": "CROSS-SECTIONAL-LOW-VOLATILITY-V1-FROZEN",
+      "stage": "DISCOVERY",
+      "attemptClass": "FEATURE_EVALUATION",
+      "status": "COMPLETED",
+      "runIdentity": { "provider": "github_actions", "runId": "37129972221", "runAttempt": "UNKNOWN" },
+      "resultRecordRef": "result-lowvol-v1-discovery",
+      "sourceRefs": ["lowvol_v1", "evidence_review"]
+    },
+    {
+      "attemptId": "attempt-lowvol-v2-funding-invalid",
+      "strategyIdentity": "LOW-VOLATILITY-RANK-WEIGHTED-V2-FROZEN",
+      "stage": "DEVELOPMENT",
+      "attemptClass": "TECHNICAL_EVALUATION",
+      "status": "TECHNICAL_INVALID",
+      "runIdentity": { "provider": "github_actions", "runId": "37131815781", "runAttempt": "UNKNOWN" },
+      "sourceRefs": ["lowvol_v2_correction", "matrix", "evidence_review"]
+    },
+    {
+      "attemptId": "attempt-lowvol-v2-development",
+      "strategyIdentity": "LOW-VOLATILITY-RANK-WEIGHTED-V2-FROZEN",
+      "stage": "DEVELOPMENT",
+      "attemptClass": "STRATEGY_EVALUATION",
+      "status": "COMPLETED",
+      "runIdentity": { "provider": "github_actions", "runId": "37132394717", "runAttempt": "UNKNOWN" },
+      "resultRecordRef": "result-lowvol-v2-development",
+      "sourceRefs": ["lowvol_v2_development", "matrix", "receipt_verification"]
+    },
+    {
+      "attemptId": "attempt-lowvol-v2-repro-check",
+      "strategyIdentity": "LOW-VOLATILITY-RANK-WEIGHTED-V2-FROZEN",
+      "stage": "DEVELOPMENT_REPRODUCIBILITY_CHECK",
+      "attemptClass": "STRATEGY_EVALUATION",
+      "status": "COMPLETED",
+      "runIdentity": { "provider": "github_actions", "runId": "37132982310", "runAttempt": "UNKNOWN" },
+      "sourceRefs": ["lowvol_v2_development", "matrix", "evidence_review"]
+    },
+    {
+      "attemptId": "attempt-lowvol-v2-holdout",
+      "strategyIdentity": "LOW-VOLATILITY-RANK-WEIGHTED-V2-FROZEN",
+      "stage": "HISTORICAL_HOLDOUT",
+      "attemptClass": "STRATEGY_EVALUATION",
+      "status": "COMPLETED",
+      "runIdentity": { "provider": "github_actions", "runId": "37133809945", "runAttempt": "UNKNOWN" },
+      "resultRecordRef": "result-lowvol-v2-holdout",
+      "sourceRefs": ["lowvol_v2_holdout", "matrix", "receipt_verification"]
+    },
+    {
+      "attemptId": "attempt-lowvol-v2-source-probe-1",
+      "strategyIdentity": "LOW-VOLATILITY-RANK-WEIGHTED-V2-FROZEN",
+      "stage": "PROSPECTIVE_SOURCE_PROBE",
+      "attemptClass": "OPERATIONAL_WORKFLOW",
+      "status": "FAILED",
+      "runIdentity": { "provider": "github_actions", "runId": "37143326461", "runAttempt": "UNKNOWN" },
+      "sourceRefs": ["lowvol_v2_prospective_start", "lowvol_v2_start_authorization", "matrix"]
+    },
+    {
+      "attemptId": "attempt-lowvol-v2-source-probe-2",
+      "strategyIdentity": "LOW-VOLATILITY-RANK-WEIGHTED-V2-FROZEN",
+      "stage": "PROSPECTIVE_SOURCE_PROBE",
+      "attemptClass": "OPERATIONAL_WORKFLOW",
+      "status": "FAILED",
+      "runIdentity": { "provider": "github_actions", "runId": "37143595493", "runAttempt": "UNKNOWN" },
+      "sourceRefs": ["lowvol_v2_prospective_start", "lowvol_v2_start_authorization", "evidence_review"]
+    },
+    {
+      "attemptId": "attempt-lowvol-v2-start-verification",
+      "strategyIdentity": "LOW-VOLATILITY-RANK-WEIGHTED-V2-FROZEN",
+      "stage": "PROSPECTIVE_START_SOURCE_VERIFICATION",
+      "attemptClass": "OPERATIONAL_WORKFLOW",
+      "status": "COMPLETED",
+      "runIdentity": { "provider": "github_actions", "runId": "37143900156", "runAttempt": "UNKNOWN" },
+      "sourceRefs": ["lowvol_v2_prospective_start", "lowvol_v2_start_authorization", "evidence_review"]
+    },
+    {
+      "attemptId": "attempt-lowvol-v2-prospective-snapshot",
+      "strategyIdentity": "LOW-VOLATILITY-RANK-WEIGHTED-V2-FROZEN",
+      "stage": "PROSPECTIVE_BOUNDARY_SNAPSHOT",
+      "attemptClass": "PROSPECTIVE_COLLECTION",
+      "status": "COMPLETED",
+      "runIdentity": { "provider": "github_actions", "runId": "38125893276", "runAttempt": "UNKNOWN" },
+      "sourceRefs": ["receipt_verification", "evidence_review", "matrix"]
+    },
+    {
+      "attemptId": "attempt-lowvol-v2-prospective-retry-1",
+      "strategyIdentity": "LOW-VOLATILITY-RANK-WEIGHTED-V2-FROZEN",
+      "stage": "PROSPECTIVE_SNAPSHOT_PRESERVATION_RETRY",
+      "attemptClass": "PROSPECTIVE_COLLECTION",
+      "status": "COMPLETED",
+      "runIdentity": { "provider": "github_actions", "runId": "38149124458", "runAttempt": "UNKNOWN" },
+      "sourceRefs": ["receipt_verification", "evidence_review"]
+    },
+    {
+      "attemptId": "attempt-lowvol-v2-prospective-retry-2",
+      "strategyIdentity": "LOW-VOLATILITY-RANK-WEIGHTED-V2-FROZEN",
+      "stage": "PROSPECTIVE_SNAPSHOT_PRESERVATION_RETRY",
+      "attemptClass": "PROSPECTIVE_COLLECTION",
+      "status": "COMPLETED",
+      "runIdentity": { "provider": "github_actions", "runId": "38156356512", "runAttempt": "UNKNOWN" },
+      "sourceRefs": ["receipt_verification", "evidence_review"]
+    },
+    {
+      "attemptId": "attempt-crossvenue-v1-discovery",
+      "strategyIdentity": "CROSS-VENUE-FUNDING-SPREAD-V1-FROZEN",
+      "stage": "DISCOVERY",
+      "attemptClass": "STRATEGY_EVALUATION",
+      "status": "COMPLETED",
+      "runIdentity": { "provider": "github_actions", "runId": "36526460897", "runAttempt": "UNKNOWN" },
+      "resultRecordRef": "result-crossvenue-v1-discovery",
+      "sourceRefs": ["crossvenue_v1_discovery", "matrix", "evidence_review"]
+    },
+    {
+      "attemptId": "attempt-crossvenue-v1-transfer",
+      "strategyIdentity": "CROSS-VENUE-FUNDING-SPREAD-V1-FROZEN",
+      "stage": "TRANSFER_HOLDOUT",
+      "attemptClass": "STRATEGY_EVALUATION",
+      "status": "COMPLETED",
+      "runIdentity": { "provider": "github_actions", "runId": "36527605999", "runAttempt": "UNKNOWN" },
+      "resultRecordRef": "result-crossvenue-v1-transfer",
+      "sourceRefs": ["crossvenue_v1_transfer", "matrix", "evidence_review"]
+    },
+    {
+      "attemptId": "attempt-crossvenue-v2-validation",
+      "strategyIdentity": "CROSS-VENUE-FUNDING-SPREAD-V2-FROZEN",
+      "stage": "VALIDATION",
+      "attemptClass": "STRATEGY_EVALUATION",
+      "status": "COMPLETED",
+      "runIdentity": { "provider": "github_actions", "runId": "36563826168", "runAttempt": "UNKNOWN" },
+      "resultRecordRef": "result-crossvenue-v2-validation",
+      "sourceRefs": ["crossvenue_v2", "matrix", "evidence_review"]
+    },
+    {
+      "attemptId": "attempt-tsmom-v2-discovery",
+      "strategyIdentity": "PAPER-PROFIT-TSMOM-V2",
+      "stage": "DISCOVERY",
+      "attemptClass": "STRATEGY_EVALUATION",
+      "status": "COMPLETED",
+      "runIdentity": { "provider": "github_actions", "runId": "36748128411", "runAttempt": "UNKNOWN" },
+      "resultRecordRef": "result-tsmom-v2-discovery",
+      "sourceRefs": ["tsmom_v2", "matrix", "evidence_review"]
+    },
+    {
+      "attemptId": "attempt-breakout-v1-discovery",
+      "strategyIdentity": "PAPER-PROFIT-REGIME-TREND-BREAKOUT-V1",
+      "stage": "DISCOVERY",
+      "attemptClass": "STRATEGY_EVALUATION",
+      "status": "COMPLETED",
+      "runIdentity": { "provider": "github_actions", "runId": "37102449505", "runAttempt": "UNKNOWN" },
+      "resultRecordRef": "result-breakout-v1-discovery",
+      "sourceRefs": ["breakout_v1_discovery", "matrix", "evidence_review"]
+    },
+    {
+      "attemptId": "attempt-breakout-v1-holdout",
+      "strategyIdentity": "PAPER-PROFIT-REGIME-TREND-BREAKOUT-V1",
+      "stage": "HISTORICAL_HOLDOUT",
+      "attemptClass": "STRATEGY_EVALUATION",
+      "status": "COMPLETED",
+      "runIdentity": { "provider": "github_actions", "runId": "37113947919", "runAttempt": "UNKNOWN" },
+      "resultRecordRef": "result-breakout-v1-holdout",
+      "sourceRefs": ["breakout_v1_holdout", "matrix", "evidence_review"]
+    },
+    {
+      "attemptId": "attempt-takerflow-v1-development",
+      "strategyIdentity": "PERPETUAL-TAKER-ORDER-FLOW-V1-FROZEN",
+      "stage": "DEVELOPMENT",
+      "attemptClass": "STRATEGY_EVALUATION",
+      "status": "COMPLETED",
+      "runIdentity": { "provider": "github_actions", "runId": "36609900324", "runAttempt": "UNKNOWN" },
+      "resultRecordRef": "result-takerflow-v1-development",
+      "sourceRefs": ["takerflow_v1", "matrix"]
+    },
+    {
+      "attemptId": "attempt-takerflow-v2-feature-validation",
+      "strategyIdentity": "PERPETUAL-TAKER-ORDER-FLOW-RELATIVE-STRENGTH-V2-FROZEN",
+      "stage": "FEATURE_VALIDATION",
+      "attemptClass": "FEATURE_EVALUATION",
+      "status": "COMPLETED",
+      "runIdentity": { "provider": "github_actions", "runId": "37115162706", "runAttempt": "UNKNOWN" },
+      "resultRecordRef": "result-takerflow-v2-feature-validation",
+      "sourceRefs": ["takerflow_v2", "matrix"]
+    },
+    {
+      "attemptId": "attempt-regime-grid-v2-discovery",
+      "strategyIdentity": "REGIME-GATED-GRID-V2-FROZEN",
+      "stage": "DISCOVERY",
+      "attemptClass": "STRATEGY_EVALUATION",
+      "status": "COMPLETED",
+      "runIdentity": { "provider": "github_actions", "runId": "36547247431", "runAttempt": "UNKNOWN" },
+      "resultRecordRef": "result-regime-grid-v2-discovery",
+      "sourceRefs": ["regime_grid_v2", "matrix"]
+    }
+  ],
+  "nonEmpiricalRecords": [
+    {
+      "recordId": "design-h5",
+      "identity": "H5 shock-and-reclaim",
+      "recordKind": "DESIGN_ONLY",
+      "status": "NOT_A_FROZEN_RULESET_OR_EMPIRICAL_RUN",
+      "details": "PR #791 reports an H5/H7 combined first-tranche ceiling of four; that is a proposed ceiling, not a reconciled count of attempts or remaining slots.",
+      "sourceRefs": ["passports", "evidence_review"]
+    },
+    {
+      "recordId": "design-h7",
+      "identity": "H7 defensive spot low-volatility",
+      "recordKind": "DESIGN_ONLY",
+      "status": "NO_EXACT_FROZEN_VERSION_OR_EVIDENCED_RUN",
+      "details": "The proposed H7 spot design is distinct from LowVol V2 perpetual long/short; PR #791's combined H5/H7 first-tranche ceiling is not observed usage.",
+      "sourceRefs": ["passports", "evidence_review"]
+    },
+    {
+      "recordId": "engineering-p1-c1",
+      "identity": "H1.P1.DAILY.V1 and H1.C1.NONCROSSING.V1",
+      "recordKind": "SYNTHETIC_ENGINEERING_ONLY",
+      "status": "DRAFT_BLOCKED_NOT_EMPIRICAL_PNL",
+      "details": "The cited passport says these draft-blocked candidates count against budget, but no reconciled numerical usage is established.",
+      "sourceRefs": ["passports", "matrix", "campaign"]
+    },
+    {
+      "recordId": "engineering-x1",
+      "identity": "X1_LONG_CASH_12M_EQUAL_SLEEVES",
+      "recordKind": "SYNTHETIC_ENGINEERING_ONLY",
+      "status": "COMPOSITION_ONLY_NO_EMPIRICAL_RUN",
+      "details": "Slot replacement is required; no approved slot or empirical run is identified in the cited sources.",
+      "sourceRefs": ["passports", "matrix"]
+    },
+    {
+      "recordId": "design-h5-rejected-direct-entry",
+      "identity": "H5 supplemental direct-entry-at-reclaim-close design",
+      "recordKind": "DESIGN_REJECTION",
+      "status": "NOT_AN_EMPIRICAL_STRATEGY_LOSS",
+      "details": "Cited supplemental PR #757 head 5a5f67cb21b10abf30cbf46497cbe79e8e0a6f62 describes a design rejection, not an executed breakout strategy.",
+      "sourceRefs": ["passports", "evidence_review"]
+    },
+    {
+      "recordId": "lowvol-receipt-hash-audit",
+      "identity": "LowVol source/result receipt and payload hash verification",
+      "recordKind": "DATA_HASH_AUDIT_ONLY",
+      "status": "PRIOR_REPORTED_RECEIPT_CHECK_NOT_PNL_OR_REPRODUCTION",
+      "details": "The cited receipt report records a hash/manifest consistency audit; this packet did not repeat those checks or treat them as a strategy result.",
+      "sourceRefs": ["receipt_verification", "matrix"]
+    },
+    {
+      "recordId": "release-safety-run-38636260048",
+      "identity": "LowVol receipt audit CI workflow, run 38636260048",
+      "recordKind": "CI_AUDIT_WITH_NO_JOBS",
+      "status": "NOT_AN_EVALUATOR_OR_STRATEGY_TRIAL",
+      "details": "The pinned receipt report records action_required with zero jobs and no failed-job logs; the current Actions metadata lookup reports failure with zero jobs. This status discrepancy remains UNKNOWN. The workflow run is explicitly excluded from trade/research-trial usage and cannot establish evaluator execution.",
+      "nonRepositoryMetadataObservation": {
+        "source": "GitHub Actions API",
+        "runApiUrl": "https://api.github.com/repos/Achi1984/meridian/actions/runs/38636260048",
+        "jobsApiUrl": "https://api.github.com/repos/Achi1984/meridian/actions/runs/38636260048/jobs?per_page=100",
+        "observedAtUTC": "2026-10-15T11:03:00Z",
+        "event": "pull_request",
+        "headBranch": "copilot/strategy-receipt-verification-20261014",
+        "headSha": "7a13ea11c49ba64b2f1cf6318a1c3d39c80f4633",
+        "conclusion": "failure",
+        "jobCount": 0,
+        "note": "Non-repository API metadata assertion; it has no Git source SHA and does not authenticate execution."
+      },
+      "sourceRefs": ["receipt_verification", "evidence_review"]
+    }
+  ],
+  "proposedProtocol": {
+    "description": "Protocol proposal only; these are not historical events, executions, consumed usage, or authorization.",
+    "expectedCounts": { "baseline": 2, "diagnostics": 6 },
+    "resourceCeilings": {
+      "measured": false,
+      "perCell": { "cpuMinutes": 10, "wallMinutes": 15, "memoryMiB": 1024, "outputMiB": 64 },
+      "package": { "cpuMinutes": 70, "wallMinutes": 105, "memoryMiB": 1024, "outputMiB": 512 }
+    },
+    "cells": [
+      {
+        "cellId": "BASELINE_DEVELOPMENT",
+        "cellKind": "BASELINE",
+        "availability": "PROPOSED",
+        "executionStatus": "NOT_EXECUTED",
+        "countedInExecutedUsage": false,
+        "sourceRefs": ["protocol", "matrix"]
+      },
+      {
+        "cellId": "BASELINE_HISTORICAL_HOLDOUT_AUDIT",
+        "cellKind": "BASELINE",
+        "availability": "PROPOSED",
+        "executionStatus": "NOT_EXECUTED",
+        "countedInExecutedUsage": false,
+        "sourceRefs": ["protocol", "matrix"]
+      },
+      {
+        "cellId": "D1_COST_30BPS",
+        "cellKind": "DIAGNOSTIC",
+        "availability": "PROPOSED",
+        "executionStatus": "NOT_EXECUTED",
+        "countedInExecutedUsage": false,
+        "sourceRefs": ["protocol", "matrix"]
+      },
+      {
+        "cellId": "D2_COST_40BPS",
+        "cellKind": "DIAGNOSTIC",
+        "availability": "PROPOSED",
+        "executionStatus": "NOT_EXECUTED",
+        "countedInExecutedUsage": false,
+        "sourceRefs": ["protocol", "matrix"]
+      },
+      {
+        "cellId": "D3_DELAY_1H",
+        "cellKind": "DIAGNOSTIC",
+        "availability": "UNAVAILABLE",
+        "executionStatus": "NOT_EXECUTED",
+        "countedInExecutedUsage": false,
+        "sourceRefs": ["protocol", "matrix"]
+      },
+      {
+        "cellId": "D4_DELAY_24H",
+        "cellKind": "DIAGNOSTIC",
+        "availability": "UNAVAILABLE",
+        "executionStatus": "NOT_EXECUTED",
+        "countedInExecutedUsage": false,
+        "sourceRefs": ["protocol", "matrix"]
+      },
+      {
+        "cellId": "D5_FEATURE_21D",
+        "cellKind": "DIAGNOSTIC",
+        "availability": "PROPOSED",
+        "executionStatus": "NOT_EXECUTED",
+        "countedInExecutedUsage": false,
+        "sourceRefs": ["protocol", "matrix"]
+      },
+      {
+        "cellId": "D6_FEATURE_35D",
+        "cellKind": "DIAGNOSTIC",
+        "availability": "UNAVAILABLE",
+        "executionStatus": "NOT_EXECUTED",
+        "countedInExecutedUsage": false,
+        "sourceRefs": ["protocol", "matrix"]
+      }
+    ]
+  },
+  "budget": {
+    "status": "UNKNOWN_UNRECONCILED",
+    "countingPolicy": {
+      "status": "UNKNOWN_UNRECONCILED",
+      "policyId": "UNKNOWN",
+      "includedAttemptClasses": "UNKNOWN",
+      "excludedAttemptClasses": "UNKNOWN",
+      "includedStatuses": "UNKNOWN",
+      "excludedStatuses": "UNKNOWN",
+      "sourceRefs": ["protocol", "matrix", "evidence_review"]
+    },
+    "authorizedCap": "UNKNOWN",
+    "consumedAttemptRefs": "UNKNOWN",
+    "remaining": "UNKNOWN",
+    "proposedEightCellsAreHistoricalUsage": false,
+    "emptyDraftVariantArraysMeanZeroPriorAttempts": false
+  },
+  "reportedCounts": {
+    "resultRecords": 12,
+    "attemptRecords": 20,
+    "documentedWorkflowRunIds": 20,
+    "knownRunAttemptNumbers": 0,
+    "exactDistinctAttemptIdentities": "UNKNOWN",
+    "evaluatorClassifiedAttemptRecords": 14,
+    "nonEmpiricalRecords": 7,
+    "proposedCells": 8
+  },
+  "interpretationLimits": [
+    "Counts are only listed inventory rows and documented run IDs in this bounded source scan, not exact attempt counts, complete campaign totals, a cap, remaining capacity, or proof of zero unlisted work. evaluatorClassifiedAttemptRecords is a raw count of classified attempt records, not deduplicated run IDs or exact run-attempt identities.",
+    "Result records are separate from workflow attempts. An evaluator result may be a feature/data-validation result rather than empirical strategy PnL; an operational workflow or synthetic test is not an empirical backtest.",
+    "Workflow success is not strategy success. The technical-invalid LowVol run and the duplicate reproducibility check are retained as separate run identities; the latter is not a second selected result.",
+    "The LowVol prospective snapshot/retry workflows recorded zero eligible observations, are not historical PnL runs, and do not establish a zero lifetime trial count.",
+    "Documented workflow run IDs are known in several sources, but all 20 exact Actions runAttempt numbers are UNKNOWN; exact distinct attempt identities and consumed use therefore remain UNKNOWN.",
+    "Actions run 38636260048 is listed only as a CI receipt-audit non-execution record: the pinned report and current Actions metadata disagree on conclusion, both report zero jobs, and neither counts it as an evaluator/trade/research trial. The current metadata observation includes its exact API URLs and UTC observation time; API assertions are not Git-pinned source evidence or authentication.",
+    "Source paths and hashes are assertions in this register, not authenticated execution receipts, reviewer signatures, or proof that an evaluator ran.",
+    "No historical cancellation, abort, or discard event is asserted unless a pinned source proves it; a missing item from this bounded list remains UNKNOWN."
+  ]
+}
