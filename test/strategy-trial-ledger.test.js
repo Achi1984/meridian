@@ -423,18 +423,32 @@ test('bounds oversized consumed lists and excessive nested input before deeper t
 });
 
 test('malformed attempt rows with a reconciled policy return structured issues instead of throwing', () => {
-  const ledger = fixture();
-  setReconciledBudget(ledger);
-  ledger.attempts.push(null);
+  const malformedCollections = [
+    ['attempts', 'INVALID_ATTEMPT', (ledger, value) => ledger.attempts.push(value)],
+    ['resultRecords', 'INVALID_RESULT_RECORD', (ledger, value) => ledger.resultRecords.push(value)],
+    ['nonEmpiricalRecords', 'INVALID_NON_EMPIRICAL_RECORD', (ledger, value) => ledger.nonEmpiricalRecords.push(value)],
+    ['coverage.gaps', 'INVALID_COVERAGE_GAP', (ledger, value) => ledger.coverage.gaps.push(value)],
+    ['proposedProtocol.cells', 'INVALID_PROPOSED_CELL', (ledger, value) => ledger.proposedProtocol.cells.push(value)],
+  ];
 
-  let validation;
-  assert.doesNotThrow(() => {
-    validation = validateTrialLedger(ledger);
-  });
-  assert.equal(validation.valid, false);
-  assert.equal(hasIssue(validation, 'INVALID_ATTEMPT'), true);
-  assert.equal(validation.executionAuthorized, false);
-  assert.equal(validation.remainingBudget, 'UNKNOWN');
+  for (const [collection, issueCode, appendMalformed] of malformedCollections) {
+    for (const malformedValue of [null, 17, 'bad', false]) {
+      const ledger = fixture();
+      setReconciledBudget(ledger);
+      appendMalformed(ledger, malformedValue);
+
+      let validation;
+      assert.doesNotThrow(() => {
+        validation = validateTrialLedger(ledger);
+      }, `${collection} should not throw for ${String(malformedValue)}`);
+      const serialized = JSON.parse(JSON.stringify(validation));
+      assert.equal(serialized.valid, false);
+      assert.equal(serialized.status, 'INVALID');
+      assert.equal(hasIssue(serialized, issueCode), true);
+      assert.equal(serialized.executionAuthorized, false);
+      assert.equal(serialized.remainingBudget, 'UNKNOWN');
+    }
+  }
 });
 
 test('requires canonical result identity to agree with its linked attempt', () => {
@@ -461,10 +475,25 @@ test('validates the committed bounded inventory separately from its source claim
   assert.equal(validation.executionAuthorized, false);
   assert.equal(validation.remainingBudget, 'UNKNOWN');
   assert.equal(ledger.sourceProvenance, 'ASSERTED_SOURCE_REFERENCES_NOT_AUTHENTICATED_EXECUTION');
+  assert.equal(ledger.sourceMainCommit, '6807d47e5c8f678534770f8d3758d95429b405c4');
+  assert.equal(ledger.scope.excluded.some((entry) => entry.includes('PR #811')
+    && entry.includes('a2eafbf3a9973afcace848713cad72ee31c7279c')
+    && entry.includes('does not depend on or use')), true);
   assert.equal(ledger.budget.countingPolicy.status, 'UNKNOWN_UNRECONCILED');
   assert.equal(ledger.coverage.gaps.some((gap) => gap.id === 'manual-nonworkflow-identities' && gap.blocksNumericBudget), true);
   assert.equal(ledger.nonEmpiricalRecords.some((record) => record.identity.includes('38636260048')), true);
   assert.equal(ledger.attempts.some((attempt) => attempt.runIdentity.runId === '38636260048'), false);
+  const ciMetadata = ledger.nonEmpiricalRecords.find((record) => record.recordId === 'release-safety-run-38636260048')
+    .nonRepositoryMetadataObservation;
+  assert.equal(ciMetadata.runApiUrl, 'https://api.github.com/repos/Achi1984/meridian/actions/runs/38636260048');
+  assert.equal(ciMetadata.jobsApiUrl, 'https://api.github.com/repos/Achi1984/meridian/actions/runs/38636260048/jobs?per_page=100');
+  assert.equal(ciMetadata.observedAtUTC, '2026-10-15T11:03:00Z');
+  assert.equal(ciMetadata.event, 'pull_request');
+  assert.equal(ciMetadata.headSha, '7a13ea11c49ba64b2f1cf6318a1c3d39c80f4633');
+  assert.equal(ciMetadata.conclusion, 'failure');
+  assert.equal(ciMetadata.jobCount, 0);
+  assert.equal('sha' in ciMetadata, false);
+  assert.match(ledger.interpretationLimits.join('\n'), /raw count of classified attempt records, not deduplicated run IDs/);
 });
 
 test('an incomplete ledger cannot report a numeric remaining budget', () => {

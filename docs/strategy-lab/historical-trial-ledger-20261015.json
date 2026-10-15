@@ -9,7 +9,7 @@
     "description": "Read-only inventory of documented strategy research results, workflow attempts, feature/data-validation evidence, and cited design/synthetic entries in the pinned sources below.",
     "searchedSourceBoundary": "The 14 October reproduction protocol, challenge matrix, passports, evidence review, receipt verification, campaign draft, and the exact result/evidence files named below at sourceMainCommit; selected prospective workflow metadata cited in the evidence review.",
     "excluded": [
-      "unmerged PR #811 and its files",
+      "PR #811 was not merged at the pinned inventory base 6807d47e5c8f678534770f8d3758d95429b405c4; it later merged to main as a2eafbf3a9973afcace848713cad72ee31c7279c. This packet does not depend on or use PR #811 files as sources.",
       "artifact downloads or raw market data",
       "unreferenced GitHub Actions history, local/private records, manual/nonworkflow runs not represented by a cited source, and undocumented variants",
       "any evaluator import, execution, PnL calculation, or strategy re-evaluation"
@@ -572,6 +572,18 @@
       "recordKind": "CI_AUDIT_WITH_NO_JOBS",
       "status": "NOT_AN_EVALUATOR_OR_STRATEGY_TRIAL",
       "details": "The pinned receipt report records action_required with zero jobs and no failed-job logs; the current Actions metadata lookup reports failure with zero jobs. This status discrepancy remains UNKNOWN. The workflow run is explicitly excluded from trade/research-trial usage and cannot establish evaluator execution.",
+      "nonRepositoryMetadataObservation": {
+        "source": "GitHub Actions API",
+        "runApiUrl": "https://api.github.com/repos/Achi1984/meridian/actions/runs/38636260048",
+        "jobsApiUrl": "https://api.github.com/repos/Achi1984/meridian/actions/runs/38636260048/jobs?per_page=100",
+        "observedAtUTC": "2026-10-15T11:03:00Z",
+        "event": "pull_request",
+        "headBranch": "copilot/strategy-receipt-verification-20261014",
+        "headSha": "7a13ea11c49ba64b2f1cf6318a1c3d39c80f4633",
+        "conclusion": "failure",
+        "jobCount": 0,
+        "note": "Non-repository API metadata assertion; it has no Git source SHA and does not authenticate execution."
+      },
       "sourceRefs": ["receipt_verification", "evidence_review"]
     }
   ],
@@ -678,12 +690,12 @@
     "proposedCells": 8
   },
   "interpretationLimits": [
-    "Counts are only listed inventory rows and documented run IDs in this bounded source scan, not exact attempt counts, complete campaign totals, a cap, remaining capacity, or proof of zero unlisted work.",
+    "Counts are only listed inventory rows and documented run IDs in this bounded source scan, not exact attempt counts, complete campaign totals, a cap, remaining capacity, or proof of zero unlisted work. evaluatorClassifiedAttemptRecords is a raw count of classified attempt records, not deduplicated run IDs or exact run-attempt identities.",
     "Result records are separate from workflow attempts. An evaluator result may be a feature/data-validation result rather than empirical strategy PnL; an operational workflow or synthetic test is not an empirical backtest.",
     "Workflow success is not strategy success. The technical-invalid LowVol run and the duplicate reproducibility check are retained as separate run identities; the latter is not a second selected result.",
     "The LowVol prospective snapshot/retry workflows recorded zero eligible observations, are not historical PnL runs, and do not establish a zero lifetime trial count.",
     "Documented workflow run IDs are known in several sources, but all 20 exact Actions runAttempt numbers are UNKNOWN; exact distinct attempt identities and consumed use therefore remain UNKNOWN.",
-    "Actions run 38636260048 is listed only as a CI receipt-audit non-execution record: the pinned report and current Actions metadata disagree on conclusion, both report zero jobs, and neither counts it as an evaluator/trade/research trial.",
+    "Actions run 38636260048 is listed only as a CI receipt-audit non-execution record: the pinned report and current Actions metadata disagree on conclusion, both report zero jobs, and neither counts it as an evaluator/trade/research trial. The current metadata observation includes its exact API URLs and UTC observation time; API assertions are not Git-pinned source evidence or authentication.",
     "Source paths and hashes are assertions in this register, not authenticated execution receipts, reviewer signatures, or proof that an evaluator ran.",
     "No historical cancellation, abort, or discard event is asserted unless a pinned source proves it; a missing item from this bounded list remains UNKNOWN."
   ]
