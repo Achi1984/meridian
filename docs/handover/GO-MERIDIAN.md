@@ -5,12 +5,28 @@
 This section is the current operational summary. Historical snapshots below are
 retained for provenance, not as instructions or evidence of present state.
 
-- Verified source main: `7dc94b9108e25d742bef7652fb7511c5cb5108ea`, PR **#818** merged.
-  FINAL_MERGE_STATUS: **6199370528**. Post-merge Agent Orchestration, Runtime
-  Smoke, Release Coordinator, Release Safety **38786060230** and Pages all succeeded.
+- Verified source main: `2736f9d1d98988858373c05c05a7d5a67cbca27b`; PR **#814**
+  merged. FINAL_MERGE_STATUS: **6201503547**. Reviewed head
+  `c9c3f9b489b3f16fb2e9d90738483f4948a317a0`, base
+  `48275e8ac149806859d698e7b29cb375dee73ff3`; full-scope Claude review
+  **6201457990 GREEN_LIGHT**. Exact-head Release Safety
+  **38793459593/job 116648593675** succeeded: 2,525 passed, 0 failed,
+  cancelled, skipped, or todo (Node **20.20.2**).
+- PR **#814 source packet is complete**; this handoff refresh is still pending
+  publication. All four required post-merge checks succeeded on
+  `2736f9d1d98988858373c05c05a7d5a67cbca27b`: Release Safety **38801351055**,
+  Runtime Smoke **38801351069**, Release Coordinator **38801351260**, and Pages
+  **38801348792**. The future publication commit for this refresh is not yet known.
+- Prior housekeeping evidence remains historical: #818 merged at
+  `7dc94b9108e25d742bef7652fb7511c5cb5108ea` (FINAL_MERGE_STATUS **6199370528**;
+  all five post-merge checks succeeded). #819 merged at
+  `48275e8ac149806859d698e7b29cb375dee73ff3` (FINAL_MERGE_STATUS **6199797884**;
+  Release Safety **38788973884**, Agent Orchestration **38788973900**, Release
+  Coordinator **38788973917**, Runtime Smoke **38788973928**, and Pages
+  **38788972716** all succeeded).
 - Terminal build: **10.0-r128**; checkpoint protocol: **STREAM-SAFE-V8**.
-- Active work: **one housekeeping package before the next infrastructure step**.
-  Infrastructure work is paused until this package is completed.
+- Active work: complete and publish this factual handoff refresh after exact-head
+  CI and full-scope review. No infrastructure action is authorized by this refresh.
 - Authoritative mailbox is now **#639**, predecessor **#571**; watchdog status
   comment is **6198924473**. Superseded rollover PR **#640** is closed.
   Successor read/delivery/response smoke **PASS**, response **6199499751** to request **6199490288**. Predecessor #571 is closed as completed historical archive (6199526147). Resolve routing from `MERIDIAN_LIVE_CHECKPOINT.json`.
@@ -19,9 +35,15 @@ retained for provenance, not as instructions or evidence of present state.
   already uses dynamic routing. Read-only event pilot **#673** is unchanged.
 - V2 remains **SOURCE_AUDIT**. Canonical execution, strategy PnL, Discovery,
   Validation, Holdout, Paper and Live authorization remain **false**.
+- Trial-history coverage and authorized reproduction budget remain **UNKNOWN**;
+  the #814 inventory is bounded/incomplete. No new empirical work, backtest, or
+  strategy PnL is authorized or claimed.
 - Publisher setup: failed owner attempt documented in #571 comment
-  **6198795959**. The one-shot marker is preserved. No recovery or second
-  attempt has been performed; each needs its own separate owner approval.
+  **6198795959**. The one-shot marker is preserved. Owner pause **6199968669**
+  remains in force. Real provider/DB/terminal/Codespace/browser state is
+  **UNKNOWN**. The prior read-only preflight remains paused; this refresh
+  authorizes no publisher next step. No recovery, retry, credential, provider,
+  or browser action has been performed; recovery/retry remain separately gated.
 - Decision records **6103358472**, **6178949360** and **6197277097** are resolved.
   Stale items **#653, #675 (issue), #686 and #690** are closed with readback.
   Clock-skew/#811 reconciliation: **6198817919**; retrospective
@@ -33,21 +55,36 @@ retained for provenance, not as instructions or evidence of present state.
   but the first hosted watchdog PATCH remains unproven. The lead activation edit is not bot evidence. Do not infer
   Codespace shutdown from this handoff.
 
-- Carry-forward #814: head `43a351328159bf9526c6bba1f8ff93f91a2298cc`, run **38776991839**, attempt 1, remains `action_required`; it did not execute. Old-run approval does not settle this gate.
+- Historical #814 run **38776991839**, head
+  `43a351328159bf9526c6bba1f8ff93f91a2298cc`, attempt 1, remains
+  `action_required`/not executed. Preserve it as historical blocked evidence;
+  it was not retrospectively passed by the later #814 merge.
 - Six further historical decisions were marked RESOLVED in place with existing quote/time evidence: 6171848445, 6187867522, 6175341101 (SUPERSEDED), 6177231926, 6177550606, 6178534667. No new authority granted.
 
 ### Resume and completion rules
 
 Read the checkpoint-selected mailbox, current main and relevant CI before acting.
-All #818 post-merge checks and successor mailbox smoke succeeded. #571 is archived;
-finish CI/review/publication of this handoff refresh before the next infrastructure step. This checkpoint authorizes no infrastructure action,
-marker recovery or second credential-setup attempt. Do not repeat setup or clear its marker.
+Mailbox **#639** is active; #571 is archived. All seven research/execution
+authorization flags remain false; V2 remains **SOURCE_AUDIT**. Four disabled
+Autopilot prompts remain disabled, management routing remains unchanged, and
+read-only event pilot #673 is unchanged. WIP limit **3** and the #818 owner
+approval history remain in force.
 
-After every completed merge block, refresh this file together with
-`MERIDIAN_LIVE_CHECKPOINT.json`, `docs/MERIDIAN_CHAT_HANDOFF.md`,
-`MERIDIAN_HANDOFF.md` and `docs/handover/GO-MERIDIAN.md`: record the verified
-commit, review/CI evidence, pending decisions and exact next step. Unknown checks
-must remain explicitly unknown; a source merge alone is not runtime acceptance.
+Complete exact-head CI and full-scope review for this handoff refresh before
+lead-guarded publication. Do not infer the publication commit from source main.
+This refresh authorizes no infrastructure action, publisher preflight, marker
+recovery, retry, or second credential-setup attempt.
+
+Handoff-only validation run locally with Node **v24.21.0** and Python
+**3.12.3**: `python3 -m json.tool MERIDIAN_LIVE_CHECKPOINT.json` **PASS**;
+`node scripts/continuity-audit.mjs` **PASS** (`ok: true`, build r128);
+`node scripts/frozen-research-guard.mjs` **PASS** (140 checked, 0 mismatches);
+`python3 scripts/validate-agent-orchestration.py` **GREEN**; `git diff --check`
+**PASS**. Node **20.20.2** is not installed locally, so these local Node audits
+were not run on the CI Node version. PR #814's exact-head CI was Node 20.20.2,
+but applies to that source PR, not this refresh. No new tests or external/runtime
+actions were run. Unknown checks remain unknown; a source merge alone is not
+runtime acceptance.
 
 ---
 
@@ -180,5 +217,3 @@ Mailbox comment id: 6029495669. Classification: PLATFORM_STALL. Recommendation: 
 
 ---
 When the user says **“Go Meridian”** in a new chat, start from this file **plus live GitHub reconciliation**. Never trust this snapshot over newer GitHub state.
-
-
