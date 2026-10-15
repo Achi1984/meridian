@@ -422,6 +422,21 @@ test('bounds oversized consumed lists and excessive nested input before deeper t
   assert.equal(hasIssue(validateTrialLedger(longString), 'INPUT_LIMIT_EXCEEDED'), true);
 });
 
+test('malformed attempt rows with a reconciled policy return structured issues instead of throwing', () => {
+  const ledger = fixture();
+  setReconciledBudget(ledger);
+  ledger.attempts.push(null);
+
+  let validation;
+  assert.doesNotThrow(() => {
+    validation = validateTrialLedger(ledger);
+  });
+  assert.equal(validation.valid, false);
+  assert.equal(hasIssue(validation, 'INVALID_ATTEMPT'), true);
+  assert.equal(validation.executionAuthorized, false);
+  assert.equal(validation.remainingBudget, 'UNKNOWN');
+});
+
 test('requires canonical result identity to agree with its linked attempt', () => {
   const ledger = fixture();
   ledger.resultRecords[0].resultIdentity = 'workflow:github_actions:999:UNKNOWN:DEVELOPMENT';

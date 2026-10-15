@@ -432,11 +432,11 @@ export function validateTrialLedger(input) {
       } else {
         policyReconciled = true;
         for (const attempt of attempts) {
+          if (!isObject(attempt) || !isRunIdentity(attempt.runIdentity)) continue;
           if (policy.includedAttemptClasses.includes(attempt.attemptClass)
             && !policy.excludedAttemptClasses.includes(attempt.attemptClass)
             && policy.includedStatuses.includes(attempt.status)
-            && !policy.excludedStatuses.includes(attempt.status)
-            && isRunIdentity(attempt.runIdentity)) {
+            && !policy.excludedStatuses.includes(attempt.status)) {
             policyCountedKeys.add(runKey(attempt.runIdentity));
           }
         }
