@@ -19,7 +19,7 @@
   },
   "terminalBuild": "10.0-r128",
   "liveMainAtCreation": "f23fc2db682963d7031ec1f3ddf9c3f4854a7f7f",
-  "lastSubstantiveCheckpoint": "0df76e19d4b04142896e227b2b2e05671b21b80c",
+  "lastSubstantiveCheckpoint": "c009326529e162f84bb985d0aca2de6cf5065c18",
   "lastContinuityMerge": {
     "pr": 553,
     "mergeSha": "f23fc2db682963d7031ec1f3ddf9c3f4854a7f7f"
@@ -144,10 +144,13 @@
       "clockSkewAnd811CommentId": 6198817919,
       "finalMerge782CommentId": 6198847209
     },
-    "proposedOnly": {
-      "wipLimit": 3,
-      "watchdogSingleEditedComment": true
-    },
-    "nextStep": "COMPLETE_REVIEWED_HOUSEKEEPING_BEFORE_INFRA_RESUMES"
+    "nextStep": "COMPLETE_REVIEWED_HOUSEKEEPING_BEFORE_INFRA_RESUMES",
+    "ownerApproval": {
+      "commentId": 6199107184,
+      "at": "2026-10-15T20:16:49+02:00",
+      "quote": "Ja Freigabe erteilt",
+      "scope": "PR818_HOUSEKEEPING_AND_WIP_LIMIT_3",
+      "wipLimit": 3
+    }
   }
 }

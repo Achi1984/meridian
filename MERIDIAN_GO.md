@@ -129,6 +129,6 @@ Owner instruction 2026-10-15T19:57:13+02:00, execution Go19:58:27:
 - For credential/mutation code with an attempt marker, first run a reviewed read-only preflight against the real target. Record a failed owner attempt and known/unknown remote state before proposing recovery. Marker recovery and a second attempt each require separate concrete owner approval.
 - Refresh MERIDIAN_LIVE_CHECKPOINT.json, docs/MERIDIAN_CHAT_HANDOFF.md, MERIDIAN_HANDOFF.md and docs/handover/GO-MERIDIAN.md after each merge block. Keep creation provenance, distinguish current evidence from historical snapshots, and never claim the current publication commit before readback.
 - Watchdog recommendations update one checkpoint-pinned status comment; request-specific review responses remain separate. A denied mailbox read prevents a verdict, not permission to infer context. No schedule, spending, research or trading authority changes.
-- WIP proposal: at most three active work packages, with remaining proposals in backlog. This cap is proposed, not adopted until an explicit owner answer is recorded.
+- WIP limit: at most three active work packages, remaining proposals in backlog. Owner approved 2026-10-15T20:16:49+02:00: "Ja Freigabe erteilt"; decision6199107184 resolved in place.
 
 Mailbox639 activation is staged with this candidate and requires concrete owner adoption after exact-head CI/review. Until that merge,571 remains binding. Do not close571 until pending requests and external automation routing are reconciled and successor smoke succeeds.

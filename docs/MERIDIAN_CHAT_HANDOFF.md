@@ -13,7 +13,7 @@ retained for provenance, not as instructions or evidence of present state.
 - Active work: **one housekeeping package before the next infrastructure step**.
   Infrastructure work is paused until this package is completed.
 - This staged candidate routes to **#639** (predecessor **#571**) and pins
-  watchdog status comment **6198924473**. Activation requires the owner-approved
+  watchdog status comment **6198924473**. Owner approval is recorded below; activation requires the reviewed
   merge; the external authoritative mailbox remains **#571** before that merge.
   Successor runtime smoke is **not yet verified**. After activation, resolve
   routing from `MERIDIAN_LIVE_CHECKPOINT.json`.
@@ -26,8 +26,12 @@ retained for provenance, not as instructions or evidence of present state.
   Stale items **#653, #675 (issue), #686 and #690** are closed with readback.
   Clock-skew/#811 reconciliation: **6198817919**; retrospective
   FINAL_MERGE_STATUS for #782: **6198847209**.
-- Watchdog single-comment behavior and WIP limit **3** remain proposals,
-  not adopted behavior. Do not infer Codespace shutdown from this handoff.
+- Owner approved **#818 housekeeping and WIP limit 3** at
+  **2026-10-15 20:16:49 Europe/Vienna**: “Ja Freigabe erteilt”, recorded
+  RESOLVED in comment **6199107184**. WIP is limited to three active packages;
+  remaining proposals belong in backlog. Watchdog behavior activates on the
+  reviewed merge and still needs successor runtime smoke. Do not infer
+  Codespace shutdown from this handoff.
 
 ### Resume and completion rules
 
