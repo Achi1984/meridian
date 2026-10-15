@@ -2,8 +2,9 @@
 
 This is a source-review candidate, **not an execution approval or production-ready
 bootstrap**. It removes password selection/copying, not authentication or owner
-review. No credentials were created while developing it. The existing manual
-helper remains unchanged. The implementation is Linux-only and owner-operated.
+review. No credentials were created while developing it. The shared manual
+helper includes the client TLS verification correction described below.
+The implementation is Linux-only and owner-operated.
 
 ## Exact scope
 
@@ -25,7 +26,7 @@ owner, never by supplying account credentials to this program or a chat.
 
 ## Prerequisites and bounded trust
 
-Use an owner-reviewed checkout containing this file and the unchanged
+Use an owner-reviewed checkout containing this file and the matching reviewed
 `scripts/publisher_test_password_setup.py`. Review/pin that checkout before use;
 this helper trusts that sibling source. Follow the existing
 `PUBLISHER_PASSWORD_DEPENDENCY_PROVENANCE.md` process for psycopg **3.3.6** and the
@@ -91,6 +92,27 @@ python3 -I /absolute/reviewed/scripts/publisher_test_auto_setup.py \
 checks. It does not fetch the administrator connection string, generate or
 install credentials, create the attempt marker, or connect to the database.
 Success is `AUTO_SETUP_CHECKS_PASSED`, not proof of DB connectivity/readiness.
+
+### TLS evidence through the Neon proxy
+
+The owner diagnostic on 2026-10-15 reached the database with the fixed hostname,
+CA and `sslmode=verify-full`, but the backend `pg_stat_ssl.ssl` value was false.
+All other identity fields matched. That backend view is not the client-to-proxy
+TLS indicator: Neon establishes a separate proxy-to-compute connection.
+The shared verifier therefore requires Psycopg's
+`cursor.connection.pgconn.ssl_in_use is True` on the actual connection, retaining
+the fixed hostname, verified CA and `verify-full` connection arguments. Missing,
+false or non-boolean client TLS evidence fails closed. The backend SSL field is
+diagnostic only; database identity, ownership, role and membership checks remain.
+This applies both to the read-only DB precheck and the transactional password
+helper. A standalone successful TLS probe is not used as authorization evidence.
+
+Primary implementation references:
+- https://github.com/psycopg/psycopg/blob/3.3.6/psycopg_c/psycopg_c/pq/pgconn.pyx
+- https://github.com/neondatabase/neon/blob/main/proxy/src/compute/tls.rs
+
+This source correction does not clear a previous attempt marker or authorize a
+retry. Reconcile the failed owner attempt before any further preparation run.
 
 For the separately approved preparation invocation, replace `--check` with
 `--prepare-test-secrets --acknowledge-provider-logging --exclusive-owner-window`.
