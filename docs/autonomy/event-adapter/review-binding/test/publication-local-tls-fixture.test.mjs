@@ -5,7 +5,7 @@ import {X509Certificate} from 'node:crypto';
 import {mkdtempSync,readFileSync,readdirSync,statSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {createLocalPoolAdapter,createFixtureCertificates,localDockerCreateArguments,withPublicationTlsPostgres,PINNED_POSTGRES_IMAGE} from '../scripts/publication-local-tls-fixture.mjs';
+import {cachePoolEnd,waitForLocalPostgres,createLocalPoolAdapter,createFixtureCertificates,localDockerCreateArguments,withPublicationTlsPostgres,PINNED_POSTGRES_IMAGE} from '../scripts/publication-local-tls-fixture.mjs';
 const HOST='ep-purple-dew-b9mbuikp.c-7.eu-central-1.aws.neon.tech';
 const config={host:HOST,database:'publisher_test',reservation:{user:'reservation',password:'synthetic'},senderRecord:{user:'sender',password:'synthetic2'},sendRecordRead:{user:'reader',password:'synthetic3'}};
 const options=()=>({host:HOST,port:5432,database:'publisher_test',...config.reservation,ssl:{rejectUnauthorized:true,servername:HOST,minVersion:'TLSv1.2',checkServerIdentity:tls.checkServerIdentity},max:1,connectionTimeoutMillis:1500,statement_timeout:2000,query_timeout:2500,lock_timeout:1000,idleTimeoutMillis:1000,allowExitOnIdle:true,options:'-c statement_timeout=2000 -c lock_timeout=1000 -c search_path=pg_catalog',application_name:'meridian-publication-test'});
@@ -52,4 +52,35 @@ test('real OpenSSL certificates verify SAN and separate CA; signing keys removed
   assert.equal(statSync(join(directory,'server.key')).mode&0o777,0o600);
   assert.equal(readdirSync(directory).some(name=>['ca.key','wrong-ca.key','server.csr','server.ext'].includes(name)),false);
  }finally{rmSync(directory,{recursive:true,force:true});}
+});
+
+test('pool cleanup is idempotent and failed closes are not retried',async()=>{
+ for(const fail of [false,true]){
+  let calls=0;const pool={end(){calls++;if(fail)throw new Error('synthetic failure');}};
+  cachePoolEnd(pool);const first=pool.end();assert.equal(first,pool.end());
+  if(fail){await assert.rejects(first);await assert.rejects(pool.end());}
+  else{await first;await pool.end();}
+  assert.equal(calls,1);
+ }
+});
+test('startup tolerates more than five seconds and ends at thirty seconds',async()=>{
+ let clock=0,calls=0;
+ await waitForLocalPostgres({async query(){calls++;if(clock<10000)throw new Error('synthetic');}},
+  {now:()=>clock,sleep:async ms=>{clock+=ms;}});
+ assert.equal(clock,10000);assert.equal(calls,41);
+ clock=0;calls=0;
+ await assert.rejects(waitForLocalPostgres({async query(){calls++;throw new Error('sensitive sentinel');}},
+  {now:()=>clock,sleep:async ms=>{clock+=ms;}}),/^Error: LOCAL_TLS_POSTGRES_FIXTURE_FAILED_STARTUP$/);
+ assert.equal(clock,30000);assert.equal(calls,120);
+});
+test('startup rejects a success arriving after the absolute deadline',async()=>{
+ let clock=0;
+ await assert.rejects(waitForLocalPostgres({async query(){clock=30001;}},
+  {now:()=>clock,sleep:async()=>assert.fail()}),/^Error: LOCAL_TLS_POSTGRES_FIXTURE_FAILED_STARTUP$/);
+});
+test('startup deadline also bounds a query that never settles',async()=>{
+ let calls=0;
+ const now=()=>++calls===1?0:calls<=3?29999:30001;
+ await assert.rejects(waitForLocalPostgres({query:()=>new Promise(()=>{})},
+  {now,sleep:async()=>assert.fail()}),/^Error: LOCAL_TLS_POSTGRES_FIXTURE_FAILED_STARTUP$/);
 });

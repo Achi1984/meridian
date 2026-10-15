@@ -36,6 +36,29 @@ export function createLocalPoolAdapter({Pool,config,port,ca,track=()=>{}}){
  };
 }
 
+// Cache failures as well as success: cleanup must not retry a failed close.
+export function cachePoolEnd(pool){
+ const end=pool.end.bind(pool);let ending;
+ pool.end=()=>{if(!ending)ending=Promise.resolve().then(end);return ending;};
+}
+
+export async function waitForLocalPostgres(admin,{now=()=>performance.now(),sleep=delay}={}){
+ const deadline=now()+30000;
+ while(now()<deadline){
+  let timer,ready=false;
+  try{
+   await Promise.race([admin.query('SELECT 1'),new Promise((_,reject)=>{
+    timer=setTimeout(()=>reject(new Error(FAIL)),Math.max(1,deadline-now()));
+   })]);
+   ready=now()<deadline;
+  }catch{}finally{clearTimeout(timer);}
+  if(ready)return;
+  const remaining=deadline-now();
+  if(remaining>0)await sleep(Math.min(250,remaining));
+ }
+ throw new Error(FAIL+'_STARTUP');
+}
+
 async function boundedEnd(pool){
  let timer;
  try{await Promise.race([pool.end(),new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(FAIL)),3000);})]);}
@@ -72,25 +95,27 @@ export async function withPublicationTlsPostgres({optIn,Pool},run){
  const token=randomBytes(12).toString('hex'),name='meridian-local-tls-'+token;
  const directory=mkdtempSync(join(tmpdir(),'meridian-local-tls-'));
  chmodSync(directory,0o700);
- const pools=new Set();let attempted=false,clean=true;
+ const pools=new Set();let attempted=false,clean=true,stage='IMAGE';
  const invoke=(program,args,timeout=15000)=>execFileSync(program,args,{timeout,maxBuffer:1024*1024,stdio:['ignore','pipe','pipe']});
  // Explicit Unix socket prevents DOCKER_HOST/context from selecting a remote daemon.
  const docker=(...args)=>invoke('docker',['--host','unix:///var/run/docker.sock',...args]);
  const track=pool=>{
-  const end=pool.end.bind(pool);let ending;
-  pool.end=()=>{if(!ending)ending=Promise.resolve().then(end);return ending;};
+  cachePoolEnd(pool);
   pools.add(pool);pool.on('error',()=>{});
  };
  try{
   docker('image','inspect',PINNED_POSTGRES_IMAGE); // No implicit image pull/install.
+  stage='CERTIFICATES';
   createFixtureCertificates(directory,args=>invoke('openssl',args));
   writeFileSync(join(directory,'pg_hba.conf'),'local all all trust\nhostnossl all all 0.0.0.0/0 reject\nhostssl all all 0.0.0.0/0 scram-sha-256\n');
   const adminPassword=randomBytes(24).toString('hex');
-  attempted=true;
+  stage='CREATE';attempted=true;
   docker(...localDockerCreateArguments(name,token,adminPassword));
   // Copy only the server material, not the CA signing key.
   // Signing keys were removed before copying the directory into the container.
+  stage='START';
   docker('cp',directory,name+':/meridian-tls');docker('start',name);
+  stage='PORT';
   const match=/^127\.0\.0\.1:(\d+)\s*$/.exec(docker('port',name,'5432/tcp').toString());
   assert.ok(match);const port=Number(match[1]),ca=readFileSync(join(directory,'ca.crt'),'utf8');
   const base={host:'127.0.0.1',port,database:'publisher_test',user:'postgres',password:adminPassword,
@@ -98,18 +123,21 @@ export async function withPublicationTlsPostgres({optIn,Pool},run){
    connectionTimeoutMillis:1500,statement_timeout:2000,query_timeout:2500,
    options:'-c statement_timeout=2000 -c lock_timeout=1000 -c search_path=pg_catalog',max:1,allowExitOnIdle:true};
   const pool=options=>{const p=new Pool(options);track(p);return p;};
-  const admin=pool(base);let ready=false;
-  for(let i=0;i<20;i++){try{await admin.query('SELECT 1');ready=true;break;}catch{await delay(250);}}
-  assert.ok(ready);
+  stage='STARTUP';
+  const admin=pool(base);await waitForLocalPostgres(admin);
+  stage='VERSION';
   assert.equal(Math.floor(Number((await admin.query('SHOW server_version_num')).rows[0].server_version_num)/10000),16);
+  stage='SCHEMA';
   for(const file of ['publication-ledger.sql','publication-send-record.sql'])
    await admin.query(readFileSync(new URL('../fixtures/'+file,import.meta.url),'utf8'));
   const config={host:HOST,database:'publisher_test'};
   const names=['publisher_reservation_test','publisher_sender_test','publisher_reader_test'];
+  stage='ROLES';
   for(let i=0;i<3;i++){
    const password=randomBytes(24).toString('hex');config[ROLE_KEYS[i]]={user:names[i],password};
    await admin.query(`CREATE ROLE ${names[i]} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT PASSWORD '${password}'`);
   }
+  stage='GRANTS';
   await admin.query(`GRANT CONNECT ON DATABASE publisher_test TO ${names.join(',')};
    GRANT USAGE ON SCHEMA meridian_publisher TO ${names.join(',')};
    GRANT SELECT ON meridian_publisher.reservations TO ${names[0]},${names[1]},${names[2]};
@@ -126,13 +154,16 @@ export async function withPublicationTlsPostgres({optIn,Pool},run){
     [{...base.ssl,servername:'wrong.invalid'},e=>e.code==='ERR_TLS_CERT_ALTNAME_INVALID'],
     [false,e=>e.code==='28000'&&/pg_hba.conf rejects connection/.test(e.message)&&/no encryption/.test(e.message)]
    ];
-   for(const [ssl,expected] of probes){
+   for(const [i,[ssl,expected]] of probes.entries()){
+    stage=['TLS_CA','TLS_HOSTNAME','TLS_REQUIRED'][i];
     const probe=pool({...base,ssl});await assert.rejects(probe.query('SELECT 1'),expected);await boundedEnd(probe);pools.delete(probe);
    }
+   stage='RUNTIME';
    return {cases:3,productionEvidence:false};
   }
+  stage='RUNTIME';
   return await run({kind:'DISPOSABLE_LOOPBACK_PG16_TLS',admin,config,Pool:LocalPool,localPool,verifyTransportRejections});
- }catch{throw new Error(FAIL);}
+ }catch{throw new Error(FAIL+'_'+stage);}
  finally{
   const results=await Promise.allSettled([...pools].map(boundedEnd));
   clean=results.every(r=>r.status==='fulfilled');
@@ -140,7 +171,7 @@ export async function withPublicationTlsPostgres({optIn,Pool},run){
    const owned=docker('inspect','--format','{{ index .Config.Labels "meridian.local-tls" }}',name).toString().trim();
    if(owned===token)docker('rm','--force','--volumes',name);else clean=false;
   }catch{clean=false;}}
-  rmSync(directory,{recursive:true,force:true});
+  try{rmSync(directory,{recursive:true,force:true});}catch{clean=false;}
   if(!clean)throw new Error('LOCAL_TLS_POSTGRES_CLEANUP_UNCONFIRMED');
  }
 }

@@ -16,7 +16,10 @@ test('integration rejects unmarked fixture before any database or transport effe
  let effects=0;
  for(const kind of [undefined,'production','DISPOSABLE_LOOPBACK_PG16']){
   await assert.rejects(checkPublicationRuntimePostgres({kind,Pool:class{constructor(){effects++;}},
-   admin:{query(){effects++;}},verifyTransportRejections(){effects++;}}),/local fixture capability required/);
+   admin:{query(){effects++;}},verifyTransportRejections(){effects++;}}),error=>{
+    assert.equal(error.message,'LOCAL_RUNTIME_INTEGRATION_FAILED');assert.equal(error.stage,'FIXTURE_CONTRACT');
+    assert.deepEqual(error.passed,[]);return true;
+   });
  }
  assert.equal(effects,0);
 });
@@ -25,7 +28,11 @@ test('failed local TLS transport assertions prevent catalog and runner activity'
  let effects=0;
  await assert.rejects(checkPublicationRuntimePostgres({kind:'DISPOSABLE_LOOPBACK_PG16_TLS',
   Pool:class{constructor(){effects++;}},admin:{query(){effects++;}},
-  verifyTransportRejections:async()=>{throw Error('synthetic rejected transport proof');}}),/synthetic rejected transport proof/);
+  verifyTransportRejections:async()=>{throw Error('PRIVATE_PASSWORD synthetic rejected transport proof');}}),error=>{
+   assert.equal(error.message,'LOCAL_RUNTIME_INTEGRATION_FAILED');assert.equal(error.stage,'TRANSPORT');
+   assert.deepEqual(error.passed,[]);assert.equal(String(error.stack).includes('PRIVATE_PASSWORD'),false);
+   assert.equal(JSON.stringify(error).includes('PRIVATE_PASSWORD'),false);return true;
+  });
  assert.equal(effects,0);
 });
 
@@ -40,7 +47,10 @@ test('actual readiness rejects malformed catalog evidence and closes all pools b
   reservation:{user:'reserve',password:'reserve-synthetic'},senderRecord:{user:'sender',password:'sender-synthetic'},
   sendRecordRead:{user:'reader',password:'reader-synthetic'}};
  await assert.rejects(checkPublicationRuntimePostgres({kind:'DISPOSABLE_LOOPBACK_PG16_TLS',Pool,config,
-  admin:{query(){adminCalls++;}},verifyTransportRejections:async()=>{}}),/SCOPED_CHECKS_FAILED/);
+  admin:{query(){adminCalls++;}},verifyTransportRejections:async()=>{}}),error=>{
+   assert.equal(error.message,'LOCAL_RUNTIME_INTEGRATION_FAILED');assert.equal(error.stage,'CATALOG_READINESS');
+   assert.deepEqual(error.passed,['transport-rejections']);assert.equal(Object.isFrozen(error.passed),true);return true;
+  });
  assert.equal(queries,1);assert.equal(closed,3);assert.equal(adminCalls,0);
 });
 
@@ -50,6 +60,10 @@ test('real Python envelope signed environment identity and preflight reach pool 
   senderRecord:{user:'sender',password:'sender-synthetic'},sendRecordRead:{user:'reader',password:'reader-synthetic'}},
   Pool:class{constructor(){opens++;throw Error('intentional offline boundary');}}};
  const s=createSyntheticRuntimeScenario('offline',9201);
+ const approved=await s.options(fixture).readApprovedManifest();
+ const approvalTime=Date.parse(approved.trustedConfig.approvalUpdatedAt);
+ assert.equal(approvalTime,approved.trustedConfig.issuedAt*1000);
+ assert.ok(Math.abs(Date.now()-approvalTime-30000)<5000);
  const result=await createPublicationTestRunner(s.options(fixture))();
  assert.equal(result.stage,'POOLS');assert.equal(result.outcome,'OWNER_RECONCILIATION_REQUIRED');assert.equal(opens,1);
  assert.deepEqual(s.counts(),{posts:0,credentials:0});

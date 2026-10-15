@@ -56,7 +56,24 @@ PostgreSQL server or installed `pg` package. The real database integration is
 therefore **NOT_EXECUTED**. Missing prerequisites are a failed invocation, never
 a successful or silently skipped database test.
 
-No workflow, dispatch, secret installation, production role, strategy permission
-or live/trading flag is changed by this packet. Exact-head CI and independent
-review remain required; source review must not substitute for the outstanding
-real database execution evidence.
+## Approved isolated Actions execution
+
+On 2026-10-15 at 10:49 Europe/Vienna the owner approved adapting the existing
+`publisher-postgres-test.yml` workflow and **one** dispatch after exact-source
+review (decision `M11-LOCAL-TLS-RUNNER-AUTH-20261015`, mailbox comment
+6188228371). The job remains manual, read-only, pinned to its reviewed source
+SHA and limited to ten minutes. It explicitly caches the already pinned image,
+retains the legacy database regression and then runs this TLS integration.
+Use only the existing Actions quota; no additional purchased budget is granted.
+No retry is authorized if the one run fails or its outcome is unknown.
+
+Synthetic passwords are visible to the disposable container's local Docker
+daemon and process inspection; they are never real service credentials.
+Docker control is privileged and therefore requires the approved isolated
+runner. An interrupted local invocation may leave its uniquely named container;
+inspect the exact `meridian.local-tls` label and name before removing only that
+identified container. Do not use broad Docker cleanup commands.
+
+No secret installation, production role, strategy permission or live/trading
+flag is changed. Exact-head CI and independent review remain required; source
+review must not substitute for the outstanding real database execution evidence.

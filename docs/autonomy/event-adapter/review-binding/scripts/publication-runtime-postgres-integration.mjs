@@ -12,6 +12,9 @@ import {RESERVE_RECEIPT_SQL} from './publication-reservation-receipt.mjs';
 const hash=s=>createHash('sha256').update(s).digest('hex');
 const root='https://api.github.com/repos/Achi1984/meridian';
 const identityUrl='https://synthetic.actions.githubusercontent.com/oidc';
+const diagnostics=new WeakMap();
+const fixtureFailures=new Set(['IMAGE','CERTIFICATES','CREATE','START','PORT','STARTUP','VERSION',
+ 'SCHEMA','ROLES','GRANTS','RUNTIME','TLS_CA','TLS_HOSTNAME','TLS_REQUIRED'].map(s=>'LOCAL_TLS_POSTGRES_FIXTURE_FAILED_'+s));
 const snapshotSql=`SELECT r.operation_key,r.status,r.comment_id::text,
  s.comment_id::text AS retained_comment_id FROM meridian_publisher.reservations r
  LEFT JOIN meridian_publisher.send_records s USING(operation_key) WHERE r.run_id=$1`;
@@ -34,7 +37,7 @@ print(json.dumps({'body':produce(c,a,e,p),'scopeRaw':json.dumps(e),'policyRaw':j
   ownerApprovalCommentId:2222,ownerApprovalBodySha256:hash(approvalBody)};
  const config={scopeRaw:f.scopeRaw,policyRaw:f.policyRaw,pinsRaw:JSON.stringify(pins),ownerId:319562141,
   environment:'publisher-test',subject:'repo:Achi1984/meridian:environment:publisher-test',
-  approvalUpdatedAt:'2026-10-14T05:00:00Z',issuedAt:now-30,expiresAt:now+300};
+  approvalUpdatedAt:new Date((now-30)*1000).toISOString().replace('.000Z','Z'),issuedAt:now-30,expiresAt:now+300};
  const claims={environment:config.environment,iss:'https://token.actions.githubusercontent.com',aud:'meridian-negative-publisher',sub:config.subject,
   repository:'Achi1984/meridian',repository_id:String(pins.repositoryId),repository_owner:'Achi1984',repository_owner_id:String(config.ownerId),
   ref:pins.ref,ref_type:'branch',workflow_ref:'Achi1984/meridian/'+pins.workflowPath+'@'+pins.ref,
@@ -95,19 +98,31 @@ export function createSyntheticRuntimeScenario(label,runId){
 }
 
 export async function checkPublicationRuntimePostgres(fixture){
+ const passed=[];let stage='FIXTURE_CONTRACT';
+ try{
  assert.equal(fixture?.kind,'DISPOSABLE_LOOPBACK_PG16_TLS','local fixture capability required');
  assert.equal(typeof fixture.Pool,'function');assert.equal(typeof fixture.admin?.query,'function');
  assert.equal(typeof fixture.verifyTransportRejections,'function');
- const passed=[];
+ stage='TRANSPORT';
  await fixture.verifyTransportRejections();passed.push('transport-rejections');
+ stage='CATALOG_READINESS';
  const readiness=()=>createPublicationDatabaseReadiness(fixture.config,{Pool:fixture.Pool})();
  assert.equal((await readiness()).outcome,'SCOPED_READ_ONLY_CHECKS_PASSED');passed.push('catalog-readiness');
  const user=fixture.config.reservation.user;
  assert.match(user,/^[a-z][a-z0-9_]{0,62}$/);
+ stage='TIMESTAMP_GRANT_DRIFT';
+ const timestampPrivilege=async expected=>{
+  const answer=await fixture.admin.query(`SELECT pg_catalog.has_column_privilege($1,
+   'meridian_publisher.reservations','created_at','INSERT') AS allowed`,[user]);
+  assert.equal(answer.rowCount,1);assert.equal(answer.rows[0]?.allowed,expected);
+ };
+ await timestampPrivilege(false);
  await fixture.admin.query(`GRANT INSERT(created_at) ON meridian_publisher.reservations TO "${user}"`);
- try{assert.equal((await readiness()).outcome,'SCOPED_CHECKS_FAILED');}
+ try{await timestampPrivilege(true);assert.equal((await readiness()).outcome,'SCOPED_CHECKS_FAILED');}
  finally{await fixture.admin.query(`REVOKE INSERT(created_at) ON meridian_publisher.reservations FROM "${user}"`);}
+ await timestampPrivilege(false);
  assert.equal((await readiness()).outcome,'SCOPED_READ_ONLY_CHECKS_PASSED');passed.push('timestamp-grant-drift');
+ stage='ENVIRONMENT_RUNNER';
  const pair=generateKeyPairSync('rsa',{modulusLength:2048});
  const key={privateKey:pair.privateKey,jwk:{...pair.publicKey.export({format:'jwk'}),kid:'local-runtime',use:'sig',alg:'RS256'}};
  const rows=async s=>(await fixture.admin.query(snapshotSql,[s.runId])).rows;
@@ -120,6 +135,7 @@ export async function checkPublicationRuntimePostgres(fixture){
  assert.equal((await execute(success)).outcome,'OWNER_RECONCILIATION_REQUIRED');
  assert.deepEqual(await rows(success),state);assert.deepEqual(success.counts(),{posts:1,credentials:1});
  passed.push('environment-runner-success-and-replay');
+ stage='CONCURRENT_ONE_SEND';
  const race=scenario('race',9102,key);
  const outcomes=await Promise.all([execute(race),execute(race)]);
  assert.equal(outcomes.filter(r=>r.outcome==='OBSERVED_CONFIRMATION').length,1);
@@ -128,6 +144,7 @@ export async function checkPublicationRuntimePostgres(fixture){
  state=await rows(race);assert.equal(state.length,1);assert.equal(state[0].status,'CONFIRMED');
  assert.ok(state[0].comment_id);assert.equal(state[0].comment_id,state[0].retained_comment_id);
  passed.push('concurrent-one-send');
+ stage='LOST_RESERVATION_ACK';
  const reserve=scenario('reserve-ack',9103,key);
  class LostReservePool extends fixture.Pool{
   async query(sql,...args){const result=await super.query(sql,...args);
@@ -139,6 +156,7 @@ export async function checkPublicationRuntimePostgres(fixture){
  assert.equal((await execute(reserve)).outcome,'OWNER_RECONCILIATION_REQUIRED');
  assert.deepEqual(await rows(reserve),state);assert.deepEqual(reserve.counts(),{posts:0,credentials:0});
  passed.push('lost-reservation-ack-no-send');
+ stage='LOST_POST_ACK';
  const post=scenario('post-ack',9104,key);post.losePostAck();
  assert.equal((await execute(post)).outcome,'OWNER_RECONCILIATION_REQUIRED');
  state=await rows(post);assert.equal(state.length,1);assert.equal(state[0].status,'RESERVED');
@@ -146,6 +164,7 @@ export async function checkPublicationRuntimePostgres(fixture){
  assert.equal((await execute(post)).outcome,'OWNER_RECONCILIATION_REQUIRED');
  assert.deepEqual(await rows(post),state);assert.deepEqual(post.counts(),{posts:1,credentials:1});
  passed.push('lost-post-ack-no-resend');
+ stage='WRONG_ENVIRONMENT';
  const invalid=scenario('wrong-environment',9105,key);invalid.claims.environment='foreign';
  let opens=0;class CountPool extends fixture.Pool{constructor(options){super(options);opens++;}}
  assert.equal((await execute(invalid,CountPool)).outcome,'REJECTED');
@@ -153,16 +172,31 @@ export async function checkPublicationRuntimePostgres(fixture){
  passed.push('wrong-environment-before-pool');
  return Object.freeze({outcome:'LOCAL_RUNTIME_INTEGRATION_PASSED',checks:Object.freeze(passed),
   syntheticGitHub:true,productionRoutingVerified:false,liveAuthorized:false});
+ }catch{
+  const error=new Error('LOCAL_RUNTIME_INTEGRATION_FAILED');
+  const detail=Object.freeze({stage,passed:Object.freeze([...passed])});
+  Object.assign(error,detail);diagnostics.set(error,detail);throw error;
+ }
 }
 
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
  let code=1,output={outcome:'LOCAL_RUNTIME_INTEGRATION_NOT_REQUESTED',liveAuthorized:false};
  if(process.argv.length===3&&process.argv[2]==='--local-pg16-tls'){
+  let runtimeDiagnostic;
   try{
    const {Pool}=await import('pg');
    const {withPublicationTlsPostgres}=await import('./publication-local-tls-fixture.mjs');
-   output=await withPublicationTlsPostgres({optIn:'LOCAL_PG16_TLS_ONLY',Pool},checkPublicationRuntimePostgres);code=0;
-  }catch{output={outcome:'LOCAL_RUNTIME_INTEGRATION_FAILED_OR_CLEANUP_UNCONFIRMED',liveAuthorized:false};}
+   output=await withPublicationTlsPostgres({optIn:'LOCAL_PG16_TLS_ONLY',Pool},async fixture=>{
+    try{return await checkPublicationRuntimePostgres(fixture);}
+    catch(error){runtimeDiagnostic=diagnostics.get(error);throw error;}
+   });code=0;
+  }catch(error){
+   const message=error?.message;
+   const detail=message==='LOCAL_TLS_POSTGRES_FIXTURE_FAILED_RUNTIME'&&runtimeDiagnostic
+    ?runtimeDiagnostic:{stage:message==='LOCAL_TLS_POSTGRES_CLEANUP_UNCONFIRMED'?'CLEANUP_UNCONFIRMED':
+     fixtureFailures.has(message)?message.slice('LOCAL_TLS_POSTGRES_FIXTURE_FAILED_'.length):'DEPENDENCY_OR_FIXTURE',passed:[]};
+   output={outcome:'LOCAL_RUNTIME_INTEGRATION_FAILED_OR_CLEANUP_UNCONFIRMED',...detail,liveAuthorized:false};
+  }
  }
  process.stdout.write(JSON.stringify(output)+'\n');process.exitCode=code;
 }
