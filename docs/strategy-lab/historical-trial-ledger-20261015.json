@@ -2,6 +2,7 @@
   "schemaVersion": "MERIDIAN_HISTORICAL_TRIAL_LEDGER_V1",
   "opId": "STRATEGY-TRIAL-LEDGER-20261015",
   "sourceMainCommit": "6807d47e5c8f678534770f8d3758d95429b405c4",
+  "sourceProvenance": "ASSERTED_SOURCE_REFERENCES_NOT_AUTHENTICATED_EXECUTION",
   "status": "BOUNDED_INVENTORY_INCOMPLETE",
   "executionAuthorized": false,
   "scope": {
@@ -10,7 +11,7 @@
     "excluded": [
       "unmerged PR #811 and its files",
       "artifact downloads or raw market data",
-      "unreferenced GitHub Actions history, local/private records, manual runs, and undocumented variants",
+      "unreferenced GitHub Actions history, local/private records, manual/nonworkflow runs not represented by a cited source, and undocumented variants",
       "any evaluator import, execution, PnL calculation, or strategy re-evaluation"
     ],
     "historicalInventoryComplete": false,
@@ -146,37 +147,52 @@
   ],
   "coverage": {
     "complete": false,
+    "nonWorkflowAttempts": {
+      "status": "UNKNOWN_UNRECONCILED",
+      "sourceRefs": ["protocol", "matrix", "evidence_review"]
+    },
     "gaps": [
       {
         "id": "unindexed-history",
         "gap": "No canonical, complete source enumerates all historical trial and attempt records across main, manual execution, discarded work, and all branches.",
         "blocks": "Completeness certification and cumulative historical usage.",
-        "closureSource": "An independently reconciled canonical ledger with exact source commits, run/attempt identities, and manual/discarded evidence."
+        "closureSource": "An independently reconciled canonical ledger with exact source commits, run/attempt identities, and manual/discarded evidence.",
+        "blocksNumericBudget": true
       },
       {
         "id": "budget-authority",
         "gap": "The complete authorized cap and policy for counting candidate, manual, technical-invalid, and discarded attempts are not established by the bounded sources.",
         "blocks": "Any remaining trial/diagnostic budget calculation.",
-        "closureSource": "The explicit authorized cap and its source, plus a complete reconciled consumed-attempt list under that policy."
+        "closureSource": "The explicit authorized cap and its source, plus a complete reconciled consumed-attempt list under that policy.",
+        "blocksNumericBudget": true
       },
       {
         "id": "attempt-outcomes",
         "gap": "For some evidenced workflow IDs, attempt number, cancellation/abort/discard state, full logs, or a result artifact is not available in the cited pinned summary. No absence is interpreted as zero events.",
         "blocks": "Full attempt/status reconciliation and result-to-attempt lineage for those cases.",
-        "closureSource": "Pinned workflow/run-attempt metadata and source-authenticated records for each unresolved identity."
+        "closureSource": "Pinned workflow/run-attempt metadata and source-authenticated records for each unresolved identity.",
+        "blocksNumericBudget": true
       },
       {
         "id": "design-and-synthetic-usage",
         "gap": "PR #791 is explicitly partial; it reports the H5/H7 first-tranche ceiling and P1/C1 budget treatment but does not reconcile cumulative usage, full manual/failed/discarded items, or remaining slots. H5/H7/P1/C1/X1 are not empirical results here.",
         "blocks": "Candidate-slot and campaign-capacity reconciliation.",
-        "closureSource": "A complete source-based candidate and trial ledger reconciling the exact PR #791/#795/#768/#757 heads with any subsequent authorized records; none is assumed."
+        "closureSource": "A complete source-based candidate and trial ledger reconciling the exact PR #791/#795/#768/#757 heads with any subsequent authorized records; none is assumed.",
+        "blocksNumericBudget": true
+      },
+      {
+        "id": "manual-nonworkflow-identities",
+        "gap": "No cited source provides a complete set of manual or nonworkflow attempt identities with provenance in this inventory.",
+        "blocks": "Numeric remaining budget, even if every listed workflow run were otherwise reconciled.",
+        "closureSource": "A source-backed manual/nonworkflow attempt register reconciled under the authorized counting policy; absent records remain UNKNOWN.",
+        "blocksNumericBudget": true
       }
     ]
   },
   "resultRecords": [
     {
       "resultRecordId": "result-lowvol-v1-discovery",
-      "resultIdentity": "run:37129972221:discovery",
+      "resultIdentity": "workflow:github_actions:37129972221:UNKNOWN:DISCOVERY",
       "strategyIdentity": "CROSS-SECTIONAL-LOW-VOLATILITY-V1-FROZEN",
       "resultKind": "FEATURE_EVIDENCE",
       "recordedOutcome": "DISCOVERY_FAIL_RESEARCH_STOP",
@@ -187,7 +203,7 @@
     },
     {
       "resultRecordId": "result-lowvol-v2-development",
-      "resultIdentity": "run:37132394717:development",
+      "resultIdentity": "workflow:github_actions:37132394717:UNKNOWN:DEVELOPMENT",
       "strategyIdentity": "LOW-VOLATILITY-RANK-WEIGHTED-V2-FROZEN",
       "resultKind": "STRATEGY_PNL_RESULT",
       "recordedOutcome": "DEVELOPMENT_PASS_HOLDOUT_REQUIRED",
@@ -198,7 +214,7 @@
     },
     {
       "resultRecordId": "result-lowvol-v2-holdout",
-      "resultIdentity": "run:37133809945:historical-holdout",
+      "resultIdentity": "workflow:github_actions:37133809945:UNKNOWN:HISTORICAL_HOLDOUT",
       "strategyIdentity": "LOW-VOLATILITY-RANK-WEIGHTED-V2-FROZEN",
       "resultKind": "STRATEGY_PNL_RESULT",
       "recordedOutcome": "HOLDOUT_PASS_PROSPECTIVE_PAPER_REVIEW_ONLY",
@@ -209,7 +225,7 @@
     },
     {
       "resultRecordId": "result-crossvenue-v1-discovery",
-      "resultIdentity": "run:36526460897:discovery",
+      "resultIdentity": "workflow:github_actions:36526460897:UNKNOWN:DISCOVERY",
       "strategyIdentity": "CROSS-VENUE-FUNDING-SPREAD-V1-FROZEN",
       "resultKind": "STRATEGY_PNL_RESULT",
       "recordedOutcome": "DISCOVERY_PASS_HOLDOUT_REQUIRED",
@@ -220,7 +236,7 @@
     },
     {
       "resultRecordId": "result-crossvenue-v1-transfer",
-      "resultIdentity": "run:36527605999:transfer-holdout",
+      "resultIdentity": "workflow:github_actions:36527605999:UNKNOWN:TRANSFER_HOLDOUT",
       "strategyIdentity": "CROSS-VENUE-FUNDING-SPREAD-V1-FROZEN",
       "resultKind": "STRATEGY_PNL_RESULT",
       "recordedOutcome": "HOLDOUT_FAIL_RESEARCH_REDESIGN",
@@ -231,7 +247,7 @@
     },
     {
       "resultRecordId": "result-crossvenue-v2-validation",
-      "resultIdentity": "run:36563826168:validation",
+      "resultIdentity": "workflow:github_actions:36563826168:UNKNOWN:VALIDATION",
       "strategyIdentity": "CROSS-VENUE-FUNDING-SPREAD-V2-FROZEN",
       "resultKind": "STRATEGY_PNL_RESULT",
       "recordedOutcome": "VALIDATION_FAIL_RESEARCH_REDESIGN",
@@ -242,7 +258,7 @@
     },
     {
       "resultRecordId": "result-tsmom-v2-discovery",
-      "resultIdentity": "run:36748128411:discovery",
+      "resultIdentity": "workflow:github_actions:36748128411:UNKNOWN:DISCOVERY",
       "strategyIdentity": "PAPER-PROFIT-TSMOM-V2",
       "resultKind": "STRATEGY_PNL_RESULT",
       "recordedOutcome": "TSMOM_V2_DISCOVERY_FAIL",
@@ -253,7 +269,7 @@
     },
     {
       "resultRecordId": "result-breakout-v1-discovery",
-      "resultIdentity": "run:37102449505:discovery",
+      "resultIdentity": "workflow:github_actions:37102449505:UNKNOWN:DISCOVERY",
       "strategyIdentity": "PAPER-PROFIT-REGIME-TREND-BREAKOUT-V1",
       "resultKind": "STRATEGY_PNL_RESULT",
       "recordedOutcome": "REGIME_TREND_BREAKOUT_V1_DISCOVERY_PASS_HOLDOUT_REQUIRED",
@@ -264,7 +280,7 @@
     },
     {
       "resultRecordId": "result-breakout-v1-holdout",
-      "resultIdentity": "run:37113947919:holdout",
+      "resultIdentity": "workflow:github_actions:37113947919:UNKNOWN:HISTORICAL_HOLDOUT",
       "strategyIdentity": "PAPER-PROFIT-REGIME-TREND-BREAKOUT-V1",
       "resultKind": "STRATEGY_PNL_RESULT",
       "recordedOutcome": "REGIME_TREND_BREAKOUT_V1_HOLDOUT_FAIL",
@@ -275,7 +291,7 @@
     },
     {
       "resultRecordId": "result-takerflow-v1-development",
-      "resultIdentity": "run:36609900324:development",
+      "resultIdentity": "workflow:github_actions:36609900324:UNKNOWN:DEVELOPMENT",
       "strategyIdentity": "PERPETUAL-TAKER-ORDER-FLOW-V1-FROZEN",
       "resultKind": "STRATEGY_PNL_RESULT",
       "recordedOutcome": "DEVELOPMENT_FAIL_RESEARCH_REDESIGN",
@@ -286,7 +302,7 @@
     },
     {
       "resultRecordId": "result-takerflow-v2-feature-validation",
-      "resultIdentity": "run:37115162706:feature-validation",
+      "resultIdentity": "workflow:github_actions:37115162706:UNKNOWN:FEATURE_VALIDATION",
       "strategyIdentity": "PERPETUAL-TAKER-ORDER-FLOW-RELATIVE-STRENGTH-V2-FROZEN",
       "resultKind": "DATA_VALIDATION_RESULT",
       "recordedOutcome": "FEATURE_VALIDATION_FAIL_RESEARCH_STOP",
@@ -297,7 +313,7 @@
     },
     {
       "resultRecordId": "result-regime-grid-v2-discovery",
-      "resultIdentity": "run:36547247431:discovery",
+      "resultIdentity": "workflow:github_actions:36547247431:UNKNOWN:DISCOVERY",
       "strategyIdentity": "REGIME-GATED-GRID-V2-FROZEN",
       "resultKind": "STRATEGY_PNL_RESULT",
       "recordedOutcome": "DISCOVERY_FAIL_RESEARCH_REDESIGN",
@@ -549,6 +565,14 @@
       "status": "PRIOR_REPORTED_RECEIPT_CHECK_NOT_PNL_OR_REPRODUCTION",
       "details": "The cited receipt report records a hash/manifest consistency audit; this packet did not repeat those checks or treat them as a strategy result.",
       "sourceRefs": ["receipt_verification", "matrix"]
+    },
+    {
+      "recordId": "release-safety-run-38636260048",
+      "identity": "LowVol receipt audit CI workflow, run 38636260048",
+      "recordKind": "CI_AUDIT_WITH_NO_JOBS",
+      "status": "NOT_AN_EVALUATOR_OR_STRATEGY_TRIAL",
+      "details": "The pinned receipt report records action_required with zero jobs and no failed-job logs; the current Actions metadata lookup reports failure with zero jobs. This status discrepancy remains UNKNOWN. The workflow run is explicitly excluded from trade/research-trial usage and cannot establish evaluator execution.",
+      "sourceRefs": ["receipt_verification", "evidence_review"]
     }
   ],
   "proposedProtocol": {
@@ -628,6 +652,15 @@
   },
   "budget": {
     "status": "UNKNOWN_UNRECONCILED",
+    "countingPolicy": {
+      "status": "UNKNOWN_UNRECONCILED",
+      "policyId": "UNKNOWN",
+      "includedAttemptClasses": "UNKNOWN",
+      "excludedAttemptClasses": "UNKNOWN",
+      "includedStatuses": "UNKNOWN",
+      "excludedStatuses": "UNKNOWN",
+      "sourceRefs": ["protocol", "matrix", "evidence_review"]
+    },
     "authorizedCap": "UNKNOWN",
     "consumedAttemptRefs": "UNKNOWN",
     "remaining": "UNKNOWN",
@@ -637,17 +670,21 @@
   "reportedCounts": {
     "resultRecords": 12,
     "attemptRecords": 20,
-    "distinctAttemptIdentities": 20,
-    "evaluatorAttempts": 14,
-    "nonEmpiricalRecords": 6,
+    "documentedWorkflowRunIds": 20,
+    "knownRunAttemptNumbers": 0,
+    "exactDistinctAttemptIdentities": "UNKNOWN",
+    "evaluatorClassifiedAttemptRecords": 14,
+    "nonEmpiricalRecords": 7,
     "proposedCells": 8
   },
   "interpretationLimits": [
-    "Counts are only the uniquely listed records in this bounded source scan, not complete campaign totals, a cap, remaining capacity, or proof of zero unlisted work.",
+    "Counts are only listed inventory rows and documented run IDs in this bounded source scan, not exact attempt counts, complete campaign totals, a cap, remaining capacity, or proof of zero unlisted work.",
     "Result records are separate from workflow attempts. An evaluator result may be a feature/data-validation result rather than empirical strategy PnL; an operational workflow or synthetic test is not an empirical backtest.",
     "Workflow success is not strategy success. The technical-invalid LowVol run and the duplicate reproducibility check are retained as separate run identities; the latter is not a second selected result.",
     "The LowVol prospective snapshot/retry workflows recorded zero eligible observations, are not historical PnL runs, and do not establish a zero lifetime trial count.",
-    "Every runAttempt number is UNKNOWN because the pinned source summaries identify workflow run IDs but do not establish a distinct Actions attempt number.",
+    "Documented workflow run IDs are known in several sources, but all 20 exact Actions runAttempt numbers are UNKNOWN; exact distinct attempt identities and consumed use therefore remain UNKNOWN.",
+    "Actions run 38636260048 is listed only as a CI receipt-audit non-execution record: the pinned report and current Actions metadata disagree on conclusion, both report zero jobs, and neither counts it as an evaluator/trade/research trial.",
+    "Source paths and hashes are assertions in this register, not authenticated execution receipts, reviewer signatures, or proof that an evaluator ran.",
     "No historical cancellation, abort, or discard event is asserted unless a pinned source proves it; a missing item from this bounded list remains UNKNOWN."
   ]
 }
