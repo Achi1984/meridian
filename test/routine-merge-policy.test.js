@@ -47,3 +47,22 @@ test('strict malformed and hostile inputs reject before early return',()=>{
  const traversal=input();traversal.candidate.changes[0].path='src/../secret';assert.throws(()=>classify(traversal),/INVALID_DIFF/);
  const duplicate=input();duplicate.ci.checks.push({...duplicate.ci.checks[0]});assert.throws(()=>classify(duplicate),/INVALID_CHECKS/);
 });
+
+
+test('canonical verdict contract and incomplete evidence cannot qualify as green',async()=>{
+ const routine=await import('../scripts/routine-merge-policy.mjs');
+ const mailbox=await import('../scripts/watchdog-mailbox.mjs');
+ assert.deepEqual(routine.CANONICAL_REVIEW_VERDICTS,['GREEN_LIGHT','REVISION_REQUIRED','NEEDS_MORE_EVIDENCE']);
+ assert.deepEqual(mailbox.CANONICAL_REVIEW_VERDICTS,routine.CANONICAL_REVIEW_VERDICTS);
+ for(const verdict of ['REVISION_REQUIRED','NEEDS_MORE_EVIDENCE']){
+  const s=input();s.review.verdict=verdict;assert.equal(classify(s).reason,'REVIEW_INCOMPLETE');
+ }
+ for(const verdict of ['CHANGES_REQUIRED','STALE_HEAD','ROOT_CAUSE_CONFIRMED','ALTERNATIVE_CAUSE']){
+  const s=input();s.review.verdict=verdict;assert.throws(()=>classify(s),/INVALID_REVIEW/);
+ }
+ for(const change of [s=>s.review.fullDiffReviewed=false,s=>s.review.gaps=1,
+   s=>s.ci.checks=[],s=>s.ci.headSha='c'.repeat(40)]){
+  const s=input();change(s);assert.equal(classify(s).eligibleForStandingApproval,false);
+ }
+ const missing=input();delete missing.ci;assert.throws(()=>classify(missing),/INVALID_SCHEMA/);
+});

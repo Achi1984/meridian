@@ -41,9 +41,9 @@ function assertDelivery(options, expected) {
   assert.equal(result.unresolved, expected === 'ANSWERED' ? '' : KEY);
 }
 
-for (const verdict of ['GREEN_LIGHT', 'CHANGES_REQUIRED', 'STALE_HEAD',
+for (const verdict of ['GREEN_LIGHT', 'REVISION_REQUIRED', 'CHANGES_REQUIRED', 'STALE_HEAD',
   'NEEDS_MORE_EVIDENCE', 'ROOT_CAUSE_CONFIRMED', 'ALTERNATIVE_CAUSE']) {
-  test(`canonical ${verdict}: delivery answered, never merge authority`, () => {
+  test(`canonical or legacy ${verdict}: delivery answered, never merge authority`, () => {
     assertDelivery({ verdict }, 'ANSWERED');
   });
 }
@@ -52,12 +52,12 @@ for (const verdict of ['GREEN_LIGHT', 'CHANGES_REQUIRED', 'STALE_HEAD',
 // not assertions that losing a delivered review is desirable policy.
 for (const [label, options, expected] of [
   ['spaced GREEN LIGHT', { verdict:'GREEN LIGHT' }, 'UNRESOLVED'],
-  ['unsupported REVISION_REQUIRED', { verdict:'REVISION_REQUIRED' }, 'UNRESOLVED'],
+  ['canonical REVISION_REQUIRED', { verdict:'REVISION_REQUIRED' }, 'ANSWERED'],
   ['REVISION_REQUIRED with prose', { verdict:'REVISION_REQUIRED for integration readiness.' }, 'UNRESOLVED'],
   ['canonical token with arbitrary suffix', { verdict:'GREEN_LIGHT for this exact head.' }, 'UNRESOLVED'],
   ['canonical token with parentheses', { verdict:'GREEN_LIGHT (static review only)' }, 'ANSWERED'],
   ['negative token with parentheses', { verdict:'CHANGES_REQUIRED (integration pending)' }, 'ANSWERED'],
-  ['unsupported token with parentheses', { verdict:'REVISION_REQUIRED (integration pending)' }, 'UNRESOLVED'],
+  ['canonical revision with parentheses', { verdict:'REVISION_REQUIRED (integration pending)' }, 'ANSWERED'],
   ['prose after closing parentheses', { verdict:'GREEN_LIGHT (static review) more text' }, 'UNRESOLVED'],
   ['separate-line review prose', { prose:'\n\nSynthetic review explanation. Not merge approval.' }, 'ANSWERED'],
   ['CRLF direct response', { eol:'\r\n' }, 'ANSWERED'],
@@ -92,3 +92,4 @@ test('canonical CRLF response cannot authenticate a request with the wrong owner
   assert.equal(result.reviewAuthorization, false);
   assert.equal(result.executionImpact, false);
 });
+

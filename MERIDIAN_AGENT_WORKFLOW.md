@@ -282,7 +282,7 @@ Default behavior:
 - interrupt only for required missing information, an unresolvable blocker, unresolved failure after three loops, or an action that requires explicit external authorization
 
 ### 16.1 Mandatory User Escalation
-Post `CROSS_MODEL_STATUS NEEDS_USER_DECISION` with `@Achi1984` in #571 before proceeding for:
+Post `CROSS_MODEL_STATUS NEEDS_USER_DECISION` with `@Achi1984` in the active checkpoint mailbox before proceeding for:
 - Stage/lock changes, canonical V2 run, strategy PnL, Discovery, Validation, Holdout, Paper or Live.
 - A new strategy or research direction.
 - Agent-rule changes: Lead lease, protocols, STREAM-SAFE version, bootstrap, review duties or workflow permissions.
@@ -409,3 +409,9 @@ After adoption, ChatGPT as sole merge owner may apply the standing approval to r
 `ownerMergeApprovalRequired` remains true: the adopted bounded standing approval is one permitted form of owner approval; it is never optional. Architecture/direction, budget, security/permissions, policy/workflows/schedulers, release-governance changes, production activation and research/trading changes remain individually owner-gated. The daily UI-release cap is removed; expected-state protection, single-writer and research gates remain unchanged. Unknown scope, conflicting findings or missing evidence stops the affected work package.
 
 Immediately publish `FINAL_MERGE_STATUS` after each merge. Do not merge another dependent candidate until all required post-merge checks succeed; failure or unknown outcome stops that pipeline and triggers reconciliation. The owner may revoke this standing approval at any time. No new automated dispatcher, credentials, schedule, deployment authority or spending is introduced.
+
+
+
+## Housekeeping contract
+
+The owner housekeeping contract in `MERIDIAN_GO.md` is binding: canonical verdicts, full-scope and exact-head-CI review gates, in-place decision resolution, real read-only credential preflight, separate recovery/retry approvals, and merge-block handoff refresh. The proposed mailbox639 route activates only after concrete owner-approved merge;571 remains binding until then. Watchdog status uses the checkpoint-pinned single comment, separate from requested review responses. WIP maximum3active work packages is approved by owner2026-10-15T20:16:49+02:00, decision6199107184.
