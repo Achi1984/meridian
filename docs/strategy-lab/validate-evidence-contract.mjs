@@ -601,8 +601,9 @@ export function validateEvidenceContract(input) {
         add(`${path}.preregistration.declaredAt`, 'INVALID', 'CRITERIA_NOT_PREDECLARED');
       }
       if (stage === 'OUT_OF_SAMPLE_HOLDOUT') {
-        const firstExposure = receipt.holdoutAccess?.exposures?.find(item =>
-          object(item) && item.role === 'FIRST_EXPOSURE');
+        const exposures = receipt.holdoutAccess?.exposures;
+        const firstExposure = Array.isArray(exposures) ? exposures.find(item =>
+          object(item) && item.role === 'FIRST_EXPOSURE') : undefined;
         if (timestamp(firstExposure?.at) && declared >= parsedTimestamp(firstExposure.at)) {
           add(`${path}.preregistration.declaredAt`, 'INVALID', 'CRITERIA_NOT_PREDECLARED');
         }
@@ -702,8 +703,9 @@ export function validateEvidenceContract(input) {
       add(`${path}.declaredAt`, 'INVALID', 'THRESHOLD_NOT_PREDECLARED');
     }
     if (receipt.stage === 'OUT_OF_SAMPLE_HOLDOUT') {
-      const firstExposure = receipt.holdoutAccess?.exposures?.find(item =>
-        object(item) && item.role === 'FIRST_EXPOSURE');
+      const exposures = receipt.holdoutAccess?.exposures;
+      const firstExposure = Array.isArray(exposures) ? exposures.find(item =>
+        object(item) && item.role === 'FIRST_EXPOSURE') : undefined;
       if (timestamp(firstExposure?.at) && declared >= parsedTimestamp(firstExposure.at)) {
         add(`${path}.declaredAt`, 'INVALID', 'THRESHOLD_NOT_PREDECLARED');
       }

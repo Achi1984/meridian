@@ -459,6 +459,27 @@ test('malformed, cyclic, accessor, and bounded inputs return structured denials 
     assert.equal(result.authority.executionAuthorized,false);
     assert.doesNotThrow(()=>JSON.stringify(result));
   }
+  for(const exposures of [{},42,'not-an-array']){
+    const malformedOutcome=packet();
+    malformedOutcome.lifecycle.receipts[3].holdoutAccess.exposures=exposures;
+    const outcomeResult=validateEvidenceContract(JSON.parse(JSON.stringify(malformedOutcome)));
+    assert.ok(issue(outcomeResult,'INVALID_EXPOSURE_LIST'));
+    assert.equal(outcomeResult.evidenceCompleteness.status,'INVALID');
+    assert.equal(outcomeResult.authority.executionAuthorized,false);
+    assert.doesNotThrow(()=>JSON.stringify(outcomeResult));
+
+    const malformedThreshold=packet();
+    malformedThreshold.lifecycle.receipts[3].holdoutAccess.exposures=exposures;
+    malformedThreshold.lifecycle.receipts[3].metrics[0].threshold={
+      operator:'GTE',value:0,unit:'ratio',declaredAt:'2025-01-02T00:00:00Z',
+      declaredBy:'Synthetic fixture author',source:'Synthetic predeclared threshold.'
+    };
+    const thresholdResult=validateEvidenceContract(JSON.parse(JSON.stringify(malformedThreshold)));
+    assert.ok(issue(thresholdResult,'INVALID_EXPOSURE_LIST'));
+    assert.equal(thresholdResult.evidenceCompleteness.status,'INVALID');
+    assert.equal(thresholdResult.authority.executionAuthorized,false);
+    assert.doesNotThrow(()=>JSON.stringify(thresholdResult));
+  }
   const nonfinite=packet();nonfinite.lifecycle.receipts[6].metrics[0].value=Infinity;
   assert.equal(validateEvidenceContract(nonfinite).evidenceCompleteness.status,'INVALID');
   const jsonPollution=JSON.parse('{"__proto__":{"polluted":true}}');
