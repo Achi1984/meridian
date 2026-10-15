@@ -3,8 +3,8 @@ from contextlib import ExitStack, redirect_stdout, redirect_stderr
 import importlib.util
 import io
 import resource
+import sys
 from pathlib import Path
-from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 
@@ -16,6 +16,16 @@ def load():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+class FlagsOverride:
+    """Override one guard while preserving interpreter flags used by argparse."""
+    def __init__(self, original, isolated):
+        self.original = original
+        self.isolated = isolated
+
+    def __getattr__(self, name):
+        return getattr(self.original, name)
 
 
 class ReadOnlyServices:
@@ -99,7 +109,7 @@ class ReconciliationTests(unittest.TestCase):
             stack.enter_context(patch.object(auto, 'load_original', return_value=original))
             factory = stack.enter_context(patch.object(auto, 'Services', return_value=services))
             stack.enter_context(patch.object(original, 'emit_status', side_effect=lambda s: emitted.append(s) or delivered))
-            stack.enter_context(patch.object(self.m.sys, 'flags', SimpleNamespace(isolated=isolated)))
+            stack.enter_context(patch.object(self.m.sys, 'flags', FlagsOverride(self.m.sys.flags, isolated)))
             stack.enter_context(patch.object(self.m.sys, 'gettrace', return_value=None))
             stack.enter_context(patch.object(self.m.sys, 'getprofile', return_value=None))
             stack.enter_context(patch.object(self.m.sys.stdin, 'isatty', return_value=tty))
@@ -108,6 +118,13 @@ class ReconciliationTests(unittest.TestCase):
             limits = stack.enter_context(patch.object(resource, 'setrlimit'))
             result = self.m.main(args)
         return result, emitted, factory, limits
+
+    def test_flags_override_preserves_argparse_environment_flag(self):
+        for isolated in (0, 1):
+            flags = FlagsOverride(sys.flags, isolated)
+            self.assertEqual(flags.isolated, isolated)
+            self.assertEqual(flags.ignore_environment, sys.flags.ignore_environment)
+            self.assertEqual(flags.verbose, sys.flags.verbose)
 
     def test_valid_cli_runs_read_only_services_and_disables_core_dumps(self):
         result, emitted, factory, limits = self.cli(self.arguments())
