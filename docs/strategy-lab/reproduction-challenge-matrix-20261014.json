@@ -1,0 +1,566 @@
+{
+  "schemaVersion": "MERIDIAN_INDEPENDENT_REPRODUCTION_CHALLENGE_MATRIX_V1",
+  "opId": "STRATEGY-INDEPENDENT-REPRODUCTION-PLAN-20261014",
+  "status": "SOURCE_PREPARATION_ONLY",
+  "preparedAgainstMain": "efec133f4ff8a809722b79fa7c5fe8007667c1ea",
+  "pinnedHistoricalSourceCommit": "386013c1e78c4be5ea5d6c89063c9c4b8dacda66",
+  "protocol": "INDEPENDENT_BACKTEST_REPRODUCTION_PROTOCOL_20261014.md",
+  "scope": {
+    "primaryStrategy": "LOW-VOLATILITY-RANK-WEIGHTED-V2-FROZEN",
+    "firstStage": "independent faithful reproduction, Development then historical Holdout audit",
+    "developmentPeriods": 48,
+    "historicalHoldoutPeriods": 34,
+    "baselineStageRuns": 2,
+    "maximumDiagnosticCells": 6,
+    "maximumStageScenarioCells": 8,
+    "eachCellAtMostOnce": true,
+    "automaticOrManualRetryAllowed": false,
+    "holdoutIsFreshConfirmation": false,
+    "dataAcquisitionAllowed": false,
+    "evaluationOrPnlRunPerformed": false,
+    "dispatchOrPaidResourcesAllowed": false,
+    "paperOrLiveAuthorizationChanged": false,
+    "pr805OrM11FilesMayBeEdited": false
+  },
+  "frozenRules": {
+    "assets": [
+      "BTC",
+      "ETH",
+      "BNB",
+      "SOL",
+      "XRP",
+      "ADA",
+      "DOGE",
+      "LINK",
+      "DOT",
+      "LTC",
+      "BCH",
+      "AVAX"
+    ],
+    "venue": "Binance USD-M perpetuals",
+    "anchorUtc": "Saturday 00:00:00",
+    "feature": {
+      "returns": 672,
+      "hours": 672,
+      "definition": "RV28=sqrt(sum(hourly_close_to_close_log_return^2)); LOWVOL=-RV28",
+      "noBarAtOrAfterAnchor": true,
+      "ranking": "ascending average rank; rank 1 highest volatility, rank 12 lowest volatility",
+      "weights": "z_i=rank_i-6.5; w_i=z_i/sum(abs(z)); fail if denominator<=0"
+    },
+    "exposure": {
+      "gross": 1.0,
+      "net": 0.0,
+      "longGross": 0.5,
+      "shortGross": -0.5,
+      "leverageMultiplier": 1.0
+    },
+    "accounting": {
+      "price": "hourly public kline open at t to open at t+7d",
+      "fundingInterval": "(t,t+7d]",
+      "fundingContribution": "-target_weight * sum(funding_rates)",
+      "turnover": "sum(abs(new_target_weight-previous_target_weight)); initial previous weights=0",
+      "terminalClose": "sum(abs(last_target_weight)) after final week",
+      "baselineOneWayBps": 10,
+      "stressOneWayBps": 20
+    },
+    "development": {
+      "periods": 48,
+      "firstAnchor": "2025-02-01T00:00:00Z",
+      "anchorRule": "firstAnchor + 7d*k for integer k=0..47",
+      "lastAnchor": "2025-12-27T00:00:00Z",
+      "terminalOpen": "2026-01-03T00:00:00Z"
+    },
+    "historicalHoldout": {
+      "periods": 34,
+      "firstAnchor": "2026-01-03T00:00:00Z",
+      "anchorRule": "firstAnchor + 7d*k for integer k=0..33",
+      "lastFeatureAnchor": "2026-08-22T00:00:00Z",
+      "terminalOpen": "2026-08-29T00:00:00Z",
+      "use": "audit-only; never fresh confirmation or tuning"
+    }
+  },
+  "frozenGates": {
+    "developmentDecisionNames": [
+      "DEVELOPMENT_PASS_HOLDOUT_REQUIRED",
+      "DEVELOPMENT_FAIL_RESEARCH_STOP"
+    ],
+    "holdoutDecisionNames": [
+      "HOLDOUT_PASS_PROSPECTIVE_PAPER_REVIEW_ONLY",
+      "HOLDOUT_FAIL_RESEARCH_STOP"
+    ],
+    "periodsExact": {
+      "development": 48,
+      "historicalHoldout": 34
+    },
+    "assetsPerPeriodExact": 12,
+    "grossExposure": "1.0 under the original frozen numerical invariant",
+    "absoluteNetExposureMax": 1e-12,
+    "baselineCompoundedNetReturnMinExclusive": 0,
+    "profitFactorMin": 1.15,
+    "annualizedWeeklySharpeMin": 0.75,
+    "sharpeAnnualization": "sqrt(52)",
+    "maximumDrawdownMax": 0.2,
+    "positiveChronologicalBlocksMin": 3,
+    "chronologicalBlockCount": 4,
+    "stressOneWayBps": 20,
+    "stressCompoundedNetReturnMinExclusive": 0,
+    "meanWeeklyRankICMinExclusive": 0,
+    "rankICNeweyWestLag": 4,
+    "rankICNeweyWestTMin": 1.645,
+    "sourceFundingInvariantOrLineageFailuresAllowed": false,
+    "gatesMayBeChanged": false
+  },
+  "receiptAudit": {
+    "pr": 805,
+    "observedStateAtPreparation": {
+      "state": "OPEN",
+      "draft": true,
+      "head": "8c6eab1138e244170ae97e66be595270323133a1",
+      "base": "c37343948f3d24c4105d9970e24dd3c0ac77905f",
+      "baseWasBehindPreparationMain": true,
+      "preparationMain": "efec133f4ff8a809722b79fa7c5fe8007667c1ea",
+      "formalGithubReviewsObserved": 0,
+      "changedFiles": 5
+    },
+    "currentStatusAfterMerge": {
+      "state": "MERGED",
+      "prHead": "e05409412d82acea26a3e0a6ccbb5cc7d99276bb",
+      "mergeCommit": "1387b47e564c06c3475db501ac3ee77ffa098715",
+      "mergedAt": "2026-10-15T05:34:24Z",
+      "mainAtVerification": "1387b47e564c06c3475db501ac3ee77ffa098715"
+    },
+    "audit": {
+      "reportedAuditCodeHead": "7a13ea11c49ba64b2f1cf6318a1c3d39c80f4633",
+      "reportedVerifierSha256": "32e5f193c215b464c16c2a4b5fbcf93a863ca3dc463218da9cd721d39f0010df",
+      "reportedOutcome": "VERIFIED",
+      "reportedInputs": 52,
+      "reportedUnavailable": 0,
+      "reportedMismatches": 0,
+      "manifestGitBlob": "6dbb807aa251ef9d49a2ed96884e5c88f10e93b8",
+      "reportGitBlob": "0ca51fdb18a443d7c65bf8773d9064ce6c9a40a3",
+      "leadReceiptComments": [
+        6177484124,
+        6177783380
+      ],
+      "independentPackageReviewComment": 6177831281,
+      "baseSyncRequestComment": 6178491881,
+      "baseSyncConfirmationComment": 6178523406,
+      "interpretation": "existing receipt/byte-identity evidence only; not an independent PnL reproduction, raw-source authenticity certification, economic audit, or review of this protocol"
+    }
+  },
+  "independenceAndBlinding": {
+    "independentCode": "required; derive from pinned specification without importing/copying/transliterating evaluator or collector",
+    "resultBlinding": "NOT_BLINDED",
+    "reason": "preparation author inspected pinned outcomes and this protocol names prior gate decisions; future implementer must declare prior exposure",
+    "freezeIndependentCodeAndSyntheticChecksBeforeAdditionalExpectedOutputComparison": true,
+    "blindnessCanBeRestoredByNewImplementer": false,
+    "ifBlindComparisonRequiredButPriorExposureKnown": "stop blind-comparison claim; any independent-code reproduction requires separate authorization and honest NOT_BLINDED label",
+    "historicalHoldoutFreshConfirmation": false
+  },
+  "existingHistoricalArtifacts": {
+    "fullMemberNamesSizesAndSha256Pin": {
+      "source": "PR805 receipt manifest",
+      "path": "docs/strategy-lab/lowvol-receipt-manifest-20261014.json",
+      "gitBlob": "6dbb807aa251ef9d49a2ed96884e5c88f10e93b8",
+      "memberRule": "use every listed archive and member name, byte size, and SHA-256 exactly; do not copy or infer omitted member hashes"
+    },
+    "development": {
+      "evaluatorImplementationMerge": "257fcd3fba441e3ccb4103ba8c1382185d22c9a0",
+      "runAuthorizationCommit": "a30a789ce058b08452bb4597f4a92b3bd58383e1",
+      "workflowRun": 37132394717,
+      "sourceArtifact": {
+        "artifactId": 11277247641,
+        "kind": "development-source",
+        "zipSha256": "b62f7b3eadacc7c55a1d61006d645caea385dbd73c33854522c30624499e5556",
+        "sourceReceiptSha256": "c632e7a00c30625fc3efb7a58c400e9c9b481bb0c603aa95bf68e0be44ba6220",
+        "manifestSha256": "770e7d452422793debc08c80f19f168c6da6ef487db6c9c2b2ce3726a05a8662",
+        "hourlyRowsPerAsset": 8738,
+        "hourlyFirst": "2025-01-03T23:00:00Z",
+        "hourlyLast": "2026-01-03T00:00:00Z",
+        "fundingFirst": "2025-02-01T00:00:00Z",
+        "fundingLast": "2026-01-03T00:00:00Z",
+        "fundingRowsPerAsset": "UNKNOWN_IN_PINNED_SUMMARY; verify from the exact receipted member before execution",
+        "assetCount": 12
+      },
+      "resultArtifact": {
+        "artifactId": 11277656738,
+        "kind": "development-result",
+        "zipSha256": "e076f9424b4373621bec7502d9835945a00a1211716ba299057b7adcd7b22314",
+        "jsonSha256": "c72046db7aeb0e28a87e3e8e2c181b9d67f8ed9b8eae275c3b7f4037793a16bb",
+        "markdownSha256": "e0a2c60b690ddd0c3b5cf141e21208bf2f255de0f1952f1853f1df14fcbeec62",
+        "recordedDecision": "DEVELOPMENT_PASS_HOLDOUT_REQUIRED"
+      }
+    },
+    "historicalHoldout": {
+      "evaluatorImplementationMerge": "76e7161ab00886932412a027b9e93b1061ecce4a",
+      "runAuthorizationCommit": "b15bddb8f316b8d313dd8893a46654849db2a6cd",
+      "workflowRun": 37133809945,
+      "sourceArtifact": {
+        "artifactId": 11278085201,
+        "kind": "holdout-source",
+        "zipSha256": "8f9ed3953268ba985034ecd6db09a4a3e5900c835061ce6930b710320de50426",
+        "sourceReceiptSha256": "cba10d070b2956d4ba293888f26dcd65c93875096aee22b5a7b7e457bbe5b76e",
+        "manifestSha256": "ed2ed862e62578dd0695a5d852e1e661ef2ee01dcc6d37f1e0e35b87168aa230",
+        "hourlyRowsPerAsset": 6386,
+        "hourlyFirst": "2025-12-05T23:00:00Z",
+        "hourlyLast": "2026-08-29T00:00:00Z",
+        "fundingRowsPerAsset": 715,
+        "fundingFirst": "2026-01-03T00:00:00.001Z",
+        "fundingLast": "2026-08-29T00:00:00Z",
+        "assetCount": 12
+      },
+      "resultArtifact": {
+        "artifactId": 11277199985,
+        "kind": "holdout-result",
+        "zipSha256": "7c96e9456d80f3eb61047f6c7f108dddddbf704409f6526643f5fa3f8e1106af",
+        "jsonSha256": "c88ab6074e3fc0777f3a69693d6e549a9b704f7a668b384a44d0e0db02a01dd0",
+        "markdownSha256": "24cdf3b1d54a943fa17645bcb77237b3082ba73e72dc196554ed13b767f24e7a",
+        "recordedDecision": "HOLDOUT_PASS_PROSPECTIVE_PAPER_REVIEW_ONLY",
+        "use": "historical audit only; already observed"
+      }
+    },
+    "excludedProspectiveArtifacts": {
+      "run": 38125893276,
+      "sourceArtifactId": 11697855479,
+      "snapshotArtifactId": 11697446266,
+      "reason": "zero eligible observations; not a substitute for historical Development/Holdout inputs or a reason to collect data"
+    },
+    "missingReceiptPolicy": "STOP; no fetch, download, replacement, reconstruction, interpolation, alternate venue, or synthetic backfill"
+  },
+  "originalLineage": {
+    "lowVolV1FeatureEvidence": {
+      "identity": "CROSS-SECTIONAL-LOW-VOLATILITY-V1-FROZEN",
+      "run": 37129972221,
+      "sourceArtifactId": 11275844066,
+      "resultArtifactId": 11275854084,
+      "recordedDecision": "DISCOVERY_FAIL_RESEARCH_STOP",
+      "detail": "48 weekly observations; 12 Binance USD-M perpetuals; 672-hour feature; Low-2 minus High-2 Newey-West(4) t=0.9583 versus 1.645; no strategy PnL and no Holdout",
+      "sourcePath": "research/CROSS-SECTIONAL-LOW-VOLATILITY-V1-DISCOVERY-EVIDENCE.md"
+    },
+    "crossVenueV1": {
+      "identity": "CROSS-VENUE-FUNDING-SPREAD-V1-FROZEN",
+      "sourceEvaluatorBlob": "774fc9cfbd5fd122fefd587d800231b0dfa99d9f",
+      "discoveryRun": 36526460897,
+      "discoveryHead": "b2c458f5a6ee42017eea890ae925efbe28961505",
+      "transferHoldoutRun": 36527605999,
+      "transferHead": "6e7184791e8ab56c8b38b1343cf1cbba518bed2c",
+      "transferArtifactId": 11015656202,
+      "transferArtifactZipSha256": "f0cd07479fb1a534275feb9a3930c732117196ac002af54236b5c245248af7f7",
+      "recordedDecision": "HOLDOUT_FAIL_RESEARCH_REDESIGN",
+      "failure": "XRP net PnL was negative under the frozen all-assets-positive gate; preserve the positive Discovery and failed transfer result together",
+      "sourcePaths": [
+        "research/CROSS-VENUE-FUNDING-SPREAD-V1-FROZEN.md",
+        "research/CROSS-VENUE-FUNDING-SPREAD-V1-TRANSFER-HOLDOUT-RESULT.md"
+      ]
+    },
+    "crossVenueV2": {
+      "identity": "CROSS-VENUE-FUNDING-SPREAD-V2-FROZEN",
+      "evaluatorBlob": "25f5210e886427ac06febf05540655719eb3894d",
+      "validationRun": 36563826168,
+      "validationHead": "f061c1779a23008993d24173224e729d1ab5dd7c",
+      "resultArtifactId": 11031542226,
+      "recordedDecision": "VALIDATION_FAIL_RESEARCH_REDESIGN",
+      "sourcePath": "research/CROSS-VENUE-FUNDING-SPREAD-V2-FROZEN.md"
+    },
+    "tsmomV2": {
+      "identity": "PAPER-PROFIT-TSMOM-V2",
+      "evaluatorBlob": "5f05fcb7f58073b0cf645690803f30be1a7c0be3",
+      "discoveryRun": 36748128411,
+      "evaluatorHead": "4de4282a7bda862d92594c01cae22f71609f1f78",
+      "resultArtifactId": 11113377407,
+      "resultArtifactSha256": "d0049137ef899fedff2e01a9185bbcc11a036343ecbc6c37c122c896db611dd5",
+      "recordedDecision": "TSMOM_V2_DISCOVERY_FAIL",
+      "holdout": "null_not_evaluated",
+      "sourcePath": "research/PAPERBOT-PROFIT-TSMOM-V2-RESULT.md"
+    },
+    "regimeTrendBreakoutV1": {
+      "identity": "PAPER-PROFIT-REGIME-TREND-BREAKOUT-V1",
+      "implementationMerge": "b45e021ec29d4c53b9878dd74ccad84482fdf3be",
+      "discoveryRunAuthorizationCommit": "df689266b113d4a2fda7c5c4c405f738fb77990d",
+      "discoveryRun": 37102449505,
+      "discoverySourceArtifactId": 11266308720,
+      "discoverySourceArtifactSha256": "51e84ed6eb02fd8ebbb49351d5c4e1ad59555b69f571f807a6d021f6f0473b06",
+      "discoveryResultArtifactId": 11266752800,
+      "discoveryResultArtifactSha256": "b2ff28a23a42dc5166b9a21a3c58cfc3d74adaec5078ca57d2887f05ac77cc41",
+      "discoveryDecision": "REGIME_TREND_BREAKOUT_V1_DISCOVERY_PASS_HOLDOUT_REQUIRED",
+      "holdoutRun": 37113947919,
+      "holdoutImplementationMerge": "4fc28499e0064985c06cf53d8e84bfd265a52aac",
+      "holdoutAuthorizationCommit": "86d9e0bc518854f57b086c30cd238c6d05131574",
+      "holdoutSourceArtifactId": 11270302232,
+      "holdoutResultArtifactId": 11270262408,
+      "holdoutResultZipSha256": "9b340d23de33da7d087fee01344f32d2d1db9a984a2bd4e85618bacb1bdfff45",
+      "recordedDecision": "REGIME_TREND_BREAKOUT_V1_HOLDOUT_FAIL",
+      "sourcePath": "research/PAPERBOT-PROFIT-REGIME-TREND-BREAKOUT-V1-HOLDOUT-EVIDENCE.md"
+    },
+    "takerFlow": [
+      {
+        "identity": "PERPETUAL-TAKER-ORDER-FLOW-V1-FROZEN",
+        "run": 36609900324,
+        "runCommit": "88e7225eca567c516ea197c27254c82cb4775645",
+        "artifactId": 11053620061,
+        "artifactZipSha256": "b7d77f3cee303467041efed59095e76b12dccacf897a66c570f1d54e762faa16",
+        "recordedDecision": "DEVELOPMENT_FAIL_RESEARCH_REDESIGN",
+        "sourcePath": "research/PERPETUAL-TAKER-ORDER-FLOW-V1-DEVELOPMENT-RESULT.md"
+      },
+      {
+        "identity": "PERPETUAL-TAKER-ORDER-FLOW-RELATIVE-STRENGTH-V2-FROZEN",
+        "implementationMerge": "d0cc924fb7abea1eb1d07bf8a85e7ab1f8993a61",
+        "run": 37115162706,
+        "runAuthorizationCommit": "c1d001f558636452f83633522b90a8c5fbcb4280",
+        "resultArtifactId": 11271273871,
+        "sourceArtifactId": 11271144039,
+        "resultArtifactZipSha256": "2b706bcd0490e29f54b10130bed53c37f788856e0144c0ebf4992e6b79100c64",
+        "resultJsonSha256": "3a9bc143980661eb00b1f5b4a5464e44d99ca65a4ecd9c56e922e15cb2bc3c4d",
+        "resultMarkdownSha256": "471ad636736a914d582e617d78860c2310f1bc03709b0c667a6eb4cc451cc5b1",
+        "recordedDecision": "FEATURE_VALIDATION_FAIL_RESEARCH_STOP",
+        "strategyPnlCalculated": false,
+        "sourcePath": "research/PERPETUAL-TAKER-ORDER-FLOW-RELATIVE-STRENGTH-V2-EVIDENCE.md"
+      }
+    ],
+    "regimeGridV2": {
+      "identity": "REGIME-GATED-GRID-V2-FROZEN",
+      "run": 36547247431,
+      "artifactId": 11023180803,
+      "artifactZipSha256": "e1ea1b30ad9ad1ddcd3bb6e88cf906595af44006003e78b7ae83033885cfd5a9",
+      "summarySha256": "89b478d4ffad0a70293d74a5476421c9c43ca2125ab424528d6ba2ed521f2b0d",
+      "fullEvidenceSha256": "db6410bd6d93941145b409e67850c72b847ca523ef61726edbedcfd484262d7d",
+      "recordedDecision": "DISCOVERY_FAIL_RESEARCH_REDESIGN",
+      "sourcePath": "research/REGIME-GATED-GRID-V2-RESULT.md",
+      "evaluatorCommit": "UNKNOWN_IN_INSPECTED_EVIDENCE"
+    },
+    "technicalInvalidLowVolRuns": [
+      {
+        "run": 37131815781,
+        "status": "technical_invalid_no_strategy_result",
+        "reason": "funding timestamp gap validation stopped before returns; result=null"
+      },
+      {
+        "run": 37132982310,
+        "status": "duplicate_after_canonical_development",
+        "use": "reproducibility check only; not an additional selected result"
+      },
+      {
+        "run": 37143326461,
+        "status": "prospective_source_probe_failed_before_eligible_outcome"
+      },
+      {
+        "run": 37143595493,
+        "status": "prospective_source_probe_failed_before_eligible_outcome"
+      }
+    ]
+  },
+  "notEstablishedAsBacktests": {
+    "identities": [
+      "H5",
+      "H7",
+      "P1",
+      "C1",
+      "X1"
+    ],
+    "knownStatus": "design_only_or_synthetic_engineering_only",
+    "empiricalBacktestEvidenceEstablished": false,
+    "trialHistoryComplete": false,
+    "remainingTrialBudget": "UNKNOWN_UNRECONCILED",
+    "individualStatuses": {
+      "H5": {
+        "status": "shock_and_reclaim_design_sketch",
+        "empiricalResult": false,
+        "supplementalPr": 757,
+        "supplementalHead": "5a5f67cb21b10abf30cbf46497cbe79e8e0a6f62",
+        "note": "rejected direct-entry design attempt is not an empirical strategy loss"
+      },
+      "H7": {
+        "status": "defensive_spot_low_volatility_design_only",
+        "empiricalResult": false,
+        "lineagePr": 791,
+        "lineageHead": "41b638ec567540e555eb0dc0cd45bb97e3278cba",
+        "note": "not the frozen LowVol V2 perpetual long/short strategy"
+      },
+      "P1": {
+        "identity": "H1.P1.DAILY.V1",
+        "status": "draft_blocked_synthetic_adapter",
+        "empiricalResult": false
+      },
+      "C1": {
+        "identity": "H1.C1.NONCROSSING.V1",
+        "status": "draft_blocked_synthetic_adapter",
+        "empiricalResult": false
+      },
+      "X1": {
+        "identity": "X1_LONG_CASH_12M_EQUAL_SLEEVES",
+        "status": "synthetic_composition_only",
+        "empiricalResult": false,
+        "explicitSlotReplacementRequired": true
+      }
+    },
+    "emptyDraftArraysProveZeroPriorAttempts": false,
+    "sources": {
+      "passport": "docs/strategy-lab/FROZEN_STRATEGY_PASSPORTS_20261014.md",
+      "evidenceReview": "docs/strategy-lab/STRATEGY_EVIDENCE_REVIEW_20261014.md",
+      "partialLineageReconciliation": {
+        "pr": 791,
+        "head": "41b638ec567540e555eb0dc0cd45bb97e3278cba",
+        "completeCanonicalLedger": false
+      },
+      "h5SupplementalDesignOnly": {
+        "pr": 757,
+        "head": "5a5f67cb21b10abf30cbf46497cbe79e8e0a6f62",
+        "interpretation": "rejected design attempt, not an empirical loss"
+      },
+      "h7P1C1X1DraftSources": {
+        "lineagePr": 791,
+        "lineageHead": "41b638ec567540e555eb0dc0cd45bb97e3278cba",
+        "syntheticAdapterBase": "7e0b9f11b0280ec781353266c6ea57ce74134da0",
+        "x1CompositionPr": 795,
+        "x1CompositionHead": "469623cf35c363d24702a73b8bfe845d95fa0923"
+      }
+    }
+  },
+  "comparison": {
+    "numericRule": "abs(actual-expected)<=max(absTol,relTol*abs(expected)); finite values required",
+    "comparisonTolerancesAreNotStrategyGates": true,
+    "doesNotRelax": [
+      "frozen absolute-net-exposure invariant <=1e-12",
+      "original frozen gross-exposure numerical invariant",
+      "exact rank and decision rules",
+      "any original strategy gate threshold"
+    ],
+    "originalGrossExposureInvariantResolution": "use exact pinned implementation/specification before execution; never substitute comparison tolerance",
+    "exactComparisons": [
+      "UTC timestamps and interval endpoints",
+      "archive/member identities, byte sizes and SHA-256",
+      "row counts and eligible asset counts",
+      "ranks, including exact ties and average-rank outcomes",
+      "nullability, missing-data/rejection reasons",
+      "gate booleans, frozen decisions and scenario availability"
+    ],
+    "tolerances": {
+      "feature": {
+        "abs": 1e-12,
+        "rel": 1e-10
+      },
+      "weightsAndExposure": {
+        "abs": 1e-12,
+        "rel": 1e-10
+      },
+      "turnoverFundingCostsWeeklyReturnsEquity": {
+        "abs": 1e-10,
+        "rel": 1e-8
+      },
+      "aggregateMetricsAndBlocks": {
+        "abs": 1e-8,
+        "rel": 1e-7
+      },
+      "sharpeProfitFactorRankICNeweyWest": {
+        "abs": 1e-7,
+        "rel": 1e-6
+      }
+    },
+    "baselineDivergenceOrGateFlip": "STOP; no diagnostics and no tolerance widening"
+  },
+  "diagnostics": [
+    {
+      "id": "D1_COST_30BPS",
+      "status": "PROPOSED_DEVELOPMENT_ONLY",
+      "changeOnly": "one-way turnover cost=30 bps",
+      "keep": "all frozen baseline holdings, timing, returns, funding, gates and Development periods"
+    },
+    {
+      "id": "D2_COST_40BPS",
+      "status": "PROPOSED_DEVELOPMENT_ONLY",
+      "changeOnly": "one-way turnover cost=40 bps",
+      "keep": "all frozen baseline holdings, timing, returns, funding, gates and Development periods"
+    },
+    {
+      "id": "D3_DELAY_1H",
+      "status": "UNAVAILABLE_ON_CURRENT_DEVELOPMENT_RECEIPT",
+      "reason": "entry and each seven-day exit shift by one hour; final shifted exit exceeds the Development source terminal open 2026-01-03T00:00:00Z",
+      "requiredHandling": "no Holdout borrowing, nearest-price substitution, partial final week or data acquisition"
+    },
+    {
+      "id": "D4_DELAY_24H",
+      "status": "UNAVAILABLE_ON_CURRENT_DEVELOPMENT_RECEIPT",
+      "reason": "entry and each seven-day exit shift by 24 hours; final shifted exit exceeds the Development source terminal open 2026-01-03T00:00:00Z",
+      "requiredHandling": "no Holdout borrowing, nearest-price substitution, partial final week or data acquisition"
+    },
+    {
+      "id": "D5_FEATURE_21D",
+      "status": "PROPOSED_DEVELOPMENT_ONLY",
+      "changeOnly": "feature uses exactly 504 preceding hourly log returns",
+      "availabilityBasis": "Development source begins 2025-01-03T23:00:00Z; first anchor 2025-02-01T00:00:00Z has complete prior coverage"
+    },
+    {
+      "id": "D6_FEATURE_35D",
+      "status": "UNAVAILABLE_ON_CURRENT_DEVELOPMENT_RECEIPT",
+      "reason": "840 prior hourly returns are required; Development source begins 2025-01-03T23:00:00Z, short of the first anchor's 35-day lookback",
+      "requiredHandling": "no Holdout borrowing, partial lookback, interpolation or data acquisition"
+    }
+  ],
+  "diagnosticExecutionConventions": {
+    "maxScenarios": 6,
+    "baselineStageRuns": [
+      "one Development reproduction",
+      "one historical Holdout audit"
+    ],
+    "maximumStageScenarioCells": 8,
+    "eachCellAttemptedAtMostOnce": true,
+    "automaticRetry": false,
+    "manualRetryOrRerun": false,
+    "failedCellConsumesCapacityAndStopsDependentWork": true,
+    "unavailableCellConsumesEvaluatorExecution": false,
+    "aggregateLimitsMayStopBeforeAllCellsComplete": true,
+    "cartesianSweep": false,
+    "serialOnly": true,
+    "developmentOnly": true,
+    "delayedPrice": "exact public kline open at each shifted boundary or scenario unavailable",
+    "delayedFunding": "(delayed entry, delayed exit]",
+    "delayedTurnover": "target-weight deltas at shifted boundaries; initial zero and mandatory shifted terminal close",
+    "baselineAt20BpsIsAlreadyIncluded": true,
+    "holdoutScenarioRunsAllowed": false,
+    "assetOrBlockAttributionCreatesNewPortfolios": false,
+    "winnerSelectionOrPromotion": false,
+    "removeLosingAssets": false,
+    "modifyFrozenRules": false,
+    "allAttemptsRemainInLedger": true
+  },
+  "proposedExecutionLimits": {
+    "measured": false,
+    "offline": true,
+    "python": "3.12 standard library only",
+    "cpuCores": 1,
+    "perAttempt": {
+      "cpuMinutesMax": 10,
+      "wallMinutesMax": 15,
+      "residentMemoryMiBMax": 1024,
+      "outputMiBMax": 64
+    },
+    "entirePackage": {
+      "cpuMinutesMax": 70,
+      "wallMinutesMax": 105,
+      "residentMemoryMiBMax": 1024,
+      "outputMiBMax": 512
+    },
+    "aggregateLimitMayPreventEightCells": true,
+    "noAutomaticRetryOrSilentBudgetIncrease": true,
+    "networkPaidResourcesWorkflowDispatch": false
+  },
+  "outcomes": {
+    "REPRODUCED": "all required receipts, coverage, comparisons and decisions match; implementation fidelity only",
+    "DIVERGED": "valid pinned inputs but a comparison, frozen decision, gate or lineage differs; stop",
+    "UNAVAILABLE": "a required existing receipt, coverage, review, budget prerequisite or resource limit prevents completion; no substitution"
+  },
+  "executionPrerequisites": {
+    "completeHistoricalTrialLedger": "UNKNOWN_UNRECONCILED",
+    "remainingDiagnosticBudget": "UNKNOWN_UNRECONCILED",
+    "independentImplementationAndSyntheticChecksFrozenBeforeAdditionalExpectedOutputComparison": true,
+    "exactHeadIndependentReview": "REQUIRED_LATER",
+    "leadMethodologyReview": "REQUIRED_LATER",
+    "claudeReview": "REQUIRED_LATER",
+    "concreteExecutionAuthorization": "REQUIRED_BEFORE_ANY_PNL",
+    "allReceiptsAvailableAndVerifiedAtExecution": "REQUIRED",
+    "economicModelAudit": "SEPARATE_REVIEW_REQUIRED",
+    "priorExposureDeclaration": "REQUIRED_BEFORE_IMPLEMENTATION",
+    "holdoutRetuningOrFreshConfirmation": false,
+    "paperLiveOrAuthorizationChanges": false
+  }
+}
