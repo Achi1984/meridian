@@ -1,0 +1,112 @@
+{
+  "schemaVersion": "MERIDIAN_STRATEGY_RECEIPT_MANIFEST_V1",
+  "maxTotalBytes": 11933903,
+  "artifacts": [
+    {
+      "artifactId": 11277247641,
+      "runId": 37132394717,
+      "runCommitSha": "a30a789ce058b08452bb4597f4a92b3bd58383e1",
+      "name": "lowvol-rank-v2-development-source",
+      "kind": "development-source",
+      "zip": {"path":"archives/dev-source.zip","sha256":"b62f7b3eadacc7c55a1d61006d645caea385dbd73c33854522c30624499e5556","sizeBytes":1485803,"maxBytes":1485803},
+      "members": [
+        {"name":"ADA.json","path":"members/development-source/ADA.json","sha256":"43c92508ec52bc56e8f92e5b634bfb61108beb2e9926234b7bc12aed9609b53b","sizeBytes":413484,"maxBytes":413484},
+        {"name":"AVAX.json","path":"members/development-source/AVAX.json","sha256":"1da0bd90f04d809f360b858abefa104c61280df3539d3a57bc6e5f9a792ea7e9","sizeBytes":413662,"maxBytes":413662},
+        {"name":"BCH.json","path":"members/development-source/BCH.json","sha256":"d848d78e428d6b80743673574382310b1623f374c63f215d736abcc5177784ef","sizeBytes":414059,"maxBytes":414059},
+        {"name":"BNB.json","path":"members/development-source/BNB.json","sha256":"84c0a1879859934d28546fdac834a9ade72458694c13feaeb69acddbdeefa36c","sizeBytes":413650,"maxBytes":413650},
+        {"name":"BTC.json","path":"members/development-source/BTC.json","sha256":"4a6cc9640949564fd1741033216dde4c37e475329f2494a5d74e429daba5e41d","sizeBytes":472725,"maxBytes":472725},
+        {"name":"DOGE.json","path":"members/development-source/DOGE.json","sha256":"538bf7e48763122418ee5b67716a7f169d5ad75ca56ad8ca3a7c07cd031da408","sizeBytes":448238,"maxBytes":448238},
+        {"name":"DOT.json","path":"members/development-source/DOT.json","sha256":"5c5f05263265dcaad064fbf8cbd567703ee0e51d6186302d86cd5b13078a9163","sizeBytes":378996,"maxBytes":378996},
+        {"name":"ETH.json","path":"members/development-source/ETH.json","sha256":"db4809df603a7a6c57ba1af0aeed28dc9bedaa64440510d5198723dd6767441a","sizeBytes":445884,"maxBytes":445884},
+        {"name":"LINK.json","path":"members/development-source/LINK.json","sha256":"fb621b8547f746ff21184255b3388949be7a69f13c8b26a80f556b612902c803","sizeBytes":413285,"maxBytes":413285},
+        {"name":"LTC.json","path":"members/development-source/LTC.json","sha256":"1614d223e133782dd939d820e12d8ddb7d377e8b61c7a514ef64c2a160ae507e","sizeBytes":394492,"maxBytes":394492},
+        {"name":"SOL.json","path":"members/development-source/SOL.json","sha256":"fdd280e85050153035f38c3c929353ce0c780c92d7fb682f11ce623bc3bfa997","sizeBytes":413995,"maxBytes":413995},
+        {"name":"XRP.json","path":"members/development-source/XRP.json","sha256":"4c319478f97770a2098fcd6cf1e5026718006b6ab5bf49a177b56cfc1212400f","sizeBytes":413194,"maxBytes":413194},
+        {"name":"manifest.json","path":"members/development-source/manifest.json","sha256":"770e7d452422793debc08c80f19f168c6da6ef487db6c9c2b2ce3726a05a8662","sizeBytes":5441,"maxBytes":5441}
+      ]
+    },
+    {
+      "artifactId": 11277656738,
+      "runId": 37132394717,
+      "runCommitSha": "a30a789ce058b08452bb4597f4a92b3bd58383e1",
+      "name": "lowvol-rank-v2-development-result",
+      "kind": "development-result",
+      "zip": {"path":"archives/dev-result.zip","sha256":"e076f9424b4373621bec7502d9835945a00a1211716ba299057b7adcd7b22314","sizeBytes":24755,"maxBytes":24755},
+      "members": [
+        {"name":"low-volatility-rank-weighted-v2-development-result.json","path":"members/development-result/low-volatility-rank-weighted-v2-development-result.json","sha256":"c72046db7aeb0e28a87e3e8e2c181b9d67f8ed9b8eae275c3b7f4037793a16bb","sizeBytes":134312,"maxBytes":134312},
+        {"name":"low-volatility-rank-weighted-v2-development-result.md","path":"members/development-result/low-volatility-rank-weighted-v2-development-result.md","sha256":"e0a2c60b690ddd0c3b5cf141e21208bf2f255de0f1952f1853f1df14fcbeec62","sizeBytes":1005,"maxBytes":1005}
+      ]
+    },
+    {
+      "artifactId": 11278085201,
+      "runId": 37133809945,
+      "runCommitSha": "b15bddb8f316b8d313dd8893a46654849db2a6cd",
+      "name": "lowvol-rank-v2-holdout-source",
+      "kind": "holdout-source",
+      "zip": {"path":"archives/holdout-source.zip","sha256":"8f9ed3953268ba985034ecd6db09a4a3e5900c835061ce6930b710320de50426","sizeBytes":1012867,"maxBytes":1012867},
+      "members": [
+        {"name":"ADA.json","path":"members/holdout-source/ADA.json","sha256":"1ef696d8fcfb4f821936beae595db288e373f5b4f85ca39805c3f6580160354e","sizeBytes":301918,"maxBytes":301918},
+        {"name":"AVAX.json","path":"members/holdout-source/AVAX.json","sha256":"1bac481860c8e91c034d6ac328e57ba03dca0439851c02f43be9126585a27317","sizeBytes":282754,"maxBytes":282754},
+        {"name":"BCH.json","path":"members/holdout-source/BCH.json","sha256":"8c88096e599f813fc989fbaa4648c0c23805fa39d516bee878ee5b639e109acb","sizeBytes":302125,"maxBytes":302125},
+        {"name":"BNB.json","path":"members/holdout-source/BNB.json","sha256":"9d8dba018aa0b588143873d49fb6bb289a725b8d860616ee62fefa624bd5de36","sizeBytes":299301,"maxBytes":299301},
+        {"name":"BTC.json","path":"members/holdout-source/BTC.json","sha256":"7c7309451fcb8b836dae549ad879aba0bb6b6d78d9f9b434127cc8cb44bcec4a","sizeBytes":330518,"maxBytes":330518},
+        {"name":"DOGE.json","path":"members/holdout-source/DOGE.json","sha256":"351aadf38c7655d91a459e27b6d1c8b7491c6de546462ed356aebd9374a6ab9a","sizeBytes":327460,"maxBytes":327460},
+        {"name":"DOT.json","path":"members/holdout-source/DOT.json","sha256":"6c0d47f7ab862d6c27fada3a403789c6a52d30d662a1441732a96768cdc85eb3","sizeBytes":280339,"maxBytes":280339},
+        {"name":"ETH.json","path":"members/holdout-source/ETH.json","sha256":"c63200ea234116d2808c7af7fd497916304afeb2c1693cc48bbaf9c0531aa0d7","sizeBytes":326142,"maxBytes":326142},
+        {"name":"LINK.json","path":"members/holdout-source/LINK.json","sha256":"b1da3e21187615c541bb5f40dddd59b2ddd0541ec418f2d720c47d6efd5ef413","sizeBytes":283306,"maxBytes":283306},
+        {"name":"LTC.json","path":"members/holdout-source/LTC.json","sha256":"30b7b946b0496810a6f2bd11bbf83afda4d03c547315e4da959b806852e410b6","sizeBytes":276789,"maxBytes":276789},
+        {"name":"SOL.json","path":"members/holdout-source/SOL.json","sha256":"a0545ac83549a61eca58003219aeeb148ff599b28e56d9449373f78e5f55087b","sizeBytes":282827,"maxBytes":282827},
+        {"name":"XRP.json","path":"members/holdout-source/XRP.json","sha256":"975b5da8eb465bc9f5132c5b3e81a79d16de2971ae294534cb68c26ace0ed4af","sizeBytes":302131,"maxBytes":302131},
+        {"name":"manifest.json","path":"members/holdout-source/manifest.json","sha256":"ed2ed862e62578dd0695a5d852e1e661ef2ee01dcc6d37f1e0e35b87168aa230","sizeBytes":5414,"maxBytes":5414}
+      ]
+    },
+    {
+      "artifactId": 11277199985,
+      "runId": 37133809945,
+      "runCommitSha": "b15bddb8f316b8d313dd8893a46654849db2a6cd",
+      "name": "lowvol-rank-v2-holdout-result",
+      "kind": "holdout-result",
+      "zip": {"path":"archives/holdout-result.zip","sha256":"7c96e9456d80f3eb61047f6c7f108dddddbf704409f6526643f5fa3f8e1106af","sizeBytes":19092,"maxBytes":19092},
+      "members": [
+        {"name":"low-volatility-rank-weighted-v2-holdout-result.json","path":"members/holdout-result/low-volatility-rank-weighted-v2-holdout-result.json","sha256":"c88ab6074e3fc0777f3a69693d6e549a9b704f7a668b384a44d0e0db02a01dd0","sizeBytes":96875,"maxBytes":96875},
+        {"name":"low-volatility-rank-weighted-v2-holdout-result.md","path":"members/holdout-result/low-volatility-rank-weighted-v2-holdout-result.md","sha256":"24cdf3b1d54a943fa17645bcb77237b3082ba73e72dc196554ed13b767f24e7a","sizeBytes":1074,"maxBytes":1074}
+      ]
+    },
+    {
+      "artifactId": 11697855479,
+      "runId": 38125893276,
+      "runCommitSha": "a5ba7eca2004ce51ec98720955b5fcc3716f09ef",
+      "name": "lowvol-v2-prospective-source-38125893276",
+      "kind": "prospective-source",
+      "zip": {"path":"archives/prospective-source.zip","sha256":"c27f46bac87f3831bec139ef36cc659b7e77a9bce159f1f0f6b0dac7d6fe1ce8","sizeBytes":117072,"maxBytes":117072},
+      "members": [
+        {"name":"AVAX.json","path":"members/prospective-source/AVAX.json","sha256":"eb8330705d8800e7737cc04fca41c583396a124f6e8b5056e783b0beb774cd1b","sizeBytes":31237,"maxBytes":31237},
+        {"name":"BCH.json","path":"members/prospective-source/BCH.json","sha256":"7c4eb59b3e79ca3ebaecb2a0b2ed48d60e13264bf2d09f28044c4617f15ee3d7","sizeBytes":32064,"maxBytes":32064},
+        {"name":"ADA.json","path":"members/prospective-source/ADA.json","sha256":"6b5be1b7716431b0734964f3422fdd85f069bc5cc0cd5c5088d4496ca4433713","sizeBytes":32115,"maxBytes":32115},
+        {"name":"BNB.json","path":"members/prospective-source/BNB.json","sha256":"978cf14f1e762e9646c5407c50bafc12a29d91c668876b4308031b4c3af684f1","sizeBytes":32024,"maxBytes":32024},
+        {"name":"BTC.json","path":"members/prospective-source/BTC.json","sha256":"fa8aa19f68000686766ba9b196808ed2a436e8b8ff81574e4e57586f494ec575","sizeBytes":35072,"maxBytes":35072},
+        {"name":"DOGE.json","path":"members/prospective-source/DOGE.json","sha256":"8b58493cf581eebcf1823425437656b42d570f1749ecedce1246ada1abf7620d","sizeBytes":34819,"maxBytes":34819},
+        {"name":"DOT.json","path":"members/prospective-source/DOT.json","sha256":"56e426f4131b915b414f03e9412f978a8b1b754547e67375b086380d284545ba","sizeBytes":32076,"maxBytes":32076},
+        {"name":"ETH.json","path":"members/prospective-source/ETH.json","sha256":"24bcc086877c787169451611257e41af3460c38aeee14e3901a17a37cefd6236","sizeBytes":34632,"maxBytes":34632},
+        {"name":"LINK.json","path":"members/prospective-source/LINK.json","sha256":"dde0e911bb9e8e4448b60bbb21db730dddaeba856dc2b9b543c3db09935bb28f","sizeBytes":32092,"maxBytes":32092},
+        {"name":"LTC.json","path":"members/prospective-source/LTC.json","sha256":"02d635ac9b6eaf9cb4db59fadf5d6b3e8358cf83c91ed28049f35542bb4c8a75","sizeBytes":29395,"maxBytes":29395},
+        {"name":"SOL.json","path":"members/prospective-source/SOL.json","sha256":"e71952c64c610c5b2966a075c56973e7361a880b9f1ad81f5f95b8ae2159116d","sizeBytes":31914,"maxBytes":31914},
+        {"name":"XRP.json","path":"members/prospective-source/XRP.json","sha256":"4eb9d4d586477c38113ae483d741809d6923960e1d7c44c26a209fd8ed25674e","sizeBytes":32091,"maxBytes":32091},
+        {"name":"manifest.json","path":"members/prospective-source/manifest.json","sha256":"ac7cf72fb53771c4a75b46fe3c567feb48b3a2804718f59f14124eca2da078dc","sizeBytes":4651,"maxBytes":4651}
+      ]
+    },
+    {
+      "artifactId": 11697446266,
+      "runId": 38125893276,
+      "runCommitSha": "a5ba7eca2004ce51ec98720955b5fcc3716f09ef",
+      "name": "lowvol-v2-prospective-snapshot-38125893276",
+      "kind": "prospective-snapshot",
+      "zip": {"path":"archives/prospective-snapshot.zip","sha256":"f942087ec71480be577cac9edbe7ec050f68683c41246b6453d942998c8d9394","sizeBytes":1921,"maxBytes":1921},
+      "members": [
+        {"name":"snapshot-id.txt","path":"members/prospective-snapshot/snapshot-id.txt","sha256":"47fc1409607daf2ee71d93cd4fea2cc99cd032f1e65ae302a119df1635bd92b7","sizeBytes":19,"maxBytes":19},
+        {"name":"snapshot.json","path":"members/prospective-snapshot/snapshot.json","sha256":"911cc803b1c89f77f478e9b94127f51192b182eaf8dc1ddb03a80c0bcba9ccc7","sizeBytes":2337,"maxBytes":2337},
+        {"name":"snapshot.md","path":"members/prospective-snapshot/snapshot.md","sha256":"f421b4cecf42168b359164a3a2bc44ea447dc84b5bfb521f07361a94057c8885","sizeBytes":460,"maxBytes":460}
+      ]
+    }
+  ]
+}
