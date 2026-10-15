@@ -76,7 +76,16 @@ report a positive test count with all passed and zero failures. Required candida
 checks therefore represent test-bearing checks; do not invent totals for non-test
 jobs. Prior postmerge checks require success but no artificial test totals.
 Verdicts are GREEN_LIGHT, REVISION_REQUIRED or NEEDS_MORE_EVIDENCE; only the first
-can qualify. All reserved classification flags must be false, scope agreed true.
+can qualify. Partial or unread diff scope, unavailable exact-head/base CI or any
+review gap requires `NEEDS_MORE_EVIDENCE`, never `GREEN_LIGHT`. Concrete required
+changes use `REVISION_REQUIRED`. The offline classifier rejects legacy verdicts
+and independently blocks incomplete evidence even if its claimed verdict is green.
+
+Mailbox delivery is a separate contract: `delivery_status: STALE_HEAD` accompanies
+`NEEDS_MORE_EVIDENCE` when a request target has moved. Legacy `STALE_HEAD` records
+remain readable solely to retire delivery; other historical verdict aliases do not
+become routine approval evidence. `ANSWERED` means delivered, not approved.
+All reserved classification flags must be false, scope agreed true.
 
 Identifiers use 3–128 ASCII letters/digits/`.`/`_`/`:`/`-`, starting alphanumeric.
 Statuses: QUEUED, RUNNING, COMPLETED. Conclusions: SUCCESS, FAILURE, PENDING,
@@ -92,3 +101,4 @@ reserved actions, protected paths and renames, all evidence pins, unknown outcom
 concurrent writers, previous-release failure, incomplete CI/review, malformed and
 hostile inputs, determinism and immutable false authority. This is local evidence,
 not independent exact-head review or successful live enforcement.
+

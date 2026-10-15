@@ -2,11 +2,11 @@
   "schema": 1,
   "project": "MERIDIAN",
   "protocol": "STREAM-SAFE-V8",
-  "mailboxIssue": 571,
+  "mailboxIssue": 639,
   "lead": "CHATGPT",
   "reviewer": "CLAUDE",
   "mailboxPolicy": {
-    "previousMailboxIssue": 539,
+    "previousMailboxIssue": 571,
     "allowedCommentKinds": [
       "CROSS_MODEL_REQUEST",
       "CROSS_MODEL_RESPONSE",
@@ -14,11 +14,12 @@
       "FINAL_MERGE_STATUS"
     ],
     "progressLocation": "ONE_EDITED_PR_STATUS_COMMENT",
-    "rolloverThresholdComments": 200
+    "rolloverThresholdComments": 200,
+    "watchdogStatusCommentId": 6198924473
   },
   "terminalBuild": "10.0-r128",
   "liveMainAtCreation": "f23fc2db682963d7031ec1f3ddf9c3f4854a7f7f",
-  "lastSubstantiveCheckpoint": "c009326529e162f84bb985d0aca2de6cf5065c18",
+  "lastSubstantiveCheckpoint": "0df76e19d4b04142896e227b2b2e05671b21b80c",
   "lastContinuityMerge": {
     "pr": 553,
     "mergeSha": "f23fc2db682963d7031ec1f3ddf9c3f4854a7f7f"
@@ -92,7 +93,61 @@
     "policyProposalCommentId": 6096562356,
     "protocol": "STREAM-SAFE-V8"
   },
-  "lastSeenCommentId": 6016389241,
+  "lastSeenCommentId": 6198924473,
   "quickCommand": "Go Meridian",
-  "bootstrapFile": "MERIDIAN_GO.md"
+  "bootstrapFile": "MERIDIAN_GO.md",
+  "currentWork": {
+    "updatedAt": "2026-10-15",
+    "verifiedSourceMain": "0df76e19d4b04142896e227b2b2e05671b21b80c",
+    "lastCompletedSourceMerge": {
+      "pr": 817,
+      "mergeSha": "0df76e19d4b04142896e227b2b2e05671b21b80c",
+      "postMergeChecks": "VERIFIED_SUCCESS",
+      "postMergeRunIds": {
+        "releaseSafety": 38781127242,
+        "runtimeSmoke": 38781127295,
+        "releaseCoordinator": 38781127331,
+        "pages": 38781126415
+      }
+    },
+    "package": "HOUSEKEEPING_BEFORE_NEXT_INFRA_STEP",
+    "state": "IN_PROGRESS",
+    "infrastructurePaused": true,
+    "mailboxRollover": {
+      "from": 571,
+      "to": 639,
+      "pr": 640,
+      "state": "STAGED_CANDIDATE_ACTIVATION_REQUIRES_OWNER_APPROVED_MERGE",
+      "preMergeExternalMailbox": 571,
+      "watchdogStatusCommentId": 6198924473,
+      "runtimeSmoke": "NOT_YET_VERIFIED"
+    },
+    "publisherSetup": {
+      "state": "FAILED_NO_REMOTE_WRITES_REPORTED",
+      "marker": "PRESERVED_NO_RECOVERY_OR_RETRY",
+      "statusCommentId": 6198795959,
+      "recoveryRequiresSeparateOwnerApproval": true,
+      "retryRequiresSeparateOwnerApproval": true
+    },
+    "reconciliation": {
+      "resolvedCommentIds": [
+        6103358472,
+        6178949360,
+        6197277097
+      ],
+      "closedStaleItems": [
+        653,
+        675,
+        686,
+        690
+      ],
+      "clockSkewAnd811CommentId": 6198817919,
+      "finalMerge782CommentId": 6198847209
+    },
+    "proposedOnly": {
+      "wipLimit": 3,
+      "watchdogSingleEditedComment": true
+    },
+    "nextStep": "COMPLETE_REVIEWED_HOUSEKEEPING_BEFORE_INFRA_RESUMES"
+  }
 }

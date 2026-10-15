@@ -2,7 +2,29 @@
 
 op_id: `MERIDIAN-COPILOT-PILOT-MAILBOX-20261010-001`
 
-## Scope and revision evidence
+## Current canonical contract (2026-10-15)
+
+New review responses use only `GREEN_LIGHT`, `REVISION_REQUIRED` or
+`NEEDS_MORE_EVIDENCE`. Partial/unread scope or missing exact-head CI evidence
+requires `NEEDS_MORE_EVIDENCE`; a delivery receipt never supplies that evidence.
+`REVISION_REQUIRED` now retires delivery with exact authenticated pins.
+Stale requests use `verdict: NEEDS_MORE_EVIDENCE` plus
+`delivery_status: STALE_HEAD`; head-less retirement still requires one request
+ID scope and its exact base.
+
+For existing records only, the parser retains `CHANGES_REQUIRED`, `STALE_HEAD`,
+`ROOT_CAUSE_CONFIRMED` and `ALTERNATIVE_CAUSE` as delivery compatibility aliases.
+They cannot grant review/merge authority. Legacy head-less stale responses remain
+recognized, so the enum migration does not strand previously answered requests.
+Legacy bot watchdog status labels (`GREEN`, `CHALLENGE`, `NEXT_STEP`) remain
+readable only on the unpinned historical compatibility path. Production supplies
+the checkpoint-pinned fixed status comment ID: dedupe requires that exact comment,
+the authenticated owner seed author, a canonical verdict and a valid nonfuture
+`updated_at` timestamp. Other owner comments and historical bot statuses cannot
+satisfy this pinned path. The fixed status is still not review/merge authority. The historical pilot observations
+below document the old parser, not today's accepted review enum.
+
+## Historical scope and revision evidence
 
 - Verified live main / PR base: `d29481521337506d107c1fa4cc846f0a247c8936`.
 - Initial isolated branch head: `aee8a1708bdc63acd20d9e2c0e4b88122c953c69`
@@ -25,14 +47,14 @@ in the new tests. A bounded read of the checkpoint-selected mailbox #571
 (comment 6097260947). No actual review payload is used as a fixture. The issue
 also reports `GREEN LIGHT`; its live response was not independently retrieved.
 
-## Current delivery classification
+## Historical delivery classification (2026-10-10)
 
 Each case uses a trusted owner request, a later trusted reviewer response,
 and a live synthetic PR with matching head/base unless explicitly varied.
 
-| Format / variation | Current state |
+| Format / variation | Historical state |
 | --- | --- |
-| All six canonical tokens: `GREEN_LIGHT`, `CHANGES_REQUIRED`, `STALE_HEAD`, `NEEDS_MORE_EVIDENCE`, `ROOT_CAUSE_CONFIRMED`, `ALTERNATIVE_CAUSE` with exact head/base | `ANSWERED` |
+| The six historically accepted tokens: `GREEN_LIGHT`, `CHANGES_REQUIRED`, `STALE_HEAD`, `NEEDS_MORE_EVIDENCE`, `ROOT_CAUSE_CONFIRMED`, `ALTERNATIVE_CAUSE` with exact head/base | `ANSWERED` |
 | `GREEN_LIGHT (static review only)` / `CHANGES_REQUIRED (integration pending)` | `ANSWERED` |
 | Canonical metadata followed by separate-line review prose | `ANSWERED` |
 | CRLF direct record or known action envelope with parenthesized verdict | `ANSWERED` |
@@ -125,3 +147,4 @@ repair is attempted. Timing above is measured test execution, not total
 agent-session time. Final handoff records the exact tested committed head
 and automated review/security results. AI-credit consumption and billing are
 not observable; no credit metrics are invented.
+

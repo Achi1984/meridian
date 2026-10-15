@@ -1,5 +1,52 @@
 # MERIDIAN HANDOFF
 
+## Current handoff — 2026-10-15
+
+This section is the current operational summary. Historical snapshots below are
+retained for provenance, not as instructions or evidence of present state.
+
+- Verified source main: `0df76e19d4b04142896e227b2b2e05671b21b80c`, PR **#817** merged.
+  Verified post-merge success for that commit: Release Safety **38781127242**,
+  Runtime Smoke **38781127295**, Release Coordinator **38781127331** and
+  Pages **38781126415**. This evidence applies only to these runs.
+- Terminal build: **10.0-r128**; checkpoint protocol: **STREAM-SAFE-V8**.
+- Active work: **one housekeeping package before the next infrastructure step**.
+  Infrastructure work is paused until this package is completed.
+- This staged candidate routes to **#639** (predecessor **#571**) and pins
+  watchdog status comment **6198924473**. Activation requires the owner-approved
+  merge; the external authoritative mailbox remains **#571** before that merge.
+  Successor runtime smoke is **not yet verified**. After activation, resolve
+  routing from `MERIDIAN_LIVE_CHECKPOINT.json`.
+- V2 remains **SOURCE_AUDIT**. Canonical execution, strategy PnL, Discovery,
+  Validation, Holdout, Paper and Live authorization remain **false**.
+- Publisher setup: failed owner attempt documented in #571 comment
+  **6198795959**. The one-shot marker is preserved. No recovery or second
+  attempt has been performed; each needs its own separate owner approval.
+- Decision records **6103358472**, **6178949360** and **6197277097** are resolved.
+  Stale items **#653, #675 (issue), #686 and #690** are closed with readback.
+  Clock-skew/#811 reconciliation: **6198817919**; retrospective
+  FINAL_MERGE_STATUS for #782: **6198847209**.
+- Watchdog single-comment behavior and WIP limit **3** remain proposals,
+  not adopted behavior. Do not infer Codespace shutdown from this handoff.
+
+### Resume and completion rules
+
+Read the checkpoint-selected mailbox, current main and relevant CI before acting.
+Complete the reviewed housekeeping package and
+its rollover/decision records, then determine the next permitted infrastructure
+step. Do not repeat setup or clear its marker.
+
+After every completed merge block, refresh this file together with
+`MERIDIAN_LIVE_CHECKPOINT.json`, `docs/MERIDIAN_CHAT_HANDOFF.md`,
+`MERIDIAN_HANDOFF.md` and `docs/handover/GO-MERIDIAN.md`: record the verified
+commit, review/CI evidence, pending decisions and exact next step. Unknown checks
+must remain explicitly unknown; a source merge alone is not runtime acceptance.
+
+---
+
+## Historical archive — superseded operational snapshots
+
+
 ## Frozen / protected references
 - Frozen legacy dashboard: `archive/v7.65-dashboard-frozen-20260905` at `8ddca55f194fb517a244cd45ae142cf28e2a8fd4`.
 - Pre-cutover production rollback branch: `archive/v8-r11-production-pre-cutover` at `bdfc64f8cf588d5b4c3d6a3f4daebf019b8e7749`.
@@ -867,4 +914,5 @@ Portfolio history capture is also fail-closed now: the backend will not append a
 - V2 stays `SOURCE_AUDIT`; canonical strategy execution, strategy PnL, Discovery, Validation, Holdout, Paper, and Live remain locked.
 - Next Research action requires explicit user authorization and separate exact-head Claude review. No completed work above should be repeated.
 - Funding-Carry Candidate A remains secondary and data-design is not authorized.
+
 

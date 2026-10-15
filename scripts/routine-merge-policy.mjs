@@ -57,6 +57,8 @@ function checks(rows, totals) {
     names.add(c.name);
   }
 }
+// Review verdicts are separate from mailbox delivery/status classifications.
+export const CANONICAL_REVIEW_VERDICTS = Object.freeze(['GREEN_LIGHT', 'REVISION_REQUIRED', 'NEEDS_MORE_EVIDENCE']);
 const green = c => c.status === 'COMPLETED' && c.conclusion === 'SUCCESS';
 /** Every claim is untrusted; lead must authenticate scope, classification and evidence. */
 export function classifyRoutineMerge(input) {
@@ -74,7 +76,7 @@ export function classifyRoutineMerge(input) {
   shape(s.ci,['runId','headSha','baseSha','checks']);pin(s.ci);need(s.ci.runId>0&&Number.isSafeInteger(s.ci.runId),'INVALID_CI');checks(s.ci.checks,true);
   shape(s.review,['commentId','headSha','baseSha','reviewer','verdict','independent','fullDiffReviewed','gaps','unresolvedBlockers']);pin(s.review);
   need(s.review.commentId>0&&Number.isSafeInteger(s.review.commentId)&&s.review.reviewer==='CLAUDE'
-    &&['GREEN_LIGHT','REVISION_REQUIRED','NEEDS_MORE_EVIDENCE'].includes(s.review.verdict)
+    &&CANONICAL_REVIEW_VERDICTS.includes(s.review.verdict)
     &&typeof s.review.independent==='boolean'&&typeof s.review.fullDiffReviewed==='boolean'
     &&Number.isSafeInteger(s.review.gaps)&&s.review.gaps>=0&&Number.isSafeInteger(s.review.unresolvedBlockers)&&s.review.unresolvedBlockers>=0,'INVALID_REVIEW');
   shape(s.coordination,['unknownOutcome','conflictingWriter']);need(Object.values(s.coordination).every(v=>typeof v==='boolean'),'INVALID_COORDINATION');
@@ -98,3 +100,4 @@ export function classifyRoutineMerge(input) {
   if(s.review.verdict!=='GREEN_LIGHT'||!s.review.independent||!s.review.fullDiffReviewed||s.review.gaps!==0||s.review.unresolvedBlockers!==0) return result(false,'REVIEW_INCOMPLETE');
   return result(true,'OFFLINE_ELIGIBLE_REQUIRES_LEAD_VERIFICATION');
 }
+

@@ -1,5 +1,52 @@
 # GO MERIDIAN — durable resume checkpoint
 
+## Current handoff — 2026-10-15
+
+This section is the current operational summary. Historical snapshots below are
+retained for provenance, not as instructions or evidence of present state.
+
+- Verified source main: `0df76e19d4b04142896e227b2b2e05671b21b80c`, PR **#817** merged.
+  Verified post-merge success for that commit: Release Safety **38781127242**,
+  Runtime Smoke **38781127295**, Release Coordinator **38781127331** and
+  Pages **38781126415**. This evidence applies only to these runs.
+- Terminal build: **10.0-r128**; checkpoint protocol: **STREAM-SAFE-V8**.
+- Active work: **one housekeeping package before the next infrastructure step**.
+  Infrastructure work is paused until this package is completed.
+- This staged candidate routes to **#639** (predecessor **#571**) and pins
+  watchdog status comment **6198924473**. Activation requires the owner-approved
+  merge; the external authoritative mailbox remains **#571** before that merge.
+  Successor runtime smoke is **not yet verified**. After activation, resolve
+  routing from `MERIDIAN_LIVE_CHECKPOINT.json`.
+- V2 remains **SOURCE_AUDIT**. Canonical execution, strategy PnL, Discovery,
+  Validation, Holdout, Paper and Live authorization remain **false**.
+- Publisher setup: failed owner attempt documented in #571 comment
+  **6198795959**. The one-shot marker is preserved. No recovery or second
+  attempt has been performed; each needs its own separate owner approval.
+- Decision records **6103358472**, **6178949360** and **6197277097** are resolved.
+  Stale items **#653, #675 (issue), #686 and #690** are closed with readback.
+  Clock-skew/#811 reconciliation: **6198817919**; retrospective
+  FINAL_MERGE_STATUS for #782: **6198847209**.
+- Watchdog single-comment behavior and WIP limit **3** remain proposals,
+  not adopted behavior. Do not infer Codespace shutdown from this handoff.
+
+### Resume and completion rules
+
+Read the checkpoint-selected mailbox, current main and relevant CI before acting.
+Complete the reviewed housekeeping package and
+its rollover/decision records, then determine the next permitted infrastructure
+step. Do not repeat setup or clear its marker.
+
+After every completed merge block, refresh this file together with
+`MERIDIAN_LIVE_CHECKPOINT.json`, `docs/MERIDIAN_CHAT_HANDOFF.md`,
+`MERIDIAN_HANDOFF.md` and `docs/handover/GO-MERIDIAN.md`: record the verified
+commit, review/CI evidence, pending decisions and exact next step. Unknown checks
+must remain explicitly unknown; a source merge alone is not runtime acceptance.
+
+---
+
+## Historical archive — superseded operational snapshots
+
+
 Updated: 2026-10-07
 Resume keyword: **Go Meridian**
 
@@ -126,3 +173,4 @@ Mailbox comment id: 6029495669. Classification: PLATFORM_STALL. Recommendation: 
 
 ---
 When the user says **“Go Meridian”** in a new chat, start from this file **plus live GitHub reconciliation**. Never trust this snapshot over newer GitHub state.
+
