@@ -131,4 +131,5 @@ Owner instruction 2026-10-15T19:57:13+02:00, execution Go19:58:27:
 - Watchdog recommendations update one checkpoint-pinned status comment; request-specific review responses remain separate. A denied mailbox read prevents a verdict, not permission to infer context. No schedule, spending, research or trading authority changes.
 - WIP limit: at most three active work packages, remaining proposals in backlog. Owner approved 2026-10-15T20:16:49+02:00: "Ja Freigabe erteilt"; decision6199107184 resolved in place.
 
-Mailbox639 activation is staged with this candidate and requires concrete owner adoption after exact-head CI/review. Until that merge,571 remains binding. Do not close571 until pending requests and external automation routing are reconciled and successor smoke succeeds.
+Mailbox639 routing is active after owner-approved PR818 merge7dc94b9108e25d742bef7652fb7511c5cb5108ea (FINAL_MERGE_STATUS6199370528). Four disabled Autopilot prompts now resolve checkpoint routing and remain disabled; management routing was already dynamic. Pending requests and external automation routing reconciled; successor smoke6199499751 passed. Predecessor571 closed as historical archive6199526147. First hosted watchdog PATCH remains unproven.
+

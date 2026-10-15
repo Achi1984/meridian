@@ -93,34 +93,48 @@
     "policyProposalCommentId": 6096562356,
     "protocol": "STREAM-SAFE-V8"
   },
-  "lastSeenCommentId": 6198924473,
+  "lastSeenCommentId": 6199499751,
   "quickCommand": "Go Meridian",
   "bootstrapFile": "MERIDIAN_GO.md",
   "currentWork": {
     "updatedAt": "2026-10-15",
-    "verifiedSourceMain": "0df76e19d4b04142896e227b2b2e05671b21b80c",
+    "verifiedSourceMain": "7dc94b9108e25d742bef7652fb7511c5cb5108ea",
     "lastCompletedSourceMerge": {
-      "pr": 817,
-      "mergeSha": "0df76e19d4b04142896e227b2b2e05671b21b80c",
+      "pr": 818,
+      "mergeSha": "7dc94b9108e25d742bef7652fb7511c5cb5108ea",
+      "finalMergeCommentId": 6199370528,
       "postMergeChecks": "VERIFIED_SUCCESS",
+      "postMergeStatus": {
+        "agentOrchestration": "SUCCESS",
+        "runtimeSmoke": "SUCCESS",
+        "releaseCoordinator": "SUCCESS",
+        "releaseSafety": "SUCCESS",
+        "pages": "SUCCESS"
+      },
       "postMergeRunIds": {
-        "releaseSafety": 38781127242,
-        "runtimeSmoke": 38781127295,
-        "releaseCoordinator": 38781127331,
-        "pages": 38781126415
+        "releaseSafety": 38786060230,
+        "agentOrchestration": 38786060339,
+        "runtimeSmoke": 38786060440,
+        "releaseCoordinator": 38786060206,
+        "pages": 38786058998
       }
     },
     "package": "HOUSEKEEPING_BEFORE_NEXT_INFRA_STEP",
-    "state": "IN_PROGRESS",
+    "state": "ROLLOVER_COMPLETE_HANDOFF_REFRESH",
     "infrastructurePaused": true,
     "mailboxRollover": {
       "from": 571,
       "to": 639,
-      "pr": 640,
-      "state": "STAGED_CANDIDATE_ACTIVATION_REQUIRES_OWNER_APPROVED_MERGE",
-      "preMergeExternalMailbox": 571,
+      "pr": 818,
+      "supersededPr": 640,
+      "supersededPrState": "CLOSED",
+      "state": "ACTIVE_VERIFIED_PREDECESSOR_ARCHIVED",
       "watchdogStatusCommentId": 6198924473,
-      "runtimeSmoke": "NOT_YET_VERIFIED"
+      "runtimeSmoke": "PASS_READ_DELIVERY_RESPONSE_ONLY",
+      "predecessorArchive": "CLOSED_COMPLETED_6199526147",
+      "smokeRequestCommentId": 6199490288,
+      "smokeResponseCommentId": 6199499751,
+      "watchdogHostedPatch": "NOT_YET_PROVEN"
     },
     "publisherSetup": {
       "state": "FAILED_NO_REMOTE_WRITES_REPORTED",
@@ -133,7 +147,13 @@
       "resolvedCommentIds": [
         6103358472,
         6178949360,
-        6197277097
+        6197277097,
+        6171848445,
+        6187867522,
+        6175341101,
+        6177231926,
+        6177550606,
+        6178534667
       ],
       "closedStaleItems": [
         653,
@@ -142,15 +162,40 @@
         690
       ],
       "clockSkewAnd811CommentId": 6198817919,
-      "finalMerge782CommentId": 6198847209
+      "finalMerge782CommentId": 6198847209,
+      "pr814": {
+        "head": "43a351328159bf9526c6bba1f8ff93f91a2298cc",
+        "run": 38776991839,
+        "conclusion": "action_required",
+        "attempt": 1,
+        "state": "CARRY_FORWARD_NOT_EXECUTED"
+      }
     },
-    "nextStep": "COMPLETE_REVIEWED_HOUSEKEEPING_BEFORE_INFRA_RESUMES",
+    "nextStep": "VERIFY_HANDOFF_REFRESH_CI_REVIEW_THEN_READ_ONLY_PUBLISHER_PREFLIGHT",
     "ownerApproval": {
       "commentId": 6199107184,
       "at": "2026-10-15T20:16:49+02:00",
       "quote": "Ja Freigabe erteilt",
       "scope": "PR818_HOUSEKEEPING_AND_WIP_LIMIT_3",
       "wipLimit": 3
-    }
+    },
+    "previousSourceMerge": {
+      "pr": 817,
+      "mergeSha": "0df76e19d4b04142896e227b2b2e05671b21b80c",
+      "postMergeChecks": "VERIFIED_SUCCESS",
+      "postMergeRunIds": {
+        "releaseSafety": 38781127242,
+        "runtimeSmoke": 38781127295,
+        "releaseCoordinator": 38781127331,
+        "pages": 38781126415
+      }
+    },
+    "externalAutomation": {
+      "disabledAutopilotCount": 4,
+      "disabledAutopilotRouting": "CHECKPOINT_DYNAMIC_CURRENT_639",
+      "enabledManagementRouting": "ALREADY_CHECKPOINT_DYNAMIC",
+      "eventPilot673": "READ_ONLY_UNCHANGED"
+    },
+    "leadStatusCommentId": 6199106917
   }
 }
