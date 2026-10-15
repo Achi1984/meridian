@@ -193,6 +193,24 @@ test('completed results cannot be recorded before the observed window or after a
   assert.ok(issue(validateEvidenceContract(futureData),'OUTCOME_NOT_AVAILABLE_AT_RECORDING'));
 });
 
+test('historical Backtest data may predate rules freeze when evaluation is declared after freeze',()=>{
+  const input=packet();
+  input.strategy.frozenAt='2025-01-11T00:00:00Z';
+  input.lifecycle.receipts[2].dataWindow.start='2025-01-02T00:00:00Z';
+  input.lifecycle.receipts[2].dataWindow.end='2025-01-10T00:00:00Z';
+  input.lifecycle.receipts[2].dataWindow.availableAt='2025-01-11T11:00:00Z';
+  input.lifecycle.receipts[2].dataRef.asKnownAt='2025-01-11T11:00:00Z';
+  input.lifecycle.receipts[2].preregistration.declaredAt='2025-01-11T00:00:00Z';
+  input.lifecycle.receipts[3].preregistration.declaredAt='2025-01-11T00:00:00Z';
+  input.lifecycle.receipts[5].preregistration.declaredAt='2025-01-11T00:00:00Z';
+  input.lifecycle.receipts[6].preregistration.declaredAt='2025-01-11T00:00:00Z';
+  assert.equal(validateEvidenceContract(input).evidenceCompleteness.status,'ASSERTED_WELL_FORMED');
+
+  const forward=packet();
+  forward.strategy.frozenAt='2025-02-02T00:00:00Z';
+  assert.ok(issue(validateEvidenceContract(forward),'PROSPECTIVE_WINDOW_PRECEDES_RULES_FREEZE'));
+});
+
 test('rules source identity is bound across receipt IDs and version changes require a new lineage',()=>{
   const rules=packet();
   rules.lifecycle.receipts[5].rulesRef={id:'different-source-id',sha256:hash('b')};
@@ -209,6 +227,12 @@ test('stage-specific data digests may differ when their references and roles are
   assert.equal(validateEvidenceContract(input).evidenceCompleteness.status,'ASSERTED_WELL_FORMED');
   const wrongRole=packet();wrongRole.lifecycle.receipts[5].dataRef.role='HOLDOUT';
   assert.ok(issue(validateEvidenceContract(wrongRole),'DATA_REFERENCE_WRONG_STAGE'));
+  const conflictingIdentity=packet();
+  conflictingIdentity.lifecycle.receipts[3].dataRef.id=conflictingIdentity.lifecycle.receipts[2].dataRef.id;
+  assert.ok(issue(validateEvidenceContract(conflictingIdentity),'DATA_REFERENCE_IDENTITY_CONFLICT'));
+  const conflictingDataset=packet();
+  conflictingDataset.lifecycle.receipts[3].dataRef.datasetId=conflictingDataset.lifecycle.receipts[2].dataRef.datasetId;
+  assert.ok(issue(validateEvidenceContract(conflictingDataset),'DATASET_DIGEST_CONFLICT'));
 });
 
 test('holdout and forward evidence must be disjoint in both declared identity and observed windows',()=>{
@@ -254,6 +278,29 @@ test('unknown holdout exposure history blocks an independence claim; access coun
   const auditResult=validateEvidenceContract(manyAudits);
   assert.equal(auditResult.holdoutIndependence.status,'DIAGNOSTIC_ONLY');
   assert.equal(auditResult.evidenceCompleteness.issues.some(item=>item.reason==='HOLDOUT_NOT_INDEPENDENT_FOR_CONFIRMATION'),false);
+});
+
+test('inconsistent first Holdout exposure timing cannot assert fresh confirmation',()=>{
+  const afterResult=packet();
+  afterResult.lifecycle.receipts[3].holdoutAccess.exposures[0].at='2025-01-23T00:00:00Z';
+  const lateResult=validateEvidenceContract(afterResult);
+  assert.ok(issue(lateResult,'HOLDOUT_FIRST_EXPOSURE_AFTER_RESULT'));
+  assert.equal(lateResult.holdoutIndependence.status,'UNKNOWN');
+  assert.equal(lateResult.holdoutIndependence.freshConfirmation,'NOT_ASSESSED');
+
+  const beforeFreeze=packet();
+  beforeFreeze.strategy.frozenAt='2025-01-23T00:00:00Z';
+  const early=validateEvidenceContract(beforeFreeze);
+  assert.ok(issue(early,'HOLDOUT_EXPOSURE_PRECEDES_RULES_FREEZE'));
+  assert.equal(early.holdoutIndependence.status,'UNKNOWN');
+
+  const beforeFirst=packet();
+  beforeFirst.lifecycle.receipts[3].holdoutAccess.exposures.push(
+    {role:'AUDIT',at:'2025-01-21T00:00:00Z',purpose:'Inconsistent earlier access.'}
+  );
+  const inconsistent=validateEvidenceContract(beforeFirst);
+  assert.ok(issue(inconsistent,'HOLDOUT_ACCESS_PRECEDES_FIRST_EXPOSURE'));
+  assert.equal(inconsistent.holdoutIndependence.status,'UNKNOWN');
 });
 
 test('selection exposure or reuse for another hypothesis blocks holdout independence',()=>{

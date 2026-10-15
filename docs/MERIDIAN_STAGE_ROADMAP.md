@@ -3,9 +3,11 @@
 Status: reconciled operating roadmap, 14 October 2026.
 Product principle: **Complex inside – simple outside.**
 
-## Reconciled current state
+## Dated checkpoint snapshot — observed 14 October 2026
 
-Current main is `efec133f4ff8a809722b79fa7c5fe8007667c1ea`, terminalBuild `10.0-r128`, with the checkpoint still at `SOURCE_AUDIT` and canonical execution, PnL, Discovery, Validation, Holdout, Paper, and Live authorization all false (`MERIDIAN_LIVE_CHECKPOINT.json:19,26-37`). Release Safety run `38637684818`, Runtime Smoke `38637684961`, Release Coordinator `38637684547`, and Pages `38637684223` succeeded on that exact main SHA. This is source/check evidence, not a new research or runtime transition.
+At this observation, main was `efec133f4ff8a809722b79fa7c5fe8007667c1ea`, terminalBuild `10.0-r128`, with the checkpoint at `SOURCE_AUDIT` and canonical execution, PnL, Discovery, Validation, Holdout, Paper, and Live authorization all false (`MERIDIAN_LIVE_CHECKPOINT.json:19,26-37`). Release Safety run `38637684818`, Runtime Smoke `38637684961`, Release Coordinator `38637684547`, and Pages `38637684223` succeeded on that exact main SHA. This is dated source/check evidence, not a new research or runtime transition or a claim about mutable latest-main state.
+
+On 15 October 2026, PR #805 merged as `1387b47e564c06c3475db501ac3ee77ffa098715`, adding a source-only receipt audit packet. The 14 October PR/head/mergeability pins below remain historical attribution, not a mutable checkpoint; consult the live checkpoint and current main for present state.
 
 Do not restart R118 or R119. PR #563 merged R118 at `bd1f67b991bf7e67ebf50e5f2ae8113207c794f8`; PR #564 merged R119 at `d995726e106c0aa2dc73904e67dd1c59bcc88f11`. R119's original approval, mobile matrix and scope remain historical release evidence, not a new Visual QA result.
 
