@@ -72,11 +72,11 @@ Use the existing official-source artifacts only. Full source ZIP/member names, s
 
 The canonical Development lineage is evaluator implementation merge `257fcd3fba441e3ccb4103ba8c1382185d22c9a0`, run-authorization commit `a30a789ce058b08452bb4597f4a92b3bd58383e1`, workflow run `37132394717`, source artifact `11277247641`, and result artifact `11277656738`. The canonical Holdout lineage is Holdout implementation merge `76e7161ab00886932412a027b9e93b1061ecce4a`, run-authorization commit `b15bddb8f316b8d313dd8893a46654849db2a6cd`, workflow run `37133809945`, source artifact `11278085201`, and result artifact `11277199985`. These are the evaluator/result comparison targets, not code to import or reproduce by copying.
 
-The pinned summaries record Development `DEVELOPMENT_PASS_HOLDOUT_REQUIRED` and historical Holdout `HOLDOUT_PASS_PROSPECTIVE_PAPER_REVIEW_ONLY`. Read the expected result JSON/Markdown only after independent source and synthetic-test hashes are frozen. Result ZIP, JSON, Markdown, source ZIP, source manifest, and every member are pinned in the matrix. Do not use the prospective snapshot or its data as a substitute for either historical sample.
+The pinned summaries record Development `DEVELOPMENT_PASS_HOLDOUT_REQUIRED` and historical Holdout `HOLDOUT_PASS_PROSPECTIVE_PAPER_REVIEW_ONLY`. Freeze/hash the independent source and synthetic checks before any **additional** expected-output comparison. Prior outcome exposure is known and disclosed as `NOT_BLINDED`; freezing code does not make this a blind comparison. Result ZIP, JSON, Markdown, source ZIP, source manifest, and every member are pinned in the matrix. Do not use the prospective snapshot or its data as a substitute for either historical sample.
 
 ### PR #805 receipt evidence attribution
 
-The receipt audit is existing evidence, not this challenge and not a PnL reproduction. At inspection, PR #805 was open/draft at head `8c6eab1138e244170ae97e66be595270323133a1`, based on `c37343948f3d24c4105d9970e24dd3c0ac77905f`; the base had since advanced to current main `efec133f4ff8a809722b79fa7c5fe8007667c1ea`. GitHub’s formal review list was empty. The PR comments and pinned receipt report separately record:
+The receipt audit is existing evidence, not this challenge and not a PnL reproduction. At the original audit inspection, PR #805 was open/draft at head `8c6eab1138e244170ae97e66be595270323133a1`, based on `c37343948f3d24c4105d9970e24dd3c0ac77905f`; the base had advanced to main `efec133f4ff8a809722b79fa7c5fe8007667c1ea`. Its formal GitHub review list was empty at that inspection. PR #805 was subsequently merged into main at `1387b47e564c06c3475db501ac3ee77ffa098715` from PR head `e05409412d82acea26a3e0a6ccbb5cc7d99276bb`. The matrix preserves both the historical audit snapshot and this current merged status. The PR comments and pinned receipt report separately record:
 
 - audit code head `7a13ea11c49ba64b2f1cf6318a1c3d39c80f4633`, verifier SHA-256 `32e5f193c215b464c16c2a4b5fbcf93a863ca3dc463218da9cd721d39f0010df`, and a reported exact-head `VERIFIED` result for 52/52 existing inputs, 0 unavailable, 0 mismatches;
 - PR #805 receipt-manifest Git blob `6dbb807aa251ef9d49a2ed96884e5c88f10e93b8` and report Git blob `0ca51fdb18a443d7c65bf8773d9064ce6c9a40a3`;
@@ -86,7 +86,7 @@ These records establish receipt/byte-identity claims only, not raw-data authenti
 
 ## 3. Comparison tolerances and stop behavior
 
-Freeze these comparison rules before expected results are unsealed. For numeric values, pass only when `abs(actual-expected) <= max(abs_tol, rel_tol * abs(expected))`; both values must be finite. Nullability, sign, exact timestamps, row/asset counts, ranks, scenario availability, and categorical decisions compare exactly. No post-result tolerance widening, rounding to hide divergence, or alternate gate interpretation is allowed.
+Freeze these comparison rules before any additional expected-output comparison. Prior outcome exposure is disclosed as `NOT_BLINDED`; do not describe a later comparison as blind. For numeric values, pass only when `abs(actual-expected) <= max(abs_tol, rel_tol * abs(expected))`; both values must be finite. Nullability, sign, exact timestamps, row/asset counts, ranks, scenario availability, and categorical decisions compare exactly. No post-result tolerance widening, rounding to hide divergence, or alternate gate interpretation is allowed.
 
 | Quantity | Absolute tolerance | Relative tolerance |
 |---|---:|---:|

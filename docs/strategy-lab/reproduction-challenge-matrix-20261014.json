@@ -122,6 +122,13 @@
       "formalGithubReviewsObserved": 0,
       "changedFiles": 5
     },
+    "currentStatusAfterMerge": {
+      "state": "MERGED",
+      "prHead": "e05409412d82acea26a3e0a6ccbb5cc7d99276bb",
+      "mergeCommit": "1387b47e564c06c3475db501ac3ee77ffa098715",
+      "mergedAt": "2026-10-15T05:34:24Z",
+      "mainAtVerification": "1387b47e564c06c3475db501ac3ee77ffa098715"
+    },
     "audit": {
       "reportedAuditCodeHead": "7a13ea11c49ba64b2f1cf6318a1c3d39c80f4633",
       "reportedVerifierSha256": "32e5f193c215b464c16c2a4b5fbcf93a863ca3dc463218da9cd721d39f0010df",
@@ -545,7 +552,7 @@
   "executionPrerequisites": {
     "completeHistoricalTrialLedger": "UNKNOWN_UNRECONCILED",
     "remainingDiagnosticBudget": "UNKNOWN_UNRECONCILED",
-    "independentImplementationAndSyntheticChecksFrozenBeforeExpectedPnl": true,
+    "independentImplementationAndSyntheticChecksFrozenBeforeAdditionalExpectedOutputComparison": true,
     "exactHeadIndependentReview": "REQUIRED_LATER",
     "leadMethodologyReview": "REQUIRED_LATER",
     "claudeReview": "REQUIRED_LATER",
