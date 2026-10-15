@@ -63,7 +63,9 @@ const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._:-]{1,79}$/;
 const TIME = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,3})?Z$/;
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const text = value => typeof value === 'string' && value.trim().length > 0;
-const timestamp = value => typeof value === 'string' && TIME.test(value) && Number.isFinite(Date.parse(value));
+const parsedTimestamp = value => typeof value === 'string' && TIME.test(value) && Number.isFinite(Date.parse(value))
+  ? Date.parse(value) : NaN;
+const timestamp = value => Number.isFinite(parsedTimestamp(value));
 const hashStatus = value => typeof value === 'string' && HASH.test(value)
   ? 'HASH_FORMAT_VALID_UNAUTHENTICATED'
   : 'MISSING_OR_INVALID';
@@ -414,8 +416,8 @@ export function validateEvidenceContract(input) {
       if (!timestamp(receipt.recordedAt)) {
         add(`${path}.recordedAt`, 'INVALID', 'INVALID_TIMESTAMP');
       } else {
-        const recorded = Date.parse(receipt.recordedAt);
-        if (recorded > Date.parse(value.asOf)) add(`${path}.recordedAt`, 'INVALID', 'FUTURE_RECORDING');
+        const recorded = parsedTimestamp(receipt.recordedAt);
+        if (recorded > parsedTimestamp(value.asOf)) add(`${path}.recordedAt`, 'INVALID', 'FUTURE_RECORDING');
         if (recorded < previousRecordedAt) add(`${path}.recordedAt`, 'INVALID', 'NON_MONOTONIC_STAGE_TIME');
         previousRecordedAt = recorded;
       }
@@ -465,8 +467,8 @@ export function validateEvidenceContract(input) {
         if (object(development?.dataWindow) && timestamp(development.dataWindow.start) &&
           timestamp(development.dataWindow.end) && object(receipt.dataWindow) &&
           timestamp(receipt.dataWindow.start) && timestamp(receipt.dataWindow.end) &&
-          Date.parse(receipt.dataWindow.start) <= Date.parse(development.dataWindow.end) &&
-          Date.parse(receipt.dataWindow.end) >= Date.parse(development.dataWindow.start)) {
+          parsedTimestamp(receipt.dataWindow.start) <= parsedTimestamp(development.dataWindow.end) &&
+          parsedTimestamp(receipt.dataWindow.end) >= parsedTimestamp(development.dataWindow.start)) {
           add(`${path}.dataWindow`, 'INVALID', 'HOLDOUT_WINDOW_OVERLAP');
         }
       }
@@ -482,13 +484,13 @@ export function validateEvidenceContract(input) {
           object(row) && row.stage === 'OUT_OF_SAMPLE_HOLDOUT');
         if (timestamp(holdoutReceipt?.dataWindow?.end) &&
           timestamp(receipt.dataWindow?.start) &&
-          Date.parse(receipt.dataWindow.start) <= Date.parse(holdoutReceipt.dataWindow.end)) {
+          parsedTimestamp(receipt.dataWindow.start) <= parsedTimestamp(holdoutReceipt.dataWindow.end)) {
           add(`${path}.dataWindow.start`, 'INVALID', 'FORWARD_WINDOW_PRECEDES_HOLDOUT_END');
         }
       }
       if (stage === 'FORWARD_VALIDATION' && object(receipt.dataWindow) && timestamp(receipt.dataWindow.end)) {
-        const start = Date.parse(receipt.dataWindow.start);
-        const end = Date.parse(receipt.dataWindow.end);
+        const start = parsedTimestamp(receipt.dataWindow.start);
+        const end = parsedTimestamp(receipt.dataWindow.end);
         if (start <= forwardEnd) add(`${path}.dataWindow.start`, 'INVALID', 'FORWARD_WINDOWS_NOT_MONOTONIC');
         forwardEnd = end;
       }
@@ -532,13 +534,13 @@ export function validateEvidenceContract(input) {
         add(`${path}.plannedWindow`, 'INVALID', 'INVALID_PLANNED_WINDOW');
       } else {
         if (!timestamp(receipt.recordedAt) ||
-          Date.parse(receipt.recordedAt) < Date.parse(value.strategy?.frozenAt)) {
+          parsedTimestamp(receipt.recordedAt) < parsedTimestamp(value.strategy?.frozenAt)) {
           add(`${path}.recordedAt`, 'INVALID', 'PAPER_SETUP_PRECEDES_RULES_FREEZE');
         }
-        if (Date.parse(receipt.plannedWindow.start) < Date.parse(value.strategy?.frozenAt)) {
+        if (parsedTimestamp(receipt.plannedWindow.start) < parsedTimestamp(value.strategy?.frozenAt)) {
           add(`${path}.plannedWindow.start`, 'INVALID', 'PAPER_WINDOW_BEFORE_RULES_FREEZE');
         }
-        if (Date.parse(receipt.plannedWindow.start) > Date.parse(receipt.plannedWindow.end)) {
+        if (parsedTimestamp(receipt.plannedWindow.start) > parsedTimestamp(receipt.plannedWindow.end)) {
           add(`${path}.plannedWindow`, 'INVALID', 'INVALID_PLANNED_WINDOW');
         }
       }
@@ -555,27 +557,27 @@ export function validateEvidenceContract(input) {
       const times = [receipt.dataWindow.start, receipt.dataWindow.end, receipt.dataWindow.availableAt];
       if (!times.every(timestamp)) add(`${path}.dataWindow`, 'INVALID', 'INVALID_DATA_TIMESTAMP');
       else {
-        const start = Date.parse(receipt.dataWindow.start);
-        const end = Date.parse(receipt.dataWindow.end);
-        const available = Date.parse(receipt.dataWindow.availableAt);
-        const recorded = timestamp(receipt.recordedAt) ? Date.parse(receipt.recordedAt) : NaN;
-        const assessed = timestamp(value.asOf) ? Date.parse(value.asOf) : NaN;
+        const start = parsedTimestamp(receipt.dataWindow.start);
+        const end = parsedTimestamp(receipt.dataWindow.end);
+        const available = parsedTimestamp(receipt.dataWindow.availableAt);
+        const recorded = parsedTimestamp(receipt.recordedAt);
+        const assessed = parsedTimestamp(value.asOf);
         if (start > end) {
           add(`${path}.dataWindow`, 'INVALID', 'INVALID_DATA_WINDOW');
         }
         if (['FORWARD_VALIDATION', 'ROBUSTNESS_REVIEW'].includes(stage) &&
-          start < Date.parse(value.strategy?.frozenAt)) {
+          start < parsedTimestamp(value.strategy?.frozenAt)) {
           add(`${path}.dataWindow`, 'INVALID', 'PROSPECTIVE_WINDOW_PRECEDES_RULES_FREEZE');
         }
         if (timestamp(value.strategy?.frozenAt) && timestamp(receipt.recordedAt) &&
-          Date.parse(receipt.recordedAt) < Date.parse(value.strategy.frozenAt)) {
+          parsedTimestamp(receipt.recordedAt) < parsedTimestamp(value.strategy.frozenAt)) {
           add(`${path}.recordedAt`, 'INVALID', 'OUTCOME_PRECEDES_RULES_FREEZE');
         }
         if (end > recorded || available < end || available > assessed || recorded > assessed) {
           add(`${path}.dataWindow`, 'INVALID', 'OUTCOME_NOT_AVAILABLE_AT_RECORDING');
         }
         if (timestamp(receipt.dataRef?.asKnownAt) &&
-          (Date.parse(receipt.dataRef.asKnownAt) < available || Date.parse(receipt.dataRef.asKnownAt) > recorded)) {
+          (parsedTimestamp(receipt.dataRef.asKnownAt) < available || parsedTimestamp(receipt.dataRef.asKnownAt) > recorded)) {
           add(`${path}.dataRef.asKnownAt`, 'INVALID', 'DATA_KNOWN_TIME_MISMATCH');
         }
       }
@@ -587,21 +589,21 @@ export function validateEvidenceContract(input) {
       } else add(`${path}.preregistration.sha256`, 'PRESENT_ASSERTED', 'HASH_FORMAT_VALID_UNAUTHENTICATED');
       validText(receipt.preregistration.declaredBy, `${path}.preregistration.declaredBy`);
       validText(receipt.preregistration.source, `${path}.preregistration.source`);
-      const declared = Date.parse(receipt.preregistration.declaredAt);
-      const frozen = Date.parse(value.strategy?.frozenAt);
-      const recorded = Date.parse(receipt.recordedAt);
-      if (!timestamp(receipt.preregistration.declaredAt) || !timestamp(receipt.recordedAt) ||
-        !timestamp(value.strategy?.frozenAt) || declared < frozen || declared >= recorded) {
+      const declared = parsedTimestamp(receipt.preregistration.declaredAt);
+      const frozen = parsedTimestamp(value.strategy?.frozenAt);
+      const recorded = parsedTimestamp(receipt.recordedAt);
+      if (!Number.isFinite(declared) || !Number.isFinite(recorded) ||
+        !Number.isFinite(frozen) || declared < frozen || declared >= recorded) {
         add(`${path}.preregistration.declaredAt`, 'INVALID', 'CRITERIA_NOT_PREDECLARED');
       }
       if (['FORWARD_VALIDATION', 'ROBUSTNESS_REVIEW'].includes(stage) &&
-        timestamp(receipt.dataWindow?.start) && declared >= Date.parse(receipt.dataWindow.start)) {
+        timestamp(receipt.dataWindow?.start) && declared >= parsedTimestamp(receipt.dataWindow.start)) {
         add(`${path}.preregistration.declaredAt`, 'INVALID', 'CRITERIA_NOT_PREDECLARED');
       }
       if (stage === 'OUT_OF_SAMPLE_HOLDOUT') {
         const firstExposure = receipt.holdoutAccess?.exposures?.find(item =>
           object(item) && item.role === 'FIRST_EXPOSURE');
-        if (timestamp(firstExposure?.at) && declared >= Date.parse(firstExposure.at)) {
+        if (timestamp(firstExposure?.at) && declared >= parsedTimestamp(firstExposure.at)) {
           add(`${path}.preregistration.declaredAt`, 'INVALID', 'CRITERIA_NOT_PREDECLARED');
         }
       }
@@ -628,7 +630,7 @@ export function validateEvidenceContract(input) {
       add(`${path}.disjointFrom`, 'NOT_ASSESSED', 'DATA_DISJOINTNESS_NOT_DECLARED');
     }
     if (!timestamp(reference.asKnownAt) || !timestamp(value.asOf) ||
-      Date.parse(reference.asKnownAt) > Date.parse(value.asOf)) {
+      parsedTimestamp(reference.asKnownAt) > parsedTimestamp(value.asOf)) {
       add(`${path}.asKnownAt`, 'INVALID', 'DATA_AVAILABILITY_NOT_ESTABLISHED');
     }
   }
@@ -688,21 +690,21 @@ export function validateEvidenceContract(input) {
     validEnum(threshold.operator, ['GT', 'GTE', 'LT', 'LTE'], `${path}.operator`);
     if (typeof threshold.value !== 'number' || !Number.isFinite(threshold.value)) add(`${path}.value`, 'INVALID', 'FINITE_THRESHOLD_REQUIRED');
     if (threshold.unit !== metric.unit) add(`${path}.unit`, 'INVALID', 'THRESHOLD_UNIT_MISMATCH');
-    const declared = Date.parse(threshold.declaredAt);
-    const frozen = Date.parse(value.strategy?.frozenAt);
-    const recorded = Date.parse(receipt.recordedAt);
-    if (!timestamp(threshold.declaredAt) || !timestamp(value.strategy?.frozenAt) ||
-      !timestamp(receipt.recordedAt) || declared < frozen || declared >= recorded) {
+    const declared = parsedTimestamp(threshold.declaredAt);
+    const frozen = parsedTimestamp(value.strategy?.frozenAt);
+    const recorded = parsedTimestamp(receipt.recordedAt);
+    if (!Number.isFinite(declared) || !Number.isFinite(frozen) ||
+      !Number.isFinite(recorded) || declared < frozen || declared >= recorded) {
       add(`${path}.declaredAt`, 'INVALID', 'THRESHOLD_NOT_PREDECLARED');
     }
     if (['FORWARD_VALIDATION', 'ROBUSTNESS_REVIEW'].includes(receipt.stage) &&
-      timestamp(receipt.dataWindow?.start) && declared >= Date.parse(receipt.dataWindow.start)) {
+      timestamp(receipt.dataWindow?.start) && declared >= parsedTimestamp(receipt.dataWindow.start)) {
       add(`${path}.declaredAt`, 'INVALID', 'THRESHOLD_NOT_PREDECLARED');
     }
     if (receipt.stage === 'OUT_OF_SAMPLE_HOLDOUT') {
       const firstExposure = receipt.holdoutAccess?.exposures?.find(item =>
         object(item) && item.role === 'FIRST_EXPOSURE');
-      if (timestamp(firstExposure?.at) && declared >= Date.parse(firstExposure.at)) {
+      if (timestamp(firstExposure?.at) && declared >= parsedTimestamp(firstExposure.at)) {
         add(`${path}.declaredAt`, 'INVALID', 'THRESHOLD_NOT_PREDECLARED');
       }
     }
@@ -739,12 +741,10 @@ export function validateEvidenceContract(input) {
       add(`${path}.holdoutAccess.exposures`, firstExposures.length
         ? 'INVALID' : 'NOT_ASSESSED', 'HOLDOUT_FIRST_EXPOSURE_REQUIRED');
     }
-    const firstAt = firstExposures.length === 1 && timestamp(firstExposures[0].at)
-      ? Date.parse(firstExposures[0].at) : NaN;
-    const recordedAt = timestamp(receipt.recordedAt) ? Date.parse(receipt.recordedAt) : NaN;
-    const availableAt = timestamp(receipt.dataWindow?.availableAt)
-      ? Date.parse(receipt.dataWindow.availableAt) : NaN;
-    const frozenAt = timestamp(value.strategy?.frozenAt) ? Date.parse(value.strategy.frozenAt) : NaN;
+    const firstAt = firstExposures.length === 1 ? parsedTimestamp(firstExposures[0].at) : NaN;
+    const recordedAt = parsedTimestamp(receipt.recordedAt);
+    const availableAt = parsedTimestamp(receipt.dataWindow?.availableAt);
+    const frozenAt = parsedTimestamp(value.strategy?.frozenAt);
     const roles = new Set([
       'FIRST_EXPOSURE', 'SELECTION_OR_TUNING', 'EXACT_REPRODUCTION',
       'AUDIT', 'HASH_INSPECTION', 'REUSED_FOR_NEW_HYPOTHESIS'
@@ -754,11 +754,12 @@ export function validateEvidenceContract(input) {
       const exposurePath = `${path}.holdoutAccess.exposures[${index}]`;
       if (!exactShape(exposure, exposurePath, ['role', 'at', 'purpose'])) continue;
       validEnum(exposure.role, [...roles], `${exposurePath}.role`);
-      if (!timestamp(exposure.at) || !timestamp(value.asOf) || Date.parse(exposure.at) > Date.parse(value.asOf)) {
+      if (!timestamp(exposure.at) || !timestamp(value.asOf) ||
+        parsedTimestamp(exposure.at) > parsedTimestamp(value.asOf)) {
         add(`${exposurePath}.at`, 'INVALID', 'INVALID_EXPOSURE_TIME');
       }
       if (timestamp(exposure.at)) {
-        const at = Date.parse(exposure.at);
+        const at = parsedTimestamp(exposure.at);
         if (Number.isFinite(firstAt) && at < firstAt) {
           add(`${exposurePath}.at`, 'INVALID', 'HOLDOUT_ACCESS_PRECEDES_FIRST_EXPOSURE');
         }
@@ -831,17 +832,17 @@ function assessHoldout(receipt, frozenAt, asOf) {
   const firstExposures = access.exposures.filter(exposure =>
     object(exposure) && exposure.role === 'FIRST_EXPOSURE');
   const first = firstExposures[0];
-  const available = Date.parse(receipt.dataWindow?.availableAt);
-  const firstAt = Date.parse(first?.at);
-  const recordedAt = Date.parse(receipt.recordedAt);
-  const frozen = Date.parse(frozenAt);
-  const assessed = Date.parse(asOf);
+  const available = parsedTimestamp(receipt.dataWindow?.availableAt);
+  const firstAt = parsedTimestamp(first?.at);
+  const recordedAt = parsedTimestamp(receipt.recordedAt);
+  const frozen = parsedTimestamp(frozenAt);
+  const assessed = parsedTimestamp(asOf);
   if (firstExposures.length !== 1 || !timestamp(first?.at) ||
     !timestamp(receipt.recordedAt) || !timestamp(receipt.dataWindow?.availableAt) ||
     !timestamp(frozenAt) || !timestamp(asOf) ||
     firstAt < frozen || firstAt < available || firstAt > recordedAt ||
     access.exposures.some(exposure => !object(exposure) || !timestamp(exposure.at) ||
-      Date.parse(exposure.at) < firstAt || Date.parse(exposure.at) > assessed)) {
+      parsedTimestamp(exposure.at) < firstAt || parsedTimestamp(exposure.at) > assessed)) {
     return {
       status: 'UNKNOWN',
       freshConfirmation: 'NOT_ASSESSED',

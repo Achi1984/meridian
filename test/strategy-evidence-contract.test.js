@@ -443,8 +443,18 @@ test('malformed, cyclic, accessor, and bounded inputs return structured denials 
   const deep=packet();let nested={};
   for(let i=0;i<14;i++)nested={child:nested};
   deep.nested=nested;
+  const invalidPrerequisiteTimestamp=packet();
+  invalidPrerequisiteTimestamp.lifecycle.receipts[2].preregistration.declaredAt={toString:'bad'};
+  const invalidExposureTimestamp=packet();
+  invalidExposureTimestamp.lifecycle.receipts[3].holdoutAccess.exposures[0].at={toString:'bad'};
   for(const input of [null,accessor,cycle,large,deep]){
     const result=validateEvidenceContract(input);
+    assert.equal(result.evidenceCompleteness.status,'INVALID');
+    assert.equal(result.authority.executionAuthorized,false);
+    assert.doesNotThrow(()=>JSON.stringify(result));
+  }
+  for(const input of [invalidPrerequisiteTimestamp,invalidExposureTimestamp]){
+    const result=validateEvidenceContract(JSON.parse(JSON.stringify(input)));
     assert.equal(result.evidenceCompleteness.status,'INVALID');
     assert.equal(result.authority.executionAuthorized,false);
     assert.doesNotThrow(()=>JSON.stringify(result));
