@@ -1,5 +1,59 @@
 # GO MERIDIAN — durable resume checkpoint
 
+## Current handoff — 2026-10-15
+
+This section is the current operational summary. Historical snapshots below are
+retained for provenance, not as instructions or evidence of present state.
+
+- Verified source main: `7dc94b9108e25d742bef7652fb7511c5cb5108ea`, PR **#818** merged.
+  FINAL_MERGE_STATUS: **6199370528**. Post-merge Agent Orchestration, Runtime
+  Smoke, Release Coordinator, Release Safety **38786060230** and Pages all succeeded.
+- Terminal build: **10.0-r128**; checkpoint protocol: **STREAM-SAFE-V8**.
+- Active work: **one housekeeping package before the next infrastructure step**.
+  Infrastructure work is paused until this package is completed.
+- Authoritative mailbox is now **#639**, predecessor **#571**; watchdog status
+  comment is **6198924473**. Superseded rollover PR **#640** is closed.
+  Successor read/delivery/response smoke **PASS**, response **6199499751** to request **6199490288**. Predecessor #571 is closed as completed historical archive (6199526147). Resolve routing from `MERIDIAN_LIVE_CHECKPOINT.json`.
+- Four disabled Autopilot prompts now use checkpoint-driven routing (current
+  mailbox **#639**) and remain disabled. The enabled management automation
+  already uses dynamic routing. Read-only event pilot **#673** is unchanged.
+- V2 remains **SOURCE_AUDIT**. Canonical execution, strategy PnL, Discovery,
+  Validation, Holdout, Paper and Live authorization remain **false**.
+- Publisher setup: failed owner attempt documented in #571 comment
+  **6198795959**. The one-shot marker is preserved. No recovery or second
+  attempt has been performed; each needs its own separate owner approval.
+- Decision records **6103358472**, **6178949360** and **6197277097** are resolved.
+  Stale items **#653, #675 (issue), #686 and #690** are closed with readback.
+  Clock-skew/#811 reconciliation: **6198817919**; retrospective
+  FINAL_MERGE_STATUS for #782: **6198847209**.
+- Owner approved **#818 housekeeping and WIP limit 3** at
+  **2026-10-15 20:16:49 Europe/Vienna**: “Ja Freigabe erteilt”, recorded
+  RESOLVED in comment **6199107184**. WIP is limited to three active packages;
+  remaining proposals belong in backlog. Watchdog source routing is merged and active,
+  but the first hosted watchdog PATCH remains unproven. The lead activation edit is not bot evidence. Do not infer
+  Codespace shutdown from this handoff.
+
+- Carry-forward #814: head `43a351328159bf9526c6bba1f8ff93f91a2298cc`, run **38776991839**, attempt 1, remains `action_required`; it did not execute. Old-run approval does not settle this gate.
+- Six further historical decisions were marked RESOLVED in place with existing quote/time evidence: 6171848445, 6187867522, 6175341101 (SUPERSEDED), 6177231926, 6177550606, 6178534667. No new authority granted.
+
+### Resume and completion rules
+
+Read the checkpoint-selected mailbox, current main and relevant CI before acting.
+All #818 post-merge checks and successor mailbox smoke succeeded. #571 is archived;
+finish CI/review/publication of this handoff refresh before the next infrastructure step. This checkpoint authorizes no infrastructure action,
+marker recovery or second credential-setup attempt. Do not repeat setup or clear its marker.
+
+After every completed merge block, refresh this file together with
+`MERIDIAN_LIVE_CHECKPOINT.json`, `docs/MERIDIAN_CHAT_HANDOFF.md`,
+`MERIDIAN_HANDOFF.md` and `docs/handover/GO-MERIDIAN.md`: record the verified
+commit, review/CI evidence, pending decisions and exact next step. Unknown checks
+must remain explicitly unknown; a source merge alone is not runtime acceptance.
+
+---
+
+## Historical archive — superseded operational snapshots
+
+
 Updated: 2026-10-07
 Resume keyword: **Go Meridian**
 
@@ -126,3 +180,5 @@ Mailbox comment id: 6029495669. Classification: PLATFORM_STALL. Recommendation: 
 
 ---
 When the user says **“Go Meridian”** in a new chat, start from this file **plus live GitHub reconciliation**. Never trust this snapshot over newer GitHub state.
+
+

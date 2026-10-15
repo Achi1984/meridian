@@ -18,8 +18,8 @@ Begründung: Der Review muss unabhängig sein; ein zweites Modell findet systema
 ## 3. Ablauf pro Änderung
 1. Lead prüft vor jedem Write `main`-SHA und offene PRs.
 2. Lead öffnet PR mit: Ziel, Research-Stage, PnL berührt (ja/nein), `Review requested: Claude`.
-3. Claude reviewt den exakten PR-HEAD-SHA. Jedes GREEN LIGHT muss einen Abschnitt `Executed checks` mit den tatsächlich ausgeführten read-only Befehlen und Ergebnissen enthalten. Kann ein für Scope/Request verpflichtender Check nicht laufen, ist GREEN LIGHT verboten; Ergebnis ist REVISION REQUIRED oder BLOCKED mit Begründung.
-4. Merge nur bei grüner CI und GREEN LIGHT auf genau diesem SHA. Neuer Commit = altes GREEN LIGHT ungültig.
+3. Claude liest den vollständigen angeforderten Scope am exakten PR-HEAD-SHA; der Lead fragt erst nach grüner Exact-Head-CI an. Jedes GREEN_LIGHT muss einen Abschnitt `Executed checks` mit den tatsächlich ausgeführten read-only Befehlen und Ergebnissen enthalten. Kann ein für Scope/Request verpflichtender Check nicht laufen, ist GREEN_LIGHT verboten; Ergebnis ist NEEDS_MORE_EVIDENCE mit Begründung; nachgewiesene Codefehler erhalten REVISION_REQUIRED.
+4. Merge nur bei grüner CI und GREEN_LIGHT auf genau diesem SHA. Neuer Commit = altes GREEN_LIGHT ungültig.
 5. Trivial (Text, Tests, CI-Fix ohne Research-Logik) kann ohne Cross-Model-Review bleiben. Datenvertrag, Source Receipt, Split/Stage-Lock, Accounting, Strategy-PnL, Stage-Übergänge sowie Agenten-Spielregeln/Workflow-Berechtigungen sind nie trivial und reviewpflichtig.
 6. Max. 3 Review-Loops, danach entscheidet der User.
 
@@ -42,16 +42,22 @@ Notfall: Ist der Lead nicht erreichbar, darf nur der User den Lease überschreib
 - „Übergib an Claude/ChatGPT“ → Abschnitt 4.
 
 ## 7. Technische Voraussetzungen
-- Verbindliche Mailbox ist `MERIDIAN_LIVE_CHECKPOINT.json.mailboxIssue`; aktuell **#571**.
+- Verbindliche Mailbox ist `MERIDIAN_LIVE_CHECKPOINT.json.mailboxIssue`; Ziel dieses Kandidaten **#639**, vor dessen freigegebenem Merge weiterhin **#571**.
 - Mailbox-Inhalt: nur `CROSS_MODEL_REQUEST`, `CROSS_MODEL_RESPONSE`, `CROSS_MODEL_STATUS NEEDS_USER_DECISION` und finale Merge-Status. INTENT/Fortschritt lebt pro aktivem PR in genau einem editierten Statuskommentar.
 - Rollover bei >200 Kommentaren: Nachfolger anlegen, Workflow-Trigger + `mailboxIssue` gemeinsam per reviewed Infra-PR umstellen, Smoke im Nachfolger, dann Vorgänger schließen.
-- Claude bleibt reviewer-only: `contents/pull-requests/actions: read`; `issues: write` nur für die Review-Antwort. Edit/Write, Commit/Push/PR/Merge, Locks/Stages und Workflow-Dispatch bleiben verboten.
-- Erlaubte read-only Prüfung: `gh api` nur GET, `gh pr view/diff`, `gh run view`, Git-Inspektion, `node --test`, Continuity Audit, Frozen Guard und Orchestration Validator.
+- Claude bleibt reviewer-only: `contents/pull-requests/actions: read`; `issues: write` nur für die angeforderte Review-Antwort und das Update des exakt im Checkpoint gepinnten Watchdog-Statuskommentars. Edit/Write, Commit/Push/PR/Merge, Locks/Stages und Workflow-Dispatch bleiben verboten.
+- Erlaubte read-only Prüfung: `gh api` zur Prüfung nur GET; einzige Watchdog-Ausnahme ist PATCH des zuvor validierten, im Checkpoint gepinnten Statuskommentars, `gh pr view/diff`, `gh run view`, Git-Inspektion, `node --test`, Continuity Audit, Frozen Guard und Orchestration Validator.
 - `CLAUDE_CODE_OAUTH_TOKEN` muss vorhanden sein; ohne Secret fail-closed. ChatGPT bleibt Lead/Merge-Owner.
 
 ## 8. Automatischer Mailbox-Loop
 1. Lead liest `mailboxIssue` aus dem Live Checkpoint und postet dort `@claude CROSS_MODEL_REQUEST <id>`.
 2. Workflow startet nur für diese Mailbox, `Achi1984` und `CROSS_MODEL_REQUEST`.
 3. Claude prüft exakten SHA/Base, CI und relevante lokale read-only Tests/Audits und postet `CROSS_MODEL_RESPONSE <id>` in derselben Mailbox.
-4. Jeder neue Commit invalidiert ein früheres GREEN LIGHT.
+4. Jeder neue Commit invalidiert ein früheres GREEN_LIGHT.
 5. User-Eingriff bleibt nur für explizite Hard-Gate-Entscheidungen nötig.
+
+
+
+## Housekeeping contract
+
+The owner housekeeping contract in `MERIDIAN_GO.md` is binding: canonical verdicts, full-scope and exact-head-CI review gates, in-place decision resolution, real read-only credential preflight, separate recovery/retry approvals, and merge-block handoff refresh. The proposed mailbox639 route activates only after concrete owner-approved merge;571 remains binding until then. Watchdog status uses the checkpoint-pinned single comment, separate from requested review responses. WIP maximum3active work packages is approved by owner2026-10-15T20:16:49+02:00, decision6199107184.

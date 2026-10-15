@@ -7,7 +7,12 @@ const isSha = value => typeof value === 'string' && SHA.test(value);
 const KEY = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const OWNER = Object.freeze({ login: 'Achi1984', id: 319562141, type: 'User' });
 const REVIEWER = Object.freeze({ login: 'claude[bot]', id: 209825114, type: 'Bot' });
-const VERDICTS = new Set(['GREEN_LIGHT', 'CHANGES_REQUIRED', 'STALE_HEAD', 'NEEDS_MORE_EVIDENCE', 'ROOT_CAUSE_CONFIRMED', 'ALTERNATIVE_CAUSE']);
+export const CANONICAL_REVIEW_VERDICTS = Object.freeze(['GREEN_LIGHT', 'REVISION_REQUIRED', 'NEEDS_MORE_EVIDENCE']);
+const VERDICTS = new Set(CANONICAL_REVIEW_VERDICTS);
+// Historical records retire delivery only; they never become approval evidence.
+const LEGACY_VERDICTS = new Map([['CHANGES_REQUIRED', 'REVISION_REQUIRED'],
+  ['STALE_HEAD', 'NEEDS_MORE_EVIDENCE'], ['ROOT_CAUSE_CONFIRMED', 'NEEDS_MORE_EVIDENCE'],
+  ['ALTERNATIVE_CAUSE', 'NEEDS_MORE_EVIDENCE']]);
 const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
 const positive = n => Number.isSafeInteger(n) && n > 0;
 const trusted = (c, who) => Object.keys(who).every(k => c.user[k] === who[k]);
@@ -116,29 +121,41 @@ function response(c, nowMs) {
   if (!trusted(c,REVIEWER)) return null;
   const r = record(c.body,'CROSS_MODEL_RESPONSE');
   if (!r) return null;
-  const f = metadata(r.text,['reviewed_head','reviewed_base','verdict']);
+  const f = metadata(r.text,['reviewed_head','reviewed_base','verdict','delivery_status']);
   if (!f || f.verdict === null || (f.reviewed_base !== null && !isSha(f.reviewed_base))) return null;
   // Permit explanatory parentheses, not arbitrary trailing records or an invented verdict.
   const v = /^([A-Z_]+)(?: \([^\n]*\))?$/.exec(f.verdict)?.[1];
-  if (!VERDICTS.has(v)) return null;
-  const staleWithoutHead = v === 'STALE_HEAD' && f.reviewed_head === 'none';
+  if (!VERDICTS.has(v) && !LEGACY_VERDICTS.has(v)) return null;
+  if (f.delivery_status !== null && f.delivery_status !== 'STALE_HEAD') return null;
+  // Staleness is transport metadata, not a fourth review verdict.
+  if (f.delivery_status === 'STALE_HEAD' && v !== 'NEEDS_MORE_EVIDENCE') return null;
+  const deliveryStatus = v === 'STALE_HEAD' ? 'STALE_HEAD' : f.delivery_status;
+  const staleWithoutHead = deliveryStatus === 'STALE_HEAD' && f.reviewed_head === 'none';
   if (!staleWithoutHead && !isSha(f.reviewed_head || '')) return null;
   const time = at(c.created_at);
   if (time > nowMs) return null;
-  return { id:r.id, head:f.reviewed_head, base:f.reviewed_base, verdict:v, time, commentId:c.id };
+  return { id:r.id, head:f.reviewed_head, base:f.reviewed_base, verdict:LEGACY_VERDICTS.get(v) || v, deliveryStatus, time, commentId:c.id };
 }
 const tuple = r => `${r.id}@${r.head}@${r.base || 'NONE'}`;
 const later = (a,b) => a.commentId > b.commentId && a.time >= b.time;
 
-export function seenFingerprint({ pages, fingerprint, nowMs }) {
+export function seenFingerprint({ pages, fingerprint, nowMs, statusCommentId = null }) {
   if (!/^[a-f0-9]{64}$/.test(fingerprint || '') || (!Number.isSafeInteger(nowMs) || nowMs < 0)) fail('invalid fingerprint input');
+  if (statusCommentId !== null && !positive(statusCommentId)) fail('invalid fixed status comment');
   return commentsFrom(pages).some(c => {
-    if (!trusted(c,REVIEWER) || at(c.created_at) > nowMs) return false;
+    // PATCH retains the seed author. Production pins that exact owner record;
+    // absent pin is historical bot-only compatibility, never generic owner trust.
+    const fixed = statusCommentId !== null;
+    if (!(fixed ? c.id === statusCommentId && trusted(c,OWNER) : trusted(c,REVIEWER))
+        || at(c.created_at) > nowMs) return false;
+    // Fixed comments are edited in place: validate the edit timestamp, not age
+    // inferred from the seed creation. Missing/malformed edit evidence fails.
+    if (fixed && (at(c.updated_at) > nowMs || at(c.updated_at) < at(c.created_at))) return false;
     const r = record(c.body,'CROSS_MODEL_STATUS');
     if (r?.id !== 'CLAUDE-DEVELOPMENT-WATCHDOG') return false;
     const f = metadata(r.text,['fingerprint','main','active_pr','verdict']);
     return !!f && f.fingerprint === fingerprint && isSha(f.main || '') &&
-      /^(?:NONE|[1-9][0-9]*)$/.test(f.active_pr || '') && ['GREEN','CHALLENGE','NEXT_STEP'].includes(f.verdict);
+      /^(?:NONE|[1-9][0-9]*)$/.test(f.active_pr || '') && (fixed ? VERDICTS.has(f.verdict) : ['GREEN','CHALLENGE','NEXT_STEP'].includes(f.verdict));
   });
 }
 
@@ -163,7 +180,7 @@ export function resolveMailbox({ pages, prPages, mainSha, nowMs }) {
     // A head-less stale response can retire delivery ONLY when its ID has one scope.
     // It can never grant review authority; require the requested base when present.
     const scopes = new Set(requests.filter(q => q.id === r.id).map(tuple));
-    const stale = responses.find(s => s.id === r.id && s.verdict === 'STALE_HEAD' && s.head === 'none' &&
+    const stale = responses.find(s => s.id === r.id && s.deliveryStatus === 'STALE_HEAD' && s.head === 'none' &&
       (!r.base || s.base === r.base) && later(s,r) && scopes.size === 1);
     // Renames are explicit and same-target. A matching PR alone is never sufficient.
     const successor = requests.find(q => q.supersedes === r.id && q.id !== r.id && q.head === r.head &&
@@ -183,11 +200,12 @@ function cli(args) {
   const json = file => JSON.parse(readFileSync(file,'utf8'));
   if (mode === 'resolve' && a.length === 4) {
     console.log(JSON.stringify(resolveMailbox({pages:json(a[0]),prPages:json(a[1]),mainSha:a[2],nowMs:Number(a[3])*1000})));
-  } else if (mode === 'seen' && a.length === 3) {
-    console.log(seenFingerprint({pages:json(a[0]),fingerprint:a[1],nowMs:Number(a[2])*1000}));
+  } else if (mode === 'seen' && (a.length === 3 || a.length === 4)) {
+    console.log(seenFingerprint({pages:json(a[0]),fingerprint:a[1],nowMs:Number(a[2])*1000, statusCommentId:a.length === 4 ? Number(a[3]) : null}));
   } else fail('invalid CLI invocation');
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try { cli(process.argv.slice(2)); }
   catch { console.error('watchdog mailbox validation failed; no Claude call is authorized'); process.exitCode=1; }
 }
+

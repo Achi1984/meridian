@@ -117,3 +117,19 @@ After adoption, ChatGPT as sole merge owner may apply the standing approval to r
 `ownerMergeApprovalRequired` remains true: the adopted bounded standing approval is one permitted form of owner approval; it is never optional. Architecture/direction, budget, security/permissions, policy/workflows/schedulers, release-governance changes, production activation and research/trading changes remain individually owner-gated. The daily UI-release cap is removed; expected-state protection, single-writer and research gates remain unchanged. Unknown scope, conflicting findings or missing evidence stops the affected work package.
 
 Immediately publish `FINAL_MERGE_STATUS` after each merge. Do not merge another dependent candidate until all required post-merge checks succeed; failure or unknown outcome stops that pipeline and triggers reconciliation. The owner may revoke this standing approval at any time. No new automated dispatcher, credentials, schedule, deployment authority or spending is introduced.
+
+
+
+## Owner housekeeping contract — 2026-10-15
+
+Owner instruction 2026-10-15T19:57:13+02:00, execution Go19:58:27:
+- Record each required owner action as NEEDS_USER_DECISION in the active mailbox; resolve that same comment in place with the actual quote, timestamp and observed outcome. Never invent historical click times or quotations.
+- Before requesting Claude review, run the relevant suite locally with the exact CI toolchain (publisher: ordinary CPython3.14.2 plus the hash-pinned dependency lock), then wait for successful exact-head CI. Partial scope or absent evidence requires NEEDS_MORE_EVIDENCE, never GREEN_LIGHT.
+- Canonical review verdicts are GREEN_LIGHT, REVISION_REQUIRED, NEEDS_MORE_EVIDENCE. GREEN_LIGHT requires the full requested scope to be read and all mandatory exact-head checks successful. Historical labels are evidence, not current verdict producers.
+- For credential/mutation code with an attempt marker, first run a reviewed read-only preflight against the real target. Record a failed owner attempt and known/unknown remote state before proposing recovery. Marker recovery and a second attempt each require separate concrete owner approval.
+- Refresh MERIDIAN_LIVE_CHECKPOINT.json, docs/MERIDIAN_CHAT_HANDOFF.md, MERIDIAN_HANDOFF.md and docs/handover/GO-MERIDIAN.md after each merge block. Keep creation provenance, distinguish current evidence from historical snapshots, and never claim the current publication commit before readback.
+- Watchdog recommendations update one checkpoint-pinned status comment; request-specific review responses remain separate. A denied mailbox read prevents a verdict, not permission to infer context. No schedule, spending, research or trading authority changes.
+- WIP limit: at most three active work packages, remaining proposals in backlog. Owner approved 2026-10-15T20:16:49+02:00: "Ja Freigabe erteilt"; decision6199107184 resolved in place.
+
+Mailbox639 routing is active after owner-approved PR818 merge7dc94b9108e25d742bef7652fb7511c5cb5108ea (FINAL_MERGE_STATUS6199370528). Four disabled Autopilot prompts now resolve checkpoint routing and remain disabled; management routing was already dynamic. Pending requests and external automation routing reconciled; successor smoke6199499751 passed. Predecessor571 closed as historical archive6199526147. First hosted watchdog PATCH remains unproven.
+

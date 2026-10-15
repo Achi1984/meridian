@@ -30,6 +30,7 @@ function audit(pages,o={}) {return resolveMailbox({pages,prPages:[[pr()]],mainSh
 const key=(id='R130-REVIEW',h=H,b=B)=>`${id}@${h}@${b||'NONE'}`;
 const state=(comments,o={})=>audit([comments],o).items[0]?.state;
 function status(o={}) {return {id:5,user:BOT,created_at:'2026-10-07T06:20:00Z',body:`CROSS_MODEL_STATUS CLAUDE-DEVELOPMENT-WATCHDOG\nfingerprint: ${FP}\nmain: ${M}\nactive_pr: NONE\nverdict: CHALLENGE`,...o};}
+const fixedStatus=(o={})=>status({id:6198924473,user:OWNER,updated_at:'2026-10-07T06:25:00Z',body:status().body.replace('verdict: CHALLENGE','verdict: NEEDS_MORE_EVIDENCE'),...o});
 const seen=(pages,o={})=>seenFingerprint({pages,fingerprint:FP,nowMs:NOW,...o});
 function runScript(name) {
   const start=WORKFLOW.indexOf(`      - name: ${name}\n`);
@@ -171,14 +172,14 @@ function shell(which, fixture={}, extraEnv={}) {
   writeFileSync(join(dir,'fixture.json'),JSON.stringify({pages:[[req()],[res()]],prPages:[[pr()]],main:M,
     runPages:[{workflow_runs:[{name:'MERIDIAN Release Safety',status:'completed',conclusion:'success'}]}],
     reviewRuns:{total_count:0,workflow_runs:[]},...fixture}));
-  writeFileSync(join(dir,'bin','gh'),`#!${process.execPath}\nconst fs=require('node:fs');const f=JSON.parse(fs.readFileSync(process.env.FIXTURE,'utf8'));const a=process.argv.slice(2);const q=a.join(' ');fs.appendFileSync(process.env.GH_CALLS,q+'\\n');if(f.fail&&q.includes(f.fail))process.exit(17);let out;if(q.includes('commits/main')){process.stdout.write(f.main+'\\n');process.exit(0)}else if(q.includes('/pulls?'))out=f.prPages;else if(q.includes('/issues/571/comments?'))out=f.pages;else if(q.includes('/actions/runs?'))out=f.runPages;else if(q.includes('/actions/workflows/')){console.log(JSON.stringify(f.reviewRuns));process.exit(0)}else process.exit(18);if(!a.includes('--paginate')||!a.includes('--slurp'))process.exit(19);console.log(JSON.stringify(out));`,{mode:0o755});
+  writeFileSync(join(dir,'bin','gh'),`#!${process.execPath}\nconst fs=require('node:fs');const f=JSON.parse(fs.readFileSync(process.env.FIXTURE,'utf8'));const a=process.argv.slice(2);const q=a.join(' ');fs.appendFileSync(process.env.GH_CALLS,q+'\\n');if(f.fail&&q.includes(f.fail))process.exit(17);let out;if(q.includes('commits/main')){process.stdout.write(f.main+'\\n');process.exit(0)}else if(q.includes('/pulls?'))out=f.prPages;else if(q.includes('/issues/639/comments?'))out=f.pages;else if(q.includes('/actions/runs?'))out=f.runPages;else if(q.includes('/actions/workflows/')){console.log(JSON.stringify(f.reviewRuns));process.exit(0)}else process.exit(18);if(!a.includes('--paginate')||!a.includes('--slurp'))process.exit(19);console.log(JSON.stringify(out));`,{mode:0o755});
   writeFileSync(join(dir,'bin','date'),`#!${process.execPath}\nconsole.log(${NOW/1000});`,{mode:0o755});
   const script=runScript(which==='state'?'Compute cheap development fingerprint':'Decide whether Claude is needed');
   const output=join(dir,'output');const calls=join(dir,'calls');
   const run=spawnSync('bash',['-c',script],{cwd:dir,encoding:'utf8',timeout:10000,
     env:{...process.env,PATH:join(dir,'bin')+':'+process.env.PATH,FIXTURE:join(dir,'fixture.json'),GH_CALLS:calls,
       GITHUB_REPOSITORY:'Achi1984/meridian',GITHUB_OUTPUT:output,GH_TOKEN:'fixture-only',
-      STATE_FINGERPRINT:FP,CACHE_HIT:'',CI_PENDING:'false',UNRESOLVED_REQUEST:'',MAILBOX_REVIEW_PENDING:'false',...extraEnv}});
+      FIXED_STATUS_COMMENT_ID:'6198924473',STATE_FINGERPRINT:FP,CACHE_HIT:'',CI_PENDING:'false',UNRESOLVED_REQUEST:'',MAILBOX_REVIEW_PENDING:'false',...extraEnv}});
   const text=existsSync(output)?readFileSync(output,'utf8'):'';
   const result={...run,text,values:Object.fromEntries(text.trim().split('\n').filter(Boolean).map(x=>{const n=x.indexOf('=');return[x.slice(0,n),x.slice(n+1)]})),
     calls:existsSync(calls)?readFileSync(calls,'utf8'):'',sentinel:existsSync(join(dir,'SENTINEL'))};
@@ -203,7 +204,7 @@ for(const [env,reason] of [[{CACHE_HIT:'true'},'UNCHANGED'],[{CI_PENDING:'true'}
   });
 }
 test('real decision path suppresses only authenticated fingerprint',()=>{
-  const a=shell('decision',{pages:[[],[status()]]});assert.equal(a.status,0,a.stderr);assert.equal(a.values.reason,'FINGERPRINT_ALREADY_COMMENTED');
+  const a=shell('decision',{pages:[[],[fixedStatus()]]});assert.equal(a.status,0,a.stderr);assert.equal(a.values.reason,'FINGERPRINT_ALREADY_COMMENTED');
   const b=shell('decision',{pages:[[status({user:OWNER})]]});assert.equal(b.status,0,b.stderr);assert.equal(b.values.reason,'STATE_CHANGED');
 });
 test('real decision fresh state authorizes only one invocation path',()=>{
@@ -290,7 +291,53 @@ test('real state shell exposes rejection count without changing its fingerprint'
   assert.ok(rejected.text.trim().split('\n').every(x=>/^[a-z_]+=/.test(x)));
 });
 test('real decision shell dedupes decision-trailer status even without a cache hit',()=>{
-  const a=shell('decision',{pages:[[],[status({body:status().body+decisionTrailer})]]},{CACHE_HIT:'false'});
+  const a=shell('decision',{pages:[[],[fixedStatus({body:fixedStatus().body+decisionTrailer})]]},{CACHE_HIT:'false'});
   assert.equal(a.status,0,a.stderr);assert.equal(a.values.run_claude,'false');
   assert.equal(a.values.reason,'FINGERPRINT_ALREADY_COMMENTED');
+});
+
+
+test('canonical revision response retires delivery without granting approval',()=>{
+ const a=audit([[req(),res(undefined,{verdict:'REVISION_REQUIRED'})]]);
+ assert.equal(a.items[0].state,'ANSWERED');assert.equal(a.reviewAuthorization,false);
+});
+test('canonical stale delivery preserves retirement and exact scope restrictions',()=>{
+ const stale=res(undefined,{head:'none',verdict:'NEEDS_MORE_EVIDENCE'});
+ stale.body+='\ndelivery_status: STALE_HEAD';
+ assert.equal(state([req(),stale]),'STALE_RESPONSE');
+ assert.equal(audit([[req(),stale]]).reviewAuthorization,false);
+ const ambiguous=res(undefined,{commentId:4,head:'none',verdict:'NEEDS_MORE_EVIDENCE',time:NOW-1000000});
+ ambiguous.body+='\ndelivery_status: STALE_HEAD';
+ assert.equal(audit([[req(),req(undefined,{head:M,pr:null,commentId:3}),ambiguous]]).items[0].state,'UNRESOLVED');
+ for(const bad of ['GREEN_LIGHT','REVISION_REQUIRED']) {
+  const r=res(undefined,{head:'none',verdict:bad});r.body+='\ndelivery_status: STALE_HEAD';
+  assert.equal(state([req(),r]),'UNRESOLVED');
+ }
+ const duplicate={...stale,body:stale.body+'\ndelivery_status: STALE_HEAD'};
+ assert.equal(state([req(),duplicate]),'UNRESOLVED');
+ const wrongBase=res(undefined,{head:'none',base:H2,verdict:'NEEDS_MORE_EVIDENCE'});
+ wrongBase.body+='\ndelivery_status: STALE_HEAD';
+ assert.equal(state([req(),wrongBase]),'UNRESOLVED');
+});
+
+test('fixed owner status requires exact pin and canonical verdict',()=>{
+ const pin={statusCommentId:6198924473};
+ assert.equal(seen([[fixedStatus()]],pin),true);
+ for(const patch of [{id:6198924474},{user:BOT},{user:{...OWNER,id:1}},
+   {user:{...OWNER,login:'impostor'}},{body:status().body},
+   {updated_at:'2026-10-07T07:00:00Z'}]) {
+  assert.equal(seen([[fixedStatus(patch)]],pin),false);
+ }
+ assert.equal(seen([[fixedStatus()]]),false);
+ assert.equal(seen([[status()]],pin),false);
+ for(const verdict of ['GREEN_LIGHT','REVISION_REQUIRED','NEEDS_MORE_EVIDENCE'])
+  assert.equal(seen([[fixedStatus({body:fixedStatus().body.replace('NEEDS_MORE_EVIDENCE',verdict)})]],pin),true);
+ assert.throws(()=>seen([[fixedStatus()]],{statusCommentId:0}),/invalid fixed status/);
+});
+
+test('fixed status uses fresh edit on old seed and rejects missing edit timestamp',()=>{
+ const pin={statusCommentId:6198924473};
+ assert.equal(seen([[fixedStatus({created_at:'2026-01-01T00:00:00Z'})]],pin),true);
+ assert.throws(()=>seen([[fixedStatus({updated_at:undefined})]],pin),/invalid API timestamp/);
+ assert.equal(seen([[fixedStatus({updated_at:'2026-10-07T06:00:00Z'})]],pin),false);
 });
