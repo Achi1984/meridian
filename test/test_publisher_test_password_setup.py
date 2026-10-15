@@ -48,6 +48,8 @@ class Fake:
         self.closed = False
         self.committed = False
         self.round = 0
+        self.connection = self
+        self.pgconn = SimpleNamespace(ssl_in_use=True)
 
     def connect(self, **kwargs):
         self.config = kwargs
@@ -140,6 +142,51 @@ class SetupTests(unittest.TestCase):
                 self.assertEqual(fake.mutations, [])
                 self.assertTrue(fake.rolled_back and fake.closed)
 
+    def test_proxy_backend_without_tls_accepts_verified_client_tls(self):
+        class ProxyBackend(Fake):
+            def execute(self, query):
+                super().execute(query)
+                if query == m.IDENTITY_SQL:
+                    self.rows = [self.rows[0][:-1] + (False,)]
+        fake = ProxyBackend()
+        result = m.perform(baseline(), Path('/trusted/ca.pem'), fake, reader())
+        self.assertEqual(result, m.STATUS_OK)
+        self.assertEqual(fake.config['sslmode'], 'verify-full')
+        self.assertEqual(fake.config['sslrootcert'], '/trusted/ca.pem')
+        self.assertEqual(fake.config['host'], m.HOST)
+        self.assertEqual(len(fake.mutations), 3)
+        self.assertTrue(fake.committed)
+
+    def test_missing_false_or_nonboolean_client_tls_never_mutates(self):
+        for fault in ('connection', 'pgconn', 'ssl_in_use', False, None, 1, 'true'):
+            with self.subTest(fault=fault):
+                fake = Fake()
+                if type(fault) is str and fault in ('connection', 'pgconn'):
+                    delattr(fake, fault)
+                elif fault == 'ssl_in_use':
+                    del fake.pgconn.ssl_in_use
+                else:
+                    fake.pgconn.ssl_in_use = fault
+                result = m.perform(baseline(), Path('/trusted/ca.pem'), fake, reader())
+                self.assertEqual(result, m.STATUS_FAIL)
+                self.assertEqual(fake.mutations, [])
+                self.assertEqual(fake.round, 0)
+                self.assertFalse(fake.committed)
+                self.assertTrue(fake.rolled_back and fake.closed)
+
+    def test_client_tls_is_rechecked_before_mutation(self):
+        fake = Fake()
+        values = reader()
+        def changed_tls(prompt):
+            value = values(prompt)
+            if fake.round:
+                fake.pgconn.ssl_in_use = False
+            return value
+        result = m.perform(baseline(), Path('/trusted/ca.pem'), fake, changed_tls)
+        self.assertEqual(result, m.STATUS_FAIL)
+        self.assertEqual(fake.mutations, [])
+        self.assertTrue(fake.rolled_back and fake.closed)
+
     def test_alter_error_and_notice_rollback(self):
         for fault in ('alter', 'notice'):
             fake, result = self.run_fake(fault)
@@ -211,7 +258,7 @@ class SetupTests(unittest.TestCase):
 
     def test_each_identity_field_rejects_independently(self):
         changes = ['wrongdb', 'wronguser', 'wrongsession', 170000, 'public',
-                   'set', 999, False, True, 0, 0, 1, False]
+                   'set', 999, False, True, 0, 0, 1]
         for index, value in enumerate(changes):
             with self.subTest(field=index):
                 class WrongIdentity(Fake):

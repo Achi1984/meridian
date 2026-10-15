@@ -306,6 +306,13 @@ def load_ca(path):
 
 
 def verify(cursor, baseline):
+    # Neon terminates client TLS at its proxy, so pg_stat_ssl describes a
+    # different hop. Require TLS on this actual libpq connection instead.
+    # Missing or non-boolean evidence fails closed; connect() still enforces
+    # the fixed host, verify-full, and the validated CA bundle.
+    if getattr(getattr(getattr(cursor, 'connection', None), 'pgconn', None),
+               'ssl_in_use', None) is not True:
+        raise ValueError('client tls')
     cursor.execute(IDENTITY_SQL)
     rows = cursor.fetchall()
     if len(rows) != 1:
@@ -315,7 +322,7 @@ def verify(cursor, baseline):
             or type(row[3]) is not int or row[3] // 10000 != 16
             or row[4:7] != ('pg_catalog', '', baseline['owner_oid'])
             or row[7] is not True or row[8] is not False
-            or row[9:12] != (1, 1, 2) or row[12] is not True):
+            or row[9:12] != (1, 1, 2)):
         raise ValueError('identity')
     cursor.execute(ROLE_SQL)
     rows = cursor.fetchall()
