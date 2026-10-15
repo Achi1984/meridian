@@ -86,6 +86,18 @@ but applies to that source PR, not this refresh. No new tests or external/runtim
 actions were run. Unknown checks remain unknown; a source merge alone is not
 runtime acceptance.
 
+Toolchain follow-up for handoff PR **#821**, head
+`50f332035d8c7c087b26597c61e52c2f53b86bce` / base
+`2736f9d1d98988858373c05c05a7d5a67cbca27b`: `.github/workflows/backend-safety.yml`
+selects `node-version: 20`. `ls -1 /opt/hostedtoolcache/node` returned only
+**22.23.3** and **24.21.0**; active `node --version` is **v24.21.0**
+(`/opt/hostedtoolcache/node/24.21.0/x64/bin/node`). Node 20 is unavailable in
+this runner, so the exact-CI-toolchain checks could not be run locally. Exact-head
+Release Safety run **38803617504** is `action_required`, with **0 jobs** and no
+job logs; it is not a pass. No workflow dispatch/retry was attempted, and no
+full-scope Claude source-acceptance request has been made. Next: obtain successful
+exact-head CI under the configured toolchain, then request full-scope review.
+
 ---
 
 ## Historical archive — superseded operational snapshots
