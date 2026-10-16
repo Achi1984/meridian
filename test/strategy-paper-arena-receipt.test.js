@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, readFile, rm, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { canonicalJSON,sha256,runArenaBundle,collectBinanceDaily } from '../scripts/run-strategy-paper-arena.mjs';
+import { canonicalJSON,sha256,runArenaBundle,collectBinanceDaily,collectKrakenDaily } from '../scripts/run-strategy-paper-arena.mjs';
 async function fixture(t,input){
   const root=await mkdtemp(join(tmpdir(),'meridian-arena-'));t.after(()=>rm(root,{recursive:true,force:true}));
   const inputPath=join(root,'fixture.json');await writeFile(inputPath,typeof input==='string'?input:JSON.stringify(input));
@@ -69,4 +69,64 @@ test('collector rejects partial, stale, unordered, misaligned, HTTP errors and o
   }
   let calls=0;await assert.rejects(collectBinanceDaily({asOf:ASOF,fetchImpl:async()=>{calls++;return new Response('{}',{status:429});}}),/HTTP/);assert.equal(calls,1);
   await assert.rejects(collectBinanceDaily({asOf:ASOF,fetchImpl:async()=>new Response(' '.repeat(1048577),{status:200})}),/TOO_LARGE/);
+});
+const KRAKEN_NAMES=['XBT','ETH','SOL','XRP','HBAR','LINK','AVAX','SUI'];
+function krakenFixture({mutateMetadata=x=>x,mutateRows=x=>x,wrongKey=false,apiError=false}={}){
+  const urls=[],metadata=Object.fromEntries(KRAKEN_NAMES.map(base=>[base==='XBT'?'XXBTZUSD':base+'USD',{altname:base+'USD',wsname:base+'/USD',base:base==='XBT'?'XXBT':base,quote:'ZUSD',status:'online'}]));
+  return {urls,fetchImpl:async url=>{
+    urls.push(url);
+    if(url.includes('AssetPairs'))return new Response(JSON.stringify({error:[],result:mutateMetadata(metadata)}));
+    const pair=new URL(url).searchParams.get('pair'),key=pair==='XBTUSD'?'XXBTZUSD':pair;
+    const rows=Array.from({length:401},(_,i)=>[DAY*(200+i)/1000,'100','102','98','101','100','1',1]);
+    return new Response(JSON.stringify({error:apiError?['EGeneral:fixture']:[],result:{[wrongKey?'UNEXPECTED':key]:mutateRows(rows,url),last:DAY*600/1000}}));
+  }};
+}
+test('Kraken collector resolves eight exact USD instruments first and records current-candle exclusion',async()=>{
+  const fixture=krakenFixture();const input=await collectKrakenDaily({asOf:ASOF,fetchImpl:fixture.fetchImpl});
+  assert.equal(fixture.urls.length,9);assert.ok(fixture.urls[0].includes('/AssetPairs?'));
+  assert.deepEqual(fixture.urls.slice(1).map(u=>new URL(u).searchParams.get('pair')),KRAKEN_NAMES.map(s=>s+'USD'));
+  assert.equal(input.quoteCurrency,'USD');assert.equal(input.collection.fxConversion,false);
+  assert.equal(input.data.BTC.length,400);assert.equal(input.data.BTC.at(-1).closeTime,DAY*600-1);
+  assert.equal(Object.keys(input.collection.instruments).length,8);
+  for(const raw of Object.values(input.collection.rawResponses)){
+    assert.equal(raw.sha256,sha256(Buffer.from(raw.body)));
+    assert.equal(raw.excludedUnclosed.openTime,DAY*600);
+    assert.equal(raw.returnedRows,401);assert.equal(raw.trimmedOlderCount,0);
+  }
+  assert.equal(input.collection.instrumentMetadata.sha256,sha256(Buffer.from(input.collection.instrumentMetadata.body)));
+});
+test('Kraken rejects partial history, wrong key, gap, multiple/future unfinished rows and API errors without fallback',async()=>{
+  for(const options of [
+    {mutateRows:rows=>rows.slice(2)},
+    {wrongKey:true},
+    {mutateRows:rows=>rows.filter((_,i)=>i!==100)},
+    {mutateRows:rows=>[...rows,[DAY*601/1000,'100','102','98','101','100','1',1]]},
+    {mutateRows:rows=>[...rows,rows.at(-1)]},
+    {apiError:true},
+    {mutateRows:rows=>rows.slice(0,-2)},
+  ]){const fixture=krakenFixture(options);await assert.rejects(collectKrakenDaily({asOf:ASOF,fetchImpl:fixture.fetchImpl}));assert.equal(fixture.urls.length,2);}
+});
+test('Kraken rejects quote aliases, offline pairs and ambiguous metadata before OHLC',async()=>{
+  for(const mutateMetadata of [
+    m=>({...m,ETHUSD:{...m.ETHUSD,quote:'USDT'}}),
+    m=>({...m,ETHUSD:{...m.ETHUSD,wsname:'ETH/USDT'}}),
+    m=>({...m,ETHUSD:{...m.ETHUSD,status:'cancel_only'}}),
+    m=>({...m,DUPLICATE:{...m.ETHUSD}}),
+    m=>({...m,ETHUSD:{...m.ETHUSD,altname:'ETHUSDT'}}),
+  ]){const fixture=krakenFixture({mutateMetadata});await assert.rejects(collectKrakenDaily({asOf:ASOF,fetchImpl:fixture.fetchImpl}));assert.equal(fixture.urls.length,1);}
+});
+test('Kraken trimming is explicit and never repairs an older gap',async()=>{
+  const earlier=[DAY*199/1000,'100','102','98','101','100','1',1];
+  const fixture=krakenFixture({mutateRows:rows=>[earlier,...rows]});
+  const input=await collectKrakenDaily({asOf:ASOF,fetchImpl:fixture.fetchImpl});
+  assert.equal(input.collection.rawResponses.BTC.trimmedOlderCount,1);
+  const bad=krakenFixture({mutateRows:rows=>[[DAY*198/1000,...earlier.slice(1)],...rows]});
+  await assert.rejects(collectKrakenDaily({asOf:ASOF,fetchImpl:bad.fetchImpl}),/GAP/);
+});
+test('collector modes are exclusive and Kraken receipt includes USD instrument identities',async t=>{
+  const args=await fixture(t,{});
+  await assert.rejects(runArenaBundle({...args,collectKrakenUSD:true}),/EXACTLY_ONE_INPUT_MODE/);
+  const fake=krakenFixture();const {receipt}=await runArenaBundle({outDir:args.outDir,collectKrakenUSD:true,asOf:ASOF,fetchImpl:fake.fetchImpl,replay:()=>({currency:'USD'})});
+  assert.equal(receipt.quoteCurrency,'USD');assert.equal(receipt.collectorProvider,'KRAKEN_SPOT_PUBLIC_OHLC');
+  assert.equal(receipt.instruments.BTC.altname,'XBTUSD');assert.equal(receipt.provenance,'PUBLIC_SPOT_COLLECTOR_RAW_RESPONSES_RETAINED');
 });

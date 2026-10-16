@@ -8,7 +8,7 @@ No credentials, publisher, workflow, runtime order gate, frozen research referen
 
 ## Frozen experimental cells
 
-All cells use the fixed universe **BTC, ETH, SOL, XRP, HBAR, LINK, AVAX, SUI**, quoted in USDT. Each cell has its own independent **10,000 USDT nominal** starting account, spot-only and unlevered (1×). This is not a EUR balance or an assertion of EUR/USDT conversion. Accounts must never be combined into one deployable portfolio or counted as additional evidence through duplication. This fixed current universe has unresolved survivorship bias; the diagnostic replay does not establish a historical point-in-time investable universe.
+All cells use the fixed universe **BTC, ETH, SOL, XRP, HBAR, LINK, AVAX, SUI**. The original lane is quoted in USDT, with **10,000 USDT nominal** per independent account. The pre-results source amendment below additionally declares a separate USD lane, with **10,000 USD nominal** per independent account. Each lane is spot-only and unlevered (1×). Quote currency is explicit throughout all outputs; neither lane is a EUR balance, an FX conversion or a claim that USD equals USDT. Accounts must never be combined into one deployable portfolio or counted as additional evidence through duplication. This fixed current universe has unresolved survivorship bias; the diagnostic replay does not establish a historical point-in-time investable universe.
 
 | Cell | Rules |
 |---|---|
@@ -51,6 +51,16 @@ Before prospective observation, retain each cell's version and predeclare its ob
 Report baseline and stress net return, marked-equity drawdown, net PnL, turnover, costs, sale-slice count (partial rebalances are not independent round-trip trades), allocation/weekly observation count, cash exposure, asset/time/regime contributions and benchmark-relative results. Include dependence-aware uncertainty and selection-risk treatment before making any validation claim. A profitable all-win sale-slice sample has an undefined profit factor with zero loss denominator; no-trade expectancy, win rate and profit factor are undefined, never PF 99 or fabricated zeros. Distinguish an engineering pass, data rejection, diagnostic outcome, operational blocker and genuine strategy failure.
 
 H1-E versus H1-B and H7-R versus H7-B are predeclared comparisons, not post-hoc winners. Include losing, inactive and blocked cells in the report. No automatic optimization, dropped losing assets, relaxed criteria, winner promotion or live activation follows a result.
+
+## Pre-results source-feasibility amendment
+
+Before obtaining or inspecting any market-price outcomes for these cells, the original Binance USDT acquisition was blocked (including HTTP 451). Preserve that failed acquisition record; it is not a strategy result and must not be retried through an access-control bypass. Official Kraken instrument metadata subsequently showed all eight **USD** pairs available online, whereas the eight-symbol USDT set was unavailable there. This source choice is based on declared instrument availability, not profitable returns, losing assets or outcome optimization.
+
+An explicit optional `--collect-kraken-usd` lane may therefore acquire **400 completed UTC daily bars per asset**, retaining raw response bodies and hashes. Exclude Kraken's current unclosed candle explicitly and record that exclusion. Reject duplicate, unordered, missing, stale, misaligned or partial completed history; do not interpolate or shorten the common window silently. Freeze the canonical input, quote currency, source receipts, engine and protocol hashes before any replay. External price acquisition remains separate from the offline replay.
+
+The USD lane uses the same eight assets, H1/H7 rules, entry buffer and baseline/stress costs of 8/16 basis points per fill. These costs remain unverified assumptions and do not become venue-specific verified fees by changing the source. Start capital is independently **10,000 USD**, with no USDT/USD parity assumption or EUR conversion. Retain source and currency visibly when importing, displaying and exporting results.
+
+USDT and USD source lanes are overlapping diagnostic views, **not independent confirmatory trials** or additional new alpha hypotheses. Replaying the same rules against a different source cannot create fresh Holdout evidence. Record all acquisition and replay attempts without asserting a reconciled historical trial budget. The original frozen LowVol/CV2 references and their flags remain unchanged; payoff-policy compatibility remains **UNRESOLVED**, and no paper-order or live promotion follows.
 
 ## Remaining blockers
 

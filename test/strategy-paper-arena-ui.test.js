@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {webcrypto} from 'node:crypto';
+import fs from 'node:fs';
 import {ARENA_SYMBOLS,ARENA_RULESET} from '../research/strategy-paper-arena.js';
-import {arenaHtml,evaluateArenaImport,canonicalArenaInput} from '../v10/strategy-arena.js';
+import {arenaHtml,evaluateArenaImport,canonicalArenaInput,loadStoredArena} from '../v10/strategy-arena.js';
 const DAY=86400000;
 function input(){
   const start=Date.UTC(2025,0,1), data=Object.fromEntries(ARENA_SYMBOLS.map(symbol=>[symbol,Array.from({length:210},(_,i)=>({openTime:start+i*DAY,closeTime:start+(i+1)*DAY-1,open:100+i,close:100+i+.5,high:101+i,low:99+i}))]));
@@ -45,4 +46,19 @@ test('all displayed caller error and digest strings are HTML escaped',()=>{
   const html=arenaHtml({error:'<script>alert(1)</script>',digest:'<img src=x onerror=x>'});
   assert.ok(!html.includes('<script>'));assert.ok(!html.includes('<img'));
   assert.ok(html.includes('&lt;script&gt;'));
+});
+test('stored diagnostic assembles the sealed eight-asset USD input and recomputes it',async()=>{
+  let requests=0;
+  const result=await loadStoredArena(async url=>{requests++;return {ok:true,text:async()=>fs.readFileSync(new URL(url),'utf8')};},webcrypto.subtle);
+  assert.equal(requests,9);
+  assert.equal(result.digest,'decf35415605bda739d08e9ac489951c21f5428d6b5f6362bd6e77abf265c473');
+  assert.equal(result.result.currency,'USD');assert.equal(result.result.window.bars,200);
+  assert.equal(result.result.validation,'UNPROVEN');
+  assert.equal(result.result.liveAuthorized,false);
+  const html=arenaHtml(result);assert.ok(html.includes('10.000 USD'));assert.ok(!html.includes('10.000 USDT'));
+});
+test('stored diagnostic rejects altered chunks and unexpected file references',async()=>{
+  const source=async(url,alter)=>({ok:true,text:async()=>alter(fs.readFileSync(new URL(url),'utf8'),url)});
+  await assert.rejects(loadStoredArena(url=>source(url,(text,path)=>path.endsWith('/BTC.json')?text+' ':text),webcrypto.subtle),/Hash/);
+  await assert.rejects(loadStoredArena(url=>source(url,(text,path)=>{if(!path.endsWith('/manifest.json'))return text;const m=JSON.parse(text);m.chunks[0].path='../../elsewhere.json';return JSON.stringify(m);}),webcrypto.subtle),/Dateiverweis/);
 });

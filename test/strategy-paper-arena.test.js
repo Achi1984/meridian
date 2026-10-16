@@ -98,3 +98,15 @@ test('derived numerical overflow fails closed, scale-safe SMA remains valid and 
   const tiny=fixture(205,()=>1e-320);assert.throws(()=>replay(tiny),/NONFINITE|INVALID/);
   const extreme=fixture(205,i=>i<150?1e-307:1e307);assert.throws(()=>replay(extreme),/NONFINITE_DERIVED_FEATURE/);
 });
+test('explicit native USD denomination propagates without FX or cross-source evidence transfer',()=>{
+  const usd=replay(fixture(),{quoteCurrency:'USD'}),usdt=replay();
+  assert.equal(usd.currency,'USD');assert.equal(usd.quoteCurrency,'USD');assert.equal(usd.model.currency,'USD');
+  assert.equal(usd.sourceVariant,'USD_QUOTE_DIAGNOSTIC');assert.equal(usdt.sourceVariant,'USDT_QUOTE_DIAGNOSTIC');assert.equal(usd.fxConversionApplied,false);
+  assert.equal(usd.capitalAccounting,'INDEPENDENT_10000_USD_SIMULATIONS_NOT_ADDITIVE_PORTFOLIO');
+  for(const pair of [...usd.candidates.slice(0,4),usd.controls.buyAndHold,usd.controls.cash])for(const lane of ['baseline','stress']){assert.equal(pair[lane].currency,'USD');assert.equal(pair[lane].startingEquity,10000);}
+  assert.equal(usd.candidates[4].currency,'USD');assert.equal(usd.candidates[4].status,'BLOCKED_DATA');
+  assert.match(usd.limitations.at(-1),/no USD\/USDT equivalence, EUR conversion or cross-source performance transfer/);
+  assert.equal(usd.validation,'UNPROVEN');assert.equal(usd.autoPromotion,false);
+  assert.equal(usd.candidates[0].baseline.equity,usdt.candidates[0].baseline.equity); // Same numeric fixture, not a conversion.
+  for(const currency of ['EUR','usd',null,{},1])assert.throws(()=>replay(fixture(),{quoteCurrency:currency}),/UNSUPPORTED_QUOTE_CURRENCY/);
+});
