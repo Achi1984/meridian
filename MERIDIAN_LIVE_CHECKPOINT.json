@@ -165,12 +165,30 @@
       "watchdogHostedPatch": "NOT_YET_PROVEN"
     },
     "publisherSetup": {
-      "state": "FAILED_NO_REMOTE_WRITES_REPORTED",
+      "state": "PRIOR_SETUP_FAILED_NO_REMOTE_WRITES_REPORTED",
       "marker": "PRESERVED_NO_RECOVERY_OR_RETRY",
-      "ownerPauseState": "PAUSED_BY_OWNER",
+      "ownerPauseState": "SUPERSEDED_BY_OWNER_CONTINUATION_2026-10-16T09:26:47+02:00",
       "ownerPauseCommentId": 6199968669,
-      "readOnlyPreflightState": "PAUSED_OWNER_CONTINUATION_REQUIRED",
-      "realEnvironment": "UNKNOWN",
+      "ownerWindowConfirmationAt": "2026-10-16T09:21:31+02:00",
+      "ownerWindowConfirmationQuote": "nein parallel arbeitest nur du daran.",
+      "readOnlyPreflightState": "STAGE_1_PASSED_POINT_IN_TIME",
+      "readOnlyPreflightCommentId": 6199968669,
+      "readOnlyPreflightAfter": "2026-10-16T09:26:47+02:00",
+      "readOnlyPreflightSourceRevision": "f0204ec0781598d9fb368088021b33e738505ed4",
+      "markerTouched": false,
+      "providerDbState": "STAGE_1_READ_ONLY_RECONCILIATION_PASSED_POINT_IN_TIME; ONGOING_STATE_NOT_ESTABLISHED",
+      "longTermCodespaceState": "UNKNOWN",
+      "realEnvironment": "POINT_IN_TIME_READ_ONLY_RECONCILIATION_ONLY",
+      "previouslyAssignedRolePasswordAbsence": "NOT_ESTABLISHED",
+      "browserState": "SIGN_IN_RESTORED_FOR_STAGE_1_SESSION; LONG_TERM_STATE_UNKNOWN",
+      "stage2": "PLAN_ONLY",
+      "stage2PlanCommentId": 6199968669,
+      "stage2Prerequisites": "CPYTHON_3.14.2_TESTS_EXACT_HEAD_CI_AND_INDEPENDENT_FULL_SCOPE_REVIEW_BEFORE_CONCRETE_RECOVERY_APPROVAL",
+      "markerRetirementRequiresSeparateOwnerApproval": true,
+      "nextSetupAttemptRequiresSeparateOwnerApproval": true,
+      "firstHostedWatchdogPatch": "UNPROVEN",
+      "leadActivationEdit": "NOT_BOT_EVIDENCE",
+      "nextPermittedStep": "STAGE_2_PLAN_REVIEW_AND_CPYTHON_3_14_2_TESTS; EXACT_HEAD_CI_AND_INDEPENDENT_REVIEW_BEFORE_ANY_CONCRETE_RECOVERY_APPROVAL",
       "statusCommentId": 6198795959,
       "recoveryRequiresSeparateOwnerApproval": true,
       "retryRequiresSeparateOwnerApproval": true
@@ -225,7 +243,9 @@
         "authorizedReproductionBudget": "UNKNOWN"
       }
     },
-    "nextStep": "VERIFY_HANDOFF_REFRESH_EXACT_HEAD_CI_AND_FULL_SCOPE_REVIEW_THEN_LEAD_GUARDED_PUBLICATION",
+    "nextStep": "HANDOFF821_REVISED_CANDIDATE_EXACT_HEAD_CI_THEN_INDEPENDENT_FULL_SCOPE_REVIEW_THEN_LEAD_GUARDED_PUBLICATION",
+    "publisherNextStep": "STAGE_2_PLAN_INDEPENDENT_REVIEW_ONLY; NO_RUNTIME_RECOVERY_OR_SETUP_AUTHORIZED",
+    "strategyNextStep": "PR823_SOURCE_ONLY",
     "handoffValidation": {
       "node": "v20.20.2",
       "python": "3.12.3",
@@ -280,7 +300,26 @@
           "conclusion": "action_required",
           "status": "REMOVED_FROM_FINAL_SCOPE"
         },
-        "cleanCandidateExactHeadCi": "PENDING",
+        "cleanCandidateExactHeadCi": "SUCCESS_ON_95fd925_ONLY; REVISED_CANDIDATE_PENDING",
+        "previousCleanCandidateCi": {
+          "run": 38855226605,
+          "attempt": 2,
+          "job": 116863146674,
+          "head": "95fd925aa3d7aed3b18411becee189a8c0934687",
+          "conclusion": "SUCCESS",
+          "tests": {
+            "passed": 2525,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        "previousCleanCandidateReview": {
+          "commentId": 6212356397,
+          "head": "95fd925aa3d7aed3b18411becee189a8c0934687",
+          "verdict": "REVISION_REQUIRED"
+        },
         "cleanCandidateLocalAudit": {
           "basis": "CLEANED_WORKTREE_DERIVED_FROM_VERIFIED_HEAD",
           "node": "v20.20.2",
@@ -305,10 +344,37 @@
           "pythonBytecode": "DISABLED",
           "v11A2EvidenceDir": "/tmp/meridian-node20-final/artifacts/v11-visual-qa",
           "fullSuiteRerun": "NOT_RUN_DOCUMENTATION_ONLY_CLEANUP",
-          "finalCandidateCi": "PENDING",
-          "fullScopeClaudeReview": "PENDING_SUCCESSFUL_FINAL_CANDIDATE_CI"
+          "finalCandidateCi": "PENDING_ON_REVISED_CANDIDATE",
+          "fullScopeClaudeReview": "PENDING_ON_REVISED_CANDIDATE_CI"
         },
-        "claudeFullScopeReview": "PENDING_SUCCESSFUL_CLEAN_CANDIDATE_CI",
+        "revisedCandidateLocalAudit": {
+          "basis": "CORRECTED_WORKING_TREE_DERIVED_FROM_95fd925",
+          "node": "v20.20.2",
+          "python": "3.12.3",
+          "commands": {
+            "nodeVersion": "PATH=/tmp/meridian-node20-review/node-v20.20.2-linux-x64/bin:$PATH node --version",
+            "json": "python3 -m json.tool MERIDIAN_LIVE_CHECKPOINT.json",
+            "continuity": "PATH=/tmp/meridian-node20-review/node-v20.20.2-linux-x64/bin:$PATH node scripts/continuity-audit.mjs",
+            "frozenResearch": "PATH=/tmp/meridian-node20-review/node-v20.20.2-linux-x64/bin:$PATH node scripts/frozen-research-guard.mjs",
+            "orchestration": "PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/validate-agent-orchestration.py",
+            "whitespace": "git diff --check"
+          },
+          "results": {
+            "nodeVersion": "v20.20.2",
+            "json": "PASS",
+            "continuity": "PASS_BUILD_R128",
+            "frozenResearch": "PASS_CHECKED_140_MISMATCHES_0",
+            "orchestration": "GREEN",
+            "whitespace": "PASS"
+          },
+          "nodePath": "/tmp/meridian-node20-review/node-v20.20.2-linux-x64/bin/node",
+          "officialNodeArchiveSha256": "df770b2a6f130ed8627c9782c988fda9669fa23898329a61a871e32f965e007d",
+          "pythonBytecode": "DISABLED",
+          "fullSuiteRerun": "NOT_RUN_DOCUMENTATION_ONLY_CORRECTION",
+          "exactHeadCi": "PENDING",
+          "independentFullScopeReview": "PENDING"
+        },
+        "claudeFullScopeReview": "REVISION_REQUIRED_ON_95fd925; NEW_REVISED_CANDIDATE_REVIEW_PENDING",
         "workflowDispatchOrRetry": "NOT_ATTEMPTED"
       }
     },
