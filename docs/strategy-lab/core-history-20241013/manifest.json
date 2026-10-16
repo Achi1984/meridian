@@ -1,0 +1,43 @@
+{
+  "schema": "CORE_ENGINEERING_HISTORY_V1",
+  "selection": "BTC_ETH_ENGINEERING_REFERENCES_NOT_TOP20_BACKTEST",
+  "fromOpen": "2023-01-01",
+  "throughOpen": "2024-10-13",
+  "requiredRowsPerAsset": 652,
+  "quoteCurrency": "USDT",
+  "eurConverted": false,
+  "executionAuthorized": false,
+  "strategyEvaluated": false,
+  "historicalAvailabilityVerified": false,
+  "identityVerified": false,
+  "inspectedSourceMonths": "January2023–October2024; all inspected, not untouched holdout",
+  "sourceAudits": [
+    "extension-audit.json",
+    "../warmup-history-audit-20241013.json"
+  ],
+  "columns": [
+    "openTimeMs",
+    "exclusiveCloseTimeMs",
+    "open",
+    "high",
+    "low",
+    "close",
+    "volumeBaseAsset"
+  ],
+  "assets": [
+    {
+      "symbol": "BTC",
+      "file": "BTC.json",
+      "valid": true,
+      "rows": 652,
+      "sha256": "95a747ec2eca2d7bfc9d05a7f20526470d91eb566a147f3d42def39527939d13"
+    },
+    {
+      "symbol": "ETH",
+      "file": "ETH.json",
+      "valid": true,
+      "rows": 652,
+      "sha256": "29f693915470729a336be88a15d347d0255cbaf8b685f3bd444a4ac12347b1b1"
+    }
+  ]
+}

@@ -1,0 +1,95 @@
+{
+  "schemaVersion": "MERIDIAN_CRYPTO_MANIFEST_DRAFT_V1",
+  "candidateId": "H7_SPOT_TREND_LOW_VOL_BASELINE",
+  "status": "SOURCE_DESIGN_DATA_AND_EXECUTION_BLOCKED",
+  "sourceReference": {
+    "pullRequest": 757,
+    "head": "5a5f67cb21b10abf30cbf46497cbe79e8e0a6f62",
+    "module": "docs/strategy-lab/signal-prototypes.mjs",
+    "export": "evaluateH7Selection"
+  },
+  "account": {
+    "id": "CRYPTO_RESEARCH_10000_EUR",
+    "startingEquity": 10000,
+    "currency": "EUR",
+    "borrowing": false,
+    "leverage": 1,
+    "sharedWithCrossMarket": false
+  },
+  "permissions": {
+    "historicalStrategyPnl": false,
+    "paperOrders": false,
+    "liveOrders": false,
+    "dispatch": false
+  },
+  "universe": {
+    "status": "TOP20_DESIGN_POINT_IN_TIME_DATA_PENDING",
+    "primaryEligibleCount": 20,
+    "comparisonEligibleCount": 10,
+    "rankMetric": "circulating market capitalization, descending, point-in-time",
+    "construction": "filter historical stablecoins and duplicate wrapped/staked representations, verify venue listing/liquidity/history, then take first N eligible in market-cap order",
+    "membershipSchedule": "weekly, latest independently available historical snapshot before Saturday selection",
+    "insufficientEligibleAssets": "INVALID_UNIVERSE_DO_NOT_FILL_FROM_CURRENT_RANKS",
+    "initialDataFeasibilitySymbols": [
+      "BTC",
+      "ETH",
+      "SOL"
+    ],
+    "selectionUniverse": null,
+    "exclusions": [
+      "stablecoins by historical function",
+      "wrapped or staked duplicates of underlying exposure"
+    ],
+    "note": "N is research universe size, not number of holdings. H7 still chooses at most3, each25percent. Top10 versusTop20 is a counted universe variant, not free optimization."
+  },
+  "signal": {
+    "historyDailyCloses": 201,
+    "trend": "latest closed price > SMA200",
+    "rank": "ascending population standard deviation of latest 30 log returns",
+    "maxSelections": 3,
+    "targetWeightPerSelection": 0.25,
+    "minimumTargetCashWeight": 0.25,
+    "fixedTakeProfit": null,
+    "minimumPlannedCRV": null
+  },
+  "proposedSchedule": {
+    "selection": "Saturday 00:00 UTC after required closed observations have been received",
+    "trendExit": "daily after verified closed-bar receipt",
+    "execution": "next executable quote after all required signal inputs are available",
+    "exitProceeds": "cash until next scheduled selection",
+    "reentry": "next scheduled selection only"
+  },
+  "controls": [
+    "CASH",
+    "BTC_BUY_AND_HOLD",
+    "ETH_BUY_AND_HOLD",
+    "SAME_UNIVERSE_EQUAL_WEIGHT_PASSIVE",
+    "SAME_TREND_FILTER_AND_TOTAL_TARGET_EXPOSURE_WITHOUT_LOW_VOL_RANKING"
+  ],
+  "quoteCurrency": null,
+  "venue": null,
+  "dataSnapshots": [],
+  "dataUseLedger": null,
+  "costModel": null,
+  "fills": null,
+  "riskLimits": null,
+  "evaluationPeriods": null,
+  "knownLimitations": [
+    "H7 is a signal selector, not a running paper account or portfolio engine",
+    "Prototype requiresTradePlan flag and legacy CRV documents need versioned migration; do not reinterpret as an execution gate pass",
+    "25 percent weights do not establish equal risk; crypto correlations and gap losses require portfolio controls",
+    "Trial registration must count existing H7 design and preserve failures; no new budget reset"
+  ],
+  "nextCandidates": [
+    "H5_REBOUND_AFTER_COST_AND_FILL_MODEL",
+    "LONG_SHORT_AFTER_INSTRUMENT_SPECIFIC_MARGIN_AND_FUNDING_MODEL"
+  ],
+  "sourceDataPreparation": {
+    "module": "docs/strategy-lab/normalize-binance-daily.mjs",
+    "spotArchiveUnitBefore2025": "ms",
+    "spotArchiveUnitFrom2025": "us",
+    "availability": "explicit actual receipt supplied; never inferred from close",
+    "verifiedFormatProbes": 6,
+    "fullHistoryVerified": false
+  }
+}

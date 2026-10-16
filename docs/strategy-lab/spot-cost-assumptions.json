@@ -1,0 +1,43 @@
+{
+  "schema": "SPOT_COST_ASSUMPTIONS_DRAFT_V1",
+  "status": "UNVALIDATED_SENSITIVITY_ASSUMPTIONS",
+  "executionAuthorized": false,
+  "strategyEvaluated": false,
+  "actualAccountRatesVerified": false,
+  "scope": "UNLEVERED_SPOT_LONG_CASH_ONLY",
+  "unit": "BASIS_POINTS_PER_SIDE",
+  "benchmark": "NEXT_EXECUTABLE_MIDQUOTE_AFTER_SIGNAL_RECEIPT",
+  "scenarios": [
+    {
+      "id": "BASE_ASSUMPTION",
+      "feeBps": 10,
+      "halfSpreadBps": 5,
+      "adverseSlippageBps": 5
+    },
+    {
+      "id": "STRESS_ASSUMPTION",
+      "feeBps": 20,
+      "halfSpreadBps": 10,
+      "adverseSlippageBps": 20
+    },
+    {
+      "id": "SHOCK_ASSUMPTION",
+      "feeBps": 20,
+      "halfSpreadBps": 30,
+      "adverseSlippageBps": 60
+    }
+  ],
+  "scenarioSelection": "REPORT_ALL_NO_BEST_SCENARIO_SELECTION",
+  "feeCurrencyAssumption": "QUOTE_EQUIVALENT_ACCOUNTING_APPROXIMATION",
+  "makerRebatesAssumed": false,
+  "discountsAssumed": false,
+  "historicalRatesKnown": false,
+  "missingQuotePolicy": "NO_EXECUTABLE_EVIDENCE",
+  "missingFxPolicy": "NO_EUR_PNL",
+  "stopGapPolicy": "NEXT_EXECUTABLE_QUOTE_MAY_BE_WORSE_THAN_STOP",
+  "fundingBorrow": "OUT_OF_SCOPE_NOT_ZERO_FOR_DERIVATIVES",
+  "sources": [
+    "https://developers.binance.com/en/docs/products/spot/faqs/commission_faq"
+  ],
+  "sourceMeaning": "Commission mechanics only; numerical scenario rates are Meridian assumptions, not sourced exchange/account fees."
+}

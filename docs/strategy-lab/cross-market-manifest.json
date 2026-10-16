@@ -1,0 +1,62 @@
+{
+  "schemaVersion": "MERIDIAN_CROSS_MARKET_MANIFEST_DRAFT_V1",
+  "candidateId": "X1_LONG_CASH_12M_EQUAL_SLEEVES",
+  "status": "SOURCE_PROTOTYPE_DATA_BLOCKED",
+  "campaignRegistration": "PENDING_REVISION_EXISTING_TRIAL_COUNTS_PRESERVED",
+  "empiricalExecutionAuthorized": false,
+  "paperAuthorized": false,
+  "liveAuthorized": false,
+  "account": {
+    "startingEquity": 10000,
+    "currency": "EUR",
+    "borrowing": false,
+    "wholeUnits": true
+  },
+  "signal": {
+    "lookbackMonths": 12,
+    "requiredCloses": 13,
+    "decisionFrequency": "MONTHLY",
+    "positiveReturn": "LONG_FIXED_SLEEVE",
+    "nonpositiveReturn": "CASH",
+    "weight": "1 / fixed universe size",
+    "fixedTakeProfit": null,
+    "minimumPlannedCRV": null
+  },
+  "instruments": [
+    {
+      "symbol": "EQUITY",
+      "isin": "IE00B4L5Y983"
+    },
+    {
+      "symbol": "BONDS",
+      "isin": "IE00B4WXJJ64"
+    },
+    {
+      "symbol": "GOLD",
+      "isin": "IE00B4ND3602"
+    },
+    {
+      "symbol": "COMMODITIES",
+      "isin": "IE00BDFL4P12"
+    }
+  ],
+  "controls": [
+    "CASH",
+    "SAME_PRODUCTS_BUY_AND_HOLD",
+    "SAME_PRODUCTS_MONTHLY_EQUAL_WEIGHT_NO_TREND"
+  ],
+  "dataSnapshots": [],
+  "evaluationPeriods": null,
+  "riskLimits": null,
+  "feeModel": null,
+  "fills": null,
+  "cashInterest": null,
+  "unresolved": [
+    "campaign variant registration and replaced first-tranche slot",
+    "historical product/FX/distribution/split data and publication times",
+    "data-use ledger and unseen/prospective validation plan",
+    "venue/broker eligibility, whole-unit sizes and execution prices",
+    "cost calibration, cash interest, accounting and outage rules",
+    "risk limits, exact review criteria and runnable portfolio engine"
+  ]
+}
