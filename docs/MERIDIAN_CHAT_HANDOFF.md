@@ -1,6 +1,6 @@
 # MERIDIAN Chat Handoff
 
-## Current handoff — 2026-10-15
+## Current handoff — 2026-10-16
 
 This section is the current operational summary. Historical snapshots below are
 retained for provenance, not as instructions or evidence of present state.
@@ -75,28 +75,42 @@ lead-guarded publication. Do not infer the publication commit from source main.
 This refresh authorizes no infrastructure action, publisher preflight, marker
 recovery, retry, or second credential-setup attempt.
 
-Handoff-only validation run locally with Node **v24.21.0** and Python
-**3.12.3**: `python3 -m json.tool MERIDIAN_LIVE_CHECKPOINT.json` **PASS**;
-`node scripts/continuity-audit.mjs` **PASS** (`ok: true`, build r128);
-`node scripts/frozen-research-guard.mjs` **PASS** (140 checked, 0 mismatches);
-`python3 scripts/validate-agent-orchestration.py` **GREEN**; `git diff --check`
-**PASS**. Node **20.20.2** is not installed locally, so these local Node audits
-were not run on the CI Node version. PR #814's exact-head CI was Node 20.20.2,
-but applies to that source PR, not this refresh. No new tests or external/runtime
-actions were run. Unknown checks remain unknown; a source merge alone is not
-runtime acceptance.
+Validation evidence is commit-scoped. The earlier Node **v24.21.0** checks and
+Node-20-unavailable notes are historical observations, superseded by the verified
+official Node **v20.20.2** run on commit
+`4cbdf5bf4a12a44bfbea61ca7cb26a26d98bf87d` (Python **3.12.3**). The official
+Linux x64 archive passed Node.js `SHASUMS256.txt` verification
+(`df770b2a6f130ed8627c9782c988fda9669fa23898329a61a871e32f965e007d`); binary
+SHA-256 `6295488653f0d93b0a157841746fef7e72cc4328cfb60c4bbe0ca2668a836ffd`.
+On that commit, `npm ci --ignore-scripts` passed; `node
+scripts/continuity-audit.mjs` passed (r128); `node
+scripts/frozen-research-guard.mjs` passed (140 checked, 0 mismatches);
+`V11_A2_EVIDENCE_DIR=artifacts/v11-visual-qa node --test test/*.test.js`
+passed (2,525/2,525); `node scripts/release-sync.mjs --check && node
+scripts/release-check.mjs`, `node scripts/v10-ui-regression-check.mjs`, `node
+scripts/privacy-check.mjs`, and `node scripts/secret-check.mjs` passed;
+`python3 -B scripts/validate-agent-orchestration.py`, checkpoint JSON, and
+`git diff --check` passed. Exact-head Release Safety **38806497445**, attempt 2,
+job **116681553158**, also succeeded on that same commit. These results do not
+cover later heads.
 
-Toolchain follow-up for handoff PR **#821**, head
-`50f332035d8c7c087b26597c61e52c2f53b86bce` / base
-`2736f9d1d98988858373c05c05a7d5a67cbca27b`: `.github/workflows/backend-safety.yml`
-selects `node-version: 20`. `ls -1 /opt/hostedtoolcache/node` returned only
-**22.23.3** and **24.21.0**; active `node --version` is **v24.21.0**
-(`/opt/hostedtoolcache/node/24.21.0/x64/bin/node`). Node 20 is unavailable in
-this runner, so the exact-CI-toolchain checks could not be run locally. Exact-head
-Release Safety run **38803617504** is `action_required`, with **0 jobs** and no
-job logs; it is not a pass. No workflow dispatch/retry was attempted, and no
-full-scope Claude source-acceptance request has been made. Next: obtain successful
-exact-head CI under the configured toolchain, then request full-scope review.
+The intervening commit `9d2665d4e97fee4e5745553d93bb61ad81a23a00` added only
+generated PNG/`.pyc` files and is being removed from the scoped candidate;
+Release Safety **38811069787** for that dirty head was `action_required`, not a
+pass. On the cleaned candidate content, Node **v20.20.2** and Python **3.12.3**
+validation passed: `python3 -m json.tool MERIDIAN_LIVE_CHECKPOINT.json`;
+`node scripts/continuity-audit.mjs` (r128); `node
+scripts/frozen-research-guard.mjs` (140 checked, 0 mismatches); and
+`PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/validate-agent-orchestration.py`
+(GREEN). Node was selected with
+`PATH=/tmp/meridian-node20-final/runtime/bin:$PATH`; bytecode was disabled and
+`V11_A2_EVIDENCE_DIR=/tmp/meridian-node20-final/artifacts/v11-visual-qa`
+kept any screenshot output outside the repository. No full suite was rerun on
+this documentation-only cleanup candidate. The exact-head CI for the cleaned
+candidate is **pending**; run **38806497445** passed only at `4cbdf5b`, and
+`38811069787` for the generated-artifact head was `action_required`. Full-scope
+Claude review remains pending successful exact-head CI. No dispatch/retry or
+review request has been made.
 
 ---
 

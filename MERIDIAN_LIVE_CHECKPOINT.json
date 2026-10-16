@@ -97,7 +97,7 @@
   "quickCommand": "Go Meridian",
   "bootstrapFile": "MERIDIAN_GO.md",
   "currentWork": {
-    "updatedAt": "2026-10-15",
+    "updatedAt": "2026-10-16",
     "verifiedSourceMain": "2736f9d1d98988858373c05c05a7d5a67cbca27b",
     "lastCompletedSourceMerge": {
       "pr": 814,
@@ -227,13 +227,13 @@
     },
     "nextStep": "VERIFY_HANDOFF_REFRESH_EXACT_HEAD_CI_AND_FULL_SCOPE_REVIEW_THEN_LEAD_GUARDED_PUBLICATION",
     "handoffValidation": {
-      "node": "v24.21.0",
+      "node": "v20.20.2",
       "python": "3.12.3",
       "commands": {
         "checkpointJson": "python3 -m json.tool MERIDIAN_LIVE_CHECKPOINT.json",
         "continuity": "node scripts/continuity-audit.mjs",
         "frozenResearch": "node scripts/frozen-research-guard.mjs",
-        "orchestration": "python3 scripts/validate-agent-orchestration.py",
+        "orchestration": "PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate-agent-orchestration.py",
         "diffWhitespace": "git diff --check"
       },
       "results": {
@@ -243,26 +243,72 @@
         "orchestration": "GREEN",
         "diffWhitespace": "PASS"
       },
-      "localNode20Available": false,
+      "verifiedOnCommit": "4cbdf5bf4a12a44bfbea61ca7cb26a26d98bf87d",
+      "officialNode20": {
+        "version": "v20.20.2",
+        "source": "https://nodejs.org/dist/v20.20.2/node-v20.20.2-linux-x64.tar.xz",
+        "manifest": "https://nodejs.org/dist/v20.20.2/SHASUMS256.txt",
+        "archiveSha256": "df770b2a6f130ed8627c9782c988fda9669fa23898329a61a871e32f965e007d",
+        "binarySha256": "6295488653f0d93b0a157841746fef7e72cc4328cfb60c4bbe0ca2668a836ffd",
+        "npm": "10.8.2",
+        "npmCiIgnoreScripts": "PASS"
+      },
+      "earlierNode24AndUnavailableNode20Notes": "HISTORICAL_SUPERSEDED_BY_VERIFIED_NODE20_RUN",
+      "node20ExistingSuite": {
+        "command": "V11_A2_EVIDENCE_DIR=artifacts/v11-visual-qa node --test test/*.test.js",
+        "commit": "4cbdf5bf4a12a44bfbea61ca7cb26a26d98bf87d",
+        "result": "PASS_2525_FAIL_0_CANCELLED_0_SKIPPED_0_TODO_0"
+      },
       "sourcePr814Node20Ci": "PASS_NODE_20.20.2_ON_EXACT_SOURCE_PR_HEAD_NOT_THIS_HANDOFF",
       "pr821ToolchainFollowup": {
-        "head": "50f332035d8c7c087b26597c61e52c2f53b86bce",
+        "verifiedHead": "4cbdf5bf4a12a44bfbea61ca7cb26a26d98bf87d",
         "base": "2736f9d1d98988858373c05c05a7d5a67cbca27b",
         "workflow": ".github/workflows/backend-safety.yml",
         "configuredNodeMajor": 20,
-        "availabilityCommand": "ls -1 /opt/hostedtoolcache/node",
-        "availableNodeVersions": [
-          "22.23.3",
-          "24.21.0"
-        ],
-        "activeNode": "v24.21.0",
-        "activeNodePath": "/opt/hostedtoolcache/node/24.21.0/x64/bin/node",
-        "exactCiToolchainLocalChecks": "BLOCKED_NODE_20_NOT_INSTALLED",
-        "releaseSafetyRun": 38803617504,
-        "releaseSafetyConclusion": "action_required",
-        "releaseSafetyJobs": 0,
-        "releaseSafetyJobLogs": "NONE",
-        "claudeFullScopeReview": "NOT_REQUESTED_PENDING_SUCCESSFUL_EXACT_HEAD_CI",
+        "node20LocalChecks": "PASS_ON_VERIFIED_HEAD_ONLY",
+        "releaseSafetyRun": 38806497445,
+        "releaseSafetyAttempt": 2,
+        "releaseSafetyJob": 116681553158,
+        "releaseSafetyConclusion": "SUCCESS",
+        "earlierHead50f332": "HISTORICAL_CANDIDATE_SUPERSEDED",
+        "artifactOnlyCommit": {
+          "head": "9d2665d4e97fee4e5745553d93bb61ad81a23a00",
+          "previousHead": "4cbdf5bf4a12a44bfbea61ca7cb26a26d98bf87d",
+          "generatedPngCount": 63,
+          "generatedPycacheCount": 14,
+          "releaseSafetyRun": 38811069787,
+          "conclusion": "action_required",
+          "status": "REMOVED_FROM_FINAL_SCOPE"
+        },
+        "cleanCandidateExactHeadCi": "PENDING",
+        "cleanCandidateLocalAudit": {
+          "basis": "CLEANED_WORKTREE_DERIVED_FROM_VERIFIED_HEAD",
+          "node": "v20.20.2",
+          "python": "3.12.3",
+          "commands": {
+            "nodeVersion": "node --version",
+            "json": "python3 -m json.tool MERIDIAN_LIVE_CHECKPOINT.json",
+            "continuity": "node scripts/continuity-audit.mjs",
+            "frozenResearch": "node scripts/frozen-research-guard.mjs",
+            "orchestration": "PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/validate-agent-orchestration.py",
+            "whitespace": "git diff --check"
+          },
+          "results": {
+            "nodeVersion": "v20.20.2",
+            "json": "PASS",
+            "continuity": "PASS_BUILD_R128",
+            "frozenResearch": "PASS_CHECKED_140_MISMATCHES_0",
+            "orchestration": "GREEN",
+            "whitespace": "PASS"
+          },
+          "nodePath": "/tmp/meridian-node20-final/runtime/bin/node",
+          "pythonBytecode": "DISABLED",
+          "v11A2EvidenceDir": "/tmp/meridian-node20-final/artifacts/v11-visual-qa",
+          "fullSuiteRerun": "NOT_RUN_DOCUMENTATION_ONLY_CLEANUP",
+          "finalCandidateCi": "PENDING",
+          "fullScopeClaudeReview": "PENDING_SUCCESSFUL_FINAL_CANDIDATE_CI"
+        },
+        "claudeFullScopeReview": "PENDING_SUCCESSFUL_CLEAN_CANDIDATE_CI",
         "workflowDispatchOrRetry": "NOT_ATTEMPTED"
       }
     },
