@@ -1,0 +1,514 @@
+{
+  "arenaInputSha256": "decf35415605bda739d08e9ac489951c21f5428d6b5f6362bd6e77abf265c473",
+  "autoPromotion": false,
+  "dependencyLockSha256": "3ef85cd792e551893f45e77db1c0d24654cbadec7d8c7cf13b54ddc669a7cd02",
+  "freqtradeCommit": "1f394eaebc2f46a83d26971388628707802f8602",
+  "liveAuthorized": false,
+  "manifestSha256": "5aa35d41d585c5b866b6d46ec1f5868e840dd3dfaa5e227ddbdb6537b172bc66",
+  "performanceParityEstablished": false,
+  "python": "3.12.14",
+  "results": {
+    "AVAX/USD": {
+      "public": {
+        "examples": [
+          {
+            "actual": 6.6370000000000005,
+            "actualBinary64": "0x1.a8c49ba5e3540p+2",
+            "column": "open",
+            "expected": 6.637,
+            "expectedBinary64": "0x1.a8c49ba5e353fp+2",
+            "row": 272,
+            "sourceJsonToken": "6.637"
+          },
+          {
+            "actual": 6.6370000000000005,
+            "actualBinary64": "0x1.a8c49ba5e3540p+2",
+            "column": "open",
+            "expected": 6.637,
+            "expectedBinary64": "0x1.a8c49ba5e353fp+2",
+            "row": 274,
+            "sourceJsonToken": "6.637"
+          },
+          {
+            "actual": 5.8260000000000005,
+            "actualBinary64": "0x1.74dd2f1a9fbe8p+2",
+            "column": "low",
+            "expected": 5.826,
+            "expectedBinary64": "0x1.74dd2f1a9fbe7p+2",
+            "row": 282,
+            "sourceJsonToken": "5.826"
+          },
+          {
+            "actual": 6.9190000000000005,
+            "actualBinary64": "0x1.bad0e56041894p+2",
+            "column": "close",
+            "expected": 6.919,
+            "expectedBinary64": "0x1.bad0e56041893p+2",
+            "row": 298,
+            "sourceJsonToken": "6.919"
+          }
+        ],
+        "maxAbsoluteDifference": 1.7763568394002505e-15,
+        "numericMismatchCount": 17,
+        "rows": 400
+      },
+      "publicEqualsRaw": true,
+      "raw": {
+        "examples": [
+          {
+            "actual": 6.6370000000000005,
+            "actualBinary64": "0x1.a8c49ba5e3540p+2",
+            "column": "open",
+            "expected": 6.637,
+            "expectedBinary64": "0x1.a8c49ba5e353fp+2",
+            "row": 272,
+            "sourceJsonToken": "6.637"
+          },
+          {
+            "actual": 6.6370000000000005,
+            "actualBinary64": "0x1.a8c49ba5e3540p+2",
+            "column": "open",
+            "expected": 6.637,
+            "expectedBinary64": "0x1.a8c49ba5e353fp+2",
+            "row": 274,
+            "sourceJsonToken": "6.637"
+          },
+          {
+            "actual": 5.8260000000000005,
+            "actualBinary64": "0x1.74dd2f1a9fbe8p+2",
+            "column": "low",
+            "expected": 5.826,
+            "expectedBinary64": "0x1.74dd2f1a9fbe7p+2",
+            "row": 282,
+            "sourceJsonToken": "5.826"
+          },
+          {
+            "actual": 6.9190000000000005,
+            "actualBinary64": "0x1.bad0e56041894p+2",
+            "column": "close",
+            "expected": 6.919,
+            "expectedBinary64": "0x1.bad0e56041893p+2",
+            "row": 298,
+            "sourceJsonToken": "6.919"
+          }
+        ],
+        "maxAbsoluteDifference": 1.7763568394002505e-15,
+        "numericMismatchCount": 17,
+        "rows": 400
+      },
+      "separatePreciseFloatProbeMismatches": 0
+    },
+    "BTC/USD": {
+      "public": {
+        "examples": [],
+        "maxAbsoluteDifference": 0.0,
+        "numericMismatchCount": 0,
+        "rows": 400
+      },
+      "publicEqualsRaw": true,
+      "raw": {
+        "examples": [],
+        "maxAbsoluteDifference": 0.0,
+        "numericMismatchCount": 0,
+        "rows": 400
+      },
+      "separatePreciseFloatProbeMismatches": 0
+    },
+    "ETH/USD": {
+      "public": {
+        "examples": [],
+        "maxAbsoluteDifference": 0.0,
+        "numericMismatchCount": 0,
+        "rows": 400
+      },
+      "publicEqualsRaw": true,
+      "raw": {
+        "examples": [],
+        "maxAbsoluteDifference": 0.0,
+        "numericMismatchCount": 0,
+        "rows": 400
+      },
+      "separatePreciseFloatProbeMismatches": 0
+    },
+    "HBAR/USD": {
+      "public": {
+        "examples": [
+          {
+            "actual": 0.23353000000000002,
+            "actualBinary64": "0x1.de44fa05143c0p-3",
+            "column": "low",
+            "expected": 0.23353,
+            "expectedBinary64": "0x1.de44fa05143bfp-3",
+            "row": 0,
+            "sourceJsonToken": "0.23353"
+          },
+          {
+            "actual": 0.23987000000000003,
+            "actualBinary64": "0x1.eb40f66a55088p-3",
+            "column": "close",
+            "expected": 0.23987,
+            "expectedBinary64": "0x1.eb40f66a55087p-3",
+            "row": 0,
+            "sourceJsonToken": "0.23987"
+          },
+          {
+            "actual": 0.23987000000000003,
+            "actualBinary64": "0x1.eb40f66a55088p-3",
+            "column": "open",
+            "expected": 0.23987,
+            "expectedBinary64": "0x1.eb40f66a55087p-3",
+            "row": 1,
+            "sourceJsonToken": "0.23987"
+          },
+          {
+            "actual": 0.23825000000000002,
+            "actualBinary64": "0x1.e7ef9db22d0e6p-3",
+            "column": "low",
+            "expected": 0.23825,
+            "expectedBinary64": "0x1.e7ef9db22d0e5p-3",
+            "row": 1,
+            "sourceJsonToken": "0.23825"
+          }
+        ],
+        "maxAbsoluteDifference": 2.7755575615628914e-17,
+        "numericMismatchCount": 776,
+        "rows": 400
+      },
+      "publicEqualsRaw": true,
+      "raw": {
+        "examples": [
+          {
+            "actual": 0.23353000000000002,
+            "actualBinary64": "0x1.de44fa05143c0p-3",
+            "column": "low",
+            "expected": 0.23353,
+            "expectedBinary64": "0x1.de44fa05143bfp-3",
+            "row": 0,
+            "sourceJsonToken": "0.23353"
+          },
+          {
+            "actual": 0.23987000000000003,
+            "actualBinary64": "0x1.eb40f66a55088p-3",
+            "column": "close",
+            "expected": 0.23987,
+            "expectedBinary64": "0x1.eb40f66a55087p-3",
+            "row": 0,
+            "sourceJsonToken": "0.23987"
+          },
+          {
+            "actual": 0.23987000000000003,
+            "actualBinary64": "0x1.eb40f66a55088p-3",
+            "column": "open",
+            "expected": 0.23987,
+            "expectedBinary64": "0x1.eb40f66a55087p-3",
+            "row": 1,
+            "sourceJsonToken": "0.23987"
+          },
+          {
+            "actual": 0.23825000000000002,
+            "actualBinary64": "0x1.e7ef9db22d0e6p-3",
+            "column": "low",
+            "expected": 0.23825,
+            "expectedBinary64": "0x1.e7ef9db22d0e5p-3",
+            "row": 1,
+            "sourceJsonToken": "0.23825"
+          }
+        ],
+        "maxAbsoluteDifference": 2.7755575615628914e-17,
+        "numericMismatchCount": 776,
+        "rows": 400
+      },
+      "separatePreciseFloatProbeMismatches": 0
+    },
+    "LINK/USD": {
+      "public": {
+        "examples": [
+          {
+            "actual": 23.995730000000002,
+            "actualBinary64": "0x1.7fee82949a566p+4",
+            "column": "open",
+            "expected": 23.99573,
+            "expectedBinary64": "0x1.7fee82949a565p+4",
+            "row": 7,
+            "sourceJsonToken": "23.99573"
+          },
+          {
+            "actual": 14.305250000000001,
+            "actualBinary64": "0x1.c9c49ba5e3540p+3",
+            "column": "low",
+            "expected": 14.30525,
+            "expectedBinary64": "0x1.c9c49ba5e353fp+3",
+            "row": 57,
+            "sourceJsonToken": "14.30525"
+          },
+          {
+            "actual": 13.449160000000001,
+            "actualBinary64": "0x1.ae5f84cad57bdp+3",
+            "column": "close",
+            "expected": 13.44916,
+            "expectedBinary64": "0x1.ae5f84cad57bcp+3",
+            "row": 76,
+            "sourceJsonToken": "13.44916"
+          },
+          {
+            "actual": 12.992560000000001,
+            "actualBinary64": "0x1.9fc30d306a2b2p+3",
+            "column": "close",
+            "expected": 12.99256,
+            "expectedBinary64": "0x1.9fc30d306a2b1p+3",
+            "row": 79,
+            "sourceJsonToken": "12.99256"
+          }
+        ],
+        "maxAbsoluteDifference": 3.552713678800501e-15,
+        "numericMismatchCount": 25,
+        "rows": 400
+      },
+      "publicEqualsRaw": true,
+      "raw": {
+        "examples": [
+          {
+            "actual": 23.995730000000002,
+            "actualBinary64": "0x1.7fee82949a566p+4",
+            "column": "open",
+            "expected": 23.99573,
+            "expectedBinary64": "0x1.7fee82949a565p+4",
+            "row": 7,
+            "sourceJsonToken": "23.99573"
+          },
+          {
+            "actual": 14.305250000000001,
+            "actualBinary64": "0x1.c9c49ba5e3540p+3",
+            "column": "low",
+            "expected": 14.30525,
+            "expectedBinary64": "0x1.c9c49ba5e353fp+3",
+            "row": 57,
+            "sourceJsonToken": "14.30525"
+          },
+          {
+            "actual": 13.449160000000001,
+            "actualBinary64": "0x1.ae5f84cad57bdp+3",
+            "column": "close",
+            "expected": 13.44916,
+            "expectedBinary64": "0x1.ae5f84cad57bcp+3",
+            "row": 76,
+            "sourceJsonToken": "13.44916"
+          },
+          {
+            "actual": 12.992560000000001,
+            "actualBinary64": "0x1.9fc30d306a2b2p+3",
+            "column": "close",
+            "expected": 12.99256,
+            "expectedBinary64": "0x1.9fc30d306a2b1p+3",
+            "row": 79,
+            "sourceJsonToken": "12.99256"
+          }
+        ],
+        "maxAbsoluteDifference": 3.552713678800501e-15,
+        "numericMismatchCount": 25,
+        "rows": 400
+      },
+      "separatePreciseFloatProbeMismatches": 0
+    },
+    "SOL/USD": {
+      "public": {
+        "examples": [],
+        "maxAbsoluteDifference": 0.0,
+        "numericMismatchCount": 0,
+        "rows": 400
+      },
+      "publicEqualsRaw": true,
+      "raw": {
+        "examples": [],
+        "maxAbsoluteDifference": 0.0,
+        "numericMismatchCount": 0,
+        "rows": 400
+      },
+      "separatePreciseFloatProbeMismatches": 0
+    },
+    "SUI/USD": {
+      "public": {
+        "examples": [
+          {
+            "actual": 3.6687000000000003,
+            "actualBinary64": "0x1.d597f62b6ae7ep+1",
+            "column": "open",
+            "expected": 3.6687,
+            "expectedBinary64": "0x1.d597f62b6ae7dp+1",
+            "row": 1,
+            "sourceJsonToken": "3.6687"
+          },
+          {
+            "actual": 3.7293000000000003,
+            "actualBinary64": "0x1.dd59b3d07c84cp+1",
+            "column": "high",
+            "expected": 3.7293,
+            "expectedBinary64": "0x1.dd59b3d07c84bp+1",
+            "row": 1,
+            "sourceJsonToken": "3.7293"
+          },
+          {
+            "actual": 3.6001000000000003,
+            "actualBinary64": "0x1.ccd013a92a306p+1",
+            "column": "close",
+            "expected": 3.6001,
+            "expectedBinary64": "0x1.ccd013a92a305p+1",
+            "row": 5,
+            "sourceJsonToken": "3.6001"
+          },
+          {
+            "actual": 3.6047000000000002,
+            "actualBinary64": "0x1.cd66cf41f212ep+1",
+            "column": "open",
+            "expected": 3.6047,
+            "expectedBinary64": "0x1.cd66cf41f212dp+1",
+            "row": 6,
+            "sourceJsonToken": "3.6047"
+          }
+        ],
+        "maxAbsoluteDifference": 4.440892098500626e-16,
+        "numericMismatchCount": 374,
+        "rows": 400
+      },
+      "publicEqualsRaw": true,
+      "raw": {
+        "examples": [
+          {
+            "actual": 3.6687000000000003,
+            "actualBinary64": "0x1.d597f62b6ae7ep+1",
+            "column": "open",
+            "expected": 3.6687,
+            "expectedBinary64": "0x1.d597f62b6ae7dp+1",
+            "row": 1,
+            "sourceJsonToken": "3.6687"
+          },
+          {
+            "actual": 3.7293000000000003,
+            "actualBinary64": "0x1.dd59b3d07c84cp+1",
+            "column": "high",
+            "expected": 3.7293,
+            "expectedBinary64": "0x1.dd59b3d07c84bp+1",
+            "row": 1,
+            "sourceJsonToken": "3.7293"
+          },
+          {
+            "actual": 3.6001000000000003,
+            "actualBinary64": "0x1.ccd013a92a306p+1",
+            "column": "close",
+            "expected": 3.6001,
+            "expectedBinary64": "0x1.ccd013a92a305p+1",
+            "row": 5,
+            "sourceJsonToken": "3.6001"
+          },
+          {
+            "actual": 3.6047000000000002,
+            "actualBinary64": "0x1.cd66cf41f212ep+1",
+            "column": "open",
+            "expected": 3.6047,
+            "expectedBinary64": "0x1.cd66cf41f212dp+1",
+            "row": 6,
+            "sourceJsonToken": "3.6047"
+          }
+        ],
+        "maxAbsoluteDifference": 4.440892098500626e-16,
+        "numericMismatchCount": 374,
+        "rows": 400
+      },
+      "separatePreciseFloatProbeMismatches": 0
+    },
+    "XRP/USD": {
+      "public": {
+        "examples": [
+          {
+            "actual": 2.9839200000000003,
+            "actualBinary64": "0x1.7df1172ef0ae6p+1",
+            "column": "open",
+            "expected": 2.98392,
+            "expectedBinary64": "0x1.7df1172ef0ae5p+1",
+            "row": 0,
+            "sourceJsonToken": "2.98392"
+          },
+          {
+            "actual": 3.0846999999999998,
+            "actualBinary64": "0x1.8ad77318fc504p+1",
+            "column": "close",
+            "expected": 3.0847,
+            "expectedBinary64": "0x1.8ad77318fc505p+1",
+            "row": 6,
+            "sourceJsonToken": "3.0847"
+          },
+          {
+            "actual": 2.9699999999999998,
+            "actualBinary64": "0x1.7c28f5c28f5c2p+1",
+            "column": "low",
+            "expected": 2.97,
+            "expectedBinary64": "0x1.7c28f5c28f5c3p+1",
+            "row": 9,
+            "sourceJsonToken": "2.97"
+          },
+          {
+            "actual": 2.9535400000000003,
+            "actualBinary64": "0x1.7a0d9945b6c38p+1",
+            "column": "low",
+            "expected": 2.95354,
+            "expectedBinary64": "0x1.7a0d9945b6c37p+1",
+            "row": 10,
+            "sourceJsonToken": "2.95354"
+          }
+        ],
+        "maxAbsoluteDifference": 4.440892098500626e-16,
+        "numericMismatchCount": 198,
+        "rows": 400
+      },
+      "publicEqualsRaw": true,
+      "raw": {
+        "examples": [
+          {
+            "actual": 2.9839200000000003,
+            "actualBinary64": "0x1.7df1172ef0ae6p+1",
+            "column": "open",
+            "expected": 2.98392,
+            "expectedBinary64": "0x1.7df1172ef0ae5p+1",
+            "row": 0,
+            "sourceJsonToken": "2.98392"
+          },
+          {
+            "actual": 3.0846999999999998,
+            "actualBinary64": "0x1.8ad77318fc504p+1",
+            "column": "close",
+            "expected": 3.0847,
+            "expectedBinary64": "0x1.8ad77318fc505p+1",
+            "row": 6,
+            "sourceJsonToken": "3.0847"
+          },
+          {
+            "actual": 2.9699999999999998,
+            "actualBinary64": "0x1.7c28f5c28f5c2p+1",
+            "column": "low",
+            "expected": 2.97,
+            "expectedBinary64": "0x1.7c28f5c28f5c3p+1",
+            "row": 9,
+            "sourceJsonToken": "2.97"
+          },
+          {
+            "actual": 2.9535400000000003,
+            "actualBinary64": "0x1.7a0d9945b6c38p+1",
+            "column": "low",
+            "expected": 2.95354,
+            "expectedBinary64": "0x1.7a0d9945b6c37p+1",
+            "row": 10,
+            "sourceJsonToken": "2.95354"
+          }
+        ],
+        "maxAbsoluteDifference": 4.440892098500626e-16,
+        "numericMismatchCount": 198,
+        "rows": 400
+      },
+      "separatePreciseFloatProbeMismatches": 0
+    }
+  },
+  "schemaVersion": "MERIDIAN_FREQTRADE_LOADER_DIAGNOSTIC_V1",
+  "status": "LOADER_NUMERIC_PARITY_FAILED",
+  "strategyExecuted": false,
+  "tolerance": 0
+}
