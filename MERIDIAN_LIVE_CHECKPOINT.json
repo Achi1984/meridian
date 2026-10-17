@@ -1115,6 +1115,86 @@
       ],
       "runtimeEvidenceCommentId": 6232998743,
       "runtimeScope": "DISPOSABLE_LOCAL_PG16_FIXTURE_ONLY_NO_DEPLOYED_DATABASE_CLAIM"
+    },
+    "boundedAutopilotPreparation20261017": {
+      "operationId": "MERIDIAN-AUTOPILOT-PREPARATION-20261017-001",
+      "state": "PREPARATION_ONLY_BLOCKED_NO_ACTIVATION",
+      "proposalIssue": 867,
+      "ownerApproval": {
+        "mailboxIssue": 639,
+        "commentId": 6239454116,
+        "at": "2026-10-17T21:22:29+02:00",
+        "quote": "Ja Freigabe erteilt",
+        "scope": "PREPARATION_ONLY",
+        "activationAuthorized": false
+      },
+      "startingInputs": {
+        "mainSha": "5c996ee9c7d4e71f0d6f2ecd59f6fc53beedcce3",
+        "branch": "copilot/proposal-bounded-github-autopilot",
+        "branchHead": "ad625f1642e011b6100086dec88d4641ceb20e97",
+        "checkpointBlobSha": "fd80e609b9dfb196f8bb317682bad923fd80aef5"
+      },
+      "queue": [
+        {
+          "target": 862,
+          "kind": "pull_request",
+          "base": "5c996ee9c7d4e71f0d6f2ecd59f6fc53beedcce3",
+          "head": "15ccb6bd0b2157abc2b44aeebce73229aeb0c1b4",
+          "ciRunId": 39061699022,
+          "ciConclusion": "action_required",
+          "ciJobs": 0,
+          "state": "BLOCKED_CI_NOT_SUCCESS"
+        },
+        {
+          "target": 860,
+          "kind": "pull_request",
+          "base": "5c996ee9c7d4e71f0d6f2ecd59f6fc53beedcce3",
+          "head": "ebaed4ab9bf274d2d569fe3d6aa3c46a2890e1de",
+          "state": "BLOCKED_PENDING_862"
+        },
+        {
+          "target": 861,
+          "kind": "issue",
+          "head": null,
+          "state": "QUEUED_PENDING_860"
+        }
+      ],
+      "capabilities": {
+        "watchdog": "MAILBOX_DELIVERY_CLASSIFICATION_ONLY",
+        "nativeDispatcher": "INACTIVE_REQUIRES_UNAVAILABLE_USER_TO_SERVER_TOKEN",
+        "codingWorkflow": "PINNED_TO_OTHER_PACKET_NOT_REUSABLE",
+        "workflowApprovalOperationAvailable": false
+      },
+      "pilot": {
+        "enabled": false,
+        "startEpoch": null,
+        "endEpoch": null,
+        "maxWindowSeconds": 86400,
+        "maxActivePackets": 3,
+        "mutationLanes": 1,
+        "maxReconciliationPassesPerHour": 1,
+        "autoMerge": false,
+        "autoDeploy": false
+      },
+      "publisherPause": {
+        "state": "REMAINS_PAUSED",
+        "repair862CleanupExceptionOnly": true,
+        "exceptionApprovalCommentId": 6238949509
+      },
+      "reviewRequestMade": false,
+      "reviewGate": "WAIT_FOR_EXACT_HEAD_CI_SUCCESS",
+      "sourceAudit": {
+        "stage": "SOURCE_AUDIT",
+        "canonicalExecutionAuthorized": false,
+        "strategyPnlAuthorized": false,
+        "discoveryAuthorized": false,
+        "validationAuthorized": false,
+        "holdoutAuthorized": false,
+        "paperAuthorized": false,
+        "liveAuthorized": false
+      },
+      "activationDiff": "BLOCKED_NO_SUPPORTED_DISPATCH_OR_ACTIVATION_AUTHORITY",
+      "nextGate": "OWNER_REVIEW_PREPARATION_AND_SEPARATE_ACTIVATION_APPROVAL_AFTER_EXACT_HEAD_CI"
     }
   }
 }
