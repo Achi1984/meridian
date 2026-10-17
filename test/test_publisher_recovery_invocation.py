@@ -17,6 +17,9 @@ REPO = Path(__file__).resolve().parents[1]
 DOCUMENT = REPO / 'docs/autonomy/PUBLISHER_RECOVERY_INVOCATION_20261017.md'
 BODY = DOCUMENT.read_bytes().split(b'```python\n', 1)[1].split(b'```', 1)[0]
 PIN = '3f5e0758a0138ed2df334847422d2b27d7fa6123cd019432647581755e1aae76'
+HISTORICAL_SCOPE_PIN = '11e0c283e227698b415d371712d01d40d7e03ffb4c5cc975e909b7864f8aa5da'
+HISTORICAL_SOURCE_COMMIT = 'd8a12f8dfeb25843d186111094e1cdc1fbb35b0d'
+HISTORICAL_AUTO_SETUP_PIN = 'c859d4413eb2b50f7aae04e1d28eb23961989eb64beb29cb751eb65f06a8bfc0'
 EXPECTED_ROOT = '/home/codespace/meridian-commissioning-20261014/recovery-830-reviewed'
 
 
@@ -27,11 +30,13 @@ class InvocationTests(unittest.TestCase):
         self.root = Path(self.temp.name) / 'stage'
         self.root.mkdir(mode=0o700)
         source = REPO / 'docs/autonomy/PUBLISHER_RECOVERY_SCOPE_20261017.json'
-        self.proposal = json.loads(source.read_bytes())
-        (self.root / 'scope.json').write_bytes(source.read_bytes())
-        for name, pin in self.proposal['sourceManifest'].items():
+        scope_bytes = source.read_bytes()
+        self.proposal = json.loads(scope_bytes)
+        (self.root / 'scope.json').write_bytes(scope_bytes)
+        self.current_sources = {}
+        for name in self.proposal['sourceManifest']:
             data = (REPO / 'scripts' / name).read_bytes()
-            self.assertEqual(hashlib.sha256(data).hexdigest(), pin)
+            self.current_sources[name] = hashlib.sha256(data).hexdigest()
             (self.root / name).write_bytes(data)
         for file in self.root.iterdir():
             file.chmod(0o600)
@@ -69,41 +74,36 @@ class InvocationTests(unittest.TestCase):
         self.assertEqual(len(BODY), 2918)
         self.assertEqual(hashlib.sha256(BODY).hexdigest(), PIN)
 
-    def test_binds_scope_argv_and_exits_once(self):
-        before = time.time()
-        with self.assertRaises(SystemExit) as outcome:
+    def test_historical_scope_is_byte_exact_and_current_source_divergence_fails_closed(self):
+        scope_bytes = (REPO / 'docs/autonomy/PUBLISHER_RECOVERY_SCOPE_20261017.json').read_bytes()
+        self.assertEqual(hashlib.sha256(scope_bytes).hexdigest(), HISTORICAL_SCOPE_PIN)
+        self.assertEqual(self.proposal['sourceCommit'], HISTORICAL_SOURCE_COMMIT)
+        self.assertEqual(
+            self.proposal['sourceManifest']['publisher_test_auto_setup.py'],
+            HISTORICAL_AUTO_SETUP_PIN,
+        )
+        self.assertEqual(
+            self.proposal['failedSourceManifest']['publisher_test_auto_setup.py'],
+            HISTORICAL_AUTO_SETUP_PIN,
+        )
+        self.assertEqual(
+            {name for name, digest in self.current_sources.items()
+             if digest != self.proposal['sourceManifest'][name]},
+            {'publisher_test_auto_setup.py'},
+        )
+        self.assertEqual(
+            self.current_sources['publisher_test_auto_setup.py'],
+            'e416e768b699cf9a33eecaa15dde5f19944750de00598c74b77d2521ab5d0c85',
+        )
+        with self.assertRaises(ValueError):
             self.invoke()
-        self.assertEqual(outcome.exception.code, 0)
-        self.assertEqual(len(self.calls), 1)
-        manifest, failed, scope, argv, window = self.calls[0]
-        self.assertEqual(manifest, self.proposal['sourceManifest'])
-        self.assertEqual(failed, self.proposal['failedSourceManifest'])
-        digest = lambda value: hashlib.sha256(json.dumps(value, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
-        self.assertEqual(scope['argv_sha256'], digest(argv))
-        self.assertEqual(scope['source_manifest_sha256'], digest(manifest))
-        self.assertEqual(scope['failed_manifest_sha256'], digest(failed))
-        self.assertEqual(scope['approval_comment_id'], 6230643903)
-        self.assertEqual(scope['marker'], self.proposal['marker'])
-        self.assertEqual(scope['action'], 'ARCHIVE_PUBLISHER_ATTEMPT_ONCE')
-        self.assertEqual(scope['owner_id'], 319562141)
-        self.assertEqual(argv.count('--baseline'), 1)
-        self.assertEqual(argv[argv.index('--baseline') + 1], str(self.root.parent / 'approved-role-baseline.json'))
-        self.assertEqual(argv[argv.index('--ca-sha256') + 1], self.proposal['caSha256'])
-        self.assertEqual(argv[argv.index('--gh-sha256') + 1], self.proposal['ghSha256'])
-        self.assertEqual(argv[argv.index('--neon-sha256') + 1], self.proposal['neonSha256'])
-        self.assertGreater(scope['expires_at'], before + 238)
-        self.assertLessEqual(scope['expires_at'], time.time() + 240)
-        self.assertTrue(window(scope['window_id']))
-        self.assertFalse(window('not-the-window'))
-        with patch('time.monotonic', return_value=time.monotonic() + 300):
-            self.assertFalse(window(scope['window_id']))
+        self.assertEqual(self.calls, [])
 
-    def test_nonzero_wrapper_exit_propagates(self):
+    def test_changed_historical_source_never_reaches_wrapper_even_if_result_is_nonzero(self):
         self.result = 1
-        with self.assertRaises(SystemExit) as outcome:
+        with self.assertRaises(ValueError):
             self.invoke()
-        self.assertEqual(outcome.exception.code, 1)
-        self.assertEqual(len(self.calls), 1)
+        self.assertEqual(self.calls, [])
 
     def test_modified_scope_rejected_before_wrapper(self):
         path = self.root / 'scope.json'
@@ -112,7 +112,7 @@ class InvocationTests(unittest.TestCase):
             self.invoke()
         self.assertEqual(self.calls, [])
 
-    def test_modified_source_rejected_before_wrapper(self):
+    def test_modified_earlier_source_rejected_before_wrapper(self):
         path = self.root / 'publisher_recovery_wrapper.py'
         path.write_bytes(path.read_bytes() + b'\n')
         with self.assertRaises(ValueError):

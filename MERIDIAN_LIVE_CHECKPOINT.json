@@ -135,8 +135,8 @@
         "pages": 39025396725
       }
     },
-    "package": "MAIN_859_VERIFIED_BOUNDED_TIMEOUT_DESCENDANT_REPAIR_PENDING_GATES",
-    "state": "PR862_REPAIR_ACTIVE_PENDING_EXACT_HEAD_CI_AND_INDEPENDENT_REVIEW",
+    "package": "MAIN_859_BOUNDED_TIMEOUT_REPAIR_TEST_CORRECTIONS_PENDING_GATES",
+    "state": "PR862_APPROVED_TWO_TEST_CORRECTIONS_COMPLETE_PENDING_EXACT_HEAD_CI_AND_INDEPENDENT_REVIEW",
     "infrastructurePaused": true,
     "mailboxRollover": {
       "from": 571,
@@ -254,7 +254,7 @@
         "authorizedReproductionBudget": "UNKNOWN"
       }
     },
-    "nextStep": "COMPLETE_PR862_EXACT_HEAD_CI_AND_INDEPENDENT_REVIEW_THEN_HANDOFF_PR860_REQUIRED_CORRECTIONS_THEN_ARENA_861",
+    "nextStep": "RUN_PR862_EXACT_HEAD_CI_AND_COMPLETE_INDEPENDENT_REVIEW_THEN_HANDOFF_PR860_REQUIRED_CORRECTIONS_THEN_ARENA_861",
     "ownerPathInspection": {
       "pr": 828,
       "mergeSha": "bfebd17ddfa1d2d3b44a15126e28618a82cb81f2",
@@ -511,9 +511,25 @@
       "ownerApprovalCommentId": 6238949509,
       "ownerPause": "PUBLISHER_REMAINS_PAUSED_EXCEPT_THIS_BOUNDED_REPAIR",
       "repairPr": 862,
-      "state": "ACTIVE_PENDING_FOCUSED_TESTS_EXACT_HEAD_CI_INDEPENDENT_REVIEW",
+      "state": "ACTIVE_PENDING_EXACT_HEAD_CI_AND_INDEPENDENT_REVIEW",
       "dependency": "REPAIR_IS_PREREQUISITE_FOR_PR860_NOT_DEPENDENT_ON_PR860_MERGE",
       "arena861": "QUEUED",
+      "testOnlyCorrection": {
+        "opId": "MERIDIAN-862-TWO-TEST-CORRECTION-20261017-2204",
+        "ownerApprovalCommentId": 6240118623,
+        "issueDecisionCommentId": 6240114260,
+        "state": "IMPLEMENTED_FOCUSED_TESTS_PASS_EXACT_HEAD_CI_PENDING",
+        "tests": [
+          "test/test_publisher_recovery_invocation.py",
+          "test/v11-terminal-entry.test.js"
+        ],
+        "historicalRecoveryScopeSha256": "11e0c283e227698b415d371712d01d40d7e03ffb4c5cc975e909b7864f8aa5da",
+        "historicalAutoSetupSha256": "c859d4413eb2b50f7aae04e1d28eb23961989eb64beb29cb751eb65f06a8bfc0",
+        "currentAutoSetupSha256": "e416e768b699cf9a33eecaa15dde5f19944750de00598c74b77d2521ab5d0c85",
+        "historicalPacketsPreserved": true,
+        "focusedRecoveryInvocationTests": "9_PASS",
+        "focusedV11TerminalEntryTests": "2_PASS_FOUR_MOBILE_WIDTHS"
+      },
       "mergeAuthorized": false
     },
     "runtimeReconciliation20261017": {
