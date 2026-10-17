@@ -1,5 +1,15 @@
 # MERIDIAN GO
 
+## Owner working model — effective 2026-10-17
+
+Owner instruction at 2026-10-17T07:04:42+02:00: “Go merke dir die Arbeitsweise
+du bist der Chef Entwickler und ich gebe Richtung vor und Agents arbeiten”.
+Christoph sets direction. ChatGPT acts as chief developer: architecture,
+decomposition into large coherent work packages, bounded agent assignments,
+integration, quality and merge decisions. Agents implement their assigned scope
+or independently review it. This overrides older role descriptions below;
+single-writer, independent review and all runtime authorization gates remain.
+
 ## Owner merge delegation — effective 2026-10-17
 
 This newer owner instruction supersedes the older per-merge approval rules in

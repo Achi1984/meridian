@@ -16,9 +16,9 @@ candidate has no claimed publication SHA.
 - Publisher #825 merged at the verified main above. Full four-file review
   6229794718; premerge CI39003151050 succeeded (2561 pass, zero failures).
   Local19 fault tests passed CPython3.14.2 with pinned dependencies.
-  FINAL_MERGE_STATUS6229853101. Postmerge checks were pending at this snapshot:
+  FINAL_MERGE_STATUS6229853101. All four postmerge checks succeeded:
   Release39004204488, Runtime39004204504, Pages39004203840;
-  Coordinator39004204485 succeeded. Read live results before proceeding.
+  Coordinator39004204485. Source packet complete.
 - The publisher primitive is inactive: no CLI or production caller.
   A future reviewed wrapper must establish canonical passwd-owner paths,
   authenticated approval/source evidence, fresh exclusivity and provider/DB
@@ -32,7 +32,12 @@ candidate has no claimed publication SHA.
   postchecks remain mandatory. This delegates merge decisions only, not runtime
   recovery/setup, activation, trading, spending or schedule/credential changes.
 
-NEXT: complete #825 postchecks and this continuity review; then prepare the
+- Owner working model at 2026-10-17T07:04:42+02:00: Christoph sets direction;
+  ChatGPT is chief developer for architecture, coherent work packages, agent
+  assignments, integration, quality and merge decisions. Agents implement bounded
+  scopes or independently review; single-writer and runtime gates remain intact.
+
+NEXT: complete this continuity review and prepare the separately reviewed
 runtime wrapper. Concrete recovery and subsequent setup remain separately
 owner-gated. CV2 remains SOURCE_AUDIT with all seven flags false; CRV unresolved.
 Autonomous end-to-end live development remains unproven.
@@ -56,7 +61,7 @@ NEXT: complete local engine/receipt/UI checks, exact-head CI and independent
 full-scope review before a guarded merge. No candidate publication SHA is claimed.
 
 
-## Current handoff — 2026-10-16
+## Historical handoff — 2026-10-16 (superseded)
 
 This section is the current operational summary. Historical snapshots below are
 retained for provenance, not as instructions or evidence of present state.
