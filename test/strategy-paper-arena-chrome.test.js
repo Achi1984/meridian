@@ -52,6 +52,7 @@ test('Paper Arena Chrome: native file import, integrity rejection and 320/390 la
       let m=await layout();assert.equal(m.cards,5);assert.equal(m.width,width);assert.ok(m.body<=width+1&&m.root<=width+1&&m.inside,JSON.stringify(m));
       assert.equal(await evaluate(`document.querySelectorAll('.paper-model-head').length`),0,'diagnostic cards must not impersonate runtime Paper model identities');
       assert.ok(await evaluate(`parseFloat(getComputedStyle(document.querySelector('[data-arena-input]')).fontSize)>=16`),'mobile import control must meet the typography floor');
+      assert.ok(await evaluate(`[...document.querySelectorAll('.arena-model-head span,.arena-model-head b,.arena-model-head strong,.arena-model>small')].every(el=>parseFloat(getComputedStyle(el).fontSize)>=12)`),'arena identities, status and PnL must remain readable at the actual mobile width');
       assert.equal(await evaluate(`document.querySelector('[data-arena-export]').disabled`),true);
       assert.equal(await evaluate(`document.querySelector('.arena-evidence').textContent.includes('Noch keine')`),true);
       await evaluate(`document.getElementById('keyboard-start').focus()`);
