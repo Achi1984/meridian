@@ -21,7 +21,7 @@ SPEC.loader.exec_module(m)
 
 def fixture():
     return {'inventory': [{'kind': 'schema', 'name': 'meridian_publisher', 'owner_oid': 42, 'left': 'schema'}] +
-                [{'kind': 'internal_fk_trigger', 'name': str(i), 'owner_oid': 42,
+                [{'kind': 'internal_fk_trigger', 'name': json.dumps(['send_records', 'synthetic_fk', 'pg_catalog', 'function_' + str(i), i]), 'owner_oid': 42,
                   'left': '{"enabled":"O"}'} for i in range(4)],
             'functions': [{'name': name, 'owner': 42, 'securityDefiner': False,
                            'configuration': ['search_path=pg_catalog'], 'language': 'plpgsql'}
@@ -176,7 +176,7 @@ class Tests(unittest.TestCase):
         kill.assert_called_once_with(12345, m.signal.SIGKILL)
         process.wait.assert_called_once_with(timeout=3)
 
-    def exercise_cluster(self, cleanup_fault=False, wrong_identity=False, hidden_inspector_mutation=False):
+    def exercise_cluster(self, cleanup_fault=False, wrong_identity=False, hidden_inspector_mutation=False, wrong_inventory_type=False):
         calls = []
         cluster = []
         def local_run(argv, text=None, timeout=10):
@@ -189,6 +189,8 @@ class Tests(unittest.TestCase):
             self.assertTrue(any(x.startswith('--host=/tmp/meridian-pg16-') for x in argv))
             if 'json_build_array' in text:
                 return json.dumps([160004, m.OWNER, 'postgres', 'external' if wrong_identity else None, cluster[0], 42])
+            if 'pg_typeof(i.name)' in text:
+                return json.dumps(['name' if wrong_inventory_type else 'text'])
             if 'jsonb_build_object' not in text:
                 return ''
             value = fixture()
@@ -207,7 +209,7 @@ class Tests(unittest.TestCase):
         with patch.object(m.os, 'getuid', return_value=1000), patch.object(m, 'binaries', return_value=(tools, {}, {})), \
              patch.object(m, 'run', side_effect=local_run), patch.object(m.subprocess, 'Popen', return_value=server) as popen, \
              patch.object(m.os, 'killpg') as kill:
-            if cleanup_fault or wrong_identity or hidden_inspector_mutation:
+            if cleanup_fault or wrong_identity or hidden_inspector_mutation or wrong_inventory_type:
                 with self.assertRaises(ValueError):
                     m.verify(Path('/fixed'))
                 result = None
@@ -225,6 +227,8 @@ class Tests(unittest.TestCase):
     def test_private_cluster_orchestration_and_rollback_negative_cases(self):
         report, calls = self.exercise_cluster()
         self.assertEqual(report['negativeCasesRejected'], list(m.NEGATIVES))
+        self.assertEqual(report['serverVersionNum'], 160004)
+        self.assertEqual(report['inventoryNameSqlType'], 'text')
         self.assertFalse(report['deployedSchemaEquivalent'])
         self.assertFalse(report['fullSemanticsProven'])
         self.assertFalse(report['activationAuthorized'])
@@ -234,6 +238,15 @@ class Tests(unittest.TestCase):
 
     def test_internal_fk_mutation_must_be_visible_in_shipped_inventory(self):
         self.exercise_cluster(hidden_inspector_mutation=True)
+
+    def test_actual_sql_identity_type_must_be_text(self):
+        self.exercise_cluster(wrong_inventory_type=True)
+
+    def test_inventory_duplicate_or_truncated_fk_identity_fails(self):
+        value = fixture(); value['inventory'].append(dict(value['inventory'][1]))
+        with self.assertRaises(ValueError): m.canonical(value, 42)
+        value = fixture(); value['inventory'][1]['name'] = '["reservations", "send_records_operation_key_fkey", "pg_catalog", '
+        with self.assertRaises(ValueError): m.canonical(value, 42)
 
     def test_server_cleanup_failure_never_returns_report(self):
         self.exercise_cluster(cleanup_fault=True)

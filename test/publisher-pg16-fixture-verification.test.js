@@ -11,6 +11,6 @@ test('publisher PG16 fixture: isolated offline boundary suite', {timeout:30000},
   });
   assert.ifError(run.error);
   assert.equal(run.status,0,`Offline PG16 fixture boundary tests failed:\n${run.stdout}\n${run.stderr}`);
-  assert.match(run.stderr,/Ran 20 tests/);
+  assert.match(run.stderr,/Ran 22 tests/);
   assert.match(run.stderr,/\nOK\s*$/);
 });

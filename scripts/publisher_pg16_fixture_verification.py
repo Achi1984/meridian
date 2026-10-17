@@ -19,7 +19,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 PINS = {
-    'scripts/publisher_test_readonly_inspection.py': 'a15377ff7c08fef89279713382b1d41b73da1a40750d14144add3b4abd325138',
+    'scripts/publisher_test_readonly_inspection.py': 'c373dcab272bfc03d484feb6a1733112f873f8ec23908abefd7d51081dbd6a69',
     'docs/autonomy/event-adapter/review-binding/fixtures/publication-ledger.sql': 'c7cab138a398936dd59845db9838947b4a308a3d387b2c4102060ac3ae646736',
     'docs/autonomy/event-adapter/review-binding/fixtures/publication-send-record.sql': '84018bd5f335652592ad3bccc4574407e14b90d7751da55480e000da6cf37bce',
 }
@@ -154,10 +154,19 @@ def canonical(value, owner_oid):
     for key in result:
         if type(result[key]) is not list or not 1 <= len(result[key]) <= 128:
             raise ValueError('snapshot bounds')
+    seen = set()
     for row in result['inventory']:
         if (set(row) != {'kind', 'name', 'owner_oid', 'left'} or row['owner_oid'] != owner_oid
                 or type(row['left']) is not str or len(row['left']) > 16384):
             raise ValueError('inventory boundary')
+        if type(row['kind']) is not str or type(row['name']) is not str or (row['kind'], row['name']) in seen:
+            raise ValueError('inventory identity collision')
+        seen.add((row['kind'], row['name']))
+        if row['kind'] == 'internal_fk_trigger':
+            key = json.loads(row['name'])
+            if (type(key) is not list or len(key) != 5 or any(type(x) is not str for x in key[:4])
+                    or type(key[4]) is not int):
+                raise ValueError('internal trigger identity truncated or malformed')
         row['owner_oid'] = 'fixture-owner'
     for row in result['functions']:
         if row['owner'] != owner_oid:
@@ -227,6 +236,11 @@ def verify(directory):
             if not (160000 <= identity[0] < 170000 and identity[1:5] == [OWNER, 'postgres', None, str(data)]):
                 raise ValueError('local identity')
             sql('\n'.join(fixtures))
+            # Check the actual SQL result type; casting after UNION resolution
+            # cannot recover names already truncated to PostgreSQL's name type.
+            name_types = json.loads(sql('SELECT pg_catalog.jsonb_agg(DISTINCT pg_catalog.pg_typeof(i.name)::text) FROM (' + inventory_sql + ') i;'))
+            if name_types != ['text']:
+                raise ValueError('inventory identity SQL type')
             query = snapshot_sql(inventory_sql)
             expected = canonical(json.loads(sql(query)), identity[5])
             require_fixture_facts(expected)
@@ -247,7 +261,8 @@ def verify(directory):
                     raise ValueError('negative case accepted')
                 compare(expected, canonical(json.loads(sql(query)), identity[5]))
             report = {'kind': 'LOCAL_PG16_FIXTURE_COMPARISON', 'sourceSha256': PINS,
-                      'toolVersions': versions, 'toolSha256': digests,
+                      'toolVersions': versions, 'toolSha256': digests, 'serverVersionNum': identity[0],
+                      'inventoryNameSqlType': name_types[0],
                       'inventorySqlSha256': hashlib.sha256(inventory_sql.encode()).hexdigest(),
                       'expectedCatalog': expected, 'negativeCasesRejected': rejected,
                       'deployedSchemaEquivalent': False, 'fullSemanticsProven': False,
