@@ -71,26 +71,55 @@ Inspect actual constraints, enabled triggers, function ownership/security/search
 path and definitions against the two pinned SQL fixtures; schema-file presence
 is not deployed-schema evidence. No automatic migration, GRANT, REVOKE or repair.
 
-**Read-only source implementation:** the inspector now combines the fixed
-baseline/grant observations, private administrator acquisition and bounded
-supervision with a pinned fixture catalog comparator. PR848 source head
-`c4e860ebd5aae2282e48e7899ed4cdbaaf9c5b47` has actual private PG16 fixture evidence
-(receipt848/6233415079), including seven independently rejected comparator
-mutations. This is not a deployed Gate A result. Complete its source review/merge
-and postchecks before operational use.
+**Gate A deployed observation completed:** the owner approved one fixed-target,
+read-only inspection at 2026-10-17T14:32:19+02:00. Approval
+[849/6233916891](https://github.com/Achi1984/meridian/pull/849#issuecomment-6233916891)
+is consumed; actual result
+[849/6233946190](https://github.com/Achi1984/meridian/pull/849#issuecomment-6233946190)
+records `fixtureCatalogMatch=true`, actual `serverVersionNum=160015`, manifest
+`611ce25904b59473149f5cb8bc69613309b0b8b147df6296defdfecc0ee11274`,
+final `READONLY_INSPECTION_COMPLETE_SCHEMA_EQUIVALENCE_NOT_ESTABLISHED` and
+both inspector and independently captured outer exit0. The reviewed code emits
+completion only after rollback/connection cleanup and provider postflight.
+A separate local process check found no matching staged inspector/launcher.
+These are lead-observed terminal results, not an independently replayed run or
+a stored raw report. No operational retry is authorized.
 
-The separate source-only packet
-`PUBLISHER_GATEA_READONLY_SCOPE_20261017.md` and companion
-`PUBLISHER_GATEA_READONLY_LAUNCH_20261017.sh` define one reviewable read-only
-invocation with immutable source/resource pins. They grant no execution authority.
-The deployed PostgreSQL version remains unknown; only actual160015 matches the
-current reference and all other versions stop. Fresh exact-scope owner approval
-is required before private credential access. No setup/recovery approval carries
-forward and no automatic retry, migration or repair is included.
+Runtime source was `c4e860ebd5aae2282e48e7899ed4cdbaaf9c5b47`; the approved
+packet was merged as `9113b194f6b8f745ad7a657ce9dcc3a01981cac0`, with launcher
+SHA256 `19b91760ade3940a04ad61a6e970551c337ea77a7d848cd65ff49d8042fc1b3e`.
+PR849 source completion
+[6233890458](https://github.com/Achi1984/meridian/pull/849#issuecomment-6233890458)
+records independent review, 2580 passing CI tests and all four postmerge checks.
+The original scope and launcher remain historical one-attempt artifacts; do not
+reuse their approval or alter them to imply a new operation.
 
-This inspector intentionally has no activation mode. Gates B–D still need their
-own separately reviewed activation/closure implementation and exact authority;
-none of this packet implements or permits LOGIN or workflow effects.
+This closes only the narrow point-in-time Gate A catalog/grant/baseline
+observation. `schemaEquivalenceEstablished=false` and
+`activationAuthorized=false` remain. All three application roles remained
+NOLOGIN. TEMP/grant-option observations were true/false for each role, outside
+the zero-mismatch grant contract; no PUBLIC revoke is inferred. Gate A must be
+rechecked inside any future separately approved activation procedure; this
+historical result is not a freshness token.
+
+The inspector has no activation mode. Gates B–D remain incomplete and require
+their separately reviewed implementation, exact-runtime evidence and explicit
+owner authority before any LOGIN, workflow installation or dispatch.
+
+## Offline role-cycle foundation
+
+`scripts/publisher_role_cycle.py` supplies pure validation and planning for the
+fixed three-role cycle. It is not an operational helper: it does not connect to a
+database, acquire credentials, install a workflow, dispatch a run or authorize
+activation. Its state represents supplied observations, not attested evidence.
+The tests exercise role identity/attribute/membership drift, event ordering,
+ambiguous outcomes and single-dispatch accounting without provider access.
+
+Before operational use, a separately reviewed adapter must acquire fresh trusted
+observations, bind the actual owner decision and workflow identity, supervise
+transactions and cleanup, persist attempt accounting, and implement explicit
+closure/reconciliation. This pure foundation does not replace those requirements
+or prove unchanged attributes that the supplied snapshot does not observe.
 
 ## Gates B–D: distinguishable, sequential effects in one owner decision
 
@@ -163,3 +192,4 @@ relevant to the unchanged immutable runtime modules. This docs-only packet was
 validated for pin consistency; no database, credential, workflow or LOGIN action
 was performed. No execution approval is requested until the missing helper and
 literal launch/closure are independently reviewed with actual toolchain evidence.
+
