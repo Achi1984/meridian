@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "status": "PROPOSAL_NOT_APPROVAL_NOT_EXECUTABLE",
+  "opId": "PUBLISHER-RECOVERY-SCOPE-20261017-01",
+  "action": "ARCHIVE_PUBLISHER_ATTEMPT_ONCE",
+  "ownerId": 319562141,
+  "sourceCommit": "d8a12f8dfeb25843d186111094e1cdc1fbb35b0d",
+  "sourceReviewCommentId": 6230151464,
+  "sourceManifest": {
+    "publisher_recovery_wrapper.py": "0b67e44bde4356046c8488ee46607462f4a259dfce3c47febe6a67fa2dfe8381",
+    "publisher_owner_path.py": "337c68d71842ba00e4a92518bf9d457a57423491aa3001abc4bc3185f5ba07be",
+    "publisher_marker_recovery.py": "946a2f0bfb3fa6127e6fcb1328653c5d16edf31b42f1bc89f8d58211a21b0954",
+    "publisher_test_reconcile.py": "1e0ad5e60cee6d46a06c1a3b50a31da3523f458b20f119a919d9baa914b4cfa5",
+    "publisher_test_auto_setup.py": "c859d4413eb2b50f7aae04e1d28eb23961989eb64beb29cb751eb65f06a8bfc0",
+    "publisher_test_password_setup.py": "3f3e4cab7fa64b5890fda1483bc73ac277636f001ec933bf514c926267ef68fb",
+    "publisher-test-password-setup-requirements.txt": "7cef1a29f54c1657bb1174a5ab9b923c0a55d43e44cbfb2181c284346a7860a9",
+    "publisher-test-password-setup-cp314-linux-x86_64.lock": "00b8671deb2339aea88940f3b4235a5145898a619a5ac62a8e407de82b166fa5"
+  },
+  "failedSourceCommit": "ad60f34d2a48e43492c8bf96ada5e5f65b8081cc",
+  "failedSourceManifest": {
+    "publisher_test_auto_setup.py": "c859d4413eb2b50f7aae04e1d28eb23961989eb64beb29cb751eb65f06a8bfc0",
+    "publisher_test_password_setup.py": "12bf995f8327e93163c803d0eb8f643fb316ce909b3c6094b2c9f44efc4c0f60",
+    "publisher-test-password-setup-requirements.txt": "7cef1a29f54c1657bb1174a5ab9b923c0a55d43e44cbfb2181c284346a7860a9",
+    "publisher-test-password-setup-cp314-linux-x86_64.lock": "00b8671deb2339aea88940f3b4235a5145898a619a5ac62a8e407de82b166fa5"
+  },
+  "reconciliationCommentId": 6230532439,
+  "baselineSha256": "cb60f0aab88dd3f23560ad14e2d4849a8ed7abc8dab0e437ba263fa217356e6c",
+  "caSha256": "9481fcd95f41b221f02f14d896535fe500bec539bc563c4cdca1acee483a8bdd",
+  "neonSha256": "e90831b13bfcf75df8d7322617965022508d28b0b8116530992c2a5db776371a",
+  "ghSha256": "553949e2efa12842771efe6012aa4de21f1d591530ec17fc435f610f10e017ee",
+  "marker": {
+    "st_dev": 45,
+    "st_ino": 1459594,
+    "st_uid": 1000,
+    "st_mode": 33152,
+    "st_nlink": 1,
+    "st_size": 53,
+    "st_mtime_ns": 1792072748768051717,
+    "st_ctime_ns": 1792072748768051717
+  },
+  "expectedFinalStatus": "OWNER_RECOVERY_ARCHIVED_NO_SETUP_AUTHORIZED",
+  "requiredOuterExit": 0,
+  "approvalCommentId": null,
+  "runtimeRecoveryAuthorized": false,
+  "setupAuthorized": false,
+  "remainingPrerequisites": [
+    "Review exact trusted-session invocation before execution; source review alone is not launcher review.",
+    "Establish trusted runtime/installed dependency provenance; current check is metadata/origin only.",
+    "Authenticate concrete owner approval for this exact archive action; bind approved scope, arguments and manifests.",
+    "Maintain fresh exclusive owner/source window; verify canonical marker paths and exact identity.",
+    "Generate one operation/window identifier and max-five-minute deadline only for the approved invocation.",
+    "Bootstrap-verify wrapper before import; invoke reviewed wrapper once in isolated CPython3.14.2.",
+    "Require fresh in-wrapper provider/DB/provider reconciliation; historical PASS is not sufficient.",
+    "On any uncertain status, stop and reconcile read-only; do not retry or repair."
+  ],
+  "effect": "Preserve existing marker inode and evidence in exclusive owner-only archive; no deletion, credentials, role mutation, setup or trading.",
+  "failedManifestVerification": "4_OF_4_MATCH_IMMUTABLE_COMMIT_READ_20261017"
+}
