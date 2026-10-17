@@ -1,5 +1,13 @@
 # Proposed one-attempt publisher database check
 
+> **Current preparation update — 2026-10-17:** TEST credential setup completed
+> in receipt6232054311; owner setup approval6231898914 is consumed. Roles remain
+> NOLOGIN. Follow [the commissioning proposal](PUBLISHER_TEST_COMMISSIONING_20261017.md)
+> for the next source preparation, exact pins and missing private inspection/
+> activation helper. LOGIN, workflow installation and dispatch remain unapproved.
+> Statements below about unprovisioned credentials are historical; the bounded
+> readiness contract and separate execution gates remain applicable.
+
 Operation: `M11-READINESS-ENTRYPOINT-20261014`. This is a source-only execution
 proposal, not permission to provision credentials, install a workflow, connect
 to the database, publish a comment, or activate trading. No dedicated role
