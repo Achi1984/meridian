@@ -202,7 +202,10 @@ class Tests(unittest.TestCase):
     def test_resource_hash_override_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             baseline = Path(directory) / 'baseline.json'
-            baseline.write_bytes(b'known synthetic baseline')
+            # Exercise the digest override, independently of the host umask/ACL.
+            fd = os.open(baseline, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, 'wb') as output:
+                output.write(b'known synthetic baseline')
             args = SimpleNamespace(baseline=baseline, ca_sha256='wrong')
             pins = dict(m.RESOURCE_PINS, baseline=hashlib.sha256(baseline.read_bytes()).hexdigest())
             with patch.object(m, 'RESOURCE_PINS', pins):
