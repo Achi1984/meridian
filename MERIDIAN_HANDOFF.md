@@ -1,6 +1,59 @@
 # MERIDIAN HANDOFF
 
-## Current source and runtime checkpoint after PR843 — 2026-10-17
+## Current source and runtime checkpoint after PR845 — complete
+
+Operation HANDOFF-845-CONSOLIDATE-20261017-01. Verified source main:
+`1406845c8728a75652e10cd29c999494745c9034` (#845). Build **10.0-r129**.
+This continuity candidate supersedes prior operational summaries. PR845 is
+merged and COMPLETE; all four postchecks succeeded. Its own publication SHA
+is not yet known. No runtime authorization is inferred.
+
+- Prior consolidated handoff PR840 merged at
+  `d5112c6f4a135847bc8b080fa402dfc46bc9a487`; final receipt639/6232870009
+  COMPLETE. Safety39025397209, Smoke39025397222, Coordinator39025397213 and
+  Pages39025396725 all SUCCESS.
+- PR844 is merged and COMPLETE. All postchecks succeeded:
+  39026385381, 39026385395, 39026385451 and 39026385137.
+  The disposable local PostgreSQL16 fixture harness has real PG16 evidence
+  (receipt6232998743). Its private Unix socket cluster is separate from Neon;
+  catalog comparison and seven rollback-isolated negative cases are fixture
+  evidence, not deployed-database equivalence or full trigger semantics.
+- PR845 exact head `d6ee312ee4f46675a0ed412875d5aa083cc8c6e7`, base
+  `92f9041397ab48c261a433ae76f380e3a154d598`, extends the shipped read-only
+  inspector with stable internal foreign-key trigger identities and enabled/
+  deferrability validation. It keeps hashed observations and explicit false
+  schema-equivalence/activation flags. The harness now requires the disabled
+  internal-FK negative to alter the shipped inspector inventory itself.
+  Actual CPython3.14 tests passed19 inspector +20 harness; actual PostgreSQL16.15
+  rejected all seven negative cases (receipt6233051417). Report SHA256:
+  `a4084529a4c35d3e1275d5acf17639f1257f9fa40fc4aa78ef07dde5d5ee8896`.
+  Cleanup inventory was empty (`[]`, receipt6233062084).
+  Source review Mailbox639/comment6233053484 and runtime-evidence supplement
+  6233072717 together returned final GREEN, closing request6233070622. Merge
+  intent6233088291 preceded merge `1406845c8728a75652e10cd29c999494745c9034`.
+  All postchecks SUCCESS: Safety39026876826, Smoke39026876821,
+  Coordinator39026876861 and Pages39026876340. Final receipt6233127412 COMPLETE.
+- Publisher setup remains PREPARED_NOLOGIN. The one-shot approval6231898914
+  was consumed by the successful setup; completion6232054311 and corrected
+  archive evidence6232007999 remain authoritative. No setup/recovery replay.
+  Source merges and local fixture tests do not authorize LOGIN, credential
+  rotation, workflow installation, dispatch, publication, trading or closure.
+- Working method remains `docs/autonomy/AGENT_EFFICIENCY.md`: large bounded
+  packages, bounded implementation subagents and the existing GitHub reviewer/CI
+  within their permissions, exact evidence reuse and consolidated handoffs. Mandatory independent review and exact-head gates stay.
+- Next: publish this consolidated continuity packet on the actual
+  verified main with its own CI/review. Gate A remains incomplete: application
+  triggers/functions/columns/constraints are still hashed observations without
+  reference comparison. Next coherent source package: pinned fixture reference
+  manifest plus strict inspector comparator; then all seven negative cases
+  through that comparator in the private PG16 cluster; then an exact, separately
+  reviewed/owner-approved read-only launch packet for deployed schema/grants.
+  Avoid an observation-only credential-bearing run that would need repetition.
+  The narrow target claim is pinned publisher fixture catalog match; universal
+  schema equivalence and activation remain false. Gates B-D retain separate
+  authorization. Local fixture success is not live-runtime readiness.
+
+## Historical source and runtime checkpoint after PR843 — superseded
 
 Operation HANDOFF-840-REBASE-20261017-02. Verified source main:
 `be757e076aac3e43dcc3bd03c4387c0550098d74` (#843). Build **10.0-r129**.
