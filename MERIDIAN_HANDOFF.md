@@ -1,6 +1,54 @@
 # MERIDIAN HANDOFF
 
-## Current source completion and runtime evidence — 2026-10-17
+## Current source and runtime checkpoint — 2026-10-17
+
+Operation HANDOFF-837-PREPARE-20261017-01. Verified source main:
+`61b2f00461ecb6b560fc454decce0ca83f62b06c` (#836). Build **10.0-r129**.
+This section supersedes older operational summaries below. This handoff
+candidate has no claimed publication SHA.
+
+- PR836 merged from head `41440ce5a724d885c0e953a4d571eb194529cc55` and base
+  `c1740225b9682534cf1fdaa0128053604e4b86da`. Combined full nine-file independent
+  GREEN_LIGHT reviews6230966533 and6231035458. Exact-head hosted Release Safety
+  39011628028/job117335191215 passed2571 tests, zero fail/cancelled/skipped.
+  FINAL_MERGE_STATUS6231062545 COMPLETE. All required postchecks succeeded:
+  Release39012695229, Runtime39012695196, Coordinator39012695212,
+  Pages39012694761. Skipped mailbox runs are not counted.
+  Local full-suite browser attempts were incomplete, not local green; successful
+  hosted browser acceptance is separate evidence on the exact source tree.
+- The merged JSON loader diagnostic retains its strict numeric failure:
+  1390 of16000 OHLCV cells differ; all3200 rows preserved. Eight isolated Python
+  contract tests passed. No tolerance was widened or strategy executed.
+- The current four-file Feather candidate is locally independently reviewed,
+  not merged:9 tests passed; actual unmodified upstream store/raw/public load
+  preserved3200 rows and16000 binary64 OHLCV values exactly, with16 observed
+  primary Arrow calls and0 fallback. This proves exact input-format parity only.
+  Reproduction on the integrated candidate returned exit0 and byte-identical
+  report/completion manifest; all five JSON dependencies remained byte-identical.
+  JSON failure remains valid; no signal/accounting/performance parity or strategy
+  profitability is established. The candidate requires its own exact-head gates.
+- Recovery remains complete (6230893412), final
+  OWNER_RECOVERY_ARCHIVED_NO_SETUP_AUTHORIZED and observed outer exit0.
+  Independent archive inspection passed for operation
+  `7bb75d21315ee2bd4b5acd895f9c556e`. Approval6230643903 is consumed; never replay.
+  Provenance6230854680 is corroborated managed-platform origin, not exhaustive
+  interpreter/stdlib/OS byte attestation. No subsequent setup has executed.
+- Subsequent TEST setup scope and exact launch are documentation proposals only.
+  Separate owner approval, source gates and fresh operational checks remain
+  required. The plan preserves NOLOGIN and accounts for new secret metadata,
+  a new attempt marker and the unchanged prior archive; it claims no secret-value
+  equality, login success or operational readiness.
+
+Priority remains roadmap831: publisher operational -> first proven autonomous
+development cycle -> controlled sustained operation. ChatGPT leads bounded agent
+assignments, integration and delegated merges; exact-head/base CI, full independent
+review and postmerge gates remain. Mailbox639. CV2 stays SOURCE_AUDIT/all seven
+flags false; no trading or strategy promotion is authorized.
+NEXT: publish the Feather plus continuity candidate for its own exact-head CI
+and full independent review. Review the concrete TEST setup proposal separately;
+setup execution requires separate owner approval.
+
+## Historical source/runtime snapshot after PR835 — superseded
 
 Operation HANDOFF-835-CONTINUITY-20261017-01. Verified source main:
 `c1740225b9682534cf1fdaa0128053604e4b86da` (#835). Build **10.0-r129**.

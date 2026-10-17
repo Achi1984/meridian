@@ -1,0 +1,272 @@
+{
+  "arenaInputSha256": "decf35415605bda739d08e9ac489951c21f5428d6b5f6362bd6e77abf265c473",
+  "autoPromotion": false,
+  "dependencyLockSha256": "3ef85cd792e551893f45e77db1c0d24654cbadec7d8c7cf13b54ddc669a7cd02",
+  "files": [
+    {
+      "filename": "AVAX_USD-1d.feather",
+      "pair": "AVAX/USD",
+      "rows": 400,
+      "sha256": "b68205964fb4501208b894f44a9c70a05b5e91caf4b50204531bbbf73998c30a"
+    },
+    {
+      "filename": "BTC_USD-1d.feather",
+      "pair": "BTC/USD",
+      "rows": 400,
+      "sha256": "f168b50a69d61da16b86eba283b633a593d1e1c441625da09176e914ccbcd45e"
+    },
+    {
+      "filename": "ETH_USD-1d.feather",
+      "pair": "ETH/USD",
+      "rows": 400,
+      "sha256": "30d284bc905a23f0bd9e5b08c39ede119a9363078a2b773da3d864400ebf96ab"
+    },
+    {
+      "filename": "HBAR_USD-1d.feather",
+      "pair": "HBAR/USD",
+      "rows": 400,
+      "sha256": "aec11f344705d3d70c5b1a31c33b0702978f858ed14aa23cde3a56a3aa645c18"
+    },
+    {
+      "filename": "LINK_USD-1d.feather",
+      "pair": "LINK/USD",
+      "rows": 400,
+      "sha256": "47b79f781ed1b272c6cbdeffc873e6d87bf5de24a7eea13023af37f832bc3eb9"
+    },
+    {
+      "filename": "SOL_USD-1d.feather",
+      "pair": "SOL/USD",
+      "rows": 400,
+      "sha256": "d9f4a2735d5bd647c2f2925179683b591a1d2960e9b53b5b9246612a9d44826e"
+    },
+    {
+      "filename": "SUI_USD-1d.feather",
+      "pair": "SUI/USD",
+      "rows": 400,
+      "sha256": "011355bff06807f975fe72915da968c78b8ce71c9a8ea200115bc16ff7a7c49d"
+    },
+    {
+      "filename": "XRP_USD-1d.feather",
+      "pair": "XRP/USD",
+      "rows": 400,
+      "sha256": "94ca33ad4d84f2b64bbc0f42d3a9168933c42d9eed238dd09cc2640b105b84be"
+    }
+  ],
+  "firstExecutionTime": 1774828800000,
+  "format": "feather",
+  "freqtradeCommit": "1f394eaebc2f46a83d26971388628707802f8602",
+  "inputDecoder": "CPYTHON_STDLIB_JSON",
+  "jsonLoaderResultSuperseded": false,
+  "jsonVerifierSha256": "2583177c7d0cea5d6bb23cb361269c3cf42c92ab0bb87e945e6e00e262f17dd5",
+  "liveAuthorized": false,
+  "performanceParityEstablished": false,
+  "python": "3.12.14",
+  "results": {
+    "AVAX/USD": {
+      "public": {
+        "binary64MismatchCount": 0,
+        "examples": [],
+        "maxAbsoluteDifference": 0.0,
+        "numericMismatchCount": 0,
+        "rows": 400
+      },
+      "publicEqualsRaw": true,
+      "publicPath": {
+        "arrowDatasetCalls": 1,
+        "featherFallbackCalls": 0
+      },
+      "raw": {
+        "binary64MismatchCount": 0,
+        "examples": [],
+        "maxAbsoluteDifference": 0.0,
+        "numericMismatchCount": 0,
+        "rows": 400
+      },
+      "rawPath": {
+        "arrowDatasetCalls": 1,
+        "featherFallbackCalls": 0
+      }
+    },
+    "BTC/USD": {
+      "public": {
+        "binary64MismatchCount": 0,
+        "examples": [],
+        "maxAbsoluteDifference": 0.0,
+        "numericMismatchCount": 0,
+        "rows": 400
+      },
+      "publicEqualsRaw": true,
+      "publicPath": {
+        "arrowDatasetCalls": 1,
+        "featherFallbackCalls": 0
+      },
+      "raw": {
+        "binary64MismatchCount": 0,
+        "examples": [],
+        "maxAbsoluteDifference": 0.0,
+        "numericMismatchCount": 0,
+        "rows": 400
+      },
+      "rawPath": {
+        "arrowDatasetCalls": 1,
+        "featherFallbackCalls": 0
+      }
+    },
+    "ETH/USD": {
+      "public": {
+        "binary64MismatchCount": 0,
+        "examples": [],
+        "maxAbsoluteDifference": 0.0,
+        "numericMismatchCount": 0,
+        "rows": 400
+      },
+      "publicEqualsRaw": true,
+      "publicPath": {
+        "arrowDatasetCalls": 1,
+        "featherFallbackCalls": 0
+      },
+      "raw": {
+        "binary64MismatchCount": 0,
+        "examples": [],
+        "maxAbsoluteDifference": 0.0,
+        "numericMismatchCount": 0,
+        "rows": 400
+      },
+      "rawPath": {
+        "arrowDatasetCalls": 1,
+        "featherFallbackCalls": 0
+      }
+    },
+    "HBAR/USD": {
+      "public": {
+        "binary64MismatchCount": 0,
+        "examples": [],
+        "maxAbsoluteDifference": 0.0,
+        "numericMismatchCount": 0,
+        "rows": 400
+      },
+      "publicEqualsRaw": true,
+      "publicPath": {
+        "arrowDatasetCalls": 1,
+        "featherFallbackCalls": 0
+      },
+      "raw": {
+        "binary64MismatchCount": 0,
+        "examples": [],
+        "maxAbsoluteDifference": 0.0,
+        "numericMismatchCount": 0,
+        "rows": 400
+      },
+      "rawPath": {
+        "arrowDatasetCalls": 1,
+        "featherFallbackCalls": 0
+      }
+    },
+    "LINK/USD": {
+      "public": {
+        "binary64MismatchCount": 0,
+        "examples": [],
+        "maxAbsoluteDifference": 0.0,
+        "numericMismatchCount": 0,
+        "rows": 400
+      },
+      "publicEqualsRaw": true,
+      "publicPath": {
+        "arrowDatasetCalls": 1,
+        "featherFallbackCalls": 0
+      },
+      "raw": {
+        "binary64MismatchCount": 0,
+        "examples": [],
+        "maxAbsoluteDifference": 0.0,
+        "numericMismatchCount": 0,
+        "rows": 400
+      },
+      "rawPath": {
+        "arrowDatasetCalls": 1,
+        "featherFallbackCalls": 0
+      }
+    },
+    "SOL/USD": {
+      "public": {
+        "binary64MismatchCount": 0,
+        "examples": [],
+        "maxAbsoluteDifference": 0.0,
+        "numericMismatchCount": 0,
+        "rows": 400
+      },
+      "publicEqualsRaw": true,
+      "publicPath": {
+        "arrowDatasetCalls": 1,
+        "featherFallbackCalls": 0
+      },
+      "raw": {
+        "binary64MismatchCount": 0,
+        "examples": [],
+        "maxAbsoluteDifference": 0.0,
+        "numericMismatchCount": 0,
+        "rows": 400
+      },
+      "rawPath": {
+        "arrowDatasetCalls": 1,
+        "featherFallbackCalls": 0
+      }
+    },
+    "SUI/USD": {
+      "public": {
+        "binary64MismatchCount": 0,
+        "examples": [],
+        "maxAbsoluteDifference": 0.0,
+        "numericMismatchCount": 0,
+        "rows": 400
+      },
+      "publicEqualsRaw": true,
+      "publicPath": {
+        "arrowDatasetCalls": 1,
+        "featherFallbackCalls": 0
+      },
+      "raw": {
+        "binary64MismatchCount": 0,
+        "examples": [],
+        "maxAbsoluteDifference": 0.0,
+        "numericMismatchCount": 0,
+        "rows": 400
+      },
+      "rawPath": {
+        "arrowDatasetCalls": 1,
+        "featherFallbackCalls": 0
+      }
+    },
+    "XRP/USD": {
+      "public": {
+        "binary64MismatchCount": 0,
+        "examples": [],
+        "maxAbsoluteDifference": 0.0,
+        "numericMismatchCount": 0,
+        "rows": 400
+      },
+      "publicEqualsRaw": true,
+      "publicPath": {
+        "arrowDatasetCalls": 1,
+        "featherFallbackCalls": 0
+      },
+      "raw": {
+        "binary64MismatchCount": 0,
+        "examples": [],
+        "maxAbsoluteDifference": 0.0,
+        "numericMismatchCount": 0,
+        "rows": 400
+      },
+      "rawPath": {
+        "arrowDatasetCalls": 1,
+        "featherFallbackCalls": 0
+      }
+    }
+  },
+  "schemaVersion": "MERIDIAN_FREQTRADE_FEATHER_DIAGNOSTIC_V1",
+  "sourceManifestSha256": "5aa35d41d585c5b866b6d46ec1f5868e840dd3dfaa5e227ddbdb6537b172bc66",
+  "status": "EXACT_FEATHER_INPUT_PARITY_ONLY",
+  "strategyExecuted": false,
+  "tolerance": 0,
+  "warmupBars": 200
+}

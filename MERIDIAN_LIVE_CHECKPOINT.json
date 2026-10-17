@@ -93,24 +93,36 @@
     "policyProposalCommentId": 6096562356,
     "protocol": "STREAM-SAFE-V8"
   },
-  "lastSeenCommentId": 6230822828,
+  "lastSeenCommentId": 6231062545,
   "quickCommand": "Go Meridian",
   "bootstrapFile": "MERIDIAN_GO.md",
   "currentWork": {
     "updatedAt": "2026-10-17",
-    "verifiedSourceMain": "c1740225b9682534cf1fdaa0128053604e4b86da",
+    "verifiedSourceMain": "61b2f00461ecb6b560fc454decce0ca83f62b06c",
     "lastCompletedSourceMerge": {
-      "pr": 835,
-      "mergeSha": "c1740225b9682534cf1fdaa0128053604e4b86da",
-      "reviewCommentId": 6230801877,
-      "finalMergeCommentId": 6230822828,
+      "pr": 836,
+      "mergeSha": "61b2f00461ecb6b560fc454decce0ca83f62b06c",
+      "reviewedHead": "41440ce5a724d885c0e953a4d571eb194529cc55",
+      "reviewedBase": "c1740225b9682534cf1fdaa0128053604e4b86da",
+      "reviewCommentIds": [
+        6230966533,
+        6231035458
+      ],
+      "sourceCiRun": 39011628028,
+      "sourceCiJob": 117335191215,
+      "sourceCiTests": {
+        "passed": 2571,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      "finalMergeCommentId": 6231062545,
       "postMergeChecks": "VERIFIED_SUCCESS",
       "postMergeRunIds": {
-        "releaseSafety": 39011004056,
-        "runtimeSmoke": 39011003935,
-        "releaseCoordinator": 39011003957,
-        "pages": 39011003549,
-        "assetWatchMirror": 39011028345
+        "releaseSafety": 39012695229,
+        "runtimeSmoke": 39012695196,
+        "releaseCoordinator": 39012695212,
+        "pages": 39012694761
       }
     },
     "lastCompletedHandoffRefresh": {
@@ -125,8 +137,8 @@
         "pages": 39009496870
       }
     },
-    "package": "HANDOFF_835_SOURCE_COMPLETION_AND_RUNTIME_EVIDENCE",
-    "state": "SOURCE835_COMPLETE_RECOVERY_ARCHIVED_VERIFIED_SETUP_NOT_EXECUTED",
+    "package": "CONTINUITY_AFTER_836_AND_FEATHER_SETUP_CANDIDATES",
+    "state": "PR836_COMPLETE_RECOVERY_COMPLETE_FEATHER_CONTINUITY_CANDIDATE_SETUP_NOT_EXECUTED",
     "infrastructurePaused": true,
     "mailboxRollover": {
       "from": 571,
@@ -238,7 +250,7 @@
         "authorizedReproductionBudget": "UNKNOWN"
       }
     },
-    "nextStep": "RECOVERY_COMPLETE_DO_NOT_REPLAY; PREPARE_CONCRETE_SETUP_SCOPE_FOR_SEPARATE_OWNER_APPROVAL",
+    "nextStep": "PUBLISH_FEATHER_CONTINUITY_CANDIDATE_FOR_OWN_GATES; REVIEW_SETUP_PROPOSAL_SEPARATELY_BEFORE_OWNER_APPROVAL",
     "ownerPathInspection": {
       "pr": 828,
       "mergeSha": "bfebd17ddfa1d2d3b44a15126e28618a82cb81f2",
@@ -259,10 +271,11 @@
       },
       "runtimeCaller": "ABSENT",
       "runtimeRecoveryAuthorized": false,
-      "setupAuthorized": false
+      "setupAuthorized": false,
+      "evidenceScope": "HISTORICAL_SOURCE_SNAPSHOT_SUPERSEDED_BY_RUNTIME_RECOVERY_20261017"
     },
     "publisherNextStep": "RECOVERY_COMPLETE_DO_NOT_REPLAY; PREPARE_CONCRETE_SETUP_SCOPE_FOR_SEPARATE_OWNER_APPROVAL",
-    "strategyNextStep": "FREQTRADE_LOADER_DIAGNOSTIC_LOCAL_REVIEW_COMPLETE_STRICT_PARITY_FAIL; PUBLISH_EXACT_HEAD_CI_AND_INDEPENDENT_REVIEW_BEFORE_MERGE; NO_STRATEGY_EXECUTION",
+    "strategyNextStep": "PR836_COMPLETE; PUBLISH_FEATHER_CONTINUITY_CANDIDATE_FOR_OWN_EXACT_HEAD_CI_AND_FULL_REVIEW; NO_STRATEGY_EXECUTION",
     "completion20261017": {
       "verifiedMain": "8691381510039e2ad48b863ea5e66d6ad6cba462",
       "arenaMerge": "ed60066fc58b4d60eddd727c24cae61c368720bb",
@@ -279,7 +292,8 @@
       ],
       "runtimeCaller": "ABSENT",
       "runtimeRecoveryAuthorized": false,
-      "setupAuthorized": false
+      "setupAuthorized": false,
+      "evidenceScope": "HISTORICAL_SOURCE_SNAPSHOT_SUPERSEDED_BY_RUNTIME_RECOVERY_20261017"
     },
     "workingModel": {
       "ownerAt": "2026-10-17T07:04:42+02:00",
@@ -505,7 +519,8 @@
       "dataRows": 3200,
       "comparisonExecuted": false,
       "performanceParityEstablished": false,
-      "scopeIssue": 832
+      "scopeIssue": 832,
+      "evidenceScope": "EXPORT_BRIDGE_SNAPSHOT_NO_STRATEGY_COMPARISON; LOADER_COMPARISONS_TRACKED_SEPARATELY"
     },
     "publicationSha": null,
     "recoveryInvocation835": {
@@ -565,7 +580,7 @@
       "nextSetupRequiresSeparateConcreteApproval": true
     },
     "freqtradeLoaderDiagnostic": {
-      "state": "LOCAL_REVIEW_COMPLETE_NOT_PUBLISHED_OR_MERGED",
+      "state": "MERGED836_ALL_POSTCHECKS_SUCCESS_STRICT_NUMERIC_PARITY_FAILED",
       "sourceCommit": "1f394eaebc2f46a83d26971388628707802f8602",
       "rowsPreserved": 3200,
       "numericMismatchCells": 1390,
@@ -580,6 +595,38 @@
       "contractTestsPassed": 8,
       "strategyExecuted": false,
       "performanceParityEstablished": false
+    },
+    "pendingContinuationDraft": {
+      "operationId": "HANDOFF-837-PREPARE-20261017-01",
+      "state": "PR836_COMPLETE_FEATHER_CONTINUITY_CANDIDATE_PENDING_OWN_CI_AND_REVIEW",
+      "publicationSha": null,
+      "pr836MergeClaimed": true,
+      "featherDiagnostic": {
+        "state": "LOCAL_INDEPENDENT_REVIEW_COMPLETE_NOT_PUBLISHED_OR_MERGED",
+        "testsPassed": 9,
+        "rows": 3200,
+        "binary64Values": 16000,
+        "binary64Mismatches": 0,
+        "observedPrimaryArrowCalls": 16,
+        "observedFallbackCalls": 0,
+        "evidenceScope": "EXACT_INPUT_FORMAT_PARITY_ONLY",
+        "jsonFailureSuperseded": false,
+        "strategyExecuted": false,
+        "performanceParityEstablished": false,
+        "integratedReproduction": {
+          "outerExit": 0,
+          "reportAndCompletionManifestByteIdentical": true,
+          "fiveJsonDependencyFilesByteIdentical": true,
+          "testsPassed": 9,
+          "nodeExporterTestsPassed": 7,
+          "frozenResearchFilesUnchanged": 140
+        }
+      },
+      "subsequentSetup": {
+        "state": "DOCUMENTATION_PROPOSAL_NOT_EXECUTED",
+        "setupAuthorized": false,
+        "requiresSeparateOwnerApproval": true
+      }
     }
   }
 }
