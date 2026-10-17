@@ -1,6 +1,52 @@
 # GO MERIDIAN — durable resume checkpoint
 
-## Current source and runtime checkpoint after PR837 — 2026-10-17
+## Current source and runtime checkpoint after PR838 — 2026-10-17
+
+Operation HANDOFF-839-PREPARE-20261017-01. Verified source main:
+`f7d3f09c786dc85d1bb11c9a3233a6f1abd08cff` (#838). Build **10.0-r129**.
+This section supersedes older operational summaries below. The next eight-file
+candidate combines four Feather evidence-consistency files and four continuity
+files; its publication SHA and new hosted CI result are not yet established.
+
+- PR838 source proposal merged from head
+  `45720cfe366e8de4d9db4907f48cb817a5439b7e`, base
+  `0ff8667a5fab5df7634d81f677160c42a4dfe5ee`. Full six-file source-only
+  GREEN_LIGHT6231388398; exact-head Release Safety39014393621,
+  job117343371225:2571 pass. FINAL_MERGE_STATUS6231435476;
+  all four postchecks succeeded: Release39015392147, Runtime39015392217,
+  Pages39015391836 and Coordinator39015392112. PR838 source packet complete.
+- The merged TEST setup documents are proposals, not runtime readiness or approval.
+  Approval remains null, setupAuthorized false, setup not executed. Relevant
+  real-toolchain launch review remains outstanding before a separate concrete
+  owner approval and fresh operational gates. The earlier31 recovery fixture
+  tests do not prove the new setup launch. Recovery6230893412 is complete,
+  approval6230643903 consumed; never replay or remove its archive.
+- Feather837 establishes exact input-format parity only:3200 rows and16000
+  binary64 values, zero mismatch,16 primary Arrow calls and0 fallback. JSON836
+  remains a strict1390-cell numeric failure. No strategy, signal/accounting or
+  performance parity, holdout, profitability or promotion is established.
+- The prospective four-file evidence-consistency packet is local evidence only:
+  six Node checks passed, nine isolated Python tests passed, genuine upstream
+  reproduction exited0 with byte-identical report. The generated report adds
+  only its producer source hash; previous data results remain unchanged.
+  Static checks bind stored claims to current source/lock/input manifest and
+  preserve JSON failure. They cannot prove execution or verify unavailable
+  Feather binary bytes; output hashes receive syntax/association checks only.
+  No full hosted CI or merge is claimed for this new candidate.
+
+Priority remains roadmap831: publisher operational -> first proven autonomous
+development cycle -> controlled sustained operation. ChatGPT leads bounded agents,
+integration and delegated merges. Mailbox639; exact-head/base CI, full independent
+review and postmerge gates remain. CV2 SOURCE_AUDIT/all seven flags false, r129
+unchanged; no trading or activation is authorized.
+Runtime access is currently blocked by an Apple identity-verification generic
+error. The targeted72 tests have not executed; setup has not executed. This
+authentication blocker is separate from the completed source review and CI.
+NEXT: publish the evidence-consistency/continuity candidate for its own exact-head
+CI and full review. Restore the authorized session and complete the separate setup
+launch evidence and review before requesting concrete execution approval.
+
+## Historical checkpoint after PR837 — superseded
 
 Operation HANDOFF-838-PREPARE-20261017-01. Verified source main:
 `0ff8667a5fab5df7634d81f677160c42a4dfe5ee` (#837). Build **10.0-r129**.

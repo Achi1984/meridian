@@ -2,6 +2,7 @@
   "arenaInputSha256": "decf35415605bda739d08e9ac489951c21f5428d6b5f6362bd6e77abf265c473",
   "autoPromotion": false,
   "dependencyLockSha256": "3ef85cd792e551893f45e77db1c0d24654cbadec7d8c7cf13b54ddc669a7cd02",
+  "featherVerifierSha256": "7969ac17086aa1c911a7dfedeaa7daca45fbd114a92e6eabe7a859483f7502e4",
   "files": [
     {
       "filename": "AVAX_USD-1d.feather",

@@ -112,6 +112,7 @@ def compare(checkout, data, out, lock):
         'freqtradeCommit': base.COMMIT, 'python': platform.python_version(),
         'dependencyLockSha256': base.digest(lock), 'sourceManifestSha256': base.MANIFEST_SHA256,
         'jsonVerifierSha256': base.digest(HERE / 'verify-freqtrade-loader.py'),
+        'featherVerifierSha256': base.digest(Path(__file__).resolve()),
         'arenaInputSha256': manifest['arenaInputSha256'], 'format': 'feather',
         'inputDecoder': 'CPYTHON_STDLIB_JSON', 'tolerance': 0, 'warmupBars': manifest['warmupBars'],
         'firstExecutionTime': manifest['firstExecutionTime'], 'files': files, 'results': results,
