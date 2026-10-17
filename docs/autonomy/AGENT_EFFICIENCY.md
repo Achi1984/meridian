@@ -52,10 +52,15 @@ local elapsed time and job duration are different measurements; label each.
 Actual token usage is unknown unless the provider reports it for the identified
 run. Do not infer tokens from turns or invent euro costs, billing or savings.
 
-Prepare one consolidated handoff per completed merge block; preserve an unpublished
-draft while dependent merges are pending. Refresh it against the resulting main
-and run its own required gates. Keep intermediate receipts in their existing
-locations rather than repeatedly publishing the same continuity files.
+Update MERIDIAN_LIVE_CHECKPOINT.json in the SAME PR whenever that PR changes the
+work state. Describe verified starting evidence and the intended transition;
+never predeclare a merge or postcheck success. A separate consolidated handoff is
+for explicit reconciliation requests, not routine delayed checkpoint maintenance.
+Request review only after completed successful exact-head CI, using the REQUEST
+form also for supplements. A self-reported review gap blocks merge even with GREEN.
+After verified postchecks, post FINAL_MERGE_STATUS PR<n> on the PR and mirror it in
+Mailbox639. Mirror direct owner decisions as RESOLVED with verbatim quote, exact
+scope and consumption state. Preserve single-writer and independent-review gates.
 
 ## Completion report
 
