@@ -506,6 +506,16 @@
       "frozenProtocolSha256": "901f0b7e48f6ecebed344d899ea5c7f5c8404bb465ce5360c54e081dc4e628bf",
       "frozenEngineSha256": "c80fdae96eda45ae8fc3f4ce253db1223639548ccda6b484c1dd093c140aee64"
     },
+    "timeoutDescendantCleanup20261017": {
+      "verifiedStartingMain": "5c996ee9c7d4e71f0d6f2ecd59f6fc53beedcce3",
+      "ownerApprovalCommentId": 6238949509,
+      "ownerPause": "PUBLISHER_REMAINS_PAUSED_EXCEPT_THIS_BOUNDED_REPAIR",
+      "repairPr": 862,
+      "state": "ACTIVE_PENDING_FOCUSED_TESTS_EXACT_HEAD_CI_INDEPENDENT_REVIEW",
+      "dependency": "REPAIR_IS_PREREQUISITE_FOR_PR860_NOT_DEPENDENT_ON_PR860_MERGE",
+      "arena861": "QUEUED",
+      "mergeAuthorized": false
+    },
     "runtimeReconciliation20261017": {
       "opId": "RUNTIME-READONLY-20261017-02",
       "commentId": 6230532439,

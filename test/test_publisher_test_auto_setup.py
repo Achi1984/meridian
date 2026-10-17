@@ -370,6 +370,17 @@ class PrivateCommandTests(unittest.TestCase):
             command.run([sys.executable, '-I', '-c', 'import time; time.sleep(30)'], timeout=0.1)
         self.assertEqual(str(raised.exception), 'command failed')
 
+    def test_command_supervision_does_not_change_callers_subreaper_state(self):
+        import ctypes
+        libc = ctypes.CDLL(None, use_errno=True)
+        before, after = ctypes.c_int(), ctypes.c_int()
+        self.assertEqual(libc.prctl(37, ctypes.byref(before), 0, 0, 0), 0)
+        result = self.m.Command({'PATH': '/usr/bin:/bin'}).run(
+            [sys.executable, '-I', '-c', 'print("bounded")'])
+        self.assertEqual(result, 'bounded\n')
+        self.assertEqual(libc.prctl(37, ctypes.byref(after), 0, 0, 0), 0)
+        self.assertEqual(after.value, before.value)
+
     def test_excess_output_is_rejected_without_raw_output(self):
         command = self.m.Command({'PATH': '/usr/bin:/bin'})
         with self.assertRaises(ValueError) as raised:

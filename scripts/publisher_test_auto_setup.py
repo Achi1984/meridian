@@ -31,6 +31,101 @@ SETUP_OK = 'AUTO_SETUP_PREPARED_NOLOGIN'
 SETUP_FAILED = 'AUTO_SETUP_FAILED_NO_REMOTE_WRITES'
 RECONCILE = 'AUTO_SETUP_RECONCILIATION_REQUIRED'
 
+_COMMAND_SUPERVISOR = r"""
+import ctypes
+import json
+import os
+import selectors
+import signal
+import subprocess
+import sys
+import time
+
+target = None
+output = bytearray()
+failed = False
+
+def stop_target():
+    if target is None:
+        return
+    try:
+        os.killpg(target.pid, signal.SIGKILL)
+    except OSError:
+        pass
+    try:
+        target.wait()
+    except BaseException:
+        pass
+    while True:
+        children_path = '/proc/self/task/{}/children'.format(os.getpid())
+        with open(children_path, encoding='ascii') as children_file:
+            children = [int(pid) for pid in children_file.read().split()]
+        for child in children:
+            try:
+                os.kill(child, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        try:
+            os.waitpid(-1, 0)
+        except ChildProcessError:
+            return
+
+def interrupt(signum, frame):
+    raise KeyboardInterrupt()
+
+signal.signal(signal.SIGTERM, interrupt)
+signal.signal(signal.SIGINT, interrupt)
+try:
+    if sys.platform != 'linux' or ctypes.CDLL(None, use_errno=True).prctl(36, 1, 0, 0, 0) != 0:
+        raise RuntimeError()
+    request = json.loads(sys.argv[1])
+    argv, input_value, timeout = request['argv'], request['input'], request['timeout']
+    target = subprocess.Popen(
+        argv,
+        stdin=subprocess.PIPE if input_value is not None else subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+        close_fds=True,
+    )
+    if input_value is not None:
+        target.stdin.write(input_value.encode('ascii'))
+        target.stdin.close()
+    os.set_blocking(target.stdout.fileno(), False)
+    selector = selectors.DefaultSelector()
+    selector.register(target.stdout, selectors.EVENT_READ)
+    deadline = time.monotonic() + timeout
+    while selector.get_map():
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError()
+        for key, _ in selector.select(min(remaining, 0.1)):
+            part = os.read(key.fd, 65536)
+            if not part:
+                selector.unregister(key.fileobj)
+            else:
+                output.extend(part)
+                if len(output) > 1024 * 1024:
+                    raise ValueError()
+    selector.close()
+    remaining = deadline - time.monotonic()
+    if remaining <= 0 or target.wait(timeout=remaining) != 0:
+        raise RuntimeError()
+except BaseException:
+    failed = True
+finally:
+    stop_target()
+    try:
+        if failed:
+            response = b'\x01'
+        else:
+            response = b'\x00' + output
+        while response:
+            response = response[os.write(1, response):]
+    except BaseException:
+        pass
+"""
+
 
 def validate_uri(value):
     """Return only password; all other connection fields are fixed independently."""
@@ -147,40 +242,20 @@ class Command:
 
     def run(self, argv, input_value=None, timeout=15):
         proc = None
-        selector = selectors.DefaultSelector()
-        output = bytearray()
         try:
-            proc = subprocess.Popen(argv, stdin=subprocess.PIPE if input_value is not None else subprocess.DEVNULL,
-                                    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                                    env=self.environment, start_new_session=True, close_fds=True)
-            if input_value is not None:
-                # Input is at most 257 bytes, smaller than the minimum pipe capacity.
-                proc.stdin.write(input_value.encode('ascii'))
-                proc.stdin.close()
-            os.set_blocking(proc.stdout.fileno(), False)
-            selector.register(proc.stdout, selectors.EVENT_READ)
-            deadline = time.monotonic() + timeout
-            while selector.get_map():
-                remaining = deadline - time.monotonic()
-                if remaining <= 0:
-                    raise ValueError('command deadline')
-                for key, _ in selector.select(min(remaining, 0.1)):
-                    part = os.read(key.fd, 65536)
-                    if not part:
-                        selector.unregister(key.fileobj)
-                    else:
-                        output.extend(part)
-                        if len(output) > 1024 * 1024:
-                            raise ValueError('command output bound')
-            if proc.wait(timeout=max(0.001, deadline - time.monotonic())) != 0:
+            request = json.dumps({'argv': argv, 'input': input_value, 'timeout': timeout})
+            proc = subprocess.Popen([sys.executable, '-I', '-c', _COMMAND_SUPERVISOR, request],
+                                    stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                    stderr=subprocess.DEVNULL, env=self.environment,
+                                    start_new_session=True, close_fds=True)
+            response, _ = proc.communicate()
+            if proc.returncode != 0 or not response or response[0] != 0 or len(response) > 1024 * 1024 + 1:
                 raise ValueError('command')
-            return bytes(output).decode('utf-8', errors='strict')
+            return response[1:].decode('utf-8', errors='strict')
         except BaseException:
             raise ValueError('command failed') from None
         finally:
-            selector.close()
             if proc is not None:
-                # Kill any lingering process-group descendants, including after exit.
                 try:
                     os.killpg(proc.pid, signal.SIGKILL)
                 except OSError:
