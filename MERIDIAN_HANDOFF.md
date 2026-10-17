@@ -1,6 +1,54 @@
 # MERIDIAN HANDOFF
 
-## Current completion and authority — 2026-10-17
+## Current completion and runtime evidence — 2026-10-17
+
+Operation HANDOFF-833-RUNTIME-20261017-01. Verified source main:
+`6473022aebcaf795888cff18ff787bfc392a4107` (#833). Build **10.0-r129**.
+This section supersedes older operational summaries below. The publication SHA
+of this handoff candidate is not claimed before publication/readback.
+
+- Recovery wrapper #830 merged at `d8a12f8dfeb25843d186111094e1cdc1fbb35b0d`.
+  Full-scope Claude GREEN_LIGHT6230151464; all required postchecks succeeded:
+  Release39006876899, Runtime39006876912, Coordinator39006876853,
+  Pages39006876433. FINAL_MERGE_STATUS6230257540. Reviewed source is ready;
+  actual marker recovery and a subsequent setup have NOT been performed.
+- Freqtrade data bridge #833 merged at the source main above. Exact-head
+  CI39008410841:2570PASS0FAIL; full-scope Claude GREEN_LIGHT6230496927.
+  All postchecks succeeded: Release39008848892, Runtime39008848823,
+  Coordinator39008848846, Pages39008848372. FINAL_MERGE_STATUS6230525372.
+  Eight assets x400 saved daily candles exported with retained source volume.
+  This is data preparation only: Freqtrade execution, signal/accounting parity,
+  fresh holdout, forward evidence and strategy profitability remain unproven.
+- Current runtime evidence: issue829/comment6230532439,
+  RUNTIME-READONLY-20261017-02. Existing pinned reconciliation runner invoked
+  once in the existing Codespace. Observed RECONCILE_READ_ONLY_CHECKS_PASSED
+  and outer RECONCILE_EXIT=0; post-check marker unchanged. Provider -> supervised
+  read-only DB -> provider checks passed at this point in time. No recovery,
+  setup, role/credential mutation or marker change. Hashes and package metadata
+  are not independent attestation of the entire installed runtime.
+- Owner moved continuation here at08:04:42+02 and said at08:06:39+02
+  "Wenn dann nur über dich". No separately owner-initiated setup reported;
+  do not turn this into proof that no unrecorded assistant attempt ever occurred.
+- Priority remains roadmap831: publisher operational -> first proven autonomous
+  development cycle -> controlled sustained operation. Close bounded OSS work
+  alongside it; then pinned Freqtrade loader/H1-B signal/accounting comparison.
+  No extra trading frameworks or automatic strategy promotion.
+- Concrete recovery-scope preparation:
+  `docs/autonomy/PUBLISHER_RECOVERY_SCOPE_20261017.json`.
+  It binds reviewed source and historical failed manifests, baseline, CLI/CA
+  pins, marker and proposed action. It is a proposal, not owner approval or an
+  executable/authenticating launcher. Fresh exclusive window, trusted runtime,
+  bootstrap source verification, exact invocation review and separate concrete
+  recovery approval remain required. A later setup requires another approval.
+
+ChatGPT retains owner-delegated merge decisions (6229644994), single-writer,
+exact-head/base CI, full independent review and postmerge gates. Mailbox639.
+CV2 remains SOURCE_AUDIT/all seven flags false; runtime trading is not authorized.
+NEXT: review this handoff/scope packet; prepare and verify the exact short-lived
+recovery invocation, obtain its concrete owner approval, then archive once with
+fresh reconciliation. Never repeat a failed/uncertain action automatically.
+
+## Historical completion snapshot — superseded by current section
 
 Operation: HANDOFF-824-825-20261017-01. Verified source main:
 `bfebd17ddfa1d2d3b44a15126e28618a82cb81f2` (#828). Build **10.0-r129**.
