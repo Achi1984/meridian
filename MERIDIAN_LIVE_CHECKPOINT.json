@@ -98,7 +98,7 @@
   "bootstrapFile": "MERIDIAN_GO.md",
   "currentWork": {
     "updatedAt": "2026-10-17",
-    "verifiedSourceMain": "8691381510039e2ad48b863ea5e66d6ad6cba462",
+    "verifiedSourceMain": "bfebd17ddfa1d2d3b44a15126e28618a82cb81f2",
     "lastCompletedSourceMerge": {
       "pr": 825,
       "mergeSha": "8691381510039e2ad48b863ea5e66d6ad6cba462",
@@ -131,7 +131,7 @@
       }
     },
     "package": "HANDOFF_824_825_AND_RUNTIME_BOUNDARY_PREPARATION",
-    "state": "PR825_SOURCE_COMPLETE_PR824_RETROSPECTIVE_ARENA_PUBLISHED",
+    "state": "READONLY_INSPECTOR828_MERGED_POSTCHECKS_PENDING",
     "infrastructurePaused": true,
     "mailboxRollover": {
       "from": 571,
@@ -236,7 +236,29 @@
         "authorizedReproductionBudget": "UNKNOWN"
       }
     },
-    "nextStep": "COMPLETE_CONTINUITY_REVIEW_AND_PREPARE_SEPARATELY_REVIEWED_RUNTIME_WRAPPER",
+    "nextStep": "VERIFY_PR828_POSTCHECKS_THEN_PR826_REVIEW_AND_SEPARATELY_REVIEWED_RUNTIME_WRAPPER",
+    "ownerPathInspection": {
+      "pr": 828,
+      "mergeSha": "bfebd17ddfa1d2d3b44a15126e28618a82cb81f2",
+      "reviewCommentId": 6229960697,
+      "finalMergeCommentId": 6229980850,
+      "postMergeChecks": "PENDING",
+      "postMergeRunIds": {
+        "releaseSafety": 39005137057,
+        "runtimeSmoke": 39005137096,
+        "releaseCoordinator": 39005137135,
+        "pages": 39005136410
+      },
+      "postMergeSnapshot": {
+        "releaseSafety": "RUNNING",
+        "runtimeSmoke": "RUNNING",
+        "releaseCoordinator": "SUCCESS",
+        "pages": "QUEUED"
+      },
+      "runtimeCaller": "ABSENT",
+      "runtimeRecoveryAuthorized": false,
+      "setupAuthorized": false
+    },
     "publisherNextStep": "PR825_INACTIVE_PRIMITIVE_MERGED; WRAPPER_AND_FRESH_EVIDENCE_REQUIRED; NO_RECOVERY_OR_SETUP_AUTHORIZED",
     "strategyNextStep": "PR824_PUBLISHED_ALL_POSTCHECKS_SUCCESS; RETROSPECTIVE_ONLY_NO_PROMOTION",
     "completion20261017": {

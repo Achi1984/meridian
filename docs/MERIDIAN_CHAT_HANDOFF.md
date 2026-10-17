@@ -3,7 +3,7 @@
 ## Current completion and authority — 2026-10-17
 
 Operation: HANDOFF-824-825-20261017-01. Verified source main:
-`8691381510039e2ad48b863ea5e66d6ad6cba462` (#825). Build **10.0-r129**.
+`bfebd17ddfa1d2d3b44a15126e28618a82cb81f2` (#828). Build **10.0-r129**.
 This section supersedes all older operational summaries below. This handoff
 candidate has no claimed publication SHA.
 
@@ -13,12 +13,15 @@ candidate has no claimed publication SHA.
   Visual39002934147, Orchestration39002934170, Pages39002933046.
   FINAL_MERGE_STATUS6229668839. Retrospective offline diagnostic only;
   no forward/holdout/profitability proof, no runtime orders or auto-promotion.
-- Publisher #825 merged at the verified main above. Full four-file review
+- Publisher #825 merged at `8691381510039e2ad48b863ea5e66d6ad6cba462`. Full four-file review
   6229794718; premerge CI39003151050 succeeded (2561 pass, zero failures).
   Local19 fault tests passed CPython3.14.2 with pinned dependencies.
   FINAL_MERGE_STATUS6229853101. All four postmerge checks succeeded:
   Release39004204488, Runtime39004204504, Pages39004203840;
   Coordinator39004204485. Source packet complete.
+- Read-only owner-path inspector #828 merged at the verified main above.
+  Review6229960697; FINAL_MERGE_STATUS6229980850. Postchecks pending.
+  No production caller, recovery or setup was added.
 - The publisher primitive is inactive: no CLI or production caller.
   A future reviewed wrapper must establish canonical passwd-owner paths,
   authenticated approval/source evidence, fresh exclusivity and provider/DB
@@ -37,7 +40,7 @@ candidate has no claimed publication SHA.
   assignments, integration, quality and merge decisions. Agents implement bounded
   scopes or independently review; single-writer and runtime gates remain intact.
 
-NEXT: complete this continuity review and prepare the separately reviewed
+NEXT: verify #828 postchecks, complete #826 continuity review and prepare the separately reviewed
 runtime wrapper. Concrete recovery and subsequent setup remain separately
 owner-gated. CV2 remains SOURCE_AUDIT with all seven flags false; CRV unresolved.
 Autonomous end-to-end live development remains unproven.
