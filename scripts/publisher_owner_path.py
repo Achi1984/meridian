@@ -1,4 +1,4 @@
-"""Inactive canonical owner-marker inspection; no CLI or production caller.
+"""Canonical owner-directory inspection; no CLI or automatic invocation.
 
 Only passwd supplies the home path. No writes, recovery or setup are performed.
 The returned identity is point-in-time evidence, never approval, exclusivity,
@@ -9,6 +9,7 @@ closed (including a group/world-writable ancestor with the sticky bit).
 import os
 import pwd
 import stat
+from contextlib import contextmanager
 
 from publisher_marker_recovery import inspect_marker
 
@@ -30,8 +31,9 @@ def _check_directory(fd, uid, role='ancestor'):
     return (info.st_dev, info.st_ino)
 
 
-def inspect_owner_marker():
-    """Return the primitive's marker identity, closing every acquired fd.
+@contextmanager
+def open_owner_directory():
+    """Yield canonical directory fd and a reachability recheck; always close.
 
     No target-path argument or environment override is accepted. Ancestors must
     be root/owner-owned and not group/world writable; home must be owner-owned
@@ -67,24 +69,39 @@ def inspect_owner_marker():
             identity = _check_directory(child, uid, role)
             links.append((parent, part, child, identity, role))
             parent = child
-        marker = inspect_marker(parent)
-        _check_directory(root, uid)
-        for parent, name, child, identity, role in links:
-            named = os.stat(name, dir_fd=parent, follow_symlinks=False)
-            if (not stat.S_ISDIR(named.st_mode)
-                    or (named.st_dev, named.st_ino) != identity
-                    or _check_directory(child, uid, role) != identity):
-                raise ValueError('directory identity changed')
-        if inspect_marker(descriptors[-1]) != marker:
-            raise ValueError('marker changed during inspection')
-        return marker
+        def revalidate():
+            current_account = pwd.getpwuid(uid)
+            if (os.getuid() != uid or os.geteuid() != uid
+                    or os.getgid() != os.getegid()
+                    or current_account.pw_uid != uid or current_account.pw_dir != home):
+                raise ValueError('owner identity changed')
+            _check_directory(root, uid)
+            for parent, name, child, identity, role in links:
+                named = os.stat(name, dir_fd=parent, follow_symlinks=False)
+                if (not stat.S_ISDIR(named.st_mode)
+                        or (named.st_dev, named.st_ino) != identity
+                        or _check_directory(child, uid, role) != identity):
+                    raise ValueError('directory identity changed')
+        revalidate()
+        yield descriptors[-1], revalidate
+        revalidate()
     finally:
         # Attempt every close even if one fails; a close error prevents success.
         failure = None
         for fd in reversed(descriptors):
             try:
                 os.close(fd)
-            except OSError as error:
+            except BaseException as error:
                 failure = error
         if failure is not None:
             raise failure
+
+
+def inspect_owner_marker():
+    """Read-only point-in-time identity; no descriptors escape this interface."""
+    with open_owner_directory() as (directory, revalidate):
+        marker = inspect_marker(directory)
+        revalidate()
+        if inspect_marker(directory) != marker:
+            raise ValueError('marker changed during inspection')
+        return marker
