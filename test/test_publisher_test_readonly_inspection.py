@@ -23,6 +23,17 @@ m = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(m)
 AUTO, ORIGINAL, QUERIES = m.load_dependencies()
 CANARY = 'SYNTHETIC_PASSWORD_URI_FUNCTION_CANARY'
+catalog_spec = importlib.util.spec_from_file_location('catalog_test', ROOT / 'scripts/publisher_fixture_catalog.py')
+catalog_module = importlib.util.module_from_spec(catalog_spec)
+catalog_spec.loader.exec_module(catalog_module)
+
+
+def synthetic_catalog():
+    # Explicit in-memory fake for offline fault injection, never a golden file.
+    manifest = {'schemaVersion': 1, 'contract': catalog_module.CONTRACT,
+        'serverVersionNum': 160015, 'inventorySqlSha256': catalog_module.QUERY_SHA256,
+        'fixtureSha256': dict(catalog_module.FIXTURES), 'entries': catalog_module.entries(inventory(), 42)}
+    return catalog_module, catalog_module.validate_manifest(manifest)
 
 
 def internal_rows():
@@ -46,8 +57,8 @@ def inventory():
 
 
 class Cursor:
-    def __init__(self, rows=None, grants=None, temporary=None):
-        self.results = [grants or [], temporary if temporary is not None else
+    def __init__(self, rows=None, grants=None, temporary=None, version_rows=None):
+        self.results = [[(160015,)] if version_rows is None else version_rows, grants or [], temporary if temporary is not None else
                         [(n, True, False) for n in ORIGINAL.ROLES], rows if rows is not None else inventory()]
         self.sql = []
     def execute(self, sql):
@@ -58,7 +69,7 @@ class Cursor:
 
 class Tests(unittest.TestCase):
     def collect(self, cursor):
-        return m.collect(cursor, SimpleNamespace(verify=Mock(), ROLES=ORIGINAL.ROLES), {'owner_oid': 42}, QUERIES)
+        return m.collect(cursor, SimpleNamespace(verify=Mock(), ROLES=ORIGINAL.ROLES), {'owner_oid': 42}, QUERIES, synthetic_catalog())
 
     def test_pins_and_authoritative_sql(self):
         for path, digest in QUERIES['sourceSha256'].items():
@@ -76,7 +87,7 @@ class Tests(unittest.TestCase):
     def test_only_fixed_queries_and_hashed_observation(self):
         cursor = Cursor()
         result = self.collect(cursor)
-        self.assertEqual(cursor.sql, [QUERIES['grantMatrixSql'], QUERIES['temporarySql'], m.INVENTORY_SQL])
+        self.assertEqual(cursor.sql, [m.VERSION_SQL, QUERIES['grantMatrixSql'], QUERIES['temporarySql'], m.INVENTORY_SQL])
         self.assertNotIn(CANARY, json.dumps(result))
         self.assertIs(result['schemaEquivalenceEstablished'], False)
         self.assertIs(result['activationAuthorized'], False)
@@ -85,9 +96,10 @@ class Tests(unittest.TestCase):
         rows = inventory()
         first = self.collect(Cursor(rows=rows))
         rows[3] = (*rows[3][:3], 'DIFFERENT DEFINITION')
-        second = self.collect(Cursor(rows=rows))
-        self.assertNotEqual(first['definitions'], second['definitions'])
-        self.assertFalse(second['schemaEquivalenceEstablished'])
+        self.assertTrue(first['fixtureCatalogMatch'])
+        with self.assertRaises(ValueError):
+            self.collect(Cursor(rows=rows))
+        self.assertFalse(first['schemaEquivalenceEstablished'])
 
     def test_union_identity_is_text_before_catalog_name_branches(self):
         self.assertIn("SELECT 'schema'::text,'meridian_publisher'::text,nspowner,'schema'::text", m.INVENTORY_SQL)
@@ -97,6 +109,40 @@ class Tests(unittest.TestCase):
         self.assertEqual(len(set(names)), 4)
         # PostgreSQL name-width truncation destroys these stable identities.
         self.assertEqual(len(set(n[:63] for n in names)), 2)
+
+    def test_pinned_catalog_loader_verifies_actual_manifest_and_module(self):
+        module, manifest = m.load_catalog()
+        self.assertEqual(len(manifest['entries']), 37)
+        self.assertEqual(manifest['serverVersionNum'], 160015)
+        self.assertEqual(module.QUERY_SHA256, catalog_module.QUERY_SHA256)
+        for name, digest in m.CATALOG_PINS.items():
+            self.assertEqual(hashlib.sha256((ROOT / 'scripts' / name).read_bytes()).hexdigest(), digest)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name in m.CATALOG_PINS:
+                (root / name).write_bytes((ROOT / 'scripts' / name).read_bytes())
+                (root / name).chmod(0o600)
+            for name in m.CATALOG_PINS:
+                target = root / name
+                original_bytes = target.read_bytes()
+                target.write_bytes(original_bytes + b' ')
+                with patch.object(m, 'ROOT', root), patch('builtins.compile', side_effect=AssertionError('must hash both before import')):
+                    with self.assertRaises(ValueError):
+                        m.load_catalog()
+                target.write_bytes(original_bytes)
+
+    def test_collect_rejects_unsupported_or_malformed_actual_version(self):
+        for rows in ([], [(160014,)], [(160015,), (160015,)], [(True,)], [('160015',)], [(160015, 1)]):
+            with self.assertRaises(ValueError):
+                self.collect(Cursor(version_rows=rows))
+
+    def test_collect_cannot_complete_if_production_comparator_rejects(self):
+        module, manifest = synthetic_catalog()
+        with patch.object(module, 'compare_fixture_catalog', side_effect=ValueError('synthetic rejection')) as compare:
+            with self.assertRaises(ValueError):
+                m.collect(Cursor(), SimpleNamespace(verify=Mock(), ROLES=ORIGINAL.ROLES),
+                          {'owner_oid': 42}, QUERIES, (module, manifest))
+            compare.assert_called_once()
 
     def test_internal_fk_inventory_is_stable_and_output_is_hashed(self):
         section = m.INVENTORY_SQL.split("'internal_fk_trigger',", 1)[1].split(" UNION ALL SELECT 'function'", 1)[0]
@@ -219,6 +265,7 @@ class Tests(unittest.TestCase):
         service.base = SimpleNamespace(args=SimpleNamespace(ca=ca, ca_sha256=hashlib.sha256(b'fake').hexdigest()),
                                        baseline={}, admin_password=lambda: CANARY)
         service.auto, service.original, service.queries = AUTO, original, QUERIES
+        service.catalog = (None, None)  # collect is explicitly mocked in this worker boundary test
         with patch.dict(sys.modules, {'psycopg': driver}), patch.object(m, 'collect', return_value={'schemaEquivalenceEstablished': False}):
             result = service.inspect()
         self.assertFalse(connection.commit.called)

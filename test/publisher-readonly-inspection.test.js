@@ -11,6 +11,6 @@ test('publisher read-only inspection: isolated offline fault-injection suite', {
   });
   assert.ifError(run.error);
   assert.equal(run.status,0,`Offline read-only inspection tests failed:\n${run.stdout}\n${run.stderr}`);
-  assert.match(run.stderr,/Ran 20 tests/);
+  assert.match(run.stderr,/Ran 23 tests/);
   assert.match(run.stderr,/\nOK\s*$/);
 });

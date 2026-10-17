@@ -17,6 +17,11 @@ PINS = {
     'publisher_test_password_setup.py': '3f3e4cab7fa64b5890fda1483bc73ac277636f001ec933bf514c926267ef68fb',
     'publisher-test-readonly-queries.json': '99ac288ed3e1dd5681345aa828bed3e129e729a1430f9022ca456622b62e7789',
 }
+CATALOG_PINS = {
+    'publisher_fixture_catalog.py': 'aecca8ba7ea9ae20c848ae8b240cb179389c13a93a5c1ba9d1a20a605e1495c5',
+    'publisher-fixture-catalog-pg16.json': '611ce25904b59473149f5cb8bc69613309b0b8b147df6296defdfecc0ee11274',
+}
+VERSION_SQL = "SELECT pg_catalog.current_setting('server_version_num')::integer"
 OBSERVED = 'READONLY_INSPECTION_COMPLETE_SCHEMA_EQUIVALENCE_NOT_ESTABLISHED'
 FAILED = 'READONLY_INSPECTION_FAILED_STOP'
 _USED = False
@@ -96,18 +101,32 @@ INVENTORY_SQL = """WITH ns AS (
 SELECT kind,name,owner_oid,pg_catalog.left(definition,16385)
 FROM inventory ORDER BY kind,name LIMIT 129"""
 
-def pinned(name):
+def pinned_resource(name, expected_digest):
     fd = os.open(ROOT / name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     try:
         s = os.fstat(fd)
         if not stat.S_ISREG(s.st_mode) or s.st_size > 262144 or s.st_mode & 0o022 or s.st_uid not in (0, os.getuid()):
             raise ValueError('source boundary')
         data = os.read(fd, 262145)
-        if len(data) != s.st_size or hashlib.sha256(data).hexdigest() != PINS[name]:
+        if len(data) != s.st_size or hashlib.sha256(data).hexdigest() != expected_digest:
             raise ValueError('source pin')
         return data
     finally:
         os.close(fd)
+
+def pinned(name):
+    return pinned_resource(name, PINS[name])
+
+
+def load_catalog():
+    captured = {name: pinned_resource(name, expected) for name, expected in CATALOG_PINS.items()}
+    name = 'publisher_fixture_catalog.py'
+    spec = importlib.util.spec_from_file_location('pinned_fixture_catalog', ROOT / name)
+    module = importlib.util.module_from_spec(spec)
+    exec(compile(captured[name], str(ROOT / name), 'exec'), module.__dict__)
+    manifest = module.validate_manifest(module.parse(captured['publisher-fixture-catalog-pg16.json']))
+    return module, manifest
+
 
 def load_dependencies():
     source = {name: pinned(name) for name in PINS}
@@ -131,7 +150,14 @@ def validate_post_setup(auto, repo, user, environment, policies, repo_page, env_
     empty = {'total_count': 0, 'secrets': []}
     auto.validate_github(repo, user, environment, policies, empty, empty)
 
-def collect(cursor, original, baseline, queries):
+def collect(cursor, original, baseline, queries, catalog=None):
+    module, manifest = load_catalog() if catalog is None else catalog
+    cursor.execute(VERSION_SQL)
+    version_rows = cursor.fetchmany(2)
+    if (len(version_rows) != 1 or len(version_rows[0]) != 1
+            or type(version_rows[0][0]) is not int):
+        raise ValueError('server version observation')
+    server_version = version_rows[0][0]
     original.verify(cursor, baseline)
     cursor.execute(queries['grantMatrixSql'])
     if cursor.fetchmany(1):
@@ -177,7 +203,10 @@ def collect(cursor, original, baseline, queries):
             'reservations.guard_reservation_row', 'reservations.guard_reservation_truncate',
             'send_records.guard_send_record_row', 'send_records.guard_send_record_truncate'}:
         raise ValueError('triggers')
-    return {'kind': 'READONLY_SCHEMA_INVENTORY', 'schemaEquivalenceEstablished': False,
+    match = module.compare_fixture_catalog(rows, baseline['owner_oid'], server_version, manifest)
+    return {'fixtureCatalogMatch': match['fixtureCatalogMatch'],
+            'fixtureManifestSha256': CATALOG_PINS['publisher-fixture-catalog-pg16.json'],
+            'serverVersionNum': server_version, 'kind': 'READONLY_SCHEMA_INVENTORY', 'schemaEquivalenceEstablished': False,
             'activationAuthorized': False, 'temporary': [list(r) for r in temporary],
             'definitions': entries}
 
@@ -185,6 +214,7 @@ class InspectionServices:
     def __init__(self, args, auto, original, queries):
         self.auto, self.original, self.queries = auto, original, queries
         verify_resources(args)
+        self.catalog = load_catalog()
         self.base = auto.Services(args, original)
 
     def preflight(self):
@@ -234,7 +264,7 @@ class InspectionServices:
                 connection.add_notice_handler(lambda unused: notices.append(True))
                 phase(b'P')
                 phase(b'M')  # Timed observation phase, not a write authorization.
-                report = collect(connection.cursor(), original, b.baseline, self.queries)
+                report = collect(connection.cursor(), original, b.baseline, self.queries, self.catalog)
                 if notices:
                     raise ValueError('notice')
             finally:

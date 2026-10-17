@@ -19,7 +19,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 PINS = {
-    'scripts/publisher_test_readonly_inspection.py': 'c373dcab272bfc03d484feb6a1733112f873f8ec23908abefd7d51081dbd6a69',
+    'scripts/publisher_test_readonly_inspection.py': 'dfa65b4258e47d7ae7b4e68d06cdafe4520a3db3d53b9f28cb80bd099a30c951',
     'docs/autonomy/event-adapter/review-binding/fixtures/publication-ledger.sql': 'c7cab138a398936dd59845db9838947b4a308a3d387b2c4102060ac3ae646736',
     'docs/autonomy/event-adapter/review-binding/fixtures/publication-send-record.sql': '84018bd5f335652592ad3bccc4574407e14b90d7751da55480e000da6cf37bce',
 }
@@ -52,7 +52,7 @@ $fixture$;""",
 ENV = {'PATH': '/usr/bin:/bin', 'LANG': 'C', 'LC_ALL': 'C', 'HOME': '/nonexistent'}
 
 
-def sources():
+def load_inspector():
     result = {}
     for name, digest in PINS.items():
         data = (ROOT / name).read_bytes()
@@ -63,7 +63,11 @@ def sources():
     spec = importlib.util.spec_from_file_location('fixture_inventory', path)
     module = importlib.util.module_from_spec(spec)
     exec(compile(result[next(iter(PINS))], str(path), 'exec'), module.__dict__)
-    return module.INVENTORY_SQL, [result[n].decode() for n in list(PINS)[1:]]
+    return module, [result[n].decode() for n in list(PINS)[1:]]
+
+def sources():
+    module, fixtures = load_inspector()
+    return module.INVENTORY_SQL, fixtures
 
 
 def run(argv, text=None, timeout=10):
@@ -202,7 +206,9 @@ def compare(expected, observed):
 def verify(directory):
     if sys.platform != 'linux' or os.getuid() == 0:
         raise ValueError('unprivileged Linux required')
-    inventory_sql, fixtures = sources()
+    inspector, fixtures = load_inspector()
+    inventory_sql = inspector.INVENTORY_SQL
+    catalog_module, catalog_manifest = inspector.load_catalog()
     tools, versions, digests = binaries(directory)
     # No inherited PG*, DATABASE_URL, HOME or credential environment is forwarded.
     with tempfile.TemporaryDirectory(prefix='meridian-pg16-', dir='/tmp') as temporary:
@@ -242,12 +248,26 @@ def verify(directory):
             if name_types != ['text']:
                 raise ValueError('inventory identity SQL type')
             query = snapshot_sql(inventory_sql)
-            expected = canonical(json.loads(sql(query)), identity[5])
+            def production_compare(observed_raw):
+                rows = [(r['kind'], r['name'], r['owner_oid'], r['left']) for r in observed_raw['inventory']]
+                return catalog_module.compare_fixture_catalog(rows, identity[5], identity[0], catalog_manifest)
+            raw_expected = json.loads(sql(query))
+            production_compare(raw_expected)
+            expected = canonical(raw_expected, identity[5])
             require_fixture_facts(expected)
-            compare(expected, canonical(json.loads(sql(query)), identity[5]))
-            rejected = []
+            raw_clean = json.loads(sql(query))
+            production_compare(raw_clean)
+            compare(expected, canonical(raw_clean, identity[5]))
+            rejected, production_rejected = [], []
             for name, mutation in NEGATIVES.items():
-                observed = canonical(json.loads(sql('BEGIN;\n' + mutation + '\n' + query + '\nROLLBACK;')), identity[5])
+                raw_observed = json.loads(sql('BEGIN;\n' + mutation + '\n' + query + '\nROLLBACK;'))
+                observed = canonical(raw_observed, identity[5])
+                try:
+                    production_compare(raw_observed)
+                except ValueError:
+                    production_rejected.append(name)
+                else:
+                    raise ValueError('production comparator accepted negative case')
                 if name == 'disabled_internal_fk_trigger':
                     expected_fk = [r for r in expected['inventory'] if r['kind'] == 'internal_fk_trigger']
                     observed_fk = [r for r in observed['inventory'] if r['kind'] == 'internal_fk_trigger']
@@ -259,12 +279,17 @@ def verify(directory):
                     rejected.append(name)
                 else:
                     raise ValueError('negative case accepted')
-                compare(expected, canonical(json.loads(sql(query)), identity[5]))
+                raw_clean = json.loads(sql(query))
+                production_compare(raw_clean)
+                compare(expected, canonical(raw_clean, identity[5]))
             report = {'kind': 'LOCAL_PG16_FIXTURE_COMPARISON', 'sourceSha256': PINS,
                       'toolVersions': versions, 'toolSha256': digests, 'serverVersionNum': identity[0],
                       'inventoryNameSqlType': name_types[0],
                       'inventorySqlSha256': hashlib.sha256(inventory_sql.encode()).hexdigest(),
                       'expectedCatalog': expected, 'negativeCasesRejected': rejected,
+                      'productionComparatorNegativeCasesRejected': production_rejected,
+                      'fixtureManifestSha256': inspector.CATALOG_PINS['publisher-fixture-catalog-pg16.json'],
+                      'fixtureCatalogMatch': True,
                       'deployedSchemaEquivalent': False, 'fullSemanticsProven': False,
                       'activationAuthorized': False}
         finally:

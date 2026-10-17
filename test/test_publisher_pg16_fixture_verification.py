@@ -12,11 +12,15 @@ import subprocess
 import tempfile
 import unittest
 from unittest.mock import Mock, patch
+from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location('fixture_harness', ROOT / 'scripts/publisher_pg16_fixture_verification.py')
 m = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(m)
+catalog_spec = importlib.util.spec_from_file_location('fixture_catalog_test', ROOT / 'scripts/publisher_fixture_catalog.py')
+catalog = importlib.util.module_from_spec(catalog_spec)
+catalog_spec.loader.exec_module(catalog)
 
 
 def fixture():
@@ -176,7 +180,7 @@ class Tests(unittest.TestCase):
         kill.assert_called_once_with(12345, m.signal.SIGKILL)
         process.wait.assert_called_once_with(timeout=3)
 
-    def exercise_cluster(self, cleanup_fault=False, wrong_identity=False, hidden_inspector_mutation=False, wrong_inventory_type=False):
+    def exercise_cluster(self, cleanup_fault=False, wrong_identity=False, hidden_inspector_mutation=False, wrong_inventory_type=False, production_accepts_mutations=False):
         calls = []
         cluster = []
         def local_run(argv, text=None, timeout=10):
@@ -188,7 +192,7 @@ class Tests(unittest.TestCase):
             self.assertIn('--no-password', argv)
             self.assertTrue(any(x.startswith('--host=/tmp/meridian-pg16-') for x in argv))
             if 'json_build_array' in text:
-                return json.dumps([160004, m.OWNER, 'postgres', 'external' if wrong_identity else None, cluster[0], 42])
+                return json.dumps([160015, m.OWNER, 'postgres', 'external' if wrong_identity else None, cluster[0], 42])
             if 'pg_typeof(i.name)' in text:
                 return json.dumps(['name' if wrong_inventory_type else 'text'])
             if 'jsonb_build_object' not in text:
@@ -206,10 +210,18 @@ class Tests(unittest.TestCase):
         server.poll.return_value = None
         server.wait.side_effect = [subprocess.TimeoutExpired('synthetic', 5), 0] if cleanup_fault else None
         tools = {n: '/fixed/' + n for n in ('initdb', 'postgres', 'psql')}
-        with patch.object(m.os, 'getuid', return_value=1000), patch.object(m, 'binaries', return_value=(tools, {}, {})), \
+        inspector, fixture_sources = m.load_inspector()
+        fake_rows = [(r['kind'], r['name'], r['owner_oid'], r['left']) for r in fixture()['inventory']]
+        fake_manifest = {'schemaVersion': 1, 'contract': catalog.CONTRACT, 'serverVersionNum': 160015,
+                         'inventorySqlSha256': catalog.QUERY_SHA256, 'fixtureSha256': dict(catalog.FIXTURES),
+                         'entries': catalog.entries(fake_rows, 42)}
+        production = SimpleNamespace(compare_fixture_catalog=lambda *unused: {'fixtureCatalogMatch': True}) if production_accepts_mutations else catalog
+        inspector.load_catalog = lambda: (production, fake_manifest)
+        with patch.object(m, 'load_inspector', return_value=(inspector, fixture_sources)), \
+             patch.object(m.os, 'getuid', return_value=1000), patch.object(m, 'binaries', return_value=(tools, {}, {})), \
              patch.object(m, 'run', side_effect=local_run), patch.object(m.subprocess, 'Popen', return_value=server) as popen, \
              patch.object(m.os, 'killpg') as kill:
-            if cleanup_fault or wrong_identity or hidden_inspector_mutation or wrong_inventory_type:
+            if cleanup_fault or wrong_identity or hidden_inspector_mutation or wrong_inventory_type or production_accepts_mutations:
                 with self.assertRaises(ValueError):
                     m.verify(Path('/fixed'))
                 result = None
@@ -227,7 +239,9 @@ class Tests(unittest.TestCase):
     def test_private_cluster_orchestration_and_rollback_negative_cases(self):
         report, calls = self.exercise_cluster()
         self.assertEqual(report['negativeCasesRejected'], list(m.NEGATIVES))
-        self.assertEqual(report['serverVersionNum'], 160004)
+        self.assertEqual(report['serverVersionNum'], 160015)
+        self.assertEqual(report['productionComparatorNegativeCasesRejected'], list(m.NEGATIVES))
+        self.assertTrue(report['fixtureCatalogMatch'])
         self.assertEqual(report['inventoryNameSqlType'], 'text')
         self.assertFalse(report['deployedSchemaEquivalent'])
         self.assertFalse(report['fullSemanticsProven'])
@@ -247,6 +261,9 @@ class Tests(unittest.TestCase):
         with self.assertRaises(ValueError): m.canonical(value, 42)
         value = fixture(); value['inventory'][1]['name'] = '["reservations", "send_records_operation_key_fkey", "pg_catalog", '
         with self.assertRaises(ValueError): m.canonical(value, 42)
+
+    def test_harness_snapshot_rejection_cannot_hide_production_acceptance(self):
+        self.exercise_cluster(production_accepts_mutations=True)
 
     def test_server_cleanup_failure_never_returns_report(self):
         self.exercise_cluster(cleanup_fault=True)
