@@ -50,6 +50,8 @@ test('Paper Arena Chrome: native file import, integrity rejection and 320/390 la
       const layout=()=>evaluate(`(()=>{const cards=[...document.querySelectorAll('.arena-model')];return{cards:cards.length,width:innerWidth,body:document.body.scrollWidth,root:document.documentElement.scrollWidth,inside:cards.every(c=>{const r=c.getBoundingClientRect();return r.left>=-1&&r.right<=innerWidth+1;})}})()`);
       await waitFor('window.arenaReady===true');
       let m=await layout();assert.equal(m.cards,5);assert.equal(m.width,width);assert.ok(m.body<=width+1&&m.root<=width+1&&m.inside,JSON.stringify(m));
+      assert.equal(await evaluate(`document.querySelectorAll('.paper-model-head').length`),0,'diagnostic cards must not impersonate runtime Paper model identities');
+      assert.ok(await evaluate(`parseFloat(getComputedStyle(document.querySelector('[data-arena-input]')).fontSize)>=16`),'mobile import control must meet the typography floor');
       assert.equal(await evaluate(`document.querySelector('[data-arena-export]').disabled`),true);
       assert.equal(await evaluate(`document.querySelector('.arena-evidence').textContent.includes('Noch keine')`),true);
       await evaluate(`document.getElementById('keyboard-start').focus()`);

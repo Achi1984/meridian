@@ -42,7 +42,7 @@ test('version history: native keyboard, focus and compact viewport at four mobil
    assert.equal(await evaluate(`document.querySelector('.version-history-list li strong').textContent`),'Meridian 11 · B9');
    const reachable=await evaluate(`(()=>{const p=document.getElementById('version-panel'),note=p.querySelector(':scope > p:last-child'),targets=[...p.querySelectorAll('.version-history-list li'),note],positions=[];for(const item of targets){item.scrollIntoView({block:'center'});const r=item.getBoundingClientRect();positions.push({top:r.top,bottom:r.bottom});}return {positions,note:{directChild:note.parentElement===p,text:note.textContent.trim()},body:document.body.scrollWidth,root:document.documentElement.scrollWidth};})()`);
    assert.equal(reachable.note.directChild,true);assert.equal(reachable.note.text,'Statischer Verlauf · Integrationsdaten sind keine Veröffentlichungsdaten. Mit Escape schließen.');
-   assert.equal(reachable.positions.length,15);assert.ok(reachable.positions.every(r=>r.top>=0&&r.bottom<=height),'all history entries and the closing note can be brought into the short viewport: '+JSON.stringify({width,height,...reachable}));assert.ok(reachable.body<=width+1&&reachable.root<=width+1);
+   assert.equal(reachable.positions.length,16);assert.ok(reachable.positions.every(r=>r.top>=0&&r.bottom<=height),'all history entries and the closing note can be brought into the short viewport: '+JSON.stringify({width,height,...reachable}));assert.ok(reachable.body<=width+1&&reachable.root<=width+1);
    await evaluate(`window.scrollTo(0,0)`);
    assert.equal(await evaluate(`document.activeElement.id`),'version-toggle','focus remains on the disclosure toggle before tab navigation');
    await key('Tab','Tab',9);
