@@ -1,6 +1,117 @@
 # MERIDIAN HANDOFF
 
-## Current source and runtime checkpoint after PR838 — 2026-10-17
+## Current source and runtime checkpoint after PR843 — 2026-10-17
+
+Operation HANDOFF-840-REBASE-20261017-02. Verified source main:
+`be757e076aac3e43dcc3bd03c4387c0550098d74` (#843). Build **10.0-r129**.
+This section supersedes older operational summaries below. PR840 R2 awaits
+publication and its own exact-head CI/full-scope review after the completed
+PR843 merge block; no publication SHA
+is claimed for this four-file continuity candidate.
+
+- PR841 merged the three-document commissioning source proposal. Full-scope
+  GREEN_LIGHT6232174405; exact-head Release Safety39020140466,
+  job117360147402:2577 pass. All four postchecks now succeeded: Release Safety
+  39020575857 on the exact merge head, Runtime39020575867, Coordinator39020575859
+  and Pages39020575389. FINAL_MERGE_STATUS6232198129 is now COMPLETE;
+  companion receipt6232135507 records the completed source packet.
+  `docs/autonomy/PUBLISHER_TEST_COMMISSIONING_20261017.md` requires a narrow,
+  read-only full-schema/effective-grant inspection first. It is not execution
+  ready for runtime: inspector PR842 merged at
+  `ce773b46c80cb1de32bb2f6f8f1dd0b3b9544243` from reviewed head
+  `4b9f34f0f027290d31240b9724e4c1e770e4e432`, based on the PR841 merge.
+  The test-only0600 fixture fix passed independent review; the real guard is
+  unchanged. Fresh directory `readonly-inspector-4b9f34f0` matched all eight
+  source hashes. Actual Python3.14.2 tests passed16/16 in0.585s, exit0
+  (PR842 receipt6232272047). The earlier head
+  `c9b0240784bfbf6a808503196ea0cd2aeaa9eb38` returned15 PASS/1 FAIL because
+  its synthetic resource fixture inherited default ACL mode0664 despite umask077;
+  that historical failure is retained. Exact-head CI39021277272/job117363417019
+  succeeded:2578 PASS, zero failures/cancelled/skipped, all named gates passed
+  on Node20.20.2. Full GitHub Claude review PUBLISHER-READONLY-842-R2 was
+  requested in Mailbox639/comment6232321604; full review6232323929 and
+  dependency supplement6232377121 returned GREEN. Final receipt6232392891
+  is COMPLETE together with receipt6232272047. All four postchecks succeeded:
+  Safety39021975402, Smoke39021975406, Coordinator39021975419, Pages39021975153.
+- Efficiency PR843 merged at `be757e076aac3e43dcc3bd03c4387c0550098d74`
+  from head `2d9a5fe61022086805375fb667a8d16210bef6e6`,
+  base `ce773b46c80cb1de32bb2f6f8f1dd0b3b9544243`. Its two files were read back
+  and verified. CI39022048999/job117365641168 succeeded:2578 PASS, all steps
+  passed. Full GitHub review AGENT-EFFICIENCY-843-R1 was requested in
+  Mailbox639/comment6232463692 and returned GREEN6232466260. Final receipt
+  6232488407 and companion6232405394 are COMPLETE. All postchecks succeeded:
+  Safety39022680790 attempt2/job117369415872:2578 PASS, zero failures/skipped/
+  cancelled, all steps SUCCESS; Coordinator39022680786, Smoke39022680804 and
+  Pages39022680939 SUCCESS. Safety attempt1/job117367453660 had2572 PASS and
+  six Chrome/CDP startup/connection timeout failures with a missing visual artifact.
+  The single accepted retry passed on the unchanged source tree; the cause remains
+  unproven. That failed attempt is preserved, not relabelled as successful.
+  Owner mandate at2026-10-17T11:41:50+02:00
+  (PR843/comment6232405394): "Speichere die Arbeitsweise ab und arbeite zukünftig
+  so - go". Bootstrap working-method reference: `docs/autonomy/AGENT_EFFICIENCY.md`
+  is now on main and adopted for future work: use its bounded-package/evidence-reuse
+  contract without weakening existing gates. No credential access, LOGIN, workflow
+  installation, dispatch or NOLOGIN closure is authorized by these source merges.
+- PR839 merged from head `63ac7f6b3f2fa7092ac49a4e0ed2b74cca48fa3d`, base
+  `f7d3f09c786dc85d1bb11c9a3233a6f1abd08cff`. Full-scope R2
+  GREEN_LIGHT6231677150; exact-head Release Safety39015820662,
+  job117347598614:2577 pass, zero fail/cancelled/skipped.
+  FINAL_MERGE_STATUS6231690035 COMPLETE. All four postchecks succeeded:
+  Release39017117794, Runtime39017117769, Coordinator39017117829,
+  Pages39017117864. PR839 source packet complete.
+- Owner exception6231581318 was consumed for that exact PR839 head only. It
+  allowed review reliance on exact-tree hosted tests and independently executed
+  local evidence rather than requiring Claude personally to execute head tests.
+  Source review and exact-head CI remained mandatory. It changes no permanent
+  review policy, workflow, tool permission or credential boundary. The permanent
+  workflow fix remains unapproved; do not generalize this exception to future PRs.
+- Stored Feather evidence consistency is now merged: six Node checks bind stored
+  claims to current producer/helper/lock/input-manifest bytes and scope fields.
+  Hosted2577 includes those six checks. Local nine Python tests and genuine
+  independent report reproduction remain separate execution evidence; the static
+  gate proves neither execution nor unavailable output-binary bytes. JSON836's
+  strict1390-cell failure remains valid. Feather837's exact input-format parity
+  is not signal/accounting/performance parity, holdout or profitability proof.
+- The actual72 targeted tests passed (6231846832). Owner approved one setup
+  attempt at2026-10-17T10:45:44+02:00 (6231898914); that approval is consumed.
+  Reviewed literal launch hash d87fa27882cabc3d2fb8d60b176d651097cff404f3049cd5435dd60cb32d661b
+  executed once at08:57:36Z (6232021281). Result6232023986 records
+  AUTO_SETUP_PREPARED_NOLOGIN, SETUP_EXIT=0 and LAUNCH_OUTER_EXIT=0.
+  This narrowly confirms six acknowledged TEST environment-secret writes and
+  the supervised DB password transaction/cleanup; the three roles remain NOLOGIN.
+  It proves neither password login nor live readiness, and authorizes no retry.
+- Independent local postcheck passed: new active marker device45/inode1459374,
+  UID1000, mode33152 (0600 regular), nlink1, size53,
+  mtime=ctime1792227465428047843. Prior archive bytes verified unchanged.
+  Reconciliation6232007999 corrects the archive operation to
+  `7b9b75d21315ee2bd4b5acd895f9c556`; the old receipt6230893412's differing
+  `7bb75d21315ee2bd4b5acd895f9c556e` is retained historically, not silently rewritten.
+  Dependency comparison covered91+32 files; the earlier33 typo is corrected in
+  result6232023986. These checks are not full runtime/OS byte attestation.
+- GitHub metadata post-verification passed (6232054311), POST_METADATA_EXIT=0.
+  Seven bounded GETs confirmed identities, protections and database binding;
+  all six expected environment names occur exactly once, with zero repository
+  target names. Creation/update timestamps match, spanning08:57:51–08:57:54Z.
+  Together with the local marker/archive check, preparation postchecks are complete.
+  This remains PREPARED_NOLOGIN only: no independent DB corroboration, password
+  login, activation or workflow dispatch occurred. Stored secret-value equality
+  and live readiness remain unproven. Preserve both marker and archive.
+
+Priority remains the accepted roadmap831: publisher operational, first proven
+autonomous development cycle, then controlled sustained operation. No new product
+scope or feature expansion is introduced. ChatGPT leads bounded agents and
+integration; Mailbox639, exact-head/base gates and independent review remain.
+CV2 SOURCE_AUDIT/all seven flags false and r129 are unchanged.
+NEXT: preserve the completed PR841 postchecks and PREPARED_NOLOGIN setup
+checkpoint, and submit this rebased continuity update through its own source
+review gates. PR843 postchecks are complete; publish this consolidated R2 packet
+on verified main through its own exact-head CI and independent full-scope review.
+The working-method contract is merged and adopted. No source merge alone makes
+a runtime proposal execution ready. Any credential access,
+DB corroboration, LOGIN, workflow installation/dispatch or NOLOGIN closure needs
+its separately reviewed and approved scope; no consumed action may be repeated.
+
+## Historical checkpoint after PR838 — superseded
 
 Operation HANDOFF-839-PREPARE-20261017-01. Verified source main:
 `f7d3f09c786dc85d1bb11c9a3233a6f1abd08cff` (#838). Build **10.0-r129**.

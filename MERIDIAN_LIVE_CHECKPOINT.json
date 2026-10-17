@@ -93,37 +93,60 @@
     "policyProposalCommentId": 6096562356,
     "protocol": "STREAM-SAFE-V8"
   },
-  "lastSeenCommentId": 6231435476,
+  "lastSeenCommentId": 6232488407,
   "quickCommand": "Go Meridian",
   "bootstrapFile": "MERIDIAN_GO.md",
   "currentWork": {
     "updatedAt": "2026-10-17",
-    "verifiedSourceMain": "f7d3f09c786dc85d1bb11c9a3233a6f1abd08cff",
+    "verifiedSourceMain": "be757e076aac3e43dcc3bd03c4387c0550098d74",
     "lastCompletedSourceMerge": {
-      "pr": 838,
-      "mergeSha": "f7d3f09c786dc85d1bb11c9a3233a6f1abd08cff",
-      "reviewedHead": "45720cfe366e8de4d9db4907f48cb817a5439b7e",
-      "reviewedBase": "0ff8667a5fab5df7634d81f677160c42a4dfe5ee",
-      "reviewCommentId": 6231388398,
-      "reviewScope": "SOURCE_ONLY_NOT_RUNTIME_READINESS",
-      "sourceCiRun": 39014393621,
-      "sourceCiJob": 117343371225,
+      "pr": 843,
+      "mergeSha": "be757e076aac3e43dcc3bd03c4387c0550098d74",
+      "reviewedHead": "2d9a5fe61022086805375fb667a8d16210bef6e6",
+      "reviewedBase": "ce773b46c80cb1de32bb2f6f8f1dd0b3b9544243",
+      "reviewCommentId": 6232466260,
+      "sourceCiRun": 39022048999,
+      "sourceCiJob": 117365641168,
       "sourceCiTests": {
-        "passed": 2571
+        "passed": 2578
       },
-      "finalMergeCommentId": 6231435476,
+      "finalMergeCommentId": 6232488407,
       "postMergeChecks": "VERIFIED_SUCCESS",
       "postMergeRunIds": {
-        "releaseSafety": 39015392147,
-        "runtimeSmoke": 39015392217,
-        "releaseCoordinator": 39015392112,
-        "pages": 39015391836
+        "releaseSafety": 39022680790,
+        "runtimeSmoke": 39022680804,
+        "releaseCoordinator": 39022680786,
+        "pages": 39022680939
       },
       "postMergeSnapshot": {
         "releaseSafety": "SUCCESS",
         "runtimeSmoke": "SUCCESS",
         "releaseCoordinator": "SUCCESS",
         "pages": "SUCCESS"
+      },
+      "finalMergeReceiptScope": "COMPLETE",
+      "companionReceiptCommentId": 6232405394,
+      "releaseSafetyPostcheck": {
+        "run": 39022680790,
+        "attempt": 2,
+        "job": 117369415872,
+        "tests": {
+          "passed": 2578,
+          "failed": 0,
+          "skipped": 0,
+          "cancelled": 0
+        },
+        "allSteps": "SUCCESS",
+        "priorAttempt": {
+          "attempt": 1,
+          "job": 117367453660,
+          "passed": 2572,
+          "failed": 6,
+          "observedFailures": "CHROME_CDP_STARTUP_CONNECTION_TIMEOUTS_AND_MISSING_VISUAL_ARTIFACT"
+        },
+        "sourceTreeUnchanged": true,
+        "rootCause": "UNPROVEN",
+        "acceptedRetryCount": 1
       }
     },
     "lastCompletedHandoffRefresh": {
@@ -138,8 +161,8 @@
         "pages": 39009496870
       }
     },
-    "package": "CONTINUITY_AFTER_838_AND_FEATHER_EVIDENCE_CONSISTENCY",
-    "state": "PR838_SOURCE_COMPLETE_SETUP_NOT_AUTHORIZED_RUNTIME_AUTH_BLOCKED",
+    "package": "CONTINUITY_AFTER_843_COMPLETE_PREPARED_NOLOGIN",
+    "state": "PR843_COMPLETE_PR840_R2_READY_FOR_PUBLICATION_OWN_GATES",
     "infrastructurePaused": true,
     "mailboxRollover": {
       "from": 571,
@@ -166,12 +189,12 @@
       "watchdogHostedPatch": "NOT_YET_PROVEN"
     },
     "publisherSetup": {
-      "state": "RECOVERY_ARCHIVED_VERIFIED_SETUP_NOT_EXECUTED",
-      "marker": "ORIGINAL_ABSENT_ARCHIVE_IDENTITY_AND_EVIDENCE_VERIFIED",
+      "state": "SETUP_PREPARED_NOLOGIN_LOCAL_AND_METADATA_POSTCHECKS_PASS",
+      "marker": "NEW_ACTIVE_MARKER_VERIFIED_PRIOR_ARCHIVE_UNCHANGED",
       "ownerPauseState": "SUPERSEDED_BY_OWNER_CONTINUATION_2026-10-16T09:26:47+02:00",
       "ownerPauseCommentId": 6199968669,
-      "ownerWindowConfirmationAt": "2026-10-16T09:21:31+02:00",
-      "ownerWindowConfirmationQuote": "nein parallel arbeitest nur du daran.",
+      "ownerWindowConfirmationAt": "2026-10-17T10:45:44+02:00",
+      "ownerWindowConfirmationQuote": "Ja Freigabe erteilt",
       "readOnlyPreflightState": "STAGE_1_PASSED_POINT_IN_TIME_20261017",
       "readOnlyPreflightCommentId": 6230532439,
       "readOnlyPreflightAfter": "2026-10-16T09:26:47+02:00",
@@ -179,7 +202,7 @@
       "markerTouched": true,
       "providerDbState": "FRESH_IN_WRAPPER_RECONCILIATION_PASSED_BEFORE_ARCHIVE_NOT_CONTINUOUS_EVIDENCE",
       "longTermCodespaceState": "UNKNOWN",
-      "realEnvironment": "RECOVERY_ARCHIVED_ONCE_AND_INDEPENDENT_READONLY_ARCHIVE_VERIFIED",
+      "realEnvironment": "PREPARED_NOLOGIN_LOCAL_AND_GITHUB_METADATA_POSTCHECKS_COMPLETE_NOT_LOGIN_OR_LIVE_READY",
       "previouslyAssignedRolePasswordAbsence": "NOT_ESTABLISHED",
       "browserState": "SIGN_IN_RESTORED_FOR_STAGE_1_SESSION; LONG_TERM_STATE_UNKNOWN",
       "stage2": "APPROVED_RECOVERY_COMPLETE_INDEPENDENT_ARCHIVE_VERIFICATION_PASS",
@@ -189,8 +212,8 @@
       "nextSetupAttemptRequiresSeparateOwnerApproval": true,
       "firstHostedWatchdogPatch": "UNPROVEN",
       "leadActivationEdit": "NOT_BOT_EVIDENCE",
-      "nextPermittedStep": "PREPARE_CONCRETE_SUBSEQUENT_SETUP_SCOPE_THEN_SEPARATE_OWNER_APPROVAL",
-      "statusCommentId": 6230893412,
+      "nextPermittedStep": "REVIEW_CONTINUITY_UPDATE_AND_DEFINE_ANY_SUBSEQUENT_ACTION_SEPARATELY_NO_RETRY_ACTIVATION",
+      "statusCommentId": 6232054311,
       "recoveryRequiresSeparateOwnerApproval": true,
       "retryRequiresSeparateOwnerApproval": true,
       "recoveryApprovalCommentId": 6230643903,
@@ -199,7 +222,13 @@
       "setupAuthorized": false,
       "recoveryApprovalConsumed": true,
       "recoveryPerformed": true,
-      "setupPerformed": false
+      "setupPerformed": true,
+      "historicalOwnerWindowConfirmation": {
+        "at": "2026-10-16T09:21:31+02:00",
+        "quote": "nein parallel arbeitest nur du daran.",
+        "evidenceScope": "HISTORICAL_PRE_RECOVERY_CONFIRMATION_NOT_CURRENT_SETUP_APPROVAL"
+      },
+      "ownerWindowConfirmationCommentId": 6231898914
     },
     "reconciliation": {
       "resolvedCommentIds": [
@@ -251,7 +280,7 @@
         "authorizedReproductionBudget": "UNKNOWN"
       }
     },
-    "nextStep": "PUBLISH_EIGHT_FILE_EVIDENCE_CONSISTENCY_CONTINUITY_FOR_OWN_CI_REVIEW; RESTORE_AUTHORIZED_RUNTIME_SESSION_FOR_OUTSTANDING_SETUP_LAUNCH_EVIDENCE",
+    "nextStep": "PUBLISH_PR840_R2_ON_VERIFIED_MAIN_THEN_OWN_EXACT_HEAD_CI_AND_FULL_SCOPE_REVIEW",
     "ownerPathInspection": {
       "pr": 828,
       "mergeSha": "bfebd17ddfa1d2d3b44a15126e28618a82cb81f2",
@@ -275,7 +304,7 @@
       "setupAuthorized": false,
       "evidenceScope": "HISTORICAL_SOURCE_SNAPSHOT_SUPERSEDED_BY_RUNTIME_RECOVERY_20261017"
     },
-    "publisherNextStep": "SETUP_SOURCE838_MERGED; REAL_TOOLCHAIN_LAUNCH_REVIEW_OUTSTANDING_THEN_SEPARATE_CONCRETE_OWNER_APPROVAL_AND_FRESH_GATES",
+    "publisherNextStep": "PR842_SOURCE_COMPLETE_NO_RUNTIME_AUTHORITY",
     "strategyNextStep": "FEATHER837_COMPLETE_EXACT_INPUT_ONLY_JSON_FAILURE_RETAINED_NO_STRATEGY_EXECUTION",
     "completion20261017": {
       "verifiedMain": "8691381510039e2ad48b863ea5e66d6ad6cba462",
@@ -578,7 +607,13 @@
       "evidenceSchemaAndPinsByteExact": true,
       "setupPerformed": false,
       "replayAuthorized": false,
-      "nextSetupRequiresSeparateConcreteApproval": true
+      "nextSetupRequiresSeparateConcreteApproval": true,
+      "operationIdCorrection": {
+        "actualOperationId": "7b9b75d21315ee2bd4b5acd895f9c556",
+        "evidenceCommentId": 6232007999,
+        "originalReceiptValueRetained": true
+      },
+      "evidenceScope": "HISTORICAL_RECOVERY_BEFORE_SETUP_WITH_LATER_OPERATION_ID_CORRECTION"
     },
     "freqtradeLoaderDiagnostic": {
       "state": "MERGED836_ALL_POSTCHECKS_SUCCESS_STRICT_NUMERIC_PARITY_FAILED",
@@ -655,8 +690,8 @@
       "reviewCommentId": 6231176025
     },
     "nextSetupProposal": {
-      "state": "SOURCE_PROPOSAL_MERGED838_NOT_RUNTIME_READY_NOT_EXECUTED",
-      "approvalCommentId": null,
+      "state": "APPROVED_ONE_SHOT_EXECUTED_PREPARED_NOLOGIN",
+      "approvalCommentId": 6231898914,
       "setupAuthorized": false,
       "sourcePinsVerifiedOn": "61b2f00461ecb6b560fc454decce0ca83f62b06c",
       "sourcePinsUnchangedAfter837": true,
@@ -665,7 +700,10 @@
       "pr": 838,
       "mergeSha": "f7d3f09c786dc85d1bb11c9a3233a6f1abd08cff",
       "reviewCommentId": 6231388398,
-      "realToolchainLaunchReview": "OUTSTANDING"
+      "realToolchainLaunchReview": "COMPLETED_FOR_EXECUTED_LITERAL_SCOPE",
+      "approvalConsumed": true,
+      "setupExecuted": true,
+      "resultCommentId": 6232023986
     },
     "featherEvidenceConsistencyCandidate": {
       "state": "LOCAL_PACKET_NOT_PUBLISHED_NO_NEW_HOSTED_CI",
@@ -680,14 +718,292 @@
       "outputHashCheck": "SYNTAX_AND_FILENAME_ASSOCIATION_ONLY",
       "jsonFailureSuperseded": false,
       "strategyExecuted": false,
+      "publicationSha": null,
+      "evidenceScope": "HISTORICAL_LOCAL_CANDIDATE_BEFORE_PR839_MERGE"
+    },
+    "dependentSourcePipeline": "PR843_COMPLETE_FUTURE_PACKETS_REQUIRE_OWN_GATES",
+    "runtimeAccess": {
+      "state": "SESSION_RESTORED_FOR_APPROVED_ONE_SHOT_SETUP",
+      "targeted72TestsExecuted": true,
+      "targeted72TestsPassed": 72,
+      "testEvidenceCommentId": 6231846832,
+      "setupExecuted": true
+    },
+    "featherEvidenceConsistency": {
+      "state": "MERGED839_ALL_POSTCHECKS_SUCCESS_STATIC_CONSISTENCY_ONLY",
+      "files": 4,
+      "staticNodeTestsPassed": 6,
+      "isolatedPythonTestsPassed": 9,
+      "independentGenuineReproductionExit": 0,
+      "reportByteIdentical": true,
+      "reportDelta": "ONLY_PRODUCER_SOURCE_HASH_ADDED",
+      "executionAttestation": false,
+      "outputBinaryBytesVerifiedByStaticGate": false,
+      "outputHashCheck": "SYNTAX_AND_FILENAME_ASSOCIATION_ONLY",
+      "jsonFailureSuperseded": false,
+      "strategyExecuted": false,
+      "publicationSha": null,
+      "pr": 839,
+      "mergeSha": "f54f38317cfe95fd97671e4192aff307722fab08",
+      "hostedStaticNodeTestsPassed": 6
+    },
+    "bounded839ReviewException": {
+      "ownerApprovalCommentId": 6231581318,
+      "head": "63ac7f6b3f2fa7092ac49a4e0ed2b74cca48fa3d",
+      "state": "CONSUMED_FOR_EXACT_HEAD_ONLY",
+      "scope": "EXACT_TREE_HOSTED_TESTS_PLUS_INDEPENDENT_LOCAL_EVIDENCE_INSTEAD_OF_REVIEWER_PERSONAL_HEAD_TEST_EXECUTION",
+      "permanentPolicyChangeAuthorized": false,
+      "workflowChangeAuthorized": false
+    },
+    "setupPreparation20261017": {
+      "state": "PREPARED_NOLOGIN_LOCAL_AND_METADATA_POSTCHECKS_COMPLETE",
+      "approvalCommentId": 6231898914,
+      "approvalAt": "2026-10-17T10:45:44+02:00",
+      "approvalConsumed": true,
+      "launchCommentId": 6232021281,
+      "launchedAt": "2026-10-17T08:57:36Z",
+      "launchSha256": "d87fa27882cabc3d2fb8d60b176d651097cff404f3049cd5435dd60cb32d661b",
+      "resultCommentId": 6232023986,
+      "preflightReconciliationCommentId": 6232007999,
+      "finalStatus": "AUTO_SETUP_PREPARED_NOLOGIN",
+      "setupExit": 0,
+      "launchOuterExit": 0,
+      "acknowledgedSecretWrites": 6,
+      "rolesRemainNoLogin": true,
+      "localPostcheck": "PASS",
+      "githubMetadataPostcheck": "PASS",
+      "newMarker": {
+        "st_dev": 45,
+        "st_ino": 1459374,
+        "st_uid": 1000,
+        "st_mode": 33152,
+        "st_nlink": 1,
+        "st_size": 53,
+        "st_mtime_ns": 1792227465428047843,
+        "st_ctime_ns": 1792227465428047843
+      },
+      "priorArchiveByteExact": true,
+      "correctedArchiveOperationId": "7b9b75d21315ee2bd4b5acd895f9c556",
+      "historicalReceiptOperationId": "7bb75d21315ee2bd4b5acd895f9c556e",
+      "archiveCorrectionCommentId": 6232007999,
+      "driverMatchedFileCounts": [
+        91,
+        32
+      ],
+      "driverCountCorrectionCommentId": 6232023986,
+      "passwordLoginVerified": false,
+      "secretValueAgreementVerified": false,
+      "liveAuthorized": false,
+      "retryAuthorized": false,
+      "metadataReceiptCommentId": 6232054311,
+      "metadataOuterExit": 0,
+      "metadataGetCount": 7,
+      "identityProtectionsDatabaseBinding": "PASS",
+      "expectedEnvironmentNamesExactlyOnce": 6,
+      "repositoryTargetNameCount": 0,
+      "secretMetadataCreatedEqualsUpdatedUtc": {
+        "MERIDIAN_PUBLISHER_TEST_RESERVATION_USER": "2026-10-17T08:57:51Z",
+        "MERIDIAN_PUBLISHER_TEST_RESERVATION_PASSWORD": "2026-10-17T08:57:52Z",
+        "MERIDIAN_PUBLISHER_TEST_SENDER_USER": "2026-10-17T08:57:52Z",
+        "MERIDIAN_PUBLISHER_TEST_SENDER_PASSWORD": "2026-10-17T08:57:53Z",
+        "MERIDIAN_PUBLISHER_TEST_READER_USER": "2026-10-17T08:57:53Z",
+        "MERIDIAN_PUBLISHER_TEST_READER_PASSWORD": "2026-10-17T08:57:54Z"
+      },
+      "independentDatabaseCorroborationExecuted": false,
+      "workflowDispatched": false,
+      "loginActivated": false
+    },
+    "completedSourceMerge839": {
+      "pr": 839,
+      "mergeSha": "f54f38317cfe95fd97671e4192aff307722fab08",
+      "reviewedHead": "63ac7f6b3f2fa7092ac49a4e0ed2b74cca48fa3d",
+      "reviewedBase": "f7d3f09c786dc85d1bb11c9a3233a6f1abd08cff",
+      "reviewCommentId": 6231677150,
+      "sourceCiRun": 39015820662,
+      "sourceCiJob": 117347598614,
+      "sourceCiTests": {
+        "passed": 2577,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      "finalMergeCommentId": 6231690035,
+      "postMergeChecks": "VERIFIED_SUCCESS",
+      "postMergeRunIds": {
+        "releaseSafety": 39017117794,
+        "runtimeSmoke": 39017117769,
+        "releaseCoordinator": 39017117829,
+        "pages": 39017117864
+      },
+      "postMergeSnapshot": {
+        "releaseSafety": "SUCCESS",
+        "runtimeSmoke": "SUCCESS",
+        "releaseCoordinator": "SUCCESS",
+        "pages": "SUCCESS"
+      }
+    },
+    "commissioningSource841": {
+      "pr": 841,
+      "mergeSha": "8ae899e373ce494766ca122011be33435ef0f8ed",
+      "sourceProposal": "docs/autonomy/PUBLISHER_TEST_COMMISSIONING_20261017.md",
+      "state": "SOURCE_PROPOSAL_MERGED_NOT_EXECUTION_READY",
+      "inspectorState": "PR842_MERGED_FULL_REVIEW_GREEN_ALL_POSTCHECKS_SUCCESS",
+      "offlineTests": {
+        "python": "3.12.14",
+        "passed": 16,
+        "actualPython314Evidence": true,
+        "runtimeSafetyEstablished": false
+      },
+      "firstGate": "READ_ONLY_FULL_SCHEMA_AND_EFFECTIVE_GRANT_INSPECTION",
+      "credentialAccessAuthorized": false,
+      "loginAuthorized": false,
+      "workflowInstallationAuthorized": false,
+      "dispatchAuthorized": false,
+      "noLoginClosureAuthorized": false,
+      "python314Evidence": {
+        "python": "3.14.2",
+        "head": "4b9f34f0f027290d31240b9724e4c1e770e4e432",
+        "passed": 16,
+        "failed": 0,
+        "seconds": 0.585,
+        "outerExit": 0,
+        "freshDirectory": "readonly-inspector-4b9f34f0",
+        "sourceHashesPassed": 8,
+        "receiptPr": 842,
+        "receiptCommentId": 6232272047,
+        "testOnlyFix": "EXPLICIT_0600_FIXTURE_INDEPENDENT_REVIEW_GREEN",
+        "realGuardChanged": false,
+        "runtimeSafetyEstablished": false
+      },
+      "inspectorPr": 842,
+      "inspectorPublishedHead": "4b9f34f0f027290d31240b9724e4c1e770e4e432",
+      "inspectorPublishedBase": "8ae899e373ce494766ca122011be33435ef0f8ed",
+      "historicalPython314FirstRun": {
+        "python": "3.14.2",
+        "passed": 15,
+        "failed": 1,
+        "failureScope": "SYNTHETIC_RESOURCE_FIXTURE_DEFAULT_ACL_MODE_0664_DESPITE_UMASK_077",
+        "testOnlyFix": "SUBSEQUENTLY_COMPLETED",
+        "realGuardChanged": false,
+        "runtimeSafetyEstablished": false,
+        "head": "c9b0240784bfbf6a808503196ea0cd2aeaa9eb38",
+        "evidenceScope": "HISTORICAL_FIRST_HEAD_FAILURE_SUPERSEDED_BY_TEST_ONLY_FIX_AND_FRESH_RUN"
+      },
+      "inspectorExactHeadCi": {
+        "run": 39021277272,
+        "job": 117363417019,
+        "state": "SUCCESS",
+        "node": "20.20.2",
+        "tests": {
+          "passed": 2578,
+          "failed": 0,
+          "cancelled": 0,
+          "skipped": 0
+        },
+        "allNamedGatesPassed": true
+      },
+      "inspectorFullClaudeReview": {
+        "state": "GREEN_LIGHT_FULL_SCOPE_WITH_DEPENDENCY_SUPPLEMENT",
+        "mailboxIssue": 639,
+        "requestCommentId": 6232321604,
+        "operationId": "PUBLISHER-READONLY-842-R2",
+        "reviewCommentId": 6232323929,
+        "supplementCommentId": 6232377121
+      },
+      "inspectorMergeSha": "ce773b46c80cb1de32bb2f6f8f1dd0b3b9544243"
+    },
+    "continuity840R2": {
+      "state": "PREPARED_NOT_PUBLISHED_MERGE_BLOCK_COMPLETE_OWN_CI_REVIEW_PENDING",
       "publicationSha": null
     },
-    "dependentSourcePipeline": "READY_FOR_EIGHT_FILE_CANDIDATE_PUBLICATION_OWN_CI_AND_REVIEW_PENDING",
-    "runtimeAccess": {
-      "state": "AUTHENTICATION_BLOCKED",
-      "observation": "APPLE_IDENTITY_VERIFICATION_GENERIC_ERROR",
-      "targeted72TestsExecuted": false,
-      "setupExecuted": false
+    "completedSourceMerge841": {
+      "pr": 841,
+      "mergeSha": "8ae899e373ce494766ca122011be33435ef0f8ed",
+      "reviewCommentId": 6232174405,
+      "reviewScope": "THREE_DOCUMENT_SOURCE_PROPOSAL_ONLY_NOT_EXECUTION_READY",
+      "sourceCiRun": 39020140466,
+      "sourceCiJob": 117360147402,
+      "sourceCiTests": {
+        "passed": 2577
+      },
+      "finalMergeCommentId": 6232198129,
+      "postMergeChecks": "VERIFIED_SUCCESS",
+      "postMergeRunIds": {
+        "releaseSafety": 39020575857,
+        "runtimeSmoke": 39020575867,
+        "releaseCoordinator": 39020575859,
+        "pages": 39020575389
+      },
+      "postMergeSnapshot": {
+        "releaseSafety": "SUCCESS",
+        "runtimeSmoke": "SUCCESS",
+        "releaseCoordinator": "SUCCESS",
+        "pages": "SUCCESS"
+      },
+      "finalMergeReceiptScope": "COMPLETE",
+      "companionReceiptCommentId": 6232135507
+    },
+    "agentEfficiency843": {
+      "pr": 843,
+      "head": "2d9a5fe61022086805375fb667a8d16210bef6e6",
+      "base": "ce773b46c80cb1de32bb2f6f8f1dd0b3b9544243",
+      "files": 2,
+      "readbackVerified": true,
+      "state": "MERGED_FULL_REVIEW_GREEN_ALL_POSTCHECKS_SUCCESS",
+      "reviewVerdict": "GREEN_LIGHT",
+      "mergeSha": "be757e076aac3e43dcc3bd03c4387c0550098d74",
+      "ci": {
+        "run": 39022048999,
+        "job": 117365641168,
+        "state": "SUCCESS",
+        "testsPassed": 2578,
+        "allStepsPassed": true
+      },
+      "fullReview": {
+        "state": "GREEN_LIGHT",
+        "mailboxIssue": 639,
+        "commentId": 6232463692,
+        "operationId": "AGENT-EFFICIENCY-843-R1",
+        "reviewCommentId": 6232466260
+      },
+      "finalMergeCommentId": 6232488407,
+      "postMergeChecks": "VERIFIED_SUCCESS",
+      "companionReceiptCommentId": 6232405394
+    },
+    "workingMethod": {
+      "bootstrapReference": "docs/autonomy/AGENT_EFFICIENCY.md",
+      "referenceState": "MERGED_ON_VERIFIED_MAIN_ADOPTED_FOR_FUTURE_WORK",
+      "ownerMandateAt": "2026-10-17T11:41:50+02:00",
+      "ownerMandatePr": 843,
+      "ownerMandateCommentId": 6232405394,
+      "ownerQuote": "Speichere die Arbeitsweise ab und arbeite zuk\u00fcnftig so - go",
+      "mandatoryGatesUnchanged": true
+    },
+    "completedSourceMerge842": {
+      "pr": 842,
+      "mergeSha": "ce773b46c80cb1de32bb2f6f8f1dd0b3b9544243",
+      "reviewedHead": "4b9f34f0f027290d31240b9724e4c1e770e4e432",
+      "reviewedBase": "8ae899e373ce494766ca122011be33435ef0f8ed",
+      "reviewCommentId": 6232323929,
+      "supplementReviewCommentId": 6232377121,
+      "sourceCiRun": 39021277272,
+      "sourceCiJob": 117363417019,
+      "sourceCiTests": {
+        "passed": 2578,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      "finalMergeCommentId": 6232392891,
+      "postMergeChecks": "VERIFIED_SUCCESS",
+      "postMergeRunIds": {
+        "releaseSafety": 39021975402,
+        "runtimeSmoke": 39021975406,
+        "releaseCoordinator": 39021975419,
+        "pages": 39021975153
+      },
+      "companionReceiptCommentId": 6232272047,
+      "finalMergeReceiptScope": "COMPLETE"
     }
   }
 }
