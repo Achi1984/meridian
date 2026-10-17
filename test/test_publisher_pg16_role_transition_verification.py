@@ -43,11 +43,11 @@ class FixtureTests(unittest.TestCase):
         with mock.patch.object(m.subprocess,'Popen',side_effect=AssertionError('process on import')), mock.patch.object(m.socket,'socket',side_effect=AssertionError('socket on import')):
             module=importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
-        self.assertEqual(module.CASES,('activation_closure','mid_alter_rollback','commit_ack_loss','claim_direction','prewrite_grant_drift','prewrite_catalog_drift','supervised_mutation_timeout','parent_completion_boundary'))
+        self.assertEqual(module.CASES,('activation_closure','mid_alter_rollback','commit_ack_loss','claim_direction','prewrite_grant_drift','prewrite_catalog_drift','supervised_mutation_timeout','parent_completion_boundary','launch_manifest_binding_and_expiry'))
 
     def test_source_pins_match_existing_modules(self):
         modules=m.load_sources()
-        self.assertEqual(set(modules),{'publisher_role_cycle','publisher_role_transition','publisher_role_journal','publisher_role_prewrite','publisher_role_supervision','publisher_parent_completion','publisher_pg16_fixture_verification'})
+        self.assertEqual(set(modules),{'publisher_role_cycle','publisher_role_transition','publisher_role_journal','publisher_role_prewrite','publisher_role_supervision','publisher_parent_completion','publisher_launch_manifest','publisher_pg16_fixture_verification'})
         self.assertEqual(modules['publisher_role_transition'].MANIFEST,'611ce25904b59473149f5cb8bc69613309b0b8b147df6296defdfecc0ee11274')
 
     def test_source_mismatch_fails_before_import(self):
@@ -221,16 +221,16 @@ class FixtureTests(unittest.TestCase):
 
     def test_supervised_factory_refuses_open_parent_and_constructs_child_only(self):
         supervisor=mock.Mock()
-        modules={'publisher_parent_completion':supervisor}
+        modules={'publisher_launch_manifest':supervisor}
         with self.assertRaisesRegex(ValueError,'parent connection'):
             m.supervised_invoke(modules,None,None,None,None,[],None,None,[types.SimpleNamespace(closed=False)])
-        supervisor.run_attempt.assert_not_called()
-        def same_process(root,binding,baseline,events,factory,**kwargs):
-            with factory(lambda token: None): pass
-        supervisor.run_attempt=same_process
+        supervisor.run_synthetic_attempt.assert_not_called()
+        def same_process(root,raw,expected,direction,baseline,events,factory,decision,now,**kwargs):
+            with factory(None,lambda token: None): pass
+        supervisor.run_synthetic_attempt=same_process
         with mock.patch.object(m,'prepare_services') as prepare:
             with self.assertRaisesRegex(ValueError,'child only'):
-                m.supervised_invoke(modules,None,None,None,None,[],None,None,[])
+                m.supervised_invoke(modules,None,None,{'direction':'activation'},None,[],None,None,[],manifest_packet=(b'x','x',{}),synthetic_now=1)
             prepare.assert_not_called()
 
     def test_child_context_closes_all_connections_and_journal_before_diagnostic(self):
@@ -241,15 +241,15 @@ class FixtureTests(unittest.TestCase):
         handle=Handle()
         services=types.SimpleNamespace(connections=[types.SimpleNamespace(raw=handle)],
             journal=types.SimpleNamespace(close=lambda:calls.append('journal')))
-        def supervisor(root,binding,baseline,events,factory,**kwargs):
+        def supervisor(root,raw,expected,direction,baseline,events,factory,decision,now,**kwargs):
             with mock.patch.object(m.os,'getpid',return_value=parent+1):
-                with factory(lambda token: calls.append(token)) as actual:
+                with factory(None,lambda token: calls.append(token)) as actual:
                     self.assertIs(actual,services); actual.phase(b'M')
             return {'outcome':'INDETERMINATE'}
         modules={key:None for key in ('publisher_role_transition','publisher_role_journal','publisher_role_prewrite')}
-        modules['publisher_parent_completion']=types.SimpleNamespace(run_attempt=supervisor)
+        modules['publisher_launch_manifest']=types.SimpleNamespace(run_synthetic_attempt=supervisor)
         with mock.patch.object(m,'prepare_services',return_value=services), mock.patch.object(m,'write_diagnostic',side_effect=lambda *unused:calls.append('diagnostic')):
-            result=m.supervised_invoke(modules,None,None,None,None,[],None,None,[])
+            result=m.supervised_invoke(modules,None,None,{'direction':'activation'},None,[],None,None,[],manifest_packet=(b'x','x',{}),synthetic_now=1)
         self.assertEqual(calls,[b'M','connection','journal','diagnostic'])
         self.assertEqual(result['outcome'],'INDETERMINATE')
         services.connections=[types.SimpleNamespace(raw=types.SimpleNamespace(closed=False,close=mock.Mock(side_effect=RuntimeError()))) ]

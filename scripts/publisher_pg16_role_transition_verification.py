@@ -11,7 +11,9 @@ uses the pinned real parent/child adapter; all connection/journal/prewrite handl
 are created in the child, after all parent database handles are verified closed.
 The real fixed-root parent coordinator persists attempts/completion and serializes
 parent launches. Distinct synthetic test cycles each have their own private anchor;
-this is not global replay or externally acknowledged completion proof. Catalog/grant/role prewrite
+this is not global replay or externally acknowledged completion proof.
+Canonical launch manifests bind each synthetic cycle and are generated ONCE;
+synthetic decisions/timestamps cannot authorize real commissioning or workflows. Catalog/grant/role prewrite
 uses the pinned real adapter on the same transaction. Claim and record use
 the real local fsynced journal in this disposable root; no reconciliation override
 is supplied. Uncertain activation blocks closure even with model-ready input. In particular
@@ -44,12 +46,13 @@ PINS = {
     'publisher_role_transition.py': '93bd773e584072227a659b836bbb7aa079eb9a86736ab6e5ef3e97e7cb98785a',
     'publisher_role_journal.py': '3789410d4d67cc12db3404bd1cf58b4b6c0bb8633646b849e9c8106dec046425',
     'publisher_role_supervision.py': '80cfd10ab5c90feb93fab1bcde6963136074994eb54cdf2a2176acc8a52f90fe',
+    'publisher_launch_manifest.py': 'fd15d23fe9df170928fbc9eb6229af3e1320e45c64d634b6df4e6ccde331c680',
     'publisher_parent_completion.py': '724e99f08c9b3ad96c4ff426bc4318ed317897018fdc8851e794f6c394bce585',
     'publisher_role_prewrite.py': 'a5e62a0e1c22a16eec057b65b446873a0b9f96abfe78ce78210caabc46defc97',
     'publisher_pg16_fixture_verification.py': 'e6907d86a45f766d288f41bba238b100767516247e5a56991df9f410d98a0871',
 }
 FAILURE = 'LOCAL_ROLE_TRANSITION_FIXTURE_FAILED_NO_PROVIDER_CLAIM'
-CASES = ('activation_closure', 'mid_alter_rollback', 'commit_ack_loss', 'claim_direction', 'prewrite_grant_drift', 'prewrite_catalog_drift', 'supervised_mutation_timeout', 'parent_completion_boundary')
+CASES = ('activation_closure', 'mid_alter_rollback', 'commit_ack_loss', 'claim_direction', 'prewrite_grant_drift', 'prewrite_catalog_drift', 'supervised_mutation_timeout', 'parent_completion_boundary', 'launch_manifest_binding_and_expiry')
 
 
 def load_sources():
@@ -304,14 +307,14 @@ def read_diagnostic(path):
     return value
 
 
-def supervised_invoke(modules,psycopg,options,binding,baseline,events,journal_root,receipt,parent_handles,fault=None,parent_root=None):
+def supervised_invoke(modules,psycopg,options,binding,baseline,events,journal_root,receipt,parent_handles,fault=None,parent_root=None,manifest_packet=None,synthetic_now=None):
     if any(raw.closed is not True for raw in parent_handles):
         raise ValueError('parent connection still open before fork')
     parent_pid=os.getpid()
     @contextlib.contextmanager
-    def factory(phase):
+    def factory(derived_binding,phase):
         if os.getpid()==parent_pid: raise ValueError('services must be child only')
-        services=prepare_services(modules['publisher_role_transition'],psycopg,options,binding,baseline,
+        services=prepare_services(modules['publisher_role_transition'],psycopg,options,derived_binding,baseline,
             journal_root,modules['publisher_role_journal'],modules['publisher_role_prewrite'],[],fault)
         services.phase=phase
         if fault=='mutation_timeout':
@@ -322,13 +325,28 @@ def supervised_invoke(modules,psycopg,options,binding,baseline,events,journal_ro
             write_diagnostic(receipt,services)
             if fault=='parent_completion_boundary':
                 # Local-only storage boundary fault AFTER real SQL/resource cleanup.
-                parent_root.chmod(0o500)
+                (parent_root/'attempts').chmod(0o500)
     budgets=None
     if fault=='mutation_timeout':
         budgets={'setup':5,'connect':15,'mutation':0.3,'cleanup':3,'exit':3}
-    return modules['publisher_parent_completion'].run_attempt(
-        parent_root,binding,baseline,events,factory,_test_budgets=budgets)
+    raw,expected,decision=manifest_packet
+    return modules['publisher_launch_manifest'].run_synthetic_attempt(
+        parent_root,raw,expected,binding['direction'],baseline,events,factory,decision,synthetic_now,_test_budgets=budgets)
 
+
+
+def synthetic_manifest_packet(module,driver,baseline,root,cycle,now):
+    """Generated once per private synthetic cycle, never from current time per call."""
+    value={'schema':1,'kind':'SYNTHETIC_TEST_LAUNCH_MANIFEST','source_commit':'1'*40,
+           'sources':dict(module.SOURCES),'baseline_sha256':module.digest(module.encode(baseline)),
+           'catalog_sha256':driver.MANIFEST,'repository':dict(module.REPOSITORY),'environment':module.ENVIRONMENT,
+           'target':dict(driver.TARGET),'cycle_id':format(cycle,'032x'),'root':str(root),
+           'synthetic_decision_ref':'1','effects':module.EFFECTS,
+           'window':{'not_before':now-1,'activation_expires':now+60,'closure_expires':now+120},
+           'workflow':{'proposed_sha256':module.WORKFLOW_SHA,'installed':{'kind':'SYNTHETIC_OBSERVATION',
+                        'commit':'3'*40,'bytes_sha256':module.WORKFLOW_SHA}}}
+    raw=module.encode(value); expected=module.digest(raw)
+    return raw,expected,{'kind':'SYNTHETIC_DECISION_INPUT','manifest_sha256':expected,'reference':'1'}
 
 @contextlib.contextmanager
 def parent_connection(psycopg,options,handles):
@@ -472,15 +490,21 @@ def verify(directory):
             if admin.closed is not True: raise ValueError('setup admin close')
             journal_root=root/'journal'
             journal_root.mkdir(mode=0o700)
-            parent_roots={n:root/('parent-'+str(n)) for n in range(1,8)}
-            for anchor in parent_roots.values(): anchor.mkdir(mode=0o700)
+            parent_roots={n:root/('parent-'+str(n)) for n in range(1,9)}
+            for anchor in parent_roots.values():
+                anchor.mkdir(mode=0o700); (anchor/'attempts').mkdir(mode=0o700)
+            manifest_module=modules['publisher_launch_manifest']
+            synthetic_epoch=int(time.time())
+            packets={n:synthetic_manifest_packet(manifest_module,driver,baseline,anchor,n,synthetic_epoch)
+                     for n,anchor in parent_roots.items()}
             def observe(login):
                 with parent_connection(psycopg,options,parent_handles) as raw:
                     return driver.observe_roles(TransactionConnection(raw,psycopg.pq),baseline,login)
-            def invoke(direction,cycle_number,events,fault=None,operation_number=None):
+            def invoke(direction,cycle_number,events,fault=None,operation_number=None,packet=None,now=None):
                 binding = test_binding(driver,direction,format(cycle_number,'032x'),format(operation_number or (cycle_number*2+(direction=='closure')),'032x'))
                 receipt=root/('diagnostic-'+binding['operation_id']+'.json')
-                result=supervised_invoke(modules,psycopg,options,binding,baseline,events,journal_root,receipt,parent_handles,fault,parent_roots[cycle_number])
+                result=supervised_invoke(modules,psycopg,options,binding,baseline,events,journal_root,receipt,parent_handles,fault,parent_roots[cycle_number],
+                    packets[cycle_number] if packet is None else packet,synthetic_epoch if now is None else now)
                 wait_for_no_owner_sessions(psycopg,admin_options,parent_handles)
                 diagnostic=read_diagnostic(receipt) if receipt.exists() else None
                 if diagnostic is not None:
@@ -527,15 +551,35 @@ def verify(directory):
             finally:
                 # Restore only the deliberately changed test permission; NEVER
                 # delete/overwrite attempt or terminal evidence, nor reset a slot.
-                parent_roots[7].chmod(0o700)
+                (parent_roots[7]/'attempts').chmod(0o700)
             observe(False)
-            if ((parent_roots[7]/'closure.terminal.json').exists()
-                    or not (parent_roots[7]/'closure.start.json').exists()):
+            if ((parent_roots[7]/'attempts'/'closure.terminal.json').exists()
+                    or not (parent_roots[7]/'attempts'/'closure.start.json').exists()):
                 raise ValueError('missing consumed parent closure')
             blocked,again=invoke('closure',7,closing_events,operation_number=102)
             if blocked['supervisorInvoked'] is not False or again is not None:
                 raise ValueError('parent uncertainty replay')
             successes.append('parent_completion_boundary')
+            expired,diagnostic=invoke('activation',8,[],operation_number=201,now=synthetic_epoch+60)
+            if expired['supervisorInvoked'] or expired['manifestIntegrityChecked'] or diagnostic is not None:
+                raise ValueError('expired manifest accepted')
+            value=json.loads(packets[8][0]); value['baseline_sha256']='0'*64
+            raw=manifest_module.encode(value); changed=manifest_module.digest(raw)
+            forged=(raw,changed,{'kind':'SYNTHETIC_DECISION_INPUT','manifest_sha256':changed,'reference':'1'})
+            rejected,diagnostic=invoke('activation',8,[],operation_number=202,packet=forged)
+            if rejected['supervisorInvoked'] or diagnostic is not None: raise ValueError('baseline manifest drift')
+            launched,diagnostic=invoke('activation',8,[])
+            if launched['outcome']!='CONFIRMED': raise ValueError('manifest activation')
+            observe(True)
+            value=json.loads(packets[8][0]); value['window']['closure_expires']+=1
+            raw=manifest_module.encode(value); changed=manifest_module.digest(raw)
+            drift=(raw,changed,{'kind':'SYNTHETIC_DECISION_INPUT','manifest_sha256':changed,'reference':'1'})
+            rejected,diagnostic=invoke('closure',8,closing_events,operation_number=203,packet=drift)
+            if rejected['supervisorInvoked'] or diagnostic is not None: raise ValueError('stored manifest drift')
+            closed,diagnostic=invoke('closure',8,closing_events,now=synthetic_epoch+61)
+            if closed['outcome']!='CONFIRMED': raise ValueError('separate closure deadline')
+            observe(False)
+            successes.append('launch_manifest_binding_and_expiry')
             drift_cases=(
                 ('prewrite_grant_drift',4,
                  'GRANT DELETE ON meridian_publisher.reservations TO meridian_test_reader;',
@@ -613,6 +657,8 @@ def verify(directory):
                       'sameTransactionCatalogGrantsRolesPrewriteExercised':True,
                       'prewriteInputSha256':prewrite_module.PINS,
                       'grantDocumentSha256':GRANT_DOCUMENT_SHA256,
+                      'canonicalSyntheticLaunchManifestExercised':True,'manifestDecisionAuthenticated':False,
+                      'workflowInstallationObserved':False,'syntheticClockInputs':True,
                       'localParentCompletionCoordinatorExercised':True,
                       'parentCompletionSourceSha256':modules['publisher_parent_completion'].PINS,
                       'perSyntheticCyclePrivateAnchor':True,'externalCallerAcknowledgementProven':False,

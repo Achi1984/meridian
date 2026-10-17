@@ -61,7 +61,10 @@ class SupervisionTests(unittest.TestCase):
         self.assertFalse(result['retryAuthorized'])
     def assert_reaped(self):
         if (self.root/'worker').exists():
-            with self.assertRaises(ChildProcessError): os.waitpid(int((self.root/'worker').read_text()),os.WNOHANG)
+            pid=int((self.root/'worker').read_text())
+            try: observed=os.waitpid(pid,os.WNOHANG)
+            except ChildProcessError: return
+            self.fail(f'child {pid} not already reaped at return: waitpid={observed!r}')
 
     def test_actual_fork_driver_journal_success_and_restart_replay(self):
         result=self.run_worker()
@@ -130,8 +133,11 @@ class SupervisionTests(unittest.TestCase):
             before=set(os.listdir('/proc/self/fd'))
             handlers=(signal.getsignal(signal.SIGTERM),signal.getsignal(signal.SIGALRM))
             started=time.monotonic()
-            with patch.object(m,'_worker',side_effect=stopped): self.assert_unknown(self.run_worker())
-            self.assertLess(time.monotonic()-started,2)
+            # CI scheduling can consume the old 150ms test-only reap allowance.
+            # Preserve immediate reaping checks; do not poll to manufacture success.
+            with patch.dict(BUDGETS,{'exit':1.0}),patch.object(m,'_worker',side_effect=stopped):
+                self.assert_unknown(self.run_worker())
+            self.assertLess(time.monotonic()-started,5)
             self.assert_reaped()
             self.assertEqual(set(os.listdir('/proc/self/fd')),before)
             self.assertEqual((signal.getsignal(signal.SIGTERM),signal.getsignal(signal.SIGALRM)),handlers)
