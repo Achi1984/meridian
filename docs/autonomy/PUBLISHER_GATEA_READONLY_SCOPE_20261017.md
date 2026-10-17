@@ -3,7 +3,7 @@
 Operation: `PUBLISHER-GATEA-LAUNCH-20261017-01`. This packet is source-only:
 not approved for operational execution, not executed, and not a workflow.
 The literal companion is `PUBLISHER_GATEA_READONLY_LAUNCH_20261017.sh`, SHA256
-`b64d333c5b80b18a2c6d234423f69d95e0d3952e609a92cf5e1537159ce27ced`.
+`6f2d75c8b820d4efe298ea52a8730715b1ba07c73c419f1e9cbe9e4a5cf4ab88`.
 Its command flags do not authenticate or grant approval. Do not execute it during
 review, CI, import or a scheduled task. Merge alone grants no runtime authority.
 
@@ -40,13 +40,27 @@ alone do not attest installed bytes. No dependency installation is permitted in
 the credential-bearing window. Python/stdlib/OS, CLI session caches and same-UID
 processes remain trusted runtime inputs, not fully attested by source hashes.
 
-The launcher preserves the existing environment, requires a TTY and rejects the
-unsafe bindings also rejected by the inspector. It does not silently remove or
-rewrite environment variables or credentials. If a required check fails, stop;
-any environmental correction requires its own explicit assessment, not a retry
-loop or a relaxed guard. Exclusive ownership must hold between hash verification
-and script execution; ordinary pathname execution is not immutable against a
-concurrent same-UID writer.
+The launcher requires a TTY and preserves the caller environment. A local-only
+preflight on CPython3.14.2 stopped at its existing environment guard before file
+checks; the only rejected variable name was `PYTHONIOENCODING`. Its value was
+not read and no provider/database inspection ran. The explicitly assessed
+correction is `/usr/bin/env -u PYTHONIOENCODING` for each Python child, both the
+local preflight and inspector invocation. Only that variable is removed from
+those child environments; the parent shell, CLI session caches and every other
+binding are unchanged. Isolated Python (`-I`) ignores Python configuration
+variables, including this output-encoding override; removing its presence also
+satisfies the unchanged explicit guard in the inspector and reused helpers.
+This is launch-environment preparation, not a production-policy exception or
+permission to remove arbitrary variables or credentials. No value is printed,
+copied or replaced. `/usr/bin/env` uses the existing trusted platform runtime;
+no tool is installed. Every other forbidden variable still stops execution.
+
+This source change requires exact-head review and the new literal digest before
+use; it does not authorize an operational retry. If a required check fails,
+stop. Further environmental correction needs its own assessment; no retry loop
+or relaxed guard is permitted. Exclusive ownership must hold between hash
+verification and script execution; ordinary pathname execution is not immutable
+against a concurrent same-UID writer.
 
 ## One concrete owner decision
 
