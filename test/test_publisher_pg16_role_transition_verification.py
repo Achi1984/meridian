@@ -41,11 +41,11 @@ class FixtureTests(unittest.TestCase):
         with mock.patch.object(m.subprocess,'Popen',side_effect=AssertionError('process on import')), mock.patch.object(m.socket,'socket',side_effect=AssertionError('socket on import')):
             module=importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
-        self.assertEqual(module.CASES,('activation_closure','mid_alter_rollback','commit_ack_loss','claim_direction'))
+        self.assertEqual(module.CASES,('activation_closure','mid_alter_rollback','commit_ack_loss','claim_direction','prewrite_grant_drift','prewrite_catalog_drift'))
 
     def test_source_pins_match_existing_modules(self):
         modules=m.load_sources()
-        self.assertEqual(set(modules),{'publisher_role_cycle','publisher_role_transition','publisher_role_journal','publisher_pg16_fixture_verification'})
+        self.assertEqual(set(modules),{'publisher_role_cycle','publisher_role_transition','publisher_role_journal','publisher_role_prewrite','publisher_pg16_fixture_verification'})
         self.assertEqual(modules['publisher_role_transition'].MANIFEST,'611ce25904b59473149f5cb8bc69613309b0b8b147df6296defdfecc0ee11274')
 
     def test_source_mismatch_fails_before_import(self):
@@ -198,10 +198,125 @@ class FixtureTests(unittest.TestCase):
             m.cleanup_cluster(Server(),services,BadClose('admin'))
         self.assertEqual(calls,['first','second','journal','admin','poll','wait'])
 
+    def test_failed_prewrite_input_load_never_opens_journal_and_registration_failure_closes(self):
+        prewrite=types.SimpleNamespace(CatalogPrewrite=mock.Mock(side_effect=ValueError('source pin')))
+        journal=types.SimpleNamespace(LocalRoleJournal=mock.Mock())
+        with self.assertRaises(ValueError):
+            m.prepare_services(None,None,None,None,None,Path('/unused'),journal,prewrite,[])
+        journal.LocalRoleJournal.assert_not_called()
+        prewrite.CatalogPrewrite=mock.Mock(return_value=object())
+        handle=mock.Mock(); journal.LocalRoleJournal.return_value=handle
+        with mock.patch.object(m,'TestServices',side_effect=ValueError('construction')):
+            with self.assertRaises(ValueError):
+                m.prepare_services(None,None,None,None,None,Path('/unused'),journal,prewrite,[])
+        handle.close.assert_called_once_with()
+
     def test_cli_failure_is_sanitized_and_has_no_arbitrary_host_argument(self):
         output=io.StringIO()
         with contextlib.redirect_stdout(output):
             result=m.main(['--pg-bin','/unused','--host','remote'])
         self.assertEqual(result,1); self.assertEqual(output.getvalue(),m.FAILURE+'\n')
+
+class PrewriteTests(unittest.TestCase):
+    def setUp(self):
+        modules=m.load_sources()
+        self.prewrite=modules['publisher_role_prewrite']
+        self.driver=modules['publisher_role_transition']
+        self.baseline={'owner_oid':10,'roles':{n:{'oid':100+i,'grantor_oid':10} for i,n in enumerate(self.driver.cycle.ROLES)}}
+        self.adapter=self.prewrite.CatalogPrewrite(self.baseline)
+        self.login=False
+        self.identity=('publisher_ledger','publisher_owner','publisher_owner',160015,'pg_catalog','',10,True,False,1,1,2,True)
+        self.transaction=(42,False)
+        self.extra_role=False
+        test=self
+        class Cursor:
+            def execute(inner,sql):
+                if sql==test.prewrite.TRANSACTION_SQL: inner.rows=[test.transaction]
+                elif sql==test.adapter.original.IDENTITY_SQL: inner.rows=[test.identity]
+                elif sql==test.adapter.original.ROLE_SQL:
+                    inner.rows=[(name,100+i,test.login,False,False,False,False,False,False,False) for i,name in enumerate(test.driver.cycle.ROLES)]
+                    if test.extra_role: inner.rows.append(inner.rows[0])
+                elif sql==test.adapter.original.MEMBERSHIP_SQL:
+                    inner.rows=[(100+i,10,10,True,False,False) for i in range(3)]
+                else: raise AssertionError('unreviewed SQL in verifier')
+            def fetchmany(inner,count): return inner.rows[:count]
+        self.cursor=Cursor()
+        class Connection:
+            pgconn=types.SimpleNamespace(transaction_status=2,ssl_in_use=True,backend_pid=42)
+            cursor_calls=0
+            def cursor(inner): inner.cursor_calls+=1; return test.cursor
+        self.connection=Connection()
+        def collect(cursor,verifier,baseline,queries,catalog):
+            self.assertIs(cursor,self.cursor)
+            self.assertEqual(queries,self.adapter.queries)
+            verifier.verify(cursor,baseline)
+            return {'fixtureCatalogMatch':True,'schemaEquivalenceEstablished':False,'activationAuthorized':False}
+        self.collect=collect
+
+    def call(self,direction='activation',collector=None):
+        binding=m.test_binding(self.driver,direction,'1'*32,'2'*32)
+        with mock.patch.object(self.adapter.inspector,'collect',side_effect=collector or self.collect):
+            return self.adapter(self.connection,binding)
+
+    def test_direction_specific_roles_reuse_collector_with_one_cursor(self):
+        for direction,login in (('activation',False),('closure',True)):
+            self.login=login; self.connection.cursor_calls=0
+            self.assertIsNone(self.call(direction))
+            self.assertEqual(self.connection.cursor_calls,1)
+            self.assertTrue(self.adapter.last_report['catalogGrantsRolesVerified'])
+            self.assertFalse(self.adapter.last_report['fullGateAEstablished'])
+            self.assertFalse(self.adapter.last_report['productionTargetValidated'])
+            self.assertFalse(self.adapter.last_report['parentSupervisorCompletionEstablished'])
+        self.login=True
+        with self.assertRaises(ValueError): self.call('activation')
+        self.assertIsNone(self.adapter.last_report)
+        self.login=False
+        with self.assertRaises(ValueError): self.call('closure')
+
+    def test_transaction_readonly_tls_status_and_backend_identity_fail_closed(self):
+        for name,value in (('transaction_status',0),('transaction_status',2.0),('ssl_in_use',False),('backend_pid',True),('backend_pid',43)):
+            original=getattr(self.connection.pgconn,name); setattr(self.connection.pgconn,name,value)
+            with self.assertRaises(ValueError): self.call()
+            setattr(self.connection.pgconn,name,original)
+        self.transaction=(42,True)
+        with self.assertRaises(ValueError): self.call()
+        self.transaction=(43,False)
+        with self.assertRaises(ValueError): self.call()
+
+    def test_owner_identity_attributes_and_owned_object_counts_are_strict(self):
+        for index,value in ((0,'other'),(3,160016),(6,True),(7,False),(8,True),(9,True),(10,0),(11,1)):
+            saved=self.identity; row=list(saved); row[index]=value; self.identity=tuple(row)
+            with self.assertRaises(ValueError): self.call()
+            self.identity=saved
+        self.extra_role=True
+        with self.assertRaises(ValueError): self.call()
+
+    def test_changed_transaction_after_collector_has_no_success_report(self):
+        def changed(*args):
+            result=self.collect(*args)
+            self.connection.pgconn.transaction_status=0
+            return result
+        with self.assertRaises(ValueError): self.call(collector=changed)
+        self.assertIsNone(self.adapter.last_report)
+
+    def test_pinned_collector_rejection_propagates_without_cached_success(self):
+        self.call(); self.assertIsNotNone(self.adapter.last_report)
+        def reject(*args): raise ValueError('synthetic grant/catalog mismatch')
+        with self.assertRaises(ValueError): self.call(collector=reject)
+        self.assertIsNone(self.adapter.last_report)
+
+    def test_prewrite_input_pin_rejected_before_use(self):
+        with mock.patch.dict(self.prewrite.PINS,{'publisher_test_readonly_inspection.py':'0'*64}):
+            with self.assertRaisesRegex(ValueError,'source pin'): self.prewrite.load_inputs()
+
+    def test_fixture_uses_pinned_original_sql_and_exact_grant_document(self):
+        helper=m.load_sources()['publisher_pg16_fixture_verification']
+        fixtures,grants=m.fixture_schema_and_grants(helper)
+        self.assertEqual(len(fixtures),2)
+        self.assertIn('GRANT INSERT (operation_key, intent_sha256, body_sha256, run_id, run_attempt, status)',grants)
+        self.assertNotIn('CREATE ROLE',grants)
+        self.assertNotIn('ALTER ROLE',grants)
+        with mock.patch.object(m,'GRANT_DOCUMENT_SHA256','0'*64):
+            with self.assertRaisesRegex(ValueError,'document pin'): m.fixture_schema_and_grants(helper)
 
 if __name__=='__main__': unittest.main()

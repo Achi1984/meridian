@@ -6,12 +6,13 @@ listens only on 127.0.0.1 with ephemeral TLS certificate/key; actual libpq
 verify-full TLS and real SQL transactions exercise the unchanged role driver.
 The identical-looking owner/database/role names exist ONLY inside that cluster.
 
-Binding/approval/prewrite/phase services are TEST DOUBLES. Claim and record use
+Binding/approval/phase services are TEST DOUBLES. Catalog/grant/role prewrite
+uses the pinned real adapter on the same transaction. Claim and record use
 the real local fsynced journal in this disposable root; no reconciliation override
 is supplied. Uncertain activation blocks closure even with model-ready input. In particular
 the driver's production-named TARGET dict is syntactic test data, never the
 connection target. This fixture does not authenticate authority, validate a
-provider target, implement full Gate A or prove durable replay protection.
+provider target, establish full Gate A or prove durable replay protection.
 Actual transaction/TLS evidence is separate from those missing integrations.
 Only already-installed psycopg3.3.6 and /usr/bin/openssl are accepted.
 """
@@ -36,10 +37,11 @@ PINS = {
     'publisher_role_cycle.py': 'fb46bfbd8ba52546bec25a7bab3864ac96abbd34d1e10cf0e8ab1939dc39c230',
     'publisher_role_transition.py': '93bd773e584072227a659b836bbb7aa079eb9a86736ab6e5ef3e97e7cb98785a',
     'publisher_role_journal.py': '3789410d4d67cc12db3404bd1cf58b4b6c0bb8633646b849e9c8106dec046425',
+    'publisher_role_prewrite.py': 'a5e62a0e1c22a16eec057b65b446873a0b9f96abfe78ce78210caabc46defc97',
     'publisher_pg16_fixture_verification.py': 'e6907d86a45f766d288f41bba238b100767516247e5a56991df9f410d98a0871',
 }
 FAILURE = 'LOCAL_ROLE_TRANSITION_FIXTURE_FAILED_NO_PROVIDER_CLAIM'
-CASES = ('activation_closure', 'mid_alter_rollback', 'commit_ack_loss', 'claim_direction')
+CASES = ('activation_closure', 'mid_alter_rollback', 'commit_ack_loss', 'claim_direction', 'prewrite_grant_drift', 'prewrite_catalog_drift')
 
 
 def load_sources():
@@ -175,10 +177,11 @@ def test_binding(driver, direction, cycle_id, operation_id):
 
 
 class TestServices:
-    """Real local journal; fabricated authority/prewrite/phase, never operational."""
-    def __init__(self, driver, psycopg, options, binding, baseline, journal, fault=None):
+    """Real local journal/catalog prewrite; fabricated authority/phase, never operational."""
+    def __init__(self, driver, psycopg, options, binding, baseline, journal, fault=None, prewrite=None):
         self.driver,self.psycopg,self.options = driver,psycopg,options
         self.binding,self.baseline,self.journal,self.fault = binding,baseline,journal,fault
+        self.catalog_prewrite=prewrite
         self.connections = []
         self.phase_log = []
     def expected_binding(self): return self.binding
@@ -189,11 +192,23 @@ class TestServices:
         self.connections.append(connection)
         return connection
     def prewrite(self, connection, binding):
-        # Only local identity + role observations, NOT full Gate A/authority.
-        connection.require_status(self.psycopg.pq.TransactionStatus.INTRANS)
-        self.driver.observe_roles(connection,self.baseline,binding['direction']=='closure')
+        if self.catalog_prewrite is None: raise ValueError('catalog prewrite adapter missing')
+        return self.catalog_prewrite(connection,binding)
     def phase(self, token): self.phase_log.append(token.decode())
     def record(self, binding, stage, status): return self.journal.record(binding,stage,status)
+
+
+def prepare_services(driver,psycopg,options,binding,baseline,journal_root,journal_module,prewrite_module,all_services,fault=None):
+    # Validate/load inert prewrite inputs before acquiring any journal descriptors.
+    prewrite=prewrite_module.CatalogPrewrite(baseline)
+    journal=journal_module.LocalRoleJournal(journal_root)
+    try:
+        services=TestServices(driver,psycopg,options,binding,baseline,journal,fault,prewrite)
+        all_services.append(services)
+        return services
+    except BaseException:
+        journal.close()
+        raise
 
 
 def invoke_driver(driver, services, baseline, events):
@@ -231,6 +246,27 @@ def build_roles(admin, driver):
     return baseline
 
 
+GRANT_DOCUMENT_SHA256='47095db6ce7d991bd46cbdd7143cc38e7fd82dfa2be5369872d348a687353957'
+
+
+def fixture_schema_and_grants(helper):
+    # Extract only the exact reviewed grant block, never any surrounding setup.
+    unused_inspector,fixtures=helper.load_inspector()
+    path=ROOT/'docs/autonomy/PUBLISHER_DATABASE_ROLE_SETUP.md'
+    fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+    try:
+        info=os.fstat(fd)
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid not in (0,os.getuid())
+                or info.st_mode & 0o022 or not 0<info.st_size<=262144):
+            raise ValueError('fixture grant document boundary')
+        data=os.read(fd,262145)
+    finally: os.close(fd)
+    if len(data)!=info.st_size or hashlib.sha256(data).hexdigest()!=GRANT_DOCUMENT_SHA256:
+        raise ValueError('fixture grant document pin')
+    grants=data.decode().split('## Reviewable grant proposal',1)[1].split('```sql\n',1)[1].split('```',1)[0]
+    return fixtures,grants
+
+
 def cleanup_cluster(server, all_services, admin):
     close_failed = False
     for services in all_services:
@@ -262,6 +298,8 @@ def verify(directory):
     helper = modules['publisher_pg16_fixture_verification']
     driver = modules['publisher_role_transition']
     journal_module = modules['publisher_role_journal']
+    prewrite_module = modules['publisher_role_prewrite']
+    fixtures,grants=fixture_schema_and_grants(helper)
     psycopg = installed_driver()
     tools,versions,digests = helper.binaries(directory)
     openssl,openssl_version,openssl_sha = openssl_tool(helper)
@@ -298,6 +336,12 @@ def verify(directory):
             assert_local_identity(admin,data,port)
             baseline = build_roles(admin,driver)
             options = connection_options(root,port,'publisher_owner','publisher_ledger')
+            with psycopg.connect(**options) as owner:
+                noticed=[]
+                owner.add_notice_handler(lambda unused: noticed.append(True))
+                for fixture in fixtures: owner.execute(fixture)
+                owner.execute(grants)
+                if noticed: raise ValueError('fixture setup notice')
             journal_root=root/'journal'
             journal_root.mkdir(mode=0o700)
             def observe(login):
@@ -305,8 +349,7 @@ def verify(directory):
                     return driver.observe_roles(TransactionConnection(raw,psycopg.pq),baseline,login)
             def invoke(direction,cycle_number,events,fault=None,operation_number=None):
                 binding = test_binding(driver,direction,format(cycle_number,'032x'),format(operation_number or (cycle_number*2+(direction=='closure')),'032x'))
-                services = TestServices(driver,psycopg,options,binding,baseline,journal_module.LocalRoleJournal(journal_root),fault)
-                all_services.append(services)
+                services = prepare_services(driver,psycopg,options,binding,baseline,journal_root,journal_module,prewrite_module,all_services,fault)
                 result = invoke_driver(driver,services,baseline,events)
                 if any(not c.closed for c in services.connections): raise ValueError('driver did not close')
                 return result,services
@@ -327,7 +370,28 @@ def verify(directory):
             closed,services = invoke('closure',1,closing_events)
             if closed['outcome'] != 'CONFIRMED' or closed['state']['phase'] != 'AWAITING_SESSIONS': raise ValueError('closure result')
             observe(False)
+            if not services.catalog_prewrite.last_report['catalogGrantsRolesVerified']:
+                raise ValueError('closure catalog prewrite missing')
             successes.extend(['activation_closure','claim_direction'])
+            drift_cases=(
+                ('prewrite_grant_drift',4,
+                 'GRANT DELETE ON meridian_publisher.reservations TO meridian_test_reader;',
+                 'REVOKE DELETE ON meridian_publisher.reservations FROM meridian_test_reader;'),
+                ('prewrite_catalog_drift',5,
+                 'ALTER TABLE meridian_publisher.reservations DISABLE TRIGGER guard_reservation_row;',
+                 'ALTER TABLE meridian_publisher.reservations ENABLE TRIGGER guard_reservation_row;'))
+            for name,number,mutation,restore in drift_cases:
+                with psycopg.connect(**options) as owner: owner.execute(mutation)
+                try:
+                    rejected,services=invoke('activation',number,[])
+                    if (rejected['outcome']!='FAILED' or len(services.connections)!=1
+                            or services.connections[0].alters!=0 or services.connections[0].commits!=0
+                            or services.catalog_prewrite.last_report is not None):
+                        raise ValueError('prewrite drift not rejected before ALTER')
+                    observe(False)
+                finally:
+                    with psycopg.connect(**options) as owner: owner.execute(restore)
+                successes.append(name)
             rolled,services = invoke('activation',2,[],fault='mid_alter_rollback')
             if (rolled['outcome'] != 'INDETERMINATE' or services.connections[0].alters != 2
                     or services.connections[0].commits != 0 or services.connections[0].rollbacks != 1):
@@ -359,7 +423,10 @@ def verify(directory):
                       'psycopgVersion':psycopg.__version__,'toolVersions':versions,'toolSha256':digests,
                       'opensslVersion':openssl_version,'opensslSha256':openssl_sha,'sourceSha256':PINS,
                       'casesPassed':sorted(successes),'realLibpqTlsVerified':True,'realSqlTransactionsVerified':True,
-                      'localRoleSessionsRemaining':sessions,'bindingApprovalPrewritePhaseMocked':True,
+                      'localRoleSessionsRemaining':sessions,'bindingApprovalPhaseMocked':True,
+                      'sameTransactionCatalogGrantsRolesPrewriteExercised':True,
+                      'prewriteInputSha256':prewrite_module.PINS,
+                      'grantDocumentSha256':GRANT_DOCUMENT_SHA256,
                       'localJournalExercised':True,'journalReplayAfterReopenRejected':True,
                       'journalUncertainClosureRejected':['mid_alter_rollback','commit_ack_loss'],
                       'lostCommitLoginObserved':True,
