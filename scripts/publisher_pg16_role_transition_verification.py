@@ -8,7 +8,10 @@ The identical-looking owner/database/role names exist ONLY inside that cluster.
 
 Binding/approval and closure transcripts are TEST DOUBLES. Phase supervision
 uses the pinned real parent/child adapter; all connection/journal/prewrite handles
-are created in the child, after all parent database handles are verified closed. Catalog/grant/role prewrite
+are created in the child, after all parent database handles are verified closed.
+The real fixed-root parent coordinator persists attempts/completion and serializes
+parent launches. Distinct synthetic test cycles each have their own private anchor;
+this is not global replay or externally acknowledged completion proof. Catalog/grant/role prewrite
 uses the pinned real adapter on the same transaction. Claim and record use
 the real local fsynced journal in this disposable root; no reconciliation override
 is supplied. Uncertain activation blocks closure even with model-ready input. In particular
@@ -41,11 +44,12 @@ PINS = {
     'publisher_role_transition.py': '93bd773e584072227a659b836bbb7aa079eb9a86736ab6e5ef3e97e7cb98785a',
     'publisher_role_journal.py': '3789410d4d67cc12db3404bd1cf58b4b6c0bb8633646b849e9c8106dec046425',
     'publisher_role_supervision.py': '80cfd10ab5c90feb93fab1bcde6963136074994eb54cdf2a2176acc8a52f90fe',
+    'publisher_parent_completion.py': '724e99f08c9b3ad96c4ff426bc4318ed317897018fdc8851e794f6c394bce585',
     'publisher_role_prewrite.py': 'a5e62a0e1c22a16eec057b65b446873a0b9f96abfe78ce78210caabc46defc97',
     'publisher_pg16_fixture_verification.py': 'e6907d86a45f766d288f41bba238b100767516247e5a56991df9f410d98a0871',
 }
 FAILURE = 'LOCAL_ROLE_TRANSITION_FIXTURE_FAILED_NO_PROVIDER_CLAIM'
-CASES = ('activation_closure', 'mid_alter_rollback', 'commit_ack_loss', 'claim_direction', 'prewrite_grant_drift', 'prewrite_catalog_drift', 'supervised_mutation_timeout')
+CASES = ('activation_closure', 'mid_alter_rollback', 'commit_ack_loss', 'claim_direction', 'prewrite_grant_drift', 'prewrite_catalog_drift', 'supervised_mutation_timeout', 'parent_completion_boundary')
 
 
 def load_sources():
@@ -300,7 +304,7 @@ def read_diagnostic(path):
     return value
 
 
-def supervised_invoke(modules,psycopg,options,binding,baseline,events,journal_root,receipt,parent_handles,fault=None):
+def supervised_invoke(modules,psycopg,options,binding,baseline,events,journal_root,receipt,parent_handles,fault=None,parent_root=None):
     if any(raw.closed is not True for raw in parent_handles):
         raise ValueError('parent connection still open before fork')
     parent_pid=os.getpid()
@@ -316,11 +320,14 @@ def supervised_invoke(modules,psycopg,options,binding,baseline,events,journal_ro
         finally:
             close_services(services)
             write_diagnostic(receipt,services)
+            if fault=='parent_completion_boundary':
+                # Local-only storage boundary fault AFTER real SQL/resource cleanup.
+                parent_root.chmod(0o500)
     budgets=None
     if fault=='mutation_timeout':
         budgets={'setup':5,'connect':15,'mutation':0.3,'cleanup':3,'exit':3}
-    return modules['publisher_role_supervision'].supervise_transition(
-        binding,baseline,events,factory,_test_budgets=budgets)
+    return modules['publisher_parent_completion'].run_attempt(
+        parent_root,binding,baseline,events,factory,_test_budgets=budgets)
 
 
 @contextlib.contextmanager
@@ -465,20 +472,24 @@ def verify(directory):
             if admin.closed is not True: raise ValueError('setup admin close')
             journal_root=root/'journal'
             journal_root.mkdir(mode=0o700)
+            parent_roots={n:root/('parent-'+str(n)) for n in range(1,8)}
+            for anchor in parent_roots.values(): anchor.mkdir(mode=0o700)
             def observe(login):
                 with parent_connection(psycopg,options,parent_handles) as raw:
                     return driver.observe_roles(TransactionConnection(raw,psycopg.pq),baseline,login)
             def invoke(direction,cycle_number,events,fault=None,operation_number=None):
                 binding = test_binding(driver,direction,format(cycle_number,'032x'),format(operation_number or (cycle_number*2+(direction=='closure')),'032x'))
                 receipt=root/('diagnostic-'+binding['operation_id']+'.json')
-                result=supervised_invoke(modules,psycopg,options,binding,baseline,events,journal_root,receipt,parent_handles,fault)
+                result=supervised_invoke(modules,psycopg,options,binding,baseline,events,journal_root,receipt,parent_handles,fault,parent_roots[cycle_number])
                 wait_for_no_owner_sessions(psycopg,admin_options,parent_handles)
                 diagnostic=read_diagnostic(receipt) if receipt.exists() else None
                 if diagnostic is not None:
                     with contextlib.suppress(ChildProcessError):
                         os.waitpid(diagnostic['pid'],os.WNOHANG)
                         raise ValueError('supervisor did not reap diagnostic child')
-                if result['outcome']=='CONFIRMED' and diagnostic is None: raise ValueError('confirmed diagnostic missing')
+                if not result['supervisorInvoked'] and diagnostic is not None: raise ValueError('prefork rejection created diagnostic')
+                if result['outcome']=='CONFIRMED' and (diagnostic is None or result['parentCompletionRecorded'] is not True
+                        or result['parentObservedConfirmedChildExit'] is not True): raise ValueError('confirmed parent evidence missing')
                 return result,diagnostic
             def require_uncertain_journal(cycle_number):
                 path=journal_root/format(cycle_number,'032x')/'activation.03-finished.json'
@@ -493,7 +504,7 @@ def verify(directory):
             if diagnostic['connections'][0]['log'] != ['BEGIN_INTRANS','COMMIT_IDLE','ROLLBACK_OR_IDLE','CLOSED']:
                 raise ValueError('real transaction sequence')
             duplicate,again = invoke('activation',1,[],operation_number=99)
-            if duplicate['outcome'] != 'INDETERMINATE' or again['connections']: raise ValueError('same-direction claim reused')
+            if duplicate['supervisorInvoked'] is not False or again is not None: raise ValueError('same-direction claim reused')
             # Synthetic test transcript, never authenticated child evidence or authority.
             closing_events=[{'type':'precheck','snapshot':before},{'type':'activation_started'},
                 {'type':'activation_committed'},{'type':'activation_verified','snapshot':after},
@@ -504,6 +515,27 @@ def verify(directory):
             if not diagnostic['prewriteVerified']:
                 raise ValueError('closure catalog prewrite missing')
             successes.extend(['activation_closure','claim_direction'])
+            parent_active,diagnostic=invoke('activation',7,[])
+            if parent_active['outcome']!='CONFIRMED': raise ValueError('parent fault activation')
+            observe(True)
+            try:
+                parent_failed,diagnostic=invoke('closure',7,closing_events,fault='parent_completion_boundary')
+                if (parent_failed['outcome']!='INDETERMINATE' or parent_failed['supervisorInvoked'] is not True
+                        or parent_failed['parentObservedConfirmedChildExit'] is not True
+                        or parent_failed['parentCompletionRecorded'] is not False or diagnostic is None):
+                    raise ValueError('parent completion fault not detected')
+            finally:
+                # Restore only the deliberately changed test permission; NEVER
+                # delete/overwrite attempt or terminal evidence, nor reset a slot.
+                parent_roots[7].chmod(0o700)
+            observe(False)
+            if ((parent_roots[7]/'closure.terminal.json').exists()
+                    or not (parent_roots[7]/'closure.start.json').exists()):
+                raise ValueError('missing consumed parent closure')
+            blocked,again=invoke('closure',7,closing_events,operation_number=102)
+            if blocked['supervisorInvoked'] is not False or again is not None:
+                raise ValueError('parent uncertainty replay')
+            successes.append('parent_completion_boundary')
             drift_cases=(
                 ('prewrite_grant_drift',4,
                  'GRANT DELETE ON meridian_publisher.reservations TO meridian_test_reader;',
@@ -531,7 +563,7 @@ def verify(directory):
             require_uncertain_journal(2)
             # Synthetic model-ready input must not bypass actual journal history.
             blocked,again = invoke('closure',2,closing_events)
-            if blocked['outcome'] != 'INDETERMINATE' or again['connections']:
+            if blocked['supervisorInvoked'] is not False or again is not None:
                 raise ValueError('uncertain rollback closure accepted')
             successes.append('mid_alter_rollback')
             timed,diagnostic=invoke('activation',6,[],fault='mutation_timeout')
@@ -550,9 +582,9 @@ def verify(directory):
                     or (pending/'activation.02-commit.json').exists() or (pending/'activation.03-finished.json').exists()):
                 raise ValueError('timeout journal evidence')
             blocked,again=invoke('activation',6,[],operation_number=101)
-            if blocked['outcome']!='INDETERMINATE' or again['connections']: raise ValueError('timeout replay')
+            if blocked['supervisorInvoked'] is not False or again is not None: raise ValueError('timeout replay')
             blocked,again=invoke('closure',6,closing_events)
-            if blocked['outcome']!='INDETERMINATE' or again['connections']: raise ValueError('timeout closure')
+            if blocked['supervisorInvoked'] is not False or again is not None: raise ValueError('timeout closure')
             successes.append('supervised_mutation_timeout')
             lost,diagnostic = invoke('activation',3,[],fault='commit_ack_loss')
             if (lost['outcome'] != 'INDETERMINATE'
@@ -561,11 +593,11 @@ def verify(directory):
             observe(True)
             require_uncertain_journal(3)
             blocked,again = invoke('activation',3,[],operation_number=100)
-            if blocked['outcome'] != 'INDETERMINATE' or again['connections']: raise ValueError('lost commit replay')
+            if blocked['supervisorInvoked'] is not False or again is not None: raise ValueError('lost commit replay')
             # No reconciliation override: actual LOGIN remains observed until
             # this private cluster is stopped and removed. Never retry ALTER.
             blocked,again = invoke('closure',3,closing_events)
-            if blocked['outcome'] != 'INDETERMINATE' or again['connections']:
+            if blocked['supervisorInvoked'] is not False or again is not None:
                 raise ValueError('uncertain committed closure accepted')
             successes.append('commit_ack_loss')
             sessions = wait_for_no_owner_sessions(psycopg,admin_options,parent_handles)
@@ -581,8 +613,11 @@ def verify(directory):
                       'sameTransactionCatalogGrantsRolesPrewriteExercised':True,
                       'prewriteInputSha256':prewrite_module.PINS,
                       'grantDocumentSha256':GRANT_DOCUMENT_SHA256,
-                      'localJournalExercised':True,'journalReplayAfterReopenRejected':True,
-                      'journalUncertainClosureRejected':['mid_alter_rollback','commit_ack_loss'],
+                      'localParentCompletionCoordinatorExercised':True,
+                      'parentCompletionSourceSha256':modules['publisher_parent_completion'].PINS,
+                      'perSyntheticCyclePrivateAnchor':True,'externalCallerAcknowledgementProven':False,
+                      'parentFilesystemIoDeadlineProven':False,'localJournalExercised':True,'parentReplayAfterReopenRejected':True,
+                      'parentUncertainClosureRejected':['mid_alter_rollback','commit_ack_loss','supervised_mutation_timeout'],
                       'lostCommitLoginObserved':True,
                       'productionTargetValidated':False,'fullGateAEstablished':False,
                       'durableReplayProtectionProven':False,'activationAuthorized':False}
