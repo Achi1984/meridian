@@ -19,7 +19,7 @@ Mailbox639 is binding;571 is archived. State-changing PRs carry their checkpoint
 
 ## Next gate
 
-Publisher stays paused (`infrastructurePaused=true`) pending the owner's explicit two-option decision in639. No further infrastructure packet may start first. Recommendation: the next packet should expose existing retrospective Arena provenance and evidence limitations, without new replay or PnL computation. The decision comment will specify both options and a bounded alternative Publisher goal/deadline.
+Publisher stays paused (`infrastructurePaused=true`) by explicit owner decision B in #639/comment6238672603. No further infrastructure packet may start first. Recommendation: the next packet should expose existing retrospective Arena provenance and evidence limitations, without new replay or PnL computation. The decision comment preserves both options and the owner's verbatim resolution.
 
 V2 remains SOURCE_AUDIT, all seven authority flags false. No PnL, Discovery, Validation, Holdout, Paper, Live or trading authorization is granted.
 
@@ -66,3 +66,7 @@ The following 37 draft heads are preserved for reversible closure as deferred/no
 | #32 | `cd6b2a073ae9d1cc73544f882b2dbd38517e1dc5` |
 | #31 | `88b72df064d86cb0fbff2c0d1da8123071216524` |
 | #30 | `64484f30a02d7e8701beea2d244618795fdcc79f` |
+
+## Owner decision and assignment — 20:38:33 Europe/Vienna
+
+Decision B is RESOLVED in #639/comment6238672603 with the verbatim owner quote. Publisher remains paused. Arena packet #861 is assigned to GitHub Copilot; first deliver a read-only implementation proposal, then wait for PR860 merge and the lead's fresh base/release allocation. Assignment is verified, execution/completion is not claimed. The 37 drafts above have now been reversibly closed; branches and locks retained (PR860/comment6238693821).

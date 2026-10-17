@@ -74,3 +74,7 @@ Do not install an entire ECC or other plugin bundle merely to accelerate work.
 Evaluate only a concrete missing capability, its provenance, dependencies and
 permissions within a separately bounded proposal. Existing agents and tooling are
 the default; no blanket plugin installation or new external access is authorized.
+
+## Owner resource preference — 2026-10-17
+
+Prefer existing GitHub-hosted agents for bounded implementation proposals, code and checks; the lead retains scope, integration and acceptance. Start with one substantial packet, avoid duplicate local/subagent implementation and repeated polling. Verify assignment and report it separately from execution. Use existing permissions only; reviewer-only Claude must not be repurposed as a writer. Exact-head CI, independent review and post-merge gates remain mandatory. Owner evidence: Mailbox639/comment6238672603; first assigned packet: #861 (Copilot).
