@@ -19,6 +19,8 @@ Comment numbers, command-line flags and the callback below are not authenticatio
 Prepare a new owner-only directory
 `/home/codespace/meridian-commissioning-20261014/recovery-830-reviewed`.
 If it already exists, inspect and reconcile it; do not overwrite or reuse blindly.
+Both the commissioning directory and staging directory must be owner-only;
+check their ownership and every ancestor for symlinks and group/world writes.
 Place the eight `scripts/` files from immutable
 `d8a12f8dfeb25843d186111094e1cdc1fbb35b0d` there, plus `scope.json`, copied
 byte-for-byte from `docs/autonomy/PUBLISHER_RECOVERY_SCOPE_20261017.json` at
@@ -41,14 +43,20 @@ source review cannot resolve it by itself.
 The lead supplies this body to the interpreter only after the external gates
 above are satisfied. Launch with shell tracing off and core dumps disabled;
 reject unexpected ambient instrumentation rather than silently repairing it.
-The three inherited Python environment variables previously identified in the
-Codespace may be unset as in the reviewed read-only invocation. The reviewed
+The three inherited variables `PYTHONIOENCODING`, `PYTHON_PATH` and `PYTHON_ROOT`
+must be unset as in the reviewed read-only invocation. The reviewed
 reconciler rejects prohibited remaining environment variables.
 
 The process must have terminal stdin/stderr. Paste as a reviewed `-c` argument
 or a separately byte-verified file, **not stdin/heredoc execution**, since that
 would replace terminal stdin. Preserve the exact body bytes and verify them
 before importing or executing it. No `exec` occurs from a network response.
+
+Exact embedded-body SHA256 (2918 bytes, including its final newline):
+`3f5e0758a0138ed2df334847422d2b27d7fa6123cd019432647581755e1aae76`.
+The approval ID below deliberately differs from the immutable proposal's null
+approval field: the later real-chat approval is recorded separately and does
+not change the pinned proposal bytes.
 
 ```python
 import hashlib
@@ -119,12 +127,35 @@ raise SystemExit(module.run_approved_recovery(
 
 ## Observation and stopping rule
 
+After independent review and resolution of external trust/session gates, use
+the already staged, separately verified file. The exact proposed shell launch
+is below; it is not to be run as part of document or unit-test validation.
+No shell `-x`, Python `-O`, heredoc or input redirection is permitted.
+
+```bash
+(
+  set +x
+  ulimit -c 0 || exit 1
+  cd /home/codespace/meridian-commissioning-20261014/recovery-830-reviewed || exit 1
+  printf '%s\n' '3f5e0758a0138ed2df334847422d2b27d7fa6123cd019432647581755e1aae76  invocation.py' | sha256sum --check --status || exit 1
+  env -u PYTHONIOENCODING -u PYTHON_PATH -u PYTHON_ROOT /home/codespace/meridian-commissioning-20261014/venv/bin/python -I -B /home/codespace/meridian-commissioning-20261014/recovery-830-reviewed/invocation.py
+  meridian_recovery_exit=$?
+  printf 'RECOVERY_EXIT=%s\n' "$meridian_recovery_exit"
+  exit "$meridian_recovery_exit"
+)
+```
+
+This shell check and subsequent file execution rely on the externally maintained
+source window; they do not defeat a malicious same-UID process swapping the
+file between commands. Do not infer exclusive control from successful hashes.
+
 This body invokes only the reviewed recovery wrapper, once. The wrapper performs
 fresh provider -> read-only DB -> provider reconciliation, checks the exact
 marker identity and source/baseline again, then archives the marker inode and
 evidence without invoking setup. The archive is named from the one operation ID.
 
-Require both final `OWNER_RECOVERY_ARCHIVED_NO_SETUP_AUTHORIZED` and observed
+The reconciler may emit an earlier status; use the final wrapper status, not
+an intermediate success. Require both `OWNER_RECOVERY_ARCHIVED_NO_SETUP_AUTHORIZED` and observed
 outer OS exit0. In-process returns are insufficient. Independently inspect the
 archive and absence of the original marker afterward, and record the operation
 ID from its evidence. Any missing output, nonzero exit, exception, lost session,
