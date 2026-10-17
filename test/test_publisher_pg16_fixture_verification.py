@@ -20,7 +20,9 @@ SPEC.loader.exec_module(m)
 
 
 def fixture():
-    return {'inventory': [{'kind': 'schema', 'name': 'meridian_publisher', 'owner_oid': 42, 'left': 'schema'}],
+    return {'inventory': [{'kind': 'schema', 'name': 'meridian_publisher', 'owner_oid': 42, 'left': 'schema'}] +
+                [{'kind': 'internal_fk_trigger', 'name': str(i), 'owner_oid': 42,
+                  'left': '{"enabled":"O"}'} for i in range(4)],
             'functions': [{'name': name, 'owner': 42, 'securityDefiner': False,
                            'configuration': ['search_path=pg_catalog'], 'language': 'plpgsql'}
                           for name in ('guard_reservation', 'guard_send_record')],
@@ -75,6 +77,14 @@ class Tests(unittest.TestCase):
             observed = copy.deepcopy(expected); mutate(observed)
             with self.assertRaises(ValueError):
                 m.compare(expected, observed)
+
+    def test_shipped_inspector_inventory_includes_internal_fk_state(self):
+        inventory, _ = m.sources()
+        section = inventory.split("'internal_fk_trigger',", 1)[1].split(" UNION ALL SELECT 'function'", 1)[0]
+        self.assertNotIn('tgname', section)
+        for field in ('c.relname', 'k.conname', 'pn.nspname', 'p.proname', 't.tgtype',
+                      't.tgenabled', 't.tgdeferrable', 't.tginitdeferred'):
+            self.assertIn(field, section)
 
     def test_catalog_normalizes_only_owner_oid(self):
         value = fixture()
@@ -166,7 +176,7 @@ class Tests(unittest.TestCase):
         kill.assert_called_once_with(12345, m.signal.SIGKILL)
         process.wait.assert_called_once_with(timeout=3)
 
-    def exercise_cluster(self, cleanup_fault=False, wrong_identity=False):
+    def exercise_cluster(self, cleanup_fault=False, wrong_identity=False, hidden_inspector_mutation=False):
         calls = []
         cluster = []
         def local_run(argv, text=None, timeout=10):
@@ -185,6 +195,8 @@ class Tests(unittest.TestCase):
             if 'BEGIN;' in text:
                 if m.NEGATIVES['disabled_internal_fk_trigger'] in text:
                     value['internalFkTriggers'][0]['enabled'] = 'D'
+                    if not hidden_inspector_mutation:
+                        value['inventory'][1]['left'] = '{"enabled":"D"}'
                 else:
                     value['inventory'][0]['left'] = 'synthetic changed definition'
             return json.dumps(value)
@@ -195,7 +207,7 @@ class Tests(unittest.TestCase):
         with patch.object(m.os, 'getuid', return_value=1000), patch.object(m, 'binaries', return_value=(tools, {}, {})), \
              patch.object(m, 'run', side_effect=local_run), patch.object(m.subprocess, 'Popen', return_value=server) as popen, \
              patch.object(m.os, 'killpg') as kill:
-            if cleanup_fault or wrong_identity:
+            if cleanup_fault or wrong_identity or hidden_inspector_mutation:
                 with self.assertRaises(ValueError):
                     m.verify(Path('/fixed'))
                 result = None
@@ -219,6 +231,9 @@ class Tests(unittest.TestCase):
         mutations = [text for _, text in calls if text and 'BEGIN;' in text]
         self.assertEqual(len(mutations), len(m.NEGATIVES))
         self.assertTrue(all(text.endswith('ROLLBACK;') for text in mutations))
+
+    def test_internal_fk_mutation_must_be_visible_in_shipped_inventory(self):
+        self.exercise_cluster(hidden_inspector_mutation=True)
 
     def test_server_cleanup_failure_never_returns_report(self):
         self.exercise_cluster(cleanup_fault=True)
