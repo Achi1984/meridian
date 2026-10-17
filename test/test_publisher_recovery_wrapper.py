@@ -29,6 +29,8 @@ class WrapperTests(unittest.TestCase):
         self.marker.chmod(0o600)
         self.baseline = self.root / 'baseline.json'
         self.baseline.write_text('{}')
+        # Fixture permissions must not depend on inherited creation defaults.
+        self.baseline.chmod(0o600)
         self.manifest = {name: hashlib.sha256((SCRIPTS/name).read_bytes()).hexdigest() for name in w.FILES}
         self.failed = {name: 'a'*64 for name in w.FAILED_FILES}
         self.argv = ['--check', '--owner-approved-cli-sessions', '--acknowledge-provider-logging',
