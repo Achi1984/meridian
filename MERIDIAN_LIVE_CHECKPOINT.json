@@ -98,7 +98,7 @@
   "bootstrapFile": "MERIDIAN_GO.md",
   "currentWork": {
     "updatedAt": "2026-10-17",
-    "verifiedSourceMain": "1406845c8728a75652e10cd29c999494745c9034",
+    "verifiedSourceMain": "5c996ee9c7d4e71f0d6f2ecd59f6fc53beedcce3",
     "lastCompletedSourceMerge": {
       "pr": 845,
       "mergeSha": "1406845c8728a75652e10cd29c999494745c9034",
@@ -135,8 +135,64 @@
         "pages": 39025396725
       }
     },
-    "package": "CONTINUITY_AFTER_845_COMPLETE_PREPARED_NOLOGIN",
-    "state": "PR845_COMPLETE_CONTINUITY_READY_FOR_PUBLICATION_OWN_GATES",
+    "package": "BOUNDED_GITHUB_AUTOPILOT_PREPARATION_PR868",
+    "state": "MAIN859_VERIFIED_EXISTING_COORDINATOR_ENABLED_FIRST_RUN_PENDING_862_CI_FAILURE_PR868_NATIVE_PROPOSAL_DISABLED",
+    "nextStep": "OBSERVE_EXISTING_COORDINATOR_FIRST_RUN_ONCE; KEEP_NATIVE_WORKFLOW_PROPOSAL_DISABLED; RECONCILE_862_CI_FAILURE",
+    "existingOwnerApprovedCoordinator": {
+      "approvalCommentId": 6239688670,
+      "statusCommentId": 6239688891,
+      "automationId": "6ac559aa5a888191a09b2fd497405a70",
+      "title": "Meridian Agenten-Koordination",
+      "updateSucceeded": true,
+      "enabled": true,
+      "schedule": "HOURLY",
+      "runLimit": 24,
+      "startAt": "2026-10-17T21:45:00 Europe/Vienna",
+      "firstNewRun": "NOT_YET_OBSERVED",
+      "nextRunTimeProvided": false,
+      "automaticMerge": false,
+      "automaticDeploy": false,
+      "usesLeadConnectedIssueAssignment": true,
+      "distinctFromNativeProposalPr868": true
+    },
+    "currentMainReconciliation": {
+      "mainSha": "5c996ee9c7d4e71f0d6f2ecd59f6fc53beedcce3",
+      "mergePr": 859,
+      "repair862": {
+        "head": "15ccb6bd0b2157abc2b44aeebce73229aeb0c1b4",
+        "ciRunId": 39061699022,
+        "attempts": [
+          {
+            "attempt": 1,
+            "conclusion": "action_required",
+            "jobs": 0
+          },
+          {
+            "attempt": 2,
+            "conclusion": "failure",
+            "job": "syntax",
+            "jobId": 117484116143,
+            "failingStep": "Research and auth regression tests",
+            "passedTests": 2582,
+            "failedTests": 5
+          }
+        ],
+        "state": "UNMERGED_CI_FAILURE"
+      },
+      "handoff860": {
+        "head": "ebaed4ab9bf274d2d569fe3d6aa3c46a2890e1de",
+        "state": "WAITING_ON_862"
+      },
+      "arena861": {
+        "kind": "issue",
+        "state": "QUEUED_ON_860"
+      },
+      "preparation868": {
+        "base": "5c996ee9c7d4e71f0d6f2ecd59f6fc53beedcce3",
+        "draft": true,
+        "pilotEnabled": false
+      }
+    },
     "infrastructurePaused": true,
     "mailboxRollover": {
       "from": 571,
@@ -254,7 +310,7 @@
         "authorizedReproductionBudget": "UNKNOWN"
       }
     },
-    "nextStep": "PUBLISH_CONSOLIDATED_CONTINUITY_ON_VERIFIED_MAIN_WITH_OWN_CI_REVIEW_THEN_PINNED_FIXTURE_COMPARATOR_PACKAGE",
+    "continuityNextStepHistorical": "PUBLISH_CONSOLIDATED_CONTINUITY_ON_VERIFIED_MAIN_WITH_OWN_CI_REVIEW_THEN_PINNED_FIXTURE_COMPARATOR_PACKAGE",
     "ownerPathInspection": {
       "pr": 828,
       "mergeSha": "bfebd17ddfa1d2d3b44a15126e28618a82cb81f2",
@@ -1115,6 +1171,93 @@
       ],
       "runtimeEvidenceCommentId": 6232998743,
       "runtimeScope": "DISPOSABLE_LOCAL_PG16_FIXTURE_ONLY_NO_DEPLOYED_DATABASE_CLAIM"
+    },
+    "boundedAutopilotPreparation20261017": {
+      "operationId": "MERIDIAN-AUTOPILOT-PREPARATION-20261017-001",
+      "state": "PREPARATION_ONLY_BLOCKED_NO_ACTIVATION",
+      "proposalIssue": 867,
+      "preparationPr": 868,
+      "ownerApproval": {
+        "mailboxIssue": 639,
+        "commentId": 6239454116,
+        "at": "2026-10-17T21:22:29+02:00",
+        "quote": "Ja Freigabe erteilt",
+        "scope": "PREPARATION_ONLY",
+        "activationAuthorized": false
+      },
+      "startingInputs": {
+        "mainSha": "5c996ee9c7d4e71f0d6f2ecd59f6fc53beedcce3",
+        "branch": "copilot/proposal-bounded-github-autopilot",
+        "branchHead": "ad625f1642e011b6100086dec88d4641ceb20e97",
+        "checkpointBlobSha": "fd80e609b9dfb196f8bb317682bad923fd80aef5"
+      },
+      "queue": [
+        {
+          "target": 862,
+          "kind": "pull_request",
+          "base": "5c996ee9c7d4e71f0d6f2ecd59f6fc53beedcce3",
+          "head": "15ccb6bd0b2157abc2b44aeebce73229aeb0c1b4",
+          "ciRunId": 39061699022,
+          "ciConclusion": "action_required",
+          "ciJobs": 0,
+          "state": "BLOCKED_CI_NOT_SUCCESS"
+        },
+        {
+          "target": 860,
+          "kind": "pull_request",
+          "base": "5c996ee9c7d4e71f0d6f2ecd59f6fc53beedcce3",
+          "head": "ebaed4ab9bf274d2d569fe3d6aa3c46a2890e1de",
+          "state": "BLOCKED_PENDING_862"
+        },
+        {
+          "target": 861,
+          "kind": "issue",
+          "head": null,
+          "state": "QUEUED_PENDING_860"
+        }
+      ],
+      "capabilities": {
+        "watchdog": "MAILBOX_DELIVERY_CLASSIFICATION_ONLY",
+        "leadConnectedIssueAssignment": {
+          "state": "VERIFIED",
+          "assignedIssues": [863, 865, 867]
+        },
+        "autonomousRunnerDispatch": "NOT_ESTABLISHED",
+        "nativeTaskAdapter": "INACTIVE_REQUIRES_USER_TO_SERVER_TOKEN",
+        "codingWorkflow": "PINNED_TO_OTHER_PACKET_NOT_REUSABLE",
+        "workflowApprovalOperationAvailable": false
+      },
+      "pilot": {
+        "enabled": false,
+        "workflowStatus": "DISABLED_PREPARATION_ONLY",
+        "startEpoch": null,
+        "endEpoch": null,
+        "maxWindowSeconds": 86400,
+        "maxActivePackets": 3,
+        "mutationLanes": 1,
+        "maxReconciliationPassesPerHour": 1,
+        "autoMerge": false,
+        "autoDeploy": false
+      },
+      "publisherPause": {
+        "state": "REMAINS_PAUSED",
+        "repair862CleanupExceptionOnly": true,
+        "exceptionApprovalCommentId": 6238949509
+      },
+      "reviewRequestMade": false,
+      "reviewGate": "WAIT_FOR_EXACT_HEAD_CI_SUCCESS",
+      "sourceAudit": {
+        "stage": "SOURCE_AUDIT",
+        "canonicalExecutionAuthorized": false,
+        "strategyPnlAuthorized": false,
+        "discoveryAuthorized": false,
+        "validationAuthorized": false,
+        "holdoutAuthorized": false,
+        "paperAuthorized": false,
+        "liveAuthorized": false
+      },
+      "activationDiff": "BLOCKED_AUTONOMOUS_RUNNER_CAPABILITY_UNESTABLISHED_AND_862_CI_FAILURE",
+      "nextGate": "REPAIR862_EXACT_HEAD_CI_SUCCESS_THEN_REVIEW; EXISTING_COORDINATOR_STATUS_TRACKED_SEPARATELY"
     }
   }
 }
