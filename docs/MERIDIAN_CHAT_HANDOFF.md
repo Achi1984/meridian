@@ -1,6 +1,51 @@
 # MERIDIAN Chat Handoff
 
-## Arena implementation candidate — 2026-10-16
+## Current completion and authority — 2026-10-17
+
+Operation: HANDOFF-824-825-20261017-01. Verified source main:
+`bfebd17ddfa1d2d3b44a15126e28618a82cb81f2` (#828). Build **10.0-r129**.
+This section supersedes all older operational summaries below. This handoff
+candidate has no claimed publication SHA.
+
+- Arena #824 merged at `ed60066fc58b4d60eddd727c24cae61c368720bb`.
+  Full-scope review 6229617979; all six postchecks succeeded:
+  Release39002934108, Runtime39002934109, Coordinator39002934102,
+  Visual39002934147, Orchestration39002934170, Pages39002933046.
+  FINAL_MERGE_STATUS6229668839. Retrospective offline diagnostic only;
+  no forward/holdout/profitability proof, no runtime orders or auto-promotion.
+- Publisher #825 merged at `8691381510039e2ad48b863ea5e66d6ad6cba462`. Full four-file review
+  6229794718; premerge CI39003151050 succeeded (2561 pass, zero failures).
+  Local19 fault tests passed CPython3.14.2 with pinned dependencies.
+  FINAL_MERGE_STATUS6229853101. All four postmerge checks succeeded:
+  Release39004204488, Runtime39004204504, Pages39004203840;
+  Coordinator39004204485. Source packet complete.
+- Read-only owner-path inspector #828 merged at the verified main above.
+  Review6229960697; FINAL_MERGE_STATUS6229980850. Postchecks pending.
+  No production caller, recovery or setup was added.
+- The publisher primitive is inactive: no CLI or production caller.
+  A future reviewed wrapper must establish canonical passwd-owner paths,
+  authenticated approval/source evidence, fresh exclusivity and provider/DB
+  reconciliation. Any propagated exception must be treated as uncertain.
+  Real marker, credentials and DB were not touched.
+- Owner instruction at 2026-10-17T06:31:42+02:00:
+  “Du kannst selbst zukünftig über merges entscheiden - freigabe erteilt”.
+  Recorded in mailbox639/comment6229644994. ChatGPT now decides future merges;
+  older per-merge owner-confirmation requirements are superseded. Exact-head/base
+  CI, full independent review, single writer, expected-head guards and successful
+  postchecks remain mandatory. This delegates merge decisions only, not runtime
+  recovery/setup, activation, trading, spending or schedule/credential changes.
+
+- Owner working model at 2026-10-17T07:04:42+02:00: Christoph sets direction;
+  ChatGPT is chief developer for architecture, coherent work packages, agent
+  assignments, integration, quality and merge decisions. Agents implement bounded
+  scopes or independently review; single-writer and runtime gates remain intact.
+
+NEXT: verify #828 postchecks, complete #826 continuity review and prepare the separately reviewed
+runtime wrapper. Concrete recovery and subsequent setup remain separately
+owner-gated. CV2 remains SOURCE_AUDIT with all seven flags false; CRV unresolved.
+Autonomous end-to-end live development remains unproven.
+
+## Historical Arena candidate — superseded 2026-10-16
 
 Build: **10.0-r129** (unmerged candidate). Canonical merged source remains
 `0a32b25c5be4db4d0ae7d3473c664bd7c35e326d` (#821; all four postchecks passed,
@@ -19,7 +64,7 @@ NEXT: complete local engine/receipt/UI checks, exact-head CI and independent
 full-scope review before a guarded merge. No candidate publication SHA is claimed.
 
 
-## Current handoff — 2026-10-16
+## Historical handoff — 2026-10-16 (superseded)
 
 This section is the current operational summary. Historical snapshots below are
 retained for provenance, not as instructions or evidence of present state.
