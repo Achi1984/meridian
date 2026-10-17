@@ -17,7 +17,7 @@ def valid_inputs():
         "window_start_epoch": 100,
         "window_end_epoch": 1000,
         "activation_owner_approval": True,
-        "agent_dispatch_supported": False,
+        "autonomous_runner_dispatch": "NOT_ESTABLISHED",
     })
     state = {
         "target": 862,
@@ -62,7 +62,8 @@ class PilotSimulationTests(unittest.TestCase):
         self.assertEqual(proposal["max_active_packets"], 3)
         self.assertEqual(proposal["mutation_lanes"], 1)
         self.assertEqual(proposal["queue_order"], [862, 860, 861])
-        self.assertIs(proposal["agent_dispatch_supported"], False)
+        self.assertEqual(proposal["lead_connected_issue_assignment"], "VERIFIED")
+        self.assertEqual(proposal["autonomous_runner_dispatch"], "NOT_ESTABLISHED")
 
     def test_disabled_pilot_is_noop(self):
         proposal, state, event = valid_inputs()
@@ -166,12 +167,12 @@ class PilotSimulationTests(unittest.TestCase):
             "WINDOW_EXPIRED",
         )
 
-    def test_unsupported_dispatch_never_returns_ready(self):
+    def test_unestablished_runner_dispatch_never_returns_ready(self):
         proposal, state, event = valid_inputs()
         result = simulate_transition(proposal, state, event, 200)
         self.assertEqual(result, {
             "status": "BLOCKED",
-            "reason": "DISPATCH_UNSUPPORTED",
+            "reason": "AUTONOMOUS_RUNNER_DISPATCH_NOT_ESTABLISHED",
         })
         self.assertNotIn(result["status"], {"READY", "DISPATCH"})
 

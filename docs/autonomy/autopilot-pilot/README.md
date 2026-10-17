@@ -17,10 +17,27 @@ Read from live GitHub before editing:
 | Starting preparation branch head | `ad625f1642e011b6100086dec88d4641ceb20e97` |
 | Starting checkpoint blob | `fd80e609b9dfb196f8bb317682bad923fd80aef5` |
 | Repair PR #862 base/head | `5c996ee9c7d4e71f0d6f2ecd59f6fc53beedcce3` / `15ccb6bd0b2157abc2b44aeebce73229aeb0c1b4` |
-| Repair required CI | run `39061699022`, `action_required`, zero jobs; not success |
+| Repair required CI at preparation start | run `39061699022` attempt 1, `action_required`, zero jobs |
 | Handoff PR #860 base/head | `5c996ee9c7d4e71f0d6f2ecd59f6fc53beedcce3` / `ebaed4ab9bf274d2d569fe3d6aa3c46a2890e1de` |
 | Arena #861 | issue, not a PR; explicitly waits for #860 |
-| Preparation #867 | issue; no pull request was present in the live PR lookup |
+| Preparation #867 / PR #868 | draft PR; pilot disabled |
+
+## Current live reconciliation
+
+The live source main remains `5c996ee9c7d4e71f0d6f2ecd59f6fc53beedcce3`,
+the merge commit for PR #859. Preparation is now draft PR #868 for issue #867;
+its pilot remains disabled. Live issue records show the lead-connected GitHub
+connector successfully assigned Copilot to #863, #865, and #867. Those observed
+assignments verify the connected Lead's issue-assignment capability; they do
+not establish autonomous dispatch from a GitHub Actions runner.
+
+Repair #862 remains unmerged at the pinned head. Run `39061699022` attempt 1
+was `action_required` with zero jobs; attempt 2 now completed `failure` with
+the `syntax` job failing in “Research and auth regression tests”. This is not
+successful exact-head CI. Handoff #860 remains open and waiting; Arena #861
+remains queued behind it. Completed read-only reports from #863/#865 are
+reusable evidence, not active writer assignments. These are current observed
+statuses; the starting SHAs above remain immutable preparation inputs.
 
 The preparation branch was not used to modify #862 or #860. Their source heads
 are evidence pins, not candidate branches for this work. The current checkpoint
@@ -39,35 +56,44 @@ Inspected at the pinned `main` above: `MERIDIAN_GO.md`,
 * The watchdog resolves bounded mailbox records and classifies delivery. Its
   output hardcodes `reviewAuthorization: false` and `executionImpact: false`;
   it does not dispatch an implementation agent.
-* The native Copilot task adapter is inactive by default. It requires a pinned
-  approved task and an externally verified user-to-server token capability;
-  its source explicitly excludes an Actions `GITHUB_TOKEN`. The CLI does not
-  provision credentials or storage. No such capability is available/authorized
-  for this proposal.
+* The connected Lead's issue-assignment capability is verified by the observed
+  Copilot assignments to #863, #865, and #867. This is distinct from dispatch
+  initiated by a GitHub Actions runner.
+* The native Copilot task adapter is inactive by default. That specific runner
+  path requires a pinned approved task and externally verified user-to-server
+  token capability; its source explicitly excludes an Actions `GITHUB_TOKEN`.
+  The CLI does not provision credentials or storage. Autonomous runner
+  dispatch/token/permission capability is **not established** here; this
+  adapter's limitation does not prove that every GitHub-supported dispatch
+  path is unavailable.
 * The existing coding workflow is bound to a different fixed workflow run/head,
   packet claim, and publisher flow. Its `copilot-requests: write` permission and
   publisher write capability cannot be generalized to this queue by editing a
   document. It does not provide the proposed per-PR operation ledger.
 * The current connector has no workflow-approval operation. Run
-  `39061699022` is `action_required` with zero jobs. There is no successful
+  `39061699022` attempt 1 was `action_required` with zero jobs; its attempt 2
+  failed its research/auth regression-test step. There is no successful
   exact-head CI evidence and no independent review; neither may be bypassed.
 
-Therefore this is a concrete **BLOCKED** design, not an implementation
-dispatcher. Do not request Claude review until required exact-head CI succeeds.
-Do not use another branch, copied commits, or a new trigger to bypass that gate.
+Therefore this is a concrete **BLOCKED** activation design, not an implementation
+dispatcher. Lead-connected issue assignment is already demonstrated, but
+autonomous runner dispatch is not established and activation is not approved.
+Do not request Claude review until required exact-head CI succeeds. Do not use
+another branch, copied commits, or a new trigger to bypass that gate.
 
 ## Bounded queue and state machine
 
 `proposal.json` is a non-workflow, disabled configuration source. Its only
 target scope is repository `Achi1984/meridian` and queue #862 → #860 → #861.
-At most three packets may be active, counting this #867 preparation packet,
-#862, and pending #860; #861 remains queued. There is one mutation lane, at
-most one reconciliation pass per hour, and validated events are preferred to
-polling. Each job is capped at 10 minutes, each packet at three agent turns,
-and the entire queue at nine turns. Retry budget is zero. Start/end are unset
-until a separately approved activation; any future window is at most 24 hours
-and does not extend automatically. The pilot ends when the authorized queue
-finishes or the 24-hour window expires, whichever comes first.
+At most three packets may be active, counting repair #862, waiting handoff #860,
+and this disabled preparation PR #868; #861 remains queued. Completed reports
+from #863 and #865 are reused, not active writer packets. There is one mutation
+lane, at most one reconciliation pass per hour, and validated events are
+preferred to polling. Each job is capped at 10 minutes, each packet at three
+agent turns, and the entire queue at nine turns. Retry budget is zero. Start/end
+are unset until a separately approved activation; any future window is at most
+24 hours and does not extend automatically. The pilot ends when the authorized
+queue finishes or the 24-hour window expires, whichever comes first.
 
 For any future approved operation, its per-PR status record must include:
 
@@ -140,9 +166,9 @@ granted here):
 | Capability | Minimum permission/capability to assess | Current state |
 | --- | --- | --- |
 | Read exact refs, PRs, checks/jobs | `contents: read`, `pull-requests: read`, `actions: read` | Not activated for this proposal |
-| Assign Copilot to a fixed issue | `issues: write` plus GitHub-supported user-to-server token capability | Unsupported here; Actions token is not accepted by the existing adapter |
+| Assign Copilot to a fixed issue from an Actions runner | `issues: write` plus a supported authentication capability | Runner capability not established; existing adapter excludes Actions token |
 | Edit a same-PR checkpoint/comment, if explicitly approved | Narrow `contents: write` and/or `pull-requests: write` | Not approved |
-| Copilot CLI generation, if separately justified | `copilot-requests: write` | Existing workflow only; not transferable by this proposal |
+| Copilot CLI generation, if separately justified | `copilot-requests: write` | Existing pinned workflow only; not transferable by this proposal |
 | Merge/deploy | None | Explicitly excluded |
 
 The exact diff is therefore deferred until capability and owner-approval gates

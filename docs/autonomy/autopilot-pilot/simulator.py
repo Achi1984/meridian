@@ -95,6 +95,6 @@ def simulate_transition(proposal, state, event, now_epoch):
             or review.get("self_reported_gap") is not False):
         return _result("BLOCKED", "REVIEW_INCOMPLETE_OR_STALE")
 
-    if proposal.get("agent_dispatch_supported") is not True:
-        return _result("BLOCKED", "DISPATCH_UNSUPPORTED")
+    if proposal.get("autonomous_runner_dispatch") != "VERIFIED":
+        return _result("BLOCKED", "AUTONOMOUS_RUNNER_DISPATCH_NOT_ESTABLISHED")
     return _result("BLOCKED", "NO_MUTATION_IMPLEMENTED")

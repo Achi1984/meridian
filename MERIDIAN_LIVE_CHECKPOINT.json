@@ -98,7 +98,7 @@
   "bootstrapFile": "MERIDIAN_GO.md",
   "currentWork": {
     "updatedAt": "2026-10-17",
-    "verifiedSourceMain": "1406845c8728a75652e10cd29c999494745c9034",
+    "verifiedSourceMain": "5c996ee9c7d4e71f0d6f2ecd59f6fc53beedcce3",
     "lastCompletedSourceMerge": {
       "pr": 845,
       "mergeSha": "1406845c8728a75652e10cd29c999494745c9034",
@@ -135,8 +135,44 @@
         "pages": 39025396725
       }
     },
-    "package": "CONTINUITY_AFTER_845_COMPLETE_PREPARED_NOLOGIN",
-    "state": "PR845_COMPLETE_CONTINUITY_READY_FOR_PUBLICATION_OWN_GATES",
+    "package": "BOUNDED_GITHUB_AUTOPILOT_PREPARATION_PR868",
+    "state": "MAIN859_VERIFIED_862_CI_FAILURE_860_WAITING_861_QUEUED_PR868_DISABLED",
+    "nextStep": "RECONCILE_862_CI_FAILURE_WITH_OWNER; KEEP_860_WAITING_861_QUEUED_PR868_DISABLED",
+    "currentMainReconciliation": {
+      "mainSha": "5c996ee9c7d4e71f0d6f2ecd59f6fc53beedcce3",
+      "mergePr": 859,
+      "repair862": {
+        "head": "15ccb6bd0b2157abc2b44aeebce73229aeb0c1b4",
+        "ciRunId": 39061699022,
+        "attempts": [
+          {
+            "attempt": 1,
+            "conclusion": "action_required",
+            "jobs": 0
+          },
+          {
+            "attempt": 2,
+            "conclusion": "failure",
+            "job": "syntax",
+            "failingStep": "Research and auth regression tests"
+          }
+        ],
+        "state": "UNMERGED_CI_FAILURE"
+      },
+      "handoff860": {
+        "head": "ebaed4ab9bf274d2d569fe3d6aa3c46a2890e1de",
+        "state": "WAITING_ON_862"
+      },
+      "arena861": {
+        "kind": "issue",
+        "state": "QUEUED_ON_860"
+      },
+      "preparation868": {
+        "base": "5c996ee9c7d4e71f0d6f2ecd59f6fc53beedcce3",
+        "draft": true,
+        "pilotEnabled": false
+      }
+    },
     "infrastructurePaused": true,
     "mailboxRollover": {
       "from": 571,
@@ -254,7 +290,7 @@
         "authorizedReproductionBudget": "UNKNOWN"
       }
     },
-    "nextStep": "PUBLISH_CONSOLIDATED_CONTINUITY_ON_VERIFIED_MAIN_WITH_OWN_CI_REVIEW_THEN_PINNED_FIXTURE_COMPARATOR_PACKAGE",
+    "continuityNextStepHistorical": "PUBLISH_CONSOLIDATED_CONTINUITY_ON_VERIFIED_MAIN_WITH_OWN_CI_REVIEW_THEN_PINNED_FIXTURE_COMPARATOR_PACKAGE",
     "ownerPathInspection": {
       "pr": 828,
       "mergeSha": "bfebd17ddfa1d2d3b44a15126e28618a82cb81f2",
@@ -1120,6 +1156,7 @@
       "operationId": "MERIDIAN-AUTOPILOT-PREPARATION-20261017-001",
       "state": "PREPARATION_ONLY_BLOCKED_NO_ACTIVATION",
       "proposalIssue": 867,
+      "preparationPr": 868,
       "ownerApproval": {
         "mailboxIssue": 639,
         "commentId": 6239454116,
@@ -1161,7 +1198,12 @@
       ],
       "capabilities": {
         "watchdog": "MAILBOX_DELIVERY_CLASSIFICATION_ONLY",
-        "nativeDispatcher": "INACTIVE_REQUIRES_UNAVAILABLE_USER_TO_SERVER_TOKEN",
+        "leadConnectedIssueAssignment": {
+          "state": "VERIFIED",
+          "assignedIssues": [863, 865, 867]
+        },
+        "autonomousRunnerDispatch": "NOT_ESTABLISHED",
+        "nativeTaskAdapter": "INACTIVE_REQUIRES_USER_TO_SERVER_TOKEN",
         "codingWorkflow": "PINNED_TO_OTHER_PACKET_NOT_REUSABLE",
         "workflowApprovalOperationAvailable": false
       },
@@ -1193,7 +1235,7 @@
         "paperAuthorized": false,
         "liveAuthorized": false
       },
-      "activationDiff": "BLOCKED_NO_SUPPORTED_DISPATCH_OR_ACTIVATION_AUTHORITY",
+      "activationDiff": "BLOCKED_AUTONOMOUS_RUNNER_CAPABILITY_UNESTABLISHED_AND_862_CI_FAILURE",
       "nextGate": "OWNER_REVIEW_PREPARATION_AND_SEPARATE_ACTIVATION_APPROVAL_AFTER_EXACT_HEAD_CI"
     }
   }
