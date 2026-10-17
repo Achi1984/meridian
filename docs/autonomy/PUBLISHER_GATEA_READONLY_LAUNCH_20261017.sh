@@ -8,10 +8,10 @@ if ! test -t 0 || ! test -t 2; then
   exit 1
 fi
 readonly meridian_gatea_python=/home/codespace/meridian-commissioning-20261014/venv/bin/python
-# Explicit assessed child-only correction: remove PYTHONIOENCODING by name.
-# Never read its value; preserve the caller and every other environment binding.
+# Explicit assessed child-only correction: remove exactly these three names.
+# Never read their values; preserve the caller and every other binding.
 # Existing forbidden-environment guards remain unchanged and fail closed.
-/usr/bin/env -u PYTHONIOENCODING "$meridian_gatea_python" -I -B - <<'PY'
+/usr/bin/env -u PYTHONIOENCODING -u PYTHON_PATH -u PYTHON_ROOT "$meridian_gatea_python" -I -B - <<'PY'
 import hashlib
 import os
 from pathlib import Path
@@ -79,7 +79,7 @@ if test "$meridian_gatea_preflight_exit" -ne 0; then
   exit 1
 fi
 # Flags acknowledge the externally authenticated approval; they do not grant it.
-/usr/bin/env -u PYTHONIOENCODING "$meridian_gatea_python" -I -B \
+/usr/bin/env -u PYTHONIOENCODING -u PYTHON_PATH -u PYTHON_ROOT "$meridian_gatea_python" -I -B \
   /home/codespace/meridian-commissioning-20261014/gatea-readonly-c4e860eb-reviewed/publisher_test_readonly_inspection.py \
   --inspect-read-only --owner-approved-cli-sessions \
   --acknowledge-provider-logging --exclusive-owner-window \

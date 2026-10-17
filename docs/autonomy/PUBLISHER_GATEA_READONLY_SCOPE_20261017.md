@@ -3,7 +3,7 @@
 Operation: `PUBLISHER-GATEA-LAUNCH-20261017-01`. This packet is source-only:
 not approved for operational execution, not executed, and not a workflow.
 The literal companion is `PUBLISHER_GATEA_READONLY_LAUNCH_20261017.sh`, SHA256
-`6f2d75c8b820d4efe298ea52a8730715b1ba07c73c419f1e9cbe9e4a5cf4ab88`.
+`19b91760ade3940a04ad61a6e970551c337ea77a7d848cd65ff49d8042fc1b3e`.
 Its command flags do not authenticate or grant approval. Do not execute it during
 review, CI, import or a scheduled task. Merge alone grants no runtime authority.
 
@@ -42,18 +42,33 @@ processes remain trusted runtime inputs, not fully attested by source hashes.
 
 The launcher requires a TTY and preserves the caller environment. A local-only
 preflight on CPython3.14.2 stopped at its existing environment guard before file
-checks; the only rejected variable name was `PYTHONIOENCODING`. Its value was
-not read and no provider/database inspection ran. The explicitly assessed
-correction is `/usr/bin/env -u PYTHONIOENCODING` for each Python child, both the
-local preflight and inspector invocation. Only that variable is removed from
-those child environments; the parent shell, CLI session caches and every other
-binding are unchanged. Isolated Python (`-I`) ignores Python configuration
-variables, including this output-encoding override; removing its presence also
-satisfies the unchanged explicit guard in the inspector and reused helpers.
-This is launch-environment preparation, not a production-policy exception or
-permission to remove arbitrary variables or credentials. No value is printed,
-copied or replaced. `/usr/bin/env` uses the existing trusted platform runtime;
-no tool is installed. Every other forbidden variable still stops execution.
+checks. A first reading incorrectly reported only `PYTHONIOENCODING`; full-view
+reinspection of the same names-only output confirmed three names:
+`PYTHONIOENCODING`, `PYTHON_PATH`, `PYTHON_ROOT`. Their values were not read.
+R2 removed only the initially reported name and its local-only preflight still
+stopped at the unchanged guard. Neither local failure ran provider/database
+inspection; both observations remain recorded rather than being called passes.
+
+The corrected, explicitly assessed invocation uses
+`/usr/bin/env -u PYTHONIOENCODING -u PYTHON_PATH -u PYTHON_ROOT` for both Python
+children. Only those three names are removed from their child environments;
+the parent shell and every other binding are unchanged. The reviewed recovery
+and setup launch documents already use this exact trio. The latter two names
+are distinct from the standard `PYTHONPATH` and `PYTHONHOME`: neither is used
+by the fixed absolute interpreter invocation or the inspected helpers. Isolated
+Python (`-I`) ignores its Python configuration environment, including the output
+encoding override. Existing explicit `PYTHON*` and other environment guards are
+unchanged and still reject every prohibited remaining name, including
+`PYTHONPATH` and `PYTHONHOME`.
+
+The reused provider CLI command environment is separately constructed from its
+existing fixed allowlist (including HOME obtained from the operating-system
+account); it does not derive session caches or authentication from these three
+names. This correction does not change that allowlist, credentials or cache
+paths. It is explicit launch-environment preparation, not a production-policy
+exception or permission to remove arbitrary variables or credentials. No values
+are printed, copied or replaced. `/usr/bin/env` uses the existing trusted platform
+runtime; no tool is installed.
 
 This source change requires exact-head review and the new literal digest before
 use; it does not authorize an operational retry. If a required check fails,
