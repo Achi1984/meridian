@@ -2,6 +2,8 @@ import contextlib
 import enum
 import importlib.util
 import io
+import json
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -41,11 +43,11 @@ class FixtureTests(unittest.TestCase):
         with mock.patch.object(m.subprocess,'Popen',side_effect=AssertionError('process on import')), mock.patch.object(m.socket,'socket',side_effect=AssertionError('socket on import')):
             module=importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
-        self.assertEqual(module.CASES,('activation_closure','mid_alter_rollback','commit_ack_loss','claim_direction','prewrite_grant_drift','prewrite_catalog_drift'))
+        self.assertEqual(module.CASES,('activation_closure','mid_alter_rollback','commit_ack_loss','claim_direction','prewrite_grant_drift','prewrite_catalog_drift','supervised_mutation_timeout'))
 
     def test_source_pins_match_existing_modules(self):
         modules=m.load_sources()
-        self.assertEqual(set(modules),{'publisher_role_cycle','publisher_role_transition','publisher_role_journal','publisher_role_prewrite','publisher_pg16_fixture_verification'})
+        self.assertEqual(set(modules),{'publisher_role_cycle','publisher_role_transition','publisher_role_journal','publisher_role_prewrite','publisher_role_supervision','publisher_pg16_fixture_verification'})
         self.assertEqual(modules['publisher_role_transition'].MANIFEST,'611ce25904b59473149f5cb8bc69613309b0b8b147df6296defdfecc0ee11274')
 
     def test_source_mismatch_fails_before_import(self):
@@ -216,6 +218,87 @@ class FixtureTests(unittest.TestCase):
         with contextlib.redirect_stdout(output):
             result=m.main(['--pg-bin','/unused','--host','remote'])
         self.assertEqual(result,1); self.assertEqual(output.getvalue(),m.FAILURE+'\n')
+
+    def test_supervised_factory_refuses_open_parent_and_constructs_child_only(self):
+        supervisor=mock.Mock()
+        modules={'publisher_role_supervision':supervisor}
+        with self.assertRaisesRegex(ValueError,'parent connection'):
+            m.supervised_invoke(modules,None,None,None,None,[],None,None,[types.SimpleNamespace(closed=False)])
+        supervisor.supervise_transition.assert_not_called()
+        def same_process(binding,baseline,events,factory,**kwargs):
+            with factory(lambda token: None): pass
+        supervisor.supervise_transition=same_process
+        with mock.patch.object(m,'prepare_services') as prepare:
+            with self.assertRaisesRegex(ValueError,'child only'):
+                m.supervised_invoke(modules,None,None,None,None,[],None,None,[])
+            prepare.assert_not_called()
+
+    def test_child_context_closes_all_connections_and_journal_before_diagnostic(self):
+        calls=[]; parent=m.os.getpid()
+        class Handle:
+            closed=False
+            def close(inner): calls.append('connection'); inner.closed=True
+        handle=Handle()
+        services=types.SimpleNamespace(connections=[types.SimpleNamespace(raw=handle)],
+            journal=types.SimpleNamespace(close=lambda:calls.append('journal')))
+        def supervisor(binding,baseline,events,factory,**kwargs):
+            with mock.patch.object(m.os,'getpid',return_value=parent+1):
+                with factory(lambda token: calls.append(token)) as actual:
+                    self.assertIs(actual,services); actual.phase(b'M')
+            return {'outcome':'INDETERMINATE'}
+        modules={key:None for key in ('publisher_role_transition','publisher_role_journal','publisher_role_prewrite')}
+        modules['publisher_role_supervision']=types.SimpleNamespace(supervise_transition=supervisor)
+        with mock.patch.object(m,'prepare_services',return_value=services), mock.patch.object(m,'write_diagnostic',side_effect=lambda *unused:calls.append('diagnostic')):
+            result=m.supervised_invoke(modules,None,None,None,None,[],None,None,[])
+        self.assertEqual(calls,[b'M','connection','journal','diagnostic'])
+        self.assertEqual(result['outcome'],'INDETERMINATE')
+        services.connections=[types.SimpleNamespace(raw=types.SimpleNamespace(closed=False,close=mock.Mock(side_effect=RuntimeError()))) ]
+        calls.clear()
+        with self.assertRaises(ValueError): m.close_services(services)
+        self.assertEqual(calls,['journal'])
+
+    def test_parent_observer_close_and_bounded_session_poll(self):
+        raw=Raw(); raw.fetchone=lambda:(1,)
+        driver=types.SimpleNamespace(connect=lambda **unused:raw)
+        handles=[]
+        with self.assertRaises(RuntimeError):
+            with m.parent_connection(driver,{},handles): raise RuntimeError('observer failure')
+        self.assertEqual(handles,[raw]); self.assertTrue(raw.closed)
+        counts=iter((2,0)); raw.fetchone=lambda:(next(counts),)
+        with mock.patch.object(m.time,'sleep'):
+            self.assertEqual(m.wait_for_no_owner_sessions(driver,{},handles),0)
+        self.assertTrue(raw.closed)
+        raw.fetchone=lambda:(1,)
+        with mock.patch.object(m.time,'monotonic',side_effect=(0,6)):
+            with self.assertRaisesRegex(ValueError,'sessions remain'):
+                m.wait_for_no_owner_sessions(driver,{},handles)
+
+    def test_timeout_marker_after_real_alter_before_stop(self):
+        raw=Raw(); conn=m.TransactionConnection(raw,PQ,'mutation_timeout'); conn.begin()
+        events=[]
+        conn.after_first_alter=lambda:events.append(list(raw.sql))
+        with mock.patch.object(m.os,'kill',side_effect=lambda pid,sig:events.append(sig)):
+            conn.cursor().execute('ALTER ROLE first LOGIN;')
+        self.assertEqual(events,[['BEGIN;','ALTER ROLE first LOGIN;'],m.signal.SIGSTOP])
+        self.assertEqual(conn.alters,1); self.assertEqual(conn.commits,0)
+        self.assertEqual(raw.info.transaction_status,Status.INTRANS)
+
+    def test_diagnostic_is_bounded_exclusive_private_and_not_authority(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/'receipt.json'
+            service=types.SimpleNamespace(catalog_prewrite=types.SimpleNamespace(last_report={}),connections=[])
+            with mock.patch.object(m.os,'getpid',return_value=os.getpid()+100): m.write_diagnostic(path,service)
+            value=m.read_diagnostic(path)
+            self.assertEqual(set(value),{'kind','pid','prewriteVerified','connections'})
+            with self.assertRaises(FileExistsError): m.write_diagnostic(path,service)
+            path.chmod(0o644)
+            with self.assertRaises(ValueError): m.read_diagnostic(path)
+            path.chmod(0o600); path.write_text('x'*8193)
+            with self.assertRaises(ValueError): m.read_diagnostic(path)
+            path.write_text('{"kind":1,"kind":2}')
+            with self.assertRaises(ValueError): m.read_diagnostic(path)
+            path.unlink(); path.symlink_to(Path(tmp)/'missing')
+            with self.assertRaises(OSError): m.read_diagnostic(path)
 
 class PrewriteTests(unittest.TestCase):
     def setUp(self):

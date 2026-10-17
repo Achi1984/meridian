@@ -6,7 +6,9 @@ listens only on 127.0.0.1 with ephemeral TLS certificate/key; actual libpq
 verify-full TLS and real SQL transactions exercise the unchanged role driver.
 The identical-looking owner/database/role names exist ONLY inside that cluster.
 
-Binding/approval/phase services are TEST DOUBLES. Catalog/grant/role prewrite
+Binding/approval and closure transcripts are TEST DOUBLES. Phase supervision
+uses the pinned real parent/child adapter; all connection/journal/prewrite handles
+are created in the child, after all parent database handles are verified closed. Catalog/grant/role prewrite
 uses the pinned real adapter on the same transaction. Claim and record use
 the real local fsynced journal in this disposable root; no reconciliation override
 is supplied. Uncertain activation blocks closure even with model-ready input. In particular
@@ -17,6 +19,7 @@ Actual transaction/TLS evidence is separate from those missing integrations.
 Only already-installed psycopg3.3.6 and /usr/bin/openssl are accepted.
 """
 import argparse
+import contextlib
 import hashlib
 import importlib.metadata
 import importlib.util
@@ -37,11 +40,12 @@ PINS = {
     'publisher_role_cycle.py': 'fb46bfbd8ba52546bec25a7bab3864ac96abbd34d1e10cf0e8ab1939dc39c230',
     'publisher_role_transition.py': '93bd773e584072227a659b836bbb7aa079eb9a86736ab6e5ef3e97e7cb98785a',
     'publisher_role_journal.py': '3789410d4d67cc12db3404bd1cf58b4b6c0bb8633646b849e9c8106dec046425',
+    'publisher_role_supervision.py': '80cfd10ab5c90feb93fab1bcde6963136074994eb54cdf2a2176acc8a52f90fe',
     'publisher_role_prewrite.py': 'a5e62a0e1c22a16eec057b65b446873a0b9f96abfe78ce78210caabc46defc97',
     'publisher_pg16_fixture_verification.py': 'e6907d86a45f766d288f41bba238b100767516247e5a56991df9f410d98a0871',
 }
 FAILURE = 'LOCAL_ROLE_TRANSITION_FIXTURE_FAILED_NO_PROVIDER_CLAIM'
-CASES = ('activation_closure', 'mid_alter_rollback', 'commit_ack_loss', 'claim_direction', 'prewrite_grant_drift', 'prewrite_catalog_drift')
+CASES = ('activation_closure', 'mid_alter_rollback', 'commit_ack_loss', 'claim_direction', 'prewrite_grant_drift', 'prewrite_catalog_drift', 'supervised_mutation_timeout')
 
 
 def load_sources():
@@ -166,7 +170,13 @@ class FixtureCursor:
             if self.connection.fault == 'mid_alter_rollback' and self.connection.alters == 2:
                 # First ALTER really executed; the second fails before transmission.
                 raise RuntimeError('synthetic second ALTER failure')
-        return self.raw.execute(sql)
+        result=self.raw.execute(sql)
+        if (sql.startswith('ALTER ROLE ') and self.connection.fault=='mutation_timeout'
+                and self.connection.alters==1):
+            # Actual first ALTER has returned INTRANS; parent must kill this child.
+            self.connection.after_first_alter()
+            os.kill(os.getpid(),signal.SIGSTOP)
+        return result
     def fetchmany(self, limit): return self.raw.fetchmany(limit)
 
 
@@ -184,11 +194,13 @@ class TestServices:
         self.catalog_prewrite=prewrite
         self.connections = []
         self.phase_log = []
+        self.after_first_alter = None
     def expected_binding(self): return self.binding
     def claim(self, binding): return self.journal.claim(binding)
     def connect(self):
         raw = self.psycopg.connect(**self.options)
         connection = TransactionConnection(raw,self.psycopg.pq,self.fault)
+        connection.after_first_alter=self.after_first_alter
         self.connections.append(connection)
         return connection
     def prewrite(self, connection, binding):
@@ -226,6 +238,111 @@ def invoke_driver(driver, services, baseline, events):
             services.journal.close()
         if failed: raise ValueError('driver connection cleanup indeterminate')
 
+
+
+def close_services(services):
+    """Every connection close precedes journal release; one failure skips neither."""
+    failed=False
+    try:
+        for connection in services.connections:
+            try:
+                if not connection.raw.closed: connection.raw.close()
+                if connection.raw.closed is not True: failed=True
+            except BaseException: failed=True
+    finally:
+        try: services.journal.close()
+        except BaseException: failed=True
+    if failed: raise ValueError('child resource cleanup')
+
+
+def write_diagnostic(path,services):
+    # Synthetic diagnostics only; never promote these to supervisor/authority proof.
+    value={'kind':'LOCAL_CHILD_DIAGNOSTIC','pid':os.getpid(),
+           'prewriteVerified':services.catalog_prewrite.last_report is not None,
+           'connections':[{'alters':c.alters,'commits':c.commits,'rollbacks':c.rollbacks,
+                           'closed':c.closed,'log':c.log} for c in services.connections]}
+    data=json.dumps(value,sort_keys=True,separators=(',',':')).encode()
+    if len(data)>8192: raise ValueError('diagnostic size')
+    fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+    try:
+        if os.write(fd,data)!=len(data): raise ValueError('diagnostic short write')
+    finally: os.close(fd)
+
+
+def read_diagnostic(path):
+    fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+    try:
+        info=os.fstat(fd)
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid!=os.getuid()
+                or stat.S_IMODE(info.st_mode)!=0o600 or info.st_nlink!=1
+                or not 0<info.st_size<=8192): raise ValueError('diagnostic boundary')
+        data=os.read(fd,8193)
+    finally: os.close(fd)
+    if len(data)!=info.st_size: raise ValueError('diagnostic read')
+    def pairs(items):
+        result={}
+        for key,value in items:
+            if key in result: raise ValueError('diagnostic duplicate')
+            result[key]=value
+        return result
+    value=json.loads(data,object_pairs_hook=pairs)
+    if (type(value) is not dict or set(value)!={'kind','pid','prewriteVerified','connections'}
+            or value['kind']!='LOCAL_CHILD_DIAGNOSTIC' or type(value['pid']) is not int
+            or value['pid']<=0 or value['pid']==os.getpid() or type(value['prewriteVerified']) is not bool
+            or type(value['connections']) is not list or len(value['connections'])>1):
+        raise ValueError('diagnostic schema')
+    for row in value['connections']:
+        if (type(row) is not dict or set(row)!={'alters','commits','rollbacks','closed','log'}
+                or any(type(row[k]) is not int or not 0<=row[k]<=3 for k in ('alters','commits','rollbacks'))
+                or type(row['closed']) is not bool or type(row['log']) is not list or len(row['log'])>5
+                or any(type(item) is not str or item not in ('BEGIN_INTRANS','COMMIT_IDLE','ROLLBACK_OR_IDLE','CLOSED') for item in row['log'])):
+            raise ValueError('diagnostic connection schema')
+    return value
+
+
+def supervised_invoke(modules,psycopg,options,binding,baseline,events,journal_root,receipt,parent_handles,fault=None):
+    if any(raw.closed is not True for raw in parent_handles):
+        raise ValueError('parent connection still open before fork')
+    parent_pid=os.getpid()
+    @contextlib.contextmanager
+    def factory(phase):
+        if os.getpid()==parent_pid: raise ValueError('services must be child only')
+        services=prepare_services(modules['publisher_role_transition'],psycopg,options,binding,baseline,
+            journal_root,modules['publisher_role_journal'],modules['publisher_role_prewrite'],[],fault)
+        services.phase=phase
+        if fault=='mutation_timeout':
+            services.after_first_alter=lambda: write_diagnostic(receipt.with_suffix('.timeout'),services)
+        try: yield services
+        finally:
+            close_services(services)
+            write_diagnostic(receipt,services)
+    budgets=None
+    if fault=='mutation_timeout':
+        budgets={'setup':5,'connect':15,'mutation':0.3,'cleanup':3,'exit':3}
+    return modules['publisher_role_supervision'].supervise_transition(
+        binding,baseline,events,factory,_test_budgets=budgets)
+
+
+@contextlib.contextmanager
+def parent_connection(psycopg,options,handles):
+    raw=psycopg.connect(**options)
+    handles.append(raw)
+    try: yield raw
+    finally:
+        raw.close()
+        if raw.closed is not True: raise ValueError('parent close unconfirmed')
+
+
+def wait_for_no_owner_sessions(psycopg,admin_options,handles):
+    # Query as fixture_admin, so the observer itself cannot inflate owner count.
+    deadline=time.monotonic()+5
+    while True:
+        with parent_connection(psycopg,admin_options,handles) as admin:
+            count=admin.execute("SELECT count(*) FROM pg_stat_activity WHERE usename='publisher_owner'").fetchone()[0]
+        if type(count) is not int or count<0: raise ValueError('session observation')
+        if count==0: return 0
+        if time.monotonic()>=deadline: raise ValueError('fixture sessions remain')
+        time.sleep(0.05)
 
 def assert_local_identity(admin, data, port):
     row = admin.execute("SELECT current_setting('server_version_num')::integer, current_user, current_database(), pg_catalog.host(pg_catalog.inet_server_addr()), inet_server_port(), current_setting('data_directory'), current_setting('listen_addresses')").fetchone()
@@ -322,6 +439,7 @@ def verify(directory):
                     env=helper.ENV,start_new_session=True,close_fds=True)
         admin = None
         all_services = []
+        parent_handles = []
         try:
             admin_options = connection_options(root,port,'fixture_admin','postgres')
             deadline = time.monotonic()+10
@@ -333,44 +451,57 @@ def verify(directory):
                 except psycopg.OperationalError:
                     if time.monotonic() >= deadline: raise ValueError('private postgres startup timeout') from None
                     time.sleep(0.05)
+            parent_handles.append(admin)
             assert_local_identity(admin,data,port)
             baseline = build_roles(admin,driver)
             options = connection_options(root,port,'publisher_owner','publisher_ledger')
-            with psycopg.connect(**options) as owner:
+            with parent_connection(psycopg,options,parent_handles) as owner:
                 noticed=[]
                 owner.add_notice_handler(lambda unused: noticed.append(True))
                 for fixture in fixtures: owner.execute(fixture)
                 owner.execute(grants)
                 if noticed: raise ValueError('fixture setup notice')
+            admin.close()
+            if admin.closed is not True: raise ValueError('setup admin close')
             journal_root=root/'journal'
             journal_root.mkdir(mode=0o700)
             def observe(login):
-                with psycopg.connect(**options) as raw:
+                with parent_connection(psycopg,options,parent_handles) as raw:
                     return driver.observe_roles(TransactionConnection(raw,psycopg.pq),baseline,login)
             def invoke(direction,cycle_number,events,fault=None,operation_number=None):
                 binding = test_binding(driver,direction,format(cycle_number,'032x'),format(operation_number or (cycle_number*2+(direction=='closure')),'032x'))
-                services = prepare_services(driver,psycopg,options,binding,baseline,journal_root,journal_module,prewrite_module,all_services,fault)
-                result = invoke_driver(driver,services,baseline,events)
-                if any(not c.closed for c in services.connections): raise ValueError('driver did not close')
-                return result,services
+                receipt=root/('diagnostic-'+binding['operation_id']+'.json')
+                result=supervised_invoke(modules,psycopg,options,binding,baseline,events,journal_root,receipt,parent_handles,fault)
+                wait_for_no_owner_sessions(psycopg,admin_options,parent_handles)
+                diagnostic=read_diagnostic(receipt) if receipt.exists() else None
+                if diagnostic is not None:
+                    with contextlib.suppress(ChildProcessError):
+                        os.waitpid(diagnostic['pid'],os.WNOHANG)
+                        raise ValueError('supervisor did not reap diagnostic child')
+                if result['outcome']=='CONFIRMED' and diagnostic is None: raise ValueError('confirmed diagnostic missing')
+                return result,diagnostic
             def require_uncertain_journal(cycle_number):
                 path=journal_root/format(cycle_number,'032x')/'activation.03-finished.json'
                 record=json.loads(path.read_text())
                 if record['stage']!='finished' or record['status']!='INDETERMINATE':
                     raise ValueError('uncertainty journal missing')
             successes = []
-            first,services = invoke('activation',1,[])
-            if first['outcome'] != 'CONFIRMED' or first['state']['phase'] != 'READY': raise ValueError('activation result')
-            observe(True)
-            if services.connections[0].log != ['BEGIN_INTRANS','COMMIT_IDLE','ROLLBACK_OR_IDLE','CLOSED']:
+            before=observe(False)
+            first,diagnostic = invoke('activation',1,[])
+            if first['outcome'] != 'CONFIRMED': raise ValueError('activation result')
+            after=observe(True)
+            if diagnostic['connections'][0]['log'] != ['BEGIN_INTRANS','COMMIT_IDLE','ROLLBACK_OR_IDLE','CLOSED']:
                 raise ValueError('real transaction sequence')
             duplicate,again = invoke('activation',1,[],operation_number=99)
-            if duplicate['outcome'] != 'BLOCKED' or again.connections: raise ValueError('same-direction claim reused')
-            closing_events = first['transcript']+[{'type':'cancel_dispatch'}]
-            closed,services = invoke('closure',1,closing_events)
-            if closed['outcome'] != 'CONFIRMED' or closed['state']['phase'] != 'AWAITING_SESSIONS': raise ValueError('closure result')
+            if duplicate['outcome'] != 'INDETERMINATE' or again['connections']: raise ValueError('same-direction claim reused')
+            # Synthetic test transcript, never authenticated child evidence or authority.
+            closing_events=[{'type':'precheck','snapshot':before},{'type':'activation_started'},
+                {'type':'activation_committed'},{'type':'activation_verified','snapshot':after},
+                {'type':'activation_cleanup','clean':True},{'type':'cancel_dispatch'}]
+            closed,diagnostic = invoke('closure',1,closing_events)
+            if closed['outcome'] != 'CONFIRMED': raise ValueError('closure result')
             observe(False)
-            if not services.catalog_prewrite.last_report['catalogGrantsRolesVerified']:
+            if not diagnostic['prewriteVerified']:
                 raise ValueError('closure catalog prewrite missing')
             successes.extend(['activation_closure','claim_direction'])
             drift_cases=(
@@ -381,49 +512,72 @@ def verify(directory):
                  'ALTER TABLE meridian_publisher.reservations DISABLE TRIGGER guard_reservation_row;',
                  'ALTER TABLE meridian_publisher.reservations ENABLE TRIGGER guard_reservation_row;'))
             for name,number,mutation,restore in drift_cases:
-                with psycopg.connect(**options) as owner: owner.execute(mutation)
+                with parent_connection(psycopg,options,parent_handles) as owner: owner.execute(mutation)
                 try:
-                    rejected,services=invoke('activation',number,[])
-                    if (rejected['outcome']!='FAILED' or len(services.connections)!=1
-                            or services.connections[0].alters!=0 or services.connections[0].commits!=0
-                            or services.catalog_prewrite.last_report is not None):
+                    rejected,diagnostic=invoke('activation',number,[])
+                    if (rejected['outcome']!='INDETERMINATE' or len(diagnostic['connections'])!=1
+                            or diagnostic['connections'][0]['alters']!=0 or diagnostic['connections'][0]['commits']!=0
+                            or diagnostic['prewriteVerified'] is not False):
                         raise ValueError('prewrite drift not rejected before ALTER')
                     observe(False)
                 finally:
-                    with psycopg.connect(**options) as owner: owner.execute(restore)
+                    with parent_connection(psycopg,options,parent_handles) as owner: owner.execute(restore)
                 successes.append(name)
-            rolled,services = invoke('activation',2,[],fault='mid_alter_rollback')
-            if (rolled['outcome'] != 'INDETERMINATE' or services.connections[0].alters != 2
-                    or services.connections[0].commits != 0 or services.connections[0].rollbacks != 1):
+            rolled,diagnostic = invoke('activation',2,[],fault='mid_alter_rollback')
+            if (rolled['outcome'] != 'INDETERMINATE' or diagnostic['connections'][0]['alters'] != 2
+                    or diagnostic['connections'][0]['commits'] != 0 or diagnostic['connections'][0]['rollbacks'] != 1):
                 raise ValueError('partial ALTER rollback result')
             observe(False)
             require_uncertain_journal(2)
             # Synthetic model-ready input must not bypass actual journal history.
             blocked,again = invoke('closure',2,closing_events)
-            if blocked['outcome'] != 'INDETERMINATE' or again.connections:
+            if blocked['outcome'] != 'INDETERMINATE' or again['connections']:
                 raise ValueError('uncertain rollback closure accepted')
             successes.append('mid_alter_rollback')
-            lost,services = invoke('activation',3,[],fault='commit_ack_loss')
-            if (lost['outcome'] != 'INDETERMINATE' or not lost['state']['reconciliationRequired']
-                    or services.connections[0].commits != 1 or services.connections[0].rollbacks != 0):
+            timed,diagnostic=invoke('activation',6,[],fault='mutation_timeout')
+            if timed['outcome']!='INDETERMINATE' or diagnostic is not None:
+                raise ValueError('mutation timeout not killed')
+            observe(False)
+            timeout_marker=read_diagnostic(root/('diagnostic-'+format(12,'032x')+'.timeout'))
+            if timeout_marker['connections'] != [{'alters':1,'commits':0,'rollbacks':0,'closed':False,'log':['BEGIN_INTRANS']}]:
+                raise ValueError('first real ALTER timeout evidence')
+            try: os.waitpid(timeout_marker['pid'],os.WNOHANG)
+            except ChildProcessError: pass
+            else: raise ValueError('timeout child not reaped')
+            pending=journal_root/format(6,'032x')
+            mutation_record=json.loads((pending/'activation.01-mutation.json').read_text())
+            if (mutation_record.get('stage')!='mutation_started' or mutation_record.get('status')!='PENDING'
+                    or (pending/'activation.02-commit.json').exists() or (pending/'activation.03-finished.json').exists()):
+                raise ValueError('timeout journal evidence')
+            blocked,again=invoke('activation',6,[],operation_number=101)
+            if blocked['outcome']!='INDETERMINATE' or again['connections']: raise ValueError('timeout replay')
+            blocked,again=invoke('closure',6,closing_events)
+            if blocked['outcome']!='INDETERMINATE' or again['connections']: raise ValueError('timeout closure')
+            successes.append('supervised_mutation_timeout')
+            lost,diagnostic = invoke('activation',3,[],fault='commit_ack_loss')
+            if (lost['outcome'] != 'INDETERMINATE'
+                    or diagnostic['connections'][0]['commits'] != 1 or diagnostic['connections'][0]['rollbacks'] != 0):
                 raise ValueError('lost commit result')
             observe(True)
             require_uncertain_journal(3)
             blocked,again = invoke('activation',3,[],operation_number=100)
-            if blocked['outcome'] != 'BLOCKED' or again.connections: raise ValueError('lost commit replay')
+            if blocked['outcome'] != 'INDETERMINATE' or again['connections']: raise ValueError('lost commit replay')
             # No reconciliation override: actual LOGIN remains observed until
             # this private cluster is stopped and removed. Never retry ALTER.
             blocked,again = invoke('closure',3,closing_events)
-            if blocked['outcome'] != 'INDETERMINATE' or again.connections:
+            if blocked['outcome'] != 'INDETERMINATE' or again['connections']:
                 raise ValueError('uncertain committed closure accepted')
             successes.append('commit_ack_loss')
-            sessions = admin.execute("SELECT count(*) FROM pg_stat_activity WHERE usename='publisher_owner'").fetchone()[0]
+            sessions = wait_for_no_owner_sessions(psycopg,admin_options,parent_handles)
             if sessions != 0: raise ValueError('fixture sessions remain')
             report = {'kind':'LOCAL_PG16_ROLE_TRANSITION_INTEGRATION','serverVersionNum':160015,
                       'psycopgVersion':psycopg.__version__,'toolVersions':versions,'toolSha256':digests,
                       'opensslVersion':openssl_version,'opensslSha256':openssl_sha,'sourceSha256':PINS,
                       'casesPassed':sorted(successes),'realLibpqTlsVerified':True,'realSqlTransactionsVerified':True,
-                      'localRoleSessionsRemaining':sessions,'bindingApprovalPhaseMocked':True,
+                      'localRoleSessionsRemaining':sessions,'bindingApprovalMocked':True,'phaseSupervisionMocked':False,
+                      'realParentChildSupervisionExercised':True,'childOnlyDatabaseAndJournalHandles':True,
+                      'syntheticClosureTranscript':True,'diagnosticsAuthenticated':False,
+                      'mutationTimeoutRollbackAndReplayBlockVerified':True,
                       'sameTransactionCatalogGrantsRolesPrewriteExercised':True,
                       'prewriteInputSha256':prewrite_module.PINS,
                       'grantDocumentSha256':GRANT_DOCUMENT_SHA256,
