@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 
-test('parent-coordinated supervised PG16 role transaction harness offline boundaries', {timeout: 30000}, () => {
+test('manifest-bound supervised PG16 role transaction harness offline boundaries', {timeout: 30000}, () => {
   const root = fileURLToPath(new URL('../', import.meta.url));
   const run = spawnSync('python3', ['-I', '-B', '-m', 'unittest', 'discover', '-s', 'test',
     '-p', 'test_publisher_pg16_role_transition_verification.py', '-v'],
