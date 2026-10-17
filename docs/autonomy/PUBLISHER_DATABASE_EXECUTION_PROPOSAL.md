@@ -1,5 +1,15 @@
 # Publisher database execution proposal
 
+> **Current preparation update — 2026-10-17:** Receipt6232054311 records completed
+> TEST secret/password preparation with NOLOGIN preserved; approval6231898914 is
+> consumed. The [commissioning proposal](PUBLISHER_TEST_COMMISSIONING_20261017.md)
+> selects the existing inactive fixture and unchanged application source, plus
+> explicit inspection, LOGIN, one-dispatch and closure gates. Historical role/
+> secret-creation instructions below are not a retry or recreation instruction.
+> A safe private inspection/activation launcher remains to be implemented and
+> reviewed before execution approval can be requested. This update installs or
+> activates nothing.
+
 > **Execution hold (2026-10-14):** The local-PC/password procedure below is
 > superseded by the candidate [browser setup](PUBLISHER_DATABASE_BROWSER_SETUP.md).
 > Do not use its `psql \password` step: Neon's documented password-input
