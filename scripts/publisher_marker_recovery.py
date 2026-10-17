@@ -120,8 +120,10 @@ def retire_marker(directory_fd, expected, record):
             raise ValueError('changed name')
         os.fsync(marker_fd)
         archive_name = 'recovery-' + record['operation_id']
-        os.mkdir(archive_name, mode=0o700, dir_fd=directory_fd)
+        # A signal may arrive after mkdir's side effect but before it returns.
+        # Mark the attempt first: uncertainty must never imply safe retry.
         archive_created = True
+        os.mkdir(archive_name, mode=0o700, dir_fd=directory_fd)
         archive_fd = os.open(archive_name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
                              dir_fd=directory_fd)
         archive = _directory(archive_fd)

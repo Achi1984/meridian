@@ -1,7 +1,9 @@
 # Publisher marker recovery: inactive source preparation
 
 Operation ID: PUBLISHER-RECOVERY-SOURCE-20261017-01.
-Expected base: `0a32b25c5be4db4d0ae7d3473c664bd7c35e326d`.
+Original base: `0a32b25c5be4db4d0ae7d3473c664bd7c35e326d`.
+Integration base: `ed60066fc58b4d60eddd727c24cae61c368720bb`.
+Follow-up operation: PUBLISHER-RECOVERY-SOURCE-20261017-02.
 Scope: four additive files, isolated branch, no runtime entry point or caller.
 This records publication intent before the source mutation. Main and the
 existing setup guard are unchanged. This is not a runtime recovery procedure.
@@ -24,7 +26,10 @@ marker and directories and detects several concurrent substitutions.
 
 The three outcomes distinguish no marker move, reconciliation required, and
 archived marker with **no setup authorization**. Errors after archive creation
-or an attempted move remain uncertain. Partial evidence is retained. No result
+or an attempted archive creation or move remain uncertain. The creation attempt
+is recorded before calling mkdir, so interruption after its side effect cannot
+claim BLOCKED. Even an archive collision conservatively requires reconciliation.
+Partial evidence is retained. No result
 authorizes retry or deletion. Interruption requires read-only inspection.
 
 ## Deliberate integration limits

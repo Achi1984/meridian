@@ -58,7 +58,7 @@ class MarkerRecoveryTests(unittest.TestCase):
     def test_archive_collision_preserves_both_records_and_marker(self):
         self.archive.mkdir(mode=0o700)
         (self.archive / 'evidence.json').write_text('existing')
-        self.assertEqual(self.run_recovery(), m.BLOCKED)
+        self.assertEqual(self.run_recovery(), m.UNCERTAIN)
         self.assertEqual((self.archive / 'evidence.json').read_text(), 'existing')
         self.assertEqual(m.inspect_marker(self.fd), self.expected)
 
@@ -66,9 +66,22 @@ class MarkerRecoveryTests(unittest.TestCase):
         target = self.root / 'other'
         target.mkdir()
         self.archive.symlink_to(target, target_is_directory=True)
-        self.assertEqual(self.run_recovery(), m.BLOCKED)
+        self.assertEqual(self.run_recovery(), m.UNCERTAIN)
         self.assertEqual(list(target.iterdir()), [])
         self.assertTrue(self.path.exists())
+
+    def test_interrupt_after_mkdir_side_effect_requires_reconciliation(self):
+        mkdir = os.mkdir
+
+        def interrupted(*args, **kwargs):
+            mkdir(*args, **kwargs)
+            raise KeyboardInterrupt()
+
+        with patch.object(m.os, 'mkdir', side_effect=interrupted):
+            self.assertEqual(self.run_recovery(), m.UNCERTAIN)
+        self.assertTrue(self.archive.is_dir())
+        self.assertEqual(list(self.archive.iterdir()), [])
+        self.assertEqual(m.inspect_marker(self.fd), self.expected)
 
     def test_marker_symlink_is_not_followed(self):
         target = self.root / 'original'

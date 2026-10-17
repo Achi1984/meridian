@@ -14,7 +14,8 @@ function block(startNeedle,endNeedle,src=js){
 }
 
 test('Stage 2 draft stays non-release and execution-neutral',()=>{
-  assert.equal(release.terminalBuild,'10.0-r128');
+  assert.match(release.terminalBuild,/^10\.0-r\d+$/);
+  assert.ok(Number(release.terminalBuild.split('-r')[1])>=128,'the isolated Stage 2 draft survives later unrelated terminal releases');
   assert.equal(release.terminalExecutionImpact,false);
 });
 
