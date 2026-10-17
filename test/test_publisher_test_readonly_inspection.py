@@ -339,28 +339,39 @@ class Tests(unittest.TestCase):
             original = SimpleNamespace(supervise=Mock(side_effect=AssertionError('DB worker must not start')))
             command = AUTO.Command({'PATH': '/usr/bin:/bin'})
             service.base = SimpleNamespace(admin_password=lambda: command.run(
-                [sys.executable, '-I', '-c', program], timeout=0.5))
+                [sys.executable, '-I', '-c', program], timeout=0.3))
             service.auto, service.original = AUTO, original
             output = io.StringIO()
             ready_fd = os.open(ready_fifo, os.O_RDWR | os.O_NONBLOCK)
-            failure = []
+            failure, ready_at, returned_at = [], [], []
             def inspect():
                 try:
                     with redirect_stdout(output), redirect_stderr(output):
                         service.inspect()
                 except BaseException as error:
                     failure.append(error)
+                finally:
+                    returned_at.append(time.monotonic())
             worker = threading.Thread(target=inspect, daemon=True)
             worker.start()
-            readable, _, _ = select.select([ready_fd], [], [], 3)
-            self.assertTrue(readable, 'descendant did not reach its readiness handshake')
-            self.assertEqual(os.read(ready_fd, 1), b'R')
-            worker.join(5)
-            os.close(ready_fd)
+            try:
+                readable, _, _ = select.select([ready_fd], [], [], 3)
+                self.assertTrue(readable, 'descendant did not reach its readiness handshake')
+                self.assertEqual(os.read(ready_fd, 1), b'R')
+                ready_at.append(time.monotonic())
+                worker.join(5)
+            finally:
+                os.close(ready_fd)
+                worker.join(3)
             self.assertFalse(worker.is_alive(), 'command supervision did not complete')
+            self.assertEqual(len(ready_at), 1)
+            self.assertEqual(len(returned_at), 1)
+            self.assertGreaterEqual(returned_at[0] - ready_at[0], 0.2)
+            self.assertLess(returned_at[0] - ready_at[0], 2.5)
             self.assertEqual(len(failure), 1)
             self.assertIsInstance(failure[0], ValueError)
             self.assertEqual(str(failure[0]), 'command failed')
+            self.assertTrue(failure[0].cleanup_complete)
             original.supervise.assert_not_called()
             self.assertEqual(output.getvalue(), '')
             self.assertTrue(heartbeat.exists())
@@ -369,6 +380,7 @@ class Tests(unittest.TestCase):
                 os.kill(int(child_pid.read_text()), 0)
             writes_at_return = heartbeat.read_bytes()
             self.assertTrue(writes_at_return)
+            time.sleep(0.15)
             self.assertEqual(heartbeat.read_bytes(), writes_at_return)
 
 

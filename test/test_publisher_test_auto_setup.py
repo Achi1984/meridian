@@ -7,12 +7,17 @@ from contextlib import redirect_stdout, redirect_stderr
 import hashlib
 import importlib.util
 import io
+import json
+import os
 from pathlib import Path
+import signal
 import socket
 import subprocess
 import sys
 from types import SimpleNamespace
 import tempfile
+import threading
+import time
 import unittest
 from unittest.mock import patch
 
@@ -363,12 +368,94 @@ class PrivateCommandTests(unittest.TestCase):
         with self.assertRaises(ValueError) as raised:
             command.run([sys.executable, '-I', '-c', source])
         self.assertEqual(str(raised.exception), 'command failed')
+        self.assertTrue(raised.exception.cleanup_complete)
 
     def test_hung_command_has_bounded_timeout(self):
         command = self.m.Command({'PATH': '/usr/bin:/bin'})
         with self.assertRaises(ValueError) as raised:
             command.run([sys.executable, '-I', '-c', 'import time; time.sleep(30)'], timeout=0.1)
         self.assertEqual(str(raised.exception), 'command failed')
+        self.assertTrue(raised.exception.cleanup_complete)
+
+    def test_sensitive_stdin_is_not_in_supervisor_arguments_or_environment(self):
+        secret = 'SYNTHETIC_PRIVATE_INPUT_CANARY'
+        command = self.m.Command({'PATH': '/usr/bin:/bin'})
+        original_popen = self.m.subprocess.Popen
+        observed = []
+        def inspect_supervisor(*args, **kwargs):
+            process = original_popen(*args, **kwargs)
+            command_line = Path('/proc/{}/cmdline'.format(process.pid)).read_bytes()
+            observed.append(command_line)
+            self.assertNotIn(secret.encode(), command_line)
+            self.assertNotIn(secret, json.dumps(kwargs.get('env', {})))
+            return process
+        source = 'import sys; print("accepted" if sys.stdin.read() else "empty")'
+        with patch.object(self.m.subprocess, 'Popen', side_effect=inspect_supervisor):
+            self.assertEqual(command.run([sys.executable, '-I', '-c', source], secret), 'accepted\n')
+        self.assertEqual(len(observed), 1)
+
+    def test_supervisor_failure_reports_cleanup_as_unconfirmed(self):
+        command = self.m.Command({'PATH': '/usr/bin:/bin'})
+        with patch.object(self.m, '_COMMAND_SUPERVISOR', 'raise RuntimeError()'):
+            with self.assertRaises(ValueError) as raised:
+                command.run([sys.executable, '-I', '-c', 'pass'])
+        self.assertEqual(str(raised.exception), 'command failed')
+        self.assertFalse(raised.exception.cleanup_complete)
+
+    def test_stalled_supervisor_is_bounded_and_cleanup_remains_unconfirmed(self):
+        command = self.m.Command({'PATH': '/usr/bin:/bin'})
+        stalled = 'import signal,time; signal.signal(signal.SIGTERM,signal.SIG_IGN); time.sleep(30)'
+        started = time.monotonic()
+        with patch.object(self.m, '_COMMAND_SUPERVISOR', stalled):
+            with self.assertRaises(ValueError) as raised:
+                command.run([sys.executable, '-I', '-c', 'pass'], timeout=0.1)
+        self.assertEqual(str(raised.exception), 'command failed')
+        self.assertFalse(raised.exception.cleanup_complete)
+        self.assertLess(time.monotonic() - started, 3)
+
+    def test_caller_interrupt_cleans_target_and_session_escaped_descendant(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            heartbeat, child_pid, ready_fifo = root / 'heartbeat', root / 'child.pid', root / 'ready'
+            os.mkfifo(ready_fifo, 0o600)
+            program = ("import os,time; from pathlib import Path\n"
+                       "child=os.fork()\n"
+                       "if child: time.sleep(20)\n"
+                       "else:\n"
+                       " os.setsid()\n"
+                       " Path(" + repr(str(child_pid)) + ").write_text(str(os.getpid()))\n"
+                       " with open(" + repr(str(heartbeat)) + ", 'ab') as beat: beat.write(b'ready\\n')\n"
+                       " ready=os.open(" + repr(str(ready_fifo)) + ", os.O_WRONLY); os.write(ready,b'R'); os.close(ready)\n"
+                       " while True:\n"
+                       "  with open(" + repr(str(heartbeat)) + ", 'ab') as beat: beat.write(b'x')\n"
+                       "  time.sleep(0.01)\n")
+            ready_fd = os.open(ready_fifo, os.O_RDWR | os.O_NONBLOCK)
+            interrupter = None
+            try:
+                def interrupt_when_ready():
+                    readable, _, _ = __import__('select').select([ready_fd], [], [], 3)
+                    if readable and os.read(ready_fd, 1) == b'R':
+                        os.kill(os.getpid(), signal.SIGINT)
+                interrupter = threading.Thread(target=interrupt_when_ready, daemon=True)
+                interrupter.start()
+                with self.assertRaises(ValueError) as raised:
+                    self.m.Command({'PATH': '/usr/bin:/bin'}).run(
+                        [sys.executable, '-I', '-c', program], timeout=10)
+                interrupter.join(3)
+                self.assertFalse(interrupter.is_alive())
+                self.assertEqual(str(raised.exception), 'command failed')
+                self.assertTrue(raised.exception.cleanup_complete)
+                self.assertTrue(child_pid.exists())
+                with self.assertRaises(ProcessLookupError):
+                    os.kill(int(child_pid.read_text()), 0)
+                stopped = heartbeat.read_bytes()
+                self.assertTrue(stopped)
+                time.sleep(0.15)
+                self.assertEqual(heartbeat.read_bytes(), stopped)
+            finally:
+                os.close(ready_fd)
+                if interrupter is not None:
+                    interrupter.join(3)
 
     def test_command_supervision_does_not_change_callers_subreaper_state(self):
         import ctypes

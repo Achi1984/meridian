@@ -10,6 +10,7 @@ import secrets
 import selectors
 import signal
 import stat
+import struct
 import subprocess
 import sys
 import time
@@ -37,6 +38,7 @@ import json
 import os
 import selectors
 import signal
+import struct
 import subprocess
 import sys
 import time
@@ -44,69 +46,110 @@ import time
 target = None
 output = bytearray()
 failed = False
+deadline = None
+
+def send_frame(kind, status=0, payload=b''):
+    message = kind + bytes((status,)) + struct.pack('!I', len(payload)) + payload
+    while message:
+        message = message[os.write(1, message):]
 
 def stop_target():
     if target is None:
-        return
+        return True
     try:
         os.killpg(target.pid, signal.SIGKILL)
     except OSError:
         pass
-    try:
-        target.wait()
-    except BaseException:
-        pass
+    cleanup_deadline = time.monotonic() + 2
     while True:
         children_path = '/proc/self/task/{}/children'.format(os.getpid())
-        with open(children_path, encoding='ascii') as children_file:
-            children = [int(pid) for pid in children_file.read().split()]
+        try:
+            with open(children_path, encoding='ascii') as children_file:
+                children = [int(pid) for pid in children_file.read().split()]
+        except OSError:
+            return False
         for child in children:
             try:
                 os.kill(child, signal.SIGKILL)
             except ProcessLookupError:
                 pass
         try:
-            os.waitpid(-1, 0)
+            target.poll()
+        except BaseException:
+            pass
+        try:
+            while os.waitpid(-1, os.WNOHANG)[0]:
+                pass
         except ChildProcessError:
-            return
+            if target.poll() is not None:
+                return True
+        if not children and target.poll() is not None:
+            try:
+                os.waitpid(-1, os.WNOHANG)
+            except ChildProcessError:
+                return True
+        if time.monotonic() >= cleanup_deadline:
+            return False
+        time.sleep(0.01)
 
 def interrupt(signum, frame):
     raise KeyboardInterrupt()
 
 signal.signal(signal.SIGTERM, interrupt)
 signal.signal(signal.SIGINT, interrupt)
+cleanup_complete = False
 try:
     if sys.platform != 'linux' or ctypes.CDLL(None, use_errno=True).prctl(36, 1, 0, 0, 0) != 0:
         raise RuntimeError()
-    request = json.loads(sys.argv[1])
-    argv, input_value, timeout = request['argv'], request['input'], request['timeout']
+    request_line = sys.stdin.buffer.readline(8193)
+    if not request_line.endswith(b'\n') or len(request_line) > 8192:
+        raise ValueError()
+    request = json.loads(request_line)
+    argv, input_length, timeout = request['argv'], request['inputLength'], request['timeout']
+    if type(input_length) is not int or not 0 <= input_length <= 257:
+        raise ValueError()
+    input_value = sys.stdin.buffer.read(input_length)
+    if len(input_value) != input_length:
+        raise ValueError()
+    deadline = time.monotonic() + timeout
     target = subprocess.Popen(
         argv,
-        stdin=subprocess.PIPE if input_value is not None else subprocess.DEVNULL,
+        stdin=subprocess.PIPE if input_length else subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL,
         start_new_session=True,
         close_fds=True,
     )
-    if input_value is not None:
-        target.stdin.write(input_value.encode('ascii'))
-        target.stdin.close()
+    send_frame(b'P', payload=struct.pack('!I', target.pid))
     os.set_blocking(target.stdout.fileno(), False)
     selector = selectors.DefaultSelector()
     selector.register(target.stdout, selectors.EVENT_READ)
-    deadline = time.monotonic() + timeout
+    if input_length:
+        os.set_blocking(target.stdin.fileno(), False)
+        selector.register(target.stdin, selectors.EVENT_WRITE, input_value)
     while selector.get_map():
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             raise TimeoutError()
         for key, _ in selector.select(min(remaining, 0.1)):
-            part = os.read(key.fd, 65536)
-            if not part:
-                selector.unregister(key.fileobj)
-            else:
-                output.extend(part)
-                if len(output) > 1024 * 1024:
+            if key.fileobj is target.stdin:
+                try:
+                    written = os.write(key.fd, key.data)
+                except BrokenPipeError:
                     raise ValueError()
+                if written == len(key.data):
+                    selector.unregister(key.fileobj)
+                    key.fileobj.close()
+                else:
+                    selector.modify(key.fileobj, selectors.EVENT_WRITE, key.data[written:])
+            else:
+                part = os.read(key.fd, 65536)
+                if not part:
+                    selector.unregister(key.fileobj)
+                else:
+                    output.extend(part)
+                    if len(output) > 1024 * 1024:
+                        raise ValueError()
     selector.close()
     remaining = deadline - time.monotonic()
     if remaining <= 0 or target.wait(timeout=remaining) != 0:
@@ -114,14 +157,12 @@ try:
 except BaseException:
     failed = True
 finally:
-    stop_target()
+    signal.signal(signal.SIGTERM, signal.SIG_IGN)
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    cleanup_complete = stop_target()
     try:
-        if failed:
-            response = b'\x01'
-        else:
-            response = b'\x00' + output
-        while response:
-            response = response[os.write(1, response):]
+        send_frame(b'R', 2 if not cleanup_complete else 1 if failed else 0,
+                   bytes(output) if cleanup_complete and not failed else b'')
     except BaseException:
         pass
 """
@@ -242,26 +283,132 @@ class Command:
 
     def run(self, argv, input_value=None, timeout=15):
         proc = None
+        selector = selectors.DefaultSelector()
+        deadline = time.monotonic() + timeout
+        target_pid = None
+        result = None
+        cleanup_complete = False
+        failed = False
+        response = bytearray()
+        outgoing = b''
+
+        def consume_frames():
+            nonlocal target_pid, result, cleanup_complete
+            while len(response) >= 6:
+                kind, status = response[0:1], response[1]
+                length = struct.unpack('!I', response[2:6])[0]
+                if length > 1024 * 1024:
+                    raise ValueError()
+                if len(response) < 6 + length:
+                    return
+                payload = bytes(response[6:6 + length])
+                del response[:6 + length]
+                if kind == b'P' and status == 0 and length == 4 and target_pid is None:
+                    target_pid = struct.unpack('!I', payload)[0]
+                elif kind == b'R' and status in (0, 1, 2) and result is None:
+                    result = (status, payload)
+                    cleanup_complete = status != 2
+                else:
+                    raise ValueError()
+
         try:
-            request = json.dumps({'argv': argv, 'input': input_value, 'timeout': timeout})
-            proc = subprocess.Popen([sys.executable, '-I', '-c', _COMMAND_SUPERVISOR, request],
-                                    stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+            if input_value is None:
+                input_bytes = b''
+            elif type(input_value) is str:
+                input_bytes = input_value.encode('ascii')
+                if len(input_bytes) > 257:
+                    raise ValueError()
+            else:
+                raise ValueError()
+            header = json.dumps({'argv': argv, 'inputLength': len(input_bytes),
+                                 'timeout': timeout}, separators=(',', ':')).encode('utf-8') + b'\n'
+            if len(header) > 8192:
+                raise ValueError()
+            outgoing = header + input_bytes
+            if time.monotonic() >= deadline:
+                raise ValueError()
+            proc = subprocess.Popen([sys.executable, '-I', '-c', _COMMAND_SUPERVISOR],
+                                    stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                     stderr=subprocess.DEVNULL, env=self.environment,
                                     start_new_session=True, close_fds=True)
-            response, _ = proc.communicate()
-            if proc.returncode != 0 or not response or response[0] != 0 or len(response) > 1024 * 1024 + 1:
+            os.set_blocking(proc.stdin.fileno(), False)
+            os.set_blocking(proc.stdout.fileno(), False)
+            selector.register(proc.stdin, selectors.EVENT_WRITE)
+            selector.register(proc.stdout, selectors.EVENT_READ)
+            eof = False
+            while result is None or proc.poll() is None:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise TimeoutError()
+                for key, _ in selector.select(min(remaining, 0.1)):
+                    if key.fileobj is proc.stdin:
+                        if outgoing:
+                            written = os.write(key.fd, outgoing)
+                            outgoing = outgoing[written:]
+                        if not outgoing:
+                            selector.unregister(key.fileobj)
+                            key.fileobj.close()
+                    else:
+                        part = os.read(key.fd, 65536)
+                        if not part:
+                            selector.unregister(key.fileobj)
+                            eof = True
+                        else:
+                            response.extend(part)
+                            if len(response) > 1024 * 1024 + 32:
+                                raise ValueError()
+                            consume_frames()
+                if eof and (response or result is None):
+                    raise ValueError()
+            if proc.returncode != 0 or result is None or response or result[0] != 0:
                 raise ValueError('command')
-            return response[1:].decode('utf-8', errors='strict')
+            cleanup_complete = True
+            return result[1].decode('utf-8', errors='strict')
         except BaseException:
-            raise ValueError('command failed') from None
+            failed = True
         finally:
-            if proc is not None:
+            if proc is not None and proc.poll() is None:
                 try:
-                    os.killpg(proc.pid, signal.SIGKILL)
-                except OSError:
+                    selector.unregister(proc.stdin)
+                    proc.stdin.close()
+                except BaseException:
                     pass
                 try:
-                    proc.wait(timeout=2)
+                    os.kill(proc.pid, signal.SIGTERM)
+                except OSError:
+                    pass
+                cleanup_deadline = time.monotonic() + 2
+                while proc.poll() is None and time.monotonic() < cleanup_deadline:
+                    try:
+                        for key, _ in selector.select(min(0.05, cleanup_deadline - time.monotonic())):
+                            if key.fileobj is proc.stdout:
+                                part = os.read(key.fd, 65536)
+                                if part:
+                                    response.extend(part)
+                                    consume_frames()
+                                else:
+                                    selector.unregister(key.fileobj)
+                    except BaseException:
+                        pass
+                cleanup_complete = result is not None and result[0] != 2 and proc.poll() is not None
+                if proc.poll() is None:
+                    if target_pid is not None:
+                        try:
+                            os.killpg(target_pid, signal.SIGKILL)
+                        except OSError:
+                            pass
+                    try:
+                        os.killpg(proc.pid, signal.SIGKILL)
+                    except OSError:
+                        pass
+                    try:
+                        proc.wait(timeout=0.1)
+                    except BaseException:
+                        pass
+                    cleanup_complete = False
+            if proc is not None:
+                try:
+                    proc.wait(timeout=0.1)
                 except BaseException:
                     pass
                 for stream in (proc.stdin, proc.stdout):
@@ -270,6 +417,15 @@ class Command:
                             stream.close()
                         except BaseException:
                             pass
+            selector.close()
+        if failed:
+            raise _CommandFailure(cleanup_complete) from None
+
+
+class _CommandFailure(ValueError):
+    def __init__(self, cleanup_complete):
+        super().__init__('command failed')
+        self.cleanup_complete = cleanup_complete
 
 
 def trusted_executable(path, digest):

@@ -13,7 +13,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parent
 PINS = {
-    'publisher_test_auto_setup.py': 'b96c157be59fcf4128217818779a5b1755f270cb7b1571c1e9492d156f43ca51',
+    'publisher_test_auto_setup.py': 'e416e768b699cf9a33eecaa15dde5f19944750de00598c74b77d2521ab5d0c85',
     'publisher_test_password_setup.py': '3f3e4cab7fa64b5890fda1483bc73ac277636f001ec933bf514c926267ef68fb',
     'publisher-test-readonly-queries.json': '99ac288ed3e1dd5681345aa828bed3e129e729a1430f9022ca456622b62e7789',
 }
