@@ -4,6 +4,7 @@ import importlib.util
 import io
 from pathlib import Path
 import sys
+import tempfile
 import types
 import unittest
 from unittest import mock
@@ -44,7 +45,7 @@ class FixtureTests(unittest.TestCase):
 
     def test_source_pins_match_existing_modules(self):
         modules=m.load_sources()
-        self.assertEqual(set(modules),{'publisher_role_cycle','publisher_role_transition','publisher_pg16_fixture_verification'})
+        self.assertEqual(set(modules),{'publisher_role_cycle','publisher_role_transition','publisher_role_journal','publisher_pg16_fixture_verification'})
         self.assertEqual(modules['publisher_role_transition'].MANIFEST,'611ce25904b59473149f5cb8bc69613309b0b8b147df6296defdfecc0ee11274')
 
     def test_source_mismatch_fails_before_import(self):
@@ -92,15 +93,73 @@ class FixtureTests(unittest.TestCase):
         raw.info.transaction_status=Status.UNKNOWN
         with self.assertRaises(ValueError): conn.rollback()
 
-    def test_claim_is_direction_scoped_and_explicitly_in_memory(self):
-        driver=types.SimpleNamespace(MANIFEST='fixture',TARGET={'target':'synthetic'})
-        claims=set(); activation=m.test_binding(driver,'activation','1'*32,'2'*32)
-        s=m.TestServices(driver,None,None,activation,None,claims)
-        self.assertTrue(s.claim(activation)); self.assertFalse(s.claim(activation))
-        other_operation=dict(activation,operation_id='3'*32)
-        self.assertFalse(s.claim(other_operation))
-        closure=dict(activation,direction='closure')
-        self.assertTrue(s.claim(closure))
+    def test_claim_and_record_delegate_to_real_journal_across_reopen(self):
+        modules=m.load_sources(); driver=modules['publisher_role_transition']; journals=modules['publisher_role_journal']
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)/'journal'; root.mkdir(mode=0o700)
+            activation=m.test_binding(driver,'activation','1'*32,'2'*32)
+            with journals.LocalRoleJournal(root) as journal:
+                services=m.TestServices(driver,None,None,activation,None,journal)
+                self.assertTrue(services.claim(activation))
+                services.record(activation,'mutation_started','PENDING')
+                services.record(activation,'commit_started','PENDING')
+                services.record(activation,'finished','CONFIRMED')
+                with journals.LocalRoleJournal(root) as blocked:
+                    with self.assertRaises(ValueError): blocked.claim(dict(activation,direction='closure'))
+            with journals.LocalRoleJournal(root) as journal:
+                services=m.TestServices(driver,None,None,activation,None,journal)
+                self.assertFalse(services.claim(dict(activation,operation_id='3'*32)))
+            closure=dict(activation,direction='closure',operation_id='4'*32)
+            with journals.LocalRoleJournal(root) as journal:
+                services=m.TestServices(driver,None,None,closure,None,journal)
+                self.assertTrue(services.claim(closure))
+
+    def test_driver_exception_releases_journal_but_never_reclaims_slot(self):
+        modules=m.load_sources(); driver=modules['publisher_role_transition']; journals=modules['publisher_role_journal']
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)/'journal'; root.mkdir(mode=0o700)
+            binding=m.test_binding(driver,'activation','1'*32,'2'*32)
+            journal=journals.LocalRoleJournal(root)
+            services=m.TestServices(driver,None,None,binding,None,journal)
+            close_order=[]
+            class OpenRaw:
+                closed=False
+                def close(inner):
+                    self.assertFalse(journal.closed)
+                    close_order.append('connection-before-journal')
+                    inner.closed=True
+            def fail(binding,baseline,events,services):
+                services.claim(binding)
+                services.connections.append(types.SimpleNamespace(raw=OpenRaw()))
+                raise RuntimeError('synthetic driver escape')
+            with self.assertRaises(RuntimeError):
+                m.invoke_driver(types.SimpleNamespace(drive_transition=fail),services,None,[])
+            self.assertTrue(journal.closed)
+            self.assertEqual(close_order,['connection-before-journal'])
+            with journals.LocalRoleJournal(root) as restarted:
+                self.assertFalse(restarted.claim(binding))
+
+    def test_uncertain_activation_journal_blocks_model_ready_closure(self):
+        modules=m.load_sources(); driver=modules['publisher_role_transition']; journals=modules['publisher_role_journal']
+        baseline={'owner_oid':10,'roles':{n:{'oid':100+i,'grantor_oid':10} for i,n in enumerate(driver.cycle.ROLES)}}
+        def snapshot(login):
+            return {'roles':{n:{'oid':100+i,'login':login,**dict.fromkeys(driver.cycle.FLAGS,False)} for i,n in enumerate(driver.cycle.ROLES)},
+                    'memberships':[dict(zip(('role_oid','member_oid','grantor_oid','admin','inherit','set'),(100+i,10,10,True,False,False))) for i in range(3)]}
+        events=[{'type':'precheck','snapshot':snapshot(False)},{'type':'activation_started'},
+                {'type':'activation_committed'},{'type':'activation_verified','snapshot':snapshot(True)},
+                {'type':'activation_cleanup','clean':True},{'type':'cancel_dispatch'}]
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)/'journal'; root.mkdir(mode=0o700)
+            activation=m.test_binding(driver,'activation','1'*32,'2'*32)
+            with journals.LocalRoleJournal(root) as journal:
+                journal.claim(activation); journal.record(activation,'finished','INDETERMINATE')
+            closure=dict(activation,direction='closure',operation_id='3'*32)
+            services=m.TestServices(driver,None,None,closure,baseline,journals.LocalRoleJournal(root))
+            with mock.patch.object(services,'connect',side_effect=AssertionError('must not connect')) as connect:
+                result=m.invoke_driver(driver,services,baseline,events)
+                connect.assert_not_called()
+            self.assertEqual(result['outcome'],'INDETERMINATE')
+            self.assertTrue(services.journal.closed)
 
     def test_actual_identity_must_include_private_data_directory_tls_and_port(self):
         class Admin:
@@ -134,10 +193,10 @@ class FixtureTests(unittest.TestCase):
         class Server:
             def poll(self): calls.append('poll'); return 0
             def wait(self,timeout): calls.append('wait'); return 0
-        services=[types.SimpleNamespace(connections=[types.SimpleNamespace(raw=BadClose('first')),types.SimpleNamespace(raw=BadClose('second'))])]
+        services=[types.SimpleNamespace(journal=BadClose('journal'),connections=[types.SimpleNamespace(raw=BadClose('first')),types.SimpleNamespace(raw=BadClose('second'))])]
         with self.assertRaisesRegex(ValueError,'connection cleanup'):
             m.cleanup_cluster(Server(),services,BadClose('admin'))
-        self.assertEqual(calls,['first','second','admin','poll','wait'])
+        self.assertEqual(calls,['first','second','journal','admin','poll','wait'])
 
     def test_cli_failure_is_sanitized_and_has_no_arbitrary_host_argument(self):
         output=io.StringIO()

@@ -10,6 +10,6 @@ test('private PG16 role transaction harness offline boundaries', {timeout: 30000
   {cwd: root, encoding: 'utf8', timeout: 25000, maxBuffer: 1024 * 1024});
   assert.ifError(run.error);
   assert.equal(run.status, 0, `${run.stdout}\n${run.stderr}`);
-  assert.match(run.stderr, /Ran 13 tests/);
+  assert.match(run.stderr, /Ran 15 tests/);
   assert.match(run.stderr, /\nOK\s*$/);
 });
