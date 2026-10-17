@@ -93,39 +93,40 @@
     "policyProposalCommentId": 6096562356,
     "protocol": "STREAM-SAFE-V8"
   },
-  "lastSeenCommentId": 6199499751,
+  "lastSeenCommentId": 6230822828,
   "quickCommand": "Go Meridian",
   "bootstrapFile": "MERIDIAN_GO.md",
   "currentWork": {
     "updatedAt": "2026-10-17",
-    "verifiedSourceMain": "6473022aebcaf795888cff18ff787bfc392a4107",
+    "verifiedSourceMain": "c1740225b9682534cf1fdaa0128053604e4b86da",
     "lastCompletedSourceMerge": {
-      "pr": 833,
-      "mergeSha": "6473022aebcaf795888cff18ff787bfc392a4107",
-      "reviewCommentId": 6230496927,
-      "finalMergeCommentId": 6230525372,
+      "pr": 835,
+      "mergeSha": "c1740225b9682534cf1fdaa0128053604e4b86da",
+      "reviewCommentId": 6230801877,
+      "finalMergeCommentId": 6230822828,
       "postMergeChecks": "VERIFIED_SUCCESS",
       "postMergeRunIds": {
-        "releaseSafety": 39008848892,
-        "runtimeSmoke": 39008848823,
-        "releaseCoordinator": 39008848846,
-        "pages": 39008848372
+        "releaseSafety": 39011004056,
+        "runtimeSmoke": 39011003935,
+        "releaseCoordinator": 39011003957,
+        "pages": 39011003549,
+        "assetWatchMirror": 39011028345
       }
     },
     "lastCompletedHandoffRefresh": {
-      "pr": 821,
-      "mergeSha": "0a32b25c5be4db4d0ae7d3473c664bd7c35e326d",
-      "finalMergeCommentId": 6214143240,
+      "pr": 834,
+      "mergeSha": "80daf2b7a5cc2ae0af5b6792583999d69451282c",
+      "finalMergeCommentId": 6230616212,
       "postMergeChecks": "VERIFIED_SUCCESS",
       "postMergeRunIds": {
-        "releaseSafety": 38891568080,
-        "runtimeSmoke": 38891568010,
-        "releaseCoordinator": 38891568120,
-        "pages": 38891567792
+        "releaseSafety": 39009497905,
+        "runtimeSmoke": 39009497869,
+        "releaseCoordinator": 39009497842,
+        "pages": 39009496870
       }
     },
-    "package": "HANDOFF_830_833_AND_CURRENT_RUNTIME_RECONCILIATION",
-    "state": "SOURCE_PACKETS_COMPLETE_RUNTIME_RECONCILIATION_PASS_RECOVERY_NOT_AUTHORIZED",
+    "package": "HANDOFF_835_SOURCE_COMPLETION_AND_RUNTIME_EVIDENCE",
+    "state": "SOURCE835_COMPLETE_RECOVERY_ARCHIVED_VERIFIED_SETUP_NOT_EXECUTED",
     "infrastructurePaused": true,
     "mailboxRollover": {
       "from": 571,
@@ -152,8 +153,8 @@
       "watchdogHostedPatch": "NOT_YET_PROVEN"
     },
     "publisherSetup": {
-      "state": "WRAPPER830_MERGED; CURRENT_READONLY_RECONCILIATION_PASSED; RECOVERY_NOT_PERFORMED",
-      "marker": "UNCHANGED_IDENTITY_CONFIRMED_AFTER_READONLY_CHECK",
+      "state": "RECOVERY_ARCHIVED_VERIFIED_SETUP_NOT_EXECUTED",
+      "marker": "ORIGINAL_ABSENT_ARCHIVE_IDENTITY_AND_EVIDENCE_VERIFIED",
       "ownerPauseState": "SUPERSEDED_BY_OWNER_CONTINUATION_2026-10-16T09:26:47+02:00",
       "ownerPauseCommentId": 6199968669,
       "ownerWindowConfirmationAt": "2026-10-16T09:21:31+02:00",
@@ -162,23 +163,30 @@
       "readOnlyPreflightCommentId": 6230532439,
       "readOnlyPreflightAfter": "2026-10-16T09:26:47+02:00",
       "readOnlyPreflightSourceRevision": "f0204ec0781598d9fb368088021b33e738505ed4",
-      "markerTouched": false,
-      "providerDbState": "20261017_READONLY_PROVIDER_DB_PROVIDER_PASS_EXIT0; NOT_CONTINUOUS_EVIDENCE",
+      "markerTouched": true,
+      "providerDbState": "FRESH_IN_WRAPPER_RECONCILIATION_PASSED_BEFORE_ARCHIVE_NOT_CONTINUOUS_EVIDENCE",
       "longTermCodespaceState": "UNKNOWN",
-      "realEnvironment": "POINT_IN_TIME_READ_ONLY_RECONCILIATION_ONLY",
+      "realEnvironment": "RECOVERY_ARCHIVED_ONCE_AND_INDEPENDENT_READONLY_ARCHIVE_VERIFIED",
       "previouslyAssignedRolePasswordAbsence": "NOT_ESTABLISHED",
       "browserState": "SIGN_IN_RESTORED_FOR_STAGE_1_SESSION; LONG_TERM_STATE_UNKNOWN",
-      "stage2": "REVIEWED_WRAPPER830_MERGED_NO_RUNTIME_INVOCATION",
+      "stage2": "APPROVED_RECOVERY_COMPLETE_INDEPENDENT_ARCHIVE_VERIFICATION_PASS",
       "stage2PlanCommentId": 6199968669,
-      "stage2Prerequisites": "CPYTHON_3.14.2_TESTS_EXACT_HEAD_CI_AND_INDEPENDENT_FULL_SCOPE_REVIEW_BEFORE_CONCRETE_RECOVERY_APPROVAL",
+      "stage2Prerequisites": "COMPLETED_FOR_SINGLE_APPROVED_ARCHIVE_ACTION_NO_REPLAY",
       "markerRetirementRequiresSeparateOwnerApproval": true,
       "nextSetupAttemptRequiresSeparateOwnerApproval": true,
       "firstHostedWatchdogPatch": "UNPROVEN",
       "leadActivationEdit": "NOT_BOT_EVIDENCE",
-      "nextPermittedStep": "PREPARE_AND_REVIEW_CONCRETE_RECOVERY_INVOCATION_THEN_SEPARATE_OWNER_APPROVAL",
-      "statusCommentId": 6198795959,
+      "nextPermittedStep": "PREPARE_CONCRETE_SUBSEQUENT_SETUP_SCOPE_THEN_SEPARATE_OWNER_APPROVAL",
+      "statusCommentId": 6230893412,
       "recoveryRequiresSeparateOwnerApproval": true,
-      "retryRequiresSeparateOwnerApproval": true
+      "retryRequiresSeparateOwnerApproval": true,
+      "recoveryApprovalCommentId": 6230643903,
+      "recoveryApprovalScope": "ARCHIVE_PUBLISHER_ATTEMPT_ONCE_UNCHANGED_SCOPE",
+      "recoveryApprovalSatisfied": true,
+      "setupAuthorized": false,
+      "recoveryApprovalConsumed": true,
+      "recoveryPerformed": true,
+      "setupPerformed": false
     },
     "reconciliation": {
       "resolvedCommentIds": [
@@ -230,7 +238,7 @@
         "authorizedReproductionBudget": "UNKNOWN"
       }
     },
-    "nextStep": "REVIEW_CONCRETE_RECOVERY_SCOPE_AND_INVOCATION_BEFORE_SEPARATE_OWNER_APPROVAL",
+    "nextStep": "RECOVERY_COMPLETE_DO_NOT_REPLAY; PREPARE_CONCRETE_SETUP_SCOPE_FOR_SEPARATE_OWNER_APPROVAL",
     "ownerPathInspection": {
       "pr": 828,
       "mergeSha": "bfebd17ddfa1d2d3b44a15126e28618a82cb81f2",
@@ -253,8 +261,8 @@
       "runtimeRecoveryAuthorized": false,
       "setupAuthorized": false
     },
-    "publisherNextStep": "WRAPPER830_MERGED_CURRENT_READONLY_RECONCILIATION_PASS; PREPARE_REVIEWED_CONCRETE_RECOVERY_INVOCATION; NO_RECOVERY_OR_SETUP_AUTHORIZED",
-    "strategyNextStep": "FREQTRADE_DATA_BRIDGE833_MERGED_POSTCHECKS_SUCCESS; LOADER_SIGNAL_ACCOUNTING_COMPARISON_NOT_RUN",
+    "publisherNextStep": "RECOVERY_COMPLETE_DO_NOT_REPLAY; PREPARE_CONCRETE_SETUP_SCOPE_FOR_SEPARATE_OWNER_APPROVAL",
+    "strategyNextStep": "FREQTRADE_LOADER_DIAGNOSTIC_LOCAL_REVIEW_COMPLETE_STRICT_PARITY_FAIL; PUBLISH_EXACT_HEAD_CI_AND_INDEPENDENT_REVIEW_BEFORE_MERGE; NO_STRATEGY_EXECUTION",
     "completion20261017": {
       "verifiedMain": "8691381510039e2ad48b863ea5e66d6ad6cba462",
       "arenaMerge": "ed60066fc58b4d60eddd727c24cae61c368720bb",
@@ -488,7 +496,8 @@
       "recoveryPerformed": false,
       "setupPerformed": false,
       "runtimeDependencyAttestation": "METADATA_AND_ORIGIN_ONLY_NOT_FULL_INDEPENDENT_BYTE_ATTESTATION",
-      "ownerClarification": "NO_SEPARATE_OWNER_ATTEMPT_REPORTED; UNRECORDED_ASSISTANT_ACTIONS_NOT_CERTIFIED_ABSENT"
+      "ownerClarification": "NO_SEPARATE_OWNER_ATTEMPT_REPORTED; UNRECORDED_ASSISTANT_ACTIONS_NOT_CERTIFIED_ABSENT",
+      "evidenceScope": "HISTORICAL_POINT_IN_TIME_READONLY_CHECK_BEFORE_COMPLETED_RECOVERY"
     },
     "freqtradeBridge": {
       "pr": 833,
@@ -497,6 +506,80 @@
       "comparisonExecuted": false,
       "performanceParityEstablished": false,
       "scopeIssue": 832
+    },
+    "publicationSha": null,
+    "recoveryInvocation835": {
+      "pr": 835,
+      "reviewedHead": "51c5a7485b89ba948b0661cc9fa668c1fbbd72ae",
+      "reviewedBase": "80daf2b7a5cc2ae0af5b6792583999d69451282c",
+      "reviewCommentId": 6230801877,
+      "reviewScope": "SOURCE_ONLY_NOT_OPERATIONAL_READINESS",
+      "sourceCiRun": 39010594230,
+      "sourceCiJob": 117332117371,
+      "sourceCiTests": {
+        "passed": 2571,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      "actualToolchainTests": {
+        "python": "3.14.2",
+        "invocationFixturesPassed": 9,
+        "wrapperTestsPassed": 22,
+        "evidenceCommentId": 6230767676,
+        "fixtureCorrection": "BASELINE_MODE_0600_PRODUCTION_PROTECTIONS_UNCHANGED"
+      },
+      "stagedFileCount": 10,
+      "stagingEvidenceCommentId": 6230690862,
+      "recoveryPerformed": true,
+      "setupPerformed": false,
+      "runtimeProvenance": "OWNER_CONTROLLED_OFFICIAL_PLATFORM_CORROBORATED_NOT_FULL_BYTE_ATTESTATION",
+      "runtimeIntentCommentId": 6230854680,
+      "runtimeCompletionCommentId": 6230893412
+    },
+    "installedDependencyEvidence": {
+      "commentId": 6230628600,
+      "matchedFiles": [
+        89,
+        15
+      ],
+      "scope": "PINNED_WHEEL_PACKAGE_BYTES_WITH_STATED_EXCLUSIONS_NOT_INTERPRETER_STDLIB_SHARED_LIBRARY_OS_ATTESTATION"
+    },
+    "runtimeRecovery20261017": {
+      "state": "COMPLETE_INDEPENDENT_ARCHIVE_VERIFICATION_PASS",
+      "operationId": "7bb75d21315ee2bd4b5acd895f9c556e",
+      "intentCommentId": 6230854680,
+      "completionCommentId": 6230893412,
+      "finalStatus": "OWNER_RECOVERY_ARCHIVED_NO_SETUP_AUTHORIZED",
+      "outerExit": 0,
+      "originalMarkerAbsent": true,
+      "archiveDirectoryMode": "0700",
+      "archiveOwnerUid": 1000,
+      "archiveFilesMode": "0600",
+      "archiveFilesNlink": 1,
+      "originalInodeAndContentPreserved": true,
+      "ctimeChangedByRename": true,
+      "evidenceSchemaAndPinsByteExact": true,
+      "setupPerformed": false,
+      "replayAuthorized": false,
+      "nextSetupRequiresSeparateConcreteApproval": true
+    },
+    "freqtradeLoaderDiagnostic": {
+      "state": "LOCAL_REVIEW_COMPLETE_NOT_PUBLISHED_OR_MERGED",
+      "sourceCommit": "1f394eaebc2f46a83d26971388628707802f8602",
+      "rowsPreserved": 3200,
+      "numericMismatchCells": 1390,
+      "numericCells": 16000,
+      "maxAbsoluteDifference": 3.552713678800501e-15,
+      "tolerance": 0,
+      "status": "LOADER_NUMERIC_PARITY_FAILED",
+      "outerExit": 2,
+      "publicEqualsRaw": true,
+      "separatePreciseFloatProbeMismatches": 0,
+      "probeSubstitutedForUpstream": false,
+      "contractTestsPassed": 8,
+      "strategyExecuted": false,
+      "performanceParityEstablished": false
     }
   }
 }

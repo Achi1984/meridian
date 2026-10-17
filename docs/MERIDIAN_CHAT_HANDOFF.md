@@ -1,6 +1,59 @@
 # MERIDIAN Chat Handoff
 
-## Current completion and runtime evidence — 2026-10-17
+## Current source completion and runtime evidence — 2026-10-17
+
+Operation HANDOFF-835-CONTINUITY-20261017-01. Verified source main:
+`c1740225b9682534cf1fdaa0128053604e4b86da` (#835). Build **10.0-r129**.
+This section supersedes older operational summaries below. The publication SHA
+of this handoff candidate is unknown until publication/readback.
+
+- Recovery invocation #835 is merged and source-complete. Reviewed head
+  `51c5a7485b89ba948b0661cc9fa668c1fbbd72ae`, base
+  `80daf2b7a5cc2ae0af5b6792583999d69451282c`. Exact-head Release Safety
+  39010594230/job117332117371 succeeded: 2571 pass, zero fail/cancelled/skipped.
+  Full four-file R2 source review GREEN_LIGHT6230801877. All required postchecks
+  succeeded: Release39011004056/job117333337616, Runtime39011003935,
+  Coordinator39011003957, Pages39011003549; additional Asset Watch Mirror
+  39011028345 also succeeded. FINAL_MERGE_STATUS6230822828.
+- Actual Codespace CPython3.14.2 tests: 9 invocation fixtures +22 wrapper tests
+  passed (issue829/comment6230767676). The earlier fixture failure was traced
+  to baseline permissions0646; the test now creates0600. Production protections
+  and the proposed2918-byte Python body remained unchanged. Synthetic test
+  execution is not production recovery evidence.
+- Approved production recovery completed once (issue829/comment6230893412):
+  final OWNER_RECOVERY_ARCHIVED_NO_SETUP_AUTHORIZED and outer RECOVERY_EXIT=0.
+  Independent read-only archive verification passed for operation
+  `7bb75d21315ee2bd4b5acd895f9c556e`: original marker absent, archive directory0700
+  owned by1000, files0600/nlink1, original inode/content preserved except ctime,
+  byte-exact evidence schema and pins verified. Do not rerun the archive action.
+- Owner approval6230643903 covered ARCHIVE_PUBLISHER_ATTEMPT_ONCE and has now
+  been consumed by the completed action. Later setup was not executed and needs
+  a separate concrete approval; neither source review nor archive success grants it.
+- Runtime intent6230854680 records corroborated owner-controlled official-platform
+  provenance, not full interpreter/stdlib/shared-library/OS byte attestation.
+  Ten staged files were byte-checked (6230690862); dependency evidence6230628600
+  covers89+15 package files against pinned official wheels, with stated exclusions.
+  Earlier read-only reconciliation6230532439 remains historical point-in-time
+  evidence; its unchanged-marker observation predates the completed archive.
+- Freqtrade data bridge #833 remains merged with all postchecks successful.
+  The subsequent five-file loader diagnostic is locally reviewed, not yet published
+  or merged. Actual upstream raw/public loading preserved all3200 rows and failed
+  the strict numeric parity gate:1390/16000 OHLCV cells differ, maximum absolute
+  difference3.552713678800501e-15. No tolerance was widened. Public equals raw;
+  a separate precise-float probe is diagnostic only, never replacement output.
+  Loader numeric parity, signal/accounting parity, fresh holdout, forward evidence
+  and strategy profitability remain unproven. No automatic strategy promotion.
+
+Priority remains roadmap831: publisher operational -> first proven autonomous
+development cycle -> controlled sustained operation. ChatGPT leads bounded
+agent assignments, integration and delegated merges (6229644994); single writer,
+exact-head/base CI, full independent review and postmerge gates remain. Mailbox639.
+CV2 remains SOURCE_AUDIT/all seven flags false; runtime trading is not authorized.
+NEXT: prepare the concrete subsequent setup scope for separate owner approval;
+never replay the completed archive. Integrate the locally reviewed Freqtrade
+strict-failure diagnostic with exact-head CI and independent review before merge.
+
+## Historical source/runtime snapshot — superseded by current section
 
 Operation HANDOFF-833-RUNTIME-20261017-01. Verified source main:
 `6473022aebcaf795888cff18ff787bfc392a4107` (#833). Build **10.0-r129**.
