@@ -25,13 +25,24 @@ AUTO, ORIGINAL, QUERIES = m.load_dependencies()
 CANARY = 'SYNTHETIC_PASSWORD_URI_FUNCTION_CANARY'
 
 
+def internal_rows():
+    return [('internal_fk_trigger', json.dumps([table, 'send_records_operation_key_fkey',
+             'pg_catalog', function, event]), 42,
+             json.dumps({'enabled': 'O', 'deferrable': False, 'initiallyDeferred': False}))
+            for table, function, event in (
+                ('reservations', 'RI_FKey_noaction_del', 9),
+                ('reservations', 'RI_FKey_noaction_upd', 17),
+                ('send_records', 'RI_FKey_check_ins', 5),
+                ('send_records', 'RI_FKey_check_upd', 17))]
+
+
 def inventory():
     return [('schema', 'meridian_publisher', 42, 'schema')] + [
         ('relation', n, 42, 'r') for n in ('reservations', 'send_records')] + [
         ('function', n, 42, CANARY) for n in ('guard_reservation()', 'guard_send_record()')] + [
         ('trigger', n, 42, CANARY) for n in (
             'reservations.guard_reservation_row', 'reservations.guard_reservation_truncate',
-            'send_records.guard_send_record_row', 'send_records.guard_send_record_truncate')]
+            'send_records.guard_send_record_row', 'send_records.guard_send_record_truncate')] + internal_rows()
 
 
 class Cursor:
@@ -77,6 +88,43 @@ class Tests(unittest.TestCase):
         second = self.collect(Cursor(rows=rows))
         self.assertNotEqual(first['definitions'], second['definitions'])
         self.assertFalse(second['schemaEquivalenceEstablished'])
+
+    def test_internal_fk_inventory_is_stable_and_output_is_hashed(self):
+        section = m.INVENTORY_SQL.split("'internal_fk_trigger',", 1)[1].split(" UNION ALL SELECT 'function'", 1)[0]
+        self.assertNotIn('tgname', section)
+        for fact in ('t.tgtype', 't.tgenabled', 't.tgdeferrable', 't.tginitdeferred', "k.contype='f'"):
+            self.assertIn(fact, section)
+        result = self.collect(Cursor())
+        self.assertEqual(sum(r['kind'] == 'internal_fk_trigger' for r in result['definitions']), 4)
+        rendered = json.dumps(result)
+        self.assertNotIn('RI_FKey', rendered)
+        self.assertNotIn('send_records_operation_key_fkey', rendered)
+        self.assertFalse(result['schemaEquivalenceEstablished'])
+
+    def test_internal_fk_missing_duplicate_or_wrong_identity_stops(self):
+        base = inventory()
+        variants = [base[:-1], base + [base[-1]]]
+        # Equivalent JSON with different whitespace must still be duplicate.
+        row = base[-1]
+        variants.append(base + [(row[0], json.dumps(json.loads(row[1]), separators=(',', ':')), row[2], row[3])])
+        for index, replacement in ((0, 'other'), (1, 'other'), (2, 'public'), (3, 'other'), (4, 99), (4, True)):
+            identity = json.loads(row[1]); identity[index] = replacement
+            variants.append(base[:-1] + [(row[0], json.dumps(identity), row[2], row[3])])
+        variants.append(base[:-1] + [(row[0], row[1], 99, row[3])])
+        for rows in variants:
+            with self.assertRaises(ValueError):
+                self.collect(Cursor(rows=rows))
+
+    def test_internal_fk_state_and_malformed_definition_stops(self):
+        base = inventory(); row = base[-1]
+        values = ['not json', 'null', '[]', '{}']
+        for key, value in (('enabled', 'D'), ('enabled', 'R'), ('enabled', 'A'),
+                           ('deferrable', True), ('deferrable', 0),
+                           ('initiallyDeferred', True), ('initiallyDeferred', 0), ('extra', False)):
+            facts = json.loads(row[3]); facts[key] = value; values.append(json.dumps(facts))
+        for definition in values:
+            with self.assertRaises(ValueError):
+                self.collect(Cursor(rows=base[:-1] + [(row[0], row[1], row[2], definition)]))
 
     def test_grant_mismatch_stops(self):
         with self.assertRaises(ValueError):

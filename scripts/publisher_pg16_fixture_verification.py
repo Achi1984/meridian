@@ -19,7 +19,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 PINS = {
-    'scripts/publisher_test_readonly_inspection.py': '0ea49dc6d5f7321ed8443bd7a5075dc92bb8642f23dbea27d696cab34365c06d',
+    'scripts/publisher_test_readonly_inspection.py': 'a15377ff7c08fef89279713382b1d41b73da1a40750d14144add3b4abd325138',
     'docs/autonomy/event-adapter/review-binding/fixtures/publication-ledger.sql': 'c7cab138a398936dd59845db9838947b4a308a3d387b2c4102060ac3ae646736',
     'docs/autonomy/event-adapter/review-binding/fixtures/publication-send-record.sql': '84018bd5f335652592ad3bccc4574407e14b90d7751da55480e000da6cf37bce',
 }
@@ -234,6 +234,11 @@ def verify(directory):
             rejected = []
             for name, mutation in NEGATIVES.items():
                 observed = canonical(json.loads(sql('BEGIN;\n' + mutation + '\n' + query + '\nROLLBACK;')), identity[5])
+                if name == 'disabled_internal_fk_trigger':
+                    expected_fk = [r for r in expected['inventory'] if r['kind'] == 'internal_fk_trigger']
+                    observed_fk = [r for r in observed['inventory'] if r['kind'] == 'internal_fk_trigger']
+                    if len(expected_fk) != 4 or len(observed_fk) != 4 or expected_fk == observed_fk:
+                        raise ValueError('inspector internal trigger mutation not visible')
                 try:
                     compare(expected, observed)
                 except ValueError:

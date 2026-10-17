@@ -49,6 +49,13 @@ def verify_resources(args):
 
 # Catalog-only inventory. Rendered PostgreSQL definitions are observations, not
 # equivalent to CREATE-source bytes; never derive an authorization from hashes.
+INTERNAL_FK_IDENTITIES = frozenset((table, 'send_records_operation_key_fkey', 'pg_catalog', function, event)
+    for table, function, event in (
+        ('reservations', 'RI_FKey_noaction_del', 9),
+        ('reservations', 'RI_FKey_noaction_upd', 17),
+        ('send_records', 'RI_FKey_check_ins', 5),
+        ('send_records', 'RI_FKey_check_upd', 17)))
+
 INVENTORY_SQL = """WITH ns AS (
  SELECT oid,nspowner FROM pg_catalog.pg_namespace WHERE nspname='meridian_publisher'
 ), inventory(kind,name,owner_oid,definition) AS (
@@ -71,6 +78,16 @@ INVENTORY_SQL = """WITH ns AS (
  pg_catalog.jsonb_build_object('enabled',t.tgenabled,'definition',pg_catalog.pg_get_triggerdef(t.oid,true))::text
  FROM pg_catalog.pg_trigger t JOIN pg_catalog.pg_class c ON t.tgrelid=c.oid
  JOIN ns ON c.relnamespace=ns.oid WHERE NOT t.tgisinternal
+ UNION ALL SELECT 'internal_fk_trigger',
+ pg_catalog.jsonb_build_array(c.relname,k.conname,pn.nspname,p.proname,t.tgtype)::text,c.relowner,
+ pg_catalog.jsonb_build_object('enabled',t.tgenabled,'deferrable',t.tgdeferrable,
+ 'initiallyDeferred',t.tginitdeferred)::text
+ FROM pg_catalog.pg_trigger t JOIN pg_catalog.pg_class c ON t.tgrelid=c.oid
+ JOIN ns ON c.relnamespace=ns.oid
+ JOIN pg_catalog.pg_constraint k ON k.oid=t.tgconstraint
+ JOIN pg_catalog.pg_proc p ON p.oid=t.tgfoid
+ JOIN pg_catalog.pg_namespace pn ON pn.oid=p.pronamespace
+ WHERE t.tgisinternal AND k.contype='f'
  UNION ALL SELECT 'function',p.proname||'('||pg_catalog.pg_get_function_identity_arguments(p.oid)||')',
  p.proowner,pg_catalog.pg_get_functiondef(p.oid)
  FROM pg_catalog.pg_proc p JOIN ns ON p.pronamespace=ns.oid
@@ -127,16 +144,30 @@ def collect(cursor, original, baseline, queries):
     rows = cursor.fetchmany(129)
     if not 1 <= len(rows) <= 128:
         raise ValueError('inventory bounds')
-    entries, seen = [], set()
+    entries, seen, fk_seen = [], set(), set()
     for kind, name, owner, definition in rows:
-        if (kind not in {'schema', 'relation', 'column', 'constraint', 'trigger', 'function'}
+        if (kind not in {'schema', 'relation', 'column', 'constraint', 'trigger', 'function', 'internal_fk_trigger'}
                 or type(name) is not str or len(name) > 256 or (kind, name) in seen
                 or type(owner) is not int or owner != baseline['owner_oid']
                 or type(definition) is not str or len(definition) > 16384):
             raise ValueError('inventory schema')
+        if kind == 'internal_fk_trigger':
+            identity, facts = json.loads(name), json.loads(definition)
+            if (type(identity) is not list or len(identity) != 5
+                    or any(type(v) is not str for v in identity[:4])
+                    or type(identity[4]) is not int
+                    or tuple(identity) not in INTERNAL_FK_IDENTITIES or tuple(identity) in fk_seen
+                    or type(facts) is not dict
+                    or set(facts) != {'enabled', 'deferrable', 'initiallyDeferred'}
+                    or facts['enabled'] != 'O' or facts['deferrable'] is not False
+                    or facts['initiallyDeferred'] is not False):
+                raise ValueError('internal foreign key trigger facts')
+            fk_seen.add(tuple(identity))
         seen.add((kind, name))
         entries.append({'kind': kind, 'nameSha256': hashlib.sha256(name.encode()).hexdigest(),
                         'definitionSha256': hashlib.sha256(definition.encode()).hexdigest()})
+    if fk_seen != INTERNAL_FK_IDENTITIES:
+        raise ValueError('internal foreign key triggers')
     if {n for k, n in seen if k == 'relation'} != {'reservations', 'send_records'}:
         raise ValueError('relations')
     if {n for k, n in seen if k == 'function'} != {'guard_reservation()', 'guard_send_record()'}:
