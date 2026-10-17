@@ -71,17 +71,26 @@ Inspect actual constraints, enabled triggers, function ownership/security/search
 path and definitions against the two pinned SQL fixtures; schema-file presence
 is not deployed-schema evidence. No automatic migration, GRANT, REVOKE or repair.
 
-**Missing implementation:** no existing reviewed CLI combines these administrative
-read-only inspections with private credential acquisition and bounded output.
-`--check` on auto setup is provider-only; `db_precheck` verifies only its narrower
-baseline. A small supervised, source-pinned inspection/activation helper is needed
-before this becomes an execution-ready request. Reuse existing private URI
-validation, CA, dependency-origin checks and process supervisor; do not paste an
-admin URI into psql arguments/environment or improvise SQL through an interactive
-prompt. That helper must have an inert import, explicit distinct read-only and
-activation modes, fixed SQL, scope/OID checks, sanitized output, deadlines,
-transaction/cleanup ambiguity handling and synthetic negative tests. This packet
-does not implement or authorize it, and contains no executable activation command.
+**Read-only source implementation:** the inspector now combines the fixed
+baseline/grant observations, private administrator acquisition and bounded
+supervision with a pinned fixture catalog comparator. PR848 source head
+`c4e860ebd5aae2282e48e7899ed4cdbaaf9c5b47` has actual private PG16 fixture evidence
+(receipt848/6233415079), including seven independently rejected comparator
+mutations. This is not a deployed Gate A result. Complete its source review/merge
+and postchecks before operational use.
+
+The separate source-only packet
+`PUBLISHER_GATEA_READONLY_SCOPE_20261017.md` and companion
+`PUBLISHER_GATEA_READONLY_LAUNCH_20261017.sh` define one reviewable read-only
+invocation with immutable source/resource pins. They grant no execution authority.
+The deployed PostgreSQL version remains unknown; only actual160015 matches the
+current reference and all other versions stop. Fresh exact-scope owner approval
+is required before private credential access. No setup/recovery approval carries
+forward and no automatic retry, migration or repair is included.
+
+This inspector intentionally has no activation mode. Gates B–D still need their
+own separately reviewed activation/closure implementation and exact authority;
+none of this packet implements or permits LOGIN or workflow effects.
 
 ## Gates B–D: distinguishable, sequential effects in one owner decision
 
