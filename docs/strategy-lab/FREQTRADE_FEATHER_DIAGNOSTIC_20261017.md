@@ -112,3 +112,40 @@ The unchanged dependency files are `scripts/verify-freqtrade-loader.py`,
 `docs/strategy-lab/FREQTRADE_LOADER_RESULT_20261017.json`. Only the first two are
 runtime imports/inputs of this verifier. Any dependency revision requires
 reconciliation and rerunning this packet before publishing its evidence.
+
+## Stored-evidence consistency gate — 2026-10-17 follow-up
+
+Intent: issue #832, comment6231315640. This follow-up adds the producer's
+`featherVerifierSha256` to its actual generated report. The isolated official
+Feather comparison was rerun after that source change; the field was not inserted
+by hand into an old result. The nine Python tests and a second genuine run with
+byte comparison passed; the data result remains 3,200 rows with zero binary64
+mismatches. The original JSON failure remains unchanged.
+
+`test/freqtrade-feather-report.test.js` runs automatically through the existing
+`node --test test/*.test.js` command, with no new workflow or dependency. It
+checks stored report consistency against current Feather/JSON verifier bytes,
+the dependency lock, the existing exporter commit reference and a freshly
+reconstructed offline bridge manifest. It also checks exact pair/row agreement,
+reported zero mismatch/path conditions, warmup, strict scope flags and preservation
+of the separately stored JSON failure. Six Node tests cover real repository
+inputs and mutations of hashes, lineage, universe, row counts, mismatch/path
+claims, scope and prior-failure evidence. No Python process or Freqtrade loader
+is started by this Node gate.
+
+Run the focused gate locally with Node20:
+
+```sh
+node --test test/freqtrade-feather-report.test.js
+```
+
+The gate is named **stored evidence consistency**, not execution verification.
+An internally consistent report is not cryptographic proof that its producer ran,
+that the reported Arrow calls occurred, or that its outer process exited0. Static
+CI cannot attest installed package/interpreter bytes or establish current Python
+runtime compatibility. Feather binaries are not stored in this repository: their
+reported hashes are checked only for valid syntax and pair/filename association,
+**not** against unavailable binary bytes. Actual local loading and independent
+reproduction remain separate evidence. No source authenticity, strategy, signal,
+accounting, performance or promotion claim follows from this gate. Coordinated
+changes to source and self-reported hashes still require independent review.

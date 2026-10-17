@@ -93,33 +93,37 @@
     "policyProposalCommentId": 6096562356,
     "protocol": "STREAM-SAFE-V8"
   },
-  "lastSeenCommentId": 6231263445,
+  "lastSeenCommentId": 6231435476,
   "quickCommand": "Go Meridian",
   "bootstrapFile": "MERIDIAN_GO.md",
   "currentWork": {
     "updatedAt": "2026-10-17",
-    "verifiedSourceMain": "0ff8667a5fab5df7634d81f677160c42a4dfe5ee",
+    "verifiedSourceMain": "f7d3f09c786dc85d1bb11c9a3233a6f1abd08cff",
     "lastCompletedSourceMerge": {
-      "pr": 837,
-      "mergeSha": "0ff8667a5fab5df7634d81f677160c42a4dfe5ee",
-      "reviewedHead": "37fad9a5ac98b05f886a7f35562cfa954f8055cc",
-      "reviewedBase": "61b2f00461ecb6b560fc454decce0ca83f62b06c",
-      "reviewCommentId": 6231176025,
-      "sourceCiRun": 39012873646,
-      "sourceCiJob": 117338924782,
+      "pr": 838,
+      "mergeSha": "f7d3f09c786dc85d1bb11c9a3233a6f1abd08cff",
+      "reviewedHead": "45720cfe366e8de4d9db4907f48cb817a5439b7e",
+      "reviewedBase": "0ff8667a5fab5df7634d81f677160c42a4dfe5ee",
+      "reviewCommentId": 6231388398,
+      "reviewScope": "SOURCE_ONLY_NOT_RUNTIME_READINESS",
+      "sourceCiRun": 39014393621,
+      "sourceCiJob": 117343371225,
       "sourceCiTests": {
-        "passed": 2571,
-        "failed": 0,
-        "cancelled": 0,
-        "skipped": 0
+        "passed": 2571
       },
-      "finalMergeCommentId": 6231263445,
+      "finalMergeCommentId": 6231435476,
       "postMergeChecks": "VERIFIED_SUCCESS",
       "postMergeRunIds": {
-        "releaseSafety": 39014125299,
-        "runtimeSmoke": 39014125293,
-        "releaseCoordinator": 39014125291,
-        "pages": 39014125002
+        "releaseSafety": 39015392147,
+        "runtimeSmoke": 39015392217,
+        "releaseCoordinator": 39015392112,
+        "pages": 39015391836
+      },
+      "postMergeSnapshot": {
+        "releaseSafety": "SUCCESS",
+        "runtimeSmoke": "SUCCESS",
+        "releaseCoordinator": "SUCCESS",
+        "pages": "SUCCESS"
       }
     },
     "lastCompletedHandoffRefresh": {
@@ -134,8 +138,8 @@
         "pages": 39009496870
       }
     },
-    "package": "CONTINUITY_AFTER_837_AND_SOURCE_ONLY_SETUP_PROPOSAL",
-    "state": "PR837_COMPLETE_RECOVERY_COMPLETE_SETUP_SOURCE_PROPOSAL_NOT_AUTHORIZED",
+    "package": "CONTINUITY_AFTER_838_AND_FEATHER_EVIDENCE_CONSISTENCY",
+    "state": "PR838_SOURCE_COMPLETE_SETUP_NOT_AUTHORIZED_RUNTIME_AUTH_BLOCKED",
     "infrastructurePaused": true,
     "mailboxRollover": {
       "from": 571,
@@ -247,7 +251,7 @@
         "authorizedReproductionBudget": "UNKNOWN"
       }
     },
-    "nextStep": "PUBLISH_SIX_FILE_SETUP_PROPOSAL_CONTINUITY_FOR_OWN_EXACT_HEAD_CI_AND_FULL_REVIEW_THEN_SEPARATE_OWNER_APPROVAL",
+    "nextStep": "PUBLISH_EIGHT_FILE_EVIDENCE_CONSISTENCY_CONTINUITY_FOR_OWN_CI_REVIEW; RESTORE_AUTHORIZED_RUNTIME_SESSION_FOR_OUTSTANDING_SETUP_LAUNCH_EVIDENCE",
     "ownerPathInspection": {
       "pr": 828,
       "mergeSha": "bfebd17ddfa1d2d3b44a15126e28618a82cb81f2",
@@ -271,7 +275,7 @@
       "setupAuthorized": false,
       "evidenceScope": "HISTORICAL_SOURCE_SNAPSHOT_SUPERSEDED_BY_RUNTIME_RECOVERY_20261017"
     },
-    "publisherNextStep": "RECOVERY_COMPLETE_DO_NOT_REPLAY; PREPARE_CONCRETE_SETUP_SCOPE_FOR_SEPARATE_OWNER_APPROVAL",
+    "publisherNextStep": "SETUP_SOURCE838_MERGED; REAL_TOOLCHAIN_LAUNCH_REVIEW_OUTSTANDING_THEN_SEPARATE_CONCRETE_OWNER_APPROVAL_AND_FRESH_GATES",
     "strategyNextStep": "FEATHER837_COMPLETE_EXACT_INPUT_ONLY_JSON_FAILURE_RETAINED_NO_STRATEGY_EXECUTION",
     "completion20261017": {
       "verifiedMain": "8691381510039e2ad48b863ea5e66d6ad6cba462",
@@ -651,13 +655,39 @@
       "reviewCommentId": 6231176025
     },
     "nextSetupProposal": {
-      "state": "TWO_DOCUMENT_SOURCE_ONLY_CANDIDATE_NOT_EXECUTED",
+      "state": "SOURCE_PROPOSAL_MERGED838_NOT_RUNTIME_READY_NOT_EXECUTED",
       "approvalCommentId": null,
       "setupAuthorized": false,
       "sourcePinsVerifiedOn": "61b2f00461ecb6b560fc454decce0ca83f62b06c",
       "sourcePinsUnchangedAfter837": true,
       "requiredGates": "EXACT_HEAD_CI_FULL_INDEPENDENT_REVIEW_RELEVANT_TOOLCHAIN_EVIDENCE_THEN_SEPARATE_CONCRETE_OWNER_APPROVAL_AND_FRESH_RUNTIME_CHECKS",
-      "rolesRemainNoLogin": true
+      "rolesRemainNoLogin": true,
+      "pr": 838,
+      "mergeSha": "f7d3f09c786dc85d1bb11c9a3233a6f1abd08cff",
+      "reviewCommentId": 6231388398,
+      "realToolchainLaunchReview": "OUTSTANDING"
+    },
+    "featherEvidenceConsistencyCandidate": {
+      "state": "LOCAL_PACKET_NOT_PUBLISHED_NO_NEW_HOSTED_CI",
+      "files": 4,
+      "staticNodeTestsPassed": 6,
+      "isolatedPythonTestsPassed": 9,
+      "independentGenuineReproductionExit": 0,
+      "reportByteIdentical": true,
+      "reportDelta": "ONLY_PRODUCER_SOURCE_HASH_ADDED",
+      "executionAttestation": false,
+      "outputBinaryBytesVerifiedByStaticGate": false,
+      "outputHashCheck": "SYNTAX_AND_FILENAME_ASSOCIATION_ONLY",
+      "jsonFailureSuperseded": false,
+      "strategyExecuted": false,
+      "publicationSha": null
+    },
+    "dependentSourcePipeline": "READY_FOR_EIGHT_FILE_CANDIDATE_PUBLICATION_OWN_CI_AND_REVIEW_PENDING",
+    "runtimeAccess": {
+      "state": "AUTHENTICATION_BLOCKED",
+      "observation": "APPLE_IDENTITY_VERIFICATION_GENERIC_ERROR",
+      "targeted72TestsExecuted": false,
+      "setupExecuted": false
     }
   }
 }
