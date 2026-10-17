@@ -11,6 +11,6 @@ test('publisher fixture catalog: offline generator and comparator suite', {timeo
   });
   assert.ifError(run.error);
   assert.equal(run.status,0,`Offline fixture catalog tests failed:\n${run.stdout}\n${run.stderr}`);
-  assert.match(run.stderr,/Ran 16 tests/);
+  assert.match(run.stderr,/Ran 17 tests/);
   assert.match(run.stderr,/\nOK\s*$/);
 });

@@ -59,8 +59,9 @@ INTERNAL_FK_IDENTITIES = frozenset((table, 'send_records_operation_key_fkey', 'p
 INVENTORY_SQL = """WITH ns AS (
  SELECT oid,nspowner FROM pg_catalog.pg_namespace WHERE nspname='meridian_publisher'
 ), inventory(kind,name,owner_oid,definition) AS (
- SELECT 'schema','meridian_publisher',nspowner,'schema' FROM ns
- UNION ALL SELECT 'relation',c.relname,c.relowner,c.relkind::text
+ -- Seed text types before UNION resolution: catalog name is limited to 63 bytes.
+ SELECT 'schema'::text,'meridian_publisher'::text,nspowner,'schema'::text FROM ns
+ UNION ALL SELECT 'relation',c.relname::text,c.relowner,c.relkind::text
  FROM pg_catalog.pg_class c JOIN ns ON c.relnamespace=ns.oid WHERE c.relkind<>'i'
  UNION ALL SELECT 'column',c.relname||'.'||a.attname,c.relowner,
  pg_catalog.jsonb_build_object('type',pg_catalog.format_type(a.atttypid,a.atttypmod),

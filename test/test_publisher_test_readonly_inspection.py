@@ -89,6 +89,15 @@ class Tests(unittest.TestCase):
         self.assertNotEqual(first['definitions'], second['definitions'])
         self.assertFalse(second['schemaEquivalenceEstablished'])
 
+    def test_union_identity_is_text_before_catalog_name_branches(self):
+        self.assertIn("SELECT 'schema'::text,'meridian_publisher'::text,nspowner,'schema'::text", m.INVENTORY_SQL)
+        self.assertIn("SELECT 'relation',c.relname::text,c.relowner", m.INVENTORY_SQL)
+        names = [r[1] for r in internal_rows()]
+        self.assertTrue(all(len(n) > 63 for n in names))
+        self.assertEqual(len(set(names)), 4)
+        # PostgreSQL name-width truncation destroys these stable identities.
+        self.assertEqual(len(set(n[:63] for n in names)), 2)
+
     def test_internal_fk_inventory_is_stable_and_output_is_hashed(self):
         section = m.INVENTORY_SQL.split("'internal_fk_trigger',", 1)[1].split(" UNION ALL SELECT 'function'", 1)[0]
         self.assertNotIn('tgname', section)

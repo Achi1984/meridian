@@ -95,6 +95,21 @@ class Tests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 m.compare_fixture_catalog(rows, 42, 160015, manifest)
 
+    def test_real_pg_name_width_collision_remains_rejected(self):
+        names = [json.dumps([table, 'send_records_operation_key_fkey', 'pg_catalog', function, event])
+                 for table, function, event in (
+                     ('reservations', 'RI_FKey_noaction_del', 9), ('reservations', 'RI_FKey_noaction_upd', 17),
+                     ('send_records', 'RI_FKey_check_ins', 5), ('send_records', 'RI_FKey_check_upd', 17))]
+        rows = [('internal_fk_trigger', name, 42, '{"enabled":"O"}') for name in names]
+        self.assertEqual(len(m.entries(rows, 42)), 4)
+        truncated = [(k, n[:63], o, d) for k, n, o, d in rows]
+        self.assertEqual(len(set(n for _, n, _, _ in truncated)), 2)
+        with self.assertRaises(ValueError): m.entries(truncated, 42)
+        value = report()
+        value['expectedCatalog']['inventory'] = [dict(kind=k, name=n, owner_oid='fixture-owner', left=d)
+                                               for k, n, _, d in truncated]
+        with self.assertRaises(ValueError): m.generate_manifest(value)
+
     def test_owner_is_checked_separately_from_stable_manifest(self):
         manifest = m.generate_manifest(report())
         for owner in (True, 0, -1, 4294967296, '42', 99):

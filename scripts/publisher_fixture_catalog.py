@@ -15,7 +15,7 @@ import sys
 
 CONTRACT = 'publisher-fixture-catalog-v1'
 SERVER_VERSION = 160015
-QUERY_SHA256 = 'eead021680c07d6da2cca799e1836a9d2d18c55149cd3cd6514a9dd1f6979eef'
+QUERY_SHA256 = 'a979e3c9db97bb55cf0d1b5176b6120ceec768edb8134306b7ddea39af48929d'
 FIXTURES = {
     'docs/autonomy/event-adapter/review-binding/fixtures/publication-ledger.sql':
         'c7cab138a398936dd59845db9838947b4a308a3d387b2c4102060ac3ae646736',
