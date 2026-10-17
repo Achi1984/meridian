@@ -1,11 +1,13 @@
 # Bounded GitHub autopilot proposal — preparation only
 
-**Status: disabled; no workflow or runtime is proposed for activation now.**
+**This GitHub-native workflow proposal is disabled; this PR does not activate a
+workflow or runtime.** A separate, owner-authorized ChatGPT coordinator is
+enabled as recorded below.
 Owner approval #639/comment6239454116 ("Ja Freigabe erteilt",
 2026-10-17T21:22:29+02:00) authorizes this preparation packet only. It does not
 approve a workflow change, permission, credential, schedule, dispatcher, or
-24-hour activation. Publisher remains paused; repair #862 is the single stated
-cleanup exception.
+24-hour GitHub-native pilot activation. Publisher remains paused; repair #862
+and the approved preparation are the stated exceptions.
 
 ## Immutable starting inputs
 
@@ -26,10 +28,19 @@ Read from live GitHub before editing:
 
 The live source main remains `5c996ee9c7d4e71f0d6f2ecd59f6fc53beedcce3`,
 the merge commit for PR #859. Preparation is now draft PR #868 for issue #867;
-its pilot remains disabled. Live issue records show the lead-connected GitHub
-connector successfully assigned Copilot to #863, #865, and #867. Those observed
-assignments verify the connected Lead's issue-assignment capability; they do
-not establish autonomous dispatch from a GitHub Actions runner.
+its GitHub-native pilot remains disabled. Separately, owner approval
+#639/comment6239688670 resumed the existing ChatGPT coordinator:
+automation `6ac559aa5a888191a09b2fd497405a70` (“Meridian Agenten-Koordination”)
+was successfully updated and enabled. Its bounded schedule is hourly for 24
+runs, starting 2026-10-17 21:45 Europe/Vienna. The first new run has not yet
+been observed; the service supplied no next-run time, so no execution is
+claimed. Durable coordinator status is #867/comment6239688891. This is the
+existing coordinator using the Lead-connected GitHub issue-assignment
+capability, not the native workflow proposal in this PR.
+
+Live issue records show that connected Lead assigned Copilot to #863, #865,
+and #867. These observed assignments verify that capability; they do not
+establish autonomous dispatch from a GitHub Actions runner.
 
 Repair #862 remains unmerged at the pinned head. Run `39061699022` attempt 1
 was `action_required` with zero jobs; attempt 2 now completed `failure` with
@@ -59,6 +70,11 @@ Inspected at the pinned `main` above: `MERIDIAN_GO.md`,
 * The connected Lead's issue-assignment capability is verified by the observed
   Copilot assignments to #863, #865, and #867. This is distinct from dispatch
   initiated by a GitHub Actions runner.
+* The existing ChatGPT coordinator automation is owner-authorized and enabled
+  (`6ac559aa5a888191a09b2fd497405a70`); update succeeded, while its first new
+  run remains unobserved. It uses the connected Lead issue-assignment capability
+  and is distinct from this disabled GitHub-native workflow proposal. This PR
+  neither creates nor changes that coordinator or its schedule.
 * The native Copilot task adapter is inactive by default. That specific runner
   path requires a pinned approved task and externally verified user-to-server
   token capability; its source explicitly excludes an Actions `GITHUB_TOKEN`.

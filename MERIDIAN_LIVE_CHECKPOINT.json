@@ -136,8 +136,25 @@
       }
     },
     "package": "BOUNDED_GITHUB_AUTOPILOT_PREPARATION_PR868",
-    "state": "MAIN859_VERIFIED_862_CI_FAILURE_860_WAITING_861_QUEUED_PR868_DISABLED",
-    "nextStep": "RECONCILE_862_CI_FAILURE_WITH_OWNER; KEEP_860_WAITING_861_QUEUED_PR868_DISABLED",
+    "state": "MAIN859_VERIFIED_EXISTING_COORDINATOR_ENABLED_FIRST_RUN_PENDING_862_CI_FAILURE_PR868_NATIVE_PROPOSAL_DISABLED",
+    "nextStep": "OBSERVE_EXISTING_COORDINATOR_FIRST_RUN_ONCE; KEEP_NATIVE_WORKFLOW_PROPOSAL_DISABLED; RECONCILE_862_CI_FAILURE",
+    "existingOwnerApprovedCoordinator": {
+      "approvalCommentId": 6239688670,
+      "statusCommentId": 6239688891,
+      "automationId": "6ac559aa5a888191a09b2fd497405a70",
+      "title": "Meridian Agenten-Koordination",
+      "updateSucceeded": true,
+      "enabled": true,
+      "schedule": "HOURLY",
+      "runLimit": 24,
+      "startAt": "2026-10-17T21:45:00 Europe/Vienna",
+      "firstNewRun": "NOT_YET_OBSERVED",
+      "nextRunTimeProvided": false,
+      "automaticMerge": false,
+      "automaticDeploy": false,
+      "usesLeadConnectedIssueAssignment": true,
+      "distinctFromNativeProposalPr868": true
+    },
     "currentMainReconciliation": {
       "mainSha": "5c996ee9c7d4e71f0d6f2ecd59f6fc53beedcce3",
       "mergePr": 859,
@@ -154,7 +171,10 @@
             "attempt": 2,
             "conclusion": "failure",
             "job": "syntax",
-            "failingStep": "Research and auth regression tests"
+            "jobId": 117484116143,
+            "failingStep": "Research and auth regression tests",
+            "passedTests": 2582,
+            "failedTests": 5
           }
         ],
         "state": "UNMERGED_CI_FAILURE"
@@ -1209,6 +1229,7 @@
       },
       "pilot": {
         "enabled": false,
+        "workflowStatus": "DISABLED_PREPARATION_ONLY",
         "startEpoch": null,
         "endEpoch": null,
         "maxWindowSeconds": 86400,
@@ -1236,7 +1257,7 @@
         "liveAuthorized": false
       },
       "activationDiff": "BLOCKED_AUTONOMOUS_RUNNER_CAPABILITY_UNESTABLISHED_AND_862_CI_FAILURE",
-      "nextGate": "OWNER_REVIEW_PREPARATION_AND_SEPARATE_ACTIVATION_APPROVAL_AFTER_EXACT_HEAD_CI"
+      "nextGate": "REPAIR862_EXACT_HEAD_CI_SUCCESS_THEN_REVIEW; EXISTING_COORDINATOR_STATUS_TRACKED_SEPARATELY"
     }
   }
 }
