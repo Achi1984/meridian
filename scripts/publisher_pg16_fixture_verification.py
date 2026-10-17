@@ -115,9 +115,12 @@ def binaries(directory):
 
 def snapshot_sql(inventory_sql):
     return """SELECT pg_catalog.jsonb_build_object(
- 'inventory',(SELECT pg_catalog.jsonb_agg(pg_catalog.to_jsonb(i)) FROM (""" + inventory_sql + """) i),
+ -- OID's PostgreSQL JSON encoding is a string; model the production driver's
+ -- integer OID values explicitly without changing the pinned inventory query.
+ 'inventory',(SELECT pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object(
+   'kind',i.kind,'name',i.name,'owner_oid',i.owner_oid::bigint,'left',i."left")) FROM (""" + inventory_sql + """) i),
  'functions',(SELECT pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object(
-   'name',p.proname,'owner',p.proowner,'securityDefiner',p.prosecdef,
+   'name',p.proname,'owner',p.proowner::bigint,'securityDefiner',p.prosecdef,
    'configuration',p.proconfig,'language',l.lanname) ORDER BY p.proname)
    FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace
    JOIN pg_catalog.pg_language l ON l.oid=p.prolang WHERE n.nspname='meridian_publisher'),
@@ -152,6 +155,8 @@ def snapshot_sql(inventory_sql):
 
 
 def canonical(value, owner_oid):
+    if type(owner_oid) is not int or not 0 < owner_oid <= 4294967295:
+        raise ValueError('owner OID type')
     if type(value) is not dict or set(value) != {'inventory', 'functions', 'triggers', 'internalFkTriggers', 'columns', 'constraints'}:
         raise ValueError('snapshot shape')
     result = json.loads(json.dumps(value))
@@ -160,7 +165,7 @@ def canonical(value, owner_oid):
             raise ValueError('snapshot bounds')
     seen = set()
     for row in result['inventory']:
-        if (set(row) != {'kind', 'name', 'owner_oid', 'left'} or row['owner_oid'] != owner_oid
+        if (set(row) != {'kind', 'name', 'owner_oid', 'left'} or type(row['owner_oid']) is not int or row['owner_oid'] != owner_oid
                 or type(row['left']) is not str or len(row['left']) > 16384):
             raise ValueError('inventory boundary')
         if type(row['kind']) is not str or type(row['name']) is not str or (row['kind'], row['name']) in seen:
@@ -173,7 +178,7 @@ def canonical(value, owner_oid):
                 raise ValueError('internal trigger identity truncated or malformed')
         row['owner_oid'] = 'fixture-owner'
     for row in result['functions']:
-        if row['owner'] != owner_oid:
+        if type(row['owner']) is not int or row['owner'] != owner_oid:
             raise ValueError('function owner')
         row['owner'] = 'fixture-owner'
     if len(json.dumps(result).encode()) > 131072:
@@ -233,13 +238,15 @@ def verify(directory):
                 if server.poll() is not None:
                     raise ValueError('local server exited')
                 try:
-                    identity = json.loads(sql("SELECT json_build_array(current_setting('server_version_num')::int,current_user,current_database(),inet_server_addr(),current_setting('data_directory'),(SELECT oid FROM pg_roles WHERE rolname=current_user));"))
+                    identity = json.loads(sql("SELECT json_build_array(current_setting('server_version_num')::int,current_user,current_database(),inet_server_addr(),current_setting('data_directory'),(SELECT oid::bigint FROM pg_roles WHERE rolname=current_user));"))
                     break
                 except ValueError:
                     if time.monotonic() >= deadline:
                         raise ValueError('local startup timeout') from None
                     time.sleep(0.05)
-            if not (160000 <= identity[0] < 170000 and identity[1:5] == [OWNER, 'postgres', None, str(data)]):
+            if not (type(identity) is list and len(identity) == 6
+                    and type(identity[0]) is int and 160000 <= identity[0] < 170000
+                    and type(identity[5]) is int and 0 < identity[5] <= 4294967295 and identity[1:5] == [OWNER, 'postgres', None, str(data)]):
                 raise ValueError('local identity')
             sql('\n'.join(fixtures))
             # Check the actual SQL result type; casting after UNION resolution

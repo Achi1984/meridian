@@ -90,6 +90,18 @@ class Tests(unittest.TestCase):
                       't.tgenabled', 't.tgdeferrable', 't.tginitdeferred'):
             self.assertIn(field, section)
 
+    def test_json_adapter_explicitly_encodes_integer_oids(self):
+        query = m.snapshot_sql(m.sources()[0])
+        self.assertIn("'owner_oid',i.owner_oid::bigint", query)
+        self.assertIn("'owner',p.proowner::bigint", query)
+        self.assertNotIn('to_jsonb(i)', query)
+        for bad_owner in ('10', True, 0, -1, 4294967296):
+            with self.assertRaises(ValueError): m.canonical(fixture(), bad_owner)
+        for field, section in (('owner_oid', 'inventory'), ('owner', 'functions')):
+            for bad_owner in ('42', True):
+                value = fixture(); value[section][0][field] = bad_owner
+                with self.assertRaises(ValueError): m.canonical(value, 42)
+
     def test_catalog_normalizes_only_owner_oid(self):
         value = fixture()
         result = m.canonical(value, 42)
@@ -192,6 +204,7 @@ class Tests(unittest.TestCase):
             self.assertIn('--no-password', argv)
             self.assertTrue(any(x.startswith('--host=/tmp/meridian-pg16-') for x in argv))
             if 'json_build_array' in text:
+                self.assertIn('SELECT oid::bigint FROM pg_roles', text)
                 return json.dumps([160015, m.OWNER, 'postgres', 'external' if wrong_identity else None, cluster[0], 42])
             if 'pg_typeof(i.name)' in text:
                 return json.dumps(['name' if wrong_inventory_type else 'text'])
