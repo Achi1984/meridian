@@ -1,5 +1,22 @@
 # MERIDIAN GO
 
+## Owner merge delegation — effective 2026-10-17
+
+This newer owner instruction supersedes the older per-merge approval rules in
+this document: “Du kannst selbst zukünftig über merges entscheiden - freigabe
+erteilt”, 2026-10-17T06:31:42+02:00, mailbox639/comment6229644994.
+ChatGPT is the sole merge decision owner, including previously reserved source
+paths. Do not ask the owner again merely because a merge changes those paths.
+Exact-head/base CI, full independent review, expected-head protection, single
+writer, scope verification and successful postmerge checks remain required.
+The offline routine classifier is unchanged and remains advisory, never an
+authorization mechanism. Its conservative classifications do not override this
+newer owner instruction. Existing approval fields remain for historical and
+runtime gates; owner merge approval is now satisfied by this delegation.
+This is merge authority only. Runtime recovery and subsequent setup each still
+need separate concrete approval; activation, trading, spending, credentials and
+schedules are not authorized by this instruction.
+
 Canonical quick-start for the user command: **Go Meridian**
 
 ## Meaning
