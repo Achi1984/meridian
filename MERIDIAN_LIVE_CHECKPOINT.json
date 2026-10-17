@@ -17,7 +17,7 @@
     "rolloverThresholdComments": 200,
     "watchdogStatusCommentId": 6198924473
   },
-  "terminalBuild": "10.0-r128",
+  "terminalBuild": "10.0-r129",
   "liveMainAtCreation": "f23fc2db682963d7031ec1f3ddf9c3f4854a7f7f",
   "lastSubstantiveCheckpoint": "c009326529e162f84bb985d0aca2de6cf5065c18",
   "lastContinuityMerge": {
@@ -98,7 +98,7 @@
   "bootstrapFile": "MERIDIAN_GO.md",
   "currentWork": {
     "updatedAt": "2026-10-16",
-    "verifiedSourceMain": "2736f9d1d98988858373c05c05a7d5a67cbca27b",
+    "verifiedSourceMain": "0a32b25c5be4db4d0ae7d3473c664bd7c35e326d",
     "lastCompletedSourceMerge": {
       "pr": 814,
       "mergeSha": "2736f9d1d98988858373c05c05a7d5a67cbca27b",
@@ -118,27 +118,19 @@
       }
     },
     "lastCompletedHandoffRefresh": {
-      "pr": 819,
-      "mergeSha": "48275e8ac149806859d698e7b29cb375dee73ff3",
-      "finalMergeCommentId": 6199797884,
+      "pr": 821,
+      "mergeSha": "0a32b25c5be4db4d0ae7d3473c664bd7c35e326d",
+      "finalMergeCommentId": 6214143240,
       "postMergeChecks": "VERIFIED_SUCCESS",
-      "postMergeStatus": {
-        "releaseSafety": "SUCCESS",
-        "agentOrchestration": "SUCCESS",
-        "runtimeSmoke": "SUCCESS",
-        "releaseCoordinator": "SUCCESS",
-        "pages": "SUCCESS"
-      },
       "postMergeRunIds": {
-        "releaseSafety": 38788973884,
-        "agentOrchestration": 38788973900,
-        "releaseCoordinator": 38788973917,
-        "runtimeSmoke": 38788973928,
-        "pages": 38788972716
+        "releaseSafety": 38891568080,
+        "runtimeSmoke": 38891568010,
+        "releaseCoordinator": 38891568120,
+        "pages": 38891567792
       }
     },
-    "package": "PR814_SOURCE_PACKET_HANDOFF_REFRESH",
-    "state": "SOURCE_PACKET_COMPLETE_HANDOFF_REFRESH_PENDING_PUBLICATION",
+    "package": "STRATEGY_PAPER_ARENA_R129",
+    "state": "DIAGNOSTIC_CAPTURED_PENDING_EXACT_HEAD_CI_REVIEW",
     "infrastructurePaused": true,
     "mailboxRollover": {
       "from": 571,
@@ -243,9 +235,9 @@
         "authorizedReproductionBudget": "UNKNOWN"
       }
     },
-    "nextStep": "HANDOFF821_REVISED_CANDIDATE_EXACT_HEAD_CI_THEN_INDEPENDENT_FULL_SCOPE_REVIEW_THEN_LEAD_GUARDED_PUBLICATION",
+    "nextStep": "VERIFY_ARENA_LOCAL_TESTS_EXACT_HEAD_CI_INDEPENDENT_REVIEW",
     "publisherNextStep": "STAGE_2_PLAN_INDEPENDENT_REVIEW_ONLY; NO_RUNTIME_RECOVERY_OR_SETUP_AUTHORIZED",
-    "strategyNextStep": "PR823_SOURCE_ONLY",
+    "strategyNextStep": "PR824_EXACT_HEAD_CI_AND_INDEPENDENT_REVIEW",
     "handoffValidation": {
       "node": "v20.20.2",
       "python": "3.12.3",
@@ -402,6 +394,33 @@
       "enabledManagementRouting": "ALREADY_CHECKPOINT_DYNAMIC",
       "eventPilot673": "READ_ONLY_UNCHANGED"
     },
-    "leadStatusCommentId": 6199106917
+    "leadStatusCommentId": 6199106917,
+    "strategyArena": {
+      "opId": "PAPER-ARENA-INTEGRATION-20261016-2235",
+      "state": "MARKET_DIAGNOSTIC_REPRODUCED_PENDING_CI_REVIEW",
+      "ownerMandateAt": "2026-10-16T22:35:21+02:00",
+      "scope": "ISOLATED_OFFLINE_PAPER_SIMULATION_AND_DIAGNOSTICS",
+      "candidates": [
+        "H1-B",
+        "H1-E",
+        "H7-B",
+        "H7-R",
+        "H9_BLOCKED_DATA"
+      ],
+      "forwardEvidence": "NOT_ESTABLISHED",
+      "runtimePaperOrders": false,
+      "liveOrders": false,
+      "policyCompatibility": "UNRESOLVED_NO_PROMOTION",
+      "pr": 824,
+      "diagnosticReceiptManifest": "research/results/strategy-arena-20261016/manifest.json",
+      "diagnosticInputSha256": "decf35415605bda739d08e9ac489951c21f5428d6b5f6362bd6e77abf265c473",
+      "quoteCurrency": "USD",
+      "source": "KRAKEN_SPOT_PUBLIC_OHLC",
+      "evidence": "RETROSPECTIVE_DIAGNOSTIC_NOT_INDEPENDENT_VALIDATION",
+      "dataRowsPerAsset": 400,
+      "scoredDailyObservations": 200,
+      "frozenProtocolSha256": "901f0b7e48f6ecebed344d899ea5c7f5c8404bb465ce5360c54e081dc4e628bf",
+      "frozenEngineSha256": "c80fdae96eda45ae8fc3f4ce253db1223639548ccda6b484c1dd093c140aee64"
+    }
   }
 }

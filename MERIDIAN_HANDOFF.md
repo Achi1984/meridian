@@ -1,5 +1,24 @@
 # MERIDIAN HANDOFF
 
+## Arena implementation candidate — 2026-10-16
+
+Build: **10.0-r129** (unmerged candidate). Canonical merged source remains
+`0a32b25c5be4db4d0ae7d3473c664bd7c35e326d` (#821; all four postchecks passed,
+FINAL_MERGE_STATUS 6214143240). Earlier current-summary sections below are
+historical snapshots, superseded by the live checkpoint for current work.
+
+Owner mandate at 22:35:21+02:00 authorizes isolated strategy Paper-arena integration
+and evaluation with agents. Four offline virtual models (H1-B, H1-E, H7-B, H7-R)
+plus H9 BLOCKED_DATA; no connected Paper/runtime orders or Live activation.
+Source/rules receipts precede replay; historical output is diagnostic, not fresh
+Holdout or forward proof. CRV compatibility remains unresolved, not waived.
+All CV2 SOURCE_AUDIT authorization flags remain false; publisher recovery/setup
+remain separately gated. See `docs/strategy-lab/PAPER_ARENA_PROTOCOL_20261016.md`.
+
+NEXT: complete local engine/receipt/UI checks, exact-head CI and independent
+full-scope review before a guarded merge. No candidate publication SHA is claimed.
+
+
 ## Current handoff — 2026-10-16
 
 This section is the current operational summary. Historical snapshots below are
