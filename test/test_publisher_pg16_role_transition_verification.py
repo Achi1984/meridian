@@ -105,7 +105,11 @@ class FixtureTests(unittest.TestCase):
     def test_actual_identity_must_include_private_data_directory_tls_and_port(self):
         class Admin:
             pgconn=types.SimpleNamespace(ssl_in_use=True)
-            def execute(self,sql): return self
+            def execute(self,sql):
+                # inet::text retains /32; the SQL must request the host address.
+                if 'pg_catalog.host(pg_catalog.inet_server_addr())' not in sql:
+                    raise AssertionError('noncanonical inet comparison')
+                return self
             def fetchone(self): return self.row
         admin=Admin(); admin.row=(160015,'fixture_admin','postgres','127.0.0.1',12345,'/tmp/private/data','127.0.0.1')
         m.assert_local_identity(admin,Path('/tmp/private/data'),12345)

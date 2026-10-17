@@ -198,7 +198,7 @@ class TestServices:
 
 
 def assert_local_identity(admin, data, port):
-    row = admin.execute("SELECT current_setting('server_version_num')::integer, current_user, current_database(), inet_server_addr()::text, inet_server_port(), current_setting('data_directory'), current_setting('listen_addresses')").fetchone()
+    row = admin.execute("SELECT current_setting('server_version_num')::integer, current_user, current_database(), pg_catalog.host(pg_catalog.inet_server_addr()), inet_server_port(), current_setting('data_directory'), current_setting('listen_addresses')").fetchone()
     if row != (160015,'fixture_admin','postgres','127.0.0.1',port,str(data),'127.0.0.1') or admin.pgconn.ssl_in_use is not True:
         raise ValueError('private server identity')
 
