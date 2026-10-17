@@ -18,7 +18,7 @@ const routes=new Map([
 for(const name of ['manifest','BTC','ETH','SOL','XRP','HBAR','LINK','AVAX','SUI'])routes.set('/research/results/strategy-arena-20261016/'+name+'.json',['../research/results/strategy-arena-20261016/'+name+'.json','application/json']);
 const html=`<!doctype html><html lang="de"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="stylesheet" href="/v9/v9.css"><link rel="stylesheet" href="/v10/v10.css"><link rel="stylesheet" href="/v10/r124-typography-floor.css">
-<style>body{margin:0}*,*:before,*:after{box-sizing:border-box}</style><body><button id="keyboard-start">Prüfung starten</button><main id="qa-root"><div data-strategy-arena></div></main>
+<style>body{margin:0}*,*:before,*:after{box-sizing:border-box}</style><body><button id="keyboard-start">Prüfung starten</button><main class="app-shell"><section id="view-paper" class="view active"><div id="qa-root"><div data-strategy-arena></div></div></section></main>
 <script type="module">import {createStrategyArenaView} from '/v10/strategy-arena.js';
 window.networkAttempts=0;window.storedRequests=0;const nativeFetch=window.fetch.bind(window);window.fetch=(url,options)=>{const u=new URL(url,location.href);if(window.allowStored&&u.origin===location.origin&&u.pathname.startsWith('/research/results/strategy-arena-20261016/')){window.storedRequests++;return nativeFetch(url,options);}window.networkAttempts++;throw Error('UNEXPECTED_RUNTIME_NETWORK');};
 const root=document.getElementById('qa-root'),view=createStrategyArenaView();root.querySelector('[data-strategy-arena]').innerHTML=view.html();view.bind(root);window.arenaReady=true;</script></body></html>`;
@@ -47,7 +47,7 @@ test('Paper Arena Chrome: native file import, integrity rejection and 320/390 la
     for(const width of [320,390])await withMobileChrome(chrome,width,url,async call=>{
       const evaluate=async expression=>{const r=await call('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});assert.ok(!r.exceptionDetails,JSON.stringify(r.exceptionDetails));return r.result?.value;};
       const waitFor=expression=>evaluate(`(async()=>{for(let i=0;i<200;i++){if(${expression})return true;await new Promise(r=>setTimeout(r,20));}throw Error('ARENA_STATE_TIMEOUT')})()`);
-      const layout=()=>evaluate(`(()=>{const cards=[...document.querySelectorAll('.arena-model')];return{cards:cards.length,width:innerWidth,body:document.body.scrollWidth,root:document.documentElement.scrollWidth,inside:cards.every(c=>{const r=c.getBoundingClientRect();return r.left>=-1&&r.right<=innerWidth+1;})}})()`);
+      const layout=()=>evaluate(`(()=>{const cards=[...document.querySelectorAll('.arena-model')],view=document.getElementById('view-paper'),bounds=view.getBoundingClientRect(),targets=[...cards,...document.querySelectorAll('.arena-toolbar,.arena-import,[data-arena-input],.arena-toolbar>button')];return{cards:cards.length,width:innerWidth,body:document.body.scrollWidth,root:document.documentElement.scrollWidth,inside:view.scrollWidth<=view.clientWidth+1&&targets.every(c=>{const r=c.getBoundingClientRect();return r.left>=bounds.left-1&&r.right<=bounds.right+1;})}})()`);
       await waitFor('window.arenaReady===true');
       let m=await layout();assert.equal(m.cards,5);assert.equal(m.width,width);assert.ok(m.body<=width+1&&m.root<=width+1&&m.inside,JSON.stringify(m));
       assert.equal(await evaluate(`document.querySelectorAll('.paper-model-head').length`),0,'diagnostic cards must not impersonate runtime Paper model identities');

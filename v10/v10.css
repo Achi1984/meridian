@@ -1909,6 +1909,9 @@ button.command-next-decision:focus-visible,.v10-command-tech-details>summary:foc
 .strategy-arena{margin-top:24px;padding:18px;border:1px solid #243449;border-radius:16px;background:#0b1420}.strategy-arena>p,.strategy-arena details{color:#a8bacd;font-size:13px;line-height:1.6}.strategy-arena .arena-evidence{color:#f2c674;font-weight:700}.arena-toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:14px 0}.arena-import{display:flex;flex-direction:column;gap:8px;font-size:12px;color:#c8d7e5}.arena-import input{max-width:100%;font-size:16px}.arena-controls{padding:12px;background:#102131;border-radius:10px}.arena-model p,.arena-model small{font-size:12px;color:#b6c7d8;line-height:1.5}.arena-digest{overflow-wrap:anywhere}.strategy-arena button{min-height:44px;padding:10px 14px;border-radius:9px;border:1px solid #3b5369;background:#142b3f;color:#e8f3fc}.strategy-arena button:disabled{opacity:.45}.strategy-arena .tone-danger{color:#ff717e}.strategy-arena .tone-safe{color:#67dfac}.strategy-arena .tone-muted{color:#9fb0c2}@media(max-width:600px){.strategy-arena{padding:12px}.arena-toolbar{align-items:stretch;flex-direction:column}.arena-model .arena-model-head{flex-wrap:wrap;gap:8px}.arena-model .paper-model-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 /* Arena headings stay distinct from runtime Paper model identities. */
+.arena-import{min-width:0;max-width:100%}
+.arena-import input{width:100%;min-width:0}
+.arena-toolbar>button{max-width:100%;white-space:normal;overflow-wrap:anywhere}
 .arena-model-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:7px}
 .arena-model-head>div{display:flex;flex-direction:column;gap:2px;min-width:0}
 .arena-model-head span{font-size:8px;color:#a996ff;font-weight:900;letter-spacing:.07em}
