@@ -225,6 +225,7 @@ class Tests(unittest.TestCase):
     def test_private_cluster_orchestration_and_rollback_negative_cases(self):
         report, calls = self.exercise_cluster()
         self.assertEqual(report['negativeCasesRejected'], list(m.NEGATIVES))
+        self.assertEqual(report['serverVersionNum'], 160004)
         self.assertFalse(report['deployedSchemaEquivalent'])
         self.assertFalse(report['fullSemanticsProven'])
         self.assertFalse(report['activationAuthorized'])

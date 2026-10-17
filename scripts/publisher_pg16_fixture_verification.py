@@ -247,7 +247,7 @@ def verify(directory):
                     raise ValueError('negative case accepted')
                 compare(expected, canonical(json.loads(sql(query)), identity[5]))
             report = {'kind': 'LOCAL_PG16_FIXTURE_COMPARISON', 'sourceSha256': PINS,
-                      'toolVersions': versions, 'toolSha256': digests,
+                      'toolVersions': versions, 'toolSha256': digests, 'serverVersionNum': identity[0],
                       'inventorySqlSha256': hashlib.sha256(inventory_sql.encode()).hexdigest(),
                       'expectedCatalog': expected, 'negativeCasesRejected': rejected,
                       'deployedSchemaEquivalent': False, 'fullSemanticsProven': False,
