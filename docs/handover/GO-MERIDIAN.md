@@ -1,6 +1,52 @@
 # GO MERIDIAN — durable resume checkpoint
 
-## Current source and runtime checkpoint — 2026-10-17
+## Current source and runtime checkpoint after PR837 — 2026-10-17
+
+Operation HANDOFF-838-PREPARE-20261017-01. Verified source main:
+`0ff8667a5fab5df7634d81f677160c42a4dfe5ee` (#837). Build **10.0-r129**.
+This section supersedes older operational summaries below. The current six-file
+candidate contains four continuity files and two source-only TEST setup proposal
+documents; it has no claimed publication SHA or setup execution authority.
+
+- PR837 merged from head `37fad9a5ac98b05f886a7f35562cfa954f8055cc`, base
+  `61b2f00461ecb6b560fc454decce0ca83f62b06c`. Full eight-file independent
+  GREEN_LIGHT6231176025; exact-head hosted Release Safety39012873646,
+  job117338924782:2571 pass, zero fail/cancelled/skipped.
+  FINAL_MERGE_STATUS6231263445. All required postchecks succeeded on the merge:
+  Release39014125299, Runtime39014125293, Coordinator39014125291,
+  Pages39014125002. Source packet complete.
+- Feather diagnostic is now merged, with exact input-format parity only:
+  3200 rows,16000 binary64 OHLCV values, zero differences;16 observed primary
+  Arrow loads and0 fallback. Nine isolated Python tests and independent actual
+  CLI reproduction passed; integration report/completion manifest byte-identical.
+  These manual Python tests are separate from hosted Node CI. The prior JSON
+  loader's1390/16000 numeric failure remains valid and is never relabeled.
+  No signal/accounting/performance parity, holdout or profitability is established.
+- Recovery remains complete6230893412, with final
+  OWNER_RECOVERY_ARCHIVED_NO_SETUP_AUTHORIZED and outer exit0, independently
+  verified archive operation `7bb75d21315ee2bd4b5acd895f9c556e`.
+  Approval6230643903 is consumed. Do not replay recovery or remove its archive.
+- Subsequent TEST setup is a two-document source-only candidate. Its approval
+  field is null and setupAuthorized is false; nothing has executed. The source
+  pins verified on61b2 remain valid unchanged after837; creation provenance is
+  retained. Exact launch/source review, required CI and relevant toolchain checks
+  precede separate concrete owner approval and fresh operational checks.
+  Proposed effects are six environment secrets and passwords for three existing
+  roles kept NOLOGIN. The plan acknowledges non-atomic provider/DB effects and
+  provider logging, excludes retries/activation, and includes metadata plus
+  marker/archive checks; optional DB corroboration needs a separately reviewed
+  private read-only invocation. No secret-value equality or login proof is claimed.
+
+Priority remains roadmap831: publisher operational -> first proven autonomous
+development cycle -> controlled sustained operation. ChatGPT leads bounded agents,
+integration and delegated merges. Mailbox639; exact-head/base CI, full review and
+postchecks remain required. CV2 SOURCE_AUDIT/all seven flags false; no strategy
+promotion or trading authority is introduced.
+NEXT: publish the six-file setup proposal/continuity candidate for exact-head CI
+and full independent review. Request the separate
+concrete owner approval only after that scope is ready for execution review.
+
+## Historical checkpoint after PR836 — superseded
 
 Operation HANDOFF-837-PREPARE-20261017-01. Verified source main:
 `61b2f00461ecb6b560fc454decce0ca83f62b06c` (#836). Build **10.0-r129**.

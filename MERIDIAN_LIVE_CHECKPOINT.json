@@ -93,36 +93,33 @@
     "policyProposalCommentId": 6096562356,
     "protocol": "STREAM-SAFE-V8"
   },
-  "lastSeenCommentId": 6231062545,
+  "lastSeenCommentId": 6231263445,
   "quickCommand": "Go Meridian",
   "bootstrapFile": "MERIDIAN_GO.md",
   "currentWork": {
     "updatedAt": "2026-10-17",
-    "verifiedSourceMain": "61b2f00461ecb6b560fc454decce0ca83f62b06c",
+    "verifiedSourceMain": "0ff8667a5fab5df7634d81f677160c42a4dfe5ee",
     "lastCompletedSourceMerge": {
-      "pr": 836,
-      "mergeSha": "61b2f00461ecb6b560fc454decce0ca83f62b06c",
-      "reviewedHead": "41440ce5a724d885c0e953a4d571eb194529cc55",
-      "reviewedBase": "c1740225b9682534cf1fdaa0128053604e4b86da",
-      "reviewCommentIds": [
-        6230966533,
-        6231035458
-      ],
-      "sourceCiRun": 39011628028,
-      "sourceCiJob": 117335191215,
+      "pr": 837,
+      "mergeSha": "0ff8667a5fab5df7634d81f677160c42a4dfe5ee",
+      "reviewedHead": "37fad9a5ac98b05f886a7f35562cfa954f8055cc",
+      "reviewedBase": "61b2f00461ecb6b560fc454decce0ca83f62b06c",
+      "reviewCommentId": 6231176025,
+      "sourceCiRun": 39012873646,
+      "sourceCiJob": 117338924782,
       "sourceCiTests": {
         "passed": 2571,
         "failed": 0,
         "cancelled": 0,
         "skipped": 0
       },
-      "finalMergeCommentId": 6231062545,
+      "finalMergeCommentId": 6231263445,
       "postMergeChecks": "VERIFIED_SUCCESS",
       "postMergeRunIds": {
-        "releaseSafety": 39012695229,
-        "runtimeSmoke": 39012695196,
-        "releaseCoordinator": 39012695212,
-        "pages": 39012694761
+        "releaseSafety": 39014125299,
+        "runtimeSmoke": 39014125293,
+        "releaseCoordinator": 39014125291,
+        "pages": 39014125002
       }
     },
     "lastCompletedHandoffRefresh": {
@@ -137,8 +134,8 @@
         "pages": 39009496870
       }
     },
-    "package": "CONTINUITY_AFTER_836_AND_FEATHER_SETUP_CANDIDATES",
-    "state": "PR836_COMPLETE_RECOVERY_COMPLETE_FEATHER_CONTINUITY_CANDIDATE_SETUP_NOT_EXECUTED",
+    "package": "CONTINUITY_AFTER_837_AND_SOURCE_ONLY_SETUP_PROPOSAL",
+    "state": "PR837_COMPLETE_RECOVERY_COMPLETE_SETUP_SOURCE_PROPOSAL_NOT_AUTHORIZED",
     "infrastructurePaused": true,
     "mailboxRollover": {
       "from": 571,
@@ -250,7 +247,7 @@
         "authorizedReproductionBudget": "UNKNOWN"
       }
     },
-    "nextStep": "PUBLISH_FEATHER_CONTINUITY_CANDIDATE_FOR_OWN_GATES; REVIEW_SETUP_PROPOSAL_SEPARATELY_BEFORE_OWNER_APPROVAL",
+    "nextStep": "PUBLISH_SIX_FILE_SETUP_PROPOSAL_CONTINUITY_FOR_OWN_EXACT_HEAD_CI_AND_FULL_REVIEW_THEN_SEPARATE_OWNER_APPROVAL",
     "ownerPathInspection": {
       "pr": 828,
       "mergeSha": "bfebd17ddfa1d2d3b44a15126e28618a82cb81f2",
@@ -275,7 +272,7 @@
       "evidenceScope": "HISTORICAL_SOURCE_SNAPSHOT_SUPERSEDED_BY_RUNTIME_RECOVERY_20261017"
     },
     "publisherNextStep": "RECOVERY_COMPLETE_DO_NOT_REPLAY; PREPARE_CONCRETE_SETUP_SCOPE_FOR_SEPARATE_OWNER_APPROVAL",
-    "strategyNextStep": "PR836_COMPLETE; PUBLISH_FEATHER_CONTINUITY_CANDIDATE_FOR_OWN_EXACT_HEAD_CI_AND_FULL_REVIEW; NO_STRATEGY_EXECUTION",
+    "strategyNextStep": "FEATHER837_COMPLETE_EXACT_INPUT_ONLY_JSON_FAILURE_RETAINED_NO_STRATEGY_EXECUTION",
     "completion20261017": {
       "verifiedMain": "8691381510039e2ad48b863ea5e66d6ad6cba462",
       "arenaMerge": "ed60066fc58b4d60eddd727c24cae61c368720bb",
@@ -626,7 +623,41 @@
         "state": "DOCUMENTATION_PROPOSAL_NOT_EXECUTED",
         "setupAuthorized": false,
         "requiresSeparateOwnerApproval": true
-      }
+      },
+      "evidenceScope": "HISTORICAL_CANDIDATE_PREPARATION_BEFORE_PR837_MERGE"
+    },
+    "featherDiagnostic": {
+      "state": "MERGED837_ALL_POSTCHECKS_SUCCESS_EXACT_INPUT_PARITY_ONLY",
+      "testsPassed": 9,
+      "rows": 3200,
+      "binary64Values": 16000,
+      "binary64Mismatches": 0,
+      "observedPrimaryArrowCalls": 16,
+      "observedFallbackCalls": 0,
+      "evidenceScope": "EXACT_INPUT_FORMAT_PARITY_ONLY",
+      "jsonFailureSuperseded": false,
+      "strategyExecuted": false,
+      "performanceParityEstablished": false,
+      "integratedReproduction": {
+        "outerExit": 0,
+        "reportAndCompletionManifestByteIdentical": true,
+        "fiveJsonDependencyFilesByteIdentical": true,
+        "testsPassed": 9,
+        "nodeExporterTestsPassed": 7,
+        "frozenResearchFilesUnchanged": 140
+      },
+      "pr": 837,
+      "mergeSha": "0ff8667a5fab5df7634d81f677160c42a4dfe5ee",
+      "reviewCommentId": 6231176025
+    },
+    "nextSetupProposal": {
+      "state": "TWO_DOCUMENT_SOURCE_ONLY_CANDIDATE_NOT_EXECUTED",
+      "approvalCommentId": null,
+      "setupAuthorized": false,
+      "sourcePinsVerifiedOn": "61b2f00461ecb6b560fc454decce0ca83f62b06c",
+      "sourcePinsUnchangedAfter837": true,
+      "requiredGates": "EXACT_HEAD_CI_FULL_INDEPENDENT_REVIEW_RELEVANT_TOOLCHAIN_EVIDENCE_THEN_SEPARATE_CONCRETE_OWNER_APPROVAL_AND_FRESH_RUNTIME_CHECKS",
+      "rolesRemainNoLogin": true
     }
   }
 }

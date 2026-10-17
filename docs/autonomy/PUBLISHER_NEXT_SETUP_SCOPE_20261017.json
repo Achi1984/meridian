@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "status": "PROPOSAL_NOT_APPROVAL_NOT_EXECUTED",
+  "operation": "PUBLISHER_TEST_PREPARE_ONCE_AFTER_RECOVERY",
+  "sourceCommit": "61b2f00461ecb6b560fc454decce0ca83f62b06c",
+  "preparationBaseline": {
+    "pr": 836,
+    "finalMergeCommentId": 6231062545,
+    "postMergeChecks": "LEAD_VERIFIED_SUCCESS",
+    "helperAndLockPins": "FOUR_OF_FOUR_MATCH_61B2_SOURCE",
+    "executionAuthorityGranted": false
+  },
+  "recoveryEvidenceCommentId": 6230893412,
+  "approvalCommentId": null,
+  "setupAuthorized": false,
+  "ownerId": 319562141,
+  "repository": "Achi1984/meridian",
+  "repositoryId": 1342084551,
+  "environment": "meridian-publisher-test",
+  "project": "wandering-queen-12324132",
+  "branch": "br-delicate-field-b9uijh3y",
+  "host": "ep-purple-dew-b9mbuikp.c-7.eu-central-1.aws.neon.tech",
+  "database": "publisher_ledger",
+  "administrator": "publisher_owner",
+  "roles": ["meridian_test_reservation", "meridian_test_sender", "meridian_test_reader"],
+  "secretWriteOrder": [
+    "MERIDIAN_PUBLISHER_TEST_RESERVATION_USER",
+    "MERIDIAN_PUBLISHER_TEST_RESERVATION_PASSWORD",
+    "MERIDIAN_PUBLISHER_TEST_SENDER_USER",
+    "MERIDIAN_PUBLISHER_TEST_SENDER_PASSWORD",
+    "MERIDIAN_PUBLISHER_TEST_READER_USER",
+    "MERIDIAN_PUBLISHER_TEST_READER_PASSWORD"
+  ],
+  "sourceManifest": {
+    "publisher_test_auto_setup.py": "c859d4413eb2b50f7aae04e1d28eb23961989eb64beb29cb751eb65f06a8bfc0",
+    "publisher_test_password_setup.py": "3f3e4cab7fa64b5890fda1483bc73ac277636f001ec933bf514c926267ef68fb",
+    "publisher-test-password-setup-requirements.txt": "7cef1a29f54c1657bb1174a5ab9b923c0a55d43e44cbfb2181c284346a7860a9",
+    "publisher-test-password-setup-cp314-linux-x86_64.lock": "00b8671deb2339aea88940f3b4235a5145898a619a5ac62a8e407de82b166fa5"
+  },
+  "baselineSha256": "cb60f0aab88dd3f23560ad14e2d4849a8ed7abc8dab0e437ba263fa217356e6c",
+  "caSha256": "9481fcd95f41b221f02f14d896535fe500bec539bc563c4cdca1acee483a8bdd",
+  "ghSha256": "553949e2efa12842771efe6012aa4de21f1d591530ec17fc435f610f10e017ee",
+  "neonSha256": "e90831b13bfcf75df8d7322617965022508d28b0b8116530992c2a5db776371a",
+  "expectedFinalStatus": "AUTO_SETUP_PREPARED_NOLOGIN",
+  "requiredOuterExit": 0,
+  "postVerification": {
+    "primaryEvidence": "FINAL_PREPARED_NOLOGIN_AND_OBSERVED_OUTER_EXIT_ZERO",
+    "independentMetadata": "EXACT_SIX_ENVIRONMENT_NAMES_NO_REPOSITORY_TARGET_NAMES_IDENTITY_PROTECTIONS_AND_DATABASE_BINDING_UNCHANGED",
+    "localEvidence": "NEW_ACTIVE_MARKER_IDENTITY_CONTENT_MODE_AND_UNCHANGED_PRIOR_RECOVERY_ARCHIVE",
+    "optionalDatabaseCorroboration": "SEPARATELY_REVIEWED_READONLY_INVOCATION_OF_EXISTING_PRIVATE_ADMIN_FETCH_AND_SUPERVISED_DB_PRECHECK",
+    "secretValueAgreementVerified": false,
+    "loginVerified": false,
+    "onUncertainty": "STOP_PRESERVE_STATE_READONLY_RECONCILIATION_NO_RETRY_OR_DELETION"
+  },
+  "rolesRemainNoLogin": true,
+  "automaticRetryAuthorized": false,
+  "liveActivationAuthorized": false
+}
