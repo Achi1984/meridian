@@ -6,7 +6,9 @@ listens only on 127.0.0.1 with ephemeral TLS certificate/key; actual libpq
 verify-full TLS and real SQL transactions exercise the unchanged role driver.
 The identical-looking owner/database/role names exist ONLY inside that cluster.
 
-Binding/approval/prewrite/journal/phase services are TEST DOUBLES. In particular
+Binding/approval/prewrite/phase services are TEST DOUBLES. Claim and record use
+the real local fsynced journal in this disposable root; no reconciliation override
+is supplied. Uncertain activation blocks closure even with model-ready input. In particular
 the driver's production-named TARGET dict is syntactic test data, never the
 connection target. This fixture does not authenticate authority, validate a
 provider target, implement full Gate A or prove durable replay protection.
@@ -33,6 +35,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PINS = {
     'publisher_role_cycle.py': 'fb46bfbd8ba52546bec25a7bab3864ac96abbd34d1e10cf0e8ab1939dc39c230',
     'publisher_role_transition.py': '93bd773e584072227a659b836bbb7aa079eb9a86736ab6e5ef3e97e7cb98785a',
+    'publisher_role_journal.py': '3789410d4d67cc12db3404bd1cf58b4b6c0bb8633646b849e9c8106dec046425',
     'publisher_pg16_fixture_verification.py': 'e6907d86a45f766d288f41bba238b100767516247e5a56991df9f410d98a0871',
 }
 FAILURE = 'LOCAL_ROLE_TRANSITION_FIXTURE_FAILED_NO_PROVIDER_CLAIM'
@@ -172,18 +175,14 @@ def test_binding(driver, direction, cycle_id, operation_id):
 
 
 class TestServices:
-    """In-memory claims and fabricated authority fields: never operational services."""
-    def __init__(self, driver, psycopg, options, binding, baseline, claims, fault=None):
+    """Real local journal; fabricated authority/prewrite/phase, never operational."""
+    def __init__(self, driver, psycopg, options, binding, baseline, journal, fault=None):
         self.driver,self.psycopg,self.options = driver,psycopg,options
-        self.binding,self.baseline,self.claims,self.fault = binding,baseline,claims,fault
+        self.binding,self.baseline,self.journal,self.fault = binding,baseline,journal,fault
         self.connections = []
         self.phase_log = []
     def expected_binding(self): return self.binding
-    def claim(self, binding):
-        key = (binding['cycle_id'],binding['direction'])
-        if key in self.claims: return False
-        self.claims.add(key)
-        return True
+    def claim(self, binding): return self.journal.claim(binding)
     def connect(self):
         raw = self.psycopg.connect(**self.options)
         connection = TransactionConnection(raw,self.psycopg.pq,self.fault)
@@ -194,7 +193,23 @@ class TestServices:
         connection.require_status(self.psycopg.pq.TransactionStatus.INTRANS)
         self.driver.observe_roles(connection,self.baseline,binding['direction']=='closure')
     def phase(self, token): self.phase_log.append(token.decode())
-    def record(self, binding, stage, status): pass
+    def record(self, binding, stage, status): return self.journal.record(binding,stage,status)
+
+
+def invoke_driver(driver, services, baseline, events):
+    """Release the lifetime journal lock even if driver/cleanup/reporting raises."""
+    try:
+        return driver.drive_transition(services.binding,baseline,events,services)
+    finally:
+        failed=False
+        try:
+            for connection in services.connections:
+                try:
+                    if not connection.raw.closed: connection.raw.close()
+                except BaseException: failed=True
+        finally:
+            services.journal.close()
+        if failed: raise ValueError('driver connection cleanup indeterminate')
 
 
 def assert_local_identity(admin, data, port):
@@ -222,6 +237,8 @@ def cleanup_cluster(server, all_services, admin):
         for connection in services.connections:
             try: connection.raw.close()
             except BaseException: close_failed = True
+        try: services.journal.close()
+        except BaseException: close_failed = True
     if admin is not None:
         try: admin.close()
         except BaseException: close_failed = True
@@ -244,6 +261,7 @@ def verify(directory):
     modules = load_sources()
     helper = modules['publisher_pg16_fixture_verification']
     driver = modules['publisher_role_transition']
+    journal_module = modules['publisher_role_journal']
     psycopg = installed_driver()
     tools,versions,digests = helper.binaries(directory)
     openssl,openssl_version,openssl_sha = openssl_tool(helper)
@@ -280,17 +298,23 @@ def verify(directory):
             assert_local_identity(admin,data,port)
             baseline = build_roles(admin,driver)
             options = connection_options(root,port,'publisher_owner','publisher_ledger')
-            claims = set()
+            journal_root=root/'journal'
+            journal_root.mkdir(mode=0o700)
             def observe(login):
                 with psycopg.connect(**options) as raw:
                     return driver.observe_roles(TransactionConnection(raw,psycopg.pq),baseline,login)
             def invoke(direction,cycle_number,events,fault=None,operation_number=None):
                 binding = test_binding(driver,direction,format(cycle_number,'032x'),format(operation_number or (cycle_number*2+(direction=='closure')),'032x'))
-                services = TestServices(driver,psycopg,options,binding,baseline,claims,fault)
+                services = TestServices(driver,psycopg,options,binding,baseline,journal_module.LocalRoleJournal(journal_root),fault)
                 all_services.append(services)
-                result = driver.drive_transition(binding,baseline,events,services)
+                result = invoke_driver(driver,services,baseline,events)
                 if any(not c.closed for c in services.connections): raise ValueError('driver did not close')
                 return result,services
+            def require_uncertain_journal(cycle_number):
+                path=journal_root/format(cycle_number,'032x')/'activation.03-finished.json'
+                record=json.loads(path.read_text())
+                if record['stage']!='finished' or record['status']!='INDETERMINATE':
+                    raise ValueError('uncertainty journal missing')
             successes = []
             first,services = invoke('activation',1,[])
             if first['outcome'] != 'CONFIRMED' or first['state']['phase'] != 'READY': raise ValueError('activation result')
@@ -309,19 +333,25 @@ def verify(directory):
                     or services.connections[0].commits != 0 or services.connections[0].rollbacks != 1):
                 raise ValueError('partial ALTER rollback result')
             observe(False)
+            require_uncertain_journal(2)
+            # Synthetic model-ready input must not bypass actual journal history.
+            blocked,again = invoke('closure',2,closing_events)
+            if blocked['outcome'] != 'INDETERMINATE' or again.connections:
+                raise ValueError('uncertain rollback closure accepted')
             successes.append('mid_alter_rollback')
             lost,services = invoke('activation',3,[],fault='commit_ack_loss')
             if (lost['outcome'] != 'INDETERMINATE' or not lost['state']['reconciliationRequired']
                     or services.connections[0].commits != 1 or services.connections[0].rollbacks != 0):
                 raise ValueError('lost commit result')
-            actual_enabled = observe(True)
+            observe(True)
+            require_uncertain_journal(3)
             blocked,again = invoke('activation',3,[],operation_number=100)
             if blocked['outcome'] != 'BLOCKED' or again.connections: raise ValueError('lost commit replay')
-            # Explicit LOCAL fixture reconciliation, never automatic driver retry.
-            reconciled = lost['transcript']+[{'type':'reconciled','snapshot':actual_enabled,'login':True,'cleanup_confirmed':True}]
-            closed,_ = invoke('closure',3,reconciled)
-            if closed['outcome'] != 'CONFIRMED': raise ValueError('reconciled local closure')
-            observe(False)
+            # No reconciliation override: actual LOGIN remains observed until
+            # this private cluster is stopped and removed. Never retry ALTER.
+            blocked,again = invoke('closure',3,closing_events)
+            if blocked['outcome'] != 'INDETERMINATE' or again.connections:
+                raise ValueError('uncertain committed closure accepted')
             successes.append('commit_ack_loss')
             sessions = admin.execute("SELECT count(*) FROM pg_stat_activity WHERE usename='publisher_owner'").fetchone()[0]
             if sessions != 0: raise ValueError('fixture sessions remain')
@@ -329,7 +359,10 @@ def verify(directory):
                       'psycopgVersion':psycopg.__version__,'toolVersions':versions,'toolSha256':digests,
                       'opensslVersion':openssl_version,'opensslSha256':openssl_sha,'sourceSha256':PINS,
                       'casesPassed':sorted(successes),'realLibpqTlsVerified':True,'realSqlTransactionsVerified':True,
-                      'localRoleSessionsRemaining':sessions,'bindingApprovalJournalPrewriteMocked':True,
+                      'localRoleSessionsRemaining':sessions,'bindingApprovalPrewritePhaseMocked':True,
+                      'localJournalExercised':True,'journalReplayAfterReopenRejected':True,
+                      'journalUncertainClosureRejected':['mid_alter_rollback','commit_ack_loss'],
+                      'lostCommitLoginObserved':True,
                       'productionTargetValidated':False,'fullGateAEstablished':False,
                       'durableReplayProtectionProven':False,'activationAuthorized':False}
         finally:
