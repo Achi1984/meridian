@@ -42,9 +42,76 @@ controls live only in this one JavaScript object. Mutating caller-owned inputs
 after session creation cannot change later path calculations. A repeated or
 wrong-order advance terminates the session; it never retries a path. An
 interrupted session makes prior paths incomplete and cannot expose a completed
-result. This is not durable checkpointing or process-restart recovery.
-The API does not create or supervise a child process. The persistent-child,
-ACK/result-channel bridge remains future work dependent on PR 884.
+result. This is not durable checkpointing or process-restart recovery. The
+inactive B1 supervisor bridge below owns one such session in a single Node
+child; the engine API itself does not create or supervise a child process.
+
+## Persistent generated-fixture bridge
+
+`scripts/research-supervisor/b1_bridge_manifest.json` names the strict
+`MERIDIAN-B1-7-GENERATED-FIXTURE-BRIDGE-R1` profile. It pins the B1 protocol,
+the generated-series input identity, all 44 manifest descriptors, the distinct
+19-development/25-diagnostic computation order, and the byte hashes of the
+engine, validator, dormant loader, protocol, generated fixture, adapter,
+supervisor, and journal. The parent verifies these source bytes before launch;
+the child independently verifies them and the generated input before reporting
+ready. These hashes bind local bytes only; they do not establish data
+authenticity or provenance.
+
+The explicit local API is `journal.initialize(path,
+profile=journal.B1_PROFILE_NAME)`, `journal.enqueue_b1(path, trial_key)`,
+`journal.scheduler_tick_b1(path, enabled=True)`, and
+`supervisor.run_b1_batch(path, claim)`. Scheduling remains OFF unless the
+caller explicitly ticks it. B1 uses a create-new-only SQLite schema version 2;
+it does not migrate or reset the existing synthetic hash-chain profile or any
+existing database.
+
+`run_b1_batch` starts the single absolute monotonic batch deadline before
+source verification, preparation, or process launch. It starts exactly one
+absolute Node process with a minimal environment and no shell. At each
+computation boundary, the child announces the expected path; the parent checks
+the fixed order and durably records the start before acknowledging it. The
+child then calls `advanceOne(expectedPathId)` once and sends the actual JSON
+path-result bytes on a separate result file descriptor using an explicit
+length frame. The parent incrementally enforces the remaining 1 MiB journal
+capacity, validates the B1 result schema and exact path identity, hashes the
+received bytes itself, then commits payload and progress atomically before
+acknowledging completion. The 8 KiB control channel and 4 KiB stderr bounds are
+separate from framed result bytes. Duplicate JSON keys, non-finite values,
+truncated or extra frames, invalid lengths, and cumulative-capacity overflow
+fail closed.
+
+The session's `controlDefinitions` are read and committed once after 19
+development paths. The journal binds that payload to the received-byte digests
+of the designated primary 15 bp and full-basket 15 bp development results.
+Only after this commit does the parent acknowledge readiness for the controls
+frame; diagnostic path admission requires a frozen control status. The final
+screen/result summary is separately framed without duplicating the 44 path
+payloads. It must have the strict completed B1 result schema, all 44 completed
+paths, and the engine's authority flags unchanged and false before it can be
+settled as `COMPLETED`. The journal commits this settlement before sending the
+final acknowledgement. An insufficient-evidence result remains failed, never
+completed, and does not admit diagnostics.
+
+Path work is limited to 60 seconds each and the complete preparation,
+calibration, serialization, and finalization lifecycle shares one 1,800-second
+batch deadline. Result payloads, controls, summary, and journal progress share
+the cumulative 1 MiB persisted-capacity check; the generated-fixture sizing
+measurement (939,435 bytes total, 30,623 bytes maximum path) is evidence for
+this fixture only, not a general path-size limit. SQLite lock waits are capped
+at 10 ms or the remaining deadline, whichever is shorter. Crash, timeout,
+protocol failure, or lost acknowledgement does not retry or resume: the
+one-shot attempt and active fence remain for explicit reconciliation.
+If the final settlement has already committed, later child-exit or trailing
+output errors do not undo it; the immediate return reports
+`postSettlementFailure`, and read-only inspection recovers the committed result.
+
+These are local operational bounds, not a hostile-code sandbox, a security
+isolation boundary, or a hard-real-time guarantee. This bridge accepts only its
+generated fixture; captured-data admission remains blocked by the inactive
+loader and missing independent manifest/admission decision. It activates no
+service or scheduler, reads no market CSVs, makes no orders, grants no research
+or trading authority, and makes no profitability or operational-readiness claim.
 
 Validation, series identity, feature preparation, path work, development
 calibration, and finalization all use the same absolute 30-minute/60-second path
@@ -115,8 +182,8 @@ claimed. No captured market CSVs are read by these tests.
   results are marked `SYNTHETIC_ONLY_NOT_ASSESSED`, not profitability evidence.
 - The 15/30 bp cost assumptions, thresholds, protocol, and authority flags are
   unchanged and are not execution evidence or permission to trade.
-- There is no complete hard-supervisor integration, no external process
-  persistence, and no ACK/result-channel bridge in this change.
+- The external supervisor persists received path evidence, but does not persist
+  resumable engine state or recover/replay an interrupted session.
 - No scheduler/service activation, actual market-data run, Paper/Live run, or
   order interface is provided.
 
