@@ -1,6 +1,6 @@
 import {createBotReadAccess} from './bot-read-access.js';
 import {createBotReadClient} from './bot-read-client.js';
-import {createBotReadView} from './bot-read-view.js?v=B6';
+import {createBotReadView,renderCommandBotOverview} from './bot-read-view.js?v=B11';
 
 // Mounting controls never starts a request. Only the view's manual refresh can read.
 export function mountBotReadAccess(document, window, {
@@ -11,6 +11,7 @@ export function mountBotReadAccess(document, window, {
   const input=document.getElementById('bot-read-token');
   const provide=document.getElementById('bot-read-provide');
   const status=document.getElementById('bot-read-access-status');
+  const commandRoot=document.getElementById('command-bot-overview');
   if (!root || !input || !provide || !status) return null;
   let client,view,disposed=false,expiryTimer=null,expiryGeneration=0,accessLockActive=false;
   function cancelExpiry(){
@@ -27,7 +28,9 @@ export function mountBotReadAccess(document, window, {
     status.textContent='Gesperrt. Der Lesezugang wird nicht gespeichert.';
   }
   try {
-    view=createView(root,{getToken:access.getToken,createClient:options=>{
+    view=createView(root,{getToken:access.getToken,
+      onSnapshot:(snapshot,jumpToBot)=>renderCommandBotOverview(commandRoot,snapshot,jumpToBot),
+      createClient:options=>{
       client=createClient({...options,onChange:state=>{
         cancelExpiry();
         if(disposed)return;

@@ -1,14 +1,47 @@
 # GO MERIDIAN — durable resume checkpoint
 
-## Pending r130 Arena integration — 2026-10-18
+## Current checkpoint — B11 draft on verified main (2026-10-18)
 
-Build: **10.0-r130** (candidate; not yet merged or published).
-Source proposal PR870 head `b5d7d2a69dd5715580e9691cfcd566e694452baa` received independent GREEN_LIGHT in mailbox639/6248189652. Base main is `cbe9b5a34ed31e61746a656d49bb1b81bc637eec`. This integration only advances release/cache identity and continuity metadata; reviewed feature code is unchanged. Final exact-head CI, integration review, merge and postchecks remain pending.
-Data PR872 remains separate: head325c7755 has a publisher timing-test CI failure under diagnosis, not accepted data evidence. No new acquisition, backtest or PnL authority. Publisher/native pilot remain paused and all research execution flags remain false.
+Verified `main` is `1c7b6dccd886f57e866c7d359c091b1e72a193ea`. B10 PR875 is
+complete: reviewed head `b4a5084b98fe54c0c840d17806a76b5a465bf4c9`, base
+`a8cde76ba3255a77049eb6318a61efaa127cedd0`, merge `1c7b6dccd886f57e866c7d359c091b1e72a193ea`,
+Claude GREEN_LIGHT639/6249104892, exact-head CI39120883771 attempt2 (2600/2600),
+and applicable postchecks Release Safety39122238945, Runtime39122238938,
+Coordinator39122238969, Pages39122238564 (receipt PR875/6248789090 and mailbox639/6249191206).
+
+- PR873 completed r130 Arena integration at `b75335da3805c0d509ff11f75ab0584d351f284e`.
+  Receipt PR873/6248247986 and mailbox639/6248725056 record reviewed head
+  `8a7c5eb2e437667ea05b6919431ec07c6a7fe96d`, 2592 passing exact-head tests,
+  and all applicable postchecks successful. The earlier Visual QA ETIMEDOUT
+  attempt is retained as historical; its unchanged-source retry passed.
+- PR872 completed data integration at `a8cde76ba3255a77049eb6318a61efaa127cedd0`.
+  Receipt PR872/6247247834 and mailbox639/6248819311 record reviewed head
+  `f3a7218d4c3162738cd9b0d42ec9d187eba4f595`, CI39119255611 (2599/2599),
+  and applicable postchecks successful. The historical CI39114588688 failure
+  remains a failure on the earlier head; its timing assertion was corrected.
+  Data coverage remains 448 common closes versus the 955 target; source
+  authenticity and complete archive hashes are not established.
+- B11 issue #876 / draft PR #877 is still pending. It adds only an offline
+  preview of the already-manual, validated Bot snapshot. Current-base checks,
+  CI approval, independent Claude review and guarded publication remain Lead
+  gates; this candidate has no merge or activation authority.
+
+Preserve V10/root/version.json/PWA identity, r130, SOURCE_AUDIT and all seven
+false flags, H9 blocked, CRV unresolved, publisher paused, native868 disabled,
+and the no-research/no-strategy-PnL/no-trading boundaries. Older pending
+PR860/862/Arena/data statements below are retained as historical snapshots,
+not current state. Creation provenance and both exact nanosecond markers remain
+unchanged.
+
+## Historical checkpoint — pending r130 integration snapshot (superseded)
+
+Build: **10.0-r130** (candidate; not yet merged or published at that snapshot).
+Source proposal PR870 head `b5d7d2a69dd5715580e9691cfcd566e694452baa` received independent GREEN_LIGHT in mailbox639/6248189652. Base main is `cbe9b5a34ed31e61746a656d49bb1b81bc637eec`. This integration only advances release/cache identity and continuity metadata; reviewed feature code is unchanged. The later PR873 completion receipt above supersedes the pending status.
+Data PR872 was still shown at earlier head325c7755 in that snapshot. Its historical CI failure is not relabelled; the corrected integrated head and final checks are recorded above.
 
 Earlier sections below are historical checkpoints.
 
-## Current source and runtime checkpoint after PR845 — complete
+## Historical source and runtime checkpoint after PR845 — superseded
 
 Operation HANDOFF-845-CONSOLIDATE-20261017-01. Verified source main:
 `1406845c8728a75652e10cd29c999494745c9034` (#845). Build **10.0-r129**.
@@ -649,7 +682,7 @@ independent exact-head review and explicit Project Owner merge approval.
 A policy update does not authorize dispatch, spending or workflow changes.
 Historical snapshots below are not live-state evidence.
 
-## Current live state
+## Historical live-state snapshot
 - Repository: `Achi1984/meridian`
 - main: `5fe94a77749d8d73df431b0104d8d870fa07dbf6`
 - checkpoint protocol: STREAM-SAFE-V7

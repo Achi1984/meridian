@@ -10,8 +10,9 @@ test('version disclosure distinguishes published terminal from integrated previe
  assert.match(html,/id="version-close"[^>]*aria-label="Versionsverlauf schließen">Schließen<\/button>/);
  assert.match(html,/Terminal 10\.0-r128/);
  assert.match(html,/Terminal 10\.0-r127<\/strong><span class="version-status">Historischer Stand/);
- assert.match(html,/id="version-toggle"[^>]*>11 · Vorschau B10<small>/);
- assert.match(html,/<li><strong>Meridian 11 · B10<\/strong><span class="version-status">Entwurf<\/span><p>Kompaktere Header- und Command-Hierarchie/);
+ assert.match(html,/id="version-toggle"[^>]*>11 · Vorschau B11<small>/);
+ assert.match(html,/<li><strong>Meridian 11 · B11<\/strong><span class="version-status">Entwurf<\/span><p>Bot-Cockpit/);
+ assert.match(html,/<li><strong>Meridian 11 · B10<\/strong><span class="version-status">Testvorschau<\/span><p>Kompaktere Header- und Command-Hierarchie/);
  assert.match(html,/keine neue Datenanbindung oder Funktionsfreigabe/i);
  assert.match(html,/Meridian 11 · B9<\/strong><span class="version-status">Testvorschau/);
  assert.match(html,/Meridian 11 · B6<\/strong>/);
