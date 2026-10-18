@@ -9,14 +9,14 @@ The R2 `GREEN_LIGHT` (response comment `6249482850`) is historical and applies o
 | Identity | Proposed value | Status |
 | --- | --- | --- |
 | Protocol | `MERIDIAN-B1-7-PROTOCOL-R3-20261018`; raw `protocol.json` SHA-256: `a78e1ae8c71c8f85baee5b51f5691643fc29136f636f19465c61f553afe09185` | Frozen file identity |
-| Implementation | `MERIDIAN-B1-7-ENGINE-R3`; bundle SHA-256 `3e70c988d63a139bfe3f4fbd469a737970068ecb3a5caaa95c8c983ed1a90285` | Exact two-file bundle identity |
+| Implementation | `MERIDIAN-B1-7-ENGINE-R3`; bundle SHA-256 `cd0ca0f93ad84286a3a556ae6204b8adfa54205b4066afc66a13156a947aa9a2` | Exact two-file bundle identity |
 | Source basis | Git commit `1c7b6dccd886f57e866c7d359c091b1e72a193ea` | Pinned source/input-provenance commit |
 | Input manifest | Canonical SHA-256 of seven caller-supplied exact Kraken candle arrays: `PENDING_NOT_COMPUTED` | No series loaded or hashed in this task |
 | Offline provenance record | `research/acquisitions/kraken-usd-daily-20261018/offline-verification.json` | Hash provenance only; source authenticity is not established |
 
 The exact seven proposed assets and copied normalized-file SHA-256 values are:
 
-The bundle digest is SHA-256 of canonical JSON with keys `engineSha256` and `validatorSha256` containing these exact raw-file SHA-256 values: `engine.mjs` = `bab7cd5171440ae4cb4d5f386cdbe9fa4f3f06170122ce3d6de22b68300eff4c`; `validate.mjs` = `2052c0fae0082622f48a18abb4a6dacc0ffa679fb5da01df5779b398f5a578fc`. The engine accepts the bundle hash as caller-supplied identity and does not inspect its own source.
+The bundle digest is SHA-256 of canonical JSON with keys `engineSha256` and `validatorSha256` containing these exact raw-file SHA-256 values: `engine.mjs` = `2e051a0529520272143b5bfc26a99b502ceafe6c9520fa998af9c92df522823f`; `validate.mjs` = `2052c0fae0082622f48a18abb4a6dacc0ffa679fb5da01df5779b398f5a578fc`. The engine accepts the bundle hash as caller-supplied identity and does not inspect its own source.
 
 | Order | Asset | Normalized file SHA-256 |
 | ---: | --- | --- |

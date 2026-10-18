@@ -639,7 +639,7 @@ export function createBudgetTracker(clock = () => performance.now()) {
   };
 }
 
-function screenResults(paths, controlDefinitions, checkpoint = () => {}) {
+export function screenResults(paths, controlDefinitions, checkpoint = () => {}) {
   const byKey = new Map();
   for (const path of paths) {
     checkpoint('screen-index');
@@ -653,16 +653,23 @@ function screenResults(paths, controlDefinitions, checkpoint = () => {}) {
   const stressed = get('primary-n30-f25', 'stress-30bp', 'diagnostic');
   const delayed = get('primary-n30-f25', 'stress-30bp-delay-1d', 'diagnostic');
   const neighbours = VARIANTS.slice(1);
+  const neighbourPaths = neighbours.map(variant => [
+    get(variant.id, 'base-15bp', 'diagnostic'),
+    get(variant.id, 'stress-30bp', 'diagnostic')
+  ]);
+  const required = [primary, full, meanControl, riskControl, stressed, delayed,
+    ...neighbourPaths.flat()];
+  if (required.some(path => !path || path.status !== 'COMPLETED' ||
+      !finite(path.netReturn) || !finite(path.sampledDrawdown)) ||
+    controlDefinitions?.status !== 'FROZEN_DEVELOPMENT_ONLY') {
+    return {status: 'INSUFFICIENT_EVIDENCE', checks: {}, relativeDrawdownReduction: null};
+  }
   let basePositive = 0;
   let stressPositive = 0;
-  for (const variant of neighbours) {
+  for (const [base, stress] of neighbourPaths) {
     checkpoint('screen-neighbour');
-    if (get(variant.id, 'base-15bp', 'diagnostic').netReturn > 0) basePositive++;
-    if (get(variant.id, 'stress-30bp', 'diagnostic').netReturn > 0) stressPositive++;
-  }
-  if (!primary || !full || !meanControl || !riskControl || !stressed || !delayed ||
-    controlDefinitions.status !== 'FROZEN_DEVELOPMENT_ONLY') {
-    return {status: 'INSUFFICIENT_EVIDENCE', checks: {}, relativeDrawdownReduction: null};
+    if (base.netReturn > 0) basePositive++;
+    if (stress.netReturn > 0) stressPositive++;
   }
   if (full.sampledDrawdown <= 1e-12) {
     return {
