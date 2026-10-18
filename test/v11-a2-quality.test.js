@@ -83,12 +83,14 @@ test('A2: foreign clicks and unsupported example states cannot create verified d
 });
 
 test('A2: examples stay in the single source disclosure; skip link and live-region semantics exist', () => {
-  assert.equal((html.match(/<details\b/g) || []).length, 2);
+  assert.equal((html.match(/<details\b/g) || []).length, 3);
   assert.equal((html.match(/<details class="command-source-details">/g) || []).length, 1);
-  const autonomy=html.match(/<section id="autonomy-status"[\s\S]*?<\/section>/)?.[0];
+  const autonomy=html.match(/<details id="autonomy-status"[\s\S]*?<\/details>/)?.[0];
   assert.ok(autonomy);
   assert.equal((autonomy.match(/<details\b/g) || []).length, 1);
-  assert.match(autonomy, /Betrieb &amp; letzte Änderung/);
+  assert.match(autonomy, /Autonome Entwicklung · <strong>Unbekannt<\/strong>/);
+  assert.match(autonomy, /B10/);
+  assert.match(autonomy, /B9-Umfang #766/);
   assert.doesNotMatch(autonomy, /data-state-preview|data-preview-state|role="status"/);
   assert.match(html, /<details class="command-source-details">[\s\S]*id="data-state-preview"[\s\S]*<\/details>/);
   assert.match(html, /href="#app-main">Zum Inhalt/);
@@ -107,4 +109,3 @@ test('A2: local examples never write portfolio, risk, sources or any privileged 
   assert.match(html, /data-preview-mode="manual-bot-depot-read-only"/);
   assert.match(html, /data-execution-impact="false"/);
 });
-

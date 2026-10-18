@@ -101,6 +101,32 @@
   "bootstrapFile": "MERIDIAN_GO.md",
   "currentWork": {
     "updatedAt": "2026-10-18",
+    "v11B10ClarityProposal": {
+      "operationId": "MERIDIAN-V11-B10-CLARITY-20261018",
+      "issue": 874,
+      "pullRequest": 875,
+      "branch": "copilot/meridian-v11-b10-clarity-20261018",
+      "verifiedBaseSha": "cbe9b5a34ed31e61746a656d49bb1b81bc637eec",
+      "initialWorkHeadSha": "fd46a1726cac15cb6c1d3c444da3dd2b96691794",
+      "observedMainAdvanceSha": "a8cde76ba3255a77049eb6318a61efaa127cedd0",
+      "relatedReleasePr873": "MERGED_TO_MAIN",
+      "additionalObservedReleasePr872": "MERGED_TO_MAIN; unrelated acquisition/checkpoint changes; merge-tree clean",
+      "reconciledMainSha": "a8cde76ba3255a77049eb6318a61efaa127cedd0",
+      "integrationMerge": "7621ce990c88c4b02e16805357ce779bebc4234b",
+      "historyReconciliation": "R130_AND_B10_HISTORY_PRESERVED; 18_REACHABLE_ITEMS_INCLUDING_CLOSING_NOTE",
+      "status": "LOCAL_ACCEPTANCE_GAPS_CLOSED_PENDING_EXACT_HEAD_CI_AND_LEAD_REVIEW",
+      "lastVerifiedUiCommit": "c395fffa5e98bf8da83058bedbcd7710b5ef5840",
+      "visualAcceptance": "docs/v11/B10_VISUAL_ACCEPTANCE.md",
+      "visualEvidenceDirectory": "docs/v11/evidence/b10",
+      "localBrowserResults": "ALL_122_V11_TESTS_PASS_ON_RECONCILED_HEAD; PORTFOLIO_VISIBILITY_AND_BOTH_DISCLOSURE_KEYS_PASS",
+      "scope": "V11 presentation, focused browser checks and visual evidence only",
+      "nonActions": [
+        "NO_V10_ROOT_OR_PWA_RELEASE_IDENTITY_CHANGE",
+        "NO_BACKEND_AUTH_PROVIDER_WORKFLOW_OR_RUNTIME_CHANGE",
+        "NO_PRIVATE_CREDENTIALS",
+        "NO_MERGE_OR_DEPLOY"
+      ]
+    },
     "verifiedSourceMain": "921246e61e07ff0624fb4a24c00a452246e9eb7f",
     "lastCompletedSourceMerge": {
       "pr": 862,

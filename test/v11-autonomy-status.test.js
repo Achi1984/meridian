@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 const html=readFileSync(new URL('../v11/index.html',import.meta.url),'utf8');
-const strip=html.match(/<section id="autonomy-status"[\s\S]*?<\/section>/)?.[0];
+const strip=html.match(/<details id="autonomy-status"[\s\S]*?<\/details>/)?.[0];
 test('autonomy status is persistent and unknown without telemetry',()=>{
  assert.ok(strip);
  assert.ok(html.indexOf(strip)<html.indexOf('<main '));
@@ -13,7 +13,8 @@ test('autonomy status is persistent and unknown without telemetry',()=>{
  assert.doesNotMatch(strip,/data-state="(?:active|waiting|blocked|paused)"|role="status"/);
 });
 test('historical UI evidence is separate from current operation and draft revision',()=>{
- assert.match(strip,/Diese Vorschau · B9/);
+ assert.match(strip,/Diese Vorschau · B10/);
+ assert.match(strip,/Vorige Vorschau · B9/);
  assert.match(strip,/Kontrollierte Testvorschau · Geräteabnahme ausstehend/);
  assert.match(strip,/https:\/\/github.com\/Achi1984\/meridian\/issues\/766/);
  assert.doesNotMatch(strip,/Integrationszeit und Änderungsnachweis stehen|Noch nicht veröffentlicht/);
@@ -21,5 +22,5 @@ test('historical UI evidence is separate from current operation and draft revisi
  assert.match(strip,/datetime="2026-10-11T19:30:28Z"/);
  assert.match(strip,/https:\/\/github.com\/Achi1984\/meridian\/pull\/702/);
  assert.match(strip,/Versionsstand ist kein Lebenszeichen/);
- assert.match(html,/>11 · Vorschau B9<small>/);
+ assert.match(html,/>11 · Vorschau B10<small>/);
 });
