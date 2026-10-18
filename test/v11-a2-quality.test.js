@@ -5,7 +5,7 @@ import vm from 'node:vm';
 
 const html = readFileSync(new URL('../v11/index.html', import.meta.url), 'utf8');
 const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
-const keys = ['command', 'depot', 'bots', 'market', 'research'];
+const keys = ['command', 'depot', 'bots', 'market', 'strategies'];
 
 function fixture() {
   let focused = null;
@@ -105,7 +105,7 @@ test('A2: local examples never write portfolio, risk, sources or any privileged 
   const examples = script.slice(script.indexOf('const preview ='));
   assert.doesNotMatch(examples, /portfolio-value|data-decision-owner|trust-cell|MERIDIAN|\.innerHTML|\.outerHTML/);
   assert.doesNotMatch(script, /\b(fetch|XMLHttpRequest|WebSocket|EventSource|localStorage|sessionStorage|indexedDB|setTimeout|setInterval)\s*\(/);
-  assert.doesNotMatch(html.replace('<script type="module" src="./bot-read-bootstrap.js?v=B11"></script>','').replace('<script type="module" src="./depot-read-bootstrap.js?v=B9"></script>',''), /<script[^>]*src=|<iframe|<form|rel="manifest"/);
+  assert.doesNotMatch(html.replace(/<script type="module" src="\.\/(?:bot-read-bootstrap|depot-read-bootstrap|strategy-workspace-bootstrap)\.js\?v=B12"><\/script>/g,''), /<script[^>]*src=|<iframe|<form|rel="manifest"/);
   assert.match(html, /data-preview-mode="manual-bot-depot-read-only"/);
   assert.match(html, /data-execution-impact="false"/);
 });
