@@ -101,6 +101,25 @@
   "bootstrapFile": "MERIDIAN_GO.md",
   "currentWork": {
     "updatedAt": "2026-10-18",
+    "v11B10ClarityProposal": {
+      "operationId": "MERIDIAN-V11-B10-CLARITY-20261018",
+      "issue": 874,
+      "pullRequest": 875,
+      "branch": "copilot/meridian-v11-b10-clarity-20261018",
+      "verifiedBaseSha": "cbe9b5a34ed31e61746a656d49bb1b81bc637eec",
+      "initialWorkHeadSha": "fd46a1726cac15cb6c1d3c444da3dd2b96691794",
+      "observedMainAdvanceSha": "b75335da3805c0d509ff11f75ab0584d351f284e",
+      "relatedReleasePr873": "MERGED_TO_MAIN",
+      "historyReconciliation": "REQUIRED_BEFORE_ACCEPTANCE",
+      "status": "IMPLEMENTATION_IN_PROGRESS",
+      "scope": "V11 presentation, focused browser checks and visual evidence only",
+      "nonActions": [
+        "NO_V10_ROOT_OR_PWA_RELEASE_IDENTITY_CHANGE",
+        "NO_BACKEND_AUTH_PROVIDER_WORKFLOW_OR_RUNTIME_CHANGE",
+        "NO_PRIVATE_CREDENTIALS",
+        "NO_MERGE_OR_DEPLOY"
+      ]
+    },
     "verifiedSourceMain": "921246e61e07ff0624fb4a24c00a452246e9eb7f",
     "lastCompletedSourceMerge": {
       "pr": 862,
@@ -1274,22 +1293,6 @@
       "finalMergeMirrorIssue": 639,
       "ownerApprovalMirrorStatus": "RESOLVED_WITH_VERBATIM_QUOTE",
       "scope": "GITHUB_ONLY_NO_RUNTIME_ACTIONS"
-    },
-    "v11B10ClarityProposal": {
-      "operationId": "MERIDIAN-V11-B10-CLARITY-20261018",
-      "issue": 874,
-      "pullRequest": 875,
-      "branch": "copilot/meridian-v11-b10-clarity-20261018",
-      "verifiedBaseSha": "cbe9b5a34ed31e61746a656d49bb1b81bc637eec",
-      "initialWorkHeadSha": "fd46a1726cac15cb6c1d3c444da3dd2b96691794",
-      "status": "IMPLEMENTATION_IN_PROGRESS",
-      "scope": "V11 presentation, focused browser checks and visual evidence only",
-      "nonActions": [
-        "NO_V10_ROOT_OR_PWA_RELEASE_IDENTITY_CHANGE",
-        "NO_BACKEND_AUTH_PROVIDER_WORKFLOW_OR_RUNTIME_CHANGE",
-        "NO_PRIVATE_CREDENTIALS",
-        "NO_MERGE_OR_DEPLOY"
-      ]
     }
   }
 }
