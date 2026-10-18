@@ -989,6 +989,9 @@ def _validate_b1_path_payload(payload, expected):
                   and all(type(item[key]) in (int, float) and __import__("math").isfinite(item[key])
                           for key in ("turnover", "cost", "cumulativeCost", "equityAfterFees",
                                       "cashAfterFees", "conservationResidual"))
+                  and item["turnover"] >= 0 and item["cost"] >= 0
+                  and item["cumulativeCost"] >= 0 and item["equityAfterFees"] >= 0
+                  and item["cashAfterFees"] >= 0 and abs(item["conservationResidual"]) <= 1e-6
                   for item in payload["fillCosts"])
           and type(payload.get("cancelledInstructions")) is list
           and type(payload.get("cancelledInstructionCount")) is int
@@ -997,6 +1000,8 @@ def _validate_b1_path_payload(payload, expected):
                       "decisionIndex", "fillIndex", "target", "decisionTimestamp", "reason",
                   } and type(item["decisionIndex"]) is int and type(item["fillIndex"]) is int
                   and type(item["target"]) in (int, float) and __import__("math").isfinite(item["target"])
+                  and type(item["decisionTimestamp"]) is str
+                  and re.fullmatch(r"\d{4}-\d{2}-\d{2}T00:00:00Z", item["decisionTimestamp"]) is not None
                   and item["reason"] == "BEYOND_SEGMENT_HORIZON"
                   for item in payload["cancelledInstructions"])
           and payload.get("diagnosticRescaling") == "NONE"
@@ -1007,7 +1012,8 @@ def _validate_b1_path_payload(payload, expected):
           and payload["tradeCRV"].get("promotionEligible") is False
           and (expected["kind"] == "CANDIDATE" or
                (type(payload.get("targetExposure")) in (int, float)
-                and __import__("math").isfinite(payload["targetExposure"])))
+                and __import__("math").isfinite(payload["targetExposure"])
+                and 0 <= payload["targetExposure"] <= 1))
           and all(type(payload.get(key)) in (int, float) and
                   __import__("math").isfinite(payload[key]) for key in (
                       "dailyReturnSd", "endEquity", "maxAbsoluteTargetMismatch",
@@ -1029,13 +1035,19 @@ def _validate_b1_summary(summary, profile, *, allow_insufficient=False):
     authority = summary.get("authority") if type(summary) is dict else None
     status = summary.get("status") if type(summary) is dict else None
     if status == "COMPLETED":
-        counts_valid = (summary.get("attemptedPaths") == 44 and
+        counts_valid = (type(summary.get("attemptedPaths")) is int and
+                        summary.get("attemptedPaths") == 44 and
+                        type(summary.get("completedPaths")) is int and
                         summary.get("completedPaths") == 44 and
+                        type(summary.get("computedPaths")) is int and
                         summary.get("computedPaths") == 44 and summary.get("failure") is None)
     else:
         counts_valid = (allow_insufficient and status == "INSUFFICIENT_EVIDENCE" and
+                        type(summary.get("attemptedPaths")) is int and
                         summary.get("attemptedPaths") == 19 and
+                        type(summary.get("completedPaths")) is int and
                         summary.get("completedPaths") == 19 and
+                        type(summary.get("computedPaths")) is int and
                         summary.get("computedPaths") == 19 and summary.get("failure") is None)
     screen = summary.get("screen")
     evidence = summary.get("evidence")
@@ -1074,11 +1086,17 @@ def _validate_b1_summary(summary, profile, *, allow_insufficient=False):
         type(value) in (int, float) and __import__("math").isfinite(value))
     realization_valid = (
         type(realization) is list and len(realization) == 6
+        and all(type(item.get("pathId")) is str for item in realization if type(item) is dict)
+        and len({item.get("pathId") for item in realization if type(item) is dict}) == 6
         and all(type(item) is dict and set(item) == realization_keys
-                and item.get("kind") is None
-                and item.get("pathId") in {path["pathId"] for path in profile["paths"]
-                                           if path["kind"] == "FIXED_CONTROL"}
-                and item.get("segmentId") == "diagnostic"
+                and (descriptor := next((path for path in profile["paths"]
+                                         if path["pathId"] == item.get("pathId")), None)) is not None
+                and descriptor["kind"] == "FIXED_CONTROL"
+                and item.get("variantId") == descriptor["variantId"]
+                and item.get("scenarioId") == descriptor["scenarioId"]
+                and item.get("segmentId") == descriptor["segmentId"]
+                and item.get("status") == (
+                    "COMPLETED" if status == "COMPLETED" else "NOT_RUN_INSUFFICIENT_EVIDENCE")
                 and item.get("diagnosticRescaling") == "NONE"
                 and all(numeric_or_null(item.get(key)) for key in (
                     "frozenTargetExposure", "meanRealizedExposure", "meanTargetRealizedMismatch",
@@ -1096,6 +1114,7 @@ def _validate_b1_summary(summary, profile, *, allow_insufficient=False):
             "paths": 44, "pathMs": 60_000, "totalMs": 1_800_000,
             "outputBytes": MAX_RESULT_BYTES, "attemptsPerPath": 1,
         }
+        and type(budget["attemptsPerStartedPath"]) is int
         and budget["attemptsPerStartedPath"] == 1
         and budget["automaticRetry"] is False and budget["status"] == "WITHIN_LIMITS"
     )
@@ -1119,7 +1138,8 @@ def _validate_b1_summary(summary, profile, *, allow_insufficient=False):
           and summary.get("protocolSha256") == profile["protocolSha256"]
           and summary.get("implementationId") == profile["implementationId"]
           and summary.get("implementationSha256") == profile["implementationSha256"]
-          and counts_valid and summary.get("plannedPaths") == 44
+          and counts_valid and type(summary.get("plannedPaths")) is int
+          and summary.get("plannedPaths") == 44
           and type(identity) is dict and set(identity) == {
               "datasetKind", "sourceCommit", "sourceProvenance", "canonicalSeriesSha256",
               "inputSha256",
@@ -1129,6 +1149,8 @@ def _validate_b1_summary(summary, profile, *, allow_insufficient=False):
           and identity.get("inputSha256") == profile["inputSha256"]
           and type(identity.get("canonicalSeriesSha256")) is dict
           and set(identity["canonicalSeriesSha256"]) == set(B1_ASSETS)
+          and all(type(value) is str and re.fullmatch(r"[0-9a-f]{64}", value) is not None
+                  for value in identity["canonicalSeriesSha256"].values())
           and identity.get("sourceProvenance") ==
               {"syntheticFixtureSeriesSha256": identity["canonicalSeriesSha256"]}
           and type(authority) is dict and set(authority) == {

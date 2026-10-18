@@ -251,6 +251,21 @@ process.stdout.write(JSON.stringify(runBatch({
                 self.database, {}, "COMPLETED", "ALL_PATHS_COMPLETED",
                 json.dumps(summary, separators=(",", ":"), allow_nan=False).encode())
 
+    def test_b1_summary_rejects_coerced_counts_and_substituted_control_identity(self):
+        direct = self.direct_b1_result()
+        profile = journal._b1_profile()
+        summary = {key: value for key, value in direct.items()
+                   if key not in ("paths", "controlDefinitions")}
+        summary["attemptedPaths"] = True
+        with self.assertRaisesRegex(journal.JournalError, "RESULT_SCHEMA_INVALID"):
+            journal._validate_b1_summary(summary, profile)
+
+        summary = {key: value for key, value in direct.items()
+                   if key not in ("paths", "controlDefinitions")}
+        summary["controlRealization"][0]["variantId"] = "substituted-control"
+        with self.assertRaisesRegex(journal.JournalError, "RESULT_SCHEMA_INVALID"):
+            journal._validate_b1_summary(summary, profile)
+
     def test_b1_insufficient_evidence_schema_is_valid_but_never_completed(self):
         direct = self.direct_b1_result()
         summary = {key: value for key, value in direct.items()
@@ -262,6 +277,13 @@ process.stdout.write(JSON.stringify(runBatch({
             "computedPaths": 19,
             "screen": {"status": "INSUFFICIENT_EVIDENCE"},
         })
+        for control in summary["controlRealization"]:
+            control["status"] = "NOT_RUN_INSUFFICIENT_EVIDENCE"
+            control["frozenTargetExposure"] = None
+            control["meanRealizedExposure"] = None
+            control["meanTargetRealizedMismatch"] = None
+            control["meanAbsoluteTargetMismatch"] = None
+            control["maxAbsoluteTargetMismatch"] = None
         profile = journal._b1_profile()
         journal._validate_b1_summary(summary, profile, allow_insufficient=True)
         with self.assertRaisesRegex(journal.JournalError, "RESULT_SCHEMA_INVALID"):
