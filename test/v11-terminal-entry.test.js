@@ -194,6 +194,8 @@ const b6Deltas=[
     "<script type=\"module\" src=\"./bot-read-bootstrap.js?v=B6\"></script>\n"
   ]
 ];
+// Exact r130 disclosure delta; preserve every historical baseline hash.
+const r130Deltas=[["        <li><strong>Terminal 10.0-r129</strong><span class=\"version-status\">Aktueller Terminal-Stand</span><p>Isolierte H1/H7-Paper-Simulationen mit Kostenstress und Quellbelegen; H9 wartet auf Daten. Kein laufender Paper-Bot und kein Profitabilitätsnachweis.</p></li>\n","        <li><strong>Terminal 10.0-r130</strong><span class=\"version-status\">Terminal-Stand dieses Builds</span><p>Quellbelege und Grenzen der Arena-Ergebnisse mit strenger Datenprüfung und aufklappbaren Details. Kein neuer Strategielauf und kein Profitabilitätsnachweis. <a href=\"https://github.com/Achi1984/meridian/pull/873\">Änderungsnachweis #873</a></p></li>\n        <li><strong>Terminal 10.0-r129</strong><span class=\"version-status\">Historischer Stand</span><p>Isolierte H1/H7-Paper-Simulationen mit Kostenstress und Quellbelegen; H9 wartet auf Daten. Kein laufender Paper-Bot und kein Profitabilitätsnachweis.</p></li>\n"]];
 const r129Deltas=[["        <li><strong>Terminal 10.0-r128</strong><span class=\"version-status\">Aktueller Terminal-Stand</span><p>Einmaliger Meridian-Lesezugang f\u00fcr das Erstellen oder Widerrufen von Asset-Watch-Links. Keine Speicherung des eingegebenen Lesepassworts.</p></li>\n", "        <li><strong>Terminal 10.0-r129</strong><span class=\"version-status\">Aktueller Terminal-Stand</span><p>Isolierte H1/H7-Paper-Simulationen mit Kostenstress und Quellbelegen; H9 wartet auf Daten. Kein laufender Paper-Bot und kein Profitabilit\u00e4tsnachweis.</p></li>\n        <li><strong>Terminal 10.0-r128</strong><span class=\"version-status\">Historischer Stand</span><p>Einmaliger Meridian-Lesezugang f\u00fcr das Erstellen oder Widerrufen von Asset-Watch-Links. Keine Speicherung des eingegebenen Lesepassworts.</p></li>\n"]];
 const r128Deltas=[
   [
@@ -237,6 +239,7 @@ function restoreB2(source){
  for(const [before,after] of b9Deltas){assert.equal(source.split(after).length-1,1,"one exact B9 delta");source=source.replace(after,before);}
  for(const [before,after] of b8Deltas){assert.equal(source.split(after).length-1,1,"one exact B8 delta");source=source.replace(after,before);}
  for(const [before,after] of b7Deltas){assert.equal(source.split(after).length-1,1,"one exact B7 delta");source=source.replace(after,before);}
+ for(const [before,after] of r130Deltas){assert.equal(source.split(after).length-1,1,'one exact r130 version disclosure delta');source=source.replace(after,before);}
  for(const [before,after] of r129Deltas){assert.equal(source.split(after).length-1,1,'one exact r129 version disclosure delta');source=source.replace(after,before);}
  for(const [before,after] of r128Deltas){assert.equal(source.split(after).length-1,1,'one exact r128 delta');source=source.replace(after,before);}
  assert.equal(gitBlob(source),'41611512b49cf8fba39545de147d6a458293c62c','exact reviewed B6 bytes restored');
