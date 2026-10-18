@@ -8,7 +8,9 @@
     "r1Verdict": "REVISION_REQUIRED",
     "r2RequestId": "MERIDIAN-B1-7-DESIGN-R2",
     "r2RequestComment": "6249480669",
-    "r2Response": "PENDING"
+    "r2ResponseComment": "6249482850",
+    "r2Response": "GREEN_LIGHT_DESIGN_ONLY",
+    "r2Scope": "SOURCE_AND_SYNTHETIC_PREPARATION_ONLY; no execution, costs, thresholds, or no-stop policy approved."
   },
   "identity": {
     "sourceCommit": "1c7b6dccd886f57e866c7d359c091b1e72a193ea",
@@ -147,7 +149,7 @@
   "costAssumptions": {
     "base": "85bp per side = 80bp published Kraken Spot Crypto Tier 1 taker reference plus 5bp assumed friction.",
     "stress": "160bp per side; 160bp plus a one-day fill delay in the third scenario.",
-    "status": "Owner approval pending. Tier/reference is not owner-specific, historical, or verified entitlement; 5bp is an assumption, not measured spread or impact."
+    "status": "Lead-reported from issue #878, not independently verified by the R2 reviewer. Owner approval pending. Tier/reference is not owner-specific, historical, or verified entitlement; 5bp is an assumption, not measured spread or impact."
   },
   "accounting": {
     "startingEquity": 10000,
@@ -173,7 +175,7 @@
       "Cash x development then diagnostic"
     ],
     "controls": {
-      "meanExposure": "Arithmetic mean of primary 85bp path's daily held target across 180 development rows; zero before first fill. Not realized weight drift or weekly-only mean.",
+      "meanExposure": "Arithmetic mean of primary 85bp path's daily held target across 180 development rows. Its initial target fills on day one, so this baseline has no pre-fill rows; zero-before-fill applies to delayed paths. Not realized weight drift or weekly-only mean.",
       "riskExposure": "min(1, sampleSD(primary 85bp development daily net returns)/sampleSD(full-basket 85bp development daily net returns)); sample denominator N-1; zero primary SD maps to zero exposure.",
       "freeze": "Derive once from development; use identical frozen values for all diagnostic cost/delay scenarios. Invalid/nonfinite or benchmark SD <= 1e-12 yields INSUFFICIENT_EVIDENCE and no diagnostic continuation."
     },
@@ -189,13 +191,16 @@
       "(full-basket drawdown-primary drawdown)/full-basket drawdown >= 20%; full-basket drawdown <= 1e-12 is INSUFFICIENT_EVIDENCE",
       "Primary diagnostic net return > 0 at 160bp and at 160bp plus one-day delay"
     ],
-    "neighbours": "At least 3 of 4 neighbours have positive diagnostic net return at 85bp and at least 3 of 4 at 160bp; neighbours are sign robustness only, not matched-control claims.",
+    "comparisonSegment": "All primary-vs-control screen comparisons use the diagnostic segment only.",
+    "neighbours": "At least 3 of 4 neighbours have positive diagnostic net return at 85bp and at least 3 of 4 at 160bp non-delayed. Neighbours are not screened at 160bp plus delay; they are sign robustness only, not matched-control claims.",
     "statuses": ["PASS", "NO_EDGE", "INSUFFICIENT_EVIDENCE", "INVALID"],
     "syntheticFixtureStatus": "SYNTHETIC_ONLY_NOT_ASSESSED; fixture rule checks are not historical outcomes and cannot produce GREEN.",
     "interpretation": "PASS is a historical candidate only. No statistical significance, alpha, prospective validation, or fresh holdout claim."
   },
   "reporting": {
-    "perPath": ["daily net returns", "start/end equity", "mean daily held target", "net return", "sampled drawdown", "drawdown duration", "turnover", "per-fill and cumulative cost", "concentration", "quarter returns", "cancelled instructions", "path status"],
+    "perPath": ["daily net returns", "start/end equity", "mean daily held target", "mean realized exposure", "mean and maximum absolute target/realized mismatch", "net return", "sampled drawdown", "drawdown duration", "turnover", "per-fill and cumulative cost", "concentration", "quarter returns", "cancelled instructions", "path status"],
+    "controlMismatch": "For each frozen control diagnostic scenario, report daily-close marked realized asset exposure versus the frozen target, including mean/absolute/max mismatch. No diagnostic rescaling is permitted.",
+    "sourceLevelLabels": ["DEVELOPMENT_AND_HISTORICAL_DIAGNOSTIC", "NOT_HOLDOUT", "UNIVERSE_HISTORY_LIMITATION_HBAR_OMITTED_FOR_COVERAGE_ONLY", "SOURCE_AUTHENTICITY_NOT_ESTABLISHED", "HISTORICAL_CANDIDATE_ONLY", "TRIAL_LEDGER_UNKNOWN"],
     "missingRisk": "No finite trade stop exists; trade CRV is explicitly UNDEFINED_NO_FINITE_STOP, null, research-only, and not a promotion failure/default zero."
   },
   "budget": {

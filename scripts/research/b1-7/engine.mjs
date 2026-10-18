@@ -305,6 +305,9 @@ function simulatePath({seriesByAsset, descriptor, scenario, targetSource}) {
   let previousEquity = CAPITAL;
   let heldTarget = 0;
   let totalTurnover = 0;
+  let totalRealizedExposure = 0;
+  let totalAbsoluteTargetMismatch = 0;
+  let maxAbsoluteTargetMismatch = 0;
   let maxConcentration = 0;
 
   for (let index = segment.startIndex; index <= segment.endIndex; index++) {
@@ -326,6 +329,14 @@ function simulatePath({seriesByAsset, descriptor, scenario, targetSource}) {
     let closeEquity = state.cash + closeValue(state.units, closePrices);
     if (!finite(closeEquity) || closeEquity < 0) fail('INVALID_ACCOUNTING', {date, reason: 'INVALID_CLOSE_EQUITY'});
     const markedPositions = closeValue(state.units, closePrices);
+    const realizedExposure = closeEquity > 0 ? markedPositions / closeEquity : 0;
+    const absoluteTargetMismatch = Math.abs(realizedExposure - heldTarget);
+    if (!finite(realizedExposure) || realizedExposure < 0 || !finite(absoluteTargetMismatch)) {
+      fail('INVALID_ACCOUNTING', {date, reason: 'INVALID_EXPOSURE_MISMATCH'});
+    }
+    totalRealizedExposure += realizedExposure;
+    totalAbsoluteTargetMismatch += absoluteTargetMismatch;
+    maxAbsoluteTargetMismatch = Math.max(maxAbsoluteTargetMismatch, absoluteTargetMismatch);
     if (markedPositions > 0) {
       for (const quantityIndex of ASSETS.keys()) {
         const weight = state.units[quantityIndex] * closePrices[quantityIndex] / closeEquity;
@@ -370,6 +381,12 @@ function simulatePath({seriesByAsset, descriptor, scenario, targetSource}) {
     dailyReturnCount: dailyReturns.length,
     dailyReturnSd: sampleStandardDeviation(dailyReturns),
     meanHeldTarget: dailyTarget.reduce((sum, value) => sum + value, 0) / dailyTarget.length,
+    meanRealizedExposure: totalRealizedExposure / dailyTarget.length,
+    meanTargetRealizedMismatch:
+      (totalRealizedExposure - dailyTarget.reduce((sum, value) => sum + value, 0)) / dailyTarget.length,
+    meanAbsoluteTargetMismatch: totalAbsoluteTargetMismatch / dailyTarget.length,
+    maxAbsoluteTargetMismatch,
+    diagnosticRescaling: 'NONE',
     maxConcentration,
     turnoverNotional: totalTurnover,
     turnoverOnInitialEquity: totalTurnover / CAPITAL,
@@ -569,14 +586,16 @@ function screenResults(paths, controlDefinitions) {
       primary.sampledDrawdown <= meanControl.sampledDrawdown &&
       primary.sampledDrawdown <= riskControl.sampledDrawdown,
     relativeDrawdownReductionAtLeast20Percent: relativeDrawdownReduction >= 0.20,
-    primaryNetPositiveAt160bp: stressed.netReturn > 0,
+    primaryNetPositiveAt160bpNonDelayed: stressed.netReturn > 0,
     primaryNetPositiveAt160bpPlusDelay: delayed.netReturn > 0,
     atLeastThreeOfFourNeighboursPositiveAt85bp: basePositive >= 3,
-    atLeastThreeOfFourNeighboursPositiveAt160bp: stressPositive >= 3
+    atLeastThreeOfFourNeighboursPositiveAt160bpNonDelayed: stressPositive >= 3
   };
   return {
     status: Object.values(checks).every(Boolean) ? 'PASS' : 'NO_EDGE',
     interpretation: 'HISTORICAL_CANDIDATE_ONLY_NOT_HOLDOUT',
+    comparisonSegment: 'diagnostic',
+    neighbourStressScenario: 'stress-160bp-non-delayed',
     checks,
     relativeDrawdownReduction,
     neighbourPositiveCounts: {base85bp: basePositive, stress160bp: stressPositive},
@@ -635,7 +654,9 @@ function emptyResult(status, code, errors = []) {
       r1ResponseComment: '6249442046',
       r1Verdict: 'REVISION_REQUIRED',
       r2RequestId: 'MERIDIAN-B1-7-DESIGN-R2',
-      r2ResponseStatus: 'PENDING'
+      r2ResponseComment: '6249482850',
+      r2Verdict: 'GREEN_LIGHT_DESIGN_ONLY',
+      r2Scope: 'SOURCE_AND_SYNTHETIC_PREPARATION_ONLY'
     }
   };
 }
@@ -861,6 +882,19 @@ export function runBatch(options) {
       fullBasketDevelopmentSd: controlDefinitions.benchmarkSd,
       calibration: controlDefinitions.calibration
     } : controlDefinitions,
+    controlRealization: paths.filter(path => path.kind === 'FIXED_CONTROL').map(path => ({
+      pathId: path.pathId,
+      variantId: path.variantId,
+      scenarioId: path.scenarioId,
+      segmentId: path.segmentId,
+      status: path.status,
+      frozenTargetExposure: path.targetExposure ?? null,
+      meanRealizedExposure: path.meanRealizedExposure ?? null,
+      meanTargetRealizedMismatch: path.meanTargetRealizedMismatch ?? null,
+      meanAbsoluteTargetMismatch: path.meanAbsoluteTargetMismatch ?? null,
+      maxAbsoluteTargetMismatch: path.maxAbsoluteTargetMismatch ?? null,
+      diagnosticRescaling: 'NONE'
+    })),
     screen: calculatedScreen
       ? source.kind === 'SYNTHETIC_FIXTURE'
         ? {
@@ -875,7 +909,10 @@ export function runBatch(options) {
       sourceAuthenticity: source.kind === 'SYNTHETIC_FIXTURE'
         ? 'SYNTHETIC_ONLY'
         : 'HASH_PROVENANCE_COPIED_NOT_AUTHENTICATED',
+      survivorship: 'UNIVERSE_HISTORY_LIMITATION_HBAR_OMITTED_FOR_COVERAGE_ONLY',
       historyLabel: 'DEVELOPMENT_AND_HISTORICAL_DIAGNOSTIC',
+      candidateInterpretation: 'HISTORICAL_CANDIDATE_ONLY_IF_PROPOSED_REAL_SCREEN_PASSES',
+      diagnosticRescaling: 'NONE',
       holdoutClaim: false,
       trialLedger: 'UNKNOWN',
       stoppedPolicy: 'NO_FINITE_TRADE_STOP',
@@ -893,7 +930,9 @@ export function runBatch(options) {
       r1ResponseComment: '6249442046',
       r1Verdict: 'REVISION_REQUIRED',
       r2RequestId: 'MERIDIAN-B1-7-DESIGN-R2',
-      r2ResponseStatus: 'PENDING'
+      r2ResponseComment: '6249482850',
+      r2Verdict: 'GREEN_LIGHT_DESIGN_ONLY',
+      r2Scope: 'SOURCE_AND_SYNTHETIC_PREPARATION_ONLY'
     }
   };
   return compactIfOverBudget(output);

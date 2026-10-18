@@ -2,19 +2,21 @@
 
 **Status: NOT APPROVED / NOT AN EXECUTION GRANT.** This request is for a later, separate owner decision after synthetic source review, exact-head CI, and independent full source review. Do not run the engine on captured market data while this request is pending.
 
+The independent R2 `GREEN_LIGHT` (response comment `6249482850`) covers deterministic SOURCE+SYNTHETIC preparation only. It does not approve this real-run proposal, its 44-path budget, costs, screen thresholds, or no-stop exception.
+
 ## Immutable identities
 
 | Identity | Proposed value | Status |
 | --- | --- | --- |
-| Protocol | `MERIDIAN-B1-7-PROTOCOL-R2-20261018`; raw `protocol.json` SHA-256: `7fda5993dffa298183e3c4b757e4cdaace4754f8a7ff11b4538e1d39dd9e1aed` | Frozen file identity |
-| Implementation | `MERIDIAN-B1-7-ENGINE-R2`; bundle SHA-256 `94785763b90b92abcd5c8bc9ec58034d932116a77a8afda7b3be7f08ea9c0193` | Exact two-file bundle identity |
+| Protocol | `MERIDIAN-B1-7-PROTOCOL-R2-20261018`; raw `protocol.json` SHA-256: `44284c22c22443520043c8450edbc8819b95a9f37ca985cfca05f4f9317ff9eb` | Frozen file identity |
+| Implementation | `MERIDIAN-B1-7-ENGINE-R2`; bundle SHA-256 `83ba22de09ee576956aaed298b2c8570f218fef78fcfda5d01f99b2cef8b518a` | Exact two-file bundle identity |
 | Source basis | Git commit `1c7b6dccd886f57e866c7d359c091b1e72a193ea` | Exact proposed source commit |
 | Input manifest | Canonical SHA-256 of the seven exact caller-supplied series: `PENDING_NOT_COMPUTED` | No series loaded or hashed by this implementation task |
 | Offline provenance record | `research/acquisitions/kraken-usd-daily-20261018/offline-verification.json` | Hash provenance only; source authenticity is not established |
 
 The exact seven proposed assets and copied normalized-file SHA-256 values are:
 
-The implementation bundle digest is SHA-256 of canonical JSON with keys `engineSha256` and `validatorSha256` containing the exact raw-file SHA-256 values: `engine.mjs` = `66cee5232ab886bb242e7cf04c68b9324b333eb5725d5cc2c733bb227eccb7c5`; `validate.mjs` = `41a476464ef65c0cbacd367762b00de21e54a85a384d608e0a5108c2f13eec33`. The engine takes this bundle hash as caller-supplied identity and does not inspect its own source.
+The implementation bundle digest is SHA-256 of canonical JSON with keys `engineSha256` and `validatorSha256` containing the exact raw-file SHA-256 values: `engine.mjs` = `ffac04e3a43871ab68510fcdab41255d14ca567170a7dadf0959f6d70f099d82`; `validate.mjs` = `b1eda06f026c9c14698b5b47524bdb4fe110f35f2881ab1214fd9a8c8eb98092`. The engine takes this bundle hash as caller-supplied identity and does not inspect its own source.
 
 | Order | Asset | Normalized file SHA-256 |
 | ---: | --- | --- |
@@ -32,12 +34,15 @@ Input must be exactly 955 synchronized daily rows for each asset, 2024-02-19 thr
 
 - One offline process; exactly 44 paths: five fixed variants × three scenarios × two segments (30), full basket × three scenarios × two segments (6), two development-frozen controls × three scenarios × diagnostic segment (6), and cash × two segments (2).
 - Hard limits: 30 minutes total, 60 seconds per path, 1 MiB serialized output. No retries or adaptive trials. Any failure stops the batch; incomplete outcomes are never ranked.
-- Costs: 85 bp per side baseline (80 bp published Kraken Spot Crypto Tier 1 taker reference plus assumed 5 bp friction), 160 bp per side stress, and 160 bp plus one-day delayed fill. These are proposals, not owner-specific fee entitlement, historical fee reconstruction, or measured spread/impact. The official fee schedule referenced in issue #878 was retrieved 2026-10-18 and states Tier 1 taker 0.80%, subject to geography/VPN caveats. Owner approval of this revised cost grid is required.
-- Screen: diagnostic primary net return positive; sampled daily-close drawdown at most 25%; return no worse than either frozen control; drawdown no worse than either control; at least 20% relative drawdown reduction versus full basket; primary positive under both stress scenarios; at least 3/4 neighbors positive at each of 85 bp and 160 bp. Zero/invalid risk denominators produce `INSUFFICIENT_EVIDENCE`. PASS would mean historical candidate only, never a holdout or significance claim.
+- Costs: 85 bp per side baseline (lead-reported 80 bp published Kraken Spot Crypto Tier 1 taker reference plus assumed 5 bp friction), 160 bp per side stress, and 160 bp plus one-day delayed fill. These are proposals, not owner-specific fee entitlement, historical fee reconstruction, or measured spread/impact. The lead reports retrieving the official fee schedule referenced in issue #878 on 2026-10-18; it displayed Tier 1 taker 0.80%, subject to geography/VPN caveats. The R2 reviewer could not independently verify it. Owner approval of this revised cost grid is required.
+- Screen: diagnostic primary net return positive; sampled daily-close drawdown at most 25%; return no worse than either frozen control; drawdown no worse than either control; at least 20% relative drawdown reduction versus full basket; primary positive at 160 bp without delay and at 160 bp plus one-day delay; at least 3/4 neighbors positive at 85 bp and separately at 160 bp without delay (no neighbor delay screen). Primary/control comparisons are diagnostic-only. Zero/invalid risk denominators produce `INSUFFICIENT_EVIDENCE`. PASS would mean historical candidate only, never a holdout or significance claim.
+- Output includes daily target-versus-realized exposure mismatch summaries for each path and each frozen-control diagnostic scenario. Report the frozen target, mean realized exposure, mean and maximum absolute mismatch; do not rescale a control to diagnostic behavior.
 - Segments start independently at USD 10,000. Development freezes the two static controls; diagnostic data are historical and conditioned, not a fresh holdout. The existing unknown trial-ledger completeness remains `UNKNOWN`.
 
 ## No-stop exception and unchanged gates
 
-This proposal permits only a research-stage portfolio-level no-stop analysis. There is no finite per-trade stop, so CRV remains `UNDEFINED_NO_FINITE_STOP`, null, and not applicable for this research-only screen. No stop is invented, and no trade CRV or promotion eligibility is claimed.
+This proposal permits only a research-stage portfolio-level no-stop analysis. There is no finite per-trade stop, so CRV remains `UNDEFINED_NO_FINITE_STOP`, null, and not applicable for this research-only screen. No stop is invented, and no trade CRV or promotion eligibility is claimed. The 85 bp baseline control mean uses the primary path's held target over all 180 development days; the initial fill is on day one, so the baseline has no pre-fill rows. The zero-before-fill rule matters for delayed paths.
+
+The R2 reviewer could not independently fetch the Kraken fee schedule. Treat 80 bp Tier 1 taker reference plus 5 bp assumed friction as lead-reported, not independently verified, owner-specific entitlement, or historical fee reconstruction. A separate owner decision must approve the assumptions.
 
 This request does **not** authorize a real-data run, strategy-PnL promotion, discovery, validation, holdout, Paper, Live, trading, runtime changes, or any authorization-flag change. `canonicalExecutionAuthorized`, `strategyPnlAuthorized`, `discoveryAuthorized`, `validationAuthorized`, `holdoutAuthorized`, `paperAuthorized`, and `liveAuthorized` remain false. A later explicit owner decision must approve the exact protocol/source/input identities, costs, screen, budget, and no-stop exception before any real series is supplied.

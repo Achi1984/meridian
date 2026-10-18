@@ -37,6 +37,8 @@ test('protocol constants, exact universe, costs, path count, and raw freeze hash
   assert.equal(protocol.schema, 'MERIDIAN_B1_7_PROTOCOL_R2');
   assert.equal(protocol.protocolId, PROTOCOL_ID);
   assert.equal(hashFile(protocolPath), PROTOCOL_SHA256);
+  assert.equal(protocol.independentReview.r2ResponseComment, '6249482850');
+  assert.equal(protocol.independentReview.r2Response, 'GREEN_LIGHT_DESIGN_ONLY');
   assert.deepEqual(protocol.universe.assets, ASSETS);
   assert.deepEqual(protocol.variants, VARIANTS);
   assert.deepEqual(protocol.scenarios, SCENARIOS.map(({id, costRate, delayDays}) => ({
@@ -96,6 +98,8 @@ test('future close perturbations leave earlier synthetic decisions and fills unc
 });
 
 test('binary64 band comparison uses exact >= 0.10 without epsilon', () => {
+  assert.equal(0.300001 - 0.200001, 0.10);
+  assert.equal(acceptsTarget(0.300001, 0.200001), true);
   assert.equal(acceptsTarget(0.35, 0.25), false);
   assert.equal(acceptsTarget(0.3500000000000001, 0.25), true);
   assert.equal(acceptsTarget(0.15, 0.25), true);
@@ -126,9 +130,29 @@ test('delayed schedule preserves immutable decisions and defers first fill one d
     index >= SEGMENTS.development.startIndex && index <= SEGMENTS.development.endIndex &&
     new Date(row.timestamp).getUTCDay() === 0);
   const truncated = {...SEGMENTS.development, endIndex: sunday, rows: sunday - SEGMENTS.development.startIndex + 1};
+  const mondayCancellation = buildSchedule(fixture.XBTUSD, features, truncated, 0);
+  assert.equal(mondayCancellation.cancelled.some(fill =>
+    fill.decisionIndex === sunday && fill.fillIndex === sunday + 1), true);
   const horizonSchedule = buildSchedule(fixture.XBTUSD, features, truncated, 1);
   assert.equal(horizonSchedule.cancelled.some(fill => fill.decisionIndex === sunday), true);
   assert.equal(horizonSchedule.fills.every(fill => fill.fillIndex <= sunday), true);
+
+  const decisionFeatures = new Array(INPUT.rowCount).fill(null);
+  decisionFeatures[SEGMENTS.development.startIndex - 1] = {rawExposure: 0.25};
+  const sundays = [];
+  for (let index = SEGMENTS.development.startIndex; index <= SEGMENTS.development.endIndex; index++) {
+    if (new Date(fixture.XBTUSD[index].timestamp).getUTCDay() === 0) {
+      sundays.push(index);
+      decisionFeatures[index] = {rawExposure: 0.25};
+    }
+  }
+  decisionFeatures[sundays[0]] = {rawExposure: 0.4};
+  const frozenDecision = buildSchedule(fixture.XBTUSD, decisionFeatures, SEGMENTS.development, 1);
+  const sundayDecision = frozenDecision.decisions.find(item => item.decisionIndex === sundays[0]);
+  const delayedInstruction = frozenDecision.fills.find(item => item.decisionIndex === sundays[0]);
+  assert.equal(sundayDecision.acceptedExposure, 0.4);
+  assert.equal(delayedInstruction.target, 0.4);
+  assert.equal(delayedInstruction.fillIndex, sundays[0] + 2);
 });
 
 test('full synthetic batch has 44 deterministic paths and complete accounting', () => {
@@ -143,11 +167,14 @@ test('full synthetic batch has 44 deterministic paths and complete accounting', 
   assert.equal(first.identity.datasetKind, 'SYNTHETIC_FIXTURE');
   assert.equal(first.evidence.syntheticFixture, true);
   assert.equal(first.evidence.holdoutClaim, false);
+  assert.equal(first.evidence.survivorship, 'UNIVERSE_HISTORY_LIMITATION_HBAR_OMITTED_FOR_COVERAGE_ONLY');
+  assert.equal(first.evidence.candidateInterpretation, 'HISTORICAL_CANDIDATE_ONLY_IF_PROPOSED_REAL_SCREEN_PASSES');
   assert.equal(first.evidence.trialLedger, 'UNKNOWN');
   assert.equal(first.evidence.crv.status, 'UNDEFINED_NO_FINITE_STOP');
   assert.equal(first.screen.status, 'SYNTHETIC_ONLY_NOT_ASSESSED');
   assert.equal(first.screen.interpretation, 'SYNTHETIC_FIXTURE_RULE_CHECKS_ONLY');
-  assert.equal(first.protocolReview.r2ResponseStatus, 'PENDING');
+  assert.equal(first.protocolReview.r2ResponseComment, '6249482850');
+  assert.equal(first.protocolReview.r2Verdict, 'GREEN_LIGHT_DESIGN_ONLY');
   assert.equal(first.paths.length, 44);
   assert.equal(Buffer.byteLength(JSON.stringify(first), 'utf8') <= BUDGET.outputBytes, true);
   assert.deepEqual(first, second);
@@ -173,6 +200,7 @@ test('full synthetic batch has 44 deterministic paths and complete accounting', 
   assert.equal(first.paths.filter(path => path.kind === 'FULL_BASKET').length, 6);
   assert.equal(first.paths.filter(path => path.kind === 'FIXED_CONTROL').length, 6);
   assert.equal(first.paths.filter(path => path.kind === 'CASH').length, 2);
+  assert.equal(first.controlRealization.length, 6);
 
   for (const path of first.paths) {
     assert.equal(path.status, 'COMPLETED');
@@ -180,6 +208,9 @@ test('full synthetic batch has 44 deterministic paths and complete accounting', 
     assert.equal(path.dailyReturnCount, path.segmentId === 'development' ? 180 : 365);
     assert.equal(path.dailyReturns.length, path.dailyReturnCount);
     assert.equal(path.dailyHeldTarget.length, path.dailyReturnCount);
+    assert.equal(Number.isFinite(path.meanRealizedExposure), true);
+    assert.equal(Number.isFinite(path.meanAbsoluteTargetMismatch), true);
+    assert.equal(path.diagnosticRescaling, 'NONE');
     assert.equal(path.observationClass, 'HISTORICAL_DIAGNOSTIC_NOT_HOLDOUT');
     assert.equal(path.tradeCRV.status, 'UNDEFINED_NO_FINITE_STOP');
     assert.equal(path.pathId, sha256(canonicalJson({
@@ -242,6 +273,10 @@ test('development controls freeze once and are not refit across diagnostic scena
   const output = makeRun();
   assert.equal(output.controlDefinitions.status, 'FROZEN_DEVELOPMENT_ONLY');
   assert.equal(output.controlDefinitions.calibration, 'DEVELOPMENT_85BP_DAILY_NET_RETURNS_AND_HELD_TARGETS');
+  const baselinePrimary = getPath(output, 'primary-n30-f25', 'base-85bp', 'development');
+  assert.equal(baselinePrimary.dailyHeldTarget[0] > 0, true);
+  assert.equal(Math.abs(baselinePrimary.meanHeldTarget -
+    baselinePrimary.dailyHeldTarget.reduce((sum, value) => sum + value, 0) / 180) < 1e-15, true);
   const controls = output.paths.filter(path => path.kind === 'FIXED_CONTROL');
   assert.equal(controls.length, 6);
   assert.equal(controls.every(path => path.segmentId === 'diagnostic'), true);
@@ -254,6 +289,15 @@ test('development controls freeze once and are not refit across diagnostic scena
         ? output.controlDefinitions.meanExposure : output.controlDefinitions.riskExposure);
   }
   assert.equal(output.screen.status, 'SYNTHETIC_ONLY_NOT_ASSESSED');
+  assert.equal(output.screen.comparisonSegment, 'diagnostic');
+  assert.equal(output.screen.neighbourStressScenario, 'stress-160bp-non-delayed');
+  assert.equal(output.screen.checks.primaryNetPositiveAt160bpNonDelayed !== undefined, true);
+  assert.equal(output.screen.checks.atLeastThreeOfFourNeighboursPositiveAt160bpNonDelayed !== undefined, true);
+  assert.equal(output.controlRealization.every(item =>
+    item.segmentId === 'diagnostic' && item.diagnosticRescaling === 'NONE' &&
+    Number.isFinite(item.frozenTargetExposure) &&
+    Number.isFinite(item.meanRealizedExposure) &&
+    Number.isFinite(item.meanAbsoluteTargetMismatch)), true);
 });
 
 test('risk-control denominator failures are explicit and zero primary risk maps to zero', () => {

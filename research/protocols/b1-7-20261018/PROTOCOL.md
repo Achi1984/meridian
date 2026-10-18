@@ -1,11 +1,11 @@
 # B1-7 frozen protocol R2 — synthetic implementation draft
 
 **Protocol ID:** `MERIDIAN-B1-7-PROTOCOL-R2-20261018`  
-**Raw protocol.json SHA-256:** `7fda5993dffa298183e3c4b757e4cdaace4754f8a7ff11b4538e1d39dd9e1aed`  
+**Raw protocol.json SHA-256:** `44284c22c22443520043c8450edbc8819b95a9f37ca985cfca05f4f9317ff9eb`  
 **Status:** source and synthetic tests only; owner execution decision pending  
 **Input base:** `1c7b6dccd886f57e866c7d359c091b1e72a193ea`  
 **R1:** `MERIDIAN-B1-7-DESIGN-R1`, response comment `6249442046`, `REVISION_REQUIRED`. Its eight determinism issues are resolved in the authoritative R2 text and encoded here.  
-**R2:** `MERIDIAN-B1-7-DESIGN-R2`, request comment `6249480669`; response pending. Do not infer a response or GREEN.
+**R2:** `MERIDIAN-B1-7-DESIGN-R2`, request comment `6249480669`, response comment `6249482850`: `GREEN_LIGHT` for deterministic SOURCE+SYNTHETIC preparation only. This is not approval for a real-data run, 44-path budget, thresholds, costs, no-stop policy, Paper, Live, or runtime/flag changes.
 
 The machine-readable parameters are in [`protocol.json`](./protocol.json). Its raw-file SHA-256 and the final implementation SHA-256 are recorded in [`EXECUTION_REQUEST.md`](./EXECUTION_REQUEST.md) when frozen. The engine emits the protocol hash and binds it with implementation, input, variant, scenario, and segment identities in deterministic IDs. The implementation hash is caller-supplied identity; the engine does not inspect its own source.
 
@@ -55,7 +55,7 @@ Three fixed scenarios apply to candidate and full-basket paths:
 | `stress-160bp` | 160 bp | 0 days |
 | `stress-160bp-delay-1d` | 160 bp | 1 day |
 
-The delay scenario uses the same immutable target instruction, one open later; it does not calculate a new signal. Base cost is 80 bp published Kraken Spot Crypto Tier 1 taker reference plus assumed 5 bp friction. Stress and friction are modelling assumptions, not owner-specific entitlement, historical fee reconstruction, measured spread, or impact. Owner approval of this revised grid remains pending.
+The delay scenario uses the same immutable target instruction, one open later; it does not calculate a new signal. Base cost is lead-reported as 80 bp published Kraken Spot Crypto Tier 1 taker reference plus assumed 5 bp friction. The independent R2 reviewer could not fetch or verify the fee page; this is not owner-specific entitlement, historical fee reconstruction, measured spread, or impact. Owner approval of this revised grid remains pending.
 
 The open-price target-weight fill is an idealization, not a claim of pre-submitted share quantities or executable first-print liquidity. Gaps, spreads, impact, liquidity, lot/minimum sizes, leverage, shorts, interest, and funding are not modelled. Units are fractional.
 
@@ -67,17 +67,17 @@ Cancel fills beyond a segment horizon without replacement. At each segment's own
 
 Frozen development controls are derived once from the primary 85 bp development path:
 
-- Mean-exposure control: arithmetic average of held target across all 180 daily rows (zero before a delayed initial fill), not weekly-only targets or realized drift.
+- Mean-exposure control: arithmetic average of the primary 85 bp path's held target across all 180 development daily rows, not weekly-only targets or realized drift. The baseline initial target fills on development day one, so this baseline mean has no pre-fill days; zero before first fill applies to delayed paths.
 - Risk-exposure control: `min(1, sampleSD(primary daily net returns) / sampleSD(full-basket daily net returns))`, with sample denominator `N-1`. Zero primary deviation maps to exposure zero. Non-finite values or full-basket standard deviation `<=1e-12` yield `INSUFFICIENT_EVIDENCE` and stop before diagnostic paths.
 
-Both controls use fixed exposure and weekly costed equalization, without target band, for all three diagnostic scenarios. Full basket is 100% weekly equal-weight and costed identically; cash is zero-cost. Each output reports per-fill and cumulative cost, turnover, held exposure, concentration, quarterly returns, sampled drawdown and duration, cancellations, and daily path arrays. Do not refit or rescale controls on diagnostic rows.
+Both controls use fixed exposure and weekly costed equalization, without target band, for all three diagnostic scenarios. Full basket is 100% weekly equal-weight and costed identically; cash is zero-cost. Each output reports per-fill and cumulative cost, turnover, held exposure, concentration, quarterly returns, sampled drawdown and duration, cancellations, and daily path arrays. For each path, report mean daily close-marked realized exposure and mean/maximum absolute target-versus-realized mismatch. Include this mismatch for each diagnostic fixed-control scenario; do not refit or rescale controls on diagnostic rows.
 
 The deterministic manifest has exactly 44 planned paths: 5 variants × 3 scenarios × 2 segments = 30; full basket × 3 scenarios × 2 segments = 6; 2 frozen controls × 3 scenarios × diagnostic only = 6; and cash × 2 segments = 2. Results remain ordered by declared variant/scenario/segment order and fixed group order. Cash has scenario-independent IDs.
 
-Primary screen uses diagnostic 85 bp: net return positive, sampled drawdown at most 25%, return at least both frozen controls, drawdown no worse than either, and at least 20% relative drawdown reduction versus full basket. If full-basket drawdown is `<=1e-12`, return `INSUFFICIENT_EVIDENCE`. Primary net return must also be positive at both 160 bp scenarios. At least 3 of 4 neighbors must have positive diagnostic net return at 85 bp and separately at 160 bp. Neighbors are sign-robustness checks, not matched-control claims. On proposed real inputs, status is `PASS`, `NO_EDGE`, `INSUFFICIENT_EVIDENCE`, or `INVALID`; PASS means a historical candidate only, never statistical significance, alpha, or holdout evidence. Synthetic fixtures always report `SYNTHETIC_ONLY_NOT_ASSESSED`, never PASS or GREEN.
+Primary screen uses diagnostic 85 bp: net return positive, sampled drawdown at most 25%, return at least both frozen controls, drawdown no worse than either, and at least 20% relative drawdown reduction versus full basket. The primary-vs-control comparisons use diagnostic results only. If full-basket drawdown is `<=1e-12`, return `INSUFFICIENT_EVIDENCE`. Primary net return must also be positive at 160 bp without delay and at 160 bp plus one-day delay. At least 3 of 4 neighbors must have positive diagnostic net return at 85 bp and separately at 160 bp without delay; neighbors are not screened at 160 bp plus delay. Neighbors are sign-robustness checks, not matched-control claims. On proposed real inputs, status is `PASS`, `NO_EDGE`, `INSUFFICIENT_EVIDENCE`, or `INVALID`; PASS means a historical candidate only, never statistical significance, alpha, or holdout evidence. Synthetic fixtures always report `SYNTHETIC_ONLY_NOT_ASSESSED`, never PASS or GREEN.
 
 ## Failure and resource policy
 
 Single process; 44 planned paths; at most 60 seconds per path and 30 minutes total; maximum serialized output 1 MiB. No retry, adaptive trial, or silent rerun. Any malformed/missing/duplicate/calendar-invalid data, source identity mismatch, invalid signal/accounting, timeout, output-size breach, or nondeterministic condition invalidates and halts the batch. Preserve completed paths as incomplete evidence, mark unstarted paths, and never rank a partial batch. Historical trial-ledger completeness remains `UNKNOWN`.
 
-Output always carries protocol and implementation identities, canonical input-series hash, path/execution IDs, `NOT_HOLDOUT`, undefined no-stop CRV, explicit statuses, and seven false authority flags. See [`EXECUTION_REQUEST.md`](./EXECUTION_REQUEST.md) for the separate owner proposal; it grants no permission.
+Output always carries protocol and implementation identities, canonical input-series hash, path/execution IDs, `NOT_HOLDOUT`, undefined no-stop CRV, explicit statuses, survivorship/source-authenticity/history labels, and seven false authority flags. See [`EXECUTION_REQUEST.md`](./EXECUTION_REQUEST.md) for the separate owner proposal; it grants no permission.
