@@ -1,5 +1,13 @@
 # GO MERIDIAN — durable resume checkpoint
 
+## Pending r130 Arena integration — 2026-10-18
+
+Build: **10.0-r130** (candidate; not yet merged or published).
+Source proposal PR870 head `b5d7d2a69dd5715580e9691cfcd566e694452baa` received independent GREEN_LIGHT in mailbox639/6248189652. Base main is `cbe9b5a34ed31e61746a656d49bb1b81bc637eec`. This integration only advances release/cache identity and continuity metadata; reviewed feature code is unchanged. Final exact-head CI, integration review, merge and postchecks remain pending.
+Data PR872 remains separate: head325c7755 has a publisher timing-test CI failure under diagnosis, not accepted data evidence. No new acquisition, backtest or PnL authority. Publisher/native pilot remain paused and all research execution flags remain false.
+
+Earlier sections below are historical checkpoints.
+
 ## Current source and runtime checkpoint after PR845 — complete
 
 Operation HANDOFF-845-CONSOLIDATE-20261017-01. Verified source main:

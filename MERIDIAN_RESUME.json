@@ -1,14 +1,17 @@
 {
   "schema": 2,
   "project": "MERIDIAN",
-  "build": "10.0-r129",
+  "build": "10.0-r130",
   "currentCompletion20261017": {
     "verifiedSourceMain": "bfebd17ddfa1d2d3b44a15126e28618a82cb81f2",
     "publisherSourceMerge": "8691381510039e2ad48b863ea5e66d6ad6cba462",
     "ownerPathInspection": "PR828_READONLY_INSPECTOR_MERGED_POSTCHECKS_PENDING_NO_CALLER",
     "arena": "PR824_PUBLISHED_ALL_POSTCHECKS_SUCCESS_RETROSPECTIVE_ONLY",
     "publisher": "PR825_INACTIVE_PRIMITIVE_MERGED_ALL_POSTCHECKS_SUCCESS",
-    "finalStatusComments": [6229668839, 6229853101],
+    "finalStatusComments": [
+      6229668839,
+      6229853101
+    ],
     "mergeAuthorityComment": 6229644994,
     "nextAction": "VERIFY_PR828_POSTCHECKS_THEN_PR826_REVIEW_AND_SEPARATELY_REVIEWED_RUNTIME_WRAPPER",
     "workingModel": "OWNER_DIRECTION_CHATGPT_CHIEF_DEVELOPER_AGENTS_BOUNDED_IMPLEMENTATION_AND_INDEPENDENT_REVIEW",
@@ -1163,7 +1166,7 @@
       "requiredImplementationGuards": [
         "If a position is open when any DATA_DEGRADED episode begins, the affected run/stage is INCONCLUSIVE immediately for research purposes; do not model an exit price, basis realization or post-detection funding path for that position.",
         "Freeze fundingCoverageEnd and markCoverageEnd; decision timestamps require t+26h <= min(fundingCoverageEnd, markCoverageEnd).",
-        "Freeze each venue funding schedule to 00:00/08:00/16:00 UTC with \u00b11s tolerance; provider interval changes are DATA_DEGRADED and never create new common decision timestamps.",
+        "Freeze each venue funding schedule to 00:00/08:00/16:00 UTC with ±1s tolerance; provider interval changes are DATA_DEGRADED and never create new common decision timestamps.",
         "If V2 reuses cross-venue-funding-edge-v1.js, replace coercive numeric validation with strict numeric handling and regression tests.",
         "Binance/OKX collector parsers must reject blank/non-numeric cells instead of Number() coercion.",
         "The V2 collector must itself reject execution unless the V2 stage lock explicitly has sourceAudit:true."
@@ -1852,7 +1855,7 @@
         "liveData": "READY",
         "marketCoverage": "15/15",
         "botCoverage": "24/24",
-        "dataSources": "MKT READY \u00b7 BOT READY \u00b7 PORTFOLIO READY",
+        "dataSources": "MKT READY · BOT READY · PORTFOLIO READY",
         "verdict": "FULL_LIVE_PASS"
       }
     },
