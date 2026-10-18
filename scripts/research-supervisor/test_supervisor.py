@@ -103,6 +103,31 @@ connection.close()
         alias.write_text(f"import {json.dumps((ROOT / 'test_b1_fault_adapter.mjs').as_uri())};\n")
         return alias
 
+    def run_actual_b1_adapter_test_scenario(self, claim, scenario, manifest_path=None):
+        original_popen = subprocess.Popen
+
+        def spawn(*args, **kwargs):
+            if Path(args[0][1]).resolve() == supervisor.B1_ADAPTER.resolve():
+                environment = dict(kwargs["env"])
+                environment.update({"NODE_ENV": "test", "B1_TEST_SCENARIO": scenario})
+                if manifest_path is not None:
+                    environment["B1_TEST_MANIFEST_PATH"] = str(manifest_path)
+                kwargs["env"] = environment
+            return original_popen(*args, **kwargs)
+
+        with patch.object(supervisor.subprocess, "Popen", side_effect=spawn):
+            return supervisor.run_b1_batch(
+                self.database, claim, limits={"path_seconds": 10, "batch_seconds": 20})
+
+    @staticmethod
+    def b1_insufficient_profile():
+        result = subprocess.run(
+            ["node", str(ROOT / "test_b1_generated_fixture.mjs"), "--profile"],
+            cwd=PROJECT_ROOT, capture_output=True, text=True, timeout=30)
+        if result.returncode:
+            raise AssertionError(result.stderr)
+        return json.loads(result.stdout)
+
     @staticmethod
     def direct_b1_result():
         code = r'''
@@ -168,6 +193,63 @@ process.stdout.write(JSON.stringify(runBatch({
         self.assertTrue(direct["authority"]["researchOnly"])
         self.assertTrue(all(value is False for key, value in direct["authority"].items()
                             if key != "researchOnly"))
+
+    def test_b1_engine_failure_preserves_reason_without_fabricating_controls(self):
+        claim = self.new_b1_claim("trial-b1-engine-failure")
+        result = self.run_actual_b1_adapter_test_scenario(claim, "ENGINE_FAILURE")
+
+        self.assertEqual((result["state"], result["reason"]), ("failed", "BUDGET_EXCEEDED"))
+        recovered = journal.inspect_b1(self.database, claim["trialId"])
+        self.assertEqual(recovered["attempts"], 1)
+        self.assertFalse(recovered["unresolved"])
+        self.assertEqual(len(recovered["paths"]), 1)
+        self.assertEqual(recovered["paths"][0]["state"], "started")
+        self.assertIsNone(recovered["controls"])
+        self.assertIsNone(recovered["result"])
+        self.assertIsNone(recovered["summarySha256"])
+        self.assertEqual(journal.scheduler_tick_b1(self.database, enabled=True)["state"], "idle")
+        with self.assertRaisesRegex(journal.JournalError, "STALE_FENCE"):
+            journal.start_b1(self.database, claim)
+
+    def test_b1_generated_insufficient_evidence_settles_through_real_adapter_and_journal(self):
+        profile_path = Path(self.temporary.name) / "insufficient-b1-profile.json"
+        profile_path.write_text(json.dumps(self.b1_insufficient_profile()))
+        with patch.object(journal, "B1_MANIFEST_PATH", profile_path):
+            claim = self.new_b1_claim("trial-b1-insufficient-evidence")
+            result = self.run_actual_b1_adapter_test_scenario(
+                claim, "INSUFFICIENT_EVIDENCE", profile_path)
+            recovered = journal.inspect_b1(self.database, claim["trialId"])
+            self.assertEqual((result["state"], result["reason"]),
+                             ("failed", "INVALID_OR_ZERO_DEVELOPMENT_RISK_DENOMINATOR"))
+            self.assertEqual(recovered["attempts"], 1)
+            self.assertFalse(recovered["unresolved"])
+            self.assertEqual(len(recovered["paths"]), 19)
+            self.assertTrue(all(path["state"] == "completed" for path in recovered["paths"]))
+            self.assertTrue(all(path["phase"] == "DEVELOPMENT" for path in recovered["paths"]))
+            controls = json.loads(recovered["controls"])
+            self.assertEqual(controls["status"], "INSUFFICIENT_EVIDENCE")
+            self.assertEqual(controls["reason"], "INVALID_OR_ZERO_DEVELOPMENT_RISK_DENOMINATOR")
+            self.assertLessEqual(controls["benchmarkSd"], 1e-12)
+            summary = json.loads(recovered["result"])
+            self.assertEqual(summary["status"], "INSUFFICIENT_EVIDENCE")
+            self.assertEqual(summary["controlDefinitions"], controls)
+            self.assertEqual((summary["attemptedPaths"], summary["completedPaths"],
+                              summary["computedPaths"], summary["plannedPaths"]),
+                             (19, 19, 19, 44))
+            self.assertIsNone(summary["failure"])
+            self.assertEqual(summary["screen"], {"status": "INSUFFICIENT_EVIDENCE"})
+            self.assertEqual(len(summary["paths"]), 44)
+            completed = [path for path in summary["paths"]
+                         if path["status"] != "NOT_RUN_INSUFFICIENT_EVIDENCE"]
+            not_run = [path for path in summary["paths"]
+                       if path["status"] == "NOT_RUN_INSUFFICIENT_EVIDENCE"]
+            self.assertEqual(len(completed), 19)
+            self.assertTrue(all(path["segmentId"] == "development" for path in completed))
+            self.assertEqual(len(not_run), 25)
+            self.assertTrue(all(path["segmentId"] == "diagnostic" for path in not_run))
+            self.assertEqual(journal.scheduler_tick_b1(self.database, enabled=True)["state"], "idle")
+            with self.assertRaisesRegex(journal.JournalError, "STALE_FENCE"):
+                journal.start_b1(self.database, claim)
 
     def test_b1_manifest_claim_and_phase_boundaries_are_fixed(self):
         claim = self.new_b1_claim("trial-b1-boundary")

@@ -1,5 +1,5 @@
 import {createHash} from 'node:crypto';
-import {readFileSync, writeFileSync, writeSync} from 'node:fs';
+import {closeSync, readFileSync, writeFileSync, writeSync} from 'node:fs';
 import {createInterface} from 'node:readline';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
@@ -74,10 +74,10 @@ if (mode === 'path') {
 
 if (mode === 'start-ack-loss') {
   const boundary = session.beforePathBoundary();
+  closeSync(0);
   writeSync(1, Buffer.from(`${JSON.stringify({
     type: 'path_started', index: 0, pathId: boundary.pathId
   })}\n`));
-  process.stdin.destroy();
   process.exit(1);
 }
 
@@ -127,6 +127,7 @@ for (let index = 0; index < 44; index++) {
       signalPhase();
       await waitForever();
     }
+    if (mode === 'controls-ack-loss') closeSync(0);
     frame(Buffer.from(JSON.stringify(session.controlDefinitions)));
     if (mode === 'controls-ack-loss') process.exit(1);
     await ack('controls_committed');
@@ -135,6 +136,7 @@ for (let index = 0; index < 44; index++) {
   await ack('path_started_ack', index);
   const outcome = session.advanceOne(boundary.pathId);
   if (outcome.completedPath?.status !== 'COMPLETED') throw new Error('PATH_FAILED');
+  if (mode === 'path-ack-loss' && index === 0) closeSync(0);
   frame(Buffer.from(JSON.stringify(outcome.completedPath)));
   if (mode === 'path-ack-loss' && index === 0) process.exit(1);
   await ack('path_committed', index);
