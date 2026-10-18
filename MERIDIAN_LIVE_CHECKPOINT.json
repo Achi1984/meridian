@@ -1725,6 +1725,39 @@
       "callerSourceAndDataHashesAuthenticated": false,
       "postMergeChecks": "ALL_APPLICABLE_SUCCESS",
       "releaseSafetyPostMergeJobId": 117713897879
+    },
+    "admissionPreparation": {
+      "opId": "MERIDIAN-B1-ADMISSION-HARDENING-20261018",
+      "pullRequest": 892,
+      "branch": "copilot/meridian-b1-admission-hardening-20261018",
+      "startingHead": "5649824a0267f052bc2ae83cb2950449c7d79b1b",
+      "startingBase": "02866635c0c90a1743a6c82a04daa176bd4b56bf",
+      "startingProtocolSha256": "a78e1ae8c71c8f85baee5b51f5691643fc29136f636f19465c61f553afe09185",
+      "startingBundleSha256": "a0a4189173a57f5afc33cd415400d66f48360a9842821093d2027b75c913e5fc",
+      "candidateBundleSha256": "42a0f62acded9f8a0e76b858382940c1c35a747ae1e6eb972936e036902620ae",
+      "candidateBundleStatus": "PROVISIONAL_AT_STARTING_BASE_NOT_FINAL_ACCEPTED_PIN",
+      "pr890": {
+        "observedHead": "4484873b4c1609f6356207a64ad9fb842f6b4ac2",
+        "observedBase": "02866635c0c90a1743a6c82a04daa176bd4b56bf",
+        "latestCiRunId": 39149618918,
+        "latestCiResult": "FAILURE_2662_PASS_1_FAIL",
+        "review": "PENDING",
+        "mergeAndPostchecks": "PENDING",
+        "acceptance": "NOT_CLAIMED"
+      },
+      "claudeAdmissionChallenge": {
+        "requestCommentId": 6252937363,
+        "responseCommentId": 6252939869,
+        "verdict": "NEEDS_MORE_EVIDENCE",
+        "scope": "READ_ONLY_ADMISSION_DESIGN_NOT_PR890_REVIEW_OR_EXECUTION_AUTHORIZATION"
+      },
+      "sourceAccepted": "PENDING_POST_890_INTEGRATION_EXACT_HEAD_CI_AND_FULL_REVIEW",
+      "selectedInputManifest": "NOT_FROZEN",
+      "dataReadApproval": "NOT_GRANTED",
+      "executionAuthorized": false,
+      "screenResult": "NOT_RUN",
+      "paperEligibility": "NOT_ELIGIBLE",
+      "nextGate": "WAIT_FOR_PR890_MERGE_AND_SUCCESSFUL_POSTCHECKS; THEN_EXPLICIT_CONTINUATION_TO_REBASE_AND_RECOMPUTE_PINS"
     }
   }
 }

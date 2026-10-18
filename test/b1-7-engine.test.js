@@ -630,6 +630,75 @@ test('malformed or accessor-backed batch envelopes fail closed without invoking 
   assert.equal(runBatch(options).failure.code, 'BATCH_INPUT_INVALID');
   assert.equal(runBatch(null).failure.code, 'BATCH_INPUT_INVALID');
   assert.equal(getterCalls, 0);
+
+  const unsafeClock = {
+    seriesByAsset: createSyntheticSeries(),
+    source: syntheticSource,
+    implementationSha256
+  };
+  Object.defineProperty(unsafeClock, 'syntheticClock', {
+    enumerable: true,
+    get() {
+      getterCalls++;
+      return () => 0;
+    }
+  });
+  assert.equal(runBatch(unsafeClock).failure.code, 'BATCH_INPUT_INVALID');
+  assert.equal(getterCalls, 0);
+});
+
+test('batch snapshots validated data before callbacks and rejects nested accessors', () => {
+  const expected = makeRun();
+  const mutableSeries = createSyntheticSeries();
+  let callbackMutatedSeries = false;
+  const actual = makeRun(mutableSeries, () => {
+    if (!callbackMutatedSeries) {
+      mutableSeries.XBTUSD[0].close *= 1.5;
+      callbackMutatedSeries = true;
+    }
+    return 0;
+  });
+  assert.equal(callbackMutatedSeries, true);
+  assert.deepEqual(actual.paths.map(path => path.pathId), expected.paths.map(path => path.pathId));
+
+  let getterCalls = 0;
+  const accessorRow = createSyntheticSeries();
+  Object.defineProperty(accessorRow.XBTUSD[0], 'close', {
+    enumerable: true,
+    get() {
+      getterCalls++;
+      return 100;
+    }
+  });
+  assert.equal(makeRun(accessorRow).failure.code, 'UNSAFE_INPUT_SHAPE');
+
+  const accessorArray = createSyntheticSeries();
+  Object.defineProperty(accessorArray.XBTUSD, '0', {
+    configurable: true,
+    enumerable: true,
+    get() {
+      getterCalls++;
+      return createSyntheticSeries().XBTUSD[0];
+    }
+  });
+  assert.equal(makeRun(accessorArray).failure.code, 'UNSAFE_INPUT_SHAPE');
+
+  const files = {...INPUT.normalizedHashes};
+  Object.defineProperty(files, 'XBTUSD', {
+    enumerable: true,
+    get() {
+      getterCalls++;
+      return INPUT.normalizedHashes.XBTUSD;
+    }
+  });
+  const source = {
+    kind: 'FROZEN_RESEARCH_INPUT',
+    commit: INPUT.sourceCommit,
+    files
+  };
+  assert.equal(runBatch({seriesByAsset: createSyntheticSeries(), source, implementationSha256})
+    .failure.code, 'UNSAFE_INPUT_SHAPE');
+  assert.equal(getterCalls, 0);
 });
 
 test('a failed path budget executes once, stops later paths, and never retries', () => {
@@ -654,7 +723,15 @@ test('a failed path budget executes once, stops later paths, and never retries',
 test('source hash is a deterministic three-file bundle identity, separate from data identity', () => {
   const executionRequest = readFileSync(requestPath, 'utf8');
   assert.match(implementationSha256, /^[a-f0-9]{64}$/);
-  assert.match(executionRequest, new RegExp(`bundle SHA-256 \`${implementationSha256}\``));
+  assert.match(executionRequest, new RegExp(`candidate bundle SHA-256 \`${implementationSha256}\``));
+  assert.match(executionRequest, /SOURCE_ACCEPTED[\s\S]*PENDING/);
+  assert.match(executionRequest, /DATA_ADMISSION_READY[\s\S]*NOT_READY/);
+  assert.match(executionRequest, /EXECUTION_AUTHORIZED[\s\S]*FALSE/);
+  assert.match(executionRequest, /SCREEN_RESULT[\s\S]*NOT_RUN/);
+  assert.match(executionRequest, /PAPER_ELIGIBILITY[\s\S]*NOT_ELIGIBLE/);
+  assert.match(executionRequest, /selected-input manifest is `NOT_FROZEN`/);
+  assert.match(executionRequest, /Decision requested: D1[\s\S]*NOT APPROVED and NOT\s+PERFORMED/);
+  assert.match(executionRequest, /source\s+authenticity is `NOT_ESTABLISHED`/);
   assert.equal(protocol.identity.implementationSha256, 'BOUND_IN_EXECUTION_REQUEST');
   assert.equal(protocol.input.mode, 'CALLER_SUPPLIED_IN_MEMORY_OHLC_ONLY');
   assert.equal(protocol.input.csvLoader, false);

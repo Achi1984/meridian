@@ -162,8 +162,40 @@ test('synthetic pins are snapshotted before I/O and loaded rows cannot follow la
   assert.equal(loaded.inputManifest.wholeFileSha256.XBTUSD, baseline.inputManifest.wholeFileSha256.XBTUSD);
 });
 
+test('synthetic manifest accessors are rejected without evaluating getters', async t => {
+  const {root} = await createFixtureTree(t);
+  let getterCalls = 0;
+  const wholeFileSha256 = Object.defineProperty({}, 'XBTUSD', {
+    enumerable: true,
+    get() {
+      getterCalls++;
+      return '0'.repeat(64);
+    }
+  });
+  const pins = {
+    profile: CAPTURED_INPUT_PROFILE,
+    wholeFileSha256,
+    selectedSeriesSha256: {}
+  };
+  const loaded = await loadSyntheticFixtureProfile(root, pins);
+  assert.equal(loaded.error.code, 'SYNTHETIC_MANIFEST_INVALID');
+  assert.equal(getterCalls, 0);
+
+  const accessorProfile = Object.defineProperty({}, 'profile', {
+    enumerable: true,
+    get() {
+      getterCalls++;
+      return CAPTURED_INPUT_PROFILE;
+    }
+  });
+  assert.equal((await loadSyntheticFixtureProfile(root, accessorProfile)).error.code,
+    'SYNTHETIC_MANIFEST_INVALID');
+  assert.equal(getterCalls, 0);
+});
+
 test('root symlinks and symlinked ancestor paths are rejected', async t => {
   const {root} = await createFixtureTree(t);
+  assert.equal((await loadSyntheticFixtureProfile(`${root}/`)).ok, true);
   const parent = await mkdtemp(join(tmpdir(), 'meridian-b1-alias-'));
   t.after(() => rm(parent, {recursive: true, force: true}));
   const alias = join(parent, 'alias');

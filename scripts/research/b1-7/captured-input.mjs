@@ -56,6 +56,31 @@ function productionManifestCheck() {
   return {ok: true, manifest, manifestSha256};
 }
 
+function normalizedRoot(rootDir) {
+  if (typeof rootDir !== 'string' || rootDir.length === 0) fail('FIXTURE_ROOT_INVALID');
+  return resolve(rootDir);
+}
+
+function snapshotDataObject(value, keys) {
+  try {
+    if (value === null || typeof value !== 'object' || Array.isArray(value) ||
+        (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null)) {
+      return null;
+    }
+    const ownKeys = Reflect.ownKeys(value);
+    if (ownKeys.length !== keys.length || ownKeys.some(key => !keys.includes(key))) return null;
+    const snapshot = {};
+    for (const key of keys) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) return null;
+      snapshot[key] = descriptor.value;
+    }
+    return snapshot;
+  } catch {
+    return null;
+  }
+}
+
 export async function loadCapturedInputs() {
   const admission = productionManifestCheck();
   if (!admission.ok) return admission;
@@ -69,26 +94,24 @@ export async function loadSyntheticFixtureProfile(rootDir, expectedManifest = nu
   if (typeof rootDir !== 'string' || rootDir.length === 0) fail('FIXTURE_ROOT_INVALID');
   let manifest = null;
   if (expectedManifest !== null) {
-    const exactKeys = (object, keys) => object !== null && typeof object === 'object' &&
-      !Array.isArray(object) && Reflect.ownKeys(object).length === keys.length &&
-      keys.every(key => {
-        const descriptor = Object.getOwnPropertyDescriptor(object, key);
-        return descriptor?.enumerable && Object.hasOwn(descriptor, 'value');
-      });
-    const hashMap = value => exactKeys(value, ASSETS) &&
+    const pins = snapshotDataObject(expectedManifest, [
+      'profile', 'wholeFileSha256', 'selectedSeriesSha256'
+    ]);
+    const wholeFileSha256 = pins && snapshotDataObject(pins.wholeFileSha256, ASSETS);
+    const selectedSeriesSha256 = pins && snapshotDataObject(pins.selectedSeriesSha256, ASSETS);
+    const hashMap = value => value &&
       ASSETS.every(asset => typeof value[asset] === 'string' && /^[a-f0-9]{64}$/.test(value[asset]));
-    if (!exactKeys(expectedManifest, ['profile', 'wholeFileSha256', 'selectedSeriesSha256']) ||
-        expectedManifest.profile !== CAPTURED_INPUT_PROFILE ||
-        !hashMap(expectedManifest.wholeFileSha256) || !hashMap(expectedManifest.selectedSeriesSha256)) {
+    if (!pins || pins.profile !== CAPTURED_INPUT_PROFILE ||
+        !hashMap(wholeFileSha256) || !hashMap(selectedSeriesSha256)) {
       return {ok: false, status: 'REJECTED', error: {code: 'SYNTHETIC_MANIFEST_INVALID', file: null}};
     }
     // Snapshot caller pins before the first await; this profile never enables production admission.
     manifest = {
-      files: {...expectedManifest.wholeFileSha256},
-      selectedSeriesSha256: {...expectedManifest.selectedSeriesSha256}
+      files: wholeFileSha256,
+      selectedSeriesSha256
     };
   }
-  return loadSeriesFromRoot(resolve(rootDir), {profile: CAPTURED_INPUT_PROFILE, manifest});
+  return loadSeriesFromRoot(rootDir, {profile: CAPTURED_INPUT_PROFILE, manifest});
 }
 
 async function checkPathComponents(root, relativePath) {
@@ -215,6 +238,7 @@ function parseCsv(buffer, relativePath) {
 
 async function loadSeriesFromRoot(root, {profile, manifest}) {
   try {
+    root = normalizedRoot(root);
     const rootStat = await lstat(root);
     if (rootStat.isSymbolicLink()) fail('SYMLINK_REJECTED');
     if (!rootStat.isDirectory()) fail('ROOT_NOT_DIRECTORY');
