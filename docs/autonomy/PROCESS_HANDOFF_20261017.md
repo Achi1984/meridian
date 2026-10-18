@@ -4,7 +4,7 @@ Owner instruction: address Mailbox #639/comment6238072184 in one handoff PR, Git
 
 ## Verified starting state
 
-Main is `5c996ee9c7d4e71f0d6f2ecd59f6fc53beedcce3` after PR859, which followed PR858 (`132079684de6afa054696530e7aa29a94a41859d`). The checkpoint records both receipts. This handoff does not predeclare its own merge or postchecks.
+The original PR860 handoff started from main `5c996ee9c7d4e71f0d6f2ecd59f6fc53beedcce3` after PR859, which followed PR858 (`132079684de6afa054696530e7aa29a94a41859d`). The checkpoint preserves those receipts. This handoff does not predeclare its own merge or postchecks.
 
 - PR858 completion: comment6237748790; normalized FINAL_MERGE_STATUS mirror in #639/comment6238544034.
 - PR859 completion: comment6238487819; normalized FINAL_MERGE_STATUS mirror in #639/comment6238544732.
@@ -25,7 +25,7 @@ V2 remains SOURCE_AUDIT, all seven authority flags false. No PnL, Discovery, Val
 
 ## Deferred-draft inventory
 
-The following 37 draft heads are preserved for reversible closure as deferred/not merged; this inventory is not a claim that closure has already happened. No branch deletion, equivalence/supersession claim, research unlock or retrospective exclusion change is authorized. In particular the locks associated with #77 and #35 remain unchanged. Existing non-draft PRs #738 and #599 require separate reconciliation and are not changed here.
+The following 37 draft heads were reversibly closed as deferred/not merged; their branches and exact heads remain preserved. No branch deletion, equivalence/supersession claim, research unlock or retrospective exclusion change is authorized. In particular the locks associated with #77 and #35 remain unchanged. Existing non-draft PRs #738 and #599 require separate reconciliation and are not changed here. Readback: PR860/comment6238693821.
 
 | Draft PR | Preserved head |
 |---|---|
@@ -69,4 +69,12 @@ The following 37 draft heads are preserved for reversible closure as deferred/no
 
 ## Owner decision and assignment — 20:38:33 Europe/Vienna
 
-Decision B is RESOLVED in #639/comment6238672603 with the verbatim owner quote. Publisher remains paused. Arena packet #861 is assigned to GitHub Copilot; first deliver a read-only implementation proposal, then wait for PR860 merge and the lead's fresh base/release allocation. Assignment is verified, execution/completion is not claimed. The 37 drafts above have now been reversibly closed; branches and locks retained (PR860/comment6238693821).
+Decision B is RESOLVED in #639/comment6238672603 with the verbatim owner quote. Publisher remains paused. Arena packet #861 is the next product; it closed at repair #862 merge and was then reopened by the lead. Its retrospective provenance/limitations view is not implemented. Use existing evidence only; retain H9 blocked and CRV unresolved.
+
+## Refresh after repair PR862 — 2026-10-18
+
+Fresh main and repair merge: `921246e61e07ff0624fb4a24c00a452246e9eb7f`. PR862 was reviewed at head `39a2f73f279f37b8adc8a0d4e682907634d3c0a4`, base `5c996ee9c7d4e71f0d6f2ecd59f6fc53beedcce3`; Claude receipt #639/comment6246692411. Exact-head source CI run39102902541, attempt2/job117605009508: SUCCESS, 2587/2587. Postchecks39105990422,39105990479,39105990429,39105990078 all SUCCESS; mirrored final receipt #639/comment6246858680. The earlier pending CI/review states for PR862 are historical and complete.
+
+The bounded timeout-descendant repair retained its owner approval (#639/comment6238949509), two-test scope (#639/comment6240114260), and Python3.14.8 exception reference (#639/comment6245083472). This records the completed repair only; it grants no broader Publisher authority.
+
+The existing PR860 branch is being refreshed from that merge. Its own final head is not asserted here: exact-head CI and independent full-scope review remain required before the lead may merge. Publisher remains paused; native868 remains disabled; all seven research authority flags remain false. No runtime, product-code, replay, PnL, stage-promotion or trading action is included.

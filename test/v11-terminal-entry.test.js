@@ -388,6 +388,38 @@ async function browserRun(call,start,width,expectedBuild,server){
     historyHidden:document.getElementById('version-panel').hidden,
     historyExpanded:document.getElementById('version-toggle').getAttribute('aria-expanded')
   })`);
+  const lifecycleKey='meridian-v11-navigation-lifecycle';
+  const lifecycleSource=`(()=>{
+    if(location.pathname!=='/meridian/v11/')return;
+    const key=${JSON.stringify(lifecycleKey)},documentId=crypto.randomUUID();
+    const recordEvent=(type,persisted=null)=>{
+      const record=JSON.parse(sessionStorage.getItem(key)||'{"events":[]}');
+      record.events.push({type,documentId,persisted});
+      record.currentDocumentId=documentId;
+      sessionStorage.setItem(key,JSON.stringify(record));
+    };
+    window.__v11NavigationDocumentId=documentId;
+    recordEvent('document');
+    addEventListener('pagehide',event=>recordEvent('pagehide',event.persisted));
+    addEventListener('pageshow',event=>recordEvent('pageshow',event.persisted));
+  })()`;
+  const waitForPageShow=async url=>{
+    for(let attempt=0;attempt<100;attempt++){
+      try{
+        const result=await evaluate(`(()=>{
+          if(location.href!==${JSON.stringify(url)}||document.readyState!=='complete')return null;
+          const documentId=window.__v11NavigationDocumentId;
+          if(!documentId)return null;
+          const record=JSON.parse(sessionStorage.getItem(${JSON.stringify(lifecycleKey)})||'{"events":[]}');
+          const pageshow=[...record.events].reverse().find(event=>event.type==='pageshow'&&event.documentId===documentId);
+          return pageshow?{documentId,pageshow,events:record.events}:null;
+        })()`);
+        if(result)return result;
+      }catch{}
+      await new Promise(resolve=>setTimeout(resolve,50));
+    }
+    assert.fail('v11 document did not report its pageshow lifecycle');
+  };
 
   const initialReads=server.metrics().reads;
   const initial=await evaluate(`(()=>{
@@ -573,6 +605,10 @@ async function browserRun(call,start,width,expectedBuild,server){
       trusted:event.isTrusted,prevented:event.defaultPrevented,href:link.getAttribute('href')
     }));
   },true);true`);
+  await call('Page.addScriptToEvaluateOnNewDocument',{source:lifecycleSource});
+  await evaluate(lifecycleSource);
+  const initialDocumentId=await evaluate('window.__v11NavigationDocumentId');
+  assert.ok(initialDocumentId,'initial v11 document identity was recorded');
 
   await key('Enter','Enter',13);
   const destination=new URL('../v10/',start).href;
@@ -590,19 +626,52 @@ async function browserRun(call,start,width,expectedBuild,server){
   assert.match(server.policies.get('/meridian/v10/'),/script-src 'none'/);
   assert.match(server.policies.get('/meridian/v10/'),/connect-src 'none'/);
   assert.match(server.policies.get('/meridian/v10/'),/worker-src 'none'/);
+  const lifecycleAtV10=await evaluate(`JSON.parse(sessionStorage.getItem(${JSON.stringify(lifecycleKey)}))`);
+  assert.ok(lifecycleAtV10.events.some(event=>
+    event.type==='pagehide'&&event.documentId===initialDocumentId),
+  'v11 reported leaving its original document');
   const history=await call('Page.getNavigationHistory');
+  assert.equal(history.entries[history.currentIndex]?.url,destination,
+    'browser Back starts from the v10 history entry');
   const previewEntry=history.entries[history.currentIndex-1];
   assert.equal(previewEntry?.url,start,'v11 is the previous browser history entry');
   await call('Page.navigateToHistoryEntry',{entryId:previewEntry.id});
   await waitForUrl(start);
-  assert.deepEqual(await state(),before,'browser Back restores the nondefault tab and open history');
+  const lifecycle=await waitForPageShow(start);
+  const historyAfterBack=await call('Page.getNavigationHistory');
+  assert.equal(historyAfterBack.currentIndex,history.currentIndex-1,
+    'browser Back moved to the immediately preceding history entry');
+  assert.equal(historyAfterBack.entries[historyAfterBack.currentIndex]?.url,start,
+    'browser Back returned to the v11 history entry');
+  assert.equal(historyAfterBack.entries[historyAfterBack.currentIndex+1]?.url,destination,
+    'browser Back returned from the v10 entry');
+  assert.ok(lifecycle.events.some(event=>
+    event.type==='pagehide'&&event.documentId===initialDocumentId),
+  'navigation evidence includes the original v11 pagehide');
+  const restoredState=await state();
+  const lifecycleResult=await evaluate(`({
+    documentId:window.__v11NavigationDocumentId
+  })`);
+  assert.equal(lifecycleResult.documentId,lifecycle.documentId);
+  if(lifecycle.documentId===initialDocumentId){
+    assert.equal(lifecycle.pageshow.persisted,true,
+      'same-document restoration must report persisted pageshow');
+    assert.deepEqual(restoredState,before,
+      'BFCache restoration preserves the nondefault tab and open history');
+  }else{
+    assert.equal(lifecycle.pageshow.persisted,false,
+      'a fresh document must report non-persisted pageshow');
+    assert.deepEqual(restoredState,{
+      views:['view-command'],current:['command'],historyHidden:true,historyExpanded:'false'
+    },'fresh v11 documents show the documented safe defaults');
+  }
   await evaluate(`document.getElementById('version-toggle').focus();true`);
   await key('Escape','Escape',27);
   assert.equal(await evaluate(`document.getElementById('version-panel').hidden&&document.activeElement.id==='version-toggle'`),true,
     'history still closes with Escape after Back');
   assert.ok(server.requests.every(request=>request.method==='GET'&&server.allowedPaths.has(request.path)),
     'only exact document/module paths and synthetic GET endpoint are served');
-  return {width,terminal:terminalState,focus,before,backRestored:true};
+  return {width,terminal:terminalState,focus,before,lifecycle:lifecycleResult,pageshowPersisted:lifecycle.pageshow.persisted};
 }
 
 test('actual v11 terminal entry works in Chrome on four mobile widths and safely reaches v10',{timeout:180000},async()=>{

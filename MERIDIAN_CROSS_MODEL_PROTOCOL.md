@@ -18,9 +18,9 @@ Begründung: Der Review muss unabhängig sein; ein zweites Modell findet systema
 ## 3. Ablauf pro Änderung
 1. Lead prüft vor jedem Write `main`-SHA und offene PRs.
 2. Lead öffnet PR mit: Ziel, Research-Stage, PnL berührt (ja/nein), `Review requested: Claude`.
-3. Claude liest den vollständigen angeforderten Scope am exakten PR-HEAD-SHA; der Lead fragt erst nach grüner Exact-Head-CI an. Jedes GREEN_LIGHT muss einen Abschnitt `Executed checks` mit den tatsächlich ausgeführten read-only Befehlen und Ergebnissen enthalten. Kann ein für Scope/Request verpflichtender Check nicht laufen, ist GREEN_LIGHT verboten; Ergebnis ist NEEDS_MORE_EVIDENCE mit Begründung; nachgewiesene Codefehler erhalten REVISION_REQUIRED.
+3. Claude liest den vollständigen angeforderten Scope am exakten PR-HEAD-SHA; der Lead fragt erst nach abgeschlossener, erfolgreicher Exact-Head-CI an. Requests und Ergänzungsrequests verwenden `@claude`, eine Leerzeile, `CROSS_MODEL_REQUEST <id>` und eigene Metadatenzeilen `exact_head_sha`, `exact_base_sha`, `pr`; kein `FOLLOWUP`. Jedes GREEN_LIGHT muss einen Abschnitt `Executed checks` mit den tatsächlich ausgeführten read-only Befehlen und Ergebnissen enthalten. Kann ein für Scope/Request verpflichtender Check nicht laufen, ist GREEN_LIGHT verboten; Ergebnis ist NEEDS_MORE_EVIDENCE mit Begründung; nachgewiesene Codefehler erhalten REVISION_REQUIRED.
 4. Merge nur bei grüner CI und GREEN_LIGHT auf genau diesem SHA. Neuer Commit = altes GREEN_LIGHT ungültig.
-5. Jeder Source-Merge benötigt das vollständige unabhängige Review nach der geltenden Owner-Merge-Delegation. Ein GREEN_LIGHT mit selbst gemeldeter Scope-, Receipt- oder Prüflücke zählt nicht: erst eine vollständige Ergänzung am selben Head/Base einholen.
+5. Jeder Source-Merge benötigt das vollständige unabhängige Review des gesamten angeforderten Scopes nach der geltenden Owner-Merge-Delegation. Ein GREEN_LIGHT mit selbst gemeldeter Scope-, Receipt- oder Prüflücke zählt nicht: erst eine vollständige Ergänzung am selben Head/Base einholen.
 6. Max. 3 Review-Loops, danach entscheidet der User.
 
 ## 4. Lead-Wechsel (Lease)
