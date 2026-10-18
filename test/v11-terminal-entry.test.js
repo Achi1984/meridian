@@ -363,7 +363,71 @@ const b7Deltas=[
     "<script type=\"module\" src=\"./bot-read-bootstrap.js?v=B6\"></script>\n<script type=\"module\" src=\"./depot-read-bootstrap.js?v=B7\"></script>"
   ]
 ];
+const b12Deltas=[
+  [
+    '    .terminal-entry-link{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px;max-width:100%;padding:10px 14px;border:1px solid #44607b;border-radius:10px;background:#142235;color:#d7e6f6;font-size:13px;line-height:1.5;font-weight:650;text-underline-offset:3px;overflow-wrap:anywhere}\n    .terminal-entry-link:focus-visible{outline:3px solid #9bc9ff;outline-offset:3px}\n',
+    '    .terminal-entry-link,.strategy-entry-link{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px;max-width:100%;padding:10px 14px;border:1px solid #44607b;border-radius:10px;background:#142235;color:#d7e6f6;font-size:13px;line-height:1.5;font-weight:650;text-underline-offset:3px;overflow-wrap:anywhere}\n    .terminal-entry-link:focus-visible,.strategy-entry-link:focus-visible{outline:3px solid #9bc9ff;outline-offset:3px}\n'
+  ],
+  [
+    '',
+    '    .command-open-strategies{display:inline-flex;align-items:center;justify-content:center;min-height:44px;max-width:100%;margin-top:12px;padding:10px 14px;border:1px solid #44607b;border-radius:10px;background:#142235;color:#d7e6f6;font-size:13px;line-height:1.5;font-weight:650;text-underline-offset:3px;overflow-wrap:anywhere}\n    .command-open-strategies:focus-visible{outline:3px solid #9bc9ff;outline-offset:3px}\n'
+  ],
+  [
+    '    #view-research .view-placeholder{border-top:3px solid #d49aff}\n',
+    '    #view-strategies .view-placeholder{border-top:3px solid #d49aff}\n'
+  ],
+  [
+    '    #nav button[data-v="research"].active{color:#d49aff}\n',
+    '    #nav button[data-v="strategies"].active{color:#d49aff}\n'
+  ],
+  [
+    '    @media(max-width:350px){.card{padding:14px}.container{padding-top:12px}.autonomy-strip>summary{padding-left:9px;padding-right:9px}}\n    .strategy-load-status{min-height:44px;padding:12px 0;color:var(--state-unknown);overflow-wrap:anywhere}\n    .strategy-source-notice{border-top:3px solid var(--research)}\n    .strategy-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}\n    .strategy-id{font-size:12px;font-weight:800;letter-spacing:.08em;color:#d8c8ff}\n    .strategy-family h2,.strategy-candidate h2{margin-bottom:8px}\n    .strategy-family>p,.strategy-candidate>p{font-size:13px;line-height:1.65;overflow-wrap:anywhere}\n    .strategy-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:13px 0}\n    .strategy-summary>div{min-width:0;padding:9px;border:1px solid #344356;border-radius:10px;background:#101824}\n    .strategy-summary dt{font-size:10px;color:var(--muted)}\n    .strategy-summary dd{margin:3px 0 0;font-size:12px;font-weight:650;overflow-wrap:anywhere}\n    .strategy-progression{list-style:none;padding:0;margin:12px 0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}\n    .strategy-progression li{min-width:0;padding:8px 6px;border:1px solid #344356;border-radius:9px;background:#101824}\n    .strategy-progression strong,.strategy-progression span{display:block;font-size:10px;line-height:1.4;overflow-wrap:anywhere}\n    .strategy-progression span{margin-top:4px;color:var(--state-unknown)}\n    .strategy-family details{margin:10px 0 0}\n    .strategy-family details summary,.arena-evidence summary,.arena-evidence-details summary{min-height:48px;letter-spacing:0;text-transform:none}\n    .strategy-candidate{border-color:#776346;background:linear-gradient(160deg,#28251d,#111923 70%)}\n    .strategy-arena{margin-top:20px;padding-top:10px;border-top:1px solid var(--line)}\n    .strategy-arena>p{font-size:13px;line-height:1.65;overflow-wrap:anywhere}\n    .arena-toolbar{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:14px 0}\n    .arena-toolbar button,.arena-import{min-width:0;min-height:48px;padding:10px;border:1px solid #567a9f;border-radius:10px;background:#142235;color:var(--text);font-size:12px;line-height:1.4;font-weight:650;overflow-wrap:anywhere}\n    .arena-toolbar button{cursor:pointer}\n    .arena-import{display:flex;align-items:center;justify-content:center;text-align:center;cursor:pointer}\n    .arena-import input{width:100%;min-width:0;min-height:44px;font-size:11px}\n    .arena-toolbar button:focus-visible,.arena-import:focus-within{outline:3px solid #9bc9ff;outline-offset:2px}\n    .arena-toolbar button:disabled{opacity:.55;cursor:not-allowed}\n    .arena-evidence{color:var(--state-unknown);font-size:12px;font-weight:750;overflow-wrap:anywhere}\n    .arena-models{display:grid;gap:10px;margin:12px 0}\n    .arena-model-card{min-width:0;padding:14px;border:1px solid #344356;border-radius:14px;background:#101824;overflow-wrap:anywhere}\n    .arena-model-card header{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}\n    .arena-model-card header>div{min-width:0}\n    .arena-model-card header strong,.arena-model-card header span{display:block}\n    .arena-model-card header span{margin-top:4px;font-size:10px;color:var(--state-unknown)}\n    .arena-model-card header>b{font-size:13px;white-space:nowrap}\n    .arena-model-card p{font-size:11px;line-height:1.6;margin-top:8px;overflow-wrap:anywhere}\n    .arena-model-card dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:12px 0}\n    .arena-model-card dl>div{min-width:0;padding:7px;border-radius:8px;background:#172336}\n    .arena-model-card dt{font-size:9px;color:var(--muted)}\n    .arena-model-card dd{margin:3px 0 0;font-size:11px;font-weight:700;overflow-wrap:anywhere}\n    .arena-blocked,.arena-unknown{padding:10px;border:1px solid #776346;border-radius:9px;color:var(--state-unknown)}\n    .arena-evidence{margin:10px 0}\n    .arena-evidence summary{font-size:10px}\n    .arena-evidence-details{margin-top:8px}\n    .arena-evidence-details ul{padding-left:18px;overflow-wrap:anywhere}\n    .arena-control{padding:10px;border:1px solid var(--line);border-radius:9px;font-size:11px;overflow-wrap:anywhere}\n    .tone-safe{color:#6ee7b7}.tone-danger{color:#ff9b9b}.tone-muted{color:var(--muted)}\n    @media(max-width:560px){.strategy-summary{grid-template-columns:1fr}.strategy-progression{grid-template-columns:1fr 1fr}.arena-toolbar{grid-template-columns:1fr}.arena-model-card{padding:11px}}\n    @media(max-width:350px){#nav button[data-v="strategies"] span:last-child{font-size:9px;letter-spacing:-.03em}}\n    @media(forced-colors:active){.strategy-family,.strategy-candidate,.arena-model-card,.strategy-progression li{border-color:CanvasText}}\n',
+    '    @media(max-width:350px){.card{padding:14px}.container{padding-top:12px}.autonomy-strip>summary{padding-left:9px;padding-right:9px}}\n'
+  ],
+  [
+    '      <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B11<small>Versionsverlauf ▾</small></button>\n',
+    '      <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B12<small>Versionsverlauf ▾</small></button>\n'
+  ],
+  [
+    '        <p><b>Diese Vorschau · B11:</b> Manuell geladene Bot-Snapshots filtern, ordnen und mit Command teilen. Nur bestätigte Quellwerte; Sprung zur passenden Karte. Draft, Geräteabnahme ausstehend.</p>\n',
+    '        <p><b>Diese Vorschau · B12:</b> Native Strategien-Ansicht mit zwölf Hypothesen, fünf Arena-Modellen und einem getrennten Entwicklungs-Kandidaten. Nur lokale Forschungsquellen und manuelle Diagnose; keine laufenden Paper- oder Live-Aktivitäten.</p>\n        <p><b>Vorige Vorschau · B11:</b> Manuell geladene Bot-Snapshots filtern, ordnen und mit Command teilen. Nur bestätigte Quellwerte; Sprung zur passenden Karte. Draft, Geräteabnahme ausstehend.</p>\n'
+  ],
+  [
+    '        <li><strong>Meridian 11 · B11</strong><span class="version-status">Entwurf</span><p>Bot-Cockpit mit Suche, Richtung/Kontraktart-Filtern und deterministischer Sortierung. Command zeigt denselben validierten Snapshot und verlinkt bestätigte Quellverluste zur Karte. Reine Testvorschau; keine Risikorangfolge, neue Datenanbindung oder Funktionsfreigabe.</p></li>\n',
+    '        <li><strong>Meridian 11 · B12</strong><span class="version-status">Entwurf</span><p>Strategien-Arbeitsbereich mit dem Quellregister, einer manuell bedienbaren M11-Arena und einem getrennten B1-7-Entwicklungskandidaten. Keine automatische Marktdatenbeschaffung, kein Paperbetrieb und keine Live-Freigabe.</p></li>\n        <li><strong>Meridian 11 · B11</strong><span class="version-status">Testvorschau</span><p>Bot-Cockpit mit Suche, Richtung/Kontraktart-Filtern und deterministischer Sortierung. Command zeigt denselben validierten Snapshot und verlinkt bestätigte Quellverluste zur Karte. Reine Testvorschau; keine Risikorangfolge, neue Datenanbindung oder Funktionsfreigabe.</p></li>\n'
+  ],
+  [
+    '    <nav class="terminal-entry" aria-label="Terminal-Zugang">\n      <a class="terminal-entry-link" href="../v10/">Terminal öffnen</a>\n    </nav>\n',
+    '    <nav class="terminal-entry" aria-label="M11-Strategien">\n      <a class="strategy-entry-link" href="#view-strategies" data-open-strategies>Strategien öffnen</a>\n    </nav>\n'
+  ],
+  [
+    '      </section>\n      <details class="command-context-details">\n',
+    '      </section>\n      <section class="card command-strategies" aria-labelledby="command-strategies-heading">\n        <div class="card-head"><h2 id="command-strategies-heading">Strategieforschung</h2><span class="limited">Keine Handelsaktivität</span></div>\n        <p>12 Hypothesen im Entwurfsregister, fünf Arena-Modelle mit historischen Diagnosen und B1-7 als getrennter Entwicklungskandidat ohne Ergebnisse. Kein laufendes Paper.</p>\n        <a class="command-open-strategies" href="#view-strategies" data-open-strategies>Strategien in M11 öffnen</a>\n      </section>\n      <details class="command-context-details">\n'
+  ],
+  [
+    '      <p class="caption">Nur manuelle Leseabfragen. Diese Ansicht steuert keine Bots. „Terminal öffnen“ führt zum separaten Terminal.</p>\n',
+    '      <p class="caption">Nur manuelle Leseabfragen. Diese Ansicht steuert keine Bots. Strategieforschung ist von deinen Pionex-Snapshots getrennt.</p>\n'
+  ],
+  [
+    '    <section id="view-research" class="view" aria-labelledby="scanner-heading" hidden>\n      <div class="eyebrow">RESEARCH &amp; CHANCEN</div><h1 id="scanner-heading">Scanner</h1>\n      <div class="card view-placeholder"><span class="limited module-availability">In Vorbereitung</span><h2>Research-Chancen erst nach Evidenz</h2><p>Der Scanner soll nachvollziehbare Research-Kandidaten zeigen. Aktuell sind keine Research-Ausgaben oder freigegebenen Signale verfügbar; es entstehen keine Handelsaufträge oder Paper-Bots.</p></div>\n    </section>\n',
+    '    <section id="view-strategies" class="view" aria-labelledby="strategies-heading" hidden>\n      <div class="eyebrow">HYPOTHESEN · EVIDENZ · BLOCKER</div><h1 id="strategies-heading">Strategien</h1>\n      <p class="sub">Strategieforschung in M11 ist getrennt von den Exchange-Bots im Bots-Tab. Keine automatische Promotion, Paper-Ausführung oder Handelsfreigabe.</p>\n      <p id="strategy-load-status" class="strategy-load-status" role="status" aria-live="polite">Das lokale Register wird erst beim Öffnen dieser Ansicht gelesen.</p>\n      <div id="strategy-catalog" aria-busy="false"></div>\n      <div id="strategy-arena-root"></div>\n    </section>\n'
+  ],
+  [
+    '    <button type="button" data-v="research" aria-controls="view-research"><span class="nav-icon" aria-hidden="true">◇</span><span>SCANNER</span></button>\n',
+    '    <button type="button" data-v="strategies" aria-controls="view-strategies"><span class="nav-icon" aria-hidden="true">◇</span><span>STRATEGIEN</span></button>\n'
+  ],
+  [
+    '<script type="module" src="./bot-read-bootstrap.js?v=B11"></script>\n<script type="module" src="./depot-read-bootstrap.js?v=B9"></script>\n',
+    '<script type="module" src="./bot-read-bootstrap.js?v=B12"></script>\n<script type="module" src="./depot-read-bootstrap.js?v=B12"></script>\n<script type="module" src="./strategy-workspace-bootstrap.js?v=B12"></script>\n'
+  ]
+];
 function restoreB2(source){
+ for(const [index,delta] of b12Deltas.entries()){
+   const [before,after]=index===4?[delta[1],delta[0]]:delta;
+   assert.equal(source.split(after).length-1,1,`one exact B12 delta ${index}`);
+   source=source.replace(after,before);
+ }
+ assert.equal(gitBlob(source),'908efe5629835c57b908e8bfb245728b4b757c19','B12 deltas restore the exact B11 shell');
  for(const [before,after] of b11Deltas){assert.equal(source.split(after).length-1,1,"one exact B11 delta");source=source.replace(after,before);}
  for(const [before,after] of b10Deltas){assert.equal(source.split(after).length-1,1,"one exact B10 delta");source=source.replace(after,before);}
  for(const [before,after] of b9Deltas){assert.equal(source.split(after).length-1,1,"one exact B9 delta");source=source.replace(after,before);}
@@ -411,7 +475,7 @@ test('Terminal öffnen preserves the reviewed history-close baseline and stays o
   assert.equal(gitBlob(restored),preimageBlob,'all source bytes except terminal-entry insertions, the checked viewport pair and exact Depot/revision deltas must match the reviewed history-close baseline');
 });
 
-const moduleNames=['bot-read-bootstrap.js','bot-read-access.js','bot-read-client.js','bot-read-view.js','bot-read-model.js','bot-overview-model.js','depot-read-bootstrap.js','depot-read-client.js','depot-read-model.js','depot-read-view.js','depot-history-model.js','depot-history-view.js','depot-current-model.js'];
+const moduleNames=['bot-read-bootstrap.js','bot-read-access.js','bot-read-client.js','bot-read-view.js','bot-read-model.js','bot-overview-model.js','depot-read-bootstrap.js','depot-read-client.js','depot-read-model.js','depot-read-view.js','depot-history-model.js','depot-history-view.js','depot-current-model.js','strategy-workspace-bootstrap.js','strategy-catalog.js','strategy-arena.js'];
 function deploymentServer(){
   const inlineScript=html.match(/<script>([\s\S]*?)<\/script>/i)?.[1];
   assert.ok(inlineScript,'actual UI-only navigation script');
@@ -434,10 +498,12 @@ function deploymentServer(){
     modules.set('/meridian/v11/'+name,body);
   }
   for(const path of ['portfolio-data-contract.js','v8-clean/live-price-core-r18.js'])modules.set('/meridian/'+path,readFileSync(new URL('../'+path,import.meta.url),'utf8'));
+  modules.set('/meridian/research/strategy-paper-arena.js',readFileSync(new URL('../research/strategy-paper-arena.js',import.meta.url),'utf8'));
+  modules.set('/meridian/docs/strategy-lab/campaign-20261013.json',readFileSync(new URL('../docs/strategy-lab/campaign-20261013.json',import.meta.url),'utf8'));
   const server=createServer((request,response)=>{
     const url=new URL(request.url,'http://127.0.0.1'),path=url.pathname;
     requests.push({method:request.method,path}); // never record headers or token values
-    const versionedModule=(path==='/meridian/v11/bot-read-bootstrap.js'||path==='/meridian/v11/bot-read-view.js')&&url.search==='?v=B11'||path==='/meridian/v11/depot-read-bootstrap.js'&&url.search==='?v=B9';
+    const versionedModule=(path==='/meridian/v11/bot-read-bootstrap.js'||path==='/meridian/v11/depot-read-bootstrap.js'||path==='/meridian/v11/strategy-workspace-bootstrap.js')&&url.search==='?v=B12'||path==='/meridian/v11/bot-read-view.js'&&url.search==='?v=B11';
     if(request.method!=='GET'||(url.search&&!versionedModule)){response.writeHead(404);response.end();return;}
     if(path===endpoint){
       reads++;
@@ -470,13 +536,13 @@ function deploymentServer(){
         rawPointCount:mode==='curve'?3:4,excludedIncompletePoints:mode==='curve'?0:1,points}));return;
     }
     if(modules.has(path)){
-      response.writeHead(200,{'Content-Type':'text/javascript; charset=utf-8','Cache-Control':'no-store'});response.end(modules.get(path));return;
+      response.writeHead(200,{'Content-Type':path.endsWith('.json')?'application/json; charset=utf-8':'text/javascript; charset=utf-8','Cache-Control':'no-store'});response.end(modules.get(path));return;
     }
     if(path!=='/meridian/v11/'&&path!=='/meridian/v10/'){response.writeHead(404);response.end();return;}
     const preview=path==='/meridian/v11/';
     const origin='http://127.0.0.1:'+server.address().port;
     const scriptSource=preview?`'sha256-${scriptHash}' `+[...modules.keys()].map(path=>origin+path).join(' '):"'none'";
-    const policy=`default-src 'none'; script-src ${scriptSource}; style-src 'unsafe-inline'; connect-src ${preview?origin+endpoint+' '+origin+depotEndpoint+' '+origin+currentEndpoint+' '+origin+priceEndpoint:"'none'"}; worker-src 'none'; child-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'none'`;
+    const policy=`default-src 'none'; script-src ${scriptSource}; style-src 'unsafe-inline'; connect-src ${preview?origin+endpoint+' '+origin+depotEndpoint+' '+origin+currentEndpoint+' '+origin+priceEndpoint+' '+origin+'/meridian/docs/strategy-lab/campaign-20261013.json':"'none'"}; worker-src 'none'; child-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'none'`;
     policies.set(path,policy);
     response.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Content-Security-Policy':policy});response.end(preview?html:terminal);
   });
@@ -490,7 +556,7 @@ function deploymentServer(){
   });
 }
 
-async function browserRun(call,start,width,expectedBuild,server){
+async function browserRun(call,start,width,server){
   const evaluate=async expression=>{
     const response=await call('Runtime.evaluate',{expression,returnByValue:true});
     assert.ok(!response.exceptionDetails,'browser evaluation failed: '+JSON.stringify(response.exceptionDetails));
@@ -506,59 +572,17 @@ async function browserRun(call,start,width,expectedBuild,server){
       type:'keyUp',key:name,code,windowsVirtualKeyCode:virtual,nativeVirtualKeyCode:virtual
     });
   };
-  const waitForUrl=async url=>{
-    for(let attempt=0;attempt<100;attempt++){
-      try{
-        if(await evaluate(`location.href===${JSON.stringify(url)}&&document.readyState==="complete"`))return;
-      }catch{}
-      await new Promise(resolve=>setTimeout(resolve,50));
-    }
-    assert.fail('browser did not finish navigation to '+url);
-  };
   const state=()=>evaluate(`({
     views:[...document.querySelectorAll('.view')].filter(view=>!view.hidden).map(view=>view.id),
     current:[...document.querySelectorAll('#nav button[aria-current="page"]')].map(button=>button.dataset.v),
     historyHidden:document.getElementById('version-panel').hidden,
     historyExpanded:document.getElementById('version-toggle').getAttribute('aria-expanded')
   })`);
-  const lifecycleKey='meridian-v11-navigation-lifecycle';
-  const lifecycleSource=`(()=>{
-    if(location.pathname!=='/meridian/v11/')return;
-    const key=${JSON.stringify(lifecycleKey)},documentId=crypto.randomUUID();
-    const recordEvent=(type,persisted=null)=>{
-      const record=JSON.parse(sessionStorage.getItem(key)||'{"events":[]}');
-      record.events.push({type,documentId,persisted});
-      record.currentDocumentId=documentId;
-      sessionStorage.setItem(key,JSON.stringify(record));
-    };
-    window.__v11NavigationDocumentId=documentId;
-    recordEvent('document');
-    addEventListener('pagehide',event=>recordEvent('pagehide',event.persisted));
-    addEventListener('pageshow',event=>recordEvent('pageshow',event.persisted));
-  })()`;
-  const waitForPageShow=async url=>{
-    for(let attempt=0;attempt<100;attempt++){
-      try{
-        const result=await evaluate(`(()=>{
-          if(location.href!==${JSON.stringify(url)}||document.readyState!=='complete')return null;
-          const documentId=window.__v11NavigationDocumentId;
-          if(!documentId)return null;
-          const record=JSON.parse(sessionStorage.getItem(${JSON.stringify(lifecycleKey)})||'{"events":[]}');
-          const pageshow=[...record.events].reverse().find(event=>event.type==='pageshow'&&event.documentId===documentId);
-          return pageshow?{documentId,pageshow,events:record.events}:null;
-        })()`);
-        if(result)return result;
-      }catch{}
-      await new Promise(resolve=>setTimeout(resolve,50));
-    }
-    assert.fail('v11 document did not report its pageshow lifecycle');
-  };
-
   const initialReads=server.metrics().reads;
   const initial=await evaluate(`(()=>{
-    const link=document.querySelector('a.terminal-entry-link'),rect=link.getBoundingClientRect(),style=getComputedStyle(link);
+    const link=document.querySelector('a.strategy-entry-link'),rect=link.getBoundingClientRect(),style=getComputedStyle(link);
     return {width:innerWidth,viewport:document.documentElement.clientWidth,body:document.body.scrollWidth,
-      root:document.documentElement.scrollWidth,count:document.querySelectorAll('a.terminal-entry-link').length,
+      root:document.documentElement.scrollWidth,count:document.querySelectorAll('a.strategy-entry-link').length,
       text:link.textContent,href:link.getAttribute('href'),height:rect.height,linkWidth:rect.width,
       visible:rect.width>0&&rect.height>0&&style.display!=='none'&&style.visibility==='visible',
       outsideHistory:!link.closest('#version-panel')&&!link.closest('[hidden]'),
@@ -566,11 +590,11 @@ async function browserRun(call,start,width,expectedBuild,server){
   })()`);
   assert.equal(initial.width,width);assert.equal(initial.viewport,width);
   assert.ok(initial.body<=width+1&&initial.root<=width+1,'initial page overflow at '+width);
-  assert.equal(initial.count,1);assert.equal(initial.text,'Terminal öffnen');assert.equal(initial.href,'../v10/');
+  assert.equal(initial.count,1);assert.equal(initial.text,'Strategien öffnen');assert.equal(initial.href,'#view-strategies');
   assert.ok(initial.visible&&initial.outsideHistory&&initial.historyHidden,'entry is visible while history is closed');
   assert.ok(initial.height>=44&&initial.linkWidth>=44,'entry target is at least 44x44px');
 
-  for(const tab of ['command','depot','bots','market','research']){
+  for(const tab of ['command','depot','bots','market','strategies']){
     await evaluate(`document.querySelector('#nav button[data-v="${tab}"]').focus();true`);
     await key('Enter','Enter',13);
     assert.deepEqual(await evaluate(`({
@@ -736,96 +760,46 @@ async function browserRun(call,start,width,expectedBuild,server){
   const before=await state();
   assert.deepEqual(before,{views:['view-depot'],current:['depot'],historyHidden:false,historyExpanded:'true'});
   await key('Tab','Tab',9);
-  assert.equal(await evaluate(`document.activeElement.matches('a.terminal-entry-link')`),true,
+  assert.equal(await evaluate(`document.activeElement.matches('a.strategy-entry-link')`),true,
     'entry follows the history button in keyboard order');
   const focus=await evaluate(`(()=>{
     const style=getComputedStyle(document.activeElement);
     return {visible:document.activeElement.matches(':focus-visible'),outline:style.outlineStyle,width:parseFloat(style.outlineWidth)};
   })()`);
   assert.ok(focus.visible&&focus.outline!=='none'&&focus.width>=3,'keyboard focus indicator is visible');
-  await evaluate(`document.addEventListener('click',event=>{
-    const link=event.target.closest?.('a.terminal-entry-link');
-    if(link)sessionStorage.setItem('meridian-terminal-entry-proof',JSON.stringify({
-      trusted:event.isTrusted,prevented:event.defaultPrevented,href:link.getAttribute('href')
-    }));
-  },true);true`);
-  await call('Page.addScriptToEvaluateOnNewDocument',{source:lifecycleSource});
-  await evaluate(lifecycleSource);
-  const initialDocumentId=await evaluate('window.__v11NavigationDocumentId');
-  assert.ok(initialDocumentId,'initial v11 document identity was recorded');
-
+  const requestCount=server.requests.length;
   await key('Enter','Enter',13);
-  const destination=new URL('../v10/',start).href;
-  await waitForUrl(destination);
-  const terminalState=await evaluate(`({
-    url:location.href,title:document.title,
-    build:document.querySelector('meta[name="meridian-build"]')?.content,
-    root:!!document.querySelector('#app'),
-    proof:JSON.parse(sessionStorage.getItem('meridian-terminal-entry-proof'))
-  })`);
-  assert.equal(terminalState.url,destination);assert.match(terminalState.title,/MERIDIAN v10/);
-  assert.equal(terminalState.build,expectedBuild);assert.ok(terminalState.root,'actual v10 document was served');
-  assert.deepEqual(terminalState.proof,{trusted:true,prevented:false,href:'../v10/'},
-    'trusted Enter uses the uncancelled native anchor');
-  assert.match(server.policies.get('/meridian/v10/'),/script-src 'none'/);
-  assert.match(server.policies.get('/meridian/v10/'),/connect-src 'none'/);
-  assert.match(server.policies.get('/meridian/v10/'),/worker-src 'none'/);
-  const lifecycleAtV10=await evaluate(`JSON.parse(sessionStorage.getItem(${JSON.stringify(lifecycleKey)}))`);
-  assert.ok(lifecycleAtV10.events.some(event=>
-    event.type==='pagehide'&&event.documentId===initialDocumentId),
-  'v11 reported leaving its original document');
-  const history=await call('Page.getNavigationHistory');
-  assert.equal(history.entries[history.currentIndex]?.url,destination,
-    'browser Back starts from the v10 history entry');
-  const previewEntry=history.entries[history.currentIndex-1];
-  assert.equal(previewEntry?.url,start,'v11 is the previous browser history entry');
-  await call('Page.navigateToHistoryEntry',{entryId:previewEntry.id});
-  await waitForUrl(start);
-  const lifecycle=await waitForPageShow(start);
-  const historyAfterBack=await call('Page.getNavigationHistory');
-  assert.equal(historyAfterBack.currentIndex,history.currentIndex-1,
-    'browser Back moved to the immediately preceding history entry');
-  assert.equal(historyAfterBack.entries[historyAfterBack.currentIndex]?.url,start,
-    'browser Back returned to the v11 history entry');
-  assert.equal(historyAfterBack.entries[historyAfterBack.currentIndex+1]?.url,destination,
-    'browser Back returned from the v10 entry');
-  assert.ok(lifecycle.events.some(event=>
-    event.type==='pagehide'&&event.documentId===initialDocumentId),
-  'navigation evidence includes the original v11 pagehide');
-  const restoredState=await state();
-  const lifecycleResult=await evaluate(`({
-    documentId:window.__v11NavigationDocumentId
-  })`);
-  assert.equal(lifecycleResult.documentId,lifecycle.documentId);
-  if(lifecycle.documentId===initialDocumentId){
-    assert.equal(lifecycle.pageshow.persisted,true,
-      'same-document restoration must report persisted pageshow');
-    assert.deepEqual(restoredState,before,
-      'BFCache restoration preserves the nondefault tab and open history');
-  }else{
-    assert.equal(lifecycle.pageshow.persisted,false,
-      'a fresh document must report non-persisted pageshow');
-    assert.deepEqual(restoredState,{
-      views:['view-command'],current:['command'],historyHidden:true,historyExpanded:'false'
-    },'fresh v11 documents show the documented safe defaults');
+  for(let attempt=0;attempt<100;attempt++){
+    if(await evaluate(`document.querySelectorAll('#strategy-catalog .strategy-family').length===12`))break;
+    await new Promise(resolve=>setTimeout(resolve,20));
   }
-  await evaluate(`document.getElementById('version-toggle').focus();true`);
-  await key('Escape','Escape',27);
-  assert.equal(await evaluate(`document.getElementById('version-panel').hidden&&document.activeElement.id==='version-toggle'`),true,
-    'history still closes with Escape after Back');
+  const strategyState=await evaluate(`({
+    url:location.href,view:[...document.querySelectorAll('.view')].filter(view=>!view.hidden).map(view=>view.id),
+    current:[...document.querySelectorAll('#nav button[aria-current="page"]')].map(button=>button.dataset.v),
+    v10Links:[...document.querySelectorAll('a[href*="v10"]')].map(link=>link.getAttribute('href')),
+    viewport:document.documentElement.clientWidth,body:document.body.scrollWidth,root:document.documentElement.scrollWidth
+  })`);
+  assert.equal(strategyState.url,start,'native Strategies navigation does not change document');
+  assert.deepEqual(strategyState.view,['view-strategies']);assert.deepEqual(strategyState.current,['strategies']);
+  const rendered=await evaluate(`document.querySelector('#strategy-catalog').textContent`);
+  assert.equal((await evaluate(`document.querySelectorAll('#strategy-catalog .strategy-family').length`)),12);
+  assert.match(rendered,/H1Hypothese/);assert.match(rendered,/7 Assets · 44 geplante Pfade/);
+  assert.deepEqual(strategyState.v10Links,[],'active M11 shell has no V10 link');
+  assert.ok(strategyState.body<=width+1&&strategyState.root<=width+1,'Strategies shell overflow at '+width);
+  assert.ok(server.requests.length>=requestCount,'native navigation can load its local source register');
   assert.ok(server.requests.every(request=>request.method==='GET'&&server.allowedPaths.has(request.path)),
     'only exact document/module paths and synthetic GET endpoint are served');
-  return {width,terminal:terminalState,focus,before,lifecycle:lifecycleResult,pageshowPersisted:lifecycle.pageshow.persisted};
+  return {width,strategies:rendered.length,focus,before};
 }
 
-test('actual v11 terminal entry works in Chrome on four mobile widths and safely reaches v10',{timeout:180000},async()=>{
+test('actual M11 Strategies entry works in Chrome on four mobile widths without V10 navigation',{timeout:180000},async()=>{
   if(typeof WebSocket!=='function'){
     assert.notEqual(process.env.V11_TERMINAL_CDP_CHILD,'1','WebSocket-enabled child has no WebSocket');
     const env={...process.env,V11_TERMINAL_CDP_CHILD:'1'};delete env.NODE_TEST_CONTEXT;
     const child=spawnSync(process.execPath,['--experimental-websocket',fileURLToPath(import.meta.url)],
       {encoding:'utf8',timeout:175000,env});
     assert.equal(child.status,0,'browser child failed: '+String(child.stdout).slice(-2500)+' '+String(child.stderr).slice(-1200));
-    const results=String(child.stdout).split('\n').filter(line=>line.startsWith('V11_TERMINAL_WIDTH '));
+    const results=String(child.stdout).split('\n').filter(line=>line.startsWith('V11_STRATEGIES_WIDTH '));
     assert.equal(results.length,4,'expected actual Chrome results at all four widths');
     for(const result of results)console.log(result);
     return;
@@ -834,11 +808,9 @@ test('actual v11 terminal entry works in Chrome on four mobile widths and safely
   const server=await deploymentServer();
   try{
     const start=server.base+'v11/';
-    const expectedBuild=terminal.match(/<meta name="meridian-build" content="([^"]+)">/)?.[1];
-    assert.ok(expectedBuild,'actual terminal build marker exists');
     for(const width of [320,375,390,430]){
-      const result=await withMobileChrome(chrome,width,start,call=>browserRun(call,start,width,expectedBuild,server));
-      console.log('V11_TERMINAL_WIDTH',JSON.stringify(result));
+      const result=await withMobileChrome(chrome,width,start,call=>browserRun(call,start,width,server));
+      console.log('V11_STRATEGIES_WIDTH',JSON.stringify(result));
     }
   }finally{
     await server.close();

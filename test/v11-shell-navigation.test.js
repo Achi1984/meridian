@@ -5,7 +5,7 @@ import {test} from 'node:test';
 import vm from 'node:vm';
 const html=readFileSync(new URL('../v11/index.html',import.meta.url),'utf8');
 const js=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
-const keys=['command','depot','bots','market','research'];
+const keys=['command','depot','bots','market','strategies'];
 test('A0: all five tabs activate exactly one view and one aria-current',()=>{
  assert.ok(js);
  const classes=on=>{const s=new Set(on?['active']:[]);return {

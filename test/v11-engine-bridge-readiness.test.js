@@ -46,7 +46,7 @@ function harness(){
       getAttribute:key=>attrs.get(key)
     };
   });
-  assert.deepEqual(tabs.map(tab=>tab.dataset.v),['command','depot','bots','market','research'],
+  assert.deepEqual(tabs.map(tab=>tab.dataset.v),['command','depot','bots','market','strategies'],
     'the actual v11 nav tab mapping changed');
   const views=new Map(tabs.map((tab,index)=>[tab.dataset.v,{
     id:'view-'+tab.dataset.v,hidden:index!==0,classList:new Classes(index===0),innerHTML:'',

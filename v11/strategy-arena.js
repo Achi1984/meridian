@@ -1,0 +1,224 @@
+import {ARENA_CANDIDATES, ARENA_RULESET, ARENA_SYMBOLS, replayStrategyPaperArena} from '../research/strategy-paper-arena.js';
+
+const DIAGNOSTIC_PATH = 'research/results/strategy-arena-20261016/';
+const PROVENANCE_PATH = `${DIAGNOSTIC_PATH}manifest.json`;
+const PROVENANCE_BLOB = 'f06444cb129d39aa60c7ea3c44c8179c163a2270';
+const names = {'H1-B':'Trend + Cash','H1-E':'Trend mit Kostenpuffer','H7-B':'Defensive Spot-Auswahl','H7-R':'Defensive Auswahl mit Rangpuffer',H9:'Basis datierter Futures'};
+const escapeHtml = value => String(value ?? 'Unbekannt').replace(/[&<>"']/g, character => ({
+  '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+}[character]));
+const formatNumber = value => Number.isFinite(value)
+  ? new Intl.NumberFormat('de-DE',{maximumFractionDigits:2}).format(value) : 'Unbekannt';
+const tone = value => !Number.isFinite(value) || value === 0 ? 'muted' : value < 0 ? 'danger' : 'safe';
+const validHash = value => typeof value === 'string' && /^[a-f0-9]{64}$/i.test(value);
+
+export function canonicalArenaInput(value) {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(canonicalArenaInput).join(',')}]`;
+  return `{${Object.keys(value).sort().map(key=>`${JSON.stringify(key)}:${canonicalArenaInput(value[key])}`).join(',')}}`;
+}
+
+async function digestText(text, subtle=globalThis.crypto?.subtle) {
+  if (!subtle) throw Error('SHA-256 ist in diesem Browser nicht verfügbar.');
+  return [...new Uint8Array(await subtle.digest('SHA-256',new TextEncoder().encode(text)))]
+    .map(value=>value.toString(16).padStart(2,'0')).join('');
+}
+
+export async function evaluateArenaImport(text, subtle=globalThis.crypto?.subtle) {
+  if (typeof text !== 'string' || text.length > 4_000_000) throw Error('Snapshot zu groß oder ungültig (max. 4 MB).');
+  const parsed = JSON.parse(text);
+  const input = parsed && typeof parsed === 'object' && parsed.input ? parsed.input : parsed;
+  if (!input || typeof input !== 'object' || Array.isArray(input)) throw Error('Snapshot-Eingabe ungültig.');
+  if ((parsed.ruleset && parsed.ruleset !== ARENA_RULESET) ||
+      (parsed.result?.ruleset && parsed.result.ruleset !== ARENA_RULESET)) {
+    throw Error('Abweichende Regelversion. Ergebnisse nicht übernommen.');
+  }
+  const digest = await digestText(`${canonicalArenaInput(input)}\n`,subtle);
+  if (parsed.inputSha256 && parsed.inputSha256 !== digest) throw Error('Snapshot-Hash stimmt nicht.');
+  if (parsed.receipt?.inputSha256 && parsed.receipt.inputSha256 !== digest) {
+    throw Error('Quellbeleg und Snapshot stimmen nicht überein.');
+  }
+  return {
+    input,
+    result:replayStrategyPaperArena(input),
+    digest,
+    sourceReceipt:parsed.receipt || null
+  };
+}
+
+async function readBounded(fetchImpl,url) {
+  const response = await fetchImpl(url,{cache:'no-store',signal:AbortSignal.timeout(12000)});
+  if (!response.ok) throw Error('Gespeicherte Diagnose oder Belegdaten nicht verfügbar.');
+  const text = await response.text();
+  if (text.length > 262_144) throw Error('Diagnosedatei zu groß.');
+  return text;
+}
+
+export async function loadStoredArena(fetchImpl=globalThis.fetch, subtle=globalThis.crypto?.subtle) {
+  const base = new URL(`../${DIAGNOSTIC_PATH}`,import.meta.url);
+  const manifest = JSON.parse(await readBounded(fetchImpl,new URL('manifest.json',base).href));
+  if (manifest.schemaVersion !== 'MERIDIAN_ARENA_CHUNKED_INPUT_V1' ||
+      manifest.ruleset !== ARENA_RULESET || !Array.isArray(manifest.chunks) ||
+      manifest.chunks.length !== ARENA_SYMBOLS.length || !manifest.receipt?.inputSha256) {
+    throw Error('Diagnose-Manifest ungültig.');
+  }
+  const input = structuredClone(manifest.inputTemplate);
+  input.data = {};
+  if (!input.collection) throw Error('Quellenbeleg fehlt.');
+  input.collection.rawResponses = {};
+  const seen = new Set();
+  for (const entry of manifest.chunks) {
+    if (!ARENA_SYMBOLS.includes(entry.symbol) || seen.has(entry.symbol) ||
+        entry.path !== `${entry.symbol}.json` || !validHash(entry.sha256)) {
+      throw Error('Diagnose-Dateiverweis ungültig.');
+    }
+    seen.add(entry.symbol);
+    const text = await readBounded(fetchImpl,new URL(entry.path,base).href);
+    if (await digestText(text,subtle) !== entry.sha256) throw Error('Diagnosedatei: Hash stimmt nicht.');
+    const chunk = JSON.parse(text);
+    if (chunk.symbol !== entry.symbol) throw Error('Diagnosesymbol stimmt nicht.');
+    input.data[entry.symbol] = chunk.rows;
+    input.collection.rawResponses[entry.symbol] = chunk.rawResponse;
+  }
+  if (seen.size !== ARENA_SYMBOLS.length) throw Error('Diagnose-Universum unvollständig.');
+  return evaluateArenaImport(JSON.stringify({ruleset:manifest.ruleset,input,receipt:manifest.receipt}),subtle);
+}
+
+export function describeArenaProvenance(manifest) {
+  if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) {
+    return {status:'UNKNOWN',message:'Belegmetadaten unbekannt.'};
+  }
+  const candidates = manifest.summary?.candidates;
+  const ids = Array.isArray(candidates) ? candidates.map(row=>row?.id) : [];
+  if (!Array.isArray(candidates) || new Set(ids).size !== ids.length ||
+      ids.some(id=>!ARENA_CANDIDATES.includes(id))) {
+    return {status:'INVALID',message:'Kandidatenzuordnung ungültig; kein Beleg wird zugeordnet.'};
+  }
+  const receipt = manifest.receipt && typeof manifest.receipt === 'object' ? manifest.receipt : {};
+  const window = manifest.summary?.window || {};
+  const chunks = Array.isArray(manifest.chunks) ? manifest.chunks : [];
+  const hashes = ['inputSha256','rawInputSha256','engineSha256','protocolSha256','rulesSha256']
+    .map(key=>({key,value:validHash(receipt[key]) ? receipt[key] : null}));
+  return {
+    status:manifest.schemaVersion === 'MERIDIAN_ARENA_CHUNKED_INPUT_V1' &&
+      manifest.ruleset === ARENA_RULESET ? 'PRESENT_UNVERIFIED' : 'INVALID',
+    message:'Metadaten der historischen Diagnose · vorhanden, nicht bestätigt.',
+    market:typeof receipt.collectorProvider === 'string' ? `${receipt.collectorProvider} · ${receipt.quoteCurrency || 'Unbekannte Währung'}` : 'Unbekannt',
+    universe:chunks.map(row=>row?.symbol).filter(value=>typeof value === 'string').join(', ') || 'Unbekannt',
+    coverage:Number.isSafeInteger(window.warmupStart) && Number.isSafeInteger(window.end)
+      ? `${new Date(window.warmupStart).toISOString().slice(0,10)} – ${new Date(window.end).toISOString().slice(0,10)} UTC`
+      : 'Unbekannt',
+    sealedAt:typeof receipt.sealedAt === 'string' ? receipt.sealedAt : 'Unbekannt',
+    hashes,
+    source:PROVENANCE_PATH
+  };
+}
+
+export async function loadStoredArenaProvenance(fetchImpl=globalThis.fetch) {
+  return describeArenaProvenance(JSON.parse(await readBounded(fetchImpl,new URL(`../${PROVENANCE_PATH}`,import.meta.url).href)));
+}
+
+function provenanceDetails(provenance) {
+  if (!provenance) return '';
+  const rows = provenance.hashes.map(({key,value})=>`<li>${escapeHtml(key)} · ${value ? escapeHtml(value) : 'Unbekannt'}</li>`).join('');
+  return `<details class="arena-evidence-details"><summary>Technische Belegdetails · Prüfsummen</summary><p>${escapeHtml(provenance.source)}</p><p>Git-Blob · ${PROVENANCE_BLOB}</p><p>Versiegelung · ${escapeHtml(provenance.sealedAt)}</p><ul>${rows}</ul></details>`;
+}
+
+function provenanceCard(id,provenance) {
+  if (id === 'H9') return '<p class="arena-blocked">H9 · BLOCKED_DATA. Datiertes Kontrakt-, Zwei-Bein-, Finanzierungs- und Marginmodell fehlen. Keine Trades.</p>';
+  if (!provenance || provenance.status !== 'PRESENT_UNVERIFIED') {
+    return `<p class="arena-unknown">${escapeHtml(provenance?.message || 'Historischer Beleg nicht geladen.')}</p>`;
+  }
+  return `<details class="arena-evidence"><summary>Historische Herkunft · nicht bestätigt</summary><p>Markt: ${escapeHtml(provenance.market)}</p><p>Universum: ${escapeHtml(provenance.universe)}</p><p>Abdeckung: ${escapeHtml(provenance.coverage)}</p><p>Keine Zukunftsdaten; keine unabhängige Bestätigung.</p>${provenanceDetails(provenance)}</details>`;
+}
+
+function candidateCard(row,provenance) {
+  const metrics = row.baseline;
+  const stress = row.stress;
+  const cells = metrics ? [
+    ['Netto',`${formatNumber(metrics.netReturnPct)} %`],
+    ['Max. Drawdown · Tagesschluss',`${formatNumber(metrics.maxDrawdownPct)} %`],
+    ['Kostenannahme',`${formatNumber(metrics.costs)} ${metrics.currency}`],
+    ['Verkaufsteile',formatNumber(metrics.closedTrades)],
+    ['Gewinnfaktor',formatNumber(metrics.profitFactor)],
+    ['Kostenstress · Netto',`${formatNumber(stress?.netReturnPct)} %`]
+  ].map(([label,value])=>`<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join('') : '';
+  return `<article class="arena-model-card"><header><div><strong>${escapeHtml(row.id)} · ${escapeHtml(names[row.id] || row.id)}</strong><span>${row.id === 'H9'?'DATEN FEHLEN':metrics?'HISTORISCHE DIAGNOSE':'NOCH NICHT AUSGEWERTET'}</span></div><b class="tone-${tone(metrics?.netPnl)}">${metrics ? `${formatNumber(metrics.netPnl)} ${escapeHtml(metrics.currency)}` : '—'}</b></header>${row.id === 'H9' ? '<p>Datiertes Kontrakt-, Zwei-Bein-, Finanzierungs- und Marginmodell fehlen. Keine simulierten Trades.</p>' : `<dl>${cells}</dl><p>${metrics ? '10.000 nominale Einheiten je getrenntem Modell · 1× Spot · keine EUR-Umrechnung.' : 'Keine Performance behauptet.'}</p>`}${provenanceCard(row.id,provenance)}</article>`;
+}
+
+function metricSummary(result) {
+  return JSON.parse(JSON.stringify(result,(key,value)=>
+    ['positions','decisions','fills','trades','equityCurve'].includes(key) ? undefined : value));
+}
+
+export function arenaHtml({result=null,error='',busy=false,digest='',provenance=null,provenanceBusy=false,provenanceError=''}={}) {
+  const rows = result?.candidates || ARENA_CANDIDATES.map(id=>({id}));
+  const evidence = result?.sourceKind === 'SYNTHETIC'
+    ? 'SYNTHETISCHE TESTDATEN · KEINE MARKTEVIDENZ'
+    : result ? 'RETROSPEKTIVE DIAGNOSE · UNABHÄNGIGE PRÜFUNG OFFEN'
+      : 'Keine Marktdaten importiert. Es findet kein automatischer Replay statt.';
+  const controls = result ? `<p class="arena-control">Vergleichswerte: gleichgewichteter Kauf &amp; Halt ${formatNumber(result.controls?.buyAndHold?.baseline?.netReturnPct)} % · Cash ${formatNumber(result.controls?.cash?.baseline?.netReturnPct)} %. Kein risikogleicher Benchmark; keine Gewinnerwahl.</p>` : '';
+  const period = result ? `<p>Zeitraum: ${escapeHtml(new Date(result.window.firstExecution).toISOString().slice(0,10))} bis ${escapeHtml(new Date(result.window.end).toISOString().slice(0,10))} · ${formatNumber(result.window.bars)} Tage. Modellannahmen: ${formatNumber(result.model.baselineCostBps)}/${formatNumber(result.model.stressCostBps)} Basispunkte je Kauf/Verkauf.</p>` : '';
+  return `<section class="strategy-arena" aria-labelledby="arena-heading"><header class="section-title"><h2 id="arena-heading">Arena · H1 / H7 / H9</h2><span class="limited">Nur manuell</span></header><p>Fünf getrennte historische Modelle. Eine Diagnose ist weder unabhängiger Test noch laufendes Paper. Keine automatische Siegerwahl.</p><div class="arena-toolbar"><label class="arena-import">Synthetischen oder vorhandenen Snapshot importieren<input data-arena-input type="file" accept="application/json,.json" ${busy?'disabled':''}></label><button type="button" data-arena-provenance ${provenanceBusy?'disabled':''}>Historische Belegmetadaten laden</button><button type="button" data-arena-stored ${busy?'disabled':''}>Gespeicherte Diagnose manuell laden</button><button type="button" data-arena-export ${result&&!busy?'':'disabled'}>Diagnose + Quelle exportieren</button></div>${provenanceBusy?'<p role="status">Nur Belegmetadaten werden geladen; keine Kurse oder Neuberechnung.</p>':''}${provenanceError?`<p role="alert">${escapeHtml(provenanceError)}</p>`:''}${busy?'<p role="status">Snapshot wird geprüft und neu berechnet …</p>':''}${error?`<p role="alert">${escapeHtml(error)}</p>`:''}<p class="arena-evidence">${evidence}</p>${period}<div class="arena-models">${rows.map(row=>candidateCard(row,provenance)).join('')}</div>${controls}<details><summary>Diagnose-Grenzen</summary><p>Regelsatz ${escapeHtml(ARENA_RULESET)}. Historische Daten, Kosten, Slippage und Universum sind keine unabhängig bestätigte Evidenz. Offene Positionen und abhängige Verkaufsteile sind keine eigenständigen Trades.</p><p>Die gespeicherte 8-Asset-Quelle und die separate historische Abdeckung von 448/955 Schlüssen bleiben unvollständig/fehlgeschlagen. Das ist kein Beleg für den neuen 7-Asset-B1-7-Kandidaten.</p><p>Keine verbundenen Paper-Orders, keine Ausführungsfreigabe und keine Live-Bereitschaft. Kosten sind die ursprünglichen Annahmen dieses Diagnoseprotokolls und werden nicht rückwirkend geändert.</p>${digest?`<p>SHA-256 des importierten Inputs · Integrität, kein Echtheitsnachweis: ${escapeHtml(digest)}</p>`:''}</details></section>`;
+}
+
+export function createStrategyArenaView(root, options={}) {
+  if (!root) throw new TypeError('Arena-Ziel fehlt.');
+  const fetchImpl = options.fetchImpl || globalThis.fetch;
+  let state = {result:null,error:'',busy:false,digest:'',provenance:null,provenanceBusy:false,provenanceError:''};
+  let input = null;
+  let receipt = null;
+  const paint = () => { root.innerHTML = arenaHtml(state); };
+  const listen = async event => {
+    const button = event.target?.closest?.('[data-arena-provenance],[data-arena-stored],[data-arena-export]');
+    if (button && root.contains(button)) {
+      if (button.hasAttribute('data-arena-provenance')) {
+        if (state.provenanceBusy) return;
+        state.provenanceBusy = true; state.provenanceError = ''; paint();
+        try { state.provenance = await loadStoredArenaProvenance(fetchImpl); }
+        catch (error) { state.provenanceError = String(error?.message || error).slice(0,220); }
+        finally { state.provenanceBusy = false; paint(); }
+      } else if (button.hasAttribute('data-arena-stored')) {
+        if (state.busy) return;
+        state = {...state,result:null,error:'',busy:true,digest:''}; input = null; receipt = null; paint();
+        try {
+          const evaluated = await loadStoredArena(fetchImpl);
+          input = evaluated.input; receipt = evaluated.sourceReceipt;
+          state.result = evaluated.result; state.digest = evaluated.digest;
+        } catch (error) { state.error = String(error?.message || error).slice(0,220); }
+        finally { state.busy = false; paint(); }
+      } else if (input && state.result) {
+        const blob = new Blob([JSON.stringify({
+          ruleset:ARENA_RULESET,inputSha256:state.digest,input,
+          result:metricSummary(state.result),
+          resultScope:'METRIC_SUMMARY_RECOMPUTABLE_FROM_RETAINED_INPUT',
+          receipt,receiptStatus:'UNVERIFIED_ORIGINAL_SOURCE_RECEIPT_LOCAL_REPLAY'
+        })],{type:'application/json'});
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url; link.download = 'meridian-m11-arena-diagnostic.json'; link.click();
+        setTimeout(()=>URL.revokeObjectURL(url),0);
+      }
+      return;
+    }
+    const fileInput = event.target?.closest?.('[data-arena-input]');
+    const file = fileInput?.files?.[0];
+    if (!file || state.busy) return;
+    if (file.size > 4_000_000) {
+      state = {...state,result:null,error:'Snapshot zu groß (max. 4 MB).',busy:false,digest:''};
+      input = null; receipt = null; paint(); return;
+    }
+    state = {...state,result:null,error:'',busy:true,digest:''}; input = null; receipt = null; paint();
+    try {
+      const evaluated = await evaluateArenaImport(await file.text());
+      input = evaluated.input; receipt = evaluated.sourceReceipt;
+      state.result = evaluated.result; state.digest = evaluated.digest;
+    } catch (error) {
+      state.error = String(error?.message || error).slice(0,220);
+    } finally { state.busy = false; paint(); }
+  };
+  root.addEventListener('click',listen);
+  root.addEventListener('change',listen);
+  paint();
+  return {dispose(){root.removeEventListener('click',listen);root.removeEventListener('change',listen);root.replaceChildren();}};
+}

@@ -70,11 +70,11 @@
     #view-depot .view-placeholder{border-top:3px solid var(--brand)}
     #view-bots .view-placeholder{border-top:3px solid var(--attention)}
     #view-market .view-placeholder{border-top:3px solid var(--research)}
-    #view-research .view-placeholder{border-top:3px solid #d49aff}
+    #view-strategies .view-placeholder{border-top:3px solid #d49aff}
     #nav button[data-v="depot"].active{color:var(--brand)}
     #nav button[data-v="bots"].active{color:var(--positive)}
     #nav button[data-v="market"].active{color:var(--research)}
-    #nav button[data-v="research"].active{color:#d49aff}
+    #nav button[data-v="strategies"].active{color:#d49aff}
 
     .decision{border-color:#466b96;background:linear-gradient(125deg,#1b3550,#142538 56%,#111c2b);position:relative}
     .decision::before{content:"";position:absolute;top:15px;bottom:15px;left:0;width:3px;border-radius:0 3px 3px 0;background:#79b7fb}
@@ -162,8 +162,10 @@
     @media(forced-colors:active){.limited,.preview-status,.state-controls button{border-color:CanvasText}.state-controls button[aria-pressed="true"],#nav button.active{outline:2px solid Highlight;outline-offset:-3px}}
     /* Fixed packet A: visible terminal entry; no data or execution changes. */
     .terminal-entry{max-width:var(--container);margin:12px auto 0;display:flex;justify-content:flex-start;min-width:0}
-    .terminal-entry-link{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px;max-width:100%;padding:10px 14px;border:1px solid #44607b;border-radius:10px;background:#142235;color:#d7e6f6;font-size:13px;line-height:1.5;font-weight:650;text-underline-offset:3px;overflow-wrap:anywhere}
-    .terminal-entry-link:focus-visible{outline:3px solid #9bc9ff;outline-offset:3px}
+    .terminal-entry-link,.strategy-entry-link{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px;max-width:100%;padding:10px 14px;border:1px solid #44607b;border-radius:10px;background:#142235;color:#d7e6f6;font-size:13px;line-height:1.5;font-weight:650;text-underline-offset:3px;overflow-wrap:anywhere}
+    .terminal-entry-link:focus-visible,.strategy-entry-link:focus-visible{outline:3px solid #9bc9ff;outline-offset:3px}
+    .command-open-strategies{display:inline-flex;align-items:center;justify-content:center;min-height:44px;max-width:100%;margin-top:12px;padding:10px 14px;border:1px solid #44607b;border-radius:10px;background:#142235;color:#d7e6f6;font-size:13px;line-height:1.5;font-weight:650;text-underline-offset:3px;overflow-wrap:anywhere}
+    .command-open-strategies:focus-visible{outline:3px solid #9bc9ff;outline-offset:3px}
     .autonomy-strip{max-width:var(--container);margin:12px auto 0;padding:12px 14px;border:1px solid #776346;border-radius:12px;background:#171e29;overflow-wrap:anywhere}
     .autonomy-strip h2{font-size:13px;margin-bottom:4px}
     .autonomy-strip p,.autonomy-strip summary{font-size:12px;letter-spacing:0}
@@ -236,6 +238,55 @@
     .command-context-details .details-body p{font-size:12px}
     .module-availability{align-self:flex-start;margin-top:4px}
     @media(max-width:350px){.card{padding:14px}.container{padding-top:12px}.autonomy-strip>summary{padding-left:9px;padding-right:9px}}
+    .strategy-load-status{min-height:44px;padding:12px 0;color:var(--state-unknown);overflow-wrap:anywhere}
+    .strategy-source-notice{border-top:3px solid var(--research)}
+    .strategy-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+    .strategy-id{font-size:12px;font-weight:800;letter-spacing:.08em;color:#d8c8ff}
+    .strategy-family h2,.strategy-candidate h2{margin-bottom:8px}
+    .strategy-family>p,.strategy-candidate>p{font-size:13px;line-height:1.65;overflow-wrap:anywhere}
+    .strategy-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:13px 0}
+    .strategy-summary>div{min-width:0;padding:9px;border:1px solid #344356;border-radius:10px;background:#101824}
+    .strategy-summary dt{font-size:10px;color:var(--muted)}
+    .strategy-summary dd{margin:3px 0 0;font-size:12px;font-weight:650;overflow-wrap:anywhere}
+    .strategy-progression{list-style:none;padding:0;margin:12px 0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}
+    .strategy-progression li{min-width:0;padding:8px 6px;border:1px solid #344356;border-radius:9px;background:#101824}
+    .strategy-progression strong,.strategy-progression span{display:block;font-size:10px;line-height:1.4;overflow-wrap:anywhere}
+    .strategy-progression span{margin-top:4px;color:var(--state-unknown)}
+    .strategy-family details{margin:10px 0 0}
+    .strategy-family details summary,.arena-evidence summary,.arena-evidence-details summary{min-height:48px;letter-spacing:0;text-transform:none}
+    .strategy-candidate{border-color:#776346;background:linear-gradient(160deg,#28251d,#111923 70%)}
+    .strategy-arena{margin-top:20px;padding-top:10px;border-top:1px solid var(--line)}
+    .strategy-arena>p{font-size:13px;line-height:1.65;overflow-wrap:anywhere}
+    .arena-toolbar{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:14px 0}
+    .arena-toolbar button,.arena-import{min-width:0;min-height:48px;padding:10px;border:1px solid #567a9f;border-radius:10px;background:#142235;color:var(--text);font-size:12px;line-height:1.4;font-weight:650;overflow-wrap:anywhere}
+    .arena-toolbar button{cursor:pointer}
+    .arena-import{display:flex;align-items:center;justify-content:center;text-align:center;cursor:pointer}
+    .arena-import input{width:100%;min-width:0;min-height:44px;font-size:11px}
+    .arena-toolbar button:focus-visible,.arena-import:focus-within{outline:3px solid #9bc9ff;outline-offset:2px}
+    .arena-toolbar button:disabled{opacity:.55;cursor:not-allowed}
+    .arena-evidence{color:var(--state-unknown);font-size:12px;font-weight:750;overflow-wrap:anywhere}
+    .arena-models{display:grid;gap:10px;margin:12px 0}
+    .arena-model-card{min-width:0;padding:14px;border:1px solid #344356;border-radius:14px;background:#101824;overflow-wrap:anywhere}
+    .arena-model-card header{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+    .arena-model-card header>div{min-width:0}
+    .arena-model-card header strong,.arena-model-card header span{display:block}
+    .arena-model-card header span{margin-top:4px;font-size:10px;color:var(--state-unknown)}
+    .arena-model-card header>b{font-size:13px;white-space:nowrap}
+    .arena-model-card p{font-size:11px;line-height:1.6;margin-top:8px;overflow-wrap:anywhere}
+    .arena-model-card dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:12px 0}
+    .arena-model-card dl>div{min-width:0;padding:7px;border-radius:8px;background:#172336}
+    .arena-model-card dt{font-size:9px;color:var(--muted)}
+    .arena-model-card dd{margin:3px 0 0;font-size:11px;font-weight:700;overflow-wrap:anywhere}
+    .arena-blocked,.arena-unknown{padding:10px;border:1px solid #776346;border-radius:9px;color:var(--state-unknown)}
+    .arena-evidence{margin:10px 0}
+    .arena-evidence summary{font-size:10px}
+    .arena-evidence-details{margin-top:8px}
+    .arena-evidence-details ul{padding-left:18px;overflow-wrap:anywhere}
+    .arena-control{padding:10px;border:1px solid var(--line);border-radius:9px;font-size:11px;overflow-wrap:anywhere}
+    .tone-safe{color:#6ee7b7}.tone-danger{color:#ff9b9b}.tone-muted{color:var(--muted)}
+    @media(max-width:560px){.strategy-summary{grid-template-columns:1fr}.strategy-progression{grid-template-columns:1fr 1fr}.arena-toolbar{grid-template-columns:1fr}.arena-model-card{padding:11px}}
+    @media(max-width:350px){#nav button[data-v="strategies"] span:last-child{font-size:9px;letter-spacing:-.03em}}
+    @media(forced-colors:active){.strategy-family,.strategy-candidate,.arena-model-card,.strategy-progression li{border-color:CanvasText}}
   </style>
 </head>
 <body>
@@ -247,10 +298,10 @@
         <span class="mark" aria-hidden="true">M</span>
         <div class="brand">MERIDIAN <span aria-label="Version 11">11</span><small>NEXT GENERATION</small></div>
       </div>
-      <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B11<small>Versionsverlauf ▾</small></button>
+      <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B12<small>Versionsverlauf ▾</small></button>
     </div>
-    <nav class="terminal-entry" aria-label="Terminal-Zugang">
-      <a class="terminal-entry-link" href="../v10/">Terminal öffnen</a>
+    <nav class="terminal-entry" aria-label="M11-Strategien">
+      <a class="strategy-entry-link" href="#view-strategies" data-open-strategies>Strategien öffnen</a>
     </nav>
     <details id="autonomy-status" class="autonomy-strip" aria-labelledby="autonomy-heading" data-state="unknown" data-source="none">
       <summary><span id="autonomy-heading">Autonome Entwicklung · <strong>Unbekannt</strong><small class="disclosure-hint"> · Details</small></span><span aria-hidden="true">+</span></summary>
@@ -258,7 +309,8 @@
         <p>Kein aktuelles Betriebssignal verbunden. Ob ein Agent arbeitet oder warum er wartet, ist hier nicht feststellbar.</p>
         <p><b>Aktuelle Aufgabe:</b> Nicht verifiziert.</p>
         <p><b>Letztes Lebenszeichen:</b> Nicht verfügbar. Diese Anzeige überwacht den Betrieb noch nicht.</p>
-        <p><b>Diese Vorschau · B11:</b> Manuell geladene Bot-Snapshots filtern, ordnen und mit Command teilen. Nur bestätigte Quellwerte; Sprung zur passenden Karte. Draft, Geräteabnahme ausstehend.</p>
+        <p><b>Diese Vorschau · B12:</b> Native Strategien-Ansicht mit zwölf Hypothesen, fünf Arena-Modellen und einem getrennten Entwicklungs-Kandidaten. Nur lokale Forschungsquellen und manuelle Diagnose; keine laufenden Paper- oder Live-Aktivitäten.</p>
+        <p><b>Vorige Vorschau · B11:</b> Manuell geladene Bot-Snapshots filtern, ordnen und mit Command teilen. Nur bestätigte Quellwerte; Sprung zur passenden Karte. Draft, Geräteabnahme ausstehend.</p>
         <p><b>Vorige Vorschau · B10:</b> Kompakter Header und klarere Command-Hierarchie. Layout-Entwurf ohne neue Datenanbindung; Integration und Geräteabnahme ausstehend.</p>
         <p><b>Vorige Vorschau · B9:</b> Geladene Depotbewertung auch in Command. Verlauf mit Zeitachse und ausgewiesenem Messzeitraum. Kontrollierte Testvorschau · Geräteabnahme ausstehend. <a href="https://github.com/Achi1984/meridian/issues/766">B9-Umfang #766</a>.</p>
         <p><b>Zuletzt belegte UI-Änderung · B1:</b> Botübersicht mit Quellen- und Risikostatus. Integriert am <time datetime="2026-10-11T19:30:28Z">11.10.2026, 21:30 Uhr Wien</time> · <a href="https://github.com/Achi1984/meridian/pull/702">Änderungsnachweis #702</a>.</p>
@@ -272,7 +324,8 @@
       </div>
       <p>Veröffentlichtes Terminal und Designvorschau sind getrennte Stände.</p>
       <ul class="version-history-list">
-        <li><strong>Meridian 11 · B11</strong><span class="version-status">Entwurf</span><p>Bot-Cockpit mit Suche, Richtung/Kontraktart-Filtern und deterministischer Sortierung. Command zeigt denselben validierten Snapshot und verlinkt bestätigte Quellverluste zur Karte. Reine Testvorschau; keine Risikorangfolge, neue Datenanbindung oder Funktionsfreigabe.</p></li>
+        <li><strong>Meridian 11 · B12</strong><span class="version-status">Entwurf</span><p>Strategien-Arbeitsbereich mit dem Quellregister, einer manuell bedienbaren M11-Arena und einem getrennten B1-7-Entwicklungskandidaten. Keine automatische Marktdatenbeschaffung, kein Paperbetrieb und keine Live-Freigabe.</p></li>
+        <li><strong>Meridian 11 · B11</strong><span class="version-status">Testvorschau</span><p>Bot-Cockpit mit Suche, Richtung/Kontraktart-Filtern und deterministischer Sortierung. Command zeigt denselben validierten Snapshot und verlinkt bestätigte Quellverluste zur Karte. Reine Testvorschau; keine Risikorangfolge, neue Datenanbindung oder Funktionsfreigabe.</p></li>
         <li><strong>Meridian 11 · B10</strong><span class="version-status">Testvorschau</span><p>Kompaktere Header- und Command-Hierarchie sowie klare Vorbereitungslabels für Forecast und Scanner. Reines Layout; keine neue Datenanbindung oder Funktionsfreigabe.</p></li>
         <li><strong>Meridian 11 · B9</strong><span class="version-status">Testvorschau</span><p>Command übernimmt die manuell geladene Depotbewertung und deren Sperre. Verlauf mit Zeitachse und vorhandenem Messzeitraum.</p></li>
         <li><strong>Meridian 11 · B8</strong><span class="version-status">Testvorschau</span><p>Depotbewertung unabhängig von der Historie. Verlauf für 1h, 1 Tag und 1 Woche mit sichtbaren Datenlücken; keine Renditeberechnung.</p></li>
@@ -319,6 +372,11 @@
         <div class="card-head"><span class="card-kicker">JETZT WICHTIG</span><span class="limited">UNGEKLÄRT</span></div>
         <h2>Risiko ungeklärt</h2>
         <p>Es wird keine Aussage über Liquidationsgefahr oder Handelsschutz getroffen. Fehlende Daten sind keine Entwarnung.</p>
+      </section>
+      <section class="card command-strategies" aria-labelledby="command-strategies-heading">
+        <div class="card-head"><h2 id="command-strategies-heading">Strategieforschung</h2><span class="limited">Keine Handelsaktivität</span></div>
+        <p>12 Hypothesen im Entwurfsregister, fünf Arena-Modelle mit historischen Diagnosen und B1-7 als getrennter Entwicklungskandidat ohne Ergebnisse. Kein laufendes Paper.</p>
+        <a class="command-open-strategies" href="#view-strategies" data-open-strategies>Strategien in M11 öffnen</a>
       </section>
       <details class="command-context-details">
         <summary><span>Einordnung &amp; Datenlage</span><span aria-hidden="true">+</span></summary>
@@ -397,15 +455,18 @@
         <div id="bot-read-root"></div>
         <p class="caption">Ohne bestätigte Botdaten sind Gebühren, Risikopuffer und Schutzstatus unbekannt. Fehlende Daten sind keine Entwarnung.</p>
       </section>
-      <p class="caption">Nur manuelle Leseabfragen. Diese Ansicht steuert keine Bots. „Terminal öffnen“ führt zum separaten Terminal.</p>
+      <p class="caption">Nur manuelle Leseabfragen. Diese Ansicht steuert keine Bots. Strategieforschung ist von deinen Pionex-Snapshots getrennt.</p>
     </section>
     <section id="view-market" class="view" aria-labelledby="forecast-heading" hidden>
       <div class="eyebrow">MARKT &amp; SZENARIEN</div><h1 id="forecast-heading">Forecast</h1>
       <div class="card view-placeholder"><span class="limited module-availability">In Vorbereitung</span><h2>Marktszenarien nachvollziehbar prüfen</h2><p>Geplant sind FIB-Zonen und Szenarien mit verifizierten Quellen und sichtbarer Unsicherheit. Aktuell sind keine Forecast-Daten oder Live-Signale verfügbar.</p></div>
     </section>
-    <section id="view-research" class="view" aria-labelledby="scanner-heading" hidden>
-      <div class="eyebrow">RESEARCH &amp; CHANCEN</div><h1 id="scanner-heading">Scanner</h1>
-      <div class="card view-placeholder"><span class="limited module-availability">In Vorbereitung</span><h2>Research-Chancen erst nach Evidenz</h2><p>Der Scanner soll nachvollziehbare Research-Kandidaten zeigen. Aktuell sind keine Research-Ausgaben oder freigegebenen Signale verfügbar; es entstehen keine Handelsaufträge oder Paper-Bots.</p></div>
+    <section id="view-strategies" class="view" aria-labelledby="strategies-heading" hidden>
+      <div class="eyebrow">HYPOTHESEN · EVIDENZ · BLOCKER</div><h1 id="strategies-heading">Strategien</h1>
+      <p class="sub">Strategieforschung in M11 ist getrennt von den Exchange-Bots im Bots-Tab. Keine automatische Promotion, Paper-Ausführung oder Handelsfreigabe.</p>
+      <p id="strategy-load-status" class="strategy-load-status" role="status" aria-live="polite">Das lokale Register wird erst beim Öffnen dieser Ansicht gelesen.</p>
+      <div id="strategy-catalog" aria-busy="false"></div>
+      <div id="strategy-arena-root"></div>
     </section>
   </main>
   <nav id="nav" aria-label="Hauptnavigation">
@@ -413,7 +474,7 @@
     <button type="button" data-v="depot" aria-controls="view-depot"><span class="nav-icon" aria-hidden="true">◉</span><span>DEPOT</span></button>
     <button type="button" data-v="bots" aria-controls="view-bots"><span class="nav-icon" aria-hidden="true">▦</span><span>BOTS</span></button>
     <button type="button" data-v="market" aria-controls="view-market"><span class="nav-icon" aria-hidden="true">⌁</span><span>FORECAST</span></button>
-    <button type="button" data-v="research" aria-controls="view-research"><span class="nav-icon" aria-hidden="true">◇</span><span>SCANNER</span></button>
+    <button type="button" data-v="strategies" aria-controls="view-strategies"><span class="nav-icon" aria-hidden="true">◇</span><span>STRATEGIEN</span></button>
   </nav>
 </div>
 <script>
@@ -501,7 +562,8 @@
   }
 })();
 </script>
-<script type="module" src="./bot-read-bootstrap.js?v=B11"></script>
-<script type="module" src="./depot-read-bootstrap.js?v=B9"></script>
+<script type="module" src="./bot-read-bootstrap.js?v=B12"></script>
+<script type="module" src="./depot-read-bootstrap.js?v=B12"></script>
+<script type="module" src="./strategy-workspace-bootstrap.js?v=B12"></script>
 </body>
 </html>

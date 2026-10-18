@@ -10,7 +10,7 @@ const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium
 const page=process.env.V11_TEST_URL||'file://'+fileURLToPath(new URL('../v11/index.html',import.meta.url));
 const sizes=[{width:320,height:568,mobile:true},{width:375,height:667,mobile:true},
   {width:390,height:844,mobile:true},{width:1440,height:900,mobile:false}];
-const views=['command','depot','bots','market','research'];
+const views=['command','depot','bots','market','strategies'];
 const evidence=process.env.V11_B10_EVIDENCE_DIR;
 
 test('V11 B10 Chrome: compact hierarchy, keyboard disclosure and reachable views at exact sizes',{timeout:120000},async()=>{
@@ -55,7 +55,7 @@ test('V11 B10 Chrome: compact hierarchy, keyboard disclosure and reachable views
           return {value:{top:value.top,bottom:value.bottom},status:{top:status.top,bottom:status.bottom},navTop:nav.top};
         })(),
         disclosureHeight:document.querySelector('#autonomy-status summary').getBoundingClientRect().height,
-        targets:[...document.querySelectorAll('#nav button,#version-toggle,.terminal-entry-link,#autonomy-status summary,.command-context-details>summary')].every(node=>node.getBoundingClientRect().height>=44)
+        targets:[...document.querySelectorAll('#nav button,#version-toggle,.strategy-entry-link,#autonomy-status summary,.command-context-details>summary')].every(node=>node.getBoundingClientRect().height>=44)
       })`);
       assert.equal(initial.width,size.width);assert.equal(initial.height,size.height);
       assert.equal(initial.scrollY,0,'initial portfolio visibility is measured without scrolling');
