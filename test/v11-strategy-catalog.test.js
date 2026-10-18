@@ -105,7 +105,7 @@ test('manual import recomputes synthetic fixtures and rejects forged receipt, ov
 test('provenance unknowns and caller-controlled strings are not trusted as HTML',()=>{
   assert.equal(describeArenaProvenance(null).status,'UNKNOWN');
   assert.equal(describeArenaProvenance({schemaVersion:'bad',ruleset:'bad',summary:{candidates:[]}}).status,'INVALID');
-  const html=arenaHtml({error:'<script>alert(1)</script>'});
-  assert.doesNotMatch(html,/<script>/);
-  assert.match(html,/&lt;script&gt;/);
+  const html=arenaHtml({error:'<SCRIPT>alert(1)</SCRIPT>'});
+  assert.doesNotMatch(html,/<script\b/i);
+  assert.match(html,/&lt;SCRIPT&gt;/);
 });
