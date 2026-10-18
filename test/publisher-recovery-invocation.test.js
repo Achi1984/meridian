@@ -11,6 +11,6 @@ test('publisher recovery invocation: pinned bootstrap with stubbed wrapper', {ti
   });
   assert.ifError(run.error);
   assert.equal(run.status,0,`Synthetic invocation tests failed:\n${run.stdout}\n${run.stderr}`);
-  assert.match(run.stderr,/Ran 9 tests/);
+  assert.match(run.stderr,/Ran 11 tests/);
   assert.match(run.stderr,/\nOK\s*$/);
 });
