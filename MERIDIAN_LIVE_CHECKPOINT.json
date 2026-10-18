@@ -877,8 +877,8 @@
         "st_mode": 33152,
         "st_nlink": 1,
         "st_size": 53,
-        "st_mtime_ns": 1792227465428048000,
-        "st_ctime_ns": 1792227465428048000
+        "st_mtime_ns": 1792227465428047843,
+        "st_ctime_ns": 1792227465428047843
       },
       "priorArchiveByteExact": true,
       "correctedArchiveOperationId": "7b9b75d21315ee2bd4b5acd895f9c556",
