@@ -130,7 +130,7 @@ export function renderBotReadState(root, state, filters = {}) {
   return data.status;
 }
 
-function renderCommandOverview(root, data, onJump) {
+export function renderCommandBotOverview(root, data, onJump) {
   if (!root) return;
   const document=root.ownerDocument;
   root.replaceChildren();
@@ -197,10 +197,10 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
   const reset=element(document,'button','Filter zurücksetzen');reset.setAttribute('type','button');
   reset.setAttribute('aria-label','Alle Botfilter zurücksetzen');filterPanel.append(reset);
   const refresh=element(document,'button','Bots aktualisieren'),lock=element(document,'button','Botansicht sperren');
+  refresh.id='bot-read-refresh';lock.id='bot-read-lock';
   refresh.setAttribute('type','button');lock.setAttribute('type','button');
   controls.append(refresh,lock);section.append(element(document,'h3','Meine Pionex Bots'),filterPanel,content,controls);
   root.replaceChildren(section);
-  const commandRoot=document.getElementById?.('command-bot-overview');
   let disposed=false,client,action=0,latestState={status:'locked'};
   const resetFilterState=()=>{
     filterState.query='';filterState.direction='all';filterState.category='all';filterState.sort='symbol';
@@ -208,8 +208,7 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
   };
   const notifySnapshot=state=>{
     const data=projection(state);
-    renderCommandOverview(commandRoot,data,jumpToBot);
-    try{onSnapshot?.(data);}catch{}
+    try{onSnapshot?.(data,jumpToBot);}catch{}
   };
   const update=state=>{
     if(disposed)return;
@@ -250,7 +249,6 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
   sortSelect.addEventListener('change',updateFilters);
   reset.addEventListener('click',resetFilters);
   update({status:'locked'});
-  renderCommandOverview(commandRoot,projection({status:'locked'}),jumpToBot);
   try {
     client=createClient({getToken,onChange:update});
     if (!client || ['refresh','lock','revalidate','dispose'].some(key=>typeof client[key]!=='function')) throw new Error();
@@ -289,8 +287,7 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
       sortSelect.removeEventListener('change',updateFilters);
       reset.removeEventListener('click',resetFilters);
       try {client.dispose();} catch {}
-      renderCommandOverview(commandRoot,projection({status:'locked'}),jumpToBot);
-      try{onSnapshot?.({status:'locked',bots:[]});}catch{}
+      notifySnapshot({status:'locked'});
       root.replaceChildren();
     }
   };

@@ -62,11 +62,13 @@ screenshots or saved by the tests.
   versus the old expectation of 17). A new exact-head result is not yet available.
   An earlier local full-suite attempt passed 2533/2544 tests; its 11 failures were
   confined to non-V11 PG-dependent, publisher-Python, and V10 tests.
-- `main` advanced through PR873 and the unrelated PR872 merge to
-  `a8cde76ba3255a77049eb6318a61efaa127cedd0`. This branch now includes that main
-  through merge commit `7621ce990c88c4b02e16805357ce779bebc4234b`; r130 and B10 are
-  both retained in the version history (17 rows plus its reachable closing note).
-  The browser history check verifies all 18 items. Exact-head CI and independent
-  review remain pending. This note does not claim those gates passed.
+- B10 was completed in PR875: reviewed head `b4a5084b98fe54c0c840d17806a76b5a465bf4c9`,
+  base `a8cde76ba3255a77049eb6318a61efaa127cedd0`, merge
+  `1c7b6dccd886f57e866c7d359c091b1e72a193ea`, Claude GREEN_LIGHT639/6249104892,
+  exact-head CI39120883771 attempt2 (2600/2600), and applicable postchecks
+  Release Safety39122238945, Runtime39122238938, Coordinator39122238969 and
+  Pages39122238564 (receipt PR875/6248789090, mailbox639/6249191206).
+  This remains a B10 V11 preview, not operational V11 go-live. B11 is a separate
+  draft; these B10 screenshots and gates are not evidence for B11.
 - No authenticated Depot/Bots access, real-account data, physical mobile device,
   Safari/PWA readiness, deployment, or production status was tested.

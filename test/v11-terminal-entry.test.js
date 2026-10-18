@@ -320,7 +320,7 @@ const b11Deltas=[
   ["        <li><strong>Meridian 11 · B10</strong><span class=\"version-status\">Entwurf</span><p>Kompaktere Header- und Command-Hierarchie sowie klare Vorbereitungslabels für Forecast und Scanner. Reines Layout; keine neue Datenanbindung oder Funktionsfreigabe.</p></li>\n",
    "        <li><strong>Meridian 11 · B11</strong><span class=\"version-status\">Entwurf</span><p>Bot-Cockpit mit Suche, Richtung/Kontraktart-Filtern und deterministischer Sortierung. Command zeigt denselben validierten Snapshot und verlinkt bestätigte Quellverluste zur Karte. Reine Testvorschau; keine Risikorangfolge, neue Datenanbindung oder Funktionsfreigabe.</p></li>\n        <li><strong>Meridian 11 · B10</strong><span class=\"version-status\">Testvorschau</span><p>Kompaktere Header- und Command-Hierarchie sowie klare Vorbereitungslabels für Forecast und Scanner. Reines Layout; keine neue Datenanbindung oder Funktionsfreigabe.</p></li>\n"],
   ["    .bot-read-view .bot-card .bot-pnl-positive{color:#6ee7b7}\n",
-   "    .bot-read-view .bot-card .bot-pnl-positive{color:#6ee7b7}\n    .bot-overview-filters{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;margin:12px 0}\n    .bot-overview-filters label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}\n    .bot-overview-filters input,.bot-overview-filters select{width:100%;min-width:0;min-height:44px;padding:8px;border:1px solid #567a9f;border-radius:8px;background:#101b28;color:var(--text);font-size:16px}\n    .bot-overview-filters button,.command-bot-overview button{min-width:44px;min-height:44px;padding:10px;border:1px solid #567a9f;border-radius:8px;background:#142235;color:var(--text);overflow-wrap:anywhere}\n    .bot-overview-filters :focus-visible,.command-bot-overview button:focus-visible{outline:3px solid #9bc9ff;outline-offset:2px}\n    .command-bot-overview{overflow-wrap:anywhere}\n    .command-bot-overview ul{list-style:none;padding:0;margin:8px 0;display:grid;gap:8px}\n    .command-bot-overview li{min-width:0}\n    .bot-read-view [hidden]{display:none!important}\n    @media(min-width:560px){.bot-overview-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.bot-overview-filters>button{grid-column:1/-1}}\n"],
+   "    .bot-read-view .bot-card .bot-pnl-positive{color:#6ee7b7}\n    .bot-overview-filters{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;margin:12px 0}\n    .bot-overview-filters label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}\n    .bot-overview-filters input,.bot-overview-filters select{width:100%;min-width:0;min-height:45px;padding:8px;border:1px solid #567a9f;border-radius:8px;background:#101b28;color:var(--text);font-size:16px}\n    .bot-overview-filters button,.command-bot-overview button{min-width:44px;min-height:44px;padding:10px;border:1px solid #567a9f;border-radius:8px;background:#142235;color:var(--text);overflow-wrap:anywhere}\n    .bot-overview-filters :focus-visible,.command-bot-overview button:focus-visible{outline:3px solid #9bc9ff;outline-offset:2px}\n    .command-bot-overview{overflow-wrap:anywhere}\n    .command-bot-overview ul{list-style:none;padding:0;margin:8px 0;display:grid;gap:8px}\n    .command-bot-overview li{min-width:0}\n    .bot-read-view [hidden]{display:none!important}\n    @media(min-width:560px){.bot-overview-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.bot-overview-filters>button{grid-column:1/-1}}\n"],
   ["",`      <section class="card" aria-labelledby="command-bots-heading">
         <div class="card-head"><h2 id="command-bots-heading">Bot-Snapshot</h2><span class="limited">Nur lesend</span></div>
         <div id="command-bot-overview" class="command-bot-overview" role="status" aria-live="polite" aria-atomic="true" data-state="locked">
@@ -411,7 +411,7 @@ test('Terminal öffnen preserves the reviewed history-close baseline and stays o
   assert.equal(gitBlob(restored),preimageBlob,'all source bytes except terminal-entry insertions, the checked viewport pair and exact Depot/revision deltas must match the reviewed history-close baseline');
 });
 
-const moduleNames=['bot-read-bootstrap.js','bot-read-access.js','bot-read-client.js','bot-read-view.js','bot-read-model.js','depot-read-bootstrap.js','depot-read-client.js','depot-read-model.js','depot-read-view.js','depot-history-model.js','depot-history-view.js','depot-current-model.js'];
+const moduleNames=['bot-read-bootstrap.js','bot-read-access.js','bot-read-client.js','bot-read-view.js','bot-read-model.js','bot-overview-model.js','depot-read-bootstrap.js','depot-read-client.js','depot-read-model.js','depot-read-view.js','depot-history-model.js','depot-history-view.js','depot-current-model.js'];
 function deploymentServer(){
   const inlineScript=html.match(/<script>([\s\S]*?)<\/script>/i)?.[1];
   assert.ok(inlineScript,'actual UI-only navigation script');
@@ -437,7 +437,7 @@ function deploymentServer(){
   const server=createServer((request,response)=>{
     const url=new URL(request.url,'http://127.0.0.1'),path=url.pathname;
     requests.push({method:request.method,path}); // never record headers or token values
-    const versionedModule=(path==='/meridian/v11/bot-read-bootstrap.js'||path==='/meridian/v11/bot-read-view.js')&&url.search==='?v=B6'||path==='/meridian/v11/depot-read-bootstrap.js'&&url.search==='?v=B9';
+    const versionedModule=(path==='/meridian/v11/bot-read-bootstrap.js'||path==='/meridian/v11/bot-read-view.js')&&url.search==='?v=B11'||path==='/meridian/v11/depot-read-bootstrap.js'&&url.search==='?v=B9';
     if(request.method!=='GET'||(url.search&&!versionedModule)){response.writeHead(404);response.end();return;}
     if(path===endpoint){
       reads++;
@@ -590,7 +590,7 @@ async function browserRun(call,start,width,expectedBuild,server){
       assert.equal(bots.value,'Anzahl aktiver Bots unbekannt');
       assert.deepEqual(bots.states,[['Quelle','Snapshot unten'],['Aktualität','Je manueller Abfrage'],['Risiko','Nicht bestimmbar']]);
       assert.equal(server.metrics().reads,initialReads,'mount and navigation never fetch');
-      assert.equal(bots.controls,4,'one credential input and three read/lock controls, no execution controls');
+      assert.equal(bots.controls,9,'one credential input, filters, and read/lock controls, no execution controls');
       assert.equal(bots.viewport,width);
       assert.ok(bots.body<=width+1&&bots.root<=width+1,'Bots panel overflow at '+width);
       const waitUntil=async predicate=>{
@@ -598,7 +598,7 @@ async function browserRun(call,start,width,expectedBuild,server){
         assert.fail('synthetic bot state timeout');
       };
       const accept=()=>evaluate(`document.getElementById('bot-read-token').value='synthetic-b3-token';document.getElementById('bot-read-provide').click();true`);
-      const refresh=()=>evaluate(`document.querySelector('#bot-read-root button').click();true`);
+      const refresh=()=>evaluate(`document.getElementById('bot-read-refresh').click();true`);
       const readState=()=>evaluate(`document.querySelector('#bot-read-root [data-state]')?.dataset.state`);
       await accept();assert.equal(server.metrics().reads,initialReads,'accepting access does not fetch');
       assert.equal(await evaluate(`document.getElementById('bot-read-token').value`),'','input cleared');
@@ -639,7 +639,7 @@ async function browserRun(call,start,width,expectedBuild,server){
         const positiveShot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
         writeFileSync(join(evidence,`v11-b6-${width}-positive.png`),Buffer.from(positiveShot.data,'base64'));
       }
-      await evaluate(`document.querySelectorAll('#bot-read-root button')[1].click();true`);
+      await evaluate(`document.getElementById('bot-read-lock').click();true`);
       assert.equal(await readState(),'locked');assert.equal(await evaluate(`document.querySelector('#depot-read-root svg')===null`),true);assert.equal(await evaluate(`document.querySelectorAll('#bot-read-root li').length`),0);
       await refresh();assert.equal(server.metrics().reads,initialReads+1,'locked credential cannot request');
       await accept();server.setMode('pending');const aborts=server.metrics().aborts;

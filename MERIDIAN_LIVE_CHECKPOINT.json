@@ -96,11 +96,21 @@
     "policyProposalCommentId": 6096562356,
     "protocol": "STREAM-SAFE-V8"
   },
-  "lastSeenCommentId": 6246858680,
+  "lastSeenCommentId": 6249191206,
   "quickCommand": "Go Meridian",
   "bootstrapFile": "MERIDIAN_GO.md",
   "currentWork": {
     "updatedAt": "2026-10-18",
+    "currentB11": {
+      "opId": "MERIDIAN-V11-B11-BOT-COCKPIT-20261018",
+      "issue": 876,
+      "pullRequest": 877,
+      "branch": "copilot/meridian-v11-b11-bot-cockpit-20261018",
+      "verifiedBaseSha": "1c7b6dccd886f57e866c7d359c091b1e72a193ea",
+      "state": "DRAFT_PENDING_LEAD_BASE_CI_REVIEW_AND_GUARDED_PUBLICATION",
+      "nextStep": "COMPLETE_SYNTHETIC_SHELL_EVIDENCE_AND_CONTINUITY; THEN LEAD_OWNS_BASE_CI_INDEPENDENT_REVIEW_AND_GUARDED_PUBLICATION",
+      "noMergeOrActivationAuthority": true
+    },
     "v11B10ClarityProposal": {
       "operationId": "MERIDIAN-V11-B10-CLARITY-20261018",
       "issue": 874,
@@ -114,11 +124,28 @@
       "reconciledMainSha": "a8cde76ba3255a77049eb6318a61efaa127cedd0",
       "integrationMerge": "7621ce990c88c4b02e16805357ce779bebc4234b",
       "historyReconciliation": "R130_AND_B10_HISTORY_PRESERVED; 18_REACHABLE_ITEMS_INCLUDING_CLOSING_NOTE",
-      "status": "LOCAL_ACCEPTANCE_GAPS_CLOSED_PENDING_EXACT_HEAD_CI_AND_LEAD_REVIEW",
+      "status": "COMPLETE_MERGED_PR875; B10_PREVIEW_NOT_OPERATIONAL_V11_GO_LIVE",
       "lastVerifiedUiCommit": "c395fffa5e98bf8da83058bedbcd7710b5ef5840",
       "visualAcceptance": "docs/v11/B10_VISUAL_ACCEPTANCE.md",
       "visualEvidenceDirectory": "docs/v11/evidence/b10",
       "localBrowserResults": "ALL_122_V11_TESTS_PASS_ON_RECONCILED_HEAD; PORTFOLIO_VISIBILITY_AND_BOTH_DISCLOSURE_KEYS_PASS",
+      "completionReceipt": {
+        "reviewedHead": "b4a5084b98fe54c0c840d17806a76b5a465bf4c9",
+        "reviewedBase": "a8cde76ba3255a77049eb6318a61efaa127cedd0",
+        "mergeSha": "1c7b6dccd886f57e866c7d359c091b1e72a193ea",
+        "reviewCommentId": 6249104892,
+        "finalMergeCommentId": 6248789090,
+        "ciRun": 39120883771,
+        "ciAttempt": 2,
+        "ciResult": "2600/2600",
+        "postMergeChecks": {
+          "releaseSafety": 39122238945,
+          "runtimeSmoke": 39122238938,
+          "releaseCoordinator": 39122238969,
+          "pages": 39122238564
+        },
+        "publicationScope": "V11_B10_PREVIEW_ONLY_NOT_OPERATIONAL_GO_LIVE"
+      },
       "scope": "V11 presentation, focused browser checks and visual evidence only",
       "nonActions": [
         "NO_V10_ROOT_OR_PWA_RELEASE_IDENTITY_CHANGE",
@@ -127,8 +154,47 @@
         "NO_MERGE_OR_DEPLOY"
       ]
     },
-    "verifiedSourceMain": "921246e61e07ff0624fb4a24c00a452246e9eb7f",
-    "lastCompletedSourceMerge": {
+    "historicalVerifiedSourceMainBeforeB11": "921246e61e07ff0624fb4a24c00a452246e9eb7f",
+    "verifiedSourceMain": "1c7b6dccd886f57e866c7d359c091b1e72a193ea",
+    "completedSourceMerge873": {
+      "pr": 873,
+      "mergeSha": "b75335da3805c0d509ff11f75ab0584d351f284e",
+      "reviewedHead": "8a7c5eb2e437667ea05b6919431ec07c6a7fe96d",
+      "reviewedBase": "cbe9b5a34ed31e61746a656d49bb1b81bc637eec",
+      "progressCommentId": 6248247986,
+      "mailboxFinalCommentId": 6248725056,
+      "sourceCiTests": "2592_PASS",
+      "postMergeChecks": {
+        "releaseSafety": 39119082142,
+        "visualQa": 39119082137,
+        "runtimeSmoke": 39119082165,
+        "orchestration": 39119082175,
+        "releaseCoordinator": 39119082161,
+        "pages": 39119081845
+      },
+      "historicalVisualCiFailure": "39119082137_ATTEMPT1_ETIMEDOUT; UNCHANGED_SOURCE_RETRY_PASSED"
+    },
+    "completedSourceMerge872": {
+      "pr": 872,
+      "mergeSha": "a8cde76ba3255a77049eb6318a61efaa127cedd0",
+      "reviewedHead": "f3a7218d4c3162738cd9b0d42ec9d187eba4f595",
+      "reviewedBase": "b75335da3805c0d509ff11f75ab0584d351f284e",
+      "progressCommentId": 6247247834,
+      "mailboxFinalCommentId": 6248819311,
+      "ciRun": 39119255611,
+      "ciResult": "2599/2599",
+      "postMergeChecks": {
+        "releaseSafety": 39119837052,
+        "runtimeSmoke": 39119837033,
+        "releaseCoordinator": 39119837037,
+        "pages": 39119836714
+      },
+      "commonCloses": 448,
+      "targetCommonCloses": 955,
+      "networkAuthenticityVerified": false,
+      "strategyPnlRun": false
+    },
+    "historicalLastCompletedSourceMergeBeforeB11": {
       "pr": 862,
       "mergeSha": "921246e61e07ff0624fb4a24c00a452246e9eb7f",
       "reviewedHead": "39a2f73f279f37b8adc8a0d4e682907634d3c0a4",
@@ -147,6 +213,27 @@
         "runtimeSmoke": 39105990479,
         "releaseCoordinator": 39105990429,
         "pages": 39105990078
+      },
+      "lastCompletedSourceMerge": {
+        "pr": 875,
+        "mergeSha": "1c7b6dccd886f57e866c7d359c091b1e72a193ea",
+        "reviewedHead": "b4a5084b98fe54c0c840d17806a76b5a465bf4c9",
+        "reviewedBase": "a8cde76ba3255a77049eb6318a61efaa127cedd0",
+        "reviewer": "CLAUDE",
+        "reviewCommentId": 6249104892,
+        "sourceCiRunId": 39120883771,
+        "sourceCiAttempt": 2,
+        "sourceCiResult": "2600/2600",
+        "state": "COMPLETE",
+        "postMergeChecks": "VERIFIED_SUCCESS",
+        "postMergeRunIds": {
+          "releaseSafety": 39122238945,
+          "runtimeSmoke": 39122238938,
+          "releaseCoordinator": 39122238969,
+          "pages": 39122238564
+        },
+        "finalMergeCommentId": 6248789090,
+        "scope": "V11_B10_PREVIEW_ONLY"
       },
       "postMergeSnapshot": {
         "releaseSafety": "SUCCESS",
@@ -193,7 +280,8 @@
       }
     },
     "package": "PROCESS_FEEDBACK_6238072184_CONSOLIDATED_HANDOFF",
-    "state": "PR862_COMPLETE_PR860_REFRESH_PENDING_OWN_EXACT_HEAD_CI_AND_REVIEW_ARENA861_REOPENED",
+    "historicalStateBeforeB11": "PR862_COMPLETE_PR860_REFRESH_PENDING_OWN_EXACT_HEAD_CI_AND_REVIEW_ARENA861_REOPENED",
+    "state": "PR873_PR872_PR875_COMPLETE_B11_DRAFT_PENDING",
     "infrastructurePaused": true,
     "mailboxRollover": {
       "from": 571,
@@ -322,7 +410,8 @@
         "authorizedReproductionBudget": "UNKNOWN"
       }
     },
-    "nextStep": "COMPLETE_PR860_REFRESH_OWN_EXACT_HEAD_CI_AND_INDEPENDENT_REVIEW_THEN_LEAD_MERGE_THEN_ARENA861_RETROSPECTIVE_PROVENANCE_EXISTING_EVIDENCE_ONLY",
+    "historicalNextStepBeforeB11": "COMPLETE_PR860_REFRESH_OWN_EXACT_HEAD_CI_AND_INDEPENDENT_REVIEW_THEN_LEAD_MERGE_THEN_ARENA861_RETROSPECTIVE_PROVENANCE_EXISTING_EVIDENCE_ONLY",
+    "nextStep": "COMPLETE_B11_LOCAL_SYNTHETIC_BROWSER_ACCEPTANCE_AND_CONTINUITY_REFRESH; THEN_LEAD_RECONCILES_BASE_CI_REVIEW_AND_GUARDED_PUBLICATION",
     "ownerPathInspection": {
       "pr": 828,
       "mergeSha": "bfebd17ddfa1d2d3b44a15126e28618a82cb81f2",
@@ -347,7 +436,8 @@
       "evidenceScope": "HISTORICAL_SOURCE_SNAPSHOT_SUPERSEDED_BY_RUNTIME_RECOVERY_20261017"
     },
     "publisherNextStep": "PAUSED_BY_OWNER_B_NO_OPERATIONAL_AUTHORITY_NATIVE868_DISABLED",
-    "strategyNextStep": "Finalize r130 Arena release integration gates; separately diagnose PR872 publisher timing-test failure before independent data review. No new strategy execution.",
+    "historicalStrategyNextStepBeforeB11": "Finalize r130 Arena release integration gates; separately diagnose PR872 publisher timing-test failure before independent data review. No new strategy execution.",
+    "strategyNextStep": "PR873 r130 Arena integration and PR872 data integration are complete on main; preserve SOURCE_AUDIT and all seven false flags. H9 remains blocked, CRV unresolved, 448/955 common-close limitation stands. No new acquisition, replay, strategy PnL, research execution or trading.",
     "completion20261017": {
       "verifiedMain": "8691381510039e2ad48b863ea5e66d6ad6cba462",
       "arenaMerge": "ed60066fc58b4d60eddd727c24cae61c368720bb",
@@ -626,10 +716,12 @@
       "repairAuthorizationConsumed": true
     },
     "arena861": {
+      "historicalPre873ImplementationMerge": "NOT_MERGED",
+      "historicalPre873IntegrationState": "PENDING_REVIEW_CI_MERGE",
       "issueLifecycle": "CLOSED_AT_REPAIR_862_MERGE_THEN_REOPENED_BY_LEAD",
       "issueState": "REOPENED_BY_LEAD",
       "product": "RETROSPECTIVE_PROVENANCE_AND_LIMITATIONS_VIEW",
-      "implementation": "REVIEWED_SOURCE_PR870_R130_INTEGRATION_PENDING",
+      "implementation": "REVIEWED_SOURCE_PR870_INTEGRATED_BY_PR873",
       "implementationBranch": "copilot/fixv10-r130-arena-provenance",
       "implementationPr": 870,
       "implementationBase": "cbe9b5a34ed31e61746a656d49bb1b81bc637eec",
@@ -637,9 +729,9 @@
       "implementationCorrectionCommit": "37e13e8728436c7396f35a3c8045b6391d4824a7",
       "implementationSourceCi": "SAFETY_39110360353_VISUAL_39110360355_SUCCESS",
       "implementationReview": "SOURCE_GREEN_LIGHT_639_6248189652",
-      "implementationMerge": "NOT_MERGED",
-      "implementationPostchecks": "NOT_RUN",
-      "proposalReleaseIdentity": "10.0-r129_UNCHANGED_LEAD_OWNS_R130_INTEGRATION",
+      "implementationMerge": "MERGED_IN_PR873_B75335DA3805C0D509FF11F75AB0584D351F284E",
+      "implementationPostchecks": "PR873_ALL_APPLICABLE_POSTCHECKS_SUCCESS",
+      "proposalReleaseIdentity": "10.0-r130_MERGED_PR873",
       "evidenceScope": "EXISTING_EVIDENCE_ONLY",
       "h9": "BLOCKED",
       "crv": "UNRESOLVED",
@@ -647,9 +739,9 @@
       "newPnlAuthorized": false,
       "implementationSourceHead": "b5d7d2a69dd5715580e9691cfcd566e694452baa",
       "integrationBranch": "v10-r130-arena-provenance-integration-20261018",
-      "integrationReview": "PENDING",
-      "integrationCi": "PENDING",
-      "integrationMerge": "NOT_MERGED",
+      "integrationReview": "GREEN_LIGHT_639_6248688625",
+      "integrationCi": "SUCCESS_2592_TESTS",
+      "integrationMerge": "MERGED_PR873_B75335DA3805C0D509FF11F75AB0584D351F284E",
       "deferredUx": "Preserve provenance fields across stored/import resets; not part of this integration."
     },
     "native868": {
@@ -1320,7 +1412,23 @@
     "krakenUsdDailyAcquisition872": {
       "pr": 872,
       "captureHead": "848e9eaa3389804fb23d727a43e6920a9e9f504d",
-      "state": "CAPTURED_OFFLINE_CONTENT_VERIFIED_PENDING_EXACT_HEAD_CI_AND_INDEPENDENT_REVIEW",
+      "historicalPreIntegrationState": "CAPTURED_OFFLINE_CONTENT_VERIFIED_PENDING_EXACT_HEAD_CI_AND_INDEPENDENT_REVIEW",
+      "state": "INTEGRATED_PR872_MERGED_A8CDE76BA3255A77049EB6318A61EFAA127CEDD0",
+      "mergeReceipt": {
+        "reviewedHead": "f3a7218d4c3162738cd9b0d42ec9d187eba4f595",
+        "reviewedBase": "b75335da3805c0d509ff11f75ab0584d351f284e",
+        "progressCommentId": 6247247834,
+        "mailboxFinalCommentId": 6248819311,
+        "ciRunId": 39119255611,
+        "ciResult": "2599/2599",
+        "mergeSha": "a8cde76ba3255a77049eb6318a61efaa127cedd0",
+        "postMergeChecks": {
+          "releaseSafety": 39119837052,
+          "runtimeSmoke": 39119837033,
+          "releaseCoordinator": 39119837037,
+          "pages": 39119836714
+        }
+      },
       "offlineVerification": {
         "command": "node scripts/verify-kraken-usd-daily-acquisition.mjs",
         "focusedTests": "node --test test/kraken-usd-daily-acquisition.test.js",
@@ -1349,9 +1457,9 @@
         "focusedPythonTest": "PASS_1_OF_1",
         "nodeWrapper": "PASS_INCLUDING_23_PYTHON_TESTS",
         "fullNodeSuite": "2545_PASS_5_FAIL; FAILURES_ERR_MODULE_NOT_FOUND_PG_IN_SUBPROCESSES",
-        "newHeadValidation": "PENDING"
+        "newHeadValidation": "PASS_CI39119255611_2599_OF_2599"
       },
-      "nextGate": "EXACT_HEAD_RELEASE_SAFETY_SUCCESS_AND_INDEPENDENT_REVIEW_BEFORE_ANY_RESEARCH_USE"
+      "nextGate": "NO_RESEARCH_USE_AUTHORIZED; SOURCE_AUTHENTICITY_UNPROVEN; NO_STRATEGY_PNL_OR_EXECUTION"
     },
     "browserCiApprovalDelegation": {
       "commentId": 6248042470,
