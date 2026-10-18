@@ -9,9 +9,11 @@ import os
 import tempfile
 from pathlib import Path
 import re
+import select
 import socket
 import subprocess
 import sys
+import threading
 import time
 from types import SimpleNamespace
 import unittest
@@ -319,12 +321,19 @@ class Tests(unittest.TestCase):
     def test_private_cli_timeout_reaps_group_before_any_db_worker(self):
         with tempfile.TemporaryDirectory() as directory:
             heartbeat = Path(directory) / 'synthetic-descendant-heartbeat'
+            child_pid = Path(directory) / 'synthetic-descendant-pid'
+            ready_fifo = Path(directory) / 'synthetic-descendant-ready'
+            os.mkfifo(ready_fifo, 0o600)
             program = ("import os,time; from pathlib import Path\n"
                        "child=os.fork()\n"
                        "if child: time.sleep(20)\n"
                        "else:\n"
+                       " os.setsid()\n"
+                       " Path(" + repr(str(child_pid)) + ").write_text(str(os.getpid()))\n"
+                       " with open(" + repr(str(heartbeat)) + ", 'ab') as beat: beat.write(b'ready\\n')\n"
+                       " ready=os.open(" + repr(str(ready_fifo)) + ", os.O_WRONLY); os.write(ready,b'R'); os.close(ready)\n"
                        " for count in range(2000):\n"
-                       "  Path(" + repr(str(heartbeat)) + ").write_text(str(count))\n"
+                       "  with open(" + repr(str(heartbeat)) + ", 'ab') as beat: beat.write((str(count)+'\\n').encode())\n"
                        "  time.sleep(0.01)\n")
             service = object.__new__(m.InspectionServices)
             original = SimpleNamespace(supervise=Mock(side_effect=AssertionError('DB worker must not start')))
@@ -333,17 +342,46 @@ class Tests(unittest.TestCase):
                 [sys.executable, '-I', '-c', program], timeout=0.3))
             service.auto, service.original = AUTO, original
             output = io.StringIO()
-            with redirect_stdout(output), redirect_stderr(output):
-                with self.assertRaisesRegex(ValueError, '^command failed$'):
-                    service.inspect()
+            ready_fd = os.open(ready_fifo, os.O_RDWR | os.O_NONBLOCK)
+            failure, ready_at, returned_at = [], [], []
+            def inspect():
+                try:
+                    with redirect_stdout(output), redirect_stderr(output):
+                        service.inspect()
+                except BaseException as error:
+                    failure.append(error)
+                finally:
+                    returned_at.append(time.monotonic())
+            worker = threading.Thread(target=inspect, daemon=True)
+            worker.start()
+            try:
+                readable, _, _ = select.select([ready_fd], [], [], 3)
+                self.assertTrue(readable, 'descendant did not reach its readiness handshake')
+                self.assertEqual(os.read(ready_fd, 1), b'R')
+                ready_at.append(time.monotonic())
+                worker.join(5)
+            finally:
+                os.close(ready_fd)
+                worker.join(3)
+            self.assertFalse(worker.is_alive(), 'command supervision did not complete')
+            self.assertEqual(len(ready_at), 1)
+            self.assertEqual(len(returned_at), 1)
+            self.assertGreaterEqual(returned_at[0] - ready_at[0], 0.2)
+            self.assertLess(returned_at[0] - ready_at[0], 2.5)
+            self.assertEqual(len(failure), 1)
+            self.assertIsInstance(failure[0], ValueError)
+            self.assertEqual(str(failure[0]), 'command failed')
+            self.assertTrue(failure[0].cleanup_complete)
             original.supervise.assert_not_called()
             self.assertEqual(output.getvalue(), '')
-            # Child PID namespaces differ from this host's /proc view. Use an
-            # active descendant heartbeat instead of inspecting unrelated PIDs.
             self.assertTrue(heartbeat.exists())
-            stopped = heartbeat.read_bytes()
+            self.assertTrue(child_pid.exists())
+            with self.assertRaises(ProcessLookupError):
+                os.kill(int(child_pid.read_text()), 0)
+            writes_at_return = heartbeat.read_bytes()
+            self.assertTrue(writes_at_return)
             time.sleep(0.15)
-            self.assertEqual(heartbeat.read_bytes(), stopped)
+            self.assertEqual(heartbeat.read_bytes(), writes_at_return)
 
 
 if __name__ == '__main__':
