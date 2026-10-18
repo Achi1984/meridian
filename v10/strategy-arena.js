@@ -12,42 +12,49 @@ function provenanceField(value, valid, format=x=>x) {
   if(!valid(value))return {status:'INVALID',value:null};
   return {status:'PRESENT_UNVERIFIED',value:format(value)};
 }
-function requiredProvenanceField(value, valid) {
-  if(value===undefined || value===null)return {status:'INVALID',value:null};
-  return provenanceField(value,valid);
-}
 const validHash = value => typeof value==='string' && /^[a-f0-9]{64}$/i.test(value);
 const validText = value => typeof value==='string' && value.trim().length>0;
+const DAY = 86400000;
 const utcDate = value => {
   if(!Number.isSafeInteger(value) || !Number.isFinite(new Date(value).getTime()))return null;
   return new Date(value).toISOString().slice(0,10);
 };
 function dateField(value) {
-  return provenanceField(value, value=>utcDate(value)!==null, utcDate);
+  return provenanceField(value, value=>utcDate(value)!==null, value=>new Intl.DateTimeFormat('de-DE',{timeZone:'UTC',day:'2-digit',month:'2-digit',year:'numeric'}).format(value));
 }
-function pairedDateField(start,end) {
-  if(start.status==='INVALID' || end.status==='INVALID')return {status:'INVALID',value:null};
-  if(start.status!=='PRESENT_UNVERIFIED' || end.status!=='PRESENT_UNVERIFIED')return unknownField();
-  if(start.value>end.value)return {status:'INVALID',value:null};
-  return {status:'PRESENT_UNVERIFIED',value:`${start.value} – ${end.value} UTC`};
+function strictTimestamp(value) {
+  if(typeof value!=='string')return null;
+  const match=/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,3}))?Z$/.exec(value);
+  if(!match)return null;
+  const date=new Date(value);
+  if(!Number.isFinite(date.getTime()))return null;
+  const canonical=match[1]+'.'+(match[2]||'').padEnd(3,'0')+'Z';
+  return date.toISOString()===canonical?date.getTime():null;
+}
+function timestampField(value) {
+  return provenanceField(value,value=>strictTimestamp(value)!==null,value=>new Date(strictTimestamp(value)).toISOString());
 }
 function provenanceStatus(field) {
-  return field.status==='PRESENT_UNVERIFIED'?'PRESENT · SOURCE-RECORDED, NOT AUTHENTICATED':field.status;
+  return field.status==='PRESENT_UNVERIFIED'?'vorhanden · nicht bestätigt':field.status==='INVALID'?'ungültig':'unbekannt';
 }
 function provenanceValue(field) {
-  return field.status==='PRESENT_UNVERIFIED'?escape(field.value):field.status==='INVALID'?'INVALID · malformed source value':'UNKNOWN · not recorded';
+  return field.status==='PRESENT_UNVERIFIED'?escape(field.value):field.status==='INVALID'?'Ungültig':'Unbekannt';
 }
-function provenanceDisclosure(record) {
+function unavailableProvenance(candidateId,status) {
+  const field=status==='INVALID'?{status:'INVALID',value:null}:unknownField();
+  return {candidateId,associationStatus:status,blocked:candidateId==='H9',fields:{market:{...field},universe:{...field},coverage:{...field},warmup:{...field},scored:{...field}},receipt:unknownField(),ruleset:{...field},technical:{schema:{...field},provider:{...field},sealed:{...field}},hashes:Object.fromEntries(['inputSha256','rawInputSha256','engineSha256','protocolSha256','rulesSha256'].map(key=>[key,{...field}]))};
+}
+function provenanceDetails(record) {
   const hashes=['inputSha256','rawInputSha256','engineSha256','protocolSha256','rulesSha256'];
-  const field=(label,key)=>`<li><b>${label} · ${provenanceStatus(record.hashes[key])}</b> <span>${provenanceValue(record.hashes[key])}</span></li>`;
-  return `<details><summary>Receipt details and full hashes</summary><p>Receipt identity · ${provenanceStatus(record.receipt)}: ${provenanceValue(record.receipt)}</p><p>Ruleset · ${provenanceStatus(record.ruleset)}: ${provenanceValue(record.ruleset)}</p><ul>${hashes.map(key=>field(key,key)).join('')}</ul></details>`;
+  const field=key=>`<li><b>${escape(key)} · ${provenanceStatus(record.hashes[key])}</b> <span>${provenanceValue(record.hashes[key])}</span></li>`;
+  return `<details><summary>Technische Belegdetails und vollständige Hashes</summary><p>Beleg-ID · ${provenanceStatus(record.receipt)}: ${provenanceValue(record.receipt)}</p><p>Regelsatz · ${provenanceStatus(record.ruleset)}: ${provenanceValue(record.ruleset)}</p><p>Schema · ${provenanceStatus(record.technical.schema)}: ${provenanceValue(record.technical.schema)}</p><p>Quelle · ${provenanceStatus(record.technical.provider)}: ${provenanceValue(record.technical.provider)}</p><p>Versiegelungszeit · ${provenanceStatus(record.technical.sealed)}: ${provenanceValue(record.technical.sealed)}</p><ul>${hashes.map(field).join('')}</ul></details>`;
 }
-function provenanceCard(candidateId, provenance) {
-  const record=provenance?.[candidateId];
-  if(!record)return `<section class="arena-provenance" aria-label="${escape(candidateId)} provenance"><h3>Retrospective provenance</h3><p>UNKNOWN · Receipt metadata not loaded.</p></section>`;
-  if(record.blocked)return `<section class="arena-provenance" aria-label="${escape(candidateId)} provenance"><h3>Retrospective provenance</h3><p><b>BLOCKED_DATA</b> · No matching source receipt; Kraken USD metadata is not borrowed.</p><p>CRV compatibility: UNRESOLVED. Forward evidence: NOT ESTABLISHED.</p></section>`;
-  const fields=[['Source / market / quote',record.fields.market],['Universe',record.fields.universe],['Coverage / warm-up',record.fields.coverage],['Scored window',record.fields.scored],['Receipt identity',record.receipt]];
-  return `<section class="arena-provenance" aria-label="${escape(candidateId)} provenance"><h3>Retrospective provenance · ${escape(candidateId)}</h3><p class="arena-provenance-status">Source-recorded diagnostic metadata · not independently authenticated · no forward evidence. Not a verification of any imported result.</p><dl>${fields.map(([label,value])=>`<div><dt>${escape(label)} <small>${provenanceStatus(value)}</small></dt><dd>${provenanceValue(value)}</dd></div>`).join('')}</dl>${provenanceDisclosure(record)}<p>CRV compatibility remains UNRESOLVED; this diagnostic does not establish profitability, readiness, or promotion.</p></section>`;
+function provenanceCard(candidateId,provenance) {
+  const record=provenance?.[candidateId]||unavailableProvenance(candidateId,'UNKNOWN');
+  if(record.blocked)return `<section class="arena-provenance" aria-label="${escape(candidateId)} Herkunft"><h3>Rückblickende Herkunft</h3><p><b>Daten fehlen.</b> H9: kein passender Beleg; Kraken-USD-Daten werden nicht zugeordnet. CRV ungeklärt · keine Zukunftsdaten.</p></section>`;
+  if(record.associationStatus!=='PRESENT_UNVERIFIED')return `<section class="arena-provenance" aria-label="${escape(candidateId)} Herkunft"><h3>Rückblickende Herkunft</h3><p>${record.associationStatus==='INVALID'?'Kandidatenzuordnung ungültig.':'Kandidatenbeleg unbekannt.'} Kein Beleg zugeordnet.</p></section>`;
+  const fields=[['Markt',record.fields.market],['Universum',record.fields.universe],['Abdeckung',record.fields.coverage],['Aufwärmphase',record.fields.warmup],['Auswertungszeitraum',record.fields.scored]];
+  return `<section class="arena-provenance" aria-label="${escape(candidateId)} Herkunft"><h3>Rückblickende Herkunft</h3><p class="arena-provenance-status">Quellenangaben · nicht bestätigt · keine Zukunftsdaten.</p><dl>${fields.map(([label,value])=>`<div><dt>${escape(label)} <small>${provenanceStatus(value)}</small></dt><dd>${provenanceValue(value)}</dd></div>`).join('')}</dl>${provenanceDetails(record)}<p>CRV ungeklärt · keine Aussage zu Ertrag oder Einsatzbereitschaft.</p></section>`;
 }
 export function canonicalArenaInput(value) {
   if(value===null || typeof value!=='object') return JSON.stringify(value);
@@ -57,56 +64,112 @@ export function canonicalArenaInput(value) {
 export function adaptArenaProvenance(manifest) {
   const root=manifest && typeof manifest==='object' && !Array.isArray(manifest) ? manifest : {};
   const receipt=root.receipt && typeof root.receipt==='object' && !Array.isArray(root.receipt) ? root.receipt : {};
-  const collection=root.inputTemplate?.collection && typeof root.inputTemplate.collection==='object' ? root.inputTemplate.collection : {};
-  const window=root.summary?.window && typeof root.summary.window==='object' ? root.summary.window : {};
-  const schema=requiredProvenanceField(root.schemaVersion,value=>value==='MERIDIAN_ARENA_CHUNKED_INPUT_V1');
-  const receiptSchema=requiredProvenanceField(receipt.schemaVersion,value=>value==='MERIDIAN_ARENA_RECEIPT_V1');
-  const ruleset=provenanceField(root.ruleset,value=>validText(value)&&value===ARENA_RULESET);
+  const template=root.inputTemplate && typeof root.inputTemplate==='object'&&!Array.isArray(root.inputTemplate)?root.inputTemplate:{};
+  const collection=template.collection && typeof template.collection==='object'&&!Array.isArray(template.collection)?template.collection:{};
+  const summary=root.summary && typeof root.summary==='object'&&!Array.isArray(root.summary)?root.summary:{};
+  const window=summary.window && typeof summary.window==='object'&&!Array.isArray(summary.window)?summary.window:{};
+  const model=summary.model && typeof summary.model==='object'&&!Array.isArray(summary.model)?summary.model:{};
+  const schema=provenanceField(root.schemaVersion,value=>value==='MERIDIAN_ARENA_CHUNKED_INPUT_V1');
+  const receiptSchema=provenanceField(receipt.schemaVersion,value=>value==='MERIDIAN_ARENA_RECEIPT_V1');
+  const ruleset=provenanceField(root.ruleset,value=>value===ARENA_RULESET);
+  const summaryRuleset=provenanceField(summary.ruleset,value=>value===ARENA_RULESET);
+  const candidateRows=summary.candidates;
+  let associationStatus='PRESENT_UNVERIFIED';
+  if(candidateRows===undefined || candidateRows===null)associationStatus='UNKNOWN';
+  else if(!Array.isArray(candidateRows))associationStatus='INVALID';
+  else {
+    const candidateIds=candidateRows.map(candidate=>candidate&&typeof candidate==='object'&&!Array.isArray(candidate)?candidate.id:undefined);
+    if(candidateIds.some(id=>typeof id!=='string'||!ARENA_CANDIDATES.includes(id)) || new Set(candidateIds).size!==candidateIds.length)associationStatus='INVALID';
+    else if(ARENA_CANDIDATES.some(id=>!candidateIds.includes(id)))associationStatus='UNKNOWN';
+    else if(candidateRows.some(candidate=>
+      (candidate.ruleset!==undefined && candidate.ruleset!==ARENA_RULESET) ||
+      (candidate.id==='H9' && candidate.status!=='BLOCKED_DATA')))associationStatus='INVALID';
+  }
+  const declaredRulesets=[root.ruleset,summary.ruleset,template.ruleset,receipt.ruleset,...(Array.isArray(candidateRows)?candidateRows.map(candidate=>candidate?.ruleset):[])].filter(value=>value!==undefined&&value!==null);
+  if(declaredRulesets.some(value=>value!==ARENA_RULESET))associationStatus='INVALID';
+  const requiredEnvelope=[schema,receiptSchema,ruleset,summaryRuleset];
+  if(requiredEnvelope.some(field=>field.status==='INVALID'))associationStatus='INVALID';
+  else if(requiredEnvelope.some(field=>field.status==='UNKNOWN') && associationStatus==='PRESENT_UNVERIFIED')associationStatus='UNKNOWN';
+
   const provider=provenanceField(receipt.collectorProvider,validText);
   const sourceKind=provenanceField(receipt.sourceKind,value=>value==='MARKET_DIAGNOSTIC');
+  const summarySource=provenanceField(summary.sourceKind,value=>value==='MARKET_DIAGNOSTIC');
   const quote=provenanceField(receipt.quoteCurrency,value=>value==='USD'||value==='USDT');
-  const inputQuote=provenanceField(root.inputTemplate?.quoteCurrency,value=>value==='USD'||value==='USDT');
+  const inputQuote=provenanceField(template.quoteCurrency,value=>value==='USD'||value==='USDT');
+  const summaryQuote=provenanceField(summary.quoteCurrency,value=>value==='USD'||value==='USDT');
+  const fxApplied=provenanceField(summary.fxConversionApplied,value=>value===false);
+  const fxCollection=provenanceField(collection.fxConversion,value=>value===false);
+  const marketFields=[provider,sourceKind,summarySource,quote,inputQuote,summaryQuote,fxApplied,fxCollection];
+  const disagrees=(left,right)=>left.status==='PRESENT_UNVERIFIED'&&right.status==='PRESENT_UNVERIFIED'&&left.value!==right.value;
   let market=unknownField();
-  if([schema,receiptSchema,provider,sourceKind,quote,inputQuote].some(field=>field.status==='INVALID')) market={status:'INVALID',value:null};
-  else if([schema,receiptSchema,provider,sourceKind,quote,inputQuote].every(field=>field.status==='PRESENT_UNVERIFIED')) {
-    if(quote.value!==inputQuote.value)market={status:'INVALID',value:null};
-    else {
-      const source=provider.value==='KRAKEN_SPOT_PUBLIC_OHLC'?'Kraken spot OHLC':provider.value;
-      market={status:'PRESENT_UNVERIFIED',value:`${source} · ${quote.value} lane (not ${quote.value==='USD'?'USDT':'USD'})`};
-    }
+  if(marketFields.some(field=>field.status==='INVALID') ||
+    disagrees(sourceKind,summarySource)||disagrees(quote,inputQuote)||disagrees(quote,summaryQuote))market={status:'INVALID',value:null};
+  else if(marketFields.every(field=>field.status==='PRESENT_UNVERIFIED')) {
+    const source=provider.value==='KRAKEN_SPOT_PUBLIC_OHLC'?'Kraken Spot':provider.value;
+    market={status:'PRESENT_UNVERIFIED',value:`${source} · ${quote.value} (nicht ${quote.value==='USD'?'USDT':'USD'})`};
   }
+
   let universe=unknownField();
   if(root.chunks===null || (root.chunks!==undefined && !Array.isArray(root.chunks)))universe={status:'INVALID',value:null};
   else if(Array.isArray(root.chunks)) {
     const symbols=root.chunks.map(chunk=>chunk?.symbol);
     if(symbols.some(symbol=>typeof symbol!=='string'||!ARENA_SYMBOLS.includes(symbol)) || new Set(symbols).size!==symbols.length)universe={status:'INVALID',value:null};
-    else if(symbols.length===ARENA_SYMBOLS.length && ARENA_SYMBOLS.every(symbol=>symbols.includes(symbol)))universe={status:'PRESENT_UNVERIFIED',value:`${symbols.length} assets: ${symbols.join(', ')}`};
+    else if(symbols.length===ARENA_SYMBOLS.length && ARENA_SYMBOLS.every(symbol=>symbols.includes(symbol)))universe={status:'PRESENT_UNVERIFIED',value:`${symbols.length} Werte: ${symbols.join(', ')}`};
     else universe=unknownField();
   }
-  const warmup=dateField(window.warmupStart), scoredStart=dateField(window.firstExecution), end=dateField(window.end);
-  const coverage=pairedDateField(warmup,end), scored=pairedDateField(scoredStart,end);
-  const sealed=provenanceField(receipt.sealedAt,value=>validText(value)&&Number.isFinite(Date.parse(value)),value=>new Date(value).toISOString());
-  let receiptIdentity=unknownField();
-  if(receiptSchema.status==='INVALID' || sealed.status==='INVALID')receiptIdentity={status:'INVALID',value:null};
-  else if(receiptSchema.status==='PRESENT_UNVERIFIED' && sealed.status==='PRESENT_UNVERIFIED')receiptIdentity={status:'PRESENT_UNVERIFIED',value:`${PROVENANCE_PATH} · ${receipt.schemaVersion} · sealed ${sealed.value}`};
+
+  const warmupRaw=window.warmupStart, decisionRaw=window.firstDecision, executionRaw=window.firstExecution, endRaw=window.end;
+  const warmup=dateField(warmupRaw), decision=dateField(decisionRaw), execution=dateField(executionRaw), end=dateField(endRaw);
+  const bars=provenanceField(window.bars,value=>Number.isSafeInteger(value)&&value>0);
+  const warmupBars=provenanceField(model.warmupBars,value=>Number.isSafeInteger(value)&&value>0);
+  let timelineStatus='PRESENT_UNVERIFIED';
+  const timelineFields=[warmup,decision,execution,end,bars,warmupBars];
+  if(timelineFields.some(field=>field.status==='INVALID'))timelineStatus='INVALID';
+  else if(timelineFields.some(field=>field.status==='UNKNOWN'))timelineStatus='UNKNOWN';
+  else {
+    const aligned=(value,close)=>value%DAY===(close?DAY-1:0);
+    const scoredCount=(endRaw-executionRaw+1)/DAY;
+    const warmupCount=(decisionRaw-warmupRaw+1)/DAY;
+    if(![warmupRaw,decisionRaw,executionRaw,endRaw].every(Number.isSafeInteger) ||
+      !aligned(warmupRaw,false)||!aligned(decisionRaw,true)||!aligned(executionRaw,false)||!aligned(endRaw,true) ||
+      !(warmupRaw<decisionRaw && decisionRaw+1===executionRaw && executionRaw<=endRaw) ||
+      !Number.isInteger(scoredCount)||scoredCount!==bars.value ||
+      !Number.isInteger(warmupCount)||warmupCount!==warmupBars.value)timelineStatus='INVALID';
+  }
+  const coverage=timelineStatus==='PRESENT_UNVERIFIED'?{status:timelineStatus,value:`${warmup.value} – ${end.value} UTC`}:{status:timelineStatus,value:null};
+  const warmupRange=timelineStatus==='PRESENT_UNVERIFIED'?{status:timelineStatus,value:`${warmup.value} – ${decision.value} UTC · ${warmupBars.value} Tage`}:{status:timelineStatus,value:null};
+  const scored=timelineStatus==='PRESENT_UNVERIFIED'?{status:timelineStatus,value:`${execution.value} – ${end.value} UTC · ${bars.value} Tage`}:{status:timelineStatus,value:null};
+
+  const sealed=timestampField(receipt.sealedAt);
+  const collected=timestampField(collection.collectedAt), completed=timestampField(collection.completedAt);
+  const asOf=provenanceField(receipt.asOf,value=>Number.isSafeInteger(value)&&value===template.asOf&&value===summary.asOf);
+  const cutoff=provenanceField(collection.eventTimeCutoff,value=>Number.isSafeInteger(value)&&value===endRaw);
+  const timeFields=[sealed,collected,completed,asOf,cutoff];
+  let receiptTimeline='PRESENT_UNVERIFIED';
+  if(timeFields.some(field=>field.status==='INVALID'))receiptTimeline='INVALID';
+  else if(timeFields.some(field=>field.status==='UNKNOWN'))receiptTimeline='UNKNOWN';
+  else if(strictTimestamp(collection.collectedAt)>strictTimestamp(collection.completedAt) ||
+    strictTimestamp(collection.completedAt)>strictTimestamp(receipt.sealedAt))receiptTimeline='INVALID';
+  if(timelineStatus==='INVALID'||receiptTimeline==='INVALID')associationStatus='INVALID';
+  else if((timelineStatus==='UNKNOWN'||receiptTimeline==='UNKNOWN')&&associationStatus==='PRESENT_UNVERIFIED')associationStatus='UNKNOWN';
+
+  const receiptIdentity=receiptTimeline==='PRESENT_UNVERIFIED' && receiptSchema.status==='PRESENT_UNVERIFIED'
+    ?{status:'PRESENT_UNVERIFIED',value:`${PROVENANCE_PATH} · ${receipt.schemaVersion} · ${sealed.value}`}
+    :{status:receiptTimeline==='INVALID'?'INVALID':'UNKNOWN',value:null};
   const hashes=Object.fromEntries(['inputSha256','rawInputSha256','engineSha256','protocolSha256','rulesSha256'].map(key=>[key,provenanceField(receipt[key],validHash)]));
-  const invalidRoot=schema.status!=='PRESENT_UNVERIFIED' || receiptSchema.status!=='PRESENT_UNVERIFIED';
   const common={
-    fields:{
-      market:invalidRoot?{status:'INVALID',value:null}:market,
-      universe:invalidRoot?{status:'INVALID',value:null}:universe,
-      coverage:invalidRoot?{status:'INVALID',value:null}:coverage,
-      scored:invalidRoot?{status:'INVALID',value:null}:scored
-    },
-    receipt:invalidRoot?{status:'INVALID',value:null}:receiptIdentity,
-    ruleset:invalidRoot?{status:'INVALID',value:null}:ruleset,
-    hashes:invalidRoot?Object.fromEntries(Object.keys(hashes).map(key=>[key,{status:'INVALID',value:null}])):hashes
+    fields:{market,universe,coverage,warmup:warmupRange,scored},
+    receipt:receiptIdentity,
+    ruleset,
+    technical:{schema:receiptSchema,provider, sealed},
+    hashes
   };
   const result={};
   for(const candidateId of ARENA_CANDIDATES) {
-    if(candidateId==='H9' || !PROVENANCE_CANDIDATES.has(candidateId)) {
-      result[candidateId]={candidateId,blocked:true,fields:{market:unknownField(),universe:unknownField(),coverage:unknownField(),scored:unknownField()},receipt:unknownField(),ruleset:unknownField(),hashes:Object.fromEntries(Object.keys(hashes).map(key=>[key,unknownField()]))};
-    } else result[candidateId]={candidateId,blocked:false,...common,hashes:{...common.hashes}};
+    if(candidateId==='H9')result[candidateId]=unavailableProvenance(candidateId,'BLOCKED_DATA');
+    else if(associationStatus!=='PRESENT_UNVERIFIED' || !PROVENANCE_CANDIDATES.has(candidateId))
+      result[candidateId]=unavailableProvenance(candidateId,associationStatus);
+    else result[candidateId]={candidateId,blocked:false,associationStatus,...common,hashes:{...common.hashes}};
   }
   return result;
 }

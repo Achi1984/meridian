@@ -56,11 +56,11 @@ test('Paper Arena Chrome: native file import, integrity rejection and 320/390 la
       assert.equal(await evaluate(`document.querySelector('[data-arena-export]').disabled`),true);
       assert.equal(await evaluate(`document.querySelector('.arena-evidence').textContent.includes('Noch keine')`),true);
       await evaluate(`window.allowMetadata=true;document.querySelector('[data-arena-provenance]').click()`);
-      await waitFor(`window.metadataRequests===1&&!document.querySelector('[data-arena-provenance]').disabled`);
+      await waitFor(`window.metadataRequests===1&&document.querySelector('.arena-provenance').textContent.includes('Kraken Spot')`);
       assert.equal(await evaluate(`document.querySelectorAll('.arena-provenance').length`),5);
       assert.equal(await evaluate(`document.querySelectorAll('.arena-provenance details').length`),4);
-      assert.ok(await evaluate(`document.querySelector('.arena-provenance').textContent.includes('PRESENT · SOURCE-RECORDED, NOT AUTHENTICATED')`));
-      assert.ok(await evaluate(`document.querySelectorAll('.arena-provenance')[4].textContent.includes('Kraken USD metadata is not borrowed')`));
+      assert.ok(await evaluate(`document.querySelector('.arena-provenance').textContent.includes('vorhanden · nicht bestätigt')`));
+      assert.ok(await evaluate(`document.querySelectorAll('.arena-provenance')[4].textContent.includes('Kraken-USD-Daten werden nicht zugeordnet')`));
       assert.equal(await evaluate(`window.storedRequests`),0,'metadata view must not fetch candle chunks or invoke stored replay');
       assert.equal(await evaluate(`window.networkAttempts`),0);
       await evaluate(`document.querySelector('.arena-provenance details summary').focus()`);
