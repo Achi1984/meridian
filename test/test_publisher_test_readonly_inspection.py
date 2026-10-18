@@ -338,8 +338,11 @@ class Tests(unittest.TestCase):
             service = object.__new__(m.InspectionServices)
             original = SimpleNamespace(supervise=Mock(side_effect=AssertionError('DB worker must not start')))
             command = AUTO.Command({'PATH': '/usr/bin:/bin'})
-            service.base = SimpleNamespace(admin_password=lambda: command.run(
-                [sys.executable, '-I', '-c', program], timeout=0.3))
+            command_started_at = []
+            def run_command():
+                command_started_at.append(time.monotonic())
+                return command.run([sys.executable, '-I', '-c', program], timeout=0.3)
+            service.base = SimpleNamespace(admin_password=run_command)
             service.auto, service.original = AUTO, original
             output = io.StringIO()
             ready_fd = os.open(ready_fifo, os.O_RDWR | os.O_NONBLOCK)
@@ -364,9 +367,12 @@ class Tests(unittest.TestCase):
                 os.close(ready_fd)
                 worker.join(3)
             self.assertFalse(worker.is_alive(), 'command supervision did not complete')
+            self.assertEqual(len(command_started_at), 1)
             self.assertEqual(len(ready_at), 1)
             self.assertEqual(len(returned_at), 1)
-            self.assertGreaterEqual(returned_at[0] - ready_at[0], 0.2)
+            self.assertLessEqual(command_started_at[0], ready_at[0])
+            self.assertLessEqual(ready_at[0], returned_at[0])
+            self.assertGreaterEqual(returned_at[0] - command_started_at[0], 0.2)
             self.assertLess(returned_at[0] - ready_at[0], 2.5)
             self.assertEqual(len(failure), 1)
             self.assertIsInstance(failure[0], ValueError)
