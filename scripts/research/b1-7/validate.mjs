@@ -166,27 +166,31 @@ export function validateSeries(seriesByAsset) {
 }
 
 export function validateSourceIdentity(source) {
-  if (!PLAIN(source) || !Object.hasOwn(source, 'kind')) {
-    return {ok: false, error: failure('SOURCE_IDENTITY_INVALID', 'source')};
-  }
-  const kindDescriptor = Object.getOwnPropertyDescriptor(source, 'kind');
-  if (!kindDescriptor?.enumerable || !Object.hasOwn(kindDescriptor, 'value')) {
-    return {ok: false, error: failure('SOURCE_IDENTITY_INVALID', 'source.kind')};
-  }
-  const kind = kindDescriptor.value;
-  if (kind === 'SYNTHETIC_FIXTURE') {
-    return exactDataObject(source, ['kind'])
-      ? {ok: true}
-      : {ok: false, error: failure('SOURCE_IDENTITY_INVALID', 'source')};
-  }
-  if (kind === 'FROZEN_RESEARCH_INPUT') {
-    if (!exactDataObject(source, ['kind', 'commit', 'files']) ||
-      source.commit !== INPUT.sourceCommit ||
-      !exactDataObject(source.files, ASSETS) ||
-      ASSETS.some(asset => source.files[asset] !== INPUT.normalizedHashes[asset])) {
-      return {ok: false, error: failure('FROZEN_IDENTITY_MISMATCH', 'source')};
+  try {
+    if (!PLAIN(source) || !Object.hasOwn(source, 'kind')) {
+      return {ok: false, error: failure('SOURCE_IDENTITY_INVALID', 'source')};
     }
-    return {ok: true};
+    const kindDescriptor = Object.getOwnPropertyDescriptor(source, 'kind');
+    if (!kindDescriptor?.enumerable || !Object.hasOwn(kindDescriptor, 'value')) {
+      return {ok: false, error: failure('SOURCE_IDENTITY_INVALID', 'source.kind')};
+    }
+    const kind = kindDescriptor.value;
+    if (kind === 'SYNTHETIC_FIXTURE') {
+      return exactDataObject(source, ['kind'])
+        ? {ok: true}
+        : {ok: false, error: failure('SOURCE_IDENTITY_INVALID', 'source')};
+    }
+    if (kind === 'FROZEN_RESEARCH_INPUT') {
+      if (!exactDataObject(source, ['kind', 'commit', 'files']) ||
+        source.commit !== INPUT.sourceCommit ||
+        !exactDataObject(source.files, ASSETS) ||
+        ASSETS.some(asset => source.files[asset] !== INPUT.normalizedHashes[asset])) {
+        return {ok: false, error: failure('FROZEN_IDENTITY_MISMATCH', 'source')};
+      }
+      return {ok: true};
+    }
+    return {ok: false, error: failure('SOURCE_KIND_INVALID', 'source.kind')};
+  } catch {
+    return {ok: false, error: failure('UNSAFE_SOURCE_IDENTITY', 'source')};
   }
-  return {ok: false, error: failure('SOURCE_KIND_INVALID', 'source.kind')};
 }

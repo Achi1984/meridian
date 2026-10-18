@@ -7,12 +7,14 @@
 | Identity | Proposed value | Status |
 | --- | --- | --- |
 | Protocol | `MERIDIAN-B1-7-PROTOCOL-R2-20261018`; raw `protocol.json` SHA-256: `7fda5993dffa298183e3c4b757e4cdaace4754f8a7ff11b4538e1d39dd9e1aed` | Frozen file identity |
-| Implementation | `MERIDIAN-B1-7-ENGINE-R2`; SHA-256 of `scripts/research/b1-7/engine.mjs` and `validate.mjs`: `PENDING_FINAL_SOURCE_HASHES` | Freeze after final source review |
+| Implementation | `MERIDIAN-B1-7-ENGINE-R2`; bundle SHA-256 `94785763b90b92abcd5c8bc9ec58034d932116a77a8afda7b3be7f08ea9c0193` | Exact two-file bundle identity |
 | Source basis | Git commit `1c7b6dccd886f57e866c7d359c091b1e72a193ea` | Exact proposed source commit |
 | Input manifest | Canonical SHA-256 of the seven exact caller-supplied series: `PENDING_NOT_COMPUTED` | No series loaded or hashed by this implementation task |
 | Offline provenance record | `research/acquisitions/kraken-usd-daily-20261018/offline-verification.json` | Hash provenance only; source authenticity is not established |
 
 The exact seven proposed assets and copied normalized-file SHA-256 values are:
+
+The implementation bundle digest is SHA-256 of canonical JSON with keys `engineSha256` and `validatorSha256` containing the exact raw-file SHA-256 values: `engine.mjs` = `66cee5232ab886bb242e7cf04c68b9324b333eb5725d5cc2c733bb227eccb7c5`; `validate.mjs` = `41a476464ef65c0cbacd367762b00de21e54a85a384d608e0a5108c2f13eec33`. The engine takes this bundle hash as caller-supplied identity and does not inspect its own source.
 
 | Order | Asset | Normalized file SHA-256 |
 | ---: | --- | --- |

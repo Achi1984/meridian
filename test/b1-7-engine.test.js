@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
 import {
-  acceptsTarget, buildSchedule, canonicalJson, createBudgetTracker, deriveControlExposures,
-  deriveFeatures, runBatch, sha256
+  acceptsTarget, buildSchedule, calculateDrawdown, canonicalJson, createBudgetTracker,
+  deriveControlExposures, deriveFeatures, runBatch, sha256
 } from '../scripts/research/b1-7/engine.mjs';
 import {
   ASSETS, BUDGET, IMPLEMENTATION_ID, INPUT, PROTOCOL_ID, PROTOCOL_SHA256, SCENARIOS,
@@ -13,6 +13,7 @@ import {
 import {createSyntheticSeries} from './fixtures/b1-7/synthetic-series.mjs';
 
 const protocolPath = new URL('../research/protocols/b1-7-20261018/protocol.json', import.meta.url);
+const requestPath = new URL('../research/protocols/b1-7-20261018/EXECUTION_REQUEST.md', import.meta.url);
 const enginePath = new URL('../scripts/research/b1-7/engine.mjs', import.meta.url);
 const validatorPath = new URL('../scripts/research/b1-7/validate.mjs', import.meta.url);
 const protocol = JSON.parse(readFileSync(protocolPath, 'utf8'));
@@ -43,6 +44,8 @@ test('protocol constants, exact universe, costs, path count, and raw freeze hash
   })));
   assert.equal(BUDGET.paths, 44);
   assert.equal(protocol.pathManifest.pathCount, 44);
+  assert.equal(protocol.calendar.warmup.rows + protocol.calendar.development.rows +
+    protocol.calendar.diagnostic.rows, INPUT.rowCount);
   assert.deepEqual(protocol.authority, {
     preparationOnly: true,
     executionAuthorized: false,
@@ -63,6 +66,9 @@ test('synthetic 45-day feature begins on exactly the 410th close', () => {
   assert.equal(features.findIndex(Boolean), 409);
   assert.equal(features[408], null);
   assert.equal(features[409].rawExposure >= 0.25 && features[409].rawExposure <= 1, true);
+  for (const variant of VARIANTS) {
+    assert.equal(deriveFeatures(fixture, variant).findIndex(Boolean), variant.window + 364);
+  }
 });
 
 test('future close perturbations leave earlier synthetic decisions and fills unchanged', () => {
@@ -93,6 +99,12 @@ test('binary64 band comparison uses exact >= 0.10 without epsilon', () => {
   assert.equal(acceptsTarget(0.35, 0.25), false);
   assert.equal(acceptsTarget(0.3500000000000001, 0.25), true);
   assert.equal(acceptsTarget(0.15, 0.25), true);
+});
+
+test('sampled drawdown includes starting equity and resets duration on a recovered peak', () => {
+  const result = calculateDrawdown([9000, 9500, 10000, 9800, 11000]);
+  assert.equal(Math.abs(result.sampledDrawdown - 0.1) < 1e-15, true);
+  assert.equal(result.maxDrawdownDuration, 2);
 });
 
 test('delayed schedule preserves immutable decisions and defers first fill one day', () => {
@@ -140,6 +152,14 @@ test('full synthetic batch has 44 deterministic paths and complete accounting', 
   assert.equal(Buffer.byteLength(JSON.stringify(first), 'utf8') <= BUDGET.outputBytes, true);
   assert.deepEqual(first, second);
   assert.equal(first.executionId, second.executionId);
+  assert.equal(first.executionId, sha256(canonicalJson({
+    protocolId: first.protocolId,
+    protocolSha256: first.protocolSha256,
+    implementationId: first.implementationId,
+    implementationSha256: first.implementationSha256,
+    inputSha256: first.identity.inputSha256,
+    pathIds: first.paths.map(path => path.pathId)
+  })));
 
   const expectedPrefix = [
     ['primary-n30-f25', 'base-85bp', 'development'],
@@ -176,6 +196,7 @@ test('full synthetic batch has 44 deterministic paths and complete accounting', 
     if (path.kind === 'CASH') {
       assert.deepEqual(path.fillCosts, []);
       assert.equal(path.totalCosts, 0);
+      assert.equal(path.dailyReturns.every(value => value === 0), true);
     } else {
       assert.equal(path.fillCosts.at(-1).kind, 'TERMINAL_LIQUIDATION');
       assert.equal(path.fillCosts.at(-1).cost > 0, true);
@@ -265,6 +286,27 @@ test('bad synthetic batches abort before any path and preserve all 44 incomplete
   }
 });
 
+test('synthetic accounting failure halts the batch, retains prior paths as incomplete, and does not rank', () => {
+  const series = createSyntheticSeries();
+  const row = series.XBTUSD[SEGMENTS.diagnostic.startIndex];
+  row.open = Number.MIN_VALUE;
+  row.low = Number.MIN_VALUE;
+  row.high = Math.max(row.close, row.open) * 1.004;
+  const output = makeRun(series);
+  assert.equal(output.status, 'INVALID');
+  assert.equal(output.screen.status, 'NOT_EVALUATED');
+  assert.equal(output.budget.automaticRetry, false);
+  assert.equal(output.budget.status, 'FAILED_NO_RETRY');
+  assert.equal(output.attemptedPaths, 20);
+  assert.equal(output.completedPaths, 0);
+  assert.equal(output.computedPaths, 19);
+  assert.equal(output.paths.filter(path => path.status === 'INCOMPLETE_BATCH_ABORT').length, 19);
+  assert.equal(output.paths.filter(path => path.status === 'INVALID').length, 1);
+  assert.equal(output.paths.filter(path => path.status === 'NOT_RUN_BATCH_ABORT').length, 24);
+  assert.equal(output.paths.find(path => path.status === 'INVALID').attempts, 1);
+  assert.equal(output.paths.find(path => path.status === 'NOT_RUN_BATCH_ABORT').attempts, 0);
+});
+
 test('frozen source identity rejects any changed file hash without reading source data', () => {
   const files = Object.fromEntries(ASSETS.map(asset => [asset, INPUT.normalizedHashes[asset]]));
   assert.equal(validateSourceIdentity({
@@ -278,6 +320,34 @@ test('frozen source identity rejects any changed file hash without reading sourc
     commit: INPUT.sourceCommit,
     files
   }).error.code, 'FROZEN_IDENTITY_MISMATCH');
+  let sourceGetterCalls = 0;
+  const unsafeSource = Object.defineProperty({}, 'kind', {
+    enumerable: true,
+    get() {
+      sourceGetterCalls++;
+      return 'SYNTHETIC_FIXTURE';
+    }
+  });
+  assert.equal(validateSourceIdentity(unsafeSource).ok, false);
+  assert.equal(sourceGetterCalls, 0);
+});
+
+test('malformed or accessor-backed batch envelopes fail closed without invoking getters', () => {
+  let getterCalls = 0;
+  const options = {
+    source: syntheticSource,
+    implementationSha256
+  };
+  Object.defineProperty(options, 'seriesByAsset', {
+    enumerable: true,
+    get() {
+      getterCalls++;
+      return createSyntheticSeries();
+    }
+  });
+  assert.equal(runBatch(options).failure.code, 'BATCH_INPUT_INVALID');
+  assert.equal(runBatch(null).failure.code, 'BATCH_INPUT_INVALID');
+  assert.equal(getterCalls, 0);
 });
 
 test('a failed path budget executes once, stops later paths, and never retries', () => {
@@ -300,9 +370,16 @@ test('a failed path budget executes once, stops later paths, and never retries',
 });
 
 test('source hash is a deterministic bundle identity, not a filesystem-loaded data identity', () => {
+  const executionRequest = readFileSync(requestPath, 'utf8');
   assert.match(implementationSha256, /^[a-f0-9]{64}$/);
+  assert.match(executionRequest, new RegExp(`bundle SHA-256 \`${implementationSha256}\``));
   assert.equal(protocol.identity.implementationSha256, 'BOUND_IN_EXECUTION_REQUEST');
   assert.equal(protocol.input.mode, 'CALLER_SUPPLIED_IN_MEMORY_OHLC_ONLY');
   assert.equal(protocol.input.csvLoader, false);
   assert.equal(protocol.input.filesystemDiscovery, false);
+  const engineSource = readFileSync(enginePath, 'utf8');
+  const validatorSource = readFileSync(validatorPath, 'utf8');
+  for (const source of [engineSource, validatorSource]) {
+    assert.doesNotMatch(source, /node:(?:fs|http|https|net|tls)|\bfetch\s*\(|\bprocess\.env\b/);
+  }
 });

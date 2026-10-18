@@ -202,14 +202,14 @@ function selfFinancingFill(state, prices, target, feeRate, date) {
   const nextUnits = weights.map((weight, index) => weight * equity / prices[index]);
   const nextCash = (1 - weightSum) * equity;
   const conservationResidual = nextCash + closeValue(nextUnits, prices) + cost - previousEquity;
-  if (!finite(cost) || cost < 0 || !finite(nextCash) || nextCash < -FEE_TOLERANCE ||
+  if (!finite(cost) || cost < 0 || !finite(nextCash) || nextCash < 0 ||
     nextUnits.some(quantity => !finite(quantity) || quantity < 0) ||
     !finite(conservationResidual) || Math.abs(conservationResidual) > FEE_TOLERANCE) {
     fail('INVALID_ACCOUNTING', {date, reason: 'FILL_CONSERVATION_FAILED', conservationResidual});
   }
   const turnover = weights.reduce((total, weight, index) =>
     total + Math.abs(weight * equity - state.units[index] * prices[index]), 0);
-  state.cash = Math.max(0, nextCash);
+  state.cash = nextCash;
   state.units = nextUnits;
   return {
     date,
@@ -264,6 +264,25 @@ function quarterlyReturns(dates, equity) {
   return quarters;
 }
 
+export function calculateDrawdown(equity) {
+  let peak = CAPITAL;
+  let drawdownDuration = 0;
+  let maxDrawdownDuration = 0;
+  let sampledDrawdown = 0;
+  for (const value of equity) {
+    if (!finite(value) || value < 0) fail('INVALID_ACCOUNTING', {reason: 'INVALID_DRAWDOWN_EQUITY'});
+    if (value >= peak) {
+      peak = value;
+      drawdownDuration = 0;
+    } else {
+      drawdownDuration++;
+      maxDrawdownDuration = Math.max(maxDrawdownDuration, drawdownDuration);
+      sampledDrawdown = Math.max(sampledDrawdown, 1 - value / peak);
+    }
+  }
+  return {sampledDrawdown, maxDrawdownDuration};
+}
+
 function simulatePath({seriesByAsset, descriptor, scenario, targetSource}) {
   const segment = SEGMENTS[descriptor.segmentId];
   const rows = seriesByAsset[ASSETS[0]];
@@ -287,10 +306,6 @@ function simulatePath({seriesByAsset, descriptor, scenario, targetSource}) {
   let heldTarget = 0;
   let totalTurnover = 0;
   let maxConcentration = 0;
-  let maxDrawdownDuration = 0;
-  let drawdownDuration = 0;
-  let peak = CAPITAL;
-  let sampledDrawdown = 0;
 
   for (let index = segment.startIndex; index <= segment.endIndex; index++) {
     const date = rows[index].timestamp;
@@ -333,16 +348,9 @@ function simulatePath({seriesByAsset, descriptor, scenario, targetSource}) {
     dailyTarget.push(heldTarget);
     previousEquity = closeEquity;
 
-    if (closeEquity > peak) {
-      peak = closeEquity;
-      drawdownDuration = 0;
-    } else if (closeEquity < peak) {
-      drawdownDuration++;
-      maxDrawdownDuration = Math.max(maxDrawdownDuration, drawdownDuration);
-      sampledDrawdown = Math.max(sampledDrawdown, 1 - closeEquity / peak);
-    }
   }
 
+  const {sampledDrawdown, maxDrawdownDuration} = calculateDrawdown(dailyEquity);
   return {
     pathId: descriptor.pathId,
     variantId: descriptor.variantId,
@@ -458,7 +466,9 @@ function inputIdentity(seriesByAsset, source) {
   const identity = {
     datasetKind: source.kind,
     sourceCommit: source.kind === 'FROZEN_RESEARCH_INPUT' ? source.commit : 'SYNTHETIC_FIXTURE',
-    sourceFileSha256: source.kind === 'FROZEN_RESEARCH_INPUT' ? source.files : seriesHashes,
+    sourceProvenance: source.kind === 'FROZEN_RESEARCH_INPUT'
+      ? {normalizedFileSha256: source.files}
+      : {syntheticFixtureSeriesSha256: seriesHashes},
     canonicalSeriesSha256: seriesHashes
   };
   return {...identity, inputSha256: sha256(canonicalJson(identity))};
@@ -676,8 +686,31 @@ function compactIfOverBudget(output) {
   return compact;
 }
 
-export function runBatch({seriesByAsset, source, implementationSha256}) {
+export function runBatch(options) {
   const tracker = createBudgetTracker();
+  let batch;
+  try {
+    const keys = ['seriesByAsset', 'source', 'implementationSha256'];
+    if (options === null || typeof options !== 'object' || Array.isArray(options) ||
+      (Object.getPrototypeOf(options) !== Object.prototype && Object.getPrototypeOf(options) !== null)) {
+      return emptyResult('INVALID', 'BATCH_INPUT_INVALID');
+    }
+    const ownKeys = Reflect.ownKeys(options);
+    if (ownKeys.length !== keys.length || ownKeys.some(key => !keys.includes(key))) {
+      return emptyResult('INVALID', 'BATCH_INPUT_INVALID');
+    }
+    batch = {};
+    for (const key of keys) {
+      const descriptor = Object.getOwnPropertyDescriptor(options, key);
+      if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) {
+        return emptyResult('INVALID', 'BATCH_INPUT_INVALID');
+      }
+      batch[key] = descriptor.value;
+    }
+  } catch {
+    return emptyResult('INVALID', 'BATCH_INPUT_INVALID');
+  }
+  const {seriesByAsset, source, implementationSha256} = batch;
   if (!HASH.test(PROTOCOL_SHA256)) {
     return emptyResult('INVALID', 'PROTOCOL_HASH_NOT_FROZEN');
   }
