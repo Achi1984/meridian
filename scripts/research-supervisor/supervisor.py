@@ -19,6 +19,7 @@ MAX_STDOUT_BYTES = 8192
 MAX_STDERR_BYTES = 4096
 MAX_PATH_SECONDS = journal.MAX_PATH_SECONDS
 MAX_BATCH_SECONDS = journal.MAX_BATCH_SECONDS
+MAX_JOURNAL_LOCK_WAIT_SECONDS = 0.01
 
 
 class ChildFailure(ValueError):
@@ -165,7 +166,8 @@ def _run_child(request, path_deadline, batch_deadline, path_seconds, on_event):
                             raise ChildFailure("PATH_START_PROTOCOL")
                     elif input_state != "ack_sent":
                         raise ChildFailure("PATH_COMPLETE_BEFORE_ACK")
-                    on_event(event, len(events))
+                    callback_deadline = batch_deadline if not events else started_deadline
+                    on_event(event, len(events), callback_deadline)
                     events.append(event)
                     if len(events) == 1:
                         if time.monotonic() >= batch_deadline:
@@ -211,18 +213,20 @@ def _event_validator(index, path, predecessor, receipt, database):
     expected_complete = {**expected_start, "event": "path_completed"}
     expected_complete_keys = set(expected_complete) | {"outputSha256"}
 
-    def validate(event, event_index):
+    def validate(event, event_index, deadline):
         if event_index == 0:
             if event != expected_start:
                 raise ChildFailure("PATH_START_EVENT_INVALID")
-            journal.record_path_started(database, receipt, index, path["id"], predecessor)
+            journal.record_path_started(database, receipt, index, path["id"], predecessor,
+                                        busy_timeout=MAX_JOURNAL_LOCK_WAIT_SECONDS, deadline=deadline)
         else:
             if (set(event) != expected_complete_keys
                     or any(event.get(key) != value for key, value in expected_complete.items())
                     or not journal._digest(event.get("outputSha256"))):
                 raise ChildFailure("PATH_COMPLETE_EVENT_INVALID")
             journal.record_path_completed(database, receipt, index, path["id"], predecessor,
-                                          event["outputSha256"])
+                                          event["outputSha256"],
+                                          busy_timeout=MAX_JOURNAL_LOCK_WAIT_SECONDS, deadline=deadline)
         seen.append(event)
     return validate, seen
 
@@ -233,11 +237,16 @@ def run_batch(database, claim, *, limits=None):
         raise ChildFailure("POSIX_REQUIRED")
     caps = _limits(limits)
     batch_deadline = time.monotonic() + caps["batch_seconds"]
-    started = journal.start(database, claim)
+    try:
+        started = journal.start(database, claim, busy_timeout=MAX_JOURNAL_LOCK_WAIT_SECONDS,
+                                deadline=batch_deadline)
+    except journal.JournalError as error:
+        return _unsettled(claim["trialId"], error.code)
     receipt = {key: started[key] for key in (
         "trialId", "trialKey", "owner", "fence", "protocolSha256", "sourceSha256",
         "dataSha256", "manifestSha256", "pathIds", "variantIds", "budget")}
     predecessor = hashlib.sha256((started["trialId"] + "\n" + started["protocolSha256"]).encode()).hexdigest()
+    completed_paths = 0
     try:
         for index, path in enumerate(journal.PATHS):
             if time.monotonic() >= batch_deadline:
@@ -257,11 +266,28 @@ def run_batch(database, claim, *, limits=None):
             if len(observed) != 2 or observed[1].get("event") != "path_completed":
                 raise ChildFailure("PATH_EVENT_MISSING")
             predecessor = observed[1]["outputSha256"]
+            completed_paths += 1
         if time.monotonic() >= batch_deadline:
             raise ChildFailure("DEADLINE_EXCEEDED", timed_out=True)
-        return journal.settle(database, receipt, "COMPLETED", "ALL_PATHS_COMPLETED")
+        return journal.settle(database, receipt, "COMPLETED", "ALL_PATHS_COMPLETED",
+                              busy_timeout=MAX_JOURNAL_LOCK_WAIT_SECONDS, deadline=batch_deadline)
     except ChildFailure as error:
-        current = journal.inspect(database, started["trialId"])
-        completed = sum(path["state"] == "completed" for path in current["paths"])
-        outcome = "TIMED_OUT" if error.timed_out else ("PARTIAL" if completed else "FAILED")
-        return journal.settle(database, receipt, outcome, error.reason)
+        outcome = "TIMED_OUT" if error.timed_out else ("PARTIAL" if completed_paths else "FAILED")
+        try:
+            return journal.settle(database, receipt, outcome, error.reason,
+                                  busy_timeout=MAX_JOURNAL_LOCK_WAIT_SECONDS)
+        except journal.JournalError as persistence_error:
+            return _unsettled(started["trialId"], persistence_error.code)
+    except journal.JournalError as error:
+        return _unsettled(started["trialId"], error.code)
+
+
+def _unsettled(trial_id, reason):
+    return {
+        "state": "UNSETTLED",
+        "trialId": trial_id,
+        "reason": reason,
+        "persistConfirmed": False,
+        "executionAuthorized": False,
+        "promotionAuthorized": False,
+    }

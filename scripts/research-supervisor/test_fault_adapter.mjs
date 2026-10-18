@@ -1,5 +1,6 @@
 import {spawn} from "node:child_process";
 import {createHash} from "node:crypto";
+import {existsSync} from "node:fs";
 import {createInterface} from "node:readline";
 
 const paths = [
@@ -23,6 +24,15 @@ if (input.sourceSha256 === "e".repeat(64)) {
 } else if (input.sourceSha256 === "f".repeat(64)) {
   process.exit(0);
 } else {
+  if (input.sourceSha256 === "2".repeat(64)) {
+    const marker = `/tmp/meridian-m11-descendant-${process.ppid}.pid`;
+    const proceed = `${marker}.go`;
+    spawn(process.execPath, ["-e",
+      "require('fs').writeFileSync(process.argv[1],String(process.pid));setTimeout(()=>{},10000)",
+      marker], {stdio: ["ignore", "inherit", "inherit"]});
+    while (!existsSync(marker)) await new Promise(resolve => setTimeout(resolve, 5));
+    while (!existsSync(proceed)) await new Promise(resolve => setTimeout(resolve, 5));
+  }
   await emit("path_started");
   const acknowledgement = await lines.next();
   if (acknowledgement.done) process.exit(3);
@@ -40,6 +50,20 @@ if (input.sourceSha256 === "e".repeat(64)) {
       stdio: ["ignore", "inherit", "inherit"]
     });
     process.exit(0);
+  } else if (input.sourceSha256 === "3".repeat(64) && input.index === 0) {
+    await new Promise(resolve => setTimeout(resolve, 350));
+    const outputSha256 = createHash("sha256").update(JSON.stringify({
+      sourceSha256: input.sourceSha256, dataSha256: input.dataSha256,
+      index: input.index, pathId: path.id, predecessorSha256: input.predecessorSha256
+    })).digest("hex");
+    await emit("path_completed", {outputSha256});
+  } else if (input.sourceSha256 === "4".repeat(64) && input.index === 43) {
+    const outputSha256 = createHash("sha256").update(JSON.stringify({
+      sourceSha256: input.sourceSha256, dataSha256: input.dataSha256,
+      index: input.index, pathId: path.id, predecessorSha256: input.predecessorSha256
+    })).digest("hex");
+    await emit("path_completed", {outputSha256});
+    await new Promise(resolve => setTimeout(resolve, 350));
   } else if (input.sourceSha256 === "8".repeat(64) && input.index === 1) {
     await emit("path_started", {pathId: "false-path"});
   } else {

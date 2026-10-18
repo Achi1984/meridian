@@ -22,10 +22,11 @@ authenticate that they match any bytes.
 The fixed manifest has one `synthetic-development` path followed sequentially by
 43 `synthetic-frozen-control` paths. Every completion digest feeds the next path.
 This is only a stable supervisor fixture, not a claim that these are the approved
-R3 engine's paths or that its mathematics is preserved. The R3 engine is not copied
-or imported; integration requires the reviewed #880 merge and its concrete protocol.
-The first path/control ordering is deliberately sequential, never dispatched in
-parallel.
+R3 engine's paths or that its mathematics is preserved. The reviewed #880 R3 engine
+and protocol are now present on `main`, but are not imported or wired here. A
+separate reviewed adapter must bind that engine's actual manifest and preserve its
+sequential mathematics. The first path/control ordering is deliberately sequential,
+never dispatched in parallel.
 
 `scheduler_tick(database, policy, owner)` is a bounded, caller-invoked scheduler
 tick. The default policy is OFF. It considers at most one oldest queued trial,
@@ -43,15 +44,26 @@ the parent validates the event and exact manifest ID and durably records it does
 the parent acknowledge and start that path's deadline. The child then runs the path
 and must emit a matching `path_completed` event and digest.
 The per-path deadline is at most 60 seconds; the one absolute monotonic batch
-deadline is at most 1,800 seconds. Shorter limits are used in tests. Standard
+deadline is at most 1,800 seconds. Shorter limits are used in tests. The parent
+passes each journal write the remaining monotonic deadline and a maximum 10 ms
+SQLite lock wait (whichever is shorter). A contended write fails without waiting
+for SQLite's former five-second default; the parent kills/reaps the child group
+before returning `UNSETTLED`. Failed start/progress/final settlement leaves the
+last committed state and active fence intact for explicit reconciliation, never
+an automatic retry. Successful path boundaries are acknowledged only after their
+write commits. Standard
 output and error are capped while being read (8 KiB and 4 KiB), input is capped at
 8 KiB, and persisted results are capped at 1 MiB. The child receives only `PATH`
 and `LANG`, runs in a new POSIX process group, and is killed/reaped on timeout,
 output failure, or exit, including when a descendant retains a pipe.
 
 This process supervision is operational bounding, **not** a hostile-code sandbox
-or network/security isolation. It assumes trusted local code, a POSIX host, and
-operator-controlled database access. A path protocol adapter can support an
+or network/security isolation. The monotonic deadline bounds child work and SQLite
+lock waiting; it is not a hard-real-time guarantee for OS scheduling, local
+filesystem/fsync latency, or process reaping. If local persistence fails, return
+latency and result persistence are not guaranteed, but the child has already been
+terminated and the durable fence is not released. It assumes trusted local code,
+a POSIX host, and operator-controlled database access. A path protocol adapter can support an
 eventual `runBatch` integration only if the approved engine exposes and validates
 these path boundaries while preserving its development-to-frozen-controls state
 and computation. No such integration is wired here.
@@ -103,7 +115,7 @@ the credential/code-hook-free child environment.
 
 ## Remaining integration/deployment checklist
 
-- [ ] Merge and review #880's approved engine, protocol, frozen source/data identities, and concrete `runBatch` path-boundary adapter; then verify sequential mathematics against that implementation.
+- [ ] Independently review the merged #880 engine/protocol, frozen source/data identities, and a concrete `runBatch` path-boundary adapter; verify sequential mathematics against that implementation before any integration.
 - [ ] Review data quality, provenance, immutable source/data byte hashes, and protocol-specific path IDs before any non-fixture batch is admitted.
 - [ ] Provision an isolated persistent POSIX host with trusted clock/storage, filesystem permissions, backup/restore review, and operator access controls.
 - [ ] Choose and explicitly invoke a scheduler; no scheduler is installed or running here. Set bounded recurring daily compute/data/model budgets and monitor reservations, timeouts, unresolved work, disk, and host health.

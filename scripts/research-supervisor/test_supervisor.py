@@ -4,6 +4,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from unittest.mock import patch
@@ -52,6 +53,59 @@ class ResearchSupervisorTests(unittest.TestCase):
         claim = self.claim(key, source, self.data)
         with patch.object(supervisor, "ADAPTER", FAULT_ADAPTER):
             return supervisor.run_batch(self.database, claim, limits=limits)
+
+    def lock_database(self):
+        code = r'''
+import sqlite3,sys
+connection=sqlite3.connect(sys.argv[1],isolation_level=None)
+connection.execute('BEGIN IMMEDIATE')
+print('LOCKED',flush=True)
+sys.stdin.readline()
+connection.rollback()
+connection.close()
+'''
+        process = subprocess.Popen([sys.executable, "-c", code, self.database],
+                                   stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE, text=True)
+        self.assertEqual(process.stdout.readline().strip(), "LOCKED")
+        return process
+
+    def run_in_thread(self, claim, limits):
+        result = []
+        failure = []
+
+        def execute():
+            try:
+                with patch.object(supervisor, "ADAPTER", FAULT_ADAPTER):
+                    result.append(supervisor.run_batch(self.database, claim, limits=limits))
+            except BaseException as error:
+                failure.append(error)
+
+        thread = threading.Thread(target=execute)
+        thread.start()
+        return thread, result, failure
+
+    def wait_for_path_state(self, trial_id, count, state, timeout=5):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            try:
+                current = journal.inspect(self.database, trial_id)
+                if len(current["paths"]) >= count and current["paths"][count - 1]["state"] == state:
+                    return current
+            except journal.JournalError as error:
+                if error.code != "DATABASE_BUSY":
+                    raise
+            time.sleep(0.005)
+        self.fail(f"path {count} did not reach {state}")
+
+    @staticmethod
+    def release_lock(process):
+        process.stdin.write("\n")
+        process.stdin.flush()
+        process.wait(timeout=5)
+        process.stdin.close()
+        process.stdout.close()
+        process.stderr.close()
 
     def test_enqueue_conflict_is_immutable_and_duplicate_is_idempotent(self):
         first = self.enqueue()
@@ -201,6 +255,117 @@ print(json.dumps(journal.scheduler_tick(sys.argv[2],policy,owner='process-'+str(
                      {"daily_compute_seconds": journal.MAX_BATCH_SECONDS + 1}):
             with self.subTest(edit=edit), self.assertRaises(journal.JournalError):
                 journal.scheduler_tick(self.database, {**self.policy, **edit})
+
+    def test_sqlite_lock_during_path_start_kills_process_group_without_retry(self):
+        self.database = str(Path(self.temporary.name) / "path-start-lock.sqlite")
+        journal.initialize(self.database)
+        claim = self.claim("trial-start-lock", "2" * 64, self.data)
+        marker = Path(f"/tmp/meridian-m11-descendant-{os.getpid()}.pid")
+        proceed = Path(str(marker) + ".go")
+        marker.unlink(missing_ok=True)
+        proceed.unlink(missing_ok=True)
+        started = time.monotonic()
+        thread, result, failure = self.run_in_thread(
+            claim, {"path_seconds": 0.2, "batch_seconds": 0.35})
+        lock = None
+        try:
+            marker_deadline = time.monotonic() + 2
+            while not marker.exists() and time.monotonic() < marker_deadline:
+                time.sleep(0.005)
+            self.assertTrue(marker.exists(), "fault child did not launch after durable start")
+            lock = self.lock_database()
+            callback_started = time.monotonic()
+            proceed.touch()
+            thread.join(0.5)
+            self.assertFalse(thread.is_alive(), "SQLite contention blocked the path-start watchdog")
+            self.assertFalse(failure)
+            self.assertEqual(result[0]["state"], "UNSETTLED")
+            self.assertEqual(result[0]["reason"], "DATABASE_BUSY")
+            self.assertLess(time.monotonic() - callback_started, 0.15)
+            self.assertLess(time.monotonic() - started, 0.5)
+            self.assertTrue(marker.is_file())
+            child_pid = int(marker.read_text())
+            time.sleep(0.65)
+        finally:
+            if lock is not None:
+                self.release_lock(lock)
+            thread.join(6)
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(journal.inspect(self.database, claim["trialId"])["attempts"], 1)
+        self.assertEqual(journal.inspect(self.database, claim["trialId"])["paths"], [])
+        with self.assertRaisesRegex(journal.JournalError, "ATTEMPT_CONSUMED"):
+            journal.start(self.database, claim)
+        self.assertEqual(journal.scheduler_tick(self.database, self.policy)["state"], "active")
+        try:
+            os.kill(child_pid, 0)
+        except ProcessLookupError:
+            pass
+        else:
+            try:
+                process_state = Path(f"/proc/{child_pid}/stat").read_text().split()[2]
+            except FileNotFoundError:
+                process_state = "X"
+            self.assertEqual(process_state, "Z", "descendant survived process-group termination")
+        marker.unlink(missing_ok=True)
+        proceed.unlink(missing_ok=True)
+
+    def test_sqlite_lock_during_path_finish_returns_unsettled_without_retry(self):
+        self.database = str(Path(self.temporary.name) / "path-finish-lock.sqlite")
+        journal.initialize(self.database)
+        claim = self.claim("trial-finish-lock", "3" * 64, self.data)
+        thread, result, failure = self.run_in_thread(
+            claim, {"path_seconds": 0.5, "batch_seconds": 2})
+        lock = None
+        try:
+            self.wait_for_path_state(claim["trialId"], 1, "started")
+            lock = self.lock_database()
+            thread.join(0.5)
+            self.assertFalse(thread.is_alive(), "SQLite contention blocked the path-finish watchdog")
+            self.assertFalse(failure)
+            self.assertEqual((result[0]["state"], result[0]["reason"]), ("UNSETTLED", "DATABASE_BUSY"))
+            time.sleep(0.65)
+        finally:
+            if lock is not None:
+                self.release_lock(lock)
+            thread.join(6)
+        current = journal.inspect(self.database, claim["trialId"])
+        self.assertTrue(current["unresolved"])
+        self.assertEqual(current["attempts"], 1)
+        self.assertEqual([path["state"] for path in current["paths"]], ["started"])
+        self.assertEqual(journal.scheduler_tick(self.database, self.policy)["state"], "active")
+
+    def test_sqlite_lock_during_final_settlement_retains_completed_progress_and_fence(self):
+        self.database = str(Path(self.temporary.name) / "settlement-lock.sqlite")
+        journal.initialize(self.database)
+        claim = self.claim("trial-settlement-lock", "4" * 64, self.data)
+        thread, result, failure = self.run_in_thread(
+            claim, {"path_seconds": 1.5, "batch_seconds": 8})
+        lock = None
+        try:
+            self.wait_for_path_state(claim["trialId"], 44, "completed")
+            lock = self.lock_database()
+            callback_started = time.monotonic()
+            thread.join(0.6)
+            self.assertFalse(thread.is_alive(), "SQLite contention blocked final settlement")
+            self.assertFalse(failure)
+            self.assertEqual((result[0]["state"], result[0]["reason"]), ("UNSETTLED", "DATABASE_BUSY"))
+            self.assertLess(time.monotonic() - callback_started, 0.6)
+            time.sleep(0.65)
+        finally:
+            if lock is not None:
+                self.release_lock(lock)
+            thread.join(6)
+        current = journal.inspect(self.database, claim["trialId"])
+        self.assertTrue(current["unresolved"])
+        self.assertEqual(current["attempts"], 1)
+        self.assertEqual(len(current["paths"]), 44)
+        self.assertTrue(all(path["state"] == "completed" for path in current["paths"]))
+        self.assertEqual(journal.scheduler_tick(self.database, self.policy)["state"], "active")
+        recovered = journal.reconcile(self.database, claim["trialId"], "OPERATOR_RECONCILED_UNKNOWN")
+        self.assertEqual(recovered["state"], "unknown")
+        self.assertEqual(len(recovered["paths"]), 44)
+        with self.assertRaisesRegex(journal.JournalError, "STALE_FENCE"):
+            journal.start(self.database, claim)
 
     def _inspect_in_new_process(self, trial_id):
         code = r'''

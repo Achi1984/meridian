@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import re
 import sqlite3
+import time
 from datetime import datetime, timezone
 
 
@@ -127,10 +128,23 @@ def initialize(database):
     return {"initialized": True, "active": False, "executionAuthorized": False}
 
 
-def _connect(database):
+def _remaining(deadline):
+    if deadline is None:
+        return None
+    _need(type(deadline) in (int, float) and deadline > 0, "DEADLINE_INVALID")
+    remaining = deadline - time.monotonic()
+    _need(remaining > 0, "OPERATION_DEADLINE")
+    return remaining
+
+
+def _connect(database, busy_timeout=5, deadline=None):
     path = _database_path(database)
     try:
-        connection = sqlite3.connect(path.as_uri() + "?mode=rw", uri=True, timeout=5, isolation_level=None)
+        remaining = _remaining(deadline)
+        timeout = min(busy_timeout, remaining) if remaining is not None else busy_timeout
+        connection = sqlite3.connect(path.as_uri() + "?mode=rw", uri=True,
+                                     timeout=timeout, isolation_level=None)
+        connection.execute(f"PRAGMA busy_timeout={int(timeout * 1000)}")
         connection.execute("PRAGMA synchronous=FULL")
         connection.execute("PRAGMA max_page_count=16384")
         connection.execute("BEGIN IMMEDIATE")
@@ -143,6 +157,9 @@ def _connect(database):
             connection.close()
         if isinstance(error, JournalError):
             raise
+        if isinstance(error, sqlite3.OperationalError) and (
+                "locked" in str(error).lower() or "busy" in str(error).lower()):
+            raise JournalError("DATABASE_BUSY")
         raise JournalError("DATABASE_UNAVAILABLE")
 
 
@@ -331,15 +348,23 @@ def _check_store(connection):
               and model_calls == 0, "STORED_BUDGET")
 
 
-def _run(database, operation):
-    connection = _connect(database)
+def _run(database, operation, busy_timeout=5, deadline=None):
+    _need(type(busy_timeout) in (int, float) and 0 <= busy_timeout <= 30, "BUSY_TIMEOUT_INVALID")
+    connection = _connect(database, busy_timeout, deadline)
     try:
+        _remaining(deadline)
         _check_store(connection)
+        _remaining(deadline)
         value = operation(connection)
+        _remaining(deadline)
         _check_store(connection)
+        _remaining(deadline)
         connection.commit()
         return value
-    except sqlite3.Error:
+    except sqlite3.Error as error:
+        if isinstance(error, sqlite3.OperationalError) and (
+                "locked" in str(error).lower() or "busy" in str(error).lower()):
+            raise JournalError("DATABASE_BUSY")
         raise JournalError("JOURNAL_STORAGE_ERROR")
     finally:
         if connection.in_transaction:
@@ -347,10 +372,13 @@ def _run(database, operation):
         connection.close()
 
 
-def _read(database, operation):
+def _read(database, operation, busy_timeout=0):
     path = _database_path(database)
     try:
-        connection = sqlite3.connect(path.as_uri() + "?mode=ro", uri=True, timeout=5, isolation_level=None)
+        _need(type(busy_timeout) in (int, float) and 0 <= busy_timeout <= 30, "BUSY_TIMEOUT_INVALID")
+        connection = sqlite3.connect(path.as_uri() + "?mode=ro", uri=True,
+                                     timeout=busy_timeout, isolation_level=None)
+        connection.execute(f"PRAGMA busy_timeout={int(busy_timeout * 1000)}")
         connection.execute("PRAGMA query_only=ON")
         connection.execute("BEGIN")
         _need(connection.execute("PRAGMA user_version").fetchone() == (1,), "DATABASE_SCHEMA")
@@ -360,7 +388,10 @@ def _read(database, operation):
         _check_store(connection)
         connection.commit()
         return value
-    except sqlite3.Error:
+    except sqlite3.Error as error:
+        if isinstance(error, sqlite3.OperationalError) and (
+                "locked" in str(error).lower() or "busy" in str(error).lower()):
+            raise JournalError("DATABASE_BUSY")
         raise JournalError("DATABASE_UNAVAILABLE")
     finally:
         if "connection" in locals():
@@ -496,17 +527,18 @@ def _bound(connection, receipt):
     return row
 
 
-def start(database, receipt):
+def start(database, receipt, *, busy_timeout=5, deadline=None):
     def operation(connection):
         row = _bound(connection, receipt)
         _need(row[3] == "CLAIMED", "ATTEMPT_CONSUMED")
         connection.execute("UPDATE jobs SET state='RUNNING',started_at=? WHERE trial_id=?",
                            (_timestamp(), row[0]))
         return _read_job(connection, row[0])
-    return _run(database, operation)
+    return _run(database, operation, busy_timeout, deadline)
 
 
-def record_path_started(database, receipt, index, path_id, predecessor_sha256):
+def record_path_started(database, receipt, index, path_id, predecessor_sha256, *,
+                        busy_timeout=5, deadline=None):
     def operation(connection):
         row = _bound(connection, receipt)
         _need(row[3] == "RUNNING" and type(index) is int and 0 <= index < MAX_PATHS, "PATH_ORDER")
@@ -520,10 +552,11 @@ def record_path_started(database, receipt, index, path_id, predecessor_sha256):
         _need(len(raw.encode()) <= MAX_PROGRESS_BYTES, "PROGRESS_BOUND")
         connection.execute("UPDATE jobs SET progress_json=? WHERE trial_id=?", (raw, row[0]))
         return _read_job(connection, row[0])
-    return _run(database, operation)
+    return _run(database, operation, busy_timeout, deadline)
 
 
-def record_path_completed(database, receipt, index, path_id, predecessor_sha256, output_sha256):
+def record_path_completed(database, receipt, index, path_id, predecessor_sha256, output_sha256,
+                          *, busy_timeout=5, deadline=None):
     _need(_digest(output_sha256), "PATH_RESULT_INVALID")
     def operation(connection):
         row = _bound(connection, receipt)
@@ -538,10 +571,10 @@ def record_path_completed(database, receipt, index, path_id, predecessor_sha256,
         _need(len(raw.encode()) <= MAX_PROGRESS_BYTES, "PROGRESS_BOUND")
         connection.execute("UPDATE jobs SET progress_json=? WHERE trial_id=?", (raw, row[0]))
         return _read_job(connection, row[0])
-    return _run(database, operation)
+    return _run(database, operation, busy_timeout, deadline)
 
 
-def settle(database, receipt, outcome, reason):
+def settle(database, receipt, outcome, reason, *, busy_timeout=5, deadline=None):
     allowed = {"COMPLETED", "FAILED", "TIMED_OUT", "PARTIAL"}
     _need(outcome in allowed and type(reason) is str and re.fullmatch(r"[A-Z][A-Z0-9_]{0,79}", reason),
           "SETTLEMENT_INVALID")
@@ -564,7 +597,7 @@ def settle(database, receipt, outcome, reason):
             WHERE trial_id=?""", (outcome, result_raw, result_sha, reason, result["timestamps"]["finishedAt"], row[0]))
         connection.execute("UPDATE meta SET active=NULL WHERE id=1")
         return _read_job(connection, row[0])
-    return _run(database, operation)
+    return _run(database, operation, busy_timeout, deadline)
 
 
 def reconcile(database, trial_id, note):
