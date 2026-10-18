@@ -58,7 +58,11 @@ function productionManifestCheck() {
 
 function normalizedRoot(rootDir) {
   if (typeof rootDir !== 'string' || rootDir.length === 0) fail('FIXTURE_ROOT_INVALID');
-  return resolve(rootDir);
+  const withoutTrailingSeparators = rootDir.replace(new RegExp(`${sep}+$`), '') || sep;
+  if (withoutTrailingSeparators.split(sep).some(component => component === '.' || component === '..')) {
+    fail('ROOT_PATH_ALIAS_REJECTED');
+  }
+  return resolve(withoutTrailingSeparators);
 }
 
 function snapshotDataObject(value, keys) {

@@ -648,7 +648,7 @@ test('malformed or accessor-backed batch envelopes fail closed without invoking 
 });
 
 test('batch snapshots validated data before callbacks and rejects nested accessors', () => {
-  const expected = makeRun();
+  const expected = makeRun(createSyntheticSeries(), () => 0);
   const mutableSeries = createSyntheticSeries();
   let callbackMutatedSeries = false;
   const actual = makeRun(mutableSeries, () => {
@@ -659,7 +659,21 @@ test('batch snapshots validated data before callbacks and rejects nested accesso
     return 0;
   });
   assert.equal(callbackMutatedSeries, true);
-  assert.deepEqual(actual.paths.map(path => path.pathId), expected.paths.map(path => path.pathId));
+  assert.deepEqual(actual, expected);
+
+  for (const rowCount of [INPUT.rowCount - 1, INPUT.rowCount + 1]) {
+    let enumerated = false;
+    const wrongCountRows = new Proxy(new Array(rowCount), {
+      ownKeys() {
+        enumerated = true;
+        throw new Error('wrong-sized rows must be rejected before enumeration');
+      }
+    });
+    const wrongCountSeries = createSyntheticSeries();
+    wrongCountSeries.XBTUSD = wrongCountRows;
+    assert.equal(makeRun(wrongCountSeries).failure.code, 'UNSAFE_INPUT_SHAPE');
+    assert.equal(enumerated, false);
+  }
 
   let getterCalls = 0;
   const accessorRow = createSyntheticSeries();
@@ -699,6 +713,16 @@ test('batch snapshots validated data before callbacks and rejects nested accesso
   assert.equal(runBatch({seriesByAsset: createSyntheticSeries(), source, implementationSha256})
     .failure.code, 'UNSAFE_INPUT_SHAPE');
   assert.equal(getterCalls, 0);
+});
+
+test('budget tracker includes trusted preparation elapsed before its first caller-clock checkpoint', () => {
+  const tracker = createBudgetTracker(() => 0, {
+    preparationElapsedMs: BUDGET.totalMs + 1
+  });
+  assert.throws(() => tracker.checkpoint('snapshot-complete'), error =>
+    error.code === 'BUDGET_EXCEEDED' &&
+    error.detail.status === 'INVALID_TOTAL_BUDGET' &&
+    error.detail.totalElapsed > BUDGET.totalMs);
 });
 
 test('a failed path budget executes once, stops later paths, and never retries', () => {

@@ -52,15 +52,18 @@ budget and fixed 1 MiB output cap. The optional synthetic clock is accepted only
 for `SYNTHETIC_FIXTURE`; it does not alter any production cap. JavaScript work is
 cooperatively checked and cannot be hard-preempted.
 
-Before any budget callback or validation, `createExecution` snapshots the accepted
-input graph through own data-property descriptors. The supported input is an
+`createExecution` starts its trusted monotonic batch deadline before taking an
+input snapshot. It snapshots the accepted input graph through own data-property
+descriptors before validation or any caller-supplied clock callback; fixed
+955-row arrays are rejected before row enumeration/copy. The supported input is an
 ordinary or null-prototype options/source/asset/row record, an exact seven-asset
 map, dense ordinary arrays, and rows with exactly seven enumerable own data
 properties. Optional `syntheticClock` must be a function and is deliberately called
-after the snapshot. Accessors, sparse arrays, extra keys, and unsupported object
-shapes are rejected without invoking getters; validation and later execution use
-the same frozen snapshot. This is not a sandbox for arbitrary Proxies or for
-side-effects in a caller-supplied clock.
+after the snapshot; trusted monotonic elapsed time, including preparation, remains
+part of the existing 30-minute and 60-second limits. Accessors, sparse arrays,
+extra keys, and unsupported object shapes are rejected without invoking getters;
+validation and later execution use the same frozen snapshot. This is not a sandbox
+for arbitrary Proxies or for side-effects in a caller-supplied clock.
 
 ## Captured-input loader
 
@@ -123,6 +126,6 @@ Focused generated-fixture checks:
 node --test test/b1-7-engine.test.js test/b1-7-captured-input.test.js
 ```
 
-Candidate result: Node `v22.23.3`, 32 tests passed, 0 failed. The existing
+Candidate result: Node `v22.23.3`, 33 tests passed, 0 failed. The existing
 inactive-source verifier also passed with `python3 -B
 docs/autonomy/verify-source.py` (all suites; no live authority established).

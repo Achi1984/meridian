@@ -54,14 +54,14 @@ protocol, costs, screen, budget, and research-only no-stop scope.
 | Identity | Proposed value | Status |
 | --- | --- | --- |
 | Protocol | `MERIDIAN-B1-7-PROTOCOL-R3-20261018`; raw `protocol.json` SHA-256: `a78e1ae8c71c8f85baee5b51f5691643fc29136f636f19465c61f553afe09185` | Frozen file identity |
-| Implementation | `MERIDIAN-B1-7-ENGINE-R3`; candidate bundle SHA-256 `42a0f62acded9f8a0e76b858382940c1c35a747ae1e6eb972936e036902620ae` | Provisional three-file identity at this preparation base only; final accepted identity must be recomputed after #890 integration and review |
+| Implementation | `MERIDIAN-B1-7-ENGINE-R3`; candidate bundle SHA-256 `a357d727496c4f83ea160ec44b1a2e3378079ef931aa15e67f08387221aab968` | Provisional three-file identity at this preparation base only; final accepted identity must be recomputed after #890 integration and review |
 | Source basis | Git commit `1c7b6dccd886f57e866c7d359c091b1e72a193ea` | Pinned source/input-provenance commit |
 | Input manifest | Independently frozen selected-series manifest: `NOT_FROZEN` | No captured series loaded or hashed in this task; production loader remains blocked |
 | Offline provenance record | `research/acquisitions/kraken-usd-daily-20261018/offline-verification.json` | Hash provenance only; source authenticity is not established |
 
 The exact seven proposed assets and copied normalized-file SHA-256 values are:
 
-The current provisional bundle digest is SHA-256 of canonical JSON with keys `capturedInputSha256`, `engineSha256`, and `validatorSha256` containing these raw-file SHA-256 values: `captured-input.mjs` = `dca0103f11dace0263e975d7744ebb8e4c52fb83955b3f2a33f472466c220597`; `engine.mjs` = `64be9258b32c0724923f1f3f72c5d13ca438da3a56e2c58b8b43b706f4446f6a`; `validate.mjs` = `2052c0fae0082622f48a18abb4a6dacc0ffa679fb5da01df5779b398f5a578fc`. It is deliberately provisional: do not treat it as an accepted final source hash or as a future #890-integrated pin. The engine accepts the bundle hash as caller-supplied identity and does not inspect its own source. The captured-input module remains inactive: the independently frozen selected-input manifest and production admission are absent, so no market CSV is read.
+The current provisional bundle digest is SHA-256 of canonical JSON with keys `capturedInputSha256`, `engineSha256`, and `validatorSha256` containing these raw-file SHA-256 values: `captured-input.mjs` = `64fc84514a642827afa983169c6a4cf55f0d2d2b7dd26302defe6e9dde39e5e0`; `engine.mjs` = `64df8c6fe5a587397b312447d310cb285f552da5b686a11b3a1d0f9441b9bb8f`; `validate.mjs` = `2052c0fae0082622f48a18abb4a6dacc0ffa679fb5da01df5779b398f5a578fc`. It is deliberately provisional: do not treat it as an accepted final source hash or as a future #890-integrated pin. The engine accepts the bundle hash as caller-supplied identity and does not inspect its own source. The captured-input module remains inactive: the independently frozen selected-input manifest and production admission are absent, so no market CSV is read.
 
 | Order | Asset | Normalized file SHA-256 |
 | ---: | --- | --- |

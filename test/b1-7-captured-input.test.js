@@ -196,6 +196,9 @@ test('synthetic manifest accessors are rejected without evaluating getters', asy
 test('root symlinks and symlinked ancestor paths are rejected', async t => {
   const {root} = await createFixtureTree(t);
   assert.equal((await loadSyntheticFixtureProfile(`${root}/`)).ok, true);
+  const rootSegment = root.split('/').at(-1);
+  assert.equal((await loadSyntheticFixtureProfile(`${root}/../${rootSegment}`)).error.code,
+    'ROOT_PATH_ALIAS_REJECTED');
   const parent = await mkdtemp(join(tmpdir(), 'meridian-b1-alias-'));
   t.after(() => rm(parent, {recursive: true, force: true}));
   const alias = join(parent, 'alias');

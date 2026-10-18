@@ -582,10 +582,11 @@ function snapshotSeries(seriesByAsset) {
   for (const asset of ASSETS) {
     const inputRows = input[asset];
     if (!Array.isArray(inputRows)) fail('UNSAFE_INPUT_SHAPE');
-    const ownKeys = Reflect.ownKeys(inputRows);
     const lengthDescriptor = Object.getOwnPropertyDescriptor(inputRows, 'length');
     const length = lengthDescriptor?.value;
-    if (!Number.isSafeInteger(length) || length < 0 || ownKeys.length !== length + 1 ||
+    if (length !== INPUT.rowCount) fail('UNSAFE_INPUT_SHAPE');
+    const ownKeys = Reflect.ownKeys(inputRows);
+    if (ownKeys.length !== length + 1 ||
         ownKeys.some(key => key !== 'length' &&
           (typeof key !== 'string' || !/^(0|[1-9]\d*)$/.test(key)))) {
       fail('UNSAFE_INPUT_SHAPE');
@@ -623,7 +624,10 @@ function bindDescriptors(items, identity, implementationSha256, checkpoint = () 
   });
 }
 
-export function createBudgetTracker(clock = () => performance.now()) {
+export function createBudgetTracker(clock = () => performance.now(), {
+  trustedBatchStart = performance.now(),
+  preparationElapsedMs = 0
+} = {}) {
   const batchStart = clock({phase: 'batch-start'});
   let lastClock = batchStart;
   let stopped = false;
@@ -631,6 +635,7 @@ export function createBudgetTracker(clock = () => performance.now()) {
   let activePathId = null;
   let activePathOrdinal = null;
   let pathStart = null;
+  let trustedPathStart = null;
   const readClock = context => {
     const now = clock(context);
     if (!finite(now) || now < lastClock) {
@@ -642,8 +647,14 @@ export function createBudgetTracker(clock = () => performance.now()) {
   const checkpoint = phase => {
     if (stopError) throw stopError;
     const now = readClock({phase, pathId: activePathId, pathOrdinal: activePathOrdinal});
-    const totalElapsed = now - batchStart;
-    const pathElapsed = pathStart === null ? null : now - pathStart;
+    const totalElapsed = Math.max(
+      now - batchStart + preparationElapsedMs,
+      performance.now() - trustedBatchStart
+    );
+    const pathElapsed = pathStart === null ? null : Math.max(
+      now - pathStart,
+      performance.now() - trustedPathStart
+    );
     if (totalElapsed > BUDGET.totalMs || pathElapsed > BUDGET.pathMs) {
       stopped = true;
       try {
@@ -671,6 +682,7 @@ export function createBudgetTracker(clock = () => performance.now()) {
       activePathOrdinal = pathOrdinal;
       let result;
       try {
+        trustedPathStart = performance.now();
         pathStart = readClock({phase: 'path-start', pathId, pathOrdinal});
         checkpoint('path-start-check');
         result = operation(checkpoint);
@@ -683,6 +695,7 @@ export function createBudgetTracker(clock = () => performance.now()) {
         activePathId = null;
         activePathOrdinal = null;
         pathStart = null;
+        trustedPathStart = null;
         return {
           status: budgetStatus ?? 'INVALID',
           attempts: 1,
@@ -693,6 +706,7 @@ export function createBudgetTracker(clock = () => performance.now()) {
       activePathId = null;
       activePathOrdinal = null;
       pathStart = null;
+      trustedPathStart = null;
       return {status: 'COMPLETED', attempts: 1, result};
     },
     get stopped() {
@@ -903,6 +917,7 @@ function compactIfOverBudget(output, checkpoint = () => {}) {
 }
 
 function* executeBatch(options) {
+  const trustedBatchStart = performance.now();
   let tracker;
   let batch;
   try {
@@ -937,6 +952,7 @@ function* executeBatch(options) {
   if (typeof implementationSha256 !== 'string' || !HASH.test(implementationSha256)) {
     return emptyResult('INVALID', 'IMPLEMENTATION_HASH_REQUIRED');
   }
+  let preparationElapsedMs;
   try {
     seriesByAsset = snapshotSeries(batch.seriesByAsset);
     source = snapshotSource(batch.source);
@@ -951,7 +967,8 @@ function* executeBatch(options) {
     (source.kind !== 'SYNTHETIC_FIXTURE' || typeof batch.syntheticClock !== 'function')) {
     return emptyResult('INVALID', 'SYNTHETIC_CLOCK_NOT_ALLOWED');
   }
-  tracker = createBudgetTracker(batch.syntheticClock);
+  preparationElapsedMs = performance.now() - trustedBatchStart;
+  tracker = createBudgetTracker(batch.syntheticClock, {trustedBatchStart, preparationElapsedMs});
   let inputCheck;
   try {
     inputCheck = validateSeries(seriesByAsset, tracker.checkpoint);
