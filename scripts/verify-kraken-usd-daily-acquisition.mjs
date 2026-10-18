@@ -225,8 +225,8 @@ function verifyPair(pair, fullBytes, q3Bytes, normalizedChunks, options = {}) {
     lastQ3Utc: isoFromEpoch(q3Rows.at(-1).timestamp),
     firstObservedUtc: isoFromEpoch(merged.rows[0].timestamp),
     lastObservedUtc: isoFromEpoch(merged.rows.at(-1).timestamp),
-    startUtc: actual.length ? actual[0].slice(0, 20) + 'Z' : null,
-    endUtc: actual.length ? actual.at(-1).slice(0, 20) + 'Z' : null,
+    startUtc: actual.length ? actual[0].split(',')[0] : null,
+    endUtc: actual.length ? actual.at(-1).split(',')[0] : null,
     gaps: calculateGaps(selectedTimestamps),
     sourceGaps: calculateGaps(merged.rows.map(row => row.timestamp)),
     commonTimestamps: selectedTimestamps

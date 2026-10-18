@@ -15,6 +15,7 @@ import {
 
 const root = new URL('../research/acquisitions/kraken-usd-daily-20261018/', import.meta.url);
 const receipt = JSON.parse(fs.readFileSync(new URL('acquisition-receipt.json', root), 'utf8'));
+const committedVerification = JSON.parse(fs.readFileSync(new URL('offline-verification.json', root), 'utf8'));
 const pinnedHashes = {
   full: {
     XBTUSD: '27fd91e9528d421c606ff7cd37bf3b8a4eed3b39631beb09ac8aec36a9b69266',
@@ -72,6 +73,7 @@ function fixture(fullLines, q3Lines, normalizedLines = [...new Set([...fullLines
 
 test('pinned committed acquisition bytes pass complete offline verification', () => {
   const result = verifyAcquisition();
+  assert.deepEqual(result, committedVerification);
   assert.equal(result.schema, 'MERIDIAN_KRAKEN_USD_DAILY_OFFLINE_VERIFICATION_V1');
   assert.equal(result.status, 'CONTENT_VERIFIED_OFFLINE');
   assert.equal(result.checks.safeContainedRegularFiles, 25);
@@ -160,4 +162,20 @@ test('normalized rows must be independently reproducible from source rows', () =
     '2025-01-02T23:59:59Z',
     1
   ).length, 1);
+});
+
+test('verifyPair returns canonical normalized endpoint timestamps', () => {
+  const first = 1735689600;
+  const last = first + 86400;
+  const full = [rawLine(first)];
+  const q3 = [rawLine(last)];
+  const data = fixture(full, q3);
+  const result = verifyPair('TESTUSD', data.full, data.q3, [data.normalized]);
+
+  assert.equal(result.startUtc, '2025-01-01T00:00:00Z');
+  assert.equal(result.endUtc, '2025-01-02T00:00:00Z');
+  assert.match(result.startUtc, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+  assert.match(result.endUtc, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+  assert.equal(new Date(result.startUtc).toISOString(), '2025-01-01T00:00:00.000Z');
+  assert.equal(new Date(result.endUtc).toISOString(), '2025-01-02T00:00:00.000Z');
 });
