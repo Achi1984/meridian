@@ -210,7 +210,22 @@
       "branch": "copilot/meridian-b1-failure-acceptance-20261018",
       "assignedBranchStart": "01a84acd3b46d0f885cbe8e361f5bd50acf0a2b3",
       "priorUnpublishedSessionCandidate": "19a855df8b3e761c9979b3f72f43bd0a23cbf94f",
-      "publishedHeadAtVerification": "47b1e6deb1da01cb4d57c681fa768701106a2fd5",
+      "publishedHeadBeforeAckLossCorrection": "47b1e6deb1da01cb4d57c681fa768701106a2fd5",
+      "ackLossCorrection": {
+        "commentId": 6253845943,
+        "commit": "3f82a0218742425b9de1bea5687248a6e65eacb3",
+        "file": "scripts/research-supervisor/test_b1_fault_adapter.mjs",
+        "behavior": "SYNCHRONOUSLY_CLOSE_CHILD_FD0_BEFORE_ACK_TRIGGERING_MESSAGE",
+        "repeatCommand": "python3 -B - <<'PY'\nimport sys\nimport unittest\nsys.path.insert(0, 'scripts/research-supervisor')\nfrom test_supervisor import ResearchSupervisorTests\nsuite = unittest.TestSuite(\n    ResearchSupervisorTests('test_b1_lost_ack_after_durable_boundaries_keeps_fence_and_attempt')\n    for _ in range(10)\n)\nresult = unittest.TextTestRunner(verbosity=2).run(suite)\nraise SystemExit(not result.wasSuccessful())\nPY",
+        "repeatResult": "10_PASS",
+        "repeatAssertions": "UNSETTLED_PARENT_ACK_FAILED_DURABLE_COUNTS_ATTEMPTS_1_UNRESOLVED_FENCE_SCHEDULER_FENCE_NO_REPLAY",
+        "environment": {
+          "node": "v22.23.3",
+          "python": "3.12.3"
+        },
+        "supervisorCommand": "node --test test/research-supervisor.test.js",
+        "supervisorResult": "1_SUITE_PASS"
+      },
       "mergedBaseSha": "fd07a8df49cbe24c73e9819170cd36e6b9645157",
       "mergedBaseTree": "a63b96e68566df9e15c90ce70a35f8c53bf287e7",
       "workingMergeCommit": "bbca098",
