@@ -157,6 +157,52 @@
       "publicVisualEvidence": "CLOUD_BROWSER_DESKTOP_B12_NAVIGATION_12_FAMILIES_B1_7_AND_5_ARENA_CARDS_NO_REPLAY_OR_IMPORT",
       "operationalPaperAuthorized": false
     },
+    "currentB1": {
+      "opId": "MERIDIAN-B1-PERSISTENT-SUPERVISOR-BRIDGE-20261018",
+      "issue": 889,
+      "pullRequest": 890,
+      "branch": "copilot/b1-persistent-engine-supervisor-bridge-integration",
+      "verifiedBaseSha": "02866635c0c90a1743a6c82a04daa176bd4b56bf",
+      "dependencyPr887": {
+        "mergeSha": "02866635c0c90a1743a6c82a04daa176bd4b56bf",
+        "sourceCiResult": "2663_PASS",
+        "independentReview": "GREEN_639/6252130926",
+        "postMergeChecks": "ALL_SUCCESS",
+        "postMergeRunIds": {
+          "releaseSafety": 39145659600,
+          "runtimeSmoke": 39145659613,
+          "releaseCoordinator": 39145659656,
+          "pages": 39145659053
+        },
+        "state": "COMPLETE_MERGED_AND_POSTCHECKED"
+      },
+      "previousCandidate": {
+        "head": "03dbb51b74d7d0b38b514b18ae6260431d1b1623",
+        "sourceCiRun": 39148970703,
+        "sourceCiConclusion": "FAILURE",
+        "failedStep": "Research and auth regression tests"
+      },
+      "failedCandidate4484873": {
+        "head": "4484873b4c1609f6356207a64ad9fb842f6b4ac2",
+        "sourceCiRun": 39149618918,
+        "sourceCiAttempt": 2,
+        "sourceCiJob": 117740983561,
+        "sourceCiConclusion": "FAILURE",
+        "supervisorFailure": "test_b1_preparation_path_calibration_and_finalization_share_deadline reached only 37 of 44 paths under concurrent CI load",
+        "localCiEquivalent": {
+          "node": "v22.23.3",
+          "command": "V11_A2_EVIDENCE_DIR=artifacts/v11-visual-qa node --test test/*.test.js",
+          "result": "2608_PASS_11_FAIL",
+          "supervisorSuite": "PASS",
+          "environmentFailures": "MISSING_INSTALLED_PG_PACKAGE_AND_UNRELATED_PUBLISHER_HARNESS_FAILURES"
+        }
+      },
+      "state": "CORRECTION_CANDIDATE_PENDING_NEW_EXACT_HEAD_CI_AND_INDEPENDENT_REVIEW",
+      "scope": "SOURCE_AND_GENERATED_FIXTURES_ONLY",
+      "actualMarketDataRead": false,
+      "runtimeActivationAuthorized": false,
+      "noMergeOrActivationAuthority": true
+    },
     "v11B10ClarityProposal": {
       "operationId": "MERIDIAN-V11-B10-CLARITY-20261018",
       "issue": 874,
@@ -335,9 +381,9 @@
         "pages": 39025396725
       }
     },
-    "package": "M11_LIVE_PAPER_SOURCE_FOUNDATION_SESSION_LOADER_886",
+    "package": "MERIDIAN_B1_PERSISTENT_SUPERVISOR_BRIDGE_889_890",
     "historicalStateBeforeB11": "PR862_COMPLETE_PR860_REFRESH_PENDING_OWN_EXACT_HEAD_CI_AND_REVIEW_ARENA861_REOPENED",
-    "state": "B12_PUBLIC_PR884_PR885_COMPLETE_PR887_DRAFT",
+    "state": "PR887_COMPLETE_PR890_CORRECTION_CANDIDATE_PENDING_EXACT_HEAD_CI_AND_REVIEW",
     "infrastructurePaused": true,
     "mailboxRollover": {
       "from": 571,
@@ -467,7 +513,7 @@
       }
     },
     "historicalNextStepBeforeB11": "COMPLETE_PR860_REFRESH_OWN_EXACT_HEAD_CI_AND_INDEPENDENT_REVIEW_THEN_LEAD_MERGE_THEN_ARENA861_RETROSPECTIVE_PROVENANCE_EXISTING_EVIDENCE_ONLY",
-    "nextStep": "REVIEW_PR887_SESSION_AND_VERIFIED_BYTE_LOADER_SOURCE_SYNTHETIC_ONLY_ON_CURRENT_BASE_WITH_EXACT_CI_AND_FULL_INDEPENDENT_REVIEW; NO_REAL_DATA_EXECUTION",
+    "nextStep": "PUBLISH_CORRECTION_CANDIDATE_THEN_RUN_FRESH_EXACT_HEAD_CI_AND_INDEPENDENT_REVIEW; NO_MERGE_OR_RUNTIME_ACTIVATION; NO_REAL_DATA_EXECUTION",
     "ownerPathInspection": {
       "pr": 828,
       "mergeSha": "bfebd17ddfa1d2d3b44a15126e28618a82cb81f2",
@@ -493,7 +539,7 @@
     },
     "publisherNextStep": "PAUSED_BY_OWNER_B_NO_OPERATIONAL_AUTHORITY_NATIVE868_DISABLED",
     "historicalStrategyNextStepBeforeB11": "Finalize r130 Arena release integration gates; separately diagnose PR872 publisher timing-test failure before independent data review. No new strategy execution.",
-    "strategyNextStep": "LIVE_PAPER_PRIORITY: B12_PUBLIC; SCREEN_BOUNDARY_TESTS885_COMPLETE; SUPERVISOR884_MERGED_INACTIVE; SESSION_AND_VERIFIED_BYTE_LOADER886_887_IN_PROGRESS; PERSISTENT_CHILD_BRIDGE_AND_CONCRETE_OWNER_RESEARCH_PAPER_PROTOCOL_STILL_REQUIRED",
+    "strategyNextStep": "B1_GENERATED_FIXTURE_SUPERVISOR_BRIDGE_IN_PR890_CORRECTION_CANDIDATE_PENDING_NEW_EXACT_HEAD_CI_AND_INDEPENDENT_REVIEW; PRODUCTION_ADMISSION_AND_ACTIVATION_BLOCKED",
     "completion20261017": {
       "verifiedMain": "8691381510039e2ad48b863ea5e66d6ad6cba462",
       "arenaMerge": "ed60066fc58b4d60eddd727c24cae61c368720bb",
