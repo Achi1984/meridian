@@ -20,7 +20,7 @@
     "rolloverThresholdComments": 200,
     "watchdogStatusCommentId": 6198924473
   },
-  "terminalBuild": "10.0-r129",
+  "terminalBuild": "10.0-r130",
   "liveMainAtCreation": "f23fc2db682963d7031ec1f3ddf9c3f4854a7f7f",
   "lastSubstantiveCheckpoint": "c009326529e162f84bb985d0aca2de6cf5065c18",
   "lastContinuityMerge": {
@@ -321,7 +321,7 @@
       "evidenceScope": "HISTORICAL_SOURCE_SNAPSHOT_SUPERSEDED_BY_RUNTIME_RECOVERY_20261017"
     },
     "publisherNextStep": "PAUSED_BY_OWNER_B_NO_OPERATIONAL_AUTHORITY_NATIVE868_DISABLED",
-    "strategyNextStep": "ARENA861_REOPENED_RETROSPECTIVE_PROVENANCE_LIMITATIONS_EXISTING_EVIDENCE_ONLY_IMPLEMENTATION_NOT_DONE_NO_NEW_PNL_OR_REPLAY",
+    "strategyNextStep": "Finalize r130 Arena release integration gates; separately diagnose PR872 publisher timing-test failure before independent data review. No new strategy execution.",
     "completion20261017": {
       "verifiedMain": "8691381510039e2ad48b863ea5e66d6ad6cba462",
       "arenaMerge": "ed60066fc58b4d60eddd727c24cae61c368720bb",
@@ -603,12 +603,28 @@
       "issueLifecycle": "CLOSED_AT_REPAIR_862_MERGE_THEN_REOPENED_BY_LEAD",
       "issueState": "REOPENED_BY_LEAD",
       "product": "RETROSPECTIVE_PROVENANCE_AND_LIMITATIONS_VIEW",
-      "implementation": "NOT_DONE",
+      "implementation": "REVIEWED_SOURCE_PR870_R130_INTEGRATION_PENDING",
+      "implementationBranch": "copilot/fixv10-r130-arena-provenance",
+      "implementationPr": 870,
+      "implementationBase": "cbe9b5a34ed31e61746a656d49bb1b81bc637eec",
+      "implementationPreviousHeadCi": "4c759056d6fc12529cc05c083870820ccb64728a_RELEASE_SAFETY_AND_VISUAL_QA_SUCCESS",
+      "implementationCorrectionCommit": "37e13e8728436c7396f35a3c8045b6391d4824a7",
+      "implementationSourceCi": "SAFETY_39110360353_VISUAL_39110360355_SUCCESS",
+      "implementationReview": "SOURCE_GREEN_LIGHT_639_6248189652",
+      "implementationMerge": "NOT_MERGED",
+      "implementationPostchecks": "NOT_RUN",
+      "proposalReleaseIdentity": "10.0-r129_UNCHANGED_LEAD_OWNS_R130_INTEGRATION",
       "evidenceScope": "EXISTING_EVIDENCE_ONLY",
       "h9": "BLOCKED",
       "crv": "UNRESOLVED",
       "newReplayAuthorized": false,
-      "newPnlAuthorized": false
+      "newPnlAuthorized": false,
+      "implementationSourceHead": "b5d7d2a69dd5715580e9691cfcd566e694452baa",
+      "integrationBranch": "v10-r130-arena-provenance-integration-20261018",
+      "integrationReview": "PENDING",
+      "integrationCi": "PENDING",
+      "integrationMerge": "NOT_MERGED",
+      "deferredUx": "Preserve provenance fields across stored/import resets; not part of this integration."
     },
     "native868": {
       "enabled": false
@@ -1274,6 +1290,11 @@
       "finalMergeMirrorIssue": 639,
       "ownerApprovalMirrorStatus": "RESOLVED_WITH_VERBATIM_QUOTE",
       "scope": "GITHUB_ONLY_NO_RUNTIME_ACTIONS"
+    },
+    "browserCiApprovalDelegation": {
+      "commentId": 6248042470,
+      "scope": "Existing authorized Meridian development/test runs via Approve and run",
+      "securitySettingsChanged": false
     }
   }
 }

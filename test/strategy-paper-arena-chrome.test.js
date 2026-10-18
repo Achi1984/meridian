@@ -20,7 +20,7 @@ const html=`<!doctype html><html lang="de"><meta charset="utf-8"><meta name="vie
 <link rel="stylesheet" href="/v9/v9.css"><link rel="stylesheet" href="/v10/v10.css"><link rel="stylesheet" href="/v10/r124-typography-floor.css">
 <style>body{margin:0}*,*:before,*:after{box-sizing:border-box}</style><body><button id="keyboard-start">Prüfung starten</button><main class="app-shell"><section id="view-paper" class="view active"><div id="qa-root"><div data-strategy-arena></div></div></section></main>
 <script type="module">import {createStrategyArenaView} from '/v10/strategy-arena.js';
-window.networkAttempts=0;window.storedRequests=0;const nativeFetch=window.fetch.bind(window);window.fetch=(url,options)=>{const u=new URL(url,location.href);if(window.allowStored&&u.origin===location.origin&&u.pathname.startsWith('/research/results/strategy-arena-20261016/')){window.storedRequests++;return nativeFetch(url,options);}window.networkAttempts++;throw Error('UNEXPECTED_RUNTIME_NETWORK');};
+window.networkAttempts=0;window.storedRequests=0;window.metadataRequests=0;const nativeFetch=window.fetch.bind(window);window.fetch=(url,options)=>{const u=new URL(url,location.href);if(window.allowStored&&u.origin===location.origin&&u.pathname.startsWith('/research/results/strategy-arena-20261016/')){window.storedRequests++;return nativeFetch(url,options);}if(u.origin===location.origin&&u.pathname==='/research/results/strategy-arena-20261016/manifest.json'&&window.allowMetadata){window.metadataRequests++;return nativeFetch(url,options);}window.networkAttempts++;throw Error('UNEXPECTED_RUNTIME_NETWORK');};
 const root=document.getElementById('qa-root'),view=createStrategyArenaView();root.querySelector('[data-strategy-arena]').innerHTML=view.html();view.bind(root);window.arenaReady=true;</script></body></html>`;
 
 test('Paper Arena Chrome: native file import, integrity rejection and 320/390 layout',{timeout:120000},async()=>{
@@ -55,6 +55,20 @@ test('Paper Arena Chrome: native file import, integrity rejection and 320/390 la
       assert.ok(await evaluate(`[...document.querySelectorAll('.arena-model-head span,.arena-model-head b,.arena-model-head strong,.arena-model>small')].every(el=>parseFloat(getComputedStyle(el).fontSize)>=12)`),'arena identities, status and PnL must remain readable at the actual mobile width');
       assert.equal(await evaluate(`document.querySelector('[data-arena-export]').disabled`),true);
       assert.equal(await evaluate(`document.querySelector('.arena-evidence').textContent.includes('Noch keine')`),true);
+      await evaluate(`window.allowMetadata=true;document.querySelector('[data-arena-provenance]').click()`);
+      await waitFor(`window.metadataRequests===1&&document.querySelector('.arena-provenance').textContent.includes('Kraken Spot')`);
+      assert.equal(await evaluate(`document.querySelectorAll('.arena-provenance').length`),5);
+      assert.equal(await evaluate(`document.querySelectorAll('.arena-provenance details').length`),4);
+      assert.ok(await evaluate(`document.querySelector('.arena-provenance').textContent.includes('vorhanden · nicht bestätigt')`));
+      assert.ok(await evaluate(`document.querySelectorAll('.arena-provenance')[4].textContent.includes('Kraken-USD-Daten werden nicht zugeordnet')`));
+      assert.equal(await evaluate(`window.storedRequests`),0,'metadata view must not fetch candle chunks or invoke stored replay');
+      assert.equal(await evaluate(`window.networkAttempts`),0);
+      await evaluate(`document.querySelector('.arena-provenance details summary').focus()`);
+      await call('Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
+      await call('Input.dispatchKeyEvent',{type:'char',key:'Enter',code:'Enter',text:'\r',unmodifiedText:'\r'});
+      await call('Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
+      assert.equal(await evaluate(`document.querySelector('.arena-provenance details').open`),true,'full hashes are available through a keyboard-operable native disclosure');
+      m=await layout();assert.ok(m.body<=width+1&&m.root<=width+1&&m.inside,JSON.stringify(m));
       await evaluate(`document.getElementById('keyboard-start').focus()`);
       await call('Input.dispatchKeyEvent',{type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
       await call('Input.dispatchKeyEvent',{type:'keyUp',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
