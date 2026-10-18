@@ -288,6 +288,7 @@ test('resumable session preserves manifest order, development calibration bounda
   mutated.high = Math.max(mutated.open, mutated.close) * 1.004;
   mutated.low = Math.min(mutated.open, mutated.close) * 0.996;
   assert.equal(session.status, 'READY');
+  assert.equal(session.controlDefinitions, null);
   assert.equal(session.manifest.length, 44);
   assert.equal(session.computationOrder.length, 44);
   assert.deepEqual(session.computationOrder.slice(0, 19).map(path => path.segmentId),
@@ -318,6 +319,13 @@ test('resumable session preserves manifest order, development calibration bounda
       assert.equal(diagnosticBoundary.phase, 'DIAGNOSTIC');
       assert.equal(diagnosticBoundary.ordinal, 20);
       assert.equal(session.completedResult, null);
+      const controls = session.controlDefinitions;
+      assert.equal(controls.status, 'FROZEN_DEVELOPMENT_ONLY');
+      assert.deepEqual(controls, direct.controlDefinitions);
+      assert.equal(controls.meanExposure, direct.controlDefinitions.meanExposure);
+      assert.equal(controls.riskExposure, direct.controlDefinitions.riskExposure);
+      controls.meanExposure = 999;
+      assert.equal(session.controlDefinitions.meanExposure, direct.controlDefinitions.meanExposure);
     }
   }
   assert.equal(advances, 44);
@@ -369,6 +377,42 @@ test('execution sessions reject out-of-order, repeated, and interrupted advances
   assert.equal(repeated.completedResult, null);
 });
 
+test('insufficient development evidence is a failed session, never completed', () => {
+  // Generated opposing asset moves preserve feature variance while the basket is flat.
+  const series = createSyntheticSeries();
+  for (let index = 410; index <= 589; index++) {
+    for (let assetIndex = 0; assetIndex < ASSETS.length; assetIndex++) {
+      const row = series[ASSETS[assetIndex]][index];
+      const swing = 8 * Math.sin(index * 0.31);
+      row.open = index === 410 ? 100 / 1.0015 : 100;
+      row.close = (100 + (assetIndex === 0 ? swing : assetIndex === 1 ? -swing : 0)) /
+        (index === 589 ? 0.9985 : 1);
+      row.high = Math.max(row.open, row.close) * 1.01;
+      row.low = Math.min(row.open, row.close) * 0.99;
+    }
+  }
+  // Remove only numerical fill-solver residuals from this generated fixture.
+  const reference = makeRun(series).paths.find(path => path.kind === 'FULL_BASKET' &&
+    path.segmentId === 'development' && path.scenarioId === 'base-15bp');
+  let relativeEquity = 1;
+  for (let index = 410; index <= 589; index++) {
+    const priorEquity = relativeEquity;
+    relativeEquity *= 1 + reference.dailyReturns[index - 410];
+    for (const asset of ASSETS) {
+      series[asset][index].close /= relativeEquity;
+      if (index > 410) series[asset][index].open /= priorEquity;
+    }
+  }
+  const session = createExecution({seriesByAsset: series, source: syntheticSource, implementationSha256});
+  let outcome;
+  while (session.status === 'READY') outcome = session.advanceOne();
+  assert.equal(outcome.status, 'FAILED');
+  assert.equal(session.status, 'FAILED');
+  assert.equal(session.finalResult().status, 'INSUFFICIENT_EVIDENCE');
+  assert.equal(session.finalResult().attemptedPaths, 19);
+  assert.equal(session.completedResult, null);
+});
+
 test('session budgets include preparation, control calibration, and finalization', () => {
   const series = createSyntheticSeries();
   const executeAtPhase = phase => {
@@ -381,6 +425,14 @@ test('session budgets include preparation, control calibration, and finalization
     while (session.status === 'READY') session.advanceOne();
     return session.finalResult();
   };
+  const failedFirstPath = createExecution({
+    seriesByAsset: series, source: syntheticSource, implementationSha256,
+    syntheticClock: context => context.phase === 'path-start-check' ? BUDGET.totalMs + 1 : 0
+  });
+  assert.equal(failedFirstPath.advanceOne().status, 'FAILED');
+  assert.equal(failedFirstPath.lastCompletedPath, null);
+  assert.equal(failedFirstPath.finalResult().computedPaths, 0);
+
   const preparation = executeAtPhase('validate-asset');
   assert.equal(preparation.failure.code, 'BUDGET_EXCEEDED');
   assert.equal(preparation.attemptedPaths, 0);

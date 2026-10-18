@@ -9,14 +9,14 @@ The R2 `GREEN_LIGHT` (response comment `6249482850`) is historical and applies o
 | Identity | Proposed value | Status |
 | --- | --- | --- |
 | Protocol | `MERIDIAN-B1-7-PROTOCOL-R3-20261018`; raw `protocol.json` SHA-256: `a78e1ae8c71c8f85baee5b51f5691643fc29136f636f19465c61f553afe09185` | Frozen file identity |
-| Implementation | `MERIDIAN-B1-7-ENGINE-R3`; bundle SHA-256 `a6fe1cb27138c6835082ce10335557c293ef78dd52b87bacd314f068cccd93ae` | Exact three-file source bundle identity |
+| Implementation | `MERIDIAN-B1-7-ENGINE-R3`; bundle SHA-256 `a0a4189173a57f5afc33cd415400d66f48360a9842821093d2027b75c913e5fc` | Exact three-file source bundle identity |
 | Source basis | Git commit `1c7b6dccd886f57e866c7d359c091b1e72a193ea` | Pinned source/input-provenance commit |
 | Input manifest | Independently frozen selected-series manifest: `NOT_FROZEN` | No captured series loaded or hashed in this task; production loader remains blocked |
 | Offline provenance record | `research/acquisitions/kraken-usd-daily-20261018/offline-verification.json` | Hash provenance only; source authenticity is not established |
 
 The exact seven proposed assets and copied normalized-file SHA-256 values are:
 
-The bundle digest is SHA-256 of canonical JSON with keys `capturedInputSha256`, `engineSha256`, and `validatorSha256` containing these exact raw-file SHA-256 values: `captured-input.mjs` = `f5021a7934b491a11524d1c79e085cb65fbf8b70ec5ad0449d48023f751fb5e5`; `engine.mjs` = `2635ab6094f2913d090bf1422690b41a1b3d3a1f0ca3938a212f78da0af78aa6`; `validate.mjs` = `2052c0fae0082622f48a18abb4a6dacc0ffa679fb5da01df5779b398f5a578fc`. The engine accepts the bundle hash as caller-supplied identity and does not inspect its own source. The captured-input module remains inactive: the independently frozen selected-input manifest and production admission are absent, so no market CSV is read.
+The bundle digest is SHA-256 of canonical JSON with keys `capturedInputSha256`, `engineSha256`, and `validatorSha256` containing these exact raw-file SHA-256 values: `captured-input.mjs` = `1818834f2ae693f738c6f42a7409c1a81d682090b0d7344b8a446bc7adec7621`; `engine.mjs` = `151e4d5e9898971510d355889c2cffbcda1dc00c52a1c63a5cffb6721dfabbd0`; `validate.mjs` = `2052c0fae0082622f48a18abb4a6dacc0ffa679fb5da01df5779b398f5a578fc`. The engine accepts the bundle hash as caller-supplied identity and does not inspect its own source. The captured-input module remains inactive: the independently frozen selected-input manifest and production admission are absent, so no market CSV is read.
 
 | Order | Asset | Normalized file SHA-256 |
 | ---: | --- | --- |

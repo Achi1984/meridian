@@ -1035,7 +1035,8 @@ function* executeBatch(options) {
           const requestedPathId = yield {
             type: 'BEFORE_PATH',
             descriptor,
-            completedPath: lastPathResult
+            completedPath: lastPathResult,
+            controlDefinitions: publicControlDefinitions(controlDefinitions)
           };
           if (requestedPathId !== undefined && requestedPathId !== descriptor.pathId) {
             aborted = true;
@@ -1101,14 +1102,7 @@ function* executeBatch(options) {
     computedPaths: 0,
     plannedPaths: BUDGET.paths,
     paths: [],
-    controlDefinitions: controlDefinitions.ok ? {
-      status: controlDefinitions.status,
-      meanExposure: controlDefinitions.meanExposure,
-      riskExposure: controlDefinitions.riskExposure,
-      primaryDevelopmentSd: controlDefinitions.primarySd,
-      fullBasketDevelopmentSd: controlDefinitions.benchmarkSd,
-      calibration: controlDefinitions.calibration
-    } : controlDefinitions,
+    controlDefinitions: publicControlDefinitions(controlDefinitions),
     controlRealization: [],
     screen: {status: 'NOT_EVALUATED'},
     evidence: {
@@ -1244,6 +1238,17 @@ function failClosedAfterInterruption(result, code) {
   };
 }
 
+function publicControlDefinitions(controls) {
+  return controls.ok ? {
+    status: controls.status,
+    meanExposure: controls.meanExposure,
+    riskExposure: controls.riskExposure,
+    primaryDevelopmentSd: controls.primarySd,
+    fullBasketDevelopmentSd: controls.benchmarkSd,
+    calibration: controls.calibration
+  } : controls;
+}
+
 function publicClone(value) {
   return value === null || value === undefined ? value : structuredClone(value);
 }
@@ -1253,7 +1258,7 @@ export function createExecution(options) {
   let step = iterator.next();
   let result = step.done ? step.value : null;
   let status = step.done
-    ? step.value?.status === 'INVALID' ? 'FAILED' : 'COMPLETED'
+    ? step.value?.status === 'COMPLETED' ? 'COMPLETED' : 'FAILED'
     : 'READY';
   const prepared = step.done ? {manifest: [], computationOrder: []} : step.value;
   const manifest = Object.freeze(prepared.manifest.map(item => Object.freeze({
@@ -1291,12 +1296,16 @@ export function createExecution(options) {
       ? requestedPathId
       : requestedPathId === undefined ? current.descriptor.pathId : requestedPathId;
     step = iterator.next(expected);
-    if (!interrupted && expected === current.descriptor.pathId) {
+    const finishedPath = step.done
+      ? step.value?.paths?.find(path => path.pathId === current.descriptor.pathId)
+      : step.value?.completedPath;
+    if (!interrupted && expected === current.descriptor.pathId &&
+      (finishedPath?.status === 'COMPLETED' || finishedPath?.computed === true)) {
       lastCompletedPath = current.descriptor.pathId;
     }
     if (step.done) {
       result = step.value;
-      status = result?.status === 'INVALID' ? 'FAILED' : 'COMPLETED';
+      status = result?.status === 'COMPLETED' ? 'COMPLETED' : 'FAILED';
       const completedPath = result?.paths?.find(path => path.pathId === lastCompletedPath) ?? null;
       return {status, pathId: lastCompletedPath, completedPath: publicClone(completedPath)};
     }
@@ -1321,6 +1330,10 @@ export function createExecution(options) {
       return status === 'COMPLETED' && result?.status === 'COMPLETED' ? publicClone(result) : null;
     },
     get lastCompletedPath() { return lastCompletedPath; },
+    get controlDefinitions() {
+      return publicClone(step.done ? result?.controlDefinitions ?? null
+        : step.value?.controlDefinitions ?? null);
+    },
     beforePathBoundary() {
       if (status !== 'READY') return {status};
       const current = step.value;

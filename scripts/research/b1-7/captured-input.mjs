@@ -19,7 +19,7 @@ export const NORMALIZED_PATHS = Object.freeze({
   SUIUSD: 'research/acquisitions/kraken-usd-daily-20261018/normalized/SUIUSD_1440_utc_normalized.csv'
 });
 
-const HEADER = 'timestamp,open,high,low,close,volume,trades';
+const HEADER = 'timestamp_utc,open,high,low,close,volume,trades';
 const LAST_TIMESTAMP = '2026-09-30T00:00:00Z';
 const PRODUCTION_SELECTED_INPUT_MANIFEST = null;
 const PRODUCTION_ADMISSION = null;
@@ -65,12 +65,30 @@ export async function loadCapturedInputs() {
   });
 }
 
-export async function loadSyntheticFixtureProfile(rootDir) {
+export async function loadSyntheticFixtureProfile(rootDir, expectedManifest = null) {
   if (typeof rootDir !== 'string' || rootDir.length === 0) fail('FIXTURE_ROOT_INVALID');
-  return loadSeriesFromRoot(resolve(rootDir), {
-    profile: CAPTURED_INPUT_PROFILE,
-    manifest: null
-  });
+  let manifest = null;
+  if (expectedManifest !== null) {
+    const exactKeys = (object, keys) => object !== null && typeof object === 'object' &&
+      !Array.isArray(object) && Reflect.ownKeys(object).length === keys.length &&
+      keys.every(key => {
+        const descriptor = Object.getOwnPropertyDescriptor(object, key);
+        return descriptor?.enumerable && Object.hasOwn(descriptor, 'value');
+      });
+    const hashMap = value => exactKeys(value, ASSETS) &&
+      ASSETS.every(asset => typeof value[asset] === 'string' && /^[a-f0-9]{64}$/.test(value[asset]));
+    if (!exactKeys(expectedManifest, ['profile', 'wholeFileSha256', 'selectedSeriesSha256']) ||
+        expectedManifest.profile !== CAPTURED_INPUT_PROFILE ||
+        !hashMap(expectedManifest.wholeFileSha256) || !hashMap(expectedManifest.selectedSeriesSha256)) {
+      return {ok: false, status: 'REJECTED', error: {code: 'SYNTHETIC_MANIFEST_INVALID', file: null}};
+    }
+    // Snapshot caller pins before the first await; this profile never enables production admission.
+    manifest = {
+      files: {...expectedManifest.wholeFileSha256},
+      selectedSeriesSha256: {...expectedManifest.selectedSeriesSha256}
+    };
+  }
+  return loadSeriesFromRoot(resolve(rootDir), {profile: CAPTURED_INPUT_PROFILE, manifest});
 }
 
 async function checkPathComponents(root, relativePath) {
@@ -102,7 +120,7 @@ async function readVerifiedBuffer(root, relativePath) {
   if (before.size <= 0 || before.size > MAX_NORMALIZED_FILE_BYTES) {
     fail('FILE_SIZE_INVALID', relativePath);
   }
-  const handle = await open(absolutePath, constants.O_RDONLY | constants.O_NOFOLLOW);
+  const handle = await open(absolutePath, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   try {
     const opened = await handle.stat();
     if (!opened.isFile() || opened.dev !== before.dev || opened.ino !== before.ino ||
@@ -197,7 +215,11 @@ function parseCsv(buffer, relativePath) {
 
 async function loadSeriesFromRoot(root, {profile, manifest}) {
   try {
+    const rootStat = await lstat(root);
+    if (rootStat.isSymbolicLink()) fail('SYMLINK_REJECTED');
+    if (!rootStat.isDirectory()) fail('ROOT_NOT_DIRECTORY');
     const canonicalRoot = await realpath(root);
+    if (canonicalRoot !== root) fail('ROOT_PATH_ALIAS_REJECTED');
     const seriesByAsset = {};
     const fileHashes = {};
     const selectedSeriesHashes = {};
