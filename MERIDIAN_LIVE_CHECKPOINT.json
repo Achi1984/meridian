@@ -194,6 +194,27 @@
       "networkAuthenticityVerified": false,
       "strategyPnlRun": false
     },
+    "lastCompletedSourceMerge": {
+      "pr": 875,
+      "mergeSha": "1c7b6dccd886f57e866c7d359c091b1e72a193ea",
+      "reviewedHead": "b4a5084b98fe54c0c840d17806a76b5a465bf4c9",
+      "reviewedBase": "a8cde76ba3255a77049eb6318a61efaa127cedd0",
+      "reviewer": "CLAUDE",
+      "reviewCommentId": 6249104892,
+      "sourceCiRunId": 39120883771,
+      "sourceCiAttempt": 2,
+      "sourceCiResult": "2600/2600",
+      "state": "COMPLETE",
+      "postMergeChecks": "VERIFIED_SUCCESS",
+      "postMergeRunIds": {
+        "releaseSafety": 39122238945,
+        "runtimeSmoke": 39122238938,
+        "releaseCoordinator": 39122238969,
+        "pages": 39122238564
+      },
+      "finalMergeCommentId": 6248789090,
+      "scope": "V11_B10_PREVIEW_ONLY"
+    },
     "historicalLastCompletedSourceMergeBeforeB11": {
       "pr": 862,
       "mergeSha": "921246e61e07ff0624fb4a24c00a452246e9eb7f",
@@ -213,27 +234,6 @@
         "runtimeSmoke": 39105990479,
         "releaseCoordinator": 39105990429,
         "pages": 39105990078
-      },
-      "lastCompletedSourceMerge": {
-        "pr": 875,
-        "mergeSha": "1c7b6dccd886f57e866c7d359c091b1e72a193ea",
-        "reviewedHead": "b4a5084b98fe54c0c840d17806a76b5a465bf4c9",
-        "reviewedBase": "a8cde76ba3255a77049eb6318a61efaa127cedd0",
-        "reviewer": "CLAUDE",
-        "reviewCommentId": 6249104892,
-        "sourceCiRunId": 39120883771,
-        "sourceCiAttempt": 2,
-        "sourceCiResult": "2600/2600",
-        "state": "COMPLETE",
-        "postMergeChecks": "VERIFIED_SUCCESS",
-        "postMergeRunIds": {
-          "releaseSafety": 39122238945,
-          "runtimeSmoke": 39122238938,
-          "releaseCoordinator": 39122238969,
-          "pages": 39122238564
-        },
-        "finalMergeCommentId": 6248789090,
-        "scope": "V11_B10_PREVIEW_ONLY"
       },
       "postMergeSnapshot": {
         "releaseSafety": "SUCCESS",
@@ -1443,7 +1443,8 @@
         "strategyPnlRun": false,
         "networkOrSourceAuthenticityIndependentlyVerified": false
       },
-      "independentReview": "NEEDS_MORE_EVIDENCE_UNTIL_REVIEWER_RECHECKS_VERIFIER_OUTPUT",
+      "independentReview": "GREEN_LIGHT_639_6248783244_CONSOLIDATED_WITH_SOURCE_GREEN_6248520450",
+      "historicalIndependentReviewBeforeIntegration": "NEEDS_MORE_EVIDENCE_UNTIL_REVIEWER_RECHECKS_VERIFIER_OUTPUT",
       "acquisitionWindowClosed": true,
       "rawAndNormalizedEvidenceModified": false,
       "ciTimingCorrection": {
@@ -1468,3 +1469,4 @@
     }
   }
 }
+

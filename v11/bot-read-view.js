@@ -48,7 +48,7 @@ function projection(state, filters = {}) {
         liquidation:valueLabel(bot.metrics?.liquidationPrice,'',true),
         takeProfit:valueLabel(bot.metrics?.takeProfit,'',true),stopLoss:valueLabel(bot.metrics?.stopLoss,'',true)};
     });
-    const losses=overview.losses.map(loss=>({ref:loss.ref,symbol:loss.symbol,pnl:valueLabel(loss.pnl,' USD')}));
+    const losses=overview.losses.map(loss=>({ref:loss.ref,symbol:loss.symbol,direction:loss.direction,pnl:valueLabel(loss.pnl,' USD')}));
     return {status,count:overview.count,distribution:overview.distribution,bots,losses,
       snapshotAt:overview.snapshotAt,source:overview.source};
   } catch { return {status:'unavailable',bots:[]}; }
@@ -156,10 +156,12 @@ export function renderCommandBotOverview(root, data, onJump) {
     const losses=element(document,'ul');
     losses.setAttribute('aria-label','Größte ausgewiesene Verluste laut Quelle');
     for(const loss of data.losses){
+      const direction=ownLabel({long:'Long',short:'Short',neutral:'Neutral'},loss.direction);
+      const identity=loss.symbol+' · '+direction+' · Referenz '+loss.ref;
       const item=element(document,'li'),button=element(document,'button',
-        loss.symbol+' · P/L laut Quelle: '+loss.pnl);
+        identity+' · P/L laut Quelle: '+loss.pnl);
       button.setAttribute('type','button');
-      button.setAttribute('aria-label',loss.symbol+' öffnen · P/L laut Quelle: '+loss.pnl);
+      button.setAttribute('aria-label',identity+' öffnen · P/L laut Quelle: '+loss.pnl);
       button.addEventListener('click',()=>onJump(loss.ref));
       item.append(button);losses.append(item);
     }
@@ -292,3 +294,4 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
     }
   };
 }
+

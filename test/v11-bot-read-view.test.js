@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {renderBotReadState,createBotReadView} from '../v11/bot-read-view.js';
+import {renderBotReadState,createBotReadView,renderCommandBotOverview} from '../v11/bot-read-view.js';
 import {buildBotReadModel} from '../v11/bot-read-model.js';
 import {createBotReadClient} from '../v11/bot-read-client.js';
 
@@ -210,4 +210,19 @@ test('collapsed native cards distinguish equal symbols and render only whitelist
     assert.equal(colored.length,tone?1:0);
     if(tone){assert.equal(colored[0].className,'bot-pnl-'+tone);assert.equal(colored[0].textContent,value<0?'-2,75 USD':'2,75 USD');}
   }
+});
+
+
+test('Command equal-symbol equal-loss actions have distinct references and directions',()=>{
+  const target=root(),selected=[];
+  renderCommandBotOverview(target,{status:'fresh',source:'PIONEX_BOT_API',snapshotAt:'2026-10-18T10:00:00Z',count:2,
+    distribution:{long:1,short:1,neutral:0,unknown:0},losses:[
+      {ref:'a'.repeat(20),symbol:'BTC',direction:'long',pnl:'-25 USD'},
+      {ref:'b'.repeat(20),symbol:'BTC',direction:'short',pnl:'-25 USD'}]},ref=>selected.push(ref));
+  const buttons=all(target,'button');
+  assert.notEqual(buttons[0].textContent,buttons[1].textContent);
+  assert.notEqual(buttons[0].getAttribute('aria-label'),buttons[1].getAttribute('aria-label'));
+  assert.match(buttons[0].textContent,/BTC · Long · Referenz a{20}/);
+  assert.match(buttons[1].textContent,/BTC · Short · Referenz b{20}/);
+  buttons.forEach(button=>button.click());assert.deepEqual(selected,['a'.repeat(20),'b'.repeat(20)]);
 });

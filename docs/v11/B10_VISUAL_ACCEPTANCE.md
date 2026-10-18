@@ -59,7 +59,8 @@ screenshots or saved by the tests.
   assertions; those contracts and the evidence-only disclosure selector are now updated.
   The later diagnostic run `39120259169` at `6b1cdcd` passed 2599 tests and failed only
   the now-corrected history reachability count (18 items including the closing note
-  versus the old expectation of 17). A new exact-head result is not yet available.
+  versus the old expectation of 17). At that historical checkpoint, a new exact-head result was not yet available;
+  the completed result is recorded below.
   An earlier local full-suite attempt passed 2533/2544 tests; its 11 failures were
   confined to non-V11 PG-dependent, publisher-Python, and V10 tests.
 - B10 was completed in PR875: reviewed head `b4a5084b98fe54c0c840d17806a76b5a465bf4c9`,
@@ -72,3 +73,4 @@ screenshots or saved by the tests.
   draft; these B10 screenshots and gates are not evidence for B11.
 - No authenticated Depot/Bots access, real-account data, physical mobile device,
   Safari/PWA readiness, deployment, or production status was tested.
+

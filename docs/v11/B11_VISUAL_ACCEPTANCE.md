@@ -1,54 +1,57 @@
 # Meridian 11 B11 Bot cockpit acceptance
 
-Local Chromium/CDP acceptance of the actual V11 shell and production Bot
-model/view modules. The existing manual read client was fed only bounded,
-synthetic fixture responses from a test-only local server. No credentials or
-account data were used.
+## Evidence provenance
 
-## Results
+The committed PNGs in `evidence/b11/` and the original local execution results
+below were produced for the worker proposal ending at
+`b52de431e9d0121c362119581806419db0b8f4fb`. They are **pre-fix evidence**, not
+screenshots or execution proof of the subsequent acceptance corrections.
+The original Command/Bots captures mainly show the upper page and do not prove
+that the cockpit controls and populated cards are visible within those captures.
+The original files ending `-locked.png` were captured after expiry and actually
+show the **stale** state; their filenames are retained only as historical evidence.
 
-| Viewport | Mixed rows | Explicit mock reads | Horizontal overflow | Bot controls |
-| --- | ---: | ---: | --- | --- |
-| 320×568 | 5 | 10 | None | 44 px or greater |
-| 375×667 | 5 | 10 | None | 44 px or greater |
-| 390×844 | 5 | 10 | None | 44 px or greater |
-| 1440×900 | 5 | 10 | None | 44 px or greater |
+## Original worker execution
 
-The five-row fixture includes two distinct BTC bots, Long/Short/Neutral/Unknown
-directions, COIN-M/Linear/Unknown contracts, confirmed losses, a source P/L zero
-and missing values. Browser assertions cover search, each filter, deterministic
-symbol/leverage/source-P&L ordering, duplicate-symbol references, no-match vs
-empty snapshot, Command direction distribution and UTC timestamp, the three
-confirmed negative P/L values, and a keyboard Enter jump that clears filters,
-opens the exact card and focuses its summary. Filter, sort, reset and navigation
-operations cause no mock reads; the ten reads per viewport are explicit refresh
-actions exercised for fresh, empty, stale, error, race, 401 and expiry paths.
+The worker reported an actual V11-shell Chromium/CDP run at 320×568, 375×667,
+390×844 and 1440×900, with five synthetic bots and ten explicit mock reads per
+viewport. The fixture included duplicate BTC symbols, but only one BTC loss.
+Search, filters, source-P/L sorting, a keyboard Enter card jump and state clearing
+were exercised. Overflow checks were initially locked and finally stale; those
+checks do **not** prove populated or expanded-card layout.
 
-Both views clear derived snapshot information on loading, stale, error, lock,
-hidden-page, expiry, 401 and late-response races. At each size, the fixed
-navigation does not overlap the final Bot-view content. Screenshot evidence is
-in [`evidence/b11/`](evidence/b11/): Command, populated Bots and locked states
-for each requested viewport.
+Original reported commands/results:
 
-## Checks
+- B11 actual-shell browser suite: passed at four viewport sizes.
+- Model/view suites: 27 passed.
+- Focused V11 suites: 128 passed.
+- Full local suite: 2,551 passed and 11 failed; this was not a full-CI pass.
+- Frozen terminal baseline reversal: passed.
 
-- `V11_B11_EVIDENCE_DIR=/tmp/meridian-b11-evidence node --test test/v11-b11-bot-cockpit-chrome.test.js`
-  — passed; four actual-shell viewports and all assertions above.
-- `node --test test/v11-bot-overview-model.test.js test/v11-bot-read-view.test.js`
-  — 27 tests passed.
-- `node --test --test-concurrency=1 test/v11-*.test.js`
-  — 128 tests passed.
-- `node --test test/*.test.js`
-  — 2,551 passed and 11 failed (2,562 total). The failures are outside the
-  V11 suites; logs include missing `pg` dependencies and unrelated publisher,
-  process-boundary and source-boundary integration failures. This local result
-  is not a full-CI pass and needs Lead reconciliation against the current base.
-- `node --test --test-name-pattern='Terminal öffnen preserves' test/v11-terminal-entry.test.js`
-  — frozen baseline hash and exact B11 reverse deltas passed.
+These are historical worker results, not a claim that the corrected candidate
+has passed exact-head hosted CI or independent review.
 
-## Evidence limits
+## Acceptance corrections requiring fresh browser evidence
 
-This is synthetic local-browser evidence only. It does not establish real
-Pionex-account behavior, authenticated provider data, physical-device or
-Safari/PWA acceptance, deployment, production readiness, or operational
-permission. Exact-head GitHub CI and independent review remain pending for B11.
+- Command loss actions include direction and the full validated bot reference,
+  making equal-symbol/equal-loss actions distinguishable visually and by accessible name.
+- The actual-shell fixture now contains six bots: two BTC bots with the same
+  negative P/L, a separate zero-P/L bot, missing values and all four direction states.
+- Tests assert both equal-loss actions have unique labels and navigate with Enter
+  to their own exact cards without extra requests.
+- Populated collapsed and expanded cards receive explicit horizontal-clipping,
+  document-overflow and fixed-navigation bottom-clearance checks.
+- Future captures scroll to the cockpit controls, Command overview or stale-state
+  content rather than photographing only the page header. Future expired-state
+  images are named `-stale.png`.
+
+The corrected view unit suite passed locally: **20/20**, including the new
+same-symbol/equal-loss action-label test. The corrected browser test passed Node
+syntax checking. Chromium/Chrome is unavailable in this local environment, so
+browser execution and new screenshots remain pending exact-candidate CI.
+
+## Limits
+
+All fixtures are synthetic; no account data or private credentials are used.
+Nothing here establishes real Pionex-account behavior, physical-device or
+Safari/PWA acceptance, deployment, production readiness or operational authority.
