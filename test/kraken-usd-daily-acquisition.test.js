@@ -81,6 +81,8 @@ test('pinned committed acquisition bytes pass complete offline verification', ()
   assert.equal(result.checks.independentlyReproducedNormalizedRows, 15372);
   assert.equal(result.commonCoverage.commonCloses, 448);
   assert.equal(result.commonCoverage.targetMet, false);
+  assert.equal(result.pairs.HBARUSD.firstSelectedUtc, '2025-07-10T00:00:00Z');
+  assert.equal(result.pairs.HBARUSD.lastSelectedUtc, '2026-09-30T00:00:00Z');
   assert.equal(result.pairs.XBTUSD.sourceGaps.missingDays, 12);
   assert.equal(result.pairs.ETHUSD.sourceGaps.missingDays, 6);
   assert.equal(result.pairs.XRPUSD.sourceGaps.missingDays, 1);

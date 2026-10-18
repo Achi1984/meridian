@@ -240,6 +240,21 @@ function requireEqual(actual, expected, label) {
 function verifyBudget(receipt) {
   const budget = receipt.budget;
   const prior = receipt.priorProbes;
+  if (prior.length !== 2 ||
+      prior.some(probe => probe.httpResponses !== 0 || probe.bodyBytes !== 0) ||
+      prior.reduce((sum, probe) => sum + probe.attempts, 0) !== 3) {
+    fail('prior blocked probe accounting is inconsistent');
+  }
+  if (receipt.archives['2026Q3'].url !==
+      'https://assets.kraken.com/marketing/institutions/Kraken_OHLCVT_2026Q3.zip' ||
+      receipt.archives.full.parts.length !== 5 ||
+      receipt.archives.full.parts.some((part, index) =>
+        part.part !== String(index).padStart(2, '0') ||
+        part.url !== `https://assets.kraken.com/marketing/institutions/Kraken_OHLCVT_Full.zip.part${String(index).padStart(2, '0')}`) ||
+      receipt.archives.full.assembledLength !==
+        receipt.archives.full.parts.reduce((sum, part) => sum + part.contentLength, 0)) {
+    fail('archive URL or multipart length receipt does not match the approved source layout');
+  }
   const headCount = receipt.archives.full.parts.length + 1;
   const tailCount = 2;
   const memberRanges = receipt.rangeRequests;
@@ -377,8 +392,8 @@ function verifyAcquisition({root = ROOT, receipt = JSON.parse(fs.readFileSync(pa
     requireEqual(result.gaps, receipt.capture.gaps[pair], `${pair} capture gaps`);
     result.startUtc = coverage.startUtc;
     result.endUtc = coverage.endUtc;
-    result.firstSelectedUtc = selectedRows.length ? `${selectedRows[0].slice(0, 20)}Z` : null;
-    result.lastSelectedUtc = selectedRows.length ? `${selectedRows.at(-1).slice(0, 20)}Z` : null;
+    result.firstSelectedUtc = selectedRows.length ? selectedRows[0].slice(0, 20) : null;
+    result.lastSelectedUtc = selectedRows.length ? selectedRows.at(-1).slice(0, 20) : null;
     delete result.commonTimestamps;
     pairResults[pair] = result;
   }

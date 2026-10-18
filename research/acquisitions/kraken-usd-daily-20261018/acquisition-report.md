@@ -45,6 +45,7 @@ All inputs were validated in original row order; duplicate timestamps, exact ove
 
 - Offline content verification: `node scripts/verify-kraken-usd-daily-acquisition.mjs`.
 - Focused verifier tests: `node --test test/kraken-usd-daily-acquisition.test.js`.
+- Existing full Node suite: `npm test` (2,593 tests passed). This shared sandbox checkout initially exposed tracked source files as group-writable; the suite was rerun with those local permissions temporarily normalized and then restored.
 - Deterministic content-check output: `offline-verification.json` (contains observed input hashes, content-check counts, coverage/gaps, budget reconciliation, and receipt-only network limitations).
 - Acquisition-time capture and normalization used temporary session scripts and are not reproduced as network-capable utilities. No acquisition or network operation is part of the offline verifier.
 
