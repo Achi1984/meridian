@@ -18,9 +18,9 @@ Begründung: Der Review muss unabhängig sein; ein zweites Modell findet systema
 ## 3. Ablauf pro Änderung
 1. Lead prüft vor jedem Write `main`-SHA und offene PRs.
 2. Lead öffnet PR mit: Ziel, Research-Stage, PnL berührt (ja/nein), `Review requested: Claude`.
-3. Claude liest den vollständigen angeforderten Scope am exakten PR-HEAD-SHA; der Lead fragt erst nach grüner Exact-Head-CI an. Jedes GREEN_LIGHT muss einen Abschnitt `Executed checks` mit den tatsächlich ausgeführten read-only Befehlen und Ergebnissen enthalten. Kann ein für Scope/Request verpflichtender Check nicht laufen, ist GREEN_LIGHT verboten; Ergebnis ist NEEDS_MORE_EVIDENCE mit Begründung; nachgewiesene Codefehler erhalten REVISION_REQUIRED.
+3. Claude liest den vollständigen angeforderten Scope am exakten PR-HEAD-SHA; der Lead fragt erst nach abgeschlossener, erfolgreicher Exact-Head-CI an. Requests und Ergänzungsrequests verwenden `@claude`, eine Leerzeile, `CROSS_MODEL_REQUEST <id>` und eigene Metadatenzeilen `exact_head_sha`, `exact_base_sha`, `pr`; kein `FOLLOWUP`. Jedes GREEN_LIGHT muss einen Abschnitt `Executed checks` mit den tatsächlich ausgeführten read-only Befehlen und Ergebnissen enthalten. Kann ein für Scope/Request verpflichtender Check nicht laufen, ist GREEN_LIGHT verboten; Ergebnis ist NEEDS_MORE_EVIDENCE mit Begründung; nachgewiesene Codefehler erhalten REVISION_REQUIRED.
 4. Merge nur bei grüner CI und GREEN_LIGHT auf genau diesem SHA. Neuer Commit = altes GREEN_LIGHT ungültig.
-5. Trivial (Text, Tests, CI-Fix ohne Research-Logik) kann ohne Cross-Model-Review bleiben. Datenvertrag, Source Receipt, Split/Stage-Lock, Accounting, Strategy-PnL, Stage-Übergänge sowie Agenten-Spielregeln/Workflow-Berechtigungen sind nie trivial und reviewpflichtig.
+5. Jeder Source-Merge benötigt das vollständige unabhängige Review des gesamten angeforderten Scopes nach der geltenden Owner-Merge-Delegation. Ein GREEN_LIGHT mit selbst gemeldeter Scope-, Receipt- oder Prüflücke zählt nicht: erst eine vollständige Ergänzung am selben Head/Base einholen.
 6. Max. 3 Review-Loops, danach entscheidet der User.
 
 ## 4. Lead-Wechsel (Lease)
@@ -42,8 +42,8 @@ Notfall: Ist der Lead nicht erreichbar, darf nur der User den Lease überschreib
 - „Übergib an Claude/ChatGPT“ → Abschnitt 4.
 
 ## 7. Technische Voraussetzungen
-- Verbindliche Mailbox ist `MERIDIAN_LIVE_CHECKPOINT.json.mailboxIssue`; Ziel dieses Kandidaten **#639**, vor dessen freigegebenem Merge weiterhin **#571**.
-- Mailbox-Inhalt: nur `CROSS_MODEL_REQUEST`, `CROSS_MODEL_RESPONSE`, `CROSS_MODEL_STATUS NEEDS_USER_DECISION` und finale Merge-Status. INTENT/Fortschritt lebt pro aktivem PR in genau einem editierten Statuskommentar.
+- Verbindliche Mailbox ist `MERIDIAN_LIVE_CHECKPOINT.json.mailboxIssue`; aktiv und verbindlich ist **#639** seit dem Merge von #818. **#571** ist nur das archivierte Vorgängerprotokoll.
+- Mailbox-Inhalt: nur `CROSS_MODEL_REQUEST`, `CROSS_MODEL_RESPONSE`, `CROSS_MODEL_STATUS NEEDS_USER_DECISION`, `CROSS_MODEL_STATUS RESOLVED`, terminale `SUPERSEDED`/`FAILED`-Status und finale Merge-Status. INTENT/Fortschritt lebt pro aktivem PR in genau einem editierten Statuskommentar.
 - Rollover bei >200 Kommentaren: Nachfolger anlegen, Workflow-Trigger + `mailboxIssue` gemeinsam per reviewed Infra-PR umstellen, Smoke im Nachfolger, dann Vorgänger schließen.
 - Claude bleibt reviewer-only: `contents/pull-requests/actions: read`; `issues: write` nur für die angeforderte Review-Antwort und das Update des exakt im Checkpoint gepinnten Watchdog-Statuskommentars. Edit/Write, Commit/Push/PR/Merge, Locks/Stages und Workflow-Dispatch bleiben verboten.
 - Erlaubte read-only Prüfung: `gh api` zur Prüfung nur GET; einzige Watchdog-Ausnahme ist PATCH des zuvor validierten, im Checkpoint gepinnten Statuskommentars, `gh pr view/diff`, `gh run view`, Git-Inspektion, `node --test`, Continuity Audit, Frozen Guard und Orchestration Validator.
@@ -60,4 +60,16 @@ Notfall: Ist der Lead nicht erreichbar, darf nur der User den Lease überschreib
 
 ## Housekeeping contract
 
-The owner housekeeping contract in `MERIDIAN_GO.md` is binding: canonical verdicts, full-scope and exact-head-CI review gates, in-place decision resolution, real read-only credential preflight, separate recovery/retry approvals, and merge-block handoff refresh. The proposed mailbox639 route activates only after concrete owner-approved merge;571 remains binding until then. Watchdog status uses the checkpoint-pinned single comment, separate from requested review responses. WIP maximum3active work packages is approved by owner2026-10-15T20:16:49+02:00, decision6199107184.
+The owner housekeeping contract in `MERIDIAN_GO.md` is binding: canonical verdicts, full-scope and exact-head-CI review gates, in-place decision resolution, real read-only credential preflight, separate recovery/retry approvals, and same-PR checkpoint updates. Mailbox #639 is active and binding following merged PR818; #571 is archived historical evidence only. Watchdog status uses the checkpoint-pinned single comment, separate from requested review responses. WIP maximum3active work packages is approved by owner2026-10-15T20:16:49+02:00, decision6199107184.
+
+## Owner-Prozesskorrektur — 2026-10-17
+
+Verbindlicher Owner-Auftrag 20:24:05 Europe/Vienna, Bezug #639/comment6238072184:
+- Review erst nach **completed SUCCESS** aller relevanten exact-head CI-Gates anfordern; laufende CI ist kein Anlass für einen vorgezogenen Request.
+- Ausschließlich `@claude` und danach `CROSS_MODEL_REQUEST <id>` verwenden, auch für Ergänzungen. Kein `FOLLOWUP`-Kommentar. Für den Mailbox-Parser: `@claude`, Leerzeile, Request-Header und `exact_head_sha`, `exact_base_sha`, `pr` als eigene Metadatenzeilen.
+- Selbst gemeldete Reviewlücken blockieren den Merge, unabhängig vom GREEN-Label. Ergänzungsreview muss Lücke schließen und denselben Head/Base binden.
+- Jeder Merge endet nach geprüften Postchecks mit `FINAL_MERGE_STATUS PR<n>` am PR und identischem Spiegelbild in #639. Pending bleibt ausdrücklich pending.
+- Owner-Freigaben zusätzlich in #639 als `CROSS_MODEL_STATUS RESOLVED` mit wörtlichem Zitat, Zeitpunkt, exakt begrenztem Scope und Verbrauchsstatus festhalten. Ein vom Agenten verfasster Spiegel erzeugt keine neue persönliche Freigabe.
+- Jede Änderung des Arbeitsstands aktualisiert `MERIDIAN_LIVE_CHECKPOINT.json` **im selben PR**. Kein nachgeschobener Checkpoint-PR als Routine. Keine vorweggenommenen Merge-/Postcheck-Erfolge: der Checkpoint benennt den verifizierten Ausgangsstand und vorgesehenen Zustandswechsel; exakte spätere Mergebelege stehen im Abschlusskommentar.
+- Publisher bleibt bis zur ausdrücklichen A/B-Entscheidung pausiert. Eine Antwort wird mit wörtlichem Owner-Zitat als RESOLVED in #639 festgehalten und im nächsten zugehörigen PR in den Checkpoint übernommen.
+- V2 SOURCE_AUDIT, alle sieben Flags false; kein neuer PnL, keine Discovery-/Validation-/Holdout-/Paper-/Live-Freigabe und keine Trading-Aktion.

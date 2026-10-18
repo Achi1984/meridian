@@ -52,10 +52,15 @@ local elapsed time and job duration are different measurements; label each.
 Actual token usage is unknown unless the provider reports it for the identified
 run. Do not infer tokens from turns or invent euro costs, billing or savings.
 
-Prepare one consolidated handoff per completed merge block; preserve an unpublished
-draft while dependent merges are pending. Refresh it against the resulting main
-and run its own required gates. Keep intermediate receipts in their existing
-locations rather than repeatedly publishing the same continuity files.
+Update MERIDIAN_LIVE_CHECKPOINT.json in the SAME PR whenever that PR changes the
+work state. Describe verified starting evidence and the intended transition;
+never predeclare a merge or postcheck success. A separate consolidated handoff is
+for explicit reconciliation requests, not routine delayed checkpoint maintenance.
+Request review only after completed successful exact-head CI, using the REQUEST
+form also for supplements. A self-reported review gap blocks merge even with GREEN.
+After verified postchecks, post FINAL_MERGE_STATUS PR<n> on the PR and mirror it in
+Mailbox639. Mirror direct owner decisions as RESOLVED with verbatim quote, exact
+scope and consumption state. Preserve single-writer and independent-review gates.
 
 ## Completion report
 
@@ -69,3 +74,7 @@ Do not install an entire ECC or other plugin bundle merely to accelerate work.
 Evaluate only a concrete missing capability, its provenance, dependencies and
 permissions within a separately bounded proposal. Existing agents and tooling are
 the default; no blanket plugin installation or new external access is authorized.
+
+## Owner resource preference — 2026-10-17
+
+Prefer existing GitHub-hosted agents for substantial bounded implementation proposals, code and checks; the lead retains scope, integration and acceptance, with a separate independent reviewer. Start with one substantial packet, avoid duplicate local/subagent implementation and repeated polling. Verify assignment and report it separately from execution. Report decisions and owner-only blocks, not repetitive owner-Go requests. Keep the existing hourly coordinator's scope and end time unchanged; do not expand automation policy, schedules, workflows or permissions. Use existing permissions only; reviewer-only Claude must not be repurposed as a writer. Exact-head CI, independent review and post-merge gates remain mandatory. Owner evidence: Mailbox639/comment6238672603; first assigned packet: #861 (Copilot).
