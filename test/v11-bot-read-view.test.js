@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {renderBotReadState,createBotReadView} from '../v11/bot-read-view.js';
+import {renderBotReadState,createBotReadView,renderCommandBotOverview} from '../v11/bot-read-view.js';
 import {buildBotReadModel} from '../v11/bot-read-model.js';
 import {createBotReadClient} from '../v11/bot-read-client.js';
 
@@ -22,14 +22,17 @@ class Node {
 function root(){const document={createElement:tag=>new Node(document,tag)};return document.createElement('div');}
 const all=(node,tag)=>[...(node.tagName===tag?[node]:[]),...node.children.flatMap(x=>all(x,tag))];
 const fresh=()=>({status:'fresh',model:{status:'FRESH_SNAPSHOT',readOnly:true,executionAllowed:false,
-  snapshotAt:'2026-10-12T20:00:00Z',bots:[{symbol:'BTC',side:'SHORT',type:'futures_grid',category:'inverse',secret:'NEVER DISPLAY'}]}});
+  source:'PIONEX_BOT_API',snapshotAt:'2026-10-12T20:00:00Z',
+  bots:[{ref:'a'.repeat(20),symbol:'BTC',side:'SHORT',type:'futures_grid',category:'inverse',
+    metrics:{leverage:null,pnlUsd:null},secret:'NEVER DISPLAY'}]}});
 function mounted(overrides={}){
   const target=root(),calls={refresh:0,lock:0,dispose:0,revalidate:0};let publish;
   const client={refresh(){calls.refresh++;publish({status:'loading'});},lock(){calls.lock++;publish({status:'locked'});},
     dispose(){calls.dispose++;},revalidate(){calls.revalidate++;},...overrides};
   const getter=()=>{throw new Error('renderer must not read token');};
   const view=createBotReadView(target,{getToken:getter,createClient:options=>{assert.equal(options.getToken,getter);publish=options.onChange;return client;}});
-  return {target,view,calls,publish:state=>publish(state),buttons:all(target,'button')};
+  return {target,view,calls,publish:state=>publish(state),
+    buttons:all(target,'button').filter(node=>['Bots aktualisieren','Botansicht sperren'].includes(node.text))};
 }
 test('fresh rows use bounded labels, UTC time, correct side and no arbitrary data',()=>{
   const target=root();assert.equal(renderBotReadState(target,fresh()),'fresh');
@@ -91,6 +94,22 @@ test('empty fresh snapshot reports absence rather than implying safety or active
   assert.match(target.textContent,/0 Bots im Snapshot/);assert.match(target.textContent,/Keine Bots in diesem Snapshot/);
   assert.doesNotMatch(target.textContent,/SAFE|sicher|0 aktive Bots/);
 });
+test('accessible Bot filters report no matches separately and reset without reading again',()=>{
+  const h=mounted();h.publish(fresh());
+  const search=all(h.target,'input')[0],direction=all(h.target,'select')[0];
+  assert.equal(search.getAttribute('aria-label'),'Symbol suchen');
+  assert.equal(direction.getAttribute('aria-label'),'Richtung');
+  search.value='ETH';for(const listener of search.listeners.get('input')||[])listener();
+  assert.match(h.target.textContent,/0 Treffer von 1 Bots/);
+  assert.match(h.target.textContent,/Keine Bots entsprechen den Filtern/);
+  assert.doesNotMatch(h.target.textContent,/BTC · Short/);
+  direction.value='short';for(const listener of direction.listeners.get('change')||[])listener();
+  assert.match(h.target.textContent,/Aktive Auswahl: Symbol ETH · Richtung short/);
+  const reset=all(h.target,'button').find(node=>node.text==='Filter zurücksetzen');
+  reset.click();assert.match(h.target.textContent,/1 Treffer von 1 Bots/);
+  assert.match(h.target.textContent,/Keine aktiven Filter/);
+  assert.equal(h.calls.refresh,0,'local filtering and reset never read a snapshot');
+});
 test('mount is inactive, preserves controls and blocks repeated loading clicks',()=>{
   const h=mounted();assert.equal(h.calls.refresh,0);assert.match(h.target.textContent,/Gesperrt/);
   const live=all(h.target,'div').find(node=>node.getAttribute('role')==='status');
@@ -99,9 +118,9 @@ test('mount is inactive, preserves controls and blocks repeated loading clicks',
   assert.equal(all(h.target,'div').find(node=>node.getAttribute('role')==='status'),live);
   assert.ok(all(h.target,'div').some(node=>node.getAttribute('aria-busy')==='true'));
   assert.ok(all(h.target,'div').filter(node=>node.contains(live)).every(node=>node.getAttribute('aria-busy')!=='true'),'loading status must not be hidden by busy ancestors');
-  assert.equal(refresh.getAttribute('aria-disabled'),'true');assert.equal(all(h.target,'button')[0],refresh);
+  assert.equal(refresh.getAttribute('aria-disabled'),'true');assert.equal(all(h.target,'button').find(node=>node.text==='Bots aktualisieren'),refresh);
   h.publish(fresh());assert.equal(refresh.getAttribute('aria-disabled'),'false');
-  assert.equal(all(h.target,'button')[1],lock);lock.click();assert.equal(h.calls.lock,1);assert.doesNotMatch(h.target.textContent,/BTC/);
+  assert.equal(all(h.target,'button').find(node=>node.text==='Botansicht sperren'),lock);lock.click();assert.equal(h.calls.lock,1);assert.doesNotMatch(h.target.textContent,/BTC/);
 });
 test('lock clears UI even if client lock throws',()=>{
   const h=mounted({lock(){throw new Error('secret');}});h.publish(fresh());h.buttons[1].click();
@@ -178,6 +197,7 @@ test('collapsed native cards distinguish equal symbols and render only whitelist
   assert.match(target.textContent,/P\/L laut Quelle: -2,75 USD/);assert.match(target.textContent,/0,00001234/);
   assert.match(target.textContent,/Grid-GewinnNicht verfügbar/);assert.match(target.textContent,/RisikopufferNicht verfügbar/);
   assert.match(target.textContent,/Liquidationspreis laut QuelleNicht verfügbar/);assert.doesNotMatch(target.textContent,/SECRET|999|100 %/);
+  assert.deepEqual(all(target,'details').map(node=>node.id),['bot-card-'+ 'a'.repeat(20),'bot-card-'+ 'b'.repeat(20)]);
   renderBotReadState(target,{status:'locked'});assert.equal(all(target,'details').length,0);
   assert.doesNotMatch(target.textContent,/125,5|a{20}|b{20}/);
 });
@@ -190,4 +210,19 @@ test('collapsed native cards distinguish equal symbols and render only whitelist
     assert.equal(colored.length,tone?1:0);
     if(tone){assert.equal(colored[0].className,'bot-pnl-'+tone);assert.equal(colored[0].textContent,value<0?'-2,75 USD':'2,75 USD');}
   }
+});
+
+
+test('Command equal-symbol equal-loss actions have distinct references and directions',()=>{
+  const target=root(),selected=[];
+  renderCommandBotOverview(target,{status:'fresh',source:'PIONEX_BOT_API',snapshotAt:'2026-10-18T10:00:00Z',count:2,
+    distribution:{long:1,short:1,neutral:0,unknown:0},losses:[
+      {ref:'a'.repeat(20),symbol:'BTC',direction:'long',pnl:'-25 USD'},
+      {ref:'b'.repeat(20),symbol:'BTC',direction:'short',pnl:'-25 USD'}]},ref=>selected.push(ref));
+  const buttons=all(target,'button');
+  assert.notEqual(buttons[0].textContent,buttons[1].textContent);
+  assert.notEqual(buttons[0].getAttribute('aria-label'),buttons[1].getAttribute('aria-label'));
+  assert.match(buttons[0].textContent,/BTC · Long · Referenz a{20}/);
+  assert.match(buttons[1].textContent,/BTC · Short · Referenz b{20}/);
+  buttons.forEach(button=>button.click());assert.deepEqual(selected,['a'.repeat(20),'b'.repeat(20)]);
 });

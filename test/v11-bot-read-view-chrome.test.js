@@ -11,14 +11,21 @@ import {withMobileChrome} from './helpers/v11-cdp.mjs';
 
 const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium'].find(p=>p&&existsSync(p));
 function fixture() {
-  const sources=['bot-read-model.js','bot-read-client.js','bot-read-view.js'].map(name=>{
+  const sources=['bot-read-model.js','bot-overview-model.js','bot-read-client.js','bot-read-view.js'].map(name=>{
     let source=readFileSync(new URL('../v11/'+name,import.meta.url),'utf8');
     if(name==='bot-read-client.js') {
       const expected="import {buildBotReadModel} from './bot-read-model.js';";
       assert.equal(source.split(expected).length,2,'known client import boundary');
       source=source.replace(expected,'');
     }
+    if(name==='bot-read-view.js') {
+      const expected="import {buildBotOverviewModel} from './bot-overview-model.js';";
+      assert.equal(source.split(expected).length,2,'known overview model import boundary');
+      source=source.replace(expected,'');
+    }
     source=source.replace(/^export function /gm,'function ');
+    if(name==='bot-overview-model.js')
+      source='(()=>{'+source+'\nwindow.__buildBotOverviewModel=buildBotOverviewModel;})();const buildBotOverviewModel=window.__buildBotOverviewModel;';
     assert.doesNotMatch(source,/^\s*(?:import|export)\b/m,'unexpected module dependency');
     assert.doesNotMatch(source,/<\/script/i,'inline fixture boundary');
     return source;
@@ -44,10 +51,10 @@ const view=createBotReadView(root,{getToken:()=>credential,createClient:options=
  return {...client,refresh(){completion=client.refresh();return completion;}};
 }});
 const initialLive=root.querySelector('[role=status]');
-const refresh=()=>root.querySelectorAll('button')[0],lock=()=>root.querySelectorAll('button')[1];
+const refresh=()=>document.getElementById('bot-read-refresh'),lock=()=>document.getElementById('bot-read-lock');
 window.botQA={
  state(){return root.querySelector('[data-state]')?.dataset.state||'disposed';},
- metrics(){return {width:innerWidth,viewport:document.documentElement.clientWidth,overflow:document.documentElement.scrollWidth>innerWidth+1,rows:root.querySelectorAll('li').length,requests,unexpected,secretLeak:/synthetic-token|synthetic-private-error/.test(root.textContent),statusRole:root.querySelector('[role=status]')?.getAttribute('aria-live'),statusPersistent:root.querySelector('[role=status]')===initialLive,statusConnected:initialLive.isConnected,statusNotBusy:!initialLive.closest('[aria-busy="true"]'),targets:[...root.querySelectorAll('button')].every(b=>b.getBoundingClientRect().height>=44),focusStable:document.activeElement===refresh()};},
+ metrics(){return {width:innerWidth,viewport:document.documentElement.clientWidth,overflow:document.documentElement.scrollWidth>innerWidth+1,rows:root.querySelectorAll('li').length,requests,unexpected,secretLeak:/synthetic-token|synthetic-private-error/.test(root.textContent),statusRole:root.querySelector('[role=status]')?.getAttribute('aria-live'),statusPersistent:root.querySelector('[role=status]')===initialLive,statusConnected:initialLive.isConnected,statusNotBusy:!initialLive.closest('[aria-busy="true"]'),targets:[...root.querySelectorAll('button')].filter(b=>b.getClientRects().length).every(b=>b.getBoundingClientRect().height>=44),focusStable:document.activeElement===refresh()};},
  async show(next){
   lock().click();mode=next;clock=Date.parse('2026-10-12T20:01:00Z');credential='synthetic-token';
   if(next==='locked')return;
@@ -78,7 +85,8 @@ test('V11 bot component Chrome: synthetic client/model/view states at four width
       const result=await withMobileChrome(chrome,width,pathToFileURL(html).href,async call=>{
         const evaluate=async expression=>{
           const reply=await call('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});
-          assert.ok(!reply.exceptionDetails,'synthetic component browser exception');return reply.result?.value;
+          assert.ok(!reply.exceptionDetails,'synthetic component browser exception '+JSON.stringify(reply.exceptionDetails));
+          return reply.result?.value;
         };
         assert.equal(await evaluate('botQA.metrics().requests'),0,'mount must not request data');
         for(const state of ['locked','loading','fresh','stale','unavailable']) {
@@ -91,7 +99,8 @@ test('V11 bot component Chrome: synthetic client/model/view states at four width
           assert.equal(measurements.statusPersistent,true,'live region identity persists');
           assert.equal(measurements.statusConnected,true,'live region stays connected');
           assert.equal(measurements.statusNotBusy,true,'loading announcements are not suppressed');
-          assert.equal(measurements.targets,true);assert.equal(measurements.rows,state==='fresh'?1:0);
+          assert.equal(measurements.targets,true,'minimum control target at '+state+': '+JSON.stringify(measurements));
+          assert.equal(measurements.rows,state==='fresh'?1:0);
           if(state!=='locked')assert.equal(measurements.focusStable,true,'refresh node retains focus');
           const evidence=process.env.V11_A2_EVIDENCE_DIR;
           if(evidence) {
