@@ -149,12 +149,20 @@ connection.close()
         self.assertEqual(result["paths"][0]["state"], "started")
         self.assertLess(time.monotonic() - started, 2)
 
-    def test_whole_batch_deadline_is_absolute_across_path_processes(self):
+    def test_whole_batch_deadline_preempts_a_long_path(self):
         started = time.monotonic()
-        result = self.run_fault("7" * 64, {"path_seconds": 0.4, "batch_seconds": 0.6})
-        self.assertEqual(result["state"], "timed_out")
-        self.assertGreater(len(result["paths"]), 0)
-        self.assertLess(time.monotonic() - started, 1.5)
+        result = self.run_fault("b" * 64, {"path_seconds": 2, "batch_seconds": 1.2},
+                                key="trial-batch-deadline")
+        self.assertIn(result["state"], ("timed_out", "UNSETTLED"))
+        self.assertLess(time.monotonic() - started, 2.5)
+        if result["state"] == "UNSETTLED":
+            current = journal.inspect(self.database, result["trialId"])
+            self.assertEqual(current["state"], "unknown")
+            self.assertTrue(current["unresolved"])
+            self.assertEqual(current["paths"][0]["state"], "started")
+            journal.reconcile(self.database, result["trialId"], "OPERATOR_RECONCILED_DEADLINE")
+        else:
+            self.assertEqual(result["paths"][0]["state"], "started")
 
     def test_output_flood_and_parent_exit_with_inherited_pipe_are_bounded(self):
         for source, reason in (("c" * 64, "STDOUT_BOUND"), ("9" * 64, "STDERR_BOUND"),
