@@ -200,6 +200,30 @@
     .depot-range button[aria-pressed="true"]{background:#1e3a5f;border-color:#93c5fd}
     .depot-history p{overflow-wrap:anywhere;font-size:14px}
     .bot-card-body{padding:0 14px 14px;border-top:1px solid #39516b}
+    /* B10: compact preview chrome and keep the validated portfolio first. */
+    .topbar{padding-top:calc(8px + env(safe-area-inset-top,0px));padding-bottom:8px}
+    .header-inner{gap:8px}
+    .identity{gap:8px}
+    .mark{width:32px;height:32px;border-radius:10px;font-size:20px}
+    .brand{font-size:16px}
+    .terminal-entry{margin-top:8px}
+    .autonomy-strip{max-width:var(--container);margin:8px auto 0;padding:0;border:1px solid #34465c;border-radius:12px;background:#101824;overflow-wrap:anywhere}
+    .autonomy-strip>summary{min-height:44px;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;letter-spacing:0;line-height:1.4}
+    .autonomy-strip>summary>span:first-child{min-width:0;overflow-wrap:anywhere}
+    .autonomy-strip>summary>span:last-child{flex:none}
+    .autonomy-strip .disclosure-hint{font-size:10px;color:var(--muted);font-weight:500;letter-spacing:0}
+    .autonomy-strip>summary strong{color:var(--state-unknown)}
+    .autonomy-strip[open]>summary{border-bottom:1px solid var(--line)}
+    .autonomy-strip>.details-body{border:0;padding:10px 12px}
+    .container{padding-top:14px}
+    .section-intro{margin-bottom:12px}
+    .card{padding:16px;margin-bottom:10px}
+    .view-placeholder{min-height:132px;padding:18px 16px}
+    .command-context-details{margin:10px 0 14px}
+    .command-context-details>summary{min-height:48px}
+    .command-context-details .details-body p{font-size:12px}
+    .module-availability{align-self:flex-start;margin-top:4px}
+    @media(max-width:350px){.card{padding:14px}.container{padding-top:12px}.autonomy-strip>summary{padding-left:9px;padding-right:9px}}
   </style>
 </head>
 <body>
@@ -211,25 +235,22 @@
         <span class="mark" aria-hidden="true">M</span>
         <div class="brand">MERIDIAN <span aria-label="Version 11">11</span><small>NEXT GENERATION</small></div>
       </div>
-      <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B9<small>Versionsverlauf ▾</small></button>
+      <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B10<small>Versionsverlauf ▾</small></button>
     </div>
     <nav class="terminal-entry" aria-label="Terminal-Zugang">
       <a class="terminal-entry-link" href="../v10/">Terminal öffnen</a>
     </nav>
-    <section id="autonomy-status" class="autonomy-strip" aria-labelledby="autonomy-heading" data-state="unknown" data-source="none">
-      <h2 id="autonomy-heading">Autonome Entwicklung · <strong>Unbekannt</strong></h2>
-      <p>Kein aktuelles Betriebssignal verbunden. Ob ein Agent arbeitet oder warum er wartet, ist hier nicht feststellbar.</p>
-      <details>
-        <summary><span>Betrieb &amp; letzte Änderung</span><span aria-hidden="true">+</span></summary>
-        <div class="details-body">
-          <p><b>Aktuelle Aufgabe:</b> Nicht verifiziert.</p>
-          <p><b>Letztes Lebenszeichen:</b> Nicht verfügbar. Diese Anzeige überwacht den Betrieb noch nicht.</p>
-          <p><b>Diese Vorschau · B9:</b> Geladene Depotbewertung auch in Command. Verlauf mit Zeitachse und ausgewiesenem Messzeitraum. Kontrollierte Testvorschau · Geräteabnahme ausstehend. <a href="https://github.com/Achi1984/meridian/issues/766">B9-Umfang #766</a>.</p>
-          <p><b>Zuletzt belegte UI-Änderung · B1:</b> Botübersicht mit Quellen- und Risikostatus. Integriert am <time datetime="2026-10-11T19:30:28Z">11.10.2026, 21:30 Uhr Wien</time> · <a href="https://github.com/Achi1984/meridian/pull/702">Änderungsnachweis #702</a>.</p>
-          <p>Der Versionsstand ist kein Lebenszeichen eines Entwicklungsagenten.</p>
-        </div>
-      </details>
-    </section>
+    <details id="autonomy-status" class="autonomy-strip" aria-labelledby="autonomy-heading" data-state="unknown" data-source="none">
+      <summary><span id="autonomy-heading">Autonome Entwicklung · <strong>Unbekannt</strong><small class="disclosure-hint"> · Details</small></span><span aria-hidden="true">+</span></summary>
+      <div class="details-body">
+        <p>Kein aktuelles Betriebssignal verbunden. Ob ein Agent arbeitet oder warum er wartet, ist hier nicht feststellbar.</p>
+        <p><b>Aktuelle Aufgabe:</b> Nicht verifiziert.</p>
+        <p><b>Letztes Lebenszeichen:</b> Nicht verfügbar. Diese Anzeige überwacht den Betrieb noch nicht.</p>
+        <p><b>Diese Vorschau · B10:</b> Kompakter Header und klarere Command-Hierarchie. Layout-Entwurf ohne neue Datenanbindung; Integration und Geräteabnahme ausstehend.</p>
+        <p><b>Zuletzt belegte UI-Änderung · B1:</b> Botübersicht mit Quellen- und Risikostatus. Integriert am <time datetime="2026-10-11T19:30:28Z">11.10.2026, 21:30 Uhr Wien</time> · <a href="https://github.com/Achi1984/meridian/pull/702">Änderungsnachweis #702</a>.</p>
+        <p>Der Versionsstand ist kein Lebenszeichen eines Entwicklungsagenten.</p>
+      </div>
+    </details>
     <section id="version-panel" class="version-panel" aria-labelledby="version-history-heading" hidden>
       <div class="version-panel-heading">
         <h2 id="version-history-heading">Versionen im Überblick</h2>
@@ -237,6 +258,7 @@
       </div>
       <p>Veröffentlichtes Terminal und Designvorschau sind getrennte Stände.</p>
       <ul class="version-history-list">
+        <li><strong>Meridian 11 · B10</strong><span class="version-status">Entwurf</span><p>Kompaktere Header- und Command-Hierarchie sowie klare Vorbereitungslabels für Forecast und Scanner. Reines Layout; keine neue Datenanbindung oder Funktionsfreigabe.</p></li>
         <li><strong>Meridian 11 · B9</strong><span class="version-status">Testvorschau</span><p>Command übernimmt die manuell geladene Depotbewertung und deren Sperre. Verlauf mit Zeitachse und vorhandenem Messzeitraum.</p></li>
         <li><strong>Meridian 11 · B8</strong><span class="version-status">Testvorschau</span><p>Depotbewertung unabhängig von der Historie. Verlauf für 1h, 1 Tag und 1 Woche mit sichtbaren Datenlücken; keine Renditeberechnung.</p></li>
         <li><strong>Meridian 11 · B7</strong><span class="version-status">Testvorschau</span><p>Manueller Depot-Lesezugang mit getrennter Sperre, Zeitprüfung und gespeicherter Gesamtbewertung. Kein automatisches Laden, keine Bestands- oder Renditebehauptung.</p></li>
@@ -259,14 +281,8 @@
   <main id="app-main" class="container" tabindex="-1">
     <section id="view-command" class="view active" aria-labelledby="command-heading">
       <div class="section-intro">
-        <div><div class="eyebrow">COMMAND CENTER</div><h1 id="command-heading">Alles Wesentliche.<br>Ein Blick.</h1><p class="sub">Deine zentrale Übersicht mit manuell geladener Depotbewertung.</p></div>
+        <div><div class="eyebrow">COMMAND CENTER</div><h1 id="command-heading">Command</h1><p class="sub">Depot-, Bot- und Marktstatus auf einen Blick.</p></div>
       </div>
-      <section class="card decision" data-decision-owner="preview" aria-label="Jetzt wichtig">
-        <div class="card-head"><span class="card-kicker">JETZT WICHTIG</span><span class="limited">UNGEKLÄRT</span></div>
-        <h2>Depot im Überblick · Risiko ungeklärt</h2>
-        <p>Die im Depot manuell geladene Bewertung erscheint auch hier. Bot-Snapshots werden separat im Bots-Tab geladen. Es wird keine Aussage über Liquidationsgefahr oder Handelsschutz getroffen.</p>
-        <div class="footnote">Keine Handlungsempfehlung · Keine automatische Order · Manueller Bot-Lesezugang separat</div>
-      </section>
       <section id="command-portfolio" class="card" aria-label="Portfolio">
         <div class="card-head"><span class="card-kicker">PORTFOLIO</span><span class="state-label"><span class="state-dot" aria-hidden="true"></span> NICHT VERBUNDEN</span></div>
         <div class="portfolio-row"><div><div class="portfolio-value" aria-label="Portfoliowert unbekannt">—</div><div class="portfolio-description">Gesamtwert nicht verifiziert</div></div></div>
@@ -277,6 +293,18 @@
           <div class="trust-cell"><strong>MARKT</strong><span>Unbekannt</span></div>
         </div>
       </section>
+      <section class="card decision" data-decision-owner="preview" aria-label="Jetzt wichtig">
+        <div class="card-head"><span class="card-kicker">RISIKO</span><span class="limited">UNGEKLÄRT</span></div>
+        <h2>Risiko ungeklärt</h2>
+        <p>Es wird keine Aussage über Liquidationsgefahr oder Handelsschutz getroffen. Fehlende Daten sind keine Entwarnung.</p>
+      </section>
+      <details class="command-context-details">
+        <summary><span>Einordnung &amp; Datenlage</span><span aria-hidden="true">+</span></summary>
+        <div class="details-body">
+          <p>Die im Depot manuell geladene Bewertung erscheint auch hier. Bot-Snapshots werden separat im Bots-Tab geladen.</p>
+          <p>Keine Handlungsempfehlung · Keine automatische Order · Manueller Bot-Lesezugang separat.</p>
+        </div>
+      </details>
       <div class="section-title"><h2>Risikomonitor</h2><small>KEINE VERIFIZIERTE ABDECKUNG</small></div>
       <section class="card card-muted" aria-label="Risikostatus unbekannt">
         <div class="empty-state"><div class="empty-symbol" aria-hidden="true">—</div><div><b>Risikostatus nicht bestimmbar</b><p>Risikoprüfungen werden erst nach der sicheren Anbindung gültiger Daten sichtbar. Fehlende Daten sind keine Entwarnung.</p></div></div>
@@ -351,11 +379,11 @@
     </section>
     <section id="view-market" class="view" aria-labelledby="forecast-heading" hidden>
       <div class="eyebrow">MARKT &amp; SZENARIEN</div><h1 id="forecast-heading">Forecast</h1>
-      <div class="card view-placeholder"><h2>Zonen verstehen. Entscheidungen prüfen.</h2><p>FIB-Zonen, Szenarien und Trendwenden werden später mit verifizierten Quellen und erkennbaren Unsicherheiten dargestellt. Keine Live-Signale in dieser Vorschau.</p></div>
+      <div class="card view-placeholder"><span class="limited module-availability">In Vorbereitung</span><h2>Marktszenarien nachvollziehbar prüfen</h2><p>Geplant sind FIB-Zonen und Szenarien mit verifizierten Quellen und sichtbarer Unsicherheit. Aktuell sind keine Forecast-Daten oder Live-Signale verfügbar.</p></div>
     </section>
     <section id="view-research" class="view" aria-labelledby="scanner-heading" hidden>
       <div class="eyebrow">RESEARCH &amp; CHANCEN</div><h1 id="scanner-heading">Scanner</h1>
-      <div class="card view-placeholder"><h2>Chancen erst nach Evidenz.</h2><p>Der Opportunity Scanner bleibt eine Research-Oberfläche. Es werden keine Handelsaufträge, Paper-Bots oder freigegebenen Signale vorgetäuscht.</p></div>
+      <div class="card view-placeholder"><span class="limited module-availability">In Vorbereitung</span><h2>Research-Chancen erst nach Evidenz</h2><p>Der Scanner soll nachvollziehbare Research-Kandidaten zeigen. Aktuell sind keine Research-Ausgaben oder freigegebenen Signale verfügbar; es entstehen keine Handelsaufträge oder Paper-Bots.</p></div>
     </section>
   </main>
   <nav id="nav" aria-label="Hauptnavigation">
