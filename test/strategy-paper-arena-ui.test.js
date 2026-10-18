@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import {webcrypto} from 'node:crypto';
 import fs from 'node:fs';
 import {ARENA_SYMBOLS,ARENA_RULESET} from '../research/strategy-paper-arena.js';
-import {arenaHtml,evaluateArenaImport,canonicalArenaInput,loadStoredArena} from '../v10/strategy-arena.js';
+import {arenaHtml,evaluateArenaImport,canonicalArenaInput,loadStoredArena,adaptArenaProvenance,loadStoredArenaProvenance} from '../v10/strategy-arena.js';
 const DAY=86400000;
+const manifest=()=>JSON.parse(fs.readFileSync(new URL('../research/results/strategy-arena-20261016/manifest.json',import.meta.url),'utf8'));
 function input(){
   const start=Date.UTC(2025,0,1), data=Object.fromEntries(ARENA_SYMBOLS.map(symbol=>[symbol,Array.from({length:210},(_,i)=>({openTime:start+i*DAY,closeTime:start+(i+1)*DAY-1,open:100+i,close:100+i+.5,high:101+i,low:99+i}))]));
   return {data,asOf:start+210*DAY,sourceKind:'SYNTHETIC',liquidateAtEnd:true};
@@ -61,4 +62,67 @@ test('stored diagnostic rejects altered chunks and unexpected file references',a
   const source=async(url,alter)=>({ok:true,text:async()=>alter(fs.readFileSync(new URL(url),'utf8'),url)});
   await assert.rejects(loadStoredArena(url=>source(url,(text,path)=>path.endsWith('/BTC.json')?text+' ':text),webcrypto.subtle),/Hash/);
   await assert.rejects(loadStoredArena(url=>source(url,(text,path)=>{if(!path.endsWith('/manifest.json'))return text;const m=JSON.parse(text);m.chunks[0].path='../../elsewhere.json';return JSON.stringify(m);}),webcrypto.subtle),/Dateiverweis/);
+});
+test('retrospective provenance is candidate-bound source metadata with explicit unknown hashes',()=>{
+  const data=adaptArenaProvenance(manifest());
+  for(const id of ['H1-B','H1-E','H7-B','H7-R']){
+    assert.equal(data[id].blocked,false);
+    assert.match(data[id].fields.market.value,/Kraken spot OHLC · USD lane \(not USDT\)/);
+    assert.equal(data[id].fields.market.status,'PRESENT_UNVERIFIED');
+    assert.match(data[id].fields.universe.value,/8 assets:/);
+    assert.match(data[id].fields.coverage.value,/2025-09-11 – 2026-10-15/);
+    assert.match(data[id].fields.scored.value,/2026-03-30 – 2026-10-15/);
+    assert.equal(data[id].receipt.status,'PRESENT_UNVERIFIED');
+    assert.equal(data[id].hashes.inputSha256.value,'decf35415605bda739d08e9ac489951c21f5428d6b5f6362bd6e77abf265c473');
+    assert.equal(data[id].hashes.rawInputSha256.status,'UNKNOWN');
+    assert.equal(data[id].hashes.rulesSha256.status,'UNKNOWN');
+  }
+  assert.equal(data.H9.blocked,true);
+  assert.equal(data.H9.receipt.status,'UNKNOWN');
+  assert.equal(data.H9.hashes.inputSha256.status,'UNKNOWN');
+  const html=arenaHtml({provenance:data});
+  assert.ok(html.includes('Kraken USD metadata is not borrowed'));
+  assert.ok(html.includes('CRV compatibility remains UNRESOLVED'));
+  assert.ok(html.includes('<summary>Receipt details and full hashes</summary>'));
+  assert.ok(html.includes('PRESENT · SOURCE-RECORDED, NOT AUTHENTICATED'));
+  assert.ok(html.includes('UNKNOWN · not recorded'));
+});
+test('provenance distinguishes absent values from malformed schema, dates and hashes',()=>{
+  const missing=manifest();
+  delete missing.receipt.inputSha256;
+  missing.summary.window.warmupStart=undefined;
+  const missingData=adaptArenaProvenance(missing);
+  assert.equal(missingData['H1-B'].hashes.inputSha256.status,'UNKNOWN');
+  assert.equal(missingData['H1-B'].fields.coverage.status,'UNKNOWN');
+  const malformed=manifest();
+  malformed.receipt.engineSha256='not-a-hash';
+  malformed.summary.window.firstExecution='2026-03-30';
+  const malformedData=adaptArenaProvenance(malformed);
+  assert.equal(malformedData['H1-B'].hashes.engineSha256.status,'INVALID');
+  assert.equal(malformedData['H1-B'].fields.scored.status,'INVALID');
+  malformed.schemaVersion='UNEXPECTED';
+  malformed.ruleset='UNEXPECTED';
+  const invalidSchema=adaptArenaProvenance(malformed);
+  assert.equal(invalidSchema['H1-B'].fields.market.status,'INVALID');
+  assert.equal(invalidSchema['H1-B'].hashes.inputSha256.status,'INVALID');
+  assert.equal(invalidSchema['H1-B'].ruleset.status,'INVALID');
+  assert.equal(invalidSchema.H9.receipt.status,'UNKNOWN');
+});
+test('metadata loader fetches only the local manifest and caller text is escaped',async()=>{
+  const source=manifest();
+  source.receipt.collectorProvider='<img src=x onerror=alert(1)>';
+  source.ruleset='<script>alert(1)</script>';
+  const html=arenaHtml({provenance:adaptArenaProvenance(source)});
+  assert.ok(!html.includes('<img'));
+  assert.ok(!html.includes('<script>'));
+  assert.ok(html.includes('&lt;img'));
+  assert.ok(arenaHtml({error:'<script>alert(1)</script>'}).includes('&lt;script&gt;'));
+  let requests=0;
+  const loaded=await loadStoredArenaProvenance(async url=>{
+    requests++;
+    assert.ok(url.endsWith('/research/results/strategy-arena-20261016/manifest.json'));
+    return {ok:true,text:async()=>JSON.stringify(manifest())};
+  });
+  assert.equal(requests,1);
+  assert.equal(loaded['H1-B'].hashes.protocolSha256.status,'PRESENT_UNVERIFIED');
 });

@@ -4,10 +4,119 @@ const escape = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<'
 const number = value => Number.isFinite(value) ? new Intl.NumberFormat('de-DE',{maximumFractionDigits:2}).format(value) : '—';
 const tone = value => !Number.isFinite(value) || value === 0 ? 'muted' : value < 0 ? 'danger' : 'safe';
 const names = {'H1-B':'Trend + Cash','H1-E':'Trend mit Kostenpuffer','H7-B':'Defensive Spot-Auswahl','H7-R':'Defensive Auswahl mit Rangpuffer',H9:'Basis datierter Futures'};
+const PROVENANCE_CANDIDATES = new Set(['H1-B','H1-E','H7-B','H7-R']);
+const PROVENANCE_PATH = 'research/results/strategy-arena-20261016/manifest.json';
+const unknownField = () => ({status:'UNKNOWN',value:null});
+function provenanceField(value, valid, format=x=>x) {
+  if(value===undefined || value===null)return unknownField();
+  if(!valid(value))return {status:'INVALID',value:null};
+  return {status:'PRESENT_UNVERIFIED',value:format(value)};
+}
+function requiredProvenanceField(value, valid) {
+  if(value===undefined || value===null)return {status:'INVALID',value:null};
+  return provenanceField(value,valid);
+}
+const validHash = value => typeof value==='string' && /^[a-f0-9]{64}$/i.test(value);
+const validText = value => typeof value==='string' && value.trim().length>0;
+const utcDate = value => {
+  if(!Number.isSafeInteger(value) || !Number.isFinite(new Date(value).getTime()))return null;
+  return new Date(value).toISOString().slice(0,10);
+};
+function dateField(value) {
+  return provenanceField(value, value=>utcDate(value)!==null, utcDate);
+}
+function pairedDateField(start,end) {
+  if(start.status==='INVALID' || end.status==='INVALID')return {status:'INVALID',value:null};
+  if(start.status!=='PRESENT_UNVERIFIED' || end.status!=='PRESENT_UNVERIFIED')return unknownField();
+  if(start.value>end.value)return {status:'INVALID',value:null};
+  return {status:'PRESENT_UNVERIFIED',value:`${start.value} – ${end.value} UTC`};
+}
+function provenanceStatus(field) {
+  return field.status==='PRESENT_UNVERIFIED'?'PRESENT · SOURCE-RECORDED, NOT AUTHENTICATED':field.status;
+}
+function provenanceValue(field) {
+  return field.status==='PRESENT_UNVERIFIED'?escape(field.value):field.status==='INVALID'?'INVALID · malformed source value':'UNKNOWN · not recorded';
+}
+function provenanceDisclosure(record) {
+  const hashes=['inputSha256','rawInputSha256','engineSha256','protocolSha256','rulesSha256'];
+  const field=(label,key)=>`<li><b>${label} · ${provenanceStatus(record.hashes[key])}</b> <span>${provenanceValue(record.hashes[key])}</span></li>`;
+  return `<details><summary>Receipt details and full hashes</summary><p>Receipt identity · ${provenanceStatus(record.receipt)}: ${provenanceValue(record.receipt)}</p><p>Ruleset · ${provenanceStatus(record.ruleset)}: ${provenanceValue(record.ruleset)}</p><ul>${hashes.map(key=>field(key,key)).join('')}</ul></details>`;
+}
+function provenanceCard(candidateId, provenance) {
+  const record=provenance?.[candidateId];
+  if(!record)return `<section class="arena-provenance" aria-label="${escape(candidateId)} provenance"><h3>Retrospective provenance</h3><p>UNKNOWN · Receipt metadata not loaded.</p></section>`;
+  if(record.blocked)return `<section class="arena-provenance" aria-label="${escape(candidateId)} provenance"><h3>Retrospective provenance</h3><p><b>BLOCKED_DATA</b> · No matching source receipt; Kraken USD metadata is not borrowed.</p><p>CRV compatibility: UNRESOLVED. Forward evidence: NOT ESTABLISHED.</p></section>`;
+  const fields=[['Source / market / quote',record.fields.market],['Universe',record.fields.universe],['Coverage / warm-up',record.fields.coverage],['Scored window',record.fields.scored],['Receipt identity',record.receipt]];
+  return `<section class="arena-provenance" aria-label="${escape(candidateId)} provenance"><h3>Retrospective provenance · ${escape(candidateId)}</h3><p class="arena-provenance-status">Source-recorded diagnostic metadata · not independently authenticated · no forward evidence. Not a verification of any imported result.</p><dl>${fields.map(([label,value])=>`<div><dt>${escape(label)} <small>${provenanceStatus(value)}</small></dt><dd>${provenanceValue(value)}</dd></div>`).join('')}</dl>${provenanceDisclosure(record)}<p>CRV compatibility remains UNRESOLVED; this diagnostic does not establish profitability, readiness, or promotion.</p></section>`;
+}
 export function canonicalArenaInput(value) {
   if(value===null || typeof value!=='object') return JSON.stringify(value);
   if(Array.isArray(value)) return '['+value.map(canonicalArenaInput).join(',')+']';
   return '{'+Object.keys(value).sort().map(key=>JSON.stringify(key)+':'+canonicalArenaInput(value[key])).join(',')+'}';
+}
+export function adaptArenaProvenance(manifest) {
+  const root=manifest && typeof manifest==='object' && !Array.isArray(manifest) ? manifest : {};
+  const receipt=root.receipt && typeof root.receipt==='object' && !Array.isArray(root.receipt) ? root.receipt : {};
+  const collection=root.inputTemplate?.collection && typeof root.inputTemplate.collection==='object' ? root.inputTemplate.collection : {};
+  const window=root.summary?.window && typeof root.summary.window==='object' ? root.summary.window : {};
+  const schema=requiredProvenanceField(root.schemaVersion,value=>value==='MERIDIAN_ARENA_CHUNKED_INPUT_V1');
+  const receiptSchema=requiredProvenanceField(receipt.schemaVersion,value=>value==='MERIDIAN_ARENA_RECEIPT_V1');
+  const ruleset=provenanceField(root.ruleset,value=>validText(value)&&value===ARENA_RULESET);
+  const provider=provenanceField(receipt.collectorProvider,validText);
+  const sourceKind=provenanceField(receipt.sourceKind,value=>value==='MARKET_DIAGNOSTIC');
+  const quote=provenanceField(receipt.quoteCurrency,value=>value==='USD'||value==='USDT');
+  const inputQuote=provenanceField(root.inputTemplate?.quoteCurrency,value=>value==='USD'||value==='USDT');
+  let market=unknownField();
+  if([schema,receiptSchema,provider,sourceKind,quote,inputQuote].some(field=>field.status==='INVALID')) market={status:'INVALID',value:null};
+  else if([schema,receiptSchema,provider,sourceKind,quote,inputQuote].every(field=>field.status==='PRESENT_UNVERIFIED')) {
+    if(quote.value!==inputQuote.value)market={status:'INVALID',value:null};
+    else {
+      const source=provider.value==='KRAKEN_SPOT_PUBLIC_OHLC'?'Kraken spot OHLC':provider.value;
+      market={status:'PRESENT_UNVERIFIED',value:`${source} · ${quote.value} lane (not ${quote.value==='USD'?'USDT':'USD'})`};
+    }
+  }
+  let universe=unknownField();
+  if(root.chunks===null || (root.chunks!==undefined && !Array.isArray(root.chunks)))universe={status:'INVALID',value:null};
+  else if(Array.isArray(root.chunks)) {
+    const symbols=root.chunks.map(chunk=>chunk?.symbol);
+    if(symbols.some(symbol=>typeof symbol!=='string'||!ARENA_SYMBOLS.includes(symbol)) || new Set(symbols).size!==symbols.length)universe={status:'INVALID',value:null};
+    else if(symbols.length===ARENA_SYMBOLS.length && ARENA_SYMBOLS.every(symbol=>symbols.includes(symbol)))universe={status:'PRESENT_UNVERIFIED',value:`${symbols.length} assets: ${symbols.join(', ')}`};
+    else universe=unknownField();
+  }
+  const warmup=dateField(window.warmupStart), scoredStart=dateField(window.firstExecution), end=dateField(window.end);
+  const coverage=pairedDateField(warmup,end), scored=pairedDateField(scoredStart,end);
+  const sealed=provenanceField(receipt.sealedAt,value=>validText(value)&&Number.isFinite(Date.parse(value)),value=>new Date(value).toISOString());
+  let receiptIdentity=unknownField();
+  if(receiptSchema.status==='INVALID' || sealed.status==='INVALID')receiptIdentity={status:'INVALID',value:null};
+  else if(receiptSchema.status==='PRESENT_UNVERIFIED' && sealed.status==='PRESENT_UNVERIFIED')receiptIdentity={status:'PRESENT_UNVERIFIED',value:`${PROVENANCE_PATH} · ${receipt.schemaVersion} · sealed ${sealed.value}`};
+  const hashes=Object.fromEntries(['inputSha256','rawInputSha256','engineSha256','protocolSha256','rulesSha256'].map(key=>[key,provenanceField(receipt[key],validHash)]));
+  const invalidRoot=schema.status!=='PRESENT_UNVERIFIED' || receiptSchema.status!=='PRESENT_UNVERIFIED';
+  const common={
+    fields:{
+      market:invalidRoot?{status:'INVALID',value:null}:market,
+      universe:invalidRoot?{status:'INVALID',value:null}:universe,
+      coverage:invalidRoot?{status:'INVALID',value:null}:coverage,
+      scored:invalidRoot?{status:'INVALID',value:null}:scored
+    },
+    receipt:invalidRoot?{status:'INVALID',value:null}:receiptIdentity,
+    ruleset:invalidRoot?{status:'INVALID',value:null}:ruleset,
+    hashes:invalidRoot?Object.fromEntries(Object.keys(hashes).map(key=>[key,{status:'INVALID',value:null}])):hashes
+  };
+  const result={};
+  for(const candidateId of ARENA_CANDIDATES) {
+    if(candidateId==='H9' || !PROVENANCE_CANDIDATES.has(candidateId)) {
+      result[candidateId]={candidateId,blocked:true,fields:{market:unknownField(),universe:unknownField(),coverage:unknownField(),scored:unknownField()},receipt:unknownField(),ruleset:unknownField(),hashes:Object.fromEntries(Object.keys(hashes).map(key=>[key,unknownField()]))};
+    } else result[candidateId]={candidateId,blocked:false,...common,hashes:{...common.hashes}};
+  }
+  return result;
+}
+export async function loadStoredArenaProvenance(fetchImpl=globalThis.fetch) {
+  const url=new URL('../research/results/strategy-arena-20261016/manifest.json',import.meta.url);
+  const response=await fetchImpl(url.href,{cache:'no-store',signal:AbortSignal.timeout(12000)});
+  if(!response.ok)throw Error('Gespeicherte Receipt-Metadaten nicht verfügbar.');
+  const text=await response.text();
+  if(text.length>262144)throw Error('Receipt-Metadaten zu groß.');
+  return adaptArenaProvenance(JSON.parse(text));
 }
 function metricSummary(result) {
   return JSON.parse(JSON.stringify(result,(key,value)=>['positions','decisions','fills','trades','equityCurve'].includes(key)?undefined:value));
@@ -38,14 +147,14 @@ export async function loadStoredArena(fetchImpl=globalThis.fetch, subtle=globalT
   return evaluateArenaImport(JSON.stringify({ruleset:manifest.ruleset,input,receipt:manifest.receipt}),subtle);
 }
 
-export function arenaHtml({result=null, error='', busy=false, digest=''}={}) {
+export function arenaHtml({result=null, error='', busy=false, digest='', provenance=null, provenanceBusy=false, provenanceError=''}={}) {
   const rows = result?.candidates || ARENA_CANDIDATES.map(id => ({id}));
   const cards = rows.map(row => {
     const m=row.baseline, stress=row.stress, blocked=row.id==='H9';
-    return `<article class="paper-model-card arena-model"><div class="arena-model-head"><div><span>${escape(row.id)} · ${escape(names[row.id] || row.id)}</span><b>${blocked?'DATEN FEHLEN':m?'HISTORISCHE DIAGNOSE':'NOCH NICHT AUSGEWERTET'}</b></div><strong class="tone-${tone(m?.netPnl)}">${m?number(m.netPnl)+' '+escape(m.currency):'—'}</strong></div>${blocked?'<p>Ausführbare Kurse beider Legs, Abrechnung, Finanzierung und Margin-Verlauf fehlen. Keine simulierten Trades.</p>':`<div class="paper-model-grid"><span>NETTO <b class="tone-${tone(m?.netReturnPct)}">${m?number(m.netReturnPct)+' %':'—'}</b></span><span>MAX. DD · TAGESSCHLUSS <b>${m?number(m.maxDrawdownPct)+' %':'—'}</b></span><span>KOSTEN <b>${m?number(m.costs)+' '+escape(m.currency):'—'}</b></span><span>VERKAUFSTEILE <b>${m?number(m.closedTrades):'—'}</b></span><span>PF <b>${number(m?.profitFactor)}</b></span><span>KOSTENSTRESS · NETTO <b class="tone-${tone(stress?.netReturnPct)}">${stress?number(stress.netReturnPct)+' %':'—'}</b></span></div>`}<small>${m?'10.000 '+escape(m.currency)+' je getrenntem Modell · 1× Spot · keine EUR-Umrechnung':'Keine Performance behauptet.'}</small></article>`;
+    return `<article class="paper-model-card arena-model"><div class="arena-model-head"><div><span>${escape(row.id)} · ${escape(names[row.id] || row.id)}</span><b>${blocked?'DATEN FEHLEN':m?'HISTORISCHE DIAGNOSE':'NOCH NICHT AUSGEWERTET'}</b></div><strong class="tone-${tone(m?.netPnl)}">${m?number(m.netPnl)+' '+escape(m.currency):'—'}</strong></div>${blocked?'<p>Ausführbare Kurse beider Legs, Abrechnung, Finanzierung und Margin-Verlauf fehlen. Keine simulierten Trades.</p>':`<div class="paper-model-grid"><span>NETTO <b class="tone-${tone(m?.netReturnPct)}">${m?number(m.netReturnPct)+' %':'—'}</b></span><span>MAX. DD · TAGESSCHLUSS <b>${m?number(m.maxDrawdownPct)+' %':'—'}</b></span><span>KOSTEN <b>${m?number(m.costs)+' '+escape(m.currency):'—'}</b></span><span>VERKAUFSTEILE <b>${m?number(m.closedTrades):'—'}</b></span><span>PF <b>${number(m?.profitFactor)}</b></span><span>KOSTENSTRESS · NETTO <b class="tone-${tone(stress?.netReturnPct)}">${stress?number(stress.netReturnPct)+' %':'—'}</b></span></div>`}<small>${m?'10.000 '+escape(m.currency)+' je getrenntem Modell · 1× Spot · keine EUR-Umrechnung':'Keine Performance behauptet.'}</small>${provenanceCard(row.id,provenance)}</article>`;
   }).join('');
   const controls=result?`<p class="arena-controls">Vergleich im selben Zeitraum: gleichgewichtetes Buy &amp; Hold <b class="tone-${tone(result.controls?.buyAndHold?.baseline?.netReturnPct)}">${number(result.controls?.buyAndHold?.baseline?.netReturnPct)} %</b> · Cash ${number(result.controls?.cash?.baseline?.netReturnPct)} %. Kein risikogleicher Benchmark.</p>`:'';
-  return `<section class="strategy-arena"><div class="section-title"><h2>STRATEGIE-ARENA</h2><small>H1 · H7 · H9</small></div><p>Getrennte Paper-Simulationen. Historische Ergebnisse sind kein unabhängiger Nachweis und kein laufender Paper-Bot. Keine automatische Siegerwahl.</p><div class="arena-toolbar"><label class="arena-import">Daten-Snapshot importieren<input data-arena-input type="file" accept="application/json,.json" ${busy?'disabled':''}></label><button data-arena-stored type="button" ${busy?'disabled':''}>Gespeicherte Marktdiagnose laden</button><button data-arena-export type="button" ${result&&!busy?'':'disabled'}>Ergebnis + Quelle exportieren</button></div>${busy?'<p role="status">Snapshot prüfen und berechnen …</p>':''}${error?`<p role="alert" class="tone-danger">${escape(error)}</p>`:''}<p class="arena-evidence">${result?.sourceKind==='SYNTHETIC'?'SYNTHETISCHE TESTDATEN · KEINE MARKTEVIDENZ':result?'RETROSPEKTIVE DIAGNOSE · FORWARD-NACHWEIS OFFEN':'Noch keine Marktdaten oder Paper-Ergebnisse importiert.'}</p>${result?`<p>Zeitraum: ${escape(new Date(result.window.firstExecution).toISOString().slice(0,10))} bis ${escape(new Date(result.window.end).toISOString().slice(0,10))} · ${number(result.window.bars)} Tage. ${result.model.baselineCostBps}/${result.model.stressCostBps} Basispunkte je Kauf/Verkauf sind Modellannahmen.</p>`:''}<div class="paper-model-stack">${cards}</div>${controls}<details><summary>Was ist belegt – was fehlt?</summary><p>Regeln: ${escape(ARENA_RULESET)}. Kosten, Slippage, Universum und historische Datenverfügbarkeit sind noch nicht unabhängig bestätigt. Kein zukünftiges Ergebnis ist nachgewiesen.</p><p>Diese Portfoliomodelle haben keinen festen Stop/TP. CRV-Kompatibilität ist ungeklärt; keine Freigabe für echte oder serverseitige Paper-Orders. Die Modelle können eingesetztes Spot-Kapital verlieren. Drawdown wird an Tagesschlüssen gemessen. PF ohne realisierte Verluste bleibt undefiniert; Verkaufsteile sind keine unabhängigen Trades.</p><p>Offene Positionen sind markiert, sofern keine ausdrücklich gekennzeichnete diagnostische Endliquidation gewählt wurde. Historische Daten sind kein frischer Holdout. Für die laufende Beobachtung fehlen noch ein geprüfter Collector, unveränderliche Zeitstempel und ein vorab festgelegtes Beobachtungsfenster.</p>${digest?`<p class="arena-digest">SHA-256 des importierten Inputs: ${escape(digest)}. Integritätswert, kein Echtheitsnachweis.</p>`:''}</details></section>`;
+  return `<section class="strategy-arena"><div class="section-title"><h2>STRATEGIE-ARENA</h2><small>H1 · H7 · H9</small></div><p>Getrennte Paper-Simulationen. Historische Ergebnisse sind kein unabhängiger Nachweis und kein laufender Paper-Bot. Keine automatische Siegerwahl.</p><div class="arena-toolbar"><label class="arena-import">Daten-Snapshot importieren<input data-arena-input type="file" accept="application/json,.json" ${busy?'disabled':''}></label><button data-arena-provenance type="button" ${provenanceBusy?'disabled':''}>Vorhandene Receipt-Metadaten anzeigen</button><button data-arena-stored type="button" ${busy?'disabled':''}>Gespeicherte Marktdiagnose laden</button><button data-arena-export type="button" ${result&&!busy?'':'disabled'}>Ergebnis + Quelle exportieren</button></div>${provenanceBusy?'<p role="status">Receipt-Metadaten werden gelesen – keine Kursdaten oder Replay.</p>':''}${provenanceError?`<p role="alert" class="tone-danger">${escape(provenanceError)}</p>`:''}${busy?'<p role="status">Snapshot prüfen und berechnen …</p>':''}${error?`<p role="alert" class="tone-danger">${escape(error)}</p>`:''}<p class="arena-evidence">${result?.sourceKind==='SYNTHETIC'?'SYNTHETISCHE TESTDATEN · KEINE MARKTEVIDENZ':result?'RETROSPEKTIVE DIAGNOSE · FORWARD-NACHWEIS OFFEN':'Noch keine Marktdaten oder Paper-Ergebnisse importiert.'}</p>${result?`<p>Zeitraum: ${escape(new Date(result.window.firstExecution).toISOString().slice(0,10))} bis ${escape(new Date(result.window.end).toISOString().slice(0,10))} · ${number(result.window.bars)} Tage. ${result.model.baselineCostBps}/${result.model.stressCostBps} Basispunkte je Kauf/Verkauf sind Modellannahmen.</p>`:''}<div class="paper-model-stack">${cards}</div>${controls}<details><summary>Was ist belegt – was fehlt?</summary><p>Regeln: ${escape(ARENA_RULESET)}. Kosten, Slippage, Universum und historische Datenverfügbarkeit sind noch nicht unabhängig bestätigt. Kein zukünftiges Ergebnis ist nachgewiesen.</p><p>Diese Portfoliomodelle haben keinen festen Stop/TP. CRV-Kompatibilität ist ungeklärt; keine Freigabe für echte oder serverseitige Paper-Orders. Die Modelle können eingesetztes Spot-Kapital verlieren. Drawdown wird an Tagesschlüssen gemessen. PF ohne realisierte Verluste bleibt undefiniert; Verkaufsteile sind keine unabhängigen Trades.</p><p>Offene Positionen sind markiert, sofern keine ausdrücklich gekennzeichnete diagnostische Endliquidation gewählt wurde. Historische Daten sind kein frischer Holdout. Für die laufende Beobachtung fehlen noch ein geprüfter Collector, unveränderliche Zeitstempel und ein vorab festgelegtes Beobachtungsfenster.</p>${digest?`<p class="arena-digest">SHA-256 des importierten Inputs: ${escape(digest)}. Integritätswert, kein Echtheitsnachweis.</p>`:''}</details></section>`;
 }
 
 export async function evaluateArenaImport(text, subtle=globalThis.crypto?.subtle) {
@@ -62,11 +171,17 @@ export async function evaluateArenaImport(text, subtle=globalThis.crypto?.subtle
 }
 
 export function createStrategyArenaView() {
-  let state={result:null,error:'',busy:false,digest:''}, input=null, sourceReceipt=null;
+  let state={result:null,error:'',busy:false,digest:'',provenance:null,provenanceBusy:false,provenanceError:''}, input=null, sourceReceipt=null;
   return {
     html:()=>arenaHtml(state),
     bind(root){
       const repaint=()=>{const host=root.querySelector('[data-strategy-arena]');if(host){host.innerHTML=arenaHtml(state);this.bind(root);}};
+      root.querySelector('[data-arena-provenance]')?.addEventListener('click',async()=>{
+        if(state.provenanceBusy)return;state.provenanceBusy=true;state.provenanceError='';repaint();
+        try{state.provenance=await loadStoredArenaProvenance();}
+        catch(error){state.provenanceError=String(error?.message||error).slice(0,220);}
+        finally{state.provenanceBusy=false;repaint();}
+      });
       root.querySelector('[data-arena-stored]')?.addEventListener('click',async()=>{
         if(state.busy)return;state={result:null,error:'',busy:true,digest:''};input=null;sourceReceipt=null;repaint();
         try{const evaluated=await loadStoredArena();input=evaluated.input;sourceReceipt=evaluated.sourceReceipt;state.result=evaluated.result;state.digest=evaluated.digest;}
