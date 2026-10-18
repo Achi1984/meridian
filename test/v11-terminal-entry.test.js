@@ -14,8 +14,9 @@ const terminal=readFileSync(new URL('../v10/index.html',import.meta.url),'utf8')
 // PR #677: base a5ba7eca2004ce51ec98720955b5fcc3716f09ef + history-close delta.
 // Scope approved in #571 comment 6107229650; terminal-entry insertions removed
 // for this baseline. PR #699 additionally reverses only the viewport fallback
-// pair below before hashing. The Depot packet reverses its exact asserted markup
-// below as well. All other bytes and browser assertions stay guarded.
+// pair below before hashing. B10 is reversed from exact literal presentation
+// deltas; the Depot packet reverses its exact asserted markup below as well.
+// All other bytes and browser assertions stay guarded.
 const preimageBlob='e7fe56dd456641e40b54f5d5b047176523c27592';
 const css=`    /* Fixed packet A: visible terminal entry; no data or execution changes. */
     .terminal-entry{max-width:var(--container);margin:12px auto 0;display:flex;justify-content:flex-start;min-width:0}
@@ -201,6 +202,113 @@ const r128Deltas=[
     "        <li><strong>Terminal 10.0-r128</strong><span class=\"version-status\">Aktueller Terminal-Stand</span><p>Einmaliger Meridian-Lesezugang für das Erstellen oder Widerrufen von Asset-Watch-Links. Keine Speicherung des eingegebenen Lesepassworts.</p></li>\n        <li><strong>Terminal 10.0-r127</strong><span class=\"version-status\">Historischer Stand</span><p>Dokumentierter Terminal-Stand am 10.10.2026. Diese Seite zeigt die separate Meridian-11-Vorschau. <a href=\"https://github.com/Achi1984/meridian/blob/7f76c15876cdda132b2c64be727cc48939094608/version.json\">Versionsnachweis</a></p></li>\n"
   ]
 ];
+const b10Deltas=[
+  ["",`    /* B10: compact preview chrome and keep the validated portfolio first. */
+    .topbar{padding-top:calc(8px + env(safe-area-inset-top,0px));padding-bottom:8px}
+    .topbar{padding-left:max(16px,calc((100% - var(--container))/2));padding-right:max(16px,calc((100% - var(--container))/2))}
+    .header-inner{gap:8px}
+    .identity{gap:8px}
+    .mark{width:32px;height:32px;border-radius:10px;font-size:20px}
+    .brand{font-size:16px}
+    .terminal-entry{margin-top:8px}
+    .autonomy-strip{max-width:var(--container);margin:8px auto 0;padding:0;border:1px solid #34465c;border-radius:12px;background:#101824;overflow-wrap:anywhere}
+    .autonomy-strip>summary{min-height:44px;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;letter-spacing:0;line-height:1.4}
+    .autonomy-strip>summary>span:first-child{min-width:0;overflow-wrap:anywhere}
+    .autonomy-strip>summary>span:last-child{flex:none}
+    .autonomy-strip .disclosure-hint{font-size:10px;color:var(--muted);font-weight:500;letter-spacing:0}
+    .autonomy-strip>summary strong{color:var(--state-unknown)}
+    .autonomy-strip[open]>summary{border-bottom:1px solid var(--line)}
+    .autonomy-strip>.details-body{border:0;padding:10px 12px}
+    #nav{padding-left:max(6px,env(safe-area-inset-left,0px),calc((100% - 740px)/2));padding-right:max(6px,env(safe-area-inset-right,0px),calc((100% - 740px)/2))}
+    .container{padding-top:14px}
+    .section-intro{margin-bottom:12px}
+    .card{padding:16px;margin-bottom:10px}
+    .view-placeholder{min-height:132px;padding:18px 16px}
+    .command-context-details{margin:10px 0 14px}
+    .command-context-details>summary{min-height:48px}
+    .command-context-details .details-body p{font-size:12px}
+    .module-availability{align-self:flex-start;margin-top:4px}
+    @media(max-width:350px){.card{padding:14px}.container{padding-top:12px}.autonomy-strip>summary{padding-left:9px;padding-right:9px}}
+`],
+  ["      <button id=\"version-toggle\" type=\"button\" class=\"preview-pill version-toggle\" aria-expanded=\"false\" aria-controls=\"version-panel\">11 · Vorschau B9<small>Versionsverlauf ▾</small></button>\n",
+   "      <button id=\"version-toggle\" type=\"button\" class=\"preview-pill version-toggle\" aria-expanded=\"false\" aria-controls=\"version-panel\">11 · Vorschau B10<small>Versionsverlauf ▾</small></button>\n"],
+  [`    <section id="autonomy-status" class="autonomy-strip" aria-labelledby="autonomy-heading" data-state="unknown" data-source="none">
+      <h2 id="autonomy-heading">Autonome Entwicklung · <strong>Unbekannt</strong></h2>
+      <p>Kein aktuelles Betriebssignal verbunden. Ob ein Agent arbeitet oder warum er wartet, ist hier nicht feststellbar.</p>
+      <details>
+        <summary><span>Betrieb &amp; letzte Änderung</span><span aria-hidden="true">+</span></summary>
+        <div class="details-body">
+          <p><b>Aktuelle Aufgabe:</b> Nicht verifiziert.</p>
+          <p><b>Letztes Lebenszeichen:</b> Nicht verfügbar. Diese Anzeige überwacht den Betrieb noch nicht.</p>
+          <p><b>Diese Vorschau · B9:</b> Geladene Depotbewertung auch in Command. Verlauf mit Zeitachse und ausgewiesenem Messzeitraum. Kontrollierte Testvorschau · Geräteabnahme ausstehend. <a href="https://github.com/Achi1984/meridian/issues/766">B9-Umfang #766</a>.</p>
+          <p><b>Zuletzt belegte UI-Änderung · B1:</b> Botübersicht mit Quellen- und Risikostatus. Integriert am <time datetime="2026-10-11T19:30:28Z">11.10.2026, 21:30 Uhr Wien</time> · <a href="https://github.com/Achi1984/meridian/pull/702">Änderungsnachweis #702</a>.</p>
+          <p>Der Versionsstand ist kein Lebenszeichen eines Entwicklungsagenten.</p>
+        </div>
+      </details>
+    </section>
+`,
+   `    <details id="autonomy-status" class="autonomy-strip" aria-labelledby="autonomy-heading" data-state="unknown" data-source="none">
+      <summary><span id="autonomy-heading">Autonome Entwicklung · <strong>Unbekannt</strong><small class="disclosure-hint"> · Details</small></span><span aria-hidden="true">+</span></summary>
+      <div class="details-body">
+        <p>Kein aktuelles Betriebssignal verbunden. Ob ein Agent arbeitet oder warum er wartet, ist hier nicht feststellbar.</p>
+        <p><b>Aktuelle Aufgabe:</b> Nicht verifiziert.</p>
+        <p><b>Letztes Lebenszeichen:</b> Nicht verfügbar. Diese Anzeige überwacht den Betrieb noch nicht.</p>
+        <p><b>Diese Vorschau · B10:</b> Kompakter Header und klarere Command-Hierarchie. Layout-Entwurf ohne neue Datenanbindung; Integration und Geräteabnahme ausstehend.</p>
+        <p><b>Zuletzt belegte UI-Änderung · B1:</b> Botübersicht mit Quellen- und Risikostatus. Integriert am <time datetime="2026-10-11T19:30:28Z">11.10.2026, 21:30 Uhr Wien</time> · <a href="https://github.com/Achi1984/meridian/pull/702">Änderungsnachweis #702</a>.</p>
+        <p>Der Versionsstand ist kein Lebenszeichen eines Entwicklungsagenten.</p>
+      </div>
+    </details>
+`],
+  ["",`        <li><strong>Meridian 11 · B10</strong><span class="version-status">Entwurf</span><p>Kompaktere Header- und Command-Hierarchie sowie klare Vorbereitungslabels für Forecast und Scanner. Reines Layout; keine neue Datenanbindung oder Funktionsfreigabe.</p></li>
+`],
+  ["        <div><div class=\"eyebrow\">COMMAND CENTER</div><h1 id=\"command-heading\">Alles Wesentliche.<br>Ein Blick.</h1><p class=\"sub\">Deine zentrale Übersicht mit manuell geladener Depotbewertung.</p></div>\n",
+   "        <div><div class=\"eyebrow\">COMMAND CENTER</div><h1 id=\"command-heading\">Command</h1><p class=\"sub\">Depot-, Bot- und Marktstatus auf einen Blick.</p></div>\n"],
+  [`      <section class="card decision" data-decision-owner="preview" aria-label="Jetzt wichtig">
+        <div class="card-head"><span class="card-kicker">JETZT WICHTIG</span><span class="limited">UNGEKLÄRT</span></div>
+        <h2>Depot im Überblick · Risiko ungeklärt</h2>
+        <p>Die im Depot manuell geladene Bewertung erscheint auch hier. Bot-Snapshots werden separat im Bots-Tab geladen. Es wird keine Aussage über Liquidationsgefahr oder Handelsschutz getroffen.</p>
+        <div class="footnote">Keine Handlungsempfehlung · Keine automatische Order · Manueller Bot-Lesezugang separat</div>
+      </section>
+      <section id="command-portfolio" class="card" aria-label="Portfolio">
+        <div class="card-head"><span class="card-kicker">PORTFOLIO</span><span class="state-label"><span class="state-dot" aria-hidden="true"></span> NICHT VERBUNDEN</span></div>
+        <div class="portfolio-row"><div><div class="portfolio-value" aria-label="Portfoliowert unbekannt">—</div><div class="portfolio-description">Gesamtwert nicht verifiziert</div></div></div>
+        <p class="caption">Keine Schätzung, kein Ersatzwert und keine simulierte Performance.</p>
+        <div class="trust-grid" aria-label="Datenquellenstatus">
+          <div class="trust-cell"><strong>DEPOT</strong><span data-command-depot-status>Unbekannt</span></div>
+          <div class="trust-cell"><strong>BOTS</strong><span>Unbekannt</span></div>
+          <div class="trust-cell"><strong>MARKT</strong><span>Unbekannt</span></div>
+        </div>
+      </section>
+`,
+   `      <section id="command-portfolio" class="card" aria-label="Portfolio">
+        <div class="card-head"><span class="card-kicker">PORTFOLIO</span><span class="state-label"><span class="state-dot" aria-hidden="true"></span> NICHT VERBUNDEN</span></div>
+        <div class="portfolio-row"><div><div class="portfolio-value" aria-label="Portfoliowert unbekannt">—</div><div class="portfolio-description">Gesamtwert nicht verifiziert</div></div></div>
+        <p class="caption">Keine Schätzung, kein Ersatzwert und keine simulierte Performance.</p>
+        <div class="trust-grid" aria-label="Datenquellenstatus">
+          <div class="trust-cell"><strong>DEPOT</strong><span data-command-depot-status>Unbekannt</span></div>
+          <div class="trust-cell"><strong>BOTS</strong><span>Unbekannt</span></div>
+          <div class="trust-cell"><strong>MARKT</strong><span>Unbekannt</span></div>
+        </div>
+      </section>
+      <section class="card decision" data-decision-owner="preview" aria-label="Jetzt wichtig">
+        <div class="card-head"><span class="card-kicker">RISIKO</span><span class="limited">UNGEKLÄRT</span></div>
+        <h2>Risiko ungeklärt</h2>
+        <p>Es wird keine Aussage über Liquidationsgefahr oder Handelsschutz getroffen. Fehlende Daten sind keine Entwarnung.</p>
+      </section>
+`],
+  ["",`      <details class="command-context-details">
+        <summary><span>Einordnung &amp; Datenlage</span><span aria-hidden="true">+</span></summary>
+        <div class="details-body">
+          <p>Die im Depot manuell geladene Bewertung erscheint auch hier. Bot-Snapshots werden separat im Bots-Tab geladen.</p>
+          <p>Keine Handlungsempfehlung · Keine automatische Order · Manueller Bot-Lesezugang separat.</p>
+        </div>
+      </details>
+`],
+  ["      <div class=\"card view-placeholder\"><h2>Zonen verstehen. Entscheidungen prüfen.</h2><p>FIB-Zonen, Szenarien und Trendwenden werden später mit verifizierten Quellen und erkennbaren Unsicherheiten dargestellt. Keine Live-Signale in dieser Vorschau.</p></div>\n",
+   "      <div class=\"card view-placeholder\"><span class=\"limited module-availability\">In Vorbereitung</span><h2>Marktszenarien nachvollziehbar prüfen</h2><p>Geplant sind FIB-Zonen und Szenarien mit verifizierten Quellen und sichtbarer Unsicherheit. Aktuell sind keine Forecast-Daten oder Live-Signale verfügbar.</p></div>\n"],
+  ["      <div class=\"card view-placeholder\"><h2>Chancen erst nach Evidenz.</h2><p>Der Opportunity Scanner bleibt eine Research-Oberfläche. Es werden keine Handelsaufträge, Paper-Bots oder freigegebenen Signale vorgetäuscht.</p></div>\n",
+   "      <div class=\"card view-placeholder\"><span class=\"limited module-availability\">In Vorbereitung</span><h2>Research-Chancen erst nach Evidenz</h2><p>Der Scanner soll nachvollziehbare Research-Kandidaten zeigen. Aktuell sind keine Research-Ausgaben oder freigegebenen Signale verfügbar; es entstehen keine Handelsaufträge oder Paper-Bots.</p></div>\n"]
+];
 const b9Deltas=[["      <button id=\"version-toggle\" type=\"button\" class=\"preview-pill version-toggle\" aria-expanded=\"false\" aria-controls=\"version-panel\">11 · Vorschau B8<small>Versionsverlauf ▾</small></button>\n", "      <button id=\"version-toggle\" type=\"button\" class=\"preview-pill version-toggle\" aria-expanded=\"false\" aria-controls=\"version-panel\">11 · Vorschau B9<small>Versionsverlauf ▾</small></button>\n"], ["          <p><b>Diese Vorschau · B8:</b> Depotbewertung und Verlauf getrennt laden. Zeiträume 1h, 1 Tag und 1 Woche; Datenlücken bleiben sichtbar. Kontrollierte Testvorschau · Geräteabnahme ausstehend. <a href=\"https://github.com/Achi1984/meridian/issues/764\">B8-Umfang #764</a>.</p>\n", "          <p><b>Diese Vorschau · B9:</b> Geladene Depotbewertung auch in Command. Verlauf mit Zeitachse und ausgewiesenem Messzeitraum. Kontrollierte Testvorschau · Geräteabnahme ausstehend. <a href=\"https://github.com/Achi1984/meridian/issues/766\">B9-Umfang #766</a>.</p>\n"], ["", "        <li><strong>Meridian 11 · B9</strong><span class=\"version-status\">Testvorschau</span><p>Command übernimmt die manuell geladene Depotbewertung und deren Sperre. Verlauf mit Zeitachse und vorhandenem Messzeitraum.</p></li>\n"], ["        <div><div class=\"eyebrow\">COMMAND CENTER</div><h1 id=\"command-heading\">Alles Wesentliche.<br>Ein Blick.</h1><p class=\"sub\">Deine zentrale Übersicht – derzeit als reine Designvorschau.</p></div>\n", "        <div><div class=\"eyebrow\">COMMAND CENTER</div><h1 id=\"command-heading\">Alles Wesentliche.<br>Ein Blick.</h1><p class=\"sub\">Deine zentrale Übersicht mit manuell geladener Depotbewertung.</p></div>\n"], ["        <h2>Datenanbindung steht noch aus</h2>\n        <p>Diese Übersicht verarbeitet keine Depot- oder Marktdaten. Bot-Snapshots können ausschließlich im Bots-Tab manuell gelesen werden. Es wird keine Aussage über Liquidationsgefahr oder Handelsschutz getroffen.</p>\n", "        <h2>Depot im Überblick · Risiko ungeklärt</h2>\n        <p>Die im Depot manuell geladene Bewertung erscheint auch hier. Bot-Snapshots werden separat im Bots-Tab geladen. Es wird keine Aussage über Liquidationsgefahr oder Handelsschutz getroffen.</p>\n"], ["      <section class=\"card\" aria-label=\"Portfolio\">\n", "      <section id=\"command-portfolio\" class=\"card\" aria-label=\"Portfolio\">\n"], ["          <div class=\"trust-cell\"><strong>DEPOT</strong><span>Unbekannt</span></div>\n", "          <div class=\"trust-cell\"><strong>DEPOT</strong><span data-command-depot-status>Unbekannt</span></div>\n"], ["          <p><b>Modus:</b> Öffentliche Entwicklungs-Vorschau mit optionalem manuellem Bot-Lesezugang.</p>\n", "          <p><b>Modus:</b> Öffentliche Entwicklungs-Vorschau mit optionalem manuellem Depot- und Bot-Lesezugang.</p>\n"], ["            <p>Nur Ansichtsmuster ohne Kontozugriff. Depotwert und Risikostatus bleiben unbekannt.</p>\n", "            <p>Nur Ansichtsmuster ohne Kontozugriff. Sie verändern weder die geladene Depotbewertung noch den Risikostatus.</p>\n"], ["<script type=\"module\" src=\"./depot-read-bootstrap.js?v=B8\"></script>\n", "<script type=\"module\" src=\"./depot-read-bootstrap.js?v=B9\"></script>\n"]];
 const b8Deltas=[["    .depot-read-view dd{margin:0 0 12px;font-weight:650;overflow-wrap:anywhere}\n", "    .depot-read-view dd{margin:0 0 12px;font-weight:650;overflow-wrap:anywhere}\n    .depot-history{margin-top:24px;border-top:1px solid #334155;padding-top:16px}\n    .depot-history svg{display:block;width:100%;height:auto;color:#93c5fd;margin:16px 0}\n    .depot-range{display:flex;flex-wrap:wrap;gap:8px}\n    .depot-range button[aria-pressed=\"true\"]{background:#1e3a5f;border-color:#93c5fd}\n    .depot-history p{overflow-wrap:anywhere;font-size:14px}\n"], ["      <button id=\"version-toggle\" type=\"button\" class=\"preview-pill version-toggle\" aria-expanded=\"false\" aria-controls=\"version-panel\">11 · Vorschau B7<small>Versionsverlauf ▾</small></button>\n", "      <button id=\"version-toggle\" type=\"button\" class=\"preview-pill version-toggle\" aria-expanded=\"false\" aria-controls=\"version-panel\">11 · Vorschau B8<small>Versionsverlauf ▾</small></button>\n"], ["          <p><b>Diese Vorschau · B7:</b> Depotbewertung manuell lesen: Gesamtwert, Spot und Pionex mit Zeitnachweis. Gespeicherte Bewertung, keine Live-Kurse. Kontrollierte Testvorschau · Geräteabnahme ausstehend. <a href=\"https://github.com/Achi1984/meridian/issues/762\">B7-Umfang #762</a>.</p>\n", "          <p><b>Diese Vorschau · B8:</b> Depotbewertung und Verlauf getrennt laden. Zeiträume 1h, 1 Tag und 1 Woche; Datenlücken bleiben sichtbar. Kontrollierte Testvorschau · Geräteabnahme ausstehend. <a href=\"https://github.com/Achi1984/meridian/issues/764\">B8-Umfang #764</a>.</p>\n"], ["      <ul class=\"version-history-list\">\n", "      <ul class=\"version-history-list\">\n        <li><strong>Meridian 11 · B8</strong><span class=\"version-status\">Testvorschau</span><p>Depotbewertung unabhängig von der Historie. Verlauf für 1h, 1 Tag und 1 Woche mit sichtbaren Datenlücken; keine Renditeberechnung.</p></li>\n"], ["        <p class=\"caption\">Letzte vollständige gespeicherte Bewertung. Keine Live-Kurse oder aktuelle Bestandsübersicht.</p>\n", "        <p class=\"caption\">Depotbewertung aus serverseitigen Quellen. Der gespeicherte Verlauf wird getrennt geprüft.</p>\n"], ["<script type=\"module\" src=\"./depot-read-bootstrap.js?v=B7\"></script>\n", "<script type=\"module\" src=\"./depot-read-bootstrap.js?v=B8\"></script>\n"]];
 const b7Deltas=[
@@ -234,6 +342,7 @@ const b7Deltas=[
   ]
 ];
 function restoreB2(source){
+ for(const [before,after] of b10Deltas){assert.equal(source.split(after).length-1,1,"one exact B10 delta");source=source.replace(after,before);}
  for(const [before,after] of b9Deltas){assert.equal(source.split(after).length-1,1,"one exact B9 delta");source=source.replace(after,before);}
  for(const [before,after] of b8Deltas){assert.equal(source.split(after).length-1,1,"one exact B8 delta");source=source.replace(after,before);}
  for(const [before,after] of b7Deltas){assert.equal(source.split(after).length-1,1,"one exact B7 delta");source=source.replace(after,before);}
