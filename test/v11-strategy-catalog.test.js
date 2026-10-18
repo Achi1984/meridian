@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import test from 'node:test';
 import {B17_CANDIDATE,buildStrategyCatalog,FAMILY_IDS,renderStrategyCatalog} from '../v11/strategy-catalog.js';
-import {ARENA_RULESET,ARENA_SYMBOLS} from '../research/strategy-paper-arena.js';
-import {arenaHtml,describeArenaProvenance,evaluateArenaImport} from '../v11/strategy-arena.js';
+import {ARENA_CANDIDATES,ARENA_RULESET,ARENA_SYMBOLS} from '../research/strategy-paper-arena.js';
+import {arenaHtml,createStrategyArenaView,describeArenaProvenance,evaluateArenaImport} from '../v11/strategy-arena.js';
 import {webcrypto} from 'node:crypto';
 
 const campaign=JSON.parse(readFileSync(new URL('../docs/strategy-lab/campaign-20261013.json',import.meta.url),'utf8'));
@@ -108,4 +108,71 @@ test('provenance unknowns and caller-controlled strings are not trusted as HTML'
   const html=arenaHtml({error:'<SCRIPT>alert(1)</SCRIPT>'});
   assert.doesNotMatch(html,/<script\b/i);
   assert.match(html,/&lt;SCRIPT&gt;/);
+});
+
+function historicalManifest(){
+  return {schemaVersion:'MERIDIAN_ARENA_CHUNKED_INPUT_V1',ruleset:ARENA_RULESET,
+    summary:{candidates:ARENA_CANDIDATES.map(id=>({id}))},
+    receipt:{collectorProvider:'ARCHIVE_ONLY',inputSha256:'a'.repeat(64)},chunks:[]};
+}
+function deferred(){let resolve;const promise=new Promise(r=>{resolve=r;});return {promise,resolve};}
+function arenaRoot(){
+  const listeners=new Map();
+  return {innerHTML:'',listeners,paints:0,
+    contains:()=>true,addEventListener:(name,fn)=>listeners.set(name,fn),
+    removeEventListener:name=>listeners.delete(name),replaceChildren(){this.innerHTML='';},
+    click(action){const button={hasAttribute:key=>key===action};return listeners.get('click')({target:{closest:()=>button}});},
+    importFile(text){const input={files:[{size:text.length,text:async()=>text}]};return listeners.get('change')({target:{closest:selector=>selector==='[data-arena-input]'?input:null}});}
+  };
+}
+function assertMetadataSeparated(html){
+  const cards=[...html.matchAll(/<article class="arena-model-card">([\s\S]*?)<\/article>/g)];
+  assert.equal(cards.length,5);
+  for(const card of cards)assert.doesNotMatch(card[1],/ARCHIVE_ONLY|inputSha256|Historische Herkunft/);
+  assert.match(html,/Separate historische Belegmetadaten/);
+  assert.match(html,/nicht den importierten Ergebnissen zugeordnet/);
+}
+
+test('historical metadata requires the complete model set and H9 progression remains blocked',()=>{
+  const manifest=historicalManifest();
+  assert.equal(describeArenaProvenance(manifest).status,'PRESENT_UNVERIFIED');
+  for(const candidates of [[],manifest.summary.candidates.slice(1),[...manifest.summary.candidates,{id:'H9'}]]){
+    assert.equal(describeArenaProvenance({...manifest,summary:{candidates}}).status,'INVALID');
+  }
+  assert.equal(buildStrategyCatalog(campaign).families.find(x=>x.id==='H9').historicalStage,'BLOCKED_DATA');
+});
+
+test('historical metadata remains separate for different synthetic imports and either async completion order',async()=>{
+  for(const metadataFirst of [true,false]){
+    const gate=deferred(); const root=arenaRoot();
+    const view=createStrategyArenaView(root,{fetchImpl:()=>gate.promise});
+    const loading=root.click('data-arena-provenance');
+    const complete=()=>gate.resolve({ok:true,text:async()=>JSON.stringify(historicalManifest())});
+    if(metadataFirst){complete();await loading;}
+    const first=syntheticInput();
+    await root.importFile(JSON.stringify(first));
+    if(!metadataFirst){complete();await loading;}
+    assert.match(root.innerHTML,/SYNTHETISCHE TESTDATEN/);assertMetadataSeparated(root.innerHTML);
+    const firstHtml=root.innerHTML;
+    const second=syntheticInput();second.data[ARENA_SYMBOLS[0]][0].high+=1;
+    await root.importFile(JSON.stringify(second));
+    assert.notEqual(root.innerHTML,firstHtml,'distinct input digest is rendered');
+    assertMetadataSeparated(root.innerHTML);
+    view.dispose();
+  }
+});
+
+test('disposed arena cannot repaint after late metadata success, failure or pending file import',async()=>{
+  for(const failure of [false,true]){
+    const gate=deferred(); const root=arenaRoot();
+    const view=createStrategyArenaView(root,{fetchImpl:()=>gate.promise});
+    const pending=root.click('data-arena-provenance');view.dispose();
+    gate.resolve({ok:!failure,text:async()=>JSON.stringify(historicalManifest())});
+    await pending;assert.equal(root.innerHTML,'');assert.equal(root.listeners.size,0);
+  }
+  const gate=deferred();const root=arenaRoot();const view=createStrategyArenaView(root);
+  const input={files:[{size:10,text:()=>gate.promise}]};
+  const pending=root.listeners.get('change')({target:{closest:selector=>selector==='[data-arena-input]'?input:null}});
+  view.dispose();gate.resolve(JSON.stringify(syntheticInput()));await pending;
+  assert.equal(root.innerHTML,'');assert.equal(root.listeners.size,0);
 });

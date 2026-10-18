@@ -90,7 +90,7 @@ export function describeArenaProvenance(manifest) {
   }
   const candidates = manifest.summary?.candidates;
   const ids = Array.isArray(candidates) ? candidates.map(row=>row?.id) : [];
-  if (!Array.isArray(candidates) || new Set(ids).size !== ids.length ||
+  if (!Array.isArray(candidates) || ids.length !== ARENA_CANDIDATES.length || new Set(ids).size !== ids.length ||
       ids.some(id=>!ARENA_CANDIDATES.includes(id))) {
     return {status:'INVALID',message:'Kandidatenzuordnung ungültig; kein Beleg wird zugeordnet.'};
   }
@@ -124,15 +124,15 @@ function provenanceDetails(provenance) {
   return `<details class="arena-evidence-details"><summary>Technische Belegdetails · Prüfsummen</summary><p>${escapeHtml(provenance.source)}</p><p>Git-Blob · ${PROVENANCE_BLOB}</p><p>Versiegelung · ${escapeHtml(provenance.sealedAt)}</p><ul>${rows}</ul></details>`;
 }
 
-function provenanceCard(id,provenance) {
-  if (id === 'H9') return '<p class="arena-blocked">H9 · BLOCKED_DATA. Datiertes Kontrakt-, Zwei-Bein-, Finanzierungs- und Marginmodell fehlen. Keine Trades.</p>';
-  if (!provenance || provenance.status !== 'PRESENT_UNVERIFIED') {
-    return `<p class="arena-unknown">${escapeHtml(provenance?.message || 'Historischer Beleg nicht geladen.')}</p>`;
-  }
-  return `<details class="arena-evidence"><summary>Historische Herkunft · nicht bestätigt</summary><p>Markt: ${escapeHtml(provenance.market)}</p><p>Universum: ${escapeHtml(provenance.universe)}</p><p>Abdeckung: ${escapeHtml(provenance.coverage)}</p><p>Keine Zukunftsdaten; keine unabhängige Bestätigung.</p>${provenanceDetails(provenance)}</details>`;
+function historicalProvenanceSection(provenance) {
+  if (!provenance) return '';
+  const details = provenance.status === 'PRESENT_UNVERIFIED'
+    ? `<p>Markt: ${escapeHtml(provenance.market)}</p><p>Universum: ${escapeHtml(provenance.universe)}</p><p>Abdeckung: ${escapeHtml(provenance.coverage)}</p>${provenanceDetails(provenance)}`
+    : '';
+  return `<section class="arena-historical-metadata" aria-label="Separate historische Belegmetadaten"><h3>Separate historische Belegmetadaten</h3><p>Archivquelle vom 16.10.2026 · nicht den importierten Ergebnissen zugeordnet. Keine bestätigte Herkunft oder unabhängige Prüfung des aktuellen Imports.</p><p>${escapeHtml(provenance.message)}</p>${details}</section>`;
 }
 
-function candidateCard(row,provenance) {
+function candidateCard(row) {
   const metrics = row.baseline;
   const stress = row.stress;
   const cells = metrics ? [
@@ -143,7 +143,7 @@ function candidateCard(row,provenance) {
     ['Gewinnfaktor',formatNumber(metrics.profitFactor)],
     ['Kostenstress · Netto',`${formatNumber(stress?.netReturnPct)} %`]
   ].map(([label,value])=>`<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join('') : '';
-  return `<article class="arena-model-card"><header><div><strong>${escapeHtml(row.id)} · ${escapeHtml(names[row.id] || row.id)}</strong><span>${row.id === 'H9'?'DATEN FEHLEN':metrics?'HISTORISCHE DIAGNOSE':'NOCH NICHT AUSGEWERTET'}</span></div><b class="tone-${tone(metrics?.netPnl)}">${metrics ? `${formatNumber(metrics.netPnl)} ${escapeHtml(metrics.currency)}` : '—'}</b></header>${row.id === 'H9' ? '<p>Datiertes Kontrakt-, Zwei-Bein-, Finanzierungs- und Marginmodell fehlen. Keine simulierten Trades.</p>' : `<dl>${cells}</dl><p>${metrics ? '10.000 nominale Einheiten je getrenntem Modell · 1× Spot · keine EUR-Umrechnung.' : 'Keine Performance behauptet.'}</p>`}${provenanceCard(row.id,provenance)}</article>`;
+  return `<article class="arena-model-card"><header><div><strong>${escapeHtml(row.id)} · ${escapeHtml(names[row.id] || row.id)}</strong><span>${row.id === 'H9'?'DATEN FEHLEN':metrics?'MANUELLE DIAGNOSE':'NOCH NICHT AUSGEWERTET'}</span></div><b class="tone-${tone(metrics?.netPnl)}">${metrics ? `${formatNumber(metrics.netPnl)} ${escapeHtml(metrics.currency)}` : '—'}</b></header>${row.id === 'H9' ? '<p>Datiertes Kontrakt-, Zwei-Bein-, Finanzierungs- und Marginmodell fehlen. Keine simulierten Trades.</p>' : `<dl>${cells}</dl><p>${metrics ? '10.000 nominale Einheiten je getrenntem Modell · 1× Spot · keine EUR-Umrechnung.' : 'Keine Performance behauptet.'}</p>`}${row.id === 'H9' ? '<p class="arena-blocked">H9 · BLOCKED_DATA. Keine Trades.</p>' : ''}</article>`;
 }
 
 function metricSummary(result) {
@@ -159,7 +159,7 @@ export function arenaHtml({result=null,error='',busy=false,digest='',provenance=
       : 'Keine Marktdaten importiert. Es findet kein automatischer Replay statt.';
   const controls = result ? `<p class="arena-control">Vergleichswerte: gleichgewichteter Kauf &amp; Halt ${formatNumber(result.controls?.buyAndHold?.baseline?.netReturnPct)} % · Cash ${formatNumber(result.controls?.cash?.baseline?.netReturnPct)} %. Kein risikogleicher Benchmark; keine Gewinnerwahl.</p>` : '';
   const period = result ? `<p>Zeitraum: ${escapeHtml(new Date(result.window.firstExecution).toISOString().slice(0,10))} bis ${escapeHtml(new Date(result.window.end).toISOString().slice(0,10))} · ${formatNumber(result.window.bars)} Tage. Modellannahmen: ${formatNumber(result.model.baselineCostBps)}/${formatNumber(result.model.stressCostBps)} Basispunkte je Kauf/Verkauf.</p>` : '';
-  return `<section class="strategy-arena" aria-labelledby="arena-heading"><header class="section-title"><h2 id="arena-heading">Arena · H1 / H7 / H9</h2><span class="limited">Nur manuell</span></header><p>Fünf getrennte historische Modelle. Eine Diagnose ist weder unabhängiger Test noch laufendes Paper. Keine automatische Siegerwahl.</p><div class="arena-toolbar"><label class="arena-import">Synthetischen oder vorhandenen Snapshot importieren<input data-arena-input type="file" accept="application/json,.json" ${busy?'disabled':''}></label><button type="button" data-arena-provenance ${provenanceBusy?'disabled':''}>Historische Belegmetadaten laden</button><button type="button" data-arena-stored ${busy?'disabled':''}>Gespeicherte Diagnose manuell laden</button><button type="button" data-arena-export ${result&&!busy?'':'disabled'}>Diagnose + Quelle exportieren</button></div>${provenanceBusy?'<p role="status">Nur Belegmetadaten werden geladen; keine Kurse oder Neuberechnung.</p>':''}${provenanceError?`<p role="alert">${escapeHtml(provenanceError)}</p>`:''}${busy?'<p role="status">Snapshot wird geprüft und neu berechnet …</p>':''}${error?`<p role="alert">${escapeHtml(error)}</p>`:''}<p class="arena-evidence">${evidence}</p>${period}<div class="arena-models">${rows.map(row=>candidateCard(row,provenance)).join('')}</div>${controls}<details><summary>Diagnose-Grenzen</summary><p>Regelsatz ${escapeHtml(ARENA_RULESET)}. Historische Daten, Kosten, Slippage und Universum sind keine unabhängig bestätigte Evidenz. Offene Positionen und abhängige Verkaufsteile sind keine eigenständigen Trades.</p><p>Die gespeicherte 8-Asset-Quelle und die separate historische Abdeckung von 448/955 Schlüssen bleiben unvollständig/fehlgeschlagen. Das ist kein Beleg für den neuen 7-Asset-B1-7-Kandidaten.</p><p>Keine verbundenen Paper-Orders, keine Ausführungsfreigabe und keine Live-Bereitschaft. Kosten sind die ursprünglichen Annahmen dieses Diagnoseprotokolls und werden nicht rückwirkend geändert.</p>${digest?`<p>SHA-256 des importierten Inputs · Integrität, kein Echtheitsnachweis: ${escapeHtml(digest)}</p>`:''}</details></section>`;
+  return `<section class="strategy-arena" aria-labelledby="arena-heading"><header class="section-title"><h2 id="arena-heading">Arena · H1 / H7 / H9</h2><span class="limited">Nur manuell</span></header><p>Vier auswertbare historische Modelle und H9 als datenbedingt gesperrtes Modell. Eine Diagnose ist weder unabhängiger Test noch laufendes Paper. Keine automatische Siegerwahl.</p><div class="arena-toolbar"><label class="arena-import">Synthetischen oder vorhandenen Snapshot importieren<input data-arena-input type="file" accept="application/json,.json" ${busy?'disabled':''}></label><button type="button" data-arena-provenance ${provenanceBusy?'disabled':''}>Historische Belegmetadaten laden</button><button type="button" data-arena-stored ${busy?'disabled':''}>Gespeicherte Diagnose manuell laden</button><button type="button" data-arena-export ${result&&!busy?'':'disabled'}>Diagnose + Quelle exportieren</button></div>${provenanceBusy?'<p role="status">Nur Belegmetadaten werden geladen; keine Kurse oder Neuberechnung.</p>':''}${provenanceError?`<p role="alert">${escapeHtml(provenanceError)}</p>`:''}${busy?'<p role="status">Snapshot wird geprüft und neu berechnet …</p>':''}${error?`<p role="alert">${escapeHtml(error)}</p>`:''}<p class="arena-evidence">${evidence}</p>${period}<div class="arena-models">${rows.map(row=>candidateCard(row)).join('')}</div>${controls}${historicalProvenanceSection(provenance)}<details><summary>Diagnose-Grenzen</summary><p>Regelsatz ${escapeHtml(ARENA_RULESET)}. Historische Daten, Kosten, Slippage und Universum sind keine unabhängig bestätigte Evidenz. Offene Positionen und abhängige Verkaufsteile sind keine eigenständigen Trades.</p><p>Die gespeicherte 8-Asset-Quelle und die separate historische Abdeckung von 448/955 Schlüssen bleiben unvollständig/fehlgeschlagen. Das ist kein Beleg für den neuen 7-Asset-B1-7-Kandidaten.</p><p>Keine verbundenen Paper-Orders, keine Ausführungsfreigabe und keine Live-Bereitschaft. Kosten sind die ursprünglichen Annahmen dieses Diagnoseprotokolls und werden nicht rückwirkend geändert.</p>${digest?`<p>SHA-256 des importierten Inputs · Integrität, kein Echtheitsnachweis: ${escapeHtml(digest)}</p>`:''}</details></section>`;
 }
 
 export function createStrategyArenaView(root, options={}) {
@@ -168,14 +168,19 @@ export function createStrategyArenaView(root, options={}) {
   let state = {result:null,error:'',busy:false,digest:'',provenance:null,provenanceBusy:false,provenanceError:''};
   let input = null;
   let receipt = null;
-  const paint = () => { root.innerHTML = arenaHtml(state); };
+  let disposed = false;
+  const paint = () => { if (!disposed) root.innerHTML = arenaHtml(state); };
   const listen = async event => {
+    if (disposed) return;
     const button = event.target?.closest?.('[data-arena-provenance],[data-arena-stored],[data-arena-export]');
     if (button && root.contains(button)) {
       if (button.hasAttribute('data-arena-provenance')) {
         if (state.provenanceBusy) return;
         state.provenanceBusy = true; state.provenanceError = ''; paint();
-        try { state.provenance = await loadStoredArenaProvenance(fetchImpl); }
+        try {
+          const provenance = await loadStoredArenaProvenance(fetchImpl);
+          if (!disposed) state.provenance = provenance;
+        }
         catch (error) { state.provenanceError = String(error?.message || error).slice(0,220); }
         finally { state.provenanceBusy = false; paint(); }
       } else if (button.hasAttribute('data-arena-stored')) {
@@ -220,5 +225,5 @@ export function createStrategyArenaView(root, options={}) {
   root.addEventListener('click',listen);
   root.addEventListener('change',listen);
   paint();
-  return {dispose(){root.removeEventListener('click',listen);root.removeEventListener('change',listen);root.replaceChildren();}};
+  return {dispose(){disposed = true; root.removeEventListener('click',listen);root.removeEventListener('change',listen);root.replaceChildren();}};
 }

@@ -2,6 +2,12 @@
 
 ## Current checkpoint — B12 M11 Strategies draft (2026-10-18)
 
+Current integration base is `c42ded8b7d33312f1a0e232d26a28ed5f0e768b3` after PR880 R3 source/synthetic merge: reviewed head `219914105a589df68014372b4ea5bfdc8f1dcb36`, base `10f10f270a012b2f31679eec2fc2625813b5e18b`, CI39129332087 attempt2 (2625 passing), Claude GREEN639/6250243642. Safety39131410769, Coordinator39131410732 and Pages39131410231 passed; Runtime39131410787 remains pending at this checkpoint. No real data run or Paper/live activation occurred.
+
+Lead B12 correction follows candidate `4effd608f7f5484d33bc12b1bcf15e6bfba31bb3`: separate unrelated historical provenance from imported results, retain H9 as blocked, and reconcile current-base continuity. Existing B12 screenshots are pre-correction historical evidence; new exact-head CI and Claude review are pending. PR884 has a reproduced SQLite-contention deadline defect under correction (884/6250470874), and is not an active service.
+
+Short-term priority is operational Live-Paper in M11. Remaining integration gates include verified source bytes, hard supervised limits, direct screen boundary tests and a concrete research/Paper protocol. The missed LowVol funding observation cannot be backfilled as timely evidence. No execution flags or frozen strategy gates are changed.
+
 The owner mandate is M11-only development: “Meridian 10 ist Geschichte wir sollten unsere Arbeit nur mehr in M11 stecken.” B11 is complete on
 `10f10f270a012b2f31679eec2fc2625813b5e18b`: reviewed head `16a54904`,
 base `1c7b6dccd886f57e866c7d359c091b1e72a193ea`, exact-head CI39125312551
@@ -1535,3 +1541,4 @@ Portfolio history capture is also fail-closed now: the backend will not append a
 - V2 stays `SOURCE_AUDIT`; canonical strategy execution, strategy PnL, Discovery, Validation, Holdout, Paper, and Live remain locked.
 - Next Research action requires explicit user authorization and separate exact-head Claude review. No completed work above should be repeated.
 - Funding-Carry Candidate A remains secondary and data-design is not authorized.
+

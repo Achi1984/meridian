@@ -32,3 +32,13 @@ winner, promote strategies, or authorize trading.
 No physical-device, PWA, Safari, deployed-site, real-account, live-trading or
 operational-readiness proof is provided. B12 remains a draft and must not be
 merged or activated by this work.
+
+## Lead correction after worker head 4effd608
+
+The existing eight PNGs above are historical **pre-correction** browser evidence,
+not visual acceptance of the corrected source. The correction separates archive
+metadata from imported result cards, rejects incomplete candidate mappings,
+prevents late async repaint after disposal, and labels H9 as BLOCKED_DATA in
+both catalog progression and summary copy. Focused synthetic tests validate
+metadata/import interleaving and disposal; no market data is replayed. Fresh
+exact-head CI/browser acceptance and independent review are still required.

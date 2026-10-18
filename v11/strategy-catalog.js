@@ -82,7 +82,7 @@ export function buildStrategyCatalog(campaign) {
       marketCode:market, regimes, horizon, rule,
       cost:'Nicht festgelegt · keine verifizierte Kostenbasis.',
       diagnostic, modelIds,
-      evidenceIdentity:modelIds.length
+      evidenceIdentity:id === 'H9' ? 'research/results/strategy-arena-20261016/manifest.json · BLOCKED_DATA, keine Auswertung' : modelIds.length
         ? 'research/results/strategy-arena-20261016/manifest.json · historische Diagnose, nicht unabhängig'
         : CAMPAIGN_SOURCE,
       sourceIdentity:CAMPAIGN_SOURCE,
@@ -91,7 +91,7 @@ export function buildStrategyCatalog(campaign) {
       sourceExit:typeof source.exitSketch === 'string' ? source.exitSketch : 'Unbekannt',
       sourcePrerequisites:Array.isArray(source.prerequisites) ? source.prerequisites.filter(x=>typeof x==='string') : [],
       lineage:typeof source.lineage === 'string' ? source.lineage : 'Unbekannt',
-      historicalStage:modelIds.length ? 'HISTORISCHE DIAGNOSE' : 'NICHT BELEGT',
+      historicalStage:id === 'H9' ? 'BLOCKED_DATA' : modelIds.length ? 'HISTORISCHE DIAGNOSE' : 'NICHT BELEGT',
       independentStage:'NICHT BELEGT',
       paperStage:'KEIN LAUFENDER PAPER-BELEG',
       liveStage:'NICHT FREIGEGEBEN'
