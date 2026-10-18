@@ -97,7 +97,7 @@
   "quickCommand": "Go Meridian",
   "bootstrapFile": "MERIDIAN_GO.md",
   "currentWork": {
-    "updatedAt": "2026-10-17",
+    "updatedAt": "2026-10-18",
     "verifiedSourceMain": "5c996ee9c7d4e71f0d6f2ecd59f6fc53beedcce3",
     "lastCompletedSourceMerge": {
       "pr": 845,
@@ -135,8 +135,8 @@
         "pages": 39025396725
       }
     },
-    "package": "MAIN_859_BOUNDED_TIMEOUT_REPAIR_TEST_CORRECTIONS_PENDING_GATES",
-    "state": "PR862_APPROVED_TWO_TEST_CORRECTIONS_COMPLETE_PENDING_EXACT_HEAD_CI_AND_INDEPENDENT_REVIEW",
+    "package": "MAIN_859_BOUNDED_TIMEOUT_REPAIR_HISTORICAL_INVOCATION_COVERAGE_RESTORED_PENDING_GATES",
+    "state": "PR862_HISTORICAL_INVOCATION_POSITIVE_PATH_RESTORED_PENDING_EXACT_HEAD_CI_AND_INDEPENDENT_REVIEW",
     "infrastructurePaused": true,
     "mailboxRollover": {
       "from": 571,
@@ -518,7 +518,7 @@
         "opId": "MERIDIAN-862-TWO-TEST-CORRECTION-20261017-2204",
         "ownerApprovalCommentId": 6240118623,
         "issueDecisionCommentId": 6240114260,
-        "state": "IMPLEMENTED_FOCUSED_TESTS_PASS_EXACT_HEAD_CI_PENDING",
+        "state": "HISTORICAL_POSITIVE_PATH_RESTORED_FOCUSED_TESTS_PASS_EXACT_HEAD_CI_PENDING",
         "tests": [
           "test/test_publisher_recovery_invocation.py",
           "test/v11-terminal-entry.test.js"
@@ -527,8 +527,9 @@
         "historicalAutoSetupSha256": "c859d4413eb2b50f7aae04e1d28eb23961989eb64beb29cb751eb65f06a8bfc0",
         "currentAutoSetupSha256": "e416e768b699cf9a33eecaa15dde5f19944750de00598c74b77d2521ab5d0c85",
         "historicalPacketsPreserved": true,
-        "focusedRecoveryInvocationTests": "9_PASS",
-        "focusedV11TerminalEntryTests": "2_PASS_FOUR_MOBILE_WIDTHS"
+        "focusedRecoveryInvocationTests": "11_PASS_CPYTHON_3.14.8_GIL_BUILD",
+        "focusedV11TerminalEntryTests": "2_PASS_FOUR_MOBILE_WIDTHS",
+        "positivePathCoverage": "HISTORICAL_MANIFEST_ARGV_SCOPE_HASHES_OWNER_ACTION_MARKER_APPROVAL_WINDOW_EXPIRY_BASELINE_CA_GH_NEON_ONE_WRAPPER_CALL_ZERO_NONZERO_EXIT"
       },
       "mergeAuthorized": false
     },
