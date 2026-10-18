@@ -4,19 +4,67 @@
 
 The R2 `GREEN_LIGHT` (response comment `6249482850`) is historical and applies only to R2 source-and-synthetic preparation. It does not review R3 or approve this real-run proposal, its 44-path budget, costs, screen thresholds, or no-stop exception.
 
+## Admission states — separate, non-transitive gates
+
+| Gate | Current state |
+| --- | --- |
+| `SOURCE_ACCEPTED` | `PENDING`: #890 and #894 are integrated on `main` at `bfaf17cd5d96db6abe248ce9c4a1fcf83f190ca4`, with their named CI/postchecks successful. This integrated #892 candidate still requires exact-head CI and full independent review before source acceptance. |
+| `DATA_ADMISSION_READY` | `NOT_READY`: the selected-input manifest is `NOT_FROZEN`; no data-read approval has been granted. |
+| `EXECUTION_AUTHORIZED` | `FALSE`: no captured-data engine run is authorized. |
+| `SCREEN_RESULT` | `NOT_RUN`: no strategy screen or return computation was performed. |
+| `PAPER_ELIGIBILITY` | `NOT_ELIGIBLE`: a historical diagnostic cannot establish forward-Paper eligibility. |
+
+Each state requires its own evidence and decision. Passing one gate does not imply
+or authorize any later gate.
+
+## Separate selected-manifest read decision — draft only
+
+**Decision requested: D1, permission to read the allowlisted files solely to build
+and verify a selected-series manifest. Status: PENDING; NOT APPROVED and NOT
+PERFORMED.** The independently frozen selected-input manifest remains
+`NOT_FROZEN` unless this specific data-read approval is granted.
+
+The proposed read is limited to the seven normalized paths already listed in this
+request, in this order: XBTUSD, ETHUSD, SOLUSD, XRPUSD, LINKUSD, AVAXUSD, SUIUSD.
+For each, read only its allowlisted file under
+`research/acquisitions/kraken-usd-daily-20261018/normalized/`; require exactly 955
+daily rows from 2024-02-19 through 2026-09-30 and the existing seven-column
+`timestamp_utc,open,high,low,close,volume,trades` schema. Compare each raw
+whole-file SHA-256 with the value already recorded below, validate the generated
+selected rows with the existing B1 verifier, and calculate their selected-series
+SHA-256. A future manifest would contain only the pinned source-commit assertion,
+the seven raw whole-file hashes, and the seven selected-series hashes; it is not
+created or frozen by this proposal.
+
+No other paths or assets are in scope. No acquisition/network access, signals,
+features, returns, PnL, engine execution, sorting, repair, filling, substitution,
+or partial acceptance is allowed. Any path, byte, schema, calendar, count, or hash
+mismatch stops the read without repair. Hashes prove byte identity only: source
+authenticity is `NOT_ESTABLISHED`; the offline provenance record is not exchange
+authentication. The existing loader's Linux `/proc/self/fd` descriptor check is
+an environment constraint, not an authenticity claim.
+
+A separate later D2 decision would be required to freeze/admit the resulting
+manifest and authorize any fixed historical batch. D1 alone grants neither
+admission nor execution; D2 would bind exact final identities and the unchanged
+protocol, costs, screen, budget, and research-only no-stop scope.
+
+The current candidate includes #890 at merge `fd07a8df49cbe24c73e9819170cd36e6b9645157` and #894 at merge `bfaf17cd5d96db6abe248ce9c4a1fcf83f190ca4`. For #890, corrected head `4333259f11992042d39e1b4c6ec7472f56c74921` passed Release Safety run `39150912974`, attempt 2; the earlier failed run remains historical and is not relabeled. Its post-merge Release Safety failure (`39155412745`, 2662 pass/1 fail) also remains historical and was corrected by #894. For #894, Release Safety `39157878217`, Runtime Smoke `39157878067`, Release Coordinator `39157878080`, and Pages `39157877431` all succeeded on `bfaf17cd5d96db6abe248ce9c4a1fcf83f190ca4`. These are dependency receipts, not CI or review of this integrated candidate.
+
 ## Immutable identities
 
 | Identity | Proposed value | Status |
 | --- | --- | --- |
 | Protocol | `MERIDIAN-B1-7-PROTOCOL-R3-20261018`; raw `protocol.json` SHA-256: `a78e1ae8c71c8f85baee5b51f5691643fc29136f636f19465c61f553afe09185` | Frozen file identity |
-| Implementation | `MERIDIAN-B1-7-ENGINE-R3`; bundle SHA-256 `a0a4189173a57f5afc33cd415400d66f48360a9842821093d2027b75c913e5fc` | Exact three-file source bundle identity |
+| Implementation | `MERIDIAN-B1-7-ENGINE-R3`; candidate bundle SHA-256 `a357d727496c4f83ea160ec44b1a2e3378079ef931aa15e67f08387221aab968` | Current integrated candidate identity; source acceptance remains pending exact-head CI and full independent review |
+| Generated bridge manifest | SHA-256 `1909f4bb14f60298bfb4aa882424905882cc0994485eee6c5a28e23b39deb58e`; computation order SHA-256 `d56f9126b6a47ca04b28f295b3d613b529b5299ea1928c47b74e7b8cc439ce2d` | Recomputed from the integrated B1 source and checked-in generated fixture; 44 path IDs refreshed, descriptors/order unchanged |
 | Source basis | Git commit `1c7b6dccd886f57e866c7d359c091b1e72a193ea` | Pinned source/input-provenance commit |
 | Input manifest | Independently frozen selected-series manifest: `NOT_FROZEN` | No captured series loaded or hashed in this task; production loader remains blocked |
 | Offline provenance record | `research/acquisitions/kraken-usd-daily-20261018/offline-verification.json` | Hash provenance only; source authenticity is not established |
 
 The exact seven proposed assets and copied normalized-file SHA-256 values are:
 
-The bundle digest is SHA-256 of canonical JSON with keys `capturedInputSha256`, `engineSha256`, and `validatorSha256` containing these exact raw-file SHA-256 values: `captured-input.mjs` = `1818834f2ae693f738c6f42a7409c1a81d682090b0d7344b8a446bc7adec7621`; `engine.mjs` = `151e4d5e9898971510d355889c2cffbcda1dc00c52a1c63a5cffb6721dfabbd0`; `validate.mjs` = `2052c0fae0082622f48a18abb4a6dacc0ffa679fb5da01df5779b398f5a578fc`. The engine accepts the bundle hash as caller-supplied identity and does not inspect its own source. The captured-input module remains inactive: the independently frozen selected-input manifest and production admission are absent, so no market CSV is read.
+The current candidate bundle digest is SHA-256 of canonical JSON with keys `capturedInputSha256`, `engineSha256`, and `validatorSha256` containing these raw-file SHA-256 values: `captured-input.mjs` = `64fc84514a642827afa983169c6a4cf55f0d2d2b7dd26302defe6e9dde39e5e0`; `engine.mjs` = `64df8c6fe5a587397b312447d310cb285f552da5b686a11b3a1d0f9441b9bb8f`; `validate.mjs` = `2052c0fae0082622f48a18abb4a6dacc0ffa679fb5da01df5779b398f5a578fc`. This binds the current integrated source bytes but is not accepted until exact-head CI and full independent review. The engine accepts the bundle hash as caller-supplied identity and does not inspect its own source. The captured-input module remains inactive: the independently frozen selected-input manifest and production admission are absent, so no market CSV is read.
 
 | Order | Asset | Normalized file SHA-256 |
 | ---: | --- | --- |

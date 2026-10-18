@@ -119,6 +119,19 @@ budget and fixed 1 MiB output cap. The optional synthetic clock is accepted only
 for `SYNTHETIC_FIXTURE`; it does not alter any production cap. JavaScript work is
 cooperatively checked and cannot be hard-preempted.
 
+`createExecution` starts its trusted monotonic batch deadline before taking an
+input snapshot. It snapshots the accepted input graph through own data-property
+descriptors before validation or any caller-supplied clock callback; fixed
+955-row arrays are rejected before row enumeration/copy. The supported input is an
+ordinary or null-prototype options/source/asset/row record, an exact seven-asset
+map, dense ordinary arrays, and rows with exactly seven enumerable own data
+properties. Optional `syntheticClock` must be a function and is deliberately called
+after the snapshot; trusted monotonic elapsed time, including preparation, remains
+part of the existing 30-minute and 60-second limits. Accessors, sparse arrays,
+extra keys, and unsupported object shapes are rejected without invoking getters;
+validation and later execution use the same frozen snapshot. This is not a sandbox
+for arbitrary Proxies or for side-effects in a caller-supplied clock.
+
 ## Captured-input loader
 
 `scripts/research/b1-7/captured-input.mjs` has no import-time file reads or network
@@ -127,6 +140,14 @@ independently frozen selected-input manifest and source admission are deliberate
 absent, so it returns `SELECTED_INPUT_MANIFEST_MISSING` before opening a market
 file. Caller-provided hashes, options, or a fixture result cannot grant that
 admission.
+
+Production and generated-fixture loads share one root normalization boundary.
+Trailing separators are normalized before the directory identity check; canonical
+path comparison and component/descriptor checks still reject root aliases,
+symlinks, and escapes. The synthetic manifest and both nested hash maps are
+snapshotted from own data descriptors before the first asynchronous filesystem
+operation. Inputs here are standard data records; Proxies are not treated as a
+security sandbox.
 
 The production path allowlist is fixed to the seven normalized paths and source
 commit/per-file SHA-256 pins already recorded in B1 metadata. When an independently
@@ -171,3 +192,7 @@ Focused generated-fixture checks:
 ```sh
 node --test test/b1-7-engine.test.js test/b1-7-captured-input.test.js
 ```
+
+Candidate result: Node `v22.23.3`, 33 tests passed, 0 failed. The existing
+inactive-source verifier also passed with `python3 -B
+docs/autonomy/verify-source.py` (all suites; no live authority established).

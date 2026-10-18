@@ -9,6 +9,7 @@ const HASH = /^[a-f0-9]{64}$/;
 const CAPITAL = 10000;
 const FEE_TOLERANCE = 1e-6;
 const NO_HOLDOUT = 'HISTORICAL_DIAGNOSTIC_NOT_HOLDOUT';
+const INPUT_ROW_KEYS = ['timestamp', 'open', 'high', 'low', 'close', 'volume', 'trades'];
 
 export function canonicalJson(value, checkpoint = () => {}) {
   if (value === null || typeof value !== 'object') return JSON.stringify(value);
@@ -539,22 +540,62 @@ function inputIdentity(seriesByAsset, source, checkpoint = () => {}) {
   return {...identity, inputSha256: sha256(canonicalJson(identity, checkpoint))};
 }
 
-function snapshotSeries(seriesByAsset, checkpoint) {
-  const snapshot = {};
+function snapshotDataRecord(value, keys) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value) ||
+      (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null)) {
+    fail('UNSAFE_INPUT_SHAPE');
+  }
+  const ownKeys = Reflect.ownKeys(value);
+  if (ownKeys.length !== keys.length || ownKeys.some(key => !keys.includes(key))) {
+    fail('UNSAFE_INPUT_SHAPE');
+  }
+  const snapshot = Object.create(null);
+  for (const key of keys) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) fail('UNSAFE_INPUT_SHAPE');
+    snapshot[key] = descriptor.value;
+  }
+  return snapshot;
+}
+
+function snapshotSource(source) {
+  if (source === null || typeof source !== 'object' || Array.isArray(source) ||
+      (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null)) {
+    fail('UNSAFE_INPUT_SHAPE');
+  }
+  const kind = Object.getOwnPropertyDescriptor(source, 'kind');
+  if (!kind?.enumerable || !Object.hasOwn(kind, 'value')) fail('UNSAFE_INPUT_SHAPE');
+  const keys = kind.value === 'FROZEN_RESEARCH_INPUT'
+    ? ['kind', 'commit', 'files']
+    : ['kind'];
+  const snapshot = snapshotDataRecord(source, keys);
+  if (kind.value === 'FROZEN_RESEARCH_INPUT') {
+    snapshot.files = Object.freeze(snapshotDataRecord(snapshot.files, ASSETS));
+  }
+  if (Object.hasOwn(snapshot, 'files')) Object.freeze(snapshot.files);
+  return Object.freeze(snapshot);
+}
+
+function snapshotSeries(seriesByAsset) {
+  const input = snapshotDataRecord(seriesByAsset, ASSETS);
+  const snapshot = Object.create(null);
   for (const asset of ASSETS) {
-    checkpoint('snapshot-asset');
+    const inputRows = input[asset];
+    if (!Array.isArray(inputRows)) fail('UNSAFE_INPUT_SHAPE');
+    const lengthDescriptor = Object.getOwnPropertyDescriptor(inputRows, 'length');
+    const length = lengthDescriptor?.value;
+    if (length !== INPUT.rowCount) fail('UNSAFE_INPUT_SHAPE');
+    const ownKeys = Reflect.ownKeys(inputRows);
+    if (ownKeys.length !== length + 1 ||
+        ownKeys.some(key => key !== 'length' &&
+          (typeof key !== 'string' || !/^(0|[1-9]\d*)$/.test(key)))) {
+      fail('UNSAFE_INPUT_SHAPE');
+    }
     const rows = [];
-    for (const row of seriesByAsset[asset]) {
-      checkpoint('snapshot-row');
-      rows.push(Object.freeze({
-        timestamp: row.timestamp,
-        open: row.open,
-        high: row.high,
-        low: row.low,
-        close: row.close,
-        volume: row.volume,
-        trades: row.trades
-      }));
+    for (let index = 0; index < length; index++) {
+      const descriptor = Object.getOwnPropertyDescriptor(inputRows, String(index));
+      if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) fail('UNSAFE_INPUT_SHAPE');
+      rows.push(Object.freeze(snapshotDataRecord(descriptor.value, INPUT_ROW_KEYS)));
     }
     snapshot[asset] = Object.freeze(rows);
   }
@@ -583,7 +624,10 @@ function bindDescriptors(items, identity, implementationSha256, checkpoint = () 
   });
 }
 
-export function createBudgetTracker(clock = () => performance.now()) {
+export function createBudgetTracker(clock = () => performance.now(), {
+  trustedBatchStart = performance.now(),
+  preparationElapsedMs = 0
+} = {}) {
   const batchStart = clock({phase: 'batch-start'});
   let lastClock = batchStart;
   let stopped = false;
@@ -591,6 +635,7 @@ export function createBudgetTracker(clock = () => performance.now()) {
   let activePathId = null;
   let activePathOrdinal = null;
   let pathStart = null;
+  let trustedPathStart = null;
   const readClock = context => {
     const now = clock(context);
     if (!finite(now) || now < lastClock) {
@@ -602,8 +647,14 @@ export function createBudgetTracker(clock = () => performance.now()) {
   const checkpoint = phase => {
     if (stopError) throw stopError;
     const now = readClock({phase, pathId: activePathId, pathOrdinal: activePathOrdinal});
-    const totalElapsed = now - batchStart;
-    const pathElapsed = pathStart === null ? null : now - pathStart;
+    const totalElapsed = Math.max(
+      now - batchStart + preparationElapsedMs,
+      performance.now() - trustedBatchStart
+    );
+    const pathElapsed = pathStart === null ? null : Math.max(
+      now - pathStart,
+      performance.now() - trustedPathStart
+    );
     if (totalElapsed > BUDGET.totalMs || pathElapsed > BUDGET.pathMs) {
       stopped = true;
       try {
@@ -631,6 +682,7 @@ export function createBudgetTracker(clock = () => performance.now()) {
       activePathOrdinal = pathOrdinal;
       let result;
       try {
+        trustedPathStart = performance.now();
         pathStart = readClock({phase: 'path-start', pathId, pathOrdinal});
         checkpoint('path-start-check');
         result = operation(checkpoint);
@@ -643,6 +695,7 @@ export function createBudgetTracker(clock = () => performance.now()) {
         activePathId = null;
         activePathOrdinal = null;
         pathStart = null;
+        trustedPathStart = null;
         return {
           status: budgetStatus ?? 'INVALID',
           attempts: 1,
@@ -653,6 +706,7 @@ export function createBudgetTracker(clock = () => performance.now()) {
       activePathId = null;
       activePathOrdinal = null;
       pathStart = null;
+      trustedPathStart = null;
       return {status: 'COMPLETED', attempts: 1, result};
     },
     get stopped() {
@@ -863,6 +917,7 @@ function compactIfOverBudget(output, checkpoint = () => {}) {
 }
 
 function* executeBatch(options) {
+  const trustedBatchStart = performance.now();
   let tracker;
   let batch;
   try {
@@ -888,28 +943,32 @@ function* executeBatch(options) {
   } catch {
     return emptyResult('INVALID', 'BATCH_INPUT_INVALID');
   }
-  let {seriesByAsset, source} = batch;
   const {implementationSha256} = batch;
+  let seriesByAsset;
+  let source;
   if (!HASH.test(PROTOCOL_SHA256)) {
     return emptyResult('INVALID', 'PROTOCOL_HASH_NOT_FROZEN');
   }
   if (typeof implementationSha256 !== 'string' || !HASH.test(implementationSha256)) {
     return emptyResult('INVALID', 'IMPLEMENTATION_HASH_REQUIRED');
   }
+  let preparationElapsedMs;
+  try {
+    seriesByAsset = snapshotSeries(batch.seriesByAsset);
+    source = snapshotSource(batch.source);
+  } catch (error) {
+    return emptyResult('INVALID', error.code ?? 'INPUT_SNAPSHOT_FAILED', [
+      {code: error.code ?? 'INPUT_SNAPSHOT_FAILED', detail: error.detail ?? null}
+    ]);
+  }
   const sourceCheck = validateSourceIdentity(source);
   if (!sourceCheck.ok) return emptyResult('INVALID', sourceCheck.error.code, [sourceCheck.error]);
-  source = source.kind === 'SYNTHETIC_FIXTURE'
-    ? Object.freeze({kind: 'SYNTHETIC_FIXTURE'})
-    : Object.freeze({
-      kind: 'FROZEN_RESEARCH_INPUT',
-      commit: source.commit,
-      files: Object.freeze({...source.files})
-    });
   if (Object.hasOwn(batch, 'syntheticClock') &&
     (source.kind !== 'SYNTHETIC_FIXTURE' || typeof batch.syntheticClock !== 'function')) {
     return emptyResult('INVALID', 'SYNTHETIC_CLOCK_NOT_ALLOWED');
   }
-  tracker = createBudgetTracker(batch.syntheticClock);
+  preparationElapsedMs = performance.now() - trustedBatchStart;
+  tracker = createBudgetTracker(batch.syntheticClock, {trustedBatchStart, preparationElapsedMs});
   let inputCheck;
   try {
     inputCheck = validateSeries(seriesByAsset, tracker.checkpoint);
@@ -925,7 +984,6 @@ function* executeBatch(options) {
   let identity;
   let allDescriptors;
   try {
-    seriesByAsset = snapshotSeries(seriesByAsset, tracker.checkpoint);
     tracker.checkpoint('input-identity-start');
     identity = inputIdentity(seriesByAsset, source, tracker.checkpoint);
     tracker.checkpoint('input-identity-complete');

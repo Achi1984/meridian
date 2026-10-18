@@ -1840,6 +1840,76 @@
       "callerSourceAndDataHashesAuthenticated": false,
       "postMergeChecks": "ALL_APPLICABLE_SUCCESS",
       "releaseSafetyPostMergeJobId": 117713897879
+    },
+    "admissionPreparation": {
+      "opId": "MERIDIAN-B1-ADMISSION-HARDENING-20261018",
+      "pullRequest": 892,
+      "branch": "copilot/meridian-b1-admission-hardening-20261018",
+      "startingHead": "5649824a0267f052bc2ae83cb2950449c7d79b1b",
+      "startingBase": "02866635c0c90a1743a6c82a04daa176bd4b56bf",
+      "integratedMainBase": "bfaf17cd5d96db6abe248ce9c4a1fcf83f190ca4",
+      "branchIntegrationMerge": "18ef07646e007a9c90c323e1c91967900bd63b95",
+      "startingProtocolSha256": "a78e1ae8c71c8f85baee5b51f5691643fc29136f636f19465c61f553afe09185",
+      "startingBundleSha256": "a0a4189173a57f5afc33cd415400d66f48360a9842821093d2027b75c913e5fc",
+      "candidateBundleSha256": "a357d727496c4f83ea160ec44b1a2e3378079ef931aa15e67f08387221aab968",
+      "candidateBundleStatus": "INTEGRATED_CANDIDATE_SOURCE_ACCEPTANCE_PENDING_EXACT_HEAD_CI_AND_FULL_REVIEW",
+      "pr890": {
+        "mergeSha": "fd07a8df49cbe24c73e9819170cd36e6b9645157",
+        "acceptedHead": "4333259f11992042d39e1b4c6ec7472f56c74921",
+        "observedBase": "02866635c0c90a1743a6c82a04daa176bd4b56bf",
+        "acceptedCiRunId": 39150912974,
+        "acceptedCiAttempt": 2,
+        "acceptedCiConclusion": "SUCCESS",
+        "postMergeReleaseSafety": 39155412745,
+        "postMergeReleaseSafetyConclusion": "FAILURE_2662_PASS_1_FAIL_CORRECTED_BY_PR894",
+        "postMergeRuntimeSmoke": 39155412656,
+        "postMergeReleaseCoordinator": 39155412696,
+        "postMergePages": 39155412397,
+        "historicalFailedCiRunId": 39149618918,
+        "historicalFailurePreserved": true,
+        "state": "MERGED_WITH_POSTCHECK_FAILURE_SUBSEQUENTLY_CORRECTED_BY_PR894"
+      },
+      "pr894": {
+        "mergeSha": "bfaf17cd5d96db6abe248ce9c4a1fcf83f190ca4",
+        "sourceHead": "63e824ccbdf55e6e39d631123e93d87c9e55243e",
+        "base": "fd07a8df49cbe24c73e9819170cd36e6b9645157",
+        "releaseSafety": 39157878217,
+        "runtimeSmoke": 39157878067,
+        "releaseCoordinator": 39157878080,
+        "pages": 39157877431,
+        "postchecks": "ALL_SUCCESS",
+        "state": "MERGED_ACCEPTED_DEPENDENCY"
+      },
+      "integratedChecks": {
+        "toolchain": {
+          "node": "v22.23.3",
+          "python": "3.12.3"
+        },
+        "b1Command": "node --test test/b1-7-engine.test.js test/b1-7-captured-input.test.js test/b1-7-screen.test.js",
+        "b1Result": "48_PASS_0_FAIL",
+        "researchSupervisorCommand": "node --test test/research-supervisor.test.js",
+        "researchSupervisorResult": "1_SUITE_PASS",
+        "inactiveSourceVerifierCommand": "python3 -B docs/autonomy/verify-source.py",
+        "inactiveSourceVerifierResult": "ALL_SUITES_PASS_NO_LIVE_AUTHORITY_ESTABLISHED",
+        "diffCheck": "PASS",
+        "checkpointAndBridgeJson": "VALID",
+        "secretScan": "PASS"
+      },
+      "claudeAdmissionChallenge": {
+        "requestCommentId": 6252937363,
+        "responseCommentId": 6252939869,
+        "verdict": "NEEDS_MORE_EVIDENCE",
+        "scope": "READ_ONLY_ADMISSION_DESIGN_NOT_PR890_REVIEW_OR_EXECUTION_AUTHORIZATION"
+      },
+      "leadFindingCommentId": 6253061605,
+      "leadFindingDisposition": "APPLIED_FIXED_ROW_COUNT_BEFORE_ENUMERATION_TRUSTED_PREPARATION_DEADLINE_FULL_RESULT_REGRESSION",
+      "sourceAccepted": "PENDING_INTEGRATED_CANDIDATE_EXACT_HEAD_CI_AND_FULL_REVIEW",
+      "selectedInputManifest": "NOT_FROZEN",
+      "dataReadApproval": "NOT_GRANTED",
+      "executionAuthorized": false,
+      "screenResult": "NOT_RUN",
+      "paperEligibility": "NOT_ELIGIBLE",
+      "nextGate": "RUN_REQUESTED_SYNTHETIC_INTEGRATION_CHECKS; THEN_LEAD_OWNS_EXACT_HEAD_CI_AND_CLAUDE_REVIEW"
     }
   }
 }
