@@ -122,7 +122,7 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fo
         assert.ok(catalog.controls.every(height=>height>=44));
         assert.ok(catalog.resources.every(path=>!/\/v10\/|\/api\/|\/market|\/ticker|\/klines/i.test(path)));
         assert.ok(catalog.resources.includes('/docs/strategy-lab/campaign-20261013.json'));
-        if(evidence&&size.width!==1440){
+        if(evidence){
           await evaluate('window.scrollTo(0,0)');
           const image=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
           writeFileSync(join(evidence,`v11-b12-strategies-${size.width}x${size.height}.png`),Buffer.from(image.data,'base64'));
@@ -133,6 +133,19 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fo
         assert.equal(await evaluate(`document.querySelector('#strategy-catalog [data-strategy-id="H1"] details').open`),true);
         assert.match(await evaluate(`document.querySelector('#strategy-catalog [data-strategy-id="H1"] details').innerText`),/Hindernis/);
         await evaluate(`document.querySelector('#strategy-catalog [data-strategy-id="H1"] summary').click()`);
+
+        await evaluate(`(()=>{
+          const picker=document.querySelector('[data-arena-input]');
+          const transfer=new DataTransfer();
+          transfer.items.add(new File(['{}'],'malformed-arena.json',{type:'application/json'}));
+          picker.files=transfer.files;picker.dispatchEvent(new Event('change',{bubbles:true}));
+        })()`);
+        for(let attempt=0;attempt<100;attempt++){
+          if(await evaluate(`document.querySelector('#strategy-arena-root [role="alert"]')?.innerText`))break;
+          await new Promise(resolve=>setTimeout(resolve,20));
+        }
+        assert.ok(await evaluate(`document.querySelector('#strategy-arena-root [role="alert"]')?.innerText`),
+          'malformed import exposes a visible error instead of results');
 
         const payload=JSON.stringify(syntheticPayload());
         await evaluate(`(()=>{

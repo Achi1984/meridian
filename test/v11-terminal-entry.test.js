@@ -419,9 +419,19 @@ const b12Deltas=[
   [
     '<script type="module" src="./bot-read-bootstrap.js?v=B11"></script>\n<script type="module" src="./depot-read-bootstrap.js?v=B9"></script>\n',
     '<script type="module" src="./bot-read-bootstrap.js?v=B12"></script>\n<script type="module" src="./depot-read-bootstrap.js?v=B12"></script>\n<script type="module" src="./strategy-workspace-bootstrap.js?v=B12"></script>\n'
+  ],
+  [
+    '',
+    '  <style id="m11-compact-nav">\n    @media(max-width:430px){#nav{grid-template-columns:repeat(4,minmax(44px,1fr)) minmax(44px,1.3fr)}}\n    @media(max-width:350px){#nav{grid-template-columns:minmax(44px,1.2fr) minmax(44px,.8fr) minmax(44px,.75fr) minmax(44px,1.15fr) minmax(44px,1.35fr)}}\n  </style>\n'
   ]
 ];
+const mobileNavDelta=[
+  '    @media(max-width:350px){#nav button[data-v="strategies"] span:last-child{font-size:9px;letter-spacing:-.03em}}\n',
+  '    @media(max-width:350px){#nav button[data-v="strategies"] span:last-child{letter-spacing:-.03em}}\n'
+];
 function restoreB2(source){
+ assert.equal(source.split(mobileNavDelta[1]).length-1,1,'one exact compact-nav B12 delta');
+ source=source.replace(mobileNavDelta[1],mobileNavDelta[0]);
  for(const [index,delta] of b12Deltas.entries()){
    const [before,after]=index===4?[delta[1],delta[0]]:delta;
    assert.equal(source.split(after).length-1,1,`one exact B12 delta ${index}`);
@@ -503,7 +513,7 @@ function deploymentServer(){
   const server=createServer((request,response)=>{
     const url=new URL(request.url,'http://127.0.0.1'),path=url.pathname;
     requests.push({method:request.method,path}); // never record headers or token values
-    const versionedModule=(path==='/meridian/v11/bot-read-bootstrap.js'||path==='/meridian/v11/depot-read-bootstrap.js'||path==='/meridian/v11/strategy-workspace-bootstrap.js')&&url.search==='?v=B12'||path==='/meridian/v11/bot-read-view.js'&&url.search==='?v=B11';
+    const versionedModule=(path==='/meridian/v11/bot-read-bootstrap.js'||path==='/meridian/v11/depot-read-bootstrap.js'||path==='/meridian/v11/strategy-workspace-bootstrap.js'||path==='/meridian/v11/strategy-catalog.js'||path==='/meridian/v11/strategy-arena.js')&&url.search==='?v=B12'||path==='/meridian/v11/bot-read-view.js'&&url.search==='?v=B11';
     if(request.method!=='GET'||(url.search&&!versionedModule)){response.writeHead(404);response.end();return;}
     if(path===endpoint){
       reads++;

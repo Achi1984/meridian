@@ -107,8 +107,38 @@
       "pullRequest": 877,
       "branch": "copilot/meridian-v11-b11-bot-cockpit-20261018",
       "verifiedBaseSha": "1c7b6dccd886f57e866c7d359c091b1e72a193ea",
-      "state": "DRAFT_PENDING_LEAD_BASE_CI_REVIEW_AND_GUARDED_PUBLICATION",
-      "nextStep": "COMPLETE_SYNTHETIC_SHELL_EVIDENCE_AND_CONTINUITY; THEN LEAD_OWNS_BASE_CI_INDEPENDENT_REVIEW_AND_GUARDED_PUBLICATION",
+      "reviewedHead": "16a54904",
+      "sourceCiRunId": 39125312551,
+      "sourceCiResult": "2607_PASS",
+      "reviewer": "CLAUDE",
+      "reviewComment": "GREEN_639/6249670854",
+      "mergedBase": "10f10f270a012b2f31679eec2fc2625813b5e18b",
+      "postMergeChecks": {
+        "releaseSafety": 39125964713,
+        "runtimeSmoke": 39125964717,
+        "releaseCoordinator": 39125964588,
+        "pages": 39125964078
+      },
+      "state": "COMPLETE_MERGED_ON_MAIN",
+      "nextStep": "B11_COMPLETE; B12_ISOLATED_DRAFT_PENDING_ITS_OWN_EXACT_HEAD_CI_AND_REVIEW",
+      "noMergeOrActivationAuthority": true
+    },
+    "currentB12": {
+      "opId": "MERIDIAN-M11-B12-STRATEGIES-20261018",
+      "issue": 881,
+      "branch": "copilot/integrate-native-strategies-workspace",
+      "verifiedBaseSha": "10f10f270a012b2f31679eec2fc2625813b5e18b",
+      "initialImplementationCommit": "c835ae3d2dd0a28aa67e24e563213af771f7ac4e",
+      "ownerMandate": "Meridian 10 ist Geschichte wir sollten unsere Arbeit nur mehr in M11 stecken. Integrier die Strategien in 11 und forciere die Weiterentwicklung der autonomen Live-Strategien",
+      "scope": "V11_NATIVE_STRATEGIES_CATALOG_ARENA_PRESENTATION_AND_SYNTHETIC_TESTS_ONLY",
+      "acceptanceNotes": "docs/v11/B12_VISUAL_ACCEPTANCE.md",
+      "syntheticScreenshots": "docs/v11/evidence/b12/",
+      "localFocusedTests": "PASS_STRATEGY_CATALOG_CHROME_TERMINAL_SOURCE_GUARD_AND_SHELL_CHROME",
+      "fullSuite": "2608_PASS_6_UNRELATED_PUBLISHER_HARNESS_FAILURES",
+      "state": "DRAFT_PENDING_FINAL_HEAD_CI_AND_CLAUDE_REVIEW",
+      "sourceCi": "PENDING_FINAL_HEAD",
+      "claudeReview": "PENDING_FINAL_HEAD",
+      "physicalDevicePwaAndRealAccountProof": "NOT_PROVIDED",
       "noMergeOrActivationAuthority": true
     },
     "v11B10ClarityProposal": {
@@ -1469,4 +1499,3 @@
     }
   }
 }
-

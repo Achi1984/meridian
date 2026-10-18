@@ -1,5 +1,5 @@
-import {CAMPAIGN_SOURCE, renderStrategyCatalog} from './strategy-catalog.js';
-import {createStrategyArenaView} from './strategy-arena.js';
+import {CAMPAIGN_SOURCE, renderStrategyCatalog} from './strategy-catalog.js?v=B12';
+import {createStrategyArenaView} from './strategy-arena.js?v=B12';
 
 const catalogRoot = document.getElementById('strategy-catalog');
 const catalogStatus = document.getElementById('strategy-load-status');

@@ -1,9 +1,20 @@
 # MERIDIAN HANDOFF
 
-## Current checkpoint — B11 draft on verified main (2026-10-18)
+## Current checkpoint — B12 M11 Strategies draft (2026-10-18)
 
-Verified `main` is `1c7b6dccd886f57e866c7d359c091b1e72a193ea`. B10 PR875 is
-complete: reviewed head `b4a5084b98fe54c0c840d17806a76b5a465bf4c9`, base
+The owner mandate is M11-only development: “Meridian 10 ist Geschichte wir sollten unsere Arbeit nur mehr in M11 stecken.” B11 is complete on
+`10f10f270a012b2f31679eec2fc2625813b5e18b`: reviewed head `16a54904`,
+base `1c7b6dccd886f57e866c7d359c091b1e72a193ea`, exact-head CI39125312551
+(2607 passing), Claude GREEN mailbox639/6249670854, and successful postchecks
+Safety39125964713, Runtime39125964717, Coordinator39125964588, Pages39125964078.
+B12 issue #881 / draft PR #882 is an isolated M11 Strategies workspace on
+`copilot/integrate-native-strategies-workspace`; initial implementation commit
+`c835ae3d2dd0a28aa67e24e563213af771f7ac4e`. Focused M11 tests, four-width
+synthetic Chrome acceptance, screenshots, frozen-source guard (140/0) and
+continuity audit have passed. Exact-final-head CI and Claude review remain
+pending; do not merge or activate. Acceptance notes: `docs/v11/B12_VISUAL_ACCEPTANCE.md`.
+
+B10 PR875 is complete: reviewed head `b4a5084b98fe54c0c840d17806a76b5a465bf4c9`, base
 `a8cde76ba3255a77049eb6318a61efaa127cedd0`, merge `1c7b6dccd886f57e866c7d359c091b1e72a193ea`,
 Claude GREEN_LIGHT639/6249104892, exact-head CI39120883771 attempt2 (2600/2600),
 and applicable postchecks Release Safety39122238945, Runtime39122238938,
@@ -21,10 +32,10 @@ Coordinator39122238969, Pages39122238564 (receipt PR875/6248789090 and mailbox63
   remains a failure on the earlier head; its timing assertion was corrected.
   Data coverage remains 448 common closes versus the 955 target; source
   authenticity and complete archive hashes are not established.
-- B11 issue #876 / draft PR #877 is still pending. It adds only an offline
-  preview of the already-manual, validated Bot snapshot. Current-base checks,
-  CI approval, independent Claude review and guarded publication remain Lead
-  gates; this candidate has no merge or activation authority.
+- B11 issue #876 / PR #877 is complete as recorded above. B12 adds native
+  Strategies navigation and a source-bounded catalog/Arena; it does not change
+  V10 files, exchange snapshots, research results, runtime permissions, or
+  trading behavior.
 
 Preserve V10/root/version.json/PWA identity, r130, SOURCE_AUDIT and all seven
 false flags, H9 blocked, CRV unresolved, publisher paused, native868 disabled,
