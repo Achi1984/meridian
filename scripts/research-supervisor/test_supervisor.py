@@ -164,6 +164,37 @@ connection.close()
         else:
             self.assertEqual(result["paths"][0]["state"], "started")
 
+    def test_whole_batch_deadline_is_absolute_across_path_processes(self):
+        # Each child waits 25 ms, so all 44 paths cannot finish in one second.
+        # The longer path limit isolates the shared batch deadline; restarting
+        # that deadline per child would incorrectly complete the entire batch.
+        started = time.monotonic()
+        result = self.run_fault("7" * 64, {"path_seconds": 2, "batch_seconds": 1},
+                                key="trial-absolute-batch-deadline")
+        self.assertLess(time.monotonic() - started, 2.5)
+        self.assertIn((result["state"], result["reason"]), (
+            ("timed_out", "DEADLINE_EXCEEDED"),
+            ("UNSETTLED", "OPERATION_DEADLINE"),
+        ))
+        current = journal.inspect(self.database, result["trialId"])
+        completed = sum(path["state"] == "completed" for path in current["paths"])
+        self.assertGreaterEqual(completed, 2, "deadline must span multiple child processes")
+        self.assertLess(completed, journal.MAX_PATHS)
+        self.assertEqual(current["attempts"], 1)
+        if result["state"] == "UNSETTLED":
+            self.assertEqual(current["state"], "unknown")
+            self.assertTrue(current["unresolved"])
+            self.assertFalse(result["persistConfirmed"])
+            self.assertEqual(journal.scheduler_tick(self.database, self.policy)["state"], "active")
+            with self.assertRaisesRegex(journal.JournalError, "ATTEMPT_CONSUMED"):
+                journal.start(self.database, current)
+            journal.reconcile(self.database, result["trialId"], "OPERATOR_RECONCILED_DEADLINE")
+        else:
+            self.assertEqual(current["state"], "timed_out")
+            self.assertFalse(current["unresolved"])
+        with self.assertRaisesRegex(journal.JournalError, "STALE_FENCE"):
+            journal.start(self.database, current)
+
     def test_output_flood_and_parent_exit_with_inherited_pipe_are_bounded(self):
         for source, reason in (("c" * 64, "STDOUT_BOUND"), ("9" * 64, "STDERR_BOUND"),
                                ("d" * 64, "DEADLINE_EXCEEDED")):
