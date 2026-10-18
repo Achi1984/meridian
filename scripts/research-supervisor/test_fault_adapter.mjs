@@ -1,6 +1,6 @@
 import {spawn} from "node:child_process";
 import {createHash} from "node:crypto";
-import {existsSync} from "node:fs";
+import {existsSync, writeFileSync} from "node:fs";
 import {createInterface} from "node:readline";
 
 const paths = [
@@ -63,7 +63,12 @@ if (input.sourceSha256 === "e".repeat(64)) {
       index: input.index, pathId: path.id, predecessorSha256: input.predecessorSha256
     })).digest("hex");
     await emit("path_completed", {outputSha256});
-    await new Promise(resolve => setTimeout(resolve, 350));
+    // Keep the final child alive until the test has observed the durable final
+    // event and acquired its independent SQLite lock. No timing race window.
+    const marker = `/tmp/meridian-m11-settlement-${process.ppid}.ready`;
+    writeFileSync(marker, String(process.pid));
+    while (!existsSync(`${marker}.go`))
+      await new Promise(resolve => setTimeout(resolve, 5));
   } else if (input.sourceSha256 === "8".repeat(64) && input.index === 1) {
     await emit("path_started", {pathId: "false-path"});
   } else {

@@ -377,13 +377,24 @@ print(json.dumps(journal.scheduler_tick(sys.argv[2],policy,owner='process-'+str(
         self.database = str(Path(self.temporary.name) / "settlement-lock.sqlite")
         journal.initialize(self.database)
         claim = self.claim("trial-settlement-lock", "4" * 64, self.data)
+        marker = Path(f"/tmp/meridian-m11-settlement-{os.getpid()}.ready")
+        proceed = Path(str(marker) + ".go")
+        marker.unlink(missing_ok=True)
+        proceed.unlink(missing_ok=True)
+        # Startup of 44 real children is setup, not the contention measurement.
+        # A final-child barrier separates it from the unchanged 0.6 s check.
         thread, result, failure = self.run_in_thread(
-            claim, {"path_seconds": 1.5, "batch_seconds": 8})
+            claim, {"path_seconds": 10, "batch_seconds": 30})
         lock = None
         try:
+            setup_deadline = time.monotonic() + 20
+            while not marker.exists() and thread.is_alive() and time.monotonic() < setup_deadline:
+                time.sleep(0.005)
+            self.assertTrue(marker.exists(), f"final child did not reach barrier: {result!r} {failure!r}")
             self.wait_for_path_state(claim["trialId"], 44, "completed")
             lock = self.lock_database()
             callback_started = time.monotonic()
+            proceed.touch()
             thread.join(0.6)
             self.assertFalse(thread.is_alive(), "SQLite contention blocked final settlement")
             self.assertFalse(failure)
@@ -391,9 +402,12 @@ print(json.dumps(journal.scheduler_tick(sys.argv[2],policy,owner='process-'+str(
             self.assertLess(time.monotonic() - callback_started, 0.6)
             time.sleep(0.65)
         finally:
+            proceed.touch()
             if lock is not None:
                 self.release_lock(lock)
             thread.join(6)
+            marker.unlink(missing_ok=True)
+            proceed.unlink(missing_ok=True)
         current = journal.inspect(self.database, claim["trialId"])
         self.assertTrue(current["unresolved"])
         self.assertEqual(current["attempts"], 1)
