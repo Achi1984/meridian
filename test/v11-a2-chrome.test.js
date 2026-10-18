@@ -105,7 +105,7 @@ test('A2 Chrome: focus, fail-closed states, contrast and layout at 320/375/390/4
         await call('Input.dispatchKeyEvent', {type: 'keyDown', key: name, code, text, unmodifiedText: text, windowsVirtualKeyCode: name === 'Enter' ? 13 : 32});
         await call('Input.dispatchKeyEvent', {type: 'keyUp', key: name, code, windowsVirtualKeyCode: name === 'Enter' ? 13 : 32});
       };
-      for (const view of ['command', 'depot', 'bots', 'market', 'research']) {
+      for (const view of ['command', 'depot', 'bots', 'market', 'strategies']) {
         await evaluate(`document.querySelector('#nav button[data-v="${view}"]').focus()`);
         await key('Enter', 'Enter');
         assert.equal(await evaluate('document.activeElement.closest(".view").id'), 'view-' + view, 'native Enter navigation');

@@ -107,9 +107,42 @@
       "pullRequest": 877,
       "branch": "copilot/meridian-v11-b11-bot-cockpit-20261018",
       "verifiedBaseSha": "1c7b6dccd886f57e866c7d359c091b1e72a193ea",
-      "state": "DRAFT_PENDING_LEAD_BASE_CI_REVIEW_AND_GUARDED_PUBLICATION",
-      "nextStep": "COMPLETE_SYNTHETIC_SHELL_EVIDENCE_AND_CONTINUITY; THEN LEAD_OWNS_BASE_CI_INDEPENDENT_REVIEW_AND_GUARDED_PUBLICATION",
+      "reviewedHead": "16a54904",
+      "sourceCiRunId": 39125312551,
+      "sourceCiResult": "2607_PASS",
+      "reviewer": "CLAUDE",
+      "reviewComment": "GREEN_639/6249670854",
+      "mergedBase": "10f10f270a012b2f31679eec2fc2625813b5e18b",
+      "postMergeChecks": {
+        "releaseSafety": 39125964713,
+        "runtimeSmoke": 39125964717,
+        "releaseCoordinator": 39125964588,
+        "pages": 39125964078
+      },
+      "state": "COMPLETE_MERGED_ON_MAIN",
+      "nextStep": "B11_COMPLETE; B12_ISOLATED_DRAFT_PENDING_ITS_OWN_EXACT_HEAD_CI_AND_REVIEW",
       "noMergeOrActivationAuthority": true
+    },
+    "currentB12": {
+      "opId": "MERIDIAN-M11-B12-STRATEGIES-20261018",
+      "issue": 881,
+      "branch": "copilot/integrate-native-strategies-workspace",
+      "verifiedBaseSha": "c42ded8b7d33312f1a0e232d26a28ed5f0e768b3",
+      "initialImplementationCommit": "c835ae3d2dd0a28aa67e24e563213af771f7ac4e",
+      "ownerMandate": "Meridian 10 ist Geschichte wir sollten unsere Arbeit nur mehr in M11 stecken. Integrier die Strategien in 11 und forciere die Weiterentwicklung der autonomen Live-Strategien",
+      "scope": "V11_NATIVE_STRATEGIES_CATALOG_ARENA_PRESENTATION_AND_SYNTHETIC_TESTS_ONLY",
+      "acceptanceNotes": "docs/v11/B12_VISUAL_ACCEPTANCE.md",
+      "syntheticScreenshots": "docs/v11/evidence/b12/",
+      "localFocusedTests": "PASS_STRATEGY_CATALOG_CHROME_TERMINAL_SOURCE_GUARD_AND_SHELL_CHROME",
+      "fullSuite": "2608_PASS_6_UNRELATED_PUBLISHER_HARNESS_FAILURES",
+      "state": "LEAD_CORRECTION_PENDING_EXACT_HEAD_CI_AND_CLAUDE",
+      "sourceCi": "PENDING_CORRECTED_HEAD",
+      "claudeReview": "PENDING_CORRECTED_HEAD",
+      "physicalDevicePwaAndRealAccountProof": "NOT_PROVIDED",
+      "noMergeOrActivationAuthority": true,
+      "integrationOpId": "MERIDIAN-B12-INTEGRATE-C42-R1",
+      "parentCandidateHead": "4effd608f7f5484d33bc12b1bcf15e6bfba31bb3",
+      "syntheticScreenshotsStatus": "PRE_CORRECTION_HISTORICAL_NOT_FINAL_HEAD_PROOF"
     },
     "v11B10ClarityProposal": {
       "operationId": "MERIDIAN-V11-B10-CLARITY-20261018",
@@ -155,7 +188,7 @@
       ]
     },
     "historicalVerifiedSourceMainBeforeB11": "921246e61e07ff0624fb4a24c00a452246e9eb7f",
-    "verifiedSourceMain": "1c7b6dccd886f57e866c7d359c091b1e72a193ea",
+    "verifiedSourceMain": "c42ded8b7d33312f1a0e232d26a28ed5f0e768b3",
     "completedSourceMerge873": {
       "pr": 873,
       "mergeSha": "b75335da3805c0d509ff11f75ab0584d351f284e",
@@ -195,25 +228,22 @@
       "strategyPnlRun": false
     },
     "lastCompletedSourceMerge": {
-      "pr": 875,
-      "mergeSha": "1c7b6dccd886f57e866c7d359c091b1e72a193ea",
-      "reviewedHead": "b4a5084b98fe54c0c840d17806a76b5a465bf4c9",
-      "reviewedBase": "a8cde76ba3255a77049eb6318a61efaa127cedd0",
-      "reviewer": "CLAUDE",
-      "reviewCommentId": 6249104892,
-      "sourceCiRunId": 39120883771,
+      "pr": 880,
+      "mergeSha": "c42ded8b7d33312f1a0e232d26a28ed5f0e768b3",
+      "reviewedHead": "219914105a589df68014372b4ea5bfdc8f1dcb36",
+      "reviewedBase": "10f10f270a012b2f31679eec2fc2625813b5e18b",
+      "reviewCommentId": 6250243642,
+      "sourceCiRunId": 39129332087,
       "sourceCiAttempt": 2,
-      "sourceCiResult": "2600/2600",
-      "state": "COMPLETE",
-      "postMergeChecks": "VERIFIED_SUCCESS",
+      "sourceCiResult": "2625_PASS",
+      "state": "MERGED_POSTCHECKS_PENDING_RUNTIME",
+      "scope": "SOURCE_SYNTHETIC_ONLY_NO_REAL_RUN",
       "postMergeRunIds": {
-        "releaseSafety": 39122238945,
-        "runtimeSmoke": 39122238938,
-        "releaseCoordinator": 39122238969,
-        "pages": 39122238564
-      },
-      "finalMergeCommentId": 6248789090,
-      "scope": "V11_B10_PREVIEW_ONLY"
+        "releaseSafety": 39131410769,
+        "runtimeSmoke": 39131410787,
+        "releaseCoordinator": 39131410732,
+        "pages": 39131410231
+      }
     },
     "historicalLastCompletedSourceMergeBeforeB11": {
       "pr": 862,
@@ -437,7 +467,7 @@
     },
     "publisherNextStep": "PAUSED_BY_OWNER_B_NO_OPERATIONAL_AUTHORITY_NATIVE868_DISABLED",
     "historicalStrategyNextStepBeforeB11": "Finalize r130 Arena release integration gates; separately diagnose PR872 publisher timing-test failure before independent data review. No new strategy execution.",
-    "strategyNextStep": "PR873 r130 Arena integration and PR872 data integration are complete on main; preserve SOURCE_AUDIT and all seven false flags. H9 remains blocked, CRV unresolved, 448/955 common-close limitation stands. No new acquisition, replay, strategy PnL, research execution or trading.",
+    "strategyNextStep": "LIVE_PAPER_PRIORITY: B12_UI_CORRECTION_AND_REVIEW; PR884_DEADLINE_CONTENTION_FIX; VERIFIED_LOADER_SCREEN_TESTS_AND_CONCRETE_RESEARCH_PAPER_PROTOCOL_BEFORE_REAL_RUN",
     "completion20261017": {
       "verifiedMain": "8691381510039e2ad48b863ea5e66d6ad6cba462",
       "arenaMerge": "ed60066fc58b4d60eddd727c24cae61c368720bb",
@@ -1466,7 +1496,43 @@
       "commentId": 6248042470,
       "scope": "Existing authorized Meridian development/test runs via Approve and run",
       "securitySettingsChanged": false
+    },
+    "historicalVerifiedSourceMainBefore880": "1c7b6dccd886f57e866c7d359c091b1e72a193ea",
+    "completedSourceMerge875": {
+      "pr": 875,
+      "mergeSha": "1c7b6dccd886f57e866c7d359c091b1e72a193ea",
+      "reviewedHead": "b4a5084b98fe54c0c840d17806a76b5a465bf4c9",
+      "reviewedBase": "a8cde76ba3255a77049eb6318a61efaa127cedd0",
+      "reviewer": "CLAUDE",
+      "reviewCommentId": 6249104892,
+      "sourceCiRunId": 39120883771,
+      "sourceCiAttempt": 2,
+      "sourceCiResult": "2600/2600",
+      "state": "COMPLETE",
+      "postMergeChecks": "VERIFIED_SUCCESS",
+      "postMergeRunIds": {
+        "releaseSafety": 39122238945,
+        "runtimeSmoke": 39122238938,
+        "releaseCoordinator": 39122238969,
+        "pages": 39122238564
+      },
+      "finalMergeCommentId": 6248789090,
+      "scope": "V11_B10_PREVIEW_ONLY"
+    },
+    "completedSourceMerge877": {
+      "pr": 877,
+      "mergeSha": "10f10f270a012b2f31679eec2fc2625813b5e18b",
+      "reviewedHead": "16a54904d1d357ff5cd7aa4ee710e5ff4e817910",
+      "reviewCommentId": 6249670854,
+      "sourceCiRunId": 39125312551,
+      "state": "COMPLETE_ALL_POSTCHECKS_SUCCESS",
+      "finalMergeCommentId": 6249737802
+    },
+    "researchSupervisor884": {
+      "state": "REVISION_REQUIRED_DEADLINE_BLOCKED_BY_SQLITE_CONTENTION",
+      "reviewedHead": "93ee993950cbbffd415d375aa0935812e1bce090",
+      "correctionCommentId": 6250470874,
+      "executionAuthorized": false
     }
   }
 }
-

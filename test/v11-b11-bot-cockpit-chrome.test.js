@@ -11,7 +11,7 @@ const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium
   .find(path=>path&&existsSync(path));
 const v11Root=fileURLToPath(new URL('../v11/',import.meta.url));
 const source=readFileSync(join(v11Root,'index.html'),'utf8');
-const bootstrap='<script type="module" src="./bot-read-bootstrap.js?v=B11"></script>';
+const bootstrap='<script type="module" src="./bot-read-bootstrap.js?v=B12"></script>';
 const fixtureScript=`<script>
 window.__botReadMode='fresh';window.__botReads=0;window.__resolveBotRead=null;window.__botErrors=[];
 window.addEventListener('error',event=>window.__botErrors.push(event.message));
@@ -56,10 +56,12 @@ function createShellServer() {
     if(pathname==='/v11/index.html'){
       response.writeHead(200,{'content-type':'text/html; charset=utf-8'});response.end(shell);return;
     }
-    if(!pathname.startsWith('/v11/')){response.writeHead(404);response.end();return;}
-    const relative=decodeURIComponent(pathname.replace(/^\/v11\//,''));
-    const path=normalize(join(v11Root,relative));
-    if(path!==v11Root&&!path.startsWith(v11Root.endsWith(sep)?v11Root:v11Root+sep)){
+    const repositoryRoot=join(v11Root,'..');
+    if(!pathname.startsWith('/v11/')&&!pathname.startsWith('/research/')){response.writeHead(404);response.end();return;}
+    const root=pathname.startsWith('/v11/')?v11Root:join(repositoryRoot,'research');
+    const relative=decodeURIComponent(pathname.replace(/^\/(?:v11|research)\//,''));
+    const path=normalize(join(root,relative));
+    if(path!==root&&!path.startsWith(root.endsWith(sep)?root:root+sep)){
       response.writeHead(404);response.end();return;
     }
     try{
@@ -319,4 +321,3 @@ test('V11 B11 actual shell: mixed synthetic snapshot, filters, Command jump and 
       await new Promise(resolve=>server.close(resolve));
     }
   });
-
