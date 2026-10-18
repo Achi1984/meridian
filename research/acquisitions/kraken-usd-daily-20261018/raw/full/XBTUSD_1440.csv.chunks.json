@@ -1,0 +1,18 @@
+{
+  "member": "XBTUSD_1440.csv",
+  "splitPolicy": "ordered lossless chunks; 262144-byte maximum per file",
+  "wholeMemberBytes": 312737,
+  "wholeMemberSHA256": "27fd91e9528d421c606ff7cd37bf3b8a4eed3b39631beb09ac8aec36a9b69266",
+  "chunks": [
+    {
+      "file": "raw/full/XBTUSD_1440.csv.part01",
+      "bytes": 262144,
+      "sha256": "920953a7b5442e94c60a8b46a4c9cd9b467a2b00752f99f818a10c1f8dc0549c"
+    },
+    {
+      "file": "raw/full/XBTUSD_1440.csv.part02",
+      "bytes": 50593,
+      "sha256": "b3f66148467e42f8fb94d5229978420ae0f588f0b94df3378873b28bce41bb29"
+    }
+  ]
+}
