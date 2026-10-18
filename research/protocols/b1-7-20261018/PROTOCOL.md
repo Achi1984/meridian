@@ -1,10 +1,10 @@
 # B1-7 frozen protocol R2 — synthetic implementation draft
 
-**Protocol ID:** `MERIDIAN-B1-7-PROTOCOL-R2-20261018`  
-**Raw protocol.json SHA-256:** `44284c22c22443520043c8450edbc8819b95a9f37ca985cfca05f4f9317ff9eb`  
-**Status:** source and synthetic tests only; owner execution decision pending  
-**Input base:** `1c7b6dccd886f57e866c7d359c091b1e72a193ea`  
-**R1:** `MERIDIAN-B1-7-DESIGN-R1`, response comment `6249442046`, `REVISION_REQUIRED`. Its eight determinism issues are resolved in the authoritative R2 text and encoded here.  
+**Protocol ID:** `MERIDIAN-B1-7-PROTOCOL-R2-20261018`
+**Raw protocol.json SHA-256:** `44284c22c22443520043c8450edbc8819b95a9f37ca985cfca05f4f9317ff9eb`
+**Status:** source and synthetic tests only; owner execution decision pending
+**Input base:** `1c7b6dccd886f57e866c7d359c091b1e72a193ea`
+**R1:** `MERIDIAN-B1-7-DESIGN-R1`, response comment `6249442046`, `REVISION_REQUIRED`. Its eight determinism issues are resolved in the authoritative R2 text and encoded here.
 **R2:** `MERIDIAN-B1-7-DESIGN-R2`, request comment `6249480669`, response comment `6249482850`: `GREEN_LIGHT` for deterministic SOURCE+SYNTHETIC preparation only. This is not approval for a real-data run, 44-path budget, thresholds, costs, no-stop policy, Paper, Live, or runtime/flag changes.
 
 The machine-readable parameters are in [`protocol.json`](./protocol.json). Its raw-file SHA-256 and the final implementation SHA-256 are recorded in [`EXECUTION_REQUEST.md`](./EXECUTION_REQUEST.md) when frozen. The engine emits the protocol hash and binds it with implementation, input, variant, scenario, and segment identities in deterministic IDs. The implementation hash is caller-supplied identity; the engine does not inspect its own source.
