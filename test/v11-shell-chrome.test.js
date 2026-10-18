@@ -53,7 +53,7 @@ for(const width of [320,375,390,430]){
  }
  assert.match(x.unknownBotsBackground,/rgb\(53, 43, 24\)/,'unknown BOTS trust-cell uses amber dark background');
  assert.equal(x.stateColor,'rgb(240, 202, 133)','A2 unknown-state color stays independent');
- const categoryColors={command:'rgb(169, 212, 255)',depot:'rgb(123, 182, 255)',bots:'rgb(46, 207, 154)',market:'rgb(182, 155, 255)',research:'rgb(212, 154, 255)'};
+ const categoryColors={command:'rgb(169, 212, 255)',depot:'rgb(123, 182, 255)',bots:'rgb(46, 207, 154)',market:'rgb(182, 155, 255)',strategies:'rgb(212, 154, 255)'};
  for(const n of x.nav){
   assert.ok(n.fit&&n.oneLine,'wrapped/clipped label '+width+' '+n.name);
   assert.equal(n.font,10,'A1 label size '+width+' '+n.name);
@@ -67,4 +67,3 @@ for(const width of [320,375,390,430]){
  }
 }
 });
-
