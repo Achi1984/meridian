@@ -1,6 +1,51 @@
 # GO MERIDIAN — durable resume checkpoint
 
-## Current checkpoint — B12 M11 Strategies draft (2026-10-18)
+## Current checkpoint — B12 public; source integration continues (2026-10-18)
+
+Verified main is `ce20052f77c99b98b0966465c4dc18c6da77e819`. This is the
+source basis of this local continuity candidate, not its own publication SHA.
+
+- M11 B12 is public and complete at PR882 merge `94b2a682f003961f37c2ce07c6cae313c0ac0e26`.
+  Exact CI39132625973 passed 2635 tests; combined Claude GREEN639/6251132456.
+  Safety39138177731, Runtime39138177976, Coordinator39138177652 and Pages39138176581
+  succeeded. Public desktop Cloud Browser check confirmed native Strategies,
+  12 families, separate B1-7 and five Arena cards including H9 blocked
+  (receipt882/6251381016). This is not physical-device/PWA/account or operational Paper proof.
+- PR880 source/synthetic engine is complete; the formerly pending exact-merge
+  Runtime39131410787 is SUCCESS. No real-data computation followed from that merge.
+- PR885 screening tests are complete at `7816b80f8f94de1929d814a142c1bdf4361add8f`,
+  reviewed head `211b031ab3d2f42470a6f46722bfa43627cfe121`; Claude GREEN639/6251396703
+  covers the full three-file delta, retaining prior unchanged-engine review6250243642.
+  CI39138242039/39138245546 passed 2650 tests; frozen140 unchanged. Postchecks
+  Safety39138672542, Runtime39138672514, Coordinator39138672543 and Pages39138672026
+  all succeeded. Receipt885/6251426568 retains its historical merge-time pending snapshot.
+- PR884 merged at current main from `3e797dfdcd6dee4dfb1cc6630e8afd43a574a739`.
+  Full nine-file Claude GREEN639/6251632595 (review run39140236165), exact
+  CI39138731585 passed2651 tests; frozen140 unchanged. Receipt884/6251677672.
+  All applicable postchecks succeeded: Safety39140543307 (job117713897879),
+  Runtime39140543320, Coordinator39140543273 and Pages39140542535. Its corrected
+  supervisor is an inactive synthetic hash-chain foundation, not a running service
+  or integration with the real B1 engine. Caller source/data hash labels are not byte authentication.
+- Issue886 is assigned to Copilot; draft PR887 on `copilot/b1-execution-session-loader-r1`
+  is queued at initial observed head `0cdab5dbb96ab2cabaa56f33e925735ea135ed19`.
+  It prepares a shared resumable engine session and verified-byte loader with generated
+  fixtures only. It does not read captured market files or implement the future persistent
+  child/ACK/result-channel bridge. Lead must reconcile its base and complete CI/review.
+
+NEXT: review PR887's source/synthetic package against current main. Operational
+Live-Paper remains the M11 priority, with supervisor integration, frozen input admission
+and a concrete separately authorized research/Paper protocol still outstanding.
+No captured-data reads, new acquisition, historical strategy run, scheduler/service
+activation, orders or Paper/Live transition are authorized by this checkpoint.
+SOURCE_AUDIT and all seven flags remain false; H9 remains blocked, historical CRV policy
+unresolved and B1 no-stop CRV undefined. Publisher stays paused; native868 stays disabled.
+The missed LowVol funding observation cannot be backfilled as timely evidence.
+
+The dated sections below are historical snapshots; their pending statuses are superseded
+only by the explicit current receipts above. Creation provenance and exact integer markers
+are preserved.
+
+## Historical checkpoint — B12 draft before publication (superseded)
 
 Current integration base is `c42ded8b7d33312f1a0e232d26a28ed5f0e768b3` after PR880 R3 source/synthetic merge: reviewed head `219914105a589df68014372b4ea5bfdc8f1dcb36`, base `10f10f270a012b2f31679eec2fc2625813b5e18b`, CI39129332087 attempt2 (2625 passing), Claude GREEN639/6250243642. Safety39131410769, Coordinator39131410732 and Pages39131410231 passed; Runtime39131410787 remains pending at this checkpoint. No real data run or Paper/live activation occurred.
 
@@ -800,4 +845,3 @@ Mailbox comment id: 6029495669. Classification: PLATFORM_STALL. Recommendation: 
 
 ---
 When the user says **“Go Meridian”** in a new chat, start from this file **plus live GitHub reconciliation**. Never trust this snapshot over newer GitHub state.
-
