@@ -89,6 +89,19 @@ screen, all 44 completed paths, and unchanged false authority flags before
 durable completion. Insufficient evidence remains failed and cannot admit
 diagnostics.
 
+An engine failure before controls are calibrated retains the engine's failure
+code and does not submit the `NOT_CALIBRATED` placeholder as controls. A natural
+`INSUFFICIENT_EVIDENCE` result may commit its explicit insufficient-evidence
+controls and summary after the 19 development paths; it remains failed, records
+no diagnostic advances, and does not count as completed.
+
+The regression suite exercises these branches through the real B1 adapter and
+supervisor. Its insufficient-evidence case uses a test-only generated-series
+variant and temporary profile whose input and path identities are recalculated
+from that generated series. The production supervisor passes only its fixed
+child environment, so this test fixture/profile selection is not a production
+adapter option and does not change the committed generated input identity.
+
 `resultSha256` hashes the complete reconstructed result returned by B1
 inspection; `summarySha256` separately hashes the exact final-summary bytes
 received from the child. A final settlement commits before its ACK. Child-exit

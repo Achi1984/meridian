@@ -203,6 +203,59 @@
       "runtimeActivationAuthorized": false,
       "noMergeOrActivationAuthority": true
     },
+    "failurePathAcceptance": {
+      "opId": "MERIDIAN-B1-FAILURE-ACCEPTANCE-20261018",
+      "issue": 893,
+      "pullRequest": 894,
+      "branch": "copilot/meridian-b1-failure-acceptance-20261018",
+      "assignedBranchStart": "01a84acd3b46d0f885cbe8e361f5bd50acf0a2b3",
+      "priorUnpublishedSessionCandidate": "19a855df8b3e761c9979b3f72f43bd0a23cbf94f",
+      "mergedBaseSha": "fd07a8df49cbe24c73e9819170cd36e6b9645157",
+      "mergedBaseTree": "a63b96e68566df9e15c90ce70a35f8c53bf287e7",
+      "workingMergeCommit": "bbca098",
+      "scope": "B1_FAILURE_PATH_AND_GENERATED_FIXTURE_TESTS_ONLY",
+      "localEnvironment": {
+        "node": "v22.23.3",
+        "python": "3.12.3",
+        "focusedCommand": "python3 -B scripts/research-supervisor/test_supervisor.py ResearchSupervisorTests.test_b1_engine_failure_preserves_reason_without_fabricating_controls ResearchSupervisorTests.test_b1_generated_insufficient_evidence_settles_through_real_adapter_and_journal",
+        "focusedResult": "2_PASS",
+        "supervisorCommand": "node --test test/research-supervisor.test.js",
+        "supervisorResult": "1_SUITE_PASS"
+      },
+      "adapterSha256": "35ee51776292e6af993c7ecad5fff8e8f0bf925f5eda9fa06fa785d8dababb38",
+      "pr890PostMergeChecks": {
+        "releaseSafety": {
+          "runId": 39155412745,
+          "conclusion": "FAILURE",
+          "researchAndAuthRegression": "2662_PASS_1_FAIL"
+        },
+        "runtimeSmoke": {
+          "runId": 39155412656,
+          "conclusion": "SUCCESS"
+        },
+        "releaseCoordinator": {
+          "runId": 39155412696,
+          "conclusion": "SUCCESS"
+        },
+        "pages": {
+          "runId": 39155412397,
+          "conclusion": "SUCCESS"
+        }
+      },
+      "authorityFlags": {
+        "executionAuthorized": false,
+        "strategyPnlAuthorized": false,
+        "discoveryAuthorized": false,
+        "validationAuthorized": false,
+        "holdoutAuthorized": false,
+        "paperAuthorized": false,
+        "liveAuthorized": false
+      },
+      "actualMarketDataRead": false,
+      "paperOrLiveExecution": false,
+      "schedulingOrRuntimeActivation": false,
+      "state": "LOCAL_VALIDATED_PENDING_PUBLICATION"
+    },
     "v11B10ClarityProposal": {
       "operationId": "MERIDIAN-V11-B10-CLARITY-20261018",
       "issue": 874,

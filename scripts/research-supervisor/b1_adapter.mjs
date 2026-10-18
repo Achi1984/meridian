@@ -9,6 +9,7 @@ import {createSyntheticSeries} from '../../test/fixtures/b1-7/synthetic-series.m
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const MANIFEST_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), 'b1_bridge_manifest.json');
+const TEST_SCENARIO = process.env.NODE_ENV === 'test' ? process.env.B1_TEST_SCENARIO : null;
 
 async function* inputLines() {
   const input = createInterface({input: process.stdin, crlfDelay: Infinity});
@@ -74,9 +75,21 @@ function sendFrame(fd, bytes) {
 async function execute() {
   const fd = Number(process.env.B1_RESULT_FD);
   if (!Number.isInteger(fd) || fd < 3) throw new Error('RESULT_CHANNEL_INVALID');
-  const profile = JSON.parse(readFileSync(MANIFEST_PATH, 'utf8'));
+  if (TEST_SCENARIO && !['ENGINE_FAILURE', 'INSUFFICIENT_EVIDENCE'].includes(TEST_SCENARIO)) {
+    throw new Error('B1_TEST_SCENARIO_INVALID');
+  }
+  let manifestPath = MANIFEST_PATH;
+  let series = createSyntheticSeries();
+  if (TEST_SCENARIO === 'INSUFFICIENT_EVIDENCE') {
+    manifestPath = process.env.B1_TEST_MANIFEST_PATH;
+    if (typeof manifestPath !== 'string' || !path.isAbsolute(manifestPath)) {
+      throw new Error('B1_TEST_MANIFEST_PATH_INVALID');
+    }
+    const {createInsufficientEvidenceSeries} = await import('./test_b1_generated_fixture.mjs');
+    series = createInsufficientEvidenceSeries();
+  }
+  const profile = JSON.parse(readFileSync(manifestPath, 'utf8'));
   const sourceSha256 = sourcePins(profile);
-  const series = createSyntheticSeries();
   const inputSha256 = fixtureIdentity(series);
   if (inputSha256 !== profile.inputSha256) throw new Error('B1_INPUT_PIN_MISMATCH');
   const fileSha = name => createHash('sha256').update(readFileSync(path.join(ROOT, name))).digest('hex');
@@ -88,11 +101,15 @@ async function execute() {
   if (implementationSha256 !== profile.implementationSha256) {
     throw new Error('B1_IMPLEMENTATION_PIN_MISMATCH');
   }
-  const session = createExecution({
+  const executionOptions = {
     seriesByAsset: series,
     source: {kind: 'SYNTHETIC_FIXTURE'},
     implementationSha256
-  });
+  };
+  if (TEST_SCENARIO === 'ENGINE_FAILURE') {
+    executionOptions.syntheticClock = ({phase}) => phase === 'path-start-check' ? 1_800_001 : 0;
+  }
+  const session = createExecution(executionOptions);
   const manifestSha256 = sha256(canonicalJson(session.manifest));
   const computationOrderSha256 = sha256(canonicalJson(session.computationOrder));
   if (PROTOCOL_ID !== profile.protocolId || PROTOCOL_SHA256 !== profile.protocolSha256 ||
@@ -139,16 +156,21 @@ async function execute() {
   }
   const finalResult = session.finalResult();
   if (!finalResult || finalResult.status !== 'COMPLETED' || session.status !== 'COMPLETED') {
-    if (!controlsRecorded && finalResult?.controlDefinitions) {
+    if (!controlsRecorded && finalResult?.status === 'INSUFFICIENT_EVIDENCE' &&
+        finalResult.controlDefinitions?.status === 'INSUFFICIENT_EVIDENCE') {
       process.stdout.write(`${JSON.stringify({type: 'controls'})}\n`);
       await receive('controls_ready');
       sendFrame(fd, Buffer.from(JSON.stringify(finalResult.controlDefinitions)));
       await receive('controls_committed');
       controlsRecorded = true;
     }
+    const reason = finalResult?.failure?.code ??
+      (finalResult?.status === 'INSUFFICIENT_EVIDENCE'
+        ? finalResult.controlDefinitions?.reason ?? 'INSUFFICIENT_EVIDENCE'
+        : 'EXECUTION_INCOMPLETE');
     process.stdout.write(`${JSON.stringify({
       type: 'execution_failed', status: finalResult?.status ?? 'INVALID',
-      reason: finalResult?.failure?.code ?? 'EXECUTION_INCOMPLETE'
+      reason
     })}\n`);
     const failureSummary = {...finalResult};
     delete failureSummary.paths;
