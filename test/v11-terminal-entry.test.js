@@ -402,7 +402,7 @@ const b12Deltas=[
   ],
   [
     '      </section>\n      <details class="command-context-details">\n',
-    '      </section>\n      <section class="card command-strategies" aria-labelledby="command-strategies-heading">\n        <div class="card-head"><h2 id="command-strategies-heading">Strategieforschung</h2><span class="limited">Keine Handelsaktivität</span></div>\n        <p>12 Hypothesen im Entwurfsregister, fünf Arena-Modelle mit historischen Diagnosen und B1-7 als getrennter Entwicklungskandidat ohne Ergebnisse. Kein laufendes Paper.</p>\n        <a class="command-open-strategies" href="#view-strategies" data-open-strategies>Strategien in M11 öffnen</a>\n      </section>\n      <details class="command-context-details">\n'
+    '      </section>\n      <section class="card command-strategies" aria-labelledby="command-strategies-heading">\n        <div class="card-head"><h2 id="command-strategies-heading">Strategieforschung</h2><span class="limited">Keine Handelsaktivität</span></div>\n        <p>12 Hypothesen im Entwurfsregister, vier Arena-Modelle mit historischen Diagnosen sowie H9 mit BLOCKED_DATA und B1-7 als getrennter Entwicklungskandidat ohne Ergebnisse. Kein laufendes Paper.</p>\n        <a class="command-open-strategies" href="#view-strategies" data-open-strategies>Strategien in M11 öffnen</a>\n      </section>\n      <details class="command-context-details">\n'
   ],
   [
     '      <p class="caption">Nur manuelle Leseabfragen. Diese Ansicht steuert keine Bots. „Terminal öffnen“ führt zum separaten Terminal.</p>\n',
