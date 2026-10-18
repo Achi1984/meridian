@@ -4,7 +4,7 @@ import {createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
 import {
   acceptsTarget, buildSchedule, calculateDrawdown, canonicalJson, createBudgetTracker,
-  deriveControlExposures, deriveFeatures, runBatch, sha256
+  createExecution, deriveControlExposures, deriveFeatures, runBatch, sha256
 } from '../scripts/research/b1-7/engine.mjs';
 import {
   ASSETS, BUDGET, IMPLEMENTATION_ID, INPUT, PROTOCOL_ID, PROTOCOL_SHA256, SCENARIOS,
@@ -18,9 +18,11 @@ const protocolPath = new URL('../research/protocols/b1-7-20261018/protocol.json'
 const requestPath = new URL('../research/protocols/b1-7-20261018/EXECUTION_REQUEST.md', import.meta.url);
 const enginePath = new URL('../scripts/research/b1-7/engine.mjs', import.meta.url);
 const validatorPath = new URL('../scripts/research/b1-7/validate.mjs', import.meta.url);
+const capturedInputPath = new URL('../scripts/research/b1-7/captured-input.mjs', import.meta.url);
 const protocol = JSON.parse(readFileSync(protocolPath, 'utf8'));
 const hashFile = path => createHash('sha256').update(readFileSync(path)).digest('hex');
 const implementationSha256 = sha256(canonicalJson({
+  capturedInputSha256: hashFile(capturedInputPath),
   engineSha256: hashFile(enginePath),
   validatorSha256: hashFile(validatorPath)
 }));
@@ -271,6 +273,184 @@ test('full synthetic batch has 44 deterministic paths and complete accounting', 
   assert.equal(first.authority.liveAuthorized, false);
 });
 
+test('resumable session preserves manifest order, development calibration boundary, and direct parity', () => {
+  const series = createSyntheticSeries();
+  const direct = makeRun(series);
+  const source = {kind: 'SYNTHETIC_FIXTURE'};
+  const session = createExecution({
+    seriesByAsset: series,
+    source,
+    implementationSha256
+  });
+  source.kind = 'FROZEN_RESEARCH_INPUT';
+  const mutated = series.XBTUSD[700];
+  mutated.close *= 1.25;
+  mutated.high = Math.max(mutated.open, mutated.close) * 1.004;
+  mutated.low = Math.min(mutated.open, mutated.close) * 0.996;
+  assert.equal(session.status, 'READY');
+  assert.equal(session.controlDefinitions, null);
+  assert.equal(session.manifest.length, 44);
+  assert.equal(session.computationOrder.length, 44);
+  assert.deepEqual(session.computationOrder.slice(0, 19).map(path => path.segmentId),
+    Array(19).fill('development'));
+  assert.deepEqual(session.computationOrder.slice(19).map(path => path.segmentId),
+    Array(25).fill('diagnostic'));
+  assert.deepEqual(session.manifest.map(path => path.pathId), direct.paths.map(path => path.pathId));
+  assert.deepEqual(session.computationOrder.slice(0, 4).map(path =>
+    [path.variantId, path.scenarioId, path.segmentId]), [
+    ['primary-n30-f25', 'base-15bp', 'development'],
+    ['primary-n30-f25', 'stress-30bp', 'development'],
+    ['primary-n30-f25', 'stress-30bp-delay-1d', 'development'],
+    ['neighbour-n20-f25', 'base-15bp', 'development']
+  ]);
+
+  let advances = 0;
+  while (session.status === 'READY') {
+    const boundary = session.beforePathBoundary();
+    assert.equal(boundary.status, 'READY');
+    const outcome = session.advanceOne(boundary.pathId);
+    assert.equal(['PATH_COMPLETED', 'COMPLETED'].includes(outcome.status), true);
+    assert.equal(outcome.completedPath.pathId, boundary.pathId);
+    assert.equal(outcome.completedPath.status, 'COMPLETED');
+    if (advances === 0) outcome.completedPath.dailyReturns[0] = 123456;
+    advances++;
+    if (advances === 19) {
+      const diagnosticBoundary = session.beforePathBoundary();
+      assert.equal(diagnosticBoundary.phase, 'DIAGNOSTIC');
+      assert.equal(diagnosticBoundary.ordinal, 20);
+      assert.equal(session.completedResult, null);
+      const controls = session.controlDefinitions;
+      assert.equal(controls.status, 'FROZEN_DEVELOPMENT_ONLY');
+      assert.deepEqual(controls, direct.controlDefinitions);
+      assert.equal(controls.meanExposure, direct.controlDefinitions.meanExposure);
+      assert.equal(controls.riskExposure, direct.controlDefinitions.riskExposure);
+      controls.meanExposure = 999;
+      assert.equal(session.controlDefinitions.meanExposure, direct.controlDefinitions.meanExposure);
+    }
+  }
+  assert.equal(advances, 44);
+  assert.equal(session.completedResult.status, 'COMPLETED');
+  session.completedResult.paths[0].dailyReturns[0] = 123456;
+  assert.deepEqual(session.finalResult(), direct);
+});
+
+test('execution sessions reject out-of-order, repeated, and interrupted advances', () => {
+  const series = createSyntheticSeries();
+  const makeSession = () => createExecution({
+    seriesByAsset: series,
+    source: syntheticSource,
+    implementationSha256
+  });
+
+  const outOfOrder = makeSession();
+  const wrongId = outOfOrder.computationOrder[1].pathId;
+  assert.equal(outOfOrder.advanceOne(wrongId).status, 'FAILED');
+  assert.equal(outOfOrder.finalResult().failure.code, 'OUT_OF_ORDER_PATH');
+  assert.equal(outOfOrder.finalResult().attemptedPaths, 0);
+  assert.equal(outOfOrder.completedResult, null);
+
+  const interrupted = makeSession();
+  interrupted.advanceOne();
+  interrupted.advanceOne();
+  assert.equal(interrupted.interrupt().status, 'FAILED');
+  assert.equal(interrupted.finalResult().failure.code, 'SESSION_INTERRUPTED');
+  assert.equal(interrupted.finalResult().attemptedPaths, 2);
+  assert.equal(interrupted.finalResult().paths.filter(path =>
+    path.status === 'INCOMPLETE_BATCH_ABORT').length, 2);
+  assert.equal(interrupted.completedResult, null);
+
+  const duplicate = makeSession();
+  const firstPathId = duplicate.beforePathBoundary().pathId;
+  duplicate.advanceOne(firstPathId);
+  assert.equal(duplicate.advanceOne(firstPathId).status, 'FAILED');
+  assert.equal(duplicate.finalResult().failure.code, 'OUT_OF_ORDER_PATH');
+  assert.equal(duplicate.finalResult().attemptedPaths, 1);
+  assert.equal(duplicate.completedResult, null);
+
+  const repeated = makeSession();
+  while (repeated.status === 'READY') repeated.advanceOne();
+  assert.equal(repeated.completedResult.status, 'COMPLETED');
+  assert.equal(repeated.advanceOne().status, 'FAILED');
+  assert.equal(repeated.finalResult().status, 'INVALID');
+  assert.equal(repeated.finalResult().failure.code, 'SESSION_NOT_ADVANCEABLE');
+  assert.equal(repeated.finalResult().completedPaths, 0);
+  assert.equal(repeated.completedResult, null);
+});
+
+test('insufficient development evidence is a failed session, never completed', () => {
+  // Generated opposing asset moves preserve feature variance while the basket is flat.
+  const series = createSyntheticSeries();
+  for (let index = 410; index <= 589; index++) {
+    for (let assetIndex = 0; assetIndex < ASSETS.length; assetIndex++) {
+      const row = series[ASSETS[assetIndex]][index];
+      const swing = 8 * Math.sin(index * 0.31);
+      row.open = index === 410 ? 100 / 1.0015 : 100;
+      row.close = (100 + (assetIndex === 0 ? swing : assetIndex === 1 ? -swing : 0)) /
+        (index === 589 ? 0.9985 : 1);
+      row.high = Math.max(row.open, row.close) * 1.01;
+      row.low = Math.min(row.open, row.close) * 0.99;
+    }
+  }
+  // Remove only numerical fill-solver residuals from this generated fixture.
+  const reference = makeRun(series).paths.find(path => path.kind === 'FULL_BASKET' &&
+    path.segmentId === 'development' && path.scenarioId === 'base-15bp');
+  let relativeEquity = 1;
+  for (let index = 410; index <= 589; index++) {
+    const priorEquity = relativeEquity;
+    relativeEquity *= 1 + reference.dailyReturns[index - 410];
+    for (const asset of ASSETS) {
+      series[asset][index].close /= relativeEquity;
+      if (index > 410) series[asset][index].open /= priorEquity;
+    }
+  }
+  const session = createExecution({seriesByAsset: series, source: syntheticSource, implementationSha256});
+  let outcome;
+  while (session.status === 'READY') outcome = session.advanceOne();
+  assert.equal(outcome.status, 'FAILED');
+  assert.equal(session.status, 'FAILED');
+  assert.equal(session.finalResult().status, 'INSUFFICIENT_EVIDENCE');
+  assert.equal(session.finalResult().attemptedPaths, 19);
+  assert.equal(session.completedResult, null);
+});
+
+test('session budgets include preparation, control calibration, and finalization', () => {
+  const series = createSyntheticSeries();
+  const executeAtPhase = phase => {
+    const session = createExecution({
+      seriesByAsset: series,
+      source: syntheticSource,
+      implementationSha256,
+      syntheticClock: context => context.phase === phase ? BUDGET.totalMs + 1 : 0
+    });
+    while (session.status === 'READY') session.advanceOne();
+    return session.finalResult();
+  };
+  const failedFirstPath = createExecution({
+    seriesByAsset: series, source: syntheticSource, implementationSha256,
+    syntheticClock: context => context.phase === 'path-start-check' ? BUDGET.totalMs + 1 : 0
+  });
+  assert.equal(failedFirstPath.advanceOne().status, 'FAILED');
+  assert.equal(failedFirstPath.lastCompletedPath, null);
+  assert.equal(failedFirstPath.finalResult().computedPaths, 0);
+
+  const preparation = executeAtPhase('validate-asset');
+  assert.equal(preparation.failure.code, 'BUDGET_EXCEEDED');
+  assert.equal(preparation.attemptedPaths, 0);
+
+  const calibration = executeAtPhase('control-calibration-start');
+  assert.equal(calibration.failure.code, 'BUDGET_EXCEEDED');
+  assert.equal(calibration.attemptedPaths, 19);
+  assert.equal(calibration.paths.filter(path =>
+    path.status === 'INCOMPLETE_BATCH_ABORT').length, 19);
+
+  const finalization = executeAtPhase('result-object-complete');
+  assert.equal(finalization.failure.code, 'BUDGET_EXCEEDED');
+  assert.equal(finalization.attemptedPaths, 44);
+  assert.equal(finalization.completedPaths, 0);
+  assert.equal(finalization.paths.every(path =>
+    path.status === 'INCOMPLETE_BATCH_ABORT'), true);
+});
+
 test('initial delayed path stays in cash and both segments include terminal costs', () => {
   const output = makeRun();
   const regular = getPath(output, 'primary-n30-f25', 'base-15bp', 'development');
@@ -471,7 +651,7 @@ test('a failed path budget executes once, stops later paths, and never retries',
   assert.equal(attempts, 1);
 });
 
-test('source hash is a deterministic bundle identity, not a filesystem-loaded data identity', () => {
+test('source hash is a deterministic three-file bundle identity, separate from data identity', () => {
   const executionRequest = readFileSync(requestPath, 'utf8');
   assert.match(implementationSha256, /^[a-f0-9]{64}$/);
   assert.match(executionRequest, new RegExp(`bundle SHA-256 \`${implementationSha256}\``));
