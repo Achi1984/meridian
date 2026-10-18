@@ -251,7 +251,8 @@ function quarterlyReturns(dates, equity) {
   let quarter = null;
   let endEquity = CAPITAL;
   for (let index = 0; index < dates.length; index++) {
-    const nextQuarter = dates[index].slice(0, 7);
+    const date = new Date(dates[index]);
+    const nextQuarter = `${date.getUTCFullYear()}-Q${Math.floor(date.getUTCMonth() / 3) + 1}`;
     if (quarter !== nextQuarter) {
       if (quarter !== null) quarters.push({quarter, netReturn: endEquity / startEquity - 1});
       quarter = nextQuarter;
@@ -309,6 +310,14 @@ function simulatePath({seriesByAsset, descriptor, scenario, targetSource}) {
     const closePrices = ASSETS.map(asset => seriesByAsset[asset][index].close);
     let closeEquity = state.cash + closeValue(state.units, closePrices);
     if (!finite(closeEquity) || closeEquity < 0) fail('INVALID_ACCOUNTING', {date, reason: 'INVALID_CLOSE_EQUITY'});
+    const markedPositions = closeValue(state.units, closePrices);
+    if (markedPositions > 0) {
+      for (const quantityIndex of ASSETS.keys()) {
+        const weight = state.units[quantityIndex] * closePrices[quantityIndex] / closeEquity;
+        if (!finite(weight) || weight < 0) fail('INVALID_ACCOUNTING', {date, reason: 'INVALID_CONCENTRATION'});
+        if (weight > maxConcentration) maxConcentration = weight;
+      }
+    }
     if (index === segment.endIndex && descriptor.kind !== 'CASH') {
       const terminal = liquidateAtClose(state, closePrices, scenario.costRate, date);
       state.cumulativeCost += terminal.cost;
@@ -324,15 +333,6 @@ function simulatePath({seriesByAsset, descriptor, scenario, targetSource}) {
     dailyTarget.push(heldTarget);
     previousEquity = closeEquity;
 
-    const markedPositions = closeValue(state.units, closePrices);
-    const actualExposure = closeEquity > 0 ? markedPositions / closeEquity : 0;
-    if (!finite(actualExposure) || actualExposure < 0) fail('INVALID_ACCOUNTING', {date, reason: 'INVALID_EXPOSURE'});
-    if (markedPositions > 0) {
-      for (const quantityIndex of ASSETS.keys()) {
-        const weight = state.units[quantityIndex] * closePrices[quantityIndex] / closeEquity;
-        if (weight > maxConcentration) maxConcentration = weight;
-      }
-    }
     if (closeEquity > peak) {
       peak = closeEquity;
       drawdownDuration = 0;
@@ -350,6 +350,7 @@ function simulatePath({seriesByAsset, descriptor, scenario, targetSource}) {
     segmentId: descriptor.segmentId,
     status: 'COMPLETED',
     attempts: 1,
+    computed: true,
     observationClass: NO_HOLDOUT,
     tradeCRV: {status: 'UNDEFINED_NO_FINITE_STOP', value: null, promotionEligible: false},
     rows: segment.rows,
@@ -371,7 +372,6 @@ function simulatePath({seriesByAsset, descriptor, scenario, targetSource}) {
     cancelledInstructions: schedule.cancelled,
     quarterlyReturns: quarterlyReturns(dates, dailyEquity),
     dailyReturns,
-    dailyEquity,
     dailyHeldTarget: dailyTarget
   };
 }
@@ -584,6 +584,7 @@ function pathFailureRecord(descriptor, status, attempts, failure = null) {
     segmentId: descriptor.segmentId,
     status,
     attempts,
+    computed: false,
     failure
   };
 }
@@ -596,7 +597,8 @@ function emptyResult(status, code, errors = []) {
     segmentId: item.segmentId,
     pathId: null,
     status: 'NOT_RUN_INPUT_INVALID',
-    attempts: 0
+    attempts: 0,
+    computed: false
   }));
   return {
     schema: 'MERIDIAN_B1_7_ENGINE_RESULT_R2',
@@ -604,10 +606,27 @@ function emptyResult(status, code, errors = []) {
     protocolSha256: PROTOCOL_SHA256,
     status,
     failure: {code, errors},
+    attemptedPaths: 0,
+    completedPaths: 0,
+    computedPaths: 0,
+    plannedPaths: BUDGET.paths,
     paths: plan,
     screen: {status: 'NOT_EVALUATED'},
+    budget: {
+      limits: BUDGET,
+      attemptsPerStartedPath: 1,
+      automaticRetry: false,
+      status: 'NOT_STARTED'
+    },
     authority: authority(),
-    trialLedger: 'UNKNOWN'
+    trialLedger: 'UNKNOWN',
+    protocolReview: {
+      r1RequestId: 'MERIDIAN-B1-7-DESIGN-R1',
+      r1ResponseComment: '6249442046',
+      r1Verdict: 'REVISION_REQUIRED',
+      r2RequestId: 'MERIDIAN-B1-7-DESIGN-R2',
+      r2ResponseStatus: 'PENDING'
+    }
   };
 }
 
@@ -635,14 +654,19 @@ function compactIfOverBudget(output) {
     failure: {code: 'OUTPUT_BUDGET_EXCEEDED', bytes, limit: BUDGET.outputBytes},
     identity: output.identity,
     executionId: output.executionId,
+    attemptedPaths: output.attemptedPaths,
+    completedPaths: 0,
+    computedPaths: output.computedPaths,
+    plannedPaths: BUDGET.paths,
     paths: output.paths.map(path => ({
       pathId: path.pathId,
       kind: path.kind,
       variantId: path.variantId,
       scenarioId: path.scenarioId,
       segmentId: path.segmentId,
-      status: path.status,
+      status: path.status === 'COMPLETED' ? 'INCOMPLETE_OUTPUT_BUDGET' : path.status,
       attempts: path.attempts,
+      computed: path.status === 'COMPLETED',
       outputOmitted: path.status === 'COMPLETED' ? 'GLOBAL_OUTPUT_BUDGET_EXCEEDED' : null
     })),
     screen: {status: 'NOT_EVALUATED'},
@@ -694,7 +718,6 @@ export function runBatch({seriesByAsset, source, implementationSha256}) {
       pathRecords.set(descriptor.pathId, {
         ...run.result,
         kind: descriptor.kind,
-        identity: descriptor.identity,
         targetExposure: target
       });
     } else {
@@ -753,6 +776,14 @@ export function runBatch({seriesByAsset, source, implementationSha256}) {
   if (aborted) {
     for (const descriptor of allDescriptors) {
       const record = pathRecords.get(descriptor.pathId);
+      if (record.status === 'COMPLETED') {
+        pathRecords.set(descriptor.pathId, {
+          ...record,
+          status: 'INCOMPLETE_BATCH_ABORT',
+          computed: true
+        });
+        continue;
+      }
       if (record.status === 'NOT_RUN') {
         pathRecords.set(descriptor.pathId,
           pathFailureRecord(descriptor, 'NOT_RUN_BATCH_ABORT', 0));
@@ -765,6 +796,8 @@ export function runBatch({seriesByAsset, source, implementationSha256}) {
   const status = aborted ? 'INVALID' :
     controlDefinitions.status === 'INSUFFICIENT_EVIDENCE' ? 'INSUFFICIENT_EVIDENCE' :
       completed === BUDGET.paths ? 'COMPLETED' : 'INCOMPLETE';
+  const calculatedScreen = status === 'COMPLETED'
+    ? screenResults(paths, controlDefinitions) : null;
   const executionId = sha256(canonicalJson({
     protocolId: PROTOCOL_ID,
     protocolSha256: PROTOCOL_SHA256,
@@ -784,6 +817,7 @@ export function runBatch({seriesByAsset, source, implementationSha256}) {
     status,
     attemptedPaths: paths.filter(path => path.attempts === 1).length,
     completedPaths: completed,
+    computedPaths: paths.filter(path => path.computed).length,
     plannedPaths: BUDGET.paths,
     paths,
     controlDefinitions: controlDefinitions.ok ? {
@@ -794,8 +828,14 @@ export function runBatch({seriesByAsset, source, implementationSha256}) {
       fullBasketDevelopmentSd: controlDefinitions.benchmarkSd,
       calibration: controlDefinitions.calibration
     } : controlDefinitions,
-    screen: status === 'COMPLETED'
-      ? screenResults(paths, controlDefinitions)
+    screen: calculatedScreen
+      ? source.kind === 'SYNTHETIC_FIXTURE'
+        ? {
+          ...calculatedScreen,
+          status: 'SYNTHETIC_ONLY_NOT_ASSESSED',
+          interpretation: 'SYNTHETIC_FIXTURE_RULE_CHECKS_ONLY'
+        }
+        : calculatedScreen
       : {status: status === 'INSUFFICIENT_EVIDENCE' ? status : 'NOT_EVALUATED'},
     evidence: {
       syntheticFixture: source.kind === 'SYNTHETIC_FIXTURE',

@@ -6,7 +6,7 @@
 
 | Identity | Proposed value | Status |
 | --- | --- | --- |
-| Protocol | `MERIDIAN-B1-7-PROTOCOL-R2-20261018`; raw `protocol.json` SHA-256: `PENDING_FINAL_PROTOCOL_HASH` | Freeze record pending |
+| Protocol | `MERIDIAN-B1-7-PROTOCOL-R2-20261018`; raw `protocol.json` SHA-256: `7fda5993dffa298183e3c4b757e4cdaace4754f8a7ff11b4538e1d39dd9e1aed` | Frozen file identity |
 | Implementation | `MERIDIAN-B1-7-ENGINE-R2`; SHA-256 of `scripts/research/b1-7/engine.mjs` and `validate.mjs`: `PENDING_FINAL_SOURCE_HASHES` | Freeze after final source review |
 | Source basis | Git commit `1c7b6dccd886f57e866c7d359c091b1e72a193ea` | Exact proposed source commit |
 | Input manifest | Canonical SHA-256 of the seven exact caller-supplied series: `PENDING_NOT_COMPUTED` | No series loaded or hashed by this implementation task |

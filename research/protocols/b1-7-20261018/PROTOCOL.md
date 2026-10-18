@@ -1,6 +1,7 @@
 # B1-7 frozen protocol R2 — synthetic implementation draft
 
 **Protocol ID:** `MERIDIAN-B1-7-PROTOCOL-R2-20261018`  
+**Raw protocol.json SHA-256:** `7fda5993dffa298183e3c4b757e4cdaace4754f8a7ff11b4538e1d39dd9e1aed`  
 **Status:** source and synthetic tests only; owner execution decision pending  
 **Input base:** `1c7b6dccd886f57e866c7d359c091b1e72a193ea`  
 **R1:** `MERIDIAN-B1-7-DESIGN-R1`, response comment `6249442046`, `REVISION_REQUIRED`. Its eight determinism issues are resolved in the authoritative R2 text and encoded here.  
@@ -73,7 +74,7 @@ Both controls use fixed exposure and weekly costed equalization, without target 
 
 The deterministic manifest has exactly 44 planned paths: 5 variants × 3 scenarios × 2 segments = 30; full basket × 3 scenarios × 2 segments = 6; 2 frozen controls × 3 scenarios × diagnostic only = 6; and cash × 2 segments = 2. Results remain ordered by declared variant/scenario/segment order and fixed group order. Cash has scenario-independent IDs.
 
-Primary screen uses diagnostic 85 bp: net return positive, sampled drawdown at most 25%, return at least both frozen controls, drawdown no worse than either, and at least 20% relative drawdown reduction versus full basket. If full-basket drawdown is `<=1e-12`, return `INSUFFICIENT_EVIDENCE`. Primary net return must also be positive at both 160 bp scenarios. At least 3 of 4 neighbors must have positive diagnostic net return at 85 bp and separately at 160 bp. Neighbors are sign-robustness checks, not matched-control claims. Status is `PASS`, `NO_EDGE`, `INSUFFICIENT_EVIDENCE`, or `INVALID`; PASS means a historical candidate only, never statistical significance, alpha, or holdout evidence.
+Primary screen uses diagnostic 85 bp: net return positive, sampled drawdown at most 25%, return at least both frozen controls, drawdown no worse than either, and at least 20% relative drawdown reduction versus full basket. If full-basket drawdown is `<=1e-12`, return `INSUFFICIENT_EVIDENCE`. Primary net return must also be positive at both 160 bp scenarios. At least 3 of 4 neighbors must have positive diagnostic net return at 85 bp and separately at 160 bp. Neighbors are sign-robustness checks, not matched-control claims. On proposed real inputs, status is `PASS`, `NO_EDGE`, `INSUFFICIENT_EVIDENCE`, or `INVALID`; PASS means a historical candidate only, never statistical significance, alpha, or holdout evidence. Synthetic fixtures always report `SYNTHETIC_ONLY_NOT_ASSESSED`, never PASS or GREEN.
 
 ## Failure and resource policy
 

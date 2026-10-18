@@ -13,7 +13,7 @@
   "identity": {
     "sourceCommit": "1c7b6dccd886f57e866c7d359c091b1e72a193ea",
     "protocolSha256": "RAW_FILE_SHA256_RECORDED_IN_EXECUTION_REQUEST",
-    "implementationSha256": "PENDING_FINAL_SOURCE_HASH",
+    "implementationSha256": "BOUND_IN_EXECUTION_REQUEST",
     "inputManifestSha256": "PENDING_CALLER_SUPPLIED_CANONICAL_SERIES"
   },
   "authority": {
@@ -191,10 +191,11 @@
     ],
     "neighbours": "At least 3 of 4 neighbours have positive diagnostic net return at 85bp and at least 3 of 4 at 160bp; neighbours are sign robustness only, not matched-control claims.",
     "statuses": ["PASS", "NO_EDGE", "INSUFFICIENT_EVIDENCE", "INVALID"],
+    "syntheticFixtureStatus": "SYNTHETIC_ONLY_NOT_ASSESSED; fixture rule checks are not historical outcomes and cannot produce GREEN.",
     "interpretation": "PASS is a historical candidate only. No statistical significance, alpha, prospective validation, or fresh holdout claim."
   },
   "reporting": {
-    "perPath": ["daily returns", "equity", "held target", "net return", "sampled drawdown", "drawdown duration", "turnover", "per-fill and cumulative cost", "exposure", "concentration", "quarter returns", "cancelled instructions", "path status"],
+    "perPath": ["daily net returns", "start/end equity", "mean daily held target", "net return", "sampled drawdown", "drawdown duration", "turnover", "per-fill and cumulative cost", "concentration", "quarter returns", "cancelled instructions", "path status"],
     "missingRisk": "No finite trade stop exists; trade CRV is explicitly UNDEFINED_NO_FINITE_STOP, null, research-only, and not a promotion failure/default zero."
   },
   "budget": {
