@@ -668,9 +668,10 @@ def run_b1_batch(database, claim, *, limits=None):
             return committed
         if error.reason == "PARENT_ACK_FAILED":
             return _unsettled(receipt["trialId"], error.reason)
-        outcome = "TIMED_OUT" if error.timed_out else ("PARTIAL" if
-                   (journal.inspect_b1(database, receipt["trialId"])["paths"]) else "FAILED")
         try:
+            current = journal.inspect_b1(database, receipt["trialId"])
+            outcome = "TIMED_OUT" if error.timed_out else (
+                "PARTIAL" if current["paths"] else "FAILED")
             return journal.settle_b1(
                 database, receipt, outcome, error.reason,
                 busy_timeout=MAX_JOURNAL_LOCK_WAIT_SECONDS, deadline=batch_deadline)

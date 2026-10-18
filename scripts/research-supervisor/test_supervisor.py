@@ -56,11 +56,12 @@ class ResearchSupervisorTests(unittest.TestCase):
         with patch.object(supervisor, "ADAPTER", FAULT_ADAPTER):
             return supervisor.run_batch(self.database, claim, limits=limits)
 
-    def lock_database(self):
-        code = r'''
+    def lock_database(self, exclusive=False):
+        begin = "EXCLUSIVE" if exclusive else "IMMEDIATE"
+        code = f'''
 import sqlite3,sys
 connection=sqlite3.connect(sys.argv[1],isolation_level=None)
-connection.execute('BEGIN IMMEDIATE')
+connection.execute('BEGIN {begin}')
 print('LOCKED',flush=True)
 sys.stdin.readline()
 connection.rollback()
@@ -451,6 +452,89 @@ process.stdout.write(JSON.stringify(runBatch({
         self.assertEqual(current["state"], "unknown")
         self.assertEqual(current["paths"], [])
         self.assertTrue(current["unresolved"])
+
+    def test_b1_child_failure_with_unreadable_journal_returns_unsettled(self):
+        claim = self.new_b1_claim("trial-b1-unreadable-journal")
+        with patch.object(supervisor, "_run_b1_child",
+                          side_effect=supervisor.ChildFailure("FRAME_TRUNCATED")), \
+                patch.object(journal, "inspect_b1",
+                             side_effect=journal.JournalError("PERSISTENCE_FAILURE")) as inspect, \
+                patch.object(journal, "settle_b1") as settle:
+            result = supervisor.run_b1_batch(self.database, claim)
+
+        self.assertEqual((result["state"], result["trialId"], result["reason"]),
+                         ("UNSETTLED", claim["trialId"], "PERSISTENCE_FAILURE"))
+        self.assertFalse(result["persistConfirmed"])
+        self.assertEqual(inspect.call_count, 2)
+        settle.assert_not_called()
+        current = journal.inspect_b1(self.database, claim["trialId"])
+        self.assertTrue(current["unresolved"])
+        self.assertEqual(current["attempts"], 1)
+        self.assertEqual(current["paths"], [])
+        with self.assertRaisesRegex(journal.JournalError, "ATTEMPT_CONSUMED"):
+            journal.start_b1(self.database, claim)
+
+    def test_b1_exclusive_lock_after_child_failure_returns_unsettled_and_reaps_child(self):
+        claim = self.new_b1_claim("trial-b1-child-failure-lock")
+        alias = self.b1_fault_adapter("path")
+        original_popen = subprocess.Popen
+        children = []
+        result = []
+        failure = []
+
+        def spawn(*args, **kwargs):
+            child = original_popen(*args, **kwargs)
+            if str(alias) in args[0]:
+                children.append(child)
+            return child
+
+        def execute():
+            try:
+                with patch.object(supervisor, "B1_ADAPTER", alias), \
+                        patch.object(supervisor.subprocess, "Popen", side_effect=spawn):
+                    result.append(supervisor.run_b1_batch(
+                        self.database, claim,
+                        limits={"path_seconds": 0.35, "batch_seconds": 2}))
+            except BaseException as error:
+                failure.append(error)
+
+        thread = threading.Thread(target=execute)
+        thread.start()
+        lock = None
+        try:
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline:
+                try:
+                    current = journal.inspect_b1(self.database, claim["trialId"])
+                    if current["paths"] and current["paths"][0]["state"] == "started":
+                        break
+                except journal.JournalError as error:
+                    if error.code != "DATABASE_BUSY":
+                        raise
+                time.sleep(0.005)
+            else:
+                self.fail("B1 fault child did not durably start its first path")
+
+            lock = self.lock_database(exclusive=True)
+            thread.join(3)
+            self.assertFalse(thread.is_alive(), "B1 persistence failure blocked beyond its deadline")
+            self.assertFalse(failure)
+            self.assertEqual(len(children), 1)
+            self.assertEqual((result[0]["state"], result[0]["trialId"], result[0]["reason"]),
+                             ("UNSETTLED", claim["trialId"], "DATABASE_BUSY"))
+            self.assertIsNotNone(children[0].poll(), "B1 child survived parent failure cleanup")
+        finally:
+            if lock is not None:
+                self.release_lock(lock)
+            thread.join(6)
+
+        current = journal.inspect_b1(self.database, claim["trialId"])
+        self.assertTrue(current["unresolved"])
+        self.assertEqual(current["attempts"], 1)
+        self.assertEqual([path["state"] for path in current["paths"]], ["started"])
+        self.assertEqual(journal.scheduler_tick_b1(self.database, enabled=True)["state"], "active")
+        with self.assertRaisesRegex(journal.JournalError, "ATTEMPT_CONSUMED"):
+            journal.start_b1(self.database, claim)
 
     def wait_for_path_state(self, trial_id, count, state, timeout=5):
         deadline = time.monotonic() + timeout
