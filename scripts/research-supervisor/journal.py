@@ -59,6 +59,40 @@ B1_VARIANTS = (
 B1_SCENARIOS = ("base-15bp", "stress-30bp", "stress-30bp-delay-1d")
 B1_CONTROL_IDS = ("frozen-mean-exposure", "frozen-risk-exposure")
 B1_COMPUTATION_LIMITS = {"path_seconds": MAX_PATH_SECONDS, "batch_seconds": MAX_BATCH_SECONDS}
+B1_ASSETS = ("XBTUSD", "ETHUSD", "SOLUSD", "XRPUSD", "LINKUSD", "AVAXUSD", "SUIUSD")
+B1_PATH_RESULT_KEYS = {
+    "attempts", "cancelledInstructionCount", "cancelledInstructions", "computed",
+    "dailyHeldTarget", "dailyReturnCount", "dailyReturnSd", "dailyReturns",
+    "diagnosticRescaling", "endEquity", "fillCostCount", "fillCosts", "kind",
+    "maxAbsoluteTargetMismatch", "maxConcentration", "maxDrawdownDuration",
+    "meanAbsoluteTargetMismatch", "meanHeldTarget", "meanRealizedExposure",
+    "meanTargetRealizedMismatch", "netReturn", "observationClass", "pathId",
+    "quarterlyReturns", "rows", "sampledDrawdown", "scenarioId", "segmentId",
+    "startEquity", "status", "totalCosts", "tradeCRV",
+    "turnoverNotional", "turnoverOnInitialEquity", "variantId",
+}
+B1_SUMMARY_KEYS = {
+    "attemptedPaths", "authority", "budget", "completedPaths", "computedPaths",
+    "controlRealization", "evidence", "executionId", "failure", "identity",
+    "implementationId", "implementationSha256", "plannedPaths", "protocolId",
+    "protocolReview", "protocolSha256", "schema", "screen", "status",
+}
+B1_SCREEN_CHECKS = {
+    "primaryDiagnosticNetPositive", "primaryDiagnosticDrawdownAtMost25Percent",
+    "primaryReturnAtLeastBothFrozenControls", "primaryDrawdownAtMostBothFrozenControls",
+    "relativeDrawdownReductionAtLeast20Percent", "primaryNetPositiveAt30bpNonDelayed",
+    "primaryNetPositiveAt30bpPlusDelay", "atLeastThreeOfFourNeighboursPositiveAt15bp",
+    "atLeastThreeOfFourNeighboursPositiveAt30bpNonDelayed",
+}
+B1_SCREEN_KEYS = {
+    "status", "interpretation", "comparisonSegment", "neighbourStressScenario", "checks",
+    "relativeDrawdownReduction", "neighbourPositiveCounts", "stopPolicy", "tradeCRV",
+}
+B1_EVIDENCE_KEYS = {
+    "syntheticFixture", "priceSource", "costModel", "executionEvidence", "sourceAuthenticity",
+    "survivorship", "historyLabel", "candidateInterpretation", "diagnosticRescaling",
+    "holdoutClaim", "trialLedger", "stoppedPolicy", "crv",
+}
 
 
 def _b1_profile():
@@ -71,13 +105,16 @@ def _b1_profile():
     expected = {
         "profile", "schemaVersion", "protocolId", "protocolSha256", "implementationId",
         "implementationSha256", "inputSha256", "manifestSha256", "computationOrderSha256",
-        "sourceFiles", "sourceSha256", "pathIds", "computationOrder",
+        "sourceFiles", "sourceSha256", "pathDescriptors", "pathIds", "computationOrder",
     }
     _need(type(profile) is dict and set(profile) == expected
           and profile["profile"] == B1_PROFILE_NAME and profile["schemaVersion"] == 2
           and profile["protocolId"] == "MERIDIAN-B1-7-PROTOCOL-R3-20261018"
           and profile["protocolSha256"] == "a78e1ae8c71c8f85baee5b51f5691643fc29136f636f19465c61f553afe09185"
           and profile["sourceFiles"] == B1_SOURCE_FILES
+          and type(profile["pathDescriptors"]) is list and len(profile["pathDescriptors"]) == 44
+          and all(type(item) is list and len(item) == 4
+                  and all(type(value) is str for value in item) for item in profile["pathDescriptors"])
           and type(profile["pathIds"]) is list and len(profile["pathIds"]) == 44
           and all(_digest(item) for item in profile["pathIds"])
           and len(set(profile["pathIds"])) == 44
@@ -127,6 +164,9 @@ def _b1_profile():
     for segment in ("development", "diagnostic"):
         descriptors.append({"kind": "CASH", "variantId": "cash-zero",
                             "scenarioId": "scenario-independent", "segmentId": segment})
+    descriptor_rows = [[item["kind"], item["variantId"], item["scenarioId"], item["segmentId"]]
+                       for item in descriptors]
+    _need(profile["pathDescriptors"] == descriptor_rows, "B1_MANIFEST_PIN_MISMATCH")
     paths = tuple({**item, "pathId": path_id} for item, path_id in zip(descriptors, profile["pathIds"]))
     manifest_digest = hashlib.sha256(_canonical(list(paths)).encode()).hexdigest()
     computation = [
@@ -784,7 +824,7 @@ def initialize_b1(database):
             owner TEXT, fence INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL,
             started_at TEXT, finished_at TEXT, progress_json TEXT NOT NULL DEFAULT '[]',
             controls_json BLOB, controls_sha256 TEXT, summary_json BLOB, summary_sha256 TEXT,
-            reason TEXT
+            reason TEXT, control_primary_sha256 TEXT, control_basket_sha256 TEXT
         )""")
         connection.execute("""CREATE TABLE b1_path_payloads (
             trial_id TEXT NOT NULL, computation_index INTEGER NOT NULL,
@@ -897,16 +937,226 @@ def _b1_parse(raw, code):
     except (ValueError, TypeError, RecursionError):
         raise JournalError(code)
 
-    def finite_tree(item):
-        if type(item) is float:
-            return __import__("math").isfinite(item)
-        if type(item) is list:
-            return all(finite_tree(child) for child in item)
-        if type(item) is dict:
-            return all(finite_tree(child) for child in item.values())
-        return item is None or type(item) in (str, int, bool)
-    _need(finite_tree(value), code)
+    _need(_b1_finite_tree(value), code)
     return value
+
+
+def _b1_finite_tree(item):
+    if type(item) is float:
+        return __import__("math").isfinite(item)
+    if type(item) is list:
+        return all(_b1_finite_tree(child) for child in item)
+    if type(item) is dict:
+        return all(_b1_finite_tree(child) for child in item.values())
+    return item is None or type(item) in (str, int, bool)
+
+
+def _validate_b1_path_payload(payload, expected):
+    rows = 180 if expected["segmentId"] == "development" else 365
+    expected_keys = B1_PATH_RESULT_KEYS | ({"targetExposure"} if expected["kind"] != "CANDIDATE" else set())
+    _need(type(payload) is dict and set(payload) == expected_keys
+          and payload.get("pathId") == expected["pathId"]
+          and payload.get("kind") == expected["kind"]
+          and payload.get("variantId") == expected["variantId"]
+          and payload.get("scenarioId") == expected["scenarioId"]
+          and payload.get("segmentId") == expected["segmentId"]
+          and payload.get("status") == "COMPLETED"
+          and type(payload.get("attempts")) is int and payload["attempts"] == 1
+          and payload.get("computed") is True
+          and type(payload.get("rows")) is int and payload["rows"] == rows
+          and type(payload.get("dailyReturnCount")) is int and payload["dailyReturnCount"] == rows
+          and type(payload.get("dailyReturns")) is list and len(payload["dailyReturns"]) == rows
+          and type(payload.get("dailyHeldTarget")) is list and len(payload["dailyHeldTarget"]) == rows
+          and all(type(value) in (int, float) and __import__("math").isfinite(value)
+                  for value in payload["dailyReturns"] + payload["dailyHeldTarget"])
+          and type(payload.get("quarterlyReturns")) is list
+          and len(payload["quarterlyReturns"]) == (2 if rows == 180 else 4)
+          and all(type(item) is dict and set(item) == {"quarter", "netReturn"}
+                  and type(item["quarter"]) is str
+                  and re.fullmatch(r"\d{4}-Q[1-4]", item["quarter"]) is not None
+                  and type(item["netReturn"]) in (int, float)
+                  and __import__("math").isfinite(item["netReturn"])
+                  for item in payload["quarterlyReturns"])
+          and type(payload.get("fillCosts")) is list
+          and type(payload.get("fillCostCount")) is int
+          and payload["fillCostCount"] == len(payload["fillCosts"])
+          and all(type(item) is dict and set(item) == {
+                      "date", "kind", "turnover", "cost", "cumulativeCost",
+                      "equityAfterFees", "cashAfterFees", "conservationResidual",
+                  } and type(item["date"]) is str and
+                  re.fullmatch(r"\d{4}-\d{2}-\d{2}T00:00:00Z", item["date"]) is not None
+                  and item["kind"] in ("REBALANCE", "TERMINAL_LIQUIDATION")
+                  and all(type(item[key]) in (int, float) and __import__("math").isfinite(item[key])
+                          for key in ("turnover", "cost", "cumulativeCost", "equityAfterFees",
+                                      "cashAfterFees", "conservationResidual"))
+                  for item in payload["fillCosts"])
+          and type(payload.get("cancelledInstructions")) is list
+          and type(payload.get("cancelledInstructionCount")) is int
+          and payload["cancelledInstructionCount"] == len(payload["cancelledInstructions"])
+          and all(type(item) is dict and set(item) == {
+                      "decisionIndex", "fillIndex", "target", "decisionTimestamp", "reason",
+                  } and type(item["decisionIndex"]) is int and type(item["fillIndex"]) is int
+                  and type(item["target"]) in (int, float) and __import__("math").isfinite(item["target"])
+                  and item["reason"] == "BEYOND_SEGMENT_HORIZON"
+                  for item in payload["cancelledInstructions"])
+          and payload.get("diagnosticRescaling") == "NONE"
+          and payload.get("observationClass") == "HISTORICAL_DIAGNOSTIC_NOT_HOLDOUT"
+          and type(payload.get("tradeCRV")) is dict
+          and payload["tradeCRV"].get("status") == "UNDEFINED_NO_FINITE_STOP"
+          and payload["tradeCRV"].get("value") is None
+          and payload["tradeCRV"].get("promotionEligible") is False
+          and (expected["kind"] == "CANDIDATE" or
+               (type(payload.get("targetExposure")) in (int, float)
+                and __import__("math").isfinite(payload["targetExposure"])))
+          and all(type(payload.get(key)) in (int, float) and
+                  __import__("math").isfinite(payload[key]) for key in (
+                      "dailyReturnSd", "endEquity", "maxAbsoluteTargetMismatch",
+                      "maxConcentration", "maxDrawdownDuration", "meanAbsoluteTargetMismatch",
+                      "meanHeldTarget", "meanRealizedExposure", "meanTargetRealizedMismatch",
+                      "netReturn", "sampledDrawdown", "startEquity",
+                      "totalCosts", "turnoverNotional", "turnoverOnInitialEquity"))
+          and (expected["kind"] == "CASH"
+               and payload["fillCosts"] == [] and payload["totalCosts"] == 0
+               and all(value == 0 for value in payload["dailyReturns"])
+               or expected["kind"] != "CASH" and bool(payload["fillCosts"])
+               and payload["fillCosts"][-1]["kind"] == "TERMINAL_LIQUIDATION"),
+          "PATH_RESULT_INVALID")
+
+
+def _validate_b1_summary(summary, profile, *, allow_insufficient=False):
+    _need(type(summary) is dict, "RESULT_SCHEMA_INVALID")
+    identity = summary.get("identity") if type(summary) is dict else None
+    authority = summary.get("authority") if type(summary) is dict else None
+    status = summary.get("status") if type(summary) is dict else None
+    if status == "COMPLETED":
+        counts_valid = (summary.get("attemptedPaths") == 44 and
+                        summary.get("completedPaths") == 44 and
+                        summary.get("computedPaths") == 44 and summary.get("failure") is None)
+    else:
+        counts_valid = (allow_insufficient and status == "INSUFFICIENT_EVIDENCE" and
+                        summary.get("attemptedPaths") == 19 and
+                        summary.get("completedPaths") == 19 and
+                        summary.get("computedPaths") == 19 and summary.get("failure") is None)
+    screen = summary.get("screen")
+    evidence = summary.get("evidence")
+    budget = summary.get("budget")
+    realization = summary.get("controlRealization")
+    screen_valid = (
+        type(screen) is dict and set(screen) == {"status"}
+        and screen["status"] == "INSUFFICIENT_EVIDENCE"
+    ) if status == "INSUFFICIENT_EVIDENCE" else (
+        type(screen) is dict and set(screen) == B1_SCREEN_KEYS
+        and screen.get("status") == "SYNTHETIC_ONLY_NOT_ASSESSED"
+        and screen.get("interpretation") == "SYNTHETIC_FIXTURE_RULE_CHECKS_ONLY"
+        and screen.get("comparisonSegment") == "diagnostic"
+        and screen.get("neighbourStressScenario") == "stress-30bp-non-delayed"
+        and screen.get("stopPolicy") == "NO_FINITE_TRADE_STOP"
+        and type(screen.get("checks")) is dict
+        and set(screen["checks"]) == B1_SCREEN_CHECKS
+        and all(type(value) is bool for value in screen["checks"].values())
+        and type(screen.get("neighbourPositiveCounts")) is dict
+        and set(screen["neighbourPositiveCounts"]) == {"base15bp", "stress30bp"}
+        and all(type(value) is int and 0 <= value <= 4
+                for value in screen["neighbourPositiveCounts"].values())
+        and type(screen.get("tradeCRV")) is dict
+        and set(screen["tradeCRV"]) == {"status", "value"}
+        and screen["tradeCRV"] == {"status": "UNDEFINED_NO_FINITE_STOP", "value": None}
+        and (screen.get("relativeDrawdownReduction") is None or
+             type(screen["relativeDrawdownReduction"]) in (int, float)
+             and __import__("math").isfinite(screen["relativeDrawdownReduction"]))
+    )
+    realization_keys = {
+        "pathId", "variantId", "scenarioId", "segmentId", "status",
+        "frozenTargetExposure", "meanRealizedExposure", "meanTargetRealizedMismatch",
+        "meanAbsoluteTargetMismatch", "maxAbsoluteTargetMismatch", "diagnosticRescaling",
+    }
+    numeric_or_null = lambda value: value is None or (
+        type(value) in (int, float) and __import__("math").isfinite(value))
+    realization_valid = (
+        type(realization) is list and len(realization) == 6
+        and all(type(item) is dict and set(item) == realization_keys
+                and item.get("kind") is None
+                and item.get("pathId") in {path["pathId"] for path in profile["paths"]
+                                           if path["kind"] == "FIXED_CONTROL"}
+                and item.get("segmentId") == "diagnostic"
+                and item.get("diagnosticRescaling") == "NONE"
+                and all(numeric_or_null(item.get(key)) for key in (
+                    "frozenTargetExposure", "meanRealizedExposure", "meanTargetRealizedMismatch",
+                    "meanAbsoluteTargetMismatch", "maxAbsoluteTargetMismatch"))
+                for item in realization)
+    )
+    budget_valid = (
+        type(budget) is dict and set(budget) == {
+            "limits", "attemptsPerStartedPath", "automaticRetry", "status",
+        }
+        and type(budget["limits"]) is dict and set(budget["limits"]) == {
+            "paths", "pathMs", "totalMs", "outputBytes", "attemptsPerPath",
+        }
+        and budget["limits"] == {
+            "paths": 44, "pathMs": 60_000, "totalMs": 1_800_000,
+            "outputBytes": MAX_RESULT_BYTES, "attemptsPerPath": 1,
+        }
+        and budget["attemptsPerStartedPath"] == 1
+        and budget["automaticRetry"] is False and budget["status"] == "WITHIN_LIMITS"
+    )
+    evidence_valid = (
+        type(evidence) is dict and set(evidence) == B1_EVIDENCE_KEYS
+        and evidence.get("syntheticFixture") is True
+        and evidence.get("priceSource") == "SYNTHETIC_FIXTURE"
+        and evidence.get("costModel") == "OKX_INSPIRED_ASSUMED_15_30BP_NOT_EXECUTION_EVIDENCE"
+        and evidence.get("executionEvidence") == "NOT_OKX_EXECUTION_EVIDENCE"
+        and evidence.get("sourceAuthenticity") == "SYNTHETIC_ONLY"
+        and evidence.get("holdoutClaim") is False
+        and evidence.get("trialLedger") == "UNKNOWN"
+        and evidence.get("diagnosticRescaling") == "NONE"
+        and evidence.get("crv") == {
+            "status": "UNDEFINED_NO_FINITE_STOP", "value": None, "researchOnly": True,
+        }
+    )
+    _need(type(summary) is dict and set(summary) == B1_SUMMARY_KEYS
+          and summary.get("schema") == "MERIDIAN_B1_7_ENGINE_RESULT_R3"
+          and summary.get("protocolId") == profile["protocolId"]
+          and summary.get("protocolSha256") == profile["protocolSha256"]
+          and summary.get("implementationId") == profile["implementationId"]
+          and summary.get("implementationSha256") == profile["implementationSha256"]
+          and counts_valid and summary.get("plannedPaths") == 44
+          and type(identity) is dict and set(identity) == {
+              "datasetKind", "sourceCommit", "sourceProvenance", "canonicalSeriesSha256",
+              "inputSha256",
+          }
+          and identity.get("datasetKind") == "SYNTHETIC_FIXTURE"
+          and identity.get("sourceCommit") == "SYNTHETIC_FIXTURE"
+          and identity.get("inputSha256") == profile["inputSha256"]
+          and type(identity.get("canonicalSeriesSha256")) is dict
+          and set(identity["canonicalSeriesSha256"]) == set(B1_ASSETS)
+          and identity.get("sourceProvenance") ==
+              {"syntheticFixtureSeriesSha256": identity["canonicalSeriesSha256"]}
+          and type(authority) is dict and set(authority) == {
+              "researchOnly", "executionAuthorized", "strategyPnlAuthorized",
+              "discoveryAuthorized", "validationAuthorized", "holdoutAuthorized",
+              "paperAuthorized", "liveAuthorized",
+          }
+          and authority["researchOnly"] is True
+          and all(value is False for key, value in authority.items() if key != "researchOnly")
+          and screen_valid and evidence_valid and budget_valid and realization_valid
+          and type(summary.get("protocolReview")) is dict
+          and set(summary["protocolReview"]) == {
+              "r1RequestId", "r1ResponseComment", "r1Verdict", "r2RequestId",
+              "r2ResponseComment", "r2Verdict", "r2Scope", "r3Review",
+          },
+          "RESULT_SCHEMA_INVALID")
+    input_identity = {key: value for key, value in identity.items() if key != "inputSha256"}
+    _need(hashlib.sha256(_canonical(input_identity).encode()).hexdigest() == profile["inputSha256"],
+          "RESULT_IDENTITY_INVALID")
+    execution_id = hashlib.sha256(_canonical({
+        "protocolId": profile["protocolId"],
+        "protocolSha256": profile["protocolSha256"],
+        "implementationId": profile["implementationId"],
+        "implementationSha256": profile["implementationSha256"],
+        "inputSha256": profile["inputSha256"],
+        "pathIds": profile["pathIds"],
+    }).encode()).hexdigest()
+    _need(summary.get("executionId") == execution_id, "RESULT_IDENTITY_INVALID")
 
 
 def _b1_job(connection, trial_id):
@@ -914,7 +1164,8 @@ def _b1_job(connection, trial_id):
     _need(row is not None, "TRIAL_NOT_FOUND")
     profile = _b1_profile()
     (trial_id, trial_key, identity_raw, state, attempts, owner, fence, created_at, started_at,
-     finished_at, progress_raw, controls_raw, controls_sha, summary_raw, summary_sha, reason) = row
+     finished_at, progress_raw, controls_raw, controls_sha, summary_raw, summary_sha, reason,
+     primary_control_sha, basket_control_sha) = row
     identity = _b1_parse(identity_raw, "STORED_JOB_CORRUPT")
     progress = _b1_parse(progress_raw, "STORED_PROGRESS")
     controls = None
@@ -953,14 +1204,7 @@ def _b1_job(connection, trial_id):
                   and hashlib.sha256(payload_row[0]).hexdigest() == payload_row[1]
                   and payload_row[1] == item["payloadSha256"], "STORED_PATH_PAYLOAD")
             path_result = _b1_parse(payload_row[0], "STORED_PATH_PAYLOAD")
-            _need(type(path_result) is dict and path_result.get("status") == "COMPLETED"
-                  and path_result.get("pathId") == expected["pathId"]
-                  and path_result.get("attempts") == 1
-                  and path_result.get("kind") == expected["kind"]
-                  and path_result.get("variantId") == expected["variantId"]
-                  and path_result.get("scenarioId") == expected["scenarioId"]
-                  and path_result.get("segmentId") == expected["segmentId"],
-                  "STORED_PATH_PAYLOAD")
+            _validate_b1_path_payload(path_result, expected)
         else:
             _need(connection.execute(
                 "SELECT 1 FROM b1_path_payloads WHERE trial_id=? AND computation_index=?",
@@ -971,6 +1215,7 @@ def _b1_job(connection, trial_id):
           "STORED_PATH_PAYLOAD")
     if controls_raw is not None:
         _need(_digest(controls_sha) and hashlib.sha256(controls_raw).hexdigest() == controls_sha
+              and _digest(primary_control_sha) and _digest(basket_control_sha)
               and len(progress) >= 19 and all(item["state"] == "completed" for item in progress[:18])
               and (progress[18]["state"] == "completed"
                    or _b1_parse(controls_raw, "STORED_CONTROLS").get("status")
@@ -979,17 +1224,17 @@ def _b1_job(connection, trial_id):
         controls = _b1_parse(controls_raw, "STORED_CONTROLS")
         _need(type(controls) is dict and controls.get("status") in
               ("FROZEN_DEVELOPMENT_ONLY", "INSUFFICIENT_EVIDENCE"), "STORED_CONTROLS")
+        bound_results = []
+        for computation_index, expected_sha in ((0, primary_control_sha), (15, basket_control_sha)):
+            stored = connection.execute(
+                "SELECT payload,payload_sha256 FROM b1_path_payloads "
+                "WHERE trial_id=? AND computation_index=?",
+                (trial_id, computation_index)).fetchone()
+            _need(stored is not None and hashlib.sha256(stored[0]).hexdigest() == stored[1]
+                  and stored[1] == expected_sha, "STORED_CONTROLS")
+            bound_results.append(_b1_parse(stored[0], "STORED_PATH_PAYLOAD"))
         if controls["status"] == "FROZEN_DEVELOPMENT_ONLY":
-            sources = []
-            for computation_index in (0, 15):
-                stored = connection.execute(
-                    "SELECT payload,payload_sha256 FROM b1_path_payloads "
-                    "WHERE trial_id=? AND computation_index=?",
-                    (trial_id, computation_index)).fetchone()
-                _need(stored is not None and hashlib.sha256(stored[0]).hexdigest() == stored[1],
-                      "STORED_CONTROLS")
-                sources.append(_b1_parse(stored[0], "STORED_PATH_PAYLOAD"))
-            primary, basket = sources
+            primary, basket = bound_results
             _need(controls.get("meanExposure") == primary.get("meanHeldTarget")
                   and controls.get("primaryDevelopmentSd") == primary.get("dailyReturnSd")
                   and controls.get("fullBasketDevelopmentSd") == basket.get("dailyReturnSd")
@@ -997,7 +1242,8 @@ def _b1_job(connection, trial_id):
                       1, controls["primaryDevelopmentSd"] / controls["fullBasketDevelopmentSd"]),
                   "STORED_CONTROLS")
     else:
-        _need(controls_sha is None and len(progress) < 20, "STORED_CONTROLS")
+        _need(controls_sha is None and primary_control_sha is None and basket_control_sha is None
+              and len(progress) < 20, "STORED_CONTROLS")
     result = None
     if summary_raw is not None:
         _need(_digest(summary_sha) and hashlib.sha256(summary_raw).hexdigest() == summary_sha,
@@ -1009,18 +1255,44 @@ def _b1_job(connection, trial_id):
               and summary.get("protocolSha256") == profile["protocolSha256"]
               and summary.get("implementationSha256") == profile["implementationSha256"]
               and isinstance(controls_raw, bytes), "STORED_RESULT_CORRUPT")
+        if state == "COMPLETED":
+            _validate_b1_summary(summary, profile)
+        elif summary.get("status") == "INSUFFICIENT_EVIDENCE":
+            _validate_b1_summary(summary, profile, allow_insufficient=True)
+            _need(controls is not None and controls.get("status") == "INSUFFICIENT_EVIDENCE"
+                  and len(progress) == 19 and payload_count == 19
+                  and all(item["state"] == "completed" for item in progress),
+                  "STORED_RESULT_CORRUPT")
+        else:
+            raise JournalError("STORED_RESULT_CORRUPT")
         by_id = {}
         for index in range(payload_count):
             payload = connection.execute(
                 "SELECT payload FROM b1_path_payloads WHERE trial_id=? AND computation_index=?",
                 (trial_id, index)).fetchone()
             projected = _b1_parse(payload[0], "STORED_PATH_PAYLOAD")
+            expected = next((item for item in paths
+                             if item["pathId"] == projected.get("pathId")), None)
+            _need(expected is not None, "STORED_PATH_PAYLOAD")
+            _validate_b1_path_payload(projected, expected)
             by_id[projected["pathId"]] = projected
         _need(len(by_id) == payload_count, "STORED_PATH_PAYLOAD")
         result = dict(summary)
         result["controlDefinitions"] = _b1_parse(controls_raw, "STORED_CONTROLS")
-        result["paths"] = [by_id[path["pathId"]] for path in paths if path["pathId"] in by_id]
-        _need(len(result["paths"]) == payload_count, "STORED_PATH_PAYLOAD")
+        result["paths"] = []
+        for descriptor in paths:
+            result_path = by_id.get(descriptor["pathId"])
+            if result_path is None and summary.get("status") == "INSUFFICIENT_EVIDENCE":
+                result_path = {
+                    **descriptor, "status": "NOT_RUN_INSUFFICIENT_EVIDENCE",
+                    "attempts": 0, "computed": False, "failure": None,
+                }
+            if result_path is not None:
+                result["paths"].append(result_path)
+        projected_path_count = 44 if summary.get("status") == "INSUFFICIENT_EVIDENCE" else payload_count
+        _need(len(result["paths"]) == projected_path_count, "STORED_PATH_PAYLOAD")
+        if summary.get("status") == "INSUFFICIENT_EVIDENCE":
+            _need(len(result["paths"]) == 44, "STORED_RESULT_CORRUPT")
     else:
         _need(summary_sha is None and state != "COMPLETED",
               "STORED_RESULT_CORRUPT")
@@ -1045,6 +1317,9 @@ def _b1_job(connection, trial_id):
         _need(attempts == 1 and type(owner) is str and 0 < fence <= MAX_INT, "STORED_JOB_STATE")
     else:
         _need(attempts == 0 and owner is None and fence == 0, "STORED_JOB_STATE")
+    result_raw = (json.dumps(result, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+                             allow_nan=False) if result is not None else None)
+    result_digest = hashlib.sha256(result_raw.encode()).hexdigest() if result_raw is not None else None
     return {
         "trialId": trial_id, "trialKey": trial_key,
         "state": "unknown" if state in ("CLAIMED", "RUNNING") else state.lower(),
@@ -1056,9 +1331,11 @@ def _b1_job(connection, trial_id):
         "computationPathIds": [item["pathId"] for item in computation],
         "timestamps": {"createdAt": created_at, "startedAt": started_at, "finishedAt": finished_at},
         "paths": progress, "controls": controls_raw.decode("utf-8") if controls_raw else None,
-        "result": json.dumps(result, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
-                             allow_nan=False) if result is not None else None,
-        "resultSha256": summary_sha, "reason": reason,
+        "controlBindings": ({"primaryDevelopmentSha256": primary_control_sha,
+                             "fullBasketDevelopmentSha256": basket_control_sha}
+                            if controls_raw else None),
+        "result": result_raw, "resultSha256": result_digest,
+        "summarySha256": summary_sha, "reason": reason,
         "unresolved": state in ("CLAIMED", "RUNNING"),
         "executionAuthorized": False, "promotionAuthorized": False,
         "profitabilityInferred": False,
@@ -1193,13 +1470,8 @@ def record_b1_path_completed(database, receipt, index, payload_bytes, *, busy_ti
     digest = hashlib.sha256(payload_bytes).hexdigest()
     payload = _b1_parse(payload_bytes, "PATH_RESULT_INVALID")
     expected = profile["computation"][index] if type(index) is int and 0 <= index < 44 else None
-    _need(expected is not None and type(payload) is dict
-          and payload.get("status") == "COMPLETED" and payload.get("attempts") == 1
-          and payload.get("pathId") == expected["pathId"]
-          and payload.get("kind") == expected["kind"]
-          and payload.get("variantId") == expected["variantId"]
-          and payload.get("scenarioId") == expected["scenarioId"]
-          and payload.get("segmentId") == expected["segmentId"], "PATH_RESULT_INVALID")
+    _need(expected is not None, "PATH_RESULT_INVALID")
+    _validate_b1_path_payload(payload, expected)
 
     def operation(connection):
         row = _b1_bound(connection, receipt)
@@ -1207,6 +1479,15 @@ def record_b1_path_completed(database, receipt, index, payload_bytes, *, busy_ti
         _need(row[3] == "RUNNING" and type(index) is int and index == len(progress) - 1
               and index >= 0 and progress[index]["state"] == "started"
               and progress[index]["pathId"] == expected["pathId"], "PATH_ORDER")
+        if expected["kind"] == "FULL_BASKET":
+            _need(payload["targetExposure"] == 1, "PATH_RESULT_INVALID")
+        elif expected["kind"] == "CASH":
+            _need(payload["targetExposure"] == 0, "PATH_RESULT_INVALID")
+        elif expected["kind"] == "FIXED_CONTROL":
+            controls = _b1_parse(row[11], "STORED_CONTROLS")
+            target = controls["meanExposure"] if expected["variantId"] == "frozen-mean-exposure" \
+                else controls["riskExposure"]
+            _need(payload["targetExposure"] == target, "PATH_RESULT_INVALID")
         _need(connection.execute("SELECT 1 FROM b1_path_payloads WHERE trial_id=? "
                                  "AND computation_index=?", (row[0], index)).fetchone() is None,
               "PATH_DUPLICATE")
@@ -1279,8 +1560,16 @@ def record_b1_controls(database, receipt, controls_bytes, *, busy_timeout=5, dea
                       1, controls["primaryDevelopmentSd"] / controls["fullBasketDevelopmentSd"]),
                   "CONTROLS_BINDING_INVALID")
         digest = hashlib.sha256(controls_bytes).hexdigest()
-        connection.execute("UPDATE b1_jobs SET controls_json=?,controls_sha256=? WHERE trial_id=?",
-                           (controls_bytes, digest, row[0]))
+        primary = connection.execute(
+            "SELECT payload_sha256 FROM b1_path_payloads WHERE trial_id=? AND computation_index=0",
+            (row[0],)).fetchone()
+        basket = connection.execute(
+            "SELECT payload_sha256 FROM b1_path_payloads WHERE trial_id=? AND computation_index=15",
+            (row[0],)).fetchone()
+        _need(primary is not None and basket is not None, "CONTROLS_BINDING_INVALID")
+        connection.execute("""UPDATE b1_jobs SET controls_json=?,controls_sha256=?,
+            control_primary_sha256=?,control_basket_sha256=? WHERE trial_id=?""",
+            (controls_bytes, digest, primary[0], basket[0], row[0]))
         return _b1_job(connection, row[0])
     return _b1_run(database, operation, busy_timeout, deadline)
 
@@ -1302,17 +1591,12 @@ def settle_b1(database, receipt, outcome, reason, summary_bytes=None, *,
               and summary["identity"].get("inputSha256") == _b1_profile()["inputSha256"],
               "RESULT_INVALID")
     if outcome == "COMPLETED":
-        _need(summary is not None and summary.get("status") == "COMPLETED"
-              and summary.get("attemptedPaths") == 44 and summary.get("completedPaths") == 44
-              and summary.get("plannedPaths") == 44, "INCOMPLETE_BATCH")
-        authority = summary.get("authority")
-        _need(type(authority) is dict and set(authority) == {
-                  "researchOnly", "executionAuthorized", "strategyPnlAuthorized",
-                  "discoveryAuthorized", "validationAuthorized", "holdoutAuthorized",
-                  "paperAuthorized", "liveAuthorized",
-              } and authority["researchOnly"] is True
-              and all(value is False for key, value in authority.items() if key != "researchOnly"),
-              "RESULT_AUTHORITY_INVALID")
+        _need(summary is not None, "INCOMPLETE_BATCH")
+        _validate_b1_summary(summary, _b1_profile())
+    elif summary is not None:
+        _need(outcome == "FAILED" and summary.get("status") == "INSUFFICIENT_EVIDENCE",
+              "RESULT_SCHEMA_INVALID")
+        _validate_b1_summary(summary, _b1_profile(), allow_insufficient=True)
 
     def operation(connection):
         row = _b1_bound(connection, receipt)
@@ -1322,6 +1606,10 @@ def settle_b1(database, receipt, outcome, reason, summary_bytes=None, *,
             _need(row[3] == "RUNNING" and len(progress) == 44
                   and all(item["state"] == "completed" for item in progress)
                   and controls is not None and controls.get("status") == "FROZEN_DEVELOPMENT_ONLY",
+                  "INCOMPLETE_BATCH")
+        elif summary is not None:
+            _need(controls is not None and controls.get("status") == "INSUFFICIENT_EVIDENCE"
+                  and len(progress) == 19 and all(item["state"] == "completed" for item in progress),
                   "INCOMPLETE_BATCH")
         if summary is not None:
             _need(row[14] is None, "RESULT_ALREADY_SETTLED")

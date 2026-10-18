@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -95,6 +96,11 @@ connection.close()
         self.assertEqual(outcome["claim"]["trialId"], queued["trialId"])
         return outcome["claim"]
 
+    def b1_fault_adapter(self, mode):
+        alias = Path(self.temporary.name) / f"b1-{mode}-adapter.mjs"
+        alias.write_text(f"import {json.dumps((ROOT / 'test_b1_fault_adapter.mjs').as_uri())};\n")
+        return alias
+
     @staticmethod
     def direct_b1_result():
         code = r'''
@@ -128,6 +134,14 @@ process.stdout.write(JSON.stringify(runBatch({
             completed = supervisor.run_b1_batch(self.database, claim)
         self.assertEqual(child_start.call_count, 1)
         self.assertEqual(completed["state"], "completed")
+        self.assertEqual(completed["resultSha256"],
+                         hashlib.sha256(completed["result"].encode()).hexdigest())
+        with sqlite_connect(self.database) as connection:
+            summary_bytes, stored_summary_sha = connection.execute(
+                "SELECT summary_json,summary_sha256 FROM b1_jobs WHERE trial_id=?",
+                (completed["trialId"],)).fetchone()
+        self.assertEqual(stored_summary_sha, hashlib.sha256(summary_bytes).hexdigest())
+        self.assertEqual(completed["summarySha256"], hashlib.sha256(summary_bytes).hexdigest())
         actual = json.loads(completed["result"])
         self.assertEqual(actual, direct)
         self.assertEqual([path["pathId"] for path in actual["paths"]], direct["paths"] and
@@ -136,6 +150,17 @@ process.stdout.write(JSON.stringify(runBatch({
         self.assertEqual(progress["attempts"], 1)
         self.assertFalse(progress["unresolved"])
         self.assertEqual(len(progress["paths"]), 44)
+        self.assertEqual([item["phase"] for item in progress["paths"][:19]],
+                         ["DEVELOPMENT"] * 19)
+        self.assertEqual([item["phase"] for item in progress["paths"][19:]],
+                         ["DIAGNOSTIC"] * 25)
+        profile = journal._b1_profile()
+        self.assertEqual([item["pathId"] for item in progress["paths"]],
+                         [item["pathId"] for item in profile["computation"]])
+        self.assertEqual(progress["controlBindings"], {
+            "primaryDevelopmentSha256": progress["paths"][0]["payloadSha256"],
+            "fullBasketDevelopmentSha256": progress["paths"][15]["payloadSha256"],
+        })
         self.assertEqual(progress["controls"], json.dumps(
             direct["controlDefinitions"], separators=(",", ":"), ensure_ascii=True))
         self.assertTrue(direct["authority"]["researchOnly"])
@@ -151,9 +176,244 @@ process.stdout.write(JSON.stringify(runBatch({
             journal.record_b1_path_started(self.database, started, 1, "0" * 64)
         with self.assertRaisesRegex(journal.JournalError, "PATH_ORDER"):
             journal.record_b1_path_started(self.database, started, 0, "0" * 64)
+        controls = {
+            "status": "FROZEN_DEVELOPMENT_ONLY",
+            "meanExposure": 0.2,
+            "riskExposure": 0.3,
+            "primaryDevelopmentSd": 0.1,
+            "fullBasketDevelopmentSd": 0.2,
+            "calibration": "DEVELOPMENT_15BP_DAILY_NET_RETURNS_AND_HELD_TARGETS",
+        }
+        with self.assertRaisesRegex(journal.JournalError, "CONTROLS_ORDER"):
+            journal.record_b1_controls(self.database, started, json.dumps(controls).encode())
         self.assertEqual(journal.inspect_b1(self.database, claim["trialId"])["paths"], [])
+        expected_path = journal._b1_profile()["computation"][0]["pathId"]
+        journal.record_b1_path_started(self.database, started, 0, expected_path)
+        with self.assertRaisesRegex(journal.JournalError, "PATH_ORDER"):
+            journal.record_b1_path_started(self.database, started, 0, expected_path)
         with self.assertRaisesRegex(journal.JournalError, "ATTEMPT_CONSUMED"):
             journal.start_b1(self.database, claim)
+
+    def test_b1_controls_are_bound_to_committed_development_results_once(self):
+        direct = self.direct_b1_result()
+        claim = self.new_b1_claim("trial-b1-control-freeze")
+        journal.start_b1(self.database, claim)
+        profile = journal._b1_profile()
+        paths_by_id = {path["pathId"]: path for path in direct["paths"]}
+        for index in range(19):
+            path_id = profile["computation"][index]["pathId"]
+            path = paths_by_id[path_id]
+            journal.record_b1_path_started(self.database, claim, index, path_id)
+            payload = json.dumps(path, separators=(",", ":"), ensure_ascii=True,
+                                 allow_nan=False).encode()
+            journal.record_b1_path_completed(self.database, claim, index, payload)
+
+        diagnostic_id = profile["computation"][19]["pathId"]
+        with self.assertRaisesRegex(journal.JournalError, "CONTROLS_NOT_FROZEN"):
+            journal.record_b1_path_started(self.database, claim, 19, diagnostic_id)
+
+        controls = dict(direct["controlDefinitions"])
+        altered = dict(controls)
+        altered["meanExposure"] += 0.01
+        with self.assertRaisesRegex(journal.JournalError, "CONTROLS_BINDING_INVALID"):
+            journal.record_b1_controls(
+                self.database, claim, json.dumps(altered, separators=(",", ":")).encode())
+        self.assertIsNone(journal.inspect_b1(self.database, claim["trialId"])["controls"])
+
+        frozen = journal.record_b1_controls(
+            self.database, claim, json.dumps(controls, separators=(",", ":")).encode())
+        self.assertEqual(frozen["controlBindings"], {
+            "primaryDevelopmentSha256": frozen["paths"][0]["payloadSha256"],
+            "fullBasketDevelopmentSha256": frozen["paths"][15]["payloadSha256"],
+        })
+        with self.assertRaisesRegex(journal.JournalError, "CONTROLS_ORDER"):
+            journal.record_b1_controls(
+                self.database, claim, json.dumps(controls, separators=(",", ":")).encode())
+        journal.record_b1_path_started(self.database, claim, 19, diagnostic_id)
+
+    def test_b1_result_and_summary_schemas_reject_minimal_or_screenless_results(self):
+        direct = self.direct_b1_result()
+        profile = journal._b1_profile()
+        descriptor = profile["paths"][0]
+        minimal = {
+            "pathId": descriptor["pathId"], "kind": descriptor["kind"],
+            "variantId": descriptor["variantId"], "scenarioId": descriptor["scenarioId"],
+            "segmentId": descriptor["segmentId"], "status": "COMPLETED", "attempts": 1,
+        }
+        with self.assertRaisesRegex(journal.JournalError, "PATH_RESULT_INVALID"):
+            journal._validate_b1_path_payload(minimal, profile["computation"][0])
+
+        summary = {key: value for key, value in direct.items()
+                   if key not in ("paths", "controlDefinitions")}
+        summary.pop("screen")
+        with self.assertRaisesRegex(journal.JournalError, "RESULT_SCHEMA_INVALID"):
+            journal.settle_b1(
+                self.database, {}, "COMPLETED", "ALL_PATHS_COMPLETED",
+                json.dumps(summary, separators=(",", ":"), allow_nan=False).encode())
+
+    def test_b1_insufficient_evidence_schema_is_valid_but_never_completed(self):
+        direct = self.direct_b1_result()
+        summary = {key: value for key, value in direct.items()
+                   if key not in ("paths", "controlDefinitions")}
+        summary.update({
+            "status": "INSUFFICIENT_EVIDENCE",
+            "attemptedPaths": 19,
+            "completedPaths": 19,
+            "computedPaths": 19,
+            "screen": {"status": "INSUFFICIENT_EVIDENCE"},
+        })
+        profile = journal._b1_profile()
+        journal._validate_b1_summary(summary, profile, allow_insufficient=True)
+        with self.assertRaisesRegex(journal.JournalError, "RESULT_SCHEMA_INVALID"):
+            journal._validate_b1_summary(summary, profile)
+
+    def test_b1_crash_after_committed_boundary_keeps_attempt_and_fence(self):
+        claim = self.new_b1_claim("trial-b1-ack-loss")
+        path_id = journal._b1_profile()["computation"][0]["pathId"]
+        journal.start_b1(self.database, claim)
+        journal.record_b1_path_started(self.database, claim, 0, path_id)
+        recovered = journal.inspect_b1(self.database, claim["trialId"])
+        self.assertTrue(recovered["unresolved"])
+        self.assertEqual(recovered["attempts"], 1)
+        self.assertEqual(recovered["paths"][0]["state"], "started")
+        self.assertEqual(journal.scheduler_tick_b1(self.database, enabled=True)["state"], "active")
+        with self.assertRaisesRegex(journal.JournalError, "ATTEMPT_CONSUMED"):
+            journal.start_b1(self.database, claim)
+
+    def test_b1_lost_ack_after_durable_boundaries_keeps_fence_and_attempt(self):
+        cases = (
+            ("start-ack-loss", 1, "started", None),
+            ("path-ack-loss", 1, "completed", None),
+            ("controls-ack-loss", 19, "completed", "FROZEN_DEVELOPMENT_ONLY"),
+        )
+        original_popen = subprocess.Popen
+        for phase, expected_count, last_state, controls_status in cases:
+            with self.subTest(phase=phase):
+                claim = self.new_b1_claim("trial-b1-" + phase)
+                alias = self.b1_fault_adapter(phase)
+                children = []
+
+                def spawn(*args, **kwargs):
+                    child = original_popen(*args, **kwargs)
+                    children.append(child)
+                    return child
+
+                with patch.object(supervisor, "B1_ADAPTER", alias), \
+                        patch.object(supervisor.subprocess, "Popen", side_effect=spawn):
+                    result = supervisor.run_b1_batch(
+                        self.database, claim, limits={"path_seconds": 10, "batch_seconds": 8})
+                self.assertEqual(result["state"], "UNSETTLED")
+                self.assertEqual(result["reason"], "PARENT_ACK_FAILED")
+                self.assertEqual(len(children), 1)
+                self.assertIsNotNone(children[0].poll())
+                current = journal.inspect_b1(self.database, claim["trialId"])
+                self.assertTrue(current["unresolved"])
+                self.assertEqual(current["attempts"], 1)
+                self.assertEqual(len(current["paths"]), expected_count)
+                self.assertEqual(current["paths"][-1]["state"], last_state)
+                if controls_status:
+                    self.assertEqual(json.loads(current["controls"])["status"], controls_status)
+                self.assertEqual(journal.scheduler_tick_b1(
+                    self.database, enabled=True)["state"], "active")
+                with self.assertRaisesRegex(journal.JournalError, "ATTEMPT_CONSUMED"):
+                    journal.start_b1(self.database, claim)
+                journal.reconcile_b1(
+                    self.database, claim["trialId"], "OPERATOR_RECONCILED_ACK_LOSS")
+
+    def test_b1_preparation_path_calibration_and_finalization_share_deadline(self):
+        scenarios = (
+            ("prepare", {"path_seconds": 1, "batch_seconds": 0.2}, 0, "UNSETTLED"),
+            ("path", {"path_seconds": 0.15, "batch_seconds": 2}, 1, "timed_out"),
+            ("calibration", {"path_seconds": 10, "batch_seconds": 6}, 19, "UNSETTLED"),
+            ("finalization", {"path_seconds": 10, "batch_seconds": 9}, 44, "UNSETTLED"),
+        )
+        original_popen = subprocess.Popen
+        for phase, limits, expected_paths, expected_state in scenarios:
+            with self.subTest(phase=phase):
+                claim = self.new_b1_claim("trial-b1-" + phase)
+                alias = self.b1_fault_adapter(phase)
+                children = []
+
+                def spawn(*args, **kwargs):
+                    child = original_popen(*args, **kwargs)
+                    children.append(child)
+                    return child
+
+                with patch.object(supervisor, "B1_ADAPTER", alias), \
+                        patch.object(supervisor.subprocess, "Popen", side_effect=spawn):
+                    result = supervisor.run_b1_batch(self.database, claim, limits=limits)
+                self.assertEqual(len(children), 1)
+                self.assertIsNotNone(children[0].poll(), "timed-out persistent child was not reaped")
+                self.assertEqual(result["state"], expected_state)
+                current = journal.inspect_b1(self.database, claim["trialId"])
+                self.assertEqual(len(current["paths"]), expected_paths)
+                if phase == "path":
+                    self.assertEqual(current["paths"][0]["state"], "started")
+                if phase in ("calibration", "finalization"):
+                    self.assertTrue(all(path["state"] == "completed" for path in current["paths"]))
+                if expected_state == "UNSETTLED":
+                    self.assertTrue(current["unresolved"])
+                    self.assertEqual(current["attempts"], 1)
+                    journal.reconcile_b1(self.database, claim["trialId"], "OPERATOR_RECONCILED_TIMEOUT")
+                else:
+                    self.assertFalse(current["unresolved"])
+
+    def test_b1_parent_ready_orders_result_fd_and_postcommit_child_failure_is_durable(self):
+        claim = self.new_b1_claim("trial-b1-postcommit-child-failure")
+        alias = self.b1_fault_adapter("postcommit")
+        original_popen = subprocess.Popen
+        children = []
+
+        def spawn(*args, **kwargs):
+            child = original_popen(*args, **kwargs)
+            children.append(child)
+            return child
+
+        with patch.object(supervisor, "B1_ADAPTER", alias), \
+                patch.object(supervisor.subprocess, "Popen", side_effect=spawn):
+            result = supervisor.run_b1_batch(
+                self.database, claim, limits={"path_seconds": 10, "batch_seconds": 10})
+
+        self.assertEqual(len(children), 1)
+        self.assertEqual(children[0].returncode, 1)
+        self.assertEqual(result["state"], "completed")
+        self.assertEqual(result["postSettlementFailure"], "TRAILING_CONTROL_EVENT")
+        self.assertEqual(len(json.loads(result["result"])["paths"]), 44)
+        recovered = journal.inspect_b1(self.database, claim["trialId"])
+        self.assertEqual(recovered["state"], "completed")
+        self.assertEqual(recovered["resultSha256"],
+                         hashlib.sha256(recovered["result"].encode()).hexdigest())
+
+    def test_b1_result_framing_schema_and_capacity_faults_never_complete(self):
+        cases = (
+            ("flood-control", "failed", "STDOUT_BOUND", 0),
+            ("oversized-frame", "partial", "RESULT_CAPACITY", 1),
+            ("duplicate-result", "partial", "PATH_RESULT_INVALID", 1),
+            ("forged-digest", "partial", "PATH_RESULT_INVALID", 1),
+            ("truncated-frame", "partial", "FRAME_TRUNCATED", 1),
+            ("extra-frame", "partial", "EXTRA_RESULT_FRAME", 1),
+            ("cumulative-cap", "partial", "RESULT_CAPACITY", 1),
+        )
+        for mode, expected_state, expected_reason, path_count in cases:
+            with self.subTest(mode=mode):
+                claim = self.new_b1_claim("trial-b1-frame-" + mode)
+                alias = self.b1_fault_adapter(mode)
+                with patch.object(supervisor, "B1_ADAPTER", alias):
+                    if mode == "cumulative-cap":
+                        with patch.object(journal, "MAX_RESULT_BYTES", 2_000):
+                            result = supervisor.run_b1_batch(
+                                self.database, claim,
+                                limits={"path_seconds": 2, "batch_seconds": 3})
+                    else:
+                        result = supervisor.run_b1_batch(
+                            self.database, claim,
+                            limits={"path_seconds": 2, "batch_seconds": 3})
+                self.assertEqual((result["state"], result["reason"]),
+                                 (expected_state, expected_reason))
+                self.assertNotEqual(result["state"], "completed")
+                self.assertEqual(len(result["paths"]), path_count)
+                self.assertFalse(result["executionAuthorized"])
+                self.assertFalse(result["promotionAuthorized"])
 
     def test_b1_source_pin_tampering_fails_before_path_work(self):
         claim = self.new_b1_claim("trial-b1-source-pin")

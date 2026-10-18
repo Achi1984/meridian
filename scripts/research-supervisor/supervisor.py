@@ -15,6 +15,7 @@ import journal
 
 
 ADAPTER = Path(__file__).resolve().with_name("synthetic_adapter.mjs")
+B1_ADAPTER = Path(__file__).resolve().with_name("b1_adapter.mjs")
 MAX_INPUT_BYTES = 8192
 MAX_STDOUT_BYTES = 8192
 MAX_STDERR_BYTES = 4096
@@ -316,7 +317,7 @@ def _run_b1_child(database, receipt, profile, started, batch_deadline, limits):
     if os.name != "posix":
         raise ChildFailure("POSIX_REQUIRED")
     node = shutil.which("node")
-    adapter = Path(__file__).resolve().with_name("b1_adapter.mjs")
+    adapter = Path(B1_ADAPTER).absolute()
     if node is None or not adapter.is_file():
         raise ChildFailure("ADAPTER_UNAVAILABLE")
     node = str(Path(node).resolve())
@@ -363,6 +364,8 @@ def _run_b1_child(database, receipt, profile, started, batch_deadline, limits):
     result_eof = False
     error_event = None
     response = started
+    post_settlement_failure = None
+    post_settlement_result_bytes = 0
 
     def send(value):
         nonlocal input_bytes
@@ -415,7 +418,11 @@ def _run_b1_child(database, receipt, profile, started, batch_deadline, limits):
             outcome = "COMPLETED" if summary.get("status") == "COMPLETED" else "FAILED"
             reason = "ALL_PATHS_COMPLETED" if outcome == "COMPLETED" else (
                 error_event.get("reason", "EXECUTION_INCOMPLETE") if error_event else "EXECUTION_INCOMPLETE")
-            summary_to_store = raw if response is None or response.get("controls") is not None else None
+            summary_to_store = raw if (
+                outcome == "COMPLETED" or
+                (summary.get("status") == "INSUFFICIENT_EVIDENCE"
+                 and response is not None and response.get("controls") is not None)
+            ) else None
             response = journal.settle_b1(
                 database, receipt, outcome, reason, summary_to_store,
                 busy_timeout=MAX_JOURNAL_LOCK_WAIT_SECONDS, deadline=batch_deadline)
@@ -428,7 +435,14 @@ def _run_b1_child(database, receipt, profile, started, batch_deadline, limits):
 
     def consume_result_bytes(chunk):
         nonlocal frame_length, frame_data, frame_limit, result_wire
+        nonlocal post_settlement_failure, post_settlement_result_bytes
         if frame is None:
+            if final_committed:
+                post_settlement_failure = post_settlement_failure or "EXTRA_RESULT_FRAME"
+                post_settlement_result_bytes += len(chunk)
+                if post_settlement_result_bytes > journal.MAX_RESULT_BYTES:
+                    raise ChildFailure("RESULT_CHANNEL_BOUND")
+                return
             raise ChildFailure("EXTRA_RESULT_FRAME")
         result_wire.extend(chunk)
         while True:
@@ -466,6 +480,10 @@ def _run_b1_child(database, receipt, profile, started, batch_deadline, limits):
 
     def handle_event(event):
         nonlocal ready, frame, current_path, path_deadline, controls_status, error_event
+        nonlocal post_settlement_failure
+        if final_committed:
+            post_settlement_failure = post_settlement_failure or "TRAILING_CONTROL_EVENT"
+            return
         event_type = event.get("type")
         if event_type == "ready":
             required = {"type", "protocolSha256", "sourceSha256", "inputSha256",
@@ -504,6 +522,7 @@ def _run_b1_child(database, receipt, profile, started, batch_deadline, limits):
                     or controls_status is not None):
                 raise ChildFailure("CONTROLS_ORDER")
             frame_start("controls")
+            send({"event": "controls_ready"})
         elif event_type == "execution_failed":
             if not ready or set(event) != {"type", "status", "reason"}:
                 raise ChildFailure("EXECUTION_FAILURE_INVALID")
@@ -518,6 +537,7 @@ def _run_b1_child(database, receipt, profile, started, batch_deadline, limits):
             if not ready or set(event) != {"type"} or current_path is not None:
                 raise ChildFailure("FINAL_SUMMARY_ORDER")
             frame_start("summary")
+            send({"event": "final_summary_ready"})
         else:
             raise ChildFailure("UNKNOWN_EVENT")
 
@@ -556,13 +576,22 @@ def _run_b1_child(database, receipt, profile, started, batch_deadline, limits):
                         control[:] = remainder
                         if len(raw) > MAX_STDOUT_BYTES:
                             raise ChildFailure("CONTROL_BOUND")
-                        handle_event(_b1_event(raw))
+                        try:
+                            event = _b1_event(raw)
+                        except ChildFailure as error:
+                            if not final_committed:
+                                raise
+                            post_settlement_failure = post_settlement_failure or error.reason
+                            continue
+                        handle_event(event)
                     if len(control) > MAX_STDOUT_BYTES:
                         raise ChildFailure("CONTROL_BOUND")
                 elif label == "error":
                     if len(stderr) + len(chunk) > MAX_STDERR_BYTES:
                         raise ChildFailure("STDERR_BOUND")
                     stderr.extend(chunk)
+                    if final_committed:
+                        post_settlement_failure = post_settlement_failure or "CHILD_STDERR"
                 else:
                     consume_result_bytes(chunk)
             if result_eof and frame is not None:
@@ -583,9 +612,14 @@ def _run_b1_child(database, receipt, profile, started, batch_deadline, limits):
         except subprocess.TimeoutExpired:
             raise ChildFailure("DEADLINE_EXCEEDED", timed_out=True)
         if exit_code != 0:
-            raise ChildFailure("CHILD_EXIT")
-        if stderr:
+            if final_committed:
+                post_settlement_failure = post_settlement_failure or "CHILD_EXIT"
+            else:
+                raise ChildFailure("CHILD_EXIT")
+        if stderr and not final_committed:
             raise ChildFailure("CHILD_STDERR")
+        if post_settlement_failure:
+            response["postSettlementFailure"] = post_settlement_failure
         return response
     finally:
         selector.close()
@@ -594,6 +628,17 @@ def _run_b1_child(database, receipt, profile, started, batch_deadline, limits):
             if not stream.closed:
                 stream.close()
         os.close(result_read)
+
+
+def _b1_after_settlement(database, trial_id, reason):
+    try:
+        current = journal.inspect_b1(database, trial_id)
+    except journal.JournalError:
+        return None
+    if current["state"] != "completed":
+        return None
+    current["postSettlementFailure"] = reason
+    return current
 
 
 def run_b1_batch(database, claim, *, limits=None):
@@ -618,6 +663,11 @@ def run_b1_batch(database, claim, *, limits=None):
     try:
         return _run_b1_child(database, receipt, profile, started, batch_deadline, caps)
     except ChildFailure as error:
+        committed = _b1_after_settlement(database, receipt["trialId"], error.reason)
+        if committed is not None:
+            return committed
+        if error.reason == "PARENT_ACK_FAILED":
+            return _unsettled(receipt["trialId"], error.reason)
         outcome = "TIMED_OUT" if error.timed_out else ("PARTIAL" if
                    (journal.inspect_b1(database, receipt["trialId"])["paths"]) else "FAILED")
         try:
@@ -627,6 +677,9 @@ def run_b1_batch(database, claim, *, limits=None):
         except journal.JournalError as persistence_error:
             return _unsettled(receipt["trialId"], persistence_error.code)
     except journal.JournalError as error:
+        committed = _b1_after_settlement(database, receipt["trialId"], error.code)
+        if committed is not None:
+            return committed
         try:
             current = journal.inspect_b1(database, receipt["trialId"])
             outcome = "PARTIAL" if current["paths"] else "FAILED"

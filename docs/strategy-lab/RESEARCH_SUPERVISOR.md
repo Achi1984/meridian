@@ -2,10 +2,11 @@
 
 This package is an inactive execution foundation for later bounded research, not
 a research authorization, profitability claim, autonomous service, or live/paper
-trading integration. It makes no exchange orders and has no CSV loader, market
-data access, database service, network client, model call, workflow, daemon, or
-import-time action. The only runnable workload today is a deterministic synthetic
-fixture that hashes a sequential chain; it does not perform strategy calculations.
+trading integration. It makes no exchange orders and has no active captured-data
+loader, market-data service, network client, model call, workflow, daemon, or
+import-time action. It retains the legacy deterministic hash-chain fixture and
+adds a generated-fixture B1 R3 session bridge. The B1 bridge runs strategy
+calculations only on its immutable generated synthetic series.
 
 ## Contract and local journal
 
@@ -19,14 +20,13 @@ IDs. Reusing a key with changed pins is a conflict. The source/data hash values 
 caller-pinned identifiers only: the fixture does not load those artifacts or
 authenticate that they match any bytes.
 
-The fixed manifest has one `synthetic-development` path followed sequentially by
-43 `synthetic-frozen-control` paths. Every completion digest feeds the next path.
-This is only a stable supervisor fixture, not a claim that these are the approved
-R3 engine's paths or that its mathematics is preserved. The reviewed #880 R3 engine
-and protocol are now present on `main`, but are not imported or wired here. A
-separate reviewed adapter must bind that engine's actual manifest and preserve its
-sequential mathematics. The first path/control ordering is deliberately sequential,
-never dispatched in parallel.
+The original `synthetic` profile retains its fixed manifest of one
+`synthetic-development` path followed by 43 `synthetic-frozen-control` hash-chain
+paths. The named `MERIDIAN-B1-7-GENERATED-FIXTURE-BRIDGE-R1` profile is separate:
+its manifest pins the B1 R3 engine's exact 44 output descriptors and its
+development-first 19/diagnostic-last 25 computation order. Both profiles are
+sequential; B1 uses `createExecution`/`advanceOne` rather than emulating or
+duplicating engine calculations.
 
 `scheduler_tick(database, policy, owner)` is a bounded, caller-invoked scheduler
 tick. The default policy is OFF. It considers at most one oldest queued trial,
@@ -57,16 +57,53 @@ output and error are capped while being read (8 KiB and 4 KiB), input is capped 
 and `LANG`, runs in a new POSIX process group, and is killed/reaped on timeout,
 output failure, or exit, including when a descendant retains a pipe.
 
+`initialize(path, profile=journal.B1_PROFILE_NAME)`, `enqueue_b1`, and
+`scheduler_tick_b1` select the distinct create-new-only B1 schema version 2;
+legacy synthetic databases remain schema version 1 and are not migrated. The B1
+profile pins the protocol, generated input identity, exact result manifest and
+computation order, plus the actual bytes of the engine, validator, dormant loader,
+protocol, fixture generator, adapter, supervisor, and journal. These are local
+source/input byte identities, not claims of market-data authenticity.
+
+`supervisor.run_b1_batch(database, claim)` starts one persistent Node process for
+the entire engine session. Input generation, preparation, all 44 paths, control
+calibration, serialization, and finalization share one absolute monotonic batch
+deadline; there is no child-per-path replay. Each path start is validated and
+committed before the parent ACK. Actual bounded path-result bytes use a separate
+explicit-length result pipe; the parent validates the B1 path schema and exact
+identity, hashes received bytes, and atomically commits payload plus progress
+before acknowledging completion. Controls are committed once after path 19 and
+bound to the received-byte digests of the designated primary/full-basket 15 bp
+development paths. Diagnostic admission requires frozen controls. Controls and
+final-summary events require a parent-ready ACK before the child writes the
+result pipe, avoiding cross-pipe ordering assumptions. The final summary omits
+the 44 payloads; inspection reconstructs the result from stored evidence.
+
+The B1 journal enforces a cumulative 1 MiB persisted-result/progress capacity.
+The generated-fixture measurement of 939,435 total bytes and a 30,623-byte
+largest path is sizing evidence for that fixture only, not a universal path-size
+limit. Framing is incrementally checked against the remaining capacity. The
+8 KiB control and 4 KiB stderr bounds remain; parent ACK input is capped at 8
+KiB. A successful summary must have a strict engine-result schema, a settled
+screen, all 44 completed paths, and unchanged false authority flags before
+durable completion. Insufficient evidence remains failed and cannot admit
+diagnostics.
+
+`resultSha256` hashes the complete reconstructed result returned by B1
+inspection; `summarySha256` separately hashes the exact final-summary bytes
+received from the child. A final settlement commits before its ACK. Child-exit
+or trailing-output errors after that ACK cannot undo the committed result; the
+immediate response carries `postSettlementFailure`, and inspection recovers the
+durable completion.
+
 This process supervision is operational bounding, **not** a hostile-code sandbox
 or network/security isolation. The monotonic deadline bounds child work and SQLite
 lock waiting; it is not a hard-real-time guarantee for OS scheduling, local
 filesystem/fsync latency, or process reaping. If local persistence fails, return
 latency and result persistence are not guaranteed, but the child has already been
 terminated and the durable fence is not released. It assumes trusted local code,
-a POSIX host, and operator-controlled database access. A path protocol adapter can support an
-eventual `runBatch` integration only if the approved engine exposes and validates
-these path boundaries while preserving its development-to-frozen-controls state
-and computation. No such integration is wired here.
+a POSIX host, and operator-controlled database access. This is not a hostile-code
+sandbox, network/security isolation, or hard-real-time guarantee.
 
 The journal retains `rejected`, `failed`, `timed_out`, `partial`, and `unknown`
 outcomes. A complete result is recoverable by read-only `inspect` without rerun.

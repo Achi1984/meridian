@@ -118,6 +118,7 @@ async function execute() {
       const controls = session.controlDefinitions;
       if (!controls) throw new Error('CONTROLS_MISSING');
       process.stdout.write(`${JSON.stringify({type: 'controls'})}\n`);
+      await receive('controls_ready');
       sendFrame(fd, Buffer.from(JSON.stringify(controls)));
       await receive('controls_committed');
       controlsRecorded = true;
@@ -140,6 +141,7 @@ async function execute() {
   if (!finalResult || finalResult.status !== 'COMPLETED' || session.status !== 'COMPLETED') {
     if (!controlsRecorded && finalResult?.controlDefinitions) {
       process.stdout.write(`${JSON.stringify({type: 'controls'})}\n`);
+      await receive('controls_ready');
       sendFrame(fd, Buffer.from(JSON.stringify(finalResult.controlDefinitions)));
       await receive('controls_committed');
       controlsRecorded = true;
@@ -152,6 +154,7 @@ async function execute() {
     delete failureSummary.paths;
     delete failureSummary.controlDefinitions;
     process.stdout.write(`${JSON.stringify({type: 'final_summary'})}\n`);
+    await receive('final_summary_ready');
     sendFrame(fd, Buffer.from(JSON.stringify(failureSummary)));
     await receive('final_ack');
     closeSync(fd);
@@ -162,6 +165,7 @@ async function execute() {
   delete summary.paths;
   delete summary.controlDefinitions;
   process.stdout.write(`${JSON.stringify({type: 'final_summary'})}\n`);
+  await receive('final_summary_ready');
   sendFrame(fd, Buffer.from(JSON.stringify(summary)));
   await receive('final_ack');
   closeSync(fd);
