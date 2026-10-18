@@ -1,5 +1,7 @@
 // Inactive component: mount explicitly with the existing read-client factory.
 // No network, credentials, storage or engine imports belong to this renderer.
+import {buildBotOverviewModel} from './bot-overview-model.js';
+
 const LABELS = {
   locked: ['Gesperrt', 'Verbinde den bestehenden Lesezugang, um deine Bots anzuzeigen.'],
   loading: ['Wird geladen', 'Der aktuelle Bot-Snapshot wird geprüft.'],
@@ -7,9 +9,7 @@ const LABELS = {
   stale: ['Daten veraltet', 'Botdetails werden bis zur nächsten aktuellen Abfrage ausgeblendet.'],
   unavailable: ['Nicht verfügbar', 'Botdaten konnten nicht verifiziert werden. Bitte erneut aktualisieren.']
 };
-const SIDES = {LONG:'Long', SHORT:'Short', NEUTRAL:'Neutral'};
 const TYPES = {futures_grid:'Futures Grid', future_hedge_grid:'Futures Hedge Grid'};
-const CATEGORIES = {inverse:'COIN-M', linear:'Linear'};
 const MISSING = 'Nicht verfügbar';
 const number = value => typeof value === 'number' && Number.isFinite(value) && value !== 0 ? value : null;
 const formatNumber = value => new Intl.NumberFormat('de-DE', {maximumSignificantDigits:10}).format(value);
@@ -18,7 +18,7 @@ function valueLabel(value, unit = '', positive = false) {
   return valid === null || (positive && valid < 0) ? MISSING : formatNumber(valid) + unit;
 }
 const ownLabel = (labels, key) => typeof key === 'string' && Object.hasOwn(labels,key) ? labels[key] : 'Unbekannt';
-function projection(state) {
+function projection(state, filters = {}) {
   try {
     const status = typeof state?.status === 'string' && Object.hasOwn(LABELS,state.status) ? state.status : 'unavailable';
     if (status !== 'fresh') return {status, bots:[]};
@@ -29,21 +29,28 @@ function projection(state) {
         !Number.isFinite(Date.parse(model.snapshotAt))) return {status:'unavailable',bots:[]};
     const canonicalStamp=model.snapshotAt.includes('.') ? model.snapshotAt : model.snapshotAt.replace('Z','.000Z');
     if (new Date(model.snapshotAt).toISOString() !== canonicalStamp) return {status:'unavailable',bots:[]};
-    const bots = Array.from(model.bots, bot => {
+    const overview=buildBotOverviewModel(model,filters);
+    if(overview.status!=='fresh')return {status:'unavailable',bots:[]};
+    const sourceBots=new Map(model.bots.map(bot=>[bot.ref,bot]));
+    const bots = overview.bots.map(row => {
+      const bot=sourceBots.get(row.ref);
       if (typeof bot?.symbol !== 'string' || !/^[A-Z0-9][A-Z0-9_/-]{0,31}$/.test(bot.symbol)) throw new Error();
-      return {symbol:bot.symbol, side:ownLabel(SIDES,bot.side),
-        ref: typeof bot.ref === 'string' && /^[a-f0-9]{20}$/.test(bot.ref) ? bot.ref : null,
-        type:ownLabel(TYPES,bot.type), category:ownLabel(CATEGORIES,bot.category),
+      return {symbol:bot.symbol, side:row.direction==='unknown'?'Unbekannt':row.direction[0].toUpperCase()+row.direction.slice(1),
+        ref:row.ref,type:ownLabel(TYPES,bot.type),
+        category:row.category==='coin-m'?'COIN-M':row.category==='linear'?'Linear':'Unbekannt',
         leverage:valueLabel(bot.metrics?.leverage,'×',true),
         investment:number(bot.metrics?.investmentUsd)>0 ? valueLabel(bot.metrics.investmentUsd,' USD/USDT',true) :
-          (typeof bot.metrics?.investmentCurrency === 'string' && /^[A-Z0-9]{2,12}$/.test(bot.metrics.investmentCurrency) ? valueLabel(bot.metrics.investmentAmount,' '+bot.metrics.investmentCurrency,true) : MISSING),
-        pnl:valueLabel(bot.metrics?.pnlUsd,' USD'),
-        pnlTone:number(bot.metrics?.pnlUsd) === null ? null : bot.metrics.pnlUsd < 0 ? 'negative' : 'positive',
+          (typeof bot.metrics?.investmentCurrency === 'string' && /^[A-Z0-9]{2,12}$/.test(bot.metrics.investmentCurrency) ? valueLabel(bot.metrics?.investmentAmount,' '+bot.metrics.investmentCurrency,true) : MISSING),
+        pnl:valueLabel(row.pnl,' USD'),
+        pnlTone:row.pnl === null ? null : row.pnl < 0 ? 'negative' : 'positive',
+        pnlValue:row.pnl,leverageValue:row.leverage,
         lower:valueLabel(bot.metrics?.lower,'',true),upper:valueLabel(bot.metrics?.upper,'',true),
         liquidation:valueLabel(bot.metrics?.liquidationPrice,'',true),
         takeProfit:valueLabel(bot.metrics?.takeProfit,'',true),stopLoss:valueLabel(bot.metrics?.stopLoss,'',true)};
     });
-    return {status,bots,snapshotAt:model.snapshotAt};
+    const losses=overview.losses.map(loss=>({ref:loss.ref,symbol:loss.symbol,pnl:valueLabel(loss.pnl,' USD')}));
+    return {status,count:overview.count,distribution:overview.distribution,bots,losses,
+      snapshotAt:overview.snapshotAt,source:overview.source};
   } catch { return {status:'unavailable',bots:[]}; }
 }
 function element(document, tag, text) {
@@ -54,8 +61,8 @@ function element(document, tag, text) {
 
 // Keep the empty live region attached before populating it, then retain its identity.
 const regions = new WeakMap();
-export function renderBotReadState(root, state) {
-  const document=root.ownerDocument, data=projection(state);
+export function renderBotReadState(root, state, filters = {}) {
+  const document=root.ownerDocument, data=projection(state,filters);
   let region=regions.get(root);
   if (!region || !root.contains(region.section)) {
     const section=element(document,'div'),status=element(document,'div'),details=element(document,'div');
@@ -75,14 +82,25 @@ export function renderBotReadState(root, state) {
     const stamp=element(document,'time',data.snapshotAt);
     stamp.setAttribute('datetime',data.snapshotAt);
     const source=element(document,'p','Snapshot-Zeit (UTC): ');source.append(stamp);details.append(source);
-    details.append(element(document,'p',data.bots.length + ' Bots im Snapshot'));
-    if (!data.bots.length) details.append(element(document,'p','Keine Bots in diesem Snapshot enthalten.'));
+    details.append(element(document,'p',data.count + ' Bots im Snapshot'));
+    const resultCount=element(document,'p',data.bots.length+' Treffer von '+data.count+' Bots');
+    resultCount.setAttribute('role','status');resultCount.setAttribute('aria-live','polite');
+    details.append(resultCount);
+    const active=[];
+    if(filters.query?.trim())active.push('Symbol '+filters.query.trim());
+    if(filters.direction&&filters.direction!=='all')active.push('Richtung '+filters.direction);
+    if(filters.category&&filters.category!=='all')active.push('Kontraktart '+filters.category);
+    if(filters.sort&&filters.sort!=='symbol')active.push('Sortierung '+filters.sort);
+    details.append(element(document,'p',active.length?'Aktive Auswahl: '+active.join(' · '):'Keine aktiven Filter'));
+    if (!data.count) details.append(element(document,'p','Keine Bots in diesem Snapshot enthalten.'));
+    else if (!data.bots.length) details.append(element(document,'p','Keine Bots entsprechen den Filtern.'));
     else {
       const list=element(document,'ul');list.className='bot-card-list';
       list.setAttribute('aria-label','Bots im aktuellen Snapshot');
       for (const [index,bot] of data.bots.entries()) {
         const item=element(document,'li'),card=element(document,'details'),summary=element(document,'summary');
         card.className='bot-card';
+        card.id='bot-card-'+bot.ref;
         const heading=element(document,'span',bot.symbol+' · '+bot.side);heading.className='bot-card-heading';
         const identity=element(document,'span','Bot '+(index+1)+(bot.ref?' · Referenz '+bot.ref:''));
         identity.className='bot-card-reference';
@@ -112,22 +130,127 @@ export function renderBotReadState(root, state) {
   return data.status;
 }
 
-export function createBotReadView(root, {createClient,getToken} = {}) {
+function renderCommandOverview(root, data, onJump) {
+  if (!root) return;
+  const document=root.ownerDocument;
+  root.replaceChildren();
+  root.setAttribute('data-state',data.status);
+  if(data.status!=='fresh'){
+    const labels={locked:'Gesperrt',loading:'Wird geladen',stale:'Daten veraltet',unavailable:'Nicht verfügbar'};
+    root.append(element(document,'p',labels[data.status]||'Nicht verfügbar'));
+    return;
+  }
+  const sources={PIONEX_BOT_API:'Pionex Bot API',PIONEX_WALLET_BOT_DETAIL:'Pionex Wallet Botdetail'};
+  root.append(element(document,'p','Lesestatus: aktueller Snapshot · Quelle: '+
+    (Object.hasOwn(sources,data.source)?sources[data.source]:'Unbekannt')));
+  root.append(element(document,'p',data.count+' Bots im Snapshot · nur lesend'));
+  const stamp=element(document,'time',data.snapshotAt);
+  stamp.setAttribute('datetime',data.snapshotAt);
+  root.append(element(document,'p','Snapshot-Zeit (UTC): '),stamp);
+  root.append(element(document,'p','Richtung: Long '+data.distribution.long+
+    ' · Short '+data.distribution.short+' · Neutral '+data.distribution.neutral+
+    ' · Unbekannt '+data.distribution.unknown));
+  if(!data.losses.length)root.append(element(document,'p','Keine bestätigten negativen P/L-Werte.'));
+  else{
+    root.append(element(document,'p','P/L laut Quelle · keine Risikorangfolge.'));
+    const losses=element(document,'ul');
+    losses.setAttribute('aria-label','Größte ausgewiesene Verluste laut Quelle');
+    for(const loss of data.losses){
+      const item=element(document,'li'),button=element(document,'button',
+        loss.symbol+' · P/L laut Quelle: '+loss.pnl);
+      button.setAttribute('type','button');
+      button.setAttribute('aria-label',loss.symbol+' öffnen · P/L laut Quelle: '+loss.pnl);
+      button.addEventListener('click',()=>onJump(loss.ref));
+      item.append(button);losses.append(item);
+    }
+    root.append(losses);
+  }
+}
+
+export function createBotReadView(root, {createClient,getToken,onSnapshot} = {}) {
   if (typeof createClient !== 'function') throw new Error('Botansicht nicht verfügbar');
   const document=root.ownerDocument, section=element(document,'section');
   section.className='bot-read-view';section.setAttribute('aria-label','Pionex Bots · nur lesend');
-  const content=element(document,'div'),controls=element(document,'div');
+  const filterPanel=element(document,'div'),content=element(document,'div'),controls=element(document,'div');
+  filterPanel.className='bot-overview-filters';
+  const filterState={query:'',direction:'all',category:'all',sort:'symbol'};
+  const search=element(document,'input');search.type='search';search.id='bot-symbol-search';
+  search.setAttribute('aria-label','Symbol suchen');search.setAttribute('type','search');
+  const searchLabel=element(document,'label','Symbol suchen');searchLabel.setAttribute('for','bot-symbol-search');
+  filterPanel.append(searchLabel,search);
+  function select(label,id,key,options){
+    const wrapper=element(document,'div'),selectNode=element(document,'select');
+    selectNode.id=id;selectNode.setAttribute('aria-label',label);
+    const fieldLabel=element(document,'label',label);fieldLabel.setAttribute('for',id);
+    for(const [value,text] of options){
+      const option=element(document,'option',text);option.value=value;option.setAttribute('value',value);
+      selectNode.append(option);
+    }
+    wrapper.append(fieldLabel,selectNode);filterPanel.append(wrapper);return selectNode;
+  }
+  const directionSelect=select('Richtung','bot-direction-filter','direction',[
+    ['all','Alle Richtungen'],['long','Long'],['short','Short'],['neutral','Neutral'],['unknown','Unbekannt']]);
+  const categorySelect=select('Kontraktart','bot-category-filter','category',[
+    ['all','Alle Kontraktarten'],['coin-m','COIN-M'],['linear','Linear'],['unknown','Unbekannt']]);
+  const sortSelect=select('Sortierung','bot-sort-filter','sort',[
+    ['symbol','Symbol (A–Z)'],['leverage','Bestätigter Hebel'],['pnl','P/L laut Quelle']]);
+  const reset=element(document,'button','Filter zurücksetzen');reset.setAttribute('type','button');
+  reset.setAttribute('aria-label','Alle Botfilter zurücksetzen');filterPanel.append(reset);
   const refresh=element(document,'button','Bots aktualisieren'),lock=element(document,'button','Botansicht sperren');
   refresh.setAttribute('type','button');lock.setAttribute('type','button');
-  controls.append(refresh,lock);section.append(element(document,'h3','Meine Pionex Bots'),content,controls);
+  controls.append(refresh,lock);section.append(element(document,'h3','Meine Pionex Bots'),filterPanel,content,controls);
   root.replaceChildren(section);
-  let disposed=false,client,action=0;
+  const commandRoot=document.getElementById?.('command-bot-overview');
+  let disposed=false,client,action=0,latestState={status:'locked'};
+  const resetFilterState=()=>{
+    filterState.query='';filterState.direction='all';filterState.category='all';filterState.sort='symbol';
+    search.value='';directionSelect.value='all';categorySelect.value='all';sortSelect.value='symbol';
+  };
+  const notifySnapshot=state=>{
+    const data=projection(state);
+    renderCommandOverview(commandRoot,data,jumpToBot);
+    try{onSnapshot?.(data);}catch{}
+  };
   const update=state=>{
     if(disposed)return;
-    const status=renderBotReadState(content,state);
+    latestState=state;
+    let status=renderBotReadState(content,state,filterState);
+    if(status!=='fresh'){
+      resetFilterState();
+      renderBotReadState(content,state,filterState);
+    }
+    filterPanel.hidden=status!=='fresh';
     refresh.setAttribute('aria-disabled',status==='loading'?'true':'false');
+    notifySnapshot(state);
   };
+  const updateFilters=()=>{
+    if(disposed||latestState?.status!=='fresh')return;
+    filterState.query=search.value;filterState.direction=directionSelect.value;
+    filterState.category=categorySelect.value;filterState.sort=sortSelect.value;
+    renderBotReadState(content,latestState,filterState);
+  };
+  const resetFilters=()=>{
+    resetFilterState();updateFilters();
+  };
+  const jumpToBot=ref=>{
+    if(disposed||typeof ref!=='string'||latestState?.status!=='fresh')return;
+    resetFilterState();updateFilters();
+    const nav=document.querySelector?.('#nav [data-v="bots"]');
+    nav?.click();
+    const card=document.getElementById?.('bot-card-'+ref);
+    if(!card)return;
+    card.setAttribute('open','');
+    const summary=card.querySelector?.('summary');
+    summary?.focus();
+    card.scrollIntoView?.({block:'nearest'});
+  };
+  search.addEventListener('input',updateFilters);
+  directionSelect.addEventListener('change',updateFilters);
+  categorySelect.addEventListener('change',updateFilters);
+  sortSelect.addEventListener('change',updateFilters);
+  reset.addEventListener('click',resetFilters);
   update({status:'locked'});
+  renderCommandOverview(commandRoot,projection({status:'locked'}),jumpToBot);
   try {
     client=createClient({getToken,onChange:update});
     if (!client || ['refresh','lock','revalidate','dispose'].some(key=>typeof client[key]!=='function')) throw new Error();
@@ -160,7 +283,14 @@ export function createBotReadView(root, {createClient,getToken} = {}) {
       if(disposed)return;
       disposed=true;
       refresh.removeEventListener('click',onRefresh);lock.removeEventListener('click',onLock);
+      search.removeEventListener('input',updateFilters);
+      directionSelect.removeEventListener('change',updateFilters);
+      categorySelect.removeEventListener('change',updateFilters);
+      sortSelect.removeEventListener('change',updateFilters);
+      reset.removeEventListener('click',resetFilters);
       try {client.dispose();} catch {}
+      renderCommandOverview(commandRoot,projection({status:'locked'}),jumpToBot);
+      try{onSnapshot?.({status:'locked',bots:[]});}catch{}
       root.replaceChildren();
     }
   };
