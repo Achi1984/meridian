@@ -1,5 +1,5 @@
 import {createHash} from 'node:crypto';
-import {readFileSync, writeSync} from 'node:fs';
+import {readFileSync, writeFileSync, writeSync} from 'node:fs';
 import {createInterface} from 'node:readline';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
@@ -37,8 +37,13 @@ async function ack(name, index) {
 }
 
 const waitForever = () => new Promise(() => {});
+const signalPhase = () => writeFileSync(
+  path.join(path.dirname(process.argv[1]), `phase-${mode}.ready`), 'ready');
 
-if (mode === 'prepare') await waitForever();
+if (mode === 'prepare') {
+  signalPhase();
+  await waitForever();
+}
 const series = createSyntheticSeries();
 const sourceHashes = Object.fromEntries(Object.entries(profile.sourceSha256));
 const sourceSha256 = sha256(canonicalJson(sourceHashes));
@@ -63,6 +68,7 @@ if (mode === 'path') {
   const boundary = session.beforePathBoundary();
   event({type: 'path_started', index: 0, pathId: boundary.pathId});
   await ack('path_started_ack', 0);
+  signalPhase();
   await waitForever();
 }
 
@@ -117,7 +123,10 @@ for (let index = 0; index < 44; index++) {
   if (boundary.ordinal === 20) {
     event({type: 'controls'});
     await ack('controls_ready');
-    if (mode === 'calibration') await waitForever();
+    if (mode === 'calibration') {
+      signalPhase();
+      await waitForever();
+    }
     frame(Buffer.from(JSON.stringify(session.controlDefinitions)));
     if (mode === 'controls-ack-loss') process.exit(1);
     await ack('controls_committed');
@@ -131,8 +140,11 @@ for (let index = 0; index < 44; index++) {
   await ack('path_committed', index);
 }
 event({type: 'final_summary'});
-if (mode === 'finalization') await waitForever();
 await ack('final_summary_ready');
+if (mode === 'finalization') {
+  signalPhase();
+  await waitForever();
+}
 const summary = {...session.finalResult()};
 delete summary.paths;
 delete summary.controlDefinitions;

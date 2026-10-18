@@ -182,6 +182,21 @@
         "sourceCiConclusion": "FAILURE",
         "failedStep": "Research and auth regression tests"
       },
+      "failedCandidate4484873": {
+        "head": "4484873b4c1609f6356207a64ad9fb842f6b4ac2",
+        "sourceCiRun": 39149618918,
+        "sourceCiAttempt": 2,
+        "sourceCiJob": 117740983561,
+        "sourceCiConclusion": "FAILURE",
+        "supervisorFailure": "test_b1_preparation_path_calibration_and_finalization_share_deadline reached only 37 of 44 paths under concurrent CI load",
+        "localCiEquivalent": {
+          "node": "v22.23.3",
+          "command": "V11_A2_EVIDENCE_DIR=artifacts/v11-visual-qa node --test test/*.test.js",
+          "result": "2608_PASS_11_FAIL",
+          "supervisorSuite": "PASS",
+          "environmentFailures": "MISSING_INSTALLED_PG_PACKAGE_AND_UNRELATED_PUBLISHER_HARNESS_FAILURES"
+        }
+      },
       "state": "CORRECTION_CANDIDATE_PENDING_NEW_EXACT_HEAD_CI_AND_INDEPENDENT_REVIEW",
       "scope": "SOURCE_AND_GENERATED_FIXTURES_ONLY",
       "actualMarketDataRead": false,

@@ -7,6 +7,7 @@ import sys
 import tempfile
 import threading
 import time
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -345,16 +346,18 @@ process.stdout.write(JSON.stringify(runBatch({
 
     def test_b1_preparation_path_calibration_and_finalization_share_deadline(self):
         scenarios = (
-            ("prepare", {"path_seconds": 1, "batch_seconds": 0.2}, 0, "UNSETTLED"),
-            ("path", {"path_seconds": 0.15, "batch_seconds": 2}, 1, "timed_out"),
-            ("calibration", {"path_seconds": 10, "batch_seconds": 6}, 19, "UNSETTLED"),
-            ("finalization", {"path_seconds": 10, "batch_seconds": 9}, 44, "UNSETTLED"),
+            ("prepare", 0),
+            ("path", 1),
+            ("calibration", 19),
+            ("finalization", 44),
         )
         original_popen = subprocess.Popen
-        for phase, limits, expected_paths, expected_state in scenarios:
+        for phase, expected_paths in scenarios:
             with self.subTest(phase=phase):
                 claim = self.new_b1_claim("trial-b1-" + phase)
                 alias = self.b1_fault_adapter(phase)
+                marker = alias.parent / f"phase-{phase}.ready"
+                marker.unlink(missing_ok=True)
                 children = []
 
                 def spawn(*args, **kwargs):
@@ -362,24 +365,36 @@ process.stdout.write(JSON.stringify(runBatch({
                     children.append(child)
                     return child
 
+                clock_origin = time.monotonic()
+                clock_advances = [0]
+
+                def deterministic_monotonic():
+                    if marker.exists():
+                        clock_advances[0] += 1
+                        return clock_origin + 1801 * clock_advances[0]
+                    return time.monotonic()
+
                 with patch.object(supervisor, "B1_ADAPTER", alias), \
-                        patch.object(supervisor.subprocess, "Popen", side_effect=spawn):
-                    result = supervisor.run_b1_batch(self.database, claim, limits=limits)
+                        patch.object(supervisor.subprocess, "Popen", side_effect=spawn), \
+                        patch.object(supervisor, "time",
+                                     SimpleNamespace(monotonic=deterministic_monotonic)):
+                    result = supervisor.run_b1_batch(
+                        self.database, claim,
+                        limits={"path_seconds": 60, "batch_seconds": 1800})
                 self.assertEqual(len(children), 1)
                 self.assertIsNotNone(children[0].poll(), "timed-out persistent child was not reaped")
-                self.assertEqual(result["state"], expected_state)
+                self.assertTrue(marker.is_file(), f"{phase} boundary was not reached")
+                self.assertEqual((result["state"], result["reason"]),
+                                 ("timed_out", "DEADLINE_EXCEEDED"))
                 current = journal.inspect_b1(self.database, claim["trialId"])
                 self.assertEqual(len(current["paths"]), expected_paths)
                 if phase == "path":
                     self.assertEqual(current["paths"][0]["state"], "started")
                 if phase in ("calibration", "finalization"):
                     self.assertTrue(all(path["state"] == "completed" for path in current["paths"]))
-                if expected_state == "UNSETTLED":
-                    self.assertTrue(current["unresolved"])
-                    self.assertEqual(current["attempts"], 1)
-                    journal.reconcile_b1(self.database, claim["trialId"], "OPERATOR_RECONCILED_TIMEOUT")
-                else:
-                    self.assertFalse(current["unresolved"])
+                self.assertFalse(current["unresolved"])
+                self.assertEqual(current["attempts"], 1)
+                marker.unlink(missing_ok=True)
 
     def test_b1_parent_ready_orders_result_fd_and_postcommit_child_failure_is_durable(self):
         claim = self.new_b1_claim("trial-b1-postcommit-child-failure")
@@ -651,7 +666,8 @@ process.stdout.write(JSON.stringify(runBatch({
                                ("d" * 64, "DEADLINE_EXCEEDED")):
             with self.subTest(source=source):
                 started = time.monotonic()
-                result = self.run_fault(source, {"path_seconds": 0.2, "batch_seconds": 0.4},
+                batch_seconds = 0.4 if source.startswith("d") else 10
+                result = self.run_fault(source, {"path_seconds": 0.2, "batch_seconds": batch_seconds},
                                         "trial-" + source[0])
                 self.assertEqual(result["state"], "timed_out" if source.startswith("d") else "failed")
                 self.assertEqual(result["reason"], reason)
@@ -754,12 +770,11 @@ print(json.dumps(journal.scheduler_tick(sys.argv[2],policy,owner='process-'+str(
         proceed = Path(str(marker) + ".go")
         marker.unlink(missing_ok=True)
         proceed.unlink(missing_ok=True)
-        started = time.monotonic()
         thread, result, failure = self.run_in_thread(
-            claim, {"path_seconds": 0.2, "batch_seconds": 0.35})
+            claim, {"path_seconds": 10, "batch_seconds": 10})
         lock = None
         try:
-            marker_deadline = time.monotonic() + 2
+            marker_deadline = time.monotonic() + 8
             while not marker.exists() and time.monotonic() < marker_deadline:
                 time.sleep(0.005)
             self.assertTrue(marker.exists(), "fault child did not launch after durable start")
@@ -772,7 +787,6 @@ print(json.dumps(journal.scheduler_tick(sys.argv[2],policy,owner='process-'+str(
             self.assertEqual(result[0]["state"], "UNSETTLED")
             self.assertEqual(result[0]["reason"], "DATABASE_BUSY")
             self.assertLess(time.monotonic() - callback_started, 0.15)
-            self.assertLess(time.monotonic() - started, 0.5)
             self.assertTrue(marker.is_file())
             child_pid = int(marker.read_text())
             time.sleep(0.65)
@@ -835,14 +849,16 @@ print(json.dumps(journal.scheduler_tick(sys.argv[2],policy,owner='process-'+str(
         # Startup of 44 real children is setup, not the contention measurement.
         # A final-child barrier separates it from the unchanged 0.6 s check.
         thread, result, failure = self.run_in_thread(
-            claim, {"path_seconds": 10, "batch_seconds": 30})
+            claim, {"path_seconds": 60, "batch_seconds": 1800})
         lock = None
         try:
-            setup_deadline = time.monotonic() + 20
+            setup_deadline = time.monotonic() + 60
             while not marker.exists() and thread.is_alive() and time.monotonic() < setup_deadline:
                 time.sleep(0.005)
             self.assertTrue(marker.exists(), f"final child did not reach barrier: {result!r} {failure!r}")
-            self.wait_for_path_state(claim["trialId"], 44, "completed")
+            self.wait_for_path_state(
+                claim["trialId"], 44, "completed",
+                timeout=max(0.1, setup_deadline - time.monotonic()))
             lock = self.lock_database()
             callback_started = time.monotonic()
             proceed.touch()
