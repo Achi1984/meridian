@@ -85,7 +85,7 @@ test('retrospective provenance is candidate-bound source metadata with explicit 
   const html=arenaHtml({provenance:data});
   assert.ok(html.includes('Kraken-USD-Daten werden nicht zugeordnet'));
   assert.ok(html.includes('CRV ungeklärt'));
-  assert.ok(html.includes('<summary>Technische Belegdetails und vollständige Hashes</summary>'));
+  assert.ok(html.includes('<summary>Technische Belegdetails und vollständige Prüfsummen</summary>'));
   assert.ok(html.includes('vorhanden · nicht bestätigt'));
   assert.ok(html.includes('Unbekannt'));
   assert.ok(html.includes('keine Zukunftsdaten'));
@@ -132,6 +132,9 @@ test('receipt attribution requires the complete unique candidate set and consist
   const candidateRule=manifest();
   candidateRule.summary.candidates[0].ruleset='OTHER_RULESET';
   assert.equal(adaptArenaProvenance(candidateRule)['H1-B'].associationStatus,'INVALID');
+  const unknownCandidateRule=manifest();
+  unknownCandidateRule.summary.candidates[0].ruleset=null;
+  assert.equal(adaptArenaProvenance(unknownCandidateRule)['H1-B'].associationStatus,'UNKNOWN');
   const h9=manifest();
   h9.summary.candidates.find(candidate=>candidate.id==='H9').status='AVAILABLE';
   assert.equal(adaptArenaProvenance(h9).H9.blocked,true);
