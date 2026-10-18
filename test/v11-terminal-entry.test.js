@@ -254,6 +254,7 @@ const b10Deltas=[
         <p><b>Aktuelle Aufgabe:</b> Nicht verifiziert.</p>
         <p><b>Letztes Lebenszeichen:</b> Nicht verfügbar. Diese Anzeige überwacht den Betrieb noch nicht.</p>
         <p><b>Diese Vorschau · B10:</b> Kompakter Header und klarere Command-Hierarchie. Layout-Entwurf ohne neue Datenanbindung; Integration und Geräteabnahme ausstehend.</p>
+        <p><b>Vorige Vorschau · B9:</b> Geladene Depotbewertung auch in Command. Verlauf mit Zeitachse und ausgewiesenem Messzeitraum. Kontrollierte Testvorschau · Geräteabnahme ausstehend. <a href="https://github.com/Achi1984/meridian/issues/766">B9-Umfang #766</a>.</p>
         <p><b>Zuletzt belegte UI-Änderung · B1:</b> Botübersicht mit Quellen- und Risikostatus. Integriert am <time datetime="2026-10-11T19:30:28Z">11.10.2026, 21:30 Uhr Wien</time> · <a href="https://github.com/Achi1984/meridian/pull/702">Änderungsnachweis #702</a>.</p>
         <p>Der Versionsstand ist kein Lebenszeichen eines Entwicklungsagenten.</p>
       </div>
@@ -291,7 +292,7 @@ const b10Deltas=[
         </div>
       </section>
       <section class="card decision" data-decision-owner="preview" aria-label="Jetzt wichtig">
-        <div class="card-head"><span class="card-kicker">RISIKO</span><span class="limited">UNGEKLÄRT</span></div>
+        <div class="card-head"><span class="card-kicker">JETZT WICHTIG</span><span class="limited">UNGEKLÄRT</span></div>
         <h2>Risiko ungeklärt</h2>
         <p>Es wird keine Aussage über Liquidationsgefahr oder Handelsschutz getroffen. Fehlende Daten sind keine Entwarnung.</p>
       </section>
@@ -436,7 +437,7 @@ function deploymentServer(){
       if(mode==='pending'){
         pending.add(response);response.on('close',()=>{pending.delete(response);if(!response.writableEnded)depotAborts++;});return;
       }
-      if(mode==='current'){response.writeHead(503,{'Content-Type':'application/json'});response.end('{}');return;}
+      if(mode==='current'||mode==='error'){response.writeHead(503,{'Content-Type':'application/json'});response.end('{}');return;}
       const stamp=Date.now()-(mode==='stale'?901000:1000);
       response.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});
       const points=[2,1,0].map((n)=>({timestamp:stamp-n*300000,spotUsd:12000-n*50,tradingUsd:3450,totalUsd:15450-n*50,
@@ -657,6 +658,9 @@ async function browserRun(call,start,width,expectedBuild,server){
       if(process.env.V11_A2_EVIDENCE_DIR){mkdirSync(process.env.V11_A2_EVIDENCE_DIR,{recursive:true});
         const shot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
         writeFileSync(join(process.env.V11_A2_EVIDENCE_DIR,'v11-depot-'+width+'-fresh.png'),Buffer.from(shot.data,'base64'));}
+      if(process.env.V11_B10_EVIDENCE_DIR&&width===375){mkdirSync(process.env.V11_B10_EVIDENCE_DIR,{recursive:true});
+        const shot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+        writeFileSync(join(process.env.V11_B10_EVIDENCE_DIR,'v11-b10-synthetic-depot-filled-375x844.png'),Buffer.from(shot.data,'base64'));}
       const beforeRange=server.metrics().depotReads;
       for(const range of ['1h','1d','1w']){await evaluate(`document.querySelector('[data-range="${range}"]').click();true`);assert.equal(await evaluate(`document.querySelector('[data-range="${range}"]').getAttribute('aria-pressed')`),'true');}
       assert.equal(server.metrics().depotReads,beforeRange,'range changes never request data');
@@ -673,9 +677,17 @@ async function browserRun(call,start,width,expectedBuild,server){
       assert.match(await evaluate(`document.querySelector('#depot-read-root .depot-total').textContent`),/15.450/);
       assert.match(await evaluate(`document.querySelector('.depot-history').textContent`),/Verlauf nicht verfügbar/);
       assert.match(await evaluate(`document.querySelector('#command-portfolio .portfolio-description').textContent`),/Serverseitige/);
+      server.setMode('error');await refresh();await waitUntil(async()=>await readState()==='unavailable');
+      assert.equal(await evaluate(`document.querySelector('#depot-read-root .depot-total')===null`),true);
+      if(process.env.V11_B10_EVIDENCE_DIR&&width===375){await evaluate(`document.getElementById('depot-read-root').scrollIntoView({block:'center'});true`);
+        const shot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+        writeFileSync(join(process.env.V11_B10_EVIDENCE_DIR,'v11-b10-synthetic-depot-error-375x844.png'),Buffer.from(shot.data,'base64'));}
       server.setMode('stale');await refresh();await waitUntil(async()=>await readState()==='stale');
       assert.equal(await evaluate(`document.querySelector('#depot-read-root .depot-total')===null`),true);
       assert.equal(await evaluate(`document.querySelector('#command-portfolio .portfolio-value').textContent`),'—');
+      if(process.env.V11_B10_EVIDENCE_DIR&&width===375){await evaluate(`document.getElementById('depot-read-root').scrollIntoView({block:'center'});true`);
+        const shot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+        writeFileSync(join(process.env.V11_B10_EVIDENCE_DIR,'v11-b10-synthetic-depot-stale-375x844.png'),Buffer.from(shot.data,'base64'));}
       server.setMode('denied');await refresh();await waitUntil(async()=>await readState()==='locked');
       const rejected=server.metrics().depotReads;await refresh();assert.equal(server.metrics().depotReads,rejected,'401 clears credential');
       server.setMode('pending');await accept('synthetic-b7-password');const aborts=server.metrics().depotAborts;

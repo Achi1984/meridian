@@ -129,10 +129,10 @@ test('A2 Chrome: focus, fail-closed states, contrast and layout at 320/375/390/4
         await evaluate('document.querySelector("details.command-source-details").open = false; window.scrollTo(0,0)');
         const image = await call('Page.captureScreenshot', {format: 'png', captureBeyondViewport: false});
         writeFileSync(join(evidence, `v11-a2-${width}-command.png`), Buffer.from(image.data, 'base64'));
-        await evaluate('document.querySelector("#autonomy-status details").open = true; window.scrollTo(0,0)');
+        await evaluate('document.querySelector("#autonomy-status").open = true; window.scrollTo(0,0)');
         const expanded = await call('Page.captureScreenshot', {format: 'png', captureBeyondViewport: true});
         writeFileSync(join(evidence, `v11-b2-${width}-autonomy-expanded.png`), Buffer.from(expanded.data, 'base64'));
-        await evaluate('document.querySelector("#autonomy-status details").open = false');
+        await evaluate('document.querySelector("#autonomy-status").open = false');
       }
       await call('Emulation.setEmulatedMedia', {features: [{name: 'prefers-reduced-motion', value: 'reduce'}]});
       assert.equal(await evaluate('getComputedStyle(document.querySelector(".view.active")).animationName'), 'none', 'reduced motion');

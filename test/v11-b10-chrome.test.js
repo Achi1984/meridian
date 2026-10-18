@@ -61,17 +61,24 @@ test('V11 B10 Chrome: compact hierarchy, keyboard disclosure and reachable views
       assert.equal(await evaluate('document.activeElement.matches("#autonomy-status summary")'),true);
       assert.match(await evaluate('document.querySelector("#autonomy-status .details-body").innerText'),/Kein aktuelles Betriebssignal/);
       assert.match(await evaluate('document.querySelector("#autonomy-status .details-body").innerText'),/Der Versionsstand ist kein Lebenszeichen/);
+      assert.match(await evaluate('document.querySelector("#autonomy-status .details-body").innerText'),/Vorige Vorschau · B9/);
       if(evidence&&size.width===1440){
-        const image=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});
-        writeFileSync(join(evidence,'v11-b10-1440x900-status-expanded.png'),Buffer.from(image.data,'base64'));
+        await evaluate('document.activeElement.blur()');
+        await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1400,deviceScaleFactor:1,mobile:false,
+          screenWidth:1440,screenHeight:1400});
+        const image=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+        writeFileSync(join(evidence,'v11-b10-1440x1400-status-expanded.png'),Buffer.from(image.data,'base64'));
+        await call('Emulation.setDeviceMetricsOverride',{width:size.width,height:size.height,deviceScaleFactor:1,mobile:size.mobile,
+          screenWidth:size.width,screenHeight:size.height});
       }
+      await evaluate('document.querySelector("#autonomy-status summary").focus()');
       await call('Input.dispatchKeyEvent',{type:'keyDown',key:' ',code:'Space',text:' ',unmodifiedText:' ',windowsVirtualKeyCode:32});
       await call('Input.dispatchKeyEvent',{type:'keyUp',key:' ',code:'Space',windowsVirtualKeyCode:32});
       assert.equal(await evaluate('document.getElementById("autonomy-status").open'),false,'Space closes status disclosure');
 
       const results=[];
       for(const view of views){
-        await evaluate(`document.querySelector('#nav button[data-v="${view}"]').click();window.scrollTo(0,0)`);
+        await evaluate(`document.querySelector('#nav button[data-v="${view}"]').click();document.activeElement.blur();window.scrollTo(0,0)`);
         const status=await evaluate(`(()=>{
           const root=document.documentElement,body=document.body,nav=document.getElementById('nav');
           const active=document.querySelector('.view.active'),last=active.lastElementChild;
@@ -92,13 +99,12 @@ test('V11 B10 Chrome: compact hierarchy, keyboard disclosure and reachable views
         assert.equal(status.atBottom,true,view+' final content not scroll-reachable '+size.width);
         results.push({view,contentReachable:true,overflow:false});
         if(evidence&&size.width===1440){
-          await evaluate('window.scrollTo(0,0)');
-          const image=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});
+          const image=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
           writeFileSync(join(evidence,`v11-b10-1440x900-${view}.png`),Buffer.from(image.data,'base64'));
         }
       }
       if(evidence&&size.width===320){
-        await evaluate('document.querySelector("#nav button[data-v=command]").click();window.scrollTo(0,0)');
+        await evaluate('document.querySelector("#nav button[data-v=command]").click();document.activeElement.blur();window.scrollTo(0,0)');
         const image=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
         writeFileSync(join(evidence,'v11-b10-320x568-command.png'),Buffer.from(image.data,'base64'));
       }
