@@ -20,7 +20,7 @@ function stderrCategory(bytes){
  if(/SingletonLock[^\n]*File exists|Failed to create a ProcessSingleton/i.test(text))return 'PROFILE_LOCK';
  return 'UNKNOWN';
 }
-export async function withMobileChrome(chrome,width,url,probe){
+export async function withMobileChrome(chrome,width,url,probe,height=844){
  const dir=mkdtempSync(join(tmpdir(),'v11-cdp-'));
  let child,spawnFailure,collectingStartup=true,stderrReadFailed=false,startupStderr=Buffer.alloc(0);
  let ws;const pending=new Map();let seq=0;
@@ -73,8 +73,8 @@ export async function withMobileChrome(chrome,width,url,probe){
   });
   await call('Page.enable');await call('Runtime.enable');
   await call('Emulation.setFocusEmulationEnabled',{enabled:true});
-  await call('Emulation.setDeviceMetricsOverride',{width,height:844,deviceScaleFactor:1,mobile:true,
-   screenWidth:width,screenHeight:844});
+  await call('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:true,
+   screenWidth:width,screenHeight:height});
   const navigation=await call('Page.navigate',{url});
   if(navigation.errorText)throw Error('Page navigation failed: '+navigation.errorText);
   let loaded=false;
@@ -96,4 +96,3 @@ export async function withMobileChrome(chrome,width,url,probe){
   await sleep(100);rmSync(dir,{recursive:true,force:true});
  }
 }
-

@@ -20,6 +20,11 @@ was selected and scrolled to its final content; every bottom edge cleared the fi
 navigation. All navigation and disclosure targets measured at least 44 px.
 The expanded status keeps the B9 issue provenance and B1 last-known UI evidence
 alongside the B10 layout-only entry.
+At 320×568, the portfolio value/status rectangles were y=327.2–364.6/368.6–386.6 px
+with the fixed navigation beginning at y=498 px. At 375×667 they were y=327.6–365/369–387 px
+with navigation at y=597 px. The browser checks exercise Enter and Space to open and
+close both the status disclosure and Command context disclosure, and verify the last
+expanded-status paragraph clears the fixed navigation.
 
 ## Screenshots
 
@@ -48,15 +53,20 @@ screenshots or saved by the tests.
 - `V11_B10_EVIDENCE_DIR=/tmp/b10-evidence node --test test/v11-terminal-entry.test.js`
   — baseline reversal, terminal link and synthetic Depot filled/error/stale integration pass.
 - `node --test --test-concurrency=1 test/v11-*.test.js` — all 122 focused V11 tests pass,
-  including the existing 320/375/390/430 shell matrix and access/privacy/race contracts.
+  including the 320×568, 375×667, 390×844 and 1440×900 B10 matrix, existing
+  320/375/390/430 shell matrix, and access/privacy/race contracts.
 - The earlier workflow run `39119273653` at head `33eb9df7` failed six pre-B10 V11
   assertions; those contracts and the evidence-only disclosure selector are now updated.
-  No post-fix hosted result is claimed. A local full-suite attempt passed 2533/2544 tests;
-  its 11 failures were confined to non-V11 PG-dependent, publisher-Python, and V10 tests.
-- `main` is now `a8cde76ba3255a77049eb6318a61efaa127cedd0` after PR873 and the unrelated
-  PR872 merge. PR875 remains based on `cbe9b5a34ed31e61746a656d49bb1b81bc637eec`
-  and is behind main. The merge-tree check against current main is clean; lead-owned
-  base/history reconciliation, fresh exact-head/base CI, and independent review remain
-  pending. This note does not claim those gates passed.
+  The later diagnostic run `39120259169` at `6b1cdcd` passed 2599 tests and failed only
+  the now-corrected history reachability count (18 items including the closing note
+  versus the old expectation of 17). A new exact-head result is not yet available.
+  An earlier local full-suite attempt passed 2533/2544 tests; its 11 failures were
+  confined to non-V11 PG-dependent, publisher-Python, and V10 tests.
+- `main` advanced through PR873 and the unrelated PR872 merge to
+  `a8cde76ba3255a77049eb6318a61efaa127cedd0`. This branch now includes that main
+  through merge commit `7621ce990c88c4b02e16805357ce779bebc4234b`; r130 and B10 are
+  both retained in the version history (17 rows plus its reachable closing note).
+  The browser history check verifies all 18 items. Exact-head CI and independent
+  review remain pending. This note does not claim those gates passed.
 - No authenticated Depot/Bots access, real-account data, physical mobile device,
   Safari/PWA readiness, deployment, or production status was tested.
