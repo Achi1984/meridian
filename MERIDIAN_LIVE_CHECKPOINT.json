@@ -210,6 +210,7 @@
       "branch": "copilot/meridian-b1-failure-acceptance-20261018",
       "assignedBranchStart": "01a84acd3b46d0f885cbe8e361f5bd50acf0a2b3",
       "priorUnpublishedSessionCandidate": "19a855df8b3e761c9979b3f72f43bd0a23cbf94f",
+      "publishedHeadAtVerification": "47b1e6deb1da01cb4d57c681fa768701106a2fd5",
       "mergedBaseSha": "fd07a8df49cbe24c73e9819170cd36e6b9645157",
       "mergedBaseTree": "a63b96e68566df9e15c90ce70a35f8c53bf287e7",
       "workingMergeCommit": "bbca098",
@@ -254,7 +255,7 @@
       "actualMarketDataRead": false,
       "paperOrLiveExecution": false,
       "schedulingOrRuntimeActivation": false,
-      "state": "LOCAL_VALIDATED_PENDING_PUBLICATION"
+      "state": "PUBLISHED_PENDING_LEAD_CI_REVIEW_AND_MERGE"
     },
     "v11B10ClarityProposal": {
       "operationId": "MERIDIAN-V11-B10-CLARITY-20261018",
