@@ -1,12 +1,12 @@
-import {createMarketRefreshController} from './market-refresh-state.mjs?v=10.0-r129';
-import {canonicalPortfolioSnapshot,latestPortfolioHistorySnapshot,authoritativePionexEquitySnapshot,sourceTimestampAge,holdingUsd} from '../portfolio-data-contract.js?v=10.0-r129';
-import {buildLivePriceOverlay,clearStaleLivePrices} from '../v8-clean/live-price-core-r18.js?v=10.0-r129';
+import {createMarketRefreshController} from './market-refresh-state.mjs?v=10.0-r130';
+import {canonicalPortfolioSnapshot,latestPortfolioHistorySnapshot,authoritativePionexEquitySnapshot,sourceTimestampAge,holdingUsd} from '../portfolio-data-contract.js?v=10.0-r130';
+import {buildLivePriceOverlay,clearStaleLivePrices} from '../v8-clean/live-price-core-r18.js?v=10.0-r130';
 // Legacy-route kill switch: cached /v9/ shells must migrate to v10.
 if(!window.MERIDIAN_V10){
   const qs=new URLSearchParams(location.search);
   if(qs.get('legacy')!=='1'){
     qs.delete('legacy');
-    qs.set('build','r129');
+    qs.set('build','r130');
     location.replace('../v10/?'+qs.toString()+(location.hash||''));
   }
 }

@@ -1,0 +1,573 @@
+{
+  "schema": "MERIDIAN_KRAKEN_USD_DAILY_OFFLINE_VERIFICATION_V1",
+  "status": "CONTENT_VERIFIED_OFFLINE",
+  "acquisitionStatus": "CAPTURED_VALIDATED_COVERAGE_LIMITED",
+  "verifiedFiles": [
+    {
+      "path": "raw/full/XBTUSD_1440.csv.part01",
+      "bytes": 262144,
+      "sha256": "920953a7b5442e94c60a8b46a4c9cd9b467a2b00752f99f818a10c1f8dc0549c"
+    },
+    {
+      "path": "raw/full/XBTUSD_1440.csv.part02",
+      "bytes": 50593,
+      "sha256": "b3f66148467e42f8fb94d5229978420ae0f588f0b94df3378873b28bce41bb29"
+    },
+    {
+      "path": "raw/2026Q3/XBTUSD_1440.csv",
+      "bytes": 6226,
+      "sha256": "5f90718045dc8531408bc88974908080b9a26bbc23eec5f506b3069911e6fc07"
+    },
+    {
+      "path": "normalized/XBTUSD_1440_utc_normalized.csv",
+      "bytes": 193432,
+      "sha256": "f2e94a03fbe61f37295b2249d5c3a4d324d13fcfb5d5b41f2ed4d7dfe2183bb9"
+    },
+    {
+      "path": "raw/full/ETHUSD_1440.csv",
+      "bytes": 261338,
+      "sha256": "63f81fbd846bf54f7a55e4ac98e8da42bd419ebbf70227fbf15272add46cec63"
+    },
+    {
+      "path": "raw/2026Q3/ETHUSD_1440.csv",
+      "bytes": 6150,
+      "sha256": "8c9e6de30dedf532ce806486e12f531fa81721ed8a383006234ec3662262a009"
+    },
+    {
+      "path": "normalized/ETHUSD_1440_utc_normalized.csv",
+      "bytes": 189396,
+      "sha256": "fbb7915af33d3c32db1cf368a171ed633090406c39da38aae90ac0d3876754bb"
+    },
+    {
+      "path": "raw/full/SOLUSD_1440.csv",
+      "bytes": 116850,
+      "sha256": "6f4f69714095aa26c673b2d7002ee56ef7efe76d07fc5f946d1906ce41cb825e"
+    },
+    {
+      "path": "raw/2026Q3/SOLUSD_1440.csv",
+      "bytes": 5556,
+      "sha256": "b57d1dd5bcb55e3c9e0cdb26cf4f8031912296e769fd3df5064169d3bc8aa5aa"
+    },
+    {
+      "path": "normalized/SOLUSD_1440_utc_normalized.csv",
+      "bytes": 136218,
+      "sha256": "caff8ea08d3548b2d8c704cc17a940754a70e23f60e44716324c464929bc18ca"
+    },
+    {
+      "path": "raw/full/XRPUSD_1440.csv",
+      "bytes": 223745,
+      "sha256": "479cd9e37cd8de2eb4a3ad3de8ed1a224c6d8139dc5ac6cea1a02f061ff48c26"
+    },
+    {
+      "path": "raw/2026Q3/XRPUSD_1440.csv",
+      "bytes": 6085,
+      "sha256": "ae60fc541880174c78e05dbddb04459b84fd3428b289f31f5c89526906beb0c4"
+    },
+    {
+      "path": "normalized/XRPUSD_1440_utc_normalized.csv",
+      "bytes": 189238,
+      "sha256": "bd006dfcbf052fb516e2d5e5a97d0570cf093e577c3c83752f2f3b7310fc52a7"
+    },
+    {
+      "path": "raw/full/HBARUSD_1440.csv",
+      "bytes": 29425,
+      "sha256": "a1e1165f0a64f02d4f64efec211edce659e166b88c361af9c14939ebee6cf2ba"
+    },
+    {
+      "path": "raw/2026Q3/HBARUSD_1440.csv",
+      "bytes": 6051,
+      "sha256": "c7f70c7195d0ed0fe1fab2b3b0d19d1ad8a52223702ba45671fa55e67249bf8f"
+    },
+    {
+      "path": "normalized/HBARUSD_1440_utc_normalized.csv",
+      "bytes": 33953,
+      "sha256": "4f30287edf98f90a2a185fe38acaa0e5a2819c340b4a33c014fc1aa62a914447"
+    },
+    {
+      "path": "raw/full/LINKUSD_1440.csv",
+      "bytes": 172251,
+      "sha256": "eade8ae89b763e953b5a3275e82eb036d241e2501b5b1f808d85654228d01f70"
+    },
+    {
+      "path": "raw/2026Q3/LINKUSD_1440.csv",
+      "bytes": 6205,
+      "sha256": "80c335a10f5fa5633374e2c663de0f3073b6e0851a6ac3dae742dce749027f8c"
+    },
+    {
+      "path": "normalized/LINKUSD_1440_utc_normalized.csv",
+      "bytes": 193348,
+      "sha256": "82682634f645ab5ca1dac4065cc0d490d343ea24b61463bcc2b6406894785518"
+    },
+    {
+      "path": "raw/full/AVAXUSD_1440.csv",
+      "bytes": 100268,
+      "sha256": "b9027724c29a7362befe1526fd8a0954c9133aa35555c065b392e02233334a94"
+    },
+    {
+      "path": "raw/2026Q3/AVAXUSD_1440.csv",
+      "bytes": 5372,
+      "sha256": "2ed173e2d2c7e4a280c8f522d156c7246e018c8e35c9e2e6e617ed9128c05329"
+    },
+    {
+      "path": "normalized/AVAXUSD_1440_utc_normalized.csv",
+      "bytes": 117766,
+      "sha256": "a4350bf73b44a45770bb173541133e4a04e847a07d74231ad6b5bbd7d6d06887"
+    },
+    {
+      "path": "raw/full/SUIUSD_1440.csv",
+      "bytes": 76162,
+      "sha256": "59511daffc2a7eff2ea43c4d8482140082fe85ebe22aeb47f15b0e5048f43700"
+    },
+    {
+      "path": "raw/2026Q3/SUIUSD_1440.csv",
+      "bytes": 5718,
+      "sha256": "a830f0f62e5b8877fb072b3e4619c2a7cc1c421aa6505cd6245dbfd408ac3275"
+    },
+    {
+      "path": "normalized/SUIUSD_1440_utc_normalized.csv",
+      "bytes": 88680,
+      "sha256": "0b35eb5598a336d8d4485b15adc2a4b4a716c967ff700eff3802386c31beda79"
+    }
+  ],
+  "checks": {
+    "safeContainedRegularFiles": 25,
+    "rawMembersAndChunks": 16,
+    "normalizedSeries": 8,
+    "sourceRowsParsed": 20891,
+    "exactOverlappingRows": 736,
+    "independentlyReproducedNormalizedRows": 15372,
+    "budget": "RECONCILED_WITHIN_ORIGINAL_LIMITS"
+  },
+  "rawMembers": {
+    "XBTUSD": {
+      "full": {
+        "bytes": 312737,
+        "sha256": "27fd91e9528d421c606ff7cd37bf3b8a4eed3b39631beb09ac8aec36a9b69266",
+        "crc32": "f1f6702e"
+      },
+      "q3": {
+        "bytes": 6226,
+        "sha256": "5f90718045dc8531408bc88974908080b9a26bbc23eec5f506b3069911e6fc07",
+        "crc32": "07322c27"
+      }
+    },
+    "ETHUSD": {
+      "full": {
+        "bytes": 261338,
+        "sha256": "63f81fbd846bf54f7a55e4ac98e8da42bd419ebbf70227fbf15272add46cec63",
+        "crc32": "7988bf8f"
+      },
+      "q3": {
+        "bytes": 6150,
+        "sha256": "8c9e6de30dedf532ce806486e12f531fa81721ed8a383006234ec3662262a009",
+        "crc32": "9071fc6d"
+      }
+    },
+    "SOLUSD": {
+      "full": {
+        "bytes": 116850,
+        "sha256": "6f4f69714095aa26c673b2d7002ee56ef7efe76d07fc5f946d1906ce41cb825e",
+        "crc32": "cf429fd7"
+      },
+      "q3": {
+        "bytes": 5556,
+        "sha256": "b57d1dd5bcb55e3c9e0cdb26cf4f8031912296e769fd3df5064169d3bc8aa5aa",
+        "crc32": "b26cfa3e"
+      }
+    },
+    "XRPUSD": {
+      "full": {
+        "bytes": 223745,
+        "sha256": "479cd9e37cd8de2eb4a3ad3de8ed1a224c6d8139dc5ac6cea1a02f061ff48c26",
+        "crc32": "8dbceda0"
+      },
+      "q3": {
+        "bytes": 6085,
+        "sha256": "ae60fc541880174c78e05dbddb04459b84fd3428b289f31f5c89526906beb0c4",
+        "crc32": "da5fc479"
+      }
+    },
+    "HBARUSD": {
+      "full": {
+        "bytes": 29425,
+        "sha256": "a1e1165f0a64f02d4f64efec211edce659e166b88c361af9c14939ebee6cf2ba",
+        "crc32": "01280c85"
+      },
+      "q3": {
+        "bytes": 6051,
+        "sha256": "c7f70c7195d0ed0fe1fab2b3b0d19d1ad8a52223702ba45671fa55e67249bf8f",
+        "crc32": "2f150854"
+      }
+    },
+    "LINKUSD": {
+      "full": {
+        "bytes": 172251,
+        "sha256": "eade8ae89b763e953b5a3275e82eb036d241e2501b5b1f808d85654228d01f70",
+        "crc32": "e44afbf9"
+      },
+      "q3": {
+        "bytes": 6205,
+        "sha256": "80c335a10f5fa5633374e2c663de0f3073b6e0851a6ac3dae742dce749027f8c",
+        "crc32": "5d185d30"
+      }
+    },
+    "AVAXUSD": {
+      "full": {
+        "bytes": 100268,
+        "sha256": "b9027724c29a7362befe1526fd8a0954c9133aa35555c065b392e02233334a94",
+        "crc32": "9ba3cd9b"
+      },
+      "q3": {
+        "bytes": 5372,
+        "sha256": "2ed173e2d2c7e4a280c8f522d156c7246e018c8e35c9e2e6e617ed9128c05329",
+        "crc32": "feb00580"
+      }
+    },
+    "SUIUSD": {
+      "full": {
+        "bytes": 76162,
+        "sha256": "59511daffc2a7eff2ea43c4d8482140082fe85ebe22aeb47f15b0e5048f43700",
+        "crc32": "f15fe170"
+      },
+      "q3": {
+        "bytes": 5718,
+        "sha256": "a830f0f62e5b8877fb072b3e4619c2a7cc1c421aa6505cd6245dbfd408ac3275",
+        "crc32": "42205613"
+      }
+    }
+  },
+  "pairs": {
+    "XBTUSD": {
+      "fullRows": 4731,
+      "q3Rows": 92,
+      "overlapRows": 92,
+      "normalizedRows": 2500,
+      "firstQ3Utc": "2026-07-01T00:00:00Z",
+      "lastQ3Utc": "2026-09-30T00:00:00Z",
+      "firstObservedUtc": "2013-10-06T00:00:00Z",
+      "lastObservedUtc": "2026-09-30T00:00:00Z",
+      "startUtc": "2019-11-27T00:00:00Z",
+      "endUtc": "2026-09-30T00:00:00Z",
+      "gaps": {
+        "missingDays": 0,
+        "gapIntervals": 0,
+        "largestGapDays": 0,
+        "ranges": []
+      },
+      "sourceGaps": {
+        "missingDays": 12,
+        "gapIntervals": 11,
+        "largestGapDays": 2,
+        "ranges": [
+          {
+            "from": "2013-10-11",
+            "through": "2013-10-11",
+            "missingDays": 1
+          },
+          {
+            "from": "2013-10-28",
+            "through": "2013-10-28",
+            "missingDays": 1
+          },
+          {
+            "from": "2014-05-19",
+            "through": "2014-05-19",
+            "missingDays": 1
+          },
+          {
+            "from": "2014-08-06",
+            "through": "2014-08-06",
+            "missingDays": 1
+          },
+          {
+            "from": "2014-08-26",
+            "through": "2014-08-26",
+            "missingDays": 1
+          },
+          {
+            "from": "2014-09-03",
+            "through": "2014-09-03",
+            "missingDays": 1
+          },
+          {
+            "from": "2014-09-05",
+            "through": "2014-09-05",
+            "missingDays": 1
+          },
+          {
+            "from": "2014-09-12",
+            "through": "2014-09-12",
+            "missingDays": 1
+          },
+          {
+            "from": "2014-09-26",
+            "through": "2014-09-27",
+            "missingDays": 2
+          },
+          {
+            "from": "2014-10-19",
+            "through": "2014-10-19",
+            "missingDays": 1
+          },
+          {
+            "from": "2014-12-25",
+            "through": "2014-12-25",
+            "missingDays": 1
+          }
+        ]
+      },
+      "firstSelectedUtc": "2019-11-27T00:00:00Z",
+      "lastSelectedUtc": "2026-09-30T00:00:00Z"
+    },
+    "ETHUSD": {
+      "fullRows": 4067,
+      "q3Rows": 92,
+      "overlapRows": 92,
+      "normalizedRows": 2500,
+      "firstQ3Utc": "2026-07-01T00:00:00Z",
+      "lastQ3Utc": "2026-09-30T00:00:00Z",
+      "firstObservedUtc": "2015-08-07T00:00:00Z",
+      "lastObservedUtc": "2026-09-30T00:00:00Z",
+      "startUtc": "2019-11-27T00:00:00Z",
+      "endUtc": "2026-09-30T00:00:00Z",
+      "gaps": {
+        "missingDays": 0,
+        "gapIntervals": 0,
+        "largestGapDays": 0,
+        "ranges": []
+      },
+      "sourceGaps": {
+        "missingDays": 6,
+        "gapIntervals": 5,
+        "largestGapDays": 2,
+        "ranges": [
+          {
+            "from": "2015-08-09",
+            "through": "2015-08-10",
+            "missingDays": 2
+          },
+          {
+            "from": "2015-09-04",
+            "through": "2015-09-04",
+            "missingDays": 1
+          },
+          {
+            "from": "2015-09-21",
+            "through": "2015-09-21",
+            "missingDays": 1
+          },
+          {
+            "from": "2015-10-10",
+            "through": "2015-10-10",
+            "missingDays": 1
+          },
+          {
+            "from": "2018-01-12",
+            "through": "2018-01-12",
+            "missingDays": 1
+          }
+        ]
+      },
+      "firstSelectedUtc": "2019-11-27T00:00:00Z",
+      "lastSelectedUtc": "2026-09-30T00:00:00Z"
+    },
+    "SOLUSD": {
+      "fullRows": 1932,
+      "q3Rows": 92,
+      "overlapRows": 92,
+      "normalizedRows": 1932,
+      "firstQ3Utc": "2026-07-01T00:00:00Z",
+      "lastQ3Utc": "2026-09-30T00:00:00Z",
+      "firstObservedUtc": "2021-06-17T00:00:00Z",
+      "lastObservedUtc": "2026-09-30T00:00:00Z",
+      "startUtc": "2021-06-17T00:00:00Z",
+      "endUtc": "2026-09-30T00:00:00Z",
+      "gaps": {
+        "missingDays": 0,
+        "gapIntervals": 0,
+        "largestGapDays": 0,
+        "ranges": []
+      },
+      "sourceGaps": {
+        "missingDays": 0,
+        "gapIntervals": 0,
+        "largestGapDays": 0,
+        "ranges": []
+      },
+      "firstSelectedUtc": "2021-06-17T00:00:00Z",
+      "lastSelectedUtc": "2026-09-30T00:00:00Z"
+    },
+    "XRPUSD": {
+      "fullRows": 3422,
+      "q3Rows": 92,
+      "overlapRows": 92,
+      "normalizedRows": 2500,
+      "firstQ3Utc": "2026-07-01T00:00:00Z",
+      "lastQ3Utc": "2026-09-30T00:00:00Z",
+      "firstObservedUtc": "2017-05-18T00:00:00Z",
+      "lastObservedUtc": "2026-09-30T00:00:00Z",
+      "startUtc": "2019-11-27T00:00:00Z",
+      "endUtc": "2026-09-30T00:00:00Z",
+      "gaps": {
+        "missingDays": 0,
+        "gapIntervals": 0,
+        "largestGapDays": 0,
+        "ranges": []
+      },
+      "sourceGaps": {
+        "missingDays": 1,
+        "gapIntervals": 1,
+        "largestGapDays": 1,
+        "ranges": [
+          {
+            "from": "2018-01-12",
+            "through": "2018-01-12",
+            "missingDays": 1
+          }
+        ]
+      },
+      "firstSelectedUtc": "2019-11-27T00:00:00Z",
+      "lastSelectedUtc": "2026-09-30T00:00:00Z"
+    },
+    "HBARUSD": {
+      "fullRows": 448,
+      "q3Rows": 92,
+      "overlapRows": 92,
+      "normalizedRows": 448,
+      "firstQ3Utc": "2026-07-01T00:00:00Z",
+      "lastQ3Utc": "2026-09-30T00:00:00Z",
+      "firstObservedUtc": "2025-07-10T00:00:00Z",
+      "lastObservedUtc": "2026-09-30T00:00:00Z",
+      "startUtc": "2025-07-10T00:00:00Z",
+      "endUtc": "2026-09-30T00:00:00Z",
+      "gaps": {
+        "missingDays": 0,
+        "gapIntervals": 0,
+        "largestGapDays": 0,
+        "ranges": []
+      },
+      "sourceGaps": {
+        "missingDays": 0,
+        "gapIntervals": 0,
+        "largestGapDays": 0,
+        "ranges": []
+      },
+      "firstSelectedUtc": "2025-07-10T00:00:00Z",
+      "lastSelectedUtc": "2026-09-30T00:00:00Z"
+    },
+    "LINKUSD": {
+      "fullRows": 2563,
+      "q3Rows": 92,
+      "overlapRows": 92,
+      "normalizedRows": 2500,
+      "firstQ3Utc": "2026-07-01T00:00:00Z",
+      "lastQ3Utc": "2026-09-30T00:00:00Z",
+      "firstObservedUtc": "2019-09-25T00:00:00Z",
+      "lastObservedUtc": "2026-09-30T00:00:00Z",
+      "startUtc": "2019-11-27T00:00:00Z",
+      "endUtc": "2026-09-30T00:00:00Z",
+      "gaps": {
+        "missingDays": 0,
+        "gapIntervals": 0,
+        "largestGapDays": 0,
+        "ranges": []
+      },
+      "sourceGaps": {
+        "missingDays": 0,
+        "gapIntervals": 0,
+        "largestGapDays": 0,
+        "ranges": []
+      },
+      "firstSelectedUtc": "2019-11-27T00:00:00Z",
+      "lastSelectedUtc": "2026-09-30T00:00:00Z"
+    },
+    "AVAXUSD": {
+      "fullRows": 1745,
+      "q3Rows": 92,
+      "overlapRows": 92,
+      "normalizedRows": 1745,
+      "firstQ3Utc": "2026-07-01T00:00:00Z",
+      "lastQ3Utc": "2026-09-30T00:00:00Z",
+      "firstObservedUtc": "2021-12-21T00:00:00Z",
+      "lastObservedUtc": "2026-09-30T00:00:00Z",
+      "startUtc": "2021-12-21T00:00:00Z",
+      "endUtc": "2026-09-30T00:00:00Z",
+      "gaps": {
+        "missingDays": 0,
+        "gapIntervals": 0,
+        "largestGapDays": 0,
+        "ranges": []
+      },
+      "sourceGaps": {
+        "missingDays": 0,
+        "gapIntervals": 0,
+        "largestGapDays": 0,
+        "ranges": []
+      },
+      "firstSelectedUtc": "2021-12-21T00:00:00Z",
+      "lastSelectedUtc": "2026-09-30T00:00:00Z"
+    },
+    "SUIUSD": {
+      "fullRows": 1247,
+      "q3Rows": 92,
+      "overlapRows": 92,
+      "normalizedRows": 1247,
+      "firstQ3Utc": "2026-07-01T00:00:00Z",
+      "lastQ3Utc": "2026-09-30T00:00:00Z",
+      "firstObservedUtc": "2023-05-03T00:00:00Z",
+      "lastObservedUtc": "2026-09-30T00:00:00Z",
+      "startUtc": "2023-05-03T00:00:00Z",
+      "endUtc": "2026-09-30T00:00:00Z",
+      "gaps": {
+        "missingDays": 0,
+        "gapIntervals": 0,
+        "largestGapDays": 0,
+        "ranges": []
+      },
+      "sourceGaps": {
+        "missingDays": 0,
+        "gapIntervals": 0,
+        "largestGapDays": 0,
+        "ranges": []
+      },
+      "firstSelectedUtc": "2023-05-03T00:00:00Z",
+      "lastSelectedUtc": "2026-09-30T00:00:00Z"
+    }
+  },
+  "commonCoverage": {
+    "commonCloses": 448,
+    "startUtc": "2025-07-10T00:00:00Z",
+    "endUtc": "2026-09-30T00:00:00Z",
+    "gaps": {
+      "missingDays": 0,
+      "gapIntervals": 0,
+      "largestGapDays": 0,
+      "ranges": []
+    },
+    "targetForLaterResearch": 955,
+    "targetMet": false
+  },
+  "budget": {
+    "requestsAttempted": 27,
+    "httpResponses": 24,
+    "bodyBytes": 3747305,
+    "elapsedSeconds": 1013.148,
+    "deadlineSeconds": 1200,
+    "memberRangeRequests": 16
+  },
+  "receiptAssertionsOnly": {
+    "archiveUrlAndHTTPResponses": "RECEIPT_ONLY_NOT_INDEPENDENTLY_AUTHENTICATED",
+    "sourceETagLastModifiedAndIdentityConsistency": "RECEIPT_ONLY_NOT_INDEPENDENTLY_AUTHENTICATED",
+    "originalNetworkRequestAndBodyCounters": "RECONCILED_FROM_RECEIPT_METADATA_NOT_NETWORK_REPLAY",
+    "sourceAuthenticity": "NOT_ESTABLISHED",
+    "fullArchiveSha256": "NOT_VERIFIED",
+    "officialChecksumManifest": "NOT_FETCHED"
+  },
+  "limitations": [
+    "448 common daily closes are below the desired 955; HBARUSD observed history begins 2025-07-10.",
+    "Full archive members extend through 2026-09-30 although supplied archive-page summary stated 2026-06-30; matching 92-row overlap per pair is content-verified, but the summary discrepancy remains unresolved.",
+    "Hashes and ZIP CRCs validate captured bytes/corruption only; no historical source authenticity or full archive checksum is established.",
+    "Network status, source identity headers, and request history are receipt assertions only; the offline verifier does not authenticate or replay network events.",
+    "No strategy, indicators, returns, evaluator, backtest, or PnL was run."
+  ]
+}
