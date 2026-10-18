@@ -1274,6 +1274,26 @@
       "finalMergeMirrorIssue": 639,
       "ownerApprovalMirrorStatus": "RESOLVED_WITH_VERBATIM_QUOTE",
       "scope": "GITHUB_ONLY_NO_RUNTIME_ACTIONS"
+    },
+    "krakenUsdDailyAcquisition872": {
+      "pr": 872,
+      "captureHead": "848e9eaa3389804fb23d727a43e6920a9e9f504d",
+      "state": "CAPTURED_OFFLINE_CONTENT_VERIFIED_PENDING_EXACT_HEAD_CI_AND_INDEPENDENT_REVIEW",
+      "offlineVerification": {
+        "command": "node scripts/verify-kraken-usd-daily-acquisition.mjs",
+        "focusedTests": "node --test test/kraken-usd-daily-acquisition.test.js",
+        "testsPassed": 6,
+        "rawMembersVerified": 16,
+        "normalizedSeriesVerified": 8,
+        "commonCloses": 448,
+        "targetCommonCloses": 955,
+        "strategyPnlRun": false,
+        "networkOrSourceAuthenticityIndependentlyVerified": false
+      },
+      "independentReview": "NEEDS_MORE_EVIDENCE_UNTIL_REVIEWER_RECHECKS_VERIFIER_OUTPUT",
+      "acquisitionWindowClosed": true,
+      "rawAndNormalizedEvidenceModified": false,
+      "nextGate": "EXACT_HEAD_RELEASE_SAFETY_SUCCESS_AND_INDEPENDENT_REVIEW_BEFORE_ANY_RESEARCH_USE"
     }
   }
 }
