@@ -10,6 +10,7 @@ import unittest
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parent
+PROJECT_ROOT = ROOT.parents[1]
 sys.path.insert(0, str(ROOT))
 import journal
 import supervisor
@@ -84,6 +85,90 @@ connection.close()
         thread = threading.Thread(target=execute)
         thread.start()
         return thread, result, failure
+
+    def new_b1_claim(self, key):
+        self.database = str(Path(self.temporary.name) / (key + ".sqlite"))
+        journal.initialize(self.database, profile=journal.B1_PROFILE_NAME)
+        queued = journal.enqueue_b1(self.database, key)
+        outcome = journal.scheduler_tick_b1(self.database, enabled=True)
+        self.assertTrue(outcome["claimed"])
+        self.assertEqual(outcome["claim"]["trialId"], queued["trialId"])
+        return outcome["claim"]
+
+    @staticmethod
+    def direct_b1_result():
+        code = r'''
+import {readFileSync} from 'node:fs';
+import {createSyntheticSeries} from './test/fixtures/b1-7/synthetic-series.mjs';
+import {createExecution, canonicalJson, runBatch, sha256} from './scripts/research/b1-7/engine.mjs';
+const fileSha = path => sha256(readFileSync(path));
+const implementationSha256 = sha256(canonicalJson({
+  capturedInputSha256: fileSha('scripts/research/b1-7/captured-input.mjs'),
+  engineSha256: fileSha('scripts/research/b1-7/engine.mjs'),
+  validatorSha256: fileSha('scripts/research/b1-7/validate.mjs')
+}));
+process.stdout.write(JSON.stringify(runBatch({
+  seriesByAsset: createSyntheticSeries(),
+  source: {kind: 'SYNTHETIC_FIXTURE'},
+  implementationSha256
+})));
+'''
+        result = subprocess.run(
+            ["node", "--input-type=module", "-e", code],
+            cwd=PROJECT_ROOT, capture_output=True, text=True, timeout=120)
+        if result.returncode:
+            raise AssertionError(result.stderr)
+        return json.loads(result.stdout)
+
+    def test_b1_persistent_session_matches_direct_generated_fixture_result(self):
+        direct = self.direct_b1_result()
+        claim = self.new_b1_claim("trial-b1-parity")
+        popen = subprocess.Popen
+        with patch.object(subprocess, "Popen", wraps=popen) as child_start:
+            completed = supervisor.run_b1_batch(self.database, claim)
+        self.assertEqual(child_start.call_count, 1)
+        self.assertEqual(completed["state"], "completed")
+        actual = json.loads(completed["result"])
+        self.assertEqual(actual, direct)
+        self.assertEqual([path["pathId"] for path in actual["paths"]], direct["paths"] and
+                         [path["pathId"] for path in direct["paths"]])
+        progress = journal.inspect_b1(self.database, completed["trialId"])
+        self.assertEqual(progress["attempts"], 1)
+        self.assertFalse(progress["unresolved"])
+        self.assertEqual(len(progress["paths"]), 44)
+        self.assertEqual(progress["controls"], json.dumps(
+            direct["controlDefinitions"], separators=(",", ":"), ensure_ascii=True))
+        self.assertTrue(direct["authority"]["researchOnly"])
+        self.assertTrue(all(value is False for key, value in direct["authority"].items()
+                            if key != "researchOnly"))
+
+    def test_b1_manifest_claim_and_phase_boundaries_are_fixed(self):
+        claim = self.new_b1_claim("trial-b1-boundary")
+        with self.assertRaisesRegex(TypeError, "positional"):
+            journal.enqueue_b1(self.database, "trial-other", "f" * 64)
+        started = journal.start_b1(self.database, claim)
+        with self.assertRaisesRegex(journal.JournalError, "PATH_ORDER"):
+            journal.record_b1_path_started(self.database, started, 1, "0" * 64)
+        with self.assertRaisesRegex(journal.JournalError, "PATH_ORDER"):
+            journal.record_b1_path_started(self.database, started, 0, "0" * 64)
+        self.assertEqual(journal.inspect_b1(self.database, claim["trialId"])["paths"], [])
+        with self.assertRaisesRegex(journal.JournalError, "ATTEMPT_CONSUMED"):
+            journal.start_b1(self.database, claim)
+
+    def test_b1_source_pin_tampering_fails_before_path_work(self):
+        claim = self.new_b1_claim("trial-b1-source-pin")
+        profile = json.loads(journal.B1_MANIFEST_PATH.read_text())
+        profile["sourceSha256"]["adapter"] = "0" * 64
+        temporary_manifest = Path(self.temporary.name) / "tampered-b1-manifest.json"
+        temporary_manifest.write_text(json.dumps(profile))
+        with patch.object(journal, "B1_MANIFEST_PATH", temporary_manifest):
+            result = supervisor.run_b1_batch(self.database, claim)
+        self.assertEqual((result["state"], result["reason"]),
+                         ("UNSETTLED", "B1_SOURCE_PIN_MISMATCH"))
+        current = journal.inspect_b1(self.database, claim["trialId"])
+        self.assertEqual(current["state"], "unknown")
+        self.assertEqual(current["paths"], [])
+        self.assertTrue(current["unresolved"])
 
     def wait_for_path_state(self, trial_id, count, state, timeout=5):
         deadline = time.monotonic() + timeout
