@@ -539,6 +539,28 @@ function inputIdentity(seriesByAsset, source, checkpoint = () => {}) {
   return {...identity, inputSha256: sha256(canonicalJson(identity, checkpoint))};
 }
 
+function snapshotSeries(seriesByAsset, checkpoint) {
+  const snapshot = {};
+  for (const asset of ASSETS) {
+    checkpoint('snapshot-asset');
+    const rows = [];
+    for (const row of seriesByAsset[asset]) {
+      checkpoint('snapshot-row');
+      rows.push(Object.freeze({
+        timestamp: row.timestamp,
+        open: row.open,
+        high: row.high,
+        low: row.low,
+        close: row.close,
+        volume: row.volume,
+        trades: row.trades
+      }));
+    }
+    snapshot[asset] = Object.freeze(rows);
+  }
+  return Object.freeze(snapshot);
+}
+
 function bindDescriptors(items, identity, implementationSha256, checkpoint = () => {}) {
   return items.map(item => {
     checkpoint('bind-path-identity');
@@ -840,7 +862,7 @@ function compactIfOverBudget(output, checkpoint = () => {}) {
   return compact;
 }
 
-export function runBatch(options) {
+function* executeBatch(options) {
   let tracker;
   let batch;
   try {
@@ -866,7 +888,8 @@ export function runBatch(options) {
   } catch {
     return emptyResult('INVALID', 'BATCH_INPUT_INVALID');
   }
-  const {seriesByAsset, source, implementationSha256} = batch;
+  let {seriesByAsset, source} = batch;
+  const {implementationSha256} = batch;
   if (!HASH.test(PROTOCOL_SHA256)) {
     return emptyResult('INVALID', 'PROTOCOL_HASH_NOT_FROZEN');
   }
@@ -875,6 +898,13 @@ export function runBatch(options) {
   }
   const sourceCheck = validateSourceIdentity(source);
   if (!sourceCheck.ok) return emptyResult('INVALID', sourceCheck.error.code, [sourceCheck.error]);
+  source = source.kind === 'SYNTHETIC_FIXTURE'
+    ? Object.freeze({kind: 'SYNTHETIC_FIXTURE'})
+    : Object.freeze({
+      kind: 'FROZEN_RESEARCH_INPUT',
+      commit: source.commit,
+      files: Object.freeze({...source.files})
+    });
   if (Object.hasOwn(batch, 'syntheticClock') &&
     (source.kind !== 'SYNTHETIC_FIXTURE' || typeof batch.syntheticClock !== 'function')) {
     return emptyResult('INVALID', 'SYNTHETIC_CLOCK_NOT_ALLOWED');
@@ -895,6 +925,7 @@ export function runBatch(options) {
   let identity;
   let allDescriptors;
   try {
+    seriesByAsset = snapshotSeries(seriesByAsset, tracker.checkpoint);
     tracker.checkpoint('input-identity-start');
     identity = inputIdentity(seriesByAsset, source, tracker.checkpoint);
     tracker.checkpoint('input-identity-complete');
@@ -912,6 +943,11 @@ export function runBatch(options) {
     [item.pathId, pathFailureRecord(item, 'NOT_RUN', 0)]));
   const featuresByVariant = new Map();
   let startedPathOrdinal = 0;
+  let lastPathResult = null;
+  const developmentPaths = allDescriptors.filter(item =>
+    item.segmentId === 'development' && item.kind !== 'FIXED_CONTROL');
+  const diagnosticPaths = allDescriptors.filter(item => item.segmentId === 'diagnostic');
+  const executionDescriptors = [...developmentPaths, ...diagnosticPaths];
 
   function executeDescriptor(descriptor, target = descriptor.target) {
     const run = tracker.run(descriptor.pathId, ++startedPathOrdinal, checkpoint => {
@@ -940,13 +976,28 @@ export function runBatch(options) {
       pathRecords.set(descriptor.pathId,
         pathFailureRecord(descriptor, run.status, run.attempts, run.failure ?? null));
     }
+    lastPathResult = pathRecords.get(descriptor.pathId);
     return run.status;
   }
 
-  const developmentPaths = allDescriptors.filter(item =>
-    item.segmentId === 'development' && item.kind !== 'FIXED_CONTROL');
   let aborted = false;
+  let controlDefinitions = {status: 'NOT_CALIBRATED'};
+  let batchFailure = null;
   for (const descriptor of developmentPaths) {
+    const requestedPathId = yield {
+      type: 'BEFORE_PATH',
+      descriptor,
+      completedPath: lastPathResult,
+      manifest: allDescriptors,
+      computationOrder: executionDescriptors
+    };
+    if (requestedPathId !== undefined && requestedPathId !== descriptor.pathId) {
+      aborted = true;
+      batchFailure = Object.assign(new Error('Unexpected execution-session advance'), {
+        code: requestedPathId?.type === 'INTERRUPT' ? 'SESSION_INTERRUPTED' : 'OUT_OF_ORDER_PATH'
+      });
+      break;
+    }
     const status = executeDescriptor(descriptor);
     if (status !== 'COMPLETED') {
       aborted = true;
@@ -954,8 +1005,6 @@ export function runBatch(options) {
     }
   }
 
-  let controlDefinitions = {status: 'NOT_CALIBRATED'};
-  let batchFailure = null;
   if (!aborted) {
     try {
       tracker.checkpoint('control-calibration-start');
@@ -982,8 +1031,19 @@ export function runBatch(options) {
             pathFailureRecord(descriptor, 'NOT_RUN_INSUFFICIENT_EVIDENCE', 0));
         }
       } else {
-        const diagnosticPaths = allDescriptors.filter(item => item.segmentId === 'diagnostic');
         for (const descriptor of diagnosticPaths) {
+          const requestedPathId = yield {
+            type: 'BEFORE_PATH',
+            descriptor,
+            completedPath: lastPathResult
+          };
+          if (requestedPathId !== undefined && requestedPathId !== descriptor.pathId) {
+            aborted = true;
+            batchFailure = Object.assign(new Error('Unexpected execution-session advance'), {
+              code: requestedPathId?.type === 'INTERRUPT' ? 'SESSION_INTERRUPTED' : 'OUT_OF_ORDER_PATH'
+            });
+            break;
+          }
           let target = descriptor.target;
           if (descriptor.kind === 'FIXED_CONTROL') {
             target = descriptor.variantId === 'frozen-mean-exposure'
@@ -995,6 +1055,7 @@ export function runBatch(options) {
             break;
           }
         }
+
       }
     }
   }
@@ -1164,4 +1225,136 @@ export function runBatch(options) {
     };
     return compactIfOverBudget(failedOutput);
   }
+}
+
+function failClosedAfterInterruption(result, code) {
+  if (!result || typeof result !== 'object') return result;
+  const paths = (result.paths ?? []).map(path => path.status === 'COMPLETED'
+    ? {...path, status: 'INCOMPLETE_BATCH_ABORT', computed: true}
+    : path);
+  return {
+    ...result,
+    status: 'INVALID',
+    failure: {code, detail: null},
+    completedPaths: 0,
+    computedPaths: paths.filter(path => path.computed).length,
+    paths,
+    screen: {status: 'NOT_EVALUATED'},
+    budget: {...result.budget, status: 'FAILED_NO_RETRY'}
+  };
+}
+
+function publicClone(value) {
+  return value === null || value === undefined ? value : structuredClone(value);
+}
+
+export function createExecution(options) {
+  const iterator = executeBatch(options);
+  let step = iterator.next();
+  let result = step.done ? step.value : null;
+  let status = step.done
+    ? step.value?.status === 'INVALID' ? 'FAILED' : 'COMPLETED'
+    : 'READY';
+  const prepared = step.done ? {manifest: [], computationOrder: []} : step.value;
+  const manifest = Object.freeze(prepared.manifest.map(item => Object.freeze({
+    kind: item.kind,
+    variantId: item.variantId,
+    scenarioId: item.scenarioId,
+    segmentId: item.segmentId,
+    pathId: item.pathId
+  })));
+  const computationOrder = Object.freeze(prepared.computationOrder.map((item, index) =>
+    Object.freeze({
+      ordinal: index + 1,
+      kind: item.kind,
+      variantId: item.variantId,
+      scenarioId: item.scenarioId,
+      segmentId: item.segmentId,
+      pathId: item.pathId
+    })));
+  let lastCompletedPath = null;
+
+  function advance(requestedPathId) {
+    if (status !== 'READY') {
+      result = failClosedAfterInterruption(result, 'SESSION_NOT_ADVANCEABLE');
+      status = 'FAILED';
+      return {status};
+    }
+    const current = step.value;
+    if (current?.type !== 'BEFORE_PATH') {
+      status = 'FAILED';
+      result = failClosedAfterInterruption(result, 'SESSION_STATE_INVALID');
+      return {status};
+    }
+    const interrupted = requestedPathId?.type === 'INTERRUPT';
+    const expected = interrupted
+      ? requestedPathId
+      : requestedPathId === undefined ? current.descriptor.pathId : requestedPathId;
+    step = iterator.next(expected);
+    if (!interrupted && expected === current.descriptor.pathId) {
+      lastCompletedPath = current.descriptor.pathId;
+    }
+    if (step.done) {
+      result = step.value;
+      status = result?.status === 'INVALID' ? 'FAILED' : 'COMPLETED';
+      const completedPath = result?.paths?.find(path => path.pathId === lastCompletedPath) ?? null;
+      return {status, pathId: lastCompletedPath, completedPath: publicClone(completedPath)};
+    }
+    if (step.value?.type !== 'BEFORE_PATH' || expected !== current.descriptor.pathId) {
+      result = step.value;
+      status = 'FAILED';
+      return {status, pathId: lastCompletedPath};
+    }
+    return {
+      status: 'PATH_COMPLETED',
+      pathId: lastCompletedPath,
+      completedPath: publicClone(step.value.completedPath),
+      nextPathId: step.value.descriptor.pathId
+    };
+  }
+
+  return {
+    manifest,
+    computationOrder,
+    get status() { return status; },
+    get completedResult() {
+      return status === 'COMPLETED' && result?.status === 'COMPLETED' ? publicClone(result) : null;
+    },
+    get lastCompletedPath() { return lastCompletedPath; },
+    beforePathBoundary() {
+      if (status !== 'READY') return {status};
+      const current = step.value;
+      if (current?.type !== 'BEFORE_PATH') {
+        status = 'FAILED';
+        result = failClosedAfterInterruption(result, 'SESSION_STATE_INVALID');
+        return {status};
+      }
+      return Object.freeze({
+        status: 'READY',
+        phase: current.descriptor.segmentId === 'development' ? 'DEVELOPMENT' : 'DIAGNOSTIC',
+        ordinal: computationOrder.find(item => item.pathId === current.descriptor.pathId).ordinal,
+        pathId: current.descriptor.pathId
+      });
+    },
+    advanceOne(expectedPathId) {
+      return advance(expectedPathId);
+    },
+    interrupt() {
+      if (status !== 'READY') {
+        result = failClosedAfterInterruption(result, 'SESSION_INTERRUPTED');
+        status = 'FAILED';
+        return {status};
+      }
+      return advance({type: 'INTERRUPT'});
+    },
+    finalResult() {
+      return status === 'READY' ? null : publicClone(result);
+    }
+  };
+}
+
+export function runBatch(options) {
+  const execution = createExecution(options);
+  while (execution.status === 'READY') execution.advanceOne();
+  return execution.finalResult();
 }
