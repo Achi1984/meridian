@@ -1,0 +1,217 @@
+{
+  "schema": "MERIDIAN_B1_7_PROTOCOL_R2",
+  "protocolId": "MERIDIAN-B1-7-PROTOCOL-R2-20261018",
+  "status": "FROZEN_DESIGN_IMPLEMENTATION_DRAFT",
+  "independentReview": {
+    "r1RequestId": "MERIDIAN-B1-7-DESIGN-R1",
+    "r1ResponseComment": "6249442046",
+    "r1Verdict": "REVISION_REQUIRED",
+    "r2RequestId": "MERIDIAN-B1-7-DESIGN-R2",
+    "r2RequestComment": "6249480669",
+    "r2Response": "PENDING"
+  },
+  "identity": {
+    "sourceCommit": "1c7b6dccd886f57e866c7d359c091b1e72a193ea",
+    "protocolSha256": "RAW_FILE_SHA256_RECORDED_IN_EXECUTION_REQUEST",
+    "implementationSha256": "PENDING_FINAL_SOURCE_HASH",
+    "inputManifestSha256": "PENDING_CALLER_SUPPLIED_CANONICAL_SERIES"
+  },
+  "authority": {
+    "preparationOnly": true,
+    "executionAuthorized": false,
+    "strategyPnlAuthorized": false,
+    "discoveryAuthorized": false,
+    "validationAuthorized": false,
+    "holdoutAuthorized": false,
+    "paperAuthorized": false,
+    "liveAuthorized": false,
+    "ownerRealRunDecision": "PENDING"
+  },
+  "universe": {
+    "assets": ["XBTUSD", "ETHUSD", "SOLUSD", "XRPUSD", "LINKUSD", "AVAXUSD", "SUIUSD"],
+    "omittedAsset": {
+      "asset": "HBARUSD",
+      "reason": "Insufficient common history for the frozen window; not a performance exclusion."
+    },
+    "retainedPriorCoverageFinding": "The earlier eight-asset common history was 448 of 955 requested rows; this is coverage evidence only, not a strategy-performance result."
+  },
+  "input": {
+    "mode": "CALLER_SUPPLIED_IN_MEMORY_OHLC_ONLY",
+    "network": false,
+    "database": false,
+    "filesystemDiscovery": false,
+    "csvLoader": false,
+    "cliOrAutorun": false,
+    "credentials": false,
+    "tradingAdapters": false,
+    "sourceAuthenticity": "NOT_ESTABLISHED_BY_CAPTURE_HASHES",
+    "firstTimestamp": "2024-02-19T00:00:00Z",
+    "rowCount": 955,
+    "lastTimestamp": "2026-09-30T00:00:00Z",
+    "requiredFields": ["timestamp", "open", "high", "low", "close", "volume", "trades"],
+    "timestampPolicy": "Strict midnight UTC ISO-8601 Z timestamps in exact daily sequence; no coercion, sorting, forward-fill, repair, substitution, or partial-asset fallback.",
+    "ohlcPolicy": "All seven assets must have identical timestamps and 955 rows. Positive finite OHLC; high >= max(open,close), low <= min(open,close), high >= low. Volume is finite and nonnegative; trades is a nonnegative integer.",
+    "featureColumns": ["close"],
+    "accountingColumns": ["open", "close"],
+    "validationOnlyColumns": ["high", "low", "volume", "trades"],
+    "orderedAssets": {
+      "XBTUSD": {
+        "file": "research/acquisitions/kraken-usd-daily-20261018/normalized/XBTUSD_1440_utc_normalized.csv",
+        "sha256": "f2e94a03fbe61f37295b2249d5c3a4d324d13fcfb5d5b41f2ed4d7dfe2183bb9"
+      },
+      "ETHUSD": {
+        "file": "research/acquisitions/kraken-usd-daily-20261018/normalized/ETHUSD_1440_utc_normalized.csv",
+        "sha256": "fbb7915af33d3c32db1cf368a171ed633090406c39da38aae90ac0d3876754bb"
+      },
+      "SOLUSD": {
+        "file": "research/acquisitions/kraken-usd-daily-20261018/normalized/SOLUSD_1440_utc_normalized.csv",
+        "sha256": "caff8ea08d3548b2d8c704cc17a940754a70e23f60e44716324c464929bc18ca"
+      },
+      "XRPUSD": {
+        "file": "research/acquisitions/kraken-usd-daily-20261018/normalized/XRPUSD_1440_utc_normalized.csv",
+        "sha256": "bd006dfcbf052fb516e2d5e5a97d0570cf093e577c3c83752f2f3b7310fc52a7"
+      },
+      "LINKUSD": {
+        "file": "research/acquisitions/kraken-usd-daily-20261018/normalized/LINKUSD_1440_utc_normalized.csv",
+        "sha256": "82682634f645ab5ca1dac4065cc0d490d343ea24b61463bcc2b6406894785518"
+      },
+      "AVAXUSD": {
+        "file": "research/acquisitions/kraken-usd-daily-20261018/normalized/AVAXUSD_1440_utc_normalized.csv",
+        "sha256": "a4350bf73b44a45770bb173541133e4a04e847a07d74231ad6b5bbd7d6d06887"
+      },
+      "SUIUSD": {
+        "file": "research/acquisitions/kraken-usd-daily-20261018/normalized/SUIUSD_1440_utc_normalized.csv",
+        "sha256": "0b35eb5598a336d8d4485b15adc2a4b4a716c967ff700eff3802386c31beda79"
+      }
+    },
+    "hashProvenance": "Copied from offline-verification.json. Hashes bind captured bytes only and do not authenticate source, source history, or the caller's in-memory arrays."
+  },
+  "calendar": {
+    "warmup": {
+      "firstTimestamp": "2024-02-19T00:00:00Z",
+      "lastTimestamp": "2025-04-03T00:00:00Z",
+      "rows": 410,
+      "scored": false
+    },
+    "development": {
+      "firstTimestamp": "2025-04-04T00:00:00Z",
+      "lastTimestamp": "2025-09-30T00:00:00Z",
+      "rows": 180,
+      "startIndex": 410,
+      "endIndex": 589
+    },
+    "diagnostic": {
+      "firstTimestamp": "2025-10-01T00:00:00Z",
+      "lastTimestamp": "2026-09-30T00:00:00Z",
+      "rows": 365,
+      "startIndex": 590,
+      "endIndex": 954,
+      "label": "Historical development/conditioned diagnostic; NOT a holdout."
+    },
+    "segmentReset": "Each segment starts at USD 10,000 cash with zero holdings. Feature history carries across the boundary; positions, pending orders, equity, and accounting reset. Each segment liquidates independently."
+  },
+  "features": {
+    "numericFormat": "IEEE-754 binary64; fixed asset order; deterministic row and variant order.",
+    "basketReturn": "b[t] = arithmetic mean of the seven simple close returns close[a,t]/close[a,t-1]-1.",
+    "annualizedVolatility": "sigma[n,t] = sample standard deviation of the last n basket returns, denominator n-1, multiplied by sqrt(365).",
+    "referenceVolatility": "m[n,t] = median of the last 365 sigma[n] values, including current t; no interpolation for the odd-length window.",
+    "exposure": "clip(m[n,t]/sigma[n,t], floor, 1). INVALID_SIGNAL if nonfinite or sigma <= 1e-12.",
+    "firstSignalIndex": {
+      "n20": 384,
+      "n30": 394,
+      "n45": 409,
+      "note": "Index is zero-based from the first warmup close. The 45-day variant's first median uses the 410th close at 2025-04-03."
+    },
+    "decisionTiming": "A close at row t is known only after that interval closes; a decision uses only rows through t and is filled no earlier than a later row's open."
+  },
+  "variants": [
+    {"id": "primary-n30-f25", "window": 30, "floor": 0.25},
+    {"id": "neighbour-n20-f25", "window": 20, "floor": 0.25},
+    {"id": "neighbour-n45-f25", "window": 45, "floor": 0.25},
+    {"id": "neighbour-n30-f20", "window": 30, "floor": 0.20},
+    {"id": "neighbour-n30-f35", "window": 30, "floor": 0.35}
+  ],
+  "trading": {
+    "initialTarget": "First segment target uses the previous completed close; its scheduled first fill is at the first segment open, or one day later in the delayed scenario.",
+    "weeklyDecision": "Each Sunday completed close creates one equal-weight target instruction for the next Monday open; one-day delay fills that same immutable instruction on Tuesday open.",
+    "band": "Compare raw target to last accepted target; accept iff Math.abs(raw-lastAccepted) >= 0.10 using binary64 with no epsilon. Initial target is accepted. Update lastAccepted at decision time, not fill time.",
+    "weeklyRebalance": "Every scheduled weekly fill equalizes all seven asset weights to accepted exposure/7, even when the band does not change the target.",
+    "idealization": "Target-weight-at-open using that open price is idealized execution. It is not a pre-submitted share-quantity order or a claim of executable first-print liquidity; gaps, spreads, impact, lot sizes, minimum sizes, and liquidity are not modeled.",
+    "units": "Fractional units; no leverage, shorts, interest, or funding."
+  },
+  "scenarios": [
+    {"id": "base-85bp", "perSideCostBp": 85, "costRate": 0.0085, "delayDays": 0},
+    {"id": "stress-160bp", "perSideCostBp": 160, "costRate": 0.016, "delayDays": 0},
+    {"id": "stress-160bp-delay-1d", "perSideCostBp": 160, "costRate": 0.016, "delayDays": 1}
+  ],
+  "costAssumptions": {
+    "base": "85bp per side = 80bp published Kraken Spot Crypto Tier 1 taker reference plus 5bp assumed friction.",
+    "stress": "160bp per side; 160bp plus a one-day fill delay in the third scenario.",
+    "status": "Owner approval pending. Tier/reference is not owner-specific, historical, or verified entitlement; 5bp is an assumption, not measured spread or impact."
+  },
+  "accounting": {
+    "startingEquity": 10000,
+    "rebalance": "At fill prices p, V=K+sum(q*p); solve E=V-c*sum(abs(w*E-q*p)); qNew=w*E/p; cashNew=(1-sum(w))*E.",
+    "solver": "Bisection on [0,V], at most 100 iterations, tolerance 1e-6 USD.",
+    "validation": "Require finite nonnegative weights/units/cash, sum(weights)<=1, positive V, and abs(cashNew+sum(qNew*p)+currentFillCost-V)<=1e-6. Conservation uses the current fill cost, not cumulative historical costs against current V. Failure invalidates the entire batch.",
+    "terminal": "At each segment's own final close, independently liquidate all units at close with sale-side costs; include terminal fees in the final daily equity and daily return. Cancel orders beyond the segment horizon without replacement.",
+    "drawdown": "Sampled daily-close drawdown only, with initial E0=10,000 included as the first peak. No synchronized intraday drawdown is inferred.",
+    "dailyReturns": "Exactly 180 development and 365 diagnostic close-to-close net returns per completed path; E0 precedes the first scored day, so first-day entry fees are included. Delayed day-one remains cash."
+  },
+  "pathManifest": {
+    "pathCount": 44,
+    "composition": {
+      "candidateVariants": 30,
+      "fullBasket": 6,
+      "frozenControls": 6,
+      "cash": 2
+    },
+    "order": [
+      "5 candidates in declared order x 3 scenarios in declared order x development then diagnostic",
+      "Full basket x 3 scenarios x development then diagnostic",
+      "Mean-exposure and risk-exposure fixed controls x 3 scenarios x diagnostic only",
+      "Cash x development then diagnostic"
+    ],
+    "controls": {
+      "meanExposure": "Arithmetic mean of primary 85bp path's daily held target across 180 development rows; zero before first fill. Not realized weight drift or weekly-only mean.",
+      "riskExposure": "min(1, sampleSD(primary 85bp development daily net returns)/sampleSD(full-basket 85bp development daily net returns)); sample denominator N-1; zero primary SD maps to zero exposure.",
+      "freeze": "Derive once from development; use identical frozen values for all diagnostic cost/delay scenarios. Invalid/nonfinite or benchmark SD <= 1e-12 yields INSUFFICIENT_EVIDENCE and no diagnostic continuation."
+    },
+    "benchmarks": "Full-basket weekly equal-weight (100%) and cash zero are costed/calendared consistently; static controls weekly equalize exposure/7. No band applies to fixed controls.",
+    "identity": "Path and execution IDs bind protocol ID/hash, implementation ID/hash, input identity/hash, variant, scenario, and segment. Caller-supplied implementation hash is an identity assertion, not runtime source authentication."
+  },
+  "screen": {
+    "primary": [
+      "Diagnostic primary 85bp net return > 0",
+      "Diagnostic primary 85bp sampled daily-close drawdown <= 25%",
+      "Primary 85bp diagnostic return >= both frozen controls",
+      "Primary 85bp diagnostic drawdown <= both frozen controls",
+      "(full-basket drawdown-primary drawdown)/full-basket drawdown >= 20%; full-basket drawdown <= 1e-12 is INSUFFICIENT_EVIDENCE",
+      "Primary diagnostic net return > 0 at 160bp and at 160bp plus one-day delay"
+    ],
+    "neighbours": "At least 3 of 4 neighbours have positive diagnostic net return at 85bp and at least 3 of 4 at 160bp; neighbours are sign robustness only, not matched-control claims.",
+    "statuses": ["PASS", "NO_EDGE", "INSUFFICIENT_EVIDENCE", "INVALID"],
+    "interpretation": "PASS is a historical candidate only. No statistical significance, alpha, prospective validation, or fresh holdout claim."
+  },
+  "reporting": {
+    "perPath": ["daily returns", "equity", "held target", "net return", "sampled drawdown", "drawdown duration", "turnover", "per-fill and cumulative cost", "exposure", "concentration", "quarter returns", "cancelled instructions", "path status"],
+    "missingRisk": "No finite trade stop exists; trade CRV is explicitly UNDEFINED_NO_FINITE_STOP, null, research-only, and not a promotion failure/default zero."
+  },
+  "budget": {
+    "processes": 1,
+    "paths": 44,
+    "perPathSeconds": 60,
+    "totalMinutes": 30,
+    "outputBytes": 1048576,
+    "automaticRetry": false,
+    "adaptiveTrials": false,
+    "failure": "Any malformed input, calendar/hash identity failure, signal/accounting failure, timeout, output limit, or nondeterministic condition invalidates and stops the whole batch. Preserve completed paths as incomplete evidence; never rank or retry."
+  },
+  "limitations": [
+    "Input source authenticity is not established by offline hashes.",
+    "The universe has survivorship/history limitations, including omission of HBAR for coverage only.",
+    "Diagnostic rows are historical and conditioned, not a holdout.",
+    "The prior eight-asset acquisition failed the coverage target, not a performance test.",
+    "No captured price CSV may be loaded or used to calculate features, returns, or PnL during implementation or testing."
+  ]
+}
