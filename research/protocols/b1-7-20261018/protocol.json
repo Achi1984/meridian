@@ -1,6 +1,6 @@
 {
-  "schema": "MERIDIAN_B1_7_PROTOCOL_R2",
-  "protocolId": "MERIDIAN-B1-7-PROTOCOL-R2-20261018",
+  "schema": "MERIDIAN_B1_7_PROTOCOL_R3",
+  "protocolId": "MERIDIAN-B1-7-PROTOCOL-R3-20261018",
   "status": "FROZEN_DESIGN_IMPLEMENTATION_DRAFT",
   "independentReview": {
     "r1RequestId": "MERIDIAN-B1-7-DESIGN-R1",
@@ -10,7 +10,11 @@
     "r2RequestComment": "6249480669",
     "r2ResponseComment": "6249482850",
     "r2Response": "GREEN_LIGHT_DESIGN_ONLY",
-    "r2Scope": "SOURCE_AND_SYNTHETIC_PREPARATION_ONLY; no execution, costs, thresholds, or no-stop policy approved."
+    "r2Scope": "HISTORICAL_SOURCE_AND_SYNTHETIC_PREPARATION_REVIEW_ONLY; does not approve R3.",
+    "r3ScopeUpdateComment": "6249518640",
+    "r3CorrectionComment": "6250026939",
+    "r3Response": "PENDING_INDEPENDENT_REVIEW",
+    "r3Scope": "SOURCE_AND_SYNTHETIC_PREPARATION_ONLY; no real-data execution authorized."
   },
   "identity": {
     "sourceCommit": "1c7b6dccd886f57e866c7d359c091b1e72a193ea",
@@ -44,6 +48,7 @@
     "filesystemDiscovery": false,
     "csvLoader": false,
     "cliOrAutorun": false,
+    "syntheticClockTestHook": "Optional test injection accepted only for SYNTHETIC_FIXTURE source; excluded from all research and execution authority.",
     "credentials": false,
     "tradingAdapters": false,
     "sourceAuthenticity": "NOT_ESTABLISHED_BY_CAPTURE_HASHES",
@@ -142,14 +147,14 @@
     "units": "Fractional units; no leverage, shorts, interest, or funding."
   },
   "scenarios": [
-    {"id": "base-85bp", "perSideCostBp": 85, "costRate": 0.0085, "delayDays": 0},
-    {"id": "stress-160bp", "perSideCostBp": 160, "costRate": 0.016, "delayDays": 0},
-    {"id": "stress-160bp-delay-1d", "perSideCostBp": 160, "costRate": 0.016, "delayDays": 1}
+    {"id": "base-15bp", "perSideCostBp": 15, "costRate": 0.0015, "delayDays": 0},
+    {"id": "stress-30bp", "perSideCostBp": 30, "costRate": 0.003, "delayDays": 0},
+    {"id": "stress-30bp-delay-1d", "perSideCostBp": 30, "costRate": 0.003, "delayDays": 1}
   ],
   "costAssumptions": {
-    "base": "85bp per side = 80bp published Kraken Spot Crypto Tier 1 taker reference plus 5bp assumed friction.",
-    "stress": "160bp per side; 160bp plus a one-day fill delay in the third scenario.",
-    "status": "Lead-reported from issue #878, not independently verified by the R2 reviewer. Owner approval pending. Tier/reference is not owner-specific, historical, or verified entitlement; 5bp is an assumption, not measured spread or impact."
+    "base": "15bp per side = 10bp spot taker reference plus 5bp assumed friction; an OKX-inspired cost assumption accepted for preparation, not account-specific entitlement.",
+    "stress": "30bp per side; 30bp plus a one-day fill delay in the third scenario.",
+    "status": "Costs are assumptions, not measured spread or impact, historical fee reconstruction, or verified account entitlement. Inputs remain pinned Kraken spot USD prices; outputs are NOT OKX execution evidence. No maker-fill, futures, or funding inference."
   },
   "accounting": {
     "startingEquity": 10000,
@@ -175,8 +180,8 @@
       "Cash x development then diagnostic"
     ],
     "controls": {
-      "meanExposure": "Arithmetic mean of primary 85bp path's daily held target across 180 development rows. Its initial target fills on day one, so this baseline has no pre-fill rows; zero-before-fill applies to delayed paths. Not realized weight drift or weekly-only mean.",
-      "riskExposure": "min(1, sampleSD(primary 85bp development daily net returns)/sampleSD(full-basket 85bp development daily net returns)); sample denominator N-1; zero primary SD maps to zero exposure.",
+      "meanExposure": "Arithmetic mean of primary 15bp path's daily held target across 180 development rows. Its initial target fills on day one, so this baseline has no pre-fill rows; zero-before-fill applies to delayed paths. Not realized weight drift or weekly-only mean.",
+      "riskExposure": "min(1, sampleSD(primary 15bp development daily net returns)/sampleSD(full-basket 15bp development daily net returns)); sample denominator N-1; zero primary SD maps to zero exposure.",
       "freeze": "Derive once from development; use identical frozen values for all diagnostic cost/delay scenarios. Invalid/nonfinite or benchmark SD <= 1e-12 yields INSUFFICIENT_EVIDENCE and no diagnostic continuation."
     },
     "benchmarks": "Full-basket weekly equal-weight (100%) and cash zero are costed/calendared consistently; static controls weekly equalize exposure/7. No band applies to fixed controls.",
@@ -184,15 +189,15 @@
   },
   "screen": {
     "primary": [
-      "Diagnostic primary 85bp net return > 0",
-      "Diagnostic primary 85bp sampled daily-close drawdown <= 25%",
-      "Primary 85bp diagnostic return >= both frozen controls",
-      "Primary 85bp diagnostic drawdown <= both frozen controls",
+      "Diagnostic primary 15bp net return > 0",
+      "Diagnostic primary 15bp sampled daily-close drawdown <= 25%",
+      "Primary 15bp diagnostic return >= both frozen controls",
+      "Primary 15bp diagnostic drawdown <= both frozen controls",
       "(full-basket drawdown-primary drawdown)/full-basket drawdown >= 20%; full-basket drawdown <= 1e-12 is INSUFFICIENT_EVIDENCE",
-      "Primary diagnostic net return > 0 at 160bp and at 160bp plus one-day delay"
+      "Primary diagnostic net return > 0 at 30bp and at 30bp plus one-day delay"
     ],
     "comparisonSegment": "All primary-vs-control screen comparisons use the diagnostic segment only.",
-    "neighbours": "At least 3 of 4 neighbours have positive diagnostic net return at 85bp and at least 3 of 4 at 160bp non-delayed. Neighbours are not screened at 160bp plus delay; they are sign robustness only, not matched-control claims.",
+    "neighbours": "At least 3 of 4 neighbours have positive diagnostic net return at 15bp and at least 3 of 4 at 30bp non-delayed. Delayed neighbours are report-only; they are not screened. Neighbours are sign robustness only, not matched-control claims.",
     "statuses": ["PASS", "NO_EDGE", "INSUFFICIENT_EVIDENCE", "INVALID"],
     "syntheticFixtureStatus": "SYNTHETIC_ONLY_NOT_ASSESSED; fixture rule checks are not historical outcomes and cannot produce GREEN.",
     "interpretation": "PASS is a historical candidate only. No statistical significance, alpha, prospective validation, or fresh holdout claim."
@@ -200,7 +205,7 @@
   "reporting": {
     "perPath": ["daily net returns", "start/end equity", "mean daily held target", "mean realized exposure", "mean and maximum absolute target/realized mismatch", "net return", "sampled drawdown", "drawdown duration", "turnover", "per-fill and cumulative cost", "concentration", "quarter returns", "cancelled instructions", "path status"],
     "controlMismatch": "For each frozen control diagnostic scenario, report daily-close marked realized asset exposure versus the frozen target, including mean/absolute/max mismatch. No diagnostic rescaling is permitted.",
-    "sourceLevelLabels": ["DEVELOPMENT_AND_HISTORICAL_DIAGNOSTIC", "NOT_HOLDOUT", "UNIVERSE_HISTORY_LIMITATION_HBAR_OMITTED_FOR_COVERAGE_ONLY", "SOURCE_AUTHENTICITY_NOT_ESTABLISHED", "HISTORICAL_CANDIDATE_ONLY", "TRIAL_LEDGER_UNKNOWN"],
+    "sourceLevelLabels": ["DEVELOPMENT_AND_HISTORICAL_DIAGNOSTIC", "NOT_HOLDOUT", "UNIVERSE_HISTORY_LIMITATION_HBAR_OMITTED_FOR_COVERAGE_ONLY", "SOURCE_AUTHENTICITY_NOT_ESTABLISHED", "KRAKEN_PRICES_WITH_OKX_INSPIRED_ASSUMED_COSTS_NOT_OKX_EXECUTION_EVIDENCE", "HISTORICAL_CANDIDATE_ONLY", "TRIAL_LEDGER_UNKNOWN"],
     "missingRisk": "No finite trade stop exists; trade CRV is explicitly UNDEFINED_NO_FINITE_STOP, null, research-only, and not a promotion failure/default zero."
   },
   "budget": {
@@ -211,13 +216,19 @@
     "outputBytes": 1048576,
     "automaticRetry": false,
     "adaptiveTrials": false,
-    "failure": "Any malformed input, calendar/hash identity failure, signal/accounting failure, timeout, output limit, or nondeterministic condition invalidates and stops the whole batch. Preserve completed paths as incomplete evidence; never rank or retry."
+    "cooperativeChecks": true,
+    "hardPreemption": false,
+    "enforcement": "Cooperative checkpoints cover validation, feature preparation, path loops, and bounded result assembly. Synchronous JavaScript operations cannot be hard-preempted; a separate externally supervised runner must enforce hard wall-clock limits before any real-data run.",
+    "failure": "Any malformed input, calendar/hash identity failure, signal/accounting failure, timeout, output limit, or nondeterministic condition invalidates and stops the whole batch. Preserve completed paths as incomplete evidence; mark unstarted paths; never rank or retry."
   },
   "limitations": [
     "Input source authenticity is not established by offline hashes.",
     "The universe has survivorship/history limitations, including omission of HBAR for coverage only.",
     "Diagnostic rows are historical and conditioned, not a holdout.",
     "The prior eight-asset acquisition failed the coverage target, not a performance test.",
-    "No captured price CSV may be loaded or used to calculate features, returns, or PnL during implementation or testing."
+    "No captured price CSV may be loaded or used to calculate features, returns, or PnL during implementation or testing.",
+    "Output is a Kraken-price historical diagnostic with OKX-inspired assumed costs, not OKX execution evidence.",
+    "No maker-fill, futures, or funding conclusions are inferred.",
+    "The in-memory budget primitive has cooperative checks but no hard preemption; external supervision is required before any real run."
   ]
 }

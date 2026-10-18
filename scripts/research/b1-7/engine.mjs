@@ -10,11 +10,22 @@ const CAPITAL = 10000;
 const FEE_TOLERANCE = 1e-6;
 const NO_HOLDOUT = 'HISTORICAL_DIAGNOSTIC_NOT_HOLDOUT';
 
-export function canonicalJson(value) {
+export function canonicalJson(value, checkpoint = () => {}) {
   if (value === null || typeof value !== 'object') return JSON.stringify(value);
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
-  return `{${Object.keys(value).sort().map(key =>
-    `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(',')}}`;
+  if (Array.isArray(value)) {
+    const items = [];
+    for (const item of value) {
+      checkpoint('canonical-array');
+      items.push(canonicalJson(item, checkpoint));
+    }
+    return `[${items.join(',')}]`;
+  }
+  const entries = [];
+  for (const key of Object.keys(value).sort()) {
+    checkpoint('canonical-object');
+    entries.push(`${JSON.stringify(key)}:${canonicalJson(value[key], checkpoint)}`);
+  }
+  return `{${entries.join(',')}}`;
 }
 
 export function sha256(value) {
@@ -32,16 +43,31 @@ function fail(code, detail = null) {
   throw error;
 }
 
-function sampleStandardDeviation(values) {
-  if (!Array.isArray(values) || values.length < 2 || values.some(value => !finite(value))) return NaN;
-  const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
-  const variance = values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (values.length - 1);
+function sampleStandardDeviation(values, checkpoint = () => {}) {
+  if (!Array.isArray(values) || values.length < 2) return NaN;
+  let sum = 0;
+  for (const value of values) {
+    checkpoint('standard-deviation-mean');
+    if (!finite(value)) return NaN;
+    sum += value;
+  }
+  const mean = sum / values.length;
+  let squaredDeviation = 0;
+  for (const value of values) {
+    checkpoint('standard-deviation-variance');
+    squaredDeviation += (value - mean) ** 2;
+  }
+  const variance = squaredDeviation / (values.length - 1);
   return Math.sqrt(variance);
 }
 
-function median(values) {
-  if (!values.length || values.some(value => !finite(value))) return NaN;
-  const ordered = [...values].sort((left, right) => left - right);
+function median(values, checkpoint = () => {}) {
+  if (!values.length) return NaN;
+  if (values.some(value => !finite(value))) return NaN;
+  const ordered = [...values].sort((left, right) => {
+    checkpoint('median-sort');
+    return left - right;
+  });
   const middle = Math.floor(ordered.length / 2);
   return ordered.length % 2 ? ordered[middle] : (ordered[middle - 1] + ordered[middle]) / 2;
 }
@@ -50,10 +76,11 @@ export function acceptsTarget(rawExposure, lastAccepted) {
   return Math.abs(rawExposure - lastAccepted) >= 0.10;
 }
 
-export function deriveFeatures(seriesByAsset, variant) {
+export function deriveFeatures(seriesByAsset, variant, checkpoint = () => {}) {
   const count = INPUT.rowCount;
   const basketReturns = new Array(count).fill(null);
   for (let index = 1; index < count; index++) {
+    checkpoint('basket-return');
     const returns = ASSETS.map(asset => {
       const prior = seriesByAsset[asset][index - 1].close;
       const current = seriesByAsset[asset][index].close;
@@ -66,8 +93,9 @@ export function deriveFeatures(seriesByAsset, variant) {
 
   const sigmas = new Array(count).fill(null);
   for (let index = variant.window; index < count; index++) {
+    checkpoint('annualized-volatility');
     const window = basketReturns.slice(index - variant.window + 1, index + 1);
-    const deviation = sampleStandardDeviation(window);
+    const deviation = sampleStandardDeviation(window, checkpoint);
     const sigma = deviation * Math.sqrt(365);
     if (!finite(sigma)) fail('INVALID_SIGNAL', {index, reason: 'NONFINITE_SIGMA'});
     sigmas[index] = sigma;
@@ -76,12 +104,13 @@ export function deriveFeatures(seriesByAsset, variant) {
   const result = new Array(count).fill(null);
   const firstSignalIndex = variant.window + 364;
   for (let index = firstSignalIndex; index < count; index++) {
+    checkpoint('rolling-volatility-median');
     const rolling = sigmas.slice(index - 364, index + 1);
     if (rolling.length !== 365 || rolling.some(value => !finite(value))) {
       fail('INVALID_SIGNAL', {index, reason: 'INCOMPLETE_MEDIAN_WINDOW'});
     }
     const currentSigma = sigmas[index];
-    const rollingMedian = median(rolling);
+    const rollingMedian = median(rolling, checkpoint);
     if (!finite(currentSigma) || currentSigma <= 1e-12 ||
       !finite(rollingMedian) || rollingMedian <= 0) {
       fail('INVALID_SIGNAL', {index, reason: 'ZERO_OR_INVALID_VOLATILITY'});
@@ -93,7 +122,7 @@ export function deriveFeatures(seriesByAsset, variant) {
   return result;
 }
 
-export function buildSchedule(rows, features, segment, delayDays = 0) {
+export function buildSchedule(rows, features, segment, delayDays = 0, checkpoint = () => {}) {
   const decisions = [];
   const fills = [];
   const cancelled = [];
@@ -133,6 +162,7 @@ export function buildSchedule(rows, features, segment, delayDays = 0) {
   if (!initialFeature) fail('INVALID_SIGNAL', {index: initialIndex, reason: 'INITIAL_TARGET_MISSING'});
   schedule(initialIndex, initialFeature.rawExposure, true);
   for (let index = segment.startIndex; index <= segment.endIndex; index++) {
+    checkpoint('schedule-row');
     if (new Date(rows[index].timestamp).getUTCDay() !== 0) continue;
     const feature = features[index];
     if (!feature) fail('INVALID_SIGNAL', {index, reason: 'WEEKLY_TARGET_MISSING'});
@@ -141,12 +171,13 @@ export function buildSchedule(rows, features, segment, delayDays = 0) {
   return {decisions, fills, cancelled};
 }
 
-function fixedSchedule(rows, segment, target, delayDays) {
+function fixedSchedule(rows, segment, target, delayDays, checkpoint = () => {}) {
   const decisions = [];
   const fills = [];
   const cancelled = [];
   const firstIndex = segment.startIndex - 1;
   for (let index = firstIndex; index <= segment.endIndex; index++) {
+    checkpoint('fixed-schedule-row');
     const initial = index === firstIndex;
     if (!initial && new Date(rows[index].timestamp).getUTCDay() !== 0) continue;
     const fillIndex = index + 1 + delayDays;
@@ -176,7 +207,7 @@ function closeValue(units, prices) {
   return units.reduce((sum, quantity, index) => sum + quantity * prices[index], 0);
 }
 
-function selfFinancingFill(state, prices, target, feeRate, date) {
+function selfFinancingFill(state, prices, target, feeRate, date, checkpoint = () => {}) {
   const previousEquity = state.cash + closeValue(state.units, prices);
   if (!finite(previousEquity) || previousEquity <= 0) fail('INVALID_ACCOUNTING', {date, reason: 'NONPOSITIVE_VALUE'});
   const weights = new Array(ASSETS.length).fill(target / ASSETS.length);
@@ -191,6 +222,7 @@ function selfFinancingFill(state, prices, target, feeRate, date) {
   let high = previousEquity;
   let equity = high / 2;
   for (let iteration = 0; iteration < 100; iteration++) {
+    checkpoint('fill-bisection');
     equity = (low + high) / 2;
     const residual = equity + costAt(equity) - previousEquity;
     if (!finite(residual)) fail('INVALID_ACCOUNTING', {date, reason: 'NONFINITE_BISECTION'});
@@ -245,12 +277,13 @@ function liquidateAtClose(state, prices, feeRate, date) {
   };
 }
 
-function quarterlyReturns(dates, equity) {
+function quarterlyReturns(dates, equity, checkpoint = () => {}) {
   const quarters = [];
   let startEquity = CAPITAL;
   let quarter = null;
   let endEquity = CAPITAL;
   for (let index = 0; index < dates.length; index++) {
+    checkpoint('quarterly-return');
     const date = new Date(dates[index]);
     const nextQuarter = `${date.getUTCFullYear()}-Q${Math.floor(date.getUTCMonth() / 3) + 1}`;
     if (quarter !== nextQuarter) {
@@ -264,12 +297,13 @@ function quarterlyReturns(dates, equity) {
   return quarters;
 }
 
-export function calculateDrawdown(equity) {
+export function calculateDrawdown(equity, checkpoint = () => {}) {
   let peak = CAPITAL;
   let drawdownDuration = 0;
   let maxDrawdownDuration = 0;
   let sampledDrawdown = 0;
   for (const value of equity) {
+    checkpoint('drawdown-row');
     if (!finite(value) || value < 0) fail('INVALID_ACCOUNTING', {reason: 'INVALID_DRAWDOWN_EQUITY'});
     if (value >= peak) {
       peak = value;
@@ -283,16 +317,16 @@ export function calculateDrawdown(equity) {
   return {sampledDrawdown, maxDrawdownDuration};
 }
 
-function simulatePath({seriesByAsset, descriptor, scenario, targetSource}) {
+function simulatePath({seriesByAsset, descriptor, scenario, targetSource, checkpoint = () => {}}) {
   const segment = SEGMENTS[descriptor.segmentId];
   const rows = seriesByAsset[ASSETS[0]];
   let schedule;
   if (descriptor.kind === 'CASH') {
     schedule = {decisions: [], fills: [], cancelled: []};
   } else if (descriptor.kind === 'CANDIDATE') {
-    schedule = buildSchedule(rows, targetSource.features, segment, scenario.delayDays);
+    schedule = buildSchedule(rows, targetSource.features, segment, scenario.delayDays, checkpoint);
   } else {
-    schedule = fixedSchedule(rows, segment, descriptor.target, scenario.delayDays);
+    schedule = fixedSchedule(rows, segment, descriptor.target, scenario.delayDays, checkpoint);
   }
 
   const state = {cash: CAPITAL, units: new Array(ASSETS.length).fill(0), cumulativeCost: 0};
@@ -311,6 +345,7 @@ function simulatePath({seriesByAsset, descriptor, scenario, targetSource}) {
   let maxConcentration = 0;
 
   for (let index = segment.startIndex; index <= segment.endIndex; index++) {
+    checkpoint('simulation-row');
     const date = rows[index].timestamp;
     dates.push(date);
     const openPrices = ASSETS.map(asset => seriesByAsset[asset][index].open);
@@ -318,7 +353,9 @@ function simulatePath({seriesByAsset, descriptor, scenario, targetSource}) {
     if (scheduled) {
       heldTarget = scheduled.target;
       if (descriptor.kind !== 'CASH') {
-        const fill = selfFinancingFill(state, openPrices, heldTarget, scenario.costRate, date);
+        const fill = selfFinancingFill(
+          state, openPrices, heldTarget, scenario.costRate, date, checkpoint
+        );
         state.cumulativeCost += fill.cost;
         totalTurnover += fill.turnover;
         fill.cumulativeCost = state.cumulativeCost;
@@ -339,6 +376,7 @@ function simulatePath({seriesByAsset, descriptor, scenario, targetSource}) {
     maxAbsoluteTargetMismatch = Math.max(maxAbsoluteTargetMismatch, absoluteTargetMismatch);
     if (markedPositions > 0) {
       for (const quantityIndex of ASSETS.keys()) {
+        checkpoint('concentration-asset');
         const weight = state.units[quantityIndex] * closePrices[quantityIndex] / closeEquity;
         if (!finite(weight) || weight < 0) fail('INVALID_ACCOUNTING', {date, reason: 'INVALID_CONCENTRATION'});
         if (weight > maxConcentration) maxConcentration = weight;
@@ -361,7 +399,7 @@ function simulatePath({seriesByAsset, descriptor, scenario, targetSource}) {
 
   }
 
-  const {sampledDrawdown, maxDrawdownDuration} = calculateDrawdown(dailyEquity);
+  const {sampledDrawdown, maxDrawdownDuration} = calculateDrawdown(dailyEquity, checkpoint);
   return {
     pathId: descriptor.pathId,
     variantId: descriptor.variantId,
@@ -379,7 +417,7 @@ function simulatePath({seriesByAsset, descriptor, scenario, targetSource}) {
     sampledDrawdown,
     maxDrawdownDuration,
     dailyReturnCount: dailyReturns.length,
-    dailyReturnSd: sampleStandardDeviation(dailyReturns),
+    dailyReturnSd: sampleStandardDeviation(dailyReturns, checkpoint),
     meanHeldTarget: dailyTarget.reduce((sum, value) => sum + value, 0) / dailyTarget.length,
     meanRealizedExposure: totalRealizedExposure / dailyTarget.length,
     meanTargetRealizedMismatch:
@@ -395,16 +433,23 @@ function simulatePath({seriesByAsset, descriptor, scenario, targetSource}) {
     fillCosts,
     cancelledInstructionCount: schedule.cancelled.length,
     cancelledInstructions: schedule.cancelled,
-    quarterlyReturns: quarterlyReturns(dates, dailyEquity),
+    quarterlyReturns: quarterlyReturns(dates, dailyEquity, checkpoint),
     dailyReturns,
     dailyHeldTarget: dailyTarget
   };
 }
 
-export function deriveControlExposures(primaryDailyReturns, benchmarkDailyReturns, primaryHeldTarget) {
-  const meanExposure = primaryHeldTarget.reduce((sum, value) => sum + value, 0) / primaryHeldTarget.length;
-  const primarySd = sampleStandardDeviation(primaryDailyReturns);
-  const benchmarkSd = sampleStandardDeviation(benchmarkDailyReturns);
+export function deriveControlExposures(
+  primaryDailyReturns, benchmarkDailyReturns, primaryHeldTarget, checkpoint = () => {}
+) {
+  let targetTotal = 0;
+  for (const value of primaryHeldTarget) {
+    checkpoint('control-mean-exposure');
+    targetTotal += value;
+  }
+  const meanExposure = targetTotal / primaryHeldTarget.length;
+  const primarySd = sampleStandardDeviation(primaryDailyReturns, checkpoint);
+  const benchmarkSd = sampleStandardDeviation(benchmarkDailyReturns, checkpoint);
   if (!finite(meanExposure) || !finite(primarySd) || !finite(benchmarkSd) || benchmarkSd <= 1e-12) {
     return {
       ok: false,
@@ -421,7 +466,7 @@ export function deriveControlExposures(primaryDailyReturns, benchmarkDailyReturn
     riskExposure: primarySd === 0 ? 0 : Math.min(1, primarySd / benchmarkSd),
     primarySd,
     benchmarkSd,
-    calibration: 'DEVELOPMENT_85BP_DAILY_NET_RETURNS_AND_HELD_TARGETS'
+    calibration: 'DEVELOPMENT_15BP_DAILY_NET_RETURNS_AND_HELD_TARGETS'
   };
 }
 
@@ -477,9 +522,12 @@ function descriptors() {
   return result;
 }
 
-function inputIdentity(seriesByAsset, source) {
-  const seriesHashes = Object.fromEntries(ASSETS.map(asset =>
-    [asset, sha256(canonicalJson(seriesByAsset[asset]))]));
+function inputIdentity(seriesByAsset, source, checkpoint = () => {}) {
+  const seriesHashes = {};
+  for (const asset of ASSETS) {
+    checkpoint('input-identity-asset');
+    seriesHashes[asset] = sha256(canonicalJson(seriesByAsset[asset], checkpoint));
+  }
   const identity = {
     datasetKind: source.kind,
     sourceCommit: source.kind === 'FROZEN_RESEARCH_INPUT' ? source.commit : 'SYNTHETIC_FIXTURE',
@@ -488,11 +536,12 @@ function inputIdentity(seriesByAsset, source) {
       : {syntheticFixtureSeriesSha256: seriesHashes},
     canonicalSeriesSha256: seriesHashes
   };
-  return {...identity, inputSha256: sha256(canonicalJson(identity))};
+  return {...identity, inputSha256: sha256(canonicalJson(identity, checkpoint))};
 }
 
-function bindDescriptors(items, identity, implementationSha256) {
+function bindDescriptors(items, identity, implementationSha256, checkpoint = () => {}) {
   return items.map(item => {
+    checkpoint('bind-path-identity');
     const pathIdentity = {
       protocolId: PROTOCOL_ID,
       protocolSha256: PROTOCOL_SHA256,
@@ -504,44 +553,84 @@ function bindDescriptors(items, identity, implementationSha256) {
       scenarioId: item.scenarioId,
       segmentId: item.segmentId
     };
-    return {...item, pathId: sha256(canonicalJson(pathIdentity)), identity: pathIdentity};
+    return {
+      ...item,
+      pathId: sha256(canonicalJson(pathIdentity, checkpoint)),
+      identity: pathIdentity
+    };
   });
 }
 
 export function createBudgetTracker(clock = () => performance.now()) {
-  const batchStart = clock();
+  const batchStart = clock({phase: 'batch-start'});
+  let lastClock = batchStart;
   let stopped = false;
-  return {
-    run(pathId, operation) {
-      if (stopped) return {status: 'NOT_RUN_BATCH_ABORT', attempts: 0, result: null};
-      if (clock() - batchStart > BUDGET.totalMs) {
-        stopped = true;
-        return {status: 'INVALID_TOTAL_BUDGET', attempts: 0, result: null};
+  let stopError = null;
+  let activePathId = null;
+  let activePathOrdinal = null;
+  let pathStart = null;
+  const readClock = context => {
+    const now = clock(context);
+    if (!finite(now) || now < lastClock) {
+      fail('INVALID_BUDGET_CLOCK', {phase: context.phase, now, previous: lastClock});
+    }
+    lastClock = now;
+    return now;
+  };
+  const checkpoint = phase => {
+    if (stopError) throw stopError;
+    const now = readClock({phase, pathId: activePathId, pathOrdinal: activePathOrdinal});
+    const totalElapsed = now - batchStart;
+    const pathElapsed = pathStart === null ? null : now - pathStart;
+    if (totalElapsed > BUDGET.totalMs || pathElapsed > BUDGET.pathMs) {
+      stopped = true;
+      try {
+        fail('BUDGET_EXCEEDED', {
+          status: totalElapsed > BUDGET.totalMs ? 'INVALID_TOTAL_BUDGET' : 'INVALID_PATH_BUDGET',
+          phase,
+          pathElapsed,
+          totalElapsed
+        });
+      } catch (error) {
+        stopError = error;
+        throw error;
       }
-      const pathStart = clock();
+    }
+  };
+  return {
+    checkpoint,
+    run(pathId, pathOrdinal, operation) {
+      if (typeof pathOrdinal === 'function') {
+        operation = pathOrdinal;
+        pathOrdinal = 1;
+      }
+      if (stopped) return {status: 'NOT_RUN_BATCH_ABORT', attempts: 0, result: null};
+      activePathId = pathId;
+      activePathOrdinal = pathOrdinal;
       let result;
       try {
-        result = operation();
+        pathStart = readClock({phase: 'path-start', pathId, pathOrdinal});
+        checkpoint('path-start-check');
+        result = operation(checkpoint);
+        checkpoint('path-end-check');
       } catch (error) {
         stopped = true;
+        stopError ??= error;
+        const budgetStatus = error.code === 'BUDGET_EXCEEDED'
+          ? error.detail?.status : null;
+        activePathId = null;
+        activePathOrdinal = null;
+        pathStart = null;
         return {
-          status: 'INVALID',
+          status: budgetStatus ?? 'INVALID',
           attempts: 1,
           result: null,
           failure: {code: error.code ?? 'PATH_FAILED', detail: error.detail ?? null}
         };
       }
-      const pathElapsed = clock() - pathStart;
-      const totalElapsed = clock() - batchStart;
-      if (pathElapsed > BUDGET.pathMs || totalElapsed > BUDGET.totalMs) {
-        stopped = true;
-        return {
-          status: pathElapsed > BUDGET.pathMs ? 'INVALID_PATH_BUDGET' : 'INVALID_TOTAL_BUDGET',
-          attempts: 1,
-          result: null,
-          failure: {code: 'BUDGET_EXCEEDED', detail: {pathElapsed, totalElapsed}}
-        };
-      }
+      activePathId = null;
+      activePathOrdinal = null;
+      pathStart = null;
       return {status: 'COMPLETED', attempts: 1, result};
     },
     get stopped() {
@@ -550,21 +639,27 @@ export function createBudgetTracker(clock = () => performance.now()) {
   };
 }
 
-function screenResults(paths, controlDefinitions) {
-  const byKey = new Map(paths.map(path =>
-    [`${path.variantId}|${path.scenarioId}|${path.segmentId}`, path]));
+function screenResults(paths, controlDefinitions, checkpoint = () => {}) {
+  const byKey = new Map();
+  for (const path of paths) {
+    checkpoint('screen-index');
+    byKey.set(`${path.variantId}|${path.scenarioId}|${path.segmentId}`, path);
+  }
   const get = (variant, scenario, segment) => byKey.get(`${variant}|${scenario}|${segment}`);
-  const primary = get('primary-n30-f25', 'base-85bp', 'diagnostic');
-  const full = get('full-basket-weekly', 'base-85bp', 'diagnostic');
-  const meanControl = get('frozen-mean-exposure', 'base-85bp', 'diagnostic');
-  const riskControl = get('frozen-risk-exposure', 'base-85bp', 'diagnostic');
-  const stressed = get('primary-n30-f25', 'stress-160bp', 'diagnostic');
-  const delayed = get('primary-n30-f25', 'stress-160bp-delay-1d', 'diagnostic');
+  const primary = get('primary-n30-f25', 'base-15bp', 'diagnostic');
+  const full = get('full-basket-weekly', 'base-15bp', 'diagnostic');
+  const meanControl = get('frozen-mean-exposure', 'base-15bp', 'diagnostic');
+  const riskControl = get('frozen-risk-exposure', 'base-15bp', 'diagnostic');
+  const stressed = get('primary-n30-f25', 'stress-30bp', 'diagnostic');
+  const delayed = get('primary-n30-f25', 'stress-30bp-delay-1d', 'diagnostic');
   const neighbours = VARIANTS.slice(1);
-  const basePositive = neighbours.filter(variant =>
-    get(variant.id, 'base-85bp', 'diagnostic').netReturn > 0).length;
-  const stressPositive = neighbours.filter(variant =>
-    get(variant.id, 'stress-160bp', 'diagnostic').netReturn > 0).length;
+  let basePositive = 0;
+  let stressPositive = 0;
+  for (const variant of neighbours) {
+    checkpoint('screen-neighbour');
+    if (get(variant.id, 'base-15bp', 'diagnostic').netReturn > 0) basePositive++;
+    if (get(variant.id, 'stress-30bp', 'diagnostic').netReturn > 0) stressPositive++;
+  }
   if (!primary || !full || !meanControl || !riskControl || !stressed || !delayed ||
     controlDefinitions.status !== 'FROZEN_DEVELOPMENT_ONLY') {
     return {status: 'INSUFFICIENT_EVIDENCE', checks: {}, relativeDrawdownReduction: null};
@@ -586,19 +681,19 @@ function screenResults(paths, controlDefinitions) {
       primary.sampledDrawdown <= meanControl.sampledDrawdown &&
       primary.sampledDrawdown <= riskControl.sampledDrawdown,
     relativeDrawdownReductionAtLeast20Percent: relativeDrawdownReduction >= 0.20,
-    primaryNetPositiveAt160bpNonDelayed: stressed.netReturn > 0,
-    primaryNetPositiveAt160bpPlusDelay: delayed.netReturn > 0,
-    atLeastThreeOfFourNeighboursPositiveAt85bp: basePositive >= 3,
-    atLeastThreeOfFourNeighboursPositiveAt160bpNonDelayed: stressPositive >= 3
+    primaryNetPositiveAt30bpNonDelayed: stressed.netReturn > 0,
+    primaryNetPositiveAt30bpPlusDelay: delayed.netReturn > 0,
+    atLeastThreeOfFourNeighboursPositiveAt15bp: basePositive >= 3,
+    atLeastThreeOfFourNeighboursPositiveAt30bpNonDelayed: stressPositive >= 3
   };
   return {
     status: Object.values(checks).every(Boolean) ? 'PASS' : 'NO_EDGE',
     interpretation: 'HISTORICAL_CANDIDATE_ONLY_NOT_HOLDOUT',
     comparisonSegment: 'diagnostic',
-    neighbourStressScenario: 'stress-160bp-non-delayed',
+    neighbourStressScenario: 'stress-30bp-non-delayed',
     checks,
     relativeDrawdownReduction,
-    neighbourPositiveCounts: {base85bp: basePositive, stress160bp: stressPositive},
+    neighbourPositiveCounts: {base15bp: basePositive, stress30bp: stressPositive},
     stopPolicy: 'NO_FINITE_TRADE_STOP',
     tradeCRV: {status: 'UNDEFINED_NO_FINITE_STOP', value: null}
   };
@@ -630,7 +725,7 @@ function emptyResult(status, code, errors = []) {
     computed: false
   }));
   return {
-    schema: 'MERIDIAN_B1_7_ENGINE_RESULT_R2',
+    schema: 'MERIDIAN_B1_7_ENGINE_RESULT_R3',
     protocolId: PROTOCOL_ID,
     protocolSha256: PROTOCOL_SHA256,
     status,
@@ -648,6 +743,16 @@ function emptyResult(status, code, errors = []) {
       status: 'NOT_STARTED'
     },
     authority: authority(),
+    evidence: {
+      priceSource: 'NOT_EVALUATED',
+      costModel: 'OKX_INSPIRED_ASSUMED_15_30BP_NOT_EXECUTION_EVIDENCE',
+      executionEvidence: 'NOT_OKX_EXECUTION_EVIDENCE',
+      sourceAuthenticity: 'NOT_ESTABLISHED',
+      holdoutClaim: false,
+      trialLedger: 'UNKNOWN',
+      stoppedPolicy: 'NO_FINITE_TRADE_STOP',
+      crv: {status: 'UNDEFINED_NO_FINITE_STOP', value: null, researchOnly: true}
+    },
     trialLedger: 'UNKNOWN',
     protocolReview: {
       r1RequestId: 'MERIDIAN-B1-7-DESIGN-R1',
@@ -656,9 +761,20 @@ function emptyResult(status, code, errors = []) {
       r2RequestId: 'MERIDIAN-B1-7-DESIGN-R2',
       r2ResponseComment: '6249482850',
       r2Verdict: 'GREEN_LIGHT_DESIGN_ONLY',
-      r2Scope: 'SOURCE_AND_SYNTHETIC_PREPARATION_ONLY'
+      r2Scope: 'HISTORICAL_R2_ONLY_NOT_APPROVAL_FOR_R3',
+      r3Review: 'PENDING'
     }
   };
+}
+
+function budgetFailureResult(error) {
+  const output = emptyResult('INVALID', error.code, [
+    {code: error.code, detail: error.detail ?? null}
+  ]);
+  output.failure = {code: error.code, detail: error.detail ?? null};
+  output.paths = output.paths.map(path => ({...path, status: 'NOT_RUN_BATCH_ABORT'}));
+  output.budget.status = 'FAILED_NO_RETRY';
+  return output;
 }
 
 function authority() {
@@ -674,9 +790,26 @@ function authority() {
   };
 }
 
-function compactIfOverBudget(output) {
+function compactIfOverBudget(output, checkpoint = () => {}) {
+  checkpoint('output-serialize-before');
   const bytes = Buffer.byteLength(JSON.stringify(output), 'utf8');
+  checkpoint('output-serialize-after');
   if (bytes <= BUDGET.outputBytes) return output;
+  const paths = [];
+  for (const path of output.paths) {
+    checkpoint('output-compact-path');
+    paths.push({
+      pathId: path.pathId,
+      kind: path.kind,
+      variantId: path.variantId,
+      scenarioId: path.scenarioId,
+      segmentId: path.segmentId,
+      status: path.status === 'COMPLETED' ? 'INCOMPLETE_OUTPUT_BUDGET' : path.status,
+      attempts: path.attempts,
+      computed: path.status === 'COMPLETED',
+      outputOmitted: path.status === 'COMPLETED' ? 'GLOBAL_OUTPUT_BUDGET_EXCEEDED' : null
+    });
+  }
   const compact = {
     schema: output.schema,
     protocolId: output.protocolId,
@@ -689,39 +822,34 @@ function compactIfOverBudget(output) {
     completedPaths: 0,
     computedPaths: output.computedPaths,
     plannedPaths: BUDGET.paths,
-    paths: output.paths.map(path => ({
-      pathId: path.pathId,
-      kind: path.kind,
-      variantId: path.variantId,
-      scenarioId: path.scenarioId,
-      segmentId: path.segmentId,
-      status: path.status === 'COMPLETED' ? 'INCOMPLETE_OUTPUT_BUDGET' : path.status,
-      attempts: path.attempts,
-      computed: path.status === 'COMPLETED',
-      outputOmitted: path.status === 'COMPLETED' ? 'GLOBAL_OUTPUT_BUDGET_EXCEEDED' : null
-    })),
+    paths,
     screen: {status: 'NOT_EVALUATED'},
     authority: authority(),
     trialLedger: 'UNKNOWN'
   };
+  checkpoint('output-compact-serialize-before');
+  JSON.stringify(compact);
+  checkpoint('output-compact-serialize-after');
   return compact;
 }
 
 export function runBatch(options) {
-  const tracker = createBudgetTracker();
+  let tracker;
   let batch;
   try {
-    const keys = ['seriesByAsset', 'source', 'implementationSha256'];
+    const keys = ['seriesByAsset', 'source', 'implementationSha256', 'syntheticClock'];
     if (options === null || typeof options !== 'object' || Array.isArray(options) ||
       (Object.getPrototypeOf(options) !== Object.prototype && Object.getPrototypeOf(options) !== null)) {
       return emptyResult('INVALID', 'BATCH_INPUT_INVALID');
     }
     const ownKeys = Reflect.ownKeys(options);
-    if (ownKeys.length !== keys.length || ownKeys.some(key => !keys.includes(key))) {
+    if (ownKeys.length < 3 || ownKeys.length > keys.length ||
+      ownKeys.some(key => !keys.includes(key)) ||
+      keys.slice(0, 3).some(key => !ownKeys.includes(key))) {
       return emptyResult('INVALID', 'BATCH_INPUT_INVALID');
     }
     batch = {};
-    for (const key of keys) {
+    for (const key of ownKeys) {
       const descriptor = Object.getOwnPropertyDescriptor(options, key);
       if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) {
         return emptyResult('INVALID', 'BATCH_INPUT_INVALID');
@@ -740,34 +868,61 @@ export function runBatch(options) {
   }
   const sourceCheck = validateSourceIdentity(source);
   if (!sourceCheck.ok) return emptyResult('INVALID', sourceCheck.error.code, [sourceCheck.error]);
-  const inputCheck = validateSeries(seriesByAsset);
-  if (!inputCheck.ok) return emptyResult('INVALID', 'INPUT_INVALID', inputCheck.errors);
-
-  let featuresByVariant;
+  if (Object.hasOwn(batch, 'syntheticClock') &&
+    (source.kind !== 'SYNTHETIC_FIXTURE' || typeof batch.syntheticClock !== 'function')) {
+    return emptyResult('INVALID', 'SYNTHETIC_CLOCK_NOT_ALLOWED');
+  }
+  tracker = createBudgetTracker(batch.syntheticClock);
+  let inputCheck;
   try {
-    featuresByVariant = Object.fromEntries(VARIANTS.map(variant =>
-      [variant.id, deriveFeatures(seriesByAsset, variant)]));
+    inputCheck = validateSeries(seriesByAsset, tracker.checkpoint);
+    tracker.checkpoint('validation-complete');
   } catch (error) {
-    return emptyResult('INVALID', error.code ?? 'INVALID_SIGNAL', [
-      {code: error.code ?? 'INVALID_SIGNAL', detail: error.detail ?? null}
+    if (error.code === 'BUDGET_EXCEEDED') return budgetFailureResult(error);
+    return emptyResult('INVALID', error.code ?? 'INPUT_VALIDATION_FAILED', [
+      {code: error.code ?? 'INPUT_VALIDATION_FAILED', detail: error.detail ?? null}
     ]);
   }
+  if (!inputCheck.ok) return emptyResult('INVALID', 'INPUT_INVALID', inputCheck.errors);
 
-  const identity = inputIdentity(seriesByAsset, source);
-  const allDescriptors = bindDescriptors(descriptors(), identity, implementationSha256);
+  let identity;
+  let allDescriptors;
+  try {
+    tracker.checkpoint('input-identity-start');
+    identity = inputIdentity(seriesByAsset, source, tracker.checkpoint);
+    tracker.checkpoint('input-identity-complete');
+    allDescriptors = bindDescriptors(
+      descriptors(), identity, implementationSha256, tracker.checkpoint
+    );
+  } catch (error) {
+    if (error.code === 'BUDGET_EXCEEDED') return budgetFailureResult(error);
+    return emptyResult('INVALID', error.code ?? 'INPUT_IDENTITY_FAILED', [
+      {code: error.code ?? 'INPUT_IDENTITY_FAILED', detail: error.detail ?? null}
+    ]);
+  }
   if (allDescriptors.length !== BUDGET.paths) return emptyResult('INVALID', 'PATH_PLAN_MISMATCH');
   const pathRecords = new Map(allDescriptors.map(item =>
     [item.pathId, pathFailureRecord(item, 'NOT_RUN', 0)]));
-  const targetSource = Object.fromEntries(VARIANTS.map(variant =>
-    [variant.id, {features: featuresByVariant[variant.id]}]));
+  const featuresByVariant = new Map();
+  let startedPathOrdinal = 0;
 
   function executeDescriptor(descriptor, target = descriptor.target) {
-    const run = tracker.run(descriptor.pathId, () => simulatePath({
-      seriesByAsset,
-      descriptor: {...descriptor, target},
-      scenario: descriptor.scenario,
-      targetSource: targetSource[descriptor.variantId] ?? {}
-    }));
+    const run = tracker.run(descriptor.pathId, ++startedPathOrdinal, checkpoint => {
+      if (descriptor.kind === 'CANDIDATE' && !featuresByVariant.has(descriptor.variantId)) {
+        const variant = VARIANTS.find(item => item.id === descriptor.variantId);
+        featuresByVariant.set(
+          descriptor.variantId,
+          deriveFeatures(seriesByAsset, variant, checkpoint)
+        );
+      }
+      return simulatePath({
+        seriesByAsset,
+        descriptor: {...descriptor, target},
+        scenario: descriptor.scenario,
+        targetSource: {features: featuresByVariant.get(descriptor.variantId)},
+        checkpoint
+      });
+    });
     if (run.status === 'COMPLETED') {
       pathRecords.set(descriptor.pathId, {
         ...run.result,
@@ -793,35 +948,45 @@ export function runBatch(options) {
   }
 
   let controlDefinitions = {status: 'NOT_CALIBRATED'};
+  let batchFailure = null;
   if (!aborted) {
-    const primaryDevelopment = allDescriptors.find(item =>
-      item.kind === 'CANDIDATE' && item.variantId === 'primary-n30-f25' &&
-      item.scenarioId === 'base-85bp' && item.segmentId === 'development');
-    const basketDevelopment = allDescriptors.find(item =>
-      item.kind === 'FULL_BASKET' && item.scenarioId === 'base-85bp' &&
-      item.segmentId === 'development');
-    const primary = pathRecords.get(primaryDevelopment.pathId);
-    const basket = pathRecords.get(basketDevelopment.pathId);
-    controlDefinitions = deriveControlExposures(
-      primary.dailyReturns, basket.dailyReturns, primary.dailyHeldTarget
-    );
-    if (!controlDefinitions.ok) {
-      for (const descriptor of allDescriptors.filter(item => item.segmentId === 'diagnostic')) {
-        pathRecords.set(descriptor.pathId,
-          pathFailureRecord(descriptor, 'NOT_RUN_INSUFFICIENT_EVIDENCE', 0));
-      }
-    } else {
-      const diagnosticPaths = allDescriptors.filter(item => item.segmentId === 'diagnostic');
-      for (const descriptor of diagnosticPaths) {
-        let target = descriptor.target;
-        if (descriptor.kind === 'FIXED_CONTROL') {
-          target = descriptor.variantId === 'frozen-mean-exposure'
-            ? controlDefinitions.meanExposure : controlDefinitions.riskExposure;
+    try {
+      tracker.checkpoint('control-calibration-start');
+      const primaryDevelopment = allDescriptors.find(item =>
+        item.kind === 'CANDIDATE' && item.variantId === 'primary-n30-f25' &&
+        item.scenarioId === 'base-15bp' && item.segmentId === 'development');
+      const basketDevelopment = allDescriptors.find(item =>
+        item.kind === 'FULL_BASKET' && item.scenarioId === 'base-15bp' &&
+        item.segmentId === 'development');
+      const primary = pathRecords.get(primaryDevelopment.pathId);
+      const basket = pathRecords.get(basketDevelopment.pathId);
+      controlDefinitions = deriveControlExposures(
+        primary.dailyReturns, basket.dailyReturns, primary.dailyHeldTarget, tracker.checkpoint
+      );
+      tracker.checkpoint('control-calibration-complete');
+    } catch (error) {
+      aborted = true;
+      batchFailure = error;
+    }
+    if (!aborted) {
+      if (!controlDefinitions.ok) {
+        for (const descriptor of allDescriptors.filter(item => item.segmentId === 'diagnostic')) {
+          pathRecords.set(descriptor.pathId,
+            pathFailureRecord(descriptor, 'NOT_RUN_INSUFFICIENT_EVIDENCE', 0));
         }
-        const status = executeDescriptor(descriptor, target);
-        if (status !== 'COMPLETED') {
-          aborted = true;
-          break;
+      } else {
+        const diagnosticPaths = allDescriptors.filter(item => item.segmentId === 'diagnostic');
+        for (const descriptor of diagnosticPaths) {
+          let target = descriptor.target;
+          if (descriptor.kind === 'FIXED_CONTROL') {
+            target = descriptor.variantId === 'frozen-mean-exposure'
+              ? controlDefinitions.meanExposure : controlDefinitions.riskExposure;
+          }
+          const status = executeDescriptor(descriptor, target);
+          if (status !== 'COMPLETED') {
+            aborted = true;
+            break;
+          }
         }
       }
     }
@@ -845,13 +1010,6 @@ export function runBatch(options) {
     }
   }
 
-  const paths = allDescriptors.map(item => pathRecords.get(item.pathId));
-  const completed = paths.filter(path => path.status === 'COMPLETED').length;
-  const status = aborted ? 'INVALID' :
-    controlDefinitions.status === 'INSUFFICIENT_EVIDENCE' ? 'INSUFFICIENT_EVIDENCE' :
-      completed === BUDGET.paths ? 'COMPLETED' : 'INCOMPLETE';
-  const calculatedScreen = status === 'COMPLETED'
-    ? screenResults(paths, controlDefinitions) : null;
   const executionId = sha256(canonicalJson({
     protocolId: PROTOCOL_ID,
     protocolSha256: PROTOCOL_SHA256,
@@ -861,19 +1019,20 @@ export function runBatch(options) {
     pathIds: allDescriptors.map(item => item.pathId)
   }));
   const output = {
-    schema: 'MERIDIAN_B1_7_ENGINE_RESULT_R2',
+    schema: 'MERIDIAN_B1_7_ENGINE_RESULT_R3',
     protocolId: PROTOCOL_ID,
     protocolSha256: PROTOCOL_SHA256,
     implementationId: IMPLEMENTATION_ID,
     implementationSha256,
     identity,
     executionId,
-    status,
-    attemptedPaths: paths.filter(path => path.attempts === 1).length,
-    completedPaths: completed,
-    computedPaths: paths.filter(path => path.computed).length,
+    status: 'INVALID',
+    failure: null,
+    attemptedPaths: startedPathOrdinal,
+    completedPaths: 0,
+    computedPaths: 0,
     plannedPaths: BUDGET.paths,
-    paths,
+    paths: [],
     controlDefinitions: controlDefinitions.ok ? {
       status: controlDefinitions.status,
       meanExposure: controlDefinitions.meanExposure,
@@ -882,30 +1041,15 @@ export function runBatch(options) {
       fullBasketDevelopmentSd: controlDefinitions.benchmarkSd,
       calibration: controlDefinitions.calibration
     } : controlDefinitions,
-    controlRealization: paths.filter(path => path.kind === 'FIXED_CONTROL').map(path => ({
-      pathId: path.pathId,
-      variantId: path.variantId,
-      scenarioId: path.scenarioId,
-      segmentId: path.segmentId,
-      status: path.status,
-      frozenTargetExposure: path.targetExposure ?? null,
-      meanRealizedExposure: path.meanRealizedExposure ?? null,
-      meanTargetRealizedMismatch: path.meanTargetRealizedMismatch ?? null,
-      meanAbsoluteTargetMismatch: path.meanAbsoluteTargetMismatch ?? null,
-      maxAbsoluteTargetMismatch: path.maxAbsoluteTargetMismatch ?? null,
-      diagnosticRescaling: 'NONE'
-    })),
-    screen: calculatedScreen
-      ? source.kind === 'SYNTHETIC_FIXTURE'
-        ? {
-          ...calculatedScreen,
-          status: 'SYNTHETIC_ONLY_NOT_ASSESSED',
-          interpretation: 'SYNTHETIC_FIXTURE_RULE_CHECKS_ONLY'
-        }
-        : calculatedScreen
-      : {status: status === 'INSUFFICIENT_EVIDENCE' ? status : 'NOT_EVALUATED'},
+    controlRealization: [],
+    screen: {status: 'NOT_EVALUATED'},
     evidence: {
       syntheticFixture: source.kind === 'SYNTHETIC_FIXTURE',
+      priceSource: source.kind === 'SYNTHETIC_FIXTURE'
+        ? 'SYNTHETIC_FIXTURE'
+        : 'PINNED_KRAKEN_SPOT_USD_CANDLES',
+      costModel: 'OKX_INSPIRED_ASSUMED_15_30BP_NOT_EXECUTION_EVIDENCE',
+      executionEvidence: 'NOT_OKX_EXECUTION_EVIDENCE',
       sourceAuthenticity: source.kind === 'SYNTHETIC_FIXTURE'
         ? 'SYNTHETIC_ONLY'
         : 'HASH_PROVENANCE_COPIED_NOT_AUTHENTICATED',
@@ -922,7 +1066,7 @@ export function runBatch(options) {
       limits: BUDGET,
       attemptsPerStartedPath: 1,
       automaticRetry: false,
-      status: aborted ? 'FAILED_NO_RETRY' : 'WITHIN_LIMITS'
+      status: 'FAILED_NO_RETRY'
     },
     authority: authority(),
     protocolReview: {
@@ -932,8 +1076,85 @@ export function runBatch(options) {
       r2RequestId: 'MERIDIAN-B1-7-DESIGN-R2',
       r2ResponseComment: '6249482850',
       r2Verdict: 'GREEN_LIGHT_DESIGN_ONLY',
-      r2Scope: 'SOURCE_AND_SYNTHETIC_PREPARATION_ONLY'
+      r2Scope: 'HISTORICAL_R2_ONLY_NOT_APPROVAL_FOR_R3',
+      r3Review: 'PENDING'
     }
   };
-  return compactIfOverBudget(output);
+  try {
+    tracker.checkpoint('result-paths-start');
+    for (const descriptor of allDescriptors) {
+      tracker.checkpoint('result-path-record');
+      output.paths.push(pathRecords.get(descriptor.pathId));
+    }
+    output.computedPaths = output.paths.filter(path => path.computed).length;
+    const completed = output.paths.filter(path => path.status === 'COMPLETED').length;
+    output.status = aborted ? 'INVALID' :
+      controlDefinitions.status === 'INSUFFICIENT_EVIDENCE' ? 'INSUFFICIENT_EVIDENCE' :
+        completed === BUDGET.paths ? 'COMPLETED' : 'INCOMPLETE';
+    output.completedPaths = completed;
+    output.budget.status = aborted ? 'FAILED_NO_RETRY' : 'WITHIN_LIMITS';
+    if (aborted) {
+      const failedPath = output.paths.find(path =>
+        path.status === 'INVALID' || path.status.startsWith('INVALID_'));
+      output.failure = failedPath?.failure ?? (batchFailure
+        ? {code: batchFailure.code ?? 'BATCH_ABORTED', detail: batchFailure.detail ?? null}
+        : {code: 'BATCH_ABORTED'});
+    }
+
+    if (output.status === 'COMPLETED') {
+      const calculatedScreen = screenResults(output.paths, controlDefinitions, tracker.checkpoint);
+      output.screen = source.kind === 'SYNTHETIC_FIXTURE'
+        ? {
+          ...calculatedScreen,
+          status: 'SYNTHETIC_ONLY_NOT_ASSESSED',
+          interpretation: 'SYNTHETIC_FIXTURE_RULE_CHECKS_ONLY'
+        }
+        : calculatedScreen;
+    } else if (output.status === 'INSUFFICIENT_EVIDENCE') {
+      output.screen = {status: 'INSUFFICIENT_EVIDENCE'};
+    }
+
+    for (const path of output.paths) {
+      tracker.checkpoint('control-realization');
+      if (path.kind !== 'FIXED_CONTROL') continue;
+      output.controlRealization.push({
+        pathId: path.pathId,
+        variantId: path.variantId,
+        scenarioId: path.scenarioId,
+        segmentId: path.segmentId,
+        status: path.status,
+        frozenTargetExposure: path.targetExposure ?? null,
+        meanRealizedExposure: path.meanRealizedExposure ?? null,
+        meanTargetRealizedMismatch: path.meanTargetRealizedMismatch ?? null,
+        meanAbsoluteTargetMismatch: path.meanAbsoluteTargetMismatch ?? null,
+        maxAbsoluteTargetMismatch: path.maxAbsoluteTargetMismatch ?? null,
+        diagnosticRescaling: 'NONE'
+      });
+    }
+    tracker.checkpoint('result-object-complete');
+    return compactIfOverBudget(output, tracker.checkpoint);
+  } catch (error) {
+    const incompletePaths = allDescriptors.map(descriptor => {
+      const path = pathRecords.get(descriptor.pathId);
+      if (path.status === 'COMPLETED') return {...path, status: 'INCOMPLETE_BATCH_ABORT', computed: true};
+      if (path.status === 'NOT_RUN') {
+        return pathFailureRecord(descriptor, 'NOT_RUN_BATCH_ABORT', 0);
+      }
+      return path;
+    });
+    const failedOutput = {
+      ...output,
+      status: 'INVALID',
+      failure: {
+        code: batchFailure?.code ?? error.code ?? 'FINALIZATION_FAILED',
+        detail: batchFailure?.detail ?? error.detail ?? null
+      },
+      completedPaths: 0,
+      computedPaths: incompletePaths.filter(path => path.computed).length,
+      paths: incompletePaths,
+      screen: {status: 'NOT_EVALUATED'},
+      budget: {...output.budget, status: 'FAILED_NO_RETRY'}
+    };
+    return compactIfOverBudget(failedOutput);
+  }
 }

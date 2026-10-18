@@ -31,3 +31,18 @@ export function createSyntheticSeries() {
   }
   return series;
 }
+
+export function createZeroVolatilityVariantSeries() {
+  const series = createSyntheticSeries();
+  for (let index = 460; index < 480; index++) {
+    for (const asset of ASSETS) {
+      const row = series[asset][index];
+      const previousClose = series[asset][index - 1].close;
+      row.open = previousClose;
+      row.close = previousClose * 1.001;
+      row.high = row.close * 1.004;
+      row.low = row.open * 0.996;
+    }
+  }
+  return series;
+}

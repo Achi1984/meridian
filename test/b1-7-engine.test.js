@@ -10,7 +10,9 @@ import {
   ASSETS, BUDGET, IMPLEMENTATION_ID, INPUT, PROTOCOL_ID, PROTOCOL_SHA256, SCENARIOS,
   SEGMENTS, VARIANTS, validateSeries, validateSourceIdentity
 } from '../scripts/research/b1-7/validate.mjs';
-import {createSyntheticSeries} from './fixtures/b1-7/synthetic-series.mjs';
+import {
+  createSyntheticSeries, createZeroVolatilityVariantSeries
+} from './fixtures/b1-7/synthetic-series.mjs';
 
 const protocolPath = new URL('../research/protocols/b1-7-20261018/protocol.json', import.meta.url);
 const requestPath = new URL('../research/protocols/b1-7-20261018/EXECUTION_REQUEST.md', import.meta.url);
@@ -24,8 +26,10 @@ const implementationSha256 = sha256(canonicalJson({
 }));
 const syntheticSource = {kind: 'SYNTHETIC_FIXTURE'};
 
-function makeRun(seriesByAsset = createSyntheticSeries()) {
-  return runBatch({seriesByAsset, source: syntheticSource, implementationSha256});
+function makeRun(seriesByAsset = createSyntheticSeries(), syntheticClock) {
+  const options = {seriesByAsset, source: syntheticSource, implementationSha256};
+  if (syntheticClock) options.syntheticClock = syntheticClock;
+  return runBatch(options);
 }
 
 function getPath(output, variantId, scenarioId, segmentId) {
@@ -34,8 +38,15 @@ function getPath(output, variantId, scenarioId, segmentId) {
 }
 
 test('protocol constants, exact universe, costs, path count, and raw freeze hash agree', () => {
-  assert.equal(protocol.schema, 'MERIDIAN_B1_7_PROTOCOL_R2');
+  assert.equal(protocol.schema, 'MERIDIAN_B1_7_PROTOCOL_R3');
   assert.equal(protocol.protocolId, PROTOCOL_ID);
+  assert.equal(protocol.independentReview.r3Response, 'PENDING_INDEPENDENT_REVIEW');
+  assert.equal(protocol.independentReview.r3ScopeUpdateComment, '6249518640');
+  assert.equal(protocol.independentReview.r3CorrectionComment, '6250026939');
+  assert.equal(protocol.independentReview.r2Response, 'GREEN_LIGHT_DESIGN_ONLY');
+  assert.equal(protocol.budget.hardPreemption, false);
+  assert.match(protocol.costAssumptions.base, /10bp spot taker reference plus 5bp assumed friction/);
+  assert.match(protocol.costAssumptions.status, /NOT OKX execution evidence/);
   assert.equal(hashFile(protocolPath), PROTOCOL_SHA256);
   assert.equal(protocol.independentReview.r2ResponseComment, '6249482850');
   assert.equal(protocol.independentReview.r2Response, 'GREEN_LIGHT_DESIGN_ONLY');
@@ -44,6 +55,11 @@ test('protocol constants, exact universe, costs, path count, and raw freeze hash
   assert.deepEqual(protocol.scenarios, SCENARIOS.map(({id, costRate, delayDays}) => ({
     id, costRate, delayDays, perSideCostBp: costRate * 10000
   })));
+  assert.deepEqual(SCENARIOS, [
+    {id: 'base-15bp', costRate: 0.0015, delayDays: 0},
+    {id: 'stress-30bp', costRate: 0.003, delayDays: 0},
+    {id: 'stress-30bp-delay-1d', costRate: 0.003, delayDays: 1}
+  ]);
   assert.equal(BUDGET.paths, 44);
   assert.equal(protocol.pathManifest.pathCount, 44);
   assert.equal(protocol.calendar.warmup.rows + protocol.calendar.development.rows +
@@ -166,6 +182,8 @@ test('full synthetic batch has 44 deterministic paths and complete accounting', 
   assert.equal(first.implementationId, IMPLEMENTATION_ID);
   assert.equal(first.identity.datasetKind, 'SYNTHETIC_FIXTURE');
   assert.equal(first.evidence.syntheticFixture, true);
+  assert.equal(first.evidence.costModel, 'OKX_INSPIRED_ASSUMED_15_30BP_NOT_EXECUTION_EVIDENCE');
+  assert.equal(first.evidence.executionEvidence, 'NOT_OKX_EXECUTION_EVIDENCE');
   assert.equal(first.evidence.holdoutClaim, false);
   assert.equal(first.evidence.survivorship, 'UNIVERSE_HISTORY_LIMITATION_HBAR_OMITTED_FOR_COVERAGE_ONLY');
   assert.equal(first.evidence.candidateInterpretation, 'HISTORICAL_CANDIDATE_ONLY_IF_PROPOSED_REAL_SCREEN_PASSES');
@@ -175,6 +193,7 @@ test('full synthetic batch has 44 deterministic paths and complete accounting', 
   assert.equal(first.screen.interpretation, 'SYNTHETIC_FIXTURE_RULE_CHECKS_ONLY');
   assert.equal(first.protocolReview.r2ResponseComment, '6249482850');
   assert.equal(first.protocolReview.r2Verdict, 'GREEN_LIGHT_DESIGN_ONLY');
+  assert.equal(first.protocolReview.r3Review, 'PENDING');
   assert.equal(first.paths.length, 44);
   assert.equal(Buffer.byteLength(JSON.stringify(first), 'utf8') <= BUDGET.outputBytes, true);
   assert.deepEqual(first, second);
@@ -189,10 +208,10 @@ test('full synthetic batch has 44 deterministic paths and complete accounting', 
   })));
 
   const expectedPrefix = [
-    ['primary-n30-f25', 'base-85bp', 'development'],
-    ['primary-n30-f25', 'base-85bp', 'diagnostic'],
-    ['primary-n30-f25', 'stress-160bp', 'development'],
-    ['primary-n30-f25', 'stress-160bp', 'diagnostic']
+    ['primary-n30-f25', 'base-15bp', 'development'],
+    ['primary-n30-f25', 'base-15bp', 'diagnostic'],
+    ['primary-n30-f25', 'stress-30bp', 'development'],
+    ['primary-n30-f25', 'stress-30bp', 'diagnostic']
   ];
   assert.deepEqual(first.paths.slice(0, 4).map(path =>
     [path.variantId, path.scenarioId, path.segmentId]), expectedPrefix);
@@ -254,8 +273,8 @@ test('full synthetic batch has 44 deterministic paths and complete accounting', 
 
 test('initial delayed path stays in cash and both segments include terminal costs', () => {
   const output = makeRun();
-  const regular = getPath(output, 'primary-n30-f25', 'base-85bp', 'development');
-  const delayed = getPath(output, 'primary-n30-f25', 'stress-160bp-delay-1d', 'development');
+  const regular = getPath(output, 'primary-n30-f25', 'base-15bp', 'development');
+  const delayed = getPath(output, 'primary-n30-f25', 'stress-30bp-delay-1d', 'development');
   assert.equal(10000 * (1 + delayed.dailyReturns[0]), 10000);
   assert.equal(delayed.dailyReturns[0], 0);
   assert.equal(delayed.dailyHeldTarget[0], 0);
@@ -263,7 +282,7 @@ test('initial delayed path stays in cash and both segments include terminal cost
   assert.equal(regular.fillCosts[0].date, SEGMENTS.development.firstTimestamp);
   assert.equal(regular.fillCosts[0].cost > 0, true);
   for (const segmentId of Object.keys(SEGMENTS)) {
-    const path = getPath(output, 'primary-n30-f25', 'base-85bp', segmentId);
+    const path = getPath(output, 'primary-n30-f25', 'base-15bp', segmentId);
     assert.equal(path.fillCosts.at(-1).date, SEGMENTS[segmentId].lastTimestamp);
     assert.equal(path.fillCosts.at(-1).kind, 'TERMINAL_LIQUIDATION');
   }
@@ -272,8 +291,8 @@ test('initial delayed path stays in cash and both segments include terminal cost
 test('development controls freeze once and are not refit across diagnostic scenarios', () => {
   const output = makeRun();
   assert.equal(output.controlDefinitions.status, 'FROZEN_DEVELOPMENT_ONLY');
-  assert.equal(output.controlDefinitions.calibration, 'DEVELOPMENT_85BP_DAILY_NET_RETURNS_AND_HELD_TARGETS');
-  const baselinePrimary = getPath(output, 'primary-n30-f25', 'base-85bp', 'development');
+  assert.equal(output.controlDefinitions.calibration, 'DEVELOPMENT_15BP_DAILY_NET_RETURNS_AND_HELD_TARGETS');
+  const baselinePrimary = getPath(output, 'primary-n30-f25', 'base-15bp', 'development');
   assert.equal(baselinePrimary.dailyHeldTarget[0] > 0, true);
   assert.equal(Math.abs(baselinePrimary.meanHeldTarget -
     baselinePrimary.dailyHeldTarget.reduce((sum, value) => sum + value, 0) / 180) < 1e-15, true);
@@ -290,9 +309,9 @@ test('development controls freeze once and are not refit across diagnostic scena
   }
   assert.equal(output.screen.status, 'SYNTHETIC_ONLY_NOT_ASSESSED');
   assert.equal(output.screen.comparisonSegment, 'diagnostic');
-  assert.equal(output.screen.neighbourStressScenario, 'stress-160bp-non-delayed');
-  assert.equal(output.screen.checks.primaryNetPositiveAt160bpNonDelayed !== undefined, true);
-  assert.equal(output.screen.checks.atLeastThreeOfFourNeighboursPositiveAt160bpNonDelayed !== undefined, true);
+  assert.equal(output.screen.neighbourStressScenario, 'stress-30bp-non-delayed');
+  assert.equal(output.screen.checks.primaryNetPositiveAt30bpNonDelayed !== undefined, true);
+  assert.equal(output.screen.checks.atLeastThreeOfFourNeighboursPositiveAt30bpNonDelayed !== undefined, true);
   assert.equal(output.controlRealization.every(item =>
     item.segmentId === 'diagnostic' && item.diagnosticRescaling === 'NONE' &&
     Number.isFinite(item.frozenTargetExposure) &&
@@ -349,6 +368,45 @@ test('synthetic accounting failure halts the batch, retains prior paths as incom
   assert.equal(output.paths.filter(path => path.status === 'NOT_RUN_BATCH_ABORT').length, 24);
   assert.equal(output.paths.find(path => path.status === 'INVALID').attempts, 1);
   assert.equal(output.paths.find(path => path.status === 'NOT_RUN_BATCH_ABORT').attempts, 0);
+});
+
+test('zero-volatility synthetic variant signal aborts after prior paths without ranking or retry', () => {
+  const output = makeRun(createZeroVolatilityVariantSeries());
+  const invalid = output.paths.find(path =>
+    path.variantId === 'neighbour-n20-f25' &&
+    path.scenarioId === 'base-15bp' && path.segmentId === 'development');
+  assert.equal(output.status, 'INVALID');
+  assert.equal(output.failure.code, 'INVALID_SIGNAL');
+  assert.equal(output.screen.status, 'NOT_EVALUATED');
+  assert.equal(output.budget.automaticRetry, false);
+  assert.equal(output.budget.status, 'FAILED_NO_RETRY');
+  assert.equal(output.attemptedPaths, 4);
+  assert.equal(output.completedPaths, 0);
+  assert.equal(output.computedPaths, 3);
+  assert.equal(output.paths.filter(path => path.status === 'INCOMPLETE_BATCH_ABORT').length, 3);
+  assert.equal(invalid.status, 'INVALID');
+  assert.equal(invalid.failure.code, 'INVALID_SIGNAL');
+  assert.equal(invalid.attempts, 1);
+  assert.equal(output.paths.filter(path => path.status === 'NOT_RUN_BATCH_ABORT').length, 40);
+});
+
+test('cooperative timeout aborts the full synthetic batch and leaves remaining paths unstarted', () => {
+  const syntheticClock = context =>
+    context.pathOrdinal === 2 && context.phase === 'simulation-row'
+      ? BUDGET.pathMs + 1 : 0;
+  const output = makeRun(undefined, syntheticClock);
+  assert.equal(output.status, 'INVALID');
+  assert.equal(output.failure.code, 'BUDGET_EXCEEDED');
+  assert.equal(output.failure.detail.status, 'INVALID_PATH_BUDGET');
+  assert.equal(output.screen.status, 'NOT_EVALUATED');
+  assert.equal(output.budget.automaticRetry, false);
+  assert.equal(output.budget.status, 'FAILED_NO_RETRY');
+  assert.equal(output.attemptedPaths, 2);
+  assert.equal(output.completedPaths, 0);
+  assert.equal(output.computedPaths, 1);
+  assert.equal(output.paths.filter(path => path.status === 'INCOMPLETE_BATCH_ABORT').length, 1);
+  assert.equal(output.paths.filter(path => path.status === 'INVALID_PATH_BUDGET').length, 1);
+  assert.equal(output.paths.filter(path => path.status === 'NOT_RUN_BATCH_ABORT').length, 42);
 });
 
 test('frozen source identity rejects any changed file hash without reading source data', () => {

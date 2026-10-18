@@ -1,6 +1,6 @@
-export const PROTOCOL_ID = 'MERIDIAN-B1-7-PROTOCOL-R2-20261018';
-export const PROTOCOL_SHA256 = '44284c22c22443520043c8450edbc8819b95a9f37ca985cfca05f4f9317ff9eb';
-export const IMPLEMENTATION_ID = 'MERIDIAN-B1-7-ENGINE-R2';
+export const PROTOCOL_ID = 'MERIDIAN-B1-7-PROTOCOL-R3-20261018';
+export const PROTOCOL_SHA256 = 'a78e1ae8c71c8f85baee5b51f5691643fc29136f636f19465c61f553afe09185';
+export const IMPLEMENTATION_ID = 'MERIDIAN-B1-7-ENGINE-R3';
 export const ASSETS = Object.freeze([
   'XBTUSD', 'ETHUSD', 'SOLUSD', 'XRPUSD', 'LINKUSD', 'AVAXUSD', 'SUIUSD'
 ]);
@@ -44,9 +44,9 @@ export const VARIANTS = Object.freeze([
   Object.freeze({id: 'neighbour-n30-f35', window: 30, floor: 0.35})
 ]);
 export const SCENARIOS = Object.freeze([
-  Object.freeze({id: 'base-85bp', costRate: 0.0085, delayDays: 0}),
-  Object.freeze({id: 'stress-160bp', costRate: 0.0160, delayDays: 0}),
-  Object.freeze({id: 'stress-160bp-delay-1d', costRate: 0.0160, delayDays: 1})
+  Object.freeze({id: 'base-15bp', costRate: 0.0015, delayDays: 0}),
+  Object.freeze({id: 'stress-30bp', costRate: 0.0030, delayDays: 0}),
+  Object.freeze({id: 'stress-30bp-delay-1d', costRate: 0.0030, delayDays: 1})
 ]);
 export const BUDGET = Object.freeze({
   paths: 44,
@@ -80,7 +80,7 @@ function failure(code, path, detail = null) {
   return {code, path, detail};
 }
 
-export function validateSeries(seriesByAsset) {
+export function validateSeries(seriesByAsset, checkpoint = () => {}) {
   const errors = [];
   try {
     if (!exactDataObject(seriesByAsset, ASSETS)) {
@@ -93,6 +93,7 @@ export function validateSeries(seriesByAsset) {
     let referenceTimestamps = null;
 
     for (const asset of ASSETS) {
+      checkpoint('validate-asset');
       const descriptor = Object.getOwnPropertyDescriptor(seriesByAsset, asset);
       const rows = descriptor.value;
       if (!Array.isArray(rows) || rows.length !== expectedLength) {
@@ -108,6 +109,7 @@ export function validateSeries(seriesByAsset) {
       }
       const timestamps = [];
       for (let index = 0; index < rows.length; index++) {
+        checkpoint('validate-row');
         const rowDescriptor = Object.getOwnPropertyDescriptor(rows, String(index));
         const row = rowDescriptor?.value;
         if (!rowDescriptor?.enumerable || !Object.hasOwn(rowDescriptor, 'value') ||
@@ -153,13 +155,15 @@ export function validateSeries(seriesByAsset) {
 
     if (errors.length === 0) {
       for (const segment of Object.values(SEGMENTS)) {
+        checkpoint('validate-segment');
         if (referenceTimestamps[segment.startIndex] !== segment.firstTimestamp ||
           referenceTimestamps[segment.endIndex] !== segment.lastTimestamp) {
           errors.push(failure('SEGMENT_CALENDAR_MISMATCH', segment.id));
         }
       }
     }
-  } catch {
+  } catch (error) {
+    if (error?.code === 'BUDGET_EXCEEDED' || error?.code === 'INVALID_BUDGET_CLOCK') throw error;
     errors.push(failure('UNSAFE_INPUT_SHAPE', 'seriesByAsset'));
   }
   return {ok: errors.length === 0, errors};
