@@ -1,3 +1,4 @@
+import {MAX_INSPECTION_REPORT_BYTES, parseArenaInspectionReport} from './arena-inspection-report.js';
 import {ARENA_CANDIDATES, ARENA_RULESET, ARENA_SYMBOLS, replayStrategyPaperArena} from '../research/strategy-paper-arena.js';
 
 const DIAGNOSTIC_PATH = 'research/results/strategy-arena-20261016/';
@@ -151,7 +152,14 @@ function metricSummary(result) {
     ['positions','decisions','fills','trades','equityCurve'].includes(key) ? undefined : value));
 }
 
-export function arenaHtml({result=null,error='',busy=false,digest='',provenance=null,provenanceBusy=false,provenanceError=''}={}) {
+function inspectionSection(inspection, busy) {
+  const projected = inspection || parseArenaInspectionReport(null);
+  const report = projected.report;
+  const details = report ? `<p>SYNTHETIC_ONLY · Status: ${escapeHtml(report.state)} · Versuch ${report.attempts} · Fence ${report.fence}</p><p>Pfade begonnen: ${report.pathsStarted} / 44 · abgeschlossen: ${report.pathsCompleted} / 44</p><p>${report.requiresExplicitReconciliation ? 'Ungeklärter Lauf · ausdrückliche Abstimmung erforderlich. Kein Wiederanlauf ausgelöst.' : 'Kein ungeklärter Fence laut Beleg; keine Wiederanlauf-Freigabe.'}</p><details class="arena-evidence-details" style="overflow-wrap:anywhere"><summary>Versuch und Belegidentitäten</summary><p>Trial: ${escapeHtml(report.trialId)}</p>${Object.entries(report.identities).map(([key,value])=>`<p>${escapeHtml(key)}: ${escapeHtml(value ?? 'Nicht vorhanden')}</p>`).join('')}${Object.entries(report.timestamps).map(([key,value])=>`<p>${escapeHtml(key)}: ${escapeHtml(value ?? 'Nicht vorhanden')}</p>`).join('')}<p>Grund: ${escapeHtml(report.reasonCode ?? 'Nicht angegeben')}</p></details>` : '';
+  return `<section class="arena-historical-metadata" aria-label="Separater synthetischer Prüfbericht"><h3>Research-Prüfbericht · separat</h3><label class="arena-import">Prüfbericht importieren (max. 16 KiB)<input data-arena-inspection type="file" accept="application/json,.json"></label><p role="${projected.status === 'INVALID' ? 'alert' : 'status'}">${busy ? 'Prüfbericht wird gelesen …' : escapeHtml(projected.message)}</p>${details}<p>Nur Metadaten; keine Neuberechnung, Renditen oder Zuordnung zu Arena-Ergebnissen. Historische Belege, D1, Paper und Live bleiben getrennt. Keine Ausführungs- oder Handelsfreigabe.</p></section>`;
+}
+
+export function arenaHtml({result=null,error='',busy=false,digest='',provenance=null,provenanceBusy=false,provenanceError='',inspection=null,inspectionBusy=false}={}) {
   const rows = result?.candidates || ARENA_CANDIDATES.map(id=>({id}));
   const evidence = result?.sourceKind === 'SYNTHETIC'
     ? 'SYNTHETISCHE TESTDATEN · KEINE MARKTEVIDENZ'
@@ -159,7 +167,7 @@ export function arenaHtml({result=null,error='',busy=false,digest='',provenance=
       : 'Keine Marktdaten importiert. Es findet kein automatischer Replay statt.';
   const controls = result ? `<p class="arena-control">Vergleichswerte: gleichgewichteter Kauf &amp; Halt ${formatNumber(result.controls?.buyAndHold?.baseline?.netReturnPct)} % · Cash ${formatNumber(result.controls?.cash?.baseline?.netReturnPct)} %. Kein risikogleicher Benchmark; keine Gewinnerwahl.</p>` : '';
   const period = result ? `<p>Zeitraum: ${escapeHtml(new Date(result.window.firstExecution).toISOString().slice(0,10))} bis ${escapeHtml(new Date(result.window.end).toISOString().slice(0,10))} · ${formatNumber(result.window.bars)} Tage. Modellannahmen: ${formatNumber(result.model.baselineCostBps)}/${formatNumber(result.model.stressCostBps)} Basispunkte je Kauf/Verkauf.</p>` : '';
-  return `<section class="strategy-arena" aria-labelledby="arena-heading"><header class="section-title"><h2 id="arena-heading">Arena · H1 / H7 / H9</h2><span class="limited">Nur manuell</span></header><p>Vier auswertbare historische Modelle und H9 als datenbedingt gesperrtes Modell. Eine Diagnose ist weder unabhängiger Test noch laufendes Paper. Keine automatische Siegerwahl.</p><div class="arena-toolbar"><label class="arena-import">Synthetischen oder vorhandenen Snapshot importieren<input data-arena-input type="file" accept="application/json,.json" ${busy?'disabled':''}></label><button type="button" data-arena-provenance ${provenanceBusy?'disabled':''}>Historische Belegmetadaten laden</button><button type="button" data-arena-stored ${busy?'disabled':''}>Gespeicherte Diagnose manuell laden</button><button type="button" data-arena-export ${result&&!busy?'':'disabled'}>Diagnose + Quelle exportieren</button></div>${provenanceBusy?'<p role="status">Nur Belegmetadaten werden geladen; keine Kurse oder Neuberechnung.</p>':''}${provenanceError?`<p role="alert">${escapeHtml(provenanceError)}</p>`:''}${busy?'<p role="status">Snapshot wird geprüft und neu berechnet …</p>':''}${error?`<p role="alert">${escapeHtml(error)}</p>`:''}<p class="arena-evidence">${evidence}</p>${period}<div class="arena-models">${rows.map(row=>candidateCard(row)).join('')}</div>${controls}${historicalProvenanceSection(provenance)}<details><summary>Diagnose-Grenzen</summary><p>Regelsatz ${escapeHtml(ARENA_RULESET)}. Historische Daten, Kosten, Slippage und Universum sind keine unabhängig bestätigte Evidenz. Offene Positionen und abhängige Verkaufsteile sind keine eigenständigen Trades.</p><p>Die gespeicherte 8-Asset-Quelle und die separate historische Abdeckung von 448/955 Schlüssen bleiben unvollständig/fehlgeschlagen. Das ist kein Beleg für den neuen 7-Asset-B1-7-Kandidaten.</p><p>Keine verbundenen Paper-Orders, keine Ausführungsfreigabe und keine Live-Bereitschaft. Kosten sind die ursprünglichen Annahmen dieses Diagnoseprotokolls und werden nicht rückwirkend geändert.</p>${digest?`<p>SHA-256 des importierten Inputs · Integrität, kein Echtheitsnachweis: ${escapeHtml(digest)}</p>`:''}</details></section>`;
+  return `<section class="strategy-arena" aria-labelledby="arena-heading"><header class="section-title"><h2 id="arena-heading">Arena · H1 / H7 / H9</h2><span class="limited">Nur manuell</span></header><p>Vier auswertbare historische Modelle und H9 als datenbedingt gesperrtes Modell. Eine Diagnose ist weder unabhängiger Test noch laufendes Paper. Keine automatische Siegerwahl.</p><div class="arena-toolbar"><label class="arena-import">Synthetischen oder vorhandenen Snapshot importieren<input data-arena-input type="file" accept="application/json,.json" ${busy?'disabled':''}></label><button type="button" data-arena-provenance ${provenanceBusy?'disabled':''}>Historische Belegmetadaten laden</button><button type="button" data-arena-stored ${busy?'disabled':''}>Gespeicherte Diagnose manuell laden</button><button type="button" data-arena-export ${result&&!busy?'':'disabled'}>Diagnose + Quelle exportieren</button></div>${provenanceBusy?'<p role="status">Nur Belegmetadaten werden geladen; keine Kurse oder Neuberechnung.</p>':''}${provenanceError?`<p role="alert">${escapeHtml(provenanceError)}</p>`:''}${busy?'<p role="status">Snapshot wird geprüft und neu berechnet …</p>':''}${error?`<p role="alert">${escapeHtml(error)}</p>`:''}<p class="arena-evidence">${evidence}</p>${period}<div class="arena-models">${rows.map(row=>candidateCard(row)).join('')}</div>${controls}${historicalProvenanceSection(provenance)}${inspectionSection(inspection,inspectionBusy)}<details><summary>Diagnose-Grenzen</summary><p>Regelsatz ${escapeHtml(ARENA_RULESET)}. Historische Daten, Kosten, Slippage und Universum sind keine unabhängig bestätigte Evidenz. Offene Positionen und abhängige Verkaufsteile sind keine eigenständigen Trades.</p><p>Die gespeicherte 8-Asset-Quelle und die separate historische Abdeckung von 448/955 Schlüssen bleiben unvollständig/fehlgeschlagen. Das ist kein Beleg für den neuen 7-Asset-B1-7-Kandidaten.</p><p>Keine verbundenen Paper-Orders, keine Ausführungsfreigabe und keine Live-Bereitschaft. Kosten sind die ursprünglichen Annahmen dieses Diagnoseprotokolls und werden nicht rückwirkend geändert.</p>${digest?`<p>SHA-256 des importierten Inputs · Integrität, kein Echtheitsnachweis: ${escapeHtml(digest)}</p>`:''}</details></section>`;
 }
 
 export function createStrategyArenaView(root, options={}) {
@@ -169,6 +177,7 @@ export function createStrategyArenaView(root, options={}) {
   let input = null;
   let receipt = null;
   let disposed = false;
+  let inspectionGeneration = 0;
   const paint = () => { if (!disposed) root.innerHTML = arenaHtml(state); };
   const listen = async event => {
     if (disposed) return;
@@ -203,6 +212,24 @@ export function createStrategyArenaView(root, options={}) {
         const link = document.createElement('a');
         link.href = url; link.download = 'meridian-m11-arena-diagnostic.json'; link.click();
         setTimeout(()=>URL.revokeObjectURL(url),0);
+      }
+      return;
+    }
+    const inspectionInput = event.target?.closest?.('[data-arena-inspection]');
+    if (inspectionInput && root.contains(inspectionInput)) {
+      if (event.type === 'click') return;
+      const file = inspectionInput.files?.[0];
+      if (!file) return;
+      const generation = ++inspectionGeneration;
+      state.inspection = null; state.inspectionBusy = true; paint();
+      try {
+        const projection = !Number.isSafeInteger(file.size) || file.size < 0 || file.size > MAX_INSPECTION_REPORT_BYTES
+          ? parseArenaInspectionReport('') : parseArenaInspectionReport(await file.text());
+        if (!disposed && generation === inspectionGeneration) state.inspection = projection;
+      } catch {
+        if (!disposed && generation === inspectionGeneration) state.inspection = parseArenaInspectionReport('');
+      } finally {
+        if (!disposed && generation === inspectionGeneration) { state.inspectionBusy = false; paint(); }
       }
       return;
     }

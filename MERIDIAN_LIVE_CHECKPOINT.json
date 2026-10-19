@@ -316,7 +316,7 @@
       ]
     },
     "historicalVerifiedSourceMainBeforeB11": "921246e61e07ff0624fb4a24c00a452246e9eb7f",
-    "verifiedSourceMain": "8ade1e56831f408dd35567fe5003699e95a606bf",
+    "verifiedSourceMain": "6d6d2a8d09608ea972b017a40cae9ba0af984e9b",
     "completedSourceMerge873": {
       "pr": 873,
       "mergeSha": "b75335da3805c0d509ff11f75ab0584d351f284e",
@@ -450,9 +450,9 @@
         "pages": 39025396725
       }
     },
-    "package": "MERIDIAN_M11_INSPECTION_REPORT_898",
+    "package": "MERIDIAN_M11_ARENA_INSPECTION",
     "historicalStateBeforeB11": "PR862_COMPLETE_PR860_REFRESH_PENDING_OWN_EXACT_HEAD_CI_AND_REVIEW_ARENA861_REOPENED",
-    "state": "D1_PR897_COMPLETE_PR898_MAIN_ALIGNED_CANDIDATE_PENDING_CI_REVIEW",
+    "state": "PR898_COMPLETE_ARENA_SOURCE_REVIEW_ACCEPTED_PENDING_PUBLICATION_AND_CI",
     "infrastructurePaused": true,
     "mailboxRollover": {
       "from": 571,
@@ -582,7 +582,7 @@
       }
     },
     "historicalNextStepBeforeB11": "COMPLETE_PR860_REFRESH_OWN_EXACT_HEAD_CI_AND_INDEPENDENT_REVIEW_THEN_LEAD_MERGE_THEN_ARENA861_RETROSPECTIVE_PROVENANCE_EXISTING_EVIDENCE_ONLY",
-    "nextStep": "PUBLISH_ALIGNED_PR898_THEN_FRESH_EXACT_HEAD_BASE_CI_AND_INDEPENDENT_REVIEW; NO_RUNTIME_ACTIVATION",
+    "nextStep": "PUBLISH_ARENA_INSPECTION_CANDIDATE_THEN_EXACT_HEAD_BASE_CI_AND_FINAL_INDEPENDENT_REVIEW; NO_RUNTIME_ACTIVATION",
     "ownerPathInspection": {
       "pr": 828,
       "mergeSha": "bfebd17ddfa1d2d3b44a15126e28618a82cb81f2",
@@ -608,7 +608,7 @@
     },
     "publisherNextStep": "PAUSED_BY_OWNER_B_NO_OPERATIONAL_AUTHORITY_NATIVE868_DISABLED",
     "historicalStrategyNextStepBeforeB11": "Finalize r130 Arena release integration gates; separately diagnose PR872 publisher timing-test failure before independent data review. No new strategy execution.",
-    "strategyNextStep": "READ_ONLY_INSPECTION_PR898_ACCEPTANCE; HISTORY_IMPLEMENTATION_REMAINS_QUEUED",
+    "strategyNextStep": "READ_ONLY_ARENA_INSPECTION_ACCEPTANCE; HISTORY_PUBLICATION_MANAGED_SEPARATELY_BY_LEAD",
     "completion20261017": {
       "verifiedMain": "8691381510039e2ad48b863ea5e66d6ad6cba462",
       "arenaMerge": "ed60066fc58b4d60eddd727c24cae61c368720bb",
@@ -807,7 +807,7 @@
       "enabledManagementRouting": "ALREADY_CHECKPOINT_DYNAMIC",
       "eventPilot673": "READ_ONLY_UNCHANGED"
     },
-    "leadStatusCommentId": 6271844753,
+    "leadStatusCommentId": null,
     "strategyArena": {
       "opId": "PAPER-ARENA-INTEGRATION-20261016-2235",
       "state": "PR824_PUBLISHED_ALL_POSTCHECKS_SUCCESS_RETROSPECTIVE_ONLY",
@@ -1998,8 +1998,57 @@
       "leadStatusCommentId": 6271844753,
       "observedRemoteHeadBeforeMainAlignment": "9ef35564c213fc943f4ee01a35e2e0387dddfa82",
       "verifiedSourceMain": "8ade1e56831f408dd35567fe5003699e95a606bf",
-      "state": "MAIN_ALIGNED_CANDIDATE_PENDING_NEW_EXACT_HEAD_BASE_CI_AND_FULL_INDEPENDENT_REVIEW",
+      "state": "COMPLETE_ALL_POSTCHECKS_SUCCESS",
       "scope": "MANUAL_READ_ONLY_GENERATED_FIXTURE_JOURNAL_REPORT_AND_SYNTHETIC_TESTS",
+      "publicationSha": null,
+      "executionAuthorized": false,
+      "paperAuthorized": false,
+      "liveAuthorized": false,
+      "recoveryPerformed": false,
+      "historicalStateBeforeAcceptance": "MAIN_ALIGNED_CANDIDATE_PENDING_NEW_EXACT_HEAD_BASE_CI_AND_FULL_INDEPENDENT_REVIEW",
+      "mergeSha": "6d6d2a8d09608ea972b017a40cae9ba0af984e9b",
+      "acceptanceReceipt": {
+        "issue": 639,
+        "commentId": 6273191124
+      },
+      "premergeCi": {
+        "runId": 39293826384,
+        "jobId": 118201076152,
+        "pass": 2676,
+        "fail": 0
+      },
+      "postchecks": {
+        "releaseSafety": 39294577029,
+        "releaseSafetyJobId": 118203669911,
+        "pass": 2676,
+        "fail": 0,
+        "runtimeSmoke": 39294576928,
+        "releaseCoordinator": 39294577023,
+        "pages": 39294576650,
+        "state": "ALL_SUCCESS"
+      }
+    },
+    "historicalWorkBeforeM11ArenaInspection20261019": {
+      "updatedAt": "2026-10-19",
+      "verifiedSourceMain": "8ade1e56831f408dd35567fe5003699e95a606bf",
+      "package": "MERIDIAN_M11_INSPECTION_REPORT_898",
+      "state": "D1_PR897_COMPLETE_PR898_MAIN_ALIGNED_CANDIDATE_PENDING_CI_REVIEW",
+      "nextStep": "PUBLISH_ALIGNED_PR898_THEN_FRESH_EXACT_HEAD_BASE_CI_AND_INDEPENDENT_REVIEW; NO_RUNTIME_ACTIVATION",
+      "strategyNextStep": "READ_ONLY_INSPECTION_PR898_ACCEPTANCE; HISTORY_IMPLEMENTATION_REMAINS_QUEUED",
+      "leadStatusCommentId": 6271844753
+    },
+    "m11ArenaInspection": {
+      "opId": "MERIDIAN-ARENA-INSPECTION-PREP-20261019",
+      "intentIssue": 831,
+      "intentCommentId": 6272188480,
+      "pullRequest": null,
+      "leadStatusCommentId": null,
+      "publicationStatus": "PENDING_NO_REMOTE_IDENTIFIERS_YET",
+      "reviewedLocalSourceHead": "2794314969c4b6ad351e0fcbd88745c07f7cff57",
+      "sourceReview": "INDEPENDENT_SOURCE_ACCEPTED_AFTER_TWO_TARGETED_CORRECTION_LOOPS",
+      "state": "SOURCE_ACCEPTED_PENDING_PUBLICATION_CI_AND_FINAL_EXACT_HEAD_REVIEW",
+      "verifiedSourceMain": "6d6d2a8d09608ea972b017a40cae9ba0af984e9b",
+      "scope": "MANUAL_METADATA_ONLY_SYNTHETIC_INSPECTION_REPORT_PRESENTATION",
       "publicationSha": null,
       "executionAuthorized": false,
       "paperAuthorized": false,

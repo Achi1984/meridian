@@ -128,6 +128,34 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fo
           writeFileSync(join(evidence,`v11-b12-strategies-${size.width}x${size.height}.png`),Buffer.from(image.data,'base64'));
         }
 
+        const beforeInspection=await evaluate(`({requests:performance.getEntriesByType('resource').length,cards:document.querySelector('.arena-models').innerHTML})`);
+        await evaluate(`(()=>{
+          const report={schema:'MERIDIAN_B1_INSPECTION_REPORT_V1',profile:'MERIDIAN-B1-7-GENERATED-FIXTURE-BRIDGE-R1',
+            evidenceClass:'SYNTHETIC_ONLY',trialId:'a'.repeat(64),state:'queued',unresolved:false,requiresExplicitReconciliation:false,
+            attempts:0,fence:0,fenceInterpretation:'NO_UNRESOLVED_FENCE_FOR_THIS_TRIAL',integrity:'STORED_JOURNAL_VALIDATED_NOT_SOURCE_AUTHENTICITY',
+            timestamps:{createdAt:'2026-01-01T00:00:00Z',startedAt:null,finishedAt:null},
+            identities:{protocolSha256:'b'.repeat(64),sourceSha256:'c'.repeat(64),dataSha256:'d'.repeat(64),manifestSha256:'e'.repeat(64),resultSha256:null,summarySha256:null},
+            pathsStarted:0,pathsCompleted:0,reasonCode:null,executionAuthorized:false,promotionAuthorized:false,profitabilityInferred:false,recoveryPerformed:false};
+          const picker=document.querySelector('[data-arena-inspection]'),transfer=new DataTransfer();
+          transfer.items.add(new File([JSON.stringify(report)],'synthetic-inspection.json',{type:'application/json'}));
+          picker.files=transfer.files;picker.dispatchEvent(new Event('change',{bubbles:true}));
+        })()`);
+        for(let attempt=0;attempt<100;attempt++){
+          if(await evaluate(`document.querySelector('[aria-label="Separater synthetischer Prüfbericht"]').innerText.includes('Status: queued')`))break;
+          await new Promise(resolve=>setTimeout(resolve,20));
+        }
+        const inspection=await evaluate(`(()=>{
+          const section=document.querySelector('[aria-label="Separater synthetischer Prüfbericht"]');
+          section.querySelector('details').open=true;
+          return {text:section.innerText,overflow:document.documentElement.scrollWidth>innerWidth+1,
+            summaryHeight:section.querySelector('summary').getBoundingClientRect().height,
+            requests:performance.getEntriesByType('resource').length,cards:document.querySelector('.arena-models').innerHTML};
+        })()`);
+        assert.match(inspection.text,/SYNTHETIC_ONLY · Status: queued/);
+        assert.match(inspection.text,/keine Echtheitsbestätigung/);
+        assert.equal(inspection.overflow,false);assert.ok(inspection.summaryHeight>=44);
+        assert.equal(inspection.requests,beforeInspection.requests);assert.equal(inspection.cards,beforeInspection.cards);
+
         await evaluate(`document.querySelector('#strategy-catalog [data-strategy-id="H1"] summary').focus()`);
         await key('Enter','Enter',13);
         assert.equal(await evaluate(`document.querySelector('#strategy-catalog [data-strategy-id="H1"] details').open`),true);
