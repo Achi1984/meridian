@@ -643,7 +643,7 @@
     },
     "mergeDelegation": {
       "ownerAt": "2026-10-17T06:31:42+02:00",
-      "ownerQuote": "Du kannst selbst zukünftig über merges entscheiden - freigabe erteilt",
+      "ownerQuote": "Du kannst selbst zuk\u00fcnftig \u00fcber merges entscheiden - freigabe erteilt",
       "commentId": 6229644994,
       "mergeDecisionOwner": "CHATGPT",
       "scope": "FUTURE_MERGE_DECISIONS_ONLY",
@@ -1359,7 +1359,7 @@
       "ownerMandateAt": "2026-10-17T11:41:50+02:00",
       "ownerMandatePr": 843,
       "ownerMandateCommentId": 6232405394,
-      "ownerQuote": "Speichere die Arbeitsweise ab und arbeite zukünftig so - go",
+      "ownerQuote": "Speichere die Arbeitsweise ab und arbeite zuk\u00fcnftig so - go",
       "mandatoryGatesUnchanged": true
     },
     "completedSourceMerge842": {
@@ -1903,13 +1903,24 @@
       },
       "leadFindingCommentId": 6253061605,
       "leadFindingDisposition": "APPLIED_FIXED_ROW_COUNT_BEFORE_ENUMERATION_TRUSTED_PREPARATION_DEADLINE_FULL_RESULT_REGRESSION",
-      "sourceAccepted": "PENDING_INTEGRATED_CANDIDATE_EXACT_HEAD_CI_AND_FULL_REVIEW",
+      "sourceAccepted": "ACCEPTED_PR892_MAILBOX639_6255139258",
       "selectedInputManifest": "NOT_FROZEN",
-      "dataReadApproval": "NOT_GRANTED",
+      "dataReadApproval": "OWNER_APPROVED_D1_ONLY_2026_10_19",
       "executionAuthorized": false,
       "screenResult": "NOT_RUN",
       "paperEligibility": "NOT_ELIGIBLE",
-      "nextGate": "RUN_REQUESTED_SYNTHETIC_INTEGRATION_CHECKS; THEN_LEAD_OWNS_EXACT_HEAD_CI_AND_CLAUDE_REVIEW"
+      "nextGate": "D1_EVIDENCE_REVIEW_NO_D2"
+    },
+    "d1Verification": {
+      "opId": "MERIDIAN-D1-WORK-20261019-01",
+      "issue": 895,
+      "sourceMain": "6f720373af5439af70c54e6cb2f1c17abaf8b877",
+      "status": "TECHNICAL_VERIFICATION_PASS_PENDING_CI_AND_INDEPENDENT_ACCEPTANCE",
+      "evidence": "docs/research/d1-20261019/verification.json",
+      "selectedInputManifest": "NOT_FROZEN",
+      "dataReadApproval": "OWNER_APPROVED_D1_ONLY_2026_10_19",
+      "executionAuthorized": false,
+      "nextGate": "EXACT_HEAD_CI_AND_INDEPENDENT_REVIEW; D2_REQUIRES_SEPARATE_EXPLICIT_OWNER_DECISION"
     }
   }
 }

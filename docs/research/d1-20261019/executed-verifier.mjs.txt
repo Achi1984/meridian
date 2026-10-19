@@ -1,0 +1,41 @@
+import {execFileSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
+import {readFileSync,writeFileSync} from 'node:fs';
+import {ASSETS,INPUT,validateSeries} from './meridian/scripts/research/b1-7/validate.mjs';
+const repo='/workspace/scratch/417d1bb2ec70/meridian';
+const sha=b=>createHash('sha256').update(b).digest('hex');
+const canonical=v=>v===null||typeof v!=='object'?JSON.stringify(v):Array.isArray(v)?`[${v.map(canonical).join(',')}]`:`{${Object.keys(v).sort().map(k=>`${JSON.stringify(k)}:${canonical(v[k])}`).join(',')}}`;
+const report={operation:'MERIDIAN-D1-WORK-20261019-01',sourceCommit:INPUT.sourceCommit,status:'IN_PROGRESS',manifestState:'NOT_FROZEN',sourceAuthenticity:'NOT_ESTABLISHED',node:process.version,files:[]};
+const series={};
+const fail=(code,detail)=>{throw Object.assign(new Error(code),{detail});};
+try {
+ for(const asset of ASSETS){
+  const path=`research/acquisitions/kraken-usd-daily-20261018/normalized/${asset}_1440_utc_normalized.csv`;
+  const bytes=execFileSync('git',['show',`${INPUT.sourceCommit}:${path}`],{cwd:repo,maxBuffer:524288});
+  const hash=sha(bytes);
+  const result={asset,path,bytes:bytes.length,expectedSha256:INPUT.normalizedHashes[asset],actualSha256:hash};report.files.push(result);
+  if(hash!==INPUT.normalizedHashes[asset])fail('WHOLE_FILE_HASH_MISMATCH',asset);
+  const text=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(bytes);
+  if(text.includes('\0'))fail('CSV_NUL',asset);
+  const lines=text.split('\n');if(lines.at(-1)==='')lines.pop();
+  if(lines.shift()!=='timestamp_utc,open,high,low,close,volume,trades')fail('CSV_SCHEMA',asset);
+  let prior=null;const selected=[];
+  for(const [index,line] of lines.entries()){
+   const fields=line.split(',');if(fields.length!==7)fail('CSV_FIELDS',{asset,index});
+   const [timestamp,...raw]=fields;const time=Date.parse(timestamp);
+   if(!/^\d{4}-\d{2}-\d{2}T00:00:00Z$/.test(timestamp)||!Number.isFinite(time)||new Date(time).toISOString().replace('.000Z','Z')!==timestamp)fail('TIMESTAMP',{asset,index});
+   if(prior!==null&&time!==prior+86400000)fail('FULL_FILE_CALENDAR',{asset,index,timestamp});prior=time;
+   if(raw.some(v=>! /^-?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(v)))fail('NUMBER_FORMAT',{asset,index});
+   const [open,high,low,close,volume,trades]=raw.map(Number);
+   if([open,high,low,close,volume,trades].some(v=>!Number.isFinite(v))||Math.min(open,high,low,close)<=0||high<Math.max(open,close)||low>Math.min(open,close)||high<low||volume<0||trades<0||!Number.isInteger(trades))fail('OHLC_RANGE',{asset,index,timestamp});
+   if(timestamp>=INPUT.firstTimestamp&&timestamp<='2026-09-30T00:00:00Z')selected.push({timestamp,open,high,low,close,volume,trades});
+  }
+  if(selected.length!==955||selected[0]?.timestamp!==INPUT.firstTimestamp||selected.at(-1)?.timestamp!=='2026-09-30T00:00:00Z')fail('SELECTED_COUNT_CALENDAR',asset);
+  series[asset]=selected;result.totalRows=lines.length;result.selectedRows=selected.length;result.selectedSeriesSha256=sha(canonical(selected));
+ }
+ const validation=validateSeries(series);if(!validation.ok)fail('B1_VALIDATOR',validation.errors);
+ report.validation=validation;report.status='VERIFIED_DRAFT_NOT_ADMITTED';
+ report.manifestDraft={sourceCommit:INPUT.sourceCommit,files:Object.fromEntries(report.files.map(f=>[f.asset,f.actualSha256])),selectedSeriesSha256:Object.fromEntries(report.files.map(f=>[f.asset,f.selectedSeriesSha256]))};
+}catch(error){report.status='STOPPED';report.error={code:error.message,detail:error.detail};process.exitCode=1;}
+writeFileSync('/workspace/scratch/417d1bb2ec70/d1-result.json',JSON.stringify(report,null,2)+'\n');
+console.log(JSON.stringify(report,null,2));

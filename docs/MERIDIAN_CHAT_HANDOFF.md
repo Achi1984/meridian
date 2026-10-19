@@ -1,3 +1,11 @@
+> Current Work receipt — 2026-10-19: source main observed
+> `6f720373af5439af70c54e6cb2f1c17abaf8b877`, mailbox resolved to #639.
+> D1 #895 technical verification and independent recomputation passed for seven
+> pinned files / 955 synchronized dates each. Evidence:
+> `docs/research/d1-20261019/README.md`. Candidate CI/final review pending;
+> manifest NOT_FROZEN, no D2/Paper/Live. Current M11 plan:
+> `docs/MERIDIAN_STAGE_ROADMAP.md`. Older snapshots below remain historical.
+
 # MERIDIAN Chat Handoff
 
 ## Current checkpoint — B12 public; source integration continues (2026-10-18)
