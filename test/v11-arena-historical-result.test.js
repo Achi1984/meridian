@@ -8,7 +8,7 @@ const digest = character=>character.repeat(64);
 const timestamp = second=>`2026-01-01T00:00:${String(second).padStart(2,'0')}Z`;
 const parse = value=>parseArenaHistoricalResultFixture(JSON.stringify(value));
 
-function fixture({state='queued',resultStatus=null,descriptorOrder=null,computationOrder=null}={}) {
+function fixture({state='queued',resultStatus=null,screenStatus=null,descriptorOrder=null,computationOrder=null}={}) {
   const pathIds=descriptorOrder || Array.from({length:44},(_,index)=>
     (index+1).toString(16).padStart(64,'0'));
   const computationPathIds=computationOrder || [...pathIds].reverse();
@@ -50,7 +50,11 @@ function fixture({state='queued',resultStatus=null,descriptorOrder=null,computat
       sourceProvenance:{normalizedFileSha256:{}},canonicalSeriesSha256:{},inputSha256:digest('b')},
     implementationId:'generated',implementationSha256:digest('c'),plannedPaths:44,protocolId:'generated',
     protocolReview:{},protocolSha256:digest('f'),schema:'MERIDIAN_B1_7_ENGINE_RESULT_R3',
-    screen:{stopPolicy:'NO_FINITE_TRADE_STOP'},status:resultStatus,
+    screen:resultStatus==='INSUFFICIENT_EVIDENCE'?{status:'INSUFFICIENT_EVIDENCE'}
+      :screenStatus==='INSUFFICIENT_EVIDENCE'
+        ?{status:'INSUFFICIENT_EVIDENCE',checks:{fullBasketDrawdownDenominator:false},
+          relativeDrawdownReduction:null}
+        :{status:'PASS',stopPolicy:'NO_FINITE_TRADE_STOP'},status:resultStatus,
     controlDefinitions:controls,
     paths:pathIds.map(pathId=>completedPathIds.has(pathId)
       ?{pathId,status:'COMPLETED',computed:true,attempts:1}
@@ -125,18 +129,18 @@ test('complete descriptor and computation identities retain their independent or
   const completed=parse(fixture({state:'completed',resultStatus:'COMPLETED',
     descriptorOrder,computationOrder}));
   assert.equal(completed.status,'PRESENT_UNVERIFIED',JSON.stringify(completed));
-  assert.equal(completed.status,'PRESENT_UNVERIFIED');
   assert.equal(completed.job.paths.length,44);
   assert.equal(completed.result.paths.length,44);
   assert.equal(completed.result.status,'COMPLETED');
 });
 
-test('all 44 completed paths may have an insufficient-evidence engine result',()=>{
-  const projection=parse(fixture({state:'completed',resultStatus:'INSUFFICIENT_EVIDENCE'}));
+test('all 44 completed paths may have an insufficient screen result',()=>{
+  const projection=parse(fixture({state:'completed',resultStatus:'COMPLETED',
+    screenStatus:'INSUFFICIENT_EVIDENCE'}));
   assert.equal(projection.status,'PRESENT_UNVERIFIED',JSON.stringify(projection));
-  assert.equal(projection.status,'PRESENT_UNVERIFIED');
   assert.equal(projection.job.state,'completed');
-  assert.equal(projection.result.status,'INSUFFICIENT_EVIDENCE');
+  assert.equal(projection.result.status,'COMPLETED');
+  assert.equal(projection.result.screen.status,'INSUFFICIENT_EVIDENCE');
   assert.equal(projection.result.completedPaths,44);
 });
 
@@ -228,6 +232,7 @@ test('historical fixture renders escaped producer fields without network, digest
   assert.match(root.innerHTML,/SYNTHETIC_ONLY/);
   assert.match(root.innerHTML,/Lifecycle: failed/);
   assert.match(root.innerHTML,/Engine-Ergebnisstatus: INSUFFICIENT_EVIDENCE/);
+  assert.match(root.innerHTML,/Screenstatus: INSUFFICIENT_EVIDENCE/);
   assert.match(root.innerHTML,/DEVELOPMENT_AND_HISTORICAL_DIAGNOSTIC/);
   assert.match(root.innerHTML,/NOT_ESTABLISHED/);
   assert.match(root.innerHTML,/NO_FINITE_TRADE_STOP/);

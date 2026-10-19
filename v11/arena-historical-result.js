@@ -26,6 +26,7 @@ const RESULT_PROPERTY_KEYS = new Set([
   'paperAuthorized','liveAuthorized','limits','paths','pathMs','totalMs','outputBytes','attemptsPerPath',
   'attemptsPerStartedPath','automaticRetry','interpretation','comparisonSegment','neighbourStressScenario',
   'checks','primaryDiagnosticNetPositive','primaryDiagnosticDrawdownAtMost25Percent',
+  'relativeDrawdownReduction','fullBasketDrawdownDenominator',
   'primaryReturnAtLeastBothFrozenControls','primaryDrawdownAtMostBothFrozenControls',
   'relativeDrawdownReductionAtLeast20Percent','primaryNetPositiveAt30bpNonDelayed',
   'primaryNetPositiveAt30bpPlusDelay','atLeastThreeOfFourNeighboursPositiveAt15bp',
@@ -208,7 +209,14 @@ function validateResult(text, job, controls) {
       result.attemptedPaths !== result.completedPaths || result.completedPaths !== result.computedPaths) return null;
   if (result.status === 'COMPLETED' &&
       (result.attemptedPaths !== 44 || job.state !== 'completed')) return null;
-  if (result.status === 'INSUFFICIENT_EVIDENCE' && ![19,44].includes(result.completedPaths)) return null;
+  if (result.status === 'INSUFFICIENT_EVIDENCE' &&
+      (result.attemptedPaths !== 19 || job.state !== 'failed' ||
+        !exact(result.screen,['status']) || result.screen.status !== 'INSUFFICIENT_EVIDENCE')) return null;
+  if (result.status === 'COMPLETED' && result.screen?.status === 'INSUFFICIENT_EVIDENCE' &&
+      (!exact(result.screen,['status','checks','relativeDrawdownReduction']) ||
+        !exact(result.screen.checks,['fullBasketDrawdownDenominator']) ||
+        result.screen.checks.fullBasketDrawdownDenominator !== false ||
+        result.screen.relativeDrawdownReduction !== null)) return null;
   if (!controls || !sameJson(result.controlDefinitions,controls)) return null;
 
   const progressById = new Map(job.paths.map(item => [item.pathId,item]));

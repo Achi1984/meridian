@@ -20,6 +20,9 @@ Progress and returned path results retain their producer order; missing results
 are not synthesized. `CLAIMED` and `RUNNING` are displayed as unresolved
 `unknown`, with their fence and explicit-reconciliation requirement kept
 separate from the engine result status.
+The engine summary status and the screen status remain distinct: a completed
+44-path summary may carry `status: COMPLETED` while its returned
+`screen.status` is `INSUFFICIENT_EVIDENCE`.
 
 The parser rejects unknown envelope/job/result keys, malformed nested JSON,
 conflicting path identities, results outside the inventory, invalid numbers,
