@@ -47,7 +47,7 @@ test('campaign adapter exposes exactly the twelve source families and the separa
   assert.deepEqual(B17_CANDIDATE,{id:'B1-7',stage:'IN ENTWICKLUNG',assets:7,plannedPaths:44,
     baselineCostBps:15,stressCostBps:30,horizon:'R3: Annahmen für den Stresstest: 15 bp Basis / 30 bp Stress / +1 Tag.',
     evidence:'Keine Ergebnisse; ausschließlich Entwicklungskandidat.',
-    blocker:'Unabhängige Prüfung, Marktbelege und jede weitere Freigabe fehlen.',
+    blocker:'D1-Manifest nicht eingefroren; D2, Paper und Live benötigen getrennte Freigaben.',
     source:'M11-Arbeitsauftrag B12 · kein Arena-Ergebnis'});
 });
 
@@ -73,9 +73,23 @@ test('catalog rendering uses text nodes and exposes rules, blockers, stage progr
   assert.match(root.textContent,/Prospektives Paper/);
   assert.match(root.textContent,/Live-Bereitschaft/);
   assert.match(root.textContent,/B1-7/);
+  assert.match(root.textContent,/Quellcode unabhängig geprüft/);
+  assert.match(root.textContent,/D1 technisch geprüft/);
+  assert.match(root.textContent,/NOT_FROZEN/);
+  assert.match(root.textContent,/2026-10-19/);
+  assert.match(root.textContent,/finale Abnahme und Integration zum Belegstand ausstehend/);
+  for (const label of ['D2 / Strategieausführung gesperrt', 'Paper-Betrieb gesperrt', 'Live-Betrieb gesperrt']) {
+    assert.ok(root.textContent.includes(label));
+  }
   assert.match(root.textContent,/448\/955/);
   assert.match(root.textContent,/Scanner · geplanter Unterbereich/);
   assert.equal(root.children.some(child=>child.id==='strategy-scanner'),true);
+  const candidate = root.children.find(child=>child.dataset.strategyId==='B1-7');
+  const evidenceDetails = candidate.children.find(child=>child.tagName==='details');
+  assert.equal(evidenceDetails.className,'arena-evidence-details');
+  const receipts = evidenceDetails.children.filter(child=>child.textContent.includes('https://github.com/'));
+  assert.equal(receipts.length,2);
+  assert.ok(receipts.every(child=>child.attrs.style==='overflow-wrap:anywhere'));
 });
 
 test('Arena shows five models and preserves unknowns, blocked H9 and the legacy coverage failure',()=>{
@@ -175,4 +189,17 @@ test('disposed arena cannot repaint after late metadata success, failure or pend
   const pending=root.listeners.get('change')({target:{closest:selector=>selector==='[data-arena-input]'?input:null}});
   view.dispose();gate.resolve(JSON.stringify(syntheticInput()));await pending;
   assert.equal(root.innerHTML,'');assert.equal(root.listeners.size,0);
+});
+
+
+test('missing research receipts render unknown independently from the valid family register',()=>{
+  const document={createElement:tag=>new Element(document,tag)};
+  const root=new Element(document,'div');
+  const result=renderStrategyCatalog(root,campaign,document,null);
+  assert.deepEqual(result.families.map(family=>family.id),FAMILY_IDS);
+  assert.equal(result.researchEvidence.source.state,'UNKNOWN');
+  assert.equal(result.researchEvidence.d1.state,'UNKNOWN');
+  assert.match(root.textContent,/Belegstand: unbekannt/);
+  assert.match(root.textContent,/Prüfbeleg fehlt oder ist widersprüchlich/);
+  assert.doesNotMatch(root.textContent,/D1 technisch geprüft|Quellcode unabhängig geprüft/);
 });

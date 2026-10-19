@@ -1,3 +1,38 @@
+> Current reconciliation — 2026-10-19, PR #898 inspection candidate.
+> Accepted main: `8ade1e56831f408dd35567fe5003699e95a606bf` (PR #897).
+> PR #897 complete; mailbox #639 receipt6272919723. Postchecks succeeded:
+> Safety39292525783/job118196563622, Smoke39292525893,
+> Coordinator39292525725, Pages39292524400.
+> PR #898 is aligned locally; fresh exact-head/base CI and independent review
+> remain pending. Lead progress comment6271844753; no candidate publication claimed.
+> D1 stays accepted and NOT_FROZEN. Inspection is generated-fixture read-only;
+> no recovery, execution, scheduler, D2, Paper or Live activation.
+> NEXT: publish and independently accept #898. History implementation stays queued.
+> Earlier candidate statements below are preserved historical snapshots.
+
+> Current reconciliation — 2026-10-19, M11 PR #897 source candidate.
+> Verified main: `99e7de636edd741de2ad4813ecdaacaa11db87df` (PR #899).
+> D1 #895 is closed/completed; acceptance receipt #895/comment6272425721.
+> Seven-file technical verification is accepted; manifest stays NOT_FROZEN.
+> Main postchecks all passed: Safety39290513335/job118189638386 (2666/0),
+> Runtime39290513327, Coordinator39290513209, Pages39290512121.
+> PR #897 is aligned locally; its new exact-head/base CI and independent review
+> are pending. No publication or merge of this candidate is claimed here.
+> The UI retains its explicitly dated earlier D1 receipt, including the historical
+> integration-pending statement; it is not a live GitHub status.
+> NEXT: publish and independently accept #897; Research-to-Arena metadata work
+> stays queued until WIP clears. D2, strategy PnL, Paper and Live remain blocked;
+> no scheduler, service, recovery, new data reads or trading activated.
+> Mailbox #639 remains authoritative. Earlier receipts below are historical.
+
+> Current Work receipt — 2026-10-19: source main observed
+> `6f720373af5439af70c54e6cb2f1c17abaf8b877`, mailbox resolved to #639.
+> D1 #895 technical verification and independent recomputation passed for seven
+> pinned files / 955 synchronized dates each. Evidence:
+> `docs/research/d1-20261019/README.md`. Candidate CI/final review pending;
+> manifest NOT_FROZEN, no D2/Paper/Live. Current M11 plan:
+> `docs/MERIDIAN_STAGE_ROADMAP.md`. Older snapshots below remain historical.
+
 # MERIDIAN HANDOFF
 
 ## Current checkpoint — B12 public; source integration continues (2026-10-18)
