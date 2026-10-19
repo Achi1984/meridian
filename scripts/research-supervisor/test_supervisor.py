@@ -98,6 +98,26 @@ connection.close()
         self.assertEqual(outcome["claim"]["trialId"], queued["trialId"])
         return outcome["claim"]
 
+    def test_historical_journal_profile_stays_dormant_without_d2_receipt(self):
+        self.database = str(Path(self.temporary.name) / "historical.sqlite")
+        initialized = journal.initialize(
+            self.database, profile=journal.HISTORICAL_PROFILE_NAME)
+        profile = journal._b1_profile(journal.HISTORICAL_PROFILE_NAME)
+        self.assertFalse(initialized["executionAuthorized"])
+        self.assertEqual(profile["status"], "NOT_FROZEN")
+        self.assertIsNone(profile["inputManifest"])
+        self.assertIsNone(profile["approvalReceipt"])
+        with self.assertRaises(journal.JournalError) as missing:
+            journal.enqueue_b1(self.database, profile["trialKey"])
+        self.assertEqual(missing.exception.code, "HISTORICAL_ADMISSION_REQUIRED")
+        outcome = journal.scheduler_tick_b1(self.database, enabled=True)
+        self.assertEqual(outcome["state"], "blocked")
+        self.assertFalse(outcome["claimed"])
+        self.assertFalse(outcome["executionAuthorized"])
+        with sqlite_connect(self.database) as connection:
+            self.assertEqual(connection.execute("SELECT COUNT(*) FROM b1_jobs").fetchone()[0], 0)
+            self.assertEqual(connection.execute("SELECT fence,active FROM b1_meta").fetchone(), (0, None))
+
     def b1_fault_adapter(self, mode):
         alias = Path(self.temporary.name) / f"b1-{mode}-adapter.mjs"
         alias.write_text(f"import {json.dumps((ROOT / 'test_b1_fault_adapter.mjs').as_uri())};\n")

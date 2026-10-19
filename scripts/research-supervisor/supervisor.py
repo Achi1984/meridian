@@ -16,6 +16,7 @@ import journal
 
 ADAPTER = Path(__file__).resolve().with_name("synthetic_adapter.mjs")
 B1_ADAPTER = Path(__file__).resolve().with_name("b1_adapter.mjs")
+HISTORICAL_ADAPTER = Path(__file__).resolve().with_name("historical_adapter.mjs")
 MAX_INPUT_BYTES = 8192
 MAX_STDOUT_BYTES = 8192
 MAX_STDERR_BYTES = 4096
@@ -317,7 +318,10 @@ def _run_b1_child(database, receipt, profile, started, batch_deadline, limits):
     if os.name != "posix":
         raise ChildFailure("POSIX_REQUIRED")
     node = shutil.which("node")
-    adapter = Path(B1_ADAPTER).absolute()
+    adapter = Path(
+        HISTORICAL_ADAPTER if profile["profile"] == journal.HISTORICAL_PROFILE_NAME
+        else B1_ADAPTER
+    ).absolute()
     if node is None or not adapter.is_file():
         raise ChildFailure("ADAPTER_UNAVAILABLE")
     node = str(Path(node).resolve())
@@ -642,15 +646,21 @@ def _b1_after_settlement(database, trial_id, reason):
 
 
 def run_b1_batch(database, claim, *, limits=None):
-    """Run one immutable generated-fixture B1 session in one persistent Node child."""
+    """Run one immutable B1 session in one persistent Node child."""
     if os.name != "posix":
         raise ChildFailure("POSIX_REQUIRED")
     caps = _limits(limits)
     batch_deadline = time.monotonic() + caps["batch_seconds"]
     try:
-        profile = journal._b1_profile()
-        if type(claim) is not dict or claim.get("profile") != journal.B1_PROFILE_NAME:
+        if type(claim) is not dict:
             raise ChildFailure("B1_CLAIM_INVALID")
+        profile = journal._b1_profile(claim.get("profile"))
+        if profile["profile"] not in (
+                journal.B1_PROFILE_NAME, journal.HISTORICAL_PROFILE_NAME):
+            raise ChildFailure("B1_CLAIM_INVALID")
+        if profile["profile"] == journal.HISTORICAL_PROFILE_NAME and (
+                profile["status"] != "FROZEN_FOR_D2" or profile["inputSha256"] is None):
+            raise ChildFailure("HISTORICAL_ADMISSION_REQUIRED")
         started = journal.start_b1(
             database, claim, busy_timeout=MAX_JOURNAL_LOCK_WAIT_SECONDS, deadline=batch_deadline)
     except journal.JournalError as error:

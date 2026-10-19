@@ -1,17 +1,25 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {spawnSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {mkdir, mkdtemp, readFile, rm, symlink, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {
   CAPTURED_INPUT_PROFILE, MAX_NORMALIZED_FILE_BYTES, NORMALIZED_PATHS,
   loadCapturedInputs, loadSyntheticFixtureProfile
 } from '../scripts/research/b1-7/captured-input.mjs';
+import {inspectHistoricalAdmission, HISTORICAL_ADMISSION_RECEIPT,
+  HISTORICAL_INPUT_MANIFEST} from '../scripts/research/b1-7/historical-admission.mjs';
+import {HISTORICAL_RUN_PROFILE} from '../scripts/research/b1-7/historical-profile.mjs';
+import {historicalProfileSha256} from '../scripts/research/b1-7/historical-profile.mjs';
 import {ASSETS, INPUT} from '../scripts/research/b1-7/validate.mjs';
+import {canonicalJson, sha256} from '../scripts/research/b1-7/engine.mjs';
 import {createSyntheticSeries} from './fixtures/b1-7/synthetic-series.mjs';
 
 const hash = value => createHash('sha256').update(value).digest('hex');
+const projectRoot = fileURLToPath(new URL('..', import.meta.url));
 
 async function createFixtureTree(t, series = createSyntheticSeries()) {
   const root = await mkdtemp(join(tmpdir(), 'meridian-b1-csv-'));
@@ -77,6 +85,135 @@ test('synthetic byte edits alter identities but cannot supply production authori
   });
   assert.equal(production.status, 'BLOCKED');
   assert.equal(production.error.code, 'SELECTED_INPUT_MANIFEST_MISSING');
+});
+
+test('historical admission remains inert and rejects stale or malformed approval candidates', async t => {
+  assert.equal(HISTORICAL_INPUT_MANIFEST, null);
+  assert.equal(HISTORICAL_ADMISSION_RECEIPT, null);
+  assert.equal(HISTORICAL_RUN_PROFILE.status, 'NOT_FROZEN');
+  assert.equal(HISTORICAL_RUN_PROFILE.inputManifestSha256, null);
+  assert.equal(HISTORICAL_RUN_PROFILE.trialKey, 'trial-historical-d2-r1');
+  assert.equal(HISTORICAL_RUN_PROFILE.pathIds.length, 44);
+  assert.equal(HISTORICAL_RUN_PROFILE.computationPathIds.length, 44);
+  assert.deepEqual(inspectHistoricalAdmission({
+    manifest: null, receipt: null, profile: HISTORICAL_RUN_PROFILE
+  }), {
+    ok: false, status: 'BLOCKED', error: {code: 'INPUT_MANIFEST_NOT_FROZEN'}
+  });
+  assert.equal((await loadCapturedInputs()).error.code, 'SELECTED_INPUT_MANIFEST_MISSING');
+  const adapter = spawnSync('node', [
+    join(projectRoot, 'scripts/research-supervisor/historical_adapter.mjs')
+  ], {
+    cwd: projectRoot,
+    encoding: 'utf8',
+    timeout: 10000,
+    env: {PATH: process.env.PATH, LANG: 'C.UTF-8', B1_RESULT_FD: '3'}
+  });
+  assert.equal(adapter.status, 1);
+  assert.match(adapter.stderr, /SELECTED_INPUT_MANIFEST_MISSING/);
+
+  const {root: fixtureRoot} = await createFixtureTree(t);
+  const generated = await loadSyntheticFixtureProfile(fixtureRoot);
+  const manifestCandidate = {
+    sourceCommit: INPUT.sourceCommit,
+    files: {...INPUT.normalizedHashes},
+    selectedSeriesSha256: {...generated.inputManifest.selectedSeriesSha256}
+  };
+  const manifestSha256 = sha256(canonicalJson(manifestCandidate));
+  const testProfile = {
+    ...HISTORICAL_RUN_PROFILE,
+    status: 'FROZEN_FOR_D2',
+    inputManifest: manifestCandidate,
+    inputManifestSha256: manifestSha256,
+    sourceSha256: Object.fromEntries(Object.keys(HISTORICAL_RUN_PROFILE.sourceFiles)
+      .map(name => [name, 'a'.repeat(64)]))
+  };
+  testProfile.runProfileSha256 = historicalProfileSha256(testProfile);
+  const unapprovedReceiptCandidate = {
+    schema: 'NOT_AN_APPROVAL',
+    decision: 'PENDING',
+    owner: 'TEST_ONLY',
+    approvedAt: null,
+    sourceCommit: testProfile.sourceCommit,
+    protocolSha256: testProfile.protocolSha256,
+    implementationSha256: testProfile.implementationSha256,
+    inputManifestSha256: manifestSha256,
+    runProfileSha256: testProfile.runProfileSha256,
+    trialKey: testProfile.trialKey,
+    pathIds: [...testProfile.pathIds]
+  };
+  assert.equal(inspectHistoricalAdmission({
+    manifest: manifestCandidate, receipt: null, profile: testProfile
+  }).error.code, 'D2_APPROVAL_REQUIRED');
+  assert.equal(inspectHistoricalAdmission({
+    manifest: manifestCandidate, receipt: unapprovedReceiptCandidate, profile: testProfile
+  }).error.code, 'D2_APPROVAL_INVALID');
+  let approvalGetterCalls = 0;
+  const accessorReceipt = Object.defineProperty({...unapprovedReceiptCandidate}, 'protocolSha256', {
+    enumerable: true,
+    get() {
+      approvalGetterCalls++;
+      return testProfile.protocolSha256;
+    }
+  });
+  assert.equal(inspectHistoricalAdmission({
+    manifest: manifestCandidate, receipt: accessorReceipt, profile: testProfile
+  }).error.code, 'D2_APPROVAL_INVALID');
+  assert.equal(approvalGetterCalls, 0);
+  const accessorPathIds = [...unapprovedReceiptCandidate.pathIds];
+  Object.defineProperty(accessorPathIds, '0', {
+    enumerable: true,
+    get() {
+      approvalGetterCalls++;
+      return testProfile.pathIds[0];
+    }
+  });
+  assert.equal(inspectHistoricalAdmission({
+    manifest: manifestCandidate,
+    receipt: {...unapprovedReceiptCandidate, pathIds: accessorPathIds},
+    profile: testProfile
+  }).error.code, 'D2_APPROVAL_INVALID');
+  assert.equal(approvalGetterCalls, 0);
+
+  for (const [field, value, expected] of [
+    ['sourceCommit', '0'.repeat(40), 'D2_SOURCE_MISMATCH'],
+    ['protocolSha256', '0'.repeat(64), 'D2_PROTOCOL_MISMATCH'],
+    ['implementationSha256', '0'.repeat(64), 'D2_IMPLEMENTATION_MISMATCH'],
+    ['inputManifestSha256', '0'.repeat(64), 'D2_MANIFEST_MISMATCH'],
+    ['runProfileSha256', '0'.repeat(64), 'D2_PROFILE_MISMATCH']
+  ]) {
+    const result = inspectHistoricalAdmission({
+      manifest: manifestCandidate,
+      receipt: {...unapprovedReceiptCandidate, [field]: value},
+      profile: testProfile
+    });
+    assert.equal(result.error.code, expected, field);
+  }
+  const changedPaths = [...unapprovedReceiptCandidate.pathIds];
+  [changedPaths[0], changedPaths[1]] = [changedPaths[1], changedPaths[0]];
+  assert.equal(inspectHistoricalAdmission({
+    manifest: manifestCandidate,
+    receipt: {...unapprovedReceiptCandidate, pathIds: changedPaths},
+    profile: testProfile
+  }).error.code, 'D2_PATHS_MISMATCH');
+  const wrongSourceManifest = {...manifestCandidate, sourceCommit: '0'.repeat(40)};
+  const wrongSourceManifestSha256 = sha256(canonicalJson(wrongSourceManifest));
+  const wrongSourceProfile = {
+    ...testProfile,
+    inputManifest: wrongSourceManifest,
+    inputManifestSha256: wrongSourceManifestSha256
+  };
+  wrongSourceProfile.runProfileSha256 = historicalProfileSha256(wrongSourceProfile);
+  assert.equal(inspectHistoricalAdmission({
+    manifest: wrongSourceManifest,
+    receipt: {
+      ...unapprovedReceiptCandidate,
+      sourceCommit: wrongSourceProfile.sourceCommit,
+      inputManifestSha256: wrongSourceManifestSha256,
+      runProfileSha256: wrongSourceProfile.runProfileSha256
+    },
+    profile: wrongSourceProfile
+  }).error.code, 'D2_SOURCE_MISMATCH');
 });
 
 test('strict generated CSV loader rejects changed schema, encoding, timestamps, and missing assets', async t => {

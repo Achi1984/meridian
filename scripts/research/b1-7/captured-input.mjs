@@ -6,6 +6,9 @@ import {resolve, sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {canonicalJson, sha256} from './engine.mjs';
 import {ASSETS, INPUT, validateSeries} from './validate.mjs';
+import {HISTORICAL_ADMISSION_RECEIPT, HISTORICAL_INPUT_MANIFEST,
+  inspectHistoricalAdmission} from './historical-admission.mjs';
+import {HISTORICAL_RUN_PROFILE} from './historical-profile.mjs';
 
 export const CAPTURED_INPUT_PROFILE = 'SYNTHETIC_ONLY_GENERATED_FIXTURE';
 export const MAX_NORMALIZED_FILE_BYTES = 512 * 1024;
@@ -21,8 +24,8 @@ export const NORMALIZED_PATHS = Object.freeze({
 
 const HEADER = 'timestamp_utc,open,high,low,close,volume,trades';
 const LAST_TIMESTAMP = '2026-09-30T00:00:00Z';
-const PRODUCTION_SELECTED_INPUT_MANIFEST = null;
-const PRODUCTION_ADMISSION = null;
+const PRODUCTION_SELECTED_INPUT_MANIFEST = HISTORICAL_INPUT_MANIFEST;
+const PRODUCTION_ADMISSION = HISTORICAL_ADMISSION_RECEIPT;
 const PRODUCTION_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const DAY_MS = 86400000;
 const DECIMAL = /^-?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
@@ -41,9 +44,12 @@ function fail(code, file = null) {
 function productionManifestCheck() {
   const manifest = PRODUCTION_SELECTED_INPUT_MANIFEST;
   if (!manifest) return {ok: false, status: 'BLOCKED', error: {code: 'SELECTED_INPUT_MANIFEST_MISSING'}};
-  if (!PRODUCTION_ADMISSION || PRODUCTION_ADMISSION.admitted !== true) {
-    return {ok: false, status: 'BLOCKED', error: {code: 'EXPLICIT_ADMISSION_REQUIRED'}};
-  }
+  const admission = inspectHistoricalAdmission({
+    receipt: PRODUCTION_ADMISSION,
+    manifest,
+    profile: HISTORICAL_RUN_PROFILE
+  });
+  if (!admission.ok) return admission;
   if (manifest.sourceCommit !== INPUT.sourceCommit ||
     ASSETS.some(asset => manifest.files?.[asset] !== INPUT.normalizedHashes[asset]) ||
     ASSETS.some(asset => !/^[a-f0-9]{64}$/.test(manifest.selectedSeriesSha256?.[asset] ?? ''))) {

@@ -5,6 +5,8 @@ import {fileURLToPath, pathToFileURL} from 'node:url';
 import path from 'node:path';
 import {createExecution, canonicalJson, sha256} from '../research/b1-7/engine.mjs';
 import {PROTOCOL_ID, PROTOCOL_SHA256} from '../research/b1-7/validate.mjs';
+import {loadCapturedInputs} from '../research/b1-7/captured-input.mjs';
+import {HISTORICAL_RUN_PROFILE} from '../research/b1-7/historical-profile.mjs';
 import {createSyntheticSeries} from '../../test/fixtures/b1-7/synthetic-series.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -72,25 +74,48 @@ function sendFrame(fd, bytes) {
   writeAll(fd, bytes);
 }
 
-async function execute() {
+export async function runB1Adapter(runProfile = 'SYNTHETIC') {
   const fd = Number(process.env.B1_RESULT_FD);
   if (!Number.isInteger(fd) || fd < 3) throw new Error('RESULT_CHANNEL_INVALID');
+  const historical = runProfile === HISTORICAL_RUN_PROFILE.profile;
+  if (runProfile !== 'SYNTHETIC' && !historical) throw new Error('B1_RUN_PROFILE_INVALID');
+  if (historical && TEST_SCENARIO) throw new Error('HISTORICAL_TEST_HOOK_REJECTED');
   if (TEST_SCENARIO && !['ENGINE_FAILURE', 'INSUFFICIENT_EVIDENCE'].includes(TEST_SCENARIO)) {
     throw new Error('B1_TEST_SCENARIO_INVALID');
   }
-  let manifestPath = MANIFEST_PATH;
-  let series = createSyntheticSeries();
+  let profilePath = MANIFEST_PATH;
+  let series = null;
+  let source = null;
+  if (historical) {
+    const loaded = await loadCapturedInputs();
+    if (!loaded.ok) throw new Error(loaded.error?.code ?? 'HISTORICAL_ADMISSION_REQUIRED');
+    profilePath = null;
+    series = loaded.seriesByAsset;
+    source = loaded.source;
+  } else {
+    series = createSyntheticSeries();
+    source = {kind: 'SYNTHETIC_FIXTURE'};
+  }
   if (TEST_SCENARIO === 'INSUFFICIENT_EVIDENCE') {
-    manifestPath = process.env.B1_TEST_MANIFEST_PATH;
-    if (typeof manifestPath !== 'string' || !path.isAbsolute(manifestPath)) {
+    profilePath = process.env.B1_TEST_MANIFEST_PATH;
+    if (typeof profilePath !== 'string' || !path.isAbsolute(profilePath)) {
       throw new Error('B1_TEST_MANIFEST_PATH_INVALID');
     }
     const {createInsufficientEvidenceSeries} = await import('./test_b1_generated_fixture.mjs');
     series = createInsufficientEvidenceSeries();
   }
-  const profile = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  const profile = historical ? HISTORICAL_RUN_PROFILE : JSON.parse(readFileSync(profilePath, 'utf8'));
   const sourceSha256 = sourcePins(profile);
-  const inputSha256 = fixtureIdentity(series);
+  const inputIdentity = historical ? {
+    datasetKind: source.kind,
+    sourceCommit: source.commit,
+    sourceProvenance: {normalizedFileSha256: source.files},
+    canonicalSeriesSha256: Object.fromEntries(Object.entries(series).map(([asset, rows]) =>
+      [asset, sha256(canonicalJson(rows))]))
+  } : null;
+  const inputSha256 = historical
+    ? sha256(canonicalJson(inputIdentity))
+    : fixtureIdentity(series);
   if (inputSha256 !== profile.inputSha256) throw new Error('B1_INPUT_PIN_MISMATCH');
   const fileSha = name => createHash('sha256').update(readFileSync(path.join(ROOT, name))).digest('hex');
   const implementationSha256 = sha256(canonicalJson({
@@ -103,7 +128,7 @@ async function execute() {
   }
   const executionOptions = {
     seriesByAsset: series,
-    source: {kind: 'SYNTHETIC_FIXTURE'},
+    source,
     implementationSha256
   };
   if (TEST_SCENARIO === 'ENGINE_FAILURE') {
@@ -184,6 +209,9 @@ async function execute() {
     return;
   }
   const summary = {...finalResult};
+  if (historical) {
+    summary.evidence = {...summary.evidence, sourceAuthenticity: 'NOT_ESTABLISHED'};
+  }
   delete summary.paths;
   delete summary.controlDefinitions;
   process.stdout.write(`${JSON.stringify({type: 'final_summary'})}\n`);
@@ -195,7 +223,7 @@ async function execute() {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  execute().catch(error => {
+  runB1Adapter(process.env.B1_RUN_PROFILE ?? 'SYNTHETIC').catch(error => {
     process.stderr.write(`${error?.code ?? error?.message ?? 'B1_ADAPTER_FAILED'}\n`);
     process.exitCode = 1;
   });
