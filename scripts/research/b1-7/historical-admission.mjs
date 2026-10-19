@@ -6,9 +6,9 @@ import {HISTORICAL_ADMISSION_RECEIPT, HISTORICAL_INPUT_MANIFEST,
 export {HISTORICAL_ADMISSION_RECEIPT, HISTORICAL_INPUT_MANIFEST};
 
 const RECEIPT_KEYS = Object.freeze([
-  'schema', 'decision', 'owner', 'approvedAt', 'sourceCommit', 'protocolSha256',
-  'implementationSha256', 'inputManifestSha256', 'runProfileSha256', 'trialKey',
-  'pathIds'
+  'schema', 'decision', 'owner', 'approvedAt', 'sourceCommit', 'sourceIdentitySha256',
+  'protocolSha256', 'implementationSha256', 'inputManifestSha256', 'runProfileSha256',
+  'manifestSha256', 'computationOrderSha256', 'trialKey', 'pathIds'
 ]);
 
 function snapshot(value, keys) {
@@ -73,6 +73,7 @@ export function inspectHistoricalAdmission({receipt, manifest, profile}) {
       !profile.inputManifest || !digest(profile.inputManifestSha256) ||
       canonicalJson(profile.inputManifest) !== canonicalJson(manifest) ||
       !profile.sourceFiles || !profile.sourceSha256 ||
+      profile.sourceIdentitySha256 !== sha256(canonicalJson(profile.sourceSha256)) ||
       canonicalJson(Object.keys(profile.sourceFiles).sort()) !==
         canonicalJson(Object.keys(profile.sourceSha256).sort()) ||
       Object.values(profile.sourceSha256).some(value => !digest(value) || value === '0'.repeat(64))) {
@@ -89,6 +90,9 @@ export function inspectHistoricalAdmission({receipt, manifest, profile}) {
   if (approved.sourceCommit !== profile?.sourceCommit || approved.sourceCommit !== INPUT.sourceCommit) {
     return denied('D2_SOURCE_MISMATCH');
   }
+  if (approved.sourceIdentitySha256 !== profile?.sourceIdentitySha256) {
+    return denied('D2_SOURCE_MISMATCH');
+  }
   if (approved.protocolSha256 !== profile?.protocolSha256) return denied('D2_PROTOCOL_MISMATCH');
   if (approved.implementationSha256 !== profile?.implementationSha256) {
     return denied('D2_IMPLEMENTATION_MISMATCH');
@@ -101,6 +105,10 @@ export function inspectHistoricalAdmission({receipt, manifest, profile}) {
   }
   if (approved.runProfileSha256 !== profile?.runProfileSha256 ||
       !digest(approved.runProfileSha256)) return denied('D2_PROFILE_MISMATCH');
+  if (approved.manifestSha256 !== profile?.manifestSha256 ||
+      approved.computationOrderSha256 !== profile?.computationOrderSha256) {
+    return denied('D2_PATHS_MISMATCH');
+  }
   if (typeof profile?.trialKey !== 'string' || approved.trialKey !== profile.trialKey) {
     return denied('D2_TRIAL_MISMATCH');
   }

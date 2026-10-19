@@ -37,8 +37,8 @@ function deepFreeze(value) {
   return value;
 }
 
-export const HISTORICAL_INPUT_MANIFEST = profileData.inputManifest;
-export const HISTORICAL_ADMISSION_RECEIPT = approvalReceipt;
+export const HISTORICAL_INPUT_MANIFEST = deepFreeze(profileData.inputManifest);
+export const HISTORICAL_ADMISSION_RECEIPT = deepFreeze(approvalReceipt);
 export const HISTORICAL_RUN_PROFILE = deepFreeze({
   ...profileIdentity,
   computationPathIds: bridge.computationOrder.map(index => bridge.pathIds[index]),

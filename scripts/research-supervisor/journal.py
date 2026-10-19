@@ -330,9 +330,9 @@ def _historical_profile():
     _need(declared["inputSha256"] == input_sha256, "HISTORICAL_INPUT_IDENTITY_INVALID")
     receipt = declared["approvalReceipt"]
     receipt_keys = {
-        "schema", "decision", "owner", "approvedAt", "sourceCommit", "protocolSha256",
-        "implementationSha256", "inputManifestSha256", "runProfileSha256", "trialKey",
-        "pathIds",
+        "schema", "decision", "owner", "approvedAt", "sourceCommit", "sourceIdentitySha256",
+        "protocolSha256", "implementationSha256", "inputManifestSha256", "runProfileSha256",
+        "manifestSha256", "computationOrderSha256", "trialKey", "pathIds",
     }
     _need(type(receipt) is dict and set(receipt) == receipt_keys
           and receipt["schema"] == "MERIDIAN_D2_HISTORICAL_APPROVAL_R1"
@@ -340,10 +340,13 @@ def _historical_profile():
           and receipt["owner"] == "Achi1984"
           and _approval_timestamp(receipt["approvedAt"])
           and receipt["sourceCommit"] == declared["sourceCommit"]
+          and receipt["sourceIdentitySha256"] == profile["sourceIdentitySha256"]
           and receipt["protocolSha256"] == declared["protocolSha256"]
           and receipt["implementationSha256"] == declared["implementationSha256"]
           and receipt["inputManifestSha256"] == declared["inputManifestSha256"]
           and receipt["runProfileSha256"] == profile["runProfileSha256"]
+          and receipt["manifestSha256"] == base["manifestSha256"]
+          and receipt["computationOrderSha256"] == base["computationOrderSha256"]
           and receipt["trialKey"] == declared["trialKey"]
           and receipt["pathIds"] == base["pathIds"],
           "HISTORICAL_APPROVAL_INVALID")

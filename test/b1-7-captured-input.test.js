@@ -128,6 +128,7 @@ test('historical admission remains inert and rejects stale or malformed approval
     sourceSha256: Object.fromEntries(Object.keys(HISTORICAL_RUN_PROFILE.sourceFiles)
       .map(name => [name, 'a'.repeat(64)]))
   };
+  testProfile.sourceIdentitySha256 = sha256(canonicalJson(testProfile.sourceSha256));
   testProfile.runProfileSha256 = historicalProfileSha256(testProfile);
   const unapprovedReceiptCandidate = {
     schema: 'NOT_AN_APPROVAL',
@@ -135,10 +136,13 @@ test('historical admission remains inert and rejects stale or malformed approval
     owner: 'TEST_ONLY',
     approvedAt: null,
     sourceCommit: testProfile.sourceCommit,
+    sourceIdentitySha256: testProfile.sourceIdentitySha256,
     protocolSha256: testProfile.protocolSha256,
     implementationSha256: testProfile.implementationSha256,
     inputManifestSha256: manifestSha256,
     runProfileSha256: testProfile.runProfileSha256,
+    manifestSha256: testProfile.manifestSha256,
+    computationOrderSha256: testProfile.computationOrderSha256,
     trialKey: testProfile.trialKey,
     pathIds: [...testProfile.pathIds]
   };
@@ -179,8 +183,11 @@ test('historical admission remains inert and rejects stale or malformed approval
     ['sourceCommit', '0'.repeat(40), 'D2_SOURCE_MISMATCH'],
     ['protocolSha256', '0'.repeat(64), 'D2_PROTOCOL_MISMATCH'],
     ['implementationSha256', '0'.repeat(64), 'D2_IMPLEMENTATION_MISMATCH'],
+    ['sourceIdentitySha256', '0'.repeat(64), 'D2_SOURCE_MISMATCH'],
     ['inputManifestSha256', '0'.repeat(64), 'D2_MANIFEST_MISMATCH'],
-    ['runProfileSha256', '0'.repeat(64), 'D2_PROFILE_MISMATCH']
+    ['runProfileSha256', '0'.repeat(64), 'D2_PROFILE_MISMATCH'],
+    ['manifestSha256', '0'.repeat(64), 'D2_PATHS_MISMATCH'],
+    ['computationOrderSha256', '0'.repeat(64), 'D2_PATHS_MISMATCH']
   ]) {
     const result = inspectHistoricalAdmission({
       manifest: manifestCandidate,
