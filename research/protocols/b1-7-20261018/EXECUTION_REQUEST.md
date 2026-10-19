@@ -17,37 +17,23 @@ The R2 `GREEN_LIGHT` (response comment `6249482850`) is historical and applies o
 Each state requires its own evidence and decision. Passing one gate does not imply
 or authorize any later gate.
 
-## Separate selected-manifest read decision — draft only
+## Existing D1 manifest draft — identity only
 
-**Decision requested: D1, permission to read the allowlisted files solely to build
-and verify a selected-series manifest. Status: PENDING; NOT APPROVED and NOT
-PERFORMED.** The independently frozen selected-input manifest remains
-`NOT_FROZEN` unless this specific data-read approval is granted.
+The existing verified metadata at
+`docs/research/d1-20261019/verification.json` contains a `manifestDraft` with
+canonical SHA-256
+`37fecaa0d003c9ec862fb57b3b312c0289c1dd370607ade99bac584d357f81a9`. This is
+identity metadata only: it is not a frozen/admitted production manifest and
+grants no D2 or execution authority. The current source-only task did not read
+the captured CSVs. Reusing the verified draft identity does not require
+rereading those files; any additional data read would require its own decision.
 
-The proposed read is limited to the seven normalized paths already listed in this
-request, in this order: XBTUSD, ETHUSD, SOLUSD, XRPUSD, LINKUSD, AVAXUSD, SUIUSD.
-For each, read only its allowlisted file under
-`research/acquisitions/kraken-usd-daily-20261018/normalized/`; require exactly 955
-daily rows from 2024-02-19 through 2026-09-30 and the existing seven-column
-`timestamp_utc,open,high,low,close,volume,trades` schema. Compare each raw
-whole-file SHA-256 with the value already recorded below, validate the generated
-selected rows with the existing B1 verifier, and calculate their selected-series
-SHA-256. A future manifest would contain only the pinned source-commit assertion,
-the seven raw whole-file hashes, and the seven selected-series hashes; it is not
-created or frozen by this proposal.
-
-No other paths or assets are in scope. No acquisition/network access, signals,
-features, returns, PnL, engine execution, sorting, repair, filling, substitution,
-or partial acceptance is allowed. Any path, byte, schema, calendar, count, or hash
-mismatch stops the read without repair. Hashes prove byte identity only: source
-authenticity is `NOT_ESTABLISHED`; the offline provenance record is not exchange
-authentication. The existing loader's Linux `/proc/self/fd` descriptor check is
-an environment constraint, not an authenticity claim.
-
-A separate later D2 decision would be required to freeze/admit the resulting
-manifest and authorize any fixed historical batch. D1 alone grants neither
-admission nor execution; D2 would bind exact final identities and the unchanged
-protocol, costs, screen, budget, and research-only no-stop scope.
+Hashes establish byte identity, not exchange authentication; source authenticity
+remains `NOT_ESTABLISHED`. No acquisition/network access, signals, features,
+returns, PnL, engine execution on captured data, repair, filling, substitution,
+or partial acceptance is authorized by this proposal. The existing loader's
+Linux `/proc/self/fd` descriptor check is an environment constraint, not an
+authenticity claim.
 
 The current candidate includes #890 at merge `fd07a8df49cbe24c73e9819170cd36e6b9645157` and #894 at merge `bfaf17cd5d96db6abe248ce9c4a1fcf83f190ca4`. For #890, corrected head `4333259f11992042d39e1b4c6ec7472f56c74921` passed Release Safety run `39150912974`, attempt 2; the earlier failed run remains historical and is not relabeled. Its post-merge Release Safety failure (`39155412745`, 2662 pass/1 fail) also remains historical and was corrected by #894. For #894, Release Safety `39157878217`, Runtime Smoke `39157878067`, Release Coordinator `39157878080`, and Pages `39157877431` all succeeded on `bfaf17cd5d96db6abe248ce9c4a1fcf83f190ca4`. These are dependency receipts, not CI or review of this integrated candidate.
 
@@ -56,15 +42,50 @@ The current candidate includes #890 at merge `fd07a8df49cbe24c73e9819170cd36e6b9
 | Identity | Proposed value | Status |
 | --- | --- | --- |
 | Protocol | `MERIDIAN-B1-7-PROTOCOL-R3-20261018`; raw `protocol.json` SHA-256: `a78e1ae8c71c8f85baee5b51f5691643fc29136f636f19465c61f553afe09185` | Frozen file identity |
-| Implementation | `MERIDIAN-B1-7-ENGINE-R3`; candidate bundle SHA-256 `a357d727496c4f83ea160ec44b1a2e3378079ef931aa15e67f08387221aab968` | Current integrated candidate identity; source acceptance remains pending exact-head CI and full independent review |
-| Generated bridge manifest | SHA-256 `1909f4bb14f60298bfb4aa882424905882cc0994485eee6c5a28e23b39deb58e`; computation order SHA-256 `d56f9126b6a47ca04b28f295b3d613b529b5299ea1928c47b74e7b8cc439ce2d` | Recomputed from the integrated B1 source and checked-in generated fixture; 44 path IDs refreshed, descriptors/order unchanged |
+| Implementation | `MERIDIAN-B1-7-ENGINE-R3`; candidate bundle SHA-256 `ab73261f01b27b8655ffea7979fec03eb1a9bea667b6fc4cda8d77b75c4f3e06` | Source-only checkpoint identity; source acceptance remains pending exact-head CI and full independent review |
+| Generated bridge manifest | SHA-256 `98a9c4442a140c1e78d60251d312ad489975f58f8f5c48a87a8916b141c1c361`; computation order SHA-256 `223220ee0d8b4569ca02b99399bac71364203478e3720cab5e93ad957e6ec6d0` | Mechanically refreshed from the unchanged generated fixture and implementation; fixture identity, descriptors, and computation order unchanged |
+| Historical run profile | `MERIDIAN-B1-7-HISTORICAL-ONE-SHOT-R1`; canonical run-profile SHA-256 `160b73ff9c380b1231d0a1e4a88566493408f978857a3b13d71826852a413fc8`; source-identity SHA-256 `3e3973847b2b37cffa11b2df1be0b832d3227692857ff4bb2631ca5ff48ad773` | Inert profile identity; status `NOT_FROZEN`, no input manifest or D2 receipt, and no historical path IDs until input metadata is frozen |
 | Source basis | Git commit `1c7b6dccd886f57e866c7d359c091b1e72a193ea` | Pinned source/input-provenance commit |
-| Input manifest | Independently frozen selected-series manifest: `NOT_FROZEN` | No captured series loaded or hashed in this task; production loader remains blocked |
+| Existing D1 manifest draft | Canonical SHA-256 `37fecaa0d003c9ec862fb57b3b312c0289c1dd370607ade99bac584d357f81a9` | Verified identity metadata only; not frozen, admitted, or execution authority; no reread is required solely to adopt this identity |
+| Input admission | Selected-series manifest SHA-256: `NOT_FROZEN`; engine input identity: `NOT_FROZEN` | No captured series loaded or hashed in this task; production loader remains blocked |
 | Offline provenance record | `research/acquisitions/kraken-usd-daily-20261018/offline-verification.json` | Hash provenance only; source authenticity is not established |
+
+The historical run-profile identity canonically binds the protocol and
+implementation, pinned source-file hashes, source-basis commit, D1 input-manifest
+state, the exact 44 descriptors and computation order, and the fixed scope and
+limits. Historical path IDs, manifest digest, and computation-order digest are
+derived from the selected-series hashes in an input manifest using the engine's
+input-bound identity formula; they are null while the production manifest is
+null and are never copied from the synthetic profile. The source-identity
+digest is SHA-256 over the profile's canonical source-hash map. The D1 manifest
+and D2 approval receipt remain null; the profile is not an approved manifest
+or authority flag.
+
+The historical profile's exact source-file SHA-256 pins are:
+
+| Source file | SHA-256 |
+| --- | --- |
+| `scripts/research/b1-7/engine.mjs` | `64df8c6fe5a587397b312447d310cb285f552da5b686a11b3a1d0f9441b9bb8f` |
+| `scripts/research/b1-7/validate.mjs` | `2052c0fae0082622f48a18abb4a6dacc0ffa679fb5da01df5779b398f5a578fc` |
+| `scripts/research/b1-7/captured-input.mjs` | `93d05a81625fed4e7f56f889a1b3b2950ac98191f183dff99f5c7f44a276f02d` |
+| `research/protocols/b1-7-20261018/protocol.json` | `a78e1ae8c71c8f85baee5b51f5691643fc29136f636f19465c61f553afe09185` |
+| `scripts/research-supervisor/b1_bridge_manifest.json` | `0a90728308f65fdcc387c3c7130c0792eaa18e921d193ac8ba61a3f428577921` |
+| `scripts/research/b1-7/historical-admission.mjs` | `eb3bef19553a299c27023bc4558157b75267fa99adf23661e5efb5730b905f04` |
+| `scripts/research/b1-7/historical-profile.mjs` | `1df24e3372acb900ead091aef55f6f6fc2288a81bcf769e7587fb36e12aaad17` |
+| `scripts/research-supervisor/historical_adapter.mjs` | `79bef665862be2a1751d201c6303c571344c42cdc7fe76897c66ff74561c5c5f` |
+| `scripts/research-supervisor/b1_adapter.mjs` | `2d912e011e441abee4c884236a8a4c09791b502151f470e7388cd2333b1ee165` |
+| `scripts/research-supervisor/supervisor.py` | `6eb664e328bb105063d9a3eabf06b0b5c54140620141d3ee9db00744f246385c` |
+| `scripts/research-supervisor/journal.py` | `83c1d37557afff72adfc08dbd2a0036db3fb7c45a895a679b7015c3f23cc055e` |
 
 The exact seven proposed assets and copied normalized-file SHA-256 values are:
 
-The current candidate bundle digest is SHA-256 of canonical JSON with keys `capturedInputSha256`, `engineSha256`, and `validatorSha256` containing these raw-file SHA-256 values: `captured-input.mjs` = `64fc84514a642827afa983169c6a4cf55f0d2d2b7dd26302defe6e9dde39e5e0`; `engine.mjs` = `64df8c6fe5a587397b312447d310cb285f552da5b686a11b3a1d0f9441b9bb8f`; `validate.mjs` = `2052c0fae0082622f48a18abb4a6dacc0ffa679fb5da01df5779b398f5a578fc`. This binds the current integrated source bytes but is not accepted until exact-head CI and full independent review. The engine accepts the bundle hash as caller-supplied identity and does not inspect its own source. The captured-input module remains inactive: the independently frozen selected-input manifest and production admission are absent, so no market CSV is read.
+The implementation bundle digest is SHA-256 of canonical JSON with keys
+`capturedInputSha256`, `engineSha256`, and `validatorSha256` containing the raw
+file hashes above. This binds the current source bytes but is not accepted until
+exact-head CI and full independent review. The engine accepts the bundle hash as
+caller-supplied identity and does not inspect its own source. The captured-input
+module remains inactive: the independently frozen selected-input manifest and
+production admission are absent, so no market CSV is read.
 
 | Order | Asset | Normalized file SHA-256 |
 | ---: | --- | --- |
@@ -94,3 +115,35 @@ This proposal asks for only a research-stage portfolio-level no-stop analysis. T
 R3 independent review is pending; the historical R2 review is not approval of this proposal. The 10 bp spot taker reference plus 5 bp assumed friction and 30 bp stress must be explicitly included in the separate owner decision. Neither is account-specific entitlement or a claim about OKX fills.
 
 This request does **not** authorize a real-data run, strategy-PnL promotion, discovery, validation, holdout, Paper, Live, trading, runtime changes, or any authorization-flag change. `canonicalExecutionAuthorized`, `strategyPnlAuthorized`, `discoveryAuthorized`, `validationAuthorized`, `holdoutAuthorized`, `paperAuthorized`, and `liveAuthorized` remain false. A later explicit owner decision must approve the exact protocol/source/input identities, costs, screen, budget, and no-stop exception before any real series is supplied.
+
+## Current D2 decision text — defer, not approval
+
+> **D2 DECISION: DEFER / NOT APPROVED.** Do not read captured market files or
+> execute the engine. The selected-input manifest and its SHA-256 remain
+> `NOT_FROZEN`; no D2 receipt exists. Reconsider only after the owner has
+> authorized any data read that remains necessary; reuse the already verified D1
+> `manifestDraft` identity without rereading files solely to adopt that identity.
+> The D1 metadata is not admission or execution authority. The final source and
+> run-profile identities pass exact-head CI and full independent review, and an
+> owner decision explicitly binds that manifest, the R3 protocol, one trial,
+> all 44 ordered paths, costs, screen, budget, and no-finite-stop exception.
+> Any future historical result remains non-holdout research evidence and grants
+> no execution, promotion, Paper, or Live authority.
+
+This is a proposed deferral record for the current source-only packet, not an
+owner approval or an execution grant. The minimal later activation diff is a
+Lead-controlled, independently reviewed change to
+`scripts/research-supervisor/historical_run_profile.json`: set
+`status` to `FROZEN_FOR_D2`, populate the exact D1 manifest, manifest/input
+hashes, and a schema-valid D2 receipt bound to `sourceIdentitySha256`,
+protocol/implementation, run-profile, manifest/order digests, fixed trial key,
+and the ordered path IDs derived from that manifest. The receipt schema validates
+identity fields but is not an authentication mechanism: owner strings and hashes
+do not prove consent. Activation requires an actual separate owner decision; the
+Lead-controlled change records that decision after review. The verified existing
+D1 `manifestDraft` may supply identity metadata without another market-file read.
+The receipt is excluded from the run-profile digest to avoid self-reference; the
+profile identity includes all other frozen fields.
+No source code, fixture identity, descriptor, computation order, or
+authorization flag should change as part of that later activation. Any source
+change requires renewed identities, CI, and review before activation.

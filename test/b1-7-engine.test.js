@@ -754,8 +754,8 @@ test('source hash is a deterministic three-file bundle identity, separate from d
   assert.match(executionRequest, /SCREEN_RESULT[\s\S]*NOT_RUN/);
   assert.match(executionRequest, /PAPER_ELIGIBILITY[\s\S]*NOT_ELIGIBLE/);
   assert.match(executionRequest, /selected-input manifest is `NOT_FROZEN`/);
-  assert.match(executionRequest, /Decision requested: D1[\s\S]*NOT APPROVED and NOT\s+PERFORMED/);
-  assert.match(executionRequest, /source\s+authenticity is `NOT_ESTABLISHED`/);
+  assert.match(executionRequest, /Existing D1 manifest draft — identity only[\s\S]*not a frozen\/admitted production manifest/);
+  assert.match(executionRequest, /source authenticity\s+remains `NOT_ESTABLISHED`/i);
   assert.equal(protocol.identity.implementationSha256, 'BOUND_IN_EXECUTION_REQUEST');
   assert.equal(protocol.input.mode, 'CALLER_SUPPLIED_IN_MEMORY_OHLC_ONLY');
   assert.equal(protocol.input.csvLoader, false);
