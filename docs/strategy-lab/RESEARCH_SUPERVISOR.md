@@ -197,3 +197,13 @@ The underlying validator still reads and validates its bounded stored evidence;
 the 16 KiB limit applies to report output, not total internal inspection work.
 Tests use temporary generated journals and do not run strategy calculations:
 `node --test test/research-supervisor-inspection.test.js`.
+
+### Supplied inspection observation history
+
+`inspection_history.py` adds a pure validator for bounded supplied inspection
+snapshots. It detects conflicting duplicates, identity drift, changed prefixes,
+progress regression and terminal-state rewrites; unresolved work never becomes
+resumable. This is observation consistency only, not durable or authenticated
+history. No journal or engine is accessed. See
+[Research lifecycle handoff](RESEARCH_LIFECYCLE_HANDOFF.md) for the exact encoding,
+limits, interruption guidance and separate future authorization gates.
