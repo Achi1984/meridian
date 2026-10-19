@@ -485,7 +485,7 @@ test('Terminal öffnen preserves the reviewed history-close baseline and stays o
   assert.equal(gitBlob(restored),preimageBlob,'all source bytes except terminal-entry insertions, the checked viewport pair and exact Depot/revision deltas must match the reviewed history-close baseline');
 });
 
-const moduleNames=['bot-read-bootstrap.js','bot-read-access.js','bot-read-client.js','bot-read-view.js','bot-read-model.js','bot-overview-model.js','depot-read-bootstrap.js','depot-read-client.js','depot-read-model.js','depot-read-view.js','depot-history-model.js','depot-history-view.js','depot-current-model.js','strategy-workspace-bootstrap.js','strategy-catalog.js','strategy-arena.js'];
+const moduleNames=['bot-read-bootstrap.js','bot-read-access.js','bot-read-client.js','bot-read-view.js','bot-read-model.js','bot-overview-model.js','depot-read-bootstrap.js','depot-read-client.js','depot-read-model.js','depot-read-view.js','depot-history-model.js','depot-history-view.js','depot-current-model.js','strategy-workspace-bootstrap.js','strategy-catalog.js','research-evidence.js','strategy-arena.js'];
 function deploymentServer(){
   const inlineScript=html.match(/<script>([\s\S]*?)<\/script>/i)?.[1];
   assert.ok(inlineScript,'actual UI-only navigation script');
@@ -565,6 +565,30 @@ function deploymentServer(){
     }));
   });
 }
+
+test('terminal deployment fixture serves the catalog research evidence module under its CSP',async()=>{
+  const server=await deploymentServer();
+  try{
+    const start=server.base+'v11/';
+    const page=await fetch(start);
+    assert.equal(page.status,200);
+    const catalogUrl=new URL('strategy-catalog.js?v=B12',start);
+    const catalog=await fetch(catalogUrl);
+    assert.equal(catalog.status,200);
+    const source=await catalog.text();
+    const imported=source.match(/from ['"](\.\/research-evidence\.js)['"]/);
+    assert.ok(imported,'catalog imports the read-only evidence module');
+    const dependency=new URL(imported[1],catalogUrl);
+    const response=await fetch(dependency);
+    assert.equal(response.status,200,'catalog dependency must be served before browser bootstrap can succeed');
+    assert.match(response.headers.get('content-type'),/^text\/javascript/);
+    assert.equal(await response.text(),readFileSync(new URL('../v11/research-evidence.js',import.meta.url),'utf8'));
+    const scriptPolicy=page.headers.get('content-security-policy').split(';').find(part=>part.trim().startsWith('script-src '));
+    assert.ok(scriptPolicy.trim().split(/\s+/).includes(dependency.href),'exact dependency URL must be in script-src');
+    assert.equal(server.allowedPaths.has(dependency.pathname),true);
+    assert.deepEqual(server.metrics(),{reads:0,aborts:0,depotReads:0,depotAborts:0,pending:0});
+  }finally{await server.close();}
+});
 
 async function browserRun(call,start,width,server){
   const evaluate=async expression=>{
