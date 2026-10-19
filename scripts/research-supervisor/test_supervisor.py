@@ -489,13 +489,23 @@ process.stdout.write(JSON.stringify(runBatch({
             children.append(child)
             return child
 
+        started_at = time.monotonic()
         with patch.object(supervisor, "B1_ADAPTER", alias), \
                 patch.object(supervisor.subprocess, "Popen", side_effect=spawn):
+            # This checks postcommit durability, not a ten-second throughput target.
+            # The unchanged path cap and enclosing 90-second suite bound remain.
             result = supervisor.run_b1_batch(
-                self.database, claim, limits={"path_seconds": 10, "batch_seconds": 10})
+                self.database, claim, limits={"path_seconds": 10, "batch_seconds": 30})
+        elapsed = time.monotonic() - started_at
 
         self.assertEqual(len(children), 1)
-        self.assertEqual(children[0].returncode, 1)
+        diagnostic = {
+            "elapsedSeconds": round(elapsed, 3), "state": result.get("state"),
+            "reason": result.get("reason"),
+            "postSettlementFailure": result.get("postSettlementFailure"),
+            "pathCount": len(result.get("paths", [])),
+        }
+        self.assertEqual(children[0].returncode, 1, diagnostic)
         self.assertEqual(result["state"], "completed")
         self.assertEqual(result["postSettlementFailure"], "TRAILING_CONTROL_EVENT")
         self.assertEqual(len(json.loads(result["result"])["paths"]), 44)
