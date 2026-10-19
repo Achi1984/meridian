@@ -1,3 +1,15 @@
+> Current reconciliation — 2026-10-19, PR #898 inspection candidate.
+> Accepted main: `8ade1e56831f408dd35567fe5003699e95a606bf` (PR #897).
+> PR #897 complete; mailbox #639 receipt6272919723. Postchecks succeeded:
+> Safety39292525783/job118196563622, Smoke39292525893,
+> Coordinator39292525725, Pages39292524400.
+> PR #898 is aligned locally; fresh exact-head/base CI and independent review
+> remain pending. Lead progress comment6271844753; no candidate publication claimed.
+> D1 stays accepted and NOT_FROZEN. Inspection is generated-fixture read-only;
+> no recovery, execution, scheduler, D2, Paper or Live activation.
+> NEXT: publish and independently accept #898. History implementation stays queued.
+> Earlier candidate statements below are preserved historical snapshots.
+
 > Current reconciliation — 2026-10-19, M11 PR #897 source candidate.
 > Verified main: `99e7de636edd741de2ad4813ecdaacaa11db87df` (PR #899).
 > D1 #895 is closed/completed; acceptance receipt #895/comment6272425721.
