@@ -44,7 +44,7 @@ The current candidate includes #890 at merge `fd07a8df49cbe24c73e9819170cd36e6b9
 | Protocol | `MERIDIAN-B1-7-PROTOCOL-R3-20261018`; raw `protocol.json` SHA-256: `a78e1ae8c71c8f85baee5b51f5691643fc29136f636f19465c61f553afe09185` | Frozen file identity |
 | Implementation | `MERIDIAN-B1-7-ENGINE-R3`; candidate bundle SHA-256 `ab73261f01b27b8655ffea7979fec03eb1a9bea667b6fc4cda8d77b75c4f3e06` | Source-only checkpoint identity; source acceptance remains pending exact-head CI and full independent review |
 | Generated bridge manifest | SHA-256 `98a9c4442a140c1e78d60251d312ad489975f58f8f5c48a87a8916b141c1c361`; computation order SHA-256 `223220ee0d8b4569ca02b99399bac71364203478e3720cab5e93ad957e6ec6d0` | Mechanically refreshed from the unchanged generated fixture and implementation; fixture identity, descriptors, and computation order unchanged |
-| Historical run profile | `MERIDIAN-B1-7-HISTORICAL-ONE-SHOT-R1`; canonical run-profile SHA-256 `abb487c2adc40ac0b5bd58e13ae3bf46b1f26afdf4767880f0b5095fcbdf8795`; source-identity SHA-256 `0a6719238e9451d14cefb01a82f5c7fa2864e6acae6328ec4913d7545dd2f2da` | Inert profile identity; status `NOT_FROZEN`, no input manifest or D2 receipt, and no historical path IDs until input metadata is frozen |
+| Historical run profile | `MERIDIAN-B1-7-HISTORICAL-ONE-SHOT-R1`; canonical run-profile SHA-256 `160b73ff9c380b1231d0a1e4a88566493408f978857a3b13d71826852a413fc8`; source-identity SHA-256 `3e3973847b2b37cffa11b2df1be0b832d3227692857ff4bb2631ca5ff48ad773` | Inert profile identity; status `NOT_FROZEN`, no input manifest or D2 receipt, and no historical path IDs until input metadata is frozen |
 | Source basis | Git commit `1c7b6dccd886f57e866c7d359c091b1e72a193ea` | Pinned source/input-provenance commit |
 | Existing D1 manifest draft | Canonical SHA-256 `37fecaa0d003c9ec862fb57b3b312c0289c1dd370607ade99bac584d357f81a9` | Verified identity metadata only; not frozen, admitted, or execution authority; no reread is required solely to adopt this identity |
 | Input admission | Selected-series manifest SHA-256: `NOT_FROZEN`; engine input identity: `NOT_FROZEN` | No captured series loaded or hashed in this task; production loader remains blocked |
@@ -69,13 +69,13 @@ The historical profile's exact source-file SHA-256 pins are:
 | `scripts/research/b1-7/validate.mjs` | `2052c0fae0082622f48a18abb4a6dacc0ffa679fb5da01df5779b398f5a578fc` |
 | `scripts/research/b1-7/captured-input.mjs` | `93d05a81625fed4e7f56f889a1b3b2950ac98191f183dff99f5c7f44a276f02d` |
 | `research/protocols/b1-7-20261018/protocol.json` | `a78e1ae8c71c8f85baee5b51f5691643fc29136f636f19465c61f553afe09185` |
-| `scripts/research-supervisor/b1_bridge_manifest.json` | `959f45204b81ce5ec4c679f336236eb78c90f94deb81b4e199aac2e45cecc7a6` |
+| `scripts/research-supervisor/b1_bridge_manifest.json` | `0a90728308f65fdcc387c3c7130c0792eaa18e921d193ac8ba61a3f428577921` |
 | `scripts/research/b1-7/historical-admission.mjs` | `eb3bef19553a299c27023bc4558157b75267fa99adf23661e5efb5730b905f04` |
 | `scripts/research/b1-7/historical-profile.mjs` | `1df24e3372acb900ead091aef55f6f6fc2288a81bcf769e7587fb36e12aaad17` |
 | `scripts/research-supervisor/historical_adapter.mjs` | `79bef665862be2a1751d201c6303c571344c42cdc7fe76897c66ff74561c5c5f` |
-| `scripts/research-supervisor/b1_adapter.mjs` | `2838b8bcce3a5483b9a404ddd64237c74c4528b46cefb66ccfccb72c8bf548cf` |
+| `scripts/research-supervisor/b1_adapter.mjs` | `2d912e011e441abee4c884236a8a4c09791b502151f470e7388cd2333b1ee165` |
 | `scripts/research-supervisor/supervisor.py` | `6eb664e328bb105063d9a3eabf06b0b5c54140620141d3ee9db00744f246385c` |
-| `scripts/research-supervisor/journal.py` | `923670817e2d467218d17e4e0e6b2e3bec8ed7ad99e798069480f35ba521e14b` |
+| `scripts/research-supervisor/journal.py` | `83c1d37557afff72adfc08dbd2a0036db3fb7c45a895a679b7015c3f23cc055e` |
 
 The exact seven proposed assets and copied normalized-file SHA-256 values are:
 

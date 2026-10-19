@@ -148,7 +148,11 @@ fixture identity is not used as historical evidence. Tests use generated data in
 temporary roots only; they prove profile-only activation identities and exercise
 the supervised adapter/journal on generated series, including insufficient
 evidence, timeout, fence, and repeat refusal. They do not authenticate consent,
-read captured CSVs, or produce a historical strategy result. Run the focused suites with
+read captured CSVs, or produce a historical strategy result. Test-only receipt
+acceptance requires explicit `MERIDIAN_HISTORICAL_TEST_MODE=1`, a
+`historical-test-` profile under the temporary directory, and a resolved path
+outside the repository root; the production profile path and symlinks are never
+accepted for test receipts. Run the focused suites with
 `node --test test/b1-7-captured-input.test.js` and
 `node --test test/research-supervisor.test.js`; the latter also covers the
 existing synthetic 44-path run, deadlines, output bounds, child failures, and

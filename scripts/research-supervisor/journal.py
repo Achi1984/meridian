@@ -423,11 +423,13 @@ def _is_isolated_historical_test_profile():
         project_root = Path(__file__).resolve().parents[2]
         temporary_root = Path(tempfile.gettempdir()).resolve(strict=True)
         profile_path = HISTORICAL_PROFILE_PATH
+        lexical_path = Path(os.path.abspath(profile_path))
         if profile_path.is_symlink():
             return False
         resolved = profile_path.resolve(strict=True)
         return (
             resolved != default_path
+            and resolved == lexical_path
             and not resolved.is_relative_to(project_root)
             and resolved.is_relative_to(temporary_root)
             and resolved.name.startswith("historical-test-")
