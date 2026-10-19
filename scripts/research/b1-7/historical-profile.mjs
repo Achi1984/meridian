@@ -100,6 +100,7 @@ export function historicalProfileSha256(profile) {
 export function verifyHistoricalSourcePins(profile = HISTORICAL_RUN_PROFILE) {
   try {
     if (!profile || !profile.sourceFiles || !profile.sourceSha256 ||
+        canonicalJson(profile.sourceFiles) !== canonicalJson(profileData.sourceFiles) ||
         canonicalJson(Object.keys(profile.sourceFiles).sort()) !==
           canonicalJson(Object.keys(profile.sourceSha256).sort())) {
       return {ok: false, error: {code: 'HISTORICAL_SOURCE_PIN_MISMATCH'}};

@@ -4,7 +4,7 @@
   "status": "NOT_FROZEN",
   "sourceCommit": "1c7b6dccd886f57e866c7d359c091b1e72a193ea",
   "implementationId": "MERIDIAN-B1-7-ENGINE-R3",
-  "implementationSha256": "14c96aa599498b89dfa5a068e674db94d0080441885af43b962c502dc251be5d",
+  "implementationSha256": "ab73261f01b27b8655ffea7979fec03eb1a9bea667b6fc4cda8d77b75c4f3e06",
   "protocolId": "MERIDIAN-B1-7-PROTOCOL-R3-20261018",
   "protocolSha256": "a78e1ae8c71c8f85baee5b51f5691643fc29136f636f19465c61f553afe09185",
   "expectedWholeFileSha256": {
@@ -94,14 +94,14 @@
   "sourceSha256": {
     "engine": "64df8c6fe5a587397b312447d310cb285f552da5b686a11b3a1d0f9441b9bb8f",
     "validator": "2052c0fae0082622f48a18abb4a6dacc0ffa679fb5da01df5779b398f5a578fc",
-    "loader": "6690db7b0564254f9e36730ca72f51050d1ff6b5f3ca13eeea2f82ec428999e8",
+    "loader": "93d05a81625fed4e7f56f889a1b3b2950ac98191f183dff99f5c7f44a276f02d",
     "protocol": "a78e1ae8c71c8f85baee5b51f5691643fc29136f636f19465c61f553afe09185",
-    "bridge": "6dece00d84fc8e34d6dc15b50b969ddbd9f38f3aec630746dffdbb3144e7cf25",
-    "admission": "e89aae1d9cdfa6d2658b1ba729626402adae918a365f25aaedf375b261be56e1",
-    "profile": "5109725c172322525184054a8767d722b6d6176721d8be752320586fcc3d6e6d",
+    "bridge": "959f45204b81ce5ec4c679f336236eb78c90f94deb81b4e199aac2e45cecc7a6",
+    "admission": "eb3bef19553a299c27023bc4558157b75267fa99adf23661e5efb5730b905f04",
+    "profile": "1df24e3372acb900ead091aef55f6f6fc2288a81bcf769e7587fb36e12aaad17",
     "adapter": "79bef665862be2a1751d201c6303c571344c42cdc7fe76897c66ff74561c5c5f",
-    "adapterRuntime": "1b9e03a2a31cc9816d686b937d126a6ae2c0f7acad0350138a0ef46ad85e529c",
+    "adapterRuntime": "2838b8bcce3a5483b9a404ddd64237c74c4528b46cefb66ccfccb72c8bf548cf",
     "supervisor": "6eb664e328bb105063d9a3eabf06b0b5c54140620141d3ee9db00744f246385c",
-    "journal": "4cb81ff2e77bd3da99613789b64dbcf5c4f39b30f0afdca19f88e6b2c4e72d83"
+    "journal": "923670817e2d467218d17e4e0e6b2e3bec8ed7ad99e798069480f35ba521e14b"
   }
 }

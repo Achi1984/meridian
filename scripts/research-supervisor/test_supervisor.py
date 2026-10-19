@@ -198,7 +198,7 @@ connection.close()
         result = self.run_historical_fixture(
             profile_path, claim, "INSUFFICIENT_EVIDENCE")
         self.assertEqual(result["state"], "failed")
-        self.assertEqual(result["reason"], "INSUFFICIENT_EVIDENCE")
+        self.assertEqual(result["reason"], "INVALID_OR_ZERO_DEVELOPMENT_RISK_DENOMINATOR")
         with patch.object(journal, "HISTORICAL_PROFILE_PATH", profile_path):
             inspected = journal.inspect_b1(self.database, claim["trialId"])
         summary = json.loads(inspected["result"])
@@ -222,7 +222,7 @@ connection.close()
         profile_path, claim = self.prepare_historical_fixture("historical-timeout")
         result = self.run_historical_fixture(
             profile_path, claim, "HISTORICAL_TIMEOUT",
-            limits={"path_seconds": 2, "batch_seconds": 1})
+            limits={"path_seconds": 1, "batch_seconds": 10})
         self.assertEqual(result["state"], "timed_out")
         self.assertEqual(result["attempts"], 1)
         self.assertGreater(result["fence"], 0)

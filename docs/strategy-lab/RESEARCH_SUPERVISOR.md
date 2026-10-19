@@ -229,7 +229,7 @@ the credential/code-hook-free child environment.
 ## Remaining independent-review/deployment checklist
 
 - [ ] Complete independent full-source review and exact-head CI for the integrated source-only adapter/profile before any non-fixture batch is admitted.
-- [ ] Obtain a separate D1 decision, then independently review data quality, provenance, selected-series byte hashes, and protocol-specific path IDs before any D2 decision.
+- [ ] Reuse and independently review the existing verified D1 `manifestDraft` identity; any additional market-file read requires separate approval. Review data quality, provenance, selected-series hashes, and derived path IDs before any D2 decision.
 - [ ] Provision an isolated persistent POSIX host with trusted clock/storage, filesystem permissions, backup/restore review, and operator access controls.
 - [ ] Choose and explicitly invoke a scheduler; no scheduler is installed or running here. Set bounded recurring daily compute/data/model budgets and monitor reservations, timeouts, unresolved work, disk, and host health.
 - [ ] Add a separate durable run ledger and independently reviewed evidence/research/holdout authorization and promotion gate. Job completion or queue admission must never satisfy these gates.

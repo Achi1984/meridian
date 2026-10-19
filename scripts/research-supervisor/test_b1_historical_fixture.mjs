@@ -42,7 +42,7 @@ function makeProfile(scenario) {
     computationOrder: derived.computationOrder,
     computationOrderSha256: derived.computationOrderSha256
   };
-  profile.runProfileSha256 = historicalProfileSha256(identity);
+  const runProfileSha256 = historicalProfileSha256(identity);
   profile.approvalReceipt = {
     schema: 'MERIDIAN_TEST_GENERATED_FIXTURE_R1',
     decision: 'TEST_ONLY_GENERATED_FIXTURE',
@@ -53,7 +53,7 @@ function makeProfile(scenario) {
     protocolSha256: profile.protocolSha256,
     implementationSha256: profile.implementationSha256,
     inputManifestSha256: profile.inputManifestSha256,
-    runProfileSha256: profile.runProfileSha256,
+    runProfileSha256,
     manifestSha256: derived.manifestSha256,
     computationOrderSha256: derived.computationOrderSha256,
     trialKey: profile.trialKey,

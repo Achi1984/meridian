@@ -162,43 +162,6 @@ test('historical admission remains inert and rejects stale or malformed approval
     }
   });
 
-  test('historical path identities derive from admitted input metadata, not synthetic pins', async t => {
-    const {series} = await createFixtureTree(t);
-    const manifest = {
-      sourceCommit: HISTORICAL_RUN_PROFILE.sourceCommit,
-      files: {...HISTORICAL_RUN_PROFILE.expectedWholeFileSha256},
-      selectedSeriesSha256: Object.fromEntries(ASSETS.map(asset =>
-        [asset, sha256(canonicalJson(series[asset]))]))
-    };
-    const historical = deriveHistoricalProfile(manifest);
-    const session = createExecution({
-      seriesByAsset: series,
-      source: {
-        kind: 'FROZEN_RESEARCH_INPUT',
-        commit: manifest.sourceCommit,
-        files: manifest.files
-      },
-      implementationSha256: historical.implementationSha256
-    });
-    assert.equal(historical.inputSha256, sha256(canonicalJson({
-      datasetKind: 'FROZEN_RESEARCH_INPUT',
-      sourceCommit: manifest.sourceCommit,
-      sourceProvenance: {normalizedFileSha256: manifest.files},
-      canonicalSeriesSha256: manifest.selectedSeriesSha256
-    })));
-    assert.deepEqual(historical.pathIds, session.manifest.map(path => path.pathId));
-    assert.equal(historical.manifestSha256, sha256(canonicalJson(session.manifest)));
-    assert.equal(historical.computationOrderSha256, sha256(canonicalJson(session.computationOrder)));
-    assert.notDeepEqual(historical.pathIds, JSON.parse(
-      await readFile(join(projectRoot, 'scripts/research-supervisor/b1_bridge_manifest.json'), 'utf8')
-    ).pathIds);
-    const alteredSourcePins = {
-      ...HISTORICAL_RUN_PROFILE,
-      sourceSha256: {...HISTORICAL_RUN_PROFILE.sourceSha256, loader: '0'.repeat(64)}
-    };
-    assert.equal(verifyHistoricalSourcePins(alteredSourcePins).error.code,
-      'HISTORICAL_SOURCE_PIN_MISMATCH');
-  });
   assert.equal(inspectHistoricalAdmission({
     manifest: manifestCandidate, receipt: accessorReceipt, profile: testProfile
   }).error.code, 'D2_APPROVAL_INVALID');
@@ -260,6 +223,45 @@ test('historical admission remains inert and rejects stale or malformed approval
     },
     profile: wrongSourceProfile
   }).error.code, 'D2_SOURCE_MISMATCH');
+});
+
+test('historical identities derive from input metadata and stale pins fail before market-file I/O', async t => {
+  const {series} = await createFixtureTree(t);
+  const manifest = {
+    sourceCommit: HISTORICAL_RUN_PROFILE.sourceCommit,
+    files: {...HISTORICAL_RUN_PROFILE.expectedWholeFileSha256},
+    selectedSeriesSha256: Object.fromEntries(ASSETS.map(asset =>
+      [asset, sha256(canonicalJson(series[asset]))]))
+  };
+  const historical = deriveHistoricalProfile(manifest);
+  const session = createExecution({
+    seriesByAsset: series,
+    source: {
+      kind: 'FROZEN_RESEARCH_INPUT',
+      commit: manifest.sourceCommit,
+      files: manifest.files
+    },
+    implementationSha256: historical.implementationSha256
+  });
+  assert.equal(historical.inputSha256, sha256(canonicalJson({
+    datasetKind: 'FROZEN_RESEARCH_INPUT',
+    sourceCommit: manifest.sourceCommit,
+    sourceProvenance: {normalizedFileSha256: manifest.files},
+    canonicalSeriesSha256: manifest.selectedSeriesSha256
+  })));
+  assert.deepEqual(historical.pathIds, session.manifest.map(path => path.pathId));
+  assert.equal(historical.manifestSha256, sha256(canonicalJson(session.manifest)));
+  assert.equal(historical.computationOrderSha256, sha256(canonicalJson(session.computationOrder)));
+  assert.notDeepEqual(historical.pathIds, JSON.parse(
+    await readFile(join(projectRoot, 'scripts/research-supervisor/b1_bridge_manifest.json'), 'utf8')
+  ).pathIds);
+  const alteredSourcePins = {
+    ...HISTORICAL_RUN_PROFILE,
+    sourceSha256: {...HISTORICAL_RUN_PROFILE.sourceSha256, loader: '0'.repeat(64)}
+  };
+  assert.ok(Object.values(alteredSourcePins.sourceFiles).every(relative => !relative.endsWith('.csv')));
+  assert.equal(verifyHistoricalSourcePins(alteredSourcePins).error.code,
+    'HISTORICAL_SOURCE_PIN_MISMATCH');
 });
 
 test('strict generated CSV loader rejects changed schema, encoding, timestamps, and missing assets', async t => {

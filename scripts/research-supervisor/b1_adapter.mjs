@@ -85,7 +85,8 @@ export async function runB1Adapter(runProfile = 'SYNTHETIC', testInput = null) {
   const historicalTest = historical && testInput !== null;
   if (historicalTest) {
     if (process.env.NODE_ENV !== 'test' ||
-        !['ENGINE_FAILURE', 'HISTORICAL_TIMEOUT', 'INSUFFICIENT_EVIDENCE'].includes(TEST_SCENARIO) ||
+        !['SUCCESS', 'ENGINE_FAILURE', 'HISTORICAL_TIMEOUT',
+          'INSUFFICIENT_EVIDENCE'].includes(TEST_SCENARIO) ||
         TEST_SCENARIO !== testInput.scenario ||
         typeof testInput.profilePath !== 'string' || !path.isAbsolute(testInput.profilePath)) {
       throw new Error('HISTORICAL_TEST_HOOK_REJECTED');
@@ -100,7 +101,7 @@ export async function runB1Adapter(runProfile = 'SYNTHETIC', testInput = null) {
       throw new Error('HISTORICAL_TEST_HOOK_REJECTED');
     }
   }
-  if (TEST_SCENARIO && !['ENGINE_FAILURE', 'HISTORICAL_TIMEOUT',
+  if (TEST_SCENARIO && !['SUCCESS', 'ENGINE_FAILURE', 'HISTORICAL_TIMEOUT',
     'INSUFFICIENT_EVIDENCE'].includes(TEST_SCENARIO)) {
     throw new Error('B1_TEST_SCENARIO_INVALID');
   }
@@ -123,9 +124,11 @@ export async function runB1Adapter(runProfile = 'SYNTHETIC', testInput = null) {
       status: 'FROZEN_FOR_D2',
       approvalReceipt: profile.approvalReceipt
     };
-    if (profile.runProfileSha256 !== historicalProfileSha256(profile)) {
+    const runProfileSha256 = historicalProfileSha256(profile);
+    if (profile.approvalReceipt?.runProfileSha256 !== runProfileSha256) {
       throw new Error('HISTORICAL_TEST_PROFILE_INVALID');
     }
+    profile.runProfileSha256 = runProfileSha256;
     series = testInput.series;
     source = {
       kind: 'FROZEN_RESEARCH_INPUT',
@@ -204,9 +207,6 @@ export async function runB1Adapter(runProfile = 'SYNTHETIC', testInput = null) {
     implementationSha256, manifestSha256, computationOrderSha256
   })}\n`);
   await receive('prepared');
-  if (TEST_SCENARIO === 'HISTORICAL_TIMEOUT' && historicalTest) {
-    await new Promise(resolve => setTimeout(resolve, 30_000));
-  }
 
   let controlsRecorded = false;
   while (session.status === 'READY') {
@@ -225,6 +225,9 @@ export async function runB1Adapter(runProfile = 'SYNTHETIC', testInput = null) {
       type: 'path_started', index: boundary.ordinal - 1, pathId: boundary.pathId
     })}\n`);
     await receive('path_started_ack', boundary.ordinal - 1);
+    if (TEST_SCENARIO === 'HISTORICAL_TIMEOUT' && historicalTest) {
+      await new Promise(resolve => setTimeout(resolve, 30_000));
+    }
     const outcome = session.advanceOne(boundary.pathId);
     if (outcome.completedPath?.status === 'COMPLETED' &&
         outcome.completedPath.pathId === boundary.pathId) {
