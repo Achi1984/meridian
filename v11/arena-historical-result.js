@@ -25,7 +25,8 @@ const RESULT_PROPERTY_KEYS = new Set([
   'researchOnly','strategyPnlAuthorized','discoveryAuthorized','validationAuthorized','holdoutAuthorized',
   'paperAuthorized','liveAuthorized','limits','paths','pathMs','totalMs','outputBytes','attemptsPerPath',
   'attemptsPerStartedPath','automaticRetry','interpretation','comparisonSegment','neighbourStressScenario',
-  'checks','primaryDiagnosticNetPositive','primaryDiagnosticDrawdownAtMost25Percent',
+  'checks','comparisonSegment','neighbourStressScenario','neighbourPositiveCounts','tradeCRV',
+  'primaryDiagnosticNetPositive','primaryDiagnosticDrawdownAtMost25Percent',
   'relativeDrawdownReduction','fullBasketDrawdownDenominator',
   'primaryReturnAtLeastBothFrozenControls','primaryDrawdownAtMostBothFrozenControls',
   'relativeDrawdownReductionAtLeast20Percent','primaryNetPositiveAt30bpNonDelayed',
@@ -137,6 +138,41 @@ function sameJson(left, right) {
     key === rightKeys[index] && sameJson(left[key],right[key]));
 }
 
+function validScreen(screen, resultStatus) {
+  if (resultStatus === 'INSUFFICIENT_EVIDENCE') {
+    return exact(screen,['status']) && screen.status === 'INSUFFICIENT_EVIDENCE';
+  }
+  if (!record(screen)) return false;
+  if (screen.status === 'INSUFFICIENT_EVIDENCE') {
+    return exact(screen,['status','checks','relativeDrawdownReduction']) &&
+      exact(screen.checks,['fullBasketDrawdownDenominator']) &&
+      screen.checks.fullBasketDrawdownDenominator === false &&
+      screen.relativeDrawdownReduction === null;
+  }
+  const screenKeys = [
+    'status','interpretation','comparisonSegment','neighbourStressScenario','checks',
+    'relativeDrawdownReduction','neighbourPositiveCounts','stopPolicy','tradeCRV'
+  ];
+  const checkKeys = [
+    'primaryDiagnosticNetPositive','primaryDiagnosticDrawdownAtMost25Percent',
+    'primaryReturnAtLeastBothFrozenControls','primaryDrawdownAtMostBothFrozenControls',
+    'relativeDrawdownReductionAtLeast20Percent','primaryNetPositiveAt30bpNonDelayed',
+    'primaryNetPositiveAt30bpPlusDelay','atLeastThreeOfFourNeighboursPositiveAt15bp',
+    'atLeastThreeOfFourNeighboursPositiveAt30bpNonDelayed'
+  ];
+  return exact(screen,screenKeys) && ['PASS','NO_EDGE'].includes(screen.status) &&
+    screen.interpretation === 'HISTORICAL_CANDIDATE_ONLY_NOT_HOLDOUT' &&
+    screen.comparisonSegment === 'diagnostic' &&
+    screen.neighbourStressScenario === 'stress-30bp-non-delayed' &&
+    screen.stopPolicy === 'NO_FINITE_TRADE_STOP' &&
+    exact(screen.checks,checkKeys) && checkKeys.every(key=>typeof screen.checks[key] === 'boolean') &&
+    (screen.relativeDrawdownReduction === null || Number.isFinite(screen.relativeDrawdownReduction)) &&
+    exact(screen.neighbourPositiveCounts,['base15bp','stress30bp']) &&
+    ['base15bp','stress30bp'].every(key=>Number.isSafeInteger(screen.neighbourPositiveCounts[key]) &&
+      screen.neighbourPositiveCounts[key] >= 0 && screen.neighbourPositiveCounts[key] <= 4) &&
+    sameJson(screen.tradeCRV,{status:'UNDEFINED_NO_FINITE_STOP',value:null});
+}
+
 function boundedJson(value, depth=0, budget={nodes:0}) {
   if (depth > 12 || ++budget.nodes > 100_000) return false;
   if (value === null || typeof value === 'boolean') return true;
@@ -210,13 +246,8 @@ function validateResult(text, job, controls) {
   if (result.status === 'COMPLETED' &&
       (result.attemptedPaths !== 44 || job.state !== 'completed')) return null;
   if (result.status === 'INSUFFICIENT_EVIDENCE' &&
-      (result.attemptedPaths !== 19 || job.state !== 'failed' ||
-        !exact(result.screen,['status']) || result.screen.status !== 'INSUFFICIENT_EVIDENCE')) return null;
-  if (result.status === 'COMPLETED' && result.screen?.status === 'INSUFFICIENT_EVIDENCE' &&
-      (!exact(result.screen,['status','checks','relativeDrawdownReduction']) ||
-        !exact(result.screen.checks,['fullBasketDrawdownDenominator']) ||
-        result.screen.checks.fullBasketDrawdownDenominator !== false ||
-        result.screen.relativeDrawdownReduction !== null)) return null;
+      (result.attemptedPaths !== 19 || job.state !== 'failed')) return null;
+  if (!validScreen(result.screen,result.status)) return null;
   if (!controls || !sameJson(result.controlDefinitions,controls)) return null;
 
   const progressById = new Map(job.paths.map(item => [item.pathId,item]));

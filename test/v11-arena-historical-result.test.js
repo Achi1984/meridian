@@ -31,6 +31,19 @@ function fixture({state='queued',resultStatus=null,screenStatus=null,descriptorO
       primaryDevelopmentSd:0.02,fullBasketDevelopmentSd:0.08,
       calibration:'DEVELOPMENT_15BP_DAILY_NET_RETURNS_AND_HELD_TARGETS'}
     :null;
+  const screen=resultStatus==='INSUFFICIENT_EVIDENCE'?{status:'INSUFFICIENT_EVIDENCE'}
+    :screenStatus==='INSUFFICIENT_EVIDENCE'
+      ?{status:'INSUFFICIENT_EVIDENCE',checks:{fullBasketDrawdownDenominator:false},
+        relativeDrawdownReduction:null}
+      :{status:screenStatus || 'PASS',interpretation:'HISTORICAL_CANDIDATE_ONLY_NOT_HOLDOUT',
+        comparisonSegment:'diagnostic',neighbourStressScenario:'stress-30bp-non-delayed',
+        checks:{primaryDiagnosticNetPositive:true,primaryDiagnosticDrawdownAtMost25Percent:true,
+          primaryReturnAtLeastBothFrozenControls:true,primaryDrawdownAtMostBothFrozenControls:true,
+          relativeDrawdownReductionAtLeast20Percent:true,primaryNetPositiveAt30bpNonDelayed:true,
+          primaryNetPositiveAt30bpPlusDelay:true,atLeastThreeOfFourNeighboursPositiveAt15bp:true,
+          atLeastThreeOfFourNeighboursPositiveAt30bpNonDelayed:true},
+        relativeDrawdownReduction:null,neighbourPositiveCounts:{base15bp:3,stress30bp:3},
+        stopPolicy:'NO_FINITE_TRADE_STOP',tradeCRV:{status:'UNDEFINED_NO_FINITE_STOP',value:null}};
   const completedPathIds=new Set(computationPathIds.slice(0,completedCount));
   const result= resultStatus ? {
     attemptedPaths:completedCount,authority:{researchOnly:true,executionAuthorized:false,
@@ -50,11 +63,7 @@ function fixture({state='queued',resultStatus=null,screenStatus=null,descriptorO
       sourceProvenance:{normalizedFileSha256:{}},canonicalSeriesSha256:{},inputSha256:digest('b')},
     implementationId:'generated',implementationSha256:digest('c'),plannedPaths:44,protocolId:'generated',
     protocolReview:{},protocolSha256:digest('f'),schema:'MERIDIAN_B1_7_ENGINE_RESULT_R3',
-    screen:resultStatus==='INSUFFICIENT_EVIDENCE'?{status:'INSUFFICIENT_EVIDENCE'}
-      :screenStatus==='INSUFFICIENT_EVIDENCE'
-        ?{status:'INSUFFICIENT_EVIDENCE',checks:{fullBasketDrawdownDenominator:false},
-          relativeDrawdownReduction:null}
-        :{status:'PASS',stopPolicy:'NO_FINITE_TRADE_STOP'},status:resultStatus,
+    screen,status:resultStatus,
     controlDefinitions:controls,
     paths:pathIds.map(pathId=>completedPathIds.has(pathId)
       ?{pathId,status:'COMPLETED',computed:true,attempts:1}
@@ -197,6 +206,18 @@ test('strict envelopes, nested JSON, bounded depth, finite values and authority 
     {...malformed,job:{...malformed.job,result:JSON.stringify({...JSON.parse(malformed.job.result),
       authority:{...JSON.parse(malformed.job.result).authority,liveAuthorized:true}})}}
   ]) assert.equal(parse(invalidValue).status,'INVALID');
+
+  for(const mutate of [
+    result=>result.screen=null,
+    result=>result.screen={status:'BOGUS'},
+    result=>delete result.screen.checks.primaryDiagnosticNetPositive,
+    result=>result.screen.tradeCRV.value=0.2
+  ]) {
+    const value=fixture({state:'completed',resultStatus:'COMPLETED'});
+    const result=JSON.parse(value.job.result);mutate(result);
+    value.job.result=JSON.stringify(result);
+    assert.equal(parse(value).status,'INVALID');
+  }
 
   const deep=fixture({state:'failed',resultStatus:'INSUFFICIENT_EVIDENCE'});
   let nested={};
