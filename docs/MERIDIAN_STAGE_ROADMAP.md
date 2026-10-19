@@ -1,7 +1,38 @@
 # MERIDIAN Stage Roadmap
 
-Status: reconciled operating roadmap, 14 October 2026.
+Status: current M11 plan, 19 October 2026; older dated snapshots retained below.
 Product principle: **Complex inside – simple outside.**
+
+## Current M11 direction — 19 October 2026
+
+Observed source main: `6f720373af5439af70c54e6cb2f1c17abaf8b877`.
+Resolve the active mailbox dynamically from the checkpoint (currently #639).
+M11 is the product platform; M10/PR599 receive no new product development.
+PR892 source acceptance is recorded in #639/comment6255139258. D1 technical
+verification and independent recomputation passed; evidence is under
+`docs/research/d1-20261019/`. Candidate CI/review is pending. NOT_FROZEN remains.
+
+| Packet | Owner / state | Acceptance and dependency |
+| --- | --- | --- |
+| D1 evidence and continuity (#895) | Lead; technical checks passed, PR acceptance pending | Seven raw/selected hashes; 955 dates each; independent verification; exact-head CI/review; no admission |
+| M11 research status projection (reuse #865/#878) | Implementation agent after D1 closure; planned | Reuse catalog; distinguish accepted source, data checks and execution; missing/conflicting evidence UNKNOWN; synthetic/UI tests |
+| Read-only supervisor inspection | Implementation agent; planned after source inspection | Reuse inspect_b1; bounded report only; generated-fixture restart/fence checks; no enqueue, retry, reconciliation or activation |
+| Experiment/Arena evidence links (reuse #863/#869) | Backlog | Bind code/protocol/input/attempt/result; reject corrupt identity; preserve failed/partial attempts; synthetic never becomes empirical evidence |
+| Consolidated roadmap (#831) | Lead; documented here, review pending | Preserve evidence history and separate authorization gates; maximum three active packets |
+
+Development order: technical/synthetic preparation → D1 data verification →
+separately approved D2 historical diagnostic → independent evidence assessment →
+separately approved forward Paper → forward/robustness review and live readiness →
+separately approved Live. A historical diagnostic is not a fresh holdout. Each
+stage retains its own authorization; source acceptance and data quality never
+imply execution, performance, promotion or operational readiness. Costs, drawdown,
+regime stability, selection bias and sample adequacy must be evaluated only in an
+explicitly authorized research packet with predeclared assumptions.
+
+One writer per branch; independent review after successful exact-head CI; lead
+owns integration. At most three active packets, remaining work in backlog.
+Disabled autopilot PR868 and observation PR738 stay inactive. No new schedules,
+background services, credentials, resource spending, Paper or Live activation.
 
 ## Dated checkpoint snapshot — observed 14 October 2026
 
@@ -19,7 +50,7 @@ Keep these independent candidate threads separate; none is a blind-merge instruc
 - PR #599 is open and not merged (head `b9d62d30a1c59005bcbcf63a36c64733a44ea9de`, mergeability `dirty`; 15 changed files). Its body describes a one-file scope and pins an older base; reconcile its exact full diff and base before any future integration.
 - PR #653 remains draft and open (head `2b267ecc0f94565fe005156bf45e8f0ae139eb9b`, mergeability `dirty`; three changed files). Its 44px “Schließen” action and focus restoration already exist in pinned `v11/index.html` (`v11/index.html:230-242,403-426`); merging its branch without reconciliation risks duplication. Source history distinguishes terminal R128 from the Meridian 11 preview labeled B9 while a B6 history entry remains (`test/v11-version-history.test.js:10-15`). These are source/history checks only: no fresh rendered or deployed Visual QA is claimed.
 
-The live checkpoint records active mailbox #571 and archived #539. The owner-requested #539 inspection is complete; retain #571 for current handoffs and do not reopen old review threads as a substitute for exact-head review.
+At the historical 14 October observation, the checkpoint recorded mailbox #571 and archived #539. The owner-requested #539 inspection is complete; that historical routing is superseded by checkpoint-resolved routing for current handoffs and do not reopen old review threads as a substitute for exact-head review.
 
 ## Product and evidence model
 
@@ -238,7 +269,11 @@ Do not require the user to repeatedly say “Go” for routine implementation in
 
 ## Current next action
 
-The R126 release-candidate conversion and its next-action wording above are historical, not the current release instruction. R119 is already merged, and terminalBuild is R128. Current priority is reproducibility, the paper-first evidence contract, and a reconciled trial ledger; next is reviewable UI integration against the existing #599 candidate; only later, and separately authorized, may Paper work begin. No packet authorizes a canonical/PnL/Discovery/Validation/Holdout/Paper/Live run, market fetch, workflow, scheduler, credential, or runtime activation.
+Close D1 evidence review and CI in #895 without freezing or admitting its manifest.
+Then implement the source-only M11 packets above, using existing research and
+Arena components. The older R126/R128 and PR599 plans are historical and are not
+current release instructions. No execution, market acquisition, runtime,
+workflow, scheduler, permission or trading change is authorized by this roadmap.
 
 ## Lifecycle-to-roadmap and external-gate mapping
 

@@ -1,0 +1,118 @@
+{
+  "operation": "MERIDIAN-D1-WORK-20261019-01",
+  "sourceCommit": "1c7b6dccd886f57e866c7d359c091b1e72a193ea",
+  "status": "VERIFIED_DRAFT_NOT_ADMITTED",
+  "manifestState": "NOT_FROZEN",
+  "sourceAuthenticity": "NOT_ESTABLISHED",
+  "node": "v24.19.0",
+  "files": [
+    {
+      "asset": "XBTUSD",
+      "path": "research/acquisitions/kraken-usd-daily-20261018/normalized/XBTUSD_1440_utc_normalized.csv",
+      "bytes": 193432,
+      "expectedSha256": "f2e94a03fbe61f37295b2249d5c3a4d324d13fcfb5d5b41f2ed4d7dfe2183bb9",
+      "actualSha256": "f2e94a03fbe61f37295b2249d5c3a4d324d13fcfb5d5b41f2ed4d7dfe2183bb9",
+      "totalRows": 2500,
+      "selectedRows": 955,
+      "selectedSeriesSha256": "bffbce1ff996b4348264554f7213e7d88f3f6e756be735e21b6ee3df499bfaf8"
+    },
+    {
+      "asset": "ETHUSD",
+      "path": "research/acquisitions/kraken-usd-daily-20261018/normalized/ETHUSD_1440_utc_normalized.csv",
+      "bytes": 189396,
+      "expectedSha256": "fbb7915af33d3c32db1cf368a171ed633090406c39da38aae90ac0d3876754bb",
+      "actualSha256": "fbb7915af33d3c32db1cf368a171ed633090406c39da38aae90ac0d3876754bb",
+      "totalRows": 2500,
+      "selectedRows": 955,
+      "selectedSeriesSha256": "99a5fb8ce0358615b222dbbc8cd298ffa03d7fc4deaf1862bbcdf2e9beeab0ef"
+    },
+    {
+      "asset": "SOLUSD",
+      "path": "research/acquisitions/kraken-usd-daily-20261018/normalized/SOLUSD_1440_utc_normalized.csv",
+      "bytes": 136218,
+      "expectedSha256": "caff8ea08d3548b2d8c704cc17a940754a70e23f60e44716324c464929bc18ca",
+      "actualSha256": "caff8ea08d3548b2d8c704cc17a940754a70e23f60e44716324c464929bc18ca",
+      "totalRows": 1932,
+      "selectedRows": 955,
+      "selectedSeriesSha256": "37b76aee67428b996db199fa5911c3c839418a02ca5d0ed78fb10466c6c962de"
+    },
+    {
+      "asset": "XRPUSD",
+      "path": "research/acquisitions/kraken-usd-daily-20261018/normalized/XRPUSD_1440_utc_normalized.csv",
+      "bytes": 189238,
+      "expectedSha256": "bd006dfcbf052fb516e2d5e5a97d0570cf093e577c3c83752f2f3b7310fc52a7",
+      "actualSha256": "bd006dfcbf052fb516e2d5e5a97d0570cf093e577c3c83752f2f3b7310fc52a7",
+      "totalRows": 2500,
+      "selectedRows": 955,
+      "selectedSeriesSha256": "80fa4021997d9c1b80cb5c0714e246988f53ae89acae46ce67e6bbb580714925"
+    },
+    {
+      "asset": "LINKUSD",
+      "path": "research/acquisitions/kraken-usd-daily-20261018/normalized/LINKUSD_1440_utc_normalized.csv",
+      "bytes": 193348,
+      "expectedSha256": "82682634f645ab5ca1dac4065cc0d490d343ea24b61463bcc2b6406894785518",
+      "actualSha256": "82682634f645ab5ca1dac4065cc0d490d343ea24b61463bcc2b6406894785518",
+      "totalRows": 2500,
+      "selectedRows": 955,
+      "selectedSeriesSha256": "82ca47fb3622a80bbcb70fb40610eb4aedf8a6151bc5cf74a66250c72a10ac05"
+    },
+    {
+      "asset": "AVAXUSD",
+      "path": "research/acquisitions/kraken-usd-daily-20261018/normalized/AVAXUSD_1440_utc_normalized.csv",
+      "bytes": 117766,
+      "expectedSha256": "a4350bf73b44a45770bb173541133e4a04e847a07d74231ad6b5bbd7d6d06887",
+      "actualSha256": "a4350bf73b44a45770bb173541133e4a04e847a07d74231ad6b5bbd7d6d06887",
+      "totalRows": 1745,
+      "selectedRows": 955,
+      "selectedSeriesSha256": "2374eb666defc74c9036d019251e1dcbde78f99b94c85453627d54d70b1d91c2"
+    },
+    {
+      "asset": "SUIUSD",
+      "path": "research/acquisitions/kraken-usd-daily-20261018/normalized/SUIUSD_1440_utc_normalized.csv",
+      "bytes": 88680,
+      "expectedSha256": "0b35eb5598a336d8d4485b15adc2a4b4a716c967ff700eff3802386c31beda79",
+      "actualSha256": "0b35eb5598a336d8d4485b15adc2a4b4a716c967ff700eff3802386c31beda79",
+      "totalRows": 1247,
+      "selectedRows": 955,
+      "selectedSeriesSha256": "03077fda4966b0699afde51118ecedc8d2f31ffe3088c23fd918c29fc20e4ba2"
+    }
+  ],
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "manifestDraft": {
+    "sourceCommit": "1c7b6dccd886f57e866c7d359c091b1e72a193ea",
+    "files": {
+      "XBTUSD": "f2e94a03fbe61f37295b2249d5c3a4d324d13fcfb5d5b41f2ed4d7dfe2183bb9",
+      "ETHUSD": "fbb7915af33d3c32db1cf368a171ed633090406c39da38aae90ac0d3876754bb",
+      "SOLUSD": "caff8ea08d3548b2d8c704cc17a940754a70e23f60e44716324c464929bc18ca",
+      "XRPUSD": "bd006dfcbf052fb516e2d5e5a97d0570cf093e577c3c83752f2f3b7310fc52a7",
+      "LINKUSD": "82682634f645ab5ca1dac4065cc0d490d343ea24b61463bcc2b6406894785518",
+      "AVAXUSD": "a4350bf73b44a45770bb173541133e4a04e847a07d74231ad6b5bbd7d6d06887",
+      "SUIUSD": "0b35eb5598a336d8d4485b15adc2a4b4a716c967ff700eff3802386c31beda79"
+    },
+    "selectedSeriesSha256": {
+      "XBTUSD": "bffbce1ff996b4348264554f7213e7d88f3f6e756be735e21b6ee3df499bfaf8",
+      "ETHUSD": "99a5fb8ce0358615b222dbbc8cd298ffa03d7fc4deaf1862bbcdf2e9beeab0ef",
+      "SOLUSD": "37b76aee67428b996db199fa5911c3c839418a02ca5d0ed78fb10466c6c962de",
+      "XRPUSD": "80fa4021997d9c1b80cb5c0714e246988f53ae89acae46ce67e6bbb580714925",
+      "LINKUSD": "82ca47fb3622a80bbcb70fb40610eb4aedf8a6151bc5cf74a66250c72a10ac05",
+      "AVAXUSD": "2374eb666defc74c9036d019251e1dcbde78f99b94c85453627d54d70b1d91c2",
+      "SUIUSD": "03077fda4966b0699afde51118ecedc8d2f31ffe3088c23fd918c29fc20e4ba2"
+    }
+  },
+  "evidence": {
+    "sourceMain": "6f720373af5439af70c54e6cb2f1c17abaf8b877",
+    "executedVerifierSha256": "30e2b8bf80d93f2bb76b70a0afc28092180b729b1b0bd4ccf203359d28b6c156",
+    "validatorSha256": "2052c0fae0082622f48a18abb4a6dacc0ffa679fb5da01df5779b398f5a578fc",
+    "firstSelectedTimestamp": "2024-02-19T00:00:00Z",
+    "lastSelectedTimestamp": "2026-09-30T00:00:00Z",
+    "selectedRowTotal": 6685,
+    "strategyExecuted": false,
+    "returnsComputed": false,
+    "admitted": false,
+    "ciStatus": "PENDING",
+    "independentReview": "TECHNICAL_RECOMPUTATION_PASS_BY_WORK_AGENT; FINAL_CANDIDATE_REVIEW_PENDING"
+  }
+}
