@@ -381,12 +381,7 @@ def _historical_profile():
         "protocolSha256", "implementationSha256", "inputManifestSha256", "runProfileSha256",
         "manifestSha256", "computationOrderSha256", "trialKey", "pathIds",
     }
-    test_profile_path = False
-    try:
-        test_profile_path = HISTORICAL_PROFILE_PATH.resolve(strict=True).is_relative_to(
-            Path(tempfile.gettempdir()).resolve(strict=True))
-    except OSError:
-        pass
+    test_profile_path = _is_isolated_historical_test_profile()
     test_receipt = (
         test_profile_path and type(receipt) is dict
         and receipt.get("schema") == "MERIDIAN_TEST_GENERATED_FIXTURE_R1"
@@ -417,6 +412,29 @@ def _historical_profile():
           and receipt["pathIds"] == profile["pathIds"],
           "HISTORICAL_APPROVAL_INVALID")
     return profile
+
+
+def _is_isolated_historical_test_profile():
+    if os.environ.get("MERIDIAN_HISTORICAL_TEST_MODE") != "1":
+        return False
+    try:
+        default_path = Path(__file__).resolve().with_name(
+            "historical_run_profile.json").resolve(strict=True)
+        project_root = Path(__file__).resolve().parents[2]
+        temporary_root = Path(tempfile.gettempdir()).resolve(strict=True)
+        profile_path = HISTORICAL_PROFILE_PATH
+        if profile_path.is_symlink():
+            return False
+        resolved = profile_path.resolve(strict=True)
+        return (
+            resolved != default_path
+            and not resolved.is_relative_to(project_root)
+            and resolved.is_relative_to(temporary_root)
+            and resolved.name.startswith("historical-test-")
+            and resolved.is_file()
+        )
+    except (OSError, RuntimeError, ValueError):
+        return False
 
 
 def _b1_profile(profile_name=B1_PROFILE_NAME):
@@ -1327,10 +1345,20 @@ def _validate_b1_summary(summary, profile, *, allow_insufficient=False):
             and screen.get("status") == "SYNTHETIC_ONLY_NOT_ASSESSED"
             and screen.get("interpretation") == "SYNTHETIC_FIXTURE_RULE_CHECKS_ONLY"
         )
-    screen_valid = (
+    completed_insufficient_screen_valid = (
+        historical and status == "COMPLETED"
+        and type(screen) is dict
+        and screen == {
+            "status": "INSUFFICIENT_EVIDENCE",
+            "checks": {"fullBasketDrawdownDenominator": False},
+            "relativeDrawdownReduction": None,
+        }
+    )
+    screen_valid = completed_insufficient_screen_valid or (
         type(screen) is dict and set(screen) == {"status"}
         and screen["status"] == "INSUFFICIENT_EVIDENCE"
-    ) if status == "INSUFFICIENT_EVIDENCE" else (
+        and status == "INSUFFICIENT_EVIDENCE"
+    ) or (
         type(screen) is dict and set(screen) == B1_SCREEN_KEYS
         and screen_status_valid
         and screen.get("comparisonSegment") == "diagnostic"

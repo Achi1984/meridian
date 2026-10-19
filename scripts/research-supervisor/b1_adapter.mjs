@@ -85,7 +85,8 @@ export async function runB1Adapter(runProfile = 'SYNTHETIC', testInput = null) {
   const historicalTest = historical && testInput !== null;
   if (historicalTest) {
     if (process.env.NODE_ENV !== 'test' ||
-        !['SUCCESS', 'ENGINE_FAILURE', 'HISTORICAL_TIMEOUT',
+        !['SUCCESS', 'COMPLETED_INSUFFICIENT_SCREEN',
+          'ENGINE_FAILURE', 'HISTORICAL_TIMEOUT',
           'INSUFFICIENT_EVIDENCE'].includes(TEST_SCENARIO) ||
         TEST_SCENARIO !== testInput.scenario ||
         typeof testInput.profilePath !== 'string' || !path.isAbsolute(testInput.profilePath)) {
@@ -97,11 +98,13 @@ export async function runB1Adapter(runProfile = 'SYNTHETIC', testInput = null) {
     const metadata = lstatSync(originalPath);
     if (metadata.isSymbolicLink() || !metadata.isFile() ||
         (resolvedPath !== temporaryRoot && !resolvedPath.startsWith(`${temporaryRoot}${path.sep}`)) ||
-        resolvedPath === ROOT || resolvedPath.startsWith(`${ROOT}${path.sep}`)) {
+        resolvedPath === ROOT || resolvedPath.startsWith(`${ROOT}${path.sep}`) ||
+        !path.basename(resolvedPath).startsWith('historical-test-')) {
       throw new Error('HISTORICAL_TEST_HOOK_REJECTED');
     }
   }
-  if (TEST_SCENARIO && !['SUCCESS', 'ENGINE_FAILURE', 'HISTORICAL_TIMEOUT',
+  if (TEST_SCENARIO && !['SUCCESS', 'COMPLETED_INSUFFICIENT_SCREEN',
+    'ENGINE_FAILURE', 'HISTORICAL_TIMEOUT',
     'INSUFFICIENT_EVIDENCE'].includes(TEST_SCENARIO)) {
     throw new Error('B1_TEST_SCENARIO_INVALID');
   }

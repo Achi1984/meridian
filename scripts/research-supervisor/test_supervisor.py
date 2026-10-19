@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -142,13 +143,14 @@ connection.close()
 
     def prepare_historical_fixture(self, name, scenario="SUCCESS"):
         self.database = str(Path(self.temporary.name) / f"{name}.sqlite")
-        profile_path = Path(self.temporary.name) / f"{name}-profile.json"
+        profile_path = Path(self.temporary.name) / f"historical-test-{name}.json"
         generated = subprocess.run(
             ["node", str(HISTORICAL_TEST_ADAPTER), "--profile", str(profile_path), scenario],
             cwd=PROJECT_ROOT, capture_output=True, text=True, timeout=30)
         if generated.returncode:
             raise AssertionError(generated.stderr)
-        with patch.object(journal, "HISTORICAL_PROFILE_PATH", profile_path):
+        with (patch.object(journal, "HISTORICAL_PROFILE_PATH", profile_path),
+              patch.dict(os.environ, {"MERIDIAN_HISTORICAL_TEST_MODE": "1"})):
             journal.initialize(self.database, profile=journal.HISTORICAL_PROFILE_NAME)
             queued = journal.enqueue_b1(self.database, "trial-historical-d2-r1")
             outcome = journal.scheduler_tick_b1(self.database, enabled=True)
@@ -171,6 +173,7 @@ connection.close()
             return original_popen(*args, **kwargs)
 
         with (patch.object(journal, "HISTORICAL_PROFILE_PATH", profile_path),
+              patch.dict(os.environ, {"MERIDIAN_HISTORICAL_TEST_MODE": "1"}),
               patch.object(supervisor, "HISTORICAL_ADAPTER", HISTORICAL_TEST_ADAPTER),
               patch.object(supervisor.subprocess, "Popen", side_effect=spawn)):
             return supervisor.run_b1_batch(
@@ -185,7 +188,8 @@ connection.close()
         self.assertEqual(len(result["paths"]), 44)
         self.assertEqual(result["executionAuthorized"], False)
         self.assertEqual(result["promotionAuthorized"], False)
-        with patch.object(journal, "HISTORICAL_PROFILE_PATH", profile_path):
+        with (patch.object(journal, "HISTORICAL_PROFILE_PATH", profile_path),
+              patch.dict(os.environ, {"MERIDIAN_HISTORICAL_TEST_MODE": "1"})):
             inspected = journal.inspect_b1(self.database, claim["trialId"])
             again = journal.scheduler_tick_b1(self.database, enabled=True)
         self.assertEqual(inspected["state"], "completed")
@@ -199,10 +203,35 @@ connection.close()
             profile_path, claim, "INSUFFICIENT_EVIDENCE")
         self.assertEqual(result["state"], "failed")
         self.assertEqual(result["reason"], "INVALID_OR_ZERO_DEVELOPMENT_RISK_DENOMINATOR")
-        with patch.object(journal, "HISTORICAL_PROFILE_PATH", profile_path):
+        with (patch.object(journal, "HISTORICAL_PROFILE_PATH", profile_path),
+              patch.dict(os.environ, {"MERIDIAN_HISTORICAL_TEST_MODE": "1"})):
             inspected = journal.inspect_b1(self.database, claim["trialId"])
         summary = json.loads(inspected["result"])
         self.assertEqual(summary["status"], "INSUFFICIENT_EVIDENCE")
+        self.assertEqual(summary["evidence"]["sourceAuthenticity"], "NOT_ESTABLISHED")
+        self.assertFalse(summary["authority"]["executionAuthorized"])
+        self.assertFalse(summary["authority"]["paperAuthorized"])
+
+    def test_generated_completed_historical_insufficient_screen_roundtrips_without_promotion(self):
+        profile_path, claim = self.prepare_historical_fixture(
+            "completed-insufficient-screen", "COMPLETED_INSUFFICIENT_SCREEN")
+        result = self.run_historical_fixture(
+            profile_path, claim, "COMPLETED_INSUFFICIENT_SCREEN")
+        self.assertEqual(result["state"], "completed")
+        self.assertEqual(result["attempts"], 1)
+        with (patch.object(journal, "HISTORICAL_PROFILE_PATH", profile_path),
+              patch.dict(os.environ, {"MERIDIAN_HISTORICAL_TEST_MODE": "1"})):
+            inspected = journal.inspect_b1(self.database, claim["trialId"])
+        summary = json.loads(inspected["result"])
+        self.assertEqual(summary["status"], "COMPLETED")
+        self.assertEqual(summary["completedPaths"], 44)
+        self.assertEqual(len(summary["paths"]), 44)
+        self.assertTrue(all(path["status"] == "COMPLETED" for path in summary["paths"]))
+        self.assertEqual(summary["screen"], {
+            "status": "INSUFFICIENT_EVIDENCE",
+            "checks": {"fullBasketDrawdownDenominator": False},
+            "relativeDrawdownReduction": None,
+        })
         self.assertEqual(summary["evidence"]["sourceAuthenticity"], "NOT_ESTABLISHED")
         self.assertFalse(summary["authority"]["executionAuthorized"])
         self.assertFalse(summary["authority"]["paperAuthorized"])
@@ -213,10 +242,49 @@ connection.close()
         profile["approvalReceipt"]["pathIds"][0] = "0" * 64
         profile_path.write_text(json.dumps(profile))
         database = str(Path(self.temporary.name) / "historical-corrupt-check.sqlite")
-        with patch.object(journal, "HISTORICAL_PROFILE_PATH", profile_path):
+        with (patch.object(journal, "HISTORICAL_PROFILE_PATH", profile_path),
+              patch.dict(os.environ, {"MERIDIAN_HISTORICAL_TEST_MODE": "1"})):
             with self.assertRaises(journal.JournalError) as invalid:
                 journal.initialize(database, profile=journal.HISTORICAL_PROFILE_NAME)
         self.assertEqual(invalid.exception.code, "HISTORICAL_APPROVAL_INVALID")
+
+    def test_test_receipt_requires_explicit_mode_and_isolated_profile_location(self):
+        profile_path, _ = self.prepare_historical_fixture("receipt-boundary")
+        with (patch.object(journal, "HISTORICAL_PROFILE_PATH", profile_path),
+              patch.dict(os.environ, {}, clear=True)):
+            with self.assertRaises(journal.JournalError) as no_test_mode:
+                journal._historical_profile()
+        self.assertEqual(no_test_mode.exception.code, "HISTORICAL_APPROVAL_INVALID")
+
+        repository = Path(self.temporary.name) / "repository"
+        profile_file = repository / "scripts/research-supervisor/historical_run_profile.json"
+        profile_file.parent.mkdir(parents=True)
+        profile_file.write_bytes(profile_path.read_bytes())
+        source_paths = set(json.loads(profile_path.read_text())["sourceFiles"].values())
+        source_paths.update(journal.B1_SOURCE_FILES.values())
+        for relative in source_paths:
+            source = PROJECT_ROOT / relative
+            target = repository / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source, target)
+        fake_journal = repository / "scripts/research-supervisor/journal.py"
+        production_database = repository / "production.sqlite"
+        with (patch.object(journal, "__file__", str(fake_journal)),
+              patch.object(journal, "HISTORICAL_PROFILE_PATH", profile_file),
+              patch.dict(os.environ, {"MERIDIAN_HISTORICAL_TEST_MODE": "1"})):
+            with self.assertRaises(journal.JournalError) as repository_profile:
+                journal.initialize(str(production_database),
+                                   profile=journal.HISTORICAL_PROFILE_NAME)
+        self.assertEqual(repository_profile.exception.code, "HISTORICAL_APPROVAL_INVALID")
+        self.assertFalse(production_database.exists())
+
+        alias = Path(self.temporary.name) / "historical-test-profile-alias.json"
+        alias.symlink_to(profile_path)
+        with (patch.object(journal, "HISTORICAL_PROFILE_PATH", alias),
+              patch.dict(os.environ, {"MERIDIAN_HISTORICAL_TEST_MODE": "1"})):
+            with self.assertRaises(journal.JournalError) as symlink_profile:
+                journal._historical_profile()
+        self.assertEqual(symlink_profile.exception.code, "HISTORICAL_APPROVAL_INVALID")
 
     def test_generated_historical_timeout_keeps_attempt_and_fence_without_retry(self):
         profile_path, claim = self.prepare_historical_fixture("historical-timeout")
@@ -226,7 +294,8 @@ connection.close()
         self.assertEqual(result["state"], "timed_out")
         self.assertEqual(result["attempts"], 1)
         self.assertGreater(result["fence"], 0)
-        with patch.object(journal, "HISTORICAL_PROFILE_PATH", profile_path):
+        with (patch.object(journal, "HISTORICAL_PROFILE_PATH", profile_path),
+              patch.dict(os.environ, {"MERIDIAN_HISTORICAL_TEST_MODE": "1"})):
             again = journal.scheduler_tick_b1(self.database, enabled=True)
         self.assertFalse(again["claimed"])
 

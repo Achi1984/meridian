@@ -10,9 +10,23 @@ import {createInsufficientEvidenceSeries} from './test_b1_generated_fixture.mjs'
 import {runB1Adapter} from './b1_adapter.mjs';
 
 function generatedSeries(scenario) {
-  return scenario === 'INSUFFICIENT_EVIDENCE'
+  const series = scenario === 'INSUFFICIENT_EVIDENCE'
     ? createInsufficientEvidenceSeries()
     : createSyntheticSeries();
+  if (scenario === 'COMPLETED_INSUFFICIENT_SCREEN') {
+    for (const rows of Object.values(series)) {
+      let prior = rows[589].close;
+      for (let index = 590; index < rows.length; index++) {
+        const row = rows[index];
+        row.open = prior;
+        row.close = prior * (index % 2 === 0 ? 1.025 : 1.015);
+        row.high = row.close * 1.004;
+        row.low = prior * 0.996;
+        prior = row.close;
+      }
+    }
+  }
+  return series;
 }
 
 function makeProfile(scenario) {
@@ -67,7 +81,8 @@ if (args[0] === '--profile') {
   const profilePath = args[1];
   const scenario = args[2] ?? 'SUCCESS';
   if (!path.isAbsolute(profilePath) ||
-      !['SUCCESS', 'INSUFFICIENT_EVIDENCE'].includes(scenario)) {
+      !['SUCCESS', 'INSUFFICIENT_EVIDENCE',
+        'COMPLETED_INSUFFICIENT_SCREEN'].includes(scenario)) {
     throw new Error('HISTORICAL_TEST_PROFILE_ARGUMENT_INVALID');
   }
   writeFileSync(profilePath, `${JSON.stringify(makeProfile(scenario))}\n`, {mode: 0o600});
