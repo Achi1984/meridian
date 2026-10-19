@@ -1,3 +1,5 @@
+import {B17_EVIDENCE_SNAPSHOT, projectResearchEvidence} from './research-evidence.js';
+
 export const CAMPAIGN_SOURCE = '../docs/strategy-lab/campaign-20261013.json';
 export const FAMILY_IDS = Object.freeze(['H1','H2','H3','H4','H5','H6','H7','H8','H9','H10','H11','H12']);
 
@@ -49,11 +51,11 @@ export const B17_CANDIDATE = Object.freeze({
   stressCostBps:30,
   horizon:'R3: Annahmen für den Stresstest: 15 bp Basis / 30 bp Stress / +1 Tag.',
   evidence:'Keine Ergebnisse; ausschließlich Entwicklungskandidat.',
-  blocker:'Unabhängige Prüfung, Marktbelege und jede weitere Freigabe fehlen.',
+  blocker:'D1-Manifest nicht eingefroren; D2, Paper und Live benötigen getrennte Freigaben.',
   source:'M11-Arbeitsauftrag B12 · kein Arena-Ergebnis'
 });
 
-export function buildStrategyCatalog(campaign) {
+export function buildStrategyCatalog(campaign, evidence=B17_EVIDENCE_SNAPSHOT) {
   if (!object(campaign) || campaign.schemaVersion !== 'MERIDIAN_STRATEGY_CAMPAIGN_DRAFT_V1' ||
       !Array.isArray(campaign.families) || campaign.families.length !== FAMILY_IDS.length) {
     return unknownCatalog('Das Familienregister fehlt, ist leer oder hat ein unbekanntes Format.');
@@ -103,6 +105,7 @@ export function buildStrategyCatalog(campaign) {
     sourceStatus:campaign.status === 'DRAFT' ? 'DRAFT' : 'UNKNOWN',
     families,
     candidate:B17_CANDIDATE,
+    researchEvidence:projectResearchEvidence(evidence),
     sharedBlocker:allPrerequisite,
     knownEvidence:Array.isArray(campaign.knownEvidence) ? campaign.knownEvidence : []
   };
@@ -175,9 +178,9 @@ function renderFamily(document, family) {
   return article;
 }
 
-export function renderStrategyCatalog(root, campaign, document=root?.ownerDocument || globalThis.document) {
+export function renderStrategyCatalog(root, campaign, document=root?.ownerDocument || globalThis.document, evidence=B17_EVIDENCE_SNAPSHOT) {
   if (!root || !document) return unknownCatalog('Ansicht nicht verfügbar.');
-  const catalog = buildStrategyCatalog(campaign);
+  const catalog = buildStrategyCatalog(campaign, evidence);
   root.replaceChildren();
   if (catalog.status !== 'PRESENT_UNVERIFIED') {
     const status = addText(document,root,'p',catalog.reason,'strategy-source-error');
@@ -199,6 +202,24 @@ export function renderStrategyCatalog(root, campaign, document=root?.ownerDocume
   addText(document,candidate,'p','7 Assets · 44 geplante Pfade. R3-Annahmen: 15 bp Basis, 30 bp Stress, +1 Tag. Es gibt keine Ergebnisse.');
   addText(document,candidate,'p','Diese 7-Asset-Vorstudie ist strikt getrennt von der bestehenden 8-Asset-Arena-Diagnose und der historischen Abdeckung von 448/955 Schlüssen. Keine Werte oder Fehler werden zwischen den Datensätzen übertragen.');
   addText(document,candidate,'p','Quelle: M11-Arbeitsauftrag B12 · Kosten und Zeitfenster sind Annahmen, keine Marktevidenz.');
+  const research = catalog.researchEvidence;
+  addText(document,candidate,'p',`Dokumentierter Belegstand: ${research.asOf || 'unbekannt'} · statische Momentaufnahme, kein Live-Status. Belege werden hier angezeigt, nicht erneut verifiziert.`);
+  const stages = document.createElement('dl');
+  stages.className = 'strategy-summary';
+  for (const [key, label] of [['source','Quellcode-Review'], ['d1','D1-Datenprüfung'],
+    ['execution','Historische Strategieausführung'], ['paper','Paper-Betrieb'], ['live','Live-Betrieb']]) {
+    addField(document,stages,label,research[key].label);
+  }
+  candidate.append(stages);
+  const evidenceDetails = document.createElement('details');
+  evidenceDetails.className = 'arena-evidence-details';
+  addText(document,evidenceDetails,'summary','Prüfbelege und Abnahme');
+  for (const provenance of [research.source.provenance, research.d1.provenance]) {
+    const receipt = addText(document,evidenceDetails,'p',provenance);
+    receipt.setAttribute('style','overflow-wrap:anywhere');
+  }
+  addText(document,evidenceDetails,'p','Keine Renditen, Eignungsbewertung oder Aktivierung werden aus diesen technischen Belegen abgeleitet.');
+  candidate.append(evidenceDetails);
   root.append(candidate);
 
   const scanner = document.createElement('section');
