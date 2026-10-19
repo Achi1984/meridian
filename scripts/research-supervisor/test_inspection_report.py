@@ -115,6 +115,17 @@ class InspectionReportTests(unittest.TestCase):
         self.assertEqual(result.stdout, b"")
         self.assertEqual(before, self.snapshot())
 
+    def test_incomplete_schema_emits_only_sanitized_error_without_mutation(self):
+        with sqlite3.connect(self.database) as connection:
+            connection.execute("DROP TABLE b1_path_payloads")
+        before = self.snapshot()
+        result = self.cli()
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, b"")
+        expected = ('{"schema":"' + report.SCHEMA + '","error":"INSPECTION_FAILED"}\n').encode()
+        self.assertEqual(result.stderr, expected)
+        self.assertEqual(before, self.snapshot())
+
     def test_invalid_or_missing_trial_and_busy_database(self):
         for trial in ("bad-id", "f" * 64):
             result = self.cli(trial=trial)

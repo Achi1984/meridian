@@ -3,6 +3,7 @@
 import argparse
 import json
 import re
+import sqlite3
 import sys
 
 import journal
@@ -82,7 +83,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         encoded = encode_report(build_report(args.database, args.trial_id))
-    except (journal.JournalError, ReportError, OSError, ValueError, TypeError, KeyError, RecursionError):
+    except (journal.JournalError, ReportError, sqlite3.Error, OSError, ValueError, TypeError, KeyError, RecursionError):
         # No path, SQL, stored payload, or exception text is emitted.
         sys.stderr.write('{"schema":"' + SCHEMA + '","error":"INSPECTION_FAILED"}\n')
         return 1
