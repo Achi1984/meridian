@@ -485,7 +485,7 @@ test('Terminal öffnen preserves the reviewed history-close baseline and stays o
   assert.equal(gitBlob(restored),preimageBlob,'all source bytes except terminal-entry insertions, the checked viewport pair and exact Depot/revision deltas must match the reviewed history-close baseline');
 });
 
-const moduleNames=['bot-read-bootstrap.js','bot-read-access.js','bot-read-client.js','bot-read-view.js','bot-read-model.js','bot-overview-model.js','depot-read-bootstrap.js','depot-read-client.js','depot-read-model.js','depot-read-view.js','depot-history-model.js','depot-history-view.js','depot-current-model.js','strategy-workspace-bootstrap.js','strategy-catalog.js','research-evidence.js','strategy-arena.js'];
+const moduleNames=['bot-read-bootstrap.js','bot-read-access.js','bot-read-client.js','bot-read-view.js','bot-read-model.js','bot-overview-model.js','depot-read-bootstrap.js','depot-read-client.js','depot-read-model.js','depot-read-view.js','depot-history-model.js','depot-history-view.js','depot-current-model.js','strategy-workspace-bootstrap.js','strategy-catalog.js','research-evidence.js','strategy-arena.js','arena-inspection-report.js'];
 function deploymentServer(){
   const inlineScript=html.match(/<script>([\s\S]*?)<\/script>/i)?.[1];
   assert.ok(inlineScript,'actual UI-only navigation script');
@@ -586,6 +586,17 @@ test('terminal deployment fixture serves the catalog research evidence module un
     const scriptPolicy=page.headers.get('content-security-policy').split(';').find(part=>part.trim().startsWith('script-src '));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(dependency.href),'exact dependency URL must be in script-src');
     assert.equal(server.allowedPaths.has(dependency.pathname),true);
+    const arenaUrl=new URL('strategy-arena.js?v=B12',start);
+    const arenaSource=await (await fetch(arenaUrl)).text();
+    const inspectionImport=arenaSource.match(/from ['"](\.\/arena-inspection-report\.js)['"]/);
+    assert.ok(inspectionImport,'Arena imports the metadata-only report adapter');
+    const inspectionUrl=new URL(inspectionImport[1],arenaUrl);
+    const inspection=await fetch(inspectionUrl);
+    assert.equal(inspection.status,200);
+    assert.match(inspection.headers.get('content-type'),/^text\/javascript/);
+    assert.equal(await inspection.text(),readFileSync(new URL('../v11/arena-inspection-report.js',import.meta.url),'utf8'));
+    assert.ok(scriptPolicy.trim().split(/\s+/).includes(inspectionUrl.href));
+    assert.equal(server.allowedPaths.has(inspectionUrl.pathname),true);
     assert.deepEqual(server.metrics(),{reads:0,aborts:0,depotReads:0,depotAborts:0,pending:0});
   }finally{await server.close();}
 });
