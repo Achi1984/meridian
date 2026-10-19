@@ -48,6 +48,21 @@ function syntheticPayload(){
   return {data,asOf:start+210*day,sourceKind:'SYNTHETIC',quoteCurrency:'USD',liquidateAtEnd:true};
 }
 
+function historicalUiFixture(){
+  const pathIds=Array.from({length:44},(_,index)=>(index+1).toString(16).padStart(64,'0'));
+  return {schema:'MERIDIAN_B1_HISTORICAL_UI_FIXTURE_V1',evidenceClass:'SYNTHETIC_ONLY',
+    purpose:'UI_FIXTURE_NOT_PRODUCER_EXPORT',job:{
+      trialId:'f'.repeat(64),trialKey:'trial-generated-browser-fixture',state:'queued',
+      attempts:0,owner:null,fence:0,profile:'MERIDIAN-B1-7-HISTORICAL-ONE-SHOT-R1',
+      protocolSha256:'a'.repeat(64),sourceSha256:'b'.repeat(64),dataSha256:'c'.repeat(64),
+      manifestSha256:'d'.repeat(64),pathIds,computationPathIds:[...pathIds].reverse(),
+      timestamps:{createdAt:'2026-01-01T00:00:00Z',startedAt:null,finishedAt:null},
+      paths:[],controls:null,controlBindings:null,result:null,resultSha256:null,summarySha256:null,
+      reason:null,unresolved:false,executionAuthorized:false,promotionAuthorized:false,
+      profitabilityInferred:false
+    }};
+}
+
 test('M11 Strategies native shell, synthetic Arena and responsive evidence at four widths',{timeout:240000},async()=>{
   if(typeof WebSocket!=='function'){
     const env={...process.env};delete env.NODE_TEST_CONTEXT;
@@ -155,6 +170,36 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fo
         assert.match(inspection.text,/keine Echtheitsbestätigung/);
         assert.equal(inspection.overflow,false);assert.ok(inspection.summaryHeight>=44);
         assert.equal(inspection.requests,beforeInspection.requests);assert.equal(inspection.cards,beforeInspection.cards);
+
+        const beforeHistorical=await evaluate(`({requests:performance.getEntriesByType('resource').length,cards:document.querySelector('.arena-models').innerHTML})`);
+        const historicalText=JSON.stringify(historicalUiFixture());
+        await evaluate(`(()=>{
+          const picker=document.querySelector('[data-arena-historical-fixture]'),transfer=new DataTransfer();
+          transfer.items.add(new File([${JSON.stringify(historicalText)}],'generated-historical-ui-fixture.json',{type:'application/json'}));
+          picker.files=transfer.files;picker.dispatchEvent(new Event('change',{bubbles:true}));
+        })()`);
+        for(let attempt=0;attempt<100;attempt++){
+          if(await evaluate(`document.querySelector('[aria-label="Separates historisches Arena-Ergebnis · UI-Fixture"]')?.innerText.includes('Lifecycle: queued')`))break;
+          await new Promise(resolve=>setTimeout(resolve,20));
+        }
+        const historical=await evaluate(`(()=>{
+          const section=document.querySelector('[aria-label="Separates historisches Arena-Ergebnis · UI-Fixture"]');
+          const disclosure=section.querySelector('details');
+          disclosure.querySelector('summary').focus();
+          return {text:section.innerText,overflow:document.documentElement.scrollWidth>innerWidth+1,
+            summaryHeight:disclosure.querySelector('summary').getBoundingClientRect().height,
+            requests:performance.getEntriesByType('resource').length,cards:document.querySelector('.arena-models').innerHTML};
+        })()`);
+        assert.match(historical.text,/SYNTHETIC_ONLY/);
+        assert.match(historical.text,/kein Producer-Export/);
+        assert.match(historical.text,/Lifecycle: queued/);
+        assert.match(historical.text,/Engine-Ergebnisstatus: Nicht verfügbar/);
+        assert.equal(historical.overflow,false);assert.ok(historical.summaryHeight>=44);
+        assert.equal(historical.requests,beforeHistorical.requests);assert.equal(historical.cards,beforeHistorical.cards);
+        await key('Enter','Enter',13);
+        assert.equal(await evaluate(`document.querySelector('[aria-label="Separates historisches Arena-Ergebnis · UI-Fixture"] details').open`),true);
+        const navClear=await evaluate(`(()=>{const root=document.documentElement,section=document.querySelector('#strategy-arena-root');window.scrollTo(0,root.scrollHeight);return section.lastElementChild.getBoundingClientRect().bottom<=document.getElementById('nav').getBoundingClientRect().top+1;})()`);
+        assert.equal(navClear,true);
 
         await evaluate(`document.querySelector('#strategy-catalog [data-strategy-id="H1"] summary').focus()`);
         await key('Enter','Enter',13);
