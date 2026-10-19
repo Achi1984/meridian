@@ -1,7 +1,7 @@
 import {canonicalJson, sha256} from './engine.mjs';
 import {ASSETS, INPUT} from './validate.mjs';
 import {HISTORICAL_ADMISSION_RECEIPT, HISTORICAL_INPUT_MANIFEST,
-  historicalProfileSha256} from './historical-profile.mjs';
+  deriveHistoricalProfile, historicalProfileSha256} from './historical-profile.mjs';
 
 export {HISTORICAL_ADMISSION_RECEIPT, HISTORICAL_INPUT_MANIFEST};
 
@@ -121,6 +121,21 @@ export function inspectHistoricalAdmission({receipt, manifest, profile}) {
   }
   if (ASSETS.some(asset => !digest(selectedSeriesSha256[asset]))) {
     return denied('INPUT_MANIFEST_INVALID');
+  }
+  let derived;
+  try {
+    derived = deriveHistoricalProfile(selected);
+  } catch {
+    return denied('INPUT_MANIFEST_INVALID');
+  }
+  if (profile.inputSha256 !== derived.inputSha256 ||
+      profile.inputManifestSha256 !== derived.inputManifestSha256) {
+    return denied('D2_MANIFEST_MISMATCH');
+  }
+  if (profile.manifestSha256 !== derived.manifestSha256 ||
+      profile.computationOrderSha256 !== derived.computationOrderSha256 ||
+      canonicalJson(expectedPaths) !== canonicalJson(derived.pathIds)) {
+    return denied('D2_PATHS_MISMATCH');
   }
   if (approved.schema !== 'MERIDIAN_D2_HISTORICAL_APPROVAL_R1' ||
       approved.decision !== 'APPROVE_ONE_SHOT_HISTORICAL_RESEARCH' ||

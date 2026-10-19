@@ -65,10 +65,14 @@ The current candidate includes #890 at merge `fd07a8df49cbe24c73e9819170cd36e6b9
 
 The historical run-profile identity canonically binds the protocol and
 implementation, pinned source-file hashes, source-basis commit, D1 input-manifest
-state, the exact 44 path IDs/descriptors and computation order, and the fixed
-scope and limits. The source-identity digest is SHA-256 over the profile's
-canonical source-hash map. The D1 manifest and D2 approval receipt remain null;
-the profile is not an approved manifest or authority flag.
+state, the exact 44 descriptors and computation order, and the fixed scope and
+limits. Historical path IDs, manifest digest, and computation-order digest are
+derived from the selected-series hashes in an input manifest using the engine's
+input-bound identity formula; they are null while the production manifest is
+null and are never copied from the synthetic profile. The source-identity
+digest is SHA-256 over the profile's canonical source-hash map. The D1 manifest
+and D2 approval receipt remain null; the profile is not an approved manifest
+or authority flag.
 
 The historical profile's exact source-file SHA-256 pins are:
 
@@ -130,7 +134,9 @@ This request does **not** authorize a real-data run, strategy-PnL promotion, dis
 > **D2 DECISION: DEFER / NOT APPROVED.** Do not read captured market files or
 > execute the engine. The selected-input manifest and its SHA-256 remain
 > `NOT_FROZEN`; no D2 receipt exists. Reconsider only after a separate D1
-> decision produces the exact selected-series manifest, the final source and
+> decision authorizes any required data read; reuse the already verified D1
+> `manifestDraft` identity without rereading files solely to adopt that identity.
+> The D1 metadata is not admission or execution authority. The final source and
 > run-profile identities pass exact-head CI and full independent review, and an
 > owner decision explicitly binds that manifest, the R3 protocol, one trial,
 > all 44 ordered paths, costs, screen, budget, and no-finite-stop exception.
@@ -144,8 +150,13 @@ Lead-controlled, independently reviewed change to
 `status` to `FROZEN_FOR_D2`, populate the exact D1 manifest, manifest/input
 hashes, and a schema-valid D2 receipt bound to `sourceIdentitySha256`,
 protocol/implementation, run-profile, manifest/order digests, fixed trial key,
-and the ordered path IDs. The receipt is excluded from the run-profile digest to
-avoid self-reference; the profile identity includes all other frozen fields.
+and the ordered path IDs derived from that manifest. The receipt schema validates
+identity fields but is not an authentication mechanism: owner strings and hashes
+do not prove consent. Activation requires an actual separate owner decision; the
+Lead-controlled change records that decision after review. The verified existing
+D1 `manifestDraft` may supply identity metadata without another market-file read.
+The receipt is excluded from the run-profile digest to avoid self-reference; the
+profile identity includes all other frozen fields.
 No source code, fixture identity, descriptor, computation order, or
 authorization flag should change as part of that later activation. Any source
 change requires renewed identities, CI, and review before activation.

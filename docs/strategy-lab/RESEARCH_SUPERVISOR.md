@@ -129,13 +129,26 @@ labels, `holdoutClaim: false`, `trialLedger: UNKNOWN`, and
 `UNDEFINED_NO_FINITE_STOP`; every execution/promotion/Paper/Live authority flag
 remains false.
 
+Historical path IDs, manifest digest, and computation-order digest are derived
+from the selected-series hashes in the exact input manifest using the engine's
+input-bound identity formula. They are not copied from the synthetic fixture;
+while the production manifest is null, the historical path identities are null
+as well. Source pins are checked before the historical loader can read a market
+file. The receipt schema validates bound strings and digests, but does not
+authenticate owner consent: a schema-valid owner name or hash is not approval.
+Activation requires a separate genuine owner decision and Lead-controlled
+reviewed change. The verified D1 `manifestDraft` is existing identity metadata;
+adopting its identity does not require rereading the market files, and does not
+admit the manifest or authorize execution.
+
 The one-shot profile fixes seven assets, 955 daily rows, the 410/180/365
 warmup/development/diagnostic split, the existing five variants and three cost
 scenarios, and the existing 44 descriptors and computation order. The generated
 fixture identity is not used as historical evidence. Tests use generated data in
-temporary roots only; they prove admission denial, identity mismatch handling,
-and descriptor/accessor rejection. They do not approve the profile, read
-captured CSVs, or execute a historical strategy. Run the focused suites with
+temporary roots only; they prove profile-only activation identities and exercise
+the supervised adapter/journal on generated series, including insufficient
+evidence, timeout, fence, and repeat refusal. They do not authenticate consent,
+read captured CSVs, or produce a historical strategy result. Run the focused suites with
 `node --test test/b1-7-captured-input.test.js` and
 `node --test test/research-supervisor.test.js`; the latter also covers the
 existing synthetic 44-path run, deadlines, output bounds, child failures, and
@@ -145,7 +158,9 @@ The minimal later activation diff is confined to
 `historical_run_profile.json`: a Lead-controlled reviewed change must set
 `status` to `FROZEN_FOR_D2`, add the D1-frozen selected-input manifest and its
 identities, and add the exact D2 receipt matching the final run-profile/source
-identities, trial key, protocol, and ordered paths. Until that separate decision,
+identities, trial key, protocol, and ordered paths. Reuse the verified existing
+D1 `manifestDraft` identity; no additional market-file read is needed solely to
+adopt it. The receipt cannot authenticate its own owner field. Until that separate decision,
 the manifest remains `NOT_FROZEN`, the receipt remains absent, and no captured
 input is loaded. A historical `PASS` remains a historical screen result only;
 it cannot grant Paper or Live eligibility.

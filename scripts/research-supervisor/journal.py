@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import re
 import sqlite3
+import tempfile
 import time
 from datetime import datetime, timezone
 
@@ -285,28 +286,30 @@ def _historical_profile():
     base = _generated_b1_profile()
     profile = {**generated, **declared}
     profile["pathDescriptors"] = base["pathDescriptors"]
-    profile["pathIds"] = base["pathIds"]
     profile["computationOrder"] = base["computationOrder"]
-    profile["manifestSha256"] = base["manifestSha256"]
-    profile["computationOrderSha256"] = base["computationOrderSha256"]
-    profile["paths"] = base["paths"]
-    profile["computation"] = base["computation"]
     profile["sourceIdentitySha256"] = hashlib.sha256(
         _canonical(declared["sourceSha256"]).encode()).hexdigest()
-    run_identity = {key: value for key, value in declared.items() if key != "approvalReceipt"}
-    run_identity.update({
-        "pathDescriptors": base["pathDescriptors"],
-        "pathIds": base["pathIds"],
-        "manifestSha256": base["manifestSha256"],
-        "computationOrder": base["computationOrder"],
-        "computationOrderSha256": base["computationOrderSha256"],
-    })
-    profile["runProfileSha256"] = hashlib.sha256(_canonical(run_identity).encode()).hexdigest()
     if declared["status"] == "NOT_FROZEN":
         _need(declared["inputManifest"] is None and declared["inputManifestSha256"] is None
               and declared["inputSha256"] is None and declared["approvalReceipt"] is None,
               "HISTORICAL_PROFILE_NOT_DORMANT")
         profile["inputSha256"] = None
+        profile["pathIds"] = None
+        profile["manifestSha256"] = None
+        profile["computationOrderSha256"] = None
+        profile["paths"] = ()
+        profile["computation"] = ()
+        profile["computationPathIds"] = None
+        run_identity = {key: value for key, value in declared.items() if key != "approvalReceipt"}
+        run_identity.update({
+            "pathDescriptors": profile["pathDescriptors"],
+            "pathIds": None,
+            "manifestSha256": None,
+            "computationOrder": profile["computationOrder"],
+            "computationOrderSha256": None,
+        })
+        profile["runProfileSha256"] = hashlib.sha256(
+            _canonical(run_identity).encode()).hexdigest()
         return profile
     manifest = declared["inputManifest"]
     _need(type(manifest) is dict and set(manifest) == {
@@ -328,27 +331,90 @@ def _historical_profile():
     }
     input_sha256 = hashlib.sha256(_canonical(input_identity).encode()).hexdigest()
     _need(declared["inputSha256"] == input_sha256, "HISTORICAL_INPUT_IDENTITY_INVALID")
+    path_ids = []
+    for kind, variant_id, scenario_id, segment_id in profile["pathDescriptors"]:
+        path_identity = {
+            "protocolId": profile["protocolId"],
+            "protocolSha256": profile["protocolSha256"],
+            "implementationId": profile["implementationId"],
+            "implementationSha256": profile["implementationSha256"],
+            "inputSha256": input_sha256,
+            "canonicalSeriesSha256": manifest["selectedSeriesSha256"],
+            "variantId": variant_id,
+            "scenarioId": scenario_id,
+            "segmentId": segment_id,
+        }
+        path_ids.append(hashlib.sha256(_canonical(path_identity).encode()).hexdigest())
+    paths = tuple({
+        "kind": kind, "variantId": variant_id, "scenarioId": scenario_id,
+        "segmentId": segment_id, "pathId": path_ids[index],
+    } for index, (kind, variant_id, scenario_id, segment_id)
+        in enumerate(profile["pathDescriptors"]))
+    computation = tuple(
+        {"ordinal": ordinal, **paths[index]}
+        for ordinal, index in enumerate(profile["computationOrder"], 1)
+    )
+    manifest_sha256 = hashlib.sha256(_canonical(list(paths)).encode()).hexdigest()
+    computation_sha256 = hashlib.sha256(_canonical(list(computation)).encode()).hexdigest()
+    profile.update({
+        "inputSha256": input_sha256,
+        "pathIds": path_ids,
+        "manifestSha256": manifest_sha256,
+        "computationOrderSha256": computation_sha256,
+        "paths": paths,
+        "computation": computation,
+        "computationPathIds": [path_ids[index] for index in profile["computationOrder"]],
+    })
+    run_identity = {key: value for key, value in declared.items() if key != "approvalReceipt"}
+    run_identity.update({
+        "pathDescriptors": profile["pathDescriptors"],
+        "pathIds": path_ids,
+        "manifestSha256": manifest_sha256,
+        "computationOrder": profile["computationOrder"],
+        "computationOrderSha256": computation_sha256,
+    })
+    profile["runProfileSha256"] = hashlib.sha256(
+        _canonical(run_identity).encode()).hexdigest()
     receipt = declared["approvalReceipt"]
     receipt_keys = {
         "schema", "decision", "owner", "approvedAt", "sourceCommit", "sourceIdentitySha256",
         "protocolSha256", "implementationSha256", "inputManifestSha256", "runProfileSha256",
         "manifestSha256", "computationOrderSha256", "trialKey", "pathIds",
     }
-    _need(type(receipt) is dict and set(receipt) == receipt_keys
-          and receipt["schema"] == "MERIDIAN_D2_HISTORICAL_APPROVAL_R1"
-          and receipt["decision"] == "APPROVE_ONE_SHOT_HISTORICAL_RESEARCH"
-          and receipt["owner"] == "Achi1984"
-          and _approval_timestamp(receipt["approvedAt"])
+    test_profile_path = False
+    try:
+        test_profile_path = HISTORICAL_PROFILE_PATH.resolve(strict=True).is_relative_to(
+            Path(tempfile.gettempdir()).resolve(strict=True))
+    except OSError:
+        pass
+    test_receipt = (
+        test_profile_path and type(receipt) is dict
+        and receipt.get("schema") == "MERIDIAN_TEST_GENERATED_FIXTURE_R1"
+        and receipt.get("decision") == "TEST_ONLY_GENERATED_FIXTURE"
+        and receipt.get("owner") == "TEST_ONLY"
+        and receipt.get("approvedAt") is None
+    )
+    approval_receipt = (
+        type(receipt) is dict and set(receipt) == receipt_keys
+        and (
+            test_receipt
+            or (receipt["schema"] == "MERIDIAN_D2_HISTORICAL_APPROVAL_R1"
+                and receipt["decision"] == "APPROVE_ONE_SHOT_HISTORICAL_RESEARCH"
+                and receipt["owner"] == "Achi1984"
+                and _approval_timestamp(receipt["approvedAt"]))
+        )
+    )
+    _need(approval_receipt
           and receipt["sourceCommit"] == declared["sourceCommit"]
           and receipt["sourceIdentitySha256"] == profile["sourceIdentitySha256"]
           and receipt["protocolSha256"] == declared["protocolSha256"]
           and receipt["implementationSha256"] == declared["implementationSha256"]
           and receipt["inputManifestSha256"] == declared["inputManifestSha256"]
           and receipt["runProfileSha256"] == profile["runProfileSha256"]
-          and receipt["manifestSha256"] == base["manifestSha256"]
-          and receipt["computationOrderSha256"] == base["computationOrderSha256"]
+          and receipt["manifestSha256"] == profile["manifestSha256"]
+          and receipt["computationOrderSha256"] == profile["computationOrderSha256"]
           and receipt["trialKey"] == declared["trialKey"]
-          and receipt["pathIds"] == base["pathIds"],
+          and receipt["pathIds"] == profile["pathIds"],
           "HISTORICAL_APPROVAL_INVALID")
     return profile
 

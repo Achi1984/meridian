@@ -19,6 +19,7 @@ import supervisor
 
 
 FAULT_ADAPTER = ROOT / "test_fault_adapter.mjs"
+HISTORICAL_TEST_ADAPTER = ROOT / "test_b1_historical_fixture.mjs"
 class ResearchSupervisorTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
@@ -138,6 +139,96 @@ connection.close()
         with patch.object(supervisor.subprocess, "Popen", side_effect=spawn):
             return supervisor.run_b1_batch(
                 self.database, claim, limits={"path_seconds": 10, "batch_seconds": 20})
+
+    def prepare_historical_fixture(self, name, scenario="SUCCESS"):
+        self.database = str(Path(self.temporary.name) / f"{name}.sqlite")
+        profile_path = Path(self.temporary.name) / f"{name}-profile.json"
+        generated = subprocess.run(
+            ["node", str(HISTORICAL_TEST_ADAPTER), "--profile", str(profile_path), scenario],
+            cwd=PROJECT_ROOT, capture_output=True, text=True, timeout=30)
+        if generated.returncode:
+            raise AssertionError(generated.stderr)
+        with patch.object(journal, "HISTORICAL_PROFILE_PATH", profile_path):
+            journal.initialize(self.database, profile=journal.HISTORICAL_PROFILE_NAME)
+            queued = journal.enqueue_b1(self.database, "trial-historical-d2-r1")
+            outcome = journal.scheduler_tick_b1(self.database, enabled=True)
+        self.assertTrue(outcome["claimed"])
+        self.assertEqual(outcome["claim"]["trialId"], queued["trialId"])
+        return profile_path, outcome["claim"]
+
+    def run_historical_fixture(self, profile_path, claim, scenario, limits=None):
+        original_popen = subprocess.Popen
+
+        def spawn(*args, **kwargs):
+            if Path(args[0][1]).resolve() == HISTORICAL_TEST_ADAPTER.resolve():
+                environment = dict(kwargs["env"])
+                environment.update({
+                    "NODE_ENV": "test",
+                    "B1_TEST_SCENARIO": scenario,
+                    "B1_TEST_HISTORICAL_PROFILE_PATH": str(profile_path),
+                })
+                kwargs["env"] = environment
+            return original_popen(*args, **kwargs)
+
+        with (patch.object(journal, "HISTORICAL_PROFILE_PATH", profile_path),
+              patch.object(supervisor, "HISTORICAL_ADAPTER", HISTORICAL_TEST_ADAPTER),
+              patch.object(supervisor.subprocess, "Popen", side_effect=spawn)):
+            return supervisor.run_b1_batch(
+                self.database, claim,
+                limits=limits or {"path_seconds": 10, "batch_seconds": 20})
+
+    def test_generated_historical_profile_runs_all_paths_and_refuses_repeat(self):
+        profile_path, claim = self.prepare_historical_fixture("historical-success")
+        result = self.run_historical_fixture(profile_path, claim, "SUCCESS")
+        self.assertEqual(result["state"], "completed")
+        self.assertEqual(result["attempts"], 1)
+        self.assertEqual(len(result["paths"]), 44)
+        self.assertEqual(result["executionAuthorized"], False)
+        self.assertEqual(result["promotionAuthorized"], False)
+        with patch.object(journal, "HISTORICAL_PROFILE_PATH", profile_path):
+            inspected = journal.inspect_b1(self.database, claim["trialId"])
+            again = journal.scheduler_tick_b1(self.database, enabled=True)
+        self.assertEqual(inspected["state"], "completed")
+        self.assertEqual(inspected["attempts"], 1)
+        self.assertFalse(again["claimed"])
+
+    def test_generated_historical_insufficient_evidence_stays_failed_and_labeled(self):
+        profile_path, claim = self.prepare_historical_fixture(
+            "historical-insufficient", "INSUFFICIENT_EVIDENCE")
+        result = self.run_historical_fixture(
+            profile_path, claim, "INSUFFICIENT_EVIDENCE")
+        self.assertEqual(result["state"], "failed")
+        self.assertEqual(result["reason"], "INSUFFICIENT_EVIDENCE")
+        with patch.object(journal, "HISTORICAL_PROFILE_PATH", profile_path):
+            inspected = journal.inspect_b1(self.database, claim["trialId"])
+        summary = json.loads(inspected["result"])
+        self.assertEqual(summary["status"], "INSUFFICIENT_EVIDENCE")
+        self.assertEqual(summary["evidence"]["sourceAuthenticity"], "NOT_ESTABLISHED")
+        self.assertFalse(summary["authority"]["executionAuthorized"])
+        self.assertFalse(summary["authority"]["paperAuthorized"])
+
+    def test_generated_historical_identity_corruption_fails_closed(self):
+        profile_path, _ = self.prepare_historical_fixture("historical-corrupt")
+        profile = json.loads(profile_path.read_text())
+        profile["approvalReceipt"]["pathIds"][0] = "0" * 64
+        profile_path.write_text(json.dumps(profile))
+        database = str(Path(self.temporary.name) / "historical-corrupt-check.sqlite")
+        with patch.object(journal, "HISTORICAL_PROFILE_PATH", profile_path):
+            with self.assertRaises(journal.JournalError) as invalid:
+                journal.initialize(database, profile=journal.HISTORICAL_PROFILE_NAME)
+        self.assertEqual(invalid.exception.code, "HISTORICAL_APPROVAL_INVALID")
+
+    def test_generated_historical_timeout_keeps_attempt_and_fence_without_retry(self):
+        profile_path, claim = self.prepare_historical_fixture("historical-timeout")
+        result = self.run_historical_fixture(
+            profile_path, claim, "HISTORICAL_TIMEOUT",
+            limits={"path_seconds": 2, "batch_seconds": 1})
+        self.assertEqual(result["state"], "timed_out")
+        self.assertEqual(result["attempts"], 1)
+        self.assertGreater(result["fence"], 0)
+        with patch.object(journal, "HISTORICAL_PROFILE_PATH", profile_path):
+            again = journal.scheduler_tick_b1(self.database, enabled=True)
+        self.assertFalse(again["claimed"])
 
     @staticmethod
     def b1_insufficient_profile():

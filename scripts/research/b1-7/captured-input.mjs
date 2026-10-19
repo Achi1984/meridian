@@ -8,7 +8,7 @@ import {canonicalJson, sha256} from './engine.mjs';
 import {ASSETS, INPUT, validateSeries} from './validate.mjs';
 import {HISTORICAL_ADMISSION_RECEIPT, HISTORICAL_INPUT_MANIFEST,
   inspectHistoricalAdmission} from './historical-admission.mjs';
-import {HISTORICAL_RUN_PROFILE} from './historical-profile.mjs';
+import {HISTORICAL_RUN_PROFILE, verifyHistoricalSourcePins} from './historical-profile.mjs';
 
 export const CAPTURED_INPUT_PROFILE = 'SYNTHETIC_ONLY_GENERATED_FIXTURE';
 export const MAX_NORMALIZED_FILE_BYTES = 512 * 1024;
@@ -42,6 +42,8 @@ function fail(code, file = null) {
 }
 
 function productionManifestCheck() {
+  const sourcePins = verifyHistoricalSourcePins(HISTORICAL_RUN_PROFILE);
+  if (!sourcePins.ok) return {ok: false, status: 'BLOCKED', error: sourcePins.error};
   const manifest = PRODUCTION_SELECTED_INPUT_MANIFEST;
   if (!manifest) return {ok: false, status: 'BLOCKED', error: {code: 'SELECTED_INPUT_MANIFEST_MISSING'}};
   const admission = inspectHistoricalAdmission({

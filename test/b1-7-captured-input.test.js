@@ -12,10 +12,10 @@ import {
 } from '../scripts/research/b1-7/captured-input.mjs';
 import {inspectHistoricalAdmission, HISTORICAL_ADMISSION_RECEIPT,
   HISTORICAL_INPUT_MANIFEST} from '../scripts/research/b1-7/historical-admission.mjs';
-import {HISTORICAL_RUN_PROFILE} from '../scripts/research/b1-7/historical-profile.mjs';
-import {historicalProfileSha256} from '../scripts/research/b1-7/historical-profile.mjs';
+import {deriveHistoricalProfile, HISTORICAL_RUN_PROFILE,
+  historicalProfileSha256, verifyHistoricalSourcePins} from '../scripts/research/b1-7/historical-profile.mjs';
 import {ASSETS, INPUT} from '../scripts/research/b1-7/validate.mjs';
-import {canonicalJson, sha256} from '../scripts/research/b1-7/engine.mjs';
+import {canonicalJson, createExecution, sha256} from '../scripts/research/b1-7/engine.mjs';
 import {createSyntheticSeries} from './fixtures/b1-7/synthetic-series.mjs';
 
 const hash = value => createHash('sha256').update(value).digest('hex');
@@ -93,8 +93,8 @@ test('historical admission remains inert and rejects stale or malformed approval
   assert.equal(HISTORICAL_RUN_PROFILE.status, 'NOT_FROZEN');
   assert.equal(HISTORICAL_RUN_PROFILE.inputManifestSha256, null);
   assert.equal(HISTORICAL_RUN_PROFILE.trialKey, 'trial-historical-d2-r1');
-  assert.equal(HISTORICAL_RUN_PROFILE.pathIds.length, 44);
-  assert.equal(HISTORICAL_RUN_PROFILE.computationPathIds.length, 44);
+  assert.equal(HISTORICAL_RUN_PROFILE.pathIds, null);
+  assert.equal(HISTORICAL_RUN_PROFILE.computationPathIds, null);
   assert.deepEqual(inspectHistoricalAdmission({
     manifest: null, receipt: null, profile: HISTORICAL_RUN_PROFILE
   }), {
@@ -120,8 +120,9 @@ test('historical admission remains inert and rejects stale or malformed approval
     selectedSeriesSha256: {...generated.inputManifest.selectedSeriesSha256}
   };
   const manifestSha256 = sha256(canonicalJson(manifestCandidate));
+  const derivedProfile = deriveHistoricalProfile(manifestCandidate);
   const testProfile = {
-    ...HISTORICAL_RUN_PROFILE,
+    ...derivedProfile,
     status: 'FROZEN_FOR_D2',
     inputManifest: manifestCandidate,
     inputManifestSha256: manifestSha256,
@@ -159,6 +160,44 @@ test('historical admission remains inert and rejects stale or malformed approval
       approvalGetterCalls++;
       return testProfile.protocolSha256;
     }
+  });
+
+  test('historical path identities derive from admitted input metadata, not synthetic pins', async t => {
+    const {series} = await createFixtureTree(t);
+    const manifest = {
+      sourceCommit: HISTORICAL_RUN_PROFILE.sourceCommit,
+      files: {...HISTORICAL_RUN_PROFILE.expectedWholeFileSha256},
+      selectedSeriesSha256: Object.fromEntries(ASSETS.map(asset =>
+        [asset, sha256(canonicalJson(series[asset]))]))
+    };
+    const historical = deriveHistoricalProfile(manifest);
+    const session = createExecution({
+      seriesByAsset: series,
+      source: {
+        kind: 'FROZEN_RESEARCH_INPUT',
+        commit: manifest.sourceCommit,
+        files: manifest.files
+      },
+      implementationSha256: historical.implementationSha256
+    });
+    assert.equal(historical.inputSha256, sha256(canonicalJson({
+      datasetKind: 'FROZEN_RESEARCH_INPUT',
+      sourceCommit: manifest.sourceCommit,
+      sourceProvenance: {normalizedFileSha256: manifest.files},
+      canonicalSeriesSha256: manifest.selectedSeriesSha256
+    })));
+    assert.deepEqual(historical.pathIds, session.manifest.map(path => path.pathId));
+    assert.equal(historical.manifestSha256, sha256(canonicalJson(session.manifest)));
+    assert.equal(historical.computationOrderSha256, sha256(canonicalJson(session.computationOrder)));
+    assert.notDeepEqual(historical.pathIds, JSON.parse(
+      await readFile(join(projectRoot, 'scripts/research-supervisor/b1_bridge_manifest.json'), 'utf8')
+    ).pathIds);
+    const alteredSourcePins = {
+      ...HISTORICAL_RUN_PROFILE,
+      sourceSha256: {...HISTORICAL_RUN_PROFILE.sourceSha256, loader: '0'.repeat(64)}
+    };
+    assert.equal(verifyHistoricalSourcePins(alteredSourcePins).error.code,
+      'HISTORICAL_SOURCE_PIN_MISMATCH');
   });
   assert.equal(inspectHistoricalAdmission({
     manifest: manifestCandidate, receipt: accessorReceipt, profile: testProfile
