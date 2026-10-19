@@ -37,11 +37,19 @@ function fixture({state='queued',resultStatus=null,descriptorOrder=null,computat
       strategyPnlAuthorized:false,discoveryAuthorized:false,validationAuthorized:false,
       holdoutAuthorized:false,paperAuthorized:false,liveAuthorized:false},
     budget:{},completedPaths:completedCount,computedPaths:completedCount,controlRealization:[],
-    evidence:{sourceAuthenticity:'NOT_ESTABLISHED',historyLabel:'DEVELOPMENT_AND_HISTORICAL_DIAGNOSTIC',
-      holdoutClaim:false,costModel:'OKX_INSPIRED_ASSUMED_15_30BP_NOT_EXECUTION_EVIDENCE'},
-    executionId:digest('b'),failure:null,identity:{},implementationId:'generated',
-    implementationSha256:digest('c'),plannedPaths:44,protocolId:'generated',
-    protocolReview:{},protocolSha256:digest('d'),schema:'MERIDIAN_B1_7_ENGINE_RESULT_R3',
+    evidence:{syntheticFixture:false,priceSource:'PINNED_KRAKEN_SPOT_USD_CANDLES',
+      sourceAuthenticity:'NOT_ESTABLISHED',historyLabel:'DEVELOPMENT_AND_HISTORICAL_DIAGNOSTIC',
+      candidateInterpretation:'HISTORICAL_CANDIDATE_ONLY_IF_PROPOSED_REAL_SCREEN_PASSES',
+      costModel:'OKX_INSPIRED_ASSUMED_15_30BP_NOT_EXECUTION_EVIDENCE',
+      executionEvidence:'NOT_OKX_EXECUTION_EVIDENCE',holdoutClaim:false,trialLedger:'UNKNOWN',
+      diagnosticRescaling:'NONE',stoppedPolicy:'NO_FINITE_TRADE_STOP',
+      crv:{status:'UNDEFINED_NO_FINITE_STOP',value:null,researchOnly:true},
+      survivorship:'generated-fixture'},
+    executionId:digest('b'),failure:null,
+    identity:{datasetKind:'FROZEN_RESEARCH_INPUT',sourceCommit:'generated-fixture',
+      sourceProvenance:{normalizedFileSha256:{}},canonicalSeriesSha256:{},inputSha256:digest('b')},
+    implementationId:'generated',implementationSha256:digest('c'),plannedPaths:44,protocolId:'generated',
+    protocolReview:{},protocolSha256:digest('f'),schema:'MERIDIAN_B1_7_ENGINE_RESULT_R3',
     screen:{stopPolicy:'NO_FINITE_TRADE_STOP'},status:resultStatus,
     controlDefinitions:controls,
     paths:pathIds.map(pathId=>completedPathIds.has(pathId)
@@ -58,7 +66,7 @@ function fixture({state='queued',resultStatus=null,descriptorOrder=null,computat
     timestamps:{createdAt:timestamp(0),startedAt:attempted?timestamp(1):null,
       finishedAt:state==='queued'||unresolved?null:timestamp(2)},
     paths,controls:controls===null?null:JSON.stringify(controls),
-    controlBindings:controls===null?null:{primaryDevelopmentSha256:digest('d'),fullBasketDevelopmentSha256:digest('e')},
+    controlBindings:controls===null?null:{primaryDevelopmentSha256:digest('a'),fullBasketDevelopmentSha256:digest('a')},
     result:result===null?null:JSON.stringify(result),
     resultSha256:result===null?null:digest('f'),summarySha256:result===null?null:digest('0'),
     reason:resultStatus==='INSUFFICIENT_EVIDENCE'?'INSUFFICIENT_EVIDENCE':null,
@@ -95,7 +103,12 @@ test('generated lifecycle fixtures keep lifecycle separate from result status',(
   const unknown=parse(fixture({state:'unknown'}));
   assert.equal(unknown.job.unresolved,true);
   assert.equal(unknown.job.paths[0].state,'started');
+  const settledUnknown=fixture({state:'unknown'});
+  settledUnknown.job.unresolved=false;
+  settledUnknown.job.timestamps.finishedAt=timestamp(2);
+  assert.equal(parse(settledUnknown).status,'PRESENT_UNVERIFIED');
   const insufficient=parse(fixture({state:'failed',resultStatus:'INSUFFICIENT_EVIDENCE'}));
+  assert.equal(insufficient.status,'PRESENT_UNVERIFIED',JSON.stringify(insufficient));
   assert.equal(insufficient.job.state,'failed');
   assert.equal(insufficient.result.status,'INSUFFICIENT_EVIDENCE');
   assert.equal(insufficient.result.completedPaths,19);
@@ -111,6 +124,7 @@ test('complete descriptor and computation identities retain their independent or
   assert.deepEqual(queued.job.computationPathIds,computationOrder);
   const completed=parse(fixture({state:'completed',resultStatus:'COMPLETED',
     descriptorOrder,computationOrder}));
+  assert.equal(completed.status,'PRESENT_UNVERIFIED',JSON.stringify(completed));
   assert.equal(completed.status,'PRESENT_UNVERIFIED');
   assert.equal(completed.job.paths.length,44);
   assert.equal(completed.result.paths.length,44);
@@ -119,6 +133,7 @@ test('complete descriptor and computation identities retain their independent or
 
 test('all 44 completed paths may have an insufficient-evidence engine result',()=>{
   const projection=parse(fixture({state:'completed',resultStatus:'INSUFFICIENT_EVIDENCE'}));
+  assert.equal(projection.status,'PRESENT_UNVERIFIED',JSON.stringify(projection));
   assert.equal(projection.status,'PRESENT_UNVERIFIED');
   assert.equal(projection.job.state,'completed');
   assert.equal(projection.result.status,'INSUFFICIENT_EVIDENCE');
@@ -132,6 +147,7 @@ test('duplicate, conflicting, outside-inventory and contradictory identities fai
     value=>value.job.computationPathIds[0]=digest('f'),
     value=>value.job.paths[0].pathId=digest('f'),
     value=>value.job.paths[1].pathId=value.job.paths[0].pathId,
+    value=>value.job.controlBindings.primaryDevelopmentSha256=digest('9'),
     value=>value.job.result=JSON.stringify({...JSON.parse(value.job.result),
       paths:JSON.parse(value.job.result).paths.map((path,index)=>index===0?{...path,pathId:digest('f')}:path)}),
     value=>value.job.result=JSON.stringify({...JSON.parse(value.job.result),
@@ -142,6 +158,14 @@ test('duplicate, conflicting, outside-inventory and contradictory identities fai
       const result=JSON.parse(value.job.result);
       value.job.result=JSON.stringify({...result,status:'INSUFFICIENT_EVIDENCE',
         attemptedPaths:19,completedPaths:19,computedPaths:19});
+    },
+    value=>{
+      const result=JSON.parse(value.job.result);
+      value.job.result=JSON.stringify({...result,protocolSha256:digest('9')});
+    },
+    value=>{
+      const result=JSON.parse(value.job.result);
+      value.job.result=JSON.stringify({...result,identity:{...result.identity,inputSha256:digest('9')}});
     }
   ];
   for(const [index,mutate] of mutations.entries()){
@@ -155,6 +179,13 @@ test('strict envelopes, nested JSON, bounded depth, finite values and authority 
   const malformed=fixture({state:'failed',resultStatus:'INSUFFICIENT_EVIDENCE'});
   assert.equal(parse({...malformed,extra:true}).status,'INVALID');
   assert.equal(parse({...malformed,job:{...malformed.job,extra:true}}).status,'INVALID');
+  const duplicateEnvelope=JSON.stringify(malformed).replace('"schema":"MERIDIAN_B1_HISTORICAL_UI_FIXTURE_V1"',
+    '"schema":"MERIDIAN_B1_HISTORICAL_UI_FIXTURE_V1","schema":"MERIDIAN_B1_HISTORICAL_UI_FIXTURE_V1"');
+  assert.equal(parseArenaHistoricalResultFixture(duplicateEnvelope).status,'INVALID');
+  const duplicateResult=fixture({state:'failed',resultStatus:'INSUFFICIENT_EVIDENCE'});
+  duplicateResult.job.result=duplicateResult.job.result.replace('"status":"INSUFFICIENT_EVIDENCE"',
+    '"status":"INSUFFICIENT_EVIDENCE","status":"INSUFFICIENT_EVIDENCE"');
+  assert.equal(parse(duplicateResult).status,'INVALID');
   for(const invalidValue of [
     {...malformed,job:{...malformed.job,controls:'{'}},
     {...malformed,job:{...malformed.job,result:'{'}},
@@ -197,6 +228,10 @@ test('historical fixture renders escaped producer fields without network, digest
   assert.match(root.innerHTML,/SYNTHETIC_ONLY/);
   assert.match(root.innerHTML,/Lifecycle: failed/);
   assert.match(root.innerHTML,/Engine-Ergebnisstatus: INSUFFICIENT_EVIDENCE/);
+  assert.match(root.innerHTML,/DEVELOPMENT_AND_HISTORICAL_DIAGNOSTIC/);
+  assert.match(root.innerHTML,/NOT_ESTABLISHED/);
+  assert.match(root.innerHTML,/NO_FINITE_TRADE_STOP/);
+  assert.match(root.innerHTML,/OKX_INSPIRED_ASSUMED_15_30BP_NOT_EXECUTION_EVIDENCE/);
   assert.match(root.innerHTML,/DESKRIPTORENREIHENFOLGE|pathIds/i);
   assert.match(root.innerHTML,/&lt;img src=x onerror=alert\(1\)&gt;/);
   assert.doesNotMatch(root.innerHTML,/<img src=x onerror=alert\(1\)>/);

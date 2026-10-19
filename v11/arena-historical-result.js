@@ -46,6 +46,11 @@ const RESULT_PROPERTY_KEYS = new Set([
 ]);
 const HASH = /^[a-f0-9]{64}$/;
 const STATES = new Set(['queued','unknown','completed','rejected','failed','timed_out','partial']);
+const AUTHORITY_FLAGS = new Set([
+  'executionAuthorized','promotionAuthorized','profitabilityInferred','strategyPnlAuthorized',
+  'discoveryAuthorized','validationAuthorized','holdoutAuthorized','paperAuthorized','liveAuthorized',
+  'promotionEligible','holdoutClaim'
+]);
 const invalid = () => ({
   status:'INVALID',
   message:'Historische UI-Fixture abgelehnt · Format, Identität oder Status widersprüchlich.'
@@ -59,8 +64,80 @@ const stamp = value => value === null || typeof value === 'string' && value.leng
   /^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(value) &&
   Number.isFinite(Date.parse(value)) && new Date(value.slice(0,10)).toISOString().slice(0,10) === value.slice(0,10);
 
+function hasUniqueKeys(text) {
+  let index = 0;
+  const whitespace = () => { while (/\s/.test(text[index] || '')) index++; };
+  const stringToken = () => {
+    const start = index++;
+    while (index < text.length) {
+      if (text[index] === '\\') index += 2;
+      else if (text[index++] === '"') return text.slice(start,index);
+    }
+    return '';
+  };
+  const value = depth => {
+    whitespace();
+    if (depth > 12) return false;
+    if (text[index] === '{') {
+      index++; whitespace();
+      if (text[index] === '}') { index++; return true; }
+      const keys = new Set();
+      while (index < text.length) {
+        whitespace();
+        if (text[index] !== '"') return false;
+        let key;
+        try { key = JSON.parse(stringToken()); } catch { return false; }
+        if (keys.has(key)) return false;
+        keys.add(key); whitespace();
+        if (text[index++] !== ':' || !value(depth+1)) return false;
+        whitespace();
+        if (text[index] === '}') { index++; return true; }
+        if (text[index++] !== ',') return false;
+      }
+      return false;
+    }
+    if (text[index] === '[') {
+      index++; whitespace();
+      if (text[index] === ']') { index++; return true; }
+      while (index < text.length) {
+        if (!value(depth+1)) return false;
+        whitespace();
+        if (text[index] === ']') { index++; return true; }
+        if (text[index++] !== ',') return false;
+      }
+      return false;
+    }
+    if (text[index] === '"') { stringToken(); return true; }
+    while (index < text.length && !/[\s,[\]{}]/.test(text[index])) index++;
+    return index > 0;
+  };
+  return value(0) && (whitespace(), index === text.length);
+}
+
+function parseUniqueJson(text) {
+  try {
+    const value = JSON.parse(text);
+    return hasUniqueKeys(text) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function sameJson(left, right) {
+  if (left === right) return true;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return Array.isArray(left) && Array.isArray(right) && left.length === right.length &&
+      left.every((item,index)=>sameJson(item,right[index]));
+  }
+  if (!record(left) || !record(right)) return false;
+  const leftKeys = Object.keys(left).sort();
+  const rightKeys = Object.keys(right).sort();
+  return leftKeys.length === rightKeys.length && leftKeys.every((key,index)=>
+    key === rightKeys[index] && sameJson(left[key],right[key]));
+}
+
 function boundedJson(value, depth=0, budget={nodes:0}) {
-  if (depth > 12 || ++budget.nodes > 50_000) return false;
+  if (depth > 12 || ++budget.nodes > 100_000) return false;
   if (value === null || typeof value === 'boolean') return true;
   if (typeof value === 'number') return Number.isFinite(value);
   if (typeof value === 'string') return value.length <= 4096;
@@ -68,26 +145,22 @@ function boundedJson(value, depth=0, budget={nodes:0}) {
     return value.length <= 1000 && value.every(item => boundedJson(item,depth+1,budget));
   }
   if (!record(value) || Object.keys(value).some(key =>
-    key.length > 80 || !RESULT_PROPERTY_KEYS.has(key))) return false;
+    key.length > 80 || !RESULT_PROPERTY_KEYS.has(key) ||
+    AUTHORITY_FLAGS.has(key) && value[key] !== false)) return false;
   return Object.values(value).every(item => boundedJson(item,depth+1,budget));
 }
 
 function parseSerialized(text, limit, keys) {
   if (typeof text !== 'string' || new TextEncoder().encode(text).length > limit) return null;
-  try {
-    const value = JSON.parse(text);
-    return boundedJson(value) && exact(value,keys) ? value : null;
-  } catch {
-    return null;
-  }
+  const value = parseUniqueJson(text);
+  return value !== null && boundedJson(value) && exact(value,keys) ? value : null;
 }
 
 function validControls(text, progress) {
   if (text === null) return null;
   if (typeof text !== 'string' || new TextEncoder().encode(text).length > 8192 ||
       progress.length < 19 || progress.slice(0,18).some(item => item.state !== 'completed')) return null;
-  let controls;
-  try { controls = JSON.parse(text); } catch { return null; }
+  const controls = parseUniqueJson(text);
   if (!boundedJson(controls) || !record(controls)) return null;
   if (controls.status === 'FROZEN_DEVELOPMENT_ONLY') {
     const keys = ['status','meanExposure','riskExposure','primaryDevelopmentSd','fullBasketDevelopmentSd','calibration'];
@@ -118,12 +191,25 @@ function validateResult(text, job, controls) {
         'discoveryAuthorized','validationAuthorized','holdoutAuthorized','paperAuthorized','liveAuthorized']) ||
       result.authority.researchOnly !== true ||
       Object.entries(result.authority).some(([key,value]) => key !== 'researchOnly' && value !== false)) return null;
+  const evidence = result.evidence;
+  if (!record(result.identity) || result.identity.inputSha256 !== job.dataSha256 ||
+      result.protocolSha256 !== job.protocolSha256 ||
+      !record(evidence) || evidence.syntheticFixture !== false ||
+      evidence.priceSource !== 'PINNED_KRAKEN_SPOT_USD_CANDLES' ||
+      evidence.sourceAuthenticity !== 'NOT_ESTABLISHED' ||
+      evidence.historyLabel !== 'DEVELOPMENT_AND_HISTORICAL_DIAGNOSTIC' ||
+      evidence.candidateInterpretation !== 'HISTORICAL_CANDIDATE_ONLY_IF_PROPOSED_REAL_SCREEN_PASSES' ||
+      evidence.costModel !== 'OKX_INSPIRED_ASSUMED_15_30BP_NOT_EXECUTION_EVIDENCE' ||
+      evidence.executionEvidence !== 'NOT_OKX_EXECUTION_EVIDENCE' ||
+      evidence.holdoutClaim !== false || evidence.trialLedger !== 'UNKNOWN' ||
+      evidence.diagnosticRescaling !== 'NONE' ||
+      !sameJson(evidence.crv,{status:'UNDEFINED_NO_FINITE_STOP',value:null,researchOnly:true})) return null;
   if (!['attemptedPaths','completedPaths','computedPaths'].every(key => integer(result[key]) && result[key] <= 44) ||
       result.attemptedPaths !== result.completedPaths || result.completedPaths !== result.computedPaths) return null;
   if (result.status === 'COMPLETED' &&
       (result.attemptedPaths !== 44 || job.state !== 'completed')) return null;
   if (result.status === 'INSUFFICIENT_EVIDENCE' && ![19,44].includes(result.completedPaths)) return null;
-  if (result.controlDefinitions.status !== controls?.status) return null;
+  if (!controls || !sameJson(result.controlDefinitions,controls)) return null;
 
   const progressById = new Map(job.paths.map(item => [item.pathId,item]));
   const seen = new Set();
@@ -210,7 +296,9 @@ function validJob(job) {
     controls = validControls(job.controls,job.paths);
     if (!controls || !exact(job.controlBindings,['primaryDevelopmentSha256','fullBasketDevelopmentSha256']) ||
         !hash(job.controlBindings.primaryDevelopmentSha256) ||
-        !hash(job.controlBindings.fullBasketDevelopmentSha256)) return null;
+        !hash(job.controlBindings.fullBasketDevelopmentSha256) ||
+        job.controlBindings.primaryDevelopmentSha256 !== job.paths[0]?.payloadSha256 ||
+        job.controlBindings.fullBasketDevelopmentSha256 !== job.paths[15]?.payloadSha256) return null;
   }
   const result = validateResult(job.result,job,controls);
   if (job.result !== null && (!result ||
@@ -225,8 +313,8 @@ export function parseArenaHistoricalResultFixture(text) {
   if (typeof text !== 'string') return invalid();
   const bytes = new TextEncoder().encode(text).length;
   if (bytes > MAX_HISTORICAL_FIXTURE_BYTES) return invalid();
-  let value;
-  try { value = JSON.parse(text); } catch { return invalid(); }
+  const value = parseUniqueJson(text);
+  if (value === null) return invalid();
   if (!exact(value,['schema','evidenceClass','purpose','job']) ||
       value.schema !== SCHEMA || value.evidenceClass !== 'SYNTHETIC_ONLY' ||
       value.purpose !== 'UI_FIXTURE_NOT_PRODUCER_EXPORT') return invalid();

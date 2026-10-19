@@ -32,11 +32,12 @@ and invalid or unreadable input clears the previous fixture.
 The section displays only fields supplied by the fixture. It does not calculate
 returns, deltas, rankings, winners, or edge/no-edge conclusions, and it never
 calls the replay/import/storage/network paths. Missing producer fields remain
-unavailable. Schema and digest consistency do not establish source authenticity,
-admission, or authority. Historical interpretation, holdout status, assumed
-costs, `NO_FINITE_TRADE_STOP`, and `sourceAuthenticity: NOT_ESTABLISHED` are
-shown only when present in the serialized producer result. Replay, the existing
-synthetic inspection panel, and disposal behavior remain separate.
+unavailable. Schema and syntactically valid digest strings do not establish
+source authenticity, admission, or authority. Historical interpretation,
+holdout status, assumed costs, `NO_FINITE_TRADE_STOP`, and
+`sourceAuthenticity: NOT_ESTABLISHED` are shown only when present in the
+serialized producer result. Replay, the existing synthetic inspection panel,
+and disposal behavior remain separate.
 
 Focused generated-fixture coverage:
 
