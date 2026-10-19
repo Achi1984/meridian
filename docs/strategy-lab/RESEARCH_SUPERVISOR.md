@@ -171,3 +171,29 @@ the credential/code-hook-free child environment.
 - [ ] Choose and explicitly invoke a scheduler; no scheduler is installed or running here. Set bounded recurring daily compute/data/model budgets and monitor reservations, timeouts, unresolved work, disk, and host health.
 - [ ] Add a separate durable run ledger and independently reviewed evidence/research/holdout authorization and promotion gate. Job completion or queue admission must never satisfy these gates.
 - [ ] Require independent review and cost-budget approval before any future continuous research or live-paper deployment. This package alone does not establish operational readiness.
+
+## Manual read-only B1 inspection report
+
+For an existing local **generated-fixture** B1 journal and exact trial ID:
+
+```sh
+python3 -B scripts/research-supervisor/inspection_report.py /path/to/existing.sqlite TRIAL_SHA256
+```
+
+This command calls the existing `inspect_b1` validator only. It does not initialize
+storage, run an engine, enqueue, retry, reconcile, release a fence, or activate a
+service. Missing files and incompatible journal profiles fail closed without a
+fallback. Output is one deterministic JSON report of at most 16 KiB; failure emits
+a generic error on stderr and no report on stdout. Stored timestamps are retained;
+there is no inferred heartbeat or claim that a process is currently healthy.
+
+The report includes trial/source identities, counts, stored state and unresolved
+fence status, but excludes raw results, strategy metrics and control payloads.
+`unknown` with `unresolved=true` means the durable fence remains and explicit
+reconciliation is required; inspection does not perform recovery. A resolved trial
+does not establish that the entire journal has no other active work. Stored-journal
+integrity is not source authenticity, profitability, or execution authority.
+The underlying validator still reads and validates its bounded stored evidence;
+the 16 KiB limit applies to report output, not total internal inspection work.
+Tests use temporary generated journals and do not run strategy calculations:
+`node --test test/research-supervisor-inspection.test.js`.
