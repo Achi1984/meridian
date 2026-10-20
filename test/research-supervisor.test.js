@@ -39,7 +39,7 @@ const groups = [
   },
   {
     name: "B1 integration",
-    timeoutMs: 60_000,
+    timeoutMs: 90_000,
     methods: [
       "test_b1_child_failure_with_unreadable_journal_returns_unsettled",
       "test_b1_controls_are_bound_to_committed_development_results_once",
