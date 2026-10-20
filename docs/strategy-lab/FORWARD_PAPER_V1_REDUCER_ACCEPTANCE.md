@@ -1,6 +1,6 @@
 # Forward Paper V1 — reducer acceptance design
 
-**Contract:** [`FORWARD_PAPER_V1_CONTRACT_SPEC.md`](FORWARD_PAPER_V1_CONTRACT_SPEC.md), interface `MERIDIAN-FORWARD-PAPER-EVENT/1.0.0`. This document defines a generated-test design matrix only; it does not define another interface, executable fixture, or test implementation.  
+**Contract:** [`FORWARD_PAPER_V1_CONTRACT_SPEC.md`](FORWARD_PAPER_V1_CONTRACT_SPEC.md), interface `MERIDIAN-FORWARD-PAPER-EVENT/1.0.0`. This document defines a generated-test design matrix only; it does not define another interface, executable fixture, or test implementation.
 **Status:** documentation only. No tests, engine, market/network reads, or operational probes are requested or performed. Forward implementation remains blocked pending useful, independently assessed D2 evidence and separate owner authorization.
 
 ## 1. Test boundary and common setup

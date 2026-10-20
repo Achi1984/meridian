@@ -1,7 +1,8 @@
 # Forward Paper V1 — event, causality and accounting contract
 
-**Interface:** `MERIDIAN-FORWARD-PAPER-EVENT/1.0.0`  
-**Status:** specification only; implementation is blocked pending useful, independently assessed D2 evidence and a separate owner decision.  
+**Interface:** `MERIDIAN-FORWARD-PAPER-EVENT/1.0.0`
+
+**Status:** specification only; implementation is blocked pending useful, independently assessed D2 evidence and a separate owner decision.
 **Audited source:** main commit `6bcaa74b35a7c093e67f144a03f82a6d77cdf9be`, tree `d2ef43696a037c1f84dc2d477bace85f34695cf4`. The references below identify the exact files and line ranges in that source tree. This specification does not claim that those historical files implement this contract.
 
 ## 1. Scope and non-authority
