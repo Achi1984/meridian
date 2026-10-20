@@ -485,7 +485,7 @@ test('Terminal öffnen preserves the reviewed history-close baseline and stays o
   assert.equal(gitBlob(restored),preimageBlob,'all source bytes except terminal-entry insertions, the checked viewport pair and exact Depot/revision deltas must match the reviewed history-close baseline');
 });
 
-const moduleNames=['bot-read-bootstrap.js','bot-read-access.js','bot-read-client.js','bot-read-view.js','bot-read-model.js','bot-overview-model.js','depot-read-bootstrap.js','depot-read-client.js','depot-read-model.js','depot-read-view.js','depot-history-model.js','depot-history-view.js','depot-current-model.js','strategy-workspace-bootstrap.js','strategy-catalog.js','research-evidence.js','strategy-arena.js','arena-inspection-report.js'];
+const moduleNames=['bot-read-bootstrap.js','bot-read-access.js','bot-read-client.js','bot-read-view.js','bot-read-model.js','bot-overview-model.js','depot-read-bootstrap.js','depot-read-client.js','depot-read-model.js','depot-read-view.js','depot-history-model.js','depot-history-view.js','depot-current-model.js','strategy-workspace-bootstrap.js','strategy-catalog.js','research-evidence.js','strategy-arena.js','arena-inspection-report.js','arena-historical-result.js'];
 function deploymentServer(){
   const inlineScript=html.match(/<script>([\s\S]*?)<\/script>/i)?.[1];
   assert.ok(inlineScript,'actual UI-only navigation script');
@@ -597,6 +597,15 @@ test('terminal deployment fixture serves the catalog research evidence module un
     assert.equal(await inspection.text(),readFileSync(new URL('../v11/arena-inspection-report.js',import.meta.url),'utf8'));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(inspectionUrl.href));
     assert.equal(server.allowedPaths.has(inspectionUrl.pathname),true);
+    const historicalImport=arenaSource.match(/from ['"](\.\/arena-historical-result\.js)['"]/);
+    assert.ok(historicalImport,'Arena imports the bounded historical fixture adapter');
+    const historicalUrl=new URL(historicalImport[1],arenaUrl);
+    const historical=await fetch(historicalUrl);
+    assert.equal(historical.status,200,'historical adapter must be served before Arena bootstrap can succeed');
+    assert.match(historical.headers.get('content-type'),/^text\/javascript/);
+    assert.equal(await historical.text(),readFileSync(new URL('../v11/arena-historical-result.js',import.meta.url),'utf8'));
+    assert.ok(scriptPolicy.trim().split(/\s+/).includes(historicalUrl.href));
+    assert.equal(server.allowedPaths.has(historicalUrl.pathname),true);
     assert.deepEqual(server.metrics(),{reads:0,aborts:0,depotReads:0,depotAborts:0,pending:0});
   }finally{await server.close();}
 });
