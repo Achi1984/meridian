@@ -1,15 +1,19 @@
 # Forward-Paper V1 durable journal and bounded observer
 
-**Status:** documentation-only design; implementation blocked pending independently
-assessed D2 evidence and the companion interface.
+**Status:** documentation-only journal design, aligned to the accepted event
+interface; implementation remains blocked pending independently assessed D2
+evidence and separate owner authorization.
 
-**Interface dependency:** Achi1984/meridian#914, Draft PR #916, owns the event and
-transition wire fields and identity semantics. At this writing PR #916 contains
-only its initial-plan commit `b7321fdd6b07f48f7523b3903cc4c71d97c9045f`; it has
-no interface files or M1 interface commit. The terms and tables below are
-conceptual design vocabulary, not wire fields, a second API, or an alternative
-identity definition. Exact names, canonicalization, digests, reason codes, and
-compatibility remain **WAITING_FOR_INTERFACE**.
+**Canonical interface:** `MERIDIAN-FORWARD-PAPER-EVENT/1.0.0`, accepted
+companion commit
+[`a1c1b35656d501e4d2bcc74ae4a717110beca26c`](https://github.com/Achi1984/meridian/commit/a1c1b35656d501e4d2bcc74ae4a717110beca26c),
+specifically the companion's
+[contract specification at that commit](https://github.com/Achi1984/meridian/blob/a1c1b35656d501e4d2bcc74ae4a717110beca26c/docs/strategy-lab/FORWARD_PAPER_V1_CONTRACT_SPEC.md)
+§§4–8. The companion contract owns all event, transition, identity,
+canonicalization, acknowledgment, state, and reason-code semantics. The tables
+below describe journal durability obligations using that interface; they do
+not add or rename wire fields. M2 alignment is complete at this pin. M3 still
+requires Lead's consolidated acceptance.
 
 ## Scope and evidence boundary
 
@@ -44,29 +48,36 @@ source, or version change requires a new immutable run.
 
 ## Journal entities and conceptual fields
 
-The field labels here describe information that durable records must represent;
-they are not prescribed serialization or API spellings. Exact event and
-transition fields are blocked on #914's published M1 interface.
+The companion's exact field names and meaning are canonical; this journal
+design adds no alternate event or transition fields. Durable records must
+preserve the following interface identities, provenance, and causal boundaries:
 
 | Entity | Required conceptual content | Immutability and checks |
 | --- | --- | --- |
-| Run and frozen configuration | Unique run identity; strategy/code and policy version identities; source/provider contract identity; universe/product and timeframe; explicit risk, cost, capital/currency and timing selections; source/config digest; explicit finite invocation limits. | Freeze before accepting observations. No in-place edit, inherited default, or mixed version. Missing or changed required configuration rejects the run before claim. Any changed policy/source/version starts a new run. |
-| Observation identity and digest | Interface-defined observation identity; digest of the interface-defined content; run identity; observation kind; source watermark reference; source-reported time and any separately identified local receipt time. | First accepted identity binds permanently to its digest. Same identity and digest is a duplicate; same identity with another digest is a conflict and halts the affected run. Digest validity does not authenticate the provider or payload. |
-| Source watermark | Interface-defined source/provider and stream identity; instrument/timeframe where applicable; source sequence or as-of/closed-through position; predecessor/continuity information where supplied. | Distinguish source progress from local receipt/fetch time. Exact meaning and encoding are owned by #914. A missing, regressing, ambiguous, late, or gapped watermark cannot silently advance the eligible position. |
-| Attempt and fence | Run and logical operation identity; monotonically advancing attempt number; unique fence generation/token; claimant; expected committed receipt sequence/state; active or resolved status. | Claim is a compare-and-set against expected state and the current fence. A successful claim consumes an attempt. Its fence token remains in immutable history after resolution. Commit atomically resolves the winning active claim; an unresolved result keeps that claim active and blocks re-execution. A losing compare-and-set does not create a claim or halt the run. |
-| Proposed transition | Interface-defined proposal identity and disposition; input observation identities/digests; expected prior state/receipt sequence; proposed next state; calculated account delta; fence generation. | Proposal is immutable, bound to the run/config and claim, and checked against current state. It is not an effect and cannot be acknowledged as committed. No proposal may bypass missing marks, source gaps, eligibility, risk, or accounting invariants. |
-| Committed receipt | Unique receipt sequence; proposal and observation references; expected and resulting state identities; account delta and post-transition account identity; run/config identity; committed fence generation; durable commit outcome. | Append-only and written atomically with the account effect, committed sequence advance, and resolution of the winning active claim. Preserve the fence token and attempt as historical identity; resolve its active status in that same transaction. A receipt cannot be fabricated, rewritten, or inferred from an ACK or UI response. A receipt sequence is contiguous within the selected journal. |
-| Optional derived snapshot/checkpoint | Run/config identity; account projection; last included committed receipt sequence and identity; snapshot content identity; explicit valuation/mark availability. | Not an atomic participant or authority for commit status. It may lag the committed head if its projection matches the receipt prefix it names; that is a stale checkpoint, not corruption. A checkpoint ahead of the committed head, or whose content/digest fails validation against its named prefix, is corrupt/drifted and unusable. It cannot make an otherwise evidenced receipt `UNKNOWN` or invalidate `OP_APPLIED`. Preserve evidence; do not rewrite or automatically repair it. Missing marks remain unavailable, never zero. |
-| Reconciliation record | Reconciliation identity; affected run/operation/observation and expected state; one outcome from the recovery table; evidence references/digests; decision and authority provenance; decision time and time basis; before/after sequence and fence disposition. | Append-only and separate from receipts. It records a decision; it does not create a missing receipt, change an account, authorize itself, or erase an earlier record. No recovery command or presumed operator identity is specified here. |
+| Run and frozen configuration | Companion `interfaceVersion`, `runIdentity`, `strategyIdentity`, `configurationIdentity`, closed `choices`, and `frozenAtLocalMs`; `RUN_ADMITTED` receipt with `runStartDurableAtLocalMs` and source barrier or trusted clock mapping. | Freeze and separately admit before `FORWARD_CANDIDATE` input. Missing/`REQUIRED_UNSET` choices block admission. Any changed strategy/config/source/version requires a new immutable run. |
+| Observation identity, payload, and provenance | Companion `eventIdentity=(sourceIdentity, sourceStream, productIdentity, sourceEventId)`; canonical complete event and `payloadDigest`; `runIdentity`, source/product/adapter identities; `sourceEventTimeMs`, `localReceivedAtMs`; `kind`; corresponding `candle`, `priceEvent`, or `mark`; `observationUse`, `provenanceClass`, and `provenanceReference`. | Identity binds the full digest, including use/provenance/reference. Exact identity+digest is `IDEMPOTENT_NOOP`; changed digest under an existing identity is `IDENTITY_CONFLICT` and halts. Historical/backfill/replay/synthetic input is `WARMUP_ONLY`, never forward performance. A digest or provenance label is not authentication. |
+| Decision proposal | Companion `decisionIdentity`, ordered `inputEventIdentities`, `inputDigest`, `decisionTimeLocalMs`, strategy-owned `proposal`/`NO_ACTION`, and `proposalDigest`; it is carried by the exact `TransitionProposal` rather than a new journal wire shape. | Pure deterministic proposal over acknowledged state and bounded events; input events precede the consuming decision. No decision effect exists until its exact durable receipt is acknowledged. |
+| Eligible fill intent | Companion `priceEventIdentity`, payload digest, `priceEventTimeMs`, `localReceivedAtMs`, phase, exact price/product, `decisionReceiptIdentity`, `decisionDurableAtLocalMs`, `causalOrderProof`, and selected quantity/side/cost treatment. | The causal proof must establish event occurrence strictly after the exact committed decision acknowledgment. Local receipt later than ACK alone is insufficient. No past open/backfill/cache event may fill. |
+| Source watermark and causal proof | Accepted source event identity/time/sequence and closed-through position, with companion `provenanceReference`; run-start source barrier or trusted source/local clock mapping. | Source time and local receipt time remain distinct. Forward decision inputs must follow the durable run-start fence and precede the consuming decision; they need not follow that decision's ACK. Only an eligible fill/price event must additionally be proven strictly later than that exact decision's durable acknowledgment. A gap, regression, late, or unprovable event cannot silently advance eligibility. |
+| Attempt and fence | The companion proposal/receipt `receiptIdentity`, `transitionIdentity`, expected/proposed `stateIdentity`, and persistence outcome, plus the journal's internal attempt number and fence token needed to enforce single-writer fencing. | A successful claim consumes one attempt. Its fence token remains immutable history after resolution. The committed winning claim's active fence is resolved in the same atomic commit as account, receipt, and sequence. `UNKNOWN` keeps it active. An ordinary compare-and-set loser consumes no attempt, does not halt the run, and does not invalidate the still-current winner. Internal attempt/fence metadata is not a competing interface field. |
+| Transition proposal | Exact companion `TransitionProposal {interfaceVersion, expectedStateIdentity, eventIdentity, proposedStateIdentity, receiptIdentity, disposition}`; disposition is `PROPOSE`, `IDEMPOTENT_NOOP`, `REJECT`, or `HALT`. | Pure proposal only; it does not itself mutate state/account. Validate exact expected state, event and receipt binding, run/config, fence, causality, and applicable invariants. Do not extend or rename this closed shape. |
+| Account state and committed receipt | Companion `accountIdentity`, `runIdentity`, `baseCurrency`, exact `cash`, `holdings`, `marks`, `equity` or `UNAVAILABLE`, `riskSnapshot`, `parentStateIdentity`/`stateIdentity`; receipt `interfaceVersion`, `receiptIdentity`, `transitionIdentity`, `transitionDisposition`, exact reason, event/input identities and digests, account/cost/mark evidence, and persistence-set `durableAtLocalMs`. | Durable `DURABLE_COMMITTED` evidence atomically applies the account state, appends receipt, advances sequence, and resolves the winning active claim; retain historical fence token. ACK/UI arrival alone is not commit. Receipt/state identities and fields are those of the pinned interface. |
+| Optional derived snapshot/checkpoint | A projection/cache of the authoritative account and reducer state already committed in the receipt transaction; names a specific committed state/receipt identity and account/mark content. It is not that authoritative committed state itself and not a new interface receipt or transition. | Not an atomic participant or authority for commit status. A lagging snapshot is valid only if it matches the committed prefix it names. Ahead-of-head or content/prefix mismatch makes that snapshot unusable; it does not undo or obscure an independently evidenced `DURABLE_COMMITTED` receipt. Never auto-repair, rewrite, or fabricate state. Missing marks/equity remain unavailable. |
+| Reconciliation record | Companion reconciliation receipt binding original `receiptIdentity`, attempted `transitionIdentity`, prior/resulting `stateIdentity`, durable evidence, authority, outcome and exact reason; internal journal evidence may additionally identify attempt and historical fence. | Append-only and distinct from the original proposal/receipt. An authorized durable decision resolves `UNKNOWN`; it cannot fabricate a fill/receipt, edit state history, or authorize itself. Read-only inspection cannot reconcile or release an active fence. |
 
 ## Transaction boundaries and effect semantics
 
-The implementation must preserve these boundaries. The exact wire transition
-shape and serialization are still owned by #914.
+The implementation must preserve these boundaries exactly as specified by
+`MERIDIAN-FORWARD-PAPER-EVENT/1.0.0` §§4–8. The companion contract owns
+serialization, identities, transition shape, states, dispositions, and reason
+codes.
 
 1. **Observe and deduplicate.** Accept only the caller-supplied bounded
    observations for this invocation. Validate run/config binding, required
-   source watermark, ordering, and interface-defined identity/digest. An
+   source watermark, `observationUse`/provenance consistency, causal proof
+   after `RUN_ADMITTED`, ordering, and interface-defined identity/digest. A
+   forward decision-input event must precede its consuming decision but need
+   not occur after that decision's durable acknowledgment. An
    identical observation already durably committed returns its existing durable
    result without another attempt or account effect. A reused identity with a
    changed digest records a conflict when storage permits and halts the run; it
@@ -79,11 +90,15 @@ shape and serialization are still owned by #914.
    halt the run or invalidate the winner. An invalid precondition creates no
    claim. An unresolved claim remains active; no timeout, restart, read-only
    inspection, or elapsed wall time releases it.
-3. **Propose.** Persist or otherwise durably identify the immutable proposal
-   against that claim. Recheck expected state, run/config identity, observation
-   digests, watermark eligibility, and fence. A stale compare-and-set is a
-   no-effect rejection; it is not by itself a run-wide identity/history
-   conflict.
+3. **Propose.** The reducer computes the exact immutable
+   `TransitionProposal` as a pure result over an acknowledged state and bounded
+   event; it performs no journal I/O or account effect. The persistence
+   boundary binds that result to the active claim/fence and rechecks expected
+   state, run/config identity, observation digests, warmup/provenance rules,
+   run-start/event ordering, watermark eligibility, and fence. Any separately
+   persisted internal intent remains non-authoritative and does not advance
+   reducer state. A stale compare-and-set is a no-effect rejection; it is not
+   by itself a run-wide identity/history conflict.
 4. **Commit account, receipt, sequence, and claim resolution atomically.** One
    storage transaction must compare the expected account/state/receipt
    sequence and active fence, apply the account delta, append exactly one
@@ -99,6 +114,14 @@ shape and serialization are still owned by #914.
    read-only lookup/deduplication of the already committed result, never by
    applying the transition again.
 
+A definite `DURABLE_REJECTED` is a known no-effect result, distinct from
+`UNKNOWN`: it leaves reducer state and account unchanged and cannot be treated
+as a commit. The journal must durably resolve that attempt as rejected before
+allowing an independent later claim; this is not permission to retry the same
+proposal. If the rejection outcome itself is ambiguous, preserve the active
+fence and classify `UNKNOWN`. This internal attempt disposition adds no
+companion wire field or receipt identity.
+
 Every commit must match its expected prior state, expected receipt sequence,
 and current fence. A stale writer, concurrent compare-and-set loser, or
 mismatched proposal must leave account state and receipt history unchanged.
@@ -109,6 +132,50 @@ other demonstrated journal-integrity conflict is distinct; preserve evidence
 and halt the affected run. A rejection must not be represented as a committed
 transition.
 
+## Pinned transition and receipt mapping
+
+All Forward-Paper reducer state names are exactly `WARMUP`, `OBSERVED`,
+`VALIDATED`, `PENDING_DURABLE_DECISION`, `ELIGIBLE_FILL`, `MARKED`, `HALTED`,
+and `UNKNOWN`, as defined by the pinned companion contract §8. In particular,
+`MARKED` is not terminal: a later admitted `FORWARD_CANDIDATE` can begin the
+next cycle while carrying the exact prior committed account/state identity,
+cash, holdings, costs, and parent receipt. It does not reset capital. A
+`WARMUP_ONLY` observation cannot produce a forward decision, fill, account
+mutation, performance receipt, or forward observation count.
+
+The companion's proposal, acknowledgment, and receipt enums are separate and
+must not be collapsed:
+
+| Layer | Exact pinned values | Journal meaning |
+| --- | --- | --- |
+| `TransitionProposal.disposition` | `PROPOSE`, `IDEMPOTENT_NOOP`, `REJECT`, `HALT` | Pure reducer intent. It cannot change durable state or account by itself. |
+| Persistence acknowledgment | `DURABLE_COMMITTED`, `DURABLE_REJECTED`, `UNKNOWN` | Only `DURABLE_COMMITTED` advances the exact matching expected/proposed state and commits its receipt/effect. `DURABLE_REJECTED` has no state/effect advancement. `UNKNOWN` retains the active fence and blocks dependent transitions. |
+| Receipt `transitionDisposition` | `COMMITTED`, `REJECTED`, `UNKNOWN` | Durable receipt outcome; it is not the proposal disposition or the outer acknowledgment enum. |
+
+The exact proposal shape is the closed companion shape:
+`{interfaceVersion, expectedStateIdentity, eventIdentity,
+proposedStateIdentity, receiptIdentity, disposition}`. `stateIdentity` binds
+its parent and canonical contents; receipt identity is stable only for that
+same proposal. A committed receipt binds interface/run/config/strategy
+identities, input/event identities and digests, transition identity/reason,
+state before/after, account/cost/mark evidence, and
+`durableAtLocalMs` assigned by persistence. Decision local time and
+`durableAtLocalMs` remain distinct. Do not invent parallel transition IDs,
+receipt IDs, states, or reason codes.
+
+Companion reason codes are the closed uppercase vocabulary in contract §8.
+Journal/recovery tests use those exact codes, including
+`CONFIGURATION_INCOMPLETE`, `VERSION_MISMATCH`, `IDENTITY_MISSING`,
+`IDENTITY_CONFLICT`, `DUPLICATE_IDEMPOTENT`,
+`PAYLOAD_INVALID`, `BOUND_EXCEEDED`, `EVENT_FUTURE`, `CANDLE_UNCLOSED`,
+`EVENT_REORDERED`, `CADENCE_GAP`, `UNIVERSE_MISALIGNED`, `SOURCE_STALE`,
+`MISSING_REQUIRED_FIELD`, `LATE_OR_PAST_EVENT`,
+`DECISION_NOT_DURABLE`, `PERSISTENCE_REJECTED`, `PERSISTENCE_UNKNOWN`,
+`STATE_IDENTITY_MISMATCH`, `BALANCE_INVARIANT`, `RISK_LIMIT`,
+`COST_POLICY_INCOMPLETE`, `COST_DUPLICATE`, `MARK_UNAVAILABLE`,
+`MISSED_OR_EXPIRED`, and `RECONCILIATION_REQUIRED`. Unknown reason codes
+reject; no reason code or free-text value is added by this journal design.
+
 ## Crash boundary map
 
 | Interruption point | Durable interpretation after restart |
@@ -117,7 +184,7 @@ transition.
 | After claim/attempt, before proposal | The attempt and active fence are durable; no proposal or account effect is presumed. Treat as unresolved until authorized reconciliation establishes the outcome. |
 | After proposal, before atomic commit | The proposal is not an account effect. If absence of commit cannot be authoritatively established, report `UNKNOWN`, retain its fence, and block re-execution. |
 | During an ambiguous commit/write failure | Do not infer either rollback or success. Keep the fence and classify `UNKNOWN` unless authoritative receipt/account evidence proves `OP_APPLIED` or `OP_ABSENT`. |
-| After durable commit, before ACK | The account effect, receipt, sequence advance, and winning-claim fence resolution are already committed together. Read-only inspection/deduplication returns that result; do not apply it again. A later optional snapshot write is irrelevant to this outcome. |
+| After `DURABLE_COMMITTED`, before caller receives ACK | The account effect, receipt, sequence advance, and winning-claim fence resolution are already committed together. Read-only lookup by exact receipt/state identity returns that result; do not apply it again. A later optional snapshot write is irrelevant to this outcome. |
 | Concurrent compare-and-set loser | The loser is rejected without a claim, attempt, proposal, or account effect. The winner remains valid and may commit if its expected state and active fence still match. This rejection alone does not halt the run. |
 | Later stale writer | Reject a proposal whose historical fence is no longer active, with no account effect. Preserve the old token and current state. Ordinary stale-writer rejection alone does not halt the run; an independent identity/history integrity conflict does. |
 | Optional snapshot lags committed head | Accept as a valid older checkpoint only if its projection matches the receipt prefix it names. It is stale, not corrupt, and does not change commit/recovery outcome. Do not silently advance or rewrite it. |
@@ -183,17 +250,40 @@ storage durability, deployment, and provider behavior are not verified.
   is inferred.
 - New policy, source, strategy, or implementation version means a new run,
   not a mutation of an existing run's identity or evidence.
+- A persistence lookup may resolve the exact same `receiptIdentity` under the
+  same fence after lost acknowledgment, but it is lookup-only and may never
+  reapply effects. This is not an execution retry.
+
+## Canonical serialization and interoperability
+
+The pinned v1 wire profile is UTF-8 RFC 8785 canonical JSON with SHA-256
+lowercase-hex digests. The digest excludes its own digest field and includes
+every other identity-bearing field, including event identity, payload,
+observation use, provenance class, and provenance reference. Reject
+noncanonical encodings, unknown/extra fields, duplicate keys, malformed
+digests, unsafe numbers, and over-bound payloads. Decimal quantities/prices/
+cash are exact decimal strings with explicit units; timestamps are UTC epoch
+milliseconds as safe integers. Do not use floating-point account arithmetic,
+exponent notation, implicit units, or Unicode normalization not defined by the
+pinned serializer.
+
+The companion interface's generated interoperability vectors are authoritative.
+The journal/recovery package must verify byte-for-byte and digest compatibility
+against commit `a1c1b35656d501e4d2bcc74ae4a717110beca26c`, not choose its own
+canonicalization. Identity-bound warmup/provenance fields and all transition,
+state, and receipt identities must participate in precisely that pinned
+canonicalization.
 
 ## M1/M2/M3 handoff
 
-- **M1 inventory and transaction/failure map:** specified here independently.
-- **M2 interface binding and interoperability:** blocked until #914 publishes
-  its exact M1 interface commit. At that point, record the exact commit and
-  resolve each conceptual table, transition, identity, and canonicalization
-  point without redefining companion-owned fields.
-- **M3 acceptance and consolidated handoff:** blocked on M2, completion of the
-  recovery acceptance matrix, and Lead's independent review. Operating choices,
-  D2 evidence, storage model, and source capability remain prerequisites.
+- **M1 inventory and transaction/failure map:** completed independently and
+  corrected by the accepted durability review.
+- **M2 interface alignment:** aligned to
+  `MERIDIAN-FORWARD-PAPER-EVENT/1.0.0` at exact companion commit
+  `a1c1b35656d501e4d2bcc74ae4a717110beca26c`; no companion-owned wire field is
+  redefined here.
+- **M3 consolidated acceptance:** recovery and serialization matrices are
+  aligned to that pin; final Lead acceptance remains pending.
 
-Current handoff state: **WAITING_FOR_INTERFACE**. No implementation, runtime,
-database, market-data, provider, or authority change is authorized.
+No implementation, runtime, database, market-data, provider, or authority
+change is authorized. D2 and operating-choice gates remain unchanged.
