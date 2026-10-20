@@ -240,6 +240,7 @@ function validateResult(text, job, controls) {
       evidence.executionEvidence !== 'NOT_OKX_EXECUTION_EVIDENCE' ||
       evidence.holdoutClaim !== false || evidence.trialLedger !== 'UNKNOWN' ||
       evidence.diagnosticRescaling !== 'NONE' ||
+      evidence.stoppedPolicy !== 'NO_FINITE_TRADE_STOP' ||
       !sameJson(evidence.crv,{status:'UNDEFINED_NO_FINITE_STOP',value:null,researchOnly:true})) return null;
   if (!['attemptedPaths','completedPaths','computedPaths'].every(key => integer(result[key]) && result[key] <= 44) ||
       result.attemptedPaths !== result.completedPaths || result.completedPaths !== result.computedPaths) return null;
@@ -257,7 +258,8 @@ function validateResult(text, job, controls) {
     if (!record(path) || !hash(path.pathId) || path.pathId !== job.pathIds[index] || seen.has(path.pathId)) return null;
     seen.add(path.pathId);
     if (path.status === 'COMPLETED') {
-      if (path.computed !== true || progressById.get(path.pathId)?.state !== 'completed') return null;
+      if (path.computed !== true || path.attempts !== 1 ||
+          progressById.get(path.pathId)?.state !== 'completed') return null;
     } else if (path.status === 'NOT_RUN_INSUFFICIENT_EVIDENCE') {
       if (result.status !== 'INSUFFICIENT_EVIDENCE' || path.computed !== false ||
           path.attempts !== 0 || progressById.has(path.pathId)) return null;

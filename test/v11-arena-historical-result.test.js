@@ -179,6 +179,11 @@ test('duplicate, conflicting, outside-inventory and contradictory identities fai
     value=>{
       const result=JSON.parse(value.job.result);
       value.job.result=JSON.stringify({...result,identity:{...result.identity,inputSha256:digest('9')}});
+    },
+    value=>{
+      const result=JSON.parse(value.job.result);
+      value.job.result=JSON.stringify({...result,paths:result.paths.map((path,index)=>
+        index===0?{...path,attempts:999}:path)});
     }
   ];
   for(const [index,mutate] of mutations.entries()){
@@ -211,7 +216,8 @@ test('strict envelopes, nested JSON, bounded depth, finite values and authority 
     result=>result.screen=null,
     result=>result.screen={status:'BOGUS'},
     result=>delete result.screen.checks.primaryDiagnosticNetPositive,
-    result=>result.screen.tradeCRV.value=0.2
+    result=>result.screen.tradeCRV.value=0.2,
+    result=>result.evidence.stoppedPolicy='FINITE_STOP'
   ]) {
     const value=fixture({state:'completed',resultStatus:'COMPLETED'});
     const result=JSON.parse(value.job.result);mutate(result);
@@ -266,6 +272,19 @@ test('historical fixture renders escaped producer fields without network, digest
   assert.match(root.innerHTML,/role="alert"/);
   assert.doesNotMatch(root.innerHTML,/Lifecycle: failed/);
   assert.deepEqual(cards(root.innerHTML),before);
+  view.dispose();
+});
+
+test('visible insufficient summaries retain the producer no-finite-stop limitation',async()=>{
+  const root=rootFixture(),view=createStrategyArenaView(root);
+  const stopSummary=()=>root.innerHTML.match(/<p>Quellenauthentizität:[\s\S]*?<\/p>/)?.[0];
+  for(const value of [
+    fixture({state:'failed',resultStatus:'INSUFFICIENT_EVIDENCE'}),
+    fixture({state:'completed',resultStatus:'COMPLETED',screenStatus:'INSUFFICIENT_EVIDENCE'})
+  ]) {
+    await root.importHistorical(file(JSON.stringify(value)));
+    assert.match(stopSummary() || '',/Quellenauthentizität: NOT_ESTABLISHED · Stoppregel: NO_FINITE_TRADE_STOP/);
+  }
   view.dispose();
 });
 
