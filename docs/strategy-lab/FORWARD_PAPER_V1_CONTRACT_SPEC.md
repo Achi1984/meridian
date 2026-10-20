@@ -41,7 +41,7 @@ The initial configuration contains explicit `REQUIRED_UNSET` values. A missing, 
 | `observationPeriod` | Explicit start/end policy, duration and minimum observation/sample rules | `REQUIRED_UNSET` | No retrospective interval counts as forward exposure. |
 | `feePolicy`, `slippagePolicy`, `liquidityPolicy` | Fee basis, fill-price/slippage treatment, spread/depth/impact and participation units | `REQUIRED_UNSET` | No inherited bps, zero costs, default depth, or silent cost substitution. |
 | `riskPolicy`, `stopPolicy`, `exposureLimit`, `lossLimit` | Explicit method, currency/quantity basis, hard bounds and breach action | `REQUIRED_UNSET` | No inherited historical no-stop exemption or implicit unlimited risk. |
-| `decisionTiming`, `fillEligibility`, `markPolicy` | Source/local time rules, event phase, lateness and mark eligibility rules | `REQUIRED_UNSET` | No past event/open or unselected candle convention may fill or mark. |
+| `decisionTiming`, `fillEligibility`, `expiryPolicy`, `markPolicy` | Source/local time rules, event phase, lateness, explicit fill-expiry boundary/action, and mark eligibility rules | `REQUIRED_UNSET` | No past event/open or unselected candle/expiry convention may fill or mark. |
 | `freshnessPolicy`, `gapPolicy`, `synchronizationPolicy` | Explicit durations/cadence in ms and alignment rules | `REQUIRED_UNSET` | No guessed freshness window, interpolation, or partial-universe decision. |
 | `computeBounds` | Explicit max input/events/bytes/work per transition and timeout units | `REQUIRED_UNSET` | An absent/exceeded bound rejects without partial state mutation. |
 | `reconciliationAuthority` | Named authority, permitted evidence and explicit durable-resolution procedure | `REQUIRED_UNSET` | No automatic retry, self-approval, or assumed settlement from `UNKNOWN`. |
@@ -81,6 +81,8 @@ All envelopes are closed schemas under `MERIDIAN-FORWARD-PAPER-EVENT/1.0.0`; mis
 | `choices` | Closed object from §3 | No `REQUIRED_UNSET`, null, omitted, inferred, or historical default accepted by an implementation admission check. |
 | `frozenAtLocalMs` | Safe integer | Local time at which the exact configuration was frozen; cannot be earlier than the decision that freezes it. |
 
+Before a run accepts any `FORWARD_CANDIDATE`, its admission must have an exact `RUN_ADMITTED` durable receipt bound to `runIdentity`, `strategyIdentity`, and `configurationIdentity`. That receipt records `runStartDurableAtLocalMs` and either a source barrier acknowledged after admission or a trusted source/local clock mapping. A forward event must be proven strictly later than this run-start fence as well as later than its decision receipt. A run-start receipt or causal fence is not implied by configuration freeze. Without such proof, observations remain warmup-only or are rejected; no forward observation count or performance effect is allowed.
+
 ### 5.2 Observation envelope
 
 | Field | Type | Rule |
@@ -95,9 +97,13 @@ All envelopes are closed schemas under `MERIDIAN-FORWARD-PAPER-EVENT/1.0.0`; mis
 | `candle` | `{intervalMs, openTimeMs, closeTimeMs, open, high, low, close}` | Required for candle observations. Complete valid OHLC, positive prices and `openTimeMs < closeTimeMs`; the close is not known/usable until close time and closure are established. |
 | `priceEvent` | `{phase, eventTimeMs, price, sourceEventId}` | Required for fill candidates. `phase` must be explicitly declared, price positive, and time distinct from local receipt time. |
 | `mark` | `{markTimeMs, price}` | Required for a mark candidate; no stale/missing mark may be coerced to zero. |
-| `sourceProvenance` | Bounded opaque assertion | Preserved verbatim in receipt; not treated as authenticated without separate evidence. |
+| `observationUse` | Enum: `FORWARD_CANDIDATE`, `WARMUP_ONLY` | Required, identity-bound classification of intended use; not itself evidence of authenticity or prospective arrival. |
+| `provenanceClass` | Enum: `PROSPECTIVE_SOURCE_EVENT`, `HISTORICAL_BACKFILL`, `REPLAY_OR_SYNTHETIC` | Required; must be consistent with `observationUse` under the rules below. This is a claimed provenance class, not authentication. |
+| `provenanceReference` | `{referenceIdentity, referenceDigest}` or explicit `UNAVAILABLE` with reason | Required and included in the canonical event digest. References bind any source-native sequence/barrier or parent receipt; a digest alone does not authenticate it. |
 
 `CANDLE` payloads must arrive complete, closed, strictly ordered, cadence-valid and synchronized for the configured universe before they can be decision inputs. Candle identity is not only its timestamp. Missing `open` is an invalid candle; do not synthesize it from close. Future, still-open, reordered, gapped, misaligned, stale, or conflicting observations cannot advance the accepted observation watermark or produce a decision.
+
+The tuple `(runIdentity, eventIdentity, observationUse, provenanceClass, provenanceReference)` is included in the complete payload digest and copied into the durable observation receipt. `FORWARD_CANDIDATE` is admissible only with `PROSPECTIVE_SOURCE_EVENT`, a committed run-start fence, and causal proof that the source event occurred after that fence; the class label alone does not establish this. `HISTORICAL_BACKFILL` and `REPLAY_OR_SYNTHETIC` must be `WARMUP_ONLY`. A mismatch, missing use/provenance field, or change of classification under an existing event identity rejects the event (`PAYLOAD_INVALID` or `IDENTITY_CONFLICT`). `WARMUP_ONLY` may initialize strategy-owned state only; it can never create a forward decision, fill, account mutation, performance receipt, or observation count. `UNAVAILABLE` provenance is not admissible for a forward candidate. These values are caller/source assertions unless independently authenticated; they do not establish source availability or approval.
 
 ### 5.3 Signal proposal envelope
 
@@ -174,19 +180,19 @@ Timeout, lost response, process restart, or disagreement between state and recei
 2. A decision consumes only closed candles that are strictly ordered by source interval, have no unexplained gap, and are synchronized for the complete configured decision universe. No partial or unaligned bundle is a decision input.
 3. A candle is closed only once source `closeTimeMs` is no later than a trusted decision-time boundary and the source marks/contract establishes closure. Local receipt alone does not establish closure.
 4. Accepted source-time watermarks cannot move backward. Future, reordered, conflicting, or stale inputs are rejected or halt according to §8; they never rewrite committed history. Source time is not compared directly with local time without the configured trusted clock mapping or source-order proof.
-5. Warmup/backfill may initialize strategy-owned state only. Mark each such input `WARMUP_ONLY`; it produces no forward decision, fill, cash/holding mutation, return, performance receipt, or forward observation-day count.
+5. Warmup/backfill may initialize strategy-owned state only. Every observation has identity-bound `observationUse` and `provenanceClass`; historical/replay inputs must be `WARMUP_ONLY`. Mark each such input accordingly; it produces no forward decision, fill, cash/holding mutation, return, performance receipt, or forward observation-day count.
 6. Persist the decision receipt before accepting any fill candidate. A candidate event is proven strictly after the persisted decision under §5.4, using a post-commit source barrier or trusted clock mapping. Any candidate that happened before/equal to the durable decision, or whose ordering cannot be proven, is `LATE_OR_PAST_EVENT`, even if it is first observed later.
 7. Persist each fill/account transition and each mark transition before subsequent dependent effects. At a restart, read only the last durably committed state and receipts; do not infer missing effects from current market data.
 8. A missing, stale, or invalid mark makes affected equity unavailable. It cannot be carried forward past its selected freshness limit, replaced with zero, or counted as a current mark.
 
 ## 8. State and transition contract
 
-States are `WARMUP`, `OBSERVED`, `VALIDATED`, `PENDING_DURABLE_DECISION`, `ELIGIBLE_FILL`, `MARKED`, `HALTED`, and `UNKNOWN`. `MARKED` is the committed account snapshot state; its valuation may explicitly be unavailable until a fresh mark exists. State names do not imply that any operational dependency exists.
+States are `WARMUP`, `OBSERVED`, `VALIDATED`, `PENDING_DURABLE_DECISION`, `ELIGIBLE_FILL`, `MARKED`, `HALTED`, and `UNKNOWN`. `MARKED` is a committed account snapshot state; its valuation may explicitly be unavailable until a fresh mark exists. It is not terminal: a later valid forward observation may begin another decision cycle from `MARKED`, carrying forward the exact committed account identity, cash, holdings, costs, and parent receipt. A cycle does not reset capital or discard positions. State names do not imply that any operational dependency exists.
 
 | Current state | Event/guard | Proposed next state | Effect and required acknowledgment |
 |---|---|---|---|
 | New run | Frozen config missing any §3 choice | `HALTED` | `CONFIGURATION_INCOMPLETE`; no observation, decision, or account effect. |
-| New run | Fully specified, separately admitted run; warmup input | `WARMUP` | Persist warmup receipt only. No forward outputs or account changes. |
+| New run | Fully specified, separately admitted run with exact durable `RUN_ADMITTED` receipt; warmup input | `WARMUP` | Admission receipt binds run/strategy/config identities and run-start causal fence. Persist warmup receipt only; no forward outputs or account changes. |
 | `WARMUP` | Warmup complete under frozen strategy contract | `OBSERVED` | Only newly arriving forward input can enter `OBSERVED`; warmup itself remains non-performance. |
 | `OBSERVED` | New event identity, valid bounded envelope | `VALIDATED` | Validation is pure until its observation receipt is durably committed. |
 | `OBSERVED` | Identical duplicate identity and digest | Same state | `IDEMPOTENT_NOOP`; no duplicate receipt effect, signal, fill, or accounting mutation. |
@@ -197,14 +203,16 @@ States are `WARMUP`, `OBSERVED`, `VALIDATED`, `PENDING_DURABLE_DECISION`, `ELIGI
 | `PENDING_DURABLE_DECISION` | Persistence rejection | `VALIDATED` or `HALTED` per reason | No decision/fill effect; reason is retained. Never reinterpret as committed. |
 | Any transition with uncertain persistence | Timeout, lost/ambiguous ack, restart ambiguity, conflicting receipt | `UNKNOWN` | Fence retained; no retry/effect/dependent transition absent explicit durable reconciliation. |
 | `ELIGIBLE_FILL` | New event proven strictly later than durable decision by post-commit source barrier or trusted clock mapping; all fill/risk/liquidity gates pass | `MARKED` after fill receipt | Proposed simulated fill/account update must be durably acknowledged. Snapshot mark status may be unavailable. No historical/past open is eligible. |
-| `ELIGIBLE_FILL` | No eligible event before selected expiry | `OBSERVED` or `HALTED` | Commit explicit `MISSED_OR_EXPIRED`; no fill. Expiry is unset until chosen. |
 | `ELIGIBLE_FILL` | Balance, cost, risk, product, or exposure invariant fails | `HALTED` | Reject fill and commit reason; no partial account mutation. |
 | `MARKED` | New fresh valid mark and conservation checks pass | `MARKED` | Persist mark and valuation receipt. `equity=UNAVAILABLE` if any required mark/conversion is absent or stale. |
+| `MARKED` | New `FORWARD_CANDIDATE` passes observation admission and event-order checks | `OBSERVED` | Persist the new observation receipt and carry forward the exact committed account snapshot; no reset, duplicate opening balance, or position loss. This begins the next decision cycle. |
+| `MARKED` | New `WARMUP_ONLY` or backfill input | `MARKED` | No forward cycle or performance effect; prior account snapshot is unchanged. |
+| `ELIGIBLE_FILL` | Configured expiry boundary is durably observed with no eligible fill event before it | `OBSERVED` or `HALTED` per frozen expiry action | Commit a no-fill transition with reason `MISSED_OR_EXPIRED`; no fill/account delta. Expiry is unset until chosen and cannot be inferred from absence alone. |
 | Any active state | Hard risk/loss bound or accounting invariant breached | `HALTED` | Persist halt and reason before any further decision/fill. |
 | `HALTED` | Cause repaired and selected authority approves a new immutable run/config | New run in `WARMUP` | No in-place resume under changed inputs/config; old state remains auditable. |
 | `UNKNOWN` | Explicit authority resolves original proposal with durable reconciliation receipt | Acknowledged resulting state or `HALTED` | Must prove commit/noncommit and bind state/receipt identities; no automatic retry. |
 
-Every acknowledged transition must bind exact expected state identity. A compare-and-swap mismatch rejects without writing a new effect. Rejection reasons are stable uppercase identifiers, not free-text control flow. Required v1 reason families include `CONFIGURATION_INCOMPLETE`, `VERSION_MISMATCH`, `IDENTITY_MISSING`, `IDENTITY_CONFLICT`, `DUPLICATE_IDEMPOTENT`, `PAYLOAD_INVALID`, `BOUND_EXCEEDED`, `EVENT_FUTURE`, `CANDLE_UNCLOSED`, `EVENT_REORDERED`, `CADENCE_GAP`, `UNIVERSE_MISALIGNED`, `SOURCE_STALE`, `MISSING_REQUIRED_FIELD`, `LATE_OR_PAST_EVENT`, `DECISION_NOT_DURABLE`, `PERSISTENCE_REJECTED`, `PERSISTENCE_UNKNOWN`, `STATE_IDENTITY_MISMATCH`, `BALANCE_INVARIANT`, `RISK_LIMIT`, `COST_POLICY_INCOMPLETE`, `COST_DUPLICATE`, `MARK_UNAVAILABLE`, and `RECONCILIATION_REQUIRED`. Unknown reason codes reject.
+Every acknowledged transition must bind exact expected state identity. A compare-and-swap mismatch rejects without writing a new effect. Rejection/transition reasons are stable uppercase identifiers, not free-text control flow. The closed v1 reason vocabulary includes `CONFIGURATION_INCOMPLETE`, `VERSION_MISMATCH`, `IDENTITY_MISSING`, `IDENTITY_CONFLICT`, `DUPLICATE_IDEMPOTENT`, `PAYLOAD_INVALID`, `BOUND_EXCEEDED`, `EVENT_FUTURE`, `CANDLE_UNCLOSED`, `EVENT_REORDERED`, `CADENCE_GAP`, `UNIVERSE_MISALIGNED`, `SOURCE_STALE`, `MISSING_REQUIRED_FIELD`, `LATE_OR_PAST_EVENT`, `DECISION_NOT_DURABLE`, `PERSISTENCE_REJECTED`, `PERSISTENCE_UNKNOWN`, `STATE_IDENTITY_MISMATCH`, `BALANCE_INVARIANT`, `RISK_LIMIT`, `COST_POLICY_INCOMPLETE`, `COST_DUPLICATE`, `MARK_UNAVAILABLE`, `MISSED_OR_EXPIRED`, and `RECONCILIATION_REQUIRED`. `MISSED_OR_EXPIRED` is the required reason for the committed no-fill transition when the explicitly configured expiry boundary is observed without an eligible event; it is not a fill disposition or an inference from missing data. Unknown reason codes reject.
 
 ## 9. Accounting invariants
 
