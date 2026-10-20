@@ -53,10 +53,10 @@ transition fields are blocked on #914's published M1 interface.
 | Run and frozen configuration | Unique run identity; strategy/code and policy version identities; source/provider contract identity; universe/product and timeframe; explicit risk, cost, capital/currency and timing selections; source/config digest; explicit finite invocation limits. | Freeze before accepting observations. No in-place edit, inherited default, or mixed version. Missing or changed required configuration rejects the run before claim. Any changed policy/source/version starts a new run. |
 | Observation identity and digest | Interface-defined observation identity; digest of the interface-defined content; run identity; observation kind; source watermark reference; source-reported time and any separately identified local receipt time. | First accepted identity binds permanently to its digest. Same identity and digest is a duplicate; same identity with another digest is a conflict and halts the affected run. Digest validity does not authenticate the provider or payload. |
 | Source watermark | Interface-defined source/provider and stream identity; instrument/timeframe where applicable; source sequence or as-of/closed-through position; predecessor/continuity information where supplied. | Distinguish source progress from local receipt/fetch time. Exact meaning and encoding are owned by #914. A missing, regressing, ambiguous, late, or gapped watermark cannot silently advance the eligible position. |
-| Attempt and fence | Run and logical operation identity; monotonically advancing attempt number; unique fence generation/token; claimant; expected committed receipt sequence/state; active, resolved, or retained status. | Claim is a compare-and-set against expected state and the current fence. A successful claim consumes an attempt. A stale claimant cannot propose or commit. An unresolved result retains its fence and blocks re-execution. |
+| Attempt and fence | Run and logical operation identity; monotonically advancing attempt number; unique fence generation/token; claimant; expected committed receipt sequence/state; active or resolved status. | Claim is a compare-and-set against expected state and the current fence. A successful claim consumes an attempt. Its fence token remains in immutable history after resolution. Commit atomically resolves the winning active claim; an unresolved result keeps that claim active and blocks re-execution. A losing compare-and-set does not create a claim or halt the run. |
 | Proposed transition | Interface-defined proposal identity and disposition; input observation identities/digests; expected prior state/receipt sequence; proposed next state; calculated account delta; fence generation. | Proposal is immutable, bound to the run/config and claim, and checked against current state. It is not an effect and cannot be acknowledged as committed. No proposal may bypass missing marks, source gaps, eligibility, risk, or accounting invariants. |
-| Committed receipt | Unique receipt sequence; proposal and observation references; expected and resulting state identities; account delta and post-transition account identity; run/config identity; committed fence generation; durable commit outcome. | Append-only and written atomically with its account effect. A receipt cannot be fabricated, rewritten, or inferred from an ACK or UI response. A receipt sequence is contiguous within the selected journal. |
-| Snapshot | Run/config identity; account projection; last included committed receipt sequence and identity; snapshot content identity; explicit valuation/mark availability. | Snapshot must be exactly reproducible from, and match, the committed receipt sequence it names. It may not advance ahead of the receipt log. Drift is a conflict, not permission to repair or rewrite history. Missing marks remain unavailable, never zero. |
+| Committed receipt | Unique receipt sequence; proposal and observation references; expected and resulting state identities; account delta and post-transition account identity; run/config identity; committed fence generation; durable commit outcome. | Append-only and written atomically with the account effect, committed sequence advance, and resolution of the winning active claim. Preserve the fence token and attempt as historical identity; resolve its active status in that same transaction. A receipt cannot be fabricated, rewritten, or inferred from an ACK or UI response. A receipt sequence is contiguous within the selected journal. |
+| Optional derived snapshot/checkpoint | Run/config identity; account projection; last included committed receipt sequence and identity; snapshot content identity; explicit valuation/mark availability. | Not an atomic participant or authority for commit status. It may lag the committed head if its projection matches the receipt prefix it names; that is a stale checkpoint, not corruption. A checkpoint ahead of the committed head, or whose content/digest fails validation against its named prefix, is corrupt/drifted and unusable. It cannot make an otherwise evidenced receipt `UNKNOWN` or invalidate `OP_APPLIED`. Preserve evidence; do not rewrite or automatically repair it. Missing marks remain unavailable, never zero. |
 | Reconciliation record | Reconciliation identity; affected run/operation/observation and expected state; one outcome from the recovery table; evidence references/digests; decision and authority provenance; decision time and time basis; before/after sequence and fence disposition. | Append-only and separate from receipts. It records a decision; it does not create a missing receipt, change an account, authorize itself, or erase an earlier record. No recovery command or presumed operator identity is specified here. |
 
 ## Transaction boundaries and effect semantics
@@ -69,24 +69,30 @@ shape and serialization are still owned by #914.
    source watermark, ordering, and interface-defined identity/digest. An
    identical observation already durably committed returns its existing durable
    result without another attempt or account effect. A reused identity with a
-   changed digest records a conflict when storage permits and halts; it never
-   replaces the old observation. Gaps and late inputs remain explicit and are
-   not backfilled.
+   changed digest records a conflict when storage permits and halts the run; it
+   never replaces the old observation. Gaps and late inputs remain explicit
+   and are not backfilled.
 2. **Claim and fence.** Atomically compare the caller's expected run state,
    committed receipt sequence, and current fence, then consume one attempt and
-   issue a new fence generation. Only one claimant may win. An invalid
-   precondition creates no claim. An unresolved claim remains fenced; no
-   timeout, restart, read-only inspection, or elapsed wall time releases it.
+   issue a new fence generation. Only one claimant may win. A compare-and-set
+   loser is rejected as ordinary contention, consumes no attempt, and does not
+   halt the run or invalidate the winner. An invalid precondition creates no
+   claim. An unresolved claim remains active; no timeout, restart, read-only
+   inspection, or elapsed wall time releases it.
 3. **Propose.** Persist or otherwise durably identify the immutable proposal
    against that claim. Recheck expected state, run/config identity, observation
-   digests, watermark eligibility, and fence. A stale state or fence is
-   rejected without an account mutation.
-4. **Commit account and receipt atomically.** One storage transaction must
-   compare the expected account/state/receipt sequence and active fence, apply
-   the account delta, append exactly one committed receipt, and advance the
-   durable sequence together. All effects happen, or none do. If the storage
-   model cannot establish which outcome happened, classify it `UNKNOWN`; do
-   not infer rollback from a missing response.
+   digests, watermark eligibility, and fence. A stale compare-and-set is a
+   no-effect rejection; it is not by itself a run-wide identity/history
+   conflict.
+4. **Commit account, receipt, sequence, and claim resolution atomically.** One
+   storage transaction must compare the expected account/state/receipt
+   sequence and active fence, apply the account delta, append exactly one
+   committed receipt, advance the durable sequence, and resolve the winning
+   claim's active fence together. All happen, or none do. The historical
+   attempt and fence token remain immutable evidence after resolution. Optional
+   derived snapshots are not participants in this transaction. If the storage
+   model cannot establish whether this transaction committed, classify the
+   operation `UNKNOWN`; do not infer rollback from a missing response.
 5. **Acknowledge only after commit.** Return the committed receipt identity and
    durable result only after the commit boundary. An ACK, process response, or
    UI arrival is not the commit point. Lost ACK after commit is recovered by
@@ -94,21 +100,28 @@ shape and serialization are still owned by #914.
    applying the transition again.
 
 Every commit must match its expected prior state, expected receipt sequence,
-and current fence. A stale writer, concurrent loser, or mismatched proposal
-must leave account state and receipt history unchanged. A definite rejection
-may be recorded as an immutable conflict/halt audit fact; it must not be
-represented as a committed transition.
+and current fence. A stale writer, concurrent compare-and-set loser, or
+mismatched proposal must leave account state and receipt history unchanged.
+An ordinary loser is not a run-wide halt: the current winner remains eligible
+to commit while its claim and expected state are still valid. A conflicting
+digest for an already-bound identity, impossible receipt sequence/history, or
+other demonstrated journal-integrity conflict is distinct; preserve evidence
+and halt the affected run. A rejection must not be represented as a committed
+transition.
 
 ## Crash boundary map
 
 | Interruption point | Durable interpretation after restart |
 | --- | --- |
 | Before claim | No attempt, fence, proposal, receipt, or account effect exists. A later invocation is not a replay of a claimed operation, but still requires a valid explicit invocation and current expected state. |
-| After claim/attempt, before proposal | The attempt and fence are durable; no proposal or account effect is presumed. Treat as unresolved until authorized reconciliation establishes the outcome. |
+| After claim/attempt, before proposal | The attempt and active fence are durable; no proposal or account effect is presumed. Treat as unresolved until authorized reconciliation establishes the outcome. |
 | After proposal, before atomic commit | The proposal is not an account effect. If absence of commit cannot be authoritatively established, report `UNKNOWN`, retain its fence, and block re-execution. |
 | During an ambiguous commit/write failure | Do not infer either rollback or success. Keep the fence and classify `UNKNOWN` unless authoritative receipt/account evidence proves `OP_APPLIED` or `OP_ABSENT`. |
-| After durable commit, before ACK | The committed receipt and account effect determine the result. Read-only inspection/deduplication returns that result; do not apply it again. |
-| Concurrent stale writer | The expected-state/fence comparison rejects the stale writer. Only the current fence may commit; a rejected proposal has no account effect or receipt. |
+| After durable commit, before ACK | The account effect, receipt, sequence advance, and winning-claim fence resolution are already committed together. Read-only inspection/deduplication returns that result; do not apply it again. A later optional snapshot write is irrelevant to this outcome. |
+| Concurrent compare-and-set loser | The loser is rejected without a claim, attempt, proposal, or account effect. The winner remains valid and may commit if its expected state and active fence still match. This rejection alone does not halt the run. |
+| Later stale writer | Reject a proposal whose historical fence is no longer active, with no account effect. Preserve the old token and current state. Ordinary stale-writer rejection alone does not halt the run; an independent identity/history integrity conflict does. |
+| Optional snapshot lags committed head | Accept as a valid older checkpoint only if its projection matches the receipt prefix it names. It is stale, not corrupt, and does not change commit/recovery outcome. Do not silently advance or rewrite it. |
+| Optional snapshot is ahead of head or fails prefix/content validation | Mark that snapshot unusable and preserve it for inspection. Do not repair it automatically. Determine operation outcome from the atomic account/receipt/sequence/claim transaction; snapshot damage alone does not reverse `OP_APPLIED`. |
 
 The exact storage technology and its crash, transaction, and durability
 guarantees are unverified. “Exactly once” is therefore not a global claim: at
@@ -161,9 +174,13 @@ storage durability, deployment, and provider behavior are not verified.
   explicit, authorized reconciliation is durably recorded. Read-only
   inspection can report evidence and outcome candidates but cannot resume,
   release a fence, create a receipt, or change account state.
-- Snapshot sequence and projection must match the validated committed receipt
-  sequence exactly. Corrupt, truncated, missing, non-contiguous, or conflicting
-  receipts stop processing; no snapshot repair is inferred.
+- The atomic account/receipt/sequence/claim-resolution transaction establishes
+  commit outcome; a later snapshot is optional and not required to establish
+  `OP_APPLIED`. A snapshot may name an older committed prefix if it matches that
+  prefix. A snapshot ahead of the head or mismatching its named prefix is
+  unusable, not silently repaired. Corrupt, truncated, missing,
+  non-contiguous, or conflicting receipts stop processing; no history repair
+  is inferred.
 - New policy, source, strategy, or implementation version means a new run,
   not a mutation of an existing run's identity or evidence.
 

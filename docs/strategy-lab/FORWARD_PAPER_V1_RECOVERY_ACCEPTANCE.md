@@ -20,10 +20,10 @@ operating choices remain separately gated.
 
 | Outcome | Required evidence | Required disposition |
 | --- | --- | --- |
-| `OP_APPLIED` | A validated, durable committed receipt for the exact operation, observation digest, expected prior receipt sequence/state, run/config identity, and fence; account projection and snapshot agree with that receipt sequence. | Return the existing durable result. Do not repeat the account effect or create another receipt. |
-| `OP_ABSENT` | An authoritative read of the declared journal establishes no receipt and no attributable account delta; the prior committed sequence/account state are intact and match the exact expected state; the relevant receipt history is complete and integrity-valid. | Record the explicit reconciliation and provenance. Absence alone is not an automatic retry, replay, or repair authorization. Any further attempt requires a separate explicit authorized decision and must still be eligible without replaying a missed event/fill. |
-| `OP_CONFLICT` | Durable evidence shows a different digest, run/config, expected state, receipt sequence, account projection, or fence than the operation required, or a stale writer lost a compare-and-set. | Halt the affected run. Preserve all history and account state; do not guess which writer/effect should win. |
-| `UNKNOWN` | Available evidence cannot distinguish applied from absent, including ambiguous commit/write failure, unavailable or corrupt storage, incomplete receipt history, or an unverified snapshot. | Retain the active fence, block re-execution, and require explicit authorized reconciliation. Read-only inspection cannot resume or settle it. |
+| `OP_APPLIED` | The atomic account-effect, committed-receipt, sequence-advance, and winning-claim fence-resolution transaction is durably evidenced for the exact operation, observation digest, expected prior state/sequence, run/config identity, and historical fence token. No later snapshot is required. | Return the existing durable result. Do not repeat the account effect or create another receipt. |
+| `OP_ABSENT` | An authoritative read of the declared journal establishes no committed receipt and no attributable account delta; the prior committed sequence/account state are intact and match the exact expected state; the relevant receipt history and atomic account/sequence records are complete and integrity-valid. A snapshot is not required evidence. | Record the explicit reconciliation and provenance. Absence alone is not an automatic retry, replay, or repair authorization. Any further attempt requires a separate explicit authorized decision and must still be eligible without replaying a missed event/fill. |
+| `OP_CONFLICT` | Durable evidence shows a changed digest for an already-bound identity, impossible/contradictory receipt sequence or history, or another demonstrated run/config/history integrity contradiction. A normal compare-and-set loser is not this outcome. | Halt the affected run. Preserve all history and account state; do not guess which writer/effect should win. |
+| `UNKNOWN` | Available evidence cannot distinguish whether the atomic account/receipt/sequence/fence-resolution transaction applied, including ambiguous commit/write failure, unavailable or corrupt authoritative storage, or incomplete receipt history. Optional snapshot damage alone does not make this transaction outcome unknown. | Retain any active fence and its historical token, block re-execution, and require explicit authorized reconciliation. Read-only inspection cannot resume or settle it. |
 
 A reconciliation record must preserve, without inventing values: the affected
 operation and expected state; observed receipt/account/snapshot evidence
@@ -35,27 +35,29 @@ Reconciliation is append-only metadata, not a receipt or account mutation.
 ## Generated fault-test matrix
 
 Use logical row labels only: `Run`, `Observation`, `Claim`, `Proposal`,
-`Receipt`, `Snapshot`, `Conflict/Halt`, and `Reconciliation`. `Δ account` means
-the account change attributable to the injected operation. “Attempt/fence”
-distinguishes a historical fence generation from an active retained fence.
+`Receipt`, optional `Snapshot`, `Conflict/Halt`, and `Reconciliation`. `Δ
+account` means the account change attributable to the injected operation.
+“Attempt/fence” distinguishes the immutable historical token from whether its
+claim is currently active or atomically resolved.
 Each test must start from a generated isolated journal and compare durable rows,
 state, sequence, attempt/fence, account, and restart inspection. Exact serialized
 fields and state names remain subject to #914.
 
 | Fault or case | Expected durable rows/state | Attempt / fence | Account delta and restart expectation |
 | --- | --- | --- | --- |
-| Identical duplicate after restart, including after a committed transition | Existing records for the operation (observation, claim, proposal, receipt, as applicable); no replacement rows or new claim. Return the prior durable result. | Unchanged; do not issue a new claim/fence. A completed fence remains resolved. | Zero additional delta. Restart returns the same receipt/result. |
+| Identical duplicate after restart, including after a committed transition | Existing records for the operation (observation, claim, proposal, receipt, as applicable); no replacement rows or new claim. Return the prior durable result. | Unchanged; do not issue a new claim/fence. The winning claim was resolved atomically with commit; its historical token remains. | Zero additional delta. Restart returns the same receipt/result. |
 | Same observation identity with changed digest, including after restart | Preserve original observation/receipt; append a conflict/halt fact if storage remains writable; halt the run. | No new attempt; retain any unresolved prior fence. | Zero additional delta. Never rewrite or reinterpret the earlier result. |
-| Two concurrent claims against the same expected state | Exactly one successful claim; losing claimant rejected as a state/fence conflict. No duplicate proposal or receipt. | Winner consumes one attempt and owns the current fence; loser consumes none. | Zero until winner's atomic commit; never apply two deltas. |
-| Stale fence submits proposal or commit after a newer fence exists | Reject stale proposal/commit; preserve the winning claim and receipt sequence. | Stale attempt cannot advance fence; current fence remains authoritative. | Zero stale-writer delta; no stale receipt. |
-| Commit succeeds but ACK is lost; restart/retry observes same identity | One proposal and one receipt; duplicate lookup returns that receipt. No new transition rows. | One consumed attempt; committed fence is resolved, not replaced. | Exactly one delta total, not one per ACK. |
+| Two concurrent claims against the same expected state | Exactly one successful claim; losing compare-and-set returns ordinary contention, not a run-wide conflict. Winner may continue and commit if its expected state/fence remain current. No duplicate proposal or receipt. | Winner consumes one attempt and owns the active fence; loser consumes none and gets no fence. | Zero until winner's atomic commit; never apply two deltas. Losing claimant does not halt or invalidate winner. |
+| Stale fence submits proposal or commit after its claim was resolved | Reject stale proposal/commit without changing account, receipt, sequence, or current claim. Treat as a no-effect stale-writer rejection, not a run-wide identity/history conflict. | Old attempt/token remain historical and resolved; current claim/fence is unchanged. | Zero stale-writer delta; no stale receipt. |
+| Commit succeeds but ACK is lost; restart/retry observes same identity | One proposal and one receipt; duplicate lookup returns that receipt. No new transition rows. Account effect, sequence advance, and winning-claim resolution committed in the same transaction. | One consumed attempt; its fence token remains historical and its active claim is resolved atomically. | Exactly one delta total, not one per ACK; no snapshot write is needed to establish applied status. |
 | Receipt corruption or truncation before restart inspection | Preserve damaged evidence; fail integrity check and halt. Do not synthesize a missing suffix or receipt. | No new attempt; retain any known unresolved fence. | No new delta. Inspection reports conflict/unknown; no resume. |
 | Disk full or write failure before the account+receipt transaction | If rollback and unchanged prior state are authoritatively proven, no receipt/account delta and classify absence; otherwise `UNKNOWN`. | If a claim already committed, its attempt and fence remain; unresolved fence retained. | No inferred delta. No automatic retry even after proven absence. |
 | Storage reports failure with commit outcome ambiguous | No fabricated receipt; preserve whatever can be read and mark `UNKNOWN`. | Attempt consumed; fence retained. | Do not apply again. Resolve only with authorized evidence-based reconciliation. |
 | Timeout or cancellation before claim | No claim, proposal, receipt, or account update. Fail closed. | No attempt and no fence allocated. | Zero delta; no invocation resumes in background. |
 | Timeout or cancellation after claim, before known commit | Claim remains; no committed receipt unless durable evidence proves commit. State is `UNKNOWN` when commit status is ambiguous. | One attempt; active fence retained. | Zero unless `OP_APPLIED` evidence proves one existing delta. Never replay on restart. |
 | Late observation or source watermark gap | Preserve the supplied late/gap fact and halt or defer according to the pre-frozen policy; no eligible past event is manufactured. | No new attempt for an ineligible transition; do not release a different unresolved fence. | Zero fill/account delta. No missed-fill backfill after restart. |
-| Snapshot sequence or account projection drifts from committed receipts | Read-only verification reports conflict and halts; no repaired snapshot or rewritten receipt. | No new attempt; preserve active fence if unresolved. | Zero repair delta. Do not select snapshot or ledger by guess. |
+| Optional snapshot lags the committed head but matches its named receipt prefix | Keep it as a valid older checkpoint; it does not describe the latest head and is not corruption. Commit outcome remains determined by atomic account/receipt/sequence/fence evidence. | No new attempt; claim/fence status is unchanged. | No new delta. Do not advance or rewrite snapshot automatically. |
+| Optional snapshot is ahead of the committed head or fails validation against its named prefix | Mark only that snapshot unusable and preserve it for inspection; do not infer a conflict in the authoritative commit solely from later derived-checkpoint damage. Do not auto-repair. | No new attempt; claim/fence status is unchanged. | No new delta. Determine `OP_APPLIED`/`OP_ABSENT` from the atomic authoritative records; if those records themselves are corrupt or ambiguous, use `OP_CONFLICT`/`UNKNOWN` as supported by evidence. |
 | Unauthorized resume while an operation is unresolved | Reject; preserve claim, prior records, and unresolved state. Read-only inspection remains read-only. | No new attempt; same active fence remains. | Zero delta; no proposal, receipt, or resumed execution. |
 | Required run/config field or explicit invocation limit missing | Reject before claim; do not create an executable run from defaults. | No attempt or fence. | Zero delta and no observation-driven transition. |
 | Warmup-only observations | Record only frozen run/config and any separately authorized input provenance; no forward decision/eligible event. | No forward attempt or transition fence. | Zero receipt/account delta; no forward fills, returns, or observation days. |
@@ -66,7 +68,9 @@ For uncertain write and timeout cases, tests must distinguish a definitively
 rolled-back pre-commit transaction from an ambiguous commit. Both forbid an
 automatic retry; only the former can support `OP_ABSENT`, and only through the
 stated evidence and explicit reconciliation. A receipt must never be fabricated
-to make the expected table pass.
+to make the expected table pass. Optional snapshots are not transaction
+participants: a valid older prefix is lag, and later snapshot corruption cannot
+undo or obscure an otherwise evidenced atomic commit.
 
 ## Interface serialization and digest interoperability
 
