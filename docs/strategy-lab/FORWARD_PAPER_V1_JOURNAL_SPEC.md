@@ -63,7 +63,7 @@ preserve the following interface identities, provenance, and causal boundaries:
 | Transition proposal | Exact companion `TransitionProposal {interfaceVersion, expectedStateIdentity, eventIdentity, proposedStateIdentity, receiptIdentity, disposition}`; disposition is `PROPOSE`, `IDEMPOTENT_NOOP`, `REJECT`, or `HALT`. | Pure proposal only; it does not itself mutate state/account. Validate exact expected state, event and receipt binding, run/config, fence, causality, and applicable invariants. Do not extend or rename this closed shape. |
 | Account state and committed receipt | Companion `accountIdentity`, `runIdentity`, `baseCurrency`, exact `cash`, `holdings`, `marks`, `equity` or `UNAVAILABLE`, `riskSnapshot`, `parentStateIdentity`/`stateIdentity`; receipt `interfaceVersion`, `receiptIdentity`, `transitionIdentity`, `transitionDisposition`, exact reason, event/input identities and digests, account/cost/mark evidence, and persistence-set `durableAtLocalMs`. | Durable `DURABLE_COMMITTED` evidence atomically applies the account state, appends receipt, advances sequence, and resolves the winning active claim; retain historical fence token. ACK/UI arrival alone is not commit. Receipt/state identities and fields are those of the pinned interface. |
 | Optional derived snapshot/checkpoint | A projection/cache of the authoritative account and reducer state already committed in the receipt transaction; names a specific committed state/receipt identity and account/mark content. It is not that authoritative committed state itself and not a new interface receipt or transition. | Not an atomic participant or authority for commit status. A lagging snapshot is valid only if it matches the committed prefix it names. Ahead-of-head or content/prefix mismatch makes that snapshot unusable; it does not undo or obscure an independently evidenced `DURABLE_COMMITTED` receipt. Never auto-repair, rewrite, or fabricate state. Missing marks/equity remain unavailable. |
-| Reconciliation record | Companion reconciliation receipt binding original `receiptIdentity`, attempted `transitionIdentity`, prior/resulting `stateIdentity`, durable evidence, authority, outcome and exact reason; internal journal evidence may additionally identify attempt and historical fence. | Append-only and distinct from the original proposal/receipt. An authorized durable decision resolves `UNKNOWN`; it cannot fabricate a fill/receipt, edit state history, or authorize itself. Read-only inspection cannot reconcile or release an active fence. |
+| Reconciliation receipt and audit metadata | The authoritative companion reconciliation receipt binds the original `receiptIdentity`/`transitionIdentity`, whether that exact proposal committed or did not commit, the resulting/prior `stateIdentity`, evidence, selected authority, outcome, and exact reason as required by interface §§6/8. Separate internal append-only audit metadata may record the decision provenance, evidence references, timestamps, and historical/active fence details. | Only the required authoritative durable reconciliation receipt resolves `UNKNOWN` and permits transition to its acknowledged resulting state or `HALTED`. Internal audit metadata supplements that receipt; metadata alone cannot resolve `UNKNOWN`, release the fence, or authorize a retry. Neither record fabricates a fill, rewrites history, or self-authorizes. Read-only inspection cannot reconcile. |
 
 ## Transaction boundaries and effect semantics
 
@@ -122,6 +122,12 @@ proposal. If the rejection outcome itself is ambiguous, preserve the active
 fence and classify `UNKNOWN`. This internal attempt disposition adds no
 companion wire field or receipt identity.
 
+Recovery from `UNKNOWN` requires the authoritative durable reconciliation
+receipt defined by the pinned interface §§6/8. A separate append-only internal
+audit record may preserve provenance and diagnostic references, but is
+supplementary only: it cannot establish committed/noncommitted outcome,
+advance state, or release the fence without that required receipt.
+
 Every commit must match its expected prior state, expected receipt sequence,
 and current fence. A stale writer, concurrent compare-and-set loser, or
 mismatched proposal must leave account state and receipt history unchanged.
@@ -151,6 +157,15 @@ must not be collapsed:
 | `TransitionProposal.disposition` | `PROPOSE`, `IDEMPOTENT_NOOP`, `REJECT`, `HALT` | Pure reducer intent. It cannot change durable state or account by itself. |
 | Persistence acknowledgment | `DURABLE_COMMITTED`, `DURABLE_REJECTED`, `UNKNOWN` | Only `DURABLE_COMMITTED` advances the exact matching expected/proposed state and commits its receipt/effect. `DURABLE_REJECTED` has no state/effect advancement. `UNKNOWN` retains the active fence and blocks dependent transitions. |
 | Receipt `transitionDisposition` | `COMMITTED`, `REJECTED`, `UNKNOWN` | Durable receipt outcome; it is not the proposal disposition or the outer acknowledgment enum. |
+
+For an actionable proposal, the exact `DURABLE_COMMITTED` decision
+acknowledgment advances `PENDING_DURABLE_DECISION` to `ELIGIBLE_FILL`.
+`ELIGIBLE_FILL` means a decision is durable and waiting for a candidate; it
+does not mean a price event has passed causal eligibility or that a fill
+occurred. The later event's proof gates acceptance of that fill and the
+subsequent transition to `MARKED`. Until a qualifying event and its fill
+receipt commit, the reducer remains `ELIGIBLE_FILL`. A committed `NO_ACTION`
+proposal instead returns to `OBSERVED`.
 
 The exact proposal shape is the closed companion shape:
 `{interfaceVersion, expectedStateIdentity, eventIdentity,

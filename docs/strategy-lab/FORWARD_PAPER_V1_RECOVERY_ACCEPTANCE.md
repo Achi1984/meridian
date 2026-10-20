@@ -26,7 +26,7 @@ operating choices remain separately gated.
 | Outcome | Required evidence | Required disposition |
 | --- | --- | --- |
 | `OP_APPLIED` | The atomic account-effect, committed-receipt, sequence-advance, and winning-claim fence-resolution transaction is durably evidenced for the exact operation, observation digest, expected prior state/sequence, run/config identity, and historical fence token. No later snapshot is required. | Return the existing durable result. Do not repeat the account effect or create another receipt. |
-| `OP_ABSENT` | An authoritative read of the declared journal establishes no committed receipt and no attributable account delta; the prior committed sequence/account state are intact and match the exact expected state; the relevant receipt history and atomic account/sequence records are complete and integrity-valid. A snapshot is not required evidence. | Record the explicit reconciliation and provenance. Absence alone is not an automatic retry, replay, or repair authorization. Any further attempt requires a separate explicit authorized decision and must still be eligible without replaying a missed event/fill. |
+| `OP_ABSENT` | An authoritative read of the declared journal establishes no committed receipt and no attributable account delta; the prior committed sequence/account state are intact and match the exact expected state; the relevant receipt history and atomic account/sequence records are complete and integrity-valid. A snapshot is not required evidence. | Resolve only with the authoritative durable reconciliation receipt required by interface §§6/8, binding the exact proposal, proof of noncommit, prior/resulting state, selected authority, and reason. Append-only audit metadata may supplement that receipt but cannot replace it. Absence alone is not an automatic retry, replay, or repair authorization; any further attempt needs a separate explicit authorized decision and must remain eligible without replaying a missed event/fill. |
 | `OP_CONFLICT` | Durable evidence shows a changed digest for an already-bound identity, impossible/contradictory receipt sequence or history, or another demonstrated run/config/history integrity contradiction. A normal compare-and-set loser is not this outcome. | Halt the affected run. Preserve all history and account state; do not guess which writer/effect should win. |
 | `UNKNOWN` | Available evidence cannot distinguish whether the atomic account/receipt/sequence/fence-resolution transaction applied, including ambiguous commit/write failure, unavailable or corrupt authoritative storage, or incomplete receipt history. Optional snapshot damage alone does not make this transaction outcome unknown. | Retain any active fence and its historical token, block re-execution, and require explicit authorized reconciliation. Read-only inspection cannot resume or settle it. |
 
@@ -37,8 +37,15 @@ recovery outcome, decision scope and exact reason, decision authority
 provenance, decision time and its source/basis, prior and resulting receipt
 sequence, and historical/active fence disposition. Bind the companion
 `interfaceVersion` and run/config/event identities. Missing evidence stays
-missing. Reconciliation is append-only metadata, not a receipt or account
-mutation.
+missing. This internal append-only audit metadata is supplementary and does
+not itself resolve `UNKNOWN`. Resolution requires the authoritative durable
+reconciliation receipt required by the pinned interface §§6/8, binding the
+original proposal/receipt identity, whether it committed or did not commit,
+the prior/resulting state identity, evidence, selected authority, outcome, and
+exact reason. Only that acknowledged receipt can resolve `UNKNOWN`; metadata
+alone cannot release the fence, advance state, or authorize a retry. Neither
+the receipt nor metadata may fabricate an account/fill effect or rewrite
+history.
 
 ## Proposal, acknowledgment, state, and reason mapping
 
@@ -70,16 +77,22 @@ The generated happy-path sequence must exercise the exact pinned lifecycle:
 separately admitted run with durable `RUN_ADMITTED` fence; identity- and
 provenance-bound prospective observation after that fence; `OBSERVED` →
 `VALIDATED` → `PENDING_DURABLE_DECISION`; exact decision `DURABLE_COMMITTED`;
-then `ELIGIBLE_FILL` only when its event is proven strictly later than that
-decision's durable acknowledgment; and `MARKED` only after the fill/account
-receipt commits. Decision inputs precede their consuming decision but need not
-be later than that decision's receipt. From committed `MARKED`, another valid
-forward observation begins `OBSERVED` and preserves the exact prior
-`stateIdentity`, account, cash, holdings, costs, and parent receipt. A `NO_ACTION`
-decision returns to `OBSERVED` without fill/account effect. Warmup/backfill
-remains `WARMUP_ONLY`; it cannot enter the forward cycle or count as performance.
-An expiry no-fill transition uses `MISSED_OR_EXPIRED` only after its explicitly
-selected boundary is durably observed, never merely because no fill arrived.
+then `ELIGIBLE_FILL` immediately after the durable acknowledgment of the exact
+actionable decision. This state records eligibility to await a fill candidate,
+not that a price event is already eligible or that a fill occurred. The
+candidate's event must be proven strictly later than that decision's durable
+acknowledgment; that proof gates the fill and transition to `MARKED`, which
+occurs only after the fill/account receipt commits. Without a qualifying event,
+the reducer remains `ELIGIBLE_FILL` or follows only the explicitly configured
+expiry transition. Decision inputs precede their consuming decision but need
+not be later than that decision's receipt. From committed `MARKED`, another
+valid forward observation begins `OBSERVED` and preserves the exact prior
+`stateIdentity`, account, cash, holdings, costs, and parent receipt. A
+`NO_ACTION` decision returns to `OBSERVED` without fill/account effect.
+Warmup/backfill remains `WARMUP_ONLY`; it cannot enter the forward cycle or
+count as performance. An expiry no-fill transition uses `MISSED_OR_EXPIRED`
+only after its explicitly selected boundary is durably observed, never merely
+because no fill arrived.
 
 ## Generated fault-test matrix
 
@@ -104,6 +117,9 @@ pinned interface. No fixture may locally redefine those wire fields.
 | Fault or case | Expected durable rows/state | Attempt / fence | Account delta and restart expectation |
 | --- | --- | --- | --- |
 | Forward decision-input observation with causal run-start proof | Identity/provenance-bound `FORWARD_CANDIDATE` is admitted only after `RUN_ADMITTED`; it advances through `OBSERVED` → `VALIDATED` → `PENDING_DURABLE_DECISION`. The input precedes its consuming decision but need not be later than that decision's durable ACK. | Each proposal compares the exact expected state; a commit resolves its winning fence. | No fill before decision `DURABLE_COMMITTED`; decision-input timing is not tested against the later decision ACK. |
+| Actionable decision durable acknowledgment | Exact decision proposal receives matching `DURABLE_COMMITTED` with expected/proposed state and receipt identities | State advances `PENDING_DURABLE_DECISION` → `ELIGIBLE_FILL`; active fence for the committed decision is resolved atomically, historical token remains | No account/fill delta yet. `ELIGIBLE_FILL` means awaiting candidate; it does not require the candidate's later-event proof to enter the state. |
+| Candidate event lacks strict post-decision causal proof | Actionable decision is committed and state is already `ELIGIBLE_FILL`; candidate is equal/earlier, only later-received, or source ordering is unproven | Reject candidate without changing state; retain exact decision and state identities | No fill/account delta; reason `LATE_OR_PAST_EVENT`. |
+| Candidate event has strict post-decision proof | Exact candidate binds the committed decision receipt and passes source-barrier/trusted-clock proof plus all other gates | `ELIGIBLE_FILL` → `MARKED` only after fill/account proposal `DURABLE_COMMITTED` | One fill/account delta; no fill effect before commit. |
 | Two decision/fill cycles | First committed fill reaches `MARKED`; a new valid forward observation advances to `OBSERVED`, then a second decision and strictly later fill reach `MARKED` again. Receipts chain exact `parentStateIdentity`/`stateIdentity`. | Each cycle has its own committed proposal/receipt; no attempt is reused for a different proposal. | Second account state equals first committed account plus only the second fill/cost deltas; no capital reset, position loss, or duplicate first effect. |
 | Identical duplicate after restart, including after a committed transition | Preserve existing records and return the same committed receipt/state. `IDEMPOTENT_NOOP`; reason `DUPLICATE_IDEMPOTENT`. | No new attempt/fence; the winning claim was resolved in its commit and its token remains historical. | Zero additional delta. Restart returns the same `receiptIdentity`/`stateIdentity`. |
 | Same `eventIdentity` with changed `payloadDigest`, including after restart | Preserve original observation/receipt; `HALTED`, disposition `HALT`, reason `IDENTITY_CONFLICT`; retain conflict evidence. | No new attempt; do not release an unresolved fence. | Zero additional delta. Never rewrite or reinterpret earlier result. |
@@ -115,6 +131,7 @@ pinned interface. No fixture may locally redefine those wire fields.
 | Storage reports failure with commit outcome ambiguous | No fabricated receipt; persistence acknowledgment `UNKNOWN`, state `UNKNOWN`, reason `PERSISTENCE_UNKNOWN`. | Attempt consumed; active fence retained. | Do not apply again. Resolve only with authorized evidence-based reconciliation. |
 | Timeout/cancellation before claim | No proposal or receipt; run's last committed state remains unchanged. If a bounded proposal was rejected, reason `BOUND_EXCEEDED`; no claim. | No attempt/fence allocated. | Zero delta; no background continuation. |
 | Timeout/cancellation after claim, before known commit | If ambiguous, persistence `UNKNOWN`, state `UNKNOWN`, reason `PERSISTENCE_UNKNOWN`; if explicit durable rejection, `DURABLE_REJECTED` and unchanged state. | One attempt; active fence retained while uncertain. | Zero unless exact commit evidence proves one existing delta. Never replay on restart. |
+| Resolve `UNKNOWN` with reconciliation evidence | Authoritative durable reconciliation receipt binds original `receiptIdentity`/`transitionIdentity`, exact outcome (`OP_APPLIED`, `OP_ABSENT`, or `OP_CONFLICT`), evidence, authority, resulting/prior state identities and reason. Separate audit metadata may record provenance but is not the receipt. | Only the acknowledged interface-required reconciliation receipt resolves the active fence; metadata alone leaves state `UNKNOWN` and fence active. | `OP_APPLIED` returns existing receipt with no reapply; `OP_ABSENT` records proven no-effect state but does not authorize retry; `OP_CONFLICT` halts. |
 | Late observation or source watermark gap | Late fill candidate is rejected with `LATE_OR_PAST_EVENT`; cadence gap with `CADENCE_GAP`. State unchanged or `HALTED` under the explicitly frozen terminal policy. No past event is made eligible. | No attempt for ineligible transition; do not release another unresolved fence. | Zero fill/account delta. No missed-fill backfill. |
 | Missing/malformed candle `open` or incomplete OHLC | Reject with `MISSING_REQUIRED_FIELD`; no close-to-open synthesis and no accepted watermark advance. | No fill attempt/fence for the invalid price input. | Zero delta. No fill is inferred from close, cache, replay, or a retrospective next-bar position. |
 | Configured expiry boundary is durably observed without an eligible fill | Commit the no-fill transition with reason `MISSED_OR_EXPIRED`; state becomes `OBSERVED` or `HALTED` according to frozen expiry action. Absence alone does not prove expiry. | Resolve only the claim associated with that committed no-fill transition; do not reopen the old fill proposal. | Zero fill/account delta; preserve the missed opportunity without backfill. |
