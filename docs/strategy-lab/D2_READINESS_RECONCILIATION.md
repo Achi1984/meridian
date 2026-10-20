@@ -1,6 +1,7 @@
 # M11 D2 readiness reconciliation
 
-**Operation:** `MERIDIAN-D2-READINESS-RECONCILIATION-R1`  
+**Operation:** `MERIDIAN-D2-READINESS-RECONCILIATION-R1`
+
 **Decision:** D2 `DEFER`; selected manifest `NOT_FROZEN`; no D2 receipt, real-data execution, Paper, or Live permission.
 
 ## Reconciled evidence
