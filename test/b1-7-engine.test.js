@@ -748,7 +748,7 @@ test('source hash is a deterministic three-file bundle identity, separate from d
   const executionRequest = readFileSync(requestPath, 'utf8');
   assert.match(implementationSha256, /^[a-f0-9]{64}$/);
   assert.match(executionRequest, new RegExp(`candidate bundle SHA-256 \`${implementationSha256}\``));
-  assert.match(executionRequest, /SOURCE_ACCEPTED[\s\S]*PENDING/);
+  assert.match(executionRequest, /\|\s*`SOURCE_ACCEPTED`\s*\|\s*`ACCEPTED`/);
   assert.match(executionRequest, /DATA_ADMISSION_READY[\s\S]*NOT_READY/);
   assert.match(executionRequest, /EXECUTION_AUTHORIZED[\s\S]*FALSE/);
   assert.match(executionRequest, /SCREEN_RESULT[\s\S]*NOT_RUN/);
