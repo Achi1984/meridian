@@ -76,7 +76,7 @@
       },
       "candidateBuilder": {
         "path": "scripts/research/b1-7/prepare-d2-candidate.mjs",
-        "sha256": "b5afaa72e0e02e612ee293c5bd1798d026acad5c71fa5fc19f68ba9d8e0e37e8"
+        "sha256": "ed599c66a68325849ee83dc8e9b25c95b43ab5649e7a336fd48cfb4377fc4549"
       }
     }
   },
@@ -935,7 +935,7 @@
     }
   },
   "screenReference": {
-    "path": "research/protocols/b1-7-20261018/EXECUTION_REQUEST.md#screen",
+    "path": "research/protocols/b1-7-20261018/EXECUTION_REQUEST.md#proposed-bounded-run",
     "protocolPath": "research/protocols/b1-7-20261018/protocol.json#screen",
     "protocolSha256": "a78e1ae8c71c8f85baee5b51f5691643fc29136f636f19465c61f553afe09185",
     "screen": {

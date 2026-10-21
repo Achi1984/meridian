@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
-import {mkdtemp, readFile, rm, stat} from 'node:fs/promises';
+import {copyFile, mkdir, mkdtemp, readFile, rm, stat, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join, resolve} from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
@@ -63,7 +63,11 @@ function build(input) {
   return buildD2Candidate(input);
 }
 
-function auditPreload(logPath, allowedReads, allowedWrite) {
+function assertArtifactMatches(actualBytes, expectedBytes) {
+  assert.deepEqual(actualBytes, expectedBytes);
+}
+
+function auditPreload(logPath, allowedReads, allowedWrite, tamperVerification = false) {
   return `
     import fs from 'node:fs';
     import {syncBuiltinESMExports} from 'node:module';
@@ -86,6 +90,13 @@ function auditPreload(logPath, allowedReads, allowedWrite) {
       events.push(['read', target]);
       if (!allowedReads.has(target) || /\\\\.(?:csv|sqlite|db)$/i.test(target)) {
         throw new Error('DISALLOWED_READ:' + target);
+      }
+      if (${JSON.stringify(tamperVerification)} &&
+          target === ${JSON.stringify(join(ROOT, METADATA_FILES.d1Verification))}) {
+        const changed = JSON.parse(originalRead(file, ...args).toString('utf8'));
+        changed.manifestDraft.selectedSeriesSha256.XBTUSD = 'f'.repeat(64);
+        changed.files[0].selectedSeriesSha256 = 'f'.repeat(64);
+        return Buffer.from(JSON.stringify(changed));
       }
       return originalRead(file, ...args);
     };
@@ -113,6 +124,23 @@ function auditPreload(logPath, allowedReads, allowedWrite) {
       ${JSON.stringify(logPath)}, JSON.stringify(events), {encoding: 'utf8'}
     ));
   `;
+}
+
+async function makeIsolatedCliTree(root) {
+  for (const relative of [...Object.values(METADATA_FILES), ...Object.values(SOURCE_FILES)]) {
+    const target = join(root, relative);
+    await mkdir(join(target, '..'), {recursive: true});
+    await copyFile(join(ROOT, relative), target);
+  }
+  await mkdir(join(root, 'docs/research/d2-candidate'), {recursive: true});
+  return {
+    script: join(root, 'scripts/research/b1-7/prepare-d2-candidate.mjs'),
+    output: join(root, 'docs/research/d2-candidate/admission-candidate.json'),
+    allowedReads: [
+      ...Object.values(METADATA_FILES),
+      ...Object.values(SOURCE_FILES)
+    ].map(relative => resolve(root, relative))
+  };
 }
 
 test('candidate validates D1 assets, status, hashes, and exact source/file pins', async () => {
@@ -220,7 +248,6 @@ test('module import performs no generation or writes', async t => {
   ].map(relative => resolve(ROOT, relative));
   const beforeBytes = await readFile(OUTPUT);
   const beforeStat = await stat(OUTPUT, {bigint: true});
-  const {writeFile} = await import('node:fs/promises');
   await writeFile(preload, auditPreload(audit, allowedReads, OUTPUT));
   const result = spawnSync(process.execPath, [
     '--import', preload, '--input-type=module', '-e',
@@ -236,40 +263,45 @@ test('module import performs no generation or writes', async t => {
 test('explicit CLI reads only allowlisted metadata/source bytes and writes only its fixed artifact', async t => {
   const temp = await mkdtemp(join(tmpdir(), 'd2-candidate-cli-'));
   t.after(() => rm(temp, {recursive: true, force: true}));
+  const isolated = await makeIsolatedCliTree(join(temp, 'repository'));
   const audit = join(temp, 'audit.json');
   const preload = join(temp, 'preload.mjs');
-  const allowedReads = [
-    ...Object.values(METADATA_FILES),
-    ...Object.values(SOURCE_FILES),
-    'scripts/research/b1-7/prepare-d2-candidate.mjs'
-  ].map(relative => resolve(ROOT, relative));
   const expected = `${JSON.stringify(build(await fixture()), null, 2)}\n`;
-  const {writeFile} = await import('node:fs/promises');
-  await writeFile(preload, auditPreload(audit, allowedReads, OUTPUT));
-  const result = spawnSync(process.execPath, ['--import', preload, SCRIPT], {
-    cwd: ROOT, encoding: 'utf8'
+  const committedBytes = await readFile(OUTPUT);
+  const expectedBytes = Buffer.from(expected);
+  assertArtifactMatches(committedBytes, expectedBytes);
+  assert.equal(committedBytes.toString('utf8'), expected,
+    'tracked artifact must match deterministic expected bytes before CLI execution');
+  const staleBytes = Buffer.from(committedBytes);
+  staleBytes[0] ^= 1;
+  assert.notDeepEqual(staleBytes, committedBytes, 'stale artifact bytes must fail the expectation');
+  assert.throws(() => assertArtifactMatches(staleBytes, expectedBytes));
+
+  await writeFile(preload, auditPreload(audit, isolated.allowedReads, isolated.output));
+  const result = spawnSync(process.execPath, ['--import', preload, isolated.script], {
+    cwd: join(temp, 'repository'), encoding: 'utf8'
   });
   assert.equal(result.status, 0, result.stderr);
   const events = JSON.parse(await readFile(audit, 'utf8'));
   const reads = events.filter(([kind]) => kind === 'read').map(([, target]) => target);
   const writes = events.filter(([kind]) => kind === 'write').map(([, target]) => target);
   assert.ok(reads.length > 0);
-  assert.ok(reads.every(target => allowedReads.includes(target)), reads.join('\n'));
-  assert.deepEqual(writes, [OUTPUT]);
+  assert.ok(reads.every(target => isolated.allowedReads.includes(target)), reads.join('\n'));
+  assert.deepEqual(writes, [isolated.output]);
   assert.equal(result.stdout.trim(), `WROTE docs/research/d2-candidate/admission-candidate.json sha256=${hash(expected)}`);
-  const firstBytes = await readFile(OUTPUT);
+  const firstBytes = await readFile(isolated.output);
   assert.equal(firstBytes.toString('utf8'), expected);
 
   const secondAudit = join(temp, 'second-audit.json');
   const secondPreload = join(temp, 'second-preload.mjs');
-  await writeFile(secondPreload, auditPreload(secondAudit, allowedReads, OUTPUT));
-  const secondResult = spawnSync(process.execPath, ['--import', secondPreload, SCRIPT], {
-    cwd: ROOT, encoding: 'utf8'
+  await writeFile(secondPreload, auditPreload(secondAudit, isolated.allowedReads, isolated.output));
+  const secondResult = spawnSync(process.execPath, ['--import', secondPreload, isolated.script], {
+    cwd: join(temp, 'repository'), encoding: 'utf8'
   });
   assert.equal(secondResult.status, 0, secondResult.stderr);
   const secondEvents = JSON.parse(await readFile(secondAudit, 'utf8'));
-  assert.deepEqual(secondEvents.filter(([kind]) => kind === 'write').map(([, target]) => target), [OUTPUT]);
-  assert.deepEqual(await readFile(OUTPUT), firstBytes);
+  assert.deepEqual(secondEvents.filter(([kind]) => kind === 'write').map(([, target]) => target), [isolated.output]);
+  assert.deepEqual(await readFile(isolated.output), firstBytes);
 
   for (const relative of [
     'scripts/research/b1-7/prepare-d2-candidate.mjs',
@@ -280,4 +312,25 @@ test('explicit CLI reads only allowlisted metadata/source bytes and writes only 
     const source = await readFile(join(ROOT, relative), 'utf8');
     assert.doesNotMatch(source, /node:(?:http|https|net|tls|dns|sqlite)|\b(?:pg|sqlite3|better-sqlite3)\b/);
   }
+});
+
+test('repository CLI rejects coherently retampered D1 metadata before any artifact write', async t => {
+  const temp = await mkdtemp(join(tmpdir(), 'd2-candidate-tamper-'));
+  t.after(() => rm(temp, {recursive: true, force: true}));
+  const audit = join(temp, 'audit.json');
+  const preload = join(temp, 'preload.mjs');
+  const allowedReads = [
+    ...Object.values(METADATA_FILES),
+    ...Object.values(SOURCE_FILES)
+  ].map(relative => resolve(ROOT, relative));
+  const originalArtifact = await readFile(OUTPUT);
+  await writeFile(preload, auditPreload(audit, allowedReads, OUTPUT, true));
+  const result = spawnSync(process.execPath, ['--import', preload, SCRIPT], {
+    cwd: ROOT, encoding: 'utf8'
+  });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /D1_VERIFICATION_FILE_PIN_MISMATCH/);
+  const events = JSON.parse(await readFile(audit, 'utf8'));
+  assert.equal(events.some(([kind, target]) => kind === 'write' && target === OUTPUT), false);
+  assert.deepEqual(await readFile(OUTPUT), originalArtifact);
 });

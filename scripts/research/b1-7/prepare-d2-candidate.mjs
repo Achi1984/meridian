@@ -13,6 +13,10 @@ const OUTPUT_PATH = path.join(ROOT, 'docs/research/d2-candidate/admission-candid
 const HASH = /^[a-f0-9]{64}$/;
 const D1_PATH_PREFIX = 'research/acquisitions/kraken-usd-daily-20261018/normalized';
 const D1_SOURCE_COMMIT = '1c7b6dccd886f57e866c7d359c091b1e72a193ea';
+const ACCEPTED_D1_VERIFICATION_SHA256 =
+  '223548051320d00866666d87b1b543243fecf9d1a5ca647be2d7a09d0b1f0f05';
+const ACCEPTED_D1_MANIFEST_DRAFT_SHA256 =
+  '37fecaa0d003c9ec862fb57b3b312c0289c1dd370607ade99bac584d357f81a9';
 const METADATA_FILES = Object.freeze({
   d1Verification: 'docs/research/d1-20261019/verification.json',
   d1Readme: 'docs/research/d1-20261019/README.md',
@@ -324,7 +328,7 @@ export function buildD2Candidate({
       assumptions: protocol.costAssumptions
     },
     screenReference: {
-      path: 'research/protocols/b1-7-20261018/EXECUTION_REQUEST.md#screen',
+      path: 'research/protocols/b1-7-20261018/EXECUTION_REQUEST.md#proposed-bounded-run',
       protocolPath: 'research/protocols/b1-7-20261018/protocol.json#screen',
       protocolSha256: populatedUnfrozenProfile.protocolSha256,
       screen: protocol.screen,
@@ -356,6 +360,13 @@ function buildFromRepository() {
     .map(([name, relative]) => [name, readAllowedFile(relative)]));
   const metadataFileHashes = Object.fromEntries(Object.entries(metadataBytes)
     .map(([name, bytes]) => [name, sha256(bytes)]));
+  if (metadataFileHashes.d1Verification !== ACCEPTED_D1_VERIFICATION_SHA256) {
+    fail('D1_VERIFICATION_FILE_PIN_MISMATCH');
+  }
+  const verification = JSON.parse(metadataBytes.d1Verification.toString('utf8'));
+  if (sha256(canonicalJson(verification.manifestDraft)) !== ACCEPTED_D1_MANIFEST_DRAFT_SHA256) {
+    fail('D1_MANIFEST_DRAFT_PIN_MISMATCH');
+  }
   const profilePathPinsValid = canonicalJson(HISTORICAL_RUN_PROFILE.sourceFiles) ===
     canonicalJson(SOURCE_FILES);
   if (!profilePathPinsValid) fail('HISTORICAL_SOURCE_FILE_PIN_MISMATCH');
@@ -363,7 +374,7 @@ function buildFromRepository() {
   if (!pinnedSources.ok) fail('HISTORICAL_SOURCE_PIN_MISMATCH');
 
   return buildD2Candidate({
-    verification: JSON.parse(metadataBytes.d1Verification.toString('utf8')),
+    verification,
     protocol: JSON.parse(metadataBytes.protocolJson.toString('utf8')),
     sourceByteHashes: HISTORICAL_RUN_PROFILE.sourceSha256,
     metadataFileHashes
