@@ -30,6 +30,7 @@
     "verifiedAt": "2026-10-21",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
+  "currentSnapshotPrecedence": "sourceOfTruth, currentContinuity, and MERIDIAN_LIVE_CHECKPOINT.currentWork are current pointers; dated UI and research snapshots below are historical context only and do not override them. Historical snapshots remain unchanged.",
   "currentContinuity": {
     "operation": "MERIDIAN-919-CONSOLIDATED-HANDOFF-R2",
     "pullRequest": 919,

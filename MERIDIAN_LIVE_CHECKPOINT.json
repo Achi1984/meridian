@@ -96,12 +96,11 @@
     "policyProposalCommentId": 6096562356,
     "protocol": "STREAM-SAFE-V8"
   },
-  "lastSeenCommentId": 6323534494,
+  "lastSeenCommentId": 6323451446,
   "quickCommand": "Go Meridian",
   "bootstrapFile": "MERIDIAN_GO.md",
   "currentWork": {
     "updatedAt": "2026-10-21",
-    "verifiedSourceMain": "c1ec1de5eec7307b1c91a5e133b5486f27fc5c88",
     "currentB11": {
       "opId": "MERIDIAN-V11-B11-BOT-COCKPIT-20261018",
       "issue": 876,
@@ -121,7 +120,8 @@
         "pages": 39125964078
       },
       "state": "COMPLETE_MERGED_ON_MAIN",
-      "nextStep": "B11_COMPLETE; B12_PUBLIC_COMPLETE; CURRENT_SOURCE_WORK_IN_PR887",
+      "historicalNextStepBefore919": "B11_COMPLETE; B12_PUBLIC_COMPLETE; CURRENT_SOURCE_WORK_IN_PR887",
+      "nextStep": "B11_COMPLETE; B12_PUBLIC_COMPLETE; CURRENT_SOURCE_WORK_IN_PR919",
       "noMergeOrActivationAuthority": true
     },
     "currentB12": {
@@ -356,7 +356,7 @@
       "networkAuthenticityVerified": false,
       "strategyPnlRun": false
     },
-    "lastCompletedSourceMerge": {
+    "historicalLastCompletedSourceMerge884": {
       "pr": 884,
       "mergeSha": "ce20052f77c99b98b0966465c4dc18c6da77e819",
       "reviewedHead": "3e797dfdcd6dee4dfb1cc6630e8afd43a574a739",
@@ -386,6 +386,12 @@
       "callerSourceAndDataHashesAuthenticated": false,
       "postMergeChecks": "ALL_APPLICABLE_SUCCESS",
       "releaseSafetyPostMergeJobId": 117713897879
+    },
+    "lastCompletedSourceMerge": {
+      "pr": 916,
+      "mergeSha": "c1ec1de5eec7307b1c91a5e133b5486f27fc5c88",
+      "state": "COMPLETE_MERGED_ON_MAIN",
+      "postMergeChecks": "ALL_APPLICABLE_SUCCESS"
     },
     "historicalLastCompletedSourceMergeBeforeB11": {
       "pr": 862,
@@ -451,7 +457,8 @@
         "pages": 39025396725
       }
     },
-    "package": "MERIDIAN_M11_ARENA_INSPECTION",
+    "historicalPackageBefore919": "MERIDIAN_M11_ARENA_INSPECTION",
+    "package": "MERIDIAN-919-CONSOLIDATED-HANDOFF-R2",
     "historicalStateBeforeB11": "PR862_COMPLETE_PR860_REFRESH_PENDING_OWN_EXACT_HEAD_CI_AND_REVIEW_ARENA861_REOPENED",
     "state": "PR919_EXPANDED_CONTINUITY_SCOPE_WAITING_INDEPENDENT_REVIEW_AND_EXACT_HEAD_CI",
     "infrastructurePaused": true,
@@ -2038,7 +2045,7 @@
       "strategyNextStep": "READ_ONLY_INSPECTION_PR898_ACCEPTANCE; HISTORY_IMPLEMENTATION_REMAINS_QUEUED",
       "leadStatusCommentId": 6271844753
     },
-    "m11ArenaInspection": {
+    "historicalM11ArenaInspectionBefore901Merge": {
       "opId": "MERIDIAN-ARENA-INSPECTION-PREP-20261019",
       "intentIssue": 831,
       "intentCommentId": 6272188480,
@@ -2057,6 +2064,16 @@
       "recoveryPerformed": false,
       "integrationOpId": "MERIDIAN-901-ALIGN-20261019-R1",
       "priorReviewCommentId": 6273568843
+    },
+    "m11ArenaInspection": {
+      "opId": "MERIDIAN-ARENA-INSPECTION-PREP-20261019",
+      "pullRequest": 901,
+      "mergeSha": "e0e7472f74a05cb2a9cedb1a758abe8816b93aa6",
+      "state": "COMPLETE_MERGED_ON_MAIN",
+      "scope": "MANUAL_METADATA_ONLY_SYNTHETIC_INSPECTION_REPORT_PRESENTATION",
+      "executionAuthorized": false,
+      "paperAuthorized": false,
+      "liveAuthorized": false
     },
     "completedSourceMerge900": {
       "mergeSha": "496360869171f0a29e3efbc7ec216ffc1833c6a0",
