@@ -1034,6 +1034,7 @@ process.stdout.write(JSON.stringify(runBatch({
                 "path_deadline": path_deadline,
                 "batch_deadline": batch_deadline,
                 "started_at": clock.now,
+                "predecessor": request["predecessorSha256"],
             })
             start_event = {
                 "event": "path_started",
@@ -1080,6 +1081,8 @@ process.stdout.write(JSON.stringify(runBatch({
         self.assertEqual([child["started_at"] for child in child_calls], [100.0, 105.0], diagnostic)
         self.assertEqual([child["batch_deadline"] for child in child_calls], [110.0, 110.0], diagnostic)
         self.assertEqual([child["path_deadline"] for child in child_calls], [110.0, 110.0], diagnostic)
+        self.assertEqual(child_calls[1]["predecessor"],
+                         hashlib.sha256(b"controlled-output-0").hexdigest(), diagnostic)
         self.assertEqual(journal_progress, [
             ("started", 0, 110.0), ("completed", 0, 110.0),
             ("started", 1, 110.0), ("completed", 1, 110.0),
