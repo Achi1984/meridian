@@ -22,7 +22,7 @@
   },
   "terminalBuild": "10.0-r130",
   "liveMainAtCreation": "f23fc2db682963d7031ec1f3ddf9c3f4854a7f7f",
-  "lastSubstantiveCheckpoint": "c1ec1de5eec7307b1c91a5e133b5486f27fc5c88",
+  "lastSubstantiveCheckpoint": "2c3e3798b3296406a88988250ff54f272ae4bb91",
   "lastContinuityMerge": {
     "pr": 553,
     "mergeSha": "f23fc2db682963d7031ec1f3ddf9c3f4854a7f7f"
@@ -317,7 +317,7 @@
       ]
     },
     "historicalVerifiedSourceMainBeforeB11": "921246e61e07ff0624fb4a24c00a452246e9eb7f",
-    "verifiedSourceMain": "c1ec1de5eec7307b1c91a5e133b5486f27fc5c88",
+    "verifiedSourceMain": "2c3e3798b3296406a88988250ff54f272ae4bb91",
     "completedSourceMerge873": {
       "pr": 873,
       "mergeSha": "b75335da3805c0d509ff11f75ab0584d351f284e",
@@ -387,11 +387,24 @@
       "postMergeChecks": "ALL_APPLICABLE_SUCCESS",
       "releaseSafetyPostMergeJobId": 117713897879
     },
-    "lastCompletedSourceMerge": {
+    "historicalLastCompletedSourceMergeBefore923": {
       "pr": 916,
       "mergeSha": "c1ec1de5eec7307b1c91a5e133b5486f27fc5c88",
       "state": "COMPLETE_MERGED_ON_MAIN",
       "postMergeChecks": "ALL_APPLICABLE_SUCCESS"
+    },
+    "lastCompletedSourceMerge": {
+      "pr": 923,
+      "mergeSha": "2c3e3798b3296406a88988250ff54f272ae4bb91",
+      "sourceStatus": "INDEPENDENT_SOURCE_ACCEPTED",
+      "preMergeCi": "2698_PASS_0_FAIL_0_SKIP",
+      "postMergeChecks": "ALL_APPLICABLE_SUCCESS",
+      "postMergeRunIds": {
+        "releaseSafety": 39657036131,
+        "runtimeSmoke": 39657036159,
+        "releaseCoordinator": 39657036338,
+        "pages": 39657032229
+      }
     },
     "historicalLastCompletedSourceMergeBeforeB11": {
       "pr": 862,
@@ -616,7 +629,8 @@
     },
     "publisherNextStep": "PAUSED_BY_OWNER_B_NO_OPERATIONAL_AUTHORITY_NATIVE868_DISABLED",
     "historicalStrategyNextStepBeforeB11": "Finalize r130 Arena release integration gates; separately diagnose PR872 publisher timing-test failure before independent data review. No new strategy execution.",
-    "strategyNextStep": "ACCEPT_PR901_THEN_RECONCILE_COPILOT_PR903_DELIVERY_PROPOSALS",
+    "historicalStrategyNextStepBefore919": "ACCEPT_PR901_THEN_RECONCILE_COPILOT_PR903_DELIVERY_PROPOSALS",
+    "strategyNextStep": "REVIEW_AND_ALIGN_ISSUE924_PR925_METADATA_ONLY_D2_PROPOSAL; SOURCE_ONLY_ACCEPTED_AT_FC0FD0D; FOCUSED_TEST_REPORTED_6_0_0; EXACT_HEAD_CI_PENDING; D2_DEFER_NO_ADMISSION_OR_EXECUTION",
     "completion20261017": {
       "verifiedMain": "8691381510039e2ad48b863ea5e66d6ad6cba462",
       "arenaMerge": "ed60066fc58b4d60eddd727c24cae61c368720bb",
@@ -2092,7 +2106,7 @@
     },
     "continuityRefresh20261021": {
       "opId": "MERIDIAN-919-CONSOLIDATED-HANDOFF-R2",
-      "verifiedMainSha": "c1ec1de5eec7307b1c91a5e133b5486f27fc5c88",
+      "verifiedMainSha": "2c3e3798b3296406a88988250ff54f272ae4bb91",
       "priorBranchHead": "29b10d9c5bc127efdfbc6dcdfee3ab3c4b9c0ed5",
       "pullRequest": 919,
       "issue": 918,
@@ -2140,6 +2154,19 @@
             "releaseCoordinator": 39490979999,
             "pages": 39490978159
           }
+        },
+        "923": {
+          "state": "MERGED_SOURCE_ACCEPTED_ALL_POSTCHECKS_SUCCESS",
+          "mergeSha": "2c3e3798b3296406a88988250ff54f272ae4bb91",
+          "sourceCi": "2698_PASS_0_FAIL_0_SKIP",
+          "releaseSafetyRun": 39657036131,
+          "runtimeSmokeRun": 39657036159,
+          "releaseCoordinatorRun": 39657036338,
+          "releaseSafety": "SUCCESS",
+          "runtimeSmoke": "SUCCESS",
+          "releaseCoordinator": "SUCCESS",
+          "pagesRun": 39657032229,
+          "pages": "SUCCESS"
         }
       },
       "917": {
@@ -2160,16 +2187,40 @@
         "rootCause": "NOT_ESTABLISHED"
       },
       "923": {
-        "state": "OPEN_DRAFT_EVIDENCE_FIRST_DIAGNOSIS",
+        "state": "MERGED_DIAGNOSTIC_INSTRUMENTATION",
         "issue": 922,
+        "mergeSha": "2c3e3798b3296406a88988250ff54f272ae4bb91",
+        "preMergeCi": "2698_PASS_0_FAIL_0_SKIP",
         "rootCause": "NOT_ESTABLISHED",
+        "postMergeChecks": "ALL_APPLICABLE_SUCCESS",
         "noRuntimeOrDeadlineChange": true
       },
       "d2CandidatePacket": {
         "status": "PROPOSAL_ONLY",
-        "admissionArtifact": "NOT_CREATED",
+        "issue": 924,
+        "pullRequest": 925,
+        "branchHead": "fc0fd0db4653630cae6c3f5a73607e02a9c9d24e",
+        "branchBase": "c1ec1de5eec7307b1c91a5e133b5486f27fc5c88",
+        "branchStatus": "OPEN_DRAFT_BEHIND_CURRENT_MAIN_2C3E3798",
+        "proposalArtifact": "PUBLISHED_ON_OPEN_DRAFT_BRANCH_NOT_MERGED",
+        "sourceStatus": "SOURCE_ONLY_ACCEPTED_NOT_ADMISSION_OR_EXECUTION",
+        "sourceAcceptanceCommentId": 6324017218,
+        "focusedTest": {
+          "command": "node --test test/b1-7-d2-candidate.test.js",
+          "testedSha": "fc0fd0db4653630cae6c3f5a73607e02a9c9d24e",
+          "reportedPass": 6,
+          "reportedFail": 0,
+          "reportedSkip": 0,
+          "reportCommentId": 6324009932,
+          "independentExecutionClaimed": false
+        },
+        "focusedTestReportCommentId": 6324009932,
+        "ioBoundary": "REPORTED_IMPORT_NO_WRITE_ISOLATED_FIXED_PATH_CLI_ALLOWLISTED_READS_TAMPER_REJECTION_NO_WRITE",
+        "currentBaseCi": "PENDING_EXACT_HEAD_CURRENT_BASE_CI",
+        "admissionArtifact": "NOT_ADMITTED_NO_APPROVAL_RECEIPT",
         "finalInputIdentity": "NOT_FROZEN",
-        "orderedHistoricalPathIdentities": "NOT_COMPUTED",
+        "proposalPathIdentities": "GENERATED_ON_UNMERGED_PR925_BRANCH_NOT_FINAL_OR_ACCEPTED",
+        "finalPathIdentities": "NOT_FINAL_OR_ACCEPTED",
         "proposedProfileIdentity": "NOT_FINAL",
         "inactiveProfileDigestUse": "PROVENANCE_ONLY_NOT_FINAL_ACTIVATED_PROFILE",
         "ownerDecision": "NOT_RECORDED",

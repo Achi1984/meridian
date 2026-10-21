@@ -26,7 +26,7 @@
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "c1ec1de5eec7307b1c91a5e133b5486f27fc5c88",
+    "verifiedSha": "2c3e3798b3296406a88988250ff54f272ae4bb91",
     "verifiedAt": "2026-10-21",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
   },
@@ -36,7 +36,7 @@
     "pullRequest": 919,
     "issue": 918,
     "branch": "copilot/meridian-d2-readiness-reconciliation-r1",
-    "baseMainSha": "c1ec1de5eec7307b1c91a5e133b5486f27fc5c88",
+    "baseMainSha": "2c3e3798b3296406a88988250ff54f272ae4bb91",
     "status": "OPEN_DRAFT_UNMERGED_WAITING_INDEPENDENT_FULL_REVIEW_AND_EXACT_HEAD_CI",
     "priorThreeFileSourceAcceptance": "NOT_ACCEPTANCE_FOR_EXPANDED_CONTINUITY_SCOPE",
     "mergedReceipts": {
@@ -44,7 +44,8 @@
       "905": "6bcaa74b35a7c093e67f144a03f82a6d77cdf9be",
       "913": "3c4af65bfe1368da608711bef37761d4cfd54f78",
       "921": "2e41968551325b69eeeed994b9d5a5df84252a5e",
-      "916": "c1ec1de5eec7307b1c91a5e133b5486f27fc5c88"
+      "916": "c1ec1de5eec7307b1c91a5e133b5486f27fc5c88",
+      "923": "2c3e3798b3296406a88988250ff54f272ae4bb91"
     },
     "pr917": {
       "status": "SOURCE_ACCEPTED_CI_FAILED_MERGE_HELD",
@@ -56,14 +57,44 @@
       "rootCause": "NOT_ESTABLISHED"
     },
     "pr923": {
-      "status": "OPEN_DRAFT_EVIDENCE_FIRST_DIAGNOSIS_FOR_ISSUE_922",
-      "rootCause": "NOT_ESTABLISHED"
+      "status": "MERGED_DIAGNOSTIC_INSTRUMENTATION",
+      "issue922Status": "OPEN_ROOT_CAUSE_NOT_ESTABLISHED",
+      "mergeSha": "2c3e3798b3296406a88988250ff54f272ae4bb91",
+      "preMergeCi": "2698_PASS_0_FAIL_0_SKIP",
+      "postMergeChecks": "ALL_APPLICABLE_SUCCESS",
+      "postMergeRunIds": {
+        "releaseSafety": 39657036131,
+        "runtimeSmoke": 39657036159,
+        "releaseCoordinator": 39657036338,
+        "pages": 39657032229
+      }
+    },
+    "pr925": {
+      "issue": 924,
+      "status": "OPEN_DRAFT_METADATA_ONLY_CANDIDATE",
+      "branchHead": "fc0fd0db4653630cae6c3f5a73607e02a9c9d24e",
+      "branchBase": "c1ec1de5eec7307b1c91a5e133b5486f27fc5c88",
+      "behindLatestMain": "2c3e3798b3296406a88988250ff54f272ae4bb91",
+      "sourceStatus": "SOURCE_ONLY_ACCEPTED_NOT_ADMISSION_OR_EXECUTION",
+      "sourceAcceptanceCommentId": 6324017218,
+      "focusedTest": {
+        "command": "node --test test/b1-7-d2-candidate.test.js",
+        "reportedPass": 6,
+        "reportedFail": 0,
+        "reportedSkip": 0,
+        "reportCommentId": 6324009932,
+        "independentExecutionClaimed": false
+      },
+      "ioBoundary": "REPORTED_IMPORT_NO_WRITE_ISOLATED_FIXED_PATH_CLI_ALLOWLISTED_READS_TAMPER_REJECTION_NO_WRITE",
+      "exactHeadCurrentBaseCi": "PENDING"
     },
     "d2CandidatePacket": {
       "status": "PROPOSAL_ONLY",
-      "admissionArtifact": "NOT_CREATED",
+      "proposalArtifact": "PUBLISHED_ON_OPEN_PR925_BRANCH_NOT_MERGED",
+      "admissionArtifact": "NOT_ADMITTED_NO_APPROVAL_RECEIPT",
       "inputIdentity": "NOT_FROZEN",
-      "orderedPathIdentities": "NOT_COMPUTED",
+      "proposalPathIdentities": "GENERATED_ON_UNMERGED_PR925_BRANCH_NOT_FINAL_OR_ACCEPTED",
+      "finalPathIdentities": "NOT_FINAL_OR_ACCEPTED",
       "finalProfileIdentity": "NOT_FINAL",
       "ownerDecision": "NOT_RECORDED",
       "executionContextJournalAndUnusedAttemptEvidence": "NOT_VERIFIED",
@@ -1295,7 +1326,7 @@
     255,
     256
   ],
-  "nextAction": "For CROSS-VENUE-FUNDING-EDGE-V2: read `mailboxIssue` from MERIDIAN_LIVE_CHECKPOINT.json, then read that mailbox, then live main/CI/related PRs. Expand large continuity files only on mismatch or when historical detail is required. Canonical execution/PnL/Discovery still requires explicit user authorization plus exact-head Claude review. Current continuity PR #919 next step: independent full review and exact-head CI; no merge. Preserve the #917 CI failure and the evidence-first #923 diagnosis with root cause NOT_ESTABLISHED. D2 candidate is PROPOSAL_ONLY, with no admission or execution authority.",
+  "nextAction": "For CROSS-VENUE-FUNDING-EDGE-V2: read `mailboxIssue` from MERIDIAN_LIVE_CHECKPOINT.json, then read that mailbox, then live main/CI/related PRs. Expand large continuity files only on mismatch or when historical detail is required. Canonical execution/PnL/Discovery still requires explicit user authorization plus exact-head Claude review. Current continuity PR #919 next step: independent full review and exact-head CI; no merge. Preserve the #917 CI failure and #923 merged diagnostics with #922 cause NOT_ESTABLISHED. Issue #924/PR #925 is an unmerged proposal lane with source-only acceptance, author-reported focused tests, and exact-head/current-base CI pending; no admission or execution authority.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -1920,7 +1951,7 @@
     "protocol": "docs/AGENT_ORCHESTRATION.md",
     "quickResume": "User only needs to say: 'Meridian fortsetzen'. Read `mailboxIssue` from MERIDIAN_LIVE_CHECKPOINT.json first, then read that mailbox, then MERIDIAN_RESUME.json + MERIDIAN_AGENT_STATE.json, inspect main/PRs/CI, and continue the first incomplete durable step without repeating merged work.",
     "streamingRule": "Never infer repository failure from 'Streaming unterbrochen'. Reconcile repo first; completed writes/merges must not be repeated.",
-    "currentMainSha": "c1ec1de5eec7307b1c91a5e133b5486f27fc5c88",
+    "currentMainSha": "2c3e3798b3296406a88988250ff54f272ae4bb91",
     "currentBuild": "10.0-r130"
   }
 }

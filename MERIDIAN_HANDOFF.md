@@ -1,7 +1,7 @@
 > ## Current continuity reconciliation — 2026-10-21
 >
-> **Canonical main:** `c1ec1de5eec7307b1c91a5e133b5486f27fc5c88` (PR #916).
-> Verified main checkpoint: **c1ec1de5eec7307b1c91a5e133b5486f27fc5c88**
+> **Latest observed main:** `2c3e3798b3296406a88988250ff54f272ae4bb91` (PR #923).
+> Verified main checkpoint: **2c3e3798b3296406a88988250ff54f272ae4bb91**
 > Build: **10.0-r130**
 > Current `version.json` terminal build is `10.0-r130`. This PR #919 is open,
 > draft, and unmerged. Its earlier three-file source acceptance does not cover
@@ -17,6 +17,7 @@
 > | #913 | Merged at `3c4af65bfe1368da608711bef37761d4cfd54f78`. | [#639/6299104780](https://github.com/Achi1984/meridian/issues/639#issuecomment-6299104780) |
 > | #921 | Merged at `2e41968551325b69eeeed994b9d5a5df84252a5e`; all applicable postchecks succeeded. | [#639/6299885755](https://github.com/Achi1984/meridian/issues/639#issuecomment-6299885755) |
 > | #916 | Merged at `c1ec1de5eec7307b1c91a5e133b5486f27fc5c88`; Release Safety, Runtime Smoke, Coordinator, and Pages all succeeded. | Completion [#639/6323341748](https://github.com/Achi1984/meridian/issues/639#issuecomment-6323341748); runs [39490979956](https://github.com/Achi1984/meridian/actions/runs/39490979956), [39490980085](https://github.com/Achi1984/meridian/actions/runs/39490980085), [39490979999](https://github.com/Achi1984/meridian/actions/runs/39490979999), [39490978159](https://github.com/Achi1984/meridian/actions/runs/39490978159) |
+> | #923 | Merged at `2c3e3798b3296406a88988250ff54f272ae4bb91`; source-only review and pre-merge CI passed (2698/0/0); all four postchecks succeeded. Root cause for #922 remains unknown. | Owner receipt [#925/6324017218](https://github.com/Achi1984/meridian/pull/925#issuecomment-6324017218); Release Safety [39657036131](https://github.com/Achi1984/meridian/actions/runs/39657036131), Runtime Smoke [39657036159](https://github.com/Achi1984/meridian/actions/runs/39657036159), Coordinator [39657036338](https://github.com/Achi1984/meridian/actions/runs/39657036338), Pages [39657032229](https://github.com/Achi1984/meridian/actions/runs/39657032229) |
 >
 > **Active CI blocker:** #917’s source is accepted, but its exact-head Release
 > Safety run [39491245043, attempt 2](https://github.com/Achi1984/meridian/actions/runs/39491245043)
@@ -29,21 +30,32 @@
 > Do not blind-rerun, increase budgets, or change this documentation PR to repair
 > that test.
 >
-> Issue #922 remains open. Draft PR #923 is the active evidence-first diagnosis
-> lane; its read-only startup-cost hypothesis is not reproduced, and root cause
-> remains `NOT_ESTABLISHED` ([PR #923 comment 6323451077](https://github.com/Achi1984/meridian/pull/923#issuecomment-6323451077)).
-> Do not infer a runtime fix, acceptance, or merge from that hypothesis.
+> Issue #922 remains open with root cause `NOT_ESTABLISHED`. PR #923's
+> bounded-diagnostics change is merged on main; it does not establish the
+> original startup cause or claim a runtime fix.
 >
-> **D2 candidate packet:** `PROPOSAL_ONLY`; no admission artifact or execution
-> approval is created here. The exact proposed scope remains one trial, 44 ordered
+> **D2 candidate lane:** Issue #924 / draft PR #925 has published a deterministic
+> metadata-only candidate artifact, including proposed ordered path identities,
+> on its unmerged branch. Independent source-only
+> acceptance applies to `fc0fd0db4653630cae6c3f5a73607e02a9c9d24e`
+> ([#925/6324017218](https://github.com/Achi1984/meridian/pull/925#issuecomment-6324017218));
+> it is not admission or execution approval, and the branch still needs alignment
+> to current main plus exact-head/base CI. The author-reported focused command
+> `node --test test/b1-7-d2-candidate.test.js` at that SHA reported 6 passed,
+> 0 failed, 0 skipped; the report also records import-no-write, isolated fixed-path
+> CLI I/O, and tampered-input rejection checks ([#925/6324009932](https://github.com/Achi1984/meridian/pull/925#issuecomment-6324009932)).
+> The reviewer did not claim independent test execution. Current D2 status remains
+> `PROPOSAL_ONLY`, not an accepted final admission artifact.
+>
+> The exact proposed scope remains one trial, 44 ordered
 > paths, 30-minute batch, 60-second path, 1 MiB output, existing 15/30 bp cost
 > scenarios including the one-day delay, existing screen criteria, and the
 > research-only `NO_FINITE_TRADE_STOP` exception. A genuine separate owner
-> decision is not recorded. Input remains `NOT_FROZEN`; ordered historical path
-> identities are `NOT_COMPUTED`; a final proposed profile identity is
-> `NOT_FINAL`. The current inactive-profile digest is provenance only, never a
-> final activated-profile identity. Source authenticity remains
-> `NOT_ESTABLISHED`; trial-ledger completeness is `UNKNOWN`; execution-context,
+> decision is not recorded. Input remains `NOT_FROZEN`; proposed ordered path
+> identities exist only on #925's unmerged branch and are not final or accepted.
+> A final proposed profile identity is `NOT_FINAL`. The current inactive-profile
+> digest is provenance only, never a final activated-profile identity. Source
+> authenticity remains `NOT_ESTABLISHED`; trial-ledger completeness is `UNKNOWN`; execution-context,
 > journal, and unused-attempt evidence is `NOT_VERIFIED`. No D1 reread, runtime
 > probe, or execution is authorized.
 >

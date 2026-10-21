@@ -46,8 +46,28 @@ gates closed. PR #905's dormant historical admission/profile source received an
 independent `GREEN_LIGHT` at mailbox #639 comment `6275925635` and merged at
 `6bcaa74b35a7c093e67f144a03f82a6d77cdf9be` with successful postchecks, recorded
 at comment `6275930095`. That is accepted source, not an approval of the proposed
-historical execution. The planning base and current `main` are
-`6bcaa74b35a7c093e67f144a03f82a6d77cdf9be`.
+historical execution. PR #905's merge at
+`6bcaa74b35a7c093e67f144a03f82a6d77cdf9be` is a historical admission/profile
+source checkpoint, not current `main`. The latest observed
+`main` is `2c3e3798b3296406a88988250ff54f272ae4bb91`, which includes merged PR
+#923's bounded diagnostic instrumentation. PR #923's source CI and source-only
+review passed before merge (2698 passed, 0 failed, 0 skipped); all four postchecks
+succeeded (Release Safety 39657036131, Runtime Smoke 39657036159, Coordinator
+39657036338, Pages 39657032229). Issue #922 remains open and the original startup
+cause remains unknown.
+
+Issue #924 / draft PR #925 has published a deterministic metadata-only candidate
+artifact with proposed ordered path identities on its unmerged branch.
+Independent source-only acceptance covers
+`fc0fd0db4653630cae6c3f5a73607e02a9c9d24e` only
+([PR comment 6324017218](https://github.com/Achi1984/meridian/pull/925#issuecomment-6324017218));
+the candidate is not a final accepted admission artifact and creates no receipt
+or execution authority. The author-reported focused test command
+`node --test test/b1-7-d2-candidate.test.js` at that commit reported 6 passed,
+0 failed, 0 skipped and metadata-only I/O-boundary checks
+([PR comment 6324009932](https://github.com/Achi1984/meridian/pull/925#issuecomment-6324009932)).
+The reviewer did not claim independent test execution, and exact-head/current-base
+CI remains pending.
 
 ## Immutable identities
 
@@ -147,9 +167,11 @@ This request does **not** authorize a real-data run, strategy-PnL promotion, dis
 
 The remaining gates are separate and conjunctive:
 
-1. Prepare a proposed admission artifact carrying the final protocol,
-   implementation, input-manifest, input, ordered-path, and run-profile
-   identities. Do not compute historical path identities or freeze/activate a
+1. Review and align the #925 proposal to current main, then independently verify
+   any final admission artifact carrying the final protocol, implementation,
+   input-manifest, input, ordered-path, and run-profile identities. The candidate
+   artifact on the open PR branch is not an admission receipt, and its candidate
+   identities are not final accepted identities. Do not freeze or activate a
    profile in this reconciliation.
 2. Record a separate genuine owner decision for the fixed one-trial/44-path
    proposal, 30-minute batch, 60-second path, 1 MiB output limit, 15/30 bp
