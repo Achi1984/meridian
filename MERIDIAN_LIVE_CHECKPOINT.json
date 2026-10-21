@@ -2113,6 +2113,13 @@
       "branch": "copilot/meridian-d2-readiness-reconciliation-r1",
       "pullRequestState": "OPEN_DRAFT_UNMERGED",
       "expandedScopeState": "PRIOR_3_FILE_SOURCE_ACCEPTANCE_SUPERSEDED_FOR_7_FILE_CONTINUITY_SCOPE",
+      "ownerExtraCycleAuthorization": {
+        "commentId": 6324387976,
+        "recordedBy": "OWNER",
+        "authorization": "Freigabe erteilt",
+        "scope": "ONE_BOUNDED_CORRECTION_FOR_TWO_REPORTED_CI_DEFECTS",
+        "additionalAutomaticCorrectionCyclesAfterThis": 0
+      },
       "allowedFiles": [
         "docs/strategy-lab/D2_READINESS_RECONCILIATION.md",
         "research/protocols/b1-7-20261018/EXECUTION_REQUEST.md",

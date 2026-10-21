@@ -1326,7 +1326,7 @@
     255,
     256
   ],
-  "nextAction": "For CROSS-VENUE-FUNDING-EDGE-V2: read `mailboxIssue` from MERIDIAN_LIVE_CHECKPOINT.json, then read that mailbox, then live main/CI/related PRs. Expand large continuity files only on mismatch or when historical detail is required. Canonical execution/PnL/Discovery still requires explicit user authorization plus exact-head Claude review. Current continuity PR #919 next step: independent full review and exact-head CI; no merge. Preserve the #917 CI failure and #923 merged diagnostics with #922 cause NOT_ESTABLISHED. Issue #924/PR #925 is an unmerged proposal lane with source-only acceptance, author-reported focused tests, and exact-head/current-base CI pending; no admission or execution authority.",
+  "nextAction": "For CROSS-VENUE-FUNDING-EDGE-V2: read `mailboxIssue` from MERIDIAN_LIVE_CHECKPOINT.json, then read that mailbox, then live main/CI/related PRs. Expand large continuity files only on mismatch or when historical detail is required. Canonical execution/PnL/Discovery still requires explicit user authorization plus exact-head Claude review. Current continuity next step: independent full review and exact-head CI; no merge. Preserve the CI failure and merged diagnostics recorded in currentContinuity; the issue cause remains NOT_ESTABLISHED. The D2 candidate remains an unmerged proposal with source-only acceptance, author-reported focused tests, and exact-head/current-base CI pending; no admission or execution authority.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
