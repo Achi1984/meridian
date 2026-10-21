@@ -26,9 +26,53 @@
   "executionImpact": false,
   "sourceOfTruth": {
     "branch": "main",
-    "verifiedSha": "c009326529e162f84bb985d0aca2de6cf5065c18",
-    "verifiedAt": "2026-10-05",
+    "verifiedSha": "c1ec1de5eec7307b1c91a5e133b5486f27fc5c88",
+    "verifiedAt": "2026-10-21",
     "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
+  },
+  "currentContinuity": {
+    "operation": "MERIDIAN-919-CONSOLIDATED-HANDOFF-R2",
+    "pullRequest": 919,
+    "issue": 918,
+    "branch": "copilot/meridian-d2-readiness-reconciliation-r1",
+    "baseMainSha": "c1ec1de5eec7307b1c91a5e133b5486f27fc5c88",
+    "status": "OPEN_DRAFT_UNMERGED_WAITING_INDEPENDENT_FULL_REVIEW_AND_EXACT_HEAD_CI",
+    "priorThreeFileSourceAcceptance": "NOT_ACCEPTANCE_FOR_EXPANDED_CONTINUITY_SCOPE",
+    "mergedReceipts": {
+      "901": "e0e7472f74a05cb2a9cedb1a758abe8816b93aa6",
+      "905": "6bcaa74b35a7c093e67f144a03f82a6d77cdf9be",
+      "913": "3c4af65bfe1368da608711bef37761d4cfd54f78",
+      "921": "2e41968551325b69eeeed994b9d5a5df84252a5e",
+      "916": "c1ec1de5eec7307b1c91a5e133b5486f27fc5c88"
+    },
+    "pr917": {
+      "status": "SOURCE_ACCEPTED_CI_FAILED_MERGE_HELD",
+      "runId": 39491245043,
+      "attempt": 2,
+      "jobId": 119402180602,
+      "result": "2697_PASS_1_FAIL_0_SKIP",
+      "failedTest": "test_b1_exclusive_lock_after_child_failure_returns_unsettled_and_reaps_child",
+      "rootCause": "NOT_ESTABLISHED"
+    },
+    "pr923": {
+      "status": "OPEN_DRAFT_EVIDENCE_FIRST_DIAGNOSIS_FOR_ISSUE_922",
+      "rootCause": "NOT_ESTABLISHED"
+    },
+    "d2CandidatePacket": {
+      "status": "PROPOSAL_ONLY",
+      "admissionArtifact": "NOT_CREATED",
+      "inputIdentity": "NOT_FROZEN",
+      "orderedPathIdentities": "NOT_COMPUTED",
+      "finalProfileIdentity": "NOT_FINAL",
+      "ownerDecision": "NOT_RECORDED",
+      "executionContextJournalAndUnusedAttemptEvidence": "NOT_VERIFIED",
+      "sourceAuthenticity": "NOT_ESTABLISHED",
+      "trialLedger": "UNKNOWN",
+      "executionAuthorized": false,
+      "paperAuthorized": false,
+      "liveAuthorized": false
+    },
+    "nextStep": "STOP_FOR_INDEPENDENT_FULL_REVIEW_AND_EXACT_HEAD_CI; NO_MERGE"
   },
   "runtime": {
     "releaseSafety": "GREEN",
@@ -1250,7 +1294,7 @@
     255,
     256
   ],
-  "nextAction": "For CROSS-VENUE-FUNDING-EDGE-V2: read `mailboxIssue` from MERIDIAN_LIVE_CHECKPOINT.json, then read that mailbox, then live main/CI/related PRs. Expand large continuity files only on mismatch or when historical detail is required. Canonical execution/PnL/Discovery still requires explicit user authorization plus exact-head Claude review.",
+  "nextAction": "For CROSS-VENUE-FUNDING-EDGE-V2: read `mailboxIssue` from MERIDIAN_LIVE_CHECKPOINT.json, then read that mailbox, then live main/CI/related PRs. Expand large continuity files only on mismatch or when historical detail is required. Canonical execution/PnL/Discovery still requires explicit user authorization plus exact-head Claude review. Current continuity PR #919 next step: independent full review and exact-head CI; no merge. Preserve the #917 CI failure and the evidence-first #923 diagnosis with root cause NOT_ESTABLISHED. D2 candidate is PROPOSAL_ONLY, with no admission or execution authority.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -1875,7 +1919,7 @@
     "protocol": "docs/AGENT_ORCHESTRATION.md",
     "quickResume": "User only needs to say: 'Meridian fortsetzen'. Read `mailboxIssue` from MERIDIAN_LIVE_CHECKPOINT.json first, then read that mailbox, then MERIDIAN_RESUME.json + MERIDIAN_AGENT_STATE.json, inspect main/PRs/CI, and continue the first incomplete durable step without repeating merged work.",
     "streamingRule": "Never infer repository failure from 'Streaming unterbrochen'. Reconcile repo first; completed writes/merges must not be repeated.",
-    "currentMainSha": "c009326529e162f84bb985d0aca2de6cf5065c18",
-    "currentBuild": "10.0-r115"
+    "currentMainSha": "c1ec1de5eec7307b1c91a5e133b5486f27fc5c88",
+    "currentBuild": "10.0-r130"
   }
 }

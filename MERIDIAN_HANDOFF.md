@@ -1,3 +1,65 @@
+> ## Current continuity reconciliation — 2026-10-21
+>
+> **Canonical main:** `c1ec1de5eec7307b1c91a5e133b5486f27fc5c88` (PR #916).
+> Verified main checkpoint: **c1ec1de5eec7307b1c91a5e133b5486f27fc5c88**
+> Build: **10.0-r130**
+> Current `version.json` terminal build is `10.0-r130`. This PR #919 is open,
+> draft, and unmerged. Its earlier three-file source acceptance does not cover
+> the expanded continuity scope; independent full review and exact-head CI are
+> required. Do not merge.
+>
+> **Merged project work and evidence**
+>
+> | PR | Verified current status | Receipt |
+> | --- | --- | --- |
+> | #901 | Merged as `e0e7472f74a05cb2a9cedb1a758abe8816b93aa6`; all applicable postchecks succeeded. | PR #901 comment [6273433124](https://github.com/Achi1984/meridian/pull/901#issuecomment-6273433124); final receipt [#639/6273865905](https://github.com/Achi1984/meridian/issues/639#issuecomment-6273865905) |
+> | #905 | Dormant historical-admission/profile source merged at `6bcaa74b35a7c093e67f144a03f82a6d77cdf9be`; independent source acceptance, not D2 approval. | [#639/6275925635](https://github.com/Achi1984/meridian/issues/639#issuecomment-6275925635), merge [#639/6275930095](https://github.com/Achi1984/meridian/issues/639#issuecomment-6275930095) |
+> | #913 | Merged at `3c4af65bfe1368da608711bef37761d4cfd54f78`. | [#639/6299104780](https://github.com/Achi1984/meridian/issues/639#issuecomment-6299104780) |
+> | #921 | Merged at `2e41968551325b69eeeed994b9d5a5df84252a5e`; all applicable postchecks succeeded. | [#639/6299885755](https://github.com/Achi1984/meridian/issues/639#issuecomment-6299885755) |
+> | #916 | Merged at `c1ec1de5eec7307b1c91a5e133b5486f27fc5c88`; Release Safety, Runtime Smoke, Coordinator, and Pages all succeeded. | Completion [#639/6323341748](https://github.com/Achi1984/meridian/issues/639#issuecomment-6323341748); runs [39490979956](https://github.com/Achi1984/meridian/actions/runs/39490979956), [39490980085](https://github.com/Achi1984/meridian/actions/runs/39490980085), [39490979999](https://github.com/Achi1984/meridian/actions/runs/39490979999), [39490978159](https://github.com/Achi1984/meridian/actions/runs/39490978159) |
+>
+> **Active CI blocker:** #917’s source is accepted, but its exact-head Release
+> Safety run [39491245043, attempt 2](https://github.com/Achi1984/meridian/actions/runs/39491245043)
+> failed at `test_b1_exclusive_lock_after_child_failure_returns_unsettled_and_reaps_child`
+> (`test_supervisor.py:803`): it did not observe a durable first-path start.
+> Result was 2697 passed, 1 failed, 0 skipped; the B1 group ran 16 tests in
+> 56.280 seconds and the wrapper took 97.228 seconds. The failure is an assertion,
+> not a group timeout; the cause is not established. Owner failure receipt:
+> [#639/6323451446](https://github.com/Achi1984/meridian/issues/639#issuecomment-6323451446).
+> Do not blind-rerun, increase budgets, or change this documentation PR to repair
+> that test.
+>
+> Issue #922 remains open. Draft PR #923 is the active evidence-first diagnosis
+> lane; its read-only startup-cost hypothesis is not reproduced, and root cause
+> remains `NOT_ESTABLISHED` ([PR #923 comment 6323451077](https://github.com/Achi1984/meridian/pull/923#issuecomment-6323451077)).
+> Do not infer a runtime fix, acceptance, or merge from that hypothesis.
+>
+> **D2 candidate packet:** `PROPOSAL_ONLY`; no admission artifact or execution
+> approval is created here. The exact proposed scope remains one trial, 44 ordered
+> paths, 30-minute batch, 60-second path, 1 MiB output, existing 15/30 bp cost
+> scenarios including the one-day delay, existing screen criteria, and the
+> research-only `NO_FINITE_TRADE_STOP` exception. A genuine separate owner
+> decision is not recorded. Input remains `NOT_FROZEN`; ordered historical path
+> identities are `NOT_COMPUTED`; a final proposed profile identity is
+> `NOT_FINAL`. The current inactive-profile digest is provenance only, never a
+> final activated-profile identity. Source authenticity remains
+> `NOT_ESTABLISHED`; trial-ledger completeness is `UNKNOWN`; execution-context,
+> journal, and unused-attempt evidence is `NOT_VERIFIED`. No D1 reread, runtime
+> probe, or execution is authorized.
+>
+> **Scope and preserved state:** The only writable files in this continuity packet
+> are:
+> `docs/strategy-lab/D2_READINESS_RECONCILIATION.md`,
+> `research/protocols/b1-7-20261018/EXECUTION_REQUEST.md`,
+> `test/b1-7-engine.test.js`, `MERIDIAN_LIVE_CHECKPOINT.json`,
+> `MERIDIAN_HANDOFF.md`, `MERIDIAN_RESUME.json`, and
+> `MERIDIAN_AGENT_STATE.json`. Historical snapshots and original D1 evidence are
+> preserved. Research authority flags remain false; infrastructure pause and
+> disabled routing are unchanged. The next gate is independent full review and
+> exact-head CI for the expanded scope. **No merge.**
+>
+> Earlier dated blocks below remain historical snapshots and are not current status.
+
 > Current reconciliation — 2026-10-19, PR #901 main alignment.
 > Verified main: `496360869171f0a29e3efbc7ec216ffc1833c6a0` (PR #900).
 > PR #900 complete: independent Work review #639/6273568843, merge receipt
