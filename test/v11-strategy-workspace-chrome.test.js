@@ -194,10 +194,19 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fo
         assert.match(historical.text,/kein Producer-Export/);
         assert.match(historical.text,/Lifecycle: queued/);
         assert.match(historical.text,/Engine-Ergebnisstatus: Nicht verfügbar/);
+        assert.match(historical.text,/Screenstatus: Nicht verfügbar/);
+        assert.match(historical.text,/44 geplante Pfaddeskriptoren; dies ist kein Nachweis abgeschlossener Ergebnisse/);
+        assert.doesNotMatch(historical.text,/protocolSha256/);
         assert.equal(historical.overflow,false);assert.ok(historical.summaryHeight>=44);
         assert.equal(historical.requests,beforeHistorical.requests);assert.equal(historical.cards,beforeHistorical.cards);
         await key('Enter','Enter',13);
-        assert.equal(await evaluate(`document.querySelector('[aria-label="Separates historisches Arena-Ergebnis · UI-Fixture"] details').open`),true);
+        const technical=await evaluate(`(()=>{
+          const disclosure=document.querySelector('[aria-label="Separates historisches Arena-Ergebnis · UI-Fixture"] details');
+          return {open:disclosure.open,text:disclosure.innerText};
+        })()`);
+        assert.equal(technical.open,true);
+        assert.match(technical.text,/protocolSha256/);
+        assert.match(technical.text,/[a-f0-9]{64}/);
         const navClear=await evaluate(`(()=>{const root=document.documentElement,section=document.querySelector('#strategy-arena-root');window.scrollTo(0,root.scrollHeight);return section.lastElementChild.getBoundingClientRect().bottom<=document.getElementById('nav').getBoundingClientRect().top+1;})()`);
         assert.equal(navClear,true);
 

@@ -7,10 +7,27 @@ import {createStrategyArenaView} from '../v11/strategy-arena.js';
 const digest = character=>character.repeat(64);
 const timestamp = second=>`2026-01-01T00:00:${String(second).padStart(2,'0')}Z`;
 const parse = value=>parseArenaHistoricalResultFixture(JSON.stringify(value));
+const resultDescriptors = () => {
+  const variants=['primary-n30-f25','neighbour-n20-f25','neighbour-n45-f25',
+    'neighbour-n30-f20','neighbour-n30-f35'];
+  const scenarios=['base-15bp','stress-30bp','stress-30bp-delay-1d'];
+  const segments=['development','diagnostic'];
+  return [
+    ...variants.flatMap(variantId=>scenarios.flatMap(scenarioId=>
+      segments.map(segmentId=>({variantId,scenarioId,segmentId})))),
+    ...scenarios.flatMap(scenarioId=>segments.map(segmentId=>
+      ({variantId:'full-basket-weekly',scenarioId,segmentId}))),
+    ...['frozen-mean-exposure','frozen-risk-exposure']
+      .flatMap(variantId=>scenarios.map(scenarioId=>({variantId,scenarioId,segmentId:'diagnostic'}))),
+    {variantId:'cash-zero',scenarioId:'scenario-independent',segmentId:'development'},
+    {variantId:'cash-zero',scenarioId:'scenario-independent',segmentId:'diagnostic'}
+  ];
+};
 
 function fixture({state='queued',resultStatus=null,screenStatus=null,descriptorOrder=null,computationOrder=null}={}) {
   const pathIds=descriptorOrder || Array.from({length:44},(_,index)=>
     (index+1).toString(16).padStart(64,'0'));
+  const descriptors=resultDescriptors();
   const computationPathIds=computationOrder || [...pathIds].reverse();
   const completedCount=state==='completed'?44:resultStatus==='INSUFFICIENT_EVIDENCE'?19:0;
   const unresolved=state==='unknown';
@@ -65,10 +82,12 @@ function fixture({state='queued',resultStatus=null,screenStatus=null,descriptorO
     protocolReview:{},protocolSha256:digest('f'),schema:'MERIDIAN_B1_7_ENGINE_RESULT_R3',
     screen,status:resultStatus,
     controlDefinitions:controls,
-    paths:pathIds.map(pathId=>completedPathIds.has(pathId)
-      ?{pathId,status:'COMPLETED',computed:true,attempts:1}
-      :{pathId,kind:'CANDIDATE',variantId:'primary-n30-f25',scenarioId:'base-15bp',
-        segmentId:'diagnostic',status:'NOT_RUN_INSUFFICIENT_EVIDENCE',computed:false,attempts:0,failure:null})
+    paths:pathIds.map((pathId,index)=>completedPathIds.has(pathId)
+      ?{pathId,...descriptors[index],status:'COMPLETED',computed:true,attempts:1,
+        netReturn:index===1?0.123456789012345:0.0042+index/100_000,
+        sampledDrawdown:index===1?0.087654321098765:0.01+index/1000}
+      :{pathId,...descriptors[index],kind:'CANDIDATE',status:'NOT_RUN_INSUFFICIENT_EVIDENCE',
+        computed:false,attempts:0,failure:null})
   } : null;
   const job={
     trialId:digest('e'),trialKey:'trial-generated-ui-fixture',state,attempts:attempted?1:0,
@@ -260,6 +279,13 @@ test('historical fixture renders escaped producer fields without network, digest
   assert.match(root.innerHTML,/Lifecycle: failed/);
   assert.match(root.innerHTML,/Engine-Ergebnisstatus: INSUFFICIENT_EVIDENCE/);
   assert.match(root.innerHTML,/Screenstatus: INSUFFICIENT_EVIDENCE/);
+  assert.match(root.innerHTML,/Lifecycle-Zusammenfassung/);
+  assert.match(root.innerHTML,/Engine-Zusammenfassung/);
+  assert.match(root.innerHTML,/Screen-Zusammenfassung/);
+  assert.match(root.innerHTML,/44 geplante Pfaddeskriptoren; dies ist kein Nachweis abgeschlossener Ergebnisse/);
+  assert.match(root.innerHTML,/Abgeschlossene Ergebnisse: 19 von 44 geplanten Pfaden/);
+  assert.match(root.innerHTML,/Primär · Basis 15 bp<\/strong> · base-15bp: Status NOT_RUN_INSUFFICIENT_EVIDENCE · Nettoertrag Nicht verfügbar/);
+  assert.match(root.innerHTML,/Screenstatus: INSUFFICIENT_EVIDENCE · Interpretation: Nicht verfügbar/);
   assert.match(root.innerHTML,/DEVELOPMENT_AND_HISTORICAL_DIAGNOSTIC/);
   assert.match(root.innerHTML,/NOT_ESTABLISHED/);
   assert.match(root.innerHTML,/NO_FINITE_TRADE_STOP/);
@@ -272,6 +298,35 @@ test('historical fixture renders escaped producer fields without network, digest
   assert.match(root.innerHTML,/role="alert"/);
   assert.doesNotMatch(root.innerHTML,/Lifecycle: failed/);
   assert.deepEqual(cards(root.innerHTML),before);
+  view.dispose();
+});
+
+test('unsettled historical fixtures keep unavailable result fields explicit',async()=>{
+  const root=rootFixture(),view=createStrategyArenaView(root);
+  for(const state of ['queued','partial','unknown','rejected']) {
+    await root.importHistorical(file(JSON.stringify(fixture({state}))));
+    assert.match(root.innerHTML,new RegExp(`Lifecycle: ${state}`));
+    assert.match(root.innerHTML,/Engine-Ergebnisstatus: Nicht verfügbar · Abgeschlossene Ergebnisse: Nicht verfügbar von Nicht verfügbar/);
+    assert.match(root.innerHTML,/Screenstatus: Nicht verfügbar · Interpretation: Nicht verfügbar/);
+    assert.match(root.innerHTML,/44 geplante Pfaddeskriptoren; dies ist kein Nachweis abgeschlossener Ergebnisse/);
+  }
+  view.dispose();
+});
+
+test('completed fixture shows exact producer metrics and keeps technical identities collapsed',async()=>{
+  const root=rootFixture(),view=createStrategyArenaView(root);
+  await root.importHistorical(file(JSON.stringify(fixture({state:'completed',resultStatus:'COMPLETED'}))));
+  const section=root.innerHTML.slice(root.innerHTML.indexOf('aria-label="Separates historisches Arena-Ergebnis'));
+  const detailsStart=section.indexOf('<details');
+  const summary=section.slice(0,detailsStart);
+  assert.match(summary,/Abgeschlossene Ergebnisse: 44 von 44 geplanten Pfaden/);
+  assert.match(summary,/Nettoertrag 0\.123456789012345 · maximaler Drawdown 0\.087654321098765/);
+  assert.match(summary,/Control · mittlere Exposition/);
+  assert.match(summary,/Nachbar · Fenster 20 · Floor 0,25/);
+  assert.match(summary,/Nachbarn positiv, Basis 15 bp: 3 von 4 · Stress 30 bp: 3 von 4/);
+  assert.doesNotMatch(summary,/protocolSha256|sourceSha256|resultSha256/);
+  assert.match(section.slice(detailsStart),/protocolSha256/);
+  assert.match(section.slice(detailsStart),/Serialisiertes Producer-Ergebnis · nicht neu berechnet/);
   view.dispose();
 });
 
