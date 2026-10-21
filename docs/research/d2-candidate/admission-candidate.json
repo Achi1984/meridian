@@ -1,0 +1,970 @@
+{
+  "schema": "MERIDIAN_D2_ADMISSION_CANDIDATE_R1",
+  "classification": "PROPOSAL_ONLY",
+  "decision": "DEFER",
+  "executionAuthorized": false,
+  "approvalReceipt": null,
+  "authority": {
+    "strategyPnlAuthorized": false,
+    "discoveryAuthorized": false,
+    "validationAuthorized": false,
+    "holdoutAuthorized": false,
+    "paperAuthorized": false,
+    "liveAuthorized": false
+  },
+  "runtimeUse": "OUTSIDE_RUNTIME_ADMISSION_AND_DISCOVERY_PATHS",
+  "evidenceState": {
+    "dataAdmission": "NOT_READY",
+    "screen": "NOT_RUN",
+    "sourceAuthenticity": "NOT_ESTABLISHED",
+    "executionContext": "NOT_VERIFIED",
+    "journal": "NOT_VERIFIED",
+    "trialLedger": "UNKNOWN",
+    "trialLedgerCompleteness": "NOT_VERIFIED"
+  },
+  "acceptedReceipts": {
+    "sourceAndProfile": {
+      "sourceAcceptanceComment": 6255139258,
+      "profileAcceptanceComment": 6275925635,
+      "profileMergeComment": 6275930095,
+      "profileMergeCommit": "6bcaa74b35a7c093e67f144a03f82a6d77cdf9be"
+    },
+    "d1": {
+      "issue": 895,
+      "authorizationComment": 6271123620,
+      "technicalClosureComment": 6272425721,
+      "evidenceMergeCommit": "fe3646378c419493e7581ac9692eb1cf68bb7422"
+    },
+    "acceptedReadinessSource": {
+      "pullRequest": 919,
+      "sourceAcceptedHead": "569a636e9311485cbbcd420cd9119b8e3f711026",
+      "sourceAcceptanceComment": 6299005779,
+      "integratedSourceSnapshotHead": "7990bbf328edd7eb4975d1f389241cbe873aa1a3",
+      "integrationReceiptComment": 6299137712,
+      "laterScopeExpansionComment": 6323534494,
+      "laterScopeReview": "PENDING"
+    }
+  },
+  "metadataSources": {
+    "d1Operation": "MERIDIAN-D1-WORK-20261019-01",
+    "d1DataSourceCommit": "1c7b6dccd886f57e866c7d359c091b1e72a193ea",
+    "d1ObservedMainCommit": "6f720373af5439af70c54e6cb2f1c17abaf8b877",
+    "files": {
+      "d1Verification": {
+        "path": "docs/research/d1-20261019/verification.json",
+        "sha256": "223548051320d00866666d87b1b543243fecf9d1a5ca647be2d7a09d0b1f0f05"
+      },
+      "d1Readme": {
+        "path": "docs/research/d1-20261019/README.md",
+        "sha256": "fc9a8639ae307a21b8c6dc9ef39e2a4fabc0be50f9c17e447f97e874bb41fd05"
+      },
+      "d1VerifierArchive": {
+        "path": "docs/research/d1-20261019/executed-verifier.mjs.txt",
+        "sha256": "30e2b8bf80d93f2bb76b70a0afc28092180b729b1b0bd4ccf203359d28b6c156"
+      },
+      "inactiveProfileJson": {
+        "path": "scripts/research-supervisor/historical_run_profile.json",
+        "sha256": "37414b5a7f595a9b2fd51784425b7b24a237a7186afa707beb37d9baa279c391"
+      },
+      "pathBridgeManifest": {
+        "path": "scripts/research-supervisor/b1_bridge_manifest.json",
+        "sha256": "0a90728308f65fdcc387c3c7130c0792eaa18e921d193ac8ba61a3f428577921"
+      },
+      "protocolJson": {
+        "path": "research/protocols/b1-7-20261018/protocol.json",
+        "sha256": "a78e1ae8c71c8f85baee5b51f5691643fc29136f636f19465c61f553afe09185"
+      },
+      "candidateBuilder": {
+        "path": "scripts/research/b1-7/prepare-d2-candidate.mjs",
+        "sha256": "b5afaa72e0e02e612ee293c5bd1798d026acad5c71fa5fc19f68ba9d8e0e37e8"
+      }
+    }
+  },
+  "source": {
+    "sourceCommit": "1c7b6dccd886f57e866c7d359c091b1e72a193ea",
+    "sourceFiles": {
+      "engine": "scripts/research/b1-7/engine.mjs",
+      "validator": "scripts/research/b1-7/validate.mjs",
+      "loader": "scripts/research/b1-7/captured-input.mjs",
+      "protocol": "research/protocols/b1-7-20261018/protocol.json",
+      "bridge": "scripts/research-supervisor/b1_bridge_manifest.json",
+      "admission": "scripts/research/b1-7/historical-admission.mjs",
+      "profile": "scripts/research/b1-7/historical-profile.mjs",
+      "adapter": "scripts/research-supervisor/historical_adapter.mjs",
+      "adapterRuntime": "scripts/research-supervisor/b1_adapter.mjs",
+      "supervisor": "scripts/research-supervisor/supervisor.py",
+      "journal": "scripts/research-supervisor/journal.py"
+    },
+    "sourceSha256": {
+      "engine": "64df8c6fe5a587397b312447d310cb285f552da5b686a11b3a1d0f9441b9bb8f",
+      "validator": "2052c0fae0082622f48a18abb4a6dacc0ffa679fb5da01df5779b398f5a578fc",
+      "loader": "93d05a81625fed4e7f56f889a1b3b2950ac98191f183dff99f5c7f44a276f02d",
+      "protocol": "a78e1ae8c71c8f85baee5b51f5691643fc29136f636f19465c61f553afe09185",
+      "bridge": "0a90728308f65fdcc387c3c7130c0792eaa18e921d193ac8ba61a3f428577921",
+      "admission": "eb3bef19553a299c27023bc4558157b75267fa99adf23661e5efb5730b905f04",
+      "profile": "1df24e3372acb900ead091aef55f6f6fc2288a81bcf769e7587fb36e12aaad17",
+      "adapter": "79bef665862be2a1751d201c6303c571344c42cdc7fe76897c66ff74561c5c5f",
+      "adapterRuntime": "2d912e011e441abee4c884236a8a4c09791b502151f470e7388cd2333b1ee165",
+      "supervisor": "6eb664e328bb105063d9a3eabf06b0b5c54140620141d3ee9db00744f246385c",
+      "journal": "83c1d37557afff72adfc08dbd2a0036db3fb7c45a895a679b7015c3f23cc055e"
+    },
+    "sourceIdentitySha256": "3e3973847b2b37cffa11b2df1be0b832d3227692857ff4bb2631ca5ff48ad773"
+  },
+  "protocol": {
+    "id": "MERIDIAN-B1-7-PROTOCOL-R3-20261018",
+    "sha256": "a78e1ae8c71c8f85baee5b51f5691643fc29136f636f19465c61f553afe09185"
+  },
+  "implementation": {
+    "id": "MERIDIAN-B1-7-ENGINE-R3",
+    "sha256": "ab73261f01b27b8655ffea7979fec03eb1a9bea667b6fc4cda8d77b75c4f3e06"
+  },
+  "input": {
+    "manifestDraft": {
+      "sourceCommit": "1c7b6dccd886f57e866c7d359c091b1e72a193ea",
+      "files": {
+        "XBTUSD": "f2e94a03fbe61f37295b2249d5c3a4d324d13fcfb5d5b41f2ed4d7dfe2183bb9",
+        "ETHUSD": "fbb7915af33d3c32db1cf368a171ed633090406c39da38aae90ac0d3876754bb",
+        "SOLUSD": "caff8ea08d3548b2d8c704cc17a940754a70e23f60e44716324c464929bc18ca",
+        "XRPUSD": "bd006dfcbf052fb516e2d5e5a97d0570cf093e577c3c83752f2f3b7310fc52a7",
+        "LINKUSD": "82682634f645ab5ca1dac4065cc0d490d343ea24b61463bcc2b6406894785518",
+        "AVAXUSD": "a4350bf73b44a45770bb173541133e4a04e847a07d74231ad6b5bbd7d6d06887",
+        "SUIUSD": "0b35eb5598a336d8d4485b15adc2a4b4a716c967ff700eff3802386c31beda79"
+      },
+      "selectedSeriesSha256": {
+        "XBTUSD": "bffbce1ff996b4348264554f7213e7d88f3f6e756be735e21b6ee3df499bfaf8",
+        "ETHUSD": "99a5fb8ce0358615b222dbbc8cd298ffa03d7fc4deaf1862bbcdf2e9beeab0ef",
+        "SOLUSD": "37b76aee67428b996db199fa5911c3c839418a02ca5d0ed78fb10466c6c962de",
+        "XRPUSD": "80fa4021997d9c1b80cb5c0714e246988f53ae89acae46ce67e6bbb580714925",
+        "LINKUSD": "82ca47fb3622a80bbcb70fb40610eb4aedf8a6151bc5cf74a66250c72a10ac05",
+        "AVAXUSD": "2374eb666defc74c9036d019251e1dcbde78f99b94c85453627d54d70b1d91c2",
+        "SUIUSD": "03077fda4966b0699afde51118ecedc8d2f31ffe3088c23fd918c29fc20e4ba2"
+      }
+    },
+    "inputManifestSha256": "37fecaa0d003c9ec862fb57b3b312c0289c1dd370607ade99bac584d357f81a9",
+    "inputSha256": "24c992c39d5c722464b19483ad4b0f1e55c8a434b6a1ac137a8dd10438398a7b"
+  },
+  "paths": {
+    "descriptorsAndIds": [
+      {
+        "ordinal": 1,
+        "kind": "CANDIDATE",
+        "variantId": "primary-n30-f25",
+        "scenarioId": "base-15bp",
+        "segmentId": "development",
+        "pathId": "c244ca520cd25dcfb1a3f2776c71724d1ca52d0f5877f24dffa5f4cd6593de02"
+      },
+      {
+        "ordinal": 2,
+        "kind": "CANDIDATE",
+        "variantId": "primary-n30-f25",
+        "scenarioId": "base-15bp",
+        "segmentId": "diagnostic",
+        "pathId": "cf30c3241e9590f36fe875186c267955c7663ed636abb3f96270aeca060b1939"
+      },
+      {
+        "ordinal": 3,
+        "kind": "CANDIDATE",
+        "variantId": "primary-n30-f25",
+        "scenarioId": "stress-30bp",
+        "segmentId": "development",
+        "pathId": "1bcd50a23a56a99a0382b9c49dbba1681f065e3c86e906cbcf3da4bfec21b486"
+      },
+      {
+        "ordinal": 4,
+        "kind": "CANDIDATE",
+        "variantId": "primary-n30-f25",
+        "scenarioId": "stress-30bp",
+        "segmentId": "diagnostic",
+        "pathId": "b25227467c5aeff448a533219f0760873aabf71c32ca98064ea5c366efc50019"
+      },
+      {
+        "ordinal": 5,
+        "kind": "CANDIDATE",
+        "variantId": "primary-n30-f25",
+        "scenarioId": "stress-30bp-delay-1d",
+        "segmentId": "development",
+        "pathId": "aa6cd5f686d2588ca40e350412952046db7309d97d94adf8a59ccd76c9a53e12"
+      },
+      {
+        "ordinal": 6,
+        "kind": "CANDIDATE",
+        "variantId": "primary-n30-f25",
+        "scenarioId": "stress-30bp-delay-1d",
+        "segmentId": "diagnostic",
+        "pathId": "aa578b7a77df7c7b7453900af7f89fa4c34b3d04d2914e3e69cd41a14bba6448"
+      },
+      {
+        "ordinal": 7,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n20-f25",
+        "scenarioId": "base-15bp",
+        "segmentId": "development",
+        "pathId": "1ec8059b8cbf281541a2d8c26f59b27d0b33d457638e0f3701e14c5d48cc46c0"
+      },
+      {
+        "ordinal": 8,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n20-f25",
+        "scenarioId": "base-15bp",
+        "segmentId": "diagnostic",
+        "pathId": "d217335f3cae31a67b47788d55ccd0240e38c18d82d6054cc33a424a2298225e"
+      },
+      {
+        "ordinal": 9,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n20-f25",
+        "scenarioId": "stress-30bp",
+        "segmentId": "development",
+        "pathId": "05fd53ee0ce34a814eda3a78476ed97555305264c2bc20d146afe47d7610e5b7"
+      },
+      {
+        "ordinal": 10,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n20-f25",
+        "scenarioId": "stress-30bp",
+        "segmentId": "diagnostic",
+        "pathId": "a08ebc6d9c0e085821f3d6a499b3d949b7349755295ed1c8d2cd6aea824f9570"
+      },
+      {
+        "ordinal": 11,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n20-f25",
+        "scenarioId": "stress-30bp-delay-1d",
+        "segmentId": "development",
+        "pathId": "2582f57d3d0b1463b8695ba8fefbef620ac29101e0374c27d3ef18faa37a6299"
+      },
+      {
+        "ordinal": 12,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n20-f25",
+        "scenarioId": "stress-30bp-delay-1d",
+        "segmentId": "diagnostic",
+        "pathId": "1227285ecb7c2c2f7f8ee22a4dabcc4be773141e8932716f843b6a6a5d5d8e45"
+      },
+      {
+        "ordinal": 13,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n45-f25",
+        "scenarioId": "base-15bp",
+        "segmentId": "development",
+        "pathId": "1bae5a4d52ee94ece7dbd0100b36fcbc1ffe450690a055d2c2e022a34da7c8f1"
+      },
+      {
+        "ordinal": 14,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n45-f25",
+        "scenarioId": "base-15bp",
+        "segmentId": "diagnostic",
+        "pathId": "fee64915698d75c38329d89553f23660c25ec4590682a5fe658705d4e387a999"
+      },
+      {
+        "ordinal": 15,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n45-f25",
+        "scenarioId": "stress-30bp",
+        "segmentId": "development",
+        "pathId": "f40d373332f604e276f49fbea8370719dd1421a72bebae9af564949251abd6cc"
+      },
+      {
+        "ordinal": 16,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n45-f25",
+        "scenarioId": "stress-30bp",
+        "segmentId": "diagnostic",
+        "pathId": "bc1ed928fe9d07738480d97ba3ad8a8c718b27d4ce834becf1d6eeaee35fe1af"
+      },
+      {
+        "ordinal": 17,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n45-f25",
+        "scenarioId": "stress-30bp-delay-1d",
+        "segmentId": "development",
+        "pathId": "d6e57207ed12cb57dc0398f338880393541212972fc80d4f13cea9ba89714d0d"
+      },
+      {
+        "ordinal": 18,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n45-f25",
+        "scenarioId": "stress-30bp-delay-1d",
+        "segmentId": "diagnostic",
+        "pathId": "bddc316d5a984a3e5d172d6f2d435637d96ed31b1520052cbc159f067424fb35"
+      },
+      {
+        "ordinal": 19,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n30-f20",
+        "scenarioId": "base-15bp",
+        "segmentId": "development",
+        "pathId": "f6989d2ee4074e4b05cf8b03a99b8a473f2758147aa320ae6f0209f23c82e30b"
+      },
+      {
+        "ordinal": 20,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n30-f20",
+        "scenarioId": "base-15bp",
+        "segmentId": "diagnostic",
+        "pathId": "ca83b9a1857554a9efdaef8d7f9bbc70c8a180731163dfaa8be8729e3f00405a"
+      },
+      {
+        "ordinal": 21,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n30-f20",
+        "scenarioId": "stress-30bp",
+        "segmentId": "development",
+        "pathId": "0917e001045f5050215254e0676590a986e9846daab93db11da0ca1a7465c6bc"
+      },
+      {
+        "ordinal": 22,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n30-f20",
+        "scenarioId": "stress-30bp",
+        "segmentId": "diagnostic",
+        "pathId": "74c8eda036b30cae903265383186b801b2f1978af0b54309df8af952e28587cd"
+      },
+      {
+        "ordinal": 23,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n30-f20",
+        "scenarioId": "stress-30bp-delay-1d",
+        "segmentId": "development",
+        "pathId": "fdad58ea2607875d353861c4a0e2147f117848acc0ed0b5f10906a543f34be42"
+      },
+      {
+        "ordinal": 24,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n30-f20",
+        "scenarioId": "stress-30bp-delay-1d",
+        "segmentId": "diagnostic",
+        "pathId": "fb52c860f11212b2f512e6508884fe4262588a4ec58690ac394b7db4450a88b9"
+      },
+      {
+        "ordinal": 25,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n30-f35",
+        "scenarioId": "base-15bp",
+        "segmentId": "development",
+        "pathId": "b2532aa110fbc4dfc8f091ec11c2aaa6d26fe61b985baa7a3b92f556de1defc7"
+      },
+      {
+        "ordinal": 26,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n30-f35",
+        "scenarioId": "base-15bp",
+        "segmentId": "diagnostic",
+        "pathId": "c9f64c0ce18b91799af6415fd5a9bcf57a24489ed2dc688b2507718165f77d6b"
+      },
+      {
+        "ordinal": 27,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n30-f35",
+        "scenarioId": "stress-30bp",
+        "segmentId": "development",
+        "pathId": "e70111e51fddee136e21332d673aeacfdb7c902d7b01517555ee206f89b82e56"
+      },
+      {
+        "ordinal": 28,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n30-f35",
+        "scenarioId": "stress-30bp",
+        "segmentId": "diagnostic",
+        "pathId": "505c488d9d0bb57b2c4c694ee0e5180455b9d3be7bae5844dfeef4c4089257b7"
+      },
+      {
+        "ordinal": 29,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n30-f35",
+        "scenarioId": "stress-30bp-delay-1d",
+        "segmentId": "development",
+        "pathId": "3ae6181a867b6ba21f17e1a1c38382c54eafbf70910073354090479fd4ceb213"
+      },
+      {
+        "ordinal": 30,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n30-f35",
+        "scenarioId": "stress-30bp-delay-1d",
+        "segmentId": "diagnostic",
+        "pathId": "a27cc6711839b7fe2690503644df67ae7a601b2712f615113d14b94b5f5ebcd9"
+      },
+      {
+        "ordinal": 31,
+        "kind": "FULL_BASKET",
+        "variantId": "full-basket-weekly",
+        "scenarioId": "base-15bp",
+        "segmentId": "development",
+        "pathId": "e0c774cd86a35649e31de62b707f96f86c9aacf0cbd9018e3499d7bb65edbda7"
+      },
+      {
+        "ordinal": 32,
+        "kind": "FULL_BASKET",
+        "variantId": "full-basket-weekly",
+        "scenarioId": "base-15bp",
+        "segmentId": "diagnostic",
+        "pathId": "06bb47b76a8fc74a8e9edfe2854f2d49d1f47ea673b54dfe5b2ac7162fa79329"
+      },
+      {
+        "ordinal": 33,
+        "kind": "FULL_BASKET",
+        "variantId": "full-basket-weekly",
+        "scenarioId": "stress-30bp",
+        "segmentId": "development",
+        "pathId": "85872d740168e12eb8ba120fa8809d38da9fc89b13c0fd2e4161f397f9e2f2c3"
+      },
+      {
+        "ordinal": 34,
+        "kind": "FULL_BASKET",
+        "variantId": "full-basket-weekly",
+        "scenarioId": "stress-30bp",
+        "segmentId": "diagnostic",
+        "pathId": "098e28ac3c57eb67d5cc02c855b216cc7f5c51882505797a6e2e9a5a8a377df1"
+      },
+      {
+        "ordinal": 35,
+        "kind": "FULL_BASKET",
+        "variantId": "full-basket-weekly",
+        "scenarioId": "stress-30bp-delay-1d",
+        "segmentId": "development",
+        "pathId": "11beb9cb6bd220f99de7cfffe2c8a36f98b1d6b798a513f7ad00caf7848b6d04"
+      },
+      {
+        "ordinal": 36,
+        "kind": "FULL_BASKET",
+        "variantId": "full-basket-weekly",
+        "scenarioId": "stress-30bp-delay-1d",
+        "segmentId": "diagnostic",
+        "pathId": "6206676b64d725a7df7c4024e5536c1d532784f5e59e387b51dbd3d351a0a2e0"
+      },
+      {
+        "ordinal": 37,
+        "kind": "FIXED_CONTROL",
+        "variantId": "frozen-mean-exposure",
+        "scenarioId": "base-15bp",
+        "segmentId": "diagnostic",
+        "pathId": "07a1fb25b3e02ae337a899d53aa03a9858715714496c245694545b266a929d6d"
+      },
+      {
+        "ordinal": 38,
+        "kind": "FIXED_CONTROL",
+        "variantId": "frozen-mean-exposure",
+        "scenarioId": "stress-30bp",
+        "segmentId": "diagnostic",
+        "pathId": "f85db036854f1495c5638098987e1b987b1ec630571c8239677917675ad181a5"
+      },
+      {
+        "ordinal": 39,
+        "kind": "FIXED_CONTROL",
+        "variantId": "frozen-mean-exposure",
+        "scenarioId": "stress-30bp-delay-1d",
+        "segmentId": "diagnostic",
+        "pathId": "7c0a6cec995d0fe62e410a09e13df222a40fb667dec90d14b56286a092074e6b"
+      },
+      {
+        "ordinal": 40,
+        "kind": "FIXED_CONTROL",
+        "variantId": "frozen-risk-exposure",
+        "scenarioId": "base-15bp",
+        "segmentId": "diagnostic",
+        "pathId": "cb09ada8b1e2b185d576736c531cbc9517d4172352ff196e79bba4bfeec611db"
+      },
+      {
+        "ordinal": 41,
+        "kind": "FIXED_CONTROL",
+        "variantId": "frozen-risk-exposure",
+        "scenarioId": "stress-30bp",
+        "segmentId": "diagnostic",
+        "pathId": "c74b953440507206c74574622ca39a690ac36a513df761231deea06987c6367b"
+      },
+      {
+        "ordinal": 42,
+        "kind": "FIXED_CONTROL",
+        "variantId": "frozen-risk-exposure",
+        "scenarioId": "stress-30bp-delay-1d",
+        "segmentId": "diagnostic",
+        "pathId": "1639468ad92039141be3ffed198b7accdd873ddcfa2965ad6b5bae46c37a4b66"
+      },
+      {
+        "ordinal": 43,
+        "kind": "CASH",
+        "variantId": "cash-zero",
+        "scenarioId": "scenario-independent",
+        "segmentId": "development",
+        "pathId": "5a95d524abff2b43c7267b52d856a176f32e470b6300b8b20b9365d8be73f90e"
+      },
+      {
+        "ordinal": 44,
+        "kind": "CASH",
+        "variantId": "cash-zero",
+        "scenarioId": "scenario-independent",
+        "segmentId": "diagnostic",
+        "pathId": "2ad8e919a2156a9271db32d762269fb28067bd75430118c8c951dc654d089ed0"
+      }
+    ],
+    "computationOrder": [
+      0,
+      2,
+      4,
+      6,
+      8,
+      10,
+      12,
+      14,
+      16,
+      18,
+      20,
+      22,
+      24,
+      26,
+      28,
+      30,
+      32,
+      34,
+      42,
+      1,
+      3,
+      5,
+      7,
+      9,
+      11,
+      13,
+      15,
+      17,
+      19,
+      21,
+      23,
+      25,
+      27,
+      29,
+      31,
+      33,
+      35,
+      36,
+      37,
+      38,
+      39,
+      40,
+      41,
+      43
+    ],
+    "orderedComputationPaths": [
+      {
+        "ordinal": 1,
+        "kind": "CANDIDATE",
+        "variantId": "primary-n30-f25",
+        "scenarioId": "base-15bp",
+        "segmentId": "development",
+        "pathId": "c244ca520cd25dcfb1a3f2776c71724d1ca52d0f5877f24dffa5f4cd6593de02"
+      },
+      {
+        "ordinal": 2,
+        "kind": "CANDIDATE",
+        "variantId": "primary-n30-f25",
+        "scenarioId": "stress-30bp",
+        "segmentId": "development",
+        "pathId": "1bcd50a23a56a99a0382b9c49dbba1681f065e3c86e906cbcf3da4bfec21b486"
+      },
+      {
+        "ordinal": 3,
+        "kind": "CANDIDATE",
+        "variantId": "primary-n30-f25",
+        "scenarioId": "stress-30bp-delay-1d",
+        "segmentId": "development",
+        "pathId": "aa6cd5f686d2588ca40e350412952046db7309d97d94adf8a59ccd76c9a53e12"
+      },
+      {
+        "ordinal": 4,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n20-f25",
+        "scenarioId": "base-15bp",
+        "segmentId": "development",
+        "pathId": "1ec8059b8cbf281541a2d8c26f59b27d0b33d457638e0f3701e14c5d48cc46c0"
+      },
+      {
+        "ordinal": 5,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n20-f25",
+        "scenarioId": "stress-30bp",
+        "segmentId": "development",
+        "pathId": "05fd53ee0ce34a814eda3a78476ed97555305264c2bc20d146afe47d7610e5b7"
+      },
+      {
+        "ordinal": 6,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n20-f25",
+        "scenarioId": "stress-30bp-delay-1d",
+        "segmentId": "development",
+        "pathId": "2582f57d3d0b1463b8695ba8fefbef620ac29101e0374c27d3ef18faa37a6299"
+      },
+      {
+        "ordinal": 7,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n45-f25",
+        "scenarioId": "base-15bp",
+        "segmentId": "development",
+        "pathId": "1bae5a4d52ee94ece7dbd0100b36fcbc1ffe450690a055d2c2e022a34da7c8f1"
+      },
+      {
+        "ordinal": 8,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n45-f25",
+        "scenarioId": "stress-30bp",
+        "segmentId": "development",
+        "pathId": "f40d373332f604e276f49fbea8370719dd1421a72bebae9af564949251abd6cc"
+      },
+      {
+        "ordinal": 9,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n45-f25",
+        "scenarioId": "stress-30bp-delay-1d",
+        "segmentId": "development",
+        "pathId": "d6e57207ed12cb57dc0398f338880393541212972fc80d4f13cea9ba89714d0d"
+      },
+      {
+        "ordinal": 10,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n30-f20",
+        "scenarioId": "base-15bp",
+        "segmentId": "development",
+        "pathId": "f6989d2ee4074e4b05cf8b03a99b8a473f2758147aa320ae6f0209f23c82e30b"
+      },
+      {
+        "ordinal": 11,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n30-f20",
+        "scenarioId": "stress-30bp",
+        "segmentId": "development",
+        "pathId": "0917e001045f5050215254e0676590a986e9846daab93db11da0ca1a7465c6bc"
+      },
+      {
+        "ordinal": 12,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n30-f20",
+        "scenarioId": "stress-30bp-delay-1d",
+        "segmentId": "development",
+        "pathId": "fdad58ea2607875d353861c4a0e2147f117848acc0ed0b5f10906a543f34be42"
+      },
+      {
+        "ordinal": 13,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n30-f35",
+        "scenarioId": "base-15bp",
+        "segmentId": "development",
+        "pathId": "b2532aa110fbc4dfc8f091ec11c2aaa6d26fe61b985baa7a3b92f556de1defc7"
+      },
+      {
+        "ordinal": 14,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n30-f35",
+        "scenarioId": "stress-30bp",
+        "segmentId": "development",
+        "pathId": "e70111e51fddee136e21332d673aeacfdb7c902d7b01517555ee206f89b82e56"
+      },
+      {
+        "ordinal": 15,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n30-f35",
+        "scenarioId": "stress-30bp-delay-1d",
+        "segmentId": "development",
+        "pathId": "3ae6181a867b6ba21f17e1a1c38382c54eafbf70910073354090479fd4ceb213"
+      },
+      {
+        "ordinal": 16,
+        "kind": "FULL_BASKET",
+        "variantId": "full-basket-weekly",
+        "scenarioId": "base-15bp",
+        "segmentId": "development",
+        "pathId": "e0c774cd86a35649e31de62b707f96f86c9aacf0cbd9018e3499d7bb65edbda7"
+      },
+      {
+        "ordinal": 17,
+        "kind": "FULL_BASKET",
+        "variantId": "full-basket-weekly",
+        "scenarioId": "stress-30bp",
+        "segmentId": "development",
+        "pathId": "85872d740168e12eb8ba120fa8809d38da9fc89b13c0fd2e4161f397f9e2f2c3"
+      },
+      {
+        "ordinal": 18,
+        "kind": "FULL_BASKET",
+        "variantId": "full-basket-weekly",
+        "scenarioId": "stress-30bp-delay-1d",
+        "segmentId": "development",
+        "pathId": "11beb9cb6bd220f99de7cfffe2c8a36f98b1d6b798a513f7ad00caf7848b6d04"
+      },
+      {
+        "ordinal": 19,
+        "kind": "CASH",
+        "variantId": "cash-zero",
+        "scenarioId": "scenario-independent",
+        "segmentId": "development",
+        "pathId": "5a95d524abff2b43c7267b52d856a176f32e470b6300b8b20b9365d8be73f90e"
+      },
+      {
+        "ordinal": 20,
+        "kind": "CANDIDATE",
+        "variantId": "primary-n30-f25",
+        "scenarioId": "base-15bp",
+        "segmentId": "diagnostic",
+        "pathId": "cf30c3241e9590f36fe875186c267955c7663ed636abb3f96270aeca060b1939"
+      },
+      {
+        "ordinal": 21,
+        "kind": "CANDIDATE",
+        "variantId": "primary-n30-f25",
+        "scenarioId": "stress-30bp",
+        "segmentId": "diagnostic",
+        "pathId": "b25227467c5aeff448a533219f0760873aabf71c32ca98064ea5c366efc50019"
+      },
+      {
+        "ordinal": 22,
+        "kind": "CANDIDATE",
+        "variantId": "primary-n30-f25",
+        "scenarioId": "stress-30bp-delay-1d",
+        "segmentId": "diagnostic",
+        "pathId": "aa578b7a77df7c7b7453900af7f89fa4c34b3d04d2914e3e69cd41a14bba6448"
+      },
+      {
+        "ordinal": 23,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n20-f25",
+        "scenarioId": "base-15bp",
+        "segmentId": "diagnostic",
+        "pathId": "d217335f3cae31a67b47788d55ccd0240e38c18d82d6054cc33a424a2298225e"
+      },
+      {
+        "ordinal": 24,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n20-f25",
+        "scenarioId": "stress-30bp",
+        "segmentId": "diagnostic",
+        "pathId": "a08ebc6d9c0e085821f3d6a499b3d949b7349755295ed1c8d2cd6aea824f9570"
+      },
+      {
+        "ordinal": 25,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n20-f25",
+        "scenarioId": "stress-30bp-delay-1d",
+        "segmentId": "diagnostic",
+        "pathId": "1227285ecb7c2c2f7f8ee22a4dabcc4be773141e8932716f843b6a6a5d5d8e45"
+      },
+      {
+        "ordinal": 26,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n45-f25",
+        "scenarioId": "base-15bp",
+        "segmentId": "diagnostic",
+        "pathId": "fee64915698d75c38329d89553f23660c25ec4590682a5fe658705d4e387a999"
+      },
+      {
+        "ordinal": 27,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n45-f25",
+        "scenarioId": "stress-30bp",
+        "segmentId": "diagnostic",
+        "pathId": "bc1ed928fe9d07738480d97ba3ad8a8c718b27d4ce834becf1d6eeaee35fe1af"
+      },
+      {
+        "ordinal": 28,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n45-f25",
+        "scenarioId": "stress-30bp-delay-1d",
+        "segmentId": "diagnostic",
+        "pathId": "bddc316d5a984a3e5d172d6f2d435637d96ed31b1520052cbc159f067424fb35"
+      },
+      {
+        "ordinal": 29,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n30-f20",
+        "scenarioId": "base-15bp",
+        "segmentId": "diagnostic",
+        "pathId": "ca83b9a1857554a9efdaef8d7f9bbc70c8a180731163dfaa8be8729e3f00405a"
+      },
+      {
+        "ordinal": 30,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n30-f20",
+        "scenarioId": "stress-30bp",
+        "segmentId": "diagnostic",
+        "pathId": "74c8eda036b30cae903265383186b801b2f1978af0b54309df8af952e28587cd"
+      },
+      {
+        "ordinal": 31,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n30-f20",
+        "scenarioId": "stress-30bp-delay-1d",
+        "segmentId": "diagnostic",
+        "pathId": "fb52c860f11212b2f512e6508884fe4262588a4ec58690ac394b7db4450a88b9"
+      },
+      {
+        "ordinal": 32,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n30-f35",
+        "scenarioId": "base-15bp",
+        "segmentId": "diagnostic",
+        "pathId": "c9f64c0ce18b91799af6415fd5a9bcf57a24489ed2dc688b2507718165f77d6b"
+      },
+      {
+        "ordinal": 33,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n30-f35",
+        "scenarioId": "stress-30bp",
+        "segmentId": "diagnostic",
+        "pathId": "505c488d9d0bb57b2c4c694ee0e5180455b9d3be7bae5844dfeef4c4089257b7"
+      },
+      {
+        "ordinal": 34,
+        "kind": "CANDIDATE",
+        "variantId": "neighbour-n30-f35",
+        "scenarioId": "stress-30bp-delay-1d",
+        "segmentId": "diagnostic",
+        "pathId": "a27cc6711839b7fe2690503644df67ae7a601b2712f615113d14b94b5f5ebcd9"
+      },
+      {
+        "ordinal": 35,
+        "kind": "FULL_BASKET",
+        "variantId": "full-basket-weekly",
+        "scenarioId": "base-15bp",
+        "segmentId": "diagnostic",
+        "pathId": "06bb47b76a8fc74a8e9edfe2854f2d49d1f47ea673b54dfe5b2ac7162fa79329"
+      },
+      {
+        "ordinal": 36,
+        "kind": "FULL_BASKET",
+        "variantId": "full-basket-weekly",
+        "scenarioId": "stress-30bp",
+        "segmentId": "diagnostic",
+        "pathId": "098e28ac3c57eb67d5cc02c855b216cc7f5c51882505797a6e2e9a5a8a377df1"
+      },
+      {
+        "ordinal": 37,
+        "kind": "FULL_BASKET",
+        "variantId": "full-basket-weekly",
+        "scenarioId": "stress-30bp-delay-1d",
+        "segmentId": "diagnostic",
+        "pathId": "6206676b64d725a7df7c4024e5536c1d532784f5e59e387b51dbd3d351a0a2e0"
+      },
+      {
+        "ordinal": 38,
+        "kind": "FIXED_CONTROL",
+        "variantId": "frozen-mean-exposure",
+        "scenarioId": "base-15bp",
+        "segmentId": "diagnostic",
+        "pathId": "07a1fb25b3e02ae337a899d53aa03a9858715714496c245694545b266a929d6d"
+      },
+      {
+        "ordinal": 39,
+        "kind": "FIXED_CONTROL",
+        "variantId": "frozen-mean-exposure",
+        "scenarioId": "stress-30bp",
+        "segmentId": "diagnostic",
+        "pathId": "f85db036854f1495c5638098987e1b987b1ec630571c8239677917675ad181a5"
+      },
+      {
+        "ordinal": 40,
+        "kind": "FIXED_CONTROL",
+        "variantId": "frozen-mean-exposure",
+        "scenarioId": "stress-30bp-delay-1d",
+        "segmentId": "diagnostic",
+        "pathId": "7c0a6cec995d0fe62e410a09e13df222a40fb667dec90d14b56286a092074e6b"
+      },
+      {
+        "ordinal": 41,
+        "kind": "FIXED_CONTROL",
+        "variantId": "frozen-risk-exposure",
+        "scenarioId": "base-15bp",
+        "segmentId": "diagnostic",
+        "pathId": "cb09ada8b1e2b185d576736c531cbc9517d4172352ff196e79bba4bfeec611db"
+      },
+      {
+        "ordinal": 42,
+        "kind": "FIXED_CONTROL",
+        "variantId": "frozen-risk-exposure",
+        "scenarioId": "stress-30bp",
+        "segmentId": "diagnostic",
+        "pathId": "c74b953440507206c74574622ca39a690ac36a513df761231deea06987c6367b"
+      },
+      {
+        "ordinal": 43,
+        "kind": "FIXED_CONTROL",
+        "variantId": "frozen-risk-exposure",
+        "scenarioId": "stress-30bp-delay-1d",
+        "segmentId": "diagnostic",
+        "pathId": "1639468ad92039141be3ffed198b7accdd873ddcfa2965ad6b5bae46c37a4b66"
+      },
+      {
+        "ordinal": 44,
+        "kind": "CASH",
+        "variantId": "cash-zero",
+        "scenarioId": "scenario-independent",
+        "segmentId": "diagnostic",
+        "pathId": "2ad8e919a2156a9271db32d762269fb28067bd75430118c8c951dc654d089ed0"
+      }
+    ],
+    "manifestSha256": "5303d2b5ddc3d40de984504435ecc73d4b4734aa6bd423fb64833913f5526442",
+    "computationOrderSha256": "5339191d01d68a09ae10b9e8aa75194e5beb16d358f27fd5eb6a1f7c94757265"
+  },
+  "profileDigests": {
+    "inactiveNotFrozenProfileSha256": "160b73ff9c380b1231d0a1e4a88566493408f978857a3b13d71826852a413fc8",
+    "populatedUnfrozenCandidateSha256": "dce7dbdaeef3482029111059e75322c7e88048fef655ffbc93240f4f64f9c14e",
+    "proposedFrozenCandidateSha256": "96112200e075745dbe692e42099970607325caf8b7a75b6dcf2fe427db8fe74e"
+  },
+  "limits": {
+    "trials": 1,
+    "paths": 44,
+    "processes": 1,
+    "batchSeconds": 1800,
+    "pathSeconds": 60,
+    "outputBytes": 1048576,
+    "attemptsPerPath": 1,
+    "automaticRetry": false,
+    "adaptiveTuning": false
+  },
+  "costs": {
+    "perSideBasisPoints": [
+      15,
+      30,
+      30
+    ],
+    "delayDays": [
+      0,
+      0,
+      1
+    ],
+    "assumptions": {
+      "base": "15bp per side = 10bp spot taker reference plus 5bp assumed friction; an OKX-inspired cost assumption accepted for preparation, not account-specific entitlement.",
+      "stress": "30bp per side; 30bp plus a one-day fill delay in the third scenario.",
+      "status": "Costs are assumptions, not measured spread or impact, historical fee reconstruction, or verified account entitlement. Inputs remain pinned Kraken spot USD prices; outputs are NOT OKX execution evidence. No maker-fill, futures, or funding inference."
+    }
+  },
+  "screenReference": {
+    "path": "research/protocols/b1-7-20261018/EXECUTION_REQUEST.md#screen",
+    "protocolPath": "research/protocols/b1-7-20261018/protocol.json#screen",
+    "protocolSha256": "a78e1ae8c71c8f85baee5b51f5691643fc29136f636f19465c61f553afe09185",
+    "screen": {
+      "primary": [
+        "Diagnostic primary 15bp net return > 0",
+        "Diagnostic primary 15bp sampled daily-close drawdown <= 25%",
+        "Primary 15bp diagnostic return >= both frozen controls",
+        "Primary 15bp diagnostic drawdown <= both frozen controls",
+        "(full-basket drawdown-primary drawdown)/full-basket drawdown >= 20%; full-basket drawdown <= 1e-12 is INSUFFICIENT_EVIDENCE",
+        "Primary diagnostic net return > 0 at 30bp and at 30bp plus one-day delay"
+      ],
+      "comparisonSegment": "All primary-vs-control screen comparisons use the diagnostic segment only.",
+      "neighbours": "At least 3 of 4 neighbours have positive diagnostic net return at 15bp and at least 3 of 4 at 30bp non-delayed. Delayed neighbours are report-only; they are not screened. Neighbours are sign robustness only, not matched-control claims.",
+      "statuses": [
+        "PASS",
+        "NO_EDGE",
+        "INSUFFICIENT_EVIDENCE",
+        "INVALID"
+      ],
+      "syntheticFixtureStatus": "SYNTHETIC_ONLY_NOT_ASSESSED; fixture rule checks are not historical outcomes and cannot produce GREEN.",
+      "interpretation": "PASS is a historical candidate only. No statistical significance, alpha, prospective validation, or fresh holdout claim."
+    },
+    "status": "NOT_RUN"
+  },
+  "researchOnlyException": {
+    "stopPolicy": "NO_FINITE_TRADE_STOP",
+    "classification": "RESEARCH_ONLY",
+    "finiteTradeStop": "NONE",
+    "finiteTradeCrv": "UNDEFINED_NO_FINITE_STOP",
+    "promotionEligible": false
+  }
+}
