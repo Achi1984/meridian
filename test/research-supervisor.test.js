@@ -25,14 +25,26 @@ const discoveryCode = [
 
 const groups = [
   {
-    name: "historical profile and admission",
+    name: "historical generated outcomes",
     timeoutMs: 45_000,
     methods: [
       "test_generated_completed_historical_insufficient_screen_roundtrips_without_promotion",
       "test_generated_historical_identity_corruption_fails_closed",
-      "test_generated_historical_insufficient_evidence_stays_failed_and_labeled",
+      "test_generated_historical_insufficient_evidence_stays_failed_and_labeled"
+    ]
+  },
+  {
+    name: "historical full-path and timeout",
+    timeoutMs: 45_000,
+    methods: [
       "test_generated_historical_profile_runs_all_paths_and_refuses_repeat",
-      "test_generated_historical_timeout_keeps_attempt_and_fence_without_retry",
+      "test_generated_historical_timeout_keeps_attempt_and_fence_without_retry"
+    ]
+  },
+  {
+    name: "historical dormancy and receipt admission",
+    timeoutMs: 45_000,
+    methods: [
       "test_historical_journal_profile_stays_dormant_without_d2_receipt",
       "test_test_receipt_requires_explicit_mode_and_isolated_profile_location"
     ]
@@ -127,8 +139,8 @@ test("durable bounded research supervisor synthetic suite", () => {
   assert.equal(new Set(assigned).size, assigned.length, "explicit unittest groups contain duplicates");
   assert.deepEqual([...assigned].sort(), [...discovered].sort(),
     "explicit unittest groups must cover actual unittest discovery exactly");
-  assert.deepEqual(groups.map(group => group.methods.length), [7, 16, 16],
-    "the discovered suite must retain the reviewed 7/16/16 partition");
+  assert.deepEqual(groups.map(group => group.methods.length), [3, 2, 2, 16, 16],
+    "the discovered suite must retain the reviewed 3/2/2/16/16 partition");
 
   const timings = [];
   for (const group of groups) {
