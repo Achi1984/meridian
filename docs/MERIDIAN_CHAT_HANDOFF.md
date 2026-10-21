@@ -1,3 +1,9 @@
+> Current continuity reconciliation — 2026-10-21.
+> Verified main checkpoint: **2c3e3798b3296406a88988250ff54f272ae4bb91**
+> PR #923 is merged at this main checkpoint; PR #919 remains open and unmerged.
+> Older dated UI/research checkpoints below are historical snapshots and do not
+> override the current repository checkpoint.
+
 > Current reconciliation — 2026-10-19, PR #901 main alignment.
 > Verified main: `496360869171f0a29e3efbc7ec216ffc1833c6a0` (PR #900).
 > PR #900 complete: independent Work review #639/6273568843, merge receipt
@@ -809,7 +815,7 @@ Updated: **2026-10-05**
 
 - Build: **10.0-r128**
 - UI-Leitprinzip: **Complex inside – simple outside.**
-- Verified main checkpoint: **c009326529e162f84bb985d0aca2de6cf5065c18**
+- Historical verified main checkpoint (2026-10-05): **c009326529e162f84bb985d0aca2de6cf5065c18**
 - UI/runtime r108 acceptance: **PASS**
 - Research gate: **V1.3 PASS**
 - Full-run decision: **INDIVIDUAL_TRADES_DATA_V1_3_PASS_STRATEGY_PREREGISTRATION_REQUIRED**
