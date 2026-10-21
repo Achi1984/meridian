@@ -28,16 +28,20 @@
     "branch": "main",
     "verifiedSha": "2c3e3798b3296406a88988250ff54f272ae4bb91",
     "verifiedAt": "2026-10-21",
-    "rule": "Only merged main plus green current-base CI is canonical. Issue comments and unmerged branches are evidence, never authority."
+    "latestObservedMainSha": "6aeb07c35aa1e45dbaf0e78fc97fd7b59170b6f7",
+    "latestObservedMainStatus": "PR927_SOURCE_MERGED_POSTCHECKS_PENDING_NOT_YET_FULLY_ACCEPTED",
+    "rule": "Only merged main plus green current-base CI is canonical. The latest observed main has PR #927 source merged but postchecks pending, so verifiedSha remains the last fully verified checkpoint. Issue comments and unmerged branches are evidence, never authority."
   },
-  "currentSnapshotPrecedence": "sourceOfTruth, currentContinuity, and MERIDIAN_LIVE_CHECKPOINT.currentWork are current pointers; dated UI and research snapshots below are historical context only and do not override them. Historical snapshots remain unchanged.",
+  "currentSnapshotPrecedence": "latestObservedMainSha in sourceOfTruth and currentContinuity is the current integration pointer; verifiedSha and MERIDIAN_LIVE_CHECKPOINT.lastSubstantiveCheckpoint remain the last fully verified main until required postchecks finish. Dated UI and research snapshots, including the 2c3e3798 verified snapshot, are retained as historical verified context and do not override the latest observed main pointer.",
   "currentContinuity": {
     "operation": "MERIDIAN-919-CONSOLIDATED-HANDOFF-R2",
     "pullRequest": 919,
     "issue": 918,
     "branch": "copilot/meridian-d2-readiness-reconciliation-r1",
-    "baseMainSha": "2c3e3798b3296406a88988250ff54f272ae4bb91",
-    "status": "OPEN_DRAFT_UNMERGED_WAITING_INDEPENDENT_FULL_REVIEW_AND_EXACT_HEAD_CI",
+    "baseMainSha": "6aeb07c35aa1e45dbaf0e78fc97fd7b59170b6f7",
+    "lastFullyVerifiedMainSha": "2c3e3798b3296406a88988250ff54f272ae4bb91",
+    "latestObservedMainStatus": "PR927_SOURCE_MERGED_POSTCHECKS_PENDING_NOT_YET_FULLY_ACCEPTED",
+    "status": "OPEN_DRAFT_UNMERGED_CONTINUITY_CORRECTION_PENDING_INDEPENDENT_REVIEW_AND_FRESH_EXACT_HEAD_CI",
     "priorThreeFileSourceAcceptance": "NOT_ACCEPTANCE_FOR_EXPANDED_CONTINUITY_SCOPE",
     "mergedReceipts": {
       "901": "e0e7472f74a05cb2a9cedb1a758abe8816b93aa6",
@@ -45,7 +49,9 @@
       "913": "3c4af65bfe1368da608711bef37761d4cfd54f78",
       "921": "2e41968551325b69eeeed994b9d5a5df84252a5e",
       "916": "c1ec1de5eec7307b1c91a5e133b5486f27fc5c88",
-      "923": "2c3e3798b3296406a88988250ff54f272ae4bb91"
+      "923": "2c3e3798b3296406a88988250ff54f272ae4bb91",
+      "925": "984e164ae9da021d3d7fadc578eb0cf0aeaa4413",
+      "927": "6aeb07c35aa1e45dbaf0e78fc97fd7b59170b6f7"
     },
     "pr917": {
       "status": "SOURCE_ACCEPTED_CI_FAILED_MERGE_HELD",
@@ -71,14 +77,22 @@
     },
     "pr925": {
       "issue": 924,
-      "status": "OPEN_DRAFT_METADATA_ONLY_CANDIDATE",
-      "branchHead": "fc0fd0db4653630cae6c3f5a73607e02a9c9d24e",
+      "status": "MERGED_METADATA_ONLY_CANDIDATE_SOURCE_POSTCHECKS_SUCCESS",
+      "branchHead": "c26265fd4554a658f5584b842c79f39ac4c406d8",
+      "candidateSourceCommit": "fc0fd0db4653630cae6c3f5a73607e02a9c9d24e",
       "branchBase": "c1ec1de5eec7307b1c91a5e133b5486f27fc5c88",
-      "behindLatestMain": "2c3e3798b3296406a88988250ff54f272ae4bb91",
-      "sourceStatus": "SOURCE_ONLY_ACCEPTED_NOT_ADMISSION_OR_EXECUTION",
+      "mergeSha": "984e164ae9da021d3d7fadc578eb0cf0aeaa4413",
+      "sourceStatus": "SOURCE_ACCEPTED_AND_MERGED; NOT_ADMISSION_OR_EXECUTION",
       "sourceAcceptanceCommentId": 6324017218,
+      "receiptMapping": {
+        "6324017218": "LEAD_RELAY_OF_REVIEWER901_SOURCE_GREEN",
+        "6324009932": "COPILOT_FOCUSED_TEST_REPORT_6_PASS"
+      },
+      "claudeGreenLightCommentId": 6324706232,
+      "mergePostcheckReceiptCommentId": 6324734993,
       "focusedTest": {
         "command": "node --test test/b1-7-d2-candidate.test.js",
+        "testedSha": "fc0fd0db4653630cae6c3f5a73607e02a9c9d24e",
         "reportedPass": 6,
         "reportedFail": 0,
         "reportedSkip": 0,
@@ -86,14 +100,25 @@
         "independentExecutionClaimed": false
       },
       "ioBoundary": "REPORTED_IMPORT_NO_WRITE_ISOLATED_FIXED_PATH_CLI_ALLOWLISTED_READS_TAMPER_REJECTION_NO_WRITE",
-      "exactHeadCurrentBaseCi": "PENDING"
+      "preMergeCi": "39657445980_2704_PASS_0_FAIL_0_SKIP",
+      "postMergeChecks": "ALL_APPLICABLE_SUCCESS"
+    },
+    "pr927": {
+      "status": "SOURCE_MERGED_POSTCHECKS_PENDING_NOT_YET_FULLY_ACCEPTED",
+      "reviewedHead": "e9822dad4f834cb0e99ab95d061ff88439342b06",
+      "mergeSha": "6aeb07c35aa1e45dbaf0e78fc97fd7b59170b6f7",
+      "sourceCiRunId": 39664406698,
+      "sourceCiResult": "2704_PASS_0_FAIL_0_SKIP",
+      "mergeReceiptCommentId": 6325242524,
+      "postMergeChecks": "PENDING",
+      "issue922RootCause": "NOT_ESTABLISHED"
     },
     "d2CandidatePacket": {
       "status": "PROPOSAL_ONLY",
-      "proposalArtifact": "PUBLISHED_ON_OPEN_PR925_BRANCH_NOT_MERGED",
+      "proposalArtifact": "MERGED_ON_MAIN_984E164_AS_METADATA_ONLY_CANDIDATE_NOT_ADMITTED",
       "admissionArtifact": "NOT_ADMITTED_NO_APPROVAL_RECEIPT",
       "inputIdentity": "NOT_FROZEN",
-      "proposalPathIdentities": "GENERATED_ON_UNMERGED_PR925_BRANCH_NOT_FINAL_OR_ACCEPTED",
+      "proposalPathIdentities": "GENERATED_BY_MERGED_PR925_CANDIDATE; STILL_PROPOSAL_NOT_FINAL_ADMISSION_IDENTITIES",
       "finalPathIdentities": "NOT_FINAL_OR_ACCEPTED",
       "finalProfileIdentity": "NOT_FINAL",
       "ownerDecision": "NOT_RECORDED",
@@ -104,7 +129,7 @@
       "paperAuthorized": false,
       "liveAuthorized": false
     },
-    "nextStep": "STOP_FOR_INDEPENDENT_FULL_REVIEW_AND_EXACT_HEAD_CI; NO_MERGE"
+    "nextStep": "CONTINUITY_CORRECTION_PENDING_INDEPENDENT_DELTA_REVIEW_AND_FRESH_EXACT_HEAD_CI; NO_MERGE"
   },
   "runtime": {
     "releaseSafety": "GREEN",
@@ -1326,7 +1351,7 @@
     255,
     256
   ],
-  "nextAction": "For CROSS-VENUE-FUNDING-EDGE-V2: read `mailboxIssue` from MERIDIAN_LIVE_CHECKPOINT.json, then read that mailbox, then live main/CI/related PRs. Expand large continuity files only on mismatch or when historical detail is required. Canonical execution/PnL/Discovery still requires explicit user authorization plus exact-head Claude review. Current continuity next step: independent full review and exact-head CI; no merge. Preserve the CI failure and merged diagnostics recorded in currentContinuity; the issue cause remains NOT_ESTABLISHED. The D2 candidate remains an unmerged proposal with source-only acceptance, author-reported focused tests, and exact-head/current-base CI pending; no admission or execution authority.",
+  "nextAction": "For CROSS-VENUE-FUNDING-EDGE-V2: read `mailboxIssue` from MERIDIAN_LIVE_CHECKPOINT.json, then read that mailbox, then live main/CI/related PRs. Expand large continuity files only on mismatch or when historical detail is required. Canonical execution/PnL/Discovery still requires explicit user authorization plus exact-head Claude review. PR #919 continuity correction is pending independent delta review and fresh exact-head CI; do not claim future CI success or merge. Latest observed main 6aeb07c has PR #927 source merged but postchecks pending; retain 2c3e379 as last fully verified main. PR #925's metadata-only candidate is merged at 984e164 with source and postcheck receipts but remains PROPOSAL_ONLY, not admission or execution authority. Preserve the #917 CI failure and #922 cause NOT_ESTABLISHED.",
   "coordination": {
     "mergeOwner": "MAIN_AGENT",
     "refreshMainBeforeMerge": true,
@@ -1951,7 +1976,9 @@
     "protocol": "docs/AGENT_ORCHESTRATION.md",
     "quickResume": "User only needs to say: 'Meridian fortsetzen'. Read `mailboxIssue` from MERIDIAN_LIVE_CHECKPOINT.json first, then read that mailbox, then MERIDIAN_RESUME.json + MERIDIAN_AGENT_STATE.json, inspect main/PRs/CI, and continue the first incomplete durable step without repeating merged work.",
     "streamingRule": "Never infer repository failure from 'Streaming unterbrochen'. Reconcile repo first; completed writes/merges must not be repeated.",
-    "currentMainSha": "2c3e3798b3296406a88988250ff54f272ae4bb91",
+    "currentMainSha": "6aeb07c35aa1e45dbaf0e78fc97fd7b59170b6f7",
+    "currentMainStatus": "PR927_SOURCE_MERGED_POSTCHECKS_PENDING_NOT_YET_FULLY_ACCEPTED",
+    "lastFullyVerifiedMainSha": "2c3e3798b3296406a88988250ff54f272ae4bb91",
     "currentBuild": "10.0-r130"
   }
 }

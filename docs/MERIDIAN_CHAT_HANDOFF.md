@@ -1,8 +1,17 @@
 > Current continuity reconciliation — 2026-10-21.
+> Latest observed main: **6aeb07c35aa1e45dbaf0e78fc97fd7b59170b6f7**; PR #927
+> source is merged, but postchecks remain pending and it is not yet fully accepted.
 > Verified main checkpoint: **2c3e3798b3296406a88988250ff54f272ae4bb91**
-> PR #923 is merged at this main checkpoint; PR #919 remains open and unmerged.
-> Older dated UI/research checkpoints below are historical snapshots and do not
-> override the current repository checkpoint.
+> (the dated #923 checkpoint and last fully verified main); Build: **10.0-r130**.
+> PR #925's metadata-only candidate merged at `984e164ae9da021d3d7fadc578eb0cf0aeaa4413`
+> from reviewed head `c26265fd4554a658f5584b842c79f39ac4c406d8`; Claude
+> GREEN_LIGHT `6324706232` and merge/postcheck receipt `6324734993` are recorded.
+> Receipt mapping remains: `6324017218` relays reviewer901 SOURCE GREEN;
+> `6324009932` is Copilot's 6-pass focused-test report.
+> D2 remains PROPOSAL_ONLY, not admitted or authorized. PR #919 is open;
+> continuity correction is pending independent review and fresh exact-head CI.
+> The eight-file allowlist and same-correction Lead extension (#919/6324701311)
+> are recorded in the current checkpoint. Older dated snapshots remain historical.
 
 > Current reconciliation — 2026-10-19, PR #901 main alignment.
 > Verified main: `496360869171f0a29e3efbc7ec216ffc1833c6a0` (PR #900).
