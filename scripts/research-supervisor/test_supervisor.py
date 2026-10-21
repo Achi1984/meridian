@@ -58,6 +58,21 @@ def _b1_readiness_diagnostic(thread, result, failure, children, last_state):
     return rendered if len(rendered) <= 4096 else rendered[:4096]
 
 
+def _deadline_diagnostic(elapsed, result, current, completed):
+    diagnostic = {
+        "elapsed_seconds": round(elapsed, 3),
+        "completed_paths": completed,
+        "path_count": len(current["paths"]),
+        "result_state": result.get("state"),
+        "result_reason": result.get("reason"),
+        "trial_state": current["state"],
+        "unresolved": current["unresolved"],
+        "attempts": current["attempts"],
+    }
+    rendered = json.dumps(diagnostic, sort_keys=True, separators=(",", ":"))
+    return rendered if len(rendered) <= 1024 else rendered[:1021] + "..."
+
+
 class ResearchSupervisorTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
@@ -952,35 +967,124 @@ process.stdout.write(JSON.stringify(runBatch({
             self.assertEqual(result["paths"][0]["state"], "started")
 
     def test_whole_batch_deadline_is_absolute_across_path_processes(self):
-        # Each child waits 25 ms, so all 44 paths cannot finish in one second.
-        # The longer path limit isolates the shared batch deadline; restarting
-        # that deadline per child would incorrectly complete the entire batch.
+        self._assert_run_batch_uses_one_absolute_deadline()
         started = time.monotonic()
         result = self.run_fault("7" * 64, {"path_seconds": 2, "batch_seconds": 1},
                                 key="trial-absolute-batch-deadline")
-        self.assertLess(time.monotonic() - started, 2.5)
+        elapsed = time.monotonic() - started
+        current = journal.inspect(self.database, result["trialId"])
+        completed = sum(path["state"] == "completed" for path in current["paths"])
+        diagnostic = _deadline_diagnostic(elapsed, result, current, completed)
+        self.assertLess(elapsed, 2.5, diagnostic)
         self.assertIn((result["state"], result["reason"]), (
             ("timed_out", "DEADLINE_EXCEEDED"),
             ("UNSETTLED", "OPERATION_DEADLINE"),
-        ))
-        current = journal.inspect(self.database, result["trialId"])
-        completed = sum(path["state"] == "completed" for path in current["paths"])
-        self.assertGreaterEqual(completed, 2, "deadline must span multiple child processes")
-        self.assertLess(completed, journal.MAX_PATHS)
-        self.assertEqual(current["attempts"], 1)
+        ), diagnostic)
+        self.assertLess(completed, journal.MAX_PATHS, diagnostic)
+        self.assertEqual(current["attempts"], 1, diagnostic)
         if result["state"] == "UNSETTLED":
-            self.assertEqual(current["state"], "unknown")
-            self.assertTrue(current["unresolved"])
+            self.assertEqual(current["state"], "unknown", diagnostic)
+            self.assertTrue(current["unresolved"], diagnostic)
             self.assertFalse(result["persistConfirmed"])
             self.assertEqual(journal.scheduler_tick(self.database, self.policy)["state"], "active")
             with self.assertRaisesRegex(journal.JournalError, "ATTEMPT_CONSUMED"):
                 journal.start(self.database, current)
             journal.reconcile(self.database, result["trialId"], "OPERATOR_RECONCILED_DEADLINE")
         else:
-            self.assertEqual(current["state"], "timed_out")
-            self.assertFalse(current["unresolved"])
-        with self.assertRaisesRegex(journal.JournalError, "STALE_FENCE"):
+            self.assertEqual(current["state"], "timed_out", diagnostic)
+            self.assertFalse(current["unresolved"], diagnostic)
+        with self.assertRaisesRegex(journal.JournalError, "STALE_FENCE",
+                                    msg=diagnostic):
             journal.start(self.database, current)
+
+    def _assert_run_batch_uses_one_absolute_deadline(self):
+        clock = SimpleNamespace(now=100.0)
+        clock.monotonic = lambda: clock.now
+        paths = tuple(
+            {"id": f"controlled-path-{index}", "variant": f"controlled-variant-{index}"}
+            for index in range(3)
+        )
+        started = {
+            "trialId": "1" * 64,
+            "trialKey": "controlled-deadline",
+            "owner": "controlled-owner",
+            "fence": 1,
+            "protocolSha256": "2" * 64,
+            "sourceSha256": "3" * 64,
+            "dataSha256": "4" * 64,
+            "manifestSha256": "5" * 64,
+            "pathIds": [path["id"] for path in paths],
+            "variantIds": [path["variant"] for path in paths],
+            "budget": {},
+        }
+        child_calls = []
+        journal_progress = []
+
+        def record_started(database, receipt, index, path_id, predecessor,
+                           *, busy_timeout, deadline):
+            journal_progress.append(("started", index, deadline))
+
+        def record_completed(database, receipt, index, path_id, predecessor,
+                             output_sha256, *, busy_timeout, deadline):
+            journal_progress.append(("completed", index, deadline))
+
+        def run_child(request, path_deadline, batch_deadline, path_seconds, on_event):
+            child_calls.append({
+                "index": request["index"],
+                "path_deadline": path_deadline,
+                "batch_deadline": batch_deadline,
+                "started_at": clock.now,
+            })
+            start_event = {
+                "event": "path_started",
+                "index": request["index"],
+                "pathId": request["pathId"],
+                "variantId": request["variantId"],
+                "predecessorSha256": request["predecessorSha256"],
+            }
+            complete_event = {
+                **start_event,
+                "event": "path_completed",
+                "outputSha256": hashlib.sha256(
+                    f"controlled-output-{request['index']}".encode()).hexdigest(),
+            }
+            on_event(start_event, 0, batch_deadline)
+            on_event(complete_event, 1, path_deadline)
+            clock.now += 5
+            return [start_event, complete_event]
+
+        settled = {"state": "timed_out", "reason": "DEADLINE_EXCEEDED"}
+        with (
+            patch.object(supervisor, "time", SimpleNamespace(monotonic=clock.monotonic)),
+            patch.object(journal, "PATHS", paths),
+            patch.object(journal, "start", return_value=started),
+            patch.object(journal, "record_path_started", side_effect=record_started),
+            patch.object(journal, "record_path_completed", side_effect=record_completed),
+            patch.object(journal, "settle", return_value=settled) as settle,
+            patch.object(supervisor, "_run_child", side_effect=run_child),
+        ):
+            result = supervisor.run_batch(
+                self.database, {"trialId": started["trialId"]},
+                limits={"path_seconds": 20, "batch_seconds": 10})
+
+        diagnostic = json.dumps({
+            "child_indices": [child["index"] for child in child_calls],
+            "batch_deadlines": [child["batch_deadline"] for child in child_calls],
+            "journal_progress": journal_progress,
+            "clock": clock.now,
+            "state": result.get("state"),
+            "reason": result.get("reason"),
+        }, sort_keys=True, separators=(",", ":"))[:1024]
+        self.assertEqual(result, settled, diagnostic)
+        self.assertEqual([child["index"] for child in child_calls], [0, 1], diagnostic)
+        self.assertEqual([child["started_at"] for child in child_calls], [100.0, 105.0], diagnostic)
+        self.assertEqual([child["batch_deadline"] for child in child_calls], [110.0, 110.0], diagnostic)
+        self.assertEqual([child["path_deadline"] for child in child_calls], [110.0, 110.0], diagnostic)
+        self.assertEqual(journal_progress, [
+            ("started", 0, 110.0), ("completed", 0, 110.0),
+            ("started", 1, 110.0), ("completed", 1, 110.0),
+        ], diagnostic)
+        self.assertEqual(settle.call_args.args[2:4], ("TIMED_OUT", "DEADLINE_EXCEEDED"), diagnostic)
 
     def test_output_flood_and_parent_exit_with_inherited_pipe_are_bounded(self):
         for source, reason in (("c" * 64, "STDOUT_BOUND"), ("9" * 64, "STDERR_BOUND"),
