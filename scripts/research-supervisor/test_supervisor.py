@@ -21,6 +21,43 @@ import supervisor
 
 FAULT_ADAPTER = ROOT / "test_fault_adapter.mjs"
 HISTORICAL_TEST_ADAPTER = ROOT / "test_b1_historical_fixture.mjs"
+
+
+def _b1_readiness_diagnostic(thread, result, failure, children, last_state):
+    def bounded_repr(value, limit):
+        try:
+            rendered = repr(value)
+        except BaseException:
+            rendered = "<repr failed>"
+        return rendered if len(rendered) <= limit else rendered[:limit - 3] + "..."
+
+    child_states = []
+    for child in children[:8]:
+        state = {"pid": child.pid}
+        try:
+            state["exit_status"] = child.poll()
+        except BaseException as error:
+            state["poll_error"] = bounded_repr(error, 256)
+        child_states.append(state)
+
+    diagnostic = {
+        "thread_alive": thread.is_alive(),
+        "result": [
+            {
+                "state": bounded_repr(item.get("state"), 128),
+                "reason": bounded_repr(item.get("reason"), 256),
+            }
+            for item in result[:2]
+        ],
+        "worker_exceptions": [bounded_repr(error, 384) for error in failure[:2]],
+        "children": child_states,
+        "children_omitted": max(0, len(children) - len(child_states)),
+        "last_journal_state": last_state,
+    }
+    rendered = json.dumps(diagnostic, sort_keys=True, separators=(",", ":"))
+    return rendered if len(rendered) <= 4096 else rendered[:4096]
+
+
 class ResearchSupervisorTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
@@ -788,11 +825,19 @@ process.stdout.write(JSON.stringify(runBatch({
         thread = threading.Thread(target=execute)
         thread.start()
         lock = None
+        last_journal_state = None
         try:
             deadline = time.monotonic() + 5
             while time.monotonic() < deadline:
                 try:
                     current = journal.inspect_b1(self.database, claim["trialId"])
+                    last_journal_state = {
+                        "state": current.get("state"),
+                        "reason": current.get("reason"),
+                        "attempts": current.get("attempts"),
+                        "unresolved": current.get("unresolved"),
+                        "paths": [path.get("state") for path in current.get("paths", [])],
+                    }
                     if current["paths"] and current["paths"][0]["state"] == "started":
                         break
                 except journal.JournalError as error:
@@ -800,7 +845,11 @@ process.stdout.write(JSON.stringify(runBatch({
                         raise
                 time.sleep(0.005)
             else:
-                self.fail("B1 fault child did not durably start its first path")
+                diagnostic = _b1_readiness_diagnostic(
+                    thread, result, failure, children, last_journal_state)
+                self.fail(
+                    "B1 fault child did not durably start its first path; "
+                    f"diagnostic={diagnostic}")
 
             lock = self.lock_database(exclusive=True)
             thread.join(3)
