@@ -583,14 +583,20 @@ export function verifyD2Candidate(bytes) {
   if (byteLength > D2_VERIFIER_BOUNDS.inputBytes) {
     return reportFailure({code: 'INPUT_SIZE_LIMIT_EXCEEDED'});
   }
+  const snapshot = new Uint8Array(byteLength);
+  try {
+    Uint8Array.prototype.set.call(snapshot, bytes);
+  } catch {
+    return reportFailure({code: 'INPUT_NOT_BYTES'});
+  }
   let candidateSha256;
   try {
-    candidateSha256 = sha256(bytes);
+    candidateSha256 = sha256(snapshot);
   } catch {
     return reportFailure({code: 'INPUT_NOT_BYTES'});
   }
   try {
-    const candidate = decodeAndParse(bytes);
+    const candidate = decodeAndParse(snapshot);
     validateCandidate(candidate);
     return {
       ok: true,

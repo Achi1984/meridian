@@ -210,6 +210,28 @@ test('verification is pure, leaves bytes unchanged, and returns repeatable bound
   assert.deepEqual(bytes, before);
   assert.equal(verifyD2Candidate('not bytes').findings[0].code, 'INPUT_NOT_BYTES');
 
+  const sharedBytes = new Uint8Array(new SharedArrayBuffer(bytes.byteLength));
+  sharedBytes.set(bytes);
+  const beforeSharedSnapshot = Buffer.from(sharedBytes);
+  const originalDecode = TextDecoder.prototype.decode;
+  let raced = false;
+  TextDecoder.prototype.decode = function(input, ...options) {
+    if (!raced) {
+      raced = true;
+      sharedBytes[0] ^= 1;
+    }
+    return originalDecode.call(this, input, ...options);
+  };
+  let sharedReport;
+  try {
+    sharedReport = verifyD2Candidate(sharedBytes);
+  } finally {
+    TextDecoder.prototype.decode = originalDecode;
+  }
+  assert.equal(raced, true);
+  assert.equal(sharedReport.ok, true);
+  assert.equal(sharedReport.candidateSha256, sha256(beforeSharedSnapshot));
+
   const source = readFileSync(VERIFIER_SOURCE, 'utf8');
   const imports = [...source.matchAll(/^\s*import\b[^'"]*['"]([^'"]+)['"]/gm)]
     .map(([, specifier]) => specifier);
