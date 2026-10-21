@@ -169,6 +169,9 @@ test('documented byte, depth, container, and total-value limits are enforced at 
   ]);
   assert.equal(verifyD2Candidate(exactlyBounded).status, 'PROPOSAL_ONLY');
   assertRejected(Buffer.concat([exactlyBounded, Buffer.from(' ')]), 'INPUT_SIZE_LIMIT_EXCEEDED');
+  const spoofedLength = new Uint8Array(D2_VERIFIER_BOUNDS.inputBytes + 1);
+  Object.defineProperty(spoofedLength, 'byteLength', {value: 1});
+  assertRejected(spoofedLength, 'INPUT_SIZE_LIMIT_EXCEEDED');
 
   const candidate = JSON.parse(bytes.toString('utf8'));
   const candidateDepth = (value) => value === null || typeof value !== 'object'

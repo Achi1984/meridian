@@ -10,6 +10,8 @@ export const D2_VERIFIER_BOUNDS = Object.freeze({
 });
 
 const HASH = /^[a-f0-9]{64}$/;
+const TYPED_ARRAY_BYTE_LENGTH_GETTER =
+  Object.getOwnPropertyDescriptor(Object.getPrototypeOf(Uint8Array.prototype), 'byteLength').get;
 const SOURCE_COMMIT = '1c7b6dccd886f57e866c7d359c091b1e72a193ea';
 const PROTOCOL_ID = 'MERIDIAN-B1-7-PROTOCOL-R3-20261018';
 const PROTOCOL_SHA256 = 'a78e1ae8c71c8f85baee5b51f5691643fc29136f636f19465c61f553afe09185';
@@ -572,10 +574,21 @@ export function verifyD2Candidate(bytes) {
   if (!(bytes instanceof Uint8Array)) {
     return reportFailure({code: 'INPUT_NOT_BYTES'});
   }
-  if (bytes.byteLength > D2_VERIFIER_BOUNDS.inputBytes) {
+  let byteLength;
+  try {
+    byteLength = TYPED_ARRAY_BYTE_LENGTH_GETTER.call(bytes);
+  } catch {
+    return reportFailure({code: 'INPUT_NOT_BYTES'});
+  }
+  if (byteLength > D2_VERIFIER_BOUNDS.inputBytes) {
     return reportFailure({code: 'INPUT_SIZE_LIMIT_EXCEEDED'});
   }
-  const candidateSha256 = sha256(bytes);
+  let candidateSha256;
+  try {
+    candidateSha256 = sha256(bytes);
+  } catch {
+    return reportFailure({code: 'INPUT_NOT_BYTES'});
+  }
   try {
     const candidate = decodeAndParse(bytes);
     validateCandidate(candidate);
