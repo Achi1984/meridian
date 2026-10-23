@@ -669,7 +669,7 @@
     },
     "mergeDelegation": {
       "ownerAt": "2026-10-17T06:31:42+02:00",
-      "ownerQuote": "Du kannst selbst zukünftig über merges entscheiden - freigabe erteilt",
+      "ownerQuote": "Du kannst selbst zuk\u00fcnftig \u00fcber merges entscheiden - freigabe erteilt",
       "commentId": 6229644994,
       "mergeDecisionOwner": "CHATGPT",
       "scope": "FUTURE_MERGE_DECISIONS_ONLY",
@@ -1192,8 +1192,8 @@
         "st_mode": 33152,
         "st_nlink": 1,
         "st_size": 53,
-        "st_mtime_ns": 1792227465428048000,
-        "st_ctime_ns": 1792227465428048000
+        "st_mtime_ns": 1792227465428047843,
+        "st_ctime_ns": 1792227465428047843
       },
       "priorArchiveByteExact": true,
       "correctedArchiveOperationId": "7b9b75d21315ee2bd4b5acd895f9c556",
@@ -1385,7 +1385,7 @@
       "ownerMandateAt": "2026-10-17T11:41:50+02:00",
       "ownerMandatePr": 843,
       "ownerMandateCommentId": 6232405394,
-      "ownerQuote": "Speichere die Arbeitsweise ab und arbeite zukünftig so - go",
+      "ownerQuote": "Speichere die Arbeitsweise ab und arbeite zuk\u00fcnftig so - go",
       "mandatoryGatesUnchanged": true
     },
     "completedSourceMerge842": {
@@ -2109,54 +2109,6 @@
       "state": "COMPLETE_ALL_APPLICABLE_POSTCHECKS_SUCCESS"
     },
     "continuityRefresh20261021": {
-      "917": {
-        "state": "SOURCE_ACCEPTED_CI_FAILED_MERGE_HELD",
-        "sourceAcceptanceCommentId": 6299699438,
-        "failedRunId": 39491245043,
-        "failedAttempt": 2,
-        "failedJobId": 119402180602,
-        "testFailure": "test_b1_exclusive_lock_after_child_failure_returns_unsettled_and_reaps_child: no durable first-path start observed",
-        "result": "2697_PASS_1_FAIL_0_SKIP",
-        "groupTiming": "16_B1_TESTS_56.280S_WRAPPER_97.228S",
-        "failureCommentId": 6323451446
-      },
-      "922": {
-        "state": "OPEN_DIAGNOSIS_ISSUE",
-        "activePullRequest": 923,
-        "diagnosticCommentId": 6323451077,
-        "rootCause": "NOT_ESTABLISHED"
-      },
-      "923": {
-        "state": "MERGED_DIAGNOSTIC_INSTRUMENTATION",
-        "issue": 922,
-        "mergeSha": "2c3e3798b3296406a88988250ff54f272ae4bb91",
-        "preMergeCi": "2698_PASS_0_FAIL_0_SKIP",
-        "rootCause": "NOT_ESTABLISHED",
-        "postMergeChecks": "ALL_APPLICABLE_SUCCESS",
-        "noRuntimeOrDeadlineChange": true
-      },
-      "925": {
-        "state": "MERGED_METADATA_ONLY_CANDIDATE_SOURCE_NOT_ADMISSION",
-        "mergeSha": "984e164ae9da021d3d7fadc578eb0cf0aeaa4413",
-        "reviewedHead": "c26265fd4554a658f5584b842c79f39ac4c406d8",
-        "sourceAcceptanceCommentId": 6324017218,
-        "focusedTestReportCommentId": 6324009932,
-        "claudeGreenLightCommentId": 6324706232,
-        "mergePostcheckReceiptCommentId": 6324734993,
-        "postMergeChecks": "ALL_APPLICABLE_SUCCESS",
-        "admissionReceipt": null,
-        "executionAuthorized": false
-      },
-      "927": {
-        "state": "SOURCE_MERGED_POSTCHECKS_PENDING_NOT_YET_FULLY_ACCEPTED",
-        "mergeSha": "6aeb07c35aa1e45dbaf0e78fc97fd7b59170b6f7",
-        "reviewedHead": "e9822dad4f834cb0e99ab95d061ff88439342b06",
-        "sourceCiRunId": 39664406698,
-        "sourceCiResult": "2704_PASS_0_FAIL_0_SKIP",
-        "mergeReceiptCommentId": 6325242524,
-        "postMergeChecks": "PENDING",
-        "issue922RootCause": "NOT_ESTABLISHED"
-      },
       "opId": "MERIDIAN-919-CONSOLIDATED-HANDOFF-R2",
       "verifiedMainSha": "2c3e3798b3296406a88988250ff54f272ae4bb91",
       "latestObservedMainSha": "6aeb07c35aa1e45dbaf0e78fc97fd7b59170b6f7",
@@ -2207,6 +2159,11 @@
           "mergeSha": "3c4af65bfe1368da608711bef37761d4cfd54f78",
           "mergeReceiptCommentId": 6299104780
         },
+        "921": {
+          "state": "MERGED_POSTCHECKS_SUCCESS",
+          "mergeSha": "2e41968551325b69eeeed994b9d5a5df84252a5e",
+          "mergeReceiptCommentId": 6299885755
+        },
         "916": {
           "state": "MERGED_POSTCHECKS_SUCCESS",
           "mergeSha": "c1ec1de5eec7307b1c91a5e133b5486f27fc5c88",
@@ -2217,11 +2174,6 @@
             "releaseCoordinator": 39490979999,
             "pages": 39490978159
           }
-        },
-        "921": {
-          "state": "MERGED_POSTCHECKS_SUCCESS",
-          "mergeSha": "2e41968551325b69eeeed994b9d5a5df84252a5e",
-          "mergeReceiptCommentId": 6299885755
         },
         "923": {
           "state": "MERGED_SOURCE_ACCEPTED_ALL_POSTCHECKS_SUCCESS",
@@ -2260,6 +2212,54 @@
           "postMergeChecks": "PENDING",
           "issue922RootCause": "NOT_ESTABLISHED"
         }
+      },
+      "917": {
+        "state": "SOURCE_ACCEPTED_CI_FAILED_MERGE_HELD",
+        "sourceAcceptanceCommentId": 6299699438,
+        "failedRunId": 39491245043,
+        "failedAttempt": 2,
+        "failedJobId": 119402180602,
+        "testFailure": "test_b1_exclusive_lock_after_child_failure_returns_unsettled_and_reaps_child: no durable first-path start observed",
+        "result": "2697_PASS_1_FAIL_0_SKIP",
+        "groupTiming": "16_B1_TESTS_56.280S_WRAPPER_97.228S",
+        "failureCommentId": 6323451446
+      },
+      "922": {
+        "state": "OPEN_DIAGNOSIS_ISSUE",
+        "activePullRequest": 923,
+        "diagnosticCommentId": 6323451077,
+        "rootCause": "NOT_ESTABLISHED"
+      },
+      "923": {
+        "state": "MERGED_DIAGNOSTIC_INSTRUMENTATION",
+        "issue": 922,
+        "mergeSha": "2c3e3798b3296406a88988250ff54f272ae4bb91",
+        "preMergeCi": "2698_PASS_0_FAIL_0_SKIP",
+        "rootCause": "NOT_ESTABLISHED",
+        "postMergeChecks": "ALL_APPLICABLE_SUCCESS",
+        "noRuntimeOrDeadlineChange": true
+      },
+      "925": {
+        "state": "MERGED_METADATA_ONLY_CANDIDATE_SOURCE_NOT_ADMISSION",
+        "mergeSha": "984e164ae9da021d3d7fadc578eb0cf0aeaa4413",
+        "reviewedHead": "c26265fd4554a658f5584b842c79f39ac4c406d8",
+        "sourceAcceptanceCommentId": 6324017218,
+        "focusedTestReportCommentId": 6324009932,
+        "claudeGreenLightCommentId": 6324706232,
+        "mergePostcheckReceiptCommentId": 6324734993,
+        "postMergeChecks": "ALL_APPLICABLE_SUCCESS",
+        "admissionReceipt": null,
+        "executionAuthorized": false
+      },
+      "927": {
+        "state": "SOURCE_MERGED_POSTCHECKS_PENDING_NOT_YET_FULLY_ACCEPTED",
+        "mergeSha": "6aeb07c35aa1e45dbaf0e78fc97fd7b59170b6f7",
+        "reviewedHead": "e9822dad4f834cb0e99ab95d061ff88439342b06",
+        "sourceCiRunId": 39664406698,
+        "sourceCiResult": "2704_PASS_0_FAIL_0_SKIP",
+        "mergeReceiptCommentId": 6325242524,
+        "postMergeChecks": "PENDING",
+        "issue922RootCause": "NOT_ESTABLISHED"
       },
       "d2CandidatePacket": {
         "status": "PROPOSAL_ONLY",
