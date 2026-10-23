@@ -99,7 +99,7 @@ class HistoricalInspectionReportTests(unittest.TestCase):
             logical = list(connection.iterdump())
         return hashlib.sha256(Path(database).read_bytes()).hexdigest(), logical
 
-    def invoke_cli(self, database=None, trial_id=None):
+    def invoke_main(self, database=None, trial_id=None):
         output = io.BytesIO()
         stdout = io.TextIOWrapper(output, encoding="utf-8")
         stderr = io.StringIO()
@@ -115,8 +115,8 @@ class HistoricalInspectionReportTests(unittest.TestCase):
     def test_queued_report_is_bounded_deterministic_and_read_only(self):
         trial_id = self.create_queued()
         before = self.snapshot()
-        first = self.invoke_cli(trial_id=trial_id)
-        second = self.invoke_cli(trial_id=trial_id)
+        first = self.invoke_main(trial_id=trial_id)
+        second = self.invoke_main(trial_id=trial_id)
         self.assertEqual(first[0], 0, first[2])
         self.assertEqual(first[1], second[1])
         self.assertLessEqual(len(first[1]), report.MAX_REPORT_BYTES)
@@ -136,7 +136,7 @@ class HistoricalInspectionReportTests(unittest.TestCase):
         completed = self.run_scenario(claim, "SUCCESS")
         self.assertEqual(completed["state"], "completed")
         before = self.snapshot()
-        status, output, error = self.invoke_cli(trial_id=claim["trialId"])
+        status, output, error = self.invoke_main(trial_id=claim["trialId"])
         self.assertEqual(status, 0, error)
         result = json.loads(output)
         self.assertEqual((result["state"], result["attempts"]), ("completed", 1))
@@ -153,7 +153,7 @@ class HistoricalInspectionReportTests(unittest.TestCase):
         self.database = database
         try:
             self.run_scenario(claim, "INSUFFICIENT_EVIDENCE")
-            status, output, error = self.invoke_cli(database, claim["trialId"])
+            status, output, error = self.invoke_main(database, claim["trialId"])
         finally:
             self.database = original_database
         self.assertEqual(status, 0, error)
@@ -162,10 +162,31 @@ class HistoricalInspectionReportTests(unittest.TestCase):
                          ("failed", "INVALID_OR_ZERO_DEVELOPMENT_RISK_DENOMINATOR", 1))
         self.assertEqual((result["pathsStarted"], result["pathsCompleted"]), (19, 19))
 
+    def test_completed_insufficient_screen_remains_observation_only(self):
+        self.profile_path = self.profiles["COMPLETED_INSUFFICIENT_SCREEN"]
+        self.profile = json.loads(self.profile_path.read_text())
+        claim = self.create_claimed()
+        completed = self.run_scenario(claim, "COMPLETED_INSUFFICIENT_SCREEN")
+        self.assertEqual(completed["state"], "completed")
+        before = self.snapshot()
+        with self.historical_profile(), self._test_mode():
+            stored = journal.inspect_b1(self.database, claim["trialId"])
+        summary = json.loads(stored["result"])
+        self.assertEqual(summary["status"], "COMPLETED")
+        self.assertEqual(summary["screen"]["status"], "INSUFFICIENT_EVIDENCE")
+        status, output, error = self.invoke_main(trial_id=claim["trialId"])
+        self.assertEqual(status, 0, error)
+        report_value = json.loads(output)
+        self.assertEqual(report_value["state"], "completed")
+        self.assertEqual(report_value["pathsCompleted"], 44)
+        self.assertFalse(report_value["executionAuthorized"])
+        self.assertFalse(report_value["promotionAuthorized"])
+        self.assertEqual(before, self.snapshot())
+
     def test_unresolved_consumed_attempt_and_failed_or_timed_out_states(self):
         claim = self.create_claimed()
         before = self.snapshot()
-        status, output, error = self.invoke_cli(trial_id=claim["trialId"])
+        status, output, error = self.invoke_main(trial_id=claim["trialId"])
         self.assertEqual(status, 0, error)
         result = json.loads(output)
         self.assertEqual(result["state"], "unknown")
@@ -180,7 +201,7 @@ class HistoricalInspectionReportTests(unittest.TestCase):
         self.database = database
         try:
             self.run_scenario(claim, "ENGINE_FAILURE")
-            status, output, error = self.invoke_cli(database, claim["trialId"])
+            status, output, error = self.invoke_main(database, claim["trialId"])
         finally:
             self.database = original_database
         self.assertEqual(status, 0, error)
@@ -194,7 +215,7 @@ class HistoricalInspectionReportTests(unittest.TestCase):
         try:
             self.run_scenario(claim, "HISTORICAL_TIMEOUT",
                               limits={"path_seconds": 1, "batch_seconds": 10})
-            status, output, error = self.invoke_cli(database, claim["trialId"])
+            status, output, error = self.invoke_main(database, claim["trialId"])
         finally:
             self.database = original_database
         self.assertEqual(status, 0, error)
@@ -204,7 +225,7 @@ class HistoricalInspectionReportTests(unittest.TestCase):
 
     def test_missing_locked_corrupt_and_wrong_profile_are_not_observed(self):
         missing = Path(self.temp.name) / "missing.sqlite"
-        status, output, error = self.invoke_cli(missing)
+        status, output, error = self.invoke_main(missing)
         self.assertEqual(status, 1)
         self.assertEqual(output, b"")
         self.assertEqual(json.loads(error)["status"], "NOT_OBSERVED")
@@ -215,7 +236,7 @@ class HistoricalInspectionReportTests(unittest.TestCase):
         connection = sqlite3.connect(self.database, isolation_level=None)
         try:
             connection.execute("BEGIN EXCLUSIVE")
-            status, output, error = self.invoke_cli(trial_id=trial_id)
+            status, output, error = self.invoke_main(trial_id=trial_id)
             self.assertEqual(status, 1)
             self.assertEqual(output, b"")
             self.assertEqual(json.loads(error)["status"], "NOT_OBSERVED")
@@ -225,7 +246,7 @@ class HistoricalInspectionReportTests(unittest.TestCase):
 
         corrupt = Path(self.temp.name) / "corrupt.sqlite"
         corrupt.write_bytes(b"not a sqlite database")
-        status, output, error = self.invoke_cli(corrupt, trial_id)
+        status, output, error = self.invoke_main(corrupt, trial_id)
         self.assertEqual(status, 1)
         self.assertEqual(output, b"")
         self.assertEqual(json.loads(error)["status"], "NOT_OBSERVED")
@@ -234,17 +255,28 @@ class HistoricalInspectionReportTests(unittest.TestCase):
         with self.historical_profile(), self._test_mode():
             journal.initialize(wrong_profile, profile=journal.B1_PROFILE_NAME)
             trial = journal.enqueue_b1(wrong_profile, "trial-generated-fixture")
-        status, output, error = self.invoke_cli(wrong_profile, trial["trialId"])
+        status, output, error = self.invoke_main(wrong_profile, trial["trialId"])
         self.assertEqual(status, 1)
         self.assertEqual(output, b"")
         self.assertEqual(json.loads(error)["status"], "NOT_OBSERVED")
+
+    def test_missing_exact_trial_is_not_observed_without_storage_change(self):
+        existing_trial = self.create_queued()
+        before = self.snapshot()
+        missing_trial = "f" * 64
+        self.assertNotEqual(existing_trial, missing_trial)
+        status, output, error = self.invoke_main(trial_id=missing_trial)
+        self.assertEqual(status, 1)
+        self.assertEqual(output, b"")
+        self.assertEqual(json.loads(error)["status"], "NOT_OBSERVED")
+        self.assertEqual(before, self.snapshot())
 
     def test_corrupt_rows_output_bounds_and_no_mutating_actions(self):
         trial_id = self.create_queued()
         with sqlite3.connect(self.database) as connection:
             connection.execute("UPDATE b1_jobs SET identity_json='{}'")
         before = self.snapshot()
-        status, output, error = self.invoke_cli(trial_id=trial_id)
+        status, output, error = self.invoke_main(trial_id=trial_id)
         self.assertEqual(status, 1)
         self.assertEqual(output, b"")
         self.assertEqual(json.loads(error)["status"], "NOT_OBSERVED")
@@ -255,19 +287,21 @@ class HistoricalInspectionReportTests(unittest.TestCase):
             "status": "OBSERVED",
             "observationScope": "ONE_JOURNAL_TRIAL",
         }
-        with patch.object(report, "MAX_REPORT_BYTES", 1):
+        valid_database = Path(self.temp.name) / "valid.sqlite"
+        valid_trial_id = self.create_queued(valid_database)
+        before = self.snapshot(valid_database)
+        with patch.object(report, "MAX_REPORT_BYTES", 256):
             with self.assertRaisesRegex(report.ReportError, "REPORT_TOO_LARGE"):
-                report.encode_report(value)
-            status, output, error = self.invoke_cli(trial_id=trial_id)
+                report.encode_report({"oversized": "x" * 257})
+            status, output, error = self.invoke_main(valid_database, valid_trial_id)
         self.assertEqual(status, 1)
         self.assertEqual(output, b"")
         self.assertEqual(json.loads(error)["status"], "NOT_OBSERVED")
-        self.assertLessEqual(len(error.encode()), report.MAX_REPORT_BYTES)
+        self.assertLessEqual(len(error.encode()), 256)
+        self.assertEqual(before, self.snapshot(valid_database))
 
         forbidden = ("initialize", "initialize_b1", "enqueue_b1", "scheduler_tick_b1",
                      "start_b1", "reconcile_b1", "settle_b1", "record_b1_path_started")
-        valid_database = Path(self.temp.name) / "valid.sqlite"
-        self.create_queued(valid_database)
         with patch.object(report.journal, "inspect_b1", wraps=journal.inspect_b1):
             from contextlib import ExitStack
             with ExitStack() as stack:
@@ -285,7 +319,7 @@ class HistoricalInspectionReportTests(unittest.TestCase):
                 self.assertEqual(
                     report.build_report(
                         valid_database,
-                        hashlib.sha256(self.profile["trialKey"].encode()).hexdigest()
+                        valid_trial_id
                     )["state"], "queued")
 
 
