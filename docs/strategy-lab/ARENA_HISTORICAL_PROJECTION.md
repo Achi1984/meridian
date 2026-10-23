@@ -71,24 +71,26 @@ The proposed envelope is an exact-key object:
 `exportHistoricalResult({observation, resultBytes, syntheticFixture})`; it
 performs no file, journal, environment, clock, network, or execution access.
 `resultBytes` is a `Uint8Array` containing the exact UTF-8 bytes represented by
-`observation.result`, or `null` exactly when `result` is `null`. Decode with
-fatal UTF-8 and require the decoded text to equal the supplied result string.
-Hash those bytes directly and compare with `resultSha256`; never parse and
-reserialize result metrics to check this digest. Require `resultSha256` to be
-`null` exactly when `result` is `null`. Copy the observation without normalizing
-or reordering progress/results.
+`observation.result`, or `null` exactly when `result` is `null`. For a present
+result, require an ordinary, non-shared, non-detached `Uint8Array`, then copy it
+once into a private byte snapshot. Never read the caller-owned view again.
+Fatal UTF-8 decoding, equality with the supplied `observation.result` string,
+and SHA-256 verification against `resultSha256` all use that same snapshot.
+Never parse and reserialize result metrics to check this digest. Require
+`resultSha256` to be `null` exactly when `result` is `null`. Copy the observation
+without normalizing or reordering progress/results.
 
-The exporter and importer resolve `job.profile` through a trusted, versioned
+The exporter and importer resolve jobs through a trusted, versioned
 profile-binding table compiled from accepted profile/manifest data, not from
-the envelope or caller-supplied expected values. Select the pinned row by
-profile, then require the observation's protocol/source/data/manifest digest
-tuple to equal that row before checking either identity array. Each row pins
-all 44 descriptor tuples and path IDs, plus computation order and digest.
-Mutually consistent arrays supplied by an envelope are never their own
-authority. Result tuples and `pathId` must match the bound descriptor slot, and
-progress IDs must match the bound computation sequence. The binding is
-structural identity only: it does not authenticate the source, observation,
-data, or caller assertion.
+the envelope or caller-supplied expected values. Require exactly one table row
+matching the complete `(profile, protocolSha256, sourceSha256, dataSha256,
+manifestSha256)` tuple before checking either identity array; reject absent or
+ambiguous matches. Each row pins all 44 descriptor tuples and path IDs, plus
+computation order and digest. Mutually consistent arrays supplied by an
+envelope are never their own authority. Result tuples and `pathId` must match
+the bound descriptor slot, and progress IDs must match the bound computation
+sequence. The binding is structural identity only: it does not authenticate
+the source, observation, data, or caller assertion.
 
 ## Byte, parser, and digest rules proposed
 
@@ -129,8 +131,9 @@ envelope with this algorithm, identically in Node and Python:
    escape `"` and `\`; use `\b`, `\t`, `\n`, `\f`, and `\r` for those controls;
    use lowercase `\u00xx` for other U+0000–U+001F controls; escape every
    non-ASCII BMP scalar as lowercase `\uxxxx`; encode a non-BMP scalar as its
-   lowercase UTF-16 surrogate-pair escapes. Emit U+007F literally, as ASCII
-   `ensure_ascii` JSON does. Do not escape `/`.
+   lowercase UTF-16 surrogate-pair escapes. Escape U+007F as lowercase
+   `\u007f`, matching Python `json.dumps(..., ensure_ascii=True)`. Do not escape
+   `/`.
 4. Before a language JSON parser can coerce number spellings, inspect outer
    number tokens. The only allowed forms are base-10 integer tokens in
    `0..9007199254740991`, with no leading zeros except `0`. Reject fractions,
@@ -148,6 +151,7 @@ shown as ASCII; SHA-256 is over those bytes):
 | Vector | Canonical bytes or raw result bytes | SHA-256 / outcome |
 | --- | --- | --- |
 | Unicode, key ordering, escaping | `{"a":"\u00e9\ud83d\ude00\u0001\"\\","\ue000":1,"\ud83d\ude00":2}` | `6bf91139486f75ee8b91fca021f4bc7ba7e62e500cd54966677c12e0145d6846` |
+| DEL escaping | `{"del":"\u007f"}` | `2a4be89ced8ad4d4ff64d890bb443669cd846aaf7b706c45ba3218cee13a30ad` |
 | Integer boundaries | `{"max":9007199254740991,"zero":0}` | `d1c6de4fff64001e181a639bafdc8cf052b2b3c99db136a90f8653ac648f1b48` |
 | Raw result metric `0` | `{"netReturn":0}` | `125ff529a4e02af41795c97411e4fac06a357ece5fb6756e008c524b299e6814` |
 | Raw result metric `0.0` | `{"netReturn":0.0}` | `cb3db5c44251fee50a9a6de53f7003a1c49e15548a8c9037b6e65eb68c121dbc` |
@@ -339,10 +343,152 @@ payload digest uses the canonicalization above.
 Verification evidence: the sample's path and computation arrays were compared
 with the checked-in generated-fixture manifest and its `computationOrder`;
 `trialId`, source identity, and payload digests were recomputed from the stated
-inputs. The Unicode/escaping and integer vectors, plus the three raw metric
-byte hashes, produced matching canonical bytes and SHA-256 values in Node and
-Python. This verification used static generated-fixture metadata only, not a
-journal/database, market data, or an engine execution.
+inputs. The Unicode/escaping, DEL and integer vectors, plus the three raw
+metric byte hashes, produced matching canonical bytes and SHA-256 values in
+Node and Python. This queued-sample/vector verification used static generated
+metadata only.
+
+### Generated completed and insufficient observations
+
+The two additional examples below are inspect-shaped envelopes constructed
+from direct B1 engine results over generated synthetic series. The queued
+example above remains the separate `b1_bridge_manifest.json` binding. The
+completed case uses that accepted 44-path synthetic fixture profile. The
+insufficient case uses `createInsufficientEvidenceProfile()` and
+`createInsufficientEvidenceSeries()` from
+`scripts/research-supervisor/test_b1_generated_fixture.mjs`; this fixture has
+the same protocol/source pins but its own generated data, manifest, and
+path-ID binding. Resolve each profile using its full pinned identity tuple, not
+the profile label alone. These are not journal reads, captured market-data
+reads, or operational runs. They are generated test observations; provenance
+remains synthetic and unverified.
+
+| Generated observation | Lifecycle / result / screen | Data SHA-256 / manifest SHA-256 | Progress / returned paths | Exact `job.result` UTF-8 bytes / SHA-256 | `summarySha256` | `payloadSha256` |
+| --- | --- | --- | ---: | --- | --- | --- |
+| Completed | `completed` / `COMPLETED` / `SYNTHETIC_ONLY_NOT_ASSESSED` | `7b98a6a6ef2834c8a4279406e2d6d174c7ee15d853283f619572b3e0da88fa99` / `98a9c4442a140c1e78d60251d312ad489975f58f8f5c48a87a8916b141c1c361` | 44 / 44 | 939389 / `1f2d4d889bc6bbf320f0cef229754b7058860c125c167af1c4cb0c711884f863` | `d73738b521b6b8cbc8cfe198b85e573c197a985bb5c5956be7544d3e82b2ea03` | `5cdf25c3b1f007de0c114436b69923bdab7bcfad9b12b70311656ad0ed8b2b33` |
+| Insufficient evidence | `failed` / `INSUFFICIENT_EVIDENCE` / `INSUFFICIENT_EVIDENCE` | `d0d0fbecb1c5bb39dd8b34fab9f689192182b089fd77dca2656f70889e81c048` / `8ce4b8e88fb2c3b391d73be392a1a02afd8beaf272106796a8a59b9701a19edd` | 19 / 44 (19 completed, 25 not run) | 207285 / `640b2603bb265607d75b704b4f6722d1553d3f21b5bb1c67c623a9ba50a4205d` | `c9fd86ab19e0e7fd42a80aa8dc9c02742d749644b356ddb0a1e6a1b905c94f83` | `89ee829a29c93faf46593c2893d1d4eba0c024bcd0a74a9903ae72d6dca88d4e` |
+
+The `pathIds` are each generated profile's descriptor-order identity list;
+`computationPathIds` and progress are mapped by its exact
+`computationOrder` indices:
+`[0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32,34,42,1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,36,37,38,39,40,41,43]`.
+Every returned path is paired with its descriptor-order tuple and matching
+`pathId`. In the insufficient case, the result still has all 44 descriptor
+slots; 19 are completed and 25 are
+`NOT_RUN_INSUFFICIENT_EVIDENCE`. The result bytes are Python's exact sorted, compact, ASCII-escaped JSON
+serialization of the JSON-compatible B1 result, matching
+`journal._canonical`; the result hash is over those UTF-8 bytes. The separate
+summary hash uses the same serialization after removing only `paths` and
+`controlDefinitions`, as the journal summary boundary does. The payload hash
+is over the full envelope including the exact result string but excluding only
+`payloadSha256`.
+
+This Python snippet regenerates and prints each full inspect-shaped export
+envelope as one canonical JSON line, including the exact result bytes and
+identity arrays. Its Node subprocess runs only the engine on generated
+synthetic fixture series; it opens no journal or captured input:
+
+```python
+import hashlib
+import json
+import subprocess
+import sys
+
+node = r"""
+import {createHash} from 'node:crypto';
+import {readFileSync} from 'node:fs';
+import {runBatch,canonicalJson,sha256} from './scripts/research/b1-7/engine.mjs';
+import {createSyntheticSeries} from './test/fixtures/b1-7/synthetic-series.mjs';
+import {createInsufficientEvidenceSeries,createInsufficientEvidenceProfile} from './scripts/research-supervisor/test_b1_generated_fixture.mjs';
+const fileSha=name=>createHash('sha256').update(readFileSync(name)).digest('hex');
+const implementationSha256=sha256(canonicalJson({
+  capturedInputSha256:fileSha('scripts/research/b1-7/captured-input.mjs'),
+  engineSha256:fileSha('scripts/research/b1-7/engine.mjs'),
+  validatorSha256:fileSha('scripts/research/b1-7/validate.mjs')
+}));
+const manifest=JSON.parse(readFileSync('scripts/research-supervisor/b1_bridge_manifest.json','utf8'));
+const generate=(series,profile)=>({profile,result:runBatch({
+  seriesByAsset:series,source:{kind:'SYNTHETIC_FIXTURE'},implementationSha256
+})});
+process.stdout.write(JSON.stringify({
+  completed:generate(createSyntheticSeries(),manifest),
+  insufficient:generate(createInsufficientEvidenceSeries(),createInsufficientEvidenceProfile())
+}));
+"""
+
+generated = json.loads(subprocess.run(
+    ['node', '--input-type=module', '-e', node], check=True,
+    capture_output=True, text=True).stdout)
+def canonical(value):
+    return json.dumps(value, sort_keys=True, separators=(',', ':'),
+                      ensure_ascii=True, allow_nan=False)
+def digest(value):
+    return hashlib.sha256(value).hexdigest()
+
+for case, state, trial_key in (
+    ('completed', 'completed', 'trial-m11-synthetic-completed'),
+    ('insufficient', 'failed', 'trial-m11-synthetic-insufficient')
+):
+    profile = generated[case]['profile']
+    result = generated[case]['result']
+    assert result['identity']['inputSha256'] == profile['inputSha256']
+    assert result['protocolSha256'] == profile['protocolSha256']
+    assert len(profile['pathDescriptors']) == len(profile['pathIds']) == 44
+    for index, path in enumerate(result['paths']):
+        assert path['pathId'] == profile['pathIds'][index]
+        assert [path[key] for key in
+                ('kind', 'variantId', 'scenarioId', 'segmentId')] == profile['pathDescriptors'][index]
+    result_bytes = canonical(result).encode('ascii')
+    by_id = {path['pathId']: path for path in result['paths']}
+    computation_ids = [profile['pathIds'][i] for i in profile['computationOrder']]
+    count = 44 if result['status'] == 'COMPLETED' else 19
+    paths = [{
+        'pathId': path_id, 'ordinal': index + 1,
+        'phase': 'DEVELOPMENT' if index < 19 else 'DIAGNOSTIC',
+        'state': 'completed', 'startedAt': '2026-01-01T00:00:01Z',
+        'payloadSha256': digest(canonical(by_id[path_id]).encode('ascii')),
+        'completedAt': '2026-01-01T00:00:01Z'
+    } for index, path_id in enumerate(computation_ids[:count])]
+    summary = {key: value for key, value in result.items()
+               if key not in ('paths', 'controlDefinitions')}
+    controls = canonical(result['controlDefinitions'])
+    job = {
+        'trialId': digest(trial_key.encode('utf8')), 'trialKey': trial_key,
+        'state': state, 'attempts': 1, 'owner': 'synthetic-generated-sample',
+        'fence': 1, 'profile': profile['profile'],
+        'protocolSha256': profile['protocolSha256'],
+        'sourceSha256': profile.get('sourceIdentitySha256') or
+                        digest(canonical(profile['sourceSha256']).encode('ascii')),
+        'dataSha256': profile['inputSha256'],
+        'manifestSha256': profile['manifestSha256'],
+        'pathIds': profile['pathIds'], 'computationPathIds': computation_ids,
+        'timestamps': {'createdAt': '2026-01-01T00:00:00Z',
+                       'startedAt': '2026-01-01T00:00:01Z',
+                       'finishedAt': '2026-01-01T00:00:01Z'},
+        'paths': paths, 'controls': controls,
+        'controlBindings': {
+            'primaryDevelopmentSha256': paths[0]['payloadSha256'],
+            'fullBasketDevelopmentSha256': paths[15]['payloadSha256']},
+        'result': result_bytes.decode('utf8'),
+        'resultSha256': digest(result_bytes),
+        'summarySha256': digest(canonical(summary).encode('ascii')),
+        'reason': None if result['status'] == 'COMPLETED' else
+                  'INVALID_OR_ZERO_DEVELOPMENT_RISK_DENOMINATOR',
+        'unresolved': False, 'executionAuthorized': False,
+        'promotionAuthorized': False, 'profitabilityInferred': False
+    }
+    envelope = {
+        'schema': 'MERIDIAN_B1_HISTORICAL_RESULT_EXPORT_V1',
+        'purpose': 'B1_RESULT_EXPORT_NOT_AUTHENTICITY_RECEIPT',
+        'provenance': {
+            'source': 'CALLER_SUPPLIED_INSPECT_B1',
+            'assertionStatus': 'UNVERIFIED',
+            'sourceAuthenticity': 'NOT_ESTABLISHED', 'syntheticFixture': True},
+        'job': job
+    }
+    envelope['payloadSha256'] = digest(canonical(envelope).encode('ascii'))
+    sys.stdout.buffer.write(canonical(envelope).encode('ascii') + b'\n')
+```
 
 **Exact proposed implementation allowlist after acceptance** (no edits are
 authorized by this proposal itself):
