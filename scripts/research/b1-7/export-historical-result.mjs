@@ -73,15 +73,16 @@ function privateResultSnapshot(resultBytes,result){
   let sourceBuffer,byteOffset,byteLength;
   try{
     if(Reflect.apply(typedArrayName,resultBytes,[])!=='Uint8Array'||
-       Object.getPrototypeOf(resultBytes)!==Uint8Array.prototype||
-       Reflect.ownKeys(resultBytes).some(key=>key==='buffer'||typeof key==='symbol'||
-         !/^(0|[1-9]\d*)$/.test(key)))
+       Object.getPrototypeOf(resultBytes)!==Uint8Array.prototype)
       throw new TypeError('RESULT_BYTES_TYPE');
     sourceBuffer=Reflect.apply(typedArrayBuffer,resultBytes,[]);
     Reflect.apply(arrayBufferByteLength,sourceBuffer,[]);
     byteOffset=Reflect.apply(typedArrayByteOffset,resultBytes,[]);
     byteLength=Reflect.apply(typedArrayLength,resultBytes,[]);
     if(byteLength>1024*1024)throw new TypeError('RESULT_BYTES_LIMIT');
+    if(Reflect.ownKeys(resultBytes).some(key=>key==='buffer'||typeof key==='symbol'||
+       !/^(0|[1-9]\d*)$/.test(key)))
+      throw new TypeError('RESULT_BYTES_TYPE');
   }catch(error){
     if(error?.message==='RESULT_BYTES_TYPE'||error?.message==='RESULT_BYTES_LIMIT')throw error;
     throw new TypeError('RESULT_BYTES_TYPE');
