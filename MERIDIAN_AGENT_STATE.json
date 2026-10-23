@@ -87,7 +87,59 @@
     "CHECKPOINT",
     "REPORT"
   ],
-  "activeWorkPackage": null,
+  "activeWorkPackage": {
+    "id": "MERIDIAN-919-CONSOLIDATED-HANDOFF-R2",
+    "title": "Refresh current continuity and preserve D2 readiness gates",
+    "status": "CORRECTION_PENDING_INDEPENDENT_REVIEW_AND_FRESH_EXACT_HEAD_CI",
+    "baseMainSha": "6aeb07c35aa1e45dbaf0e78fc97fd7b59170b6f7",
+    "lastFullyVerifiedMainSha": "2c3e3798b3296406a88988250ff54f272ae4bb91",
+    "orchestrationBranch": "copilot/meridian-d2-readiness-reconciliation-r1",
+    "executionMode": "SINGLE_WRITER_CONTINUITY_DOCUMENTATION_ONLY",
+    "riskClass": "RESEARCH_AUTHORITY_BOUNDARY",
+    "tasks": [
+      {
+        "id": "CONTINUITY_REFRESH",
+        "role": "MAIN_AGENT",
+        "status": "CORRECTION_PENDING_INDEPENDENT_REVIEW_AND_FRESH_CI",
+        "dependencies": [
+          "MAIN_6AEB07C_SOURCE_MERGED_POSTCHECKS_PENDING",
+          "CURRENT_GITHUB_RECEIPTS_RECONCILED"
+        ],
+        "allowedFiles": [
+          "docs/strategy-lab/D2_READINESS_RECONCILIATION.md",
+          "research/protocols/b1-7-20261018/EXECUTION_REQUEST.md",
+          "test/b1-7-engine.test.js",
+          "MERIDIAN_LIVE_CHECKPOINT.json",
+          "MERIDIAN_HANDOFF.md",
+          "MERIDIAN_RESUME.json",
+          "MERIDIAN_AGENT_STATE.json",
+          "docs/MERIDIAN_CHAT_HANDOFF.md"
+        ],
+        "leadScopeExtension": {
+          "commentId": 6324701311,
+          "authorizedFile": "docs/MERIDIAN_CHAT_HANDOFF.md",
+          "scope": "SAME_CONTINUITY_CORRECTION_CURRENT_CHECKPOINT_ONLY"
+        },
+        "forbiddenFiles": [
+          "runtime and production profile/authorization files",
+          "captured market data",
+          "workflows and policy"
+        ],
+        "acceptanceCriteria": [
+          "Current main and merged PR/CI receipts are reflected without rewriting historical snapshots.",
+          "PR #919 remains unmerged pending independent full review and exact-head CI.",
+          "Issue #924/PR #925 candidate is merged source but remains PROPOSAL_ONLY, not an admission receipt; no owner decision or execution authority is invented.",
+          "PR #927 is source-merged at 6aeb07c with postchecks pending and is not represented as fully accepted.",
+          "Research authority flags and paused/disabled infrastructure remain unchanged."
+        ],
+        "reviewLoop": 0,
+        "reviewVerdict": null
+      }
+    ],
+    "reviewStatus": "PRIOR_THREE_FILE_SOURCE_ACCEPTANCE_SUPERSEDED_FOR_EXPANDED_SCOPE; INDEPENDENT_FULL_REVIEW_PENDING",
+    "createdAt": "2026-10-21T18:31:13Z",
+    "lastCheckpoint": "Latest observed main 6aeb07c includes source-merged PR #927 with postchecks pending; last fully verified main remains 2c3e379. PR #925 metadata-only candidate merged at 984e164 with source and postcheck receipts; D2 remains PROPOSAL_ONLY. PR #919 continuity correction is pending independent review and fresh exact-head CI; no future success or merge claimed."
+  },
   "lastCompletedWorkPackage": {
     "id": "WP-20261001-UI-R108-PAPER-READINESS-PREFETCH",
     "status": "COMPLETE",
@@ -157,11 +209,13 @@
     "researchStatePreservedFromMain": "93d6c65a87df2131aa77428b8e8438f4d55d7680"
   },
   "lastCheckpoint": {
-    "at": "2026-10-05T18:36:13Z",
-    "canonicalMainSha": "c009326529e162f84bb985d0aca2de6cf5065c18",
-    "build": "10.0-r115",
+    "at": "2026-10-21T19:58:00Z",
+    "canonicalMainSha": "2c3e3798b3296406a88988250ff54f272ae4bb91",
+    "latestObservedMainSha": "6aeb07c35aa1e45dbaf0e78fc97fd7b59170b6f7",
+    "latestObservedMainStatus": "PR927_SOURCE_MERGED_POSTCHECKS_PENDING_NOT_YET_FULLY_ACCEPTED",
+    "build": "10.0-r130",
     "resumeFile": "MERIDIAN_RESUME.json",
-    "note": "Current durable checkpoint reconciled through PR #552. V2 source seal (#545), exit-fill runner fix (#546), causal event builder (#547), structural runner adapter (#548), and synthetic strategy adapter/driver (#549) are merged, independently reviewed and frozen. PR #550 automated the reviewer-only Claude mailbox. UI r114/r115 (#551/#552) are merged with green post-merge gates. V2 remains SOURCE_AUDIT; canonical Source→Events→Strategy→Runner execution, strategy PnL, Discovery, Validation, Holdout, Paper and Live remain unauthorized."
+    "note": "Latest observed main is 6aeb07c35aa1e45dbaf0e78fc97fd7b59170b6f7 with PR #927 source merged and postchecks pending; last fully verified main remains 2c3e3798b3296406a88988250ff54f272ae4bb91. Issue #922 remains open; original cause is NOT_ESTABLISHED. #917 source remains accepted but its exact-head CI failure is unresolved. PR #925 metadata-only candidate source merged at 984e164ae9da021d3d7fadc578eb0cf0aeaa4413 after reviewed head c26265fd4554a658f5584b842c79f39ac4c406d8; it remains PROPOSAL_ONLY, with no admission receipt or execution authority. PR #919 continuity correction is pending independent review and fresh exact-head CI. No D1 reread, runtime probe, execution, Paper or Live authority."
   },
   "nextChatBootstrap": [
     "Read mailboxIssue from MERIDIAN_LIVE_CHECKPOINT.json, then read that mailbox since the last checkpoint and all open CROSS_MODEL_REQUEST / REVISION_REQUIRED items",

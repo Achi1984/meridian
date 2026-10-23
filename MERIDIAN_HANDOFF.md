@@ -1,3 +1,86 @@
+> ## Current continuity reconciliation — 2026-10-21
+>
+> **Latest observed main:** `6aeb07c35aa1e45dbaf0e78fc97fd7b59170b6f7` (PR #927 source merge; postchecks pending).
+> Verified main checkpoint: **2c3e3798b3296406a88988250ff54f272ae4bb91**
+> Build: **10.0-r130**
+> The verified checkpoint above is the last main with all applicable postchecks
+> confirmed. PR #927 is source-merged at the newer observed main; its postchecks
+> remain pending, so it is not yet fully accepted. PR #919 is open and unmerged;
+> the continuity correction is pending independent review and fresh exact-head CI.
+> Do not claim future CI success or merge.
+>
+> **Merged project work and evidence**
+>
+> | PR | Verified current status | Receipt |
+> | --- | --- | --- |
+> | #901 | Merged as `e0e7472f74a05cb2a9cedb1a758abe8816b93aa6`; all applicable postchecks succeeded. | PR #901 comment [6273433124](https://github.com/Achi1984/meridian/pull/901#issuecomment-6273433124); final receipt [#639/6273865905](https://github.com/Achi1984/meridian/issues/639#issuecomment-6273865905) |
+> | #905 | Dormant historical-admission/profile source merged at `6bcaa74b35a7c093e67f144a03f82a6d77cdf9be`; independent source acceptance, not D2 approval. | [#639/6275925635](https://github.com/Achi1984/meridian/issues/639#issuecomment-6275925635), merge [#639/6275930095](https://github.com/Achi1984/meridian/issues/639#issuecomment-6275930095) |
+> | #913 | Merged at `3c4af65bfe1368da608711bef37761d4cfd54f78`. | [#639/6299104780](https://github.com/Achi1984/meridian/issues/639#issuecomment-6299104780) |
+> | #921 | Merged at `2e41968551325b69eeeed994b9d5a5df84252a5e`; all applicable postchecks succeeded. | [#639/6299885755](https://github.com/Achi1984/meridian/issues/639#issuecomment-6299885755) |
+> | #916 | Merged at `c1ec1de5eec7307b1c91a5e133b5486f27fc5c88`; Release Safety, Runtime Smoke, Coordinator, and Pages all succeeded. | Completion [#639/6323341748](https://github.com/Achi1984/meridian/issues/639#issuecomment-6323341748); runs [39490979956](https://github.com/Achi1984/meridian/actions/runs/39490979956), [39490980085](https://github.com/Achi1984/meridian/actions/runs/39490980085), [39490979999](https://github.com/Achi1984/meridian/actions/runs/39490979999), [39490978159](https://github.com/Achi1984/meridian/actions/runs/39490978159) |
+> | #923 | Merged at `2c3e3798b3296406a88988250ff54f272ae4bb91`; source-only review and pre-merge CI passed (2698/0/0); all four postchecks succeeded. Root cause for #922 remains unknown. | Merge/status receipt [#923/6324021896](https://github.com/Achi1984/meridian/pull/923#issuecomment-6324021896); Release Safety [39657036131](https://github.com/Achi1984/meridian/actions/runs/39657036131), Runtime Smoke [39657036159](https://github.com/Achi1984/meridian/actions/runs/39657036159), Coordinator [39657036338](https://github.com/Achi1984/meridian/actions/runs/39657036338), Pages [39657032229](https://github.com/Achi1984/meridian/actions/runs/39657032229) |
+> | #925 | Metadata-only D2 candidate merged at `984e164ae9da021d3d7fadc578eb0cf0aeaa4413` from reviewed head `c26265fd4554a658f5584b842c79f39ac4c406d8`; Claude GREEN_LIGHT and all applicable postchecks are recorded. Still proposal-only, not admission or execution approval. | Lead relay of reviewer901 SOURCE GREEN [#925/6324017218](https://github.com/Achi1984/meridian/pull/925#issuecomment-6324017218); Copilot focused-test report [#925/6324009932](https://github.com/Achi1984/meridian/pull/925#issuecomment-6324009932); Claude [#639/6324706232](https://github.com/Achi1984/meridian/issues/639#issuecomment-6324706232); merge/postcheck receipt [#639/6324734993](https://github.com/Achi1984/meridian/issues/639#issuecomment-6324734993) |
+> | #927 | Source merged at `6aeb07c35aa1e45dbaf0e78fc97fd7b59170b6f7`; pre-merge Safety passed 2704/0/0; postchecks are pending and the change is not yet fully accepted. #922 root cause remains not established. | Merge/status receipt [#927/6325242524](https://github.com/Achi1984/meridian/pull/927#issuecomment-6325242524); Safety [39664406698](https://github.com/Achi1984/meridian/actions/runs/39664406698) |
+>
+> **Active CI blocker:** #917’s source is accepted, but its exact-head Release
+> Safety run [39491245043, attempt 2](https://github.com/Achi1984/meridian/actions/runs/39491245043)
+> failed at `test_b1_exclusive_lock_after_child_failure_returns_unsettled_and_reaps_child`
+> (`test_supervisor.py:803`): it did not observe a durable first-path start.
+> Result was 2697 passed, 1 failed, 0 skipped; the B1 group ran 16 tests in
+> 56.280 seconds and the wrapper took 97.228 seconds. The failure is an assertion,
+> not a group timeout; the cause is not established. Owner failure receipt:
+> [#639/6323451446](https://github.com/Achi1984/meridian/issues/639#issuecomment-6323451446).
+> Do not blind-rerun, increase budgets, or change this documentation PR to repair
+> that test.
+>
+> Issue #922 remains open with root cause `NOT_ESTABLISHED`. PR #923's
+> bounded-diagnostics change is merged on main; it does not establish the
+> original startup cause or claim a runtime fix.
+>
+> **D2 candidate lane:** Issue #924 / PR #925's deterministic metadata-only
+> candidate artifact, including proposed ordered path identities, is merged on
+> main at `984e164ae9da021d3d7fadc578eb0cf0aeaa4413` from reviewed head
+> `c26265fd4554a658f5584b842c79f39ac4c406d8`. Independent source-only
+> acceptance applies to candidate source commit `fc0fd0db4653630cae6c3f5a73607e02a9c9d24e`
+> ([#925/6324017218](https://github.com/Achi1984/meridian/pull/925#issuecomment-6324017218));
+> complete Claude GREEN_LIGHT is [#639/6324706232](https://github.com/Achi1984/meridian/issues/639#issuecomment-6324706232), and merge/postcheck receipt is [#639/6324734993](https://github.com/Achi1984/meridian/issues/639#issuecomment-6324734993).
+> The candidate remains proposal-only, not admission or execution approval. The author-reported focused command
+> `node --test test/b1-7-d2-candidate.test.js` at that SHA reported 6 passed,
+> 0 failed, 0 skipped; the report also records import-no-write, isolated fixed-path
+> CLI I/O, and tampered-input rejection checks ([#925/6324009932](https://github.com/Achi1984/meridian/pull/925#issuecomment-6324009932)).
+> The correct receipt mapping is retained: `6324017218` is the Lead's source-green
+> relay; `6324009932` is the Copilot 6/0/0 focused-test report. The reviewer did
+> not claim independent test execution. Current D2 status remains
+> `PROPOSAL_ONLY`, not an accepted final admission artifact.
+>
+> The exact proposed scope remains one trial, 44 ordered
+> paths, 30-minute batch, 60-second path, 1 MiB output, existing 15/30 bp cost
+> scenarios including the one-day delay, existing screen criteria, and the
+> research-only `NO_FINITE_TRADE_STOP` exception. A genuine separate owner
+> decision is not recorded. Input remains `NOT_FROZEN`; proposed ordered path
+> identities in the merged #925 candidate are not final admission identities and
+> are not accepted as frozen input.
+> A final proposed profile identity is `NOT_FINAL`. The current inactive-profile
+> digest is provenance only, never a final activated-profile identity. Source
+> authenticity remains `NOT_ESTABLISHED`; trial-ledger completeness is `UNKNOWN`; execution-context,
+> journal, and unused-attempt evidence is `NOT_VERIFIED`. No D1 reread, runtime
+> probe, or execution is authorized.
+>
+> **Scope and preserved state:** The eight writable files in this continuity packet
+> are:
+> `docs/strategy-lab/D2_READINESS_RECONCILIATION.md`,
+> `research/protocols/b1-7-20261018/EXECUTION_REQUEST.md`,
+> `test/b1-7-engine.test.js`, `MERIDIAN_LIVE_CHECKPOINT.json`,
+> `MERIDIAN_HANDOFF.md`, `MERIDIAN_RESUME.json`,
+> `MERIDIAN_AGENT_STATE.json`, and `docs/MERIDIAN_CHAT_HANDOFF.md`. The Lead's
+> same-correction scope extension is recorded at [#919/6324701311](https://github.com/Achi1984/meridian/pull/919#issuecomment-6324701311).
+> Historical snapshots and original D1 evidence are
+> preserved. Research authority flags remain false; infrastructure pause and
+> disabled routing are unchanged. The next gate is independent full review and
+> exact-head CI for the expanded scope. **No merge.**
+>
+> Earlier dated blocks below remain historical snapshots and are not current status.
+
 > Current reconciliation — 2026-10-19, PR #901 main alignment.
 > Verified main: `496360869171f0a29e3efbc7ec216ffc1833c6a0` (PR #900).
 > PR #900 complete: independent Work review #639/6273568843, merge receipt

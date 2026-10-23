@@ -1,15 +1,16 @@
 # Owner execution request — proposal only
 
-**Status: PROPOSAL ONLY — NOT APPROVED / NOT AN EXECUTION GRANT.** R3 independent review is pending. This request is for a later, separate owner decision after synthetic source review, exact-head CI, and independent full source review. Do not run the engine on captured market data while this request is pending.
+**Status: SOURCE ACCEPTED; D1 AUTHORIZED AND TECHNICALLY VERIFIED; D2 DEFERRED — NOT AN EXECUTION GRANT.** The R3 implementation source and the dormant #905 admission/profile source are accepted. The proposed historical run remains unapproved: source acceptance is not approval to admit data or execute the engine. Do not run the engine on captured market data.
 
-The R2 `GREEN_LIGHT` (response comment `6249482850`) is historical and applies only to R2 source-and-synthetic preparation. It does not review R3 or approve this real-run proposal, its 44-path budget, costs, screen thresholds, or no-stop exception.
+The R2 `GREEN_LIGHT` (response comment `6249482850`) is historical and applies only to R2 source-and-synthetic preparation. Neither that review nor the later R3 source acceptances approve this real-run proposal, its 44-path budget, costs, screen thresholds, or no-stop exception.
 
 ## Admission states — separate, non-transitive gates
 
 | Gate | Current state |
 | --- | --- |
-| `SOURCE_ACCEPTED` | `PENDING`: #890 and #894 are integrated on `main` at `bfaf17cd5d96db6abe248ce9c4a1fcf83f190ca4`, with their named CI/postchecks successful. This integrated #892 candidate still requires exact-head CI and full independent review before source acceptance. |
-| `DATA_ADMISSION_READY` | `NOT_READY`: the selected-input manifest is `NOT_FROZEN`; no data-read approval has been granted. |
+| `SOURCE_ACCEPTED` | `ACCEPTED`: PR #892 R3 source acceptance is recorded at mailbox #639 comment `6255139258`; dormant admission/profile source PR #905 was independently accepted and merged at `6bcaa74b35a7c093e67f144a03f82a6d77cdf9be` (mailbox #639 comments `6275925635`, `6275930095`). |
+| `D1_TECHNICAL_VERIFICATION` | `AUTHORIZED_AND_VERIFIED` for the bounded D1 task only; it does not admit data or authorize D2. |
+| `DATA_ADMISSION_READY` | `NOT_READY`: the selected-input manifest is `NOT_FROZEN`; the verified D1 draft is not an admitted manifest and no D2 admission receipt exists. |
 | `EXECUTION_AUTHORIZED` | `FALSE`: no captured-data engine run is authorized. |
 | `SCREEN_RESULT` | `NOT_RUN`: no strategy screen or return computation was performed. |
 | `PAPER_ELIGIBILITY` | `NOT_ELIGIBLE`: a historical diagnostic cannot establish forward-Paper eligibility. |
@@ -19,13 +20,15 @@ or authorize any later gate.
 
 ## Existing D1 manifest draft — identity only
 
-The existing verified metadata at
+The existing D1 verification metadata at
 `docs/research/d1-20261019/verification.json` contains a `manifestDraft` with
 canonical SHA-256
 `37fecaa0d003c9ec862fb57b3b312c0289c1dd370607ade99bac584d357f81a9`. This is
 identity metadata only: it is not a frozen/admitted production manifest and
 grants no D2 or execution authority. The current source-only task did not read
-the captured CSVs. Reusing the verified draft identity does not require
+the captured files. The D1 read-only verification was separately owner-authorized
+and technically completed under issue #895; that authorization did not admit the
+data or authorize D2. Reusing the verified draft identity does not require
 rereading those files; any additional data read would require its own decision.
 
 Hashes establish byte identity, not exchange authentication; source authenticity
@@ -35,16 +38,54 @@ or partial acceptance is authorized by this proposal. The existing loader's
 Linux `/proc/self/fd` descriptor check is an environment constraint, not an
 authenticity claim.
 
-The current candidate includes #890 at merge `fd07a8df49cbe24c73e9819170cd36e6b9645157` and #894 at merge `bfaf17cd5d96db6abe248ce9c4a1fcf83f190ca4`. For #890, corrected head `4333259f11992042d39e1b4c6ec7472f56c74921` passed Release Safety run `39150912974`, attempt 2; the earlier failed run remains historical and is not relabeled. Its post-merge Release Safety failure (`39155412745`, 2662 pass/1 fail) also remains historical and was corrected by #894. For #894, Release Safety `39157878217`, Runtime Smoke `39157878067`, Release Coordinator `39157878080`, and Pages `39157877431` all succeeded on `bfaf17cd5d96db6abe248ce9c4a1fcf83f190ca4`. These are dependency receipts, not CI or review of this integrated candidate.
+Source acceptance is distinct from execution approval. PR #892 merged at
+`6f720373af5439af70c54e6cb2f1c17abaf8b877` after exact-head CI and independent
+source acceptance; mailbox #639 comment `6255139258` records that source
+acceptance and explicitly leaves the selected manifest unfrozen and all runtime
+gates closed. PR #905's dormant historical admission/profile source received an
+independent `GREEN_LIGHT` at mailbox #639 comment `6275925635` and merged at
+`6bcaa74b35a7c093e67f144a03f82a6d77cdf9be` with successful postchecks, recorded
+at comment `6275930095`. That is accepted source, not an approval of the proposed
+historical execution. PR #905's merge at
+`6bcaa74b35a7c093e67f144a03f82a6d77cdf9be` is a historical admission/profile
+source checkpoint, not current `main`. The dated #923 checkpoint
+`2c3e3798b3296406a88988250ff54f272ae4bb91` is the last fully verified main:
+PR #923's source CI and source-only review passed before merge (2698 passed,
+0 failed, 0 skipped), and all four postchecks succeeded (Release Safety
+39657036131, Runtime Smoke 39657036159, Coordinator 39657036338, Pages
+39657032229). Latest observed `main` is
+`6aeb07c35aa1e45dbaf0e78fc97fd7b59170b6f7` after PR #927 source merge. Its
+pre-merge Safety result was 2704 passed, 0 failed, 0 skipped; postchecks remain
+pending, so #927 is not yet fully accepted. Issue #922 remains open and its
+original startup cause remains not established.
+
+Issue #924 / PR #925's deterministic metadata-only candidate artifact with
+proposed ordered path identities merged to main as
+`984e164ae9da021d3d7fadc578eb0cf0aeaa4413` from reviewed head
+`c26265fd4554a658f5584b842c79f39ac4c406d8`. Independent source-only acceptance covers
+`fc0fd0db4653630cae6c3f5a73607e02a9c9d24e` only
+([PR comment 6324017218](https://github.com/Achi1984/meridian/pull/925#issuecomment-6324017218));
+this is the Lead's relay of reviewer901 SOURCE GREEN. Copilot's focused-test report
+is separate ([PR comment 6324009932](https://github.com/Achi1984/meridian/pull/925#issuecomment-6324009932)).
+Complete Claude GREEN_LIGHT is [#639/6324706232](https://github.com/Achi1984/meridian/issues/639#issuecomment-6324706232);
+the merge/postcheck receipt is [#639/6324734993](https://github.com/Achi1984/meridian/issues/639#issuecomment-6324734993).
+The candidate is still not a final admitted artifact and creates no admission
+receipt or execution authority. The author-reported focused test command
+`node --test test/b1-7-d2-candidate.test.js` at that commit reported 6 passed,
+0 failed, 0 skipped and metadata-only I/O-boundary checks
+([PR comment 6324009932](https://github.com/Achi1984/meridian/pull/925#issuecomment-6324009932)).
+The reviewer did not claim independent test execution; later pre-merge CI passed
+and the merged candidate's postchecks succeeded. These receipts do not change
+`DATA_ADMISSION_READY`, D2, or execution authorization.
 
 ## Immutable identities
 
 | Identity | Proposed value | Status |
 | --- | --- | --- |
 | Protocol | `MERIDIAN-B1-7-PROTOCOL-R3-20261018`; raw `protocol.json` SHA-256: `a78e1ae8c71c8f85baee5b51f5691643fc29136f636f19465c61f553afe09185` | Frozen file identity |
-| Implementation | `MERIDIAN-B1-7-ENGINE-R3`; candidate bundle SHA-256 `ab73261f01b27b8655ffea7979fec03eb1a9bea667b6fc4cda8d77b75c4f3e06` | Source-only checkpoint identity; source acceptance remains pending exact-head CI and full independent review |
+| Implementation | `MERIDIAN-B1-7-ENGINE-R3`; candidate bundle SHA-256 `ab73261f01b27b8655ffea7979fec03eb1a9bea667b6fc4cda8d77b75c4f3e06` | Accepted source identity; no data admission or execution authority |
 | Generated bridge manifest | SHA-256 `98a9c4442a140c1e78d60251d312ad489975f58f8f5c48a87a8916b141c1c361`; computation order SHA-256 `223220ee0d8b4569ca02b99399bac71364203478e3720cab5e93ad957e6ec6d0` | Mechanically refreshed from the unchanged generated fixture and implementation; fixture identity, descriptors, and computation order unchanged |
-| Historical run profile | `MERIDIAN-B1-7-HISTORICAL-ONE-SHOT-R1`; canonical run-profile SHA-256 `160b73ff9c380b1231d0a1e4a88566493408f978857a3b13d71826852a413fc8`; source-identity SHA-256 `3e3973847b2b37cffa11b2df1be0b832d3227692857ff4bb2631ca5ff48ad773` | Inert profile identity; status `NOT_FROZEN`, no input manifest or D2 receipt, and no historical path IDs until input metadata is frozen |
+| Inactive historical run profile | `MERIDIAN-B1-7-HISTORICAL-ONE-SHOT-R1`; existing canonical inactive-profile SHA-256 `160b73ff9c380b1231d0a1e4a88566493408f978857a3b13d71826852a413fc8`; source-identity SHA-256 `3e3973847b2b37cffa11b2df1be0b832d3227692857ff4bb2631ca5ff48ad773` | `NOT_FROZEN`, with null input manifest and D2 receipt. This inactive-profile digest is not a final activated-profile digest. |
 | Source basis | Git commit `1c7b6dccd886f57e866c7d359c091b1e72a193ea` | Pinned source/input-provenance commit |
 | Existing D1 manifest draft | Canonical SHA-256 `37fecaa0d003c9ec862fb57b3b312c0289c1dd370607ade99bac584d357f81a9` | Verified identity metadata only; not frozen, admitted, or execution authority; no reread is required solely to adopt this identity |
 | Input admission | Selected-series manifest SHA-256: `NOT_FROZEN`; engine input identity: `NOT_FROZEN` | No captured series loaded or hashed in this task; production loader remains blocked |
@@ -81,11 +122,11 @@ The exact seven proposed assets and copied normalized-file SHA-256 values are:
 
 The implementation bundle digest is SHA-256 of canonical JSON with keys
 `capturedInputSha256`, `engineSha256`, and `validatorSha256` containing the raw
-file hashes above. This binds the current source bytes but is not accepted until
-exact-head CI and full independent review. The engine accepts the bundle hash as
-caller-supplied identity and does not inspect its own source. The captured-input
-module remains inactive: the independently frozen selected-input manifest and
-production admission are absent, so no market CSV is read.
+file hashes above. This binds the accepted source bytes; it does not establish a
+frozen input manifest, authorize execution, or approve the proposed run. The
+engine accepts the bundle hash as caller-supplied identity and does not inspect
+its own source. The captured-input module remains inactive: the selected-input
+manifest is not frozen and production admission is absent.
 
 | Order | Asset | Normalized file SHA-256 |
 | ---: | --- | --- |
@@ -112,38 +153,43 @@ Input must be exactly 955 synchronized daily rows for each asset, 2024-02-19 thr
 
 This proposal asks for only a research-stage portfolio-level no-stop analysis. There is no finite per-trade stop, so CRV remains `UNDEFINED_NO_FINITE_STOP`, null, and not applicable for this research-only screen. No stop is invented, and no trade CRV or promotion eligibility is claimed. The 15 bp baseline control mean uses the primary path's held target over all 180 development days; the initial fill is on day one, so the baseline has no pre-fill rows. The zero-before-fill rule matters for delayed paths.
 
-R3 independent review is pending; the historical R2 review is not approval of this proposal. The 10 bp spot taker reference plus 5 bp assumed friction and 30 bp stress must be explicitly included in the separate owner decision. Neither is account-specific entitlement or a claim about OKX fills.
+R3 source review is accepted; neither it nor the historical R2 review approves
+this proposal. The 10 bp spot taker reference plus 5 bp assumed friction and
+30 bp stress must be explicitly included in a separate genuine owner decision.
+Neither is account-specific entitlement or a claim about OKX fills.
 
-This request does **not** authorize a real-data run, strategy-PnL promotion, discovery, validation, holdout, Paper, Live, trading, runtime changes, or any authorization-flag change. `canonicalExecutionAuthorized`, `strategyPnlAuthorized`, `discoveryAuthorized`, `validationAuthorized`, `holdoutAuthorized`, `paperAuthorized`, and `liveAuthorized` remain false. A later explicit owner decision must approve the exact protocol/source/input identities, costs, screen, budget, and no-stop exception before any real series is supplied.
+This request does **not** authorize a real-data run, strategy-PnL promotion, discovery, validation, holdout, Paper, Live, trading, runtime changes, or any authorization-flag change. `canonicalExecutionAuthorized`, `strategyPnlAuthorized`, `discoveryAuthorized`, `validationAuthorized`, `holdoutAuthorized`, `paperAuthorized`, and `liveAuthorized` remain false. A later explicit owner decision must approve the exact protocol/source/input identities, costs, screen, budget, and research-only no-stop exception before any real series is supplied.
 
 ## Current D2 decision text — defer, not approval
 
 > **D2 DECISION: DEFER / NOT APPROVED.** Do not read captured market files or
-> execute the engine. The selected-input manifest and its SHA-256 remain
-> `NOT_FROZEN`; no D2 receipt exists. Reconsider only after the owner has
-> authorized any data read that remains necessary; reuse the already verified D1
-> `manifestDraft` identity without rereading files solely to adopt that identity.
-> The D1 metadata is not admission or execution authority. The final source and
-> run-profile identities pass exact-head CI and full independent review, and an
-> owner decision explicitly binds that manifest, the R3 protocol, one trial,
-> all 44 ordered paths, costs, screen, budget, and no-finite-stop exception.
-> Any future historical result remains non-holdout research evidence and grants
+> execute the engine. The selected-input manifest remains `NOT_FROZEN`; no D2
+> receipt exists. D1 was separately authorized and technically verified, but its
+> draft metadata is not admission or execution authority. Reuse that verified
+> identity without rereading files solely to adopt it; any additional data read
+> needs its own decision. Accepted source identities do not approve the proposed
+> run. Before any future execution, a separate genuine owner decision must bind
+> the final protocol, implementation, input, profile, and ordered-path identities,
+> one trial, all 44 paths, costs, screen, limits, and research-only no-stop
+> exception. Any future result remains non-holdout research evidence and grants
 > no execution, promotion, Paper, or Live authority.
 
-This is a proposed deferral record for the current source-only packet, not an
-owner approval or an execution grant. The minimal later activation diff is a
-Lead-controlled, independently reviewed change to
-`scripts/research-supervisor/historical_run_profile.json`: set
-`status` to `FROZEN_FOR_D2`, populate the exact D1 manifest, manifest/input
-hashes, and a schema-valid D2 receipt bound to `sourceIdentitySha256`,
-protocol/implementation, run-profile, manifest/order digests, fixed trial key,
-and the ordered path IDs derived from that manifest. The receipt schema validates
-identity fields but is not an authentication mechanism: owner strings and hashes
-do not prove consent. Activation requires an actual separate owner decision; the
-Lead-controlled change records that decision after review. The verified existing
-D1 `manifestDraft` may supply identity metadata without another market-file read.
-The receipt is excluded from the run-profile digest to avoid self-reference; the
-profile identity includes all other frozen fields.
-No source code, fixture identity, descriptor, computation order, or
-authorization flag should change as part of that later activation. Any source
-change requires renewed identities, CI, and review before activation.
+The remaining gates are separate and conjunctive:
+
+1. Independently review the merged #925 metadata-only proposal and verify any
+   final admission artifact carrying the final protocol, implementation,
+   input-manifest, input, ordered-path, and run-profile identities. The merged
+   candidate is not an admission receipt, and its candidate identities are not
+   final accepted identities. Do not freeze or activate a profile in this
+   reconciliation.
+2. Record a separate genuine owner decision for the fixed one-trial/44-path
+   proposal, 30-minute batch, 60-second path, 1 MiB output limit, 15/30 bp
+   scenarios including the one-day delay, the exact screen, and the research-only
+   no-finite-stop exception. Current source acceptance and the D1 approval are
+   not that decision.
+3. Verify the actual execution context and journal status before any later
+   execution proposal; no execution context or journal check is represented as
+   complete here.
+
+Until those gates are satisfied, the profile remains inactive, `NOT_FROZEN`, and
+without a D2 receipt. No real-data execution, Paper, or Live permission exists.
