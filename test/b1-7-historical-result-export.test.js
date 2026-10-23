@@ -3,19 +3,18 @@ import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import test from 'node:test';
 import {
-  canonicalHistoricalExportPayload,parseArenaHistoricalExport,validateArenaHistoricalExport,
-  MAX_HISTORICAL_EXPORT_BYTES
+  canonicalHistoricalExportPayload,parseArenaHistoricalExport,MAX_HISTORICAL_EXPORT_BYTES
 } from '../v11/arena-historical-export.js';
 import {exportHistoricalResult} from '../scripts/research/b1-7/export-historical-result.mjs';
-import {createExecution,canonicalJson,sha256} from '../scripts/research/b1-7/engine.mjs';
+import {createExecution,canonicalJson} from '../scripts/research/b1-7/engine.mjs';
 import {createSyntheticSeries} from '../test/fixtures/b1-7/synthetic-series.mjs';
 import bridgeManifest from '../scripts/research-supervisor/b1_bridge_manifest.json' with {type:'json'};
 import {
   createInsufficientEvidenceProfile,createInsufficientEvidenceSeries
 } from '../scripts/research-supervisor/test_b1_generated_fixture.mjs';
+import {createStrategyArenaView} from '../v11/strategy-arena.js';
 
 const digest=value=>createHash('sha256').update(value).digest('hex');
-const digestBytes=async bytes=>digest(bytes);
 const pythonGenerator=String.raw`
 import hashlib, json, sys
 def canonical(value):
@@ -94,13 +93,23 @@ test('synthetic generated completed and insufficient results round-trip with exa
   const insufficientResult=generatedResult(insufficientProfile,createInsufficientEvidenceSeries());
   assert.equal(completedResult.status,'COMPLETED');
   assert.equal(insufficientResult.status,'INSUFFICIENT_EVIDENCE');
-  const completed=await generatedEnvelope(bridgeManifest,completedResult,'completed','trial-m11-generated-completed');
-  const insufficient=await generatedEnvelope(insufficientProfile,insufficientResult,'failed','trial-m11-generated-insufficient');
-  for(const [envelope,status,count] of [[completed,'COMPLETED',44],[insufficient,'INSUFFICIENT_EVIDENCE',19]]){
+  const completed=await generatedEnvelope(bridgeManifest,completedResult,'completed','trial-m11-synthetic-completed');
+  const insufficient=await generatedEnvelope(insufficientProfile,insufficientResult,'failed','trial-m11-synthetic-insufficient');
+  for(const [envelope,status,count,resultSha,summarySha,payloadSha] of [
+    [completed,'COMPLETED',44,'1f2d4d889bc6bbf320f0cef229754b7058860c125c167af1c4cb0c711884f863',
+      'd73738b521b6b8cbc8cfe198b85e573c197a985bb5c5956be7544d3e82b2ea03',
+      '5cdf25c3b1f007de0c114436b69923bdab7bcfad9b12b70311656ad0ed8b2b33'],
+    [insufficient,'INSUFFICIENT_EVIDENCE',19,'640b2603bb265607d75b704b4f6722d1553d3f21b5bb1c67c623a9ba50a4205d',
+      'c9fd86ab19e0e7fd42a80aa8dc9c02742d749644b356ddb0a1e6a1b905c94f83',
+      '89ee829a29c93faf46593c2893d1d4eba0c024bcd0a74a9903ae72d6dca88d4e']
+  ]){
     const sourceBytes=new TextEncoder().encode(envelope.job.result);
     const imported=await parseArenaHistoricalExport(new TextEncoder().encode(JSON.stringify(envelope)));
     assert.equal(imported.status,'PRESENT_UNVERIFIED');
+    assert.equal(imported.job.resultSha256,resultSha);
+    assert.equal(imported.job.summarySha256,summarySha);
     assert.equal(imported.job.resultSha256,digest(sourceBytes));
+    assert.equal(envelope.payloadSha256,payloadSha);
     assert.equal(imported.result.status,status);
     assert.equal(imported.result.completedPaths,count);
     assert.equal(imported.job.paths.length,count);
@@ -113,6 +122,46 @@ test('synthetic generated completed and insufficient results round-trip with exa
   }
   assert.equal(Buffer.byteLength(completed.job.result),939389);
   assert.equal(Buffer.byteLength(insufficient.job.result),207285);
+});
+
+test('generated export import displays exact statuses, zero, false and missing metrics, then clears stale data',async()=>{
+  const completedResult=generatedResult(bridgeManifest,createSyntheticSeries());
+  const insufficientProfile=createInsufficientEvidenceProfile();
+  const insufficientResult=generatedResult(insufficientProfile,createInsufficientEvidenceSeries());
+  const completed=await generatedEnvelope(bridgeManifest,completedResult,'completed','trial-m11-synthetic-completed');
+  const insufficient=await generatedEnvelope(insufficientProfile,insufficientResult,'failed','trial-m11-synthetic-insufficient');
+  const listeners=new Map();
+  const root={
+    innerHTML:'',
+    contains:()=>true,
+    addEventListener:(name,handler)=>listeners.set(name,handler),
+    removeEventListener:name=>listeners.delete(name),
+    replaceChildren(){this.innerHTML='';},
+    importExport(bytes){
+      const file={size:bytes.byteLength,arrayBuffer:async()=>bytes.slice().buffer};
+      return listeners.get('change')({type:'change',target:{
+        closest:selector=>selector==='[data-arena-historical-export]'?{files:[file]}:null
+      }});
+    }
+  };
+  const view=createStrategyArenaView(root);
+  await root.importExport(new TextEncoder().encode(JSON.stringify(completed)));
+  assert.match(root.innerHTML,/Historisches B1-Ergebnis · Producer-Export/);
+  assert.match(root.innerHTML,/SYNTHETIC_ONLY · UNVERIFIED · CALLER_SUPPLIED_INSPECT_B1/);
+  assert.match(root.innerHTML,/Lifecycle: completed/);
+  assert.match(root.innerHTML,/Engine-Ergebnisstatus: COMPLETED/);
+  assert.match(root.innerHTML,/Screenstatus: SYNTHETIC_ONLY_NOT_ASSESSED/);
+  assert.match(root.innerHTML,/Nettoertrag 0 · maximaler Drawdown 0/);
+  assert.match(root.innerHTML,/· false/);
+  await root.importExport(new TextEncoder().encode(JSON.stringify(insufficient)));
+  assert.match(root.innerHTML,/Lifecycle: failed/);
+  assert.match(root.innerHTML,/Abgeschlossene Ergebnisse: 19 von 44 geplanten Pfaden/);
+  assert.match(root.innerHTML,/Screenstatus: INSUFFICIENT_EVIDENCE/);
+  assert.match(root.innerHTML,/Nettoertrag Nicht verfügbar/);
+  await root.importExport(new TextEncoder().encode(JSON.stringify({...completed,payloadSha256:'0'.repeat(64)})));
+  assert.match(root.innerHTML,/role="alert"/);
+  assert.doesNotMatch(root.innerHTML,/Engine-Ergebnisstatus: COMPLETED|Lifecycle: failed/);
+  view.dispose();
 });
 
 test('queued inspect-shaped observations preserve the full inventory without inventing results',async()=>{
@@ -142,13 +191,18 @@ test('export snapshots caller result bytes once and rejects shared, mismatched, 
   assert.equal((await parseArenaHistoricalExport(new TextEncoder().encode(JSON.stringify(envelope)))).status,
     'PRESENT_UNVERIFIED');
   const shared=new Uint8Array(new SharedArrayBuffer(new TextEncoder().encode(observation.result).length));
-  assert.rejects(exportHistoricalResult({observation,resultBytes:shared,syntheticFixture:true}),
+  await assert.rejects(exportHistoricalResult({observation,resultBytes:shared,syntheticFixture:true}),
     /RESULT_BYTES_TYPE/);
-  assert.rejects(exportHistoricalResult({observation,resultBytes:new Uint8Array([0xff]),syntheticFixture:true}),
+  await assert.rejects(exportHistoricalResult({observation,resultBytes:new Uint8Array([0xff]),syntheticFixture:true}),
     /RESULT_BYTES_INVALID_UTF8/);
-  assert.rejects(exportHistoricalResult({
+  await assert.rejects(exportHistoricalResult({
     observation:{...observation,result:'\ud800'},resultBytes:new Uint8Array([0xff]),syntheticFixture:true
   }),/RESULT_BYTES_INVALID_UTF8/);
+  let getterCalled=false;
+  const accessorInput={resultBytes:bytes,syntheticFixture:true};
+  Object.defineProperty(accessorInput,'observation',{enumerable:true,get(){getterCalled=true;return observation;}});
+  await assert.rejects(exportHistoricalResult(accessorInput),/EXPORT_INPUT_INVALID/);
+  assert.equal(getterCalled,false);
 });
 
 test('producer importer rejects duplicate keys, invalid UTF-8, bad digests, identity conflicts and limits',async()=>{
@@ -160,12 +214,29 @@ test('producer importer rejects duplicate keys, invalid UTF-8, bad digests, iden
       '"schema":"MERIDIAN_B1_HISTORICAL_RESULT_EXPORT_V1","schema":"MERIDIAN_B1_HISTORICAL_RESULT_EXPORT_V1"')
   ))).status,'INVALID');
   assert.equal((await parseArenaHistoricalExport(new Uint8Array([0xff]))).status,'INVALID');
+  assert.equal((await parseArenaHistoricalExport(new Uint8Array([0xef,0xbb,0xbf,0x7b,0x7d]))).status,'INVALID');
   assert.equal((await parseArenaHistoricalExport(new Uint8Array(MAX_HISTORICAL_EXPORT_BYTES+1))).status,'INVALID');
   assert.equal((await parseArenaHistoricalExport(new TextEncoder().encode(json.replace('"attempts":1','"attempts":1.0')))).status,
     'INVALID');
   const corrupt=structuredClone(source);
   corrupt.payloadSha256='0'.repeat(64);
   assert.equal((await parseArenaHistoricalExport(new TextEncoder().encode(JSON.stringify(corrupt)))).status,'INVALID');
+  const fixtureConfusion=structuredClone(source);
+  fixtureConfusion.schema='MERIDIAN_B1_HISTORICAL_UI_FIXTURE_V1';
+  await seal(fixtureConfusion);
+  assert.equal((await parseArenaHistoricalExport(new TextEncoder().encode(JSON.stringify(fixtureConfusion)))).status,
+    'INVALID');
+  const oversizedResult=structuredClone(source);
+  oversizedResult.job.result=' '.repeat(1024*1024+1);
+  oversizedResult.job.resultSha256=digest(oversizedResult.job.result);
+  await seal(oversizedResult);
+  assert.equal((await parseArenaHistoricalExport(new TextEncoder().encode(JSON.stringify(oversizedResult)))).status,
+    'INVALID');
+  const oversizedControls=structuredClone(source);
+  oversizedControls.job.controls=' '.repeat(8193);
+  await seal(oversizedControls);
+  assert.equal((await parseArenaHistoricalExport(new TextEncoder().encode(JSON.stringify(oversizedControls)))).status,
+    'INVALID');
   const mismatch=structuredClone(source);
   mismatch.job.dataSha256='0'.repeat(64);
   await seal(mismatch);
@@ -174,6 +245,14 @@ test('producer importer rejects duplicate keys, invalid UTF-8, bad digests, iden
   tuple.job.pathIds[0]=tuple.job.pathIds[1];
   await seal(tuple);
   assert.equal((await parseArenaHistoricalExport(new TextEncoder().encode(JSON.stringify(tuple)))).status,'INVALID');
+  const tupleConflict=structuredClone(source);
+  const conflictingResult=JSON.parse(tupleConflict.job.result);
+  conflictingResult.paths[0].variantId='neighbour-n20-f25';
+  tupleConflict.job.result=canonicalJson(conflictingResult);
+  tupleConflict.job.resultSha256=digest(tupleConflict.job.result);
+  await seal(tupleConflict);
+  assert.equal((await parseArenaHistoricalExport(new TextEncoder().encode(JSON.stringify(tupleConflict)))).status,
+    'INVALID');
 });
 
 test('nested duplicate keys, nonfinite metrics, authority escalation and lifecycle mismatches fail closed',async()=>{
@@ -187,6 +266,17 @@ test('nested duplicate keys, nonfinite metrics, authority escalation and lifecyc
   nestedDuplicate.job.resultSha256=digest(duplicateBytes);
   await seal(nestedDuplicate);
   assert.equal((await parseArenaHistoricalExport(new TextEncoder().encode(JSON.stringify(nestedDuplicate)))).status,'INVALID');
+  const tooDeep=structuredClone(source);
+  tooDeep.job.result=`${'{"failure":'.repeat(14)}null${'}'.repeat(14)}`;
+  tooDeep.job.resultSha256=digest(tooDeep.job.result);
+  await seal(tooDeep);
+  assert.equal((await parseArenaHistoricalExport(new TextEncoder().encode(JSON.stringify(tooDeep)))).status,'INVALID');
+  const tooManyNodes=structuredClone(source);
+  tooManyNodes.job.result=`[${'0,'.repeat(100_000)}0]`;
+  tooManyNodes.job.resultSha256=digest(tooManyNodes.job.result);
+  await seal(tooManyNodes);
+  assert.equal((await parseArenaHistoricalExport(new TextEncoder().encode(JSON.stringify(tooManyNodes)))).status,
+    'INVALID');
   const badMetric=structuredClone(source);
   badMetric.job.result=badMetric.job.result.replace(/"netReturn":-?[0-9.eE+-]+/,'"netReturn":1e400');
   badMetric.job.resultSha256=digest(badMetric.job.result);
@@ -209,17 +299,25 @@ test('canonical payload preserves Python ASCII escapes and raw nested metric spe
   const vectors=[
     [String.raw`{"del":"\u007f"}`,'2a4be89ced8ad4d4ff64d890bb443669cd846aaf7b706c45ba3218cee13a30ad'],
     [String.raw`{"a":"\u00e9\ud83d\ude00\u0001\"\\","\ue000":1,"\ud83d\ude00":2}`,
-      '6bf91139486f75ee8b91fca021f4bc7ba7e62e500cd54966677c12e0145d6846']
+      '6bf91139486f75ee8b91fca021f4bc7ba7e62e500cd54966677c12e0145d6846'],
+    ['{"max":9007199254740991,"zero":0}','d1c6de4fff64001e181a639bafdc8cf052b2b3c99db136a90f8653ac648f1b48']
   ];
   for(const [canonical,expected] of vectors)assert.equal(digest(Buffer.from(canonical,'ascii')),expected);
+  assert.equal(canonicalHistoricalExportPayload({del:'\u007f'}),vectors[0][0]);
+  assert.equal(canonicalHistoricalExportPayload({
+    a:'é😀\u0001"\\', '\ue000':1, '😀':2
+  }),vectors[1][0]);
+  assert.equal(canonicalHistoricalExportPayload({max:Number.MAX_SAFE_INTEGER,zero:0}),vectors[2][0]);
   const result=generatedResult(bridgeManifest,createSyntheticSeries());
   const original=await generatedEnvelope(bridgeManifest,result,'completed','trial-m11-generated-raw-number');
-  const changed=structuredClone(original);
-  changed.job.result=changed.job.result.replace(/"netReturn":(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/,
-    '"netReturn":0.0');
-  changed.job.resultSha256=digest(changed.job.result);
-  await seal(changed);
-  const imported=await parseArenaHistoricalExport(new TextEncoder().encode(JSON.stringify(changed)));
-  assert.equal(imported.status,'PRESENT_UNVERIFIED');
-  assert.match(imported.job.result,/"netReturn":0\.0/);
+  for(const spelling of ['0','0.0','-0']){
+    const changed=structuredClone(original);
+    changed.job.result=changed.job.result.replace(/"netReturn":(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/,
+      `"netReturn":${spelling}`);
+    changed.job.resultSha256=digest(changed.job.result);
+    await seal(changed);
+    const imported=await parseArenaHistoricalExport(new TextEncoder().encode(JSON.stringify(changed)));
+    assert.equal(imported.status,'PRESENT_UNVERIFIED',spelling);
+    assert.ok(imported.job.result.includes(`"netReturn":${spelling}`));
+  }
 });

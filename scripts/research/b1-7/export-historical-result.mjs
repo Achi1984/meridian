@@ -73,10 +73,24 @@ function privateResultSnapshot(resultBytes,result){
   return snapshot;
 }
 
-export async function exportHistoricalResult({observation,resultBytes,syntheticFixture}={}){
+export async function exportHistoricalResult(input={}){
+  if(!input||typeof input!=='object'||Array.isArray(input)||
+     Object.getPrototypeOf(input)!==Object.prototype&&Object.getPrototypeOf(input)!==null)
+    throw new TypeError('EXPORT_INPUT_INVALID');
+  const inputKeys=Reflect.ownKeys(input);
+  if(inputKeys.length!==3||inputKeys.some(key=>!['observation','resultBytes','syntheticFixture'].includes(key))||
+     inputKeys.some(key=>{
+       const descriptor=Object.getOwnPropertyDescriptor(input,key);
+       return typeof key!=='string'||!descriptor.enumerable||!owns(descriptor,'value');
+     }))throw new TypeError('EXPORT_INPUT_INVALID');
+  const observation=input.observation;
+  const resultBytes=input.resultBytes;
+  const syntheticFixture=input.syntheticFixture;
   if(!observation||typeof observation!=='object'||Array.isArray(observation)||
      typeof syntheticFixture!=='boolean')throw new TypeError('EXPORT_INPUT_INVALID');
-  const snapshot=privateResultSnapshot(resultBytes,observation.result);
+  const resultDescriptor=Object.getOwnPropertyDescriptor(observation,'result');
+  if(!resultDescriptor||!owns(resultDescriptor,'value'))throw new TypeError('OBSERVATION_RESULT');
+  const snapshot=privateResultSnapshot(resultBytes,resultDescriptor.value);
   const job=copyJson(observation);
   const envelope=Object.assign(Object.create(null),{
     schema:HISTORICAL_EXPORT_SCHEMA,

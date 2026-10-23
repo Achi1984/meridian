@@ -7,6 +7,9 @@ import {spawnSync} from 'node:child_process';
 import test from 'node:test';
 import {parseArenaHistoricalResultFixture} from '../v11/arena-historical-result.js';
 import {ARENA_SYMBOLS} from '../research/strategy-paper-arena.js';
+import {exportHistoricalResult} from '../scripts/research/b1-7/export-historical-result.mjs';
+import {canonicalJson,sha256} from '../scripts/research/b1-7/engine.mjs';
+import bridgeManifest from '../scripts/research-supervisor/b1_bridge_manifest.json' with {type:'json'};
 import {withMobileChrome} from './helpers/v11-cdp.mjs';
 
 const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium'].find(path=>path&&existsSync(path));
@@ -120,9 +123,27 @@ function historicalUiFixture({screenStatus='PASS'}={}){
     }};
 }
 
+async function queuedProducerExport(){
+  const trialKey='trial-m11-browser-queued';
+  const observation={
+    trialId:sha256(Buffer.from(trialKey,'utf8')),trialKey,state:'queued',attempts:0,owner:null,fence:0,
+    profile:bridgeManifest.profile,protocolSha256:bridgeManifest.protocolSha256,
+    sourceSha256:sha256(canonicalJson(bridgeManifest.sourceSha256)),
+    dataSha256:bridgeManifest.inputSha256,manifestSha256:bridgeManifest.manifestSha256,
+    pathIds:bridgeManifest.pathIds,
+    computationPathIds:bridgeManifest.computationOrder.map(index=>bridgeManifest.pathIds[index]),
+    timestamps:{createdAt:'2026-01-01T00:00:00Z',startedAt:null,finishedAt:null},
+    paths:[],controls:null,controlBindings:null,result:null,resultSha256:null,summarySha256:null,
+    reason:null,unresolved:false,executionAuthorized:false,promotionAuthorized:false,
+    profitabilityInferred:false
+  };
+  return exportHistoricalResult({observation,resultBytes:null,syntheticFixture:true});
+}
+
 test('M11 Strategies native shell, synthetic Arena and responsive evidence at four widths',{timeout:240000},async()=>{
   const completed=historicalUiFixture();
   const insufficientScreen=historicalUiFixture({screenStatus:'INSUFFICIENT_EVIDENCE'});
+  const producerExport=await queuedProducerExport();
   assert.equal(parseArenaHistoricalResultFixture(JSON.stringify(completed)).status,'PRESENT_UNVERIFIED');
   assert.equal(parseArenaHistoricalResultFixture(JSON.stringify(insufficientScreen)).status,'PRESENT_UNVERIFIED');
   if(typeof WebSocket!=='function'){
@@ -306,6 +327,42 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fo
           }
           assert.equal(await evaluate(`document.querySelector('.arena-models').innerHTML===${JSON.stringify(beforeHistorical.cards)}`),true);
         }
+        const beforeProducer=await evaluate(`({requests:performance.getEntriesByType('resource').length,cards:document.querySelector('.arena-models').innerHTML})`);
+        const producerText=JSON.stringify(producerExport);
+        await evaluate(`(()=>{
+          const picker=document.querySelector('[data-arena-historical-export]'),transfer=new DataTransfer();
+          transfer.items.add(new File([${JSON.stringify(producerText)}],
+            'generated-producer-export.json',{type:'application/json'}));
+          picker.files=transfer.files;picker.dispatchEvent(new Event('change',{bubbles:true}));
+        })()`);
+        for(let attempt=0;attempt<100;attempt++){
+          if(await evaluate(`document.querySelector('[aria-label="Separates historisches Arena-Ergebnis · Producer-Export"]')?.innerText.includes('Lifecycle: queued')`))break;
+          await new Promise(resolve=>setTimeout(resolve,20));
+        }
+        const producer=await evaluate(`(()=>{
+          const section=document.querySelector('[aria-label="Separates historisches Arena-Ergebnis · Producer-Export"]');
+          const summary=section.querySelector('details summary');
+          summary.focus();
+          return {text:section.innerText,overflow:document.documentElement.scrollWidth>innerWidth+1 ||
+              section.scrollWidth>section.clientWidth+1,
+            summaryHeight:summary.getBoundingClientRect().height,
+            focused:document.activeElement===summary,
+            requests:performance.getEntriesByType('resource').length,
+            cards:document.querySelector('.arena-models').innerHTML,
+            inputLabel:section.querySelector('input').closest('label').innerText};
+        })()`);
+        assert.match(producer.text,/UNVERIFIED · CALLER_SUPPLIED_INSPECT_B1 · NOT_ESTABLISHED/);
+        assert.match(producer.text,/SYNTHETIC_ONLY/);
+        assert.match(producer.text,/Lifecycle: queued/);
+        assert.match(producer.text,/Engine-Ergebnisstatus: Nicht verfügbar/);
+        assert.match(producer.text,/Screenstatus: Nicht verfügbar/);
+        assert.doesNotMatch(producer.text,/UI-Fixture|kein Producer-Export/);
+        assert.match(producer.inputLabel,/Versionierten Producer-Export importieren/);
+        assert.equal(producer.overflow,false);assert.ok(producer.summaryHeight>=44);
+        assert.equal(producer.focused,true);
+        assert.equal(producer.requests,beforeProducer.requests);assert.equal(producer.cards,beforeProducer.cards);
+        await key('Enter','Enter',13);
+        assert.equal(await evaluate(`document.querySelector('[aria-label="Separates historisches Arena-Ergebnis · Producer-Export"] details').open`),true);
         const navClear=await evaluate(`(()=>{const root=document.documentElement,section=document.querySelector('#strategy-arena-root');window.scrollTo(0,root.scrollHeight);return section.lastElementChild.getBoundingClientRect().bottom<=document.getElementById('nav').getBoundingClientRect().top+1;})()`);
         assert.equal(navClear,true);
 

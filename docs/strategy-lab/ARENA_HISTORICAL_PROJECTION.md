@@ -1,12 +1,13 @@
 # Arena historical-result projection
 
-The Arena has a separate, read-only projection for generated UI fixtures. There
-is no accepted browser export envelope for `journal.inspect_b1()` and this
-proposal is not one. The fixture wrapper is versioned as
+The Arena has separate, read-only projections for synthetic UI fixtures and the
+accepted B1 producer-export envelope. The fixture wrapper is versioned as
 `MERIDIAN_B1_HISTORICAL_UI_FIXTURE_V1`, declares `SYNTHETIC_ONLY`, and contains
 `purpose: UI_FIXTURE_NOT_PRODUCER_EXPORT`. It must not be represented as a
 producer export, receipt, authenticated evidence, admission, or permission.
-No genuine report import or captured-data read is enabled.
+The producer importer currently accepts only the two pinned generated-profile
+bindings below; it does not enable real historical-result ingestion or any
+captured-data read.
 
 The wrapper's `job` uses the exact returned field names from
 `scripts/research-supervisor/journal.py` (`_b1_job`/`inspect_b1`): trial and
@@ -42,14 +43,15 @@ holdout status, assumed costs, `NO_FINITE_TRADE_STOP`, and
 serialized producer result. Replay, the existing synthetic inspection panel,
 and disposal behavior remain separate.
 
-## Proposed producer-export checkpoint (pending Lead acceptance)
+## Accepted producer-export envelope
 
-This is a contract proposal, not an accepted interface. Do not implement the
-exporter or connect it to the Arena until Lead accepts this envelope. It is
-distinct from `MERIDIAN_B1_HISTORICAL_UI_FIXTURE_V1`; neither envelope is an
-authenticity receipt, admission, or authority.
+Lead accepted this interface checkpoint at commit
+`3b702298c1af678a442944c4dbd8344dc64ba20e`. The implementation is a separate,
+read-only producer import; it does not reinterpret
+`MERIDIAN_B1_HISTORICAL_UI_FIXTURE_V1`. Neither envelope is an authenticity
+receipt, admission, or authority.
 
-The proposed envelope is an exact-key object:
+The accepted envelope is an exact-key object:
 
 ```text
 {
@@ -67,7 +69,7 @@ The proposed envelope is an exact-key object:
 ```
 
 `job` has the exact fields returned by `inspect_b1()`, including its serialized
-`result` string. The pure exporter proposal is
+`result` string. The pure exporter is
 `exportHistoricalResult({observation, resultBytes, syntheticFixture})`; it
 performs no file, journal, environment, clock, network, or execution access.
 `resultBytes` is a `Uint8Array` containing the exact UTF-8 bytes represented by
@@ -85,14 +87,18 @@ profile-binding table compiled from accepted profile/manifest data, not from
 the envelope or caller-supplied expected values. Require exactly one table row
 matching the complete `(profile, protocolSha256, sourceSha256, dataSha256,
 manifestSha256)` tuple before checking either identity array; reject absent or
-ambiguous matches. Each row pins all 44 descriptor tuples and path IDs, plus
-computation order and digest. Mutually consistent arrays supplied by an
-envelope are never their own authority. Result tuples and `pathId` must match
-the bound descriptor slot, and progress IDs must match the bound computation
-sequence. The binding is structural identity only: it does not authenticate
-the source, observation, data, or caller assertion.
+ambiguous matches. Each row pins the 44 descriptor tuples and SHA-256 digests
+of the complete ordered `pathIds` and `computationPathIds` arrays; the
+computation sequence is additionally checked against the pinned descriptor
+order. Mutually consistent arrays supplied by an envelope are never their own
+authority. Result tuples and `pathId` must match the bound descriptor slot, and
+progress IDs must match the bound computation sequence. The currently compiled
+rows cover only the accepted generated bridge and generated insufficient-
+evidence profiles; no real historical profile or evidence is authorized by
+this delivery. The binding is structural identity only: it does not
+authenticate the source, observation, data, or caller assertion.
 
-## Byte, parser, and digest rules proposed
+## Byte, parser, and digest rules
 
 Use separate budgets for each parsed layer; all size and string limits below
 are UTF-8 byte counts, not JavaScript character counts:
@@ -162,12 +168,17 @@ The three raw-result forms are intentionally distinct hash inputs even if a
 language parses their metric values as numerically equivalent. Inner metric
 validation requires finite numbers but does not rewrite their lexical form.
 The 44-entry descriptor inventory remains separate from progress and returned
-results; proposed bounds are not a promise that every future journal result
+results; these bounds are not a promise that every future journal result
 fits.
 
-Validation must bind `trialId` to `trialKey`, result identity to the job's
-data/protocol identities, result bytes to `resultSha256`, and the canonical
-payload to its digest. It must reject duplicate/unknown keys, unknown schema or
+Validation binds `trialId` to `trialKey`, result identity to the job's
+data/protocol identities, exact result bytes to `resultSha256`, and the
+canonical payload to `payloadSha256`. `summarySha256` is required to be a
+well-formed digest and is covered by `payloadSha256`, but is not independently
+recomputed because `inspect_b1()` does not expose its
+canonical summary bytes separately from the opaque result. Generated fixtures
+reproduce the result, summary, and payload digests in the focused tests. The
+importer rejects duplicate/unknown keys, unknown schema or
 purpose, malformed nested JSON, bad digests, duplicate or conflicting path
 IDs/tuples, tuples outside the expected B1 inventory, non-finite present
 metrics, exceeded bounds, and permission flags other than false. A result's
@@ -490,8 +501,7 @@ for case, state, trial_key in (
     sys.stdout.buffer.write(canonical(envelope).encode('ascii') + b'\n')
 ```
 
-**Exact proposed implementation allowlist after acceptance** (no edits are
-authorized by this proposal itself):
+**Implemented allowlist** (no shell/terminal-entry or pinned engine changes):
 
 - `scripts/research/b1-7/export-historical-result.mjs`
 - `v11/arena-historical-export.js`
@@ -503,13 +513,14 @@ authorized by this proposal itself):
 - this document, `docs/strategy-lab/ARENA_HISTORICAL_PROJECTION.md`
 
 No shell/terminal-entry, pinned journal/supervisor/engine/candidate/verifier,
-or actual-data files are in scope. No UI integration, exporter, or importer
-implementation is included in this checkpoint. Continue only after Lead
-acceptance of the schema, canonicalization, bounds, and lifecycle semantics.
+or actual-data files are in scope. Implementation proceeds only within the
+accepted schema, canonicalization, bounds, and lifecycle semantics above.
 
-Focused generated-fixture coverage:
+Focused generated-fixture coverage (the full local suite is intentionally not
+run for this delivery):
 
 ```sh
 node --test test/v11-arena-historical-result.test.js
+node --test test/b1-7-historical-result-export.test.js
 node --test test/v11-strategy-workspace-chrome.test.js
 ```

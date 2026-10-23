@@ -44,7 +44,7 @@ const RESULT_PROPERTY_KEYS = new Set([
   'ordinal','phase','startedAt','completedAt','payloadSha256'
 ]);
 const NUMERIC_KEYS = new Set([
-  'attempts','fence','ordinal','netReturn','dailyReturnSd','startEquity','endEquity',
+  'attempts','fence','ordinal','rows','dailyReturnCount','netReturn','dailyReturnSd','startEquity','endEquity',
   'turnoverNotional','turnoverOnInitialEquity','meanHeldTarget','meanRealizedExposure',
   'meanTargetRealizedMismatch','meanAbsoluteTargetMismatch','maxAbsoluteTargetMismatch',
   'maxConcentration','maxDrawdownDuration','sampledDrawdown','totalCosts','targetExposure',
@@ -542,7 +542,8 @@ export async function parseArenaHistoricalExport(input,digestBytes=async bytes=>
     .map(value=>value.toString(16).padStart(2,'0')).join('');
 }){
   try{
-    if(!(input instanceof Uint8Array)||input.byteLength>MAX_HISTORICAL_EXPORT_BYTES)return invalid();
+    if(!(input instanceof Uint8Array)||input.byteLength>MAX_HISTORICAL_EXPORT_BYTES||
+       input[0]===0xef&&input[1]===0xbb&&input[2]===0xbf)return invalid();
     const text=new TextDecoder('utf-8',{fatal:true}).decode(input);
     const envelope=parseStrictJson(text,{maxBytes:MAX_HISTORICAL_EXPORT_BYTES,maxDepth:12,
       maxNodes:100_000,layer:'outer'});
