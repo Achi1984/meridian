@@ -1,0 +1,98 @@
+import {createHash} from 'node:crypto';
+import {
+  HISTORICAL_EXPORT_PURPOSE,HISTORICAL_EXPORT_SCHEMA,canonicalHistoricalExportPayload,
+  validateArenaHistoricalExport
+} from '../../../v11/arena-historical-export.js';
+
+const digestBytes = async bytes => createHash('sha256').update(bytes).digest('hex');
+const owns = (value,key) => Object.prototype.hasOwnProperty.call(value,key);
+
+function copyJson(value,depth=0,budget={nodes:0}){
+  if(depth>12||++budget.nodes>100_000)throw new TypeError('OBSERVATION_LIMIT');
+  if(value===null||typeof value==='boolean')return value;
+  if(typeof value==='string'){
+    if(!scalarString(value)||Buffer.byteLength(value,'utf8')>1024*1024)throw new TypeError('OBSERVATION_STRING');
+    return value;
+  }
+  if(typeof value==='number'){
+    if(!Number.isSafeInteger(value)||value<0||Object.is(value,-0))throw new TypeError('OBSERVATION_NUMBER');
+    return value;
+  }
+  if(Array.isArray(value)){
+    if(Object.getPrototypeOf(value)!==Array.prototype||value.length>1000)throw new TypeError('OBSERVATION_ARRAY');
+    const result=[];
+    for(let index=0;index<value.length;index++){
+      const descriptor=Object.getOwnPropertyDescriptor(value,String(index));
+      if(!descriptor||!owns(descriptor,'value'))throw new TypeError('OBSERVATION_ACCESSOR');
+      result.push(copyJson(descriptor.value,depth+1,budget));
+    }
+    if(Reflect.ownKeys(value).some(key=>key!=='length'&&
+      (typeof key!=='string'||!/^(0|[1-9]\d*)$/.test(key)||Number(key)>=value.length)))
+      throw new TypeError('OBSERVATION_ARRAY');
+    return result;
+  }
+  if(!value||Object.getPrototypeOf(value)!==Object.prototype&&Object.getPrototypeOf(value)!==null)
+    throw new TypeError('OBSERVATION_OBJECT');
+  const keys=Reflect.ownKeys(value);
+  if(keys.some(key=>typeof key!=='string'))throw new TypeError('OBSERVATION_SYMBOL');
+  const result=Object.create(null);
+  for(const key of keys){
+    const descriptor=Object.getOwnPropertyDescriptor(value,key);
+    if(!descriptor.enumerable||!owns(descriptor,'value')||!scalarString(key)||
+       Buffer.byteLength(key,'utf8')>4096)throw new TypeError('OBSERVATION_ACCESSOR');
+    result[key]=copyJson(descriptor.value,depth+1,budget);
+  }
+  return result;
+}
+
+function scalarString(value){
+  for(let index=0;index<value.length;index++){
+    const code=value.charCodeAt(index);
+    if(code>=0xd800&&code<=0xdbff){
+      const next=value.charCodeAt(index+1);
+      if(!(next>=0xdc00&&next<=0xdfff))return false;
+      index++;
+    }else if(code>=0xdc00&&code<=0xdfff)return false;
+  }
+  return true;
+}
+
+function privateResultSnapshot(resultBytes,result){
+  if(result===null){
+    if(resultBytes!==null)throw new TypeError('RESULT_BYTES_MISMATCH');
+    return null;
+  }
+  if(!(resultBytes instanceof Uint8Array)||Object.getPrototypeOf(resultBytes)!==Uint8Array.prototype||
+     !(resultBytes.buffer instanceof ArrayBuffer))throw new TypeError('RESULT_BYTES_TYPE');
+  let snapshot;
+  try{snapshot=new Uint8Array(resultBytes);}catch{throw new TypeError('RESULT_BYTES_DETACHED');}
+  let decoded;
+  try{decoded=new TextDecoder('utf-8',{fatal:true}).decode(snapshot);}
+  catch{throw new TypeError('RESULT_BYTES_INVALID_UTF8');}
+  if(decoded!==result)throw new TypeError('RESULT_BYTES_MISMATCH');
+  return snapshot;
+}
+
+export async function exportHistoricalResult({observation,resultBytes,syntheticFixture}={}){
+  if(!observation||typeof observation!=='object'||Array.isArray(observation)||
+     typeof syntheticFixture!=='boolean')throw new TypeError('EXPORT_INPUT_INVALID');
+  const snapshot=privateResultSnapshot(resultBytes,observation.result);
+  const job=copyJson(observation);
+  const envelope=Object.assign(Object.create(null),{
+    schema:HISTORICAL_EXPORT_SCHEMA,
+    purpose:HISTORICAL_EXPORT_PURPOSE,
+    provenance:{
+      source:'CALLER_SUPPLIED_INSPECT_B1',
+      assertionStatus:'UNVERIFIED',
+      sourceAuthenticity:'NOT_ESTABLISHED',
+      syntheticFixture
+    },
+    job,
+    payloadSha256:'0'.repeat(64)
+  });
+  envelope.payloadSha256=await digestBytes(
+    Buffer.from(canonicalHistoricalExportPayload(envelope),'ascii'));
+  const projection=await validateArenaHistoricalExport(envelope,digestBytes,snapshot);
+  if(!projection)throw new TypeError('INSPECT_OBSERVATION_INVALID');
+  return envelope;
+}
