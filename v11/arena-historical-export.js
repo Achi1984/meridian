@@ -13,36 +13,34 @@ const RESULT_KEYS = [
   'executionId','failure','identity','implementationId','implementationSha256','plannedPaths',
   'protocolId','protocolReview','protocolSha256','schema','screen','status','controlDefinitions','paths'
 ];
-const RESULT_PROPERTY_KEYS = new Set([
-  ...RESULT_KEYS,...JOB_KEYS,'pathId','kind','variantId','scenarioId','segmentId','status','attempts',
-  'computed','rows','dailyReturnCount','dailyReturns','dailyHeldTarget','quarterlyReturns','quarter',
-  'netReturn','dailyReturnSd','startEquity','endEquity','turnoverNotional','turnoverOnInitialEquity',
-  'meanHeldTarget','meanRealizedExposure','meanTargetRealizedMismatch','meanAbsoluteTargetMismatch',
-  'maxAbsoluteTargetMismatch','maxConcentration','maxDrawdownDuration','sampledDrawdown','totalCosts',
-  'targetExposure','fillCosts','fillCostCount','date','turnover','cost','cumulativeCost','equityAfterFees',
-  'cashAfterFees','conservationResidual','cancelledInstructions','cancelledInstructionCount',
-  'decisionIndex','fillIndex','target','decisionTimestamp','reason','observationClass',
-  'diagnosticRescaling','tradeCRV','value','promotionEligible','researchOnly','strategyPnlAuthorized',
-  'discoveryAuthorized','validationAuthorized','holdoutAuthorized','paperAuthorized','liveAuthorized',
-  'limits','pathMs','totalMs','outputBytes','attemptsPerPath','attemptsPerStartedPath','automaticRetry',
-  'interpretation','comparisonSegment','neighbourStressScenario','checks','neighbourPositiveCounts',
-  'primaryDiagnosticNetPositive','primaryDiagnosticDrawdownAtMost25Percent','relativeDrawdownReduction',
-  'fullBasketDrawdownDenominator','primaryReturnAtLeastBothFrozenControls',
-  'primaryDrawdownAtMostBothFrozenControls','relativeDrawdownReductionAtLeast20Percent',
-  'primaryNetPositiveAt30bpNonDelayed','primaryNetPositiveAt30bpPlusDelay',
-  'atLeastThreeOfFourNeighboursPositiveAt15bp','atLeastThreeOfFourNeighboursPositiveAt30bpNonDelayed',
-  'base15bp','stress30bp','stopPolicy','survivorship','historyLabel','candidateInterpretation','costModel',
-  'executionEvidence','sourceAuthenticity','syntheticFixture','priceSource','holdoutClaim','trialLedger',
-  'stoppedPolicy','crv','identity','datasetKind','sourceCommit','sourceProvenance','canonicalSeriesSha256',
-  'inputSha256','normalizedFileSha256','syntheticFixtureSeriesSha256','XBTUSD','ETHUSD','SOLUSD','XRPUSD',
-  'LINKUSD','AVAXUSD','SUIUSD','protocolReview','r1RequestId','r1ResponseComment','r1Verdict',
-  'r2RequestId','r2ResponseComment','r2Verdict','r2Scope','r3Review','executionId','implementationId',
-  'protocolId','frozenTargetExposure','diagnosticRescaling','failure','NOT_RUN_INSUFFICIENT_EVIDENCE',
-  'FULL_BASKET','FIXED_CONTROL','CASH','CANDIDATE','COMPLETED','INSUFFICIENT_EVIDENCE',
-  'FROZEN_DEVELOPMENT_ONLY','UNDEFINED_NO_FINITE_STOP','meanExposure','riskExposure',
-  'primaryDevelopmentSd','fullBasketDevelopmentSd','calibration','ok','primarySd','benchmarkSd',
-  'ordinal','phase','startedAt','completedAt','payloadSha256'
-]);
+const ASSET_KEYS = ['XBTUSD','ETHUSD','SOLUSD','XRPUSD','LINKUSD','AVAXUSD','SUIUSD'];
+const PATH_RESULT_KEYS = [
+  'attempts','cancelledInstructionCount','cancelledInstructions','computed','dailyHeldTarget',
+  'dailyReturnCount','dailyReturnSd','dailyReturns','diagnosticRescaling','endEquity','fillCostCount',
+  'fillCosts','kind','maxAbsoluteTargetMismatch','maxConcentration','maxDrawdownDuration',
+  'meanAbsoluteTargetMismatch','meanHeldTarget','meanRealizedExposure','meanTargetRealizedMismatch',
+  'netReturn','observationClass','pathId','quarterlyReturns','rows','sampledDrawdown','scenarioId',
+  'segmentId','startEquity','status','totalCosts','tradeCRV','turnoverNotional',
+  'turnoverOnInitialEquity','variantId'
+];
+const NOT_RUN_PATH_KEYS = [
+  'pathId','kind','variantId','scenarioId','segmentId','status','attempts','computed','failure'
+];
+const FILL_COST_KEYS = [
+  'date','kind','turnover','cost','cumulativeCost','equityAfterFees','cashAfterFees','conservationResidual'
+];
+const CANCELLED_INSTRUCTION_KEYS = [
+  'decisionIndex','fillIndex','target','decisionTimestamp','reason'
+];
+const CONTROL_REALIZATION_KEYS = [
+  'pathId','variantId','scenarioId','segmentId','status','frozenTargetExposure',
+  'meanRealizedExposure','meanTargetRealizedMismatch','meanAbsoluteTargetMismatch',
+  'maxAbsoluteTargetMismatch','diagnosticRescaling'
+];
+const PROTOCOL_REVIEW_KEYS = [
+  'r1RequestId','r1ResponseComment','r1Verdict','r2RequestId','r2ResponseComment',
+  'r2Verdict','r2Scope','r3Review'
+];
 const NUMERIC_KEYS = new Set([
   'attempts','fence','ordinal','rows','dailyReturnCount','netReturn','dailyReturnSd','startEquity','endEquity',
   'turnoverNotional','turnoverOnInitialEquity','meanHeldTarget','meanRealizedExposure',
@@ -64,6 +62,10 @@ const STATES = new Set(['queued','unknown','completed','rejected','failed','time
 const ENVELOPE_KEYS = ['schema','purpose','provenance','job','payloadSha256'];
 const PROVENANCE_KEYS = ['source','assertionStatus','sourceAuthenticity','syntheticFixture'];
 const COMPUTATION_ORDER = [0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32,34,42,1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,36,37,38,39,40,41,43];
+const RESULT_IDENTITY = {
+  datasetKind:'SYNTHETIC_FIXTURE',
+  sourceCommit:'SYNTHETIC_FIXTURE'
+};
 const DESCRIPTORS = (() => {
   const variants = ['primary-n30-f25','neighbour-n20-f25','neighbour-n45-f25',
     'neighbour-n30-f20','neighbour-n30-f35'];
@@ -82,7 +84,10 @@ const DESCRIPTORS = (() => {
 const BINDINGS = [
   {
     profile:'MERIDIAN-B1-7-GENERATED-FIXTURE-BRIDGE-R1',
+    protocolId:'MERIDIAN-B1-7-PROTOCOL-R3-20261018',
     protocolSha256:'a78e1ae8c71c8f85baee5b51f5691643fc29136f636f19465c61f553afe09185',
+    implementationId:'MERIDIAN-B1-7-ENGINE-R3',
+    implementationSha256:'ab73261f01b27b8655ffea7979fec03eb1a9bea667b6fc4cda8d77b75c4f3e06',
     sourceSha256:'64de87409d07004c7a8ab1a17e0ac7ce0c85a259e978c689745f907c9c55ea05',
     dataSha256:'7b98a6a6ef2834c8a4279406e2d6d174c7ee15d853283f619572b3e0da88fa99',
     manifestSha256:'98a9c4442a140c1e78d60251d312ad489975f58f8f5c48a87a8916b141c1c361',
@@ -91,7 +96,10 @@ const BINDINGS = [
   },
   {
     profile:'MERIDIAN-B1-7-GENERATED-FIXTURE-BRIDGE-R1',
+    protocolId:'MERIDIAN-B1-7-PROTOCOL-R3-20261018',
     protocolSha256:'a78e1ae8c71c8f85baee5b51f5691643fc29136f636f19465c61f553afe09185',
+    implementationId:'MERIDIAN-B1-7-ENGINE-R3',
+    implementationSha256:'ab73261f01b27b8655ffea7979fec03eb1a9bea667b6fc4cda8d77b75c4f3e06',
     sourceSha256:'64de87409d07004c7a8ab1a17e0ac7ce0c85a259e978c689745f907c9c55ea05',
     dataSha256:'d0d0fbecb1c5bb39dd8b34fab9f689192182b089fd77dca2656f70889e81c048',
     manifestSha256:'8ce4b8e88fb2c3b391d73be392a1a02afd8beaf272106796a8a59b9701a19edd',
@@ -299,12 +307,79 @@ function boundedResult(value,depth=0,budget={nodes:0}){
   if(Array.isArray(value))return value.length<=1000&&value.every(item=>boundedResult(item,depth+1,budget));
   if(!record(value))return false;
   for(const [key,child] of Object.entries(value)){
-    if(!RESULT_PROPERTY_KEYS.has(key)||utf8(key).length>4096||
+    if(!scalarString(key)||utf8(key).length>4096||
        AUTHORITY_FLAGS.has(key)&&child!==false||
        NUMERIC_KEYS.has(key)&&child!==null&&typeof child!=='number'||
        !boundedResult(child,depth+1,budget))return false;
   }
   return true;
+}
+
+function validHashRecord(value){
+  return exact(value,ASSET_KEYS)&&ASSET_KEYS.every(asset=>hash(value[asset]));
+}
+
+function validResultIdentity(identity,job){
+  if(!exact(identity,['datasetKind','sourceCommit','sourceProvenance','canonicalSeriesSha256','inputSha256'])||
+     identity.datasetKind!==RESULT_IDENTITY.datasetKind||identity.sourceCommit!==RESULT_IDENTITY.sourceCommit||
+     identity.inputSha256!==job.dataSha256||!validHashRecord(identity.canonicalSeriesSha256)||
+     !exact(identity.sourceProvenance,['syntheticFixtureSeriesSha256'])||
+     !validHashRecord(identity.sourceProvenance.syntheticFixtureSeriesSha256))return false;
+  return deepEqual(identity.sourceProvenance.syntheticFixtureSeriesSha256,
+    identity.canonicalSeriesSha256);
+}
+
+function validResultEvidence(evidence){
+  if(!exact(evidence,['syntheticFixture','priceSource','costModel','executionEvidence','sourceAuthenticity',
+    'survivorship','historyLabel','candidateInterpretation','diagnosticRescaling','holdoutClaim','trialLedger',
+    'stoppedPolicy','crv']))return false;
+  return evidence.syntheticFixture===true&&evidence.priceSource==='SYNTHETIC_FIXTURE'&&
+    evidence.costModel==='OKX_INSPIRED_ASSUMED_15_30BP_NOT_EXECUTION_EVIDENCE'&&
+    evidence.executionEvidence==='NOT_OKX_EXECUTION_EVIDENCE'&&evidence.sourceAuthenticity==='SYNTHETIC_ONLY'&&
+    evidence.survivorship==='UNIVERSE_HISTORY_LIMITATION_HBAR_OMITTED_FOR_COVERAGE_ONLY'&&
+    evidence.historyLabel==='DEVELOPMENT_AND_HISTORICAL_DIAGNOSTIC'&&
+    evidence.candidateInterpretation==='HISTORICAL_CANDIDATE_ONLY_IF_PROPOSED_REAL_SCREEN_PASSES'&&
+    evidence.diagnosticRescaling==='NONE'&&evidence.holdoutClaim===false&&evidence.trialLedger==='UNKNOWN'&&
+    evidence.stoppedPolicy==='NO_FINITE_TRADE_STOP'&&
+    deepEqual(evidence.crv,{status:'UNDEFINED_NO_FINITE_STOP',value:null,researchOnly:true});
+}
+
+function validBudget(budget){
+  return exact(budget,['limits','attemptsPerStartedPath','automaticRetry','status'])&&
+    exact(budget.limits,['paths','pathMs','totalMs','outputBytes','attemptsPerPath'])&&
+    deepEqual(budget.limits,{paths:44,pathMs:60_000,totalMs:1_800_000,
+      outputBytes:1024*1024,attemptsPerPath:1})&&
+    budget.attemptsPerStartedPath===1&&budget.automaticRetry===false&&budget.status==='WITHIN_LIMITS';
+}
+
+function validProtocolReview(review){
+  return exact(review,PROTOCOL_REVIEW_KEYS)&&
+    deepEqual(review,{
+      r1RequestId:'MERIDIAN-B1-7-DESIGN-R1',r1ResponseComment:'6249442046',
+      r1Verdict:'REVISION_REQUIRED',r2RequestId:'MERIDIAN-B1-7-DESIGN-R2',
+      r2ResponseComment:'6249482850',r2Verdict:'GREEN_LIGHT_DESIGN_ONLY',
+      r2Scope:'HISTORICAL_R2_ONLY_NOT_APPROVAL_FOR_R3',r3Review:'PENDING'
+    });
+}
+
+function validControlRealization(realization,resultStatus,controls,job){
+  if(!Array.isArray(realization)||realization.length!==6)return false;
+  const expected=DESCRIPTORS.map((descriptor,index)=>({descriptor,index}))
+    .filter(({descriptor})=>descriptor.kind==='FIXED_CONTROL'&&descriptor.segmentId==='diagnostic');
+  return expected.length===6&&realization.every((item,index)=>{
+    const {descriptor,index:descriptorIndex}=expected[index];
+    if(!exact(item,CONTROL_REALIZATION_KEYS)||item.pathId!==job.pathIds[descriptorIndex]||
+       item.variantId!==descriptor.variantId||item.scenarioId!==descriptor.scenarioId||
+       item.segmentId!==descriptor.segmentId||item.diagnosticRescaling!=='NONE')return false;
+    if(resultStatus==='INSUFFICIENT_EVIDENCE')
+      return item.status==='NOT_RUN_INSUFFICIENT_EVIDENCE'&&
+        ['frozenTargetExposure','meanRealizedExposure','meanTargetRealizedMismatch',
+          'meanAbsoluteTargetMismatch','maxAbsoluteTargetMismatch'].every(key=>item[key]===null);
+    const target=descriptor.variantId==='frozen-mean-exposure'?controls.meanExposure:controls.riskExposure;
+    return item.status==='COMPLETED'&&item.frozenTargetExposure===target&&
+      ['meanRealizedExposure','meanTargetRealizedMismatch','meanAbsoluteTargetMismatch',
+        'maxAbsoluteTargetMismatch'].every(key=>typeof item[key]==='number'&&Number.isFinite(item[key]));
+  });
 }
 
 function parseNested(text,limit,maxNodes){
@@ -374,6 +449,56 @@ function validScreen(screen,resultStatus){
     deepEqual(screen.tradeCRV,{status:'UNDEFINED_NO_FINITE_STOP',value:null});
 }
 
+function validCompletedPath(path,descriptor,rows){
+  const expectedKeys=descriptor.kind==='CANDIDATE'
+    ?PATH_RESULT_KEYS:PATH_RESULT_KEYS.concat('targetExposure');
+  const numericKeys=[
+    'dailyReturnSd','endEquity','maxAbsoluteTargetMismatch','maxConcentration','maxDrawdownDuration',
+    'meanAbsoluteTargetMismatch','meanHeldTarget','meanRealizedExposure','meanTargetRealizedMismatch',
+    'netReturn','sampledDrawdown','startEquity','totalCosts','turnoverNotional','turnoverOnInitialEquity'
+  ];
+  if(!exact(path,expectedKeys)||path.status!=='COMPLETED'||path.attempts!==1||path.computed!==true||
+     path.observationClass!=='HISTORICAL_DIAGNOSTIC_NOT_HOLDOUT'||path.diagnosticRescaling!=='NONE'||
+     path.rows!==rows||path.dailyReturnCount!==rows||!integer(path.maxDrawdownDuration)||
+     !integer(path.fillCostCount)||!integer(path.cancelledInstructionCount)||
+     !numericKeys.every(key=>typeof path[key]==='number'&&Number.isFinite(path[key]))||
+     !Array.isArray(path.dailyReturns)||path.dailyReturns.length!==rows||
+     !path.dailyReturns.every(value=>typeof value==='number'&&Number.isFinite(value))||
+     !Array.isArray(path.dailyHeldTarget)||path.dailyHeldTarget.length!==rows||
+     !path.dailyHeldTarget.every(value=>typeof value==='number'&&Number.isFinite(value))||
+     !Array.isArray(path.quarterlyReturns)||path.quarterlyReturns.length!==(rows===180?2:4)||
+     !path.quarterlyReturns.every(item=>exact(item,['quarter','netReturn'])&&
+       typeof item.quarter==='string'&&/^\d{4}-Q[1-4]$/.test(item.quarter)&&
+       typeof item.netReturn==='number'&&Number.isFinite(item.netReturn))||
+     !Array.isArray(path.fillCosts)||path.fillCosts.length!==path.fillCostCount||
+     !path.fillCosts.every(item=>exact(item,FILL_COST_KEYS)&&
+       typeof item.date==='string'&&/^\d{4}-\d{2}-\d{2}T00:00:00Z$/.test(item.date)&&
+       ['REBALANCE','TERMINAL_LIQUIDATION'].includes(item.kind)&&
+       ['turnover','cost','cumulativeCost','equityAfterFees','cashAfterFees','conservationResidual']
+         .every(key=>typeof item[key]==='number'&&Number.isFinite(item[key]))&&
+       item.turnover>=0&&item.cost>=0&&item.cumulativeCost>=0&&item.equityAfterFees>=0&&
+       item.cashAfterFees>=0&&Math.abs(item.conservationResidual)<=1e-6)||
+     !Array.isArray(path.cancelledInstructions)||
+     path.cancelledInstructions.length!==path.cancelledInstructionCount||
+     !path.cancelledInstructions.every(item=>exact(item,CANCELLED_INSTRUCTION_KEYS)&&
+       integer(item.decisionIndex)&&integer(item.fillIndex)&&
+       typeof item.target==='number'&&Number.isFinite(item.target)&&
+       typeof item.decisionTimestamp==='string'&&
+       /^\d{4}-\d{2}-\d{2}T00:00:00Z$/.test(item.decisionTimestamp)&&
+       item.reason==='BEYOND_SEGMENT_HORIZON')||
+     !exact(path.tradeCRV,['status','value','promotionEligible'])||
+     path.tradeCRV.status!=='UNDEFINED_NO_FINITE_STOP'||path.tradeCRV.value!==null||
+     path.tradeCRV.promotionEligible!==false)return false;
+  if(descriptor.kind==='CASH'){
+    if(path.targetExposure!==0||path.fillCosts.length!==0||path.totalCosts!==0||
+       path.dailyReturns.some(value=>value!==0))return false;
+  }else if(path.fillCosts.length===0||
+     path.fillCosts.at(-1).kind!=='TERMINAL_LIQUIDATION')return false;
+  return descriptor.kind==='CANDIDATE'||
+    typeof path.targetExposure==='number'&&Number.isFinite(path.targetExposure)&&
+    path.targetExposure>=0&&path.targetExposure<=1;
+}
+
 function validResult(text,job,controls){
   if(text===null)return null;
   const result=parseNested(text,1024*1024,100_000);
@@ -383,20 +508,29 @@ function validResult(text,job,controls){
      !['COMPLETED','INSUFFICIENT_EVIDENCE'].includes(result.status)||
      result.plannedPaths!==44||!Array.isArray(result.paths)||result.paths.length!==44||
      !record(result.controlDefinitions)||!record(result.authority))return reject('schema');
+  const binding=matchingBinding(job);
   if(!exact(result.authority,['researchOnly','executionAuthorized','strategyPnlAuthorized','discoveryAuthorized',
         'validationAuthorized','holdoutAuthorized','paperAuthorized','liveAuthorized'])||
      result.authority.researchOnly!==true||
-     Object.entries(result.authority).some(([key,value])=>key!=='researchOnly'&&value!==false))return reject('authority');
+     Object.entries(result.authority).some(([key,value])=>key!=='researchOnly'&&value!==false)||
+     !exact(result.identity,['datasetKind','sourceCommit','sourceProvenance','canonicalSeriesSha256','inputSha256'])||
+     !validResultIdentity(result.identity,job)||
+     !validResultEvidence(result.evidence)||result.evidence.syntheticFixture!==true||
+     !validBudget(result.budget)||!validProtocolReview(result.protocolReview)||
+     !hash(result.executionId)||result.protocolId!==binding?.protocolId||
+     result.implementationId!==binding?.implementationId||
+     result.implementationSha256!==binding?.implementationSha256)return reject('authority-or-schema');
   const evidence=result.evidence;
-  if(!record(result.identity)||result.identity.inputSha256!==job.dataSha256||
-     result.protocolSha256!==job.protocolSha256||!record(evidence)||
-     typeof evidence.syntheticFixture!=='boolean'||
-     !['NOT_ESTABLISHED','SYNTHETIC_ONLY'].includes(evidence.sourceAuthenticity)||
-     evidence.holdoutClaim!==false||!integer(result.attemptedPaths)||!integer(result.completedPaths)||
+  if(result.identity.inputSha256!==job.dataSha256||
+     result.protocolSha256!==job.protocolSha256||evidence.syntheticFixture!==true||
+     !integer(result.attemptedPaths)||!integer(result.completedPaths)||
      !integer(result.computedPaths)||result.attemptedPaths>44||result.completedPaths>44||
      result.attemptedPaths!==result.completedPaths||result.completedPaths!==result.computedPaths||
      result.completedPaths!==job.paths.filter(item=>item.state==='completed').length||
-     !validScreen(result.screen,result.status)||!controls||!deepEqual(result.controlDefinitions,controls))return reject('identity-or-summary');
+     !validScreen(result.screen,result.status)||!controls||!deepEqual(result.controlDefinitions,controls)||
+     !validControlRealization(result.controlRealization,result.status,controls,job))return reject('identity-or-summary');
+  if(result.failure!==null)return reject('failure');
+  if(!exact(result.screen,['status'])&&result.status==='INSUFFICIENT_EVIDENCE')return reject('screen-shape');
   if(result.status==='COMPLETED'&&
      (result.completedPaths!==44||job.state!=='completed'||result.paths.some(path=>path.status!=='COMPLETED')))return reject('completed-state');
   if(result.status==='INSUFFICIENT_EVIDENCE'&&
@@ -409,9 +543,12 @@ function validResult(text,job,controls){
         path.variantId!==descriptor.variantId||path.scenarioId!==descriptor.scenarioId||
         path.segmentId!==descriptor.segmentId)return reject(`descriptor-${index}`);
     if(path.status==='COMPLETED'){
-       if(path.computed!==true||path.attempts!==1||progressById.get(path.pathId)?.state!=='completed')return reject(`progress-${index}`);
+       const rows=path.segmentId==='development'?180:365;
+       if(!validCompletedPath(path,descriptor,rows)||progressById.get(path.pathId)?.state!=='completed')
+         return reject(`progress-${index}`);
     }else if(path.status==='NOT_RUN_INSUFFICIENT_EVIDENCE'){
-       if(result.status!=='INSUFFICIENT_EVIDENCE'||path.computed!==false||path.attempts!==0||
+       if(!exact(path,NOT_RUN_PATH_KEYS)||result.status!=='INSUFFICIENT_EVIDENCE'||
+          path.computed!==false||path.attempts!==0||path.failure!==null||
           progressById.has(path.pathId))return reject(`not-run-${index}`);
     }else return reject(`path-status-${index}`);
   }
@@ -437,17 +574,27 @@ function validJob(job){
   const binding=matchingBinding(job);
   if(job.pathIds.some((id,index)=>job.computationPathIds[index]!==job.pathIds[COMPUTATION_ORDER[index]]))
     return null;
+  const createdMs=Date.parse(job.timestamps.createdAt);
+  const startedMs=job.timestamps.startedAt===null?null:Date.parse(job.timestamps.startedAt);
+  const finishedMs=job.timestamps.finishedAt===null?null:Date.parse(job.timestamps.finishedAt);
+  let previousProgressMs=startedMs??createdMs;
   for(let index=0;index<job.paths.length;index++){
     const item=job.paths[index],completed=item?.state==='completed';
     const keys=completed
       ?['pathId','ordinal','phase','state','startedAt','payloadSha256','completedAt']
       :['pathId','ordinal','phase','state','startedAt'];
+    const progressStartedMs=typeof item?.startedAt==='string'?Date.parse(item.startedAt):NaN;
+    const progressCompletedMs=completed&&typeof item?.completedAt==='string'?Date.parse(item.completedAt):NaN;
     if(!exact(item,keys)||item.pathId!==job.computationPathIds[index]||item.ordinal!==index+1||
        item.phase!==(index<19?'DEVELOPMENT':'DIAGNOSTIC')||!['started','completed'].includes(item.state)||
        !stamp(item.startedAt)||item.startedAt===null||
+       progressStartedMs<(startedMs??createdMs)||progressStartedMs<previousProgressMs||
+       finishedMs!==null&&progressStartedMs>finishedMs||
        completed&&(!hash(item.payloadSha256)||!stamp(item.completedAt)||item.completedAt===null||
-         Date.parse(item.completedAt)<Date.parse(item.startedAt))||
+         progressCompletedMs<progressStartedMs||progressCompletedMs<previousProgressMs||
+         finishedMs!==null&&progressCompletedMs>finishedMs)||
        !completed&&index!==job.paths.length-1)return null;
+    previousProgressMs=completed?progressCompletedMs:progressStartedMs;
   }
   const notAttempted=['queued','rejected'].includes(job.state);
   if(job.attempts!==(notAttempted?0:1)||job.fence===0!==notAttempted||
@@ -457,7 +604,9 @@ function validJob(job){
      (job.unresolved&&(job.timestamps.finishedAt!==null||job.result!==null))||
      (job.state==='queued'&&(job.paths.length!==0||job.timestamps.startedAt!==null||
        job.timestamps.finishedAt!==null||job.result!==null))||
-     (job.state==='rejected'&&job.timestamps.finishedAt===null)||
+     (job.state==='rejected'&&(job.timestamps.startedAt!==null||job.paths.length!==0||
+       job.timestamps.finishedAt===null))||
+     (['completed','failed','timed_out','partial'].includes(job.state)&&job.timestamps.startedAt===null)||
      (job.state==='completed'&&(job.paths.length!==44||
        job.paths.some(item=>item.state!=='completed')||job.timestamps.startedAt===null||
        job.timestamps.finishedAt===null))||
@@ -466,6 +615,7 @@ function validJob(job){
   const {createdAt,startedAt,finishedAt}=job.timestamps;
   if(startedAt!==null&&Date.parse(startedAt)<Date.parse(createdAt)||
      finishedAt!==null&&Date.parse(finishedAt)<Date.parse(startedAt??createdAt))return null;
+  if(finishedAt!==null&&previousProgressMs>Date.parse(finishedAt))return null;
   const noResult=job.result===null;
   if((job.resultSha256===null)!==noResult||(job.summarySha256===null)!==noResult||
      (!noResult&&(!hash(job.resultSha256)||!hash(job.summarySha256)))||
@@ -502,11 +652,20 @@ export async function validateArenaHistoricalExport(envelope,digestBytes,resultS
        !boundedOuter(envelope))return null;
     const {controls,result,binding}=validJob(envelope.job)||{};
     if(!binding)return null;
+    if(result&&envelope.provenance.syntheticFixture!==result.evidence.syntheticFixture)return null;
     const payloadBytes=utf8(canonicalWithoutPayload(envelope));
     const fullEnvelopeBytes=utf8(canonical(envelope));
     if(fullEnvelopeBytes.length>MAX_HISTORICAL_EXPORT_BYTES)return null;
     const idsBytes=utf8(canonical(envelope.job.pathIds));
     const computationBytes=utf8(canonical(envelope.job.computationPathIds));
+    const resultIdentity=envelope.job.result===null?null:result.identity;
+    const inputIdentity=resultIdentity===null?null:Object.fromEntries(
+      Object.entries(resultIdentity).filter(([key])=>key!=='inputSha256'));
+    const executionIdentity=result===null?null:{
+      protocolId:binding.protocolId,protocolSha256:binding.protocolSha256,
+      implementationId:binding.implementationId,implementationSha256:binding.implementationSha256,
+      inputSha256:envelope.job.dataSha256,pathIds:envelope.job.pathIds
+    };
     const resultBytes=envelope.job.result===null?null:
       resultSnapshot??utf8(envelope.job.result);
     if(resultBytes!==null){
@@ -518,13 +677,16 @@ export async function validateArenaHistoricalExport(envelope,digestBytes,resultS
       resultBytes===null?null:digestBytes(resultBytes),
       digestBytes(payloadBytes),
       digestBytes(idsBytes),
-      digestBytes(computationBytes)
+      digestBytes(computationBytes),
+      inputIdentity===null?null:digestBytes(utf8(canonical(inputIdentity))),
+      executionIdentity===null?null:digestBytes(utf8(canonical(executionIdentity)))
     ]);
     if(envelope.job.trialId!==hashes[0]||
        (resultBytes!==null&&envelope.job.resultSha256!==hashes[1])||
        envelope.payloadSha256!==hashes[2]||
        binding.pathIdsSha256!==hashes[3]||
-       binding.computationPathIdsSha256!==hashes[4])return null;
+       binding.computationPathIdsSha256!==hashes[4]||
+       resultBytes!==null&&(envelope.job.dataSha256!==hashes[5]||result.executionId!==hashes[6]))return null;
     return {
       status:'PRESENT_UNVERIFIED',
       message:'Producer-Export vorhanden · Herkunft und caller assertions nicht bestätigt.',

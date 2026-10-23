@@ -171,20 +171,43 @@ The 44-entry descriptor inventory remains separate from progress and returned
 results; these bounds are not a promise that every future journal result
 fits.
 
-Validation binds `trialId` to `trialKey`, result identity to the job's
-data/protocol identities, exact result bytes to `resultSha256`, and the
-canonical payload to `payloadSha256`. `summarySha256` is required to be a
-well-formed digest and is covered by `payloadSha256`, but is not independently
-recomputed because `inspect_b1()` does not expose its
-canonical summary bytes separately from the opaque result. Generated fixtures
-reproduce the result, summary, and payload digests in the focused tests. The
-importer rejects duplicate/unknown keys, unknown schema or
-purpose, malformed nested JSON, bad digests, duplicate or conflicting path
-IDs/tuples, tuples outside the expected B1 inventory, non-finite present
-metrics, exceeded bounds, and permission flags other than false. A result's
+Validation binds `trialId` to `trialKey`, recomputes the result's synthetic
+input-identity digest against the pinned job data identity and its execution
+identity, exact result bytes to `resultSha256`, and the
+canonical payload to `payloadSha256`, and both canonical identity arrays to
+their pinned binding digests. Those hashes are independently recomputed from
+the trial key, the one private result-byte snapshot, canonical envelope
+payload, and canonical identity arrays. `summarySha256` and progress
+`payloadSha256` values are required to be well-formed and are envelope-bound,
+but are not independently recomputed: `inspect_b1()` does not expose the
+canonical summary or stored path-payload bytes separately from the opaque
+result. `controlBindings` must equal the matching progress digests, but that
+does not verify the path payloads themselves. Generated fixtures reproduce
+the result, summary, and envelope digests in focused tests; carrying a digest
+is not evidence that it was verified against an unavailable source payload.
+
+Nested result validation uses the exact R3 summary and context-specific
+schemas from the read-only journal producer, not a global key whitelist.
+Identity requires the seven generated asset hashes and matching synthetic
+provenance; each completed descriptor requires its exact producer fields,
+finite metric arrays of the expected segment length, typed quarterly/fill-cost
+and cancellation records, and the appropriate optional exposure field.
+Insufficient-evidence not-run paths use their separate exact shape. Screen,
+evidence, budget, protocol review, authority, and control-realization records
+also require their exact accepted shapes. Thus a globally known field in the
+wrong object, a missing mandatory property, or a non-numeric metric-array
+element is rejected even when all enclosing digests are recomputed.
+
+The importer rejects duplicate/unknown keys, unknown schema or purpose,
+malformed nested JSON, bad digests, duplicate or conflicting path IDs/tuples,
+tuples outside the expected B1 inventory, non-finite present metrics,
+exceeded bounds, and permission flags other than false. A result's
 `authority.researchOnly` remains true and its execution, P&L, discovery,
 validation, holdout, paper, and live permission flags remain false. Lifecycle,
-timestamps, progress, controls, and result completion must agree. Valid absent,
+timestamps, progress timestamps, controls, and result completion must agree:
+progress starts no earlier than the job start, each path follows the prior
+completion, and no progress timestamp may exceed the job finish. Rejected
+pre-claim observations have no start or path progress. Valid absent,
 partial, rejected, failed, timed-out, and unresolved observations remain
 representable; a 44-result completion is required only for the lifecycle and
 result statuses that claim it. Screen status remains independent of engine

@@ -8,8 +8,12 @@ import test from 'node:test';
 import {parseArenaHistoricalResultFixture} from '../v11/arena-historical-result.js';
 import {ARENA_SYMBOLS} from '../research/strategy-paper-arena.js';
 import {exportHistoricalResult} from '../scripts/research/b1-7/export-historical-result.mjs';
-import {canonicalJson,sha256} from '../scripts/research/b1-7/engine.mjs';
+import {canonicalJson,createExecution,sha256} from '../scripts/research/b1-7/engine.mjs';
 import bridgeManifest from '../scripts/research-supervisor/b1_bridge_manifest.json' with {type:'json'};
+import {createSyntheticSeries} from './fixtures/b1-7/synthetic-series.mjs';
+import {
+  createInsufficientEvidenceProfile,createInsufficientEvidenceSeries
+} from '../scripts/research-supervisor/test_b1_generated_fixture.mjs';
 import {withMobileChrome} from './helpers/v11-cdp.mjs';
 
 const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium'].find(path=>path&&existsSync(path));
@@ -140,10 +144,75 @@ async function queuedProducerExport(){
   return exportHistoricalResult({observation,resultBytes:null,syntheticFixture:true});
 }
 
+async function generatedProducerExport(insufficient=false){
+  const profile=insufficient?createInsufficientEvidenceProfile():bridgeManifest;
+  const series=insufficient?createInsufficientEvidenceSeries():createSyntheticSeries();
+  const execution=createExecution({
+    seriesByAsset:series,source:{kind:'SYNTHETIC_FIXTURE'},
+    implementationSha256:profile.implementationSha256
+  });
+  while(execution.status==='READY')execution.advanceOne();
+  const result=execution.finalResult();
+  const trialKey=`trial-m11-browser-${insufficient?'insufficient':'completed'}`;
+  const generator=String.raw`
+import hashlib, json, sys
+def canonical(value):
+    return json.dumps(value, sort_keys=True, separators=(',', ':'), ensure_ascii=True, allow_nan=False)
+def sha(value):
+    return hashlib.sha256(value).hexdigest()
+profile, result, state, trial_key = (lambda v: (v['profile'],v['result'],v['state'],v['trialKey']))(json.load(sys.stdin))
+result_bytes = canonical(result).encode('ascii')
+by_id = {path['pathId']: path for path in result['paths']}
+computation_ids = [profile['pathIds'][i] for i in profile['computationOrder']]
+count = 44 if result['status'] == 'COMPLETED' else 19
+paths = [{
+    'pathId': path_id, 'ordinal': index + 1,
+    'phase': 'DEVELOPMENT' if index < 19 else 'DIAGNOSTIC',
+    'state': 'completed', 'startedAt': '2026-01-01T00:00:01Z',
+    'payloadSha256': sha(canonical(by_id[path_id]).encode('ascii')),
+    'completedAt': '2026-01-01T00:00:01Z'
+} for index, path_id in enumerate(computation_ids[:count])]
+summary = {key: value for key, value in result.items() if key not in ('paths', 'controlDefinitions')}
+controls = canonical(result['controlDefinitions'])
+job = {
+    'trialId': sha(trial_key.encode('utf8')), 'trialKey': trial_key,
+    'state': state, 'attempts': 1, 'owner': 'synthetic-generated-sample', 'fence': 1,
+    'profile': profile['profile'], 'protocolSha256': profile['protocolSha256'],
+    'sourceSha256': profile.get('sourceIdentitySha256') or
+                    sha(canonical(profile['sourceSha256']).encode('ascii')),
+    'dataSha256': profile['inputSha256'], 'manifestSha256': profile['manifestSha256'],
+    'pathIds': profile['pathIds'], 'computationPathIds': computation_ids,
+    'timestamps': {'createdAt': '2026-01-01T00:00:00Z', 'startedAt': '2026-01-01T00:00:01Z',
+                   'finishedAt': '2026-01-01T00:00:01Z'},
+    'paths': paths, 'controls': controls,
+    'controlBindings': {
+        'primaryDevelopmentSha256': paths[0]['payloadSha256'],
+        'fullBasketDevelopmentSha256': paths[15]['payloadSha256']},
+    'result': result_bytes.decode('utf8'), 'resultSha256': sha(result_bytes),
+    'summarySha256': sha(canonical(summary).encode('ascii')),
+    'reason': None if result['status'] == 'COMPLETED' else
+              'INVALID_OR_ZERO_DEVELOPMENT_RISK_DENOMINATOR',
+    'unresolved': False, 'executionAuthorized': False,
+    'promotionAuthorized': False, 'profitabilityInferred': False
+}
+sys.stdout.write(json.dumps(job, sort_keys=True, separators=(',', ':'), ensure_ascii=True, allow_nan=False))
+`;
+  const generated=spawnSync('python3',['-c',generator],{
+    input:JSON.stringify({profile,result,state:insufficient?'failed':'completed',trialKey}),
+    encoding:'utf8',maxBuffer:8*1024*1024
+  });
+  assert.equal(generated.status,0,generated.stderr);
+  const observation=JSON.parse(generated.stdout);
+  const resultBytes=new Uint8Array(Buffer.from(observation.result,'utf8'));
+  return {envelope:await exportHistoricalResult({observation,resultBytes,syntheticFixture:true}),result};
+}
+
 test('M11 Strategies native shell, synthetic Arena and responsive evidence at four widths',{timeout:240000},async()=>{
   const completed=historicalUiFixture();
   const insufficientScreen=historicalUiFixture({screenStatus:'INSUFFICIENT_EVIDENCE'});
   const producerExport=await queuedProducerExport();
+  const completedProducer=await generatedProducerExport();
+  const insufficientProducer=await generatedProducerExport(true);
   assert.equal(parseArenaHistoricalResultFixture(JSON.stringify(completed)).status,'PRESENT_UNVERIFIED');
   assert.equal(parseArenaHistoricalResultFixture(JSON.stringify(insufficientScreen)).status,'PRESENT_UNVERIFIED');
   if(typeof WebSocket!=='function'){
@@ -363,6 +432,72 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fo
         assert.equal(producer.requests,beforeProducer.requests);assert.equal(producer.cards,beforeProducer.cards);
         await key('Enter','Enter',13);
         assert.equal(await evaluate(`document.querySelector('[aria-label="Separates historisches Arena-Ergebnis · Producer-Export"] details').open`),true);
+        for(const producerCase of [
+          {name:'completed',...completedProducer,state:'completed',screen:'SYNTHETIC_ONLY_NOT_ASSESSED'},
+          {name:'insufficient',...insufficientProducer,state:'failed',screen:'INSUFFICIENT_EVIDENCE'}
+        ]){
+          const beforeImport=await evaluate(`({requests:performance.getEntriesByType('resource').length,
+            cards:document.querySelector('.arena-models').innerHTML})`);
+          const serialized=JSON.stringify(producerCase.envelope);
+          await evaluate(`(()=>{
+            const picker=document.querySelector('[data-arena-historical-export]'),transfer=new DataTransfer();
+            transfer.items.add(new File([${JSON.stringify(serialized)}],
+              'generated-producer-${producerCase.name}.json',{type:'application/json'}));
+            picker.files=transfer.files;picker.dispatchEvent(new Event('change',{bubbles:true}));
+          })()`);
+          for(let attempt=0;attempt<150;attempt++){
+            if(await evaluate(`document.querySelector('[aria-label="Separates historisches Arena-Ergebnis · Producer-Export"]')?.innerText.includes('Lifecycle: ${producerCase.state}')`))break;
+            await new Promise(resolve=>setTimeout(resolve,20));
+          }
+          const imported=await evaluate(`(()=>{
+            const section=document.querySelector('[aria-label="Separates historisches Arena-Ergebnis · Producer-Export"]');
+            const summary=section.querySelector('details summary');
+            summary.focus();
+            return {text:section.innerText,overflow:document.documentElement.scrollWidth>innerWidth+1 ||
+                section.scrollWidth>section.clientWidth+1,summaryHeight:summary.getBoundingClientRect().height,
+              focused:document.activeElement===summary,requests:performance.getEntriesByType('resource').length,
+              cards:document.querySelector('.arena-models').innerHTML};
+          })()`);
+          assert.match(imported.text,/SYNTHETIC_ONLY · UNVERIFIED · CALLER_SUPPLIED_INSPECT_B1 · NOT_ESTABLISHED/);
+          assert.match(imported.text,new RegExp(`Lifecycle: ${producerCase.state}`));
+          assert.match(imported.text,new RegExp(`Engine-Ergebnisstatus: ${producerCase.result.status}`));
+          assert.match(imported.text,new RegExp(`Screenstatus: ${producerCase.screen}`));
+          assert.match(imported.text,producerCase.name==='completed'
+            ?/Abgeschlossene Ergebnisse: 44 von 44 geplanten Pfaden/
+            :/Abgeschlossene Ergebnisse: 19 von 44 geplanten Pfaden/);
+          if(producerCase.name==='completed'){
+            const primary=producerCase.result.paths.find(path=>path.variantId==='primary-n30-f25'&&
+              path.scenarioId==='base-15bp'&&path.segmentId==='diagnostic');
+            assert.ok(imported.text.includes(
+              `Nettoertrag ${primary.netReturn} · maximaler Drawdown ${primary.sampledDrawdown}`));
+            assert.match(imported.text,/Cash-Control · Diagnose · scenario-independent: Status COMPLETED · Nettoertrag 0 · maximaler Drawdown 0/);
+            assert.match(imported.text,/Primärer Ertrag mindestens beide eingefrorenen Controls · false/);
+          }else{
+            assert.match(imported.text,/Nettoertrag Nicht verfügbar/);
+            assert.match(imported.text,/Relativer Drawdown-Rückgang \(Producerwert\): Nicht verfügbar/);
+          }
+          assert.equal(imported.overflow,false);assert.ok(imported.summaryHeight>=44);
+          assert.equal(imported.focused,true);assert.equal(imported.requests,beforeImport.requests);
+          assert.equal(imported.cards,beforeImport.cards);
+          await key('Enter','Enter',13);
+          assert.equal(await evaluate(`document.querySelector('[aria-label="Separates historisches Arena-Ergebnis · Producer-Export"] details').open`),true);
+        }
+        const invalidProducer=structuredClone(completedProducer.envelope);
+        invalidProducer.payloadSha256='0'.repeat(64);
+        const invalidProducerText=JSON.stringify(invalidProducer);
+        await evaluate(`(()=>{
+          const picker=document.querySelector('[data-arena-historical-export]'),transfer=new DataTransfer();
+          transfer.items.add(new File([${JSON.stringify(invalidProducerText)}],
+            'invalid-generated-producer.json',{type:'application/json'}));
+          picker.files=transfer.files;picker.dispatchEvent(new Event('change',{bubbles:true}));
+        })()`);
+        for(let attempt=0;attempt<150;attempt++){
+          if(await evaluate(`!!document.querySelector('[aria-label="Separates historisches Arena-Ergebnis · Producer-Export"] [role="alert"]')`))break;
+          await new Promise(resolve=>setTimeout(resolve,20));
+        }
+        const rejectedProducer=await evaluate(`document.querySelector('[aria-label="Separates historisches Arena-Ergebnis · Producer-Export"]').innerText`);
+        assert.match(rejectedProducer,/role="alert"|abgelehnt/);
+        assert.doesNotMatch(rejectedProducer,/Lifecycle: (completed|failed)|Engine-Ergebnisstatus:|Screenstatus: SYNTHETIC_ONLY_NOT_ASSESSED|Cash-Control · Diagnose: scenario-independent: Status COMPLETED/);
         const navClear=await evaluate(`(()=>{const root=document.documentElement,section=document.querySelector('#strategy-arena-root');window.scrollTo(0,root.scrollHeight);return section.lastElementChild.getBoundingClientRect().bottom<=document.getElementById('nav').getBoundingClientRect().top+1;})()`);
         assert.equal(navClear,true);
 

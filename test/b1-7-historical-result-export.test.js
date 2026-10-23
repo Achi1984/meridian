@@ -164,6 +164,47 @@ test('generated export import displays exact statuses, zero, false and missing m
   view.dispose();
 });
 
+test('producer import clears read errors and stale async results, and disposal suppresses late paints',async()=>{
+  const result=generatedResult(bridgeManifest,createSyntheticSeries());
+  const envelope=await generatedEnvelope(bridgeManifest,result,'completed','trial-m11-generated-race');
+  const bytes=new TextEncoder().encode(JSON.stringify(envelope));
+  const listeners=new Map();
+  const root={
+    innerHTML:'',
+    contains:()=>true,
+    addEventListener:(name,handler)=>listeners.set(name,handler),
+    removeEventListener:name=>listeners.delete(name),
+    replaceChildren(){this.innerHTML='';}
+  };
+  const view=createStrategyArenaView(root);
+  const dispatch=file=>listeners.get('change')({type:'change',target:{
+    closest:selector=>selector==='[data-arena-historical-export]'?{files:[file]}:null
+  }});
+  const regularFile={size:bytes.length,arrayBuffer:async()=>bytes.slice().buffer};
+  await dispatch(regularFile);
+  assert.match(root.innerHTML,/Engine-Ergebnisstatus: COMPLETED/);
+  let finishSlow;
+  const slowFile={size:bytes.length,arrayBuffer:()=>new Promise(resolve=>{finishSlow=resolve;})};
+  const slowImport=dispatch(slowFile);
+  const failedImport=dispatch({size:2,arrayBuffer:async()=>new TextEncoder().encode('{}').buffer});
+  await failedImport;
+  assert.match(root.innerHTML,/role="alert"/);
+  assert.doesNotMatch(root.innerHTML,/Engine-Ergebnisstatus: COMPLETED|Lifecycle: completed/);
+  finishSlow(bytes.slice().buffer);
+  await slowImport;
+  assert.match(root.innerHTML,/role="alert"/);
+  assert.doesNotMatch(root.innerHTML,/Engine-Ergebnisstatus: COMPLETED|Lifecycle: completed/);
+  await dispatch({size:10,arrayBuffer:async()=>{throw new Error('read failed');}});
+  assert.match(root.innerHTML,/role="alert"/);
+  const disposedImport=dispatch(slowFile);
+  view.dispose();
+  const disposedMarkup=root.innerHTML;
+  finishSlow(bytes.slice().buffer);
+  await disposedImport;
+  assert.equal(root.innerHTML,disposedMarkup);
+  assert.equal(listeners.size,0);
+});
+
 test('queued inspect-shaped observations preserve the full inventory without inventing results',async()=>{
   const completedResult=generatedResult(bridgeManifest,createSyntheticSeries());
   const completed=generatedObservation(bridgeManifest,completedResult,'completed','trial-m11-generated-queued-source');
@@ -193,6 +234,20 @@ test('export snapshots caller result bytes once and rejects shared, mismatched, 
   const shared=new Uint8Array(new SharedArrayBuffer(new TextEncoder().encode(observation.result).length));
   await assert.rejects(exportHistoricalResult({observation,resultBytes:shared,syntheticFixture:true}),
     /RESULT_BYTES_TYPE/);
+  Object.defineProperty(shared,'buffer',{value:new ArrayBuffer(2)});
+  await assert.rejects(exportHistoricalResult({observation,resultBytes:shared,syntheticFixture:true}),
+    /RESULT_BYTES_TYPE/);
+  let bufferGetterCalled=false;
+  const maliciousBuffer=new Uint8Array(new TextEncoder().encode(observation.result));
+  Object.defineProperty(maliciousBuffer,'buffer',{get(){bufferGetterCalled=true;return new ArrayBuffer(2);}});
+  await assert.rejects(exportHistoricalResult({observation,resultBytes:maliciousBuffer,syntheticFixture:true}),
+    /RESULT_BYTES_TYPE/);
+  assert.equal(bufferGetterCalled,false);
+  const detached=new Uint8Array([123,125]);
+  structuredClone(detached.buffer,{transfer:[detached.buffer]});
+  await assert.rejects(exportHistoricalResult({
+    observation:{...observation,result:'{}'},resultBytes:detached,syntheticFixture:true
+  }),/RESULT_BYTES_DETACHED/);
   await assert.rejects(exportHistoricalResult({observation,resultBytes:new Uint8Array([0xff]),syntheticFixture:true}),
     /RESULT_BYTES_INVALID_UTF8/);
   await assert.rejects(exportHistoricalResult({
@@ -203,6 +258,96 @@ test('export snapshots caller result bytes once and rejects shared, mismatched, 
   Object.defineProperty(accessorInput,'observation',{enumerable:true,get(){getterCalled=true;return observation;}});
   await assert.rejects(exportHistoricalResult(accessorInput),/EXPORT_INPUT_INVALID/);
   assert.equal(getterCalled,false);
+});
+
+test('producer result objects enforce exact context schemas and metric array element types',async()=>{
+  const result=generatedResult(bridgeManifest,createSyntheticSeries());
+  const source=await generatedEnvelope(bridgeManifest,result,'completed','trial-m11-generated-shapes');
+  async function assertRejected(mutate){
+    const forged=structuredClone(source);
+    const parsed=JSON.parse(forged.job.result);
+    mutate(parsed);
+    forged.job.result=canonicalJson(parsed);
+    forged.job.resultSha256=digest(forged.job.result);
+    await seal(forged);
+    assert.equal((await parseArenaHistoricalExport(new TextEncoder().encode(JSON.stringify(forged)))).status,
+      'INVALID');
+  }
+  await assertRejected(parsed=>{parsed.identity.paths='not an identity property';});
+  await assertRejected(parsed=>{
+    parsed.identity.canonicalSeriesSha256.XBTUSD='0'.repeat(64);
+    parsed.identity.sourceProvenance.syntheticFixtureSeriesSha256.XBTUSD='0'.repeat(64);
+  });
+  await assertRejected(parsed=>{parsed.executionId='f'.repeat(64);});
+  await assertRejected(parsed=>{parsed.paths[0].dailyReturns=['not a number'];});
+  await assertRejected(parsed=>{parsed.paths[0].screen={liveAuthorized:false};});
+  await assertRejected(parsed=>{delete parsed.paths[0].netReturn;});
+  await assertRejected(parsed=>{parsed.paths[0].fillCosts[0].turnover='not a number';});
+  await assertRejected(parsed=>{parsed.controlRealization[0].extraKnownField=false;});
+});
+
+test('rejected, partial, timed-out and unresolved progress obey job timestamps',async()=>{
+  const result=generatedResult(bridgeManifest,createSyntheticSeries());
+  const queued=generatedObservation(bridgeManifest,result,'completed','trial-m11-generated-lifecycle');
+  queued.state='queued';queued.attempts=0;queued.owner=null;queued.fence=0;
+  queued.timestamps={createdAt:'2026-01-01T00:00:00Z',startedAt:null,finishedAt:null};
+  queued.paths=[];queued.controls=null;queued.controlBindings=null;
+  queued.result=null;queued.resultSha256=null;queued.summarySha256=null;
+  queued.reason=null;queued.unresolved=false;
+  const progress=(index,state,startedAt,completedAt=null)=>({
+    pathId:queued.computationPathIds[index],ordinal:index+1,phase:index<19?'DEVELOPMENT':'DIAGNOSTIC',
+    state,startedAt,...(completedAt===null?{}:{payloadSha256:'a'.repeat(64),completedAt})
+  });
+  async function assertAccepted(job){
+    const envelope=await exportHistoricalResult({observation:job,resultBytes:null,syntheticFixture:true});
+    assert.equal((await parseArenaHistoricalExport(new TextEncoder().encode(JSON.stringify(envelope)))).status,
+      'PRESENT_UNVERIFIED',job.state);
+  }
+  const rejected=structuredClone(queued);
+  rejected.state='rejected';rejected.reason='DAILY_BUDGET_EXHAUSTED';
+  rejected.timestamps.finishedAt='2026-01-01T00:00:02Z';
+  await assertAccepted(rejected);
+  const unresolved=structuredClone(queued);
+  unresolved.state='unknown';unresolved.attempts=1;unresolved.owner='synthetic-worker';unresolved.fence=1;
+  unresolved.unresolved=true;unresolved.timestamps.startedAt='2026-01-01T00:00:01Z';
+  unresolved.paths=[progress(0,'started','2026-01-01T00:00:02Z')];
+  await assertAccepted(unresolved);
+  const partial=structuredClone(unresolved);
+  partial.state='partial';partial.unresolved=false;
+  partial.timestamps.finishedAt='2026-01-01T00:00:04Z';partial.reason='WORKER_INTERRUPTED';
+  partial.paths=[progress(0,'completed','2026-01-01T00:00:02Z','2026-01-01T00:00:03Z'),
+    progress(1,'started','2026-01-01T00:00:03Z')];
+  await assertAccepted(partial);
+  const timedOut=structuredClone(unresolved);
+  timedOut.state='timed_out';timedOut.unresolved=false;timedOut.reason='PATH_TIMEOUT';
+  timedOut.timestamps.finishedAt='2026-01-01T00:00:04Z';
+  await assertAccepted(timedOut);
+  const terminalUnknown=structuredClone(unresolved);
+  terminalUnknown.unresolved=false;terminalUnknown.timestamps.finishedAt='2026-01-01T00:00:04Z';
+  await assertAccepted(terminalUnknown);
+  const futureProgress=structuredClone(rejected);
+  futureProgress.timestamps.startedAt='2026-01-01T00:00:00Z';
+  futureProgress.paths=[progress(0,'completed','2030-01-01T00:00:01Z','2030-01-01T00:00:02Z')];
+  const queuedEnvelope=await exportHistoricalResult({observation:queued,resultBytes:null,syntheticFixture:true});
+  const futureEnvelope=structuredClone(queuedEnvelope);
+  futureEnvelope.job=futureProgress;
+  await seal(futureEnvelope);
+  assert.equal((await parseArenaHistoricalExport(new TextEncoder().encode(JSON.stringify(futureEnvelope)))).status,
+    'INVALID');
+  const noJobStart=structuredClone(partial);
+  noJobStart.timestamps.startedAt=null;
+  const noJobStartEnvelope=structuredClone(queuedEnvelope);
+  noJobStartEnvelope.job=noJobStart;
+  await seal(noJobStartEnvelope);
+  assert.equal((await parseArenaHistoricalExport(new TextEncoder().encode(JSON.stringify(noJobStartEnvelope)))).status,
+    'INVALID');
+  const regressing=structuredClone(partial);
+  regressing.paths[1].startedAt='2026-01-01T00:00:02Z';
+  const regressingEnvelope=structuredClone(queuedEnvelope);
+  regressingEnvelope.job=regressing;
+  await seal(regressingEnvelope);
+  assert.equal((await parseArenaHistoricalExport(new TextEncoder().encode(JSON.stringify(regressingEnvelope)))).status,
+    'INVALID');
 });
 
 test('producer importer rejects duplicate keys, invalid UTF-8, bad digests, identity conflicts and limits',async()=>{

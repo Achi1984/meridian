@@ -6,6 +6,14 @@ import {
 
 const digestBytes = async bytes => createHash('sha256').update(bytes).digest('hex');
 const owns = (value,key) => Object.prototype.hasOwnProperty.call(value,key);
+const typedArrayPrototype = Object.getPrototypeOf(Uint8Array.prototype);
+const typedArrayBuffer = Object.getOwnPropertyDescriptor(typedArrayPrototype,'buffer').get;
+const typedArrayByteOffset = Object.getOwnPropertyDescriptor(typedArrayPrototype,'byteOffset').get;
+const typedArrayLength = Object.getOwnPropertyDescriptor(typedArrayPrototype,'length').get;
+const typedArrayName = Object.getOwnPropertyDescriptor(typedArrayPrototype,Symbol.toStringTag).get;
+const arrayBufferByteLength = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype,'byteLength').get;
+const uint8Array = Uint8Array;
+const uint8ArraySet = Uint8Array.prototype.set;
 
 function copyJson(value,depth=0,budget={nodes:0}){
   if(depth>12||++budget.nodes>100_000)throw new TypeError('OBSERVATION_LIMIT');
@@ -62,10 +70,27 @@ function privateResultSnapshot(resultBytes,result){
     if(resultBytes!==null)throw new TypeError('RESULT_BYTES_MISMATCH');
     return null;
   }
-  if(!(resultBytes instanceof Uint8Array)||Object.getPrototypeOf(resultBytes)!==Uint8Array.prototype||
-     !(resultBytes.buffer instanceof ArrayBuffer))throw new TypeError('RESULT_BYTES_TYPE');
-  let snapshot;
-  try{snapshot=new Uint8Array(resultBytes);}catch{throw new TypeError('RESULT_BYTES_DETACHED');}
+  let sourceBuffer,byteOffset,byteLength;
+  try{
+    if(Reflect.apply(typedArrayName,resultBytes,[])!=='Uint8Array'||
+       Object.getPrototypeOf(resultBytes)!==Uint8Array.prototype||
+       Reflect.ownKeys(resultBytes).some(key=>key==='buffer'||typeof key==='symbol'||
+         !/^(0|[1-9]\d*)$/.test(key)))
+      throw new TypeError('RESULT_BYTES_TYPE');
+    sourceBuffer=Reflect.apply(typedArrayBuffer,resultBytes,[]);
+    Reflect.apply(arrayBufferByteLength,sourceBuffer,[]);
+    byteOffset=Reflect.apply(typedArrayByteOffset,resultBytes,[]);
+    byteLength=Reflect.apply(typedArrayLength,resultBytes,[]);
+  }catch(error){
+    if(error?.message==='RESULT_BYTES_TYPE')throw error;
+    throw new TypeError('RESULT_BYTES_TYPE');
+  }
+  let snapshot,source;
+  try{
+    source=new uint8Array(sourceBuffer,byteOffset,byteLength);
+    snapshot=new uint8Array(byteLength);
+    Reflect.apply(uint8ArraySet,snapshot,[source]);
+  }catch{throw new TypeError('RESULT_BYTES_DETACHED');}
   let decoded;
   try{decoded=new TextDecoder('utf-8',{fatal:true}).decode(snapshot);}
   catch{throw new TypeError('RESULT_BYTES_INVALID_UTF8');}
