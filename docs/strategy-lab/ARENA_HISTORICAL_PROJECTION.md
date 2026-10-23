@@ -547,3 +547,10 @@ node --test test/v11-arena-historical-result.test.js
 node --test test/b1-7-historical-result-export.test.js
 node --test test/v11-strategy-workspace-chrome.test.js
 ```
+
+The Chrome scenario imports generated queued, completed, and insufficient
+producer envelopes at four viewport widths. It asserts exact visible metrics,
+zero/false/missing fields, independent lifecycle/engine/screen statuses,
+unverified provenance, invalid/stale/read-error clearing, delayed async
+completion, disposal during a pending read, keyboard disclosure, no overflow,
+unchanged model cards, and no additional resource requests for imports.

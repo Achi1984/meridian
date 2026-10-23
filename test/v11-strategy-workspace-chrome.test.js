@@ -498,6 +498,57 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fo
         const rejectedProducer=await evaluate(`document.querySelector('[aria-label="Separates historisches Arena-Ergebnis · Producer-Export"]').innerText`);
         assert.match(rejectedProducer,/role="alert"|abgelehnt/);
         assert.doesNotMatch(rejectedProducer,/Lifecycle: (completed|failed)|Engine-Ergebnisstatus:|Screenstatus: SYNTHETIC_ONLY_NOT_ASSESSED|Cash-Control · Diagnose: scenario-independent: Status COMPLETED/);
+        const delayedProducerText=JSON.stringify(completedProducer.envelope);
+        await evaluate(`(()=>{
+          window.__m11DelayedRead={started:false,release:null};
+          const file=new File([${JSON.stringify(delayedProducerText)}],
+            'delayed-generated-producer.json',{type:'application/json'});
+          Object.defineProperty(file,'arrayBuffer',{value:()=>new Promise(resolve=>{
+            window.__m11DelayedRead.started=true;window.__m11DelayedRead.release=resolve;
+          })});
+          const picker=document.querySelector('[data-arena-historical-export]'),transfer=new DataTransfer();
+          transfer.items.add(file);picker.files=transfer.files;picker.dispatchEvent(new Event('change',{bubbles:true}));
+        })()`);
+        for(let attempt=0;attempt<100;attempt++){
+          if(await evaluate('window.__m11DelayedRead?.started'))break;
+          await new Promise(resolve=>setTimeout(resolve,10));
+        }
+        assert.equal(await evaluate('window.__m11DelayedRead.started'),true);
+        await evaluate(`(()=>{
+          const file=new File(['{}'],'unreadable-generated-producer.json',{type:'application/json'});
+          Object.defineProperty(file,'arrayBuffer',{value:()=>Promise.reject(Error('synthetic read failure'))});
+          const picker=document.querySelector('[data-arena-historical-export]'),transfer=new DataTransfer();
+          transfer.items.add(file);picker.files=transfer.files;picker.dispatchEvent(new Event('change',{bubbles:true}));
+        })()`);
+        for(let attempt=0;attempt<100;attempt++){
+          if(await evaluate(`!!document.querySelector('[aria-label="Separates historisches Arena-Ergebnis · Producer-Export"] [role="alert"]')`))break;
+          await new Promise(resolve=>setTimeout(resolve,10));
+        }
+        await evaluate(`window.__m11DelayedRead.release(new TextEncoder().encode(${JSON.stringify(delayedProducerText)}).buffer)`);
+        await new Promise(resolve=>setTimeout(resolve,50));
+        const afterStaleRead=await evaluate(`document.querySelector('[aria-label="Separates historisches Arena-Ergebnis · Producer-Export"]').innerText`);
+        assert.match(afterStaleRead,/abgelehnt/);
+        assert.doesNotMatch(afterStaleRead,/Lifecycle: completed|Engine-Ergebnisstatus: COMPLETED/);
+        if(size.width===320){
+          const disposal=await evaluate(`(async()=>{
+            const {createStrategyArenaView}=await import('/v11/strategy-arena.js?v=B12');
+            const root=document.createElement('div');document.body.append(root);
+            const view=createStrategyArenaView(root);
+            const file=new File([${JSON.stringify(delayedProducerText)}],
+              'disposed-generated-producer.json',{type:'application/json'});
+            let release;
+            Object.defineProperty(file,'arrayBuffer',{value:()=>new Promise(resolve=>{release=resolve;})});
+            const picker=root.querySelector('[data-arena-historical-export]'),transfer=new DataTransfer();
+            transfer.items.add(file);picker.files=transfer.files;picker.dispatchEvent(new Event('change',{bubbles:true}));
+            view.dispose();
+            release(new TextEncoder().encode(${JSON.stringify(delayedProducerText)}).buffer);
+            await new Promise(resolve=>setTimeout(resolve,50));
+            const result=root.innerHTML;
+            root.remove();
+            return result;
+          })()`);
+          assert.equal(disposal,'');
+        }
         const navClear=await evaluate(`(()=>{const root=document.documentElement,section=document.querySelector('#strategy-arena-root');window.scrollTo(0,root.scrollHeight);return section.lastElementChild.getBoundingClientRect().bottom<=document.getElementById('nav').getBoundingClientRect().top+1;})()`);
         assert.equal(navClear,true);
 
