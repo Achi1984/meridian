@@ -198,6 +198,13 @@ evidence, budget, protocol review, authority, and control-realization records
 also require their exact accepted shapes. Thus a globally known field in the
 wrong object, a missing mandatory property, or a non-numeric metric-array
 element is rejected even when all enclosing digests are recomputed.
+The trusted producer bindings are synthetic-only: completed-result screens
+must use `SYNTHETIC_ONLY_NOT_ASSESSED` with
+`SYNTHETIC_FIXTURE_RULE_CHECKS_ONLY` or the exact screen-level insufficient
+shape. `PASS`, `NO_EDGE`, and `HISTORICAL_CANDIDATE_ONLY_NOT_HOLDOUT`
+interpretations are not accepted for these bindings. A result-level
+`INSUFFICIENT_EVIDENCE` remains a supported engine status and is kept separate
+from the screen status.
 
 The importer rejects duplicate/unknown keys, unknown schema or purpose,
 malformed nested JSON, bad digests, duplicate or conflicting path IDs/tuples,

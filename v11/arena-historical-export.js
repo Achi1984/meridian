@@ -92,7 +92,8 @@ const BINDINGS = [
     dataSha256:'7b98a6a6ef2834c8a4279406e2d6d174c7ee15d853283f619572b3e0da88fa99',
     manifestSha256:'98a9c4442a140c1e78d60251d312ad489975f58f8f5c48a87a8916b141c1c361',
     pathIdsSha256:'58e86b8528516bfbd9adb87227b3a922480d2920567c88194e575afe911260e9',
-    computationPathIdsSha256:'306c304914c3f8e7dcfec40ae7918bae2ac6aa59815073cc8c4da1632f31411b'
+    computationPathIdsSha256:'306c304914c3f8e7dcfec40ae7918bae2ac6aa59815073cc8c4da1632f31411b',
+    screenMode:'SYNTHETIC_ONLY'
   },
   {
     profile:'MERIDIAN-B1-7-GENERATED-FIXTURE-BRIDGE-R1',
@@ -104,7 +105,8 @@ const BINDINGS = [
     dataSha256:'d0d0fbecb1c5bb39dd8b34fab9f689192182b089fd77dca2656f70889e81c048',
     manifestSha256:'8ce4b8e88fb2c3b391d73be392a1a02afd8beaf272106796a8a59b9701a19edd',
     pathIdsSha256:'f78148b3d854d88d00bc64cc9758b91ebc487283ee45da6d937a8f70da20caa2',
-    computationPathIdsSha256:'b88b9cc4d8a78a635055e3aec962ad6291e0bd830520c96a12e73170cab33b4d'
+    computationPathIdsSha256:'b88b9cc4d8a78a635055e3aec962ad6291e0bd830520c96a12e73170cab33b4d',
+    screenMode:'SYNTHETIC_ONLY'
   }
 ];
 
@@ -420,7 +422,8 @@ function validControls(text,progress){
   return controls;
 }
 
-function validScreen(screen,resultStatus){
+function validScreen(screen,resultStatus,binding){
+  if(binding?.screenMode!=='SYNTHETIC_ONLY')return false;
   if(resultStatus==='INSUFFICIENT_EVIDENCE')
     return exact(screen,['status'])&&screen.status==='INSUFFICIENT_EVIDENCE';
   if(!record(screen))return false;
@@ -437,8 +440,7 @@ function validScreen(screen,resultStatus){
     'atLeastThreeOfFourNeighboursPositiveAt30bpNonDelayed'];
   const synthetic=screen.status==='SYNTHETIC_ONLY_NOT_ASSESSED'&&
     screen.interpretation==='SYNTHETIC_FIXTURE_RULE_CHECKS_ONLY';
-  return exact(screen,screenKeys)&&(['PASS','NO_EDGE'].includes(screen.status)||synthetic)&&
-    (synthetic||screen.interpretation==='HISTORICAL_CANDIDATE_ONLY_NOT_HOLDOUT')&&
+  return exact(screen,screenKeys)&&synthetic&&
     screen.comparisonSegment==='diagnostic'&&
     screen.neighbourStressScenario==='stress-30bp-non-delayed'&&screen.stopPolicy==='NO_FINITE_TRADE_STOP'&&
     exact(screen.checks,checkKeys)&&checkKeys.every(key=>typeof screen.checks[key]==='boolean')&&
@@ -527,7 +529,8 @@ function validResult(text,job,controls){
      !integer(result.computedPaths)||result.attemptedPaths>44||result.completedPaths>44||
      result.attemptedPaths!==result.completedPaths||result.completedPaths!==result.computedPaths||
      result.completedPaths!==job.paths.filter(item=>item.state==='completed').length||
-     !validScreen(result.screen,result.status)||!controls||!deepEqual(result.controlDefinitions,controls)||
+     !validScreen(result.screen,result.status,binding)||!controls||
+     !deepEqual(result.controlDefinitions,controls)||
      !validControlRealization(result.controlRealization,result.status,controls,job))return reject('identity-or-summary');
   if(result.failure!==null)return reject('failure');
   if(!exact(result.screen,['status'])&&result.status==='INSUFFICIENT_EVIDENCE')return reject('screen-shape');

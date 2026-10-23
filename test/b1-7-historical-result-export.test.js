@@ -124,6 +124,47 @@ test('synthetic generated completed and insufficient results round-trip with exa
   assert.equal(Buffer.byteLength(insufficient.job.result),207285);
 });
 
+test('synthetic producer bindings reject resealed historical screen verdicts',async()=>{
+  const completedResult=generatedResult(bridgeManifest,createSyntheticSeries());
+  const completed=await generatedEnvelope(bridgeManifest,completedResult,'completed','trial-m11-screen-binding');
+  const accepted=await parseArenaHistoricalExport(new TextEncoder().encode(JSON.stringify(completed)));
+  assert.equal(accepted.status,'PRESENT_UNVERIFIED');
+  for(const [status,interpretation] of [
+    ['PASS','HISTORICAL_CANDIDATE_ONLY_NOT_HOLDOUT'],
+    ['NO_EDGE','HISTORICAL_CANDIDATE_ONLY_NOT_HOLDOUT'],
+    ['SYNTHETIC_ONLY_NOT_ASSESSED','HISTORICAL_CANDIDATE_ONLY_NOT_HOLDOUT']
+  ]){
+    const changed=structuredClone(completed);
+    const result=JSON.parse(changed.job.result);
+    result.screen.status=status;
+    result.screen.interpretation=interpretation;
+    changed.job.result=canonicalJson(result);
+    changed.job.resultSha256=digest(changed.job.result);
+    await seal(changed);
+    assert.equal((await parseArenaHistoricalExport(new TextEncoder().encode(JSON.stringify(changed)))).status,
+      'INVALID',`${status}/${interpretation}`);
+  }
+  const insufficientProfile=createInsufficientEvidenceProfile();
+  const insufficientResult=generatedResult(insufficientProfile,createInsufficientEvidenceSeries());
+  const insufficient=await generatedEnvelope(
+    insufficientProfile,insufficientResult,'failed','trial-m11-screen-binding-insufficient'
+  );
+  const acceptedInsufficient=await parseArenaHistoricalExport(
+    new TextEncoder().encode(JSON.stringify(insufficient))
+  );
+  assert.equal(acceptedInsufficient.status,'PRESENT_UNVERIFIED');
+  assert.equal(acceptedInsufficient.result.status,'INSUFFICIENT_EVIDENCE');
+  const historicalInsufficient=structuredClone(insufficient);
+  const insufficientNested=JSON.parse(historicalInsufficient.job.result);
+  insufficientNested.screen.interpretation='HISTORICAL_CANDIDATE_ONLY_NOT_HOLDOUT';
+  historicalInsufficient.job.result=canonicalJson(insufficientNested);
+  historicalInsufficient.job.resultSha256=digest(historicalInsufficient.job.result);
+  await seal(historicalInsufficient);
+  assert.equal((await parseArenaHistoricalExport(
+    new TextEncoder().encode(JSON.stringify(historicalInsufficient))
+  )).status,'INVALID');
+});
+
 test('generated export import displays exact statuses, zero, false and missing metrics, then clears stale data',async()=>{
   const completedResult=generatedResult(bridgeManifest,createSyntheticSeries());
   const insufficientProfile=createInsufficientEvidenceProfile();
