@@ -265,6 +265,28 @@ the 16 KiB limit applies to report output, not total internal inspection work.
 Tests use temporary generated journals and do not run strategy calculations:
 `node --test test/research-supervisor-inspection.test.js`.
 
+### Bounded historical journal inspection
+
+Inspect one exact trial in an existing historical-profile B1 journal:
+
+```sh
+python3 -B scripts/research-supervisor/historical_inspection_report.py \
+  /path/to/existing.sqlite TRIAL_SHA256
+```
+
+The command reuses `journal.inspect_b1` and accepts no database discovery,
+creation, profile fallback, or trial lookup. It emits a deterministic JSON
+observation bounded to 16 KiB; missing, locked, corrupt, or mismatched input
+returns a bounded `NOT_OBSERVED` diagnostic instead of defaulting counts or
+readiness. The report is scoped to the specified journal and trial. Stored
+journal integrity does not establish historical completeness, source
+authenticity, profitability, or execution authority. Inspection does not claim,
+initialize, reconcile, execute, or release a fence.
+
+The focused generated-fixture integration proof is
+`node --test test/research-supervisor-historical-inspection.test.js`. Its
+temporary test profile and generated series are not captured historical data.
+
 ### Supplied inspection observation history
 
 `inspection_history.py` adds a pure validator for bounded supplied inspection
