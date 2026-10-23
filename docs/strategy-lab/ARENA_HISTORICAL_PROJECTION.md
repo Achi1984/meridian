@@ -75,7 +75,8 @@ performs no file, journal, environment, clock, network, or execution access.
 `resultBytes` is a `Uint8Array` containing the exact UTF-8 bytes represented by
 `observation.result`, or `null` exactly when `result` is `null`. For a present
 result, require an ordinary, non-shared, non-detached `Uint8Array`, then copy it
-once into a private byte snapshot. Never read the caller-owned view again.
+once into a private byte snapshot. Reject views larger than 1 MiB before
+allocating the snapshot. Never read the caller-owned view again.
 Fatal UTF-8 decoding, equality with the supplied `observation.result` string,
 and SHA-256 verification against `resultSha256` all use that same snapshot.
 Never parse and reserialize result metrics to check this digest. Require

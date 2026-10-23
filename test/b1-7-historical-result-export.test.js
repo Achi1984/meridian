@@ -248,6 +248,11 @@ test('export snapshots caller result bytes once and rejects shared, mismatched, 
   await assert.rejects(exportHistoricalResult({
     observation:{...observation,result:'{}'},resultBytes:detached,syntheticFixture:true
   }),/RESULT_BYTES_DETACHED/);
+  const oversizeBytes=new Uint8Array(1024*1024+1);
+  await assert.rejects(exportHistoricalResult({
+    observation:{...observation,result:'x'.repeat(oversizeBytes.length)},
+    resultBytes:oversizeBytes,syntheticFixture:true
+  }),/RESULT_BYTES_LIMIT/);
   await assert.rejects(exportHistoricalResult({observation,resultBytes:new Uint8Array([0xff]),syntheticFixture:true}),
     /RESULT_BYTES_INVALID_UTF8/);
   await assert.rejects(exportHistoricalResult({

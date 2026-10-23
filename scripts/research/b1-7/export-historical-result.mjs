@@ -81,8 +81,9 @@ function privateResultSnapshot(resultBytes,result){
     Reflect.apply(arrayBufferByteLength,sourceBuffer,[]);
     byteOffset=Reflect.apply(typedArrayByteOffset,resultBytes,[]);
     byteLength=Reflect.apply(typedArrayLength,resultBytes,[]);
+    if(byteLength>1024*1024)throw new TypeError('RESULT_BYTES_LIMIT');
   }catch(error){
-    if(error?.message==='RESULT_BYTES_TYPE')throw error;
+    if(error?.message==='RESULT_BYTES_TYPE'||error?.message==='RESULT_BYTES_LIMIT')throw error;
     throw new TypeError('RESULT_BYTES_TYPE');
   }
   let snapshot,source;
