@@ -5,6 +5,7 @@ import {join,normalize,sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import test from 'node:test';
+import {parseArenaHistoricalResultFixture} from '../v11/arena-historical-result.js';
 import {ARENA_SYMBOLS} from '../research/strategy-paper-arena.js';
 import {withMobileChrome} from './helpers/v11-cdp.mjs';
 
@@ -48,22 +49,82 @@ function syntheticPayload(){
   return {data,asOf:start+210*day,sourceKind:'SYNTHETIC',quoteCurrency:'USD',liquidateAtEnd:true};
 }
 
-function historicalUiFixture(){
+function historicalUiFixture({screenStatus='PASS'}={}){
   const pathIds=Array.from({length:44},(_,index)=>(index+1).toString(16).padStart(64,'0'));
+  const computationPathIds=[...pathIds].reverse();
+  const variants=['primary-n30-f25','neighbour-n20-f25','neighbour-n45-f25',
+    'neighbour-n30-f20','neighbour-n30-f35'];
+  const scenarios=['base-15bp','stress-30bp','stress-30bp-delay-1d'];
+  const descriptors=[
+    ...variants.flatMap(variantId=>scenarios.flatMap(scenarioId=>
+      ['development','diagnostic'].map(segmentId=>({variantId,scenarioId,segmentId})))),
+    ...scenarios.flatMap(scenarioId=>['development','diagnostic']
+      .map(segmentId=>({variantId:'full-basket-weekly',scenarioId,segmentId}))),
+    ...['frozen-mean-exposure','frozen-risk-exposure']
+      .flatMap(variantId=>scenarios.map(scenarioId=>({variantId,scenarioId,segmentId:'diagnostic'}))),
+    {variantId:'cash-zero',scenarioId:'scenario-independent',segmentId:'development'},
+    {variantId:'cash-zero',scenarioId:'scenario-independent',segmentId:'diagnostic'}
+  ];
+  const controlDefinitions={status:'FROZEN_DEVELOPMENT_ONLY',meanExposure:0.5,riskExposure:0.25,
+    primaryDevelopmentSd:0.02,fullBasketDevelopmentSd:0.08,
+    calibration:'DEVELOPMENT_15BP_DAILY_NET_RETURNS_AND_HELD_TARGETS'};
+  const screen=screenStatus==='INSUFFICIENT_EVIDENCE'
+    ?{status:'INSUFFICIENT_EVIDENCE',checks:{fullBasketDrawdownDenominator:false},relativeDrawdownReduction:null}
+    :{status:'PASS',interpretation:'HISTORICAL_CANDIDATE_ONLY_NOT_HOLDOUT',comparisonSegment:'diagnostic',
+      neighbourStressScenario:'stress-30bp-non-delayed',
+      checks:{primaryDiagnosticNetPositive:true,primaryDiagnosticDrawdownAtMost25Percent:true,
+        primaryReturnAtLeastBothFrozenControls:true,primaryDrawdownAtMostBothFrozenControls:true,
+        relativeDrawdownReductionAtLeast20Percent:true,primaryNetPositiveAt30bpNonDelayed:true,
+        primaryNetPositiveAt30bpPlusDelay:true,atLeastThreeOfFourNeighboursPositiveAt15bp:true,
+        atLeastThreeOfFourNeighboursPositiveAt30bpNonDelayed:true},
+      relativeDrawdownReduction:0.25,neighbourPositiveCounts:{base15bp:3,stress30bp:3},
+      stopPolicy:'NO_FINITE_TRADE_STOP',tradeCRV:{status:'UNDEFINED_NO_FINITE_STOP',value:null}};
+  const jobPaths=computationPathIds.map((pathId,index)=>({
+    pathId,ordinal:index+1,phase:index<19?'DEVELOPMENT':'DIAGNOSTIC',state:'completed',
+    startedAt:'2026-01-01T00:00:01Z',payloadSha256:'a'.repeat(64),completedAt:'2026-01-01T00:00:02Z'
+  }));
+  const result={
+    attemptedPaths:44,authority:{researchOnly:true,executionAuthorized:false,strategyPnlAuthorized:false,
+      discoveryAuthorized:false,validationAuthorized:false,holdoutAuthorized:false,paperAuthorized:false,
+      liveAuthorized:false},
+    budget:{},completedPaths:44,computedPaths:44,controlRealization:[],
+    evidence:{syntheticFixture:false,priceSource:'PINNED_KRAKEN_SPOT_USD_CANDLES',
+      sourceAuthenticity:'NOT_ESTABLISHED',historyLabel:'DEVELOPMENT_AND_HISTORICAL_DIAGNOSTIC',
+      candidateInterpretation:'HISTORICAL_CANDIDATE_ONLY_IF_PROPOSED_REAL_SCREEN_PASSES',
+      costModel:'OKX_INSPIRED_ASSUMED_15_30BP_NOT_EXECUTION_EVIDENCE',
+      executionEvidence:'NOT_OKX_EXECUTION_EVIDENCE',holdoutClaim:false,trialLedger:'UNKNOWN',
+      diagnosticRescaling:'NONE',stoppedPolicy:'NO_FINITE_TRADE_STOP',
+      crv:{status:'UNDEFINED_NO_FINITE_STOP',value:null,researchOnly:true},survivorship:'generated-browser-fixture'},
+    executionId:'b'.repeat(64),failure:null,
+    identity:{datasetKind:'FROZEN_RESEARCH_INPUT',sourceCommit:'generated-browser-fixture',
+      sourceProvenance:{normalizedFileSha256:{}},canonicalSeriesSha256:{},inputSha256:'c'.repeat(64)},
+    implementationId:'generated-browser-fixture',implementationSha256:'d'.repeat(64),
+    plannedPaths:44,protocolId:'generated-browser-fixture',protocolReview:{},protocolSha256:'a'.repeat(64),
+    schema:'MERIDIAN_B1_7_ENGINE_RESULT_R3',screen,status:'COMPLETED',controlDefinitions,
+    paths:pathIds.map((pathId,index)=>({pathId,...descriptors[index],status:'COMPLETED',computed:true,
+      attempts:1,netReturn:0.123456789012345,sampledDrawdown:0.087654321098765}))
+  };
   return {schema:'MERIDIAN_B1_HISTORICAL_UI_FIXTURE_V1',evidenceClass:'SYNTHETIC_ONLY',
     purpose:'UI_FIXTURE_NOT_PRODUCER_EXPORT',job:{
-      trialId:'f'.repeat(64),trialKey:'trial-generated-browser-fixture',state:'queued',
-      attempts:0,owner:null,fence:0,profile:'MERIDIAN-B1-7-HISTORICAL-ONE-SHOT-R1',
+      trialId:'f'.repeat(64),trialKey:'trial-generated-browser-fixture',state:'completed',
+      attempts:1,owner:'generated-browser-fixture',fence:7,profile:'MERIDIAN-B1-7-HISTORICAL-ONE-SHOT-R1',
       protocolSha256:'a'.repeat(64),sourceSha256:'b'.repeat(64),dataSha256:'c'.repeat(64),
-      manifestSha256:'d'.repeat(64),pathIds,computationPathIds:[...pathIds].reverse(),
-      timestamps:{createdAt:'2026-01-01T00:00:00Z',startedAt:null,finishedAt:null},
-      paths:[],controls:null,controlBindings:null,result:null,resultSha256:null,summarySha256:null,
+      manifestSha256:'e'.repeat(64),pathIds,computationPathIds,
+      timestamps:{createdAt:'2026-01-01T00:00:00Z',startedAt:'2026-01-01T00:00:01Z',
+        finishedAt:'2026-01-01T00:00:03Z'},
+      paths:jobPaths,controls:JSON.stringify(controlDefinitions),
+      controlBindings:{primaryDevelopmentSha256:'a'.repeat(64),fullBasketDevelopmentSha256:'a'.repeat(64)},
+      result:JSON.stringify(result),resultSha256:'f'.repeat(64),summarySha256:'1'.repeat(64),
       reason:null,unresolved:false,executionAuthorized:false,promotionAuthorized:false,
       profitabilityInferred:false
     }};
 }
 
 test('M11 Strategies native shell, synthetic Arena and responsive evidence at four widths',{timeout:240000},async()=>{
+  const completed=historicalUiFixture();
+  const insufficientScreen=historicalUiFixture({screenStatus:'INSUFFICIENT_EVIDENCE'});
+  assert.equal(parseArenaHistoricalResultFixture(JSON.stringify(completed)).status,'PRESENT_UNVERIFIED');
+  assert.equal(parseArenaHistoricalResultFixture(JSON.stringify(insufficientScreen)).status,'PRESENT_UNVERIFIED');
   if(typeof WebSocket!=='function'){
     const env={...process.env};delete env.NODE_TEST_CONTEXT;
     const child=spawnSync(process.execPath,['--experimental-websocket',fileURLToPath(import.meta.url)],
@@ -172,32 +233,79 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fo
         assert.equal(inspection.requests,beforeInspection.requests);assert.equal(inspection.cards,beforeInspection.cards);
 
         const beforeHistorical=await evaluate(`({requests:performance.getEntriesByType('resource').length,cards:document.querySelector('.arena-models').innerHTML})`);
-        const historicalText=JSON.stringify(historicalUiFixture());
-        await evaluate(`(()=>{
-          const picker=document.querySelector('[data-arena-historical-fixture]'),transfer=new DataTransfer();
-          transfer.items.add(new File([${JSON.stringify(historicalText)}],'generated-historical-ui-fixture.json',{type:'application/json'}));
-          picker.files=transfer.files;picker.dispatchEvent(new Event('change',{bubbles:true}));
-        })()`);
-        for(let attempt=0;attempt<100;attempt++){
-          if(await evaluate(`document.querySelector('[aria-label="Separates historisches Arena-Ergebnis · UI-Fixture"]')?.innerText.includes('Lifecycle: queued')`))break;
-          await new Promise(resolve=>setTimeout(resolve,20));
+        for(const [fixtureName,fixtureValue,expectedScreen] of [
+          ['completed',completed,'Screenstatus: PASS'],
+          ['completed-insufficient-screen',insufficientScreen,'Screenstatus: INSUFFICIENT_EVIDENCE']
+        ]){
+          const historicalText=JSON.stringify(fixtureValue);
+          await evaluate(`(()=>{
+            const picker=document.querySelector('[data-arena-historical-fixture]'),transfer=new DataTransfer();
+            transfer.items.add(new File([${JSON.stringify(historicalText)}],
+              'generated-historical-${fixtureName}.json',{type:'application/json'}));
+            picker.files=transfer.files;picker.dispatchEvent(new Event('change',{bubbles:true}));
+          })()`);
+          for(let attempt=0;attempt<100;attempt++){
+            if(await evaluate(`document.querySelector('[aria-label="Separates historisches Arena-Ergebnis · UI-Fixture"]')?.innerText.includes('Lifecycle: completed')`))break;
+            await new Promise(resolve=>setTimeout(resolve,20));
+          }
+          const historical=await evaluate(`(()=>{
+            const section=document.querySelector('[aria-label="Separates historisches Arena-Ergebnis · UI-Fixture"]');
+            const panel=section.getBoundingClientRect();
+            const calibration=[...section.querySelectorAll('dd')].find(node=>
+              node.innerText==='DEVELOPMENT_15BP_DAILY_NET_RETURNS_AND_HELD_TARGETS');
+            const disclosure=section.querySelector('details');
+            const summary=disclosure.querySelector('summary');
+            summary.focus();
+            return {text:section.innerText,overflow:document.documentElement.scrollWidth>innerWidth+1 ||
+                section.scrollWidth>section.clientWidth+1,
+              summaryHeight:summary.getBoundingClientRect().height,
+              focused:document.activeElement===summary,summarySemantic:summary.tagName==='SUMMARY',
+              panelWidth:panel.width,calibration:calibration?.innerText,
+              calibrationHeight:calibration?.getBoundingClientRect().height,
+              calibrationWrap:calibration?getComputedStyle(calibration).overflowWrap:null,
+              calibrationOverflow:calibration?.scrollWidth>calibration?.clientWidth+1,
+              requests:performance.getEntriesByType('resource').length,
+              cards:document.querySelector('.arena-models').innerHTML};
+          })()`);
+          assert.match(historical.text,/SYNTHETIC_ONLY/);
+          assert.match(historical.text,/kein Producer-Export/);
+          assert.match(historical.text,/Lifecycle: completed/);
+          assert.match(historical.text,/Engine-Ergebnisstatus: COMPLETED/);
+          assert.match(historical.text,/Abgeschlossene Ergebnisse: 44 von 44 geplanten Pfaden/);
+          assert.match(historical.text,/DEVELOPMENT_15BP_DAILY_NET_RETURNS_AND_HELD_TARGETS/);
+          assert.match(historical.text,new RegExp(expectedScreen));
+          assert.match(historical.text,/Abgeschlossene Ergebnisse sind kein Nachweis ausreichender Screen-Evidenz/);
+          assert.doesNotMatch(historical.text,/protocolSha256/);
+          assert.equal(historical.overflow,false);assert.ok(historical.summaryHeight>=44);
+          assert.equal(historical.focused,true);assert.equal(historical.summarySemantic,true);
+          assert.equal(historical.calibration,'DEVELOPMENT_15BP_DAILY_NET_RETURNS_AND_HELD_TARGETS');
+          if(size.mobile)assert.ok(historical.calibrationHeight>=32);
+          assert.equal(historical.calibrationWrap,'anywhere');
+          assert.equal(historical.calibrationOverflow,false);
+          assert.equal(historical.requests,beforeHistorical.requests);assert.equal(historical.cards,beforeHistorical.cards);
+          if(evidence){
+            await evaluate(`([...document.querySelectorAll('[aria-label="Separates historisches Arena-Ergebnis · UI-Fixture"] dd')].find(node=>node.innerText==='DEVELOPMENT_15BP_DAILY_NET_RETURNS_AND_HELD_TARGETS')).scrollIntoView({block:'center'})`);
+            const image=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+            writeFileSync(join(evidence,`v11-m11-historical-${fixtureName}-${size.width}x${size.height}.png`),Buffer.from(image.data,'base64'));
+          }
+          await key('Enter','Enter',13);
+          const technical=await evaluate(`(()=>{
+            const disclosure=document.querySelector('[aria-label="Separates historisches Arena-Ergebnis · UI-Fixture"] details');
+            return {open:disclosure.open,text:disclosure.innerText,
+              overflow:document.documentElement.scrollWidth>innerWidth+1,
+              summaryHeight:disclosure.querySelector('summary').getBoundingClientRect().height};
+          })()`);
+          assert.equal(technical.open,true);
+          assert.match(technical.text,/protocolSha256/);
+          assert.match(technical.text,/[a-f0-9]{64}/);
+          assert.equal(technical.overflow,false);assert.ok(technical.summaryHeight>=44);
+          if(evidence){
+            await evaluate(`document.querySelector('[aria-label="Separates historisches Arena-Ergebnis · UI-Fixture"] details summary').scrollIntoView({block:'center'})`);
+            const image=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+            writeFileSync(join(evidence,`v11-m11-historical-${fixtureName}-details-${size.width}x${size.height}.png`),Buffer.from(image.data,'base64'));
+          }
+          assert.equal(await evaluate(`document.querySelector('.arena-models').innerHTML===${JSON.stringify(beforeHistorical.cards)}`),true);
         }
-        const historical=await evaluate(`(()=>{
-          const section=document.querySelector('[aria-label="Separates historisches Arena-Ergebnis · UI-Fixture"]');
-          const disclosure=section.querySelector('details');
-          disclosure.querySelector('summary').focus();
-          return {text:section.innerText,overflow:document.documentElement.scrollWidth>innerWidth+1,
-            summaryHeight:disclosure.querySelector('summary').getBoundingClientRect().height,
-            requests:performance.getEntriesByType('resource').length,cards:document.querySelector('.arena-models').innerHTML};
-        })()`);
-        assert.match(historical.text,/SYNTHETIC_ONLY/);
-        assert.match(historical.text,/kein Producer-Export/);
-        assert.match(historical.text,/Lifecycle: queued/);
-        assert.match(historical.text,/Engine-Ergebnisstatus: Nicht verfügbar/);
-        assert.equal(historical.overflow,false);assert.ok(historical.summaryHeight>=44);
-        assert.equal(historical.requests,beforeHistorical.requests);assert.equal(historical.cards,beforeHistorical.cards);
-        await key('Enter','Enter',13);
-        assert.equal(await evaluate(`document.querySelector('[aria-label="Separates historisches Arena-Ergebnis · UI-Fixture"] details').open`),true);
         const navClear=await evaluate(`(()=>{const root=document.documentElement,section=document.querySelector('#strategy-arena-root');window.scrollTo(0,root.scrollHeight);return section.lastElementChild.getBoundingClientRect().bottom<=document.getElementById('nav').getBoundingClientRect().top+1;})()`);
         assert.equal(navClear,true);
 
