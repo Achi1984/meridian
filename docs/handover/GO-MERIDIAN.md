@@ -1,3 +1,15 @@
+> **Current routing and review rule — owner decision 2026-10-23**
+> Resolve `mailboxIssue` from the live `MERIDIAN_LIVE_CHECKPOINT.json` before posting.
+> This reviewed rollover candidate selects #942, predecessor #639, watchdog status
+> comment6371625947, threshold200. Before merge the live checkpoint still selects #639;
+> archive #639 only after the successor smoke succeeds. Earlier mailbox declarations
+> and handoff snapshots below are historical; they do not override live routing.
+> Final exact-head Claude GREEN_LIGHT after completed successful CI remains mandatory.
+> Lead-only closure of SOURCE_GREEN/CI_PENDING does not replace that final review.
+> Owner decision and literal quotes: #639/comment6371484899. #941 completed with all
+> postchecks (receipt6371614438). #940 remains held until routing/smoke completion.
+> SOURCE_AUDIT and all false authorization flags remain unchanged; no activation.
+
 > Current reconciliation — 2026-10-19, PR #901 main alignment.
 > Verified main: `496360869171f0a29e3efbc7ec216ffc1833c6a0` (PR #900).
 > PR #900 complete: independent Work review #639/6273568843, merge receipt
