@@ -426,11 +426,7 @@ function validScreen(screen,resultStatus,binding){
   if(binding?.screenMode!=='SYNTHETIC_ONLY')return false;
   if(resultStatus==='INSUFFICIENT_EVIDENCE')
     return exact(screen,['status'])&&screen.status==='INSUFFICIENT_EVIDENCE';
-  if(!record(screen))return false;
-  if(screen.status==='INSUFFICIENT_EVIDENCE')
-    return exact(screen,['status','checks','relativeDrawdownReduction'])&&
-      exact(screen.checks,['fullBasketDrawdownDenominator'])&&
-      screen.checks.fullBasketDrawdownDenominator===false&&screen.relativeDrawdownReduction===null;
+  if(!record(screen)||screen.status==='INSUFFICIENT_EVIDENCE')return false;
   const screenKeys=['status','interpretation','comparisonSegment','neighbourStressScenario','checks',
     'relativeDrawdownReduction','neighbourPositiveCounts','stopPolicy','tradeCRV'];
   const checkKeys=['primaryDiagnosticNetPositive','primaryDiagnosticDrawdownAtMost25Percent',

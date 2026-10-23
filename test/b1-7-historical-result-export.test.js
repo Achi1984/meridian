@@ -144,6 +144,17 @@ test('synthetic producer bindings reject resealed historical screen verdicts',as
     assert.equal((await parseArenaHistoricalExport(new TextEncoder().encode(JSON.stringify(changed)))).status,
       'INVALID',`${status}/${interpretation}`);
   }
+  const completedWithInsufficientScreen=structuredClone(completed);
+  const completedNested=JSON.parse(completedWithInsufficientScreen.job.result);
+  completedNested.screen={status:'INSUFFICIENT_EVIDENCE',
+    checks:{fullBasketDrawdownDenominator:false},relativeDrawdownReduction:null};
+  completedWithInsufficientScreen.job.result=canonicalJson(completedNested);
+  completedWithInsufficientScreen.job.resultSha256=digest(completedWithInsufficientScreen.job.result);
+  await seal(completedWithInsufficientScreen);
+  assert.equal((await parseArenaHistoricalExport(
+    new TextEncoder().encode(JSON.stringify(completedWithInsufficientScreen))
+  )).status,'INVALID');
+
   const insufficientProfile=createInsufficientEvidenceProfile();
   const insufficientResult=generatedResult(insufficientProfile,createInsufficientEvidenceSeries());
   const insufficient=await generatedEnvelope(

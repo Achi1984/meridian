@@ -21,9 +21,10 @@ Progress and returned path results retain their producer order; missing results
 are not synthesized. `CLAIMED` and `RUNNING` are displayed as unresolved
 `unknown`, with their fence and explicit-reconciliation requirement kept
 separate from the engine result status.
-The engine summary status and the screen status remain distinct: a completed
-44-path summary may carry `status: COMPLETED` while its returned
-`screen.status` is `INSUFFICIENT_EVIDENCE`.
+The engine summary status and screen status remain distinct. The separate
+historical UI-fixture projection can represent a completed 44-path summary with
+`screen.status: INSUFFICIENT_EVIDENCE`; the producer importer does not accept
+that screen variant for its synthetic-only bindings.
 
 The parser rejects unknown envelope/job/result keys, malformed nested JSON,
 conflicting path identities, results outside the inventory, invalid numbers,
@@ -200,11 +201,11 @@ wrong object, a missing mandatory property, or a non-numeric metric-array
 element is rejected even when all enclosing digests are recomputed.
 The trusted producer bindings are synthetic-only: completed-result screens
 must use `SYNTHETIC_ONLY_NOT_ASSESSED` with
-`SYNTHETIC_FIXTURE_RULE_CHECKS_ONLY` or the exact screen-level insufficient
-shape. `PASS`, `NO_EDGE`, and `HISTORICAL_CANDIDATE_ONLY_NOT_HOLDOUT`
-interpretations are not accepted for these bindings. A result-level
-`INSUFFICIENT_EVIDENCE` remains a supported engine status and is kept separate
-from the screen status.
+`SYNTHETIC_FIXTURE_RULE_CHECKS_ONLY`. `PASS`, `NO_EDGE`, historical-only
+interpretations, and a screen-level insufficient verdict on a completed result
+are rejected for these bindings. A result-level `INSUFFICIENT_EVIDENCE` remains
+a supported engine status and requires the exact screen shape
+`{"status":"INSUFFICIENT_EVIDENCE"}`.
 
 The importer rejects duplicate/unknown keys, unknown schema or purpose,
 malformed nested JSON, bad digests, duplicate or conflicting path IDs/tuples,
