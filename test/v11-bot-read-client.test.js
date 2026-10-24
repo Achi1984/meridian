@@ -47,7 +47,23 @@ test('401 and 403 clear previously visible rows',async()=>{
 test('stale source withholds rows and focus revalidation expires a fresh snapshot',async()=>{
   const h=harness();await h.client.refresh();h.time(TIME+900001);h.client.revalidate();
   assert.equal(h.events.at(-1).status,'stale');assert.deepEqual(h.events.at(-1).model.bots,[]);
+  assert.equal('readIdentity' in h.events.at(-1),false);
   await h.client.refresh();assert.equal(h.events.at(-1).status,'stale');
+});
+test('same-read revalidation keeps an opaque identity while every explicit read gets a new one',async()=>{
+  const h=harness();await h.client.refresh();
+  const first=h.events.at(-1),firstIdentity=first.readIdentity;
+  assert.equal(typeof firstIdentity,'symbol');
+  h.client.revalidate();
+  assert.equal(h.events.at(-1).status,'fresh');
+  assert.notEqual(h.events.at(-1).model,first.model,'revalidation reprojects instead of caching a model');
+  assert.equal(h.events.at(-1).readIdentity,firstIdentity);
+  assert.doesNotMatch(JSON.stringify(h.events),/private-test-token/);
+  await h.client.refresh();
+  assert.equal(h.events.at(-1).status,'fresh');
+  assert.notEqual(h.events.at(-1).readIdentity,firstIdentity,'explicit identical read starts a new identity');
+  h.token('replacement-token');h.client.revalidate();
+  assert.deepEqual(h.events.at(-1),{status:'locked',model:null});
 });
 test('lock invalidates ignored abort and late fetch resolution',async()=>{
   const d=deferred();const h=harness({fetchImpl:()=>d.promise});
