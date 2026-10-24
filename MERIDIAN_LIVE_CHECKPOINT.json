@@ -100,7 +100,155 @@
   "quickCommand": "Go Meridian",
   "bootstrapFile": "MERIDIAN_GO.md",
   "currentWork": {
-    "updatedAt": "2026-10-23",
+    "updatedAt": "2026-10-24",
+    "strategyEvidenceWorkspace944": {
+      "opId": "MERIDIAN-944-INTEGRATE-20261024-R1",
+      "issue": 944,
+      "pullRequest": 946,
+      "branch": "lead/arena944-result-view-preparation",
+      "verifiedBaseSha": "b5727493378814229267a7d881471172d0b606fb",
+      "historicalPublishedCorrectionCommit": "fb844e012bc999e4939f4a9d02b5e5cc216be3dc",
+      "pullRequestState": "DRAFT",
+      "dependencyPr940": {
+        "state": "COMPLETE_MERGED_AND_POSTCHECKED",
+        "mergeSha": "b5727493378814229267a7d881471172d0b606fb",
+        "reviewedHead": "14f4d33fe173c3a0b7b8829f18e8d5611abebcb9",
+        "verifiedBaseSha": "ab4f91b65f76981bdcd8aa69996ec63deb6f65c2",
+        "finalClaudeReceiptCommentId": 6380610504,
+        "preMergeReleaseSafety": {
+          "runId": 40020095282,
+          "attempt": 2,
+          "jobId": 120790537195,
+          "result": "SUCCESS"
+        },
+        "postMergeChecks": {
+          "releaseSafety": {"runId": 40068725083, "result": "SUCCESS"},
+          "runtimeSmoke": {"runId": 40068724996, "result": "SUCCESS"},
+          "releaseCoordinator": {"runId": 40068725175, "result": "SUCCESS"},
+          "pages": {"runId": 40068723395, "result": "SUCCESS"}
+        },
+        "completionReceiptIssue": 942,
+        "completionReceiptCommentId": 6380786372
+      },
+      "priorExactHeadReleaseSafety": {
+        "head": "7758e4251a5f66e6ce1b5b9cdf49bd3baacdf841",
+        "runId": 40071135556,
+        "result": "ACTION_REQUIRED_NO_JOBS",
+        "retryOrApproval": "NOT_REQUESTED"
+      },
+      "earlierObservedExactHeadReleaseSafety": {
+        "head": "21bf62cdd8cc1aaf8c0f04b0d8c50640e6376fc4",
+        "runId": 40072536126,
+        "result": "ACTION_REQUIRED_NO_JOBS",
+        "retryOrApproval": "NOT_REQUESTED"
+      },
+      "lastReviewedCandidate": {
+        "head": "b40b4ed1bae7059db1f4ed85c131e45a518d76ad",
+        "releaseSafety": {
+          "runId": 40072753537,
+          "attempt": 2,
+          "jobId": 120813573164,
+          "result": "SUCCESS",
+          "tests": {"passed": 2738, "failed": 0, "skipped": 0}
+        },
+        "claudeReview": {
+          "receiptCommentId": 6381590041,
+          "verdict": "REVISION_REQUIRED",
+          "findings": ["DOC_ALLOWLIST_INACCURATE", "REVIEW_COVERAGE_INCOMPLETE"]
+        }
+      },
+      "currentGate": "CURRENT_MAIN_INTEGRATED_FOR_DRAFT_REPAIR_PREPARATION; EXACT_INTEGRATED_HEAD_CI_AND_COMPLETE_CLAUDE_REVIEW_PENDING; PR947_POSTCHECK_FAILED_NOT_COMPLETE",
+      "repairIntegration": {
+        "intentCommentId": 6387579709,
+        "integrationMode": "MERGE_MAIN_NO_REBASE",
+        "integratedMainSha": "4ac61510c615e8743df77647394fe8e70e7a293b",
+        "mergeCommit": "485e4486fbb54689f48b0b4cd1afebf174c5fb04",
+        "preparedRepairHead": "d0509e43bf816a6392bdb17e98f4d10077dd8a90",
+        "preMergeAcceptance": {
+          "review": {
+            "receiptIssue": 942,
+            "receiptCommentId": 6384839597,
+            "verdict": "GREEN_LIGHT"
+          },
+          "releaseSafety": {
+            "runId": 40075414844,
+            "attempt": 2,
+            "jobId": 120818592329,
+            "result": "SUCCESS",
+            "tests": {
+              "passed": 2733,
+              "failed": 0,
+              "skipped": 0
+            }
+          }
+        },
+        "mainMergeReceipt": {
+          "issue": 942,
+          "commentId": 6386970534,
+          "status": "MERGED_POSTCHECKS_PENDING"
+        },
+        "postMergeChecks": {
+          "releaseSafety": {
+            "runId": 40113807323,
+            "jobId": 120930807986,
+            "result": "FAILED",
+            "tests": {
+              "passed": 2732,
+              "failed": 1,
+              "skipped": 0
+            },
+            "failure": "test/v11-strategy-workspace-chrome.test.js:594"
+          },
+          "runtimeSmoke": {
+            "runId": 40113807233,
+            "jobId": 120930807848,
+            "result": "SUCCESS"
+          },
+          "releaseCoordinator": {
+            "runId": 40113807270,
+            "jobId": 120930807924,
+            "result": "SUCCESS"
+          },
+          "pages": {
+            "runId": 40113806502,
+            "result": "SUCCESS"
+          }
+        },
+        "postMergeReceipt": {
+          "issue": 942,
+          "commentId": 6387020975,
+          "status": "POSTCHECK_FAILED_NOT_COMPLETE"
+        },
+        "repairStatus": "TEST_ONLY_ASYNC_IMPORT_SYNCHRONIZATION_FIX_PREPARED; INTEGRATED_HEAD_CHECKS_PENDING",
+        "focusedRepairEvidence": {
+          "testedHead": "d0509e43bf816a6392bdb17e98f4d10077dd8a90",
+          "test": "node --test test/v11-strategy-workspace-chrome.test.js",
+          "result": "PASS_CHROME_320_375_390_430_1440",
+          "appliesToIntegratedHead": false
+        },
+        "exactIntegratedHeadReleaseSafety": "PENDING",
+        "completeScopeClaudeReview": "PENDING",
+        "draftOnly": true,
+        "releaseGateLifted": false
+      },
+      "scope": "ARENA_RESULT_PRESENTATION_AND_SYNTHETIC_GENERATED_FIXTURE_ACCEPTANCE_ONLY",
+      "final946CompletionRecord": "CARRY_IN_NEXT_ASSOCIATED_SOURCE_PR; NO_STANDALONE_CONTINUITY_PUBLICATION",
+      "actualJournalOrMarketDataAccess": false,
+      "canonicalExecutionPerformed": false,
+      "strategyPnlComputed": false,
+      "paperOrLiveExecution": false,
+      "schedulerOrRuntimeActivation": false,
+      "noMergeOrActivationAuthority": true,
+      "authorityFlags": {
+        "executionAuthorized": false,
+        "strategyPnlAuthorized": false,
+        "discoveryAuthorized": false,
+        "validationAuthorized": false,
+        "holdoutAuthorized": false,
+        "paperAuthorized": false,
+        "liveAuthorized": false
+      }
+    },
     "currentB11": {
       "opId": "MERIDIAN-V11-B11-BOT-COCKPIT-20261018",
       "issue": 876,

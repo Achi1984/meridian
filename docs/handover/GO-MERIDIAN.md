@@ -10,6 +10,35 @@
 > postchecks (receipt6371614438). #940 remains held until routing/smoke completion.
 > SOURCE_AUDIT and all false authorization flags remain unchanged; no activation.
 
+> Current Strategy Evidence Workspace correction — 2026-10-24.
+> PR #940 is COMPLETE: merge `b5727493378814229267a7d881471172d0b606fb`;
+> final Claude receipt #942/comment6380610504; pre-merge Release Safety
+> 40020095282 attempt 2/job120790537195 succeeded. Exact-merge postchecks all
+> succeeded: Safety40068725083, Runtime40068724996, Coordinator40068725175,
+> Pages40068723395. Completion receipt: #942/comment6380786372.
+> PR #946 remains Draft. Historical candidate `b40b4ed1bae7059db1f4ed85c131e45a518d76ad`
+> passed Release Safety40072753537 attempt2/job120813573164 (2738/0/0), but Claude
+> #942/comment6381590041 returned REVISION_REQUIRED; that evidence is not current-head
+> approval. For #947, exact pre-merge head `50eb013a0fc0dadf6ab3abc3139c0fd91f70069f`
+> on base `b5727493378814229267a7d881471172d0b606fb` had Claude GREEN_LIGHT
+> #942/comment6384839597 and Release Safety40075414844 attempt2/job120818592329
+> SUCCESS (2733/0/0). Main merge `4ac61510c615e8743df77647394fe8e70e7a293b`
+> was recorded in #942/comment6386970534 as MERGED_POSTCHECKS_PENDING.
+> Exact-merge postchecks: Safety40113807323/job120930807986 FAILED (2732/1/0;
+> `test/v11-strategy-workspace-chrome.test.js:594`); Runtime40113807233,
+> Coordinator40113807270, and Pages40113806502 SUCCESS. #942/comment6387020975
+> records POSTCHECK_FAILED_NOT_COMPLETE; dependent release remains held.
+> The bounded diagnosis/correction was authorized in #946/comment6387579709.
+> Repair head `d0509e43bf816a6392bdb17e98f4d10077dd8a90` passed the focused native
+> Chrome test at 320/375/390/430/1440px, but that is pre-integration evidence only.
+> Current main was merged into the draft repair branch as `485e4486fbb54689f48b0b4cd1afebf174c5fb04`;
+> exact integrated-head Release Safety and complete-scope Claude review remain pending.
+> This repair preparation does not mark #947 complete or lift its release gate.
+> No journal or market-data access, canonical execution, strategy PnL, scheduling,
+> runtime activation, or Paper/Live execution occurred; all authority flags remain false.
+> Historical receipts and provenance are retained; no standalone continuity publication
+> or PR acceptance is claimed.
+
 > Current reconciliation — 2026-10-19, PR #901 main alignment.
 > Verified main: `496360869171f0a29e3efbc7ec216ffc1833c6a0` (PR #900).
 > PR #900 complete: independent Work review #639/6273568843, merge receipt
