@@ -4,7 +4,7 @@ import {renderArenaResultView, ARENA_RESULT_DISCLOSURE_KEYS} from '../v11/arena-
 
 // Constructed presentation projections, not engine runs or authenticated evidence.
 // The importer is the validation boundary; these fixtures exercise its output shape.
-function projectedResult({state='completed', insufficient=false, unresolved=false}={}) {
+function projectedResult({state='completed', insufficient=false, unresolved=false, screenStatus=null}={}) {
   const variants = ['primary-n30-f25','full-basket-weekly','frozen-mean-exposure',
     'frozen-risk-exposure','cash-zero','neighbour-n20-f25','neighbour-n45-f25',
     'neighbour-n30-f20','neighbour-n30-f35'];
@@ -22,19 +22,29 @@ function projectedResult({state='completed', insufficient=false, unresolved=fals
     controlDefinitions:{status:'COMPLETED',meanExposure:0,riskExposure:0,
       primaryDevelopmentSd:0,fullBasketDevelopmentSd:0,calibration:false},
     screen:insufficient?{status:'INSUFFICIENT_EVIDENCE'}:{
-      status:'SYNTHETIC_ONLY_NOT_ASSESSED',interpretation:'SYNTHETIC_FIXTURE_RULE_CHECKS_ONLY',
+      status:screenStatus||'SYNTHETIC_ONLY_NOT_ASSESSED',interpretation:'SYNTHETIC_FIXTURE_RULE_CHECKS_ONLY',
       comparisonSegment:'diagnostic',checks:{primaryDiagnosticNetPositive:false},
       relativeDrawdownReduction:0,neighbourPositiveCounts:{base15bp:0,stress30bp:0},
       stopPolicy:'NO_FINITE_TRADE_STOP',tradeCRV:{status:'UNDEFINED_NO_FINITE_STOP',value:null}
     },
-    evidence:{historyLabel:'SYNTHETIC_ONLY',holdoutClaim:false,costModel:'ASSUMED',executionEvidence:false}
+    identity:{inputSha256:'b'.repeat(64)},
+    authority:{executionAuthorized:false,paperAuthorized:false,liveAuthorized:false},
+    evidence:{sourceAuthenticity:'NOT_ESTABLISHED',historyLabel:'SYNTHETIC_ONLY',
+      holdoutClaim:false,costModel:'ASSUMED',executionEvidence:false}
   };
   return {status:'PRESENT_UNVERIFIED',provenance:{syntheticFixture:true,
     assertionStatus:'UNVERIFIED',source:'CALLER_SUPPLIED_INSPECT_B1',sourceAuthenticity:'NOT_ESTABLISHED'},
     job:{state,attempts:state==='queued'?0:1,fence:state==='queued'?0:1,unresolved,
       trialId:'a'.repeat(64),trialKey:'display-fixture',profile:'SYNTHETIC_DISPLAY',
+      protocolSha256:'c'.repeat(64),sourceSha256:'d'.repeat(64),dataSha256:'b'.repeat(64),
+      manifestSha256:'e'.repeat(64),resultSha256:result?'f'.repeat(64):null,
+      summarySha256:result?'0'.repeat(64):null,
       pathIds:['descriptor-b','descriptor-a'],computationPathIds:['descriptor-a','descriptor-b'],
-      paths:[],controls:'{"exact":1e-7}',controlBindings:{},timestamps:{started:null},
+      paths:[],controls:'{"exact":1e-7}',controlBindings:{},timestamps:{
+        createdAt:'2026-01-01T00:00:00Z',
+        startedAt:state==='queued'?null:'2026-01-01T00:00:01Z',
+        finishedAt:result?'2026-01-01T00:00:02Z':null
+      },
       owner:null,reason:null,result:result?' {"raw":1.2300,"text":"<source>"} ':null,
       executionAuthorized:false,promotionAuthorized:false,profitabilityInferred:false},result};
 }
@@ -56,12 +66,43 @@ test('absent, invalid and loading replace stale metrics and raw data',()=>{
 test('completed projection keeps exact values, zero, false and missing distinct',()=>{
   const html=renderArenaResultView({projection:projectedResult()});
   assert.match(html,/<dt>Nettoertrag<\/dt><dd>0\.123456789<\/dd>/);
-  assert.match(html,/<strong>Cash<\/strong><dl><div><dt>Status<\/dt><dd>COMPLETED<\/dd><\/div><div><dt>Nettoertrag<\/dt><dd>0<\/dd>/);
+  assert.match(html,/<th scope="row">Cash<\/th><td>COMPLETED<\/td><td>0<\/td><td>0<\/td>/);
   assert.match(html,/<dt>Primärer Diagnose-Nettoertrag positiv<\/dt><dd>false<\/dd>/);
   assert.match(html,/<dt>Primärer Diagnose-Drawdown höchstens 25 %<\/dt><dd>Nicht verfügbar<\/dd>/);
   assert.match(html,/<dt>Trade-CRV-Wert<\/dt><dd>Nicht verfügbar<\/dd>/);
+  assert.match(html,/<dt>Input SHA-256 · Job<\/dt><dd>b{64}<\/dd>/);
+  assert.match(html,/<dt>Input SHA-256 · Ergebnis<\/dt><dd>b{64}<\/dd>/);
   assert.match(html,/SYNTHETIC_ONLY · UNVERIFIED/);
   assert.match(html,/CALLER_SUPPLIED_INSPECT_B1/);
+});
+
+test('identity preserves missing and conflicting supplied values without reconciliation',()=>{
+  const projection=projectedResult();
+  projection.job.dataSha256='job-input-digest';
+  projection.result.identity.inputSha256='result-input-digest';
+  projection.job.protocolSha256='job-protocol-digest';
+  projection.result.protocolSha256='result-protocol-digest';
+  projection.job.sourceSha256=null;
+  projection.job.summarySha256=undefined;
+  const html=renderArenaResultView({projection});
+  assert.match(html,/<dt>Input SHA-256 · Job<\/dt><dd>job-input-digest<\/dd>/);
+  assert.match(html,/<dt>Input SHA-256 · Ergebnis<\/dt><dd>result-input-digest<\/dd>/);
+  assert.match(html,/<dt>Quelle SHA-256<\/dt><dd>Nicht verfügbar<\/dd>/);
+  assert.match(html,/<dt>Summary SHA-256<\/dt><dd>Nicht verfügbar<\/dd>/);
+  assert.match(html,/job-protocol-digest/);
+  assert.match(html,/result-protocol-digest/);
+  assert.match(html,/Nächster Schritt für fehlende Angaben:/);
+  assert.match(html,/Quelle SHA-256/);
+});
+
+test('missing timestamps stay explicit and suggest checking the supplied evidence',()=>{
+  const projection=projectedResult();
+  projection.job.timestamps={createdAt:null,startedAt:undefined};
+  const html=renderArenaResultView({projection});
+  assert.match(html,/<dt>Zeitstempel · createdAt<\/dt><dd>Nicht verfügbar<\/dd>/);
+  assert.match(html,/<dt>Zeitstempel · startedAt<\/dt><dd>Nicht verfügbar<\/dd>/);
+  assert.match(html,/<dt>Zeitstempel · finishedAt<\/dt><dd>Nicht verfügbar<\/dd>/);
+  assert.match(html,/Zeitstempel createdAt, Zeitstempel startedAt, Zeitstempel finishedAt im bereitgestellten Producer-Beleg prüfen/);
 });
 
 test('lifecycle, result and screen remain separately labelled',()=>{
@@ -73,6 +114,30 @@ test('lifecycle, result and screen remain separately labelled',()=>{
   assert.match(html,/<dt>Pfade geplant<\/dt><dd>44/);
   assert.match(html,/<dt>Nettoertrag<\/dt><dd>Nicht verfügbar/);
   assert.doesNotMatch(html,/0\.123456789/);
+});
+
+test('44 completed paths and insufficient evidence remain independent dimensions',()=>{
+  const html=renderArenaResultView({projection:projectedResult({screenStatus:'INSUFFICIENT_EVIDENCE'})});
+  assert.match(html,/<dt>Engine-Ergebnis<\/dt><dd>COMPLETED<\/dd>/);
+  assert.match(html,/<dt>Screen<\/dt><dd>INSUFFICIENT_EVIDENCE<\/dd>/);
+  assert.match(html,/<dt>Technische Vollständigkeit<\/dt><dd>COMPLETED · abgeschlossen 44 \/ geplant 44<\/dd>/);
+  assert.match(html,/Abgeschlossene Pfade sind kein Nachweis ausreichender Evidenz/);
+  assert.doesNotMatch(html,/Optimierung erfolgreich|Gewinner|Freigabe erteilt/);
+});
+
+test('caller-supplied authority assertions never grant authorization',()=>{
+  const projection=projectedResult();
+  projection.job.executionAuthorized=true;
+  projection.job.promotionAuthorized=true;
+  projection.job.profitabilityInferred=true;
+  projection.result.authority={executionAuthorized:true,liveAuthorized:true};
+  const html=renderArenaResultView({projection});
+  assert.match(html,/data-arena-result-state="present"/);
+  assert.match(html,/<dt>Autorisierung<\/dt><dd>Execution true · Promotion true · Profitabilität true<\/dd>/);
+  assert.match(html,/executionAuthorized · Caller-Assertion/);
+  assert.match(html,/&quot;liveAuthorized&quot;:true/);
+  assert.match(html,/Producer- oder Caller-Assertions erteilen keine Autorität/);
+  assert.doesNotMatch(html,/authoriz(?:ed|ation).*granted|execution granted|live enabled/i);
 });
 
 test('queued and unresolved have useful next steps without invented results',()=>{
@@ -118,8 +183,14 @@ test('every actionable disclosure has a 44px target and wrapping raw block',()=>
   const html=renderArenaResultView({projection:projectedResult(),expandedSections:[...ARENA_RESULT_DISCLOSURE_KEYS]});
   assert.equal((html.match(/<summary /g)||[]).length,5);
   assert.equal((html.match(/min-height:44px/g)||[]).length,5);
-  assert.ok((html.match(/white-space:pre-wrap;overflow-wrap:anywhere/g)||[]).length>=7);
+  assert.ok((html.match(/white-space:pre-wrap;overflow-wrap:anywhere/g)||[]).length>=6);
   assert.doesNotMatch(html,/tabindex="-1"/);
+  assert.match(html,/<caption>Producerwerte · feste fachliche Reihenfolge, ohne Berechnung oder Sortierung<\/caption>/);
+  const comparison=html.slice(html.indexOf('<caption>'),html.indexOf('</table>'));
+  assert.ok(comparison.indexOf('Baseline · Primär · Basis 15 bp')<comparison.indexOf('Control · Vollkorb'));
+  assert.ok(comparison.indexOf('Control · risikobasierte Exposition')<comparison.indexOf('Cash'));
+  assert.ok(comparison.indexOf('Cash')<comparison.indexOf('Nachbar · Fenster 20'));
+  assert.ok(comparison.indexOf('Nachbar · Fenster 20')<comparison.indexOf('Stress · Primär · 30 bp'));
 });
 
 test('untrusted text is escaped, raw producer spelling and source order preserved',()=>{
