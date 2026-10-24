@@ -133,7 +133,7 @@ test('caller-supplied authority assertions never grant authorization',()=>{
   projection.result.authority={executionAuthorized:true,liveAuthorized:true};
   const html=renderArenaResultView({projection});
   assert.match(html,/data-arena-result-state="present"/);
-  assert.match(html,/<dt>Autorisierung<\/dt><dd>Execution true · Promotion true · Profitabilität true<\/dd>/);
+  assert.match(html,/<dt>Autorisierung · Caller-Assertions<\/dt><dd>Execution true · Promotion true · Profitabilität true<\/dd>/);
   assert.match(html,/executionAuthorized · Caller-Assertion/);
   assert.match(html,/&quot;liveAuthorized&quot;:true/);
   assert.match(html,/Producer- oder Caller-Assertions erteilen keine Autorität/);

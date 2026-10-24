@@ -1,12 +1,14 @@
 import {MAX_INSPECTION_REPORT_BYTES, parseArenaInspectionReport} from './arena-inspection-report.js';
 import {MAX_HISTORICAL_FIXTURE_BYTES, parseArenaHistoricalResultFixture} from './arena-historical-result.js';
 import {MAX_HISTORICAL_EXPORT_BYTES, parseArenaHistoricalExport} from './arena-historical-export.js';
+import {renderArenaResultView} from './arena-result-view.js';
 import {ARENA_CANDIDATES, ARENA_RULESET, ARENA_SYMBOLS, replayStrategyPaperArena} from '../research/strategy-paper-arena.js';
 
 const DIAGNOSTIC_PATH = 'research/results/strategy-arena-20261016/';
 const PROVENANCE_PATH = `${DIAGNOSTIC_PATH}manifest.json`;
 const PROVENANCE_BLOB = 'f06444cb129d39aa60c7ea3c44c8179c163a2270';
 const names = {'H1-B':'Trend + Cash','H1-E':'Trend mit Kostenpuffer','H7-B':'Defensive Spot-Auswahl','H7-R':'Defensive Auswahl mit Rangpuffer',H9:'Basis datierter Futures'};
+let resultViewInstanceCount = 0;
 const escapeHtml = value => String(value ?? 'Unbekannt').replace(/[&<>"']/g, character => ({
   '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
 }[character]));
@@ -224,7 +226,11 @@ function historicalResultSection(projection, busy, producerExport=false) {
   return `<section class="arena-historical-metadata" aria-label="Separates historisches Arena-Ergebnis · ${label}"><h3>Historisches B1-Ergebnis · ${label}</h3><label class="arena-import">${producerExport?'Versionierten Producer-Export':'Vorgeschlagene historische UI-Fixture'} importieren<input ${input} type="file" accept="application/json,.json" ${busy?'disabled':''}></label><p role="${projection?.status === 'INVALID' ? 'alert' : 'status'}">${busy ? `${label} wird geprüft …` : escapeHtml(message)}</p>${report ? `${provenance}${payload}` : `<p>Kein ${producerExport?'authentischer':'echter'} Bericht importiert. Keine Marktdaten, Neuberechnung, Kennzahlenberechnung oder Ergebniszuordnung.</p>`}</section>`;
 }
 
-export function arenaHtml({result=null,error='',busy=false,digest='',provenance=null,provenanceBusy=false,provenanceError='',inspection=null,inspectionBusy=false,historicalResult=null,historicalResultBusy=false,historicalExport=null,historicalExportBusy=false}={}) {
+function historicalExportSection(projection,busy,expandedSections=[],idPrefix='arena-producer-export') {
+  return `<section class="arena-historical-metadata" aria-label="Separates historisches Arena-Ergebnis · Producer-Export"><label class="arena-import">Versionierten Producer-Export importieren<input id="${idPrefix}-input" data-arena-historical-export type="file" accept="application/json,.json"></label>${renderArenaResultView({projection,busy,expandedSections,idPrefix})}</section>`;
+}
+
+export function arenaHtml({result=null,error='',busy=false,digest='',provenance=null,provenanceBusy=false,provenanceError='',inspection=null,inspectionBusy=false,historicalResult=null,historicalResultBusy=false,historicalExport=null,historicalExportBusy=false,historicalExportExpandedSections=[],historicalExportIdPrefix='arena-producer-export'}={}) {
   const rows = result?.candidates || ARENA_CANDIDATES.map(id=>({id}));
   const evidence = result?.sourceKind === 'SYNTHETIC'
     ? 'SYNTHETISCHE TESTDATEN · KEINE MARKTEVIDENZ'
@@ -232,20 +238,48 @@ export function arenaHtml({result=null,error='',busy=false,digest='',provenance=
       : 'Keine Marktdaten importiert. Es findet kein automatischer Replay statt.';
   const controls = result ? `<p class="arena-control">Vergleichswerte: gleichgewichteter Kauf &amp; Halt ${formatNumber(result.controls?.buyAndHold?.baseline?.netReturnPct)} % · Cash ${formatNumber(result.controls?.cash?.baseline?.netReturnPct)} %. Kein risikogleicher Benchmark; keine Gewinnerwahl.</p>` : '';
   const period = result ? `<p>Zeitraum: ${escapeHtml(new Date(result.window.firstExecution).toISOString().slice(0,10))} bis ${escapeHtml(new Date(result.window.end).toISOString().slice(0,10))} · ${formatNumber(result.window.bars)} Tage. Modellannahmen: ${formatNumber(result.model.baselineCostBps)}/${formatNumber(result.model.stressCostBps)} Basispunkte je Kauf/Verkauf.</p>` : '';
-  return `<section class="strategy-arena" aria-labelledby="arena-heading"><header class="section-title"><h2 id="arena-heading">Arena · H1 / H7 / H9</h2><span class="limited">Nur manuell</span></header><p>Vier auswertbare historische Modelle und H9 als datenbedingt gesperrtes Modell. Eine Diagnose ist weder unabhängiger Test noch laufendes Paper. Keine automatische Siegerwahl.</p><div class="arena-toolbar"><label class="arena-import">Synthetischen oder vorhandenen Snapshot importieren<input data-arena-input type="file" accept="application/json,.json" ${busy?'disabled':''}></label><button type="button" data-arena-provenance ${provenanceBusy?'disabled':''}>Historische Belegmetadaten laden</button><button type="button" data-arena-stored ${busy?'disabled':''}>Gespeicherte Diagnose manuell laden</button><button type="button" data-arena-export ${result&&!busy?'':'disabled'}>Diagnose + Quelle exportieren</button></div>${provenanceBusy?'<p role="status">Nur Belegmetadaten werden geladen; keine Kurse oder Neuberechnung.</p>':''}${provenanceError?`<p role="alert">${escapeHtml(provenanceError)}</p>`:''}${busy?'<p role="status">Snapshot wird geprüft und neu berechnet …</p>':''}${error?`<p role="alert">${escapeHtml(error)}</p>`:''}<p class="arena-evidence">${evidence}</p>${period}<div class="arena-models">${rows.map(row=>candidateCard(row)).join('')}</div>${controls}${historicalProvenanceSection(provenance)}${inspectionSection(inspection,inspectionBusy)}${historicalResultSection(historicalResult,historicalResultBusy)}${historicalResultSection(historicalExport,historicalExportBusy,true)}<details><summary>Diagnose-Grenzen</summary><p>Regelsatz ${escapeHtml(ARENA_RULESET)}. Historische Daten, Kosten, Slippage und Universum sind keine unabhängig bestätigte Evidenz. Offene Positionen und abhängige Verkaufsteile sind keine eigenständigen Trades.</p><p>Die gespeicherte 8-Asset-Quelle und die separate historische Abdeckung von 448/955 Schlüssen bleiben unvollständig/fehlgeschlagen. Das ist kein Beleg für den neuen 7-Asset-B1-7-Kandidaten.</p><p>Keine verbundenen Paper-Orders, keine Ausführungsfreigabe und keine Live-Bereitschaft. Kosten sind die ursprünglichen Annahmen dieses Diagnoseprotokolls und werden nicht rückwirkend geändert.</p>${digest?`<p>SHA-256 des importierten Inputs · Integrität, kein Echtheitsnachweis: ${escapeHtml(digest)}</p>`:''}</details></section>`;
+  return `<section class="strategy-arena" aria-labelledby="arena-heading"><header class="section-title"><h2 id="arena-heading">Arena · H1 / H7 / H9</h2><span class="limited">Nur manuell</span></header><p>Vier auswertbare historische Modelle und H9 als datenbedingt gesperrtes Modell. Eine Diagnose ist weder unabhängiger Test noch laufendes Paper. Keine automatische Siegerwahl.</p><div class="arena-toolbar"><label class="arena-import">Synthetischen oder vorhandenen Snapshot importieren<input data-arena-input type="file" accept="application/json,.json" ${busy?'disabled':''}></label><button type="button" data-arena-provenance ${provenanceBusy?'disabled':''}>Historische Belegmetadaten laden</button><button type="button" data-arena-stored ${busy?'disabled':''}>Gespeicherte Diagnose manuell laden</button><button type="button" data-arena-export ${result&&!busy?'':'disabled'}>Diagnose + Quelle exportieren</button></div>${provenanceBusy?'<p role="status">Nur Belegmetadaten werden geladen; keine Kurse oder Neuberechnung.</p>':''}${provenanceError?`<p role="alert">${escapeHtml(provenanceError)}</p>`:''}${busy?'<p role="status">Snapshot wird geprüft und neu berechnet …</p>':''}${error?`<p role="alert">${escapeHtml(error)}</p>`:''}<p class="arena-evidence">${evidence}</p>${period}<div class="arena-models">${rows.map(row=>candidateCard(row)).join('')}</div>${controls}${historicalProvenanceSection(provenance)}${inspectionSection(inspection,inspectionBusy)}${historicalResultSection(historicalResult,historicalResultBusy)}${historicalExportSection(historicalExport,historicalExportBusy,historicalExportExpandedSections,historicalExportIdPrefix)}<details><summary>Diagnose-Grenzen</summary><p>Regelsatz ${escapeHtml(ARENA_RULESET)}. Historische Daten, Kosten, Slippage und Universum sind keine unabhängig bestätigte Evidenz. Offene Positionen und abhängige Verkaufsteile sind keine eigenständigen Trades.</p><p>Die gespeicherte 8-Asset-Quelle und die separate historische Abdeckung von 448/955 Schlüssen bleiben unvollständig/fehlgeschlagen. Das ist kein Beleg für den neuen 7-Asset-B1-7-Kandidaten.</p><p>Keine verbundenen Paper-Orders, keine Ausführungsfreigabe und keine Live-Bereitschaft. Kosten sind die ursprünglichen Annahmen dieses Diagnoseprotokolls und werden nicht rückwirkend geändert.</p>${digest?`<p>SHA-256 des importierten Inputs · Integrität, kein Echtheitsnachweis: ${escapeHtml(digest)}</p>`:''}</details></section>`;
 }
 
 export function createStrategyArenaView(root, options={}) {
   if (!root) throw new TypeError('Arena-Ziel fehlt.');
   const fetchImpl = options.fetchImpl || globalThis.fetch;
-  let state = {result:null,error:'',busy:false,digest:'',provenance:null,provenanceBusy:false,provenanceError:''};
+  let state = {result:null,error:'',busy:false,digest:'',provenance:null,provenanceBusy:false,provenanceError:'',
+    historicalExportIdPrefix:`arena-producer-${++resultViewInstanceCount}`};
   let input = null;
   let receipt = null;
   let disposed = false;
+  let focusId = null;
+  let pendingFocusRestore = false;
   let inspectionGeneration = 0;
   let historicalResultGeneration = 0;
   let historicalExportGeneration = 0;
-  const paint = () => { if (!disposed) root.innerHTML = arenaHtml(state); };
+  const paint = () => {
+    if (disposed) return;
+    const active = globalThis.document?.activeElement;
+    if (active && root.contains(active)) {
+      focusId = active?.id || null;
+      pendingFocusRestore = false;
+    } else if (!(pendingFocusRestore && active === globalThis.document?.body)) {
+      focusId = null;
+      pendingFocusRestore = false;
+    }
+    const disclosures = root.querySelectorAll?.('[data-arena-result-section]') ?? [];
+    if (disclosures.length) {
+      state.historicalExportExpandedSections = [...disclosures]
+        .filter(section=>section.open)
+        .map(section=>section.dataset.arenaResultSection);
+    }
+    root.innerHTML = arenaHtml(state);
+    if (!focusId) return;
+    const target = [...(root.querySelectorAll?.('[id]') ?? [])].find(element=>element.id===focusId);
+    if (target) {
+      target.focus({preventScroll:true});
+      pendingFocusRestore = false;
+    } else {
+      pendingFocusRestore = true;
+    }
+  };
   const listen = async event => {
     if (disposed) return;
     const button = event.target?.closest?.('[data-arena-provenance],[data-arena-stored],[data-arena-export]');

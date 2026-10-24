@@ -537,8 +537,10 @@ for case, state, trial_key in (
 
 - `scripts/research/b1-7/export-historical-result.mjs`
 - `v11/arena-historical-export.js`
+- `v11/arena-result-view.js`
 - `v11/strategy-arena.js`
 - `test/b1-7-historical-result-export.test.js`
+- `test/v11-arena-result-view.test.js`
 - focused generated-export and Arena browser tests:
   `test/v11-arena-historical-result.test.js` and
   `test/v11-strategy-workspace-chrome.test.js`
@@ -548,18 +550,22 @@ No shell/terminal-entry, pinned journal/supervisor/engine/candidate/verifier,
 or actual-data files are in scope. Implementation proceeds only within the
 accepted schema, canonicalization, bounds, and lifecycle semantics above.
 
-Focused generated-fixture coverage (the full local suite is intentionally not
-run for this delivery):
+Focused generated-fixture and renderer coverage:
 
 ```sh
 node --test test/v11-arena-historical-result.test.js
 node --test test/b1-7-historical-result-export.test.js
+node --test test/v11-arena-result-view.test.js
 node --test test/v11-strategy-workspace-chrome.test.js
 ```
 
 The Chrome scenario imports generated queued, completed, and insufficient
-producer envelopes at four viewport widths. It asserts exact visible metrics,
-zero/false/missing fields, independent lifecycle/engine/screen statuses,
-unverified provenance, invalid/stale/read-error clearing, delayed async
-completion, disposal during a pending read, keyboard disclosure, no overflow,
-unchanged model cards, and no additional resource requests for imports.
+producer envelopes at 320, 375, 390, 430, and desktop viewport widths. The
+generated producer import is rendered through the isolated Strategy Evidence
+Workspace; the synthetic UI fixture remains a separate import and presentation.
+The browser scenario asserts exact producer values, zero/false/missing fields,
+independent technical/evidence/authorization dimensions, unverified provenance,
+disclosure and keyboard-focus retention, invalid/loading/stale/read-error
+clearing, delayed async completion, disposal during a pending read, expanded
+content overflow, unchanged model cards, and no additional resource requests
+for imports.
