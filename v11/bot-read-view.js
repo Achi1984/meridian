@@ -71,11 +71,16 @@ export function renderBotReadState(root, state, filters = {}) {
     status.setAttribute('aria-atomic','true');
     section.append(status,details);
     root.replaceChildren(section);
-    region={section,status,details,model:null,expanded:new Set()};regions.set(root,region);
+    region={section,status,details,model:null,readIdentity:null,expanded:new Set()};regions.set(root,region);
   }
   const {section,status,details}=region;
   // A disclosure belongs to one validated snapshot, never to a future read.
-  if(data.status==='fresh'&&region.model===state.model){
+  const hasPreviousIdentity=region.readIdentity!==undefined&&region.readIdentity!==null;
+  const hasNextIdentity=state.readIdentity!==undefined&&state.readIdentity!==null;
+  const sameRead=data.status==='fresh'&&(hasPreviousIdentity||hasNextIdentity
+    ?hasPreviousIdentity&&hasNextIdentity&&region.readIdentity===state.readIdentity
+    :region.model===state.model);
+  if(sameRead){
     for(const card of details.querySelectorAll?.('.bot-card')||[]){
       const ref=card.id.slice('bot-card-'.length);
       if(card.getAttribute('open')!==null)region.expanded.add(ref);
@@ -84,6 +89,7 @@ export function renderBotReadState(root, state, filters = {}) {
   }else{
     region.expanded.clear();
     region.model=data.status==='fresh'?state.model:null;
+    region.readIdentity=data.status==='fresh'&&hasNextIdentity?state.readIdentity:null;
   }
   section.setAttribute('data-state',data.status);
   status.replaceChildren(element(document,'strong',LABELS[data.status][0]),element(document,'p',LABELS[data.status][1]));
@@ -231,9 +237,17 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
     const data=projection(state);
     try{onSnapshot?.(data,jumpToBot);}catch{}
   };
+  const sameRead=(previous,next)=>{
+    if(previous?.status!=='fresh'||next?.status!=='fresh')return false;
+    const hasPreviousIdentity=previous.readIdentity!==undefined&&previous.readIdentity!==null;
+    const hasNextIdentity=next.readIdentity!==undefined&&next.readIdentity!==null;
+    if(hasPreviousIdentity||hasNextIdentity)
+      return hasPreviousIdentity&&hasNextIdentity&&previous.readIdentity===next.readIdentity;
+    return previous.model===next.model;
+  };
   const update=state=>{
     if(disposed)return;
-    if(state?.status!=='fresh'||state.model!==latestState?.model){
+    if(!sameRead(latestState,state)){
       clearPreviousSelection();resetFilterState();
     }
     latestState=state;
@@ -332,5 +346,3 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
     }
   };
 }
-
-

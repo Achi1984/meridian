@@ -184,6 +184,14 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           const backSelector=`[...document.querySelectorAll('#bot-read-root button')].find(b=>b.textContent==='Zur vorherigen Auswahl zurück')`;
           assert.equal(await evaluate(`(${backSelector}).hidden`),false);
           assert.ok(await evaluate(`(${backSelector}).getBoundingClientRect().height>=44`));
+          await evaluate(`window.dispatchEvent(new Event('focus'));window.dispatchEvent(new Event('pageshow'))`);
+          assert.deepEqual(await evaluate(`({query:document.getElementById('bot-symbol-search').value,
+            sort:document.getElementById('bot-sort-filter').value,
+            backHidden:(${backSelector}).hidden,
+            targetOpen:document.getElementById('bot-card-${'b'.repeat(20)}').open,
+            reads:window.__botReads})`),
+            {query:'',sort:'symbol',backHidden:false,targetOpen:true,reads:1},
+            'focus/pageshow reproject the same read without clearing jump context or fetching');
           await evaluate(`(${backSelector}).focus()`);await key('Enter','Enter',13);
           assert.deepEqual(await evaluate(`({query:document.getElementById('bot-symbol-search').value,
             sort:document.getElementById('bot-sort-filter').value,
@@ -361,4 +369,3 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
       await new Promise(resolve=>server.close(resolve));
     }
   });
-

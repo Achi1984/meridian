@@ -191,6 +191,61 @@ test('real client to model to renderer pipeline expires data, locks on logout an
   credential='';client.revalidate();assert.equal(events.at(-1),'locked');assert.equal(all(target,'li').length,0);
   client.dispose();await client.refresh();assert.equal(calls,1);
 });
+test('real client revalidation preserves investigation state only within the same fresh read',async()=>{
+  const target=root();let credential='synthetic-token',clock=Date.parse('2026-10-12T20:01:00Z'),payload=snapshot('2026-10-12T20:00:00Z');
+  let calls=0,client,lastState,jump;
+  const view=createBotReadView(target,{getToken:()=>credential,
+    onSnapshot:(_,navigate)=>{jump=navigate;},
+    createClient:options=>{
+      client=createBotReadClient({...options,now:()=>clock,fetchImpl:async()=>{
+        calls++;return new Response(JSON.stringify(payload));
+      },onChange:state=>{lastState=state;options.onChange(state);}});
+      return client;
+    }});
+  await client.refresh();
+  const firstIdentity=lastState.readIdentity;
+  const search=all(target,'input')[0],direction=all(target,'select')[0],sort=all(target,'select')[2];
+  change(search,'input','BTC');change(direction,'change','short');change(sort,'change','pnl');
+  all(target,'details')[0].setAttribute('open','');
+  jump('a'.repeat(20));
+  assert.equal(returnButton({target}).hidden,false);
+  assert.equal(all(target,'details')[0].getAttribute('open'),'');
+  client.revalidate();
+  assert.equal(lastState.readIdentity,firstIdentity);
+  assert.notEqual(lastState.model,undefined);
+  assert.equal(returnButton({target}).hidden,false,'same-read projection retains the Command return');
+  assert.equal(all(target,'details')[0].getAttribute('open'),'','same-read projection retains the expanded Bot');
+  returnButton({target}).click();
+  assert.equal(search.value,'BTC');assert.equal(direction.value,'short');assert.equal(sort.value,'pnl');
+  assert.equal(all(target,'details')[0].getAttribute('open'),'');
+  assert.equal(calls,1,'revalidation never reads again');
+
+  await client.refresh();
+  assert.notEqual(lastState.readIdentity,firstIdentity,'an explicit identical refresh invalidates the old read');
+  assert.equal(search.value,'');assert.equal(returnButton({target}).hidden,true);
+  assert.equal(all(target,'details')[0].getAttribute('open'),null);
+
+  change(search,'input','BTC');jump('a'.repeat(20));
+  credential='replacement-token';client.revalidate();
+  assert.equal(lastState.status,'locked');assert.equal(search.value,'');
+  assert.equal(returnButton({target}).hidden,true);assert.equal(all(target,'details').length,0);
+  await client.refresh();
+  change(search,'input','BTC');all(target,'details')[0].setAttribute('open','');
+  payload={...payload,schemaVersion:'MALFORMED'};
+  await client.refresh();
+  assert.equal(lastState.status,'unavailable');assert.equal(lastState.readIdentity,undefined);
+  assert.equal(search.value,'');assert.equal(returnButton({target}).hidden,true);
+  assert.equal(all(target,'details').length,0);
+  payload=snapshot('2026-10-12T20:00:00Z');await client.refresh();
+  change(search,'input','BTC');jump('a'.repeat(20));
+  clock=Date.parse('2026-10-12T20:16:00Z');client.revalidate();
+  assert.equal(lastState.status,'stale');assert.equal(lastState.readIdentity,undefined);
+  assert.equal(search.value,'');assert.equal(returnButton({target}).hidden,true);
+  clock=Date.parse('2026-10-12T20:01:00Z');client.revalidate();
+  assert.equal(lastState.status,'stale','a clock rollback cannot revive a wiped stale snapshot');
+  assert.equal(calls,5,'only explicit reads fetch, including the malformed read');
+  view.dispose();
+});
 
 test('collapsed native cards distinguish equal symbols and render only whitelisted metrics',()=>{
   const state=fresh(), target=root();
