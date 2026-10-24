@@ -15,23 +15,31 @@ class Node {
   contains(node){return this===node||this.children.some(child=>child.contains(node));}
   setAttribute(key,value){this.attrs[key]=String(value);}
   getAttribute(key){return this.attrs[key]??null;}
+  removeAttribute(key){delete this.attrs[key];}
+  querySelectorAll(selector){const matches=node=>selector.startsWith('.')
+    ? node.className===selector.slice(1):node.tagName===selector;
+    return this.children.flatMap(node=>[...(matches(node)?[node]:[]),...node.querySelectorAll(selector)]);}
+  querySelector(selector){return this.querySelectorAll(selector)[0]||null;}
+  focus(){this.ownerDocument.activeElement=this;}
   addEventListener(type,fn){if(!this.listeners.has(type))this.listeners.set(type,new Set());this.listeners.get(type).add(fn);}
   removeEventListener(type,fn){this.listeners.get(type)?.delete(fn);}
   click(){if(!this.disabled)for(const fn of this.listeners.get('click')||[])fn();}
 }
-function root(){const document={createElement:tag=>new Node(document,tag)};return document.createElement('div');}
+function root(){const document={createElement:tag=>new Node(document,tag)};const target=document.createElement('div');
+  document.getElementById=id=>[target,...all(target,'details')].find(node=>node.id===id)||null;
+  return target;}
 const all=(node,tag)=>[...(node.tagName===tag?[node]:[]),...node.children.flatMap(x=>all(x,tag))];
 const fresh=()=>({status:'fresh',model:{status:'FRESH_SNAPSHOT',readOnly:true,executionAllowed:false,
   source:'PIONEX_BOT_API',snapshotAt:'2026-10-12T20:00:00Z',
   bots:[{ref:'a'.repeat(20),symbol:'BTC',side:'SHORT',type:'futures_grid',category:'inverse',
     metrics:{leverage:null,pnlUsd:null},secret:'NEVER DISPLAY'}]}});
 function mounted(overrides={}){
-  const target=root(),calls={refresh:0,lock:0,dispose:0,revalidate:0};let publish;
+  const target=root(),calls={refresh:0,lock:0,dispose:0,revalidate:0};let publish,jump;
   const client={refresh(){calls.refresh++;publish({status:'loading'});},lock(){calls.lock++;publish({status:'locked'});},
     dispose(){calls.dispose++;},revalidate(){calls.revalidate++;},...overrides};
   const getter=()=>{throw new Error('renderer must not read token');};
-  const view=createBotReadView(target,{getToken:getter,createClient:options=>{assert.equal(options.getToken,getter);publish=options.onChange;return client;}});
-  return {target,view,calls,publish:state=>publish(state),
+  const view=createBotReadView(target,{getToken:getter,onSnapshot:(_,navigate)=>{jump=navigate;},createClient:options=>{assert.equal(options.getToken,getter);publish=options.onChange;return client;}});
+  return {target,view,calls,publish:state=>publish(state),jump:ref=>jump(ref),
     buttons:all(target,'button').filter(node=>['Bots aktualisieren','Botansicht sperren'].includes(node.text))};
 }
 test('fresh rows use bounded labels, UTC time, correct side and no arbitrary data',()=>{
@@ -225,4 +233,56 @@ test('Command equal-symbol equal-loss actions have distinct references and direc
   assert.match(buttons[0].textContent,/BTC · Long · Referenz a{20}/);
   assert.match(buttons[1].textContent,/BTC · Short · Referenz b{20}/);
   buttons.forEach(button=>button.click());assert.deepEqual(selected,['a'.repeat(20),'b'.repeat(20)]);
+});
+
+
+const change=(node,type,value)=>{node.value=value;for(const listener of node.listeners.get(type)||[])listener();};
+const returnButton=h=>all(h.target,'button').find(node=>node.text==='Zur vorherigen Auswahl zurück');
+function duplicateSnapshot(){const state=fresh();state.model.bots.push({...state.model.bots[0],ref:'b'.repeat(20),side:'LONG'});return state;}
+test('disclosures retain exact reference through filtering sorting and reset within one snapshot',()=>{
+  const h=mounted(),state=duplicateSnapshot();h.publish(state);
+  all(h.target,'details')[0].setAttribute('open','');
+  const direction=all(h.target,'select')[0],sort=all(h.target,'select')[2];
+  change(direction,'change','long');assert.equal(all(h.target,'details').length,1);
+  assert.equal(all(h.target,'details')[0].getAttribute('open'),null,'same symbol is not the same Bot');
+  change(sort,'change','pnl');change(direction,'change','all');
+  const [a,b]=all(h.target,'details');assert.equal(a.getAttribute('open'),'');assert.equal(b.getAttribute('open'),null);
+  a.removeAttribute('open');change(sort,'change','leverage');
+  assert.equal(all(h.target,'details')[0].getAttribute('open'),null,'explicit close survives rerender');
+  all(h.target,'details')[1].setAttribute('open','');
+  all(h.target,'button').find(node=>node.text==='Filter zurücksetzen').click();
+  assert.equal(all(h.target,'details')[1].getAttribute('open'),'');assert.equal(h.calls.refresh,0);
+});
+test('Command jump and return retain original filters and reveal exact duplicate-symbol Bot',()=>{
+  const h=mounted();h.publish(duplicateSnapshot());
+  const search=all(h.target,'input')[0],direction=all(h.target,'select')[0],sort=all(h.target,'select')[2];
+  change(search,'input','NO_MATCH');change(direction,'change','long');change(sort,'change','pnl');
+  h.jump('a'.repeat(20));assert.equal(returnButton(h).hidden,false);assert.equal(search.value,'');
+  assert.equal(h.target.ownerDocument.activeElement,all(h.target,'details')[0].querySelector('summary'));
+  h.jump('b'.repeat(20));assert.equal(h.target.ownerDocument.activeElement,all(h.target,'details')[1].querySelector('summary'));
+  returnButton(h).click();assert.equal(search.value,'NO_MATCH');assert.equal(direction.value,'long');assert.equal(sort.value,'pnl');
+  assert.equal(all(h.target,'details').length,0);assert.equal(returnButton(h).hidden,true);
+  assert.equal(h.target.ownerDocument.activeElement,search);assert.equal(h.calls.refresh,0);
+});
+test('every invalidation and snapshot replacement drops disclosure and return memory',()=>{
+  for(const status of ['loading','locked','stale','unavailable','malformed','new-snapshot','dispose']){
+    const h=mounted(),state=duplicateSnapshot();h.publish(state);
+    change(all(h.target,'input')[0],'input','BTC');h.jump('a'.repeat(20));
+    const previousReturn=returnButton(h);
+    if(status==='dispose')h.view.dispose();
+    else if(status==='new-snapshot')h.publish(duplicateSnapshot());
+    else if(status==='malformed')h.publish({status:'fresh',model:{...state.model,readOnly:false}});
+    else h.publish({status});
+    assert.equal(previousReturn.hidden,true,status);previousReturn.click();
+    if(status==='dispose'){assert.equal(h.target.textContent,'');continue;}
+    h.publish(state);assert.ok(all(h.target,'details').every(node=>node.getAttribute('open')===null),status);
+    assert.equal(returnButton(h).hidden,true,status);
+    assert.equal(h.calls.refresh,0,status);
+  }
+});
+test('reset discards pending return and unknown Command targets do not change selection',()=>{
+  const h=mounted();h.publish(fresh());const search=all(h.target,'input')[0];
+  change(search,'input','BTC');h.jump('f'.repeat(20));assert.equal(search.value,'BTC');assert.equal(returnButton(h).hidden,true);
+  h.jump('a'.repeat(20));all(h.target,'button').find(node=>node.text==='Filter zurücksetzen').click();
+  assert.equal(returnButton(h).hidden,true);returnButton(h).click();assert.equal(search.value,'');
 });

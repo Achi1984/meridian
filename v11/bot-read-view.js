@@ -71,9 +71,20 @@ export function renderBotReadState(root, state, filters = {}) {
     status.setAttribute('aria-atomic','true');
     section.append(status,details);
     root.replaceChildren(section);
-    region={section,status,details};regions.set(root,region);
+    region={section,status,details,model:null,expanded:new Set()};regions.set(root,region);
   }
   const {section,status,details}=region;
+  // A disclosure belongs to one validated snapshot, never to a future read.
+  if(data.status==='fresh'&&region.model===state.model){
+    for(const card of details.querySelectorAll?.('.bot-card')||[]){
+      const ref=card.id.slice('bot-card-'.length);
+      if(card.getAttribute('open')!==null)region.expanded.add(ref);
+      else region.expanded.delete(ref);
+    }
+  }else{
+    region.expanded.clear();
+    region.model=data.status==='fresh'?state.model:null;
+  }
   section.setAttribute('data-state',data.status);
   status.replaceChildren(element(document,'strong',LABELS[data.status][0]),element(document,'p',LABELS[data.status][1]));
   details.replaceChildren();
@@ -101,6 +112,7 @@ export function renderBotReadState(root, state, filters = {}) {
         const item=element(document,'li'),card=element(document,'details'),summary=element(document,'summary');
         card.className='bot-card';
         card.id='bot-card-'+bot.ref;
+        if(region.expanded.has(bot.ref))card.setAttribute('open','');
         const heading=element(document,'span',bot.symbol+' · '+bot.side);heading.className='bot-card-heading';
         const identity=element(document,'span','Bot '+(index+1)+(bot.ref?' · Referenz '+bot.ref:''));
         identity.className='bot-card-reference';
@@ -198,15 +210,22 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
     ['symbol','Symbol (A–Z)'],['leverage','Bestätigter Hebel'],['pnl','P/L laut Quelle']]);
   const reset=element(document,'button','Filter zurücksetzen');reset.setAttribute('type','button');
   reset.setAttribute('aria-label','Alle Botfilter zurücksetzen');filterPanel.append(reset);
+  const returnSelection=element(document,'button','Zur vorherigen Auswahl zurück');
+  returnSelection.setAttribute('type','button');returnSelection.hidden=true;filterPanel.append(returnSelection);
   const refresh=element(document,'button','Bots aktualisieren'),lock=element(document,'button','Botansicht sperren');
   refresh.id='bot-read-refresh';lock.id='bot-read-lock';
   refresh.setAttribute('type','button');lock.setAttribute('type','button');
   controls.append(refresh,lock);section.append(element(document,'h3','Meine Pionex Bots'),filterPanel,content,controls);
   root.replaceChildren(section);
-  let disposed=false,client,action=0,latestState={status:'locked'};
+  let disposed=false,client,action=0,latestState={status:'locked'},previousSelection=null;
+  const clearPreviousSelection=()=>{previousSelection=null;returnSelection.hidden=true;};
+  const applyFilters=selection=>{
+    Object.assign(filterState,selection);
+    search.value=filterState.query;directionSelect.value=filterState.direction;
+    categorySelect.value=filterState.category;sortSelect.value=filterState.sort;
+  };
   const resetFilterState=()=>{
-    filterState.query='';filterState.direction='all';filterState.category='all';filterState.sort='symbol';
-    search.value='';directionSelect.value='all';categorySelect.value='all';sortSelect.value='symbol';
+    applyFilters({query:'',direction:'all',category:'all',sort:'symbol'});
   };
   const notifySnapshot=state=>{
     const data=projection(state);
@@ -214,9 +233,14 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
   };
   const update=state=>{
     if(disposed)return;
+    if(state?.status!=='fresh'||state.model!==latestState?.model){
+      clearPreviousSelection();resetFilterState();
+    }
     latestState=state;
     let status=renderBotReadState(content,state,filterState);
     if(status!=='fresh'){
+      clearPreviousSelection();
+      latestState={status};
       resetFilterState();
       renderBotReadState(content,state,filterState);
     }
@@ -231,10 +255,19 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
     renderBotReadState(content,latestState,filterState);
   };
   const resetFilters=()=>{
+    clearPreviousSelection();
     resetFilterState();updateFilters();
   };
+  const returnToSelection=()=>{
+    if(disposed||!previousSelection||latestState?.status!=='fresh')return;
+    const selection=previousSelection;clearPreviousSelection();
+    applyFilters(selection);updateFilters();search.focus?.();
+  };
   const jumpToBot=ref=>{
-    if(disposed||typeof ref!=='string'||latestState?.status!=='fresh')return;
+    if(disposed||typeof ref!=='string'||latestState?.status!=='fresh'||
+      !latestState.model?.bots?.some(bot=>bot.ref===ref))return;
+    if(!previousSelection)previousSelection={...filterState};
+    returnSelection.hidden=false;
     resetFilterState();updateFilters();
     const nav=document.querySelector?.('#nav [data-v="bots"]');
     nav?.click();
@@ -250,6 +283,7 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
   categorySelect.addEventListener('change',updateFilters);
   sortSelect.addEventListener('change',updateFilters);
   reset.addEventListener('click',resetFilters);
+  returnSelection.addEventListener('click',returnToSelection);
   update({status:'locked'});
   try {
     client=createClient({getToken,onChange:update});
@@ -288,10 +322,15 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
       categorySelect.removeEventListener('change',updateFilters);
       sortSelect.removeEventListener('change',updateFilters);
       reset.removeEventListener('click',resetFilters);
+      returnSelection.removeEventListener('click',returnToSelection);
+      clearPreviousSelection();
+      latestState={status:'locked'};
+      renderBotReadState(content,{status:'locked'});
       try {client.dispose();} catch {}
       notifySnapshot({status:'locked'});
       root.replaceChildren();
     }
   };
 }
+
 
