@@ -10,6 +10,35 @@
 > postchecks (receipt6371614438). #940 remains held until routing/smoke completion.
 > SOURCE_AUDIT and all false authorization flags remain unchanged; no activation.
 
+> Current Strategy Evidence Workspace correction — 2026-10-24.
+> PR #940 is COMPLETE: merge `b5727493378814229267a7d881471172d0b606fb`;
+> final Claude receipt #942/comment6380610504; pre-merge Release Safety
+> 40020095282 attempt 2/job120790537195 succeeded. Exact-merge postchecks all
+> succeeded: Safety40068725083, Runtime40068724996, Coordinator40068725175,
+> Pages40068723395. Completion receipt: #942/comment6380786372.
+> PR #946 remains Draft. Previously published correction commit:
+> `fb844e012bc999e4939f4a9d02b5e5cc216be3dc`; fresh exact-head hosted CI and
+> final independent reviews for the current correction remain pending. On prior
+> candidate `b40b4ed1bae7059db1f4ed85c131e45a518d76ad`, Release Safety run
+> 40072753537 attempt 2/job120813573164 succeeded (2738 passed, 0 failed,
+> 0 skipped), while Claude #942/comment6381590041 returned REVISION_REQUIRED
+> for the documentation allowlist and incomplete review coverage. This evidence
+> applies only to that prior head; the current doc-scope correction needs fresh
+> exact-head CI and complete-scope review. The earlier Safety40071135556 was
+> `action_required` with zero jobs on prior head `7758e425`; it was not retried
+> or approved. Earlier still, Safety40072536126 on `21bf62cd` was
+> `action_required` with zero jobs; that status was superseded for prior-head CI
+> evidence by the successful b40 run above. The preceding integration correction
+> was limited to generated/synthetic presentation and fixture serving/CSP
+> assertions; this correction changes documentation/continuity records only.
+> No current-correction CI or review is claimed. No journal or
+> market-data access, canonical execution, strategy PnL, scheduling, runtime
+> activation, or Paper/Live execution occurred; all authority flags remain false.
+> This supersedes the #940-held statement in the preceding 2026-10-23 snapshot;
+> historical receipts and their provenance are retained. Carry final #946
+> completion evidence into the next associated source PR; do not create a
+> standalone continuity-only publication or claim this correction is acceptance.
+
 > Current continuity reconciliation — 2026-10-21.
 > Latest observed main: **6aeb07c35aa1e45dbaf0e78fc97fd7b59170b6f7**; PR #927
 > source is merged, but postchecks remain pending and it is not yet fully accepted.
