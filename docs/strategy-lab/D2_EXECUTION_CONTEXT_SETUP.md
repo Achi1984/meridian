@@ -118,6 +118,15 @@ inspection error by calling `initialize`, searching for a database, or
 choosing another trial. Preserve state, attempts, timestamps and fence exactly;
 an unresolved `unknown` state is not resumable.
 
+The alternative new-journal branch is permitted only after a later concrete
+setup decision designates a new path and explicitly approves creation. The
+existing `journal.initialize(path, HISTORICAL_PROFILE_NAME)` implementation
+uses exclusive creation and mode `0600`; it refuses an existing file and has
+no reset or migration path. Do not invoke it now or use it as an inspection
+fallback. A newly created empty schema with no trial is not an `OBSERVED`
+historical trial or proof of zero prior attempts. Do not enqueue a trial to
+manufacture readiness, and do not add a global all-history gate.
+
 Before accepting a selected context, retain a bounded evidence bundle for:
 
 - persistent volume identity, filesystem/mount, available capacity, owner and
