@@ -76,7 +76,7 @@ export function renderBotReadState(root, state, filters = {}) {
   const {section,status,details}=region;
   // A disclosure belongs to one validated snapshot, never to a future read.
   const hasPreviousIdentity=region.readIdentity!==undefined&&region.readIdentity!==null;
-  const hasNextIdentity=state.readIdentity!==undefined&&state.readIdentity!==null;
+  const hasNextIdentity=state?.readIdentity!==undefined&&state?.readIdentity!==null;
   const sameRead=data.status==='fresh'&&(hasPreviousIdentity||hasNextIdentity
     ?hasPreviousIdentity&&hasNextIdentity&&region.readIdentity===state.readIdentity
     :region.model===state.model);

@@ -82,6 +82,20 @@ test('malformed fresh data fails closed atomically',()=>{
     assert.doesNotMatch(target.textContent,/BTC|script|secret/);
   }
 });
+test('renderer fails closed on null and undefined and does not restore previous disclosures',()=>{
+  for(const malformed of [null,undefined]){
+    const target=root(),state=fresh();state.readIdentity=Symbol('read');
+    assert.equal(renderBotReadState(target,state),'fresh');
+    all(target,'details')[0].setAttribute('open','');
+    assert.doesNotThrow(()=>assert.equal(renderBotReadState(target,malformed),'unavailable'));
+    assert.equal(all(target,'details').length,0);
+    assert.equal(all(target,'li').length,0);assert.equal(all(target,'time').length,0);
+    assert.doesNotMatch(target.textContent,/BTC|2026-10-12|Snapshot-Zeit/);
+    assert.equal(target.querySelector('.bot-read-state').getAttribute('data-state'),'unavailable');
+    assert.equal(renderBotReadState(target,state),'fresh');
+    assert.equal(all(target,'details')[0].getAttribute('open'),null,'valid state cannot revive cleared disclosure');
+  }
+});
 test('unknown enums stay unknown, including inherited object names',()=>{
   const target=root(),state=fresh();Object.assign(state.model.bots[0],{side:'constructor',type:'__proto__',category:'secret'});
   renderBotReadState(target,state);assert.equal((target.textContent.match(/Unbekannt/g)||[]).length,4);
@@ -255,6 +269,27 @@ test('missing read identity fails closed instead of inheriting retained context'
   assert.equal(all(h.target,'input')[0].value,'');
   assert.equal(returnButton(h).hidden,true);
   assert.ok(all(h.target,'details').every(card=>card.getAttribute('open')===null));
+});
+test('view update fails closed on null and undefined and clears all selection context',()=>{
+  for(const malformed of [null,undefined]){
+    const h=mounted(),state=duplicateSnapshot();state.readIdentity=Symbol('read');
+    h.publish(state);
+    const search=all(h.target,'input')[0],direction=all(h.target,'select')[0],sort=all(h.target,'select')[2];
+    change(search,'input','BTC');change(direction,'change','long');change(sort,'change','pnl');
+    all(h.target,'details')[0].setAttribute('open','');h.jump('a'.repeat(20));
+    assert.equal(returnButton(h).hidden,false);
+    assert.doesNotThrow(()=>h.publish(malformed));
+    assert.equal(h.target.querySelector('.bot-read-state').getAttribute('data-state'),'unavailable');
+    assert.equal(all(h.target,'details').length,0);assert.equal(all(h.target,'li').length,0);
+    assert.equal(all(h.target,'time').length,0);
+    assert.doesNotMatch(h.target.textContent,/BTC|2026-10-12|Snapshot-Zeit/);
+    assert.equal(search.value,'');assert.equal(direction.value,'all');assert.equal(sort.value,'symbol');
+    assert.equal(returnButton(h).hidden,true);
+    h.publish(state);
+    assert.equal(search.value,'');assert.equal(direction.value,'all');assert.equal(sort.value,'symbol');
+    assert.equal(returnButton(h).hidden,true);
+    assert.ok(all(h.target,'details').every(card=>card.getAttribute('open')===null));
+  }
 });
 
 test('collapsed native cards distinguish equal symbols and render only whitelisted metrics',()=>{
