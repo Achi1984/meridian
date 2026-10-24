@@ -712,17 +712,45 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         await evaluate(`document.querySelector('#strategy-catalog [data-strategy-id="H1"] summary').click()`);
 
         await evaluate(`(()=>{
+          window.__m11InvalidSnapshotRead={started:false,release:null};
+          const file=new File(['{}'],'malformed-arena.json',{type:'application/json'});
+          Object.defineProperty(file,'text',{value:()=>new Promise(resolve=>{
+            window.__m11InvalidSnapshotRead.started=true;
+            window.__m11InvalidSnapshotRead.release=resolve;
+          })});
           const picker=document.querySelector('[data-arena-input]');
           const transfer=new DataTransfer();
-          transfer.items.add(new File(['{}'],'malformed-arena.json',{type:'application/json'}));
+          transfer.items.add(file);
           picker.files=transfer.files;picker.dispatchEvent(new Event('change',{bubbles:true}));
         })()`);
         for(let attempt=0;attempt<100;attempt++){
-          if(await evaluate(`document.querySelector('#strategy-arena-root [role="alert"]')?.innerText`))break;
+          if(await evaluate(`window.__m11InvalidSnapshotRead?.started`))break;
           await new Promise(resolve=>setTimeout(resolve,20));
         }
-        assert.ok(await evaluate(`document.querySelector('#strategy-arena-root [role="alert"]')?.innerText`),
-          'malformed import exposes a visible error instead of results');
+        assert.equal(await evaluate(`window.__m11InvalidSnapshotRead?.started`),true,
+          'malformed snapshot read is held for deterministic lifecycle assertions');
+        const snapshotBusy=await evaluate(`({
+          status:document.querySelector('#strategy-arena-root .strategy-arena > [role="status"]')?.innerText,
+          disabled:document.querySelector('#strategy-arena-root [data-arena-input]')?.disabled,
+          producerAlert:!!document.querySelector('[aria-label="Separates historisches Arena-Ergebnis · Producer-Export"] [role="alert"]')
+        })`);
+        assert.match(snapshotBusy.status,/Snapshot wird geprüft/);
+        assert.equal(snapshotBusy.disabled,true);
+        assert.equal(snapshotBusy.producerAlert,true);
+        await evaluate(`window.__m11InvalidSnapshotRead.release('{}')`);
+        for(let attempt=0;attempt<100;attempt++){
+          if(await evaluate(`!!document.querySelector('#strategy-arena-root .strategy-arena > [role="alert"]') &&
+            !document.querySelector('#strategy-arena-root [data-arena-input]')?.disabled`))break;
+          await new Promise(resolve=>setTimeout(resolve,20));
+        }
+        const snapshotFailure=await evaluate(`({
+          alert:document.querySelector('#strategy-arena-root .strategy-arena > [role="alert"]')?.innerText,
+          disabled:document.querySelector('#strategy-arena-root [data-arena-input]')?.disabled,
+          producerAlert:!!document.querySelector('[aria-label="Separates historisches Arena-Ergebnis · Producer-Export"] [role="alert"]')
+        })`);
+        assert.ok(snapshotFailure.alert,'malformed snapshot reports its own visible error');
+        assert.equal(snapshotFailure.disabled,false,'snapshot input is re-enabled after validation');
+        assert.equal(snapshotFailure.producerAlert,true,'producer-export rejection remains separate');
 
         const payload=JSON.stringify(syntheticPayload());
         await evaluate(`(()=>{
