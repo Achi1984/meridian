@@ -203,7 +203,7 @@ test('real client revalidation preserves investigation state only within the sam
       return client;
     }});
   await client.refresh();
-  const firstIdentity=lastState.readIdentity;
+  const firstIdentity=lastState.readIdentity,firstModel=lastState.model;
   const search=all(target,'input')[0],direction=all(target,'select')[0],sort=all(target,'select')[2];
   change(search,'input','BTC');change(direction,'change','short');change(sort,'change','pnl');
   all(target,'details')[0].setAttribute('open','');
@@ -212,7 +212,7 @@ test('real client revalidation preserves investigation state only within the sam
   assert.equal(all(target,'details')[0].getAttribute('open'),'');
   client.revalidate();
   assert.equal(lastState.readIdentity,firstIdentity);
-  assert.notEqual(lastState.model,undefined);
+  assert.notEqual(lastState.model,firstModel,'revalidation rebuilds the model');
   assert.equal(returnButton({target}).hidden,false,'same-read projection retains the Command return');
   assert.equal(all(target,'details')[0].getAttribute('open'),'','same-read projection retains the expanded Bot');
   returnButton({target}).click();
@@ -245,6 +245,16 @@ test('real client revalidation preserves investigation state only within the sam
   assert.equal(lastState.status,'stale','a clock rollback cannot revive a wiped stale snapshot');
   assert.equal(calls,5,'only explicit reads fetch, including the malformed read');
   view.dispose();
+});
+test('missing read identity fails closed instead of inheriting retained context',()=>{
+  const h=mounted(),state=duplicateSnapshot();state.readIdentity=Symbol('read');
+  h.publish(state);change(all(h.target,'input')[0],'input','BTC');
+  all(h.target,'details')[0].setAttribute('open','');h.jump('a'.repeat(20));
+  const replacement={...state};delete replacement.readIdentity;
+  h.publish(replacement);
+  assert.equal(all(h.target,'input')[0].value,'');
+  assert.equal(returnButton(h).hidden,true);
+  assert.ok(all(h.target,'details').every(card=>card.getAttribute('open')===null));
 });
 
 test('collapsed native cards distinguish equal symbols and render only whitelisted metrics',()=>{
