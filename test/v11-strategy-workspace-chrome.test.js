@@ -612,9 +612,13 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
             const {createStrategyArenaView}=await import('/v11/strategy-arena.js?v=B12');
             const existingIds=new Set([...document.querySelectorAll('#strategy-arena-root [id^="arena-producer-"]')].map(node=>node.id));
             const root=document.createElement('div');document.body.append(root);
-            const view=createStrategyArenaView(root);
+            const view=createStrategyArenaView(root,{fetchImpl:async()=>{throw Error('synthetic provenance read failure');}});
             const uniqueIds=[...root.querySelectorAll('[id^="arena-producer-"]')]
               .every(node=>!existingIds.has(node.id));
+            const button=root.querySelector('[data-arena-provenance]');
+            button.focus();button.click();
+            await new Promise(resolve=>setTimeout(resolve,0));
+            const toolbarFocusRetained=document.activeElement?.id===button.id;
             const file=new File([${JSON.stringify(delayedProducerText)}],
               'disposed-generated-producer.json',{type:'application/json'});
             let release;
@@ -626,10 +630,11 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
             await new Promise(resolve=>setTimeout(resolve,50));
             const result=root.innerHTML;
             root.remove();
-            return {result,uniqueIds};
+            return {result,uniqueIds,toolbarFocusRetained};
           })()`);
           assert.equal(disposal.result,'');
           assert.equal(disposal.uniqueIds,true);
+          assert.equal(disposal.toolbarFocusRetained,true);
         }
         const navClear=await evaluate(`(()=>{const root=document.documentElement,section=document.querySelector('#strategy-arena-root');window.scrollTo(0,root.scrollHeight);return section.lastElementChild.getBoundingClientRect().bottom<=document.getElementById('nav').getBoundingClientRect().top+1;})()`);
         assert.equal(navClear,true);

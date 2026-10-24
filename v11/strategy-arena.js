@@ -9,6 +9,15 @@ const PROVENANCE_PATH = `${DIAGNOSTIC_PATH}manifest.json`;
 const PROVENANCE_BLOB = 'f06444cb129d39aa60c7ea3c44c8179c163a2270';
 const names = {'H1-B':'Trend + Cash','H1-E':'Trend mit Kostenpuffer','H7-B':'Defensive Spot-Auswahl','H7-R':'Defensive Auswahl mit Rangpuffer',H9:'Basis datierter Futures'};
 let resultViewInstanceCount = 0;
+const FOCUS_CONTROLS = Object.freeze([
+  ['[data-arena-provenance]','provenance-button'],
+  ['[data-arena-stored]','stored-button'],
+  ['[data-arena-export]','export-button'],
+  ['[data-arena-input]','snapshot-input'],
+  ['[data-arena-inspection]','inspection-input'],
+  ['[data-arena-historical-fixture]','fixture-input'],
+  ['[data-arena-historical-export]','producer-input']
+]);
 const escapeHtml = value => String(value ?? 'Unbekannt').replace(/[&<>"']/g, character => ({
   '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
 }[character]));
@@ -258,7 +267,8 @@ export function createStrategyArenaView(root, options={}) {
     if (disposed) return;
     const active = globalThis.document?.activeElement;
     if (active && root.contains(active)) {
-      focusId = active?.id || null;
+      const control = FOCUS_CONTROLS.find(([selector])=>active.matches?.(selector));
+      focusId = active.id || (control ? `${state.historicalExportIdPrefix}-${control[1]}` : null);
       pendingFocusRestore = false;
     } else if (!(pendingFocusRestore && active === globalThis.document?.body)) {
       focusId = null;
@@ -271,9 +281,17 @@ export function createStrategyArenaView(root, options={}) {
         .map(section=>section.dataset.arenaResultSection);
     }
     root.innerHTML = arenaHtml(state);
+    for (const [selector,suffix] of FOCUS_CONTROLS) {
+      const control = root.querySelector?.(selector);
+      if (control && !control.id) control.id = `${state.historicalExportIdPrefix}-${suffix}`;
+    }
     if (!focusId) return;
     const target = [...(root.querySelectorAll?.('[id]') ?? [])].find(element=>element.id===focusId);
     if (target) {
+      if (target.disabled) {
+        target.disabled = false;
+        target.setAttribute('aria-busy','true');
+      }
       target.focus({preventScroll:true});
       pendingFocusRestore = false;
     } else {
