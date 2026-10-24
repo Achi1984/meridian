@@ -136,7 +136,13 @@
         "result": "ACTION_REQUIRED_NO_JOBS",
         "retryOrApproval": "NOT_REQUESTED"
       },
-      "currentGate": "FRESH_EXACT_HEAD_HOSTED_CI_AND_FINAL_INDEPENDENT_REVIEWS_PENDING",
+      "lastObservedExactHeadReleaseSafety": {
+        "head": "21bf62cdd8cc1aaf8c0f04b0d8c50640e6376fc4",
+        "runId": 40072536126,
+        "result": "ACTION_REQUIRED_NO_JOBS",
+        "retryOrApproval": "NOT_REQUESTED"
+      },
+      "currentGate": "FRESH_FULL_HOSTED_CI_AND_FINAL_INDEPENDENT_REVIEWS_PENDING",
       "scope": "ARENA_RESULT_PRESENTATION_AND_SYNTHETIC_GENERATED_FIXTURE_ACCEPTANCE_ONLY",
       "actualJournalOrMarketDataAccess": false,
       "canonicalExecutionPerformed": false,

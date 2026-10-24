@@ -20,7 +20,9 @@
 > `fb844e012bc999e4939f4a9d02b5e5cc216be3dc`; fresh exact-head hosted CI and
 > final independent reviews are pending. The earlier Safety40071135556 was
 > `action_required` with zero jobs on prior head `7758e425`; it is not a pass and
-> was not retried or approved. The correction is limited to generated/synthetic
+> was not retried or approved. Latest observed exact-head Safety40072536126 on
+> `21bf62cd` is also `action_required` with zero jobs, so the full suite has not
+> run; no retry or approval was requested. The correction is limited to generated/synthetic
 > presentation acceptance and fixture serving/CSP assertions. No journal or
 > market-data access, canonical execution, strategy PnL, scheduling, runtime
 > activation, or Paper/Live execution occurred; all authority flags remain false.
