@@ -684,13 +684,41 @@ async function browserRun(call,start,width,server){
           value:panel.querySelector('.portfolio-value').getAttribute('aria-label'),
           states:[...panel.querySelectorAll('.trust-cell')].map(cell=>[cell.querySelector('strong').textContent,cell.querySelector('span').textContent]),
           controls:panel.querySelectorAll('button,input,select,form').length,
+          controlDetails:[...panel.querySelectorAll('button,input,select,form')].map(control=>({
+            tag:control.tagName.toLowerCase(),id:control.id,type:control.type||'',
+            label:control.getAttribute('aria-label')||control.labels?.[0]?.textContent.trim()||control.textContent.trim(),
+            hidden:control.hidden,disabled:control.disabled
+          })),
+          executionControls:[...panel.querySelectorAll('button')].map(button=>
+            button.getAttribute('aria-label')||button.textContent.trim()).filter(label=>/(?:ausführ|order|kauf|verkauf|start|stopp)/i.test(label)),
           viewport:document.documentElement.clientWidth,body:document.body.scrollWidth,root:document.documentElement.scrollWidth};
       })()`);
       assert.equal(bots.label,'Nur lesend');
       assert.equal(bots.value,'Anzahl aktiver Bots unbekannt');
       assert.deepEqual(bots.states,[['Quelle','Snapshot unten'],['Aktualität','Je manueller Abfrage'],['Risiko','Nicht bestimmbar']]);
       assert.equal(server.metrics().reads,initialReads,'mount and navigation never fetch');
-      assert.equal(bots.controls,9,'one credential input, filters, and read/lock controls, no execution controls');
+      assert.equal(bots.controls,10,'existing credential/filter/read/lock controls plus the return-selection control');
+      assert.deepEqual(bots.controlDetails,[
+        {tag:'input',id:'bot-read-token',type:'password',label:'Asset-Watch-Link oder Meridian-Lesepasswort',hidden:false,disabled:false},
+        {tag:'button',id:'bot-read-provide',type:'button',label:'Lesezugang übernehmen',hidden:false,disabled:false},
+        {tag:'input',id:'bot-symbol-search',type:'search',label:'Symbol suchen',hidden:false,disabled:false},
+        {tag:'select',id:'bot-direction-filter',type:'select-one',label:'Richtung',hidden:false,disabled:false},
+        {tag:'select',id:'bot-category-filter',type:'select-one',label:'Kontraktart',hidden:false,disabled:false},
+        {tag:'select',id:'bot-sort-filter',type:'select-one',label:'Sortierung',hidden:false,disabled:false},
+        {tag:'button',id:'',type:'button',label:'Alle Botfilter zurücksetzen',hidden:false,disabled:false},
+        {tag:'button',id:'',type:'button',label:'Zur vorherigen Auswahl zurück',hidden:true,disabled:false},
+        {tag:'button',id:'bot-read-refresh',type:'button',label:'Bots aktualisieren',hidden:false,disabled:false},
+        {tag:'button',id:'bot-read-lock',type:'button',label:'Botansicht sperren',hidden:false,disabled:false}
+      ]);
+      assert.deepEqual(bots.executionControls,[],'the Bot view exposes no execution controls');
+      assert.deepEqual(await evaluate(`(()=>{
+        const button=[...document.querySelectorAll('#view-bots button')].find(item=>item.textContent.trim()==='Zur vorherigen Auswahl zurück');
+        const active=document.activeElement;button.focus();const focusStayed=document.activeElement===active;
+        button.click();
+        return {hidden:button.hidden,focusStayed,text:button.textContent.trim()};
+      })()`),{hidden:true,focusStayed:true,text:'Zur vorherigen Auswahl zurück'},
+      'return-selection control is hidden and inert before a prior selection exists');
+      assert.equal(server.metrics().reads,initialReads,'inactive return-selection control does not fetch');
       assert.equal(bots.viewport,width);
       assert.ok(bots.body<=width+1&&bots.root<=width+1,'Bots panel overflow at '+width);
       const waitUntil=async predicate=>{
