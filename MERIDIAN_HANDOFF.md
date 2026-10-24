@@ -10,6 +10,23 @@
 > postchecks (receipt6371614438). #940 remains held until routing/smoke completion.
 > SOURCE_AUDIT and all false authorization flags remain unchanged; no activation.
 
+> Current Strategy Evidence Workspace correction — 2026-10-24.
+> PR #940 is COMPLETE: merge `b5727493378814229267a7d881471172d0b606fb`;
+> final Claude receipt #942/comment6380610504; pre-merge Release Safety
+> 40020095282 attempt 2/job120790537195 succeeded. Exact-merge postchecks all
+> succeeded: Safety40068725083, Runtime40068724996, Coordinator40068725175,
+> Pages40068723395. Completion receipt: #942/comment6380786372.
+> PR #946 remains Draft. Published correction commit:
+> `fb844e012bc999e4939f4a9d02b5e5cc216be3dc`; fresh exact-head hosted CI and
+> final independent reviews are pending. The earlier Safety40071135556 was
+> `action_required` with zero jobs on prior head `7758e425`; it is not a pass and
+> was not retried or approved. The correction is limited to generated/synthetic
+> presentation acceptance and fixture serving/CSP assertions. No journal or
+> market-data access, canonical execution, strategy PnL, scheduling, runtime
+> activation, or Paper/Live execution occurred; all authority flags remain false.
+> This supersedes the #940-held statement in the preceding 2026-10-23 snapshot; historical receipts
+> and their provenance are retained.
+
 > ## Current continuity reconciliation — 2026-10-21
 >
 > **Latest observed main:** `6aeb07c35aa1e45dbaf0e78fc97fd7b59170b6f7` (PR #927 source merge; postchecks pending).
