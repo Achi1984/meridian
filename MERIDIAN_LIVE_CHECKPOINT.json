@@ -157,7 +157,80 @@
           "findings": ["DOC_ALLOWLIST_INACCURATE", "REVIEW_COVERAGE_INCOMPLETE"]
         }
       },
-      "currentGate": "DOC_SCOPE_CORRECTION_COMPLETE; NEW_HEAD_EXACT_CI_AND_COMPLETE_SOURCE_REVIEW_PENDING",
+      "currentGate": "CURRENT_MAIN_INTEGRATED_FOR_DRAFT_REPAIR_PREPARATION; EXACT_INTEGRATED_HEAD_CI_AND_COMPLETE_CLAUDE_REVIEW_PENDING; PR947_POSTCHECK_FAILED_NOT_COMPLETE",
+      "repairIntegration": {
+        "intentCommentId": 6387579709,
+        "integrationMode": "MERGE_MAIN_NO_REBASE",
+        "integratedMainSha": "4ac61510c615e8743df77647394fe8e70e7a293b",
+        "mergeCommit": "485e4486fbb54689f48b0b4cd1afebf174c5fb04",
+        "preparedRepairHead": "d0509e43bf816a6392bdb17e98f4d10077dd8a90",
+        "preMergeAcceptance": {
+          "review": {
+            "receiptIssue": 942,
+            "receiptCommentId": 6384839597,
+            "verdict": "GREEN_LIGHT"
+          },
+          "releaseSafety": {
+            "runId": 40075414844,
+            "attempt": 2,
+            "jobId": 120818592329,
+            "result": "SUCCESS",
+            "tests": {
+              "passed": 2733,
+              "failed": 0,
+              "skipped": 0
+            }
+          }
+        },
+        "mainMergeReceipt": {
+          "issue": 942,
+          "commentId": 6386970534,
+          "status": "MERGED_POSTCHECKS_PENDING"
+        },
+        "postMergeChecks": {
+          "releaseSafety": {
+            "runId": 40113807323,
+            "jobId": 120930807986,
+            "result": "FAILED",
+            "tests": {
+              "passed": 2732,
+              "failed": 1,
+              "skipped": 0
+            },
+            "failure": "test/v11-strategy-workspace-chrome.test.js:594"
+          },
+          "runtimeSmoke": {
+            "runId": 40113807233,
+            "jobId": 120930807848,
+            "result": "SUCCESS"
+          },
+          "releaseCoordinator": {
+            "runId": 40113807270,
+            "jobId": 120930807924,
+            "result": "SUCCESS"
+          },
+          "pages": {
+            "runId": 40113806502,
+            "result": "SUCCESS"
+          }
+        },
+        "postMergeReceipt": {
+          "issue": 942,
+          "commentId": 6387020975,
+          "status": "POSTCHECK_FAILED_NOT_COMPLETE"
+        },
+        "repairStatus": "TEST_ONLY_ASYNC_IMPORT_SYNCHRONIZATION_FIX_PREPARED; INTEGRATED_HEAD_CHECKS_PENDING",
+        "focusedRepairEvidence": {
+          "testedHead": "d0509e43bf816a6392bdb17e98f4d10077dd8a90",
+          "test": "node --test test/v11-strategy-workspace-chrome.test.js",
+          "result": "PASS_CHROME_320_375_390_430_1440",
+          "appliesToIntegratedHead": false
+        },
+        "exactIntegratedHeadReleaseSafety": "PENDING",
+        "completeScopeClaudeReview": "PENDING",
+        "draftOnly": true,
+        "releaseGateLifted": false
+      },
       "scope": "ARENA_RESULT_PRESENTATION_AND_SYNTHETIC_GENERATED_FIXTURE_ACCEPTANCE_ONLY",
       "final946CompletionRecord": "CARRY_IN_NEXT_ASSOCIATED_SOURCE_PR; NO_STANDALONE_CONTINUITY_PUBLICATION",
       "actualJournalOrMarketDataAccess": false,
