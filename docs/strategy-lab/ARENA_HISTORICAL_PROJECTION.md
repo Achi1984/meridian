@@ -533,34 +533,50 @@ for case, state, trial_key in (
     sys.stdout.buffer.write(canonical(envelope).encode('ascii') + b'\n')
 ```
 
-**Implemented allowlist** (no production shell/terminal-entry or pinned engine changes):
+## Delivery and change scope
+
+PR #940 delivered the producer export and its validating parser before this
+workspace integration:
 
 - `scripts/research/b1-7/export-historical-result.mjs`
 - `v11/arena-historical-export.js`
-- `v11/arena-result-view.js`
-- `v11/strategy-arena.js`
-- `test/b1-7-historical-result-export.test.js`
-- `test/v11-arena-result-view.test.js`
-- focused generated-export and Arena browser tests:
-  `test/v11-arena-historical-result.test.js` and
-  `test/v11-strategy-workspace-chrome.test.js`
-- `test/v11-terminal-entry.test.js` serves the imported renderer dependency at
-  its exact module path and verifies its exact URL is present in the fixture CSP;
-  this does not change production terminal navigation or CSP.
-- this document, `docs/strategy-lab/ARENA_HISTORICAL_PROJECTION.md`
 
-No production shell/terminal-entry, pinned journal/supervisor/engine/candidate/
-verifier, or actual-data files are in scope. Implementation proceeds only within
-the accepted schema, canonicalization, bounds, and lifecycle semantics above.
+Those modules and the accepted envelope contract are already present in the
+PR #946 base. PR #946 consumes that contract; it does not change either module.
 
-Focused generated-fixture and renderer coverage:
+The exact PR #946 diff contains eleven files:
+
+- `v11/arena-result-view.js` (new presentation module)
+- `v11/strategy-arena.js` (workspace integration)
+- `test/v11-arena-result-view.test.js` (new focused renderer tests)
+- `test/v11-strategy-workspace-chrome.test.js`
+- `test/v11-terminal-entry.test.js` (exact renderer serving/CSP fixture check)
+- `test/b1-7-historical-result-export.test.js` (generated export→renderer integration)
+- `docs/strategy-lab/ARENA_HISTORICAL_PROJECTION.md` (this scope and contract document)
+- `MERIDIAN_LIVE_CHECKPOINT.json`
+- `docs/MERIDIAN_CHAT_HANDOFF.md`
+- `MERIDIAN_HANDOFF.md`
+- `docs/handover/GO-MERIDIAN.md`
+
+The following existing suite is unchanged by PR #946 and is run as supporting
+coverage, not part of the changed-file allowlist:
+`test/v11-arena-historical-result.test.js`. No production shell/terminal-entry,
+pinned journal/supervisor/engine/candidate/verifier, or actual-data files are in
+scope. Implementation proceeds only within the accepted schema,
+canonicalization, bounds, and lifecycle semantics above.
+
+Focused generated-fixture and renderer coverage commands:
 
 ```sh
 node --test test/v11-arena-historical-result.test.js
 node --test test/b1-7-historical-result-export.test.js
 node --test test/v11-arena-result-view.test.js
 node --test test/v11-strategy-workspace-chrome.test.js
+node --test test/v11-terminal-entry.test.js
 ```
+
+The first command runs the unchanged existing fixture suite; the remaining
+commands cover changed or newly added #946 tests.
 
 The Chrome scenario imports generated queued, completed, and insufficient
 producer envelopes at 320, 375, 390, 430, and desktop viewport widths. The

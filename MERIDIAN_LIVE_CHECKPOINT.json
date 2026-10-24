@@ -107,7 +107,7 @@
       "pullRequest": 946,
       "branch": "lead/arena944-result-view-preparation",
       "verifiedBaseSha": "b5727493378814229267a7d881471172d0b606fb",
-      "publishedCorrectionCommit": "fb844e012bc999e4939f4a9d02b5e5cc216be3dc",
+      "historicalPublishedCorrectionCommit": "fb844e012bc999e4939f4a9d02b5e5cc216be3dc",
       "pullRequestState": "DRAFT",
       "dependencyPr940": {
         "state": "COMPLETE_MERGED_AND_POSTCHECKED",
@@ -136,14 +136,30 @@
         "result": "ACTION_REQUIRED_NO_JOBS",
         "retryOrApproval": "NOT_REQUESTED"
       },
-      "lastObservedExactHeadReleaseSafety": {
+      "earlierObservedExactHeadReleaseSafety": {
         "head": "21bf62cdd8cc1aaf8c0f04b0d8c50640e6376fc4",
         "runId": 40072536126,
         "result": "ACTION_REQUIRED_NO_JOBS",
         "retryOrApproval": "NOT_REQUESTED"
       },
-      "currentGate": "FRESH_FULL_HOSTED_CI_AND_FINAL_INDEPENDENT_REVIEWS_PENDING",
+      "lastReviewedCandidate": {
+        "head": "b40b4ed1bae7059db1f4ed85c131e45a518d76ad",
+        "releaseSafety": {
+          "runId": 40072753537,
+          "attempt": 2,
+          "jobId": 120813573164,
+          "result": "SUCCESS",
+          "tests": {"passed": 2738, "failed": 0, "skipped": 0}
+        },
+        "claudeReview": {
+          "receiptCommentId": 6381590041,
+          "verdict": "REVISION_REQUIRED",
+          "findings": ["DOC_ALLOWLIST_INACCURATE", "REVIEW_COVERAGE_INCOMPLETE"]
+        }
+      },
+      "currentGate": "DOC_SCOPE_CORRECTION_COMPLETE; NEW_HEAD_EXACT_CI_AND_COMPLETE_SOURCE_REVIEW_PENDING",
       "scope": "ARENA_RESULT_PRESENTATION_AND_SYNTHETIC_GENERATED_FIXTURE_ACCEPTANCE_ONLY",
+      "final946CompletionRecord": "CARRY_IN_NEXT_ASSOCIATED_SOURCE_PR; NO_STANDALONE_CONTINUITY_PUBLICATION",
       "actualJournalOrMarketDataAccess": false,
       "canonicalExecutionPerformed": false,
       "strategyPnlComputed": false,
