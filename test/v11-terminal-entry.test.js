@@ -489,7 +489,7 @@ test('Terminal öffnen preserves the reviewed history-close baseline and stays o
   assert.equal(gitBlob(restored),preimageBlob,'all source bytes except terminal-entry insertions, the checked viewport pair and exact Depot/revision deltas must match the reviewed history-close baseline');
 });
 
-const moduleNames=['bot-read-bootstrap.js','bot-read-access.js','bot-read-client.js','bot-read-view.js','bot-read-model.js','bot-overview-model.js','depot-read-bootstrap.js','depot-read-client.js','depot-read-model.js','depot-read-view.js','depot-history-model.js','depot-history-view.js','depot-current-model.js','strategy-workspace-bootstrap.js','strategy-catalog.js','research-evidence.js','strategy-arena.js','arena-inspection-report.js','arena-historical-result.js','arena-historical-export.js'];
+const moduleNames=['bot-read-bootstrap.js','bot-read-access.js','bot-read-client.js','bot-read-view.js','bot-read-model.js','bot-overview-model.js','depot-read-bootstrap.js','depot-read-client.js','depot-read-model.js','depot-read-view.js','depot-history-model.js','depot-history-view.js','depot-current-model.js','strategy-workspace-bootstrap.js','strategy-catalog.js','research-evidence.js','strategy-arena.js','arena-inspection-report.js','arena-historical-result.js','arena-historical-export.js','arena-result-view.js'];
 function deploymentServer(){
   const inlineScript=html.match(/<script>([\s\S]*?)<\/script>/i)?.[1];
   assert.ok(inlineScript,'actual UI-only navigation script');
@@ -570,7 +570,7 @@ function deploymentServer(){
   });
 }
 
-test('terminal deployment fixture serves the catalog research evidence module under its CSP',async()=>{
+test('terminal deployment fixture serves Arena dependencies under its CSP',async()=>{
   const server=await deploymentServer();
   try{
     const start=server.base+'v11/';
@@ -619,6 +619,15 @@ test('terminal deployment fixture serves the catalog research evidence module un
     assert.equal(await producer.text(),readFileSync(new URL('../v11/arena-historical-export.js',import.meta.url),'utf8'));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(producerUrl.href),'exact producer dependency URL must be in script-src');
     assert.equal(server.allowedPaths.has(producerUrl.pathname),true);
+    const rendererImport=arenaSource.match(/from ['"](\.\/arena-result-view\.js)['"]/);
+    assert.ok(rendererImport,'Arena imports the isolated result renderer');
+    const rendererUrl=new URL(rendererImport[1],arenaUrl);
+    const renderer=await fetch(rendererUrl);
+    assert.equal(renderer.status,200,'renderer dependency must be served before Arena bootstrap can succeed');
+    assert.match(renderer.headers.get('content-type'),/^text\/javascript/);
+    assert.equal(await renderer.text(),readFileSync(new URL('../v11/arena-result-view.js',import.meta.url),'utf8'));
+    assert.ok(scriptPolicy.trim().split(/\s+/).includes(rendererUrl.href),'exact renderer dependency URL must be in script-src');
+    assert.equal(server.allowedPaths.has(rendererUrl.pathname),true);
     assert.deepEqual(server.metrics(),{reads:0,aborts:0,depotReads:0,depotAborts:0,pending:0});
   }finally{await server.close();}
 });

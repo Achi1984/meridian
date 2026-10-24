@@ -237,6 +237,26 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
           assert.ok(!result.exceptionDetails,'M11 strategy page expression failed');
           return result.result?.value;
         };
+        const waitForProducerText=text=>evaluate(`new Promise(resolve=>{
+          const root=document.getElementById('strategy-arena-root');
+          const matches=()=>root.querySelector('[aria-label="Separates historisches Arena-Ergebnis · Producer-Export"]')
+            ?.innerText.includes(${JSON.stringify(text)});
+          if(matches())return resolve(true);
+          const observer=new MutationObserver(()=>{
+            if(matches()){observer.disconnect();resolve(true);}
+          });
+          observer.observe(root,{childList:true,subtree:true,characterData:true});
+        })`);
+        const waitForProducerAlert=text=>evaluate(`new Promise(resolve=>{
+          const root=document.getElementById('strategy-arena-root');
+          const matches=()=>root.querySelector('[aria-label="Separates historisches Arena-Ergebnis · Producer-Export"] [role="alert"]')
+            ?.innerText.includes(${JSON.stringify(text)});
+          if(matches())return resolve(true);
+          const observer=new MutationObserver(()=>{
+            if(matches()){observer.disconnect();resolve(true);}
+          });
+          observer.observe(root,{childList:true,subtree:true,characterData:true});
+        })`);
         const key=async(name,code,keyCode)=>{
           const text=name==='Enter'?'\r':null;
           await call('Input.dispatchKeyEvent',{type:'keyDown',key:name,code,windowsVirtualKeyCode:keyCode,
@@ -455,10 +475,15 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
             cards:document.querySelector('.arena-models').innerHTML,storageCalls:window.__m11StorageCalls})`);
           const serialized=JSON.stringify(producerCase.envelope);
           await evaluate(`(()=>{
+            window.__m11ImportRead={started:false,release:null};
+            const file=new File([${JSON.stringify(serialized)}],
+              'generated-producer-${producerCase.name}.json',{type:'application/json'});
+            Object.defineProperty(file,'arrayBuffer',{value:()=>new Promise(resolve=>{
+              window.__m11ImportRead.started=true;window.__m11ImportRead.release=resolve;
+            })});
             const picker=document.querySelector('[data-arena-historical-export]'),transfer=new DataTransfer();
             picker.focus();
-            transfer.items.add(new File([${JSON.stringify(serialized)}],
-              'generated-producer-${producerCase.name}.json',{type:'application/json'}));
+            transfer.items.add(file);
             picker.files=transfer.files;picker.dispatchEvent(new Event('change',{bubbles:true}));
           })()`);
           const loading=await evaluate(`(()=>{
@@ -467,7 +492,8 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
               text:section.innerText,focused:document.activeElement?.matches('[data-arena-historical-export]'),
               inputId:section.querySelector('[data-arena-historical-export]').id,
               inputDisabled:section.querySelector('[data-arena-historical-export]').disabled,
-              hasComparison:!!section.querySelector('table tbody')};
+              hasComparison:!!section.querySelector('table tbody'),
+              readStarted:window.__m11ImportRead.started};
           })()`);
           assert.equal(loading.state,'loading');
           assert.match(loading.text,/Producer-Export wird geprüft/);
@@ -475,22 +501,38 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
           assert.match(loading.inputId,/^arena-producer-\d+-input$/);
           assert.equal(loading.inputDisabled,false);
           assert.equal(loading.hasComparison,false);
+          assert.equal(loading.readStarted,true,'the result remains cleared while the controlled file read is pending');
           if(producerCase.name==='insufficient'){
             const prior=completedProducer.result.paths.find(path=>path.variantId==='primary-n30-f25'&&
               path.scenarioId==='base-15bp'&&path.segmentId==='diagnostic');
             assert.ok(!loading.text.includes(String(prior.netReturn)));
           }
-          for(let attempt=0;attempt<150;attempt++){
-            if(await evaluate(`document.querySelector('[aria-label="Separates historisches Arena-Ergebnis · Producer-Export"]')?.innerText.includes('Lifecycle ${producerCase.state}')`))break;
-            await new Promise(resolve=>setTimeout(resolve,20));
+          await evaluate(`window.__m11ImportRead.release(new TextEncoder().encode(${JSON.stringify(serialized)}).buffer)`);
+          assert.equal(await waitForProducerText(`Lifecycle ${producerCase.state}`),true);
+          assert.equal(await evaluate(`document.activeElement?.matches('[data-arena-historical-export]')`),true,
+            'producer import preserves focus on the stable file input');
+          for(const disclosure of ['paths','screen']){
+            await evaluate(`document.querySelector('[data-arena-result-section="${disclosure}"] summary').focus()`);
+            if(await evaluate(`document.querySelector('[data-arena-result-section="${disclosure}"]').open`))
+              await key('Enter','Enter',13);
+            await key('Enter','Enter',13);
+            assert.equal(await evaluate(`document.querySelector('[data-arena-result-section="${disclosure}"]').open`),
+              true,`${disclosure} disclosure opens through keyboard interaction`);
           }
           const imported=await evaluate(`(()=>{
             const section=document.querySelector('[aria-label="Separates historisches Arena-Ergebnis · Producer-Export"]');
             const summary=section.querySelector('details summary');
-            summary.focus();
+            const paths=section.querySelector('[data-arena-result-section="paths"]');
+            const screen=section.querySelector('[data-arena-result-section="screen"]');
+            const falseCheck=[...screen.querySelectorAll('div')].find(row=>
+              row.querySelector('dt')?.innerText.trim()==='Primärer Ertrag mindestens beide eingefrorenen Controls');
             return {text:section.innerText,overflow:document.documentElement.scrollWidth>innerWidth+1 ||
                 section.scrollWidth>section.clientWidth+1,summaryHeight:summary.getBoundingClientRect().height,
-              focused:document.activeElement===summary,requests:performance.getEntriesByType('resource').length,
+              pathsOpen:paths.open,screenOpen:screen.open,
+              comparison:[...paths.querySelectorAll('tbody tr')].map(row=>
+                [...row.cells].map(cell=>cell.innerText.trim())),
+              falseCheck:falseCheck?.querySelector('dd')?.innerText.trim(),
+              requests:performance.getEntriesByType('resource').length,
               cards:document.querySelector('.arena-models').innerHTML,
               storageCalls:window.__m11StorageCalls,
               fixtureStillSeparate:!!document.querySelector('[aria-label="Separates historisches Arena-Ergebnis · UI-Fixture"]')};
@@ -504,18 +546,21 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
           assert.match(imported.text,producerCase.name==='completed'
             ?/Ergebnisse abgeschlossen\s+44[\s\S]*Pfade geplant\s+44/
             :/Ergebnisse abgeschlossen\s+19[\s\S]*Pfade geplant\s+44/);
+          assert.equal(imported.pathsOpen,true);assert.equal(imported.screenOpen,true);
           if(producerCase.name==='completed'){
             const primary=producerCase.result.paths.find(path=>path.variantId==='primary-n30-f25'&&
               path.scenarioId==='base-15bp'&&path.segmentId==='diagnostic');
-            assert.match(imported.text,new RegExp(`Baseline · Primär · Basis 15 bp\\s+COMPLETED\\s+${primary.netReturn}\\s+${primary.sampledDrawdown}`));
-            assert.match(imported.text,/Cash\s+COMPLETED\s+0\s+0/);
-            assert.match(imported.text,/Primärer Ertrag mindestens beide eingefrorenen Controls · false/);
+            assert.deepEqual(imported.comparison.find(row=>row[0]==='Baseline · Primär · Basis 15 bp'),
+              ['Baseline · Primär · Basis 15 bp','COMPLETED',String(primary.netReturn),String(primary.sampledDrawdown)]);
+            assert.deepEqual(imported.comparison.find(row=>row[0]==='Cash'),
+              ['Cash','COMPLETED','0','0']);
+            assert.equal(imported.falseCheck,'false');
           }else{
             assert.match(imported.text,/Nettoertrag\s+Nicht verfügbar/);
             assert.match(imported.text,/Relativer Drawdown-Rückgang \(Producerwert\)\s+Nicht verfügbar/);
           }
           assert.equal(imported.overflow,false);assert.ok(imported.summaryHeight>=44);
-          assert.equal(imported.focused,true);assert.equal(imported.requests,beforeImport.requests);
+          assert.equal(imported.requests,beforeImport.requests);
           assert.equal(imported.cards,beforeImport.cards);
           assert.equal(imported.storageCalls,beforeImport.storageCalls);
           assert.equal(imported.fixtureStillSeparate,true);
@@ -569,16 +614,35 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
             'invalid-generated-producer.json',{type:'application/json'}));
           picker.files=transfer.files;picker.dispatchEvent(new Event('change',{bubbles:true}));
         })()`);
-        for(let attempt=0;attempt<150;attempt++){
-          if(await evaluate(`!!document.querySelector('[aria-label="Separates historisches Arena-Ergebnis · Producer-Export"] [role="alert"]')`))break;
-          await new Promise(resolve=>setTimeout(resolve,20));
-        }
-        const rejectedProducer=await evaluate(`document.querySelector('[aria-label="Separates historisches Arena-Ergebnis · Producer-Export"]').innerText`);
-        assert.match(rejectedProducer,/role="alert"|abgelehnt/);
-        assert.doesNotMatch(rejectedProducer,/Lifecycle (completed|failed)|Engine-Ergebnis\s+COMPLETED|Screen\s+SYNTHETIC_ONLY_NOT_ASSESSED|Cash\s+COMPLETED/);
+        assert.equal(await waitForProducerAlert('Export konnte nicht angenommen werden.'),true);
+        const rejectedProducer=await evaluate(`(()=>{
+          const section=document.querySelector('[aria-label="Separates historisches Arena-Ergebnis · Producer-Export"]');
+          const alert=section.querySelector('[role="alert"]');
+          return {alertRole:alert?.getAttribute('role'),alertText:alert?.innerText,text:section.innerText};
+        })()`);
+        assert.equal(rejectedProducer.alertRole,'alert');
+        assert.match(rejectedProducer.alertText,/Export konnte nicht angenommen werden\. Kein Ergebnis wird angezeigt\./);
+        assert.doesNotMatch(rejectedProducer.text,/Lifecycle (completed|failed)|Engine-Ergebnis\s+COMPLETED|Screen\s+SYNTHETIC_ONLY_NOT_ASSESSED|Cash\s+COMPLETED/);
         const delayedProducerText=JSON.stringify(completedProducer.envelope);
         await evaluate(`(()=>{
-          window.__m11DelayedRead={started:false,release:null};
+          const state=window.__m11DelayedRead={started:false,release:null,digestCalls:0,digestSettled:0};
+          const originalDigest=crypto.subtle.digest.bind(crypto.subtle);
+          state.originalDigest=originalDigest;
+          state.finished=new Promise(resolve=>{state.resolveFinished=resolve;});
+          crypto.subtle.digest=(...args)=>{
+            state.digestCalls++;
+            return originalDigest(...args).then(value=>{
+              state.digestSettled++;
+              if(state.digestCalls===7&&state.digestSettled===7){
+                const channel=new MessageChannel();
+                channel.port1.onmessage=()=>{
+                  channel.port1.close();channel.port2.close();state.resolveFinished();
+                };
+                channel.port2.postMessage('digests-settled');
+              }
+              return value;
+            });
+          };
           const file=new File([${JSON.stringify(delayedProducerText)}],
             'delayed-generated-producer.json',{type:'application/json'});
           Object.defineProperty(file,'arrayBuffer',{value:()=>new Promise(resolve=>{
@@ -587,10 +651,6 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
           const picker=document.querySelector('[data-arena-historical-export]'),transfer=new DataTransfer();
           transfer.items.add(file);picker.files=transfer.files;picker.dispatchEvent(new Event('change',{bubbles:true}));
         })()`);
-        for(let attempt=0;attempt<100;attempt++){
-          if(await evaluate('window.__m11DelayedRead?.started'))break;
-          await new Promise(resolve=>setTimeout(resolve,10));
-        }
         assert.equal(await evaluate('window.__m11DelayedRead.started'),true);
         await evaluate(`(()=>{
           const file=new File(['{}'],'unreadable-generated-producer.json',{type:'application/json'});
@@ -598,15 +658,21 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
           const picker=document.querySelector('[data-arena-historical-export]'),transfer=new DataTransfer();
           transfer.items.add(file);picker.files=transfer.files;picker.dispatchEvent(new Event('change',{bubbles:true}));
         })()`);
-        for(let attempt=0;attempt<100;attempt++){
-          if(await evaluate(`!!document.querySelector('[aria-label="Separates historisches Arena-Ergebnis · Producer-Export"] [role="alert"]')`))break;
-          await new Promise(resolve=>setTimeout(resolve,10));
-        }
+        assert.equal(await waitForProducerAlert('Export konnte nicht angenommen werden.'),true);
         await evaluate(`window.__m11DelayedRead.release(new TextEncoder().encode(${JSON.stringify(delayedProducerText)}).buffer)`);
-        await new Promise(resolve=>setTimeout(resolve,50));
-        const afterStaleRead=await evaluate(`document.querySelector('[aria-label="Separates historisches Arena-Ergebnis · Producer-Export"]').innerText`);
-        assert.match(afterStaleRead,/abgelehnt/);
-        assert.doesNotMatch(afterStaleRead,/Lifecycle completed|Engine-Ergebnis\s+COMPLETED/);
+        await evaluate('window.__m11DelayedRead.finished');
+        const afterStaleRead=await evaluate(`(()=>{
+          const section=document.querySelector('[aria-label="Separates historisches Arena-Ergebnis · Producer-Export"]');
+          const alert=section.querySelector('[role="alert"]');
+          crypto.subtle.digest=window.__m11DelayedRead.originalDigest;
+          return {alertRole:alert?.getAttribute('role'),alertText:alert?.innerText,text:section.innerText,
+            digestCalls:window.__m11DelayedRead.digestCalls,digestSettled:window.__m11DelayedRead.digestSettled};
+        })()`);
+        assert.equal(afterStaleRead.digestCalls,7);
+        assert.equal(afterStaleRead.digestSettled,7);
+        assert.equal(afterStaleRead.alertRole,'alert');
+        assert.match(afterStaleRead.alertText,/Export konnte nicht angenommen werden\. Kein Ergebnis wird angezeigt\./);
+        assert.doesNotMatch(afterStaleRead.text,/Lifecycle completed|Engine-Ergebnis\s+COMPLETED/);
         if(size.width===320){
           const disposal=await evaluate(`(async()=>{
             const {createStrategyArenaView}=await import('/v11/strategy-arena.js?v=B12');

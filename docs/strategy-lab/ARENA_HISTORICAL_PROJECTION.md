@@ -533,7 +533,7 @@ for case, state, trial_key in (
     sys.stdout.buffer.write(canonical(envelope).encode('ascii') + b'\n')
 ```
 
-**Implemented allowlist** (no shell/terminal-entry or pinned engine changes):
+**Implemented allowlist** (no production shell/terminal-entry or pinned engine changes):
 
 - `scripts/research/b1-7/export-historical-result.mjs`
 - `v11/arena-historical-export.js`
@@ -544,11 +544,14 @@ for case, state, trial_key in (
 - focused generated-export and Arena browser tests:
   `test/v11-arena-historical-result.test.js` and
   `test/v11-strategy-workspace-chrome.test.js`
+- `test/v11-terminal-entry.test.js` serves the imported renderer dependency at
+  its exact module path and verifies its exact URL is present in the fixture CSP;
+  this does not change production terminal navigation or CSP.
 - this document, `docs/strategy-lab/ARENA_HISTORICAL_PROJECTION.md`
 
-No shell/terminal-entry, pinned journal/supervisor/engine/candidate/verifier,
-or actual-data files are in scope. Implementation proceeds only within the
-accepted schema, canonicalization, bounds, and lifecycle semantics above.
+No production shell/terminal-entry, pinned journal/supervisor/engine/candidate/
+verifier, or actual-data files are in scope. Implementation proceeds only within
+the accepted schema, canonicalization, bounds, and lifecycle semantics above.
 
 Focused generated-fixture and renderer coverage:
 
