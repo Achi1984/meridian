@@ -370,6 +370,84 @@ test('removed failure and holdout-use claims remain in earlier issues and diffs'
   assert.equal(result.holdoutUseClaims.callerClaimedUseInEitherInput, true);
 });
 
+test('CLI retains semantic failure and incomplete audit evidence instead of rejecting it', () => {
+  const consumed = packet();
+  consumed.lifecycle.receipts[3].holdoutAccess.exposures.push({
+    role: 'REUSED_FOR_NEW_HYPOTHESIS',
+    at: '2025-01-22T13:00:00Z',
+    purpose: 'Synthetic reuse claim.'
+  });
+  const later = packet();
+  const consumedResult = cli(JSON.stringify({earlier: consumed, later}));
+
+  assert.equal(consumedResult.status, 0);
+  const consumedOutput = JSON.parse(consumedResult.stdout);
+  assert.equal(consumedOutput.validation.earlier.evidenceCompleteness.status, 'FAILED');
+  assert.ok(consumedOutput.failures.earlier.some(issue =>
+    issue.reason === 'HOLDOUT_NOT_INDEPENDENT_FOR_CONFIRMATION'));
+  assert.ok(consumedOutput.failures.removed.some(item =>
+    item.earlier.reason === 'HOLDOUT_NOT_INDEPENDENT_FOR_CONFIRMATION'));
+  assert.ok(consumedOutput.holdoutUseClaims.removed.some(item =>
+    item.earlier.role === 'REUSED_FOR_NEW_HYPOTHESIS'));
+  assert.equal(consumedOutput.executionAuthorized, false);
+  assert.equal(consumedOutput.autoPromotion, false);
+  assert.equal(consumedOutput.provenanceVerified, false);
+
+  const nonApplicable = packet();
+  const sharpe = metric(nonApplicable, 'SHARPE');
+  sharpe.applicability = 'NOT_APPLICABLE';
+  sharpe.value = null;
+  sharpe.unit = null;
+  sharpe.denominator = null;
+  sharpe.reason = 'Synthetic metric not applicable.';
+  const nonApplicableResult = cli(JSON.stringify({earlier: nonApplicable, later: packet()}));
+  assert.equal(nonApplicableResult.status, 0);
+  const nonApplicableOutput = JSON.parse(nonApplicableResult.stdout);
+  assert.equal(nonApplicableOutput.validation.earlier.evidenceCompleteness.status, 'NOT_ASSESSED');
+  assert.ok(nonApplicableOutput.metrics.changed.some(item =>
+    item.id.includes('SHARPE') && item.earlier.reason.value === 'Synthetic metric not applicable.'));
+
+  const missingTrial = packet();
+  delete missingTrial.trialLedger;
+  const missingTrialResult = cli(JSON.stringify({earlier: missingTrial, later: packet()}));
+  assert.equal(missingTrialResult.status, 0);
+  const missingTrialOutput = JSON.parse(missingTrialResult.stdout);
+  assert.equal(missingTrialOutput.validation.earlier.evidenceCompleteness.status, 'NOT_ASSESSED');
+  assert.ok(missingTrialOutput.unknowns.earlier.some(issue =>
+    issue.reason === 'TRIAL_HISTORY_NOT_RECONCILED'));
+});
+
+test('malformed null, receipt-container, and exposure entries never escape projections as native errors', () => {
+  const nullInput = compareStrategyEvidence(null, null);
+  assert.equal(nullInput.validation.earlier.evidenceCompleteness.status, 'INVALID');
+  assert.equal(nullInput.comparison.declaredComparability, 'NOT_COMPARABLE_INCOMPLETE_OR_INVALID');
+
+  const objectReceipts = packet();
+  objectReceipts.lifecycle.receipts = {stage: 'OUT_OF_SAMPLE_HOLDOUT'};
+  const objectReceiptResult = compareStrategyEvidence(objectReceipts, packet());
+  assert.notEqual(objectReceiptResult.validation.earlier.evidenceCompleteness.status, 'ASSERTED_WELL_FORMED');
+  assert.ok(objectReceiptResult.validation.earlier.evidenceCompleteness.issues.some(issue =>
+    issue.reason === 'INVALID_RECEIPT_LIST'));
+
+  const nullExposure = packet();
+  nullExposure.lifecycle.receipts[3].holdoutAccess.exposures = [null];
+  const nullExposureResult = compareStrategyEvidence(nullExposure, packet());
+  assert.notEqual(nullExposureResult.validation.earlier.evidenceCompleteness.status, 'ASSERTED_WELL_FORMED');
+  assert.ok(nullExposureResult.validation.earlier.evidenceCompleteness.issues.some(issue =>
+    issue.reason === 'OBJECT_REQUIRED'));
+  assert.doesNotThrow(() => JSON.stringify(nullExposureResult));
+
+  for (const malformed of [objectReceipts, nullExposure]) {
+    const result = cli(JSON.stringify({earlier: malformed, later: packet()}));
+    assert.equal(result.status, 0);
+    assert.notEqual(JSON.parse(result.stdout).validation.earlier.evidenceCompleteness.status, 'ASSERTED_WELL_FORMED');
+    assert.equal(result.stderr, '');
+  }
+  const nullCli = cli(JSON.stringify({earlier: null, later: packet()}));
+  assert.notEqual(nullCli.status, 0);
+  assert.equal(nullCli.stdout, '');
+});
+
 test('synthetic versus non-synthetic caller claims are incompatible and remain unauthenticated', () => {
   const earlier = packet();
   const later = packet();
@@ -429,10 +507,13 @@ test('CLI uses the contract, bounds serialized bytes, and rejects invalid input 
   assert.equal(JSON.parse(valid.stdout).validation.earlier.evidenceCompleteness.status, 'ASSERTED_WELL_FORMED');
 
   const marker = 'sensitive caller evidence marker';
-  const invalid = cli(JSON.stringify({earlier: {marker}, later: {}}));
-  assert.notEqual(invalid.status, 0);
-  assert.equal(invalid.stdout, '');
-  assert.doesNotMatch(invalid.stderr, new RegExp(marker));
+  const semanticInvalid = cli(JSON.stringify({earlier: {marker}, later: {}}));
+  assert.equal(semanticInvalid.status, 0);
+  assert.doesNotMatch(semanticInvalid.stdout, new RegExp(marker));
+  const malformedJson = cli(`{"caller":"${marker}"`);
+  assert.notEqual(malformedJson.status, 0);
+  assert.equal(malformedJson.stdout, '');
+  assert.doesNotMatch(malformedJson.stderr, new RegExp(marker));
   assert.notEqual(cli('{"earlier":{},"later":{},"extra":true}').status, 0);
 
   const oversized = ' '.repeat(COMPARISON_LIMITS.inputBytes + 1);

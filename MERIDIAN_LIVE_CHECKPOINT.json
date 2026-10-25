@@ -910,23 +910,38 @@
         "observedSeconds": 8
       },
       "finalExactHeadCi": {
+        "head": "3a383907a9d9e572ed584993b93be8cb58f33984",
+        "runId": 40183397323,
+        "attempt": 2,
+        "jobId": 121139299923,
+        "conclusion": "SUCCESS",
+        "jobs": 1,
+        "failedJobs": 0,
+        "elapsedJobSeconds": 214,
+        "reviewRequested": false
+      },
+      "priorExactHeadCi": {
         "head": "57661a3f4ebdf1f6b3d998e4200d2c589c24c962",
         "runId": 40183168350,
         "attempt": 1,
-        "conclusion": "ACTION_REQUIRED",
+        "conclusion": "FAILURE",
         "jobs": 0,
-        "failedJobs": 0,
-        "elapsedJobSeconds": null,
-        "reviewRequested": false
+        "elapsedJobSeconds": null
       },
-      "independentClaudeReview": "NOT_REQUESTED_BECAUSE_EXACT_HEAD_CI_HAS_NOT_SUCCEEDED",
+      "sourceMerge": {
+        "mergeSha": "9d223cb60115dbebdb5671b8782e0dd0763df972",
+        "mergedAt": "2026-10-25T11:02:36Z",
+        "state": "SOURCE_MERGED",
+        "postMergeChecks": "PENDING_LEAD_CONFIRMATION"
+      },
+      "independentClaudeReview": "NOT_RECORDED",
       "providerTokenUsage": "UNKNOWN",
       "actualMarketDataAccess": false,
       "researchExecutionOrStrategyActivation": false,
       "paperOrLiveTrading": false,
       "runtimeOrSpendingChanges": false,
       "mergeAuthority": "LEAD_CHATGPT_ONLY",
-      "currentGate": "LOCAL_MODEL_BROWSER_AND_TERMINAL_CHECKS_PASS; RELEASE_SAFETY_ACTION_REQUIRED_WITH_ZERO_JOBS_ON_HEAD_57661A3; LEAD_CI_AUTHORIZATION_AND_SUCCESSFUL_EXACT_HEAD_CI_REQUIRED_BEFORE_INDEPENDENT_REVIEW"
+      "currentGate": "SOURCE_MERGED_AT_9D223CB; EXACT_HEAD_CI_SUCCESS_RUN_40183397323; POST_MERGE_CHECKS_PENDING_LEAD_CONFIRMATION"
     },
     "completion20261017": {
       "verifiedMain": "8691381510039e2ad48b863ea5e66d6ad6cba462",
@@ -2826,6 +2841,10 @@
       "pullRequest": 954,
       "branch": "copilot/research-deterministic-comparator",
       "startingBaseSha": "13b43881e93fe99b4c33cf3607b068e7d19bc452",
+      "integratedMainBaseSha": "9d223cb60115dbebdb5671b8782e0dd0763df972",
+      "integratedMainMergeCommit": "8e51024fe3fbde7cb3a72dc1eb1cc794b46ec459",
+      "preservedPr953Additions": true,
+      "pr953State": "EXACT_HEAD_CI_SUCCESS_RUN_40183397323; SOURCE_MERGED; POSTCHECKS_PENDING_LEAD_CONFIRMATION",
       "scope": "VALIDATOR_BACKED_V2_OFFLINE_COMPARISON_NO_AUTHENTICATION_OR_EXECUTION",
       "implementationFiles": [
         "scripts/research/compare-strategy-evidence.mjs",
@@ -2867,7 +2886,28 @@
         }
       },
       "tokenUsage": "UNKNOWN_NOT_REPORTED",
-      "nextGate": "LEAD_RESOLVE_ZERO_JOB_CI_BLOCK_THEN_SUCCESSFUL_EXACT_HEAD_CI_AND_INDEPENDENT_REVIEW",
+      "nextGate": "R3_REVISION_EXACT_HEAD_CI_THEN_INDEPENDENT_REVIEW; NOT_YET_OBSERVED",
+      "reviewR3": {
+        "reviewCommentId": 6396845681,
+        "implementationHeadBeforeCheckpoint": "8e51024fe3fbde7cb3a72dc1eb1cc794b46ec459",
+        "focusedCheck": {
+          "command": "node --test test/strategy-evidence-comparison.test.js",
+          "result": "11_PASS_0_FAIL",
+          "observedTestSeconds": 0.686,
+          "node": "v22.23.3",
+          "comparatorSha256": "7c22fa9d0e74b48ac6fcaee57f0795824293f83dfa04d95e05f6f8d29f21f0dc",
+          "testSha256": "4ef248f546f558cd5988897feb5323e8133ab2629334055af058deb658a6e127"
+        },
+        "validatorRegressionCheck": {
+          "command": "node --test test/strategy-evidence-contract.test.js",
+          "result": "22_PASS_0_FAIL",
+          "observedTestSeconds": 0.202,
+          "validatorUnchanged": true
+        },
+        "exactHeadCi": "PENDING_FOR_REVISION_HEAD",
+        "independentReview": "PENDING_SUCCESSFUL_EXACT_HEAD_CI",
+        "prDescriptionExample": "OBSOLETE_FLAT_EXAMPLE_REPLACEMENT_PROVIDED_IN_REVIEW_REPLY; PR_BODY_EDIT_PERMISSION_NOT_AVAILABLE"
+      },
       "executionAuthorized": false,
       "autoPromotion": false,
       "provenanceVerified": false

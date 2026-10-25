@@ -131,7 +131,7 @@ function field(object, key) {
 
 
 function identityFor(input, validation) {
-  const receipts = input.lifecycle?.receipts ?? [];
+  const receipts = Array.isArray(input?.lifecycle?.receipts) ? input.lifecycle.receipts : [];
   const validatedReceiptRefs = new Set(validation.lifecycle.receipts.map(receipt => receipt.receiptRef));
   const data = [];
   const windows = [];
@@ -157,7 +157,8 @@ function identityFor(input, validation) {
         preregistration: receipt.preregistration
       });
     }
-    for (const metric of receipt.metrics ?? []) {
+    for (const metric of Array.isArray(receipt.metrics) ? receipt.metrics : []) {
+      if (!metric || typeof metric !== 'object') continue;
       metrics.push({
         stage: receipt.stage,
         receiptRef: receipt.receiptRef,
@@ -166,7 +167,7 @@ function identityFor(input, validation) {
       });
     }
   }
-  const strategy = input.strategy;
+  const strategy = input?.strategy;
   return {
     strategy: strategy ? {id: strategy.id, version: strategy.version} : undefined,
     rules: strategy?.rulesRef,
@@ -212,7 +213,7 @@ function issueKey(issue) {
 }
 
 function metricRecords(input, validation) {
-  const sourceReceipts = input.lifecycle?.receipts ?? [];
+  const sourceReceipts = Array.isArray(input?.lifecycle?.receipts) ? input.lifecycle.receipts : [];
   const validatedReceipts = validation.lifecycle.receipts;
   const records = [];
   for (const sourceReceipt of sourceReceipts) {
@@ -238,9 +239,15 @@ function metricRecords(input, validation) {
 
 function holdoutClaims(input) {
   const claims = [];
-  for (const receipt of input.lifecycle?.receipts ?? []) {
-    if (receipt?.stage !== 'OUT_OF_SAMPLE_HOLDOUT' || !receipt.holdoutAccess) continue;
-    for (const exposure of receipt.holdoutAccess.exposures ?? []) {
+  const receipts = Array.isArray(input?.lifecycle?.receipts) ? input.lifecycle.receipts : [];
+  for (const receipt of receipts) {
+    if (!receipt || typeof receipt !== 'object' ||
+        receipt.stage !== 'OUT_OF_SAMPLE_HOLDOUT' || !receipt.holdoutAccess ||
+        typeof receipt.holdoutAccess !== 'object') continue;
+    const exposures = Array.isArray(receipt.holdoutAccess.exposures)
+      ? receipt.holdoutAccess.exposures : [];
+    for (const exposure of exposures) {
+      if (!exposure || typeof exposure !== 'object' || Array.isArray(exposure)) continue;
       claims.push({
         stage: receipt.stage,
         receiptRef: receipt.receiptRef,
@@ -419,12 +426,7 @@ function runCli() {
           !input.later || Array.isArray(input.later) || typeof input.later !== 'object') {
         throw invalid('CLI_REQUIRES_TWO_EVIDENCE_OBJECTS');
       }
-      const result = compareOne(input.earlier, input.later);
-      if (result.validation.earlier.evidenceCompleteness.status !== 'ASSERTED_WELL_FORMED' ||
-          result.validation.later.evidenceCompleteness.status !== 'ASSERTED_WELL_FORMED') {
-        throw invalid('CLI_EVIDENCE_INVALID_OR_INCOMPLETE');
-      }
-      process.stdout.write(`${JSON.stringify(result)}\n`);
+      process.stdout.write(`${JSON.stringify(compareOne(input.earlier, input.later))}\n`);
     } catch {
       process.stderr.write('Invalid comparison input; provide exactly two bounded contract evidence objects.\n');
       process.exitCode = 1;
