@@ -2746,7 +2746,7 @@
       "pullRequest": 954,
       "branch": "copilot/research-deterministic-comparator",
       "startingBaseSha": "13b43881e93fe99b4c33cf3607b068e7d19bc452",
-      "scope": "BOUNDED_OFFLINE_METADATA_COMPARISON_ONLY_NO_EVIDENCE_ACQUISITION_OR_EXECUTION",
+      "scope": "VALIDATOR_BACKED_V2_OFFLINE_COMPARISON_NO_AUTHENTICATION_OR_EXECUTION",
       "implementationFiles": [
         "scripts/research/compare-strategy-evidence.mjs",
         "test/strategy-evidence-comparison.test.js",
@@ -2754,13 +2754,19 @@
       ],
       "focusedCheck": {
         "command": "node --test test/strategy-evidence-comparison.test.js",
-        "result": "10_PASS_0_FAIL",
-        "observedTestSeconds": 0.351,
+        "result": "9_PASS_0_FAIL",
+        "observedTestSeconds": 0.347,
         "node": "v22.23.3",
         "localCandidate": {
           "baseSha": "13b43881e93fe99b4c33cf3607b068e7d19bc452",
-          "comparatorSha256": "6dfd4e5b6a43fcba17ecaf7608e3785a033dc20c64cf6db66617def5d69950ac",
-          "testSha256": "c9784b9d7be4db6be8bca18bf239efb916604fdf2e9fdfccacc6eba62dc1aae9"
+          "comparatorSha256": "9fd5a4662da22bc4253dffe457959650d4e4acfdbd901a964cd11102227497de",
+          "testSha256": "66c8d2a61ee56bcc55ae2216fdbcdf19532a6247502d199c59081db7facf7e4f"
+        },
+        "validatorRegressionCheck": {
+          "command": "node --test test/strategy-evidence-contract.test.js",
+          "result": "22_PASS_0_FAIL",
+          "observedTestSeconds": 0.200,
+          "validatorUnchanged": true
         },
         "inputHashes": {
           "docs/strategy-lab/PAPER_FIRST_EVIDENCE_CONTRACT.md": "91d343e4f0d754ca6e8177a3534d037c533baffccfe0f6d88cc7bbe5f5df25d1",
