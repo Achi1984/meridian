@@ -181,7 +181,7 @@ connection.close()
         original_popen = subprocess.Popen
 
         def spawn(*args, **kwargs):
-            if Path(args[0][1]).resolve() == supervisor.B1_ADAPTER.resolve():
+            if Path(args[0][-1]).resolve() == supervisor.B1_ADAPTER.resolve():
                 environment = dict(kwargs["env"])
                 environment.update({"NODE_ENV": "test", "B1_TEST_SCENARIO": scenario})
                 if manifest_path is not None:
@@ -214,7 +214,7 @@ connection.close()
         original_popen = subprocess.Popen
 
         def spawn(*args, **kwargs):
-            if Path(args[0][1]).resolve() == HISTORICAL_TEST_ADAPTER.resolve():
+            if Path(args[0][-1]).resolve() == HISTORICAL_TEST_ADAPTER.resolve():
                 environment = dict(kwargs["env"])
                 environment.update({
                     "NODE_ENV": "test",

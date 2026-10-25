@@ -2,13 +2,16 @@
 
 import hashlib
 import json
+import errno
 import os
 from pathlib import Path
 import re
 import selectors
 import shutil
 import signal
+import stat
 import subprocess
+import sys
 import time
 
 import journal
@@ -23,6 +26,43 @@ MAX_STDERR_BYTES = 4096
 MAX_PATH_SECONDS = journal.MAX_PATH_SECONDS
 MAX_BATCH_SECONDS = journal.MAX_BATCH_SECONDS
 MAX_JOURNAL_LOCK_WAIT_SECONDS = 0.01
+WORKER_GUARD_READY = b"PDEATHSIG_ARMED\n"
+WORKER_GUARD_TIMEOUT_SECONDS = 5
+PDEATHSIG_BOOTSTRAP = """
+import ctypes
+import os
+import signal
+import sys
+
+def fail():
+    try:
+        os.write(2, b"PARENT_DEATH_GUARD_FAILED\\n")
+    except OSError:
+        pass
+    os._exit(120)
+
+try:
+    expected_parent = int(sys.argv[1])
+    ready_fd = int(sys.argv[2])
+    node = sys.argv[3]
+    adapter = sys.argv[4]
+    libc = ctypes.CDLL(None, use_errno=True)
+    prctl = libc.prctl
+    prctl.restype = ctypes.c_int
+    if prctl(1, signal.SIGKILL, 0, 0, 0) != 0:
+        fail()
+    observed = ctypes.c_int(-1)
+    if prctl(2, ctypes.byref(observed), 0, 0, 0) != 0 or observed.value != signal.SIGKILL:
+        fail()
+    if os.getppid() != expected_parent:
+        fail()
+    if os.write(ready_fd, b"PDEATHSIG_ARMED\\n") != len(b"PDEATHSIG_ARMED\\n"):
+        fail()
+    os.close(ready_fd)
+    os.execve(node, [node, adapter], os.environ)
+except BaseException:
+    fail()
+"""
 
 
 class ChildFailure(ValueError):
@@ -82,6 +122,97 @@ def _terminate_group(process, immediate=False):
         except ProcessLookupError:
             pass
         process.wait(timeout=2)
+
+
+def _unprivileged_executable(path):
+    try:
+        mode = path.stat().st_mode
+        if mode & (stat.S_ISUID | stat.S_ISGID):
+            return False
+        os.getxattr(path, "security.capability")
+        return False
+    except OSError as error:
+        return error.errno in (errno.ENODATA, errno.ENOTSUP, errno.EOPNOTSUPP)
+
+
+def _wait_worker_guard(process, ready_fd, batch_deadline):
+    expected = WORKER_GUARD_READY
+    observed = bytearray()
+    os.set_blocking(ready_fd, False)
+    deadline = min(batch_deadline, time.monotonic() + WORKER_GUARD_TIMEOUT_SECONDS)
+    with selectors.DefaultSelector() as readiness:
+        readiness.register(ready_fd, selectors.EVENT_READ)
+        while time.monotonic() < deadline:
+            if not readiness.select(min(0.05, deadline - time.monotonic())):
+                if process.poll() is not None:
+                    break
+                continue
+            chunk = os.read(ready_fd, len(expected) + 1 - len(observed))
+            if not chunk:
+                break
+            observed.extend(chunk)
+            if len(observed) > len(expected) or not expected.startswith(observed):
+                raise ChildFailure("PARENT_DEATH_GUARD_FAILED")
+            if observed == expected:
+                continue
+    if observed != expected:
+        timed_out = time.monotonic() >= batch_deadline
+        raise ChildFailure("DEADLINE_EXCEEDED" if timed_out else "PARENT_DEATH_GUARD_FAILED",
+                           timed_out=timed_out)
+
+
+def _worker_bootstrap_command(expected_parent, ready_fd, node, adapter):
+    return [
+        str(Path(sys.executable).resolve()), "-I", "-c", PDEATHSIG_BOOTSTRAP,
+        str(expected_parent), str(ready_fd), str(Path(node).resolve()),
+        str(Path(adapter).resolve()),
+    ]
+
+
+def _spawn_guarded_worker(node, adapter, *, env, pass_fds, batch_deadline):
+    python = Path(sys.executable).resolve()
+    node_path = Path(node).resolve()
+    if not _unprivileged_executable(python) or not _unprivileged_executable(node_path):
+        raise ChildFailure("PRIVILEGED_EXECUTABLE")
+    guard_read, guard_write = os.pipe()
+    os.set_inheritable(guard_write, True)
+    process = None
+    succeeded = False
+    try:
+        process = subprocess.Popen(
+            _worker_bootstrap_command(os.getpid(), guard_write, node_path, adapter),
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=env,
+            start_new_session=True,
+            close_fds=True,
+            pass_fds=(*pass_fds, guard_write),
+        )
+        os.close(guard_write)
+        guard_write = None
+        try:
+            _wait_worker_guard(process, guard_read, batch_deadline)
+        finally:
+            os.close(guard_read)
+            guard_read = None
+        succeeded = True
+        return process
+    except OSError:
+        raise ChildFailure("CHILD_START_FAILED")
+    finally:
+        if guard_read is not None:
+            os.close(guard_read)
+        if guard_write is not None:
+            os.close(guard_write)
+        if process is not None and not succeeded:
+            if process.poll() is None:
+                _terminate_group(process, immediate=True)
+            else:
+                process.wait()
+            for stream in (process.stdin, process.stdout, process.stderr):
+                if not stream.closed:
+                    stream.close()
 
 
 def _run_child(request, path_deadline, batch_deadline, path_seconds, on_event):
@@ -315,8 +446,8 @@ def _b1_event(raw):
 
 
 def _run_b1_child(database, receipt, profile, started, batch_deadline, limits):
-    if os.name != "posix":
-        raise ChildFailure("POSIX_REQUIRED")
+    if not sys.platform.startswith("linux"):
+        raise ChildFailure("LINUX_REQUIRED")
     node = shutil.which("node")
     adapter = Path(
         HISTORICAL_ADAPTER if profile["profile"] == journal.HISTORICAL_PROFILE_NAME
@@ -328,21 +459,14 @@ def _run_b1_child(database, receipt, profile, started, batch_deadline, limits):
     result_read, result_write = os.pipe()
     os.set_inheritable(result_write, True)
     try:
-        process = subprocess.Popen(
-            [node, str(adapter.resolve())],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            env={"PATH": os.path.dirname(node), "LANG": "C.UTF-8",
-                 "B1_RESULT_FD": str(result_write)},
-            start_new_session=True,
-            close_fds=True,
-            pass_fds=(result_write,),
-        )
-    except OSError:
+        process = _spawn_guarded_worker(
+            node, adapter, env={"PATH": os.path.dirname(node), "LANG": "C.UTF-8",
+                                "B1_RESULT_FD": str(result_write)},
+            pass_fds=(result_write,), batch_deadline=batch_deadline)
+    except ChildFailure:
         os.close(result_read)
         os.close(result_write)
-        raise ChildFailure("CHILD_START_FAILED")
+        raise
     os.close(result_write)
     selector = selectors.DefaultSelector()
     streams = ((process.stdin, "input"), (process.stdout, "control"),
