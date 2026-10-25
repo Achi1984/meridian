@@ -1065,23 +1065,45 @@
         "observedSeconds": 8
       },
       "finalExactHeadCi": {
+        "head": "3a383907a9d9e572ed584993b93be8cb58f33984",
+        "runId": 40183397323,
+        "attempt": 2,
+        "jobId": 121139299923,
+        "conclusion": "SUCCESS",
+        "jobs": 1,
+        "failedJobs": 0,
+        "elapsedJobSeconds": 214,
+        "reviewRequested": false
+      },
+      "priorExactHeadCi": {
         "head": "57661a3f4ebdf1f6b3d998e4200d2c589c24c962",
         "runId": 40183168350,
         "attempt": 1,
-        "conclusion": "ACTION_REQUIRED",
+        "conclusion": "FAILURE",
         "jobs": 0,
-        "failedJobs": 0,
-        "elapsedJobSeconds": null,
-        "reviewRequested": false
+        "elapsedJobSeconds": null
       },
-      "independentClaudeReview": "NOT_REQUESTED_BECAUSE_EXACT_HEAD_CI_HAS_NOT_SUCCEEDED",
+      "sourceMerge": {
+        "mergeSha": "9d223cb60115dbebdb5671b8782e0dd0763df972",
+        "mergedAt": "2026-10-25T11:02:36Z",
+        "sourceHead": "3a383907a9d9e572ed584993b93be8cb58f33984",
+        "state": "COMPLETE",
+        "completionReceipts": [6396903885, 6396904072],
+        "postMergeChecks": {
+          "releaseSafety": {"runId": 40187225864, "state": "SUCCESS"},
+          "runtimeSmoke": {"runId": 40187225869, "state": "SUCCESS"},
+          "releaseCoordinator": {"runId": 40187225896, "state": "SUCCESS"},
+          "pages": {"runId": 40187225428, "state": "SUCCESS"}
+        }
+      },
+      "independentClaudeReview": "NOT_RECORDED",
       "providerTokenUsage": "UNKNOWN",
       "actualMarketDataAccess": false,
       "researchExecutionOrStrategyActivation": false,
       "paperOrLiveTrading": false,
       "runtimeOrSpendingChanges": false,
       "mergeAuthority": "LEAD_CHATGPT_ONLY",
-      "currentGate": "LOCAL_MODEL_BROWSER_AND_TERMINAL_CHECKS_PASS; RELEASE_SAFETY_ACTION_REQUIRED_WITH_ZERO_JOBS_ON_HEAD_57661A3; LEAD_CI_AUTHORIZATION_AND_SUCCESSFUL_EXACT_HEAD_CI_REQUIRED_BEFORE_INDEPENDENT_REVIEW"
+      "currentGate": "PR953_COMPLETE_ALL_FOUR_POSTMERGE_CHECKS_SUCCESS; RECEIPTS_6396903885_6396904072"
     },
     "completion20261017": {
       "verifiedMain": "8691381510039e2ad48b863ea5e66d6ad6cba462",
@@ -2975,6 +2997,137 @@
         "scope": "HOSTED_STATUS_PATCH_DELIVERY_ONLY_NOT_HUMAN_APPROVAL_OR_REVIEW_AUTHORITY",
         "rawHttpPatchTraceObserved": false
       }
+    },
+    "strategyEvidenceComparison952": {
+      "issue": 952,
+      "pullRequest": 954,
+      "branch": "copilot/research-deterministic-comparator",
+      "startingBaseSha": "13b43881e93fe99b4c33cf3607b068e7d19bc452",
+      "integratedMainBaseSha": "2a044edb5011f415aaf972d206e5fcd6d010f52f",
+      "integratedMainMergeCommit": "2a044edb5011f415aaf972d206e5fcd6d010f52f",
+      "previousIntegratedMainMergeCommit": "8e51024fe3fbde7cb3a72dc1eb1cc794b46ec459",
+      "preservedPr953Additions": true,
+      "pr953State": "COMPLETE_POSTCHECKS_SUCCESS; RECEIPTS_6396903885_6396904072",
+      "scope": "VALIDATOR_BACKED_V2_OFFLINE_COMPARISON_NO_AUTHENTICATION_OR_EXECUTION",
+      "implementationFiles": [
+        "scripts/research/compare-strategy-evidence.mjs",
+        "test/strategy-evidence-comparison.test.js",
+        "MERIDIAN_LIVE_CHECKPOINT.json"
+      ],
+      "implementationFilesStatus": "HISTORICAL_INITIAL_SCOPE_LIST; CURRENT_COMPARATOR_AND_TEST_FILE_HASHES_ARE_RECORDED_UNDER_REVIEW_R3",
+      "focusedCheck": {
+        "recordStatus": "HISTORICAL_R2_CHECK_PRECEDING_R3_FIXES",
+        "command": "node --test test/strategy-evidence-comparison.test.js",
+        "result": "9_PASS_0_FAIL",
+        "observedTestSeconds": 0.347,
+        "node": "v22.23.3",
+        "localCandidate": {
+          "recordStatus": "HISTORICAL_EARLY_CANDIDATE_NOT_CURRENT_REVIEWED_TREE",
+          "baseSha": "13b43881e93fe99b4c33cf3607b068e7d19bc452",
+          "comparatorSha256": "9fd5a4662da22bc4253dffe457959650d4e4acfdbd901a964cd11102227497de",
+          "testSha256": "66c8d2a61ee56bcc55ae2216fdbcdf19532a6247502d199c59081db7facf7e4f"
+        },
+        "validatorRegressionCheck": {
+          "command": "node --test test/strategy-evidence-contract.test.js",
+          "result": "22_PASS_0_FAIL",
+          "observedTestSeconds": 0.200,
+          "validatorUnchanged": true
+        },
+        "observedSourceHeadCi": {
+          "head": "f57969fb53c9d4c0493435c74d37a4bc82773c66",
+          "base": "13b43881e93fe99b4c33cf3607b068e7d19bc452",
+          "workflowRunId": 40183978665,
+          "attempt": 1,
+          "conclusion": "ACTION_REQUIRED",
+          "jobCount": 0,
+          "jobId": null,
+          "observedJobSeconds": null,
+          "durationStatus": "NO_JOB_STARTED_NOT_MEASURED",
+          "runUrl": "https://github.com/Achi1984/meridian/actions/runs/40183978665"
+        },
+        "inputHashes": {
+          "docs/strategy-lab/PAPER_FIRST_EVIDENCE_CONTRACT.md": "91d343e4f0d754ca6e8177a3534d037c533baffccfe0f6d88cc7bbe5f5df25d1",
+          "docs/strategy-lab/validate-evidence-contract.mjs": "4ec83edb02c141425955dde9d90e13a12b22253d310f2c5de2f906ace72a272b",
+          "docs/autonomy/AGENT_EFFICIENCY.md": "ecd95f897f04e54ddbf5c5530693a543bf274f43a40fd56f3803f3c814aeda85"
+        }
+      },
+      "tokenUsage": "UNKNOWN_NOT_REPORTED",
+      "reviewR3": {
+        "historicalNextGate": "R3_REVISION_EXACT_HEAD_CI_THEN_INDEPENDENT_REVIEW; NOT_YET_OBSERVED",
+        "reviewCommentId": 6396845681,
+        "implementationHeadBeforeCheckpoint": "8e51024fe3fbde7cb3a72dc1eb1cc794b46ec459",
+        "focusedCheck": {
+          "command": "node --test test/strategy-evidence-comparison.test.js",
+          "result": "11_PASS_0_FAIL",
+          "observedTestSeconds": 0.686,
+          "node": "v22.23.3",
+          "comparatorSha256": "7c22fa9d0e74b48ac6fcaee57f0795824293f83dfa04d95e05f6f8d29f21f0dc",
+          "testSha256": "4ef248f546f558cd5988897feb5323e8133ab2629334055af058deb658a6e127"
+        },
+        "validatorRegressionCheck": {
+          "command": "node --test test/strategy-evidence-contract.test.js",
+          "result": "22_PASS_0_FAIL",
+          "observedTestSeconds": 0.202,
+          "validatorUnchanged": true
+        },
+        "implementationTestHead": "f3e339decbe57f9a3ce39dfec7cd476887787e94",
+        "exactCandidateHead": "a9cbbc5e436ea47e141bc513331c2351db4f4b10",
+        "exactCandidateBase": "9d223cb60115dbebdb5671b8782e0dd0763df972",
+        "exactHeadCi": {
+          "head": "a9cbbc5e436ea47e141bc513331c2351db4f4b10",
+          "base": "9d223cb60115dbebdb5671b8782e0dd0763df972",
+          "workflowRunId": 40187925171,
+          "attempt": 2,
+          "jobId": 121173273389,
+          "result": "2760_PASS_0_FAIL_0_SKIP"
+        },
+        "independentReview": "FULL_CLAUDE_GREEN_RECEIPT_6397969493",
+        "prDescriptionExample": "LEAD_CORRECTED"
+      },
+      "pr950Integration": {
+        "mergeSha": "2a044edb5011f415aaf972d206e5fcd6d010f52f",
+        "state": "COMPLETE_ALL_FOUR_POSTMERGE_CHECKS_SUCCESS",
+        "receiptComments": [6398541696, 6398541875],
+        "postMergeChecks": {
+          "releaseSafety": {
+            "runId": 40198984890,
+            "attempt": 1,
+            "jobId": 121185888959,
+            "result": "2750_PASS_0_FAIL_0_SKIP",
+            "state": "SUCCESS"
+          },
+          "runtimeSmoke": {
+            "runId": 40198984734,
+            "state": "SUCCESS"
+          },
+          "releaseCoordinator": {
+            "runId": 40198984760,
+            "state": "SUCCESS"
+          },
+          "pages": {
+            "runId": 40198983890,
+            "state": "SUCCESS"
+          }
+        }
+      },
+      "integrationValidation": {
+        "previousExactPair": {
+          "head": "a9cbbc5e436ea47e141bc513331c2351db4f4b10",
+          "base": "9d223cb60115dbebdb5671b8782e0dd0763df972",
+          "ciRunId": 40187925171,
+          "ciAttempt": 2,
+          "ciJobId": 121173273389,
+          "ciResult": "2760_PASS_0_FAIL_0_SKIP",
+          "claudeReview": "GREEN",
+          "claudeReceiptCommentId": 6397969493
+        },
+        "currentIntegratedMain": "2a044edb5011f415aaf972d206e5fcd6d010f52f",
+        "state": "FRESH_EXACT_INTEGRATED_HEAD_CI_AND_NARROW_DELTA_REVIEW_PENDING"
+      },
+      "nextGate": "FRESH_EXACT_INTEGRATED_HEAD_CI_THEN_NARROW_CLAUDE_DELTA_REVIEW; NO_RUNTIME_OR_AUTHORITY_CHANGE",
+      "executionAuthorized": false,
+      "autoPromotion": false,
+      "provenanceVerified": false
     }
   }
 }
