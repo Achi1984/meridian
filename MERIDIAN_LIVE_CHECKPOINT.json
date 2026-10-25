@@ -848,6 +848,77 @@
     "historicalStrategyNextStepBeforeB11": "Finalize r130 Arena release integration gates; separately diagnose PR872 publisher timing-test failure before independent data review. No new strategy execution.",
     "historicalStrategyNextStepBefore919": "ACCEPT_PR901_THEN_RECONCILE_COPILOT_PR903_DELIVERY_PROPOSALS",
     "strategyNextStep": "PR946_COMPLETE_PR947_RECOVERED_COMPLETE; PR948_ZERO_COST_D2_SETUP_DOCUMENT_DRAFT_PENDING_EXACT_HEAD_CI_AND_INDEPENDENT_REVIEW; D2_DEFER",
+    "m11HypothesisComparison951": {
+      "issue": 951,
+      "pullRequest": 953,
+      "branch": "copilot/m11-innovation-compare-strategy-hypotheses",
+      "verifiedBaseSha": "13b43881e93fe99b4c33cf3607b068e7d19bc452",
+      "startingHead": "717ba63e9ff0f643a242325c0adfd2364acdb943",
+      "scope": [
+        "v11/strategy-catalog.js",
+        "test/v11-strategy-catalog.test.js",
+        "test/v11-strategy-workspace-chrome.test.js",
+        "MERIDIAN_LIVE_CHECKPOINT.json"
+      ],
+      "campaignSha256": "8b3deaefa91e1459fdef88cb02abf5afcaf6f412a72049097f043023a1af2c8e",
+      "initialWorkflowObservation": {
+        "runId": 40182547341,
+        "attempt": 1,
+        "head": "717ba63e9ff0f643a242325c0adfd2364acdb943",
+        "conclusion": "ACTION_REQUIRED",
+        "jobs": 0,
+        "elapsedJobSeconds": null
+      },
+      "localFocusedTests": {
+        "testedHead": "717ba63e9ff0f643a242325c0adfd2364acdb943",
+        "testedBase": "13b43881e93fe99b4c33cf3607b068e7d19bc452",
+        "toolchain": {
+          "node": "v22.23.3",
+          "npm": "10.9.9",
+          "chrome": "Google Chrome 155.0.8059.39"
+        },
+        "modelCommand": "node --test test/v11-strategy-catalog.test.js test/v11-strategy-workspace-chrome.test.js",
+        "modelResult": "12_PASS",
+        "modelTestTree": "cf82f9bc50d8afe112b8d72cc3bf51be1039913a",
+        "browserRuns": [
+          {
+            "command": "node --test test/v11-strategy-catalog.test.js test/v11-strategy-workspace-chrome.test.js",
+            "tree": "cf82f9bc50d8afe112b8d72cc3bf51be1039913a",
+            "result": "MODEL_12_PASS; CHROME_DEVTOOLS_STARTUP_TIMEOUT_UNKNOWN_BEFORE_FIRST_VIEWPORT",
+            "observedSeconds": 14
+          },
+          {
+            "command": "node --test test/v11-strategy-workspace-chrome.test.js",
+            "testedHead": "717ba63e9ff0f643a242325c0adfd2364acdb943",
+            "result": "FAIL_EXISTING_FAMILY_COUNT_INCLUDED_COMPARISON_CARDS_14_INSTEAD_OF_12; FIXED_WITH_SEPARATE_DATA_ATTRIBUTE",
+            "observedSeconds": 7
+          },
+          {
+            "command": "node --test test/v11-strategy-workspace-chrome.test.js",
+            "tree": "f16386cd4424b324fcaa1f5aca38f2e8b6c094a2",
+            "result": "PASS_AT_320_375_390_430_1440; ZERO_OVERFLOW; KEYBOARD_SELECTION_IDENTICAL_SELECTION_AND_RESET_FOCUS_PASS",
+            "observedSeconds": 18
+          }
+        ],
+        "diagnostic": "Separate Chrome launch created DevToolsActivePort; it was not counted as browser acceptance."
+      },
+      "terminalRegressionTest": {
+        "command": "node --test test/v11-terminal-entry.test.js",
+        "testedHead": "717ba63e9ff0f643a242325c0adfd2364acdb943",
+        "testedBase": "13b43881e93fe99b4c33cf3607b068e7d19bc452",
+        "result": "3_PASS_0_FAIL; CHROME_ENTRY_CHECKS_AT_320_375_390_430",
+        "observedSeconds": 8
+      },
+      "finalExactHeadCi": "PENDING",
+      "independentClaudeReview": "PENDING_AFTER_SUCCESSFUL_EXACT_HEAD_CI",
+      "providerTokenUsage": "UNKNOWN",
+      "actualMarketDataAccess": false,
+      "researchExecutionOrStrategyActivation": false,
+      "paperOrLiveTrading": false,
+      "runtimeOrSpendingChanges": false,
+      "mergeAuthority": "LEAD_CHATGPT_ONLY",
+      "currentGate": "MODEL_TESTS_PASS; FIVE_WIDTH_BROWSER_AND_TERMINAL_REGRESSION_PASS; FINAL_EXACT_HEAD_CI_AND_INDEPENDENT_REVIEW_NOT_YET_OBSERVED"
+    },
     "completion20261017": {
       "verifiedMain": "8691381510039e2ad48b863ea5e66d6ad6cba462",
       "arenaMerge": "ed60066fc58b4d60eddd727c24cae61c368720bb",
