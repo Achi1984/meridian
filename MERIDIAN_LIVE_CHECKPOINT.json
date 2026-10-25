@@ -2904,7 +2904,8 @@
           "observedTestSeconds": 0.202,
           "validatorUnchanged": true
         },
-        "exactCandidateHead": "f3e339decbe57f9a3ce39dfec7cd476887787e94",
+        "implementationTestHead": "f3e339decbe57f9a3ce39dfec7cd476887787e94",
+        "exactCandidateHead": "77395d01fca130e79a6ab69cf82f912dd2b2c1dc",
         "exactCandidateBase": "9d223cb60115dbebdb5671b8782e0dd0763df972",
         "exactHeadCi": "NOT_YET_OBSERVED_FOR_EXACT_CANDIDATE",
         "independentReview": "PENDING_SUCCESSFUL_EXACT_HEAD_CI",
