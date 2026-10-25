@@ -2768,6 +2768,18 @@
           "observedTestSeconds": 0.200,
           "validatorUnchanged": true
         },
+        "observedSourceHeadCi": {
+          "head": "f57969fb53c9d4c0493435c74d37a4bc82773c66",
+          "base": "13b43881e93fe99b4c33cf3607b068e7d19bc452",
+          "workflowRunId": 40183978665,
+          "attempt": 1,
+          "conclusion": "ACTION_REQUIRED",
+          "jobCount": 0,
+          "jobId": null,
+          "observedJobSeconds": null,
+          "durationStatus": "NO_JOB_STARTED_NOT_MEASURED",
+          "runUrl": "https://github.com/Achi1984/meridian/actions/runs/40183978665"
+        },
         "inputHashes": {
           "docs/strategy-lab/PAPER_FIRST_EVIDENCE_CONTRACT.md": "91d343e4f0d754ca6e8177a3534d037c533baffccfe0f6d88cc7bbe5f5df25d1",
           "docs/strategy-lab/validate-evidence-contract.mjs": "4ec83edb02c141425955dde9d90e13a12b22253d310f2c5de2f906ace72a272b",
@@ -2775,7 +2787,7 @@
         }
       },
       "tokenUsage": "UNKNOWN_NOT_REPORTED",
-      "nextGate": "EXACT_HEAD_CI_THEN_INDEPENDENT_REVIEW",
+      "nextGate": "LEAD_RESOLVE_ZERO_JOB_CI_BLOCK_THEN_SUCCESSFUL_EXACT_HEAD_CI_AND_INDEPENDENT_REVIEW",
       "executionAuthorized": false,
       "autoPromotion": false,
       "provenanceVerified": false
