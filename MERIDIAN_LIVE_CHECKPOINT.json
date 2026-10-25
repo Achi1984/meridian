@@ -357,6 +357,62 @@
       "hostAccess": false,
       "currentGate": "R3_CORRECTION_IN_PROGRESS; FRESH_EXACT_HEAD_CI_REQUIRED; COMPLETE_SCOPE_CLAUDE_GREEN_LIGHT_AFTER_SUCCESSFUL_CI; NO_ACTIVATION"
     },
+    "d2Launcher950CorrectionR4": {
+      "opId": "MERIDIAN-950-INTEGRATION-20261025-R4",
+      "issue": 949,
+      "pullRequest": 950,
+      "pullRequestState": "OPEN_DRAFT",
+      "branch": "copilot/meridian-d2-launcher-20261025-r1",
+      "baseSha": "13b43881e93fe99b4c33cf3607b068e7d19bc452",
+      "observedHeadBeforeCorrection": "1f361e36de797bb451985e36e19b7b876604341b",
+      "correctionRequestCommentId": 6396127649,
+      "priorFullCi": {
+        "runId": 40177333973,
+        "attempt": 2,
+        "head": "b8e738d5663fc064d5c29efa360a07fe500f7dc6",
+        "result": "FAILED",
+        "tests": {"total": 2748, "passed": 2735, "failed": 13, "skipped": 0},
+        "failureBreakdown": {
+          "historicalExportNodeTests": 11,
+          "historicalInspectionNodeWrapper": 1,
+          "historicalInspectionInternalPythonTests": 3,
+          "fiveWidthChromeNodeWrapper": 1
+        },
+        "causes": [
+          "Stale generated-fixture sourceSha256 binding in v11/arena-historical-export.js",
+          "Historical inspection test hook did not recognize the isolated Python bootstrap command"
+        ]
+      },
+      "r3HeadCi": {
+        "runId": 40180765963,
+        "head": "1f361e36de797bb451985e36e19b7b876604341b",
+        "result": "ACTION_REQUIRED_ZERO_JOBS"
+      },
+      "r4FocusedValidation": {
+        "historicalExporter": {"passed": 11, "failed": 0},
+        "historicalInspectionPython": {"passed": 7, "failed": 0},
+        "historicalInspectionNodeWrapper": "PASSED",
+        "fiveWidthChromeNodeWrapper": "LOCAL_CHROME_DEVTOOLS_STARTUP_TIMEOUT; FIVE_WIDTHS_NOT_COMPLETED"
+      },
+      "acceptedSyntheticSourceMapSha256": "bab379ce692601315ef3b0436ac7969798e96cc9781f7f3845ec4ed8a2b770e7",
+      "historicalExporterFileSha256": "1b4c96aed9d9f78ca33ae1f8e76900036259aaee397a4178eee6853a1a51eef8",
+      "currentGate": "R4_SOURCE_CORRECTION_IN_PROGRESS; FRESH_EXACT_HEAD_CI_REQUIRED; COMPLETE_SCOPE_CLAUDE_GREEN_LIGHT_AFTER_SUCCESSFUL_CI; NO_ACTIVATION",
+      "d2Decision": "DEFER",
+      "profileState": "NOT_FROZEN",
+      "inputManifest": null,
+      "inputManifestSha256": null,
+      "inputSha256": null,
+      "approvalReceipt": null,
+      "executionAuthorized": false,
+      "strategyPnlAuthorized": false,
+      "discoveryAuthorized": false,
+      "validationAuthorized": false,
+      "holdoutAuthorized": false,
+      "paperAuthorized": false,
+      "liveAuthorized": false,
+      "capturedDataOrRealJournalAccess": false,
+      "hostAccess": false
+    },
     "currentB11": {
       "opId": "MERIDIAN-V11-B11-BOT-COCKPIT-20261018",
       "issue": 876,

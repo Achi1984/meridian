@@ -122,7 +122,16 @@ node --test test/research-supervisor-historical-one-shot.test.js
 ```
 
 No captured CSV or real journal is used. Run `40177333973` attempt 2 failed on
-the prior `b8e738d` head (2,735 passed, 13 failed, 0 skipped); it is not a
-successful CI receipt for this correction. A fresh successful exact-head
-Actions CI run and then a mandatory complete-scope final Claude `GREEN_LIGHT`
-are required, in addition to the Lead's decision, before any later decision.
+the prior `b8e738d` head (2,735 passed, 13 failed, 0 skipped): 11 historical
+export tests failed on a stale synthetic source-map binding, the historical
+inspection wrapper failed because its test hook did not recognize the isolated
+bootstrap (three internal Python failures), and the five-width Chrome wrapper
+failed for the same stale exporter binding before browser acceptance. Run
+`40180765963` on R3 head `1f361e3` is `action_required` with zero jobs, not a
+test result. R4 focused validation passed 11 historical-export tests and 7
+historical-inspection Python tests (the existing Node wrapper passed). The
+five-width Chrome test was attempted locally but could not start DevTools within
+the existing timeout, so no widths are claimed as validated. A fresh successful
+exact-head Actions run and then a mandatory complete-scope final Claude
+`GREEN_LIGHT` are required, in addition to the Lead's decision, before any later
+decision.

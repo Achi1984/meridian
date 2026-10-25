@@ -60,9 +60,17 @@
 > PR #948 is complete and merged; completion receipt is #942/comment6394400471.
 > The related #935 receipts remain setup6394798304, metadata6394830829, input
 > acceptance6394872153, and launcher dispatch6395214870. Issue #949 is open and
-> PR #950 remains an open Draft under R3 correction. The prior exact-head
+> PR #950 remains an open Draft under R4 correction. The prior exact-head
 > `b8e738d5663fc064d5c29efa360a07fe500f7dc6` Release Safety attempt 2 failed
-> (2735 passed, 13 failed, 0 skipped); that result is not for the correction.
+> (2735 passed, 13 failed, 0 skipped): 11 historical-export tests failed on a
+> stale synthetic source-map binding; one historical-inspection wrapper failed
+> because its hook missed the isolated bootstrap (three internal Python failures);
+> and one five-width Chrome wrapper failed on the stale exporter binding. R3
+> exact-head run40180765963 is `action_required` with zero jobs, not a test result.
+> R4 focused runs: historical exporter 11/11 and historical inspection 7/7
+> Python tests (Node wrapper passed); local five-width Chrome acceptance was
+> attempted but blocked by `Chrome DevTools startup timeout`, so the widths are
+> not validated locally.
 > Fresh exact-head CI must succeed before a complete-scope final Claude
 > `GREEN_LIGHT`. The current source identity and launcher are proposed, not
 > reviewed; any later execution package must bind the exact reviewed head and
