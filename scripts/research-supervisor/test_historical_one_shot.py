@@ -3,6 +3,7 @@ import hashlib
 import os
 from pathlib import Path
 import signal
+import sqlite3
 import stat
 import subprocess
 import sys
@@ -53,6 +54,17 @@ class HistoricalOneShotTests(unittest.TestCase):
             journal.initialize(
                 str(self.database), profile=journal.HISTORICAL_PROFILE_NAME)
 
+    def journal_state(self):
+        connection = sqlite3.connect(self.database)
+        try:
+            meta = connection.execute("SELECT fence,active FROM b1_meta WHERE id=1").fetchone()
+            jobs = connection.execute("SELECT COUNT(*) FROM b1_jobs").fetchone()[0]
+            budgets = connection.execute("SELECT COUNT(*) FROM b1_daily_budget").fetchone()[0]
+            payloads = connection.execute("SELECT COUNT(*) FROM b1_path_payloads").fetchone()[0]
+        finally:
+            connection.close()
+        return meta, jobs, budgets, payloads
+
     def worker_helper(self, script, env, pass_fds=(), deadline_seconds=5):
         return supervisor._spawn_guarded_worker(
             sys.executable, script, env=env, pass_fds=pass_fds,
@@ -82,6 +94,45 @@ class HistoricalOneShotTests(unittest.TestCase):
                 queued.rollback()
                 queued.close()
         self.assertEqual(state, ("QUEUED", 0))
+
+    def test_runtime_preflight_failures_do_not_create_receipt_or_mutate_journal(self):
+        self.initialize()
+        for name, patcher in (
+                ("missing_node", patch.object(supervisor.shutil, "which", return_value=None)),
+                ("prohibited_executable",
+                 patch.object(supervisor, "_unprivileged_executable", return_value=False))):
+            with self.subTest(runtime=name):
+                before_bytes = self.database.read_bytes()
+                before_state = self.journal_state()
+                evidence = self.root / f"{name}.jsonl"
+                with (self.profile_context()[0], self.profile_context()[1], patcher):
+                    with self.assertRaises(supervisor.ChildFailure):
+                        launcher.run_once(str(self.database), str(evidence), "test-owner")
+                self.assertFalse(evidence.exists())
+                self.assertEqual(self.database.read_bytes(), before_bytes)
+                self.assertEqual(self.journal_state(), before_state)
+                self.assertEqual(before_state, ((0, None), 0, 0, 0))
+
+    def test_orphan_path_payload_is_rejected_without_database_changes(self):
+        self.initialize()
+        payload = b"synthetic orphan payload"
+        connection = sqlite3.connect(self.database)
+        try:
+            connection.execute(
+                "INSERT INTO b1_path_payloads VALUES (?,?,?,?)",
+                ("orphan-trial", 0, payload, hashlib.sha256(payload).hexdigest()))
+            connection.commit()
+        finally:
+            connection.close()
+        before_bytes = self.database.read_bytes()
+        before_state = self.journal_state()
+        with self.profile_context()[0], self.profile_context()[1]:
+            with self.assertRaises(launcher.LaunchError) as blocked:
+                launcher.run_once(str(self.database), str(self.evidence), "test-owner")
+        self.assertEqual(blocked.exception.code, "JOURNAL_PAYLOADS_NOT_EMPTY")
+        self.assertFalse(self.evidence.exists())
+        self.assertEqual(self.database.read_bytes(), before_bytes)
+        self.assertEqual(self.journal_state(), ((0, None), 0, 0, 1))
 
     def test_enqueue_ambiguity_records_boundary_and_never_retries(self):
         self.initialize()
@@ -128,6 +179,49 @@ class HistoricalOneShotTests(unittest.TestCase):
                 launcher.run_once(str(self.database), str(self.evidence), "test-owner")
             self.assertEqual(receipt_error.exception.code, "EVIDENCE_ALREADY_EXISTS")
             self.assertEqual(self.evidence.read_text(), "private test sentinel\n")
+
+    def test_journal_and_sidecar_hardlink_aliases_fail_closed(self):
+        self.initialize()
+        with self.profile_context()[0], self.profile_context()[1]:
+            journal_alias = self.root / "journal-alias.sqlite"
+            os.link(self.database, journal_alias)
+            with self.assertRaises(launcher.LaunchError) as journal_error:
+                launcher.run_once(str(self.database), str(self.evidence), "test-owner")
+            self.assertEqual(journal_error.exception.code, "PRIVATE_FILE_INVALID")
+            journal_alias.unlink()
+
+            sidecar_source = self.root / "sidecar-source"
+            sidecar_source.write_bytes(b"synthetic sidecar")
+            sidecar_source.chmod(0o600)
+            os.link(sidecar_source, Path(f"{self.database}-wal"))
+            with self.assertRaises(launcher.LaunchError) as sidecar_error:
+                launcher.run_once(str(self.database), str(self.evidence), "test-owner")
+            self.assertEqual(sidecar_error.exception.code, "PRIVATE_FILE_INVALID")
+            Path(f"{self.database}-wal").unlink()
+            sidecar_source.unlink()
+
+    def test_new_receipt_must_remain_single_link(self):
+        self.initialize()
+        before_bytes = self.database.read_bytes()
+        real_open = os.open
+        alias = self.root / "evidence-alias.jsonl"
+
+        def create_alias_after_receipt_open(path, flags, mode=0o777, *, dir_fd=None):
+            fd = real_open(path, flags, mode, dir_fd=dir_fd) if dir_fd is not None \
+                else real_open(path, flags, mode)
+            if os.fspath(path) == str(self.evidence) and flags & os.O_CREAT:
+                os.link(self.evidence, alias)
+            return fd
+
+        with (self.profile_context()[0], self.profile_context()[1],
+              patch.object(launcher.os, "open", side_effect=create_alias_after_receipt_open)):
+            with self.assertRaises(launcher.LaunchError) as blocked:
+                launcher.run_once(str(self.database), str(self.evidence), "test-owner")
+        self.assertEqual(blocked.exception.code, "EVIDENCE_PERMISSIONS_INVALID")
+        self.assertEqual(os.stat(self.evidence).st_nlink, 2)
+        self.assertFalse(self.evidence.is_symlink())
+        self.assertEqual(self.database.read_bytes(), before_bytes)
+        self.assertEqual(self.journal_state(), ((0, None), 0, 0, 0))
 
     def test_unexpected_claim_preserves_fence_and_skips_run(self):
         self.initialize()

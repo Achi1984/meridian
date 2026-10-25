@@ -14,10 +14,18 @@ selection of an already existing journal and a new private receipt location.
 Both paths must be exact, absolute, canonical paths outside the repository.
 The journal must be a private regular historical-profile database with no jobs,
 budget reservations, or active fence. The receipt must not already exist, and
-its existing parent directory must be private and owner-controlled. The
-launcher validates the Linux host, source pins, frozen profile/admission,
+its existing parent directory must be private and owner-controlled. Existing
+journal files and SQLite sidecars must be regular, private, single-link files;
+the exclusively created receipt is checked for the same single-link property.
+The launcher rejects any existing `b1_path_payloads` rows, including orphans,
+and validates the
+Linux host, source pins, frozen profile/admission,
 journal schema and fence, all of these filesystem properties, and the fixed
-44-path/60-second/1,800-second/1-MiB bounds before its first write.
+44-path/60-second/1,800-second/1-MiB bounds before its first write. Its
+read-only runtime preflight resolves Python and Node and checks executable
+availability and privilege bits/capabilities before creating a receipt or
+calling enqueue, claim, or run. Launch-time checks remain in place.
+These checks run before a receipt is created or any enqueue, claim, or run call.
 
 The command requires an explicit subcommand and owner; placeholders below must
 be replaced with the operator's exact paths and owner:
@@ -99,6 +107,12 @@ The regenerated D2 candidate remains metadata-only: its D1 manifest/input
 identity, 44 path IDs and order, protocol, and engine identity must remain
 unchanged; only the affected supervisor/bridge source identities and derived
 source/profile digests change. Historical records are retained as history.
+The strict 11-file admission source map does not include this launcher. A later
+execution package must separately bind the exact reviewed source head and the
+SHA-256 of `historical_one_shot.py`; do not widen the admission schema to imply
+that this new file is already covered. The current proposed launcher file SHA-256 is
+`915dccdd705d7251b00567e8c3ba4dbc0f978e3eb63ffa0fccecc7d928f3f951`; refresh
+it after every source change. This is not yet a reviewed binding.
 
 Focused generated-fixture acceptance is run through the existing Node test
 glob:
@@ -107,5 +121,8 @@ glob:
 node --test test/research-supervisor-historical-one-shot.test.js
 ```
 
-No captured CSV or real journal is used. Final exact-head Actions CI and the
-independent Lead review remain required before any later decision.
+No captured CSV or real journal is used. Run `40177333973` attempt 2 failed on
+the prior `b8e738d` head (2,735 passed, 13 failed, 0 skipped); it is not a
+successful CI receipt for this correction. A fresh successful exact-head
+Actions CI run and then a mandatory complete-scope final Claude `GREEN_LIGHT`
+are required, in addition to the Lead's decision, before any later decision.

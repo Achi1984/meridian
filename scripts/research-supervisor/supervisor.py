@@ -135,6 +135,23 @@ def _unprivileged_executable(path):
         return error.errno in (errno.ENODATA, errno.ENOTSUP, errno.EOPNOTSUPP)
 
 
+def preflight_b1_runtime():
+    """Read-only availability and privilege check shared by preflight and launch."""
+    if not sys.platform.startswith("linux"):
+        raise ChildFailure("LINUX_REQUIRED")
+    python = Path(sys.executable).resolve()
+    node = shutil.which("node")
+    if (not python.is_file() or not os.access(python, os.X_OK)
+            or node is None):
+        raise ChildFailure("ADAPTER_UNAVAILABLE")
+    node_path = Path(node).resolve()
+    if not node_path.is_file() or not os.access(node_path, os.X_OK):
+        raise ChildFailure("ADAPTER_UNAVAILABLE")
+    if not _unprivileged_executable(python) or not _unprivileged_executable(node_path):
+        raise ChildFailure("PRIVILEGED_EXECUTABLE")
+    return str(node_path)
+
+
 def _wait_worker_guard(process, ready_fd, batch_deadline):
     expected = WORKER_GUARD_READY
     observed = bytearray()
@@ -446,16 +463,13 @@ def _b1_event(raw):
 
 
 def _run_b1_child(database, receipt, profile, started, batch_deadline, limits):
-    if not sys.platform.startswith("linux"):
-        raise ChildFailure("LINUX_REQUIRED")
-    node = shutil.which("node")
+    node = preflight_b1_runtime()
     adapter = Path(
         HISTORICAL_ADAPTER if profile["profile"] == journal.HISTORICAL_PROFILE_NAME
         else B1_ADAPTER
     ).absolute()
-    if node is None or not adapter.is_file():
+    if not adapter.is_file():
         raise ChildFailure("ADAPTER_UNAVAILABLE")
-    node = str(Path(node).resolve())
     result_read, result_write = os.pipe()
     os.set_inheritable(result_write, True)
     try:

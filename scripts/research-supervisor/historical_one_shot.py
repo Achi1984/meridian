@@ -64,7 +64,8 @@ def _private_regular_file(path, *, existing):
         raise LaunchError("PRIVATE_FILE_INVALID")
     except OSError:
         raise LaunchError("PRIVATE_FILE_INVALID")
-    _need(stat.S_ISREG(info.st_mode) and info.st_uid == os.geteuid()
+    _need(stat.S_ISREG(info.st_mode) and info.st_nlink == 1
+          and info.st_uid == os.geteuid()
           and info.st_mode & 0o077 == 0, "PRIVATE_FILE_INVALID")
     return info
 
@@ -134,6 +135,8 @@ def _journal_preflight(database, profile):
         _need(jobs == 0 and queued == 0, "JOURNAL_NOT_EMPTY")
         budgets = connection.execute("SELECT COUNT(*) FROM b1_daily_budget").fetchone()[0]
         _need(budgets == 0, "JOURNAL_BUDGET_NOT_EMPTY")
+        payloads = connection.execute("SELECT COUNT(*) FROM b1_path_payloads").fetchone()[0]
+        _need(payloads == 0, "JOURNAL_PAYLOADS_NOT_EMPTY")
     except journal.JournalError as error:
         raise LaunchError(error.code)
     finally:
@@ -149,7 +152,8 @@ def _create_evidence(path):
         fd = os.open(path, flags, 0o600)
         os.fchmod(fd, 0o600)
         info = os.fstat(fd)
-        _need(stat.S_ISREG(info.st_mode) and info.st_uid == os.geteuid()
+        _need(stat.S_ISREG(info.st_mode) and info.st_nlink == 1
+              and info.st_uid == os.geteuid()
               and info.st_mode & 0o077 == 0, "EVIDENCE_PERMISSIONS_INVALID")
         parent_fd = os.open(path.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
         try:
@@ -245,6 +249,7 @@ def run_once(database, evidence_path, owner):
     database = _validate_journal_path(database)
     evidence_path = _validate_evidence_path(evidence_path)
     _journal_preflight(database, profile)
+    supervisor.preflight_b1_runtime()
 
     fd = _create_evidence(evidence_path)
     sequence = 0

@@ -56,6 +56,22 @@
 > synthetic journals/claims and exercise generated-fixture code; this packet ran none.
 > Proposed body link remains “Part of #935”; umbrella is open.
 
+> ## Current D2 launcher correction — 2026-10-25
+> PR #948 is complete and merged; completion receipt is #942/comment6394400471.
+> The related #935 receipts remain setup6394798304, metadata6394830829, input
+> acceptance6394872153, and launcher dispatch6395214870. Issue #949 is open and
+> PR #950 remains an open Draft under R3 correction. The prior exact-head
+> `b8e738d5663fc064d5c29efa360a07fe500f7dc6` Release Safety attempt 2 failed
+> (2735 passed, 13 failed, 0 skipped); that result is not for the correction.
+> Fresh exact-head CI must succeed before a complete-scope final Claude
+> `GREEN_LIGHT`. The current source identity and launcher are proposed, not
+> reviewed; any later execution package must bind the exact reviewed head and
+> launcher file hash separately from the strict 11-file admission source map.
+> Proposed launcher hash: `915dccdd705d7251b00567e8c3ba4dbc0f978e3eb63ffa0fccecc7d928f3f951`.
+> D2 remains DEFER, profile NOT_FROZEN with null input/receipt, and every
+> execution/Paper/Live authority flag remains false. No host, real journal or
+> captured data was accessed.
+
 > Current reconciliation — 2026-10-19, PR #901 main alignment.
 > Verified main: `496360869171f0a29e3efbc7ec216ffc1833c6a0` (PR #900).
 > PR #900 complete: independent Work review #639/6273568843, merge receipt
