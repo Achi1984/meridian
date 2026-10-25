@@ -413,6 +413,66 @@
       "capturedDataOrRealJournalAccess": false,
       "hostAccess": false
     },
+    "d2Launcher950IntegrationR5": {
+      "opId": "MERIDIAN-950-R5-20261025",
+      "pullRequest": 950,
+      "pullRequestState": "OPEN_DRAFT",
+      "branch": "copilot/meridian-d2-launcher-20261025-r1",
+      "baseSha": "9d223cb60115dbebdb5671b8782e0dd0763df972",
+      "mergedMainPr953": {
+        "state": "MERGED_POSTCHECKS_SUCCESS",
+        "mergeSha": "9d223cb60115dbebdb5671b8782e0dd0763df972",
+        "mergeCommit": "a498e4227eeef08b574ad536ceb0cbd180a19b15",
+        "sourceHead": "3a383907a9d9e572ed584993b93be8cb58f33984",
+        "requiredPostchecks": {
+          "releaseSafety": {"runId": 40187225864, "status": "SUCCESS"},
+          "runtimeSmoke": {"runId": 40187225869, "status": "SUCCESS"},
+          "releaseCoordinator": {"runId": 40187225896, "status": "SUCCESS"},
+          "pages": {"runId": 40187225428, "status": "SUCCESS"}
+        },
+        "complete": true
+      },
+      "priorR4Head": "7109999cd63e0febd18365b2c8ef6c85eb3d5a13",
+      "priorR4ExactHeadCi": {
+        "runId": 40182697302,
+        "attempt": 2,
+        "jobId": 121139241538,
+        "checkoutMergeHead": "1133eb2ad254c4e682ec08c651f299ee79897f42",
+        "tests": {"total": 2748, "passed": 2748, "failed": 0, "skipped": 0},
+        "result": "SUCCESS"
+      },
+      "priorR4ClaudeReview": {
+        "commentId": 6396350291,
+        "requestId": "MERIDIAN-950-FINAL-7109999-20261025-R1",
+        "verdict": "NEEDS_MORE_EVIDENCE",
+        "reviewedHead": "7109999cd63e0febd18365b2c8ef6c85eb3d5a13",
+        "reviewedBase": "13b43881e93fe99b4c33cf3607b068e7d19bc452",
+        "missingRanges": [1, 2, 3, 4, 5, 6],
+        "notGreenLight": true,
+        "supplementalReviewRequiredAfterSuccessfulExactHeadCi": true
+      },
+      "preservedMainAdditions": [
+        "PR953 M11 strategy comparison UI/source handling",
+        "PR953 checkpoint updates"
+      ],
+      "mergeConflicts": [],
+      "currentGate": "R5_MAIN_INTEGRATED; PR953_POSTCHECKS_SUCCESS; FRESH_EXACT_HEAD_CI_REQUIRED; CLAUDE_NEEDS_MORE_EVIDENCE; SUPPLEMENTAL_REVIEW_AFTER_CI; NO_ACTIVATION",
+      "d2Decision": "DEFER",
+      "profileState": "NOT_FROZEN",
+      "inputManifest": null,
+      "inputManifestSha256": null,
+      "inputSha256": null,
+      "approvalReceipt": null,
+      "executionAuthorized": false,
+      "strategyPnlAuthorized": false,
+      "discoveryAuthorized": false,
+      "validationAuthorized": false,
+      "holdoutAuthorized": false,
+      "paperAuthorized": false,
+      "liveAuthorized": false,
+      "capturedDataOrRealJournalAccess": false,
+      "hostAccess": false
+    },
     "currentB11": {
       "opId": "MERIDIAN-V11-B11-BOT-COCKPIT-20261018",
       "issue": 876,
