@@ -1,8 +1,8 @@
 """POSIX process supervision for the fixed synthetic path adapter."""
 
+import errno
 import hashlib
 import json
-import errno
 import os
 from pathlib import Path
 import re
@@ -175,10 +175,10 @@ def _spawn_guarded_worker(node, adapter, *, env, pass_fds, batch_deadline):
     if not _unprivileged_executable(python) or not _unprivileged_executable(node_path):
         raise ChildFailure("PRIVILEGED_EXECUTABLE")
     guard_read, guard_write = os.pipe()
-    os.set_inheritable(guard_write, True)
     process = None
     succeeded = False
     try:
+        os.set_inheritable(guard_write, True)
         process = subprocess.Popen(
             _worker_bootstrap_command(os.getpid(), guard_write, node_path, adapter),
             stdin=subprocess.PIPE,

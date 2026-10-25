@@ -26,7 +26,7 @@ class LaunchError(ValueError):
         self.code = code
 
 
-class TerminationRequested(InterruptedError):
+class TerminationRequested(RuntimeError):
     pass
 
 
@@ -207,6 +207,7 @@ def _enqueue_matches(enqueued, profile):
         and enqueued.get("profile") == journal.HISTORICAL_PROFILE_NAME
         and type(enqueued.get("attempts")) is int and enqueued["attempts"] == 0
         and enqueued.get("owner") is None and enqueued.get("fence") == 0
+        and enqueued.get("protocolSha256") == profile["protocolSha256"]
         and enqueued.get("sourceSha256") == profile["sourceIdentitySha256"]
         and enqueued.get("dataSha256") == profile["inputSha256"]
         and enqueued.get("manifestSha256") == profile["manifestSha256"]
@@ -226,6 +227,7 @@ def _claim_matches(claim, profile, owner):
         and claim.get("owner") == owner
         and type(claim.get("fence")) is int and claim["fence"] > 0
         and type(claim.get("attempts")) is int and claim["attempts"] == 1
+        and claim.get("protocolSha256") == profile["protocolSha256"]
         and claim.get("sourceSha256") == profile["sourceIdentitySha256"]
         and claim.get("dataSha256") == profile["inputSha256"]
         and claim.get("manifestSha256") == profile["manifestSha256"]

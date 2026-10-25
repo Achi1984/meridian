@@ -107,6 +107,28 @@ class HistoricalOneShotTests(unittest.TestCase):
         self.assertEqual(records[-1]["event"], "failure")
         self.assertEqual(stat.S_IMODE(self.evidence.stat().st_mode), 0o600)
 
+    def test_unprivate_journal_symlink_and_existing_receipt_fail_closed(self):
+        self.initialize()
+        with self.profile_context()[0], self.profile_context()[1]:
+            os.chmod(self.database, 0o640)
+            with self.assertRaises(launcher.LaunchError) as mode_error:
+                launcher.run_once(str(self.database), str(self.evidence), "test-owner")
+            self.assertEqual(mode_error.exception.code, "PRIVATE_FILE_INVALID")
+            os.chmod(self.database, 0o600)
+
+            link = self.root / "journal-link.sqlite"
+            link.symlink_to(self.database)
+            with self.assertRaises(launcher.LaunchError) as link_error:
+                launcher.run_once(str(link), str(self.evidence), "test-owner")
+            self.assertEqual(link_error.exception.code, "EXACT_PATH_INVALID")
+
+            self.evidence.write_text("private test sentinel\n")
+            os.chmod(self.evidence, 0o600)
+            with self.assertRaises(launcher.LaunchError) as receipt_error:
+                launcher.run_once(str(self.database), str(self.evidence), "test-owner")
+            self.assertEqual(receipt_error.exception.code, "EVIDENCE_ALREADY_EXISTS")
+            self.assertEqual(self.evidence.read_text(), "private test sentinel\n")
+
     def test_unexpected_claim_preserves_fence_and_skips_run(self):
         self.initialize()
         real_tick = journal.scheduler_tick_b1
@@ -146,6 +168,7 @@ class HistoricalOneShotTests(unittest.TestCase):
                     if Path(args[0][-1]).resolve() == HISTORICAL_TEST_ADAPTER.resolve():
                         child_env = dict(kwargs["env"])
                         child_env.update({
+                            "NODE_ENV": "test",
                             "B1_TEST_HISTORICAL_PROFILE_PATH": str(self.profile),
                             "B1_TEST_SCENARIO": "SUCCESS",
                         })
@@ -180,6 +203,7 @@ class HistoricalOneShotTests(unittest.TestCase):
             if Path(args[0][-1]).resolve() == HISTORICAL_TEST_ADAPTER.resolve():
                 child_env = dict(kwargs["env"])
                 child_env.update({
+                    "NODE_ENV": "test",
                     "B1_TEST_HISTORICAL_PROFILE_PATH": str(self.profile),
                     "B1_TEST_SCENARIO": "INSUFFICIENT_EVIDENCE",
                 })
@@ -199,8 +223,14 @@ class HistoricalOneShotTests(unittest.TestCase):
         records = [json.loads(line) for line in self.evidence.read_text().splitlines()]
         self.assertEqual(records[-1]["event"], "run_returned")
         self.assertEqual(records[-1]["state"], "failed")
+        with self.profile_context()[0], self.profile_context()[1]:
+            with self.assertRaises(launcher.LaunchError) as duplicate:
+                launcher.run_once(str(self.database), str(self.root / "failed-retry.jsonl"),
+                                  "test-owner")
+        self.assertEqual(duplicate.exception.code, "JOURNAL_NOT_EMPTY")
+        self.assertFalse((self.root / "failed-retry.jsonl").exists())
 
-    def test_launcher_sigterm_preserves_unresolved_claim_and_receipt(self):
+    def test_launcher_sigterm_cleans_worker_and_records_unresolved_claim(self):
         profile = self.root / "historical-test-interrupt.json"
         database = self.root / "interrupt.sqlite"
         evidence = self.root / "interrupt-evidence.jsonl"
@@ -232,8 +262,8 @@ class HistoricalOneShotTests(unittest.TestCase):
             "def add_test_input(*args,**kwargs):\n"
             f" if Path(args[0][-1]).resolve()==Path({str(HISTORICAL_TEST_ADAPTER)!r}).resolve():\n"
             "  env=dict(kwargs['env'])\n"
-            f"  env.update({{'B1_TEST_HISTORICAL_PROFILE_PATH':{str(profile)!r},"
-            "'B1_TEST_SCENARIO':'HISTORICAL_TIMEOUT'}})\n"
+            f"  env.update({{'NODE_ENV':'test','B1_TEST_HISTORICAL_PROFILE_PATH':{str(profile)!r},"
+            "'B1_TEST_SCENARIO':'HISTORICAL_TIMEOUT'})\n"
             "  kwargs['env']=env\n"
             " return popen(*args,**kwargs)\n"
             "supervisor.subprocess.Popen=add_test_input\n"
@@ -242,18 +272,20 @@ class HistoricalOneShotTests(unittest.TestCase):
             " '--owner','test-owner']))\n")
         parent = subprocess.Popen(
             [sys.executable, "-B", str(helper)], cwd=PROJECT_ROOT,
-            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             start_new_session=True)
         deadline = time.monotonic() + 15
         while time.monotonic() < deadline and not worker_pid.exists():
             if parent.poll() is not None:
-                self.fail("launcher exited before the guarded Node worker started")
+                stdout, stderr = parent.communicate(timeout=5)
+                self.fail(f"launcher exited before the guarded Node worker started: "
+                          f"{stdout[-1024:]!r} {stderr[-1024:]!r}")
             time.sleep(0.02)
         self.assertTrue(worker_pid.exists(), "guarded worker was not launched")
         pid = int(worker_pid.read_text())
-        time.sleep(0.2)
         os.kill(parent.pid, signal.SIGTERM)
-        self.assertNotEqual(parent.wait(timeout=10), 0)
+        _stdout, _stderr = parent.communicate(timeout=10)
+        self.assertEqual(parent.returncode, 1)
         self._assert_not_running(pid)
         with patch.object(journal, "HISTORICAL_PROFILE_PATH", profile), \
                 patch.dict(os.environ, {"MERIDIAN_HISTORICAL_TEST_MODE": "1"}):
@@ -264,8 +296,8 @@ class HistoricalOneShotTests(unittest.TestCase):
         self.assertTrue(current["unresolved"])
         records = [json.loads(line) for line in evidence.read_text().splitlines()]
         self.assertIn("run_invoked", [item["event"] for item in records])
-        self.assertEqual(records[-2]["event"], "run_outcome")
-        self.assertEqual(records[-2]["state"], "AMBIGUOUS")
+        self.assertEqual(records[-1]["event"], "failure")
+        self.assertEqual(records[-1]["code"], "SIGTERM_INTERRUPTED")
 
     def test_guard_bootstrap_rejects_registration_failure_and_wrong_parent(self):
         worker = self.root / "worker.py"
@@ -358,6 +390,13 @@ class HistoricalOneShotTests(unittest.TestCase):
             time.sleep(0.01)
         self.assertTrue(signal_file.exists(), "worker did not reach the expected launch boundary")
         worker_pid = int(signal_file.read_text())
+        if not before_ready:
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline and not worker_marker.exists():
+                if parent.poll() is not None:
+                    self.fail("guarded direct worker exited before its readiness marker")
+                time.sleep(0.01)
+            self.assertTrue(worker_marker.exists(), "direct worker did not start after guard readiness")
         os.kill(parent.pid, signum)
         parent.wait(timeout=5)
         self._assert_not_running(worker_pid)
@@ -371,7 +410,7 @@ class HistoricalOneShotTests(unittest.TestCase):
                 state = status[status.rfind(")") + 2]
                 if state == "Z":
                     return
-            except FileNotFoundError:
+            except (FileNotFoundError, ProcessLookupError):
                 return
             time.sleep(0.02)
         self.fail("direct worker remained running after its parent exited")
