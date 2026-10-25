@@ -293,9 +293,17 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
             families:[...document.querySelectorAll('#strategy-catalog [data-strategy-id^="H"]')].length,
             candidate:document.querySelector('[data-strategy-id="B1-7"]')?.innerText,
             h9:document.querySelector('[data-strategy-id="H9"]')?.innerText,
-            models:[...document.querySelectorAll('.arena-model-card')].map(card=>card.innerText),
+            models:[...document.querySelectorAll('#strategy-arena-root .arena-model-card')].map(card=>card.innerText),
             overflow:root.scrollWidth>innerWidth+1,
-            controls:[...document.querySelectorAll('#strategy-catalog details summary,#strategy-arena-root button,#strategy-arena-root input')].map(node=>node.getBoundingClientRect().height),
+            controls:[...document.querySelectorAll('#strategy-catalog details summary,#strategy-catalog select,#strategy-catalog [data-strategy-compare-reset],#strategy-arena-root button,#strategy-arena-root input')].map(node=>node.getBoundingClientRect().height),
+            comparison:{
+              selectors:[...document.querySelectorAll('#strategy-catalog [data-strategy-compare]')].map(node=>({
+                value:node.value,focused:document.activeElement===node,height:node.getBoundingClientRect().height
+              })),
+              families:[...document.querySelectorAll('.strategy-comparison [data-comparison-family]')].map(node=>node.dataset.comparisonFamily),
+              text:document.querySelector('.strategy-comparison [aria-live="polite"]')?.innerText,
+              overflow:document.querySelector('.strategy-comparison').scrollWidth>document.querySelector('.strategy-comparison').clientWidth+1
+            },
             resources:performance.getEntriesByType('resource').map(row=>new URL(row.name).pathname)};
         })()`);
         assert.equal(catalog.visible,true);assert.equal(catalog.active,'view-strategies');
@@ -307,8 +315,49 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         assert.equal(catalog.models.length,5);
         assert.equal(catalog.overflow,false);
         assert.ok(catalog.controls.every(height=>height>=44));
+        assert.deepEqual(catalog.comparison.selectors.map(node=>node.value),['H1','H2']);
+        assert.deepEqual(catalog.comparison.families,['H1','H2']);
+        assert.match(catalog.comparison.text,/Hypotheses|Hypothese|Hypoth/i);
+        assert.equal(catalog.comparison.overflow,false);
+        assert.ok(catalog.comparison.selectors.every(node=>node.height>=44));
         assert.ok(catalog.resources.every(path=>!/\/v10\/|\/api\/|\/market|\/ticker|\/klines/i.test(path)));
         assert.ok(catalog.resources.includes('/docs/strategy-lab/campaign-20261013.json'));
+        await evaluate(`(()=>{
+          const first=document.querySelector('#strategy-comparison-first');
+          const second=document.querySelector('#strategy-comparison-second');
+          second.focus();
+        })()`);
+        await key('ArrowDown','ArrowDown',40);
+        const keyboardSelection=await evaluate(`({
+          value:document.querySelector('#strategy-comparison-second').value,
+          focused:document.activeElement===document.querySelector('#strategy-comparison-second'),
+          cards:[...document.querySelectorAll('.strategy-comparison [data-comparison-family]')].map(node=>node.dataset.comparisonFamily)
+        })`);
+        assert.equal(keyboardSelection.value,'H3');
+        assert.equal(keyboardSelection.focused,true);
+        assert.deepEqual(keyboardSelection.cards,['H1','H3']);
+        const identical=await evaluate(`(()=>{
+          const second=document.querySelector('#strategy-comparison-second');
+          second.value='H1';second.dispatchEvent(new Event('change',{bubbles:true}));
+          const output=document.querySelector('.strategy-comparison [aria-live="polite"]');
+          return {text:output.innerText,cards:[...output.querySelectorAll('[data-comparison-family]')].map(node=>node.dataset.comparisonFamily),
+            overflow:output.scrollWidth>output.clientWidth+1};
+        })()`);
+        assert.match(identical.text,/Dieselbe Familie \(H1\) ist auf beiden Seiten ausgewählt/);
+        assert.deepEqual(identical.cards,['H1','H1']);
+        assert.equal(identical.overflow,false);
+        await evaluate(`document.querySelector('[data-strategy-compare-reset]').focus()`);
+        await key('Enter','Enter',13);
+        const resetSelection=await evaluate(`({
+          values:[...document.querySelectorAll('#strategy-catalog [data-strategy-compare]')].map(node=>node.value),
+          focused:document.activeElement===document.querySelector('[data-strategy-compare-reset]'),
+          cards:[...document.querySelectorAll('.strategy-comparison [data-comparison-family]')].map(node=>node.dataset.comparisonFamily),
+          overflow:document.querySelector('.strategy-comparison').scrollWidth>document.querySelector('.strategy-comparison').clientWidth+1
+        })`);
+        assert.deepEqual(resetSelection.values,['H1','H2']);
+        assert.equal(resetSelection.focused,true);
+        assert.deepEqual(resetSelection.cards,['H1','H2']);
+        assert.equal(resetSelection.overflow,false);
         if(evidence){
           await evaluate('window.scrollTo(0,0)');
           const image=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
