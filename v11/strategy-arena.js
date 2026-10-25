@@ -1,7 +1,7 @@
-import {MAX_INSPECTION_REPORT_BYTES, parseArenaInspectionReport} from './arena-inspection-report.js';
-import {MAX_HISTORICAL_FIXTURE_BYTES, parseArenaHistoricalResultFixture} from './arena-historical-result.js';
-import {MAX_HISTORICAL_EXPORT_BYTES, parseArenaHistoricalExport} from './arena-historical-export.js';
-import {renderArenaResultView} from './arena-result-view.js';
+import {MAX_INSPECTION_REPORT_BYTES, parseArenaInspectionReport} from './arena-inspection-report.js?v=B13';
+import {MAX_HISTORICAL_FIXTURE_BYTES, parseArenaHistoricalResultFixture} from './arena-historical-result.js?v=B13';
+import {MAX_HISTORICAL_EXPORT_BYTES, parseArenaHistoricalExport} from './arena-historical-export.js?v=B13';
+import {renderArenaResultView} from './arena-result-view.js?v=B13';
 import {ARENA_CANDIDATES, ARENA_RULESET, ARENA_SYMBOLS, replayStrategyPaperArena} from '../research/strategy-paper-arena.js';
 
 const DIAGNOSTIC_PATH = 'research/results/strategy-arena-20261016/';

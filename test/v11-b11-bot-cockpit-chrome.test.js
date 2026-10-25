@@ -11,7 +11,7 @@ const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium
   .find(path=>path&&existsSync(path));
 const v11Root=fileURLToPath(new URL('../v11/',import.meta.url));
 const source=readFileSync(join(v11Root,'index.html'),'utf8');
-const bootstrap='<script type="module" src="./bot-read-bootstrap.js?v=B12"></script>';
+const bootstrap='<script type="module" src="./bot-read-bootstrap.js?v=B13"></script>';
 const fixtureScript=`<script>
 window.__botReadMode='fresh';window.__botReads=0;window.__resolveBotRead=null;window.__botErrors=[];
 window.addEventListener('error',event=>window.__botErrors.push(event.message));

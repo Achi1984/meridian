@@ -1,6 +1,6 @@
 // Inactive component: mount explicitly with the existing read-client factory.
 // No network, credentials, storage or engine imports belong to this renderer.
-import {buildBotOverviewModel} from './bot-overview-model.js';
+import {buildBotOverviewModel} from './bot-overview-model.js?v=B13';
 
 const LABELS = {
   locked: ['Gesperrt', 'Verbinde den bestehenden Lesezugang, um deine Bots anzuzeigen.'],
