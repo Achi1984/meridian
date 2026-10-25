@@ -2904,7 +2904,9 @@
           "observedTestSeconds": 0.202,
           "validatorUnchanged": true
         },
-        "exactHeadCi": "PENDING_FOR_REVISION_HEAD",
+        "exactCandidateHead": "f3e339decbe57f9a3ce39dfec7cd476887787e94",
+        "exactCandidateBase": "9d223cb60115dbebdb5671b8782e0dd0763df972",
+        "exactHeadCi": "NOT_YET_OBSERVED_FOR_EXACT_CANDIDATE",
         "independentReview": "PENDING_SUCCESSFUL_EXACT_HEAD_CI",
         "prDescriptionExample": "OBSOLETE_FLAT_EXAMPLE_REPLACEMENT_PROVIDED_IN_REVIEW_REPLY; PR_BODY_EDIT_PERMISSION_NOT_AVAILABLE"
       },
