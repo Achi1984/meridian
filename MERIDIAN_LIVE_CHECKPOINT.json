@@ -103,7 +103,7 @@
     "updatedAt": "2026-10-25",
     "m11HistoricalResearchSummaries955": {
       "issue": 955,
-      "pullRequest": 955,
+      "pullRequest": 956,
       "branch": "copilot/m11-searchable-historical-research-summaries",
       "startingCheckoutHead": "f5cc2f2700f3f1ffba1d4b552bc7f5afe858f54c",
       "verifiedBaseSha": "2a044edb5011f415aaf972d206e5fcd6d010f52f",
