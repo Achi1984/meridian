@@ -165,6 +165,88 @@ test('catalog rendering uses text nodes and exposes rules, blockers, stage progr
   assert.ok(receipts.every(child=>child.attrs.style==='overflow-wrap:anywhere'));
 });
 
+test('historical research renders complete draft summaries with bounded text search and reset',()=>{
+  const source=structuredClone(campaign);
+  source.knownEvidence[0].internalNote='not searchable';
+  const original=structuredClone(source);
+  const document={createElement:tag=>new Element(document,tag)};
+  const root=new Element(document,'div');
+  renderStrategyCatalog(root,source,document);
+  const section=root.children.find(child=>child.className==='card card-muted strategy-history');
+  assert.ok(section);
+  assert.match(section.textContent,/Historische Zusammenfassungen aus dem Entwurfsregister/);
+  assert.match(section.textContent,/nicht neu verifizierte Evidenz/);
+  assert.match(section.textContent,/Keine Zuordnung zu H1–H12, keine Vererbung von PASS und keine Paper-Freigabe/);
+  assert.ok(section.textContent.includes(`Quelle: Historische Zusammenfassungen aus dem Entwurfsregister (${buildStrategyCatalog(campaign).source})`));
+  assert.ok(section.textContent.includes(campaign.knownEvidence[0].reason));
+  assert.ok(section.textContent.includes(campaign.knownEvidence[4].reason));
+  const visit=node=>[node,...node.children.flatMap(visit)];
+  const nodes=visit(section);
+  const search=nodes.find(node=>node.id==='strategy-history-search');
+  const reset=nodes.find(node=>node.dataset.strategyHistoryReset!==undefined);
+  const count=nodes.find(node=>node.attrs['aria-live']==='polite');
+  assert.ok(nodes.some(node=>node.tagName==='label'&&node.attrs.for===search.id));
+  assert.equal(search.type,'search');
+  assert.equal(reset.textContent,'Suche zurücksetzen');
+  assert.equal(count.textContent,'5 von 5 Zusammenfassungen angezeigt.');
+  assert.equal(nodes.filter(node=>node.tagName==='article').length,5);
+  assert.equal(section.dataset.strategyId,undefined);
+
+  for(const [query,expected] of [
+    ['taker ORDER FLOW V1','Taker order flow V1'],
+    ['holdout_pass_prospective_paper_review_only','Low volatility rank weighted V2'],
+    ['NEwEy-West','Taker flow relative strength V2']
+  ]){
+    search.value=query;
+    search.listeners.input();
+    assert.equal(count.textContent,'1 von 5 Zusammenfassungen angezeigt.');
+    assert.ok(visit(section).filter(node=>node.tagName==='article')
+      .some(node=>node.textContent.includes(expected)));
+  }
+  search.value='not searchable';
+  search.listeners.input();
+  assert.equal(count.textContent,'0 von 5 Zusammenfassungen angezeigt.');
+  assert.match(section.textContent,/Keine historischen Zusammenfassungen entsprechen der Suche/);
+  search.value='<img src=x onerror=alert(1)>';
+  search.listeners.input();
+  assert.equal(count.textContent,'0 von 5 Zusammenfassungen angezeigt.');
+  assert.equal(nodes.some(node=>node.tagName==='img'),false);
+  search.value='HOLDOUT_FAIL';
+  search.listeners.input();
+  reset.listeners.click();
+  assert.equal(search.value,'');
+  assert.equal(count.textContent,'5 von 5 Zusammenfassungen angezeigt.');
+  assert.deepEqual(source,original);
+});
+
+test('missing and malformed historical evidence stays safe and visibly empty or unknown',()=>{
+  const document={createElement:tag=>new Element(document,tag)};
+  for(const knownEvidence of [undefined,'malformed',[null,'malformed']]){
+    const source=structuredClone(campaign);
+    if(knownEvidence===undefined)delete source.knownEvidence;
+    else source.knownEvidence=knownEvidence;
+    const root=new Element(document,'div');
+    renderStrategyCatalog(root,source,document);
+    const section=root.children.find(child=>child.className==='card card-muted strategy-history');
+    assert.match(section.textContent,/0 von 0 Zusammenfassungen angezeigt/);
+    assert.match(section.textContent,/Keine historischen Zusammenfassungen verfügbar/);
+  }
+  const source=structuredClone(campaign);
+  source.knownEvidence=[{name:'<img src=x>',status:'',rationale:'Complete rationale',extra:'ignored'}];
+  const original=structuredClone(source);
+  const root=new Element(document,'div');
+  renderStrategyCatalog(root,source,document);
+  const section=root.children.find(child=>child.className==='card card-muted strategy-history');
+  assert.match(section.textContent,/<img src=x>/);
+  assert.match(section.textContent,/Vollständige BegründungComplete rationale/);
+  assert.match(section.textContent,/Entscheidung \/ StatusUnbekannt/);
+  const nodes=[];
+  const visit=node=>{nodes.push(node);node.children.forEach(visit);};
+  visit(section);
+  assert.equal(nodes.some(node=>node.tagName==='img'),false);
+  assert.deepEqual(source,original);
+});
+
 test('Arena shows five models and preserves unknowns, blocked H9 and the legacy coverage failure',()=>{
   const html=arenaHtml();
   for(const id of ['H1-B','H1-E','H7-B','H7-R','H9']) assert.ok(html.includes(id));

@@ -101,6 +101,68 @@
   "bootstrapFile": "MERIDIAN_GO.md",
   "currentWork": {
     "updatedAt": "2026-10-25",
+    "m11HistoricalResearchSummaries955": {
+      "issue": 955,
+      "pullRequest": 955,
+      "branch": "copilot/m11-searchable-historical-research-summaries",
+      "startingCheckoutHead": "f5cc2f2700f3f1ffba1d4b552bc7f5afe858f54c",
+      "verifiedBaseSha": "2a044edb5011f415aaf972d206e5fcd6d010f52f",
+      "state": "IMPLEMENTED_LOCAL_CHECKS_COMPLETE_EXACT_HEAD_CI_AND_INDEPENDENT_REVIEW_PENDING",
+      "scope": [
+        "v11/strategy-catalog.js",
+        "test/v11-strategy-catalog.test.js",
+        "test/v11-strategy-workspace-chrome.test.js",
+        "MERIDIAN_LIVE_CHECKPOINT.json"
+      ],
+      "historicalInput": {
+        "path": "docs/strategy-lab/campaign-20261013.json",
+        "sha256": "8b3deaefa91e1459fdef88cb02abf5afcaf6f412a72049097f043023a1af2c8e",
+        "summaryCount": 5,
+        "interpretation": "DRAFT_REGISTER_SUMMARIES_ONLY_NOT_NEWLY_VERIFIED_NOT_MAPPED_TO_H1_H12_NO_INHERITED_PASS_OR_PAPER_PERMISSION"
+      },
+      "testedCandidateIdentity": {
+        "checkoutHead": "f5cc2f2700f3f1ffba1d4b552bc7f5afe858f54c",
+        "trackedSourceIdentifiedBy": "relevantInputsSha256"
+      },
+      "relevantInputsSha256": {
+        "v11/strategy-catalog.js": "713a2ef01bed03e6fb16452f0ef4bbd8b6d68bca453d1f03b711f814cd2e8e85",
+        "test/v11-strategy-catalog.test.js": "0f96d14e0a0396304d452417cf1551228c756362b0ad77b6e6a0cb980ebea889",
+        "test/v11-strategy-workspace-chrome.test.js": "70fda8fd09d0c7577622d13e4c6fa054af130fbc1af2b2e1f789e98e58825547"
+      },
+      "toolchain": {
+        "node": "v22.23.3",
+        "npm": "10.9.9",
+        "chromium": "155.0.8059.0"
+      },
+      "localValidation": [
+        {
+          "command": "node --test test/v11-strategy-catalog.test.js",
+          "result": "14_PASS_0_FAIL_0_SKIP",
+          "elapsedSeconds": 0.205
+        },
+        {
+          "command": "node --test test/v11-strategy-workspace-chrome.test.js",
+          "initialAttempt": "FAIL_CHROME_DEVTOOLS_STARTUP_TIMEOUT_BEFORE_UI_INTERACTION",
+          "finalRunResult": "1_PASS_0_FAIL_0_SKIP_ALL_FIVE_VIEWPORTS",
+          "testedWidths": [320, 375, 390, 430, 1440],
+          "overflow": false,
+          "elapsedSeconds": 15.182
+        }
+      ],
+      "ci": {
+        "runId": null,
+        "jobId": null,
+        "attempt": null,
+        "status": "PENDING_EXACT_HEAD_CI"
+      },
+      "independentReview": {
+        "reviewer": "CLAUDE",
+        "status": "PENDING_COMPLETE_EXACT_HEAD_REVIEW_AFTER_SUCCESSFUL_CI"
+      },
+      "elapsedTimeUnit": "SECONDS_NOT_BILLING_MINUTES",
+      "providerTokenUsage": "UNKNOWN_NOT_REPORTED",
+      "nextGate": "CONSOLIDATED_SOURCE_AND_CHECKPOINT_PUSH_THEN_EXACT_HEAD_CI_THEN_COMPLETE_INDEPENDENT_CLAUDE_REVIEW; LEAD_RETAINS_MERGE; NO_MERGE_OR_POSTCHECK_CLAIM"
+    },
     "strategyEvidenceWorkspace944": {
       "opId": "MERIDIAN-944-INTEGRATE-20261024-R1",
       "issue": 944,
