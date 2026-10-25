@@ -39,6 +39,23 @@
 > Historical receipts and provenance are retained; no standalone continuity publication
 > or PR acceptance is claimed.
 
+> Current #948 zero-cost integration — 2026-10-25.
+> Branch started at `f67ff71fcc384dc7ebd5d1b2c6c66cd19ddb17f2` and merged verified
+> main `4d58d303f75c16a865ea24938f77d94f04b1f6dd` without rebasing. #946 is COMPLETE
+> at that merge: final Claude GREEN_LIGHT #942/comment6388005116; Safety40123531531,
+> Runtime40123531527, Coordinator40123531512 and Pages40123530831 all SUCCESS.
+> #947 is RECOVERED_COMPLETE, separately preserving its original failed Safety
+> 40113807323 (2732/1/0); recovery receipts are #942/comments6394162574 and
+> 6394164578. PR948 remains Draft pending integrated-head CI and independent Work/
+> complete-scope Claude review. The setup document now requires existing suitable
+> capacity at ZERO additional cost; no paid resource, free-tier assumption or
+> validated host is claimed. Target remains BLOCKED_TARGET_NOT_DESIGNATED /
+> NOT_OBSERVED; D2 DEFER, profile NOT_FROZEN and all execution/Paper/Live flags false.
+> Loader paths remain checkout-relative under `research/acquisitions/kraken-usd-daily-20261018/normalized/`;
+> Linux `/proc/self/fd` is required. Supervisor/inspection suites create temporary
+> synthetic journals/claims and exercise generated-fixture code; this packet ran none.
+> Proposed body link remains “Part of #935”; umbrella is open.
+
 > Current reconciliation — 2026-10-19, PR #901 main alignment.
 > Verified main: `496360869171f0a29e3efbc7ec216ffc1833c6a0` (PR #900).
 > PR #900 complete: independent Work review #639/6273568843, merge receipt

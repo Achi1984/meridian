@@ -25,10 +25,11 @@ and [context/preflight receipts](https://github.com/Achi1984/meridian/issues/935
 ## Proposed setup — not selected or approved
 
 Use one dedicated, persistent Linux context with working `/proc/self/fd` and
-one manual one-shot operator. First assess whether owner-controlled persistent
-capacity already exists and can be evidenced. If not, present a named hosting
-option and verified cost for a separate owner decision; do not infer a provider,
-machine, price or budget.
+one manual one-shot operator, but only on existing owner-controlled capacity
+available at zero additional cost. No paid capacity, upgrades, subscriptions or
+spend are in scope. Do not assume a free tier is available or suitable. If no
+existing target meets the requirements at zero incremental cost, remain blocked;
+do not select or provision another host.
 Do not use chat scratch, an ephemeral Actions runner, or a scheduled workflow
 as durable journal storage. Do not add a service, daemon, cron, broker, Paper
 or Live integration.
@@ -70,9 +71,10 @@ runtime specification.
 
 ## Bounded setup delta for a later decision
 
-1. Select and document the actual owner-controlled Linux machine, persistent
-   volume, operator, filesystem and verified cost. If no evidenced capacity
-   is suitable, stop for a named hosting/cost decision.
+1. Identify whether an existing owner-controlled Linux machine and persistent
+   volume are available at zero additional cost, and document suitability,
+   operator and filesystem evidence. If none is evidenced, stop; no paid
+   alternative, upgrade, subscription or assumed free-tier option is authorized.
 2. Confirm the selected Linux host exposes working `/proc/self/fd` and supports
    POSIX process groups and a monotonic clock. The existing loader resolves each
    opened descriptor through `/proc/self/fd/<fd>`, rejects symlinked components
@@ -164,12 +166,15 @@ historical trial enqueue/claim, or historical strategy execution is in scope.
 ## Owner decision card
 
 **Setup choice still required:** approve or decline manual persistent Linux
-setup only after machine, operator, volume, cost, `/proc/self/fd` and private
-paths are specified. Delta: reviewed source; later-authorized, hash-pinned
-inputs at fixed checkout paths; private access controls and version recording.
-No such target, price, provisioning, setup approval or actual readiness is
-asserted here. Current blocker: no designated target exists in the inspected
-source/receipts, so actual context and journal state cannot be observed.
+setup only if existing owner-controlled capacity is suitable at zero additional
+cost and its machine, operator, persistent volume, `/proc/self/fd` and private
+paths are evidenced. No paid capacity, upgrade, subscription or unverified
+free-tier assumption is allowed. Delta: reviewed source; later-authorized,
+hash-pinned inputs at fixed checkout paths; private access controls and version
+recording. No target or suitability has been observed, and no provisioning or
+setup approval is asserted. Current blocker: no designated target exists in
+the inspected source/receipts, so actual context and journal state cannot be
+observed.
 
 **Separate later execution decision:** after setup and independent final
 identity verification, the owner must make a new exact decision for one
