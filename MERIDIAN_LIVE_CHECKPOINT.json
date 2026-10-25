@@ -107,7 +107,9 @@
       "branch": "copilot/m11-searchable-historical-research-summaries",
       "startingCheckoutHead": "f5cc2f2700f3f1ffba1d4b552bc7f5afe858f54c",
       "verifiedBaseSha": "2a044edb5011f415aaf972d206e5fcd6d010f52f",
-      "state": "IMPLEMENTED_LOCAL_CHECKS_COMPLETE_EXACT_HEAD_CI_AND_INDEPENDENT_REVIEW_PENDING",
+      "state": "PR954_MAIN_INTEGRATED_SOURCE_GREEN_EXACT_INTEGRATED_HEAD_CI_AND_FULL_REVIEW_PENDING",
+      "integratedMainSha": "f77ca242477f2ea1a0875ad80fec4bbc51dd9e9d",
+      "integrationMergeCommit": "70a84e9f9acd70dc84800120b065154fd3dff85a",
       "scope": [
         "v11/strategy-catalog.js",
         "test/v11-strategy-catalog.test.js",
@@ -3185,6 +3187,13 @@
         },
         "currentIntegratedMain": "2a044edb5011f415aaf972d206e5fcd6d010f52f",
         "state": "FRESH_EXACT_INTEGRATED_HEAD_CI_AND_NARROW_DELTA_REVIEW_PENDING"
+      },
+      "sourcePr954Integration": {
+        "pullRequest": 954,
+        "sourceMergeCommit": "f77ca242477f2ea1a0875ad80fec4bbc51dd9e9d",
+        "branchIntegrationMergeCommit": "70a84e9f9acd70dc84800120b065154fd3dff85a",
+        "state": "MERGED_POSTCHECKS_PENDING",
+        "postMergeChecks": "PENDING_LEAD_REPORT"
       },
       "nextGate": "FRESH_EXACT_INTEGRATED_HEAD_CI_THEN_NARROW_CLAUDE_DELTA_REVIEW; NO_RUNTIME_OR_AUTHORITY_CHANGE",
       "executionAuthorized": false,
