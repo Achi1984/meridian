@@ -157,7 +157,7 @@
           "findings": ["DOC_ALLOWLIST_INACCURATE", "REVIEW_COVERAGE_INCOMPLETE"]
         }
       },
-      "currentGate": "PR946_COMPLETE_ALL_POSTCHECKS_SUCCESS; PR947_RECOVERED_COMPLETE; PR948_EXACT_HEAD_CI_AND_WORK_CLAUDE_REVIEW_PENDING; D2_DEFER",
+      "currentGate": "PR946_COMPLETE_ALL_POSTCHECKS_SUCCESS; PR947_RECOVERED_COMPLETE; PR948_MERGED_COMPLETE; PR950_R3_CORRECTION_PENDING; D2_DEFER",
       "repairIntegration": {
         "intentCommentId": 6387579709,
         "integrationMode": "MERGE_MAIN_NO_REBASE",
@@ -289,7 +289,7 @@
       "mergeMode": "MERGE_MAIN_NO_REBASE",
       "mergeCommit": "03e94d5633ce4c845d04a241aefed3590be84a5e",
       "verifiedBaseSha": "4d58d303f75c16a865ea24938f77d94f04b1f6dd",
-      "pullRequestState": "DRAFT",
+      "pullRequestState": "MERGED",
       "scope": "D2_EXECUTION_CONTEXT_SETUP_DOCUMENT_AND_ASSOCIATED_CONTINUITY_ONLY",
       "zeroAdditionalCost": true,
       "paidCapacityUpgradeSubscriptionOrSpendAuthorized": false,
@@ -314,9 +314,164 @@
         "docs/MERIDIAN_CHAT_HANDOFF.md",
         "docs/handover/GO-MERIDIAN.md"
       ],
-      "currentGate": "INTEGRATED_MAIN; DOCUMENT_AND_CONTINUITY_VALIDATION_PASSED; EXACT_HEAD_CI_AND_INDEPENDENT_WORK_AND_CLAUDE_REVIEW_REQUIRED",
+      "currentGate": "COMPLETE_MERGED; COMPLETION_RECEIPT_942/6394400471",
       "leadAssignmentIssue": 948,
-      "leadAssignmentCommentId": 6394169321
+      "leadAssignmentCommentId": 6394169321,
+      "completionReceiptIssue": 942,
+      "completionReceiptCommentId": 6394400471
+    },
+    "d2Launcher950CorrectionR3": {
+      "opId": "MERIDIAN-950-CORRECTION-20261025-R3",
+      "issue": 949,
+      "pullRequest": 950,
+      "pullRequestState": "OPEN_DRAFT",
+      "branch": "copilot/meridian-d2-launcher-20261025-r1",
+      "baseSha": "13b43881e93fe99b4c33cf3607b068e7d19bc452",
+      "priorReviewedHead": "b8e738d5663fc064d5c29efa360a07fe500f7dc6",
+      "correctionRequestCommentId": 6395841173,
+      "priorExactHeadReleaseSafety": {
+        "runId": 40177333973,
+        "attempt": 2,
+        "head": "b8e738d5663fc064d5c29efa360a07fe500f7dc6",
+        "result": "FAILED",
+        "tests": {"passed": 2735, "failed": 13, "skipped": 0}
+      },
+      "proposedHistoricalSourceIdentitySha256": "4a27722939d62cdca5600b6ad6491bfbc4228b66c35b0ba6326eec8c4c35fd9a",
+      "proposedCandidateSha256": "793060a6eb57855e79275f88471b678cf5bbf3e03d87a04482657a76dc3e4096",
+      "proposedLauncherFileSha256": "915dccdd705d7251b00567e8c3ba4dbc0f978e3eb63ffa0fccecc7d928f3f951",
+      "launcherBinding": "SEPARATE_EXACT_REVIEWED_HEAD_AND_FILE_HASH_REQUIRED_IN_LATER_EXECUTION_PACKAGE; NOT_IN_11_FILE_ADMISSION_SOURCE_MAP",
+      "d2Decision": "DEFER",
+      "profileState": "NOT_FROZEN",
+      "inputManifest": null,
+      "inputManifestSha256": null,
+      "inputSha256": null,
+      "approvalReceipt": null,
+      "executionAuthorized": false,
+      "strategyPnlAuthorized": false,
+      "discoveryAuthorized": false,
+      "validationAuthorized": false,
+      "holdoutAuthorized": false,
+      "paperAuthorized": false,
+      "liveAuthorized": false,
+      "capturedDataOrRealJournalAccess": false,
+      "hostAccess": false,
+      "currentGate": "R3_CORRECTION_IN_PROGRESS; FRESH_EXACT_HEAD_CI_REQUIRED; COMPLETE_SCOPE_CLAUDE_GREEN_LIGHT_AFTER_SUCCESSFUL_CI; NO_ACTIVATION"
+    },
+    "d2Launcher950CorrectionR4": {
+      "opId": "MERIDIAN-950-INTEGRATION-20261025-R4",
+      "issue": 949,
+      "pullRequest": 950,
+      "pullRequestState": "OPEN_DRAFT",
+      "branch": "copilot/meridian-d2-launcher-20261025-r1",
+      "baseSha": "13b43881e93fe99b4c33cf3607b068e7d19bc452",
+      "observedHeadBeforeCorrection": "1f361e36de797bb451985e36e19b7b876604341b",
+      "correctionRequestCommentId": 6396127649,
+      "priorFullCi": {
+        "runId": 40177333973,
+        "attempt": 2,
+        "head": "b8e738d5663fc064d5c29efa360a07fe500f7dc6",
+        "result": "FAILED",
+        "tests": {"total": 2748, "passed": 2735, "failed": 13, "skipped": 0},
+        "failureBreakdown": {
+          "historicalExportNodeTests": 11,
+          "historicalInspectionNodeWrapper": 1,
+          "historicalInspectionInternalPythonTests": 3,
+          "fiveWidthChromeNodeWrapper": 1
+        },
+        "causes": [
+          "Stale generated-fixture sourceSha256 binding in v11/arena-historical-export.js",
+          "Historical inspection test hook did not recognize the isolated Python bootstrap command"
+        ]
+      },
+      "r3HeadCi": {
+        "runId": 40180765963,
+        "head": "1f361e36de797bb451985e36e19b7b876604341b",
+        "result": "ACTION_REQUIRED_ZERO_JOBS"
+      },
+      "r4FocusedValidation": {
+        "historicalExporter": {"passed": 11, "failed": 0},
+        "historicalInspectionPython": {"passed": 7, "failed": 0},
+        "historicalInspectionNodeWrapper": "PASSED",
+        "fiveWidthChromeNodeWrapper": "LOCAL_CHROME_DEVTOOLS_STARTUP_TIMEOUT; FIVE_WIDTHS_NOT_COMPLETED"
+      },
+      "acceptedSyntheticSourceMapSha256": "bab379ce692601315ef3b0436ac7969798e96cc9781f7f3845ec4ed8a2b770e7",
+      "historicalExporterFileSha256": "1b4c96aed9d9f78ca33ae1f8e76900036259aaee397a4178eee6853a1a51eef8",
+      "currentGate": "R4_SOURCE_CORRECTION_IN_PROGRESS; FRESH_EXACT_HEAD_CI_REQUIRED; COMPLETE_SCOPE_CLAUDE_GREEN_LIGHT_AFTER_SUCCESSFUL_CI; NO_ACTIVATION",
+      "d2Decision": "DEFER",
+      "profileState": "NOT_FROZEN",
+      "inputManifest": null,
+      "inputManifestSha256": null,
+      "inputSha256": null,
+      "approvalReceipt": null,
+      "executionAuthorized": false,
+      "strategyPnlAuthorized": false,
+      "discoveryAuthorized": false,
+      "validationAuthorized": false,
+      "holdoutAuthorized": false,
+      "paperAuthorized": false,
+      "liveAuthorized": false,
+      "capturedDataOrRealJournalAccess": false,
+      "hostAccess": false
+    },
+    "d2Launcher950IntegrationR5": {
+      "opId": "MERIDIAN-950-R5-20261025",
+      "pullRequest": 950,
+      "pullRequestState": "OPEN_DRAFT",
+      "branch": "copilot/meridian-d2-launcher-20261025-r1",
+      "baseSha": "9d223cb60115dbebdb5671b8782e0dd0763df972",
+      "mergedMainPr953": {
+        "state": "MERGED_POSTCHECKS_SUCCESS",
+        "mergeSha": "9d223cb60115dbebdb5671b8782e0dd0763df972",
+        "mergeCommit": "a498e4227eeef08b574ad536ceb0cbd180a19b15",
+        "sourceHead": "3a383907a9d9e572ed584993b93be8cb58f33984",
+        "requiredPostchecks": {
+          "releaseSafety": {"runId": 40187225864, "status": "SUCCESS"},
+          "runtimeSmoke": {"runId": 40187225869, "status": "SUCCESS"},
+          "releaseCoordinator": {"runId": 40187225896, "status": "SUCCESS"},
+          "pages": {"runId": 40187225428, "status": "SUCCESS"}
+        },
+        "complete": true
+      },
+      "priorR4Head": "7109999cd63e0febd18365b2c8ef6c85eb3d5a13",
+      "priorR4ExactHeadCi": {
+        "runId": 40182697302,
+        "attempt": 2,
+        "jobId": 121139241538,
+        "checkoutMergeHead": "1133eb2ad254c4e682ec08c651f299ee79897f42",
+        "tests": {"total": 2748, "passed": 2748, "failed": 0, "skipped": 0},
+        "result": "SUCCESS"
+      },
+      "priorR4ClaudeReview": {
+        "commentId": 6396350291,
+        "requestId": "MERIDIAN-950-FINAL-7109999-20261025-R1",
+        "verdict": "NEEDS_MORE_EVIDENCE",
+        "reviewedHead": "7109999cd63e0febd18365b2c8ef6c85eb3d5a13",
+        "reviewedBase": "13b43881e93fe99b4c33cf3607b068e7d19bc452",
+        "missingRanges": [1, 2, 3, 4, 5, 6],
+        "notGreenLight": true,
+        "supplementalReviewRequiredAfterSuccessfulExactHeadCi": true
+      },
+      "preservedMainAdditions": [
+        "PR953 M11 strategy comparison UI/source handling",
+        "PR953 checkpoint updates"
+      ],
+      "mergeConflicts": [],
+      "currentGate": "R5_MAIN_INTEGRATED; PR953_POSTCHECKS_SUCCESS; FRESH_EXACT_HEAD_CI_REQUIRED; CLAUDE_NEEDS_MORE_EVIDENCE; SUPPLEMENTAL_REVIEW_AFTER_CI; NO_ACTIVATION",
+      "d2Decision": "DEFER",
+      "profileState": "NOT_FROZEN",
+      "inputManifest": null,
+      "inputManifestSha256": null,
+      "inputSha256": null,
+      "approvalReceipt": null,
+      "executionAuthorized": false,
+      "strategyPnlAuthorized": false,
+      "discoveryAuthorized": false,
+      "validationAuthorized": false,
+      "holdoutAuthorized": false,
+      "paperAuthorized": false,
+      "liveAuthorized": false,
+      "capturedDataOrRealJournalAccess": false,
+      "hostAccess": false
     },
     "currentB11": {
       "opId": "MERIDIAN-V11-B11-BOT-COCKPIT-20261018",
@@ -2841,10 +2996,11 @@
       "pullRequest": 954,
       "branch": "copilot/research-deterministic-comparator",
       "startingBaseSha": "13b43881e93fe99b4c33cf3607b068e7d19bc452",
-      "integratedMainBaseSha": "9d223cb60115dbebdb5671b8782e0dd0763df972",
-      "integratedMainMergeCommit": "8e51024fe3fbde7cb3a72dc1eb1cc794b46ec459",
+      "integratedMainBaseSha": "2a044edb5011f415aaf972d206e5fcd6d010f52f",
+      "integratedMainMergeCommit": "2a044edb5011f415aaf972d206e5fcd6d010f52f",
+      "previousIntegratedMainMergeCommit": "8e51024fe3fbde7cb3a72dc1eb1cc794b46ec459",
       "preservedPr953Additions": true,
-      "pr953State": "EXACT_HEAD_CI_SUCCESS_RUN_40183397323; SOURCE_MERGED; POSTCHECKS_PENDING_LEAD_CONFIRMATION",
+      "pr953State": "COMPLETE_POSTCHECKS_SUCCESS; RECEIPTS_6396903885_6396904072",
       "scope": "VALIDATOR_BACKED_V2_OFFLINE_COMPARISON_NO_AUTHENTICATION_OR_EXECUTION",
       "implementationFiles": [
         "scripts/research/compare-strategy-evidence.mjs",
@@ -2905,12 +3061,60 @@
           "validatorUnchanged": true
         },
         "implementationTestHead": "f3e339decbe57f9a3ce39dfec7cd476887787e94",
-        "exactCandidateHead": "77395d01fca130e79a6ab69cf82f912dd2b2c1dc",
+        "exactCandidateHead": "a9cbbc5e436ea47e141bc513331c2351db4f4b10",
         "exactCandidateBase": "9d223cb60115dbebdb5671b8782e0dd0763df972",
-        "exactHeadCi": "NOT_YET_OBSERVED_FOR_EXACT_CANDIDATE",
-        "independentReview": "PENDING_SUCCESSFUL_EXACT_HEAD_CI",
-        "prDescriptionExample": "OBSOLETE_FLAT_EXAMPLE_REPLACEMENT_PROVIDED_IN_REVIEW_REPLY; PR_BODY_EDIT_PERMISSION_NOT_AVAILABLE"
+        "exactHeadCi": {
+          "head": "a9cbbc5e436ea47e141bc513331c2351db4f4b10",
+          "base": "9d223cb60115dbebdb5671b8782e0dd0763df972",
+          "workflowRunId": 40187925171,
+          "attempt": 2,
+          "jobId": 121173273389,
+          "result": "2760_PASS_0_FAIL_0_SKIP"
+        },
+        "independentReview": "FULL_CLAUDE_GREEN_RECEIPT_6397969493",
+        "prDescriptionExample": "LEAD_CORRECTED"
       },
+      "pr950Integration": {
+        "mergeSha": "2a044edb5011f415aaf972d206e5fcd6d010f52f",
+        "state": "COMPLETE_ALL_FOUR_POSTMERGE_CHECKS_SUCCESS",
+        "receiptComments": [6398541696, 6398541875],
+        "postMergeChecks": {
+          "releaseSafety": {
+            "runId": 40198984890,
+            "attempt": 1,
+            "jobId": 121185888959,
+            "result": "2750_PASS_0_FAIL_0_SKIP",
+            "state": "SUCCESS"
+          },
+          "runtimeSmoke": {
+            "runId": 40198984734,
+            "state": "SUCCESS"
+          },
+          "releaseCoordinator": {
+            "runId": 40198984760,
+            "state": "SUCCESS"
+          },
+          "pages": {
+            "runId": 40198983890,
+            "state": "SUCCESS"
+          }
+        }
+      },
+      "integrationValidation": {
+        "previousExactPair": {
+          "head": "a9cbbc5e436ea47e141bc513331c2351db4f4b10",
+          "base": "9d223cb60115dbebdb5671b8782e0dd0763df972",
+          "ciRunId": 40187925171,
+          "ciAttempt": 2,
+          "ciJobId": 121173273389,
+          "ciResult": "2760_PASS_0_FAIL_0_SKIP",
+          "claudeReview": "GREEN",
+          "claudeReceiptCommentId": 6397969493
+        },
+        "currentIntegratedMain": "2a044edb5011f415aaf972d206e5fcd6d010f52f",
+        "state": "FRESH_EXACT_INTEGRATED_HEAD_CI_AND_NARROW_DELTA_REVIEW_PENDING"
+      },
+      "nextGate": "FRESH_EXACT_INTEGRATED_HEAD_CI_THEN_NARROW_CLAUDE_DELTA_REVIEW; NO_RUNTIME_OR_AUTHORITY_CHANGE",
       "executionAuthorized": false,
       "autoPromotion": false,
       "provenanceVerified": false

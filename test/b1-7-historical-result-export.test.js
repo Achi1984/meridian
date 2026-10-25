@@ -98,11 +98,12 @@ test('synthetic generated completed and insufficient results round-trip with exa
   for(const [envelope,status,count,resultSha,summarySha,payloadSha] of [
     [completed,'COMPLETED',44,'1f2d4d889bc6bbf320f0cef229754b7058860c125c167af1c4cb0c711884f863',
       'd73738b521b6b8cbc8cfe198b85e573c197a985bb5c5956be7544d3e82b2ea03',
-      '5cdf25c3b1f007de0c114436b69923bdab7bcfad9b12b70311656ad0ed8b2b33'],
+      '0e904f0e6d6287edec237a412b4519d459d17f4132bf77b4ce0c1bffe02bea04'],
     [insufficient,'INSUFFICIENT_EVIDENCE',19,'640b2603bb265607d75b704b4f6722d1553d3f21b5bb1c67c623a9ba50a4205d',
       'c9fd86ab19e0e7fd42a80aa8dc9c02742d749644b356ddb0a1e6a1b905c94f83',
-      '89ee829a29c93faf46593c2893d1d4eba0c024bcd0a74a9903ae72d6dca88d4e']
+      '7e1332df258eecb0fb9c559d05f9ec4ba38bf7cd604acebc7bb729d2fe403f2a']
   ]){
+    assert.equal(envelope.job.sourceSha256,digest(canonicalJson(bridgeManifest.sourceSha256)));
     const sourceBytes=new TextEncoder().encode(envelope.job.result);
     const imported=await parseArenaHistoricalExport(new TextEncoder().encode(JSON.stringify(envelope)));
     assert.equal(imported.status,'PRESENT_UNVERIFIED');
@@ -120,6 +121,8 @@ test('synthetic generated completed and insufficient results round-trip with exa
     assert.notDeepEqual(imported.job.pathIds,imported.job.computationPathIds);
     assert.ok(sourceBytes.length<1024*1024);
   }
+  assert.equal(digest(canonicalJson(bridgeManifest.sourceSha256)),
+    'bab379ce692601315ef3b0436ac7969798e96cc9781f7f3845ec4ed8a2b770e7');
   assert.equal(Buffer.byteLength(completed.job.result),939389);
   assert.equal(Buffer.byteLength(insufficient.job.result),207285);
 });
@@ -129,6 +132,12 @@ test('synthetic producer bindings reject resealed historical screen verdicts',as
   const completed=await generatedEnvelope(bridgeManifest,completedResult,'completed','trial-m11-screen-binding');
   const accepted=await parseArenaHistoricalExport(new TextEncoder().encode(JSON.stringify(completed)));
   assert.equal(accepted.status,'PRESENT_UNVERIFIED');
+  const staleSourceBinding=structuredClone(completed);
+  staleSourceBinding.job.sourceSha256='64de87409d07004c7a8ab1a17e0ac7ce0c85a259e978c689745f907c9c55ea05';
+  await seal(staleSourceBinding);
+  assert.equal((await parseArenaHistoricalExport(
+    new TextEncoder().encode(JSON.stringify(staleSourceBinding))
+  )).status,'INVALID');
   for(const [status,interpretation] of [
     ['PASS','HISTORICAL_CANDIDATE_ONLY_NOT_HOLDOUT'],
     ['NO_EDGE','HISTORICAL_CANDIDATE_ONLY_NOT_HOLDOUT'],
