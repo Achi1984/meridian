@@ -909,15 +909,24 @@
         "result": "3_PASS_0_FAIL; CHROME_ENTRY_CHECKS_AT_320_375_390_430",
         "observedSeconds": 8
       },
-      "finalExactHeadCi": "PENDING",
-      "independentClaudeReview": "PENDING_AFTER_SUCCESSFUL_EXACT_HEAD_CI",
+      "finalExactHeadCi": {
+        "head": "57661a3f4ebdf1f6b3d998e4200d2c589c24c962",
+        "runId": 40183168350,
+        "attempt": 1,
+        "conclusion": "ACTION_REQUIRED",
+        "jobs": 0,
+        "failedJobs": 0,
+        "elapsedJobSeconds": null,
+        "reviewRequested": false
+      },
+      "independentClaudeReview": "NOT_REQUESTED_BECAUSE_EXACT_HEAD_CI_HAS_NOT_SUCCEEDED",
       "providerTokenUsage": "UNKNOWN",
       "actualMarketDataAccess": false,
       "researchExecutionOrStrategyActivation": false,
       "paperOrLiveTrading": false,
       "runtimeOrSpendingChanges": false,
       "mergeAuthority": "LEAD_CHATGPT_ONLY",
-      "currentGate": "MODEL_TESTS_PASS; FIVE_WIDTH_BROWSER_AND_TERMINAL_REGRESSION_PASS; FINAL_EXACT_HEAD_CI_AND_INDEPENDENT_REVIEW_NOT_YET_OBSERVED"
+      "currentGate": "LOCAL_MODEL_BROWSER_AND_TERMINAL_CHECKS_PASS; RELEASE_SAFETY_ACTION_REQUIRED_WITH_ZERO_JOBS_ON_HEAD_57661A3; LEAD_CI_AUTHORIZATION_AND_SUCCESSFUL_EXACT_HEAD_CI_REQUIRED_BEFORE_INDEPENDENT_REVIEW"
     },
     "completion20261017": {
       "verifiedMain": "8691381510039e2ad48b863ea5e66d6ad6cba462",
