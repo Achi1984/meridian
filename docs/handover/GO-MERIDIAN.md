@@ -56,6 +56,45 @@
 > synthetic journals/claims and exercise generated-fixture code; this packet ran none.
 > Proposed body link remains “Part of #935”; umbrella is open.
 
+> ## Current D2 launcher correction — 2026-10-25
+> PR #948 is complete and merged; completion receipt is #942/comment6394400471.
+> The related #935 receipts remain setup6394798304, metadata6394830829, input
+> acceptance6394872153, and launcher dispatch6395214870. Issue #949 is open and
+> PR #950 remains an open Draft under R4 correction. The prior exact-head
+> `b8e738d5663fc064d5c29efa360a07fe500f7dc6` Release Safety attempt 2 failed
+> (2735 passed, 13 failed, 0 skipped): 11 historical-export tests failed on a
+> stale synthetic source-map binding; one historical-inspection wrapper failed
+> because its hook missed the isolated bootstrap (three internal Python failures);
+> and one five-width Chrome wrapper failed on the stale exporter binding. R3
+> exact-head run40180765963 is `action_required` with zero jobs, not a test result.
+> R4 focused runs: historical exporter 11/11 and historical inspection 7/7
+> Python tests (Node wrapper passed); local five-width Chrome acceptance was
+> attempted but blocked by `Chrome DevTools startup timeout`, so the widths are
+> not validated locally.
+> Fresh exact-head CI must succeed before a complete-scope final Claude
+> `GREEN_LIGHT`. The current source identity and launcher are proposed, not
+> reviewed; any later execution package must bind the exact reviewed head and
+> launcher file hash separately from the strict 11-file admission source map.
+> Proposed launcher hash: `915dccdd705d7251b00567e8c3ba4dbc0f978e3eb63ffa0fccecc7d928f3f951`.
+> D2 remains DEFER, profile NOT_FROZEN with null input/receipt, and every
+> execution/Paper/Live authority flag remains false. No host, real journal or
+> captured data was accessed.
+
+> ## R5 mainline integration — 2026-10-25
+> PR #953 merged to main at `9d223cb60115dbebdb5671b8782e0dd0763df972`.
+> Its comparison UI and checkpoint additions are preserved in this branch.
+> All four main postchecks are verified successful: Release Safety `40187225864`,
+> Runtime Smoke `40187225869`, Release Coordinator `40187225896`, and Pages
+> `40187225428`. PR #953 is `MERGED_POSTCHECKS_SUCCESS`.
+> The #950 R4 source head `7109999cd63e0febd18365b2c8ef6c85eb3d5a13` had exact-head
+> CI run `40182697302` attempt 2/job `121139241538` succeed: 2,748 passed,
+> 0 failed, 0 skipped. Claude comment `6396350291` is
+> `NEEDS_MORE_EVIDENCE`, not `GREEN_LIGHT`; missing review ranges 1–6 remain.
+> Fresh exact-head CI after this base/head change and narrow supplemental
+> independent review after success are required. R5 merge of main was clean
+> with no conflict resolutions. D2 remains DEFER; profile NOT_FROZEN, null
+> manifest/input/receipt, all authority flags false. No runtime action.
+
 > Current reconciliation — 2026-10-19, PR #901 main alignment.
 > Verified main: `496360869171f0a29e3efbc7ec216ffc1833c6a0` (PR #900).
 > PR #900 complete: independent Work review #639/6273568843, merge receipt

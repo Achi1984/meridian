@@ -75,7 +75,12 @@ class HistoricalInspectionReportTests(unittest.TestCase):
         original_popen = subprocess.Popen
 
         def spawn(*args, **kwargs):
-            if Path(args[0][1]).resolve() == FIXTURE_ADAPTER.resolve():
+            command = args[0]
+            if (len(command) == 8
+                    and Path(command[0]).resolve() == Path(sys.executable).resolve()
+                    and command[1:3] == ["-I", "-c"]
+                    and command[3] == supervisor.PDEATHSIG_BOOTSTRAP
+                    and Path(command[-1]).resolve() == FIXTURE_ADAPTER.resolve()):
                 environment = dict(kwargs["env"])
                 environment.update({
                     "NODE_ENV": "test",
