@@ -315,7 +315,8 @@
         "docs/handover/GO-MERIDIAN.md"
       ],
       "currentGate": "INTEGRATED_MAIN; DOCUMENT_AND_CONTINUITY_VALIDATION_PASSED; EXACT_HEAD_CI_AND_INDEPENDENT_WORK_AND_CLAUDE_REVIEW_REQUIRED",
-      "ownerReceiptCommentId": 6394169321
+      "leadAssignmentIssue": 948,
+      "leadAssignmentCommentId": 6394169321
     },
     "currentB11": {
       "opId": "MERIDIAN-V11-B11-BOT-COCKPIT-20261018",
