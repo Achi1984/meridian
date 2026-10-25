@@ -287,6 +287,83 @@ function renderStrategyComparison(document, catalog) {
   return section;
 }
 
+function renderHistoricalResearch(document, catalog) {
+  const section = document.createElement('section');
+  section.className = 'card card-muted strategy-history';
+  section.setAttribute('aria-labelledby','strategy-history-heading');
+  addText(document,section,'h2','Bisherige Forschung').id = 'strategy-history-heading';
+  addText(document,section,'p',
+    `Quelle: Historische Zusammenfassungen aus dem Entwurfsregister (${catalog.source}); nicht neu verifizierte Evidenz. Keine Zuordnung zu H1–H12, keine Vererbung von PASS und keine Paper-Freigabe.`);
+
+  const entries = catalog.knownEvidence
+    .filter(object)
+    .map(entry => ({
+      family:typeof entry.family === 'string' && entry.family.trim() ? entry.family :
+        typeof entry.name === 'string' && entry.name.trim() ? entry.name : 'Unbekannt',
+      decision:typeof entry.decision === 'string' && entry.decision.trim() ? entry.decision :
+        typeof entry.status === 'string' && entry.status.trim() ? entry.status : 'Unbekannt',
+      reason:typeof entry.reason === 'string' && entry.reason.trim() ? entry.reason :
+        typeof entry.rationale === 'string' && entry.rationale.trim() ? entry.rationale : 'Unbekannt'
+    }));
+  const controls = document.createElement('div');
+  controls.className = 'arena-toolbar';
+  const label = document.createElement('label');
+  label.className = 'arena-control';
+  label.setAttribute('for','strategy-history-search');
+  addText(document,label,'span','Historische Zusammenfassungen durchsuchen (Familie, Entscheidung, Begründung)');
+  const search = document.createElement('input');
+  search.id = 'strategy-history-search';
+  search.type = 'search';
+  search.value = '';
+  search.setAttribute('style','box-sizing:border-box;width:100%;min-width:0;min-height:48px;padding:8px');
+  label.append(search);
+  controls.append(label);
+  const reset = document.createElement('button');
+  reset.type = 'button';
+  reset.dataset.strategyHistoryReset = '';
+  reset.textContent = 'Suche zurücksetzen';
+  controls.append(reset);
+  section.append(controls);
+
+  const count = addText(document,section,'p',`0 von ${entries.length} Zusammenfassungen angezeigt.`);
+  count.setAttribute('role','status');
+  count.setAttribute('aria-live','polite');
+  const results = document.createElement('div');
+  results.className = 'arena-models';
+  section.append(count,results);
+
+  const update = () => {
+    const query = search.value.trim().toLowerCase();
+    const matches = entries.filter(entry =>
+      [entry.family,entry.decision,entry.reason].some(value=>value.toLowerCase().includes(query)));
+    count.textContent = `${matches.length} von ${entries.length} Zusammenfassungen angezeigt.`;
+    results.replaceChildren();
+    if (!matches.length) {
+      addText(document,results,'p',entries.length
+        ? 'Keine historischen Zusammenfassungen entsprechen der Suche.'
+        : 'Keine historischen Zusammenfassungen verfügbar.','arena-unknown');
+      return;
+    }
+    for (const entry of matches) {
+      const card = document.createElement('article');
+      card.className = 'arena-model-card';
+      const fields = document.createElement('dl');
+      addField(document,fields,'Familie / Name',entry.family);
+      addField(document,fields,'Entscheidung / Status',entry.decision);
+      addField(document,fields,'Vollständige Begründung',entry.reason);
+      card.append(fields);
+      results.append(card);
+    }
+  };
+  search.addEventListener('input',update);
+  reset.addEventListener('click',()=>{
+    search.value = '';
+    update();
+  });
+  update();
+  return section;
+}
+
 export function renderStrategyCatalog(root, campaign, document=root?.ownerDocument || globalThis.document, evidence=B17_EVIDENCE_SNAPSHOT) {
   if (!root || !document) return unknownCatalog('Ansicht nicht verfügbar.');
   const catalog = buildStrategyCatalog(campaign, evidence);
@@ -302,6 +379,7 @@ export function renderStrategyCatalog(root, campaign, document=root?.ownerDocume
   addText(document,notice,'p',catalog.sharedBlocker);
   root.append(notice);
   root.append(renderStrategyComparison(document,catalog));
+  root.append(renderHistoricalResearch(document,catalog));
   for (const family of catalog.families) root.append(renderFamily(document,family));
 
   const candidate = document.createElement('article');

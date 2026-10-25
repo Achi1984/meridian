@@ -18,6 +18,7 @@ import {withMobileChrome} from './helpers/v11-cdp.mjs';
 
 const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium'].find(path=>path&&existsSync(path));
 const repository=fileURLToPath(new URL('../',import.meta.url));
+const campaign=JSON.parse(readFileSync(join(repository,'docs/strategy-lab/campaign-20261013.json'),'utf8'));
 const v11=join(repository,'v11');
 const sizes=[{width:320,height:568,mobile:true},{width:375,height:667,mobile:true},
   {width:390,height:844,mobile:true},{width:430,height:932,mobile:true},
@@ -295,7 +296,7 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
             h9:document.querySelector('[data-strategy-id="H9"]')?.innerText,
             models:[...document.querySelectorAll('#strategy-arena-root .arena-model-card')].map(card=>card.innerText),
             overflow:root.scrollWidth>innerWidth+1,
-            controls:[...document.querySelectorAll('#strategy-catalog details summary,#strategy-catalog select,#strategy-catalog [data-strategy-compare-reset],#strategy-arena-root button,#strategy-arena-root input')].map(node=>node.getBoundingClientRect().height),
+            controls:[...document.querySelectorAll('#strategy-catalog details summary,#strategy-catalog select,#strategy-catalog [data-strategy-compare-reset],#strategy-catalog .strategy-history input,#strategy-catalog [data-strategy-history-reset],#strategy-arena-root button,#strategy-arena-root input')].map(node=>node.getBoundingClientRect().height),
             comparison:{
               selectors:[...document.querySelectorAll('#strategy-catalog [data-strategy-compare]')].map(node=>({
                 value:node.value,focused:document.activeElement===node,height:node.getBoundingClientRect().height
@@ -304,6 +305,19 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
               text:document.querySelector('.strategy-comparison [aria-live="polite"]')?.innerText,
               overflow:document.querySelector('.strategy-comparison').scrollWidth>document.querySelector('.strategy-comparison').clientWidth+1
             },
+            history:(()=>{
+              const section=document.querySelector('.strategy-history');
+              return {text:section.innerText,
+                rationales:[...section.querySelectorAll('dl')].map(fields=>fields.querySelectorAll('dd')[2]?.innerText),
+                count:section.querySelector('[aria-live="polite"]').innerText,
+                searchLabel:section.querySelector('label[for="strategy-history-search"]')?.innerText,
+                entries:section.querySelectorAll('.arena-model-card').length,
+                searchHeight:section.querySelector('input').getBoundingClientRect().height,
+                resetHeight:section.querySelector('[data-strategy-history-reset]').getBoundingClientRect().height,
+                overflow:section.scrollWidth>section.clientWidth+1,
+                documentOverflow:root.scrollWidth>innerWidth+1,
+                strategyIds:section.querySelectorAll('[data-strategy-id],[data-comparison-family]').length};
+            })(),
             resources:performance.getEntriesByType('resource').map(row=>new URL(row.name).pathname)};
         })()`);
         assert.equal(catalog.visible,true);assert.equal(catalog.active,'view-strategies');
@@ -320,6 +334,72 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         assert.match(catalog.comparison.text,/Hypotheses|Hypothese|Hypoth/i);
         assert.equal(catalog.comparison.overflow,false);
         assert.ok(catalog.comparison.selectors.every(node=>node.height>=44));
+        assert.match(catalog.history.text,/Historische Zusammenfassungen aus dem Entwurfsregister/);
+        assert.match(catalog.history.text,/nicht neu verifizierte Evidenz/);
+        assert.match(catalog.history.text,/Keine Zuordnung zu H1–H12, keine Vererbung von PASS und keine Paper-Freigabe/);
+        assert.match(catalog.history.text,/Quelle: Historische Zusammenfassungen aus dem Entwurfsregister/);
+        assert.deepEqual(catalog.history.rationales,campaign.knownEvidence.map(entry=>entry.reason));
+        assert.equal(catalog.history.count,'5 von 5 Zusammenfassungen angezeigt.');
+        assert.match(catalog.history.searchLabel,/Familie, Entscheidung, Begründung/);
+        assert.equal(catalog.history.entries,5);
+        assert.equal(catalog.history.strategyIds,0);
+        assert.equal(catalog.history.overflow,false);
+        assert.equal(catalog.history.documentOverflow,false);
+        assert.ok(catalog.history.searchHeight>=44);
+        assert.ok(catalog.history.resetHeight>=44);
+        await evaluate(`document.querySelector('#strategy-history-search').focus()`);
+        await call('Input.insertText',{text:'TAKER ORDER FLOW V1'});
+        const searchedFamily=await evaluate(`(()=>{
+          const section=document.querySelector('.strategy-history'),input=section.querySelector('input');
+          return {value:input.value,focused:document.activeElement===input,
+            count:section.querySelector('[aria-live="polite"]').innerText,
+            entries:[...section.querySelectorAll('.arena-model-card')].map(card=>card.innerText),
+            overflow:section.scrollWidth>section.clientWidth+1};
+        })()`);
+        assert.equal(searchedFamily.value,'TAKER ORDER FLOW V1');
+        assert.equal(searchedFamily.focused,true);
+        assert.equal(searchedFamily.count,'1 von 5 Zusammenfassungen angezeigt.');
+        assert.equal(searchedFamily.entries.length,1);
+        assert.match(searchedFamily.entries[0],/Taker order flow V1/);
+        assert.equal(searchedFamily.overflow,false);
+        for(const query of ['HOLDOUT_FAIL','PF BELOW GATE']){
+          const searchResult=await evaluate(`(()=>{
+            const section=document.querySelector('.strategy-history'),input=section.querySelector('input');
+            input.value=${JSON.stringify(query)};input.dispatchEvent(new Event('input',{bubbles:true}));
+            return {count:section.querySelector('[aria-live="polite"]').innerText,
+              entries:[...section.querySelectorAll('.arena-model-card')].map(card=>card.innerText),
+              overflow:section.scrollWidth>section.clientWidth+1};
+          })()`);
+          assert.equal(searchResult.count,'1 von 5 Zusammenfassungen angezeigt.');
+          assert.equal(searchResult.entries.length,1);
+          assert.equal(searchResult.overflow,false);
+        }
+        const noHistoryMatch=await evaluate(`(()=>{
+          const section=document.querySelector('.strategy-history'),input=section.querySelector('input');
+          input.value='not present in the draft';input.dispatchEvent(new Event('input',{bubbles:true}));
+          return {count:section.querySelector('[aria-live="polite"]').innerText,
+            empty:section.innerText.includes('Keine historischen Zusammenfassungen entsprechen der Suche.'),
+            entries:section.querySelectorAll('.arena-model-card').length,
+            overflow:section.scrollWidth>section.clientWidth+1};
+        })()`);
+        assert.equal(noHistoryMatch.count,'0 von 5 Zusammenfassungen angezeigt.');
+        assert.equal(noHistoryMatch.empty,true);
+        assert.equal(noHistoryMatch.entries,0);
+        assert.equal(noHistoryMatch.overflow,false);
+        await evaluate(`document.querySelector('[data-strategy-history-reset]').focus()`);
+        await key('Enter','Enter',13);
+        const resetHistory=await evaluate(`(()=>{
+          const section=document.querySelector('.strategy-history'),input=section.querySelector('input');
+          return {value:input.value,focused:document.activeElement===section.querySelector('[data-strategy-history-reset]'),
+            count:section.querySelector('[aria-live="polite"]').innerText,
+            entries:section.querySelectorAll('.arena-model-card').length,
+            overflow:section.scrollWidth>section.clientWidth+1};
+        })()`);
+        assert.equal(resetHistory.value,'');
+        assert.equal(resetHistory.focused,true);
+        assert.equal(resetHistory.count,'5 von 5 Zusammenfassungen angezeigt.');
+        assert.equal(resetHistory.entries,5);
+        assert.equal(resetHistory.overflow,false);
         assert.ok(catalog.resources.every(path=>!/\/v10\/|\/api\/|\/market|\/ticker|\/klines/i.test(path)));
         assert.ok(catalog.resources.includes('/docs/strategy-lab/campaign-20261013.json'));
         await evaluate(`(()=>{
