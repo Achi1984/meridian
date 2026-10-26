@@ -693,6 +693,133 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
           assert.equal(imported.cards,beforeImport.cards);
           assert.equal(imported.storageCalls,beforeImport.storageCalls);
           assert.equal(imported.fixtureStillSeparate,true);
+          const explorerInitial=await evaluate(`(()=>{
+            const explorer=document.querySelector('[data-arena-path-explorer]');
+            return {ids:[...explorer.querySelectorAll('[data-arena-path-row]')].map(row=>row.dataset.arenaPathRow),
+              checked:explorer.querySelectorAll('input:checked').length,
+              detail:explorer.querySelector('[id$="-path-detail"]').innerText,
+              filters:[...explorer.querySelectorAll('select')].map(node=>node.value),
+              targets:[...explorer.querySelectorAll('select,button,input')].map(node=>node.getBoundingClientRect().height)};
+          })()`);
+          assert.deepEqual(explorerInitial.ids,producerCase.result.paths.map(path=>path.pathId));
+          assert.equal(explorerInitial.checked,0,'a new report clears prior selection');
+          assert.match(explorerInitial.detail,/Über „Details“ einen Pfad auswählen/);
+          assert.deepEqual(explorerInitial.filters,['','','','']);
+          assert.ok(explorerInitial.targets.every(height=>height>=44));
+          const tableViewport=await evaluate(`(()=>{
+            const region=document.querySelector('[id$="-path-table"]');
+            region.focus();
+            return {scrollable:region.scrollWidth>region.clientWidth,
+              column:region.querySelector('th').getBoundingClientRect().width};
+          })()`);
+          assert.ok(tableViewport.column>=190,'path actions have a legible column at mobile widths');
+          if(size.width<840){
+            assert.equal(tableViewport.scrollable,true);
+            await key('ArrowRight','ArrowRight',39);
+            // Native scroll animation settles before its position is inspected.
+            await evaluate(`new Promise(resolve=>setTimeout(resolve,150))`);
+            assert.ok(await evaluate(`document.querySelector('[id$="-path-table"]').scrollLeft>0`));
+          }
+          for(const dimension of ['segmentId','variantId','scenarioId','status']){
+            for(const filterValue of new Set(producerCase.result.paths.map(path=>path[dimension]))){
+              const filtered=await evaluate(`(()=>{
+                const filter=document.querySelector('[data-arena-path-filter="${dimension}"]');
+                filter.focus();filter.value=${JSON.stringify(filterValue)};
+                filter.dispatchEvent(new Event('change',{bubbles:true}));
+                return {ids:[...document.querySelectorAll('[data-arena-path-row]')].map(row=>row.dataset.arenaPathRow),
+                  focused:document.activeElement?.dataset.arenaPathFilter===${JSON.stringify(dimension)}};
+              })()`);
+              assert.deepEqual(filtered.ids,producerCase.result.paths.filter(path=>path[dimension]===filterValue).map(path=>path.pathId));
+              assert.equal(filtered.focused,true);
+            }
+            await evaluate(`document.querySelector('[data-arena-path-filter-reset]').click()`);
+          }
+          await evaluate(`document.querySelector('[data-arena-path-filter="segmentId"]').focus()`);
+          await key('ArrowDown','ArrowDown',40);
+          const keyboardFilter=await evaluate(`({
+            value:document.querySelector('[data-arena-path-filter="segmentId"]').value,
+            focused:document.activeElement?.dataset.arenaPathFilter==='segmentId'
+          })`);
+          assert.equal(keyboardFilter.value,producerCase.result.paths[0].segmentId);
+          assert.equal(keyboardFilter.focused,true);
+          await evaluate(`document.querySelector('[data-arena-path-filter-reset]').focus()`);
+          await key('Enter','Enter',13);
+          assert.equal(await evaluate(`document.activeElement?.hasAttribute('data-arena-path-filter-reset')`),true);
+          const firstId=producerCase.result.paths[0].pathId;
+          const secondId=producerCase.result.paths[3].pathId;
+          await evaluate(`document.querySelector('[data-arena-path-select="${firstId}"]').focus()`);
+          await key(' ','Space',32);
+          assert.equal(await evaluate(`document.querySelector('[data-arena-path-select="${firstId}"]').checked`),true);
+          assert.equal(await evaluate(`document.activeElement?.dataset.arenaPathSelect===${JSON.stringify(firstId)}`),true);
+          await evaluate(`document.querySelector('[data-arena-path-select="${secondId}"]').focus()`);
+          await key(' ','Space',32);
+          const bounded=await evaluate(`(()=>{
+            const explorer=document.querySelector('[data-arena-path-explorer]');
+            const third=explorer.querySelector('input:not(:checked)');
+            const disabled=third.disabled;
+            third.checked=true;third.dispatchEvent(new Event('change',{bubbles:true}));
+            return {disabled,selected:[...document.querySelectorAll('[aria-label^="Vergleichspfad "]')].map(node=>node.getAttribute('aria-label')),
+              checked:document.querySelectorAll('[data-arena-path-select]:checked').length,
+              text:document.querySelector('[data-arena-path-explorer]').innerText};
+          })()`);
+          assert.equal(bounded.disabled,true);
+          assert.equal(bounded.checked,2);
+          assert.deepEqual(bounded.selected,[firstId,secondId].map(id=>'Vergleichspfad '+id));
+          assert.match(bounded.text,/Segmente: unterschiedlich · Szenarien: unterschiedlich/);
+          const noMatch=await evaluate(`(()=>{
+            const set=(key,value)=>{
+              const filter=document.querySelector('[data-arena-path-filter="'+key+'"]');
+              filter.value=value;filter.dispatchEvent(new Event('change',{bubbles:true}));
+            };
+            set('variantId','cash-zero');set('scenarioId','base-15bp');
+            return {count:document.querySelector('[data-arena-path-count]').innerText,
+              text:document.querySelector('[data-arena-path-explorer]').innerText,
+              selected:document.querySelectorAll('[aria-label^="Vergleichspfad "]').length};
+          })()`);
+          assert.equal(noMatch.count,'0 von 44 Pfaden angezeigt.');
+          assert.match(noMatch.text,/Keine Pfade entsprechen den Filtern/);
+          assert.equal(noMatch.selected,2);
+          await evaluate(`document.querySelector('[data-arena-path-filter-reset]').click()`);
+          await evaluate(`document.querySelector('[data-arena-path-detail="${firstId}"]').focus()`);
+          await key('Enter','Enter',13);
+          const detailState=await evaluate(`(()=>{
+            const detail=document.querySelector('[id$="-path-detail"]');
+            return {focused:document.activeElement===detail.querySelector('h5'),
+              quarters:[...detail.querySelectorAll('tbody tr')].map(row=>[...row.cells].map(cell=>cell.innerText)),
+              titles:[...detail.querySelectorAll('svg g title')].map(node=>node.textContent),
+              text:detail.innerText,
+              overflow:document.documentElement.scrollWidth>innerWidth+1 ||
+                document.querySelector('[data-arena-path-explorer]').scrollWidth>document.querySelector('[data-arena-path-explorer]').clientWidth+1};
+          })()`);
+          assert.equal(detailState.focused,true);
+          assert.equal(detailState.overflow,false);
+          assert.deepEqual(detailState.quarters,producerCase.result.paths[0].quarterlyReturns.map(item=>[item.quarter,String(item.netReturn)]));
+          assert.deepEqual(detailState.titles,producerCase.result.paths[0].quarterlyReturns.map(item=>item.quarter+': '+String(item.netReturn)));
+          for(const [label,field] of [['Kosten','totalCosts'],['Umsatznotional','turnoverNotional'],
+            ['Mittlere realisierte Exposition','meanRealizedExposure'],['Maximale Drawdown-Dauer','maxDrawdownDuration']]){
+            assert.ok(detailState.text.includes(label+'\n'+String(producerCase.result.paths[0][field])));
+          }
+          if(evidence){
+            await evaluate(`document.querySelector('[id$="-path-detail"] figure').scrollIntoView({block:'center'})`);
+            const image=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+            writeFileSync(join(evidence,`v11-b14-detail-${producerCase.name}-${size.width}x${size.height}.png`),Buffer.from(image.data,'base64'));
+            await evaluate(`document.querySelector('[aria-label^="Vergleichspfad "]').parentElement.scrollIntoView({block:'start'})`);
+            const comparison=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+            writeFileSync(join(evidence,`v11-b14-comparison-${producerCase.name}-${size.width}x${size.height}.png`),Buffer.from(comparison.data,'base64'));
+            await evaluate(`document.querySelector('[data-arena-path-explorer]').scrollIntoView({block:'start'})`);
+            const filters=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+            writeFileSync(join(evidence,`v11-b14-explorer-${producerCase.name}-${size.width}x${size.height}.png`),Buffer.from(filters.data,'base64'));
+          }
+          await evaluate(`document.querySelector('[data-arena-path-selection-reset]').focus()`);
+          await key('Enter','Enter',13);
+          assert.equal(await evaluate(`document.querySelectorAll('[data-arena-path-select]:checked').length`),0);
+          assert.equal(await evaluate(`document.activeElement?.hasAttribute('data-arena-path-selection-reset')`),true);
+          // Leave a selection and filter behind to verify that the next import clears both.
+          await evaluate(`(()=>{
+            document.querySelector('[data-arena-path-select="${firstId}"]').click();
+            const filter=document.querySelector('[data-arena-path-filter="segmentId"]');
+            filter.value='development';filter.dispatchEvent(new Event('change',{bubbles:true}));
+          })()`);
           await evaluate(`document.querySelector('[data-arena-result-section="technical"] summary').focus()`);
           if(await evaluate(`document.querySelector('[data-arena-result-section="technical"]').open`))
             await key('Enter','Enter',13);
@@ -802,9 +929,33 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         assert.equal(afterStaleRead.alertRole,'alert');
         assert.match(afterStaleRead.alertText,/Export konnte nicht angenommen werden\. Kein Ergebnis wird angezeigt\./);
         assert.doesNotMatch(afterStaleRead.text,/Lifecycle completed|Engine-Ergebnis\s+COMPLETED/);
+        const hostilePresentation=await evaluate(`(async()=>{
+          const {renderArenaResultView}=await import('/v11/arena-result-view.js?v=B14');
+          const hostile='"><img src=x onerror="alert(1)">'+ 'identity'.repeat(60);
+          const root=document.createElement('div');
+          root.style.cssText='max-width:100%;min-width:0';
+          document.getElementById('strategy-arena-root').append(root);
+          // Deliberately hostile presentation input, not an accepted producer export.
+          const path={pathId:hostile,kind:hostile,variantId:hostile,segmentId:hostile,
+            scenarioId:hostile,status:hostile,computed:false,attempts:0,
+            quarterlyReturns:[{quarter:hostile,netReturn:-0.123456789},{quarter:'zero',netReturn:0}]};
+          root.innerHTML=renderArenaResultView({idPrefix:'hostile-preview',projection:{
+            status:'PRESENT_UNVERIFIED',provenance:{syntheticFixture:true},
+            job:{state:'completed',paths:[]},result:{paths:[path]}},
+            explorer:{selectedPathIds:[hostile],detailPathId:hostile}});
+          const result={unsafe:!!root.querySelector('img,script'),overflow:root.scrollWidth>root.clientWidth+1 ||
+              document.documentElement.scrollWidth>innerWidth+1,
+            exact:root.querySelector('tbody th')?.textContent.includes(hostile),
+            columns:root.querySelector('table th').getBoundingClientRect().width};
+          root.remove();return result;
+        })()`);
+        assert.equal(hostilePresentation.unsafe,false);
+        assert.equal(hostilePresentation.overflow,false);
+        assert.equal(hostilePresentation.exact,true);
+        assert.ok(hostilePresentation.columns>=190);
         if(size.width===320){
           const disposal=await evaluate(`(async()=>{
-            const {createStrategyArenaView}=await import('/v11/strategy-arena.js?v=B13');
+            const {createStrategyArenaView}=await import('/v11/strategy-arena.js?v=B14');
             const existingIds=new Set([...document.querySelectorAll('#strategy-arena-root [id^="arena-producer-"]')].map(node=>node.id));
             const root=document.createElement('div');document.body.append(root);
             const view=createStrategyArenaView(root,{fetchImpl:async()=>{throw Error('synthetic provenance read failure');}});
@@ -918,7 +1069,8 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         const requestPaths=hosted.requests.map(request=>request.path);
         assert.ok(!requestPaths.some(path=>/\/v10\/|\/api\/|\/klines|\/ticker|\/market/i.test(path)));
         return {width:size.width,sourceFetches:requestPaths.filter(path=>path==='/docs/strategy-lab/campaign-20261013.json').length,
-          families:catalog.families,models:arena.cards,overflow:catalog.overflow,synthetic:true};
+          families:catalog.families,models:arena.cards,overflow:catalog.overflow,synthetic:true,
+          explorerPaths:44,selectionLimit:2,quarterlyValues:'producer-exact',importReset:true};
       },size.height);
       assert.equal(metrics.sourceFetches-previousSourceRequests,1);
       assert.equal(metrics.families,12);
