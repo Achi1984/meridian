@@ -37,6 +37,7 @@ const groups = [
     name: "historical full-path and timeout",
     timeoutMs: 45_000,
     methods: [
+      "test_generated_historical_result_diagnostic_is_allowlisted_and_bounded",
       "test_generated_historical_profile_runs_all_paths_and_refuses_repeat",
       "test_generated_historical_timeout_keeps_attempt_and_fence_without_retry"
     ]
@@ -139,8 +140,8 @@ test("durable bounded research supervisor synthetic suite", () => {
   assert.equal(new Set(assigned).size, assigned.length, "explicit unittest groups contain duplicates");
   assert.deepEqual([...assigned].sort(), [...discovered].sort(),
     "explicit unittest groups must cover actual unittest discovery exactly");
-  assert.deepEqual(groups.map(group => group.methods.length), [3, 2, 2, 16, 16],
-    "the discovered suite must retain the reviewed 3/2/2/16/16 partition");
+  assert.deepEqual(groups.map(group => group.methods.length), [3, 3, 2, 16, 16],
+    "the discovered suite must retain the reviewed 3/3/2/16/16 partition");
 
   const timings = [];
   for (const group of groups) {
