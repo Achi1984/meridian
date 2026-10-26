@@ -5,19 +5,19 @@ import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {withMobileChrome} from './helpers/v11-cdp.mjs';
 const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium'].find(p=>p&&existsSync(p));
-test('version history: native keyboard, focus and compact viewport at four mobile widths',{timeout:120000},async()=>{
+test('version history: native keyboard, focus and compact viewport at five widths',{timeout:150000},async()=>{
  if(typeof WebSocket!=='function'){
   const env={...process.env};delete env.NODE_TEST_CONTEXT;
   const child=spawnSync(process.execPath,['--experimental-websocket',fileURLToPath(import.meta.url)],{env,encoding:'utf8',timeout:115000});
   assert.equal(child.status,0,String(child.stdout).slice(-1600)+String(child.stderr).slice(-800));
   const measurements=String(child.stdout).split('\n').filter(l=>l.includes('V11_HISTORY_WIDTH'));
-  assert.equal(measurements.length,4);
+  assert.equal(measurements.length,5);
   for(const line of measurements) console.log(line);
   return;
  }
  assert.ok(chrome,'Chrome binary required');
  const url=process.env.V11_TEST_URL||'file://'+fileURLToPath(new URL('../v11/index.html',import.meta.url));
- for(const [width,height] of [[320,568],[375,667],[390,844],[430,844]]){
+ for(const [width,height] of [[320,568],[375,667],[390,844],[430,844],[1440,900]]){
   await withMobileChrome(chrome,width,url,async call=>{
    const evaluate=async expression=>{const r=await call('Runtime.evaluate',{expression,returnByValue:true});assert.ok(!r.exceptionDetails,JSON.stringify(r.exceptionDetails));return r.result.value;};
    const key=async(key,code,windowsVirtualKeyCode)=>{
@@ -39,10 +39,12 @@ test('version history: native keyboard, focus and compact viewport at four mobil
    assert.equal(await evaluate(`document.getElementById('version-panel').hidden`),false);
    const metrics=await evaluate(`(()=>{const b=document.getElementById('version-toggle').getBoundingClientRect(),p=document.getElementById('version-panel').getBoundingClientRect(),c=document.getElementById('version-close').getBoundingClientRect();return {width:innerWidth,height:innerHeight,buttonWidth:b.width,buttonHeight:b.height,panel:{left:p.left,right:p.right,top:p.top,bottom:p.bottom,height:p.height},body:document.body.scrollWidth,root:document.documentElement.scrollWidth,close:{left:c.left,right:c.right,top:c.top,bottom:c.bottom,width:c.width,height:c.height},expanded:document.getElementById('version-toggle').getAttribute('aria-expanded')};})()`);
    assert.equal(metrics.width,width);assert.equal(metrics.height,height);assert.ok(metrics.buttonWidth>=44&&metrics.buttonHeight>=44);assert.ok(metrics.panel.left>=0&&metrics.panel.right<=width+1&&metrics.body<=width+1&&metrics.root<=width+1);assert.ok(metrics.close.width>=44&&metrics.close.height>=44&&metrics.close.left>=metrics.panel.left&&metrics.close.right<=metrics.panel.right&&metrics.close.top>=0&&metrics.close.bottom<=height);assert.equal(metrics.expanded,'true');
-   assert.equal(await evaluate(`document.querySelector('.version-history-list li strong').textContent`),'Meridian 11 · B12');
+   assert.equal(await evaluate(`document.querySelector('.version-history-list li strong').textContent`),'Meridian 11 · B13');
+   const history=await evaluate(`document.querySelector('.version-history-list').innerText`);
+   assert.match(history,/Meridian 11 · B12/);assert.match(history,/Terminal 10\.0-r130/);
    const reachable=await evaluate(`(()=>{const p=document.getElementById('version-panel'),note=p.querySelector(':scope > p:last-child'),targets=[...p.querySelectorAll('.version-history-list li'),note],positions=[];for(const item of targets){item.scrollIntoView({block:'center'});const r=item.getBoundingClientRect();positions.push({top:r.top,bottom:r.bottom});}return {positions,note:{directChild:note.parentElement===p,text:note.textContent.trim()},body:document.body.scrollWidth,root:document.documentElement.scrollWidth};})()`);
    assert.equal(reachable.note.directChild,true);assert.equal(reachable.note.text,'Statischer Verlauf · Integrationsdaten sind keine Veröffentlichungsdaten. Mit Escape schließen.');
-   assert.equal(reachable.positions.length,20);assert.ok(reachable.positions.every(r=>r.top>=0&&r.bottom<=height),'all history entries and the closing note can be brought into the short viewport: '+JSON.stringify({width,height,...reachable}));assert.ok(reachable.body<=width+1&&reachable.root<=width+1);
+   assert.equal(reachable.positions.length,21);assert.ok(reachable.positions.every(r=>r.top>=0&&r.bottom<=height),'all history entries and the closing note can be brought into the short viewport: '+JSON.stringify({width,height,...reachable}));assert.ok(reachable.body<=width+1&&reachable.root<=width+1);
    await evaluate(`window.scrollTo(0,0)`);
    assert.equal(await evaluate(`document.activeElement.id`),'version-toggle','focus remains on the disclosure toggle before tab navigation');
    await key('Tab','Tab',9);
