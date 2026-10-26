@@ -141,6 +141,39 @@ function setCounts(value) {
   };
 }
 
+function setReconciledBudget(value, cap = 3) {
+  value.attempts.forEach((attempt, index) => {
+    attempt.runIdentity.runAttempt = index + 1;
+  });
+  for (const record of value.resultRecords) {
+    const attempt = value.attempts.find((row) => row.attemptId === record.attemptRef);
+    if (!attempt) continue;
+    record.runIdentity = structuredClone(attempt.runIdentity);
+    record.resultIdentity = `workflow:${attempt.runIdentity.provider}:${attempt.runIdentity.runId}:${attempt.runIdentity.runAttempt}:${attempt.stage}`;
+  }
+  value.coverage = {
+    complete: true,
+    nonWorkflowAttempts: { status: 'RECONCILED', sourceRefs: ['source'] },
+    gaps: [],
+  };
+  value.budget = {
+    status: 'RECONCILED',
+    countingPolicy: {
+      status: 'RECONCILED',
+      policyId: 'SYNTHETIC-COUNTING-POLICY',
+      includedAttemptClasses: ['STRATEGY_EVALUATION', 'TECHNICAL_EVALUATION'],
+      excludedAttemptClasses: ['FEATURE_EVALUATION', 'OPERATIONAL_WORKFLOW', 'PROSPECTIVE_COLLECTION', 'MANUAL_ATTEMPT'],
+      includedStatuses: ['COMPLETED', 'FAILED'],
+      excludedStatuses: ['TECHNICAL_INVALID', 'CANCELLED', 'ABORTED', 'DISCARDED'],
+      sourceRefs: ['source'],
+    },
+    authorizedCap: { value: cap, sourceRefs: ['source'] },
+    consumedAttemptRefs: value.attempts.map((attempt) => attempt.attemptId),
+    remaining: cap - value.attempts.length,
+  };
+  setCounts(value);
+}
+
 function group(audit, name) {
   return audit.differences[name];
 }
@@ -339,6 +372,27 @@ test('retains source provenance, scope, and the complete submitted budget declar
   assert.equal(audit.differences.budget.later.arithmeticConsistency, 'UNRESOLVED');
 });
 
+test('reports valid reconciled numeric budget without certifying capacity or authority', () => {
+  const earlier = ledger();
+  setReconciledBudget(earlier, 3);
+  const later = structuredClone(earlier);
+
+  assert.equal(validateTrialLedger(earlier).valid, true);
+  const audit = compareTrialLedgers({ earlier, later });
+  assert.equal(audit.status, 'COMPARED');
+  assert.equal(audit.validation.earlier.remainingBudget, 1);
+  assert.equal(audit.validation.later.remainingBudget, 1);
+  assert.equal(audit.differences.budget.earlier.submitted.remaining, 1);
+  assert.equal(audit.differences.budget.earlier.submitted.authorizedCap.value, 3);
+  assert.equal(audit.differences.budget.earlier.arithmeticConsistency, 'CONSISTENT');
+  assert.equal(audit.validation.earlier.completenessCertified, false);
+  assert.equal(audit.validation.earlier.executionAuthorized, false);
+  assert.equal(audit.completenessCertified, false);
+  assert.equal(audit.executionAuthorized, false);
+  assert.equal(audit.provenanceVerified, false);
+  assert.equal(audit.autoPromotion, false);
+});
+
 test('returns invalid-ledger findings and safe differences for malformed rows and counts', () => {
   const earlier = ledger();
   earlier.attempts.push(null);
@@ -411,4 +465,66 @@ test('CLI emits JSON on success and fails closed for malformed JSON or unsafe en
   const help = spawnSync(process.execPath, [cliPath, '--help'], { encoding: 'utf8' });
   assert.equal(help.status, 0);
   assert.match(help.stdout, /MERIDIAN_HISTORICAL_TRIAL_LEDGER_V1/);
+});
+
+test('CLI audits semantically invalid ledgers successfully with INVALID status and validator findings', () => {
+  const earlier = ledger();
+  const later = ledger();
+  later.reportedCounts.attemptRecords += 1;
+  const result = spawnSync(process.execPath, [cliPath], {
+    input: JSON.stringify({ earlier, later }),
+    encoding: 'utf8',
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  const audit = JSON.parse(result.stdout);
+  assert.equal(audit.status, 'INVALID');
+  assert.ok(audit.validation.later.issues.some((issue) => (
+    issue.code === 'REPORTED_COUNT_MISMATCH' && issue.path === '$.reportedCounts'
+  )));
+  assert.equal(audit.differences.attempts.removed.length, 0);
+  assert.equal(audit.executionAuthorized, false);
+  assert.equal(audit.completenessCertified, false);
+  assert.equal(audit.provenanceVerified, false);
+  assert.equal(audit.autoPromotion, false);
+});
+
+test('CLI structural, byte, and output limits fail without emitting partial JSON', () => {
+  const deep = ledger();
+  deep.extra = {};
+  let nested = deep.extra;
+  for (let index = 0; index < 40; index += 1) {
+    nested.value = {};
+    nested = nested.value;
+  }
+
+  const oversizedSide = ledger();
+  oversizedSide.extra = Array(530).fill('x'.repeat(4000));
+  assert.ok(Buffer.byteLength(JSON.stringify({ earlier: oversizedSide, later: ledger() }), 'utf8') < 4 * 1024 * 1024);
+
+  const outputBoundLedger = ledger();
+  const repeatedAttempt = structuredClone(outputBoundLedger.attempts[0]);
+  repeatedAttempt.status = 'FAILED';
+  repeatedAttempt.sourceRefs = ['x', 'x'];
+  repeatedAttempt.auditPayload = 'x'.repeat(530);
+  outputBoundLedger.attempts = Array.from({ length: 2500 }, () => structuredClone(repeatedAttempt));
+  setCounts(outputBoundLedger);
+  assert.ok(Buffer.byteLength(JSON.stringify(outputBoundLedger), 'utf8') < 2 * 1024 * 1024);
+  const outputBoundEnvelope = { earlier: outputBoundLedger, later: ledger() };
+  assert.throws(() => compareTrialLedgers(outputBoundEnvelope), { code: 'OUTPUT_BYTE_LIMIT_EXCEEDED' });
+
+  for (const envelope of [
+    { earlier: deep, later: ledger() },
+    { earlier: oversizedSide, later: ledger() },
+    outputBoundEnvelope,
+  ]) {
+    const result = spawnSync(process.execPath, [cliPath], {
+      input: JSON.stringify(envelope),
+      encoding: 'utf8',
+      maxBuffer: 1024 * 1024,
+    });
+    assert.equal(result.status, 1);
+    assert.equal(result.stdout, '');
+    assert.match(result.stderr, /no audit was produced/);
+  }
 });
