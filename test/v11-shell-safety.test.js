@@ -45,8 +45,8 @@ test('A0: no live imports, network, credentials, orders or PWA bootstrap',()=>{
  assert.doesNotMatch(html,/<(?:img|base|object|embed|source|video|audio|link)\b|<meta[^>]*http-equiv=["']refresh|\bon[a-z]+\s*=|javascript:|url\s*\(/i);
  assert.equal(scripts.length,1,'navigation-only inline script');
  for(const module of ['bot-read-bootstrap.js','depot-read-bootstrap.js','strategy-workspace-bootstrap.js'])
-   assert.ok(html.includes(`<script type="module" src="./${module}?v=B13"></script>`));
- assert.doesNotMatch(html.replace(/<script type="module" src="\.\/(?:bot-read-bootstrap|depot-read-bootstrap|strategy-workspace-bootstrap)\.js\?v=B13"><\/script>/g,''),/<script\b[^>]*\bsrc\s*=|<iframe\b|<form\b|@import\b/i);
+   assert.ok(html.includes(`<script type="module" src="./${module}?v=B14"></script>`));
+ assert.doesNotMatch(html.replace(/<script type="module" src="\.\/(?:bot-read-bootstrap|depot-read-bootstrap|strategy-workspace-bootstrap)\.js\?v=B14"><\/script>/g,''),/<script\b[^>]*\bsrc\s*=|<iframe\b|<form\b|@import\b/i);
  assert.match(html,/id="view-strategies"/);
  assert.doesNotMatch(html,/href="\.\.\/v10\/"/);
  assert.doesNotMatch(html,/<link\b[^>]*rel=["']manifest/i);

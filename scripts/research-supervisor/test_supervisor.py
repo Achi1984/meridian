@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -21,6 +22,28 @@ import supervisor
 
 FAULT_ADAPTER = ROOT / "test_fault_adapter.mjs"
 HISTORICAL_TEST_ADAPTER = ROOT / "test_b1_historical_fixture.mjs"
+
+
+def _generated_historical_result_diagnostic(result):
+    diagnostic = {}
+    if type(result) is dict:
+        for key in ("state", "reason"):
+            value = result.get(key)
+            if type(value) is str and re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{0,79}", value):
+                diagnostic[key] = value
+        trial_id = result.get("trialId")
+        if type(trial_id) is str and re.fullmatch(r"[a-f0-9]{64}", trial_id):
+            diagnostic["trialId"] = trial_id
+        attempts = result.get("attempts")
+        if type(attempts) is int and attempts in (0, 1):
+            diagnostic["attempts"] = attempts
+        paths = result.get("paths")
+        if type(paths) is list:
+            diagnostic["pathCount"] = len(paths)
+            diagnostic["completedPathCount"] = sum(
+                type(path) is dict and path.get("state") == "completed" for path in paths)
+    rendered = json.dumps(diagnostic, sort_keys=True, separators=(",", ":"))
+    return rendered if len(rendered) <= 1024 else rendered[:1021] + "..."
 
 
 def _b1_readiness_diagnostic(thread, result, failure, children, last_state):
@@ -232,12 +255,47 @@ connection.close()
                 self.database, claim,
                 limits=limits or {"path_seconds": 10, "batch_seconds": 20})
 
+    def test_generated_historical_result_diagnostic_is_allowlisted_and_bounded(self):
+        trial_id = "a" * 64
+        private_text = "PRIVATE_DIAGNOSTIC_TEXT " + ("x" * 2048)
+        result = {
+            "state": "UNSETTLED",
+            "reason": "OPERATION_DEADLINE",
+            "trialId": trial_id,
+            "attempts": True,
+            "paths": [
+                {"state": "completed", "path": "/synthetic/private/path"},
+                {"state": "started", "path": "../private/path"},
+            ],
+            "realPath": "/home/runner/private",
+            "freeText": private_text,
+            "extraField": {"value": "not permitted"},
+        }
+
+        diagnostic = _generated_historical_result_diagnostic(result)
+        rendered = json.loads(diagnostic)
+
+        self.assertEqual(rendered, {
+            "state": "UNSETTLED",
+            "reason": "OPERATION_DEADLINE",
+            "trialId": trial_id,
+            "pathCount": 2,
+            "completedPathCount": 1,
+        })
+        self.assertNotIn("attempts", rendered)
+        self.assertLessEqual(len(diagnostic), 1024)
+        self.assertNotIn("/synthetic/private/path", diagnostic)
+        self.assertNotIn("../private/path", diagnostic)
+        self.assertNotIn("/home/runner/private", diagnostic)
+        self.assertNotIn(private_text, diagnostic)
+
     def test_generated_historical_profile_runs_all_paths_and_refuses_repeat(self):
         profile_path, claim = self.prepare_historical_fixture("historical-success")
         result = self.run_historical_fixture(profile_path, claim, "SUCCESS")
-        self.assertEqual(result["state"], "completed")
-        self.assertEqual(result["attempts"], 1)
-        self.assertEqual(len(result["paths"]), 44)
+        diagnostic = _generated_historical_result_diagnostic(result)
+        self.assertEqual(result["state"], "completed", diagnostic)
+        self.assertEqual(result["attempts"], 1, diagnostic)
+        self.assertEqual(len(result["paths"]), 44, diagnostic)
         self.assertEqual(result["executionAuthorized"], False)
         self.assertEqual(result["promotionAuthorized"], False)
         with (patch.object(journal, "HISTORICAL_PROFILE_PATH", profile_path),

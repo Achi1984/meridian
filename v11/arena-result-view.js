@@ -39,13 +39,72 @@ function comparisonRow(label, path) {
   return `<tr><th scope="row">${escape(label)}</th><td>${value(path?.status)}</td><td>${value(path?.netReturn)}</td><td>${value(path?.sampledDrawdown)}</td></tr>`;
 }
 
+const FILTERS = Object.freeze([
+  ['segmentId','Segment'],['variantId','Variante'],['scenarioId','Szenario'],['status','Status']
+]);
+const PATH_FIELDS = Object.freeze([
+  ['pathId','pathId'],['Art','kind'],['Variante','variantId'],['Segment','segmentId'],
+  ['Szenario','scenarioId'],['Status','status'],['Berechnet','computed'],['Versuche','attempts'],
+  ['Nettoertrag','netReturn'],['Maximaler Drawdown','sampledDrawdown'],['Kosten','totalCosts'],
+  ['Umsatznotional','turnoverNotional'],['Mittlere realisierte Exposition','meanRealizedExposure'],
+  ['Maximale Drawdown-Dauer','maxDrawdownDuration']
+]);
+const TABLE = 'width:100%;table-layout:fixed;border-collapse:collapse';
+const TARGET = 'min-height:44px;max-width:100%;white-space:normal;overflow-wrap:anywhere';
+
+export function filterArenaResultPaths(paths, filters={}) {
+  return paths.filter(path=>FILTERS.every(([key])=>!filters[key] || path[key]===filters[key]));
+}
+
+function quarterlyView(path, idPrefix) {
+  const quarters = path.quarterlyReturns;
+  if (!Array.isArray(quarters) || !quarters.length) return '<p>Quartalsrenditen: Nicht verfügbar</p>';
+  const numeric = quarters.filter(item=>typeof item.netReturn==='number' && Number.isFinite(item.netReturn));
+  const scale = Math.max(...numeric.map(item=>Math.abs(item.netReturn)),0) || 1;
+  const height = Math.max(80,quarters.length*28);
+  const chart = `<svg role="img" aria-labelledby="${idPrefix}-chart-title" viewBox="0 0 600 ${height}" style="display:block;width:100%;max-height:360px"><title id="${idPrefix}-chart-title">Gelieferte Quartals-Nettoerträge · Null in der Mitte; exakte Werte in der Tabelle</title><line x1="300" x2="300" y1="0" y2="${height}" stroke="currentColor"/>${quarters.map((item,index)=>{
+    if (typeof item.netReturn!=='number' || !Number.isFinite(item.netReturn)) return '';
+    const x = 300 + item.netReturn/scale*280;
+    const y = index*28+14;
+    return `<g><title>${value(item.quarter)}: ${value(item.netReturn)}</title><line x1="300" x2="${x}" y1="${y}" y2="${y}" stroke="currentColor" stroke-width="6"/><circle cx="${x}" cy="${y}" r="4" fill="currentColor"/></g>`;
+  }).join('')}</svg>`;
+  return `<figure style="margin:0;${WRAP}"><figcaption>Quartals-Nettoerträge · gelieferte Werte, keine rekonstruierte Equitykurve</figcaption>${chart}<table style="${TABLE}"><caption>Identische Producerwerte zur Grafik · keine Prozentumrechnung</caption><thead><tr><th scope="col">Quartal</th><th scope="col">netReturn</th></tr></thead><tbody>${quarters.map(item=>`<tr><th scope="row">${value(item.quarter)}</th><td>${value(item.netReturn)}</td></tr>`).join('')}</tbody></table></figure>`;
+}
+
+function explorerView(result, job, explorer, idPrefix) {
+  const paths = Array.isArray(result.paths) ? result.paths : [];
+  const filters = explorer.filters ?? {};
+  const selected = paths.filter(path=>(explorer.selectedPathIds ?? []).includes(path.pathId)).slice(0,2);
+  const matching = filterArenaResultPaths(paths,filters);
+  const fields = path=>`<dl>${PATH_FIELDS.map(([label,key])=>row(label,path[key])).join('')}</dl>`;
+  const filterControls = FILTERS.map(([key,label])=>{
+    const options = [...new Set(paths.map(path=>path[key]).filter(item=>typeof item==='string'))];
+    return `<label for="${idPrefix}-filter-${key}" style="${WRAP}">${label}<select id="${idPrefix}-filter-${key}" data-arena-path-filter="${key}" style="display:block;width:100%;${TARGET}"><option value="">Alle</option>${options.map(item=>`<option value="${escape(item)}"${filters[key]===item?' selected':''}>${escape(item)}</option>`).join('')}</select></label>`;
+  }).join('');
+  const rows = matching.map(path=>{
+    const index = paths.indexOf(path);
+    const checked = selected.includes(path);
+    return `<tr data-arena-path-row="${escape(path.pathId)}"><th scope="row">${value(path.pathId)}<br>${value(path.variantId)}<br><button id="${idPrefix}-detail-${index}" type="button" data-arena-path-detail="${escape(path.pathId)}" aria-controls="${idPrefix}-path-detail" style="${TARGET}">Details</button><label style="display:flex;align-items:center;min-height:44px;${WRAP}"><input id="${idPrefix}-select-${index}" type="checkbox" data-arena-path-select="${escape(path.pathId)}" aria-label="Pfad ${escape(path.pathId)} vergleichen" style="flex-shrink:0;min-height:44px"${checked?' checked':''}${!checked&&selected.length===2?' disabled':''}>Vergleichen</label></th><td>${value(path.segmentId)}</td><td>${value(path.scenarioId)}</td><td>${value(path.status)}</td><td>${value(path.netReturn)}</td><td>${value(path.sampledDrawdown)}</td><td>${value(path.totalCosts)}</td></tr>`;
+  }).join('');
+  const different = selected.length===2
+    ? `<p>Segmente: ${selected[0].segmentId===selected[1].segmentId?'gleich':'unterschiedlich'} · Szenarien: ${selected[0].scenarioId===selected[1].scenarioId?'gleich':'unterschiedlich'}. Keine Aussage zur Vergleichbarkeit, kein Leistungsdelta, keine Gewinnerwahl.</p>` : '';
+  const comparison = `<section aria-labelledby="${idPrefix}-comparison-heading"><h5 id="${idPrefix}-comparison-heading">Zwei Pfade · Originalwerte</h5><p role="status">${selected.length} von 2 Pfaden ausgewählt · Auswahl bleibt beim Filtern erhalten.</p><button id="${idPrefix}-selection-reset" type="button" data-arena-path-selection-reset style="${TARGET}">Vergleich zurücksetzen</button>${different}<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">${selected.map(path=>`<article style="${WRAP}" aria-label="Vergleichspfad ${escape(path.pathId)}">${fields(path)}</article>`).join('')}</div></section>`;
+  const detail = typeof explorer.detailPathId==='string'
+    ? paths.find(path=>path.pathId===explorer.detailPathId) : null;
+  const detailBody = detail ? `${fields(detail)}<h6>Gelieferte Ausführungsmetadaten</h6><pre style="${RAW}">${json(job.paths?.find(path=>path.pathId===detail.pathId))}</pre><dl>${row('Fehler · Producerangabe',detail.failure===undefined?null:JSON.stringify(detail.failure))}</dl>${quarterlyView(detail,`${idPrefix}-quarterly`)}` : '<p>Über „Details“ einen Pfad auswählen.</p>';
+  const listing = matching.length
+    ? `<p>Pfadtabelle bei Bedarf horizontal scrollen.</p><div id="${idPrefix}-path-table" role="region" aria-label="Gefilterte Producerpfade · horizontal scrollbar" tabindex="0" style="max-width:100%;overflow-x:auto"><table style="${TABLE};min-width:840px"><caption>Gelieferte Pfadwerte · nicht ausgeführte Werte bleiben nicht verfügbar</caption><thead><tr>${['Pfad / Variante / Auswahl','Segment','Szenario','Status','Nettoertrag','Drawdown','Kosten'].map((label,index)=>`<th scope="col"${index===0?' style="width:200px"':''}>${label}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>`
+    : '<p>Keine Pfade entsprechen den Filtern.</p>';
+  return `<section data-arena-path-explorer aria-labelledby="${idPrefix}-explorer-heading" style="${WRAP}"><h4 id="${idPrefix}-explorer-heading">Alle 44 Pfade</h4><p>Producer-Deskriptorreihenfolge · keine Rangfolge. UNVERIFIED · Herkunft nicht bestätigt.</p><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">${filterControls}</div><button id="${idPrefix}-filter-reset" type="button" data-arena-path-filter-reset style="${TARGET}">Filter zurücksetzen</button><p role="status" data-arena-path-count>${matching.length} von ${paths.length} Pfaden angezeigt.</p>${listing}${comparison}<section id="${idPrefix}-path-detail" aria-labelledby="${idPrefix}-detail-heading" style="${WRAP}"><h5 id="${idPrefix}-detail-heading"${detail?' tabindex="-1"':''}>Pfaddetail · Originalwerte</h5>${detailBody}</section></section>`;
+}
+
 /**
  * Stable IDs and explicit disclosure state let the owning view preserve focus and
  * open panels when it updates the DOM. No DOM reads, listeners or timers here.
  * Pass a unique, stable idPrefix when more than one view is rendered.
  */
 export function renderArenaResultView({projection=null, busy=false,
-  expandedSections=[], idPrefix='arena-producer'}={}) {
+  expandedSections=[], idPrefix='arena-producer', explorer={}}={}) {
   if (typeof idPrefix !== 'string' || !/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(idPrefix)) {
     throw new TypeError('Ungültige Arena-Ansichtskennung.');
   }
@@ -104,7 +163,7 @@ export function renderArenaResultView({projection=null, busy=false,
     ['Berechnungsreihenfolge · computationPathIds',job.computationPathIds],
     ['Fortschritt · paths',job.paths],['Control-Bindungen',job.controlBindings]
   ].map(([label,data])=>`<h5>${escape(label)}</h5><pre style="${RAW}">${json(data)}</pre>`).join('')}<h5>Controls · unveränderter Producertext</h5><pre style="${RAW}">${value(job.controls)}</pre><h5>Ergebnis · unveränderter Producertext</h5><pre style="${RAW}">${value(job.result)}</pre><p>Anzeige übernommener Identitäten; kein zusätzlicher Hash- oder Herkunftsnachweis.</p>`;
-  return shell(`${summary}${identity}${missingNext}${provenanceText}${assessment}${result?`${primary}${details('controls','Control-Definitionen',controlsBody)}${details('paths','Baseline-, Control-, Cash-, Nachbar- und Stressvergleich',pathsBody)}${details('screen','Screen-Prüfwerte und Grenzen',screenBody)}`:''}${details('technical','Technische Belege · Identitäten und Rohdaten',technicalBody)}`,job.unresolved?'unresolved':'present');
+  return shell(`${summary}${identity}${missingNext}${provenanceText}${assessment}${result?`${primary}${explorerView(result,job,explorer,idPrefix)}${details('controls','Control-Definitionen',controlsBody)}${details('paths','Baseline-, Control-, Cash-, Nachbar- und Stressvergleich',pathsBody)}${details('screen','Screen-Prüfwerte und Grenzen',screenBody)}`:''}${details('technical','Technische Belege · Identitäten und Rohdaten',technicalBody)}`,job.unresolved?'unresolved':'present');
 }
 
 export const ARENA_RESULT_DISCLOSURE_KEYS = DETAILS;

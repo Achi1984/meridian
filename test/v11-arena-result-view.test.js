@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {renderArenaResultView, ARENA_RESULT_DISCLOSURE_KEYS} from '../v11/arena-result-view.js';
+import {renderArenaResultView, filterArenaResultPaths, ARENA_RESULT_DISCLOSURE_KEYS} from '../v11/arena-result-view.js';
 
 // Constructed presentation projections, not engine runs or authenticated evidence.
 // The importer is the validation boundary; these fixtures exercise its output shape.
@@ -182,11 +182,11 @@ test('all disclosure identities are stable and explicit expansion survives new p
 test('every actionable disclosure has a 44px target and wrapping raw block',()=>{
   const html=renderArenaResultView({projection:projectedResult(),expandedSections:[...ARENA_RESULT_DISCLOSURE_KEYS]});
   assert.equal((html.match(/<summary /g)||[]).length,5);
-  assert.equal((html.match(/min-height:44px/g)||[]).length,5);
+  assert.equal((html.match(/<summary [^>]*min-height:44px/g)||[]).length,5);
   assert.ok((html.match(/white-space:pre-wrap;overflow-wrap:anywhere/g)||[]).length>=6);
   assert.doesNotMatch(html,/tabindex="-1"/);
   assert.match(html,/<caption>Producerwerte · feste fachliche Reihenfolge, ohne Berechnung oder Sortierung<\/caption>/);
-  const comparison=html.slice(html.indexOf('<caption>'),html.indexOf('</table>'));
+  const comparison=html.slice(html.indexOf('<caption>Producerwerte'),html.indexOf('</table>',html.indexOf('<caption>Producerwerte')));
   assert.ok(comparison.indexOf('Baseline · Primär · Basis 15 bp')<comparison.indexOf('Control · Vollkorb'));
   assert.ok(comparison.indexOf('Control · risikobasierte Exposition')<comparison.indexOf('Cash'));
   assert.ok(comparison.indexOf('Cash')<comparison.indexOf('Nachbar · Fenster 20'));
@@ -225,4 +225,112 @@ test('invalid DOM ID prefixes are rejected and distinct instances do not share I
   const ids=html=>[...html.matchAll(/\bid="([^"]+)"/g)].map(match=>match[1]);
   assert.equal(ids(a).length,new Set(ids(a)).size);
   assert.equal(ids(a).filter(id=>ids(b).includes(id)).length,0);
+});
+
+function explorerProjection(insufficient=false) {
+  const projection=projectedResult({insufficient});
+  const scenarios=['base-15bp','stress-30bp','stress-30bp-delay-1d'];
+  const candidates=['primary-n30-f25','neighbour-n20-f25','neighbour-n45-f25',
+    'neighbour-n30-f20','neighbour-n30-f35'];
+  const descriptors=[
+    ...candidates.flatMap(variantId=>scenarios.flatMap(scenarioId=>
+      ['development','diagnostic'].map(segmentId=>({kind:'CANDIDATE',variantId,scenarioId,segmentId})))),
+    ...scenarios.flatMap(scenarioId=>['development','diagnostic'].map(segmentId=>
+      ({kind:'FULL_BASKET',variantId:'full-basket-weekly',scenarioId,segmentId}))),
+    ...['frozen-mean-exposure','frozen-risk-exposure'].flatMap(variantId=>scenarios.map(scenarioId=>
+      ({kind:'FIXED_CONTROL',variantId,scenarioId,segmentId:'diagnostic'}))),
+    ...['development','diagnostic'].map(segmentId=>
+      ({kind:'CASH',variantId:'cash-zero',scenarioId:'scenario-independent',segmentId}))
+  ];
+  projection.result.paths=descriptors.map((descriptor,index)=>{
+    const path={pathId:`producer-path-${index}`, ...descriptor};
+    if(insufficient && descriptor.segmentId==='diagnostic') return {
+      ...path,status:'NOT_RUN_INSUFFICIENT_EVIDENCE',computed:false,attempts:0,
+      failure:{code:'INVALID_OR_ZERO_DEVELOPMENT_RISK_DENOMINATOR'}
+    };
+    return {...path,status:'COMPLETED',computed:true,attempts:1,
+      netReturn:index===42?0:0.123456789,sampledDrawdown:0,totalCosts:0,
+      turnoverNotional:123.456789,meanRealizedExposure:0,maxDrawdownDuration:7,
+      quarterlyReturns:[{quarter:'2025-Q1',netReturn:-0.123456789},
+        {quarter:'2025-Q2',netReturn:0},{quarter:'2025-Q3',netReturn:0.234567891}]};
+  });
+  projection.job.paths=[{pathId:'producer-path-0',state:'completed',ordinal:1,
+    startedAt:'2026-01-01T00:00:01Z',completedAt:'2026-01-01T00:00:02Z',payloadSha256:'e'.repeat(64)}];
+  return projection;
+}
+
+test('44 producer paths filter by every dimension and intersection without mutation or sorting',()=>{
+  const projection=explorerProjection(), paths=projection.result.paths;
+  const before=structuredClone(paths);
+  for(const key of ['segmentId','variantId','scenarioId','status']) {
+    for(const item of new Set(paths.map(path=>path[key]))) {
+      assert.deepEqual(filterArenaResultPaths(paths,{[key]:item}),paths.filter(path=>path[key]===item));
+    }
+  }
+  const filters={segmentId:'diagnostic',variantId:'primary-n30-f25',scenarioId:'base-15bp',status:'COMPLETED'};
+  assert.deepEqual(filterArenaResultPaths(paths,filters),[paths[1]]);
+  const html=renderArenaResultView({projection,explorer:{filters}});
+  assert.match(html,/1 von 44 Pfaden angezeigt/);
+  assert.equal((html.match(/data-arena-path-row=/g)||[]).length,1);
+  const all=renderArenaResultView({projection});
+  assert.deepEqual([...all.matchAll(/data-arena-path-row="([^"]+)"/g)].map(match=>match[1]),paths.map(path=>path.pathId));
+  assert.match(renderArenaResultView({projection,explorer:{filters:{status:'absent'}}}),/0 von 44[\s\S]*Keine Pfade entsprechen den Filtern/);
+  assert.deepEqual(paths,before);
+});
+
+test('insufficient evidence retains 19 completed and 25 unexecuted paths with unavailable metrics',()=>{
+  const projection=explorerProjection(true);
+  assert.equal(filterArenaResultPaths(projection.result.paths,{status:'COMPLETED'}).length,19);
+  const html=renderArenaResultView({projection,explorer:{
+    filters:{status:'NOT_RUN_INSUFFICIENT_EVIDENCE'},selectedPathIds:['producer-path-1'],detailPathId:'producer-path-1'}});
+  assert.match(html,/25 von 44 Pfaden angezeigt/);
+  assert.equal((html.match(/data-arena-path-row=/g)||[]).length,25);
+  assert.match(html,/NOT_RUN_INSUFFICIENT_EVIDENCE<\/td><td>Nicht verfügbar<\/td><td>Nicht verfügbar<\/td><td>Nicht verfügbar/);
+  assert.match(html,/<dt>Berechnet<\/dt><dd>false<\/dd>/);
+  assert.match(html,/<dt>Versuche<\/dt><dd>0<\/dd>/);
+  assert.match(html,/Quartalsrenditen: Nicht verfügbar/);
+  assert.doesNotMatch(html,/<svg/);
+});
+
+test('comparison is bounded, identity stable across filters, and explicitly labels different segments/scenarios',()=>{
+  const projection=explorerProjection();
+  const explorer={filters:{status:'none'},selectedPathIds:['producer-path-0','producer-path-3','producer-path-5']};
+  const before=structuredClone(explorer);
+  const html=renderArenaResultView({projection,explorer});
+  assert.equal((html.match(/aria-label="Vergleichspfad /g)||[]).length,2);
+  assert.match(html,/Segmente: unterschiedlich · Szenarien: unterschiedlich/);
+  assert.match(html,/2 von 2 Pfaden ausgewählt/);
+  assert.match(html,/<dt>Umsatznotional<\/dt><dd>123\.456789<\/dd>/);
+  assert.deepEqual(explorer,before);
+  const bounded=renderArenaResultView({projection,explorer:{...explorer,filters:{}}});
+  assert.equal((bounded.match(/data-arena-path-select="[^"]+"[^>]* disabled/g)||[]).length,42);
+});
+
+test('detail keeps exact metadata, zero and quarterly values identical in accessible graphic and table',()=>{
+  const projection=explorerProjection();
+  const html=renderArenaResultView({projection,explorer:{detailPathId:'producer-path-0'}});
+  for(const item of projection.result.paths[0].quarterlyReturns) {
+    assert.ok(html.includes(`<title>${item.quarter}: ${item.netReturn}</title>`));
+    assert.ok(html.includes(`<th scope="row">${item.quarter}</th><td>${item.netReturn}</td>`));
+  }
+  assert.match(html,/<svg role="img" aria-labelledby="arena-producer-quarterly-chart-title"/);
+  assert.match(html,/<dt>Mittlere realisierte Exposition<\/dt><dd>0<\/dd>/);
+  assert.match(html,/<dt>Maximale Drawdown-Dauer<\/dt><dd>7<\/dd>/);
+  assert.match(html,/&quot;ordinal&quot;:1/);
+  for(const status of ['INVALID','ABSENT']) assert.doesNotMatch(
+    renderArenaResultView({projection:{...projection,status},explorer:{detailPathId:'producer-path-0'}}),
+    /producer-path-0|<svg|data-arena-path-explorer/);
+});
+
+test('explorer escapes malicious long identities, attributes, quarter labels and metadata',()=>{
+  const projection=explorerProjection();
+  const hostile='"><img src=x onerror="alert(1)">'+ 'x'.repeat(400);
+  Object.assign(projection.result.paths[0],{pathId:hostile,variantId:hostile,quarterlyReturns:[{quarter:hostile,netReturn:0}]});
+  const html=renderArenaResultView({projection,explorer:{selectedPathIds:[hostile],detailPathId:hostile}});
+  assert.doesNotMatch(html,/<img|<script|onerror="alert/);
+  assert.match(html,/&lt;img src=x onerror=&quot;alert/);
+  assert.match(html,/overflow-wrap:anywhere/);
+  const ids=[...html.matchAll(/\bid="([^"]+)"/g)].map(match=>match[1]);
+  assert.equal(ids.length,new Set(ids).size);
+  assert.equal(html,renderArenaResultView({projection,explorer:{selectedPathIds:[hostile],detailPathId:hostile}}));
 });
