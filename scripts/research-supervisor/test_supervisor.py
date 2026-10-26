@@ -255,6 +255,40 @@ connection.close()
                 self.database, claim,
                 limits=limits or {"path_seconds": 10, "batch_seconds": 20})
 
+    def test_generated_historical_result_diagnostic_is_allowlisted_and_bounded(self):
+        trial_id = "a" * 64
+        private_text = "PRIVATE_DIAGNOSTIC_TEXT " + ("x" * 2048)
+        result = {
+            "state": "UNSETTLED",
+            "reason": "OPERATION_DEADLINE",
+            "trialId": trial_id,
+            "attempts": True,
+            "paths": [
+                {"state": "completed", "path": "/synthetic/private/path"},
+                {"state": "started", "path": "../private/path"},
+            ],
+            "realPath": "/home/runner/private",
+            "freeText": private_text,
+            "extraField": {"value": "not permitted"},
+        }
+
+        diagnostic = _generated_historical_result_diagnostic(result)
+        rendered = json.loads(diagnostic)
+
+        self.assertEqual(rendered, {
+            "state": "UNSETTLED",
+            "reason": "OPERATION_DEADLINE",
+            "trialId": trial_id,
+            "pathCount": 2,
+            "completedPathCount": 1,
+        })
+        self.assertNotIn("attempts", rendered)
+        self.assertLessEqual(len(diagnostic), 1024)
+        self.assertNotIn("/synthetic/private/path", diagnostic)
+        self.assertNotIn("../private/path", diagnostic)
+        self.assertNotIn("/home/runner/private", diagnostic)
+        self.assertNotIn(private_text, diagnostic)
+
     def test_generated_historical_profile_runs_all_paths_and_refuses_repeat(self):
         profile_path, claim = self.prepare_historical_fixture("historical-success")
         result = self.run_historical_fixture(profile_path, claim, "SUCCESS")
