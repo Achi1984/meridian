@@ -1,4 +1,31 @@
-> **Current routing and review rule — owner decision 2026-10-23**
+> **Current continuity reconciliation — 2026-10-27**
+> Verified and latest observed `main`: `f59c540e006c7931e9be2ca338ddd0039a1a9546`.
+> PR #910 is merged and complete; all four postchecks succeeded (PR receipt
+> #910/comment6449656966; mailbox #942/comment6449657435). PR #911 is complete
+> at merge prefix `5e80112`; receipts 6448656195/6448656706.
+> Mailbox #942 was read through comment6449657435; do not advance `lastSeenCommentId`
+> beyond the latest actually read receipt.
+> D2 issue #935 snapshot/comment6448721244, assessment6449045864, and mailbox
+> #942/comment6449029155 record one approved trial completed (attempt 1, 44
+> payloads): `NO_EDGE`, all nine checks false; neighbors: zero positive out of four
+> for each cost scenario. Relative drawdown reduction is 2.3371%
+> (not percentage points).
+> The private local execution profile is frozen; the checked-in profile remains
+> `NOT_FROZEN`. The Codespace is stopped. Independent acceptance of the full
+> private result is pending. Issue #965 is historical evidence V2. PR #966 is the
+> ACTIVE source-only V2 implementation on its existing single-writer branch,
+> dispatched at #966/comment6449658001. Next gates: author delivery ->
+> exact-head/base CI -> complete independent Claude review -> Lead merge/postchecks.
+> This already-authorized generated-fixture source work is not blocked by the
+> independently pending full private-result acceptance.
+> No retry, tuning, new trial, Paper, Live, or runtime action. Existing
+> activation flags remain false.
+> Older current-labeled entries below—including #948 setup, #950 launcher,
+> #955 summaries, #952 comparison, and D1/admission snapshots—are historical
+> and superseded. Preserve receipts, failures, false flags, and provenance.
+> No private paths are included.
+>
+> **Historical routing and review rule — owner decision 2026-10-23**
 > Resolve `mailboxIssue` from the live `MERIDIAN_LIVE_CHECKPOINT.json` before posting.
 > This reviewed rollover candidate selects #942, predecessor #639, watchdog status
 > comment6371625947, threshold200. Before merge the live checkpoint still selects #639;
