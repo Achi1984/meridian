@@ -52,7 +52,7 @@ test('401/403 are rejected passwords while transport and data failures stay unav
   }
 });
 
-test('share links, raw share tokens and malformed password values cannot unlock the app',async()=>{
+test('share links, URL-shaped credentials and malformed password values are rejected before verification',async()=>{
   let reads=0;
   const h=harness({fetchImpl:async()=>{reads++;return new Response('{}');}});
   const share='https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/asset-watch?share='+'a'.repeat(43);
@@ -63,7 +63,7 @@ test('share links, raw share tokens and malformed password values cannot unlock 
   assert.equal(reads,0);
 });
 
-test('43-character bearer passwords are decided by the protected endpoint, not token shape',async()=>{
+test('43-character bearer passwords, including raw share-shaped values, are server-validated',async()=>{
   const bearer='a'.repeat(43);
   let request;
   const accepted=harness({fetchImpl:async(url,options)=>{

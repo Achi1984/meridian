@@ -3,7 +3,7 @@
 import {buildBotOverviewModel} from './bot-overview-model.js?v=B14-M11';
 
 const LABELS = {
-  locked: ['Gesperrt', 'Verbinde den bestehenden Lesezugang, um deine Bots anzuzeigen.'],
+  locked: ['Gesperrt', 'App mit Meridian-Passwort öffnen, dann Bots manuell aktualisieren.'],
   loading: ['Wird geladen', 'Der aktuelle Bot-Snapshot wird geprüft.'],
   fresh: ['Aktueller Snapshot', 'Nur lesend · Der Snapshot bestätigt keinen laufenden Bot-Prozess.'],
   stale: ['Daten veraltet', 'Botdetails werden bis zur nächsten aktuellen Abfrage ausgeblendet.'],
