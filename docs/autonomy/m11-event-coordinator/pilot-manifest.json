@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "id": "M11-COORDINATOR-20261027-R1",
+  "status": "PREPARATION_ONLY",
+  "enabled": false,
+  "startUtc": null,
+  "endUtc": null,
+  "durationHours": 24,
+  "maxPackets": 3,
+  "maxConcurrentWriters": 1,
+  "maxConcurrentDraftPrs": 1,
+  "wipLimit": 3,
+  "requiredPostchecks": [
+    "release-safety",
+    "runtime-smoke",
+    "release-coordinator",
+    "pages"
+  ],
+  "repositoryAllowlist": [
+    "<OWNER-APPROVED-REPOSITORY-ALLOWLIST-REQUIRED>"
+  ],
+  "pullRequestAllowlist": [
+    "<OWNER-APPROVED-PR-ALLOWLIST-REQUIRED>"
+  ],
+  "actorAllowlist": [
+    "<AUTHENTICATED-EVENT-ACTOR-ALLOWLIST-REQUIRED>"
+  ],
+  "budgets": {
+    "events": 96,
+    "transitions": 24,
+    "eventBytes": 4096,
+    "replayBytes": 65536,
+    "runtimeMilliseconds": 10000
+  },
+  "adapters": {
+    "liveNetwork": false,
+    "liveMutation": false,
+    "agentDispatch": false,
+    "reviewRequest": false,
+    "automaticMerge": false,
+    "automaticDeploy": false,
+    "approvalBypass": false
+  },
+  "boundaries": {
+    "publisherPaused": true,
+    "researchPaused": true,
+    "runtimeExecution": false,
+    "tradingAuthority": false,
+    "additionalSpend": false,
+    "planUpgrade": false,
+    "existingResourcesOnly": true
+  }
+}

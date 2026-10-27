@@ -131,6 +131,16 @@ test('out-of-order and duplicate deliveries do not change state or re-offer work
   assert.equal(reduceEvent(state, author).actionDedupeKey, replay.actionDedupeKey);
 });
 
+test('one writer and the three-package WIP ceiling are part of restartable state', () => {
+  const state = initial({wipCount: 3});
+  assert.equal(state.wipLimit, 3);
+  assert.equal(state.maxConcurrentWriters, 1);
+  assert.equal(state.wipCount, 3);
+  assert.throws(() => initial({wipCount: 4}), {code: 'WIP_LIMIT_EXCEEDED'});
+  assert.throws(() => reduceEvent({...state, maxConcurrentWriters: 2},
+    event(state, 'AUTHOR_DELIVERY', 'AUTHOR', 'Copilot', {status: 'delivered'})), {code: 'WIP_OR_WRITER_LIMIT'});
+});
+
 test('unknown issue instructions and forged actors fail strict event validation', () => {
   const state = initial();
   const author = event(state, 'AUTHOR_DELIVERY', 'AUTHOR', 'Copilot', {status: 'delivered'});
@@ -171,6 +181,11 @@ test('pending CI waits; success unlocks review; failure proposes one correction;
   assert.equal(failed.correctionIssued, true);
   const duplicateFailure = reduceEvent(failed, ciEvent(failed, 'failure', 'ci-failed-again'));
   assert.equal(duplicateFailure.changed, false);
+  const secondFailure = event(failed, 'CI', 'CI', 'github-actions[bot]', {
+    status: 'failure', completed: true, runId: 12, runAttempt: 1, workflowId: WORKFLOW
+  }, 'second-failure');
+  const noSecondCorrection = apply(failed, secondFailure);
+  assert.equal(noSecondCorrection.nextAllowedAction, 'WAIT_FOR_CONSOLIDATED_CORRECTION');
 
   let actionRequired = delivered();
   actionRequired = apply(actionRequired, ciEvent(actionRequired, 'action_required', 'ci-action-required'));
@@ -236,6 +251,17 @@ test('source merge does not complete before every exact-merge postcheck succeeds
   state = apply(state, postcheckEvent(state, last, 'success', 'last-check-complete', 40));
   assert.equal(state.phase, 'COMPLETE');
   assert.equal(state.nextAllowedAction, 'COMPLETE');
+});
+
+test('only the pinned applicable postchecks are required for completion', () => {
+  const requiredPostchecks = ['release-safety', 'runtime-smoke'];
+  let state = fullyReviewed(ciPassed(delivered(initial({requiredPostchecks}))));
+  state = merged(state);
+  assert.throws(() => reduceEvent(state, postcheckEvent(state, 'pages')), {code: 'NON_APPLICABLE_POSTCHECK'});
+  state = apply(state, postcheckEvent(state, 'release-safety'));
+  assert.equal(state.phase, 'POSTCHECK');
+  state = apply(state, postcheckEvent(state, 'runtime-smoke'));
+  assert.equal(state.phase, 'COMPLETE');
 });
 
 test('unsupported agent operations block; they never dispatch, approve, merge, or deploy', () => {

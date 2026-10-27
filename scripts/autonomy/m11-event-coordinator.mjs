@@ -147,16 +147,26 @@ function validateIdentity(repository, pullRequest, headSha, baseSha) {
   need(sha(headSha) && sha(baseSha) && headSha !== baseSha, 'INVALID_SHA');
 }
 
-export function createCoordinatorState({repository = REPOSITORY, pullRequest, headSha, baseSha, startsAt, expiresAt}) {
+export function createCoordinatorState({
+  repository = REPOSITORY, pullRequest, headSha, baseSha, startsAt, expiresAt, wipCount = 1,
+  requiredPostchecks = [...REQUIRED_POSTCHECKS]
+}) {
   validateIdentity(repository, pullRequest, headSha, baseSha);
   need(Number.isSafeInteger(startsAt) && Number.isSafeInteger(expiresAt)
     && startsAt > 0 && expiresAt > startsAt && expiresAt - startsAt <= 86400000, 'INVALID_WINDOW');
+  need(Number.isSafeInteger(wipCount) && wipCount > 0 && wipCount <= 3, 'WIP_LIMIT_EXCEEDED');
+  requiredPostchecks = readStringArray(requiredPostchecks, REQUIRED_POSTCHECKS, 'INVALID_REQUIRED_POSTCHECKS');
+  need(requiredPostchecks.length > 0, 'INVALID_REQUIRED_POSTCHECKS');
   return freeze({
     schemaVersion: 1,
     repository,
     pullRequest,
     headSha,
     baseSha,
+    wipCount,
+    wipLimit: 3,
+    maxConcurrentWriters: 1,
+    requiredPostchecks,
     startsAt,
     expiresAt,
     phase: 'AUTHOR',
@@ -178,7 +188,8 @@ export function createCoordinatorState({repository = REPOSITORY, pullRequest, he
 function validateState(input) {
   const state = cloneData(input);
   const keys = [
-    'schemaVersion', 'repository', 'pullRequest', 'headSha', 'baseSha', 'startsAt', 'expiresAt',
+    'schemaVersion', 'repository', 'pullRequest', 'headSha', 'baseSha', 'wipCount', 'wipLimit',
+    'maxConcurrentWriters', 'requiredPostchecks', 'startsAt', 'expiresAt',
     'phase', 'authorDelivery', 'ci', 'review', 'mergeSha', 'postchecks', 'correctionIssued',
     'mutationLane', 'mutationHistory', 'processedEvents', 'eventCount', 'transitionCount', 'nextAllowedAction'
   ];
@@ -186,6 +197,10 @@ function validateState(input) {
   validateIdentity(state.repository, state.pullRequest, state.headSha, state.baseSha);
   need(state.schemaVersion === 1 && Number.isSafeInteger(state.startsAt) && Number.isSafeInteger(state.expiresAt)
     && state.startsAt > 0 && state.expiresAt > state.startsAt && state.expiresAt - state.startsAt <= 86400000, 'STATE_INVALID');
+  need(Number.isSafeInteger(state.wipCount) && state.wipCount > 0 && state.wipCount <= 3
+    && state.wipLimit === 3 && state.maxConcurrentWriters === 1, 'WIP_OR_WRITER_LIMIT');
+  state.requiredPostchecks = readStringArray(state.requiredPostchecks, REQUIRED_POSTCHECKS, 'STATE_INVALID');
+  need(state.requiredPostchecks.length > 0, 'STATE_INVALID');
   need(PHASES.includes(state.phase) && ['PENDING', 'DELIVERED', 'FAILED'].includes(state.authorDelivery)
     && typeof state.correctionIssued === 'boolean' && Number.isSafeInteger(state.eventCount)
     && state.eventCount >= 0 && state.eventCount <= DEFAULT_LIMITS.events
@@ -237,7 +252,7 @@ function validateState(input) {
   }
   if (state.ci === null) need(['AUTHOR', 'CI', 'RECONCILE', 'EXPIRED', 'BLOCKED'].includes(state.phase), 'STATE_INVALID');
   if (state.phase === 'COMPLETE') {
-    need(state.mergeSha !== null && REQUIRED_POSTCHECKS.every(check => state.postchecks[check]?.status === 'SUCCESS'), 'STATE_INVALID');
+    need(state.mergeSha !== null && state.requiredPostchecks.every(check => state.postchecks[check]?.status === 'SUCCESS'), 'STATE_INVALID');
   }
   if (state.mutationLane.status === 'UNKNOWN') need(state.phase === 'RECONCILE', 'STATE_INVALID');
   return state;
@@ -294,13 +309,14 @@ function setNextAction(state) {
   if (state.mutationLane.status === 'UNKNOWN') return 'RECONCILE_UNKNOWN_MUTATION';
   if (state.phase === 'AUTHOR') return 'WAIT_FOR_AUTHOR_DELIVERY';
   if (state.phase === 'CI') {
-    if (state.ci?.status === 'FAILURE') return 'REQUEST_ONE_CONSOLIDATED_CORRECTION';
+    if (state.ci?.status === 'FAILURE') return state.correctionIssued
+      ? 'WAIT_FOR_CONSOLIDATED_CORRECTION' : 'REQUEST_ONE_CONSOLIDATED_CORRECTION';
     if (state.ci?.status === 'ACTION_REQUIRED') return 'WAIT_FOR_OWNER_CI_ACTION';
     return 'WAIT_FOR_CI';
   }
   if (state.phase === 'REVIEW') {
     if (state.review.status === 'COMPLETE' && state.review.verdict === 'REVISION_REQUIRED') {
-      return 'REQUEST_ONE_CONSOLIDATED_CORRECTION';
+      return state.correctionIssued ? 'WAIT_FOR_CONSOLIDATED_CORRECTION' : 'REQUEST_ONE_CONSOLIDATED_CORRECTION';
     }
     return state.review.status === 'NONE' ? 'REQUEST_EXACT_PAIR_REVIEW' : 'REQUEST_REVIEW_COMPLETION';
   }
@@ -368,6 +384,7 @@ export function reduceEvent(inputState, inputEvent) {
   }
 
   const next = cloneData(old);
+  let oneShotAction = null;
   const resetPairGates = () => {
     next.authorDelivery = 'PENDING';
     next.ci = null;
@@ -418,7 +435,10 @@ export function reduceEvent(inputState, inputEvent) {
     }
     next.ci = {runId: event.runId, runAttempt: event.runAttempt, workflowId: event.workflowId,
       status: event.status.toUpperCase()};
-    if (event.status === 'failure') next.correctionIssued = true;
+    if (event.status === 'failure' && !old.correctionIssued) {
+      next.correctionIssued = true;
+      oneShotAction = 'REQUEST_ONE_CONSOLIDATED_CORRECTION';
+    }
     if (event.status === 'success') next.phase = 'REVIEW';
   } else if (event.type === 'REVIEW_PART') {
     need(old.phase === 'REVIEW' && old.ci?.status === 'SUCCESS', 'REVIEW_REQUIRES_SUCCESSFUL_CI');
@@ -436,7 +456,10 @@ export function reduceEvent(inputState, inputEvent) {
       turnLimit: event.turnLimit
     };
     if (complete && event.verdict === 'GREEN_LIGHT') next.phase = 'OWNER_MERGE';
-    if (complete && event.verdict === 'REVISION_REQUIRED') next.correctionIssued = true;
+    if (complete && event.verdict === 'REVISION_REQUIRED' && !old.correctionIssued) {
+      next.correctionIssued = true;
+      oneShotAction = 'REQUEST_ONE_CONSOLIDATED_CORRECTION';
+    }
   } else if (event.type === 'SOURCE_MERGED') {
     need(old.phase === 'OWNER_MERGE' && old.authorDelivery === 'DELIVERED'
       && old.ci?.status === 'SUCCESS' && old.review.status === 'COMPLETE'
@@ -445,6 +468,7 @@ export function reduceEvent(inputState, inputEvent) {
     next.phase = 'POSTCHECK';
   } else if (event.type === 'POSTCHECK') {
     need(old.phase === 'POSTCHECK' && old.mergeSha !== null && event.mergeSha === old.mergeSha, 'POSTCHECK_MERGE_MISMATCH');
+    need(old.requiredPostchecks.includes(event.check), 'NON_APPLICABLE_POSTCHECK');
     const previous = old.postchecks[event.check];
     if (previous && previous.runId === event.runId && previous.runAttempt === event.runAttempt) {
       if (previous.status === 'PENDING' && event.status !== 'pending') {
@@ -461,7 +485,7 @@ export function reduceEvent(inputState, inputEvent) {
       mergeSha: event.mergeSha,
       status: event.status.toUpperCase()
     };
-    if (REQUIRED_POSTCHECKS.every(check => next.postchecks[check]?.status === 'SUCCESS')) {
+    if (next.requiredPostchecks.every(check => next.postchecks[check]?.status === 'SUCCESS')) {
       next.phase = 'COMPLETE';
     }
   } else if (event.type === 'MUTATION_UNKNOWN') {
@@ -492,7 +516,7 @@ export function reduceEvent(inputState, inputEvent) {
   next.eventCount++;
   next.transitionCount++;
   next.processedEvents.push({key: eventScopeKey, digest});
-  next.nextAllowedAction = setNextAction(next);
+  next.nextAllowedAction = oneShotAction || setNextAction(next);
   return result(next, true, event.type);
 }
 
