@@ -11,8 +11,9 @@ const exists=url=>existsSync(diskPath(url));
 const specifiers=source=>[...source.matchAll(/\b(?:import|export)\s+(?:[\s\S]*?\s+from\s*)?['"]([^'"]+)['"]/g)]
   .map(match=>match[1]);
 const expectedModules=[
+  'app-access-bootstrap.js','app-access.js',
   'arena-historical-export.js','arena-historical-result.js','arena-inspection-report.js','arena-result-view.js',
-  'bot-overview-model.js','bot-read-access.js','bot-read-bootstrap.js','bot-read-client.js','bot-read-model.js','bot-read-view.js',
+  'bot-overview-model.js','bot-read-bootstrap.js','bot-read-client.js','bot-read-model.js','bot-read-view.js',
   'depot-current-model.js','depot-history-model.js','depot-history-view.js','depot-read-bootstrap.js',
   'depot-read-client.js','depot-read-model.js','depot-read-view.js','research-evidence.js',
   'strategy-arena.js','strategy-catalog.js','strategy-workspace-bootstrap.js'
@@ -60,7 +61,7 @@ test('served M11 module graph has one existing B14 identity for every local edge
   const entries=[...html.matchAll(/<script\s+type="module"\s+src="([^"]+)"/g)]
     .map(match=>new URL(match[1],indexUrl));
   assert.deepEqual(entries.map(url=>url.pathname.slice(v11Root.pathname.length)).sort(),
-    ['bot-read-bootstrap.js','depot-read-bootstrap.js','strategy-workspace-bootstrap.js']);
+    ['app-access-bootstrap.js','bot-read-bootstrap.js','depot-read-bootstrap.js','strategy-workspace-bootstrap.js']);
 
   const graph=scanGraph(entries);
   assert.deepEqual([...graph.modules].sort(),expectedModules);

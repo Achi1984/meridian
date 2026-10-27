@@ -203,6 +203,19 @@
     .command-bot-overview li{min-width:0}
     .bot-read-view [hidden]{display:none!important}
     @media(min-width:560px){.bot-overview-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.bot-overview-filters>button{grid-column:1/-1}}
+    #app[hidden],#app-access-gate[hidden]{display:none!important}
+    .app-access-gate{min-height:100vh;min-height:100dvh;display:grid;place-items:center;padding:24px max(16px,env(safe-area-inset-left,0px))}
+    .app-access-card{width:min(100%,440px);padding:24px;border:1px solid #39516b;border-radius:18px;background:linear-gradient(160deg,#172337,#111b29);box-shadow:0 12px 30px #00000025}
+    .app-access-card h1{font-size:clamp(25px,7vw,34px);margin:0 0 8px}
+    .app-access-card p{font-size:13px;line-height:1.6;margin:8px 0}
+    .app-access-card label{display:block;margin:18px 0 6px;font-size:13px;font-weight:650}
+    .app-access-card input,.app-access-card button,.app-access-lock{min-width:44px;min-height:44px}
+    .app-access-card input{width:100%;padding:10px;border:1px solid #567a9f;border-radius:8px;background:#101b28;color:var(--text);font-size:16px}
+    .app-access-card button,.app-access-lock{padding:10px 14px;border:1px solid #567a9f;border-radius:8px;background:#142235;color:var(--text);cursor:pointer}
+    .app-access-card button{width:100%;margin-top:12px;font-weight:700}
+    .app-access-card :focus-visible,.app-access-lock:focus-visible{outline:3px solid #9bc9ff;outline-offset:3px}
+    .header-actions{display:flex;align-items:center;gap:8px;flex:none}
+    @media(max-width:350px){.header-inner{flex-wrap:wrap}.header-actions{margin-left:auto}.app-access-card{padding:18px}}
     .depot-read-view .depot-total{font-size:28px;font-weight:750;line-height:1.3}
     .depot-read-view dl{display:grid;grid-template-columns:minmax(0,1fr);gap:6px}
     .depot-read-view dd{margin:0 0 12px;font-weight:650;overflow-wrap:anywhere}
@@ -296,15 +309,32 @@
   </style>
 </head>
 <body>
-<a class="skip-link" href="#app-main">Zum Inhalt</a>
-<div id="app" class="app-shell v11-shell" data-ui-generation="11" data-preview-mode="manual-bot-depot-read-only" data-execution-impact="false">
+<section id="app-access-gate" class="app-access-gate" aria-labelledby="app-access-heading">
+  <div class="app-access-card">
+    <div class="eyebrow">MERIDIAN · LESEZUGANG</div>
+    <h1 id="app-access-heading">Meridian öffnen</h1>
+    <p>Gib dein Meridian-Passwort ein. Der Zugang wird vorübergehend im Arbeitsspeicher gehalten und nach 15 Minuten gesperrt.</p>
+    <form id="app-access-form">
+      <label for="app-access-password">Meridian-Passwort</label>
+      <input id="app-access-password" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="4096" required aria-describedby="app-access-help">
+      <p id="app-access-help">Asset-Watch-Freigabelinks gelten nur für Bots und können die App nicht öffnen.</p>
+      <button type="submit">Öffnen</button>
+      <p id="app-access-status" role="status" aria-live="polite" aria-atomic="true">Gesperrt. Das Meridian-Passwort wird nicht gespeichert.</p>
+    </form>
+  </div>
+</section>
+<div id="app" class="app-shell v11-shell" data-ui-generation="11" data-preview-mode="manual-bot-depot-read-only" data-execution-impact="false" hidden>
+  <a class="skip-link" href="#app-main">Zum Inhalt</a>
   <header class="topbar">
     <div class="header-inner">
       <div class="identity">
         <span class="mark" aria-hidden="true">M</span>
         <div class="brand">MERIDIAN <span aria-label="Version 11">11</span><small>NEXT GENERATION</small></div>
       </div>
-      <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B14<small>Versionsverlauf ▾</small></button>
+      <div class="header-actions">
+        <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B14<small>Versionsverlauf ▾</small></button>
+        <button id="app-access-lock" class="app-access-lock" type="button" aria-label="App sperren">Sperren</button>
+      </div>
     </div>
     <nav class="terminal-entry" aria-label="M11-Strategien">
       <a class="strategy-entry-link" href="#view-strategies" data-open-strategies>Strategien öffnen</a>
@@ -425,13 +455,6 @@
       <section class="card" aria-labelledby="depot-summary-heading">
         <div class="card-head"><h2 id="depot-summary-heading">Depotbewertung</h2><span class="limited">Nur lesend</span></div>
         <p class="caption">Depotbewertung aus serverseitigen Quellen. Der gespeicherte Verlauf wird getrennt geprüft.</p>
-        <div class="bot-access-controls">
-          <label for="depot-read-token">Meridian-Lesepasswort für das Depot</label>
-          <input id="depot-read-token" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="4096" aria-describedby="depot-read-access-help">
-          <p id="depot-read-access-help">Asset-Watch-Links gelten nur für Bots. Passwort nur vorübergehend im Arbeitsspeicher; Sperren, Ausblenden oder Verlassen der Seite löscht den Zugang.</p>
-          <button id="depot-read-provide" type="button">Depot-Lesezugang übernehmen</button>
-          <p id="depot-read-access-status" role="status" aria-live="polite"></p>
-        </div>
         <div id="depot-read-root"></div>
       </section>
       <section class="card card-muted" aria-labelledby="depot-holdings-heading">
@@ -453,13 +476,6 @@
       </section>
       <section class="card card-muted" aria-labelledby="bots-status-heading">
         <h2 id="bots-status-heading">Deine Bots</h2>
-        <div class="bot-access-controls">
-          <label for="bot-read-token">Asset-Watch-Link oder Meridian-Lesepasswort</label>
-          <input id="bot-read-token" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="4096" aria-describedby="bot-read-access-help">
-          <p id="bot-read-access-help">Bestehenden Asset-Watch-Freigabelink aus Meridian 10 oder Meridian-Lesepasswort einfügen. Kein Börsen-API-Schlüssel. Der Zugang bleibt nur bis zum Sperren, Verlassen oder Ausblenden dieser Seite im Arbeitsspeicher.</p>
-          <button id="bot-read-provide" type="button">Lesezugang übernehmen</button>
-          <p id="bot-read-access-status" role="status" aria-live="polite"></p>
-        </div>
         <div id="bot-read-root"></div>
         <p class="caption">Ohne bestätigte Botdaten sind Gebühren, Risikopuffer und Schutzstatus unbekannt. Fehlende Daten sind keine Entwarnung.</p>
       </section>
@@ -570,6 +586,7 @@
   }
 })();
 </script>
+<script type="module" src="./app-access-bootstrap.js?v=B14"></script>
 <script type="module" src="./bot-read-bootstrap.js?v=B14"></script>
 <script type="module" src="./depot-read-bootstrap.js?v=B14"></script>
 <script type="module" src="./strategy-workspace-bootstrap.js?v=B14"></script>
