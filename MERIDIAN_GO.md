@@ -1,4 +1,26 @@
-> **Current routing and review rule — owner decision 2026-10-23**
+> **Current continuity reconciliation — 2026-10-27**
+> Verified and latest observed `main`: `f59c540e006c7931e9be2ca338ddd0039a1a9546`.
+> PR #910 is merged and complete; all four postchecks succeeded (PR receipt
+> #910/comment6449656966; mailbox #942/comment6449657435). PR #911 is complete
+> at merge prefix `5e80112`; receipts 6448656195/6448656706.
+> Mailbox #942 was read through comment6449657435; do not advance `lastSeenCommentId`
+> beyond the latest actually read receipt.
+> D2 issue #935 snapshot/comment6448721244, assessment6449045864, and mailbox
+> #942/comment6449029155 record one approved trial completed (attempt 1, 44
+> payloads): `NO_EDGE`, all nine checks false, zero of four neighbors for each
+> cost scenario, and a 2.3371% relative drawdown reduction (not percentage points).
+> The private local execution profile is frozen; the checked-in profile remains
+> `NOT_FROZEN`. The Codespace is stopped. Independent acceptance of the full
+> private result is pending. Issues #965/#966 are historical evidence V2.
+> No retry, tuning, further result reconciliation, Paper, Live, or runtime action.
+> Existing activation flags remain false. Any next work requires separate Lead
+> dispatch to a single writer; no assignment is assumed here.
+> Older current-labeled entries below—including #948 setup, #950 launcher,
+> #955 summaries, #952 comparison, and D1/admission snapshots—are historical
+> and superseded. Preserve receipts, failures, false flags, and provenance.
+> No private paths are included.
+>
+> **Historical routing and review rule — owner decision 2026-10-23**
 > Resolve `mailboxIssue` from the live `MERIDIAN_LIVE_CHECKPOINT.json` before posting.
 > This reviewed rollover candidate selects #942, predecessor #639, watchdog status
 > comment6371625947, threshold200. Before merge the live checkpoint still selects #639;
@@ -171,4 +193,3 @@ Owner instruction 2026-10-15T19:57:13+02:00, execution Go19:58:27:
 - WIP limit: at most three active work packages, remaining proposals in backlog. Owner approved 2026-10-15T20:16:49+02:00: "Ja Freigabe erteilt"; decision6199107184 resolved in place.
 
 Mailbox639 routing is active after owner-approved PR818 merge7dc94b9108e25d742bef7652fb7511c5cb5108ea (FINAL_MERGE_STATUS6199370528). Four disabled Autopilot prompts now resolve checkpoint routing and remain disabled; management routing was already dynamic. Pending requests and external automation routing reconciled; successor smoke6199499751 passed. Predecessor571 closed as historical archive6199526147. First hosted watchdog PATCH remains unproven.
-
