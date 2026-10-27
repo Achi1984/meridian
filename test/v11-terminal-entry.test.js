@@ -65,6 +65,28 @@ const botsAfter=`      <section class="card view-placeholder" aria-labelledby="b
         <p class="caption">Ohne bestätigte Botdaten sind Gebühren, Risikopuffer und Schutzstatus unbekannt. Fehlende Daten sind keine Entwarnung.</p>
       </section>
       <p class="caption">Diese Vorschau hat keinen Kontozugriff und steuert keine Bots. „Terminal öffnen“ führt zum separaten Terminal.</p>`;
+const botPresentationMarkupBefore=`      <section class="card view-placeholder" aria-labelledby="bots-summary-heading">
+        <div class="card-head"><h2 id="bots-summary-heading">Botübersicht</h2><span class="limited">Nur lesend</span></div>
+        <div class="portfolio-row"><div><p class="caption">Aktive Bots</p><div class="portfolio-value" aria-label="Anzahl aktiver Bots unbekannt">—</div><p class="portfolio-description">Unbekannt</p></div></div>
+        <p class="caption">Aktive Bot-Prozesse werden nicht überwacht. Die Anzahl im gelesenen Snapshot erscheint unten.</p>
+        <div class="trust-grid" aria-label="Datenstatus der Bots">
+          <div class="trust-cell"><strong>Quelle</strong><span>Snapshot unten</span></div>
+          <div class="trust-cell"><strong>Aktualität</strong><span>Je manueller Abfrage</span></div>
+          <div class="trust-cell"><strong>Risiko</strong><span>Nicht bestimmbar</span></div>
+        </div>
+      </section>
+      <section class="card card-muted" aria-labelledby="bots-status-heading">
+        <h2 id="bots-status-heading">Deine Bots</h2>
+        <div id="bot-read-root"></div>
+        <p class="caption">Ohne bestätigte Botdaten sind Gebühren, Risikopuffer und Schutzstatus unbekannt. Fehlende Daten sind keine Entwarnung.</p>
+      </section>
+      <p class="caption">Nur manuelle Leseabfragen. Diese Ansicht steuert keine Bots. Strategieforschung ist von deinen Pionex-Snapshots getrennt.</p>`;
+const compactBotsMarkup=`      <section class="card card-muted" aria-labelledby="bots-status-heading">
+        <h2 id="bots-status-heading">Deine Bots</h2>
+        <div id="bot-read-root"></div>
+        <p class="caption">Ohne bestätigte Botdaten sind Gebühren, Risikopuffer und Schutzstatus unbekannt. Fehlende Daten sind keine Entwarnung.</p>
+      </section>
+      <p class="caption">Nur manuelle Leseabfragen. Diese Ansicht steuert keine Bots. Strategieforschung ist von deinen Pionex-Snapshots getrennt.</p>`;
 const botsRevisionLabel='11 · Vorschau B1<small>Versionsverlauf ▾</small>';
 const botsRevisionRow='        <li><strong>Meridian 11 · B1</strong><span class="version-status">Vorschaustand</span><p>Botübersicht mit unbekannter Anzahl, Datenquelle, Aktualität und Risikostatus. Statische Vorschau ohne Kontozugriff.</p></li>\n';
 // Exact B2 additions: reverse only these literal bytes; preserve the historical hash.
@@ -331,6 +353,85 @@ const b11Deltas=[
   ["<script type=\"module\" src=\"./bot-read-bootstrap.js?v=B6\"></script>\n",
    "<script type=\"module\" src=\"./bot-read-bootstrap.js?v=B11\"></script>\n"]
 ];
+const botPresentationCssBefore=`    .bot-read-view .bot-card-list{list-style:none;padding:0;margin:12px 0;display:grid;gap:12px}
+    .bot-card{border:1px solid #39516b;border-radius:12px;background:#111e2c;overflow:hidden}
+    .bot-card summary{display:block;min-height:44px;padding:14px;cursor:pointer;overflow-wrap:anywhere;letter-spacing:normal;font-size:14px;font-weight:400}
+    .bot-card summary:focus-visible{outline:3px solid #53ddc0;outline-offset:-3px}
+    .bot-card-heading{display:block;font-size:17px;font-weight:700}
+    .bot-card-reference{display:block;color:var(--muted);font-size:11px;margin:6px 0;overflow-wrap:anywhere}
+    .bot-card-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,120px),1fr));gap:12px;margin:12px 0}
+    .bot-card-metrics>div,.bot-card-metrics>span{min-width:0}
+    .bot-card-metrics dt{font-size:12px;color:var(--muted)}
+    .bot-card-metrics dd{margin:4px 0 0;font-size:14px;font-weight:600;overflow-wrap:anywhere}
+    .bot-read-view .bot-card summary span:last-child{transform:none;transition:none;color:inherit;font-size:inherit}
+    .bot-card summary .bot-card-metrics>span>span{font-size:12px;color:var(--muted)}
+    .bot-card summary>span:last-child{font-size:12px;color:var(--muted)}
+    .bot-card summary .bot-card-metrics>span>span,.bot-card summary .bot-card-metrics strong{display:block}
+    .bot-read-view .bot-card .bot-pnl-negative{color:#ff9b9b}
+    .bot-read-view .bot-card .bot-pnl-positive{color:#6ee7b7}
+    .bot-overview-filters{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;margin:12px 0}
+    .bot-overview-filters label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+    .bot-overview-filters input,.bot-overview-filters select{width:100%;min-width:0;min-height:45px;padding:8px;border:1px solid #567a9f;border-radius:8px;background:#101b28;color:var(--text);font-size:16px}
+    .bot-overview-filters button,.command-bot-overview button{min-width:44px;min-height:44px;padding:10px;border:1px solid #567a9f;border-radius:8px;background:#142235;color:var(--text);overflow-wrap:anywhere}
+    .bot-overview-filters :focus-visible,.command-bot-overview button:focus-visible{outline:3px solid #9bc9ff;outline-offset:2px}
+    .command-bot-overview{overflow-wrap:anywhere}
+    .command-bot-overview ul{list-style:none;padding:0;margin:8px 0;display:grid;gap:8px}
+    .command-bot-overview li{min-width:0}
+    .bot-read-view [hidden]{display:none!important}
+    @media(min-width:560px){.bot-overview-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.bot-overview-filters>button{grid-column:1/-1}}
+`;
+const botPresentationCssAfter=`    .bot-read-view .bot-card-list{list-style:none;padding:0;margin:8px 0;display:grid;gap:8px}
+    .bot-read-view .bot-card-list>li{min-width:0;margin:0}
+    .bot-card{margin:0;border:1px solid #39516b;border-radius:12px;background:#111e2c;overflow:hidden}
+    .bot-card summary{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"top top" "capital disclosure";align-items:center;gap:4px 8px;min-height:64px;padding:5px 10px;cursor:pointer;overflow-wrap:anywhere;letter-spacing:normal;font-size:14px;font-weight:400;list-style:none}
+    .bot-card:not([open])>.bot-card-body{display:none}
+    .bot-card[open]>.bot-card-body{display:block}
+    .bot-card summary::-webkit-details-marker{display:none}
+    .bot-card summary::marker{content:""}
+    .bot-read-view .bot-card[open] summary span:last-child{transform:none}
+    .bot-read-view .bot-card[open] summary .bot-card-disclosure span{transform:rotate(45deg)}
+    .bot-card summary:focus-visible{outline:3px solid #53ddc0;outline-offset:-3px}
+    .bot-card-top{grid-area:top;display:grid;grid-template-columns:minmax(0,1fr) minmax(92px,40%);gap:8px;align-items:center;min-width:0}
+    .bot-card-identity{min-width:0}
+    .bot-card-heading{display:block;font-size:17px;font-weight:700;line-height:1.2;overflow-wrap:anywhere}
+    .bot-card-badges{display:flex;flex-wrap:wrap;gap:4px;margin-top:3px}
+    .bot-card-badge{display:inline-flex;align-items:center;max-width:100%;padding:2px 6px;border:1px solid #567a9f;border-radius:999px;color:#d7e6f6;font-size:11px;line-height:1.25;overflow-wrap:anywhere}
+    .bot-card-pnl{display:grid;justify-items:end;align-content:center;width:100%;min-width:0;text-align:right}
+    .bot-card-pnl>span{font-size:11px;color:var(--muted);white-space:nowrap}
+    .bot-card-pnl strong{font-size:17px;line-height:1.2;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+    .bot-card-capital{grid-area:capital;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;min-width:0;font-size:12px;color:var(--muted)}
+    .bot-card-capital strong{font-size:12px;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+    .bot-card-disclosure{grid-area:disclosure;display:inline-flex;align-items:center;justify-content:flex-end;gap:4px;min-width:44px;min-height:44px;padding-left:8px;color:#a9d4ff;font-size:12px;white-space:nowrap}
+    .bot-card-disclosure span{font-size:18px;line-height:1;transition:transform .18s ease}
+    .bot-card-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:8px;margin:10px 0}
+    .bot-card-metrics>div,.bot-card-metrics dd{min-width:0;overflow-wrap:anywhere}
+    .bot-card-metrics dt{font-size:12px;color:var(--muted)}
+    .bot-card-metrics dd{margin:2px 0 0;font-size:14px;font-weight:600}
+    .bot-read-view .bot-card .bot-pnl-negative{color:#ff9b9b}
+    .bot-read-view .bot-card .bot-pnl-positive{color:#6ee7b7}
+    .bot-overview-filters{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;margin:10px 0}
+    .bot-overview-filters label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+    .bot-overview-filters input,.bot-overview-filters select{width:100%;min-width:0;min-height:44px;padding:8px;border:1px solid #567a9f;border-radius:8px;background:#101b28;color:var(--text);font-size:16px}
+    .bot-overview-filters button,.command-bot-overview button{min-width:44px;min-height:44px;padding:10px;border:1px solid #567a9f;border-radius:8px;background:#142235;color:var(--text);overflow-wrap:anywhere}
+    .bot-overview-filters :focus-visible,.command-bot-overview button:focus-visible{outline:3px solid #9bc9ff;outline-offset:2px}
+    .command-bot-overview{overflow-wrap:anywhere}
+    .command-bot-overview ul{list-style:none;padding:0;margin:8px 0;display:grid;gap:8px}
+    .command-bot-overview li{min-width:0}
+    .bot-read-view [hidden]{display:none!important}
+    @media(min-width:360px){.bot-overview-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.bot-overview-filters>button{grid-column:1/-1}}
+    @media(min-width:760px){.bot-overview-filters{grid-template-columns:repeat(4,minmax(0,1fr))}}
+`;
+const botReadControls=`        <div class="bot-access-controls">
+          <label for="bot-read-token">Asset-Watch-Link oder Meridian-Lesepasswort</label>
+          <input id="bot-read-token" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="4096" aria-describedby="bot-read-access-help">
+          <p id="bot-read-access-help">Bestehenden Asset-Watch-Freigabelink aus Meridian 10 oder Meridian-Lesepasswort einfügen. Kein Börsen-API-Schlüssel. Der Zugang bleibt nur bis zum Sperren, Verlassen oder Ausblenden dieser Seite im Arbeitsspeicher.</p>
+          <button id="bot-read-provide" type="button">Lesezugang übernehmen</button>
+          <p id="bot-read-access-status" role="status" aria-live="polite"></p>
+        </div>
+`;
+const compactBotsMarkupWithAccess=compactBotsMarkup.replace('        <div id="bot-read-root"></div>',botReadControls+'        <div id="bot-read-root"></div>');
+const botPresentationMarkupBeforeWithAccess=botPresentationMarkupBefore.replace('        <div id="bot-read-root"></div>',botReadControls+'        <div id="bot-read-root"></div>');
+const botPresentationDeltas=[[botPresentationCssBefore,botPresentationCssAfter]];
 const b9Deltas=[["      <button id=\"version-toggle\" type=\"button\" class=\"preview-pill version-toggle\" aria-expanded=\"false\" aria-controls=\"version-panel\">11 · Vorschau B8<small>Versionsverlauf ▾</small></button>\n", "      <button id=\"version-toggle\" type=\"button\" class=\"preview-pill version-toggle\" aria-expanded=\"false\" aria-controls=\"version-panel\">11 · Vorschau B9<small>Versionsverlauf ▾</small></button>\n"], ["          <p><b>Diese Vorschau · B8:</b> Depotbewertung und Verlauf getrennt laden. Zeiträume 1h, 1 Tag und 1 Woche; Datenlücken bleiben sichtbar. Kontrollierte Testvorschau · Geräteabnahme ausstehend. <a href=\"https://github.com/Achi1984/meridian/issues/764\">B8-Umfang #764</a>.</p>\n", "          <p><b>Diese Vorschau · B9:</b> Geladene Depotbewertung auch in Command. Verlauf mit Zeitachse und ausgewiesenem Messzeitraum. Kontrollierte Testvorschau · Geräteabnahme ausstehend. <a href=\"https://github.com/Achi1984/meridian/issues/766\">B9-Umfang #766</a>.</p>\n"], ["", "        <li><strong>Meridian 11 · B9</strong><span class=\"version-status\">Testvorschau</span><p>Command übernimmt die manuell geladene Depotbewertung und deren Sperre. Verlauf mit Zeitachse und vorhandenem Messzeitraum.</p></li>\n"], ["        <div><div class=\"eyebrow\">COMMAND CENTER</div><h1 id=\"command-heading\">Alles Wesentliche.<br>Ein Blick.</h1><p class=\"sub\">Deine zentrale Übersicht – derzeit als reine Designvorschau.</p></div>\n", "        <div><div class=\"eyebrow\">COMMAND CENTER</div><h1 id=\"command-heading\">Alles Wesentliche.<br>Ein Blick.</h1><p class=\"sub\">Deine zentrale Übersicht mit manuell geladener Depotbewertung.</p></div>\n"], ["        <h2>Datenanbindung steht noch aus</h2>\n        <p>Diese Übersicht verarbeitet keine Depot- oder Marktdaten. Bot-Snapshots können ausschließlich im Bots-Tab manuell gelesen werden. Es wird keine Aussage über Liquidationsgefahr oder Handelsschutz getroffen.</p>\n", "        <h2>Depot im Überblick · Risiko ungeklärt</h2>\n        <p>Die im Depot manuell geladene Bewertung erscheint auch hier. Bot-Snapshots werden separat im Bots-Tab geladen. Es wird keine Aussage über Liquidationsgefahr oder Handelsschutz getroffen.</p>\n"], ["      <section class=\"card\" aria-label=\"Portfolio\">\n", "      <section id=\"command-portfolio\" class=\"card\" aria-label=\"Portfolio\">\n"], ["          <div class=\"trust-cell\"><strong>DEPOT</strong><span>Unbekannt</span></div>\n", "          <div class=\"trust-cell\"><strong>DEPOT</strong><span data-command-depot-status>Unbekannt</span></div>\n"], ["          <p><b>Modus:</b> Öffentliche Entwicklungs-Vorschau mit optionalem manuellem Bot-Lesezugang.</p>\n", "          <p><b>Modus:</b> Öffentliche Entwicklungs-Vorschau mit optionalem manuellem Depot- und Bot-Lesezugang.</p>\n"], ["            <p>Nur Ansichtsmuster ohne Kontozugriff. Depotwert und Risikostatus bleiben unbekannt.</p>\n", "            <p>Nur Ansichtsmuster ohne Kontozugriff. Sie verändern weder die geladene Depotbewertung noch den Risikostatus.</p>\n"], ["<script type=\"module\" src=\"./depot-read-bootstrap.js?v=B8\"></script>\n", "<script type=\"module\" src=\"./depot-read-bootstrap.js?v=B9\"></script>\n"]];
 const b8Deltas=[["    .depot-read-view dd{margin:0 0 12px;font-weight:650;overflow-wrap:anywhere}\n", "    .depot-read-view dd{margin:0 0 12px;font-weight:650;overflow-wrap:anywhere}\n    .depot-history{margin-top:24px;border-top:1px solid #334155;padding-top:16px}\n    .depot-history svg{display:block;width:100%;height:auto;color:#93c5fd;margin:16px 0}\n    .depot-range{display:flex;flex-wrap:wrap;gap:8px}\n    .depot-range button[aria-pressed=\"true\"]{background:#1e3a5f;border-color:#93c5fd}\n    .depot-history p{overflow-wrap:anywhere;font-size:14px}\n"], ["      <button id=\"version-toggle\" type=\"button\" class=\"preview-pill version-toggle\" aria-expanded=\"false\" aria-controls=\"version-panel\">11 · Vorschau B7<small>Versionsverlauf ▾</small></button>\n", "      <button id=\"version-toggle\" type=\"button\" class=\"preview-pill version-toggle\" aria-expanded=\"false\" aria-controls=\"version-panel\">11 · Vorschau B8<small>Versionsverlauf ▾</small></button>\n"], ["          <p><b>Diese Vorschau · B7:</b> Depotbewertung manuell lesen: Gesamtwert, Spot und Pionex mit Zeitnachweis. Gespeicherte Bewertung, keine Live-Kurse. Kontrollierte Testvorschau · Geräteabnahme ausstehend. <a href=\"https://github.com/Achi1984/meridian/issues/762\">B7-Umfang #762</a>.</p>\n", "          <p><b>Diese Vorschau · B8:</b> Depotbewertung und Verlauf getrennt laden. Zeiträume 1h, 1 Tag und 1 Woche; Datenlücken bleiben sichtbar. Kontrollierte Testvorschau · Geräteabnahme ausstehend. <a href=\"https://github.com/Achi1984/meridian/issues/764\">B8-Umfang #764</a>.</p>\n"], ["      <ul class=\"version-history-list\">\n", "      <ul class=\"version-history-list\">\n        <li><strong>Meridian 11 · B8</strong><span class=\"version-status\">Testvorschau</span><p>Depotbewertung unabhängig von der Historie. Verlauf für 1h, 1 Tag und 1 Woche mit sichtbaren Datenlücken; keine Renditeberechnung.</p></li>\n"], ["        <p class=\"caption\">Letzte vollständige gespeicherte Bewertung. Keine Live-Kurse oder aktuelle Bestandsübersicht.</p>\n", "        <p class=\"caption\">Depotbewertung aus serverseitigen Quellen. Der gespeicherte Verlauf wird getrennt geprüft.</p>\n"], ["<script type=\"module\" src=\"./depot-read-bootstrap.js?v=B7\"></script>\n", "<script type=\"module\" src=\"./depot-read-bootstrap.js?v=B8\"></script>\n"]];
 const b7Deltas=[
@@ -538,10 +639,16 @@ const b14Deltas=[
  ]
 ];
 function restoreB2(source){
+ for(const [before,after] of botPresentationDeltas){
+   assert.equal(source.split(after).length-1,1,'one exact compact Bots CSS delta');
+   source=source.replace(after,before);
+ }
  for(const [before,after] of appAccessDeltas){
    assert.equal(source.split(after).length-1,1,'one exact shared app-access source delta');
    source=source.replace(after,before);
  }
+ assert.equal(source.split(compactBotsMarkupWithAccess).length-1,1,'one exact compact Bots markup delta');
+ source=source.replace(compactBotsMarkupWithAccess,botPresentationMarkupBeforeWithAccess);
  assert.equal(gitBlob(source),'c41b13457aa33d6b3d50c5d2b401bdf647522bd3','M11 access deltas restore the exact B14 source');
  for(const [before,after] of b14Deltas){
    assert.equal(source.split(after).length-1,1,'one exact B14 source delta');
@@ -581,6 +688,8 @@ function restoreB2(source){
 
 test('Terminal öffnen preserves the reviewed history-close baseline and stays outside version history',()=>{
   const html=restoreB2(globalHtml);
+  assert.equal(globalHtml.split(compactBotsMarkup).length-1,1,'one compact Bots section');
+  assert.equal(globalHtml.split(botPresentationCssAfter).length-1,1,'one exact compact-card CSS block');
   assert.equal(css.trimEnd(),html.match(/    \/\* Fixed packet A:[\s\S]*?    \.terminal-entry-link:focus-visible\{[^\n]*\}\n/)?.[0]?.trimEnd());
   assert.equal(html.split(entry).length-1,1);
   const anchor=[...html.matchAll(/<a\b[^>]*class="terminal-entry-link"[^>]*>[\s\S]*?<\/a>/g)];
@@ -758,7 +867,7 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
   }finally{await server.close();}
 });
 
-async function browserRun(call,start,width,server){
+async function browserRun(call,start,width,height,server){
   const evaluate=async expression=>{
     const response=await call('Runtime.evaluate',{expression,returnByValue:true});
     assert.ok(!response.exceptionDetails,'browser evaluation failed: '+JSON.stringify(response.exceptionDetails));
@@ -813,14 +922,14 @@ async function browserRun(call,start,width,server){
   const initialReads=server.metrics().reads;
   const initial=await evaluate(`(()=>{
     const link=document.querySelector('a.strategy-entry-link'),rect=link.getBoundingClientRect(),style=getComputedStyle(link);
-    return {width:innerWidth,viewport:document.documentElement.clientWidth,body:document.body.scrollWidth,
+    return {width:innerWidth,height:innerHeight,viewport:document.documentElement.clientWidth,body:document.body.scrollWidth,
       root:document.documentElement.scrollWidth,count:document.querySelectorAll('a.strategy-entry-link').length,
       text:link.textContent,href:link.getAttribute('href'),height:rect.height,linkWidth:rect.width,
       visible:rect.width>0&&rect.height>0&&style.display!=='none'&&style.visibility==='visible',
       outsideHistory:!link.closest('#version-panel')&&!link.closest('[hidden]'),
       historyHidden:document.getElementById('version-panel').hidden};
   })()`);
-  assert.equal(initial.width,width);assert.equal(initial.viewport,width);
+  assert.equal(initial.width,width);assert.equal(initial.height,height);assert.equal(initial.viewport,width);
   assert.ok(initial.body<=width+1&&initial.root<=width+1,'initial page overflow at '+width);
   assert.equal(initial.count,1);assert.equal(initial.text,'Strategien öffnen');assert.equal(initial.href,'#view-strategies');
   assert.ok(initial.visible&&initial.outsideHistory&&initial.historyHidden,'entry is visible while history is closed');
@@ -836,9 +945,9 @@ async function browserRun(call,start,width,server){
     if(tab==='bots'){
       const bots=await evaluate(`(()=>{
         const panel=document.getElementById('view-bots');
-        return {label:panel.querySelector('.limited').textContent,
-          value:panel.querySelector('.portfolio-value').getAttribute('aria-label'),
-          states:[...panel.querySelectorAll('.trust-cell')].map(cell=>[cell.querySelector('strong').textContent,cell.querySelector('span').textContent]),
+        return {label:panel.querySelector('#bots-status-heading').textContent,
+          activeProcessPlaceholder:panel.querySelector('.portfolio-value')?.textContent||null,
+          staticStatusCells:panel.querySelectorAll('.trust-cell').length,
           controls:panel.querySelectorAll('button,input,select,form').length,
           controlDetails:[...panel.querySelectorAll('button,input,select,form')].map(control=>({
             tag:control.tagName.toLowerCase(),id:control.id,type:control.type||'',
@@ -849,9 +958,9 @@ async function browserRun(call,start,width,server){
             button.getAttribute('aria-label')||button.textContent.trim()).filter(label=>/(?:ausführ|order|kauf|verkauf|start|stopp)/i.test(label)),
           viewport:document.documentElement.clientWidth,body:document.body.scrollWidth,root:document.documentElement.scrollWidth};
       })()`);
-      assert.equal(bots.label,'Nur lesend');
-      assert.equal(bots.value,'Anzahl aktiver Bots unbekannt');
-      assert.deepEqual(bots.states,[['Quelle','Snapshot unten'],['Aktualität','Je manueller Abfrage'],['Risiko','Nicht bestimmbar']]);
+      assert.equal(bots.label,'Deine Bots');
+      assert.equal(bots.activeProcessPlaceholder,null,'snapshot rows do not imply active bot processes');
+      assert.equal(bots.staticStatusCells,0,'freshness and read-only context appears with the current snapshot');
       assert.equal(server.metrics().reads,initialReads,'mount and navigation never fetch');
       assert.equal(bots.controls,8,'shared app password removes the redundant Bot credential controls');
       assert.deepEqual(bots.controlDetails,[
@@ -886,38 +995,44 @@ async function browserRun(call,start,width,server){
       assert.equal(server.metrics().reads,initialReads+1,'one explicit read');
       assert.equal(await evaluate(`document.querySelectorAll('#bot-read-root li').length`),2);
       assert.equal(await evaluate(`document.getElementById('bot-read-root').textContent.includes('synthetic-b3-token')`),false);
-      const cardMetrics=()=>evaluate(`(()=>{const c=document.querySelector('#bot-read-root .bot-card'),s=c.querySelector('summary'),r=s.getBoundingClientRect();return {open:c.open,text:s.textContent,body:document.body.scrollWidth,root:document.documentElement.scrollWidth,summaryHeight:r.height,display:getComputedStyle(s).display,unrotated:[...s.querySelectorAll('span')].every(n=>getComputedStyle(n).transform==='none'),headingWidth:s.querySelector('.bot-card-heading').getBoundingClientRect().width,phrasing:s.querySelectorAll('dl,div,p').length};})()`);
+      const cardMetrics=()=>evaluate(`(()=>{const c=document.querySelector('#bot-read-root .bot-card'),s=c.querySelector('summary'),r=s.getBoundingClientRect(),nav=document.querySelector('#nav').getBoundingClientRect();return {open:c.open,text:s.textContent,body:document.body.scrollWidth,root:document.documentElement.scrollWidth,summaryHeight:r.height,cardHeight:c.getBoundingClientRect().height,collapsedCards:[...document.querySelectorAll('#bot-read-root .bot-card:not([open])')].map(card=>card.getBoundingClientRect().height),navTop:nav.top,display:getComputedStyle(s).display,textUnrotated:[...s.querySelectorAll('.bot-card-heading,.bot-card-pnl,.bot-card-capital')].every(n=>getComputedStyle(n).transform==='none'),headingWidth:s.querySelector('.bot-card-heading').getBoundingClientRect().width,phrasing:s.querySelectorAll('dl,div,p').length};})()`);
       let card=await cardMetrics();
-      assert.equal(card.open,false);assert.equal(card.display,'block');assert.equal(card.unrotated,true);assert.ok(card.headingWidth>180,'heading has usable line width');assert.equal(card.phrasing,0);assert.ok(card.summaryHeight>=44);
-      assert.match(card.text,/3×/);assert.match(card.text,/0,42 ETH/);assert.match(card.text,/-12,5 USD/);
+      assert.equal(card.open,false);assert.equal(card.display,'grid');assert.equal(card.textUnrotated,true);assert.ok(card.headingWidth>48,'symbol has usable line width');assert.equal(card.phrasing,0);assert.ok(card.summaryHeight>=44&&card.summaryHeight<=150);
+      assert.match(card.text,/3×/);assert.match(card.text,/0,42 ETH/);assert.match(card.text,/-12,50 USD/);
+      assert.ok(card.collapsedCards.length===2&&card.collapsedCards.every(value=>value>=44&&value<=150),
+        'collapsed card heights at '+width+': '+JSON.stringify(card.collapsedCards));
+      console.log('V11_BOT_COMPACT_MEASURE',JSON.stringify({width,height,collapsedCardHeights:card.collapsedCards}));
       assert.equal(await evaluate(`getComputedStyle(document.querySelector('#bot-read-root .bot-pnl-negative')).color`),'rgb(255, 155, 155)');
       assert.equal(await evaluate(`getComputedStyle(document.querySelector('#bot-read-root .bot-pnl-positive')).color`),'rgb(110, 231, 183)');
-      assert.equal(await evaluate(`document.querySelector('#bot-read-root .bot-pnl-positive').textContent`),'8,25 USD');
+      assert.equal(await evaluate(`document.querySelector('#bot-read-root .bot-pnl-positive').textContent`),'+8,25 USD');
       assert.ok(card.body<=width+1&&card.root<=width+1,'collapsed card overflow');
       await evaluate(`document.querySelector('#bot-read-root summary').focus();true`);
       await call('Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13,text:'\r',unmodifiedText:'\r'});
       await call('Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
-      card=await cardMetrics();assert.equal(card.open,true,'native keyboard expands card');assert.equal(card.unrotated,true,'open card text must not inherit icon rotation');
+      card=await cardMetrics();assert.equal(card.open,true,'native keyboard expands card');assert.equal(card.textUnrotated,true,'open card text must not inherit icon rotation');
       assert.ok(card.body<=width+1&&card.root<=width+1,'expanded card overflow');
       const expanded=await evaluate(`document.querySelector('#bot-read-root .bot-card-body').textContent`);
-      assert.match(expanded,/Grid-Untergrenze/);assert.match(expanded,/2.000/);assert.match(expanded,/Nicht verfügbar/);
+      assert.match(expanded,/Technische Referenz: a{20}/);
+      assert.match(expanded,/Grid-Untergrenze2000/);assert.match(expanded,/P\/L laut Quelle · Originalwert-12.5 USD/);
+      assert.match(expanded,/Nicht verfügbar/);
       assert.equal(server.metrics().reads,initialReads+1,'disclosure must never request data');
+      await evaluate(`document.querySelector('#bot-read-root .bot-card').scrollIntoView({block:'center'});true`);
+      assert.equal(await evaluate(`(()=>{const c=document.querySelector('#bot-read-root .bot-card').getBoundingClientRect(),n=document.querySelector('#nav').getBoundingClientRect();return c.bottom<=n.top})()`),true,'expanded card clears bottom navigation');
       const evidence=process.env.V11_A2_EVIDENCE_DIR;
       if(evidence){
         mkdirSync(evidence,{recursive:true});
-        await evaluate(`document.getElementById('bot-read-root').scrollIntoView({block:'center'});true`);
         const shot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
-        writeFileSync(join(evidence,`v11-b6-${width}-expanded.png`),Buffer.from(shot.data,'base64'));
+        writeFileSync(join(evidence,`v11-bot-compact-${width}-expanded.png`),Buffer.from(shot.data,'base64'));
       }
       await evaluate(`document.querySelector('#bot-read-root summary').click();true`);
       assert.equal((await cardMetrics()).open,false);
       if(evidence){
         await evaluate(`document.querySelector('#bot-read-root .bot-card').scrollIntoView({block:'center'});true`);
         const shot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
-        writeFileSync(join(evidence,`v11-b6-${width}-collapsed.png`),Buffer.from(shot.data,'base64'));
+        writeFileSync(join(evidence,`v11-bot-compact-${width}-collapsed.png`),Buffer.from(shot.data,'base64'));
         await evaluate(`document.querySelector('#bot-read-root .bot-pnl-positive').closest('.bot-card').scrollIntoView({block:'center'});true`);
         const positiveShot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
-        writeFileSync(join(evidence,`v11-b6-${width}-positive.png`),Buffer.from(positiveShot.data,'base64'));
+        writeFileSync(join(evidence,`v11-bot-compact-${width}-positive.png`),Buffer.from(positiveShot.data,'base64'));
       }
       await evaluate(`document.getElementById('bot-read-lock').click();true`);
       assert.equal(await readState(),'locked');assert.equal(await evaluate(`document.querySelector('#depot-read-root svg')===null`),true);assert.equal(await evaluate(`document.querySelectorAll('#bot-read-root li').length`),0);
@@ -1075,16 +1190,18 @@ test('actual M11 app access and Strategies entry work at mobile and desktop widt
       {encoding:'utf8',timeout:175000,env});
     assert.equal(child.status,0,'browser child failed: '+String(child.stdout).slice(-2500)+' '+String(child.stderr).slice(-1200));
     const results=String(child.stdout).split('\n').filter(line=>line.startsWith('V11_STRATEGIES_WIDTH '));
+    const measurements=String(child.stdout).split('\n').filter(line=>line.startsWith('V11_BOT_COMPACT_MEASURE '));
     assert.equal(results.length,5,'expected actual Chrome results at all four widths and desktop');
-    for(const result of results)console.log(result);
+    assert.equal(measurements.length,5,'expected card measurements at every viewport');
+    for(const result of [...results,...measurements])console.log(result);
     return;
   }
   assert.ok(chrome,'Chrome binary required; browser acceptance cannot be skipped');
   const server=await deploymentServer();
   try{
     const start=server.base+'v11/';
-    for(const width of [320,375,390,430,1440]){
-      const result=await withMobileChrome(chrome,width,start,call=>browserRun(call,start,width,server));
+    for(const [width,height] of [[320,568],[375,667],[390,844],[430,932],[1440,900]]){
+      const result=await withMobileChrome(chrome,width,start,call=>browserRun(call,start,width,height,server),height);
       console.log('V11_STRATEGIES_WIDTH',JSON.stringify(result));
     }
   }finally{

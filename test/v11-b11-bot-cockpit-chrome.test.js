@@ -22,15 +22,15 @@ window.__botSnapshot=age=>({schemaVersion:'MERIDIAN-ASSET-WATCH-BRIDGE-V1',sourc
  executionImpact:false,detailsComplete:true,sourceStatusOk:true,fresh:true,usableForOverwrite:true,
  botCount:6,bots:[
   {botRef:'a'.repeat(20),symbol:'BTCUSDT',side:'LONG',cateType:'inverse',botType:'futures_grid',
-   leverage:5,pnl:{usd:-25}},
+   leverage:5,investment:{usd:125.5678},pnl:{usd:-25}},
   {botRef:'b'.repeat(20),symbol:'BTCUSDT',side:'SHORT',cateType:'linear',botType:'futures_grid',
-   leverage:2,pnl:{usd:-25}},
+   leverage:2,investment:{usd:0.004},pnl:{usd:-25}},
   {botRef:'c'.repeat(20),symbol:'ETHUSDT',side:'NEUTRAL',cateType:'linear',botType:'futures_grid',
-   leverage:8,pnl:{usd:-3.5}},
+   leverage:8,investment:{quoteAmount:0.0000123456789,currency:'ETH'},pnl:{usd:-3.5}},
   {botRef:'d'.repeat(20),symbol:'ADAUSDT',side:null,cateType:null,botType:'futures_grid',
    leverage:null,pnl:{usd:null}},
   {botRef:'e'.repeat(20),symbol:'XRPUSDT',side:'SHORT',cateType:'inverse',botType:'futures_grid',
-   leverage:3,pnl:{usd:-8}},
+   leverage:3,investment:{quoteAmount:0.42,currency:'XRP'},pnl:{usd:0.005}},
   {botRef:'f'.repeat(20),symbol:'SOLUSDT',side:'LONG',cateType:'linear',botType:'futures_grid',
    leverage:null,pnl:{usd:0}}
  ]});
@@ -158,6 +158,21 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
             const command=document.getElementById('command-bot-overview');
             return {cards:cards.length,ids:cards.map(c=>c.id),count:root.innerText.includes('6 Bots im Snapshot'),
               duplicate:cards.filter(c=>c.innerText.includes('BTCUSDT')).length,
+              cardHeights:cards.map(c=>c.getBoundingClientRect().height),
+              cardGeometry:cards.map(c=>({open:c.open,summary:c.querySelector('summary').getBoundingClientRect().height,
+                width:c.getBoundingClientRect().width,body:c.querySelector('.bot-card-body').getBoundingClientRect().height,
+                rows:getComputedStyle(c.querySelector('summary')).gridTemplateRows,
+                top:c.querySelector('.bot-card-top').getBoundingClientRect().height,
+                identity:c.querySelector('.bot-card-identity').getBoundingClientRect().height,
+                pnl:c.querySelector('.bot-card-pnl').getBoundingClientRect().height,
+                heading:c.querySelector('.bot-card-heading').getBoundingClientRect().height,
+                badges:c.querySelector('.bot-card-badges').getBoundingClientRect().height,
+                badgeRects:[...c.querySelectorAll('.bot-card-badge')].map(b=>({text:b.innerText,width:b.getBoundingClientRect().width,height:b.getBoundingClientRect().height})),
+                text:c.querySelector('summary').innerText})),
+              referenceLabels:cards.map(c=>c.querySelector('summary').getAttribute('aria-label')),
+              referencesVisible:cards.some(c=>c.querySelector('summary').innerText.includes('Referenz')),
+              tinyPositive:cards.find(c=>c.id.endsWith('e'.repeat(20)))?.querySelector('.bot-pnl-positive')?.innerText,
+              tinyCapital:cards.find(c=>c.id.endsWith('b'.repeat(20)))?.querySelector('.bot-card-capital strong')?.innerText,
               command:command.innerText,lossButtons:command.querySelectorAll('button').length,
               commandState:command.dataset.state,
               touch:[...root.querySelectorAll('input,select,button')].filter(e=>!e.hidden).map(e=>[e.tagName,e.getAttribute('aria-label')||e.textContent,e.getBoundingClientRect().height]),
@@ -165,6 +180,29 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           })()`);
           assert.equal(fresh.cards,6);assert.equal(new Set(fresh.ids).size,6);assert.equal(fresh.duplicate,2);
           assert.equal(fresh.count,true);assert.equal(fresh.commandState,'fresh');assert.equal(fresh.lossButtons,3);
+          assert.ok(fresh.cardHeights.every(height=>height>=44&&height<=150),JSON.stringify(fresh.cardGeometry));
+          assert.equal(new Set(fresh.referenceLabels).size,6,'duplicate symbols have distinct accessible names');
+          assert.equal(fresh.referencesVisible,false,'full references stay out of collapsed visual cards');
+          assert.equal(fresh.tinyPositive,'+<0,01 USD');
+          assert.equal(fresh.tinyCapital,'<0,01 USD/USDT');
+          const visibleAmounts=await evaluate(`[...document.querySelectorAll('#bot-read-root .bot-card')].map(card=>({id:card.id,text:card.querySelector('summary').innerText}))`);
+          assert.match(visibleAmounts.find(row=>row.id.endsWith('a'.repeat(20))).text,/-25,00 USD/);
+          assert.match(visibleAmounts.find(row=>row.id.endsWith('e'.repeat(20))).text,/\+<0,01 USD/);
+          const zero=visibleAmounts.find(row=>row.id.endsWith('f'.repeat(20))).text;
+          assert.match(zero,/P\/L laut Quelle\s*Nicht verfügbar/);
+          assert.doesNotMatch(zero,/0,00 USD/);
+          const pnlContrast=await evaluate(`(()=>{
+            const ratio=(foreground,background)=>{
+              const channel=value=>{value/=255;return value<=0.04045?value/12.92:((value+0.055)/1.055)**2.4};
+              const luminance=color=>{const [r,g,b]=color.match(/\\d+/g).map(Number);
+                return .2126*channel(r)+.7152*channel(g)+.0722*channel(b);};
+              const a=luminance(foreground),b=luminance(background);
+              return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);
+            };
+            return [...document.querySelectorAll('#bot-read-root .bot-pnl-negative,#bot-read-root .bot-pnl-positive')]
+              .map(node=>ratio(getComputedStyle(node).color,getComputedStyle(node.closest('.bot-card')).backgroundColor));
+          })()`);
+          assert.ok(pnlContrast.length>=2&&pnlContrast.every(ratio=>ratio>=4.5),JSON.stringify(pnlContrast));
           assert.match(fresh.command,/Lesestatus: aktueller Snapshot/);assert.match(fresh.command,/Richtung: Long 2 · Short 2 · Neutral 1 · Unbekannt 1/);
           assert.match(fresh.command,/P\/L laut Quelle/);
           assert.ok(fresh.touch.every(([, ,height])=>height>=44),JSON.stringify(fresh.touch));
@@ -227,8 +265,33 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
             mkdirSync(evidence,{recursive:true});
             await evaluate("document.querySelector('.bot-overview-filters').scrollIntoView({block:'start'})");
             const image=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
-            writeFileSync(join(evidence,`v11-b11-${size.width}x${size.height}-bots.png`),
+            writeFileSync(join(evidence,`v11-bot-compact-${size.width}x${size.height}-bots.png`),
               Buffer.from(image.data,'base64'));
+          }
+          if(size.width===320){
+            const normalHeights=await evaluate(`[...document.querySelectorAll('#bot-read-root .bot-card')].map(card=>card.getBoundingClientRect().height)`);
+            await evaluate(`document.querySelectorAll('#bot-read-root .bot-card *').forEach(node=>{
+              const size=parseFloat(getComputedStyle(node).fontSize);node.style.fontSize=(size*1.35)+'px';
+            })`);
+            const enlarged=await evaluate(`(()=>{
+              const cards=[...document.querySelectorAll('#bot-read-root .bot-card')];
+              return {overflow:document.documentElement.scrollWidth>innerWidth+1,
+                heights:cards.map(card=>card.getBoundingClientRect().height),
+                targets:cards.every(card=>card.querySelector('summary').getBoundingClientRect().height>=44),
+                overlap:cards.some(card=>{
+                  const identity=card.querySelector('.bot-card-identity').getBoundingClientRect();
+                  const pnl=card.querySelector('.bot-card-pnl').getBoundingClientRect();
+                  return identity.right>pnl.left+1;
+                }),
+                clipping:cards.some(card=>card.scrollWidth>card.clientWidth+1)};
+            })()`);
+            assert.equal(enlarged.overflow,false,JSON.stringify(enlarged));
+            assert.ok(enlarged.heights.every((height,index)=>height>=normalHeights[index]),JSON.stringify(enlarged));
+            assert.equal(enlarged.targets,true);assert.equal(enlarged.overlap,false);assert.equal(enlarged.clipping,false);
+            if(evidence){
+              const image=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+              writeFileSync(join(evidence,'v11-bot-compact-320x568-enlarged-text.png'),Buffer.from(image.data,'base64'));
+            }
           }
 
           await evaluate('window.scrollTo(0,0)');
@@ -244,11 +307,13 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           await evaluate(`(()=>{const select=document.getElementById('bot-sort-filter');select.value='pnl';
             select.dispatchEvent(new Event('change',{bubbles:true}));})()`);
           assert.deepEqual(await evaluate(`[...document.querySelectorAll('#bot-read-root .bot-card')].map(c=>c.querySelector('.bot-card-heading').innerText.split(' · ')[0])`),
-            ['BTCUSDT','BTCUSDT','XRPUSDT','ETHUSDT','ADAUSDT','SOLUSDT']);
+            ['BTCUSDT','BTCUSDT','ETHUSDT','XRPUSDT','ADAUSDT','SOLUSDT']);
           await evaluate(`(()=>{const dir=document.getElementById('bot-direction-filter');dir.value='unknown';
             dir.dispatchEvent(new Event('change',{bubbles:true}));})()`);
           assert.equal(await evaluate(`document.querySelector('#bot-read-root .bot-card .bot-card-heading').innerText`),
-            'ADAUSDT · Unbekannt');
+            'ADAUSDT');
+          assert.equal(await evaluate(`document.querySelector('#bot-read-root .bot-card .bot-card-direction').innerText`),
+            'Unbekannt');
           await evaluate(`(()=>{const dir=document.getElementById('bot-direction-filter');dir.value='all';
             dir.dispatchEvent(new Event('change',{bubbles:true}));
             const type=document.getElementById('bot-category-filter');type.value='coin-m';
@@ -257,7 +322,7 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           await evaluate(`(()=>{const search=document.getElementById('bot-symbol-search');search.value='NO_MATCH';
             search.dispatchEvent(new Event('input',{bubbles:true}));})()`);
           const none=await evaluate(`document.getElementById('bot-read-root').innerText`);
-          assert.match(none,/0 Treffer von 6 Bots/);assert.match(none,/Keine Bots entsprechen den Filtern/);
+          assert.match(none,/0 von 6 Bots im Snapshot/);assert.match(none,/Keine Bots entsprechen den Filtern/);
           assert.doesNotMatch(none,/Keine Bots in diesem Snapshot/);
           assert.equal(await evaluate('window.__botReads'),1,'local filter, sort, reset and navigation must not fetch');
 
@@ -267,7 +332,7 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           if(evidence){
             await evaluate("document.getElementById('command-bot-overview').scrollIntoView({block:'start'})");
             const image=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
-            writeFileSync(join(evidence,`v11-b11-${size.width}x${size.height}-command.png`),
+            writeFileSync(join(evidence,`v11-bot-compact-${size.width}x${size.height}-command.png`),
               Buffer.from(image.data,'base64'));
           }
           await evaluate('window.scrollTo(0,0)');
@@ -369,10 +434,11 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
             mkdirSync(evidence,{recursive:true});
             await evaluate("document.getElementById('bot-read-root').scrollIntoView({block:'start'})");
             const image=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
-            writeFileSync(join(evidence,`v11-b11-${size.width}x${size.height}-stale.png`),
+            writeFileSync(join(evidence,`v11-bot-compact-${size.width}x${size.height}-stale.png`),
               Buffer.from(image.data,'base64'));
           }
-          return {width:size.width,height:size.height,mixedRows:fresh.cards,requests:10,
+          return {width:size.width,height:size.height,mixedRows:fresh.cards,
+            collapsedCardHeights:fresh.cardHeights,requests:10,
             filtersNoRequest:true,commandJumpFocused:jump.focused,statesCleared:true,
             overflow:finalLayout.overflow,controls44px:fresh.touch};
         },size.height);

@@ -177,32 +177,46 @@
     .bot-access-controls button,.bot-read-view button{min-width:44px;min-height:44px;white-space:normal;border:1px solid #567a9f;border-radius:8px;padding:10px;background:#142235;color:var(--text);margin:4px 4px 4px 0}
     .bot-access-controls input:focus-visible{outline:3px solid #9bc9ff;outline-offset:3px}
     .bot-access-controls p,.bot-read-view p,.bot-read-view time{overflow-wrap:anywhere;font-size:13px}
-    .bot-read-view .bot-card-list{list-style:none;padding:0;margin:12px 0;display:grid;gap:12px}
-    .bot-card{border:1px solid #39516b;border-radius:12px;background:#111e2c;overflow:hidden}
-    .bot-card summary{display:block;min-height:44px;padding:14px;cursor:pointer;overflow-wrap:anywhere;letter-spacing:normal;font-size:14px;font-weight:400}
+    .bot-read-view .bot-card-list{list-style:none;padding:0;margin:8px 0;display:grid;gap:8px}
+    .bot-read-view .bot-card-list>li{min-width:0;margin:0}
+    .bot-card{margin:0;border:1px solid #39516b;border-radius:12px;background:#111e2c;overflow:hidden}
+    .bot-card summary{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"top top" "capital disclosure";align-items:center;gap:4px 8px;min-height:64px;padding:5px 10px;cursor:pointer;overflow-wrap:anywhere;letter-spacing:normal;font-size:14px;font-weight:400;list-style:none}
+    .bot-card:not([open])>.bot-card-body{display:none}
+    .bot-card[open]>.bot-card-body{display:block}
+    .bot-card summary::-webkit-details-marker{display:none}
+    .bot-card summary::marker{content:""}
+    .bot-read-view .bot-card[open] summary span:last-child{transform:none}
+    .bot-read-view .bot-card[open] summary .bot-card-disclosure span{transform:rotate(45deg)}
     .bot-card summary:focus-visible{outline:3px solid #53ddc0;outline-offset:-3px}
-    .bot-card-heading{display:block;font-size:17px;font-weight:700}
-    .bot-card-reference{display:block;color:var(--muted);font-size:11px;margin:6px 0;overflow-wrap:anywhere}
-    .bot-card-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,120px),1fr));gap:12px;margin:12px 0}
-    .bot-card-metrics>div,.bot-card-metrics>span{min-width:0}
+    .bot-card-top{grid-area:top;display:grid;grid-template-columns:minmax(0,1fr) minmax(92px,40%);gap:8px;align-items:center;min-width:0}
+    .bot-card-identity{min-width:0}
+    .bot-card-heading{display:block;font-size:17px;font-weight:700;line-height:1.2;overflow-wrap:anywhere}
+    .bot-card-badges{display:flex;flex-wrap:wrap;gap:4px;margin-top:3px}
+    .bot-card-badge{display:inline-flex;align-items:center;max-width:100%;padding:2px 6px;border:1px solid #567a9f;border-radius:999px;color:#d7e6f6;font-size:11px;line-height:1.25;overflow-wrap:anywhere}
+    .bot-card-pnl{display:grid;justify-items:end;align-content:center;width:100%;min-width:0;text-align:right}
+    .bot-card-pnl>span{font-size:11px;color:var(--muted);white-space:nowrap}
+    .bot-card-pnl strong{font-size:17px;line-height:1.2;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+    .bot-card-capital{grid-area:capital;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;min-width:0;font-size:12px;color:var(--muted)}
+    .bot-card-capital strong{font-size:12px;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+    .bot-card-disclosure{grid-area:disclosure;display:inline-flex;align-items:center;justify-content:flex-end;gap:4px;min-width:44px;min-height:44px;padding-left:8px;color:#a9d4ff;font-size:12px;white-space:nowrap}
+    .bot-card-disclosure span{font-size:18px;line-height:1;transition:transform .18s ease}
+    .bot-card-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:8px;margin:10px 0}
+    .bot-card-metrics>div,.bot-card-metrics dd{min-width:0;overflow-wrap:anywhere}
     .bot-card-metrics dt{font-size:12px;color:var(--muted)}
-    .bot-card-metrics dd{margin:4px 0 0;font-size:14px;font-weight:600;overflow-wrap:anywhere}
-    .bot-read-view .bot-card summary span:last-child{transform:none;transition:none;color:inherit;font-size:inherit}
-    .bot-card summary .bot-card-metrics>span>span{font-size:12px;color:var(--muted)}
-    .bot-card summary>span:last-child{font-size:12px;color:var(--muted)}
-    .bot-card summary .bot-card-metrics>span>span,.bot-card summary .bot-card-metrics strong{display:block}
+    .bot-card-metrics dd{margin:2px 0 0;font-size:14px;font-weight:600}
     .bot-read-view .bot-card .bot-pnl-negative{color:#ff9b9b}
     .bot-read-view .bot-card .bot-pnl-positive{color:#6ee7b7}
-    .bot-overview-filters{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;margin:12px 0}
+    .bot-overview-filters{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;margin:10px 0}
     .bot-overview-filters label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
-    .bot-overview-filters input,.bot-overview-filters select{width:100%;min-width:0;min-height:45px;padding:8px;border:1px solid #567a9f;border-radius:8px;background:#101b28;color:var(--text);font-size:16px}
+    .bot-overview-filters input,.bot-overview-filters select{width:100%;min-width:0;min-height:44px;padding:8px;border:1px solid #567a9f;border-radius:8px;background:#101b28;color:var(--text);font-size:16px}
     .bot-overview-filters button,.command-bot-overview button{min-width:44px;min-height:44px;padding:10px;border:1px solid #567a9f;border-radius:8px;background:#142235;color:var(--text);overflow-wrap:anywhere}
     .bot-overview-filters :focus-visible,.command-bot-overview button:focus-visible{outline:3px solid #9bc9ff;outline-offset:2px}
     .command-bot-overview{overflow-wrap:anywhere}
     .command-bot-overview ul{list-style:none;padding:0;margin:8px 0;display:grid;gap:8px}
     .command-bot-overview li{min-width:0}
     .bot-read-view [hidden]{display:none!important}
-    @media(min-width:560px){.bot-overview-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.bot-overview-filters>button{grid-column:1/-1}}
+    @media(min-width:360px){.bot-overview-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.bot-overview-filters>button{grid-column:1/-1}}
+    @media(min-width:760px){.bot-overview-filters{grid-template-columns:repeat(4,minmax(0,1fr))}}
     #app[hidden],#app-access-gate[hidden]{display:none!important}
     .app-access-gate{min-height:100vh;min-height:100dvh;display:grid;place-items:center;padding:24px max(16px,env(safe-area-inset-left,0px))}
     .app-access-card{width:min(100%,440px);padding:24px;border:1px solid #39516b;border-radius:18px;background:linear-gradient(160deg,#172337,#111b29);box-shadow:0 12px 30px #00000025}
@@ -465,16 +479,6 @@
     </section>
     <section id="view-bots" class="view" aria-labelledby="bots-heading" hidden>
       <div class="eyebrow">RISIKO &amp; KONTROLLE</div><h1 id="bots-heading">Bots</h1>
-      <section class="card view-placeholder" aria-labelledby="bots-summary-heading">
-        <div class="card-head"><h2 id="bots-summary-heading">Botübersicht</h2><span class="limited">Nur lesend</span></div>
-        <div class="portfolio-row"><div><p class="caption">Aktive Bots</p><div class="portfolio-value" aria-label="Anzahl aktiver Bots unbekannt">—</div><p class="portfolio-description">Unbekannt</p></div></div>
-        <p class="caption">Aktive Bot-Prozesse werden nicht überwacht. Die Anzahl im gelesenen Snapshot erscheint unten.</p>
-        <div class="trust-grid" aria-label="Datenstatus der Bots">
-          <div class="trust-cell"><strong>Quelle</strong><span>Snapshot unten</span></div>
-          <div class="trust-cell"><strong>Aktualität</strong><span>Je manueller Abfrage</span></div>
-          <div class="trust-cell"><strong>Risiko</strong><span>Nicht bestimmbar</span></div>
-        </div>
-      </section>
       <section class="card card-muted" aria-labelledby="bots-status-heading">
         <h2 id="bots-status-heading">Deine Bots</h2>
         <div id="bot-read-root"></div>

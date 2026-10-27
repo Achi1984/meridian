@@ -5,7 +5,7 @@ import {buildBotOverviewModel} from './bot-overview-model.js?v=B14-M11';
 const LABELS = {
   locked: ['Gesperrt', 'App mit Meridian-Passwort öffnen, dann Bots manuell aktualisieren.'],
   loading: ['Wird geladen', 'Der aktuelle Bot-Snapshot wird geprüft.'],
-  fresh: ['Aktueller Snapshot', 'Nur lesend · Der Snapshot bestätigt keinen laufenden Bot-Prozess.'],
+  fresh: ['Aktueller Snapshot · nur lesend', ''],
   stale: ['Daten veraltet', 'Botdetails werden bis zur nächsten aktuellen Abfrage ausgeblendet.'],
   unavailable: ['Nicht verfügbar', 'Botdaten konnten nicht verifiziert werden. Bitte erneut aktualisieren.']
 };
@@ -13,6 +13,18 @@ const TYPES = {futures_grid:'Futures Grid', future_hedge_grid:'Futures Hedge Gri
 const MISSING = 'Nicht verfügbar';
 const number = value => typeof value === 'number' && Number.isFinite(value) && value !== 0 ? value : null;
 const formatNumber = value => new Intl.NumberFormat('de-DE', {maximumSignificantDigits:10}).format(value);
+const formatExact = (value, unit = '') => {
+  const valid = number(value);
+  return valid === null ? MISSING : String(valid) + unit;
+};
+function formatMoney(value, currency, signed = false) {
+  const valid = number(value);
+  if (valid === null) return MISSING;
+  const sign = valid < 0 ? '-' : signed ? '+' : '';
+  const amount = Math.abs(valid) < 0.01 ? '<0,01' :
+    new Intl.NumberFormat('de-DE', {minimumFractionDigits:2, maximumFractionDigits:2}).format(Math.abs(valid));
+  return sign + amount + ' ' + currency;
+}
 function valueLabel(value, unit = '', positive = false) {
   const valid = number(value);
   return valid === null || (positive && valid < 0) ? MISSING : formatNumber(valid) + unit;
@@ -35,18 +47,30 @@ function projection(state, filters = {}) {
     const bots = overview.bots.map(row => {
       const bot=sourceBots.get(row.ref);
       if (typeof bot?.symbol !== 'string' || !/^[A-Z0-9][A-Z0-9_/-]{0,31}$/.test(bot.symbol)) throw new Error();
+      const investmentUsd=number(bot.metrics?.investmentUsd);
+      const investmentAmount=number(bot.metrics?.investmentAmount);
+      const investmentCurrency=typeof bot.metrics?.investmentCurrency === 'string' &&
+        /^[A-Z0-9]{2,12}$/.test(bot.metrics.investmentCurrency) ? bot.metrics.investmentCurrency : null;
+      const hasUsdInvestment=investmentUsd>0;
+      const hasQuoteInvestment=investmentCurrency && investmentAmount>0;
+      const moneyCurrency=investmentCurrency==='USD'||investmentCurrency==='USDT';
       return {symbol:bot.symbol, side:row.direction==='unknown'?'Unbekannt':row.direction[0].toUpperCase()+row.direction.slice(1),
         ref:row.ref,type:ownLabel(TYPES,bot.type),
         category:row.category==='coin-m'?'COIN-M':row.category==='linear'?'Linear':'Unbekannt',
         leverage:valueLabel(bot.metrics?.leverage,'×',true),
-        investment:number(bot.metrics?.investmentUsd)>0 ? valueLabel(bot.metrics.investmentUsd,' USD/USDT',true) :
-          (typeof bot.metrics?.investmentCurrency === 'string' && /^[A-Z0-9]{2,12}$/.test(bot.metrics.investmentCurrency) ? valueLabel(bot.metrics?.investmentAmount,' '+bot.metrics.investmentCurrency,true) : MISSING),
-        pnl:valueLabel(row.pnl,' USD'),
+        leverageDetail:formatExact(bot.metrics?.leverage,'×'),
+        investment:hasUsdInvestment ? formatMoney(investmentUsd,'USD/USDT') :
+          hasQuoteInvestment ? moneyCurrency ? formatMoney(investmentAmount,investmentCurrency) :
+            valueLabel(investmentAmount,' '+investmentCurrency,true) : MISSING,
+        investmentDetail:hasUsdInvestment ? formatExact(investmentUsd,' USD/USDT') :
+          hasQuoteInvestment ? formatExact(investmentAmount,' '+investmentCurrency) : MISSING,
+        pnl:formatMoney(row.pnl,'USD',true),
+        pnlDetail:formatExact(bot.metrics?.pnlUsd,' USD'),
         pnlTone:row.pnl === null ? null : row.pnl < 0 ? 'negative' : 'positive',
         pnlValue:row.pnl,leverageValue:row.leverage,
-        lower:valueLabel(bot.metrics?.lower,'',true),upper:valueLabel(bot.metrics?.upper,'',true),
-        liquidation:valueLabel(bot.metrics?.liquidationPrice,'',true),
-        takeProfit:valueLabel(bot.metrics?.takeProfit,'',true),stopLoss:valueLabel(bot.metrics?.stopLoss,'',true)};
+        lower:formatExact(bot.metrics?.lower),upper:formatExact(bot.metrics?.upper),
+        liquidation:formatExact(bot.metrics?.liquidationPrice),
+        takeProfit:formatExact(bot.metrics?.takeProfit),stopLoss:formatExact(bot.metrics?.stopLoss)};
     });
     const losses=overview.losses.map(loss=>({ref:loss.ref,symbol:loss.symbol,direction:loss.direction,pnl:valueLabel(loss.pnl,' USD')}));
     return {status,count:overview.count,distribution:overview.distribution,bots,losses,
@@ -92,48 +116,56 @@ export function renderBotReadState(root, state, filters = {}) {
     region.readIdentity=data.status==='fresh'&&hasNextIdentity?state.readIdentity:null;
   }
   section.setAttribute('data-state',data.status);
-  status.replaceChildren(element(document,'strong',LABELS[data.status][0]),element(document,'p',LABELS[data.status][1]));
+  status.replaceChildren(element(document,'strong',LABELS[data.status][0]));
+  if(data.status==='fresh'){
+    const context=element(document,'p','Snapshot-Zeit (UTC): ');
+    const stamp=element(document,'time',data.snapshotAt);
+    stamp.setAttribute('datetime',data.snapshotAt);
+    context.append(stamp,element(document,'span',' · bestätigt keinen laufenden Bot-Prozess.'));
+    status.append(context);
+  }else status.append(element(document,'p',LABELS[data.status][1]));
   details.replaceChildren();
   details.setAttribute('aria-busy',data.status==='loading'?'true':'false');
   if (data.status === 'fresh') {
-    const stamp=element(document,'time',data.snapshotAt);
-    stamp.setAttribute('datetime',data.snapshotAt);
-    const source=element(document,'p','Snapshot-Zeit (UTC): ');source.append(stamp);details.append(source);
-    details.append(element(document,'p',data.count + ' Bots im Snapshot'));
-    const resultCount=element(document,'p',data.bots.length+' Treffer von '+data.count+' Bots');
+    const resultCount=element(document,'p',data.bots.length+' von '+data.count+' Bots im Snapshot');
     resultCount.setAttribute('role','status');resultCount.setAttribute('aria-live','polite');
     details.append(resultCount);
-    const active=[];
-    if(filters.query?.trim())active.push('Symbol '+filters.query.trim());
-    if(filters.direction&&filters.direction!=='all')active.push('Richtung '+filters.direction);
-    if(filters.category&&filters.category!=='all')active.push('Kontraktart '+filters.category);
-    if(filters.sort&&filters.sort!=='symbol')active.push('Sortierung '+filters.sort);
-    details.append(element(document,'p',active.length?'Aktive Auswahl: '+active.join(' · '):'Keine aktiven Filter'));
     if (!data.count) details.append(element(document,'p','Keine Bots in diesem Snapshot enthalten.'));
     else if (!data.bots.length) details.append(element(document,'p','Keine Bots entsprechen den Filtern.'));
     else {
       const list=element(document,'ul');list.className='bot-card-list';
       list.setAttribute('aria-label','Bots im aktuellen Snapshot');
-      for (const [index,bot] of data.bots.entries()) {
+      for (const bot of data.bots) {
         const item=element(document,'li'),card=element(document,'details'),summary=element(document,'summary');
         card.className='bot-card';
         card.id='bot-card-'+bot.ref;
         if(region.expanded.has(bot.ref))card.setAttribute('open','');
-        const heading=element(document,'span',bot.symbol+' · '+bot.side);heading.className='bot-card-heading';
-        const identity=element(document,'span','Bot '+(index+1)+(bot.ref?' · Referenz '+bot.ref:''));
-        identity.className='bot-card-reference';
-        summary.append(heading,identity);
-        const headline=element(document,'span');headline.className='bot-card-metrics';
-        for (const [label,value] of [['Hebel',bot.leverage],['Kapital',bot.investment],['P/L laut Quelle',bot.pnl]]) {
-          const group=element(document,'span'),amount=element(document,'strong',value);
-          if(label==='P/L laut Quelle' && bot.pnlTone) amount.className='bot-pnl-'+bot.pnlTone;
-          group.append(element(document,'span',label+': '),amount);headline.append(group);
-        }
-        summary.append(headline,element(document,'span','Details anzeigen / ausblenden'));
+        summary.setAttribute('aria-label',bot.symbol+' · '+bot.side+' · Referenz '+bot.ref+' · Details anzeigen');
+        const top=element(document,'span');top.className='bot-card-top';
+        const identity=element(document,'span');identity.className='bot-card-identity';
+        const heading=element(document,'span',bot.symbol);heading.className='bot-card-heading';
+        const badges=element(document,'span');badges.className='bot-card-badges';
+        const direction=element(document,'span',bot.side);direction.className='bot-card-badge bot-card-direction';
+        const leverage=element(document,'span','Hebel '+(bot.leverage===MISSING?'—':bot.leverage));leverage.className='bot-card-badge bot-card-leverage';
+        badges.append(direction,leverage);identity.append(heading,badges);
+        const pnl=element(document,'span');pnl.className='bot-card-pnl';
+        const pnlAmount=element(document,'strong',bot.pnl);
+        if(bot.pnlTone)pnlAmount.className='bot-pnl-'+bot.pnlTone;
+        pnl.append(element(document,'span','P/L laut Quelle'),pnlAmount);
+        top.append(identity,pnl);
+        const capital=element(document,'span');capital.className='bot-card-capital';
+        capital.append(element(document,'span','Kapital'),element(document,'strong',bot.investment));
+        const disclosure=element(document,'span','Details');disclosure.className='bot-card-disclosure';
+        const chevron=element(document,'span','⌄');chevron.setAttribute('aria-hidden','true');
+        disclosure.append(chevron);
+        summary.append(top,capital,disclosure);
         const body=element(document,'div');body.className='bot-card-body';
+        body.append(element(document,'p','Technische Referenz: '+bot.ref));
         body.append(element(document,'p','Richtung: '+bot.side+' · Typ: '+bot.type+' · Kategorie: '+bot.category));
         const metrics=element(document,'dl');metrics.className='bot-card-metrics';
         for (const [label,value] of [
+          ['Hebel · Originalwert',bot.leverageDetail],['Kapital · Originalwert',bot.investmentDetail],
+          ['P/L laut Quelle · Originalwert',bot.pnlDetail],
           ['Grid-Untergrenze',bot.lower],['Grid-Obergrenze',bot.upper],['Grid-Gewinn',MISSING],
           ['Liquidationspreis laut Quelle',bot.liquidation],['Risikopuffer',MISSING],
           ['Take-Profit',bot.takeProfit],['Stop-Loss',bot.stopLoss]]) {
@@ -197,7 +229,8 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
   const search=element(document,'input');search.type='search';search.id='bot-symbol-search';
   search.setAttribute('aria-label','Symbol suchen');search.setAttribute('type','search');
   const searchLabel=element(document,'label','Symbol suchen');searchLabel.setAttribute('for','bot-symbol-search');
-  filterPanel.append(searchLabel,search);
+  const searchField=element(document,'div');searchField.append(searchLabel,search);
+  filterPanel.append(searchField);
   function select(label,id,key,options){
     const wrapper=element(document,'div'),selectNode=element(document,'select');
     selectNode.id=id;selectNode.setAttribute('aria-label',label);
@@ -221,7 +254,7 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
   const refresh=element(document,'button','Bots aktualisieren'),lock=element(document,'button','Botansicht sperren');
   refresh.id='bot-read-refresh';lock.id='bot-read-lock';
   refresh.setAttribute('type','button');lock.setAttribute('type','button');
-  controls.append(refresh,lock);section.append(element(document,'h3','Meine Pionex Bots'),filterPanel,content,controls);
+  controls.append(refresh,lock);section.append(element(document,'h3','Meine Pionex Bots'),content,filterPanel,controls);
   root.replaceChildren(section);
   let disposed=false,client,action=0,latestState={status:'locked'},previousSelection=null;
   const clearPreviousSelection=()=>{previousSelection=null;returnSelection.hidden=true;};
