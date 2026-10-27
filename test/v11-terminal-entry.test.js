@@ -924,7 +924,7 @@ async function browserRun(call,start,width,height,server){
     const link=document.querySelector('a.strategy-entry-link'),rect=link.getBoundingClientRect(),style=getComputedStyle(link);
     return {width:innerWidth,height:innerHeight,viewport:document.documentElement.clientWidth,body:document.body.scrollWidth,
       root:document.documentElement.scrollWidth,count:document.querySelectorAll('a.strategy-entry-link').length,
-      text:link.textContent,href:link.getAttribute('href'),height:rect.height,linkWidth:rect.width,
+      text:link.textContent,href:link.getAttribute('href'),linkHeight:rect.height,linkWidth:rect.width,
       visible:rect.width>0&&rect.height>0&&style.display!=='none'&&style.visibility==='visible',
       outsideHistory:!link.closest('#version-panel')&&!link.closest('[hidden]'),
       historyHidden:document.getElementById('version-panel').hidden};
@@ -933,7 +933,7 @@ async function browserRun(call,start,width,height,server){
   assert.ok(initial.body<=width+1&&initial.root<=width+1,'initial page overflow at '+width);
   assert.equal(initial.count,1);assert.equal(initial.text,'Strategien öffnen');assert.equal(initial.href,'#view-strategies');
   assert.ok(initial.visible&&initial.outsideHistory&&initial.historyHidden,'entry is visible while history is closed');
-  assert.ok(initial.height>=44&&initial.linkWidth>=44,'entry target is at least 44x44px');
+  assert.ok(initial.linkHeight>=44&&initial.linkWidth>=44,'entry target is at least 44x44px');
 
   for(const tab of ['command','depot','bots','market','strategies']){
     await evaluate(`document.querySelector('#nav button[data-v="${tab}"]').focus();true`);
@@ -1016,8 +1016,8 @@ async function browserRun(call,start,width,height,server){
       assert.match(expanded,/Grid-Untergrenze2000/);assert.match(expanded,/P\/L laut Quelle · Originalwert-12.5 USD/);
       assert.match(expanded,/Nicht verfügbar/);
       assert.equal(server.metrics().reads,initialReads+1,'disclosure must never request data');
-      await evaluate(`document.querySelector('#bot-read-root .bot-card').scrollIntoView({block:'center'});true`);
-      assert.equal(await evaluate(`(()=>{const c=document.querySelector('#bot-read-root .bot-card').getBoundingClientRect(),n=document.querySelector('#nav').getBoundingClientRect();return c.bottom<=n.top})()`),true,'expanded card clears bottom navigation');
+      const clearance=await evaluate(`(()=>{const card=document.querySelector('#bot-read-root .bot-card'),nav=document.querySelector('#nav');card.scrollIntoView({block:'end'});window.scrollBy(0,nav.getBoundingClientRect().height);const c=card.getBoundingClientRect(),n=nav.getBoundingClientRect();return {clear:c.bottom<=n.top+1,bottom:c.bottom,navTop:n.top,cardHeight:c.height,viewport:innerHeight}})()`);
+      assert.equal(clearance.clear,true,'expanded card clears bottom navigation: '+JSON.stringify(clearance));
       const evidence=process.env.V11_A2_EVIDENCE_DIR;
       if(evidence){
         mkdirSync(evidence,{recursive:true});

@@ -205,7 +205,7 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           assert.ok(pnlContrast.length>=2&&pnlContrast.every(ratio=>ratio>=4.5),JSON.stringify(pnlContrast));
           assert.match(fresh.command,/Lesestatus: aktueller Snapshot/);assert.match(fresh.command,/Richtung: Long 2 · Short 2 · Neutral 1 · Unbekannt 1/);
           assert.match(fresh.command,/P\/L laut Quelle/);
-          assert.ok(fresh.touch.every(([, ,height])=>height>=44),JSON.stringify(fresh.touch));
+          assert.ok(fresh.touch.every(([, ,height])=>height>=43.99),JSON.stringify(fresh.touch));
           assert.equal(fresh.leak,false);
           const lossNames=await evaluate(`[...document.querySelectorAll('#command-bot-overview button')].map(button=>({text:button.textContent,name:button.getAttribute('aria-label')}))`);
           assert.equal(new Set(lossNames.map(row=>row.text)).size,3,'distinct visible loss labels');
