@@ -2,7 +2,7 @@
 
 **Interface:** `MERIDIAN-FORWARD-PAPER-EVENT/1.0.0`
 
-**Status:** specification only; implementation is blocked pending useful, independently assessed D2 evidence and a separate owner decision.
+**Status:** specification only; implementation is blocked pending useful, independently assessed D2 evidence, a separate owner decision, and the gates below.
 **Audited source:** main commit `6bcaa74b35a7c093e67f144a03f82a6d77cdf9be`, tree `d2ef43696a037c1f84dc2d477bace85f34695cf4`. The references below identify the exact files and line ranges in that source tree. This specification does not claim that those historical files implement this contract.
 
 ## 1. Scope and non-authority
@@ -10,6 +10,8 @@
 This document specifies an event boundary and pure reducer proposal for a future, isolated Forward Paper implementation. It authorizes no D2 work, data access, engine execution, Paper operation, persistence service, schedule, provider, credential, spending, order, or Live action. It makes no PnL, execution, profitability, readiness, or source-authenticity claim. Warmup and historical/backfill inputs are not forward observations and cannot establish forward performance.
 
 The versioned interface in this document is owned by work package A. Its proposal, acknowledgment, unknown-outcome, bounds, units, and reason-code semantics are canonical here. Any companion package may link to this contract, but must not restate or redefine that interface. A validly formatted hash or matching digest proves neither source authenticity nor approval; evidence validation likewise remains offline and non-authorizing (`docs/strategy-lab/PAPER_FIRST_EVIDENCE_CONTRACT.md:3,16-22`).
+
+The accepted companion commit `a1c1b35656d501e4d2bcc74ae4a717110beca26c` remains the historical pin for the unchanged v1 event/transition wire contract. This documentation clarification does not claim that the pinned commit contains this text or changes its wire fields. The reconciliation-resolution receipt envelope is **UNSPECIFIED** in v1; a separate versioned contract amendment defining it is required before implementing reconciliation or resolving `UNKNOWN`.
 
 ## 2. Source audit and boundaries
 
@@ -172,7 +174,7 @@ Only the persistence boundary may acknowledge a proposal:
 | `DURABLE_REJECTED` | Exact proposal identity and rejection reason | No state/effect advancement; a rejected proposal is not evidence of a commit. A new proposal requires a newly validated input/state. |
 | `UNKNOWN` | Exact attempted proposal identity, last known state, fence/attempt identity, uncertainty reason | No retry, fill, later dependent transition, or assumed commit. Hold the fence and enter `UNKNOWN` until the selected reconciliation authority makes an explicit durable resolution. |
 
-Timeout, lost response, process restart, or disagreement between state and receipt is `UNKNOWN`, not rejection or success. Replaying the exact same proposal identity is permitted only as an idempotent persistence lookup under the same fence; it must never reapply its effects. An authoritative reconciliation receipt must identify whether the original proposal committed or did not commit and bind the resulting state. Until then, state remains `UNKNOWN`.
+Timeout, lost response, process restart, or disagreement between state and receipt is `UNKNOWN`, not rejection or success. Replaying the exact same proposal identity is permitted only as an idempotent persistence lookup under the same fence; it must never reapply its effects. Such a lookup may establish `OP_APPLIED` only by finding the exact original committed result. The v1 interface defines no reconciliation-resolution receipt envelope for other outcomes; its schema and binding rules are **UNSPECIFIED**. A separate versioned contract amendment must define and accept that envelope before reconciliation can be implemented or can resolve `UNKNOWN`. Until then, retain the fence and do not retry or resume.
 
 ## 7. Causality and event admission
 
@@ -210,7 +212,7 @@ States are `WARMUP`, `OBSERVED`, `VALIDATED`, `PENDING_DURABLE_DECISION`, `ELIGI
 | `ELIGIBLE_FILL` | Configured expiry boundary is durably observed with no eligible fill event before it | `OBSERVED` or `HALTED` per frozen expiry action | Commit a no-fill transition with reason `MISSED_OR_EXPIRED`; no fill/account delta. Expiry is unset until chosen and cannot be inferred from absence alone. |
 | Any active state | Hard risk/loss bound or accounting invariant breached | `HALTED` | Persist halt and reason before any further decision/fill. |
 | `HALTED` | Cause repaired and selected authority approves a new immutable run/config | New run in `WARMUP` | No in-place resume under changed inputs/config; old state remains auditable. |
-| `UNKNOWN` | Explicit authority resolves original proposal with durable reconciliation receipt | Acknowledged resulting state or `HALTED` | Must prove commit/noncommit and bind state/receipt identities; no automatic retry. |
+| `UNKNOWN` | Explicit authority resolves original proposal | No v1 reconciliation transition is defined; retain `UNKNOWN` and its fence pending a separately accepted contract amendment | The reconciliation receipt envelope is **UNSPECIFIED**; no new fields or receipt schema are implied here. No automatic retry. |
 
 Every acknowledged transition must bind exact expected state identity. A compare-and-swap mismatch rejects without writing a new effect. Rejection/transition reasons are stable uppercase identifiers, not free-text control flow. The closed v1 reason vocabulary includes `CONFIGURATION_INCOMPLETE`, `VERSION_MISMATCH`, `IDENTITY_MISSING`, `IDENTITY_CONFLICT`, `DUPLICATE_IDEMPOTENT`, `PAYLOAD_INVALID`, `BOUND_EXCEEDED`, `EVENT_FUTURE`, `CANDLE_UNCLOSED`, `EVENT_REORDERED`, `CADENCE_GAP`, `UNIVERSE_MISALIGNED`, `SOURCE_STALE`, `MISSING_REQUIRED_FIELD`, `LATE_OR_PAST_EVENT`, `DECISION_NOT_DURABLE`, `PERSISTENCE_REJECTED`, `PERSISTENCE_UNKNOWN`, `STATE_IDENTITY_MISMATCH`, `BALANCE_INVARIANT`, `RISK_LIMIT`, `COST_POLICY_INCOMPLETE`, `COST_DUPLICATE`, `MARK_UNAVAILABLE`, `MISSED_OR_EXPIRED`, and `RECONCILIATION_REQUIRED`. `MISSED_OR_EXPIRED` is the required reason for the committed no-fill transition when the explicitly configured expiry boundary is observed without an eligible event; it is not a fill disposition or an inference from missing data. Unknown reason codes reject.
 
@@ -239,4 +241,4 @@ Required invariants:
 
 The implementation must enforce the frozen `computeBounds` before parsing/processing and before proposing a state change. Byte/event/array/work/time limits must be explicit and tested at exact limit and one unit over; oversize input rejects without truncation into a different valid event. No values are chosen here.
 
-This is documentation only. A future implementation remains blocked until useful D2 evidence is independently assessed, owner choices in §3 are resolved, source capability/identity and full-OHLC event availability are established, and a separate owner decision authorizes the next bounded package. D2 usefulness permits consideration only; it does not authorize Forward Paper operation.
+This is documentation only. A future implementation remains blocked until useful D2 evidence is independently assessed, owner choices in §3 are resolved, source capability/identity and full-OHLC event availability are established, the reconciliation-resolution receipt contract is separately amended and accepted, and a separate owner decision authorizes the next bounded package. Any future work must use verified existing resources only, at `$0` additional spend, with no provisioning or other spending; current availability/capacity is unverified. Storage location/durability and authoritative clock/source-time mapping are additional implementation gates, not additional §3 choices, and must be explicitly selected and verified. D2 usefulness permits consideration only; it does not authorize Forward Paper operation.

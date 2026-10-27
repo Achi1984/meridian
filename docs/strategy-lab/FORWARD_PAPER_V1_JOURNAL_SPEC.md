@@ -4,7 +4,7 @@
 interface; implementation remains blocked pending independently assessed D2
 evidence and separate owner authorization.
 
-**Canonical interface:** `MERIDIAN-FORWARD-PAPER-EVENT/1.0.0`, accepted
+**Canonical event/transition interface:** `MERIDIAN-FORWARD-PAPER-EVENT/1.0.0`, accepted
 companion commit
 [`a1c1b35656d501e4d2bcc74ae4a717110beca26c`](https://github.com/Achi1984/meridian/commit/a1c1b35656d501e4d2bcc74ae4a717110beca26c),
 specifically the companion's
@@ -12,8 +12,12 @@ specifically the companion's
 §§4–8. The companion contract owns all event, transition, identity,
 canonicalization, acknowledgment, state, and reason-code semantics. The tables
 below describe journal durability obligations using that interface; they do
-not add or rename wire fields. M2 alignment is complete at this pin. M3 still
-requires Lead's consolidated acceptance.
+not add or rename wire fields. This is a historical pin for the unchanged
+event/transition wire contract; this documentation clarification is not text
+from that commit and does not change its fields. The reconciliation-resolution
+receipt envelope is **UNSPECIFIED** in v1. A separate versioned contract
+amendment defining that envelope is required before implementing reconciliation
+or resolving `UNKNOWN`. M3 still requires Lead's consolidated acceptance.
 
 ## Scope and evidence boundary
 
@@ -41,10 +45,17 @@ Provider availability, source authenticity, storage durability, clock behavior,
 and deployment behavior remain unverified.
 
 The accepted #911 gate requires useful, independently assessed D2 evidence
-before any Forward-Paper implementation. Strategy, source, universe, product,
-capital, costs, risk, timing, stop/resume, budget, and reconciliation-authority
-choices remain unset. Historical no-stop policy is not inherited. A policy,
-source, or version change requires a new immutable run.
+before any Forward-Paper implementation. All twelve §3 configuration groups
+remain `REQUIRED_UNSET`: strategy identity; source identity; ordered universe;
+product; initial capital/account currency; observation period; fee/slippage/
+liquidity; risk/stop/exposure/loss; decision/fill/expiry/mark timing; freshness/
+gap/synchronization; compute bounds; and reconciliation authority. No separate
+budget or stop/resume choice is added to §3. Future work is limited to verified
+existing resources, `$0` additional spend, and no provisioning; availability is
+unverified. Storage location/durability and authoritative clock/source-time
+mapping are additional implementation gates, not §3 configuration rows.
+Historical no-stop policy is not inherited. A policy, source, or version change
+requires a new immutable run.
 
 ## Journal entities and conceptual fields
 
@@ -63,7 +74,7 @@ preserve the following interface identities, provenance, and causal boundaries:
 | Transition proposal | Exact companion `TransitionProposal {interfaceVersion, expectedStateIdentity, eventIdentity, proposedStateIdentity, receiptIdentity, disposition}`; disposition is `PROPOSE`, `IDEMPOTENT_NOOP`, `REJECT`, or `HALT`. | Pure proposal only; it does not itself mutate state/account. Validate exact expected state, event and receipt binding, run/config, fence, causality, and applicable invariants. Do not extend or rename this closed shape. |
 | Account state and committed receipt | Companion `accountIdentity`, `runIdentity`, `baseCurrency`, exact `cash`, `holdings`, `marks`, `equity` or `UNAVAILABLE`, `riskSnapshot`, `parentStateIdentity`/`stateIdentity`; receipt `interfaceVersion`, `receiptIdentity`, `transitionIdentity`, `transitionDisposition`, exact reason, event/input identities and digests, account/cost/mark evidence, and persistence-set `durableAtLocalMs`. | Durable `DURABLE_COMMITTED` evidence atomically applies the account state, appends receipt, advances sequence, and resolves the winning active claim; retain historical fence token. ACK/UI arrival alone is not commit. Receipt/state identities and fields are those of the pinned interface. |
 | Optional derived snapshot/checkpoint | A projection/cache of the authoritative account and reducer state already committed in the receipt transaction; names a specific committed state/receipt identity and account/mark content. It is not that authoritative committed state itself and not a new interface receipt or transition. | Not an atomic participant or authority for commit status. A lagging snapshot is valid only if it matches the committed prefix it names. Ahead-of-head or content/prefix mismatch makes that snapshot unusable; it does not undo or obscure an independently evidenced `DURABLE_COMMITTED` receipt. Never auto-repair, rewrite, or fabricate state. Missing marks/equity remain unavailable. |
-| Reconciliation receipt and audit metadata | The authoritative companion reconciliation receipt binds the original `receiptIdentity`/`transitionIdentity`, whether that exact proposal committed or did not commit, the resulting/prior `stateIdentity`, evidence, selected authority, outcome, and exact reason as required by interface §§6/8. Separate internal append-only audit metadata may record the decision provenance, evidence references, timestamps, and historical/active fence details. | Only the required authoritative durable reconciliation receipt resolves `UNKNOWN` and permits transition to its acknowledged resulting state or `HALTED`. Internal audit metadata supplements that receipt; metadata alone cannot resolve `UNKNOWN`, release the fence, or authorize a retry. Neither record fabricates a fill, rewrites history, or self-authorizes. Read-only inspection cannot reconcile. |
+| Reconciliation outcome and audit metadata | `OP_APPLIED`, `OP_ABSENT`, `OP_CONFLICT`, and `UNKNOWN` are conceptual recovery outcomes only. The pinned v1 interface defines no reconciliation-resolution receipt envelope or schema. | No reconciliation receipt fields or transition are specified here. A separate versioned contract amendment must define and accept the envelope before reconciliation can be implemented or resolve `UNKNOWN`. Until then, retain the active fence and block retry/resume. Read-only inspection cannot reconcile. |
 
 ## Transaction boundaries and effect semantics
 
@@ -122,11 +133,14 @@ proposal. If the rejection outcome itself is ambiguous, preserve the active
 fence and classify `UNKNOWN`. This internal attempt disposition adds no
 companion wire field or receipt identity.
 
-Recovery from `UNKNOWN` requires the authoritative durable reconciliation
-receipt defined by the pinned interface §§6/8. A separate append-only internal
-audit record may preserve provenance and diagnostic references, but is
-supplementary only: it cannot establish committed/noncommitted outcome,
-advance state, or release the fence without that required receipt.
+Recovery from `UNKNOWN` is not currently implementable: the pinned interface
+§§6/8 define no reconciliation-resolution receipt envelope. A separate
+versioned contract amendment must specify and accept its schema and binding
+rules before any reconciliation implementation or resolution. Until then,
+retain the active fence and do not retry, resume, or advance state. A read-only
+lookup may establish `OP_APPLIED` only by finding the exact original committed
+result; it cannot resolve other outcomes. Internal audit metadata may preserve
+diagnostic evidence but does not itself resolve `UNKNOWN`.
 
 Every commit must match its expected prior state, expected receipt sequence,
 and current fence. A stale writer, concurrent compare-and-set loser, or
@@ -198,7 +212,7 @@ reject; no reason code or free-text value is added by this journal design.
 | Before claim | No attempt, fence, proposal, receipt, or account effect exists. A later invocation is not a replay of a claimed operation, but still requires a valid explicit invocation and current expected state. |
 | After claim/attempt, before proposal | The attempt and active fence are durable; no proposal or account effect is presumed. Treat as unresolved until authorized reconciliation establishes the outcome. |
 | After proposal, before atomic commit | The proposal is not an account effect. If absence of commit cannot be authoritatively established, report `UNKNOWN`, retain its fence, and block re-execution. |
-| During an ambiguous commit/write failure | Do not infer either rollback or success. Keep the fence and classify `UNKNOWN` unless authoritative receipt/account evidence proves `OP_APPLIED` or `OP_ABSENT`. |
+| During an ambiguous commit/write failure | Do not infer either rollback or success. Keep the fence and classify `UNKNOWN` unless authoritative receipt/account evidence proves `OP_APPLIED`; `OP_ABSENT` does not permit resolution or retry without the separately amended reconciliation contract. |
 | After `DURABLE_COMMITTED`, before caller receives ACK | The account effect, receipt, sequence advance, and winning-claim fence resolution are already committed together. Read-only lookup by exact receipt/state identity returns that result; do not apply it again. A later optional snapshot write is irrelevant to this outcome. |
 | Concurrent compare-and-set loser | The loser is rejected without a claim, attempt, proposal, or account effect. The winner remains valid and may commit if its expected state and active fence still match. This rejection alone does not halt the run. |
 | Later stale writer | Reject a proposal whose historical fence is no longer active, with no account effect. Preserve the old token and current state. Ordinary stale-writer rejection alone does not halt the run; an independent identity/history integrity conflict does. |
@@ -252,10 +266,12 @@ storage durability, deployment, and provider behavior are not verified.
 - After restart, identical observation identity plus digest resolves to the
   original durable result. A different digest for that identity halts as a
   conflict. An integrity failure never authorizes rebuilding history.
-- A `UNKNOWN` operation retains its fence and blocks re-execution until an
-  explicit, authorized reconciliation is durably recorded. Read-only
-  inspection can report evidence and outcome candidates but cannot resume,
-  release a fence, create a receipt, or change account state.
+- A `UNKNOWN` operation retains its fence and blocks re-execution. The pinned
+  interface has no reconciliation-resolution receipt schema; a separate
+  versioned contract amendment must be accepted before an authorized
+  reconciliation can be implemented. Read-only inspection can report evidence
+  and outcome candidates but cannot resume, release a fence, create a receipt,
+  or change account state.
 - The atomic account/receipt/sequence/claim-resolution transaction establishes
   commit outcome; a later snapshot is optional and not required to establish
   `OP_APPLIED`. A snapshot may name an older committed prefix if it matches that
@@ -293,12 +309,16 @@ canonicalization.
 
 - **M1 inventory and transaction/failure map:** completed independently and
   corrected by the accepted durability review.
-- **M2 interface alignment:** aligned to
-  `MERIDIAN-FORWARD-PAPER-EVENT/1.0.0` at exact companion commit
+- **M2 event/transition alignment:** aligned to the unchanged
+  `MERIDIAN-FORWARD-PAPER-EVENT/1.0.0` wire contract at exact companion commit
   `a1c1b35656d501e4d2bcc74ae4a717110beca26c`; no companion-owned wire field is
-  redefined here.
+  redefined here. Reconciliation-resolution receipt schema remains
+  **UNSPECIFIED** and requires a separate versioned contract amendment before
+  implementation or resolution; this clarification is not claimed to exist in
+  the pinned commit.
 - **M3 consolidated acceptance:** recovery and serialization matrices are
-  aligned to that pin; final Lead acceptance remains pending.
+  documented against that pin, with the reconciliation-schema blocker explicit;
+  final Lead acceptance remains pending.
 
 No implementation, runtime, database, market-data, provider, or authority
 change is authorized. D2 and operating-choice gates remain unchanged.
