@@ -36,10 +36,13 @@ async function historicalInput(profile,result,state,key,screenStatus='NO_EDGE'){
   if(!observation.result)return {observation,resultBytes:null,summaryBytes:null};
   const historical=JSON.parse(observation.result);
   historical.identity.datasetKind='FROZEN_RESEARCH_INPUT';
-  historical.identity.sourceCommit='generated-historical-fixture-commit';
+  historical.identity.sourceCommit='a'.repeat(40);
   historical.identity.sourceProvenance={
     normalizedFileSha256:{'generated-fixture.csv':'f'.repeat(64)}
   };
+  const identityWithoutInput={...historical.identity};
+  delete identityWithoutInput.inputSha256;
+  historical.identity.inputSha256=digest(canonical(identityWithoutInput));
   historical.evidence.syntheticFixture=false;
   historical.evidence.priceSource='PINNED_KRAKEN_SPOT_USD_CANDLES';
   historical.evidence.sourceAuthenticity='NOT_ESTABLISHED';
@@ -55,6 +58,50 @@ async function historicalInput(profile,result,state,key,screenStatus='NO_EDGE'){
       historical.screen.interpretation='HISTORICAL_CANDIDATE_ONLY_NOT_HOLDOUT';
     }
   }
+  const oldPathIds=historical.paths.map(path=>path.pathId);
+  const newPathIds=[];
+  for(const path of historical.paths){
+    const identity={
+      protocolId:historical.protocolId,
+      protocolSha256:historical.protocolSha256,
+      implementationId:historical.implementationId,
+      implementationSha256:historical.implementationSha256,
+      inputSha256:historical.identity.inputSha256,
+      canonicalSeriesSha256:historical.identity.canonicalSeriesSha256,
+      variantId:path.variantId,
+      scenarioId:path.scenarioId,
+      segmentId:path.segmentId
+    };
+    const newPathId=digest(canonical(identity));
+    newPathIds.push(newPathId);
+    path.pathId=newPathId;
+  }
+  const pathIdMap=new Map(oldPathIds.map((pathId,index)=>[pathId,newPathIds[index]]));
+  historical.controlRealization.forEach(item=>{item.pathId=pathIdMap.get(item.pathId);});
+  const computationPathIds=profile.computationOrder.map(index=>newPathIds[index]);
+  const executionIdentity={
+    protocolId:historical.protocolId,protocolSha256:historical.protocolSha256,
+    implementationId:historical.implementationId,implementationSha256:historical.implementationSha256,
+    inputSha256:historical.identity.inputSha256,pathIds:newPathIds
+  };
+  historical.executionId=digest(canonical(executionIdentity));
+  observation.dataSha256=historical.identity.inputSha256;
+  observation.pathIds=newPathIds;
+  observation.computationPathIds=computationPathIds;
+  const manifestPaths=historical.paths.map(({kind,variantId,scenarioId,segmentId,pathId})=>
+    ({kind,variantId,scenarioId,segmentId,pathId}));
+  observation.manifestSha256=digest(canonical(manifestPaths));
+  const progressPayloads=[];
+  observation.paths.forEach((progress,index)=>{
+    const manifestIndex=profile.computationOrder[index];
+    const path=historical.paths[manifestIndex];
+    const payloadBytes=Buffer.from(canonical(path));
+    progress.pathId=path.pathId;
+    progress.payloadSha256=digest(payloadBytes);
+    progressPayloads.push({computationIndex:index,payloadBytes:new Uint8Array(payloadBytes)});
+  });
+  observation.controlBindings.primaryDevelopmentSha256=observation.paths[0].payloadSha256;
+  observation.controlBindings.fullBasketDevelopmentSha256=observation.paths[15].payloadSha256;
   const withoutProjection={...historical};
   delete withoutProjection.paths;
   delete withoutProjection.controlDefinitions;
@@ -63,7 +110,10 @@ async function historicalInput(profile,result,state,key,screenStatus='NO_EDGE'){
   observation.result=resultBytes.toString('utf8');
   observation.resultSha256=digest(resultBytes);
   observation.summarySha256=digest(summaryBytes);
-  return {observation,resultBytes,summaryBytes};
+  return {
+    observation,resultBytes,summaryBytes,
+    optionalEvidence:{progressPayloads,supplemental:[]}
+  };
 }
 
 async function makeEnvelope(profile,result,state,key,screenStatus){
@@ -72,6 +122,7 @@ async function makeEnvelope(profile,result,state,key,screenStatus){
     ...input,
     resultBytes:input.resultBytes===null?null:new Uint8Array(input.resultBytes),
     summaryBytes:input.summaryBytes===null?null:new Uint8Array(input.summaryBytes),
+    ...(input.optionalEvidence?{optionalEvidence:input.optionalEvidence}:{}),
     generatedFixture:true
   });
 }
@@ -123,7 +174,7 @@ test('historical V2 preserves three distinct historical screen and engine states
     assert.equal(projection.verification.summaryProjection,
       'VERIFIED_EXCLUDING_PATHS_AND_CONTROL_DEFINITIONS');
     assert.equal(projection.verification.progressPayloads,
-      'NOT_VERIFIED_ORIGINAL_BYTES_NOT_SUPPLIED');
+      'VERIFIED_EXACT_BYTES_FOR_ALL_COMPLETED_PROGRESS');
     assert.equal(projection.provenance.generatedFixture,true);
     if(engineStatus==='INSUFFICIENT_EVIDENCE'){
       assert.equal(projection.job.state,'failed');
@@ -142,8 +193,8 @@ test('V2 exporter and shared report keep inventory, controls, costs, quarters an
   assert.match(first,/HISTORICAL V2/);
   assert.match(first,/sourceAuthenticity/);
   assert.match(first,/NO\\_EDGE/);
-  assert.match(first,/NOT\\_VERIFIED\\_ORIGINAL\\_BYTES\\_NOT\\_SUPPLIED/);
-  assert.match(first,/daily budget/);
+  assert.match(first,/VERIFIED\\_EXACT\\_BYTES\\_FOR\\_ALL\\_COMPLETED\\_PROGRESS/);
+  assert.match(first,/DAILY\\_BUDGET/);
   assert.match(first,/NOT_SUPPLIED/);
   const firstPath=values.noEdge.job.result&&JSON.parse(values.noEdge.job.result).paths[0];
   assert.ok(first.includes(firstPath.quarterlyReturns[0].quarter.replace('-','\\-')));
@@ -195,12 +246,138 @@ test('summary/result byte digests and exact projection reject alteration and sub
   assert.equal((await parseArenaHistoricalExportV2(encode(wrongControlOrder),digestBytes)).status,'INVALID');
 
   const unverifiedProgress=structuredClone(source);
-  unverifiedProgress.job.paths[1].payloadSha256='0'.repeat(64);
+  delete unverifiedProgress.optionalEvidence;
   await seal(unverifiedProgress);
-  const projection=await parseArenaHistoricalExportV2(encode(unverifiedProgress),digestBytes);
+  const noPayloadBytes=await parseArenaHistoricalExportV2(encode(unverifiedProgress),digestBytes);
+  assert.equal(noPayloadBytes.verification.progressPayloads,
+    'NOT_VERIFIED_ORIGINAL_BYTES_NOT_SUPPLIED');
+
+  const partialPayloadBytes=structuredClone(source);
+  partialPayloadBytes.optionalEvidence.progressPayloads=
+    partialPayloadBytes.optionalEvidence.progressPayloads.slice(0,1);
+  await seal(partialPayloadBytes);
+  const partialProjection=await parseArenaHistoricalExportV2(encode(partialPayloadBytes),digestBytes);
+  assert.equal(partialProjection.verification.progressPayloads,'PARTIALLY_VERIFIED_EXACT_BYTES');
+
+  const alteredPayloadBytes=structuredClone(source);
+  const encodedPayload=alteredPayloadBytes.optionalEvidence.progressPayloads[0].payloadBytesBase64;
+  const payloadBytes=Buffer.from(encodedPayload,'base64');
+  payloadBytes[0]^=1;
+  alteredPayloadBytes.optionalEvidence.progressPayloads[0].payloadBytesBase64=
+    payloadBytes.toString('base64');
+  await seal(alteredPayloadBytes);
+  assert.equal((await parseArenaHistoricalExportV2(encode(alteredPayloadBytes),digestBytes)).status,'INVALID');
+
+  const changedProgressDigest=structuredClone(source);
+  changedProgressDigest.job.paths[1].payloadSha256='0'.repeat(64);
+  delete changedProgressDigest.optionalEvidence;
+  await seal(changedProgressDigest);
+  const projection=await parseArenaHistoricalExportV2(encode(changedProgressDigest),digestBytes);
   assert.equal(projection.status,'PRESENT_UNVERIFIED');
   assert.equal(projection.verification.progressPayloads,
     'NOT_VERIFIED_ORIGINAL_BYTES_NOT_SUPPLIED');
+});
+
+test('canonical identities reject resealed identity and descriptor mutations',async()=>{
+  const values=await fixtures(),source=values.noEdge;
+  for(const mutate of [
+    identity=>{identity.sourceCommit='b'.repeat(40);},
+    identity=>{identity.sourceProvenance.normalizedFileSha256['generated-fixture.csv']='e'.repeat(64);},
+    identity=>{identity.canonicalSeriesSha256.XBTUSD='d'.repeat(64);}
+  ]){
+    const staleIdentity=structuredClone(source);
+    const staleResult=JSON.parse(staleIdentity.job.result);
+    mutate(staleResult.identity);
+    staleIdentity.job.result=canonical(staleResult);
+    staleIdentity.job.resultSha256=digest(staleIdentity.job.result);
+    const staleSummary={...staleResult};
+    delete staleSummary.paths;
+    delete staleSummary.controlDefinitions;
+    staleIdentity.summary=canonical(staleSummary);
+    staleIdentity.job.summarySha256=digest(staleIdentity.summary);
+    await seal(staleIdentity);
+    assert.equal((await parseArenaHistoricalExportV2(encode(staleIdentity),digestBytes)).status,'INVALID');
+  }
+
+  const changedDescriptor=structuredClone(source);
+  const result=JSON.parse(changedDescriptor.job.result);
+  const path=result.paths[0];
+  path.variantId='neighbour-n20-f25';
+  const identity={
+    protocolId:result.protocolId,protocolSha256:result.protocolSha256,
+    implementationId:result.implementationId,implementationSha256:result.implementationSha256,
+    inputSha256:result.identity.inputSha256,
+    canonicalSeriesSha256:result.identity.canonicalSeriesSha256,
+    variantId:path.variantId,scenarioId:path.scenarioId,segmentId:path.segmentId
+  };
+  path.pathId=digest(canonical(identity));
+  changedDescriptor.job.pathIds[0]=path.pathId;
+  changedDescriptor.job.computationPathIds=
+    bridgeManifest.computationOrder.map(index=>changedDescriptor.job.pathIds[index]);
+  changedDescriptor.job.paths[0].pathId=path.pathId;
+  result.executionId=digest(canonical({
+    protocolId:result.protocolId,protocolSha256:result.protocolSha256,
+    implementationId:result.implementationId,implementationSha256:result.implementationSha256,
+    inputSha256:result.identity.inputSha256,pathIds:changedDescriptor.job.pathIds
+  }));
+  changedDescriptor.job.manifestSha256=digest(canonical(result.paths.map(
+    ({kind,variantId,scenarioId,segmentId,pathId})=>({kind,variantId,scenarioId,segmentId,pathId})
+  )));
+  changedDescriptor.job.result=canonical(result);
+  changedDescriptor.job.resultSha256=digest(changedDescriptor.job.result);
+  const summary={...result};
+  delete summary.paths;
+  delete summary.controlDefinitions;
+  changedDescriptor.summary=canonical(summary);
+  changedDescriptor.job.summarySha256=digest(changedDescriptor.summary);
+  await seal(changedDescriptor);
+  assert.equal((await parseArenaHistoricalExportV2(encode(changedDescriptor),digestBytes)).status,'INVALID');
+});
+
+test('optional supplemental evidence is bounded, typed and remains unverified',async()=>{
+  const prepared=await historicalInput(
+    bridgeManifest,generatedResult(bridgeManifest,createSyntheticSeries()),
+    'completed','trial-v2-supplemental','NO_EDGE'
+  );
+  const envelope=await exportHistoricalResultV2({
+    ...prepared,
+    resultBytes:new Uint8Array(prepared.resultBytes),
+    summaryBytes:new Uint8Array(prepared.summaryBytes),
+    optionalEvidence:{
+      ...prepared.optionalEvidence,
+      supplemental:[{kind:'DAILY_BUDGET',bytes:new Uint8Array([0xff,0x00])}]
+    },
+    generatedFixture:true
+  });
+  const projection=await parseArenaHistoricalExportV2(encode(envelope),digestBytes);
+  assert.equal(projection.status,'PRESENT_UNVERIFIED');
+  assert.deepEqual(projection.optionalEvidence.supplemental[0],{
+    kind:'DAILY_BUDGET',status:'SUPPLIED_UNVERIFIED',
+    sha256:digest(new Uint8Array([0xff,0x00])),identityBinding:'NOT_AVAILABLE_FROM_INSPECT_B1'
+  });
+  assert.equal(projection.optionalEvidence.supplemental[1].status,'NOT_SUPPLIED');
+  const report=await renderReviewReport(encode(envelope));
+  assert.match(report,/SUPPLIED\\_UNVERIFIED/);
+  assert.match(report,/NOT\\_AVAILABLE\\_FROM\\_INSPECT\\_B1/);
+  assert.doesNotMatch(report,/\/wA=/);
+  await assert.rejects(exportHistoricalResultV2({
+    ...prepared,resultBytes:new Uint8Array(prepared.resultBytes),
+    summaryBytes:new Uint8Array(prepared.summaryBytes),generatedFixture:true,
+    optionalEvidence:{
+      ...prepared.optionalEvidence,
+      supplemental:[{kind:'UNKNOWN',bytes:new Uint8Array()}]
+    }
+  }),{message:'EXPORT_INPUT_INVALID'});
+  await assert.rejects(exportHistoricalResultV2({
+    ...prepared,resultBytes:new Uint8Array(prepared.resultBytes),
+    summaryBytes:new Uint8Array(prepared.summaryBytes),generatedFixture:true,
+    optionalEvidence:{
+      ...prepared.optionalEvidence,
+      supplemental:[{
+        kind:'DAILY_BUDGET',bytes:new Uint8Array(MAX_HISTORICAL_EXPORT_V2_BYTES+1)
+      }]
+    }
+  }),{message:'EXPORT_INPUT_LIMIT'});
 });
 
 test('V2 rejects wrong bindings, substitution, duplicate keys, invalid UTF-8, size and synthetic results',async()=>{
@@ -274,6 +451,8 @@ test('V2 retains no-result unknown, partial, queued and missing-budget distincti
       variant.job.unresolved=state==='unknown';
       variant.job.reason=state==='unknown'?'RECONCILIATION_REQUIRED':'WORKER_INTERRUPTED';
     }
+    variant.optionalEvidence.progressPayloads=
+      variant.optionalEvidence.progressPayloads.slice(0,variant.job.paths.length);
     if(state==='partial')variant.job.reason='unsafe <script>alert(1)</script> ![x](https://bad.example)';
     await seal(variant);
     const projection=await parseArenaHistoricalExportV2(encode(variant),digestBytes);
@@ -309,7 +488,9 @@ test('V2 exporter and parser remain offline and do not import the engine or jour
   const exporter=readFileSync(new URL(
     '../scripts/research/b1-7/export-historical-result-v2.mjs',import.meta.url
   ),'utf8');
-  assert.doesNotMatch(parser,/^import\s|\bfetch\s*\(/m);
+  assert.equal((parser.match(/^import\s/gm)||[]).length,1);
+  assert.match(parser,/from '\.\/arena-historical-export\.js';/);
+  assert.doesNotMatch(parser,/\bfetch\s*\(/);
   assert.doesNotMatch(exporter,/from ['"][^'"]*(?:engine|journal|captured-input|supervisor)\.mjs/);
   assert.doesNotMatch(exporter,/\b(?:fetch|readFileSync|writeFileSync|createExecution|runBatch)\s*\(/);
 });
@@ -324,10 +505,19 @@ test('V2 CLI emits a complete envelope or no stdout on invalid caller bytes',asy
     observation:prepared.observation,
     resultBytesBase64:prepared.resultBytes.toString('base64'),
     summaryBytesBase64:prepared.summaryBytes.toString('base64'),
+    optionalEvidence:{
+      progressPayloads:prepared.optionalEvidence.progressPayloads.map(item=>({
+        computationIndex:item.computationIndex,
+        payloadBytesBase64:Buffer.from(item.payloadBytes).toString('base64')
+      })),
+      supplemental:[]
+    },
     generatedFixture:true
   };
   const script=new URL('../scripts/research/b1-7/export-historical-result-v2.mjs',import.meta.url);
-  const success=spawnSync(process.execPath,[script.pathname],{input:JSON.stringify(cliInput),encoding:'utf8'});
+  const success=spawnSync(process.execPath,[script.pathname],{
+    input:JSON.stringify(cliInput),encoding:'utf8',maxBuffer:8*1024*1024
+  });
   assert.equal(success.status,0,success.stderr);
   const output=JSON.parse(success.stdout);
   assert.equal(output.schema,HISTORICAL_EXPORT_V2_SCHEMA);

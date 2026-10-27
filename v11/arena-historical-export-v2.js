@@ -1,3 +1,7 @@
+import {
+  HISTORICAL_EXPORT_COMPUTATION_ORDER,HISTORICAL_EXPORT_PATH_DESCRIPTORS
+} from './arena-historical-export.js';
+
 export const MAX_HISTORICAL_EXPORT_V2_BYTES = 8 * 1024 * 1024;
 export const MAX_HISTORICAL_RESULT_V2_BYTES = 1024 * 1024;
 export const HISTORICAL_EXPORT_V2_SCHEMA = 'MERIDIAN_B1_HISTORICAL_RESULT_EXPORT_V2';
@@ -5,6 +9,7 @@ export const HISTORICAL_EXPORT_V2_PURPOSE = 'B1_HISTORICAL_RESULT_REVIEW_NOT_AUT
 
 const HASH = /^[a-f0-9]{64}$/;
 const ENVELOPE_KEYS = ['schema','purpose','provenance','job','summary','payloadSha256'];
+const OPTIONAL_EVIDENCE_KEYS = ['progressPayloads','supplemental'];
 const PROVENANCE_KEYS = [
   'source','assertionStatus','sourceAuthenticity','assertedDatasetClass','generatedFixture'
 ];
@@ -35,6 +40,12 @@ const AUTHORITY_KEYS = [
   'validationAuthorized','holdoutAuthorized','paperAuthorized','liveAuthorized'
 ];
 const ASSETS = ['XBTUSD','ETHUSD','SOLUSD','XRPUSD','LINKUSD','AVAXUSD','SUIUSD'];
+const SUPPLEMENTAL_EVIDENCE_KINDS = [
+  'DAILY_BUDGET','GLOBAL_ACTIVE_FENCE','LAUNCHER_RECEIPT','APPROVAL',
+  'PROFILE_BUNDLE','EXECUTION_CHECKOUT','SOURCE_MAP_DIGEST'
+];
+export const MAX_HISTORICAL_PROGRESS_PAYLOAD_V2_BYTES = 65_536;
+export const MAX_HISTORICAL_SUPPLEMENTAL_V2_BYTES = MAX_HISTORICAL_EXPORT_V2_BYTES;
 const EVIDENCE_KEYS = [
   'syntheticFixture','priceSource','costModel','executionEvidence','sourceAuthenticity',
   'survivorship','historyLabel','candidateInterpretation','diagnosticRescaling','holdoutClaim',
@@ -127,8 +138,20 @@ function parseStrictJson(text,{maxBytes,maxDepth=12,maxNodes=100_000,stringLimit
         ?MAX_HISTORICAL_RESULT_V2_BYTES
         :layer==='outer'&&path[0]==='job'&&path[1]==='controls'?8192:
           layer==='outer'&&path[0]==='summary'?MAX_HISTORICAL_RESULT_V2_BYTES:
+            layer==='outer'&&path[0]==='optionalEvidence'&&path[1]==='progressPayloads'&&
+              path[3]==='payloadBytesBase64'
+                ?Math.ceil(MAX_HISTORICAL_PROGRESS_PAYLOAD_V2_BYTES*4/3)+4:
+            layer==='outer'&&path[0]==='optionalEvidence'&&path[1]==='supplemental'&&
+              path[3]==='bytesBase64'
+                ?Math.ceil(MAX_HISTORICAL_SUPPLEMENTAL_V2_BYTES*4/3)+4:
             layer==='export-input'&&path[0]==='observation'&&path[1]==='result'
               ?MAX_HISTORICAL_RESULT_V2_BYTES:
+                layer==='export-input'&&path[0]==='optionalEvidence'&&path[1]==='progressPayloads'&&
+                  path[3]==='payloadBytesBase64'
+                    ?Math.ceil(MAX_HISTORICAL_PROGRESS_PAYLOAD_V2_BYTES*4/3)+4:
+                layer==='export-input'&&path[0]==='optionalEvidence'&&path[1]==='supplemental'&&
+                  path[3]==='bytesBase64'
+                    ?Math.ceil(MAX_HISTORICAL_SUPPLEMENTAL_V2_BYTES*4/3)+4:
                 layer==='export-input'&&['resultBytesBase64','summaryBytesBase64'].includes(path[0])
                   ?Math.ceil(MAX_HISTORICAL_RESULT_V2_BYTES*4/3)+4:stringLimit;
       const parsed=string(limit);
@@ -254,6 +277,94 @@ function deepEqual(left,right){
   return a.length===b.length&&a.every((key,index)=>key===b[index]&&deepEqual(left[key],right[key]));
 }
 
+function base64Bytes(value,maxBytes){
+  if(typeof value!=='string'||value.length>Math.ceil(maxBytes*4/3)+4||
+     value.length%4!==0||!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value))
+    return null;
+  const padding=value.endsWith('==')?2:value.endsWith('=')?1:0;
+  const size=value.length/4*3-padding;
+  if(size>maxBytes)return null;
+  const alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  if(padding===2&&(alphabet.indexOf(value.at(-3))&15)!==0||
+     padding===1&&(alphabet.indexOf(value.at(-2))&3)!==0)return null;
+  const bytes=new Uint8Array(size);
+  let offset=0;
+  for(let index=0;index<value.length;index+=4){
+    const a=alphabet.indexOf(value[index]),b=alphabet.indexOf(value[index+1]);
+    const c=value[index+2]==='='?0:alphabet.indexOf(value[index+2]);
+    const d=value[index+3]==='='?0:alphabet.indexOf(value[index+3]);
+    if(a<0||b<0||c<0||d<0)return null;
+    if(offset<size)bytes[offset++]=(a<<2)|(b>>4);
+    if(offset<size)bytes[offset++]=((b&15)<<4)|(c>>2);
+    if(offset<size)bytes[offset++]=((c&3)<<6)|d;
+  }
+  return bytes;
+}
+
+async function validateOptionalEvidence(value,job,result,digestBytes){
+  const absentKinds=SUPPLEMENTAL_EVIDENCE_KINDS.map(kind=>({kind,status:'NOT_SUPPLIED'}));
+  if(value===undefined)return {
+    progressPayloads:{
+      status:'NOT_VERIFIED_ORIGINAL_BYTES_NOT_SUPPLIED',suppliedCount:0,
+      completedCount:job.paths.filter(item=>item.state==='completed').length
+    },
+    supplemental:absentKinds
+  };
+  if(!exact(value,OPTIONAL_EVIDENCE_KEYS)||!Array.isArray(value.progressPayloads)||
+     value.progressPayloads.length>44||!Array.isArray(value.supplemental)||
+     value.supplemental.length>SUPPLEMENTAL_EVIDENCE_KINDS.length)return null;
+  const completedCount=job.paths.filter(item=>item.state==='completed').length;
+  let previous=-1;
+  for(const item of value.progressPayloads){
+    if(!exact(item,['computationIndex','payloadBytesBase64'])||
+       !integer(item.computationIndex)||item.computationIndex<=previous||
+       item.computationIndex>=job.paths.length||job.paths[item.computationIndex]?.state!=='completed')
+      return null;
+    previous=item.computationIndex;
+    const bytes=base64Bytes(item.payloadBytesBase64,MAX_HISTORICAL_PROGRESS_PAYLOAD_V2_BYTES);
+    if(!bytes||await digestBytes(bytes)!==job.paths[item.computationIndex].payloadSha256)return null;
+    let text,payload;
+    try{text=new TextDecoder('utf-8',{fatal:true}).decode(bytes);}catch{return null;}
+    payload=parseStrictJson(text,{maxBytes:MAX_HISTORICAL_PROGRESS_PAYLOAD_V2_BYTES,
+      maxDepth:12,maxNodes:20_000,layer:'nested'});
+    if(!payload||!boundedTree(payload)||
+       payload.pathId!==job.paths[item.computationIndex].pathId||
+       result&&!deepEqual(payload,result.paths.find(path=>path.pathId===job.paths[item.computationIndex].pathId)))
+      return null;
+  }
+  const progressVerified=value.progressPayloads.length;
+  const supplementalSeen=new Set();
+  let supplementalBytes=0;
+  const supplied=[];
+  for(const item of value.supplemental){
+    if(!exact(item,['kind','bytesBase64','sha256'])||
+       !SUPPLEMENTAL_EVIDENCE_KINDS.includes(item.kind)||supplementalSeen.has(item.kind)||
+       !hash(item.sha256))return null;
+    supplementalSeen.add(item.kind);
+    const bytes=base64Bytes(item.bytesBase64,MAX_HISTORICAL_SUPPLEMENTAL_V2_BYTES);
+    if(!bytes)return null;
+    supplementalBytes+=bytes.length;
+    if(supplementalBytes>MAX_HISTORICAL_SUPPLEMENTAL_V2_BYTES||
+       await digestBytes(bytes)!==item.sha256)return null;
+    supplied.push({
+      kind:item.kind,status:'SUPPLIED_UNVERIFIED',sha256:item.sha256,
+      identityBinding:'NOT_AVAILABLE_FROM_INSPECT_B1'
+    });
+  }
+  const progressStatus=progressVerified===0
+    ?'NOT_VERIFIED_ORIGINAL_BYTES_NOT_SUPPLIED'
+    :progressVerified===completedCount
+      ?'VERIFIED_EXACT_BYTES_FOR_ALL_COMPLETED_PROGRESS'
+      :'PARTIALLY_VERIFIED_EXACT_BYTES';
+  return {
+    progressPayloads:{
+      status:progressStatus,suppliedCount:progressVerified,completedCount
+    },
+    supplemental:SUPPLEMENTAL_EVIDENCE_KINDS.map(kind=>
+      supplied.find(item=>item.kind===kind)??{kind,status:'NOT_SUPPLIED'})
+  };
+}
+
 function boundedTree(value,depth=0,budget={nodes:0}){
   if(depth>12||++budget.nodes>100_000)return false;
   if(value===null||typeof value==='boolean')return true;
@@ -272,7 +383,11 @@ function boundedOuter(value,depth=0,budget={nodes:0},path=[]){
   if(typeof value==='string'){
     const limit=path[0]==='job'&&path[1]==='result'||
       path.length===1&&path[0]==='summary'?MAX_HISTORICAL_RESULT_V2_BYTES:
-        path[0]==='job'&&path[1]==='controls'?8192:4096;
+        path[0]==='job'&&path[1]==='controls'?8192:
+          path[0]==='optionalEvidence'&&path[1]==='progressPayloads'&&path.at(-1)==='payloadBytesBase64'
+            ?Math.ceil(MAX_HISTORICAL_PROGRESS_PAYLOAD_V2_BYTES*4/3)+4:
+          path[0]==='optionalEvidence'&&path[1]==='supplemental'&&path.at(-1)==='bytesBase64'
+            ?Math.ceil(MAX_HISTORICAL_SUPPLEMENTAL_V2_BYTES*4/3)+4:4096;
     return scalarString(value)&&utf8(value).length<=limit;
   }
   if(Array.isArray(value))return value.length<=1000&&value.every((item,index)=>
@@ -339,6 +454,8 @@ function validJob(job){
      job.computationPathIds.length!==44||!job.computationPathIds.every(hash)||
      new Set(job.computationPathIds).size!==44||
      job.computationPathIds.some(id=>!job.pathIds.includes(id))||
+     job.computationPathIds.some((id,index)=>
+       id!==job.pathIds[HISTORICAL_EXPORT_COMPUTATION_ORDER[index]])||
      !exact(job.timestamps,['createdAt','startedAt','finishedAt'])||
      !validTimestamp(job.timestamps.createdAt)||
      ![job.timestamps.startedAt,job.timestamps.finishedAt].every(value=>value===null||validTimestamp(value))||
@@ -463,7 +580,7 @@ async function validHistoricalResult(result,job,controls,digestBytes){
      result.plannedPaths!==44||!Array.isArray(result.paths)||result.paths.length!==44||
      !exact(result.identity,['datasetKind','sourceCommit','sourceProvenance','canonicalSeriesSha256','inputSha256'])||
      result.identity.datasetKind!=='FROZEN_RESEARCH_INPUT'||
-     typeof result.identity.sourceCommit!=='string'||result.identity.sourceCommit.length===0||
+     typeof result.identity.sourceCommit!=='string'||!/^[a-f0-9]{40,64}$/.test(result.identity.sourceCommit)||
      result.identity.inputSha256!==job.dataSha256||!exact(result.identity.sourceProvenance,['normalizedFileSha256'])||
      !record(result.identity.sourceProvenance.normalizedFileSha256)||
      Object.keys(result.identity.sourceProvenance.normalizedFileSha256).length===0||
@@ -479,10 +596,18 @@ async function validHistoricalResult(result,job,controls,digestBytes){
      !validHistoricalEvidence(result.evidence)||
      !controls||!deepEqual(result.controlDefinitions,controls)||
      !validBudget(result.budget)||!validProtocolReview(result.protocolReview)||
-     typeof result.protocolId!=='string'||typeof result.implementationId!=='string'||
+     typeof result.protocolId!=='string'||!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(result.protocolId)||
+     typeof result.implementationId!=='string'||!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(result.implementationId)||
      !hash(result.protocolSha256)||
      !Array.isArray(result.controlRealization)||result.controlRealization.length!==6||
      result.failure!==null||!validScreen(result.screen,result.status))return false;
+  const inputIdentity={
+    datasetKind:result.identity.datasetKind,
+    sourceCommit:result.identity.sourceCommit,
+    sourceProvenance:result.identity.sourceProvenance,
+    canonicalSeriesSha256:result.identity.canonicalSeriesSha256
+  };
+  if(result.identity.inputSha256!==await digestBytes(utf8(canonical(inputIdentity))))return false;
   const completed=result.status==='COMPLETED';
   const expectedCompleted=completed?44:19;
   if(result.attemptedPaths!==expectedCompleted||result.completedPaths!==expectedCompleted||
@@ -523,14 +648,36 @@ async function validHistoricalResult(result,job,controls,digestBytes){
   if(controlDescriptors.size!==6)return false;
   const descriptorSet=new Set();
   const progressById=new Map(job.paths.map(item=>[item.pathId,item.state]));
+  const manifestPaths=[];
   for(let index=0;index<44;index++){
     const path=result.paths[index];
+    const expectedDescriptor=HISTORICAL_EXPORT_PATH_DESCRIPTORS[index];
     if(!validPath(path,index,job,path?.status)||
+       !deepEqual({
+         kind:path.kind,variantId:path.variantId,scenarioId:path.scenarioId,segmentId:path.segmentId
+       },expectedDescriptor)||
        (path.status==='COMPLETED')!==(progressById.get(path.pathId)==='completed'))return false;
+    const pathIdentity={
+      protocolId:result.protocolId,
+      protocolSha256:result.protocolSha256,
+      implementationId:result.implementationId,
+      implementationSha256:result.implementationSha256,
+      inputSha256:job.dataSha256,
+      canonicalSeriesSha256:result.identity.canonicalSeriesSha256,
+      variantId:path.variantId,
+      scenarioId:path.scenarioId,
+      segmentId:path.segmentId
+    };
+    if(path.pathId!==await digestBytes(utf8(canonical(pathIdentity))))return false;
+    manifestPaths.push({...expectedDescriptor,pathId:path.pathId});
     const descriptor=[path.kind,path.variantId,path.scenarioId,path.segmentId].join('\0');
     if(descriptorSet.has(descriptor))return false;
     descriptorSet.add(descriptor);
   }
+  if(job.manifestSha256!==await digestBytes(utf8(canonical(manifestPaths)))||
+     job.computationPathIds.some((pathId,index)=>
+       pathId!==job.pathIds[HISTORICAL_EXPORT_COMPUTATION_ORDER[index]]))
+    return false;
   if(!completed&&result.paths.filter(item=>item.status==='NOT_RUN_INSUFFICIENT_EVIDENCE').length!==25){
     return false;
   }
@@ -569,7 +716,10 @@ function validHistoricalEvidence(evidence){
 }
 
 function validEnvelope(envelope){
-  if(!exact(envelope,ENVELOPE_KEYS)||envelope.schema!==HISTORICAL_EXPORT_V2_SCHEMA||
+  const keys=record(envelope)?Object.keys(envelope):[];
+  if(!(keys.length===ENVELOPE_KEYS.length&&ENVELOPE_KEYS.every(key=>keys.includes(key))||
+       keys.length===ENVELOPE_KEYS.length+1&&ENVELOPE_KEYS.every(key=>keys.includes(key))&&
+       keys.includes('optionalEvidence'))||envelope.schema!==HISTORICAL_EXPORT_V2_SCHEMA||
      envelope.purpose!==HISTORICAL_EXPORT_V2_PURPOSE||
      !exact(envelope.provenance,PROVENANCE_KEYS)||
      envelope.provenance.source!=='CALLER_SUPPLIED_INSPECT_B1'||
@@ -582,7 +732,9 @@ function validEnvelope(envelope){
   const job=envelope.job;
   if(job.result===null){
     if(envelope.summary!==null||job.resultSha256!==null||job.summarySha256!==null)return null;
-    return {controls:job.controls===null?null:parseStrictJson(job.controls,{maxBytes:8192,maxNodes:10_000})};
+    return {
+      controls:job.controls===null?null:parseStrictJson(job.controls,{maxBytes:8192,maxNodes:10_000})
+    };
   }
   if(typeof envelope.summary!=='string'||utf8(envelope.summary).length>MAX_HISTORICAL_RESULT_V2_BYTES||
      utf8(job.result).length>MAX_HISTORICAL_RESULT_V2_BYTES)return null;
@@ -607,15 +759,25 @@ export async function validateArenaHistoricalExportV2(envelope,digestBytes){
     if(envelope.payloadSha256!==await digestBytes(payloadBytes))return null;
     const job=envelope.job;
     if(job.trialId!==await digestBytes(utf8(job.trialKey)))return null;
-    if(job.result===null)return {
-      status:'PRESENT_UNVERIFIED',schema:envelope.schema,purpose:envelope.purpose,
-      provenance:envelope.provenance,job,result:null,summary:null,
-      verification:{
-        resultBytes:'NOT_SUPPLIED',summaryBytes:'NOT_SUPPLIED',
-        summaryProjection:'NOT_SUPPLIED',progressPayloads:'NOT_VERIFIED_ORIGINAL_BYTES_NOT_SUPPLIED',
-        identityBindings:'STRUCTURAL_CONSISTENCY_ONLY',sourceAuthenticity:'NOT_ESTABLISHED'
+    if(job.result===null){
+      if(job.manifestSha256!==await digestBytes(utf8(canonical(
+        HISTORICAL_EXPORT_PATH_DESCRIPTORS.map((descriptor,index)=>({...descriptor,pathId:job.pathIds[index]}))
+      ))))return null;
+      const optionalEvidence=await validateOptionalEvidence(
+        envelope.optionalEvidence,job,null,digestBytes
+      );
+      if(!optionalEvidence)return null;
+      return {
+        status:'PRESENT_UNVERIFIED',schema:envelope.schema,purpose:envelope.purpose,
+        provenance:envelope.provenance,job,result:null,summary:null,optionalEvidence,
+        verification:{
+          resultBytes:'NOT_SUPPLIED',summaryBytes:'NOT_SUPPLIED',
+          summaryProjection:'NOT_SUPPLIED',
+          progressPayloads:optionalEvidence.progressPayloads.status,
+          identityBindings:'STRUCTURAL_CONSISTENCY_ONLY',sourceAuthenticity:'NOT_ESTABLISHED'
+        }
       }
-    };
+    }
     const resultBytes=utf8(job.result),summaryBytes=utf8(envelope.summary);
     if(await digestBytes(resultBytes)!==job.resultSha256||
        await digestBytes(summaryBytes)!==job.summarySha256)return null;
@@ -631,14 +793,19 @@ export async function validateArenaHistoricalExportV2(envelope,digestBytes){
     delete projection.paths;
     delete projection.controlDefinitions;
     if(!deepEqual(projection,summary))return null;
+    const optionalEvidence=await validateOptionalEvidence(
+      envelope.optionalEvidence,job,result,digestBytes
+    );
+    if(!optionalEvidence)return null;
     return {
       status:'PRESENT_UNVERIFIED',schema:envelope.schema,purpose:envelope.purpose,
-      provenance:envelope.provenance,job,result,summary,
+      provenance:envelope.provenance,job,result,summary,optionalEvidence,
       verification:{
         resultBytes:'VERIFIED_EXACT_BYTES',summaryBytes:'VERIFIED_EXACT_BYTES',
         summaryProjection:'VERIFIED_EXCLUDING_PATHS_AND_CONTROL_DEFINITIONS',
-        progressPayloads:'NOT_VERIFIED_ORIGINAL_BYTES_NOT_SUPPLIED',
-        identityBindings:'STRUCTURAL_CONSISTENCY_ONLY',sourceAuthenticity:'NOT_ESTABLISHED'
+        progressPayloads:optionalEvidence.progressPayloads.status,
+        identityBindings:'CANONICAL_INPUT_EXECUTION_AND_PATH_IDENTITIES_CHECKED',
+        sourceAuthenticity:'NOT_ESTABLISHED'
       }
     };
   }catch{return null;}

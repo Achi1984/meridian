@@ -3,7 +3,9 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {
   HISTORICAL_EXPORT_V2_PURPOSE,HISTORICAL_EXPORT_V2_SCHEMA,MAX_HISTORICAL_EXPORT_V2_BYTES,
-  MAX_HISTORICAL_RESULT_V2_BYTES,canonicalHistoricalExportV2Payload,
+  MAX_HISTORICAL_PROGRESS_PAYLOAD_V2_BYTES,MAX_HISTORICAL_RESULT_V2_BYTES,
+  MAX_HISTORICAL_SUPPLEMENTAL_V2_BYTES,
+  canonicalHistoricalExportV2Payload,
   parseArenaHistoricalExportV2,parseHistoricalExportV2Input
 } from '../../../v11/arena-historical-export-v2.js';
 
@@ -20,6 +22,10 @@ const uint8ArraySet=Uint8Array.prototype.set;
 const EXPORT_ERRORS=new Set([
   'EXPORT_ARGUMENTS_INVALID','EXPORT_INPUT_LIMIT','EXPORT_INPUT_INVALID','EXPORT_IO_FAILED'
 ]);
+const SUPPLEMENTAL_EVIDENCE_KINDS=[
+  'DAILY_BUDGET','GLOBAL_ACTIVE_FENCE','LAUNCHER_RECEIPT','APPROVAL',
+  'PROFILE_BUNDLE','EXECUTION_CHECKOUT','SOURCE_MAP_DIGEST'
+];
 
 function scalarString(value){
   for(let index=0;index<value.length;index++){
@@ -74,7 +80,7 @@ function copyJson(value,depth=0,budget={nodes:0}){
   return result;
 }
 
-function snapshotBytes(value,limit,code){
+function snapshotBytes(value,limit,code,requireUtf8=true){
   if(value===null)return null;
   let buffer,offset,length;
   try{
@@ -94,7 +100,7 @@ function snapshotBytes(value,limit,code){
   try{
     const source=new uint8Array(buffer,offset,length),snapshot=new uint8Array(length);
     Reflect.apply(uint8ArraySet,snapshot,[source]);
-    new TextDecoder('utf-8',{fatal:true}).decode(snapshot);
+    if(requireUtf8)new TextDecoder('utf-8',{fatal:true}).decode(snapshot);
     return snapshot;
   }catch{throw new TypeError(code);}
 }
@@ -104,11 +110,89 @@ function exactInput(input){
      Object.getPrototypeOf(input)!==Object.prototype&&Object.getPrototypeOf(input)!==null)
     throw new TypeError('EXPORT_INPUT_INVALID');
   const keys=Reflect.ownKeys(input);
-  if(keys.length!==4||keys.some(key=>!['observation','resultBytes','summaryBytes','generatedFixture'].includes(key))||
+  if(!(keys.length===4||keys.length===5&&keys.includes('optionalEvidence'))||
+     keys.some(key=>!['observation','resultBytes','summaryBytes','generatedFixture','optionalEvidence'].includes(key))||
+     !['observation','resultBytes','summaryBytes','generatedFixture'].every(key=>keys.includes(key))||
      keys.some(key=>{
        const descriptor=Object.getOwnPropertyDescriptor(input,key);
        return typeof key!=='string'||!descriptor.enumerable||!owns(descriptor,'value');
      }))throw new TypeError('EXPORT_INPUT_INVALID');
+}
+
+function exactDataObject(value,keys){
+     if(!value||typeof value!=='object'||Array.isArray(value)||
+        Object.getPrototypeOf(value)!==Object.prototype&&Object.getPrototypeOf(value)!==null)
+       return false;
+     const ownKeys=Reflect.ownKeys(value);
+     return ownKeys.length===keys.length&&ownKeys.every(key=>{
+       const descriptor=Object.getOwnPropertyDescriptor(value,key);
+       return typeof key==='string'&&keys.includes(key)&&descriptor?.enumerable&&owns(descriptor,'value');
+     });
+}
+
+function snapshotArray(value,limit){
+     if(!Array.isArray(value)||Object.getPrototypeOf(value)!==Array.prototype||value.length>limit)
+       throw new TypeError('EXPORT_INPUT_INVALID');
+     const keys=Reflect.ownKeys(value);
+     if(keys.length!==value.length+1||keys.some(key=>key!=='length'&&
+        (typeof key!=='string'||!/^(0|[1-9]\d*)$/.test(key)||Number(key)>=value.length)))
+       throw new TypeError('EXPORT_INPUT_INVALID');
+     const result=[];
+     for(let index=0;index<value.length;index++){
+       const descriptor=Object.getOwnPropertyDescriptor(value,String(index));
+       if(!descriptor?.enumerable||!owns(descriptor,'value'))
+     throw new TypeError('EXPORT_INPUT_INVALID');
+       result.push(descriptor.value);
+     }
+     return result;
+}
+
+async function snapshotOptionalEvidence(value){
+     if(value===undefined)return undefined;
+     if(!exactDataObject(value,['progressPayloads','supplemental'])||
+        !Array.isArray(value.progressPayloads)||!Array.isArray(value.supplemental))
+       throw new TypeError('EXPORT_INPUT_INVALID');
+     const inputProgress=snapshotArray(value.progressPayloads,44);
+     const inputSupplemental=snapshotArray(value.supplemental,SUPPLEMENTAL_EVIDENCE_KINDS.length);
+     const progressPayloads=[];
+     const seenIndices=new Set();
+     for(const entry of inputProgress){
+    if(!exactDataObject(entry,['computationIndex','payloadBytes'])||
+      !Number.isSafeInteger(entry.computationIndex)||entry.computationIndex<0||
+      entry.computationIndex>=44||seenIndices.has(entry.computationIndex))
+     throw new TypeError('EXPORT_INPUT_INVALID');
+    seenIndices.add(entry.computationIndex);
+    const bytes=snapshotBytes(
+     entry.payloadBytes,MAX_HISTORICAL_PROGRESS_PAYLOAD_V2_BYTES,'EXPORT_INPUT_INVALID'
+    );
+    if(!bytes)throw new TypeError('EXPORT_INPUT_INVALID');
+    progressPayloads.push({
+     computationIndex:entry.computationIndex,payloadBytesBase64:Buffer.from(bytes).toString('base64')
+    });
+  }
+  progressPayloads.sort((left,right)=>left.computationIndex-right.computationIndex);
+  const supplemental=[];
+  const seenKinds=new Set();
+  let total=0;
+  for(const entry of inputSupplemental){
+    if(!exactDataObject(entry,['kind','bytes'])||
+      !SUPPLEMENTAL_EVIDENCE_KINDS.includes(entry.kind)||seenKinds.has(entry.kind))
+     throw new TypeError('EXPORT_INPUT_INVALID');
+    seenKinds.add(entry.kind);
+    const bytes=snapshotBytes(
+      entry.bytes,MAX_HISTORICAL_SUPPLEMENTAL_V2_BYTES,'EXPORT_INPUT_INVALID',false
+    );
+    if(!bytes)throw new TypeError('EXPORT_INPUT_INVALID');
+    total+=bytes.length;
+    if(total>MAX_HISTORICAL_SUPPLEMENTAL_V2_BYTES)throw new TypeError('EXPORT_INPUT_LIMIT');
+    supplemental.push({
+     kind:entry.kind,bytesBase64:Buffer.from(bytes).toString('base64'),
+     sha256:await digestBytes(bytes)
+    });
+  }
+  supplemental.sort((left,right)=>SUPPLEMENTAL_EVIDENCE_KINDS.indexOf(left.kind)-
+    SUPPLEMENTAL_EVIDENCE_KINDS.indexOf(right.kind));
+  return {progressPayloads,supplemental};
 }
 
 export async function exportHistoricalResultV2(input={}){
@@ -120,6 +204,7 @@ export async function exportHistoricalResultV2(input={}){
   if(!Object.hasOwn(observation,'result'))throw new TypeError('EXPORT_INPUT_INVALID');
   const resultBytes=snapshotBytes(input.resultBytes,MAX_HISTORICAL_RESULT_V2_BYTES,'EXPORT_INPUT_INVALID');
   const summaryBytes=snapshotBytes(input.summaryBytes,MAX_HISTORICAL_RESULT_V2_BYTES,'EXPORT_INPUT_INVALID');
+  const optionalEvidence=await snapshotOptionalEvidence(input.optionalEvidence);
   let summary=null;
   if(observation.result===null){
     if(resultBytes!==null||summaryBytes!==null||observation.resultSha256!==null||
@@ -149,6 +234,7 @@ export async function exportHistoricalResultV2(input={}){
     summary,
     payloadSha256:'0'.repeat(64)
   });
+  if(optionalEvidence!==undefined)envelope.optionalEvidence=optionalEvidence;
   envelope.payloadSha256=await digestBytes(
     Buffer.from(canonicalHistoricalExportV2Payload(envelope),'ascii'));
   const encoded=Buffer.from(JSON.stringify(envelope));
@@ -158,15 +244,45 @@ export async function exportHistoricalResultV2(input={}){
   return envelope;
 }
 
-function decodeBase64(value){
+function decodeBase64(value,limit=MAX_HISTORICAL_RESULT_V2_BYTES){
   if(value===null)return null;
-  if(typeof value!=='string'||value.length>Math.ceil(MAX_HISTORICAL_RESULT_V2_BYTES*4/3)+4||
+  if(typeof value!=='string'||value.length>Math.ceil(limit*4/3)+4||
      value.length%4!==0||!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value))
     throw new TypeError('EXPORT_INPUT_INVALID');
   const bytes=Buffer.from(value,'base64');
-  if(bytes.length>MAX_HISTORICAL_RESULT_V2_BYTES||bytes.toString('base64')!==value)
+  if(bytes.length>limit||bytes.toString('base64')!==value)
     throw new TypeError('EXPORT_INPUT_INVALID');
   return new Uint8Array(bytes);
+}
+
+function decodeOptionalEvidence(value){
+  if(value===undefined)return undefined;
+  if(!value||typeof value!=='object'||Array.isArray(value)||
+     Object.keys(value).length!==2||
+     Object.keys(value).some(key=>!['progressPayloads','supplemental'].includes(key))||
+     !Array.isArray(value.progressPayloads)||!Array.isArray(value.supplemental))
+    throw new TypeError('EXPORT_INPUT_INVALID');
+  const progressPayloads=value.progressPayloads.map(item=>{
+    if(!item||typeof item!=='object'||Array.isArray(item)||
+       Object.keys(item).length!==2||!Object.hasOwn(item,'computationIndex')||
+       !Object.hasOwn(item,'payloadBytesBase64'))
+      throw new TypeError('EXPORT_INPUT_INVALID');
+    return {
+      computationIndex:item.computationIndex,
+      payloadBytes:decodeBase64(item.payloadBytesBase64,MAX_HISTORICAL_PROGRESS_PAYLOAD_V2_BYTES)
+    };
+  });
+  const supplemental=value.supplemental.map(item=>{
+    if(!item||typeof item!=='object'||Array.isArray(item)||
+       Object.keys(item).length!==2||!Object.hasOwn(item,'kind')||
+       !Object.hasOwn(item,'bytesBase64'))
+      throw new TypeError('EXPORT_INPUT_INVALID');
+    return {
+      kind:item.kind,
+      bytes:decodeBase64(item.bytesBase64,MAX_HISTORICAL_SUPPLEMENTAL_V2_BYTES)
+    };
+  });
+  return {progressPayloads,supplemental};
 }
 
 async function readStdinBounded(){
@@ -187,14 +303,17 @@ async function runCli(){
   try{text=new TextDecoder('utf-8',{fatal:true}).decode(inputBytes);}
   catch{throw new Error('EXPORT_INPUT_INVALID');}
   const input=parseHistoricalExportV2Input(text);
-  if(!input||Object.keys(input).length!==4||
+  if(!input||!(Object.keys(input).length===4||Object.keys(input).length===5&&
+       Object.hasOwn(input,'optionalEvidence'))||
      !['observation','resultBytesBase64','summaryBytesBase64','generatedFixture']
        .every(key=>Object.hasOwn(input,key)))throw new Error('EXPORT_INPUT_INVALID');
   const envelope=await exportHistoricalResultV2({
     observation:input.observation,
     resultBytes:decodeBase64(input.resultBytesBase64),
     summaryBytes:decodeBase64(input.summaryBytesBase64),
-    generatedFixture:input.generatedFixture
+    generatedFixture:input.generatedFixture,
+    ...(Object.hasOwn(input,'optionalEvidence')
+      ?{optionalEvidence:decodeOptionalEvidence(input.optionalEvidence)}:{})
   });
   const output=Buffer.from(JSON.stringify(envelope));
   if(output.byteLength>MAX_HISTORICAL_EXPORT_V2_BYTES)throw new Error('EXPORT_INPUT_LIMIT');

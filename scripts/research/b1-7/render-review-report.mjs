@@ -110,7 +110,7 @@ function resultRows(result) {
 }
 
 function composition(projection) {
-  const {job, result, provenance} = projection;
+  const {job, result, provenance, optionalEvidence} = projection;
   const historicalV2 = projection.schema === HISTORICAL_EXPORT_V2_SCHEMA;
   const lines = [
     '# Offline B1 review report',
@@ -150,9 +150,15 @@ function composition(projection) {
       '',
       table(['Check','Outcome'],Object.entries(projection.verification)),
       '',
-      'The original journal daily budget, global active fence, launcher receipt, approval, profile bundle,',
-      'execution checkout, and source-map digest were not supplied by inspect_b1 and are NOT_SUPPLIED.',
-      'Progress payload hashes are NOT_VERIFIED because original payload bytes were not supplied.'
+      table(['Optional supplemental evidence','Status and byte binding'],
+        optionalEvidence.supplemental.map(item=>[
+          item.kind,item.status==='NOT_SUPPLIED'
+            ?'NOT_SUPPLIED'
+            :`${item.status}; SHA-256 ${item.sha256}; ${item.identityBinding}`
+        ])),
+      '',
+      'Original progress payload bytes are checked only when supplied; supplemental assertions remain unverified',
+      'and are not bound by inspect_b1 to runtime authority or source authenticity.'
     ] : []),
     '',
     '## Lifecycle and attempt',
@@ -215,7 +221,7 @@ function composition(projection) {
       '- This is a bounded offline review of caller-supplied historical-shaped evidence, not independent acceptance.',
       '- Hash consistency binds supplied bytes; it does not authenticate the source, caller, or execution checkout.',
       '- The diagnostic window has already been seen; no holdout, prospective, profitability, or causal claim follows.',
-      '- Missing budget, fence, approval, and launcher facts remain NOT_SUPPLIED, not inferred from other fields.',
+      '- Missing optional evidence remains NOT_SUPPLIED; supplied supplemental bytes remain unverified assertions.',
       '- No thresholds are changed; screen checks and returned statuses are displayed, never recomputed.',
       '- Costs, returns, quarters, control bindings, and lifecycle values are copied from supplied records.',
       '- Daily return/held-target series and fill/cancel detail arrays are omitted from this compact report.'

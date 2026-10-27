@@ -29,9 +29,16 @@ reconstruct an original digest.
 
 The parser rejects duplicate keys, invalid UTF-8, unknown keys in closed
 objects, invalid numbers, inconsistent path/order identities, mismatched
-digests, contradictory lifecycle/result states, and oversize input. The
-envelope is limited to 8 MiB; serialized result and summary are each limited to
-1 MiB, controls to 8 KiB, and the shared Markdown report to 1 MiB.
+digests, contradictory lifecycle/result states, and oversize input. It checks
+the producer's canonical input identity, execution identity, all 44 canonical
+path descriptors and path identities, manifest digest, and computation order.
+The identity inputs contain only bounded strings and hash records; no
+JavaScript serialization is used to reproduce hashes of floating-point result
+or progress payloads. These checks establish internal consistency, not a trusted
+profile binding. The envelope is limited to 8 MiB; serialized result and summary
+are each limited to 1 MiB, controls to 8 KiB, individual progress payloads to
+64 KiB, and the complete envelope including optional evidence to 8 MiB. The
+shared Markdown report is limited to 1 MiB.
 
 ## What is and is not checked
 
@@ -49,25 +56,33 @@ V2 preserves the three supported result shapes:
 The 44 `pathIds` inventory slots and computation order remain separate from
 progress and returned path results. Control bindings are checked against
 computation progress indices 0 and 15. This checks internal references only:
-`inspect_b1` does not provide the original progress payload bytes, so their
-individual SHA-256 values are reported as
-`NOT_VERIFIED_ORIGINAL_BYTES_NOT_SUPPLIED`. Supplied controls are retained;
-they are not recalculated.
+`inspect_b1` does not provide original progress payload bytes by default, so
+their SHA-256 values remain
+`NOT_VERIFIED_ORIGINAL_BYTES_NOT_SUPPLIED`. Callers may optionally supply
+original payload bytes by computation index; V2 verifies their exact byte
+hashes against progress and structurally compares each parsed payload with its
+returned path record. Partial provision is reported separately from complete
+verification. Supplied controls are retained; they are not recalculated.
 
 Result and summary byte digests, the summary/result structural projection,
-trial ID, protocol/input consistency, and the result execution identity are
-checked. Source SHA, manifest SHA, profile, implementation claims, and
-path/order values are still caller-supplied bindings; there is no separate
-trusted profile bundle or pinned historical catalog in this format. A
-well-formed or matching hash is not source authenticity, independent
-acceptance, or authority. The outer payload digest detects unresealed changes,
-not a malicious caller who can replace data and recompute the digest.
+trial ID, protocol/input consistency, result execution identity, path identities,
+and manifest order are checked. Source SHA, profile, implementation claims,
+and input provenance remain caller-supplied assertions; there is no trusted
+profile bundle or pinned historical catalog in this format. A well-formed or
+matching hash is not source authenticity, independent acceptance, or authority.
+The outer payload digest detects unresealed changes, not a malicious caller who
+can replace data and recompute the digest.
 
 The journal observation has attempt and per-job fence fields, but does not
 supply a durable daily budget, global active fence, launcher receipt,
 approval, execution checkout, or source-map digest. The engine result's
 `budget` is only its reported configured limits; it is not the journal's
-durable budget. Missing fields are shown as `NOT_SUPPLIED`, not inferred.
+durable budget. V2 can optionally carry separately typed supplemental bytes for
+those seven evidence categories. Their bytes are bounded and their supplied
+SHA-256 is checked, but their contents are opaque, are not validated against
+producer contracts unavailable in `inspect_b1`, and are never treated as
+authentic, independently accepted, or authority-bearing. Missing categories
+remain `NOT_SUPPLIED`; no field is inferred from another.
 The diagnostic window has already been seen. The report makes no holdout,
 execution, promotion, profitability, or causal claim and does not change any
 screen threshold.
@@ -81,7 +96,10 @@ continues to reject historical evidence.
 
 The exporter reads one bounded JSON wrapper from stdin containing
 `observation`, base64 `resultBytesBase64`, base64 `summaryBytesBase64`, and
-`generatedFixture`. It writes a complete V2 envelope only after validation.
+`generatedFixture`. An optional `optionalEvidence` object may carry
+`progressPayloads` (`computationIndex`, `payloadBytesBase64`) and `supplemental`
+(`kind`, `bytesBase64`). The importable API accepts the same shape using raw
+`Uint8Array` byte values. It writes a complete V2 envelope only after validation.
 The existing report command accepts V1 or V2 bytes and writes only a complete
 report:
 
