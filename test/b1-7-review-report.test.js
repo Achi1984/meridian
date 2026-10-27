@@ -109,7 +109,7 @@ test('accepted synthetic completed export renders deterministically and preserve
   const firstQuarter=parsedResult.paths[0].quarterlyReturns[0];
   assert.ok(first.includes(firstQuarter.quarter.replace('-', '\\-')));
   const quarterValue=Object.is(firstQuarter.netReturn,-0)?'-0':String(firstQuarter.netReturn);
-  assert.ok(first.includes(quarterValue.replace(/[.-]/g,'\\$&')));
+  assert.ok(first.includes(quarterValue.replace(/[\\.-]/g,'\\$&')));
   assert.ok(parsedResult.paths.some(path=>path.kind==='CASH'&&path.totalCosts===0));
   assert.ok(first.includes('totalCosts\\"\\:0'));
   assert.ok(first.includes('promotionEligible\\"\\:false'));
