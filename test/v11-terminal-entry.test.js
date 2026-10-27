@@ -939,10 +939,10 @@ async function browserRun(call,start,width,server){
       await openApp();await waitUntil(async()=>await evaluate(`!document.getElementById('app').hidden`));
     }
     if(tab==='depot'){
-      const openApp=async(value='synthetic-b3-token')=>evaluate(`(()=>{const input=document.getElementById('app-access-password');input.value=${JSON.stringify(value)};document.getElementById('app-access-form').requestSubmit();return input.value;})()`);
+      const openApp=async()=>evaluate(`(()=>{const input=document.getElementById('app-access-password');input.value='synthetic-b3-token';document.getElementById('app-access-form').requestSubmit();return input.value;})()`);
       const waitApp=async()=>{for(let i=0;i<100;i++){if(await evaluate(`!document.getElementById('app').hidden`))return;await new Promise(r=>setTimeout(r,20));}assert.fail('App unlock timeout');};
       const opened=server.metrics().authReads;
-      assert.equal(await openApp('https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/asset-watch?share='+'a'.repeat(43)),'');
+      assert.equal(await evaluate(`(()=>{const input=document.getElementById('app-access-password');input.value='https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/asset-watch?share='+'a'.repeat(43);document.getElementById('app-access-form').requestSubmit();return input.value;})()`),'');
       await new Promise(r=>setTimeout(r,20));
       assert.equal(await evaluate(`document.getElementById('app').hidden`),true,'bot share link cannot unlock Depot or the app');
       assert.equal(server.metrics().authReads,opened,'share credential is rejected before the app endpoint');
