@@ -83,7 +83,7 @@ test('401 and 403 from a manual bot read revoke the shared credential',async()=>
   }
 });
 
-test('disposing the bot mount unregisters listeners and reader ownership',()=>{
-  const h=setup();h.mounted.dispose();h.access.set('still-app-owned');
-  assert.equal(h.access.getToken(),'still-app-owned');
+test('disposing a reader mount revokes shared access and reader ownership',()=>{
+  const h=setup();h.access.set('verified-password');h.mounted.dispose();
+  assert.equal(h.access.getToken(),null);
 });

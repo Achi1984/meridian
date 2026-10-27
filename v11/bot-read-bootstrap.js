@@ -1,6 +1,6 @@
-import {appAccess} from './app-access.js?v=B14';
-import {createBotReadClient} from './bot-read-client.js?v=B14';
-import {createBotReadView,renderCommandBotOverview} from './bot-read-view.js?v=B14';
+import {appAccess} from './app-access.js?v=B14-M11';
+import {createBotReadClient} from './bot-read-client.js?v=B14-M11';
+import {createBotReadView,renderCommandBotOverview} from './bot-read-view.js?v=B14-M11';
 
 // Mounting controls never starts a request. Only the view's manual refresh can read.
 export function mountBotReadAccess(document,window,{
@@ -41,12 +41,13 @@ export function mountBotReadAccess(document,window,{
       }});
   }catch{
     cancelExpiry();unregister();
+    try{client?.dispose();}catch{}
     root.textContent='Botansicht nicht verfügbar. Bitte Seite neu laden.';
     return null;
   }
   return {dispose(){
     if(disposed)return;
-    disposed=true;cancelExpiry();unregister();view.dispose();client=null;
+    disposed=true;access.lock();cancelExpiry();unregister();view.dispose();client=null;
   }};
 }
 

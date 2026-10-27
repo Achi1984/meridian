@@ -1,6 +1,6 @@
-import {appAccess} from './app-access.js?v=B14';
-import {createDepotReadClient} from './depot-read-client.js?v=B14';
-import {createDepotReadView} from './depot-read-view.js?v=B14';
+import {appAccess} from './app-access.js?v=B14-M11';
+import {createDepotReadClient} from './depot-read-client.js?v=B14-M11';
+import {createDepotReadView} from './depot-read-view.js?v=B14-M11';
 
 // Mounting controls never starts a request. Only the view's manual refresh can read.
 export function mountDepotReadAccess(document,window,{
@@ -39,12 +39,13 @@ export function mountDepotReadAccess(document,window,{
       }});
   }catch{
     cancelExpiry();unregister();
+    try{client?.dispose();}catch{}
     root.textContent='Depotansicht nicht verfügbar. Bitte Seite neu laden.';
     return null;
   }
   return {dispose(){
     if(disposed)return;
-    disposed=true;cancelExpiry();unregister();view.dispose();client=null;
+    disposed=true;access.lock();cancelExpiry();unregister();view.dispose();client=null;
   }};
 }
 

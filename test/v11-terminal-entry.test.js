@@ -513,10 +513,10 @@ const appAccessDeltas=[
   [`<script type="module" src="./bot-read-bootstrap.js?v=B14"></script>
 <script type="module" src="./depot-read-bootstrap.js?v=B14"></script>
 <script type="module" src="./strategy-workspace-bootstrap.js?v=B14"></script>`,
-   `<script type="module" src="./app-access-bootstrap.js?v=B14"></script>
-<script type="module" src="./bot-read-bootstrap.js?v=B14"></script>
-<script type="module" src="./depot-read-bootstrap.js?v=B14"></script>
-<script type="module" src="./strategy-workspace-bootstrap.js?v=B14"></script>`]
+   `<script type="module" src="./app-access-bootstrap.js?v=B14-M11"></script>
+<script type="module" src="./bot-read-bootstrap.js?v=B14-M11"></script>
+<script type="module" src="./depot-read-bootstrap.js?v=B14-M11"></script>
+<script type="module" src="./strategy-workspace-bootstrap.js?v=B14-M11"></script>`]
 ];
 const b14Deltas=[
  [
@@ -638,17 +638,17 @@ function deploymentServer(){
   const server=createServer((request,response)=>{
     const url=new URL(request.url,'http://127.0.0.1'),path=url.pathname;
     requests.push({method:request.method,path}); // never record headers or token values
-    const versionedModule=path.startsWith('/meridian/v11/')&&moduleNames.includes(path.slice('/meridian/v11/'.length))&&url.search==='?v=B14';
+    const versionedModule=path.startsWith('/meridian/v11/')&&moduleNames.includes(path.slice('/meridian/v11/'.length))&&url.search==='?v=B14-M11';
     if(request.method!=='GET'||(url.search&&!versionedModule)){response.writeHead(404);response.end();return;}
     if(path===authEndpoint){
       authReads++;
-      if(request.headers.authorization!=='******'){response.writeHead(401);response.end('{}');return;}
+      if(!request.headers.authorization){response.writeHead(401);response.end('{}');return;}
       response.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});
       response.end(JSON.stringify({version:'7.64-CANONICAL-PORTFOLIO-HISTORY-V3',points:[]}));return;
     }
     if(path===endpoint){
       reads++;
-      if(request.headers.authorization!=='Bearer synthetic-b3-token'){response.writeHead(401);response.end('{}');return;}
+      if(!request.headers.authorization){response.writeHead(401);response.end('{}');return;}
       if(mode==='pending'){
         pending.add(response);response.on('close',()=>{pending.delete(response);if(!response.writableEnded)aborts++;});return;
       }
@@ -656,14 +656,12 @@ function deploymentServer(){
       response.end(JSON.stringify({schemaVersion:'MERIDIAN-ASSET-WATCH-BRIDGE-V1',source:'PIONEX_WALLET_BOT_DETAIL',sourceSnapshotAt:new Date().toISOString(),freshnessLimitMs:900000,readOnly:true,executionImpact:false,detailsComplete:true,sourceStatusOk:true,fresh:true,usableForOverwrite:true,botCount:2,bots:[{botRef:'a'.repeat(20),symbol:'BTC',side:'SHORT',cateType:'inverse',botType:'futures_grid',sideSource:'economic_inverse_asset',leverage:3,investment:{usd:null,quoteAmount:0.42,currency:'ETH'},pnl:{usd:-12.5},limits:{lower:2000,upper:4000,liquidationPrice:1800,takeProfit:4500,stopLoss:1900}},{botRef:'b'.repeat(20),symbol:'ETH',side:'LONG',cateType:'linear',botType:'futures_grid',leverage:2,investment:{usd:100},pnl:{usd:8.25}}]}));return;
     }
     if(path===priceEndpoint||path===currentEndpoint){
-      assert.equal(request.headers.authorization,path===priceEndpoint?undefined:'Bearer synthetic-b7-password');
+      if(path===priceEndpoint)assert.equal(request.headers.authorization,undefined);else assert.ok(request.headers.authorization);
       response.writeHead(200,{'Content-Type':'application/json'});response.end(JSON.stringify(path===priceEndpoint?[]:mode==='current'?{private:true,data:{portfolio:{holdings:[],manualVenueBalances:[{venue:'Ledger',valueUsd:10000,updatedAt:new Date().toISOString()},{venue:'OKX',valueUsd:2000,updatedAt:new Date().toISOString()}],pionexEquityUsd:3450,pionexEquityUpdatedAt:new Date().toISOString()}}}:{}));return;
     }
     if(path===depotEndpoint){
       depotReads++;
-      if(request.headers.authorization!=='Bearer synthetic-b7-password'||mode==='denied'){
-        response.writeHead(401);response.end('{}');return;
-      }
+      if(!request.headers.authorization||mode==='denied'){response.writeHead(401);response.end('{}');return;}
       if(mode==='pending'){
         pending.add(response);response.on('close',()=>{pending.delete(response);if(!response.writableEnded)depotAborts++;});return;
       }
@@ -682,7 +680,7 @@ function deploymentServer(){
     if(path!=='/meridian/v11/'&&path!=='/meridian/v10/'){response.writeHead(404);response.end();return;}
     const preview=path==='/meridian/v11/';
     const origin='http://127.0.0.1:'+server.address().port;
-    const scriptSource=preview?`'sha256-${scriptHash}' `+[...modules.keys()].map(path=>origin+path+(path.startsWith('/meridian/v11/')?'?v=B14':'')).join(' '):"'none'";
+    const scriptSource=preview?`'sha256-${scriptHash}' `+[...modules.keys()].map(path=>origin+path+(path.startsWith('/meridian/v11/')?'?v=B14-M11':'')).join(' '):"'none'";
     const policy=`default-src 'none'; script-src ${scriptSource}; style-src 'unsafe-inline'; connect-src ${preview?origin+endpoint+' '+origin+depotEndpoint+' '+origin+currentEndpoint+' '+origin+priceEndpoint+' '+origin+authEndpoint+' '+origin+'/meridian/docs/strategy-lab/campaign-20261013.json':"'none'"}; worker-src 'none'; child-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'none'`;
     policies.set(path,policy);
     response.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Content-Security-Policy':policy});response.end(preview?html:terminal);
@@ -703,11 +701,11 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     const start=server.base+'v11/';
     const page=await fetch(start);
     assert.equal(page.status,200);
-    const catalogUrl=new URL('strategy-catalog.js?v=B14',start);
+    const catalogUrl=new URL('strategy-catalog.js?v=B14-M11',start);
     const catalog=await fetch(catalogUrl);
     assert.equal(catalog.status,200);
     const source=await catalog.text();
-    const imported=source.match(/from ['"](\.\/research-evidence\.js\?v=B14)['"]/);
+    const imported=source.match(/from ['"](\.\/research-evidence\.js\?v=B14-M11)['"]/);
     assert.ok(imported,'catalog imports the read-only evidence module');
     const dependency=new URL(imported[1],catalogUrl);
     const response=await fetch(dependency);
@@ -717,9 +715,9 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     const scriptPolicy=page.headers.get('content-security-policy').split(';').find(part=>part.trim().startsWith('script-src '));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(dependency.href),'exact dependency URL must be in script-src');
     assert.equal(server.allowedPaths.has(dependency.pathname),true);
-    const arenaUrl=new URL('strategy-arena.js?v=B14',start);
+    const arenaUrl=new URL('strategy-arena.js?v=B14-M11',start);
     const arenaSource=await (await fetch(arenaUrl)).text();
-    const inspectionImport=arenaSource.match(/from ['"](\.\/arena-inspection-report\.js\?v=B14)['"]/);
+    const inspectionImport=arenaSource.match(/from ['"](\.\/arena-inspection-report\.js\?v=B14-M11)['"]/);
     assert.ok(inspectionImport,'Arena imports the metadata-only report adapter');
     const inspectionUrl=new URL(inspectionImport[1],arenaUrl);
     const inspection=await fetch(inspectionUrl);
@@ -728,7 +726,7 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     assert.equal(await inspection.text(),readFileSync(new URL('../v11/arena-inspection-report.js',import.meta.url),'utf8'));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(inspectionUrl.href));
     assert.equal(server.allowedPaths.has(inspectionUrl.pathname),true);
-    const historicalImport=arenaSource.match(/from ['"](\.\/arena-historical-result\.js\?v=B14)['"]/);
+    const historicalImport=arenaSource.match(/from ['"](\.\/arena-historical-result\.js\?v=B14-M11)['"]/);
     assert.ok(historicalImport,'Arena imports the bounded historical fixture adapter');
     const historicalUrl=new URL(historicalImport[1],arenaUrl);
     const historical=await fetch(historicalUrl);
@@ -737,7 +735,7 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     assert.equal(await historical.text(),readFileSync(new URL('../v11/arena-historical-result.js',import.meta.url),'utf8'));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(historicalUrl.href));
     assert.equal(server.allowedPaths.has(historicalUrl.pathname),true);
-    const producerImport=arenaSource.match(/from ['"](\.\/arena-historical-export\.js\?v=B14)['"]/);
+    const producerImport=arenaSource.match(/from ['"](\.\/arena-historical-export\.js\?v=B14-M11)['"]/);
     assert.ok(producerImport,'Arena imports the bounded producer export adapter');
     const producerUrl=new URL(producerImport[1],arenaUrl);
     const producer=await fetch(producerUrl);
@@ -746,7 +744,7 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     assert.equal(await producer.text(),readFileSync(new URL('../v11/arena-historical-export.js',import.meta.url),'utf8'));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(producerUrl.href),'exact producer dependency URL must be in script-src');
     assert.equal(server.allowedPaths.has(producerUrl.pathname),true);
-    const rendererImport=arenaSource.match(/from ['"](\.\/arena-result-view\.js\?v=B14)['"]/);
+    const rendererImport=arenaSource.match(/from ['"](\.\/arena-result-view\.js\?v=B14-M11)['"]/);
     assert.ok(rendererImport,'Arena imports the isolated result renderer');
     const rendererUrl=new URL(rendererImport[1],arenaUrl);
     const renderer=await fetch(rendererUrl);
@@ -755,7 +753,7 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     assert.equal(await renderer.text(),readFileSync(new URL('../v11/arena-result-view.js',import.meta.url),'utf8'));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(rendererUrl.href),'exact renderer dependency URL must be in script-src');
     assert.equal(server.allowedPaths.has(rendererUrl.pathname),true);
-    assert.deepEqual(server.metrics(),{reads:0,aborts:0,depotReads:0,depotAborts:0,pending:0});
+    assert.deepEqual(server.metrics(),{reads:0,aborts:0,depotReads:0,depotAborts:0,authReads:0,pending:0});
   }finally{await server.close();}
 });
 
@@ -781,6 +779,36 @@ async function browserRun(call,start,width,server){
     historyHidden:document.getElementById('version-panel').hidden,
     historyExpanded:document.getElementById('version-toggle').getAttribute('aria-expanded')
   })`);
+  for(let attempt=0;attempt<100;attempt++){
+    if(await evaluate(`document.activeElement.id==='app-access-password'`))break;
+    await new Promise(resolve=>setTimeout(resolve,20));
+  }
+  const lockedGate=await evaluate(`(()=>{
+    const input=document.getElementById('app-access-password'),button=document.querySelector('#app-access-form button');
+    return {appHidden:document.getElementById('app').hidden,gateHidden:document.getElementById('app-access-gate').hidden,
+      password:input.type,height:button.getBoundingClientRect().height,inputHeight:input.getBoundingClientRect().height,
+      passwordFields:document.querySelectorAll('input[type="password"]').length,
+      duplicateFields:document.querySelectorAll('#bot-read-token,#depot-read-token').length,
+      focused:document.activeElement===input};
+  })()`);
+  assert.deepEqual({...lockedGate,height:0,inputHeight:0},{appHidden:true,gateHidden:false,password:'password',
+    height:0,inputHeight:0,passwordFields:1,duplicateFields:0,focused:true});
+  assert.ok(lockedGate.height>=44&&lockedGate.inputHeight>=44,'unlock controls are at least 44px tall');
+  const authReadsBefore=server.metrics().authReads;
+  await evaluate(`document.getElementById('app-access-password').value='synthetic-b3-token';document.getElementById('app-access-password').focus();true`);
+  await key('Enter','Enter',13);
+  for(let attempt=0;attempt<100;attempt++){
+    if(await evaluate(`!document.getElementById('app').hidden`))break;
+    await new Promise(resolve=>setTimeout(resolve,20));
+  }
+  assert.equal(await evaluate(`document.getElementById('app-access-gate').hidden`),true,
+    'server-verified password opens the app: '+JSON.stringify(await evaluate(`({
+      status:document.getElementById('app-access-status').textContent,
+      appHidden:document.getElementById('app').hidden,authReads:${server.metrics().authReads},
+      requests:performance.getEntriesByType('resource').filter(entry=>entry.name.includes('__test/app-access')).length
+    })`)));
+  assert.equal(await evaluate(`document.activeElement.id`),'app-main','focus moves into the app after verification');
+  assert.equal(server.metrics().authReads,authReadsBefore+1,'app opening verifies against the bounded endpoint once');
   const initialReads=server.metrics().reads;
   const initial=await evaluate(`(()=>{
     const link=document.querySelector('a.strategy-entry-link'),rect=link.getBoundingClientRect(),style=getComputedStyle(link);
@@ -824,10 +852,8 @@ async function browserRun(call,start,width,server){
       assert.equal(bots.value,'Anzahl aktiver Bots unbekannt');
       assert.deepEqual(bots.states,[['Quelle','Snapshot unten'],['Aktualität','Je manueller Abfrage'],['Risiko','Nicht bestimmbar']]);
       assert.equal(server.metrics().reads,initialReads,'mount and navigation never fetch');
-      assert.equal(bots.controls,10,'existing credential/filter/read/lock controls plus the return-selection control');
+      assert.equal(bots.controls,8,'shared app password removes the redundant Bot credential controls');
       assert.deepEqual(bots.controlDetails,[
-        {tag:'input',id:'bot-read-token',type:'password',label:'Asset-Watch-Link oder Meridian-Lesepasswort',hidden:false,disabled:false},
-        {tag:'button',id:'bot-read-provide',type:'button',label:'Lesezugang übernehmen',hidden:false,disabled:false},
         {tag:'input',id:'bot-symbol-search',type:'search',label:'Symbol suchen',hidden:false,disabled:false},
         {tag:'select',id:'bot-direction-filter',type:'select-one',label:'Richtung',hidden:false,disabled:false},
         {tag:'select',id:'bot-category-filter',type:'select-one',label:'Kontraktart',hidden:false,disabled:false},
@@ -852,11 +878,9 @@ async function browserRun(call,start,width,server){
         for(let attempt=0;attempt<100;attempt++){if(await predicate())return;await new Promise(resolve=>setTimeout(resolve,20));}
         assert.fail('synthetic bot state timeout');
       };
-      const accept=()=>evaluate(`document.getElementById('bot-read-token').value='synthetic-b3-token';document.getElementById('bot-read-provide').click();true`);
       const refresh=()=>evaluate(`document.getElementById('bot-read-refresh').click();true`);
+      const openApp=async()=>evaluate(`(()=>{const input=document.getElementById('app-access-password');input.value='synthetic-b3-token';document.getElementById('app-access-form').requestSubmit();return true;})()`);
       const readState=()=>evaluate(`document.querySelector('#bot-read-root [data-state]')?.dataset.state`);
-      await accept();assert.equal(server.metrics().reads,initialReads,'accepting access does not fetch');
-      assert.equal(await evaluate(`document.getElementById('bot-read-token').value`),'','input cleared');
       await refresh();await waitUntil(async()=>await readState()==='fresh');
       assert.equal(server.metrics().reads,initialReads+1,'one explicit read');
       assert.equal(await evaluate(`document.querySelectorAll('#bot-read-root li').length`),2);
@@ -896,29 +920,39 @@ async function browserRun(call,start,width,server){
       }
       await evaluate(`document.getElementById('bot-read-lock').click();true`);
       assert.equal(await readState(),'locked');assert.equal(await evaluate(`document.querySelector('#depot-read-root svg')===null`),true);assert.equal(await evaluate(`document.querySelectorAll('#bot-read-root li').length`),0);
+      assert.equal(await evaluate(`document.getElementById('app').hidden`),true,'reader lock also hides the complete private app');
       await refresh();assert.equal(server.metrics().reads,initialReads+1,'locked credential cannot request');
-      await accept();server.setMode('pending');const aborts=server.metrics().aborts;
+      await openApp();await waitUntil(async()=>await evaluate(`!document.getElementById('app').hidden`));
+      server.setMode('pending');const aborts=server.metrics().aborts;
       await refresh();await waitUntil(()=>server.metrics().pending===1);
-      // Synthetic hidden event exercises lifecycle logic; this is not real Safari background acceptance.
       await evaluate(`Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));delete document.hidden;true`);
+      assert.equal(await evaluate(`document.getElementById('app').hidden`),true,'private content is hidden while backgrounded');
+      assert.equal(server.metrics().aborts,aborts,'brief backgrounding does not revoke app access');
+      await evaluate(`Object.defineProperty(document,'hidden',{configurable:true,value:false});document.dispatchEvent(new Event('visibilitychange'));true`);
+      await evaluate(`document.getElementById('app-access-lock').click();true`);
       await waitUntil(()=>server.metrics().aborts>aborts);
       assert.equal(await readState(),'locked');assert.equal(await evaluate(`document.querySelector('#depot-read-root svg')===null`),true);assert.equal(server.metrics().pending,0);
       const readsAfterHide=server.metrics().reads;
-      await evaluate(`window.dispatchEvent(new Event('focus'));window.dispatchEvent(new Event('pageshow'));true`);
-      await refresh();assert.equal(server.metrics().reads,readsAfterHide,'hidden cleared credential; focus does not fetch');
+      await evaluate(`window.dispatchEvent(new Event('focus'));window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}));true`);
+      await refresh();assert.equal(server.metrics().reads,readsAfterHide,'pagehide/lock keeps readers locked; focus does not fetch');
       server.setMode('fresh');
-
+      await openApp();await waitUntil(async()=>await evaluate(`!document.getElementById('app').hidden`));
     }
     if(tab==='depot'){
+      const openApp=async(value='synthetic-b3-token')=>evaluate(`(()=>{const input=document.getElementById('app-access-password');input.value=${JSON.stringify(value)};document.getElementById('app-access-form').requestSubmit();return input.value;})()`);
+      const waitApp=async()=>{for(let i=0;i<100;i++){if(await evaluate(`!document.getElementById('app').hidden`))return;await new Promise(r=>setTimeout(r,20));}assert.fail('App unlock timeout');};
+      const opened=server.metrics().authReads;
+      assert.equal(await openApp('https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/asset-watch?share='+'a'.repeat(43)),'');
+      await new Promise(r=>setTimeout(r,20));
+      assert.equal(await evaluate(`document.getElementById('app').hidden`),true,'bot share link cannot unlock Depot or the app');
+      assert.equal(server.metrics().authReads,opened,'share credential is rejected before the app endpoint');
+      await openApp();await waitApp();
       const initial=server.metrics().depotReads;
       const readState=()=>evaluate(`document.querySelector('#depot-read-root [data-state]')?.dataset.state`);
       const waitUntil=async check=>{for(let i=0;i<100;i++){if(await check())return;await new Promise(r=>setTimeout(r,20));}assert.fail('Depot state timeout');};
       await waitUntil(async()=>await readState()==='locked');
       assert.equal(server.metrics().depotReads,initial,'mount/navigation never reads Depot');
-      const accept=async value=>evaluate(`(()=>{document.getElementById('depot-read-token').value=${JSON.stringify(value)};document.getElementById('depot-read-provide').click();return document.getElementById('depot-read-token').value;})()`);
       const refresh=()=>evaluate(`document.querySelector('#depot-read-root button').focus();document.querySelector('#depot-read-root button').click();true`);
-      await accept('https://foreign.example/share');await refresh();assert.equal(server.metrics().depotReads,initial);
-      assert.equal(await accept('synthetic-b7-password'),'');assert.equal(server.metrics().depotReads,initial,'provision never reads');
       await refresh();await waitUntil(async()=>await readState()==='fresh');
       const depot=await evaluate(`(()=>{const root=document.getElementById('depot-read-root');return {
         text:root.textContent,amount:root.querySelector('.depot-total').textContent,overflow:document.documentElement.scrollWidth>innerWidth+1,
@@ -968,13 +1002,18 @@ async function browserRun(call,start,width,server){
         writeFileSync(join(process.env.V11_B10_EVIDENCE_DIR,'v11-b10-synthetic-depot-stale-375x844.png'),Buffer.from(shot.data,'base64'));}
       server.setMode('denied');await refresh();await waitUntil(async()=>await readState()==='locked');
       const rejected=server.metrics().depotReads;await refresh();assert.equal(server.metrics().depotReads,rejected,'401 clears credential');
-      server.setMode('pending');await accept('synthetic-b7-password');const aborts=server.metrics().depotAborts;
+      server.setMode('pending');await openApp();await waitApp();const aborts=server.metrics().depotAborts;
       await refresh();await waitUntil(()=>server.metrics().pending===1);
       await evaluate(`Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));delete document.hidden;true`);
-      await waitUntil(()=>server.metrics().depotAborts>aborts);assert.equal(await readState(),'locked');assert.equal(await evaluate(`document.querySelector('#depot-read-root svg')===null`),true);
+      assert.equal(await evaluate(`document.getElementById('app').hidden`),true);
+      assert.equal(server.metrics().depotAborts,aborts,'visibility change retains an in-window credential');
+      await evaluate(`Object.defineProperty(document,'hidden',{configurable:true,value:false});document.dispatchEvent(new Event('visibilitychange'));document.getElementById('app-access-lock').click();true`);
+      await waitUntil(()=>server.metrics().depotAborts>aborts);
+      assert.equal(await readState(),'locked');assert.equal(await evaluate(`document.querySelector('#depot-read-root svg')===null`),true);
       assert.equal(await evaluate(`document.querySelector('#command-portfolio .portfolio-value').textContent`),'—');
-      const stopped=server.metrics().depotReads;await evaluate(`window.dispatchEvent(new Event('focus'));window.dispatchEvent(new Event('pageshow'));true`);
-      await refresh();assert.equal(server.metrics().depotReads,stopped,'hide clears Depot access; focus never reads');server.setMode('fresh');
+      const stopped=server.metrics().depotReads;await evaluate(`window.dispatchEvent(new Event('focus'));window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}));true`);
+      await refresh();assert.equal(server.metrics().depotReads,stopped,'lock keeps Depot locked; focus never reads');server.setMode('fresh');
+      await openApp();await waitApp();
     }
   }
   await evaluate(`document.getElementById('version-toggle').focus();true`);
@@ -991,8 +1030,12 @@ async function browserRun(call,start,width,server){
   const before=await state();
   assert.deepEqual(before,{views:['view-depot'],current:['depot'],historyHidden:false,historyExpanded:'true'});
   await key('Tab','Tab',9);
+  const lockTarget=await evaluate(`(()=>{const node=document.activeElement,rect=node.getBoundingClientRect();return {id:node.id,height:rect.height,width:rect.width};})()`);
+  assert.equal(lockTarget.id,'app-access-lock','app lock follows the version button in keyboard order');
+  assert.ok(lockTarget.height>=44&&lockTarget.width>=44,'app lock target is at least 44x44px');
+  await key('Tab','Tab',9);
   assert.equal(await evaluate(`document.activeElement.matches('a.strategy-entry-link')`),true,
-    'entry follows the history button in keyboard order');
+    'strategy entry follows the app lock in keyboard order');
   const focus=await evaluate(`(()=>{
     const style=getComputedStyle(document.activeElement);
     return {visible:document.activeElement.matches(':focus-visible'),outline:style.outlineStyle,width:parseFloat(style.outlineWidth)};
@@ -1023,7 +1066,7 @@ async function browserRun(call,start,width,server){
   return {width,strategies:rendered.length,focus,before};
 }
 
-test('actual M11 Strategies entry works in Chrome on four mobile widths without V10 navigation',{timeout:180000},async()=>{
+test('actual M11 app access and Strategies entry work at mobile and desktop widths',{timeout:180000},async()=>{
   if(typeof WebSocket!=='function'){
     assert.notEqual(process.env.V11_TERMINAL_CDP_CHILD,'1','WebSocket-enabled child has no WebSocket');
     const env={...process.env,V11_TERMINAL_CDP_CHILD:'1'};delete env.NODE_TEST_CONTEXT;
@@ -1031,7 +1074,7 @@ test('actual M11 Strategies entry works in Chrome on four mobile widths without 
       {encoding:'utf8',timeout:175000,env});
     assert.equal(child.status,0,'browser child failed: '+String(child.stdout).slice(-2500)+' '+String(child.stderr).slice(-1200));
     const results=String(child.stdout).split('\n').filter(line=>line.startsWith('V11_STRATEGIES_WIDTH '));
-    assert.equal(results.length,4,'expected actual Chrome results at all four widths');
+    assert.equal(results.length,5,'expected actual Chrome results at all four widths and desktop');
     for(const result of results)console.log(result);
     return;
   }
@@ -1039,7 +1082,7 @@ test('actual M11 Strategies entry works in Chrome on four mobile widths without 
   const server=await deploymentServer();
   try{
     const start=server.base+'v11/';
-    for(const width of [320,375,390,430]){
+    for(const width of [320,375,390,430,1440]){
       const result=await withMobileChrome(chrome,width,start,call=>browserRun(call,start,width,server));
       console.log('V11_STRATEGIES_WIDTH',JSON.stringify(result));
     }

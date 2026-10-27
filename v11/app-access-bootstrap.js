@@ -1,4 +1,4 @@
-import {appAccess} from './app-access.js?v=B14';
+import {appAccess} from './app-access.js?v=B14-M11';
 
 export function mountAppAccess(document,window,{access=appAccess}={}){
   const app=document.getElementById('app');
@@ -9,7 +9,7 @@ export function mountAppAccess(document,window,{access=appAccess}={}){
   const lockButton=document.getElementById('app-access-lock');
   const main=document.getElementById('app-main');
   if(!app||!gate||!form||!input||!status||!lockButton)return null;
-  let disposed=false,lastStatus='locked';
+  let disposed=false,lastStatus='locked',submissionGeneration=0;
   function render(state){
     if(disposed)return;
     const unlocked=state.status==='unlocked';
@@ -19,31 +19,34 @@ export function mountAppAccess(document,window,{access=appAccess}={}){
     if(unlocked&&lastStatus!=='unlocked'&&visible)main?.focus?.({preventScroll:true});
     lastStatus=state.status;
     if(state.status==='locked')status.textContent='Gesperrt. Das Meridian-Passwort wird nicht gespeichert.';
+    else if(state.status==='checking')status.textContent='Zugang wird geprüft.';
     else status.textContent='Zugang geprüft. Manuelle Datenabfragen bleiben getrennt.';
   }
   async function submit(event){
     event.preventDefault();
     if(disposed)return;
+    const submission=++submissionGeneration;
     const value=input.value;
     input.value='';
     if(!value){status.textContent='Bitte das Meridian-Passwort eingeben.';return;}
     status.textContent='Zugang wird geprüft.';
     const result=await access.verify(value);
-    if(disposed)return;
+    if(disposed||submission!==submissionGeneration)return;
     if(result==='unlocked')status.textContent='Zugang geprüft. Manuelle Datenabfragen bleiben getrennt.';
     else if(result==='rejected')status.textContent='Passwort nicht akzeptiert. Bitte erneut versuchen.';
     else status.textContent='Zugang derzeit nicht verfügbar. Bitte Verbindung prüfen und erneut versuchen.';
   }
   function lock(){
+    submissionGeneration++;
     access.lock();
     input.value='';
     try{input.focus({preventScroll:true});}catch{}
   }
   function visibility(){render({status:access.isUnlocked()?'unlocked':'locked'});}
   function focus(){render({status:access.isUnlocked()?'unlocked':'locked'});}
-  function pagehide(){access.lock();}
+  function pagehide(){submissionGeneration++;access.lock();}
   function pageshow(event){
-    if(event?.persisted)access.lock();
+    if(event?.persisted){submissionGeneration++;access.lock();}
     render({status:access.isUnlocked()?'unlocked':'locked'});
   }
   function keydown(event){
@@ -61,6 +64,7 @@ export function mountAppAccess(document,window,{access=appAccess}={}){
   if(!document.hidden&&!access.isUnlocked())try{input.focus({preventScroll:true});}catch{}
   return {dispose(){
     if(disposed)return;
+    submissionGeneration++;
     access.lock();disposed=true;
     unsubscribe();
     form.removeEventListener('submit',submit);

@@ -1,4 +1,4 @@
-import {DEPOT_WINDOWS} from './depot-history-model.js?v=B14';
+import {DEPOT_WINDOWS} from './depot-history-model.js?v=B14-M11';
 const money=x=>new Intl.NumberFormat('de-DE',{style:'currency',currency:'USD',maximumFractionDigits:2}).format(x);
 export function createDepotHistoryView(root,{onRange}={}){
   const d=root.ownerDocument,el=(tag,text)=>{const n=d.createElement(tag);if(text!==undefined)n.textContent=text;return n;};

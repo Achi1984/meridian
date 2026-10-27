@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {createAppAccess} from '../v11/app-access.js';
 import {mountAppAccess} from '../v11/app-access-bootstrap.js';
 
@@ -90,6 +91,17 @@ test('a suspended expiry timer cannot extend access beyond its deadline',async()
   assert.equal(clears,2);
 });
 
+test('verification timeout aborts the request and remains a data-unavailable result',async()=>{
+  let signal;
+  const h=harness({fetchImpl:(_url,options)=>{signal=options.signal;return new Promise(()=>{});}});
+  const pending=h.access.verify(PASSWORD);
+  const [id]=h.timers.keys();
+  h.fire(id);
+  assert.equal(await pending,'unavailable');
+  assert.equal(signal.aborted,true);
+  assert.equal(h.access.getToken(),null);
+});
+
 test('manual lock aborts verification and rejects a late response',async()=>{
   let resolve;
   const h=harness({fetchImpl:(_url,{signal})=>new Promise(r=>{
@@ -111,17 +123,18 @@ class Target{
   focus(){this.focused=true;}
 }
 
-function mountHarness(){
+function mountHarness({initialCredential=PASSWORD,verifyResult='unlocked'}={}){
   const ids=['app','app-access-gate','app-access-form','app-access-password','app-access-status','app-access-lock','app-main'];
   const nodes=new Map(ids.map(id=>[id,new Target()]));
   const document=new Target(),window=new Target();
   document.getElementById=id=>nodes.get(id);
-  let credential=PASSWORD,locks=0;
+  let credential=initialCredential,locks=0;const subscribers=new Set();
+  const publish=()=>{for(const listener of subscribers)listener({status:credential?'unlocked':'locked'});};
   const access={
     isUnlocked:()=>credential!==null,getToken:()=>credential,
-    subscribe(fn){fn({status:credential?'unlocked':'locked'});return ()=>{};},
-    verify:async value=>{credential=value;return 'unlocked';},
-    lock(){credential=null;locks++;}
+    subscribe(fn){subscribers.add(fn);fn({status:credential?'unlocked':'locked'});return ()=>subscribers.delete(fn);},
+    verify:async value=>{if(verifyResult==='unlocked')credential=value;publish();return verifyResult;},
+    lock(){credential=null;locks++;publish();}
   };
   const mounted=mountAppAccess(document,window,{access});
   return {nodes,document,window,access,mounted,locks:()=>locks};
@@ -157,6 +170,7 @@ test('gate clears the password field, reports generic results, and disposes list
   assert.equal(h.nodes.get('app').hidden,false);
   h.nodes.get('app-access-lock').fire('click');
   assert.equal(h.access.getToken(),null);
+  assert.equal(h.nodes.get('app').hidden,true);
   assert.equal(input.focused,true);
   h.mounted.dispose();
   const prior=h.locks();
@@ -164,8 +178,34 @@ test('gate clears the password field, reports generic results, and disposes list
   assert.equal(h.locks(),prior);
 });
 
+test('rejected and unavailable states are distinct and never include the submitted value',async()=>{
+  for(const [result,message] of [
+    ['rejected','Passwort nicht akzeptiert. Bitte erneut versuchen.'],
+    ['unavailable','Zugang derzeit nicht verfügbar. Bitte Verbindung prüfen und erneut versuchen.']
+  ]){
+    const h=mountHarness({initialCredential:null,verifyResult:result});
+    const input=h.nodes.get('app-access-password');input.value='not-the-password';
+    h.nodes.get('app-access-form').fire('submit');
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(h.nodes.get('app-access-status').textContent,message);
+    assert.doesNotMatch(h.nodes.get('app-access-status').textContent,/not-the-password/);
+    assert.equal(input.value,'');
+    assert.equal(h.nodes.get('app').hidden,true);
+    h.mounted.dispose();
+  }
+});
+
+test('Escape clears the masked entry without disclosing or submitting it',()=>{
+  const h=mountHarness({initialCredential:null});
+  const input=h.nodes.get('app-access-password');input.value=PASSWORD;
+  h.document.fire('keydown',{key:'Escape'});
+  assert.equal(input.value,'');
+  assert.equal(h.access.getToken(),null);
+  h.mounted.dispose();
+});
+
 test('access modules do not persist credentials or private snapshots',()=>{
-  const source=String(import.meta.resolve('../v11/app-access.js'));
-  assert.match(source,/app-access\.js$/);
-  assert.equal(['localStorage','sessionStorage','indexedDB'].some(name=>name in globalThis),false);
+  const source=readFileSync(new URL('../v11/app-access.js',import.meta.url),'utf8')+
+    readFileSync(new URL('../v11/app-access-bootstrap.js',import.meta.url),'utf8');
+  assert.doesNotMatch(source,/localStorage|sessionStorage|indexedDB|document\.cookie|location\.href/);
 });

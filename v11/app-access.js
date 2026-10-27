@@ -51,7 +51,8 @@ export function createAppAccess({fetchImpl=globalThis.fetch,now=Date.now,schedul
   function cancelExpiry(){
     if(expiryTimer!==null){cancelSchedule(expiryTimer);expiryTimer=null;}
   }
-  function state(){return Object.freeze({status:credential?'unlocked':'locked',expiresAt:credential?expiresAt:null});}
+  function state(){return Object.freeze({status:credential?'unlocked':pending?'checking':'locked',
+    expiresAt:credential?expiresAt:null});}
   function publish(){const current=state();for(const listener of subscribers){try{listener(current);}catch{}}}
   function lock(){
     generation++;
@@ -83,6 +84,7 @@ export function createAppAccess({fetchImpl=globalThis.fetch,now=Date.now,schedul
     if(!candidate||typeof AbortController==='undefined')return 'rejected';
     const id=generation,controller=new AbortController();
     pending=controller;
+    publish();
     let timer,onAbort;
     const aborted=new Promise((_,reject)=>{
       onAbort=()=>reject(new Error('unavailable'));
