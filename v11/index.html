@@ -282,6 +282,8 @@
     .arena-evidence summary{font-size:10px}
     .arena-evidence-details{margin-top:8px}
     .arena-evidence-details ul{padding-left:18px;overflow-wrap:anywhere}
+    .arena-historical-metadata[aria-label^="Separates historisches Arena-Ergebnis"]{min-width:0;overflow-wrap:anywhere}
+    .arena-historical-metadata[aria-label^="Separates historisches Arena-Ergebnis"] section,.arena-historical-metadata[aria-label^="Separates historisches Arena-Ergebnis"] dl,.arena-historical-metadata[aria-label^="Separates historisches Arena-Ergebnis"] dt,.arena-historical-metadata[aria-label^="Separates historisches Arena-Ergebnis"] dd,.arena-historical-metadata[aria-label^="Separates historisches Arena-Ergebnis"] p,.arena-historical-metadata[aria-label^="Separates historisches Arena-Ergebnis"] h4,.arena-historical-metadata[aria-label^="Separates historisches Arena-Ergebnis"] h5,.arena-historical-metadata[aria-label^="Separates historisches Arena-Ergebnis"] ul,.arena-historical-metadata[aria-label^="Separates historisches Arena-Ergebnis"] li,.arena-historical-metadata[aria-label^="Separates historisches Arena-Ergebnis"] summary,.arena-historical-metadata[aria-label^="Separates historisches Arena-Ergebnis"] pre{min-width:0;overflow-wrap:anywhere}
     .arena-control{padding:10px;border:1px solid var(--line);border-radius:9px;font-size:11px;overflow-wrap:anywhere}
     .tone-safe{color:#6ee7b7}.tone-danger{color:#ff9b9b}.tone-muted{color:var(--muted)}
     @media(max-width:560px){.strategy-summary{grid-template-columns:1fr}.strategy-progression{grid-template-columns:1fr 1fr}.arena-toolbar{grid-template-columns:1fr}.arena-model-card{padding:11px}}
@@ -302,7 +304,7 @@
         <span class="mark" aria-hidden="true">M</span>
         <div class="brand">MERIDIAN <span aria-label="Version 11">11</span><small>NEXT GENERATION</small></div>
       </div>
-      <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B12<small>Versionsverlauf ▾</small></button>
+      <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B14<small>Versionsverlauf ▾</small></button>
     </div>
     <nav class="terminal-entry" aria-label="M11-Strategien">
       <a class="strategy-entry-link" href="#view-strategies" data-open-strategies>Strategien öffnen</a>
@@ -313,7 +315,7 @@
         <p>Kein aktuelles Betriebssignal verbunden. Ob ein Agent arbeitet oder warum er wartet, ist hier nicht feststellbar.</p>
         <p><b>Aktuelle Aufgabe:</b> Nicht verifiziert.</p>
         <p><b>Letztes Lebenszeichen:</b> Nicht verfügbar. Diese Anzeige überwacht den Betrieb noch nicht.</p>
-        <p><b>Diese Vorschau · B12:</b> Native Strategien-Ansicht mit zwölf Hypothesen, fünf Arena-Modellen und einem getrennten Entwicklungs-Kandidaten. Nur lokale Forschungsquellen und manuelle Diagnose; keine laufenden Paper- oder Live-Aktivitäten.</p>
+        <p><b>Diese Vorschau · B14:</b> Research Results Explorer für 44 Producerpfade mit Filtern, Zweipfadvergleich und gelieferten Quartalsrenditen. UNVERIFIED · Herkunft nicht bestätigt. Keine neuen Research-Ergebnisse oder Paper-/Live-Aktivitäten.</p>
         <p><b>Vorige Vorschau · B11:</b> Manuell geladene Bot-Snapshots filtern, ordnen und mit Command teilen. Nur bestätigte Quellwerte; Sprung zur passenden Karte. Draft, Geräteabnahme ausstehend.</p>
         <p><b>Vorige Vorschau · B10:</b> Kompakter Header und klarere Command-Hierarchie. Layout-Entwurf ohne neue Datenanbindung; Integration und Geräteabnahme ausstehend.</p>
         <p><b>Vorige Vorschau · B9:</b> Geladene Depotbewertung auch in Command. Verlauf mit Zeitachse und ausgewiesenem Messzeitraum. Kontrollierte Testvorschau · Geräteabnahme ausstehend. <a href="https://github.com/Achi1984/meridian/issues/766">B9-Umfang #766</a>.</p>
@@ -328,6 +330,8 @@
       </div>
       <p>Veröffentlichtes Terminal und Designvorschau sind getrennte Stände.</p>
       <ul class="version-history-list">
+        <li><strong>Meridian 11 · B14</strong><span class="version-status">Entwurf</span><p>Research Results Explorer für 44 Producerpfade mit Filtern, Zweipfadvergleich, Pfaddetails und gelieferten Quartalsrenditen. <a href="https://github.com/Achi1984/meridian/issues/961">Umfang #961</a>. UNVERIFIED · Herkunft nicht bestätigt. Keine neuen Research-Ergebnisse oder Paper-/Live-Aktivitäten.</p></li>
+        <li><strong>Meridian 11 · B13</strong><span class="version-status">Entwurf</span><p>Einheitliche Cache-Identitäten für das lokale M11-Modulnetz nach Auslieferung der Research-Oberfläche. <a href="https://github.com/Achi1984/meridian/issues/953">Umfang #953</a> · <a href="https://github.com/Achi1984/meridian/pull/956">Research-Oberfläche #956</a>. Keine neuen Research-Ergebnisse oder Paper-/Live-Aktivitäten.</p></li>
         <li><strong>Meridian 11 · B12</strong><span class="version-status">Entwurf</span><p>Strategien-Arbeitsbereich mit dem Quellregister, einer manuell bedienbaren M11-Arena und einem getrennten B1-7-Entwicklungskandidaten. Keine automatische Marktdatenbeschaffung, kein Paperbetrieb und keine Live-Freigabe.</p></li>
         <li><strong>Meridian 11 · B11</strong><span class="version-status">Testvorschau</span><p>Bot-Cockpit mit Suche, Richtung/Kontraktart-Filtern und deterministischer Sortierung. Command zeigt denselben validierten Snapshot und verlinkt bestätigte Quellverluste zur Karte. Reine Testvorschau; keine Risikorangfolge, neue Datenanbindung oder Funktionsfreigabe.</p></li>
         <li><strong>Meridian 11 · B10</strong><span class="version-status">Testvorschau</span><p>Kompaktere Header- und Command-Hierarchie sowie klare Vorbereitungslabels für Forecast und Scanner. Reines Layout; keine neue Datenanbindung oder Funktionsfreigabe.</p></li>
@@ -566,8 +570,8 @@
   }
 })();
 </script>
-<script type="module" src="./bot-read-bootstrap.js?v=B12"></script>
-<script type="module" src="./depot-read-bootstrap.js?v=B12"></script>
-<script type="module" src="./strategy-workspace-bootstrap.js?v=B12"></script>
+<script type="module" src="./bot-read-bootstrap.js?v=B14"></script>
+<script type="module" src="./depot-read-bootstrap.js?v=B14"></script>
+<script type="module" src="./strategy-workspace-bootstrap.js?v=B14"></script>
 </body>
 </html>

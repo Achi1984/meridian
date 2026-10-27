@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import test from 'node:test';
-import {B17_CANDIDATE,buildStrategyCatalog,FAMILY_IDS,renderStrategyCatalog} from '../v11/strategy-catalog.js';
+import {B17_CANDIDATE,buildStrategyCatalog,buildStrategyComparison,FAMILY_IDS,renderStrategyCatalog} from '../v11/strategy-catalog.js';
 import {ARENA_CANDIDATES,ARENA_RULESET,ARENA_SYMBOLS} from '../research/strategy-paper-arena.js';
 import {arenaHtml,createStrategyArenaView,describeArenaProvenance,evaluateArenaImport} from '../v11/strategy-arena.js';
 import {webcrypto} from 'node:crypto';
@@ -9,13 +9,14 @@ import {webcrypto} from 'node:crypto';
 const campaign=JSON.parse(readFileSync(new URL('../docs/strategy-lab/campaign-20261013.json',import.meta.url),'utf8'));
 
 class Element {
-  constructor(document,tag){this.ownerDocument=document;this.tagName=tag;this.children=[];this.attrs={};this.dataset={};this.text='';}
+  constructor(document,tag){this.ownerDocument=document;this.tagName=tag;this.children=[];this.attrs={};this.dataset={};this.listeners={};this.text='';}
   set textContent(value){this.text=String(value);this.children=[];}
   get textContent(){return this.text+this.children.map(child=>child.textContent).join('');}
   set innerHTML(_){throw new Error('HTML rendering is forbidden for the strategy catalog');}
   append(...children){this.children.push(...children);}
   replaceChildren(...children){this.text='';this.children=children;}
   setAttribute(key,value){this.attrs[key]=String(value);}
+  addEventListener(name,listener){this.listeners[name]=listener;}
 }
 
 function syntheticInput(){
@@ -34,6 +35,7 @@ test('campaign adapter exposes exactly the twelve source families and the separa
   for(const family of model.families){
     const source=campaign.families.find(row=>row.id===family.id);
     assert.equal(family.explanation,source.hypothesis);
+    assert.equal(family.failureRegime,source.failureRegime);
     assert.equal(family.sourceStatus,source.status);
     assert.equal(family.validationStatus,source.validationStatus);
     assert.equal(family.cost,'Nicht festgelegt · keine verifizierte Kostenbasis.');
@@ -49,6 +51,54 @@ test('campaign adapter exposes exactly the twelve source families and the separa
     evidence:'Keine Ergebnisse; ausschließlich Entwicklungskandidat.',
     blocker:'D1-Manifest nicht eingefroren; D2, Paper und Live benötigen getrennte Freigaben.',
     source:'M11-Arbeitsauftrag B12 · kein Arena-Ergebnis'});
+});
+
+test('comparison model selects two source families, permits identical selections and does not mutate inputs',()=>{
+  const original=structuredClone(campaign);
+  const model=buildStrategyCatalog(campaign);
+  const pair=buildStrategyComparison(model.families,'H1','H2');
+  assert.equal(pair.status,'PRESENT_UNVERIFIED');
+  assert.equal(pair.first.id,'H1');
+  assert.equal(pair.second.id,'H2');
+  assert.equal(pair.identical,false);
+  assert.equal(pair.first.failureRegime,campaign.families.find(row=>row.id==='H1').failureRegime);
+  assert.equal(pair.second.lineage,campaign.families.find(row=>row.id==='H2').lineage);
+  const same=buildStrategyComparison(model.families,'H1','H1');
+  assert.equal(same.status,'PRESENT_UNVERIFIED');
+  assert.equal(same.identical,true);
+  assert.equal(same.first,same.second);
+  assert.equal(buildStrategyComparison(model.families,'missing','H1').status,'UNKNOWN');
+  assert.deepEqual(campaign,original);
+});
+
+test('comparison keeps missing source fields unknown and renders untrusted strings as text',()=>{
+  const source=structuredClone(campaign);
+  const family=source.families.find(row=>row.id==='H1');
+  delete family.hypothesis;
+  delete family.entrySketch;
+  delete family.exitSketch;
+  delete family.failureRegime;
+  delete family.prerequisites;
+  delete family.lineage;
+  family.name='<img src=x onerror=alert(1)>';
+  const original=structuredClone(source);
+  const model=buildStrategyCatalog(source);
+  const adapted=model.families.find(row=>row.id==='H1');
+  assert.equal(adapted.explanation,'Unbekannt');
+  assert.equal(adapted.sourceEntry,'Unbekannt');
+  assert.equal(adapted.sourceExit,'Unbekannt');
+  assert.equal(adapted.failureRegime,'Unbekannt');
+  assert.deepEqual(adapted.sourcePrerequisites,[]);
+  assert.equal(adapted.lineage,'Unbekannt');
+  const document={createElement:tag=>new Element(document,tag)};
+  const root=new Element(document,'div');
+  renderStrategyCatalog(root,source,document);
+  assert.ok(root.textContent.includes('<img src=x onerror=alert(1)>'));
+  const nodes=[];
+  const visit=node=>{nodes.push(node);node.children.forEach(visit);};
+  visit(root);
+  assert.equal(nodes.some(node=>node.tagName==='img'),false);
+  assert.deepEqual(source,original);
 });
 
 test('empty, malformed and incomplete campaign sources remain unknown without invented families',()=>{
@@ -72,6 +122,29 @@ test('catalog rendering uses text nodes and exposes rules, blockers, stage progr
   assert.match(root.textContent,/Historischer Test/);
   assert.match(root.textContent,/Prospektives Paper/);
   assert.match(root.textContent,/Live-Bereitschaft/);
+  assert.match(root.textContent,/Hypothesen vergleichen/);
+  assert.match(root.textContent,/Fehlermodus/);
+  assert.match(root.textContent,/Erste Familie/);
+  assert.match(root.textContent,/Zweite Familie/);
+  assert.match(root.textContent,/Quelle: \.\.\/docs\/strategy-lab\/campaign-20261013\.json · DRAFT · Research: UNVALIDATED/);
+  const visit=node=>[node,...node.children.flatMap(visit)];
+  const nodes=visit(root);
+  const selectors=nodes.filter(node=>node.tagName==='select');
+  assert.equal(selectors.length,2);
+  assert.deepEqual(selectors.map(node=>node.value),['H1','H2']);
+  assert.deepEqual(selectors.map(node=>node.attrs.style.includes('min-height:48px')),[true,true]);
+  const output=nodes.find(node=>node.attrs['aria-live']==='polite');
+  assert.equal(output.children.filter(node=>node.tagName==='article').length,2);
+  selectors[1].value='H1';
+  selectors[1].listeners.change();
+  assert.match(output.textContent,/Dieselbe Familie \(H1\) ist auf beiden Seiten ausgewählt/);
+  assert.equal(output.children.filter(node=>node.tagName==='article').length,2);
+  const reset=nodes.find(node=>node.dataset.strategyCompareReset!==undefined);
+  assert.ok(reset);
+  reset.listeners.click();
+  assert.deepEqual(selectors.map(node=>node.value),['H1','H2']);
+  assert.doesNotMatch(output.textContent,/Dieselbe Familie/);
+  assert.equal(output.children.filter(node=>node.tagName==='article').length,2);
   assert.match(root.textContent,/B1-7/);
   assert.match(root.textContent,/Quellcode unabhängig geprüft/);
   assert.match(root.textContent,/D1 technisch geprüft/);
@@ -90,6 +163,88 @@ test('catalog rendering uses text nodes and exposes rules, blockers, stage progr
   const receipts = evidenceDetails.children.filter(child=>child.textContent.includes('https://github.com/'));
   assert.equal(receipts.length,2);
   assert.ok(receipts.every(child=>child.attrs.style==='overflow-wrap:anywhere'));
+});
+
+test('historical research renders complete draft summaries with bounded text search and reset',()=>{
+  const source=structuredClone(campaign);
+  source.knownEvidence[0].internalNote='not searchable';
+  const original=structuredClone(source);
+  const document={createElement:tag=>new Element(document,tag)};
+  const root=new Element(document,'div');
+  renderStrategyCatalog(root,source,document);
+  const section=root.children.find(child=>child.className==='card card-muted strategy-history');
+  assert.ok(section);
+  assert.match(section.textContent,/Historische Zusammenfassungen aus dem Entwurfsregister/);
+  assert.match(section.textContent,/nicht neu verifizierte Evidenz/);
+  assert.match(section.textContent,/Keine Zuordnung zu H1–H12, keine Vererbung von PASS und keine Paper-Freigabe/);
+  assert.ok(section.textContent.includes(`Quelle: Historische Zusammenfassungen aus dem Entwurfsregister (${buildStrategyCatalog(campaign).source})`));
+  assert.ok(section.textContent.includes(campaign.knownEvidence[0].reason));
+  assert.ok(section.textContent.includes(campaign.knownEvidence[4].reason));
+  const visit=node=>[node,...node.children.flatMap(visit)];
+  const nodes=visit(section);
+  const search=nodes.find(node=>node.id==='strategy-history-search');
+  const reset=nodes.find(node=>node.dataset.strategyHistoryReset!==undefined);
+  const count=nodes.find(node=>node.attrs['aria-live']==='polite');
+  assert.ok(nodes.some(node=>node.tagName==='label'&&node.attrs.for===search.id));
+  assert.equal(search.type,'search');
+  assert.equal(reset.textContent,'Suche zurücksetzen');
+  assert.equal(count.textContent,'5 von 5 Zusammenfassungen angezeigt.');
+  assert.equal(nodes.filter(node=>node.tagName==='article').length,5);
+  assert.equal(section.dataset.strategyId,undefined);
+
+  for(const [query,expected] of [
+    ['taker ORDER FLOW V1','Taker order flow V1'],
+    ['holdout_pass_prospective_paper_review_only','Low volatility rank weighted V2'],
+    ['NEwEy-West','Taker flow relative strength V2']
+  ]){
+    search.value=query;
+    search.listeners.input();
+    assert.equal(count.textContent,'1 von 5 Zusammenfassungen angezeigt.');
+    assert.ok(visit(section).filter(node=>node.tagName==='article')
+      .some(node=>node.textContent.includes(expected)));
+  }
+  search.value='not searchable';
+  search.listeners.input();
+  assert.equal(count.textContent,'0 von 5 Zusammenfassungen angezeigt.');
+  assert.match(section.textContent,/Keine historischen Zusammenfassungen entsprechen der Suche/);
+  search.value='<img src=x onerror=alert(1)>';
+  search.listeners.input();
+  assert.equal(count.textContent,'0 von 5 Zusammenfassungen angezeigt.');
+  assert.equal(nodes.some(node=>node.tagName==='img'),false);
+  search.value='HOLDOUT_FAIL';
+  search.listeners.input();
+  reset.listeners.click();
+  assert.equal(search.value,'');
+  assert.equal(count.textContent,'5 von 5 Zusammenfassungen angezeigt.');
+  assert.deepEqual(source,original);
+});
+
+test('missing and malformed historical evidence stays safe and visibly empty or unknown',()=>{
+  const document={createElement:tag=>new Element(document,tag)};
+  for(const knownEvidence of [undefined,'malformed',[null,'malformed']]){
+    const source=structuredClone(campaign);
+    if(knownEvidence===undefined)delete source.knownEvidence;
+    else source.knownEvidence=knownEvidence;
+    const root=new Element(document,'div');
+    renderStrategyCatalog(root,source,document);
+    const section=root.children.find(child=>child.className==='card card-muted strategy-history');
+    assert.match(section.textContent,/0 von 0 Zusammenfassungen angezeigt/);
+    assert.match(section.textContent,/Keine historischen Zusammenfassungen verfügbar/);
+  }
+  const source=structuredClone(campaign);
+  source.knownEvidence=[{name:'<img src=x>',status:'',rationale:'Complete rationale',extra:'ignored'}];
+  const original=structuredClone(source);
+  const root=new Element(document,'div');
+  renderStrategyCatalog(root,source,document);
+  const section=root.children.find(child=>child.className==='card card-muted strategy-history');
+  assert.match(section.textContent,/<img src=x>/);
+  assert.match(section.textContent,/Vollständige BegründungComplete rationale/);
+  assert.match(section.textContent,/Entscheidung \/ StatusUnbekannt/);
+  const nodes=[];
+  const visit=node=>{nodes.push(node);node.children.forEach(visit);};
+  visit(section);
+  assert.equal(nodes.some(node=>node.tagName==='img'),false);
+  assert.deepEqual(source,original);
 });
 
 test('Arena shows five models and preserves unknowns, blocked H9 and the legacy coverage failure',()=>{

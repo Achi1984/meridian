@@ -8,9 +8,13 @@ test('version disclosure distinguishes published terminal from integrated previe
  assert.match(html,/id="version-toggle"[^>]*aria-expanded="false"[^>]*aria-controls="version-panel"/);
  assert.match(html,/id="version-panel"[^>]*aria-labelledby="version-history-heading" hidden/);
  assert.match(html,/id="version-close"[^>]*aria-label="Versionsverlauf schließen">Schließen<\/button>/);
+ assert.match(html,/Terminal 10\.0-r130/);
  assert.match(html,/Terminal 10\.0-r128/);
  assert.match(html,/Terminal 10\.0-r127<\/strong><span class="version-status">Historischer Stand/);
- assert.match(html,/id="version-toggle"[^>]*>11 · Vorschau B12<small>/);
+ assert.match(html,/id="version-toggle"[^>]*>11 · Vorschau B14<small>/);
+ assert.match(html,/<li><strong>Meridian 11 · B14<\/strong><span class="version-status">Entwurf<\/span><p>Research Results Explorer/);
+ assert.match(html,/issues\/953">Umfang #953/);
+ assert.match(html,/pull\/956">Research-Oberfläche #956/);
  assert.match(html,/<li><strong>Meridian 11 · B12<\/strong><span class="version-status">Entwurf<\/span><p>Strategien-Arbeitsbereich/);
  assert.match(html,/<li><strong>Meridian 11 · B11<\/strong><span class="version-status">Testvorschau<\/span><p>Bot-Cockpit/);
  assert.match(html,/<li><strong>Meridian 11 · B10<\/strong><span class="version-status">Testvorschau<\/span><p>Kompaktere Header- und Command-Hierarchie/);

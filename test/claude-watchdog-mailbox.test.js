@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { resolveMailbox, seenFingerprint } from '../scripts/watchdog-mailbox.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)),'..');
+const MAILBOX_ISSUE = JSON.parse(readFileSync(join(ROOT,'MERIDIAN_LIVE_CHECKPOINT.json'),'utf8')).mailboxIssue;
 const WORKFLOW = readFileSync(join(ROOT,'.github/workflows/claude-watchdog-15m.yml'),'utf8');
 const H='a'.repeat(40), M='b'.repeat(40), B='c'.repeat(40), H2='d'.repeat(40), FP='e'.repeat(64);
 const NOW=Date.parse('2026-10-07T06:30:00Z');
@@ -172,7 +173,7 @@ function shell(which, fixture={}, extraEnv={}) {
   writeFileSync(join(dir,'fixture.json'),JSON.stringify({pages:[[req()],[res()]],prPages:[[pr()]],main:M,
     runPages:[{workflow_runs:[{name:'MERIDIAN Release Safety',status:'completed',conclusion:'success'}]}],
     reviewRuns:{total_count:0,workflow_runs:[]},...fixture}));
-  writeFileSync(join(dir,'bin','gh'),`#!${process.execPath}\nconst fs=require('node:fs');const f=JSON.parse(fs.readFileSync(process.env.FIXTURE,'utf8'));const a=process.argv.slice(2);const q=a.join(' ');fs.appendFileSync(process.env.GH_CALLS,q+'\\n');if(f.fail&&q.includes(f.fail))process.exit(17);let out;if(q.includes('commits/main')){process.stdout.write(f.main+'\\n');process.exit(0)}else if(q.includes('/pulls?'))out=f.prPages;else if(q.includes('/issues/639/comments?'))out=f.pages;else if(q.includes('/actions/runs?'))out=f.runPages;else if(q.includes('/actions/workflows/')){console.log(JSON.stringify(f.reviewRuns));process.exit(0)}else process.exit(18);if(!a.includes('--paginate')||!a.includes('--slurp'))process.exit(19);console.log(JSON.stringify(out));`,{mode:0o755});
+  writeFileSync(join(dir,'bin','gh'),`#!${process.execPath}\nconst fs=require('node:fs');const f=JSON.parse(fs.readFileSync(process.env.FIXTURE,'utf8'));const a=process.argv.slice(2);const q=a.join(' ');fs.appendFileSync(process.env.GH_CALLS,q+'\\n');if(f.fail&&q.includes(f.fail))process.exit(17);let out;if(q.includes('commits/main')){process.stdout.write(f.main+'\\n');process.exit(0)}else if(q.includes('/pulls?'))out=f.prPages;else if(q.includes('/issues/${MAILBOX_ISSUE}/comments?'))out=f.pages;else if(q.includes('/actions/runs?'))out=f.runPages;else if(q.includes('/actions/workflows/')){console.log(JSON.stringify(f.reviewRuns));process.exit(0)}else process.exit(18);if(!a.includes('--paginate')||!a.includes('--slurp'))process.exit(19);console.log(JSON.stringify(out));`,{mode:0o755});
   writeFileSync(join(dir,'bin','date'),`#!${process.execPath}\nconsole.log(${NOW/1000});`,{mode:0o755});
   const script=runScript(which==='state'?'Compute cheap development fingerprint':'Decide whether Claude is needed');
   const output=join(dir,'output');const calls=join(dir,'calls');

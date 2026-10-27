@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import re
 import sqlite3
+import tempfile
 import time
 from datetime import datetime, timezone
 
@@ -40,8 +41,10 @@ DEFAULT_POLICY = {
     "daily_model_calls": 0,
 }
 B1_PROFILE_NAME = "MERIDIAN-B1-7-GENERATED-FIXTURE-BRIDGE-R1"
+HISTORICAL_PROFILE_NAME = "MERIDIAN-B1-7-HISTORICAL-ONE-SHOT-R1"
 B1_CONTROL_BYTES = 8192
 B1_MANIFEST_PATH = Path(__file__).resolve().with_name("b1_bridge_manifest.json")
+HISTORICAL_PROFILE_PATH = Path(__file__).resolve().with_name("historical_run_profile.json")
 B1_SOURCE_FILES = {
     "engine": "scripts/research/b1-7/engine.mjs",
     "validator": "scripts/research/b1-7/validate.mjs",
@@ -60,6 +63,15 @@ B1_SCENARIOS = ("base-15bp", "stress-30bp", "stress-30bp-delay-1d")
 B1_CONTROL_IDS = ("frozen-mean-exposure", "frozen-risk-exposure")
 B1_COMPUTATION_LIMITS = {"path_seconds": MAX_PATH_SECONDS, "batch_seconds": MAX_BATCH_SECONDS}
 B1_ASSETS = ("XBTUSD", "ETHUSD", "SOLUSD", "XRPUSD", "LINKUSD", "AVAXUSD", "SUIUSD")
+HISTORICAL_EXPECTED_FILE_SHA256 = {
+    "XBTUSD": "f2e94a03fbe61f37295b2249d5c3a4d324d13fcfb5d5b41f2ed4d7dfe2183bb9",
+    "ETHUSD": "fbb7915af33d3c32db1cf368a171ed633090406c39da38aae90ac0d3876754bb",
+    "SOLUSD": "caff8ea08d3548b2d8c704cc17a940754a70e23f60e44716324c464929bc18ca",
+    "XRPUSD": "bd006dfcbf052fb516e2d5e5a97d0570cf093e577c3c83752f2f3b7310fc52a7",
+    "LINKUSD": "82682634f645ab5ca1dac4065cc0d490d343ea24b61463bcc2b6406894785518",
+    "AVAXUSD": "a4350bf73b44a45770bb173541133e4a04e847a07d74231ad6b5bbd7d6d06887",
+    "SUIUSD": "0b35eb5598a336d8d4485b15adc2a4b4a716c967ff700eff3802386c31beda79",
+}
 B1_PATH_RESULT_KEYS = {
     "attempts", "cancelledInstructionCount", "cancelledInstructions", "computed",
     "dailyHeldTarget", "dailyReturnCount", "dailyReturnSd", "dailyReturns",
@@ -95,7 +107,7 @@ B1_EVIDENCE_KEYS = {
 }
 
 
-def _b1_profile():
+def _generated_b1_profile():
     try:
         raw = B1_MANIFEST_PATH.read_bytes()
         profile = json.loads(raw, object_pairs_hook=_unique_object,
@@ -183,6 +195,258 @@ def _b1_profile():
     return profile
 
 
+def _historical_profile():
+    try:
+        raw = HISTORICAL_PROFILE_PATH.read_bytes()
+        declared = json.loads(raw, object_pairs_hook=_unique_object,
+                              parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
+    except (OSError, ValueError, RecursionError):
+        raise JournalError("HISTORICAL_PROFILE_INVALID")
+    expected_keys = {
+        "profile", "schemaVersion", "status", "sourceCommit", "implementationId",
+        "implementationSha256", "protocolId", "protocolSha256", "expectedWholeFileSha256",
+        "inputManifest", "inputManifestSha256", "inputSha256", "approvalReceipt", "trialKey",
+        "assets", "firstTimestamp", "lastTimestamp", "rowsPerAsset", "segments", "variants",
+        "scenarios", "costPerSideBasisPoints", "delayDays", "limits", "trials",
+        "automaticRetry", "adaptiveTuning", "stopPolicy", "holdout", "sourceAuthenticity",
+        "historyLabel", "costModel", "executionEvidence", "holdoutClaim", "trialLedger",
+        "sourceFiles", "sourceSha256",
+    }
+    _need(type(declared) is dict and set(declared) == expected_keys
+          and declared["profile"] == HISTORICAL_PROFILE_NAME and declared["schemaVersion"] == 1
+          and declared["status"] in ("NOT_FROZEN", "FROZEN_FOR_D2")
+          and declared["sourceCommit"] == "1c7b6dccd886f57e866c7d359c091b1e72a193ea"
+          and declared["protocolId"] == "MERIDIAN-B1-7-PROTOCOL-R3-20261018"
+          and declared["protocolSha256"] == "a78e1ae8c71c8f85baee5b51f5691643fc29136f636f19465c61f553afe09185"
+          and declared["assets"] == list(B1_ASSETS)
+          and declared["firstTimestamp"] == "2024-02-19T00:00:00Z"
+          and declared["lastTimestamp"] == "2026-09-30T00:00:00Z"
+          and declared["rowsPerAsset"] == 955
+          and declared["segments"] == {"warmup": 410, "development": 180, "diagnostic": 365}
+          and declared["variants"] == list(B1_VARIANTS)
+          and declared["scenarios"] == list(B1_SCENARIOS)
+          and declared["costPerSideBasisPoints"] == [15, 30, 30]
+          and declared["delayDays"] == [0, 0, 1]
+          and declared["limits"] == {
+              "paths": 44, "pathSeconds": 60, "batchSeconds": 1800,
+              "outputBytes": MAX_RESULT_BYTES, "attemptsPerPath": 1,
+          }
+          and declared["trials"] == 1 and declared["automaticRetry"] is False
+          and declared["adaptiveTuning"] is False
+          and declared["stopPolicy"] == "NO_FINITE_TRADE_STOP"
+          and declared["holdout"] is False
+          and declared["sourceAuthenticity"] == "NOT_ESTABLISHED"
+          and declared["historyLabel"] == "DEVELOPMENT_AND_HISTORICAL_DIAGNOSTIC"
+          and declared["costModel"] == "OKX_INSPIRED_ASSUMED_15_30BP_NOT_EXECUTION_EVIDENCE"
+          and declared["executionEvidence"] == "NOT_OKX_EXECUTION_EVIDENCE"
+          and declared["holdoutClaim"] is False and declared["trialLedger"] == "UNKNOWN",
+          "HISTORICAL_PROFILE_INVALID")
+    generated = _generated_b1_profile()
+    _need(declared["implementationId"] == generated["implementationId"]
+          and declared["protocolSha256"] == generated["protocolSha256"]
+          and declared["sourceFiles"] == {
+              "engine": "scripts/research/b1-7/engine.mjs",
+              "validator": "scripts/research/b1-7/validate.mjs",
+              "loader": "scripts/research/b1-7/captured-input.mjs",
+              "protocol": "research/protocols/b1-7-20261018/protocol.json",
+              "bridge": "scripts/research-supervisor/b1_bridge_manifest.json",
+              "admission": "scripts/research/b1-7/historical-admission.mjs",
+              "profile": "scripts/research/b1-7/historical-profile.mjs",
+              "adapter": "scripts/research-supervisor/historical_adapter.mjs",
+              "adapterRuntime": "scripts/research-supervisor/b1_adapter.mjs",
+              "supervisor": "scripts/research-supervisor/supervisor.py",
+              "journal": "scripts/research-supervisor/journal.py",
+          }
+          and type(declared["sourceSha256"]) is dict
+          and set(declared["sourceSha256"]) == set(declared["sourceFiles"])
+          and all(_digest(value) and value != "0" * 64
+                  for value in declared["sourceSha256"].values()),
+          "HISTORICAL_SOURCE_IDENTITY_INVALID")
+    root = Path(__file__).resolve().parents[2]
+    for name, relative in declared["sourceFiles"].items():
+        try:
+            source_path = (root / relative).resolve(strict=True)
+            _need(source_path.is_relative_to(root), "HISTORICAL_PROFILE_INVALID")
+            observed = hashlib.sha256(source_path.read_bytes()).hexdigest()
+        except (OSError, JournalError):
+            raise JournalError("HISTORICAL_SOURCE_UNAVAILABLE")
+        _need(observed == declared["sourceSha256"][name], "HISTORICAL_SOURCE_PIN_MISMATCH")
+    implementation_identity = {
+        "capturedInputSha256": declared["sourceSha256"]["loader"],
+        "engineSha256": declared["sourceSha256"]["engine"],
+        "validatorSha256": declared["sourceSha256"]["validator"],
+    }
+    implementation_sha256 = hashlib.sha256(_canonical(implementation_identity).encode()).hexdigest()
+    _need(declared["implementationSha256"] == implementation_sha256
+          and declared["sourceSha256"]["protocol"] == declared["protocolSha256"],
+          "HISTORICAL_IMPLEMENTATION_IDENTITY_INVALID")
+    expected_files = declared["expectedWholeFileSha256"]
+    _need(type(expected_files) is dict and expected_files == HISTORICAL_EXPECTED_FILE_SHA256,
+          "HISTORICAL_INPUT_MANIFEST_INVALID")
+    base = _generated_b1_profile()
+    profile = {**generated, **declared}
+    profile["pathDescriptors"] = base["pathDescriptors"]
+    profile["computationOrder"] = base["computationOrder"]
+    profile["sourceIdentitySha256"] = hashlib.sha256(
+        _canonical(declared["sourceSha256"]).encode()).hexdigest()
+    if declared["status"] == "NOT_FROZEN":
+        _need(declared["inputManifest"] is None and declared["inputManifestSha256"] is None
+              and declared["inputSha256"] is None and declared["approvalReceipt"] is None,
+              "HISTORICAL_PROFILE_NOT_DORMANT")
+        profile["inputSha256"] = None
+        profile["pathIds"] = None
+        profile["manifestSha256"] = None
+        profile["computationOrderSha256"] = None
+        profile["paths"] = ()
+        profile["computation"] = ()
+        profile["computationPathIds"] = None
+        run_identity = {key: value for key, value in declared.items() if key != "approvalReceipt"}
+        run_identity.update({
+            "pathDescriptors": profile["pathDescriptors"],
+            "pathIds": None,
+            "manifestSha256": None,
+            "computationOrder": profile["computationOrder"],
+            "computationOrderSha256": None,
+        })
+        profile["runProfileSha256"] = hashlib.sha256(
+            _canonical(run_identity).encode()).hexdigest()
+        return profile
+    manifest = declared["inputManifest"]
+    _need(type(manifest) is dict and set(manifest) == {
+              "sourceCommit", "files", "selectedSeriesSha256",
+          }
+          and manifest["sourceCommit"] == declared["sourceCommit"]
+          and manifest["files"] == expected_files
+          and type(manifest["selectedSeriesSha256"]) is dict
+          and set(manifest["selectedSeriesSha256"]) == set(B1_ASSETS)
+          and all(_digest(value) for value in manifest["selectedSeriesSha256"].values())
+          and declared["inputManifestSha256"] ==
+              hashlib.sha256(_canonical(manifest).encode()).hexdigest(),
+          "HISTORICAL_INPUT_MANIFEST_INVALID")
+    input_identity = {
+        "datasetKind": "FROZEN_RESEARCH_INPUT",
+        "sourceCommit": declared["sourceCommit"],
+        "sourceProvenance": {"normalizedFileSha256": manifest["files"]},
+        "canonicalSeriesSha256": manifest["selectedSeriesSha256"],
+    }
+    input_sha256 = hashlib.sha256(_canonical(input_identity).encode()).hexdigest()
+    _need(declared["inputSha256"] == input_sha256, "HISTORICAL_INPUT_IDENTITY_INVALID")
+    path_ids = []
+    for kind, variant_id, scenario_id, segment_id in profile["pathDescriptors"]:
+        path_identity = {
+            "protocolId": profile["protocolId"],
+            "protocolSha256": profile["protocolSha256"],
+            "implementationId": profile["implementationId"],
+            "implementationSha256": profile["implementationSha256"],
+            "inputSha256": input_sha256,
+            "canonicalSeriesSha256": manifest["selectedSeriesSha256"],
+            "variantId": variant_id,
+            "scenarioId": scenario_id,
+            "segmentId": segment_id,
+        }
+        path_ids.append(hashlib.sha256(_canonical(path_identity).encode()).hexdigest())
+    paths = tuple({
+        "kind": kind, "variantId": variant_id, "scenarioId": scenario_id,
+        "segmentId": segment_id, "pathId": path_ids[index],
+    } for index, (kind, variant_id, scenario_id, segment_id)
+        in enumerate(profile["pathDescriptors"]))
+    computation = tuple(
+        {"ordinal": ordinal, **paths[index]}
+        for ordinal, index in enumerate(profile["computationOrder"], 1)
+    )
+    manifest_sha256 = hashlib.sha256(_canonical(list(paths)).encode()).hexdigest()
+    computation_sha256 = hashlib.sha256(_canonical(list(computation)).encode()).hexdigest()
+    profile.update({
+        "inputSha256": input_sha256,
+        "pathIds": path_ids,
+        "manifestSha256": manifest_sha256,
+        "computationOrderSha256": computation_sha256,
+        "paths": paths,
+        "computation": computation,
+        "computationPathIds": [path_ids[index] for index in profile["computationOrder"]],
+    })
+    run_identity = {key: value for key, value in declared.items() if key != "approvalReceipt"}
+    run_identity.update({
+        "pathDescriptors": profile["pathDescriptors"],
+        "pathIds": path_ids,
+        "manifestSha256": manifest_sha256,
+        "computationOrder": profile["computationOrder"],
+        "computationOrderSha256": computation_sha256,
+    })
+    profile["runProfileSha256"] = hashlib.sha256(
+        _canonical(run_identity).encode()).hexdigest()
+    receipt = declared["approvalReceipt"]
+    receipt_keys = {
+        "schema", "decision", "owner", "approvedAt", "sourceCommit", "sourceIdentitySha256",
+        "protocolSha256", "implementationSha256", "inputManifestSha256", "runProfileSha256",
+        "manifestSha256", "computationOrderSha256", "trialKey", "pathIds",
+    }
+    test_profile_path = _is_isolated_historical_test_profile()
+    test_receipt = (
+        test_profile_path and type(receipt) is dict
+        and receipt.get("schema") == "MERIDIAN_TEST_GENERATED_FIXTURE_R1"
+        and receipt.get("decision") == "TEST_ONLY_GENERATED_FIXTURE"
+        and receipt.get("owner") == "TEST_ONLY"
+        and receipt.get("approvedAt") is None
+    )
+    approval_receipt = (
+        type(receipt) is dict and set(receipt) == receipt_keys
+        and (
+            test_receipt
+            or (receipt["schema"] == "MERIDIAN_D2_HISTORICAL_APPROVAL_R1"
+                and receipt["decision"] == "APPROVE_ONE_SHOT_HISTORICAL_RESEARCH"
+                and receipt["owner"] == "Achi1984"
+                and _approval_timestamp(receipt["approvedAt"]))
+        )
+    )
+    _need(approval_receipt
+          and receipt["sourceCommit"] == declared["sourceCommit"]
+          and receipt["sourceIdentitySha256"] == profile["sourceIdentitySha256"]
+          and receipt["protocolSha256"] == declared["protocolSha256"]
+          and receipt["implementationSha256"] == declared["implementationSha256"]
+          and receipt["inputManifestSha256"] == declared["inputManifestSha256"]
+          and receipt["runProfileSha256"] == profile["runProfileSha256"]
+          and receipt["manifestSha256"] == profile["manifestSha256"]
+          and receipt["computationOrderSha256"] == profile["computationOrderSha256"]
+          and receipt["trialKey"] == declared["trialKey"]
+          and receipt["pathIds"] == profile["pathIds"],
+          "HISTORICAL_APPROVAL_INVALID")
+    return profile
+
+
+def _is_isolated_historical_test_profile():
+    if os.environ.get("MERIDIAN_HISTORICAL_TEST_MODE") != "1":
+        return False
+    try:
+        default_path = Path(__file__).resolve().with_name(
+            "historical_run_profile.json").resolve(strict=True)
+        project_root = Path(__file__).resolve().parents[2]
+        temporary_root = Path(tempfile.gettempdir()).resolve(strict=True)
+        profile_path = HISTORICAL_PROFILE_PATH
+        lexical_path = Path(os.path.abspath(profile_path))
+        if profile_path.is_symlink():
+            return False
+        resolved = profile_path.resolve(strict=True)
+        return (
+            resolved != default_path
+            and resolved == lexical_path
+            and not resolved.is_relative_to(project_root)
+            and resolved.is_relative_to(temporary_root)
+            and resolved.name.startswith("historical-test-")
+            and resolved.is_file()
+        )
+    except (OSError, RuntimeError, ValueError):
+        return False
+
+
+def _b1_profile(profile_name=B1_PROFILE_NAME):
+    if profile_name == B1_PROFILE_NAME:
+        return _generated_b1_profile()
+    if profile_name == HISTORICAL_PROFILE_NAME:
+        return _historical_profile()
+    raise JournalError("PROFILE_INVALID")
+
+
 def _unique_object(items):
     result = {}
     for key, value in items:
@@ -211,6 +475,16 @@ def _digest(value):
     return type(value) is str and re.fullmatch(r"[a-f0-9]{64}", value) is not None
 
 
+def _approval_timestamp(value):
+    if type(value) is not str:
+        return False
+    try:
+        timestamp = datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return False
+    return timestamp <= datetime.now(timezone.utc)
+
+
 def _database_path(database):
     try:
         raw = os.fspath(database)
@@ -227,9 +501,9 @@ def _timestamp():
 
 def initialize(database, profile="synthetic"):
     """Create a new private database only; never reset or migrate an existing file."""
-    _need(profile in ("synthetic", B1_PROFILE_NAME), "PROFILE_INVALID")
-    if profile == B1_PROFILE_NAME:
-        return initialize_b1(database)
+    _need(profile in ("synthetic", B1_PROFILE_NAME, HISTORICAL_PROFILE_NAME), "PROFILE_INVALID")
+    if profile in (B1_PROFILE_NAME, HISTORICAL_PROFILE_NAME):
+        return initialize_b1(database, profile_name=profile)
     path = _database_path(database)
     try:
         fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
@@ -793,9 +1067,9 @@ def budget_status(database):
     return _read(database, operation)
 
 
-def initialize_b1(database):
-    """Create the explicitly versioned B1 generated-fixture journal profile."""
-    _b1_profile()
+def initialize_b1(database, profile_name=B1_PROFILE_NAME):
+    """Create a versioned B1 generated-fixture or dormant historical journal."""
+    profile = _b1_profile(profile_name)
     path = _database_path(database)
     try:
         fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
@@ -815,7 +1089,7 @@ def initialize_b1(database):
             id INTEGER PRIMARY KEY CHECK(id=1), profile TEXT NOT NULL, fence INTEGER NOT NULL,
             active TEXT
         )""")
-        connection.execute("INSERT INTO b1_meta VALUES (1,?,0,NULL)", (B1_PROFILE_NAME,))
+        connection.execute("INSERT INTO b1_meta VALUES (1,?,0,NULL)", (profile_name,))
         connection.execute("""CREATE TABLE b1_jobs (
             trial_id TEXT PRIMARY KEY, trial_key TEXT NOT NULL UNIQUE, identity_json TEXT NOT NULL,
             state TEXT NOT NULL CHECK(state IN ('QUEUED','CLAIMED','RUNNING','COMPLETED','REJECTED',
@@ -842,7 +1116,7 @@ def initialize_b1(database):
     finally:
         if connection is not None:
             connection.close()
-    return {"initialized": True, "profile": B1_PROFILE_NAME, "active": False,
+    return {"initialized": True, "profile": profile_name, "active": False,
             "executionAuthorized": False}
 
 
@@ -862,10 +1136,11 @@ def _b1_connect(database, busy_timeout=5, deadline=None, readonly=False):
         else:
             connection.execute("PRAGMA query_only=ON")
             connection.execute("BEGIN")
+        meta = connection.execute("SELECT profile FROM b1_meta WHERE id=1").fetchone()
         _need(connection.execute("PRAGMA user_version").fetchone() == (2,)
               and connection.execute("PRAGMA page_size").fetchone() == (4096,)
-              and connection.execute("SELECT profile FROM b1_meta WHERE id=1").fetchone()
-              == (B1_PROFILE_NAME,), "DATABASE_SCHEMA")
+              and meta in ((B1_PROFILE_NAME,), (HISTORICAL_PROFILE_NAME,)), "DATABASE_SCHEMA")
+        _b1_profile(meta[0])
         return connection
     except (sqlite3.Error, JournalError) as error:
         if "connection" in locals():
@@ -890,8 +1165,9 @@ def _b1_capacity(connection):
 
 def _b1_check(connection):
     meta = connection.execute("SELECT profile,fence,active FROM b1_meta WHERE id=1").fetchone()
-    _need(meta is not None and meta[0] == B1_PROFILE_NAME
+    _need(meta is not None and meta[0] in (B1_PROFILE_NAME, HISTORICAL_PROFILE_NAME)
           and type(meta[1]) is int and 0 <= meta[1] <= MAX_INT, "STORED_META")
+    _b1_profile(meta[0])
     active = connection.execute(
         "SELECT trial_id,fence FROM b1_jobs WHERE state IN ('CLAIMED','RUNNING')").fetchall()
     _need(len(active) <= 1, "STORED_ACTIVE")
@@ -905,6 +1181,12 @@ def _b1_check(connection):
     _need(connection.execute("SELECT COUNT(*) FROM b1_jobs").fetchone()[0] <= MAX_JOBS,
           "JOURNAL_CAPACITY")
     _b1_capacity(connection)
+
+
+def _profile_for_connection(connection):
+    row = connection.execute("SELECT profile FROM b1_meta WHERE id=1").fetchone()
+    _need(row is not None, "DATABASE_SCHEMA")
+    return _b1_profile(row[0])
 
 
 def _b1_run(database, operation, busy_timeout=5, deadline=None):
@@ -1030,6 +1312,7 @@ def _validate_b1_path_payload(payload, expected):
 
 
 def _validate_b1_summary(summary, profile, *, allow_insufficient=False):
+    historical = profile["profile"] == HISTORICAL_PROFILE_NAME
     _need(type(summary) is dict, "RESULT_SCHEMA_INVALID")
     identity = summary.get("identity") if type(summary) is dict else None
     authority = summary.get("authority") if type(summary) is dict else None
@@ -1053,13 +1336,33 @@ def _validate_b1_summary(summary, profile, *, allow_insufficient=False):
     evidence = summary.get("evidence")
     budget = summary.get("budget")
     realization = summary.get("controlRealization")
-    screen_valid = (
+    if historical:
+        screen_status_valid = (
+            screen.get("status") in ("PASS", "NO_EDGE")
+            and screen.get("interpretation") == "HISTORICAL_CANDIDATE_ONLY_NOT_HOLDOUT"
+        ) if type(screen) is dict else False
+    else:
+        screen_status_valid = (
+            type(screen) is dict
+            and screen.get("status") == "SYNTHETIC_ONLY_NOT_ASSESSED"
+            and screen.get("interpretation") == "SYNTHETIC_FIXTURE_RULE_CHECKS_ONLY"
+        )
+    completed_insufficient_screen_valid = (
+        historical and status == "COMPLETED"
+        and type(screen) is dict
+        and screen == {
+            "status": "INSUFFICIENT_EVIDENCE",
+            "checks": {"fullBasketDrawdownDenominator": False},
+            "relativeDrawdownReduction": None,
+        }
+    )
+    screen_valid = completed_insufficient_screen_valid or (
         type(screen) is dict and set(screen) == {"status"}
         and screen["status"] == "INSUFFICIENT_EVIDENCE"
-    ) if status == "INSUFFICIENT_EVIDENCE" else (
+        and status == "INSUFFICIENT_EVIDENCE"
+    ) or (
         type(screen) is dict and set(screen) == B1_SCREEN_KEYS
-        and screen.get("status") == "SYNTHETIC_ONLY_NOT_ASSESSED"
-        and screen.get("interpretation") == "SYNTHETIC_FIXTURE_RULE_CHECKS_ONLY"
+        and screen_status_valid
         and screen.get("comparisonSegment") == "diagnostic"
         and screen.get("neighbourStressScenario") == "stress-30bp-non-delayed"
         and screen.get("stopPolicy") == "NO_FINITE_TRADE_STOP"
@@ -1118,13 +1421,26 @@ def _validate_b1_summary(summary, profile, *, allow_insufficient=False):
         and budget["attemptsPerStartedPath"] == 1
         and budget["automaticRetry"] is False and budget["status"] == "WITHIN_LIMITS"
     )
+    if historical:
+        evidence_origin_valid = (
+            evidence.get("syntheticFixture") is False
+            and evidence.get("priceSource") == "PINNED_KRAKEN_SPOT_USD_CANDLES"
+            and evidence.get("sourceAuthenticity") == "NOT_ESTABLISHED"
+            and evidence.get("historyLabel") == "DEVELOPMENT_AND_HISTORICAL_DIAGNOSTIC"
+            and evidence.get("candidateInterpretation") ==
+                "HISTORICAL_CANDIDATE_ONLY_IF_PROPOSED_REAL_SCREEN_PASSES"
+        ) if type(evidence) is dict else False
+    else:
+        evidence_origin_valid = (
+            evidence.get("syntheticFixture") is True
+            and evidence.get("priceSource") == "SYNTHETIC_FIXTURE"
+            and evidence.get("sourceAuthenticity") == "SYNTHETIC_ONLY"
+        ) if type(evidence) is dict else False
     evidence_valid = (
         type(evidence) is dict and set(evidence) == B1_EVIDENCE_KEYS
-        and evidence.get("syntheticFixture") is True
-        and evidence.get("priceSource") == "SYNTHETIC_FIXTURE"
+        and evidence_origin_valid
         and evidence.get("costModel") == "OKX_INSPIRED_ASSUMED_15_30BP_NOT_EXECUTION_EVIDENCE"
         and evidence.get("executionEvidence") == "NOT_OKX_EXECUTION_EVIDENCE"
-        and evidence.get("sourceAuthenticity") == "SYNTHETIC_ONLY"
         and evidence.get("holdoutClaim") is False
         and evidence.get("trialLedger") == "UNKNOWN"
         and evidence.get("diagnosticRescaling") == "NONE"
@@ -1144,15 +1460,21 @@ def _validate_b1_summary(summary, profile, *, allow_insufficient=False):
               "datasetKind", "sourceCommit", "sourceProvenance", "canonicalSeriesSha256",
               "inputSha256",
           }
-          and identity.get("datasetKind") == "SYNTHETIC_FIXTURE"
-          and identity.get("sourceCommit") == "SYNTHETIC_FIXTURE"
+          and identity.get("datasetKind") == (
+              "FROZEN_RESEARCH_INPUT" if historical else "SYNTHETIC_FIXTURE")
+          and identity.get("sourceCommit") == (
+              profile["sourceCommit"] if historical else "SYNTHETIC_FIXTURE")
           and identity.get("inputSha256") == profile["inputSha256"]
           and type(identity.get("canonicalSeriesSha256")) is dict
           and set(identity["canonicalSeriesSha256"]) == set(B1_ASSETS)
           and all(type(value) is str and re.fullmatch(r"[0-9a-f]{64}", value) is not None
                   for value in identity["canonicalSeriesSha256"].values())
-          and identity.get("sourceProvenance") ==
-              {"syntheticFixtureSeriesSha256": identity["canonicalSeriesSha256"]}
+          and identity.get("sourceProvenance") == (
+              {"normalizedFileSha256": profile["inputManifest"]["files"]}
+              if historical else
+              {"syntheticFixtureSeriesSha256": identity["canonicalSeriesSha256"]})
+          and (not historical or identity["canonicalSeriesSha256"] ==
+               profile["inputManifest"]["selectedSeriesSha256"])
           and type(authority) is dict and set(authority) == {
               "researchOnly", "executionAuthorized", "strategyPnlAuthorized",
               "discoveryAuthorized", "validationAuthorized", "holdoutAuthorized",
@@ -1184,7 +1506,7 @@ def _validate_b1_summary(summary, profile, *, allow_insufficient=False):
 def _b1_job(connection, trial_id):
     row = connection.execute("SELECT * FROM b1_jobs WHERE trial_id=?", (trial_id,)).fetchone()
     _need(row is not None, "TRIAL_NOT_FOUND")
-    profile = _b1_profile()
+    profile = _profile_for_connection(connection)
     (trial_id, trial_key, identity_raw, state, attempts, owner, fence, created_at, started_at,
      finished_at, progress_raw, controls_raw, controls_sha, summary_raw, summary_sha, reason,
      primary_control_sha, basket_control_sha) = row
@@ -1195,7 +1517,7 @@ def _b1_job(connection, trial_id):
     _need(type(identity) is dict and _canonical(identity) == identity_raw
           and identity.get("trial_id") == trial_id and identity.get("trial_key") == trial_key
           and hashlib.sha256(trial_key.encode()).hexdigest() == trial_id
-          and identity.get("profile") == B1_PROFILE_NAME
+          and identity.get("profile") == profile["profile"]
           and identity.get("protocol_sha256") == profile["protocolSha256"]
           and identity.get("source_sha256") == profile["sourceIdentitySha256"]
           and identity.get("data_sha256") == profile["inputSha256"]
@@ -1346,7 +1668,7 @@ def _b1_job(connection, trial_id):
         "trialId": trial_id, "trialKey": trial_key,
         "state": "unknown" if state in ("CLAIMED", "RUNNING") else state.lower(),
         "attempts": attempts, "owner": owner, "fence": fence,
-        "profile": B1_PROFILE_NAME, "protocolSha256": profile["protocolSha256"],
+        "profile": profile["profile"], "protocolSha256": profile["protocolSha256"],
         "sourceSha256": profile["sourceIdentitySha256"], "dataSha256": profile["inputSha256"],
         "manifestSha256": profile["manifestSha256"],
         "pathIds": list(profile["pathIds"]),
@@ -1365,22 +1687,26 @@ def _b1_job(connection, trial_id):
 
 
 def enqueue_b1(database, trial_key):
-    profile = _b1_profile()
     _need(type(trial_key) is str
           and re.fullmatch(r"trial-[a-z0-9][a-z0-9-]{0,47}", trial_key) is not None,
           "TRIAL_KEY_INVALID")
     trial_id = hashlib.sha256(trial_key.encode()).hexdigest()
-    identity = {
-        "trial_id": trial_id, "trial_key": trial_key, "profile": B1_PROFILE_NAME,
-        "protocol_sha256": profile["protocolSha256"],
-        "implementation_sha256": profile["implementationSha256"],
-        "source_sha256": profile["sourceIdentitySha256"], "data_sha256": profile["inputSha256"],
-        "manifest_sha256": profile["manifestSha256"], "path_ids": profile["pathIds"],
-        "computation_order": profile["computationOrder"],
-    }
-    identity_raw = _canonical(identity)
 
     def operation(connection):
+        profile = _profile_for_connection(connection)
+        if profile["profile"] == HISTORICAL_PROFILE_NAME:
+            _need(profile["status"] == "FROZEN_FOR_D2" and profile["inputSha256"] is not None,
+                  "HISTORICAL_ADMISSION_REQUIRED")
+            _need(trial_key == profile["trialKey"], "TRIAL_KEY_MISMATCH")
+        identity = {
+            "trial_id": trial_id, "trial_key": trial_key, "profile": profile["profile"],
+            "protocol_sha256": profile["protocolSha256"],
+            "implementation_sha256": profile["implementationSha256"],
+            "source_sha256": profile["sourceIdentitySha256"], "data_sha256": profile["inputSha256"],
+            "manifest_sha256": profile["manifestSha256"], "path_ids": profile["pathIds"],
+            "computation_order": profile["computationOrder"],
+        }
+        identity_raw = _canonical(identity)
         existing = connection.execute("SELECT * FROM b1_jobs WHERE trial_id=?", (trial_id,)).fetchone()
         if existing:
             _need(existing[2] == identity_raw, "TRIAL_ID_CONFLICT")
@@ -1403,7 +1729,11 @@ def scheduler_tick_b1(database, enabled=False, owner="local-b1-worker"):
     day = datetime.now(timezone.utc).date().isoformat()
 
     def operation(connection):
-        profile = _b1_profile()
+        profile = _profile_for_connection(connection)
+        if profile["profile"] == HISTORICAL_PROFILE_NAME and (
+                profile["status"] != "FROZEN_FOR_D2" or profile["inputSha256"] is None):
+            return {"state": "blocked", "claimed": False,
+                    "reason": "HISTORICAL_ADMISSION_REQUIRED", "executionAuthorized": False}
         fence, active = connection.execute("SELECT fence,active FROM b1_meta WHERE id=1").fetchone()
         if active is not None:
             return {"state": "active", "claimed": False, "trialId": active,
@@ -1464,7 +1794,7 @@ def start_b1(database, receipt, *, busy_timeout=5, deadline=None):
 def record_b1_path_started(database, receipt, index, path_id, *, busy_timeout=5, deadline=None):
     def operation(connection):
         row = _b1_bound(connection, receipt)
-        profile = _b1_profile()
+        profile = _profile_for_connection(connection)
         progress = _b1_parse(row[10], "STORED_PROGRESS")
         _need(row[3] == "RUNNING" and type(index) is int and index == len(progress)
               and 0 <= index < 44 and profile["computation"][index]["pathId"] == path_id,
@@ -1486,7 +1816,10 @@ def record_b1_path_started(database, receipt, index, path_id, *, busy_timeout=5,
 
 
 def record_b1_path_completed(database, receipt, index, payload_bytes, *, busy_timeout=5, deadline=None):
-    profile = _b1_profile()
+    profile_name = receipt.get("profile") if type(receipt) is dict else None
+    if profile_name not in (B1_PROFILE_NAME, HISTORICAL_PROFILE_NAME):
+        profile_name = B1_PROFILE_NAME
+    profile = _b1_profile(profile_name)
     _need(type(payload_bytes) is bytes and 0 < len(payload_bytes) <= MAX_RESULT_BYTES,
           "PATH_RESULT_INVALID")
     digest = hashlib.sha256(payload_bytes).hexdigest()
@@ -1549,7 +1882,7 @@ def record_b1_controls(database, receipt, controls_bytes, *, busy_timeout=5, dea
 
     def operation(connection):
         row = _b1_bound(connection, receipt)
-        profile = _b1_profile()
+        profile = _profile_for_connection(connection)
         progress = _b1_parse(row[10], "STORED_PROGRESS")
         _need(row[3] == "RUNNING" and len(progress) == 19
               and all(item["state"] == "completed" for item in progress[:18])
@@ -1601,24 +1934,28 @@ def settle_b1(database, receipt, outcome, reason, summary_bytes=None, *,
     _need(outcome in ("COMPLETED", "FAILED", "TIMED_OUT", "PARTIAL")
           and type(reason) is str and re.fullmatch(r"[A-Z][A-Z0-9_]{0,79}", reason),
           "SETTLEMENT_INVALID")
+    profile_name = receipt.get("profile") if type(receipt) is dict else None
+    if profile_name not in (B1_PROFILE_NAME, HISTORICAL_PROFILE_NAME):
+        profile_name = B1_PROFILE_NAME
+    profile = _b1_profile(profile_name)
     summary = None
     if summary_bytes is not None:
         _need(type(summary_bytes) is bytes and 0 < len(summary_bytes) <= MAX_RESULT_BYTES,
               "RESULT_BOUND")
         summary = _b1_parse(summary_bytes, "RESULT_INVALID")
         _need(type(summary) is dict and "paths" not in summary and "controlDefinitions" not in summary
-              and summary.get("protocolSha256") == _b1_profile()["protocolSha256"]
-              and summary.get("implementationSha256") == _b1_profile()["implementationSha256"]
+              and summary.get("protocolSha256") == profile["protocolSha256"]
+              and summary.get("implementationSha256") == profile["implementationSha256"]
               and type(summary.get("identity")) is dict
-              and summary["identity"].get("inputSha256") == _b1_profile()["inputSha256"],
+              and summary["identity"].get("inputSha256") == profile["inputSha256"],
               "RESULT_INVALID")
     if outcome == "COMPLETED":
         _need(summary is not None, "INCOMPLETE_BATCH")
-        _validate_b1_summary(summary, _b1_profile())
+        _validate_b1_summary(summary, profile)
     elif summary is not None:
         _need(outcome == "FAILED" and summary.get("status") == "INSUFFICIENT_EVIDENCE",
               "RESULT_SCHEMA_INVALID")
-        _validate_b1_summary(summary, _b1_profile(), allow_insufficient=True)
+        _validate_b1_summary(summary, profile, allow_insufficient=True)
 
     def operation(connection):
         row = _b1_bound(connection, receipt)

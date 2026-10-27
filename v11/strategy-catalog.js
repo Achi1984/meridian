@@ -1,4 +1,4 @@
-import {B17_EVIDENCE_SNAPSHOT, projectResearchEvidence} from './research-evidence.js';
+import {B17_EVIDENCE_SNAPSHOT, projectResearchEvidence} from './research-evidence.js?v=B14';
 
 export const CAMPAIGN_SOURCE = '../docs/strategy-lab/campaign-20261013.json';
 export const FAMILY_IDS = Object.freeze(['H1','H2','H3','H4','H5','H6','H7','H8','H9','H10','H11','H12']);
@@ -92,6 +92,8 @@ export function buildStrategyCatalog(campaign, evidence=B17_EVIDENCE_SNAPSHOT) {
       sourceEntry:typeof source.entrySketch === 'string' ? source.entrySketch : 'Unbekannt',
       sourceExit:typeof source.exitSketch === 'string' ? source.exitSketch : 'Unbekannt',
       sourcePrerequisites:Array.isArray(source.prerequisites) ? source.prerequisites.filter(x=>typeof x==='string') : [],
+      failureRegime:typeof source.failureRegime === 'string' && source.failureRegime.trim()
+        ? source.failureRegime : 'Unbekannt',
       lineage:typeof source.lineage === 'string' ? source.lineage : 'Unbekannt',
       historicalStage:id === 'H9' ? 'BLOCKED_DATA' : modelIds.length ? 'HISTORISCHE DIAGNOSE' : 'NICHT BELEGT',
       independentStage:'NICHT BELEGT',
@@ -108,6 +110,18 @@ export function buildStrategyCatalog(campaign, evidence=B17_EVIDENCE_SNAPSHOT) {
     researchEvidence:projectResearchEvidence(evidence),
     sharedBlocker:allPrerequisite,
     knownEvidence:Array.isArray(campaign.knownEvidence) ? campaign.knownEvidence : []
+  };
+}
+
+export function buildStrategyComparison(families, firstId, secondId) {
+  const byId = new Map(Array.isArray(families) ? families.map(family=>[family.id,family]) : []);
+  const first = byId.get(firstId) || null;
+  const second = byId.get(secondId) || null;
+  return {
+    status:first && second ? 'PRESENT_UNVERIFIED' : 'UNKNOWN',
+    first,
+    second,
+    identical:Boolean(first && second && first.id === second.id)
   };
 }
 
@@ -178,6 +192,178 @@ function renderFamily(document, family) {
   return article;
 }
 
+function renderComparisonFamily(document, parent, family) {
+  const article = document.createElement('article');
+  article.className = 'arena-model-card';
+  article.dataset.comparisonFamily = family.id;
+  const header = document.createElement('header');
+  const identity = document.createElement('div');
+  addText(document,identity,'strong',`${family.id} · ${family.sourceName}`);
+  addText(document,identity,'span',
+    `Quelle: ${CAMPAIGN_SOURCE} · ${family.sourceStatus} · Research: ${family.validationStatus}`);
+  header.append(identity);
+  article.append(header);
+  const fields = document.createElement('dl');
+  for (const [label,value] of [
+    ['Hypothese',family.explanation],
+    ['Markt / Regime',family.market],
+    ['Horizont',family.horizon],
+    ['Einstiegsskizze',family.sourceEntry],
+    ['Ausstiegsskizze',family.sourceExit],
+    ['Fehlermodus',family.failureRegime],
+    ['Voraussetzungen',family.sourcePrerequisites.join(' · ') || 'Unbekannt'],
+    ['Linie',family.lineage]
+  ]) addField(document,fields,label,value);
+  article.append(fields);
+  parent.append(article);
+}
+
+function renderStrategyComparison(document, catalog) {
+  const section = document.createElement('section');
+  section.className = 'card strategy-comparison';
+  section.setAttribute('aria-labelledby','strategy-comparison-heading');
+  addText(document,section,'h2','Hypothesen vergleichen').id = 'strategy-comparison-heading';
+  addText(document,section,'p',
+    'Zwei Familien aus dem Entwurfsregister nebeneinander. Gleiche Auswahl wird auf beiden Seiten gezeigt; keine Rangfolge oder Bewertung.');
+
+  const controls = document.createElement('div');
+  controls.className = 'arena-toolbar';
+  const selectors = [];
+  for (const [id,label,attribute,defaultId] of [
+    ['strategy-comparison-first','Erste Familie','first','H1'],
+    ['strategy-comparison-second','Zweite Familie','second','H2']
+  ]) {
+    const wrapper = document.createElement('label');
+    wrapper.className = 'arena-control';
+    wrapper.setAttribute('for',id);
+    addText(document,wrapper,'span',label);
+    const select = document.createElement('select');
+    select.id = id;
+    select.dataset.strategyCompare = attribute;
+    select.setAttribute('style','box-sizing:border-box;width:100%;min-width:0;min-height:48px;padding:8px');
+    for (const family of catalog.families) {
+      const option = document.createElement('option');
+      option.value = family.id;
+      option.textContent = `${family.id} · ${family.sourceName}`;
+      select.append(option);
+    }
+    select.value = defaultId;
+    wrapper.append(select);
+    controls.append(wrapper);
+    selectors.push(select);
+  }
+  const reset = document.createElement('button');
+  reset.type = 'button';
+  reset.dataset.strategyCompareReset = '';
+  reset.textContent = 'Auswahl zurücksetzen';
+  controls.append(reset);
+  section.append(controls);
+
+  const comparison = document.createElement('div');
+  comparison.className = 'arena-toolbar';
+  comparison.setAttribute('aria-label','Vergleich der ausgewählten Hypothesen');
+  comparison.setAttribute('aria-live','polite');
+  const update = () => {
+    comparison.replaceChildren();
+    const model = buildStrategyComparison(catalog.families,selectors[0].value,selectors[1].value);
+    if (model.status !== 'PRESENT_UNVERIFIED') {
+      addText(document,comparison,'p','Auswahl nicht verfügbar. Fehlende Quellfelder bleiben unbekannt.','arena-unknown');
+      return;
+    }
+    if (model.identical) {
+      addText(document,comparison,'p',`Dieselbe Familie (${model.first.id}) ist auf beiden Seiten ausgewählt.`);
+    }
+    renderComparisonFamily(document,comparison,model.first);
+    renderComparisonFamily(document,comparison,model.second);
+  };
+  selectors.forEach(select=>select.addEventListener('change',update));
+  reset.addEventListener('click',()=>{
+    selectors[0].value = 'H1';
+    selectors[1].value = 'H2';
+    update();
+  });
+  update();
+  section.append(comparison);
+  return section;
+}
+
+function renderHistoricalResearch(document, catalog) {
+  const section = document.createElement('section');
+  section.className = 'card card-muted strategy-history';
+  section.setAttribute('aria-labelledby','strategy-history-heading');
+  addText(document,section,'h2','Bisherige Forschung').id = 'strategy-history-heading';
+  addText(document,section,'p',
+    `Quelle: Historische Zusammenfassungen aus dem Entwurfsregister (${catalog.source}); nicht neu verifizierte Evidenz. Keine Zuordnung zu H1–H12, keine Vererbung von PASS und keine Paper-Freigabe.`);
+
+  const entries = catalog.knownEvidence
+    .filter(object)
+    .map(entry => ({
+      family:typeof entry.family === 'string' && entry.family.trim() ? entry.family :
+        typeof entry.name === 'string' && entry.name.trim() ? entry.name : 'Unbekannt',
+      decision:typeof entry.decision === 'string' && entry.decision.trim() ? entry.decision :
+        typeof entry.status === 'string' && entry.status.trim() ? entry.status : 'Unbekannt',
+      reason:typeof entry.reason === 'string' && entry.reason.trim() ? entry.reason :
+        typeof entry.rationale === 'string' && entry.rationale.trim() ? entry.rationale : 'Unbekannt'
+    }));
+  const controls = document.createElement('div');
+  controls.className = 'arena-toolbar';
+  const label = document.createElement('label');
+  label.className = 'arena-control';
+  label.setAttribute('for','strategy-history-search');
+  addText(document,label,'span','Historische Zusammenfassungen durchsuchen (Familie, Entscheidung, Begründung)');
+  const search = document.createElement('input');
+  search.id = 'strategy-history-search';
+  search.type = 'search';
+  search.value = '';
+  search.setAttribute('style','box-sizing:border-box;width:100%;min-width:0;min-height:48px;padding:8px');
+  label.append(search);
+  controls.append(label);
+  const reset = document.createElement('button');
+  reset.type = 'button';
+  reset.dataset.strategyHistoryReset = '';
+  reset.textContent = 'Suche zurücksetzen';
+  controls.append(reset);
+  section.append(controls);
+
+  const count = addText(document,section,'p',`0 von ${entries.length} Zusammenfassungen angezeigt.`);
+  count.setAttribute('role','status');
+  count.setAttribute('aria-live','polite');
+  const results = document.createElement('div');
+  results.className = 'arena-models';
+  section.append(count,results);
+
+  const update = () => {
+    const query = search.value.trim().toLowerCase();
+    const matches = entries.filter(entry =>
+      [entry.family,entry.decision,entry.reason].some(value=>value.toLowerCase().includes(query)));
+    count.textContent = `${matches.length} von ${entries.length} Zusammenfassungen angezeigt.`;
+    results.replaceChildren();
+    if (!matches.length) {
+      addText(document,results,'p',entries.length
+        ? 'Keine historischen Zusammenfassungen entsprechen der Suche.'
+        : 'Keine historischen Zusammenfassungen verfügbar.','arena-unknown');
+      return;
+    }
+    for (const entry of matches) {
+      const card = document.createElement('article');
+      card.className = 'arena-model-card';
+      const fields = document.createElement('dl');
+      addField(document,fields,'Familie / Name',entry.family);
+      addField(document,fields,'Entscheidung / Status',entry.decision);
+      addField(document,fields,'Vollständige Begründung',entry.reason);
+      card.append(fields);
+      results.append(card);
+    }
+  };
+  search.addEventListener('input',update);
+  reset.addEventListener('click',()=>{
+    search.value = '';
+    update();
+  });
+  update();
+  return section;
+}
+
 export function renderStrategyCatalog(root, campaign, document=root?.ownerDocument || globalThis.document, evidence=B17_EVIDENCE_SNAPSHOT) {
   if (!root || !document) return unknownCatalog('Ansicht nicht verfügbar.');
   const catalog = buildStrategyCatalog(campaign, evidence);
@@ -192,6 +378,8 @@ export function renderStrategyCatalog(root, campaign, document=root?.ownerDocume
   addText(document,notice,'p','12 Familien aus dem unveränderten Entwurfsregister. Stufen bezeichnen nur vorhandene Quellenbelege; kein automatischer Aufstieg, keine Gewinnerwahl.');
   addText(document,notice,'p',catalog.sharedBlocker);
   root.append(notice);
+  root.append(renderStrategyComparison(document,catalog));
+  root.append(renderHistoricalResearch(document,catalog));
   for (const family of catalog.families) root.append(renderFamily(document,family));
 
   const candidate = document.createElement('article');

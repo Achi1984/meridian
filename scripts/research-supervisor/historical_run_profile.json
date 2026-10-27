@@ -1,0 +1,107 @@
+{
+  "profile": "MERIDIAN-B1-7-HISTORICAL-ONE-SHOT-R1",
+  "schemaVersion": 1,
+  "status": "NOT_FROZEN",
+  "sourceCommit": "1c7b6dccd886f57e866c7d359c091b1e72a193ea",
+  "implementationId": "MERIDIAN-B1-7-ENGINE-R3",
+  "implementationSha256": "ab73261f01b27b8655ffea7979fec03eb1a9bea667b6fc4cda8d77b75c4f3e06",
+  "protocolId": "MERIDIAN-B1-7-PROTOCOL-R3-20261018",
+  "protocolSha256": "a78e1ae8c71c8f85baee5b51f5691643fc29136f636f19465c61f553afe09185",
+  "expectedWholeFileSha256": {
+    "XBTUSD": "f2e94a03fbe61f37295b2249d5c3a4d324d13fcfb5d5b41f2ed4d7dfe2183bb9",
+    "ETHUSD": "fbb7915af33d3c32db1cf368a171ed633090406c39da38aae90ac0d3876754bb",
+    "SOLUSD": "caff8ea08d3548b2d8c704cc17a940754a70e23f60e44716324c464929bc18ca",
+    "XRPUSD": "bd006dfcbf052fb516e2d5e5a97d0570cf093e577c3c83752f2f3b7310fc52a7",
+    "LINKUSD": "82682634f645ab5ca1dac4065cc0d490d343ea24b61463bcc2b6406894785518",
+    "AVAXUSD": "a4350bf73b44a45770bb173541133e4a04e847a07d74231ad6b5bbd7d6d06887",
+    "SUIUSD": "0b35eb5598a336d8d4485b15adc2a4b4a716c967ff700eff3802386c31beda79"
+  },
+  "inputManifest": null,
+  "inputManifestSha256": null,
+  "inputSha256": null,
+  "approvalReceipt": null,
+  "trialKey": "trial-historical-d2-r1",
+  "assets": [
+    "XBTUSD",
+    "ETHUSD",
+    "SOLUSD",
+    "XRPUSD",
+    "LINKUSD",
+    "AVAXUSD",
+    "SUIUSD"
+  ],
+  "firstTimestamp": "2024-02-19T00:00:00Z",
+  "lastTimestamp": "2026-09-30T00:00:00Z",
+  "rowsPerAsset": 955,
+  "segments": {
+    "warmup": 410,
+    "development": 180,
+    "diagnostic": 365
+  },
+  "variants": [
+    "primary-n30-f25",
+    "neighbour-n20-f25",
+    "neighbour-n45-f25",
+    "neighbour-n30-f20",
+    "neighbour-n30-f35"
+  ],
+  "scenarios": [
+    "base-15bp",
+    "stress-30bp",
+    "stress-30bp-delay-1d"
+  ],
+  "costPerSideBasisPoints": [
+    15,
+    30,
+    30
+  ],
+  "delayDays": [
+    0,
+    0,
+    1
+  ],
+  "limits": {
+    "paths": 44,
+    "pathSeconds": 60,
+    "batchSeconds": 1800,
+    "outputBytes": 1048576,
+    "attemptsPerPath": 1
+  },
+  "trials": 1,
+  "automaticRetry": false,
+  "adaptiveTuning": false,
+  "stopPolicy": "NO_FINITE_TRADE_STOP",
+  "holdout": false,
+  "sourceAuthenticity": "NOT_ESTABLISHED",
+  "historyLabel": "DEVELOPMENT_AND_HISTORICAL_DIAGNOSTIC",
+  "costModel": "OKX_INSPIRED_ASSUMED_15_30BP_NOT_EXECUTION_EVIDENCE",
+  "executionEvidence": "NOT_OKX_EXECUTION_EVIDENCE",
+  "holdoutClaim": false,
+  "trialLedger": "UNKNOWN",
+  "sourceFiles": {
+    "engine": "scripts/research/b1-7/engine.mjs",
+    "validator": "scripts/research/b1-7/validate.mjs",
+    "loader": "scripts/research/b1-7/captured-input.mjs",
+    "protocol": "research/protocols/b1-7-20261018/protocol.json",
+    "bridge": "scripts/research-supervisor/b1_bridge_manifest.json",
+    "admission": "scripts/research/b1-7/historical-admission.mjs",
+    "profile": "scripts/research/b1-7/historical-profile.mjs",
+    "adapter": "scripts/research-supervisor/historical_adapter.mjs",
+    "adapterRuntime": "scripts/research-supervisor/b1_adapter.mjs",
+    "supervisor": "scripts/research-supervisor/supervisor.py",
+    "journal": "scripts/research-supervisor/journal.py"
+  },
+  "sourceSha256": {
+    "engine": "64df8c6fe5a587397b312447d310cb285f552da5b686a11b3a1d0f9441b9bb8f",
+    "validator": "2052c0fae0082622f48a18abb4a6dacc0ffa679fb5da01df5779b398f5a578fc",
+    "loader": "93d05a81625fed4e7f56f889a1b3b2950ac98191f183dff99f5c7f44a276f02d",
+    "protocol": "a78e1ae8c71c8f85baee5b51f5691643fc29136f636f19465c61f553afe09185",
+    "bridge": "7240f8202937804d271bb8f3b000e56a77eacdc669fb08049d315606dc3285a7",
+    "admission": "eb3bef19553a299c27023bc4558157b75267fa99adf23661e5efb5730b905f04",
+    "profile": "1df24e3372acb900ead091aef55f6f6fc2288a81bcf769e7587fb36e12aaad17",
+    "adapter": "79bef665862be2a1751d201c6303c571344c42cdc7fe76897c66ff74561c5c5f",
+    "adapterRuntime": "2d912e011e441abee4c884236a8a4c09791b502151f470e7388cd2333b1ee165",
+    "supervisor": "d5e9004fe5375afdfaef7fb877403c917d184126f81a15f9de76a9bc79d44b9b",
+    "journal": "83c1d37557afff72adfc08dbd2a0036db3fb7c45a895a679b7015c3f23cc055e"
+  }
+}

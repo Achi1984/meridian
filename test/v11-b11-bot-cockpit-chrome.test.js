@@ -11,7 +11,7 @@ const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium
   .find(path=>path&&existsSync(path));
 const v11Root=fileURLToPath(new URL('../v11/',import.meta.url));
 const source=readFileSync(join(v11Root,'index.html'),'utf8');
-const bootstrap='<script type="module" src="./bot-read-bootstrap.js?v=B12"></script>';
+const bootstrap='<script type="module" src="./bot-read-bootstrap.js?v=B14"></script>';
 const fixtureScript=`<script>
 window.__botReadMode='fresh';window.__botReads=0;window.__resolveBotRead=null;window.__botErrors=[];
 window.addEventListener('error',event=>window.__botErrors.push(event.message));
@@ -72,7 +72,7 @@ function createShellServer() {
   });
 }
 
-test('V11 B11 actual shell: mixed synthetic snapshot, filters, Command jump and invalidation at four viewports',
+test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and invalidation at five viewports',
   {timeout:180000},async()=>{
     if(typeof WebSocket!=='function'){
       const env={...process.env};delete env.NODE_TEST_CONTEXT;
@@ -80,14 +80,14 @@ test('V11 B11 actual shell: mixed synthetic snapshot, filters, Command jump and 
         {env,encoding:'utf8',timeout:175000});
       assert.equal(child.status,0,String(child.stdout).slice(-3000)+String(child.stderr).slice(-1000));
       const rows=child.stdout.split('\n').filter(line=>line.includes('V11_B11_SIZE'));
-      assert.equal(rows.length,4);rows.forEach(row=>console.log(row));return;
+      assert.equal(rows.length,5);rows.forEach(row=>console.log(row));return;
     }
     assert.ok(chrome,'Chrome required; actual-shell acceptance must not silently skip');
     const server=createShellServer();
     await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
     const url=`http://127.0.0.1:${server.address().port}/v11/index.html`;
     const sizes=[{width:320,height:568,mobile:true},{width:375,height:667,mobile:true},
-      {width:390,height:844,mobile:true},{width:1440,height:900,mobile:false}];
+      {width:390,height:844,mobile:true},{width:430,height:932,mobile:true},{width:1440,height:900,mobile:false}];
     const evidence=process.env.V11_B11_EVIDENCE_DIR;
     try{
       for(const size of sizes){
@@ -143,7 +143,7 @@ test('V11 B11 actual shell: mixed synthetic snapshot, filters, Command jump and 
               duplicate:cards.filter(c=>c.innerText.includes('BTCUSDT')).length,
               command:command.innerText,lossButtons:command.querySelectorAll('button').length,
               commandState:command.dataset.state,
-              touch:[...root.querySelectorAll('input,select,button')].map(e=>[e.tagName,e.getAttribute('aria-label')||e.textContent,e.getBoundingClientRect().height]),
+              touch:[...root.querySelectorAll('input,select,button')].filter(e=>!e.hidden).map(e=>[e.tagName,e.getAttribute('aria-label')||e.textContent,e.getBoundingClientRect().height]),
               leak:/synthetic-token|private failure/.test(document.body.innerText)};
           })()`);
           assert.equal(fresh.cards,6);assert.equal(new Set(fresh.ids).size,6);assert.equal(fresh.duplicate,2);
@@ -159,6 +159,53 @@ test('V11 B11 actual shell: mixed synthetic snapshot, filters, Command jump and 
           assert.match(lossNames[1].name,/BTCUSDT · Short · Referenz b{20}/);
           assert.match(lossNames[0].name,/-25 USD/);assert.match(lossNames[1].name,/-25 USD/);
           await assertPopulatedLayout('populated collapsed');
+          // Native disclosure state follows botRef, not symbol, through local selection.
+          await evaluate(`document.querySelector('#bot-card-${'a'.repeat(20)} summary').focus()`);
+          await key('Enter','Enter',13);
+          assert.equal(await evaluate(`document.getElementById('bot-card-${'a'.repeat(20)}').open`),true);
+          await evaluate(`(()=>{const dir=document.getElementById('bot-direction-filter');dir.value='short';
+            dir.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+          assert.equal(await evaluate(`document.getElementById('bot-card-${'b'.repeat(20)}').open`),false,
+            'duplicate symbol must not inherit the other reference disclosure');
+          await evaluate(`(()=>{const dir=document.getElementById('bot-direction-filter');dir.value='all';
+            dir.dispatchEvent(new Event('change',{bubbles:true}));
+            const sort=document.getElementById('bot-sort-filter');sort.value='pnl';
+            sort.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+          assert.equal(await evaluate(`document.getElementById('bot-card-${'a'.repeat(20)}').open`),true);
+          await evaluate(`(()=>{const search=document.getElementById('bot-symbol-search');search.value='ETH';
+            search.focus();search.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+          assert.equal(await evaluate(`document.activeElement===document.getElementById('bot-symbol-search')`),true);
+          await evaluate(`document.querySelector('#nav [data-v="command"]').click();
+            document.querySelectorAll('#command-bot-overview button')[1].focus()`);
+          await key('Enter','Enter',13);
+          assert.equal(await evaluate(`document.activeElement===document.querySelector('#bot-card-${'b'.repeat(20)} summary')`),true);
+          assert.equal(await evaluate(`document.getElementById('bot-card-${'b'.repeat(20)}').open`),true);
+          await assertPopulatedLayout('investigation jump expanded');
+          const backSelector=`[...document.querySelectorAll('#bot-read-root button')].find(b=>b.textContent==='Zur vorherigen Auswahl zurück')`;
+          assert.equal(await evaluate(`(${backSelector}).hidden`),false);
+          assert.ok(await evaluate(`(${backSelector}).getBoundingClientRect().height>=44`));
+          await evaluate(`window.dispatchEvent(new Event('focus'));window.dispatchEvent(new Event('pageshow'))`);
+          assert.deepEqual(await evaluate(`({query:document.getElementById('bot-symbol-search').value,
+            sort:document.getElementById('bot-sort-filter').value,
+            backHidden:(${backSelector}).hidden,
+            targetOpen:document.getElementById('bot-card-${'b'.repeat(20)}').open,
+            reads:window.__botReads})`),
+            {query:'',sort:'symbol',backHidden:false,targetOpen:true,reads:1},
+            'focus/pageshow reproject the same read without clearing jump context or fetching');
+          await evaluate(`(${backSelector}).focus()`);await key('Enter','Enter',13);
+          assert.deepEqual(await evaluate(`({query:document.getElementById('bot-symbol-search').value,
+            sort:document.getElementById('bot-sort-filter').value,
+            focus:document.activeElement===document.getElementById('bot-symbol-search'),
+            hidden:(${backSelector}).hidden,reads:window.__botReads})`),
+            {query:'ETH',sort:'pnl',focus:true,hidden:true,reads:1});
+          await evaluate(`document.querySelector('[aria-label="Alle Botfilter zurücksetzen"]').click()`);
+          assert.equal(await evaluate(`document.getElementById('bot-card-${'a'.repeat(20)}').open`),true);
+          assert.equal(await evaluate(`document.getElementById('bot-card-${'b'.repeat(20)}').open`),true);
+          // Close through native keyboard before the existing baseline screenshot.
+          for(const ref of ['a','b']){
+            await evaluate(`document.querySelector('#bot-card-'+ '${ref}'.repeat(20)+' summary').focus()`);
+            await key('Enter','Enter',13);
+          }
           if(evidence){
             mkdirSync(evidence,{recursive:true});
             await evaluate("document.querySelector('.bot-overview-filters').scrollIntoView({block:'start'})");
@@ -232,6 +279,7 @@ test('V11 B11 actual shell: mixed synthetic snapshot, filters, Command jump and 
           await evaluate('new Promise(resolve=>setTimeout(resolve,60))');
           const empty=await evaluate(`document.getElementById('bot-read-root').innerText`);
           assert.match(empty,/0 Bots im Snapshot/);assert.match(empty,/Keine Bots in diesem Snapshot/);
+          assert.equal(await evaluate(`(${backSelector}).hidden`),true,'new read drops prior return context');
           assert.doesNotMatch(empty,/Keine Bots entsprechen den Filtern/);
           assert.doesNotMatch(await evaluate(`document.getElementById('command-bot-overview').innerText`),/P\/L laut Quelle/);
 
