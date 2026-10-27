@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   canonicalHistoricalExportPayload,parseArenaHistoricalExport,MAX_HISTORICAL_EXPORT_BYTES
 } from '../v11/arena-historical-export.js';
+import {exportHistoricalResult} from '../scripts/research/b1-7/export-historical-result.mjs';
 import {createSyntheticSeries} from '../test/fixtures/b1-7/synthetic-series.mjs';
 import bridgeManifest from '../scripts/research-supervisor/b1_bridge_manifest.json' with {type:'json'};
 import {
