@@ -16,6 +16,12 @@
     "release-coordinator",
     "pages"
   ],
+  "postcheckWorkflowIds": {
+    "release-safety": "<PINNED-WORKFLOW-ID-REQUIRED>",
+    "runtime-smoke": "<PINNED-WORKFLOW-ID-REQUIRED>",
+    "release-coordinator": "<PINNED-WORKFLOW-ID-REQUIRED>",
+    "pages": "<PAGES-CHECK-IDENTITY-REQUIRED>"
+  },
   "repositoryAllowlist": [
     "<OWNER-APPROVED-REPOSITORY-ALLOWLIST-REQUIRED>"
   ],

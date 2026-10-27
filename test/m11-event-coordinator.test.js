@@ -7,7 +7,8 @@ import {
   reduceEvent,
   simulateReplay,
   REQUIRED_POSTCHECKS,
-  REQUIRED_REVIEW_PARTS
+  REQUIRED_REVIEW_PARTS,
+  SYNTHETIC_POSTCHECK_WORKFLOW_IDS
 } from '../scripts/autonomy/m11-event-coordinator.mjs';
 
 const REPO = 'Achi1984/meridian';
@@ -17,9 +18,11 @@ const HEAD = 'a'.repeat(40);
 const BASE = 'b'.repeat(40);
 const MERGE = 'c'.repeat(40);
 const WORKFLOW = 347821227;
+const POSTCHECK_WORKFLOWS = SYNTHETIC_POSTCHECK_WORKFLOW_IDS;
 let sequence = 0;
 
 function initial(overrides = {}) {
+  const requiredPostchecks = overrides.requiredPostchecks || [...REQUIRED_POSTCHECKS];
   return createCoordinatorState({
     repository: REPO,
     pullRequest: 972,
@@ -27,6 +30,7 @@ function initial(overrides = {}) {
     baseSha: BASE,
     startsAt: START,
     expiresAt: END,
+    postcheckWorkflowIds: Object.fromEntries(requiredPostchecks.map(check => [check, POSTCHECK_WORKFLOWS[check]])),
     ...overrides
   });
 }
@@ -54,13 +58,18 @@ function delivered(state = initial()) {
   return apply(state, event(state, 'AUTHOR_DELIVERY', 'AUTHOR', 'Copilot', {status: 'delivered'}));
 }
 
-function ciEvent(state, status = 'success', id = `${status}-run`) {
+function ciEvent(state, status = 'success', id = `${status}-run`, {
+  runId = 11, runAttempt = 1, selectionRevision = 1
+} = {}) {
   return event(state, 'CI', state.phase, 'github-actions[bot]', {
     status,
     completed: status !== 'pending',
-    runId: 11,
-    runAttempt: 1,
-    workflowId: WORKFLOW
+    runId,
+    runAttempt,
+    workflowId: WORKFLOW,
+    selectionRevision,
+    currentRunId: runId,
+    currentRunAttempt: runAttempt
   }, id);
 }
 
@@ -90,14 +99,18 @@ function merged(state = fullyReviewed()) {
   return apply(state, event(state, 'SOURCE_MERGED', 'OWNER_MERGE', 'Achi1984', {mergeSha: MERGE}));
 }
 
-function postcheckEvent(state, check, status = 'success', id = `post-${check}-${++sequence}`, runId = 20) {
+function postcheckEvent(state, check, status = 'success', id = `post-${check}-${++sequence}`,
+  runId = 20, runAttempt = 1, selectionRevision = 1, workflowId = POSTCHECK_WORKFLOWS[check]) {
   return event(state, 'POSTCHECK', 'POSTCHECK', 'github-actions[bot]', {
     check,
     status,
     mergeSha: MERGE,
     runId,
-    runAttempt: 1,
-    workflowId: 100 + REQUIRED_POSTCHECKS.indexOf(check)
+    runAttempt,
+    workflowId,
+    selectionRevision,
+    currentRunId: runId,
+    currentRunAttempt: runAttempt
   }, id);
 }
 
@@ -182,7 +195,8 @@ test('pending CI waits; success unlocks review; failure proposes one correction;
   const duplicateFailure = reduceEvent(failed, ciEvent(failed, 'failure', 'ci-failed-again'));
   assert.equal(duplicateFailure.changed, false);
   const secondFailure = event(failed, 'CI', 'CI', 'github-actions[bot]', {
-    status: 'failure', completed: true, runId: 12, runAttempt: 1, workflowId: WORKFLOW
+    status: 'failure', completed: true, runId: 12, runAttempt: 1, workflowId: WORKFLOW,
+    selectionRevision: 2, currentRunId: 12, currentRunAttempt: 1
   }, 'second-failure');
   const noSecondCorrection = apply(failed, secondFailure);
   assert.equal(noSecondCorrection.nextAllowedAction, 'WAIT_FOR_CONSOLIDATED_CORRECTION');
@@ -227,13 +241,54 @@ test('new CI attempt invalidates a prior review even when the head and base are 
     completed: false,
     runId: 12,
     runAttempt: 1,
-    workflowId: WORKFLOW
+    workflowId: WORKFLOW,
+    selectionRevision: 2,
+    currentRunId: 12,
+    currentRunAttempt: 1
   }, 'new-ci-attempt');
   const next = apply(reviewed, rerun);
   assert.equal(next.phase, 'CI');
   assert.equal(next.ci.status, 'PENDING');
   assert.equal(next.review.status, 'NONE');
   assert.equal(next.nextAllowedAction, 'WAIT_FOR_CI');
+});
+
+test('older CI success cannot replace a newer pending or failed attempt', () => {
+  for (const newerStatus of ['pending', 'failure']) {
+    let state = delivered();
+    state = apply(state, ciEvent(state, newerStatus, `attempt-2-${newerStatus}`, {
+      runAttempt: 2,
+      selectionRevision: 2
+    }));
+    const stale = ciEvent(state, 'success', `attempt-1-success-${newerStatus}`, {
+      runAttempt: 1,
+      selectionRevision: 1
+    });
+    const result = reduceEvent(state, stale);
+    assert.equal(result.changed, false);
+    assert.equal(result.reason, 'STALE_RUN_ATTEMPT');
+    assert.equal(result.state.ci.runAttempt, 2);
+    assert.equal(result.state.ci.status, newerStatus.toUpperCase());
+    assert.notEqual(result.state.phase, 'REVIEW');
+  }
+});
+
+test('different CI run IDs require newer authoritative current-run selection revisions', () => {
+  let state = delivered();
+  state = apply(state, ciEvent(state, 'pending', 'selected-run-31', {
+    runId: 31,
+    selectionRevision: 3
+  }));
+  const oldRun = ciEvent(state, 'success', 'delayed-run-30', {runId: 30, selectionRevision: 2});
+  const stale = reduceEvent(state, oldRun);
+  assert.equal(stale.changed, false);
+  assert.equal(stale.reason, 'STALE_RUN_SELECTION');
+  assert.equal(stale.state.ci.runId, 31);
+  assert.equal(stale.state.ci.status, 'PENDING');
+  assert.throws(() => reduceEvent(state, ciEvent(state, 'success', 'ambiguous-run-30',
+    {runId: 30, selectionRevision: 3})), {code: 'CURRENT_RUN_SELECTION_CONFLICT'});
+  assert.throws(() => reduceEvent(state, {...ciEvent(state, 'success', 'unselected-run'),
+    currentRunId: 12}), {code: 'INVALID_CI_EVENT'});
 });
 
 test('source merge does not complete before every exact-merge postcheck succeeds', () => {
@@ -262,6 +317,40 @@ test('only the pinned applicable postchecks are required for completion', () => 
   assert.equal(state.phase, 'POSTCHECK');
   state = apply(state, postcheckEvent(state, 'runtime-smoke'));
   assert.equal(state.phase, 'COMPLETE');
+});
+
+test('postchecks reject workflow mismatches and ignore older attempts after newer pending or failure', () => {
+  for (const newerStatus of ['pending', 'failure']) {
+    let state = merged();
+    state = apply(state, postcheckEvent(state, 'release-safety', newerStatus,
+      `post-attempt-2-${newerStatus}`, 30, 2, 2));
+    const stale = reduceEvent(state, postcheckEvent(state, 'release-safety', 'success',
+      `post-attempt-1-success-${newerStatus}`, 30, 1, 1));
+    assert.equal(stale.changed, false);
+    assert.equal(stale.reason, 'STALE_RUN_ATTEMPT');
+    assert.equal(stale.state.postchecks['release-safety'].runAttempt, 2);
+    assert.equal(stale.state.postchecks['release-safety'].status, newerStatus.toUpperCase());
+    for (const check of REQUIRED_POSTCHECKS.slice(1)) state = apply(state, postcheckEvent(state, check));
+    assert.equal(state.phase, 'POSTCHECK');
+    assert.notEqual(state.phase, 'COMPLETE');
+  }
+
+  const state = merged();
+  assert.throws(() => reduceEvent(state, postcheckEvent(state, 'release-safety',
+    'success', 'wrong-workflow', 30, 1, 1, POSTCHECK_WORKFLOWS['release-safety'] + 1)),
+  {code: 'POSTCHECK_WORKFLOW_MISMATCH'});
+});
+
+test('postchecks across run IDs require a newer current-run selection revision', () => {
+  let state = merged();
+  state = apply(state, postcheckEvent(state, 'release-safety', 'pending', 'selected-post-run', 31, 1, 3));
+  const stale = reduceEvent(state, postcheckEvent(state, 'release-safety', 'success', 'old-post-run', 30, 1, 2));
+  assert.equal(stale.changed, false);
+  assert.equal(stale.reason, 'STALE_RUN_SELECTION');
+  assert.equal(stale.state.postchecks['release-safety'].runId, 31);
+  assert.equal(stale.state.postchecks['release-safety'].status, 'PENDING');
+  assert.throws(() => reduceEvent(state, postcheckEvent(state, 'release-safety',
+    'success', 'ambiguous-post-run', 30, 1, 3)), {code: 'CURRENT_RUN_SELECTION_CONFLICT'});
 });
 
 test('unsupported agent operations block; they never dispatch, approve, merge, or deploy', () => {

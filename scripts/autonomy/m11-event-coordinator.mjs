@@ -28,6 +28,12 @@ export const REQUIRED_POSTCHECKS = Object.freeze([
 
 const REPOSITORY = 'Achi1984/meridian';
 const RELEASE_SAFETY_WORKFLOW_ID = 347821227;
+export const SYNTHETIC_POSTCHECK_WORKFLOW_IDS = Object.freeze({
+  'release-safety': 901,
+  'runtime-smoke': 902,
+  'release-coordinator': 903,
+  pages: 904
+});
 const PHASES = ['AUTHOR', 'CI', 'REVIEW', 'OWNER_MERGE', 'POSTCHECK', 'COMPLETE', 'RECONCILE', 'BLOCKED', 'EXPIRED'];
 const VERDICTS = ['GREEN_LIGHT', 'REVISION_REQUIRED', 'NEEDS_MORE_EVIDENCE'];
 const ACTORS = Object.freeze({
@@ -43,11 +49,13 @@ const ACTORS = Object.freeze({
 });
 const EVENT_FIELDS = Object.freeze({
   AUTHOR_DELIVERY: ['status'],
-  CI: ['status', 'completed', 'runId', 'runAttempt', 'workflowId'],
+  CI: ['status', 'completed', 'runId', 'runAttempt', 'workflowId', 'selectionRevision',
+    'currentRunId', 'currentRunAttempt'],
   REVIEW_PART: ['coverageParts', 'complete', 'verdict', 'truncated', 'turnLimit', 'ciRunId', 'ciRunAttempt', 'ciWorkflowId'],
   HEAD_MOVED: ['newHeadSha', 'newBaseSha'],
   SOURCE_MERGED: ['mergeSha'],
-  POSTCHECK: ['check', 'status', 'mergeSha', 'runId', 'runAttempt', 'workflowId'],
+  POSTCHECK: ['check', 'status', 'mergeSha', 'runId', 'runAttempt', 'workflowId',
+    'selectionRevision', 'currentRunId', 'currentRunAttempt'],
   MUTATION_UNKNOWN: ['operationId'],
   RECONCILED: ['operationId', 'outcome'],
   AGENT_OPERATION: ['operation']
@@ -147,9 +155,29 @@ function validateIdentity(repository, pullRequest, headSha, baseSha) {
   need(sha(headSha) && sha(baseSha) && headSha !== baseSha, 'INVALID_SHA');
 }
 
+function currentRunDisposition(previous, event) {
+  if (!previous) return null;
+  const sameRun = previous.runId === event.runId;
+  const incomingStatus = event.status.toUpperCase();
+  if (sameRun && event.runAttempt < previous.runAttempt) return 'STALE_RUN_ATTEMPT';
+  if (sameRun && event.runAttempt > previous.runAttempt) {
+    return event.selectionRevision > previous.selectionRevision ? null : 'STALE_RUN_ATTEMPT';
+  }
+  if (!sameRun) {
+    if (event.selectionRevision < previous.selectionRevision) return 'STALE_RUN_SELECTION';
+    need(event.selectionRevision > previous.selectionRevision, 'CURRENT_RUN_SELECTION_CONFLICT');
+    return null;
+  }
+  if (event.selectionRevision < previous.selectionRevision) return 'STALE_RUN_SELECTION';
+  need(event.selectionRevision === previous.selectionRevision, 'CURRENT_RUN_SELECTION_CONFLICT');
+  if (previous.status === incomingStatus) return 'UNCHANGED_RUN';
+  if (previous.status === 'PENDING' && incomingStatus !== 'PENDING') return null;
+  throw new CoordinatorError('RUN_RESULT_CONFLICT');
+}
+
 export function createCoordinatorState({
   repository = REPOSITORY, pullRequest, headSha, baseSha, startsAt, expiresAt, wipCount = 1,
-  requiredPostchecks = [...REQUIRED_POSTCHECKS]
+  requiredPostchecks = [...REQUIRED_POSTCHECKS], postcheckWorkflowIds
 }) {
   validateIdentity(repository, pullRequest, headSha, baseSha);
   need(Number.isSafeInteger(startsAt) && Number.isSafeInteger(expiresAt)
@@ -157,6 +185,8 @@ export function createCoordinatorState({
   need(Number.isSafeInteger(wipCount) && wipCount > 0 && wipCount <= 3, 'WIP_LIMIT_EXCEEDED');
   requiredPostchecks = readStringArray(requiredPostchecks, REQUIRED_POSTCHECKS, 'INVALID_REQUIRED_POSTCHECKS');
   need(requiredPostchecks.length > 0, 'INVALID_REQUIRED_POSTCHECKS');
+  postcheckWorkflowIds = readRecord(postcheckWorkflowIds, requiredPostchecks, 'INVALID_POSTCHECK_WORKFLOW_MAP');
+  for (const workflowId of Object.values(postcheckWorkflowIds)) need(positive(workflowId), 'INVALID_POSTCHECK_WORKFLOW_MAP');
   return freeze({
     schemaVersion: 1,
     repository,
@@ -167,6 +197,7 @@ export function createCoordinatorState({
     wipLimit: 3,
     maxConcurrentWriters: 1,
     requiredPostchecks,
+    postcheckWorkflowIds,
     startsAt,
     expiresAt,
     phase: 'AUTHOR',
@@ -189,7 +220,7 @@ function validateState(input) {
   const state = cloneData(input);
   const keys = [
     'schemaVersion', 'repository', 'pullRequest', 'headSha', 'baseSha', 'wipCount', 'wipLimit',
-    'maxConcurrentWriters', 'requiredPostchecks', 'startsAt', 'expiresAt',
+    'maxConcurrentWriters', 'requiredPostchecks', 'postcheckWorkflowIds', 'startsAt', 'expiresAt',
     'phase', 'authorDelivery', 'ci', 'review', 'mergeSha', 'postchecks', 'correctionIssued',
     'mutationLane', 'mutationHistory', 'processedEvents', 'eventCount', 'transitionCount', 'nextAllowedAction'
   ];
@@ -201,6 +232,9 @@ function validateState(input) {
     && state.wipLimit === 3 && state.maxConcurrentWriters === 1, 'WIP_OR_WRITER_LIMIT');
   state.requiredPostchecks = readStringArray(state.requiredPostchecks, REQUIRED_POSTCHECKS, 'STATE_INVALID');
   need(state.requiredPostchecks.length > 0, 'STATE_INVALID');
+  const postcheckWorkflowIds = readRecord(state.postcheckWorkflowIds, state.requiredPostchecks, 'STATE_INVALID');
+  for (const workflowId of Object.values(postcheckWorkflowIds)) need(positive(workflowId), 'STATE_INVALID');
+  state.postcheckWorkflowIds = postcheckWorkflowIds;
   need(PHASES.includes(state.phase) && ['PENDING', 'DELIVERED', 'FAILED'].includes(state.authorDelivery)
     && typeof state.correctionIssued === 'boolean' && Number.isSafeInteger(state.eventCount)
     && state.eventCount >= 0 && state.eventCount <= DEFAULT_LIMITS.events
@@ -208,8 +242,9 @@ function validateState(input) {
     && state.transitionCount <= DEFAULT_LIMITS.transitions, 'STATE_INVALID');
   need(typeof state.nextAllowedAction === 'string', 'STATE_INVALID');
   if (state.ci !== null) {
-    readRecord(state.ci, ['runId', 'runAttempt', 'workflowId', 'status']);
+    readRecord(state.ci, ['runId', 'runAttempt', 'workflowId', 'selectionRevision', 'status']);
     need(positive(state.ci.runId) && positive(state.ci.runAttempt) && state.ci.workflowId === RELEASE_SAFETY_WORKFLOW_ID
+      && positive(state.ci.selectionRevision)
       && ['PENDING', 'SUCCESS', 'FAILURE', 'ACTION_REQUIRED'].includes(state.ci.status), 'STATE_INVALID');
   }
   readRecord(state.review, ['status', 'coverageParts', 'verdict', 'truncated', 'turnLimit']);
@@ -224,10 +259,13 @@ function validateState(input) {
   }
   need(state.mergeSha === null || sha(state.mergeSha), 'STATE_INVALID');
   const postchecks = readRecord(state.postchecks, REQUIRED_POSTCHECKS, 'STATE_INVALID');
-  for (const item of Object.values(postchecks)) {
+  for (const [check, item] of Object.entries(postchecks)) {
     if (item !== null) {
-      readRecord(item, ['runId', 'runAttempt', 'workflowId', 'mergeSha', 'status']);
-      need(positive(item.runId) && positive(item.runAttempt) && positive(item.workflowId)
+      readRecord(item, ['runId', 'runAttempt', 'workflowId', 'selectionRevision', 'mergeSha', 'status']);
+      need(state.requiredPostchecks.includes(check)
+        && positive(item.runId) && positive(item.runAttempt)
+        && item.workflowId === state.postcheckWorkflowIds[check]
+        && positive(item.selectionRevision)
         && item.mergeSha === state.mergeSha && ['PENDING', 'SUCCESS', 'FAILURE'].includes(item.status), 'STATE_INVALID');
     }
   }
@@ -277,7 +315,9 @@ function normalizeEvent(input) {
   if (type === 'CI') {
     need(['pending', 'success', 'failure', 'action_required'].includes(event.status)
       && typeof event.completed === 'boolean' && (event.status === 'pending' ? !event.completed : event.completed)
-      && positive(event.runId) && positive(event.runAttempt) && event.workflowId === RELEASE_SAFETY_WORKFLOW_ID, 'INVALID_CI_EVENT');
+      && positive(event.runId) && positive(event.runAttempt) && event.workflowId === RELEASE_SAFETY_WORKFLOW_ID
+      && positive(event.selectionRevision) && event.currentRunId === event.runId
+      && event.currentRunAttempt === event.runAttempt, 'INVALID_CI_EVENT');
   }
   if (type === 'REVIEW_PART') {
     event.coverageParts = readStringArray(event.coverageParts, REQUIRED_REVIEW_PARTS, 'INVALID_REVIEW_COVERAGE');
@@ -290,7 +330,9 @@ function normalizeEvent(input) {
   if (type === 'SOURCE_MERGED') need(sha(event.mergeSha), 'INVALID_MERGE_EVENT');
   if (type === 'POSTCHECK') need(REQUIRED_POSTCHECKS.includes(event.check)
     && ['pending', 'success', 'failure'].includes(event.status) && sha(event.mergeSha)
-    && positive(event.runId) && positive(event.runAttempt) && positive(event.workflowId), 'INVALID_POSTCHECK_EVENT');
+    && positive(event.runId) && positive(event.runAttempt) && positive(event.workflowId)
+    && positive(event.selectionRevision) && event.currentRunId === event.runId
+    && event.currentRunAttempt === event.runAttempt, 'INVALID_POSTCHECK_EVENT');
   if (type === 'MUTATION_UNKNOWN' || type === 'RECONCILED') {
     need(typeof event.operationId === 'string' && /^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$/.test(event.operationId), 'INVALID_OPERATION_ID');
   }
@@ -376,6 +418,19 @@ export function reduceEvent(inputState, inputEvent) {
     need(prior.digest === digest, 'EVENT_ID_CONFLICT');
     return result(old, false, 'DUPLICATE_EVENT');
   }
+  if (event.type === 'CI' && old.ci !== null) {
+    const disposition = currentRunDisposition(old.ci, event);
+    if (disposition) return result(old, false, disposition);
+  }
+  if (event.type === 'POSTCHECK') {
+    need(old.requiredPostchecks.includes(event.check), 'NON_APPLICABLE_POSTCHECK');
+    need(event.workflowId === old.postcheckWorkflowIds[event.check], 'POSTCHECK_WORKFLOW_MISMATCH');
+    const previous = old.postchecks[event.check];
+    if (previous !== null) {
+      const disposition = currentRunDisposition(previous, event);
+      if (disposition) return result(old, false, disposition);
+    }
+  }
   if (event.phase !== old.phase && !(event.type === 'CI' && ['REVIEW', 'OWNER_MERGE'].includes(event.phase))) {
     return result(old, false, 'STALE_PHASE');
   }
@@ -413,28 +468,11 @@ export function reduceEvent(inputState, inputEvent) {
   } else if (event.type === 'CI') {
     need(old.phase === 'CI' || old.phase === 'REVIEW' || old.phase === 'OWNER_MERGE', 'INVALID_TRANSITION');
     if (old.phase === 'REVIEW' || old.phase === 'OWNER_MERGE') {
-      const sameRun = old.ci && old.ci.runId === event.runId && old.ci.runAttempt === event.runAttempt;
-      if (sameRun) {
-        if (old.ci.status === 'PENDING' && event.status !== 'pending') {
-          // A workflow attempt progresses from in-progress to completed.
-        } else {
-          need(old.ci.status === event.status.toUpperCase(), 'CI_IDENTITY_CONFLICT');
-          return result(old, false, 'UNCHANGED_CI');
-        }
-      }
       next.review = {status: 'NONE', coverageParts: [], verdict: null, truncated: false, turnLimit: false};
       next.phase = 'CI';
     }
-    if (old.ci && old.ci.runId === event.runId && old.ci.runAttempt === event.runAttempt) {
-      if (old.ci.status === 'PENDING' && event.status !== 'pending') {
-        // A workflow attempt progresses from in-progress to completed.
-      } else {
-        need(old.ci.status === event.status.toUpperCase(), 'CI_IDENTITY_CONFLICT');
-        return result(old, false, 'UNCHANGED_CI');
-      }
-    }
     next.ci = {runId: event.runId, runAttempt: event.runAttempt, workflowId: event.workflowId,
-      status: event.status.toUpperCase()};
+      selectionRevision: event.selectionRevision, status: event.status.toUpperCase()};
     if (event.status === 'failure' && !old.correctionIssued) {
       next.correctionIssued = true;
       oneShotAction = 'REQUEST_ONE_CONSOLIDATED_CORRECTION';
@@ -468,20 +506,11 @@ export function reduceEvent(inputState, inputEvent) {
     next.phase = 'POSTCHECK';
   } else if (event.type === 'POSTCHECK') {
     need(old.phase === 'POSTCHECK' && old.mergeSha !== null && event.mergeSha === old.mergeSha, 'POSTCHECK_MERGE_MISMATCH');
-    need(old.requiredPostchecks.includes(event.check), 'NON_APPLICABLE_POSTCHECK');
-    const previous = old.postchecks[event.check];
-    if (previous && previous.runId === event.runId && previous.runAttempt === event.runAttempt) {
-      if (previous.status === 'PENDING' && event.status !== 'pending') {
-        // A postcheck attempt progresses from in-progress to completed.
-      } else {
-        need(previous.status === event.status.toUpperCase(), 'POSTCHECK_IDENTITY_CONFLICT');
-        return result(old, false, 'UNCHANGED_POSTCHECK');
-      }
-    }
     next.postchecks[event.check] = {
       runId: event.runId,
       runAttempt: event.runAttempt,
       workflowId: event.workflowId,
+      selectionRevision: event.selectionRevision,
       mergeSha: event.mergeSha,
       status: event.status.toUpperCase()
     };
@@ -556,7 +585,8 @@ export function simulateReplay(inputEvents, {
     headSha: 'a'.repeat(40),
     baseSha: 'b'.repeat(40),
     startsAt: 1700000000000,
-    expiresAt: 1700086400000
+    expiresAt: 1700086400000,
+    postcheckWorkflowIds: SYNTHETIC_POSTCHECK_WORKFLOW_IDS
   });
   const start = clock();
   need(Number.isFinite(start), 'INVALID_REPLAY_CLOCK');
@@ -622,17 +652,23 @@ export function createSyntheticReplay() {
   return {
     startsAt,
     expiresAt: startsAt + 86400000,
-    initialState: createCoordinatorState({repository, pullRequest, headSha, baseSha, startsAt, expiresAt: startsAt + 86400000}),
+    initialState: createCoordinatorState({
+      repository, pullRequest, headSha, baseSha, startsAt, expiresAt: startsAt + 86400000,
+      postcheckWorkflowIds: SYNTHETIC_POSTCHECK_WORKFLOW_IDS
+    }),
     events: [
       event('AUTHOR_DELIVERY', 'AUTHOR', 'Copilot', 'synthetic-author-01', {status: 'delivered'}),
       event('CI', 'CI', 'github-actions[bot]', 'synthetic-ci-01', {
-        status: 'success', completed: true, runId: 11, runAttempt: 1, workflowId: RELEASE_SAFETY_WORKFLOW_ID
+        status: 'success', completed: true, runId: 11, runAttempt: 1, workflowId: RELEASE_SAFETY_WORKFLOW_ID,
+        selectionRevision: 1, currentRunId: 11, currentRunAttempt: 1
       }),
       review,
       event('SOURCE_MERGED', 'OWNER_MERGE', 'Achi1984', 'synthetic-merge-01', {mergeSha}),
       ...REQUIRED_POSTCHECKS.map((check, index) => event('POSTCHECK', 'POSTCHECK', 'github-actions[bot]',
         `synthetic-postcheck-${index + 1}`, {
-          check, status: 'success', mergeSha, runId: 20 + index, runAttempt: 1, workflowId: 100 + index
+          check, status: 'success', mergeSha, runId: 20 + index, runAttempt: 1,
+          workflowId: SYNTHETIC_POSTCHECK_WORKFLOW_IDS[check], selectionRevision: 1,
+          currentRunId: 20 + index, currentRunAttempt: 1
         }))
     ]
   };

@@ -66,7 +66,14 @@ review request may be proposed. Partial, truncated, turn-limited, or
 performed. `COMPLETE` requires all four configured postchecks to report
 success for the exact merge SHA in the pilot manifest. Other scopes must pin
 their applicable postcheck allowlist before replay; unlisted checks cannot
-complete the state.
+complete the state. Each applicable postcheck receipt must match the workflow
+ID pinned in state. CI and postcheck receipts also carry an explicit
+`currentRunId`, `currentRunAttempt`, and monotonic `selectionRevision`; stale
+attempts are ignored and different run IDs require a newer authoritative
+selection revision. The offline reducer cannot authenticate that selection:
+the future collector must determine it from authoritative current workflow
+state. The pilot manifest deliberately leaves these IDs as placeholders; the
+synthetic replay uses generated test IDs only.
 
 Event delivery deduplication binds repo/PR/head/base/phase plus immutable event
 ID and digest. The stable `actionDedupeKey` hashes exactly repo/PR/head/base/
@@ -96,7 +103,8 @@ allowlists are explicit owner-approval placeholders. Network, mutation,
 dispatch, review-request, automatic merge/deploy, and approval-bypass adapters
 are all false. Costs are existing resources only; no plan upgrade is proposed.
 Publisher/research remain paused, and runtime/trading authorization remains
-false.
+false. Required check workflow IDs are unset placeholders; determine the
+applicable exact workflow/check identity before proposing activation.
 
 ## Activation checklist — none of these steps is automatic
 
