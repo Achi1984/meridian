@@ -96,12 +96,53 @@
     "policyProposalCommentId": 6096562356,
     "protocol": "STREAM-SAFE-V8"
   },
-  "lastSeenCommentId": 6394169321,
+  "lastSeenCommentId": 6449657435,
   "quickCommand": "Go Meridian",
   "bootstrapFile": "MERIDIAN_GO.md",
   "currentWork": {
-    "updatedAt": "2026-10-25",
+    "updatedAt": "2026-10-27",
+    "pr911Completion": {
+      "pullRequest": 911,
+      "mergeShaPrefix": "5e80112",
+      "state": "COMPLETE",
+      "receiptCommentIds": [
+        6448656195,
+        6448656706
+      ]
+    },
+    "d2NoEdge935": {
+      "issue": 935,
+      "snapshotCommentId": 6448721244,
+      "assessmentCommentId": 6449045864,
+      "mailboxIssue": 942,
+      "mailboxCommentId": 6449029155,
+      "approvedTrialCount": 1,
+      "completedTrialCount": 1,
+      "attempt": 1,
+      "payloadCount": 44,
+      "screenResult": "NO_EDGE",
+      "checks": {
+        "count": 9,
+        "allFalse": true
+      },
+      "neighborCountsForBothCostScenarios": {
+        "observed": 0,
+        "required": 4
+      },
+      "relativeDrawdownReductionPercent": 2.3371,
+      "drawdownReductionUnit": "RELATIVE_PERCENT_NOT_PERCENTAGE_POINTS",
+      "privateLocalExecutionProfile": "FROZEN",
+      "checkedInExecutionProfile": "NOT_FROZEN",
+      "codespaceState": "STOPPED",
+      "fullPrivateResultIndependentAcceptance": "PENDING",
+      "relatedEvidence": {
+        "issue965": "HISTORICAL_EVIDENCE_V2",
+        "issue966": "HISTORICAL_EVIDENCE_V2"
+      },
+      "nextGate": "INDEPENDENT_ACCEPTANCE_OF_FULL_PRIVATE_RESULT; NO_RETRY_TUNING_FURTHER_RECONCILIATION_PAPER_OR_LIVE"
+    },
     "m11HistoricalResearchSummaries955": {
+      "recordStatus": "HISTORICAL_SUPERSEDED_BY_2026-10-27_CURRENT_RECONCILIATION",
       "issue": 955,
       "pullRequest": 956,
       "branch": "copilot/m11-searchable-historical-research-summaries",
@@ -344,6 +385,7 @@
       }
     },
     "d2ExecutionContextSetup948": {
+      "recordStatus": "HISTORICAL_SUPERSEDED_BY_2026-10-27_D2_NO_EDGE",
       "opId": "MERIDIAN-948-INTEGRATE-ZERO-COST-20261025-R1",
       "issue": 948,
       "pullRequest": 948,
@@ -385,6 +427,7 @@
       "completionReceiptCommentId": 6394400471
     },
     "d2Launcher950CorrectionR3": {
+      "recordStatus": "HISTORICAL_SUPERSEDED_BY_2026-10-27_D2_NO_EDGE",
       "opId": "MERIDIAN-950-CORRECTION-20261025-R3",
       "issue": 949,
       "pullRequest": 950,
@@ -422,6 +465,7 @@
       "currentGate": "R3_CORRECTION_IN_PROGRESS; FRESH_EXACT_HEAD_CI_REQUIRED; COMPLETE_SCOPE_CLAUDE_GREEN_LIGHT_AFTER_SUCCESSFUL_CI; NO_ACTIVATION"
     },
     "d2Launcher950CorrectionR4": {
+      "recordStatus": "HISTORICAL_SUPERSEDED_BY_2026-10-27_D2_NO_EDGE",
       "opId": "MERIDIAN-950-INTEGRATION-20261025-R4",
       "issue": 949,
       "pullRequest": 950,
@@ -478,6 +522,7 @@
       "hostAccess": false
     },
     "d2Launcher950IntegrationR5": {
+      "recordStatus": "HISTORICAL_SUPERSEDED_BY_2026-10-27_D2_NO_EDGE",
       "opId": "MERIDIAN-950-R5-20261025",
       "pullRequest": 950,
       "pullRequestState": "OPEN_DRAFT",
@@ -753,9 +798,9 @@
       ]
     },
     "historicalVerifiedSourceMainBeforeB11": "921246e61e07ff0624fb4a24c00a452246e9eb7f",
-    "verifiedSourceMain": "4d58d303f75c16a865ea24938f77d94f04b1f6dd",
-    "latestObservedMainSha": "4d58d303f75c16a865ea24938f77d94f04b1f6dd",
-    "latestObservedMainStatus": "PR946_COMPLETE_ALL_POSTCHECKS_SUCCESS; PR947_RECOVERED_COMPLETE",
+    "verifiedSourceMain": "f59c540e006c7931e9be2ca338ddd0039a1a9546",
+    "latestObservedMainSha": "f59c540e006c7931e9be2ca338ddd0039a1a9546",
+    "latestObservedMainStatus": "PR910_MERGED_COMPLETE_ALL_FOUR_POSTCHECKS_SUCCESS; PR911_COMPLETE",
     "completedSourceMerge873": {
       "pr": 873,
       "mergeSha": "b75335da3805c0d509ff11f75ab0584d351f284e",
@@ -832,20 +877,12 @@
       "postMergeChecks": "ALL_APPLICABLE_SUCCESS"
     },
     "lastCompletedSourceMerge": {
-      "pr": 946,
-      "mergeSha": "4d58d303f75c16a865ea24938f77d94f04b1f6dd",
-      "mergedHead": "9ea6b39c9cd3f1d00e04d5fc3675bfc1f418a635",
-      "baseAtMerge": "4ac61510c615e8743df77647394fe8e70e7a293b",
-      "state": "COMPLETE_ALL_POSTCHECKS_SUCCESS",
+      "pr": 910,
+      "mergeSha": "f59c540e006c7931e9be2ca338ddd0039a1a9546",
+      "state": "COMPLETE_ALL_FOUR_POSTCHECKS_SUCCESS",
       "completionReceiptIssue": 942,
-      "completionReceiptCommentId": 6394162574,
-      "claudeGreenLightCommentId": 6388005116,
-      "postMergeRunIds": {
-        "releaseSafety": 40123531531,
-        "runtimeSmoke": 40123531527,
-        "releaseCoordinator": 40123531512,
-        "pages": 40123530831
-      }
+      "completionReceiptCommentId": 6449657435,
+      "pullRequestCompletionReceiptCommentId": 6449656966
     },
     "historicalLastCompletedSourceMergeBeforeB11": {
       "pr": 862,
@@ -912,9 +949,9 @@
       }
     },
     "historicalPackageBefore919": "MERIDIAN_M11_ARENA_INSPECTION",
-    "package": "MERIDIAN-MAILBOX942-OWNER-PROCESS-ROLLOVER-20261023",
+    "package": "MERIDIAN-D2-NO-EDGE-CHECKPOINT-RECONCILIATION-20261027",
     "historicalStateBeforeB11": "PR862_COMPLETE_PR860_REFRESH_PENDING_OWN_EXACT_HEAD_CI_AND_REVIEW_ARENA861_REOPENED",
-    "state": "MAILBOX942_ROLLOVER_COMPLETE; M11_HISTORICAL_RESULT_DELIVERY_UNDER_SOURCE_REVIEW",
+    "state": "D2_ONE_APPROVED_TRIAL_COMPLETE_NO_EDGE; FULL_PRIVATE_RESULT_INDEPENDENT_ACCEPTANCE_PENDING",
     "infrastructurePaused": true,
     "mailboxRollover": {
       "from": 639,
@@ -1039,7 +1076,7 @@
       }
     },
     "historicalNextStepBeforeB11": "COMPLETE_PR860_REFRESH_OWN_EXACT_HEAD_CI_AND_INDEPENDENT_REVIEW_THEN_LEAD_MERGE_THEN_ARENA861_RETROSPECTIVE_PROVENANCE_EXISTING_EVIDENCE_ONLY",
-    "nextStep": "CONTINUE_940_SOURCE_REVIEW; REQUIRE_EXACT_HEAD_CI_AND_FINAL_CLAUDE_GREEN_LIGHT_BEFORE_LEAD_MERGE",
+    "nextStep": "WAIT_FOR_SEPARATELY_DISPATCHED_SINGLE_WRITER_AND_INDEPENDENT_ACCEPTANCE_OF_FULL_PRIVATE_RESULT; NO_RETRY_OR_TUNING",
     "ownerPathInspection": {
       "pr": 828,
       "mergeSha": "bfebd17ddfa1d2d3b44a15126e28618a82cb81f2",
@@ -1066,7 +1103,7 @@
     "publisherNextStep": "PAUSED_BY_OWNER_B_NO_OPERATIONAL_AUTHORITY_NATIVE868_DISABLED",
     "historicalStrategyNextStepBeforeB11": "Finalize r130 Arena release integration gates; separately diagnose PR872 publisher timing-test failure before independent data review. No new strategy execution.",
     "historicalStrategyNextStepBefore919": "ACCEPT_PR901_THEN_RECONCILE_COPILOT_PR903_DELIVERY_PROPOSALS",
-    "strategyNextStep": "PR946_COMPLETE_PR947_RECOVERED_COMPLETE; PR948_ZERO_COST_D2_SETUP_DOCUMENT_DRAFT_PENDING_EXACT_HEAD_CI_AND_INDEPENDENT_REVIEW; D2_DEFER",
+    "strategyNextStep": "D2_NO_EDGE_AFTER_ONE_APPROVED_TRIAL; FULL_PRIVATE_RESULT_INDEPENDENT_ACCEPTANCE_PENDING; NO_RETRY_TUNING_FURTHER_RECONCILIATION_PAPER_OR_LIVE",
     "m11HypothesisComparison951": {
       "issue": 951,
       "pullRequest": 953,
@@ -2402,6 +2439,7 @@
       "releaseSafetyPostMergeJobId": 117713897879
     },
     "admissionPreparation": {
+      "recordStatus": "HISTORICAL_SUPERSEDED_BY_2026-10-27_D2_NO_EDGE",
       "opId": "MERIDIAN-B1-ADMISSION-HARDENING-20261018",
       "pullRequest": 892,
       "branch": "copilot/meridian-b1-admission-hardening-20261018",
@@ -2472,6 +2510,7 @@
       "nextGate": "D1_TECHNICAL_ACCEPTANCE_COMPLETE; D2_REQUIRES_SEPARATE_EXPLICIT_OWNER_DECISION"
     },
     "d1Verification": {
+      "recordStatus": "HISTORICAL_SUPERSEDED_BY_2026-10-27_D2_NO_EDGE",
       "opId": "MERIDIAN-D1-WORK-20261019-01",
       "issue": 895,
       "sourceMain": "6f720373af5439af70c54e6cb2f1c17abaf8b877",
@@ -3063,6 +3102,7 @@
       }
     },
     "strategyEvidenceComparison952": {
+      "recordStatus": "HISTORICAL_SUPERSEDED_BY_2026-10-27_CURRENT_RECONCILIATION",
       "issue": 952,
       "pullRequest": 954,
       "branch": "copilot/research-deterministic-comparator",
