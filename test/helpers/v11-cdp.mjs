@@ -61,16 +61,27 @@ export async function withMobileChrome(chrome,width,url,probe,height=844){
    ws.addEventListener('open',resolve,{once:true});
    ws.addEventListener('error',reject,{once:true});
   });
+  const eventListeners=new Map();
   ws.addEventListener('message',e=>{
-   const m=JSON.parse(e.data),p=pending.get(m.id);if(!p)return;
-   pending.delete(m.id);clearTimeout(p.timer);
-   m.error?p.reject(Error(JSON.stringify(m.error))):p.resolve(m.result);
+   const m=JSON.parse(e.data),p=pending.get(m.id);
+   if(p){
+    pending.delete(m.id);clearTimeout(p.timer);
+    m.error?p.reject(Error(JSON.stringify(m.error))):p.resolve(m.result);
+    return;
+   }
+   if(typeof m.method==='string')
+    for(const listener of eventListeners.get(m.method)||[])listener(m.params);
   });
   const call=(method,params={})=>new Promise((resolve,reject)=>{
    const id=++seq,timer=setTimeout(()=>{pending.delete(id);reject(Error(method+' timeout'));},10000);
    pending.set(id,{resolve,reject,timer});
    ws.send(JSON.stringify({id,method,params}));
   });
+  call.onEvent=(method,listener)=>{
+   if(!eventListeners.has(method))eventListeners.set(method,new Set());
+   const listeners=eventListeners.get(method);listeners.add(listener);
+   return ()=>listeners.delete(listener);
+  };
   await call('Page.enable');await call('Runtime.enable');
   await call('Emulation.setFocusEmulationEnabled',{enabled:true});
   await call('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:true,

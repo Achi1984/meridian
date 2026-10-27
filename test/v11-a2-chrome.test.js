@@ -5,9 +5,10 @@ import {join} from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {withMobileChrome} from './helpers/v11-cdp.mjs';
+import {unlockAppThroughGate} from './helpers/v11-app-access-browser.mjs';
+import {startV11StaticServer} from './helpers/v11-static-server.mjs';
 
 const chrome = [process.env.CHROME_BIN, '/usr/bin/google-chrome', '/usr/bin/chromium'].find(p => p && existsSync(p));
-const page = process.env.V11_TEST_URL || 'file://' + fileURLToPath(new URL('../v11/index.html', import.meta.url));
 const probe = `(() => {
   const nav = document.getElementById('nav');
   const tabs = [...nav.querySelectorAll('button[data-v]')];
@@ -92,13 +93,16 @@ test('A2 Chrome: focus, fail-closed states, contrast and layout at 320/375/390/4
     return;
   }
   assert.ok(chrome, 'Chrome required; this test must not silently skip');
-  for (const width of [320, 375, 390, 430]) {
-    const result = await withMobileChrome(chrome, width, page, async call => {
+  const hosted=process.env.V11_TEST_URL?{url:process.env.V11_TEST_URL,close:async()=>{}}:await startV11StaticServer();
+  try{
+   for (const width of [320, 375, 390, 430]) {
+    const result = await withMobileChrome(chrome, width, hosted.url, async call => {
       const evaluate = async expression => {
         const response = await call('Runtime.evaluate', {expression, returnByValue: true});
         assert.ok(!response.exceptionDetails, 'browser expression exception: ' + JSON.stringify(response.exceptionDetails));
         return response.result?.value;
       };
+      await unlockAppThroughGate(call);
       const result = await evaluate(probe);
       const key = async (name, code) => {
         const text = name === 'Enter' ? '\r' : ' ';
@@ -146,5 +150,6 @@ test('A2 Chrome: focus, fail-closed states, contrast and layout at 320/375/390/4
     assert.deepEqual(result.failures, [], 'A2 quality failures at ' + width);
     assert.equal(result.cycles, 20);
     assert.deepEqual(result.states.map(state => state.state), ['unknown', 'loading', 'error', 'unknown']);
-  }
+   }
+  }finally{await hosted.close();}
 });

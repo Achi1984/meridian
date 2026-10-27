@@ -5,9 +5,10 @@ import {join} from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {withMobileChrome} from './helpers/v11-cdp.mjs';
+import {unlockAppThroughGate} from './helpers/v11-app-access-browser.mjs';
+import {startV11StaticServer} from './helpers/v11-static-server.mjs';
 
 const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium'].find(path=>path&&existsSync(path));
-const page=process.env.V11_TEST_URL||'file://'+fileURLToPath(new URL('../v11/index.html',import.meta.url));
 const sizes=[{width:320,height:568,mobile:true},{width:375,height:667,mobile:true},
   {width:390,height:844,mobile:true},{width:1440,height:900,mobile:false}];
 const views=['command','depot','bots','market','strategies'];
@@ -23,9 +24,11 @@ test('V11 B10 Chrome: compact hierarchy, keyboard disclosure and reachable views
     assert.equal(rows.length,sizes.length);rows.forEach(row=>console.log(row));return;
   }
   assert.ok(chrome,'Chrome required; this test must not silently skip');
-  if(evidence)mkdirSync(evidence,{recursive:true});
-  for(const size of sizes){
-    const metrics=await withMobileChrome(chrome,size.width,page,async call=>{
+  const hosted=process.env.V11_TEST_URL?{url:process.env.V11_TEST_URL,close:async()=>{}}:await startV11StaticServer();
+  try{
+   if(evidence)mkdirSync(evidence,{recursive:true});
+   for(const size of sizes){
+    const metrics=await withMobileChrome(chrome,size.width,hosted.url,async call=>{
       const evaluate=async expression=>{
         const result=await call('Runtime.evaluate',{expression,returnByValue:true});
         assert.ok(!result.exceptionDetails,'browser expression exception: '+JSON.stringify(result.exceptionDetails));
@@ -39,6 +42,7 @@ test('V11 B10 Chrome: compact hierarchy, keyboard disclosure and reachable views
       };
       await call('Emulation.setDeviceMetricsOverride',{width:size.width,height:size.height,deviceScaleFactor:1,
         mobile:size.mobile,screenWidth:size.width,screenHeight:size.height});
+      await unlockAppThroughGate(call);
       const initial=await evaluate(`({
         width:innerWidth,height:innerHeight,scrollY,viewport:document.documentElement.clientWidth,
         body:document.body.scrollWidth,root:document.documentElement.scrollWidth,
@@ -101,7 +105,7 @@ test('V11 B10 Chrome: compact hierarchy, keyboard disclosure and reachable views
         const detail=document.querySelector('#autonomy-status .details-body p:last-child');
         detail.scrollIntoView({block:'end'});
         const nav=document.getElementById('nav').getBoundingClientRect();
-        window.scrollBy(0,innerHeight-nav.top);
+        window.scrollBy(0,innerHeight-nav.top+1);
         const content=detail.getBoundingClientRect();
         return {text:detail.textContent,top:content.top,bottom:content.bottom,navTop:nav.top,scrollY};
       })()`);
@@ -159,5 +163,6 @@ test('V11 B10 Chrome: compact hierarchy, keyboard disclosure and reachable views
       return {...initial,views:results};
     },size.height);
     console.log('V11_B10_SIZE',`${size.width}x${size.height}`,JSON.stringify(metrics));
-  }
+   }
+  }finally{await hosted.close();}
 });
