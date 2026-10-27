@@ -21,7 +21,7 @@ test('version disclosure distinguishes published terminal from integrated previe
  assert.match(html,/keine neue Datenanbindung oder Funktionsfreigabe/i);
  assert.match(html,/Meridian 11 · B9<\/strong><span class="version-status">Testvorschau/);
  assert.match(html,/Meridian 11 · B6<\/strong>/);
- assert.match(html,/Asset-Watch-Link oder Meridian-Lesepasswort/);
+ assert.match(html,/id="app-access-help">Asset-Watch-Freigabelinks gelten nur für Bots und können die App nicht öffnen\./);
  const b3=html.match(/<li><strong>Meridian 11 · B3<\/strong>[\s\S]*?<\/li>/)?.[0];
  assert.ok(b3);
  assert.match(b3,/Kontrollierte Testvorschau · Geräteabnahme ausstehend/);

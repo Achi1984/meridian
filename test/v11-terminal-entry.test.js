@@ -516,7 +516,8 @@ const appAccessDeltas=[
    `<script type="module" src="./app-access-bootstrap.js?v=B14-M11"></script>
 <script type="module" src="./bot-read-bootstrap.js?v=B14-M11"></script>
 <script type="module" src="./depot-read-bootstrap.js?v=B14-M11"></script>
-<script type="module" src="./strategy-workspace-bootstrap.js?v=B14-M11"></script>`]
+<script type="module" src="./strategy-workspace-bootstrap.js?v=B14-M11"></script>`],
+  ['', '    @media(max-width:350px){.header-inner{flex-wrap:nowrap}.identity{gap:6px}.mark{width:32px;height:32px}.brand{font-size:12px}.brand small{display:none}.header-actions{gap:4px}.version-toggle{padding:4px;font-size:10px;letter-spacing:0}.version-toggle small{display:none}}\n']
 ];
 const b14Deltas=[
  [

@@ -4,6 +4,8 @@ import {existsSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {withMobileChrome} from './helpers/v11-cdp.mjs';
+import {unlockAppThroughGate} from './helpers/v11-app-access-browser.mjs';
+import {startV11StaticServer} from './helpers/v11-static-server.mjs';
 const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium'].find(p=>p&&existsSync(p));
 test('version history: native keyboard, focus and compact viewport at five widths',{timeout:150000},async()=>{
  if(typeof WebSocket!=='function'){
@@ -16,7 +18,9 @@ test('version history: native keyboard, focus and compact viewport at five width
   return;
  }
  assert.ok(chrome,'Chrome binary required');
- const url=process.env.V11_TEST_URL||'file://'+fileURLToPath(new URL('../v11/index.html',import.meta.url));
+ const hosted=process.env.V11_TEST_URL?{url:process.env.V11_TEST_URL,close:async()=>{}}:await startV11StaticServer();
+ try{
+ const url=hosted.url;
  for(const [width,height] of [[320,568],[375,667],[390,844],[430,844],[1440,900]]){
   await withMobileChrome(chrome,width,url,async call=>{
    const evaluate=async expression=>{const r=await call('Runtime.evaluate',{expression,returnByValue:true});assert.ok(!r.exceptionDetails,JSON.stringify(r.exceptionDetails));return r.result.value;};
@@ -31,6 +35,7 @@ test('version history: native keyboard, focus and compact viewport at five width
     await call('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
    };
    await call('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:true,screenWidth:width,screenHeight:height});
+   await unlockAppThroughGate(call);
    const before=await evaluate(`JSON.stringify({value:document.querySelector('.portfolio-value').textContent,sources:[...document.querySelectorAll('.trust-cell span')].map(x=>x.textContent),decision:document.querySelector('[data-decision-owner]').textContent})`);
    assert.equal(await evaluate(`document.getElementById('version-panel').hidden`),true);
    await evaluate(`document.getElementById('version-toggle').focus()`);
@@ -47,6 +52,8 @@ test('version history: native keyboard, focus and compact viewport at five width
    assert.equal(reachable.positions.length,22);assert.ok(reachable.positions.every(r=>r.top>=0&&r.bottom<=height),'all history entries and the closing note can be brought into the short viewport: '+JSON.stringify({width,height,...reachable}));assert.ok(reachable.body<=width+1&&reachable.root<=width+1);
    await evaluate(`window.scrollTo(0,0)`);
    assert.equal(await evaluate(`document.activeElement.id`),'version-toggle','focus remains on the disclosure toggle before tab navigation');
+   await key('Tab','Tab',9);
+   assert.equal(await evaluate(`document.activeElement.id`),'app-access-lock','app lock remains in the native header tab order');
    await key('Tab','Tab',9);
    assert.equal(await evaluate(`document.activeElement.classList.contains('strategy-entry-link')`),true,'native strategy navigation remains keyboard reachable');
    await key('Tab','Tab',9);
@@ -73,4 +80,5 @@ test('version history: native keyboard, focus and compact viewport at five width
    console.log('V11_HISTORY_WIDTH',width,JSON.stringify(metrics));
   });
  }
+ }finally{await hosted.close();}
 });
