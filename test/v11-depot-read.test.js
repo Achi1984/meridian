@@ -39,10 +39,11 @@ test('B7 ages capture and source independently and does not use generatedAt or o
 });
 test('B7 rejects bot-share and foreign URLs before making any request',async()=>{
   for(const value of ['https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/asset-watch?share='+'a'.repeat(43),
-    'a'.repeat(43),'https://foreign.example/token','//foreign.example','bad\nsecret','']){
+    'https://foreign.example/token','//foreign.example','bad\nsecret','']){
     assert.equal(parseDepotReadCredential(value),null);let reads=0;
     const c=createDepotReadClient({getToken:()=>value,fetchImpl:()=>{reads++;}});await c.refresh();assert.equal(reads,0);c.dispose();
   }
+  assert.deepEqual(parseDepotReadCredential('a'.repeat(43)),{kind:'bearer',value:'a'.repeat(43)});
 });
 test('B7 fixed GET only, bounded body, no mount read, no credential/error leakage',async()=>{
   const states=[];let reads=0;
@@ -73,31 +74,57 @@ class Target{
   removeEventListener(k,f){this.listeners.get(k)?.delete(f);}
   fire(k){for(const f of this.listeners.get(k)||[])f();}
 }
+function accessController(){
+  let credential=null;const readers=new Map();
+  return {getToken:()=>credential,isUnlocked:()=>credential!==null,set(value){credential=value;},
+    lock(){credential=null;for(const clear of readers.keys())clear();},
+    revalidateReaders(){if(!credential)return false;for(const revalidate of readers.values())revalidate();return true;},
+    registerReader(clear,revalidate=()=>{}){readers.set(clear,revalidate);return ()=>readers.delete(clear);}};
+}
 function mounted(response){
-  const document=new Target(),window=new Target(),nodes=new Map(['root','token','provide','access-status'].map(n=>['depot-read-'+n,new Target()]));
-  document.getElementById=id=>nodes.get(id);document.hidden=false;
+  const document=new Target(),window=new Target(),nodes=new Map(['root'].map(n=>['depot-read-'+n,new Target()]));
+  document.getElementById=id=>nodes.get(id);
+  const access=accessController();
   let client,token,reads=0,clock=NOW;const states=[],timers=new Map();let next=0;
-  const mount=mountDepotReadAccess(document,window,{now:()=>clock,schedule:(f,ms)=>{timers.set(++next,{f,ms});return next;},cancelSchedule:id=>timers.delete(id),
+  const mount=mountDepotReadAccess(document,window,{access,now:()=>clock,schedule:(f,ms)=>{timers.set(++next,{f,ms});return next;},cancelSchedule:id=>timers.delete(id),
     createClient:options=>{token=options.getToken;return createDepotReadClient({...options,now:()=>clock,fetchImpl:async()=>{reads++;return response();}});},
     createView:(_r,o)=>{client=o.createClient({getToken:o.getToken,onChange:s=>states.push(s)});return {revalidate:()=>client.revalidate(),dispose:()=>client.dispose()};}});
-  return {document,window,nodes,states,timers,mount,client:()=>client,token:()=>token(),reads:()=>reads,
-    accept(value='synthetic-password'){nodes.get('depot-read-token').value=value;nodes.get('depot-read-provide').fire('click');},clock(value){clock=value;}};
+  return {document,window,nodes,states,timers,mount,client:()=>client,access,token:()=>token(),reads:()=>reads,
+    clock(value){clock=value;}};
 }
-test('B7 memory access clears on hide/pagehide and401/403; focus and provision never fetch',async()=>{
+test('B7 foreground revalidation preserves the locked state before the first private read',()=>{
+  const states=[],c=createDepotReadClient({getToken:()=> 'synthetic-password',onChange:s=>states.push(s.status)});
+  c.revalidate();
+  assert.deepEqual(states,[]);
+  c.dispose();
+});
+test('B7 uses shared access and manual reads; 401/403 revoke the shared credential',async()=>{
   for(const code of [200,401,403]){
-    const h=mounted(()=>new Response(JSON.stringify(snapshot()),{status:code}));h.accept();
-    assert.equal(h.reads(),0);assert.equal(h.nodes.get('depot-read-token').value,'');await h.client().refresh();
+    const h=mounted(()=>new Response(JSON.stringify(snapshot()),{status:code}));h.access.set('synthetic-password');
+    assert.equal(h.reads(),0);await h.client().refresh();
     if(code!==200){assert.equal(h.token(),null);assert.equal(h.states.at(-1).status,'locked');}
-    h.document.hidden=true;h.document.fire('visibilitychange');assert.equal(h.token(),null);
-    const reads=h.reads();h.window.fire('focus');h.window.fire('pageshow');assert.equal(h.reads(),reads);
-    h.accept();h.window.fire('pagehide');assert.equal(h.token(),null);h.mount.dispose();
+    h.access.lock();assert.equal(h.token(),null);h.mount.dispose();
   }
 });
 test('B7 expiry invalidates foreground valuation without polling; rejected replacement clears access',async()=>{
-  const h=mounted(()=>new Response(JSON.stringify(snapshot())));h.accept();await h.client().refresh();
+  const h=mounted(()=>new Response(JSON.stringify(snapshot())));h.access.set('synthetic-password');await h.client().refresh();
   assert.equal(h.timers.size,1);const timer=[...h.timers.values()][0];assert.equal(timer.ms,898001);
   h.clock(NOW+898001);timer.f();assert.equal(h.states.at(-1).status,'stale');assert.equal(h.reads(),3);
-  h.accept('https://foreign.example');assert.equal(h.token(),null);assert.equal(h.nodes.get('depot-read-token').value,'');h.mount.dispose();
+  h.access.set('https://foreign.example');await h.client().refresh();assert.equal(h.token(),null);h.mount.dispose();
+});
+
+test('shared foreground revalidation stales cached Depot projections without reading',async()=>{
+  const h=mounted(()=>new Response(JSON.stringify(snapshot())));
+  h.access.set('synthetic-password');
+  await h.client().refresh();
+  assert.equal(h.states.at(-1).status,'fresh');
+  assert.equal(h.reads(),3);
+  h.clock(NOW+898001);
+  h.access.revalidateReaders();
+  assert.equal(h.access.getToken(),'synthetic-password','the source expiry is inside the app session');
+  assert.equal(h.states.at(-1).status,'stale');
+  assert.equal(h.reads(),3,'foreground revalidation does not issue requests');
+  h.mount.dispose();
 });
 
 test('B8 current value survives history failure; public price call never receives credentials',async()=>{

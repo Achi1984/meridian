@@ -1,7 +1,7 @@
-import {buildCurrentDepotModel} from './depot-current-model.js?v=B14';
-import {buildDepotHistoryModel} from './depot-history-model.js?v=B14';
-import {buildDepotReadModel} from './depot-read-model.js?v=B14';
-import {parseBotReadCredential} from './bot-read-client.js?v=B14';
+import {buildCurrentDepotModel} from './depot-current-model.js?v=B14-M11';
+import {buildDepotHistoryModel} from './depot-history-model.js?v=B14-M11';
+import {buildDepotReadModel} from './depot-read-model.js?v=B14-M11';
+import {parseBotReadCredential} from './bot-read-client.js?v=B14-M11';
 
 const ENDPOINT = 'https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/portfolio-history?range=1w';
 const CURRENT_ENDPOINT='https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/dashboard';
@@ -9,7 +9,7 @@ const PRICE_ENDPOINT='https://data-api.binance.vision/api/v3/ticker/price';
 // Only the Meridian bearer password is accepted; bot share access never expands to Depot.
 export function parseDepotReadCredential(value) {
   const parsed = parseBotReadCredential(value);
-  return parsed?.kind === 'bearer' && !/^[A-Za-z0-9_-]{43}$/.test(parsed.value) ? parsed : null;
+  return parsed?.kind === 'bearer' ? parsed : null;
 }
 
 const MAX_BYTES = 512 * 1024;
@@ -94,7 +94,7 @@ export function createDepotReadClient({getToken,onChange=()=>{},fetchImpl=global
     if(!current&&!stored&&h.status==='STALE')stored={status:'STALE'};
     project();
   }
-  function revalidate(){if(disposed)return;if(!token()||(snapshotToken&&token()!==snapshotToken)){lock();return;}project();}
+  function revalidate(){if(disposed)return;if(!token()||(snapshotToken&&token()!==snapshotToken)){lock();return;}if(current||stored)project();}
   function dispose(){if(disposed)return;lock();disposed=true;}
   return {refresh,lock,revalidate,dispose};
 }

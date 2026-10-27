@@ -11,9 +11,10 @@ const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium
   .find(path=>path&&existsSync(path));
 const v11Root=fileURLToPath(new URL('../v11/',import.meta.url));
 const source=readFileSync(join(v11Root,'index.html'),'utf8');
-const bootstrap='<script type="module" src="./bot-read-bootstrap.js?v=B14"></script>';
+const bootstrap='<script type="module" src="./bot-read-bootstrap.js?v=B14-M11"></script>';
 const fixtureScript=`<script>
 window.__botReadMode='fresh';window.__botReads=0;window.__resolveBotRead=null;window.__botErrors=[];
+window.__appAccessReads=0;
 window.addEventListener('error',event=>window.__botErrors.push(event.message));
 window.addEventListener('unhandledrejection',event=>window.__botErrors.push(String(event.reason)));
 window.__botSnapshot=age=>({schemaVersion:'MERIDIAN-ASSET-WATCH-BRIDGE-V1',source:'PIONEX_BOT_API',
@@ -33,7 +34,12 @@ window.__botSnapshot=age=>({schemaVersion:'MERIDIAN-ASSET-WATCH-BRIDGE-V1',sourc
   {botRef:'f'.repeat(20),symbol:'SOLUSDT',side:'LONG',cateType:'linear',botType:'futures_grid',
    leverage:null,pnl:{usd:0}}
  ]});
-window.fetch=async()=>{window.__botReads++;
+window.fetch=async(url)=>{if(String(url).endsWith('/app-access')){
+  window.__appAccessReads++;
+  return new Response(JSON.stringify({version:'7.64-CANONICAL-PORTFOLIO-HISTORY-V3',points:[]}),
+    {headers:{'content-type':'application/json'}});
+ }
+ window.__botReads++;
  if(window.__botReadMode==='error')throw new Error('synthetic private failure');
  if(window.__botReadMode==='unauthorized')return new Response('',{status:401});
  if(window.__botReadMode==='pending')return await new Promise(resolve=>{
@@ -65,7 +71,10 @@ function createShellServer() {
       response.writeHead(404);response.end();return;
     }
     try{
-      const body=readFileSync(path);
+      let body=readFileSync(path);
+      if(path===join(v11Root,'app-access.js')){
+        body=body.toString().replace('https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/portfolio-history?range=1w','/app-access');
+      }
       response.writeHead(200,{'content-type':'text/javascript; charset=utf-8'});
       response.end(body);
     }catch{if(!response.headersSent)response.writeHead(404);response.end();}
@@ -97,6 +106,15 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
             assert.ok(!result.exceptionDetails,'B11 shell browser expression failed');
             return result.result?.value;
           };
+          const openApp=async()=>{
+            await evaluate(`(()=>{const input=document.getElementById('app-access-password');input.value='synthetic-token';
+              document.getElementById('app-access-form').requestSubmit();return true;})()`);
+            for(let attempt=0;attempt<100;attempt++){
+              if(await evaluate(`!document.getElementById('app').hidden`))return;
+              await new Promise(resolve=>setTimeout(resolve,10));
+            }
+            assert.fail('shared app access did not unlock');
+          };
           const assertPopulatedLayout=async label=>{
             const layout=await evaluate(`(()=>{
               const x=scrollX,y=scrollY,root=document.documentElement;
@@ -120,6 +138,7 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           };
           await call('Emulation.setDeviceMetricsOverride',{width:size.width,height:size.height,
             deviceScaleFactor:1,mobile:size.mobile,screenWidth:size.width,screenHeight:size.height});
+          await openApp();
           await evaluate(`document.querySelector('#nav [data-v="bots"]').click()`);
           await evaluate('new Promise(resolve=>setTimeout(resolve,80))');
           const initial=await evaluate(`({width:innerWidth,height:innerHeight,reads:window.__botReads,
@@ -130,9 +149,7 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           assert.equal(initial.width,size.width);assert.equal(initial.height,size.height);
           assert.equal(initial.reads,0);assert.equal(initial.overflow,false);assert.equal(initial.navTargets,true);
           assert.equal(initial.botState,'locked',JSON.stringify(initial));
-          await evaluate(`document.getElementById('bot-read-token').value='synthetic-token';
-            document.getElementById('bot-read-provide').click();
-            window.__botReadMode='fresh';document.getElementById('bot-read-refresh').click()`);
+          await evaluate(`window.__botReadMode='fresh';document.getElementById('bot-read-refresh').click()`);
           await evaluate('new Promise(resolve=>setTimeout(resolve,60))');
           assert.equal(await evaluate('window.__botReads'),1);
           const fresh=await evaluate(`(()=>{
@@ -305,38 +322,34 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           assert.equal(await evaluate(`document.getElementById('command-bot-overview').dataset.state`),'locked');
           assert.doesNotMatch(await evaluate(`document.getElementById('command-bot-overview').innerText`),/BTCUSDT|Snapshot-Zeit/);
 
-          await evaluate(`document.getElementById('bot-read-token').value='synthetic-token';
-            document.getElementById('bot-read-provide').click();
-            window.__botReadMode='pending';document.getElementById('bot-read-refresh').click()`);
+          await openApp();
+          await evaluate(`window.__botReadMode='pending';document.getElementById('bot-read-refresh').click()`);
           await evaluate('new Promise(resolve=>setTimeout(resolve,20))');
           assert.equal(await evaluate(`document.querySelector('#bot-read-root [data-state]').dataset.state`),'loading');
           await evaluate(`document.getElementById('bot-read-lock').click();window.__resolveBotRead?.()`);
           await evaluate('new Promise(resolve=>setTimeout(resolve,80))');
           assert.equal(await evaluate(`document.querySelector('#bot-read-root [data-state]').dataset.state`),'locked');
           assert.equal(await evaluate(`document.getElementById('command-bot-overview').dataset.state`),'locked');
-          await evaluate(`document.getElementById('bot-read-token').value='synthetic-token';
-            document.getElementById('bot-read-provide').click();window.__botReadMode='fresh';
-            document.getElementById('bot-read-refresh').click()`);
+          await openApp();
+          await evaluate(`window.__botReadMode='fresh';document.getElementById('bot-read-refresh').click()`);
           await evaluate('new Promise(resolve=>setTimeout(resolve,60))');
           await evaluate(`Object.defineProperty(document,'hidden',{value:true,configurable:true});
             document.dispatchEvent(new Event('visibilitychange'))`);
-          assert.equal(await evaluate(`document.querySelector('#bot-read-root [data-state]').dataset.state`),'locked');
-          assert.equal(await evaluate(`document.getElementById('command-bot-overview').dataset.state`),'locked');
+          assert.equal(await evaluate(`document.getElementById('app').hidden`),true);
+          assert.equal(await evaluate(`document.querySelector('#bot-read-root [data-state]').dataset.state`),'fresh');
           await evaluate(`Object.defineProperty(document,'hidden',{value:false,configurable:true});
             document.dispatchEvent(new Event('visibilitychange'))`);
+          assert.equal(await evaluate(`document.getElementById('app').hidden`),false);
           assert.equal(await evaluate('window.__botReads'),8,'visibility and navigation do not fetch');
 
-          await evaluate(`document.getElementById('bot-read-token').value='synthetic-token';
-            document.getElementById('bot-read-provide').click();window.__botReadMode='unauthorized';
-            document.getElementById('bot-read-refresh').click()`);
+          await evaluate(`window.__botReadMode='unauthorized';document.getElementById('bot-read-refresh').click()`);
           await evaluate('new Promise(resolve=>setTimeout(resolve,60))');
           assert.equal(await evaluate(`document.querySelector('#bot-read-root [data-state]').dataset.state`),'locked');
           assert.equal(await evaluate(`document.getElementById('command-bot-overview').dataset.state`),'locked');
-          assert.equal(await evaluate(`document.getElementById('bot-read-token').value`),'');
+          assert.equal(await evaluate(`document.getElementById('app').hidden`),true);
 
-          await evaluate(`document.getElementById('bot-read-token').value='synthetic-token';
-            document.getElementById('bot-read-provide').click();window.__botReadMode='expires';
-            document.getElementById('bot-read-refresh').click()`);
+          await openApp();
+          await evaluate(`window.__botReadMode='expires';document.getElementById('bot-read-refresh').click()`);
           await evaluate('new Promise(resolve=>setTimeout(resolve,300))');
           assert.equal(await evaluate(`document.querySelector('#bot-read-root [data-state]').dataset.state`),'stale');
           assert.equal(await evaluate(`document.getElementById('command-bot-overview').dataset.state`),'stale');

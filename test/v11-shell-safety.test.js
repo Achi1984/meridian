@@ -40,13 +40,17 @@ test('A0: exactly one decision and unknown data fail closed',()=>{
 });
 
 test('A0: no live imports, network, credentials, orders or PWA bootstrap',()=>{
- assert.equal((html.match(/<script\b/gi)||[]).length,4,'one navigation script plus the manual read and strategy modules');
+ assert.equal((html.match(/<script\b/gi)||[]).length,5,'one navigation script plus the access, manual read and strategy modules');
  assert.match(html,/<script>/,'script must have no attributes');
  assert.doesNotMatch(html,/<(?:img|base|object|embed|source|video|audio|link)\b|<meta[^>]*http-equiv=["']refresh|\bon[a-z]+\s*=|javascript:|url\s*\(/i);
  assert.equal(scripts.length,1,'navigation-only inline script');
- for(const module of ['bot-read-bootstrap.js','depot-read-bootstrap.js','strategy-workspace-bootstrap.js'])
-   assert.ok(html.includes(`<script type="module" src="./${module}?v=B14"></script>`));
- assert.doesNotMatch(html.replace(/<script type="module" src="\.\/(?:bot-read-bootstrap|depot-read-bootstrap|strategy-workspace-bootstrap)\.js\?v=B14"><\/script>/g,''),/<script\b[^>]*\bsrc\s*=|<iframe\b|<form\b|@import\b/i);
+ for(const module of ['app-access-bootstrap.js','bot-read-bootstrap.js','depot-read-bootstrap.js','strategy-workspace-bootstrap.js'])
+   assert.ok(html.includes(`<script type="module" src="./${module}?v=B14-M11"></script>`));
+ assert.equal((html.match(/<form\b/g)||[]).length,1,'one app-opening form');
+ assert.equal((html.match(/type="password"/g)||[]).length,1,'one masked app password input');
+ const withoutGate=html.replace(/<form id="app-access-form">[\s\S]*?<\/form>/,'')
+   .replace(/<script type="module" src="[^"]+"><\/script>/g,'');
+ assert.doesNotMatch(withoutGate,/<script\b[^>]*\bsrc\s*=|<iframe\b|<form\b|@import\b/i);
  assert.match(html,/id="view-strategies"/);
  assert.doesNotMatch(html,/href="\.\.\/v10\/"/);
  assert.doesNotMatch(html,/<link\b[^>]*rel=["']manifest/i);

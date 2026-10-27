@@ -30,6 +30,10 @@ function staticServer(){
     const url=new URL(request.url,'http://localhost');
     requests.push({method:request.method,path:url.pathname});
     if(request.method!=='GET'){response.writeHead(405);response.end();return;}
+    if(url.pathname==='/app-access'){
+      response.writeHead(200,{'content-type':'application/json','cache-control':'no-store'});
+      response.end(JSON.stringify({version:'7.64-CANONICAL-PORTFOLIO-HISTORY-V3',points:[]}));return;
+    }
     const roots=[['/v11/',v11],['/research/',join(repository,'research')],['/docs/',join(repository,'docs')]];
     const match=roots.find(([prefix])=>url.pathname.startsWith(prefix));
     if(!match){response.writeHead(404);response.end();return;}
@@ -37,7 +41,10 @@ function staticServer(){
     const path=normalize(join(root,decodeURIComponent(url.pathname.slice(prefix.length))));
     if(path!==root&&!path.startsWith(root.endsWith(sep)?root:root+sep)){response.writeHead(404);response.end();return;}
     try{
-      const body=readFileSync(path);
+      let body=readFileSync(path);
+      if(path===join(v11,'app-access.js')){
+        body=body.toString().replace('https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/portfolio-history?range=1w','/app-access');
+      }
       const type=path.endsWith('.html')?'text/html; charset=utf-8':
         path.endsWith('.json')?'application/json; charset=utf-8':'text/javascript; charset=utf-8';
       response.writeHead(200,{'content-type':type,'cache-control':'no-store'});
@@ -266,6 +273,13 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         };
         await call('Emulation.setDeviceMetricsOverride',{width:size.width,height:size.height,
           deviceScaleFactor:1,mobile:size.mobile,screenWidth:size.width,screenHeight:size.height});
+        await evaluate(`(()=>{const input=document.getElementById('app-access-password');input.value='synthetic-password';
+          document.getElementById('app-access-form').requestSubmit();return true;})()`);
+        for(let attempt=0;attempt<100;attempt++){
+          if(await evaluate(`!document.getElementById('app').hidden`))break;
+          await new Promise(resolve=>setTimeout(resolve,10));
+        }
+        assert.equal(await evaluate(`document.getElementById('app').hidden`),false,'shared app password unlocks the shell');
         const initial=await evaluate(`(()=>{
           const nav=[...document.querySelectorAll('#nav button')];
           return {width:innerWidth,overflow:document.documentElement.scrollWidth>innerWidth+1,
@@ -930,7 +944,7 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         assert.match(afterStaleRead.alertText,/Export konnte nicht angenommen werden\. Kein Ergebnis wird angezeigt\./);
         assert.doesNotMatch(afterStaleRead.text,/Lifecycle completed|Engine-Ergebnis\s+COMPLETED/);
         const hostilePresentation=await evaluate(`(async()=>{
-          const {renderArenaResultView}=await import('/v11/arena-result-view.js?v=B14');
+          const {renderArenaResultView}=await import('/v11/arena-result-view.js?v=B14-M11');
           const hostile='"><img src=x onerror="alert(1)">'+ 'identity'.repeat(60);
           const root=document.createElement('div');
           root.style.cssText='max-width:100%;min-width:0';
@@ -955,7 +969,7 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         assert.ok(hostilePresentation.columns>=190);
         if(size.width===320){
           const disposal=await evaluate(`(async()=>{
-            const {createStrategyArenaView}=await import('/v11/strategy-arena.js?v=B14');
+            const {createStrategyArenaView}=await import('/v11/strategy-arena.js?v=B14-M11');
             const existingIds=new Set([...document.querySelectorAll('#strategy-arena-root [id^="arena-producer-"]')].map(node=>node.id));
             const root=document.createElement('div');document.body.append(root);
             const view=createStrategyArenaView(root,{fetchImpl:async()=>{throw Error('synthetic provenance read failure');}});

@@ -1,7 +1,7 @@
-import {createDepotHistoryView} from './depot-history-view.js?v=B14';
+import {createDepotHistoryView} from './depot-history-view.js?v=B14-M11';
 // DOM text only. Neither credentials nor raw response bodies are rendered.
 const LABELS={
-  locked:['Gesperrt','Meridian-Lesepasswort übernehmen und anschließend manuell aktualisieren.'],
+  locked:['Gesperrt','App mit Meridian-Passwort öffnen, dann Depot manuell aktualisieren.'],
   loading:['Wird geladen','Die gespeicherte Depotbewertung wird geprüft.'],
   fresh:['Letzte vollständige Depotbewertung','Gespeicherter Snapshot · keine Live-Kurse oder aktuelle Kontovollständigkeit.'],
   stale:['Daten veraltet','Bewertung ausgeblendet. Bitte manuell aktualisieren.'],
@@ -36,7 +36,7 @@ export function createDepotReadView(root,{getToken,createClient,commandRoot=null
       value?.setAttribute('aria-label',kind==='fresh'?'Depotbewertung: '+money(m.totalUsd):'Portfoliowert unbekannt');
       set('.state-label',kind==='fresh'?'BEWERTUNG GELADEN':LABELS[kind][0].toUpperCase());
       set('.portfolio-description',kind==='fresh'?(current?'Serverseitige Depotbewertung':'Gespeicherte Depotbewertung'):LABELS[kind][1]);
-      set('.caption',kind==='fresh'?'Stand: '+new Date(m.snapshotAt).toLocaleString('de-AT')+' · '+(current?'Serverseitige Quellen; lokale Ergänzungen aus V10 fehlen.':'Gespeicherter Snapshot; keine Live-Kurse.'):'Im Depot entsperren und manuell aktualisieren.');
+      set('.caption',kind==='fresh'?'Stand: '+new Date(m.snapshotAt).toLocaleString('de-AT')+' · '+(current?'Serverseitige Quellen; lokale Ergänzungen aus V10 fehlen.':'Gespeicherter Snapshot; keine Live-Kurse.'):kind==='locked'?'App entsperren und Depot manuell aktualisieren.':LABELS[kind][1]);
       set('[data-command-depot-status]',kind==='fresh'?'Bewertung geladen':LABELS[kind][0]);
       commandRoot.dataset.state=kind;
     }

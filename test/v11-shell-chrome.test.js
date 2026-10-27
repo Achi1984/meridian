@@ -5,8 +5,9 @@ import {spawnSync} from 'node:child_process';
 import {existsSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {withMobileChrome} from './helpers/v11-cdp.mjs';
+import {unlockAppThroughGate} from './helpers/v11-app-access-browser.mjs';
+import {startV11StaticServer} from './helpers/v11-static-server.mjs';
 const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium'].find(p=>p&&existsSync(p));
-const page=process.env.V11_TEST_URL||'file://'+fileURLToPath(new URL('../v11/index.html',import.meta.url));
 const probe=`(()=>{const tokenColor=token=>{const node=document.createElement('span');node.style.color='var('+token+')';document.body.append(node);const color=getComputedStyle(node).color;node.remove();return color;};
 const x={width:innerWidth,viewport:document.documentElement.clientWidth,
 body:document.body.scrollWidth,root:document.documentElement.scrollWidth,dpr:devicePixelRatio,
@@ -39,14 +40,21 @@ if(typeof WebSocket!=='function'){
  return;
 }
 assert.ok(chrome,'Chrome binary required');
+const hosted=process.env.V11_TEST_URL?{url:process.env.V11_TEST_URL,close:async()=>{}}:await startV11StaticServer();
+try{
 for(const width of [320,375,390,430]){
- const x=await withMobileChrome(chrome,width,page,probe);
+ const x=await withMobileChrome(chrome,width,hosted.url,async call=>{
+  await unlockAppThroughGate(call);
+  const result=await call('Runtime.evaluate',{expression:probe,returnByValue:true});
+  assert.ok(!result.exceptionDetails,'shell measurement expression must execute in the unlocked app');
+  return result.result?.value;
+ });
  console.log('V11_CDP_WIDTH',width,JSON.stringify(x));
  assert.equal(x.width,width,'real innerWidth');assert.equal(x.viewport,width,'real clientWidth');
  assert.equal(x.dpr,1);assert.ok(x.body<=width+1&&x.root<=width+1,'overflow '+width);
  assert.equal(x.decision,1);assert.equal(x.nav.length,5);
  assert.match(x.decisionBackground,/125deg.*rgb\(27, 53, 80\)/,'A1 gradient must survive CSS cascade');
- assert.deepEqual(x.sourceLabels,['Unbekannt','Unbekannt','Unbekannt'],'category colors do not verify sources');
+ assert.deepEqual(x.sourceLabels,['Gesperrt','Unbekannt','Unbekannt'],'unrefreshed readers do not verify sources');
  for(const accent of x.unknownBotsAccents){
   assert.equal(accent,x.attentionColor,'unknown BOTS surface uses attention, not category status');
   assert.notEqual(accent,x.positiveColor,'unknown BOTS surface cannot imply positive verification');
@@ -66,4 +74,5 @@ for(const width of [320,375,390,430]){
   assert.ok(v.body<=width+1&&v.root<=width+1,'view overflow '+width+' '+v.name);
  }
 }
+}finally{await hosted.close();}
 });
