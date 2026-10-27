@@ -1,4 +1,4 @@
-import {buildBotReadModel} from './bot-read-model.js';
+import {buildBotReadModel} from './bot-read-model.js?v=B14';
 
 const ENDPOINT = 'https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/asset-watch';
 // Exact canonical gateway links only. Never use a supplied URL as a fetch target.
@@ -54,26 +54,31 @@ async function readBounded(response, signal) {
 // Inactive until explicitly called. No token storage, engine import or account activation.
 export function createBotReadClient({getToken, onChange = () => {}, fetchImpl = globalThis.fetch,
   now = Date.now, schedule = setTimeout, cancelSchedule = clearTimeout} = {}) {
-  let generation = 0, pending = null, disposed = false, snapshot = null, snapshotToken = null, pendingToken = null;
+  let generation = 0, pending = null, disposed = false, snapshot = null, snapshotToken = null,
+    pendingToken = null, readIdentity = null;
   const token = () => {
     try {
       const value = getToken();
       return parseBotReadCredential(value) ? value.trim() : null;
     } catch { return null; }
   };
-  const emit = (status, model = null) => {
+  const emit = (status, model = null, identity = null) => {
     if (disposed) return;
-    try { onChange({status, model}); } catch {}
+    const state={status,model};
+    if(status==='fresh'&&identity!==null)state.readIdentity=identity;
+    try { onChange(state); } catch {}
   };
   const stop = () => {
     generation++;
     if (pending) { pending.abort(); pending = null; }
     pendingToken = null;
   };
-  const wipe = () => { snapshot = null; snapshotToken = null; };
+  const wipe = () => { snapshot = null; snapshotToken = null; readIdentity = null; };
   const project = () => {
     const model = buildBotReadModel(snapshot, {now:now()});
-    emit(model.status === 'FRESH_SNAPSHOT' ? 'fresh' : model.status === 'STALE' ? 'stale' : 'unavailable', model);
+    const status=model.status === 'FRESH_SNAPSHOT' ? 'fresh' : model.status === 'STALE' ? 'stale' : 'unavailable';
+    if(status==='fresh')emit(status,model,readIdentity);
+    else {wipe();emit(status,model);}
   };
   function lock() { stop(); wipe(); emit('locked'); }
   async function refresh() {
@@ -109,7 +114,7 @@ export function createBotReadClient({getToken, onChange = () => {}, fetchImpl = 
       const result = await Promise.race([operation(), aborted]);
       if (id !== generation || disposed) return;
       if (token() !== credential || result.locked) { lock(); return; }
-      snapshot = result.snapshot; snapshotToken = credential;
+      snapshot = result.snapshot; snapshotToken = credential; readIdentity=Symbol('bot-read');
       project();
     } catch {
       if (id === generation && !disposed) {

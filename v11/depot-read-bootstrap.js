@@ -1,6 +1,6 @@
-import {createBotReadAccess} from './bot-read-access.js';
-import {createDepotReadClient,parseDepotReadCredential} from './depot-read-client.js';
-import {createDepotReadView} from './depot-read-view.js';
+import {createBotReadAccess} from './bot-read-access.js?v=B14';
+import {createDepotReadClient,parseDepotReadCredential} from './depot-read-client.js?v=B14';
+import {createDepotReadView} from './depot-read-view.js?v=B14';
 
 // Mounting controls never starts a request. Only the view's manual refresh can read.
 export function mountDepotReadAccess(document, window, {

@@ -89,7 +89,7 @@ for workflow in (text, watchdog):
     assert "full scope" in workflow.lower() or "full requested scope" in workflow.lower()
     assert "exact-head CI" in workflow or "CI on the exact reviewed head" in workflow
 for invariant in (
-    "Validate fixed watchdog status destination", ".mailboxIssue == 639",
+    "Validate fixed watchdog status destination", f".mailboxIssue == {mailbox_issue}",
     ".mailboxPolicy.watchdogStatusCommentId", '.id == $id and .issue_url == $issue',
     '.user.login == "Achi1984" and .user.id == 319562141',
     'startswith("CROSS_MODEL_STATUS CLAUDE-DEVELOPMENT-WATCHDOG',

@@ -381,6 +381,10 @@ const b12Deltas=[
     '    #nav button[data-v="strategies"].active{color:#d49aff}\n'
   ],
   [
+    '',
+    '    .arena-historical-metadata[aria-label^="Separates historisches Arena-Ergebnis"]{min-width:0;overflow-wrap:anywhere}\n    .arena-historical-metadata[aria-label^="Separates historisches Arena-Ergebnis"] section,.arena-historical-metadata[aria-label^="Separates historisches Arena-Ergebnis"] dl,.arena-historical-metadata[aria-label^="Separates historisches Arena-Ergebnis"] dt,.arena-historical-metadata[aria-label^="Separates historisches Arena-Ergebnis"] dd,.arena-historical-metadata[aria-label^="Separates historisches Arena-Ergebnis"] p,.arena-historical-metadata[aria-label^="Separates historisches Arena-Ergebnis"] h4,.arena-historical-metadata[aria-label^="Separates historisches Arena-Ergebnis"] h5,.arena-historical-metadata[aria-label^="Separates historisches Arena-Ergebnis"] ul,.arena-historical-metadata[aria-label^="Separates historisches Arena-Ergebnis"] li,.arena-historical-metadata[aria-label^="Separates historisches Arena-Ergebnis"] summary,.arena-historical-metadata[aria-label^="Separates historisches Arena-Ergebnis"] pre{min-width:0;overflow-wrap:anywhere}\n'
+  ],
+  [
     '    @media(max-width:350px){.card{padding:14px}.container{padding-top:12px}.autonomy-strip>summary{padding-left:9px;padding-right:9px}}\n    .strategy-load-status{min-height:44px;padding:12px 0;color:var(--state-unknown);overflow-wrap:anywhere}\n    .strategy-source-notice{border-top:3px solid var(--research)}\n    .strategy-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}\n    .strategy-id{font-size:12px;font-weight:800;letter-spacing:.08em;color:#d8c8ff}\n    .strategy-family h2,.strategy-candidate h2{margin-bottom:8px}\n    .strategy-family>p,.strategy-candidate>p{font-size:13px;line-height:1.65;overflow-wrap:anywhere}\n    .strategy-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:13px 0}\n    .strategy-summary>div{min-width:0;padding:9px;border:1px solid #344356;border-radius:10px;background:#101824}\n    .strategy-summary dt{font-size:10px;color:var(--muted)}\n    .strategy-summary dd{margin:3px 0 0;font-size:12px;font-weight:650;overflow-wrap:anywhere}\n    .strategy-progression{list-style:none;padding:0;margin:12px 0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}\n    .strategy-progression li{min-width:0;padding:8px 6px;border:1px solid #344356;border-radius:9px;background:#101824}\n    .strategy-progression strong,.strategy-progression span{display:block;font-size:10px;line-height:1.4;overflow-wrap:anywhere}\n    .strategy-progression span{margin-top:4px;color:var(--state-unknown)}\n    .strategy-family details{margin:10px 0 0}\n    .strategy-family details summary,.arena-evidence summary,.arena-evidence-details summary{min-height:48px;letter-spacing:0;text-transform:none}\n    .strategy-candidate{border-color:#776346;background:linear-gradient(160deg,#28251d,#111923 70%)}\n    .strategy-arena{margin-top:20px;padding-top:10px;border-top:1px solid var(--line)}\n    .strategy-arena>p{font-size:13px;line-height:1.65;overflow-wrap:anywhere}\n    .arena-toolbar{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:14px 0}\n    .arena-toolbar button,.arena-import{min-width:0;min-height:48px;padding:10px;border:1px solid #567a9f;border-radius:10px;background:#142235;color:var(--text);font-size:12px;line-height:1.4;font-weight:650;overflow-wrap:anywhere}\n    .arena-toolbar button{cursor:pointer}\n    .arena-import{display:flex;align-items:center;justify-content:center;text-align:center;cursor:pointer}\n    .arena-import input{width:100%;min-width:0;min-height:44px;font-size:11px}\n    .arena-toolbar button:focus-visible,.arena-import:focus-within{outline:3px solid #9bc9ff;outline-offset:2px}\n    .arena-toolbar button:disabled{opacity:.55;cursor:not-allowed}\n    .arena-evidence{color:var(--state-unknown);font-size:12px;font-weight:750;overflow-wrap:anywhere}\n    .arena-models{display:grid;gap:10px;margin:12px 0}\n    .arena-model-card{min-width:0;padding:14px;border:1px solid #344356;border-radius:14px;background:#101824;overflow-wrap:anywhere}\n    .arena-model-card header{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}\n    .arena-model-card header>div{min-width:0}\n    .arena-model-card header strong,.arena-model-card header span{display:block}\n    .arena-model-card header span{margin-top:4px;font-size:10px;color:var(--state-unknown)}\n    .arena-model-card header>b{font-size:13px;white-space:nowrap}\n    .arena-model-card p{font-size:11px;line-height:1.6;margin-top:8px;overflow-wrap:anywhere}\n    .arena-model-card dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:12px 0}\n    .arena-model-card dl>div{min-width:0;padding:7px;border-radius:8px;background:#172336}\n    .arena-model-card dt{font-size:9px;color:var(--muted)}\n    .arena-model-card dd{margin:3px 0 0;font-size:11px;font-weight:700;overflow-wrap:anywhere}\n    .arena-blocked,.arena-unknown{padding:10px;border:1px solid #776346;border-radius:9px;color:var(--state-unknown)}\n    .arena-evidence{margin:10px 0}\n    .arena-evidence summary{font-size:10px}\n    .arena-evidence-details{margin-top:8px}\n    .arena-evidence-details ul{padding-left:18px;overflow-wrap:anywhere}\n    .arena-control{padding:10px;border:1px solid var(--line);border-radius:9px;font-size:11px;overflow-wrap:anywhere}\n    .tone-safe{color:#6ee7b7}.tone-danger{color:#ff9b9b}.tone-muted{color:var(--muted)}\n    @media(max-width:560px){.strategy-summary{grid-template-columns:1fr}.strategy-progression{grid-template-columns:1fr 1fr}.arena-toolbar{grid-template-columns:1fr}.arena-model-card{padding:11px}}\n    @media(max-width:350px){#nav button[data-v="strategies"] span:last-child{font-size:9px;letter-spacing:-.03em}}\n    @media(forced-colors:active){.strategy-family,.strategy-candidate,.arena-model-card,.strategy-progression li{border-color:CanvasText}}\n',
     '    @media(max-width:350px){.card{padding:14px}.container{padding-top:12px}.autonomy-strip>summary{padding-left:9px;padding-right:9px}}\n'
   ],
@@ -429,11 +433,55 @@ const mobileNavDelta=[
   '    @media(max-width:350px){#nav button[data-v="strategies"] span:last-child{font-size:9px;letter-spacing:-.03em}}\n',
   '    @media(max-width:350px){#nav button[data-v="strategies"] span:last-child{letter-spacing:-.03em}}\n'
 ];
+const b13Deltas=[
+ [
+   '      <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B12<small>Versionsverlauf ▾</small></button>\n',
+   '      <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B13<small>Versionsverlauf ▾</small></button>\n'
+ ],
+ [
+   '        <p><b>Diese Vorschau · B12:</b> Native Strategien-Ansicht mit zwölf Hypothesen, fünf Arena-Modellen und einem getrennten Entwicklungs-Kandidaten. Nur lokale Forschungsquellen und manuelle Diagnose; keine laufenden Paper- oder Live-Aktivitäten.</p>\n',
+   '        <p><b>Diese Vorschau · B13:</b> Einheitliche Cache-Identitäten für das lokale M11-Modulnetz nach Auslieferung der Research-Oberfläche. Keine neuen Research-Ergebnisse oder Paper-/Live-Aktivitäten.</p>\n'
+ ],
+ [
+   '        <li><strong>Meridian 11 · B12</strong><span class="version-status">Entwurf</span><p>Strategien-Arbeitsbereich mit dem Quellregister, einer manuell bedienbaren M11-Arena und einem getrennten B1-7-Entwicklungskandidaten. Keine automatische Marktdatenbeschaffung, kein Paperbetrieb und keine Live-Freigabe.</p></li>\n',
+   '        <li><strong>Meridian 11 · B13</strong><span class="version-status">Entwurf</span><p>Einheitliche Cache-Identitäten für das lokale M11-Modulnetz nach Auslieferung der Research-Oberfläche. <a href="https://github.com/Achi1984/meridian/issues/953">Umfang #953</a> · <a href="https://github.com/Achi1984/meridian/pull/956">Research-Oberfläche #956</a>. Keine neuen Research-Ergebnisse oder Paper-/Live-Aktivitäten.</p></li>\n        <li><strong>Meridian 11 · B12</strong><span class="version-status">Entwurf</span><p>Strategien-Arbeitsbereich mit dem Quellregister, einer manuell bedienbaren M11-Arena und einem getrennten B1-7-Entwicklungskandidaten. Keine automatische Marktdatenbeschaffung, kein Paperbetrieb und keine Live-Freigabe.</p></li>\n'
+ ],
+ [
+   '<script type="module" src="./bot-read-bootstrap.js?v=B12"></script>\n<script type="module" src="./depot-read-bootstrap.js?v=B12"></script>\n<script type="module" src="./strategy-workspace-bootstrap.js?v=B12"></script>\n',
+   '<script type="module" src="./bot-read-bootstrap.js?v=B13"></script>\n<script type="module" src="./depot-read-bootstrap.js?v=B13"></script>\n<script type="module" src="./strategy-workspace-bootstrap.js?v=B13"></script>\n'
+ ]
+];
+const b14Deltas=[
+ [
+   '11 · Vorschau B13<small>Versionsverlauf ▾</small>',
+   '11 · Vorschau B14<small>Versionsverlauf ▾</small>'
+ ],
+ [
+   '        <p><b>Diese Vorschau · B13:</b> Einheitliche Cache-Identitäten für das lokale M11-Modulnetz nach Auslieferung der Research-Oberfläche. Keine neuen Research-Ergebnisse oder Paper-/Live-Aktivitäten.</p>\n',
+   '        <p><b>Diese Vorschau · B14:</b> Research Results Explorer für 44 Producerpfade mit Filtern, Zweipfadvergleich und gelieferten Quartalsrenditen. UNVERIFIED · Herkunft nicht bestätigt. Keine neuen Research-Ergebnisse oder Paper-/Live-Aktivitäten.</p>\n'
+ ],
+ [
+   '',
+   '        <li><strong>Meridian 11 · B14</strong><span class="version-status">Entwurf</span><p>Research Results Explorer für 44 Producerpfade mit Filtern, Zweipfadvergleich, Pfaddetails und gelieferten Quartalsrenditen. <a href="https://github.com/Achi1984/meridian/issues/961">Umfang #961</a>. UNVERIFIED · Herkunft nicht bestätigt. Keine neuen Research-Ergebnisse oder Paper-/Live-Aktivitäten.</p></li>\n'
+ ],
+ [
+   '<script type="module" src="./bot-read-bootstrap.js?v=B13"></script>\n<script type="module" src="./depot-read-bootstrap.js?v=B13"></script>\n<script type="module" src="./strategy-workspace-bootstrap.js?v=B13"></script>\n',
+   '<script type="module" src="./bot-read-bootstrap.js?v=B14"></script>\n<script type="module" src="./depot-read-bootstrap.js?v=B14"></script>\n<script type="module" src="./strategy-workspace-bootstrap.js?v=B14"></script>\n'
+ ]
+];
 function restoreB2(source){
+ for(const [before,after] of b14Deltas){
+   assert.equal(source.split(after).length-1,1,'one exact B14 source delta');
+   source=source.replace(after,before);
+ }
+ for(const [before,after] of b13Deltas){
+   assert.equal(source.split(after).length-1,1,'one exact B13 source delta');
+   source=source.replace(after,before);
+ }
  assert.equal(source.split(mobileNavDelta[1]).length-1,1,'one exact compact-nav B12 delta');
  source=source.replace(mobileNavDelta[1],mobileNavDelta[0]);
  for(const [index,delta] of b12Deltas.entries()){
-   const [before,after]=index===4?[delta[1],delta[0]]:delta;
+   const [before,after]=index===5?[delta[1],delta[0]]:delta;
    assert.equal(source.split(after).length-1,1,`one exact B12 delta ${index}`);
    source=source.replace(after,before);
  }
@@ -485,7 +533,7 @@ test('Terminal öffnen preserves the reviewed history-close baseline and stays o
   assert.equal(gitBlob(restored),preimageBlob,'all source bytes except terminal-entry insertions, the checked viewport pair and exact Depot/revision deltas must match the reviewed history-close baseline');
 });
 
-const moduleNames=['bot-read-bootstrap.js','bot-read-access.js','bot-read-client.js','bot-read-view.js','bot-read-model.js','bot-overview-model.js','depot-read-bootstrap.js','depot-read-client.js','depot-read-model.js','depot-read-view.js','depot-history-model.js','depot-history-view.js','depot-current-model.js','strategy-workspace-bootstrap.js','strategy-catalog.js','research-evidence.js','strategy-arena.js','arena-inspection-report.js'];
+const moduleNames=['bot-read-bootstrap.js','bot-read-access.js','bot-read-client.js','bot-read-view.js','bot-read-model.js','bot-overview-model.js','depot-read-bootstrap.js','depot-read-client.js','depot-read-model.js','depot-read-view.js','depot-history-model.js','depot-history-view.js','depot-current-model.js','strategy-workspace-bootstrap.js','strategy-catalog.js','research-evidence.js','strategy-arena.js','arena-inspection-report.js','arena-historical-result.js','arena-historical-export.js','arena-result-view.js'];
 function deploymentServer(){
   const inlineScript=html.match(/<script>([\s\S]*?)<\/script>/i)?.[1];
   assert.ok(inlineScript,'actual UI-only navigation script');
@@ -513,7 +561,7 @@ function deploymentServer(){
   const server=createServer((request,response)=>{
     const url=new URL(request.url,'http://127.0.0.1'),path=url.pathname;
     requests.push({method:request.method,path}); // never record headers or token values
-    const versionedModule=(path==='/meridian/v11/bot-read-bootstrap.js'||path==='/meridian/v11/depot-read-bootstrap.js'||path==='/meridian/v11/strategy-workspace-bootstrap.js'||path==='/meridian/v11/strategy-catalog.js'||path==='/meridian/v11/strategy-arena.js')&&url.search==='?v=B12'||path==='/meridian/v11/bot-read-view.js'&&url.search==='?v=B11';
+    const versionedModule=path.startsWith('/meridian/v11/')&&moduleNames.includes(path.slice('/meridian/v11/'.length))&&url.search==='?v=B14';
     if(request.method!=='GET'||(url.search&&!versionedModule)){response.writeHead(404);response.end();return;}
     if(path===endpoint){
       reads++;
@@ -551,7 +599,7 @@ function deploymentServer(){
     if(path!=='/meridian/v11/'&&path!=='/meridian/v10/'){response.writeHead(404);response.end();return;}
     const preview=path==='/meridian/v11/';
     const origin='http://127.0.0.1:'+server.address().port;
-    const scriptSource=preview?`'sha256-${scriptHash}' `+[...modules.keys()].map(path=>origin+path).join(' '):"'none'";
+    const scriptSource=preview?`'sha256-${scriptHash}' `+[...modules.keys()].map(path=>origin+path+(path.startsWith('/meridian/v11/')?'?v=B14':'')).join(' '):"'none'";
     const policy=`default-src 'none'; script-src ${scriptSource}; style-src 'unsafe-inline'; connect-src ${preview?origin+endpoint+' '+origin+depotEndpoint+' '+origin+currentEndpoint+' '+origin+priceEndpoint+' '+origin+'/meridian/docs/strategy-lab/campaign-20261013.json':"'none'"}; worker-src 'none'; child-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'none'`;
     policies.set(path,policy);
     response.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Content-Security-Policy':policy});response.end(preview?html:terminal);
@@ -566,17 +614,17 @@ function deploymentServer(){
   });
 }
 
-test('terminal deployment fixture serves the catalog research evidence module under its CSP',async()=>{
+test('terminal deployment fixture serves Arena dependencies under its CSP',async()=>{
   const server=await deploymentServer();
   try{
     const start=server.base+'v11/';
     const page=await fetch(start);
     assert.equal(page.status,200);
-    const catalogUrl=new URL('strategy-catalog.js?v=B12',start);
+    const catalogUrl=new URL('strategy-catalog.js?v=B14',start);
     const catalog=await fetch(catalogUrl);
     assert.equal(catalog.status,200);
     const source=await catalog.text();
-    const imported=source.match(/from ['"](\.\/research-evidence\.js)['"]/);
+    const imported=source.match(/from ['"](\.\/research-evidence\.js\?v=B14)['"]/);
     assert.ok(imported,'catalog imports the read-only evidence module');
     const dependency=new URL(imported[1],catalogUrl);
     const response=await fetch(dependency);
@@ -586,9 +634,9 @@ test('terminal deployment fixture serves the catalog research evidence module un
     const scriptPolicy=page.headers.get('content-security-policy').split(';').find(part=>part.trim().startsWith('script-src '));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(dependency.href),'exact dependency URL must be in script-src');
     assert.equal(server.allowedPaths.has(dependency.pathname),true);
-    const arenaUrl=new URL('strategy-arena.js?v=B12',start);
+    const arenaUrl=new URL('strategy-arena.js?v=B14',start);
     const arenaSource=await (await fetch(arenaUrl)).text();
-    const inspectionImport=arenaSource.match(/from ['"](\.\/arena-inspection-report\.js)['"]/);
+    const inspectionImport=arenaSource.match(/from ['"](\.\/arena-inspection-report\.js\?v=B14)['"]/);
     assert.ok(inspectionImport,'Arena imports the metadata-only report adapter');
     const inspectionUrl=new URL(inspectionImport[1],arenaUrl);
     const inspection=await fetch(inspectionUrl);
@@ -597,6 +645,33 @@ test('terminal deployment fixture serves the catalog research evidence module un
     assert.equal(await inspection.text(),readFileSync(new URL('../v11/arena-inspection-report.js',import.meta.url),'utf8'));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(inspectionUrl.href));
     assert.equal(server.allowedPaths.has(inspectionUrl.pathname),true);
+    const historicalImport=arenaSource.match(/from ['"](\.\/arena-historical-result\.js\?v=B14)['"]/);
+    assert.ok(historicalImport,'Arena imports the bounded historical fixture adapter');
+    const historicalUrl=new URL(historicalImport[1],arenaUrl);
+    const historical=await fetch(historicalUrl);
+    assert.equal(historical.status,200,'historical adapter must be served before Arena bootstrap can succeed');
+    assert.match(historical.headers.get('content-type'),/^text\/javascript/);
+    assert.equal(await historical.text(),readFileSync(new URL('../v11/arena-historical-result.js',import.meta.url),'utf8'));
+    assert.ok(scriptPolicy.trim().split(/\s+/).includes(historicalUrl.href));
+    assert.equal(server.allowedPaths.has(historicalUrl.pathname),true);
+    const producerImport=arenaSource.match(/from ['"](\.\/arena-historical-export\.js\?v=B14)['"]/);
+    assert.ok(producerImport,'Arena imports the bounded producer export adapter');
+    const producerUrl=new URL(producerImport[1],arenaUrl);
+    const producer=await fetch(producerUrl);
+    assert.equal(producer.status,200,'producer adapter must be served before Arena bootstrap can succeed');
+    assert.match(producer.headers.get('content-type'),/^text\/javascript/);
+    assert.equal(await producer.text(),readFileSync(new URL('../v11/arena-historical-export.js',import.meta.url),'utf8'));
+    assert.ok(scriptPolicy.trim().split(/\s+/).includes(producerUrl.href),'exact producer dependency URL must be in script-src');
+    assert.equal(server.allowedPaths.has(producerUrl.pathname),true);
+    const rendererImport=arenaSource.match(/from ['"](\.\/arena-result-view\.js\?v=B14)['"]/);
+    assert.ok(rendererImport,'Arena imports the isolated result renderer');
+    const rendererUrl=new URL(rendererImport[1],arenaUrl);
+    const renderer=await fetch(rendererUrl);
+    assert.equal(renderer.status,200,'renderer dependency must be served before Arena bootstrap can succeed');
+    assert.match(renderer.headers.get('content-type'),/^text\/javascript/);
+    assert.equal(await renderer.text(),readFileSync(new URL('../v11/arena-result-view.js',import.meta.url),'utf8'));
+    assert.ok(scriptPolicy.trim().split(/\s+/).includes(rendererUrl.href),'exact renderer dependency URL must be in script-src');
+    assert.equal(server.allowedPaths.has(rendererUrl.pathname),true);
     assert.deepEqual(server.metrics(),{reads:0,aborts:0,depotReads:0,depotAborts:0,pending:0});
   }finally{await server.close();}
 });
@@ -653,13 +728,41 @@ async function browserRun(call,start,width,server){
           value:panel.querySelector('.portfolio-value').getAttribute('aria-label'),
           states:[...panel.querySelectorAll('.trust-cell')].map(cell=>[cell.querySelector('strong').textContent,cell.querySelector('span').textContent]),
           controls:panel.querySelectorAll('button,input,select,form').length,
+          controlDetails:[...panel.querySelectorAll('button,input,select,form')].map(control=>({
+            tag:control.tagName.toLowerCase(),id:control.id,type:control.type||'',
+            label:control.getAttribute('aria-label')||control.labels?.[0]?.textContent.trim()||control.textContent.trim(),
+            hidden:control.hidden,disabled:control.disabled
+          })),
+          executionControls:[...panel.querySelectorAll('button')].map(button=>
+            button.getAttribute('aria-label')||button.textContent.trim()).filter(label=>/(?:ausführ|order|kauf|verkauf|start|stopp)/i.test(label)),
           viewport:document.documentElement.clientWidth,body:document.body.scrollWidth,root:document.documentElement.scrollWidth};
       })()`);
       assert.equal(bots.label,'Nur lesend');
       assert.equal(bots.value,'Anzahl aktiver Bots unbekannt');
       assert.deepEqual(bots.states,[['Quelle','Snapshot unten'],['Aktualität','Je manueller Abfrage'],['Risiko','Nicht bestimmbar']]);
       assert.equal(server.metrics().reads,initialReads,'mount and navigation never fetch');
-      assert.equal(bots.controls,9,'one credential input, filters, and read/lock controls, no execution controls');
+      assert.equal(bots.controls,10,'existing credential/filter/read/lock controls plus the return-selection control');
+      assert.deepEqual(bots.controlDetails,[
+        {tag:'input',id:'bot-read-token',type:'password',label:'Asset-Watch-Link oder Meridian-Lesepasswort',hidden:false,disabled:false},
+        {tag:'button',id:'bot-read-provide',type:'button',label:'Lesezugang übernehmen',hidden:false,disabled:false},
+        {tag:'input',id:'bot-symbol-search',type:'search',label:'Symbol suchen',hidden:false,disabled:false},
+        {tag:'select',id:'bot-direction-filter',type:'select-one',label:'Richtung',hidden:false,disabled:false},
+        {tag:'select',id:'bot-category-filter',type:'select-one',label:'Kontraktart',hidden:false,disabled:false},
+        {tag:'select',id:'bot-sort-filter',type:'select-one',label:'Sortierung',hidden:false,disabled:false},
+        {tag:'button',id:'',type:'button',label:'Alle Botfilter zurücksetzen',hidden:false,disabled:false},
+        {tag:'button',id:'',type:'button',label:'Zur vorherigen Auswahl zurück',hidden:true,disabled:false},
+        {tag:'button',id:'bot-read-refresh',type:'button',label:'Bots aktualisieren',hidden:false,disabled:false},
+        {tag:'button',id:'bot-read-lock',type:'button',label:'Botansicht sperren',hidden:false,disabled:false}
+      ]);
+      assert.deepEqual(bots.executionControls,[],'the Bot view exposes no execution controls');
+      assert.deepEqual(await evaluate(`(()=>{
+        const button=[...document.querySelectorAll('#view-bots button')].find(item=>item.textContent.trim()==='Zur vorherigen Auswahl zurück');
+        const active=document.activeElement;button.focus();const focusStayed=document.activeElement===active;
+        button.click();
+        return {hidden:button.hidden,focusStayed,text:button.textContent.trim()};
+      })()`),{hidden:true,focusStayed:true,text:'Zur vorherigen Auswahl zurück'},
+      'return-selection control is hidden and inert before a prior selection exists');
+      assert.equal(server.metrics().reads,initialReads,'inactive return-selection control does not fetch');
       assert.equal(bots.viewport,width);
       assert.ok(bots.body<=width+1&&bots.root<=width+1,'Bots panel overflow at '+width);
       const waitUntil=async predicate=>{

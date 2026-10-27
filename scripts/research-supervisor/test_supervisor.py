@@ -2,6 +2,8 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -19,6 +21,81 @@ import supervisor
 
 
 FAULT_ADAPTER = ROOT / "test_fault_adapter.mjs"
+HISTORICAL_TEST_ADAPTER = ROOT / "test_b1_historical_fixture.mjs"
+
+
+def _generated_historical_result_diagnostic(result):
+    diagnostic = {}
+    if type(result) is dict:
+        for key in ("state", "reason"):
+            value = result.get(key)
+            if type(value) is str and re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{0,79}", value):
+                diagnostic[key] = value
+        trial_id = result.get("trialId")
+        if type(trial_id) is str and re.fullmatch(r"[a-f0-9]{64}", trial_id):
+            diagnostic["trialId"] = trial_id
+        attempts = result.get("attempts")
+        if type(attempts) is int and attempts in (0, 1):
+            diagnostic["attempts"] = attempts
+        paths = result.get("paths")
+        if type(paths) is list:
+            diagnostic["pathCount"] = len(paths)
+            diagnostic["completedPathCount"] = sum(
+                type(path) is dict and path.get("state") == "completed" for path in paths)
+    rendered = json.dumps(diagnostic, sort_keys=True, separators=(",", ":"))
+    return rendered if len(rendered) <= 1024 else rendered[:1021] + "..."
+
+
+def _b1_readiness_diagnostic(thread, result, failure, children, last_state):
+    def bounded_repr(value, limit):
+        try:
+            rendered = repr(value)
+        except BaseException:
+            rendered = "<repr failed>"
+        return rendered if len(rendered) <= limit else rendered[:limit - 3] + "..."
+
+    child_states = []
+    for child in children[:8]:
+        state = {"pid": child.pid}
+        try:
+            state["exit_status"] = child.poll()
+        except BaseException as error:
+            state["poll_error"] = bounded_repr(error, 256)
+        child_states.append(state)
+
+    diagnostic = {
+        "thread_alive": thread.is_alive(),
+        "result": [
+            {
+                "state": bounded_repr(item.get("state"), 128),
+                "reason": bounded_repr(item.get("reason"), 256),
+            }
+            for item in result[:2]
+        ],
+        "worker_exceptions": [bounded_repr(error, 384) for error in failure[:2]],
+        "children": child_states,
+        "children_omitted": max(0, len(children) - len(child_states)),
+        "last_journal_state": last_state,
+    }
+    rendered = json.dumps(diagnostic, sort_keys=True, separators=(",", ":"))
+    return rendered if len(rendered) <= 4096 else rendered[:4096]
+
+
+def _deadline_diagnostic(elapsed, result, current, completed):
+    diagnostic = {
+        "elapsed_seconds": round(elapsed, 3),
+        "completed_paths": completed,
+        "path_count": len(current["paths"]),
+        "result_state": result.get("state"),
+        "result_reason": result.get("reason"),
+        "trial_state": current["state"],
+        "unresolved": current["unresolved"],
+        "attempts": current["attempts"],
+    }
+    rendered = json.dumps(diagnostic, sort_keys=True, separators=(",", ":"))
+    return rendered if len(rendered) <= 1024 else rendered[:1021] + "..."
+
+
 class ResearchSupervisorTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
@@ -98,6 +175,26 @@ connection.close()
         self.assertEqual(outcome["claim"]["trialId"], queued["trialId"])
         return outcome["claim"]
 
+    def test_historical_journal_profile_stays_dormant_without_d2_receipt(self):
+        self.database = str(Path(self.temporary.name) / "historical.sqlite")
+        initialized = journal.initialize(
+            self.database, profile=journal.HISTORICAL_PROFILE_NAME)
+        profile = journal._b1_profile(journal.HISTORICAL_PROFILE_NAME)
+        self.assertFalse(initialized["executionAuthorized"])
+        self.assertEqual(profile["status"], "NOT_FROZEN")
+        self.assertIsNone(profile["inputManifest"])
+        self.assertIsNone(profile["approvalReceipt"])
+        with self.assertRaises(journal.JournalError) as missing:
+            journal.enqueue_b1(self.database, profile["trialKey"])
+        self.assertEqual(missing.exception.code, "HISTORICAL_ADMISSION_REQUIRED")
+        outcome = journal.scheduler_tick_b1(self.database, enabled=True)
+        self.assertEqual(outcome["state"], "blocked")
+        self.assertFalse(outcome["claimed"])
+        self.assertFalse(outcome["executionAuthorized"])
+        with sqlite_connect(self.database) as connection:
+            self.assertEqual(connection.execute("SELECT COUNT(*) FROM b1_jobs").fetchone()[0], 0)
+            self.assertEqual(connection.execute("SELECT fence,active FROM b1_meta").fetchone(), (0, None))
+
     def b1_fault_adapter(self, mode):
         alias = Path(self.temporary.name) / f"b1-{mode}-adapter.mjs"
         alias.write_text(f"import {json.dumps((ROOT / 'test_b1_fault_adapter.mjs').as_uri())};\n")
@@ -107,7 +204,7 @@ connection.close()
         original_popen = subprocess.Popen
 
         def spawn(*args, **kwargs):
-            if Path(args[0][1]).resolve() == supervisor.B1_ADAPTER.resolve():
+            if Path(args[0][-1]).resolve() == supervisor.B1_ADAPTER.resolve():
                 environment = dict(kwargs["env"])
                 environment.update({"NODE_ENV": "test", "B1_TEST_SCENARIO": scenario})
                 if manifest_path is not None:
@@ -118,6 +215,199 @@ connection.close()
         with patch.object(supervisor.subprocess, "Popen", side_effect=spawn):
             return supervisor.run_b1_batch(
                 self.database, claim, limits={"path_seconds": 10, "batch_seconds": 20})
+
+    def prepare_historical_fixture(self, name, scenario="SUCCESS"):
+        self.database = str(Path(self.temporary.name) / f"{name}.sqlite")
+        profile_path = Path(self.temporary.name) / f"historical-test-{name}.json"
+        generated = subprocess.run(
+            ["node", str(HISTORICAL_TEST_ADAPTER), "--profile", str(profile_path), scenario],
+            cwd=PROJECT_ROOT, capture_output=True, text=True, timeout=30)
+        if generated.returncode:
+            raise AssertionError(generated.stderr)
+        with (patch.object(journal, "HISTORICAL_PROFILE_PATH", profile_path),
+              patch.dict(os.environ, {"MERIDIAN_HISTORICAL_TEST_MODE": "1"})):
+            journal.initialize(self.database, profile=journal.HISTORICAL_PROFILE_NAME)
+            queued = journal.enqueue_b1(self.database, "trial-historical-d2-r1")
+            outcome = journal.scheduler_tick_b1(self.database, enabled=True)
+        self.assertTrue(outcome["claimed"])
+        self.assertEqual(outcome["claim"]["trialId"], queued["trialId"])
+        return profile_path, outcome["claim"]
+
+    def run_historical_fixture(self, profile_path, claim, scenario, limits=None):
+        original_popen = subprocess.Popen
+
+        def spawn(*args, **kwargs):
+            if Path(args[0][-1]).resolve() == HISTORICAL_TEST_ADAPTER.resolve():
+                environment = dict(kwargs["env"])
+                environment.update({
+                    "NODE_ENV": "test",
+                    "B1_TEST_SCENARIO": scenario,
+                    "B1_TEST_HISTORICAL_PROFILE_PATH": str(profile_path),
+                })
+                kwargs["env"] = environment
+            return original_popen(*args, **kwargs)
+
+        with (patch.object(journal, "HISTORICAL_PROFILE_PATH", profile_path),
+              patch.dict(os.environ, {"MERIDIAN_HISTORICAL_TEST_MODE": "1"}),
+              patch.object(supervisor, "HISTORICAL_ADAPTER", HISTORICAL_TEST_ADAPTER),
+              patch.object(supervisor.subprocess, "Popen", side_effect=spawn)):
+            return supervisor.run_b1_batch(
+                self.database, claim,
+                limits=limits or {"path_seconds": 10, "batch_seconds": 20})
+
+    def test_generated_historical_result_diagnostic_is_allowlisted_and_bounded(self):
+        trial_id = "a" * 64
+        private_text = "PRIVATE_DIAGNOSTIC_TEXT " + ("x" * 2048)
+        result = {
+            "state": "UNSETTLED",
+            "reason": "OPERATION_DEADLINE",
+            "trialId": trial_id,
+            "attempts": True,
+            "paths": [
+                {"state": "completed", "path": "/synthetic/private/path"},
+                {"state": "started", "path": "../private/path"},
+            ],
+            "realPath": "/home/runner/private",
+            "freeText": private_text,
+            "extraField": {"value": "not permitted"},
+        }
+
+        diagnostic = _generated_historical_result_diagnostic(result)
+        rendered = json.loads(diagnostic)
+
+        self.assertEqual(rendered, {
+            "state": "UNSETTLED",
+            "reason": "OPERATION_DEADLINE",
+            "trialId": trial_id,
+            "pathCount": 2,
+            "completedPathCount": 1,
+        })
+        self.assertNotIn("attempts", rendered)
+        self.assertLessEqual(len(diagnostic), 1024)
+        self.assertNotIn("/synthetic/private/path", diagnostic)
+        self.assertNotIn("../private/path", diagnostic)
+        self.assertNotIn("/home/runner/private", diagnostic)
+        self.assertNotIn(private_text, diagnostic)
+
+    def test_generated_historical_profile_runs_all_paths_and_refuses_repeat(self):
+        profile_path, claim = self.prepare_historical_fixture("historical-success")
+        result = self.run_historical_fixture(profile_path, claim, "SUCCESS")
+        diagnostic = _generated_historical_result_diagnostic(result)
+        self.assertEqual(result["state"], "completed", diagnostic)
+        self.assertEqual(result["attempts"], 1, diagnostic)
+        self.assertEqual(len(result["paths"]), 44, diagnostic)
+        self.assertEqual(result["executionAuthorized"], False)
+        self.assertEqual(result["promotionAuthorized"], False)
+        with (patch.object(journal, "HISTORICAL_PROFILE_PATH", profile_path),
+              patch.dict(os.environ, {"MERIDIAN_HISTORICAL_TEST_MODE": "1"})):
+            inspected = journal.inspect_b1(self.database, claim["trialId"])
+            again = journal.scheduler_tick_b1(self.database, enabled=True)
+        self.assertEqual(inspected["state"], "completed")
+        self.assertEqual(inspected["attempts"], 1)
+        self.assertFalse(again["claimed"])
+
+    def test_generated_historical_insufficient_evidence_stays_failed_and_labeled(self):
+        profile_path, claim = self.prepare_historical_fixture(
+            "historical-insufficient", "INSUFFICIENT_EVIDENCE")
+        result = self.run_historical_fixture(
+            profile_path, claim, "INSUFFICIENT_EVIDENCE")
+        self.assertEqual(result["state"], "failed")
+        self.assertEqual(result["reason"], "INVALID_OR_ZERO_DEVELOPMENT_RISK_DENOMINATOR")
+        with (patch.object(journal, "HISTORICAL_PROFILE_PATH", profile_path),
+              patch.dict(os.environ, {"MERIDIAN_HISTORICAL_TEST_MODE": "1"})):
+            inspected = journal.inspect_b1(self.database, claim["trialId"])
+        summary = json.loads(inspected["result"])
+        self.assertEqual(summary["status"], "INSUFFICIENT_EVIDENCE")
+        self.assertEqual(summary["evidence"]["sourceAuthenticity"], "NOT_ESTABLISHED")
+        self.assertFalse(summary["authority"]["executionAuthorized"])
+        self.assertFalse(summary["authority"]["paperAuthorized"])
+
+    def test_generated_completed_historical_insufficient_screen_roundtrips_without_promotion(self):
+        profile_path, claim = self.prepare_historical_fixture(
+            "completed-insufficient-screen", "COMPLETED_INSUFFICIENT_SCREEN")
+        result = self.run_historical_fixture(
+            profile_path, claim, "COMPLETED_INSUFFICIENT_SCREEN")
+        self.assertEqual(result["state"], "completed")
+        self.assertEqual(result["attempts"], 1)
+        with (patch.object(journal, "HISTORICAL_PROFILE_PATH", profile_path),
+              patch.dict(os.environ, {"MERIDIAN_HISTORICAL_TEST_MODE": "1"})):
+            inspected = journal.inspect_b1(self.database, claim["trialId"])
+        summary = json.loads(inspected["result"])
+        self.assertEqual(summary["status"], "COMPLETED")
+        self.assertEqual(summary["completedPaths"], 44)
+        self.assertEqual(len(summary["paths"]), 44)
+        self.assertTrue(all(path["status"] == "COMPLETED" for path in summary["paths"]))
+        self.assertEqual(summary["screen"], {
+            "status": "INSUFFICIENT_EVIDENCE",
+            "checks": {"fullBasketDrawdownDenominator": False},
+            "relativeDrawdownReduction": None,
+        })
+        self.assertEqual(summary["evidence"]["sourceAuthenticity"], "NOT_ESTABLISHED")
+        self.assertFalse(summary["authority"]["executionAuthorized"])
+        self.assertFalse(summary["authority"]["paperAuthorized"])
+
+    def test_generated_historical_identity_corruption_fails_closed(self):
+        profile_path, _ = self.prepare_historical_fixture("historical-corrupt")
+        profile = json.loads(profile_path.read_text())
+        profile["approvalReceipt"]["pathIds"][0] = "0" * 64
+        profile_path.write_text(json.dumps(profile))
+        database = str(Path(self.temporary.name) / "historical-corrupt-check.sqlite")
+        with (patch.object(journal, "HISTORICAL_PROFILE_PATH", profile_path),
+              patch.dict(os.environ, {"MERIDIAN_HISTORICAL_TEST_MODE": "1"})):
+            with self.assertRaises(journal.JournalError) as invalid:
+                journal.initialize(database, profile=journal.HISTORICAL_PROFILE_NAME)
+        self.assertEqual(invalid.exception.code, "HISTORICAL_APPROVAL_INVALID")
+
+    def test_test_receipt_requires_explicit_mode_and_isolated_profile_location(self):
+        profile_path, _ = self.prepare_historical_fixture("receipt-boundary")
+        with (patch.object(journal, "HISTORICAL_PROFILE_PATH", profile_path),
+              patch.dict(os.environ, {}, clear=True)):
+            with self.assertRaises(journal.JournalError) as no_test_mode:
+                journal._historical_profile()
+        self.assertEqual(no_test_mode.exception.code, "HISTORICAL_APPROVAL_INVALID")
+
+        repository = Path(self.temporary.name) / "repository"
+        profile_file = repository / "scripts/research-supervisor/historical_run_profile.json"
+        profile_file.parent.mkdir(parents=True)
+        profile_file.write_bytes(profile_path.read_bytes())
+        source_paths = set(json.loads(profile_path.read_text())["sourceFiles"].values())
+        source_paths.update(journal.B1_SOURCE_FILES.values())
+        for relative in source_paths:
+            source = PROJECT_ROOT / relative
+            target = repository / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source, target)
+        fake_journal = repository / "scripts/research-supervisor/journal.py"
+        production_database = repository / "production.sqlite"
+        with (patch.object(journal, "__file__", str(fake_journal)),
+              patch.object(journal, "HISTORICAL_PROFILE_PATH", profile_file),
+              patch.dict(os.environ, {"MERIDIAN_HISTORICAL_TEST_MODE": "1"})):
+            with self.assertRaises(journal.JournalError) as repository_profile:
+                journal.initialize(str(production_database),
+                                   profile=journal.HISTORICAL_PROFILE_NAME)
+        self.assertEqual(repository_profile.exception.code, "HISTORICAL_APPROVAL_INVALID")
+        self.assertFalse(production_database.exists())
+
+        alias = Path(self.temporary.name) / "historical-test-profile-alias.json"
+        alias.symlink_to(profile_path)
+        with (patch.object(journal, "HISTORICAL_PROFILE_PATH", alias),
+              patch.dict(os.environ, {"MERIDIAN_HISTORICAL_TEST_MODE": "1"})):
+            with self.assertRaises(journal.JournalError) as symlink_profile:
+                journal._historical_profile()
+        self.assertEqual(symlink_profile.exception.code, "HISTORICAL_APPROVAL_INVALID")
+
+    def test_generated_historical_timeout_keeps_attempt_and_fence_without_retry(self):
+        profile_path, claim = self.prepare_historical_fixture("historical-timeout")
+        result = self.run_historical_fixture(
+            profile_path, claim, "HISTORICAL_TIMEOUT",
+            limits={"path_seconds": 1, "batch_seconds": 10})
+        self.assertEqual(result["state"], "timed_out")
+        self.assertEqual(result["attempts"], 1)
+        self.assertGreater(result["fence"], 0)
+        with (patch.object(journal, "HISTORICAL_PROFILE_PATH", profile_path),
+              patch.dict(os.environ, {"MERIDIAN_HISTORICAL_TEST_MODE": "1"})):
+            again = journal.scheduler_tick_b1(self.database, enabled=True)
+        self.assertFalse(again["claimed"])
 
     @staticmethod
     def b1_insufficient_profile():
@@ -608,11 +898,19 @@ process.stdout.write(JSON.stringify(runBatch({
         thread = threading.Thread(target=execute)
         thread.start()
         lock = None
+        last_journal_state = None
         try:
             deadline = time.monotonic() + 5
             while time.monotonic() < deadline:
                 try:
                     current = journal.inspect_b1(self.database, claim["trialId"])
+                    last_journal_state = {
+                        "state": current.get("state"),
+                        "reason": current.get("reason"),
+                        "attempts": current.get("attempts"),
+                        "unresolved": current.get("unresolved"),
+                        "paths": [path.get("state") for path in current.get("paths", [])],
+                    }
                     if current["paths"] and current["paths"][0]["state"] == "started":
                         break
                 except journal.JournalError as error:
@@ -620,7 +918,11 @@ process.stdout.write(JSON.stringify(runBatch({
                         raise
                 time.sleep(0.005)
             else:
-                self.fail("B1 fault child did not durably start its first path")
+                diagnostic = _b1_readiness_diagnostic(
+                    thread, result, failure, children, last_journal_state)
+                self.fail(
+                    "B1 fault child did not durably start its first path; "
+                    f"diagnostic={diagnostic}")
 
             lock = self.lock_database(exclusive=True)
             thread.join(3)
@@ -723,35 +1025,127 @@ process.stdout.write(JSON.stringify(runBatch({
             self.assertEqual(result["paths"][0]["state"], "started")
 
     def test_whole_batch_deadline_is_absolute_across_path_processes(self):
-        # Each child waits 25 ms, so all 44 paths cannot finish in one second.
-        # The longer path limit isolates the shared batch deadline; restarting
-        # that deadline per child would incorrectly complete the entire batch.
+        self._assert_run_batch_uses_one_absolute_deadline()
         started = time.monotonic()
         result = self.run_fault("7" * 64, {"path_seconds": 2, "batch_seconds": 1},
                                 key="trial-absolute-batch-deadline")
-        self.assertLess(time.monotonic() - started, 2.5)
+        elapsed = time.monotonic() - started
+        current = journal.inspect(self.database, result["trialId"])
+        completed = sum(path["state"] == "completed" for path in current["paths"])
+        diagnostic = _deadline_diagnostic(elapsed, result, current, completed)
+        self.assertLess(elapsed, 2.5, diagnostic)
         self.assertIn((result["state"], result["reason"]), (
             ("timed_out", "DEADLINE_EXCEEDED"),
             ("UNSETTLED", "OPERATION_DEADLINE"),
-        ))
-        current = journal.inspect(self.database, result["trialId"])
-        completed = sum(path["state"] == "completed" for path in current["paths"])
-        self.assertGreaterEqual(completed, 2, "deadline must span multiple child processes")
-        self.assertLess(completed, journal.MAX_PATHS)
-        self.assertEqual(current["attempts"], 1)
+        ), diagnostic)
+        self.assertLess(completed, journal.MAX_PATHS, diagnostic)
+        self.assertEqual(current["attempts"], 1, diagnostic)
         if result["state"] == "UNSETTLED":
-            self.assertEqual(current["state"], "unknown")
-            self.assertTrue(current["unresolved"])
+            self.assertEqual(current["state"], "unknown", diagnostic)
+            self.assertTrue(current["unresolved"], diagnostic)
             self.assertFalse(result["persistConfirmed"])
             self.assertEqual(journal.scheduler_tick(self.database, self.policy)["state"], "active")
             with self.assertRaisesRegex(journal.JournalError, "ATTEMPT_CONSUMED"):
                 journal.start(self.database, current)
             journal.reconcile(self.database, result["trialId"], "OPERATOR_RECONCILED_DEADLINE")
         else:
-            self.assertEqual(current["state"], "timed_out")
-            self.assertFalse(current["unresolved"])
-        with self.assertRaisesRegex(journal.JournalError, "STALE_FENCE"):
+            self.assertEqual(current["state"], "timed_out", diagnostic)
+            self.assertFalse(current["unresolved"], diagnostic)
+        with self.assertRaisesRegex(journal.JournalError, "STALE_FENCE",
+                                    msg=diagnostic):
             journal.start(self.database, current)
+
+    def _assert_run_batch_uses_one_absolute_deadline(self):
+        clock = SimpleNamespace(now=100.0)
+        clock.monotonic = lambda: clock.now
+        paths = tuple(
+            {"id": f"controlled-path-{index}", "variant": f"controlled-variant-{index}"}
+            for index in range(3)
+        )
+        started = {
+            "trialId": "1" * 64,
+            "trialKey": "controlled-deadline",
+            "owner": "controlled-owner",
+            "fence": 1,
+            "protocolSha256": "2" * 64,
+            "sourceSha256": "3" * 64,
+            "dataSha256": "4" * 64,
+            "manifestSha256": "5" * 64,
+            "pathIds": [path["id"] for path in paths],
+            "variantIds": [path["variant"] for path in paths],
+            "budget": {},
+        }
+        child_calls = []
+        journal_progress = []
+
+        def record_started(database, receipt, index, path_id, predecessor,
+                           *, busy_timeout, deadline):
+            journal_progress.append(("started", index, deadline))
+
+        def record_completed(database, receipt, index, path_id, predecessor,
+                             output_sha256, *, busy_timeout, deadline):
+            journal_progress.append(("completed", index, deadline))
+
+        def run_child(request, path_deadline, batch_deadline, path_seconds, on_event):
+            child_calls.append({
+                "index": request["index"],
+                "path_deadline": path_deadline,
+                "batch_deadline": batch_deadline,
+                "started_at": clock.now,
+                "predecessor": request["predecessorSha256"],
+            })
+            start_event = {
+                "event": "path_started",
+                "index": request["index"],
+                "pathId": request["pathId"],
+                "variantId": request["variantId"],
+                "predecessorSha256": request["predecessorSha256"],
+            }
+            complete_event = {
+                **start_event,
+                "event": "path_completed",
+                "outputSha256": hashlib.sha256(
+                    f"controlled-output-{request['index']}".encode()).hexdigest(),
+            }
+            on_event(start_event, 0, batch_deadline)
+            on_event(complete_event, 1, path_deadline)
+            clock.now += 5
+            return [start_event, complete_event]
+
+        settled = {"state": "timed_out", "reason": "DEADLINE_EXCEEDED"}
+        with (
+            patch.object(supervisor, "time", SimpleNamespace(monotonic=clock.monotonic)),
+            patch.object(journal, "PATHS", paths),
+            patch.object(journal, "start", return_value=started),
+            patch.object(journal, "record_path_started", side_effect=record_started),
+            patch.object(journal, "record_path_completed", side_effect=record_completed),
+            patch.object(journal, "settle", return_value=settled) as settle,
+            patch.object(supervisor, "_run_child", side_effect=run_child),
+        ):
+            result = supervisor.run_batch(
+                self.database, {"trialId": started["trialId"]},
+                limits={"path_seconds": 20, "batch_seconds": 10})
+
+        diagnostic = json.dumps({
+            "child_indices": [child["index"] for child in child_calls],
+            "batch_deadlines": [child["batch_deadline"] for child in child_calls],
+            "journal_progress": journal_progress,
+            "clock": clock.now,
+            "state": result.get("state"),
+            "reason": result.get("reason"),
+        }, sort_keys=True, separators=(",", ":"))[:1024]
+        self.assertEqual(result, settled, diagnostic)
+        self.assertEqual([child["index"] for child in child_calls], [0, 1], diagnostic)
+        self.assertEqual([child["started_at"] for child in child_calls], [100.0, 105.0], diagnostic)
+        self.assertEqual([child["batch_deadline"] for child in child_calls], [110.0, 110.0], diagnostic)
+        self.assertEqual([child["path_deadline"] for child in child_calls], [110.0, 110.0], diagnostic)
+        self.assertEqual(child_calls[1]["predecessor"],
+                         hashlib.sha256(b"controlled-output-0").hexdigest(), diagnostic)
+        self.assertEqual(journal_progress, [
+            ("started", 0, 110.0), ("completed", 0, 110.0),
+            ("started", 1, 110.0), ("completed", 1, 110.0),
+        ], diagnostic)
+        self.assertEqual(settle.call_args.args[2:4], ("TIMED_OUT", "DEADLINE_EXCEEDED"), diagnostic)
 
     def test_output_flood_and_parent_exit_with_inherited_pipe_are_bounded(self):
         for source, reason in (("c" * 64, "STDOUT_BOUND"), ("9" * 64, "STDERR_BOUND"),
