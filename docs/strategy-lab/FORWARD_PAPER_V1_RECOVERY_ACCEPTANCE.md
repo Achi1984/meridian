@@ -5,15 +5,19 @@ interface; final consolidated Lead acceptance remains pending. Implementation is
 blocked pending independently assessed D2 evidence and separate owner
 authorization.
 
-**Canonical interface:** `MERIDIAN-FORWARD-PAPER-EVENT/1.0.0`, accepted
+**Canonical event/transition interface:** `MERIDIAN-FORWARD-PAPER-EVENT/1.0.0`, accepted
 companion commit
 [`a1c1b35656d501e4d2bcc74ae4a717110beca26c`](https://github.com/Achi1984/meridian/commit/a1c1b35656d501e4d2bcc74ae4a717110beca26c),
 specifically the
 [contract specification at that commit](https://github.com/Achi1984/meridian/blob/a1c1b35656d501e4d2bcc74ae4a717110beca26c/docs/strategy-lab/FORWARD_PAPER_V1_CONTRACT_SPEC.md)
 §§4–8 and
 [reducer acceptance design at that commit](https://github.com/Achi1984/meridian/blob/a1c1b35656d501e4d2bcc74ae4a717110beca26c/docs/strategy-lab/FORWARD_PAPER_V1_REDUCER_ACCEPTANCE.md).
-The companion owns all wire fields and semantics; this document adds no
-alternate interface.
+The companion owns the unchanged event/transition wire fields and semantics;
+this document adds no alternate interface. Its pin is historical and does not
+contain this documentation clarification. The reconciliation-resolution
+receipt envelope/schema is **UNSPECIFIED** in v1; a separate versioned
+contract amendment must define and accept it before reconciliation can be
+implemented or can resolve `UNKNOWN`.
 
 This is a generated-fault acceptance design, not executable tests, SQL, a
 recovery procedure, or a runnable command. It assumes no real market data,
@@ -26,26 +30,21 @@ operating choices remain separately gated.
 | Outcome | Required evidence | Required disposition |
 | --- | --- | --- |
 | `OP_APPLIED` | The atomic account-effect, committed-receipt, sequence-advance, and winning-claim fence-resolution transaction is durably evidenced for the exact operation, observation digest, expected prior state/sequence, run/config identity, and historical fence token. No later snapshot is required. | Return the existing durable result. Do not repeat the account effect or create another receipt. |
-| `OP_ABSENT` | An authoritative read of the declared journal establishes no committed receipt and no attributable account delta; the prior committed sequence/account state are intact and match the exact expected state; the relevant receipt history and atomic account/sequence records are complete and integrity-valid. A snapshot is not required evidence. | Resolve only with the authoritative durable reconciliation receipt required by interface §§6/8, binding the exact proposal, proof of noncommit, prior/resulting state, selected authority, and reason. Append-only audit metadata may supplement that receipt but cannot replace it. Absence alone is not an automatic retry, replay, or repair authorization; any further attempt needs a separate explicit authorized decision and must remain eligible without replaying a missed event/fill. |
+| `OP_ABSENT` | An authoritative read of the declared journal establishes no committed receipt and no attributable account delta; the prior committed sequence/account state are intact and match the exact expected state; the relevant receipt history and atomic account/sequence records are complete and integrity-valid. A snapshot is not required evidence. | This conceptual outcome cannot currently resolve `UNKNOWN`: v1 §§6/8 define no reconciliation-resolution receipt envelope. Keep the fence and block retry/resume until a separate versioned contract amendment defines and accepts the receipt schema and binding rules. Absence alone is never automatic retry, replay, or repair authorization; any future attempt requires separate explicit authorization and must not replay a missed event/fill. |
 | `OP_CONFLICT` | Durable evidence shows a changed digest for an already-bound identity, impossible/contradictory receipt sequence or history, or another demonstrated run/config/history integrity contradiction. A normal compare-and-set loser is not this outcome. | Halt the affected run. Preserve all history and account state; do not guess which writer/effect should win. |
-| `UNKNOWN` | Available evidence cannot distinguish whether the atomic account/receipt/sequence/fence-resolution transaction applied, including ambiguous commit/write failure, unavailable or corrupt authoritative storage, or incomplete receipt history. Optional snapshot damage alone does not make this transaction outcome unknown. | Retain any active fence and its historical token, block re-execution, and require explicit authorized reconciliation. Read-only inspection cannot resume or settle it. |
+| `UNKNOWN` | Available evidence cannot distinguish whether the atomic account/receipt/sequence/fence-resolution transaction applied, including ambiguous commit/write failure, unavailable or corrupt authoritative storage, or incomplete receipt history. Optional snapshot damage alone does not make this transaction outcome unknown. | Retain any active fence and its historical token and block re-execution. Reconciliation cannot be implemented until the separate receipt-schema contract amendment is accepted. Read-only inspection cannot resume or settle it. |
 
-A reconciliation record must preserve, without inventing values: the affected
-`receiptIdentity`, `transitionIdentity`, `expectedStateIdentity`, observed
-`stateIdentity`/receipt/account evidence references and digests, selected
-recovery outcome, decision scope and exact reason, decision authority
-provenance, decision time and its source/basis, prior and resulting receipt
-sequence, and historical/active fence disposition. Bind the companion
-`interfaceVersion` and run/config/event identities. Missing evidence stays
-missing. This internal append-only audit metadata is supplementary and does
-not itself resolve `UNKNOWN`. Resolution requires the authoritative durable
-reconciliation receipt required by the pinned interface §§6/8, binding the
-original proposal/receipt identity, whether it committed or did not commit,
-the prior/resulting state identity, evidence, selected authority, outcome, and
-exact reason. Only that acknowledged receipt can resolve `UNKNOWN`; metadata
-alone cannot release the fence, advance state, or authorize a retry. Neither
-the receipt nor metadata may fabricate an account/fill effect or rewrite
-history.
+The reconciliation outcome labels and evidence criteria above are conceptual
+acceptance guidance, not a wire schema. The pinned interface §§6/8 do not define
+a reconciliation-resolution receipt envelope or its fields. Do not treat
+internal audit metadata as such a receipt or invent an envelope here. Before
+any reconciliation implementation or resolution, a separate versioned
+contract amendment must define and accept the receipt schema, authority
+binding, evidence binding, and resulting-state semantics. Until that amendment
+exists, `UNKNOWN` remains unresolved with its fence retained; no receipt may be
+fabricated, no state advanced, and no retry/resume authorized. A read-only
+lookup may establish `OP_APPLIED` only by finding the exact original committed
+result. Proven `OP_CONFLICT` remains a halt, not a guessed repair.
 
 ## Proposal, acknowledgment, state, and reason mapping
 
@@ -131,7 +130,7 @@ pinned interface. No fixture may locally redefine those wire fields.
 | Storage reports failure with commit outcome ambiguous | No fabricated receipt; persistence acknowledgment `UNKNOWN`, state `UNKNOWN`, reason `PERSISTENCE_UNKNOWN`. | Attempt consumed; active fence retained. | Do not apply again. Resolve only with authorized evidence-based reconciliation. |
 | Timeout/cancellation before claim | No proposal or receipt; run's last committed state remains unchanged. If a bounded proposal was rejected, reason `BOUND_EXCEEDED`; no claim. | No attempt/fence allocated. | Zero delta; no background continuation. |
 | Timeout/cancellation after claim, before known commit | If ambiguous, persistence `UNKNOWN`, state `UNKNOWN`, reason `PERSISTENCE_UNKNOWN`; if explicit durable rejection, `DURABLE_REJECTED` and unchanged state. | One attempt; active fence retained while uncertain. | Zero unless exact commit evidence proves one existing delta. Never replay on restart. |
-| Resolve `UNKNOWN` with reconciliation evidence | Authoritative durable reconciliation receipt binds original `receiptIdentity`/`transitionIdentity`, exact outcome (`OP_APPLIED`, `OP_ABSENT`, or `OP_CONFLICT`), evidence, authority, resulting/prior state identities and reason. Separate audit metadata may record provenance but is not the receipt. | Only the acknowledged interface-required reconciliation receipt resolves the active fence; metadata alone leaves state `UNKNOWN` and fence active. | `OP_APPLIED` returns existing receipt with no reapply; `OP_ABSENT` records proven no-effect state but does not authorize retry; `OP_CONFLICT` halts. |
+| Conceptual recovery outcomes while `UNKNOWN` | `OP_APPLIED` requires the exact original committed result; `OP_ABSENT` requires authoritative proof of no effect; `OP_CONFLICT` requires demonstrated integrity contradiction. The v1 interface defines no reconciliation-resolution receipt envelope. | Exact original evidence may establish `OP_APPLIED`; proven `OP_CONFLICT` halts. `OP_ABSENT` cannot resolve `UNKNOWN` or release its fence until a separate versioned contract amendment defines and accepts a reconciliation receipt schema. No invented receipt fields. | No reapply or retry. `UNKNOWN` remains fenced until that amendment and a separately authorized resolution exist. |
 | Late observation or source watermark gap | Late fill candidate is rejected with `LATE_OR_PAST_EVENT`; cadence gap with `CADENCE_GAP`. State unchanged or `HALTED` under the explicitly frozen terminal policy. No past event is made eligible. | No attempt for ineligible transition; do not release another unresolved fence. | Zero fill/account delta. No missed-fill backfill. |
 | Missing/malformed candle `open` or incomplete OHLC | Reject with `MISSING_REQUIRED_FIELD`; no close-to-open synthesis and no accepted watermark advance. | No fill attempt/fence for the invalid price input. | Zero delta. No fill is inferred from close, cache, replay, or a retrospective next-bar position. |
 | Configured expiry boundary is durably observed without an eligible fill | Commit the no-fill transition with reason `MISSED_OR_EXPIRED`; state becomes `OBSERVED` or `HALTED` according to frozen expiry action. Absence alone does not prove expiry. | Resolve only the claim associated with that committed no-fill transition; do not reopen the old fill proposal. | Zero fill/account delta; preserve the missed opportunity without backfill. |
@@ -146,11 +145,12 @@ pinned interface. No fixture may locally redefine those wire fields.
 
 For uncertain write and timeout cases, tests must distinguish a definitively
 rolled-back pre-commit transaction from an ambiguous commit. Both forbid an
-automatic retry; only the former can support `OP_ABSENT`, and only through the
-stated evidence and explicit reconciliation. A receipt must never be fabricated
-to make the expected table pass. Optional snapshots are not transaction
-participants: a valid older prefix is lag, and later snapshot corruption cannot
-undo or obscure an otherwise evidenced atomic commit.
+automatic retry; only the former can support the conceptual `OP_ABSENT` outcome.
+Neither outcome can resolve `UNKNOWN` until the separate receipt-schema
+amendment is accepted. A receipt must never be fabricated to make the expected
+table pass. Optional snapshots are not transaction participants: a valid older
+prefix is lag, and later snapshot corruption cannot undo or obscure an otherwise
+evidenced atomic commit.
 
 ## Pinned interface serialization and digest interoperability
 
@@ -188,12 +188,13 @@ global exactly-once delivery.
 | Gate | Required before advancing | Current status |
 | --- | --- | --- |
 | Interface M1 | Exact companion commit defining wire fields, identity, transition, canonicalization, and bounds. | Accepted at `a1c1b35656d501e4d2bcc74ae4a717110beca26c`. |
-| Interface compatibility M2 | Journal and recovery documentation bind the same version/commit and align identities, provenance/warmup, causality, states, dispositions, reason mapping, serialization, and recovery acceptance. | Documentation alignment complete at this revision; executable vectors are future implementation acceptance, not run here. |
-| Final M3 acceptance | Lead's consolidated review of both packages and no unresolved spec contradiction. | Pending Lead confirmation; no interface blocker remains. |
+| Interface compatibility M2 | Journal and recovery documentation bind the same event/transition version/commit and align its defined identities, provenance/warmup, causality, states, dispositions, reason mapping, and serialization. | Event/transition documentation aligned; reconciliation-resolution receipt schema is **UNSPECIFIED** and remains a contract-amendment blocker. Executable vectors are future implementation acceptance, not run here. |
+| Final M3 acceptance | Lead's consolidated review of both packages and no unresolved spec contradiction. | Pending independent full review and Lead confirmation; this clarification does not mark M3 complete. |
 | Evidence gate | Useful D2 evidence independently assessed before Forward-Paper implementation. | Not established by this specification. |
 | Operating choices | Explicit owner-approved strategy/source/product, run period, cost/risk, timing, bounds, and reconciliation authority. | Required choices unset. |
 | Source capability | A separately verified source adapter provides the actual fields needed by the eventual contract. Gateway's current mapping lacks `open`, volume, and trades. | Unverified; no usable full OHLC assumed. |
-| Storage/clock/deployment | Declare and independently verify transaction durability, crash consistency, monotonic-clock behavior, and deployment boundary. | Unverified. |
+| Storage/clock/deployment | Declare and independently verify journal location, transaction durability, crash consistency, authoritative clock/source-time mapping, monotonic-clock behavior, and deployment boundary. These are additional implementation gates, not new §3 choice groups. | Unverified. |
+| Resource/spending gate | Restrict any future bounded work to verified existing resources, `$0` additional spend, no provisioning, and no other spending. | Availability/capacity unverified; gate not established. |
 
 Until remaining gates are resolved, this acceptance design authorizes no
 implementation, test execution, data read, database creation, runtime,
