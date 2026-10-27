@@ -126,8 +126,8 @@
         "allFalse": true
       },
       "neighborCountsForBothCostScenarios": {
-        "observed": 0,
-        "required": 4
+        "positive": 0,
+        "total": 4
       },
       "relativeDrawdownReductionPercent": 2.3371,
       "drawdownReductionUnit": "RELATIVE_PERCENT_NOT_PERCENTAGE_POINTS",
@@ -137,9 +137,22 @@
       "fullPrivateResultIndependentAcceptance": "PENDING",
       "relatedEvidence": {
         "issue965": "HISTORICAL_EVIDENCE_V2",
-        "issue966": "HISTORICAL_EVIDENCE_V2"
+        "pr966": {
+          "state": "ACTIVE_SOURCE_ONLY_V2_IMPLEMENTATION",
+          "branch": "copilot/d2-evidence-v2-export-parser",
+          "dispatchCommentId": 6449658001,
+          "singleWriter": "EXISTING_PR966_SINGLE_WRITER",
+          "nextGates": [
+            "AUTHOR_DELIVERY",
+            "EXACT_HEAD_BASE_CI",
+            "COMPLETE_INDEPENDENT_CLAUDE_REVIEW",
+            "LEAD_MERGE_AND_POSTCHECKS"
+          ],
+          "generatedFixturesOnly": true,
+          "blockedByPrivateResultAcceptance": false
+        }
       },
-      "nextGate": "INDEPENDENT_ACCEPTANCE_OF_FULL_PRIVATE_RESULT; NO_RETRY_TUNING_FURTHER_RECONCILIATION_PAPER_OR_LIVE"
+      "nextGate": "PR966_ACTIVE_SOURCE_ONLY_V2: AUTHOR_DELIVERY_THEN_EXACT_HEAD_BASE_CI_THEN_COMPLETE_INDEPENDENT_CLAUDE_REVIEW_THEN_LEAD_MERGE_AND_POSTCHECKS; FULL_PRIVATE_RESULT_ACCEPTANCE_INDEPENDENTLY_PENDING_NOT_BLOCKING_AUTHORIZED_GENERATED_FIXTURE_SOURCE_WORK; NO_NEW_TRIAL_TUNING_PAPER_LIVE_OR_RUNTIME"
     },
     "m11HistoricalResearchSummaries955": {
       "recordStatus": "HISTORICAL_SUPERSEDED_BY_2026-10-27_CURRENT_RECONCILIATION",
@@ -1076,7 +1089,7 @@
       }
     },
     "historicalNextStepBeforeB11": "COMPLETE_PR860_REFRESH_OWN_EXACT_HEAD_CI_AND_INDEPENDENT_REVIEW_THEN_LEAD_MERGE_THEN_ARENA861_RETROSPECTIVE_PROVENANCE_EXISTING_EVIDENCE_ONLY",
-    "nextStep": "WAIT_FOR_SEPARATELY_DISPATCHED_SINGLE_WRITER_AND_INDEPENDENT_ACCEPTANCE_OF_FULL_PRIVATE_RESULT; NO_RETRY_OR_TUNING",
+    "nextStep": "PR966_EXISTING_SINGLE_WRITER_AUTHOR_DELIVERY_THEN_EXACT_HEAD_BASE_CI_THEN_COMPLETE_INDEPENDENT_CLAUDE_REVIEW_THEN_LEAD_MERGE_AND_POSTCHECKS; FULL_PRIVATE_RESULT_ACCEPTANCE_REMAINS_INDEPENDENTLY_PENDING; NO_NEW_TRIAL_OR_TUNING",
     "ownerPathInspection": {
       "pr": 828,
       "mergeSha": "bfebd17ddfa1d2d3b44a15126e28618a82cb81f2",
@@ -1103,7 +1116,7 @@
     "publisherNextStep": "PAUSED_BY_OWNER_B_NO_OPERATIONAL_AUTHORITY_NATIVE868_DISABLED",
     "historicalStrategyNextStepBeforeB11": "Finalize r130 Arena release integration gates; separately diagnose PR872 publisher timing-test failure before independent data review. No new strategy execution.",
     "historicalStrategyNextStepBefore919": "ACCEPT_PR901_THEN_RECONCILE_COPILOT_PR903_DELIVERY_PROPOSALS",
-    "strategyNextStep": "D2_NO_EDGE_AFTER_ONE_APPROVED_TRIAL; FULL_PRIVATE_RESULT_INDEPENDENT_ACCEPTANCE_PENDING; NO_RETRY_TUNING_FURTHER_RECONCILIATION_PAPER_OR_LIVE",
+    "strategyNextStep": "PR966_ACTIVE_SOURCE_ONLY_V2_GENERATED_FIXTURE_IMPLEMENTATION_THEN_EXACT_HEAD_BASE_CI_THEN_COMPLETE_INDEPENDENT_CLAUDE_REVIEW_THEN_LEAD_MERGE_AND_POSTCHECKS; FULL_PRIVATE_RESULT_ACCEPTANCE_INDEPENDENTLY_PENDING_NOT_BLOCKING_SOURCE_WORK; NO_NEW_TRIAL_TUNING_PAPER_LIVE_OR_RUNTIME",
     "m11HypothesisComparison951": {
       "issue": 951,
       "pullRequest": 953,

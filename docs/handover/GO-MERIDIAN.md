@@ -7,14 +7,19 @@
 > beyond the latest actually read receipt.
 > D2 issue #935 snapshot/comment6448721244, assessment6449045864, and mailbox
 > #942/comment6449029155 record one approved trial completed (attempt 1, 44
-> payloads): `NO_EDGE`, all nine checks false, zero of four neighbors for each
-> cost scenario, and a 2.3371% relative drawdown reduction (not percentage points).
+> payloads): `NO_EDGE`, all nine checks false; neighbors: zero positive out of four
+> for each cost scenario. Relative drawdown reduction is 2.3371%
+> (not percentage points).
 > The private local execution profile is frozen; the checked-in profile remains
 > `NOT_FROZEN`. The Codespace is stopped. Independent acceptance of the full
-> private result is pending. Issues #965/#966 are historical evidence V2.
-> No retry, tuning, further result reconciliation, Paper, Live, or runtime action.
-> Existing activation flags remain false. Any next work requires separate Lead
-> dispatch to a single writer; no assignment is assumed here.
+> private result is pending. Issue #965 is historical evidence V2. PR #966 is the
+> ACTIVE source-only V2 implementation on its existing single-writer branch,
+> dispatched at #966/comment6449658001. Next gates: author delivery ->
+> exact-head/base CI -> complete independent Claude review -> Lead merge/postchecks.
+> This already-authorized generated-fixture source work is not blocked by the
+> independently pending full private-result acceptance.
+> No retry, tuning, new trial, Paper, Live, or runtime action. Existing
+> activation flags remain false.
 > Older current-labeled entries below—including #948 setup, #950 launcher,
 > #955 summaries, #952 comparison, and D1/admission snapshots—are historical
 > and superseded. Preserve receipts, failures, false flags, and provenance.
