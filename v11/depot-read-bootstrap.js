@@ -32,7 +32,7 @@ export function mountDepotReadAccess(document,window,{
           }
         }});
         client=reader;
-        unregister=access.registerReader(()=>reader.lock());
+        unregister=access.registerReader(()=>reader.lock(),()=>view?.revalidate());
         return {...reader,lock:()=>access.lock(),dispose(){
           unregister();cancelExpiry();reader.dispose();
         }};

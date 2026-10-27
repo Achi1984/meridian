@@ -12,10 +12,15 @@ export function mountAppAccess(document,window,{access=appAccess}={}){
   let disposed=false,lastStatus='locked',submissionGeneration=0;
   function render(state){
     if(disposed)return;
+    if(state.status==='unlocked'&&!document.hidden){
+      access.revalidateReaders?.();
+      state={status:access.isUnlocked()?'unlocked':'locked'};
+    }
     const unlocked=state.status==='unlocked';
     const visible=unlocked&&!document.hidden;
     app.hidden=!visible;
     gate.hidden=visible;
+    if(state.status==='locked')input.value='';
     if(unlocked&&lastStatus!=='unlocked'&&visible)main?.focus?.({preventScroll:true});
     lastStatus=state.status;
     if(state.status==='locked')status.textContent='Gesperrt. Das Meridian-Passwort wird nicht gespeichert.';
@@ -44,9 +49,9 @@ export function mountAppAccess(document,window,{access=appAccess}={}){
   }
   function visibility(){render({status:access.isUnlocked()?'unlocked':'locked'});}
   function focus(){render({status:access.isUnlocked()?'unlocked':'locked'});}
-  function pagehide(){submissionGeneration++;access.lock();}
+  function pagehide(){submissionGeneration++;input.value='';access.lock();}
   function pageshow(event){
-    if(event?.persisted){submissionGeneration++;access.lock();}
+    if(event?.persisted){submissionGeneration++;input.value='';access.lock();}
     render({status:access.isUnlocked()?'unlocked':'locked'});
   }
   function keydown(event){
@@ -64,7 +69,7 @@ export function mountAppAccess(document,window,{access=appAccess}={}){
   if(!document.hidden&&!access.isUnlocked())try{input.focus({preventScroll:true});}catch{}
   return {dispose(){
     if(disposed)return;
-    submissionGeneration++;
+    submissionGeneration++;input.value='';
     access.lock();disposed=true;
     unsubscribe();
     form.removeEventListener('submit',submit);

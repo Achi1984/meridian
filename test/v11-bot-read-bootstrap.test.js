@@ -10,18 +10,19 @@ class Target{
   fire(name){for(const fn of this.listeners.get(name)||[])fn();}
 }
 function makeAccess(){
-  let credential=null;const readers=new Set();
+  let credential=null;const readers=new Map();
   return {
     getToken:()=>credential,isUnlocked:()=>credential!==null,
     set(value){credential=value;},
-    lock(){credential=null;for(const clear of readers)clear();},
-    registerReader(clear){readers.add(clear);return ()=>readers.delete(clear);}
+    lock(){credential=null;for(const clear of readers.keys())clear();},
+    revalidateReaders(){if(!credential)return false;for(const revalidate of readers.values())revalidate();return true;},
+    registerReader(clear,revalidate=()=>{}){readers.set(clear,revalidate);return ()=>readers.delete(clear);}
   };
 }
 function setup({createClient:factory,now=Date.now,schedule=setTimeout,cancelSchedule=clearTimeout}={}){
   const nodes=new Map(['bot-read-root','command-bot-overview'].map(id=>[id,new Target()]));
   const document=new Target(),window=new Target();document.getElementById=id=>nodes.get(id);
-  const access=makeAccess();let client,view;
+  const access=makeAccess();let client,view;const commandProjection=[];
   const mounted=mountBotReadAccess(document,window,{access,now,schedule,cancelSchedule,
     createClient:factory||((options)=>({
       lock(){options.onChange({status:'locked'});},refresh(){return options.getToken();},
@@ -29,9 +30,10 @@ function setup({createClient:factory,now=Date.now,schedule=setTimeout,cancelSche
     })),
     createView:(_root,options)=>{
       client=options.createClient({getToken:options.getToken,onChange:state=>view?.onChange?.(state)});
-      return view={revalidate:()=>client.revalidate(),dispose:()=>client.dispose()};
+      return view={revalidate:()=>client.revalidate(),onChange:state=>commandProjection.push(state.status),
+        dispose:()=>client.dispose()};
     }});
-  return {nodes,document,window,access,mounted,client:()=>client};
+  return {nodes,document,window,access,mounted,client:()=>client,commandProjection};
 }
 
 test('mount shares the verified credential and keeps reads manual',async()=>{
@@ -69,6 +71,26 @@ test('bot freshness deadline revalidates without polling; shared lock cancels it
   await h.client().refresh();assert.equal(timers.size,1);
   h.access.lock();assert.equal(timers.size,0);
   assert.equal(states.at(-1),'locked');assert.equal(reads,2);
+  h.mounted.dispose();
+});
+
+test('shared foreground revalidation stales cached Bot and command projections without reading',async()=>{
+  let clock=Date.parse('2026-10-13T00:00:00Z'),reads=0;
+  const h=setup({now:()=>clock,createClient:options=>createBotReadClient({...options,now:()=>clock,
+    fetchImpl:async()=>{
+      reads++;
+      return new Response(JSON.stringify({schemaVersion:'MERIDIAN-ASSET-WATCH-BRIDGE-V1',source:'PIONEX_BOT_API',
+        sourceSnapshotAt:new Date(clock).toISOString(),freshnessLimitMs:2000,readOnly:true,executionImpact:false,
+        detailsComplete:true,sourceStatusOk:true,fresh:true,usableForOverwrite:true,botCount:0,bots:[]}));
+    }})});
+  h.access.set('verified-password');
+  await h.client().refresh();
+  assert.equal(h.commandProjection.at(-1),'fresh');
+  clock+=2001;
+  h.access.revalidateReaders();
+  assert.equal(h.access.getToken(),'verified-password','the source expiry is inside the app session');
+  assert.equal(h.commandProjection.at(-1),'stale');
+  assert.equal(reads,1,'reader and command projections only revalidate cached data');
   h.mounted.dispose();
 });
 

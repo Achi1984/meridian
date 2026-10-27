@@ -6,8 +6,7 @@ const TIMEOUT_MS=10000;
 function password(value){
   if(typeof value!=='string'||value.length>4096||/[\x00-\x1f\x7f]/.test(value))return null;
   const candidate=value.trim();
-  if(!candidate||/^[A-Za-z][A-Za-z0-9+.-]*:/.test(candidate)||/^(?:[/\\]{2}|www\.)/i.test(candidate)||
-    /^[A-Za-z0-9_-]{43}$/.test(candidate))return null;
+  if(!candidate||/^[A-Za-z][A-Za-z0-9+.-]*:/.test(candidate)||/^(?:[/\\]{2}|www\.)/i.test(candidate))return null;
   return candidate;
 }
 
@@ -46,7 +45,7 @@ export function createAppAccess({fetchImpl=globalThis.fetch,now=Date.now,schedul
   cancelSchedule=clearTimeout}={}){
   if(typeof fetchImpl!=='function')throw new Error('Access unavailable');
   let credential=null,expiresAt=null,pending=null,expiryTimer=null,generation=0,disposed=false;
-  const readers=new Set(),subscribers=new Set();
+  const readers=new Map(),subscribers=new Set();
 
   function cancelExpiry(){
     if(expiryTimer!==null){cancelSchedule(expiryTimer);expiryTimer=null;}
@@ -59,7 +58,7 @@ export function createAppAccess({fetchImpl=globalThis.fetch,now=Date.now,schedul
     credential=null;expiresAt=null;
     if(pending){pending.abort();pending=null;}
     cancelExpiry();
-    for(const clear of readers){try{clear();}catch{}}
+    for(const clear of readers.keys()){try{clear();}catch{}}
     publish();
   }
   function scheduleExpiry(id){
@@ -114,14 +113,23 @@ export function createAppAccess({fetchImpl=globalThis.fetch,now=Date.now,schedul
     }finally{
       if(timer!==undefined)cancelSchedule(timer);
       controller.signal.removeEventListener('abort',onAbort);
-      if(pending===controller)pending=null;
+      if(pending===controller){
+        pending=null;
+        if(id===generation&&!disposed&&!credential)publish();
+      }
     }
   }
-  function registerReader(clear){
+  function registerReader(clear,revalidate=()=>{}){
     if(typeof clear!=='function')throw new Error('Access unavailable');
-    readers.add(clear);
+    if(typeof revalidate!=='function')throw new Error('Access unavailable');
+    readers.set(clear,revalidate);
     let active=true;
     return ()=>{if(active){active=false;readers.delete(clear);}};
+  }
+  function revalidateReaders(){
+    if(!isUnlocked())return false;
+    for(const revalidate of readers.values()){try{revalidate();}catch{}}
+    return isUnlocked();
   }
   function subscribe(listener){
     if(typeof listener!=='function')throw new Error('Access unavailable');
@@ -134,7 +142,7 @@ export function createAppAccess({fetchImpl=globalThis.fetch,now=Date.now,schedul
     lock();disposed=true;
     readers.clear();subscribers.clear();
   }
-  return Object.freeze({verify,lock,isUnlocked,getToken,registerReader,subscribe,dispose});
+  return Object.freeze({verify,lock,isUnlocked,getToken,registerReader,revalidateReaders,subscribe,dispose});
 }
 
 export const appAccess=createAppAccess();

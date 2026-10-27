@@ -56,11 +56,67 @@ test('share links, raw share tokens and malformed password values cannot unlock 
   let reads=0;
   const h=harness({fetchImpl:async()=>{reads++;return new Response('{}');}});
   const share='https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/asset-watch?share='+'a'.repeat(43);
-  for(const value of [share,'a'.repeat(43),'https://foreign.example/read','bad\npassword','']){
+  for(const value of [share,'https://foreign.example/read','bad\npassword','']){
     assert.equal(await h.access.verify(value),'rejected');
     assert.equal(h.access.getToken(),null);
   }
   assert.equal(reads,0);
+});
+
+test('43-character bearer passwords are decided by the protected endpoint, not token shape',async()=>{
+  const bearer='a'.repeat(43);
+  let request;
+  const accepted=harness({fetchImpl:async(url,options)=>{
+    request={url,options};
+    return new Response(JSON.stringify({version:'7.64-CANONICAL-PORTFOLIO-HISTORY-V3',points:[]}));
+  }});
+  assert.equal(await accepted.access.verify(bearer),'unlocked');
+  assert.equal(request.url,ENDPOINT);
+  assert.equal(request.options.headers.authorization,'Bearer '+bearer);
+  assert.equal(accepted.access.getToken(),bearer);
+
+  let rejectedRequest;
+  const rawShare=harness({fetchImpl:async(url,options)=>{
+    rejectedRequest={url,options};
+    return new Response('unauthorized',{status:401});
+  }});
+  assert.equal(await rawShare.access.verify('s'.repeat(43)),'rejected');
+  assert.equal(rejectedRequest.url,ENDPOINT);
+  assert.equal(rejectedRequest.options.headers.authorization,'Bearer '+'s'.repeat(43));
+  assert.equal(rawShare.access.getToken(),null);
+});
+
+test('failed verification publishes locked state without publishing over a newer generation',async()=>{
+  const h=harness({fetchImpl:async()=>new Response('{}',{status:403})});
+  const states=[];
+  h.access.subscribe(state=>states.push(state.status));
+  assert.equal(await h.access.verify(PASSWORD),'rejected');
+  assert.deepEqual(states.slice(-3),['locked','checking','locked']);
+
+  let resolve;
+  const pendingHarness=harness({fetchImpl:()=>new Promise(r=>{resolve=()=>r(new Response('{}'));})});
+  const pendingStates=[];
+  pendingHarness.access.subscribe(state=>pendingStates.push(state.status));
+  const pending=pendingHarness.access.verify(PASSWORD);
+  pendingHarness.access.lock();
+  resolve();
+  assert.equal(await pending,'unavailable');
+  assert.equal(pendingStates.at(-1),'locked');
+  assert.deepEqual(pendingStates.slice(-3),['locked','checking','locked']);
+});
+
+test('shared reader revalidation is synchronous and does not outlive the access deadline',async()=>{
+  let clock=1000,bot=0,depot=0;
+  const h=harness({now:()=>clock});
+  h.access.registerReader(()=>{},()=>bot++);
+  h.access.registerReader(()=>{},()=>depot++);
+  await h.access.verify(PASSWORD);
+  assert.equal(h.access.revalidateReaders(),true);
+  assert.deepEqual([bot,depot],[1,1]);
+  clock=1000+15*60*1000;
+  assert.equal(h.access.revalidateReaders(),false);
+  assert.deepEqual([bot,depot],[1,1]);
+  assert.equal(h.access.getToken(),null);
 });
 
 test('15-minute deadline is absolute, exact-boundary checked, and clears every reader',async()=>{
@@ -123,15 +179,16 @@ class Target{
   focus(){this.focused=true;}
 }
 
-function mountHarness({initialCredential=PASSWORD,verifyResult='unlocked'}={}){
+function mountHarness({initialCredential=PASSWORD,verifyResult='unlocked',revalidateReaders=()=>{},access:providedAccess}={}){
   const ids=['app','app-access-gate','app-access-form','app-access-password','app-access-status','app-access-lock','app-main'];
   const nodes=new Map(ids.map(id=>[id,new Target()]));
   const document=new Target(),window=new Target();
   document.getElementById=id=>nodes.get(id);
   let credential=initialCredential,locks=0;const subscribers=new Set();
   const publish=()=>{for(const listener of subscribers)listener({status:credential?'unlocked':'locked'});};
-  const access={
+  const access=providedAccess||{
     isUnlocked:()=>credential!==null,getToken:()=>credential,
+    revalidateReaders,
     subscribe(fn){subscribers.add(fn);fn({status:credential?'unlocked':'locked'});return ()=>subscribers.delete(fn);},
     verify:async value=>{if(verifyResult==='unlocked')credential=value;publish();return verifyResult;},
     lock(){credential=null;locks++;publish();}
@@ -158,6 +215,34 @@ test('app gate submits on Enter, retains access across visibility changes, locks
   h.mounted.dispose();
 });
 
+test('foreground, focus, and pageshow reproject both private readers before access is shown',()=>{
+  let clock=1000,bot='fresh',depot='fresh',command='fresh',reads=0,calls=0,app,canAssertOrder=false;
+  const revalidateReaders=()=>{
+    calls++;
+    if(canAssertOrder)assert.equal(app.hidden,true,'private shell remains hidden during synchronous revalidation');
+    const status=clock>2000?'stale':'fresh';
+    bot=status;depot=status;command=status;
+  };
+  const h=mountHarness({revalidateReaders});
+  app=h.nodes.get('app');
+  const initialCalls=calls;
+  canAssertOrder=true;
+  h.document.hidden=true;h.document.fire('visibilitychange');
+  clock=2001;
+  h.document.hidden=false;h.document.fire('visibilitychange');
+  assert.equal(h.access.isUnlocked(),true,'source freshness expiry does not end the app session');
+  assert.deepEqual([bot,depot,command],['stale','stale','stale']);
+  assert.equal(reads,0,'resume only reprojects cached data');
+  assert.equal(calls,initialCalls+1,'foreground return revalidates before showing the app');
+  canAssertOrder=false;
+  h.window.fire('focus');
+  h.window.fire('pageshow');
+  assert.equal(calls,initialCalls+3,'focus and pageshow each revalidate');
+  assert.deepEqual([bot,depot,command],['stale','stale','stale']);
+  assert.equal(reads,0);
+  h.mounted.dispose();
+});
+
 test('gate clears the password field, reports generic results, and disposes listeners',async()=>{
   const h=mountHarness(),input=h.nodes.get('app-access-password');
   h.access.lock();
@@ -176,6 +261,30 @@ test('gate clears the password field, reports generic results, and disposes list
   const prior=h.locks();
   h.window.fire('pagehide');
   assert.equal(h.locks(),prior);
+});
+
+test('unsubmitted password is cleared on global lock, pagehide, BFCache restoration, and disposal',()=>{
+  const h=mountHarness({initialCredential:null}),input=h.nodes.get('app-access-password');
+  input.value='unsubmitted-secret';h.window.fire('pagehide');
+  assert.equal(input.value,'');
+  input.value='unsubmitted-secret';h.window.fire('pageshow',{persisted:true});
+  assert.equal(input.value,'');
+  input.value='unsubmitted-secret';h.access.lock();
+  assert.equal(input.value,'');
+  input.value='unsubmitted-secret';h.mounted.dispose();
+  assert.equal(input.value,'');
+});
+
+test('expiry clears an unsubmitted password through the shared locked-state publication',async()=>{
+  let clock=1000;
+  const access=createAppAccess({now:()=>clock,fetchImpl:async()=>new Response('{}')});
+  assert.equal(await access.verify(PASSWORD),'unlocked');
+  const h=mountHarness({access});
+  const input=h.nodes.get('app-access-password');input.value='unsubmitted-secret';
+  clock=1000+15*60*1000;
+  assert.equal(access.isUnlocked(),false);
+  assert.equal(input.value,'');
+  h.mounted.dispose();
 });
 
 test('rejected and unavailable states are distinct and never include the submitted value',async()=>{
