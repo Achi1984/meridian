@@ -61,3 +61,8 @@ Generated-only coverage:
 ```sh
 node --test test/b1-7-review-report.test.js
 ```
+
+The shared formatter also renders the separately versioned historical V2
+contract. V2 byte, summary, progress-hash, and provenance limits are documented
+in [HISTORICAL_RESULT_EXPORT_V2.md](HISTORICAL_RESULT_EXPORT_V2.md); V1 remains
+synthetic-only and unchanged.

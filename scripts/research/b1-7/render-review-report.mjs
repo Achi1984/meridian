@@ -4,6 +4,9 @@ import {pathToFileURL} from 'node:url';
 import {
   HISTORICAL_EXPORT_SCHEMA, MAX_HISTORICAL_EXPORT_BYTES, parseArenaHistoricalExport
 } from '../../../v11/arena-historical-export.js';
+import {
+  HISTORICAL_EXPORT_V2_SCHEMA, parseArenaHistoricalExportV2
+} from '../../../v11/arena-historical-export-v2.js';
 
 export const MAX_REVIEW_REPORT_BYTES = 1024 * 1024;
 const PATH_FIELDS = [
@@ -108,25 +111,49 @@ function resultRows(result) {
 
 function composition(projection) {
   const {job, result, provenance} = projection;
+  const historicalV2 = projection.schema === HISTORICAL_EXPORT_V2_SCHEMA;
   const lines = [
     '# Offline B1 review report',
     '',
-    '> SYNTHETIC-ONLY EXPORT CONTRACT · UNVERIFIED CALLER ASSERTIONS · NOT D2 EVIDENCE',
+    historicalV2
+      ? '> HISTORICAL V2 · UNVERIFIED CALLER ASSERTIONS · NOT AUTHENTICATED EVIDENCE'
+      : '> SYNTHETIC-ONLY EXPORT CONTRACT · UNVERIFIED CALLER ASSERTIONS · NOT D2 EVIDENCE',
     '',
-    'This report formats a parser-accepted export only. It does not authenticate source or caller,',
-    'recompute metrics, replay paths, rank candidates, or grant research or trading authority.',
-    'The current importer accepts generated-profile bindings only; genuine D2 import is unsupported.',
+    ...(historicalV2 ? [
+      'This report formats caller-supplied historical-result bytes only. Provenance and source bindings',
+      'remain unverified assertions. It does not replay paths, recalculate metrics, rank candidates,',
+      'attribute causality, or grant research or trading authority.'
+    ] : [
+      'This report formats a parser-accepted export only. It does not authenticate source or caller,',
+      'recompute metrics, replay paths, rank candidates, or grant research or trading authority.',
+      'The current importer accepts generated-profile bindings only; genuine D2 import is unsupported.'
+    ]),
     '',
     '## Export provenance',
     '',
     table(['Field','Returned value'], [
-      ['schema',HISTORICAL_EXPORT_SCHEMA],
-      ['purpose',projection.envelopePurpose],
+      ['schema',projection.schema ?? HISTORICAL_EXPORT_SCHEMA],
+      ['purpose',projection.purpose ?? projection.envelopePurpose],
       ['source',provenance.source],
       ['assertionStatus',provenance.assertionStatus],
       ['sourceAuthenticity',provenance.sourceAuthenticity],
-      ['syntheticFixture',provenance.syntheticFixture]
+      ...(historicalV2
+        ? [['assertedDatasetClass',provenance.assertedDatasetClass],
+          ['generatedFixture',provenance.generatedFixture]]
+        : [['syntheticFixture',provenance.syntheticFixture]])
     ]),
+    ...(historicalV2 ? [
+      '',
+      '## Byte and binding verification',
+      '',
+      'Verification is limited to supplied bytes and internal structural consistency; it is not authenticity.',
+      '',
+      table(['Check','Outcome'],Object.entries(projection.verification)),
+      '',
+      'The original journal daily budget, global active fence, launcher receipt, approval, profile bundle,',
+      'execution checkout, and source-map digest were not supplied by inspect_b1 and are NOT_SUPPLIED.',
+      'Progress payload hashes are NOT_VERIFIED because original payload bytes were not supplied.'
+    ] : []),
     '',
     '## Lifecycle and attempt',
     '',
@@ -184,14 +211,24 @@ function composition(projection) {
     '',
     '## Evidence limitations',
     '',
-    '- The export contract is synthetic-only; genuine D2 exports are unsupported.',
-    '- Source authenticity remains NOT_ESTABLISHED; hashes bind bytes/identities, not provenance.',
-    '- Historical diagnostic is not a holdout; no forward, Paper, or Live conclusion follows.',
-    '- Costs are assumptions, not verified execution costs.',
-    '- No finite trade stop exists; returned CRV is not inferred or recalculated.',
-    '- Trial-ledger state and all authority flags remain exactly as returned; no permission is inferred.',
-    '- Daily return/held-target series and fill/cancel detail arrays are omitted from this compact report.',
-    '  Scalar fields and quarterly returns shown above are copied from the accepted result unchanged.',
+    ...(historicalV2 ? [
+      '- This is a bounded offline review of caller-supplied historical-shaped evidence, not independent acceptance.',
+      '- Hash consistency binds supplied bytes; it does not authenticate the source, caller, or execution checkout.',
+      '- The diagnostic window has already been seen; no holdout, prospective, profitability, or causal claim follows.',
+      '- Missing budget, fence, approval, and launcher facts remain NOT_SUPPLIED, not inferred from other fields.',
+      '- No thresholds are changed; screen checks and returned statuses are displayed, never recomputed.',
+      '- Costs, returns, quarters, control bindings, and lifecycle values are copied from supplied records.',
+      '- Daily return/held-target series and fill/cancel detail arrays are omitted from this compact report.'
+    ] : [
+      '- The export contract is synthetic-only; genuine D2 exports are unsupported.',
+      '- Source authenticity remains NOT_ESTABLISHED; hashes bind bytes/identities, not provenance.',
+      '- Historical diagnostic is not a holdout; no forward, Paper, or Live conclusion follows.',
+      '- Costs are assumptions, not verified execution costs.',
+      '- No finite trade stop exists; returned CRV is not inferred or recalculated.',
+      '- Trial-ledger state and all authority flags remain exactly as returned; no permission is inferred.',
+      '- Daily return/held-target series and fill/cancel detail arrays are omitted from this compact report.',
+      '  Scalar fields and quarterly returns shown above are copied from the accepted result unchanged.'
+    ]),
     ''
   ];
   return lines.join('\n');
@@ -219,8 +256,11 @@ export function renderParsedReviewReport(projection) {
 export async function renderReviewReport(inputBytes) {
   if (!(inputBytes instanceof Uint8Array)) throw new Error('REPORT_INPUT_INVALID');
   if (inputBytes.byteLength > MAX_HISTORICAL_EXPORT_BYTES) throw new Error('REPORT_INPUT_LIMIT');
-  const projection = await parseArenaHistoricalExport(inputBytes, async bytes =>
-    createHash('sha256').update(bytes).digest('hex'));
+  const digest = async bytes =>
+    createHash('sha256').update(bytes).digest('hex');
+  let projection = await parseArenaHistoricalExportV2(inputBytes,digest);
+  if(projection.status!=='PRESENT_UNVERIFIED')
+    projection=await parseArenaHistoricalExport(inputBytes,digest);
   if (projection.status !== 'PRESENT_UNVERIFIED') throw new Error('REPORT_INPUT_INVALID');
   return renderParsedReviewReport(projection);
 }
