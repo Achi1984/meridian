@@ -34,7 +34,8 @@ function stableJson(value, depth = 0, budget = {nodes: 0}) {
   if (Array.isArray(value)) {
     return `[${value.map(item => stableJson(item, depth + 1, budget)).join(',')}]`;
   }
-  if (typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
+  if (typeof value === 'object' &&
+      [Object.prototype,null].includes(Object.getPrototypeOf(value))) {
     return `{${Object.keys(value).sort().map(key =>
       `${JSON.stringify(key)}:${stableJson(value[key], depth + 1, budget)}`).join(',')}}`;
   }
@@ -137,6 +138,15 @@ function composition(projection) {
         'executionAuthorized','promotionAuthorized','profitabilityInferred'
       ].filter(key => Object.hasOwn(job, key)).map(key => [key,job[key]]),
       ...Object.entries(job.timestamps).map(([key,value]) => [`timestamp.${key}`,value])
+    ]),
+    '',
+    '## Development control calibration and bindings',
+    '',
+    'Only caller-supplied values are shown; bindings do not authenticate the source.',
+    '',
+    table(['Field','Returned value'], [
+      ['controls',job.controls],
+      ['controlBindings',job.controlBindings]
     ]),
     '',
     'Lifecycle state, engine result status, and screen status are separate returned fields.',

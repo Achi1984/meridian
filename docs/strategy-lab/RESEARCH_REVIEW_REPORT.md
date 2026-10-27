@@ -14,6 +14,10 @@ insufficient evidence is represented by the parser-provided 19 completed paths
 and 25 explicit `NOT_RUN_INSUFFICIENT_EVIDENCE` records. A screen-only
 `INSUFFICIENT_EVIDENCE` remains separate from an engine-level outcome.
 
+Supplied development controls and control-binding hashes are shown separately,
+including when progress has no final result. They remain unverified caller
+assertions and are not recomputed or treated as authentication.
+
 Per-path scalar fields and quarterly returns are printed as returned, including
 zero, false, and null. Daily return/held-target arrays and fill/cancel detail
 arrays are deliberately omitted from the compact report; no aggregates or
@@ -35,6 +39,11 @@ stderr and no stdout. The importable `renderReviewReport(Uint8Array)` function
 uses the same unchanged parser. `renderParsedReviewReport` is only a formatter
 for an already parser-accepted projection and is not an import or validation
 entry point.
+
+The focused suite exercises the output-size guard directly at the formatter
+boundary. Current V1 parser bounds do not provide a valid generated export whose
+projected report exceeds 1 MiB, so the suite does not claim end-to-end overflow
+coverage through the import API or CLI.
 
 ## Evidence boundary
 
