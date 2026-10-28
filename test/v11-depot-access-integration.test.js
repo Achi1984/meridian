@@ -160,7 +160,23 @@ test('independently valid current or history survive a failure of the other sour
   await d.access.verify('synthetic-password');d.click();await d.done();
   assert.equal(d.last().status,'unavailable');
   assert.deepEqual(d.last().reasons,{current:'INCOMPLETE',prices:'TRANSPORT',history:'EMPTY'});
-  assert.match(d.h.text(),/Aktuell: unvollständig · Kurse: nicht erreichbar · Historie: leer/);d.m.dispose();
+  assert.match(d.h.text(),/Aktuell: unvollständig · Kurse: nicht erreichbar · Historie: keine vollständigen Bewertungen im Zeitraum/);d.m.dispose();
+});
+test('history reason: excluded-only is EMPTY, malformed is INCOMPLETE, current stays independent',async()=>{
+  const excludedOnly={...history(false),rawPointCount:2,excludedIncompletePoints:2};
+  const e=harness({dashboard:dashboard(),prices:prices(),history:excludedOnly});
+  await e.access.verify('synthetic-password');e.click();await e.done();
+  assert.equal(e.last().status,'fresh');assert.equal(e.last().model.source,'SERVER_PORTFOLIO_CURRENT');
+  assert.equal(e.last().reasons.history,'EMPTY');e.m.dispose();
+  for(const bad of [{...history(false),version:'old'},{...history(false),source:'OTHER'},{...history(false),rawPointCount:3}]){
+    const t=harness({dashboard:{},prices:prices(),history:bad});
+    await t.access.verify('synthetic-password');t.click();await t.done();
+    assert.equal(t.last().status,'unavailable');assert.equal(t.last().reasons.history,'INCOMPLETE');
+    assert.match(t.h.text(),/Historie: unvollständig/);assert.doesNotMatch(t.h.text(),/keine vollständigen Bewertungen/);t.m.dispose();
+  }
+  const l=harness({dashboard:dashboard(),prices:prices(),history:history(false)});
+  await l.access.verify('synthetic-password');l.click();await l.done();
+  l.access.lock();assert.equal(l.last().status,'locked');assert.equal(l.last().reasons,null);assert.equal(l.last().model,null);l.m.dispose();
 });
 test('revalidation while loading neither resets nor refetches',async()=>{
   const t=harness({dashboard:'defer',prices:'defer',history:'defer'});

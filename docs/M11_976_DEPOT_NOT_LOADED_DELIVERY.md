@@ -12,7 +12,7 @@ Base: `1afdbf9e64435701f3903b17625441a19c2295ff`. Delivery head: the PR head com
 `reasons` is derived at emit time (never cached across a fresh→stale revalidation) and holds only fixed categories per source:
 - `current` (dashboard model): `OK` only while the model is unexpired; otherwise `TRANSPORT`, `STALE` (stale or expired) or `INCOMPLETE`.
 - `prices`: `TRANSPORT` or `RECEIVED`. `RECEIVED` means the public request succeeded and parsed; it does not claim validated coverage (coverage is checked inside the current model and surfaces as `current`). `RECEIVED` is not shown to the user.
-- `history`: `OK`, `TRANSPORT`, `STALE`, `EMPTY` or `INCOMPLETE`. `EMPTY` is a schema-valid archive with no points (the history model reports `empty` for it); it is distinct from an invalid/unavailable archive.
+- `history`: `OK`, `TRANSPORT`, `STALE`, `EMPTY` or `INCOMPLETE`. `EMPTY` is a schema-valid archive envelope with no complete valuation points in the window (the history model reports `empty`); excluded or older stored records may still exist, so it is shown as "keine vollständigen Bewertungen im Zeitraum", not as an empty archive. It is distinct from an invalid archive (`INCOMPLETE`) and a failed request (`TRANSPORT`). Valuation admission is unchanged.
 No raw responses, holdings or credentials. `INCOMPLETE` for `current` is not split further (no invented schema/price causes). Current and history stay independently valid.
 
 ## Commands and results
