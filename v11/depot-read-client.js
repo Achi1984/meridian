@@ -1,7 +1,7 @@
-import {buildCurrentDepotModel} from './depot-current-model.js?v=B14-M11';
-import {buildDepotHistoryModel} from './depot-history-model.js?v=B14-M11';
-import {buildDepotReadModel} from './depot-read-model.js?v=B14-M11';
-import {parseBotReadCredential} from './bot-read-client.js?v=B14-M11';
+import {buildCurrentDepotModel} from './depot-current-model.js?v=B14-M11-DEPOT976';
+import {buildDepotHistoryModel} from './depot-history-model.js?v=B14-M11-DEPOT976';
+import {buildDepotReadModel} from './depot-read-model.js?v=B14-M11-DEPOT976';
+import {parseBotReadCredential} from './bot-read-client.js?v=B14-M11-DEPOT976';
 
 const ENDPOINT = 'https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/portfolio-history?range=1w';
 const CURRENT_ENDPOINT='https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/dashboard';
@@ -48,18 +48,28 @@ async function readBounded(response, signal) {
 // Manual reads only. Independent source failures preserve other verified results.
 export function createDepotReadClient({getToken,onChange=()=>{},fetchImpl=globalThis.fetch,
   now=Date.now,schedule=setTimeout,cancelSchedule=clearTimeout}={}){
-  let generation=0,pending=null,disposed=false,current=null,stored=null,history=null;
+  let generation=0,pending=null,disposed=false,current=null,stored=null,history=null,attempted=false,src=null;
   const token=()=>{try{const value=getToken();return parseDepotReadCredential(value)?value.trim():null;}catch{return null;}};
   let snapshotToken=null;
-  const emit=(status,model=null)=>{if(!disposed)try{onChange({status,model,history});}catch{}};
+  const emit=(status,model=null)=>{if(!disposed)try{onChange({status,model,history,reasons:reasons()});}catch{}};
   const stop=()=>{generation++;pending?.abort();pending=null;};
-  const wipe=()=>{current=null;stored=null;history=null;snapshotToken=null;};
+  const wipe=()=>{current=null;stored=null;history=null;src=null;snapshotToken=null;};
+  // Fixed categories only, derived at emit time so a fresh->stale projection never keeps an OK label.
+  // prices: RECEIVED means transport success only; coverage is validated inside the current model.
+  function reasons(){
+    if(!src)return null;
+    const clock=now(),valid=m=>m?.status==='FRESH_SNAPSHOT'&&clock<=m.expiresAt;
+    return {
+      current:valid(current)?'OK':src.dashboardFailed?'TRANSPORT':src.c==='STALE'||current?'STALE':'INCOMPLETE',
+      prices:src.pricesFailed?'TRANSPORT':'RECEIVED',
+      history:valid(stored)?'OK':src.archiveFailed?'TRANSPORT':src.h==='STALE'||stored?.status==='FRESH_SNAPSHOT'?'STALE':src.historyEmpty?'EMPTY':'INCOMPLETE'};
+  }
   function project(){
     const clock=now(),valid=m=>m?.status==='FRESH_SNAPSHOT'&&clock<=m.expiresAt;
     const model=valid(current)?current:valid(stored)?stored:null;
     emit(model?'fresh':current||stored?'stale':'unavailable',model);
   }
-  function lock(){stop();wipe();emit('locked');}
+  function lock(){stop();wipe();attempted=false;emit('locked');}
   async function read(url,credential,parent){
     const ctl=new AbortController();let timer,aborted;
     const abort=()=>ctl.abort();parent.addEventListener('abort',abort,{once:true});
@@ -80,7 +90,7 @@ export function createDepotReadClient({getToken,onChange=()=>{},fetchImpl=global
   }
   async function refresh(){
     if(disposed)return;stop();wipe();const credential=token();if(!credential){emit('locked');return;}
-    const id=generation,ctl=new AbortController();pending=ctl;snapshotToken=credential;emit('loading');
+    attempted=true;const id=generation,ctl=new AbortController();pending=ctl;snapshotToken=credential;emit('loading');
     if(id!==generation||disposed)return;
     const [dashboard,prices,archive]=await Promise.all([read(CURRENT_ENDPOINT,credential,ctl.signal),read(PRICE_ENDPOINT,null,ctl.signal),read(ENDPOINT,credential,ctl.signal)]);
     if(disposed||id!==generation)return;
@@ -92,9 +102,12 @@ export function createDepotReadClient({getToken,onChange=()=>{},fetchImpl=global
     // Keep only validated graph projections, never the broad account response.
     history=Object.fromEntries(['1h','1d','1w'].map(range=>[range,buildDepotHistoryModel(archive.data,{now:now(),range})]));
     if(!current&&!stored&&h.status==='STALE')stored={status:'STALE'};
+    const failed=r=>r.failed||r.data===undefined;
+    src={dashboardFailed:failed(dashboard),pricesFailed:failed(prices),archiveFailed:failed(archive),c:c.status,h:h.status,
+      historyEmpty:history['1w']?.status==='empty'};
     project();
   }
-  function revalidate(){if(disposed)return;if(!token()||(snapshotToken&&token()!==snapshotToken)){lock();return;}if(current||stored)project();}
+  function revalidate(){if(disposed)return;if(!token()||(snapshotToken&&token()!==snapshotToken)){lock();return;}if(current||stored)project();else if(!attempted&&!pending)emit('not_loaded');}
   function dispose(){if(disposed)return;lock();disposed=true;}
   return {refresh,lock,revalidate,dispose};
 }

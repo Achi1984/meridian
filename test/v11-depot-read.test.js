@@ -75,8 +75,8 @@ class Target{
   fire(k){for(const f of this.listeners.get(k)||[])f();}
 }
 function accessController(){
-  let credential=null;const readers=new Map();
-  return {getToken:()=>credential,isUnlocked:()=>credential!==null,set(value){credential=value;},
+  let credential=null;const readers=new Map(),subs=new Set();
+  return {subs,subscribe(l){subs.add(l);l({status:credential?'unlocked':'locked'});return()=>subs.delete(l);},getToken:()=>credential,isUnlocked:()=>credential!==null,set(value){credential=value;for(const l of subs)l({status:value?'unlocked':'locked'});},
     lock(){credential=null;for(const clear of readers.keys())clear();},
     revalidateReaders(){if(!credential)return false;for(const revalidate of readers.values())revalidate();return true;},
     registerReader(clear,revalidate=()=>{}){readers.set(clear,revalidate);return ()=>readers.delete(clear);}};
@@ -92,11 +92,22 @@ function mounted(response){
   return {document,window,nodes,states,timers,mount,client:()=>client,access,token:()=>token(),reads:()=>reads,
     clock(value){clock=value;}};
 }
-test('B7 foreground revalidation preserves the locked state before the first private read',()=>{
-  const states=[],c=createDepotReadClient({getToken:()=> 'synthetic-password',onChange:s=>states.push(s.status)});
+test('unlocked session before the first private read reports not_loaded without fetching',()=>{
+  const states=[];let reads=0;
+  const c=createDepotReadClient({getToken:()=> 'synthetic-password',fetchImpl:async()=>{reads++;},onChange:s=>states.push(s.status)});
   c.revalidate();
-  assert.deepEqual(states,[]);
+  assert.deepEqual(states,['not_loaded']);assert.equal(reads,0);
+  c.lock();c.revalidate();
+  assert.deepEqual(states,['not_loaded','locked','not_loaded']);
   c.dispose();
+});
+test('central unlock yields not_loaded without reads; unsubscribes on dispose',async()=>{
+  const h=mounted(()=>new Response(JSON.stringify(snapshot())));
+  assert.equal(h.states.length,0);
+  h.access.set('synthetic-password');
+  assert.equal(h.states.at(-1).status,'not_loaded');assert.equal(h.reads(),0);
+  await h.client().refresh();assert.equal(h.states.at(-1).status,'fresh');
+  h.mount.dispose();assert.equal(h.access.subs.size,0);
 });
 test('B7 uses shared access and manual reads; 401/403 revoke the shared credential',async()=>{
   for(const code of [200,401,403]){
