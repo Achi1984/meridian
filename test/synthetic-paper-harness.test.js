@@ -12,6 +12,7 @@ const limits=overrides=>({
   maxPriceCentsPerShare:100000n,
   maxFeeCents:10000n,
   maxEvents:10,
+  maxAttempts:10,
   maxIdentityChars:128,
   maxMarkAgeMs:100,
   maxProjectionReceipts:2,
@@ -108,6 +109,7 @@ test('one fee is booked once and exact balances do not deduct it again at valuat
   const action=fill('event:accounting-example');
   const {result:first}=commit(h,action);
   assert.equal(first.status,'COMMITTED');
+  assert.equal(h.project(first).status,'COMMITTED');
   assert.equal(h.account.cashCents,79900n);
   assert.equal(h.account.holdingsShares,2n);
   assert.equal(h.account.costBasisCents,20000n);
@@ -122,12 +124,16 @@ test('one fee is booked once and exact balances do not deduct it again at valuat
     quantityShares:1n,feeIdentity:'fee:event:accounting-example',
   }));
   assert.equal(duplicateFee.reason,'COST_DUPLICATE');
+  assert.equal(h.project(duplicateFee).status,'REJECTED');
   assert.deepEqual({account:h.account,stateIdentity:h.stateIdentity,receipts:h.receipts},before);
 });
 
 test('conservation failure rejects the entire commit without partial account or receipt mutation',()=>{
   const h=harness();
+  const beforeProposal={account:h.account,stateIdentity:h.stateIdentity,receipts:h.receipts};
   const proposal=h.propose(fill('event:bad-conservation'));
+  assert.equal(h.project(proposal).status,'PROPOSED');
+  assert.deepEqual({account:h.account,stateIdentity:h.stateIdentity,receipts:h.receipts},beforeProposal);
   const claim=h.claim(h.stateIdentity);
   const tampered={
     ...proposal,
@@ -136,6 +142,7 @@ test('conservation failure rejects the entire commit without partial account or 
   const before={account:h.account,stateIdentity:h.stateIdentity,receipts:h.receipts};
   const rejected=h.commit(claim,tampered);
   assert.equal(rejected.reason,'BALANCE_INVARIANT');
+  assert.equal(h.project(rejected).status,'REJECTED');
   assert.deepEqual({account:h.account,stateIdentity:h.stateIdentity,receipts:h.receipts},before);
 });
 
@@ -149,6 +156,7 @@ test('missing and stale marks project unavailable rather than zero or carry-forw
   assert.equal(missing.equityCents,null);
   assert.equal(stale.status,'UNAVAILABLE');
   assert.equal(stale.valuation,'UNAVAILABLE');
+  assert.equal(h.project(missing).status,'UNAVAILABLE');
   assert.deepEqual(h.project(missing).account,before.account);
   assert.deepEqual({account:h.account,stateIdentity:h.stateIdentity,receipts:h.receipts},before);
 });
@@ -182,12 +190,15 @@ test('lost ACK returns UNKNOWN and exact same-fence lookup retrieves the origina
   const {claim,result:unknown}=commit(h,fill('event:lost-ack'),{ack:'LOST'});
   assert.equal(unknown.status,'UNKNOWN');
   const afterCommit={account:h.account,stateIdentity:h.stateIdentity,receipts:h.receipts,attempts:h.attempts};
+  assert.equal(h.propose(fill('event:blocked-after-lost-ack')).reason,'RECONCILIATION_REQUIRED');
   const wrongFence=h.lookup(unknown.receiptIdentity,'synthetic-test:paper-990:wrong-fence');
   assert.equal(wrongFence.status,'UNKNOWN');
   const recovered=h.lookup(unknown.receiptIdentity,claim.fenceToken);
   assert.equal(recovered.status,'COMMITTED');
   assert.equal(recovered.lookupOnly,true);
   assert.equal(recovered.receipt.receiptIdentity,unknown.receiptIdentity);
+  const allowedProposal=h.propose(fill('event:after-exact-lookup'),{lookupProof:recovered});
+  assert.equal(allowedProposal.status,'PROPOSED');
   assert.deepEqual({account:h.account,stateIdentity:h.stateIdentity,receipts:h.receipts,attempts:h.attempts},afterCommit);
   assert.equal(h.project().status,'UNKNOWN');
 });
@@ -216,8 +227,17 @@ test('exact configured bounds pass and limit plus one rejects atomically',()=>{
 });
 
 test('NO_ACTION is explicit, committed as a bounded receipt, and has no account effect',()=>{
-  const h=harness();
+  const h=harness({maxProjectionReceipts:1});
   const before=h.account;
+  const actionProposal=fakeDecision('ACTION_PROPOSAL');
+  const proposed=h.propose({
+    ...actionProposal,
+    decision:'ACTION_PROPOSAL',
+    eventIdentity:'decision:action-proposal',
+    syntheticIdentity:ID,
+  });
+  assert.equal(proposed.status,'PROPOSED');
+  assert.deepEqual(h.account,before);
   const decision=fakeDecision('NO_ACTION');
   assert.equal(decision.kind,'NO_ACTION');
   const action={...decision,eventIdentity:'event:no-action',syntheticIdentity:ID};
@@ -226,5 +246,12 @@ test('NO_ACTION is explicit, committed as a bounded receipt, and has no account 
   assert.equal(committed.status,'COMMITTED');
   assert.equal(committed.receipt.kind,'NO_ACTION');
   assert.deepEqual(h.account,before);
-  assert.equal(h.receipts,1);
+  const second=commit(h,{
+    ...decision,eventIdentity:'event:no-action-second',syntheticIdentity:ID,
+  });
+  assert.equal(second.result.receipt.kind,'NO_ACTION');
+  const projection=h.project();
+  assert.equal(h.receipts,2);
+  assert.equal(projection.recentReceipts.length,1);
+  assert.deepEqual(h.account,before);
 });

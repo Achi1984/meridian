@@ -1,17 +1,19 @@
 import {createHash} from 'node:crypto';
 
 const VERSION='SYNTHETIC-PAPER-ACCOUNTING-MODEL/1';
+const LOOKUP_PROOF=Symbol('exact committed receipt lookup');
 const sha256=value=>createHash('sha256').update(value).digest('hex');
 const isPositiveBigInt=value=>typeof value==='bigint'&&value>0n;
 const isNonnegativeBigInt=value=>typeof value==='bigint'&&value>=0n;
 const isSafeTime=value=>Number.isSafeInteger(value)&&value>=0;
 const frozen=value=>Object.freeze(value);
 
-function stateDigest(identity,sequence,account){
+function stateDigest(identity,sequence,account,parentStateIdentity=null,receiptIdentity=null,eventIdentity=null,payloadDigest=null){
   return sha256(JSON.stringify([
     VERSION,identity,String(sequence),String(account.cashCents),
     String(account.holdingsShares),String(account.costBasisCents),
     String(account.feesCents),[...account.feeIdentities].sort(),
+    parentStateIdentity??'',receiptIdentity??'',eventIdentity??'',payloadDigest??'',
   ]));
 }
 
@@ -25,9 +27,9 @@ function eventDigest(action){
   ]));
 }
 
-export function fakeDecision(kind,details={}){
+export function fakeDecision(kind){
   if(kind==='NO_ACTION')return frozen({kind});
-  if(kind==='ACTION_PROPOSAL')return frozen({kind,details:frozen({...details})});
+  if(kind==='ACTION_PROPOSAL')return frozen({kind});
   throw new TypeError('unsupported fake decision');
 }
 
@@ -48,6 +50,7 @@ export function createSyntheticPaperHarness({
     ||!isNonnegativeBigInt(limits.maxFeeCents)
     ||initialCashCents>limits.maxCashCents
     ||!Number.isSafeInteger(limits.maxEvents)||limits.maxEvents<1
+    ||!Number.isSafeInteger(limits.maxAttempts)||limits.maxAttempts<1
     ||!Number.isSafeInteger(limits.maxIdentityChars)||limits.maxIdentityChars<1
     ||!Number.isSafeInteger(limits.maxMarkAgeMs)||limits.maxMarkAgeMs<0
     ||!Number.isSafeInteger(limits.maxProjectionReceipts)||limits.maxProjectionReceipts<1){
@@ -67,6 +70,7 @@ export function createSyntheticPaperHarness({
   let nextFence=0;
   let activeFence=null;
   let unresolvedUnknown=null;
+  let lostAck=null;
   let haltedReason=null;
   const attempts=[];
   const receipts=[];
@@ -83,16 +87,21 @@ export function createSyntheticPaperHarness({
     status,reason,syntheticIdentity,...extra,
   });
   const reject=(reason,extra={})=>result('REJECTED',reason,extra);
-  const currentState=()=>unresolvedUnknown?'UNKNOWN':haltedReason?'HALTED':'MODELED';
-  const eligible=()=>{
+  const currentState=()=>unresolvedUnknown||lostAck?'UNKNOWN':haltedReason?'HALTED':'MODELED';
+  const matchesLookupProof=proof=>Boolean(lostAck
+    &&proof?.[LOOKUP_PROOF]===true
+    &&proof.receiptIdentity===lostAck.receiptIdentity
+    &&proof.fenceToken===lostAck.fenceToken);
+  const eligible=proof=>{
     if(unresolvedUnknown)return reject('RECONCILIATION_REQUIRED',{state:'UNKNOWN'});
+    if(lostAck&&!matchesLookupProof(proof))return reject('RECONCILIATION_REQUIRED',{state:'UNKNOWN'});
     if(haltedReason)return reject(haltedReason,{state:'HALTED'});
     return null;
   };
 
-  function propose(action){
+  function propose(action,{lookupProof}={}){
     if(!action||typeof action!=='object')return reject('PAYLOAD_INVALID');
-    const blocked=eligible();
+    const blocked=eligible(lookupProof);
     if(blocked)return blocked;
     if(action.syntheticIdentity!==syntheticIdentity)return reject('SYNTHETIC_IDENTITY_MISMATCH');
     if(typeof action.eventIdentity!=='string'||action.eventIdentity.length===0)return reject('IDENTITY_MISSING');
@@ -104,15 +113,22 @@ export function createSyntheticPaperHarness({
         if(prior.digest===digest)return result('IDEMPOTENT',null,{priorResult:prior.result});
         return result('HALT','IDENTITY_CONFLICT',{eventIdentity:action.eventIdentity});
       }
+      if(events.size>=limits.maxEvents)return reject('BOUND_EXCEEDED');
+      const receiptIdentity=`${syntheticIdentity}:receipt:${sequence+1}`;
       return result('PROPOSED',null,{
         kind:'NO_ACTION',eventIdentity:action.eventIdentity,payloadDigest:digest,
-        expectedStateIdentity:stateIdentity,proposedStateIdentity:null,
+        expectedStateIdentity:stateIdentity,receiptIdentity,
+        proposedStateIdentity:stateDigest(
+          syntheticIdentity,sequence+1,account,stateIdentity,receiptIdentity,
+          action.eventIdentity,digest,
+        ),
         nextAccount:snapshotAccount(account),
       });
     }
     if(action.kind==='ACTION_PROPOSAL'){
+      if(action.decision!=='ACTION_PROPOSAL')return reject('PAYLOAD_INVALID');
       return result('PROPOSED',null,{
-        kind:'ACTION_PROPOSAL',decision:action.decision,
+        kind:'ACTION_PROPOSAL',
         expectedStateIdentity:stateIdentity,
       });
     }
@@ -125,16 +141,15 @@ export function createSyntheticPaperHarness({
       return result('HALT','IDENTITY_CONFLICT',{eventIdentity:action.eventIdentity});
     }
     if(!isPositiveBigInt(action.quantityShares)
-      ||action.quantityShares>limits.maxQuantityShares
       ||!isPositiveBigInt(action.priceCentsPerShare)
-      ||action.priceCentsPerShare>limits.maxPriceCentsPerShare
       ||!isNonnegativeBigInt(action.feeCents)
       ||typeof action.feeIdentity!=='string'||action.feeIdentity.length===0){
-      return reject(action.quantityShares>limits.maxQuantityShares?'BOUND_EXCEEDED':'PAYLOAD_INVALID');
+      return reject('PAYLOAD_INVALID');
     }
-    if(action.feeCents>limits.maxFeeCents
-      ||action.feeIdentity.length>limits.maxIdentityChars
-      ||action.priceCentsPerShare>limits.maxPriceCentsPerShare){
+    if(action.quantityShares>limits.maxQuantityShares
+      ||action.priceCentsPerShare>limits.maxPriceCentsPerShare
+      ||action.feeCents>limits.maxFeeCents
+      ||action.feeIdentity.length>limits.maxIdentityChars){
       return reject('BOUND_EXCEEDED');
     }
     if(!isSafeTime(action.eventTimeMs)||!isSafeTime(action.decisionDurableAtMs)
@@ -155,20 +170,25 @@ export function createSyntheticPaperHarness({
       feeIdentities:new Set(account.feeIdentities).add(action.feeIdentity),
     };
     if(nextAccount.cashCents<0n)return reject('BALANCE_INVARIANT');
-    const proposedStateIdentity=stateDigest(syntheticIdentity,sequence+1,nextAccount);
+    const receiptIdentity=`${syntheticIdentity}:receipt:${sequence+1}`;
+    const proposedStateIdentity=stateDigest(
+      syntheticIdentity,sequence+1,nextAccount,stateIdentity,receiptIdentity,
+      action.eventIdentity,digest,
+    );
     return result('PROPOSED',null,{
       kind:'FILL',eventIdentity:action.eventIdentity,payloadDigest:digest,
-      feeIdentity:action.feeIdentity,expectedStateIdentity:stateIdentity,
+      feeIdentity:action.feeIdentity,expectedStateIdentity:stateIdentity,receiptIdentity,
       proposedStateIdentity,nextAccount:snapshotAccount(nextAccount),
-      nextFeeIdentities:[...nextAccount.feeIdentities],
+      nextFeeIdentities:frozen([...nextAccount.feeIdentities]),
     });
   }
 
-  function claim(expectedStateIdentity){
-    const blocked=eligible();
+  function claim(expectedStateIdentity,{lookupProof}={}){
+    const blocked=eligible(lookupProof);
     if(blocked){lastOutcome=blocked;return blocked;}
     if(activeFence)return reject('CAS_LOSER');
     if(expectedStateIdentity!==stateIdentity)return reject('CAS_LOSER');
+    if(attempts.length>=limits.maxAttempts)return reject('BOUND_EXCEEDED');
     const token=`${syntheticIdentity}:fence:${++nextFence}`;
     const claimRecord=frozen({
       token,expectedStateIdentity,attempt:attempts.length+1,
@@ -187,8 +207,8 @@ export function createSyntheticPaperHarness({
     return lastOutcome;
   }
 
-  function commit(claimResult,proposal,{outcome='COMMITTED',ack='ACK'}={}){
-    const blocked=eligible();
+  function commit(claimResult,proposal,{outcome='COMMITTED',ack='ACK',lookupProof}={}){
+    const blocked=eligible(lookupProof);
     if(blocked){lastOutcome=blocked;return blocked;}
     if(!activeFence||claimResult?.fenceToken!==activeFence.token
       ||proposal?.expectedStateIdentity!==stateIdentity
@@ -254,9 +274,20 @@ export function createSyntheticPaperHarness({
       return invalid;
     }
     const nextSequence=sequence+1;
-    const nextIdentity=stateDigest(syntheticIdentity,nextSequence,candidate);
+    const receiptIdentity=`${syntheticIdentity}:receipt:${nextSequence}`;
+    const nextIdentity=stateDigest(
+      syntheticIdentity,nextSequence,candidate,stateIdentity,receiptIdentity,
+      proposal.eventIdentity,proposal.payloadDigest,
+    );
+    if(proposal.receiptIdentity!==receiptIdentity
+      ||proposal.proposedStateIdentity!==nextIdentity){
+      const invalid=reject('STATE_IDENTITY_MISMATCH');
+      activeFence=null;
+      lastOutcome=invalid;
+      return invalid;
+    }
     const receipt=frozen({
-      receiptIdentity:`${syntheticIdentity}:receipt:${nextSequence}`,
+      receiptIdentity,
       eventIdentity:proposal.eventIdentity,
       payloadDigest:proposal.payloadDigest,
       fenceToken:activeFence.token,
@@ -279,21 +310,28 @@ export function createSyntheticPaperHarness({
     activeFence=null;
     receipts.push(receipt);
     events.set(proposal.eventIdentity,{digest:proposal.payloadDigest,result:committed});
+    if(lostAck&&matchesLookupProof(lookupProof))lostAck=null;
     lastOutcome=ack==='LOST'
       ?result('UNKNOWN','PERSISTENCE_UNKNOWN',{
         fenceToken:receipt.fenceToken,receiptIdentity:receipt.receiptIdentity,
       })
       :committed;
+    if(ack==='LOST')lostAck=frozen({
+      fenceToken:receipt.fenceToken,
+      receiptIdentity:receipt.receiptIdentity,
+    });
     return lastOutcome;
   }
 
   function lookup(receiptIdentity,fenceToken){
     const receipt=receipts.find(item=>item.receiptIdentity===receiptIdentity
       &&item.fenceToken===fenceToken);
-    if(receipt)return result('COMMITTED',null,{receipt,lookupOnly:true});
-    return result('UNKNOWN','PERSISTENCE_UNKNOWN',{
-      receiptIdentity,fenceToken,lookupOnly:true,
+    if(receipt)return result('COMMITTED',null,{
+      receipt,lookupOnly:true,receiptIdentity:receipt.receiptIdentity,
+      fenceToken:receipt.fenceToken,
+      [LOOKUP_PROOF]:true,
     });
+    return result('UNKNOWN','PERSISTENCE_UNKNOWN',{lookupOnly:true,exactMatch:false});
   }
 
   function mark(mark){
@@ -312,7 +350,7 @@ export function createSyntheticPaperHarness({
   }
 
   function project(outcome=lastOutcome){
-    const recent=receipts.slice(-limits.maxProjectionReceipts).map(receipt=>({
+    const recent=receipts.slice(-limits.maxProjectionReceipts).map(receipt=>frozen({
       receiptIdentity:receipt.receiptIdentity,
       sequence:receipt.sequence,
       stateIdentity:receipt.stateIdentity,
