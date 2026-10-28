@@ -1,9 +1,11 @@
 # Forward-Paper V1 recovery and fault acceptance design
 
 **Status:** documentation-only acceptance design, aligned to the accepted event
-interface; final consolidated Lead acceptance remains pending. Implementation is
-blocked pending independently assessed D2 evidence and separate owner
-authorization.
+interface; final consolidated Lead acceptance remains pending. Only the
+isolated synthetic test harness in
+[`SYNTHETIC_PAPER_INFRASTRUCTURE_V1.md`](SYNTHETIC_PAPER_INFRASTRUCTURE_V1.md)
+is owner-approved in principle before D2; Forward-Paper admission and
+operational implementation remain gated.
 
 **Canonical event/transition interface:** `MERIDIAN-FORWARD-PAPER-EVENT/1.0.0`, accepted
 companion commit
@@ -22,8 +24,9 @@ implemented or can resolve `UNKNOWN`.
 This is a generated-fault acceptance design, not executable tests, SQL, a
 recovery procedure, or a runnable command. It assumes no real market data,
 provider connectivity, or deployment behavior. Useful and independently
-assessed D2 evidence is required before any implementation; Paper/Live and
-operating choices remain separately gated.
+assessed D2 evidence is required before Forward-Paper admission or operational
+implementation. The separate synthetic test-only scope is not a Paper/Live
+run; operating choices remain separately gated.
 
 ## Recovery outcomes and evidence
 
@@ -197,5 +200,8 @@ global exactly-once delivery.
 | Resource/spending gate | Restrict any future bounded work to verified existing resources, `$0` additional spend, no provisioning, and no other spending. | Availability/capacity unverified; gate not established. |
 
 Until remaining gates are resolved, this acceptance design authorizes no
-implementation, test execution, data read, database creation, runtime,
-workflow, provider, credential, spending, recovery, Paper, or Live activity.
+operational implementation, data read, database creation, runtime, workflow,
+provider, credential, spending, recovery, Paper, or Live activity. The only
+pre-qualification exception is the generated-fixture harness specified in
+[`SYNTHETIC_PAPER_INFRASTRUCTURE_V1.md`](SYNTHETIC_PAPER_INFRASTRUCTURE_V1.md);
+its model tests do not establish crash durability or live behavior.

@@ -1,8 +1,9 @@
 # Forward-Paper V1 durable journal and bounded observer
 
 **Status:** documentation-only journal design, aligned to the accepted event
-interface; implementation remains blocked pending independently assessed D2
-evidence and separate owner authorization.
+interface. The separately specified isolated synthetic test harness is
+owner-approved in principle; journal/operational implementation remains blocked
+by the gates below.
 
 **Canonical event/transition interface:** `MERIDIAN-FORWARD-PAPER-EVENT/1.0.0`, accepted
 companion commit
@@ -24,7 +25,11 @@ or resolving `UNKNOWN`. M3 still requires Lead's consolidated acceptance.
 This document specifies durability, fencing, bounded observation, and failure
 semantics only. It does not specify an executable observer, storage schema,
 SQL, runnable commands, market-data adapter, strategy reducer, or accounting
-engine. No Paper or Live authority follows from this design.
+engine. The only approved pre-qualification technical scope is the isolated,
+generated-fixture harness in
+[`SYNTHETIC_PAPER_INFRASTRUCTURE_V1.md`](SYNTHETIC_PAPER_INFRASTRUCTURE_V1.md);
+it is not a journal implementation or evidence of durability. No Paper or Live
+authority follows from this design.
 
 The local research supervisor documents useful mechanisms: create-new-only
 local journal provisioning, transactional claims, consumed attempts, monotonic
@@ -45,17 +50,18 @@ Provider availability, source authenticity, storage durability, clock behavior,
 and deployment behavior remain unverified.
 
 The accepted #911 gate requires useful, independently assessed D2 evidence
-before any Forward-Paper implementation. All twelve §3 configuration groups
-remain `REQUIRED_UNSET`: strategy identity; source identity; ordered universe;
-product; initial capital/account currency; observation period; fee/slippage/
-liquidity; risk/stop/exposure/loss; decision/fill/expiry/mark timing; freshness/
-gap/synchronization; compute bounds; and reconciliation authority. No separate
-budget or stop/resume choice is added to §3. Future work is limited to verified
-existing resources, `$0` additional spend, and no provisioning; availability is
-unverified. Storage location/durability and authoritative clock/source-time
-mapping are additional implementation gates, not §3 configuration rows.
-Historical no-stop policy is not inherited. A policy, source, or version change
-requires a new immutable run.
+before Forward-Paper admission or operational implementation; it does not
+block the separate synthetic test-only scope above. All twelve §3 configuration
+groups remain `REQUIRED_UNSET` for real operation: strategy identity; source
+identity; ordered universe; product; initial capital/account currency;
+observation period; fee/slippage/liquidity; risk/stop/exposure/loss;
+decision/fill/expiry/mark timing; freshness/gap/synchronization; compute bounds;
+and reconciliation authority. No separate budget or stop/resume choice is added
+to §3. Future work is limited to verified existing resources, `$0` additional
+spend, and no provisioning; availability is unverified. Storage
+location/durability and authoritative clock/source-time mapping are additional
+implementation gates, not §3 configuration rows. Historical no-stop policy is
+not inherited. A policy, source, or version change requires a new immutable run.
 
 ## Journal entities and conceptual fields
 
@@ -320,5 +326,9 @@ canonicalization.
   documented against that pin, with the reconciliation-schema blocker explicit;
   final Lead acceptance remains pending.
 
-No implementation, runtime, database, market-data, provider, or authority
-change is authorized. D2 and operating-choice gates remain unchanged.
+No operational implementation, runtime, database, market-data, provider, or
+authority change is authorized by this document. Only the isolated synthetic
+test harness specified in
+[`SYNTHETIC_PAPER_INFRASTRUCTURE_V1.md`](SYNTHETIC_PAPER_INFRASTRUCTURE_V1.md)
+is approved in principle, subject to contract review and an available lane. D2
+and operating-choice gates remain unchanged.
