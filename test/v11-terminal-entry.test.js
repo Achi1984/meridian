@@ -433,6 +433,8 @@ const botPresentationCssAfter=`    .bot-read-view .bot-card-list{list-style:none
     .command-bot-details{margin:0;border-radius:8px}
     .command-bot-overview .command-bot-details>summary{min-width:44px;white-space:nowrap}
     .command-bot-details p+p{margin-top:5px}
+    @media(min-width:360px) and (max-width:559px){.bot-overview-filters>div:nth-of-type(3){grid-column:1/-1}}
+    @media(max-width:350px){.command-bot-row{grid-template-columns:minmax(0,1fr)}.command-bot-overview .command-bot-jump{display:grid;grid-template-columns:minmax(0,1fr);justify-content:stretch;align-items:start}.command-bot-overview .command-bot-jump>span:first-child{min-width:0;overflow-wrap:normal;word-break:normal}.command-bot-pnl{max-width:100%;overflow-wrap:normal}}
 `;
 const botReadControls=`        <div class="bot-access-controls">
           <label for="bot-read-token">Asset-Watch-Link oder Meridian-Lesepasswort</label>

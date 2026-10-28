@@ -187,6 +187,21 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           assert.equal(fresh.cards,6);assert.equal(new Set(fresh.ids).size,6);assert.equal(fresh.duplicate,2);
           assert.equal(fresh.count,true);assert.equal(fresh.commandState,'fresh');assert.equal(fresh.lossButtons,3);
           assert.ok(fresh.cardHeights.every(height=>height>=44&&height<=150),JSON.stringify(fresh.cardGeometry));
+          if(size.width===390){
+            const category=await evaluate(`(()=>{
+              const select=document.getElementById('bot-category-filter');
+              const canvas=document.createElement('canvas'),context=canvas.getContext('2d');
+              context.font=getComputedStyle(select).font;
+              return {label:select.labels[0].innerText,value:select.value,
+                text:select.selectedOptions[0].textContent,width:select.getBoundingClientRect().width,
+                textWidth:context.measureText(select.selectedOptions[0].textContent).width,
+                gridColumn:getComputedStyle(select.parentElement).gridColumn};
+            })()`);
+            assert.deepEqual({label:category.label,value:category.value,text:category.text},
+              {label:'Kontraktart',value:'all',text:'Alle Kontraktarten'});
+            assert.ok(category.width>=category.textWidth+40,JSON.stringify(category));
+            assert.equal(category.gridColumn,'1 / -1',JSON.stringify(category));
+          }
           assert.equal(new Set(fresh.referenceLabels).size,6,'duplicate symbols have distinct accessible names');
           assert.equal(fresh.referencesVisible,false,'full references stay out of collapsed visual cards');
           assert.equal(fresh.tinyPositive,'+<0,01 USD');
@@ -197,6 +212,9 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           const zero=visibleAmounts.find(row=>row.id.endsWith('f'.repeat(20))).text;
           assert.match(zero,/P\/L laut Quelle\s*Nicht verfügbar/);
           assert.doesNotMatch(zero,/0,00 USD/);
+          const missing=visibleAmounts.find(row=>row.id.endsWith('d'.repeat(20))).text;
+          assert.match(missing,/P\/L laut Quelle\s*Nicht verfügbar/);
+          assert.doesNotMatch(missing,/0,00 USD/);
           const pnlContrast=await evaluate(`(()=>{
             const ratio=(foreground,background)=>{
               const channel=value=>{value/=255;return value<=0.04045?value/12.92:((value+0.055)/1.055)**2.4};
@@ -276,7 +294,9 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           }
           if(evidence){
             mkdirSync(evidence,{recursive:true});
-            await evaluate("document.querySelector('.bot-overview-filters').scrollIntoView({block:'start'})");
+            await evaluate("document.querySelector('#bot-read-root .bot-card').scrollIntoView({block:'start'})");
+            assert.ok(await evaluate(`[...document.querySelectorAll('#bot-read-root .bot-card')]
+              .filter(card=>{const rect=card.getBoundingClientRect();return rect.top<innerHeight&&rect.bottom>0}).length>0`));
             const image=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
             writeFileSync(join(evidence,`v11-bot-compact-${size.width}x${size.height}-bots.png`),
               Buffer.from(image.data,'base64'));
@@ -365,10 +385,19 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
             const root=document.getElementById('command-bot-overview');
             const rows=[...root.querySelectorAll('.command-bot-row')];
             return {overflow:document.documentElement.scrollWidth>innerWidth+1,
+              identities:rows.map(row=>{
+                const identity=row.firstElementChild.firstElementChild,range=document.createRange();
+                range.selectNodeContents(identity);
+                return {text:identity.innerText,width:identity.getBoundingClientRect().width,
+                  lines:range.getClientRects().length};
+              }),
               rowHeights:rows.map(row=>row.getBoundingClientRect().height),
               actionHeights:[...root.querySelectorAll('button,summary')].map(node=>node.getBoundingClientRect().height)};
           })()`);
           assert.equal(commandLayout.overflow,false,JSON.stringify(commandLayout));
+          if(size.width===320)assert.ok(commandLayout.identities.every(identity=>
+            identity.text.includes(' · ')&&identity.width>=160&&identity.lines<=2),
+            JSON.stringify(commandLayout.identities));
           assert.ok(commandLayout.actionHeights.every(height=>height>=43.99),JSON.stringify(commandLayout));
           let commandLargeText=null;
           if(size.width===320){
@@ -381,13 +410,27 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
               });
               const rows=[...root.querySelectorAll('.command-bot-row')];
               return {overflow:document.documentElement.scrollWidth>innerWidth+1,
-                overlap:rows.some(row=>row.firstElementChild.getBoundingClientRect().right>
-                  row.lastElementChild.getBoundingClientRect().left+1),
+                overlap:rows.some(row=>{
+                  const button=row.firstElementChild.getBoundingClientRect();
+                  const details=row.lastElementChild.getBoundingClientRect();
+                  return button.left<details.right-1&&button.right>details.left+1&&
+                    button.top<details.bottom-1&&button.bottom>details.top+1;
+                }),
+                identities:rows.map(row=>{
+                  const identity=row.firstElementChild.firstElementChild,range=document.createRange();
+                  range.selectNodeContents(identity);
+                  return {text:identity.innerText,width:identity.getBoundingClientRect().width,
+                    lines:range.getClientRects().length,detailsTop:row.lastElementChild.getBoundingClientRect().top,
+                    buttonBottom:row.firstElementChild.getBoundingClientRect().bottom};
+                }),
                 rowHeights:rows.map(row=>row.getBoundingClientRect().height),
                 actionHeights:[...root.querySelectorAll('button,summary')].map(node=>node.getBoundingClientRect().height)};
             })()`);
             assert.equal(commandLargeText.overflow,false,JSON.stringify(commandLargeText));
             assert.equal(commandLargeText.overlap,false,JSON.stringify(commandLargeText));
+            assert.ok(commandLargeText.identities.every(identity=>identity.text.includes(' · ')&&
+               identity.width>=160&&identity.lines<=2&&identity.detailsTop>=identity.buttonBottom-1),
+               JSON.stringify(commandLargeText.identities));
             assert.ok(commandLargeText.actionHeights.every(height=>height>=43.99),JSON.stringify(commandLargeText));
           }
           if(evidence&&commandLargeText){

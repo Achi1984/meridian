@@ -230,6 +230,8 @@
     .command-bot-details{margin:0;border-radius:8px}
     .command-bot-overview .command-bot-details>summary{min-width:44px;white-space:nowrap}
     .command-bot-details p+p{margin-top:5px}
+    @media(min-width:360px) and (max-width:559px){.bot-overview-filters>div:nth-of-type(3){grid-column:1/-1}}
+    @media(max-width:350px){.command-bot-row{grid-template-columns:minmax(0,1fr)}.command-bot-overview .command-bot-jump{display:grid;grid-template-columns:minmax(0,1fr);justify-content:stretch;align-items:start}.command-bot-overview .command-bot-jump>span:first-child{min-width:0;overflow-wrap:normal;word-break:normal}.command-bot-pnl{max-width:100%;overflow-wrap:normal}}
     #app[hidden],#app-access-gate[hidden]{display:none!important}
     .app-access-gate{min-height:100vh;min-height:100dvh;display:grid;place-items:center;padding:24px max(16px,env(safe-area-inset-left,0px))}
     .app-access-card{width:min(100%,440px);padding:24px;border:1px solid #39516b;border-radius:18px;background:linear-gradient(160deg,#172337,#111b29);box-shadow:0 12px 30px #00000025}

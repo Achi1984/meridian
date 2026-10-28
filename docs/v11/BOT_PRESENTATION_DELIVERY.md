@@ -10,7 +10,9 @@ count semantics, and read-only behavior are unchanged.
 ## Synthetic visual comparison
 
 Before and after images use the same six-bot synthetic fixture, including
-duplicate BTC symbols, unavailable and zero P/L, and a tiny nonzero P/L.
+duplicate BTC symbols, negative P/L, missing and zero-as-unconfirmed P/L, and a
+tiny nonzero P/L. The refreshed after images show the card list; the original
+before images are unchanged.
 
 | Viewport | Before | After |
 | --- | --- | --- |
@@ -18,6 +20,11 @@ duplicate BTC symbols, unavailable and zero P/L, and a tiny nonzero P/L.
 | 390×844 | [before](evidence/b11-bots-presentation/before-390x844.png) | [after](evidence/b11-bots-presentation/after-390x844.png) |
 
 [After at 320×568 with enlarged text](evidence/b11-bots-presentation/after-320x568-enlarged-text.png)
+
+At 320px, Command rows stack the identity, signed P/L, and native Details
+disclosure. The identity remains on one rendered line at normal and 1.35×
+descendant text sizes; the 390px contract-type filter gives the full selected
+“Alle Kontraktarten” option its own grid row.
 
 The 1.35× browser check scales computed font sizes only on descendants of the
 Bot cards and Command overview; it does not enlarge the whole page or global
@@ -46,10 +53,12 @@ preview remains a draft.
 
 [Command at 320×568 with 1.35× text](evidence/b11-bots-presentation/command-320x568-enlarged-text.png)
 
-For the fixture's three negative-P/L Command rows, heights measured 61px at
-320px width, 46–61px at 375px, and 46px at 390px, 430px, and 1440px. At 320px
-with 1.35× text, the rows grew naturally to 153.56–179.88px without overlap or
-horizontal overflow; row controls remained at least 44px tall.
+For the fixture's three negative-P/L Command rows, heights measured 121px at
+320px width, 46–61px at 375px, and 46px at 390px, 430px, and 1440px. At 320px,
+identity text occupied 244px and one line. With 1.35× descendant text, rows
+grew naturally to 134.63px; identity remained one line and Details stayed below
+the jump button without overlap or horizontal overflow. Row controls remained
+at least 44px tall.
 
 Actual-shell Chromium checks passed at 320×568, 375×667, 390×844, 430×932
 and 1440×900. The largest collapsed card measured 148.39px at 320px width;
@@ -63,10 +72,10 @@ on new, locked, stale and error states.
 Focused validation commands and totals:
 
 - `node --test test/v11-bot-read-view.test.js` — 33 tests passed.
-- `node --test test/v11-b11-bot-cockpit-chrome.test.js` — 1 actual-shell
-  Chromium test passed, including five standard viewports and generated
-  20-bot runs at 320px and 390px.
-- `node --test test/v11-terminal-entry.test.js` — 3 tests passed, including
+- `CHROME_BIN=/usr/bin/chromium V11_B11_EVIDENCE_DIR=/tmp/m11-visual-evidence node --experimental-websocket test/v11-b11-bot-cockpit-chrome.test.js`
+  — 1 actual-shell Chromium test passed, including five standard viewports and
+  generated 20-bot runs at 320px and 390px.
+- `node --experimental-websocket test/v11-terminal-entry.test.js` — 3 tests passed, including
   five viewport runs and exact reversible source-delta checks.
 
 All screenshots and browser data are synthetic. These checks do not establish
