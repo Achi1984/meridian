@@ -1043,11 +1043,41 @@ process.stdout.write(JSON.stringify(runBatch({
 
     def test_path_timeout_kills_real_child_and_persists_timed_out_trial(self):
         started = time.monotonic()
-        result = self.run_fault("b" * 64, {"path_seconds": 0.15, "batch_seconds": 0.7})
-        self.assertEqual(result["state"], "timed_out")
-        self.assertEqual(result["reason"], "DEADLINE_EXCEEDED")
-        self.assertEqual(result["paths"][0]["state"], "started")
-        self.assertLess(time.monotonic() - started, 2)
+        original_popen = subprocess.Popen
+        children = []
+
+        def spawn(*args, **kwargs):
+            child = original_popen(*args, **kwargs)
+            if Path(args[0][-1]).resolve() == FAULT_ADAPTER.resolve():
+                children.append(child)
+            return child
+
+        with patch.object(supervisor.subprocess, "Popen", side_effect=spawn):
+            result = self.run_fault(
+                "b" * 64, {"path_seconds": 1.0, "batch_seconds": 4.0})
+        elapsed = time.monotonic() - started
+        paths = result.get("paths") if type(result) is dict else None
+        diagnostic = json.dumps({
+            "elapsed_seconds": round(elapsed, 3),
+            "state": result.get("state") if type(result) is dict else None,
+            "reason": result.get("reason") if type(result) is dict else None,
+            "path_count": len(paths) if type(paths) is list else None,
+        }, sort_keys=True, separators=(",", ":"))
+        self.assertLessEqual(len(diagnostic), 512)
+        self.assertEqual(result["state"], "timed_out", diagnostic)
+        self.assertEqual(result["reason"], "DEADLINE_EXCEEDED", diagnostic)
+        self.assertIsInstance(paths, list, diagnostic)
+        self.assertTrue(paths, diagnostic)
+        self.assertEqual(paths[0]["state"], "started", diagnostic)
+        self.assertEqual(len(children), 1, diagnostic)
+        self.assertIsNotNone(children[0].poll(), diagnostic)
+        current = journal.inspect(self.database, result["trialId"])
+        self.assertEqual((current["state"], current["attempts"]), ("timed_out", 1), diagnostic)
+        self.assertFalse(current["unresolved"], diagnostic)
+        self.assertEqual(current["paths"][0]["state"], "started", diagnostic)
+        self.assertEqual(journal.scheduler_tick(self.database, self.policy)["state"],
+                         "idle", diagnostic)
+        self.assertLess(elapsed, 2.9, diagnostic)
 
     def test_whole_batch_deadline_preempts_a_long_path(self):
         started = time.monotonic()
