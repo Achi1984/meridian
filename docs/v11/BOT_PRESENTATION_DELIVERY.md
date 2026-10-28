@@ -34,8 +34,10 @@ exact source timestamp and source/direction breakdown are in “Quelle & Zeit”
 Unknown fresh metadata remains explicitly “Unbekannt”, distinct from locked,
 stale, and unavailable states. Search, filters, reset, and refresh/lock controls
 precede the card list, so they remain reachable with large snapshots.
-No authentication/depot lifecycle, backend, cache-token, or network-read changes
-were made.
+No authentication/depot lifecycle, backend, or network-read changes were made.
+The coordinated presentation release advances the local M11 cache identity to
+`B15-M11` across all four entrypoints and the reachable 22-module graph; the
+preview remains a draft.
 
 | Viewport | Command capture |
 | --- | --- |

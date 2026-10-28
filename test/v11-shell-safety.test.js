@@ -45,7 +45,7 @@ test('A0: no live imports, network, credentials, orders or PWA bootstrap',()=>{
  assert.doesNotMatch(html,/<(?:img|base|object|embed|source|video|audio|link)\b|<meta[^>]*http-equiv=["']refresh|\bon[a-z]+\s*=|javascript:|url\s*\(/i);
  assert.equal(scripts.length,1,'navigation-only inline script');
  for(const module of ['app-access-bootstrap.js','bot-read-bootstrap.js','depot-read-bootstrap.js','strategy-workspace-bootstrap.js'])
-   assert.ok(html.includes(`<script type="module" src="./${module}?v=B14-M11"></script>`));
+   assert.ok(html.includes(`<script type="module" src="./${module}?v=B15-M11"></script>`));
  assert.equal((html.match(/<form\b/g)||[]).length,1,'one app-opening form');
  assert.equal((html.match(/type="password"/g)||[]).length,1,'one masked app password input');
  const withoutGate=html.replace(/<form id="app-access-form">[\s\S]*?<\/form>/,'')
