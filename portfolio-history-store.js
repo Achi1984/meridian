@@ -1,7 +1,7 @@
 // MERIDIAN v7.64 — Canonical Portfolio History
 // Private PostgreSQL persistence for one portfolio valuation basis.
 
-import { canonicalPortfolioSnapshot, authoritativePionexEquitySnapshot, PIONEX_EQUITY_AUTHORITY_MAX_AGE_MS } from './portfolio-data-contract.js';
+import { canonicalPortfolioSnapshot, authoritativePionexEquitySnapshot, PIONEX_EQUITY_AUTHORITY_MAX_AGE_MS, spotHistoryProvenanceComplete } from './portfolio-data-contract.js';
 
 export const PORTFOLIO_HISTORY_VERSION='7.64-CANONICAL-PORTFOLIO-HISTORY-V3';
 const num=v=>Number.isFinite(Number(v))?Number(v):null;
@@ -12,7 +12,7 @@ export function historySnapshot(data={},opts={}){
   const tradingAuthority=authoritativePionexEquitySnapshot(strictData,timestamp);
   const historyPortfolio={...strictPortfolio,manualVenueBalances:(Array.isArray(strictPortfolio.manualVenueBalances)?strictPortfolio.manualVenueBalances:[]).filter(x=>String(x?.venue||x?.name||'').trim().toLowerCase()!=='pionex'),pionexEquityUsd:tradingAuthority.found?tradingAuthority.value:null,pionexEquitySource:tradingAuthority.found?tradingAuthority.source:'MISSING',pionexEquityUpdatedAt:tradingAuthority.found?tradingAuthority.updatedAt:null};
   const base=canonicalPortfolioSnapshot({...strictData,portfolio:historyPortfolio},timestamp);
-  const cumulative=num(opts.cumulativeCashflowUsd??data?.portfolio?.cumulativeCashflowUsd),spotAuthorityComplete=base?.spotAuthority?.complete===true,tradingAuthorityComplete=tradingAuthority?.found===true&&tradingAuthority?.fresh===true,authorityComplete=spotAuthorityComplete&&tradingAuthorityComplete;
+  const cumulative=num(opts.cumulativeCashflowUsd??data?.portfolio?.cumulativeCashflowUsd),spotAuthorityComplete=base?.spotAuthority?.complete===true,tradingAuthorityComplete=tradingAuthority?.found===true&&tradingAuthority?.fresh===true,authorityComplete=spotAuthorityComplete&&tradingAuthorityComplete,priceCoverage=base?.priceCoverage||{},requiredSymbols=Array.isArray(priceCoverage.requiredSymbols)?priceCoverage.requiredSymbols:[],priceStatus=priceCoverage.complete?(requiredSymbols.length?'COMPLETE':'NO_REQUIRED_SYMBOLS'):'INCOMPLETE',spotPriceProvenance={version:'SPOT_PRICE_PROVENANCE_V1',captureAt:timestamp,status:priceStatus,fetchStatus:priceCoverage.fetchStatus||'UNKNOWN',fetchReason:priceCoverage.fetchReason??null,requiredSymbols,symbols:Object.fromEntries((Array.isArray(priceCoverage.symbols)?priceCoverage.symbols:[]).map(x=>[x.symbol,{price:x.price,source:x.source,sourceQuality:x.sourceQuality,fetchedAt:x.fetchedAt,providerObservedAt:x.providerObservedAt,valid:x.valid,reason:x.reason}]))};
   return{
     version:PORTFOLIO_HISTORY_VERSION,
     timestamp:base.timestamp,
@@ -25,14 +25,14 @@ export function historySnapshot(data={},opts={}){
     cashflowAdjustedTotalUsd:authorityComplete&&cumulative!=null?Math.round((base.totalUsd-cumulative)*100)/100:null,
     cumulativeCashflowUsd:cumulative,
     sourceRevision:Number.isInteger(data?.privateRevision)?data.privateRevision:null,
-    sourceStatus:{...base.sourceStatus,trading:tradingAuthorityComplete?'PIONEX_EQUITY':'MISSING',tradingFresh:tradingAuthorityComplete,tradingAuthorityVersion:tradingAuthorityComplete?'PIONEX_FRESH_V1':'MISSING',tradingSource:tradingAuthority?.source||'MISSING',tradingUpdatedAt:tradingAuthority?.updatedAt||null}
+    sourceStatus:{...base.sourceStatus,spotPriceProvenance,trading:tradingAuthorityComplete?'PIONEX_EQUITY':'MISSING',tradingFresh:tradingAuthorityComplete,tradingAuthorityVersion:tradingAuthorityComplete?'PIONEX_FRESH_V1':'MISSING',tradingSource:tradingAuthority?.source||'MISSING',tradingUpdatedAt:tradingAuthority?.updatedAt||null}
   };
 }
 
 export function canonicalHistoryPointComplete(point={}){
   const timestamp=num(point?.timestamp),spotUsd=num(point?.spotUsd),tradingUsd=num(point?.tradingUsd),totalUsd=num(point?.totalUsd),spotStatus=String(point?.sourceStatus?.spot||''),tradingStatus=String(point?.sourceStatus?.trading||''),tradingFresh=point?.sourceStatus?.tradingFresh===true,authorityVersion=String(point?.sourceStatus?.tradingAuthorityVersion||''),updatedRaw=point?.sourceStatus?.tradingUpdatedAt??null,updatedAt=updatedRaw==null||updatedRaw===''?null:(Number.isFinite(Number(updatedRaw))?Number(updatedRaw):Date.parse(String(updatedRaw))),source=String(point?.sourceStatus?.tradingSource||'');
   const provenanceFresh=Number.isFinite(updatedAt)&&timestamp!=null&&updatedAt<=timestamp+30000&&timestamp-updatedAt<=PIONEX_EQUITY_AUTHORITY_MAX_AGE_MS;
-  return timestamp!=null&&spotUsd!=null&&spotUsd>=0&&tradingUsd!=null&&tradingUsd>=0&&totalUsd!=null&&totalUsd>=0&&Math.abs(totalUsd-(spotUsd+tradingUsd))<=1&&spotStatus==='STRICT_AUTHORITY'&&tradingStatus==='PIONEX_EQUITY'&&tradingFresh&&authorityVersion==='PIONEX_FRESH_V1'&&source!=='MISSING'&&source!=='MISSING_OR_STALE'&&provenanceFresh;
+  return timestamp!=null&&spotUsd!=null&&spotUsd>=0&&tradingUsd!=null&&tradingUsd>=0&&totalUsd!=null&&totalUsd>=0&&Math.abs(totalUsd-(spotUsd+tradingUsd))<=1&&spotStatus==='STRICT_AUTHORITY'&&tradingStatus==='PIONEX_EQUITY'&&tradingFresh&&authorityVersion==='PIONEX_FRESH_V1'&&source!=='MISSING'&&source!=='MISSING_OR_STALE'&&provenanceFresh&&spotHistoryProvenanceComplete(point);
 }
 
 export async function ensurePortfolioHistorySchema(db){
@@ -96,6 +96,6 @@ export async function readPortfolioHistory(db,opts={}){
     FROM meridian_portfolio_history
     WHERE captured_at>=to_timestamp($1/1000.0) AND captured_at<=to_timestamp($2/1000.0)
     ORDER BY captured_at ASC LIMIT $3`,[now-rangeMs,now,limit]);
-  const normalized=normalizeHistoryRows(r.rows||[]),points=normalized.filter(canonicalHistoryPointComplete),excludedIncompletePoints=normalized.length-points.length;
-  return{version:PORTFOLIO_HISTORY_VERSION,source:'POSTGRES_CANONICAL_HISTORY',generatedAt:new Date(now).toISOString(),rangeMs,rawPointCount:normalized.length,excludedIncompletePoints,points};
+  const normalized=normalizeHistoryRows(r.rows||[]),points=normalized.filter(canonicalHistoryPointComplete),excludedIncompletePoints=normalized.length-points.length,unknownSpotPriceProvenancePoints=normalized.filter(x=>!x?.sourceStatus?.spotPriceProvenance).length;
+  return{version:PORTFOLIO_HISTORY_VERSION,source:'POSTGRES_CANONICAL_HISTORY',generatedAt:new Date(now).toISOString(),rangeMs,rawPointCount:normalized.length,excludedIncompletePoints,unknownSpotPriceProvenancePoints,points};
 }
