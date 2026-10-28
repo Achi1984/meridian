@@ -7,10 +7,12 @@ import {
 
 const ID='synthetic-test:paper-990:fixture-a';
 const limits=overrides=>({
-  maxCashCents:1000000n,
-  maxQuantityShares:3n,
+  maxInitialCashCents:1000000n,
+  maxQuantityPerFillShares:3n,
+  maxAggregateShares:10n,
   maxPriceCentsPerShare:100000n,
-  maxFeeCents:10000n,
+  maxFeePerFillCents:10000n,
+  maxAggregateFeesCents:50000n,
   maxEvents:10,
   maxAttempts:10,
   maxIdentityChars:128,
@@ -115,7 +117,10 @@ test('one fee is booked once and exact balances do not deduct it again at valuat
   assert.equal(h.account.costBasisCents,20000n);
   assert.equal(h.account.feesCents,100n);
   assert.deepEqual(h.feeIdentities,['fee:event:accounting-example']);
-  const marked=h.mark({priceCentsPerShare:11000n,markTimeMs:950});
+  const marked=h.mark({
+    syntheticIdentity:ID,markIdentity:'mark:example',
+    priceCentsPerShare:11000n,markTimeMs:950,
+  });
   assert.equal(marked.valuation,'AVAILABLE');
   assert.equal(marked.equityCents,101900n);
   assert.notEqual(marked.equityCents,101800n);
@@ -141,7 +146,7 @@ test('conservation failure rejects the entire commit without partial account or 
   };
   const before={account:h.account,stateIdentity:h.stateIdentity,receipts:h.receipts};
   const rejected=h.commit(claim,tampered);
-  assert.equal(rejected.reason,'BALANCE_INVARIANT');
+  assert.equal(rejected.reason,'PAYLOAD_INVALID');
   assert.equal(h.project(rejected).status,'REJECTED');
   assert.deepEqual({account:h.account,stateIdentity:h.stateIdentity,receipts:h.receipts},before);
 });
@@ -150,7 +155,10 @@ test('missing and stale marks project unavailable rather than zero or carry-forw
   const h=harness();
   const before={account:h.account,stateIdentity:h.stateIdentity,receipts:h.receipts};
   const missing=h.mark(null);
-  const stale=h.mark({priceCentsPerShare:12000n,markTimeMs:800});
+  const stale=h.mark({
+    syntheticIdentity:ID,markIdentity:'mark:stale',
+    priceCentsPerShare:12000n,markTimeMs:800,
+  });
   assert.equal(missing.status,'UNAVAILABLE');
   assert.equal(missing.reason,'MARK_UNAVAILABLE');
   assert.equal(missing.equityCents,null);
@@ -185,9 +193,9 @@ test('resolved historical fence cannot write through a stale writer',()=>{
   assert.equal(first.receipt.fenceToken,claim.fenceToken);
 });
 
-test('lost ACK returns UNKNOWN and exact same-fence lookup retrieves the original result only',()=>{
+test('lost ACK lookup is read-only and never authorizes dependent work',()=>{
   const h=harness();
-  const {claim,result:unknown}=commit(h,fill('event:lost-ack'),{ack:'LOST'});
+  const {claim,proposal,result:unknown}=commit(h,fill('event:lost-ack'),{ack:'LOST'});
   assert.equal(unknown.status,'UNKNOWN');
   const afterCommit={account:h.account,stateIdentity:h.stateIdentity,receipts:h.receipts,attempts:h.attempts};
   assert.equal(h.propose(fill('event:blocked-after-lost-ack')).reason,'RECONCILIATION_REQUIRED');
@@ -197,8 +205,12 @@ test('lost ACK returns UNKNOWN and exact same-fence lookup retrieves the origina
   assert.equal(recovered.status,'COMMITTED');
   assert.equal(recovered.lookupOnly,true);
   assert.equal(recovered.receipt.receiptIdentity,unknown.receiptIdentity);
-  const allowedProposal=h.propose(fill('event:after-exact-lookup'),{lookupProof:recovered});
-  assert.equal(allowedProposal.status,'PROPOSED');
+  assert.equal(h.lookup(unknown.receiptIdentity,claim.fenceToken).receipt.receiptIdentity,unknown.receiptIdentity);
+  assert.equal(h.propose(fill('event:after-lookup'),{lookupProof:recovered}).reason,'RECONCILIATION_REQUIRED');
+  assert.equal(h.claim(h.stateIdentity,{lookupProof:recovered}).reason,'RECONCILIATION_REQUIRED');
+  assert.equal(h.commit(claim,proposal,{lookupProof:recovered}).reason,'RECONCILIATION_REQUIRED');
+  const copiedProof={...recovered,receiptIdentity:unknown.receiptIdentity,fenceToken:claim.fenceToken};
+  assert.equal(h.propose(fill('event:copied-proof'),{lookupProof:copiedProof}).reason,'RECONCILIATION_REQUIRED');
   assert.deepEqual({account:h.account,stateIdentity:h.stateIdentity,receipts:h.receipts,attempts:h.attempts},afterCommit);
   assert.equal(h.project().status,'UNKNOWN');
 });
@@ -212,12 +224,13 @@ test('ambiguous UNKNOWN retains its fence and blocks dependent proposals and ret
   assert.equal(h.propose(fill('event:blocked')).reason,'RECONCILIATION_REQUIRED');
   assert.equal(h.claim(h.stateIdentity).reason,'RECONCILIATION_REQUIRED');
   assert.equal(h.lookup(unknown.receiptIdentity,claim.fenceToken).status,'UNKNOWN');
+  assert.equal(h.commit(claim,proposal,{lookupProof:{}}).reason,'RECONCILIATION_REQUIRED');
   assert.deepEqual({account:h.account,stateIdentity:h.stateIdentity,receipts:h.receipts,attempts:h.attempts},after);
   assert.equal(proposal.status,'PROPOSED');
 });
 
 test('exact configured bounds pass and limit plus one rejects atomically',()=>{
-  const h=harness({maxQuantityShares:3n,maxEvents:1});
+  const h=harness({maxQuantityPerFillShares:3n,maxAggregateShares:3n,maxEvents:1});
   const exact=commit(h,fill('event:at-limit',{quantityShares:3n,feeCents:0n}));
   assert.equal(exact.result.status,'COMMITTED');
   const before={account:h.account,stateIdentity:h.stateIdentity,receipts:h.receipts,attempts:h.attempts};
@@ -226,8 +239,107 @@ test('exact configured bounds pass and limit plus one rejects atomically',()=>{
   assert.deepEqual({account:h.account,stateIdentity:h.stateIdentity,receipts:h.receipts,attempts:h.attempts},before);
 });
 
+test('commit rejects proposal kind, identity, digest, output, fee, and harness tampering atomically',()=>{
+  const mutations=[
+    proposal=>({...proposal,kind:'NO_ACTION'}),
+    proposal=>({...proposal,eventIdentity:'event:forged'}),
+    proposal=>({...proposal,payloadDigest:'forged-digest'}),
+    proposal=>({...proposal,nextAccount:{...proposal.nextAccount,cashCents:proposal.nextAccount.cashCents+1n}}),
+    proposal=>({...proposal,feeIdentity:'fee:forged'}),
+    ()=>({}),
+  ];
+  for(const mutate of mutations){
+    const h=harness();
+    const proposal=h.propose(fill('event:tamper'));
+    const claim=h.claim(h.stateIdentity);
+    const before={
+      account:h.account,stateIdentity:h.stateIdentity,
+      receipts:h.receipts,attempts:h.attempts,
+      activeFence:h.project().activeFence,
+    };
+    const rejected=h.commit(claim,mutate(proposal));
+    assert.equal(rejected.status,'REJECTED');
+    assert.equal(rejected.reason,'PAYLOAD_INVALID');
+    assert.deepEqual({
+      account:h.account,stateIdentity:h.stateIdentity,
+      receipts:h.receipts,attempts:h.attempts,
+      activeFence:h.project().activeFence,
+    },before);
+  }
+  const owner=harness();
+  const foreign=harness();
+  const foreignProposal=foreign.propose(fill('event:foreign-proposal'));
+  const ownerClaim=owner.claim(owner.stateIdentity);
+  const before={account:owner.account,stateIdentity:owner.stateIdentity,receipts:owner.receipts};
+  assert.equal(owner.commit(ownerClaim,foreignProposal).reason,'PAYLOAD_INVALID');
+  assert.deepEqual({account:owner.account,stateIdentity:owner.stateIdentity,receipts:owner.receipts},before);
+});
+
+test('fixture bounds are copied and remain finite after caller mutates its limits object',()=>{
+  const supplied=limits({maxEvents:1,maxAggregateShares:3n});
+  const h=createSyntheticPaperHarness({
+    syntheticIdentity:ID,clock:()=>1000,initialCashCents:100000n,limits:supplied,
+  });
+  supplied.maxEvents=Infinity;
+  supplied.maxAggregateShares=1000000n;
+  supplied.maxPriceCentsPerShare=Infinity;
+  commit(h,{...fakeDecision('NO_ACTION'),eventIdentity:'event:one',syntheticIdentity:ID});
+  const before={account:h.account,stateIdentity:h.stateIdentity,receipts:h.receipts,attempts:h.attempts};
+  assert.equal(h.propose({
+    ...fakeDecision('NO_ACTION'),eventIdentity:'event:two',syntheticIdentity:ID,
+  }).reason,'BOUND_EXCEEDED');
+  assert.deepEqual({account:h.account,stateIdentity:h.stateIdentity,receipts:h.receipts,attempts:h.attempts},before);
+});
+
+test('synthetic identity and marks enforce identity, price, and timestamp bounds',()=>{
+  assert.throws(()=>createSyntheticPaperHarness({
+    syntheticIdentity:ID,clock:()=>1000,initialCashCents:100000n,
+    limits:limits({maxIdentityChars:10}),
+  }),/synthetic identity/);
+  const h=harness();
+  const before={account:h.account,stateIdentity:h.stateIdentity,receipts:h.receipts};
+  assert.equal(h.mark({
+    syntheticIdentity:ID,priceCentsPerShare:1000n,markTimeMs:1000,
+  }).reason,'MARK_UNAVAILABLE');
+  assert.equal(h.mark({
+    syntheticIdentity:ID,markIdentity:'mark:over-price',
+    priceCentsPerShare:100001n,markTimeMs:1000,
+  }).reason,'MARK_UNAVAILABLE');
+  assert.equal(h.mark({
+    syntheticIdentity:ID,markIdentity:'x'.repeat(129),
+    priceCentsPerShare:1000n,markTimeMs:1000,
+  }).reason,'MARK_UNAVAILABLE');
+  assert.equal(h.mark({
+    syntheticIdentity:ID,markIdentity:'mark:future',
+    priceCentsPerShare:1000n,markTimeMs:1005,
+  }).reason,'MARK_UNAVAILABLE');
+  assert.equal(h.mark({
+    syntheticIdentity:'synthetic-test:foreign',markIdentity:'mark:foreign',
+    priceCentsPerShare:1000n,markTimeMs:1000,
+  }).reason,'MARK_UNAVAILABLE');
+  assert.equal(h.mark({
+    syntheticIdentity:ID,markIdentity:'mark:at-price-limit',
+    priceCentsPerShare:100000n,markTimeMs:1000,
+  }).valuation,'AVAILABLE');
+  assert.equal(h.propose(fill('event:price-over',{priceCentsPerShare:100001n})).reason,'BOUND_EXCEEDED');
+  assert.deepEqual({account:h.account,stateIdentity:h.stateIdentity,receipts:h.receipts},before);
+});
+
+test('per-fill quantity and fee limits are distinct from aggregate account limits',()=>{
+  const h=harness({
+    maxQuantityPerFillShares:2n,maxAggregateShares:3n,
+    maxFeePerFillCents:100n,maxAggregateFeesCents:150n,
+  });
+  commit(h,fill('event:aggregate-one',{quantityShares:2n,feeCents:100n}));
+  const before={account:h.account,stateIdentity:h.stateIdentity,receipts:h.receipts,attempts:h.attempts};
+  assert.equal(h.propose(fill('event:aggregate-shares',{quantityShares:2n,feeCents:0n})).reason,'BOUND_EXCEEDED');
+  assert.equal(h.propose(fill('event:aggregate-fees',{quantityShares:1n,feeCents:51n})).reason,'BOUND_EXCEEDED');
+  assert.deepEqual({account:h.account,stateIdentity:h.stateIdentity,receipts:h.receipts,attempts:h.attempts},before);
+});
+
 test('NO_ACTION is explicit, committed as a bounded receipt, and has no account effect',()=>{
   const h=harness({maxProjectionReceipts:1});
+  commit(h,fill('event:prior-account-state'));
   const before=h.account;
   const actionProposal=fakeDecision('ACTION_PROPOSAL');
   const proposed=h.propose({
@@ -251,7 +363,7 @@ test('NO_ACTION is explicit, committed as a bounded receipt, and has no account 
   });
   assert.equal(second.result.receipt.kind,'NO_ACTION');
   const projection=h.project();
-  assert.equal(h.receipts,2);
+  assert.equal(h.receipts,3);
   assert.equal(projection.recentReceipts.length,1);
   assert.deepEqual(h.account,before);
 });

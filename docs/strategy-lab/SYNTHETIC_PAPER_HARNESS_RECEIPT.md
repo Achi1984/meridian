@@ -1,8 +1,9 @@
 # Synthetic Paper harness delivery receipt
 
 Implemented the isolated, test-only BigInt accounting model in
-`test-support/synthetic-paper/harness.mjs` with 13 Node acceptance tests in
-`test/synthetic-paper-harness.test.js`.
+[`test-support/synthetic-paper/harness.mjs`](../../test-support/synthetic-paper/harness.mjs)
+with 17 Node tests in
+[`test/synthetic-paper-harness.test.js`](../../test/synthetic-paper-harness.test.js).
 
 ## Exact fixture and deterministic example
 
@@ -11,8 +12,10 @@ cents-per-share. A fee is an integer USD-cent amount. Multiplication is exact
 (`whole shares × cents/share`); the fixture accepts no fractional shares and
 performs no rounding. These units and numbers are test data, not operating
 defaults. Every instance requires its own `synthetic-test:` identity, injected
-clock, and finite cash, price, fee, quantity, event, attempt, identity, mark-age,
-and projection bounds.
+clock, and a private copy of finite bounds. Per-fill quantity/fee and price
+limits are distinct from aggregate shares/fees, initial cash, event, attempt,
+identity-length, mark-age, and projection limits. Mutating the caller's original
+limits object cannot widen those bounds.
 
 The accounting example starts with **$1,000.00**, buys **2 shares at $100.00**
 with one **$1.00** fee, then marks at **$110.00**: cash is **$799.00**, holdings
@@ -28,12 +31,14 @@ node --check test-support/synthetic-paper/harness.mjs
 node --test test/synthetic-paper-harness.test.js
 ```
 
-Result: **13 tests passed, 0 failed**. The TAP run reported `# tests 13`,
-`# pass 13`, and `# fail 0`. Representative fixed outputs include
+Result: **17 tests passed, 0 failed**. The TAP run reported `# tests 17`,
+`# pass 17`, and `# fail 0`. Representative fixed outputs include
 `COMMITTED` for the valid accounting example, exact equity `101900n`,
 `LATE_OR_PAST_EVENT` for past/equal/unproven ordering, `MARK_UNAVAILABLE` for
-missing/stale valuation, `BOUND_EXCEEDED` at limit+1, and `UNKNOWN` for an
-ambiguous commit or lost acknowledgment.
+missing/stale/over-bound marks, `BOUND_EXCEEDED` at per-fill and aggregate
+limit+1, and `UNKNOWN` for an ambiguous commit or lost acknowledgment. Exact
+same-fence receipt lookup is read-only and does not permit proposals, claims, or
+commits afterward; copied or foreign proposals are rejected without mutation.
 
 ## Limits
 
