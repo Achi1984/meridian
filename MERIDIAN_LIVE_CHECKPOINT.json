@@ -111,7 +111,7 @@
       "sourceHead": "a7728788768125935d3036a867cab291064cf6df",
       "sourceBase": "1afdbf9e64435701f3903b17625441a19c2295ff",
       "sourceAuthorReceipt": {
-        "issue": 942,
+        "issue": 975,
         "commentId": 6478162174
       },
       "sourceEightImageReviewReceipt": {
@@ -144,12 +144,14 @@
           "pullRequest": 986,
           "mergeSha": "5d31a4807dc9e4b763a0e82a3834fcfc934e3b96",
           "premergeSafety": "40758174484: 2854/2854",
-          "claudeReceipt": "942/6479283548"
+          "claudeReceipt": "942/6479283548",
+          "historicalPostmergeSafety": "40760415196 FAILED: 2853/2854; path-start test assertion; underlying cause unproved"
         },
         {
           "pullRequest": 992,
           "mergeSha": "219c18572cc63f46cfc19377ef049fc057a49163",
           "completionReceipt": "942/6480518691",
+          "repairForHistoricalFailure": "test startup-margin repair only; underlying cause of 40760415196 remains unproved",
           "postchecks": "ALL_SUCCESS: Safety40767820482/job123096625869 (2854/2854), Runtime40767820503, Coordinator40767820710, Pages40767819761"
         }
       ],

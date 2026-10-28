@@ -9,10 +9,14 @@
 > #988 merged `d08a4db` (completion #6478568871, Claude #942/6478686922 and all
 > four postchecks successful; timing-only observability, no cause established);
 > #986 merged `5d31a48` (Claude #942/6479283548,
-> Safety40758174484 2854/2854); #992 merged `219c185` with the four checks above.
+> premerge Safety40758174484 2854/2854). Its distinct post-merge Safety
+> 40760415196 failed 2853/2854 on a path-start test assertion; the underlying
+> cause was not established. PR #992 later repaired the test's startup margin;
+> its separate successful completion receipt is #942/comment6480518691, not a
+> reclassification of the failed run. #992 merged `219c185` with the four checks above.
 > #975 is CLOSED UNMERGED and remains read-only source at head
 > `a7728788768125935d3036a867cab291064cf6df`, base
-> `1afdbf9e64435701f3903b17625441a19c2295ff`; author receipt #942/6478162174 and
+> `1afdbf9e64435701f3903b17625441a19c2295ff`; author receipt #975/comment6478162174 and
 > the eight-image review #942/6478219419 are source evidence only. Its sole
 > successor is #994 / draft PR #995, started from accepted main; no merge or
 > activation is claimed. Paper issue #993 remains IN_PROGRESS in its independent
