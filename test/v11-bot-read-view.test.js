@@ -143,6 +143,15 @@ test('mount is inactive, preserves controls and blocks repeated loading clicks',
   h.publish(fresh());assert.equal(refresh.getAttribute('aria-disabled'),'false');
   assert.equal(all(h.target,'button').find(node=>node.text==='Botansicht sperren'),lock);lock.click();assert.equal(h.calls.lock,1);assert.doesNotMatch(h.target.textContent,/BTC/);
 });
+test('generated Bots controls precede snapshot content and the card list',()=>{
+  const h=mounted();h.publish(fresh());
+  const section=h.target.children[0],filterIndex=section.children.findIndex(node=>node.className==='bot-overview-filters');
+  const contentIndex=section.children.findIndex(node=>node.contains(all(h.target,'ul')[0]));
+  const actionIndex=section.children.findIndex(node=>all(node,'button').some(button=>
+    ['Bots aktualisieren','Botansicht sperren'].includes(button.text)));
+  assert.ok(filterIndex>=0&&filterIndex<contentIndex,'search, filter, sort and reset are above cards');
+  assert.ok(actionIndex>=0&&actionIndex<contentIndex,'refresh and lock remain above cards');
+});
 test('lock clears UI even if client lock throws',()=>{
   const h=mounted({lock(){throw new Error('secret');}});h.publish(fresh());h.buttons[1].click();
   assert.match(h.target.textContent,/Gesperrt/);assert.doesNotMatch(h.target.textContent,/BTC|secret/);
@@ -377,14 +386,41 @@ test('Command equal-symbol equal-loss actions have distinct references and direc
   const target=root(),selected=[];
   renderCommandBotOverview(target,{status:'fresh',source:'PIONEX_BOT_API',snapshotAt:'2026-10-18T10:00:00Z',count:2,
     distribution:{long:1,short:1,neutral:0,unknown:0},losses:[
-      {ref:'a'.repeat(20),symbol:'BTC',direction:'long',pnl:'-25 USD'},
-      {ref:'b'.repeat(20),symbol:'BTC',direction:'short',pnl:'-25 USD'}]},ref=>selected.push(ref));
+      {ref:'a'.repeat(20),symbol:'BTC',direction:'long',pnl:'-25,00 USD',pnlDetail:'-25 USD',pnlTone:'negative'},
+      {ref:'b'.repeat(20),symbol:'BTC',direction:'short',pnl:'-25,00 USD',pnlDetail:'-25 USD',pnlTone:'negative'}]},ref=>selected.push(ref));
   const buttons=all(target,'button');
   assert.notEqual(buttons[0].textContent,buttons[1].textContent);
   assert.notEqual(buttons[0].getAttribute('aria-label'),buttons[1].getAttribute('aria-label'));
-  assert.match(buttons[0].textContent,/BTC · Long · Referenz a{20}/);
-  assert.match(buttons[1].textContent,/BTC · Short · Referenz b{20}/);
+  assert.match(buttons[0].textContent,/BTC · Long/);assert.match(buttons[0].textContent,/-25,00 USD/);
+  assert.match(buttons[1].textContent,/BTC · Short/);assert.match(buttons[1].textContent,/-25,00 USD/);
+  assert.doesNotMatch(buttons[0].textContent,/Referenz/);
+  assert.match(buttons[0].getAttribute('aria-label'),/Referenz a{20}/);
+  assert.match(buttons[1].getAttribute('aria-label'),/Referenz b{20}/);
+  assert.match(all(target,'details').find(node=>node.className==='command-bot-details').textContent,/Technische Referenz: a{20}/);
+  const detailNames=all(target,'summary').filter(node=>node.getAttribute('aria-label')?.startsWith('Details zu'));
+  assert.deepEqual(detailNames.map(node=>node.getAttribute('aria-label')),[
+    'Details zu BTC · Long · Referenz '+'a'.repeat(20),'Details zu BTC · Short · Referenz '+'b'.repeat(20)]);
+  assert.match(target.textContent,/18\.10\.2026, 10:00 UTC/);
+  assert.equal(all(target,'time')[0].textContent,'2026-10-18T10:00:00Z');
+  assert.equal(all(target,'time')[0].getAttribute('datetime'),'2026-10-18T10:00:00Z');
+  assert.match(target.textContent,/Quelle & Zeit/);assert.match(target.textContent,/Long 1 · Short 1 · Neutral 0 · Unbekannt 0/);
   buttons.forEach(button=>button.click());assert.deepEqual(selected,['a'.repeat(20),'b'.repeat(20)]);
+});
+test('Command keeps unavailable status distinct from unknown fresh metadata',()=>{
+  const target=root();
+  renderCommandBotOverview(target,{status:'fresh',source:'unknown',count:null,distribution:{},
+    snapshotAt:'invalid',losses:[]});
+  assert.equal(target.getAttribute('data-state'),'fresh');
+  assert.match(target.textContent,/Zeit unbekannt · Unbekannt Bots · nur lesend/);
+  assert.match(target.textContent,/Quelle: Unbekannt/);
+  assert.match(target.textContent,/Richtung: Long Unbekannt · Short Unbekannt · Neutral Unbekannt · Unbekannt Unbekannt/);
+  assert.match(target.textContent,/Keine bestätigten negativen P\/L-Werte/);
+  assert.equal(all(target,'time')[0].getAttribute('datetime'),null);
+  for(const status of ['locked','stale','unavailable']){
+    renderCommandBotOverview(target,{status});
+    assert.equal(target.getAttribute('data-state'),status);
+    assert.notEqual(target.textContent,'Zeit unbekannt · Unbekannt Bots · nur lesend');
+  }
 });
 
 

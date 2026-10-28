@@ -19,6 +19,30 @@ duplicate BTC symbols, unavailable and zero P/L, and a tiny nonzero P/L.
 
 [After at 320×568 with enlarged text](evidence/b11-bots-presentation/after-320x568-enlarged-text.png)
 
+## Command overview
+
+Command now shows compact rows with symbol/direction and signed two-decimal P/L;
+the reference and source-precision value are in each row's native disclosure.
+Snapshot time is localized German date/time with an explicit UTC suffix; the
+exact source timestamp and source/direction breakdown are in “Quelle & Zeit”.
+Unknown fresh metadata remains explicitly “Unbekannt”, distinct from locked,
+stale, and unavailable states. Search, filters, reset, and refresh/lock controls
+precede the card list, so they remain reachable with large snapshots.
+No authentication/depot lifecycle, backend, cache-token, or network-read changes
+were made.
+
+| Viewport | Command capture |
+| --- | --- |
+| 320×568 | [synthetic Command](evidence/b11-bots-presentation/command-320x568.png) |
+| 390×844 | [synthetic Command](evidence/b11-bots-presentation/command-390x844.png) |
+
+[Command at 320×568 with 1.35× text](evidence/b11-bots-presentation/command-320x568-enlarged-text.png)
+
+For the fixture's three negative-P/L Command rows, heights measured 61px at
+320px width, 46–61px at 375px, and 46px at 390px, 430px, and 1440px. At 320px
+with 1.35× text, the rows grew naturally to 153.56–179.88px without overlap or
+horizontal overflow; row controls remained at least 44px tall.
+
 Actual-shell Chromium checks passed at 320×568, 375×667, 390×844, 430×932
 and 1440×900. The largest collapsed card measured 148.39px at 320px width;
 maximums at 375px, 390px and 430px were 117.28px, and all cards measured

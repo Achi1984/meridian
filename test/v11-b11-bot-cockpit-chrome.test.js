@@ -203,16 +203,23 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
               .map(node=>ratio(getComputedStyle(node).color,getComputedStyle(node.closest('.bot-card')).backgroundColor));
           })()`);
           assert.ok(pnlContrast.length>=2&&pnlContrast.every(ratio=>ratio>=4.5),JSON.stringify(pnlContrast));
-          assert.match(fresh.command,/Lesestatus: aktueller Snapshot/);assert.match(fresh.command,/Richtung: Long 2 · Short 2 · Neutral 1 · Unbekannt 1/);
-          assert.match(fresh.command,/P\/L laut Quelle/);
+          assert.match(fresh.command,/6 Bots · nur lesend/);assert.match(fresh.command,/Quelle & Zeit/);
+          assert.match(fresh.command,/Bestätigte negative P\/L-Werte/);
+          const commandMetadata=await evaluate(`document.querySelector('#command-bot-overview .command-bot-metadata').innerText`);
+          assert.match(commandMetadata,/Quelle: Pionex Bot API · Richtung: Long 2 · Short 2 · Neutral 1 · Unbekannt 1/);
+          const exactCommandTimestamp=commandMetadata.match(/\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z/)?.[0];
+          assert.ok(exactCommandTimestamp);
+          assert.ok(fresh.command.includes(new Intl.DateTimeFormat('de-DE',{dateStyle:'medium',timeStyle:'short',
+            timeZone:'UTC'}).format(new Date(exactCommandTimestamp))+' UTC'),fresh.command);
           assert.ok(fresh.touch.every(([, ,height])=>height>=43.99),JSON.stringify(fresh.touch));
           assert.equal(fresh.leak,false);
           const lossNames=await evaluate(`[...document.querySelectorAll('#command-bot-overview button')].map(button=>({text:button.textContent,name:button.getAttribute('aria-label')}))`);
           assert.equal(new Set(lossNames.map(row=>row.text)).size,3,'distinct visible loss labels');
           assert.equal(new Set(lossNames.map(row=>row.name)).size,3,'distinct accessible loss labels');
+          assert.ok(lossNames.every(row=>!/[a-f0-9]{20}/.test(row.text)),'technical refs are not in primary rows');
           assert.match(lossNames[0].name,/BTCUSDT · Long · Referenz a{20}/);
           assert.match(lossNames[1].name,/BTCUSDT · Short · Referenz b{20}/);
-          assert.match(lossNames[0].name,/-25 USD/);assert.match(lossNames[1].name,/-25 USD/);
+          assert.match(lossNames[0].name,/-25,00 USD/);assert.match(lossNames[1].name,/-25,00 USD/);
           await assertPopulatedLayout('populated collapsed');
           // Native disclosure state follows botRef, not symbol, through local selection.
           await evaluate(`document.querySelector('#bot-card-${'a'.repeat(20)} summary').focus()`);
@@ -270,9 +277,11 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           }
           if(size.width===320){
             const normalHeights=await evaluate(`[...document.querySelectorAll('#bot-read-root .bot-card')].map(card=>card.getBoundingClientRect().height)`);
-            await evaluate(`document.querySelectorAll('#bot-read-root .bot-card *').forEach(node=>{
-              const size=parseFloat(getComputedStyle(node).fontSize);node.style.fontSize=(size*1.35)+'px';
-            })`);
+            await evaluate(`(()=>{
+              const nodes=[...document.querySelectorAll('#bot-read-root .bot-card *')];
+              const sizes=nodes.map(node=>parseFloat(getComputedStyle(node).fontSize));
+              nodes.forEach((node,index)=>{if(Number.isFinite(sizes[index]))node.style.fontSize=(sizes[index]*1.35)+'px';});
+            })()`);
             const enlarged=await evaluate(`(()=>{
               const cards=[...document.querySelectorAll('#bot-read-root .bot-card')];
               return {overflow:document.documentElement.scrollWidth>innerWidth+1,
@@ -329,11 +338,56 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           await evaluate(`document.querySelector('#nav [data-v="command"]').click()`);
           const commandTargets=await evaluate(`[...document.querySelectorAll('#command-bot-overview button')].map(b=>b.getBoundingClientRect().height)`);
           assert.ok(commandTargets.every(height=>height>=44),JSON.stringify(commandTargets));
+          await evaluate(`document.querySelector('#command-bot-overview .command-bot-details summary').focus()`);
+          await key('Enter','Enter',13);
+          assert.equal(await evaluate(`document.querySelector('#command-bot-overview .command-bot-details').open`),true);
+          assert.match(await evaluate(`document.querySelector('#command-bot-overview .command-bot-details').innerText`),
+            /Technische Referenz: a{20}[\s\S]*P\/L laut Quelle · Originalwert: -25 USD/);
+          await key('Enter','Enter',13);
+          await evaluate(`document.querySelector('#command-bot-overview .command-bot-metadata summary').focus()`);
+          await key('Enter','Enter',13);
+          assert.match(await evaluate(`document.querySelector('#command-bot-overview .command-bot-metadata').innerText`),
+            /Snapshot-Zeit exakt \(UTC\):\s*\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z/);
+          await key('Enter','Enter',13);
           if(evidence){
             await evaluate("document.getElementById('command-bot-overview').scrollIntoView({block:'start'})");
             const image=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
             writeFileSync(join(evidence,`v11-bot-compact-${size.width}x${size.height}-command.png`),
               Buffer.from(image.data,'base64'));
+          }
+          const commandLayout=await evaluate(`(()=>{
+            const root=document.getElementById('command-bot-overview');
+            const rows=[...root.querySelectorAll('.command-bot-row')];
+            return {overflow:document.documentElement.scrollWidth>innerWidth+1,
+              rowHeights:rows.map(row=>row.getBoundingClientRect().height),
+              actionHeights:[...root.querySelectorAll('button,summary')].map(node=>node.getBoundingClientRect().height)};
+          })()`);
+          assert.equal(commandLayout.overflow,false,JSON.stringify(commandLayout));
+          assert.ok(commandLayout.actionHeights.every(height=>height>=43.99),JSON.stringify(commandLayout));
+          let commandLargeText=null;
+          if(size.width===320){
+            commandLargeText=await evaluate(`(()=>{
+              const root=document.getElementById('command-bot-overview');
+              const nodes=[...root.querySelectorAll('*')];
+              const sizes=nodes.map(node=>parseFloat(getComputedStyle(node).fontSize));
+              nodes.forEach((node,index)=>{
+                if(Number.isFinite(sizes[index]))node.style.fontSize=(sizes[index]*1.35)+'px';
+              });
+              const rows=[...root.querySelectorAll('.command-bot-row')];
+              return {overflow:document.documentElement.scrollWidth>innerWidth+1,
+                overlap:rows.some(row=>row.firstElementChild.getBoundingClientRect().right>
+                  row.lastElementChild.getBoundingClientRect().left+1),
+                rowHeights:rows.map(row=>row.getBoundingClientRect().height),
+                actionHeights:[...root.querySelectorAll('button,summary')].map(node=>node.getBoundingClientRect().height)};
+            })()`);
+            assert.equal(commandLargeText.overflow,false,JSON.stringify(commandLargeText));
+            assert.equal(commandLargeText.overlap,false,JSON.stringify(commandLargeText));
+            assert.ok(commandLargeText.actionHeights.every(height=>height>=43.99),JSON.stringify(commandLargeText));
+          }
+          if(evidence&&commandLargeText){
+            const enlargedShot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+            writeFileSync(join(evidence,`v11-bot-compact-${size.width}x${size.height}-command-enlarged-text.png`),
+              Buffer.from(enlargedShot.data,'base64'));
           }
           await evaluate('window.scrollTo(0,0)');
           await evaluate(`document.querySelector('#command-bot-overview button').focus()`);
@@ -440,7 +494,7 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           return {width:size.width,height:size.height,mixedRows:fresh.cards,
             collapsedCardHeights:fresh.cardHeights,requests:10,
             filtersNoRequest:true,commandJumpFocused:jump.focused,statesCleared:true,
-            overflow:finalLayout.overflow,controls44px:fresh.touch};
+            overflow:finalLayout.overflow,controls44px:fresh.touch,commandLayout,commandLargeText};
         },size.height);
         console.log('V11_B11_SIZE',`${size.width}x${size.height}`,JSON.stringify(measurements));
       }

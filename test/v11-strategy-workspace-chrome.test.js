@@ -1076,9 +1076,9 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         }
 
         await evaluate(`document.querySelector('#nav button[data-v="command"]').click()`);
-        await evaluate(`document.querySelector('.command-open-strategies').click()`);
+        await evaluate(`document.querySelector('#nav button[data-v="strategies"]').click()`);
         assert.equal(await evaluate(`document.querySelector('.view.active').id`),'view-strategies',
-          'Command offers direct native navigation to strategies');
+          'the consolidated navigation opens strategies from Command');
         assert.equal(await evaluate(`document.documentElement.scrollWidth<=innerWidth+1`),true);
         const requestPaths=hosted.requests.map(request=>request.path);
         assert.ok(!requestPaths.some(path=>/\/v10\/|\/api\/|\/klines|\/ticker|\/market/i.test(path)));

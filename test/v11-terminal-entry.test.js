@@ -420,6 +420,19 @@ const botPresentationCssAfter=`    .bot-read-view .bot-card-list{list-style:none
     .bot-read-view [hidden]{display:none!important}
     @media(min-width:360px){.bot-overview-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.bot-overview-filters>button{grid-column:1/-1}}
     @media(min-width:760px){.bot-overview-filters{grid-template-columns:repeat(4,minmax(0,1fr))}}
+    .command-bot-summary{font-size:13px;font-weight:650}
+    .command-bot-metadata{margin:6px 0;border-radius:10px}
+    .command-bot-metadata>summary,.command-bot-details>summary{min-height:44px;padding:8px 10px;font-size:12px;letter-spacing:0}
+    .command-bot-metadata>div,.command-bot-details>div{padding:8px 10px;border-top:1px solid var(--line)}
+    .command-bot-metadata p,.command-bot-details p{font-size:12px;line-height:1.5;overflow-wrap:anywhere}
+    .command-bot-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:6px}
+    .command-bot-overview .command-bot-jump{display:flex;align-items:center;justify-content:space-between;text-align:left;gap:8px;width:100%;min-width:0;min-height:44px;font-size:13px;font-weight:650}
+    .command-bot-pnl{flex:none;font-variant-numeric:tabular-nums}
+    .command-bot-pnl.bot-pnl-negative{color:#ff9b9b}
+    .command-bot-pnl.bot-pnl-positive{color:#6ee7b7}
+    .command-bot-details{margin:0;border-radius:8px}
+    .command-bot-overview .command-bot-details>summary{min-width:44px;white-space:nowrap}
+    .command-bot-details p+p{margin-top:5px}
 `;
 const botReadControls=`        <div class="bot-access-controls">
           <label for="bot-read-token">Asset-Watch-Link oder Meridian-Lesepasswort</label>
@@ -638,7 +651,66 @@ const b14Deltas=[
    '<script type="module" src="./bot-read-bootstrap.js?v=B14"></script>\n<script type="module" src="./depot-read-bootstrap.js?v=B14"></script>\n<script type="module" src="./strategy-workspace-bootstrap.js?v=B14"></script>\n'
  ]
 ];
+const commandPresentationDeltas=[
+  [
+    `      <div class="details-body">
+        <p>Kein aktuelles Betriebssignal verbunden. Ob ein Agent arbeitet oder warum er wartet, ist hier nicht feststellbar.</p>
+        <p><b>Aktuelle Aufgabe:</b> Nicht verifiziert.</p>
+        <p><b>Letztes Lebenszeichen:</b> Nicht verfügbar. Diese Anzeige überwacht den Betrieb noch nicht.</p>
+        <p><b>Diese Vorschau · B14:</b> Research Results Explorer für 44 Producerpfade mit Filtern, Zweipfadvergleich und gelieferten Quartalsrenditen. UNVERIFIED · Herkunft nicht bestätigt. Keine neuen Research-Ergebnisse oder Paper-/Live-Aktivitäten.</p>
+        <p><b>Vorige Vorschau · B11:</b> Manuell geladene Bot-Snapshots filtern, ordnen und mit Command teilen. Nur bestätigte Quellwerte; Sprung zur passenden Karte. Draft, Geräteabnahme ausstehend.</p>
+        <p><b>Vorige Vorschau · B10:</b> Kompakter Header und klarere Command-Hierarchie. Layout-Entwurf ohne neue Datenanbindung; Integration und Geräteabnahme ausstehend.</p>
+        <p><b>Vorige Vorschau · B9:</b> Geladene Depotbewertung auch in Command. Verlauf mit Zeitachse und ausgewiesenem Messzeitraum. Kontrollierte Testvorschau · Geräteabnahme ausstehend. <a href="https://github.com/Achi1984/meridian/issues/766">B9-Umfang #766</a>.</p>
+        <p><b>Zuletzt belegte UI-Änderung · B1:</b> Botübersicht mit Quellen- und Risikostatus. Integriert am <time datetime="2026-10-11T19:30:28Z">11.10.2026, 21:30 Uhr Wien</time> · <a href="https://github.com/Achi1984/meridian/pull/702">Änderungsnachweis #702</a>.</p>
+        <p>Der Versionsstand ist kein Lebenszeichen eines Entwicklungsagenten.</p>
+      </div>`,
+    `      <div class="details-body">
+        <p>Kein aktuelles Betriebssignal. <b>Aktuelle Aufgabe:</b> Nicht verifiziert. <b>Letztes Lebenszeichen:</b> Nicht verfügbar. Diese Anzeige überwacht den Betrieb nicht.</p>
+        <p><b>Diese Vorschau · B14:</b> Research-Ausgaben unverifiziert. <b>Vorige Vorschau · B11:</b> Manuelle Bot-Snapshots; Testvorschau · Geräteabnahme ausstehend.</p>
+        <p><b>Vorige Vorschau · B10:</b> Kompaktes Layout. <b>Vorige Vorschau · B9:</b> Depotbewertung und Verlauf · <a href="https://github.com/Achi1984/meridian/issues/766">B9-Umfang #766</a>. Kontrollierte Testvorschau · Geräteabnahme ausstehend.</p>
+        <p><b>Zuletzt belegte UI-Änderung · B1:</b> <time datetime="2026-10-11T19:30:28Z">11.10.2026, 21:30 Uhr Wien</time> · <a href="https://github.com/Achi1984/meridian/pull/702">Nachweis #702</a>. Der Versionsstand ist kein Lebenszeichen.</p>
+      </div>`
+  ],
+  [
+    `      <section class="card decision" data-decision-owner="preview" aria-label="Jetzt wichtig">
+        <div class="card-head"><span class="card-kicker">JETZT WICHTIG</span><span class="limited">UNGEKLÄRT</span></div>
+        <h2>Risiko ungeklärt</h2>
+        <p>Es wird keine Aussage über Liquidationsgefahr oder Handelsschutz getroffen. Fehlende Daten sind keine Entwarnung.</p>
+      </section>`,
+    `      <section class="card decision" data-decision-owner="preview" aria-label="Jetzt wichtig">
+        <div class="card-head"><span class="card-kicker">RISIKOSTATUS</span><span class="limited">UNBEKANNT</span></div>
+        <h2>Keine bestätigte Risikoprüfung</h2>
+        <p>Fehlende Daten sind keine Entwarnung.</p>
+      </section>`
+  ],
+  [
+    `        <p>12 Hypothesen im Entwurfsregister, vier Arena-Modelle mit historischen Diagnosen sowie H9 mit BLOCKED_DATA und B1-7 als getrennter Entwicklungskandidat ohne Ergebnisse. Kein laufendes Paper.</p>
+        <a class="command-open-strategies" href="#view-strategies" data-open-strategies>Strategien in M11 öffnen</a>`,
+    `        <p>12 Hypothesen · 4 Arena-Modelle · H9 blockiert · B1-7 ohne Ergebnisse. Kein laufender Paper-Betrieb, keine Handelsaktivität.</p>`
+  ],
+  [
+    `        <summary><span>Einordnung &amp; Datenlage</span><span aria-hidden="true">+</span></summary>
+        <div class="details-body">
+          <p>Die im Depot manuell geladene Bewertung erscheint auch hier. Bot-Snapshots werden separat im Bots-Tab geladen.</p>
+          <p>Keine Handlungsempfehlung · Keine automatische Order · Manueller Bot-Lesezugang separat.</p>
+        </div>
+      </details>
+      <div class="section-title"><h2>Risikomonitor</h2><small>KEINE VERIFIZIERTE ABDECKUNG</small></div>
+      <section class="card card-muted" aria-label="Risikostatus unbekannt">
+        <div class="empty-state"><div class="empty-symbol" aria-hidden="true">—</div><div><b>Risikostatus nicht bestimmbar</b><p>Risikoprüfungen werden erst nach der sicheren Anbindung gültiger Daten sichtbar. Fehlende Daten sind keine Entwarnung.</p></div></div>
+      </section>`,
+    `        <summary><span>Einordnung &amp; Grenzen</span><span aria-hidden="true">+</span></summary>
+        <div class="details-body">
+          <p>Depot- und Botdaten werden getrennt manuell geladen. Nur lesend, keine Handlungsempfehlung oder automatische Order. Keine Aussage über Liquidationsgefahr oder Handelsschutz.</p>
+        </div>
+      </details>`
+  ]
+];
 function restoreB2(source){
+  for(const [before,after] of commandPresentationDeltas){
+    assert.equal(source.split(after).length-1,1,'one exact concise Command presentation delta');
+    source=source.replace(after,before);
+  }
  for(const [before,after] of botPresentationDeltas){
    assert.equal(source.split(after).length-1,1,'one exact compact Bots CSS delta');
    source=source.replace(after,before);

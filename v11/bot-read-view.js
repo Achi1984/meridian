@@ -72,7 +72,8 @@ function projection(state, filters = {}) {
         liquidation:formatExact(bot.metrics?.liquidationPrice),
         takeProfit:formatExact(bot.metrics?.takeProfit),stopLoss:formatExact(bot.metrics?.stopLoss)};
     });
-    const losses=overview.losses.map(loss=>({ref:loss.ref,symbol:loss.symbol,direction:loss.direction,pnl:valueLabel(loss.pnl,' USD')}));
+    const losses=overview.losses.map(loss=>({ref:loss.ref,symbol:loss.symbol,direction:loss.direction,
+      pnl:formatMoney(loss.pnl,'USD',true),pnlDetail:formatExact(loss.pnl,' USD'),pnlTone:loss.pnl<0?'negative':'positive'}));
     return {status,count:overview.count,distribution:overview.distribution,bots,losses,
       snapshotAt:overview.snapshotAt,source:overview.source};
   } catch { return {status:'unavailable',bots:[]}; }
@@ -191,29 +192,55 @@ export function renderCommandBotOverview(root, data, onJump) {
     return;
   }
   const sources={PIONEX_BOT_API:'Pionex Bot API',PIONEX_WALLET_BOT_DETAIL:'Pionex Wallet Botdetail'};
-  root.append(element(document,'p','Lesestatus: aktueller Snapshot · Quelle: '+
-    (Object.hasOwn(sources,data.source)?sources[data.source]:'Unbekannt')));
-  root.append(element(document,'p',data.count+' Bots im Snapshot · nur lesend'));
-  const stamp=element(document,'time',data.snapshotAt);
-  stamp.setAttribute('datetime',data.snapshotAt);
-  root.append(element(document,'p','Snapshot-Zeit (UTC): '),stamp);
-  root.append(element(document,'p','Richtung: Long '+data.distribution.long+
-    ' · Short '+data.distribution.short+' · Neutral '+data.distribution.neutral+
-    ' · Unbekannt '+data.distribution.unknown));
+  const timestamp=typeof data.snapshotAt==='string'&&Number.isFinite(Date.parse(data.snapshotAt))
+    ?data.snapshotAt:null;
+  const localizedTime=timestamp?new Intl.DateTimeFormat('de-DE',{dateStyle:'medium',timeStyle:'short',
+    timeZone:'UTC'}).format(new Date(timestamp))+' UTC':'Zeit unbekannt';
+  const count=Number.isSafeInteger(data.count)&&data.count>=0?data.count:'Unbekannt';
+  const distribution=data.distribution||{};
+  const distributionCount=key=>Number.isSafeInteger(distribution[key])&&distribution[key]>=0
+    ?distribution[key]:'Unbekannt';
+  const source=Object.hasOwn(sources,data.source)?sources[data.source]:'Unbekannt';
+  const summary=element(document,'p',localizedTime+' · '+count+' Bots · nur lesend');
+  summary.className='command-bot-summary';root.append(summary);
+  const metadata=element(document,'details');metadata.className='command-bot-metadata';
+  const metadataSummary=element(document,'summary','Quelle & Zeit');
+  metadataSummary.setAttribute('aria-label','Quelle und exakter Snapshot-Zeitpunkt');
+  metadata.append(metadataSummary);
+  const metadataBody=element(document,'div');
+  metadataBody.append(element(document,'p','Quelle: '+source+' · Richtung: Long '+distributionCount('long')+
+    ' · Short '+distributionCount('short')+' · Neutral '+distributionCount('neutral')+
+    ' · Unbekannt '+distributionCount('unknown')));
+  const exactTimestamp=element(document,'time',timestamp||'Zeit unbekannt');
+  if(timestamp)exactTimestamp.setAttribute('datetime',timestamp);
+  metadataBody.append(element(document,'p','Snapshot-Zeit exakt (UTC): '),exactTimestamp);
+  metadata.append(metadataBody);root.append(metadata);
   if(!data.losses.length)root.append(element(document,'p','Keine bestätigten negativen P/L-Werte.'));
   else{
-    root.append(element(document,'p','P/L laut Quelle · keine Risikorangfolge.'));
+    root.append(element(document,'p','Bestätigte negative P/L-Werte · keine Risikorangfolge.'));
     const losses=element(document,'ul');
-    losses.setAttribute('aria-label','Größte ausgewiesene Verluste laut Quelle');
+    losses.setAttribute('aria-label','Bestätigte negative P/L-Werte laut Quelle');
     for(const loss of data.losses){
       const direction=ownLabel({long:'Long',short:'Short',neutral:'Neutral'},loss.direction);
-      const identity=loss.symbol+' · '+direction+' · Referenz '+loss.ref;
-      const item=element(document,'li'),button=element(document,'button',
-        identity+' · P/L laut Quelle: '+loss.pnl);
+      const identity=loss.symbol+' · '+direction;
+      const item=element(document,'li'),row=element(document,'div'),button=element(document,'button');
+      row.className='command-bot-row';
+      button.className='command-bot-jump';
+      button.append(element(document,'span',identity));
+      const amount=element(document,'strong',loss.pnl);
+      amount.className='command-bot-pnl bot-pnl-'+(loss.pnlTone||'negative');
+      button.append(amount);
       button.setAttribute('type','button');
-      button.setAttribute('aria-label',identity+' öffnen · P/L laut Quelle: '+loss.pnl);
+      button.setAttribute('aria-label',identity+' · Referenz '+loss.ref+' öffnen · P/L laut Quelle: '+loss.pnl);
       button.addEventListener('click',()=>onJump(loss.ref));
-      item.append(button);losses.append(item);
+      const details=element(document,'details');details.className='command-bot-details';
+      const detailSummary=element(document,'summary','Details');
+      detailSummary.setAttribute('aria-label','Details zu '+identity+' · Referenz '+loss.ref);
+      details.append(detailSummary);
+      const body=element(document,'div');
+      body.append(element(document,'p','Technische Referenz: '+loss.ref));
+      body.append(element(document,'p','P/L laut Quelle · Originalwert: '+loss.pnlDetail));
+      details.append(body);row.append(button,details);item.append(row);losses.append(item);
     }
     root.append(losses);
   }
@@ -254,7 +281,7 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
   const refresh=element(document,'button','Bots aktualisieren'),lock=element(document,'button','Botansicht sperren');
   refresh.id='bot-read-refresh';lock.id='bot-read-lock';
   refresh.setAttribute('type','button');lock.setAttribute('type','button');
-  controls.append(refresh,lock);section.append(element(document,'h3','Meine Pionex Bots'),content,filterPanel,controls);
+  controls.append(refresh,lock);section.append(element(document,'h3','Meine Pionex Bots'),filterPanel,controls,content);
   root.replaceChildren(section);
   let disposed=false,client,action=0,latestState={status:'locked'},previousSelection=null;
   const clearPreviousSelection=()=>{previousSelection=null;returnSelection.hidden=true;};
