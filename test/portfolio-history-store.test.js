@@ -110,6 +110,21 @@ test('canonical history completeness requires both authority components and arit
     const invalid={...base,sourceStatus:{...base.sourceStatus,spotPriceProvenance:{...base.sourceStatus.spotPriceProvenance,status:'COMPLETE',requiredSymbols:symbols,symbols:Object.fromEntries(symbols.map(symbol=>[symbol,{...row}]))}}};
     assert.equal(canonicalHistoryPointComplete(invalid),false,`noncanonical required symbols: ${symbols.join(',')}`);
   }
+  for(const symbol of [null,42,false,{}]){
+    const key=String(symbol),invalid={...base,sourceStatus:{...base.sourceStatus,spotPriceProvenance:{...base.sourceStatus.spotPriceProvenance,status:'COMPLETE',requiredSymbols:[symbol],symbols:{[key]:{...row}}}}};
+    assert.equal(canonicalHistoryPointComplete(invalid),false,`malformed required symbol: ${key}`);
+  }
+});
+
+test('history reader excludes malformed persisted symbols while retaining canonical rows',async()=>{
+  const timestamp=1_000_000,validStatus={spot:'STRICT_AUTHORITY',spotPriceProvenance:spotProvenance(timestamp,timestamp-100),trading:'PIONEX_EQUITY',tradingFresh:true,tradingAuthorityVersion:'PIONEX_FRESH_V1',tradingSource:'PIONEX_WALLET_READ_API',tradingUpdatedAt:timestamp-100};
+  const malformedStatus={...validStatus,spotPriceProvenance:{...validStatus.spotPriceProvenance,requiredSymbols:[null],symbols:{null:{price:100,source:'BINANCE_SPOT',sourceQuality:'PUBLIC_LIVE_FETCH',fetchedAt:timestamp-100,providerObservedAt:null,valid:true,reason:'FRESH'}}}};
+  const rows=[malformedStatus,validStatus].map((source_status,index)=>({captured_at:new Date(timestamp+index).toISOString(),spot_usd:100,trading_usd:50,total_usd:150,cashflow_adjusted_total_usd:null,cumulative_cashflow_usd:null,source_revision:null,source_status}));
+  const out=await readPortfolioHistory({query:async()=>({rows})},{now:timestamp+10,rangeMs:3600000});
+  assert.equal(out.rawPointCount,2);
+  assert.equal(out.excludedIncompletePoints,1);
+  assert.equal(out.points.length,1);
+  assert.deepEqual(out.points[0].sourceStatus.spotPriceProvenance.requiredSymbols,['BTC']);
 });
 
 
