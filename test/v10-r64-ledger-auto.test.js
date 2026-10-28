@@ -10,7 +10,7 @@ const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.u
 test('r64 strict authority can combine live-priced Ledger holdings with an OKX venue balance',()=>{
   const now=Date.parse('2026-09-28T19:10:00Z');
   const data={
-    livePrices:{BTC:{price:50000},ETH:{price:2500}},
+    livePrices:{BTC:{price:50000,source:'BINANCE_SPOT',ts:Date.parse('2026-09-28T19:09:00Z')},ETH:{price:2500,source:'BINANCE_SPOT',ts:Date.parse('2026-09-28T19:09:00Z')}},
     livePriceMeta:{fresh:true},
     portfolio:{
       authorityMode:'STRICT_VENUE_SNAPSHOT',

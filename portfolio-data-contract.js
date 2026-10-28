@@ -4,13 +4,17 @@
 export const PORTFOLIO_CONTRACT_VERSION='7.63-PORTFOLIO-DATA-CONTRACT-V2';
 export const PORTFOLIO_AUTHORITY_MAX_AGE_MS=24*60*60*1000;
 export const PIONEX_EQUITY_AUTHORITY_MAX_AGE_MS=15*60*1000;
+export const SPOT_PRICE_AUTHORITY_MAX_AGE_MS=15*60*1000;
+const LIVE_PRICE_SOURCES=new Set(['BINANCE_PUBLIC_HISTORY_CAPTURE','BINANCE_SPOT','Binance REST','Binance WebSocket']);
+const FALLBACK_PRICE_SOURCES=new Set(['CoinGecko REST']);
 const num=(v,f=0)=>Number.isFinite(Number(v))?Number(v):f;
 const round=(v,d=2)=>Math.round(num(v)*10**d)/10**d;
 const finite=v=>v===null||v===undefined||v===''?null:(Number.isFinite(Number(v))?Number(v):null);
+export function canonicalPriceSymbol(symbol){return typeof symbol==='string'&&symbol.length>0&&symbol.trim()===symbol?symbol:null}
 
 export function holdingUsd(data={},holding={}){
   const q=finite(holding.quantity);
-  const live=finite(data?.livePrices?.[holding.symbol]?.price);
+  const symbol=canonicalPriceSymbol(holding.symbol),live=symbol?finite(data?.livePrices?.[symbol]?.price):null;
   const own=finite(holding.price);
   const stored=finite(holding.value)??finite(holding.valueUsd)??finite(holding.usdValue);
   if(q!=null&&q>=0&&live!=null&&live>0)return q*live;
@@ -41,6 +45,24 @@ export function sourceTimestampAge(updatedAt,now=Date.now()){
   if(timestampMs==null)return{known:false,future:false,timestampMs:null,ageMs:null};
   const future=timestampMs>nowMs+30000,ageMs=Math.max(0,nowMs-timestampMs);
   return{known:true,future,timestampMs,ageMs};
+}
+
+function spotPriceProvenance(data,symbol,now,maxAgeMs=SPOT_PRICE_AUTHORITY_MAX_AGE_MS){
+  const entry=data?.livePrices?.[symbol],meta=data?.livePriceMeta||{},hasRecord=!!meta?.perSymbol&&Object.prototype.hasOwnProperty.call(meta.perSymbol,symbol),record=hasRecord?meta.perSymbol[symbol]:null,legacyR18=entry?.source==='BINANCE_SPOT'&&typeof entry?.ts==='number'&&!hasRecord&&!Object.prototype.hasOwnProperty.call(entry,'fetchedAt')&&!Object.prototype.hasOwnProperty.call(entry,'sourceQuality')&&!Object.prototype.hasOwnProperty.call(entry,'providerObservedAt');
+  const price=entry?.price,source=entry?.source,sourceQuality=legacyR18?'PUBLIC_LIVE_FETCH':entry?.sourceQuality,rawFetchedAt=legacyR18?entry.ts:entry?.fetchedAt,observationRaw=legacyR18?null:entry?.providerObservedAt,nowMs=finite(now)??Date.now(),maxAge=Math.max(0,finite(maxAgeMs)??SPOT_PRICE_AUTHORITY_MAX_AGE_MS);
+  const age=typeof rawFetchedAt==='number'?sourceTimestampAge(rawFetchedAt,now):{known:false,future:false,timestampMs:null,ageMs:null},observation=observationRaw==null?null:typeof observationRaw==='number'?sourceTimestampAge(observationRaw,now):{known:false,future:false,timestampMs:null,ageMs:null};
+  const sourceQualitySupported=typeof source==='string'&&typeof sourceQuality==='string'&&((sourceQuality==='PUBLIC_LIVE_FETCH'&&LIVE_PRICE_SOURCES.has(source))||(sourceQuality==='PUBLIC_FALLBACK_FETCH'&&FALLBACK_PRICE_SOURCES.has(source)));
+  const recordMatches=!hasRecord||(record!==null&&typeof record==='object'&&!Array.isArray(record)&&typeof record.source==='string'&&typeof record.sourceQuality==='string'&&typeof record.fetchedAt==='number'&&(record.providerObservedAt===null||typeof record.providerObservedAt==='number')&&typeof record.price==='number'&&record.price===price&&record.source===source&&record.sourceQuality===sourceQuality&&record.fetchedAt===rawFetchedAt&&record.providerObservedAt===observationRaw);
+  let reason='FRESH';
+  if(canonicalPriceSymbol(symbol)!==symbol)reason='REQUIRED_SYMBOL_NONCANONICAL';
+  else if(typeof price!=='number'||!Number.isFinite(price)||price<=0)reason='PRICE_MISSING_OR_INVALID';
+  else if(!sourceQualitySupported)reason='PROVENANCE_MISSING_OR_UNSUPPORTED';
+  else if(!recordMatches)reason='PROVENANCE_MISMATCH';
+  else if(!age.known)reason='FETCH_TIME_MISSING_OR_INVALID';
+  else if(age.timestampMs>nowMs)reason='FETCH_TIME_FUTURE';
+  else if(age.ageMs>maxAge)reason='FETCH_TIME_EXPIRED';
+  else if(observation&&(!observation.known||observation.timestampMs>nowMs||observation.ageMs>maxAge))reason='OBSERVATION_TIME_INVALID_OR_STALE';
+  return{symbol,price,source:typeof source==='string'?source:null,sourceQuality:typeof sourceQuality==='string'?sourceQuality:null,fetchedAt:age.timestampMs,providerObservedAt:observationRaw??null,valid:reason==='FRESH',reason};
 }
 
 export function authoritativePionexEquitySnapshot(data={},now=Date.now(),maxAgeMs=PIONEX_EQUITY_AUTHORITY_MAX_AGE_MS){
@@ -133,11 +155,20 @@ export function authoritativeSpotHoldings(data={},now=Date.now(),maxAgeMs=PORTFO
 
 export function portfolioPriceCoverage(data={},now=Date.now()){
   const auth=authoritativeSpotHoldings(data,now),holdings=auth.current,meta=data?.livePriceMeta||{},strict=auth.strict;
-  const requestedRaw=strict?null:finite(meta.requestedCount),resolvedRaw=strict?null:finite(meta.resolvedCount);
-  const requested=requestedRaw==null?holdings.length:Math.max(0,Math.floor(requestedRaw));
-  const resolved=resolvedRaw==null?holdings.filter(h=>finite(data?.livePrices?.[h?.symbol]?.price)>0).length:Math.max(0,Math.floor(resolvedRaw));
-  const feedFresh=holdings.length===0?true:meta.fresh===true,complete=holdings.length===0?true:feedFresh&&requested===holdings.length&&resolved===requested,partial=holdings.length>0&&feedFresh&&resolved>0&&!complete;
-  return{holdingCount:holdings.length,requested,resolved,feedFresh,complete,partial,strict,excludedStaleHoldings:auth.stale.length,supersededHoldings:auth.superseded.length,externalVenueCount:auth.external.venueCount};
+  const holdingSymbols=holdings.map(h=>canonicalPriceSymbol(h?.symbol)),requiredSymbols=[...new Set(holdingSymbols.filter(Boolean))],invalidHoldings=holdings.filter(h=>canonicalPriceSymbol(h?.symbol)===null),symbols=requiredSymbols.map(symbol=>spotPriceProvenance(data,symbol,now)),requested=requiredSymbols.length+invalidHoldings.length,resolved=symbols.filter(x=>x.valid).length,missingSymbols=[...symbols.filter(x=>!x.valid).map(x=>({symbol:x.symbol,reason:x.reason})),...invalidHoldings.map(h=>({symbol:typeof h?.symbol==='string'?h.symbol:null,reason:typeof h?.symbol==='string'&&h.symbol.trim()?'REQUIRED_SYMBOL_NONCANONICAL':'REQUIRED_SYMBOL_MISSING'}))];
+  const feedFresh=requested===resolved,complete=feedFresh,partial=requested>0&&resolved>0&&!complete;
+  const fetchReason=['PRICE_FETCH_FAILED','PRICE_SYMBOLS_UNRESOLVED'].includes(meta.fetchReason)?meta.fetchReason:null;
+  return{holdingCount:holdings.length,requested,resolved,feedFresh,complete,partial,strict,requiredSymbols,symbols,missingSymbols,excludedStaleHoldings:auth.stale.length,supersededHoldings:auth.superseded.length,externalVenueCount:auth.external.venueCount,fetchStatus:['COMPLETE','PARTIAL','FAILED'].includes(meta.fetchStatus)?meta.fetchStatus:'UNKNOWN',fetchReason};
+}
+
+export function spotHistoryProvenanceComplete(point={}){
+  const timestamp=point?.timestamp,provenance=point?.sourceStatus?.spotPriceProvenance,requiredSymbols=Array.isArray(provenance?.requiredSymbols)?provenance.requiredSymbols:null,captureAt=provenance?.captureAt,symbolRows=provenance?.symbols;
+  if(typeof timestamp!=='number'||!Number.isFinite(timestamp)||typeof captureAt!=='number'||!Number.isFinite(captureAt)||captureAt>timestamp||provenance?.version!=='SPOT_PRICE_PROVENANCE_V1'||!requiredSymbols||!symbolRows||typeof symbolRows!=='object'||Array.isArray(symbolRows))return false;
+  if(requiredSymbols.length===0)return provenance.status==='NO_REQUIRED_SYMBOLS';
+  return provenance.status==='COMPLETE'&&requiredSymbols.every(symbol=>{
+    const canonicalSymbol=canonicalPriceSymbol(symbol),row=symbolRows[symbol],fetched=typeof row?.fetchedAt==='number'?sourceTimestampAge(row.fetchedAt,timestamp):{known:false},observation=row?.providerObservedAt==null?null:typeof row.providerObservedAt==='number'?sourceTimestampAge(row.providerObservedAt,timestamp):{known:false},sourceQualitySupported=typeof row?.source==='string'&&typeof row?.sourceQuality==='string'&&((row.sourceQuality==='PUBLIC_LIVE_FETCH'&&LIVE_PRICE_SOURCES.has(row.source))||(row.sourceQuality==='PUBLIC_FALLBACK_FETCH'&&FALLBACK_PRICE_SOURCES.has(row.source)));
+    return typeof symbol==='string'&&canonicalSymbol!==null&&canonicalSymbol===symbol&&Object.prototype.hasOwnProperty.call(symbolRows,symbol)&&typeof row?.price==='number'&&Number.isFinite(row.price)&&row.price>0&&sourceQualitySupported&&row.valid===true&&fetched.known&&fetched.timestampMs<=timestamp&&fetched.ageMs<=SPOT_PRICE_AUTHORITY_MAX_AGE_MS&&(!observation||(observation.known&&observation.timestampMs<=timestamp&&observation.ageMs<=SPOT_PRICE_AUTHORITY_MAX_AGE_MS));
+  });
 }
 
 export function canonicalPortfolioSnapshot(data={},timestamp=Date.now()){
@@ -184,7 +215,7 @@ export function canonicalPortfolioSnapshot(data={},timestamp=Date.now()){
 
 export function latestPortfolioHistorySnapshot(history={},now=Date.now(),maxAgeMs=15*60*1000){
   const points=Array.isArray(history?.points)?history.points:[];
-  const point=[...points].reverse().find(x=>finite(x?.timestamp)!=null&&finite(x?.spotUsd)!=null&&finite(x?.tradingUsd)!=null&&finite(x?.totalUsd)!=null&&String(x?.sourceStatus?.spot||'')==='STRICT_AUTHORITY'&&String(x?.sourceStatus?.trading||'')==='PIONEX_EQUITY'&&x?.sourceStatus?.tradingFresh===true&&String(x?.sourceStatus?.tradingAuthorityVersion||'')==='PIONEX_FRESH_V1');
+  const point=[...points].reverse().find(x=>finite(x?.timestamp)!=null&&finite(x?.spotUsd)!=null&&finite(x?.tradingUsd)!=null&&finite(x?.totalUsd)!=null&&String(x?.sourceStatus?.spot||'')==='STRICT_AUTHORITY'&&String(x?.sourceStatus?.trading||'')==='PIONEX_EQUITY'&&x?.sourceStatus?.tradingFresh===true&&String(x?.sourceStatus?.tradingAuthorityVersion||'')==='PIONEX_FRESH_V1'&&spotHistoryProvenanceComplete(x));
   if(!point)return{found:false,fresh:false,complete:false,consistent:false,ageMs:null,timestamp:null,spotUsd:null,tradingUsd:null,totalUsd:null,sourceStatus:null,source:String(history?.source||'MISSING')};
   const timestamp=finite(point.timestamp),spotUsd=finite(point.spotUsd),tradingUsd=finite(point.tradingUsd),totalUsd=finite(point.totalUsd);
   const nowMs=finite(now)??Date.now(),future=timestamp!=null&&timestamp>nowMs+30000,ageMs=timestamp==null?null:Math.max(0,nowMs-timestamp);
