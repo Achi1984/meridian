@@ -951,7 +951,7 @@ async function browserRun(call,start,width,server){
       const initial=server.metrics().depotReads;
       const readState=()=>evaluate(`document.querySelector('#depot-read-root [data-state]')?.dataset.state`);
       const waitUntil=async check=>{for(let i=0;i<100;i++){if(await check())return;await new Promise(r=>setTimeout(r,20));}assert.fail('Depot state timeout');};
-      await waitUntil(async()=>await readState()==='locked');
+      await waitUntil(async()=>await readState()==='not_loaded');
       assert.equal(server.metrics().depotReads,initial,'mount/navigation never reads Depot');
       const refresh=()=>evaluate(`document.querySelector('#depot-read-root button').focus();document.querySelector('#depot-read-root button').click();true`);
       await refresh();await waitUntil(async()=>await readState()==='fresh');
