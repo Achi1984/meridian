@@ -96,7 +96,7 @@ export function createDepotReadClient({getToken,onChange=()=>{},fetchImpl=global
     const failed=r=>r.failed||r.data===undefined;
     reasons={current:failed(dashboard)?'TRANSPORT':c.status==='FRESH_SNAPSHOT'?'OK':c.status==='STALE'?'STALE':'INCOMPLETE',
       prices:failed(prices)?'TRANSPORT':'OK',
-      history:failed(archive)?'TRANSPORT':h.status==='FRESH_SNAPSHOT'?'OK':h.status==='STALE'?'STALE':history['1w']?.status==='empty'?'EMPTY':'INCOMPLETE'};
+      history:failed(archive)?'TRANSPORT':h.status==='FRESH_SNAPSHOT'?'OK':h.status==='STALE'?'STALE':'INCOMPLETE'};
     project();
   }
   function revalidate(){if(disposed)return;if(!token()||(snapshotToken&&token()!==snapshotToken)){lock();return;}if(current||stored)project();else if(!attempted&&!pending)emit('not_loaded');}

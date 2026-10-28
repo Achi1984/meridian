@@ -8,7 +8,7 @@ const LABELS={
   stale:['Daten veraltet','Bewertung ausgeblendet. Bitte manuell aktualisieren.'],
   unavailable:['Nicht verfügbar','Keine verifizierbare Depotbewertung. Fehlende Daten sind nicht null.']
 };
-const REASONS={TRANSPORT:'nicht erreichbar',INCOMPLETE:'unvollständig',STALE:'veraltet',EMPTY:'leer'};
+const REASONS={TRANSPORT:'nicht erreichbar',INCOMPLETE:'unvollständig',STALE:'veraltet'};
 const diagnose=r=>r?[['Aktuell',r.current],['Kurse',r.prices],['Historie',r.history]].filter(([,v])=>Object.hasOwn(REASONS,v))
   .map(([k,v])=>k+': '+REASONS[v]).join(' · '):'';
 const money=x=>new Intl.NumberFormat('de-DE',{style:'currency',currency:'USD'}).format(x);
