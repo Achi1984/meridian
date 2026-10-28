@@ -26,22 +26,37 @@ async function publicPrices(){
   }
   return out;
 }
-export function mergeRuntimePrices(data={},prices={}){
-  const next={...data,livePrices:{...(data.livePrices||{})}},holdings=Array.isArray(data?.portfolio?.holdings)?data.portfolio.holdings:[],requested=holdings.filter(h=>String(h?.venue||'').trim().toLowerCase()!=='pionex').length;
-  for(const h of holdings){const s=sym(h?.symbol),p=Number(prices[s]);if(p>0)next.livePrices[h.symbol]={price:p,source:'BINANCE_PUBLIC_HISTORY_CAPTURE'};}
-  const resolved=holdings.filter(h=>String(h?.venue||'').trim().toLowerCase()!=='pionex'&&Number(next.livePrices?.[h?.symbol]?.price)>0).length;
-  next.livePriceMeta={...(data.livePriceMeta||{}),fresh:true,requestedCount:requested,resolvedCount:resolved,source:'BINANCE_PUBLIC_HISTORY_CAPTURE',updatedAt:Date.now()};
+export function mergeRuntimePrices(data={},prices={},opts={}){
+  prices=prices&&typeof prices==='object'?prices:{};
+  const next={...data,livePrices:{...(data.livePrices||{})}},holdings=Array.isArray(data?.portfolio?.holdings)?data.portfolio.holdings:[],symbols=[...new Set(holdings.filter(h=>String(h?.venue||'').trim().toLowerCase()!=='pionex').map(h=>String(h?.symbol||'').trim()).filter(Boolean))],fetchedAt=Number(opts.fetchedAt),attemptAt=Number(opts.attemptAt??Date.now()),meta={...(data.livePriceMeta||{})},perSymbol={...(meta.perSymbol||{})};
+  let resolved=0;
+  for(const symbol of symbols){
+    const price=Number(prices[sym(symbol)]);
+    if(Number.isFinite(price)&&price>0&&Number.isFinite(fetchedAt)){
+      next.livePrices[symbol]={...(next.livePrices[symbol]||{}),price,source:'BINANCE_PUBLIC_HISTORY_CAPTURE',ts:fetchedAt};
+      perSymbol[symbol]={source:'BINANCE_PUBLIC_HISTORY_CAPTURE',sourceQuality:'PUBLIC_LIVE_FETCH',fetchedAt,providerObservedAt:null};
+      resolved++;
+    }
+  }
+  const fetchSucceeded=opts.fetchSucceeded!==false,complete=fetchSucceeded&&resolved===symbols.length;
+  const fetchReason=opts.fetchReason||(!complete&&fetchSucceeded?'PRICE_SYMBOLS_UNRESOLVED':null);
+  next.livePriceMeta={...meta,perSymbol,fresh:complete,requestedCount:symbols.length,resolvedCount:resolved,fetchStatus:!fetchSucceeded?'FAILED':complete?'COMPLETE':'PARTIAL',fetchReason:fetchReason?String(fetchReason).slice(0,120):null,lastFetchAttemptAt:Number.isFinite(attemptAt)?attemptAt:null,lastFetchSource:'BINANCE_PUBLIC_HISTORY_CAPTURE'};
+  if(fetchSucceeded&&Number.isFinite(fetchedAt))next.livePriceMeta.fetchedAt=fetchedAt;
   return next;
 }
 export async function capturePortfolioHistoryOnce(opts={}){
   const p=opts.db||db();if(!p)return{ok:false,reason:'NO_DATABASE'};
   await ensurePortfolioHistorySchema(p);
   const current=opts.data||await stateGet();if(!current)return{ok:false,reason:'PRIVATE_DASHBOARD_UNAVAILABLE'};
-  let prices={};let priceStatus='LIVE';
-  try{prices=opts.prices||await publicPrices()}catch(e){priceStatus='STORED_PRICE_FALLBACK';console.error('[PORTFOLIO_HISTORY] prices',String(e?.message||e))}
-  const enriched=mergeRuntimePrices(current,prices);
-  const result=await appendPortfolioHistory(p,enriched,{timestamp:opts.timestamp??Date.now(),dedupeMs:opts.dedupeMs??4*60*1000});
-  return{...result,priceStatus};
+  const clock=()=>{const value=typeof opts.now==='function'?opts.now():typeof opts.clock==='function'?opts.clock():opts.now;const n=Number(value??Date.now());return Number.isFinite(n)?n:Date.now()};
+  let prices={},priceStatus='LIVE',priceReason=null,fetchSucceeded=true;
+  try{prices=opts.fetchPrices?await opts.fetchPrices():opts.prices??await publicPrices()}catch(e){priceStatus='STORED_PRICE_FALLBACK';priceReason=String(e?.message||e).slice(0,120);fetchSucceeded=false;console.error('[PORTFOLIO_HISTORY] prices',priceReason)}
+  if(!prices||typeof prices!=='object')prices={};
+  const fetchedAt=fetchSucceeded?clock():null,attemptAt=clock(),timestamp=opts.timestamp??attemptAt;
+  const enriched=mergeRuntimePrices(current,prices,{attemptAt,fetchedAt,fetchSucceeded,fetchReason:priceReason});
+  if(fetchSucceeded&&enriched.livePriceMeta.fetchStatus==='PARTIAL')priceStatus='PARTIAL';
+  const result=await appendPortfolioHistory(p,enriched,{timestamp,dedupeMs:opts.dedupeMs??4*60*1000});
+  return{...result,priceStatus,...(priceReason?{priceReason}:{})};
 }
 export function startPortfolioHistoryCapture(){
   if(!DATABASE_URL){console.log('[PORTFOLIO_HISTORY] disabled · missing database');return{enabled:false}}

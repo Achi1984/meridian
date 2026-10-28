@@ -59,7 +59,7 @@ test('r94 canonical history accepts fresh Ledger holdings plus current OKX autho
   const now=Date.parse('2026-09-30T18:32:00Z');
   const data={
     privateRevision:9,
-    livePrices:{BTC:{price:50000}},
+    livePrices:{BTC:{price:50000,source:'BINANCE_SPOT',ts:Date.parse('2026-09-30T18:31:00Z')}},
     livePriceMeta:{fresh:true},
     portfolio:{
       ledgerAuthorityAt:'2026-09-30T18:30:00Z',

@@ -99,7 +99,7 @@ function applyQuote(sym,price,change24h,source,status='LIVE',ts=Date.now(),sched
  price=Number(price);change24h=Number(change24h);
  if(!Number.isFinite(price)||price<=0)return;
  DATA.livePrices=DATA.livePrices||{};
- DATA.livePrices[sym]={price,change24h:Number.isFinite(change24h)?change24h:(DATA.livePrices[sym]?.change24h||0),source,status,updatedAt:ts};
+ DATA.livePrices[sym]={price,change24h:Number.isFinite(change24h)?change24h:(DATA.livePrices[sym]?.change24h||0),source,status,updatedAt:ts,fetchedAt:ts,providerObservedAt:null,sourceQuality:status};
  LAST_PRICE_UPDATE=Math.max(LAST_PRICE_UPDATE||0,ts);
  if(schedule)scheduleLiveRender();
 }

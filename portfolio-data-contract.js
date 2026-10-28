@@ -4,6 +4,7 @@
 export const PORTFOLIO_CONTRACT_VERSION='7.63-PORTFOLIO-DATA-CONTRACT-V2';
 export const PORTFOLIO_AUTHORITY_MAX_AGE_MS=24*60*60*1000;
 export const PIONEX_EQUITY_AUTHORITY_MAX_AGE_MS=15*60*1000;
+export const SPOT_PRICE_AUTHORITY_MAX_AGE_MS=15*60*1000;
 const num=(v,f=0)=>Number.isFinite(Number(v))?Number(v):f;
 const round=(v,d=2)=>Math.round(num(v)*10**d)/10**d;
 const finite=v=>v===null||v===undefined||v===''?null:(Number.isFinite(Number(v))?Number(v):null);
@@ -41,6 +42,20 @@ export function sourceTimestampAge(updatedAt,now=Date.now()){
   if(timestampMs==null)return{known:false,future:false,timestampMs:null,ageMs:null};
   const future=timestampMs>nowMs+30000,ageMs=Math.max(0,nowMs-timestampMs);
   return{known:true,future,timestampMs,ageMs};
+}
+
+function spotPriceProvenance(data,symbol,now,maxAgeMs=SPOT_PRICE_AUTHORITY_MAX_AGE_MS){
+  const entry=data?.livePrices?.[symbol],meta=data?.livePriceMeta||{},explicit=meta?.perSymbol&&Object.prototype.hasOwnProperty.call(meta.perSymbol,symbol),record=explicit?meta.perSymbol[symbol]:null,entryProvenance=!explicit&&Object.prototype.hasOwnProperty.call(entry||{},'fetchedAt');
+  const price=finite(entry?.price),source=String(explicit?record?.source:entry?.source||''),sourceQuality=String(explicit?record?.sourceQuality:entryProvenance?entry?.sourceQuality:source==='BINANCE_SPOT'?'PUBLIC_LIVE_FETCH':''),rawFetchedAt=explicit?record?.fetchedAt:entryProvenance?entry?.fetchedAt:(source==='BINANCE_SPOT'?entry?.ts:null),age=sourceTimestampAge(rawFetchedAt,now),nowMs=finite(now)??Date.now(),maxAge=Math.max(0,finite(maxAgeMs)??SPOT_PRICE_AUTHORITY_MAX_AGE_MS);
+  const observationRaw=explicit?record?.providerObservedAt:entryProvenance?entry?.providerObservedAt:null,observation=observationRaw==null||observationRaw===''?{known:false,future:false,ageMs:null}:sourceTimestampAge(observationRaw,now);
+  let reason='FRESH';
+  if(price==null||price<=0)reason='PRICE_MISSING_OR_INVALID';
+  else if(!source||!sourceQuality)reason='PROVENANCE_MISSING';
+  else if(!age.known)reason='FETCH_TIME_MISSING_OR_INVALID';
+  else if(age.timestampMs>nowMs)reason='FETCH_TIME_FUTURE';
+  else if(age.ageMs>maxAge)reason='FETCH_TIME_EXPIRED';
+  else if(observationRaw!=null&&(!observation.known||observation.timestampMs>nowMs||observation.ageMs>maxAge))reason='OBSERVATION_TIME_INVALID_OR_STALE';
+  return{symbol,price,source:source||null,sourceQuality:sourceQuality||null,fetchedAt:age.timestampMs,providerObservedAt:observationRaw??null,valid:reason==='FRESH',reason};
 }
 
 export function authoritativePionexEquitySnapshot(data={},now=Date.now(),maxAgeMs=PIONEX_EQUITY_AUTHORITY_MAX_AGE_MS){
@@ -133,11 +148,19 @@ export function authoritativeSpotHoldings(data={},now=Date.now(),maxAgeMs=PORTFO
 
 export function portfolioPriceCoverage(data={},now=Date.now()){
   const auth=authoritativeSpotHoldings(data,now),holdings=auth.current,meta=data?.livePriceMeta||{},strict=auth.strict;
-  const requestedRaw=strict?null:finite(meta.requestedCount),resolvedRaw=strict?null:finite(meta.resolvedCount);
-  const requested=requestedRaw==null?holdings.length:Math.max(0,Math.floor(requestedRaw));
-  const resolved=resolvedRaw==null?holdings.filter(h=>finite(data?.livePrices?.[h?.symbol]?.price)>0).length:Math.max(0,Math.floor(resolvedRaw));
-  const feedFresh=holdings.length===0?true:meta.fresh===true,complete=holdings.length===0?true:feedFresh&&requested===holdings.length&&resolved===requested,partial=holdings.length>0&&feedFresh&&resolved>0&&!complete;
-  return{holdingCount:holdings.length,requested,resolved,feedFresh,complete,partial,strict,excludedStaleHoldings:auth.stale.length,supersededHoldings:auth.superseded.length,externalVenueCount:auth.external.venueCount};
+  const requiredSymbols=[...new Set(holdings.map(h=>String(h?.symbol||'').trim()).filter(Boolean))],missingSymbolCount=holdings.filter(h=>!String(h?.symbol||'').trim()).length,symbols=requiredSymbols.map(symbol=>spotPriceProvenance(data,symbol,now)),requested=requiredSymbols.length+missingSymbolCount,resolved=symbols.filter(x=>x.valid).length,missingSymbols=[...symbols.filter(x=>!x.valid).map(x=>({symbol:x.symbol,reason:x.reason})),...Array.from({length:missingSymbolCount},()=>({symbol:null,reason:'REQUIRED_SYMBOL_MISSING'}))];
+  const feedFresh=requested===resolved,complete=feedFresh,partial=requested>0&&resolved>0&&!complete;
+  return{holdingCount:holdings.length,requested,resolved,feedFresh,complete,partial,strict,requiredSymbols,symbols,missingSymbols,excludedStaleHoldings:auth.stale.length,supersededHoldings:auth.superseded.length,externalVenueCount:auth.external.venueCount,fetchStatus:String(meta.fetchStatus||'UNKNOWN'),fetchReason:meta.fetchReason??null};
+}
+
+export function spotHistoryProvenanceComplete(point={}){
+  const timestamp=finite(point?.timestamp),provenance=point?.sourceStatus?.spotPriceProvenance,requiredSymbols=Array.isArray(provenance?.requiredSymbols)?provenance.requiredSymbols:null,captureAt=finite(provenance?.captureAt),symbolRows=provenance?.symbols||{};
+  if(timestamp==null||captureAt==null||captureAt>timestamp||provenance?.version!=='SPOT_PRICE_PROVENANCE_V1'||!requiredSymbols)return false;
+  if(requiredSymbols.length===0)return provenance.status==='NO_REQUIRED_SYMBOLS';
+  return provenance.status==='COMPLETE'&&requiredSymbols.every(symbol=>{
+    const row=symbolRows[symbol],fetched=sourceTimestampAge(row?.fetchedAt,timestamp),observation=row?.providerObservedAt==null?null:sourceTimestampAge(row.providerObservedAt,timestamp);
+    return finite(row?.price)>0&&!!String(row?.source||'').trim()&&!!String(row?.sourceQuality||'').trim()&&row?.valid===true&&fetched.known&&fetched.timestampMs<=timestamp&&fetched.ageMs<=SPOT_PRICE_AUTHORITY_MAX_AGE_MS&&(!observation||(observation.known&&observation.timestampMs<=timestamp&&observation.ageMs<=SPOT_PRICE_AUTHORITY_MAX_AGE_MS));
+  });
 }
 
 export function canonicalPortfolioSnapshot(data={},timestamp=Date.now()){
@@ -184,7 +207,7 @@ export function canonicalPortfolioSnapshot(data={},timestamp=Date.now()){
 
 export function latestPortfolioHistorySnapshot(history={},now=Date.now(),maxAgeMs=15*60*1000){
   const points=Array.isArray(history?.points)?history.points:[];
-  const point=[...points].reverse().find(x=>finite(x?.timestamp)!=null&&finite(x?.spotUsd)!=null&&finite(x?.tradingUsd)!=null&&finite(x?.totalUsd)!=null&&String(x?.sourceStatus?.spot||'')==='STRICT_AUTHORITY'&&String(x?.sourceStatus?.trading||'')==='PIONEX_EQUITY'&&x?.sourceStatus?.tradingFresh===true&&String(x?.sourceStatus?.tradingAuthorityVersion||'')==='PIONEX_FRESH_V1');
+  const point=[...points].reverse().find(x=>finite(x?.timestamp)!=null&&finite(x?.spotUsd)!=null&&finite(x?.tradingUsd)!=null&&finite(x?.totalUsd)!=null&&String(x?.sourceStatus?.spot||'')==='STRICT_AUTHORITY'&&String(x?.sourceStatus?.trading||'')==='PIONEX_EQUITY'&&x?.sourceStatus?.tradingFresh===true&&String(x?.sourceStatus?.tradingAuthorityVersion||'')==='PIONEX_FRESH_V1'&&spotHistoryProvenanceComplete(x));
   if(!point)return{found:false,fresh:false,complete:false,consistent:false,ageMs:null,timestamp:null,spotUsd:null,tradingUsd:null,totalUsd:null,sourceStatus:null,source:String(history?.source||'MISSING')};
   const timestamp=finite(point.timestamp),spotUsd=finite(point.spotUsd),tradingUsd=finite(point.tradingUsd),totalUsd=finite(point.totalUsd);
   const nowMs=finite(now)??Date.now(),future=timestamp!=null&&timestamp>nowMs+30000,ageMs=timestamp==null?null:Math.max(0,nowMs-timestamp);
