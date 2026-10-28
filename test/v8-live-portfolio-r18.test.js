@@ -62,7 +62,7 @@ test('R18 adapter reuses ticker data without renewing its receipt timestamp',asy
   const rawFetch=async input=>{
     const url=typeof input==='string'?input:input?.url||'';
     requests.push(url);
-    if(url.includes('api.binance.com'))return new Response(JSON.stringify([{symbol:'BTCUSDT',price:'50000'}]),{status:200,headers:{'content-type':'application/json'}});
+    if(new URL(url,'https://meridian.invalid').hostname==='api.binance.com')return new Response(JSON.stringify([{symbol:'BTCUSDT',price:'50000'}]),{status:200,headers:{'content-type':'application/json'}});
     return new Response(JSON.stringify({data:{portfolio:{holdings:[{symbol:'BTC',venue:'Ledger',quantity:1}]}}}),{status:200,headers:{'content-type':'application/json'}});
   };
   globalThis.window={fetch:rawFetch};
@@ -75,7 +75,7 @@ test('R18 adapter reuses ticker data without renewing its receipt timestamp',asy
     assert.equal(first.data.livePrices.BTC.fetchedAt,initialNow);
     assert.equal(reused.data.livePrices.BTC.fetchedAt,initialNow);
     assert.equal(portfolioPriceCoverage(reused.data,now).complete,true);
-    assert.equal(requests.filter(url=>url.includes('api.binance.com')).length,1);
+    assert.equal(requests.filter(url=>new URL(url,'https://meridian.invalid').hostname==='api.binance.com').length,1);
   }finally{
     Date.now=originalNow;
     if(originalWindow===undefined)delete globalThis.window;else globalThis.window=originalWindow;
