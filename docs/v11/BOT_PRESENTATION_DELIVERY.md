@@ -22,15 +22,23 @@ before images are unchanged.
 [After at 320×568 with enlarged text](evidence/b11-bots-presentation/after-320x568-enlarged-text.png)
 
 At 320px, Command rows stack the identity, signed P/L, and native Details
-disclosure. The identity remains on one rendered line at normal and 1.35×
-descendant text sizes; the 390px contract-type filter gives the full selected
-“Alle Kontraktarten” option its own grid row.
+disclosure. Their identities remain on one rendered line at normal and 1.35×
+descendant text sizes. In the 320px enlarged Bot cards, P/L labels and signed
+amounts remain fully visible on one line; “Nicht verfügbar” is not split inside
+either word. Text scales by exactly 1.35× without reducing font sizes. Card
+content wraps naturally, with a maximum measured height of 215.91px and no
+clipping or horizontal overflow.
 
 The 1.35× browser check scales computed font sizes only on descendants of the
-Bot cards and Command overview; it does not enlarge the whole page or global
-text. Generated 20-bot snapshots at 320px and 390px confirmed that the labeled
-filters and refresh/lock controls remain before and reachable ahead of the card
-list, with no horizontal overflow and keyboard jump/return preserving selection.
+Bot cards and Command overview (306 Bot descendant elements in the 320px fixture);
+it does not enlarge the whole page or global text. Generated 20-bot snapshots
+at 320px and 390px confirmed that the labeled filters and refresh/lock controls
+remain before and reachable ahead of the card list, with no horizontal overflow
+and keyboard jump/return preserving selection. The selected “Alle Kontraktarten”
+fit is measured in the actual control at 355, 375, 390, and 430px: its widths
+were 289, 309, 324, and 364px respectively, versus 127.18px of measured option
+text. These filter measurements are test evidence; the card-only screenshots
+do not show the filter control.
 
 ## Command overview
 
@@ -54,26 +62,26 @@ preview remains a draft.
 [Command at 320×568 with 1.35× text](evidence/b11-bots-presentation/command-320x568-enlarged-text.png)
 
 For the fixture's three negative-P/L Command rows, heights measured 121px at
-320px width, 46–61px at 375px, and 46px at 390px, 430px, and 1440px. At 320px,
-identity text occupied 244px and one line. With 1.35× descendant text, rows
-grew naturally to 134.63px; identity remained one line and Details stayed below
-the jump button without overlap or horizontal overflow. Row controls remained
-at least 44px tall.
+320px width, 46–61px at 355px and 375px, and 46px at 390px, 430px, and 1440px.
+At 320px, identity text occupied 244px and one line. With 1.35× descendant
+text, rows grew naturally to 134.63px; identity remained one line and Details
+stayed below the jump button without overlap or horizontal overflow. Row
+controls remained at least 44px tall.
 
-Actual-shell Chromium checks passed at 320×568, 375×667, 390×844, 430×932
-and 1440×900. The largest collapsed card measured 148.39px at 320px width;
-maximums at 375px, 390px and 430px were 117.28px, and all cards measured
-110.64px at 1440px. Enlarged text grew naturally without overlap, clipping or
-horizontal overflow. Visible filter/action controls and disclosures meet the
-44px touch-target minimum. The run covered keyboard Command jump/return,
-same-snapshot disclosure persistence, filters without extra reads, and clearing
-on new, locked, stale and error states.
+Actual-shell Chromium checks passed at 320×568, 355×700, 375×667, 390×844,
+430×932, and 1440×900. Maximum collapsed card heights were 169.53px at 320px,
+134.39px at 355px, 117.28px at 375px, 390px, and 430px, and 110.64px at 1440px.
+At 320px with 1.35× descendant text, the maximum card height was 215.91px.
+Visible filter/action controls and disclosures meet the 44px touch-target
+minimum. The run covered keyboard Command jump/return, same-snapshot disclosure
+persistence, filters without extra reads, and clearing on new, locked, stale,
+and error states.
 
 Focused validation commands and totals:
 
 - `node --test test/v11-bot-read-view.test.js` — 33 tests passed.
-- `CHROME_BIN=/usr/bin/chromium V11_B11_EVIDENCE_DIR=/tmp/m11-visual-evidence node --experimental-websocket test/v11-b11-bot-cockpit-chrome.test.js`
-  — 1 actual-shell Chromium test passed, including five standard viewports and
+- `CHROME_BIN=/usr/bin/chromium V11_B11_EVIDENCE_DIR=/tmp/m11-visual-evidence-r2 node --experimental-websocket test/v11-b11-bot-cockpit-chrome.test.js`
+  — 1 actual-shell Chromium test passed, including six viewports and
   generated 20-bot runs at 320px and 390px.
 - `node --experimental-websocket test/v11-terminal-entry.test.js` — 3 tests passed, including
   five viewport runs and exact reversible source-delta checks.

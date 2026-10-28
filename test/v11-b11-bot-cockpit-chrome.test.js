@@ -87,7 +87,7 @@ function createShellServer() {
   });
 }
 
-test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and invalidation at five viewports',
+test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and invalidation at six viewports',
   {timeout:180000},async()=>{
     if(typeof WebSocket!=='function'){
       const env={...process.env};delete env.NODE_TEST_CONTEXT;
@@ -95,15 +95,16 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
         {env,encoding:'utf8',timeout:175000});
       assert.equal(child.status,0,String(child.stdout).slice(-3000)+String(child.stderr).slice(-1000));
       const rows=child.stdout.split('\n').filter(line=>line.includes('V11_B11_SIZE'));
-      assert.equal(rows.length,5);rows.forEach(row=>console.log(row));return;
+      assert.equal(rows.length,6);rows.forEach(row=>console.log(row));return;
     }
     assert.ok(chrome,'Chrome required; actual-shell acceptance must not silently skip');
     const server=createShellServer();
     await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
     const url=`http://127.0.0.1:${server.address().port}/v11/index.html`;
-    const sizes=[{width:320,height:568,mobile:true},{width:375,height:667,mobile:true},
+    const sizes=[{width:320,height:568,mobile:true},{width:355,height:700,mobile:true},{width:375,height:667,mobile:true},
       {width:390,height:844,mobile:true},{width:430,height:932,mobile:true},{width:1440,height:900,mobile:false}];
     const evidence=process.env.V11_B11_EVIDENCE_DIR;
+    const screenshotWidths=new Set([320,390]);
     try{
       for(const size of sizes){
         const measurements=await withMobileChrome(chrome,size.width,url,async call=>{
@@ -186,8 +187,10 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           })()`);
           assert.equal(fresh.cards,6);assert.equal(new Set(fresh.ids).size,6);assert.equal(fresh.duplicate,2);
           assert.equal(fresh.count,true);assert.equal(fresh.commandState,'fresh');assert.equal(fresh.lossButtons,3);
-          assert.ok(fresh.cardHeights.every(height=>height>=44&&height<=150),JSON.stringify(fresh.cardGeometry));
-          if(size.width===390){
+          assert.ok(fresh.cardHeights.every(height=>height>=44&&height<=(size.width===320?180:150)),
+            JSON.stringify(fresh.cardGeometry));
+          let categoryFit=null;
+          if([355,375,390,430].includes(size.width)){
             const category=await evaluate(`(()=>{
               const select=document.getElementById('bot-category-filter');
               const canvas=document.createElement('canvas'),context=canvas.getContext('2d');
@@ -195,12 +198,16 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
               return {label:select.labels[0].innerText,value:select.value,
                 text:select.selectedOptions[0].textContent,width:select.getBoundingClientRect().width,
                 textWidth:context.measureText(select.selectedOptions[0].textContent).width,
-                gridColumn:getComputedStyle(select.parentElement).gridColumn};
+                gridColumn:getComputedStyle(select.parentElement).gridColumn,
+                visible:select.getBoundingClientRect().left>=0&&select.getBoundingClientRect().right<=innerWidth&&
+                  select.scrollWidth<=select.clientWidth+1};
             })()`);
             assert.deepEqual({label:category.label,value:category.value,text:category.text},
               {label:'Kontraktart',value:'all',text:'Alle Kontraktarten'});
             assert.ok(category.width>=category.textWidth+40,JSON.stringify(category));
-            assert.equal(category.gridColumn,'1 / -1',JSON.stringify(category));
+            assert.equal(category.gridColumn,size.width<360?'auto':'1 / -1',JSON.stringify(category));
+            assert.equal(category.visible,true,JSON.stringify(category));
+            categoryFit={width:category.width,selectedTextWidth:category.textWidth,gridColumn:category.gridColumn};
           }
           assert.equal(new Set(fresh.referenceLabels).size,6,'duplicate symbols have distinct accessible names');
           assert.equal(fresh.referencesVisible,false,'full references stay out of collapsed visual cards');
@@ -292,7 +299,7 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
             await evaluate(`document.querySelector('#bot-card-'+ '${ref}'.repeat(20)+' summary').focus()`);
             await key('Enter','Enter',13);
           }
-          if(evidence){
+          if(evidence&&screenshotWidths.has(size.width)){
             mkdirSync(evidence,{recursive:true});
             await evaluate("document.querySelector('#bot-read-root .bot-card').scrollIntoView({block:'start'})");
             assert.ok(await evaluate(`[...document.querySelectorAll('#bot-read-root .bot-card')]
@@ -301,29 +308,80 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
             writeFileSync(join(evidence,`v11-bot-compact-${size.width}x${size.height}-bots.png`),
               Buffer.from(image.data,'base64'));
           }
+          let botLargeText=null;
           if(size.width===320){
             const normalHeights=await evaluate(`[...document.querySelectorAll('#bot-read-root .bot-card')].map(card=>card.getBoundingClientRect().height)`);
-            await evaluate(`(()=>{
+            const enlarged=await evaluate(`(()=>{
               const nodes=[...document.querySelectorAll('#bot-read-root .bot-card *')];
               const sizes=nodes.map(node=>parseFloat(getComputedStyle(node).fontSize));
               nodes.forEach((node,index)=>{if(Number.isFinite(sizes[index]))node.style.fontSize=(sizes[index]*1.35)+'px';});
-            })()`);
-            const enlarged=await evaluate(`(()=>{
               const cards=[...document.querySelectorAll('#bot-read-root .bot-card')];
+              const wordRects=node=>{
+                const text=node.firstChild;
+                if(!text||text.nodeType!==Node.TEXT_NODE)return [];
+                return [...text.textContent.matchAll(/\\S+/g)].map(match=>{
+                  const range=document.createRange();
+                  range.setStart(text,match.index);range.setEnd(text,match.index+match[0].length);
+                  return {word:match[0],rects:[...range.getClientRects()].map(rect=>({
+                    left:rect.left,right:rect.right,top:rect.top,bottom:rect.bottom}))};
+                });
+              };
+              const cardsText=cards.map(card=>{
+                const bounds=card.getBoundingClientRect();
+                const pnlNode=card.querySelector('.bot-card-pnl strong'),pnlRange=document.createRange();
+                pnlRange.selectNodeContents(pnlNode);
+                const pnlLabel=card.querySelector('.bot-card-pnl>span'),pnlLabelRange=document.createRange();
+                pnlLabelRange.selectNodeContents(pnlLabel);
+                const nodes=[card.querySelector('.bot-card-pnl>span'),card.querySelector('.bot-card-pnl strong'),
+                  ...card.querySelectorAll('.bot-card-capital>span,.bot-card-capital strong,.bot-card-badge')];
+                const texts=nodes.map(node=>{
+                  const rect=node.getBoundingClientRect();
+                  const words=wordRects(node);
+                  return {text:node.textContent,words,inside:rect.left>=bounds.left&&rect.right<=bounds.right&&
+                    rect.top>=bounds.top&&rect.bottom<=bounds.bottom&&node.scrollWidth<=node.clientWidth+1,
+                    wordsInside:words.every(word=>word.rects.length===1&&word.rects[0].left>=bounds.left&&
+                      word.rects[0].right<=bounds.right&&word.rects[0].top>=bounds.top&&
+                      word.rects[0].bottom<=bounds.bottom)};
+                });
+                return {id:card.id,pnl:pnlNode.textContent,pnlLineCount:pnlRange.getClientRects().length,
+                  pnlLabel:pnlLabel.textContent,pnlLabelLineCount:pnlLabelRange.getClientRects().length,
+                  capitalLabel:card.querySelector('.bot-card-capital>span').textContent,
+                  bounds:{left:bounds.left,right:bounds.right,width:bounds.width},
+                  pnlBounds:card.querySelector('.bot-card-pnl').getBoundingClientRect().toJSON(),
+                  height:card.getBoundingClientRect().height,texts};
+              });
+              const ratios=nodes.map((node,index)=>({
+                before:sizes[index],after:parseFloat(getComputedStyle(node).fontSize)}))
+                .filter(row=>Number.isFinite(row.before)&&row.before>0)
+                .map(row=>row.after/row.before);
               return {overflow:document.documentElement.scrollWidth>innerWidth+1,
                 heights:cards.map(card=>card.getBoundingClientRect().height),
                 targets:cards.every(card=>card.querySelector('summary').getBoundingClientRect().height>=44),
-                overlap:cards.some(card=>{
-                  const identity=card.querySelector('.bot-card-identity').getBoundingClientRect();
-                  const pnl=card.querySelector('.bot-card-pnl').getBoundingClientRect();
-                  return identity.right>pnl.left+1;
-                }),
-                clipping:cards.some(card=>card.scrollWidth>card.clientWidth+1)};
+                clipping:cards.some(card=>card.scrollWidth>card.clientWidth+1),
+                scale:ratios.length?{min:Math.min(...ratios),max:Math.max(...ratios),count:ratios.length}:null,
+                cardsText};
             })()`);
             assert.equal(enlarged.overflow,false,JSON.stringify(enlarged));
             assert.ok(enlarged.heights.every((height,index)=>height>=normalHeights[index]),JSON.stringify(enlarged));
-            assert.equal(enlarged.targets,true);assert.equal(enlarged.overlap,false);assert.equal(enlarged.clipping,false);
+            assert.equal(enlarged.targets,true,JSON.stringify(enlarged));
+            assert.equal(enlarged.clipping,false,JSON.stringify(enlarged));
+            assert.ok(enlarged.scale&&Math.abs(enlarged.scale.min-1.35)<0.01&&
+              Math.abs(enlarged.scale.max-1.35)<0.01,JSON.stringify(enlarged.scale));
+            assert.ok(enlarged.cardsText.every(card=>card.texts.every(text=>text.inside&&text.wordsInside)),
+              JSON.stringify(enlarged.cardsText));
+            assert.equal(enlarged.cardsText.find(card=>card.id.endsWith('d'.repeat(20)))?.pnl,'Nicht verfügbar');
+            assert.equal(enlarged.cardsText.find(card=>card.id.endsWith('f'.repeat(20)))?.pnl,'Nicht verfügbar');
+            assert.equal(enlarged.cardsText.find(card=>card.id.endsWith('e'.repeat(20)))?.pnl,'+<0,01 USD');
+            assert.ok(enlarged.cardsText.filter(card=>['a','b'].some(ref=>card.id.endsWith(ref.repeat(20))))
+              .every(card=>card.pnl==='-25,00 USD'));
+            assert.ok(enlarged.cardsText.every(card=>card.pnlLabel==='P/L laut Quelle'&&card.capitalLabel==='Kapital'));
+            assert.ok(enlarged.cardsText.every(card=>card.pnlLineCount===1&&card.pnlLabelLineCount===1),
+              JSON.stringify(enlarged.cardsText));
+            botLargeText={...enlarged,values:enlarged.cardsText.map(card=>({pnl:card.pnl,pnlLabel:card.pnlLabel,
+              capitalLabel:card.capitalLabel,height:card.height,pnlLineCount:card.pnlLineCount,
+              pnlLabelLineCount:card.pnlLabelLineCount}))};
             if(evidence){
+              await evaluate(`document.getElementById('bot-card-${'d'.repeat(20)}').scrollIntoView({block:'start'})`);
               const image=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
               writeFileSync(join(evidence,'v11-bot-compact-320x568-enlarged-text.png'),Buffer.from(image.data,'base64'));
             }
@@ -375,7 +433,7 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           assert.match(await evaluate(`document.querySelector('#command-bot-overview .command-bot-metadata').innerText`),
             /Snapshot-Zeit exakt \(UTC\):\s*\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z/);
           await key('Enter','Enter',13);
-          if(evidence){
+          if(evidence&&screenshotWidths.has(size.width)){
             await evaluate("document.getElementById('command-bot-overview').scrollIntoView({block:'start'})");
             const image=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
             writeFileSync(join(evidence,`v11-bot-compact-${size.width}x${size.height}-command.png`),
@@ -396,7 +454,7 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           })()`);
           assert.equal(commandLayout.overflow,false,JSON.stringify(commandLayout));
           if(size.width===320)assert.ok(commandLayout.identities.every(identity=>
-            identity.text.includes(' · ')&&identity.width>=160&&identity.lines<=2),
+            identity.text.includes(' · ')&&identity.width>=160&&identity.lines===1),
             JSON.stringify(commandLayout.identities));
           assert.ok(commandLayout.actionHeights.every(height=>height>=43.99),JSON.stringify(commandLayout));
           let commandLargeText=null;
@@ -429,11 +487,11 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
             assert.equal(commandLargeText.overflow,false,JSON.stringify(commandLargeText));
             assert.equal(commandLargeText.overlap,false,JSON.stringify(commandLargeText));
             assert.ok(commandLargeText.identities.every(identity=>identity.text.includes(' · ')&&
-               identity.width>=160&&identity.lines<=2&&identity.detailsTop>=identity.buttonBottom-1),
+               identity.width>=160&&identity.lines===1&&identity.detailsTop>=identity.buttonBottom-1),
                JSON.stringify(commandLargeText.identities));
             assert.ok(commandLargeText.actionHeights.every(height=>height>=43.99),JSON.stringify(commandLargeText));
           }
-          if(evidence&&commandLargeText){
+          if(evidence&&commandLargeText&&screenshotWidths.has(size.width)){
             const enlargedShot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
             writeFileSync(join(evidence,`v11-bot-compact-${size.width}x${size.height}-command-enlarged-text.png`),
               Buffer.from(enlargedShot.data,'base64'));
@@ -578,7 +636,7 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           })()`);
           assert.equal(finalLayout.overflow,false);assert.equal(finalLayout.navHeight,true);
           assert.equal(finalLayout.lastClear,true);
-          if(evidence){
+          if(evidence&&screenshotWidths.has(size.width)){
             mkdirSync(evidence,{recursive:true});
             await evaluate("document.getElementById('bot-read-root').scrollIntoView({block:'start'})");
             const image=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
@@ -588,7 +646,7 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           return {width:size.width,height:size.height,mixedRows:fresh.cards,
             collapsedCardHeights:fresh.cardHeights,requests:await evaluate('window.__botReads'),
             filtersNoRequest:true,commandJumpFocused:jump.focused,statesCleared:true,
-            overflow:finalLayout.overflow,controls44px:fresh.touch,commandLayout,commandLargeText};
+            overflow:finalLayout.overflow,controls44px:fresh.touch,categoryFit,botLargeText,commandLayout,commandLargeText};
         },size.height);
         console.log('V11_B11_SIZE',`${size.width}x${size.height}`,JSON.stringify(measurements));
       }

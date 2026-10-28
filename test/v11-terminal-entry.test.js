@@ -434,7 +434,7 @@ const botPresentationCssAfter=`    .bot-read-view .bot-card-list{list-style:none
     .command-bot-overview .command-bot-details>summary{min-width:44px;white-space:nowrap}
     .command-bot-details p+p{margin-top:5px}
     @media(min-width:360px) and (max-width:559px){.bot-overview-filters>div:nth-of-type(3){grid-column:1/-1}}
-    @media(max-width:350px){.command-bot-row{grid-template-columns:minmax(0,1fr)}.command-bot-overview .command-bot-jump{display:grid;grid-template-columns:minmax(0,1fr);justify-content:stretch;align-items:start}.command-bot-overview .command-bot-jump>span:first-child{min-width:0;overflow-wrap:normal;word-break:normal}.command-bot-pnl{max-width:100%;overflow-wrap:normal}}
+    @media(max-width:350px){.bot-card-top{grid-template-columns:minmax(0,1fr)}.bot-card-pnl{justify-items:start;text-align:left}.bot-card-pnl>span{white-space:normal}.bot-card-pnl strong{min-width:0;max-width:100%;overflow-wrap:break-word;word-break:normal}.bot-card-capital strong{overflow-wrap:break-word;word-break:normal}.bot-card-badge{overflow-wrap:normal;word-break:normal}.command-bot-row{grid-template-columns:minmax(0,1fr)}.command-bot-overview .command-bot-jump{display:grid;grid-template-columns:minmax(0,1fr);justify-content:stretch;align-items:start}.command-bot-overview .command-bot-jump>span:first-child{min-width:0;overflow-wrap:normal;word-break:normal}.command-bot-pnl{max-width:100%;overflow-wrap:normal}}
 `;
 const botReadControls=`        <div class="bot-access-controls">
           <label for="bot-read-token">Asset-Watch-Link oder Meridian-Lesepasswort</label>
@@ -1093,9 +1093,10 @@ async function browserRun(call,start,width,height,server){
       assert.equal(await evaluate(`document.getElementById('bot-read-root').textContent.includes('synthetic-b3-token')`),false);
       const cardMetrics=()=>evaluate(`(()=>{const c=document.querySelector('#bot-read-root .bot-card'),s=c.querySelector('summary'),r=s.getBoundingClientRect(),nav=document.querySelector('#nav').getBoundingClientRect();return {open:c.open,text:s.textContent,body:document.body.scrollWidth,root:document.documentElement.scrollWidth,summaryHeight:r.height,cardHeight:c.getBoundingClientRect().height,collapsedCards:[...document.querySelectorAll('#bot-read-root .bot-card:not([open])')].map(card=>card.getBoundingClientRect().height),navTop:nav.top,display:getComputedStyle(s).display,textUnrotated:[...s.querySelectorAll('.bot-card-heading,.bot-card-pnl,.bot-card-capital')].every(n=>getComputedStyle(n).transform==='none'),headingWidth:s.querySelector('.bot-card-heading').getBoundingClientRect().width,phrasing:s.querySelectorAll('dl,div,p').length};})()`);
       let card=await cardMetrics();
-      assert.equal(card.open,false);assert.equal(card.display,'grid');assert.equal(card.textUnrotated,true);assert.ok(card.headingWidth>48,'symbol has usable line width');assert.equal(card.phrasing,0);assert.ok(card.summaryHeight>=44&&card.summaryHeight<=150);
+      const maxCardHeight=width===320?180:150;
+      assert.equal(card.open,false);assert.equal(card.display,'grid');assert.equal(card.textUnrotated,true);assert.ok(card.headingWidth>48,'symbol has usable line width');assert.equal(card.phrasing,0);assert.ok(card.summaryHeight>=44&&card.summaryHeight<=maxCardHeight);
       assert.match(card.text,/3×/);assert.match(card.text,/0,42 ETH/);assert.match(card.text,/-12,50 USD/);
-      assert.ok(card.collapsedCards.length===2&&card.collapsedCards.every(value=>value>=44&&value<=150),
+      assert.ok(card.collapsedCards.length===2&&card.collapsedCards.every(value=>value>=44&&value<=maxCardHeight),
         'collapsed card heights at '+width+': '+JSON.stringify(card.collapsedCards));
       console.log('V11_BOT_COMPACT_MEASURE',JSON.stringify({width,height,collapsedCardHeights:card.collapsedCards}));
       assert.equal(await evaluate(`getComputedStyle(document.querySelector('#bot-read-root .bot-pnl-negative')).color`),'rgb(255, 155, 155)');
