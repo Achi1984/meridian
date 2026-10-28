@@ -513,10 +513,10 @@ const appAccessDeltas=[
   [`<script type="module" src="./bot-read-bootstrap.js?v=B14"></script>
 <script type="module" src="./depot-read-bootstrap.js?v=B14"></script>
 <script type="module" src="./strategy-workspace-bootstrap.js?v=B14"></script>`,
-   `<script type="module" src="./app-access-bootstrap.js?v=B14-M11"></script>
-<script type="module" src="./bot-read-bootstrap.js?v=B14-M11"></script>
-<script type="module" src="./depot-read-bootstrap.js?v=B14-M11"></script>
-<script type="module" src="./strategy-workspace-bootstrap.js?v=B14-M11"></script>`],
+   `<script type="module" src="./app-access-bootstrap.js?v=B14-M11-DEPOT976"></script>
+<script type="module" src="./bot-read-bootstrap.js?v=B14-M11-DEPOT976"></script>
+<script type="module" src="./depot-read-bootstrap.js?v=B14-M11-DEPOT976"></script>
+<script type="module" src="./strategy-workspace-bootstrap.js?v=B14-M11-DEPOT976"></script>`],
   ['', '    @media(max-width:350px){.header-inner{flex-wrap:nowrap}.identity{gap:6px}.mark{width:32px;height:32px}.brand{font-size:12px}.brand small{display:none}.header-actions{gap:4px}.version-toggle{padding:4px;font-size:10px;letter-spacing:0}.version-toggle small{display:none}}\n']
 ];
 const b14Deltas=[
@@ -639,7 +639,7 @@ function deploymentServer(){
   const server=createServer((request,response)=>{
     const url=new URL(request.url,'http://127.0.0.1'),path=url.pathname;
     requests.push({method:request.method,path}); // never record headers or token values
-    const versionedModule=path.startsWith('/meridian/v11/')&&moduleNames.includes(path.slice('/meridian/v11/'.length))&&url.search==='?v=B14-M11';
+    const versionedModule=path.startsWith('/meridian/v11/')&&moduleNames.includes(path.slice('/meridian/v11/'.length))&&url.search==='?v=B14-M11-DEPOT976';
     if(request.method!=='GET'||(url.search&&!versionedModule)){response.writeHead(404);response.end();return;}
     if(path===authEndpoint){
       authReads++;
@@ -681,7 +681,7 @@ function deploymentServer(){
     if(path!=='/meridian/v11/'&&path!=='/meridian/v10/'){response.writeHead(404);response.end();return;}
     const preview=path==='/meridian/v11/';
     const origin='http://127.0.0.1:'+server.address().port;
-    const scriptSource=preview?`'sha256-${scriptHash}' `+[...modules.keys()].map(path=>origin+path+(path.startsWith('/meridian/v11/')?'?v=B14-M11':'')).join(' '):"'none'";
+    const scriptSource=preview?`'sha256-${scriptHash}' `+[...modules.keys()].map(path=>origin+path+(path.startsWith('/meridian/v11/')?'?v=B14-M11-DEPOT976':'')).join(' '):"'none'";
     const policy=`default-src 'none'; script-src ${scriptSource}; style-src 'unsafe-inline'; connect-src ${preview?origin+endpoint+' '+origin+depotEndpoint+' '+origin+currentEndpoint+' '+origin+priceEndpoint+' '+origin+authEndpoint+' '+origin+'/meridian/docs/strategy-lab/campaign-20261013.json':"'none'"}; worker-src 'none'; child-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'none'`;
     policies.set(path,policy);
     response.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Content-Security-Policy':policy});response.end(preview?html:terminal);
@@ -702,11 +702,11 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     const start=server.base+'v11/';
     const page=await fetch(start);
     assert.equal(page.status,200);
-    const catalogUrl=new URL('strategy-catalog.js?v=B14-M11',start);
+    const catalogUrl=new URL('strategy-catalog.js?v=B14-M11-DEPOT976',start);
     const catalog=await fetch(catalogUrl);
     assert.equal(catalog.status,200);
     const source=await catalog.text();
-    const imported=source.match(/from ['"](\.\/research-evidence\.js\?v=B14-M11)['"]/);
+    const imported=source.match(/from ['"](\.\/research-evidence\.js\?v=B14-M11-DEPOT976)['"]/);
     assert.ok(imported,'catalog imports the read-only evidence module');
     const dependency=new URL(imported[1],catalogUrl);
     const response=await fetch(dependency);
@@ -716,9 +716,9 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     const scriptPolicy=page.headers.get('content-security-policy').split(';').find(part=>part.trim().startsWith('script-src '));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(dependency.href),'exact dependency URL must be in script-src');
     assert.equal(server.allowedPaths.has(dependency.pathname),true);
-    const arenaUrl=new URL('strategy-arena.js?v=B14-M11',start);
+    const arenaUrl=new URL('strategy-arena.js?v=B14-M11-DEPOT976',start);
     const arenaSource=await (await fetch(arenaUrl)).text();
-    const inspectionImport=arenaSource.match(/from ['"](\.\/arena-inspection-report\.js\?v=B14-M11)['"]/);
+    const inspectionImport=arenaSource.match(/from ['"](\.\/arena-inspection-report\.js\?v=B14-M11-DEPOT976)['"]/);
     assert.ok(inspectionImport,'Arena imports the metadata-only report adapter');
     const inspectionUrl=new URL(inspectionImport[1],arenaUrl);
     const inspection=await fetch(inspectionUrl);
@@ -727,7 +727,7 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     assert.equal(await inspection.text(),readFileSync(new URL('../v11/arena-inspection-report.js',import.meta.url),'utf8'));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(inspectionUrl.href));
     assert.equal(server.allowedPaths.has(inspectionUrl.pathname),true);
-    const historicalImport=arenaSource.match(/from ['"](\.\/arena-historical-result\.js\?v=B14-M11)['"]/);
+    const historicalImport=arenaSource.match(/from ['"](\.\/arena-historical-result\.js\?v=B14-M11-DEPOT976)['"]/);
     assert.ok(historicalImport,'Arena imports the bounded historical fixture adapter');
     const historicalUrl=new URL(historicalImport[1],arenaUrl);
     const historical=await fetch(historicalUrl);
@@ -736,7 +736,7 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     assert.equal(await historical.text(),readFileSync(new URL('../v11/arena-historical-result.js',import.meta.url),'utf8'));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(historicalUrl.href));
     assert.equal(server.allowedPaths.has(historicalUrl.pathname),true);
-    const producerImport=arenaSource.match(/from ['"](\.\/arena-historical-export\.js\?v=B14-M11)['"]/);
+    const producerImport=arenaSource.match(/from ['"](\.\/arena-historical-export\.js\?v=B14-M11-DEPOT976)['"]/);
     assert.ok(producerImport,'Arena imports the bounded producer export adapter');
     const producerUrl=new URL(producerImport[1],arenaUrl);
     const producer=await fetch(producerUrl);
@@ -745,7 +745,7 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     assert.equal(await producer.text(),readFileSync(new URL('../v11/arena-historical-export.js',import.meta.url),'utf8'));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(producerUrl.href),'exact producer dependency URL must be in script-src');
     assert.equal(server.allowedPaths.has(producerUrl.pathname),true);
-    const rendererImport=arenaSource.match(/from ['"](\.\/arena-result-view\.js\?v=B14-M11)['"]/);
+    const rendererImport=arenaSource.match(/from ['"](\.\/arena-result-view\.js\?v=B14-M11-DEPOT976)['"]/);
     assert.ok(rendererImport,'Arena imports the isolated result renderer');
     const rendererUrl=new URL(rendererImport[1],arenaUrl);
     const renderer=await fetch(rendererUrl);

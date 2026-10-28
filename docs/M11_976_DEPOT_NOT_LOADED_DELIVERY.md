@@ -28,3 +28,7 @@ Interception: the page is navigated first and `Fetch.enable` is then applied onl
 - Full CI not run. No cache/build/workflow/auth/index changes.
 - A fresh→stale projection keeps the cached chart models from the last read; only reasons and the headline state are recomputed.
 - Stale handling of the stored model follows the existing model contract; no model changes were made.
+
+## Cache identity
+
+The Lead-allocated cache-only token `B14-M11-DEPOT976` replaces `B14-M11` on the served v11 entrypoint script sources and every internal v11 import edge, with one `app-access.js` identity across readers. The stale-edge rejection fixture now uses the previous `B14-M11`. The visible preview label, terminal r130, root, v10, manifest and `sw.js` are unchanged. Focused run: cache identity, terminal entry, shell safety, bot/strategy chrome and Depot tests pass; full CI is not run.
