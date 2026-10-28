@@ -156,6 +156,9 @@ test("durable bounded research supervisor synthetic suite", () => {
     assert.match(result.stderr, /\nOK(?:\n|$)/,
       `${group.name} must pass without skips\n${tail(result.stderr)}`);
     assert.doesNotMatch(result.stderr, /skipped=/, `${group.name} must not skip tests`);
+    for (const line of result.stdout.split(/\r?\n/)) {
+      if (line.startsWith("SYNTHETIC_SUPERVISOR_TIMING ")) console.log(line);
+    }
     const durationMs = Math.round(performance.now() - groupStartedAt);
     timings.push({name: group.name, count: group.methods.length, durationMs});
   }

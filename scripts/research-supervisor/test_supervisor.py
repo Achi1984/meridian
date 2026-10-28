@@ -1,5 +1,6 @@
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -22,9 +23,10 @@ import supervisor
 
 FAULT_ADAPTER = ROOT / "test_fault_adapter.mjs"
 HISTORICAL_TEST_ADAPTER = ROOT / "test_b1_historical_fixture.mjs"
+MAX_DIAGNOSTIC_ELAPSED_MS = 60_000
 
 
-def _generated_historical_result_diagnostic(result):
+def _generated_historical_result_diagnostic(result, elapsed_ms=None):
     diagnostic = {}
     if type(result) is dict:
         for key in ("state", "reason"):
@@ -42,6 +44,10 @@ def _generated_historical_result_diagnostic(result):
             diagnostic["pathCount"] = len(paths)
             diagnostic["completedPathCount"] = sum(
                 type(path) is dict and path.get("state") == "completed" for path in paths)
+    if (type(elapsed_ms) in (int, float) and
+            0 <= elapsed_ms <= MAX_DIAGNOSTIC_ELAPSED_MS and math.isfinite(elapsed_ms)):
+        diagnostic["elapsedMs"] = round(elapsed_ms, 3)
+        diagnostic["batchSeconds"] = round(elapsed_ms / 1000, 3)
     rendered = json.dumps(diagnostic, sort_keys=True, separators=(",", ":"))
     return rendered if len(rendered) <= 1024 else rendered[:1021] + "..."
 
@@ -272,7 +278,7 @@ connection.close()
             "extraField": {"value": "not permitted"},
         }
 
-        diagnostic = _generated_historical_result_diagnostic(result)
+        diagnostic = _generated_historical_result_diagnostic(result, 1234.6)
         rendered = json.loads(diagnostic)
 
         self.assertEqual(rendered, {
@@ -281,6 +287,8 @@ connection.close()
             "trialId": trial_id,
             "pathCount": 2,
             "completedPathCount": 1,
+            "elapsedMs": 1234.6,
+            "batchSeconds": 1.235,
         })
         self.assertNotIn("attempts", rendered)
         self.assertLessEqual(len(diagnostic), 1024)
@@ -288,11 +296,25 @@ connection.close()
         self.assertNotIn("../private/path", diagnostic)
         self.assertNotIn("/home/runner/private", diagnostic)
         self.assertNotIn(private_text, diagnostic)
+        for invalid_elapsed in (-1, True, float("nan"), float("inf"),
+                                float("-inf"), MAX_DIAGNOSTIC_ELAPSED_MS + 1,
+                                10 ** 400, private_text):
+            with self.subTest(invalid_elapsed=repr(invalid_elapsed)):
+                invalid = json.loads(
+                    _generated_historical_result_diagnostic(result, invalid_elapsed))
+                self.assertNotIn("elapsedMs", invalid)
+                self.assertNotIn("batchSeconds", invalid)
 
     def test_generated_historical_profile_runs_all_paths_and_refuses_repeat(self):
         profile_path, claim = self.prepare_historical_fixture("historical-success")
-        result = self.run_historical_fixture(profile_path, claim, "SUCCESS")
-        diagnostic = _generated_historical_result_diagnostic(result)
+        started_at = time.monotonic()
+        result = None
+        try:
+            result = self.run_historical_fixture(profile_path, claim, "SUCCESS")
+        finally:
+            elapsed_ms = (time.monotonic() - started_at) * 1000
+            diagnostic = _generated_historical_result_diagnostic(result, elapsed_ms)
+            print(f"SYNTHETIC_SUPERVISOR_TIMING {diagnostic}", flush=True)
         self.assertEqual(result["state"], "completed", diagnostic)
         self.assertEqual(result["attempts"], 1, diagnostic)
         self.assertEqual(len(result["paths"]), 44, diagnostic)
