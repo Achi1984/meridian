@@ -57,8 +57,23 @@ test('V11 Depot Chrome: central unlock shows not-loaded on both surfaces without
             responseHeaders:[...cors,{name:'Content-Type',value:'application/json'}],body:Buffer.from(JSON.stringify(body)).toString('base64')});
         })().catch(error=>{failure=error;});});
         await call('Fetch.enable',{patterns:[{urlPattern:'*/api/private/*',requestStage:'Request'},{urlPattern:'*binance.vision*',requestStage:'Request'}]});
+        const describe="(()=>{const a=document.activeElement;return a?(a.id||a.getAttribute('data-v')||a.textContent.trim().slice(0,40)):''})()";
+        // Real Tab navigation (forward, then backward from the sequential-focus start) until the target has focus.
+        const tabTo=async(match,label)=>{
+          const order=[];
+          for(const [name,code,keyCode,shift] of [['Tab','Tab',9,0],['Tab','Tab',9,8]]){
+            for(let i=0;i<120;i++){
+              if(await evaluate(`(()=>{const a=document.activeElement;return !!a&&(${match})(a)})()`))return order;
+              await call('Input.dispatchKeyEvent',{type:'keyDown',key:name,code,windowsVirtualKeyCode:keyCode,modifiers:shift});
+              await call('Input.dispatchKeyEvent',{type:'keyUp',key:name,code,windowsVirtualKeyCode:keyCode,modifiers:shift});
+              order.push(await evaluate(describe));
+            }
+          }
+          assert.fail('Tab could not reach '+label+' at '+size.width+': '+order.join(' > '));
+        };
+        const isDepotButton=text=>`a=>a.tagName==='BUTTON'&&a.closest('#depot-read-root')&&a.textContent==${JSON.stringify(text)}`;
         const unlock=async()=>{
-          await evaluate('document.getElementById("app-access-password").focus()');
+          await tabTo("a=>a.id==='app-access-password'",'password field');
           await call('Input.insertText',{text:PASSWORD});
           await key('Enter','Enter',13);
           for(let i=0;i<200&&await evaluate('document.getElementById("app").hidden');i++)await sleep(25);
@@ -76,8 +91,13 @@ test('V11 Depot Chrome: central unlock shows not-loaded on both surfaces without
             leak:/synthetic-browser-gate-password/.test(document.body.innerText)};
         })()`);
         const shot=async name=>{if(evidence){const image=await call('Page.captureScreenshot',{format:'png'});writeFileSync(join(evidence,'v11-depot-'+size.width+'-'+name+'.png'),Buffer.from(image.data,'base64'));}};
-        const showDepot=()=>evaluate("document.querySelector('#nav button[data-v=depot]').click();window.scrollTo(0,0);true");
-        const showCommand=()=>evaluate("document.querySelector('#nav button[data-v=command]').click();window.scrollTo(0,0);true");
+        const navKey=async view=>{
+          await tabTo(`a=>a.getAttribute('data-v')==='${view}'&&!!a.closest('#nav')`,view+' navigation button');
+          await key('Enter','Enter',13);
+          assert.equal(await evaluate(`document.getElementById('view-${view}').hidden`),false,view+' view opened by keyboard Enter');
+          await evaluate('window.scrollTo(0,0);true');
+        };
+        const showDepot=()=>navKey('depot'),showCommand=()=>navKey('command');
 
         await unlock();
         assert.equal(counts.dashboard+counts.prices,0,'unlock must not read Depot sources');
@@ -92,7 +112,13 @@ test('V11 Depot Chrome: central unlock shows not-loaded on both surfaces without
         assert.equal(counts.dashboard+counts.prices,0);assert.equal(counts.history,1);
 
         // Keyboard activation of the single manual refresh CTA.
-        await evaluate("[...document.querySelectorAll('#depot-read-root button')].find(b=>b.textContent==='Depot aktualisieren').focus()");
+        await tabTo(isDepotButton('Depot aktualisieren'),'refresh button');
+        // focus order inside the Depot controls: refresh, then lock
+        await key('Tab','Tab',9);
+        assert.equal(await evaluate("document.activeElement.textContent"),'Depot sperren','focus order: refresh then lock');
+        await call('Input.dispatchKeyEvent',{type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9,modifiers:8});
+        await call('Input.dispatchKeyEvent',{type:'keyUp',key:'Tab',code:'Tab',windowsVirtualKeyCode:9,modifiers:8});
+        assert.equal(await evaluate("document.activeElement.textContent"),'Depot aktualisieren','Shift+Tab returns to refresh');
         await key('Enter','Enter',13);
         for(let i=0;i<200&&counts.history<2;i++)await sleep(25);
         await sleep(100);
@@ -106,7 +132,7 @@ test('V11 Depot Chrome: central unlock shows not-loaded on both surfaces without
         await shot('command-unavailable');
 
         // Shared lock, then re-unlock returns to not-loaded with prior private view cleared.
-        await evaluate('document.getElementById("app-access-lock").focus()');
+        await tabTo("a=>a.id==='app-access-lock'",'global lock button');
         await key('Enter','Enter',13);await sleep(100);
         assert.equal(await evaluate('document.getElementById("app").hidden'),true);
         s=await snap();assert.equal(s.depot,'locked');assert.equal(s.command,'locked');
