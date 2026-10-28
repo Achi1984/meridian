@@ -39,6 +39,67 @@ requested review response in Mailbox639. A green CI run is not a review verdict.
 A local test against another checkout is not an exact-head test. Neither this
 contract nor an evidence link overrides the reviewer's mandatory checks.
 
+## Pinned Claude image preparation (#983)
+
+Owner dispatch M11-983-PINNED-IMAGES-R1 authorizes preparation only. The bounded
+helper `scripts/claude-pinned-images.mjs` runs before Claude in the existing #942
+mailbox workflow, from the trusted checkout, never from PR code. A recognized
+owner-authored `@claude CROSS_MODEL_REQUEST` must include exactly one standalone
+line in this format (replace the placeholder with the current lowercase full SHA):
+
+```text
+PINNED_PR_IMAGES PR=975 HEAD=<40 lowercase hex characters>
+```
+
+The marker is authoritative; duplicate/malformed marker lines, extra path/URL
+arguments, missing pins, other repositories and stale heads are blocked. Ordinary
+requests without the marker do no API reads or image writes and add no reviewer
+context. The helper parses `GITHUB_EVENT_PATH` as JSON; comment text never becomes
+a shell command. Both PR base and head must belong to `Achi1984/meridian`, and PR
+metadata is checked before retrieval and again before publication.
+
+Only these eight fixed PNG names under `docs/v11/evidence/b11-bots-presentation/`
+are read; callers cannot select files:
+
+- `after-320x568-enlarged-text.png`
+- `after-320x568.png`
+- `after-390x844.png`
+- `before-320x568.png`
+- `before-390x844.png`
+- `command-320x568-enlarged-text.png`
+- `command-320x568.png`
+- `command-390x844.png`
+
+Fixed-host GitHub GETs read pinned commit/trees and raw git blobs, without redirects,
+PR checkout, installs, PR scripts or PR tests. Tree traversal rejects missing or
+ambiguous entries, symlinks, submodules and nonblobs. Limits are **2 MiB per PNG,
+12 MiB total**, and **1 MiB per JSON response/event**. These conservative ceilings
+bound memory/network consumption for eight mobile screenshots, not arbitrary
+downloads. Declared sizes are checked before blob requests; streamed response
+sizes, PNG signatures and Git blob SHA-1 digests are checked before any image write.
+Each API request has a 10-second timeout; the preparation step has a three-minute cap.
+
+Success creates only a fresh private `RUNNER_TEMP/claude-pinned-images-*` directory
+outside the tracked checkout. Existing scratch paths are not touched. Its
+`manifest.json` binds repository, PR, head, all eight source/absolute paths, sizes,
+Git blob IDs and SHA-256 digests. The supported action input `claude_args` appends
+the manifest pointer to the existing system context; no tools, permissions,
+credentials, max-turns or concurrency change. No images, base64, environment
+values, raw API errors or private data are logged/uploaded. Failure emits a fixed
+blocking reason to reviewer context and requires `NEEDS_MORE_EVIDENCE`, not visual
+acceptance. The reviewer must recheck the head before its final verdict.
+
+Receipt status: source preparation and synthetic mocked-API regression coverage
+only (`node --test test/claude-pinned-images.test.js`); no live Claude image Read,
+visual review, merge or runtime activation is claimed. Next gates are independent
+security review and full appropriate exact-head CI/workflow review. Once approved,
+perform one authorized capability smoke request pinned to the current PR975 head:
+record the workflow/head and manifest digests, require Claude to Read all eight
+PNGs without writes and report honest per-image findings. Missing access or any
+uninspected image keeps visual acceptance blocked; do not broaden permissions.
+Lead/owner-approved merge remains separate and mandatory. No trading/research
+activation, scheduler or service is authorized.
+
 ## Scheduling and measurement
 
 The existing mailbox workflow already has a 35-turn limit, a 35-minute job timeout
