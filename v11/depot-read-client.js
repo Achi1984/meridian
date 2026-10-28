@@ -48,12 +48,12 @@ async function readBounded(response, signal) {
 // Manual reads only. Independent source failures preserve other verified results.
 export function createDepotReadClient({getToken,onChange=()=>{},fetchImpl=globalThis.fetch,
   now=Date.now,schedule=setTimeout,cancelSchedule=clearTimeout}={}){
-  let generation=0,pending=null,disposed=false,current=null,stored=null,history=null,attempted=false;
+  let generation=0,pending=null,disposed=false,current=null,stored=null,history=null,attempted=false,reasons=null;
   const token=()=>{try{const value=getToken();return parseDepotReadCredential(value)?value.trim():null;}catch{return null;}};
   let snapshotToken=null;
-  const emit=(status,model=null)=>{if(!disposed)try{onChange({status,model,history});}catch{}};
+  const emit=(status,model=null)=>{if(!disposed)try{onChange({status,model,history,reasons});}catch{}};
   const stop=()=>{generation++;pending?.abort();pending=null;};
-  const wipe=()=>{current=null;stored=null;history=null;snapshotToken=null;};
+  const wipe=()=>{current=null;stored=null;history=null;reasons=null;snapshotToken=null;};
   function project(){
     const clock=now(),valid=m=>m?.status==='FRESH_SNAPSHOT'&&clock<=m.expiresAt;
     const model=valid(current)?current:valid(stored)?stored:null;
@@ -92,6 +92,11 @@ export function createDepotReadClient({getToken,onChange=()=>{},fetchImpl=global
     // Keep only validated graph projections, never the broad account response.
     history=Object.fromEntries(['1h','1d','1w'].map(range=>[range,buildDepotHistoryModel(archive.data,{now:now(),range})]));
     if(!current&&!stored&&h.status==='STALE')stored={status:'STALE'};
+    // Fixed categories only; never raw responses, holdings or credentials.
+    const failed=r=>r.failed||r.data===undefined;
+    reasons={current:failed(dashboard)?'TRANSPORT':c.status==='FRESH_SNAPSHOT'?'OK':c.status==='STALE'?'STALE':'INCOMPLETE',
+      prices:failed(prices)?'TRANSPORT':'OK',
+      history:failed(archive)?'TRANSPORT':h.status==='FRESH_SNAPSHOT'?'OK':h.status==='STALE'?'STALE':history['1w']?.status==='empty'?'EMPTY':'INCOMPLETE'};
     project();
   }
   function revalidate(){if(disposed)return;if(!token()||(snapshotToken&&token()!==snapshotToken)){lock();return;}if(current||stored)project();else if(!attempted&&!pending)emit('not_loaded');}
