@@ -31,7 +31,11 @@ test('A0: exactly one decision and unknown data fail closed',()=>{
  assert.equal((html.match(/data-decision-owner=/g)||[]).length,1);
  assert.match(html,/data-preview-mode="manual-bot-depot-read-only"/);
  assert.match(html,/data-execution-impact="false"/);
- assert.match(html,/JETZT WICHTIG[\s\S]*?UNGEKLÄRT/);
+ const decision=html.match(/<section\b(?=[^>]*\bdata-decision-owner=)[^>]*>[\s\S]*?<\/section>/)?.[0];
+ assert.ok(decision,'single risk decision section exists');
+ assert.match(decision,/RISIKOSTATUS[\s\S]*?UNBEKANNT/);
+ assert.match(decision,/Keine bestätigte Risikoprüfung/);
+ assert.match(decision,/Fehlende Daten sind keine Entwarnung/);
  assert.match(html,/<div class="portfolio-value"[^>]*>—<\/div>/);
  assert.match(html,/Gesamtwert nicht verifiziert/);
  assert.match(html,/Fehlende Daten sind keine Entwarnung/);
