@@ -93,6 +93,40 @@ test('capture rejects future and expired per-symbol fetch times before store adm
   assert.equal(expiredDb.calls.some(sql=>sql.startsWith('INSERT INTO')),false);
 });
 
+test('provider failure preserves a retained mark inside the freshness bound and rejects one just beyond it',async()=>{
+  const makeData=fetchedAt=>{
+    const data=dataFor(),quote={price:100,source:'BINANCE_PUBLIC_HISTORY_CAPTURE',sourceQuality:'PUBLIC_LIVE_FETCH',fetchedAt,providerObservedAt:null};
+    data.livePrices.BTC={...quote};
+    data.livePriceMeta={fresh:true,fetchedAt,updatedAt:fetchedAt,perSymbol:{BTC:{...quote}}};
+    return data;
+  };
+  const retainedAt=NOW-5*60*1000,data=makeData(retainedAt),db=fakeDb();
+  const out=await capturePortfolioHistoryOnce({db,data,fetchPrices:async()=>{throw new Error('feed_unavailable')},now:()=>NOW,timestamp:NOW});
+  assert.equal(out.ok,true);
+  assert.equal(out.inserted,true);
+  assert.equal(out.snapshot.sourceStatus.spotPriceProvenance.status,'COMPLETE');
+  assert.equal(out.snapshot.sourceStatus.spotPriceProvenance.fetchStatus,'FAILED');
+  assert.equal(out.snapshot.sourceStatus.spotPriceProvenance.fetchReason,'PRICE_FETCH_FAILED');
+  assert.equal(out.snapshot.sourceStatus.spotPriceProvenance.symbols.BTC.fetchedAt,retainedAt);
+  assert.equal(data.livePriceMeta.fetchedAt,retainedAt);
+  assert.equal(data.livePrices.BTC.fetchedAt,retainedAt);
+  assert.equal(data.livePriceMeta.perSymbol.BTC.fetchedAt,retainedAt);
+  const storedSourceStatus=JSON.parse(db.insertArgs[7]);
+  assert.equal(storedSourceStatus.spotPriceProvenance.fetchStatus,'FAILED');
+  assert.equal(storedSourceStatus.spotPriceProvenance.fetchReason,'PRICE_FETCH_FAILED');
+  assert.equal(storedSourceStatus.spotPriceProvenance.symbols.BTC.fetchedAt,retainedAt);
+  assert.equal(canonicalHistoryPointComplete({timestamp:NOW,spotUsd:out.snapshot.spotUsd,tradingUsd:out.snapshot.tradingUsd,totalUsd:out.snapshot.totalUsd,sourceStatus:storedSourceStatus}),true);
+
+  const expiredAt=NOW-SPOT_PRICE_AUTHORITY_MAX_AGE_MS-1,expiredData=makeData(expiredAt),expiredDb=fakeDb();
+  const expired=await capturePortfolioHistoryOnce({db:expiredDb,data:expiredData,fetchPrices:async()=>{throw new Error('feed_unavailable')},now:()=>NOW,timestamp:NOW});
+  assert.equal(expired.ok,false);
+  assert.equal(expired.snapshot.sourceStatus.spotPriceProvenance.status,'INCOMPLETE');
+  assert.equal(expired.snapshot.sourceStatus.spotPriceProvenance.symbols.BTC.reason,'FETCH_TIME_EXPIRED');
+  assert.equal(expired.snapshot.sourceStatus.spotPriceProvenance.symbols.BTC.fetchedAt,expiredAt);
+  assert.equal(expiredData.livePriceMeta.fetchedAt,expiredAt);
+  assert.equal(expiredDb.calls.some(sql=>sql.startsWith('INSERT INTO')),false);
+});
+
 test('capture never admits whitespace or trim-colliding holding symbols',async()=>{
   for(const [label,symbols,expectedSpotUsd] of [
     ['whitespace symbol',[' BTC '],11],
