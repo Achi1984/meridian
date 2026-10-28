@@ -98,11 +98,29 @@ test('portfolio price coverage distinguishes complete, partial and fallback valu
 test('spot price coverage rejects missing, future, and expired per-symbol fetch provenance',()=>{
   const base={portfolio:{holdings:[{symbol:'BTC',venue:'Ledger',quantity:1}]}};
   const check=fetchedAt=>portfolioPriceCoverage({...base,livePrices:{BTC:{price:100,source:'BINANCE_SPOT',...(fetchedAt===undefined?{}:{ts:fetchedAt})}},livePriceMeta:{fresh:true}},1_000_000);
+  assert.equal(check(999_999).complete,true);
   assert.equal(check(undefined).complete,false);
   assert.equal(check(1_000_001).missingSymbols[0].reason,'FETCH_TIME_FUTURE');
   assert.equal(check(1_000_000-SPOT_PRICE_AUTHORITY_MAX_AGE_MS-1).missingSymbols[0].reason,'FETCH_TIME_EXPIRED');
   const zero=portfolioPriceCoverage({...base,livePrices:{BTC:{price:0,source:'BINANCE_SPOT',ts:999}},livePriceMeta:{fresh:true}},1_000_000);
   assert.equal(zero.missingSymbols[0].reason,'PRICE_MISSING_OR_INVALID');
+});
+
+test('legacy R18 compatibility cannot launder explicit malformed price metadata',()=>{
+  const base={portfolio:{holdings:[{symbol:'BTC',venue:'Ledger',quantity:1}]},livePriceMeta:{fresh:true}};
+  const coverage=entry=>portfolioPriceCoverage({...base,livePrices:{BTC:entry}},1_000_000);
+  const original={price:100,source:'BINANCE_SPOT',ts:999_999};
+  assert.equal(coverage(original).complete,true);
+  for(const [label,fields] of [
+    ['stale quality',{sourceQuality:'STALE'}],
+    ['policy quality',{sourceQuality:'POLICY_ASSUMPTION'}],
+    ['undefined quality',{sourceQuality:undefined}],
+    ['null quality',{sourceQuality:null}],
+    ['expired observation',{providerObservedAt:1_000_000-24*60*60*1000}],
+    ['future observation',{providerObservedAt:1_000_001}],
+    ['undefined observation',{providerObservedAt:undefined}],
+    ['null observation',{providerObservedAt:null}]
+  ])assert.equal(coverage({...original,...fields}).complete,false,label);
 });
 
 test('current app quotes identify local fetch time without claiming provider observation time',()=>{

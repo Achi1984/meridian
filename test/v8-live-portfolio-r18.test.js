@@ -56,6 +56,32 @@ test('R18 cache reuse preserves the original market-fetch receipt timestamp',()=
   assert.match(adapter,/buildLivePriceOverlay\(data,tickers\.rows,tickers\.fetchedAt\)/);
 });
 
+test('R18 adapter reuses ticker data without renewing its receipt timestamp',async()=>{
+  const originalWindow=globalThis.window,originalNow=Date.now,initialNow=1_000,requests=[];
+  let now=initialNow;
+  const rawFetch=async input=>{
+    const url=typeof input==='string'?input:input?.url||'';
+    requests.push(url);
+    if(url.includes('api.binance.com'))return new Response(JSON.stringify([{symbol:'BTCUSDT',price:'50000'}]),{status:200,headers:{'content-type':'application/json'}});
+    return new Response(JSON.stringify({data:{portfolio:{holdings:[{symbol:'BTC',venue:'Ledger',quantity:1}]}}}),{status:200,headers:{'content-type':'application/json'}});
+  };
+  globalThis.window={fetch:rawFetch};
+  Date.now=()=>now;
+  try{
+    await import(`../v8-clean/live-price-adapter-r18.js?adapter-cache-${initialNow}`);
+    const first=await (await window.fetch('/api/private/dashboard')).json();
+    now=initialNow+20_000;
+    const reused=await (await window.fetch('/api/private/dashboard')).json();
+    assert.equal(first.data.livePrices.BTC.fetchedAt,initialNow);
+    assert.equal(reused.data.livePrices.BTC.fetchedAt,initialNow);
+    assert.equal(portfolioPriceCoverage(reused.data,now).complete,true);
+    assert.equal(requests.filter(url=>url.includes('api.binance.com')).length,1);
+  }finally{
+    Date.now=originalNow;
+    if(originalWindow===undefined)delete globalThis.window;else globalThis.window=originalWindow;
+  }
+});
+
 test('R18 clears stale persisted live prices when public feed is unavailable',()=>{
   const out=clearStaleLivePrices({livePrices:{BTC:{price:1}}},456,'fail');
   assert.deepEqual(out.livePrices,{});
