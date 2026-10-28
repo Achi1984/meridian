@@ -28,19 +28,19 @@ async function publicPrices(){
 }
 export function mergeRuntimePrices(data={},prices={},opts={}){
   prices=prices&&typeof prices==='object'?prices:{};
-  const next={...data,livePrices:{...(data.livePrices||{})}},holdings=Array.isArray(data?.portfolio?.holdings)?data.portfolio.holdings:[],symbols=[...new Set(holdings.filter(h=>String(h?.venue||'').trim().toLowerCase()!=='pionex').map(h=>String(h?.symbol||'').trim()).filter(Boolean))],fetchedAt=Number(opts.fetchedAt),attemptAt=Number(opts.attemptAt??Date.now()),meta={...(data.livePriceMeta||{})},perSymbol={...(meta.perSymbol||{})};
+  const next={...data,livePrices:{...(data.livePrices||{})}},holdings=Array.isArray(data?.portfolio?.holdings)?data.portfolio.holdings:[],symbols=[...new Set(holdings.filter(h=>String(h?.venue||'').trim().toLowerCase()!=='pionex').map(h=>String(h?.symbol||'').trim()).filter(Boolean))],fetchedAt=typeof opts.fetchedAt==='number'?opts.fetchedAt:NaN,attemptAt=typeof opts.attemptAt==='number'?opts.attemptAt:Date.now(),meta={...(data.livePriceMeta||{})},perSymbol={...(meta.perSymbol||{})};
   let resolved=0;
   for(const symbol of symbols){
     const price=Number(prices[sym(symbol)]);
     if(Number.isFinite(price)&&price>0&&Number.isFinite(fetchedAt)){
-      next.livePrices[symbol]={...(next.livePrices[symbol]||{}),price,source:'BINANCE_PUBLIC_HISTORY_CAPTURE',ts:fetchedAt};
-      perSymbol[symbol]={source:'BINANCE_PUBLIC_HISTORY_CAPTURE',sourceQuality:'PUBLIC_LIVE_FETCH',fetchedAt,providerObservedAt:null};
+      next.livePrices[symbol]={...(next.livePrices[symbol]||{}),price,source:'BINANCE_PUBLIC_HISTORY_CAPTURE',sourceQuality:'PUBLIC_LIVE_FETCH',fetchedAt,providerObservedAt:null,ts:fetchedAt};
+      perSymbol[symbol]={price,source:'BINANCE_PUBLIC_HISTORY_CAPTURE',sourceQuality:'PUBLIC_LIVE_FETCH',fetchedAt,providerObservedAt:null};
       resolved++;
     }
   }
   const fetchSucceeded=opts.fetchSucceeded!==false,complete=fetchSucceeded&&resolved===symbols.length;
-  const fetchReason=opts.fetchReason||(!complete&&fetchSucceeded?'PRICE_SYMBOLS_UNRESOLVED':null);
-  next.livePriceMeta={...meta,perSymbol,fresh:complete,requestedCount:symbols.length,resolvedCount:resolved,fetchStatus:!fetchSucceeded?'FAILED':complete?'COMPLETE':'PARTIAL',fetchReason:fetchReason?String(fetchReason).slice(0,120):null,lastFetchAttemptAt:Number.isFinite(attemptAt)?attemptAt:null,lastFetchSource:'BINANCE_PUBLIC_HISTORY_CAPTURE'};
+  const fetchReason=!fetchSucceeded?'PRICE_FETCH_FAILED':!complete?'PRICE_SYMBOLS_UNRESOLVED':null;
+  next.livePriceMeta={...meta,perSymbol,fresh:complete,requestedCount:symbols.length,resolvedCount:resolved,fetchStatus:!fetchSucceeded?'FAILED':complete?'COMPLETE':'PARTIAL',fetchReason,lastFetchAttemptAt:Number.isFinite(attemptAt)?attemptAt:null,lastFetchSource:'BINANCE_PUBLIC_HISTORY_CAPTURE'};
   if(fetchSucceeded&&Number.isFinite(fetchedAt))next.livePriceMeta.fetchedAt=fetchedAt;
   return next;
 }
@@ -48,9 +48,9 @@ export async function capturePortfolioHistoryOnce(opts={}){
   const p=opts.db||db();if(!p)return{ok:false,reason:'NO_DATABASE'};
   await ensurePortfolioHistorySchema(p);
   const current=opts.data||await stateGet();if(!current)return{ok:false,reason:'PRIVATE_DASHBOARD_UNAVAILABLE'};
-  const clock=()=>{const value=typeof opts.now==='function'?opts.now():typeof opts.clock==='function'?opts.clock():opts.now;const n=Number(value??Date.now());return Number.isFinite(n)?n:Date.now()};
+  const clock=()=>{const value=typeof opts.now==='function'?opts.now():typeof opts.clock==='function'?opts.clock():opts.now;return typeof value==='number'&&Number.isFinite(value)?value:Date.now()};
   let prices={},priceStatus='LIVE',priceReason=null,fetchSucceeded=true;
-  try{prices=opts.fetchPrices?await opts.fetchPrices():opts.prices??await publicPrices()}catch(e){priceStatus='STORED_PRICE_FALLBACK';priceReason=String(e?.message||e).slice(0,120);fetchSucceeded=false;console.error('[PORTFOLIO_HISTORY] prices',priceReason)}
+  try{prices=opts.fetchPrices?await opts.fetchPrices():opts.prices??await publicPrices()}catch(_e){priceStatus='STORED_PRICE_FALLBACK';priceReason='PRICE_FETCH_FAILED';fetchSucceeded=false;console.error('[PORTFOLIO_HISTORY] prices',priceReason)}
   if(!prices||typeof prices!=='object')prices={};
   const fetchedAt=fetchSucceeded?clock():null,attemptAt=clock(),timestamp=opts.timestamp??attemptAt;
   const enriched=mergeRuntimePrices(current,prices,{attemptAt,fetchedAt,fetchSucceeded,fetchReason:priceReason});
@@ -60,7 +60,7 @@ export async function capturePortfolioHistoryOnce(opts={}){
 }
 export function startPortfolioHistoryCapture(){
   if(!DATABASE_URL){console.log('[PORTFOLIO_HISTORY] disabled · missing database');return{enabled:false}}
-  const run=async()=>{if(running)return;running=true;try{const r=await capturePortfolioHistoryOnce();console.log(`[PORTFOLIO_HISTORY] ${r.inserted?'captured':'unchanged'} · ${r.snapshot?.totalUsd??'—'} USD · ${r.priceStatus||r.reason}`)}catch(e){console.error('[PORTFOLIO_HISTORY] failed',String(e?.message||e))}finally{running=false}};
+  const run=async()=>{if(running)return;running=true;  try{const r=await capturePortfolioHistoryOnce();console.log(`[PORTFOLIO_HISTORY] ${r.inserted?'captured':'unchanged'} · ${r.snapshot?.totalUsd??'—'} USD · ${r.priceStatus||r.reason}`)}catch(_e){console.error('[PORTFOLIO_HISTORY] failed · PORTFOLIO_HISTORY_CAPTURE_FAILED')}finally{running=false}};
   setTimeout(run,20000);const timer=setInterval(run,INTERVAL_MIN*60000);timer.unref?.();
   console.log(`[PORTFOLIO_HISTORY] enabled · every ${INTERVAL_MIN} min`);return{enabled:true,intervalMin:INTERVAL_MIN};
 }

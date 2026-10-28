@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { capturePortfolioHistoryOnce, mergeRuntimePrices } from '../portfolio-history-runtime.js';
 import { SPOT_PRICE_AUTHORITY_MAX_AGE_MS } from '../portfolio-data-contract.js';
+import { canonicalHistoryPointComplete } from '../portfolio-history-store.js';
 
 const NOW=Date.parse('2026-10-28T04:00:00Z');
 function dataFor(symbols=['BTC']){
@@ -17,8 +18,8 @@ function dataFor(symbols=['BTC']){
   };
 }
 function fakeDb(existing=[]){
-  const calls=[];
-  return{calls,query:async(sql)=>{calls.push(sql);if(sql.startsWith('SELECT captured_at'))return{rows:existing};return{rows:[]}}};
+  const calls=[];let insertArgs=null;
+  return{calls,get insertArgs(){return insertArgs},query:async(sql,args)=>{calls.push(sql);if(sql.startsWith('SELECT captured_at'))return{rows:existing};if(sql.startsWith('INSERT INTO'))insertArgs=args;return{rows:[]}}};
 }
 
 test('runtime prices normalize wrapped assets and attach fetch rather than observation provenance',()=>{
@@ -44,10 +45,10 @@ test('a failed price fetch cannot freshen retained positive legacy prices or adm
   assert.equal(out.ok,false);
   assert.equal(out.reason,'PORTFOLIO_AUTHORITY_INCOMPLETE');
   assert.equal(out.priceStatus,'STORED_PRICE_FALLBACK');
-  assert.equal(out.priceReason,'feed_unavailable');
+  assert.equal(out.priceReason,'PRICE_FETCH_FAILED');
   assert.deepEqual(out.snapshot.sourceStatus.spotPriceProvenance.requiredSymbols,['BTC']);
   assert.equal(out.snapshot.sourceStatus.spotPriceProvenance.status,'INCOMPLETE');
-  assert.equal(out.snapshot.sourceStatus.spotPriceProvenance.fetchReason,'feed_unavailable');
+  assert.equal(out.snapshot.sourceStatus.spotPriceProvenance.fetchReason,'PRICE_FETCH_FAILED');
   assert.deepEqual(data.livePrices,before);
   assert.equal(data.livePriceMeta.updatedAt,NOW);
   assert.equal(data.livePriceMeta.fresh,true);
@@ -71,7 +72,7 @@ test('a partial symbol response retains the missing mark and refuses a complete 
   assert.equal(out.snapshot.sourceStatus.spotPriceProvenance.symbols.BTC.price,110);
   assert.equal(out.snapshot.sourceStatus.spotPriceProvenance.fetchStatus,'PARTIAL');
   assert.equal(out.snapshot.sourceStatus.spotPriceProvenance.symbols.BTC.valid,true);
-  assert.equal(out.snapshot.sourceStatus.spotPriceProvenance.symbols.ETH.reason,'PROVENANCE_MISSING');
+  assert.equal(out.snapshot.sourceStatus.spotPriceProvenance.symbols.ETH.reason,'PROVENANCE_MISSING_OR_UNSUPPORTED');
   assert.equal(db.calls.some(sql=>sql.startsWith('INSERT INTO')),false);
 });
 
@@ -83,11 +84,59 @@ test('capture rejects future and expired per-symbol fetch times before store adm
   assert.equal(futureDb.calls.some(sql=>sql.startsWith('INSERT INTO')),false);
 
   const expiredData=dataFor(),expiredDb=fakeDb();
-  expiredData.livePriceMeta.perSymbol={BTC:{source:'OLD_FEED',sourceQuality:'PUBLIC_LIVE_FETCH',fetchedAt:NOW-SPOT_PRICE_AUTHORITY_MAX_AGE_MS-1,providerObservedAt:null}};
+  const expiredAt=NOW-SPOT_PRICE_AUTHORITY_MAX_AGE_MS-1;
+  expiredData.livePrices.BTC={price:100,source:'BINANCE_PUBLIC_HISTORY_CAPTURE',sourceQuality:'PUBLIC_LIVE_FETCH',fetchedAt:expiredAt,providerObservedAt:null};
+  expiredData.livePriceMeta.perSymbol={BTC:{price:100,source:'BINANCE_PUBLIC_HISTORY_CAPTURE',sourceQuality:'PUBLIC_LIVE_FETCH',fetchedAt:expiredAt,providerObservedAt:null}};
   const expired=await capturePortfolioHistoryOnce({db:expiredDb,data:expiredData,fetchPrices:async()=>{throw new Error('feed_unavailable')},now:()=>NOW,timestamp:NOW});
   assert.equal(expired.ok,false);
   assert.equal(expired.snapshot.sourceStatus.spotPriceProvenance.symbols.BTC.reason,'FETCH_TIME_EXPIRED');
   assert.equal(expiredDb.calls.some(sql=>sql.startsWith('INSERT INTO')),false);
+});
+
+test('capture rejects malformed, unsupported, or mismatched per-symbol provenance',async()=>{
+  const baseline={price:100,source:'BINANCE_PUBLIC_HISTORY_CAPTURE',sourceQuality:'PUBLIC_LIVE_FETCH',fetchedAt:NOW-10,providerObservedAt:null};
+  const cases=[
+    ['missing source',record=>{delete record.source}],
+    ['null source',record=>{record.source=null}],
+    ['undefined source',record=>{record.source=undefined}],
+    ['wrong source type',record=>{record.source=42}],
+    ['missing quality',record=>{delete record.sourceQuality}],
+    ['null quality',record=>{record.sourceQuality=null}],
+    ['undefined quality',record=>{record.sourceQuality=undefined}],
+    ['wrong quality type',record=>{record.sourceQuality=42}],
+    ['unsupported stale quality',record=>{record.sourceQuality='STALE'}],
+    ['unsupported fallback label',record=>{record.sourceQuality='FALLBACK'}],
+    ['policy assumption',record=>{record.source='STABLE_VALUE_POLICY';record.sourceQuality='POLICY_ASSUMPTION'}],
+    ['missing fetch time',record=>{delete record.fetchedAt}],
+    ['null fetch time',record=>{record.fetchedAt=null}],
+    ['undefined fetch time',record=>{record.fetchedAt=undefined}],
+    ['wrong fetch time type',record=>{record.fetchedAt=String(NOW-10)}],
+    ['wrong observation time type',record=>{record.providerObservedAt='unknown'}],
+    ['mismatched price',record=>{record.price=101}]
+  ];
+  for(const [label,mutate] of cases){
+    const data=dataFor(),db=fakeDb(),record={...baseline};
+    mutate(record);
+    data.livePrices.BTC={...baseline};
+    data.livePriceMeta.perSymbol={BTC:record};
+    const out=await capturePortfolioHistoryOnce({db,data,prices:{},now:()=>NOW,timestamp:NOW});
+    assert.equal(out.ok,false,label);
+    assert.equal(out.snapshot.sourceStatus.spotPriceProvenance.symbols.BTC.valid,false,label);
+    assert.equal(db.calls.some(sql=>sql.startsWith('INSERT INTO')),false,label);
+  }
+});
+
+test('fetch failure diagnostics never expose raw provider exception content',async()=>{
+  const data=dataFor(),db=fakeDb(),sentinel='secret://provider/<payload> DO_NOT_PERSIST';
+  const original=console.error,logs=[];
+  console.error=(...args)=>logs.push(args.join(' '));
+  try{
+    const out=await capturePortfolioHistoryOnce({db,data,fetchPrices:async()=>{throw new Error(sentinel)},now:()=>NOW,timestamp:NOW});
+    assert.equal(out.priceReason,'PRICE_FETCH_FAILED');
+    assert.equal(out.snapshot.sourceStatus.spotPriceProvenance.fetchReason,'PRICE_FETCH_FAILED');
+    assert.doesNotMatch(JSON.stringify(out),/secret:\/\/provider|DO_NOT_PERSIST|<payload>/);
+    assert.doesNotMatch(logs.join(' '),/secret:\/\/provider|DO_NOT_PERSIST|<payload>/);
+  }finally{console.error=original}
 });
 
 test('complete fetched prices insert with source and fetch times while preserving authoritative equity',async()=>{
@@ -103,6 +152,9 @@ test('complete fetched prices insert with source and fetch times while preservin
   assert.equal(out.snapshot.sourceStatus.spotPriceProvenance.symbols.BTC.providerObservedAt,null);
   assert.equal(out.snapshot.sourceStatus.spotPriceProvenance.symbols.BTC.fetchedAt,NOW-1);
   assert.equal(db.calls.some(sql=>sql.startsWith('INSERT INTO')),true);
+  const storedSourceStatus=JSON.parse(db.insertArgs[7]);
+  assert.deepEqual(storedSourceStatus.spotPriceProvenance,out.snapshot.sourceStatus.spotPriceProvenance);
+  assert.equal(canonicalHistoryPointComplete({timestamp:NOW,spotUsd:out.snapshot.spotUsd,tradingUsd:out.snapshot.tradingUsd,totalUsd:out.snapshot.totalUsd,sourceStatus:storedSourceStatus}),true);
 });
 
 test('no required spot holdings preserve complete independent venue and trading authorities',async()=>{

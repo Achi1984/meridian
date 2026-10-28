@@ -12,13 +12,13 @@ let cache={at:0,rows:null};
 
 async function allTickers(){
   const now=Date.now();
-  if(Array.isArray(cache.rows)&&now-cache.at<CACHE_MS)return cache.rows;
+  if(Array.isArray(cache.rows)&&now-cache.at<CACHE_MS)return{rows:cache.rows,fetchedAt:cache.at};
   const r=await rawFetch(BINANCE_ALL,{cache:'no-store',headers:{accept:'application/json'}});
   if(!r.ok)throw new Error(`market_http_${r.status}`);
   const rows=await r.json();
   if(!Array.isArray(rows))throw new Error('market_payload_invalid');
-  cache={at:now,rows};
-  return rows;
+  cache={at:Date.now(),rows};
+  return{rows:cache.rows,fetchedAt:cache.at};
 }
 
 function isDashboardGet(input,init){
@@ -34,8 +34,8 @@ window.fetch=async function meridianLivePortfolioFetch(input,init){
     const payload=await response.clone().json();
     const data=payload?.data||payload;
     let augmented;
-    try{augmented=buildLivePriceOverlay(data,await allTickers(),Date.now())}
-    catch(e){augmented=clearStaleLivePrices(data,Date.now(),String(e?.message||e))}
+    try{const tickers=await allTickers();augmented=buildLivePriceOverlay(data,tickers.rows,tickers.fetchedAt)}
+    catch(_e){augmented=clearStaleLivePrices(data,Date.now(),'MARKET_FEED_UNAVAILABLE')}
     const body=payload?.data?{...payload,data:augmented}:augmented;
     const headers=new Headers(response.headers);headers.set('content-type','application/json; charset=utf-8');headers.set('cache-control','no-store');
     return new Response(JSON.stringify(body),{status:response.status,statusText:response.statusText,headers});

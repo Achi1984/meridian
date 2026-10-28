@@ -99,7 +99,8 @@ function applyQuote(sym,price,change24h,source,status='LIVE',ts=Date.now(),sched
  price=Number(price);change24h=Number(change24h);
  if(!Number.isFinite(price)||price<=0)return;
  DATA.livePrices=DATA.livePrices||{};
- DATA.livePrices[sym]={price,change24h:Number.isFinite(change24h)?change24h:(DATA.livePrices[sym]?.change24h||0),source,status,updatedAt:ts,fetchedAt:ts,providerObservedAt:null,sourceQuality:status};
+ const sourceQuality=source==='CoinGecko REST'&&status==='FALLBACK'?'PUBLIC_FALLBACK_FETCH':['Binance REST','Binance WebSocket'].includes(source)&&status==='LIVE'?'PUBLIC_LIVE_FETCH':'UNSUPPORTED';
+ DATA.livePrices[sym]={price,change24h:Number.isFinite(change24h)?change24h:(DATA.livePrices[sym]?.change24h||0),source,status,updatedAt:ts,fetchedAt:ts,providerObservedAt:null,sourceQuality};
  LAST_PRICE_UPDATE=Math.max(LAST_PRICE_UPDATE||0,ts);
  if(schedule)scheduleLiveRender();
 }

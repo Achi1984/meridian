@@ -95,6 +95,17 @@ test('canonical history completeness requires both authority components and arit
   assert.equal(canonicalHistoryPointComplete({...base,sourceStatus:{...base.sourceStatus,spotPriceProvenance:undefined}}),false);
   assert.equal(canonicalHistoryPointComplete({...base,sourceStatus:{...base.sourceStatus,spotPriceProvenance:spotProvenance(1000,1001)}}),false);
   assert.equal(canonicalHistoryPointComplete({...base,sourceStatus:{...base.sourceStatus,spotPriceProvenance:spotProvenance(1000,1000-15*60*1000-1)}}),false);
+  const row=base.sourceStatus.spotPriceProvenance.symbols.BTC;
+  for(const [label,mutate] of [
+    ['missing source',x=>delete x.source],['null source',x=>{x.source=null}],['undefined source',x=>{x.source=undefined}],['wrong source type',x=>{x.source=42}],
+    ['missing quality',x=>delete x.sourceQuality],['null quality',x=>{x.sourceQuality=null}],['undefined quality',x=>{x.sourceQuality=undefined}],['wrong quality type',x=>{x.sourceQuality=42}],
+    ['unsupported quality',x=>{x.sourceQuality='STALE'}],['policy assumption',x=>{x.source='STABLE_VALUE_POLICY';x.sourceQuality='POLICY_ASSUMPTION'}],
+    ['wrong price type',x=>{x.price='100'}],['wrong time type',x=>{x.fetchedAt='900'}],['valid flag',x=>{x.valid=1}]
+  ]){
+    const invalid={...row};mutate(invalid);
+    const point={...base,sourceStatus:{...base.sourceStatus,spotPriceProvenance:{...base.sourceStatus.spotPriceProvenance,symbols:{BTC:invalid}}}};
+    assert.equal(canonicalHistoryPointComplete(point),false,label);
+  }
 });
 
 

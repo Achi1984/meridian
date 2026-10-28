@@ -98,7 +98,7 @@ test('portfolio price coverage distinguishes complete, partial and fallback valu
 test('spot price coverage rejects missing, future, and expired per-symbol fetch provenance',()=>{
   const base={portfolio:{holdings:[{symbol:'BTC',venue:'Ledger',quantity:1}]}};
   const check=fetchedAt=>portfolioPriceCoverage({...base,livePrices:{BTC:{price:100,source:'BINANCE_SPOT',...(fetchedAt===undefined?{}:{ts:fetchedAt})}},livePriceMeta:{fresh:true}},1_000_000);
-  assert.equal(check(undefined).missingSymbols[0].reason,'FETCH_TIME_MISSING_OR_INVALID');
+  assert.equal(check(undefined).complete,false);
   assert.equal(check(1_000_001).missingSymbols[0].reason,'FETCH_TIME_FUTURE');
   assert.equal(check(1_000_000-SPOT_PRICE_AUTHORITY_MAX_AGE_MS-1).missingSymbols[0].reason,'FETCH_TIME_EXPIRED');
   const zero=portfolioPriceCoverage({...base,livePrices:{BTC:{price:0,source:'BINANCE_SPOT',ts:999}},livePriceMeta:{fresh:true}},1_000_000);
@@ -107,18 +107,50 @@ test('spot price coverage rejects missing, future, and expired per-symbol fetch 
 
 test('current app quotes identify local fetch time without claiming provider observation time',()=>{
   const app=fs.readFileSync(new URL('../app.js',import.meta.url),'utf8');
-  assert.match(app,/updatedAt:ts,fetchedAt:ts,providerObservedAt:null,sourceQuality:status/);
-  const d={portfolio:{holdings:[{symbol:'BTC',venue:'Ledger',quantity:1}]},livePriceMeta:{fresh:false},livePrices:{BTC:{price:100,source:'Binance REST',status:'LIVE',updatedAt:999,fetchedAt:999,providerObservedAt:null,sourceQuality:'LIVE'}}};
+  assert.match(app,/updatedAt:ts,fetchedAt:ts,providerObservedAt:null,sourceQuality/);
+  const d={portfolio:{holdings:[{symbol:'BTC',venue:'Ledger',quantity:1}]},livePriceMeta:{fresh:false},livePrices:{BTC:{price:100,source:'Binance REST',status:'LIVE',updatedAt:999,fetchedAt:999,providerObservedAt:null,sourceQuality:'PUBLIC_LIVE_FETCH'}}};
   assert.equal(portfolioPriceCoverage(d,1000).complete,true);
   const legacy={...d,livePriceMeta:{fresh:true},livePrices:{BTC:{price:100,source:'Binance REST',status:'LIVE',updatedAt:999}}};
   assert.equal(portfolioPriceCoverage(legacy,1000).complete,false);
+  const fallback={...d,livePrices:{BTC:{price:100,source:'CoinGecko REST',status:'FALLBACK',updatedAt:999,fetchedAt:999,providerObservedAt:null,sourceQuality:'PUBLIC_FALLBACK_FETCH'}}};
+  assert.equal(portfolioPriceCoverage(fallback,1000).complete,true);
 });
 
 test('provider observation time is validated independently from local fetch time',()=>{
-  const data={portfolio:{holdings:[{symbol:'BTC',venue:'Ledger',quantity:1}]},livePriceMeta:{perSymbol:{BTC:{source:'PUBLIC_FEED',sourceQuality:'LIVE',fetchedAt:999,providerObservedAt:1001}}},livePrices:{BTC:{price:100}}};
+  const entry={price:100,source:'BINANCE_PUBLIC_HISTORY_CAPTURE',sourceQuality:'PUBLIC_LIVE_FETCH',fetchedAt:999,providerObservedAt:1001};
+  const data={portfolio:{holdings:[{symbol:'BTC',venue:'Ledger',quantity:1}]},livePriceMeta:{perSymbol:{BTC:{...entry}}},livePrices:{BTC:{...entry}}};
   const coverage=portfolioPriceCoverage(data,1000);
   assert.equal(coverage.complete,false);
   assert.equal(coverage.missingSymbols[0].reason,'OBSERVATION_TIME_INVALID_OR_STALE');
+});
+
+test('spot provenance requires typed closed metadata bound to the exact accepted mark',()=>{
+  const data={portfolio:{holdings:[{symbol:'BTC',venue:'Ledger',quantity:1}]},livePriceMeta:{fresh:true},livePrices:{BTC:{price:100,source:'BINANCE_PUBLIC_HISTORY_CAPTURE',sourceQuality:'PUBLIC_LIVE_FETCH',fetchedAt:999,providerObservedAt:null}}};
+  const withRecord=(mutate,entry=data.livePrices.BTC)=>{
+    const record={price:entry.price,source:entry.source,sourceQuality:entry.sourceQuality,fetchedAt:entry.fetchedAt,providerObservedAt:entry.providerObservedAt};
+    mutate(record);
+    return{...data,livePrices:{BTC:entry},livePriceMeta:{fresh:true,perSymbol:{BTC:record}}};
+  };
+  assert.equal(portfolioPriceCoverage(withRecord(()=>{}),1000).complete,true);
+  for(const [label,mutate] of [
+    ['missing source',x=>delete x.source],
+    ['null source',x=>{x.source=null}],
+    ['undefined source',x=>{x.source=undefined}],
+    ['wrong source type',x=>{x.source=42}],
+    ['missing quality',x=>delete x.sourceQuality],
+    ['null quality',x=>{x.sourceQuality=null}],
+    ['undefined quality',x=>{x.sourceQuality=undefined}],
+    ['wrong quality type',x=>{x.sourceQuality=42}],
+    ['unsupported quality',x=>{x.sourceQuality='STALE'}],
+    ['policy quality',x=>{x.source='STABLE_VALUE_POLICY';x.sourceQuality='POLICY_ASSUMPTION'}],
+    ['missing fetched time',x=>delete x.fetchedAt],
+    ['null fetched time',x=>{x.fetchedAt=null}],
+    ['undefined fetched time',x=>{x.fetchedAt=undefined}],
+    ['wrong fetched time type',x=>{x.fetchedAt='999'}],
+    ['mismatched value',x=>{x.price=101}]
+  ])assert.equal(portfolioPriceCoverage(withRecord(mutate),1000).complete,false,label);
+  const mismatch={...data,livePriceMeta:{perSymbol:{BTC:{price:101,source:'BINANCE_PUBLIC_HISTORY_CAPTURE',sourceQuality:'PUBLIC_LIVE_FETCH',fetchedAt:999,providerObservedAt:null}}}};
+  assert.equal(portfolioPriceCoverage(mismatch,1000).complete,false);
 });
 
 test('canonical snapshot exposes valuation provenance without changing Spot + Pionex math',()=>{

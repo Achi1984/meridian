@@ -20,19 +20,25 @@ export function buildLivePriceOverlay(data={},tickerRows=[],fetchedAt=Date.now()
     const price=Number(row?.price);
     if(symbol&&Number.isFinite(price)&&price>0)byPair.set(symbol,price);
   }
-  const livePrices={};let resolved=0,requested=0;
+  const livePrices={};let resolved=0,requested=0,policyAssumptionCount=0;
   for(const h of spotHoldingsForPricing(data)){
     const raw=String(h?.symbol||'').trim().toUpperCase();
     if(!raw)continue;
     requested++;
     const asset=pricingAsset(raw);
-    const price=STABLES.has(asset)?1:byPair.get(`${asset}USDT`);
-    if(Number.isFinite(price)&&price>0){livePrices[raw]={price,ts:fetchedAt,source:'BINANCE_SPOT'};resolved++}
+    const marketPrice=byPair.get(`${asset}USDT`),policyAssumption=marketPrice===undefined&&STABLES.has(asset),price=policyAssumption?1:marketPrice;
+    if(Number.isFinite(price)&&price>0){
+      const source=policyAssumption?'STABLE_VALUE_POLICY':'BINANCE_SPOT',sourceQuality=policyAssumption?'POLICY_ASSUMPTION':'PUBLIC_LIVE_FETCH',providerObservedAt=null;
+      livePrices[raw]={price,source,sourceQuality,providerObservedAt};
+      if(!policyAssumption){livePrices[raw].ts=fetchedAt;livePrices[raw].fetchedAt=fetchedAt}
+      if(policyAssumption)policyAssumptionCount++;else resolved++;
+    }
   }
+  const perSymbol=Object.fromEntries(Object.entries(livePrices).map(([symbol,quote])=>[symbol,{price:quote.price,source:quote.source,sourceQuality:quote.sourceQuality,fetchedAt:quote.fetchedAt,providerObservedAt:quote.providerObservedAt}]));
   return {
     ...data,
     livePrices,
-    livePriceMeta:{source:'BINANCE_SPOT',fetchedAt,fresh:true,requestedCount:requested,resolvedCount:resolved,privacyMode:'ALL_TICKERS_NO_HOLDING_QUERY'}
+    livePriceMeta:{source:'BINANCE_SPOT',fetchedAt,fresh:resolved===requested,requestedCount:requested,resolvedCount:resolved,policyAssumptionCount,perSymbol,privacyMode:'ALL_TICKERS_NO_HOLDING_QUERY'}
   };
 }
 
