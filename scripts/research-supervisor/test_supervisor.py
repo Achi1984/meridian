@@ -24,9 +24,11 @@ import supervisor
 FAULT_ADAPTER = ROOT / "test_fault_adapter.mjs"
 HISTORICAL_TEST_ADAPTER = ROOT / "test_b1_historical_fixture.mjs"
 MAX_DIAGNOSTIC_ELAPSED_MS = 60_000
+HISTORICAL_FIXTURE_LIMITS = {"path_seconds": 10, "batch_seconds": 20}
 
 
-def _generated_historical_result_diagnostic(result, elapsed_ms=None):
+def _generated_historical_result_diagnostic(
+        result, elapsed_ms=None, configured_batch_seconds=None):
     diagnostic = {}
     if type(result) is dict:
         for key in ("state", "reason"):
@@ -47,7 +49,10 @@ def _generated_historical_result_diagnostic(result, elapsed_ms=None):
     if (type(elapsed_ms) in (int, float) and
             0 <= elapsed_ms <= MAX_DIAGNOSTIC_ELAPSED_MS and math.isfinite(elapsed_ms)):
         diagnostic["elapsedMs"] = round(elapsed_ms, 3)
-        diagnostic["batchSeconds"] = round(elapsed_ms / 1000, 3)
+    if (type(configured_batch_seconds) in (int, float) and
+            0 < configured_batch_seconds <= journal.MAX_BATCH_SECONDS and
+            math.isfinite(configured_batch_seconds)):
+        diagnostic["configuredBatchSeconds"] = configured_batch_seconds
     rendered = json.dumps(diagnostic, sort_keys=True, separators=(",", ":"))
     return rendered if len(rendered) <= 1024 else rendered[:1021] + "..."
 
@@ -259,7 +264,7 @@ connection.close()
               patch.object(supervisor.subprocess, "Popen", side_effect=spawn)):
             return supervisor.run_b1_batch(
                 self.database, claim,
-                limits=limits or {"path_seconds": 10, "batch_seconds": 20})
+                limits=limits or HISTORICAL_FIXTURE_LIMITS)
 
     def test_generated_historical_result_diagnostic_is_allowlisted_and_bounded(self):
         trial_id = "a" * 64
@@ -278,7 +283,8 @@ connection.close()
             "extraField": {"value": "not permitted"},
         }
 
-        diagnostic = _generated_historical_result_diagnostic(result, 1234.6)
+        diagnostic = _generated_historical_result_diagnostic(
+            result, 1234.6, HISTORICAL_FIXTURE_LIMITS["batch_seconds"])
         rendered = json.loads(diagnostic)
 
         self.assertEqual(rendered, {
@@ -288,7 +294,7 @@ connection.close()
             "pathCount": 2,
             "completedPathCount": 1,
             "elapsedMs": 1234.6,
-            "batchSeconds": 1.235,
+            "configuredBatchSeconds": 20,
         })
         self.assertNotIn("attempts", rendered)
         self.assertLessEqual(len(diagnostic), 1024)
@@ -301,19 +307,31 @@ connection.close()
                                 10 ** 400, private_text):
             with self.subTest(invalid_elapsed=repr(invalid_elapsed)):
                 invalid = json.loads(
-                    _generated_historical_result_diagnostic(result, invalid_elapsed))
+                    _generated_historical_result_diagnostic(
+                        result, invalid_elapsed, HISTORICAL_FIXTURE_LIMITS["batch_seconds"]))
                 self.assertNotIn("elapsedMs", invalid)
-                self.assertNotIn("batchSeconds", invalid)
+                self.assertEqual(invalid["configuredBatchSeconds"], 20)
+        for invalid_batch_seconds in (0, -1, True, float("nan"), float("inf"),
+                                      float("-inf"), journal.MAX_BATCH_SECONDS + 1,
+                                      10 ** 400, private_text):
+            with self.subTest(invalid_batch_seconds=repr(invalid_batch_seconds)):
+                invalid = json.loads(
+                    _generated_historical_result_diagnostic(
+                        result, 1234.6, invalid_batch_seconds))
+                self.assertEqual(invalid["elapsedMs"], 1234.6)
+                self.assertNotIn("configuredBatchSeconds", invalid)
 
     def test_generated_historical_profile_runs_all_paths_and_refuses_repeat(self):
         profile_path, claim = self.prepare_historical_fixture("historical-success")
         started_at = time.monotonic()
         result = None
         try:
-            result = self.run_historical_fixture(profile_path, claim, "SUCCESS")
+            result = self.run_historical_fixture(
+                profile_path, claim, "SUCCESS", limits=HISTORICAL_FIXTURE_LIMITS)
         finally:
             elapsed_ms = (time.monotonic() - started_at) * 1000
-            diagnostic = _generated_historical_result_diagnostic(result, elapsed_ms)
+            diagnostic = _generated_historical_result_diagnostic(
+                result, elapsed_ms, HISTORICAL_FIXTURE_LIMITS["batch_seconds"])
             print(f"SYNTHETIC_SUPERVISOR_TIMING {diagnostic}", flush=True)
         self.assertEqual(result["state"], "completed", diagnostic)
         self.assertEqual(result["attempts"], 1, diagnostic)

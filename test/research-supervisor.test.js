@@ -116,6 +116,9 @@ function runPython(args, timeoutMs, label) {
     timeout: timeoutMs,
     maxBuffer
   });
+  for (const line of String(result.stdout || "").split(/\r?\n/)) {
+    if (line.startsWith("SYNTHETIC_SUPERVISOR_TIMING ")) console.log(line);
+  }
   assert.equal(result.error, undefined, diagnostic(label, result));
   assert.equal(result.status, 0, diagnostic(label, result));
   return result;
@@ -156,9 +159,6 @@ test("durable bounded research supervisor synthetic suite", () => {
     assert.match(result.stderr, /\nOK(?:\n|$)/,
       `${group.name} must pass without skips\n${tail(result.stderr)}`);
     assert.doesNotMatch(result.stderr, /skipped=/, `${group.name} must not skip tests`);
-    for (const line of result.stdout.split(/\r?\n/)) {
-      if (line.startsWith("SYNTHETIC_SUPERVISOR_TIMING ")) console.log(line);
-    }
     const durationMs = Math.round(performance.now() - groupStartedAt);
     timings.push({name: group.name, count: group.methods.length, durationMs});
   }
