@@ -1,12 +1,16 @@
-import {createDepotHistoryView} from './depot-history-view.js?v=B14-M11';
+import {createDepotHistoryView} from './depot-history-view.js?v=B14-M11-DEPOT976';
 // DOM text only. Neither credentials nor raw response bodies are rendered.
 const LABELS={
   locked:['Gesperrt','App mit Meridian-Passwort öffnen, dann Depot manuell aktualisieren.'],
+  not_loaded:['Noch nicht geladen','Depot manuell aktualisieren.'],
   loading:['Wird geladen','Die gespeicherte Depotbewertung wird geprüft.'],
   fresh:['Letzte vollständige Depotbewertung','Gespeicherter Snapshot · keine Live-Kurse oder aktuelle Kontovollständigkeit.'],
   stale:['Daten veraltet','Bewertung ausgeblendet. Bitte manuell aktualisieren.'],
   unavailable:['Nicht verfügbar','Keine verifizierbare Depotbewertung. Fehlende Daten sind nicht null.']
 };
+const REASONS={TRANSPORT:'nicht erreichbar',INCOMPLETE:'unvollständig',STALE:'veraltet',EMPTY:'keine vollständigen Bewertungen im Zeitraum'};
+const diagnose=r=>r?[['Aktuell',r.current],['Kurse',r.prices],['Historie',r.history]].filter(([,v])=>Object.hasOwn(REASONS,v))
+  .map(([k,v])=>k+': '+REASONS[v]).join(' · '):'';
 const money=x=>new Intl.NumberFormat('de-DE',{style:'currency',currency:'USD'}).format(x);
 export function createDepotReadView(root,{getToken,createClient,commandRoot=null}={}){
   const document=root.ownerDocument;
@@ -19,8 +23,9 @@ export function createDepotReadView(root,{getToken,createClient,commandRoot=null
   let disposed=false,range='1d',lastHistory=null;
   const chartRoot=el('section');section.append(chartRoot);
   const chart=createDepotHistoryView(chartRoot,{onRange:key=>{range=key;chart.render(lastHistory?.[range],range);}});
+  let rendered=false;
   function render(state){
-    if(disposed)return;
+    if(disposed)return;rendered=true;
     let kind=Object.hasOwn(LABELS,state?.status)?state.status:'unavailable';
     const m=state?.model;
     lastHistory=state?.history||null;chart.render(lastHistory?.[range],range);
@@ -41,6 +46,7 @@ export function createDepotReadView(root,{getToken,createClient,commandRoot=null
       commandRoot.dataset.state=kind;
     }
     status.replaceChildren(el('strong',current?'Depotbewertung':LABELS[kind][0]),el('p',current?'Aus serverseitigen Depotdaten. Lokale Ergänzungen aus V10 sind nicht enthalten.':LABELS[kind][1]));
+    if(kind==='unavailable'||kind==='stale'){const why=diagnose(state?.reasons);if(why)status.append(el('p',why));}
     details.replaceChildren();details.setAttribute('aria-busy',String(kind==='loading'));
     if(kind!=='fresh')return;
     const total=el('p',money(m.totalUsd));total.className='depot-total';
@@ -58,7 +64,7 @@ export function createDepotReadView(root,{getToken,createClient,commandRoot=null
   const client=createClient({getToken,onChange:render});
   const update=()=>client.refresh(),clear=()=>client.lock();
   refresh.addEventListener('click',update);lock.addEventListener('click',clear);
-  render({status:'locked'});
+  client.revalidate();if(!rendered)render({status:'locked'});
   return {revalidate:()=>client.revalidate(),dispose(){if(disposed)return;client.dispose();
     render({status:'locked'});disposed=true;refresh.removeEventListener('click',update);lock.removeEventListener('click',clear);root.replaceChildren();}};
 }

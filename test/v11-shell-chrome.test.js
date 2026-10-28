@@ -54,7 +54,7 @@ for(const width of [320,375,390,430]){
  assert.equal(x.dpr,1);assert.ok(x.body<=width+1&&x.root<=width+1,'overflow '+width);
  assert.equal(x.decision,1);assert.equal(x.nav.length,5);
  assert.match(x.decisionBackground,/125deg.*rgb\(27, 53, 80\)/,'A1 gradient must survive CSS cascade');
- assert.deepEqual(x.sourceLabels,['Gesperrt','Unbekannt','Unbekannt'],'unrefreshed readers do not verify sources');
+ assert.deepEqual(x.sourceLabels,['Noch nicht geladen','Unbekannt','Unbekannt'],'unrefreshed readers do not verify sources');
  for(const accent of x.unknownBotsAccents){
   assert.equal(accent,x.attentionColor,'unknown BOTS surface uses attention, not category status');
   assert.notEqual(accent,x.positiveColor,'unknown BOTS surface cannot imply positive verification');
