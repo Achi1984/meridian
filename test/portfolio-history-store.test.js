@@ -106,6 +106,10 @@ test('canonical history completeness requires both authority components and arit
     const point={...base,sourceStatus:{...base.sourceStatus,spotPriceProvenance:{...base.sourceStatus.spotPriceProvenance,symbols:{BTC:invalid}}}};
     assert.equal(canonicalHistoryPointComplete(point),false,label);
   }
+  for(const symbols of [[' BTC '],['BTC',' BTC ']]){
+    const invalid={...base,sourceStatus:{...base.sourceStatus,spotPriceProvenance:{...base.sourceStatus.spotPriceProvenance,status:'COMPLETE',requiredSymbols:symbols,symbols:Object.fromEntries(symbols.map(symbol=>[symbol,{...row}]))}}};
+    assert.equal(canonicalHistoryPointComplete(invalid),false,`noncanonical required symbols: ${symbols.join(',')}`);
+  }
 });
 
 

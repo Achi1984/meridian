@@ -106,6 +106,26 @@ test('spot price coverage rejects missing, future, and expired per-symbol fetch 
   assert.equal(zero.missingSymbols[0].reason,'PRICE_MISSING_OR_INVALID');
 });
 
+test('canonical snapshots reject whitespace symbols and trim-collisions without changing holding values',()=>{
+  const quote={price:100,source:'BINANCE_PUBLIC_HISTORY_CAPTURE',sourceQuality:'PUBLIC_LIVE_FETCH',fetchedAt:999_999,providerObservedAt:null};
+  const make=holdings=>({livePrices:{BTC:quote},livePriceMeta:{perSymbol:{BTC:{...quote}}},portfolio:{
+    authorityMode:'STRICT_VENUE_SNAPSHOT',externalVenueSnapshotComplete:true,externalVenueExpectedVenues:['OKX'],requiredHoldingVenues:['Ledger'],
+    holdings,manualVenueBalances:[{venue:'OKX',valueUsd:10,updatedAt:999_999}]
+  }});
+  for(const [label,holdings,expectedSpotUsd] of [
+    ['whitespace symbol',[{symbol:' BTC ',quantity:1,price:1,venue:'Ledger',updatedAt:999_999}],11],
+    ['trim collision',[{symbol:'BTC',quantity:1,price:1,venue:'Ledger',updatedAt:999_999},{symbol:' BTC ',quantity:1,price:1,venue:'Ledger',updatedAt:999_999}],111]
+  ]){
+    const data=make(holdings),original=structuredClone(data.portfolio.holdings),snapshot=canonicalPortfolioSnapshot(data,1_000_000);
+    assert.equal(snapshot.spotUsd,expectedSpotUsd,label);
+    assert.equal(snapshot.priceCoverage.complete,false,label);
+    assert.equal(snapshot.spotAuthority.holdingsPricingComplete,false,label);
+    assert.equal(snapshot.spotAuthority.complete,false,label);
+    assert.deepEqual(data.portfolio.holdings,original,label);
+    assert.equal(snapshot.priceCoverage.missingSymbols.some(x=>x.reason==='REQUIRED_SYMBOL_NONCANONICAL'),true,label);
+  }
+});
+
 test('legacy R18 compatibility cannot launder explicit malformed price metadata',()=>{
   const base={portfolio:{holdings:[{symbol:'BTC',venue:'Ledger',quantity:1}]},livePriceMeta:{fresh:true}};
   const coverage=entry=>portfolioPriceCoverage({...base,livePrices:{BTC:entry}},1_000_000);

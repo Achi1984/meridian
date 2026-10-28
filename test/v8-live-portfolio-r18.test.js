@@ -34,6 +34,14 @@ test('R18 overlays fetched prices and marks fixed stable values as policy assump
   assert.equal(out.livePriceMeta.privacyMode,'ALL_TICKERS_NO_HOLDING_QUERY');
 });
 
+test('R18 does not normalize whitespace symbols into a certified market mark',()=>{
+  const data={portfolio:{holdings:[{symbol:' BTC ',quantity:1,venue:'Ledger'}]}};
+  const out=buildLivePriceOverlay(data,[{symbol:'BTCUSDT',price:'80000'}],1000);
+  assert.equal(out.livePrices.BTC,undefined);
+  assert.equal(out.livePriceMeta.fresh,false);
+  assert.equal(portfolioPriceCoverage(out,1001).complete,false);
+});
+
 test('R18 overlay treats fixed stable values as assumptions, not complete observed prices',()=>{
   const data={portfolio:{holdings:[{symbol:'USDC',venue:'Ledger',quantity:100}]}};
   const assumed=buildLivePriceOverlay(data,[],1000);

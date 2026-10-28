@@ -93,6 +93,33 @@ test('capture rejects future and expired per-symbol fetch times before store adm
   assert.equal(expiredDb.calls.some(sql=>sql.startsWith('INSERT INTO')),false);
 });
 
+test('capture never admits whitespace or trim-colliding holding symbols',async()=>{
+  for(const [label,symbols,expectedSpotUsd] of [
+    ['whitespace symbol',[' BTC '],11],
+    ['trim collision',['BTC',' BTC '],121]
+  ]){
+    const data=dataFor(symbols),db=fakeDb();
+    data.portfolio.manualVenueBalances[0].valueUsd=10;
+    for(const holding of data.portfolio.holdings)holding.price=1;
+    const quote={price:100,source:'BINANCE_PUBLIC_HISTORY_CAPTURE',sourceQuality:'PUBLIC_LIVE_FETCH',fetchedAt:NOW-10,providerObservedAt:null};
+    data.livePrices={BTC:{...quote}};
+    data.livePriceMeta={fresh:true,perSymbol:{BTC:{...quote}}};
+    const originalSymbols=data.portfolio.holdings.map(h=>h.symbol);
+    const out=await capturePortfolioHistoryOnce({db,data,prices:{BTC:110},now:()=>NOW,timestamp:NOW});
+    assert.equal(out.ok,false,label);
+    assert.equal(out.snapshot.spotUsd,expectedSpotUsd,label);
+    assert.equal(out.snapshot.spotAuthorityComplete,false,label);
+    assert.equal(out.snapshot.sourceStatus.spotPriceProvenance.status,'INCOMPLETE',label);
+    if(symbols.includes('BTC')){
+      assert.equal(out.snapshot.sourceStatus.spotPriceProvenance.symbols.BTC.valid,true,label);
+      assert.equal(out.snapshot.sourceStatus.spotPriceProvenance.symbols.BTC.price,110,label);
+    }else assert.deepEqual(out.snapshot.sourceStatus.spotPriceProvenance.symbols,{},label);
+    assert.equal(out.snapshot.sourceStatus.spotPriceProvenance.symbols[' BTC '],undefined,label);
+    assert.deepEqual(data.portfolio.holdings.map(h=>h.symbol),originalSymbols,label);
+    assert.equal(db.calls.some(sql=>sql.startsWith('INSERT INTO')),false,label);
+  }
+});
+
 test('capture rejects malformed, unsupported, or mismatched per-symbol provenance',async()=>{
   const baseline={price:100,source:'BINANCE_PUBLIC_HISTORY_CAPTURE',sourceQuality:'PUBLIC_LIVE_FETCH',fetchedAt:NOW-10,providerObservedAt:null};
   const cases=[

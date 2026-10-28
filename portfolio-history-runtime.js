@@ -3,6 +3,7 @@
 
 import pg from 'pg';
 import { appendPortfolioHistory, ensurePortfolioHistorySchema } from './portfolio-history-store.js';
+import { canonicalPriceSymbol } from './portfolio-data-contract.js';
 
 const { Pool }=pg;
 const DATABASE_URL=String(process.env.DATABASE_URL||'').trim();
@@ -28,9 +29,10 @@ async function publicPrices(){
 }
 export function mergeRuntimePrices(data={},prices={},opts={}){
   prices=prices&&typeof prices==='object'?prices:{};
-  const next={...data,livePrices:{...(data.livePrices||{})}},holdings=Array.isArray(data?.portfolio?.holdings)?data.portfolio.holdings:[],symbols=[...new Set(holdings.filter(h=>String(h?.venue||'').trim().toLowerCase()!=='pionex').map(h=>String(h?.symbol||'').trim()).filter(Boolean))],fetchedAt=typeof opts.fetchedAt==='number'?opts.fetchedAt:NaN,attemptAt=typeof opts.attemptAt==='number'?opts.attemptAt:Date.now(),meta={...(data.livePriceMeta||{})},perSymbol={...(meta.perSymbol||{})};
+  const next={...data,livePrices:{...(data.livePrices||{})}},holdings=Array.isArray(data?.portfolio?.holdings)?data.portfolio.holdings:[],symbols=[...new Set(holdings.filter(h=>String(h?.venue||'').trim().toLowerCase()!=='pionex'&&typeof h?.symbol==='string'&&h.symbol.trim()).map(h=>h.symbol))],fetchedAt=typeof opts.fetchedAt==='number'?opts.fetchedAt:NaN,attemptAt=typeof opts.attemptAt==='number'?opts.attemptAt:Date.now(),meta={...(data.livePriceMeta||{})},perSymbol={...(meta.perSymbol||{})};
   let resolved=0;
   for(const symbol of symbols){
+    if(canonicalPriceSymbol(symbol)!==symbol)continue;
     const price=Number(prices[sym(symbol)]);
     if(Number.isFinite(price)&&price>0&&Number.isFinite(fetchedAt)){
       next.livePrices[symbol]={...(next.livePrices[symbol]||{}),price,source:'BINANCE_PUBLIC_HISTORY_CAPTURE',sourceQuality:'PUBLIC_LIVE_FETCH',fetchedAt,providerObservedAt:null,ts:fetchedAt};

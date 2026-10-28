@@ -10,10 +10,11 @@ const FALLBACK_PRICE_SOURCES=new Set(['CoinGecko REST']);
 const num=(v,f=0)=>Number.isFinite(Number(v))?Number(v):f;
 const round=(v,d=2)=>Math.round(num(v)*10**d)/10**d;
 const finite=v=>v===null||v===undefined||v===''?null:(Number.isFinite(Number(v))?Number(v):null);
+export function canonicalPriceSymbol(symbol){return typeof symbol==='string'&&symbol.length>0&&symbol.trim()===symbol?symbol:null}
 
 export function holdingUsd(data={},holding={}){
   const q=finite(holding.quantity);
-  const live=finite(data?.livePrices?.[holding.symbol]?.price);
+  const symbol=canonicalPriceSymbol(holding.symbol),live=symbol?finite(data?.livePrices?.[symbol]?.price):null;
   const own=finite(holding.price);
   const stored=finite(holding.value)??finite(holding.valueUsd)??finite(holding.usdValue);
   if(q!=null&&q>=0&&live!=null&&live>0)return q*live;
@@ -53,7 +54,8 @@ function spotPriceProvenance(data,symbol,now,maxAgeMs=SPOT_PRICE_AUTHORITY_MAX_A
   const sourceQualitySupported=typeof source==='string'&&typeof sourceQuality==='string'&&((sourceQuality==='PUBLIC_LIVE_FETCH'&&LIVE_PRICE_SOURCES.has(source))||(sourceQuality==='PUBLIC_FALLBACK_FETCH'&&FALLBACK_PRICE_SOURCES.has(source)));
   const recordMatches=!hasRecord||(record!==null&&typeof record==='object'&&!Array.isArray(record)&&typeof record.source==='string'&&typeof record.sourceQuality==='string'&&typeof record.fetchedAt==='number'&&(record.providerObservedAt===null||typeof record.providerObservedAt==='number')&&typeof record.price==='number'&&record.price===price&&record.source===source&&record.sourceQuality===sourceQuality&&record.fetchedAt===rawFetchedAt&&record.providerObservedAt===observationRaw);
   let reason='FRESH';
-  if(typeof price!=='number'||!Number.isFinite(price)||price<=0)reason='PRICE_MISSING_OR_INVALID';
+  if(canonicalPriceSymbol(symbol)!==symbol)reason='REQUIRED_SYMBOL_NONCANONICAL';
+  else if(typeof price!=='number'||!Number.isFinite(price)||price<=0)reason='PRICE_MISSING_OR_INVALID';
   else if(!sourceQualitySupported)reason='PROVENANCE_MISSING_OR_UNSUPPORTED';
   else if(!recordMatches)reason='PROVENANCE_MISMATCH';
   else if(!age.known)reason='FETCH_TIME_MISSING_OR_INVALID';
@@ -153,7 +155,7 @@ export function authoritativeSpotHoldings(data={},now=Date.now(),maxAgeMs=PORTFO
 
 export function portfolioPriceCoverage(data={},now=Date.now()){
   const auth=authoritativeSpotHoldings(data,now),holdings=auth.current,meta=data?.livePriceMeta||{},strict=auth.strict;
-  const requiredSymbols=[...new Set(holdings.map(h=>String(h?.symbol||'').trim()).filter(Boolean))],missingSymbolCount=holdings.filter(h=>!String(h?.symbol||'').trim()).length,symbols=requiredSymbols.map(symbol=>spotPriceProvenance(data,symbol,now)),requested=requiredSymbols.length+missingSymbolCount,resolved=symbols.filter(x=>x.valid).length,missingSymbols=[...symbols.filter(x=>!x.valid).map(x=>({symbol:x.symbol,reason:x.reason})),...Array.from({length:missingSymbolCount},()=>({symbol:null,reason:'REQUIRED_SYMBOL_MISSING'}))];
+  const holdingSymbols=holdings.map(h=>canonicalPriceSymbol(h?.symbol)),requiredSymbols=[...new Set(holdingSymbols.filter(Boolean))],invalidHoldings=holdings.filter(h=>canonicalPriceSymbol(h?.symbol)===null),symbols=requiredSymbols.map(symbol=>spotPriceProvenance(data,symbol,now)),requested=requiredSymbols.length+invalidHoldings.length,resolved=symbols.filter(x=>x.valid).length,missingSymbols=[...symbols.filter(x=>!x.valid).map(x=>({symbol:x.symbol,reason:x.reason})),...invalidHoldings.map(h=>({symbol:typeof h?.symbol==='string'?h.symbol:null,reason:typeof h?.symbol==='string'&&h.symbol.trim()?'REQUIRED_SYMBOL_NONCANONICAL':'REQUIRED_SYMBOL_MISSING'}))];
   const feedFresh=requested===resolved,complete=feedFresh,partial=requested>0&&resolved>0&&!complete;
   const fetchReason=['PRICE_FETCH_FAILED','PRICE_SYMBOLS_UNRESOLVED'].includes(meta.fetchReason)?meta.fetchReason:null;
   return{holdingCount:holdings.length,requested,resolved,feedFresh,complete,partial,strict,requiredSymbols,symbols,missingSymbols,excludedStaleHoldings:auth.stale.length,supersededHoldings:auth.superseded.length,externalVenueCount:auth.external.venueCount,fetchStatus:['COMPLETE','PARTIAL','FAILED'].includes(meta.fetchStatus)?meta.fetchStatus:'UNKNOWN',fetchReason};
@@ -165,7 +167,7 @@ export function spotHistoryProvenanceComplete(point={}){
   if(requiredSymbols.length===0)return provenance.status==='NO_REQUIRED_SYMBOLS';
   return provenance.status==='COMPLETE'&&requiredSymbols.every(symbol=>{
     const row=symbolRows[symbol],fetched=typeof row?.fetchedAt==='number'?sourceTimestampAge(row.fetchedAt,timestamp):{known:false},observation=row?.providerObservedAt==null?null:typeof row.providerObservedAt==='number'?sourceTimestampAge(row.providerObservedAt,timestamp):{known:false},sourceQualitySupported=typeof row?.source==='string'&&typeof row?.sourceQuality==='string'&&((row.sourceQuality==='PUBLIC_LIVE_FETCH'&&LIVE_PRICE_SOURCES.has(row.source))||(row.sourceQuality==='PUBLIC_FALLBACK_FETCH'&&FALLBACK_PRICE_SOURCES.has(row.source)));
-    return typeof symbol==='string'&&symbol.trim().length>0&&Object.prototype.hasOwnProperty.call(symbolRows,symbol)&&typeof row?.price==='number'&&Number.isFinite(row.price)&&row.price>0&&sourceQualitySupported&&row.valid===true&&fetched.known&&fetched.timestampMs<=timestamp&&fetched.ageMs<=SPOT_PRICE_AUTHORITY_MAX_AGE_MS&&(!observation||(observation.known&&observation.timestampMs<=timestamp&&observation.ageMs<=SPOT_PRICE_AUTHORITY_MAX_AGE_MS));
+    return canonicalPriceSymbol(symbol)===symbol&&Object.prototype.hasOwnProperty.call(symbolRows,symbol)&&typeof row?.price==='number'&&Number.isFinite(row.price)&&row.price>0&&sourceQualitySupported&&row.valid===true&&fetched.known&&fetched.timestampMs<=timestamp&&fetched.ageMs<=SPOT_PRICE_AUTHORITY_MAX_AGE_MS&&(!observation||(observation.known&&observation.timestampMs<=timestamp&&observation.ageMs<=SPOT_PRICE_AUTHORITY_MAX_AGE_MS));
   });
 }
 

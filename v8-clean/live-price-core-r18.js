@@ -22,9 +22,10 @@ export function buildLivePriceOverlay(data={},tickerRows=[],fetchedAt=Date.now()
   }
   const livePrices={};let resolved=0,requested=0,policyAssumptionCount=0;
   for(const h of spotHoldingsForPricing(data)){
-    const raw=String(h?.symbol||'').trim().toUpperCase();
+    const original=h?.symbol,raw=String(original||'').trim().toUpperCase();
     if(!raw)continue;
     requested++;
+    if(typeof original!=='string'||raw!==original)continue;
     const asset=pricingAsset(raw);
     const marketPrice=byPair.get(`${asset}USDT`),policyAssumption=marketPrice===undefined&&STABLES.has(asset),price=policyAssumption?1:marketPrice;
     if(Number.isFinite(price)&&price>0){
