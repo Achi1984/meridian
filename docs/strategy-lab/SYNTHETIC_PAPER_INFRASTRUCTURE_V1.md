@@ -93,6 +93,13 @@ an exact-decimal transactional journal.
 `UNKNOWN` blocks by default: retain the fence, prohibit dependent effects and
 automatic retry, and do not infer success or absence from a lost ACK. The first
 technical packet may test that block; it does not implement reconciliation.
+Per canonical contract §6, a read-only lookup of the exact original committed
+`receiptIdentity` under the same fence is idempotent retrieval, not a new
+transition or reconciliation: return the original result without a new row or
+effect. A lookup that does not find that exact committed receipt is not
+authoritative `OP_ABSENT` proof and never permits retry; keep `UNKNOWN` and its
+fence.
+
 The following are proposed semantic acceptance criteria for a future,
 separately versioned contract review, **not v1 fields or an adopted schema**:
 bind the original operation and immutable evidence to an authorized authority;
