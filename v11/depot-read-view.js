@@ -2,6 +2,7 @@ import {createDepotHistoryView} from './depot-history-view.js?v=B14-M11';
 // DOM text only. Neither credentials nor raw response bodies are rendered.
 const LABELS={
   locked:['Gesperrt','App mit Meridian-Passwort öffnen, dann Depot manuell aktualisieren.'],
+  not_loaded:['Noch nicht geladen','Depot manuell aktualisieren.'],
   loading:['Wird geladen','Die gespeicherte Depotbewertung wird geprüft.'],
   fresh:['Letzte vollständige Depotbewertung','Gespeicherter Snapshot · keine Live-Kurse oder aktuelle Kontovollständigkeit.'],
   stale:['Daten veraltet','Bewertung ausgeblendet. Bitte manuell aktualisieren.'],

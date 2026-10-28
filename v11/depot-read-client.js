@@ -48,7 +48,7 @@ async function readBounded(response, signal) {
 // Manual reads only. Independent source failures preserve other verified results.
 export function createDepotReadClient({getToken,onChange=()=>{},fetchImpl=globalThis.fetch,
   now=Date.now,schedule=setTimeout,cancelSchedule=clearTimeout}={}){
-  let generation=0,pending=null,disposed=false,current=null,stored=null,history=null;
+  let generation=0,pending=null,disposed=false,current=null,stored=null,history=null,attempted=false;
   const token=()=>{try{const value=getToken();return parseDepotReadCredential(value)?value.trim():null;}catch{return null;}};
   let snapshotToken=null;
   const emit=(status,model=null)=>{if(!disposed)try{onChange({status,model,history});}catch{}};
@@ -59,7 +59,7 @@ export function createDepotReadClient({getToken,onChange=()=>{},fetchImpl=global
     const model=valid(current)?current:valid(stored)?stored:null;
     emit(model?'fresh':current||stored?'stale':'unavailable',model);
   }
-  function lock(){stop();wipe();emit('locked');}
+  function lock(){stop();wipe();attempted=false;emit('locked');}
   async function read(url,credential,parent){
     const ctl=new AbortController();let timer,aborted;
     const abort=()=>ctl.abort();parent.addEventListener('abort',abort,{once:true});
@@ -80,7 +80,7 @@ export function createDepotReadClient({getToken,onChange=()=>{},fetchImpl=global
   }
   async function refresh(){
     if(disposed)return;stop();wipe();const credential=token();if(!credential){emit('locked');return;}
-    const id=generation,ctl=new AbortController();pending=ctl;snapshotToken=credential;emit('loading');
+    attempted=true;const id=generation,ctl=new AbortController();pending=ctl;snapshotToken=credential;emit('loading');
     if(id!==generation||disposed)return;
     const [dashboard,prices,archive]=await Promise.all([read(CURRENT_ENDPOINT,credential,ctl.signal),read(PRICE_ENDPOINT,null,ctl.signal),read(ENDPOINT,credential,ctl.signal)]);
     if(disposed||id!==generation)return;
@@ -94,7 +94,7 @@ export function createDepotReadClient({getToken,onChange=()=>{},fetchImpl=global
     if(!current&&!stored&&h.status==='STALE')stored={status:'STALE'};
     project();
   }
-  function revalidate(){if(disposed)return;if(!token()||(snapshotToken&&token()!==snapshotToken)){lock();return;}if(current||stored)project();}
+  function revalidate(){if(disposed)return;if(!token()||(snapshotToken&&token()!==snapshotToken)){lock();return;}if(current||stored)project();else if(!attempted&&!pending)emit('not_loaded');}
   function dispose(){if(disposed)return;lock();disposed=true;}
   return {refresh,lock,revalidate,dispose};
 }

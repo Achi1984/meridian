@@ -9,7 +9,7 @@ export function mountDepotReadAccess(document,window,{
 }={}){
   const root=document.getElementById('depot-read-root');
   if(!root)return null;
-  let client,view,unregister=()=>{},disposed=false,expiryTimer=null,expiryGeneration=0;
+  let client,view,unregister=()=>{},unsubscribe=()=>{},disposed=false,expiryTimer=null,expiryGeneration=0;
   function cancelExpiry(){
     expiryGeneration++;
     if(expiryTimer!==null){cancelSchedule(expiryTimer);expiryTimer=null;}
@@ -37,15 +37,16 @@ export function mountDepotReadAccess(document,window,{
           unregister();cancelExpiry();reader.dispose();
         }};
       }});
+    unsubscribe=access.subscribe(s=>{if(!disposed&&s?.status==='unlocked')view?.revalidate();});
   }catch{
-    cancelExpiry();unregister();
+    cancelExpiry();unregister();unsubscribe();
     try{client?.dispose();}catch{}
     root.textContent='Depotansicht nicht verfügbar. Bitte Seite neu laden.';
     return null;
   }
   return {dispose(){
     if(disposed)return;
-    disposed=true;access.lock();cancelExpiry();unregister();view.dispose();client=null;
+    disposed=true;unsubscribe();access.lock();cancelExpiry();unregister();view.dispose();client=null;
   }};
 }
 
