@@ -136,12 +136,20 @@ export function renderBotReadState(root, state, filters = {}) {
     else {
       const list=element(document,'ul');list.className='bot-card-list';
       list.setAttribute('aria-label','Bots im aktuellen Snapshot');
+      const referenceTail=ref=>{
+        let length=Math.min(6,ref.length);
+        while(length<ref.length&&data.bots.some(other=>other.ref!==ref&&
+          other.ref.slice(-length)===ref.slice(-length)))length++;
+        return ref.slice(-length);
+      };
       for (const bot of data.bots) {
         const item=element(document,'li'),card=element(document,'details'),summary=element(document,'summary');
         card.className='bot-card';
         card.id='bot-card-'+bot.ref;
         if(region.expanded.has(bot.ref))card.setAttribute('open','');
-        summary.setAttribute('aria-label',bot.symbol+' · '+bot.side+' · Referenz '+bot.ref+' · Details anzeigen');
+        summary.setAttribute('aria-label',bot.symbol+' · '+bot.side+' · Hebel '+
+          (bot.leverage===MISSING?'—':bot.leverage)+' · P/L laut Quelle '+bot.pnl+' · Kapital '+
+          bot.investment+' · ID-Ende '+referenceTail(bot.ref)+' · Details anzeigen');
         const top=element(document,'span');top.className='bot-card-top';
         const identity=element(document,'span');identity.className='bot-card-identity';
         const heading=element(document,'span',bot.symbol);heading.className='bot-card-heading';

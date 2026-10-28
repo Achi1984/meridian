@@ -34,6 +34,12 @@ window.__botSnapshot=age=>({schemaVersion:'MERIDIAN-ASSET-WATCH-BRIDGE-V1',sourc
   {botRef:'f'.repeat(20),symbol:'SOLUSDT',side:'LONG',cateType:'linear',botType:'futures_grid',
    leverage:null,pnl:{usd:0}}
  ]});
+window.__largeBotSnapshot=age=>{const snapshot=window.__botSnapshot(age);
+ snapshot.botCount=20;snapshot.bots=Array.from({length:20},(_,index)=>({
+  botRef:index.toString(16).padStart(20,'0'),symbol:index<2?'BTCUSDT':'SYNTH'+String(index).padStart(2,'0')+'USDT',
+  side:['LONG','SHORT','NEUTRAL'][index%3],cateType:index%2?'linear':'inverse',botType:'futures_grid',
+  leverage:index%10+1,investment:{usd:index+1},pnl:{usd:-(index+1)}
+ }));return snapshot;};
 window.fetch=async(url)=>{if(String(url).endsWith('/app-access')){
   window.__appAccessReads++;
   return new Response(JSON.stringify({version:'7.64-CANONICAL-PORTFOLIO-HISTORY-V3',points:[]}),
@@ -47,7 +53,7 @@ window.fetch=async(url)=>{if(String(url).endsWith('/app-access')){
    {headers:{'content-type':'application/json'}}));
  });
  const age=window.__botReadMode==='stale'?3600000:window.__botReadMode==='expires'?100:0;
- const payload=window.__botReadMode==='empty'
+ const payload=window.__botReadMode==='large'?window.__largeBotSnapshot(age):window.__botReadMode==='empty'
   ? {...window.__botSnapshot(0),botCount:0,bots:[]} : window.__botSnapshot(age);
  if(window.__botReadMode==='expires')payload.freshnessLimitMs=200;
  return new Response(JSON.stringify(payload),{headers:{'content-type':'application/json'}});
@@ -474,6 +480,51 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           assert.equal(await evaluate(`document.getElementById('command-bot-overview').dataset.state`),'stale');
           assert.doesNotMatch(await evaluate(`document.getElementById('command-bot-overview').innerText`),/Bots im Snapshot|BTCUSDT|Snapshot-Zeit/);
           assert.equal(await evaluate('window.__botReads'),10,'only explicit refresh actions reach the mock source');
+          if(size.width===320||size.width===390){
+            await evaluate(`window.__botReadMode='fresh';document.getElementById('bot-read-refresh').click()`);
+            await evaluate('new Promise(resolve=>setTimeout(resolve,60))');
+            await evaluate(`window.__botReadMode='large';document.getElementById('bot-read-refresh').click()`);
+            await evaluate('new Promise(resolve=>setTimeout(resolve,60))');
+            assert.equal(await evaluate(`document.querySelectorAll('#bot-read-root .bot-card').length`),20);
+            await evaluate('window.scrollTo(0,0)');
+            const largeLayout=await evaluate(`(()=>{
+              const root=document.getElementById('bot-read-root'),first=root.querySelector('.bot-card');
+              const filter=root.querySelector('.bot-overview-filters'),actions=filter.nextElementSibling;
+              const filtersRect=filter.getBoundingClientRect(),actionsRect=actions.getBoundingClientRect();
+              const firstRect=first.getBoundingClientRect();
+              return {count:root.querySelectorAll('.bot-card').length,
+                filtersBeforeCards:Boolean(filter.compareDocumentPosition(first)&Node.DOCUMENT_POSITION_FOLLOWING),
+                actionsBeforeCards:Boolean(actions.compareDocumentPosition(first)&Node.DOCUMENT_POSITION_FOLLOWING),
+                controlsReachable:filtersRect.top<firstRect.top&&actionsRect.top<firstRect.top&&
+                  filtersRect.bottom<=firstRect.top&&actionsRect.bottom<=firstRect.top,
+                overflow:document.documentElement.scrollWidth>innerWidth+1,
+                clipping:[...root.querySelectorAll('.bot-card')].some(card=>card.scrollWidth>card.clientWidth+1),
+                refs:new Set([...root.querySelectorAll('.bot-card')].map(card=>card.id)).size};
+            })()`);
+            assert.deepEqual(largeLayout,{count:20,filtersBeforeCards:true,actionsBeforeCards:true,
+              controlsReachable:true,overflow:false,clipping:false,refs:20},
+              `20-bot controls and geometry at ${size.width}px`);
+            await evaluate(`(()=>{
+              const search=document.getElementById('bot-symbol-search');search.value='NO_MATCH';
+              search.dispatchEvent(new Event('input',{bubbles:true}));
+              document.querySelector('#nav [data-v="command"]').click();
+              const jump=document.querySelector('#command-bot-overview button');
+              window.__largeJumpRef=jump.getAttribute('aria-label').match(/Referenz ([a-f0-9]{20})/)[1];
+              jump.focus();
+            })()`);
+            await key('Enter','Enter',13);
+            assert.equal(await evaluate(`document.getElementById('bot-card-'+window.__largeJumpRef)?.open`),true,
+              'keyboard jump selects the stable reference in a 20-bot snapshot');
+            const largeBack=`[...document.querySelectorAll('#bot-read-root button')].find(button=>button.textContent==='Zur vorherigen Auswahl zurück')`;
+            assert.equal(await evaluate(`(${largeBack}).hidden`),false);
+            await evaluate(`(${largeBack}).focus()`);await key('Enter','Enter',13);
+            assert.deepEqual(await evaluate(`({query:document.getElementById('bot-symbol-search').value,
+              focus:document.activeElement===document.getElementById('bot-symbol-search'),
+              hidden:(${largeBack}).hidden,reads:window.__botReads,
+              overflow:document.documentElement.scrollWidth>innerWidth+1})`),
+              {query:'NO_MATCH',focus:true,hidden:true,reads:12,overflow:false},
+              'keyboard return restores the selection without a new read or horizontal overflow');
+          }
           const finalLayout=await evaluate(`(()=>{
             window.scrollTo(0,document.documentElement.scrollHeight);
             const nav=document.getElementById('nav').getBoundingClientRect();
@@ -492,7 +543,7 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
               Buffer.from(image.data,'base64'));
           }
           return {width:size.width,height:size.height,mixedRows:fresh.cards,
-            collapsedCardHeights:fresh.cardHeights,requests:10,
+            collapsedCardHeights:fresh.cardHeights,requests:await evaluate('window.__botReads'),
             filtersNoRequest:true,commandJumpFocused:jump.focused,statesCleared:true,
             overflow:finalLayout.overflow,controls44px:fresh.touch,commandLayout,commandLargeText};
         },size.height);

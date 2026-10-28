@@ -310,8 +310,10 @@ test('collapsed native cards distinguish equal symbols and render only whitelist
   assert.ok(all(target,'details').every(node=>node.getAttribute('open')===null));
    const [first,second]=all(target,'details'),[firstSummary,secondSummary]=all(target,'summary');
    assert.doesNotMatch(firstSummary.textContent,/Referenz|Bot 1/);
-   assert.match(firstSummary.getAttribute('aria-label'),/Referenz a{20}/);
-   assert.match(secondSummary.getAttribute('aria-label'),/Referenz b{20}/);
+   assert.equal(firstSummary.getAttribute('aria-label'),
+     'BTC · Short · Hebel 5× · P/L laut Quelle -2,75 USD · Kapital 125,50 USD/USDT · ID-Ende aaaaaa · Details anzeigen');
+   assert.equal(secondSummary.getAttribute('aria-label'),
+     'BTC · Short · Hebel 5× · P/L laut Quelle -2,75 USD · Kapital 125,50 USD/USDT · ID-Ende bbbbbb · Details anzeigen');
    assert.match(firstSummary.textContent,/BTCShortHebel 5×/);
    assert.match(firstSummary.textContent,/Kapital125,50 USD\/USDT/);
    assert.match(firstSummary.textContent,/P\/L laut Quelle-2,75 USD/);
@@ -347,6 +349,21 @@ test('collapsed native cards distinguish equal symbols and render only whitelist
      assert.ok(summary.textContent.includes(expected),expected);
      assert.ok(all(target,'strong').some(node=>node.textContent===expected));
    }
+ });
+
+ test('duplicate-symbol accessible names include visible metrics and disambiguate reference-tail collisions',()=>{
+   const state=fresh(),target=root(),template=state.model.bots[0];
+   state.model.bots=[
+     {...template,ref:'a'.repeat(14)+'abcdef',metrics:{leverage:5,investmentUsd:125.5,pnlUsd:-2.75}},
+     {...template,ref:'b'.repeat(14)+'abcdef',metrics:{leverage:2,investmentUsd:80,pnlUsd:1.25}}
+   ];
+   renderBotReadState(target,state);
+   const names=all(target,'summary').map(summary=>summary.getAttribute('aria-label'));
+   assert.deepEqual(names,[
+     'BTC · Short · Hebel 5× · P/L laut Quelle -2,75 USD · Kapital 125,50 USD/USDT · ID-Ende aabcdef · Details anzeigen',
+     'BTC · Short · Hebel 2× · P/L laut Quelle +1,25 USD · Kapital 80,00 USD/USDT · ID-Ende babcdef · Details anzeigen'
+   ]);
+   assert.ok(names.every(name=>!name.includes('a'.repeat(14))&&!name.includes('b'.repeat(14))));
  });
 
  test('USD, USDT and COIN-M capital keep source units and original detail precision',()=>{

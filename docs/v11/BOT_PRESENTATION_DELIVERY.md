@@ -19,6 +19,12 @@ duplicate BTC symbols, unavailable and zero P/L, and a tiny nonzero P/L.
 
 [After at 320×568 with enlarged text](evidence/b11-bots-presentation/after-320x568-enlarged-text.png)
 
+The 1.35× browser check scales computed font sizes only on descendants of the
+Bot cards and Command overview; it does not enlarge the whole page or global
+text. Generated 20-bot snapshots at 320px and 390px confirmed that the labeled
+filters and refresh/lock controls remain before and reachable ahead of the card
+list, with no horizontal overflow and keyboard jump/return preserving selection.
+
 ## Command overview
 
 Command now shows compact rows with symbol/direction and signed two-decimal P/L;
@@ -51,6 +57,15 @@ horizontal overflow. Visible filter/action controls and disclosures meet the
 44px touch-target minimum. The run covered keyboard Command jump/return,
 same-snapshot disclosure persistence, filters without extra reads, and clearing
 on new, locked, stale and error states.
+
+Focused validation commands and totals:
+
+- `node --test test/v11-bot-read-view.test.js` — 33 tests passed.
+- `node --test test/v11-b11-bot-cockpit-chrome.test.js` — 1 actual-shell
+  Chromium test passed, including five standard viewports and generated
+  20-bot runs at 320px and 390px.
+- `node --test test/v11-terminal-entry.test.js` — 3 tests passed, including
+  five viewport runs and exact reversible source-delta checks.
 
 All screenshots and browser data are synthetic. These checks do not establish
 real-account behavior, physical-device/browser coverage, deployment, activation,
