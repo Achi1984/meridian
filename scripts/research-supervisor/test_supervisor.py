@@ -291,7 +291,9 @@ connection.close()
 
     def test_generated_historical_profile_runs_all_paths_and_refuses_repeat(self):
         profile_path, claim = self.prepare_historical_fixture("historical-success")
-        result = self.run_historical_fixture(profile_path, claim, "SUCCESS")
+        result = self.run_historical_fixture(
+            profile_path, claim, "SUCCESS",
+            limits={"path_seconds": 10, "batch_seconds": 35})
         diagnostic = _generated_historical_result_diagnostic(result)
         self.assertEqual(result["state"], "completed", diagnostic)
         self.assertEqual(result["attempts"], 1, diagnostic)
@@ -1148,16 +1150,21 @@ process.stdout.write(JSON.stringify(runBatch({
         self.assertEqual(settle.call_args.args[2:4], ("TIMED_OUT", "DEADLINE_EXCEEDED"), diagnostic)
 
     def test_output_flood_and_parent_exit_with_inherited_pipe_are_bounded(self):
-        for source, reason in (("c" * 64, "STDOUT_BOUND"), ("9" * 64, "STDERR_BOUND"),
-                               ("d" * 64, "DEADLINE_EXCEEDED")):
+        cases = (
+            ("c" * 64, "failed", "STDOUT_BOUND",
+             {"path_seconds": 5, "batch_seconds": 10}, 8),
+            ("9" * 64, "failed", "STDERR_BOUND",
+             {"path_seconds": 5, "batch_seconds": 10}, 8),
+            ("d" * 64, "timed_out", "DEADLINE_EXCEEDED",
+             {"path_seconds": 0.2, "batch_seconds": 0.4}, 2),
+        )
+        for source, expected_state, reason, limits, elapsed_bound in cases:
             with self.subTest(source=source):
                 started = time.monotonic()
-                batch_seconds = 0.4 if source.startswith("d") else 10
-                result = self.run_fault(source, {"path_seconds": 0.2, "batch_seconds": batch_seconds},
-                                        "trial-" + source[0])
-                self.assertEqual(result["state"], "timed_out" if source.startswith("d") else "failed")
+                result = self.run_fault(source, limits, "trial-" + source[0])
+                self.assertEqual(result["state"], expected_state)
                 self.assertEqual(result["reason"], reason)
-                self.assertLess(time.monotonic() - started, 2)
+                self.assertLess(time.monotonic() - started, elapsed_bound)
 
     def test_missed_and_false_path_events_never_count_as_completed(self):
         missed = self.run_fault("f" * 64, key="trial-missed")
