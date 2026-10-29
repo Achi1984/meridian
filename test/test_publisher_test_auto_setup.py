@@ -382,13 +382,18 @@ class PrivateCommandTests(unittest.TestCase):
             continue_fd = os.open(continue_fifo, os.O_RDWR | os.O_NONBLOCK)
             ready_seen = threading.Event()
             advance_deadline = threading.Event()
+            watchdog_escape = threading.Event()
             fake_now = [1000.0]
             real_watchdog = time.perf_counter
+            started = real_watchdog()
             source = ("import os,time\n"
                       "ready=os.open(" + repr(str(ready_fifo)) + ", os.O_WRONLY); os.write(ready,b'R'); os.close(ready)\n"
                       "gate=os.open(" + repr(str(continue_fifo)) + ", os.O_RDONLY); os.read(gate,1); os.close(gate)\n"
                       "time.sleep(30)\n")
             def fake_monotonic():
+                if not advance_deadline.is_set() and real_watchdog() - started >= 1:
+                    watchdog_escape.set()
+                    advance_deadline.set()
                 if advance_deadline.is_set():
                     fake_now[0] += 0.002
                 return fake_now[0]
@@ -399,19 +404,26 @@ class PrivateCommandTests(unittest.TestCase):
                     os.write(continue_fd, b'G')
                     advance_deadline.set()
             synchronizer = threading.Thread(target=release_after_ready, daemon=True)
-            started = real_watchdog()
             synchronizer.start()
+            synchronizer_alive = True
             try:
                 with patch.object(self.m.time, 'monotonic', side_effect=fake_monotonic):
                     with self.assertRaises(ValueError) as raised:
                         command.run([sys.executable, '-I', '-c', source], timeout=0.1)
-                synchronizer.join(3)
-                self.assertFalse(synchronizer.is_alive())
-                self.assertTrue(ready_seen.is_set())
                 self.assertLess(real_watchdog() - started, 3)
             finally:
+                synchronizer.join(3)
+                synchronizer_alive = synchronizer.is_alive()
+                if synchronizer_alive:
+                    try:
+                        os.write(continue_fd, b'G')
+                    except OSError:
+                        pass
                 os.close(ready_fd)
                 os.close(continue_fd)
+        self.assertFalse(synchronizer_alive)
+        self.assertFalse(watchdog_escape.is_set(), 'fixture readiness not observed before watchdog escape')
+        self.assertTrue(ready_seen.is_set())
         self.assertEqual(str(raised.exception), 'command failed')
         self.assertTrue(raised.exception.cleanup_complete)
 
@@ -558,6 +570,9 @@ os._exit(0)
         command = self.m.Command({'PATH': '/usr/bin:/bin'})
         with tempfile.TemporaryDirectory() as directory:
             child_pid = Path(directory) / 'child.pid'
+            receipt_sent = Path(directory) / 'receipt.sent'
+            parent_exited = Path(directory) / 'parent.exited'
+            child_heartbeat = Path(directory) / 'child.heartbeat'
             held_open = """
 import os, struct, time
 def send(kind, status=0, payload=b''):
@@ -566,25 +581,61 @@ def send(kind, status=0, payload=b''):
         message = message[os.write(1, message):]
 send(b'P', payload=struct.pack('!I', os.getpid()))
 send(b'R', 0, b'ok\\n')
+open({receipt!r}, 'w', encoding='ascii').write('sent')
 child = os.fork()
 if child == 0:
     open({pid!r}, 'w', encoding='ascii').write(str(os.getpid()))
-    time.sleep(30)
+    deadline = time.time() + 30
+    while time.time() < deadline:
+        with open({heartbeat!r}, 'ab') as beat:
+            beat.write(b'x')
+        time.sleep(0.02)
     os._exit(0)
+open({parent!r}, 'w', encoding='ascii').write('exited')
 os._exit(0)
-""".format(pid=str(child_pid))
+""".format(pid=str(child_pid), receipt=str(receipt_sent),
+           parent=str(parent_exited), heartbeat=str(child_heartbeat))
             started = time.monotonic()
-            with patch.object(self.m, '_COMMAND_SUPERVISOR', held_open):
-                with self.assertRaises(ValueError) as raised:
-                    command.run([sys.executable, '-I', '-c', 'pass'], timeout=0.2)
-            self.assertEqual(str(raised.exception), 'command failed')
-            self.assertFalse(raised.exception.cleanup_complete)
-            self.assertLess(time.monotonic() - started, 3)
-            if child_pid.exists():
-                try:
-                    os.kill(int(child_pid.read_text()), signal.SIGKILL)
-                except (ProcessLookupError, ValueError):
-                    pass
+            observed_pid = None
+            try:
+                with patch.object(self.m, '_COMMAND_SUPERVISOR', held_open):
+                    with self.assertRaises(ValueError) as raised:
+                        command.run([sys.executable, '-I', '-c', 'pass'], timeout=0.2)
+                elapsed = time.monotonic() - started
+                self.assertEqual(str(raised.exception), 'command failed')
+                self.assertFalse(raised.exception.cleanup_complete)
+                self.assertGreater(elapsed, 1.5)
+                self.assertLess(elapsed, 3.5)
+                self.assertTrue(receipt_sent.exists())
+                self.assertTrue(parent_exited.exists())
+                self.assertTrue(child_pid.exists())
+                observed_pid = int(child_pid.read_text())
+                os.kill(observed_pid, 0)
+                self.assertTrue(child_heartbeat.exists())
+                self.assertGreater(len(child_heartbeat.read_bytes()), 0)
+            finally:
+                if observed_pid is None and child_pid.exists():
+                    try:
+                        observed_pid = int(child_pid.read_text())
+                    except ValueError:
+                        observed_pid = None
+                if observed_pid is not None:
+                    try:
+                        os.kill(observed_pid, signal.SIGKILL)
+                    except (ProcessLookupError, OSError):
+                        pass
+                elif child_pid.exists():
+                    try:
+                        os.kill(int(child_pid.read_text()), signal.SIGKILL)
+                    except (ProcessLookupError, ValueError, OSError):
+                        pass
+                time.sleep(0.05)
+                if child_pid.exists():
+                    try:
+                        with self.assertRaises(ProcessLookupError):
+                            os.kill(int(child_pid.read_text()), 0)
+                    except ValueError:
+                        pass
 
     def test_successful_command_does_not_wait_cleanup_budget_after_eof(self):
         command = self.m.Command({'PATH': '/usr/bin:/bin'})
