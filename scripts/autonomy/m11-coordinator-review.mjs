@@ -109,13 +109,21 @@ function normalizeReview(input, expected) {
 }
 
 function sameEvidence(left, right) {
+  const leftAuth = left.provenance?.authenticationEvidence;
+  const rightAuth = right?.provenance?.authenticationEvidence;
   return right?.status === 'READY'
     && left.actionKey === right.actionKey && left.executionKey === right.executionKey
     && left.repository === right.repository && left.pullRequest === right.pullRequest
     && left.headSha === right.headSha && left.baseSha === right.baseSha
     && left.runId === right.runId && left.runAttempt === right.runAttempt
     && left.workflowId === right.workflowId && left.selectionRevision === right.selectionRevision
-    && left.diffDigest === right.diffDigest;
+    && left.diffDigest === right.diffDigest
+    && leftAuth?.evidenceId === rightAuth?.evidenceId
+    && leftAuth?.principal === rightAuth?.principal
+    && leftAuth?.host === rightAuth?.host && leftAuth?.scheme === rightAuth?.scheme
+    && leftAuth?.tls === rightAuth?.tls
+    && leftAuth?.verifiedAtMs === rightAuth?.verifiedAtMs
+    && leftAuth?.expiresAtMs === rightAuth?.expiresAtMs;
 }
 
 async function revalidateCollection(revalidate, collected, remainingMs, now) {
@@ -131,7 +139,8 @@ async function revalidateCollection(revalidate, collected, remainingMs, now) {
       selectionRevision: collected.selectionRevision,
       actionKey: collected.actionKey,
       executionKey: collected.executionKey,
-      diffDigest: collected.diffDigest
+      diffDigest: collected.diffDigest,
+      authenticationEvidence: collected.provenance?.authenticationEvidence
     })
   }, remainingMs);
   if (checked.timedOut || checked.error || !isVerifiedCollection(checked.value, now())

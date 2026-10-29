@@ -9,6 +9,7 @@ const MAX_ITEMS = 500;
 const MAX_RUNTIME_MS = 10000;
 const MAX_DIFF_BYTES = 262144;
 const COLLECTION_TTL_MS = 300000;
+const MAX_AUTH_EVIDENCE_TTL_MS = 900000;
 const REQUIRED_JOBS = Object.freeze([
   Object.freeze({name: 'syntax', required: true, requiredSteps: Object.freeze([
     'Research and auth regression tests'
@@ -46,6 +47,48 @@ function validPage(page) {
     && Array.isArray(page.items) && typeof page.hasNextPage === 'boolean'
     && Number.isSafeInteger(page.totalCount) && page.totalCount >= 0
     && page.totalCount <= MAX_ITEMS && page.items.length <= MAX_ITEMS;
+}
+
+function validAuthenticationEvidence(value, timestamp) {
+  const keys = ['evidenceId', 'principal', 'host', 'scheme', 'tls', 'verifiedAtMs', 'expiresAtMs'];
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    && Object.getPrototypeOf(value) === Object.prototype && Object.isFrozen(value)
+    && hasExactKeys(value, keys)
+    && typeof value.evidenceId === 'string' && value.evidenceId.length >= 8
+    && typeof value.principal === 'string' && value.principal.length > 0
+    && value.host === 'api.github.com' && value.scheme === 'https' && value.tls === true
+    && Number.isSafeInteger(value.verifiedAtMs) && value.verifiedAtMs > 0
+    && value.verifiedAtMs <= timestamp
+    && Number.isSafeInteger(value.expiresAtMs) && value.expiresAtMs > timestamp
+    && value.expiresAtMs - value.verifiedAtMs <= MAX_AUTH_EVIDENCE_TTL_MS;
+}
+
+function sameAuthenticationEvidence(left, right) {
+  return left !== null && typeof left === 'object' && right !== null && typeof right === 'object'
+    && left.evidenceId === right.evidenceId && left.principal === right.principal
+    && left.host === right.host && left.scheme === right.scheme && left.tls === right.tls
+    && left.verifiedAtMs === right.verifiedAtMs && left.expiresAtMs === right.expiresAtMs;
+}
+
+function authenticationEvidenceMatches(api, expected, timestamp) {
+  try {
+    const current = api.authenticationEvidence;
+    return api.authenticated === true && validAuthenticationEvidence(current, timestamp)
+      && sameAuthenticationEvidence(expected, current);
+  } catch {
+    return false;
+  }
+}
+
+async function readWithAuthenticationEvidence(api, expected, now, operation) {
+  if (!authenticationEvidenceMatches(api, expected, now())) {
+    throw new Error('AUTHENTICATION_EVIDENCE_CHANGED_OR_EXPIRED');
+  }
+  const result = await operation();
+  if (!authenticationEvidenceMatches(api, expected, now())) {
+    throw new Error('AUTHENTICATION_EVIDENCE_CHANGED_OR_EXPIRED');
+  }
+  return result;
 }
 
 async function readAllPages(readPage, maxPages, deadline) {
@@ -138,6 +181,15 @@ export async function collectExactPair({hint, config, api, now = Date.now}) {
     || typeof api.getPullRequest !== 'function' || typeof api.getPullRequestDiff !== 'function'
     || typeof api.listWorkflowRuns !== 'function'
     || typeof api.listWorkflowJobs !== 'function') return fail('AUTHENTICATED_READ_API_REQUIRED');
+  let initialAuthenticationEvidence;
+  try {
+    initialAuthenticationEvidence = api.authenticationEvidence;
+  } catch {
+    return fail('AUTHENTICATED_READ_API_REQUIRED');
+  }
+  if (!validAuthenticationEvidence(initialAuthenticationEvidence, timestamp)) {
+    return fail('AUTHENTICATED_READ_API_REQUIRED');
+  }
 
   const deadline = performance.now() + config.maxRuntimeMs;
   try {
@@ -152,7 +204,8 @@ export async function collectExactPair({hint, config, api, now = Date.now}) {
     let run;
     try {
       run = await Promise.race([
-        api.getWorkflowRun({repository: REPOSITORY, runId: hint.workflowRunId, signal: controller.signal}),
+        readWithAuthenticationEvidence(api, initialAuthenticationEvidence, now, () =>
+          api.getWorkflowRun({repository: REPOSITORY, runId: hint.workflowRunId, signal: controller.signal})),
         timeout
       ]);
     } finally {
@@ -182,7 +235,10 @@ export async function collectExactPair({hint, config, api, now = Date.now}) {
     let pr;
     try {
       pr = await Promise.race([
-        api.getPullRequest({repository: REPOSITORY, pullRequest: pullRequestNumber, signal: prController.signal}),
+        readWithAuthenticationEvidence(api, initialAuthenticationEvidence, now, () =>
+          api.getPullRequest({
+            repository: REPOSITORY, pullRequest: pullRequestNumber, signal: prController.signal
+          })),
         prTimeout
       ]);
     } finally {
@@ -206,13 +262,14 @@ export async function collectExactPair({hint, config, api, now = Date.now}) {
     let diff;
     try {
       diff = await Promise.race([
-        api.getPullRequestDiff({
-          repository: REPOSITORY,
-          pullRequest: pullRequestNumber,
-          headSha: run.headSha,
-          baseSha: run.baseSha,
-          signal: diffController.signal
-        }),
+        readWithAuthenticationEvidence(api, initialAuthenticationEvidence, now, () =>
+          api.getPullRequestDiff({
+            repository: REPOSITORY,
+            pullRequest: pullRequestNumber,
+            headSha: run.headSha,
+            baseSha: run.baseSha,
+            signal: diffController.signal
+          })),
         diffTimeout
       ]);
     } finally {
@@ -225,13 +282,15 @@ export async function collectExactPair({hint, config, api, now = Date.now}) {
       return fail('DIFF_UNAVAILABLE_OR_INCOMPLETE');
     }
 
-    const runs = await readAllPages((page, signal) => api.listWorkflowRuns({
-      repository: REPOSITORY,
-      workflowId: RELEASE_SAFETY_WORKFLOW_ID,
-      pullRequest: pullRequestNumber,
-      page,
-      signal
-    }), config.maxPages, deadline);
+    const runs = await readAllPages((page, signal) => readWithAuthenticationEvidence(
+      api, initialAuthenticationEvidence, now, () => api.listWorkflowRuns({
+        repository: REPOSITORY,
+        workflowId: RELEASE_SAFETY_WORKFLOW_ID,
+        pullRequest: pullRequestNumber,
+        page,
+        signal
+      })
+    ), config.maxPages, deadline);
     if (!runs || runs.length === 0) return fail('RUN_PAGINATION_INCOMPLETE');
     const associatedRuns = runs.filter(item => item && item.repository === REPOSITORY
       && item.workflowId === RELEASE_SAFETY_WORKFLOW_ID
@@ -245,13 +304,15 @@ export async function collectExactPair({hint, config, api, now = Date.now}) {
     }
     if (performance.now() > deadline) return fail('TIME_BUDGET_EXHAUSTED');
 
-    const jobs = await readAllPages((page, signal) => api.listWorkflowJobs({
-      repository: REPOSITORY,
-      runId: run.id,
-      runAttempt: run.runAttempt,
-      page,
-      signal
-    }), config.maxPages, deadline);
+    const jobs = await readAllPages((page, signal) => readWithAuthenticationEvidence(
+      api, initialAuthenticationEvidence, now, () => api.listWorkflowJobs({
+        repository: REPOSITORY,
+        runId: run.id,
+        runAttempt: run.runAttempt,
+        page,
+        signal
+      })
+    ), config.maxPages, deadline);
     if (!jobs || jobs.length === 0) return fail('JOB_PAGINATION_INCOMPLETE');
     if (!validateWorkflowJobs(jobs, {
       runId: run.id,
@@ -262,6 +323,17 @@ export async function collectExactPair({hint, config, api, now = Date.now}) {
       return fail(run.conclusion === 'action_required' ? 'ACTION_REQUIRED' : 'CI_NOT_SUCCESSFUL');
     }
     if (performance.now() > deadline) return fail('TIME_BUDGET_EXHAUSTED');
+    const finalTimestamp = now();
+    let finalAuthenticationEvidence;
+    try {
+      finalAuthenticationEvidence = api.authenticationEvidence;
+    } catch {
+      return fail('AUTHENTICATION_EVIDENCE_UNAVAILABLE');
+    }
+    if (!Number.isSafeInteger(finalTimestamp)
+      || !validAuthenticationEvidence(finalAuthenticationEvidence, finalTimestamp)
+      || !sameAuthenticationEvidence(initialAuthenticationEvidence, finalAuthenticationEvidence)
+      || api.authenticated !== true) return fail('AUTHENTICATION_EVIDENCE_CHANGED_OR_EXPIRED');
 
     const logicalActionKey = collectionDigest([
       REPOSITORY, pullRequestNumber, run.headSha, run.baseSha, 'CI_TO_INDEPENDENT_REVIEW'
@@ -284,12 +356,14 @@ export async function collectExactPair({hint, config, api, now = Date.now}) {
       triggeringActor: run.triggeringActor,
       selectionRevision: run.runNumber,
       collectedAt: timestamp,
-      expiresAt: Math.min(config.expiresAt, timestamp + COLLECTION_TTL_MS),
+      expiresAt: Math.min(config.expiresAt, timestamp + COLLECTION_TTL_MS,
+        initialAuthenticationEvidence.expiresAtMs),
       provenance: Object.freeze({
         kind: 'AUTHENTICATED_READ_ADAPTER',
         workflowId: run.workflowId,
         runId: run.id,
-        runAttempt: run.runAttempt
+        runAttempt: run.runAttempt,
+        authenticationEvidence: initialAuthenticationEvidence
       }),
       diff: diff.text,
       diffDigest: createHash('sha256').update(diff.text).digest('hex'),
