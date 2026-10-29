@@ -287,29 +287,33 @@ class Command:
         deadline = time.monotonic() + timeout
         target_pid = None
         result = None
+        decoded = None
         cleanup_complete = False
-        receipt_error = False
+        protocol_error = False
         failed = False
         response = bytearray()
         outgoing = b''
 
         def consume_frames():
-            nonlocal target_pid, result, cleanup_complete
+            nonlocal target_pid, result, cleanup_complete, protocol_error
             while len(response) >= 6:
                 kind, status = response[0:1], response[1]
                 length = struct.unpack('!I', response[2:6])[0]
                 if length > 1024 * 1024:
+                    protocol_error = True
                     raise ValueError()
                 if len(response) < 6 + length:
                     return
                 payload = bytes(response[6:6 + length])
-                del response[:6 + length]
                 if kind == b'P' and status == 0 and length == 4 and target_pid is None:
+                    del response[:6 + length]
                     target_pid = struct.unpack('!I', payload)[0]
                 elif kind == b'R' and status in (0, 1, 2) and result is None:
+                    del response[:6 + length]
                     result = (status, payload)
                     cleanup_complete = status != 2
                 else:
+                    protocol_error = True
                     raise ValueError()
 
         try:
@@ -364,7 +368,7 @@ class Command:
             if proc.returncode != 0 or result is None or response or result[0] != 0:
                 raise ValueError('command')
             cleanup_complete = True
-            return result[1].decode('utf-8', errors='strict')
+            decoded = result[1].decode('utf-8', errors='strict')
         except BaseException:
             failed = True
         finally:
@@ -380,11 +384,10 @@ class Command:
                     except OSError:
                         pass
                 cleanup_deadline = time.monotonic() + 2
+                stdout_open = proc.stdout is not None
                 while time.monotonic() < cleanup_deadline:
                     try:
-                        drained = False
                         for key, _ in selector.select(min(0.05, cleanup_deadline - time.monotonic())):
-                            drained = True
                             if key.fileobj is proc.stdout:
                                 part = os.read(key.fd, 65536)
                                 if part:
@@ -392,12 +395,13 @@ class Command:
                                     consume_frames()
                                 else:
                                     selector.unregister(key.fileobj)
-                        if proc.poll() is not None and not drained:
+                                    stdout_open = False
+                        if proc.poll() is not None and not stdout_open:
                             break
                     except BaseException:
-                        receipt_error = True
+                        protocol_error = True
                         break
-                cleanup_complete = (not receipt_error and result is not None and result[0] != 2
+                cleanup_complete = (not protocol_error and result is not None and result[0] != 2
                                     and proc.poll() is not None and not response)
                 if proc.poll() is None:
                     if target_pid is not None:
@@ -426,8 +430,12 @@ class Command:
                         except BaseException:
                             pass
             selector.close()
+        if not failed and (decoded is None or protocol_error or result is None or response
+                           or result[0] != 0 or proc is None or proc.returncode != 0):
+            failed = True
         if failed:
             raise _CommandFailure(cleanup_complete) from None
+        return decoded
 
 
 class _CommandFailure(ValueError):

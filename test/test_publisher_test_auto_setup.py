@@ -373,14 +373,36 @@ class PrivateCommandTests(unittest.TestCase):
     def test_hung_command_has_bounded_timeout(self):
         command = self.m.Command({'PATH': '/usr/bin:/bin'})
         with tempfile.TemporaryDirectory() as directory:
-            ready = Path(directory) / 'ready'
-            source = ('from pathlib import Path; import time; '
-                      'Path(' + repr(str(ready)) + ').write_text("ready"); time.sleep(30)')
+            root = Path(directory)
+            ready_fifo = root / 'ready'
+            continue_fifo = root / 'continue'
+            os.mkfifo(ready_fifo, 0o600)
+            os.mkfifo(continue_fifo, 0o600)
+            ready_fd = os.open(ready_fifo, os.O_RDWR | os.O_NONBLOCK)
+            continue_fd = os.open(continue_fifo, os.O_RDWR | os.O_NONBLOCK)
+            ready_seen = threading.Event()
+            source = ("import os,time\n"
+                      "ready=os.open(" + repr(str(ready_fifo)) + ", os.O_WRONLY); os.write(ready,b'R'); os.close(ready)\n"
+                      "gate=os.open(" + repr(str(continue_fifo)) + ", os.O_RDONLY); os.read(gate,1); os.close(gate)\n"
+                      "time.sleep(30)\n")
+            def release_after_ready():
+                readable, _, _ = __import__('select').select([ready_fd], [], [], 3)
+                if readable and os.read(ready_fd, 1) == b'R':
+                    ready_seen.set()
+                    os.write(continue_fd, b'G')
+            synchronizer = threading.Thread(target=release_after_ready, daemon=True)
             started = time.monotonic()
-            with self.assertRaises(ValueError) as raised:
-                command.run([sys.executable, '-I', '-c', source], timeout=0.2)
-            self.assertLess(time.monotonic() - started, 3)
-            self.assertTrue(ready.exists())
+            synchronizer.start()
+            try:
+                with self.assertRaises(ValueError) as raised:
+                    command.run([sys.executable, '-I', '-c', source], timeout=0.1)
+                synchronizer.join(3)
+                self.assertFalse(synchronizer.is_alive())
+                self.assertTrue(ready_seen.is_set())
+                self.assertLess(time.monotonic() - started, 3)
+            finally:
+                os.close(ready_fd)
+                os.close(continue_fd)
         self.assertEqual(str(raised.exception), 'command failed')
         self.assertTrue(raised.exception.cleanup_complete)
 
@@ -395,29 +417,124 @@ class PrivateCommandTests(unittest.TestCase):
         self.assertFalse(raised.exception.cleanup_complete)
         self.assertLess(time.monotonic() - started, 3)
 
-    def test_cleanup_receipt_is_drained_after_supervisor_exits(self):
+    def test_cleanup_receipt_is_drained_when_supervisor_exits_before_initial_read(self):
         command = self.m.Command({'PATH': '/usr/bin:/bin'})
         delayed_receipt = """
-import json, os, signal, struct, sys, time
+import os, struct, sys
 def send(kind, status=0, payload=b''):
     message = kind + bytes((status,)) + struct.pack('!I', len(payload)) + payload
     while message:
         message = message[os.write(1, message):]
-request = json.loads(sys.stdin.buffer.readline())
-sys.stdin.buffer.read(request['inputLength'])
 send(b'P', payload=struct.pack('!I', os.getpid()))
-def terminate(signum, frame):
-    send(b'R', 1, b'')
-    raise SystemExit(0)
-signal.signal(signal.SIGTERM, terminate)
-while True:
-    time.sleep(1)
+send(b'R', 1, b'')
+sys.exit(0)
 """
-        with patch.object(self.m, '_COMMAND_SUPERVISOR', delayed_receipt):
+        original_selector = self.m.selectors.DefaultSelector
+        class DelayedReadSelector:
+            def __init__(self):
+                self.inner = original_selector()
+                self.block_until = time.monotonic() + 0.2
+            def register(self, *args, **kwargs): return self.inner.register(*args, **kwargs)
+            def unregister(self, *args, **kwargs): return self.inner.unregister(*args, **kwargs)
+            def get_map(self): return self.inner.get_map()
+            def close(self): return self.inner.close()
+            def select(self, timeout=None):
+                if time.monotonic() < self.block_until:
+                    if timeout and timeout > 0:
+                        time.sleep(min(timeout, 0.005))
+                    return []
+                return self.inner.select(timeout)
+        with patch.object(self.m, '_COMMAND_SUPERVISOR', delayed_receipt), \
+                patch.object(self.m.selectors, 'DefaultSelector', DelayedReadSelector):
             with self.assertRaises(ValueError) as raised:
                 command.run([sys.executable, '-I', '-c', 'pass'], timeout=0.1)
         self.assertEqual(str(raised.exception), 'command failed')
         self.assertTrue(raised.exception.cleanup_complete)
+
+    def test_invalid_receipt_matrix_remains_unconfirmed(self):
+        command = self.m.Command({'PATH': '/usr/bin:/bin'})
+        scenarios = {
+            'missing_receipt': """
+import os, struct, sys
+def send(kind, status=0, payload=b''):
+    message = kind + bytes((status,)) + struct.pack('!I', len(payload)) + payload
+    while message:
+        message = message[os.write(1, message):]
+send(b'P', payload=struct.pack('!I', os.getpid()))
+sys.exit(0)
+""",
+            'truncated_receipt': """
+import os, struct, sys
+def send(kind, status=0, payload=b''):
+    message = kind + bytes((status,)) + struct.pack('!I', len(payload)) + payload
+    while message:
+        message = message[os.write(1, message):]
+send(b'P', payload=struct.pack('!I', os.getpid()))
+os.write(1, b'R\\x01' + struct.pack('!I', 4) + b'ab')
+sys.exit(0)
+""",
+            'malformed_receipt_kind': """
+import os, struct, sys
+def send(kind, status=0, payload=b''):
+    message = kind + bytes((status,)) + struct.pack('!I', len(payload)) + payload
+    while message:
+        message = message[os.write(1, message):]
+send(b'P', payload=struct.pack('!I', os.getpid()))
+send(b'X', 0, b'')
+sys.exit(0)
+""",
+            'duplicate_receipt': """
+import os, struct, sys
+def send(kind, status=0, payload=b''):
+    message = kind + bytes((status,)) + struct.pack('!I', len(payload)) + payload
+    while message:
+        message = message[os.write(1, message):]
+send(b'P', payload=struct.pack('!I', os.getpid()))
+send(b'R', 1, b'')
+send(b'R', 1, b'')
+sys.exit(0)
+""",
+            'trailing_bytes_after_receipt': """
+import os, struct, sys
+def send(kind, status=0, payload=b''):
+    message = kind + bytes((status,)) + struct.pack('!I', len(payload)) + payload
+    while message:
+        message = message[os.write(1, message):]
+send(b'P', payload=struct.pack('!I', os.getpid()))
+send(b'R', 1, b'')
+os.write(1, b'JUNK')
+sys.exit(0)
+""",
+        }
+        for name, script in scenarios.items():
+            with self.subTest(name=name), patch.object(self.m, '_COMMAND_SUPERVISOR', script):
+                with self.assertRaises(ValueError) as raised:
+                    command.run([sys.executable, '-I', '-c', 'pass'], timeout=0.1)
+                self.assertEqual(str(raised.exception), 'command failed')
+                self.assertFalse(raised.exception.cleanup_complete)
+
+    def test_late_trailing_data_after_success_receipt_is_rejected(self):
+        command = self.m.Command({'PATH': '/usr/bin:/bin'})
+        trailing_after_success = """
+import os, struct, sys, time
+def send(kind, status=0, payload=b''):
+    message = kind + bytes((status,)) + struct.pack('!I', len(payload)) + payload
+    while message:
+        message = message[os.write(1, message):]
+send(b'P', payload=struct.pack('!I', os.getpid()))
+send(b'R', 0, b'ok\\n')
+child = os.fork()
+if child == 0:
+    time.sleep(0.05)
+    os.write(1, b'JUNK')
+    os._exit(0)
+os._exit(0)
+"""
+        with patch.object(self.m, '_COMMAND_SUPERVISOR', trailing_after_success):
+            with self.assertRaises(ValueError) as raised:
+                command.run([sys.executable, '-I', '-c', 'pass'], timeout=0.1)
+        self.assertEqual(str(raised.exception), 'command failed')
+        self.assertFalse(raised.exception.cleanup_complete)
 
     def test_sensitive_stdin_is_not_in_supervisor_arguments_or_environment(self):
         secret = 'SYNTHETIC_PRIVATE_INPUT_CANARY'
