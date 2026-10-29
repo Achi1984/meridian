@@ -444,6 +444,43 @@ test('unsupported agent operations block; they never dispatch, approve, merge, o
   })), {code: 'UNSUPPORTED_OPERATION'});
 });
 
+test('unsupported agent operations preserve UNKNOWN state across blocking and restart', () => {
+  for (const [index, operation] of [
+    'copilot_assignment',
+    'claude_review_dispatch',
+    'action_required_approval',
+    'auto_merge',
+    'deployment'
+  ].entries()) {
+    const before = initial();
+    const unknown = apply(before, event(before, 'MUTATION_UNKNOWN', 'AUTHOR', 'coordinator-sim', {
+      operationId: `blocked-unknown-${index}`
+    }, `blocked-unknown-event-${index}`));
+    const blocked = apply(unknown, event(unknown, 'AGENT_OPERATION', 'RECONCILE', 'coordinator-sim', {
+      operation
+    }, `blocked-operation-${index}`));
+
+    assert.equal(blocked.phase, 'BLOCKED');
+    assert.equal(blocked.nextAllowedAction, 'STOP_UNSUPPORTED_AGENT_OPERATION');
+    assert.equal(blocked.mutationLane.status, 'UNKNOWN');
+    assert.equal(blocked.mutationHistory[0].status, 'UNKNOWN');
+
+    const restarted = JSON.parse(JSON.stringify(blocked));
+    const stopped = reduceEvent(restarted, event(restarted, 'AGENT_OPERATION', 'BLOCKED', 'coordinator-sim', {
+      operation
+    }, `blocked-after-restart-${index}`));
+    assert.equal(stopped.changed, false);
+    assert.equal(stopped.reason, 'TERMINAL_STATE');
+    assert.equal(stopped.state.phase, 'BLOCKED');
+    assert.equal(stopped.state.nextAllowedAction, 'STOP_UNSUPPORTED_AGENT_OPERATION');
+    assert.equal(stopped.state.mutationLane.status, 'UNKNOWN');
+    assert.equal(stopped.state.mutationHistory[0].status, 'UNKNOWN');
+    assert.equal(stopped.dispatchAllowed, false);
+    assert.equal(stopped.mergeAllowed, false);
+    assert.equal(stopped.externalEffects, false);
+  }
+});
+
 test('mutation observations never resume work without operation-specific authoritative evidence', () => {
   for (const [phase, stateBeforeUnknown] of [['AUTHOR', initial()], ['REVIEW', ciPassed()]]) {
     const unknown = apply(stateBeforeUnknown, event(stateBeforeUnknown, 'MUTATION_UNKNOWN', phase, 'coordinator-sim', {

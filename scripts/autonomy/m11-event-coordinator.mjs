@@ -308,7 +308,7 @@ function validateState(input) {
   if (state.phase === 'COMPLETE') {
     need(state.mergeSha !== null && state.requiredPostchecks.every(check => state.postchecks[check]?.status === 'SUCCESS'), 'STATE_INVALID');
   }
-  if (state.mutationLane.status === 'UNKNOWN') need(['RECONCILE', 'EXPIRED'].includes(state.phase), 'STATE_INVALID');
+  if (state.mutationLane.status === 'UNKNOWN') need(['RECONCILE', 'BLOCKED', 'EXPIRED'].includes(state.phase), 'STATE_INVALID');
   return state;
 }
 
