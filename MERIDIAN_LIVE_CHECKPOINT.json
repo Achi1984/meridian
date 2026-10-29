@@ -100,7 +100,67 @@
   "quickCommand": "Go Meridian",
   "bootstrapFile": "MERIDIAN_GO.md",
   "currentWork": {
-    "updatedAt": "2026-10-27",
+    "updatedAt": "2026-10-28",
+    "m11BotsPresentationSuccessor": {
+      "issue": 994,
+      "successorPullRequest": 995,
+      "state": "IN_PROGRESS_FROM_ACCEPTED_MAIN",
+      "acceptedMainSha": "219c18572cc63f46cfc19377ef049fc057a49163",
+      "sourcePullRequest": 975,
+      "sourceState": "CLOSED_UNMERGED_READ_ONLY",
+      "sourceHead": "a7728788768125935d3036a867cab291064cf6df",
+      "sourceBase": "1afdbf9e64435701f3903b17625441a19c2295ff",
+      "sourceAuthorReceipt": {
+        "issue": 975,
+        "commentId": 6478162174
+      },
+      "sourceEightImageReviewReceipt": {
+        "issue": 942,
+        "commentId": 6478219419
+      },
+      "acceptedPrerequisites": [
+        {
+          "pullRequest": 984,
+          "mergeSha": "aa00651fd1a05df3a2bc2faef424cb1ca996113a",
+          "mergeReceipt": "942/6476631640",
+          "postchecks": "ALL_SUCCESS: Safety40740827167, Runtime40740825905, Orchestration40740825743, Coordinator40740826539, Pages40740823426"
+        },
+        {
+          "pullRequest": 981,
+          "mergeSha": "ef0c8e0c33add7df52eed37522215f5ea6cd732a",
+          "premergeSafety": "40746052076: 2854/2854",
+          "claudeReceipt": "942/6477843874",
+          "historicalPostmergeSafety": "40750362950/job123035132744 FAILED 2853/2854; OPERATION_DEADLINE, root cause unknown"
+        },
+        {
+          "pullRequest": 988,
+          "mergeSha": "d08a4dbf98b487275bf149cec4f234da9ca57fc8",
+          "completionReceipt": "6478568871",
+          "claudeReceipt": "942/6478686922",
+          "postchecks": "ALL_SUCCESS: Safety40756740553, Runtime40756740614, Coordinator40756740850, Pages40756740306",
+          "historicalDeadlineCause": "UNKNOWN; PR988 added timing observability only and did not establish cause"
+        },
+        {
+          "pullRequest": 986,
+          "mergeSha": "5d31a4807dc9e4b763a0e82a3834fcfc934e3b96",
+          "premergeSafety": "40758174484: 2854/2854",
+          "claudeReceipt": "942/6479283548",
+          "historicalPostmergeSafety": "40760415196 FAILED: 2853/2854; path-start test assertion; underlying cause unproved"
+        },
+        {
+          "pullRequest": 992,
+          "mergeSha": "219c18572cc63f46cfc19377ef049fc057a49163",
+          "completionReceipt": "942/6480518691",
+          "repairForHistoricalFailure": "test startup-margin repair only; underlying cause of 40760415196 remains unproved",
+          "postchecks": "ALL_SUCCESS: Safety40767820482/job123096625869 (2854/2854), Runtime40767820503, Coordinator40767820710, Pages40767819761"
+        }
+      ],
+      "parallelPaperIssue993": "IN_PROGRESS_INDEPENDENT_LANE",
+      "terminalBuild": "10.0-r130",
+      "mailboxIssue": 942,
+      "mergeAuthorized": false,
+      "deploymentAuthorized": false
+    },
     "pr911Completion": {
       "pullRequest": 911,
       "mergeShaPrefix": "5e80112",
