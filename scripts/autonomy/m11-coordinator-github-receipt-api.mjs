@@ -4,6 +4,7 @@ import {types} from 'node:util';
 const ROOT = 'https://api.github.com/repos/Achi1984/meridian';
 const MAILBOX = `${ROOT}/issues/942`;
 const COMMENTS = `${MAILBOX}/comments`;
+const NUMERIC_COMMENTS = 'https://api.github.com/repositories/1342084551/issues/942/comments';
 const REPOSITORY = 'Achi1984/meridian';
 const MARKER = 'meridian-m11-receipt:v1';
 const RECEIPT_KEYS = ['actionKey', 'executionKey', 'reviewRequestId', 'sessionId', 'repository',
@@ -141,7 +142,8 @@ function nextPage(headers, page) {
     const url = new URL(match[1]);
     const target = url.searchParams.get('page');
     need(/^[1-9][0-9]*$/.test(target) && positive(Number(target))
-      && url.href === `${COMMENTS}?per_page=100&page=${target}`);
+      && [COMMENTS, NUMERIC_COMMENTS].some(resource =>
+        match[1] === `${resource}?per_page=100&page=${target}`));
     const number = Number(target);
     if (match[2] === 'next') { need(number === page + 1); next = true; }
     if (match[2] === 'prev') need(page > 1 && number === page - 1);

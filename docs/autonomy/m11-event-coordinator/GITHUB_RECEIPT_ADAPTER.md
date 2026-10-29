@@ -135,6 +135,24 @@ collection's GET pagination. Redirects, alternate response URLs, unexpected
 statuses/media types, and malformed streams are rejected. There is no retry,
 PATCH, DELETE, arbitrary direct comment GET, or fallback endpoint.
 
+GitHub Link headers may identify this same mailbox through either pinned
+resource:
+
+* `https://api.github.com/repos/Achi1984/meridian/issues/942/comments`
+* `https://api.github.com/repositories/1342084551/issues/942/comments`
+
+Only these exact HTTPS resource strings followed by
+`?per_page=100&page=N` are accepted (`N` is a canonical positive safe integer).
+Repository ID `1342084551` is an immutable repository-identity pin, not a
+caller-supplied alias. Wrong IDs/issues/origins, extra/duplicate/missing/reordered
+query parameters, encoded page values, credentials, fragments, and normalized
+path aliases are rejected. Numeric and named links may coexist, but their
+next/previous/first/last relations retain the same loop/skip/drift checks.
+The adapter never follows Link URLs: it generates each GET at the original
+named-repository endpoint. Response destination, inventory, deadline, and byte
+checks are unchanged; accepting equivalent Link resources grants no new write
+or authentication authority and does not increase any limits.
+
 Each adapter locally consumes its posting slot synchronously before its first
 await. It invokes HTTP POST **at most once over its entire lifetime**. The
 external authority must additionally enforce durable one-use consumption over
@@ -225,6 +243,10 @@ copy/edit checks, zero/one/many matches, conflicting/mutating pagination, and
 auth expiry/rotation, same-actor/app full-body copies, missing/wrong/ambiguous
 actual-send evidence, and valid evidence with revalidation. Synthetic authority
 persistence is a serialized in-memory fixture, not a hosted atomic store or
-production crash-durability proof. No live GitHub POST or authentication is exercised.
+production crash-durability proof. Realistic numeric-repository pagination
+fixtures cover all four Link relations, mixed equivalent resources, wrong
+repository/origin/issue, malformed queries, loops/skips, drift/truncation, and
+page caps, with shared GET/POST counts proving that Link URLs are not followed.
+No live GitHub POST or authentication is exercised.
 Lead full CI and Claude review remain integration gates; focused success does
 not claim those gates, production readiness, provisioning, or hosted safety.

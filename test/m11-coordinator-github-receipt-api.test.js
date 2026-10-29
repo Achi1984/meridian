@@ -7,6 +7,7 @@ import {
 
 const ROOT = 'https://api.github.com/repos/Achi1984/meridian';
 const COMMENTS = `${ROOT}/issues/942/comments`;
+const NUMERIC_COMMENTS = 'https://api.github.com/repositories/1342084551/issues/942/comments';
 const NOW = 1700000000000;
 const clone = value => JSON.parse(JSON.stringify(value));
 const iso = value => new Date(value).toISOString().replace('.000Z', 'Z');
@@ -481,6 +482,91 @@ test('complete bounded pagination is scanned twice; no direct GET substitutes fo
     : response(url, [f.comment(101)], {headers: {link: `<${COMMENTS}?per_page=100&page=1>; rel="prev"`}});
   assert.equal((await f.adapter().lookupByActionKey({actionKey: f.input.actionKey})).status, 'FOUND');
   counts(f.state, 0, 4);
+});
+
+test('realistic numeric repository Link relations support complete double inventory without following URLs', async t => {
+  for (const mode of ['numeric', 'mixed']) {
+    await t.test(mode, async () => {
+      const f = fixture();
+      f.state.publicationEvidence = f.sendEvidence('201');
+      f.state.handle = url => {
+        const page = Number(new URL(url).searchParams.get('page'));
+        const resource = mode === 'mixed' && page === 2 ? COMMENTS : NUMERIC_COMMENTS;
+        const links = [`<${resource}?per_page=100&page=3>; rel="last"`];
+        if (page > 1) links.push(`<${resource}?per_page=100&page=${page - 1}>; rel="prev"`,
+          `<${resource}?per_page=100&page=1>; rel="first"`);
+        if (page < 3) links.push(`<${resource}?per_page=100&page=${page + 1}>; rel="next"`);
+        const rows = page === 3 ? [f.comment(201)]
+          : Array.from({length: 100}, (_, i) => f.comment((page - 1) * 100 + i + 1, {body: 'unrelated'}));
+        return response(url, rows, {headers: {link: links.join(', ')}});
+      };
+      assert.deepEqual(await f.adapter().lookupByActionKey({actionKey: f.input.actionKey}),
+        {status: 'FOUND', complete: true, receiptIds: ['201']});
+      assert.deepEqual(f.state.calls.map(call => call.url),
+        [1, 2, 3, 1, 2, 3].map(page => `${COMMENTS}?per_page=100&page=${page}`));
+      counts(f.state, 0, 6);
+    });
+  }
+});
+
+test('numeric Link aliases reject wrong identity/origin/issue, malformed queries and noncanonical URLs', async t => {
+  const links = {
+    'wrong repository ID': NUMERIC_COMMENTS.replace('1342084551', '1342084552') + '?per_page=100&page=2',
+    'repository ID leading zero': NUMERIC_COMMENTS.replace('1342084551', '01342084551') + '?per_page=100&page=2',
+    'wrong issue': NUMERIC_COMMENTS.replace('/942/', '/943/') + '?per_page=100&page=2',
+    'off origin': NUMERIC_COMMENTS.replace('api.github.com', 'example.invalid') + '?per_page=100&page=2',
+    'HTTP': NUMERIC_COMMENTS.replace('https:', 'http:') + '?per_page=100&page=2',
+    'userinfo': NUMERIC_COMMENTS.replace('api.github.com', 'someone@api.github.com') + '?per_page=100&page=2',
+    'nondefault port': NUMERIC_COMMENTS.replace('api.github.com', 'api.github.com:444') + '?per_page=100&page=2',
+    'fragment': `${NUMERIC_COMMENTS}?per_page=100&page=2#fragment`,
+    'extra query': `${NUMERIC_COMMENTS}?per_page=100&page=2&extra=1`,
+    'duplicate page': `${NUMERIC_COMMENTS}?per_page=100&page=2&page=2`,
+    'duplicate per_page': `${NUMERIC_COMMENTS}?per_page=100&per_page=100&page=2`,
+    'wrong page size': `${NUMERIC_COMMENTS}?per_page=99&page=2`,
+    'missing page size': `${NUMERIC_COMMENTS}?page=2`,
+    'missing page': `${NUMERIC_COMMENTS}?per_page=100`,
+    'reordered query': `${NUMERIC_COMMENTS}?page=2&per_page=100`,
+    'encoded query': `${NUMERIC_COMMENTS}?per_page=100&page=%32`,
+    'zero page': `${NUMERIC_COMMENTS}?per_page=100&page=0`,
+    'noncanonical page': `${NUMERIC_COMMENTS}?per_page=100&page=02`,
+    'unsafe page': `${NUMERIC_COMMENTS}?per_page=100&page=9007199254740992`,
+    'trailing slash': `${NUMERIC_COMMENTS}/?per_page=100&page=2`,
+    'normalized path': NUMERIC_COMMENTS.replace('/issues/', '/./issues/') + '?per_page=100&page=2',
+    'loop': `${NUMERIC_COMMENTS}?per_page=100&page=1`,
+    'skip': `${NUMERIC_COMMENTS}?per_page=100&page=3`
+  };
+  for (const [name, link] of Object.entries(links)) {
+    await t.test(name, async () => {
+      const f = fixture();
+      f.state.handle = url => response(url,
+        Array.from({length: 100}, (_, i) => f.comment(i + 1, {body: 'unrelated'})),
+        {headers: {link: `<${link}>; rel="next"`}});
+      assert.deepEqual(await f.adapter().lookupByActionKey({actionKey: f.input.actionKey}),
+        {status: 'UNKNOWN', complete: false, receiptIds: []});
+      counts(f.state, 0, 1);
+    });
+  }
+});
+
+test('numeric Link aliases preserve last-page drift, truncation, duplicate relation and page-cap rejection', async t => {
+  for (const mode of ['last-drift', 'truncated', 'duplicate-relation', 'contradictory-last', 'page-cap']) {
+    await t.test(mode, async () => {
+      const f = fixture({maxPages: mode === 'page-cap' ? 1 : 10});
+      f.state.handle = url => {
+        const page = Number(new URL(url).searchParams.get('page'));
+        let link = `<${NUMERIC_COMMENTS}?per_page=100&page=2>; rel="next", <${NUMERIC_COMMENTS}?per_page=100&page=2>; rel="last"`;
+        if (page === 2 || mode === 'truncated') link = `<${NUMERIC_COMMENTS}?per_page=100&page=3>; rel="last"`;
+        if (mode === 'duplicate-relation') link += `, <${NUMERIC_COMMENTS}?per_page=100&page=2>; rel="next"`;
+        if (mode === 'contradictory-last') link = `<${NUMERIC_COMMENTS}?per_page=100&page=2>; rel="next", <${NUMERIC_COMMENTS}?per_page=100&page=1>; rel="last"`;
+        return response(url, page === 1
+          ? Array.from({length: 100}, (_, i) => f.comment(i + 1, {body: 'unrelated'}))
+          : [f.comment(101)], {headers: {link}});
+      };
+      assert.deepEqual(await f.adapter().lookupByActionKey({actionKey: f.input.actionKey}),
+        {status: 'UNKNOWN', complete: false, receiptIds: []});
+      counts(f.state, 0, mode === 'last-drift' ? 2 : 1);
+    });
+  }
 });
 
 test('truncated, malformed, looping, off-origin, off-path and conflicting pagination fail closed', async t => {
