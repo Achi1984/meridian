@@ -306,6 +306,7 @@ test('exact-pair happy path maps authoritative GitHub payloads', async () => {
   assert.equal(runsPage.totalCount, 1);
   const listRunCall = calls.find(call => call.path === '/repos/Achi1984/meridian/actions/workflows/347821227/runs');
   assert.ok(listRunCall?.query.includes(`head_sha=${HEAD}`));
+  assert.equal(listRunCall?.query.includes('pull_request='), false);
 
   const jobsPage = await api.listWorkflowJobs({repository: REPOSITORY, runId: 7001, runAttempt: 1, page: 1});
   assert.equal(jobsPage.hasNextPage, false);

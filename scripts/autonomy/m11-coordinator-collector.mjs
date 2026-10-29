@@ -173,10 +173,10 @@ async function readRelevantRuns({
       if (!item || item.repository !== REPOSITORY || item.workflowId !== RELEASE_SAFETY_WORKFLOW_ID
         || !positive(item.id) || !positive(item.runNumber) || !positive(item.runAttempt)
         || !Array.isArray(item.pullRequests) || item.pullRequests.some(value => !positive(value))
-        || !sha(item.headSha) || !sha(item.baseSha)) {
+        || !sha(item.headSha)) {
         return fail('RUN_PAGINATION_INCOMPLETE');
       }
-      if (item.headSha !== headSha || item.baseSha !== baseSha
+      if (!sha(item.baseSha) || item.headSha !== headSha || item.baseSha !== baseSha
         || !item.pullRequests.includes(pullRequestNumber)) {
         return fail('UNSUPPORTED_RELEVANT_RUN_DISCOVERY');
       }
