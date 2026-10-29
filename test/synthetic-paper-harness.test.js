@@ -133,7 +133,7 @@ test('one fee is booked once and exact balances do not deduct it again at valuat
   assert.deepEqual({account:h.account,stateIdentity:h.stateIdentity,receipts:h.receipts},before);
 });
 
-test('conservation failure rejects the entire commit without partial account or receipt mutation',()=>{
+test('tampered copied proposal is rejected without partial account or receipt mutation',()=>{
   const h=harness();
   const beforeProposal={account:h.account,stateIdentity:h.stateIdentity,receipts:h.receipts};
   const proposal=h.propose(fill('event:bad-conservation'));
@@ -149,6 +149,27 @@ test('conservation failure rejects the entire commit without partial account or 
   assert.equal(rejected.reason,'PAYLOAD_INVALID');
   assert.equal(h.project(rejected).status,'REJECTED');
   assert.deepEqual({account:h.account,stateIdentity:h.stateIdentity,receipts:h.receipts},before);
+});
+
+test('insufficient cash rejects an otherwise valid bounded fill with BALANCE_INVARIANT',()=>{
+  const h=harness();
+  const before={
+    account:h.account,stateIdentity:h.stateIdentity,
+    receipts:h.receipts,attempts:h.attempts,
+    activeFence:h.project().activeFence,
+  };
+  const proposal=h.propose(fill('event:insufficient-cash',{
+    quantityShares:3n,
+    priceCentsPerShare:40000n,
+    feeCents:100n,
+  }));
+  assert.equal(proposal.status,'REJECTED');
+  assert.equal(proposal.reason,'BALANCE_INVARIANT');
+  assert.deepEqual({
+    account:h.account,stateIdentity:h.stateIdentity,
+    receipts:h.receipts,attempts:h.attempts,
+    activeFence:h.project().activeFence,
+  },before);
 });
 
 test('missing and stale marks project unavailable rather than zero or carry-forward',()=>{

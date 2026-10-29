@@ -2,7 +2,7 @@
 
 Implemented the isolated, test-only BigInt accounting model in
 [`test-support/synthetic-paper/harness.mjs`](../../test-support/synthetic-paper/harness.mjs)
-with 17 Node tests in
+with 18 Node tests in
 [`test/synthetic-paper-harness.test.js`](../../test/synthetic-paper-harness.test.js).
 
 ## Exact fixture and deterministic example
@@ -31,13 +31,14 @@ node --check test-support/synthetic-paper/harness.mjs
 node --test test/synthetic-paper-harness.test.js
 ```
 
-Result: **17 tests passed, 0 failed**. The TAP run reported `# tests 17`,
-`# pass 17`, and `# fail 0`. Representative fixed outputs include
+Result: **18 tests passed, 0 failed**. The TAP run reported `# tests 18`,
+`# pass 18`, and `# fail 0`. Representative fixed outputs include
 `COMMITTED` for the valid accounting example, exact equity `101900n`,
 `LATE_OR_PAST_EVENT` for past/equal/unproven ordering, `MARK_UNAVAILABLE` for
 missing/stale/over-bound marks, `BOUND_EXCEEDED` at per-fill and aggregate
-limit+1, and `UNKNOWN` for an ambiguous commit or lost acknowledgment. Exact
-same-fence receipt lookup is read-only and does not permit proposals, claims, or
+limit+1, `BALANCE_INVARIANT` for a bounded fill whose notional and fee exceed
+cash, and `UNKNOWN` for an ambiguous commit or lost acknowledgment. Exact same-
+fence receipt lookup is read-only and does not permit proposals, claims, or
 commits afterward; copied or foreign proposals are rejected without mutation.
 
 ## Limits
@@ -50,3 +51,17 @@ Synthetic accounting transitions and projections remain scoped to
 Production `WARMUP_ONLY` behavior and the 12 real-operation `REQUIRED_UNSET`
 choice groups are unchanged. The harness does not implement reconciliation,
 source authenticity, strategy qualification, admission, or Paper/Live operation.
+
+The supported inputs are ordinary generated fixture values. This model does not
+claim to validate or authenticate hostile getters/coercion hooks or every
+arbitrary supplied outcome/halt object. `project(outcome)` may expose the
+provided outcome's `status` and `reason`; the receipt-count/list bounds do not
+bound arbitrary caller-provided projection content. Causal ordering is a
+caller-asserted fixture boolean, not source proof. Read-only marks and account
+projections may expose the current modeled state while the result is `UNKNOWN`;
+they do not authorize mutation or resolve its fence.
+
+Commit-time balance-conservation and `NO_ACTION` account-equality checks are
+defensive invariants over private proposal records. Public proposal copies or
+tampering are rejected before reaching those checks, so the focused tests do not
+claim to exercise those private defensive branches through the public API.
