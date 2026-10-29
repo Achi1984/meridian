@@ -154,6 +154,10 @@ const TERMINAL_UNKNOWN_STAGES = new Set([
   'STALE_BEFORE_OBSERVE',
   'STALE_BEFORE_RECEIPT'
 ]);
+const NONADVANCING_ATTEMPT_STAGES = new Set([
+  'OBSERVE_PREPARING',
+  'RECEIPT_PREPARING'
+]);
 
 async function recordUnknown(store, claim, stage, remainingMs, extra = {}) {
   return callWithinBudget(store.commit.bind(store), {
@@ -393,6 +397,9 @@ export async function observeReviewLifecycle({
     if (claim.lastStage === 'REVIEW_PENDING') {
       return unknown('DISPATCH_ACK_DURABILITY_MISSING', true);
     }
+    if (NONADVANCING_ATTEMPT_STAGES.has(claim.lastStage)) {
+      return unknown('PERSISTENCE_UNCERTAINTY_RECONCILE_REQUIRED', false);
+    }
     if (claim.lastStage === 'RECEIPT_DELIVERED' && claim.status === 'COMMITTED') {
       return Object.freeze({
         status: 'COMPLETE',
@@ -499,6 +506,14 @@ export async function observeReviewLifecycle({
         ...baseResult()
       });
     } else {
+      const observePreparingCommit = await callWithinBudget(store.commit.bind(store), {
+        claim,
+        transition: {kind: 'OBSERVE_PREPARING'}
+      }, remainingMs());
+      if (observePreparingCommit.timedOut || observePreparingCommit.error || observePreparingCommit.value?.status !== 'COMMITTED') {
+        return unknown('OBSERVE_PREPARING_STATE_UNKNOWN', false);
+      }
+      claim = observePreparingCommit.value.claim;
       const observeCall = await callWithinBudget(observeReview, {
         actionKey: claim.actionKey,
         executionKey: claim.executionKey,
@@ -514,6 +529,13 @@ export async function observeReviewLifecycle({
       }
       const observed = observeCall.value;
       if (!observed || observed.status === 'PENDING') {
+        const pendingCommit = await callWithinBudget(store.commit.bind(store), {
+          claim,
+          transition: {kind: 'OBSERVE_PENDING'}
+        }, remainingMs());
+        if (pendingCommit.timedOut || pendingCommit.error || pendingCommit.value?.status !== 'COMMITTED') {
+          return unknown('OBSERVE_PENDING_STATE_UNKNOWN', false);
+        }
         return Object.freeze({
           status: 'REVIEW_PENDING',
           reviewRequestId: claim.reviewRequestId,
@@ -600,6 +622,19 @@ export async function observeReviewLifecycle({
         });
       }
     }
+    const receiptPreparingCommit = await callWithinBudget(store.commit.bind(store), {
+      claim,
+      transition: {
+        kind: 'RECEIPT_PREPARING',
+        completionState,
+        verdict
+      }
+    }, remainingMs());
+    if (receiptPreparingCommit.timedOut || receiptPreparingCommit.error
+      || receiptPreparingCommit.value?.status !== 'COMMITTED') {
+      return unknown('RECEIPT_PREPARING_STATE_UNKNOWN', false);
+    }
+    claim = receiptPreparingCommit.value.claim;
     const beforeReceipt = await revalidateCollection({revalidate, expected: fresh, remainingMs: remainingMs(), now});
     if (!beforeReceipt.ok || budgetExpired()) {
       await recordUnknown(store, claim, 'STALE_BEFORE_RECEIPT', remainingMs(), {
