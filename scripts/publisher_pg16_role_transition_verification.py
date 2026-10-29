@@ -46,10 +46,10 @@ PINS = {
     'publisher_role_transition.py': '93bd773e584072227a659b836bbb7aa079eb9a86736ab6e5ef3e97e7cb98785a',
     'publisher_role_journal.py': '3789410d4d67cc12db3404bd1cf58b4b6c0bb8633646b849e9c8106dec046425',
     'publisher_role_supervision.py': '80cfd10ab5c90feb93fab1bcde6963136074994eb54cdf2a2176acc8a52f90fe',
-    'publisher_launch_manifest.py': 'd96cc97fca6ae1190398522e1151bbaeb4179baf8e5ed8e1c5d8d48366a78398',
+    'publisher_launch_manifest.py': '4c01760238a8aaaf4756c3ba6682a40a3b67b3de46eee5a9dd6bd69246abe6c3',
     'publisher_parent_completion.py': '724e99f08c9b3ad96c4ff426bc4318ed317897018fdc8851e794f6c394bce585',
-    'publisher_role_prewrite.py': '8f78391afbc0d6af1ddee328df25a53254fe3d35aae9a1ed0db94a999f10e363',
-    'publisher_pg16_fixture_verification.py': 'fa2a4c1961b35c9e730d0bcb9795aafc9ff436f0ab1f7cb937679e6a8c051c8f',
+    'publisher_role_prewrite.py': 'ca5ac6b67e930feb55aace070e6b4455185f96d9e33cf67c40ee6002d40eb747',
+    'publisher_pg16_fixture_verification.py': '47cf4a1abb3052c16f3b6386f5458a2ff4dc1e78cba1f15759a2696809bd29f3',
 }
 FAILURE = 'LOCAL_ROLE_TRANSITION_FIXTURE_FAILED_NO_PROVIDER_CLAIM'
 CASES = ('activation_closure', 'mid_alter_rollback', 'commit_ack_loss', 'claim_direction', 'prewrite_grant_drift', 'prewrite_catalog_drift', 'supervised_mutation_timeout', 'parent_completion_boundary', 'launch_manifest_binding_and_expiry')

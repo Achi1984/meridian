@@ -8,6 +8,7 @@
   <meta name="meridian-ui-generation" content="11-preview">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <title>MERIDIAN 11 — Next Generation · Entwurf</title>
+  <link rel="stylesheet" href="../public/css/m11-agent-status.css">
   <!-- B6 DRAFT: Semantic P/L colors in read-only bot snapshot cards; no persistence, automatic request, engine, orders or service worker.
        The v9 engine is intentionally NOT loaded until the single-engine / lifecycle / safety tests exist.
        Noindex does not make this private: any future Pages publication makes the source publicly accessible. -->
@@ -374,6 +375,7 @@
       <summary><span id="autonomy-heading">Autonome Entwicklung · <strong>Unbekannt</strong><small class="disclosure-hint"> · Details</small></span><span aria-hidden="true">+</span></summary>
       <div class="details-body">
         <p>Kein aktuelles Betriebssignal. <b>Aktuelle Aufgabe:</b> Nicht verifiziert. <b>Letztes Lebenszeichen:</b> Nicht verfügbar. Diese Anzeige überwacht den Betrieb nicht.</p>
+        <div id="agent-status-root" role="status" aria-live="polite">Keine verifizierten Statusdaten.</div>
         <p><b>Diese Vorschau · B15:</b> Kompakte Bot-Karten und Command-Zeilen; synthetische Darstellungstests, keine Betriebsfreigabe. <b>Vorige Vorschau · B14:</b> Research-Ausgaben unverifiziert. <b>Vorige Vorschau · B11:</b> Manuelle Bot-Snapshots; Testvorschau · Geräteabnahme ausstehend.</p>
         <p><b>Vorige Vorschau · B10:</b> Kompaktes Layout. <b>Vorige Vorschau · B9:</b> Depotbewertung und Verlauf · <a href="https://github.com/Achi1984/meridian/issues/766">B9-Umfang #766</a>. Kontrollierte Testvorschau · Geräteabnahme ausstehend.</p>
         <p><b>Zuletzt belegte UI-Änderung · B1:</b> <time datetime="2026-10-11T19:30:28Z">11.10.2026, 21:30 Uhr Wien</time> · <a href="https://github.com/Achi1984/meridian/pull/702">Nachweis #702</a>. Der Versionsstand ist kein Lebenszeichen.</p>
@@ -601,5 +603,6 @@
 <script type="module" src="./bot-read-bootstrap.js?v=B17-M11"></script>
 <script type="module" src="./depot-read-bootstrap.js?v=B17-M11"></script>
 <script type="module" src="./strategy-workspace-bootstrap.js?v=B17-M11"></script>
+<script type="module" src="./agent-status-bootstrap.js?v=B17-M11"></script>
 </body>
 </html>

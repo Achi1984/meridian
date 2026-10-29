@@ -1,0 +1,141 @@
+name: M11 CI-to-review coordinator TEMPLATE ONLY
+
+on:
+  workflow_run:
+    workflows:
+      - MERIDIAN Release Safety
+    types:
+      - completed
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+env:
+  M11_COORDINATOR_ENABLED: ${{ vars.M11_COORDINATOR_ENABLED || 'false' }}
+
+concurrency:
+  group: m11-coordinator-${{ github.repository }}-${{ github.event.workflow_run.id }}
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    if: >-
+      ${{
+        vars.M11_COORDINATOR_ENABLED == 'true' &&
+        github.repository == 'Achi1984/meridian' &&
+        github.event.workflow_run.workflow_id == 347821227 &&
+        github.event.workflow_run.conclusion == 'success'
+      }}
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out trusted main only
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Enforce manifest and bounded pilot gates
+        id: gate
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const manifest = JSON.parse(fs.readFileSync(
+            'docs/autonomy/m11-event-coordinator/pilot-manifest.json', 'utf8'));
+          const now = Date.now();
+          const enabled = manifest.enabled === true
+            && manifest.status === 'ACTIVE_OWNER_APPROVED'
+            && manifest.startUtc !== null
+            && manifest.endUtc !== null
+            && Date.parse(manifest.startUtc) <= now
+            && now < Date.parse(manifest.endUtc)
+            && Date.parse(manifest.endUtc) - Date.parse(manifest.startUtc) <= 86400000
+            && Number.isSafeInteger(manifest.maxPackets)
+            && manifest.maxPackets > 0
+            && manifest.maxPackets <= 3
+            && Array.isArray(manifest.repositoryAllowlist)
+            && manifest.repositoryAllowlist.includes('Achi1984/meridian')
+            && Array.isArray(manifest.pullRequestAllowlist)
+            && manifest.pullRequestAllowlist.length > 0
+            && manifest.pullRequestAllowlist.length <= 3
+            && manifest.pullRequestAllowlist.every(Number.isSafeInteger)
+            && Array.isArray(manifest.actorAllowlist)
+            && manifest.actorAllowlist.length > 0
+            && manifest.actorAllowlist.every(actor => typeof actor === 'string' && !actor.startsWith('<'))
+            && manifest.maxConcurrentWriters === 1;
+          if (!enabled) process.exit(1);
+          NODE
+      - name: Template placeholder — authenticated read collector not wired
+        run: echo "INERT TEMPLATE: no collector client is enabled"
+
+  claim:
+    needs: collect
+    if: >-
+      ${{
+        vars.M11_COORDINATOR_ENABLED == 'true' &&
+        github.repository == 'Achi1984/meridian' &&
+        github.event.workflow_run.workflow_id == 347821227 &&
+        github.event.workflow_run.conclusion == 'success'
+      }}
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out trusted main only
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Template placeholder — create-only claim and quota not wired
+        run: echo "INERT TEMPLATE: no claim or state mutation is enabled"
+
+  review:
+    needs: claim
+    if: >-
+      ${{
+        vars.M11_COORDINATOR_ENABLED == 'true' &&
+        github.repository == 'Achi1984/meridian' &&
+        github.event.workflow_run.workflow_id == 347821227 &&
+        github.event.workflow_run.conclusion == 'success'
+      }}
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out trusted main only
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Template placeholder — reviewer secret isolated from state writer
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: echo "INERT TEMPLATE: no model invocation is enabled"
+
+  commit-receipt:
+    needs: review
+    if: >-
+      ${{
+        vars.M11_COORDINATOR_ENABLED == 'true' &&
+        github.repository == 'Achi1984/meridian' &&
+        github.event.workflow_run.workflow_id == 347821227 &&
+        github.event.workflow_run.conclusion == 'success'
+      }}
+    permissions:
+      contents: write
+      issues: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out trusted main only
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Template placeholder — model-free state reconciliation and receipt
+        run: echo "INERT TEMPLATE: no GitHub write is enabled"

@@ -1,0 +1,182 @@
+{
+  "schemaVersion": 1,
+  "id": "M11-COORDINATOR-20261027-R1",
+  "status": "PREPARATION_ONLY",
+  "enabled": false,
+  "startUtc": null,
+  "endUtc": null,
+  "durationHours": 24,
+  "maxPackets": 3,
+  "maxConcurrentWriters": 1,
+  "maxConcurrentDraftPrs": 1,
+  "wipLimit": 3,
+  "requiredPostchecks": [
+    "release-safety",
+    "runtime-smoke",
+    "release-coordinator",
+    "pages"
+  ],
+  "postcheckWorkflowIds": {
+    "release-safety": "<PINNED-WORKFLOW-ID-REQUIRED>",
+    "runtime-smoke": "<PINNED-WORKFLOW-ID-REQUIRED>",
+    "release-coordinator": "<PINNED-WORKFLOW-ID-REQUIRED>",
+    "pages": "<PAGES-CHECK-IDENTITY-REQUIRED>"
+  },
+  "evidenceSnapshot": {
+    "mainSha": "830c9346aae22023c739a89bdc46943a2d5d088d",
+    "observedAtUtc": "2026-10-29T07:51:47Z",
+    "currentMainPostchecks": "NOT_QUERIED_AFTER_BASE_ADVANCE",
+    "previousMainPostchecks": {
+      "mainSha": "a40b714ea4a60b2b367d8db834ad65b7782f5a46",
+      "release-safety": {
+        "runId": 40823600133,
+        "runAttempt": 1,
+        "jobId": 123281454123,
+        "status": "failure",
+        "failedStep": "Research and auth regression tests",
+        "testTotals": {
+          "passed": 2876,
+          "failed": 1,
+          "skipped": 0
+        },
+        "failureDetail": "Failed test name and assertion unavailable from the returned job-log tail; not inferred"
+      },
+      "runtime-smoke": {
+        "runId": 40823600130,
+        "runAttempt": 1,
+        "status": "success"
+      },
+      "release-coordinator": {
+        "runId": 40823600127,
+        "runAttempt": 1,
+        "status": "success"
+      },
+      "pages": {
+        "runId": 40823599573,
+        "runAttempt": 1,
+        "status": "success"
+      }
+    },
+    "coordinatorCi": "NOT_RUN_ON_CURRENT_HEAD_BASE_PAIR",
+    "currentPairCoordinatorCi": "NOT_RUN",
+    "independentClaudeAcceptance": "PENDING"
+  },
+  "handoffDesign": {
+    "status": "IMPLEMENTED_SOURCE_ONLY_DISABLED",
+    "rankedPilot": "CI_SUCCESS_TO_INDEPENDENT_REVIEW_AND_ONE_RECEIPT",
+    "authorDelivery": "INTERACTIVE_EXISTING_PATH; NATIVE_DISPATCH_NOT_REQUIRED",
+    "progression": [
+      "AUTHOR_DELIVERY",
+      "EXACT_PAIR_CI",
+      "COMPLETE_INDEPENDENT_REVIEW",
+      "CORRECTION_OR_LEAD_MERGE",
+      "FOUR_EXACT_MERGE_POSTCHECKS"
+    ],
+    "dedupe": {
+      "logicalActionKey": "REPOSITORY_PR_HEAD_BASE_PHASE",
+      "executionGeneration": "LOGICAL_ACTION_KEY_WORKFLOW_ID_RUN_ID_RUN_ATTEMPT",
+      "claim": "IRREVERSIBLE_CREATE_ONLY_NO_LEASE_NO_TAKEOVER",
+      "globalReservations": 3,
+      "unknown": "MANUAL_RECONCILIATION_NO_RETRY"
+    },
+    "reviewEnvelope": {
+      "binding": "REVIEW_REQUEST_ID_SESSION_PROVIDER_AGENT_MODEL_TRANSPORT_EXACT_CI_PAIR",
+      "coverage": "ONE_SESSION_ONLY_NO_CROSS_SESSION_UNION",
+      "invocation": "DISABLED"
+    },
+    "eventAuthentication": "INJECTED_AUTHENTICATED_READ_ADAPTER_REQUIRED; NO_GITHUB_ADAPTER_INCLUDED",
+    "stateStore": "BACKEND_INTERFACE_ONLY; ONE_SHOT_CLAIMS_ONLY; EXPECTED_OID_CAS_CHAIN_VALIDATION_AND_HOSTED_ATOMICITY_UNPROVEN",
+    "nativeAssignment": "USER_TO_SERVER_TOKEN_REQUIRED_NOT_PROVISIONED",
+    "claudeTrigger": "NO_REVIEWER_ADAPTER_WIRED; OWNER_COMMENT_ONLY_CURRENT_RESOURCE",
+    "implementedSourceFiles": [
+      "scripts/autonomy/m11-coordinator-collector.mjs",
+      "scripts/autonomy/m11-coordinator-state-store.mjs",
+      "scripts/autonomy/m11-coordinator-review.mjs",
+      "test/m11-coordinator-pilot.test.js",
+      "docs/autonomy/m11-event-coordinator/m11-ci-review-workflow.yml.disabled"
+    ],
+    "notImplementedAdapters": [
+      "AUTHENTICATED_GITHUB_READ_CLIENT",
+      "HOSTED_ATOMIC_EXPECTED_OID_CAS_AND_CREATE_ONLY_CLAIMS",
+      "CLAUDE_REVIEWER_INVOCATION",
+      "GITHUB_RECEIPT_WRITE_AND_AUTHORITATIVE_LOOKUP"
+    ],
+    "remainingActivationWork": [
+      "Implement and independently verify an authenticated GitHub read adapter behind scripts/autonomy/m11-coordinator-collector.mjs",
+      "Implement and independently verify a hosted create-only one-shot claim, single-writer, atomic three-reservation and expected-OID state backend",
+      "Run isolated L1-L8 GitHub ref, receipt read-after-write and pinned Claude read-token/OIDC validation before any mutation",
+      "Implement separately isolated Claude reviewer and GitHub receipt-write/readback adapters; bind one session and report capability evidence with expiry",
+      "Approve exact permissions, allowlists, start/end, and move the inert template into .github/workflows only after independent review"
+    ],
+    "proposedPermissionNames": [
+      "actions: read",
+      "contents: read",
+      "pull-requests: read",
+      "contents: write (dedicated CAS refs only; separately reviewed)",
+      "issues: write (single keyed mailbox receipt)",
+      "id-token: write (only if pinned Claude action requires it)",
+      "CLAUDE_CODE_OAUTH_TOKEN (existing secret; event-triggered reuse needs separate approval)"
+    ],
+    "testAcceptance": [
+      "AUTHENTICATED_EVENT_AND_AUTHORITATIVE_RUN_SELECTION",
+      "EXACT_PAIR_CI_SUCCESS_REQUIRED",
+      "DUPLICATE_DELIVERY_INVOKES_REVIEW_ONCE",
+      "CAS_COMPETITION_HAS_ONE_WINNER",
+      "DURABLE_THREE_RESERVATION_GLOBAL_QUOTA",
+      "RESTART_RECONSTRUCTS_ONE_SHOT_CLAIM_AND_STATE",
+      "CRASH_AND_UNKNOWN_RESULT_REQUIRE_RECONCILIATION",
+      "STALE_REVALIDATION_BEFORE_CLAIM_REVIEW_AND_RECEIPT",
+      "CI_JOB_NAME_RUN_ID_ATTEMPT_AND_WORKFLOW_ID_PINNED",
+      "REVIEW_SESSION_AND_EXECUTION_GENERATION_BOUND",
+      "CAPABILITY_EVIDENCE_STATES_AND_EXPIRY",
+      "PARTIAL_OR_TRUNCATED_REVIEW_NEVER_GREEN",
+      "ONE_CONSOLIDATED_RECEIPT",
+      "DEFAULT_DISABLED_AND_NO_LIVE_IO_IN_TESTS",
+      "HOSTED_EXPECTED_OID_CAS_AND_REMOTE_EXACTLY_ONCE_REMAIN_UNPROVEN",
+      "NO_LEASE_TAKEOVER_OR_AUTOMATIC_RETRY",
+      "NO_MERGE_DEPLOY_OR_APPROVAL_BYPASS_CAPABILITY"
+    ],
+    "actionRequiredApproval": "OWNER_ONLY",
+    "merge": "LEAD_ONLY_NO_COORDINATOR_TOKEN",
+    "unknownMutation": "RECONCILE_BEFORE_ANY_RETRY",
+    "ownerExceptions": [
+      "STRATEGIC_DECISION",
+      "PERMISSION_CREDENTIAL_COST_OR_RUNTIME_CHANGE",
+      "UNRESOLVED_BLOCKER"
+    ]
+  },
+  "repositoryAllowlist": [
+    "<OWNER-APPROVED-REPOSITORY-ALLOWLIST-REQUIRED>"
+  ],
+  "pullRequestAllowlist": [
+    "<OWNER-APPROVED-PR-ALLOWLIST-REQUIRED>"
+  ],
+  "actorAllowlist": [
+    "<AUTHENTICATED-EVENT-ACTOR-ALLOWLIST-REQUIRED>"
+  ],
+  "budgets": {
+    "events": 96,
+    "transitions": 24,
+    "eventBytes": 4096,
+    "replayBytes": 65536,
+    "runtimeMilliseconds": 10000
+  },
+  "adapters": {
+    "liveNetwork": false,
+    "liveMutation": false,
+    "agentDispatch": false,
+    "reviewRequest": false,
+    "automaticMerge": false,
+    "automaticDeploy": false,
+    "approvalBypass": false
+  },
+  "boundaries": {
+    "publisherPaused": true,
+    "researchPaused": true,
+    "runtimeExecution": false,
+    "tradingAuthority": false,
+    "additionalSpend": false,
+    "planUpgrade": false,
+    "existingResourcesOnly": true
+  }
+}

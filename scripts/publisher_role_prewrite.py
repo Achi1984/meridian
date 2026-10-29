@@ -23,7 +23,7 @@ import publisher_role_transition as transition
 
 ROOT=Path(__file__).resolve().parent
 PINS={
-    'publisher_test_readonly_inspection.py':'cef46e32d0d20e20f0051d06920c984fe19977a9354b2ea8cce6c0dd582dd5b9',
+    'publisher_test_readonly_inspection.py':'5feb20a9b4007fd7d65d4230a50f9055bb7dbfeb9053acbdc091363ae8f6d22d',
     'publisher_test_password_setup.py':'3f3e4cab7fa64b5890fda1483bc73ac277636f001ec933bf514c926267ef68fb',
     'publisher-test-readonly-queries.json':'99ac288ed3e1dd5681345aa828bed3e129e729a1430f9022ca456622b62e7789',
 }

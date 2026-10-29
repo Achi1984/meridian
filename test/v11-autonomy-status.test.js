@@ -10,7 +10,9 @@ test('autonomy status is persistent and unknown without telemetry',()=>{
  assert.match(strip,/Kein aktuelles Betriebssignal/);
  assert.match(strip,/Aktuelle Aufgabe:<\/b> Nicht verifiziert/);
  assert.match(strip,/Letztes Lebenszeichen:<\/b> Nicht verfügbar/);
- assert.doesNotMatch(strip,/data-state="(?:active|waiting|blocked|paused)"|role="status"/);
+ const agentStatusRoot='<div id="agent-status-root" role="status" aria-live="polite">Keine verifizierten Statusdaten.</div>';
+ assert.equal(strip.split(agentStatusRoot).length-1,1,'one exact approved empty agent-status root');
+ assert.doesNotMatch(strip.replace(agentStatusRoot,''),/data-state="(?:active|waiting|blocked|paused)"|role="status"/);
 });
 test('historical UI evidence is separate from current operation and draft revision',()=>{
  assert.match(strip,/Diese Vorschau · B15/);

@@ -740,6 +740,14 @@ const commandPresentationDeltas=[
   ]
 ];
 function restoreB2(source){
+  for(const addition of [
+    '  <link rel="stylesheet" href="../public/css/m11-agent-status.css">\n',
+    '        <div id="agent-status-root" role="status" aria-live="polite">Keine verifizierten Statusdaten.</div>\n',
+    '<script type="module" src="./agent-status-bootstrap.js?v=B17-M11"></script>\n'
+  ]){
+    assert.equal(source.split(addition).length-1,1,'one exact agent-status mount addition');
+    source=source.replace(addition,'');
+  }
   for(const [before,after] of b17CacheDelta){
     assert.equal(source.split(after).length-1,1,'one exact B17 cache identity delta');
     source=source.replace(after,before);
@@ -832,11 +840,13 @@ test('Terminal öffnen preserves the reviewed history-close baseline and stays o
   assert.equal(gitBlob(restored),preimageBlob,'all source bytes except terminal-entry insertions, the checked viewport pair and exact Depot/revision deltas must match the reviewed history-close baseline');
 });
 
-const moduleNames=['app-access-bootstrap.js','app-access.js','bot-read-bootstrap.js','bot-read-client.js','bot-read-view.js','bot-read-model.js','bot-overview-model.js','depot-read-bootstrap.js','depot-read-client.js','depot-read-model.js','depot-read-view.js','depot-history-model.js','depot-history-view.js','depot-current-model.js','depot-portfolio-state.js','strategy-workspace-bootstrap.js','strategy-catalog.js','research-evidence.js','strategy-arena.js','arena-inspection-report.js','arena-historical-result.js','arena-historical-export.js','arena-result-view.js'];
+const moduleNames=['app-access-bootstrap.js','app-access.js','agent-status-bootstrap.js','agent-status-client.js','bot-read-bootstrap.js','bot-read-client.js','bot-read-view.js','bot-read-model.js','bot-overview-model.js','depot-read-bootstrap.js','depot-read-client.js','depot-read-model.js','depot-read-view.js','depot-history-model.js','depot-history-view.js','depot-current-model.js','depot-portfolio-state.js','strategy-workspace-bootstrap.js','strategy-catalog.js','research-evidence.js','strategy-arena.js','arena-inspection-report.js','arena-historical-result.js','arena-historical-export.js','arena-result-view.js'];
 function deploymentServer(){
   const inlineScript=html.match(/<script>([\s\S]*?)<\/script>/i)?.[1];
   assert.ok(inlineScript,'actual UI-only navigation script');
   const scriptHash=createHash('sha256').update(inlineScript).digest('base64');
+  const statusCssPath='/meridian/public/css/m11-agent-status.css';
+  const statusCss=readFileSync(new URL('../public/css/m11-agent-status.css',import.meta.url),'utf8');
   const policies=new Map(),requests=[],modules=new Map(),pending=new Set();
   let reads=0,aborts=0,depotReads=0,depotAborts=0,authReads=0,mode='fresh';
   const endpoint='/meridian/__test/bot-snapshot',depotEndpoint='/meridian/__test/depot-snapshot',currentEndpoint='/meridian/__test/depot-current',priceEndpoint='/meridian/__test/depot-prices',authEndpoint='/meridian/__test/app-access';
@@ -862,6 +872,7 @@ function deploymentServer(){
   for(const path of ['portfolio-data-contract.js','v8-clean/live-price-core-r18.js'])modules.set('/meridian/'+path,readFileSync(new URL('../'+path,import.meta.url),'utf8'));
   modules.set('/meridian/research/strategy-paper-arena.js',readFileSync(new URL('../research/strategy-paper-arena.js',import.meta.url),'utf8'));
   modules.set('/meridian/docs/strategy-lab/campaign-20261013.json',readFileSync(new URL('../docs/strategy-lab/campaign-20261013.json',import.meta.url),'utf8'));
+  modules.set('/meridian/public/js/m11-agent-status.js',readFileSync(new URL('../public/js/m11-agent-status.js',import.meta.url),'utf8'));
   const server=createServer((request,response)=>{
     const url=new URL(request.url,'http://127.0.0.1'),path=url.pathname;
     requests.push({method:request.method,path}); // never record headers or token values
@@ -904,11 +915,14 @@ function deploymentServer(){
     if(modules.has(path)){
       response.writeHead(200,{'Content-Type':path.endsWith('.json')?'application/json; charset=utf-8':'text/javascript; charset=utf-8','Cache-Control':'no-store'});response.end(modules.get(path));return;
     }
+    if(path===statusCssPath){
+      response.writeHead(200,{'Content-Type':'text/css; charset=utf-8','Cache-Control':'no-store'});response.end(statusCss);return;
+    }
     if(path!=='/meridian/v11/'&&path!=='/meridian/v10/'){response.writeHead(404);response.end();return;}
     const preview=path==='/meridian/v11/';
     const origin='http://127.0.0.1:'+server.address().port;
     const scriptSource=preview?`'sha256-${scriptHash}' `+[...modules.keys()].map(path=>origin+path+(path.startsWith('/meridian/v11/')?'?v=B17-M11':'')).join(' '):"'none'";
-    const policy=`default-src 'none'; script-src ${scriptSource}; style-src 'unsafe-inline'; connect-src ${preview?origin+endpoint+' '+origin+depotEndpoint+' '+origin+currentEndpoint+' '+origin+priceEndpoint+' '+origin+authEndpoint+' '+origin+'/meridian/docs/strategy-lab/campaign-20261013.json':"'none'"}; worker-src 'none'; child-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'none'`;
+    const policy=`default-src 'none'; script-src ${scriptSource}; style-src 'unsafe-inline'${preview?' '+origin+statusCssPath:''}; connect-src ${preview?origin+endpoint+' '+origin+depotEndpoint+' '+origin+currentEndpoint+' '+origin+priceEndpoint+' '+origin+authEndpoint+' '+origin+'/meridian/docs/strategy-lab/campaign-20261013.json':"'none'"}; worker-src 'none'; child-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'none'`;
     policies.set(path,policy);
     response.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Content-Security-Policy':policy});response.end(preview?html:terminal);
   });
@@ -916,7 +930,7 @@ function deploymentServer(){
     server.once('error',reject);server.listen(0,'127.0.0.1',()=>resolve({
       base:`http://127.0.0.1:${server.address().port}/meridian/`,policies,requests,
       metrics:()=>({reads,aborts,depotReads,depotAborts,authReads,pending:pending.size}),setMode:value=>{mode=value;},
-      allowedPaths:new Set(['/meridian/v11/','/meridian/v10/',endpoint,depotEndpoint,currentEndpoint,priceEndpoint,authEndpoint,...modules.keys()]),
+      allowedPaths:new Set(['/meridian/v11/','/meridian/v10/',endpoint,depotEndpoint,currentEndpoint,priceEndpoint,authEndpoint,statusCssPath,...modules.keys()]),
       close:()=>new Promise((done,fail)=>{for(const response of pending)response.destroy();server.close(error=>error?fail(error):done());server.closeAllConnections();})
     }));
   });
@@ -980,6 +994,28 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     assert.equal(await renderer.text(),readFileSync(new URL('../v11/arena-result-view.js',import.meta.url),'utf8'));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(rendererUrl.href),'exact renderer dependency URL must be in script-src');
     assert.equal(server.allowedPaths.has(rendererUrl.pathname),true);
+    for(const [path,file,type] of [
+      ['agent-status-bootstrap.js?v=B17-M11','v11/agent-status-bootstrap.js','javascript'],
+      ['agent-status-client.js?v=B17-M11','v11/agent-status-client.js','javascript'],
+      ['../public/js/m11-agent-status.js','public/js/m11-agent-status.js','javascript'],
+      ['../public/css/m11-agent-status.css','public/css/m11-agent-status.css','css']
+    ]){
+      const url=new URL(path,start),asset=await fetch(url);
+      assert.equal(asset.status,200);
+      assert.ok(asset.headers.get('content-type').startsWith('text/'+type));
+      assert.equal(await asset.text(),readFileSync(new URL('../'+file,import.meta.url),'utf8'));
+      assert.equal(server.allowedPaths.has(url.pathname),true);
+      const directive=type==='css'?'style-src':'script-src';
+      const policy=page.headers.get('content-security-policy').split(';').find(part=>part.trim().startsWith(directive+' '));
+      assert.ok(policy.trim().split(/\s+/).includes(url.href),'exact status asset URL allowed by '+directive);
+      const unexpected=new URL(url);unexpected.searchParams.set('unexpected','1');
+      assert.equal((await fetch(unexpected)).status,404,'unexpected queries remain blocked');
+      assert.equal((await fetch(url,{method:'POST'})).status,404,'non-GET asset requests remain blocked');
+    }
+    const stylePolicy=page.headers.get('content-security-policy').split(';').find(part=>part.trim().startsWith('style-src '));
+    assert.deepEqual(stylePolicy.trim().split(/\s+/),['style-src',"'unsafe-inline'",new URL('../public/css/m11-agent-status.css',start).href]);
+    const terminalPage=await fetch(server.base+'v10/');
+    assert.match(terminalPage.headers.get('content-security-policy'),/script-src 'none'; style-src 'unsafe-inline'; connect-src 'none';/);
     assert.deepEqual(server.metrics(),{reads:0,aborts:0,depotReads:0,depotAborts:0,authReads:0,pending:0});
   }finally{await server.close();}
 });
