@@ -9,6 +9,7 @@ import {withMobileChrome} from './helpers/v11-cdp.mjs';
 
 const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium']
   .find(path=>path&&existsSync(path));
+const MOON_BOT_REF='f00df00df00df00df00d';
 const v11Root=fileURLToPath(new URL('../v11/',import.meta.url));
 const source=readFileSync(join(v11Root,'index.html'),'utf8');
 const bootstrap='<script type="module" src="./bot-read-bootstrap.js?v=B17-M11"></script>';
@@ -44,7 +45,7 @@ window.__botSnapshot=age=>({schemaVersion:'MERIDIAN-ASSET-WATCH-BRIDGE-V1',sourc
    leverage:3,investment:{quoteAmount:0.42,currency:'XRP'},pnl:{usd:0.005}},
   {botRef:'f'.repeat(20),symbol:'SOLUSDT',side:'LONG',cateType:'linear',botType:'futures_grid',
    leverage:null,pnl:{usd:0}},
-  {botRef:'g'.repeat(20),symbol:'MOONUSDT',side:'LONG',cateType:'FUTURES_MOON',botType:'futures_grid',
+  {botRef:'${MOON_BOT_REF}',symbol:'MOONUSDT',side:'LONG',cateType:'FUTURES_MOON',botType:'futures_grid',
    leverage:1,pnl:{usd:null}}
  ]});
 window.__largeBotSnapshot=age=>{const snapshot=window.__botSnapshot(age);
@@ -245,8 +246,8 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
                 text:c.querySelector('summary').innerText})),
               referenceLabels:cards.map(c=>c.querySelector('summary').getAttribute('aria-label')),
               neutralDetails:cards.find(c=>c.id.endsWith('c'.repeat(20)))?.querySelector('.bot-card-body').textContent,
-              moonDetails:cards.find(c=>c.id.endsWith('g'.repeat(20)))?.querySelector('.bot-card-body').textContent,
-              moonBadges:[...cards.find(c=>c.id.endsWith('g'.repeat(20)))?.querySelectorAll('.bot-card-badge')||[]].map(b=>b.innerText),
+              moonDetails:cards.find(c=>c.id.endsWith('${MOON_BOT_REF}'))?.querySelector('.bot-card-body').textContent,
+              moonBadges:[...cards.find(c=>c.id.endsWith('${MOON_BOT_REF}'))?.querySelectorAll('.bot-card-badge')||[]].map(b=>b.innerText),
               coverage:root.innerText,
               referencesVisible:cards.some(c=>c.querySelector('summary').innerText.includes('Referenz')),
               tinyPositive:cards.find(c=>c.id.endsWith('e'.repeat(20)))?.querySelector('.bot-pnl-positive')?.innerText,

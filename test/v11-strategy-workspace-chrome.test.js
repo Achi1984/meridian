@@ -242,7 +242,17 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
       const metrics=await withMobileChrome(chrome,size.width,hosted.url,async call=>{
         const evaluate=async expression=>{
           const result=await call('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});
-          assert.ok(!result.exceptionDetails,'M11 strategy page expression failed');
+          const exception=result.exceptionDetails;
+          if(exception){
+            const name=String(exception.exception?.className||'Exception')
+              .replace(/[^A-Za-z0-9_.-]/g,'').slice(0,40)||'Exception';
+            const detail=String(exception.exception?.description||exception.text||'')
+              .split('\n',1)[0]
+              .replace(/\b(password|token|secret|credential)\b\s*[:=]\s*[^\s,;]+/gi,'$1=[redacted]')
+              .replace(/\bBearer\s+\S+/gi,'******')
+              .replace(/[^\x20-\x7e]/g,'?').slice(0,180);
+            assert.fail(`M11 strategy page expression failed (${name})${detail?': '+detail:''}`);
+          }
           return result.result?.value;
         };
         const waitForProducerText=text=>evaluate(`new Promise(resolve=>{
@@ -756,7 +766,7 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
                 setTimeout(inspect,25);
               };
               inspect();
-            })()`);
+            })`);
             assert.equal(scrollResult.activeElementIsRegion,true,
               'ArrowRight must not move focus away from the scroll region: '+JSON.stringify(scrollResult));
             assert.deepEqual(scrollResult.keyEvent,
