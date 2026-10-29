@@ -1,38 +1,53 @@
 # M11 Coordinator Atomic Record Backend
 
-This backend is a source-only synthetic implementation of the coordinator atomic-record contract.
+This backend is source-only synthetic composition for coordinator state-store integration.
 
 ## Contract
 
-- One canonical envelope is atomically replaced by exact `storageVersion` compare-and-swap.
-- `storageVersion` is private and increments on **every** durable mutation, including claim creation.
-- Public lifecycle snapshot (`snapshot.oid`, `snapshot.revision`) does **not** advance on `createOnlyClaim`; it advances only on transition commit.
-- Admission reducer state is independent from public lifecycle revision.
-- Durable envelope fields are bounded to:
-  - `storageVersion`
-  - public `snapshot`
-  - `admissionState`
-  - retained `claims`
-  - `transitionChain`
+- The backend stores one canonical envelope and only mutates it via exact `storageVersion` compare-and-swap replacement.
+- Private `storageVersion` increments on **every durable mutation**, including claim creation.
+- Public lifecycle pair (`snapshot.oid`, `snapshot.revision`) does **not** change on claim creation and changes only on transition commit.
+- Admission reducer revision is separate from public snapshot revision.
 
-## Safety and sequencing
+Envelope fields:
 
-- Claims atomically consume quota and gate identity via `reduceAdmissionRecord(...SIMULATE_ADMISSION...)`.
-- Transition commit enforces:
-  - private-version fence (`claim.storageVersion` must match envelope `storageVersion`)
-  - public expected pair fence (`expectedOid` + `expectedRevision`)
-  - immutable claim identity consistency (action/execution/request/session when present)
-  - legal lifecycle transition order, including dispatch/observe/receipt fences
-- `OBSERVE_PENDING` remains resumable by allowing `OBSERVE_PREPARING` from `OBSERVE_PENDING`.
-- Once a claim is marked `UNKNOWN`, it cannot resume to non-`UNKNOWN` transitions.
-- Duplicate receipt preparation is rejected.
+- `storageVersion`
+- `snapshot`
+- `admissionState`
+- `claims`
+- `transitionChain`
 
-## Reconstruction and durability boundaries
+## Durability and validation
 
-- Canonical envelope import validates chain monotonicity and admission/claim projection coherence.
-- Inconsistent chain, reducer, or claim projection data is rejected.
-- Lost write ACK behavior is fail-closed: callers reconcile as unknown; replay does not duplicate write.
+- `transitionChain` persists immutable transition records including parent linkage and digests:
+  - `parentStorageVersion`
+  - `parentDigest`
+  - `transitionDigest`
+  - record `digest`
+  - public tip (`publicOid`, `publicRevision`)
+- Reconstruction validates chain linkage, digests, and reducer/projection replay consistency.
+- Any inconsistency (chain parent/digest, public tip drift, admission/projection mismatch, or missing retained claim) rejects the envelope.
+- `snapshot.chainValid` is returned only for validated/reconstructed history.
 
-## Hosted gaps (intentional)
+## Lifecycle fences and identity
 
-This module does **not** claim hosted durability or external authority. Capability flags in this synthetic backend prove only local source semantics, not production database/network guarantees.
+- Claims atomically consume quota/gate/identity through `reduceAdmissionRecord(...SIMULATE_ADMISSION...)`.
+- Transition commits enforce both:
+  - private fence (`claim.storageVersion` == envelope `storageVersion`)
+  - public CAS fence (`expectedOid`, `expectedRevision`)
+- Strict lifecycle order is enforced (no shortcut bypasses):
+  - `CLAIMED -> REVIEW_PENDING -> DISPATCH_ACKED -> OBSERVE_PREPARING -> REVIEW_RESULT -> RECEIPT_PREPARING -> RECEIPT_POSTING -> RECEIPT_DELIVERED`
+- `OBSERVE_PENDING` remains eligible by allowing `OBSERVE_PREPARING` from `OBSERVE_PENDING`.
+- Completion pairs are validated (`completionState`/`verdict`), and final delivered transition cannot overwrite accepted pair values.
+- `UNKNOWN` is terminal for progression; non-unknown resume is rejected.
+
+## One-attempt write semantics
+
+- Claim and commit perform one conditional replacement attempt per invocation (no automatic retry/takeover/refund).
+- Successful replace responses require authoritative readback verification before returning `CREATED`/`COMMITTED`.
+- Malformed/uncertain replace outcomes fail closed.
+- Lost ACK after persisted write remains uncertain to caller, and replay cannot duplicate the write.
+
+## Hosted gap
+
+This backend does not claim hosted database/network durability. Its capability flags prove source semantics only.

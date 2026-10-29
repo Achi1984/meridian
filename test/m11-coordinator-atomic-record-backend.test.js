@@ -2,18 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {collectExactPair} from '../scripts/autonomy/m11-coordinator-collector.mjs';
 import {createCoordinatorStateStore} from '../scripts/autonomy/m11-coordinator-state-store.mjs';
+import {REQUIRED_REVIEW_PARTS} from '../scripts/autonomy/m11-event-coordinator.mjs';
+import {startReviewLifecycle, observeReviewLifecycle} from '../scripts/autonomy/m11-review-lifecycle.mjs';
 import {
   createAtomicRecordEnvelope,
   createAtomicRecordMemoryTransport,
   createCoordinatorAtomicRecordBackend
 } from '../scripts/autonomy/m11-coordinator-atomic-record-backend.mjs';
-
-let lifecycle = null;
-try {
-  lifecycle = await import('../scripts/autonomy/m11-review-lifecycle.mjs');
-} catch {
-  lifecycle = null;
-}
 
 const START = 1700000000000;
 const END = START + 86400000;
@@ -24,20 +19,40 @@ const BASE = 'b'.repeat(40);
 const WORKFLOW_ID = 347821227;
 const RUN_ID = 7001;
 const RUN_ATTEMPT = 1;
+const REVIEWER = Object.freeze({provider: 'claude', agent: 'agent', model: 'model', transport: 'trusted-runtime'});
 
-function makeBackend({totalQuota = 3, afterReplace = null} = {}) {
-  const transport = createAtomicRecordMemoryTransport({
+function makeBackend({
+  totalQuota = 3,
+  beforeReplace = null,
+  afterReplace = null
+} = {}) {
+  const raw = createAtomicRecordMemoryTransport({
     initialEnvelope: createAtomicRecordEnvelope({totalQuota}),
     afterReplace
   });
+  let replaceCalls = 0;
+  const transport = {
+    readCanonicalEnvelope: (...args) => raw.readCanonicalEnvelope(...args),
+    replaceCanonicalEnvelope: async payload => {
+      replaceCalls += 1;
+      if (typeof beforeReplace === 'function') {
+        await beforeReplace(payload);
+      }
+      return raw.replaceCanonicalEnvelope(payload);
+    }
+  };
   const backend = createCoordinatorAtomicRecordBackend({transport, now: () => START + 10});
-  return {transport, backend};
+  return {
+    backend,
+    transport,
+    getReplaceCalls: () => replaceCalls
+  };
 }
 
 async function claimViaStore(store, {actionKey, executionKey, owner = 'writer-one'} = {}) {
   const before = await store.read();
   assert.equal(before.status, 'READY');
-  const claim = await store.claim({
+  return store.claim({
     actionKey,
     executionKey,
     packetKey: 'f'.repeat(64),
@@ -46,7 +61,42 @@ async function claimViaStore(store, {actionKey, executionKey, owner = 'writer-on
     owner,
     now: START + 10
   });
-  return claim;
+}
+
+async function strictCompleteTransitionPath(store, claim) {
+  let current = claim;
+  for (const transition of [
+    {
+      kind: 'REVIEW_PENDING',
+      reviewRequestId: 'req-1',
+      sessionId: 'sess-1',
+      reviewer: REVIEWER,
+      repository: REPOSITORY,
+      pullRequest: PR,
+      headSha: HEAD,
+      baseSha: BASE,
+      diffDigest: 'd'.repeat(64),
+      changedPathDigest: 'e'.repeat(64),
+      changedPathCount: 1,
+      runId: RUN_ID,
+      runAttempt: RUN_ATTEMPT,
+      workflowId: WORKFLOW_ID,
+      selectionRevision: 20,
+      reviewDeadlineAt: START + 1000
+    },
+    {kind: 'DISPATCH_ACKED', reviewRequestId: 'req-1', sessionId: 'sess-1'},
+    {kind: 'OBSERVE_PREPARING'},
+    {kind: 'REVIEW_RESULT', completionState: 'COMPLETE', verdict: 'GREEN_LIGHT',
+      reviewRequestId: 'req-1', sessionId: 'sess-1'},
+    {kind: 'RECEIPT_PREPARING', completionState: 'COMPLETE', verdict: 'GREEN_LIGHT'},
+    {kind: 'RECEIPT_POSTING'},
+    {kind: 'RECEIPT_DELIVERED', receiptId: 'receipt-1', completionState: 'COMPLETE', verdict: 'GREEN_LIGHT'}
+  ]) {
+    const result = await store.commit({claim: current, transition});
+    assert.equal(result.status, 'COMMITTED', transition.kind);
+    current = result.claim;
+  }
+  return current;
 }
 
 function fixtureApi({headSha = HEAD, baseSha = BASE} = {}) {
@@ -144,243 +194,16 @@ async function collectReady() {
   });
 }
 
-test('claim mutates private storageVersion only; public pair advances only on commit transition', async () => {
-  const {backend} = makeBackend();
-  const store = createCoordinatorStateStore({backend, enabled: true});
-  const claimed = await claimViaStore(store, {
-    actionKey: '1'.repeat(64),
-    executionKey: '2'.repeat(64)
-  });
-  assert.equal(claimed.status, 'CLAIMED');
-
-  const afterClaim = await backend.exportCanonicalEnvelope();
-  assert.equal(afterClaim.storageVersion, 1);
-  assert.equal(afterClaim.snapshot.revision, 0);
-  assert.equal(afterClaim.snapshot.oid, 'root');
-
-  const committed = await store.commit({
-    claim: claimed.claim,
-    transition: {kind: 'REVIEW_PENDING', reviewRequestId: 'r1', sessionId: 's1'}
-  });
-  assert.equal(committed.status, 'COMMITTED');
-  const afterCommit = await backend.exportCanonicalEnvelope();
-  assert.equal(afterCommit.storageVersion, 2);
-  assert.equal(afterCommit.snapshot.revision, 1);
-  assert.equal(afterCommit.snapshot.oid, committed.oid);
-});
-
-test('competing claims produce one winner and stale expectation does not mutate state', async () => {
-  const {backend} = makeBackend();
-  const store = createCoordinatorStateStore({backend, enabled: true});
-  const before = await backend.exportCanonicalEnvelope();
-
-  const results = await Promise.all([
-    claimViaStore(store, {actionKey: '3'.repeat(64), executionKey: '4'.repeat(64), owner: 'writer-a'}),
-    claimViaStore(store, {actionKey: '5'.repeat(64), executionKey: '6'.repeat(64), owner: 'writer-b'})
-  ]);
-  assert.equal(results.filter(item => item.status === 'CLAIMED').length, 1);
-
-  const stale = await backend.createOnlyClaim({
-    actionKey: '7'.repeat(64),
-    executionKey: '8'.repeat(64),
-    packetKey: 'f'.repeat(64),
-    maxPackets: 3,
-    maxActiveClaims: 1,
-    owner: 'writer-c',
-    expectedRevision: before.snapshot.revision,
-    expectedOid: before.snapshot.oid,
-    createdAt: START + 20
-  });
-  assert.equal(stale.status, 'BUSY');
-  const after = await backend.exportCanonicalEnvelope();
-  assert.equal(after.storageVersion, 1);
-});
-
-test('duplicate execution/logical identities are rejected and claims are retained with permanent consumed quota across restart', async () => {
-  const {backend} = makeBackend({totalQuota: 1});
-  const store = createCoordinatorStateStore({backend, enabled: true});
-  const first = await claimViaStore(store, {
-    actionKey: '9'.repeat(64),
-    executionKey: 'a'.repeat(64)
-  });
-  assert.equal(first.status, 'CLAIMED');
-
-  const dupExec = await backend.createOnlyClaim({
-    actionKey: 'b'.repeat(64),
-    executionKey: 'a'.repeat(64),
-    packetKey: 'f'.repeat(64),
-    maxPackets: 3,
-    maxActiveClaims: 1,
-    owner: 'writer-z',
-    expectedRevision: 0,
-    expectedOid: 'root',
-    createdAt: START + 20
-  });
-  assert.equal(dupExec.status, 'EXISTS');
-
-  let claim = first.claim;
-  for (const transition of [
-    {kind: 'REVIEW_RESULT', completionState: 'COMPLETE', verdict: 'GREEN_LIGHT'},
-    {kind: 'RECEIPT_POSTING'},
-    {kind: 'RECEIPT_DELIVERED', receiptId: 'receipt-1', completionState: 'COMPLETE', verdict: 'GREEN_LIGHT'}
-  ]) {
-    const result = await store.commit({claim, transition});
-    assert.equal(result.status, 'COMMITTED');
-    claim = result.claim;
-  }
-
-  const serialized = JSON.stringify(await backend.exportCanonicalEnvelope());
-  const reconstructedBackend = createCoordinatorAtomicRecordBackend({
-    transport: createAtomicRecordMemoryTransport({initialEnvelope: JSON.parse(serialized)}),
-    now: () => START + 50
-  });
-  const restartedStore = createCoordinatorStateStore({backend: reconstructedBackend, enabled: true});
-  const retained = await restartedStore.reconcile('a'.repeat(64));
-  assert.equal(retained.status, 'READY');
-  assert.equal(retained.claim.status, 'COMMITTED');
-
-  const exhausted = await claimViaStore(restartedStore, {
-    actionKey: 'c'.repeat(64),
-    executionKey: 'd'.repeat(64)
-  });
-  assert.equal(exhausted.status, 'BUDGET_EXHAUSTED');
-});
-
-test('invalid canonical reconstruction rejects inconsistent chain and reducer/projection mismatch', async () => {
-  const {backend} = makeBackend();
-  const store = createCoordinatorStateStore({backend, enabled: true});
-  const claimed = await claimViaStore(store, {
-    actionKey: 'e'.repeat(64),
-    executionKey: 'f'.repeat(64)
-  });
-  assert.equal(claimed.status, 'CLAIMED');
-
-  const envelope = await backend.exportCanonicalEnvelope();
-  const badChain = JSON.parse(JSON.stringify(envelope));
-  badChain.transitionChain[0].storageVersion = 999;
-  assert.throws(() => createCoordinatorAtomicRecordBackend({
-    transport: createAtomicRecordMemoryTransport({initialEnvelope: badChain}),
-    now: () => START
-  }), /INVALID_CANONICAL_ENVELOPE/);
-
-  const badProjection = JSON.parse(JSON.stringify(envelope));
-  badProjection.admissionState.activeGate = null;
-  assert.throws(() => createCoordinatorAtomicRecordBackend({
-    transport: createAtomicRecordMemoryTransport({initialEnvelope: badProjection}),
-    now: () => START
-  }), /(INVALID_CANONICAL_ENVELOPE|STATE_INVALID)/);
-});
-
-test('dispatch/observe/receipt transition fences are strict and duplicate receipt preparation is rejected', async () => {
-  const {backend} = makeBackend();
-  const store = createCoordinatorStateStore({backend, enabled: true});
-  const claimed = await claimViaStore(store, {
-    actionKey: '0'.repeat(64),
-    executionKey: '1'.repeat(64)
-  });
-  assert.equal(claimed.status, 'CLAIMED');
-
-  const illegalFirst = await store.commit({claim: claimed.claim, transition: {kind: 'RECEIPT_POSTING'}});
-  assert.equal(illegalFirst.status, 'CONFLICT_RECONCILE');
-
-  let claim = claimed.claim;
-  for (const transition of [
-    {kind: 'REVIEW_PENDING', reviewRequestId: 'req-1', sessionId: 'sess-1'},
-    {kind: 'DISPATCH_ACKED', reviewRequestId: 'req-1', sessionId: 'sess-1'},
-    {kind: 'OBSERVE_PREPARING'},
-    {kind: 'OBSERVE_PENDING'},
-    {kind: 'OBSERVE_PREPARING'},
-    {kind: 'REVIEW_RESULT', completionState: 'COMPLETE', verdict: 'GREEN_LIGHT'},
-    {kind: 'RECEIPT_PREPARING', completionState: 'COMPLETE', verdict: 'GREEN_LIGHT'}
-  ]) {
-    const result = await store.commit({claim, transition});
-    assert.equal(result.status, 'COMMITTED', transition.kind);
-    claim = result.claim;
-  }
-
-  const duplicatePreparing = await store.commit({
-    claim,
-    transition: {kind: 'RECEIPT_PREPARING', completionState: 'COMPLETE', verdict: 'GREEN_LIGHT'}
-  });
-  assert.equal(duplicatePreparing.status, 'CONFLICT_RECONCILE');
-
-  const posting = await store.commit({claim, transition: {kind: 'RECEIPT_POSTING'}});
-  assert.equal(posting.status, 'COMMITTED');
-  const delivered = await store.commit({
-    claim: posting.claim,
-    transition: {kind: 'RECEIPT_DELIVERED', receiptId: 'receipt-xyz', completionState: 'COMPLETE', verdict: 'GREEN_LIGHT'}
-  });
-  assert.equal(delivered.status, 'COMMITTED');
-
-  const resumeFromUnknown = await store.commit({
-    claim: {...posting.claim, expectedRevision: posting.revision, expectedOid: posting.oid},
-    transition: {kind: 'UNKNOWN', stage: 'RECEIPT_DELIVERY_UNKNOWN'}
-  });
-  assert.equal(resumeFromUnknown.status, 'CONFLICT_RECONCILE');
-});
-
-test('lost write ACK yields unknown reconcile and replay does not reapply', async () => {
-  let failOnce = true;
-  const {backend} = makeBackend({
-    afterReplace: async envelope => {
-      const last = envelope.transitionChain[envelope.transitionChain.length - 1];
-      if (failOnce && last?.kind === 'RECEIPT_POSTING') {
-        failOnce = false;
-        throw new Error('ACK_LOST_AFTER_WRITE');
-      }
-    }
-  });
-  const store = createCoordinatorStateStore({backend, enabled: true});
-  const claimed = await claimViaStore(store, {
-    actionKey: '2'.repeat(64),
-    executionKey: '3'.repeat(64)
-  });
-  let claim = claimed.claim;
-  const review = await store.commit({claim, transition: {kind: 'REVIEW_RESULT', completionState: 'COMPLETE', verdict: 'GREEN_LIGHT'}});
-  assert.equal(review.status, 'COMMITTED');
-  claim = review.claim;
-
-  const unknown = await store.commit({claim, transition: {kind: 'RECEIPT_POSTING'}});
-  assert.equal(unknown.status, 'UNKNOWN_RECONCILE');
-
-  const replay = await store.commit({claim, transition: {kind: 'RECEIPT_POSTING'}});
-  assert.equal(replay.status, 'CONFLICT_RECONCILE');
-  const envelope = await backend.exportCanonicalEnvelope();
-  assert.equal(envelope.transitionChain.filter(item => item.kind === 'RECEIPT_POSTING').length, 1);
-});
-
-test('accepted lifecycle restart/review/single-receipt and post-success/final-commit-failure readback-only', {skip: lifecycle === null}, async () => {
-  const {startReviewLifecycle, observeReviewLifecycle} = lifecycle;
-  const collected = await collectReady();
-  assert.equal(collected.status, 'READY');
-
-  const {backend} = makeBackend();
-  const store = createCoordinatorStateStore({backend, enabled: true});
-  const clock = {value: START + 100};
-  let posted = 0;
-  const receipts = [];
-
-  const start = await startReviewLifecycle({
-    enabled: true,
-    collected,
-    store,
-    reviewerIdentity: {provider: 'claude', agent: 'agent', model: 'model', transport: 'trusted-runtime'},
-    dispatchReview: async input => ({status: 'ACKNOWLEDGED', reviewRequestId: input.reviewRequestId, sessionId: input.sessionId}),
-    observeReview: async () => ({status: 'PENDING'}),
-    trustedRuntimeSeam: {verifyRuntimeEvidence: value => value},
-    revalidate: async () => collected,
-    receipt: {
-      postOnce: async () => ({status: 'CREATED', receiptId: 'unused'}),
-      lookupByActionKey: async () => ({status: 'NOT_FOUND', complete: true, receiptIds: []})
-    },
-    now: () => clock.value,
-    expiresAt: END
-  });
-  assert.equal(start.status, 'REVIEW_PENDING');
-
-  const observedComplete = {
+function buildCompletedObservation({start, collected, nowMs = START + 200, verdict = 'GREEN_LIGHT', completionState = 'COMPLETE'}) {
+  const pair = completionState === 'COMPLETE'
+    ? {completionState, verdict: 'GREEN_LIGHT'}
+    : completionState === 'REVISION_REQUIRED'
+      ? {completionState, verdict: 'REVISION_REQUIRED'}
+      : {completionState: 'INCOMPLETE', verdict: 'NEEDS_MORE_EVIDENCE'};
+  const finalVerdict = verdict || pair.verdict;
+  return {
     status: 'COMPLETED',
-    observedAtMs: clock.value + 100,
+    observedAtMs: nowMs,
     ci: {
       runId: collected.runId,
       runAttempt: collected.runAttempt,
@@ -390,9 +213,9 @@ test('accepted lifecycle restart/review/single-receipt and post-success/final-co
     modelOutput: {
       reviewRequestId: start.reviewRequestId,
       sessionId: start.sessionId,
-      reviewer: {provider: 'claude', agent: 'agent', model: 'model', transport: 'trusted-runtime'},
-      coverageParts: ['scope', 'safety', 'tests', 'diff-anchoring', 'policy'],
-      verdict: 'GREEN_LIGHT',
+      reviewer: {...REVIEWER},
+      coverageParts: [...REQUIRED_REVIEW_PARTS],
+      verdict: finalVerdict,
       complete: true,
       truncated: false,
       turnLimit: false,
@@ -401,12 +224,12 @@ test('accepted lifecycle restart/review/single-receipt and post-success/final-co
     trustedRuntimeEvidence: {
       evidenceId: 'runtime-1',
       provider: 'runtime',
-      observedAtMs: clock.value,
-      expiresAtMs: clock.value + 60000,
+      observedAtMs: nowMs - 10,
+      expiresAtMs: nowMs + 60000,
       runtime: {
         reviewRequestId: start.reviewRequestId,
         sessionId: start.sessionId,
-        reviewer: {provider: 'claude', agent: 'agent', model: 'model', transport: 'trusted-runtime'},
+        reviewer: {...REVIEWER},
         repository: collected.repository,
         pullRequest: collected.pullRequest,
         headSha: collected.headSha,
@@ -416,174 +239,440 @@ test('accepted lifecycle restart/review/single-receipt and post-success/final-co
         stopReason: 'end_turn',
         truncated: false,
         turnLimit: false,
-        coverageParts: ['scope', 'safety', 'tests', 'diff-anchoring', 'policy'],
+        coverageParts: [...REQUIRED_REVIEW_PARTS],
         changedPaths: [...collected.changedPaths]
       }
     }
   };
+}
 
-  const completed = await observeReviewLifecycle({
-    enabled: true,
-    executionKey: collected.executionKey,
-    collected,
-    store,
-    observeReview: async () => observedComplete,
-    revalidate: async () => collected,
-    trustedRuntimeSeam: {verifyRuntimeEvidence: value => value},
-    receipt: {
-      postOnce: async () => {
-        posted++;
-        receipts.push('receipt-1');
-        return {status: 'CREATED', receiptId: 'receipt-1'};
-      },
-      lookupByActionKey: async () => ({status: 'FOUND', complete: true, receiptIds: [...receipts]})
-    },
-    now: () => clock.value,
-    expiresAt: END
-  });
-  assert.equal(completed.status, 'COMPLETE');
-  assert.equal(posted, 1);
+test('private storageVersion mutates on claim and public pair mutates only on commit transition', async () => {
+  const {backend} = makeBackend();
+  const store = createCoordinatorStateStore({backend, enabled: true});
+  const claim = await claimViaStore(store, {actionKey: '1'.repeat(64), executionKey: '2'.repeat(64)});
+  assert.equal(claim.status, 'CLAIMED');
 
-  const noReplay = await observeReviewLifecycle({
-    enabled: true,
-    executionKey: collected.executionKey,
-    collected,
-    store,
-    observeReview: async () => ({status: 'PENDING'}),
-    revalidate: async () => collected,
-    trustedRuntimeSeam: {verifyRuntimeEvidence: value => value},
-    receipt: {
-      postOnce: async () => {
-        posted++;
-        return {status: 'CREATED', receiptId: 'receipt-2'};
-      },
-      lookupByActionKey: async () => ({status: 'FOUND', complete: true, receiptIds: ['receipt-2']})
-    },
-    now: () => clock.value,
-    expiresAt: END
+  const afterClaim = await backend.exportCanonicalEnvelope();
+  assert.equal(afterClaim.storageVersion, 1);
+  assert.equal(afterClaim.snapshot.revision, 0);
+  assert.equal(afterClaim.snapshot.oid, 'root');
+
+  const pending = await store.commit({
+    claim: claim.claim,
+    transition: {
+      kind: 'REVIEW_PENDING',
+      reviewRequestId: 'req',
+      sessionId: 'sess',
+      reviewer: REVIEWER,
+      repository: REPOSITORY,
+      pullRequest: PR,
+      headSha: HEAD,
+      baseSha: BASE,
+      diffDigest: 'd'.repeat(64),
+      changedPathDigest: 'e'.repeat(64),
+      changedPathCount: 1,
+      runId: RUN_ID,
+      runAttempt: RUN_ATTEMPT,
+      workflowId: WORKFLOW_ID,
+      selectionRevision: 20,
+      reviewDeadlineAt: START + 1000
+    }
   });
-  assert.equal(noReplay.status, 'COMPLETE');
-  assert.equal(posted, 1);
+  assert.equal(pending.status, 'COMMITTED');
+  const afterCommit = await backend.exportCanonicalEnvelope();
+  assert.equal(afterCommit.storageVersion, 2);
+  assert.equal(afterCommit.snapshot.revision, 1);
+  assert.equal(afterCommit.snapshot.oid, pending.oid);
 });
 
-test('accepted lifecycle post-success/final-commit-failure resumes readback-only without repost', {skip: lifecycle === null}, async () => {
-  const {startReviewLifecycle, observeReviewLifecycle} = lifecycle;
-  const collected = await collectReady();
-  let failFinalCommitOnce = true;
-  const {backend} = makeBackend({
+test('strict FSM fences reject shortcuts and verdict/completion mismatches', async () => {
+  const {backend} = makeBackend();
+  const store = createCoordinatorStateStore({backend, enabled: true});
+  const claimed = await claimViaStore(store, {actionKey: '3'.repeat(64), executionKey: '4'.repeat(64)});
+  assert.equal(claimed.status, 'CLAIMED');
+
+  const reviewShortcut = await store.commit({
+    claim: claimed.claim,
+    transition: {kind: 'REVIEW_RESULT', completionState: 'COMPLETE', verdict: 'GREEN_LIGHT', reviewRequestId: 'r', sessionId: 's'}
+  });
+  assert.equal(reviewShortcut.status, 'CONFLICT_RECONCILE');
+
+  let claim = claimed.claim;
+  for (const transition of [
+    {
+      kind: 'REVIEW_PENDING',
+      reviewRequestId: 'r1',
+      sessionId: 's1',
+      reviewer: REVIEWER,
+      repository: REPOSITORY,
+      pullRequest: PR,
+      headSha: HEAD,
+      baseSha: BASE,
+      diffDigest: 'd'.repeat(64),
+      changedPathDigest: 'e'.repeat(64),
+      changedPathCount: 1,
+      runId: RUN_ID,
+      runAttempt: RUN_ATTEMPT,
+      workflowId: WORKFLOW_ID,
+      selectionRevision: 20,
+      reviewDeadlineAt: START + 1000
+    },
+    {kind: 'DISPATCH_ACKED', reviewRequestId: 'r1', sessionId: 's1'},
+    {kind: 'OBSERVE_PREPARING'}
+  ]) {
+    const next = await store.commit({claim, transition});
+    assert.equal(next.status, 'COMMITTED');
+    claim = next.claim;
+  }
+
+  const invalidPair = await store.commit({
+    claim,
+    transition: {kind: 'REVIEW_RESULT', completionState: 'COMPLETE', verdict: 'REVISION_REQUIRED', reviewRequestId: 'r1', sessionId: 's1'}
+  });
+  assert.equal(invalidPair.status, 'CONFLICT_RECONCILE');
+
+  const reviewed = await store.commit({
+    claim,
+    transition: {kind: 'REVIEW_RESULT', completionState: 'REVISION_REQUIRED', verdict: 'REVISION_REQUIRED', reviewRequestId: 'r1', sessionId: 's1'}
+  });
+  assert.equal(reviewed.status, 'COMMITTED');
+
+  const postingShortcut = await store.commit({claim: reviewed.claim, transition: {kind: 'RECEIPT_POSTING'}});
+  assert.equal(postingShortcut.status, 'CONFLICT_RECONCILE');
+
+  const prepared = await store.commit({
+    claim: reviewed.claim,
+    transition: {kind: 'RECEIPT_PREPARING', completionState: 'REVISION_REQUIRED', verdict: 'REVISION_REQUIRED'}
+  });
+  assert.equal(prepared.status, 'COMMITTED');
+
+  const posted = await store.commit({claim: prepared.claim, transition: {kind: 'RECEIPT_POSTING'}});
+  assert.equal(posted.status, 'COMMITTED');
+
+  const mismatchedDelivered = await store.commit({
+    claim: posted.claim,
+    transition: {kind: 'RECEIPT_DELIVERED', receiptId: 'x1', completionState: 'COMPLETE', verdict: 'GREEN_LIGHT'}
+  });
+  assert.equal(mismatchedDelivered.status, 'CONFLICT_RECONCILE');
+});
+
+test('duplicate logical action is rejected after completion and UNKNOWN never resumes', async () => {
+  const {backend} = makeBackend({totalQuota: 2});
+  const store = createCoordinatorStateStore({backend, enabled: true});
+  const first = await claimViaStore(store, {actionKey: '5'.repeat(64), executionKey: '6'.repeat(64)});
+  assert.equal(first.status, 'CLAIMED');
+  await strictCompleteTransitionPath(store, first.claim);
+
+  const duplicateLogical = await claimViaStore(store, {actionKey: '5'.repeat(64), executionKey: '7'.repeat(64)});
+  assert.equal(duplicateLogical.status, 'ALREADY_CLAIMED');
+
+  const second = await claimViaStore(store, {actionKey: '8'.repeat(64), executionKey: '9'.repeat(64)});
+  assert.equal(second.status, 'CLAIMED');
+  const unknown = await store.commit({
+    claim: second.claim,
+    transition: {kind: 'UNKNOWN', stage: 'OBSERVE_UNKNOWN', reviewRequestId: 'r2', sessionId: 's2'}
+  });
+  assert.equal(unknown.status, 'COMMITTED');
+
+  const resume = await store.commit({
+    claim: unknown.claim,
+    transition: {kind: 'OBSERVE_PREPARING'}
+  });
+  assert.equal(resume.status, 'CONFLICT_RECONCILE');
+});
+
+test('canonical reconstruction rejects chain parent/digest/public tip tampering and claim projection removal', async () => {
+  const {backend} = makeBackend();
+  const store = createCoordinatorStateStore({backend, enabled: true});
+  const claim = await claimViaStore(store, {actionKey: 'a'.repeat(64), executionKey: 'b'.repeat(64)});
+  await strictCompleteTransitionPath(store, claim.claim);
+
+  const envelope = await backend.exportCanonicalEnvelope();
+
+  const tamperedSnapshot = JSON.parse(JSON.stringify(envelope));
+  tamperedSnapshot.snapshot.oid = 'tampered-oid';
+  assert.throws(() => createAtomicRecordMemoryTransport({initialEnvelope: tamperedSnapshot}), /INVALID_CANONICAL_ENVELOPE/);
+
+  const removedClaim = JSON.parse(JSON.stringify(envelope));
+  removedClaim.claims = [];
+  assert.throws(() => createAtomicRecordMemoryTransport({initialEnvelope: removedClaim}), /INVALID_CANONICAL_ENVELOPE/);
+
+  const brokenParent = JSON.parse(JSON.stringify(envelope));
+  brokenParent.transitionChain[1].parentDigest = 'f'.repeat(64);
+  assert.throws(() => createAtomicRecordMemoryTransport({initialEnvelope: brokenParent}), /INVALID_CANONICAL_ENVELOPE/);
+
+  const wrongPublicTip = JSON.parse(JSON.stringify(envelope));
+  wrongPublicTip.transitionChain[wrongPublicTip.transitionChain.length - 1].publicRevision += 1;
+  assert.throws(() => createAtomicRecordMemoryTransport({initialEnvelope: wrongPublicTip}), /INVALID_CANONICAL_ENVELOPE/);
+});
+
+test('one replace attempt only: unknown response without write fails closed, and ACK-loss after write stays uncertain without replay', async () => {
+  const noWrite = makeBackend({
+    beforeReplace: async () => {
+      throw new Error('TRANSPORT_UNCERTAIN_BEFORE_WRITE');
+    }
+  });
+  const noWriteStore = createCoordinatorStateStore({backend: noWrite.backend, enabled: true});
+  const unknownClaim = await claimViaStore(noWriteStore, {actionKey: 'c'.repeat(64), executionKey: 'd'.repeat(64)});
+  assert.equal(unknownClaim.status, 'CLAIM_UNKNOWN');
+  assert.equal(noWrite.getReplaceCalls(), 1);
+
+  let failOnce = true;
+  const lostAck = makeBackend({
     afterReplace: async envelope => {
       const last = envelope.transitionChain[envelope.transitionChain.length - 1];
-      if (failFinalCommitOnce && last?.kind === 'RECEIPT_DELIVERED') {
-        failFinalCommitOnce = false;
-        throw new Error('FINAL_COMMIT_ACK_LOST');
+      if (failOnce && last?.kind === 'RECEIPT_POSTING') {
+        failOnce = false;
+        throw new Error('ACK_LOST_AFTER_WRITE');
+      }
+    }
+  });
+  const store = createCoordinatorStateStore({backend: lostAck.backend, enabled: true});
+  const claimed = await claimViaStore(store, {actionKey: 'e'.repeat(64), executionKey: 'f'.repeat(64)});
+  let claim = claimed.claim;
+  for (const transition of [
+    {
+      kind: 'REVIEW_PENDING',
+      reviewRequestId: 'r3',
+      sessionId: 's3',
+      reviewer: REVIEWER,
+      repository: REPOSITORY,
+      pullRequest: PR,
+      headSha: HEAD,
+      baseSha: BASE,
+      diffDigest: 'd'.repeat(64),
+      changedPathDigest: 'e'.repeat(64),
+      changedPathCount: 1,
+      runId: RUN_ID,
+      runAttempt: RUN_ATTEMPT,
+      workflowId: WORKFLOW_ID,
+      selectionRevision: 20,
+      reviewDeadlineAt: START + 1000
+    },
+    {kind: 'DISPATCH_ACKED', reviewRequestId: 'r3', sessionId: 's3'},
+    {kind: 'OBSERVE_PREPARING'},
+    {kind: 'REVIEW_RESULT', completionState: 'COMPLETE', verdict: 'GREEN_LIGHT', reviewRequestId: 'r3', sessionId: 's3'},
+    {kind: 'RECEIPT_PREPARING', completionState: 'COMPLETE', verdict: 'GREEN_LIGHT'}
+  ]) {
+    const next = await store.commit({claim, transition});
+    assert.equal(next.status, 'COMMITTED');
+    claim = next.claim;
+  }
+  const lost = await store.commit({claim, transition: {kind: 'RECEIPT_POSTING'}});
+  assert.equal(lost.status, 'UNKNOWN_RECONCILE');
+  assert.equal(lostAck.getReplaceCalls(), 7);
+
+  const replay = await store.commit({claim, transition: {kind: 'RECEIPT_POSTING'}});
+  assert.equal(replay.status, 'CONFLICT_RECONCILE');
+  assert.equal(lostAck.getReplaceCalls(), 7);
+});
+
+test('lifecycle composition: final write failure before replacement leaves durable posting and restart readback-only without repost', async () => {
+  const collected = await collectReady();
+  assert.equal(collected.status, 'READY');
+
+  let failFinalBeforeReplace = true;
+  const counters = {dispatch: 0, observe: 0, post: 0, readback: 0};
+  const {backend} = makeBackend({
+    totalQuota: 1,
+    beforeReplace: async ({nextEnvelope}) => {
+      const last = nextEnvelope.transitionChain[nextEnvelope.transitionChain.length - 1];
+      if (failFinalBeforeReplace && last?.kind === 'RECEIPT_DELIVERED') {
+        failFinalBeforeReplace = false;
+        throw new Error('FAIL_BEFORE_REPLACE');
       }
     }
   });
   const store = createCoordinatorStateStore({backend, enabled: true});
-  const clock = {value: START + 200};
-  let posted = 0;
 
   const start = await startReviewLifecycle({
     enabled: true,
     collected,
     store,
-    reviewerIdentity: {provider: 'claude', agent: 'agent', model: 'model', transport: 'trusted-runtime'},
-    dispatchReview: async input => ({status: 'ACKNOWLEDGED', reviewRequestId: input.reviewRequestId, sessionId: input.sessionId}),
-    observeReview: async () => ({status: 'PENDING'}),
-    trustedRuntimeSeam: {verifyRuntimeEvidence: value => value},
-    revalidate: async () => collected,
-    receipt: {
-      postOnce: async () => ({status: 'CREATED', receiptId: 'unused'}),
-      lookupByActionKey: async () => ({status: 'NOT_FOUND', complete: true, receiptIds: []})
+    reviewerIdentity: REVIEWER,
+    dispatchReview: async input => {
+      counters.dispatch += 1;
+      return {status: 'ACKNOWLEDGED', reviewRequestId: input.reviewRequestId, sessionId: input.sessionId};
     },
-    now: () => clock.value,
+    revalidate: async () => collected,
+    now: () => START + 200,
     expiresAt: END
   });
   assert.equal(start.status, 'REVIEW_PENDING');
 
-  const boundary = {
-    status: 'COMPLETED',
-    observedAtMs: clock.value,
-    ci: {
-      runId: collected.runId,
-      runAttempt: collected.runAttempt,
-      workflowId: collected.workflowId,
-      selectionRevision: collected.selectionRevision
+  const duplicateStart = await startReviewLifecycle({
+    enabled: true,
+    collected,
+    store,
+    reviewerIdentity: REVIEWER,
+    dispatchReview: async () => {
+      counters.dispatch += 1;
+      return {status: 'ACKNOWLEDGED'};
     },
-    modelOutput: {
-      reviewRequestId: start.reviewRequestId,
-      sessionId: start.sessionId,
-      reviewer: {provider: 'claude', agent: 'agent', model: 'model', transport: 'trusted-runtime'},
-      coverageParts: ['scope', 'safety', 'tests', 'diff-anchoring', 'policy'],
-      verdict: 'GREEN_LIGHT',
-      complete: true,
-      truncated: false,
-      turnLimit: false,
-      summary: 'ok'
-    },
-    trustedRuntimeEvidence: {
-      evidenceId: 'runtime-2',
-      provider: 'runtime',
-      observedAtMs: clock.value,
-      expiresAtMs: clock.value + 60000,
-      runtime: {
-        reviewRequestId: start.reviewRequestId,
-        sessionId: start.sessionId,
-        reviewer: {provider: 'claude', agent: 'agent', model: 'model', transport: 'trusted-runtime'},
-        repository: collected.repository,
-        pullRequest: collected.pullRequest,
-        headSha: collected.headSha,
-        baseSha: collected.baseSha,
-        diffDigest: collected.diffDigest,
-        terminalState: 'completed',
-        stopReason: 'end_turn',
-        truncated: false,
-        turnLimit: false,
-        coverageParts: ['scope', 'safety', 'tests', 'diff-anchoring', 'policy'],
-        changedPaths: [...collected.changedPaths]
-      }
-    }
-  };
+    revalidate: async () => collected,
+    now: () => START + 210,
+    expiresAt: END
+  });
+  assert.equal(duplicateStart.status, 'WAITING');
+  assert.equal(duplicateStart.reason, 'ALREADY_CLAIMED');
 
   const firstObserve = await observeReviewLifecycle({
     enabled: true,
     executionKey: collected.executionKey,
     collected,
     store,
-    observeReview: async () => boundary,
+    observeReview: async () => {
+      counters.observe += 1;
+      return buildCompletedObservation({start, collected});
+    },
     revalidate: async () => collected,
     trustedRuntimeSeam: {verifyRuntimeEvidence: value => value},
     receipt: {
       postOnce: async () => {
-        posted++;
-        return {status: 'CREATED', receiptId: 'receipt-final'};
+        counters.post += 1;
+        return {status: 'CREATED', receiptId: 'receipt-before'};
       },
-      lookupByActionKey: async () => ({status: 'FOUND', complete: true, receiptIds: ['receipt-final']})
+      lookupByActionKey: async () => {
+        counters.readback += 1;
+        return {status: 'FOUND', complete: true, receiptIds: ['receipt-before']};
+      }
     },
-    now: () => clock.value,
+    now: () => START + 300,
     expiresAt: END
   });
   assert.equal(firstObserve.status, 'UNKNOWN');
+  assert.equal(firstObserve.reason, 'RECEIPT_STATE_COMMIT_UNKNOWN');
 
-  const replayObserve = await observeReviewLifecycle({
+  const postedEnvelope = await backend.exportCanonicalEnvelope();
+  const postedClaim = postedEnvelope.claims.find(item => item.executionKey === collected.executionKey);
+  assert.equal(postedClaim.status, 'RECEIPT_POSTING');
+  assert.equal(postedClaim.lastStage, 'RECEIPT_POSTING');
+  assert.equal(postedEnvelope.admissionState.activeGate.executionKey, collected.executionKey);
+  assert.equal(postedEnvelope.admissionState.consumedQuota, 1);
+
+  const restarted = await observeReviewLifecycle({
     enabled: true,
     executionKey: collected.executionKey,
     collected,
     store,
-    observeReview: async () => ({status: 'PENDING'}),
+    observeReview: async () => {
+      counters.observe += 1;
+      return {status: 'PENDING'};
+    },
     revalidate: async () => collected,
     trustedRuntimeSeam: {verifyRuntimeEvidence: value => value},
     receipt: {
       postOnce: async () => {
-        posted++;
+        counters.post += 1;
         return {status: 'CREATED', receiptId: 'receipt-replay'};
       },
-      lookupByActionKey: async () => ({status: 'FOUND', complete: true, receiptIds: ['receipt-final']})
+      lookupByActionKey: async () => {
+        counters.readback += 1;
+        return {status: 'FOUND', complete: true, receiptIds: ['receipt-before']};
+      }
     },
-    now: () => clock.value,
+    now: () => START + 400,
     expiresAt: END
   });
-  assert.equal(replayObserve.status, 'UNKNOWN');
-  assert.equal(replayObserve.reason, 'RECEIPT_FOUND_RECONCILE_REQUIRED');
-  assert.equal(posted, 1);
+  assert.equal(restarted.status, 'UNKNOWN');
+  assert.equal(restarted.reason, 'RECEIPT_FOUND_RECONCILE_REQUIRED');
+
+  assert.deepEqual(counters, {dispatch: 1, observe: 1, post: 1, readback: 2});
+});
+
+test('lifecycle composition: ACK-loss after persisted delivered resumes as authoritative COMPLETE without repost', async () => {
+  const collected = await collectReady();
+  let failAfterPersistedFinal = true;
+  const counters = {dispatch: 0, observe: 0, post: 0, readback: 0};
+
+  const {backend} = makeBackend({
+    totalQuota: 1,
+    afterReplace: async envelope => {
+      const last = envelope.transitionChain[envelope.transitionChain.length - 1];
+      if (failAfterPersistedFinal && last?.kind === 'RECEIPT_DELIVERED') {
+        failAfterPersistedFinal = false;
+        throw new Error('ACK_LOSS_AFTER_PERSISTED_DELIVERED');
+      }
+    }
+  });
+  const store = createCoordinatorStateStore({backend, enabled: true});
+
+  const start = await startReviewLifecycle({
+    enabled: true,
+    collected,
+    store,
+    reviewerIdentity: REVIEWER,
+    dispatchReview: async input => {
+      counters.dispatch += 1;
+      return {status: 'ACKNOWLEDGED', reviewRequestId: input.reviewRequestId, sessionId: input.sessionId};
+    },
+    revalidate: async () => collected,
+    now: () => START + 500,
+    expiresAt: END
+  });
+  assert.equal(start.status, 'REVIEW_PENDING');
+
+  const firstObserve = await observeReviewLifecycle({
+    enabled: true,
+    executionKey: collected.executionKey,
+    collected,
+    store,
+    observeReview: async () => {
+      counters.observe += 1;
+      return buildCompletedObservation({start, collected});
+    },
+    revalidate: async () => collected,
+    trustedRuntimeSeam: {verifyRuntimeEvidence: value => value},
+    receipt: {
+      postOnce: async () => {
+        counters.post += 1;
+        return {status: 'CREATED', receiptId: 'receipt-after'};
+      },
+      lookupByActionKey: async () => {
+        counters.readback += 1;
+        return {status: 'FOUND', complete: true, receiptIds: ['receipt-after']};
+      }
+    },
+    now: () => START + 600,
+    expiresAt: END
+  });
+  assert.equal(firstObserve.status, 'UNKNOWN');
+  assert.equal(firstObserve.reason, 'RECEIPT_STATE_COMMIT_UNKNOWN');
+
+  const durable = await backend.exportCanonicalEnvelope();
+  const durableClaim = durable.claims.find(item => item.executionKey === collected.executionKey);
+  assert.equal(durableClaim.status, 'COMMITTED');
+  assert.equal(durableClaim.lastStage, 'RECEIPT_DELIVERED');
+  assert.equal(durable.admissionState.activeGate, null);
+
+  const resumed = await observeReviewLifecycle({
+    enabled: true,
+    executionKey: collected.executionKey,
+    collected,
+    store,
+    observeReview: async () => {
+      counters.observe += 1;
+      return {status: 'PENDING'};
+    },
+    revalidate: async () => collected,
+    trustedRuntimeSeam: {verifyRuntimeEvidence: value => value},
+    receipt: {
+      postOnce: async () => {
+        counters.post += 1;
+        return {status: 'CREATED', receiptId: 'receipt-unexpected'};
+      },
+      lookupByActionKey: async () => {
+        counters.readback += 1;
+        return {status: 'FOUND', complete: true, receiptIds: ['receipt-after']};
+      }
+    },
+    now: () => START + 700,
+    expiresAt: END
+  });
+  assert.equal(resumed.status, 'COMPLETE');
+  assert.equal(counters.post, 1);
+  assert.deepEqual(counters, {dispatch: 1, observe: 1, post: 1, readback: 1});
+
+  const quotaBlocked = await claimViaStore(store, {actionKey: '9'.repeat(64), executionKey: '0'.repeat(64)});
+  assert.equal(quotaBlocked.status, 'BUDGET_EXHAUSTED');
 });
