@@ -60,6 +60,10 @@ function response(url, value, {onBodyRead = () => {}, headers = {}} = {}) {
 function makeHarness({
   clock = {value: START + 100},
   prHead = HEAD,
+  prBase = BASE,
+  prIsFork = false,
+  prHeadRepository = REPOSITORY,
+  prBaseRepository = REPOSITORY,
   run = {},
   runTotalByPage = [1],
   runItemCountLimit = Infinity,
@@ -67,7 +71,14 @@ function makeHarness({
   expireOnPath = null,
   rotateOnPath = null,
   jobRunId = RUN_ID,
-  jobRunAttempt = null
+  jobRunAttempt = null,
+  runHeadSha = HEAD,
+  runBaseSha = BASE,
+  runPullRequest = PR,
+  runPullRequestEntries = null,
+  extraRunRows = [],
+  attemptWorkflowId = null,
+  unfilteredRunTotalCount = null
 } = {}) {
   const credentials = makeCredentials();
   const calls = [];
@@ -75,7 +86,7 @@ function makeHarness({
   const comparePath = `/repos/${REPOSITORY}/compare/${BASE}...${HEAD}`;
   const fetchImpl = async (url, options) => {
     const requestUrl = new URL(url);
-    calls.push({path: requestUrl.pathname, method: options.method});
+    calls.push({path: requestUrl.pathname, query: requestUrl.search, method: options.method});
     const expire = () => {
       if (expireOnPath === requestUrl.pathname) clock.value = credentials.getTrustedAuthEvidence().expiresAtMs;
     };
@@ -110,8 +121,8 @@ function makeHarness({
         number: PR,
         state: 'open',
         changed_files: 1,
-        head: {sha: prHead, repo: {full_name: REPOSITORY, fork: false}},
-        base: {sha: BASE, repo: {full_name: REPOSITORY}}
+        head: {sha: prHead, repo: {full_name: prHeadRepository, fork: prIsFork}},
+        base: {sha: prBase, repo: {full_name: prBaseRepository}}
       }, {onBodyRead: afterBodyRead});
     }
     if (requestUrl.pathname === comparePath) {
@@ -128,16 +139,35 @@ function makeHarness({
     }
     if (requestUrl.pathname === `/repos/${REPOSITORY}/actions/workflows/${WORKFLOW_ID}/runs`) {
       const page = Number(requestUrl.searchParams.get('page'));
-      const totalCount = runTotalByPage[Math.min(page - 1, runTotalByPage.length - 1)];
-      const generatedCount = Math.max(1, Number(runTotalByPage[0]) || 1);
-      const allRuns = Array.from({length: generatedCount}, (_, index) => ({
-        id: index === 0 ? RUN_ID : 8000 + index,
+      const totalCount = requestUrl.searchParams.has('head_sha')
+        ? runTotalByPage[Math.min(page - 1, runTotalByPage.length - 1)]
+        : (unfilteredRunTotalCount ?? runTotalByPage[Math.min(page - 1, runTotalByPage.length - 1)]);
+      const baseEntries = runPullRequestEntries ?? [
+        {number: runPullRequest, base: {sha: runBaseSha}, head: {sha: runHeadSha}}
+      ];
+      const firstRow = {
+        id: RUN_ID,
         repository: {full_name: REPOSITORY},
         workflow_id: run.workflow_id ?? WORKFLOW_ID,
-        run_number: index === 0 ? 20 : 19,
-        run_attempt: index === 0 ? run.run_attempt ?? RUN_ATTEMPT : RUN_ATTEMPT,
-        pull_requests: [{number: PR}]
-      }));
+        run_number: run.run_number ?? 20,
+        run_attempt: run.run_attempt ?? RUN_ATTEMPT,
+        head_sha: runHeadSha,
+        pull_requests: baseEntries
+      };
+      const seededRows = [firstRow, ...extraRunRows];
+      const generatedCount = Math.max(seededRows.length, Math.max(1, Number(runTotalByPage[0]) || 1));
+      const allRuns = Array.from({length: generatedCount}, (_, index) => {
+        if (index < seededRows.length) return seededRows[index];
+        return {
+          id: 8000 + index,
+          repository: {full_name: REPOSITORY},
+          workflow_id: run.workflow_id ?? WORKFLOW_ID,
+          run_number: 19,
+          run_attempt: RUN_ATTEMPT,
+          head_sha: runHeadSha,
+          pull_requests: [{number: runPullRequest, base: {sha: runBaseSha}, head: {sha: runHeadSha}}]
+        };
+      });
       const items = allRuns.slice((page - 1) * 100, page * 100).slice(0, runItemCountLimit);
       const hasNext = page < runTotalByPage.length;
       runPageSizes.push({page, totalCount, itemCount: items.length});
@@ -159,7 +189,7 @@ function makeHarness({
       return response(requestUrl, {
         id: RUN_ID,
         run_attempt: Number(attemptMatch[1]),
-        workflow_id: run.workflow_id ?? WORKFLOW_ID,
+        workflow_id: attemptWorkflowId ?? run.workflow_id ?? WORKFLOW_ID,
         path: '.github/workflows/backend-safety.yml@refs/heads/main',
         repository: {full_name: REPOSITORY}
       }, {onBodyRead: afterBodyRead});
@@ -331,6 +361,30 @@ function createCoordinator({collected, store, revalidate, reviewer, postOnce, no
   });
 }
 
+async function assertBlockedCollectionHasNoSideEffects(collected) {
+  const backend = new AtomicMemoryBackend();
+  const store = createCoordinatorStateStore({backend, enabled: true});
+  let reviewerCalls = 0;
+  let receiptCalls = 0;
+  const result = await createCoordinator({
+    collected,
+    store,
+    revalidate: async () => collected,
+    reviewer: async () => {
+      reviewerCalls++;
+      return null;
+    },
+    postOnce: async () => {
+      receiptCalls++;
+      return {status: 'CREATED', receiptId: 'never'};
+    }
+  });
+  assert.equal(result.reason, 'UNVERIFIED_OR_EXPIRED_CI_COLLECTION');
+  assert.equal(reviewerCalls, 0);
+  assert.equal(receiptCalls, 0);
+  assert.equal(backend.claims.size, 0);
+}
+
 test('real adapter to collector to review/state/receipt composition succeeds with bound auth evidence', async () => {
   const harness = makeHarness();
   const collected = await collect(harness.api);
@@ -389,6 +443,8 @@ test('exact run, attempt, workflow, pagination totals, and job inventory remain 
   assert.equal(wrongJobRun.reason, 'AUTHORITATIVE_READ_FAILED');
   const wrongJobAttempt = await collect(makeHarness({jobRunAttempt: RUN_ATTEMPT + 1}).api);
   assert.equal(wrongJobAttempt.reason, 'AUTHORITATIVE_READ_FAILED');
+  const wrongAttemptWorkflow = await collect(makeHarness({attemptWorkflowId: WORKFLOW_ID + 1}).api);
+  assert.equal(wrongAttemptWorkflow.reason, 'CI_JOB_INVENTORY_OR_IDENTITY_MISMATCH');
   const stale = await collect(makeHarness({prHead: 'c'.repeat(40)}).api);
   assert.equal(stale.reason, 'PULL_REQUEST_PAIR_OR_FORK_MISMATCH');
 });
@@ -401,6 +457,150 @@ test('complete run pagination collects all 130 entries across 100 plus 30', asyn
     {page: 1, totalCount: 130, itemCount: 100},
     {page: 2, totalCount: 130, itemCount: 30}
   ]);
+});
+
+test('bounded relevant-run discovery uses head_sha filtering and rejects unsupported unbounded totals', async () => {
+  const bounded = makeHarness({runTotalByPage: [1], unfilteredRunTotalCount: 2500});
+  const collected = await collect(bounded.api);
+  assert.equal(collected.status, 'READY');
+  const runListCall = bounded.calls.find(call => call.path === `/repos/${REPOSITORY}/actions/workflows/${WORKFLOW_ID}/runs`);
+  assert.ok(runListCall?.query.includes(`head_sha=${HEAD}`));
+  assert.ok(runListCall?.query.includes('event=pull_request'));
+
+  const unsupported = await collect(makeHarness({
+    runTotalByPage: [2500]
+  }).api);
+  assert.equal(unsupported.reason, 'UNSUPPORTED_RELEVANT_RUN_DISCOVERY');
+});
+
+test('negative bounded-discovery matrix blocks unsupported PR/head/base attribution without side effects', async () => {
+  const cases = [
+    {
+      name: 'wrong-pr-in-listed-row',
+      options: {runPullRequest: PR + 1},
+      expectedReason: 'UNSUPPORTED_RELEVANT_RUN_DISCOVERY'
+    },
+    {
+      name: 'wrong-head-in-listed-row',
+      options: {runHeadSha: 'c'.repeat(40)},
+      expectedReason: 'UNSUPPORTED_RELEVANT_RUN_DISCOVERY'
+    },
+    {
+      name: 'wrong-base-in-listed-row',
+      options: {runBaseSha: 'd'.repeat(40)},
+      expectedReason: 'UNSUPPORTED_RELEVANT_RUN_DISCOVERY'
+    },
+    {
+      name: 'empty-pr-associations',
+      options: {runPullRequestEntries: []},
+      expectedReason: 'UNSUPPORTED_RELEVANT_RUN_DISCOVERY'
+    },
+    {
+      name: 'ambiguous-pr-associations',
+      options: {
+        runPullRequestEntries: [
+          {number: PR, base: {sha: BASE}, head: {sha: HEAD}},
+          {number: PR, base: {sha: 'e'.repeat(40)}, head: {sha: HEAD}}
+        ]
+      },
+      expectedReason: 'UNSUPPORTED_RELEVANT_RUN_DISCOVERY'
+    },
+    {
+      name: 'synthetic-merge-sha-not-pr-head',
+      options: {
+        run: {
+          head_sha: 'f'.repeat(40),
+          pull_requests: [{number: PR, base: {sha: BASE}, head: {sha: 'a'.repeat(40)}}]
+        }
+      },
+      expectedReason: 'PULL_REQUEST_PAIR_OR_FORK_MISMATCH'
+    },
+    {
+      name: 'fork-branch-collision',
+      options: {
+        prIsFork: true,
+        prHeadRepository: 'fork-owner/meridian',
+        prBaseRepository: REPOSITORY
+      },
+      expectedReason: 'PULL_REQUEST_PAIR_OR_FORK_MISMATCH'
+    },
+    {
+      name: 'moved-base',
+      options: {prBase: '9'.repeat(40)},
+      expectedReason: 'PULL_REQUEST_PAIR_OR_FORK_MISMATCH'
+    },
+    {
+      name: 'newer-competing-run',
+      options: {
+        runTotalByPage: [2],
+        extraRunRows: [{
+          id: 7100,
+          repository: {full_name: REPOSITORY},
+          workflow_id: WORKFLOW_ID,
+          run_number: 21,
+          run_attempt: 1,
+          head_sha: HEAD,
+          pull_requests: [{number: PR, base: {sha: BASE}, head: {sha: HEAD}}]
+        }]
+      },
+      expectedReason: 'STALE_OR_AMBIGUOUS_CURRENT_RUN'
+    },
+    {
+      name: 'tied-competing-run',
+      options: {
+        runTotalByPage: [2],
+        extraRunRows: [{
+          id: 7101,
+          repository: {full_name: REPOSITORY},
+          workflow_id: WORKFLOW_ID,
+          run_number: 20,
+          run_attempt: 1,
+          head_sha: HEAD,
+          pull_requests: [{number: PR, base: {sha: BASE}, head: {sha: HEAD}}]
+        }]
+      },
+      expectedReason: 'STALE_OR_AMBIGUOUS_CURRENT_RUN'
+    },
+    {
+      name: 'newer-competing-attempt',
+      options: {
+        runTotalByPage: [2],
+        extraRunRows: [{
+          id: RUN_ID,
+          repository: {full_name: REPOSITORY},
+          workflow_id: WORKFLOW_ID,
+          run_number: 20,
+          run_attempt: RUN_ATTEMPT + 1,
+          head_sha: HEAD,
+          pull_requests: [{number: PR, base: {sha: BASE}, head: {sha: HEAD}}]
+        }]
+      },
+      expectedReason: 'STALE_OR_AMBIGUOUS_CURRENT_RUN'
+    },
+    {
+      name: 'head-sha-filter-ignored-mixed-bounded-set',
+      options: {
+        runTotalByPage: [2],
+        extraRunRows: [{
+          id: 7200,
+          repository: {full_name: REPOSITORY},
+          workflow_id: WORKFLOW_ID,
+          run_number: 19,
+          run_attempt: 1,
+          head_sha: '1'.repeat(40),
+          pull_requests: [{number: PR, base: {sha: BASE}, head: {sha: '1'.repeat(40)}}]
+        }]
+      },
+      expectedReason: 'UNSUPPORTED_RELEVANT_RUN_DISCOVERY'
+    }
+  ];
+
+  for (const testCase of cases) {
+    const collected = await collect(makeHarness(testCase.options).api);
+    assert.equal(collected.status, 'BLOCKED', testCase.name);
+    assert.equal(collected.reason, testCase.expectedReason, testCase.name);
+    await assertBlockedCollectionHasNoSideEffects(collected);
+  }
 });
 
 test('auth expiry during a response body blocks collection without exposing reviewer or store', async () => {
