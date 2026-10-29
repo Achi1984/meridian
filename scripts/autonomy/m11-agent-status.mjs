@@ -237,7 +237,7 @@ function validateEvidenceBinding(binding, expectedAgentId, expectedTaskId, expec
     return null;
   }
   const freshness = deriveFreshness(readOwnDataValue(binding, 'observedAt'), readOwnDataValue(binding, 'expiresAt'), nowMs);
-  if (freshness !== 'CURRENT') {
+  if (freshness === 'UNKNOWN') {
     return null;
   }
   if (evidenceType === 'manual' || evidenceType === 'unknown') {
@@ -250,7 +250,8 @@ function validateEvidenceBinding(binding, expectedAgentId, expectedTaskId, expec
     observedAt: readOwnDataValue(binding, 'observedAt'),
     expiresAt: readOwnDataValue(binding, 'expiresAt'),
     evidenceUrl,
-    evidenceType
+    evidenceType,
+    freshness
   });
 }
 
@@ -306,19 +307,20 @@ function validateRow(row, nowMs) {
   const modelEvidence = validateEvidenceBinding(row.modelEvidence, agentId, taskId, undefined, nowMs);
   const coordinatorEvidence = validateEvidenceBinding(row.coordinatorEvidence, agentId, taskId, row.coordinatorMode, nowMs);
 
-  const evidencePresent = (row.providerEvidence !== undefined && row.providerEvidence !== null)
-    || (row.modelEvidence !== undefined && row.modelEvidence !== null)
-    || (row.coordinatorEvidence !== undefined && row.coordinatorEvidence !== null);
-  const hasAnyEvidence = Boolean(providerEvidence || modelEvidence || coordinatorEvidence);
-  const rowFreshness = evidencePresent ? deriveFreshness(row.observedAt, row.expiresAt, nowMs) : 'UNKNOWN';
-  const providerVerified = rowFreshness === 'CURRENT' && providerEvidence ? providerEvidence.value : 'UNKNOWN';
-  const modelVerified = rowFreshness === 'CURRENT' && modelEvidence ? modelEvidence.value : 'UNKNOWN';
+  const evidenceFreshnesses = [providerEvidence && providerEvidence.freshness, modelEvidence && modelEvidence.freshness, coordinatorEvidence && coordinatorEvidence.freshness].filter(Boolean);
+  const outerFreshness = deriveFreshness(row.observedAt, row.expiresAt, nowMs);
+  const rowFreshness = evidenceFreshnesses.length === 0 ? 'UNKNOWN'
+    : outerFreshness === 'STALE' || evidenceFreshnesses.includes('STALE') ? 'STALE'
+      : outerFreshness === 'UNKNOWN' ? 'UNKNOWN'
+        : 'CURRENT';
+  const providerVerified = (rowFreshness === 'CURRENT' && providerEvidence) ? providerEvidence.value : 'UNKNOWN';
+  const modelVerified = (rowFreshness === 'CURRENT' && modelEvidence) ? modelEvidence.value : 'UNKNOWN';
 
   const effectiveTaskState = row.taskState === 'RUNNING' || row.taskState === 'REVIEWING'
-    ? (rowFreshness === 'CURRENT' && (providerEvidence || modelEvidence) ? row.taskState : 'UNKNOWN')
+    ? ((rowFreshness === 'CURRENT' && (providerEvidence || modelEvidence)) ? row.taskState : 'UNKNOWN')
     : row.taskState;
   const effectiveCoordinatorMode = row.coordinatorMode === 'ACTIVE'
-    ? (rowFreshness === 'CURRENT' && coordinatorEvidence && coordinatorEvidence.value === 'ACTIVE' ? row.coordinatorMode : 'UNKNOWN')
+    ? ((rowFreshness === 'CURRENT' && coordinatorEvidence && coordinatorEvidence.value === 'ACTIVE') ? row.coordinatorMode : 'UNKNOWN')
     : row.coordinatorMode;
 
   const blocker = row.blocker === null || row.blocker === undefined ? null : safeText(row.blocker, 200);

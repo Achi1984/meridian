@@ -185,6 +185,59 @@ test('strict rejection for hostile rows, arrays, and dangerous DTO mutation', ()
   assert.throws(() => validateM11AgentStatusRow(sample({ taskUrl: 'https://github.com/acme/meridian/issues/42?token=secret' }), NOW), { name: 'TypeError' });
 });
 
+test('browser no-evidence roundtrip and wrong-bound evidence stay UNKNOWN, while expired valid evidence remains STALE', () => {
+  const noEvidence = sample({
+    providerEvidence: null,
+    modelEvidence: null,
+    coordinatorEvidence: null,
+    providerVerified: 'UNKNOWN',
+    modelVerified: 'UNKNOWN',
+    taskState: 'RUNNING',
+    coordinatorMode: 'ACTIVE'
+  });
+  const normalized = normalizeM11AgentStatus({ schemaVersion: 1, rows: [noEvidence] }, { now: () => NOW });
+  assert.equal(normalized.rows[0].freshness, 'UNKNOWN');
+  assert.equal(normalized.rows[0].providerVerified, 'UNKNOWN');
+  assert.equal(normalized.rows[0].modelVerified, 'UNKNOWN');
+  assert.equal(normalized.rows[0].taskState, 'UNKNOWN');
+  assert.equal(normalized.rows[0].coordinatorMode, 'UNKNOWN');
+
+  const serialized = JSON.stringify(normalized);
+  const document = makeDocument();
+  const root = document.createElement('div');
+  renderM11AgentStatus(root, serialized, { now: () => NOW });
+  const section = root.children[0];
+  assert.equal(section.getAttribute('data-status'), 'UNKNOWN');
+  assert.match(root.textContent, /Unbekannt/);
+  assert.doesNotMatch(root.textContent, /Aktuell|Laufend|Aktiv/);
+
+  const wrongBinding = sample({
+    providerEvidence: { ...sample().providerEvidence, taskId: 'other-task' },
+    modelEvidence: { ...sample().modelEvidence, taskId: 'other-task' },
+    coordinatorEvidence: { ...sample().coordinatorEvidence, taskId: 'other-task' },
+    providerVerified: 'github',
+    modelVerified: 'gpt-5'
+  });
+  const wrongBindingNormalized = normalizeM11AgentStatus({ schemaVersion: 1, rows: [wrongBinding] }, { now: () => NOW });
+  assert.equal(wrongBindingNormalized.rows[0].freshness, 'UNKNOWN');
+  assert.equal(wrongBindingNormalized.rows[0].providerVerified, 'UNKNOWN');
+  assert.equal(wrongBindingNormalized.rows[0].modelVerified, 'UNKNOWN');
+
+  const expiredValidEvidence = sample({
+    providerEvidence: { ...sample().providerEvidence, expiresAt: '2026-10-29T11:59:00.000Z' },
+    modelEvidence: { ...sample().modelEvidence, expiresAt: '2026-10-29T11:59:00.000Z' },
+    coordinatorEvidence: { ...sample().coordinatorEvidence, expiresAt: '2026-10-29T11:59:00.000Z' },
+    providerVerified: 'github',
+    modelVerified: 'gpt-5',
+    taskState: 'RUNNING',
+    coordinatorMode: 'ACTIVE'
+  });
+  const expiredNormalized = normalizeM11AgentStatus({ schemaVersion: 1, rows: [expiredValidEvidence] }, { now: () => NOW });
+  assert.equal(expiredNormalized.rows[0].freshness, 'STALE');
+  assert.equal(expiredNormalized.rows[0].providerVerified, 'UNKNOWN');
+  assert.equal(expiredNormalized.rows[0].modelVerified, 'UNKNOWN');
+});
+
 test('browser revalidation recomputes stale visible claims and rejects descriptor-driven getters', () => {
   const valid = sample({
     taskState: 'RUNNING',

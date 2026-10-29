@@ -249,11 +249,15 @@ function validateSerializedStatus(raw, nowMs) {
     if (observedAt === null || expiresAt === null || observedAt > expiresAt) throw new TypeError('Observation and expiry timestamps are invalid');
     const evidenceType = safeText(row.evidenceType, 80);
     if (evidenceType && !VALID_EVIDENCE_TYPES.has(evidenceType)) throw new TypeError('Evidence type is invalid');
-    const rowFreshness = deriveFreshness(row.observedAt, row.expiresAt, nowMs);
     const providerEvidence = validateEvidenceBinding(row.providerEvidence, agentId, taskId, undefined, nowMs);
     const modelEvidence = validateEvidenceBinding(row.modelEvidence, agentId, taskId, undefined, nowMs);
     const coordinatorEvidence = validateEvidenceBinding(row.coordinatorEvidence, agentId, taskId, row.coordinatorMode, nowMs);
-    const effectiveFreshness = rowFreshness;
+    const evidenceFreshnesses = [providerEvidence && providerEvidence.freshness, modelEvidence && modelEvidence.freshness, coordinatorEvidence && coordinatorEvidence.freshness].filter(Boolean);
+    const outerFreshness = deriveFreshness(row.observedAt, row.expiresAt, nowMs);
+    const effectiveFreshness = evidenceFreshnesses.length === 0 ? 'UNKNOWN'
+      : outerFreshness === 'STALE' || evidenceFreshnesses.includes('STALE') ? 'STALE'
+        : outerFreshness === 'UNKNOWN' ? 'UNKNOWN'
+          : 'CURRENT';
     const effectiveProviderVerified = effectiveFreshness === 'CURRENT' && providerEvidence ? providerEvidence.value : 'UNKNOWN';
     const effectiveModelVerified = effectiveFreshness === 'CURRENT' && modelEvidence ? modelEvidence.value : 'UNKNOWN';
     const effectiveTaskState = row.taskState === 'RUNNING' || row.taskState === 'REVIEWING'
