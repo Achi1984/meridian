@@ -8,7 +8,9 @@ import re
 import sqlite3
 import tempfile
 import time
+from dataclasses import dataclass
 from datetime import datetime, timezone
+from types import MappingProxyType
 
 
 PATHS = tuple(
@@ -150,15 +152,7 @@ def _generated_b1_profile():
           == profile["implementationSha256"]
           and profile["sourceSha256"]["protocol"] == profile["protocolSha256"],
           "B1_SOURCE_IDENTITY_INVALID")
-    root = Path(__file__).resolve().parents[2]
-    for name, relative in B1_SOURCE_FILES.items():
-        try:
-            source_path = (root / relative).resolve(strict=True)
-            _need(source_path.is_relative_to(root), "B1_PROFILE_INVALID")
-            observed = hashlib.sha256(source_path.read_bytes()).hexdigest()
-        except (OSError, JournalError):
-            raise JournalError("B1_SOURCE_UNAVAILABLE")
-        _need(observed == profile["sourceSha256"][name], "B1_SOURCE_PIN_MISMATCH")
+    _validate_b1_source_pins(profile)
     descriptors = []
     for variant in B1_VARIANTS:
         for scenario in B1_SCENARIOS:
@@ -192,6 +186,30 @@ def _generated_b1_profile():
     profile["computation"] = tuple(computation)
     profile["sourceIdentitySha256"] = hashlib.sha256(
         _canonical(profile["sourceSha256"]).encode()).hexdigest()
+    profile["_documentSha256"] = hashlib.sha256(raw).hexdigest()
+    return profile
+
+
+def _validate_b1_source_pins(profile):
+    root = Path(__file__).resolve().parents[2]
+    for name, relative in profile["sourceFiles"].items():
+        try:
+            source_path = (root / relative).resolve(strict=True)
+            _need(source_path.is_relative_to(root), "B1_PROFILE_INVALID")
+            observed = hashlib.sha256(source_path.read_bytes()).hexdigest()
+        except (OSError, JournalError):
+            raise JournalError("B1_SOURCE_UNAVAILABLE")
+        _need(observed == profile["sourceSha256"][name], "B1_SOURCE_PIN_MISMATCH")
+
+
+def _refresh_generated_b1_profile(profile):
+    try:
+        raw = B1_MANIFEST_PATH.read_bytes()
+    except OSError:
+        raise JournalError("B1_PROFILE_INVALID")
+    if hashlib.sha256(raw).hexdigest() != profile["_documentSha256"]:
+        return _generated_b1_profile()
+    _validate_b1_source_pins(profile)
     return profile
 
 
@@ -283,8 +301,11 @@ def _historical_profile():
     expected_files = declared["expectedWholeFileSha256"]
     _need(type(expected_files) is dict and expected_files == HISTORICAL_EXPECTED_FILE_SHA256,
           "HISTORICAL_INPUT_MANIFEST_INVALID")
-    base = _generated_b1_profile()
+    base = _refresh_generated_b1_profile(generated)
     profile = {**generated, **declared}
+    profile["_documentSha256"] = hashlib.sha256(raw).hexdigest()
+    profile["_generatedSourceFiles"] = generated["sourceFiles"]
+    profile["_generatedSourceSha256"] = generated["sourceSha256"]
     profile["pathDescriptors"] = base["pathDescriptors"]
     profile["computationOrder"] = base["computationOrder"]
     profile["sourceIdentitySha256"] = hashlib.sha256(
@@ -445,6 +466,54 @@ def _b1_profile(profile_name=B1_PROFILE_NAME):
     if profile_name == HISTORICAL_PROFILE_NAME:
         return _historical_profile()
     raise JournalError("PROFILE_INVALID")
+
+
+@dataclass(frozen=True)
+class _ValidatedB1Profile:
+    name: str
+    profile: object
+    document_path: Path
+    document_sha256: str
+    source_pins: tuple
+
+
+def _validated_b1_profile(profile):
+    profile_name = profile["profile"]
+    document_path = (
+        HISTORICAL_PROFILE_PATH if profile_name == HISTORICAL_PROFILE_NAME
+        else B1_MANIFEST_PATH)
+    source_sets = [(profile["sourceFiles"], profile["sourceSha256"])]
+    if profile_name == HISTORICAL_PROFILE_NAME:
+        source_sets.append((profile["_generatedSourceFiles"], profile["_generatedSourceSha256"]))
+    source_pins = tuple(
+        (relative, source_hashes[name])
+        for source_files, source_hashes in source_sets
+        for name, relative in source_files.items()
+    )
+    return _ValidatedB1Profile(
+        profile_name, MappingProxyType(profile), Path(document_path),
+        profile["_documentSha256"], source_pins)
+
+
+def _validated_b1_profile_is_current(context):
+    document_path = (
+        HISTORICAL_PROFILE_PATH if context.name == HISTORICAL_PROFILE_NAME
+        else B1_MANIFEST_PATH)
+    try:
+        if Path(document_path) != context.document_path:
+            return False
+        if hashlib.sha256(Path(document_path).read_bytes()).hexdigest() != context.document_sha256:
+            return False
+        root = Path(__file__).resolve().parents[2]
+        for relative, expected in context.source_pins:
+            source_path = (root / relative).resolve(strict=True)
+            if not source_path.is_relative_to(root):
+                return False
+            if hashlib.sha256(source_path.read_bytes()).hexdigest() != expected:
+                return False
+    except (OSError, RuntimeError, ValueError):
+        return False
+    return True
 
 
 def _unique_object(items):
@@ -1167,7 +1236,7 @@ def _b1_check(connection):
     meta = connection.execute("SELECT profile,fence,active FROM b1_meta WHERE id=1").fetchone()
     _need(meta is not None and meta[0] in (B1_PROFILE_NAME, HISTORICAL_PROFILE_NAME)
           and type(meta[1]) is int and 0 <= meta[1] <= MAX_INT, "STORED_META")
-    _b1_profile(meta[0])
+    profile = _b1_profile(meta[0])
     active = connection.execute(
         "SELECT trial_id,fence FROM b1_jobs WHERE state IN ('CLAIMED','RUNNING')").fetchall()
     _need(len(active) <= 1, "STORED_ACTIVE")
@@ -1181,11 +1250,16 @@ def _b1_check(connection):
     _need(connection.execute("SELECT COUNT(*) FROM b1_jobs").fetchone()[0] <= MAX_JOBS,
           "JOURNAL_CAPACITY")
     _b1_capacity(connection)
+    return _validated_b1_profile(profile)
 
 
-def _profile_for_connection(connection):
+def _profile_for_connection(connection, profile_context=None):
     row = connection.execute("SELECT profile FROM b1_meta WHERE id=1").fetchone()
     _need(row is not None, "DATABASE_SCHEMA")
+    if (type(profile_context) is _ValidatedB1Profile
+            and profile_context.name == row[0]
+            and _validated_b1_profile_is_current(profile_context)):
+        return profile_context.profile
     return _b1_profile(row[0])
 
 
@@ -1194,8 +1268,8 @@ def _b1_run(database, operation, busy_timeout=5, deadline=None):
     connection = _b1_connect(database, busy_timeout, deadline)
     try:
         _remaining(deadline)
-        _b1_check(connection)
-        value = operation(connection)
+        profile_context = _b1_check(connection)
+        value = operation(connection, profile_context)
         _remaining(deadline)
         _b1_check(connection)
         _remaining(deadline)
@@ -1503,10 +1577,10 @@ def _validate_b1_summary(summary, profile, *, allow_insufficient=False):
     _need(summary.get("executionId") == execution_id, "RESULT_IDENTITY_INVALID")
 
 
-def _b1_job(connection, trial_id):
+def _b1_job(connection, trial_id, profile_context=None):
     row = connection.execute("SELECT * FROM b1_jobs WHERE trial_id=?", (trial_id,)).fetchone()
     _need(row is not None, "TRIAL_NOT_FOUND")
-    profile = _profile_for_connection(connection)
+    profile = _profile_for_connection(connection, profile_context)
     (trial_id, trial_key, identity_raw, state, attempts, owner, fence, created_at, started_at,
      finished_at, progress_raw, controls_raw, controls_sha, summary_raw, summary_sha, reason,
      primary_control_sha, basket_control_sha) = row
@@ -1692,8 +1766,8 @@ def enqueue_b1(database, trial_key):
           "TRIAL_KEY_INVALID")
     trial_id = hashlib.sha256(trial_key.encode()).hexdigest()
 
-    def operation(connection):
-        profile = _profile_for_connection(connection)
+    def operation(connection, profile_context):
+        profile = _profile_for_connection(connection, profile_context)
         if profile["profile"] == HISTORICAL_PROFILE_NAME:
             _need(profile["status"] == "FROZEN_FOR_D2" and profile["inputSha256"] is not None,
                   "HISTORICAL_ADMISSION_REQUIRED")
@@ -1710,13 +1784,13 @@ def enqueue_b1(database, trial_key):
         existing = connection.execute("SELECT * FROM b1_jobs WHERE trial_id=?", (trial_id,)).fetchone()
         if existing:
             _need(existing[2] == identity_raw, "TRIAL_ID_CONFLICT")
-            return _b1_job(connection, trial_id)
+            return _b1_job(connection, trial_id, profile_context)
         _need(connection.execute("SELECT COUNT(*) FROM b1_jobs").fetchone()[0] < MAX_JOBS,
               "JOURNAL_CAPACITY")
         connection.execute("INSERT INTO b1_jobs(trial_id,trial_key,identity_json,state,created_at) "
                            "VALUES (?,?,?,'QUEUED',?)",
                            (trial_id, trial_key, identity_raw, _timestamp()))
-        return _b1_job(connection, trial_id)
+        return _b1_job(connection, trial_id, profile_context)
     return _b1_run(database, operation)
 
 
@@ -1728,8 +1802,8 @@ def scheduler_tick_b1(database, enabled=False, owner="local-b1-worker"):
           "OWNER_INVALID")
     day = datetime.now(timezone.utc).date().isoformat()
 
-    def operation(connection):
-        profile = _profile_for_connection(connection)
+    def operation(connection, profile_context):
+        profile = _profile_for_connection(connection, profile_context)
         if profile["profile"] == HISTORICAL_PROFILE_NAME and (
                 profile["status"] != "FROZEN_FOR_D2" or profile["inputSha256"] is None):
             return {"state": "blocked", "claimed": False,
@@ -1757,16 +1831,17 @@ def scheduler_tick_b1(database, enabled=False, owner="local-b1-worker"):
         connection.execute("UPDATE b1_jobs SET state='CLAIMED',attempts=1,owner=?,fence=? WHERE trial_id=?",
                            (owner, fence, row[0]))
         connection.execute("UPDATE b1_meta SET fence=?,active=? WHERE id=1", (fence, row[0]))
-        return {"state": "claimed", "claimed": True, "claim": _b1_job(connection, row[0]),
+        return {"state": "claimed", "claimed": True,
+                "claim": _b1_job(connection, row[0], profile_context),
                 "executionAuthorized": False}
     return _b1_run(database, operation)
 
 
-def _b1_bound(connection, receipt):
+def _b1_bound(connection, receipt, profile_context=None):
     _need(type(receipt) is dict and _digest(receipt.get("trialId"))
           and type(receipt.get("owner")) is str and type(receipt.get("fence")) is int,
           "CLAIM_INVALID")
-    job = _b1_job(connection, receipt["trialId"])
+    job = _b1_job(connection, receipt["trialId"], profile_context)
     _need(job["owner"] == receipt["owner"] and job["fence"] == receipt["fence"]
           and job["trialKey"] == receipt.get("trialKey")
           and job["profile"] == receipt.get("profile")
@@ -1782,19 +1857,19 @@ def _b1_bound(connection, receipt):
 
 
 def start_b1(database, receipt, *, busy_timeout=5, deadline=None):
-    def operation(connection):
-        row = _b1_bound(connection, receipt)
+    def operation(connection, profile_context):
+        row = _b1_bound(connection, receipt, profile_context)
         _need(row[3] == "CLAIMED", "ATTEMPT_CONSUMED")
         connection.execute("UPDATE b1_jobs SET state='RUNNING',started_at=? WHERE trial_id=?",
                            (_timestamp(), row[0]))
-        return _b1_job(connection, row[0])
+        return _b1_job(connection, row[0], profile_context)
     return _b1_run(database, operation, busy_timeout, deadline)
 
 
 def record_b1_path_started(database, receipt, index, path_id, *, busy_timeout=5, deadline=None):
-    def operation(connection):
-        row = _b1_bound(connection, receipt)
-        profile = _profile_for_connection(connection)
+    def operation(connection, profile_context):
+        row = _b1_bound(connection, receipt, profile_context)
+        profile = _profile_for_connection(connection, profile_context)
         progress = _b1_parse(row[10], "STORED_PROGRESS")
         _need(row[3] == "RUNNING" and type(index) is int and index == len(progress)
               and 0 <= index < 44 and profile["computation"][index]["pathId"] == path_id,
@@ -1811,7 +1886,7 @@ def record_b1_path_started(database, receipt, index, path_id, *, busy_timeout=5,
         raw = _canonical(progress)
         _need(len(raw.encode()) <= MAX_PROGRESS_BYTES, "PROGRESS_BOUND")
         connection.execute("UPDATE b1_jobs SET progress_json=? WHERE trial_id=?", (raw, row[0]))
-        return _b1_job(connection, row[0])
+        return _b1_job(connection, row[0], profile_context)
     return _b1_run(database, operation, busy_timeout, deadline)
 
 
@@ -1828,8 +1903,8 @@ def record_b1_path_completed(database, receipt, index, payload_bytes, *, busy_ti
     _need(expected is not None, "PATH_RESULT_INVALID")
     _validate_b1_path_payload(payload, expected)
 
-    def operation(connection):
-        row = _b1_bound(connection, receipt)
+    def operation(connection, profile_context):
+        row = _b1_bound(connection, receipt, profile_context)
         progress = _b1_parse(row[10], "STORED_PROGRESS")
         _need(row[3] == "RUNNING" and type(index) is int and index == len(progress) - 1
               and index >= 0 and progress[index]["state"] == "started"
@@ -1853,7 +1928,7 @@ def record_b1_path_completed(database, receipt, index, payload_bytes, *, busy_ti
         connection.execute("INSERT INTO b1_path_payloads VALUES (?,?,?,?)",
                            (row[0], index, payload_bytes, digest))
         connection.execute("UPDATE b1_jobs SET progress_json=? WHERE trial_id=?", (raw, row[0]))
-        return _b1_job(connection, row[0])
+        return _b1_job(connection, row[0], profile_context)
     return _b1_run(database, operation, busy_timeout, deadline)
 
 
@@ -1880,9 +1955,9 @@ def record_b1_controls(database, receipt, controls_bytes, *, busy_timeout=5, dea
               and controls["reason"] == "INVALID_OR_ZERO_DEVELOPMENT_RISK_DENOMINATOR",
               "CONTROLS_INVALID")
 
-    def operation(connection):
-        row = _b1_bound(connection, receipt)
-        profile = _profile_for_connection(connection)
+    def operation(connection, profile_context):
+        row = _b1_bound(connection, receipt, profile_context)
+        profile = _profile_for_connection(connection, profile_context)
         progress = _b1_parse(row[10], "STORED_PROGRESS")
         _need(row[3] == "RUNNING" and len(progress) == 19
               and all(item["state"] == "completed" for item in progress[:18])
@@ -1925,7 +2000,7 @@ def record_b1_controls(database, receipt, controls_bytes, *, busy_timeout=5, dea
         connection.execute("""UPDATE b1_jobs SET controls_json=?,controls_sha256=?,
             control_primary_sha256=?,control_basket_sha256=? WHERE trial_id=?""",
             (controls_bytes, digest, primary[0], basket[0], row[0]))
-        return _b1_job(connection, row[0])
+        return _b1_job(connection, row[0], profile_context)
     return _b1_run(database, operation, busy_timeout, deadline)
 
 
@@ -1957,8 +2032,8 @@ def settle_b1(database, receipt, outcome, reason, summary_bytes=None, *,
               "RESULT_SCHEMA_INVALID")
         _validate_b1_summary(summary, profile, allow_insufficient=True)
 
-    def operation(connection):
-        row = _b1_bound(connection, receipt)
+    def operation(connection, profile_context):
+        row = _b1_bound(connection, receipt, profile_context)
         progress = _b1_parse(row[10], "STORED_PROGRESS")
         controls = _b1_parse(row[11], "STORED_CONTROLS") if row[11] is not None else None
         if outcome == "COMPLETED":
@@ -1983,7 +2058,7 @@ def settle_b1(database, receipt, outcome, reason, summary_bytes=None, *,
             reason=?,finished_at=? WHERE trial_id=?""",
             (outcome, summary_bytes, summary_digest, reason, finished_at, row[0]))
         connection.execute("UPDATE b1_meta SET active=NULL WHERE id=1")
-        return _b1_job(connection, row[0])
+        return _b1_job(connection, row[0], profile_context)
     return _b1_run(database, operation, busy_timeout, deadline)
 
 
@@ -1991,7 +2066,7 @@ def reconcile_b1(database, trial_id, note):
     _need(_digest(trial_id) and type(note) is str
           and re.fullmatch(r"[A-Z][A-Z0-9_]{0,79}", note), "RECONCILIATION_INVALID")
 
-    def operation(connection):
+    def operation(connection, profile_context):
         row = connection.execute("SELECT * FROM b1_jobs WHERE trial_id=?", (trial_id,)).fetchone()
         _need(row is not None and row[3] in ("CLAIMED", "RUNNING")
               and connection.execute("SELECT active FROM b1_meta WHERE id=1").fetchone()[0] == trial_id,
@@ -1999,7 +2074,7 @@ def reconcile_b1(database, trial_id, note):
         connection.execute("UPDATE b1_jobs SET state='UNKNOWN',reason=?,finished_at=? WHERE trial_id=?",
                            (note, _timestamp(), trial_id))
         connection.execute("UPDATE b1_meta SET active=NULL WHERE id=1")
-        return _b1_job(connection, trial_id)
+        return _b1_job(connection, trial_id, profile_context)
     return _b1_run(database, operation)
 
 
@@ -2007,8 +2082,8 @@ def inspect_b1(database, trial_id):
     _need(_digest(trial_id), "TRIAL_ID_INVALID")
     connection = _b1_connect(database, busy_timeout=0, readonly=True)
     try:
-        _b1_check(connection)
-        return _b1_job(connection, trial_id)
+        profile_context = _b1_check(connection)
+        return _b1_job(connection, trial_id, profile_context)
     finally:
         if connection.in_transaction:
             connection.rollback()

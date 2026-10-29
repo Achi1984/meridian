@@ -965,7 +965,22 @@ connection.close()
         self.assertEqual(result["promotionAuthorized"], False)
         with (patch.object(journal, "HISTORICAL_PROFILE_PATH", profile_path),
               patch.dict(os.environ, {"MERIDIAN_HISTORICAL_TEST_MODE": "1"})):
-            inspected = journal.inspect_b1(self.database, claim["trialId"])
+            original_profile = journal._historical_profile
+            profile_calls = 0
+
+            def counted_profile():
+                nonlocal profile_calls
+                profile_calls += 1
+                return original_profile()
+
+            context = journal._validated_b1_profile(original_profile())
+            with self.assertRaises(TypeError):
+                context.profile["status"] = "FROZEN_FOR_D2"
+            with patch.object(journal, "_historical_profile", side_effect=counted_profile):
+                inspected = journal.inspect_b1(self.database, claim["trialId"])
+                self.assertEqual(profile_calls, 2)
+                journal.inspect_b1(self.database, claim["trialId"])
+                self.assertEqual(profile_calls, 4)
             again = journal.scheduler_tick_b1(self.database, enabled=True)
         self.assertEqual(inspected["state"], "completed")
         self.assertEqual(inspected["attempts"], 1)
@@ -1227,7 +1242,11 @@ process.stdout.write(JSON.stringify(runBatch({
             journal.record_b1_controls(self.database, started, json.dumps(controls).encode())
         self.assertEqual(journal.inspect_b1(self.database, claim["trialId"])["paths"], [])
         expected_path = journal._b1_profile()["computation"][0]["pathId"]
-        journal.record_b1_path_started(self.database, started, 0, expected_path)
+        updated = journal.record_b1_path_started(self.database, started, 0, expected_path)
+        self.assertEqual(len(updated["paths"]), 1)
+        self.assertEqual(updated["paths"][0]["state"], "started")
+        self.assertEqual(journal.inspect_b1(self.database, claim["trialId"])["paths"],
+                         updated["paths"])
         with self.assertRaisesRegex(journal.JournalError, "PATH_ORDER"):
             journal.record_b1_path_started(self.database, started, 0, expected_path)
         with self.assertRaisesRegex(journal.JournalError, "ATTEMPT_CONSUMED"):
@@ -1269,6 +1288,17 @@ process.stdout.write(JSON.stringify(runBatch({
             journal.record_b1_controls(
                 self.database, claim, json.dumps(controls, separators=(",", ":")).encode())
         journal.record_b1_path_started(self.database, claim, 19, diagnostic_id)
+        inspected = journal.inspect_b1(self.database, claim["trialId"])
+        self.assertEqual(inspected["paths"][0]["state"], "completed")
+        with sqlite3.connect(self.database) as connection:
+            payload = connection.execute(
+                "SELECT payload FROM b1_path_payloads WHERE trial_id=? AND computation_index=0",
+                (claim["trialId"],)).fetchone()[0]
+            connection.execute(
+                "UPDATE b1_path_payloads SET payload=? WHERE trial_id=? AND computation_index=0",
+                (payload + b" ", claim["trialId"]))
+        with self.assertRaisesRegex(journal.JournalError, "STORED_PATH_PAYLOAD"):
+            journal.inspect_b1(self.database, claim["trialId"])
 
     def test_b1_result_and_summary_schemas_reject_minimal_or_screenless_results(self):
         direct = self.direct_b1_result()
@@ -1502,6 +1532,7 @@ process.stdout.write(JSON.stringify(runBatch({
 
     def test_b1_source_pin_tampering_fails_before_path_work(self):
         claim = self.new_b1_claim("trial-b1-source-pin")
+        self.assertEqual(journal.inspect_b1(self.database, claim["trialId"])["paths"], [])
         profile = json.loads(journal.B1_MANIFEST_PATH.read_text())
         profile["sourceSha256"]["adapter"] = "0" * 64
         temporary_manifest = Path(self.temporary.name) / "tampered-b1-manifest.json"
