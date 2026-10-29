@@ -444,23 +444,33 @@ test('unsupported agent operations block; they never dispatch, approve, merge, o
   })), {code: 'UNSUPPORTED_OPERATION'});
 });
 
-test('unknown mutation outcome requires restart-safe reconciliation and cannot be retried', () => {
-  const before = initial();
-  const unknown = apply(before, event(before, 'MUTATION_UNKNOWN', 'AUTHOR', 'coordinator-sim', {
-    operationId: 'operation-972'
-  }, 'unknown-op'));
-  assert.equal(unknown.phase, 'RECONCILE');
-  assert.equal(unknown.nextAllowedAction, 'RECONCILE_UNKNOWN_MUTATION');
-  const restarted = JSON.parse(JSON.stringify(unknown));
-  const reconciled = apply(restarted, event(restarted, 'RECONCILED', 'RECONCILE', 'coordinator-sim', {
-    operationId: 'operation-972',
-    outcome: 'not_applied'
-  }, 'reconcile-op'));
-  assert.equal(reconciled.phase, 'AUTHOR');
-  assert.equal(reconciled.mutationHistory[0].status, 'RECONCILED');
-  assert.throws(() => reduceEvent(reconciled, event(reconciled, 'MUTATION_UNKNOWN', 'AUTHOR', 'coordinator-sim', {
-    operationId: 'operation-972'
-  }, 'blind-retry')), {code: 'MUTATION_REPLAY_BLOCKED'});
+test('mutation observations never resume work without operation-specific authoritative evidence', () => {
+  for (const [phase, stateBeforeUnknown] of [['AUTHOR', initial()], ['REVIEW', ciPassed()]]) {
+    const unknown = apply(stateBeforeUnknown, event(stateBeforeUnknown, 'MUTATION_UNKNOWN', phase, 'coordinator-sim', {
+      operationId: `operation-${phase.toLowerCase()}`
+    }, `unknown-${phase.toLowerCase()}`));
+    assert.equal(unknown.phase, 'RECONCILE');
+    assert.equal(unknown.nextAllowedAction, 'RECONCILE_UNKNOWN_MUTATION');
+    const restarted = JSON.parse(JSON.stringify(unknown));
+
+    for (const outcome of ['not_applied', 'applied', 'ambiguous']) {
+      const observed = reduceEvent(restarted, event(restarted, 'RECONCILED', 'RECONCILE', 'coordinator-sim', {
+        operationId: `operation-${phase.toLowerCase()}`,
+        outcome
+      }, `observation-${phase.toLowerCase()}-${outcome}`));
+      assert.equal(observed.changed, false);
+      assert.equal(observed.reason, 'MANUAL_RECONCILIATION_REQUIRED');
+      assert.equal(JSON.stringify(observed.state), JSON.stringify(restarted));
+      assert.equal(observed.state.phase, 'RECONCILE');
+      assert.equal(observed.state.mutationLane.status, 'UNKNOWN');
+      assert.equal(observed.state.mutationHistory[0].status, 'UNKNOWN');
+      assert.equal(observed.state.nextAllowedAction, 'RECONCILE_UNKNOWN_MUTATION');
+    }
+
+    assert.throws(() => reduceEvent(restarted, event(restarted, 'MUTATION_UNKNOWN',
+      'RECONCILE', 'coordinator-sim', {operationId: `operation-${phase.toLowerCase()}`},
+      `blind-retry-${phase.toLowerCase()}`)), {code: 'MUTATION_REPLAY_BLOCKED'});
+  }
 });
 
 test('expiry and event, byte, transition, and time budgets stop replay without effects', () => {
@@ -469,6 +479,32 @@ test('expiry and event, byte, transition, and time budgets stop replay without e
   const expired = reduceEvent(expires, expiringEvent);
   assert.equal(expired.state.phase, 'EXPIRED');
   assert.equal(expired.state.nextAllowedAction, 'STOP_EXPIRED');
+
+  const pendingMutation = apply(expires, event(expires, 'MUTATION_UNKNOWN', 'AUTHOR', 'coordinator-sim', {
+    operationId: 'expiring-operation'
+  }, 'expiring-unknown'));
+  const expirePendingMutation = reduceEvent(pendingMutation, {
+    ...event(pendingMutation, 'AUTHOR_DELIVERY', 'AUTHOR', 'Copilot', {status: 'delivered'}, 'expire-pending-operation'),
+    occurredAt: END
+  });
+  assert.equal(expirePendingMutation.state.phase, 'EXPIRED');
+  assert.equal(expirePendingMutation.state.mutationLane.status, 'UNKNOWN');
+  assert.equal(expirePendingMutation.state.mutationHistory[0].status, 'UNKNOWN');
+  assert.equal(expirePendingMutation.state.nextAllowedAction, 'STOP_EXPIRED');
+  const reloadedExpired = JSON.parse(JSON.stringify(expirePendingMutation.state));
+  const repeatedExpiry = reduceEvent(reloadedExpired, {
+    ...event(reloadedExpired, 'AUTHOR_DELIVERY', 'AUTHOR', 'Copilot', {status: 'delivered'}, 'repeat-expiry'),
+    occurredAt: END
+  });
+  assert.equal(repeatedExpiry.changed, false);
+  assert.equal(repeatedExpiry.reason, 'EXPIRED_NOOP');
+  assert.equal(repeatedExpiry.state.mutationLane.status, 'UNKNOWN');
+  const lateObservation = reduceEvent(reloadedExpired, event(reloadedExpired, 'RECONCILED',
+    'RECONCILE', 'coordinator-sim', {operationId: 'expiring-operation', outcome: 'not_applied'},
+    'late-expired-observation'));
+  assert.equal(lateObservation.changed, false);
+  assert.equal(lateObservation.state.phase, 'EXPIRED');
+  assert.equal(lateObservation.state.mutationLane.status, 'UNKNOWN');
 
   const sample = createSyntheticReplay();
   const byEvents = simulateReplay(sample.events, {initialState: sample.initialState, maxEvents: 1});

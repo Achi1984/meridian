@@ -100,6 +100,11 @@ selection revision. The offline reducer cannot authenticate that selection:
 the future collector must determine it from authoritative current workflow
 state. The pilot manifest deliberately leaves these IDs as placeholders; the
 synthetic replay uses generated test IDs only.
+Unknown mutation state survives expiry and serialization unchanged. `RECONCILED`
+events are observations only: absent operation-specific authoritative evidence,
+none of `applied`, `not_applied`, or `ambiguous` clears uncertainty or resumes
+work. The reducer remains stopped for manual reconciliation and never infers a
+retry or reoffers the operation.
 
 Event delivery deduplication binds repo/PR/head/base/phase plus immutable event
 ID and digest. The stable `actionDedupeKey` hashes exactly repo/PR/head/base/

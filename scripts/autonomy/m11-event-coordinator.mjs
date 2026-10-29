@@ -308,7 +308,7 @@ function validateState(input) {
   if (state.phase === 'COMPLETE') {
     need(state.mergeSha !== null && state.requiredPostchecks.every(check => state.postchecks[check]?.status === 'SUCCESS'), 'STATE_INVALID');
   }
-  if (state.mutationLane.status === 'UNKNOWN') need(state.phase === 'RECONCILE', 'STATE_INVALID');
+  if (state.mutationLane.status === 'UNKNOWN') need(['RECONCILE', 'EXPIRED'].includes(state.phase), 'STATE_INVALID');
   return state;
 }
 
@@ -564,10 +564,7 @@ export function reduceEvent(inputState, inputEvent) {
       && old.mutationLane.operationId === event.operationId, 'RECONCILIATION_SCOPE_MISMATCH');
     const history = next.mutationHistory.find(item => item.operationId === event.operationId);
     need(history?.status === 'UNKNOWN', 'MUTATION_REPLAY_BLOCKED');
-    history.status = 'RECONCILED';
-    history.outcome = event.outcome;
-    next.mutationLane = {status: 'RECONCILED', operationId: event.operationId, resumePhase: old.mutationLane.resumePhase};
-    next.phase = event.outcome === 'ambiguous' ? 'BLOCKED' : old.mutationLane.resumePhase;
+    return result(old, false, 'MANUAL_RECONCILIATION_REQUIRED');
   } else if (event.type === 'AGENT_OPERATION') {
     next.phase = 'BLOCKED';
     next.ci = null;
