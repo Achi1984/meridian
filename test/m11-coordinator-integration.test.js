@@ -62,11 +62,16 @@ function makeHarness({
   prHead = HEAD,
   run = {},
   runTotalByPage = [1],
+  runItemCountLimit = Infinity,
   jobTotalByPage = [1],
-  expireOnPath = null
+  expireOnPath = null,
+  rotateOnPath = null,
+  jobRunId = RUN_ID,
+  jobRunAttempt = null
 } = {}) {
   const credentials = makeCredentials();
   const calls = [];
+  const runPageSizes = [];
   const comparePath = `/repos/${REPOSITORY}/compare/${BASE}...${HEAD}`;
   const fetchImpl = async (url, options) => {
     const requestUrl = new URL(url);
@@ -74,6 +79,15 @@ function makeHarness({
     const expire = () => {
       if (expireOnPath === requestUrl.pathname) clock.value = credentials.getTrustedAuthEvidence().expiresAtMs;
     };
+    const rotate = () => {
+      if (rotateOnPath === requestUrl.pathname) {
+        credentials.replaceEvidence({
+          ...credentials.getTrustedAuthEvidence(),
+          evidenceId: 'rotated-auth-evidence-002'
+        });
+      }
+    };
+    const afterBodyRead = () => { expire(); rotate(); };
     if (requestUrl.pathname === `/repos/${REPOSITORY}/actions/runs/${RUN_ID}`) {
       return response(requestUrl, {
         id: RUN_ID,
@@ -89,7 +103,7 @@ function makeHarness({
         actor: {login: 'Achi1984'},
         triggering_actor: {login: 'Achi1984'},
         ...run
-      }, {onBodyRead: expire});
+      }, {onBodyRead: afterBodyRead});
     }
     if (requestUrl.pathname === `/repos/${REPOSITORY}/pulls/${PR}`) {
       return response(requestUrl, {
@@ -98,11 +112,11 @@ function makeHarness({
         changed_files: 1,
         head: {sha: prHead, repo: {full_name: REPOSITORY, fork: false}},
         base: {sha: BASE, repo: {full_name: REPOSITORY}}
-      }, {onBodyRead: expire});
+      }, {onBodyRead: afterBodyRead});
     }
     if (requestUrl.pathname === comparePath) {
       if (options.headers.accept === 'application/vnd.github.v3.diff') {
-        return response(requestUrl, `diff --git a/example.js b/example.js\n+${HEAD}`, {onBodyRead: expire});
+        return response(requestUrl, `diff --git a/example.js b/example.js\n+${HEAD}`, {onBodyRead: afterBodyRead});
       }
       return response(requestUrl, {
         base_commit: {sha: BASE},
@@ -110,24 +124,28 @@ function makeHarness({
         total_commits: 1,
         commits: [{sha: HEAD}],
         files: [{filename: 'example.js', patch: '@@ -0,0 +1 @@'}]
-      }, {onBodyRead: expire});
+      }, {onBodyRead: afterBodyRead});
     }
     if (requestUrl.pathname === `/repos/${REPOSITORY}/actions/workflows/${WORKFLOW_ID}/runs`) {
       const page = Number(requestUrl.searchParams.get('page'));
       const totalCount = runTotalByPage[Math.min(page - 1, runTotalByPage.length - 1)];
+      const generatedCount = Math.max(1, Number(runTotalByPage[0]) || 1);
+      const allRuns = Array.from({length: generatedCount}, (_, index) => ({
+        id: index === 0 ? RUN_ID : 8000 + index,
+        repository: {full_name: REPOSITORY},
+        workflow_id: run.workflow_id ?? WORKFLOW_ID,
+        run_number: index === 0 ? 20 : 19,
+        run_attempt: index === 0 ? run.run_attempt ?? RUN_ATTEMPT : RUN_ATTEMPT,
+        pull_requests: [{number: PR}]
+      }));
+      const items = allRuns.slice((page - 1) * 100, page * 100).slice(0, runItemCountLimit);
       const hasNext = page < runTotalByPage.length;
+      runPageSizes.push({page, totalCount, itemCount: items.length});
       return response(requestUrl, {
         total_count: totalCount,
-        workflow_runs: [{
-          id: RUN_ID,
-          repository: {full_name: REPOSITORY},
-          workflow_id: run.workflow_id ?? WORKFLOW_ID,
-          run_number: 20,
-          run_attempt: run.run_attempt ?? RUN_ATTEMPT,
-          pull_requests: [{number: PR}]
-        }]
+        workflow_runs: items
       }, {
-        onBodyRead: expire,
+        onBodyRead: afterBodyRead,
         headers: hasNext
           ? {link: `<https://api.github.com${requestUrl.pathname}?page=${page + 1}>; rel="next"`}
           : {}
@@ -144,7 +162,7 @@ function makeHarness({
         workflow_id: run.workflow_id ?? WORKFLOW_ID,
         path: '.github/workflows/backend-safety.yml@refs/heads/main',
         repository: {full_name: REPOSITORY}
-      }, {onBodyRead: expire});
+      }, {onBodyRead: afterBodyRead});
     }
     const jobsPath = new RegExp(
       `^/repos/${REPOSITORY}/actions/runs/${RUN_ID}/attempts/(\\d+)/jobs$`
@@ -158,14 +176,14 @@ function makeHarness({
         jobs: [{
           id: 81,
           name: 'syntax',
-          run_id: RUN_ID,
-          run_attempt: attempt,
+          run_id: jobRunId,
+          run_attempt: jobRunAttempt ?? attempt,
           status: 'completed',
           conclusion: 'success',
           steps: [{name: 'Research and auth regression tests', status: 'completed', conclusion: 'success'}]
         }]
       }, {
-        onBodyRead: expire,
+        onBodyRead: afterBodyRead,
         headers: page < jobTotalByPage.length
           ? {link: `<https://api.github.com${requestUrl.pathname}?page=${page + 1}>; rel="next"`}
           : {}
@@ -179,7 +197,7 @@ function makeHarness({
     now: () => clock.value,
     defaultDeadlineMs: 1000
   });
-  return {api, calls, clock, credentials};
+  return {api, calls, clock, credentials, runPageSizes};
 }
 
 function collectionConfig() {
@@ -361,14 +379,28 @@ test('exact run, attempt, workflow, pagination totals, and job inventory remain 
   assert.equal(wrongHint.reason, 'RUN_IDENTITY_OR_ACTOR_MISMATCH');
   const malformedTotal = await collect(makeHarness({runTotalByPage: ['1']}).api);
   assert.equal(malformedTotal.reason, 'AUTHORITATIVE_READ_FAILED');
-  const truncated = await collect(makeHarness({runTotalByPage: [2]}).api);
+  const truncated = await collect(makeHarness({runTotalByPage: [2], runItemCountLimit: 1}).api);
   assert.equal(truncated.reason, 'RUN_PAGINATION_INCOMPLETE');
   const changedTotal = await collect(makeHarness({runTotalByPage: [2, 1]}).api);
   assert.equal(changedTotal.reason, 'RUN_PAGINATION_INCOMPLETE');
   const truncatedJobs = await collect(makeHarness({jobTotalByPage: [2]}).api);
   assert.equal(truncatedJobs.reason, 'JOB_PAGINATION_INCOMPLETE');
+  const wrongJobRun = await collect(makeHarness({jobRunId: RUN_ID + 1}).api);
+  assert.equal(wrongJobRun.reason, 'AUTHORITATIVE_READ_FAILED');
+  const wrongJobAttempt = await collect(makeHarness({jobRunAttempt: RUN_ATTEMPT + 1}).api);
+  assert.equal(wrongJobAttempt.reason, 'AUTHORITATIVE_READ_FAILED');
   const stale = await collect(makeHarness({prHead: 'c'.repeat(40)}).api);
   assert.equal(stale.reason, 'PULL_REQUEST_PAIR_OR_FORK_MISMATCH');
+});
+
+test('complete run pagination collects all 130 entries across 100 plus 30', async () => {
+  const harness = makeHarness({runTotalByPage: [130, 130]});
+  const collected = await collect(harness.api);
+  assert.equal(collected.status, 'READY');
+  assert.deepEqual(harness.runPageSizes, [
+    {page: 1, totalCount: 130, itemCount: 100},
+    {page: 2, totalCount: 130, itemCount: 30}
+  ]);
 });
 
 test('auth expiry during a response body blocks collection without exposing reviewer or store', async () => {
@@ -394,6 +426,15 @@ test('auth expiry during a response body blocks collection without exposing revi
   assert.equal(reviewerCalls, 0);
   assert.equal(receiptCalls, 0);
   assert.equal(backend.claims.size, 0);
+});
+
+test('credential evidence rotation during a response body stops further reads and collection', async () => {
+  const rotatedPath = `/repos/${REPOSITORY}/actions/runs/${RUN_ID}`;
+  const harness = makeHarness({rotateOnPath: rotatedPath});
+  const collected = await collect(harness.api);
+  assert.equal(collected.status, 'BLOCKED');
+  assert.equal(collected.reason, 'AUTHORITATIVE_READ_FAILED');
+  assert.deepEqual(harness.calls.map(call => call.path), [rotatedPath]);
 });
 
 test('auth evidence identity change and expiry at claim, review, or receipt revalidation stop promotion', async () => {
