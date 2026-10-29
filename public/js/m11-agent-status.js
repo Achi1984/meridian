@@ -1,5 +1,3 @@
-import {normalizeM11AgentStatus} from '../../scripts/autonomy/m11-agent-status.mjs';
-
 const TASK_LABELS = Object.freeze({
   QUEUED: 'Wartend',
   RUNNING: 'Laufend',
@@ -23,10 +21,6 @@ const FRESHNESS_LABELS = Object.freeze({
   UNKNOWN: 'Unbekannt'
 });
 
-const PUBLIC_URL_TEXT = Object.freeze({
-  unknown: 'Unbekannt'
-});
-
 function safeText(value, fallback = 'Unbekannt') {
   if (typeof value === 'string') {
     const text = value.trim();
@@ -45,7 +39,7 @@ function node(doc, tag, text) {
 
 function appendMetaList(parent, entries) {
   for (const [label, value] of entries) {
-    const row = node(parent.ownerDocument, 'div', '');
+    const row = node(parent.ownerDocument, 'div');
     row.className = 'm11-agent-status__meta-row';
     const labelNode = node(parent.ownerDocument, 'span', label);
     labelNode.className = 'm11-agent-status__meta-label';
@@ -57,21 +51,21 @@ function appendMetaList(parent, entries) {
 }
 
 function renderRow(document, row) {
-  const card = node(document, 'article', '');
+  const card = node(document, 'article');
   card.className = 'm11-agent-status__card';
   card.setAttribute('data-task-state', row.taskState);
   card.setAttribute('data-freshness', row.freshness);
 
-  const heading = node(document, 'div', '');
+  const heading = node(document, 'div');
   heading.className = 'm11-agent-status__heading';
   const title = node(document, 'h3', `${row.agentName} · ${row.taskLabel}`);
   title.className = 'm11-agent-status__title';
-  const badge = node(document, 'span', `${TASK_LABELS[row.taskState] || 'Unbekannt'}`);
+  const badge = node(document, 'span', TASK_LABELS[row.taskState] || 'Unbekannt');
   badge.className = 'm11-agent-status__badge';
   heading.append(title, badge);
   card.append(heading);
 
-  const meta = node(document, 'div', '');
+  const meta = node(document, 'div');
   meta.className = 'm11-agent-status__meta';
   appendMetaList(meta, [
     ['Agent', row.agentId],
@@ -86,7 +80,7 @@ function renderRow(document, row) {
   ]);
   card.append(meta);
 
-  const links = node(document, 'div', '');
+  const links = node(document, 'div');
   links.className = 'm11-agent-status__links';
   const taskLink = node(document, 'a', 'Aufgabe öffnen');
   taskLink.href = row.taskUrl;
@@ -104,16 +98,16 @@ function renderRow(document, row) {
   }
   card.append(links);
 
-  const details = node(document, 'div', '');
+  const details = node(document, 'div');
   details.className = 'm11-agent-status__details';
-  const summary = node(document, 'div', '');
+  const summary = node(document, 'div');
   summary.className = 'm11-agent-status__summary';
   const block = row.blocker === null ? '—' : row.blocker;
   const next = row.nextAction || 'Keine weitere Aktion angegeben';
   summary.textContent = `Blocker: ${block} · Nächste Aktion: ${next}`;
   details.append(summary);
 
-  const noteList = node(document, 'ul', '');
+  const noteList = node(document, 'ul');
   noteList.className = 'm11-agent-status__notes';
   const observed = node(document, 'li', `Beobachtet: ${row.observedAt}`);
   const expires = node(document, 'li', `Gültig bis: ${row.expiresAt}`);
@@ -139,14 +133,21 @@ export function renderM11AgentStatus(root, input, options = {}) {
     throw new TypeError('M11 agent status rendering requires a document');
   }
 
-  const normalized = normalizeM11AgentStatus(input, {now: typeof options.now === 'function' ? options.now : Date.now});
+  const normalize = typeof globalThis !== 'undefined' && globalThis.M11AgentStatusContract
+    ? globalThis.M11AgentStatusContract.normalizeM11AgentStatus
+    : null;
+  if (typeof normalize !== 'function') {
+    throw new Error('M11 agent status browser contract is unavailable');
+  }
+
+  const normalized = normalize(input, {now: typeof options.now === 'function' ? options.now : Date.now});
   root.replaceChildren();
-  const section = node(document, 'section', '');
+  const section = node(document, 'section');
   section.className = 'm11-agent-status';
   section.setAttribute('data-status', normalized.freshness);
   section.setAttribute('aria-live', 'polite');
 
-  const header = node(document, 'div', '');
+  const header = node(document, 'div');
   header.className = 'm11-agent-status__header';
   const heading = node(document, 'h2', 'M11 Agent Status');
   heading.className = 'm11-agent-status__header-title';
@@ -155,7 +156,7 @@ export function renderM11AgentStatus(root, input, options = {}) {
   header.append(heading, state);
   section.append(header);
 
-  const list = node(document, 'div', '');
+  const list = node(document, 'div');
   list.className = 'm11-agent-status__list';
   for (const row of normalized.rows) {
     list.append(renderRow(document, row));
@@ -174,7 +175,6 @@ export function mountM11AgentStatus(target, input, options = {}) {
 
 if (typeof globalThis !== 'undefined') {
   globalThis.M11AgentStatus = Object.freeze({
-    normalizeM11AgentStatus,
     renderM11AgentStatus,
     mountM11AgentStatus
   });

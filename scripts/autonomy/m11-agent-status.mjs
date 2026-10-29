@@ -1,5 +1,3 @@
-import {types} from 'node:util';
-
 export const M11_TASK_STATES = Object.freeze([
   'QUEUED',
   'RUNNING',
@@ -32,13 +30,57 @@ export const M11_EVIDENCE_TYPES = Object.freeze([
   'unknown'
 ]);
 
-const SAFE_PROTOCOLS = new Set(['http:', 'https:']);
+export const POWERED_BY_PUBLIC_GITHUB = Object.freeze({
+  hostnames: Object.freeze(['github.com', 'www.github.com'])
+});
 
-function plainObject(value) {
-  return value !== null && typeof value === 'object'
-    && !Array.isArray(value)
-    && !types.isProxy(value)
-    && Object.getPrototypeOf(value) === Object.prototype;
+const SAFE_PROTOCOLS = new Set(['http:', 'https:']);
+const VERIFIED_EVIDENCE_TYPES = new Set(['github-workflow', 'github-issue', 'github-pr', 'copilot-session']);
+const SUSPICIOUS_QUERY_KEYS = /(?:^|[?&;])(token|auth|password|passwd|secret|key|sig|signature|session|jwt|access_token|client_secret|authorization)(?:=|$)/i;
+
+function isSafePlainObject(value) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+  if (Object.getPrototypeOf(value) !== Object.prototype) return false;
+  if (Object.getOwnPropertySymbols(value).length > 0) return false;
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const keys = Reflect.ownKeys(descriptors);
+  return keys.every(key => typeof key === 'string')
+    && Object.values(descriptors).every(descriptor => descriptor && Object.hasOwn(descriptor, 'value') && descriptor.enumerable === true && descriptor.get === undefined && descriptor.set === undefined);
+}
+
+function isSafeArray(value) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) return false;
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const keys = Reflect.ownKeys(descriptors);
+  if (keys.length !== value.length + 1 || !keys.includes('length')) return false;
+  for (const key of keys) {
+    if (key === 'length') continue;
+    if (typeof key !== 'string' || !/^(0|[1-9][0-9]*)$/.test(key) || Number(key) >= value.length) return false;
+    const descriptor = descriptors[key];
+    if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true || descriptor.get !== undefined || descriptor.set !== undefined) return false;
+  }
+  return true;
+}
+
+function ensureFiniteClock(nowMs, label = 'clock') {
+  if (typeof nowMs !== 'number' || !Number.isFinite(nowMs)) {
+    throw new TypeError(`Invalid ${label}`);
+  }
+}
+
+function readClock(options = {}) {
+  if (Object.hasOwn(options, 'now') && typeof options.now !== 'function') {
+    throw new TypeError('Invalid injected clock');
+  }
+  const provider = typeof options.now === 'function' ? options.now : Date.now;
+  let value;
+  try {
+    value = provider();
+  } catch {
+    throw new TypeError('Invalid injected clock');
+  }
+  ensureFiniteClock(value, 'injected clock');
+  return value;
 }
 
 function safeText(value, maxLength = 200) {
@@ -50,7 +92,7 @@ function safeText(value, maxLength = 200) {
   return text;
 }
 
-function safeUrl(value) {
+function safeGitHubUrl(value) {
   if (typeof value !== 'string') return null;
   const text = value.trim();
   if (!text || /[\x00-\x1F\x7F<>]/.test(text)) return null;
@@ -58,6 +100,32 @@ function safeUrl(value) {
     const parsed = new URL(text);
     if (!SAFE_PROTOCOLS.has(parsed.protocol)) return null;
     if (parsed.username || parsed.password) return null;
+    const host = parsed.hostname.toLowerCase();
+    if (!POWERED_BY_PUBLIC_GITHUB.hostnames.includes(host)) return null;
+    if (parsed.port) return null;
+    const suspiciousQuery = parsed.search && SUSPICIOUS_QUERY_KEYS.test(parsed.search);
+    const suspiciousHash = parsed.hash && SUSPICIOUS_QUERY_KEYS.test(parsed.hash);
+    if (suspiciousQuery || suspiciousHash) return null;
+    const noPublicHost = /(localhost|127\.0\.0\.1|0\.0\.0\.0|::1|\.local(?:host)?|\.internal|\.home|\.lan|\.localdomain|\.local$)/i.test(host);
+    if (noPublicHost) return null;
+    const parts = parsed.pathname.split('/').filter(Boolean);
+    if (parts.length < 2) return null;
+    const [owner, repo, kind, ...rest] = parts;
+    if (!owner || !repo || /\.+$/.test(owner) || /\.+$/.test(repo)) return null;
+    const validKinds = new Set(['issues', 'pull', 'actions', 'commit', 'discussions', 'releases', 'compare']);
+    if (kind && !validKinds.has(kind)) return null;
+    if (!kind) return parsed.href;
+    if (kind === 'issues' && rest.length > 1) return null;
+    if (kind === 'pull' && rest.length > 1) return null;
+    if (kind === 'commit' && rest.length > 1) return null;
+    if (kind === 'discussions' && rest.length > 1) return null;
+    if (kind === 'releases' && rest.length > 1) return null;
+    if (kind === 'actions') {
+      if (rest.length === 0) return parsed.href;
+      if (rest[0] === 'runs' && rest.length <= 2) return parsed.href;
+      return null;
+    }
+    if (kind === 'compare' && rest.length <= 2) return parsed.href;
     return parsed.href;
   } catch {
     return null;
@@ -74,6 +142,7 @@ function isoMs(value) {
 function deriveFreshness(observedAt, expiresAt, nowMs) {
   const observed = isoMs(observedAt);
   const expires = isoMs(expiresAt);
+  if (!Number.isFinite(nowMs)) return 'UNKNOWN';
   if (observed === null || expires === null) return 'UNKNOWN';
   if (observed > nowMs) return 'UNKNOWN';
   if (expires <= nowMs) return 'STALE';
@@ -81,7 +150,8 @@ function deriveFreshness(observedAt, expiresAt, nowMs) {
 }
 
 function validateRow(row, nowMs) {
-  if (!plainObject(row)) {
+  ensureFiniteClock(nowMs, 'now value');
+  if (!isSafePlainObject(row)) {
     throw new TypeError('M11 agent status row must be a plain object');
   }
   const keys = [
@@ -90,9 +160,16 @@ function validateRow(row, nowMs) {
     'taskUrl', 'observedAt', 'expiresAt', 'evidenceUrl', 'evidenceType',
     'blocker', 'nextAction', 'ownerDecisionRequired', 'ownerDecisionReason'
   ];
-  const currentKeys = Object.keys(row);
-  if (currentKeys.length !== keys.length || currentKeys.some(key => !keys.includes(key))) {
+  const descriptors = Object.getOwnPropertyDescriptors(row);
+  const names = Reflect.ownKeys(descriptors);
+  if (names.length !== keys.length || names.some(key => typeof key !== 'string' || !keys.includes(key))) {
     throw new TypeError('M11 agent status row field set is invalid');
+  }
+  for (const key of keys) {
+    const descriptor = descriptors[key];
+    if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true || descriptor.get !== undefined || descriptor.set !== undefined) {
+      throw new TypeError(`M11 agent status row field '${key}' is invalid`);
+    }
   }
 
   const agentId = safeText(row.agentId, 120);
@@ -123,30 +200,32 @@ function validateRow(row, nowMs) {
   if (modelVerified !== 'UNKNOWN' && !modelVerified) {
     throw new TypeError('Model verification is invalid');
   }
-  if (providerVerified !== 'UNKNOWN' && providerVerified !== providerRequested) {
-    throw new TypeError('Provider verification must match the requested provider');
-  }
-  if (modelVerified !== 'UNKNOWN' && modelVerified !== modelRequested) {
-    throw new TypeError('Model verification must match the requested model');
-  }
 
-  const taskUrl = safeUrl(row.taskUrl);
-  const evidenceUrl = row.evidenceUrl === null ? null : safeUrl(row.evidenceUrl);
+  const taskUrl = safeGitHubUrl(row.taskUrl);
   if (!taskUrl) {
-    throw new TypeError('Task URL must be http(s)');
-  }
-  if (providerVerified !== 'UNKNOWN' || modelVerified !== 'UNKNOWN') {
-    if (!evidenceUrl) {
-      throw new TypeError('Evidence URL is required when provider or model is verified');
-    }
+    throw new TypeError('Task URL must be a valid public GitHub URL');
   }
 
   const evidenceType = safeText(row.evidenceType, 80);
-  if (evidenceUrl && !evidenceType) {
-    throw new TypeError('Evidence type is required when evidence URL is present');
+  const evidenceUrl = row.evidenceUrl === null || row.evidenceUrl === undefined ? null : safeGitHubUrl(row.evidenceUrl);
+  if ((providerVerified !== 'UNKNOWN' || modelVerified !== 'UNKNOWN') && (!evidenceUrl || !evidenceType || !VERIFIED_EVIDENCE_TYPES.has(evidenceType))) {
+    throw new TypeError('Verified provider/model claims require explicit public GitHub evidence');
   }
   if (evidenceType && !M11_EVIDENCE_TYPES.includes(evidenceType)) {
     throw new TypeError('Evidence type is invalid');
+  }
+  if (evidenceType === 'manual' || evidenceType === 'unknown') {
+    if (providerVerified !== 'UNKNOWN' || modelVerified !== 'UNKNOWN') {
+      throw new TypeError('Manual or unknown evidence cannot verify executed provider/model claims');
+    }
+  }
+  if (evidenceUrl === null && (providerVerified !== 'UNKNOWN' || modelVerified !== 'UNKNOWN')) {
+    throw new TypeError('Evidence URL is required when provider or model is verified');
+  }
+  if (evidenceUrl === null && evidenceType) {
+    if (evidenceType !== 'unknown' && evidenceType !== 'manual') {
+      throw new TypeError('Evidence URL must be supplied for typed evidence');
+    }
   }
 
   const observedAt = isoMs(row.observedAt);
@@ -154,9 +233,9 @@ function validateRow(row, nowMs) {
   if (observedAt === null || expiresAt === null || observedAt > expiresAt) {
     throw new TypeError('Observation and expiry timestamps are invalid');
   }
-
   const freshness = deriveFreshness(row.observedAt, row.expiresAt, nowMs);
-  const blocker = row.blocker === null ? null : safeText(row.blocker, 200);
+
+  const blocker = row.blocker === null || row.blocker === undefined ? null : safeText(row.blocker, 200);
   const nextAction = safeText(row.nextAction, 200);
   if (!nextAction) {
     throw new TypeError('Next action is required');
@@ -201,7 +280,7 @@ function validateRow(row, nowMs) {
 }
 
 export function normalizeM11AgentStatus(input, options = {}) {
-  if (!plainObject(input)) {
+  if (!isSafePlainObject(input)) {
     throw new TypeError('M11 agent status input must be a plain object');
   }
   const currentKeys = Object.keys(input);
@@ -212,9 +291,9 @@ export function normalizeM11AgentStatus(input, options = {}) {
     throw new TypeError('Unsupported M11 agent status schemaVersion');
   }
 
-  const now = typeof options.now === 'function' ? options.now() : Date.now();
+  const now = readClock(options);
   const rows = Array.isArray(input.rows) ? input.rows : null;
-  if (!rows || rows.length === 0 || rows.length > 50) {
+  if (!rows || rows.length === 0 || rows.length > 50 || !isSafeArray(rows)) {
     throw new TypeError('M11 agent status rows must be a non-empty array up to 50 items');
   }
 
@@ -239,9 +318,15 @@ export function normalizeM11AgentStatus(input, options = {}) {
 }
 
 export function validateM11AgentStatusRow(row, nowMs = Date.now()) {
+  ensureFiniteClock(nowMs, 'now value');
   return validateRow(row, nowMs);
 }
 
 export function deriveM11Freshness(observedAt, expiresAt, nowMs = Date.now()) {
+  ensureFiniteClock(nowMs, 'now value');
   return deriveFreshness(observedAt, expiresAt, nowMs);
+}
+
+export function validatePublicM11Url(value) {
+  return safeGitHubUrl(value);
 }
