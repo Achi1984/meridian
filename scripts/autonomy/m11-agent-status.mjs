@@ -58,6 +58,34 @@ function isPlainObject(value) {
   }
 }
 
+function readOwnDataValue(obj, key) {
+  if (!isPlainObject(obj)) {
+    return undefined;
+  }
+  const descriptor = Object.getOwnPropertyDescriptor(obj, key);
+  if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value') || descriptor.enumerable !== true || descriptor.get !== undefined || descriptor.set !== undefined) {
+    return undefined;
+  }
+  return descriptor.value;
+}
+
+function hasExactDataKeys(obj, expectedKeys) {
+  if (!isPlainObject(obj) && !Array.isArray(obj)) {
+    return false;
+  }
+  const keys = Reflect.ownKeys(obj);
+  if (keys.length !== expectedKeys.length || keys.some(key => typeof key !== 'string' || !expectedKeys.includes(key))) {
+    return false;
+  }
+  for (const key of expectedKeys) {
+    const descriptor = Object.getOwnPropertyDescriptor(obj, key);
+    if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value') || descriptor.enumerable !== true || descriptor.get !== undefined || descriptor.set !== undefined) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function isExactArray(value) {
   if (!Array.isArray(value) || isProxy(value) || Object.getPrototypeOf(value) !== Array.prototype) {
     return false;
@@ -183,15 +211,14 @@ function validateEvidenceBinding(binding, expectedAgentId, expectedTaskId, expec
   if (!isPlainObject(binding)) {
     return null;
   }
-  const keys = Reflect.ownKeys(binding);
-  if (keys.length !== EVIDENCE_KEYS.length || keys.some(key => typeof key !== 'string' || !EVIDENCE_KEYS.includes(key))) {
+  if (!hasExactDataKeys(binding, EVIDENCE_KEYS)) {
     return null;
   }
-  const agentId = safeText(binding.agentId, 120);
-  const taskId = safeText(binding.taskId, 120);
-  const value = safeText(binding.value, 200);
-  const evidenceType = safeText(binding.evidenceType, 80);
-  const evidenceUrl = validateGithubUrl(binding.evidenceUrl);
+  const agentId = safeText(readOwnDataValue(binding, 'agentId'), 120);
+  const taskId = safeText(readOwnDataValue(binding, 'taskId'), 120);
+  const value = safeText(readOwnDataValue(binding, 'value'), 200);
+  const evidenceType = safeText(readOwnDataValue(binding, 'evidenceType'), 80);
+  const evidenceUrl = validateGithubUrl(readOwnDataValue(binding, 'evidenceUrl'));
   if (!agentId || !taskId || !value || !evidenceType || !evidenceUrl) {
     return null;
   }
@@ -204,20 +231,24 @@ function validateEvidenceBinding(binding, expectedAgentId, expectedTaskId, expec
   if (!M11_EVIDENCE_TYPES.includes(evidenceType)) {
     return null;
   }
-  const observedAt = isoMs(binding.observedAt);
-  const expiresAt = isoMs(binding.expiresAt);
+  const observedAt = isoMs(readOwnDataValue(binding, 'observedAt'));
+  const expiresAt = isoMs(readOwnDataValue(binding, 'expiresAt'));
   if (observedAt === null || expiresAt === null || observedAt > expiresAt) {
     return null;
   }
-  if (deriveFreshness(binding.observedAt, binding.expiresAt, nowMs) !== 'CURRENT') {
+  const freshness = deriveFreshness(readOwnDataValue(binding, 'observedAt'), readOwnDataValue(binding, 'expiresAt'), nowMs);
+  if (freshness !== 'CURRENT') {
+    return null;
+  }
+  if (evidenceType === 'manual' || evidenceType === 'unknown') {
     return null;
   }
   return Object.freeze({
     agentId,
     taskId,
     value,
-    observedAt: binding.observedAt,
-    expiresAt: binding.expiresAt,
+    observedAt: readOwnDataValue(binding, 'observedAt'),
+    expiresAt: readOwnDataValue(binding, 'expiresAt'),
     evidenceUrl,
     evidenceType
   });
@@ -228,17 +259,8 @@ function validateRow(row, nowMs) {
   if (!isPlainObject(row)) {
     throw new TypeError('M11 agent status row must be a plain object');
   }
-  const keys = Reflect.ownKeys(row);
-  if (keys.length !== ROW_KEYS.length || keys.some(key => typeof key !== 'string' || !ROW_KEYS.includes(key))) {
+  if (!hasExactDataKeys(row, ROW_KEYS)) {
     throw new TypeError('M11 agent status row field set is invalid');
-  }
-
-  const descriptors = Object.getOwnPropertyDescriptors(row);
-  for (const key of ROW_KEYS) {
-    const descriptor = descriptors[key];
-    if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value') || descriptor.enumerable !== true || descriptor.get !== undefined || descriptor.set !== undefined) {
-      throw new TypeError(`M11 agent status row field '${key}' is invalid`);
-    }
   }
 
   const agentId = safeText(row.agentId, 120);
@@ -284,18 +306,16 @@ function validateRow(row, nowMs) {
   const modelEvidence = validateEvidenceBinding(row.modelEvidence, agentId, taskId, undefined, nowMs);
   const coordinatorEvidence = validateEvidenceBinding(row.coordinatorEvidence, agentId, taskId, row.coordinatorMode, nowMs);
 
-  const hasUsableEvidence = Boolean(providerEvidence || modelEvidence || coordinatorEvidence);
-  const rowFreshness = hasUsableEvidence ? deriveFreshness(row.observedAt, row.expiresAt, nowMs) : 'UNKNOWN';
+  const rowFreshness = deriveFreshness(row.observedAt, row.expiresAt, nowMs);
   const providerVerified = rowFreshness === 'CURRENT' && providerEvidence ? providerEvidence.value : 'UNKNOWN';
   const modelVerified = rowFreshness === 'CURRENT' && modelEvidence ? modelEvidence.value : 'UNKNOWN';
 
-  const effectiveTaskState = (row.taskState === 'RUNNING' || row.taskState === 'REVIEWING') && rowFreshness === 'CURRENT'
-    ? row.taskState
-    : 'UNKNOWN';
-  const effectiveCoordinatorMode = row.coordinatorMode === 'ACTIVE' && rowFreshness === 'CURRENT' && coordinatorEvidence && coordinatorEvidence.value === 'ACTIVE'
-    ? row.coordinatorMode
-    : 'UNKNOWN';
-  const finalCoordinatorMode = rowFreshness !== 'CURRENT' ? 'UNKNOWN' : effectiveCoordinatorMode;
+  const effectiveTaskState = row.taskState === 'RUNNING' || row.taskState === 'REVIEWING'
+    ? (rowFreshness === 'CURRENT' && (providerEvidence || modelEvidence) ? row.taskState : 'UNKNOWN')
+    : row.taskState;
+  const effectiveCoordinatorMode = row.coordinatorMode === 'ACTIVE'
+    ? (rowFreshness === 'CURRENT' && coordinatorEvidence && coordinatorEvidence.value === 'ACTIVE' ? row.coordinatorMode : 'UNKNOWN')
+    : row.coordinatorMode;
 
   const blocker = row.blocker === null || row.blocker === undefined ? null : safeText(row.blocker, 200);
   const nextAction = safeText(row.nextAction, 200);
@@ -322,7 +342,7 @@ function validateRow(row, nowMs) {
     taskId,
     taskLabel,
     taskState: effectiveTaskState,
-    coordinatorMode: finalCoordinatorMode,
+    coordinatorMode: effectiveCoordinatorMode,
     providerRequested,
     providerVerified,
     modelRequested,
@@ -369,6 +389,12 @@ export function normalizeM11AgentStatus(input, options = {}) {
     rows.push(validateRow(row, nowMs));
   }
 
+  const knownRows = rows.map(row => ({
+    ...row,
+    providerVerified: row.providerEvidence ? row.providerEvidence.value : 'UNKNOWN',
+    modelVerified: row.modelEvidence ? row.modelEvidence.value : 'UNKNOWN'
+  }));
+
   const freshness = rows.every(row => row.freshness === 'CURRENT')
     ? 'CURRENT'
     : rows.some(row => row.freshness === 'STALE')
@@ -379,7 +405,7 @@ export function normalizeM11AgentStatus(input, options = {}) {
     schemaVersion: 1,
     status: 'READY',
     freshness,
-    rows: Object.freeze(rows)
+    rows: Object.freeze(knownRows)
   });
 }
 

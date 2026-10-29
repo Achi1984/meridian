@@ -184,3 +184,83 @@ test('strict rejection for hostile rows, arrays, and dangerous DTO mutation', ()
 
   assert.throws(() => validateM11AgentStatusRow(sample({ taskUrl: 'https://github.com/acme/meridian/issues/42?token=secret' }), NOW), { name: 'TypeError' });
 });
+
+test('browser revalidation recomputes stale visible claims and rejects descriptor-driven getters', () => {
+  const valid = sample({
+    taskState: 'RUNNING',
+    coordinatorMode: 'STOPPED',
+    providerVerified: 'github',
+    modelVerified: 'gpt-5'
+  });
+  const normalized = normalizeM11AgentStatus({ schemaVersion: 1, rows: [valid] }, { now: () => NOW });
+  const serialized = JSON.stringify(normalized);
+
+  const document = makeDocument();
+  const root = document.createElement('div');
+  renderM11AgentStatus(root, serialized, { now: () => Date.parse('2026-10-29T12:05:00.000Z') });
+  assert.match(root.textContent, /Veraltet|Unbekannt/);
+
+  const mutated = JSON.parse(serialized);
+  mutated.rows[0].modelEvidence = null;
+  mutated.rows[0].modelVerified = 'gpt-5';
+  const mutRoot = document.createElement('div');
+  renderM11AgentStatus(mutRoot, JSON.stringify(mutated), { now: () => NOW });
+  assert.match(mutRoot.textContent, /Unbekannt/);
+
+  let schemaGetterCount = 0;
+  const getterObject = {
+    get schemaVersion() {
+      schemaGetterCount += 1;
+      return 1;
+    },
+    rows: [valid]
+  };
+  assert.throws(() => normalizeM11AgentStatus(getterObject, { now: () => NOW }), { name: 'TypeError' });
+  assert.equal(schemaGetterCount, 0);
+
+  let evidenceGetterCount = 0;
+  const evilEvidence = {
+    get value() {
+      evidenceGetterCount += 1;
+      return 'github';
+    },
+    agentId: 'agent-100',
+    taskId: 'task-200',
+    observedAt: '2026-10-29T11:55:00.000Z',
+    expiresAt: '2026-10-29T12:05:00.000Z',
+    evidenceUrl: 'https://github.com/acme/meridian/actions/runs/123456',
+    evidenceType: 'github-workflow'
+  };
+  const evilRow = sample({ providerEvidence: evilEvidence });
+  assert.throws(() => normalizeM11AgentStatus({ schemaVersion: 1, rows: [evilRow] }, { now: () => NOW }), { name: 'TypeError' });
+  assert.equal(evidenceGetterCount, 0);
+});
+
+test('manual and unknown evidence never verify provider, model, or active coordinator claims', () => {
+  const manualRow = sample({
+    providerEvidence: { ...sample().providerEvidence, evidenceType: 'manual' },
+    modelEvidence: { ...sample().modelEvidence, evidenceType: 'manual' },
+    coordinatorEvidence: { ...sample().coordinatorEvidence, evidenceType: 'manual' },
+    providerVerified: 'github',
+    modelVerified: 'gpt-5',
+    taskState: 'RUNNING',
+    coordinatorMode: 'ACTIVE'
+  });
+  const normalized = normalizeM11AgentStatus({ schemaVersion: 1, rows: [manualRow] }, { now: () => NOW });
+  assert.equal(normalized.rows[0].providerVerified, 'UNKNOWN');
+  assert.equal(normalized.rows[0].modelVerified, 'UNKNOWN');
+  assert.equal(normalized.rows[0].coordinatorMode, 'UNKNOWN');
+
+  const unknownRow = sample({
+    providerEvidence: { ...sample().providerEvidence, evidenceType: 'unknown' },
+    modelEvidence: { ...sample().modelEvidence, evidenceType: 'unknown' },
+    coordinatorEvidence: { ...sample().coordinatorEvidence, evidenceType: 'unknown' },
+    providerVerified: 'github',
+    modelVerified: 'gpt-5',
+    coordinatorMode: 'ACTIVE'
+  });
+  const unknownNormalized = normalizeM11AgentStatus({ schemaVersion: 1, rows: [unknownRow] }, { now: () => NOW });
+  assert.equal(unknownNormalized.rows[0].providerVerified, 'UNKNOWN');
+  assert.equal(unknownNormalized.rows[0].modelVerified, 'UNKNOWN');
+  assert.equal(unknownNormalized.rows[0].coordinatorMode, 'UNKNOWN');
+});

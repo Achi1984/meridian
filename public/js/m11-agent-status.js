@@ -36,6 +36,34 @@ function isPlainObject(value) {
   }
 }
 
+function readOwnDataValue(obj, key) {
+  if (!isPlainObject(obj)) {
+    return undefined;
+  }
+  const descriptor = Object.getOwnPropertyDescriptor(obj, key);
+  if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value') || descriptor.enumerable !== true || descriptor.get !== undefined || descriptor.set !== undefined) {
+    return undefined;
+  }
+  return descriptor.value;
+}
+
+function hasExactDataKeys(obj, expectedKeys) {
+  if (!isPlainObject(obj)) {
+    return false;
+  }
+  const keys = Reflect.ownKeys(obj);
+  if (keys.length !== expectedKeys.length || keys.some(key => typeof key !== 'string' || !expectedKeys.includes(key))) {
+    return false;
+  }
+  for (const key of expectedKeys) {
+    const descriptor = Object.getOwnPropertyDescriptor(obj, key);
+    if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value') || descriptor.enumerable !== true || descriptor.get !== undefined || descriptor.set !== undefined) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function isExactArray(value) {
   if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
     return false;
@@ -131,16 +159,15 @@ function validateEvidenceBinding(binding, expectedAgentId, expectedTaskId, expec
   if (!isPlainObject(binding)) {
     return null;
   }
-  const keys = Reflect.ownKeys(binding);
   const expectedKeys = ['agentId', 'taskId', 'value', 'observedAt', 'expiresAt', 'evidenceUrl', 'evidenceType'];
-  if (keys.length !== expectedKeys.length || keys.some(key => typeof key !== 'string' || !expectedKeys.includes(key))) {
+  if (!hasExactDataKeys(binding, expectedKeys)) {
     return null;
   }
-  const agentId = safeText(binding.agentId, 120);
-  const taskId = safeText(binding.taskId, 120);
-  const value = safeText(binding.value, 200);
-  const evidenceType = safeText(binding.evidenceType, 80);
-  const evidenceUrl = validateGithubUrl(binding.evidenceUrl);
+  const agentId = safeText(readOwnDataValue(binding, 'agentId'), 120);
+  const taskId = safeText(readOwnDataValue(binding, 'taskId'), 120);
+  const value = safeText(readOwnDataValue(binding, 'value'), 200);
+  const evidenceType = safeText(readOwnDataValue(binding, 'evidenceType'), 80);
+  const evidenceUrl = validateGithubUrl(readOwnDataValue(binding, 'evidenceUrl'));
   if (!agentId || !taskId || !value || !evidenceType || !evidenceUrl) {
     return null;
   }
@@ -153,20 +180,23 @@ function validateEvidenceBinding(binding, expectedAgentId, expectedTaskId, expec
   if (!VALID_EVIDENCE_TYPES.has(evidenceType)) {
     return null;
   }
-  const observedAt = isoMs(binding.observedAt);
-  const expiresAt = isoMs(binding.expiresAt);
+  const observedAt = isoMs(readOwnDataValue(binding, 'observedAt'));
+  const expiresAt = isoMs(readOwnDataValue(binding, 'expiresAt'));
   if (observedAt === null || expiresAt === null || observedAt > expiresAt) {
     return null;
   }
-  if (deriveFreshness(binding.observedAt, binding.expiresAt, nowMs) !== 'CURRENT') {
+  if (deriveFreshness(readOwnDataValue(binding, 'observedAt'), readOwnDataValue(binding, 'expiresAt'), nowMs) !== 'CURRENT') {
+    return null;
+  }
+  if (evidenceType === 'manual' || evidenceType === 'unknown') {
     return null;
   }
   return Object.freeze({
     agentId,
     taskId,
     value,
-    observedAt: binding.observedAt,
-    expiresAt: binding.expiresAt,
+    observedAt: readOwnDataValue(binding, 'observedAt'),
+    expiresAt: readOwnDataValue(binding, 'expiresAt'),
     evidenceUrl,
     evidenceType
   });
@@ -220,9 +250,14 @@ function validateSerializedStatus(raw, nowMs) {
     const providerEvidence = validateEvidenceBinding(row.providerEvidence, agentId, taskId, undefined, nowMs);
     const modelEvidence = validateEvidenceBinding(row.modelEvidence, agentId, taskId, undefined, nowMs);
     const coordinatorEvidence = validateEvidenceBinding(row.coordinatorEvidence, agentId, taskId, row.coordinatorMode, nowMs);
-    const effectiveTaskState = (row.taskState === 'RUNNING' || row.taskState === 'REVIEWING') && freshness !== 'CURRENT' ? 'UNKNOWN' : row.taskState;
-    const effectiveCoordinatorMode = row.coordinatorMode === 'ACTIVE' && (!coordinatorEvidence || coordinatorEvidence.value !== 'ACTIVE') ? 'UNKNOWN' : row.coordinatorMode;
-    const finalCoordinatorMode = freshness !== 'CURRENT' && row.coordinatorMode !== 'UNKNOWN' ? 'UNKNOWN' : effectiveCoordinatorMode;
+    const providerVerified = freshness === 'CURRENT' && providerEvidence ? providerEvidence.value : 'UNKNOWN';
+    const modelVerified = freshness === 'CURRENT' && modelEvidence ? modelEvidence.value : 'UNKNOWN';
+    const effectiveTaskState = row.taskState === 'RUNNING' || row.taskState === 'REVIEWING'
+      ? (freshness === 'CURRENT' && (providerEvidence || modelEvidence) ? row.taskState : 'UNKNOWN')
+      : row.taskState;
+    const effectiveCoordinatorMode = row.coordinatorMode === 'ACTIVE'
+      ? (freshness === 'CURRENT' && coordinatorEvidence && coordinatorEvidence.value === 'ACTIVE' ? row.coordinatorMode : 'UNKNOWN')
+      : row.coordinatorMode;
     const blocker = row.blocker === null || row.blocker === undefined ? null : safeText(row.blocker, 200);
     const nextAction = safeText(row.nextAction, 200);
     if (!nextAction) throw new TypeError('Next action is required');
@@ -238,7 +273,7 @@ function validateSerializedStatus(raw, nowMs) {
       taskId,
       taskLabel,
       taskState: effectiveTaskState,
-      coordinatorMode: finalCoordinatorMode,
+      coordinatorMode: effectiveCoordinatorMode,
       providerRequested,
       providerVerified,
       modelRequested,
