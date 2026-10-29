@@ -4,6 +4,7 @@ import {createM11CoordinatorGithubReadApi} from '../scripts/autonomy/m11-coordin
 import {collectExactPair, validateWorkflowJobs} from '../scripts/autonomy/m11-coordinator-collector.mjs';
 import {runReviewCoordinator} from '../scripts/autonomy/m11-coordinator-review.mjs';
 import {createCoordinatorStateStore} from '../scripts/autonomy/m11-coordinator-state-store.mjs';
+import {REQUIRED_REVIEW_PARTS} from '../scripts/autonomy/m11-event-coordinator.mjs';
 
 const REPOSITORY = 'Achi1984/meridian';
 const PR = 973;
@@ -13,45 +14,66 @@ const RUN_ATTEMPT = 1;
 const HEAD = 'a'.repeat(40);
 const BASE = 'b'.repeat(40);
 const START = 1700000000000;
-const END = START + 86400000;
+const PILOT_END = START + 86400000;
+const AUTH_END = START + 600000;
+const IDENTITY = Object.freeze({
+  provider: 'claude',
+  agent: 'test-reviewer',
+  model: 'offline-fixture',
+  transport: 'injected'
+});
 
-function credentials(expiresAtMs = START + 10000) {
+function makeCredentials({expiresAtMs = AUTH_END} = {}) {
+  let evidence = {
+    host: 'api.github.com',
+    scheme: 'https',
+    tls: true,
+    principal: 'synthetic-test-principal',
+    evidenceId: 'synthetic-auth-evidence-001',
+    verifiedAtMs: START,
+    expiresAtMs
+  };
   return {
     getAuthorizationHeader: () => 'synthetic-test-token',
-    getTrustedAuthEvidence: () => ({
-      host: 'api.github.com',
-      scheme: 'https',
-      tls: true,
-      principal: 'synthetic-test-principal',
-      evidenceId: 'synthetic-evidence-123',
-      verifiedAtMs: START,
-      expiresAtMs
-    })
+    getTrustedAuthEvidence: () => evidence,
+    replaceEvidence(value) { evidence = value; }
   };
 }
 
-function response(url, value) {
+function response(url, value, {onBodyRead = () => {}, headers = {}} = {}) {
   const body = typeof value === 'string' ? value : JSON.stringify(value);
   const encoder = new TextEncoder();
   return {
     status: 200,
     url: url.toString(),
-    headers: new Headers(),
+    headers: new Headers(headers),
     body: new ReadableStream({
       start(controller) {
         controller.enqueue(encoder.encode(body));
+        onBodyRead();
         controller.close();
       }
     })
   };
 }
 
-function makeHarness({prHead = HEAD, authExpiresAt = START + 10000} = {}) {
+function makeHarness({
+  clock = {value: START + 100},
+  prHead = HEAD,
+  run = {},
+  runTotalByPage = [1],
+  jobTotalByPage = [1],
+  expireOnPath = null
+} = {}) {
+  const credentials = makeCredentials();
   const calls = [];
   const comparePath = `/repos/${REPOSITORY}/compare/${BASE}...${HEAD}`;
   const fetchImpl = async (url, options) => {
     const requestUrl = new URL(url);
     calls.push({path: requestUrl.pathname, method: options.method});
+    const expire = () => {
+      if (expireOnPath === requestUrl.pathname) clock.value = credentials.getTrustedAuthEvidence().expiresAtMs;
+    };
     if (requestUrl.pathname === `/repos/${REPOSITORY}/actions/runs/${RUN_ID}`) {
       return response(requestUrl, {
         id: RUN_ID,
@@ -65,8 +87,9 @@ function makeHarness({prHead = HEAD, authExpiresAt = START + 10000} = {}) {
         head_sha: HEAD,
         pull_requests: [{number: PR, base: {sha: BASE}, head: {sha: HEAD}}],
         actor: {login: 'Achi1984'},
-        triggering_actor: {login: 'Achi1984'}
-      });
+        triggering_actor: {login: 'Achi1984'},
+        ...run
+      }, {onBodyRead: expire});
     }
     if (requestUrl.pathname === `/repos/${REPOSITORY}/pulls/${PR}`) {
       return response(requestUrl, {
@@ -75,11 +98,11 @@ function makeHarness({prHead = HEAD, authExpiresAt = START + 10000} = {}) {
         changed_files: 1,
         head: {sha: prHead, repo: {full_name: REPOSITORY, fork: false}},
         base: {sha: BASE, repo: {full_name: REPOSITORY}}
-      });
+      }, {onBodyRead: expire});
     }
     if (requestUrl.pathname === comparePath) {
       if (options.headers.accept === 'application/vnd.github.v3.diff') {
-        return response(requestUrl, `diff --git a/example.js b/example.js\n+${HEAD}`);
+        return response(requestUrl, `diff --git a/example.js b/example.js\n+${HEAD}`, {onBodyRead: expire});
       }
       return response(requestUrl, {
         base_commit: {sha: BASE},
@@ -87,71 +110,121 @@ function makeHarness({prHead = HEAD, authExpiresAt = START + 10000} = {}) {
         total_commits: 1,
         commits: [{sha: HEAD}],
         files: [{filename: 'example.js', patch: '@@ -0,0 +1 @@'}]
-      });
+      }, {onBodyRead: expire});
     }
     if (requestUrl.pathname === `/repos/${REPOSITORY}/actions/workflows/${WORKFLOW_ID}/runs`) {
+      const page = Number(requestUrl.searchParams.get('page'));
+      const totalCount = runTotalByPage[Math.min(page - 1, runTotalByPage.length - 1)];
+      const hasNext = page < runTotalByPage.length;
       return response(requestUrl, {
+        total_count: totalCount,
         workflow_runs: [{
           id: RUN_ID,
           repository: {full_name: REPOSITORY},
-          workflow_id: WORKFLOW_ID,
+          workflow_id: run.workflow_id ?? WORKFLOW_ID,
           run_number: 20,
-          run_attempt: RUN_ATTEMPT,
+          run_attempt: run.run_attempt ?? RUN_ATTEMPT,
           pull_requests: [{number: PR}]
         }]
+      }, {
+        onBodyRead: expire,
+        headers: hasNext
+          ? {link: `<https://api.github.com${requestUrl.pathname}?page=${page + 1}>; rel="next"`}
+          : {}
       });
     }
-    if (new RegExp(`^/repos/${REPOSITORY}/actions/runs/${RUN_ID}/attempts/\\d+/jobs$`)
-      .test(requestUrl.pathname)) {
+    const runAttemptPath = new RegExp(
+      `^/repos/${REPOSITORY}/actions/runs/${RUN_ID}/attempts/(\\d+)$`
+    );
+    const attemptMatch = runAttemptPath.exec(requestUrl.pathname);
+    if (attemptMatch) {
       return response(requestUrl, {
+        id: RUN_ID,
+        run_attempt: Number(attemptMatch[1]),
+        workflow_id: run.workflow_id ?? WORKFLOW_ID,
+        path: '.github/workflows/backend-safety.yml@refs/heads/main',
+        repository: {full_name: REPOSITORY}
+      }, {onBodyRead: expire});
+    }
+    const jobsPath = new RegExp(
+      `^/repos/${REPOSITORY}/actions/runs/${RUN_ID}/attempts/(\\d+)/jobs$`
+    );
+    const jobsMatch = jobsPath.exec(requestUrl.pathname);
+    if (jobsMatch) {
+      const attempt = Number(jobsMatch[1]);
+      const page = Number(requestUrl.searchParams.get('page'));
+      return response(requestUrl, {
+        total_count: jobTotalByPage[Math.min(page - 1, jobTotalByPage.length - 1)],
         jobs: [{
           id: 81,
           name: 'syntax',
           run_id: RUN_ID,
-          run_attempt: RUN_ATTEMPT,
+          run_attempt: attempt,
           status: 'completed',
           conclusion: 'success',
           steps: [{name: 'Research and auth regression tests', status: 'completed', conclusion: 'success'}]
         }]
+      }, {
+        onBodyRead: expire,
+        headers: page < jobTotalByPage.length
+          ? {link: `<https://api.github.com${requestUrl.pathname}?page=${page + 1}>; rel="next"`}
+          : {}
       });
     }
     throw new Error(`Unexpected request path: ${requestUrl.pathname}`);
   };
   const api = createM11CoordinatorGithubReadApi({
     fetchImpl,
-    credentials: credentials(authExpiresAt),
-    now: () => START + 100,
+    credentials,
+    now: () => clock.value,
     defaultDeadlineMs: 1000
   });
-  return {api, calls};
+  return {api, calls, clock, credentials};
 }
 
-function collect(api) {
+function collectionConfig() {
+  return {
+    enabled: true,
+    repository: REPOSITORY,
+    pullRequests: [PR],
+    actors: ['Achi1984'],
+    startsAt: START,
+    expiresAt: PILOT_END,
+    maxPages: 5,
+    maxRuntimeMs: 1000
+  };
+}
+
+function collect(api, {attempt = RUN_ATTEMPT, now = () => START + 100} = {}) {
   return collectExactPair({
     hint: {
       eventName: 'workflow_run',
       repository: REPOSITORY,
       workflowRunId: RUN_ID,
-      workflowRunAttempt: RUN_ATTEMPT
+      workflowRunAttempt: attempt
     },
-    config: {
-      enabled: true,
-      repository: REPOSITORY,
-      pullRequests: [PR],
-      actors: ['Achi1984'],
-      startsAt: START,
-      expiresAt: END,
-      maxPages: 5,
-      maxRuntimeMs: 1000
-    },
+    config: collectionConfig(),
     api,
-    now: () => START + 100
+    now
   });
 }
 
-class CountingStateBackend {
+function reviewResult(reviewRequestId) {
+  return {
+    reviewRequestId,
+    sessionId: 'offline-review-session',
+    reviewer: {...IDENTITY},
+    coverageParts: [...REQUIRED_REVIEW_PARTS],
+    verdict: 'GREEN_LIGHT',
+    complete: true,
+    truncated: false,
+    turnLimit: false,
+    summary: 'Synthetic composition result.'
+  };
+}
+
+class AtomicMemoryBackend {
   constructor() {
-    this.calls = [];
     this.capabilities = {
       immutableCommits: true,
       validatedRevisionChain: true,
@@ -160,94 +233,270 @@ class CountingStateBackend {
       atomicPacketQuota: true,
       atomicExpectedOidCAS: true
     };
+    this.snapshot = {revision: 0, oid: 'root', chainValid: true};
+    this.claims = new Map();
+    this.commits = new Map();
+    this.nextCommit = 0;
   }
 
-  async readSnapshot() {
-    this.calls.push('readSnapshot');
-    return {revision: 0, oid: 'root', chainValid: true};
+  async readSnapshot() { return structuredClone(this.snapshot); }
+
+  async createOnlyClaim(input) {
+    if (input.maxActiveClaims !== 1 || input.maxPackets !== 3) return {status: 'INVALID_LIMIT'};
+    if (this.claims.has(input.executionKey)) return {status: 'EXISTS'};
+    if ([...this.claims.values()].some(claim => claim.status !== 'COMMITTED')) return {status: 'BUSY'};
+    if (input.expectedRevision !== this.snapshot.revision || input.expectedOid !== this.snapshot.oid) {
+      return {status: 'STALE_EXPECTATION'};
+    }
+    if (this.claims.size >= input.maxPackets) return {status: 'BUDGET_EXHAUSTED'};
+    const claimId = `claim-${this.claims.size + 1}`;
+    this.claims.set(input.executionKey, {
+      status: 'CLAIMED', lastStage: 'CLAIMED', claimId, ...input
+    });
+    return {status: 'CREATED', claimId};
   }
-  async createOnlyClaim() { this.calls.push('createOnlyClaim'); return {status: 'CREATED', claimId: 'test-claim'}; }
-  async createImmutableCommit() { this.calls.push('createImmutableCommit'); return null; }
-  async compareAndSwapRef() { this.calls.push('compareAndSwapRef'); return {status: 'CONFLICT'}; }
-  async readClaim() { this.calls.push('readClaim'); return null; }
+
+  async createImmutableCommit(input) {
+    const oid = `commit-${++this.nextCommit}`;
+    this.commits.set(oid, structuredClone(input));
+    return {
+      oid,
+      parentOid: input.parentOid,
+      revision: input.revision,
+      commitNonce: input.commitNonce
+    };
+  }
+
+  async compareAndSwapRef(input) {
+    const claim = this.claims.get(input.executionKey);
+    const current = this.snapshot;
+    const commit = this.commits.get(input.newOid);
+    if (!claim || claim.actionKey !== input.actionKey || claim.claimId !== input.claimId
+      || current.oid !== input.expectedOid || current.revision !== input.expectedRevision
+      || commit?.parentOid !== current.oid || commit?.revision !== input.newRevision) {
+      return {status: 'CONFLICT'};
+    }
+    current.oid = input.newOid;
+    current.revision = input.newRevision;
+    const transition = commit.transition;
+    claim.status = transition.kind === 'UNKNOWN' ? 'UNKNOWN'
+      : transition.kind === 'RECEIPT_DELIVERED' ? 'COMMITTED'
+        : transition.kind === 'RECEIPT_POSTING' ? 'RECEIPT_POSTING' : 'REVIEWED';
+    claim.lastStage = transition.stage || transition.kind;
+    if (transition.kind === 'RECEIPT_DELIVERED') claim.receiptId = transition.receiptId;
+    return {status: 'COMMITTED', oid: input.newOid};
+  }
+
+  async readClaim(executionKey) { return this.claims.get(executionKey) || null; }
 }
 
-test('real adapter stays blocked at collector pagination and cannot reach review or state', async () => {
-  const {api, calls} = makeHarness();
-  const collected = await collect(api);
-
-  assert.equal(collected.status, 'BLOCKED');
-  assert.equal(collected.reason, 'RUN_PAGINATION_INCOMPLETE');
-  assert.ok(calls.some(call => call.path.endsWith(`/actions/workflows/${WORKFLOW_ID}/runs`)));
-  assert.equal(calls.some(call => call.path.endsWith(`/attempts/${RUN_ATTEMPT}/jobs`)), false);
-  assert.ok(calls.every(call => call.method === 'GET'));
-
-  const runPage = await api.listWorkflowRuns({repository: REPOSITORY, workflowId: WORKFLOW_ID, page: 1});
-  assert.equal(Object.hasOwn(runPage, 'totalCount'), false);
-
-  const jobPage = await api.listWorkflowJobs({
-    repository: REPOSITORY, runId: RUN_ID, runAttempt: RUN_ATTEMPT, page: 1
-  });
-  assert.deepEqual(jobPage.items[0], {id: 81, status: 'completed', conclusion: 'success'});
-  assert.equal(validateWorkflowJobs(jobPage.items, {
-    runId: RUN_ID, runAttempt: RUN_ATTEMPT, workflowId: WORKFLOW_ID
-  }), false);
-  const anotherAttempt = await api.listWorkflowJobs({
-    repository: REPOSITORY, runId: RUN_ID, runAttempt: RUN_ATTEMPT + 1, page: 1
-  });
-  assert.equal(calls.at(-1).path.endsWith(`/attempts/${RUN_ATTEMPT + 1}/jobs`), true);
-  assert.equal(Object.hasOwn(anotherAttempt.items[0], 'runAttempt'), false);
-
-  const backend = new CountingStateBackend();
-  const store = createCoordinatorStateStore({backend, enabled: true});
-  let reviewerCalls = 0;
-  let receiptCalls = 0;
-  const review = await runReviewCoordinator({
+function createCoordinator({collected, store, revalidate, reviewer, postOnce, now = () => START + 100}) {
+  return runReviewCoordinator({
     enabled: true,
     collected,
     store,
-    reviewer: async () => { reviewerCalls++; },
-    reviewerIdentity: {provider: 'claude', agent: 'test-agent', model: 'test-model', transport: 'injected'},
+    reviewerIdentity: IDENTITY,
     capabilityEvidence: {
       state: 'ENABLED',
-      provider: 'claude',
-      agent: 'test-agent',
-      model: 'test-model',
-      transport: 'injected',
+      ...IDENTITY,
       observedAt: START,
-      expiresAt: END
+      expiresAt: PILOT_END
     },
-    revalidate: async () => collected,
+    revalidate,
+    reviewer,
     receipt: {
-      postOnce: async () => { receiptCalls++; },
-      lookupByActionKey: async () => { receiptCalls++; }
+      postOnce,
+      lookupByActionKey: async () => ({status: 'NOT_FOUND', complete: true, receiptIds: []})
     },
-    now: () => START + 100,
-    expiresAt: END
+    now,
+    expiresAt: PILOT_END
   });
-  assert.equal(review.status, 'WAITING');
-  assert.equal(review.reason, 'UNVERIFIED_OR_EXPIRED_CI_COLLECTION');
-  assert.equal(reviewerCalls, 0);
-  assert.equal(receiptCalls, 0);
-  assert.deepEqual(backend.calls, []);
+}
+
+test('real adapter to collector to review/state/receipt composition succeeds with bound auth evidence', async () => {
+  const harness = makeHarness();
+  const collected = await collect(harness.api);
+  assert.equal(collected.status, 'READY');
+  assert.deepEqual(collected.provenance.authenticationEvidence, harness.api.authenticationEvidence);
+  assert.equal(Object.isFrozen(collected.provenance.authenticationEvidence), true);
+  assert.equal(collected.expiresAt, START + 300100);
+
+  const backend = new AtomicMemoryBackend();
+  const store = createCoordinatorStateStore({backend, enabled: true});
+  let revalidations = 0;
+  let reviewerCalls = 0;
+  let receiptCalls = 0;
+  const result = await createCoordinator({
+    collected,
+    store,
+    revalidate: async ({expected}) => {
+      revalidations++;
+      assert.deepEqual(expected.authenticationEvidence, collected.provenance.authenticationEvidence);
+      return collect(harness.api);
+    },
+    reviewer: async input => {
+      reviewerCalls++;
+      return reviewResult(input.reviewRequestId);
+    },
+    postOnce: async () => {
+      receiptCalls++;
+      return {status: 'CREATED', receiptId: 'synthetic-comment-id'};
+    }
+  });
+  assert.equal(result.status, 'PROPOSED', result.reason);
+  assert.equal(revalidations, 3);
+  assert.equal(reviewerCalls, 1);
+  assert.equal(receiptCalls, 1);
+  assert.equal(backend.snapshot.revision, 3);
+  assert.equal(backend.claims.get(collected.executionKey).receiptId, 'synthetic-comment-id');
+  assert.ok(harness.calls.every(call => call.method === 'GET'));
 });
 
-test('actual adapter rejects stale pair and expired authentication evidence', async () => {
+test('exact run, attempt, workflow, pagination totals, and job inventory remain required', async () => {
+  const wrongAttempt = await collect(makeHarness({run: {run_attempt: 2}}).api);
+  assert.equal(wrongAttempt.reason, 'RUN_IDENTITY_OR_ACTOR_MISMATCH');
+  const wrongWorkflow = await collect(makeHarness({run: {workflow_id: 5}}).api);
+  assert.equal(wrongWorkflow.reason, 'RUN_IDENTITY_OR_ACTOR_MISMATCH');
+  const wrongHint = await collect(makeHarness().api, {attempt: 2});
+  assert.equal(wrongHint.reason, 'RUN_IDENTITY_OR_ACTOR_MISMATCH');
+  const malformedTotal = await collect(makeHarness({runTotalByPage: ['1']}).api);
+  assert.equal(malformedTotal.reason, 'AUTHORITATIVE_READ_FAILED');
+  const truncated = await collect(makeHarness({runTotalByPage: [2]}).api);
+  assert.equal(truncated.reason, 'RUN_PAGINATION_INCOMPLETE');
+  const changedTotal = await collect(makeHarness({runTotalByPage: [2, 1]}).api);
+  assert.equal(changedTotal.reason, 'RUN_PAGINATION_INCOMPLETE');
+  const truncatedJobs = await collect(makeHarness({jobTotalByPage: [2]}).api);
+  assert.equal(truncatedJobs.reason, 'JOB_PAGINATION_INCOMPLETE');
   const stale = await collect(makeHarness({prHead: 'c'.repeat(40)}).api);
-  assert.equal(stale.status, 'BLOCKED');
   assert.equal(stale.reason, 'PULL_REQUEST_PAIR_OR_FORK_MISMATCH');
+});
 
-  const expiredHarness = makeHarness({authExpiresAt: START + 50});
-  const expired = await collect(expiredHarness.api);
-  assert.equal(expired.status, 'BLOCKED');
-  assert.equal(expired.reason, 'AUTHENTICATED_READ_API_REQUIRED');
-  assert.equal(expiredHarness.calls.length, 0);
+test('auth expiry during a response body blocks collection without exposing reviewer or store', async () => {
+  const harness = makeHarness({
+    expireOnPath: `/repos/${REPOSITORY}/actions/workflows/${WORKFLOW_ID}/runs`
+  });
+  const collected = await collect(harness.api);
+  assert.equal(collected.status, 'BLOCKED');
+  assert.equal(collected.reason, 'AUTHORITATIVE_READ_FAILED');
+
+  const backend = new AtomicMemoryBackend();
+  const store = createCoordinatorStateStore({backend, enabled: true});
+  let reviewerCalls = 0;
+  let receiptCalls = 0;
+  const result = await createCoordinator({
+    collected,
+    store,
+    revalidate: async () => collected,
+    reviewer: async () => { reviewerCalls++; return null; },
+    postOnce: async () => { receiptCalls++; return {status: 'CREATED', receiptId: 'never'}; }
+  });
+  assert.equal(result.reason, 'UNVERIFIED_OR_EXPIRED_CI_COLLECTION');
+  assert.equal(reviewerCalls, 0);
+  assert.equal(receiptCalls, 0);
+  assert.equal(backend.claims.size, 0);
+});
+
+test('auth evidence identity change and expiry at claim, review, or receipt revalidation stop promotion', async () => {
+  const changedHarness = makeHarness();
+  const collected = await collect(changedHarness.api);
+  changedHarness.credentials.replaceEvidence({
+    ...changedHarness.api.authenticationEvidence,
+    evidenceId: 'synthetic-auth-evidence-002'
+  });
+  const changedBackend = new AtomicMemoryBackend();
+  const changedStore = createCoordinatorStateStore({backend: changedBackend, enabled: true});
+  let changedReviewerCalls = 0;
+  const changed = await createCoordinator({
+    collected,
+    store: changedStore,
+    revalidate: async () => collect(changedHarness.api),
+    reviewer: async input => { changedReviewerCalls++; return reviewResult(input.reviewRequestId); },
+    postOnce: async () => ({status: 'CREATED', receiptId: 'never'})
+  });
+  assert.equal(changed.reason, 'STALE_OR_UNKNOWN_BEFORE_CLAIM');
+  assert.equal(changedReviewerCalls, 0);
+  assert.equal(changedBackend.claims.size, 0);
+
+  for (const expirationBoundary of ['claim', 'review', 'receipt']) {
+    const clock = {value: START + 100};
+    const harness = makeHarness({clock});
+    const evidence = harness.api.authenticationEvidence;
+    const shortened = {...evidence, expiresAtMs: START + 1000};
+    harness.credentials.replaceEvidence(shortened);
+    const candidate = await collect(harness.api, {now: () => clock.value});
+    assert.equal(candidate.status, 'READY');
+    assert.equal(candidate.expiresAt, shortened.expiresAtMs);
+    const backend = new AtomicMemoryBackend();
+    const store = createCoordinatorStateStore({backend, enabled: true});
+    let validation = 0;
+    let reviewerCalls = 0;
+    let receiptCalls = 0;
+    const result = await createCoordinator({
+      collected: candidate,
+      store,
+      now: () => clock.value,
+      revalidate: async () => {
+        validation++;
+        if ((expirationBoundary === 'claim' && validation === 1)
+          || (expirationBoundary === 'review' && validation === 2)
+          || (expirationBoundary === 'receipt' && validation === 3)) {
+          clock.value = shortened.expiresAtMs;
+        }
+        return collect(harness.api, {now: () => clock.value});
+      },
+      reviewer: async input => { reviewerCalls++; return reviewResult(input.reviewRequestId); },
+      postOnce: async () => { receiptCalls++; return {status: 'CREATED', receiptId: 'too-late'}; }
+    });
+    assert.equal(result.status, expirationBoundary === 'claim' ? 'WAITING' : 'UNKNOWN');
+    assert.equal(result.reason, expirationBoundary === 'claim'
+      ? 'STALE_OR_UNKNOWN_BEFORE_CLAIM'
+      : expirationBoundary === 'review' ? 'STALE_OR_UNKNOWN_BEFORE_REVIEW' : 'STALE_OR_UNKNOWN_BEFORE_RECEIPT');
+    assert.equal(reviewerCalls, expirationBoundary === 'claim' || expirationBoundary === 'review' ? 0 : 1);
+    assert.equal(receiptCalls, 0);
+    if (expirationBoundary === 'claim') {
+      assert.equal(backend.claims.size, 0);
+    } else {
+      assert.notEqual(backend.claims.get(candidate.executionKey).status, 'COMMITTED');
+    }
+  }
+});
+
+test('receipt UNKNOWN is one-shot and replay does not duplicate reviewer or receipt delivery', async () => {
+  const harness = makeHarness();
+  const collected = await collect(harness.api);
+  const backend = new AtomicMemoryBackend();
+  const store = createCoordinatorStateStore({backend, enabled: true});
+  let reviewerCalls = 0;
+  let receiptCalls = 0;
+  const input = {
+    collected,
+    store,
+    revalidate: async () => collect(harness.api),
+    reviewer: async reviewInput => {
+      reviewerCalls++;
+      return reviewResult(reviewInput.reviewRequestId);
+    },
+    postOnce: async () => {
+      receiptCalls++;
+      throw new Error('synthetic unknown delivery result');
+    }
+  };
+  const unknown = await createCoordinator(input);
+  assert.equal(unknown.status, 'UNKNOWN');
+  assert.equal(unknown.reason, 'RECEIPT_DELIVERY_UNKNOWN');
+  assert.equal(reviewerCalls, 1);
+  assert.equal(receiptCalls, 1);
+  assert.equal(backend.claims.get(collected.executionKey).status, 'UNKNOWN');
+  const duplicate = await createCoordinator(input);
+  assert.equal(duplicate.reason, 'ALREADY_CLAIMED');
+  assert.equal(reviewerCalls, 1);
+  assert.equal(receiptCalls, 1);
 });
 
 test('actual adapter propagates caller abort without promoting evidence', async () => {
   const controller = new AbortController();
   const api = createM11CoordinatorGithubReadApi({
-    credentials: credentials(),
+    credentials: makeCredentials(),
     now: () => START + 100,
     defaultDeadlineMs: 1000,
     fetchImpl: (_url, {signal}) => new Promise((_resolve, reject) => {

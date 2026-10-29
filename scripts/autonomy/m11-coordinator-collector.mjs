@@ -9,6 +9,7 @@ const MAX_ITEMS = 500;
 const MAX_RUNTIME_MS = 10000;
 const MAX_DIFF_BYTES = 262144;
 const COLLECTION_TTL_MS = 300000;
+const MAX_AUTH_EVIDENCE_TTL_MS = 900000;
 const REQUIRED_JOBS = Object.freeze([
   Object.freeze({name: 'syntax', required: true, requiredSteps: Object.freeze([
     'Research and auth regression tests'
@@ -46,6 +47,27 @@ function validPage(page) {
     && Array.isArray(page.items) && typeof page.hasNextPage === 'boolean'
     && Number.isSafeInteger(page.totalCount) && page.totalCount >= 0
     && page.totalCount <= MAX_ITEMS && page.items.length <= MAX_ITEMS;
+}
+
+function validAuthenticationEvidence(value, timestamp) {
+  const keys = ['evidenceId', 'principal', 'host', 'scheme', 'tls', 'verifiedAtMs', 'expiresAtMs'];
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    && Object.getPrototypeOf(value) === Object.prototype && Object.isFrozen(value)
+    && hasExactKeys(value, keys)
+    && typeof value.evidenceId === 'string' && value.evidenceId.length >= 8
+    && typeof value.principal === 'string' && value.principal.length > 0
+    && value.host === 'api.github.com' && value.scheme === 'https' && value.tls === true
+    && Number.isSafeInteger(value.verifiedAtMs) && value.verifiedAtMs > 0
+    && value.verifiedAtMs <= timestamp
+    && Number.isSafeInteger(value.expiresAtMs) && value.expiresAtMs > timestamp
+    && value.expiresAtMs - value.verifiedAtMs <= MAX_AUTH_EVIDENCE_TTL_MS;
+}
+
+function sameAuthenticationEvidence(left, right) {
+  return left !== null && typeof left === 'object' && right !== null && typeof right === 'object'
+    && left.evidenceId === right.evidenceId && left.principal === right.principal
+    && left.host === right.host && left.scheme === right.scheme && left.tls === right.tls
+    && left.verifiedAtMs === right.verifiedAtMs && left.expiresAtMs === right.expiresAtMs;
 }
 
 async function readAllPages(readPage, maxPages, deadline) {
@@ -138,6 +160,15 @@ export async function collectExactPair({hint, config, api, now = Date.now}) {
     || typeof api.getPullRequest !== 'function' || typeof api.getPullRequestDiff !== 'function'
     || typeof api.listWorkflowRuns !== 'function'
     || typeof api.listWorkflowJobs !== 'function') return fail('AUTHENTICATED_READ_API_REQUIRED');
+  let initialAuthenticationEvidence;
+  try {
+    initialAuthenticationEvidence = api.authenticationEvidence;
+  } catch {
+    return fail('AUTHENTICATED_READ_API_REQUIRED');
+  }
+  if (!validAuthenticationEvidence(initialAuthenticationEvidence, timestamp)) {
+    return fail('AUTHENTICATED_READ_API_REQUIRED');
+  }
 
   const deadline = performance.now() + config.maxRuntimeMs;
   try {
@@ -262,6 +293,17 @@ export async function collectExactPair({hint, config, api, now = Date.now}) {
       return fail(run.conclusion === 'action_required' ? 'ACTION_REQUIRED' : 'CI_NOT_SUCCESSFUL');
     }
     if (performance.now() > deadline) return fail('TIME_BUDGET_EXHAUSTED');
+    const finalTimestamp = now();
+    let finalAuthenticationEvidence;
+    try {
+      finalAuthenticationEvidence = api.authenticationEvidence;
+    } catch {
+      return fail('AUTHENTICATION_EVIDENCE_UNAVAILABLE');
+    }
+    if (!Number.isSafeInteger(finalTimestamp)
+      || !validAuthenticationEvidence(finalAuthenticationEvidence, finalTimestamp)
+      || !sameAuthenticationEvidence(initialAuthenticationEvidence, finalAuthenticationEvidence)
+      || api.authenticated !== true) return fail('AUTHENTICATION_EVIDENCE_CHANGED_OR_EXPIRED');
 
     const logicalActionKey = collectionDigest([
       REPOSITORY, pullRequestNumber, run.headSha, run.baseSha, 'CI_TO_INDEPENDENT_REVIEW'
@@ -284,12 +326,14 @@ export async function collectExactPair({hint, config, api, now = Date.now}) {
       triggeringActor: run.triggeringActor,
       selectionRevision: run.runNumber,
       collectedAt: timestamp,
-      expiresAt: Math.min(config.expiresAt, timestamp + COLLECTION_TTL_MS),
+      expiresAt: Math.min(config.expiresAt, timestamp + COLLECTION_TTL_MS,
+        initialAuthenticationEvidence.expiresAtMs),
       provenance: Object.freeze({
         kind: 'AUTHENTICATED_READ_ADAPTER',
         workflowId: run.workflowId,
         runId: run.id,
-        runAttempt: run.runAttempt
+        runAttempt: run.runAttempt,
+        authenticationEvidence: initialAuthenticationEvidence
       }),
       diff: diff.text,
       diffDigest: createHash('sha256').update(diff.text).digest('hex'),
