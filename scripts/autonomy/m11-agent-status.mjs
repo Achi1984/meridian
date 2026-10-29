@@ -71,6 +71,17 @@ function readOwnDataValue(obj, key) {
   return descriptor.value;
 }
 
+function readRequiredOwnData(obj, key, label) {
+  if (!isPlainObject(obj)) {
+    throw new TypeError(`${label} must be a plain object`);
+  }
+  const descriptor = Object.getOwnPropertyDescriptor(obj, key);
+  if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value') || descriptor.enumerable !== true || descriptor.get !== undefined || descriptor.set !== undefined) {
+    throw new TypeError(`${label} must be an own enumerable data property`);
+  }
+  return descriptor.value;
+}
+
 function hasExactDataKeys(obj, expectedKeys) {
   if (!isPlainObject(obj) && !Array.isArray(obj)) {
     return false;
@@ -406,8 +417,16 @@ export function normalizeM11AgentStatus(input, options = {}) {
 
   const schemaValue = schemaDesc.value;
   const rowsValue = rowsDesc.value;
-  const statusValue = Object.prototype.hasOwnProperty.call(input, 'status') ? readOwnDataValue(input, 'status') : undefined;
-  const freshnessValue = Object.prototype.hasOwnProperty.call(input, 'freshness') ? readOwnDataValue(input, 'freshness') : undefined;
+  const statusDesc = Object.getOwnPropertyDescriptor(input, 'status');
+  const freshnessDesc = Object.getOwnPropertyDescriptor(input, 'freshness');
+  const statusValue = Object.prototype.hasOwnProperty.call(input, 'status') ? readRequiredOwnData(input, 'status', 'M11 agent status status') : undefined;
+  const freshnessValue = Object.prototype.hasOwnProperty.call(input, 'freshness') ? readRequiredOwnData(input, 'freshness', 'M11 agent status freshness') : undefined;
+  if (Object.prototype.hasOwnProperty.call(input, 'status') && (!statusDesc || !Object.prototype.hasOwnProperty.call(statusDesc, 'value') || statusDesc.enumerable !== true || statusDesc.get !== undefined || statusDesc.set !== undefined)) {
+    throw new TypeError('M11 agent status status must be a plain data property');
+  }
+  if (Object.prototype.hasOwnProperty.call(input, 'freshness') && (!freshnessDesc || !Object.prototype.hasOwnProperty.call(freshnessDesc, 'value') || freshnessDesc.enumerable !== true || freshnessDesc.get !== undefined || freshnessDesc.set !== undefined)) {
+    throw new TypeError('M11 agent status freshness must be a plain data property');
+  }
   if (schemaValue !== 1) {
     throw new TypeError('Unsupported M11 agent status schemaVersion');
   }

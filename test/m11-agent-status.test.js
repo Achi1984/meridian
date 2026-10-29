@@ -271,6 +271,22 @@ test('browser revalidation recomputes stale visible claims and rejects descripto
   assert.throws(() => normalizeM11AgentStatus(getterObject, { now: () => NOW }), { name: 'TypeError' });
   assert.equal(schemaGetterCount, 0);
 
+  let statusGetterCount = 0;
+  const getterStatusObject = {
+    schemaVersion: 1,
+    get status() {
+      statusGetterCount += 1;
+      return 'READY';
+    },
+    get freshness() {
+      statusGetterCount += 1;
+      return 'CURRENT';
+    },
+    rows: [valid]
+  };
+  assert.throws(() => normalizeM11AgentStatus(getterStatusObject, { now: () => NOW }), { name: 'TypeError' });
+  assert.equal(statusGetterCount, 0);
+
   let evidenceGetterCount = 0;
   const evilEvidence = {
     get value() {

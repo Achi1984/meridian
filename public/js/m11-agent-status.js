@@ -64,6 +64,17 @@ function hasExactDataKeys(obj, expectedKeys) {
   return true;
 }
 
+function readRequiredOwnData(obj, key, label) {
+  if (!isPlainObject(obj)) {
+    throw new TypeError(`${label} must be a plain object`);
+  }
+  const descriptor = Object.getOwnPropertyDescriptor(obj, key);
+  if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value') || descriptor.enumerable !== true || descriptor.get !== undefined || descriptor.set !== undefined) {
+    throw new TypeError(`${label} must be an own enumerable data property`);
+  }
+  return descriptor.value;
+}
+
 function isExactArray(value) {
   if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
     return false;
@@ -219,9 +230,27 @@ function validateSerializedStatus(raw, nowMs) {
   if (!isMinimal && !isSerialized) {
     throw new TypeError('M11 agent status must contain schemaVersion and rows');
   }
+  const schemaDescriptor = Object.getOwnPropertyDescriptor(raw, 'schemaVersion');
+  const rowsDescriptor = Object.getOwnPropertyDescriptor(raw, 'rows');
+  if (!schemaDescriptor || !Object.prototype.hasOwnProperty.call(schemaDescriptor, 'value') || schemaDescriptor.enumerable !== true || schemaDescriptor.get !== undefined || schemaDescriptor.set !== undefined) {
+    throw new TypeError('M11 agent status schemaVersion must be a plain data property');
+  }
+  if (!rowsDescriptor || !Object.prototype.hasOwnProperty.call(rowsDescriptor, 'value') || rowsDescriptor.enumerable !== true || rowsDescriptor.get !== undefined || rowsDescriptor.set !== undefined) {
+    throw new TypeError('M11 agent status rows must be a plain data property');
+  }
   if (raw.schemaVersion !== 1) throw new TypeError('Unsupported M11 agent status schemaVersion');
-  if (raw.status !== undefined && raw.status !== 'READY') throw new TypeError('Invalid M11 agent status status');
-  if (raw.freshness !== undefined && !['CURRENT', 'STALE', 'UNKNOWN'].includes(raw.freshness)) throw new TypeError('Invalid M11 agent status freshness');
+  const statusDescriptor = Object.getOwnPropertyDescriptor(raw, 'status');
+  const freshnessDescriptor = Object.getOwnPropertyDescriptor(raw, 'freshness');
+  const statusValue = Object.prototype.hasOwnProperty.call(raw, 'status') ? readRequiredOwnData(raw, 'status', 'M11 agent status status') : undefined;
+  const freshnessValue = Object.prototype.hasOwnProperty.call(raw, 'freshness') ? readRequiredOwnData(raw, 'freshness', 'M11 agent status freshness') : undefined;
+  if (Object.prototype.hasOwnProperty.call(raw, 'status') && (!statusDescriptor || !Object.prototype.hasOwnProperty.call(statusDescriptor, 'value') || statusDescriptor.enumerable !== true || statusDescriptor.get !== undefined || statusDescriptor.set !== undefined)) {
+    throw new TypeError('M11 agent status status must be a plain data property');
+  }
+  if (Object.prototype.hasOwnProperty.call(raw, 'freshness') && (!freshnessDescriptor || !Object.prototype.hasOwnProperty.call(freshnessDescriptor, 'value') || freshnessDescriptor.enumerable !== true || freshnessDescriptor.get !== undefined || freshnessDescriptor.set !== undefined)) {
+    throw new TypeError('M11 agent status freshness must be a plain data property');
+  }
+  if (statusValue !== undefined && statusValue !== 'READY') throw new TypeError('Invalid M11 agent status status');
+  if (freshnessValue !== undefined && !['CURRENT', 'STALE', 'UNKNOWN'].includes(freshnessValue)) throw new TypeError('Invalid M11 agent status freshness');
   if (!isExactArray(raw.rows) || raw.rows.length === 0 || raw.rows.length > 50) {
     throw new TypeError('M11 agent status rows must be a non-empty array up to 50 items');
   }
