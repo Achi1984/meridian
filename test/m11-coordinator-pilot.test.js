@@ -249,6 +249,9 @@ class AtomicMemoryBackend {
         : commit.transition.kind === 'RECEIPT_DELIVERED' ? 'COMMITTED'
           : commit.transition.kind === 'RECEIPT_POSTING' ? 'RECEIPT_POSTING' : 'REVIEWED';
       claim.lastStage = commit.transition.stage || commit.transition.kind;
+      if (commit.transition.kind === 'RECEIPT_DELIVERED') {
+        claim.receiptId = commit.transition.receiptId;
+      }
       return {status: 'COMMITTED', oid: input.newOid};
     });
   }
@@ -310,6 +313,9 @@ function fakeReviewStore({secondCommit = 'COMMITTED'} = {}) {
         : input.transition.kind === 'RECEIPT_DELIVERED' ? 'COMMITTED'
           : input.transition.kind === 'RECEIPT_POSTING' ? 'RECEIPT_POSTING' : 'REVIEWED';
       durableClaim.lastStage = input.transition.stage || input.transition.kind;
+      if (input.transition.kind === 'RECEIPT_DELIVERED') {
+        durableClaim.receiptId = input.transition.receiptId;
+      }
       return {status: 'COMMITTED', claim: updatedClaim};
     },
     async reconcile(executionKey) {
@@ -688,7 +694,30 @@ test('real state-store composition revalidates each boundary and a duplicate del
   assert.equal(receiptCalls, 1);
   assert.equal(backend.snapshot.revision, 3);
   assert.equal(backend.claims.get(collected.executionKey).status, 'COMMITTED');
+  assert.equal(backend.claims.get(collected.executionKey).receiptId, 'comment-composed');
   assert.equal(typeof store.release, 'undefined');
+
+  const reconcileFound = receiptId => reconcileUnknownReceipt({
+    enabled: true,
+    executionKey: collected.executionKey,
+    store,
+    receipt: receiptAdapter(undefined, async () => ({
+      status: 'FOUND',
+      complete: true,
+      receiptIds: [receiptId]
+    }))
+  });
+  const matchingReceipt = await reconcileFound('comment-composed');
+  assert.equal(matchingReceipt.status, 'APPLIED');
+  assert.equal(matchingReceipt.reason, 'DURABLE_AND_REMOTE_RECEIPT_IDS_MATCH');
+  assert.equal(matchingReceipt.receiptId, 'comment-composed');
+  const conflictingReceipt = await reconcileFound('comment-other');
+  assert.equal(conflictingReceipt.status, 'UNKNOWN');
+  assert.equal(conflictingReceipt.reason, 'DURABLE_RECEIPT_ID_MISMATCH');
+  backend.claims.get(collected.executionKey).receiptId = undefined;
+  const missingDurableReceipt = await reconcileFound('comment-composed');
+  assert.equal(missingDurableReceipt.status, 'UNKNOWN');
+  assert.equal(missingDurableReceipt.reason, 'DURABLE_RECEIPT_ID_MISSING');
 
   const duplicate = await runReviewCoordinator(input);
   assert.equal(duplicate.reason, 'ALREADY_CLAIMED');
@@ -873,6 +902,7 @@ test('crash/unknown before and after a side effect never triggers a blind review
     }))
   });
   assert.equal(reconciledFound.status, 'APPLIED');
+  assert.equal(reconciledFound.reason, 'REMOTE_RECEIPT_FOUND_BEFORE_FINAL_STATE_COMMIT');
   assert.equal(reconciledFound.retryAllowed, false);
   const conflicting = await reconcileUnknownReceipt({
     enabled: true,

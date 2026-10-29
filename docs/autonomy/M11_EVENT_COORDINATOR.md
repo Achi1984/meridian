@@ -305,8 +305,12 @@ credentials.
    truncated, turn-limited, or unbound output remains incomplete/unknown.
    The receipt is marked `RECEIPT_POSTING` before its write. A timeout,
    conflicting durable claim, zero/multiple marker hits, or unknown commit
-   remains `UNKNOWN` and never triggers retry; comments are receipts, not
-   atomic locks.
+   remains `UNKNOWN` and never triggers retry. The final durable transition
+   stores the returned receipt ID; a later remote lookup is settled only when
+   its single ID exactly matches that durable ID. A mismatch or missing durable
+   identity is `UNKNOWN`. A receipt found before the final commit remains a
+   separate pre-final recovery observation and does not claim durable ID
+   agreement. Comments are receipts, not atomic locks.
    Provider/agent/model/transport and session fields bind the result envelope,
    but are only adapter-supplied identity assertions. Capability evidence must
    separately distinguish `DOCUMENTED`, `CONFIGURED`, `EXERCISED`, and

@@ -405,12 +405,26 @@ export async function reconcileUnknownReceipt({
     || (result.status === 'NOT_FOUND' && (!Array.isArray(result.receiptIds) || result.receiptIds.length !== 0))) {
     return Object.freeze({status: 'UNKNOWN', reason: 'REMOTE_RECEIPT_STATE_AMBIGUOUS', retryAllowed: false});
   }
-  if (result.status === 'FOUND'
-    && (claim.lastStage === 'RECEIPT_POSTING' || claim.lastStage === 'RECEIPT_DELIVERY'
-      || claim.lastStage === 'RECEIPT_DELIVERED')) {
+  if (result.status === 'FOUND' && claim.lastStage === 'RECEIPT_DELIVERED') {
+    if (typeof claim.receiptId !== 'string' || claim.receiptId.length === 0
+      || claim.receiptId.length > MAX_ID_BYTES) {
+      return Object.freeze({status: 'UNKNOWN', reason: 'DURABLE_RECEIPT_ID_MISSING', retryAllowed: false});
+    }
+    if (claim.receiptId !== result.receiptIds[0]) {
+      return Object.freeze({status: 'UNKNOWN', reason: 'DURABLE_RECEIPT_ID_MISMATCH', retryAllowed: false});
+    }
     return Object.freeze({
       status: 'APPLIED',
-      reason: 'RECEIPT_AND_DURABLE_CLAIM_AGREE',
+      reason: 'DURABLE_AND_REMOTE_RECEIPT_IDS_MATCH',
+      receiptId: claim.receiptId,
+      retryAllowed: false
+    });
+  }
+  if (result.status === 'FOUND'
+    && (claim.lastStage === 'RECEIPT_POSTING' || claim.lastStage === 'RECEIPT_DELIVERY')) {
+    return Object.freeze({
+      status: 'APPLIED',
+      reason: 'REMOTE_RECEIPT_FOUND_BEFORE_FINAL_STATE_COMMIT',
       receiptId: result.receiptIds[0],
       retryAllowed: false
     });
