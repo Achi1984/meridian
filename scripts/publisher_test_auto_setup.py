@@ -293,6 +293,7 @@ class Command:
         failed = False
         response = bytearray()
         outgoing = b''
+        stdout_eof = False
 
         def consume_frames():
             nonlocal target_pid, result, cleanup_complete, protocol_error
@@ -340,7 +341,6 @@ class Command:
             os.set_blocking(proc.stdout.fileno(), False)
             selector.register(proc.stdin, selectors.EVENT_WRITE)
             selector.register(proc.stdout, selectors.EVENT_READ)
-            eof = False
             while result is None or proc.poll() is None:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
@@ -357,13 +357,13 @@ class Command:
                         part = os.read(key.fd, 65536)
                         if not part:
                             selector.unregister(key.fileobj)
-                            eof = True
+                            stdout_eof = True
                         else:
                             response.extend(part)
                             if len(response) > 1024 * 1024 + 32:
                                 raise ValueError()
                             consume_frames()
-                if eof and (response or result is None):
+                if stdout_eof and (response or result is None):
                     raise ValueError()
             if proc.returncode != 0 or result is None or response or result[0] != 0:
                 raise ValueError('command')
@@ -384,7 +384,7 @@ class Command:
                     except OSError:
                         pass
                 cleanup_deadline = time.monotonic() + 2
-                stdout_open = proc.stdout is not None
+                stdout_open = proc.stdout is not None and not stdout_eof
                 while time.monotonic() < cleanup_deadline:
                     try:
                         for key, _ in selector.select(min(0.05, cleanup_deadline - time.monotonic())):
@@ -395,14 +395,15 @@ class Command:
                                     consume_frames()
                                 else:
                                     selector.unregister(key.fileobj)
+                                    stdout_eof = True
                                     stdout_open = False
-                        if proc.poll() is not None and not stdout_open:
+                        if proc.poll() is not None and stdout_eof:
                             break
                     except BaseException:
                         protocol_error = True
                         break
                 cleanup_complete = (not protocol_error and result is not None and result[0] != 2
-                                    and proc.poll() is not None and not response)
+                                    and proc.poll() is not None and not response and stdout_eof)
                 if proc.poll() is None:
                     if target_pid is not None:
                         try:
@@ -430,7 +431,7 @@ class Command:
                         except BaseException:
                             pass
             selector.close()
-        if not failed and (decoded is None or protocol_error or result is None or response
+        if not failed and (decoded is None or protocol_error or result is None or response or not stdout_eof
                            or result[0] != 0 or proc is None or proc.returncode != 0):
             failed = True
         if failed:

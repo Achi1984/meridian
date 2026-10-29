@@ -381,25 +381,34 @@ class PrivateCommandTests(unittest.TestCase):
             ready_fd = os.open(ready_fifo, os.O_RDWR | os.O_NONBLOCK)
             continue_fd = os.open(continue_fifo, os.O_RDWR | os.O_NONBLOCK)
             ready_seen = threading.Event()
+            advance_deadline = threading.Event()
+            fake_now = [1000.0]
+            real_watchdog = time.perf_counter
             source = ("import os,time\n"
                       "ready=os.open(" + repr(str(ready_fifo)) + ", os.O_WRONLY); os.write(ready,b'R'); os.close(ready)\n"
                       "gate=os.open(" + repr(str(continue_fifo)) + ", os.O_RDONLY); os.read(gate,1); os.close(gate)\n"
                       "time.sleep(30)\n")
+            def fake_monotonic():
+                if advance_deadline.is_set():
+                    fake_now[0] += 0.002
+                return fake_now[0]
             def release_after_ready():
                 readable, _, _ = __import__('select').select([ready_fd], [], [], 3)
                 if readable and os.read(ready_fd, 1) == b'R':
                     ready_seen.set()
                     os.write(continue_fd, b'G')
+                    advance_deadline.set()
             synchronizer = threading.Thread(target=release_after_ready, daemon=True)
-            started = time.monotonic()
+            started = real_watchdog()
             synchronizer.start()
             try:
-                with self.assertRaises(ValueError) as raised:
-                    command.run([sys.executable, '-I', '-c', source], timeout=0.1)
+                with patch.object(self.m.time, 'monotonic', side_effect=fake_monotonic):
+                    with self.assertRaises(ValueError) as raised:
+                        command.run([sys.executable, '-I', '-c', source], timeout=0.1)
                 synchronizer.join(3)
                 self.assertFalse(synchronizer.is_alive())
                 self.assertTrue(ready_seen.is_set())
-                self.assertLess(time.monotonic() - started, 3)
+                self.assertLess(real_watchdog() - started, 3)
             finally:
                 os.close(ready_fd)
                 os.close(continue_fd)
@@ -429,25 +438,32 @@ send(b'P', payload=struct.pack('!I', os.getpid()))
 send(b'R', 1, b'')
 sys.exit(0)
 """
+        state = {'proc': None}
+        original_popen = self.m.subprocess.Popen
+        def capture_popen(*args, **kwargs):
+            process = original_popen(*args, **kwargs)
+            state['proc'] = process
+            return process
         original_selector = self.m.selectors.DefaultSelector
-        class DelayedReadSelector:
+        class ExitBarrierSelector:
             def __init__(self):
                 self.inner = original_selector()
-                self.block_until = time.monotonic() + 0.2
             def register(self, *args, **kwargs): return self.inner.register(*args, **kwargs)
             def unregister(self, *args, **kwargs): return self.inner.unregister(*args, **kwargs)
             def get_map(self): return self.inner.get_map()
             def close(self): return self.inner.close()
             def select(self, timeout=None):
-                if time.monotonic() < self.block_until:
+                process = state['proc']
+                if process is None or process.poll() is None:
                     if timeout and timeout > 0:
                         time.sleep(min(timeout, 0.005))
                     return []
                 return self.inner.select(timeout)
         with patch.object(self.m, '_COMMAND_SUPERVISOR', delayed_receipt), \
-                patch.object(self.m.selectors, 'DefaultSelector', DelayedReadSelector):
+                patch.object(self.m.subprocess, 'Popen', side_effect=capture_popen), \
+                patch.object(self.m.selectors, 'DefaultSelector', ExitBarrierSelector):
             with self.assertRaises(ValueError) as raised:
-                command.run([sys.executable, '-I', '-c', 'pass'], timeout=0.1)
+                command.run([sys.executable, '-I', '-c', 'pass'], timeout=0.2)
         self.assertEqual(str(raised.exception), 'command failed')
         self.assertTrue(raised.exception.cleanup_complete)
 
@@ -508,10 +524,12 @@ sys.exit(0)
         }
         for name, script in scenarios.items():
             with self.subTest(name=name), patch.object(self.m, '_COMMAND_SUPERVISOR', script):
+                started = time.monotonic()
                 with self.assertRaises(ValueError) as raised:
-                    command.run([sys.executable, '-I', '-c', 'pass'], timeout=0.1)
+                    command.run([sys.executable, '-I', '-c', 'pass'], timeout=5)
                 self.assertEqual(str(raised.exception), 'command failed')
                 self.assertFalse(raised.exception.cleanup_complete)
+                self.assertLess(time.monotonic() - started, 2)
 
     def test_late_trailing_data_after_success_receipt_is_rejected(self):
         command = self.m.Command({'PATH': '/usr/bin:/bin'})
@@ -535,6 +553,45 @@ os._exit(0)
                 command.run([sys.executable, '-I', '-c', 'pass'], timeout=0.1)
         self.assertEqual(str(raised.exception), 'command failed')
         self.assertFalse(raised.exception.cleanup_complete)
+
+    def test_success_path_requires_stdout_eof_and_rejects_held_open_pipe(self):
+        command = self.m.Command({'PATH': '/usr/bin:/bin'})
+        with tempfile.TemporaryDirectory() as directory:
+            child_pid = Path(directory) / 'child.pid'
+            held_open = """
+import os, struct, time
+def send(kind, status=0, payload=b''):
+    message = kind + bytes((status,)) + struct.pack('!I', len(payload)) + payload
+    while message:
+        message = message[os.write(1, message):]
+send(b'P', payload=struct.pack('!I', os.getpid()))
+send(b'R', 0, b'ok\\n')
+child = os.fork()
+if child == 0:
+    open({pid!r}, 'w', encoding='ascii').write(str(os.getpid()))
+    time.sleep(30)
+    os._exit(0)
+os._exit(0)
+""".format(pid=str(child_pid))
+            started = time.monotonic()
+            with patch.object(self.m, '_COMMAND_SUPERVISOR', held_open):
+                with self.assertRaises(ValueError) as raised:
+                    command.run([sys.executable, '-I', '-c', 'pass'], timeout=0.2)
+            self.assertEqual(str(raised.exception), 'command failed')
+            self.assertFalse(raised.exception.cleanup_complete)
+            self.assertLess(time.monotonic() - started, 3)
+            if child_pid.exists():
+                try:
+                    os.kill(int(child_pid.read_text()), signal.SIGKILL)
+                except (ProcessLookupError, ValueError):
+                    pass
+
+    def test_successful_command_does_not_wait_cleanup_budget_after_eof(self):
+        command = self.m.Command({'PATH': '/usr/bin:/bin'})
+        started = time.monotonic()
+        result = command.run([sys.executable, '-I', '-c', 'print("ok")'])
+        self.assertEqual(result, 'ok\n')
+        self.assertLess(time.monotonic() - started, 1)
 
     def test_sensitive_stdin_is_not_in_supervisor_arguments_or_environment(self):
         secret = 'SYNTHETIC_PRIVATE_INPUT_CANARY'
