@@ -189,6 +189,7 @@ class DurableLifecycleBackend {
     this.nextCommit = 0;
     this.failTransitionKinds = new Set(failTransitionKinds);
     this.failedKinds = new Set();
+    this.transitionCounts = new Map();
   }
 
   claimByIdentity(actionKey, executionKey) {
@@ -346,6 +347,9 @@ class DurableLifecycleBackend {
       if (transition.completionState !== claim.completionState || transition.verdict !== claim.verdict) {
         return {status: 'CONFLICT'};
       }
+      if (claim.lastStage === 'RECEIPT_PREPARING') {
+        return {status: 'CONFLICT'};
+      }
       current.oid = input.newOid;
       current.revision = input.newRevision;
       claim.expectedOid = input.newOid;
@@ -398,12 +402,17 @@ class DurableLifecycleBackend {
       claim.expectedOid = input.newOid;
       claim.expectedRevision = input.newRevision;
     }
+    this.transitionCounts.set(transition.kind, (this.transitionCounts.get(transition.kind) || 0) + 1);
     return {status: 'COMMITTED', oid: input.newOid};
   }
 
   async readClaim(executionKey) {
     const claim = this.claims.get(executionKey);
     return claim ? structuredClone(claim) : null;
+  }
+
+  committedTransitionCount(kind) {
+    return this.transitionCounts.get(kind) || 0;
   }
 
   toSerializableRecords() {
@@ -414,7 +423,8 @@ class DurableLifecycleBackend {
       commits: [...this.commits.entries()].map(([key, value]) => [key, structuredClone(value)]),
       nextCommit: this.nextCommit,
       failedKinds: [...this.failedKinds],
-      failTransitionKinds: [...this.failTransitionKinds]
+      failTransitionKinds: [...this.failTransitionKinds],
+      transitionCounts: [...this.transitionCounts.entries()]
     });
   }
 
@@ -422,7 +432,7 @@ class DurableLifecycleBackend {
     if (!records || typeof records !== 'object' || Array.isArray(records)) {
       throw new Error('INVALID_RECORDS');
     }
-    const keys = ['snapshot', 'admissionState', 'claims', 'commits', 'nextCommit', 'failedKinds', 'failTransitionKinds'];
+    const keys = ['snapshot', 'admissionState', 'claims', 'commits', 'nextCommit', 'failedKinds', 'failTransitionKinds', 'transitionCounts'];
     if (Object.keys(records).length !== keys.length || keys.some(key => !Object.hasOwn(records, key))) {
       throw new Error('INVALID_RECORDS');
     }
@@ -437,7 +447,8 @@ class DurableLifecycleBackend {
     if (!Array.isArray(claims) || !Array.isArray(commits)
       || !Number.isSafeInteger(records.nextCommit) || records.nextCommit < 0
       || !Array.isArray(records.failedKinds)
-      || !Array.isArray(records.failTransitionKinds)) {
+      || !Array.isArray(records.failTransitionKinds)
+      || !Array.isArray(records.transitionCounts)) {
       throw new Error('INVALID_RECORDS');
     }
     const backend = new DurableLifecycleBackend({
@@ -461,6 +472,13 @@ class DurableLifecycleBackend {
     }));
     backend.nextCommit = records.nextCommit;
     backend.failedKinds = new Set(records.failedKinds);
+    backend.transitionCounts = new Map(records.transitionCounts.map(entry => {
+      if (!Array.isArray(entry) || entry.length !== 2 || typeof entry[0] !== 'string'
+        || !Number.isSafeInteger(entry[1]) || entry[1] < 0) {
+        throw new Error('INVALID_RECORDS');
+      }
+      return [entry[0], entry[1]];
+    }));
 
     const validation = reduceAdmissionRecord(backend.admissionState, {
       kind: 'SIMULATE_ADMISSION',
@@ -848,6 +866,7 @@ test('composition: async start->pending->restart->observe->boundary->receipt and
   assert.equal(completed.completionState, 'COMPLETE');
   assert.equal(receiptPosts, 1);
   assert.equal(receiptLookups, 1);
+  assert.equal(backend.committedTransitionCount('RECEIPT_PREPARING'), 1);
 
   const duplicateObservation = await observeReviewLifecycle({
     ...lifecycleInput({
@@ -872,6 +891,7 @@ test('composition: async start->pending->restart->observe->boundary->receipt and
   });
   assert.equal(duplicateObservation.status, 'COMPLETE');
   assert.equal(receiptPosts, 1);
+  assert.equal(backend.committedTransitionCount('RECEIPT_PREPARING'), 1);
 
   const missingRevalidateObserve = await observeReviewLifecycle({
     enabled: true,
@@ -1518,6 +1538,7 @@ test('durable COMPLETE review result resumes receipt after restart without re-ob
   assert.equal(restarted.completionState, 'COMPLETE');
   assert.equal(observeCalls, 0);
   assert.equal(receiptPosts, 1);
+  assert.equal(backend.committedTransitionCount('RECEIPT_PREPARING'), 1);
 });
 
 test('durable REVISION_REQUIRED review result resumes receipt after restart without re-observe even after deadline when receipt preparation never began', async () => {
@@ -1602,6 +1623,7 @@ test('durable REVISION_REQUIRED review result resumes receipt after restart with
   assert.equal(restarted.completionState, 'REVISION_REQUIRED');
   assert.equal(observeCalls, 0);
   assert.equal(receiptPosts, 1);
+  assert.equal(backend.committedTransitionCount('RECEIPT_PREPARING'), 1);
 });
 
 test('restart with unresolved dispatch acknowledgement uncertainty cannot advance completion', async () => {
@@ -2072,6 +2094,7 @@ test('durable COMPLETE review result resumes receipt before deadline when receip
   assert.equal(restarted.completionState, 'COMPLETE');
   assert.equal(observeCalls, 0);
   assert.equal(receiptPosts, 1);
+  assert.equal(backend.committedTransitionCount('RECEIPT_PREPARING'), 1);
 });
 
 test('durable REVISION_REQUIRED review result resumes receipt before deadline when receipt preparation never began', async () => {
@@ -2150,6 +2173,7 @@ test('durable REVISION_REQUIRED review result resumes receipt before deadline wh
   assert.equal(restarted.completionState, 'REVISION_REQUIRED');
   assert.equal(observeCalls, 0);
   assert.equal(receiptPosts, 1);
+  assert.equal(backend.committedTransitionCount('RECEIPT_PREPARING'), 1);
 });
 
 test('ack and pending entry windows with UNKNOWN persistence failure remain nonadvancing after JSON reconstruction', async () => {

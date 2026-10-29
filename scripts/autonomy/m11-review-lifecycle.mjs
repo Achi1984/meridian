@@ -470,6 +470,7 @@ export async function observeReviewLifecycle({
     }
     let completionState;
     let verdict;
+    let receiptPreparationCommitted = false;
     if (observePendingEntry) {
       const observePreparingCommit = await callWithinBudget(store.commit.bind(store), {
         claim,
@@ -495,6 +496,7 @@ export async function observeReviewLifecycle({
         return unknown('RECEIPT_PREPARING_STATE_UNKNOWN', false);
       }
       claim = receiptPreparingCommit.value.claim;
+      receiptPreparationCommitted = true;
     }
     const revalidated = await revalidateCollection({
       revalidate,
@@ -664,7 +666,7 @@ export async function observeReviewLifecycle({
         });
       }
     }
-    if (claim.lastStage !== 'RECEIPT_PREPARING') {
+    if (!receiptPreparationCommitted) {
       const receiptPreparingCommit = await callWithinBudget(store.commit.bind(store), {
         claim,
         transition: {
@@ -678,6 +680,7 @@ export async function observeReviewLifecycle({
         return unknown('RECEIPT_PREPARING_STATE_UNKNOWN', false);
       }
       claim = receiptPreparingCommit.value.claim;
+      receiptPreparationCommitted = true;
     }
     const beforeReceipt = await revalidateCollection({revalidate, expected: fresh, remainingMs: remainingMs(), now});
     if (!beforeReceipt.ok || budgetExpired()) {
