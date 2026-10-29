@@ -91,6 +91,15 @@ function fixtureApi({runData = run(), pullRequest = {}, runs = [runData], jobs =
   };
   const api = {
     authenticated,
+    authenticationEvidence: Object.freeze({
+      evidenceId: 'fixture-auth-evidence',
+      principal: 'fixture-principal',
+      host: 'api.github.com',
+      scheme: 'https',
+      tls: true,
+      verifiedAtMs: START,
+      expiresAtMs: START + 600000
+    }),
     async getWorkflowRun(input) {
       calls.push(['run', input]);
       return runData;
