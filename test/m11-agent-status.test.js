@@ -338,3 +338,95 @@ test('manual and unknown evidence never verify provider, model, or active coordi
   assert.equal(unknownNormalized.rows[0].modelVerified, 'UNKNOWN');
   assert.equal(unknownNormalized.rows[0].coordinatorMode, 'UNKNOWN');
 });
+
+test('serialized status/freshness descriptor matrix rejects invalid top-level data without invoking getters', () => {
+  const validRaw = { schemaVersion: 1, rows: [sample()] };
+  const validSerialized = { schemaVersion: 1, status: 'READY', freshness: 'CURRENT', rows: [sample()] };
+  assert.doesNotThrow(() => normalizeM11AgentStatus(validRaw, { now: () => NOW }));
+  assert.doesNotThrow(() => normalizeM11AgentStatus(validSerialized, { now: () => NOW }));
+
+  const statusUndefined = { schemaVersion: 1, status: undefined, freshness: 'CURRENT', rows: [sample()] };
+  assert.throws(() => normalizeM11AgentStatus(statusUndefined, { now: () => NOW }), { name: 'TypeError' });
+
+  const freshnessUndefined = { schemaVersion: 1, status: 'READY', freshness: undefined, rows: [sample()] };
+  assert.throws(() => normalizeM11AgentStatus(freshnessUndefined, { now: () => NOW }), { name: 'TypeError' });
+
+  let statusGetterCount = 0;
+  let freshnessGetterCount = 0;
+  const getterStatus = {
+    schemaVersion: 1,
+    get status() {
+      statusGetterCount += 1;
+      return 'READY';
+    },
+    rows: [sample()]
+  };
+  const getterFreshness = {
+    schemaVersion: 1,
+    status: 'READY',
+    get freshness() {
+      freshnessGetterCount += 1;
+      return 'CURRENT';
+    },
+    rows: [sample()]
+  };
+  const combinedGetter = {
+    schemaVersion: 1,
+    get status() {
+      statusGetterCount += 1;
+      return 'READY';
+    },
+    get freshness() {
+      freshnessGetterCount += 1;
+      return 'CURRENT';
+    },
+    rows: [sample()]
+  };
+  assert.throws(() => normalizeM11AgentStatus(getterStatus, { now: () => NOW }), { name: 'TypeError' });
+  assert.throws(() => normalizeM11AgentStatus(getterFreshness, { now: () => NOW }), { name: 'TypeError' });
+  assert.throws(() => normalizeM11AgentStatus(combinedGetter, { now: () => NOW }), { name: 'TypeError' });
+  assert.equal(statusGetterCount, 0);
+  assert.equal(freshnessGetterCount, 0);
+
+  let statusSetterCount = 0;
+  let freshnessSetterCount = 0;
+  const setterStatus = {
+    schemaVersion: 1,
+    status: undefined,
+    freshness: 'CURRENT',
+    rows: [sample()]
+  };
+  Object.defineProperty(setterStatus, 'status', {
+    enumerable: true,
+    set(value) {
+      statusSetterCount += 1;
+      this.__status = value;
+    }
+  });
+  const setterFreshness = {
+    schemaVersion: 1,
+    status: 'READY',
+    freshness: undefined,
+    rows: [sample()]
+  };
+  Object.defineProperty(setterFreshness, 'freshness', {
+    enumerable: true,
+    set(value) {
+      freshnessSetterCount += 1;
+      this.__freshness = value;
+    }
+  });
+  assert.throws(() => normalizeM11AgentStatus(setterStatus, { now: () => NOW }), { name: 'TypeError' });
+  assert.throws(() => normalizeM11AgentStatus(setterFreshness, { now: () => NOW }), { name: 'TypeError' });
+  assert.equal(statusSetterCount, 0);
+  assert.equal(freshnessSetterCount, 0);
+
+  const nonEnumerableStatus = { schemaVersion: 1, rows: [sample()] };
+  Object.defineProperty(nonEnumerableStatus, 'status', { value: 'READY', enumerable: false });
+  Object.defineProperty(nonEnumerableStatus, 'freshness', { value: 'CURRENT', enumerable: true });
+  assert.throws(() => normalizeM11AgentStatus(nonEnumerableStatus, { now: () => NOW }), { name: 'TypeError' });
+
+  const nonEnumerableFreshness = { schemaVersion: 1, status: 'READY', rows: [sample()] };
+  Object.defineProperty(nonEnumerableFreshness, 'freshness', { value: 'CURRENT', enumerable: false });
+  assert.throws(() => normalizeM11AgentStatus(nonEnumerableFreshness, { now: () => NOW }), { name: 'TypeError' });
+});
