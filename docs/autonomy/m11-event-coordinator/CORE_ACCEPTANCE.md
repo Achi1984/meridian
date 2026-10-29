@@ -1,6 +1,6 @@
 # M11 Coordinator Core Acceptance
 
-This acceptance suite is implemented in `/home/runner/work/meridian/meridian/test/m11-coordinator-core-acceptance.test.js`.
+This acceptance suite is implemented in `test/m11-coordinator-core-acceptance.test.js`.
 
 Scope (core only):
 

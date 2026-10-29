@@ -4,7 +4,6 @@ import {readFile} from 'node:fs/promises';
 import {collectExactPair} from '../scripts/autonomy/m11-coordinator-collector.mjs';
 import {
   createAtomicRecordEnvelope,
-  createAtomicRecordMemoryTransport,
   createCoordinatorAtomicRecordBackend
 } from '../scripts/autonomy/m11-coordinator-atomic-record-backend.mjs';
 import {createCoordinatorStateStore} from '../scripts/autonomy/m11-coordinator-state-store.mjs';
@@ -22,6 +21,10 @@ const BASE = 'b'.repeat(40);
 const WORKFLOW_ID = 347821227;
 const RUN_ID = 7001;
 const RUN_ATTEMPT = 1;
+const RUNTIME_FIXTURE_URL = new URL(
+  './fixtures/m11-coordinator-core-acceptance/claude-runtime.json',
+  import.meta.url
+);
 const REVIEWER = Object.freeze({
   provider: 'claude',
   agent: 'claude-code-action',
@@ -124,21 +127,47 @@ async function collectReady({nowMs = START + 100} = {}) {
   });
 }
 
-function createFacade({initialEnvelope = createAtomicRecordEnvelope({totalQuota: 1}), replaceHook = null} = {}) {
-  const base = createAtomicRecordMemoryTransport({initialEnvelope});
+function createFacade({
+  initialEnvelope = createAtomicRecordEnvelope({totalQuota: 1}),
+  replaceHook = null,
+  writeLedger = null
+} = {}) {
+  let serializedEnvelope = JSON.stringify(initialEnvelope);
+  const ledger = writeLedger || {attempts: 0, persisted: 0, conflicts: 0};
+  async function persistEnvelope(nextEnvelope) {
+    serializedEnvelope = JSON.stringify(nextEnvelope);
+    ledger.persisted += 1;
+    return {status: 'REPLACED', storageVersion: nextEnvelope.storageVersion};
+  }
   const transport = {
-    readCanonicalEnvelope: (...args) => base.readCanonicalEnvelope(...args),
+    readCanonicalEnvelope: async () => JSON.parse(serializedEnvelope),
     replaceCanonicalEnvelope: async payload => {
-      if (typeof replaceHook === 'function') {
-        const decided = await replaceHook(payload);
-        if (decided) return decided;
+      const currentEnvelope = JSON.parse(serializedEnvelope);
+      if (!Number.isSafeInteger(payload?.expectedStorageVersion) || payload.expectedStorageVersion < 0) {
+        throw new Error('INVALID_EXPECTED_STORAGE_VERSION');
       }
-      return base.replaceCanonicalEnvelope(payload);
+      if (payload.expectedStorageVersion !== currentEnvelope.storageVersion) {
+        ledger.conflicts += 1;
+        return {status: 'CONFLICT', storageVersion: currentEnvelope.storageVersion};
+      }
+      ledger.attempts += 1;
+      if (typeof replaceHook === 'function') {
+        const decided = await replaceHook({
+          payload,
+          currentEnvelope: JSON.parse(serializedEnvelope),
+          persist: () => persistEnvelope(payload.nextEnvelope)
+        });
+        if (decided) {
+          if (decided.status === 'CONFLICT') ledger.conflicts += 1;
+          return decided;
+        }
+      }
+      return persistEnvelope(payload.nextEnvelope);
     }
   };
   const backend = createCoordinatorAtomicRecordBackend({transport, now: () => START + 10});
   const store = createCoordinatorStateStore({backend, enabled: true});
-  return {backend, store};
+  return {backend, store, writeLedger: ledger};
 }
 
 function rebuildFacadeFromBackend(backend, options = {}) {
@@ -304,8 +333,7 @@ test('3) captured UNVERIFIED runtime candidate is rejected by boundary and lifec
   const collected = await collectReady();
   assert.equal(collected.status, 'READY');
 
-  const fixturePath = '/home/runner/work/meridian/meridian/test/fixtures/m11-coordinator-core-acceptance/claude-runtime.json';
-  const runtimeBytes = await readFile(fixturePath);
+  const runtimeBytes = await readFile(RUNTIME_FIXTURE_URL);
   const capture = captureClaudeRuntimeCandidate(runtimeBytes, {
     parserContractVersion: SUPPORTED_PARSER_CONTRACT_VERSION,
     requestedModel: REVIEWER.model
@@ -322,8 +350,16 @@ test('3) captured UNVERIFIED runtime candidate is rejected by boundary and lifec
   const started = await startPendingLifecycle({store: first.store, collected, counters, nowMs: START + 500});
   assert.equal(started.status, 'REVIEW_PENDING');
 
+  const verifierCalls = [];
+  const recordingVerifier = {
+    verifyRuntimeEvidence: value => {
+      verifierCalls.push(value);
+      return value;
+    }
+  };
+
   const boundary = evaluateReviewBoundary({
-    trustedRuntimeSeam: {verifyRuntimeEvidence: value => value},
+    trustedRuntimeSeam: recordingVerifier,
     trustedRuntimeEvidence: capture.candidate,
     modelOutput: {
       reviewRequestId: started.reviewRequestId,
@@ -349,7 +385,10 @@ test('3) captured UNVERIFIED runtime candidate is rejected by boundary and lifec
     },
     now: () => START + 520
   });
-  assert.notEqual(boundary.status, 'ADMITTED');
+  assert.equal(boundary.status, 'BLOCKED');
+  assert.equal(boundary.reason, 'TRUSTED_RUNTIME_EVIDENCE_INVALID');
+  assert.equal(verifierCalls.length, 1);
+  assert.equal(verifierCalls[0], capture.candidate);
 
   const observed = await observeReviewLifecycle({
     enabled: true,
@@ -366,7 +405,7 @@ test('3) captured UNVERIFIED runtime candidate is rejected by boundary and lifec
       });
     },
     revalidate: async () => collected,
-    trustedRuntimeSeam: {verifyRuntimeEvidence: value => value},
+    trustedRuntimeSeam: recordingVerifier,
     receipt: {
       postOnce: async () => {
         counters.post += 1;
@@ -383,6 +422,8 @@ test('3) captured UNVERIFIED runtime candidate is rejected by boundary and lifec
 
   assert.equal(observed.status, 'UNKNOWN');
   assert.equal(observed.reason, 'BOUNDARY_REJECTED');
+  assert.equal(verifierCalls.length, 2);
+  assert.equal(verifierCalls[1], capture.candidate);
   assert.deepEqual(counters, {dispatch: 1, observe: 1, post: 0, readback: 0});
 
   const durable = await first.backend.exportCanonicalEnvelope();
@@ -402,7 +443,7 @@ test('3) captured UNVERIFIED runtime candidate is rejected by boundary and lifec
       throw new Error('observe should not run after terminal UNKNOWN fence');
     },
     revalidate: async () => collected,
-    trustedRuntimeSeam: {verifyRuntimeEvidence: value => value},
+    trustedRuntimeSeam: recordingVerifier,
     receipt: {
       postOnce: async () => {
         counters.post += 1;
@@ -418,6 +459,7 @@ test('3) captured UNVERIFIED runtime candidate is rejected by boundary and lifec
   });
   assert.equal(resumed.status, 'UNKNOWN');
   assert.equal(resumed.reason, 'TERMINAL_UNKNOWN_REQUIRES_MANUAL_RECONCILIATION');
+  assert.equal(verifierCalls.length, 2);
   assert.deepEqual(counters, {dispatch: 1, observe: 1, post: 0, readback: 0});
 });
 
@@ -504,88 +546,188 @@ test('4) pending claim crossing deadline persists INCOMPLETE and restart remains
   assert.deepEqual(counters, {dispatch: 1, observe: 0, post: 0, readback: 0});
 });
 
-test('5) ambiguous CAS at observe fence fails closed without retry and restart cannot advance retained fence', async () => {
+test('5) ambiguous CAS at observe fences fail closed with exact write-attempt accounting before and after persistence', async () => {
   const collected = await collectReady();
   assert.equal(collected.status, 'READY');
 
-  const counters = {dispatch: 0, observe: 0, post: 0, readback: 0};
-  let conflictInjected = false;
-  const first = createFacade({
-    replaceHook: async ({nextEnvelope}) => {
-      const last = nextEnvelope.transitionChain[nextEnvelope.transitionChain.length - 1];
-      if (!conflictInjected && last?.kind === 'OBSERVE_PENDING') {
-        conflictInjected = true;
-        return {status: 'CONFLICT', storageVersion: nextEnvelope.storageVersion - 1};
+  {
+    const counters = {dispatch: 0, observe: 0, post: 0, readback: 0};
+    let conflictInjected = false;
+    const first = createFacade({
+      replaceHook: async ({payload}) => {
+        const last = payload.nextEnvelope.transitionChain[payload.nextEnvelope.transitionChain.length - 1];
+        if (!conflictInjected && last?.kind === 'OBSERVE_PREPARING') {
+          conflictInjected = true;
+          return {status: 'CONFLICT', storageVersion: payload.nextEnvelope.storageVersion - 1};
+        }
+        return null;
       }
-      return null;
-    }
-  });
+    });
 
-  const started = await startPendingLifecycle({store: first.store, collected, counters, nowMs: START + 700});
-  assert.equal(started.status, 'REVIEW_PENDING');
+    const started = await startPendingLifecycle({store: first.store, collected, counters, nowMs: START + 700});
+    assert.equal(started.status, 'REVIEW_PENDING');
 
-  const uncertain = await observeReviewLifecycle({
-    enabled: true,
-    executionKey: collected.executionKey,
-    collected,
-    store: first.store,
-    observeReview: async () => {
-      counters.observe += 1;
-      return {status: 'PENDING'};
-    },
-    revalidate: async () => collected,
-    trustedRuntimeSeam: {verifyRuntimeEvidence: value => value},
-    receipt: {
-      postOnce: async () => {
-        counters.post += 1;
-        throw new Error('receipt callbacks must not run in CAS ambiguity path');
+    const uncertain = await observeReviewLifecycle({
+      enabled: true,
+      executionKey: collected.executionKey,
+      collected,
+      store: first.store,
+      observeReview: async () => {
+        counters.observe += 1;
+        return {status: 'PENDING'};
       },
-      lookupByActionKey: async () => {
-        counters.readback += 1;
-        throw new Error('receipt callbacks must not run in CAS ambiguity path');
-      }
-    },
-    now: () => START + 710,
-    expiresAt: END
-  });
-
-  assert.equal(uncertain.status, 'UNKNOWN');
-  assert.equal(uncertain.reason, 'OBSERVE_PENDING_STATE_UNKNOWN');
-  assert.equal(conflictInjected, true);
-  assert.deepEqual(counters, {dispatch: 1, observe: 1, post: 0, readback: 0});
-
-  const durable = await first.backend.exportCanonicalEnvelope();
-  assert.equal(durable.claims[0].lastStage, 'OBSERVE_PREPARING');
-  assert.equal(durable.admissionState.activeGate.executionKey, collected.executionKey);
-  assert.equal(durable.admissionState.consumedQuota, 1);
-
-  const restarted = await rebuildFacadeFromBackend(first.backend);
-  const resumed = await observeReviewLifecycle({
-    enabled: true,
-    executionKey: collected.executionKey,
-    collected,
-    store: restarted.store,
-    observeReview: async () => {
-      counters.observe += 1;
-      throw new Error('observe must not run without durable proof beyond OBSERVE_PREPARING');
-    },
-    revalidate: async () => collected,
-    trustedRuntimeSeam: {verifyRuntimeEvidence: value => value},
-    receipt: {
-      postOnce: async () => {
-        counters.post += 1;
-        throw new Error('receipt callbacks must not run after nonadvancing fence');
+      revalidate: async () => collected,
+      trustedRuntimeSeam: {verifyRuntimeEvidence: value => value},
+      receipt: {
+        postOnce: async () => {
+          counters.post += 1;
+          throw new Error('receipt callbacks must not run in CAS ambiguity path');
+        },
+        lookupByActionKey: async () => {
+          counters.readback += 1;
+          throw new Error('receipt callbacks must not run in CAS ambiguity path');
+        }
       },
-      lookupByActionKey: async () => {
-        counters.readback += 1;
-        throw new Error('receipt callbacks must not run after nonadvancing fence');
-      }
-    },
-    now: () => START + 720,
-    expiresAt: END
-  });
+      now: () => START + 710,
+      expiresAt: END
+    });
 
-  assert.equal(resumed.status, 'UNKNOWN');
-  assert.equal(resumed.reason, 'PERSISTENCE_UNCERTAINTY_RECONCILE_REQUIRED');
-  assert.deepEqual(counters, {dispatch: 1, observe: 1, post: 0, readback: 0});
+    assert.equal(uncertain.status, 'UNKNOWN');
+    assert.equal(uncertain.reason, 'OBSERVE_PREPARING_STATE_UNKNOWN');
+    assert.equal(conflictInjected, true);
+    assert.deepEqual(counters, {dispatch: 1, observe: 0, post: 0, readback: 0});
+    assert.deepEqual(first.writeLedger, {attempts: 4, persisted: 3, conflicts: 1});
+    const durable = await first.backend.exportCanonicalEnvelope();
+    assert.equal(durable.claims[0].lastStage, 'DISPATCH_ACKED');
+  }
+
+  {
+    const counters = {dispatch: 0, observe: 0, post: 0, readback: 0};
+    let lostAckInjected = false;
+    const first = createFacade({
+      replaceHook: async ({payload, persist}) => {
+        const last = payload.nextEnvelope.transitionChain[payload.nextEnvelope.transitionChain.length - 1];
+        if (!lostAckInjected && last?.kind === 'OBSERVE_PREPARING') {
+          lostAckInjected = true;
+          await persist();
+          throw new Error('ACK_LOST_AFTER_OBSERVE_PREPARING_PERSISTED');
+        }
+        return null;
+      }
+    });
+
+    const started = await startPendingLifecycle({store: first.store, collected, counters, nowMs: START + 720});
+    assert.equal(started.status, 'REVIEW_PENDING');
+    const uncertain = await observeReviewLifecycle({
+      enabled: true,
+      executionKey: collected.executionKey,
+      collected,
+      store: first.store,
+      observeReview: async () => {
+        counters.observe += 1;
+        return {status: 'PENDING'};
+      },
+      revalidate: async () => collected,
+      trustedRuntimeSeam: {verifyRuntimeEvidence: value => value},
+      receipt: {
+        postOnce: async () => {
+          counters.post += 1;
+          throw new Error('receipt callbacks must not run after uncertain persistence');
+        },
+        lookupByActionKey: async () => {
+          counters.readback += 1;
+          throw new Error('receipt callbacks must not run after uncertain persistence');
+        }
+      },
+      now: () => START + 725,
+      expiresAt: END
+    });
+    assert.equal(uncertain.status, 'UNKNOWN');
+    assert.equal(uncertain.reason, 'OBSERVE_PREPARING_STATE_UNKNOWN');
+    assert.equal(lostAckInjected, true);
+    assert.deepEqual(counters, {dispatch: 1, observe: 0, post: 0, readback: 0});
+    assert.deepEqual(first.writeLedger, {attempts: 4, persisted: 4, conflicts: 0});
+
+    const durable = await first.backend.exportCanonicalEnvelope();
+    assert.equal(durable.claims[0].lastStage, 'OBSERVE_PREPARING');
+    assert.equal(durable.admissionState.activeGate.executionKey, collected.executionKey);
+    assert.equal(durable.admissionState.consumedQuota, 1);
+
+    const restarted = await rebuildFacadeFromBackend(first.backend, {writeLedger: first.writeLedger});
+    const resumed = await observeReviewLifecycle({
+      enabled: true,
+      executionKey: collected.executionKey,
+      collected,
+      store: restarted.store,
+      observeReview: async () => {
+        counters.observe += 1;
+        throw new Error('observe must not run without durable proof beyond OBSERVE_PREPARING');
+      },
+      revalidate: async () => collected,
+      trustedRuntimeSeam: {verifyRuntimeEvidence: value => value},
+      receipt: {
+        postOnce: async () => {
+          counters.post += 1;
+          throw new Error('receipt callbacks must not run after nonadvancing fence');
+        },
+        lookupByActionKey: async () => {
+          counters.readback += 1;
+          throw new Error('receipt callbacks must not run after nonadvancing fence');
+        }
+      },
+      now: () => START + 730,
+      expiresAt: END
+    });
+
+    assert.equal(resumed.status, 'UNKNOWN');
+    assert.equal(resumed.reason, 'PERSISTENCE_UNCERTAINTY_RECONCILE_REQUIRED');
+    assert.deepEqual(counters, {dispatch: 1, observe: 0, post: 0, readback: 0});
+    assert.deepEqual(first.writeLedger, {attempts: 4, persisted: 4, conflicts: 0});
+  }
+
+  {
+    const counters = {dispatch: 0, observe: 0, post: 0, readback: 0};
+    let conflictInjected = false;
+    const first = createFacade({
+      replaceHook: async ({payload}) => {
+        const last = payload.nextEnvelope.transitionChain[payload.nextEnvelope.transitionChain.length - 1];
+        if (!conflictInjected && last?.kind === 'OBSERVE_PENDING') {
+          conflictInjected = true;
+          return {status: 'CONFLICT', storageVersion: payload.nextEnvelope.storageVersion - 1};
+        }
+        return null;
+      }
+    });
+    const started = await startPendingLifecycle({store: first.store, collected, counters, nowMs: START + 740});
+    assert.equal(started.status, 'REVIEW_PENDING');
+    const uncertain = await observeReviewLifecycle({
+      enabled: true,
+      executionKey: collected.executionKey,
+      collected,
+      store: first.store,
+      observeReview: async () => {
+        counters.observe += 1;
+        return {status: 'PENDING'};
+      },
+      revalidate: async () => collected,
+      trustedRuntimeSeam: {verifyRuntimeEvidence: value => value},
+      receipt: {
+        postOnce: async () => {
+          counters.post += 1;
+          throw new Error('receipt callbacks must not run in OBSERVE_PENDING conflict path');
+        },
+        lookupByActionKey: async () => {
+          counters.readback += 1;
+          throw new Error('receipt callbacks must not run in OBSERVE_PENDING conflict path');
+        }
+      },
+      now: () => START + 745,
+      expiresAt: END
+    });
+    assert.equal(uncertain.status, 'UNKNOWN');
+    assert.equal(uncertain.reason, 'OBSERVE_PENDING_STATE_UNKNOWN');
+    assert.equal(conflictInjected, true);
+    assert.deepEqual(counters, {dispatch: 1, observe: 1, post: 0, readback: 0});
+    assert.deepEqual(first.writeLedger, {attempts: 5, persisted: 4, conflicts: 1});
+  }
 });
