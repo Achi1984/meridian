@@ -175,12 +175,21 @@ function mapPullRequest(payload) {
 
 function mapWorkflowRuns(payload) {
   if (!Array.isArray(payload?.workflow_runs)) fail('MALFORMED_RESPONSE');
+  const extractBaseSha = value => {
+    const candidates = Array.isArray(value?.pull_requests)
+      ? value.pull_requests.map(item => item?.base?.sha).filter(isSha)
+      : [];
+    const unique = [...new Set(candidates)];
+    return unique.length === 1 ? unique[0] : null;
+  };
   return payload.workflow_runs.map(item => ({
     id: item?.id,
     repository: item?.repository?.full_name ?? null,
     workflowId: item?.workflow_id,
     runNumber: item?.run_number,
     runAttempt: item?.run_attempt,
+    headSha: item?.head_sha ?? null,
+    baseSha: extractBaseSha(item),
     pullRequests: workflowRunPullRequests(item)
   }));
 }
@@ -489,12 +498,16 @@ export function createM11CoordinatorGithubReadApi({
       };
     },
 
-    async listWorkflowRuns({repository, workflowId, page, signal}) {
+    async listWorkflowRuns({repository, workflowId, pullRequest, headSha, page, signal}) {
       validateRepository(repository);
-      if (!positiveInteger(workflowId) || !positiveInteger(page) || page > maxPages) fail('INVALID_INPUT');
+      if (!positiveInteger(workflowId) || !positiveInteger(page) || page > maxPages
+        || (pullRequest !== undefined && !positiveInteger(pullRequest))
+        || (headSha !== undefined && !isSha(headSha))) fail('INVALID_INPUT');
+      const query = {event: 'pull_request', page, per_page: 100};
+      if (headSha !== undefined) query.head_sha = headSha;
       const {payload, headers} = await getJson({
         path: `/repos/Achi1984/meridian/actions/workflows/${workflowId}/runs`,
-        query: {event: 'pull_request', page, per_page: 100},
+        query,
         signal
       });
       const hasNextPage = extractHasNextPage(
