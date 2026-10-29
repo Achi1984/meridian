@@ -111,8 +111,11 @@ unavailable or the position unfilled.
 
 The daily loss gate is 3% of local-day opening marked equity (USD 30 on the
 initial USD 1,000), using Europe/Vienna calendar days and net costs. Unknown
-marks block entries. This in-memory prototype cannot persist that gate safely
-across process restarts; it declares restart unrecoverable and fails closed.
+marks block entries. When the loss gate trips, the risk stage requests
+risk-reducing simulated exits only where a fresh identity-bound hypothetical
+executable quote and explicit costs are available; unresolved positions remain
+open. This in-memory prototype cannot persist that gate safely across process
+restarts; it declares restart unrecoverable and fails closed.
 At run end, open positions remain open and are marked only if evidence permits;
 no terminal liquidation is fabricated.
 

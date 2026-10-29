@@ -19,6 +19,7 @@ import {
   AuditLogger,
   analyzeCandidate,
   filterCandidate,
+  processCandidate,
   scout
 } from "../scripts/memecoin-paper/stages.mjs";
 import {
@@ -126,7 +127,10 @@ test("strict filter accepts inclusive baseline evidence and carries provenance",
   assert.equal(result.accepted, true);
   for (const check of Object.values(result.checks)) {
     assert.equal(check.status, "PASS");
-    if (check.source) assert.equal(check.source, SYNTHETIC_SOURCE);
+    assert.equal(check.source, SYNTHETIC_SOURCE);
+    assert.equal(check.observedAt, now);
+    assert.ok(check.coverage);
+    assert.ok(check.reason);
   }
 });
 
@@ -189,6 +193,8 @@ test("unknown, stale, unbound, incomplete and unsafe evidence fail closed distin
   delete missing.evidence.mintAuthorityRevoked;
   assert.equal(validFilters(missing, now).checks.mintAuthority.status, "UNKNOWN");
 
+  assert.equal(filterCandidate(syntheticCandidate(now), {now: "not-a-time"}).status, "UNKNOWN");
+
   const stale = syntheticCandidate(now);
   stale.evidence.volume1hUsd.observedAt = now - 5 * 60 * 1000 - 1;
   assert.equal(validFilters(stale, now).checks.volume1h.status, "UNKNOWN");
@@ -210,6 +216,36 @@ test("unknown, stale, unbound, incomplete and unsafe evidence fail closed distin
     transferFee: false, transferHook: true, defaultFrozen: false, permanentDelegate: false
   });
   assert.equal(validFilters(extension, now).checks.tokenExtensions.status, "REJECT");
+});
+
+test("prior-rug rejection requires attributable evidence and survives the audit trail", () => {
+  const now = Date.now();
+  const unsupported = syntheticCandidate(now);
+  setEvidence(unsupported, "crediblePriorRug", {
+    found: true, reviewed: true, historyCoverage: "complete"
+  });
+  assert.equal(validFilters(unsupported, now).checks.priorRug.status, "UNKNOWN");
+
+  const attributed = syntheticCandidate(now);
+  setEvidence(attributed, "crediblePriorRug", {
+    found: true,
+    reviewed: true,
+    historyCoverage: "complete",
+    attribution: "Public transaction evidence reviewed",
+    evidenceIds: ["tx-signature-reference-1"]
+  });
+  const {filters, logger} = processCandidate(attributed, {
+    now,
+    holdUntil: now + EIGHT_HOURS,
+    smartWalletAllowlist: SYNTHETIC_SMART_WALLET_ALLOWLIST
+  });
+  assert.equal(filters.checks.priorRug.status, "REJECT");
+  assert.equal(logger.report().filter(event => event.stage === "Filter").length, Object.keys(filters.checks).length);
+  assert.deepEqual(filters.checks.priorRug.evidenceRefs, ["tx-signature-reference-1"]);
+  const row = logger.report().find(event => event.gate === "priorRug");
+  assert.equal(row.status, "REJECT");
+  assert.deepEqual(row.evidenceRefs, ["tx-signature-reference-1"]);
+  assert.equal(row.source, SYNTHETIC_SOURCE);
 });
 
 test("pool lock evidence must match selected pool and cover the proposed hold", () => {
@@ -277,6 +313,20 @@ test("missing smart-wallet provenance and incomplete analyst data never redistri
   assert.equal(staleResult.components.momentum15m.status, "UNKNOWN");
 });
 
+test("synthetic evidence and smart-wallet fixture allowlists cannot mix with real-source candidates", () => {
+  const now = Date.now();
+  const claimedReal = syntheticCandidate(now, {source: "DexScreener public API"});
+  const filterResult = validFilters(claimedReal, now);
+  assert.equal(filterResult.status, "UNKNOWN");
+  assert.equal(filterResult.checks.mintAuthority.status, "UNKNOWN");
+  const score = analyzeCandidate(claimedReal, {
+    now,
+    filterResult: validFilters(syntheticCandidate(now), now),
+    smartWalletAllowlist: SYNTHETIC_SMART_WALLET_ALLOWLIST
+  });
+  assert.equal(score.status, "BLOCKED");
+});
+
 test("DexScreener parser preserves missing market cap and never substitutes FDV", () => {
   const parsed = parseDexScreenerPair({
     chainId: "solana",
@@ -309,6 +359,19 @@ test("RPC adapter exposes only read methods and largest token accounts stay inco
   await assert.rejects(createReadOnlyAdapterInterface().request("getAccountInfo"), /disabled/);
 });
 
+test("malformed adapter identities return UNKNOWN instead of trusting hostile fields", () => {
+  const parsed = parseDexScreenerPair({
+    chainId: "solana",
+    pairAddress: "https://attacker.example/pool",
+    baseToken: {address: SYNTHETIC_MINT},
+    quoteToken: {address: SYNTHETIC_QUOTE},
+    liquidity: {usd: 50_000},
+    volume: {h1: 50_000},
+    txns: {h1: {buys: 1, sells: 1}}
+  }, {sampledAt: Date.now()});
+  assert.equal(parsed.status, "UNKNOWN");
+});
+
 test("fixed-point entry sizes to at most 8%, reserves atomically, and deduplicates event identity", () => {
   const now = Date.now();
   const candidate = syntheticCandidate(now);
@@ -326,6 +389,7 @@ test("fixed-point entry sizes to at most 8%, reserves atomically, and deduplicat
   assert.equal(ledger.auditEvents()[0].type, "RISK_AUTHORIZED");
   assert.deepEqual(ledger.auditEvents().slice(1, 3).map(event => event.type), ["STOP_ARMED", "PAPER_FILL"]);
   assert.equal(ledger.executeEntry(auth, {...quote, priceMicros: 9999}, {now: now + 2000}).status, "REJECT");
+  assert.equal(ledger.executeEntry(auth, {...quote, eventId: "entry\nhttps://evil"}, {now: now + 2000}).status, "REJECT");
 });
 
 test("risk reservations cap three distinct positions and prevent same-tick re-entry", () => {
@@ -343,6 +407,19 @@ test("risk reservations cap three distinct positions and prevent same-tick re-en
   const overflow = authorize(ledger, candidates[3], now, {authorizationId: "auth-overflow", tickId: "tick-4"});
   assert.equal(overflow.status, "REJECT");
   assert.match(overflow.reason, /three/);
+  const mismatchedDecision = ledger.authorizeEntry({
+    authorizationId: "auth-mismatched",
+    candidate: candidates[3],
+    filterResult: validFilters(candidates[0], now),
+    scoreResult: analyzeCandidate(candidates[0], {
+      now, filterResult: validFilters(candidates[0], now),
+      smartWalletAllowlist: SYNTHETIC_SMART_WALLET_ALLOWLIST
+    }),
+    tickId: "tick-mismatched",
+    now: now + 1000
+  });
+  assert.equal(mismatchedDecision.status, "REJECT");
+  assert.match(mismatchedDecision.reason, /not bound/);
   const duplicateMint = ledger.authorizeEntry({
     authorizationId: "auth-same-tick",
     candidate: candidates[0],
@@ -403,6 +480,15 @@ test("cost assumptions are explicit, integer cents, and charged once", () => {
   }), {now: now + 2000});
   assert.equal(missingCosts.status, "UNFILLED");
   assert.equal(ledger2.summary().cashCents, "100000");
+
+  const mark = exitQuote(candidate, now + 3000, 10_000, {
+    costs: {feeCents: 100, spreadCents: 50, slippageCents: 25, priceImpactCents: 25, networkCents: 10}
+  });
+  const equity = ledger.riskSnapshot({now: now + 3000, marks: [mark]});
+  assert.equal(equity.status, "PASS");
+  assert.equal(equity.equityCents, equity.cashAtMarkCents + equity.grossOpenValueCents - equity.estimatedExitCostsCents);
+  assert.equal(equity.grossUnrealizedPnlCents, 0n);
+  assert.equal(equity.netUnrealizedPnlCents, -420n);
 });
 
 test("initial stop, trailing activation, high-water monotonicity, and gap-through fill", () => {
@@ -419,12 +505,15 @@ test("initial stop, trailing activation, high-water monotonicity, and gap-throug
   const second = ledger.observeExitQuote(exitQuote(candidate, now + 4000, 10_600));
   assert.equal(second.status, "MARKED");
   assert.equal(second.stopPriceMicros, "10528");
-  const exit = ledger.observeExitQuote(exitQuote(candidate, now + 5000, 10_000));
+  const lastQuote = exitQuote(candidate, now + 5000, 10_000);
+  const exit = ledger.observeExitQuote(lastQuote);
   assert.equal(exit.status, "CLOSED_PAPER");
   assert.equal(exit.fillPriceMicros, "10000");
   assert.equal(exit.gapThroughStop, true);
   assert.equal(exit.realizedNetPnlCents, "0");
   assert.equal(ledger.summary().openPositions.length, 0);
+  assert.deepEqual(ledger.observeExitQuote(lastQuote), exit);
+  assert.equal(ledger.observeExitQuote({...lastQuote, costs: {...ZERO_COSTS, feeCents: 1}}).status, "REJECT");
 });
 
 test("missing exit evidence is unresolved and never invents liquidation profit", () => {
@@ -467,6 +556,10 @@ test("daily loss gate uses Europe/Vienna opening equity and unknown marks block 
   assert.equal(loss.lossCents, 3200n);
   assert.equal(loss.limitCents, 3000n);
   assert.equal(loss.entriesAllowed, false);
+  assert.equal(loss.exitRequests[0].status, "CLOSED_PAPER");
+  assert.equal(loss.exitRequests[0].reason, "DAILY_LOSS_LIMIT");
+  assert.equal(loss.openPositions, 0);
+  assert.equal(loss.equityCents, loss.cashCents);
 });
 
 test("eight-hour report stops new work and leaves open positions explicitly unresolved", () => {
@@ -489,6 +582,7 @@ test("audit output is bounded and removes URLs/control characters from hostile f
   const logger = new AuditLogger({maxEvents: 1, maxTextLength: 40});
   assert.equal(logger.record({reason: "hostile\u0000 https://token.example/path?secret=x"}), true);
   assert.equal(logger.record({reason: "overflow"}), false);
+  assert.equal(logger.truncated, true);
   assert.equal(logger.report().length, 1);
   assert.doesNotMatch(logger.report()[0].reason, /https?:\/\//);
   assert.doesNotMatch(logger.report()[0].reason, /\u0000/);
@@ -499,6 +593,9 @@ test("synthetic replay is integrated, bounded, and visibly non-operational", () 
   assert.equal(report.reportType, "SYNTHETIC_FIXTURE_REPLAY_ONLY");
   assert.equal(report.networkAccessed, false);
   assert.equal(report.liveCandidateEvidence, false);
+  assert.equal(report.realDataPreparation.status, "BLOCKED");
+  assert.equal(report.realDataPreparation.executableAdapterAvailable, false);
+  assert.ok(report.realDataPreparation.missingEvidence.length >= 5);
   assert.deepEqual(report.pipeline.map(stage => stage.stage), [
     "Scout", "Filter", "Analyst", "Risk authorization", "Executor (simulated only)", "Logger"
   ]);

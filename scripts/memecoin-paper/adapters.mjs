@@ -5,6 +5,14 @@ export const ALLOWED_SOLANA_RPC_METHODS = Object.freeze([
   "getTokenLargestAccounts",
   "getTokenSupply"
 ]);
+export const UNSUPPORTED_REQUIRED_EVIDENCE = Object.freeze([
+  "mint/freeze authority state and Token-2022 extensions",
+  "pool-specific LP burn or lock duration",
+  "complete owner-aggregated holder concentration",
+  "developer-associated holdings and complete attributed rug history",
+  "bundled-launch supply and qualified smart-wallet provenance",
+  "depth/executable quote and validated costs"
+]);
 
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -64,14 +72,7 @@ export function parseDexScreenerPair(pair, {sampledAt, observedAt = sampledAt} =
       coverage: ["pairCreatedAt", "marketCap", "liquidity.usd", "volume.h1", "txns.h1", "priceChange.h1"],
       fdvObservedButNotUsed: finite(pair.fdv)
     },
-    unsupportedRequiredEvidence: [
-      "mint/freeze authority state and Token-2022 extensions",
-      "pool-specific LP burn or lock duration",
-      "complete owner-aggregated holder concentration",
-      "developer-associated holdings and complete attributed rug history",
-      "bundled-launch supply and qualified smart-wallet provenance",
-      "depth/executable quote and validated costs"
-    ],
+    unsupportedRequiredEvidence: UNSUPPORTED_REQUIRED_EVIDENCE,
     note: "A missing marketCap remains null; FDV is never substituted. Pair profiles/boosts are not exhaustive discovery."
   };
 }

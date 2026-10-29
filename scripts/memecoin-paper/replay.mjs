@@ -1,4 +1,5 @@
 import {pathToFileURL} from "node:url";
+import {UNSUPPORTED_REQUIRED_EVIDENCE} from "./adapters.mjs";
 import {AuditLogger, PIPELINE_ROLES, processCandidate, scout} from "./stages.mjs";
 import {PaperLedger} from "./ledger.mjs";
 import {
@@ -76,6 +77,12 @@ export function runSyntheticReplay({now = Date.now()} = {}) {
     liveCandidateEvidence: false,
     roles: PIPELINE_ROLES,
     discovery: discoveries.discovery,
+    realDataPreparation: {
+      status: "BLOCKED",
+      networkAccessed: false,
+      executableAdapterAvailable: false,
+      missingEvidence: UNSUPPORTED_REQUIRED_EVIDENCE
+    },
     pipeline: timeline,
     filters,
     analysis,

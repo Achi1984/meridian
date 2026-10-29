@@ -1,9 +1,12 @@
 const INITIAL_CAPITAL_CENTS = 100_000n;
 const MAX_ENTRY_CENTS = 8_000n;
 const MAX_POSITIONS = 3;
+const MAX_EVENTS = 10_000;
 const DAY_LOSS_BPS = 300n;
 const BPS = 10_000n;
 const MAX_QUOTE_AGE_MS = 5 * 60 * 1000;
+const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+const SAFE_ID = /^[A-Za-z0-9._:-]{1,120}$/;
 const VIENNA_DAY = new Intl.DateTimeFormat("en-CA", {
   timeZone: "Europe/Vienna",
   year: "numeric",
@@ -13,17 +16,18 @@ const VIENNA_DAY = new Intl.DateTimeFormat("en-CA", {
 
 function asBigInt(value, label, {positive = false} = {}) {
   let result;
-  if (typeof value === "bigint") result = value;
+  if (typeof value === "bigint" && value.toString().length <= 40) result = value;
   else if (typeof value === "number" && Number.isSafeInteger(value)) result = BigInt(value);
-  else if (typeof value === "string" && /^\d+$/.test(value)) result = BigInt(value);
+  else if (typeof value === "string" && value.length <= 40 && /^\d+$/.test(value)) result = BigInt(value);
   else throw new TypeError(`${label} must be an integer`);
   if (result < 0n || (positive && result === 0n)) throw new RangeError(`${label} is outside allowed range`);
   return result;
 }
 
 function time(value) {
-  const parsed = typeof value === "number" ? value : Date.parse(value);
-  return Number.isFinite(parsed) ? parsed : null;
+  const parsed = typeof value === "number" ? value
+    : (typeof value === "string" && value.length <= 64 ? Date.parse(value) : NaN);
+  return Number.isSafeInteger(parsed) && Number.isFinite(new Date(parsed).getTime()) ? parsed : null;
 }
 
 function moneyCents(value, label) {
@@ -46,9 +50,19 @@ function sumCosts(costs, label) {
 }
 
 function quoteIdentityValid(quote, identity) {
-  return quote && quote.mint === identity.mint && quote.chainId === identity.chainId &&
+  return quote && BASE58.test(quote.mint ?? "") && BASE58.test(quote.pool ?? "") &&
+    BASE58.test(quote.quote ?? "") && quote.mint === identity.mint && quote.chainId === identity.chainId &&
     quote.pool === identity.pool && quote.quote === identity.quote &&
-    typeof quote.source === "string" && quote.source.trim().length > 0;
+    typeof quote.source === "string" && quote.source.trim().length > 0 && quote.source.length <= 256;
+}
+
+function decisionBoundToCandidate(decision, candidate) {
+  const identity = decision?.identity;
+  return Boolean(identity && identity.chainId === candidate?.chainId &&
+    identity.mint === candidate?.mint && identity.pool === candidate?.pool &&
+    identity.quote === candidate?.quote && identity.source === candidate?.source &&
+    time(identity.sampledAt) !== null &&
+    time(identity.sampledAt) === time(candidate?.sampledAt));
 }
 
 function digest(fields) {
@@ -65,6 +79,7 @@ function exitPayloadDigest(eventId, quote) {
     observedAt: quote?.observedAt,
     priceMicros: quote?.priceMicros,
     costs: quote?.costs,
+    source: quote?.source,
     mode: quote?.mode,
     executable: quote?.executable
   });
@@ -121,15 +136,18 @@ export class PaperLedger {
     this.results = new Map();
     this.entriesByTickMint = new Set();
     this.events = [];
+    this.auditTruncated = false;
     this.costTotals = {
       entry: {feeCents: 0n, spreadCents: 0n, slippageCents: 0n, priceImpactCents: 0n, networkCents: 0n},
       exit: {feeCents: 0n, spreadCents: 0n, slippageCents: 0n, priceImpactCents: 0n, networkCents: 0n}
     };
+    this.lastEquitySnapshot = null;
     this.day = viennaDay(now);
     if (!this.day) throw new TypeError("valid initialization time is required");
     this.dailyOpeningEquityCents = this.initialCapitalCents;
     this.dailyLossTripped = false;
-    this.runId = String(runId);
+    if (typeof runId !== "string" || !SAFE_ID.test(runId)) throw new TypeError("runId must be a bounded safe identifier");
+    this.runId = runId;
     this.newWorkAllowed = true;
   }
 
@@ -142,11 +160,21 @@ export class PaperLedger {
   }
 
   #record(event) {
-    if (this.events.length >= 10_000) {
+    if (this.events.length >= MAX_EVENTS) {
       this.newWorkAllowed = false;
+      this.auditTruncated = true;
       return false;
     }
     this.events.push(Object.freeze(event));
+    return true;
+  }
+
+  #canRecord(count = 1) {
+    if (this.events.length + count > MAX_EVENTS) {
+      this.newWorkAllowed = false;
+      this.auditTruncated = true;
+      return false;
+    }
     return true;
   }
 
@@ -213,6 +241,11 @@ export class PaperLedger {
       status: this.dailyLossTripped ? "DAILY_LOSS_LIMIT" : "PASS",
       entriesAllowed: !this.dailyLossTripped && this.newWorkAllowed,
       equityCents: snapshot.equityCents,
+      cashAtMarkCents: snapshot.cashCents,
+      grossOpenValueCents: snapshot.grossOpenValueCents,
+      estimatedExitCostsCents: snapshot.estimatedExitCostsCents,
+      grossUnrealizedPnlCents: snapshot.grossUnrealizedPnlCents,
+      netUnrealizedPnlCents: snapshot.netUnrealizedPnlCents,
       dailyOpeningEquityCents: this.dailyOpeningEquityCents,
       lossCents: loss > 0n ? loss : 0n,
       limitCents: threshold,
@@ -240,8 +273,9 @@ export class PaperLedger {
       sampledAt: candidate?.sampledAt
     };
     const requestDigest = digest(request);
-    if (typeof authorizationId !== "string" || !authorizationId ||
-        typeof candidate?.mint !== "string" || typeof tickId !== "string" || !tickId) {
+    if (typeof authorizationId !== "string" || !SAFE_ID.test(authorizationId) ||
+        typeof candidate?.mint !== "string" || !BASE58.test(candidate.mint) ||
+        typeof tickId !== "string" || !SAFE_ID.test(tickId)) {
       return {status: "REJECT", reason: "authorization, candidate, and tick identities are required"};
     }
     if (this.authorizationDigests.has(authorizationId)) {
@@ -252,15 +286,29 @@ export class PaperLedger {
         {status: "DUPLICATE", reason: "authorization already consumed"};
     }
     if (!this.newWorkAllowed) return {status: "REJECT", reason: "session is stopped"};
+    if (!this.#canRecord()) return {status: "REJECT", reason: "audit capacity reached"};
     if (filterResult?.status !== "PASS" || !filterResult.accepted) {
       return {status: "REJECT", reason: "all hard evidence gates must PASS"};
+    }
+    if (!decisionBoundToCandidate(filterResult, candidate)) {
+      return {status: "REJECT", reason: "hard-filter decision is not bound to this candidate sample"};
     }
     if (scoreResult?.status !== "PASS" || scoreResult.score < 70) {
       return {status: "REJECT", reason: "proposed analyst score must be at least 70"};
     }
-    if (candidate.chainId !== "solana" || !candidate.pool || !candidate.quote ||
+    if (!decisionBoundToCandidate(scoreResult, candidate)) {
+      return {status: "REJECT", reason: "analyst decision is not bound to this candidate sample"};
+    }
+    if (candidate.chainId !== "solana" || !BASE58.test(candidate.pool ?? "") ||
+        !BASE58.test(candidate.quote ?? "") ||
         !Number.isInteger(candidate.decimals) || candidate.decimals < 0 || candidate.decimals > 18) {
       return {status: "REJECT", reason: "Solana mint, selected pool, and quote identity are required"};
+    }
+    const candidateSample = time(candidate.sampledAt);
+    const currentTime = time(now);
+    if (candidateSample === null || currentTime === null || candidateSample > currentTime ||
+        currentTime - candidateSample > MAX_QUOTE_AGE_MS) {
+      return {status: "REJECT", reason: "fresh candidate sample time is required"};
     }
     const gate = this.#updateDailyGate({now, marks});
     if (!gate.entriesAllowed) {
@@ -295,8 +343,8 @@ export class PaperLedger {
       quote: candidate.quote,
       decimals: candidate.decimals,
       tickId,
-      sampledAt: candidate.sampledAt,
-      authorizedAt: now,
+      sampledAt: new Date(candidateSample).toISOString(),
+      authorizedAt: new Date(currentTime).toISOString(),
       maxSpendCents: maxSpend,
       stopLossBps: 600,
       trailingActivationBps: 1200,
@@ -308,18 +356,21 @@ export class PaperLedger {
     this.reservations.set(authorizationId, authorization);
     this.entriesByTickMint.add(tickMint);
     this.#record({type: "RISK_AUTHORIZED", authorizationId, mint: candidate.mint,
-      maxSpendCents: maxSpend.toString(), tickId, observedAt: now});
+      maxSpendCents: maxSpend.toString(), tickId, observedAt: new Date(currentTime).toISOString()});
     return authorization;
   }
 
   executeEntry(authorization, quote, {now = Date.now()} = {}) {
     const eventId = quote?.eventId;
-    if (typeof eventId !== "string" || !eventId) return {status: "REJECT", reason: "stable entry event identity required"};
+    if (typeof eventId !== "string" || !SAFE_ID.test(eventId)) {
+      return {status: "REJECT", reason: "stable bounded entry event identity required"};
+    }
     const eventPayload = {
       eventId, authorizationId: authorization?.authorizationId, mint: authorization?.mint,
       chainId: authorization?.chainId, pool: authorization?.pool, quote: authorization?.quote,
       observedAt: quote.observedAt, priceMicros: quote.priceMicros,
-      decimals: quote.decimals, costs: quote.costs, mode: quote.mode
+      decimals: quote.decimals, costs: quote.costs, source: quote.source,
+      executable: quote.executable, mode: quote.mode
     };
     const eventDigest = digest(eventPayload);
     if (this.eventDigests.has(eventId)) {
@@ -359,6 +410,9 @@ export class PaperLedger {
     if (tokenAtoms <= 0n || allIn > auth.maxSpendCents || allIn > this.cashCents) {
       return {status: "UNFILLED", reason: "conservative base-unit rounding leaves no affordable fill"};
     }
+    if (!this.newWorkAllowed || !this.#canRecord(2)) {
+      return {status: "UNFILLED", reason: "session stopped or audit capacity unavailable"};
+    }
     const stopPriceMicros = BigInt(quote.priceMicros) * 9_400n / BPS;
     if (stopPriceMicros <= 0n) return {status: "UNFILLED", reason: "modeled initial stop is invalid"};
 
@@ -377,8 +431,8 @@ export class PaperLedger {
       entryNotionalCents: notional,
       entryCostCents: allIn,
       entryCosts: costs.values,
-      entryObservedAt: quote.observedAt,
-      lastObservedAt: quote.observedAt,
+      entryObservedAt: new Date(fillTime).toISOString(),
+      lastObservedAt: new Date(fillTime).toISOString(),
       executionRealistic: false
     };
     const result = Object.freeze({
@@ -397,18 +451,19 @@ export class PaperLedger {
     });
     this.cashCents -= allIn;
     this.positions.set(auth.mint, position);
+    this.lastEquitySnapshot = null;
     this.reservations.delete(auth.authorizationId);
     for (const [key, value] of Object.entries(costs.values)) this.costTotals.entry[key] += value;
     this.eventDigests.set(eventId, eventDigest);
     this.results.set(eventId, result);
     this.#record({type: "STOP_ARMED", eventId, mint: auth.mint,
-      stopPriceMicros: stopPriceMicros.toString(), observedAt: quote.observedAt});
+      stopPriceMicros: stopPriceMicros.toString(),       observedAt: new Date(fillTime).toISOString()});
     this.#record({type: "PAPER_FILL", ...result});
     return result;
   }
 
   #closeAtQuote(position, quote, eventId, {reason, gapThroughStop = false} = {}) {
-    if (typeof eventId !== "string" || !eventId) {
+    if (typeof eventId !== "string" || !SAFE_ID.test(eventId)) {
       return {status: "UNFILLED", reason: "stable exit event identity is missing"};
     }
     const payloadDigest = exitPayloadDigest(eventId, quote);
@@ -435,6 +490,7 @@ export class PaperLedger {
     const proceeds = grossCents - costs.total;
     const pnl = proceeds - position.entryCostCents;
     const grossPnl = grossCents - position.entryNotionalCents;
+    if (!this.#canRecord()) return {status: "UNFILLED", reason: "audit capacity unavailable; position remains open"};
     const result = Object.freeze({
       status: "CLOSED_PAPER",
       eventId,
@@ -455,6 +511,7 @@ export class PaperLedger {
     this.realizedPnlCents += pnl;
     for (const [key, value] of Object.entries(costs.values)) this.costTotals.exit[key] += value;
     this.positions.delete(position.mint);
+    this.lastEquitySnapshot = null;
     this.eventDigests.set(eventId, payloadDigest);
     this.results.set(eventId, result);
     this.#record({type: "PAPER_EXIT", ...result});
@@ -475,6 +532,10 @@ export class PaperLedger {
         requests.push({mint, status: "UNFILLED", reason: "risk-reducing quote unavailable; position remains open"});
         continue;
       }
+      if (!this.#canRecord()) {
+        requests.push({mint, status: "UNFILLED", reason: "audit capacity reached; position remains unchanged"});
+        continue;
+      }
       const price = BigInt(quote.priceMicros);
       if (price > position.highWaterPriceMicros) position.highWaterPriceMicros = price;
       if (price * BPS >= position.entryPriceMicros * 11_200n) position.trailingActive = true;
@@ -482,10 +543,10 @@ export class PaperLedger {
         const trailingStop = position.highWaterPriceMicros * 9_400n / BPS;
         if (trailingStop > position.stopPriceMicros) position.stopPriceMicros = trailingStop;
       }
-      position.lastObservedAt = quote.observedAt;
-      const eventId = typeof quote.eventId === "string" && quote.eventId
+      position.lastObservedAt = new Date(observed).toISOString();
+      const eventId = typeof quote.eventId === "string" && SAFE_ID.test(quote.eventId)
         ? quote.eventId
-        : `daily-loss:${this.runId}:${mint}:${String(quote.observedAt)}`;
+        : `daily-loss:${this.runId}:${mint}:${new Date(observed).toISOString()}`;
       const exit = this.#closeAtQuote(position, quote, eventId, {
         reason: "DAILY_LOSS_LIMIT",
         gapThroughStop: price < position.stopPriceMicros
@@ -496,7 +557,7 @@ export class PaperLedger {
   }
 
   observeExitQuote(quote, {now = quote?.observedAt, eventId = quote?.eventId} = {}) {
-    if (typeof eventId === "string" && this.eventDigests.has(eventId)) {
+    if (typeof eventId === "string" && SAFE_ID.test(eventId) && this.eventDigests.has(eventId)) {
       if (this.eventDigests.get(eventId) !== exitPayloadDigest(eventId, quote)) {
         return {status: "REJECT", reason: "exit event identity reused with different payload"};
       }
@@ -513,17 +574,22 @@ export class PaperLedger {
       return {status: "VALUATION_UNAVAILABLE", reason: "exit quote is stale, non-monotonic, or identity-mismatched"};
     }
     const price = BigInt(quote.priceMicros);
-    if (price > position.highWaterPriceMicros) position.highWaterPriceMicros = price;
-    if (price * BPS >= position.entryPriceMicros * 11_200n) position.trailingActive = true;
-    if (position.trailingActive) {
-      const trailingStop = position.highWaterPriceMicros * 9_400n / BPS;
-      if (trailingStop > position.stopPriceMicros) position.stopPriceMicros = trailingStop;
+    const highWater = price > position.highWaterPriceMicros ? price : position.highWaterPriceMicros;
+    const trailingActive = position.trailingActive || price * BPS >= position.entryPriceMicros * 11_200n;
+    const trailingStop = trailingActive ? highWater * 9_400n / BPS : position.stopPriceMicros;
+    const nextStop = trailingStop > position.stopPriceMicros ? trailingStop : position.stopPriceMicros;
+    const triggered = price <= nextStop;
+    if (!this.#canRecord(triggered ? 2 : 1)) {
+      return {status: "VALUATION_UNAVAILABLE", reason: "audit capacity reached; position remains unchanged"};
     }
-    position.lastObservedAt = quote.observedAt;
-    this.#record({type: "RISK_MARK", mint: position.mint, observedAt: quote.observedAt,
+    position.highWaterPriceMicros = highWater;
+    position.trailingActive = trailingActive;
+    position.stopPriceMicros = nextStop;
+    position.lastObservedAt = new Date(observed).toISOString();
+    this.#record({type: "RISK_MARK", mint: position.mint, observedAt: new Date(observed).toISOString(),
       priceMicros: price.toString(), highWaterPriceMicros: position.highWaterPriceMicros.toString(),
       stopPriceMicros: position.stopPriceMicros.toString(), trailingActive: position.trailingActive});
-    if (price > position.stopPriceMicros) return {status: "MARKED", stopPriceMicros: position.stopPriceMicros.toString()};
+    if (!triggered) return {status: "MARKED", stopPriceMicros: position.stopPriceMicros.toString()};
     return this.#closeAtQuote(position, quote, eventId, {
       reason: "STOP",
       gapThroughStop: price < position.stopPriceMicros
@@ -557,7 +623,7 @@ export class PaperLedger {
     }
     const valued = this.#snapshotEquity({now: end, marks});
     const remaining = [...this.positions.keys()];
-    this.#record({type: "RUN_FINISHED", observedAt: now, openMints: remaining});
+    this.#record({type: "RUN_FINISHED", observedAt: new Date(end).toISOString(), openMints: remaining});
     return {
       status: "FINISHED",
       entriesAllowed: false,
@@ -567,6 +633,7 @@ export class PaperLedger {
         markStatus: valued.status === "PASS" ? "MARKED" : "VALUATION_UNAVAILABLE"
       })),
       equityCents: valued.status === "PASS" ? valued.equityCents.toString() : null,
+      auditTruncated: this.auditTruncated,
       accounting: valued.status === "PASS" ? {
         cashCents: valued.cashCents.toString(),
         grossOpenValueCents: valued.grossOpenValueCents.toString(),
@@ -612,6 +679,7 @@ export class PaperLedger {
         highWaterPriceMicros: position.highWaterPriceMicros.toString()
       })),
       eventCount: this.events.length,
+      auditTruncated: this.auditTruncated,
       restartDisposition: PaperLedger.restartDisposition(),
       executionRealistic: false
     };

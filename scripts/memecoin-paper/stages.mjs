@@ -45,10 +45,17 @@ export const SCORE_SPEC = Object.freeze({
 
 const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 const EXTENSIONS = ["transferFee", "transferHook", "defaultFrozen", "permanentDelegate"];
+const SYNTHETIC_SOURCE = "SYNTHETIC_FIXTURE_ONLY";
 
 function timestamp(value) {
   const parsed = typeof value === "number" ? value : Date.parse(value);
-  return Number.isFinite(parsed) ? parsed : null;
+  return Number.isSafeInteger(parsed) && Number.isFinite(new Date(parsed).getTime()) ? parsed : null;
+}
+
+function safeLogString(value, maxLength = 200) {
+  if (typeof value !== "string") return null;
+  return value.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/https?:\/\/\S+/gi, "[url]")
+    .slice(0, maxLength);
 }
 
 function evidenceResult(status, reason, evidence = null) {
@@ -69,12 +76,17 @@ function boundEvidence(candidate, key, now, maxAgeMs = FILTER_POLICY.maxEvidence
   }
   const observed = timestamp(evidence.observedAt);
   const sample = timestamp(candidate.sampledAt);
-  const age = observed === null ? null : now - observed;
+  const evaluationTime = timestamp(now);
+  const age = observed === null || evaluationTime === null ? null : evaluationTime - observed;
   const binding = evidence.binding;
-  if (typeof evidence.source !== "string" || !evidence.source.trim()) {
+  if (typeof evidence.source !== "string" || !evidence.source.trim() || evidence.source.length > 256) {
     return {result: evidenceResult("UNKNOWN", "evidence source missing", evidence), value: undefined};
   }
-  if (observed === null || age < 0 || age > maxAgeMs || sample === null || observed > sample) {
+  if ((candidate.source === SYNTHETIC_SOURCE) !== (evidence.source === SYNTHETIC_SOURCE)) {
+    return {result: evidenceResult("UNKNOWN", "synthetic and real evidence may not be mixed", evidence), value: undefined};
+  }
+  if (observed === null || evaluationTime === null || age === null ||
+      age < 0 || age > maxAgeMs || sample === null || observed > sample) {
     return {result: evidenceResult("UNKNOWN", "evidence stale, future-dated, or outside sample", evidence), value: undefined};
   }
   if (evidence.verified !== true) {
@@ -103,23 +115,55 @@ function numeric(value) {
   return typeof value === "number" && Number.isFinite(value);
 }
 
+function candidateBinding(candidate) {
+  return {
+    chainId: candidate?.chainId ?? null,
+    mint: candidate?.mint ?? null,
+    pool: candidate?.pool ?? null,
+    quote: candidate?.quote ?? null,
+    source: candidate?.source ?? null,
+    sampledAt: timestamp(candidate?.sampledAt)
+  };
+}
+
+function sameBinding(left, right) {
+  return Boolean(left && right && left.chainId === right.chainId && left.mint === right.mint &&
+    left.pool === right.pool && left.quote === right.quote && left.source === right.source &&
+    left.sampledAt !== null && left.sampledAt === right.sampledAt);
+}
+
 function identityFilter(candidate, now) {
   const sample = timestamp(candidate?.sampledAt);
-  const age = sample === null ? null : now - sample;
+  const evaluationTime = timestamp(now);
+  const age = sample === null || evaluationTime === null ? null : evaluationTime - sample;
+  const identityEvidence = {
+    source: candidate?.source ?? null,
+    observedAt: candidate?.sampledAt ?? null,
+    slot: candidate?.slot ?? null,
+    coverage: {
+      chainId: candidate?.chainId ?? null,
+      mint: candidate?.mint ?? null,
+      pool: candidate?.pool ?? null,
+      quote: candidate?.quote ?? null
+    }
+  };
   if (candidate?.chainId === undefined || candidate.chainId === null || candidate.chainId === "") {
-    return evidenceResult("UNKNOWN", "chain identity is missing");
+    return evidenceResult("UNKNOWN", "chain identity is missing", identityEvidence);
   }
-  if (candidate.chainId !== "solana") return evidenceResult("REJECT", "chain is not Solana");
+  if (candidate.chainId !== "solana") return evidenceResult("REJECT", "chain is not Solana", identityEvidence);
   if (!BASE58.test(candidate?.mint ?? "") || !BASE58.test(candidate?.pool ?? "") ||
-      !BASE58.test(candidate?.quote ?? "")) return evidenceResult("UNKNOWN", "mint, selected pool, or quote identity is invalid");
+      !BASE58.test(candidate?.quote ?? "")) {
+    return evidenceResult("UNKNOWN", "mint, selected pool, or quote identity is invalid", identityEvidence);
+  }
   if (typeof candidate?.source !== "string" || !candidate.source.trim() ||
-      sample === null || age < 0 || age > FILTER_POLICY.maxEvidenceAgeMs) {
-    return evidenceResult("UNKNOWN", "source or sample time missing, stale, or future-dated");
+      sample === null || age === null || age < 0 || age > FILTER_POLICY.maxEvidenceAgeMs) {
+    return evidenceResult("UNKNOWN", "source or sample time missing, stale, or future-dated", identityEvidence);
   }
   return evidenceResult("PASS", "Solana mint, selected pool, quote, source, and sample time are bound", {
     source: candidate.source,
     observedAt: candidate.sampledAt,
-    coverage: {identityBound: true, pool: candidate.pool, quote: candidate.quote}
+    slot: candidate.slot ?? null,
+    coverage: identityEvidence.coverage
   });
 }
 
@@ -128,12 +172,13 @@ export function scout(rows, {now = Date.now(), maxCandidates = 1000, source = "U
     throw new TypeError("invalid bounded scout input");
   }
   const bounded = rows.slice(0, maxCandidates);
+  const loggedSource = safeLogString(source, 120);
   const groups = new Map();
   const audit = [];
   for (const row of bounded) {
     const mint = typeof row?.mint === "string" ? row.mint : "";
     if (!BASE58.test(mint)) {
-      audit.push({stage: "Scout", status: "REJECT", reason: "invalid or missing mint identity", source});
+      audit.push({stage: "Scout", status: "REJECT", reason: "invalid or missing mint identity", source: loggedSource});
       continue;
     }
     const list = groups.get(mint) ?? [];
@@ -152,11 +197,11 @@ export function scout(rows, {now = Date.now(), maxCandidates = 1000, source = "U
       stage: "Scout",
       status: "SELECTED",
       mint,
-      selectedPool: chosen.pool ?? null,
-      quote: chosen.quote ?? null,
-      chainId: chosen.chainId ?? null,
-      sampledAt: chosen.sampledAt ?? null,
-      source
+      selectedPool: BASE58.test(chosen.pool ?? "") ? chosen.pool : null,
+      quote: BASE58.test(chosen.quote ?? "") ? chosen.quote : null,
+      chainId: safeLogString(chosen.chainId, 32),
+      sampledAt: timestamp(chosen.sampledAt) === null ? null : new Date(timestamp(chosen.sampledAt)).toISOString(),
+      source: loggedSource
     });
     for (const duplicate of ordered.slice(1)) {
       audit.push({
@@ -164,9 +209,9 @@ export function scout(rows, {now = Date.now(), maxCandidates = 1000, source = "U
         status: "REJECT",
         reason: "duplicate mint; selected pool evidence is not mixed",
         mint,
-        selectedPool: chosen.pool ?? null,
-        duplicatePool: duplicate.pool ?? null,
-        source
+        selectedPool: BASE58.test(chosen.pool ?? "") ? chosen.pool : null,
+        duplicatePool: BASE58.test(duplicate.pool ?? "") ? duplicate.pool : null,
+        source: loggedSource
       });
     }
   }
@@ -174,7 +219,7 @@ export function scout(rows, {now = Date.now(), maxCandidates = 1000, source = "U
     selected,
     audit: audit.slice(0, maxCandidates * 2),
     discovery: {
-      source,
+      source: loggedSource,
       observedRecords: bounded.length,
       truncated: rows.length > bounded.length,
       exhaustive: false,
@@ -192,10 +237,11 @@ export function filterCandidate(candidate, {now = Date.now(), holdUntil = null} 
       const sampled = timestamp(row.sampledAt);
       if (sampled === null) return null;
       const age = sampled - pairTime;
+      if (age < 0) return null;
       return age >= FILTER_POLICY.minPairAgeMs && age <= FILTER_POLICY.maxPairAgeMs;
     }, "pair age is outside 30-minute to 72-hour bounds"),
     marketCap: evaluate(candidate, "marketCapUsd", now, (value, row) =>
-      !numeric(value) || value !== row.marketCapUsd ? null
+      !numeric(value) || value < 0 || value !== row.marketCapUsd ? null
         : value >= FILTER_POLICY.minMarketCapUsd && value <= FILTER_POLICY.maxMarketCapUsd,
     "actual USD market cap is outside USD 300,000 to USD 20,000,000"),
     tokenDecimals: evaluate(candidate, "tokenDecimals", now, (value, row) =>
@@ -219,20 +265,21 @@ export function filterCandidate(candidate, {now = Date.now(), holdUntil = null} 
       return null;
     }, "pool LP is not verifiably burned or locked for the proposed hold"),
     liquidity: evaluate(candidate, "liquidityUsd", now, value =>
-      !numeric(value) ? null : value >= FILTER_POLICY.minLiquidityUsd,
+      !numeric(value) || value < 0 ? null : value >= FILTER_POLICY.minLiquidityUsd,
       "liquidity is below USD 40,000"),
     volume1h: evaluate(candidate, "volume1hUsd", now, value =>
-      !numeric(value) ? null : value >= FILTER_POLICY.minVolume1hUsd,
+      !numeric(value) || value < 0 ? null : value >= FILTER_POLICY.minVolume1hUsd,
       "trailing one-hour volume is below USD 50,000"),
     top10Owners: evaluate(candidate, "top10OwnerPct", now, (value, row, coverage) =>
-      !numeric(value) || coverage.aggregation !== "owner" ||
-      typeof coverage.denominatorAtoms !== "string" || !/^\d+$/.test(coverage.denominatorAtoms) ||
+      !numeric(value) || value < 0 || coverage.aggregation !== "owner" ||
+      typeof coverage.denominatorAtoms !== "string" || coverage.denominatorAtoms.length > 40 ||
+      !/^\d+$/.test(coverage.denominatorAtoms) ||
       BigInt(coverage.denominatorAtoms) <= 0n || !Array.isArray(coverage.exclusions) ||
       !coverage.exclusions.includes("selected_pool") || !coverage.exclusions.includes("burned_supply")
         ? null : value <= FILTER_POLICY.maxTop10OwnerPct,
     "owner-aggregated top-ten concentration exceeds 25% or coverage is incomplete"),
     devHoldings: evaluate(candidate, "devAssociatedPct", now, (value, row, coverage) =>
-      !numeric(value) || coverage.associationMethod !== "documented"
+      !numeric(value) || value < 0 || coverage.associationMethod !== "documented"
         ? null : value <= FILTER_POLICY.maxDevAssociatedPct,
     "dev-associated holdings exceed 3% or attribution is incomplete"),
     priorRug: evaluate(candidate, "crediblePriorRug", now, value => {
@@ -245,10 +292,10 @@ export function filterCandidate(candidate, {now = Date.now(), holdUntil = null} 
     },
     "credible attributable prior-rug evidence found or history is incomplete"),
     bundledLaunch: evaluate(candidate, "bundledLaunchPct", now, (value, row, coverage) =>
-      !numeric(value) ? null : value <= FILTER_POLICY.maxBundledLaunchPct,
+      !numeric(value) || value < 0 ? null : value <= FILTER_POLICY.maxBundledLaunchPct,
     "bundled-launch supply exceeds 10% or coverage is incomplete"),
     priceRunup: evaluate(candidate, "priceChange1hPct", now, value =>
-      !numeric(value) ? null : value < FILTER_POLICY.maxPriceChange1hPct,
+      !numeric(value) || value < -100 ? null : value < FILTER_POLICY.maxPriceChange1hPct,
     "one-hour price increase is at least 80%"),
     tokenExtensions: evaluate(candidate, "tokenExtensions", now, value => {
       if (!value || !EXTENSIONS.every(name => typeof value[name] === "boolean")) return null;
@@ -265,12 +312,14 @@ export function filterCandidate(candidate, {now = Date.now(), holdUntil = null} 
   const statuses = Object.values(checks).map(check => check.status);
   const status = statuses.includes("REJECT") ? "REJECT"
     : statuses.includes("UNKNOWN") ? "UNKNOWN" : "PASS";
-  return {status, accepted: status === "PASS", checks};
+  return {status, accepted: status === "PASS", identity: candidateBinding(candidate), checks};
 }
 
 function normalize(key, value) {
   if (!numeric(value)) return null;
   const [minimum, maximum] = SCORE_SPEC.normalizations[key];
+  if (value <= minimum) return 0;
+  if (value >= maximum) return 100;
   const scale = 1_000_000n;
   const toScaled = number => BigInt(Math.round(number * Number(scale)));
   const scaledValue = toScaled(value);
@@ -286,8 +335,12 @@ export function analyzeCandidate(candidate, {
   filterResult,
   smartWalletAllowlist = {status: "UNSET", provenance: null}
 } = {}) {
+  const identity = candidateBinding(candidate);
   if (!filterResult?.accepted) {
-    return {status: "BLOCKED", reason: "hard filters must all PASS before scoring", score: null};
+    return {status: "BLOCKED", reason: "hard filters must all PASS before scoring", score: null, identity};
+  }
+  if (!sameBinding(filterResult.identity, identity)) {
+    return {status: "BLOCKED", reason: "hard-filter decision is not bound to this candidate sample", score: null, identity};
   }
   const metrics = candidate?.analystEvidence;
   const components = {};
@@ -301,7 +354,9 @@ export function analyzeCandidate(candidate, {
     if (key === "qualifiedSmartWallets" &&
         (smartWalletAllowlist?.status !== "VERIFIED" ||
          typeof smartWalletAllowlist.provenance !== "string" ||
-         smartWalletAllowlist.provenance.trim() === "")) {
+         smartWalletAllowlist.provenance.trim() === "" ||
+         ((candidate.source === SYNTHETIC_SOURCE) !==
+          (smartWalletAllowlist.provenance === SYNTHETIC_SOURCE)))) {
       components[key] = evidenceResult("UNKNOWN", "smart-wallet allowlist or provenance is unset", item);
       components[key].score = null;
       continue;
@@ -322,13 +377,18 @@ export function analyzeCandidate(candidate, {
       components[key] = {...evidenceResult("UNKNOWN", "wallet count must be a nonnegative integer", item), score: null};
       continue;
     }
+    if ((key === "momentum15m" || key === "holderGrowthPct1h") && value < -100 ||
+        key === "liquidityMarketCapPct" && value <= 0) {
+      components[key] = {...evidenceResult("UNKNOWN", "component value is outside its valid domain", item), score: null};
+      continue;
+    }
     const score = normalize(key, value);
     components[key] = score === null
       ? {...evidenceResult("UNKNOWN", "component value unavailable", item), score: null}
       : {...evidenceResult("PASS", "component normalized by the versioned proposed specification", item), score};
   }
   if (Object.values(components).some(component => component.status !== "PASS")) {
-    return {status: "SCORE_UNAVAILABLE", reason: "all six independently evidenced score components are required", score: null, components};
+    return {status: "SCORE_UNAVAILABLE", reason: "all six independently evidenced score components are required", score: null, components, identity};
   }
   const weighted = Object.entries(SCORE_SPEC.weights)
     .reduce((sum, [key, weight]) => sum + components[key].score * weight, 0);
@@ -339,6 +399,7 @@ export function analyzeCandidate(candidate, {
     score,
     threshold: SCORE_SPEC.threshold,
     version: SCORE_SPEC.version,
+    identity,
     components,
     weights: SCORE_SPEC.weights
   };

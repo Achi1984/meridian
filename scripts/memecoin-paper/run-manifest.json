@@ -38,7 +38,7 @@
     "maxBytesPerResponse": 1048576,
     "maxBytesPerRun": 10485760,
     "maxEvents": 10000,
-    "maxCandidates": 1000
+    "maxCandidates": 300
   },
   "http": {
     "redirects": "error",
