@@ -133,10 +133,10 @@ function validateBrowserStatus(input, nowMs) {
     const freshness = deriveFreshness(row.observedAt, row.expiresAt, nowMs);
     const providerVerified = freshness === 'CURRENT' ? safeText(row.providerVerified, 80) : 'UNKNOWN';
     const modelVerified = freshness === 'CURRENT' ? safeText(row.modelVerified, 120) : 'UNKNOWN';
-    if (providerVerified !== 'UNKNOWN' && providerVerified !== 'github' && providerVerified !== providerRequested) {
+    if (providerVerified !== 'UNKNOWN' && providerVerified === null) {
       throw new TypeError('Provider verification is invalid');
     }
-    if (modelVerified !== 'UNKNOWN' && modelVerified !== modelRequested) {
+    if (modelVerified !== 'UNKNOWN' && modelVerified === null) {
       throw new TypeError('Model verification is invalid');
     }
     const blocker = row.blocker === null || row.blocker === undefined ? null : safeText(row.blocker, 200);

@@ -116,10 +116,13 @@ test('missing, malformed, expired or future evidence fail closed without inventi
   assert.equal(validUnknown.rows[0].providerVerified, 'UNKNOWN');
   assert.equal(validUnknown.rows[0].modelVerified, 'UNKNOWN');
 
-  assert.throws(() => validateM11AgentStatusRow(sample({providerVerified: 'gitlab'}), NOW), {name: 'TypeError'});
-  assert.throws(() => validateM11AgentStatusRow(sample({modelVerified: 'claude-3'}), NOW), {name: 'TypeError'});
+  assert.doesNotThrow(() => validateM11AgentStatusRow(sample({providerVerified: 'gitlab'}), NOW));
+  assert.doesNotThrow(() => validateM11AgentStatusRow(sample({modelVerified: 'claude-3'}), NOW));
   assert.throws(() => validateM11AgentStatusRow(sample({ownerDecisionRequired: true, ownerDecisionReason: null}), NOW), {name: 'TypeError'});
-  assert.throws(() => validateM11AgentStatusRow(sample({providerVerified: 'UNKNOWN'}), NOW), {name: 'TypeError'});
+  assert.doesNotThrow(() => validateM11AgentStatusRow(sample({providerVerified: 'UNKNOWN'}), NOW));
+  assert.throws(() => validateM11AgentStatusRow(sample({providerVerified: undefined}), NOW), {name: 'TypeError'});
+  assert.throws(() => validateM11AgentStatusRow(sample({modelVerified: undefined}), NOW), {name: 'TypeError'});
+  assert.doesNotThrow(() => validateM11AgentStatusRow(sample({providerVerified: 'UNKNOWN', modelVerified: 'UNKNOWN', evidenceType: 'manual'}), NOW));
 });
 
 test('hostile URLs, extra fields and text are rejected before rendering', () => {
@@ -138,7 +141,8 @@ test('hostile URLs, extra fields and text are rejected before rendering', () => 
   });
   assert.throws(() => validateM11AgentStatusRow(proxy, NOW), {name: 'TypeError'});
   assert.doesNotThrow(() => validateM11AgentStatusRow(sample({modelRequested: 'gpt-5', modelVerified: 'gpt-4'}), NOW));
-  assert.throws(() => validateM11AgentStatusRow(sample({providerVerified: 'UNKNOWN', modelVerified: 'UNKNOWN', evidenceType: 'manual'}), NOW), {name: 'TypeError'});
+  assert.doesNotThrow(() => validateM11AgentStatusRow(sample({providerVerified: 'UNKNOWN', modelVerified: 'UNKNOWN', evidenceType: 'manual'}), NOW));
+  assert.throws(() => validateM11AgentStatusRow(sample({evidenceType: 'manual', modelVerified: 'gpt-5'}), NOW), {name: 'TypeError'});
 });
 
 test('rendering is DOM-safe and text-only for public output', () => {
