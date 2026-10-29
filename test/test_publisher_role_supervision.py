@@ -20,6 +20,9 @@ f=importlib.util.module_from_spec(spec); spec.loader.exec_module(f)
 import publisher_role_supervision as m
 import publisher_role_journal as journal
 BUDGETS=dict.fromkeys(('setup','connect','mutation','cleanup','exit'),0.15)
+SUPERVISOR_ROOT_ENV='MERIDIAN_SUPERVISOR_TEST_ROOT'
+if os.environ.get(SUPERVISOR_ROOT_ENV):
+    m.ROOT=Path(os.environ[SUPERVISOR_ROOT_ENV])
 
 
 class SupervisionTests(unittest.TestCase):
@@ -28,6 +31,16 @@ class SupervisionTests(unittest.TestCase):
         self.root=Path(self.tmp.name); self.jroot=self.root/'journal'; self.jroot.mkdir(mode=0o700)
         self.parent=os.getpid()
     def tearDown(self): self.tmp.cleanup()
+    @contextlib.contextmanager
+    def private_supervisor_root(self):
+        private=tempfile.TemporaryDirectory(prefix='meridian-supervisor-src-')
+        private_root=Path(private.name)
+        supervisor_path=private_root/'publisher_test_password_setup.py'
+        supervisor_path.write_bytes((m.ROOT/'publisher_test_password_setup.py').read_bytes())
+        os.chmod(supervisor_path,0o600)
+        try:
+            with patch.object(m,'ROOT',private_root): yield private_root
+        finally: private.cleanup()
     def factory(self,*,hang=None,fail=None,exit_error=False,suppress=False,nonzero=False):
         parent=self.parent; root=self.root; jroot=self.jroot
         @contextlib.contextmanager
@@ -67,7 +80,8 @@ class SupervisionTests(unittest.TestCase):
             self.fail(f'child {pid} not already reaped at return: waitpid={observed!r}')
 
     def test_actual_fork_driver_journal_success_and_restart_replay(self):
-        result=self.run_worker()
+        with self.private_supervisor_root():
+            result=self.run_worker()
         self.assertEqual(result['outcome'],'CONFIRMED')
         self.assertTrue(result['parentObservedConfirmedChildExit'])
         self.assertTrue(all(v is False for k,v in result.items() if k not in ('outcome','parentObservedConfirmedChildExit')))
@@ -121,22 +135,13 @@ class SupervisionTests(unittest.TestCase):
             if worker.exists() and found==int(worker.read_text()):
                 observed.append((found,status))
             return found,status
-        private=tempfile.TemporaryDirectory(prefix='meridian-supervisor-src-')
-        private_root=Path(private.name)
-        supervisor_path=private_root/'publisher_test_password_setup.py'
-        source=(m.ROOT/'publisher_test_password_setup.py').read_bytes()
-        supervisor_path.write_bytes(source)
-        os.chmod(supervisor_path,0o600)
-        try:
+        with self.private_supervisor_root():
             with (
-                patch.object(m,'ROOT',private_root),
                 patch.object(m.transition,'drive_transition',side_effect=observe_drive),
                 patch.object(m.os,'waitpid',side_effect=observe_waitpid),
                 patch.dict(BUDGETS,{'exit':3.0}),
             ):
                 self.assert_unknown(self.run_worker(self.factory())); self.assert_reaped()
-        finally:
-            private.cleanup()
         self.assertEqual(confirmed.read_text(),'confirmed')
         self.assertEqual(exit7.read_text(),'exit7')
         self.assertTrue(any(os.WIFEXITED(status) and os.WEXITSTATUS(status)==7 for _,status in observed),observed)
@@ -216,8 +221,11 @@ class SupervisionTests(unittest.TestCase):
         self.assertFalse((self.root/'worker').exists())
 
     def test_real_parent_death_kills_protected_worker(self):
-        run=subprocess.run([sys.executable,'-I','-B',str(Path(__file__).resolve()),'parent-death'],
-                           capture_output=True,text=True,timeout=6)
+        with self.private_supervisor_root() as private_root:
+            env=dict(os.environ)
+            env[SUPERVISOR_ROOT_ENV]=str(private_root)
+            run=subprocess.run([sys.executable,'-I','-B',str(Path(__file__).resolve()),'parent-death'],
+                               capture_output=True,text=True,timeout=6,env=env)
         self.assertEqual(run.returncode,0,run.stderr)
 
 
