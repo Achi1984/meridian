@@ -1,43 +1,49 @@
 # M11 event coordinator — preparation only
 
-Status: `PREPARATION_ONLY`; the pilot manifest is disabled and has no start/end
-timestamps. The owner authorized this reviewable source packet in mailbox #942
-comment 6453205248, not activation. This packet does not install a workflow,
-schedule, network transport, mutation adapter, credential, or continuous runtime.
-It does not create another UI/cache writer.
+Status: `PREPARATION_ONLY`. The 24-hour/three-packet manifest remains disabled
+with start/end unset. The owner authorized source preparation, not activation.
+This packet installs no workflow, schedule, transport, mutation adapter,
+credential, or continuous runtime. It does not create another UI/cache writer.
 
 ## Current evidence and capability matrix
 
-The checkpoint at preparation time selects mailbox #942 and records
-`lastSeenCommentId: 6449657435`; the mailbox has since advanced. Read through
-comment 6453229023 before acting on this packet. Comment 6453205248 authorizes
-preparation only. Comment 6453229023 records PR #970 merged at
-`d62004e5a9d3194dd6ca16982d39999246585431`, with exact-head Claude review and
-pre-merge CI, but its exact-merge Release Safety, Runtime Smoke, Release
-Coordinator, and Pages checks were still pending. It says #966 integration
-follows those postchecks and #971 remains preparation. Do not treat the
-checkpoint's `liveMainAtCreation` (`f23fc2db…`) or this source packet as current
-merge/postcheck evidence; reconcile live main and relevant checks before any
-future action. This worktree started from `d309b3559cfcda4580fc2a286977b1033b7ccd06`;
-live `main` has moved to the #970 merge, so this packet is not integrated with
-current main and has no merge readiness claim. PR #973 is still a draft, based
-on `d309b3559cfcda4580fc2a286977b1033b7ccd06`, and GitHub reports it behind.
+Reconciliation snapshot: current `main` is
+`34eb7dfd804fed8769bec3d8f9e7bb0557c31b62` (2026-10-29). The coordinator
+branch has been integrated with that main; the prior supervisor timing patch was
+dropped in favor of the current-main copy. Earlier coordinator CI run
+`40632733971` is for the former `eacb230…` / `d62004e…` pair and is not evidence
+for this reconciled source. No current-pair coordinator CI or final independent
+Claude review is claimed here.
 
-| Capability | Read-only evidence | Classification for this packet |
+The following are source observations and dated run receipts, not proof that a
+new workflow or credential works:
+
+| Capability | Current evidence | What it establishes / does not establish |
 |---|---|---|
-| Interactive GitHub connector assignment | The issue scope records successful interactive connector assignment. | Reported interactive capability only; not proof of unattended runner credentials, an Actions API, or event-driven continuation. |
-| Native issue assignment endpoint | `scripts/native-copilot-task-dispatch.py`, `scripts/native-copilot-task-runtime.py`, and `docs/autonomy/native-assignment-pilot-readiness.md` require a verified user-to-server token (PAT, OAuth, or GitHub App user access token); they explicitly exclude Actions `GITHUB_TOKEN` and App installation tokens. | **Unsupported with the ordinary Actions token.** No credential was inspected, provisioned, or used here. |
-| Scoped Copilot request workflows | `copilot-coding-pilot.yml` gates a fixed `workflow_run`, exact source SHA, and owner `triggering_actor`; its generation job declares `copilot-requests: write`. `copilot-ci-event-pilot.yml` is a capped, old-branch, read-only observation pilot with a similar permission. | The permission and narrow source adapters exist; they do not prove this coordinator can dispatch arbitrary Copilot work, nor that an unattended PR assignment succeeds. No live dispatch was attempted. |
-| Copilot CLI read-only path | `copilot-readonly-pilot.yml` has a manual, owner/main/one-shot gate and a restricted tool-free CLI call. Its output is explicitly not review or merge approval. | Narrow connectivity/observation only; not source authoring, review, or general event continuation. |
-| Claude reviewer | `claude-mailbox-review.yml` accepts an owner-authored `@claude CROSS_MODEL_REQUEST` on issue #942, declares `id-token: write`, requires `CLAUDE_CODE_OAUTH_TOKEN`, and scopes the reviewer to read-only work plus a mailbox receipt. | A scoped reviewer path exists; it is not an unattended coding dispatcher or CI approval mechanism. Its required credential was not inspected. |
-| Observed Claude failure | Run `40580614439`, job `122458678108`, ended failed: Claude returned a successful result after 45 turns, exceeding the configured 35-turn maximum. | That invocation is not a successful complete review receipt. Turn-limit/partial output remains incomplete and must retain coverage, never become a green gate. |
-| Candidate CI observation | The latest observed Release Safety run at source-only head `a904b50d794c84d32c4559947773ba2008e0764f` (run `40583298725`) was `action_required`; the jobs listing returned zero jobs. `backend-safety.yml` grants workflow-level `contents: read` and `pull-requests: read`. | No successful hosted test evidence. The run predates this documentation/manifest update. Approval/approval-bypass capability is unsupported here; do not infer it from `GITHUB_TOKEN` or the interactive connector. |
+| Interactive Copilot assignment | Prior task delivery in #997 was explicitly requested by an owner and completed its R2 focused suite (33/33, receipt `6488608926`). | Human-started assignment/delivery can work. It does not prove a reusable unattended Actions dispatch or automatic resume. |
+| Native issue assignment | `scripts/native-copilot-task-dispatch.py` and `scripts/native-copilot-task-runtime.py` implement a bounded, inert assignment adapter. It requires an externally verified PAT, OAuth token, or GitHub App user-to-server token; it excludes Actions `GITHUB_TOKEN` and App installation tokens. | The adapter is source, not a deployed workflow or successful unattended dispatch. No credential was inspected, provisioned, or used. |
+| Existing Copilot request workflow | `.github/workflows/copilot-coding-pilot.yml` accepts a fixed historical source SHA (`99eff911…`), successful Release Safety, attempt cap, and owner `triggering_actor`; only its generation job has `copilot-requests: write`. Publishing has separate contents-write and publisher-App scope. | A one-packet, immutable pilot, not general current-PR dispatch. Its scoped permission does not prove this coordinator can call the Copilot API. |
+| Existing CI event pilot | `.github/workflows/copilot-ci-event-pilot.yml` is pinned to the old `feat/v11-version-history-20261010` branch, October 10 deadline, three-run cap, and read-only event summary; it also declares `copilot-requests: write`. | Expired, branch-specific observation experiment. It is not a current coordinator listener or general author/continuation path. |
+| Claude reviewer trigger | `.github/workflows/claude-mailbox-review.yml` only accepts issue #942 comments by `Achi1984` containing `@claude` and `CROSS_MODEL_REQUEST`. It declares `contents: read`, `issues: write`, `pull-requests: read`, `actions: read`, and `id-token: write`; Claude is read-only, with `Edit,Write` disallowed and 35 turns. | An owner-authored mailbox request can launch a bounded independent review. A bot comment, arbitrary issue text, or coordinator event cannot pass this gate. This does not approve CI or request PR review automatically. |
+| Exact-pair hosted CI observation | Release Safety run `40821781547`, attempt 2, job `123277027311`, passed 2,877/2,877 on PR #1000 head `a013a202…` / base `34eb7df…`. Its independent final Claude review was requested in mailbox comment `6488665928` and was still in progress at snapshot. | Demonstrates one successful current-main-pair hosted run and a separately owner-triggered reviewer path, not coordinator readiness or reliability proof. |
+| CI permissions / approval | `.github/workflows/backend-safety.yml` declares only `contents: read` and `pull-requests: read`; no workflow-write or approval capability is declared. | `action_required` cannot be approved by this packet. The interactive connector and `GITHUB_TOKEN` are not evidence of an unattended approval path. |
+| Merge and postchecks | No coordinator merge adapter exists. Four exact-merge checks are configured in the manifest, but the coordinator has no authenticated collector or execution path for them. | Source merge remains Lead-owned; automatic merge/deploy, approval bypass, and automatic post-merge continuation are unsupported. |
 
-These are source and run observations, not proof that a future workflow, token,
-external webhook, or GitHub policy will behave the same way. The repository's
-native assignment adapter documents an immutable issue/body/run pin and
-user-token prerequisite; its tested/offline status is not a successful
-unattended dispatch. No credentials or secret values were read.
+### Flow evidence and gaps
+
+The last observed chain is intentionally split across different packets: the
+#997 author completed its requested R2 work; #1000 then obtained exact-pair
+Release Safety success and requested independent Claude review. Those events
+were not joined by a coordinator and do not show unattended continuation.
+Issue #942 remains the durable human-facing mailbox, but comments are receipts,
+not authenticated locks. The source-only coordinator run and any previously
+green CI on its old head/base pair are stale for the current base.
+
+Current event discrimination is a key gap: Claude's workflow accepts only an
+owner-authored comment on #942, while the coding pilot is fixed to a historical
+SHA and owner-triggered workflow run. A coordinator-generated comment cannot
+impersonate `Achi1984`; no general accepted bot trigger or automatic ChatGPT
+session wake-up exists. Do not infer either from `copilot-requests: write`.
 
 ## Reducer and replay contract
 
@@ -93,62 +99,132 @@ after every write. No such hosted CAS/lease guard is implemented or proven by
 this packet. An unknown mutation outcome blocks the lane until authoritative
 read reconciliation; it must never be blindly retried.
 
-## Pilot proposal
+## Disabled pilot proposal
 
-`m11-event-coordinator/pilot-manifest.json` proposes a 24-hour, three-packet
-pilot, capped at three concurrent WIP packages, one writer, and one concurrent
-draft PR. It is
-`enabled: false`; `startUtc` and `endUtc` are `null`; repository, PR, and actor
-allowlists are explicit owner-approval placeholders. Network, mutation,
-dispatch, review-request, automatic merge/deploy, and approval-bypass adapters
-are all false. Costs are existing resources only; no plan upgrade is proposed.
-Publisher/research remain paused, and runtime/trading authorization remains
-false. Required check workflow IDs are unset placeholders; determine the
-applicable exact workflow/check identity before proposing activation.
+`m11-event-coordinator/pilot-manifest.json` still proposes at most 24 hours,
+three packets, three WIP packages, one writer, and one draft PR. It is
+`enabled: false`; start/end and repository/PR/actor allowlists remain unset or
+owner-approval placeholders. All network, mutation, dispatch, review-request,
+automatic merge/deploy, and approval-bypass flags remain false. Existing
+resources only; no plan upgrade. Publisher/research stay paused and runtime or
+trading authority stays false. Exact required workflow identities still need
+verification from authoritative runs before any future activation review.
 
-## Activation checklist — none of these steps is automatic
+## Concrete handoff design — reviewable proposal only
 
-1. Reconcile live `main`, #942 since the checkpoint cursor, PR #970's four
-   exact-merge postchecks, #966's integration gate, and #971's preparation
-   state. Re-pin exact repo/PR/head/base and the eventual 24-hour UTC window.
-2. Obtain owner decisions for concrete repository, PR, and authenticated-actor
-   allowlists, packet count, WIP limit, and one writer. Replace placeholders
-   only in a separately reviewed activation package.
-3. Demonstrate the exact unattended Copilot operation independently. For the
-   native issue-assignment endpoint, the documented credential types are a
-   user-to-server PAT, OAuth token, or GitHub App user access token; the
-   required secret name/type and minimum endpoint permissions must be approved
-   without exposing values. `GITHUB_TOKEN` and App installation tokens are not
-   substitutes. The existing `copilot-requests: write` workflow permission is
-   scoped to its fixed pilots and is not proof for this operation. If that
-   capability cannot be established, leave dispatch blocked and report it.
-4. Select and review a durable CAS/lease/fencing service and its narrowly
-   scoped credential. No atomic lease is supported by issue comments; no
-   service credential or hosted guard currently exists in this packet.
-5. If Claude review is retained, independently approve use of the existing
-   `CLAUDE_CODE_OAUTH_TOKEN` Actions secret (OAuth token) and mailbox
-   `issues: write` receipt permission. Neither authorizes CI approval, merge,
-   deployment, or a broader agent task.
-6. Require exact-pair successful CI, full independent Claude coverage/verdict,
-   and Lead review of this concrete activation package. The Lead remains sole
-   merge owner. No activation decision is requested or claimed here.
-7. Preserve publisher/research pauses and all canonical execution, PnL,
-   Discovery, Validation, Holdout, Paper, and Live boundaries. No automatic
-   merge/deploy, approval bypass, workflow/schedule/permission/secret change,
-   runtime activation, plan upgrade, or trading authority.
+The desired progression is one bounded event-driven state machine:
 
-### Permission and credential names/types for a future review
+| Transition | Required authoritative evidence | Proposed next action | Present status |
+|---|---|---|---|
+| Admit packet → author | Owner-approved repo/PR/head/base and an authenticated, current event; external WIP count below three; one writer lease. | Dispatch one fixed task with an idempotency key for repo/PR/head/base/phase. | No generic authenticated event collector or general Copilot dispatcher is installed. |
+| Author → CI | Re-read PR head/base and author delivery; select current Release Safety workflow/run/attempt from Actions API, not event payload alone. | Wait while pending; on failure/action-required produce one consolidated exception/correction receipt; do not retry an unchanged request. | Existing Release Safety runs provide CI, but no current coordinator subscribes or persists their state. The workflow token declares only `contents: read` and `pull-requests: read`. |
+| CI success → independent review | Full success on exact PR/head/base and current workflow selection. | Request a complete independent review bound to the exact CI run/attempt/workflow. | Current Claude workflow only starts from an owner-authored #942 comment. A bot cannot trigger it. A new authenticated event path is required for automatic review. |
+| Review → correction or Lead merge | All required coverage parts and complete verdict tied to the exact successful CI pair; truncated/turn-limited/partial responses remain incomplete. | `REVISION_REQUIRED`: one consolidated correction dispatch, then return to exact-pair CI. `GREEN_LIGHT`: Lead may perform an already-authorized routine merge; coordinator never merges. | No automatic PR review request or Lead/ChatGPT wake-up path exists. No workflow receives merge authority. |
+| Merge → four postchecks | Authoritatively observed merge SHA plus current run selection and pinned workflow identity for every applicable check. | `COMPLETE` only when all four checks succeed on that SHA; otherwise one deduplicated exception and wait/reconcile. | The reducer models this gate, but no current collector persists or advances it. The manifest IDs are placeholders. |
 
-| Purpose | Proposed name/type | Status |
+### Event authentication, durable state, and unknown outcomes
+
+An eventual collector must treat webhook/workflow payloads as hints, then
+re-fetch the repository, PR, head/base, workflow identity, run attempt,
+conclusion, actor and `triggering_actor`, review threads, merge SHA, and checks
+through GitHub's authenticated API. It must reject forks, wrong repositories,
+unlisted actors/workflows, stale head/base, incomplete pagination, and unknown
+current-run ordering. It must never parse arbitrary issue text as executable
+instructions. The offline reducer's actor strings and selection revisions are
+not authenticated evidence.
+
+Each persisted transition needs a durable atomic compare-and-swap on
+`(repository, PR, head, base, phase, revision)`, a lease owner/expiry, a
+monotonically increasing fencing epoch, and a unique operation key. Commit the
+event digest and new revision before offering the next action. Re-read the lease
+and exact source pair immediately before any side effect. If a remote write has
+an unknown outcome, mark it `UNKNOWN`, reconcile the authoritative remote state,
+and never blindly retry. Emit one exception receipt per stable action key; later
+unchanged event deliveries are no-ops.
+
+There are two existing fencing mechanisms to evaluate, neither a complete
+coordinator lease:
+
+* `SQLiteAttemptJournal` in `scripts/native-copilot-task-dispatch.py` is a
+  durable, one-shot operation fence using SQLite `FULL` synchronous commits.
+  It requires a pre-provisioned existing database on stable, access-controlled
+  storage that survives runner/process restarts. The source does not establish
+  that hosted Actions has such shared storage, nor does this journal implement
+  the coordinator's mutable revision/lease state.
+* The dispatcher's `github_ref` mode proceeds only after this invocation
+  receives and validates HTTP 201 for a create-only claim ref. It is useful as a
+  fail-closed one-operation claim, but its own documentation requires validation
+  of ref atomicity/retention. It does not alone provide renewable leases,
+  monotonically fenced writers across phases, or atomic state-plus-assignment.
+  A comment is never a substitute for either mechanism.
+
+Accordingly, current source supports no proven unattended CAS/lease store. Do
+not enable side effects until one store is selected, its crash/concurrency/
+rollback properties are integration-tested, and UNKNOWN reconciliation is
+exercised. A future ref-backed state log or shared SQLite service is a design
+candidate, not a capability claim.
+
+### Minimum viable next step and exact remaining authority
+
+The smallest useful no-mutation stage is a separately reviewed, read-only
+`workflow_run` observer for the exact Release Safety workflow. It would
+re-fetch exact-pair run and PR state, persist an allowlisted status/coverage
+receipt, and stop at `WAITING` on pending, action-required, ambiguous, or
+unsupported events. It cannot dispatch an author, trigger the current Claude
+workflow, approve `action_required`, request a review, merge, or deploy. A
+temporary artifact is not durable state; a mailbox comment is not a lock.
+Therefore that observer alone does not remove the owner/Lead handoff.
+
+To attempt end-to-end continuation in a later, separately approved package:
+
+1. Reuse the native task dispatcher's immutable task pins and no-retry behavior
+   for author assignment only. Its existing names/types are a user-to-server
+   PAT, OAuth token, or GitHub App user access token; Actions `GITHUB_TOKEN` and
+   App installation tokens are explicitly ineligible for native assignment.
+   The one-packet request must pin issue body digest, main SHA, workflow/run/
+   attempt, actor, assignees, and expiry. A secret name such as
+   `COPILOT_NATIVE_ASSIGNMENT_USER_TOKEN` is only a proposal; no credential was
+   inspected or requested. If this capability is not approved and verified,
+   keep author dispatch `BLOCKED`.
+2. Separately review a collector/reviewer trigger that accepts authenticated
+   exact-pair workflow events. The existing Claude trigger cannot be reached by
+   a bot comment. If Claude is used, its existing OAuth secret name is
+   `CLAUDE_CODE_OAUTH_TOKEN`; its existence/value was not inspected and its
+   existing owner-comment workflow does not authorize automatic event calls.
+   Only a separately reviewed workflow may use it for the same read-only review
+   scope and full-coverage contract.
+3. Select and test the durable CAS/lease/fencing store before enabling any
+   automatic dispatch or receipt. The native SQLite journal and create-only
+   ref are candidates with the limits above; neither is proven as a shared
+   multi-phase state store in hosted Actions.
+4. Preserve explicit human stops: `action_required` approval remains owner
+   controlled; merge remains Lead-owned with no coordinator merge token; deploy
+   remains outside scope. Under a future standing owner policy, Lead need not
+   ask for another “Go” for a routine eligible merge, but an external Lead
+   invocation is still required. Actions cannot wake ChatGPT by themselves.
+5. Persist progress and deduplicated exceptions in #942 only after a separately
+   reviewed, narrowly scoped receipt path exists. Ask the owner only for a
+   strategic decision, a real permission/credential/cost/runtime change, or an
+   unresolved blocker; never duplicate an unchanged request. Do not invent
+   approval for this disabled preparation packet.
+
+No new workflow, schedule, permission, credential, secret, spending, runtime,
+automatic merge/deploy, approval bypass, or activation is authorized here. The
+manifest's 24-hour/three-packet proposal remains disabled and unset until the
+concrete implementation, exact permissions, current evidence, and test plan
+receive independent source review and owner/security approval.
+
+### Authority inventory (names and types only)
+
+| Operation | Minimum capability candidate | Current result |
 |---|---|---|
-| Current evidence reads | `GITHUB_TOKEN`: ephemeral Actions installation token; minimal `contents: read`, `pull-requests: read`, `actions: read`, and `issues: read` | No coordinator workflow exists; exact scope must be reviewed before activation. |
-| Create a review request | `pull-requests: write` | Not enabled; use only after exact-pair successful CI. |
-| Post a mailbox receipt | `issues: write` | Not enabled by this packet; a comment is not a lock. |
-| Copilot request API | `copilot-requests: write` | Present only in existing fixed pilots; this packet has no proven general-purpose dispatch adapter. |
-| Native Copilot issue assignment | Proposed name `COPILOT_NATIVE_ASSIGNMENT_USER_TOKEN`; user-to-server PAT, OAuth token, or GitHub App user access token | Not provisioned or verified. Required fine-grained endpoint permissions and provenance remain owner/security-review questions. |
-| Claude reviewer | `CLAUDE_CODE_OAUTH_TOKEN`: OAuth token stored as an Actions secret | Existing reviewer workflow prerequisite; not inspected. |
-| Existing publisher | `MERIDIAN_PUBLISHER_APP_PRIVATE_KEY`: GitHub App private key | Separate publisher path, paused and not required/authorized for this coordinator. |
-| Approve `action_required`, merge, or deploy | No coordinator credential | Unsupported; retain explicit human owner action and existing gates. No `actions: write`, `contents: write`, approval bypass, or merge permission is proposed. |
+| Read current PR/run/check/review state | Actions installation token with `actions: read`, `pull-requests: read`, `contents: read`; exact event collector must be separately reviewed. | Existing Release Safety workflow has only contents/PR read; no coordinator collector. |
+| Native Copilot issue assignment | Verified user-to-server PAT/OAuth/GitHub App user token, plus immutable task pins and a durable one-shot fence. | Adapter source only; no live capability proof or secret inspection. |
+| Claude independent review | Existing `CLAUDE_CODE_OAUTH_TOKEN` OAuth secret plus a separately reviewed authenticated event path. | Current workflow only accepts owner-authored #942 request. |
+| Status receipt | Narrow `issues: write` if #942 comments are selected as the receipt channel; retain state separately under CAS. | Existing Claude workflow has it only for requested review receipts; no coordinator receipt path. |
+| Persistent operation fence/state | Existing SQLite attempt journal on stable shared storage, or a validated ref-backed CAS design. | Storage durability, full-state CAS, retention, and fencing are unproven. |
+| Approve `action_required`, merge, deploy | No coordinator capability. | Unsupported and intentionally remains a human/Lead boundary; no `actions: write`, merge, or approval-bypass permission proposed. |
+| Publisher/research/runtime/trading | None. | Remain paused/false; not part of this coordinator. |
 
 ## Local checks
 

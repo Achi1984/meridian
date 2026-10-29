@@ -22,6 +22,35 @@
     "release-coordinator": "<PINNED-WORKFLOW-ID-REQUIRED>",
     "pages": "<PAGES-CHECK-IDENTITY-REQUIRED>"
   },
+  "evidenceSnapshot": {
+    "mainSha": "34eb7dfd804fed8769bec3d8f9e7bb0557c31b62",
+    "observedAtUtc": "2026-10-29T05:19:00Z",
+    "coordinatorCi": "STALE_OLD_HEAD_BASE_PAIR",
+    "currentPairCoordinatorCi": "NOT_RUN",
+    "independentClaudeAcceptance": "PENDING"
+  },
+  "handoffDesign": {
+    "status": "PROPOSAL_ONLY",
+    "progression": [
+      "AUTHOR_DELIVERY",
+      "EXACT_PAIR_CI",
+      "COMPLETE_INDEPENDENT_REVIEW",
+      "CORRECTION_OR_LEAD_MERGE",
+      "FOUR_EXACT_MERGE_POSTCHECKS"
+    ],
+    "eventAuthentication": "REAUTHORITATIVE_GITHUB_API_READ_REQUIRED",
+    "stateStore": "DURABLE_CAS_LEASE_AND_FENCING_NOT_SELECTED_OR_PROVEN",
+    "nativeAssignment": "USER_TO_SERVER_TOKEN_REQUIRED_NOT_PROVISIONED",
+    "claudeTrigger": "OWNER_COMMENT_ONLY_CURRENTLY",
+    "actionRequiredApproval": "OWNER_ONLY",
+    "merge": "LEAD_ONLY_NO_COORDINATOR_TOKEN",
+    "unknownMutation": "RECONCILE_BEFORE_ANY_RETRY",
+    "ownerExceptions": [
+      "STRATEGIC_DECISION",
+      "PERMISSION_CREDENTIAL_COST_OR_RUNTIME_CHANGE",
+      "UNRESOLVED_BLOCKER"
+    ]
+  },
   "repositoryAllowlist": [
     "<OWNER-APPROVED-REPOSITORY-ALLOWLIST-REQUIRED>"
   ],
