@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {collectExactPair} from '../scripts/autonomy/m11-coordinator-collector.mjs';
 import {createCoordinatorStateStore} from '../scripts/autonomy/m11-coordinator-state-store.mjs';
 import {REQUIRED_REVIEW_PARTS} from '../scripts/autonomy/m11-event-coordinator.mjs';
+import {createAdmissionRecordState, reduceAdmissionRecord} from '../scripts/autonomy/m11-admission-record.mjs';
 import {startReviewLifecycle, observeReviewLifecycle} from '../scripts/autonomy/m11-review-lifecycle.mjs';
 
 const REPOSITORY = 'Achi1984/meridian';
@@ -35,14 +36,14 @@ function collectConfig() {
   };
 }
 
-function runData({headSha = HEAD, baseSha = BASE} = {}) {
+function runData({headSha = HEAD, baseSha = BASE, runId = RUN_ID, runAttempt = RUN_ATTEMPT, runNumber = SELECTION_REVISION} = {}) {
   return {
-    id: RUN_ID,
+    id: runId,
     repository: REPOSITORY,
     workflowId: WORKFLOW_ID,
     workflowPath: '.github/workflows/backend-safety.yml',
-    runAttempt: RUN_ATTEMPT,
-    runNumber: SELECTION_REVISION,
+    runAttempt,
+    runNumber,
     status: 'completed',
     conclusion: 'success',
     headSha,
@@ -53,8 +54,8 @@ function runData({headSha = HEAD, baseSha = BASE} = {}) {
   };
 }
 
-function fixtureApi({headSha = HEAD, baseSha = BASE} = {}) {
-  const run = runData({headSha, baseSha});
+function fixtureApi({headSha = HEAD, baseSha = BASE, runId = RUN_ID, runAttempt = RUN_ATTEMPT, runNumber = SELECTION_REVISION} = {}) {
+  const run = runData({headSha, baseSha, runId, runAttempt, runNumber});
   return {
     authenticated: true,
     authenticationEvidence: Object.freeze({
@@ -87,7 +88,8 @@ function fixtureApi({headSha = HEAD, baseSha = BASE} = {}) {
         baseSha,
         complete: true,
         truncated: false,
-        text: 'diff --git a/scripts/autonomy/m11-review-lifecycle.mjs b/scripts/autonomy/m11-review-lifecycle.mjs\n+integration'
+        text: 'diff --git a/scripts/autonomy/m11-review-lifecycle.mjs b/scripts/autonomy/m11-review-lifecycle.mjs\n+integration',
+        changedPaths: ['scripts/autonomy/m11-review-lifecycle.mjs']
       };
     },
     async listWorkflowRuns() {
@@ -98,8 +100,8 @@ function fixtureApi({headSha = HEAD, baseSha = BASE} = {}) {
         items: [{
           id: 81,
           name: 'syntax',
-          runId: RUN_ID,
-          runAttempt: RUN_ATTEMPT,
+          runId: run.id,
+          runAttempt: run.runAttempt,
           workflowId: WORKFLOW_ID,
           status: 'completed',
           conclusion: 'success',
@@ -112,22 +114,45 @@ function fixtureApi({headSha = HEAD, baseSha = BASE} = {}) {
   };
 }
 
-async function collectReady({headSha = HEAD, baseSha = BASE, nowMs = START + 100} = {}) {
+async function collectReady({
+  headSha = HEAD,
+  baseSha = BASE,
+  nowMs = START + 100,
+  runId = RUN_ID,
+  runAttempt = RUN_ATTEMPT,
+  runNumber = SELECTION_REVISION
+} = {}) {
   return collectExactPair({
     hint: {
       eventName: 'workflow_run',
       repository: REPOSITORY,
-      workflowRunId: RUN_ID,
-      workflowRunAttempt: RUN_ATTEMPT
+      workflowRunId: runId,
+      workflowRunAttempt: runAttempt
     },
     config: collectConfig(),
-    api: fixtureApi({headSha, baseSha}),
+    api: fixtureApi({headSha, baseSha, runId, runAttempt, runNumber}),
     now: () => nowMs
   });
 }
 
+const UNKNOWN_STAGE_MAP = Object.freeze({
+  STALE_BEFORE_DISPATCH: 'ADMISSION',
+  STALE_BEFORE_OBSERVE: 'EFFECT',
+  OBSERVE_UNKNOWN: 'EFFECT',
+  OBSERVE_AMBIGUOUS: 'EFFECT',
+  OBSERVED_RUN_IDENTITY_MISMATCH: 'EFFECT',
+  COLLECTION_PIN_MISMATCH: 'EFFECT',
+  BOUNDARY_REJECTED: 'EFFECT',
+  STALE_BEFORE_RECEIPT: 'CHECKPOINT',
+  RECEIPT_DELIVERY_UNKNOWN: 'CHECKPOINT',
+  RECEIPT_READBACK_UNKNOWN: 'CHECKPOINT',
+  RECEIPT_STATE_COMMIT_UNKNOWN: 'CHECKPOINT',
+  DISPATCH_ACK_UNKNOWN: 'ADMISSION',
+  DISPATCH_ACK_AMBIGUOUS: 'ADMISSION'
+});
+
 class DurableLifecycleBackend {
-  constructor({failTransitionKinds = []} = {}) {
+  constructor({failTransitionKinds = [], quota = 3} = {}) {
     this.capabilities = {
       immutableCommits: true,
       validatedRevisionChain: true,
@@ -137,11 +162,32 @@ class DurableLifecycleBackend {
       atomicExpectedOidCAS: true
     };
     this.snapshot = {revision: 0, oid: 'root', chainValid: true};
+    this.admissionState = createAdmissionRecordState({enabled: true, totalQuota: quota});
     this.claims = new Map();
     this.commits = new Map();
     this.nextCommit = 0;
     this.failTransitionKinds = new Set(failTransitionKinds);
     this.failedKinds = new Set();
+  }
+
+  claimByIdentity(actionKey, executionKey) {
+    return this.claims.get(executionKey) || [...this.claims.values()]
+      .find(claim => claim.actionKey === actionKey && claim.executionKey === executionKey) || null;
+  }
+
+  admissionEventResult(event) {
+    return reduceAdmissionRecord(this.admissionState, event);
+  }
+
+  applyUnknownAdmission(claim, stage) {
+    const mappedStage = UNKNOWN_STAGE_MAP[stage] || 'CHECKPOINT';
+    const result = this.admissionEventResult({
+      kind: 'MARK_UNKNOWN',
+      logicalActionId: claim.actionKey,
+      executionKey: claim.executionKey,
+      stage: mappedStage
+    });
+    if (result.changed === true) this.admissionState = result.state;
   }
 
   async readSnapshot() {
@@ -150,11 +196,24 @@ class DurableLifecycleBackend {
 
   async createOnlyClaim(input) {
     if (input.maxActiveClaims !== 1 || input.maxPackets !== 3) return {status: 'INVALID_LIMIT'};
-    if (this.claims.has(input.executionKey)) return {status: 'EXISTS'};
-    if ([...this.claims.values()].some(claim => claim.status !== 'COMMITTED')) return {status: 'BUSY'};
     if (input.expectedRevision !== this.snapshot.revision || input.expectedOid !== this.snapshot.oid) {
       return {status: 'STALE_EXPECTATION'};
     }
+    if (this.claims.has(input.executionKey)) return {status: 'EXISTS'};
+    const admission = this.admissionEventResult({
+      kind: 'SIMULATE_ADMISSION',
+      expectedRevision: this.admissionState.revision,
+      expectedTotalQuota: this.admissionState.totalQuota,
+      logicalActionId: input.actionKey,
+      executionKey: input.executionKey
+    });
+    if (admission.status === 'BLOCKED') {
+      if (admission.reason === 'QUOTA_EXHAUSTED') return {status: 'BUDGET_EXHAUSTED'};
+      if (admission.reason === 'DUPLICATE_EXECUTION_KEY') return {status: 'EXISTS'};
+      if (admission.reason === 'ACTIVE_GATE_HELD') return {status: 'BUSY'};
+      return {status: 'UNKNOWN'};
+    }
+    this.admissionState = admission.state;
     const claimId = `claim-${this.claims.size + 1}`;
     this.claims.set(input.executionKey, {
       status: 'CLAIMED',
@@ -164,7 +223,8 @@ class DurableLifecycleBackend {
       executionKey: input.executionKey,
       owner: input.owner,
       expectedRevision: input.expectedRevision,
-      expectedOid: input.expectedOid
+      expectedOid: input.expectedOid,
+      admissionRevision: this.admissionState.activeGate?.admissionRevision
     });
     return {status: 'CREATED', claimId};
   }
@@ -181,7 +241,7 @@ class DurableLifecycleBackend {
   }
 
   async compareAndSwapRef(input) {
-    const claim = this.claims.get(input.executionKey);
+    const claim = this.claimByIdentity(input.actionKey, input.executionKey);
     const current = this.snapshot;
     const commit = this.commits.get(input.newOid);
     if (!claim || !commit || claim.claimId !== input.claimId || claim.actionKey !== input.actionKey
@@ -210,12 +270,21 @@ class DurableLifecycleBackend {
       claim.headSha = transition.headSha;
       claim.baseSha = transition.baseSha;
       claim.diffDigest = transition.diffDigest;
+      claim.changedPathDigest = transition.changedPathDigest;
+      claim.changedPathCount = transition.changedPathCount;
       claim.runId = transition.runId;
       claim.runAttempt = transition.runAttempt;
       claim.workflowId = transition.workflowId;
       claim.selectionRevision = transition.selectionRevision;
       claim.reviewDeadlineAt = transition.reviewDeadlineAt;
     } else if (transition.kind === 'REVIEW_RESULT') {
+      const observed = this.admissionEventResult({
+        kind: 'EFFECT_OBSERVED',
+        logicalActionId: claim.actionKey,
+        executionKey: claim.executionKey,
+        admissionRevision: claim.admissionRevision
+      });
+      if (observed.changed === true) this.admissionState = observed.state;
       claim.status = 'REVIEWED';
       claim.lastStage = 'REVIEW_RESULT';
       claim.completionState = transition.completionState;
@@ -226,12 +295,31 @@ class DurableLifecycleBackend {
       claim.status = 'RECEIPT_POSTING';
       claim.lastStage = 'RECEIPT_POSTING';
     } else if (transition.kind === 'RECEIPT_DELIVERED') {
+      const observed = this.admissionEventResult({
+        kind: 'EFFECT_OBSERVED',
+        logicalActionId: claim.actionKey,
+        executionKey: claim.executionKey,
+        admissionRevision: claim.admissionRevision
+      });
+      if (observed.changed === true) this.admissionState = observed.state;
+      const completed = this.admissionEventResult({
+        kind: 'TERMINAL_COMPLETION',
+        evidence: {
+          logicalActionId: claim.actionKey,
+          executionKey: claim.executionKey,
+          admissionRevision: claim.admissionRevision,
+          effect: 'COMPLETED',
+          checkpointAcknowledged: true
+        }
+      });
+      if (completed.changed === true) this.admissionState = completed.state;
       claim.status = 'COMMITTED';
       claim.lastStage = 'RECEIPT_DELIVERED';
       claim.receiptId = transition.receiptId;
       claim.completionState = transition.completionState;
       claim.verdict = transition.verdict;
     } else if (transition.kind === 'UNKNOWN') {
+      this.applyUnknownAdmission(claim, transition.stage);
       claim.status = 'UNKNOWN';
       claim.lastStage = transition.stage;
     }
@@ -306,10 +394,198 @@ function lifecycleInput({collected, store, clock, dispatchReview, observeReview,
   };
 }
 
+test('reducer-backed store composition enforces quota=3, single-active gate, duplicate/restart, and stale revision conflict', async () => {
+  const backend = new DurableLifecycleBackend({quota: 3});
+  const store = createCoordinatorStateStore({backend, enabled: true});
+  const clock = {value: START + 100};
+  const receipt = {
+    postOnce: async () => ({status: 'CREATED', receiptId: 'receipt-q'}),
+    lookupByActionKey: async () => ({status: 'FOUND', complete: true, receiptIds: ['receipt-q']})
+  };
+
+  const firstCollected = await collectReady({nowMs: clock.value, runId: RUN_ID, runAttempt: 1, runNumber: 20});
+  const first = await startReviewLifecycle({
+    ...lifecycleInput({
+      collected: firstCollected,
+      store,
+      clock,
+      dispatchReview: async input => ({status: 'ACKNOWLEDGED', reviewRequestId: input.reviewRequestId, sessionId: input.sessionId}),
+      observeReview: async () => ({status: 'PENDING'}),
+      revalidate: async () => firstCollected,
+      receipt
+    })
+  });
+  assert.equal(first.status, 'REVIEW_PENDING');
+
+  const secondAttemptWhileGateHeld = await startReviewLifecycle({
+    ...lifecycleInput({
+      collected: await collectReady({nowMs: clock.value, runId: RUN_ID + 1, runAttempt: 2, runNumber: 21}),
+      store,
+      clock,
+      dispatchReview: async input => ({status: 'ACKNOWLEDGED', reviewRequestId: input.reviewRequestId, sessionId: input.sessionId}),
+      observeReview: async () => ({status: 'PENDING'}),
+      revalidate: async () => collectReady({nowMs: clock.value, runId: RUN_ID + 1, runAttempt: 2, runNumber: 21}),
+      receipt
+    })
+  });
+  assert.equal(secondAttemptWhileGateHeld.reason, 'CLAIM_OUTCOME_UNKNOWN');
+  assert.equal(backend.admissionState.activeGate.executionKey, firstCollected.executionKey);
+
+  const completeObserved = makeBoundaryCompletion({
+    reviewRequestId: first.reviewRequestId,
+    sessionId: first.sessionId,
+    collected: firstCollected,
+    nowMs: clock.value
+  });
+  const completeFirst = await observeReviewLifecycle({
+    ...lifecycleInput({
+      collected: firstCollected,
+      store,
+      clock,
+      dispatchReview: async () => ({status: 'ACKNOWLEDGED'}),
+      observeReview: async () => completeObserved,
+      revalidate: async () => firstCollected,
+      receipt
+    }),
+    executionKey: firstCollected.executionKey
+  });
+  assert.equal(completeFirst.status, 'COMPLETE');
+
+  const secondCollected = await collectReady({
+    nowMs: clock.value,
+    runId: RUN_ID + 2,
+    runAttempt: 2,
+    runNumber: 21,
+    headSha: 'c'.repeat(40),
+    baseSha: 'd'.repeat(40)
+  });
+  const second = await startReviewLifecycle({
+    ...lifecycleInput({
+      collected: secondCollected,
+      store,
+      clock,
+      dispatchReview: async input => ({status: 'ACKNOWLEDGED', reviewRequestId: input.reviewRequestId, sessionId: input.sessionId}),
+      observeReview: async () => ({status: 'PENDING'}),
+      revalidate: async () => secondCollected,
+      receipt
+    })
+  });
+  assert.equal(second.status, 'REVIEW_PENDING');
+  const completeSecond = await observeReviewLifecycle({
+    ...lifecycleInput({
+      collected: secondCollected,
+      store,
+      clock,
+      dispatchReview: async () => ({status: 'ACKNOWLEDGED'}),
+      observeReview: async () => makeBoundaryCompletion({
+        reviewRequestId: second.reviewRequestId,
+        sessionId: second.sessionId,
+        collected: secondCollected,
+        nowMs: clock.value
+      }),
+      revalidate: async () => secondCollected,
+      receipt
+    }),
+    executionKey: secondCollected.executionKey
+  });
+  assert.equal(completeSecond.status, 'COMPLETE');
+
+  const thirdCollected = await collectReady({
+    nowMs: clock.value,
+    runId: RUN_ID + 3,
+    runAttempt: 3,
+    runNumber: 22,
+    headSha: 'e'.repeat(40),
+    baseSha: 'f'.repeat(40)
+  });
+  const third = await startReviewLifecycle({
+    ...lifecycleInput({
+      collected: thirdCollected,
+      store,
+      clock,
+      dispatchReview: async input => ({status: 'ACKNOWLEDGED', reviewRequestId: input.reviewRequestId, sessionId: input.sessionId}),
+      observeReview: async () => ({status: 'PENDING'}),
+      revalidate: async () => thirdCollected,
+      receipt
+    })
+  });
+  assert.equal(third.status, 'REVIEW_PENDING');
+  const completeThird = await observeReviewLifecycle({
+    ...lifecycleInput({
+      collected: thirdCollected,
+      store,
+      clock,
+      dispatchReview: async () => ({status: 'ACKNOWLEDGED'}),
+      observeReview: async () => makeBoundaryCompletion({
+        reviewRequestId: third.reviewRequestId,
+        sessionId: third.sessionId,
+        collected: thirdCollected,
+        nowMs: clock.value
+      }),
+      revalidate: async () => thirdCollected,
+      receipt
+    }),
+    executionKey: thirdCollected.executionKey
+  });
+  assert.equal(completeThird.status, 'COMPLETE');
+
+  const quotaExceededCollected = await collectReady({
+    nowMs: clock.value,
+    runId: RUN_ID + 4,
+    runAttempt: 4,
+    runNumber: 23,
+    headSha: '1'.repeat(40),
+    baseSha: '2'.repeat(40)
+  });
+  const quotaExceeded = await startReviewLifecycle({
+    ...lifecycleInput({
+      collected: quotaExceededCollected,
+      store,
+      clock,
+      dispatchReview: async input => ({status: 'ACKNOWLEDGED', reviewRequestId: input.reviewRequestId, sessionId: input.sessionId}),
+      observeReview: async () => ({status: 'PENDING'}),
+      revalidate: async () => quotaExceededCollected,
+      receipt
+    })
+  });
+  assert.equal(quotaExceeded.reason, 'BUDGET_EXHAUSTED');
+
+  const duplicateRestart = await startReviewLifecycle({
+    ...lifecycleInput({
+      collected: firstCollected,
+      store,
+      clock,
+      dispatchReview: async input => ({status: 'ACKNOWLEDGED', reviewRequestId: input.reviewRequestId, sessionId: input.sessionId}),
+      observeReview: async () => ({status: 'PENDING'}),
+      revalidate: async () => firstCollected,
+      receipt
+    })
+  });
+  assert.equal(duplicateRestart.reason, 'ALREADY_CLAIMED');
+
+  const staleClaim = backend.claims.get(thirdCollected.executionKey);
+  const staleCommit = await store.commit({
+    claim: {...staleClaim, expectedRevision: staleClaim.expectedRevision - 1},
+    transition: {kind: 'UNKNOWN', stage: 'RECEIPT_DELIVERY_UNKNOWN'}
+  });
+  assert.equal(staleCommit.status, 'CONFLICT_RECONCILE');
+});
+
 test('composition: async start->pending->restart->observe->boundary->receipt and fail-closed matrix', async () => {
   const clock = {value: START + 100};
   const collected = await collectReady({nowMs: clock.value});
   assert.equal(collected.status, 'READY');
+
+  const missingRevalidateStart = await startReviewLifecycle({
+    enabled: true,
+    collected,
+    store: createCoordinatorStateStore({backend: new DurableLifecycleBackend(), enabled: true}),
+    reviewerIdentity: REVIEWER,
+    dispatchReview: async () => ({status: 'ACKNOWLEDGED'}),
+    now: () => clock.value,
+    expiresAt: END
+  });
+  assert.equal(missingRevalidateStart.reason, 'START_ADAPTER_UNAVAILABLE');
 
   const backend = new DurableLifecycleBackend();
   let store = createCoordinatorStateStore({backend, enabled: true});
@@ -436,6 +712,22 @@ test('composition: async start->pending->restart->observe->boundary->receipt and
   assert.equal(duplicateObservation.status, 'COMPLETE');
   assert.equal(receiptPosts, 1);
 
+  const missingRevalidateObserve = await observeReviewLifecycle({
+    enabled: true,
+    executionKey: collected.executionKey,
+    collected,
+    store,
+    observeReview: async () => ({status: 'PENDING'}),
+    trustedRuntimeSeam: {verifyRuntimeEvidence: value => value},
+    receipt: {
+      postOnce: async () => ({status: 'CREATED', receiptId: 'nope'}),
+      lookupByActionKey: async () => ({status: 'NOT_FOUND', complete: true, receiptIds: []})
+    },
+    now: () => clock.value,
+    expiresAt: END
+  });
+  assert.equal(missingRevalidateObserve.reason, 'OBSERVE_ADAPTER_UNAVAILABLE');
+
   const driftBackend = new DurableLifecycleBackend();
   const driftStore = createCoordinatorStateStore({backend: driftBackend, enabled: true});
   const driftCollected = await collectReady({nowMs: clock.value});
@@ -540,6 +832,43 @@ test('composition: async start->pending->restart->observe->boundary->receipt and
   });
   assert.equal(missingCoverageResult.status, 'UNKNOWN');
   assert.equal(missingCoverageResult.reason, 'BOUNDARY_REJECTED');
+
+  const witnessBackend = new DurableLifecycleBackend();
+  const witnessStore = createCoordinatorStateStore({backend: witnessBackend, enabled: true});
+  const witnessCollected = await collectReady({nowMs: clock.value});
+  const witnessStart = await startReviewLifecycle({
+    ...lifecycleInput({
+      collected: witnessCollected,
+      store: witnessStore,
+      clock,
+      dispatchReview: async input => ({status: 'ACKNOWLEDGED', reviewRequestId: input.reviewRequestId, sessionId: input.sessionId}),
+      observeReview: async () => ({status: 'PENDING'}),
+      revalidate: async () => witnessCollected,
+      receipt: {postOnce: async () => ({status: 'CREATED', receiptId: 'x'}), lookupByActionKey: async () => ({status: 'FOUND', complete: true, receiptIds: ['x']})}
+    })
+  });
+  assert.equal(witnessStart.status, 'REVIEW_PENDING');
+  const missingWitness = makeBoundaryCompletion({
+    reviewRequestId: witnessStart.reviewRequestId,
+    sessionId: witnessStart.sessionId,
+    collected: witnessCollected,
+    nowMs: clock.value
+  });
+  missingWitness.trustedRuntimeEvidence.runtime.changedPaths = [];
+  const missingWitnessResult = await observeReviewLifecycle({
+    ...lifecycleInput({
+      collected: witnessCollected,
+      store: witnessStore,
+      clock,
+      dispatchReview: async () => ({status: 'ACKNOWLEDGED'}),
+      observeReview: async () => missingWitness,
+      revalidate: async () => witnessCollected,
+      receipt: {postOnce: async () => ({status: 'CREATED', receiptId: 'x'}), lookupByActionKey: async () => ({status: 'FOUND', complete: true, receiptIds: ['x']})}
+    }),
+    executionKey: witnessCollected.executionKey
+  });
+  assert.equal(missingWitnessResult.status, 'UNKNOWN');
+  assert.equal(missingWitnessResult.reason, 'BOUNDARY_REJECTED');
 
   const dispatchBackend = new DurableLifecycleBackend();
   const dispatchStore = createCoordinatorStateStore({backend: dispatchBackend, enabled: true});
@@ -699,6 +1028,6 @@ test('composition: async start->pending->restart->observe->boundary->receipt and
     executionKey: unknownReceiptCollected.executionKey
   });
   assert.equal(duplicateUnknownObserve.status, 'UNKNOWN');
-  assert.equal(duplicateUnknownObserve.reason, 'TERMINAL_UNKNOWN_REQUIRES_MANUAL_RECONCILIATION');
+  assert.equal(duplicateUnknownObserve.reason, 'RECEIPT_FOUND_RECONCILE_REQUIRED');
   assert.equal(unknownReceiptPosts, 1);
 });

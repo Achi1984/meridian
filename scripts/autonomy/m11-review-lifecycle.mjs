@@ -37,19 +37,19 @@ function validDeadlineMs(value) {
   return Number.isSafeInteger(value) && value >= 1 && value <= MAX_REVIEW_DEADLINE_MS;
 }
 
-function parseChangedPaths(diff) {
-  if (typeof diff !== 'string' || diff.length === 0) return [];
-  const paths = [];
-  for (const line of diff.split('\n')) {
-    const match = /^diff --git a\/(.+) b\/(.+)$/.exec(line);
-    if (!match) continue;
-    const [, left, right] = match;
-    if (!right || right === '/dev/null') continue;
-    const path = right.startsWith('"') && right.endsWith('"') ? right.slice(1, -1) : right;
-    if (path.length > 0 && !paths.includes(path)) paths.push(path);
-    if (left === '/dev/null' && path.length > 0 && !paths.includes(path)) paths.push(path);
-  }
-  return paths;
+function validChangedPath(path) {
+  return typeof path === 'string'
+    && path.length > 0
+    && path.isWellFormed()
+    && Buffer.byteLength(path, 'utf8') <= 512;
+}
+
+function validChangedPathsInventory(paths) {
+  return Array.isArray(paths)
+    && paths.length > 0
+    && paths.length <= 1024
+    && paths.every(validChangedPath)
+    && new Set(paths).size === paths.length;
 }
 
 function sameCollectionPins(expected, observed) {
@@ -64,7 +64,10 @@ function sameCollectionPins(expected, observed) {
     && expected.runAttempt === observed.runAttempt
     && expected.workflowId === observed.workflowId
     && expected.selectionRevision === observed.selectionRevision
-    && expected.diffDigest === observed.diffDigest;
+    && expected.diffDigest === observed.diffDigest
+    && expected.changedPathDigest === observed.changedPathDigest
+    && Array.isArray(observed.changedPaths)
+    && validChangedPathsInventory(observed.changedPaths);
 }
 
 async function callWithinBudget(operation, input, remainingMs) {
@@ -94,7 +97,7 @@ async function callWithinBudget(operation, input, remainingMs) {
 }
 
 async function revalidateCollection({revalidate, expected, remainingMs, now}) {
-  if (typeof revalidate !== 'function') return {ok: true, collected: expected};
+  if (typeof revalidate !== 'function') return {ok: false, missing: true, timedOut: false};
   const value = await callWithinBudget(revalidate, {
     expected: Object.freeze({
       repository: expected.repository,
@@ -107,10 +110,14 @@ async function revalidateCollection({revalidate, expected, remainingMs, now}) {
       selectionRevision: expected.selectionRevision,
       actionKey: expected.actionKey,
       executionKey: expected.executionKey,
-      diffDigest: expected.diffDigest
+      diffDigest: expected.diffDigest,
+      changedPathDigest: expected.changedPathDigest
     })
   }, remainingMs);
   if (value.timedOut || value.error || !isVerifiedCollection(value.value, now())
+    || value.value?.status !== 'READY'
+    || !validChangedPathsInventory(value.value?.changedPaths)
+    || typeof value.value?.changedPathDigest !== 'string'
     || !sameCollectionPins(expected, value.value)) {
     return {ok: false, timedOut: value.timedOut};
   }
@@ -130,6 +137,8 @@ function claimHasPendingIdentity(claim) {
     && typeof claim.headSha === 'string'
     && typeof claim.baseSha === 'string'
     && typeof claim.diffDigest === 'string'
+    && typeof claim.changedPathDigest === 'string'
+    && positiveInteger(claim.changedPathCount)
     && claim.reviewer && typeof claim.reviewer === 'object';
 }
 
@@ -140,8 +149,7 @@ const TERMINAL_UNKNOWN_STAGES = new Set([
   'OBSERVE_AMBIGUOUS',
   'OBSERVED_RUN_IDENTITY_MISMATCH',
   'BOUNDARY_REJECTED',
-  'RECEIPT_DELIVERY_UNKNOWN',
-  'RECEIPT_READBACK_UNKNOWN',
+  'COLLECTION_PIN_MISMATCH',
   'STALE_BEFORE_OBSERVE',
   'STALE_BEFORE_RECEIPT'
 ]);
@@ -181,12 +189,15 @@ export async function startReviewLifecycle({
   claimOwner = 'm11-review-lifecycle'
 } = {}) {
   if (enabled !== true) return waiting('DISABLED');
-  if (!isVerifiedCollection(collected, now()) || collected.status !== 'READY') {
+  if (!isVerifiedCollection(collected, now()) || collected.status !== 'READY'
+    || !validChangedPathsInventory(collected.changedPaths)
+    || typeof collected.changedPathDigest !== 'string') {
     return waiting('UNVERIFIED_OR_EXPIRED_CI_COLLECTION');
   }
   if (!store || store.available !== true || typeof store.read !== 'function'
     || typeof store.claim !== 'function' || typeof store.commit !== 'function'
     || typeof dispatchReview !== 'function'
+    || typeof revalidate !== 'function'
     || !reviewerIdentity || ['provider', 'agent', 'model', 'transport']
       .some(key => typeof reviewerIdentity[key] !== 'string'
         || reviewerIdentity[key].length === 0
@@ -219,7 +230,8 @@ export async function startReviewLifecycle({
   try {
     const beforeClaim = await revalidateCollection({revalidate, expected: collected, remainingMs: remainingMs(), now});
     if (!beforeClaim.ok || budgetExpired()) {
-      return waiting(beforeClaim.timedOut ? 'REVALIDATION_TIMEOUT' : 'STALE_OR_UNKNOWN_BEFORE_CLAIM');
+      return waiting(beforeClaim.timedOut ? 'REVALIDATION_TIMEOUT'
+        : beforeClaim.missing ? 'FRESH_COLLECTION_REQUIRED' : 'STALE_OR_UNKNOWN_BEFORE_CLAIM');
     }
     const snapshotCall = await callWithinBudget(store.read.bind(store), {}, remainingMs());
     if (snapshotCall.timedOut || snapshotCall.error || budgetExpired() || snapshotCall.value?.status !== 'READY') {
@@ -264,6 +276,8 @@ export async function startReviewLifecycle({
       headSha: collected.headSha,
       baseSha: collected.baseSha,
       diffDigest: collected.diffDigest,
+      changedPathDigest: collected.changedPathDigest,
+      changedPathCount: collected.changedPaths.length,
       runId: collected.runId,
       runAttempt: collected.runAttempt,
       workflowId: collected.workflowId,
@@ -282,7 +296,7 @@ export async function startReviewLifecycle({
     const beforeDispatch = await revalidateCollection({revalidate, expected: beforeClaim.collected, remainingMs: remainingMs(), now});
     if (!beforeDispatch.ok || budgetExpired()) {
       await recordUnknown(store, claim, 'STALE_BEFORE_DISPATCH', remainingMs(), {reviewRequestId, sessionId});
-      return unknown('STALE_OR_UNKNOWN_BEFORE_DISPATCH', false);
+      return unknown(beforeDispatch.missing ? 'FRESH_COLLECTION_REQUIRED' : 'STALE_OR_UNKNOWN_BEFORE_DISPATCH', false);
     }
     const dispatchCall = await callWithinBudget(dispatchReview, {
       reviewRequestId,
@@ -333,9 +347,15 @@ export async function observeReviewLifecycle({
   maxRuntimeMs = MAX_RUNTIME_MS
 } = {}) {
   if (enabled !== true) return waiting('DISABLED');
+  if (!isVerifiedCollection(collected, now()) || collected?.status !== 'READY'
+    || !validChangedPathsInventory(collected?.changedPaths)
+    || typeof collected?.changedPathDigest !== 'string') {
+    return waiting('FRESH_COLLECTION_REQUIRED');
+  }
   if (typeof executionKey !== 'string' || !/^[a-f0-9]{64}$/.test(executionKey)
     || !store || store.available !== true || typeof store.reconcile !== 'function'
     || typeof store.commit !== 'function' || typeof observeReview !== 'function'
+    || typeof revalidate !== 'function'
     || !receipt || typeof receipt.postOnce !== 'function' || typeof receipt.lookupByActionKey !== 'function'
     || !trustedRuntimeSeam || typeof trustedRuntimeSeam.verifyRuntimeEvidence !== 'function'
     || !validRuntimeMs(maxRuntimeMs) || !positiveInteger(expiresAt)) {
@@ -366,6 +386,32 @@ export async function observeReviewLifecycle({
         ...baseResult()
       });
     }
+    if (claim.lastStage === 'RECEIPT_POSTING'
+      || (claim.status === 'UNKNOWN'
+        && ['RECEIPT_DELIVERY_UNKNOWN', 'RECEIPT_READBACK_UNKNOWN', 'RECEIPT_STATE_COMMIT_UNKNOWN']
+          .includes(claim.lastStage))) {
+      const lookup = await callWithinBudget(receipt.lookupByActionKey.bind(receipt), {
+        actionKey: claim.executionKey
+      }, remainingMs());
+      if (lookup.timedOut || lookup.error || lookup.value?.complete !== true
+        || !['FOUND', 'NOT_FOUND'].includes(lookup.value?.status)
+        || !Array.isArray(lookup.value?.receiptIds)) {
+        return unknown('RECEIPT_READBACK_UNKNOWN', true);
+      }
+      if (lookup.value.status === 'FOUND'
+        && lookup.value.receiptIds.length === 1
+        && typeof lookup.value.receiptIds[0] === 'string'
+        && lookup.value.receiptIds[0].length > 0) {
+        return Object.freeze({
+          status: 'UNKNOWN',
+          reason: 'RECEIPT_FOUND_RECONCILE_REQUIRED',
+          receiptId: lookup.value.receiptIds[0],
+          ...baseResult(),
+          externalEffects: true
+        });
+      }
+      return unknown('RECEIPT_NOT_CONFIRMED_NO_REPOST', true);
+    }
     if (claim.lastStage === 'REVIEW_RESULT'
       && claim.completionState && claim.completionState !== 'COMPLETE'
       && claim.completionState !== 'REVISION_REQUIRED') {
@@ -376,12 +422,9 @@ export async function observeReviewLifecycle({
         ...baseResult()
       });
     }
-    const baseline = collected && isVerifiedCollection(collected, now()) && sameCollectionPins(claim, collected)
-      ? collected
-      : null;
     const revalidated = await revalidateCollection({
       revalidate,
-      expected: baseline || claim,
+      expected: collected,
       remainingMs: remainingMs(),
       now
     });
@@ -390,9 +433,22 @@ export async function observeReviewLifecycle({
         reviewRequestId: claim.reviewRequestId,
         sessionId: claim.sessionId
       });
-      return unknown('STALE_OR_UNKNOWN_BEFORE_OBSERVE', false);
+      return unknown(revalidated.missing ? 'FRESH_COLLECTION_REQUIRED' : 'STALE_OR_UNKNOWN_BEFORE_OBSERVE', false);
     }
     const fresh = revalidated.collected;
+    if (claim.actionKey !== fresh.actionKey || claim.executionKey !== fresh.executionKey
+      || claim.headSha !== fresh.headSha || claim.baseSha !== fresh.baseSha
+      || claim.runId !== fresh.runId || claim.runAttempt !== fresh.runAttempt
+      || claim.workflowId !== fresh.workflowId || claim.selectionRevision !== fresh.selectionRevision
+      || claim.diffDigest !== fresh.diffDigest
+      || claim.changedPathDigest !== fresh.changedPathDigest
+      || claim.changedPathCount !== fresh.changedPaths.length) {
+      await recordUnknown(store, claim, 'COLLECTION_PIN_MISMATCH', remainingMs(), {
+        reviewRequestId: claim.reviewRequestId,
+        sessionId: claim.sessionId
+      });
+      return unknown('COLLECTION_PIN_MISMATCH', false);
+    }
     if (now() > claim.reviewDeadlineAt) {
       const timeoutCommit = await callWithinBudget(store.commit.bind(store), {
         claim,
@@ -474,12 +530,11 @@ export async function observeReviewLifecycle({
       });
     }
 
-    const changedPaths = parseChangedPaths(fresh.diff);
     const boundary = evaluateReviewBoundary({
       trustedRuntimeSeam,
       trustedRuntimeEvidence: observed.trustedRuntimeEvidence,
       modelOutput: observed.modelOutput,
-      expectedIdentity: expectedIdentityFromClaim(claim, changedPaths),
+      expectedIdentity: expectedIdentityFromClaim(claim, fresh.changedPaths),
       now
     });
     if (boundary.status !== 'ADMITTED') {
@@ -518,7 +573,7 @@ export async function observeReviewLifecycle({
         reviewRequestId: claim.reviewRequestId,
         sessionId: claim.sessionId
       });
-      return unknown('STALE_OR_UNKNOWN_BEFORE_RECEIPT', true);
+      return unknown(beforeReceipt.missing ? 'FRESH_COLLECTION_REQUIRED' : 'STALE_OR_UNKNOWN_BEFORE_RECEIPT', true);
     }
 
     const postingCommit = await callWithinBudget(store.commit.bind(store), {
