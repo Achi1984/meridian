@@ -22,36 +22,31 @@ const FRESHNESS_LABELS = Object.freeze({
 });
 
 const ALLOWED_GITHUB_PATHS = new Set(['issues', 'pull', 'actions', 'commit', 'discussions', 'releases']);
-const GITHUB_ANCHOR_RE = /^(?:issuecomment|discussioncomment)-\d+$/;
+const VALID_EVIDENCE_TYPES = new Set(['github-workflow', 'github-issue', 'github-pr', 'copilot-session', 'manual', 'unknown']);
+const SAFE_TEXT_RE = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F<>]/;
 
 function isPlainObject(value) {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
-  try {
-    return Object.getPrototypeOf(value) === Object.prototype;
-  } catch {
-    return false;
-  }
+  return value !== null && typeof value === 'object' && !Array.isArray(value) && Object.getPrototypeOf(value) === Object.prototype;
 }
 
-function safeText(value, fallback = 'Unbekannt') {
-  if (typeof value === 'string') {
-    const text = value.trim();
-    return text.length ? text : fallback;
-  }
-  return fallback;
-}
-
-function safeGitHubUrl(value) {
+function safeText(value, maxLength = 200) {
   if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  if (!trimmed || /[\x00-\x1F\x7F<>]/.test(trimmed)) return null;
+  const text = value.trim();
+  if (!text || text.length > maxLength || SAFE_TEXT_RE.test(text)) return null;
+  return text;
+}
+
+function validateGithubUrl(value) {
+  if (typeof value !== 'string') return null;
+  const text = value.trim();
+  if (!text || /[\x00-\x1F\x7F<>]/.test(text)) return null;
   try {
-    const parsed = new URL(trimmed);
+    const parsed = new URL(text);
     if (parsed.protocol !== 'https:') return null;
     if (parsed.username || parsed.password || parsed.port || parsed.hostname.toLowerCase() !== 'github.com') return null;
     if (parsed.search) return null;
     const hash = parsed.hash ? parsed.hash.slice(1) : '';
-    if (hash && !GITHUB_ANCHOR_RE.test(hash)) return null;
+    if (hash && !/^(?:issuecomment|discussioncomment)-\d+$/.test(hash)) return null;
     const path = parsed.pathname.split('/').filter(Boolean);
     if (path.length < 2) return null;
     const [owner, repo, kind, ...rest] = path;
@@ -79,33 +74,64 @@ function isoMs(value) {
 function deriveFreshness(observedAt, expiresAt, nowMs) {
   const observed = isoMs(observedAt);
   const expires = isoMs(expiresAt);
-  if (!Number.isFinite(nowMs)) return 'UNKNOWN';
+  if (typeof nowMs !== 'number' || !Number.isFinite(nowMs)) return 'UNKNOWN';
   if (observed === null || expires === null) return 'UNKNOWN';
   if (observed > nowMs) return 'UNKNOWN';
   if (expires <= nowMs) return 'STALE';
   return 'CURRENT';
 }
 
-function validateBrowserStatus(input, nowMs) {
-  if (!isPlainObject(input)) throw new TypeError('M11 agent status input must be a plain object');
-  const keys = Reflect.ownKeys(input);
+function validateEvidenceBinding(binding, expectedAgentId, expectedTaskId, expectedValue, nowMs) {
+  if (binding === null || binding === undefined) return null;
+  if (!isPlainObject(binding)) return null;
+  const keys = Reflect.ownKeys(binding);
+  const expectedKeys = ['agentId', 'taskId', 'value', 'observedAt', 'expiresAt', 'evidenceUrl', 'evidenceType'];
+  if (keys.length !== expectedKeys.length || keys.some(key => typeof key !== 'string' || !expectedKeys.includes(key))) {
+    return null;
+  }
+  const agentId = safeText(binding.agentId, 120);
+  const taskId = safeText(binding.taskId, 120);
+  const value = safeText(binding.value, 200);
+  const evidenceType = safeText(binding.evidenceType, 80);
+  if (!agentId || !taskId || !value || !evidenceType) return null;
+  if (agentId !== expectedAgentId || taskId !== expectedTaskId) return null;
+  if (expectedValue !== undefined && value !== expectedValue) {
+    return null;
+  }
+  const evidenceUrl = validateGithubUrl(binding.evidenceUrl);
+  if (!evidenceUrl) return null;
+  const observedAt = isoMs(binding.observedAt);
+  const expiresAt = isoMs(binding.expiresAt);
+  if (observedAt === null || expiresAt === null || observedAt > expiresAt) return null;
+  if (!VALID_EVIDENCE_TYPES.has(evidenceType)) return null;
+  if (deriveFreshness(binding.observedAt, binding.expiresAt, nowMs) !== 'CURRENT') return null;
+  return Object.freeze({
+    agentId,
+    taskId,
+    value,
+    observedAt: binding.observedAt,
+    expiresAt: binding.expiresAt,
+    evidenceUrl,
+    evidenceType
+  });
+}
+
+function validateSerializedStatus(raw, nowMs) {
+  if (!isPlainObject(raw)) throw new TypeError('M11 agent status input must be a plain object');
+  const keys = Reflect.ownKeys(raw);
   if (keys.length !== 2 || !keys.includes('schemaVersion') || !keys.includes('rows')) {
     throw new TypeError('M11 agent status must contain schemaVersion and rows');
   }
-  if (input.schemaVersion !== 1) throw new TypeError('Unsupported M11 agent status schemaVersion');
+  if (raw.schemaVersion !== 1) throw new TypeError('Unsupported M11 agent status schemaVersion');
   if (typeof nowMs !== 'number' || !Number.isFinite(nowMs)) throw new TypeError('Invalid injected clock');
-  if (!Array.isArray(input.rows) || input.rows.length === 0 || input.rows.length > 50) {
+  if (!Array.isArray(raw.rows) || raw.rows.length === 0 || raw.rows.length > 50) {
     throw new TypeError('M11 agent status rows must be a non-empty array up to 50 items');
   }
-  const rows = input.rows.map((row) => {
+  const rows = [];
+  for (const row of raw.rows) {
     if (!isPlainObject(row)) throw new TypeError('M11 agent status row must be a plain object');
     const rowKeys = Reflect.ownKeys(row);
-    const expected = [
-      'agentId','agentName','taskId','taskLabel','taskState','coordinatorMode',
-      'providerRequested','providerVerified','modelRequested','modelVerified',
-      'taskUrl','observedAt','expiresAt','evidenceUrl','evidenceType',
-      'blocker','nextAction','ownerDecisionRequired','ownerDecisionReason'
-    ];
+    const expected = ['agentId','agentName','taskId','taskLabel','taskState','coordinatorMode','providerRequested','providerVerified','modelRequested','modelVerified','providerEvidence','modelEvidence','coordinatorEvidence','taskUrl','observedAt','expiresAt','evidenceUrl','evidenceType','blocker','nextAction','ownerDecisionRequired','ownerDecisionReason'];
     if (rowKeys.length !== expected.length || rowKeys.some(key => typeof key !== 'string' || !expected.includes(key))) {
       throw new TypeError('M11 agent status row field set is invalid');
     }
@@ -119,26 +145,22 @@ function validateBrowserStatus(input, nowMs) {
     const providerRequested = safeText(row.providerRequested, 80);
     const modelRequested = safeText(row.modelRequested, 120);
     if (!providerRequested || !modelRequested) throw new TypeError('Requested provider and model are required');
-    if (safeGitHubUrl(row.taskUrl) === null) throw new TypeError('Task URL must be a valid public GitHub URL');
+    const taskUrl = validateGithubUrl(row.taskUrl);
+    if (!taskUrl) throw new TypeError('Task URL must be a valid public GitHub URL');
     const observedAt = isoMs(row.observedAt);
     const expiresAt = isoMs(row.expiresAt);
-    if (observedAt === null || expiresAt === null || observedAt > expiresAt) {
-      throw new TypeError('Observation and expiry timestamps are invalid');
-    }
+    if (observedAt === null || expiresAt === null || observedAt > expiresAt) throw new TypeError('Observation and expiry timestamps are invalid');
     const evidenceType = safeText(row.evidenceType, 80);
-    const evidenceUrl = row.evidenceUrl === null || row.evidenceUrl === undefined ? null : safeGitHubUrl(row.evidenceUrl);
-    if (evidenceType && !['github-workflow','github-issue','github-pr','copilot-session','manual','unknown'].includes(evidenceType)) {
-      throw new TypeError('Evidence type is invalid');
-    }
+    const evidenceUrl = row.evidenceUrl === null || row.evidenceUrl === undefined ? null : validateGithubUrl(row.evidenceUrl);
+    if (evidenceType && !VALID_EVIDENCE_TYPES.has(evidenceType)) throw new TypeError('Evidence type is invalid');
     const freshness = deriveFreshness(row.observedAt, row.expiresAt, nowMs);
-    const providerVerified = freshness === 'CURRENT' ? safeText(row.providerVerified, 80) : 'UNKNOWN';
-    const modelVerified = freshness === 'CURRENT' ? safeText(row.modelVerified, 120) : 'UNKNOWN';
-    if (providerVerified !== 'UNKNOWN' && providerVerified === null) {
-      throw new TypeError('Provider verification is invalid');
-    }
-    if (modelVerified !== 'UNKNOWN' && modelVerified === null) {
-      throw new TypeError('Model verification is invalid');
-    }
+    const providerEvidence = validateEvidenceBinding(row.providerEvidence, agentId, taskId, undefined, nowMs);
+    const modelEvidence = validateEvidenceBinding(row.modelEvidence, agentId, taskId, undefined, nowMs);
+    const coordinatorEvidence = validateEvidenceBinding(row.coordinatorEvidence, agentId, taskId, row.coordinatorMode, nowMs);
+    const providerVerified = providerEvidence ? providerEvidence.value : 'UNKNOWN';
+    const modelVerified = modelEvidence ? modelEvidence.value : 'UNKNOWN';
+    const effectiveCoordinatorMode = row.coordinatorMode === 'ACTIVE' && (!coordinatorEvidence || coordinatorEvidence.value !== 'ACTIVE') ? 'UNKNOWN' : row.coordinatorMode;
+    const effectiveTaskState = (row.taskState === 'RUNNING' || row.taskState === 'REVIEWING') && freshness !== 'CURRENT' ? 'UNKNOWN' : row.taskState;
     const blocker = row.blocker === null || row.blocker === undefined ? null : safeText(row.blocker, 200);
     const nextAction = safeText(row.nextAction, 200);
     if (!nextAction) throw new TypeError('Next action is required');
@@ -147,37 +169,40 @@ function validateBrowserStatus(input, nowMs) {
     const ownerDecisionReason = row.ownerDecisionRequired === true
       ? safeText(row.ownerDecisionReason, 200)
       : (row.ownerDecisionReason === null || row.ownerDecisionReason === undefined ? null : safeText(row.ownerDecisionReason, 200));
-    if (row.ownerDecisionRequired === true && (!ownerDecisionReason || !ownerDecisionReason.length)) {
+    if (row.ownerDecisionRequired === true && (!ownerDecisionReason || ownerDecisionReason.length === 0)) {
       throw new TypeError('An owner decision reason is required when ownerDecisionRequired is true');
     }
     if (row.ownerDecisionRequired === false && ownerDecisionReason !== null) {
       throw new TypeError('A false ownerDecisionRequired must not include a reason');
     }
-    const normalized = {
+    rows.push(Object.freeze({
       agentId,
       agentName,
       taskId,
       taskLabel,
-      taskState: row.taskState,
-      coordinatorMode: row.coordinatorMode,
+      taskState: effectiveTaskState,
+      coordinatorMode: effectiveCoordinatorMode,
       providerRequested,
       providerVerified,
       modelRequested,
       modelVerified,
-      taskUrl: safeGitHubUrl(row.taskUrl),
+      providerEvidence,
+      modelEvidence,
+      coordinatorEvidence,
+      taskUrl,
       observedAt: row.observedAt,
       expiresAt: row.expiresAt,
-      evidenceUrl: evidenceUrl,
+      evidenceUrl,
       evidenceType: evidenceType || 'unknown',
       blocker,
       nextAction,
       ownerDecisionRequired: row.ownerDecisionRequired,
       ownerDecisionReason,
       freshness
-    };
-    return normalized;
-  });
-  return Object.freeze({schemaVersion: 1, status: 'READY', freshness: rows.every(r => r.freshness === 'CURRENT') ? 'CURRENT' : rows.some(r => r.freshness === 'STALE') ? 'STALE' : 'UNKNOWN', rows: Object.freeze(rows)});
+    }));
+  }
+  const normalized = {schemaVersion: 1, status: 'READY', freshness: rows.every(r => r.freshness === 'CURRENT') ? 'CURRENT' : rows.some(r => r.freshness === 'STALE') ? 'STALE' : 'UNKNOWN', rows: Object.freeze(rows)};
+  return Object.freeze(normalized);
 }
 
 function node(doc, tag, text) {
@@ -224,10 +249,10 @@ function renderRow(document, row) {
     ['Status', TASK_LABELS[row.taskState] || 'Unbekannt'],
     ['Koordinator', COORDINATOR_LABELS[row.coordinatorMode] || 'Unbekannt'],
     ['Frische', FRESHNESS_LABELS[row.freshness] || 'Unbekannt'],
-    ['Anbieter angefragt', safeText(row.providerRequested)],
-    ['Anbieter verifiziert', safeText(row.providerVerified, 'Unbekannt')],
-    ['Modell angefragt', safeText(row.modelRequested)],
-    ['Modell verifiziert', safeText(row.modelVerified, 'Unbekannt')]
+    ['Anbieter angefragt', safeText(row.providerRequested, 80) || 'Unbekannt'],
+    ['Anbieter verifiziert', safeText(row.providerVerified, 80) || 'Unbekannt'],
+    ['Modell angefragt', safeText(row.modelRequested, 120) || 'Unbekannt'],
+    ['Modell verifiziert', safeText(row.modelVerified, 120) || 'Unbekannt']
   ]);
   card.append(meta);
 
@@ -253,9 +278,7 @@ function renderRow(document, row) {
   details.className = 'm11-agent-status__details';
   const summary = node(document, 'div');
   summary.className = 'm11-agent-status__summary';
-  const block = row.blocker === null ? '—' : row.blocker;
-  const next = row.nextAction || 'Keine weitere Aktion angegeben';
-  summary.textContent = `Blocker: ${block} · Nächste Aktion: ${next}`;
+  summary.textContent = `Blocker: ${row.blocker === null ? '—' : row.blocker} · Nächste Aktion: ${row.nextAction || 'Keine weitere Aktion angegeben'}`;
   details.append(summary);
 
   const noteList = node(document, 'ul');
@@ -267,7 +290,7 @@ function renderRow(document, row) {
   details.append(noteList);
 
   if (row.ownerDecisionRequired) {
-    const owner = node(document, 'p', `Entscheidung erforderlich: ${row.ownerDecisionReason}`);
+    const owner = node(document, 'p', `Entscheidung erforderlich: ${row.ownerDecisionReason || 'Unbekannt'}`);
     owner.className = 'm11-agent-status__owner-decision';
     details.append(owner);
   }
@@ -283,10 +306,23 @@ export function renderM11AgentStatus(root, input, options = {}) {
   if (!document) {
     throw new TypeError('M11 agent status rendering requires a document');
   }
+  if (typeof input !== 'string') {
+    throw new TypeError('M11 agent status renderer expects a JSON string');
+  }
   if (typeof options.now !== 'function') {
     throw new TypeError('M11 agent status requires a valid injected clock');
   }
-  const normalized = validateBrowserStatus(input, options.now());
+  let parsed;
+  try {
+    parsed = JSON.parse(input);
+  } catch {
+    throw new TypeError('M11 agent status payload is not valid JSON');
+  }
+  const nowMs = options.now();
+  if (typeof nowMs !== 'number' || !Number.isFinite(nowMs)) {
+    throw new TypeError('Invalid injected clock');
+  }
+  const normalized = validateSerializedStatus(parsed, nowMs);
   root.replaceChildren();
   const section = node(document, 'section');
   section.className = 'm11-agent-status';

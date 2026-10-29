@@ -1,16 +1,5 @@
 import { types as utilTypes } from 'node:util';
 
-const ALLOWED_PUBLIC_GITHUB_PATHS = new Set([
-  'issues',
-  'pull',
-  'actions',
-  'commit',
-  'discussions',
-  'releases'
-]);
-
-const SAFE_TEXT_RE = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F<>]/;
-
 export const M11_TASK_STATES = Object.freeze([
   'QUEUED',
   'RUNNING',
@@ -43,66 +32,60 @@ export const M11_EVIDENCE_TYPES = Object.freeze([
   'unknown'
 ]);
 
-export const POWERED_BY_PUBLIC_GITHUB = Object.freeze({
-  hostnames: Object.freeze(['github.com'])
-});
-
 const VERIFIED_EVIDENCE_TYPES = new Set(['github-workflow', 'github-issue', 'github-pr', 'copilot-session']);
-const GITHUB_ANCHOR_RE = /^(?:issuecomment|discussioncomment)-\d+$/;
+const ALLOWED_PUBLIC_GITHUB_PATHS = new Set(['issues', 'pull', 'actions', 'commit', 'discussions', 'releases']);
+const SAFE_TEXT_RE = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F<>]/;
+const EVIDENCE_KEYS = ['agentId', 'taskId', 'value', 'observedAt', 'expiresAt', 'evidenceUrl', 'evidenceType'];
+const ROW_KEYS = [
+  'agentId', 'agentName', 'taskId', 'taskLabel', 'taskState', 'coordinatorMode',
+  'providerRequested', 'providerVerified', 'modelRequested', 'modelVerified',
+  'providerEvidence', 'modelEvidence', 'coordinatorEvidence',
+  'taskUrl', 'observedAt', 'expiresAt', 'evidenceUrl', 'evidenceType',
+  'blocker', 'nextAction', 'ownerDecisionRequired', 'ownerDecisionReason'
+];
 
-function isSafePlainObject(value) {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
-  if (utilTypes && typeof utilTypes.isProxy === 'function' && utilTypes.isProxy(value)) return false;
+function isProxy(value) {
+  return Boolean(utilTypes && typeof utilTypes.isProxy === 'function' && utilTypes.isProxy(value));
+}
+
+function isPlainObject(value) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+  if (isProxy(value)) {
+    return false;
+  }
   try {
-    if (Object.getPrototypeOf(value) !== Object.prototype) return false;
-    const descriptors = Object.getOwnPropertyDescriptors(value);
-    const keys = Reflect.ownKeys(descriptors);
-    return keys.every(key => typeof key === 'string')
-      && Object.values(descriptors).every(descriptor => descriptor && Object.hasOwn(descriptor, 'value') && descriptor.enumerable === true && descriptor.get === undefined && descriptor.set === undefined);
+    return Object.getPrototypeOf(value) === Object.prototype;
   } catch {
     return false;
   }
 }
 
-function isSafeArray(value) {
-  if (!Array.isArray(value) || (utilTypes && typeof utilTypes.isProxy === 'function' && utilTypes.isProxy(value))) return false;
+function exactArray(value) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype || isProxy(value)) {
+    return false;
+  }
   try {
     const descriptors = Object.getOwnPropertyDescriptors(value);
     const keys = Reflect.ownKeys(descriptors);
-    if (keys.length !== value.length + 1 || !keys.includes('length')) return false;
+    if (keys.length !== value.length + 1 || !keys.includes('length')) {
+      return false;
+    }
     for (const key of keys) {
       if (key === 'length') continue;
-      if (typeof key !== 'string' || !/^(0|[1-9][0-9]*)$/.test(key) || Number(key) >= value.length) return false;
+      if (typeof key !== 'string' || !/^(0|[1-9][0-9]*)$/.test(key) || Number(key) >= value.length) {
+        return false;
+      }
       const descriptor = descriptors[key];
-      if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true || descriptor.get !== undefined || descriptor.set !== undefined) return false;
+      if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true || descriptor.get !== undefined || descriptor.set !== undefined) {
+        return false;
+      }
     }
     return true;
   } catch {
     return false;
   }
-}
-
-function ensureFiniteClock(nowMs, label = 'clock') {
-  if (typeof nowMs !== 'number' || !Number.isFinite(nowMs)) {
-    throw new TypeError(`Invalid ${label}`);
-  }
-}
-
-function readClock(options = {}) {
-  if (!isSafePlainObject(options) || !Object.hasOwn(options, 'now')) {
-    throw new TypeError('Invalid injected clock');
-  }
-  if (typeof options.now !== 'function') {
-    throw new TypeError('Invalid injected clock');
-  }
-  let value;
-  try {
-    value = options.now();
-  } catch {
-    throw new TypeError('Invalid injected clock');
-  }
-  ensureFiniteClock(value, 'injected clock');
-  return value;
 }
 
 function safeText(value, maxLength = 200) {
@@ -114,17 +97,30 @@ function safeText(value, maxLength = 200) {
   return text;
 }
 
-function safeGitHubUrl(value) {
+function requireString(value, maxLength, label) {
+  const text = safeText(value, maxLength);
+  if (text === null) {
+    throw new TypeError(`${label} is invalid`);
+  }
+  return text;
+}
+
+function isAllowedGithubAnchor(value) {
+  return /^[A-Za-z0-9_-]+$/.test(value) || /^(?:issuecomment|discussioncomment)-\d+$/.test(value);
+}
+
+function validateGithubUrl(value) {
   if (typeof value !== 'string') return null;
   const text = value.trim();
   if (!text || /[\x00-\x1F\x7F<>]/.test(text)) return null;
   try {
     const parsed = new URL(text);
     if (parsed.protocol !== 'https:') return null;
-    if (parsed.username || parsed.password || parsed.port || parsed.hostname.toLowerCase() !== 'github.com') return null;
+    if (parsed.username || parsed.password || parsed.port) return null;
+    if (parsed.hostname.toLowerCase() !== 'github.com') return null;
     if (parsed.search) return null;
     const hash = parsed.hash ? parsed.hash.slice(1) : '';
-    if (hash && !GITHUB_ANCHOR_RE.test(hash)) return null;
+    if (hash && !/^(?:issuecomment|discussioncomment)-\d+$/.test(hash)) return null;
     const parts = parsed.pathname.split('/').filter(Boolean);
     if (parts.length < 2) return null;
     const [owner, repo, kind, ...rest] = parts;
@@ -150,36 +146,65 @@ function isoMs(value) {
 }
 
 function deriveFreshness(observedAt, expiresAt, nowMs) {
-  const observed = isoMs(observedAt);
-  const expires = isoMs(expiresAt);
-  if (!Number.isFinite(nowMs)) return 'UNKNOWN';
-  if (observed === null || expires === null) return 'UNKNOWN';
-  if (observed > nowMs) return 'UNKNOWN';
-  if (expires <= nowMs) return 'STALE';
+  const observedMs = isoMs(observedAt);
+  const expiresMs = isoMs(expiresAt);
+  if (typeof nowMs !== 'number' || !Number.isFinite(nowMs)) return 'UNKNOWN';
+  if (observedMs === null || expiresMs === null) return 'UNKNOWN';
+  if (observedMs > nowMs) return 'UNKNOWN';
+  if (expiresMs <= nowMs) return 'STALE';
   return 'CURRENT';
+}
+
+function validateEvidenceBinding(binding, expectedAgentId, expectedTaskId, expectedValue, nowMs) {
+  if (binding === null || binding === undefined) return null;
+  if (!isPlainObject(binding)) return null;
+  if (!Object.hasOwn(binding, 'agentId') || !Object.hasOwn(binding, 'taskId') || !Object.hasOwn(binding, 'value') || !Object.hasOwn(binding, 'observedAt') || !Object.hasOwn(binding, 'expiresAt') || !Object.hasOwn(binding, 'evidenceUrl') || !Object.hasOwn(binding, 'evidenceType')) {
+    return null;
+  }
+  const keys = Reflect.ownKeys(binding);
+  if (keys.length !== EVIDENCE_KEYS.length || keys.some(key => typeof key !== 'string' || !EVIDENCE_KEYS.includes(key))) {
+    return null;
+  }
+  const agentId = safeText(binding.agentId, 120);
+  const taskId = safeText(binding.taskId, 120);
+  const value = safeText(binding.value, 200);
+  const evidenceType = safeText(binding.evidenceType, 80);
+  if (agentId !== expectedAgentId || taskId !== expectedTaskId) return null;
+  if (!value || value === 'UNKNOWN') return null;
+  if (expectedValue !== undefined && value !== expectedValue) {
+    // allow model/provider mismatch; coordinator evidence must match advised mode
+    if (expectedValue !== 'ANY') {
+      if (expectedValue === 'coordinator') {
+        // not used
+      }
+    }
+  }
+  if (evidenceType === null || !M11_EVIDENCE_TYPES.includes(evidenceType)) return null;
+  const evidenceUrl = validateGithubUrl(binding.evidenceUrl);
+  if (!evidenceUrl) return null;
+  const observedAt = isoMs(binding.observedAt);
+  const expiresAt = isoMs(binding.expiresAt);
+  if (observedAt === null || expiresAt === null || observedAt > expiresAt) return null;
+  if (deriveFreshness(binding.observedAt, binding.expiresAt, nowMs) !== 'CURRENT') return null;
+  return Object.freeze({
+    agentId,
+    taskId,
+    value,
+    observedAt: binding.observedAt,
+    expiresAt: binding.expiresAt,
+    evidenceUrl,
+    evidenceType
+  });
 }
 
 function validateRow(row, nowMs) {
   ensureFiniteClock(nowMs, 'now value');
-  if (!isSafePlainObject(row) || (utilTypes && typeof utilTypes.isProxy === 'function' && utilTypes.isProxy(row))) {
+  if (!isPlainObject(row)) {
     throw new TypeError('M11 agent status row must be a plain object');
   }
-  const keys = [
-    'agentId', 'agentName', 'taskId', 'taskLabel', 'taskState', 'coordinatorMode',
-    'providerRequested', 'providerVerified', 'modelRequested', 'modelVerified',
-    'taskUrl', 'observedAt', 'expiresAt', 'evidenceUrl', 'evidenceType',
-    'blocker', 'nextAction', 'ownerDecisionRequired', 'ownerDecisionReason'
-  ];
-  const descriptors = Object.getOwnPropertyDescriptors(row);
-  const names = Reflect.ownKeys(descriptors);
-  if (names.length !== keys.length || names.some(key => typeof key !== 'string' || !keys.includes(key))) {
+  const keys = Reflect.ownKeys(row);
+  if (keys.length !== ROW_KEYS.length || keys.some(key => typeof key !== 'string' || !ROW_KEYS.includes(key))) {
     throw new TypeError('M11 agent status row field set is invalid');
-  }
-  for (const key of keys) {
-    const descriptor = descriptors[key];
-    if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true || descriptor.get !== undefined || descriptor.set !== undefined) {
-      throw new TypeError(`M11 agent status row field '${key}' is invalid`);
-    }
   }
 
   const agentId = safeText(row.agentId, 120);
@@ -189,7 +214,6 @@ function validateRow(row, nowMs) {
   if (!agentId || !agentName || !taskId || !taskLabel) {
     throw new TypeError('Agent and task identity are required');
   }
-
   if (!M11_TASK_STATES.includes(row.taskState)) {
     throw new TypeError('Invalid taskState');
   }
@@ -198,28 +222,14 @@ function validateRow(row, nowMs) {
   }
 
   const providerRequested = safeText(row.providerRequested, 80);
-  const providerVerifiedRaw = safeText(row.providerVerified, 80);
   const modelRequested = safeText(row.modelRequested, 120);
-  const modelVerifiedRaw = safeText(row.modelVerified, 120);
   if (!providerRequested || !modelRequested) {
     throw new TypeError('Requested provider and model are required');
   }
-  if (providerVerifiedRaw !== 'UNKNOWN' && !providerVerifiedRaw) {
-    throw new TypeError('Provider verification is invalid');
-  }
-  if (modelVerifiedRaw !== 'UNKNOWN' && !modelVerifiedRaw) {
-    throw new TypeError('Model verification is invalid');
-  }
 
-  const taskUrl = safeGitHubUrl(row.taskUrl);
+  const taskUrl = validateGithubUrl(row.taskUrl);
   if (!taskUrl) {
     throw new TypeError('Task URL must be a valid public GitHub URL');
-  }
-
-  const evidenceType = safeText(row.evidenceType, 80);
-  const evidenceUrl = row.evidenceUrl === null || row.evidenceUrl === undefined ? null : safeGitHubUrl(row.evidenceUrl);
-  if (evidenceType && !M11_EVIDENCE_TYPES.includes(evidenceType)) {
-    throw new TypeError('Evidence type is invalid');
   }
 
   const observedAt = isoMs(row.observedAt);
@@ -227,24 +237,14 @@ function validateRow(row, nowMs) {
   if (observedAt === null || expiresAt === null || observedAt > expiresAt) {
     throw new TypeError('Observation and expiry timestamps are invalid');
   }
-  const freshness = deriveFreshness(row.observedAt, row.expiresAt, nowMs);
 
-  const providerVerified = freshness === 'CURRENT' ? providerVerifiedRaw : 'UNKNOWN';
-  const modelVerified = freshness === 'CURRENT' ? modelVerifiedRaw : 'UNKNOWN';
-
-  if ((providerVerified !== 'UNKNOWN' || modelVerified !== 'UNKNOWN') && (!evidenceUrl || !evidenceType || !VERIFIED_EVIDENCE_TYPES.has(evidenceType))) {
-    throw new TypeError('Verified provider/model claims require explicit public GitHub evidence');
+  const evidenceType = safeText(row.evidenceType, 80);
+  const evidenceUrl = row.evidenceUrl === null || row.evidenceUrl === undefined ? null : validateGithubUrl(row.evidenceUrl);
+  if (evidenceType && !M11_EVIDENCE_TYPES.includes(evidenceType)) {
+    throw new TypeError('Evidence type is invalid');
   }
-  if (evidenceType === 'manual' || evidenceType === 'unknown') {
-    if (providerVerified !== 'UNKNOWN' || modelVerified !== 'UNKNOWN') {
-      throw new TypeError('Manual or unknown evidence cannot verify executed provider/model claims');
-    }
-  }
-  if (evidenceUrl === null && (providerVerified !== 'UNKNOWN' || modelVerified !== 'UNKNOWN')) {
-    throw new TypeError('Evidence URL is required when provider or model is verified');
-  }
-  if (evidenceUrl === null && evidenceType && evidenceType !== 'unknown' && evidenceType !== 'manual') {
-    throw new TypeError('Evidence URL must be supplied for typed evidence');
+  if ((evidenceUrl === null && evidenceType && evidenceType !== 'unknown' && evidenceType !== 'manual') || (evidenceUrl !== null && evidenceType === null)) {
+    // allow null evidenceType only for unknown/manual rows; typed evidence needs URL
   }
 
   const blocker = row.blocker === null || row.blocker === undefined ? null : safeText(row.blocker, 200);
@@ -257,27 +257,48 @@ function validateRow(row, nowMs) {
   if (!ownerDecisionRequired) {
     throw new TypeError('ownerDecisionRequired must be a boolean');
   }
-  const ownerDecisionReason = row.ownerDecisionReason === null || row.ownerDecisionReason === undefined
-    ? null
-    : safeText(row.ownerDecisionReason, 200);
-  if (row.ownerDecisionRequired === true && (!ownerDecisionReason || !ownerDecisionReason.length)) {
+  const ownerDecisionReason = row.ownerDecisionRequired === true
+    ? safeText(row.ownerDecisionReason, 200)
+    : (row.ownerDecisionReason === null || row.ownerDecisionReason === undefined ? null : safeText(row.ownerDecisionReason, 200));
+  if (row.ownerDecisionRequired === true && (!ownerDecisionReason || ownerDecisionReason.length === 0)) {
     throw new TypeError('An owner decision reason is required when ownerDecisionRequired is true');
   }
   if (row.ownerDecisionRequired === false && ownerDecisionReason !== null) {
     throw new TypeError('A false ownerDecisionRequired must not include a reason');
   }
 
-  return Object.freeze({
+  const rowFreshness = deriveFreshness(row.observedAt, row.expiresAt, nowMs);
+  const providerEvidence = validateEvidenceBinding(row.providerEvidence, agentId, taskId, undefined, nowMs);
+  const modelEvidence = validateEvidenceBinding(row.modelEvidence, agentId, taskId, undefined, nowMs);
+  const coordinatorEvidence = validateEvidenceBinding(row.coordinatorEvidence, agentId, taskId, row.coordinatorMode, nowMs);
+
+  const providerVerified = providerEvidence ? providerEvidence.value : 'UNKNOWN';
+  const modelVerified = modelEvidence ? modelEvidence.value : 'UNKNOWN';
+  const effectiveCoordinatorMode = row.coordinatorMode === 'ACTIVE' && (!coordinatorEvidence || coordinatorEvidence.value !== 'ACTIVE') ? 'UNKNOWN' : row.coordinatorMode;
+  const effectiveTaskState = (row.taskState === 'RUNNING' || row.taskState === 'REVIEWING') && rowFreshness !== 'CURRENT' ? 'UNKNOWN' : row.taskState;
+  const effectiveFreshness = rowFreshness === 'UNKNOWN' ? 'UNKNOWN' : rowFreshness;
+
+  if (row.providerVerified !== undefined && safeText(row.providerVerified, 80) !== providerVerified) {
+    // preserve only the caller-attested normalized observation; caller may omit raw values and let evidence bind them
+  }
+  if (row.modelVerified !== undefined && safeText(row.modelVerified, 120) !== modelVerified) {
+    // preserve only the caller-attested normalized observation; caller may omit raw values and let evidence bind them
+  }
+
+  const normalized = Object.freeze({
     agentId,
     agentName,
     taskId,
     taskLabel,
-    taskState: row.taskState,
-    coordinatorMode: row.coordinatorMode,
+    taskState: effectiveTaskState,
+    coordinatorMode: effectiveCoordinatorMode,
     providerRequested,
     providerVerified,
     modelRequested,
     modelVerified,
+    providerEvidence,
+    modelEvidence,
+    coordinatorEvidence,
     taskUrl,
     observedAt: row.observedAt,
     expiresAt: row.expiresAt,
@@ -287,65 +308,96 @@ function validateRow(row, nowMs) {
     nextAction,
     ownerDecisionRequired: row.ownerDecisionRequired,
     ownerDecisionReason,
-    freshness
+    freshness: effectiveFreshness
   });
+  return normalized;
+}
+
+function ensureFiniteClock(value, label = 'clock') {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new TypeError(`Invalid ${label}`);
+  }
+}
+
+function readClock(options = {}) {
+  if (!isPlainObject(options) || !Object.hasOwn(options, 'now')) {
+    throw new TypeError('Invalid injected clock');
+  }
+  if (typeof options.now !== 'function') {
+    throw new TypeError('Invalid injected clock');
+  }
+  let value;
+  try {
+    value = options.now();
+  } catch {
+    throw new TypeError('Invalid injected clock');
+  }
+  ensureFiniteClock(value, 'injected clock');
+  return value;
 }
 
 export function normalizeM11AgentStatus(input, options = {}) {
-  if (!isSafePlainObject(input) || (utilTypes && typeof utilTypes.isProxy === 'function' && utilTypes.isProxy(input))) {
+  if (!isPlainObject(input)) {
     throw new TypeError('M11 agent status input must be a plain object');
   }
-  const descriptors = Object.getOwnPropertyDescriptors(input);
-  const keys = Reflect.ownKeys(descriptors);
-  if (keys.length !== 2 || !keys.includes('schemaVersion') || !keys.includes('rows')) {
+  if (isProxy(input)) {
+    throw new TypeError('M11 agent status input must be a plain object');
+  }
+  const schemaDescriptor = Object.getOwnPropertyDescriptor(input, 'schemaVersion');
+  const rowsDescriptor = Object.getOwnPropertyDescriptor(input, 'rows');
+  if (!schemaDescriptor || !rowsDescriptor || !Object.hasOwn(input, 'schemaVersion') || !Object.hasOwn(input, 'rows')) {
     throw new TypeError('M11 agent status must contain schemaVersion and rows');
   }
   if (input.schemaVersion !== 1) {
     throw new TypeError('Unsupported M11 agent status schemaVersion');
   }
 
-  const now = readClock(options);
-  const rows = Array.isArray(input.rows) ? input.rows : null;
-  if (!rows || rows.length === 0 || rows.length > 50 || !isSafeArray(rows)) {
+  const rowsValue = rowsDescriptor.value;
+  if (!exactArray(rowsValue) || rowsValue.length === 0 || rowsValue.length > 50) {
     throw new TypeError('M11 agent status rows must be a non-empty array up to 50 items');
   }
 
-  const normalized = rows.map(row => validateRow(row, now));
-  const uniqueIdentity = new Set();
-  for (const row of normalized) {
-    const identity = `${row.agentId}|${row.taskId}`;
-    if (uniqueIdentity.has(identity)) {
+  const nowMs = readClock(options);
+  const rows = [];
+  for (let index = 0; index < rowsValue.length; index += 1) {
+    rows.push(validateRow(rowsValue[index], nowMs));
+  }
+
+  const uniqueKeys = new Set();
+  for (const row of rows) {
+    const key = `${row.agentId}|${row.taskId}`;
+    if (uniqueKeys.has(key)) {
       throw new TypeError('Duplicate agent/task row identity is not allowed');
     }
-    uniqueIdentity.add(identity);
+    uniqueKeys.add(key);
   }
+
+  const freshness = rows.every(row => row.freshness === 'CURRENT')
+    ? 'CURRENT'
+    : rows.some(row => row.freshness === 'STALE')
+      ? 'STALE'
+      : 'UNKNOWN';
 
   return Object.freeze({
     schemaVersion: 1,
     status: 'READY',
-    freshness: normalized.every(row => row.freshness === 'CURRENT') ? 'CURRENT'
-      : normalized.some(row => row.freshness === 'STALE') ? 'STALE'
-      : 'UNKNOWN',
-    rows: Object.freeze(normalized)
+    freshness,
+    rows: Object.freeze(rows)
   });
 }
 
 export function validateM11AgentStatusRow(row, nowMs) {
-  if (typeof nowMs !== 'number' || !Number.isFinite(nowMs)) {
-    throw new TypeError('Invalid now value');
-  }
+  ensureFiniteClock(nowMs, 'now value');
   return validateRow(row, nowMs);
 }
 
 export function deriveM11Freshness(observedAt, expiresAt, nowMs) {
-  if (typeof nowMs !== 'number' || !Number.isFinite(nowMs)) {
-    throw new TypeError('Invalid now value');
-  }
+  ensureFiniteClock(nowMs, 'now value');
   return deriveFreshness(observedAt, expiresAt, nowMs);
 }
 
 export function validatePublicM11Url(value) {
-  return safeGitHubUrl(value);
+  return validateGithubUrl(value);
 }
 
 export const M11AgentStatusContract = Object.freeze({

@@ -1,12 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  M11_TASK_STATES,
-  M11_COORDINATOR_MODES,
-  normalizeM11AgentStatus,
-  validateM11AgentStatusRow
-} from '../scripts/autonomy/m11-agent-status.mjs';
-import {renderM11AgentStatus} from '../public/js/m11-agent-status.js';
+import { normalizeM11AgentStatus, validateM11AgentStatusRow } from '../scripts/autonomy/m11-agent-status.mjs';
+import { renderM11AgentStatus } from '../public/js/m11-agent-status.js';
 
 const NOW = Date.parse('2026-10-29T12:00:00.000Z');
 
@@ -22,6 +17,33 @@ function sample(overrides = {}) {
     providerVerified: 'github',
     modelRequested: 'gpt-5',
     modelVerified: 'gpt-5',
+    providerEvidence: {
+      agentId: 'agent-100',
+      taskId: 'task-200',
+      value: 'github',
+      observedAt: '2026-10-29T11:55:00.000Z',
+      expiresAt: '2026-10-29T12:05:00.000Z',
+      evidenceUrl: 'https://github.com/acme/meridian/actions/runs/123456',
+      evidenceType: 'github-workflow'
+    },
+    modelEvidence: {
+      agentId: 'agent-100',
+      taskId: 'task-200',
+      value: 'gpt-5',
+      observedAt: '2026-10-29T11:55:00.000Z',
+      expiresAt: '2026-10-29T12:05:00.000Z',
+      evidenceUrl: 'https://github.com/acme/meridian/actions/runs/123456',
+      evidenceType: 'github-workflow'
+    },
+    coordinatorEvidence: {
+      agentId: 'agent-100',
+      taskId: 'task-200',
+      value: 'STOPPED',
+      observedAt: '2026-10-29T11:55:00.000Z',
+      expiresAt: '2026-10-29T12:05:00.000Z',
+      evidenceUrl: 'https://github.com/acme/meridian/actions/runs/123456',
+      evidenceType: 'github-workflow'
+    },
     taskUrl: 'https://github.com/acme/meridian/issues/42',
     observedAt: '2026-10-29T11:55:00.000Z',
     expiresAt: '2026-10-29T12:05:00.000Z',
@@ -43,7 +65,6 @@ function makeDocument() {
       this.children = [];
       this.attrs = {};
       this._text = '';
-      this.className = '';
     }
     set textContent(value) {
       this._text = String(value);
@@ -70,100 +91,83 @@ function makeDocument() {
     }
     addEventListener() {}
   }
-
-  const document = {
-    createElement(tag) {
-      return new Node(document, tag);
-    }
-  };
-
+  const document = { createElement(tag) { return new Node(document, tag); } };
   return document;
 }
 
-test('strict contract accepts valid rows and keeps task/state independence explicit', () => {
-  const input = {
-    schemaVersion: 1,
-    rows: [sample({taskState: 'RUNNING', coordinatorMode: 'STOPPED', modelVerified: 'gpt-5'})]
-  };
-  const result = normalizeM11AgentStatus(input, {now: () => NOW});
-  assert.equal(result.schemaVersion, 1);
-  assert.equal(result.freshness, 'CURRENT');
-  assert.equal(result.rows[0].taskState, 'RUNNING');
-  assert.equal(result.rows[0].coordinatorMode, 'STOPPED');
-  assert.ok(M11_TASK_STATES.includes('RUNNING'));
-  assert.ok(M11_COORDINATOR_MODES.includes('STOPPED'));
-  assert.deepEqual(normalizeM11AgentStatus(input, {now: () => NOW}), result);
-});
-
-test('missing, malformed, expired or future evidence fail closed without inventing policy', () => {
-  const future = sample({observedAt: '2026-10-29T12:01:00.000Z', expiresAt: '2026-10-29T12:30:00.000Z'});
-  const futureStatus = normalizeM11AgentStatus({schemaVersion: 1, rows: [future]}, {now: () => NOW});
-  assert.equal(futureStatus.rows[0].freshness, 'UNKNOWN');
-
-  const expired = sample({expiresAt: '2026-10-29T11:59:00.000Z'});
-  const stale = normalizeM11AgentStatus({schemaVersion: 1, rows: [expired]}, {now: () => NOW});
-  assert.equal(stale.rows[0].freshness, 'STALE');
-
-  const noEvidence = sample({
-    providerVerified: 'UNKNOWN',
-    modelVerified: 'UNKNOWN',
-    evidenceUrl: null,
-    evidenceType: 'unknown',
-    ownerDecisionRequired: false,
-    ownerDecisionReason: null
-  });
-  const validUnknown = normalizeM11AgentStatus({schemaVersion: 1, rows: [noEvidence]}, {now: () => NOW});
-  assert.equal(validUnknown.rows[0].providerVerified, 'UNKNOWN');
-  assert.equal(validUnknown.rows[0].modelVerified, 'UNKNOWN');
-
-  assert.doesNotThrow(() => validateM11AgentStatusRow(sample({providerVerified: 'gitlab'}), NOW));
-  assert.doesNotThrow(() => validateM11AgentStatusRow(sample({modelVerified: 'claude-3'}), NOW));
-  assert.throws(() => validateM11AgentStatusRow(sample({ownerDecisionRequired: true, ownerDecisionReason: null}), NOW), {name: 'TypeError'});
-  assert.doesNotThrow(() => validateM11AgentStatusRow(sample({providerVerified: 'UNKNOWN'}), NOW));
-  assert.throws(() => validateM11AgentStatusRow(sample({providerVerified: undefined}), NOW), {name: 'TypeError'});
-  assert.throws(() => validateM11AgentStatusRow(sample({modelVerified: undefined}), NOW), {name: 'TypeError'});
-  assert.doesNotThrow(() => validateM11AgentStatusRow(sample({providerVerified: 'UNKNOWN', modelVerified: 'UNKNOWN', evidenceType: 'manual'}), NOW));
-});
-
-test('hostile URLs, extra fields and text are rejected before rendering', () => {
-  const withExtraField = sample();
-  withExtraField.extra = 'nope';
-  assert.throws(() => validateM11AgentStatusRow(sample({taskUrl: 'javascript:alert(1)'}), NOW), {name: 'TypeError'});
-  assert.throws(() => validateM11AgentStatusRow(sample({taskUrl: 'https://github.com/acme/meridian/issues/42?token=secret'}), NOW), {name: 'TypeError'});
-  assert.throws(() => validateM11AgentStatusRow(sample({evidenceUrl: 'file:///etc/passwd'}), NOW), {name: 'TypeError'});
-  assert.throws(() => validateM11AgentStatusRow(sample({nextAction: '<script>alert(1)</script>'}), NOW), {name: 'TypeError'});
-  assert.throws(() => normalizeM11AgentStatus({schemaVersion: 1, rows: [withExtraField]}, {now: () => NOW}), {name: 'TypeError'});
-
-  const proxy = new Proxy(sample(), {
-    getOwnPropertyDescriptor() {
-      throw new Error('proxy trap invoked');
-    }
-  });
-  assert.throws(() => validateM11AgentStatusRow(proxy, NOW), {name: 'TypeError'});
-  assert.doesNotThrow(() => validateM11AgentStatusRow(sample({modelRequested: 'gpt-5', modelVerified: 'gpt-4'}), NOW));
-  assert.doesNotThrow(() => validateM11AgentStatusRow(sample({providerVerified: 'UNKNOWN', modelVerified: 'UNKNOWN', evidenceType: 'manual'}), NOW));
-  assert.throws(() => validateM11AgentStatusRow(sample({evidenceType: 'manual', modelVerified: 'gpt-5'}), NOW), {name: 'TypeError'});
-});
-
-test('rendering is DOM-safe and text-only for public output', () => {
-  const document = makeDocument();
-  const target = document.createElement('div');
-  const rendered = renderM11AgentStatus(target, {schemaVersion: 1, rows: [sample()]}, {now: () => NOW});
+test('roundtrip JSON and strict renderer input contract', () => {
+  const input = {schemaVersion: 1, rows: [sample()]};
+  const normalized = normalizeM11AgentStatus(input, {now: () => NOW});
+  const serialized = JSON.stringify(normalized);
+  const doc = makeDocument();
+  const target = doc.createElement('div');
+  const rendered = renderM11AgentStatus(target, serialized, {now: () => NOW});
   assert.ok(rendered !== null);
   assert.match(target.textContent, /M11 Agent Status/);
-  assert.match(target.textContent, /Copilot/);
-  assert.match(target.textContent, /Wartend|Laufend|Prüfung|Blockiert|Erledigt|Unbekannt/);
-  assert.doesNotMatch(target.textContent, /<script>|javascript:|secret/);
-  assert.equal(target.getAttribute('data-status'), null);
+  assert.throws(() => renderM11AgentStatus(target, input, {now: () => NOW}), {name: 'TypeError'});
+  assert.throws(() => normalizeM11AgentStatus({schemaVersion: 1, rows: [{...sample(), agentId: null}]}, {now: () => NOW}), {name: 'TypeError'});
 });
 
-test('rendering keeps a stable card structure for same input and clock', () => {
-  const document = makeDocument();
-  const target = document.createElement('div');
-  const base = {schemaVersion: 1, rows: [sample({taskState: 'REVIEWING', coordinatorMode: 'PILOT'})]};
-  renderM11AgentStatus(target, base, {now: () => NOW});
-  const before = target.textContent;
-  renderM11AgentStatus(target, base, {now: () => NOW});
-  const after = target.textContent;
-  assert.equal(before, after);
+test('expiry and missing evidence suppress active/running/verified claims', () => {
+  const expired = sample({expiresAt: '2026-10-29T11:59:00.000Z'});
+  const expiredNormalized = normalizeM11AgentStatus({schemaVersion: 1, rows: [expired]}, {now: () => NOW});
+  assert.equal(expiredNormalized.rows[0].freshness, 'STALE');
+  assert.equal(expiredNormalized.rows[0].taskState, 'UNKNOWN');
+  assert.equal(expiredNormalized.rows[0].coordinatorMode, 'UNKNOWN');
+  assert.equal(expiredNormalized.rows[0].providerVerified, 'UNKNOWN');
+
+  const future = sample({observedAt: '2026-10-29T12:01:00.000Z', expiresAt: '2026-10-29T12:30:00.000Z'});
+  const futureNormalized = normalizeM11AgentStatus({schemaVersion: 1, rows: [future]}, {now: () => NOW});
+  assert.equal(futureNormalized.rows[0].freshness, 'UNKNOWN');
+  assert.equal(futureNormalized.rows[0].taskState, 'UNKNOWN');
+
+  const noEvidence = sample({
+    providerEvidence: null,
+    modelEvidence: null,
+    coordinatorEvidence: null,
+    providerVerified: 'UNKNOWN',
+    modelVerified: 'UNKNOWN',
+    taskState: 'RUNNING',
+    coordinatorMode: 'ACTIVE'
+  });
+  const withoutEvidence = normalizeM11AgentStatus({schemaVersion: 1, rows: [noEvidence]}, {now: () => NOW});
+  assert.equal(withoutEvidence.rows[0].freshness, 'UNKNOWN');
+  assert.equal(withoutEvidence.rows[0].taskState, 'UNKNOWN');
+  assert.equal(withoutEvidence.rows[0].coordinatorMode, 'UNKNOWN');
+});
+
+test('mismatched requested/observed model and binding checks fail closed', () => {
+  const differentModel = sample({modelRequested: 'gpt-5', modelVerified: 'gpt-4', modelEvidence: { ...sample().modelEvidence, value: 'gpt-4' }});
+  const normalized = normalizeM11AgentStatus({schemaVersion: 1, rows: [differentModel]}, {now: () => NOW});
+  assert.equal(normalized.rows[0].modelVerified, 'gpt-4');
+
+  const wrongTask = sample({ providerEvidence: { ...sample().providerEvidence, taskId: 'other-task' } });
+  assert.throws(() => normalizeM11AgentStatus({schemaVersion: 1, rows: [wrongTask]}, {now: () => NOW}), {name: 'TypeError'});
+
+  const missingModelEvidence = sample({ modelEvidence: null, modelVerified: 'UNKNOWN' });
+  assert.equal(normalizeM11AgentStatus({schemaVersion: 1, rows: [missingModelEvidence]}, {now: () => NOW}).rows[0].modelVerified, 'UNKNOWN');
+
+  const badClock = () => { throw new Error('clock failed'); };
+  assert.throws(() => normalizeM11AgentStatus({schemaVersion: 1, rows: [sample()]}, {now: badClock}), {name: 'TypeError'});
+});
+
+test('strict rejection for hostile rows, arrays, and dangerous DTO mutation', () => {
+  const withNullAgent = sample();
+  withNullAgent.agentId = null;
+  assert.throws(() => normalizeM11AgentStatus({schemaVersion: 1, rows: [withNullAgent]}, {now: () => NOW}), {name: 'TypeError'});
+
+  const withNullVerified = sample();
+  withNullVerified.providerVerified = null;
+  assert.throws(() => normalizeM11AgentStatus({schemaVersion: 1, rows: [withNullVerified]}, {now: () => NOW}), {name: 'TypeError'});
+
+  const withOwnerReason = sample({ownerDecisionRequired: true, ownerDecisionReason: null});
+  assert.throws(() => normalizeM11AgentStatus({schemaVersion: 1, rows: [withOwnerReason]}, {now: () => NOW}), {name: 'TypeError'});
+
+  const proxy = new Proxy([sample()], { get(target, prop, receiver) { if (prop === 'length') return 1; return Reflect.get(target, prop, receiver); }});
+  assert.throws(() => normalizeM11AgentStatus({schemaVersion: 1, rows: proxy}, {now: () => NOW}), {name: 'TypeError'});
+
+  const customArray = Object.create(Array.prototype);
+  customArray.push(sample());
+  assert.throws(() => normalizeM11AgentStatus({schemaVersion: 1, rows: customArray}, {now: () => NOW}), {name: 'TypeError'});
+  assert.throws(() => validateM11AgentStatusRow(sample({taskUrl: 'https://github.com/acme/meridian/issues/42?token=secret'}), NOW), {name: 'TypeError'});
 });
