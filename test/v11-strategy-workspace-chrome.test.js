@@ -729,10 +729,42 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
           assert.ok(tableViewport.column>=190,'path actions have a legible column at mobile widths');
           if(size.width<840){
             assert.equal(tableViewport.scrollable,true);
+            const focusState=await evaluate(`(()=>{
+              const region=document.querySelector('[id$="-path-table"]');
+              region.focus();
+              window.__pathTableArrowRight=null;
+              region.addEventListener('keydown',event=>{
+                if(event.key==='ArrowRight')window.__pathTableArrowRight={
+                  key:event.key,code:event.code,targetIsRegion:event.target===region,
+                  defaultPrevented:event.defaultPrevented};
+              },{once:true});
+              return {focused:document.activeElement===region,scrollLeft:region.scrollLeft,
+                scrollWidth:region.scrollWidth,clientWidth:region.clientWidth};
+            })()`);
+            assert.equal(focusState.focused,true,'horizontal path region must receive focus before keyboard input');
             await key('ArrowRight','ArrowRight',39);
-            // Native scroll animation settles before its position is inspected.
-            await evaluate(`new Promise(resolve=>setTimeout(resolve,150))`);
-            assert.ok(await evaluate(`document.querySelector('[id$="-path-table"]').scrollLeft>0`));
+            const scrollResult=await evaluate(`new Promise(resolve=>{
+              const region=document.querySelector('[id$="-path-table"]');
+              const started=performance.now(),timeoutMs=1200;
+              const inspect=()=>{
+                const keyEvent=window.__pathTableArrowRight||null;
+                const result={scrolled:region.scrollLeft>0,scrollLeft:region.scrollLeft,
+                  scrollWidth:region.scrollWidth,clientWidth:region.clientWidth,
+                  activeElementIsRegion:document.activeElement===region,keyEvent,
+                  elapsedMs:Math.round(performance.now()-started)};
+                if(result.scrolled||result.elapsedMs>=timeoutMs)return resolve(result);
+                setTimeout(inspect,25);
+              };
+              inspect();
+            })()`);
+            assert.equal(scrollResult.activeElementIsRegion,true,
+              'ArrowRight must not move focus away from the scroll region: '+JSON.stringify(scrollResult));
+            assert.deepEqual(scrollResult.keyEvent,
+              {key:'ArrowRight',code:'ArrowRight',targetIsRegion:true,defaultPrevented:false},
+              'the focused scroll region must receive an unhandled native ArrowRight event: '+JSON.stringify(scrollResult));
+            assert.equal(scrollResult.scrolled,true,
+              'native ArrowRight did not scroll the horizontally scrollable path region before the bounded timeout: '+
+                JSON.stringify({focusState,scrollResult}));
           }
           for(const dimension of ['segmentId','variantId','scenarioId','status']){
             for(const filterValue of new Set(producerCase.result.paths.map(path=>path[dimension]))){
