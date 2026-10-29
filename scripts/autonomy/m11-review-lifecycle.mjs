@@ -434,6 +434,15 @@ export async function observeReviewLifecycle({
       }
       return unknown('RECEIPT_NOT_CONFIRMED_NO_REPOST', true);
     }
+    if ((claim.lastStage === 'DISPATCH_ACKED' || claim.lastStage === 'OBSERVE_PENDING')
+      && claim.status !== 'REVIEW_PENDING') {
+      return unknown('UNSUPPORTED_DURABLE_STATE_PAIR', false);
+    }
+    if (claim.lastStage === 'REVIEW_RESULT'
+      && (claim.completionState === 'COMPLETE' || claim.completionState === 'REVISION_REQUIRED')
+      && claim.status !== 'REVIEWED') {
+      return unknown('UNSUPPORTED_DURABLE_STATE_PAIR', false);
+    }
     if (claim.lastStage === 'REVIEW_RESULT'
       && claim.completionState && claim.completionState !== 'COMPLETE'
       && claim.completionState !== 'REVISION_REQUIRED') {
@@ -444,7 +453,10 @@ export async function observeReviewLifecycle({
         ...baseResult()
       });
     }
-    const persistedCompletion = claim.lastStage === 'REVIEW_RESULT'
+    const observePendingEntry = claim.status === 'REVIEW_PENDING'
+      && (claim.lastStage === 'DISPATCH_ACKED' || claim.lastStage === 'OBSERVE_PENDING');
+    const persistedCompletion = claim.status === 'REVIEWED'
+      && claim.lastStage === 'REVIEW_RESULT'
       && (claim.completionState === 'COMPLETE' || claim.completionState === 'REVISION_REQUIRED')
       ? Object.freeze({
         completionState: claim.completionState,
@@ -453,6 +465,37 @@ export async function observeReviewLifecycle({
           : 'NEEDS_MORE_EVIDENCE'
       })
       : null;
+    if (!observePendingEntry && !persistedCompletion) {
+      return unknown('UNSUPPORTED_DURABLE_STATE_PAIR', false);
+    }
+    let completionState;
+    let verdict;
+    if (observePendingEntry) {
+      const observePreparingCommit = await callWithinBudget(store.commit.bind(store), {
+        claim,
+        transition: {kind: 'OBSERVE_PREPARING'}
+      }, remainingMs());
+      if (observePreparingCommit.timedOut || observePreparingCommit.error || observePreparingCommit.value?.status !== 'COMMITTED') {
+        return unknown('OBSERVE_PREPARING_STATE_UNKNOWN', false);
+      }
+      claim = observePreparingCommit.value.claim;
+    } else {
+      completionState = persistedCompletion.completionState;
+      verdict = persistedCompletion.verdict;
+      const receiptPreparingCommit = await callWithinBudget(store.commit.bind(store), {
+        claim,
+        transition: {
+          kind: 'RECEIPT_PREPARING',
+          completionState,
+          verdict
+        }
+      }, remainingMs());
+      if (receiptPreparingCommit.timedOut || receiptPreparingCommit.error
+        || receiptPreparingCommit.value?.status !== 'COMMITTED') {
+        return unknown('RECEIPT_PREPARING_STATE_UNKNOWN', false);
+      }
+      claim = receiptPreparingCommit.value.claim;
+    }
     const revalidated = await revalidateCollection({
       revalidate,
       expected: collected,
@@ -460,11 +503,14 @@ export async function observeReviewLifecycle({
       now
     });
     if (!revalidated.ok || budgetExpired()) {
-      await recordUnknown(store, claim, 'STALE_BEFORE_OBSERVE', remainingMs(), {
+      const staleStage = observePendingEntry ? 'STALE_BEFORE_OBSERVE' : 'STALE_BEFORE_RECEIPT';
+      await recordUnknown(store, claim, staleStage, remainingMs(), {
         reviewRequestId: claim.reviewRequestId,
         sessionId: claim.sessionId
       });
-      return unknown(revalidated.missing ? 'FRESH_COLLECTION_REQUIRED' : 'STALE_OR_UNKNOWN_BEFORE_OBSERVE', false);
+      return unknown(revalidated.missing
+        ? 'FRESH_COLLECTION_REQUIRED'
+        : observePendingEntry ? 'STALE_OR_UNKNOWN_BEFORE_OBSERVE' : 'STALE_OR_UNKNOWN_BEFORE_RECEIPT', false);
     }
     const fresh = revalidated.collected;
     if (claim.actionKey !== fresh.actionKey || claim.executionKey !== fresh.executionKey
@@ -480,12 +526,7 @@ export async function observeReviewLifecycle({
       });
       return unknown('COLLECTION_PIN_MISMATCH', false);
     }
-    let completionState;
-    let verdict;
-    if (persistedCompletion) {
-      completionState = persistedCompletion.completionState;
-      verdict = persistedCompletion.verdict;
-    } else if (now() > claim.reviewDeadlineAt) {
+    if (observePendingEntry && now() > claim.reviewDeadlineAt) {
       const timeoutCommit = await callWithinBudget(store.commit.bind(store), {
         claim,
         transition: {
@@ -505,15 +546,8 @@ export async function observeReviewLifecycle({
         completionState: 'INCOMPLETE',
         ...baseResult()
       });
-    } else {
-      const observePreparingCommit = await callWithinBudget(store.commit.bind(store), {
-        claim,
-        transition: {kind: 'OBSERVE_PREPARING'}
-      }, remainingMs());
-      if (observePreparingCommit.timedOut || observePreparingCommit.error || observePreparingCommit.value?.status !== 'COMMITTED') {
-        return unknown('OBSERVE_PREPARING_STATE_UNKNOWN', false);
-      }
-      claim = observePreparingCommit.value.claim;
+    }
+    if (observePendingEntry) {
       const observeCall = await callWithinBudget(observeReview, {
         actionKey: claim.actionKey,
         executionKey: claim.executionKey,
@@ -528,7 +562,7 @@ export async function observeReviewLifecycle({
         return unknown('OBSERVE_OUTCOME_UNKNOWN', false);
       }
       const observed = observeCall.value;
-      if (!observed || observed.status === 'PENDING') {
+      if (observed && observed.status === 'PENDING') {
         const pendingCommit = await callWithinBudget(store.commit.bind(store), {
           claim,
           transition: {kind: 'OBSERVE_PENDING'}
@@ -536,12 +570,20 @@ export async function observeReviewLifecycle({
         if (pendingCommit.timedOut || pendingCommit.error || pendingCommit.value?.status !== 'COMMITTED') {
           return unknown('OBSERVE_PENDING_STATE_UNKNOWN', false);
         }
+        claim = pendingCommit.value.claim;
         return Object.freeze({
           status: 'REVIEW_PENDING',
           reviewRequestId: claim.reviewRequestId,
           sessionId: claim.sessionId,
           ...baseResult()
         });
+      }
+      if (!observed) {
+        await recordUnknown(store, claim, 'OBSERVE_AMBIGUOUS', remainingMs(), {
+          reviewRequestId: claim.reviewRequestId,
+          sessionId: claim.sessionId
+        });
+        return unknown('OBSERVE_AMBIGUOUS', false);
       }
       if (observed.status !== 'COMPLETED') {
         await recordUnknown(store, claim, 'OBSERVE_AMBIGUOUS', remainingMs(), {
@@ -622,19 +664,21 @@ export async function observeReviewLifecycle({
         });
       }
     }
-    const receiptPreparingCommit = await callWithinBudget(store.commit.bind(store), {
-      claim,
-      transition: {
-        kind: 'RECEIPT_PREPARING',
-        completionState,
-        verdict
+    if (claim.lastStage !== 'RECEIPT_PREPARING') {
+      const receiptPreparingCommit = await callWithinBudget(store.commit.bind(store), {
+        claim,
+        transition: {
+          kind: 'RECEIPT_PREPARING',
+          completionState,
+          verdict
+        }
+      }, remainingMs());
+      if (receiptPreparingCommit.timedOut || receiptPreparingCommit.error
+        || receiptPreparingCommit.value?.status !== 'COMMITTED') {
+        return unknown('RECEIPT_PREPARING_STATE_UNKNOWN', false);
       }
-    }, remainingMs());
-    if (receiptPreparingCommit.timedOut || receiptPreparingCommit.error
-      || receiptPreparingCommit.value?.status !== 'COMMITTED') {
-      return unknown('RECEIPT_PREPARING_STATE_UNKNOWN', false);
+      claim = receiptPreparingCommit.value.claim;
     }
-    claim = receiptPreparingCommit.value.claim;
     const beforeReceipt = await revalidateCollection({revalidate, expected: fresh, remainingMs: remainingMs(), now});
     if (!beforeReceipt.ok || budgetExpired()) {
       await recordUnknown(store, claim, 'STALE_BEFORE_RECEIPT', remainingMs(), {
