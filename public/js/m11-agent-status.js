@@ -320,13 +320,32 @@ function node(doc, tag, text) {
   return element;
 }
 
+function displayMapping(value, fallback = 'Unbekannt') {
+  if (typeof value !== 'string') return fallback;
+  const trimmed = value.trim();
+  if (!trimmed) return fallback;
+  if (trimmed === 'UNKNOWN') return 'Unbekannt';
+  if (trimmed === 'CURRENT') return 'Aktuell';
+  if (trimmed === 'STALE') return 'Veraltet';
+  if (trimmed === 'ACTIVE') return 'Aktiv';
+  if (trimmed === 'STOPPED') return 'Gestoppt';
+  if (trimmed === 'PREPARATION') return 'Vorbereitung';
+  if (trimmed === 'PILOT') return 'Pilot';
+  if (trimmed === 'RUNNING') return 'Laufend';
+  if (trimmed === 'REVIEWING') return 'Prüfung';
+  if (trimmed === 'QUEUED') return 'Wartend';
+  if (trimmed === 'BLOCKED') return 'Blockiert';
+  if (trimmed === 'DONE') return 'Erledigt';
+  return trimmed;
+}
+
 function appendMetaList(parent, entries) {
   for (const [label, value] of entries) {
     const row = node(parent.ownerDocument, 'div');
     row.className = 'm11-agent-status__meta-row';
     const labelNode = node(parent.ownerDocument, 'span', label);
     labelNode.className = 'm11-agent-status__meta-label';
-    const valueNode = node(parent.ownerDocument, 'span', value);
+    const valueNode = node(parent.ownerDocument, 'span', displayMapping(value, 'Unbekannt'));
     valueNode.className = 'm11-agent-status__meta-value';
     row.append(labelNode, valueNode);
     parent.append(row);
@@ -357,9 +376,9 @@ function renderRow(document, row) {
     ['Koordinator', COORDINATOR_LABELS[row.coordinatorMode] || 'Unbekannt'],
     ['Frische', FRESHNESS_LABELS[row.freshness] || 'Unbekannt'],
     ['Anbieter angefragt', safeText(row.providerRequested, 80) || 'Unbekannt'],
-    ['Anbieter verifiziert', safeText(row.providerVerified, 80) || 'Unbekannt'],
+    ['Anbieter verifiziert', displayMapping(row.providerVerified, 'UNKNOWN')],
     ['Modell angefragt', safeText(row.modelRequested, 120) || 'Unbekannt'],
-    ['Modell verifiziert', safeText(row.modelVerified, 120) || 'Unbekannt']
+    ['Modell verifiziert', displayMapping(row.modelVerified, 'UNKNOWN')]
   ]);
   card.append(meta);
 

@@ -212,7 +212,7 @@ function validateEvidenceBinding(binding, expectedAgentId, expectedTaskId, expec
     return null;
   }
   if (!hasExactDataKeys(binding, EVIDENCE_KEYS)) {
-    return null;
+    throw new TypeError('M11 evidence binding must use exact data properties');
   }
   const agentId = safeText(readOwnDataValue(binding, 'agentId'), 120);
   const taskId = safeText(readOwnDataValue(binding, 'taskId'), 120);
@@ -380,10 +380,19 @@ export function normalizeM11AgentStatus(input, options = {}) {
     throw new TypeError('M11 agent status must contain schemaVersion and rows');
   }
 
-  const schemaValue = readOwnDataValue(input, 'schemaVersion');
-  const rowsValue = readOwnDataValue(input, 'rows');
-  const statusValue = readOwnDataValue(input, 'status');
-  const freshnessValue = readOwnDataValue(input, 'freshness');
+  const schemaDesc = Object.getOwnPropertyDescriptor(input, 'schemaVersion');
+  const rowsDesc = Object.getOwnPropertyDescriptor(input, 'rows');
+  if (!schemaDesc || !Object.prototype.hasOwnProperty.call(schemaDesc, 'value') || schemaDesc.enumerable !== true || schemaDesc.get !== undefined || schemaDesc.set !== undefined) {
+    throw new TypeError('M11 agent status schemaVersion must be a plain data property');
+  }
+  if (!rowsDesc || !Object.prototype.hasOwnProperty.call(rowsDesc, 'value') || rowsDesc.enumerable !== true || rowsDesc.get !== undefined || rowsDesc.set !== undefined) {
+    throw new TypeError('M11 agent status rows must be a plain data property');
+  }
+
+  const schemaValue = schemaDesc.value;
+  const rowsValue = rowsDesc.value;
+  const statusValue = Object.prototype.hasOwnProperty.call(input, 'status') ? readOwnDataValue(input, 'status') : undefined;
+  const freshnessValue = Object.prototype.hasOwnProperty.call(input, 'freshness') ? readOwnDataValue(input, 'freshness') : undefined;
   if (schemaValue !== 1) {
     throw new TypeError('Unsupported M11 agent status schemaVersion');
   }
