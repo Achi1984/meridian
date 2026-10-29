@@ -114,12 +114,15 @@ async function readTextBounded(response, {maxResponseBytes, signal}) {
       while (true) {
         if (signal?.aborted) fail('ABORTED');
         const {done, value} = await reader.read();
+        if (signal?.aborted) fail('ABORTED');
         if (done) break;
         size += value.byteLength;
         if (size > maxResponseBytes) fail('RESPONSE_TOO_LARGE');
         text += decoder.decode(value, {stream: true});
       }
+      if (signal?.aborted) fail('ABORTED');
       text += decoder.decode();
+      if (signal?.aborted) fail('ABORTED');
       return text;
     } catch (error) {
       if (signal?.aborted || error?.name === 'AbortError') fail('ABORTED');
@@ -241,13 +244,16 @@ export function createM11CoordinatorGithubReadApi({
         maxResponseBytes,
         signal: requestScope.requestSignal
       });
+      if (requestScope.requestSignal.aborted) fail('ABORTED');
       let parsed;
       try {
         parsed = JSON.parse(text);
       } catch {
         fail('MALFORMED_RESPONSE');
       }
+      if (requestScope.requestSignal.aborted) fail('ABORTED');
       if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) fail('MALFORMED_RESPONSE');
+      if (requestScope.requestSignal.aborted) fail('ABORTED');
       return {payload: parsed, headers: requestScope.response.headers};
     } finally {
       requestScope.finalize();
@@ -261,6 +267,7 @@ export function createM11CoordinatorGithubReadApi({
         maxResponseBytes,
         signal: requestScope.requestSignal
       });
+      if (requestScope.requestSignal.aborted) fail('ABORTED');
       return {text, headers: requestScope.response.headers};
     } finally {
       requestScope.finalize();
@@ -323,14 +330,18 @@ export function createM11CoordinatorGithubReadApi({
       finalize();
       fail('OFF_ORIGIN_RESPONSE');
     }
+    if (response.status === 401 || response.status === 403) {
+      authInvalidatedAtMs = now();
+      if (detectRateLimit(response)) {
+        finalize();
+        fail('RATE_LIMITED');
+      }
+      finalize();
+      fail('UNAUTHORIZED');
+    }
     if (detectRateLimit(response)) {
       finalize();
       fail('RATE_LIMITED');
-    }
-    if (response.status === 401 || response.status === 403) {
-      authInvalidatedAtMs = now();
-      finalize();
-      fail('UNAUTHORIZED');
     }
     if (response.status < 200 || response.status >= 300) {
       finalize();

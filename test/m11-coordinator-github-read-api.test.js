@@ -456,10 +456,12 @@ test('rate limits are explicit and malformed payloads fail closed', async () => 
     credentials: credentials(),
     now: () => NOW_MS
   });
+  assert.equal(rateApi.authenticated, true);
   await assert.rejects(
     rateApi.getWorkflowRun({repository: REPOSITORY, runId: 7001}),
     error => error?.code === 'RATE_LIMITED'
   );
+  assert.equal(rateApi.authenticated, false);
 
   const {fetchImpl: malformedFetch} = makeFetch([
     {
@@ -510,19 +512,21 @@ test('abort propagates and error messages never leak bearer secrets', async () =
   assert.equal(sawAbort, true);
 });
 
-test('stalled bodies, caller abort after headers, and chunked limits fail closed', async () => {
+test('deadline rejects cancel-as-eof when full valid JSON chunk was already received', async () => {
   const secret = '******';
-  let stalledAborted = false;
+  let pullCount = 0;
   const stalledFetch = async (url, options) => ({
     status: 200,
     url: typeof url === 'string' ? url : url.toString(),
     headers: new Headers({'content-type': 'application/json'}),
     body: new ReadableStream({
-      start(controller) {
-        options.signal.addEventListener('abort', () => {
-          stalledAborted = true;
-          controller.error(new DOMException('aborted', 'AbortError'));
-        }, {once: true});
+      pull(controller) {
+        pullCount += 1;
+        if (pullCount === 1) {
+          controller.enqueue(new TextEncoder().encode(JSON.stringify(runPayload())));
+          return;
+        }
+        return new Promise(() => {});
       }
     })
   });
@@ -536,30 +540,40 @@ test('stalled bodies, caller abort after headers, and chunked limits fail closed
     stalledApi.getWorkflowRun({repository: REPOSITORY, runId: 7001}),
     error => error?.code === 'ABORTED'
   );
-  assert.equal(stalledAborted, true);
+});
 
-  let abortedDuringBody = false;
-  const abortableFetch = async (url, options) => ({
-    status: 200,
-    url: typeof url === 'string' ? url : url.toString(),
-    headers: new Headers({'content-type': 'application/json'}),
-    body: new ReadableStream({
-      start(controller) {
-        const enc = new TextEncoder();
-        controller.enqueue(enc.encode('{"id":7001,'));
-        const timer = setTimeout(() => {
-          try {
-            controller.enqueue(enc.encode('"repository":{"full_name":"Achi1984/meridian"},'));
-          } catch {}
-        }, 20);
-        options.signal.addEventListener('abort', () => {
-          abortedDuringBody = true;
-          clearTimeout(timer);
-          controller.error(new DOMException('aborted', 'AbortError'));
-        }, {once: true});
+test('caller cancellation after headers rejects nonempty stalled diff body as ABORTED', async () => {
+  const secret = '******';
+  let diffPullCount = 0;
+  const {fetchImpl: abortableFetch} = makeFetch([
+    {
+      match: url => url.pathname === '/repos/Achi1984/meridian/pulls/973',
+      handle: ({url}) => json(pullPayload(), {url: url.toString()})
+    },
+    {
+      match: url => url.pathname === `/repos/Achi1984/meridian/compare/${BASE}...${HEAD}`,
+      handle: ({url, options}) => {
+        if (options?.headers?.accept === 'application/vnd.github.v3.diff') {
+          return {
+            status: 200,
+            url: url.toString(),
+            headers: new Headers({'content-type': 'text/plain'}),
+            body: new ReadableStream({
+              pull(controller) {
+                diffPullCount += 1;
+                if (diffPullCount === 1) {
+                  controller.enqueue(new TextEncoder().encode('diff --git a/a b/a\nindex 1..2 100644\n'));
+                  return;
+                }
+                return new Promise(() => {});
+              }
+            })
+          };
+        }
+        return json(comparePayload(), {url: url.toString()});
       }
-    })
-  });
+    }
+  ]);
   const abortableApi = createM11CoordinatorGithubReadApi({
     fetchImpl: abortableFetch,
     credentials: credentials({token: secret}),
@@ -568,11 +582,19 @@ test('stalled bodies, caller abort after headers, and chunked limits fail closed
   const callerAbort = new AbortController();
   setTimeout(() => callerAbort.abort(), 5);
   await assert.rejects(
-    abortableApi.getWorkflowRun({repository: REPOSITORY, runId: 7001, signal: callerAbort.signal}),
+    abortableApi.getPullRequestDiff({
+      repository: REPOSITORY,
+      pullRequest: 973,
+      headSha: HEAD,
+      baseSha: BASE,
+      signal: callerAbort.signal
+    }),
     error => error?.code === 'ABORTED'
   );
-  assert.equal(abortedDuringBody, true);
+});
 
+test('chunked byte limits fail closed', async () => {
+  const secret = '******';
   const oversizedApi = createM11CoordinatorGithubReadApi({
     fetchImpl: async (url) => makeResponse({
       status: 200,
