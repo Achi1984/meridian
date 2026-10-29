@@ -23,14 +23,38 @@
     "pages": "<PAGES-CHECK-IDENTITY-REQUIRED>"
   },
   "evidenceSnapshot": {
-    "mainSha": "34eb7dfd804fed8769bec3d8f9e7bb0557c31b62",
-    "observedAtUtc": "2026-10-29T05:19:00Z",
-    "coordinatorCi": "STALE_OLD_HEAD_BASE_PAIR",
+    "mainSha": "a40b714ea4a60b2b367d8db834ad65b7782f5a46",
+    "observedAtUtc": "2026-10-29T05:29:35Z",
+    "mainPostchecks": {
+      "release-safety": {
+        "runId": 40823600133,
+        "runAttempt": 1,
+        "status": "in_progress"
+      },
+      "runtime-smoke": {
+        "runId": 40823600130,
+        "runAttempt": 1,
+        "status": "success"
+      },
+      "release-coordinator": {
+        "runId": 40823600127,
+        "runAttempt": 1,
+        "status": "success"
+      },
+      "pages": {
+        "runId": 40823599573,
+        "runAttempt": 1,
+        "status": "success"
+      }
+    },
+    "coordinatorCi": "NOT_RUN_ON_CURRENT_HEAD_BASE_PAIR",
     "currentPairCoordinatorCi": "NOT_RUN",
     "independentClaudeAcceptance": "PENDING"
   },
   "handoffDesign": {
     "status": "PROPOSAL_ONLY",
+    "rankedPilot": "CI_SUCCESS_TO_INDEPENDENT_REVIEW_AND_ONE_RECEIPT",
+    "authorDelivery": "INTERACTIVE_EXISTING_PATH; NATIVE_DISPATCH_NOT_REQUIRED",
     "progression": [
       "AUTHOR_DELIVERY",
       "EXACT_PAIR_CI",
@@ -42,6 +66,34 @@
     "stateStore": "DURABLE_CAS_LEASE_AND_FENCING_NOT_SELECTED_OR_PROVEN",
     "nativeAssignment": "USER_TO_SERVER_TOKEN_REQUIRED_NOT_PROVISIONED",
     "claudeTrigger": "OWNER_COMMENT_ONLY_CURRENTLY",
+    "proposedFiles": [
+      ".github/workflows/m11-ci-review-coordinator.yml",
+      "scripts/autonomy/m11-coordinator-collector.mjs",
+      "scripts/autonomy/m11-coordinator-state-store.mjs",
+      "test/m11-coordinator-collector.test.js",
+      "test/m11-coordinator-state-store.test.js",
+      "test/m11-coordinator-review.test.js"
+    ],
+    "proposedPermissionNames": [
+      "actions: read",
+      "contents: read",
+      "pull-requests: read",
+      "contents: write (dedicated CAS refs only; separately reviewed)",
+      "issues: write (single keyed mailbox receipt)",
+      "id-token: write (only if pinned Claude action requires it)",
+      "CLAUDE_CODE_OAUTH_TOKEN (existing secret; event-triggered reuse needs separate approval)"
+    ],
+    "testAcceptance": [
+      "AUTHENTICATED_EVENT_AND_AUTHORITATIVE_RUN_SELECTION",
+      "EXACT_PAIR_CI_SUCCESS_REQUIRED",
+      "DUPLICATE_DELIVERY_INVOKES_REVIEW_ONCE",
+      "CAS_COMPETITION_HAS_ONE_WINNER",
+      "RESTART_RECONSTRUCTS_STATE_AND_FENCE",
+      "CRASH_AND_UNKNOWN_RESULT_REQUIRE_RECONCILIATION",
+      "PARTIAL_OR_TRUNCATED_REVIEW_NEVER_GREEN",
+      "ONE_CONSOLIDATED_RECEIPT",
+      "NO_MERGE_DEPLOY_OR_APPROVAL_BYPASS_CAPABILITY"
+    ],
     "actionRequiredApproval": "OWNER_ONLY",
     "merge": "LEAD_ONLY_NO_COORDINATOR_TOKEN",
     "unknownMutation": "RECONCILE_BEFORE_ANY_RETRY",
