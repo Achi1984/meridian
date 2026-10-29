@@ -159,9 +159,14 @@ function validateEvidenceBinding(binding, expectedAgentId, expectedTaskId, expec
   if (!isPlainObject(binding)) {
     return null;
   }
-  const expectedKeys = ['agentId', 'taskId', 'value', 'observedAt', 'expiresAt', 'evidenceUrl', 'evidenceType'];
+  const bindingKeys = Reflect.ownKeys(binding);
+  const expectedKeys = bindingKeys.length === 8 ? ['agentId', 'taskId', 'value', 'observedAt', 'expiresAt', 'evidenceUrl', 'evidenceType', 'freshness'] : ['agentId', 'taskId', 'value', 'observedAt', 'expiresAt', 'evidenceUrl', 'evidenceType'];
   if (!hasExactDataKeys(binding, expectedKeys)) {
     return null;
+  }
+  const bindingFreshness = readOwnDataValue(binding, 'freshness');
+  if (bindingFreshness !== undefined && bindingFreshness !== null && !['CURRENT', 'STALE', 'UNKNOWN'].includes(bindingFreshness)) {
+    throw new TypeError('M11 evidence binding freshness must be CURRENT, STALE, or UNKNOWN');
   }
   const agentId = safeText(readOwnDataValue(binding, 'agentId'), 120);
   const taskId = safeText(readOwnDataValue(binding, 'taskId'), 120);
@@ -185,7 +190,8 @@ function validateEvidenceBinding(binding, expectedAgentId, expectedTaskId, expec
   if (observedAt === null || expiresAt === null || observedAt > expiresAt) {
     return null;
   }
-  if (deriveFreshness(readOwnDataValue(binding, 'observedAt'), readOwnDataValue(binding, 'expiresAt'), nowMs) !== 'CURRENT') {
+  const freshness = deriveFreshness(readOwnDataValue(binding, 'observedAt'), readOwnDataValue(binding, 'expiresAt'), nowMs);
+  if (freshness === 'UNKNOWN') {
     return null;
   }
   if (evidenceType === 'manual' || evidenceType === 'unknown') {
@@ -198,7 +204,8 @@ function validateEvidenceBinding(binding, expectedAgentId, expectedTaskId, expec
     observedAt: readOwnDataValue(binding, 'observedAt'),
     expiresAt: readOwnDataValue(binding, 'expiresAt'),
     evidenceUrl,
-    evidenceType
+    evidenceType,
+    freshness
   });
 }
 
@@ -224,8 +231,10 @@ function validateSerializedStatus(raw, nowMs) {
   for (const row of raw.rows) {
     if (!isPlainObject(row)) throw new TypeError('M11 agent status row must be a plain object');
     const rowKeys = Reflect.ownKeys(row);
-    const expected = ['agentId', 'agentName', 'taskId', 'taskLabel', 'taskState', 'coordinatorMode', 'providerRequested', 'providerVerified', 'modelRequested', 'modelVerified', 'providerEvidence', 'modelEvidence', 'coordinatorEvidence', 'taskUrl', 'observedAt', 'expiresAt', 'evidenceUrl', 'evidenceType', 'blocker', 'nextAction', 'ownerDecisionRequired', 'ownerDecisionReason', 'freshness'];
-    if (rowKeys.length !== expected.length || rowKeys.some(key => typeof key !== 'string' || !expected.includes(key))) {
+    const expected = ['agentId', 'agentName', 'taskId', 'taskLabel', 'taskState', 'coordinatorMode', 'providerRequested', 'providerVerified', 'modelRequested', 'modelVerified', 'providerEvidence', 'modelEvidence', 'coordinatorEvidence', 'taskUrl', 'observedAt', 'expiresAt', 'evidenceUrl', 'evidenceType', 'blocker', 'nextAction', 'ownerDecisionRequired', 'ownerDecisionReason'];
+    const expectedWithFreshness = [...expected, 'freshness'];
+    const exactKeys = rowKeys.length === expectedWithFreshness.length ? expectedWithFreshness : expected;
+    if (rowKeys.length !== exactKeys.length || rowKeys.some(key => typeof key !== 'string' || !exactKeys.includes(key))) {
       throw new TypeError('M11 agent status row field set is invalid');
     }
 

@@ -41,7 +41,9 @@ const ROW_KEYS = [
   'taskUrl', 'observedAt', 'expiresAt', 'evidenceUrl', 'evidenceType',
   'blocker', 'nextAction', 'ownerDecisionRequired', 'ownerDecisionReason'
 ];
+const ROW_KEYS_WITH_FRESHNESS = [...ROW_KEYS, 'freshness'];
 const EVIDENCE_KEYS = ['agentId', 'taskId', 'value', 'observedAt', 'expiresAt', 'evidenceUrl', 'evidenceType'];
+const EVIDENCE_KEYS_WITH_FRESHNESS = [...EVIDENCE_KEYS, 'freshness'];
 
 function isProxy(value) {
   return Boolean(utilTypes && typeof utilTypes.isProxy === 'function' && utilTypes.isProxy(value));
@@ -211,7 +213,9 @@ function validateEvidenceBinding(binding, expectedAgentId, expectedTaskId, expec
   if (!isPlainObject(binding)) {
     return null;
   }
-  if (!hasExactDataKeys(binding, EVIDENCE_KEYS)) {
+  const bindingKeys = Reflect.ownKeys(binding);
+  const expectedBindingKeys = bindingKeys.length === EVIDENCE_KEYS_WITH_FRESHNESS.length ? EVIDENCE_KEYS_WITH_FRESHNESS : EVIDENCE_KEYS;
+  if (!hasExactDataKeys(binding, expectedBindingKeys)) {
     throw new TypeError('M11 evidence binding must use exact data properties');
   }
   const agentId = safeText(readOwnDataValue(binding, 'agentId'), 120);
@@ -236,7 +240,11 @@ function validateEvidenceBinding(binding, expectedAgentId, expectedTaskId, expec
   if (observedAt === null || expiresAt === null || observedAt > expiresAt) {
     return null;
   }
+  const bindingFreshness = readOwnDataValue(binding, 'freshness');
   const freshness = deriveFreshness(readOwnDataValue(binding, 'observedAt'), readOwnDataValue(binding, 'expiresAt'), nowMs);
+  if (bindingFreshness !== undefined && bindingFreshness !== null && !['CURRENT', 'STALE', 'UNKNOWN'].includes(bindingFreshness)) {
+    throw new TypeError('M11 evidence binding freshness must be CURRENT, STALE, or UNKNOWN');
+  }
   if (freshness === 'UNKNOWN') {
     return null;
   }
@@ -260,8 +268,13 @@ function validateRow(row, nowMs) {
   if (!isPlainObject(row)) {
     throw new TypeError('M11 agent status row must be a plain object');
   }
-  if (!hasExactDataKeys(row, ROW_KEYS)) {
+  const rowKeys = Reflect.ownKeys(row);
+  const exactKeys = rowKeys.length === ROW_KEYS_WITH_FRESHNESS.length ? ROW_KEYS_WITH_FRESHNESS : ROW_KEYS;
+  if (!hasExactDataKeys(row, exactKeys)) {
     throw new TypeError('M11 agent status row field set is invalid');
+  }
+  if (Object.prototype.hasOwnProperty.call(row, 'freshness') && !M11_FRESHNESS_STATES.includes(row.freshness)) {
+    throw new TypeError('M11 agent status row freshness must be CURRENT, STALE, or UNKNOWN');
   }
 
   const agentId = safeText(row.agentId, 120);

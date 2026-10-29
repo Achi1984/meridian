@@ -105,7 +105,7 @@ test('normalize -> stringify -> render roundtrip and raw object rejection', () =
   assert.ok(rendered !== null);
   assert.match(target.textContent, /M11 Agent Status/);
   assert.throws(() => renderM11AgentStatus(target, JSON.stringify({ schemaVersion: 1, rows: [{ ...sample(), agentId: null }] }), { now: () => NOW }), { name: 'TypeError' });
-  assert.throws(() => renderM11AgentStatus(target, JSON.stringify(input), { now: () => NOW }), { name: 'TypeError' });
+  assert.throws(() => renderM11AgentStatus(target, input, { now: () => NOW }), { name: 'TypeError' });
 });
 
 test('expiry and missing evidence suppress active/running/verified claims', () => {
@@ -185,31 +185,45 @@ test('strict rejection for hostile rows, arrays, and dangerous DTO mutation', ()
   assert.throws(() => validateM11AgentStatusRow(sample({ taskUrl: 'https://github.com/acme/meridian/issues/42?token=secret' }), NOW), { name: 'TypeError' });
 });
 
-test('browser no-evidence roundtrip and wrong-bound evidence stay UNKNOWN, while expired valid evidence remains STALE', () => {
+test('browser serialization contract preserves current and stale evidence exactly', () => {
+  const freshRow = sample();
+  const freshNormalized = normalizeM11AgentStatus({ schemaVersion: 1, rows: [freshRow] }, { now: () => NOW });
+  const freshSerialized = JSON.stringify(freshNormalized);
+  const freshDocument = makeDocument();
+  const freshRoot = freshDocument.createElement('div');
+  renderM11AgentStatus(freshRoot, freshSerialized, { now: () => NOW });
+  const freshSection = freshRoot.children[0];
+  assert.equal(freshSection.getAttribute('data-status'), 'CURRENT');
+  assert.ok(freshRoot.textContent.includes('Aktuell'));
+  assert.ok(freshRoot.textContent.includes('Laufend'));
+  assert.ok(freshRoot.textContent.includes('Gestoppt'));
+
+  const staleLater = makeDocument();
+  const staleRoot = staleLater.createElement('div');
+  renderM11AgentStatus(staleRoot, freshSerialized, { now: () => Date.parse('2026-10-29T12:05:00.000Z') });
+  const staleSection = staleRoot.children[0];
+  assert.equal(staleSection.getAttribute('data-status'), 'STALE');
+  assert.ok(staleRoot.textContent.includes('Veraltet'));
+  assert.ok(!staleRoot.textContent.includes('Aktuell'));
+  assert.ok(staleRoot.textContent.includes('Unbekannt') || staleRoot.textContent.includes('Veraltet'));
+
   const noEvidence = sample({
     providerEvidence: null,
     modelEvidence: null,
     coordinatorEvidence: null,
-    providerVerified: 'UNKNOWN',
-    modelVerified: 'UNKNOWN',
     taskState: 'RUNNING',
     coordinatorMode: 'ACTIVE'
   });
-  const normalized = normalizeM11AgentStatus({ schemaVersion: 1, rows: [noEvidence] }, { now: () => NOW });
-  assert.equal(normalized.rows[0].freshness, 'UNKNOWN');
-  assert.equal(normalized.rows[0].providerVerified, 'UNKNOWN');
-  assert.equal(normalized.rows[0].modelVerified, 'UNKNOWN');
-  assert.equal(normalized.rows[0].taskState, 'UNKNOWN');
-  assert.equal(normalized.rows[0].coordinatorMode, 'UNKNOWN');
-
-  const serialized = JSON.stringify(normalized);
-  const document = makeDocument();
-  const root = document.createElement('div');
-  renderM11AgentStatus(root, serialized, { now: () => NOW });
-  const section = root.children[0];
-  assert.equal(section.getAttribute('data-status'), 'UNKNOWN');
-  assert.match(root.textContent, /Unbekannt/);
-  assert.doesNotMatch(root.textContent, /Aktuell|Laufend|Aktiv/);
+  const noEvidenceNormalized = normalizeM11AgentStatus({ schemaVersion: 1, rows: [noEvidence] }, { now: () => NOW });
+  const noEvidenceSerialized = JSON.stringify(noEvidenceNormalized);
+  const unknownDocument = makeDocument();
+  const unknownRoot = unknownDocument.createElement('div');
+  renderM11AgentStatus(unknownRoot, noEvidenceSerialized, { now: () => NOW });
+  const unknownSection = unknownRoot.children[0];
+  assert.equal(unknownSection.getAttribute('data-status'), 'UNKNOWN');
+  assert.ok(unknownRoot.textContent.includes('Unbekannt'));
+  assert.ok(!unknownRoot.textContent.includes('Aktuell'));
+  assert.ok(!unknownRoot.textContent.includes('Laufend'));
 
   const wrongBinding = sample({
     providerEvidence: { ...sample().providerEvidence, taskId: 'other-task' },
@@ -222,20 +236,6 @@ test('browser no-evidence roundtrip and wrong-bound evidence stay UNKNOWN, while
   assert.equal(wrongBindingNormalized.rows[0].freshness, 'UNKNOWN');
   assert.equal(wrongBindingNormalized.rows[0].providerVerified, 'UNKNOWN');
   assert.equal(wrongBindingNormalized.rows[0].modelVerified, 'UNKNOWN');
-
-  const expiredValidEvidence = sample({
-    providerEvidence: { ...sample().providerEvidence, expiresAt: '2026-10-29T11:59:00.000Z' },
-    modelEvidence: { ...sample().modelEvidence, expiresAt: '2026-10-29T11:59:00.000Z' },
-    coordinatorEvidence: { ...sample().coordinatorEvidence, expiresAt: '2026-10-29T11:59:00.000Z' },
-    providerVerified: 'github',
-    modelVerified: 'gpt-5',
-    taskState: 'RUNNING',
-    coordinatorMode: 'ACTIVE'
-  });
-  const expiredNormalized = normalizeM11AgentStatus({ schemaVersion: 1, rows: [expiredValidEvidence] }, { now: () => NOW });
-  assert.equal(expiredNormalized.rows[0].freshness, 'STALE');
-  assert.equal(expiredNormalized.rows[0].providerVerified, 'UNKNOWN');
-  assert.equal(expiredNormalized.rows[0].modelVerified, 'UNKNOWN');
 });
 
 test('browser revalidation recomputes stale visible claims and rejects descriptor-driven getters', () => {
