@@ -5,6 +5,7 @@ const USER_AGENT = 'meridian-m11-coordinator-read-adapter/1.0';
 const MAX_RESPONSE_BYTES = 1024 * 1024;
 const DEFAULT_DEADLINE_MS = 10000;
 const DEFAULT_MAX_PAGES = 20;
+const MAX_AUTH_EVIDENCE_TTL_MS = 15 * 60 * 1000;
 
 class ReadApiError extends Error {
   constructor(code) {
@@ -65,23 +66,16 @@ function detectRateLimit(response) {
   return response.status === 403 && response.headers?.get?.('x-ratelimit-remaining') === '0';
 }
 
-function detectAuthenticatedTransport(response) {
-  if (!response || response.status < 200 || response.status >= 300) return false;
-  const scopes = response.headers?.get?.('x-oauth-scopes');
-  if (typeof scopes === 'string' && scopes.trim().length > 0) return true;
-  const permissions = response.headers?.get?.('x-accepted-github-permissions');
-  return typeof permissions === 'string' && permissions.trim().length > 0;
-}
-
-function parseTransportEvidence(evidence, nowMs) {
+function parseTrustedAuthEvidence(evidence, nowMs) {
   if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence)) return false;
   if (evidence.host !== 'api.github.com' || evidence.scheme !== 'https' || evidence.tls !== true) return false;
+  if (typeof evidence.evidenceId !== 'string' || evidence.evidenceId.length < 8) return false;
+  if (typeof evidence.principal !== 'string' || evidence.principal.length === 0) return false;
   if (!Number.isSafeInteger(evidence.verifiedAtMs) || evidence.verifiedAtMs <= 0) return false;
   if (evidence.verifiedAtMs > nowMs) return false;
-  if (evidence.expiresAtMs !== undefined) {
-    if (!Number.isSafeInteger(evidence.expiresAtMs) || evidence.expiresAtMs <= evidence.verifiedAtMs) return false;
-    if (evidence.expiresAtMs <= nowMs) return false;
-  }
+  if (!Number.isSafeInteger(evidence.expiresAtMs) || evidence.expiresAtMs <= evidence.verifiedAtMs) return false;
+  if (evidence.expiresAtMs <= nowMs) return false;
+  if (evidence.expiresAtMs - evidence.verifiedAtMs > MAX_AUTH_EVIDENCE_TTL_MS) return false;
   return true;
 }
 
@@ -116,16 +110,22 @@ async function readTextBounded(response, {maxResponseBytes, signal}) {
   const cancel = () => { try { Promise.resolve(reader.cancel()).catch(() => {}); } catch {} };
   signal?.addEventListener?.('abort', cancel, {once: true});
   try {
-    while (true) {
-      if (signal?.aborted) fail('ABORTED');
-      const {done, value} = await reader.read();
-      if (done) break;
-      size += value.byteLength;
-      if (size > maxResponseBytes) fail('RESPONSE_TOO_LARGE');
-      text += decoder.decode(value, {stream: true});
+    try {
+      while (true) {
+        if (signal?.aborted) fail('ABORTED');
+        const {done, value} = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size > maxResponseBytes) fail('RESPONSE_TOO_LARGE');
+        text += decoder.decode(value, {stream: true});
+      }
+      text += decoder.decode();
+      return text;
+    } catch (error) {
+      if (signal?.aborted || error?.name === 'AbortError') fail('ABORTED');
+      if (error instanceof ReadApiError) throw error;
+      fail('UNAVAILABLE');
     }
-    text += decoder.decode();
-    return text;
   } finally {
     signal?.removeEventListener?.('abort', cancel);
     cancel();
@@ -191,6 +191,12 @@ function mapWorkflowJobs(payload) {
   }));
 }
 
+function extractCompareHeadSha(comparePayload) {
+  if (!Array.isArray(comparePayload?.commits) || comparePayload.commits.length === 0) return null;
+  const tail = comparePayload.commits[comparePayload.commits.length - 1];
+  return isSha(tail?.sha) ? tail.sha : null;
+}
+
 export function createM11CoordinatorGithubReadApi({
   fetchImpl = globalThis.fetch,
   credentials,
@@ -213,28 +219,56 @@ export function createM11CoordinatorGithubReadApi({
     throw new Error('credentials.getAuthorizationHeader is required');
   }
 
-  let transportAuthenticated = parseTransportEvidence(credentials.transportEvidence, now());
+  let authInvalidatedAtMs = null;
+
+  function readTrustedAuthEvidence() {
+    const evidence = typeof credentials.getTrustedAuthEvidence === 'function'
+      ? credentials.getTrustedAuthEvidence()
+      : credentials.trustedAuthEvidence;
+    if (!parseTrustedAuthEvidence(evidence, now())) return null;
+    if (authInvalidatedAtMs !== null && evidence.verifiedAtMs <= authInvalidatedAtMs) return null;
+    return evidence;
+  }
+
+  function ensureTrustedAuthentication() {
+    if (!readTrustedAuthEvidence()) fail('UNAUTHENTICATED_TRANSPORT_EVIDENCE_REQUIRED');
+  }
 
   async function getJson({path, query = null, signal, accept = 'application/vnd.github+json'}) {
-    const {response, requestSignal} = await request({path, query, signal, accept});
-    const text = await readTextBounded(response, {maxResponseBytes, signal: requestSignal});
-    let parsed;
+    const requestScope = await request({path, query, signal, accept});
     try {
-      parsed = JSON.parse(text);
-    } catch {
-      fail('MALFORMED_RESPONSE');
+      const text = await readTextBounded(requestScope.response, {
+        maxResponseBytes,
+        signal: requestScope.requestSignal
+      });
+      let parsed;
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        fail('MALFORMED_RESPONSE');
+      }
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) fail('MALFORMED_RESPONSE');
+      return {payload: parsed, headers: requestScope.response.headers};
+    } finally {
+      requestScope.finalize();
     }
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) fail('MALFORMED_RESPONSE');
-    return {payload: parsed, headers: response.headers};
   }
 
   async function getText({path, query = null, signal, accept}) {
-    const {response, requestSignal} = await request({path, query, signal, accept});
-    const text = await readTextBounded(response, {maxResponseBytes, signal: requestSignal});
-    return {text, headers: response.headers};
+    const requestScope = await request({path, query, signal, accept});
+    try {
+      const text = await readTextBounded(requestScope.response, {
+        maxResponseBytes,
+        signal: requestScope.requestSignal
+      });
+      return {text, headers: requestScope.response.headers};
+    } finally {
+      requestScope.finalize();
+    }
   }
 
   async function request({path, query, signal, accept}) {
+    ensureTrustedAuthentication();
     if (typeof path !== 'string' || !path.startsWith('/repos/Achi1984/meridian/')) {
       fail('UNAVAILABLE_PATH');
     }
@@ -250,6 +284,13 @@ export function createM11CoordinatorGithubReadApi({
     const controller = new AbortController();
     const unbind = bindAbort(signal, controller);
     const timer = setTimeout(() => controller.abort(), defaultDeadlineMs);
+    let finalized = false;
+    const finalize = () => {
+      if (finalized) return;
+      finalized = true;
+      clearTimeout(timer);
+      unbind();
+    };
     let response;
     try {
       response = await fetchImpl(url, {
@@ -267,28 +308,41 @@ export function createM11CoordinatorGithubReadApi({
         }
       });
     } catch (error) {
+      finalize();
       if (controller.signal.aborted || error?.name === 'AbortError') fail('ABORTED');
       fail('UNAVAILABLE');
-    } finally {
-      clearTimeout(timer);
-      unbind();
     }
 
     const responseUrl = response?.url;
-    if (typeof responseUrl !== 'string' || responseUrl.length === 0) fail('UNAVAILABLE');
+    if (typeof responseUrl !== 'string' || responseUrl.length === 0) {
+      finalize();
+      fail('UNAVAILABLE');
+    }
     const observed = new URL(responseUrl);
-    if (observed.origin !== API_ORIGIN || observed.pathname !== path) fail('OFF_ORIGIN_RESPONSE');
-    if (detectRateLimit(response)) fail('RATE_LIMITED');
-    if (response.status === 401 || response.status === 403) fail('UNAUTHORIZED');
-    if (response.status < 200 || response.status >= 300) fail('UNAVAILABLE');
-    if (detectAuthenticatedTransport(response)) transportAuthenticated = true;
+    if (observed.origin !== API_ORIGIN || observed.pathname !== path) {
+      finalize();
+      fail('OFF_ORIGIN_RESPONSE');
+    }
+    if (detectRateLimit(response)) {
+      finalize();
+      fail('RATE_LIMITED');
+    }
+    if (response.status === 401 || response.status === 403) {
+      authInvalidatedAtMs = now();
+      finalize();
+      fail('UNAUTHORIZED');
+    }
+    if (response.status < 200 || response.status >= 300) {
+      finalize();
+      fail('UNAVAILABLE');
+    }
 
-    return {response, requestSignal: controller.signal};
+    return {response, requestSignal: controller.signal, finalize};
   }
 
   return Object.freeze({
     get authenticated() {
-      return transportAuthenticated;
+      return readTrustedAuthEvidence() !== null;
     },
 
     async getWorkflowRun({repository, runId, signal}) {
@@ -323,40 +377,56 @@ export function createM11CoordinatorGithubReadApi({
     async getPullRequestDiff({repository, pullRequest, headSha, baseSha, signal}) {
       validateRepository(repository);
       if (!positiveInteger(pullRequest) || !isSha(headSha) || !isSha(baseSha)) fail('INVALID_INPUT');
-      const [prResult, compareResult, diffResult] = await Promise.all([
-        getJson({path: `/repos/Achi1984/meridian/pulls/${pullRequest}`, signal}),
+      const initialPrResult = await getJson({path: `/repos/Achi1984/meridian/pulls/${pullRequest}`, signal});
+      const initialPr = mapPullRequest(initialPrResult.payload);
+      if (initialPr.number !== pullRequest || initialPr.repository !== REPOSITORY) fail('MALFORMED_RESPONSE');
+      if (initialPr.headSha !== headSha || initialPr.baseSha !== baseSha) {
+        fail('AMBIGUOUS_PULL_REQUEST_HEAD_BASE');
+      }
+
+      const comparePath = `/repos/Achi1984/meridian/compare/${baseSha}...${headSha}`;
+      const [compareResult, diffResult] = await Promise.all([
         getJson({
-          path: `/repos/Achi1984/meridian/compare/${baseSha}...${headSha}`,
+          path: comparePath,
           query: {page: 1, per_page: 100},
           signal
         }),
         getText({
-          path: `/repos/Achi1984/meridian/pulls/${pullRequest}`,
+          path: comparePath,
+          query: {page: 1, per_page: 100},
           signal,
           accept: 'application/vnd.github.v3.diff'
         })
       ]);
 
-      const pr = mapPullRequest(prResult.payload);
-      if (pr.number !== pullRequest || pr.repository !== REPOSITORY) fail('MALFORMED_RESPONSE');
-      if (pr.headSha !== headSha || pr.baseSha !== baseSha) fail('AMBIGUOUS_PULL_REQUEST_HEAD_BASE');
+      const finalPrResult = await getJson({path: `/repos/Achi1984/meridian/pulls/${pullRequest}`, signal});
+      const finalPr = mapPullRequest(finalPrResult.payload);
+      if (finalPr.number !== pullRequest || finalPr.repository !== REPOSITORY) fail('MALFORMED_RESPONSE');
+      if (finalPr.headSha !== headSha || finalPr.baseSha !== baseSha
+        || finalPr.headSha !== initialPr.headSha || finalPr.baseSha !== initialPr.baseSha) {
+        fail('AMBIGUOUS_PULL_REQUEST_MOVED');
+      }
 
       const compare = compareResult.payload;
       const compareBase = compare?.base_commit?.sha ?? null;
-      const compareHead = compare?.head_commit?.sha ?? null;
+      const compareHead = extractCompareHeadSha(compare);
       if (compareBase !== baseSha || compareHead !== headSha) fail('AMBIGUOUS_COMPARE_HEAD_BASE');
 
       let complete = true;
       const hasNext = extractHasNextPage(
         compareResult.headers,
-        `/repos/Achi1984/meridian/compare/${baseSha}...${headSha}`
+        comparePath
       );
       if (hasNext) complete = false;
       if (!Array.isArray(compare?.files)) complete = false;
-      if (!positiveInteger(pr.changedFiles) && pr.changedFiles !== 0) complete = false;
-      if (Array.isArray(compare?.files) && Number.isSafeInteger(pr.changedFiles)
-        && pr.changedFiles !== compare.files.length) complete = false;
+      if (!positiveInteger(finalPr.changedFiles) && finalPr.changedFiles !== 0) complete = false;
+      if (Array.isArray(compare?.files) && Number.isSafeInteger(finalPr.changedFiles)
+        && finalPr.changedFiles !== compare.files.length) complete = false;
       if (Array.isArray(compare?.files) && compare.files.some(file => typeof file?.patch !== 'string')) {
+        complete = false;
+      }
+      if (!positiveInteger(compare?.total_commits) || compare.total_commits > 250) complete = false;
+      if (typeof compare?.merge_base_commit?.sha !== 'string' || compare.merge_base_commit.sha !== baseSha) {
         complete = false;
       }
 

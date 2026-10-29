@@ -23,24 +23,32 @@ It is intentionally **not integrated** into existing coordinator files yet.
 
 ## `authenticated` contract (non-forged)
 
-`authenticated` is **not inferred from token presence**. It is true only when at least one of these is true:
+`authenticated` is **not inferred from token presence** and is never elevated from response headers.
 
-1. Constructor receives valid `transportEvidence` (host/api scheme/TLS/verified time, optional unexpired window).
-2. A successful API response contains authenticated transport headers (`x-oauth-scopes` or `x-accepted-github-permissions`).
+It is true only when caller-provided trusted attestation is currently valid (`getTrustedAuthEvidence()` or `trustedAuthEvidence`), with mandatory:
 
-Residual trust: this proves authenticated transport metadata was observed on `api.github.com`; it does **not** prove principal identity or that every required scope/permission is still present after the observation time.
+- `host: api.github.com`, `scheme: https`, `tls: true`
+- `principal` and stable `evidenceId`
+- `verifiedAtMs` and **required** `expiresAtMs`
+- bounded evidence lifetime (short-lived window)
+
+If evidence expires or a request receives `401/403`, the adapter invalidates prior attestation and reports unauthenticated until fresh evidence is supplied.
+
+Residual trust: this proves caller-attested authenticated transport evidence for `api.github.com` within the validity window; it does **not** prove end-to-end principal continuity outside that window.
 
 ## Exact-pair and diff completeness behavior
 
 - Workflow run head SHA is mapped from GitHub run payload (`head_sha`) as-is (can be merge SHA).
 - Historical base SHA is taken only from run-associated pull request objects; empty/ambiguous associations remain explicit (`baseSha: null`) and must block at collector policy level.
 - PR metadata is never used to substitute missing historical run evidence.
-- `getPullRequestDiff` binds to immutable `baseSha/headSha` and marks `complete: false` when completeness cannot be proven (pagination ambiguity, missing file patches, changed-file mismatch, empty diff text).
+- `getPullRequestDiff` binds immutable pair evidence by requesting both compare JSON and compare diff from `/compare/{base}...{head}`.
+- PR metadata is read before and after compare fetches; movement races are rejected as ambiguous.
+- Completeness remains `false` when proof is missing (pagination ambiguity, missing file patches, changed-file mismatch, commit-list truncation, merge-base mismatch, empty diff text).
 
 ## Interface gaps for core integration owner
 
 This packet does not modify existing #973 core files. Integration owner still needs to:
 
 1. Wire this adapter into coordinator injection points.
-2. Decide the authoritative source and lifecycle for `transportEvidence`.
+2. Decide and implement authoritative source/lifecycle for short-lived trusted auth evidence.
 3. Map adapter error codes to coordinator-level blocked/waiting reasons.
