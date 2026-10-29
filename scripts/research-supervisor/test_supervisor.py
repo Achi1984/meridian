@@ -26,7 +26,13 @@ HISTORICAL_TEST_ADAPTER = ROOT / "test_b1_historical_fixture.mjs"
 MAX_DIAGNOSTIC_ELAPSED_MS = 60_000
 MAX_DIAGNOSTIC_PATHS = 44
 MAX_DIAGNOSTIC_CPU_COUNT = 1024
+MAX_DIAGNOSTIC_HELPER_CALLS = 100_000
 HISTORICAL_FIXTURE_LIMITS = {"path_seconds": 10, "batch_seconds": 20}
+HISTORICAL_HELPERS = {
+    "_historical_profile": "profile",
+    "_b1_job": "job",
+    "_validate_b1_path_payload": "payload",
+}
 HISTORICAL_JOURNAL_STATES = {
     "queued", "claimed", "running", "completed", "rejected",
     "failed", "timed_out", "partial", "unknown",
@@ -76,6 +82,91 @@ def _timed_path_callback(callback, phase, timings, started_at, clock=time.monoto
         return result
 
     return wrapped
+
+
+def _record_historical_helper_metric(metrics, helper, field, amount=1):
+    try:
+        record = metrics[helper]
+        current = record.get(field)
+        if field in ("calls", "successfulCalls"):
+            if type(current) is not int or current < 0:
+                return
+            if current >= MAX_DIAGNOSTIC_HELPER_CALLS:
+                record[f"{field}Capped"] = True
+            else:
+                record[field] = current + amount
+        elif field == "inclusiveMs":
+            bounded_current = _bounded_diagnostic_ms(current)
+            if (bounded_current is None or type(amount) not in (int, float)
+                    or amount < 0 or not math.isfinite(amount)):
+                return
+            bounded_amount = min(round(float(amount), 3), MAX_DIAGNOSTIC_ELAPSED_MS)
+            total = bounded_current + bounded_amount
+            record[field] = _bounded_diagnostic_ms(
+                min(total, MAX_DIAGNOSTIC_ELAPSED_MS))
+            if total > MAX_DIAGNOSTIC_ELAPSED_MS or amount > MAX_DIAGNOSTIC_ELAPSED_MS:
+                record["inclusiveMsCapped"] = True
+    except BaseException:
+        pass
+
+
+def _timed_historical_helper(callback, helper, metrics, clock=time.monotonic):
+    def wrapped(*args, **kwargs):
+        started_at = None
+        try:
+            started_at = clock()
+        except BaseException:
+            pass
+        _record_historical_helper_metric(metrics, helper, "calls")
+        try:
+            result = callback(*args, **kwargs)
+        except BaseException:
+            try:
+                elapsed = (clock() - started_at) * 1000
+                _record_historical_helper_metric(metrics, helper, "inclusiveMs", elapsed)
+            except BaseException:
+                pass
+            raise
+        _record_historical_helper_metric(metrics, helper, "successfulCalls")
+        try:
+            elapsed = (clock() - started_at) * 1000
+            _record_historical_helper_metric(metrics, helper, "inclusiveMs", elapsed)
+        except BaseException:
+            pass
+        return result
+
+    return wrapped
+
+
+def _historical_helper_diagnostic_fields(metrics):
+    if type(metrics) is not dict:
+        return {}
+    measured = {}
+    for helper, label in HISTORICAL_HELPERS.items():
+        try:
+            record = metrics.get(helper)
+            if type(record) is not dict:
+                continue
+            calls = record.get("calls")
+            successes = record.get("successfulCalls")
+            elapsed = _bounded_diagnostic_ms(record.get("inclusiveMs"))
+            if (type(calls) is not int or not 0 <= calls <= MAX_DIAGNOSTIC_HELPER_CALLS
+                    or type(successes) is not int or not 0 <= successes <= calls
+                    or elapsed is None):
+                continue
+            entry = {"calls": calls, "successfulCalls": successes, "inclusiveMs": elapsed}
+            for field in ("callsCapped", "successfulCallsCapped", "inclusiveMsCapped"):
+                if record.get(field) is True:
+                    entry[field] = True
+            measured[label] = entry
+        except BaseException:
+            continue
+    if not measured:
+        return {}
+    return {
+        "historicalHelperMetrics": measured,
+        "historicalHelperTiming": "inclusive_overlapping",
+    }
 
 
 def _best_effort_historical_journal_inspection(database, trial_id, profile_path):
@@ -161,7 +252,7 @@ def _timing_diagnostic_fields(timings):
 def _generated_historical_result_diagnostic(
         result, elapsed_ms=None, configured_batch_seconds=None, *,
         path_timings=None, journal_snapshot=None, inspection_error=None,
-        cpu_count=None, load1=None):
+        cpu_count=None, load1=None, helper_metrics=None):
     diagnostic = {}
     if type(result) is dict:
         for key in ("state", "reason"):
@@ -189,6 +280,7 @@ def _generated_historical_result_diagnostic(
         diagnostic["configuredBatchSeconds"] = configured_batch_seconds
 
     diagnostic.update(_timing_diagnostic_fields(path_timings))
+    diagnostic.update(_historical_helper_diagnostic_fields(helper_metrics))
     if type(journal_snapshot) is dict:
         state = journal_snapshot.get("state")
         if type(state) is str and state in HISTORICAL_JOURNAL_STATES:
@@ -214,6 +306,16 @@ def _generated_historical_result_diagnostic(
     if len(rendered) <= 1024:
         return rendered
     for key in ("completedPathIndices0Based", "trialId", "reason", "state"):
+        diagnostic.pop(key, None)
+        rendered = json.dumps(diagnostic, sort_keys=True, separators=(",", ":"), allow_nan=False)
+        if len(rendered) <= 1024:
+            return rendered
+    for key in ("cpuCount", "load1", "journalInspectionError", "journalState", "journalAttemptCount",
+                "journalPathCount", "journalCompletedPathCount", "completedPathCount",
+                "pathCount", "startupToFirstPathMs", "pathStartAttemptCount",
+                "pathStartAcceptedCount", "pathCompletionAttemptCount",
+                "pathCompletionAcceptedCount", "lastCompletedIndex0Based",
+                "maxPathMs", "medianPathMs", "configuredBatchSeconds", "elapsedMs"):
         diagnostic.pop(key, None)
         rendered = json.dumps(diagnostic, sort_keys=True, separators=(",", ":"), allow_nan=False)
         if len(rendered) <= 1024:
@@ -590,6 +692,58 @@ connection.close()
         self.assertNotIn("journalState", missing)
         self.assertLessEqual(len(json.dumps(rendered, separators=(",", ":"))), 1024)
 
+        valid_helper_metrics = {
+            "_historical_profile": {"calls": 3, "successfulCalls": 3, "inclusiveMs": 12.5},
+            "_b1_job": {"calls": 4, "successfulCalls": 3, "inclusiveMs": 25},
+            "_validate_b1_path_payload": {"calls": 8, "successfulCalls": 8, "inclusiveMs": 50},
+            private_text: {"calls": 999, "successfulCalls": 999, "inclusiveMs": 999},
+        }
+        helper_diagnostic = _generated_historical_result_diagnostic(
+            result, helper_metrics=valid_helper_metrics)
+        helper_rendered = json.loads(helper_diagnostic)
+        self.assertEqual(helper_rendered["historicalHelperTiming"], "inclusive_overlapping")
+        self.assertEqual(helper_rendered["historicalHelperMetrics"], {
+            "profile": {"calls": 3, "successfulCalls": 3, "inclusiveMs": 12.5},
+            "job": {"calls": 4, "successfulCalls": 3, "inclusiveMs": 25.0},
+            "payload": {"calls": 8, "successfulCalls": 8, "inclusiveMs": 50.0},
+        })
+        self.assertNotIn(private_text, helper_diagnostic)
+        self.assertLessEqual(len(helper_diagnostic), 1024)
+        combined_diagnostic = _generated_historical_result_diagnostic(
+            result, 1234.6, HISTORICAL_FIXTURE_LIMITS["batch_seconds"],
+            path_timings=timings, journal_snapshot=journal_snapshot,
+            cpu_count=8, load1=1.25, helper_metrics=valid_helper_metrics)
+        combined_rendered = json.loads(combined_diagnostic)
+        self.assertLessEqual(len(combined_diagnostic), 1024)
+        self.assertEqual(combined_rendered["historicalHelperTiming"], "inclusive_overlapping")
+        self.assertEqual(combined_rendered["historicalHelperMetrics"], {
+            "profile": {"calls": 3, "successfulCalls": 3, "inclusiveMs": 12.5},
+            "job": {"calls": 4, "successfulCalls": 3, "inclusiveMs": 25.0},
+            "payload": {"calls": 8, "successfulCalls": 8, "inclusiveMs": 50.0},
+        })
+        self.assertNotIn(private_text, combined_diagnostic)
+
+        invalid_helper_values = {
+            "calls": (None, True, float("nan"), float("inf"), -1,
+                      MAX_DIAGNOSTIC_HELPER_CALLS + 1, 10 ** 400, private_text),
+            "successfulCalls": (None, True, float("nan"), float("inf"), -1,
+                                MAX_DIAGNOSTIC_HELPER_CALLS + 1, 10 ** 400, private_text),
+            "inclusiveMs": (None, True, float("nan"), float("inf"), -1,
+                            MAX_DIAGNOSTIC_ELAPSED_MS + 1, 10 ** 400, private_text),
+        }
+        for field, invalid_values_for_field in invalid_helper_values.items():
+            for invalid_value in invalid_values_for_field:
+                with self.subTest(helper_field=field, invalid_value=repr(invalid_value)):
+                    invalid_metrics = {
+                        helper: {"calls": 1, "successfulCalls": 1, "inclusiveMs": 1}
+                        for helper in HISTORICAL_HELPERS
+                    }
+                    invalid_metrics["_historical_profile"][field] = invalid_value
+                    invalid = json.loads(_generated_historical_result_diagnostic(
+                        result, helper_metrics=invalid_metrics))
+                    self.assertNotIn("profile", invalid.get("historicalHelperMetrics", {}))
+                    self.assertNotIn(private_text, json.dumps(invalid))
+
         returned = object()
         forwarded = []
         timing = {}
@@ -645,6 +799,85 @@ connection.close()
         self.assertIs(successful_with_monitor_error(*callback_args, **callback_kwargs), returned)
         self.assertEqual(effects, [(callback_args, callback_kwargs)])
 
+        helper_metrics = {
+            name: {"calls": 0, "successfulCalls": 0, "inclusiveMs": 0}
+            for name in HISTORICAL_HELPERS
+        }
+        helper_effects = []
+        helper_ticks = iter((1.0, 1.125))
+        helper_wrapper = _timed_historical_helper(
+            lambda *args, **kwargs: helper_effects.append((args, kwargs)) or returned,
+            "_historical_profile", helper_metrics, clock=lambda: next(helper_ticks))
+        self.assertIs(helper_wrapper(*callback_args, **callback_kwargs), returned)
+        self.assertEqual(helper_effects, [(callback_args, callback_kwargs)])
+        self.assertEqual(helper_metrics["_historical_profile"], {
+            "calls": 1, "successfulCalls": 1, "inclusiveMs": 125.0,
+        })
+
+        raising_metrics = {
+            name: {"calls": 0, "successfulCalls": 0, "inclusiveMs": 0}
+            for name in HISTORICAL_HELPERS
+        }
+        raising_error = RuntimeError(private_text)
+        raising_ticks = iter((2.0, 2.25))
+        raising_effects = []
+
+        def raise_helper(*args, **kwargs):
+            raising_effects.append((args, kwargs))
+            raise raising_error
+
+        raising_wrapper = _timed_historical_helper(
+            raise_helper, "_b1_job", raising_metrics, clock=lambda: next(raising_ticks))
+        with self.assertRaises(RuntimeError) as caught_helper:
+            raising_wrapper(*callback_args, **callback_kwargs)
+        self.assertIs(caught_helper.exception, raising_error)
+        self.assertEqual(raising_effects, [(callback_args, callback_kwargs)])
+        self.assertEqual(raising_metrics["_b1_job"], {
+            "calls": 1, "successfulCalls": 0, "inclusiveMs": 250.0,
+        })
+
+        monitoring_metrics = {
+            name: {"calls": 0, "successfulCalls": 0, "inclusiveMs": 0}
+            for name in HISTORICAL_HELPERS
+        }
+        monitoring_effects = []
+        monitoring_wrapper = _timed_historical_helper(
+            lambda *args, **kwargs: monitoring_effects.append((args, kwargs)) or returned,
+            "_validate_b1_path_payload", monitoring_metrics,
+            clock=lambda: (_ for _ in ()).throw(RuntimeError(private_text)))
+        self.assertIs(monitoring_wrapper(*callback_args, **callback_kwargs), returned)
+        self.assertEqual(monitoring_effects, [(callback_args, callback_kwargs)])
+        self.assertEqual(monitoring_metrics["_validate_b1_path_payload"], {
+            "calls": 1, "successfulCalls": 1, "inclusiveMs": 0,
+        })
+        broken_monitor = _timed_historical_helper(
+            lambda *args, **kwargs: returned, "_historical_profile", None,
+            clock=lambda: (_ for _ in ()).throw(RuntimeError(private_text)))
+        self.assertIs(broken_monitor(*callback_args, **callback_kwargs), returned)
+
+        capped_metrics = {
+            name: {"calls": 0, "successfulCalls": 0, "inclusiveMs": 0}
+            for name in HISTORICAL_HELPERS
+        }
+        capped_metrics["_historical_profile"].update({
+            "calls": MAX_DIAGNOSTIC_HELPER_CALLS,
+            "successfulCalls": MAX_DIAGNOSTIC_HELPER_CALLS,
+            "inclusiveMs": MAX_DIAGNOSTIC_ELAPSED_MS,
+        })
+        capped_ticks = iter((10.0, 10.1))
+        capped_wrapper = _timed_historical_helper(
+            lambda *args, **kwargs: returned, "_historical_profile", capped_metrics,
+            clock=lambda: next(capped_ticks))
+        self.assertIs(capped_wrapper(*callback_args, **callback_kwargs), returned)
+        capped_helper = json.loads(_generated_historical_result_diagnostic(
+            result, helper_metrics=capped_metrics))["historicalHelperMetrics"]["profile"]
+        self.assertEqual(capped_helper["calls"], MAX_DIAGNOSTIC_HELPER_CALLS)
+        self.assertEqual(capped_helper["successfulCalls"], MAX_DIAGNOSTIC_HELPER_CALLS)
+        self.assertEqual(capped_helper["inclusiveMs"], MAX_DIAGNOSTIC_ELAPSED_MS)
+        self.assertTrue(capped_helper["callsCapped"])
+        self.assertTrue(capped_helper["successfulCallsCapped"])
+        self.assertTrue(capped_helper["inclusiveMsCapped"])
+
         with (patch.object(os, "cpu_count", side_effect=RuntimeError(private_text)),
               patch.object(os, "getloadavg", new=None, create=True)):
             unavailable_cpu, unavailable_load = _best_effort_host_metrics()
@@ -672,8 +905,13 @@ connection.close()
         except BaseException:
             started_at = None
         path_timings = {}
+        helper_metrics = {
+            name: {"calls": 0, "successfulCalls": 0, "inclusiveMs": 0}
+            for name in HISTORICAL_HELPERS
+        }
         original_path_started = journal.record_b1_path_started
         original_path_completed = journal.record_b1_path_completed
+        original_helpers = {name: getattr(journal, name) for name in HISTORICAL_HELPERS}
         result = None
         try:
             with (patch.object(
@@ -683,7 +921,21 @@ connection.close()
                   patch.object(
                     journal, "record_b1_path_completed",
                     new=_timed_path_callback(
-                        original_path_completed, "completion", path_timings, started_at))):
+                        original_path_completed, "completion", path_timings, started_at)),
+                  patch.object(
+                    journal, "_historical_profile",
+                    new=_timed_historical_helper(
+                        original_helpers["_historical_profile"], "_historical_profile",
+                        helper_metrics)),
+                  patch.object(
+                    journal, "_b1_job",
+                    new=_timed_historical_helper(
+                        original_helpers["_b1_job"], "_b1_job", helper_metrics)),
+                  patch.object(
+                    journal, "_validate_b1_path_payload",
+                    new=_timed_historical_helper(
+                        original_helpers["_validate_b1_path_payload"],
+                        "_validate_b1_path_payload", helper_metrics))):
                 result = self.run_historical_fixture(
                     profile_path, claim, "SUCCESS", limits=HISTORICAL_FIXTURE_LIMITS)
         finally:
@@ -701,7 +953,8 @@ connection.close()
                 diagnostic = _generated_historical_result_diagnostic(
                     result, elapsed_ms, HISTORICAL_FIXTURE_LIMITS["batch_seconds"],
                     path_timings=path_timings, journal_snapshot=inspected,
-                    inspection_error=inspection_error, cpu_count=cpu_count, load1=load1)
+                    inspection_error=inspection_error, cpu_count=cpu_count, load1=load1,
+                    helper_metrics=helper_metrics)
                 print(f"SYNTHETIC_SUPERVISOR_TIMING {diagnostic}", flush=True)
             except BaseException:
                 pass
