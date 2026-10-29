@@ -20,6 +20,7 @@ It is intentionally **not integrated** into existing coordinator files yet.
 - Caller abort/deadline remain active through full body streaming and parse (including cancel-as-EOF edge cases).
 - Rate-limit and ambiguity conditions fail closed.
 - Errors use stable codes and must not include credential values.
+- Page responses return validated GitHub `total_count` as `totalCount`; missing/malformed counts fail closed.
 
 ## `authenticated` contract (non-forged)
 
@@ -34,6 +35,8 @@ It is true only when caller-provided trusted attestation is currently valid (`ge
 
 If evidence expires or a request receives `401/403`, the adapter invalidates prior attestation and reports unauthenticated until fresh evidence is supplied. `403` responses classified as rate-limited still invalidate authentication state while returning `RATE_LIMITED`.
 
+`authenticated` is only a gate signal; it is **not** independent identity proof. For provenance, callers should read `authenticationEvidence` (immutable snapshot with `evidenceId`, `principal`, `verifiedAtMs`, `expiresAtMs`, host/scheme/tls) and persist it alongside collected artifacts.
+
 Residual trust: this proves caller-attested authenticated transport evidence for `api.github.com` within the validity window; it does **not** prove end-to-end principal continuity outside that window.
 
 ## Exact-pair and diff completeness behavior
@@ -44,6 +47,7 @@ Residual trust: this proves caller-attested authenticated transport evidence for
 - `getPullRequestDiff` binds immutable pair evidence by requesting both compare JSON and compare diff from `/compare/{base}...{head}`.
 - PR metadata is read before and after compare fetches; movement races are rejected as ambiguous.
 - Completeness remains `false` when proof is missing (pagination ambiguity, missing file patches, changed-file mismatch, commit-list truncation, merge-base mismatch, empty diff text).
+- `listWorkflowJobs` validates run-attempt identity via bounded authenticated GET `/actions/runs/{runId}/attempts/{runAttempt}` and cross-checks every job `run_id`/`run_attempt`.
 
 ## Interface gaps for core integration owner
 

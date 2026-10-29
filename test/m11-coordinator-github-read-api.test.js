@@ -178,6 +178,19 @@ test('authentication evidence expires and 401 invalidates previous attestation',
   assert.equal(invalidated.authenticated, false);
 });
 
+test('authenticationEvidence exposes immutable caller-attested identity/expiry snapshot', () => {
+  const api = createM11CoordinatorGithubReadApi({
+    fetchImpl: async () => { throw new Error('not-called'); },
+    credentials: credentials(),
+    now: () => NOW_MS
+  });
+  const evidence = api.authenticationEvidence;
+  assert.equal(evidence.evidenceId, 'ev-12345678');
+  assert.equal(evidence.principal, 'github-actions:run/7001');
+  assert.equal(evidence.expiresAtMs, 10000);
+  assert.ok(Object.isFrozen(evidence));
+});
+
 test('exact-pair happy path maps authoritative GitHub payloads', async () => {
   const workflowRun = runPayload();
   const pullRequest = pullPayload();
@@ -207,6 +220,7 @@ test('exact-pair happy path maps authoritative GitHub payloads', async () => {
     {
       match: url => url.pathname === '/repos/Achi1984/meridian/actions/workflows/347821227/runs',
       handle: ({url}) => json({
+        total_count: 1,
         workflow_runs: [{
           id: 7001,
           repository: {full_name: REPOSITORY},
@@ -218,9 +232,32 @@ test('exact-pair happy path maps authoritative GitHub payloads', async () => {
       }, {url: url.toString(), headers: {link: '<https://api.github.com/repos/Achi1984/meridian/actions/workflows/347821227/runs?page=2>; rel="next"'}})
     },
     {
+      match: url => url.pathname === '/repos/Achi1984/meridian/actions/runs/7001/attempts/1',
+      handle: ({url}) => json({
+        id: 7001,
+        run_attempt: 1,
+        workflow_id: 347821227,
+        path: '.github/workflows/backend-safety.yml@refs/heads/main',
+        repository: {full_name: REPOSITORY}
+      }, {url: url.toString()})
+    },
+    {
       match: url => url.pathname === '/repos/Achi1984/meridian/actions/runs/7001/attempts/1/jobs',
       handle: ({url}) => json({
-        jobs: [{id: 1, status: 'completed', conclusion: 'success'}]
+        total_count: 1,
+        jobs: [{
+          id: 123356524474,
+          name: 'syntax',
+          run_id: 7001,
+          run_attempt: 1,
+          status: 'completed',
+          conclusion: 'success',
+          steps: [{
+            name: 'Research and auth regression tests',
+            status: 'completed',
+            conclusion: 'success'
+          }]
+        }]
       }, {url: url.toString()})
     }
   ]);
@@ -257,9 +294,16 @@ test('exact-pair happy path maps authoritative GitHub payloads', async () => {
   const runsPage = await api.listWorkflowRuns({repository: REPOSITORY, workflowId: 347821227, page: 1});
   assert.equal(runsPage.hasNextPage, true);
   assert.equal(runsPage.items[0].runAttempt, 1);
+  assert.equal(runsPage.totalCount, 1);
 
   const jobsPage = await api.listWorkflowJobs({repository: REPOSITORY, runId: 7001, runAttempt: 1, page: 1});
   assert.equal(jobsPage.hasNextPage, false);
+  assert.equal(jobsPage.totalCount, 1);
+  assert.equal(jobsPage.items[0].name, 'syntax');
+  assert.equal(jobsPage.items[0].runId, 7001);
+  assert.equal(jobsPage.items[0].runAttempt, 1);
+  assert.equal(jobsPage.items[0].workflowId, 347821227);
+  assert.equal(jobsPage.items[0].steps[0].name, 'Research and auth regression tests');
   assert.equal(jobsPage.items[0].status, 'completed');
   assert.ok(calls.every(call => call.method === 'GET'));
 });
@@ -369,6 +413,7 @@ test('stale attempts are mapped exactly, not normalized', async () => {
     {
       match: url => url.pathname === '/repos/Achi1984/meridian/actions/workflows/347821227/runs',
       handle: ({url}) => json({
+        total_count: 1,
         workflow_runs: [{
           id: 7001,
           repository: {full_name: REPOSITORY},
@@ -387,6 +432,103 @@ test('stale attempts are mapped exactly, not normalized', async () => {
   });
   const result = await api.listWorkflowRuns({repository: REPOSITORY, workflowId: 347821227, page: 1});
   assert.equal(result.items[0].runAttempt, 2);
+  assert.equal(result.totalCount, 1);
+});
+
+test('workflow run pages preserve authoritative total_count (130 = 100 + 30)', async () => {
+  const {fetchImpl} = makeFetch([
+    {
+      match: url => url.pathname === '/repos/Achi1984/meridian/actions/workflows/347821227/runs',
+      handle: ({url}) => {
+        const page = url.searchParams.get('page');
+        if (page === '1') {
+          return json({
+            total_count: 130,
+            workflow_runs: Array.from({length: 100}, (_, index) => ({
+              id: 7100 + index,
+              repository: {full_name: REPOSITORY},
+              workflow_id: 347821227,
+              run_number: 1000 + index,
+              run_attempt: 1,
+              pull_requests: [{number: 973}]
+            }))
+          }, {url: url.toString(), headers: {link: '<https://api.github.com/repos/Achi1984/meridian/actions/workflows/347821227/runs?page=2>; rel="next"'}});
+        }
+        return json({
+          total_count: 130,
+          workflow_runs: Array.from({length: 30}, (_, index) => ({
+            id: 8100 + index,
+            repository: {full_name: REPOSITORY},
+            workflow_id: 347821227,
+            run_number: 1100 + index,
+            run_attempt: 1,
+            pull_requests: [{number: 973}]
+          }))
+        }, {url: url.toString()});
+      }
+    }
+  ]);
+  const api = createM11CoordinatorGithubReadApi({
+    fetchImpl,
+    credentials: credentials(),
+    now: () => NOW_MS
+  });
+  const pageOne = await api.listWorkflowRuns({repository: REPOSITORY, workflowId: 347821227, page: 1});
+  const pageTwo = await api.listWorkflowRuns({repository: REPOSITORY, workflowId: 347821227, page: 2});
+  assert.equal(pageOne.totalCount, 130);
+  assert.equal(pageOne.items.length, 100);
+  assert.equal(pageOne.hasNextPage, true);
+  assert.equal(pageTwo.totalCount, 130);
+  assert.equal(pageTwo.items.length, 30);
+  assert.equal(pageTwo.hasNextPage, false);
+});
+
+test('workflow run pages fail closed for missing total_count and surface changing totals', async () => {
+  const {fetchImpl: missingTotalFetch} = makeFetch([
+    {
+      match: () => true,
+      handle: ({url}) => json({workflow_runs: []}, {url: url.toString()})
+    }
+  ]);
+  const missingTotalApi = createM11CoordinatorGithubReadApi({
+    fetchImpl: missingTotalFetch,
+    credentials: credentials(),
+    now: () => NOW_MS
+  });
+  await assert.rejects(
+    missingTotalApi.listWorkflowRuns({repository: REPOSITORY, workflowId: 347821227, page: 1}),
+    error => error?.code === 'MALFORMED_RESPONSE'
+  );
+
+  const {fetchImpl: changingTotalFetch} = makeFetch([
+    {
+      match: () => true,
+      handle: ({url}) => {
+        const page = url.searchParams.get('page');
+        const total = page === '1' ? 130 : 129;
+        return json({
+          total_count: total,
+          workflow_runs: [{
+            id: 7001,
+            repository: {full_name: REPOSITORY},
+            workflow_id: 347821227,
+            run_number: 20,
+            run_attempt: 1,
+            pull_requests: [{number: 973}]
+          }]
+        }, {url: url.toString()});
+      }
+    }
+  ]);
+  const changingTotalApi = createM11CoordinatorGithubReadApi({
+    fetchImpl: changingTotalFetch,
+    credentials: credentials(),
+    now: () => NOW_MS
+  });
+  const first = await changingTotalApi.listWorkflowRuns({repository: REPOSITORY, workflowId: 347821227, page: 1});
+  const second = await changingTotalApi.listWorkflowRuns({repository: REPOSITORY, workflowId: 347821227, page: 2});
+  assert.equal(first.totalCount, 130);
+  assert.equal(second.totalCount, 129);
 });
 
 test('pagination limits and off-origin pagination links are rejected', async () => {
@@ -404,7 +546,7 @@ test('pagination limits and off-origin pagination links are rejected', async () 
   const {fetchImpl} = makeFetch([
     {
       match: url => url.pathname === '/repos/Achi1984/meridian/actions/workflows/347821227/runs',
-      handle: ({url}) => json({workflow_runs: []}, {
+      handle: ({url}) => json({total_count: 0, workflow_runs: []}, {
         url: url.toString(),
         headers: {link: '<https://evil.example/next>; rel="next"'}
       })
@@ -419,6 +561,166 @@ test('pagination limits and off-origin pagination links are rejected', async () 
     api.listWorkflowRuns({repository: REPOSITORY, workflowId: 347821227, page: 1}),
     error => error?.code === 'OFF_ORIGIN_PAGINATION_LINK'
   );
+});
+
+test('jobs pages require run-attempt identity and preserve workflow/step provenance', async () => {
+  const {fetchImpl} = makeFetch([
+    {
+      match: url => url.pathname === '/repos/Achi1984/meridian/actions/runs/40844925310/attempts/2',
+      handle: ({url}) => json({
+        id: 40844925310,
+        run_attempt: 2,
+        workflow_id: 347821227,
+        path: '.github/workflows/backend-safety.yml@refs/heads/main',
+        repository: {full_name: REPOSITORY}
+      }, {url: url.toString()})
+    },
+    {
+      match: url => url.pathname === '/repos/Achi1984/meridian/actions/runs/40844925310/attempts/2/jobs',
+      handle: ({url}) => json({
+        total_count: 1,
+        jobs: [{
+          id: 123356524474,
+          name: 'syntax',
+          run_id: 40844925310,
+          run_attempt: 2,
+          status: 'completed',
+          conclusion: 'success',
+          steps: [
+            {name: 'Research and auth regression tests', status: 'completed', conclusion: 'success'},
+            {name: 'Upload logs', status: 'completed', conclusion: 'success'}
+          ]
+        }]
+      }, {url: url.toString()})
+    }
+  ]);
+  const api = createM11CoordinatorGithubReadApi({
+    fetchImpl,
+    credentials: credentials(),
+    now: () => NOW_MS
+  });
+  const page = await api.listWorkflowJobs({
+    repository: REPOSITORY,
+    runId: 40844925310,
+    runAttempt: 2,
+    page: 1
+  });
+  assert.equal(page.totalCount, 1);
+  assert.equal(page.items[0].workflowId, 347821227);
+  assert.equal(page.items[0].runId, 40844925310);
+  assert.equal(page.items[0].runAttempt, 2);
+  assert.equal(page.items[0].steps[0].name, 'Research and auth regression tests');
+});
+
+test('jobs pages fail closed for wrong run/attempt/workflow and missing step fields', async () => {
+  const cases = [
+    {
+      name: 'wrong-run-id',
+      runPayload: {
+        id: 999,
+        run_attempt: 2,
+        workflow_id: 347821227,
+        path: '.github/workflows/backend-safety.yml@refs/heads/main',
+        repository: {full_name: REPOSITORY}
+      }
+    },
+    {
+      name: 'wrong-run-attempt',
+      runPayload: {
+        id: 40844925310,
+        run_attempt: 3,
+        workflow_id: 347821227,
+        path: '.github/workflows/backend-safety.yml@refs/heads/main',
+        repository: {full_name: REPOSITORY}
+      }
+    },
+    {
+      name: 'missing-workflow-id',
+      runPayload: {
+        id: 40844925310,
+        run_attempt: 2,
+        path: '.github/workflows/backend-safety.yml@refs/heads/main',
+        repository: {full_name: REPOSITORY}
+      }
+    },
+    {
+      name: 'missing-step-conclusion',
+      runPayload: {
+        id: 40844925310,
+        run_attempt: 2,
+        workflow_id: 347821227,
+        path: '.github/workflows/backend-safety.yml@refs/heads/main',
+        repository: {full_name: REPOSITORY}
+      },
+      jobPayload: {
+        total_count: 1,
+        jobs: [{
+          id: 123356524474,
+          name: 'syntax',
+          run_id: 40844925310,
+          run_attempt: 2,
+          status: 'completed',
+          conclusion: 'failure',
+          steps: [{name: 'Research and auth regression tests', status: 'completed', conclusion: null}]
+        }]
+      }
+    },
+    {
+      name: 'missing-total-count',
+      runPayload: {
+        id: 40844925310,
+        run_attempt: 2,
+        workflow_id: 347821227,
+        path: '.github/workflows/backend-safety.yml@refs/heads/main',
+        repository: {full_name: REPOSITORY}
+      },
+      jobPayload: {
+        jobs: [{
+          id: 123356524474,
+          name: 'syntax',
+          run_id: 40844925310,
+          run_attempt: 2,
+          status: 'completed',
+          conclusion: 'success',
+          steps: [{name: 'Research and auth regression tests', status: 'completed', conclusion: 'success'}]
+        }]
+      }
+    }
+  ];
+
+  for (const testCase of cases) {
+    const {fetchImpl} = makeFetch([
+      {
+        match: url => url.pathname === '/repos/Achi1984/meridian/actions/runs/40844925310/attempts/2',
+        handle: ({url}) => json(testCase.runPayload, {url: url.toString()})
+      },
+      {
+        match: url => url.pathname === '/repos/Achi1984/meridian/actions/runs/40844925310/attempts/2/jobs',
+        handle: ({url}) => json(testCase.jobPayload || {
+          total_count: 1,
+          jobs: [{
+            id: 123356524474,
+            name: 'syntax',
+            run_id: 40844925310,
+            run_attempt: 2,
+            status: 'completed',
+            conclusion: 'success',
+            steps: [{name: 'Research and auth regression tests', status: 'completed', conclusion: 'success'}]
+          }]
+        }, {url: url.toString()})
+      }
+    ]);
+    const api = createM11CoordinatorGithubReadApi({
+      fetchImpl,
+      credentials: credentials(),
+      now: () => NOW_MS
+    });
+    await assert.rejects(
+      api.listWorkflowJobs({repository: REPOSITORY, runId: 40844925310, runAttempt: 2, page: 1}),
+      error => error?.code === 'MALFORMED_RESPONSE',
+      testCase.name
+    );
+  }
 });
 
 test('redirect or off-origin response URL is rejected before payload use', async () => {
