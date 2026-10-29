@@ -80,7 +80,7 @@ test('accepted #925 artifact validates as proposal-only without authorizing exec
   assert.deepEqual(report, {
     ok: true,
     status: 'PROPOSAL_ONLY',
-    candidateSha256: '793060a6eb57855e79275f88471b678cf5bbf3e03d87a04482657a76dc3e4096',
+    candidateSha256: '3e8c4f98e0d562be1f57ac9ea3ca670caff048bf3491caba41a36861f59b8a01',
     executionAuthorized: false,
     findings: []
   });

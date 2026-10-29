@@ -1290,7 +1290,7 @@ process.stdout.write(JSON.stringify(runBatch({
         journal.record_b1_path_started(self.database, claim, 19, diagnostic_id)
         inspected = journal.inspect_b1(self.database, claim["trialId"])
         self.assertEqual(inspected["paths"][0]["state"], "completed")
-        with sqlite3.connect(self.database) as connection:
+        with sqlite_connect(self.database) as connection:
             payload = connection.execute(
                 "SELECT payload FROM b1_path_payloads WHERE trial_id=? AND computation_index=0",
                 (claim["trialId"],)).fetchone()[0]
