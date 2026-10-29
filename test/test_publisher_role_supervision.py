@@ -6,7 +6,6 @@ import os
 from pathlib import Path
 import select
 import signal
-import stat
 import subprocess
 import sys
 import tempfile
@@ -113,37 +112,31 @@ class SupervisionTests(unittest.TestCase):
                     and result.get('operationClaimConfirmed') is True
                     and result.get('connectionCleanupConfirmed') is True):
                 confirmed.write_text('confirmed')
-            return result
+                exit7.write_text('exit7')
+                os._exit(7)
+            raise AssertionError(f'unexpected drive result: {result!r}')
         def observe_waitpid(pid,options):
             found,status=real_waitpid(pid,options)
             worker=(self.root/'worker')
             if worker.exists() and found==int(worker.read_text()):
                 observed.append((found,status))
             return found,status
-        @contextlib.contextmanager
-        def nonzero_after_success(phase):
-            with self.factory()(phase) as services:
-                original=services.record
-                def record(binding,stage,status):
-                    if stage=='finished' and status=='CONFIRMED':
-                        confirmed.write_text('confirmed')
-                    return original(binding,stage,status)
-                services.record=record
-                yield services
-            exit7.write_text('exit7')
-            os._exit(7)
-        supervisor_path=m.ROOT/'publisher_test_password_setup.py'
-        original_mode=stat.S_IMODE(os.stat(supervisor_path).st_mode)
-        os.chmod(supervisor_path,original_mode & ~0o022)
+        private=tempfile.TemporaryDirectory(prefix='meridian-supervisor-src-')
+        private_root=Path(private.name)
+        supervisor_path=private_root/'publisher_test_password_setup.py'
+        source=(m.ROOT/'publisher_test_password_setup.py').read_bytes()
+        supervisor_path.write_bytes(source)
+        os.chmod(supervisor_path,0o600)
         try:
             with (
+                patch.object(m,'ROOT',private_root),
                 patch.object(m.transition,'drive_transition',side_effect=observe_drive),
                 patch.object(m.os,'waitpid',side_effect=observe_waitpid),
                 patch.dict(BUDGETS,{'exit':3.0}),
             ):
-                self.assert_unknown(self.run_worker(nonzero_after_success)); self.assert_reaped()
+                self.assert_unknown(self.run_worker(self.factory())); self.assert_reaped()
         finally:
-            os.chmod(supervisor_path,original_mode)
+            private.cleanup()
         self.assertEqual(confirmed.read_text(),'confirmed')
         self.assertEqual(exit7.read_text(),'exit7')
         self.assertTrue(any(os.WIFEXITED(status) and os.WEXITSTATUS(status)==7 for _,status in observed),observed)

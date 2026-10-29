@@ -1891,14 +1891,14 @@ process.stdout.write(JSON.stringify(runBatch({
                         "paths": result.get("paths"),
                         "ack_marker_exists": ack_marker.exists(),
                         "child_count": len(children),
-                        "child_returncode": None if not children else children[0].poll(),
+                        "child_returncode": None if not children else children[0].returncode,
                     }, sort_keys=True, separators=(",", ":"))
                     self.assertEqual(result["state"], "failed", diagnostic)
                     self.assertEqual(result["reason"], reason, diagnostic)
                     self.assertTrue(ack_marker.exists(), diagnostic)
                     self.assertEqual(ack_marker.read_text(), f"{source}:0", diagnostic)
                     self.assertEqual(len(children), 1, diagnostic)
-                    self.assertIsNotNone(children[0].poll(), diagnostic)
+                    self.assertIsNotNone(children[0].returncode, diagnostic)
                     self.assertEqual(result["paths"][0]["state"], "started", diagnostic)
                     current = journal.inspect(self.database, result["trialId"])
                     self.assertEqual((current["state"], current["attempts"]), ("failed", 1), diagnostic)
