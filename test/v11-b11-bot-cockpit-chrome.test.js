@@ -19,12 +19,18 @@ window.__portfolioReady=import('./depot-portfolio-state.js?v=B17-M11').then(({pu
  publishDepotPortfolioState({status:'fresh',model:{status:'FRESH_SNAPSHOT',readOnly:true,executionAllowed:false,
   totalUsd:1234.56,snapshotAt:new Date().toISOString(),sourceAt:new Date().toISOString(),
   source:'SERVER_PORTFOLIO_CURRENT',expiresAt:Date.now()+60000}}));
+window.__publishPortfolio=async state=>{
+ const {publishDepotPortfolioState}=await import('./depot-portfolio-state.js?v=B17-M11');
+ publishDepotPortfolioState(state);
+};
 window.addEventListener('error',event=>window.__botErrors.push(event.message));
 window.addEventListener('unhandledrejection',event=>window.__botErrors.push(String(event.reason)));
 window.__botSnapshot=age=>({schemaVersion:'MERIDIAN-ASSET-WATCH-BRIDGE-V1',source:'PIONEX_BOT_API',
  sourceSnapshotAt:new Date(Date.now()-age).toISOString(),freshnessLimitMs:900000,readOnly:true,
  executionImpact:false,detailsComplete:true,sourceStatusOk:true,fresh:true,usableForOverwrite:true,
- botCount:6,bots:[
+ botCount:7,coverage:{status:'PARTIAL',providerContractStatus:'DOCUMENTED',
+  liveAccountVerification:'NOT_PERFORMED',listRows:8,recognizedRows:7,representedRows:7,
+  unsupportedRows:1,unhydratedRows:0,paginationComplete:false,pages:20,pageLimit:20},bots:[
   {botRef:'a'.repeat(20),symbol:'BTCUSDT',side:'LONG',cateType:'inverse',botType:'futures_grid',
    leverage:5,investment:{usd:125.5678},pnl:{usd:-25}},
   {botRef:'b'.repeat(20),symbol:'BTCUSDT',side:'SHORT',cateType:'linear',botType:'futures_grid',
@@ -37,7 +43,9 @@ window.__botSnapshot=age=>({schemaVersion:'MERIDIAN-ASSET-WATCH-BRIDGE-V1',sourc
   {botRef:'e'.repeat(20),symbol:'XRPUSDT',side:'SHORT',cateType:'inverse',botType:'futures_grid',
    leverage:3,investment:{quoteAmount:0.42,currency:'XRP'},pnl:{usd:0.005}},
   {botRef:'f'.repeat(20),symbol:'SOLUSDT',side:'LONG',cateType:'linear',botType:'futures_grid',
-   leverage:null,pnl:{usd:0}}
+   leverage:null,pnl:{usd:0}},
+  {botRef:'g'.repeat(20),symbol:'MOONUSDT',side:'LONG',cateType:'FUTURES_MOON',botType:'futures_grid',
+   leverage:1,pnl:{usd:null}}
  ]});
 window.__largeBotSnapshot=age=>{const snapshot=window.__botSnapshot(age);
  snapshot.botCount=20;snapshot.bots=Array.from({length:20},(_,index)=>({
@@ -181,11 +189,40 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
             navTargets:[...document.querySelectorAll('#nav button')].every(b=>b.getBoundingClientRect().height>=44),
             botState:document.querySelector('#bot-read-root .bot-read-state')?.dataset.state,
             portfolio:document.querySelector('#bot-read-root .bot-portfolio-total').innerText,
+            portfolioTimes:[...document.querySelectorAll('#bot-read-root .bot-portfolio-total time')].map(t=>t.dateTime),
             root:document.getElementById('bot-read-root').innerText,errors:window.__botErrors})`);
           assert.equal(initial.width,size.width);assert.equal(initial.height,size.height);
           assert.equal(initial.reads,0);assert.equal(initial.overflow,false);assert.equal(initial.navTargets,true);
           assert.equal(initial.botState,'locked',JSON.stringify(initial));
           assert.match(initial.portfolio,/1\.234,56 USD/);assert.match(initial.portfolio,/Aktuell/);
+          assert.match(initial.portfolio,/Gesamtwert laut Depot/);
+          assert.match(initial.portfolio,/Stand \(UTC\)/);assert.match(initial.portfolio,/Quellzeit \(UTC\)/);
+          assert.equal(initial.portfolioTimes.length,3,JSON.stringify(initial.portfolioTimes));
+          assert.doesNotMatch(initial.portfolio,/1\.360,13/,'bot capital is not added to the confirmed total');
+          await evaluate(`window.__publishPortfolio({status:'stale'})`);
+          let portfolioState=await evaluate(`document.querySelector('#bot-read-root .bot-portfolio-total').innerText`);
+          assert.match(portfolioState,/Daten veraltet/);assert.doesNotMatch(portfolioState,/1\.234,56 USD/);
+          await evaluate(`window.__publishPortfolio({status:'locked'})`);
+          portfolioState=await evaluate(`document.querySelector('#bot-read-root .bot-portfolio-total').innerText`);
+          assert.match(portfolioState,/Depotdaten ausgeblendet/);assert.doesNotMatch(portfolioState,/1\.234,56 USD/);
+          await evaluate(`window.__publishPortfolio({status:'unavailable'})`);
+          portfolioState=await evaluate(`document.querySelector('#bot-read-root .bot-portfolio-total').innerText`);
+          assert.match(portfolioState,/kein bestätigter Gesamtwert/);
+          assert.doesNotMatch(portfolioState,/1\.234,56 USD/);
+          await evaluate(`window.__publishPortfolio({status:'fresh',model:{status:'FRESH_SNAPSHOT',readOnly:true,
+            executionAllowed:false,totalUsd:null,snapshotAt:new Date().toISOString(),sourceAt:new Date().toISOString(),
+            source:'SERVER_PORTFOLIO_CURRENT',expiresAt:Date.now()+60000}})`);
+          portfolioState=await evaluate(`document.querySelector('#bot-read-root .bot-portfolio-total').innerText`);
+          assert.match(portfolioState,/kein bestätigter Gesamtwert/);
+          assert.doesNotMatch(portfolioState,/0,00 USD|1\.234,56 USD/);
+          await evaluate(`window.__publishPortfolio({status:'fresh',model:{status:'FRESH_SNAPSHOT',readOnly:true,
+            executionAllowed:false,totalUsd:0,snapshotAt:new Date().toISOString(),sourceAt:new Date().toISOString(),
+            source:'SERVER_PORTFOLIO_CURRENT',expiresAt:Date.now()+60000}})`);
+          portfolioState=await evaluate(`document.querySelector('#bot-read-root .bot-portfolio-total').innerText`);
+          assert.match(portfolioState,/0,00 USD/);
+          await evaluate(`window.__publishPortfolio({status:'fresh',model:{status:'FRESH_SNAPSHOT',readOnly:true,
+            executionAllowed:false,totalUsd:1234.56,snapshotAt:new Date().toISOString(),sourceAt:new Date().toISOString(),
+            source:'SERVER_PORTFOLIO_CURRENT',expiresAt:Date.now()+60000}})`);
           await evaluate(`window.__botReadMode='fresh';document.getElementById('bot-read-refresh').click()`);
           await evaluate('new Promise(resolve=>setTimeout(resolve,60))');
           assert.equal(await evaluate('window.__botReads'),1);
@@ -193,7 +230,7 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
             const root=document.getElementById('bot-read-root');
             const cards=[...root.querySelectorAll('.bot-card')];
             const command=document.getElementById('command-bot-overview');
-            return {cards:cards.length,ids:cards.map(c=>c.id),count:root.innerText.includes('6 Bots im Snapshot'),
+            return {cards:cards.length,ids:cards.map(c=>c.id),count:root.innerText.includes('7 Bots im Snapshot'),
               duplicate:cards.filter(c=>c.innerText.includes('BTCUSDT')).length,
               cardHeights:cards.map(c=>c.getBoundingClientRect().height),
               cardGeometry:cards.map(c=>({open:c.open,summary:c.querySelector('summary').getBoundingClientRect().height,
@@ -208,6 +245,9 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
                 text:c.querySelector('summary').innerText})),
               referenceLabels:cards.map(c=>c.querySelector('summary').getAttribute('aria-label')),
               neutralDetails:cards.find(c=>c.id.endsWith('c'.repeat(20)))?.querySelector('.bot-card-body').textContent,
+              moonDetails:cards.find(c=>c.id.endsWith('g'.repeat(20)))?.querySelector('.bot-card-body').textContent,
+              moonBadges:[...cards.find(c=>c.id.endsWith('g'.repeat(20)))?.querySelectorAll('.bot-card-badge')||[]].map(b=>b.innerText),
+              coverage:root.innerText,
               referencesVisible:cards.some(c=>c.querySelector('summary').innerText.includes('Referenz')),
               tinyPositive:cards.find(c=>c.id.endsWith('e'.repeat(20)))?.querySelector('.bot-pnl-positive')?.innerText,
               tinyCapital:cards.find(c=>c.id.endsWith('b'.repeat(20)))?.querySelector('.bot-card-capital strong')?.innerText,
@@ -216,10 +256,15 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
               touch:[...root.querySelectorAll('input,select,button')].filter(e=>!e.hidden).map(e=>[e.tagName,e.getAttribute('aria-label')||e.textContent,e.getBoundingClientRect().height]),
               leak:/synthetic-token|private failure/.test(document.body.innerText)};
           })()`);
-          assert.equal(fresh.cards,6);assert.equal(new Set(fresh.ids).size,6);assert.equal(fresh.duplicate,2);
+          assert.equal(fresh.cards,7);assert.equal(new Set(fresh.ids).size,7);assert.equal(fresh.duplicate,2);
           assert.match(fresh.neutralDetails,/Liquidationsschätzung · Untergrenze/);
           assert.match(fresh.neutralDetails,/Liquidationsschätzung · Obergrenze/);
           assert.doesNotMatch(fresh.neutralDetails,/Liquidationspreis laut Quelle/);
+          assert.match(fresh.moonDetails,/Richtung: Long · Typ: Futures Grid · Kategorie: Futures Moon/);
+          assert.ok(fresh.moonBadges.includes('Futures Moon')&&fresh.moonBadges.includes('Long'),
+            JSON.stringify(fresh.moonBadges));
+          assert.match(fresh.coverage,/Teilabdeckung/);
+          assert.match(fresh.coverage,/Weitere Listenseiten waren beim Erreichen des Seitenlimits noch vorhanden/);
           assert.equal(fresh.count,true);assert.equal(fresh.commandState,'fresh');assert.equal(fresh.lossButtons,3);
           assert.ok(fresh.cardHeights.every(height=>Number.isFinite(height)&&height>0),
             JSON.stringify(fresh.cardGeometry));
@@ -243,7 +288,7 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
             assert.equal(category.visible,true,JSON.stringify(category));
             categoryFit={width:category.width,selectedTextWidth:category.textWidth,gridColumn:category.gridColumn};
           }
-          assert.equal(new Set(fresh.referenceLabels).size,6,'duplicate symbols have distinct accessible names');
+          assert.equal(new Set(fresh.referenceLabels).size,7,'duplicate symbols have distinct accessible names');
           assert.equal(fresh.referencesVisible,false,'full references stay out of collapsed visual cards');
           assert.equal(fresh.tinyPositive,'+<0,01 USD');
           assert.equal(fresh.tinyCapital,'<0,01 USD/USDT');
@@ -268,10 +313,10 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
               .map(node=>ratio(getComputedStyle(node).color,getComputedStyle(node.closest('.bot-card')).backgroundColor));
           })()`);
           assert.ok(pnlContrast.length>=2&&pnlContrast.every(ratio=>ratio>=4.5),JSON.stringify(pnlContrast));
-          assert.match(fresh.command,/6 Bots · nur lesend/);assert.match(fresh.command,/Quelle & Zeit/);
+          assert.match(fresh.command,/7 Bots · nur lesend/);assert.match(fresh.command,/Quelle & Zeit/);
           assert.match(fresh.command,/Bestätigte negative P\/L-Werte/);
           const commandMetadata=await evaluate(`document.querySelector('#command-bot-overview .command-bot-metadata').innerText`);
-          assert.match(commandMetadata,/Quelle: Pionex Bot API · Richtung: Long 2 · Short 2 · Neutral 1 · Unbekannt 1/);
+          assert.match(commandMetadata,/Quelle: Pionex Bot API · Richtung: Long 3 · Short 2 · Neutral 1 · Unbekannt 1/);
           const exactCommandTimestamp=commandMetadata.match(/\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z/)?.[0];
           assert.ok(exactCommandTimestamp);
           assert.ok(fresh.command.includes(new Intl.DateTimeFormat('de-DE',{dateStyle:'medium',timeStyle:'short',
@@ -442,11 +487,11 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
             const select=document.getElementById('bot-sort-filter');select.value='leverage';
             select.dispatchEvent(new Event('change',{bubbles:true}));})()`);
           assert.deepEqual(await evaluate(`[...document.querySelectorAll('#bot-read-root .bot-card')].map(c=>c.querySelector('.bot-card-heading').innerText.split(' · ')[0])`,
-          ),['ETHUSDT','BTCUSDT','XRPUSDT','BTCUSDT','ADAUSDT','SOLUSDT']);
+          ),['ETHUSDT','BTCUSDT','XRPUSDT','BTCUSDT','ADAUSDT','MOONUSDT','SOLUSDT']);
           await evaluate(`(()=>{const select=document.getElementById('bot-sort-filter');select.value='pnl';
             select.dispatchEvent(new Event('change',{bubbles:true}));})()`);
           assert.deepEqual(await evaluate(`[...document.querySelectorAll('#bot-read-root .bot-card')].map(c=>c.querySelector('.bot-card-heading').innerText.split(' · ')[0])`),
-            ['BTCUSDT','BTCUSDT','ETHUSDT','XRPUSDT','ADAUSDT','SOLUSDT']);
+            ['BTCUSDT','BTCUSDT','ETHUSDT','XRPUSDT','ADAUSDT','MOONUSDT','SOLUSDT']);
           await evaluate(`(()=>{const dir=document.getElementById('bot-direction-filter');dir.value='unknown';
             dir.dispatchEvent(new Event('change',{bubbles:true}));})()`);
           assert.equal(await evaluate(`document.querySelector('#bot-read-root .bot-card .bot-card-heading').innerText`),
@@ -461,7 +506,7 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           await evaluate(`(()=>{const search=document.getElementById('bot-symbol-search');search.value='NO_MATCH';
             search.dispatchEvent(new Event('input',{bubbles:true}));})()`);
           const none=await evaluate(`document.getElementById('bot-read-root').innerText`);
-          assert.match(none,/0 von 6 Bots im Snapshot/);assert.match(none,/Keine Bots entsprechen den Filtern/);
+          assert.match(none,/0 von 7 Bots im Snapshot/);assert.match(none,/Keine Bots entsprechen den Filtern/);
           assert.doesNotMatch(none,/Keine Bots in diesem Snapshot/);
           assert.equal(await evaluate('window.__botReads'),1,'local filter, sort, reset and navigation must not fetch');
 
