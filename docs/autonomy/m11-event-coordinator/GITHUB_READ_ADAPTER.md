@@ -44,10 +44,12 @@ Residual trust: this proves caller-attested authenticated transport evidence for
 - Workflow run head SHA is mapped from GitHub run payload (`head_sha`) as-is (can be merge SHA).
 - Historical base SHA is taken only from run-associated pull request objects; empty/ambiguous associations remain explicit (`baseSha: null`) and must block at collector policy level.
 - PR metadata is never used to substitute missing historical run evidence.
+- `listWorkflowRuns` is bounded to workflow + `event=pull_request` + immutable `head_sha`; returned run rows expose `headSha` and historical `baseSha` derived only from run payload associations.
 - `getPullRequestDiff` binds immutable pair evidence by requesting both compare JSON and compare diff from `/compare/{base}...{head}`.
 - PR metadata is read before and after compare fetches; movement races are rejected as ambiguous.
 - Completeness remains `false` when proof is missing (pagination ambiguity, missing file patches, changed-file mismatch, commit-list truncation, merge-base mismatch, empty diff text).
 - `listWorkflowJobs` validates run-attempt identity via bounded authenticated GET `/actions/runs/{runId}/attempts/{runAttempt}` and cross-checks every job `run_id`/`run_attempt`.
+- If bounded relevant-run discovery cannot be proven complete within page/item limits, collector policy must fail closed (`UNSUPPORTED_RELEVANT_RUN_DISCOVERY`) rather than treating partial inventory as complete.
 
 ## Interface gaps for core integration owner
 

@@ -227,7 +227,8 @@ test('exact-pair happy path maps authoritative GitHub payloads', async () => {
           workflow_id: 347821227,
           run_number: 20,
           run_attempt: 1,
-          pull_requests: [{number: 973}]
+          head_sha: HEAD,
+          pull_requests: [{number: 973, base: {sha: BASE}, head: {sha: HEAD}}]
         }]
       }, {url: url.toString(), headers: {link: '<https://api.github.com/repos/Achi1984/meridian/actions/workflows/347821227/runs?page=2>; rel="next"'}})
     },
@@ -291,10 +292,20 @@ test('exact-pair happy path maps authoritative GitHub payloads', async () => {
   assert.equal(calls.filter(call => call.path === '/repos/Achi1984/meridian/pulls/973').length, 3);
   assert.equal(calls.filter(call => call.path === `/repos/Achi1984/meridian/compare/${BASE}...${HEAD}`).length, 2);
 
-  const runsPage = await api.listWorkflowRuns({repository: REPOSITORY, workflowId: 347821227, page: 1});
+  const runsPage = await api.listWorkflowRuns({
+    repository: REPOSITORY,
+    workflowId: 347821227,
+    pullRequest: 973,
+    headSha: HEAD,
+    page: 1
+  });
   assert.equal(runsPage.hasNextPage, true);
   assert.equal(runsPage.items[0].runAttempt, 1);
+  assert.equal(runsPage.items[0].headSha, HEAD);
+  assert.equal(runsPage.items[0].baseSha, BASE);
   assert.equal(runsPage.totalCount, 1);
+  const listRunCall = calls.find(call => call.path === '/repos/Achi1984/meridian/actions/workflows/347821227/runs');
+  assert.ok(listRunCall?.query.includes(`head_sha=${HEAD}`));
 
   const jobsPage = await api.listWorkflowJobs({repository: REPOSITORY, runId: 7001, runAttempt: 1, page: 1});
   assert.equal(jobsPage.hasNextPage, false);

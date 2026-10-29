@@ -46,7 +46,7 @@ function validPage(page) {
   return page !== null && typeof page === 'object' && !Array.isArray(page)
     && Array.isArray(page.items) && typeof page.hasNextPage === 'boolean'
     && Number.isSafeInteger(page.totalCount) && page.totalCount >= 0
-    && page.totalCount <= MAX_ITEMS && page.items.length <= MAX_ITEMS;
+    && page.items.length <= MAX_ITEMS;
 }
 
 function validAuthenticationEvidence(value, timestamp) {
@@ -120,6 +120,71 @@ async function readAllPages(readPage, maxPages, deadline) {
     if (!page.hasNextPage) return items.length === totalCount ? items : null;
   }
   return null;
+}
+
+async function readRelevantRuns({
+  api,
+  initialAuthenticationEvidence,
+  now,
+  deadline,
+  maxPages,
+  pullRequestNumber,
+  headSha,
+  baseSha
+}) {
+  const items = [];
+  let totalCount = null;
+  for (let pageNumber = 1; pageNumber <= maxPages; pageNumber++) {
+    if (performance.now() > deadline) return fail('TIME_BUDGET_EXHAUSTED');
+    const remaining = Math.max(0, deadline - performance.now());
+    const controller = new AbortController();
+    let timer;
+    const timeout = new Promise(resolve => {
+      timer = setTimeout(() => {
+        controller.abort();
+        resolve(TIMED_OUT);
+      }, remaining);
+    });
+    let page;
+    try {
+      page = await Promise.race([readWithAuthenticationEvidence(
+        api,
+        initialAuthenticationEvidence,
+        now,
+        () => api.listWorkflowRuns({
+          repository: REPOSITORY,
+          workflowId: RELEASE_SAFETY_WORKFLOW_ID,
+          pullRequest: pullRequestNumber,
+          headSha,
+          page: pageNumber,
+          signal: controller.signal
+        })
+      ), timeout]);
+    } finally {
+      clearTimeout(timer);
+    }
+    if (page === TIMED_OUT) return fail('TIME_BUDGET_EXHAUSTED');
+    if (!validPage(page) || (totalCount !== null && page.totalCount !== totalCount)
+      || items.length + page.items.length > MAX_ITEMS) return fail('RUN_PAGINATION_INCOMPLETE');
+    totalCount = page.totalCount;
+    if (totalCount > MAX_ITEMS) return fail('UNSUPPORTED_RELEVANT_RUN_DISCOVERY');
+    if (items.length + page.items.length > totalCount) return fail('RUN_PAGINATION_INCOMPLETE');
+    for (const item of page.items) {
+      if (!item || item.repository !== REPOSITORY || item.workflowId !== RELEASE_SAFETY_WORKFLOW_ID
+        || !positive(item.id) || !positive(item.runNumber) || !positive(item.runAttempt)
+        || !Array.isArray(item.pullRequests) || item.pullRequests.some(value => !positive(value))
+        || !sha(item.headSha) || !sha(item.baseSha)) {
+        return fail('RUN_PAGINATION_INCOMPLETE');
+      }
+      if (item.headSha !== headSha || item.baseSha !== baseSha
+        || !item.pullRequests.includes(pullRequestNumber)) {
+        return fail('UNSUPPORTED_RELEVANT_RUN_DISCOVERY');
+      }
+    }
+    items.push(...page.items);
+    if (!page.hasNextPage) return items.length === totalCount ? items : fail('RUN_PAGINATION_INCOMPLETE');
+  }
+  return fail('RUN_PAGINATION_INCOMPLETE');
 }
 
 function collectionDigest(data) {
@@ -282,23 +347,21 @@ export async function collectExactPair({hint, config, api, now = Date.now}) {
       return fail('DIFF_UNAVAILABLE_OR_INCOMPLETE');
     }
 
-    const runs = await readAllPages((page, signal) => readWithAuthenticationEvidence(
-      api, initialAuthenticationEvidence, now, () => api.listWorkflowRuns({
-        repository: REPOSITORY,
-        workflowId: RELEASE_SAFETY_WORKFLOW_ID,
-        pullRequest: pullRequestNumber,
-        page,
-        signal
-      })
-    ), config.maxPages, deadline);
-    if (!runs || runs.length === 0) return fail('RUN_PAGINATION_INCOMPLETE');
-    const associatedRuns = runs.filter(item => item && item.repository === REPOSITORY
-      && item.workflowId === RELEASE_SAFETY_WORKFLOW_ID
-      && Array.isArray(item.pullRequests) && item.pullRequests.includes(pullRequestNumber));
-    if (associatedRuns.length === 0) return fail('CURRENT_RUN_NOT_FOUND');
-    const latestRunNumber = Math.max(...associatedRuns.map(item => item.runNumber).filter(positive));
+    const runs = await readRelevantRuns({
+      api,
+      initialAuthenticationEvidence,
+      now,
+      deadline,
+      maxPages: config.maxPages,
+      pullRequestNumber,
+      headSha: run.headSha,
+      baseSha: run.baseSha
+    });
+    if (runs.status === 'BLOCKED') return runs;
+    if (runs.length === 0) return fail('CURRENT_RUN_NOT_FOUND');
+    const latestRunNumber = Math.max(...runs.map(item => item.runNumber).filter(positive));
     if (!positive(latestRunNumber)) return fail('CURRENT_RUN_UNKNOWN');
-    const latest = associatedRuns.filter(item => item.runNumber === latestRunNumber);
+    const latest = runs.filter(item => item.runNumber === latestRunNumber);
     if (latest.length !== 1 || latest[0].id !== run.id || latest[0].runAttempt !== run.runAttempt) {
       return fail('STALE_OR_AMBIGUOUS_CURRENT_RUN');
     }
