@@ -7,6 +7,7 @@ function num(v){
   const n=Number(v);
   return Number.isFinite(n)?n:null;
 }
+const positiveMetric=value=>typeof value==='number'&&Number.isFinite(value)&&value>0?value:null;
 function text(v){
   const s=String(v??'').trim();
   return s||null;
@@ -50,6 +51,8 @@ function sanitizedBot(bot={}){
       lower:num(bot.lower),
       upper:num(bot.upper),
       liquidationPrice:num(bot.liquidationPrice),
+      liquidationLowerBound:positiveMetric(bot.liquidationLowerBound),
+      liquidationUpperBound:positiveMetric(bot.liquidationUpperBound),
       takeProfit:num(bot.takeProfit),
       stopLoss:num(bot.stopLoss)
     },
@@ -79,6 +82,23 @@ function sanitizedBot(bot={}){
     source:text(bot.source)
   };
 }
+function coverageFor(risk={}){
+  const raw=risk?.coverage&&typeof risk.coverage==='object'?risk.coverage:{};
+  const count=value=>Number.isSafeInteger(value)&&value>=0?value:null;
+  const listRows=count(raw.listRows)??count(risk.apiRows);
+  const recognizedRows=count(raw.recognizedRows)??count(risk.supportedRows);
+  const representedRows=count(raw.representedRows)??count(risk.botCount);
+  const unsupportedRows=count(raw.unsupportedRows)??count(risk.unsupportedRows);
+  const unhydratedRows=count(raw.unhydratedRows)??(
+    count(risk.supportedRows)!==null&&representedRows!==null
+      ?Math.max(0,risk.supportedRows-representedRows):count(risk.rejectedCount));
+  const partial=unsupportedRows>0||unhydratedRows>0;
+  return {
+    status:partial?'PARTIAL':raw.status==='UNVERIFIED'?'UNVERIFIED':'UNKNOWN',
+    providerContractStatus:'UNVERIFIED',
+    listRows,recognizedRows,representedRows,unsupportedRows,unhydratedRows
+  };
+}
 function candidate({name,risk,status,lastSuccessAt,now,staleMs}){
   if(!risk||typeof risk!=='object')return null;
   const snapshotAt=risk.snapshotAt||risk.updatedAt||lastSuccessAt||null;
@@ -91,6 +111,7 @@ function candidate({name,risk,status,lastSuccessAt,now,staleMs}){
     risk,
     snapshotAt,
     detailsComplete,
+    coverage:coverageFor(risk),
     statusOk,
     fresh,
     rows,
@@ -132,10 +153,20 @@ function fingerprint(bots){
 
 export function buildAssetWatchApiSnapshot(data,{now=Date.now(),staleMs=DEFAULT_STALE_MS}={}){
   const selected=pickSource(data||{},now,staleMs);
-  const bots=stableSortBots((selected?.rows||[]).map(sanitizedBot).filter(b=>b.symbol&&b.side&&b.botRef));
+  const sourceRows=selected?.rows||[],seen=new Set();
+  const bots=stableSortBots(sourceRows.map(sanitizedBot).filter(bot=>{
+    if(!bot.symbol||!bot.side||!bot.botRef||seen.has(bot.botRef))return false;
+    seen.add(bot.botRef);return true;
+  }));
+  const coverage=selected?.coverage||coverageFor();
+  const droppedRows=sourceRows.length-bots.length;
+  coverage.representedRows=bots.length;
+  coverage.unhydratedRows=coverage.unhydratedRows===null?droppedRows:coverage.unhydratedRows+droppedRows;
+  if(coverage.unsupportedRows>0||coverage.unhydratedRows>0)coverage.status='PARTIAL';
   const snapshotAt=selected?.snapshotAt||null;
   const ageMs=tsMs(snapshotAt)==null?null:Math.max(0,now-tsMs(snapshotAt));
-  const usableForOverwrite=selected?.usable===true;
+  const usableForDisplay=selected?.usable===true;
+  const usableForOverwrite=usableForDisplay&&coverage.status!=='PARTIAL';
   return {
     schemaVersion:'MERIDIAN-ASSET-WATCH-BRIDGE-V1',
     readOnly:true,
@@ -146,8 +177,10 @@ export function buildAssetWatchApiSnapshot(data,{now=Date.now(),staleMs=DEFAULT_
     sourceAgeMs:ageMs,
     freshnessLimitMs:staleMs,
     detailsComplete:selected?.detailsComplete===true,
+    coverage,
     sourceStatusOk:selected?.statusOk===true,
     fresh:selected?.fresh===true,
+    usableForDisplay,
     usableForOverwrite,
     overwriteRule:'ONLY_WHEN_usableForOverwrite_IS_TRUE',
     botCount:bots.length,
@@ -160,4 +193,3 @@ export function buildAssetWatchApiSnapshot(data,{now=Date.now(),staleMs=DEFAULT_
     }
   };
 }
-

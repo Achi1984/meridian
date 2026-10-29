@@ -117,6 +117,14 @@ function liquidationFor(order,d,side){
   valid.sort((a,b)=>Math.abs(a-entry)-Math.abs(b-entry));
   return valid[0];
 }
+function liquidationBoundsFor(order,d){
+  const up=firstAssetPrice(order,d,['estimateLiquidationPriceUp']);
+  const down=firstAssetPrice(order,d,['estimateLiquidationPriceDown']);
+  if(up!=null&&down!=null)return{lower:Math.min(up,down),upper:Math.max(up,down)};
+  if(up!=null)return quoteInverseConvention(order)?{lower:up,upper:null}:{lower:null,upper:up};
+  if(down!=null)return quoteInverseConvention(order)?{lower:null,upper:down}:{lower:down,upper:null};
+  return{lower:null,upper:null};
+}
 function tpFor(order,d){
   if(String(d?.profitStopType||'').toLowerCase()==='price'){
     const x=assetPrice(order,d?.profitStop);if(x>0)return x;
@@ -152,7 +160,8 @@ function optionalPnlPct(d){
 export function normalizePionexBotOrder(order){
   const check=inspectPionexBotOrder(order);
   if(!check.typePass||!check.statusPass||!check.symbolPass||!check.sidePass)return null;
-  const d=order.buOrderData||{},side=check.side,symbol=resolvedSymbol(order).symbol,range=rangeFor(order,d);
+  const d=order.buOrderData||{},side=check.side,symbol=resolvedSymbol(order).symbol,range=rangeFor(order,d),
+    liquidationBounds=liquidationBoundsFor(order,d);
   const row={
     id:String(order.buOrderId||order.id||symbol),
     botOrderId:String(order.buOrderId||''),
@@ -166,6 +175,8 @@ export function normalizePionexBotOrder(order){
     lower:range.lower,
     upper:range.upper,
     liquidationPrice:liquidationFor(order,d,side),
+    liquidationLowerBound:liquidationBounds.lower,
+    liquidationUpperBound:liquidationBounds.upper,
     takeProfit:tpFor(order,d),
     stopLoss:slFor(order,d),
     investmentUsd:reliableUsdInvestment(d),
@@ -184,6 +195,24 @@ export function normalizePionexBotOrder(order){
     source:'PIONEX_BOT_API'
   };
   return row;
+}
+
+export function buildPionexBotCoverage(orders=[],hydration={}){
+  const rows=Array.isArray(orders)?orders:[];
+  const recognizedRows=rows.filter(row=>ACTIVE_TYPES.has(String(row?.buOrderType||'').trim())).length;
+  const unsupportedRows=rows.length-recognizedRows;
+  const representedRows=Number.isSafeInteger(hydration?.detailRows)&&hydration.detailRows>=0
+    ?hydration.detailRows:0;
+  const unhydratedRows=Math.max(0,recognizedRows-representedRows);
+  return {
+    status:unsupportedRows>0||unhydratedRows>0?'PARTIAL':'UNVERIFIED',
+    providerContractStatus:'UNVERIFIED',
+    listRows:rows.length,
+    recognizedRows,
+    representedRows,
+    unsupportedRows,
+    unhydratedRows
+  };
 }
 
 export async function pionexGet(path,params,{apiKey,apiSecret,fetchImpl=fetch,now=Date.now}={}){
@@ -325,6 +354,7 @@ export async function runPionexBotSyncOnce({env=process.env,fetchImpl=fetch,now=
       supportedRows:hydrated.supportedRows,
       detailRows:hydrated.detailRows,
       detailsComplete:hydrated.detailsComplete,
+      coverage:buildPionexBotCoverage(orders,hydrated),
       syncMode:'BOT_READING_DETAIL_HYDRATED'
     };
     let applied=false,guarded=false;

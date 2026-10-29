@@ -11,10 +11,14 @@ const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium
   .find(path=>path&&existsSync(path));
 const v11Root=fileURLToPath(new URL('../v11/',import.meta.url));
 const source=readFileSync(join(v11Root,'index.html'),'utf8');
-const bootstrap='<script type="module" src="./bot-read-bootstrap.js?v=B15-M11"></script>';
+const bootstrap='<script type="module" src="./bot-read-bootstrap.js?v=B16-M11"></script>';
 const fixtureScript=`<script>
 window.__botReadMode='fresh';window.__botReads=0;window.__resolveBotRead=null;window.__botErrors=[];
 window.__appAccessReads=0;
+window.__portfolioReady=import('./depot-portfolio-state.js?v=B16-M11').then(({publishDepotPortfolioState})=>
+ publishDepotPortfolioState({status:'fresh',model:{status:'FRESH_SNAPSHOT',readOnly:true,executionAllowed:false,
+  totalUsd:1234.56,snapshotAt:new Date().toISOString(),sourceAt:new Date().toISOString(),
+  source:'SERVER_PORTFOLIO_CURRENT',expiresAt:Date.now()+60000}}));
 window.addEventListener('error',event=>window.__botErrors.push(event.message));
 window.addEventListener('unhandledrejection',event=>window.__botErrors.push(String(event.reason)));
 window.__botSnapshot=age=>({schemaVersion:'MERIDIAN-ASSET-WATCH-BRIDGE-V1',source:'PIONEX_BOT_API',
@@ -26,7 +30,8 @@ window.__botSnapshot=age=>({schemaVersion:'MERIDIAN-ASSET-WATCH-BRIDGE-V1',sourc
   {botRef:'b'.repeat(20),symbol:'BTCUSDT',side:'SHORT',cateType:'linear',botType:'futures_grid',
    leverage:2,investment:{usd:0.004},pnl:{usd:-25}},
   {botRef:'c'.repeat(20),symbol:'ETHUSDT',side:'NEUTRAL',cateType:'linear',botType:'futures_grid',
-   leverage:8,investment:{quoteAmount:0.0000123456789,currency:'ETH'},pnl:{usd:-3.5}},
+   leverage:8,investment:{quoteAmount:0.0000123456789,currency:'ETH'},pnl:{usd:-3.5},
+   limits:{liquidationLowerBound:2000,liquidationUpperBound:3000}},
   {botRef:'d'.repeat(20),symbol:'ADAUSDT',side:null,cateType:null,botType:'futures_grid',
    leverage:null,pnl:{usd:null}},
   {botRef:'e'.repeat(20),symbol:'XRPUSDT',side:'SHORT',cateType:'inverse',botType:'futures_grid',
@@ -126,7 +131,7 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
             const layout=await evaluate(`(()=>{
               const x=scrollX,y=scrollY,root=document.documentElement;
               const cards=[...document.querySelectorAll('#bot-read-root .bot-card')];
-              const nodes=[...document.querySelectorAll('#bot-read-root .bot-card,#bot-read-root .bot-card summary,#bot-read-root .bot-card-metrics')];
+              const nodes=[...document.querySelectorAll('#bot-read-root .bot-portfolio-total,#bot-read-root .bot-card,#bot-read-root .bot-card summary,#bot-read-root .bot-card-metrics')];
               const clipped=nodes.filter(node=>node.scrollWidth>node.clientWidth+1).length;
               const intersects=(a,b)=>a.left<b.right-1&&a.right>b.left+1&&a.top<b.bottom-1&&a.bottom>b.top+1;
               const relationships=cards.map(card=>{
@@ -168,16 +173,19 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           await call('Emulation.setDeviceMetricsOverride',{width:size.width,height:size.height,
             deviceScaleFactor:1,mobile:size.mobile,screenWidth:size.width,screenHeight:size.height});
           await openApp();
+          await evaluate('window.__portfolioReady');
           await evaluate(`document.querySelector('#nav [data-v="bots"]').click()`);
           await evaluate('new Promise(resolve=>setTimeout(resolve,80))');
           const initial=await evaluate(`({width:innerWidth,height:innerHeight,reads:window.__botReads,
             overflow:document.documentElement.scrollWidth>innerWidth+1,
             navTargets:[...document.querySelectorAll('#nav button')].every(b=>b.getBoundingClientRect().height>=44),
             botState:document.querySelector('#bot-read-root [data-state]')?.dataset.state,
+            portfolio:document.querySelector('#bot-read-root .bot-portfolio-total').innerText,
             root:document.getElementById('bot-read-root').innerText,errors:window.__botErrors})`);
           assert.equal(initial.width,size.width);assert.equal(initial.height,size.height);
           assert.equal(initial.reads,0);assert.equal(initial.overflow,false);assert.equal(initial.navTargets,true);
           assert.equal(initial.botState,'locked',JSON.stringify(initial));
+          assert.match(initial.portfolio,/1\.234,56 USD/);assert.match(initial.portfolio,/Aktuell/);
           await evaluate(`window.__botReadMode='fresh';document.getElementById('bot-read-refresh').click()`);
           await evaluate('new Promise(resolve=>setTimeout(resolve,60))');
           assert.equal(await evaluate('window.__botReads'),1);
@@ -199,6 +207,7 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
                 badgeRects:[...c.querySelectorAll('.bot-card-badge')].map(b=>({text:b.innerText,width:b.getBoundingClientRect().width,height:b.getBoundingClientRect().height})),
                 text:c.querySelector('summary').innerText})),
               referenceLabels:cards.map(c=>c.querySelector('summary').getAttribute('aria-label')),
+              neutralDetails:cards.find(c=>c.id.endsWith('c'.repeat(20)))?.querySelector('.bot-card-body').innerText,
               referencesVisible:cards.some(c=>c.querySelector('summary').innerText.includes('Referenz')),
               tinyPositive:cards.find(c=>c.id.endsWith('e'.repeat(20)))?.querySelector('.bot-pnl-positive')?.innerText,
               tinyCapital:cards.find(c=>c.id.endsWith('b'.repeat(20)))?.querySelector('.bot-card-capital strong')?.innerText,
@@ -208,6 +217,9 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
               leak:/synthetic-token|private failure/.test(document.body.innerText)};
           })()`);
           assert.equal(fresh.cards,6);assert.equal(new Set(fresh.ids).size,6);assert.equal(fresh.duplicate,2);
+          assert.match(fresh.neutralDetails,/Liquidationsschätzung · Untergrenze/);
+          assert.match(fresh.neutralDetails,/Liquidationsschätzung · Obergrenze/);
+          assert.doesNotMatch(fresh.neutralDetails,/Liquidationspreis laut Quelle/);
           assert.equal(fresh.count,true);assert.equal(fresh.commandState,'fresh');assert.equal(fresh.lossButtons,3);
           assert.ok(fresh.cardHeights.every(height=>Number.isFinite(height)&&height>0),
             JSON.stringify(fresh.cardGeometry));

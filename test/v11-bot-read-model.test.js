@@ -69,7 +69,8 @@ test('source metric projection preserves nonzero finite numeric values without c
   const input=fixture();Object.assign(input.bots[0],{leverage:5,investment:{usd:120},pnl:{usd:-2.5},
     limits:{lower:0.000001,upper:100,liquidationPrice:90,takeProfit:110,stopLoss:95},grid:{profitUsd:999},riskBufferPct:99});
   assert.deepEqual(buildBotReadModel(input,{now}).bots[0].metrics,{leverage:5,investmentUsd:120,investmentAmount:null,investmentCurrency:null,pnlUsd:-2.5,
-    lower:0.000001,upper:100,liquidationPrice:90,takeProfit:110,stopLoss:95,gridProfitUsd:null,riskBufferPct:null});
+    lower:0.000001,upper:100,liquidationPrice:90,liquidationLowerBound:null,liquidationUpperBound:null,
+    takeProfit:110,stopLoss:95,gridProfitUsd:null,riskBufferPct:null});
 });
 test('missing, coerced zero, invalid and negative positive-only metrics remain unavailable',()=>{
   for(const value of [undefined,null,'',0,-0,'12',true,Infinity,NaN,{},[]]) {
@@ -81,6 +82,23 @@ test('missing, coerced zero, invalid and negative positive-only metrics remain u
   assert.equal(buildBotReadModel(input,{now}).bots[0].metrics.leverage,null);
   assert.equal(buildBotReadModel(input,{now}).bots[0].metrics.investmentUsd,null);
   assert.equal(buildBotReadModel(input,{now}).bots[0].metrics.lower,null);
+});
+
+test('neutral liquidation bounds and unverified provider coverage remain independent and explicit',()=>{
+  const input=fixture();
+  input.coverage={status:'PARTIAL',providerContractStatus:'UNVERIFIED',listRows:3,
+    recognizedRows:2,representedRows:1,unsupportedRows:1,unhydratedRows:1};
+  input.bots[0].side='NEUTRAL';
+  input.bots[0].limits={liquidationLowerBound:50000,liquidationUpperBound:null};
+  const model=buildBotReadModel(input,{now});
+  assert.equal(model.status,'FRESH_SNAPSHOT');
+  assert.equal(model.bots[0].side,'NEUTRAL');
+  assert.equal(model.bots[0].metrics.liquidationLowerBound,50000);
+  assert.equal(model.bots[0].metrics.liquidationUpperBound,null);
+  assert.deepEqual(model.coverage,{status:'PARTIAL',providerContractStatus:'UNVERIFIED',
+    listRows:3,recognizedRows:2,representedRows:1,unsupportedRows:1,unhydratedRows:1});
+  const unknown=buildBotReadModel(fixture(),{now});
+  assert.equal(unknown.coverage.status,'UNKNOWN','legacy snapshots cannot assert full provider coverage');
 });
 
 test('capital fallback preserves only an explicit bounded source currency and positive amount',()=>{

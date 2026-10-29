@@ -1,6 +1,7 @@
 // Inactive component: mount explicitly with the existing read-client factory.
 // No network, credentials, storage or engine imports belong to this renderer.
-import {buildBotOverviewModel} from './bot-overview-model.js?v=B15-M11';
+import {buildBotOverviewModel} from './bot-overview-model.js?v=B16-M11';
+import {subscribeDepotPortfolio} from './depot-portfolio-state.js?v=B16-M11';
 
 const LABELS = {
   locked: ['Gesperrt', 'App mit Meridian-Passwort öffnen, dann Bots manuell aktualisieren.'],
@@ -11,6 +12,16 @@ const LABELS = {
 };
 const TYPES = {futures_grid:'Futures Grid', future_hedge_grid:'Futures Hedge Grid'};
 const MISSING = 'Nicht verfügbar';
+function coverageText(coverage={}){
+  const count=value=>Number.isSafeInteger(value)&&value>=0?String(value):'unbekannt';
+  const contract='Futures Moon Provider-Typkennung und Detailvertrag sind nicht verifiziert.';
+  if(coverage.status==='PARTIAL')
+    return 'Teilabdeckung: '+count(coverage.representedRows)+' von '+count(coverage.listRows)+
+      ' beobachteten Listeneinträgen dargestellt; '+count(coverage.unsupportedRows)+
+      ' nicht unterstützte und '+count(coverage.unhydratedRows)+' nicht dargestellte Einträge. '+
+      contract+' Keine Botdatensätze abgeleitet.';
+  return 'Abdeckung nicht verifiziert. '+contract+' Keine Botdatensätze abgeleitet.';
+}
 const number = value => typeof value === 'number' && Number.isFinite(value) && value !== 0 ? value : null;
 const formatNumber = value => new Intl.NumberFormat('de-DE', {maximumSignificantDigits:10}).format(value);
 const formatExact = (value, unit = '') => {
@@ -70,11 +81,13 @@ function projection(state, filters = {}) {
         pnlValue:row.pnl,leverageValue:row.leverage,
         lower:formatExact(bot.metrics?.lower),upper:formatExact(bot.metrics?.upper),
         liquidation:formatExact(bot.metrics?.liquidationPrice),
+        liquidationLowerBound:formatExact(bot.metrics?.liquidationLowerBound),
+        liquidationUpperBound:formatExact(bot.metrics?.liquidationUpperBound),
         takeProfit:formatExact(bot.metrics?.takeProfit),stopLoss:formatExact(bot.metrics?.stopLoss)};
     });
     const losses=overview.losses.map(loss=>({ref:loss.ref,symbol:loss.symbol,direction:loss.direction,
       pnl:formatMoney(loss.pnl,'USD',true),pnlDetail:formatExact(loss.pnl,' USD'),pnlTone:loss.pnl<0?'negative':'positive'}));
-    return {status,count:overview.count,distribution:overview.distribution,bots,losses,
+    return {status,count:overview.count,distribution:overview.distribution,coverage:model.coverage,bots,losses,
       snapshotAt:overview.snapshotAt,source:overview.source};
   } catch { return {status:'unavailable',bots:[]}; }
 }
@@ -130,7 +143,7 @@ export function renderBotReadState(root, state, filters = {}) {
   if (data.status === 'fresh') {
     const resultCount=element(document,'p',data.bots.length+' von '+data.count+' Bots im Snapshot');
     resultCount.setAttribute('role','status');resultCount.setAttribute('aria-live','polite');
-    details.append(resultCount);
+    details.append(resultCount,element(document,'p',coverageText(data.coverage)));
     if (!data.count) details.append(element(document,'p','Keine Bots in diesem Snapshot enthalten.'));
     else if (!data.bots.length) details.append(element(document,'p','Keine Bots entsprechen den Filtern.'));
     else {
@@ -172,11 +185,15 @@ export function renderBotReadState(root, state, filters = {}) {
         body.append(element(document,'p','Technische Referenz: '+bot.ref));
         body.append(element(document,'p','Richtung: '+bot.side+' · Typ: '+bot.type+' · Kategorie: '+bot.category));
         const metrics=element(document,'dl');metrics.className='bot-card-metrics';
+        const liquidationMetrics=bot.side==='Neutral'
+          ?[['Liquidationsschätzung · Untergrenze',bot.liquidationLowerBound],
+            ['Liquidationsschätzung · Obergrenze',bot.liquidationUpperBound]]
+          :[['Liquidationspreis laut Quelle',bot.liquidation]];
         for (const [label,value] of [
           ['Hebel · Originalwert',bot.leverageDetail],['Kapital · Originalwert',bot.investmentDetail],
           ['P/L laut Quelle · Originalwert',bot.pnlDetail],
           ['Grid-Untergrenze',bot.lower],['Grid-Obergrenze',bot.upper],['Grid-Gewinn',MISSING],
-          ['Liquidationspreis laut Quelle',bot.liquidation],['Risikopuffer',MISSING],
+          ...liquidationMetrics,['Risikopuffer',MISSING],
           ['Take-Profit',bot.takeProfit],['Stop-Loss',bot.stopLoss]]) {
           const group=element(document,'div');group.append(element(document,'dt',label),element(document,'dd',value));metrics.append(group);
         }
@@ -216,6 +233,7 @@ export function renderCommandBotOverview(root, data, onJump) {
   metadataSummary.setAttribute('aria-label','Quelle und exakter Snapshot-Zeitpunkt');
   metadata.append(metadataSummary);
   const metadataBody=element(document,'div');
+  metadataBody.append(element(document,'p',coverageText(data.coverage)));
   metadataBody.append(element(document,'p','Quelle: '+source+' · Richtung: Long '+distributionCount('long')+
     ' · Short '+distributionCount('short')+' · Neutral '+distributionCount('neutral')+
     ' · Unbekannt '+distributionCount('unknown')));
@@ -259,6 +277,36 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
   const document=root.ownerDocument, section=element(document,'section');
   section.className='bot-read-view';section.setAttribute('aria-label','Pionex Bots · nur lesend');
   const filterPanel=element(document,'div'),content=element(document,'div'),controls=element(document,'div');
+  const portfolio=element(document,'div');portfolio.className='depot-read-view bot-portfolio-total';
+  function renderPortfolio(state={}){
+    const status=state?.status||'unavailable',model=state?.model;
+    portfolio.setAttribute('data-state',status);
+    portfolio.replaceChildren(element(document,'h4','Bestätigtes Depot-Gesamtportfolio'));
+    const valid=status==='fresh'&&model?.currency==='USD'&&typeof model.totalUsd==='number'&&
+      Number.isFinite(model.totalUsd)&&model.totalUsd>=0;
+    const value=element(document,'p',valid
+      ?new Intl.NumberFormat('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}).format(model.totalUsd)+' '+model.currency
+      :'—');
+    value.className='depot-total';
+    value.setAttribute('aria-label',valid?'Bestätigtes Depot-Gesamtportfolio: '+value.textContent:'Depot-Gesamtportfolio nicht verfügbar');
+    portfolio.append(value);
+    if(valid){
+      const source=model.source==='SERVER_PORTFOLIO_CURRENT'?'Serverseitige Depotbewertung':'Gespeicherte Depotbewertung';
+      const asOf=element(document,'time',model.snapshotAt);asOf.setAttribute('datetime',model.snapshotAt);
+      const sourceAt=element(document,'time',model.sourceAt);sourceAt.setAttribute('datetime',model.sourceAt);
+      const expires=Number.isSafeInteger(model.expiresAt)?new Date(model.expiresAt).toISOString():'unbekannt';
+      const expiry=element(document,'time',expires);if(expires!=='unbekannt')expiry.setAttribute('datetime',expires);
+      portfolio.append(element(document,'p','Aktuell · '+source+' · Stand (UTC): '),asOf,
+        element(document,'p','Quellzeit (UTC): '),sourceAt,
+        element(document,'p','Gültig bis (UTC): '),expiry,
+        element(document,'p','Gesamtwert laut Depot. Bot-Kapital und P/L bleiben getrennt und werden nicht addiert.'));
+    }else{
+      const labels={locked:'Gesperrt · Depotdaten ausgeblendet.',not_loaded:'Noch nicht geladen · Depot manuell aktualisieren.',
+        loading:'Wird geladen · kein bestätigter Gesamtwert verfügbar.',stale:'Daten veraltet · Gesamtwert ausgeblendet.',
+        unavailable:'Nicht verfügbar · kein bestätigter Gesamtwert.'};
+      portfolio.append(element(document,'p',labels[status]||labels.unavailable));
+    }
+  }
   filterPanel.className='bot-overview-filters';
   const filterState={query:'',direction:'all',category:'all',sort:'symbol'};
   const search=element(document,'input');search.type='search';search.id='bot-symbol-search';
@@ -289,9 +337,9 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
   const refresh=element(document,'button','Bots aktualisieren'),lock=element(document,'button','Botansicht sperren');
   refresh.id='bot-read-refresh';lock.id='bot-read-lock';
   refresh.setAttribute('type','button');lock.setAttribute('type','button');
-  controls.append(refresh,lock);section.append(element(document,'h3','Meine Pionex Bots'),filterPanel,controls,content);
+  controls.append(refresh,lock);section.append(element(document,'h3','Meine Pionex Bots'),portfolio,filterPanel,controls,content);
   root.replaceChildren(section);
-  let disposed=false,client,action=0,latestState={status:'locked'},previousSelection=null;
+  let disposed=false,client,action=0,latestState={status:'locked'},previousSelection=null,unsubscribeDepot=()=>{};
   const clearPreviousSelection=()=>{previousSelection=null;returnSelection.hidden=true;};
   const applyFilters=selection=>{
     Object.assign(filterState,selection);
@@ -370,10 +418,13 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
   try {
     client=createClient({getToken,onChange:update});
     if (!client || ['refresh','lock','revalidate','dispose'].some(key=>typeof client[key]!=='function')) throw new Error();
+    unsubscribeDepot=subscribeDepotPortfolio(renderPortfolio);
   } catch {
+    unsubscribeDepot();
     try {client?.dispose?.();} catch {}
     update({status:'unavailable'});
     disposed=true;
+    unsubscribeDepot();
     refresh.disabled=true;lock.disabled=true;
     throw new Error('Botansicht nicht verfügbar');
   }

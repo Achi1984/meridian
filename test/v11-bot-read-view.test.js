@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {renderBotReadState,createBotReadView,renderCommandBotOverview} from '../v11/bot-read-view.js';
 import {buildBotReadModel} from '../v11/bot-read-model.js';
 import {createBotReadClient} from '../v11/bot-read-client.js';
+import {publishDepotPortfolioState} from '../v11/depot-portfolio-state.js?v=B16-M11';
 
 // Deliberately minimal DOM contract fixture, not browser/layout acceptance.
 class Node {
@@ -49,6 +50,19 @@ test('fresh rows use bounded labels, UTC time, correct side and no arbitrary dat
   assert.equal(all(target,'li').length,1);assert.equal(all(target,'time')[0].getAttribute('datetime'),'2026-10-12T20:00:00Z');
   const live=all(target,'div').find(x=>x.getAttribute('role')==='status');
   assert.equal(live.getAttribute('aria-live'),'polite');assert.equal(live.getAttribute('aria-atomic'),'true');
+});
+test('neutral rows display independent liquidation bounds and explicit partial coverage',()=>{
+  const state=fresh(),bot=state.model.bots[0];
+  bot.side='NEUTRAL';bot.metrics.liquidationLowerBound=50000;bot.metrics.liquidationUpperBound=60000;
+  state.model.coverage={status:'PARTIAL',providerContractStatus:'UNVERIFIED',listRows:2,
+    recognizedRows:1,representedRows:1,unsupportedRows:1,unhydratedRows:0};
+  const target=root();renderBotReadState(target,state);
+  assert.match(target.textContent,/Liquidationsschätzung · Untergrenze/);
+  assert.match(target.textContent,/Liquidationsschätzung · Obergrenze/);
+  assert.match(target.textContent,/Untergrenze50000/);assert.match(target.textContent,/Obergrenze60000/);
+  assert.doesNotMatch(target.textContent,/Liquidationspreis laut Quelle/);
+  assert.match(target.textContent,/Teilabdeckung/);
+  assert.match(target.textContent,/Futures Moon Provider-Typkennung und Detailvertrag sind nicht verifiziert/);
 });
 test('live status is attached empty and retains identity across all state transitions',()=>{
   const target=root(),replace=target.replaceChildren.bind(target);let mounts=0;
@@ -142,6 +156,25 @@ test('mount is inactive, preserves controls and blocks repeated loading clicks',
   assert.equal(refresh.getAttribute('aria-disabled'),'true');assert.equal(all(h.target,'button').find(node=>node.text==='Bots aktualisieren'),refresh);
   h.publish(fresh());assert.equal(refresh.getAttribute('aria-disabled'),'false');
   assert.equal(all(h.target,'button').find(node=>node.text==='Botansicht sperren'),lock);lock.click();assert.equal(h.calls.lock,1);assert.doesNotMatch(h.target.textContent,/BTC/);
+});
+test('Bots reuse only the canonical Depot total and clear it on stale or locked state',()=>{
+  const model={status:'FRESH_SNAPSHOT',readOnly:true,executionAllowed:false,totalUsd:1234.56,currency:'USD',
+    snapshotAt:'2026-10-12T19:59:00.000Z',sourceAt:'2026-10-12T19:58:00.000Z',
+    source:'SERVER_PORTFOLIO_CURRENT',expiresAt:Date.parse('2026-10-12T20:14:00.000Z')};
+  publishDepotPortfolioState({status:'fresh',model});
+  const h=mounted();
+  assert.match(h.target.textContent,/1\.234,56 USD/);
+  assert.match(h.target.textContent,/Gesamtwert laut Depot/);
+  assert.doesNotMatch(h.target.textContent,/1\.434,56 USD/);
+  publishDepotPortfolioState({status:'stale'});
+  assert.doesNotMatch(h.target.textContent,/1\.234,56 USD/);
+  assert.match(h.target.textContent,/Daten veraltet/);
+  publishDepotPortfolioState({status:'fresh',model:{...model,totalUsd:0}});
+  assert.match(h.target.textContent,/0,00 USD/);
+  publishDepotPortfolioState({status:'locked'});
+  assert.doesNotMatch(h.target.textContent,/0,00 USD/);
+  assert.match(h.target.textContent,/Depotdaten ausgeblendet/);
+  h.view.dispose();
 });
 test('generated Bots controls precede snapshot content and the card list',()=>{
   const h=mounted();h.publish(fresh());

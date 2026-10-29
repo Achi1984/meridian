@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import {
   canonicalQuery,signPionexGet,inspectPionexBotOrder,normalizePionexBotOrder,
   buildPionexRiskSnapshot,mergePionexSyncState,fetchFuturesGridOrderDetail,
-  fetchRunningBotOrders,summarizePionexBotList
+  fetchRunningBotOrders,summarizePionexBotList,buildPionexBotCoverage
 } from '../pionex-bot-auto-sync.js';
 
 test('Pionex GET signing is canonical and deterministic',()=>{
@@ -231,6 +231,36 @@ test('inverse Coin-M liquidation estimates are selected after reciprocal normali
   });
   assert.equal(short.side,'SHORT');
   assert.ok(Math.abs(short.liquidationPrice-1.5636)<1e-9);
+});
+
+test('neutral liquidation estimates preserve both independent bounds through inverse normalization',()=>{
+  const normalize=overrides=>normalizePionexBotOrder({
+    buOrderType:'futures_grid',buOrderId:'synthetic-neutral',base:'USD',quote:'BTC',
+    cateType:'inverse',status:'running',
+    buOrderData:{status:'running',trend:'no_trend',cateType:'inverse',
+      estimateLiquidationPriceUp:'0.00002',estimateLiquidationPriceDown:'0.00001',...overrides}
+  });
+  const both=normalize({});
+  assert.equal(both.side,'NEUTRAL');assert.equal(both.liquidationPrice,null);
+  assert.ok(Math.abs(both.liquidationLowerBound-50000)<1e-8);assert.ok(Math.abs(both.liquidationUpperBound-100000)<1e-8);
+  const missingUp=normalize({estimateLiquidationPriceUp:null});
+  assert.equal(missingUp.liquidationLowerBound,null);assert.ok(Math.abs(missingUp.liquidationUpperBound-100000)<1e-8);
+  const missingDown=normalize({estimateLiquidationPriceDown:null});
+  assert.ok(Math.abs(missingDown.liquidationLowerBound-50000)<1e-8);assert.equal(missingDown.liquidationUpperBound,null);
+  const invalid=normalize({estimateLiquidationPriceUp:'not-a-price',estimateLiquidationPriceDown:0});
+  assert.equal(invalid.liquidationLowerBound,null);assert.equal(invalid.liquidationUpperBound,null);
+});
+
+test('coverage reports observed unsupported rows without inventing their provider identity',()=>{
+  const coverage=buildPionexBotCoverage([
+    {buOrderType:'futures_grid'},{buOrderType:'future_hedge_grid'},
+    {buOrderType:'synthetic_unverified_enum'}
+  ],{detailRows:2});
+  assert.deepEqual(coverage,{status:'PARTIAL',providerContractStatus:'UNVERIFIED',
+    listRows:3,recognizedRows:2,representedRows:2,unsupportedRows:1,unhydratedRows:0});
+  assert.doesNotMatch(JSON.stringify(coverage),/synthetic_unverified_enum/);
+  assert.equal(buildPionexBotCoverage([{buOrderType:'futures_grid'}],{detailRows:1}).status,'UNVERIFIED',
+    'full handling of observed rows does not verify the provider product contract');
 });
 
 test('current BTC reciprocal sample renders asset-quoted BE and TP instead of raw inverse values',()=>{

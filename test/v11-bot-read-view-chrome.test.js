@@ -14,14 +14,17 @@ function fixture() {
   const sources=['bot-read-model.js','bot-overview-model.js','bot-read-client.js','bot-read-view.js'].map(name=>{
     let source=readFileSync(new URL('../v11/'+name,import.meta.url),'utf8');
     if(name==='bot-read-client.js') {
-      const expected="import {buildBotReadModel} from './bot-read-model.js?v=B15-M11';";
+      const expected="import {buildBotReadModel} from './bot-read-model.js?v=B16-M11';";
       assert.equal(source.split(expected).length,2,'known client import boundary');
       source=source.replace(expected,'');
     }
     if(name==='bot-read-view.js') {
-      const expected="import {buildBotOverviewModel} from './bot-overview-model.js?v=B15-M11';";
+      const expected="import {buildBotOverviewModel} from './bot-overview-model.js?v=B16-M11';";
       assert.equal(source.split(expected).length,2,'known overview model import boundary');
       source=source.replace(expected,'');
+      const depotExpected="import {subscribeDepotPortfolio} from './depot-portfolio-state.js?v=B16-M11';";
+      assert.equal(source.split(depotExpected).length,2,'known shared Depot state boundary');
+      source=source.replace(depotExpected,'');
     }
     source=source.replace(/^export function /gm,'function ');
     if(name==='bot-overview-model.js')
@@ -37,6 +40,7 @@ function fixture() {
 <style>body{font:16px system-ui;margin:16px;background:#101923;color:#edf4ff}main{max-width:600px;margin:auto}button{font:inherit;min-height:44px;min-width:44px;margin:4px;padding:8px}button:focus-visible{outline:3px solid #80caff}p,strong,time{overflow-wrap:anywhere}ul{padding-left:24px}li{margin:12px 0}h1{font-size:20px}</style>
 <main><h1>Synthetische Bot-Komponente</h1><div id="root"></div></main><script>
 (()=>{${sources.join('\n')}
+const subscribeDepotPortfolio=listener=>{listener({status:'not_loaded'});return()=>{};};
 let clock=Date.parse('2026-10-12T20:01:00Z'),credential='synthetic-token',mode='fresh',pending=null,requests=0,unexpected=0,completion;
 window.fetch=()=>{unexpected++;throw Error('External fetch forbidden');};
 const snapshot=()=>({schemaVersion:'MERIDIAN-ASSET-WATCH-BRIDGE-V1',source:'PIONEX_WALLET_BOT_DETAIL',sourceSnapshotAt:'2026-10-12T20:00:00Z',freshnessLimitMs:900000,readOnly:true,executionImpact:false,detailsComplete:true,sourceStatusOk:true,fresh:true,usableForOverwrite:true,botCount:1,bots:[{botRef:'a'.repeat(20),symbol:'BTC',side:'SHORT',cateType:'inverse',botType:'futures_grid',sideSource:'economic_inverse_asset'}]});

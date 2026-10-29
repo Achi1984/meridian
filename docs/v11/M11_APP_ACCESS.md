@@ -6,4 +6,4 @@ The shared access controller clears both readers when access is explicitly locke
 
 The password and snapshots are not written to browser storage. Reader requests remain manual, bounded, and read-only. The app gate is a user-interface control, not a privacy boundary for publicly hosted source; protected server endpoints continue to enforce `MERIDIAN_READ_TOKEN_SHA256`.
 
-The local M11 entrypoints and their shared 22-module graph use the cache-only `?v=B15-M11` identity so browsers cannot reuse the prior B14 module graph. The B15 preview remains a draft; the cache identity is not a publication or activation claim.
+The local M11 entrypoints and their shared module graph use the cache-only `?v=B16-M11` identity so browsers cannot reuse the prior B15 module graph. The B16 preview remains a draft; the cache identity is not a publication or activation claim.

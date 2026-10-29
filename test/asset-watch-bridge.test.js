@@ -13,6 +13,8 @@ function bot(overrides={}){
     lower:0.05,
     upper:0.15,
     liquidationPrice:0.06089,
+    liquidationLowerBound:null,
+    liquidationUpperBound:null,
     takeProfit:0.15,
     stopLoss:null,
     grids:287,
@@ -51,6 +53,8 @@ test('asset-watch bridge exports only a fresh complete read-only Pionex bot snap
   assert.equal(x.bots[0].limits.lower,0.05);
   assert.equal(x.bots[0].limits.upper,0.15);
   assert.equal(x.bots[0].limits.liquidationPrice,0.06089);
+  assert.equal(x.bots[0].limits.liquidationLowerBound,null);
+  assert.equal(x.bots[0].limits.liquidationUpperBound,null);
   assert.equal(x.bots[0].limits.takeProfit,0.15);
   assert.equal(x.bots[0].grid.grids,287);
   assert.equal(x.bots[0].position.positionOpenPrice,0.11576);
@@ -153,4 +157,22 @@ test('whitespace-padded supported provenance follows existing upstream type vali
   const input=state();input.pionexRisk.bots=[bot({botType:' arbitrary-secret ',cateType:1,sideSource:{value:'trend'}})];
   const x=buildAssetWatchApiSnapshot(input,{now:NOW});
   for(const key of ['botType','cateType','sideSource'])assert.equal(x.bots[0][key],null);
+});
+
+test('partial provider coverage and duplicate identities preserve valid rows without claiming completeness',()=>{
+  const first=bot({botOrderId:'synthetic-id-1',symbol:'BTC',side:'NEUTRAL',
+    liquidationLowerBound:50000,liquidationUpperBound:60000});
+  const input=state({pionexRisk:{snapshotAt:'2026-09-28T20:40:00.000Z',detailsComplete:true,
+    apiRows:3,supportedRows:2,botCount:2,
+    coverage:{status:'PARTIAL',providerContractStatus:'UNVERIFIED',listRows:3,
+      recognizedRows:2,representedRows:2,unsupportedRows:1,unhydratedRows:0},
+    bots:[first,structuredClone(first)]}});
+  const x=buildAssetWatchApiSnapshot(input,{now:NOW});
+  assert.equal(x.botCount,1);assert.equal(x.bots.length,1);
+  assert.equal(x.bots[0].limits.liquidationLowerBound,50000);
+  assert.equal(x.bots[0].limits.liquidationUpperBound,60000);
+  assert.equal(x.coverage.status,'PARTIAL');assert.equal(x.coverage.unsupportedRows,1);
+  assert.equal(x.coverage.representedRows,1);assert.equal(x.coverage.unhydratedRows,1);
+  assert.equal(x.usableForDisplay,true);assert.equal(x.usableForOverwrite,false);
+  assert.doesNotMatch(JSON.stringify(x),/synthetic-id-1|raw-secret-bot-id/);
 });

@@ -14,7 +14,7 @@ const expectedModules=[
   'app-access-bootstrap.js','app-access.js',
   'arena-historical-export.js','arena-historical-result.js','arena-inspection-report.js','arena-result-view.js',
   'bot-overview-model.js','bot-read-bootstrap.js','bot-read-client.js','bot-read-model.js','bot-read-view.js',
-  'depot-current-model.js','depot-history-model.js','depot-history-view.js','depot-read-bootstrap.js',
+  'depot-current-model.js','depot-history-model.js','depot-history-view.js','depot-portfolio-state.js','depot-read-bootstrap.js',
   'depot-read-client.js','depot-read-model.js','depot-read-view.js','research-evidence.js',
   'strategy-arena.js','strategy-catalog.js','strategy-workspace-bootstrap.js'
 ];
@@ -38,7 +38,7 @@ function scanGraph(entries,{root=v11Root,read=readModule,fileExists=exists}={}){
         external.add(specifier);
         continue;
       }
-      assert.equal(target.search,'?v=B15-M11',`internal v11 import must use B15-M11: ${url.pathname} -> ${specifier}`);
+      assert.equal(target.search,'?v=B16-M11',`internal v11 import must use B16-M11: ${url.pathname} -> ${specifier}`);
       assert.ok(fileExists(target),`internal v11 module exists: ${specifier}`);
       const name=target.pathname.slice(root.pathname.length);
       modules.add(name);
@@ -49,14 +49,14 @@ function scanGraph(entries,{root=v11Root,read=readModule,fileExists=exists}={}){
     }
   }
   for(const entry of entries){
-    assert.equal(entry.search,'?v=B15-M11','served M11 entrypoint must use B15-M11');
+    assert.equal(entry.search,'?v=B16-M11','served M11 entrypoint must use B16-M11');
     assert.ok(fileExists(entry),`served M11 entrypoint exists: ${entry.pathname}`);
     visit(entry);
   }
   return {modules,external,identities,references};
 }
 
-test('served M11 module graph has one existing B15 identity for every local edge',()=>{
+test('served M11 module graph has one existing B16 identity for every local edge',()=>{
   const html=readFileSync(indexUrl,'utf8');
   const entries=[...html.matchAll(/<script\s+type="module"\s+src="([^"]+)"/g)]
     .map(match=>new URL(match[1],indexUrl));
@@ -71,25 +71,25 @@ test('served M11 module graph has one existing B15 identity for every local edge
   assert.ok(graph.references.get('bot-read-client.js')>=2,'shared bot client is reached by both read surfaces');
   for(const [module,identities] of graph.identities){
     assert.equal(identities.size,1,`${module} must resolve to one shared URL identity`);
-    assert.match([...identities][0],/\?v=B15-M11$/);
+    assert.match([...identities][0],/\?v=B16-M11$/);
   }
 });
 
-test('nested stale B14 edges fail the same graph assertion',()=>{
+test('nested stale B15 edges fail the same graph assertion',()=>{
   const fixtureRoot=new URL('file:///fixture/v11/');
   const fixture=new Map([
-    ['/fixture/v11/entry.js',"import './nested.js?v=B15-M11';"],
-    ['/fixture/v11/nested.js',"import './leaf.js?v=B14-M11';"],
+    ['/fixture/v11/entry.js',"import './nested.js?v=B16-M11';"],
+    ['/fixture/v11/nested.js',"import './leaf.js?v=B15-M11';"],
     ['/fixture/v11/leaf.js','export const ready=true;']
   ]);
-  assert.throws(()=>scanGraph([new URL('entry.js?v=B15-M11',fixtureRoot)],{
+  assert.throws(()=>scanGraph([new URL('entry.js?v=B16-M11',fixtureRoot)],{
     root:fixtureRoot,
     read:url=>fixture.get(url.pathname),
     fileExists:url=>fixture.has(url.pathname)
-  }),/internal v11 import must use B15-M11/);
+  }),/internal v11 import must use B16-M11/);
 });
 
-test('B15 draft preview remains isolated from terminal, root and PWA release identities',()=>{
+test('B16 cache preview remains isolated from terminal, root and PWA release identities',()=>{
   const release=JSON.parse(readFileSync(new URL('../version.json',import.meta.url),'utf8'));
   const rootHtml=readFileSync(new URL('../index.html',import.meta.url),'utf8');
   const terminalHtml=readFileSync(new URL('../v10/index.html',import.meta.url),'utf8');
