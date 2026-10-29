@@ -23,9 +23,11 @@
     "pages": "<PAGES-CHECK-IDENTITY-REQUIRED>"
   },
   "evidenceSnapshot": {
-    "mainSha": "a40b714ea4a60b2b367d8db834ad65b7782f5a46",
-    "observedAtUtc": "2026-10-29T05:34:23Z",
-    "mainPostchecks": {
+    "mainSha": "830c9346aae22023c739a89bdc46943a2d5d088d",
+    "observedAtUtc": "2026-10-29T07:51:47Z",
+    "currentMainPostchecks": "NOT_QUERIED_AFTER_BASE_ADVANCE",
+    "previousMainPostchecks": {
+      "mainSha": "a40b714ea4a60b2b367d8db834ad65b7782f5a46",
       "release-safety": {
         "runId": 40823600133,
         "runAttempt": 1,
@@ -60,7 +62,7 @@
     "independentClaudeAcceptance": "PENDING"
   },
   "handoffDesign": {
-    "status": "PROPOSAL_ONLY",
+    "status": "IMPLEMENTED_SOURCE_ONLY_DISABLED",
     "rankedPilot": "CI_SUCCESS_TO_INDEPENDENT_REVIEW_AND_ONE_RECEIPT",
     "authorDelivery": "INTERACTIVE_EXISTING_PATH; NATIVE_DISPATCH_NOT_REQUIRED",
     "progression": [
@@ -70,17 +72,28 @@
       "CORRECTION_OR_LEAD_MERGE",
       "FOUR_EXACT_MERGE_POSTCHECKS"
     ],
-    "eventAuthentication": "REAUTHORITATIVE_GITHUB_API_READ_REQUIRED",
-    "stateStore": "DURABLE_CAS_LEASE_AND_FENCING_NOT_SELECTED_OR_PROVEN",
+    "eventAuthentication": "INJECTED_AUTHENTICATED_READ_ADAPTER_REQUIRED; NO_GITHUB_ADAPTER_INCLUDED",
+    "stateStore": "BACKEND_INTERFACE_ONLY; EXPECTED_OID_CAS_AND_HOSTED_FENCING_UNPROVEN",
     "nativeAssignment": "USER_TO_SERVER_TOKEN_REQUIRED_NOT_PROVISIONED",
-    "claudeTrigger": "OWNER_COMMENT_ONLY_CURRENTLY",
-    "proposedFiles": [
-      ".github/workflows/m11-ci-review-coordinator.yml",
+    "claudeTrigger": "NO_REVIEWER_ADAPTER_WIRED; OWNER_COMMENT_ONLY_CURRENT_RESOURCE",
+    "implementedSourceFiles": [
       "scripts/autonomy/m11-coordinator-collector.mjs",
       "scripts/autonomy/m11-coordinator-state-store.mjs",
-      "test/m11-coordinator-collector.test.js",
-      "test/m11-coordinator-state-store.test.js",
-      "test/m11-coordinator-review.test.js"
+      "scripts/autonomy/m11-coordinator-review.mjs",
+      "test/m11-coordinator-pilot.test.js",
+      "docs/autonomy/m11-event-coordinator/m11-ci-review-workflow.yml.disabled"
+    ],
+    "notImplementedAdapters": [
+      "AUTHENTICATED_GITHUB_READ_CLIENT",
+      "HOSTED_ATOMIC_EXPECTED_OID_CAS_AND_CREATE_ONLY_CLAIMS",
+      "CLAUDE_REVIEWER_INVOCATION",
+      "GITHUB_RECEIPT_WRITE_AND_AUTHORITATIVE_LOOKUP"
+    ],
+    "remainingActivationWork": [
+      "Implement and independently verify an authenticated GitHub read adapter behind scripts/autonomy/m11-coordinator-collector.mjs",
+      "Implement and independently verify a hosted atomic expected-OID CAS/fence and durable packet-quota backend",
+      "Implement separately isolated Claude reviewer and GitHub receipt-write/readback adapters",
+      "Approve exact permissions, allowlists, start/end, and move the inert template into .github/workflows only after independent review"
     ],
     "proposedPermissionNames": [
       "actions: read",
@@ -96,10 +109,13 @@
       "EXACT_PAIR_CI_SUCCESS_REQUIRED",
       "DUPLICATE_DELIVERY_INVOKES_REVIEW_ONCE",
       "CAS_COMPETITION_HAS_ONE_WINNER",
+      "DURABLE_THREE_PACKET_QUOTA",
       "RESTART_RECONSTRUCTS_STATE_AND_FENCE",
       "CRASH_AND_UNKNOWN_RESULT_REQUIRE_RECONCILIATION",
       "PARTIAL_OR_TRUNCATED_REVIEW_NEVER_GREEN",
       "ONE_CONSOLIDATED_RECEIPT",
+      "DEFAULT_DISABLED_AND_NO_LIVE_IO_IN_TESTS",
+      "HOSTED_CAS_AND_REMOTE_EXACTLY_ONCE_REMAIN_UNPROVEN",
       "NO_MERGE_DEPLOY_OR_APPROVAL_BYPASS_CAPABILITY"
     ],
     "actionRequiredApproval": "OWNER_ONLY",

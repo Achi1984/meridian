@@ -8,9 +8,9 @@ credential, or continuous runtime. It does not create another UI/cache writer.
 ## Current evidence and capability matrix
 
 Reconciliation snapshot: current `main` is
-`a40b714ea4a60b2b367d8db834ad65b7782f5a46` (2026-10-29). The coordinator
-branch includes that merge. Its current diff is limited to the five coordinator
-files; `scripts/research-supervisor/test_supervisor.py` matches main byte for
+`830c9346aae22023c739a89bdc46943a2d5d088d` (2026-10-29). The coordinator
+branch includes that merge. Its diff remains within the isolated coordinator
+packet; `scripts/research-supervisor/test_supervisor.py` matches main byte for
 byte. The earlier coordinator CI run `40632733971` is for the former
 `eacb230…` / `d62004e…` pair and is stale. On main merge SHA `a40b714…`,
 Release Coordinator `40823600127`, Runtime Smoke `40823600130`, and Pages
@@ -21,8 +21,11 @@ test name or assertion, so neither is inferred here. This is not a complete
 four-check postcheck set. No retry was requested. No full CI has been run on the
 current #973 head/base pair, and no independent Claude acceptance of that exact
 pair is claimed.
-Issue #989 remains open: the merged #1000 change added bounded diagnostics but
-did not establish or fix the historical timing root cause.
+Main advanced to `830c9346aae22023c739a89bdc46943a2d5d088d`; its postchecks have
+not been queried for this exact SHA. The previously recorded Release Safety
+failure on `a40b714…` remains separate historical evidence. Issue #989 remains
+open: the merged #1000 change added bounded diagnostics but did not establish
+or fix the historical timing root cause.
 
 The following are source observations and dated run receipts, not proof that a
 new workflow or credential works:
@@ -36,7 +39,7 @@ new workflow or credential works:
 | Claude reviewer trigger | `.github/workflows/claude-mailbox-review.yml` only accepts issue #942 comments by `Achi1984` containing `@claude` and `CROSS_MODEL_REQUEST`. It declares `contents: read`, `issues: write`, `pull-requests: read`, `actions: read`, and `id-token: write`; Claude is read-only, with `Edit,Write` disallowed and 35 turns. | An owner-authored mailbox request can launch a bounded independent review. A bot comment, arbitrary issue text, or coordinator event cannot pass this gate. This does not approve CI or request PR review automatically. |
 | Exact-pair hosted CI and independent review observation | Release Safety run `40821781547`, attempt 2, job `123277027311`, passed 2,877/2,877 on PR #1000 head `a013a202…` / base `34eb7df…`; independent Claude returned `GREEN_LIGHT` for that exact diagnostic-only diff in #942 receipt `6488670460`. #1000 was subsequently merged as `a40b714…`. | Evidence for that separate test-diagnostic packet only; it is not review or full CI for #973. The exact-merge Release Safety run on main `40823600133` completed with 2,876 pass / 1 fail; the failed test identity is unavailable from the returned log tail. |
 | CI permissions / approval | `.github/workflows/backend-safety.yml` declares only `contents: read` and `pull-requests: read`; no workflow-write or approval capability is declared. | `action_required` cannot be approved by this packet. The interactive connector and `GITHUB_TOKEN` are not evidence of an unattended approval path. |
-| Merge and postchecks | No coordinator merge adapter exists. Four exact-merge checks are configured in the manifest, but the coordinator has no authenticated collector or execution path for them. | Source merge remains Lead-owned; automatic merge/deploy, approval bypass, and automatic post-merge continuation are unsupported. |
+| Merge and postchecks | No coordinator merge adapter exists. Source models exact-merge postchecks; new CI collector source has no authenticated GitHub client or live postcheck path. | Source merge remains Lead-owned; automatic merge/deploy, approval bypass, and automatic post-merge continuation are unsupported. |
 
 ### Flow evidence and gaps
 
@@ -119,7 +122,48 @@ resources only; no plan upgrade. Publisher/research stay paused and runtime or
 trading authority stays false. Exact required workflow identities still need
 verification from authoritative runs before any future activation review.
 
-## Concrete handoff design — reviewable proposal only
+## Disabled coordinator source and handoff design
+
+The newly implemented modules are offline/injected-IO source only:
+
+* `scripts/autonomy/m11-coordinator-collector.mjs` accepts a minimal
+  `workflow_run` hint, then requires an injected adapter to identify itself as
+  authenticated and re-fetch the workflow run, PR, exact-pair diff, current run
+  selection, and every jobs/runs page. It binds the exact
+  repo/PR/head/base/workflow/run/attempt and both actors; forks, stale or
+  ambiguous selection, missing pages, `action_required`, incomplete jobs/diffs,
+  and expired/over-budget input fail closed. Diff bytes are explicitly passed as
+  untrusted reviewer input and never executed. The `authenticated` property is
+  an adapter contract, not GitHub provenance; no GitHub API adapter is included.
+* `scripts/autonomy/m11-coordinator-state-store.mjs` defines a backend contract
+  for immutable commits, atomic create-only claims, atomic packet quota,
+  expected-old-OID + expected-revision CAS, and durable fencing. Missing
+  capability declarations disable the store. Declarations and deterministic
+  in-memory tests do not prove a hosted backend; there is no GitHub-ref or
+  shared-SQLite implementation. Ref fast-forward behavior is not treated as
+  expected-old-OID CAS.
+* `scripts/autonomy/m11-coordinator-review.mjs` accepts only a collector result
+  branded in the same process, claims the exact CI action before review, passes
+  only bounded pair/CI/coverage input to an injected reviewer, persists a
+  structured complete/incomplete verdict, then makes one injected receipt
+  attempt. `AbortSignal` and runtime/window budgets are passed to adapters;
+  timeout/transport errors are `UNKNOWN`, never a retry. The explicit
+  `reconcileUnknownReceipt` path performs read-only state/receipt lookup and
+  never retries, even when no receipt is found.
+* `test/m11-coordinator-pilot.test.js` supplies synthetic API/store/reviewer/
+  receipt adapters only. It tests local expected-OID/fence/quota behavior and
+  restart/unknown handling; these test doubles cannot establish GitHub
+  atomicity, exactly-once comments, authentication, or reviewer availability.
+* `docs/autonomy/m11-event-coordinator/m11-ci-review-workflow.yml.disabled` is
+  an inert template outside `.github/workflows`. It separates read-only
+  collection, state-write, reviewer, and receipt jobs and gates every job on an
+  unset opt-in plus manifest, allowlist, expiry, 24-hour, and three-packet
+  checks. Its steps are placeholders, not runnable adapters.
+
+The manifest remains disabled with unset dates and owner-approval allowlist
+placeholders. No source path performs a live GitHub or model operation by
+default; there is no automatic merge, approval, native author dispatch, deploy,
+or Lead/ChatGPT wake-up.
 
 The desired progression is one bounded event-driven state machine:
 
@@ -127,16 +171,17 @@ The desired progression is one bounded event-driven state machine:
 |---|---|---|---|
 | Admit packet → author | Owner-approved repo/PR/head/base and an authenticated, current event; external WIP count below three; one writer lease. | Dispatch one fixed task with an idempotency key for repo/PR/head/base/phase. | No generic authenticated event collector or general Copilot dispatcher is installed. |
 | Author → CI | Re-read PR head/base and author delivery; select current Release Safety workflow/run/attempt from Actions API, not event payload alone. | Wait while pending; on failure/action-required produce one consolidated exception/correction receipt; do not retry an unchanged request. | Existing Release Safety runs provide CI, but no current coordinator subscribes or persists their state. The workflow token declares only `contents: read` and `pull-requests: read`. |
-| CI success → independent review | Full success on exact PR/head/base and current workflow selection. | Request a complete independent review bound to the exact CI run/attempt/workflow. | Current Claude workflow only starts from an owner-authored #942 comment. A bot cannot trigger it. A new authenticated event path is required for automatic review. |
+| CI success → independent review | Full success on exact PR/head/base, complete diff, and current workflow selection. | Request a complete independent review bound to the exact CI run/attempt/workflow and diff digest. | Offline collector/review source models this transition; no authenticated API or reviewer adapter is installed. Current Claude workflow only starts from an owner-authored #942 comment. |
 | Review → correction or Lead merge | All required coverage parts and complete verdict tied to the exact successful CI pair; truncated/turn-limited/partial responses remain incomplete. | `REVISION_REQUIRED`: one consolidated correction dispatch, then return to exact-pair CI. `GREEN_LIGHT`: Lead may perform an already-authorized routine merge; coordinator never merges. | No automatic PR review request or Lead/ChatGPT wake-up path exists. No workflow receives merge authority. |
-| Merge → four postchecks | Authoritatively observed merge SHA plus current run selection and pinned workflow identity for every applicable check. | `COMPLETE` only when all four checks succeed on that SHA; otherwise one deduplicated exception and wait/reconcile. | The reducer models this gate, but no current collector persists or advances it. The manifest IDs are placeholders. |
+| Merge → four postchecks | Authoritatively observed merge SHA plus current run selection and pinned workflow identity for every applicable check. | `COMPLETE` only when all four checks succeed on that SHA; otherwise one deduplicated exception and wait/reconcile. | Reducer source models this gate; no authenticated post-merge collector persists or advances it. The manifest IDs are placeholders. |
 
 ### Event authentication, durable state, and unknown outcomes
 
-An eventual collector must treat webhook/workflow payloads as hints, then
-re-fetch the repository, PR, head/base, workflow identity, run attempt,
-conclusion, actor and `triggering_actor`, review threads, merge SHA, and checks
-through GitHub's authenticated API. It must reject forks, wrong repositories,
+The implemented normalizer treats workflow payloads as hints, but its future
+production API adapter must fetch repository, PR, head/base, workflow identity,
+run attempt, conclusion, actor and `triggering_actor`, exact PR diff, and
+complete job pagination from authenticated GitHub APIs. A separate collector
+must later implement post-merge SHA/check reads. It must reject forks, wrong repositories,
 unlisted actors/workflows, stale head/base, incomplete pagination, and unknown
 current-run ordering. It must never parse arbitrary issue text as executable
 instructions. The offline reducer's actor strings and selection revisions are
@@ -173,7 +218,7 @@ rollback properties are integration-tested, and UNKNOWN reconciliation is
 exercised. A future ref-backed state log or shared SQLite service is a design
 candidate, not a capability claim.
 
-### Ranked implementation options and exact file-level plan
+### Ranked implementation options and exact file-level boundary
 
 The smallest useful automation does **not** dispatch an author. Keep the
 existing interactive/owner-authorized author delivery as the start of the
@@ -184,75 +229,67 @@ credentials.
 
 | Rank | Later pilot | Access and coverage | Decision |
 |---|---|---|---|
-| 1 — recommended | A bounded Release Safety `workflow_run` listener invokes the existing read-only Claude review resource only after authoritative exact-pair CI success, then persists one consolidated receipt. | Actions reads + a durable CAS write + issue receipt write + the already configured Claude OAuth secret. No native Copilot assignment, `copilot-requests: write`, approval, merge, or deploy permission. | Best reduction in routine handoff with native author dispatch decoupled. Still requires a separately reviewed workflow/permission change and validation of the state store; not authorized or implemented in this packet. |
+| 1 — recommended | A bounded Release Safety `workflow_run` listener invokes the existing read-only Claude review resource only after authoritative exact-pair CI success, then persists one consolidated receipt. | Actions reads + a durable CAS write + issue receipt write + the already configured Claude OAuth secret. No native Copilot assignment, `copilot-requests: write`, approval, merge, or deploy permission. | The disabled injected-IO implementation is now present. It still requires separately reviewed authenticated read, hosted CAS, reviewer, and receipt adapters plus workflow/permission approval; none is installed or proven. |
 | 2 — least access | Read-only `workflow_run` observer reports allowlisted CI state, with no review invocation and no persistent receipt. | `actions: read`, `pull-requests: read`, `contents: read`; no writes or secret. | Safe observation only; does not launch review or durably resume a phase, so it does not remove the owner/Lead handoff. |
 | 3 — defer | Native unattended author assignment before CI. | Existing dispatcher requires an externally verified user-to-server PAT/OAuth/GitHub App user token plus a one-shot fence. | Not a prerequisite for option 1, not proven operationally, and excluded from the minimal pilot. Keep `agentDispatch: false`. |
 
-#### Proposed files and contracts (future reviewed package; no files added here)
+#### Implemented source and future wiring boundary
 
-1. **`.github/workflows/m11-ci-review-coordinator.yml` — new, disabled until separately approved.**
-   Trigger only on `workflow_run` completed for `MERIDIAN Release Safety`;
-   every active job is gated on `vars.M11_COORDINATOR_ENABLED == 'true'` (unset
-   by default) and also rechecks manifest `enabled: true`. Check out trusted
-   `main` code, never the untrusted PR head. Job `collect` receives only
-   `actions: read`, `contents: read`, and `pull-requests: read`.
-   It passes the source run ID/attempt to the collector, not issue/PR body text.
-   The reviewer job uses the same pinned `anthropic/claude-code-action@v1`
-   review-only configuration and `CLAUDE_CODE_OAUTH_TOKEN` already present in
-   the repository workflow; it requires separate approval before an automated
-   event may use that existing credential.
-2. **`scripts/autonomy/m11-coordinator-collector.mjs` — new trusted normalizer.**
-   Input: bounded workflow event hint and an API client authorized only for
-   authenticated reads. Re-fetch the Release Safety run, workflow ID/path,
-   attempt/current-run selection, run actor and triggering actor, PR association,
-   PR state/head/base, complete check/job pagination, and fork/repository
-   identity. Reject missing/incomplete pages, stale selection, forks,
-   `action_required`, failure, pending, changed head/base, and unknown fields.
-   Output: an allowlisted immutable envelope
-   `{schemaVersion, repository, pullRequest, headSha, baseSha, runId,
-   runAttempt, workflowId, selectionRevision, actionKey, disposition}` with
-   `WAITING` unless exact-pair CI is completed-success. Do not include
-   arbitrary body text or treat model/event text as instructions.
-3. **`scripts/autonomy/m11-coordinator-state-store.mjs` — new CAS adapter.**
-   Interface: `read(key)`, `claim(expectedRevision, actionKey, leaseOwner,
-   leaseExpiry)`, `commit(expectedRevision, fencedEpoch, transition)`, and
-   `reconcile(actionKey)`. Candidate implementation: a dedicated append-only
-   coordinator state ref, with immutable event/transition commits and
-   non-force ref updates from the expected parent revision. A create-only
-   operation ref supplies the one-shot action fence. A stale/non-fast-forward
-   update loses the race; re-read state and reduce again. Never force-update,
-   delete/recreate claims, or let a comment serve as the lock. This design
-   requires a bounded, isolated-repository concurrency/crash test proving the
-   GitHub ref semantics before production use. If those semantics cannot be
-   established, stop and choose a separately reviewed shared durable CAS store;
-   do not fall back to runner-local SQLite or artifacts.
-4. **Review and receipt within that workflow.** The collector may invoke the
-   reviewer only after the durable action claim commits. Reviewer input is the
-   exact PR diff and pinned CI receipt, with the existing required coverage
+1. **`docs/autonomy/m11-event-coordinator/m11-ci-review-workflow.yml.disabled` —
+   inert template only.** It describes a completed `workflow_run` allowlist for
+   `MERIDIAN Release Safety` / workflow `347821227`; jobs require the unset
+   `M11_COORDINATOR_ENABLED` opt-in, exact repository/workflow/conclusion, a
+   `PREPARATION_ONLY`-blocking manifest gate, trusted `main` checkout, and
+   bounded 24-hour/three-packet/one-writer allowlists. It separates read-only
+   collector, candidate state-write, read-only reviewer, and receipt jobs.
+   Candidate permissions remain `actions: read`, `contents: read`,
+   `pull-requests: read`; `contents: write` only for isolated state,
+   `issues: write` only for receipt, and reviewer credentials only in the
+   reviewer job after separate approval. The template does not pass the state
+   writer token to the model job. No live action, credential, or secret is wired.
+2. **`scripts/autonomy/m11-coordinator-collector.mjs` — implemented normalizer,
+   no API adapter.** Input: four-field workflow event hint and injected
+   authenticated-read adapter. It re-fetches workflow/PR identity, the exact
+   diff, latest run selection, actors, and fully paginated jobs/runs. It rejects
+   incomplete or stale results and returns a same-process branded envelope
+   binding repo/PR/head/base, workflow/run/attempt, selection revision, diff
+   digest, and idempotency key. The source diff is bounded and marked untrusted;
+   arbitrary event/issue body text is not part of the schema.
+3. **`scripts/autonomy/m11-coordinator-state-store.mjs` — implemented contract
+   adapter, no production backend.** Interface includes read, fenced lease/
+   claim, immutable commit against an explicit expected-old OID and revision,
+   read-only reconciliation, atomic release, and a durable three-packet quota.
+   The backend must enforce CAS atomically; a create-only claim or ordinary
+   fast-forward is not equivalent. A future GitHub ref backend requires
+   isolated concurrency/crash/restart tests proving its exact semantics before
+   activation. If that cannot be established, use a separately reviewed shared
+   durable CAS service; never fall back to runner-local SQLite or artifacts.
+4. **`scripts/autonomy/m11-coordinator-review.mjs` — implemented injected
+   orchestration, no reviewer/receipt adapter.** It may invoke the reviewer only
+   after the durable create-only action claim succeeds. Reviewer input is the exact,
+   explicitly untrusted PR diff and pinned CI receipt, with the required coverage
    parts and explicit read-only boundary. Output is a bounded structured verdict
    plus covered parts, exact run/head/base, and completion/truncation/turn-limit
    flags. Only full coverage and a complete verdict may record `GREEN_LIGHT` or
-   `REVISION_REQUIRED`; partial output remains `NEEDS_MORE_EVIDENCE`. Post one
-   consolidated #942 receipt keyed by `actionKey`. If comment delivery is
-   ambiguous, re-fetch comments and reconcile the key before any retry.
-5. **Tests to add before any activation:** `test/m11-coordinator-collector.test.js`
-   for forged/stale event hints, actor/repo/workflow mismatch, fork rejection,
-   incomplete pagination and current-run changes; `test/m11-coordinator-state-store.test.js`
-   for two concurrent claimers (one winner), stale revision/fence rejection,
-   restart reconstruction, crash after claim, and UNKNOWN reconciliation without
-   blind retry; `test/m11-coordinator-review.test.js` for no invocation before
-   exact-pair success, duplicate delivery invoking once, exact coverage binding,
-   partial/truncated/turn-limited output staying incomplete, and exactly one
-   consolidated receipt including comment-write UNKNOWN recovery. Add a workflow
-   contract test proving default-disabled rollout, exact trigger/workflow
-   allowlist, least job permissions, and no merge/deploy/approval capability.
+   `REVISION_REQUIRED`; partial output remains `NEEDS_MORE_EVIDENCE`. Make at
+   most one #942 receipt call keyed by `actionKey`. If delivery is ambiguous,
+   the explicit lookup can reconcile it, but no retry is offered even when
+   lookup says not found; remote exactly-once behavior is not established.
+5. **`test/m11-coordinator-pilot.test.js` — deterministic source acceptance.**
+   Covers forged/stale hints, actors/repo/workflow mismatch, forks, incomplete
+   pagination/current-run changes, one concurrent claim winner, stale fence
+   rejection, restart reconstruction, three-packet budget, crash before/after
+   side effect, UNKNOWN reconciliation without retry, exact review coverage,
+   partial/truncated/turn-limited output, expiry/runtime limits, default-disabled
+   behavior, and the inert workflow contract. Remote delivery exactly-once is
+   deliberately not asserted.
 
 #### Dedupe, failure handling, rollout, and authority
 
-Use the reducer's `actionDedupeKey` for
-`repository/PR/head/base/phase`; bind the claim to the immutable source run ID,
-attempt, workflow ID and event digest. A duplicate unchanged event is a no-op.
-Persist the full authenticated selection revision and lease epoch. Every remote
+The collector's `actionKey` binds repo/PR/head/base, workflow/run/attempt, run
+selection, and diff digest; the separate `packetKey` binds repo/PR/head/base for
+the durable three-packet quota. A duplicate unchanged event is a no-op. Persist
+the full adapter-provided selection revision and lease epoch. Every remote
 operation follows `claim → perform once → read back authoritative result →
 commit`; timeout or lost acknowledgment becomes `UNKNOWN`, followed by
 read-only reconciliation. It never results in a blind re-dispatch. A crash
@@ -309,9 +346,10 @@ receive independent source review and owner/security approval.
 
 ```sh
 node --test test/m11-event-coordinator.test.js
+node --test test/m11-coordinator-pilot.test.js
 node scripts/autonomy/m11-event-coordinator-replay.mjs
 ```
 
-Both use generated/local data only. Hosted full CI and the required independent
+These use generated/local data only. Hosted full CI and the required independent
 Claude and Lead implementation reviews remain pending; preparation is not
 activation.
