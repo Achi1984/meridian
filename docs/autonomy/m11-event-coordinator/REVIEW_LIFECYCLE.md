@@ -10,13 +10,21 @@
 - Control operations are individually bounded (`maxRuntimeMs <= 10000`); they do not inflate runtime budgets to wait for model execution.
 - A separate explicit review deadline is persisted (`reviewDeadlineAt`) and enforced during observation.
 - Dispatch acknowledgement and persistence ambiguities fail closed to `UNKNOWN`; no automatic re-dispatch/repost is attempted.
+- Dispatch acknowledgement is durably committed (`DISPATCH_ACKED`) before observation can advance; a reconstructed `REVIEW_PENDING` claim without durable ack remains non-advancing.
 - Restart paths must reacquire a fresh branded collection and match immutable pins (`action/execution/run/head/base/diff/changed-path-digest`); serialized JSON is not treated as verified collection evidence.
 - Revalidation is mandatory at promotion boundaries; missing/errored/stale collector output fails closed.
 - Changed paths for boundary identity come from collector-validated compare inventory, not diff-header regex parsing.
 - Completion is accepted only through `evaluateReviewBoundary(...)` with injected trusted runtime verification and exact identity/coverage/terminal checks.
+- Persisted terminal review results (`REVIEW_RESULT` with `COMPLETE`/`REVISION_REQUIRED`) resume receipt preparation after restart without re-observing model output or re-applying deadline downgrades; fresh revalidation is still required before receipt.
 - Receipt posting is identity-bound and readback-verified before durable `RECEIPT_DELIVERED`.
 - If durable state is already in `RECEIPT_POSTING` or unknown receipt-delivery stages after restart, observation performs authoritative readback only and never auto-reposts.
 - Duplicate completion/observation is idempotent: no second dispatch and no second receipt.
+
+## Durability limits
+
+- Returning `UNKNOWN` from a control operation is not, by itself, proof that a durable unknown latch was committed.
+- Recovery therefore relies on explicit durable stage invariants (`DISPATCH_ACKED`, `REVIEW_RESULT`, `RECEIPT_POSTING`, `RECEIPT_DELIVERED`) plus authoritative receipt readback.
+- This packet still does not prove hosted crash safety or global linearizability; those remain backend responsibilities.
 
 ## Current scope and hosted gaps
 

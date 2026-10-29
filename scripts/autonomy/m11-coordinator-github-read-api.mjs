@@ -233,6 +233,10 @@ function validChangedPath(path) {
     && Buffer.byteLength(path, 'utf8') <= 512;
 }
 
+function nonNegativeSafeInteger(value) {
+  return Number.isSafeInteger(value) && value >= 0;
+}
+
 export function createM11CoordinatorGithubReadApi({
   fetchImpl = globalThis.fetch,
   credentials,
@@ -483,8 +487,8 @@ export function createM11CoordinatorGithubReadApi({
       );
       if (hasNext) complete = false;
       if (!Array.isArray(compare?.files)) complete = false;
-      if (!positiveInteger(finalPr.changedFiles) && finalPr.changedFiles !== 0) complete = false;
-      if (Array.isArray(compare?.files) && Number.isSafeInteger(finalPr.changedFiles)
+      if (!nonNegativeSafeInteger(finalPr.changedFiles)) complete = false;
+      if (Array.isArray(compare?.files) && nonNegativeSafeInteger(finalPr.changedFiles)
         && finalPr.changedFiles !== compare.files.length) complete = false;
       if (Array.isArray(compare?.files) && compare.files.some(file => typeof file?.patch !== 'string')) {
         complete = false;
@@ -512,7 +516,8 @@ export function createM11CoordinatorGithubReadApi({
         complete = false;
       }
       if (!Array.isArray(compare?.files) || changedPaths.length !== compare.files.length) complete = false;
-      if (Number.isSafeInteger(finalPr.changedFiles) && changedPaths.length !== finalPr.changedFiles) complete = false;
+      if (!nonNegativeSafeInteger(finalPr.changedFiles)
+        || changedPaths.length !== finalPr.changedFiles) complete = false;
       if (changedPaths.length === 0) complete = false;
 
       const text = diffResult.text;

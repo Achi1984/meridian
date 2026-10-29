@@ -322,6 +322,17 @@ export async function startReviewLifecycle({
       await recordUnknown(store, claim, 'DISPATCH_ACK_AMBIGUOUS', remainingMs(), {reviewRequestId, sessionId});
       return unknown('DISPATCH_ACK_AMBIGUOUS', true);
     }
+    const acknowledgedCommit = await callWithinBudget(store.commit.bind(store), {
+      claim,
+      transition: {
+        kind: 'DISPATCH_ACKED',
+        reviewRequestId,
+        sessionId
+      }
+    }, remainingMs());
+    if (acknowledgedCommit.timedOut || acknowledgedCommit.error || acknowledgedCommit.value?.status !== 'COMMITTED') {
+      return unknown('DISPATCH_ACK_COMMIT_UNKNOWN', true);
+    }
     return Object.freeze({
       status: 'REVIEW_PENDING',
       reviewRequestId,
@@ -379,6 +390,9 @@ export async function observeReviewLifecycle({
     if (claim.status === 'UNKNOWN' && TERMINAL_UNKNOWN_STAGES.has(claim.lastStage)) {
       return unknown('TERMINAL_UNKNOWN_REQUIRES_MANUAL_RECONCILIATION', false);
     }
+    if (claim.lastStage === 'REVIEW_PENDING') {
+      return unknown('DISPATCH_ACK_DURABILITY_MISSING', true);
+    }
     if (claim.lastStage === 'RECEIPT_DELIVERED' && claim.status === 'COMMITTED') {
       return Object.freeze({
         status: 'COMPLETE',
@@ -423,6 +437,15 @@ export async function observeReviewLifecycle({
         ...baseResult()
       });
     }
+    const persistedCompletion = claim.lastStage === 'REVIEW_RESULT'
+      && (claim.completionState === 'COMPLETE' || claim.completionState === 'REVISION_REQUIRED')
+      ? Object.freeze({
+        completionState: claim.completionState,
+        verdict: typeof claim.verdict === 'string' && claim.verdict.length > 0
+          ? claim.verdict
+          : 'NEEDS_MORE_EVIDENCE'
+      })
+      : null;
     const revalidated = await revalidateCollection({
       revalidate,
       expected: collected,
@@ -450,7 +473,12 @@ export async function observeReviewLifecycle({
       });
       return unknown('COLLECTION_PIN_MISMATCH', false);
     }
-    if (now() > claim.reviewDeadlineAt) {
+    let completionState;
+    let verdict;
+    if (persistedCompletion) {
+      completionState = persistedCompletion.completionState;
+      verdict = persistedCompletion.verdict;
+    } else if (now() > claim.reviewDeadlineAt) {
       const timeoutCommit = await callWithinBudget(store.commit.bind(store), {
         claim,
         transition: {
@@ -460,113 +488,117 @@ export async function observeReviewLifecycle({
           reason: 'REVIEW_DEADLINE_EXPIRED'
         }
       }, remainingMs());
-      if (!timeoutCommit.timedOut && !timeoutCommit.error && timeoutCommit.value?.status === 'COMMITTED') {
-        claim = timeoutCommit.value.claim;
+      if (timeoutCommit.timedOut || timeoutCommit.error || timeoutCommit.value?.status !== 'COMMITTED') {
+        return unknown('REVIEW_RESULT_COMMIT_UNKNOWN', false);
       }
+      claim = timeoutCommit.value.claim;
       return Object.freeze({
         status: 'INCOMPLETE',
         reason: 'REVIEW_DEADLINE_EXPIRED',
         completionState: 'INCOMPLETE',
         ...baseResult()
       });
-    }
-    const observeCall = await callWithinBudget(observeReview, {
-      actionKey: claim.actionKey,
-      executionKey: claim.executionKey,
-      reviewRequestId: claim.reviewRequestId,
-      sessionId: claim.sessionId
-    }, remainingMs());
-    if (observeCall.timedOut || observeCall.error) {
-      await recordUnknown(store, claim, 'OBSERVE_UNKNOWN', remainingMs(), {
+    } else {
+      const observeCall = await callWithinBudget(observeReview, {
+        actionKey: claim.actionKey,
+        executionKey: claim.executionKey,
         reviewRequestId: claim.reviewRequestId,
         sessionId: claim.sessionId
+      }, remainingMs());
+      if (observeCall.timedOut || observeCall.error) {
+        await recordUnknown(store, claim, 'OBSERVE_UNKNOWN', remainingMs(), {
+          reviewRequestId: claim.reviewRequestId,
+          sessionId: claim.sessionId
+        });
+        return unknown('OBSERVE_OUTCOME_UNKNOWN', false);
+      }
+      const observed = observeCall.value;
+      if (!observed || observed.status === 'PENDING') {
+        return Object.freeze({
+          status: 'REVIEW_PENDING',
+          reviewRequestId: claim.reviewRequestId,
+          sessionId: claim.sessionId,
+          ...baseResult()
+        });
+      }
+      if (observed.status !== 'COMPLETED') {
+        await recordUnknown(store, claim, 'OBSERVE_AMBIGUOUS', remainingMs(), {
+          reviewRequestId: claim.reviewRequestId,
+          sessionId: claim.sessionId
+        });
+        return unknown('OBSERVE_AMBIGUOUS', false);
+      }
+      if (!observed.ci || observed.ci.runId !== claim.runId
+        || observed.ci.runAttempt !== claim.runAttempt
+        || observed.ci.workflowId !== claim.workflowId
+        || observed.ci.selectionRevision !== claim.selectionRevision) {
+        await recordUnknown(store, claim, 'OBSERVED_RUN_IDENTITY_MISMATCH', remainingMs(), {
+          reviewRequestId: claim.reviewRequestId,
+          sessionId: claim.sessionId
+        });
+        return unknown('OBSERVED_RUN_IDENTITY_MISMATCH', false);
+      }
+      const observedAtMs = Number.isSafeInteger(observed.observedAtMs) ? observed.observedAtMs : now();
+      if (observedAtMs > claim.reviewDeadlineAt) {
+        const lateCommit = await callWithinBudget(store.commit.bind(store), {
+          claim,
+          transition: {
+            kind: 'REVIEW_RESULT',
+            completionState: 'INCOMPLETE',
+            verdict: 'NEEDS_MORE_EVIDENCE',
+            reason: 'LATE_COMPLETION_AFTER_DEADLINE'
+          }
+        }, remainingMs());
+        if (lateCommit.timedOut || lateCommit.error || lateCommit.value?.status !== 'COMMITTED') {
+          return unknown('REVIEW_RESULT_COMMIT_UNKNOWN', false);
+        }
+        claim = lateCommit.value.claim;
+        return Object.freeze({
+          status: 'INCOMPLETE',
+          reason: 'LATE_COMPLETION_AFTER_DEADLINE',
+          completionState: 'INCOMPLETE',
+          ...baseResult()
+        });
+      }
+
+      const boundary = evaluateReviewBoundary({
+        trustedRuntimeSeam,
+        trustedRuntimeEvidence: observed.trustedRuntimeEvidence,
+        modelOutput: observed.modelOutput,
+        expectedIdentity: expectedIdentityFromClaim(claim, fresh.changedPaths),
+        now
       });
-      return unknown('OBSERVE_OUTCOME_UNKNOWN', false);
-    }
-    const observed = observeCall.value;
-    if (!observed || observed.status === 'PENDING') {
-      return Object.freeze({
-        status: 'REVIEW_PENDING',
-        reviewRequestId: claim.reviewRequestId,
-        sessionId: claim.sessionId,
-        ...baseResult()
-      });
-    }
-    if (observed.status !== 'COMPLETED') {
-      await recordUnknown(store, claim, 'OBSERVE_AMBIGUOUS', remainingMs(), {
-        reviewRequestId: claim.reviewRequestId,
-        sessionId: claim.sessionId
-      });
-      return unknown('OBSERVE_AMBIGUOUS', false);
-    }
-    if (!observed.ci || observed.ci.runId !== claim.runId
-      || observed.ci.runAttempt !== claim.runAttempt
-      || observed.ci.workflowId !== claim.workflowId
-      || observed.ci.selectionRevision !== claim.selectionRevision) {
-      await recordUnknown(store, claim, 'OBSERVED_RUN_IDENTITY_MISMATCH', remainingMs(), {
-        reviewRequestId: claim.reviewRequestId,
-        sessionId: claim.sessionId
-      });
-      return unknown('OBSERVED_RUN_IDENTITY_MISMATCH', false);
-    }
-    const observedAtMs = Number.isSafeInteger(observed.observedAtMs) ? observed.observedAtMs : now();
-    if (observedAtMs > claim.reviewDeadlineAt) {
-      const lateCommit = await callWithinBudget(store.commit.bind(store), {
+      if (boundary.status !== 'ADMITTED') {
+        await recordUnknown(store, claim, 'BOUNDARY_REJECTED', remainingMs(), {
+          reason: boundary.reason || boundary.status
+        });
+        return unknown('BOUNDARY_REJECTED', false);
+      }
+      completionState = boundary.completionState;
+      verdict = boundary.verdict;
+      const resultCommit = await callWithinBudget(store.commit.bind(store), {
         claim,
         transition: {
           kind: 'REVIEW_RESULT',
-          completionState: 'INCOMPLETE',
-          verdict: 'NEEDS_MORE_EVIDENCE',
-          reason: 'LATE_COMPLETION_AFTER_DEADLINE'
+          completionState,
+          verdict,
+          reviewRequestId: claim.reviewRequestId,
+          sessionId: claim.sessionId,
+          evidenceId: boundary.trustedRuntime.evidenceId
         }
       }, remainingMs());
-      if (!lateCommit.timedOut && !lateCommit.error && lateCommit.value?.status === 'COMMITTED') {
-        claim = lateCommit.value.claim;
+      if (resultCommit.timedOut || resultCommit.error || resultCommit.value?.status !== 'COMMITTED') {
+        return unknown('REVIEW_RESULT_COMMIT_UNKNOWN', false);
       }
-      return Object.freeze({
-        status: 'INCOMPLETE',
-        reason: 'LATE_COMPLETION_AFTER_DEADLINE',
-        completionState: 'INCOMPLETE',
-        ...baseResult()
-      });
-    }
-
-    const boundary = evaluateReviewBoundary({
-      trustedRuntimeSeam,
-      trustedRuntimeEvidence: observed.trustedRuntimeEvidence,
-      modelOutput: observed.modelOutput,
-      expectedIdentity: expectedIdentityFromClaim(claim, fresh.changedPaths),
-      now
-    });
-    if (boundary.status !== 'ADMITTED') {
-      await recordUnknown(store, claim, 'BOUNDARY_REJECTED', remainingMs(), {
-        reason: boundary.reason || boundary.status
-      });
-      return unknown('BOUNDARY_REJECTED', false);
-    }
-    const completionState = boundary.completionState;
-    const resultCommit = await callWithinBudget(store.commit.bind(store), {
-      claim,
-      transition: {
-        kind: 'REVIEW_RESULT',
-        completionState,
-        verdict: boundary.verdict,
-        reviewRequestId: claim.reviewRequestId,
-        sessionId: claim.sessionId,
-        evidenceId: boundary.trustedRuntime.evidenceId
+      claim = resultCommit.value.claim;
+      if (completionState !== 'COMPLETE' && completionState !== 'REVISION_REQUIRED') {
+        return Object.freeze({
+          status: 'INCOMPLETE',
+          completionState,
+          verdict,
+          ...baseResult()
+        });
       }
-    }, remainingMs());
-    if (resultCommit.timedOut || resultCommit.error || resultCommit.value?.status !== 'COMMITTED') {
-      return unknown('REVIEW_RESULT_COMMIT_UNKNOWN', true);
-    }
-    claim = resultCommit.value.claim;
-    if (completionState !== 'COMPLETE' && completionState !== 'REVISION_REQUIRED') {
-      return Object.freeze({
-        status: 'INCOMPLETE',
-        completionState,
-        verdict: boundary.verdict,
-        ...baseResult()
-      });
     }
     const beforeReceipt = await revalidateCollection({revalidate, expected: fresh, remainingMs: remainingMs(), now});
     if (!beforeReceipt.ok || budgetExpired()) {
@@ -582,7 +614,7 @@ export async function observeReviewLifecycle({
       transition: {kind: 'RECEIPT_POSTING'}
     }, remainingMs());
     if (postingCommit.timedOut || postingCommit.error || postingCommit.value?.status !== 'COMMITTED') {
-      return unknown('RECEIPT_POSTING_STATE_UNKNOWN', true);
+      return unknown('RECEIPT_POSTING_STATE_UNKNOWN', false);
     }
     claim = postingCommit.value.claim;
 
@@ -597,7 +629,7 @@ export async function observeReviewLifecycle({
       baseSha: claim.baseSha,
       diffDigest: claim.diffDigest,
       completionState,
-      verdict: boundary.verdict
+      verdict
     });
     const receiptCall = await callWithinBudget(receipt.postOnce.bind(receipt), {
       actionKey: claim.executionKey,
@@ -633,7 +665,7 @@ export async function observeReviewLifecycle({
         kind: 'RECEIPT_DELIVERED',
         receiptId: receiptCall.value.receiptId,
         completionState,
-        verdict: boundary.verdict
+        verdict
       }
     }, remainingMs());
     if (finalCommit.timedOut || finalCommit.error || finalCommit.value?.status !== 'COMMITTED') {
@@ -642,7 +674,7 @@ export async function observeReviewLifecycle({
     return Object.freeze({
       status: 'COMPLETE',
       completionState,
-      verdict: boundary.verdict,
+      verdict,
       receiptId: receiptCall.value.receiptId,
       ...baseResult()
     });

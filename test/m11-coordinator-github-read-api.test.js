@@ -371,6 +371,30 @@ test('compare inventory enforces changed-path integrity for quoted/non-ascii/ren
   assert.equal(mismatch.complete, false);
   assert.deepEqual(mismatch.changedPaths, []);
 
+  for (const invalidChangedFiles of [null, '3', 1.5, -1]) {
+    const invalidCountApi = createM11CoordinatorGithubReadApi({
+      fetchImpl: makeFetch([
+        {match: url => url.pathname === '/repos/Achi1984/meridian/pulls/973', handle: ({url}) => json(pullPayload({changedFiles: invalidChangedFiles}), {url: url.toString()})},
+        {
+          match: url => url.pathname === `/repos/Achi1984/meridian/compare/${BASE}...${HEAD}`,
+          handle: ({url, options}) => options?.headers?.accept === 'application/vnd.github.v3.diff'
+            ? makeResponse({status: 200, body: 'diff --git a/a b/a\n', url: url.toString()})
+            : json(comparePayload({files}), {url: url.toString()})
+        }
+      ]).fetchImpl,
+      credentials: credentials(),
+      now: () => NOW_MS
+    });
+    const invalidCount = await invalidCountApi.getPullRequestDiff({
+      repository: REPOSITORY,
+      pullRequest: 973,
+      headSha: HEAD,
+      baseSha: BASE
+    });
+    assert.equal(invalidCount.complete, false);
+    assert.deepEqual(invalidCount.changedPaths, []);
+  }
+
   const renamedMissingPrevApi = createM11CoordinatorGithubReadApi({
     fetchImpl: makeFetch([
       {match: url => url.pathname === '/repos/Achi1984/meridian/pulls/973', handle: ({url}) => json(pullPayload({changedFiles: 1}), {url: url.toString()})},
