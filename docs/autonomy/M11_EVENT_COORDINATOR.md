@@ -80,6 +80,12 @@ Head/base movement clears dependent author/CI/review/merge/postcheck gates.
 CI must be completed `success` for the exact head/base and workflow before a
 review request may be proposed. Partial, truncated, turn-limited, or
 `NEEDS_MORE_EVIDENCE` reviews retain coverage parts but remain incomplete.
+Coverage accumulation is bound to one explicit review-session ID and exact CI
+attempt; another session cannot complete it. A `REVISION_REQUIRED` finding is
+latched for that review session and cannot be replaced by `GREEN_LIGHT`.
+Consolidated correction requests are deduplicated by CI or review cause and
+generation, not by one packet-wide flag. Late pending events after a terminal
+same-attempt result are stale no-ops; conflicting terminal outcomes fail closed.
 `REVISION_REQUIRED` yields one consolidated correction proposal; pending CI and
 `action_required` yield waiting actions. Only complete full-coverage
 `GREEN_LIGHT` reaches `WAIT_FOR_OWNER_MERGE`; source merge is observed, never

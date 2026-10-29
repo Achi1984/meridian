@@ -79,14 +79,15 @@ function ciPassed(state = delivered()) {
 
 function reviewEvent(state, fields = {}, id = `review-${++sequence}`) {
   return event(state, 'REVIEW_PART', 'REVIEW', 'claude[bot]', {
+    reviewId: 'review-session-01',
     coverageParts: [...REQUIRED_REVIEW_PARTS],
     complete: true,
     verdict: 'GREEN_LIGHT',
     truncated: false,
     turnLimit: false,
-    ciRunId: 11,
-    ciRunAttempt: 1,
-    ciWorkflowId: WORKFLOW,
+    ciRunId: state.ci?.runId ?? 11,
+    ciRunAttempt: state.ci?.runAttempt ?? 1,
+    ciWorkflowId: state.ci?.workflowId ?? WORKFLOW,
     ...fields
   }, id);
 }
@@ -191,20 +192,79 @@ test('pending CI waits; success unlocks review; failure proposes one correction;
   let failed = delivered();
   failed = apply(failed, ciEvent(failed, 'failure', 'ci-failed'));
   assert.equal(failed.nextAllowedAction, 'REQUEST_ONE_CONSOLIDATED_CORRECTION');
-  assert.equal(failed.correctionIssued, true);
+  assert.equal(failed.correctionCauses.length, 1);
   const duplicateFailure = reduceEvent(failed, ciEvent(failed, 'failure', 'ci-failed-again'));
   assert.equal(duplicateFailure.changed, false);
   const secondFailure = event(failed, 'CI', 'CI', 'github-actions[bot]', {
     status: 'failure', completed: true, runId: 12, runAttempt: 1, workflowId: WORKFLOW,
     selectionRevision: 2, currentRunId: 12, currentRunAttempt: 1
   }, 'second-failure');
-  const noSecondCorrection = apply(failed, secondFailure);
-  assert.equal(noSecondCorrection.nextAllowedAction, 'WAIT_FOR_CONSOLIDATED_CORRECTION');
+  const secondCorrection = apply(failed, secondFailure);
+  assert.equal(secondCorrection.nextAllowedAction, 'REQUEST_ONE_CONSOLIDATED_CORRECTION');
+  assert.equal(secondCorrection.correctionCauses.length, 2);
+  const duplicateSecondFailure = reduceEvent(secondCorrection, {...secondFailure, eventId: 'second-failure-duplicate'});
+  assert.equal(duplicateSecondFailure.changed, false);
+  assert.equal(duplicateSecondFailure.reason, 'UNCHANGED_RUN');
 
   let actionRequired = delivered();
   actionRequired = apply(actionRequired, ciEvent(actionRequired, 'action_required', 'ci-action-required'));
   assert.equal(actionRequired.nextAllowedAction, 'WAIT_FOR_OWNER_CI_ACTION');
   assert.notEqual(actionRequired.nextAllowedAction, 'REQUEST_ONE_CONSOLIDATED_CORRECTION');
+});
+
+test('review verdicts and coverage remain bound to one review identity', () => {
+  let state = ciPassed();
+  state = apply(state, reviewEvent(state, {
+    reviewId: 'review-session-negative',
+    coverageParts: ['scope', 'changed-files'],
+    complete: false,
+    verdict: 'REVISION_REQUIRED'
+  }, 'partial-negative-review'));
+  assert.equal(state.review.status, 'INCOMPLETE');
+  assert.equal(state.review.verdict, 'REVISION_REQUIRED');
+
+  assert.throws(() => reduceEvent(state, reviewEvent(state, {
+    reviewId: 'different-review-session',
+    coverageParts: REQUIRED_REVIEW_PARTS.filter(part => !state.review.coverageParts.includes(part)),
+    verdict: 'GREEN_LIGHT'
+  }, 'other-review-coverage')), {code: 'REVIEW_IDENTITY_MISMATCH'});
+  assert.throws(() => reduceEvent(state, reviewEvent(state, {
+    reviewId: 'review-session-negative',
+    coverageParts: REQUIRED_REVIEW_PARTS.filter(part => !state.review.coverageParts.includes(part)),
+    verdict: 'GREEN_LIGHT'
+  }, 'green-after-partial-negative')), {code: 'REVIEW_RESULT_CONFLICT'});
+
+  state = apply(state, reviewEvent(state, {
+    reviewId: 'review-session-negative',
+    coverageParts: REQUIRED_REVIEW_PARTS.filter(part => !state.review.coverageParts.includes(part)),
+    verdict: 'REVISION_REQUIRED'
+  }, 'complete-negative-review'));
+  assert.equal(state.review.status, 'COMPLETE');
+  assert.equal(state.review.verdict, 'REVISION_REQUIRED');
+  assert.equal(state.phase, 'REVIEW');
+  assert.equal(state.nextAllowedAction, 'REQUEST_ONE_CONSOLIDATED_CORRECTION');
+  assert.throws(() => reduceEvent(state, reviewEvent(state, {
+    reviewId: 'review-session-negative',
+    verdict: 'GREEN_LIGHT'
+  }, 'green-after-complete-negative')), {code: 'REVIEW_RESULT_CONFLICT'});
+
+  let failed = delivered();
+  failed = apply(failed, ciEvent(failed, 'failure', 'earlier-ci-failure'));
+  const success = apply(failed, ciEvent(failed, 'success', 'new-ci-success', {
+    runId: 12, selectionRevision: 2
+  }));
+  const revisionRequired = apply(success, reviewEvent(success, {
+    reviewId: 'new-review-session',
+    verdict: 'REVISION_REQUIRED'
+  }, 'new-generation-negative-review'));
+  assert.equal(revisionRequired.nextAllowedAction, 'REQUEST_ONE_CONSOLIDATED_CORRECTION');
+  assert.equal(revisionRequired.correctionCauses.length, 2);
+  const repeatedReview = reduceEvent(revisionRequired, reviewEvent(revisionRequired, {
+    reviewId: 'new-review-session',
+    verdict: 'REVISION_REQUIRED'
+  }, 'repeat-negative-review'));
+  assert.equal(repeatedReview.changed, false);
+  assert.equal(repeatedReview.reason, 'UNCHANGED_REVIEW_RESULT');
 });
 
 test('reviews bind exact completed CI pair and retain partial or turn-limited coverage', () => {
@@ -271,6 +331,25 @@ test('older CI success cannot replace a newer pending or failed attempt', () => 
     assert.equal(result.state.ci.status, newerStatus.toUpperCase());
     assert.notEqual(result.state.phase, 'REVIEW');
   }
+});
+
+test('late pending updates after terminal success are stale for CI and postchecks', () => {
+  let state = ciPassed();
+  const lateCiPending = reduceEvent(state, ciEvent(state, 'pending', 'late-ci-pending'));
+  assert.equal(lateCiPending.changed, false);
+  assert.equal(lateCiPending.reason, 'STALE_PENDING_AFTER_TERMINAL');
+  assert.equal(lateCiPending.state.ci.status, 'SUCCESS');
+  assert.throws(() => reduceEvent(state, ciEvent(state, 'failure', 'conflicting-ci-terminal')),
+    {code: 'RUN_RESULT_CONFLICT'});
+
+  state = apply(merged(), postcheckEvent(merged(), 'release-safety'));
+  const latePostcheckPending = reduceEvent(state, postcheckEvent(state, 'release-safety',
+    'pending', 'late-postcheck-pending'));
+  assert.equal(latePostcheckPending.changed, false);
+  assert.equal(latePostcheckPending.reason, 'STALE_PENDING_AFTER_TERMINAL');
+  assert.equal(latePostcheckPending.state.postchecks['release-safety'].status, 'SUCCESS');
+  assert.throws(() => reduceEvent(state, postcheckEvent(state, 'release-safety',
+    'failure', 'conflicting-postcheck-terminal')), {code: 'RUN_RESULT_CONFLICT'});
 });
 
 test('different CI run IDs require newer authoritative current-run selection revisions', () => {

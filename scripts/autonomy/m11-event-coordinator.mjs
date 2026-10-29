@@ -51,7 +51,8 @@ const EVENT_FIELDS = Object.freeze({
   AUTHOR_DELIVERY: ['status'],
   CI: ['status', 'completed', 'runId', 'runAttempt', 'workflowId', 'selectionRevision',
     'currentRunId', 'currentRunAttempt'],
-  REVIEW_PART: ['coverageParts', 'complete', 'verdict', 'truncated', 'turnLimit', 'ciRunId', 'ciRunAttempt', 'ciWorkflowId'],
+  REVIEW_PART: ['reviewId', 'coverageParts', 'complete', 'verdict', 'truncated', 'turnLimit',
+    'ciRunId', 'ciRunAttempt', 'ciWorkflowId'],
   HEAD_MOVED: ['newHeadSha', 'newBaseSha'],
   SOURCE_MERGED: ['mergeSha'],
   POSTCHECK: ['check', 'status', 'mergeSha', 'runId', 'runAttempt', 'workflowId',
@@ -171,8 +172,17 @@ function currentRunDisposition(previous, event) {
   if (event.selectionRevision < previous.selectionRevision) return 'STALE_RUN_SELECTION';
   need(event.selectionRevision === previous.selectionRevision, 'CURRENT_RUN_SELECTION_CONFLICT');
   if (previous.status === incomingStatus) return 'UNCHANGED_RUN';
+  if (previous.status !== 'PENDING' && incomingStatus === 'PENDING') return 'STALE_PENDING_AFTER_TERMINAL';
   if (previous.status === 'PENDING' && incomingStatus !== 'PENDING') return null;
   throw new CoordinatorError('RUN_RESULT_CONFLICT');
+}
+
+function ciCorrectionCause(ci) {
+  return `ci:${ci.workflowId}:${ci.runId}:${ci.runAttempt}:${ci.selectionRevision}`;
+}
+
+function reviewCorrectionCause(ci, reviewId) {
+  return `review:${ciCorrectionCause(ci)}:${reviewId}`;
 }
 
 export function createCoordinatorState({
@@ -188,7 +198,7 @@ export function createCoordinatorState({
   postcheckWorkflowIds = readRecord(postcheckWorkflowIds, requiredPostchecks, 'INVALID_POSTCHECK_WORKFLOW_MAP');
   for (const workflowId of Object.values(postcheckWorkflowIds)) need(positive(workflowId), 'INVALID_POSTCHECK_WORKFLOW_MAP');
   return freeze({
-    schemaVersion: 1,
+    schemaVersion: 2,
     repository,
     pullRequest,
     headSha,
@@ -203,10 +213,10 @@ export function createCoordinatorState({
     phase: 'AUTHOR',
     authorDelivery: 'PENDING',
     ci: null,
-    review: {status: 'NONE', coverageParts: [], verdict: null, truncated: false, turnLimit: false},
+    review: {status: 'NONE', reviewId: null, coverageParts: [], verdict: null, truncated: false, turnLimit: false},
     mergeSha: null,
     postchecks: Object.fromEntries(REQUIRED_POSTCHECKS.map(check => [check, null])),
-    correctionIssued: false,
+    correctionCauses: [],
     mutationLane: {status: 'CLEAR', operationId: null, resumePhase: null},
     mutationHistory: [],
     processedEvents: [],
@@ -221,12 +231,12 @@ function validateState(input) {
   const keys = [
     'schemaVersion', 'repository', 'pullRequest', 'headSha', 'baseSha', 'wipCount', 'wipLimit',
     'maxConcurrentWriters', 'requiredPostchecks', 'postcheckWorkflowIds', 'startsAt', 'expiresAt',
-    'phase', 'authorDelivery', 'ci', 'review', 'mergeSha', 'postchecks', 'correctionIssued',
+    'phase', 'authorDelivery', 'ci', 'review', 'mergeSha', 'postchecks', 'correctionCauses',
     'mutationLane', 'mutationHistory', 'processedEvents', 'eventCount', 'transitionCount', 'nextAllowedAction'
   ];
   need(Object.keys(state).length === keys.length && keys.every(key => Object.hasOwn(state, key)), 'STATE_SCHEMA');
   validateIdentity(state.repository, state.pullRequest, state.headSha, state.baseSha);
-  need(state.schemaVersion === 1 && Number.isSafeInteger(state.startsAt) && Number.isSafeInteger(state.expiresAt)
+  need(state.schemaVersion === 2 && Number.isSafeInteger(state.startsAt) && Number.isSafeInteger(state.expiresAt)
     && state.startsAt > 0 && state.expiresAt > state.startsAt && state.expiresAt - state.startsAt <= 86400000, 'STATE_INVALID');
   need(Number.isSafeInteger(state.wipCount) && state.wipCount > 0 && state.wipCount <= 3
     && state.wipLimit === 3 && state.maxConcurrentWriters === 1, 'WIP_OR_WRITER_LIMIT');
@@ -236,7 +246,10 @@ function validateState(input) {
   for (const workflowId of Object.values(postcheckWorkflowIds)) need(positive(workflowId), 'STATE_INVALID');
   state.postcheckWorkflowIds = postcheckWorkflowIds;
   need(PHASES.includes(state.phase) && ['PENDING', 'DELIVERED', 'FAILED'].includes(state.authorDelivery)
-    && typeof state.correctionIssued === 'boolean' && Number.isSafeInteger(state.eventCount)
+    && Array.isArray(state.correctionCauses) && state.correctionCauses.length <= DEFAULT_LIMITS.transitions
+    && state.correctionCauses.every(cause => typeof cause === 'string' && cause.length <= 256)
+    && new Set(state.correctionCauses).size === state.correctionCauses.length
+    && Number.isSafeInteger(state.eventCount)
     && state.eventCount >= 0 && state.eventCount <= DEFAULT_LIMITS.events
     && Number.isSafeInteger(state.transitionCount) && state.transitionCount >= 0
     && state.transitionCount <= DEFAULT_LIMITS.transitions, 'STATE_INVALID');
@@ -247,11 +260,14 @@ function validateState(input) {
       && positive(state.ci.selectionRevision)
       && ['PENDING', 'SUCCESS', 'FAILURE', 'ACTION_REQUIRED'].includes(state.ci.status), 'STATE_INVALID');
   }
-  readRecord(state.review, ['status', 'coverageParts', 'verdict', 'truncated', 'turnLimit']);
+  readRecord(state.review, ['status', 'reviewId', 'coverageParts', 'verdict', 'truncated', 'turnLimit']);
   need(['NONE', 'INCOMPLETE', 'COMPLETE'].includes(state.review.status)
+    && (state.review.reviewId === null
+      || (typeof state.review.reviewId === 'string' && /^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$/.test(state.review.reviewId)))
     && (state.review.verdict === null || VERDICTS.includes(state.review.verdict))
     && typeof state.review.truncated === 'boolean' && typeof state.review.turnLimit === 'boolean', 'STATE_INVALID');
   state.review.coverageParts = readStringArray(state.review.coverageParts, REQUIRED_REVIEW_PARTS, 'STATE_INVALID');
+  need((state.review.status === 'NONE') === (state.review.reviewId === null), 'STATE_INVALID');
   if (state.review.status === 'COMPLETE') {
     need(REQUIRED_REVIEW_PARTS.every(part => state.review.coverageParts.includes(part))
       && ['GREEN_LIGHT', 'REVISION_REQUIRED'].includes(state.review.verdict)
@@ -321,7 +337,8 @@ function normalizeEvent(input) {
   }
   if (type === 'REVIEW_PART') {
     event.coverageParts = readStringArray(event.coverageParts, REQUIRED_REVIEW_PARTS, 'INVALID_REVIEW_COVERAGE');
-    need(typeof event.complete === 'boolean' && typeof event.truncated === 'boolean' && typeof event.turnLimit === 'boolean'
+    need(typeof event.reviewId === 'string' && /^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$/.test(event.reviewId)
+      && typeof event.complete === 'boolean' && typeof event.truncated === 'boolean' && typeof event.turnLimit === 'boolean'
       && VERDICTS.includes(event.verdict) && positive(event.ciRunId) && positive(event.ciRunAttempt)
       && event.ciWorkflowId === RELEASE_SAFETY_WORKFLOW_ID, 'INVALID_REVIEW_EVENT');
   }
@@ -351,14 +368,15 @@ function setNextAction(state) {
   if (state.mutationLane.status === 'UNKNOWN') return 'RECONCILE_UNKNOWN_MUTATION';
   if (state.phase === 'AUTHOR') return 'WAIT_FOR_AUTHOR_DELIVERY';
   if (state.phase === 'CI') {
-    if (state.ci?.status === 'FAILURE') return state.correctionIssued
+    if (state.ci?.status === 'FAILURE') return state.correctionCauses.includes(ciCorrectionCause(state.ci))
       ? 'WAIT_FOR_CONSOLIDATED_CORRECTION' : 'REQUEST_ONE_CONSOLIDATED_CORRECTION';
     if (state.ci?.status === 'ACTION_REQUIRED') return 'WAIT_FOR_OWNER_CI_ACTION';
     return 'WAIT_FOR_CI';
   }
   if (state.phase === 'REVIEW') {
     if (state.review.status === 'COMPLETE' && state.review.verdict === 'REVISION_REQUIRED') {
-      return state.correctionIssued ? 'WAIT_FOR_CONSOLIDATED_CORRECTION' : 'REQUEST_ONE_CONSOLIDATED_CORRECTION';
+      return state.correctionCauses.includes(reviewCorrectionCause(state.ci, state.review.reviewId))
+        ? 'WAIT_FOR_CONSOLIDATED_CORRECTION' : 'REQUEST_ONE_CONSOLIDATED_CORRECTION';
     }
     return state.review.status === 'NONE' ? 'REQUEST_EXACT_PAIR_REVIEW' : 'REQUEST_REVIEW_COMPLETION';
   }
@@ -406,7 +424,7 @@ export function reduceEvent(inputState, inputEvent) {
   if (event.occurredAt >= old.expiresAt) {
     if (old.phase === 'EXPIRED') return result(old, false, 'EXPIRED_NOOP');
     const expired = {...old, phase: 'EXPIRED', ci: null,
-      review: {status: 'NONE', coverageParts: [], verdict: null, truncated: false, turnLimit: false},
+      review: {status: 'NONE', reviewId: null, coverageParts: [], verdict: null, truncated: false, turnLimit: false},
       mergeSha: null, postchecks: Object.fromEntries(REQUIRED_POSTCHECKS.map(check => [check, null])),
       nextAllowedAction: 'STOP_EXPIRED'};
     return result(expired, true, 'EXPIRED');
@@ -443,10 +461,10 @@ export function reduceEvent(inputState, inputEvent) {
   const resetPairGates = () => {
     next.authorDelivery = 'PENDING';
     next.ci = null;
-    next.review = {status: 'NONE', coverageParts: [], verdict: null, truncated: false, turnLimit: false};
+    next.review = {status: 'NONE', reviewId: null, coverageParts: [], verdict: null, truncated: false, turnLimit: false};
     next.mergeSha = null;
     next.postchecks = Object.fromEntries(REQUIRED_POSTCHECKS.map(check => [check, null]));
-    next.correctionIssued = false;
+    next.correctionCauses = [];
     next.mutationLane = {status: 'CLEAR', operationId: null, resumePhase: null};
     next.phase = 'AUTHOR';
   };
@@ -468,35 +486,53 @@ export function reduceEvent(inputState, inputEvent) {
   } else if (event.type === 'CI') {
     need(old.phase === 'CI' || old.phase === 'REVIEW' || old.phase === 'OWNER_MERGE', 'INVALID_TRANSITION');
     if (old.phase === 'REVIEW' || old.phase === 'OWNER_MERGE') {
-      next.review = {status: 'NONE', coverageParts: [], verdict: null, truncated: false, turnLimit: false};
+      next.review = {status: 'NONE', reviewId: null, coverageParts: [], verdict: null, truncated: false, turnLimit: false};
       next.phase = 'CI';
     }
     next.ci = {runId: event.runId, runAttempt: event.runAttempt, workflowId: event.workflowId,
       selectionRevision: event.selectionRevision, status: event.status.toUpperCase()};
-    if (event.status === 'failure' && !old.correctionIssued) {
-      next.correctionIssued = true;
-      oneShotAction = 'REQUEST_ONE_CONSOLIDATED_CORRECTION';
+    if (event.status === 'failure') {
+      const cause = ciCorrectionCause(next.ci);
+      if (!old.correctionCauses.includes(cause)) {
+        next.correctionCauses.push(cause);
+        oneShotAction = 'REQUEST_ONE_CONSOLIDATED_CORRECTION';
+      }
     }
     if (event.status === 'success') next.phase = 'REVIEW';
   } else if (event.type === 'REVIEW_PART') {
     need(old.phase === 'REVIEW' && old.ci?.status === 'SUCCESS', 'REVIEW_REQUIRES_SUCCESSFUL_CI');
     need(event.ciRunId === old.ci.runId && event.ciRunAttempt === old.ci.runAttempt
       && event.ciWorkflowId === old.ci.workflowId, 'REVIEW_CI_MISMATCH');
+    if (old.review.reviewId !== null) {
+      need(old.review.reviewId === event.reviewId, 'REVIEW_IDENTITY_MISMATCH');
+      if (old.review.status === 'COMPLETE') {
+        need(old.review.verdict === event.verdict, 'REVIEW_RESULT_CONFLICT');
+        return result(old, false, 'UNCHANGED_REVIEW_RESULT');
+      }
+      need(!(old.review.verdict === 'REVISION_REQUIRED' && event.verdict === 'GREEN_LIGHT'),
+        'REVIEW_RESULT_CONFLICT');
+    }
     const parts = [...new Set([...old.review.coverageParts, ...event.coverageParts])];
+    const verdict = old.review.verdict === 'REVISION_REQUIRED' || event.verdict === 'REVISION_REQUIRED'
+      ? 'REVISION_REQUIRED' : event.verdict;
     const complete = event.complete && !event.truncated && !event.turnLimit
       && REQUIRED_REVIEW_PARTS.every(part => parts.includes(part))
-      && event.verdict !== 'NEEDS_MORE_EVIDENCE';
+      && verdict !== 'NEEDS_MORE_EVIDENCE';
     next.review = {
       status: complete ? 'COMPLETE' : 'INCOMPLETE',
+      reviewId: event.reviewId,
       coverageParts: parts,
-      verdict: complete ? event.verdict : 'NEEDS_MORE_EVIDENCE',
+      verdict: complete ? verdict : (verdict === 'REVISION_REQUIRED' ? verdict : 'NEEDS_MORE_EVIDENCE'),
       truncated: event.truncated,
       turnLimit: event.turnLimit
     };
     if (complete && event.verdict === 'GREEN_LIGHT') next.phase = 'OWNER_MERGE';
-    if (complete && event.verdict === 'REVISION_REQUIRED' && !old.correctionIssued) {
-      next.correctionIssued = true;
-      oneShotAction = 'REQUEST_ONE_CONSOLIDATED_CORRECTION';
+    if (complete && verdict === 'REVISION_REQUIRED') {
+      const cause = reviewCorrectionCause(old.ci, event.reviewId);
+      if (!old.correctionCauses.includes(cause)) {
+        next.correctionCauses.push(cause);
+        oneShotAction = 'REQUEST_ONE_CONSOLIDATED_CORRECTION';
+      }
     }
   } else if (event.type === 'SOURCE_MERGED') {
     need(old.phase === 'OWNER_MERGE' && old.authorDelivery === 'DELIVERED'
@@ -535,7 +571,7 @@ export function reduceEvent(inputState, inputEvent) {
   } else if (event.type === 'AGENT_OPERATION') {
     next.phase = 'BLOCKED';
     next.ci = null;
-    next.review = {status: 'NONE', coverageParts: [], verdict: null, truncated: false, turnLimit: false};
+    next.review = {status: 'NONE', reviewId: null, coverageParts: [], verdict: null, truncated: false, turnLimit: false};
     next.mergeSha = null;
     next.postchecks = Object.fromEntries(REQUIRED_POSTCHECKS.map(check => [check, null]));
   }
@@ -646,7 +682,8 @@ export function createSyntheticReplay() {
     eventId, repository, pullRequest, headSha, baseSha, phase, actor, type, occurredAt, ...fields
   });
   const review = event('REVIEW_PART', 'REVIEW', 'claude[bot]', 'synthetic-review-01', {
-    coverageParts: [...REQUIRED_REVIEW_PARTS], complete: true, verdict: 'GREEN_LIGHT',
+    reviewId: 'synthetic-review-session-01', coverageParts: [...REQUIRED_REVIEW_PARTS],
+    complete: true, verdict: 'GREEN_LIGHT',
     truncated: false, turnLimit: false, ciRunId: 11, ciRunAttempt: 1, ciWorkflowId: RELEASE_SAFETY_WORKFLOW_ID
   });
   return {
