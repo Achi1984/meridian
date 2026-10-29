@@ -17,7 +17,7 @@ It is intentionally **not integrated** into existing coordinator files yet.
 - Redirects disabled (`redirect: 'error'`).
 - Off-origin responses and off-origin pagination links are rejected.
 - Bounded request deadline, bounded response bytes, bounded caller page window.
-- Caller abort is propagated to in-flight fetch.
+- Caller abort/deadline remain active through full body streaming and parse (including cancel-as-EOF edge cases).
 - Rate-limit and ambiguity conditions fail closed.
 - Errors use stable codes and must not include credential values.
 
@@ -32,7 +32,7 @@ It is true only when caller-provided trusted attestation is currently valid (`ge
 - `verifiedAtMs` and **required** `expiresAtMs`
 - bounded evidence lifetime (short-lived window)
 
-If evidence expires or a request receives `401/403`, the adapter invalidates prior attestation and reports unauthenticated until fresh evidence is supplied.
+If evidence expires or a request receives `401/403`, the adapter invalidates prior attestation and reports unauthenticated until fresh evidence is supplied. `403` responses classified as rate-limited still invalidate authentication state while returning `RATE_LIMITED`.
 
 Residual trust: this proves caller-attested authenticated transport evidence for `api.github.com` within the validity window; it does **not** prove end-to-end principal continuity outside that window.
 
