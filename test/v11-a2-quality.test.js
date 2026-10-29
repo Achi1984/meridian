@@ -91,7 +91,9 @@ test('A2: examples stay in the single source disclosure; skip link and live-regi
   assert.match(autonomy, /Autonome Entwicklung · <strong>Unbekannt<\/strong>/);
   assert.match(autonomy, /B10/);
   assert.match(autonomy, /B9-Umfang #766/);
-  assert.doesNotMatch(autonomy, /data-state-preview|data-preview-state|role="status"/);
+  const agentStatusRoot='<div id="agent-status-root" role="status" aria-live="polite">Keine verifizierten Statusdaten.</div>';
+  assert.equal(autonomy.split(agentStatusRoot).length-1,1,'one exact approved empty agent-status root');
+  assert.doesNotMatch(autonomy.replace(agentStatusRoot,''), /data-state-preview|data-preview-state|role="status"/);
   assert.match(html, /<details class="command-source-details">[\s\S]*id="data-state-preview"[\s\S]*<\/details>/);
   assert.match(html, /href="#app-main">Zum Inhalt/);
   assert.match(html, /<main[^>]*id="app-main"[^>]*tabindex="-1"/);
