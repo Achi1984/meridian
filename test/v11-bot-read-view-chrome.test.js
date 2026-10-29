@@ -57,7 +57,7 @@ const view=createBotReadView(root,{getToken:()=>credential,createClient:options=
 const initialLive=root.querySelector('[role=status]');
 const refresh=()=>document.getElementById('bot-read-refresh'),lock=()=>document.getElementById('bot-read-lock');
 window.botQA={
- state(){return root.querySelector('[data-state]')?.dataset.state||'disposed';},
+ state(){return root.querySelector('.bot-read-state')?.dataset.state||'disposed';},
  metrics(){return {width:innerWidth,viewport:document.documentElement.clientWidth,overflow:document.documentElement.scrollWidth>innerWidth+1,rows:root.querySelectorAll('li').length,requests,unexpected,secretLeak:/synthetic-token|synthetic-private-error/.test(root.textContent),statusRole:root.querySelector('[role=status]')?.getAttribute('aria-live'),statusPersistent:root.querySelector('[role=status]')===initialLive,statusConnected:initialLive.isConnected,statusNotBusy:!initialLive.closest('[aria-busy="true"]'),targets:[...root.querySelectorAll('button')].filter(b=>b.getClientRects().length).every(b=>b.getBoundingClientRect().height>=44),focusStable:document.activeElement===refresh()};},
  async show(next){
   lock().click();mode=next;clock=Date.parse('2026-10-12T20:01:00Z');credential='synthetic-token';

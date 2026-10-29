@@ -179,7 +179,7 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           const initial=await evaluate(`({width:innerWidth,height:innerHeight,reads:window.__botReads,
             overflow:document.documentElement.scrollWidth>innerWidth+1,
             navTargets:[...document.querySelectorAll('#nav button')].every(b=>b.getBoundingClientRect().height>=44),
-            botState:document.querySelector('#bot-read-root [data-state]')?.dataset.state,
+            botState:document.querySelector('#bot-read-root .bot-read-state')?.dataset.state,
             portfolio:document.querySelector('#bot-read-root .bot-portfolio-total').innerText,
             root:document.getElementById('bot-read-root').innerText,errors:window.__botErrors})`);
           assert.equal(initial.width,size.width);assert.equal(initial.height,size.height);
@@ -207,7 +207,7 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
                 badgeRects:[...c.querySelectorAll('.bot-card-badge')].map(b=>({text:b.innerText,width:b.getBoundingClientRect().width,height:b.getBoundingClientRect().height})),
                 text:c.querySelector('summary').innerText})),
               referenceLabels:cards.map(c=>c.querySelector('summary').getAttribute('aria-label')),
-              neutralDetails:cards.find(c=>c.id.endsWith('c'.repeat(20)))?.querySelector('.bot-card-body').innerText,
+              neutralDetails:cards.find(c=>c.id.endsWith('c'.repeat(20)))?.querySelector('.bot-card-body').textContent,
               referencesVisible:cards.some(c=>c.querySelector('summary').innerText.includes('Referenz')),
               tinyPositive:cards.find(c=>c.id.endsWith('e'.repeat(20)))?.querySelector('.bot-pnl-positive')?.innerText,
               tinyCapital:cards.find(c=>c.id.endsWith('b'.repeat(20)))?.querySelector('.bot-card-capital strong')?.innerText,
@@ -576,7 +576,7 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           await evaluate(`${navButton}.click();window.__botReadMode='stale';
             document.getElementById('bot-read-refresh').click()`);
           await evaluate('new Promise(resolve=>setTimeout(resolve,60))');
-          assert.equal(await evaluate(`document.querySelector('#bot-read-root [data-state]').dataset.state`),'stale');
+          assert.equal(await evaluate(`document.querySelector('#bot-read-root .bot-read-state').dataset.state`),'stale');
           assert.equal(await evaluate(`document.getElementById('command-bot-overview').dataset.state`),'stale');
           assert.doesNotMatch(await evaluate(`document.getElementById('command-bot-overview').innerText`),/Bots im Snapshot|BTCUSDT|Snapshot-Zeit/);
 
@@ -584,24 +584,24 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           await evaluate('new Promise(resolve=>setTimeout(resolve,60))');
           await evaluate(`window.__botReadMode='error';document.getElementById('bot-read-refresh').click()`);
           await evaluate('new Promise(resolve=>setTimeout(resolve,60))');
-          assert.equal(await evaluate(`document.querySelector('#bot-read-root [data-state]').dataset.state`),'unavailable');
+          assert.equal(await evaluate(`document.querySelector('#bot-read-root .bot-read-state').dataset.state`),'unavailable');
           assert.equal(await evaluate(`document.getElementById('command-bot-overview').dataset.state`),'unavailable');
           assert.doesNotMatch(await evaluate(`document.getElementById('command-bot-overview').innerText`),/BTCUSDT|Snapshot-Zeit/);
 
           await evaluate(`window.__botReadMode='fresh';document.getElementById('bot-read-refresh').click()`);
           await evaluate('new Promise(resolve=>setTimeout(resolve,60))');
           await evaluate(`document.getElementById('bot-read-lock').click()`);
-          assert.equal(await evaluate(`document.querySelector('#bot-read-root [data-state]').dataset.state`),'locked');
+          assert.equal(await evaluate(`document.querySelector('#bot-read-root .bot-read-state').dataset.state`),'locked');
           assert.equal(await evaluate(`document.getElementById('command-bot-overview').dataset.state`),'locked');
           assert.doesNotMatch(await evaluate(`document.getElementById('command-bot-overview').innerText`),/BTCUSDT|Snapshot-Zeit/);
 
           await openApp();
           await evaluate(`window.__botReadMode='pending';document.getElementById('bot-read-refresh').click()`);
           await evaluate('new Promise(resolve=>setTimeout(resolve,20))');
-          assert.equal(await evaluate(`document.querySelector('#bot-read-root [data-state]').dataset.state`),'loading');
+          assert.equal(await evaluate(`document.querySelector('#bot-read-root .bot-read-state').dataset.state`),'loading');
           await evaluate(`document.getElementById('bot-read-lock').click();window.__resolveBotRead?.()`);
           await evaluate('new Promise(resolve=>setTimeout(resolve,80))');
-          assert.equal(await evaluate(`document.querySelector('#bot-read-root [data-state]').dataset.state`),'locked');
+          assert.equal(await evaluate(`document.querySelector('#bot-read-root .bot-read-state').dataset.state`),'locked');
           assert.equal(await evaluate(`document.getElementById('command-bot-overview').dataset.state`),'locked');
           await openApp();
           await evaluate(`window.__botReadMode='fresh';document.getElementById('bot-read-refresh').click()`);
@@ -609,7 +609,7 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           await evaluate(`Object.defineProperty(document,'hidden',{value:true,configurable:true});
             document.dispatchEvent(new Event('visibilitychange'))`);
           assert.equal(await evaluate(`document.getElementById('app').hidden`),true);
-          assert.equal(await evaluate(`document.querySelector('#bot-read-root [data-state]').dataset.state`),'fresh');
+          assert.equal(await evaluate(`document.querySelector('#bot-read-root .bot-read-state').dataset.state`),'fresh');
           await evaluate(`Object.defineProperty(document,'hidden',{value:false,configurable:true});
             document.dispatchEvent(new Event('visibilitychange'))`);
           assert.equal(await evaluate(`document.getElementById('app').hidden`),false);
@@ -617,14 +617,14 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
 
           await evaluate(`window.__botReadMode='unauthorized';document.getElementById('bot-read-refresh').click()`);
           await evaluate('new Promise(resolve=>setTimeout(resolve,60))');
-          assert.equal(await evaluate(`document.querySelector('#bot-read-root [data-state]').dataset.state`),'locked');
+          assert.equal(await evaluate(`document.querySelector('#bot-read-root .bot-read-state').dataset.state`),'locked');
           assert.equal(await evaluate(`document.getElementById('command-bot-overview').dataset.state`),'locked');
           assert.equal(await evaluate(`document.getElementById('app').hidden`),true);
 
           await openApp();
           await evaluate(`window.__botReadMode='expires';document.getElementById('bot-read-refresh').click()`);
           await evaluate('new Promise(resolve=>setTimeout(resolve,300))');
-          assert.equal(await evaluate(`document.querySelector('#bot-read-root [data-state]').dataset.state`),'stale');
+          assert.equal(await evaluate(`document.querySelector('#bot-read-root .bot-read-state').dataset.state`),'stale');
           assert.equal(await evaluate(`document.getElementById('command-bot-overview').dataset.state`),'stale');
           assert.doesNotMatch(await evaluate(`document.getElementById('command-bot-overview').innerText`),/Bots im Snapshot|BTCUSDT|Snapshot-Zeit/);
           assert.equal(await evaluate('window.__botReads'),10,'only explicit refresh actions reach the mock source');
