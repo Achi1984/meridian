@@ -103,13 +103,15 @@ until its five-minute expiry; expiry, Vienna-day rollover, and a daily-loss
 trip revoke it.
 
 Token quantities are integer base units with validated decimals (0–18);
-monetary totals and P&L use integer cents/BigInt. Rounding is conservative
-downward and zero-quantity dust is unfilled. Entry and exit require explicit
-nonnegative integer-cent assumptions for fee, spread, slippage, price impact,
-and network costs. No defaults imply actual fees or fills. Marked gross/net
-proceeds, realized/unrealized P&L, and cash remain separate. The modeled initial
-stop is 6% below the modeled entry; a 6% trailing stop arms at +12% and only
-moves up with observed high-water prices. A stop is not a guaranteed price:
+monetary totals and P&L use integer cents/BigInt. Affordable base-unit quantity
+rounds down, while entry notional rounds up to the next cent; exit proceeds and
+marks round down. Zero-quantity dust is unfilled. Entry and exit require
+explicit nonnegative integer-cent assumptions for fee, spread, slippage, price
+impact, and network costs. No defaults imply actual fees or fills. Marked
+gross/net proceeds, realized/unrealized P&L, and cash remain separate. The
+modeled initial stop is 6% below the modeled entry; a 6% trailing stop arms at
++12% and only moves up with observed high-water prices. A stop is not a
+guaranteed price:
 gap-through exits use the later observed quote, not the stop. Quotes must be
 later than the decision sample. Missing executable quotes/costs leave valuation
 unavailable or the position unfilled.
