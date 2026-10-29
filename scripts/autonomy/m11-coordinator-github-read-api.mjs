@@ -185,13 +185,30 @@ function mapWorkflowRuns(payload) {
   }));
 }
 
-function mapWorkflowJobs(payload) {
+function mapWorkflowJobs(payload, {expectedRunId, expectedRunAttempt, workflowId}) {
   if (!Array.isArray(payload?.jobs)) fail('MALFORMED_RESPONSE');
-  return payload.jobs.map(item => ({
+  return payload.jobs.map(item => {
+    if (!positiveInteger(item?.run_id) || item.run_id !== expectedRunId
+      || !positiveInteger(item?.run_attempt) || item.run_attempt !== expectedRunAttempt) {
+      fail('MALFORMED_RESPONSE');
+    }
+    return ({
     id: item?.id,
+    name: item?.name ?? null,
+    runId: item.run_id,
+    runAttempt: item.run_attempt,
+    workflowId,
     status: item?.status,
-    conclusion: item?.conclusion ?? null
-  }));
+    conclusion: item?.conclusion ?? null,
+    steps: Array.isArray(item?.steps)
+      ? item.steps.map(step => ({
+        name: step?.name ?? null,
+        status: step?.status ?? null,
+        conclusion: step?.conclusion ?? null
+      }))
+      : null
+    });
+  });
 }
 
 function extractCompareHeadSha(comparePayload) {
@@ -237,6 +254,20 @@ export function createM11CoordinatorGithubReadApi({
     if (!readTrustedAuthEvidence()) fail('UNAUTHENTICATED_TRANSPORT_EVIDENCE_REQUIRED');
   }
 
+  function buildAuthEvidenceSnapshot() {
+    const evidence = readTrustedAuthEvidence();
+    if (!evidence) return null;
+    return Object.freeze({
+      evidenceId: evidence.evidenceId,
+      principal: evidence.principal,
+      host: evidence.host,
+      scheme: evidence.scheme,
+      tls: evidence.tls,
+      verifiedAtMs: evidence.verifiedAtMs,
+      expiresAtMs: evidence.expiresAtMs
+    });
+  }
+
   async function getJson({path, query = null, signal, accept = 'application/vnd.github+json'}) {
     const requestScope = await request({path, query, signal, accept});
     try {
@@ -244,6 +275,7 @@ export function createM11CoordinatorGithubReadApi({
         maxResponseBytes,
         signal: requestScope.requestSignal
       });
+      ensureTrustedAuthentication();
       if (requestScope.requestSignal.aborted) fail('ABORTED');
       let parsed;
       try {
@@ -251,6 +283,7 @@ export function createM11CoordinatorGithubReadApi({
       } catch {
         fail('MALFORMED_RESPONSE');
       }
+      ensureTrustedAuthentication();
       if (requestScope.requestSignal.aborted) fail('ABORTED');
       if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) fail('MALFORMED_RESPONSE');
       if (requestScope.requestSignal.aborted) fail('ABORTED');
@@ -267,6 +300,7 @@ export function createM11CoordinatorGithubReadApi({
         maxResponseBytes,
         signal: requestScope.requestSignal
       });
+      ensureTrustedAuthentication();
       if (requestScope.requestSignal.aborted) fail('ABORTED');
       return {text, headers: requestScope.response.headers};
     } finally {
@@ -354,6 +388,9 @@ export function createM11CoordinatorGithubReadApi({
   return Object.freeze({
     get authenticated() {
       return readTrustedAuthEvidence() !== null;
+    },
+    get authenticationEvidence() {
+      return buildAuthEvidenceSnapshot();
     },
 
     async getWorkflowRun({repository, runId, signal}) {
@@ -464,8 +501,9 @@ export function createM11CoordinatorGithubReadApi({
         headers,
         `/repos/Achi1984/meridian/actions/workflows/${workflowId}/runs`
       );
+      if (!Number.isSafeInteger(payload?.total_count) || payload.total_count < 0) fail('MALFORMED_RESPONSE');
       const items = mapWorkflowRuns(payload);
-      return {items, hasNextPage};
+      return {items, hasNextPage, totalCount: payload.total_count};
     },
 
     async listWorkflowJobs({repository, runId, runAttempt, page, signal}) {
@@ -473,16 +511,50 @@ export function createM11CoordinatorGithubReadApi({
       if (!positiveInteger(runId) || !positiveInteger(runAttempt) || !positiveInteger(page) || page > maxPages) {
         fail('INVALID_INPUT');
       }
-      const {payload, headers} = await getJson({
-        path: `/repos/Achi1984/meridian/actions/runs/${runId}/attempts/${runAttempt}/jobs`,
-        query: {page, per_page: 100},
-        signal
-      });
+      const [runResult, jobsResult] = await Promise.all([
+        getJson({
+          path: `/repos/Achi1984/meridian/actions/runs/${runId}/attempts/${runAttempt}`,
+          signal
+        }),
+        getJson({
+          path: `/repos/Achi1984/meridian/actions/runs/${runId}/attempts/${runAttempt}/jobs`,
+          query: {page, per_page: 100},
+          signal
+        })
+      ]);
+      const runPayload = runResult.payload;
+      const runPath = normalizeWorkflowPath(runPayload?.path);
+      if (!positiveInteger(runPayload?.id) || runPayload.id !== runId
+        || !positiveInteger(runPayload?.run_attempt) || runPayload.run_attempt !== runAttempt
+        || runPayload?.repository?.full_name !== REPOSITORY
+        || !positiveInteger(runPayload?.workflow_id)
+        || typeof runPath !== 'string' || runPath.length === 0) {
+        fail('MALFORMED_RESPONSE');
+      }
+      if (!Number.isSafeInteger(jobsResult.payload?.total_count) || jobsResult.payload.total_count < 0) {
+        fail('MALFORMED_RESPONSE');
+      }
       const hasNextPage = extractHasNextPage(
-        headers,
+        jobsResult.headers,
         `/repos/Achi1984/meridian/actions/runs/${runId}/attempts/${runAttempt}/jobs`
       );
-      return {items: mapWorkflowJobs(payload), hasNextPage};
+      const items = mapWorkflowJobs(jobsResult.payload, {
+        expectedRunId: runId,
+        expectedRunAttempt: runAttempt,
+        workflowId: runPayload.workflow_id
+      });
+      if (items.some(item => !positiveInteger(item.id)
+        || typeof item.name !== 'string' || item.name.length === 0
+        || !positiveInteger(item.runId) || item.runId !== runId
+        || !positiveInteger(item.runAttempt) || item.runAttempt !== runAttempt
+        || item.workflowId !== runPayload.workflow_id
+        || !Array.isArray(item.steps)
+        || item.steps.some(step => typeof step?.name !== 'string' || step.name.length === 0
+          || typeof step?.status !== 'string' || step.status.length === 0
+          || typeof step?.conclusion !== 'string' || step.conclusion.length === 0))) {
+        fail('MALFORMED_RESPONSE');
+      }
+      return {items, hasNextPage, totalCount: jobsResult.payload.total_count};
     }
   });
 }
