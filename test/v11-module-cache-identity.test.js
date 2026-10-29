@@ -11,6 +11,7 @@ const exists=url=>existsSync(diskPath(url));
 const specifiers=source=>[...source.matchAll(/\b(?:import|export)\s+(?:[\s\S]*?\s+from\s*)?['"]([^'"]+)['"]/g)]
   .map(match=>match[1]);
 const expectedModules=[
+  'agent-status-bootstrap.js','agent-status-client.js',
   'app-access-bootstrap.js','app-access.js',
   'arena-historical-export.js','arena-historical-result.js','arena-inspection-report.js','arena-result-view.js',
   'bot-overview-model.js','bot-read-bootstrap.js','bot-read-client.js','bot-read-model.js','bot-read-view.js',
@@ -61,13 +62,17 @@ test('served M11 module graph has one existing B15 identity for every local edge
   const entries=[...html.matchAll(/<script\s+type="module"\s+src="([^"]+)"/g)]
     .map(match=>new URL(match[1],indexUrl));
   assert.deepEqual(entries.map(url=>url.pathname.slice(v11Root.pathname.length)).sort(),
-    ['app-access-bootstrap.js','bot-read-bootstrap.js','depot-read-bootstrap.js','strategy-workspace-bootstrap.js']);
+    ['agent-status-bootstrap.js','app-access-bootstrap.js','bot-read-bootstrap.js','depot-read-bootstrap.js','strategy-workspace-bootstrap.js']);
 
   const graph=scanGraph(entries);
   assert.deepEqual([...graph.modules].sort(),expectedModules);
   assert.deepEqual([...graph.external].sort(),[
-    '../portfolio-data-contract.js','../research/strategy-paper-arena.js','../v8-clean/live-price-core-r18.js'
+    '../portfolio-data-contract.js','../public/js/m11-agent-status.js',
+    '../research/strategy-paper-arena.js','../v8-clean/live-price-core-r18.js'
   ]);
+  assert.ok(graph.references.get('app-access.js')>=4,'status shares the existing central access module');
+  const renderer=readModule(new URL('../public/js/m11-agent-status.js',v11Root));
+  assert.deepEqual(specifiers(renderer),[],'browser renderer has no Node normalizer dependency');
   assert.ok(graph.references.get('bot-read-client.js')>=2,'shared bot client is reached by both read surfaces');
   for(const [module,identities] of graph.identities){
     assert.equal(identities.size,1,`${module} must resolve to one shared URL identity`);
