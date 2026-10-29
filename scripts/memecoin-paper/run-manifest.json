@@ -1,0 +1,59 @@
+{
+  "manifestVersion": "memecoin-paper-one-shot-v1",
+  "enabled": false,
+  "mode": "READ_ONLY_PAPER",
+  "execution": "SIMULATED_ONLY",
+  "runId": null,
+  "startAt": null,
+  "endAt": null,
+  "durationMs": 28800000,
+  "timezone": "Europe/Vienna",
+  "stopSwitch": {
+    "engaged": true,
+    "reason": "Not authorized for activation"
+  },
+  "providers": [
+    {
+      "name": "DexScreener public API",
+      "host": "api.dexscreener.com",
+      "enabled": false
+    },
+    {
+      "name": "Solana mainnet public JSON-RPC",
+      "host": "api.mainnet-beta.solana.com",
+      "enabled": false,
+      "methods": [
+        "getAccountInfo",
+        "getTokenLargestAccounts",
+        "getTokenSupply"
+      ]
+    }
+  ],
+  "allowedMints": [],
+  "allowedPools": [],
+  "pollBudget": {
+    "intervalMs": 30000,
+    "maxRequestsPerRun": 960,
+    "maxRequestsPerProvider": 480,
+    "maxBytesPerResponse": 1048576,
+    "maxBytesPerRun": 10485760,
+    "maxEvents": 10000,
+    "maxCandidates": 1000
+  },
+  "http": {
+    "redirects": "error",
+    "credentials": false,
+    "arbitraryUrls": false,
+    "tokenProvidedUrls": false
+  },
+  "restartPolicy": "UNRECOVERABLE_FAIL_CLOSED",
+  "syntheticFixturesMayNotMixWithRealScans": true,
+  "activationBlockers": [
+    "explicit owner approval of this exact one-shot manifest",
+    "fixed allowed mint and pool lists",
+    "reviewed start and end timestamps",
+    "independent accounting and security/source review",
+    "validated complete evidence providers and request budgets",
+    "durable atomic journal or replacement restart protocol"
+  ]
+}
