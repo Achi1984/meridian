@@ -73,7 +73,7 @@ async function queuedEnvelope(){
     job:{
       trialId:digest(Buffer.from(trialKey)),trialKey,state:'queued',attempts:0,owner:null,fence:0,
       profile:bridgeManifest.profile,protocolSha256:bridgeManifest.protocolSha256,
-      sourceSha256:'bab379ce692601315ef3b0436ac7969798e96cc9781f7f3845ec4ed8a2b770e7',
+      sourceSha256:'9141a3728755b82028f6c27ba0b2e41610db25da61a7c65fd7c985071fb5ca8e',
       dataSha256:bridgeManifest.inputSha256,manifestSha256:bridgeManifest.manifestSha256,
       pathIds:bridgeManifest.pathIds,computationPathIds:computationPathIds(),
       timestamps:{createdAt:'2026-01-01T00:00:00Z',startedAt:null,finishedAt:null},

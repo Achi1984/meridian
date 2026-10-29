@@ -26,10 +26,10 @@ test('synthetic generated completed and insufficient results round-trip with exa
   for(const [envelope,status,count,resultSha,summarySha,payloadSha] of [
     [completed,'COMPLETED',44,'1f2d4d889bc6bbf320f0cef229754b7058860c125c167af1c4cb0c711884f863',
       'd73738b521b6b8cbc8cfe198b85e573c197a985bb5c5956be7544d3e82b2ea03',
-      '0e904f0e6d6287edec237a412b4519d459d17f4132bf77b4ce0c1bffe02bea04'],
+      '7ed70725975164a85888553779ca53a55bc7f446992c092220dd5954711c2c83'],
     [insufficient,'INSUFFICIENT_EVIDENCE',19,'640b2603bb265607d75b704b4f6722d1553d3f21b5bb1c67c623a9ba50a4205d',
       'c9fd86ab19e0e7fd42a80aa8dc9c02742d749644b356ddb0a1e6a1b905c94f83',
-      '7e1332df258eecb0fb9c559d05f9ec4ba38bf7cd604acebc7bb729d2fe403f2a']
+      'ef7f165e383fa6bedcbb91b5652c5972a40218c753d38e60cde688def1cb97e7']
   ]){
     assert.equal(envelope.job.sourceSha256,digest(canonicalJson(bridgeManifest.sourceSha256)));
     const sourceBytes=new TextEncoder().encode(envelope.job.result);
@@ -50,7 +50,7 @@ test('synthetic generated completed and insufficient results round-trip with exa
     assert.ok(sourceBytes.length<1024*1024);
   }
   assert.equal(digest(canonicalJson(bridgeManifest.sourceSha256)),
-    'bab379ce692601315ef3b0436ac7969798e96cc9781f7f3845ec4ed8a2b770e7');
+    '9141a3728755b82028f6c27ba0b2e41610db25da61a7c65fd7c985071fb5ca8e');
   assert.equal(Buffer.byteLength(completed.job.result),939389);
   assert.equal(Buffer.byteLength(insufficient.job.result),207285);
 });
