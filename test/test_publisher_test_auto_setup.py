@@ -372,8 +372,50 @@ class PrivateCommandTests(unittest.TestCase):
 
     def test_hung_command_has_bounded_timeout(self):
         command = self.m.Command({'PATH': '/usr/bin:/bin'})
-        with self.assertRaises(ValueError) as raised:
-            command.run([sys.executable, '-I', '-c', 'import time; time.sleep(30)'], timeout=0.1)
+        with tempfile.TemporaryDirectory() as directory:
+            ready = Path(directory) / 'ready'
+            source = ('from pathlib import Path; import time; '
+                      'Path(' + repr(str(ready)) + ').write_text("ready"); time.sleep(30)')
+            started = time.monotonic()
+            with self.assertRaises(ValueError) as raised:
+                command.run([sys.executable, '-I', '-c', source], timeout=0.2)
+            self.assertLess(time.monotonic() - started, 3)
+            self.assertTrue(ready.exists())
+        self.assertEqual(str(raised.exception), 'command failed')
+        self.assertTrue(raised.exception.cleanup_complete)
+
+    def test_startup_timeout_is_bounded_and_cleanup_remains_unconfirmed(self):
+        command = self.m.Command({'PATH': '/usr/bin:/bin'})
+        delayed_start = 'import time; time.sleep(30)'
+        started = time.monotonic()
+        with patch.object(self.m, '_COMMAND_SUPERVISOR', delayed_start):
+            with self.assertRaises(ValueError) as raised:
+                command.run([sys.executable, '-I', '-c', 'pass'], timeout=0.1)
+        self.assertEqual(str(raised.exception), 'command failed')
+        self.assertFalse(raised.exception.cleanup_complete)
+        self.assertLess(time.monotonic() - started, 3)
+
+    def test_cleanup_receipt_is_drained_after_supervisor_exits(self):
+        command = self.m.Command({'PATH': '/usr/bin:/bin'})
+        delayed_receipt = """
+import json, os, signal, struct, sys, time
+def send(kind, status=0, payload=b''):
+    message = kind + bytes((status,)) + struct.pack('!I', len(payload)) + payload
+    while message:
+        message = message[os.write(1, message):]
+request = json.loads(sys.stdin.buffer.readline())
+sys.stdin.buffer.read(request['inputLength'])
+send(b'P', payload=struct.pack('!I', os.getpid()))
+def terminate(signum, frame):
+    send(b'R', 1, b'')
+    raise SystemExit(0)
+signal.signal(signal.SIGTERM, terminate)
+while True:
+    time.sleep(1)
+"""
+        with patch.object(self.m, '_COMMAND_SUPERVISOR', delayed_receipt):
+            with self.assertRaises(ValueError) as raised:
+                command.run([sys.executable, '-I', '-c', 'pass'], timeout=0.1)
         self.assertEqual(str(raised.exception), 'command failed')
         self.assertTrue(raised.exception.cleanup_complete)
 

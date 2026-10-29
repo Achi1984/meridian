@@ -288,6 +288,7 @@ class Command:
         target_pid = None
         result = None
         cleanup_complete = False
+        receipt_error = False
         failed = False
         response = bytearray()
         outgoing = b''
@@ -367,20 +368,23 @@ class Command:
         except BaseException:
             failed = True
         finally:
-            if proc is not None and proc.poll() is None:
+            if proc is not None:
                 try:
                     selector.unregister(proc.stdin)
                     proc.stdin.close()
                 except BaseException:
                     pass
-                try:
-                    os.kill(proc.pid, signal.SIGTERM)
-                except OSError:
-                    pass
-                cleanup_deadline = time.monotonic() + 2
-                while proc.poll() is None and time.monotonic() < cleanup_deadline:
+                if proc.poll() is None:
                     try:
+                        os.kill(proc.pid, signal.SIGTERM)
+                    except OSError:
+                        pass
+                cleanup_deadline = time.monotonic() + 2
+                while time.monotonic() < cleanup_deadline:
+                    try:
+                        drained = False
                         for key, _ in selector.select(min(0.05, cleanup_deadline - time.monotonic())):
+                            drained = True
                             if key.fileobj is proc.stdout:
                                 part = os.read(key.fd, 65536)
                                 if part:
@@ -388,9 +392,13 @@ class Command:
                                     consume_frames()
                                 else:
                                     selector.unregister(key.fileobj)
+                        if proc.poll() is not None and not drained:
+                            break
                     except BaseException:
-                        pass
-                cleanup_complete = result is not None and result[0] != 2 and proc.poll() is not None
+                        receipt_error = True
+                        break
+                cleanup_complete = (not receipt_error and result is not None and result[0] != 2
+                                    and proc.poll() is not None and not response)
                 if proc.poll() is None:
                     if target_pid is not None:
                         try:
