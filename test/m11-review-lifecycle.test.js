@@ -375,6 +375,84 @@ class DurableLifecycleBackend {
     const claim = this.claims.get(executionKey);
     return claim ? structuredClone(claim) : null;
   }
+
+  toSerializableRecords() {
+    return Object.freeze({
+      snapshot: structuredClone(this.snapshot),
+      admissionState: structuredClone(this.admissionState),
+      claims: [...this.claims.entries()].map(([key, value]) => [key, structuredClone(value)]),
+      commits: [...this.commits.entries()].map(([key, value]) => [key, structuredClone(value)]),
+      nextCommit: this.nextCommit,
+      failedKinds: [...this.failedKinds],
+      failTransitionKinds: [...this.failTransitionKinds]
+    });
+  }
+
+  static fromSerializableRecords(records) {
+    if (!records || typeof records !== 'object' || Array.isArray(records)) {
+      throw new Error('INVALID_RECORDS');
+    }
+    const keys = ['snapshot', 'admissionState', 'claims', 'commits', 'nextCommit', 'failedKinds', 'failTransitionKinds'];
+    if (Object.keys(records).length !== keys.length || keys.some(key => !Object.hasOwn(records, key))) {
+      throw new Error('INVALID_RECORDS');
+    }
+    const snapshot = records.snapshot;
+    if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)
+      || !Number.isSafeInteger(snapshot.revision) || snapshot.revision < 0
+      || typeof snapshot.oid !== 'string' || typeof snapshot.chainValid !== 'boolean') {
+      throw new Error('INVALID_RECORDS');
+    }
+    const claims = records.claims;
+    const commits = records.commits;
+    if (!Array.isArray(claims) || !Array.isArray(commits)
+      || !Number.isSafeInteger(records.nextCommit) || records.nextCommit < 0
+      || !Array.isArray(records.failedKinds)
+      || !Array.isArray(records.failTransitionKinds)) {
+      throw new Error('INVALID_RECORDS');
+    }
+    const backend = new DurableLifecycleBackend({
+      failTransitionKinds: records.failTransitionKinds
+    });
+    backend.snapshot = structuredClone(snapshot);
+    backend.admissionState = structuredClone(records.admissionState);
+    backend.claims = new Map(claims.map(entry => {
+      if (!Array.isArray(entry) || entry.length !== 2 || typeof entry[0] !== 'string'
+        || !entry[1] || typeof entry[1] !== 'object' || Array.isArray(entry[1])) {
+        throw new Error('INVALID_RECORDS');
+      }
+      return [entry[0], structuredClone(entry[1])];
+    }));
+    backend.commits = new Map(commits.map(entry => {
+      if (!Array.isArray(entry) || entry.length !== 2 || typeof entry[0] !== 'string'
+        || !entry[1] || typeof entry[1] !== 'object' || Array.isArray(entry[1])) {
+        throw new Error('INVALID_RECORDS');
+      }
+      return [entry[0], structuredClone(entry[1])];
+    }));
+    backend.nextCommit = records.nextCommit;
+    backend.failedKinds = new Set(records.failedKinds);
+
+    const validation = reduceAdmissionRecord(backend.admissionState, {
+      kind: 'SIMULATE_ADMISSION',
+      expectedRevision: backend.admissionState.revision,
+      expectedTotalQuota: backend.admissionState.totalQuota,
+      logicalActionId: 'a'.repeat(64),
+      executionKey: 'b'.repeat(64)
+    });
+    if (!validation || typeof validation.status !== 'string') throw new Error('INVALID_RECORDS');
+    for (const [key, claim] of backend.claims.entries()) {
+      if (!claim || claim.executionKey !== key || typeof claim.actionKey !== 'string' || claim.actionKey.length !== 64) {
+        throw new Error('INVALID_RECORDS');
+      }
+    }
+    return backend;
+  }
+}
+
+function reconstructBackendFromJson(backend) {
+  const serialized = JSON.stringify(backend.toSerializableRecords());
+  const parsed = JSON.parse(serialized);
+  return DurableLifecycleBackend.fromSerializableRecords(parsed);
 }
 
 function makeBoundaryCompletion({reviewRequestId, sessionId, collected, nowMs, reviewer = REVIEWER, coverageParts = REQUIRED_REVIEW_PARTS}) {
@@ -1139,7 +1217,7 @@ test('restart after STALE_BEFORE_DISPATCH remains UNKNOWN and never posts receip
 });
 
 test('fresh collection with rotated auth after old auth expiry works after restart without old brand revival', async () => {
-  const backend = new DurableLifecycleBackend();
+  let backend = new DurableLifecycleBackend();
   let store = createCoordinatorStateStore({backend, enabled: true});
   const clock = {value: START + 100};
   const initialCollected = await collectReady({
@@ -1149,12 +1227,16 @@ test('fresh collection with rotated auth after old auth expiry works after resta
     authExpiresAtMs: START + 1000
   });
   assert.equal(initialCollected.status, 'READY');
+  let dispatchCount = 0;
   const started = await startReviewLifecycle({
     ...lifecycleInput({
       collected: initialCollected,
       store,
       clock,
-      dispatchReview: async input => ({status: 'ACKNOWLEDGED', reviewRequestId: input.reviewRequestId, sessionId: input.sessionId}),
+      dispatchReview: async input => {
+        dispatchCount++;
+        return {status: 'ACKNOWLEDGED', reviewRequestId: input.reviewRequestId, sessionId: input.sessionId};
+      },
       observeReview: async () => ({status: 'PENDING'}),
       revalidate: async () => initialCollected,
       receipt: {
@@ -1166,10 +1248,11 @@ test('fresh collection with rotated auth after old auth expiry works after resta
   });
   assert.equal(started.status, 'REVIEW_PENDING');
 
-  const serialized = JSON.stringify({executionKey: initialCollected.executionKey});
-  const reconstructed = JSON.parse(serialized);
-  clock.value = START + 400000;
+  const serialized = JSON.stringify(backend.toSerializableRecords());
+  backend = DurableLifecycleBackend.fromSerializableRecords(JSON.parse(serialized));
   store = createCoordinatorStateStore({backend, enabled: true});
+  const reconstructed = {executionKey: initialCollected.executionKey};
+  clock.value = START + 400000;
 
   const oldBrandObserve = await observeReviewLifecycle({
     ...lifecycleInput({
@@ -1198,26 +1281,48 @@ test('fresh collection with rotated auth after old auth expiry works after resta
   assert.equal(freshCollected.status, 'READY');
   assert.notEqual(freshCollected.provenance.authenticationEvidence.evidenceId, initialCollected.provenance.authenticationEvidence.evidenceId);
 
-  const restartedPending = await observeReviewLifecycle({
+  let receiptCount = 0;
+  const completed = await observeReviewLifecycle({
     ...lifecycleInput({
       collected: freshCollected,
       store,
       clock,
       dispatchReview: async () => ({status: 'ACKNOWLEDGED'}),
-      observeReview: async () => ({status: 'PENDING'}),
+      observeReview: async () => makeBoundaryCompletion({
+        reviewRequestId: started.reviewRequestId,
+        sessionId: started.sessionId,
+        collected: freshCollected,
+        nowMs: clock.value
+      }),
       revalidate: async () => freshCollected,
       receipt: {
-        postOnce: async () => ({status: 'CREATED', receiptId: 'unused'}),
-        lookupByActionKey: async () => ({status: 'NOT_FOUND', complete: true, receiptIds: []})
+        postOnce: async () => {
+          receiptCount++;
+          return {status: 'CREATED', receiptId: 'receipt-rotated'};
+        },
+        lookupByActionKey: async () => ({status: 'FOUND', complete: true, receiptIds: ['receipt-rotated']})
       }
     }),
     executionKey: reconstructed.executionKey
   });
-  assert.equal(restartedPending.status, 'REVIEW_PENDING');
+  assert.equal(completed.status, 'COMPLETE');
+  assert.equal(dispatchCount, 1);
+  assert.equal(receiptCount, 1);
+  assert.equal(backend.admissionState.consumedQuota, 1);
+  assert.equal(backend.admissionState.claims.length, 1);
+  assert.equal(backend.admissionState.activeGate, null);
+  assert.equal(backend.admissionState.claims[0].status, 'COMPLETED_ACKED');
+
+  const malformed = JSON.parse(serialized);
+  malformed.snapshot.revision = -1;
+  assert.throws(
+    () => DurableLifecycleBackend.fromSerializableRecords(malformed),
+    /INVALID_RECORDS/
+  );
 });
 
 test('receipt posted then final commit failure restarts into readback-only path without repost', async () => {
-  const backend = new DurableLifecycleBackend({failTransitionKinds: ['RECEIPT_DELIVERED']});
+  let backend = new DurableLifecycleBackend({failTransitionKinds: ['RECEIPT_DELIVERED']});
   let store = createCoordinatorStateStore({backend, enabled: true});
   const clock = {value: START + 100};
   const collected = await collectReady({nowMs: clock.value});
@@ -1269,6 +1374,7 @@ test('receipt posted then final commit failure restarts into readback-only path 
   assert.equal(persisted.status, 'READY');
   assert.equal(persisted.claim.lastStage, 'RECEIPT_POSTING');
 
+  backend = reconstructBackendFromJson(backend);
   store = createCoordinatorStateStore({backend, enabled: true});
   const restarted = await observeReviewLifecycle({
     ...lifecycleInput({
