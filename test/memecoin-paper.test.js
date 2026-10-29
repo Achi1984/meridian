@@ -397,6 +397,52 @@ test("fixed-point entry sizes to at most 8%, reserves atomically, and deduplicat
   assert.equal(ledger.executeEntry(auth, {...quote, eventId: "entry\nhttps://evil"}, {now: now + 2000}).status, "REJECT");
 });
 
+test("entry requires literal executable true", () => {
+  const now = Date.now();
+  for (const [index, executable] of ["false", 1, {}, []].entries()) {
+    const candidate = syntheticCandidate(now);
+    const ledger = new PaperLedger({now});
+    const auth = authorize(ledger, candidate, now);
+    const result = ledger.executeEntry(auth, fillQuote(candidate, now, {
+      eventId: `invalid-executable-${index}`,
+      executable
+    }), {now: now + 2000});
+    assert.equal(result.status, "UNFILLED");
+    assert.equal(ledger.summary().cashCents, "100000");
+    assert.equal(ledger.summary().openPositions.length, 0);
+  }
+});
+
+test("entry event identity binds actual quote identity and exact replay charges once", () => {
+  const now = Date.now();
+  const candidate = syntheticCandidate(now);
+  const ledger = new PaperLedger({now});
+  const auth = authorize(ledger, candidate, now);
+  const quote = fillQuote(candidate, now, {
+    eventId: "entry-quote-identity",
+    costs: {...ZERO_COSTS, feeCents: 10}
+  });
+  const fill = ledger.executeEntry(auth, quote, {now: now + 2000});
+  assert.equal(fill.status, "FILLED_PAPER");
+  assert.deepEqual(ledger.executeEntry(auth, quote, {now: now + 2000}), fill);
+  assert.equal(ledger.summary().cashCents, "92000");
+  assert.equal(ledger.summary().costs.entry.feeCents, "10");
+  assert.equal(ledger.summary().eventCount, 3);
+
+  const afterFill = ledger.summary();
+  const changedIdentities = [
+    {mint: "11111111111111111111111111111112"},
+    {chainId: "other-chain"},
+    {pool: "11111111111111111111111111111113"},
+    {quote: "11111111111111111111111111111114"}
+  ];
+  for (const identity of changedIdentities) {
+    const result = ledger.executeEntry(auth, {...quote, ...identity}, {now: now + 2000});
+    assert.equal(result.status, "REJECT");
+    assert.deepEqual(ledger.summary(), afterFill);
+  }
+});
+
 test("risk reservations cap three distinct positions and prevent same-tick re-entry", () => {
   const now = Date.now();
   const ledger = new PaperLedger({now});
@@ -485,7 +531,7 @@ test("analyst score must be a finite integer within the supported range", () => 
 });
 
 test("same-sample, stale, and identity-mismatched fills stay unfilled", () => {
-  const now = Date.now();
+  const now = Date.parse("2026-01-01T10:00:00Z");
   const candidate = syntheticCandidate(now);
   const ledger = new PaperLedger({now});
   const auth = authorize(ledger, candidate, now);

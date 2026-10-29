@@ -410,6 +410,9 @@ export class PaperLedger {
     const eventPayload = {
       eventId, authorizationId: authorization?.authorizationId, mint: authorization?.mint,
       chainId: authorization?.chainId, pool: authorization?.pool, quote: authorization?.quote,
+      quoteIdentity: {
+        mint: quote.mint, chainId: quote.chainId, pool: quote.pool, quote: quote.quote
+      },
       observedAt: quote.observedAt, priceMicros: quote.priceMicros,
       decimals: quote.decimals, costs: quote.costs, source: quote.source,
       executable: quote.executable, mode: quote.mode
@@ -444,7 +447,7 @@ export class PaperLedger {
     const fillTime = time(quote.observedAt);
     const authTime = time(auth.sampledAt);
     if (!quoteIdentityValid(quote, identity) || quote.mode !== "HYPOTHETICAL" ||
-        !quote.executable || fillTime === null || authTime === null ||
+        quote.executable !== true || fillTime === null || authTime === null ||
         fillTime <= authTime || fillTime <= authorizedTime ||
         fillTime > currentTime || currentTime - fillTime > MAX_QUOTE_AGE_MS ||
         quote.decimals !== auth.decimals ||
