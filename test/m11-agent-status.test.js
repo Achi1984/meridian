@@ -359,6 +359,7 @@ test('serialized status/freshness descriptor matrix rejects invalid top-level da
       statusGetterCount += 1;
       return 'READY';
     },
+    freshness: 'CURRENT',
     rows: [sample()]
   };
   const getterFreshness = {
