@@ -249,8 +249,13 @@ function validateSerializedStatus(raw, nowMs) {
   if (Object.prototype.hasOwnProperty.call(raw, 'freshness') && (!freshnessDescriptor || !Object.prototype.hasOwnProperty.call(freshnessDescriptor, 'value') || freshnessDescriptor.enumerable !== true || freshnessDescriptor.get !== undefined || freshnessDescriptor.set !== undefined)) {
     throw new TypeError('M11 agent status freshness must be a plain data property');
   }
-  if (statusValue !== undefined && statusValue !== 'READY') throw new TypeError('Invalid M11 agent status status');
-  if (freshnessValue !== undefined && !['CURRENT', 'STALE', 'UNKNOWN'].includes(freshnessValue)) throw new TypeError('Invalid M11 agent status freshness');
+  if (isSerialized) {
+    if (statusValue !== 'READY') throw new TypeError('M11 agent status status must be READY for serialized input');
+    if (!['CURRENT', 'STALE', 'UNKNOWN'].includes(freshnessValue)) throw new TypeError('Invalid M11 agent status freshness');
+  } else {
+    if (statusValue !== undefined && statusValue !== 'READY') throw new TypeError('Invalid M11 agent status status');
+    if (freshnessValue !== undefined && !['CURRENT', 'STALE', 'UNKNOWN'].includes(freshnessValue)) throw new TypeError('Invalid M11 agent status freshness');
+  }
   if (!isExactArray(raw.rows) || raw.rows.length === 0 || raw.rows.length > 50) {
     throw new TypeError('M11 agent status rows must be a non-empty array up to 50 items');
   }

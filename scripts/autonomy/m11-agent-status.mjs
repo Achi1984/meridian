@@ -430,11 +430,20 @@ export function normalizeM11AgentStatus(input, options = {}) {
   if (schemaValue !== 1) {
     throw new TypeError('Unsupported M11 agent status schemaVersion');
   }
-  if (statusValue !== undefined && statusValue !== 'READY') {
-    throw new TypeError('Invalid M11 agent status status');
-  }
-  if (freshnessValue !== undefined && !M11_FRESHNESS_STATES.includes(freshnessValue)) {
-    throw new TypeError('Invalid M11 agent status freshness');
+  if (isSerializedInput) {
+    if (statusValue !== 'READY') {
+      throw new TypeError('M11 agent status status must be READY for serialized input');
+    }
+    if (!M11_FRESHNESS_STATES.includes(freshnessValue)) {
+      throw new TypeError('Invalid M11 agent status freshness');
+    }
+  } else {
+    if (statusValue !== undefined && statusValue !== 'READY') {
+      throw new TypeError('Invalid M11 agent status status');
+    }
+    if (freshnessValue !== undefined && !M11_FRESHNESS_STATES.includes(freshnessValue)) {
+      throw new TypeError('Invalid M11 agent status freshness');
+    }
   }
   if (!isExactArray(rowsValue) || rowsValue.length === 0 || rowsValue.length > 50) {
     throw new TypeError('M11 agent status rows must be a non-empty array up to 50 items');
