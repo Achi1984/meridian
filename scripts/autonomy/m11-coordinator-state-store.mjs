@@ -80,6 +80,14 @@ export function createCoordinatorStateStore({backend = null, enabled = false} = 
         createdAt: now
       });
       if (!claimResult || claimResult.status !== 'CREATED') {
+        const released = await backend.releaseLease({
+          actionKey,
+          owner,
+          fencingToken: lease.fencingToken,
+          expectedRevision,
+          expectedOid
+        });
+        if (released?.status !== 'RELEASED') return Object.freeze({status: 'CLAIM_UNKNOWN'});
         if (claimResult?.status === 'BUDGET_EXHAUSTED') return Object.freeze({status: 'BUDGET_EXHAUSTED'});
         return Object.freeze({status: claimResult?.status === 'EXISTS' ? 'ALREADY_CLAIMED' : 'CLAIM_UNKNOWN'});
       }

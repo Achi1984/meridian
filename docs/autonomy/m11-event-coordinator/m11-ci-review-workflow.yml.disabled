@@ -12,6 +12,9 @@ permissions:
   contents: read
   pull-requests: read
 
+env:
+  M11_COORDINATOR_ENABLED: ${{ vars.M11_COORDINATOR_ENABLED || 'false' }}
+
 concurrency:
   group: m11-coordinator-${{ github.repository }}-${{ github.event.workflow_run.id }}
   cancel-in-progress: false
@@ -50,6 +53,8 @@ jobs:
             && Date.parse(manifest.startUtc) <= now
             && now < Date.parse(manifest.endUtc)
             && Date.parse(manifest.endUtc) - Date.parse(manifest.startUtc) <= 86400000
+            && Number.isSafeInteger(manifest.maxPackets)
+            && manifest.maxPackets > 0
             && manifest.maxPackets <= 3
             && Array.isArray(manifest.repositoryAllowlist)
             && manifest.repositoryAllowlist.includes('Achi1984/meridian')

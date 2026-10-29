@@ -299,8 +299,10 @@ test('workflow proposal remains outside active workflow discovery with default-d
   const template = readFileSync(path, 'utf8');
   assert.match(path.pathname, /\/docs\/autonomy\/m11-event-coordinator\/.*\.yml\.disabled$/);
   assert.match(template, /M11_COORDINATOR_ENABLED == 'true'/);
+  assert.match(template, /M11_COORDINATOR_ENABLED: \$\{\{ vars\.M11_COORDINATOR_ENABLED \|\| 'false' \}\}/);
   assert.match(template, /workflow_id == 347821227/);
   assert.match(template, /ref: main/);
+  assert.match(template, /manifest\.maxPackets > 0/);
   assert.match(template, /maxPackets <= 3/);
   assert.match(template, /<= 86400000/);
   assert.match(template, /Template placeholder/);
@@ -426,6 +428,7 @@ test('two concurrent state claimers produce one winner; retries cannot delete or
   });
   assert.equal(retry.status, 'ALREADY_CLAIMED');
   assert.equal(backend.claims.size, 1);
+  assert.equal(backend.snapshot.lease, null);
 });
 
 test('stale lease fencing loses the expected-OID CAS while the new fence can commit', async () => {
@@ -462,6 +465,7 @@ test('durable packet quota admits at most three distinct packets and reuses an e
   const tooMany = await claimStore(store, backend, 'f'.repeat(64), 'fourth-writer', '9'.repeat(64));
   assert.equal(tooMany.status, 'BUDGET_EXHAUSTED');
   assert.equal(backend.packetKeys.size, 3);
+  assert.equal(backend.snapshot.lease, null);
 });
 
 test('store reconstructs after restart and unknown commit outcomes require reconciliation', async () => {
