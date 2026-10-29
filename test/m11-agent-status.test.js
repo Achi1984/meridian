@@ -22,10 +22,10 @@ function sample(overrides = {}) {
     providerVerified: 'github',
     modelRequested: 'gpt-5',
     modelVerified: 'gpt-5',
-    taskUrl: 'https://example.com/tasks/task-200',
+    taskUrl: 'https://github.com/acme/meridian/issues/42',
     observedAt: '2026-10-29T11:55:00.000Z',
     expiresAt: '2026-10-29T12:05:00.000Z',
-    evidenceUrl: 'https://example.com/evidence/abc123',
+    evidenceUrl: 'https://github.com/acme/meridian/actions/runs/123456',
     evidenceType: 'github-workflow',
     blocker: 'Awaiting owner confirmation',
     nextAction: 'Wait for owner decision',
@@ -129,8 +129,13 @@ test('hostile URLs, extra fields and text are rejected before rendering', () => 
   assert.throws(() => validateM11AgentStatusRow(sample({nextAction: '<script>alert(1)</script>'}), NOW), {name: 'TypeError'});
   assert.throws(() => normalizeM11AgentStatus({schemaVersion: 1, rows: [withExtraField]}, {now: () => NOW}), {name: 'TypeError'});
 
-  const proxy = new Proxy(sample(), {});
+  const proxy = new Proxy(sample(), {
+    getOwnPropertyDescriptor() {
+      throw new Error('proxy trap invoked');
+    }
+  });
   assert.throws(() => validateM11AgentStatusRow(proxy, NOW), {name: 'TypeError'});
+  assert.throws(() => validateM11AgentStatusRow(sample({modelVerified: 'gpt-4'}), NOW), {name: 'TypeError'});
 });
 
 test('rendering is DOM-safe and text-only for public output', () => {

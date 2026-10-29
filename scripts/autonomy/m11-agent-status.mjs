@@ -40,26 +40,34 @@ const SUSPICIOUS_QUERY_KEYS = /(?:^|[?&;])(token|auth|password|passwd|secret|key
 
 function isSafePlainObject(value) {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
-  if (Object.getPrototypeOf(value) !== Object.prototype) return false;
-  if (Object.getOwnPropertySymbols(value).length > 0) return false;
-  const descriptors = Object.getOwnPropertyDescriptors(value);
-  const keys = Reflect.ownKeys(descriptors);
-  return keys.every(key => typeof key === 'string')
-    && Object.values(descriptors).every(descriptor => descriptor && Object.hasOwn(descriptor, 'value') && descriptor.enumerable === true && descriptor.get === undefined && descriptor.set === undefined);
+  try {
+    if (Object.getPrototypeOf(value) !== Object.prototype) return false;
+    if (Object.getOwnPropertySymbols(value).length > 0) return false;
+    const descriptors = Object.getOwnPropertyDescriptors(value);
+    const keys = Reflect.ownKeys(descriptors);
+    return keys.every(key => typeof key === 'string')
+      && Object.values(descriptors).every(descriptor => descriptor && Object.hasOwn(descriptor, 'value') && descriptor.enumerable === true && descriptor.get === undefined && descriptor.set === undefined);
+  } catch {
+    return false;
+  }
 }
 
 function isSafeArray(value) {
   if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) return false;
-  const descriptors = Object.getOwnPropertyDescriptors(value);
-  const keys = Reflect.ownKeys(descriptors);
-  if (keys.length !== value.length + 1 || !keys.includes('length')) return false;
-  for (const key of keys) {
-    if (key === 'length') continue;
-    if (typeof key !== 'string' || !/^(0|[1-9][0-9]*)$/.test(key) || Number(key) >= value.length) return false;
-    const descriptor = descriptors[key];
-    if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true || descriptor.get !== undefined || descriptor.set !== undefined) return false;
+  try {
+    const descriptors = Object.getOwnPropertyDescriptors(value);
+    const keys = Reflect.ownKeys(descriptors);
+    if (keys.length !== value.length + 1 || !keys.includes('length')) return false;
+    for (const key of keys) {
+      if (key === 'length') continue;
+      if (typeof key !== 'string' || !/^(0|[1-9][0-9]*)$/.test(key) || Number(key) >= value.length) return false;
+      const descriptor = descriptors[key];
+      if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true || descriptor.get !== undefined || descriptor.set !== undefined) return false;
+    }
+    return true;
+  } catch {
+    return false;
   }
-  return true;
 }
 
 function ensureFiniteClock(nowMs, label = 'clock') {
@@ -200,6 +208,12 @@ function validateRow(row, nowMs) {
   if (modelVerified !== 'UNKNOWN' && !modelVerified) {
     throw new TypeError('Model verification is invalid');
   }
+  if (providerVerified !== 'UNKNOWN' && providerVerified !== providerRequested) {
+    throw new TypeError('Provider verification must match the requested provider or be UNKNOWN');
+  }
+  if (modelVerified !== 'UNKNOWN' && modelVerified !== modelRequested) {
+    throw new TypeError('Model verification must match the requested model or be UNKNOWN');
+  }
 
   const taskUrl = safeGitHubUrl(row.taskUrl);
   if (!taskUrl) {
@@ -329,4 +343,15 @@ export function deriveM11Freshness(observedAt, expiresAt, nowMs = Date.now()) {
 
 export function validatePublicM11Url(value) {
   return safeGitHubUrl(value);
+}
+
+export const M11AgentStatusContract = Object.freeze({
+  normalizeM11AgentStatus,
+  validateM11AgentStatusRow,
+  deriveM11Freshness,
+  validatePublicM11Url
+});
+
+if (typeof globalThis !== 'undefined') {
+  globalThis.M11AgentStatusContract = M11AgentStatusContract;
 }
