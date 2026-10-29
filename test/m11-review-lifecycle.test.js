@@ -54,18 +54,27 @@ function runData({headSha = HEAD, baseSha = BASE, runId = RUN_ID, runAttempt = R
   };
 }
 
-function fixtureApi({headSha = HEAD, baseSha = BASE, runId = RUN_ID, runAttempt = RUN_ATTEMPT, runNumber = SELECTION_REVISION} = {}) {
+function fixtureApi({
+  headSha = HEAD,
+  baseSha = BASE,
+  runId = RUN_ID,
+  runAttempt = RUN_ATTEMPT,
+  runNumber = SELECTION_REVISION,
+  authEvidenceId = 'fixture-auth-1',
+  authVerifiedAtMs = START,
+  authExpiresAtMs = START + 600000
+} = {}) {
   const run = runData({headSha, baseSha, runId, runAttempt, runNumber});
   return {
     authenticated: true,
     authenticationEvidence: Object.freeze({
-      evidenceId: 'fixture-auth-1',
+      evidenceId: authEvidenceId,
       principal: 'synthetic-principal',
       host: 'api.github.com',
       scheme: 'https',
       tls: true,
-      verifiedAtMs: START,
-      expiresAtMs: START + 600000
+      verifiedAtMs: authVerifiedAtMs,
+      expiresAtMs: authExpiresAtMs
     }),
     async getWorkflowRun() {
       return run;
@@ -120,7 +129,10 @@ async function collectReady({
   nowMs = START + 100,
   runId = RUN_ID,
   runAttempt = RUN_ATTEMPT,
-  runNumber = SELECTION_REVISION
+  runNumber = SELECTION_REVISION,
+  authEvidenceId = 'fixture-auth-1',
+  authVerifiedAtMs = START,
+  authExpiresAtMs = START + 600000
 } = {}) {
   return collectExactPair({
     hint: {
@@ -130,7 +142,16 @@ async function collectReady({
       workflowRunAttempt: runAttempt
     },
     config: collectConfig(),
-    api: fixtureApi({headSha, baseSha, runId, runAttempt, runNumber}),
+    api: fixtureApi({
+      headSha,
+      baseSha,
+      runId,
+      runAttempt,
+      runNumber,
+      authEvidenceId,
+      authVerifiedAtMs,
+      authExpiresAtMs
+    }),
     now: () => nowMs
   });
 }
@@ -187,7 +208,9 @@ class DurableLifecycleBackend {
       executionKey: claim.executionKey,
       stage: mappedStage
     });
-    if (result.changed === true) this.admissionState = result.state;
+    if (result.changed !== true || result.status !== 'UNKNOWN') return null;
+    this.admissionState = result.state;
+    return result.state;
   }
 
   async readSnapshot() {
@@ -254,12 +277,13 @@ class DurableLifecycleBackend {
       this.failedKinds.add(commit.transition.kind);
       return {status: 'CONFLICT'};
     }
-    current.oid = input.newOid;
-    current.revision = input.newRevision;
-    claim.expectedOid = input.newOid;
-    claim.expectedRevision = input.newRevision;
     const transition = commit.transition;
+    let nextAdmissionState = this.admissionState;
     if (transition.kind === 'REVIEW_PENDING') {
+      current.oid = input.newOid;
+      current.revision = input.newRevision;
+      claim.expectedOid = input.newOid;
+      claim.expectedRevision = input.newRevision;
       claim.status = 'REVIEW_PENDING';
       claim.lastStage = 'REVIEW_PENDING';
       claim.reviewRequestId = transition.reviewRequestId;
@@ -278,13 +302,19 @@ class DurableLifecycleBackend {
       claim.selectionRevision = transition.selectionRevision;
       claim.reviewDeadlineAt = transition.reviewDeadlineAt;
     } else if (transition.kind === 'REVIEW_RESULT') {
-      const observed = this.admissionEventResult({
+      const observed = reduceAdmissionRecord(this.admissionState, {
         kind: 'EFFECT_OBSERVED',
         logicalActionId: claim.actionKey,
         executionKey: claim.executionKey,
         admissionRevision: claim.admissionRevision
       });
-      if (observed.changed === true) this.admissionState = observed.state;
+      if (observed.status !== 'RECORDED' || observed.changed !== true) return {status: 'CONFLICT'};
+      nextAdmissionState = observed.state;
+      current.oid = input.newOid;
+      current.revision = input.newRevision;
+      claim.expectedOid = input.newOid;
+      claim.expectedRevision = input.newRevision;
+      this.admissionState = nextAdmissionState;
       claim.status = 'REVIEWED';
       claim.lastStage = 'REVIEW_RESULT';
       claim.completionState = transition.completionState;
@@ -292,17 +322,14 @@ class DurableLifecycleBackend {
       if (transition.evidenceId) claim.evidenceId = transition.evidenceId;
       if (transition.reason) claim.reason = transition.reason;
     } else if (transition.kind === 'RECEIPT_POSTING') {
+      current.oid = input.newOid;
+      current.revision = input.newRevision;
+      claim.expectedOid = input.newOid;
+      claim.expectedRevision = input.newRevision;
       claim.status = 'RECEIPT_POSTING';
       claim.lastStage = 'RECEIPT_POSTING';
     } else if (transition.kind === 'RECEIPT_DELIVERED') {
-      const observed = this.admissionEventResult({
-        kind: 'EFFECT_OBSERVED',
-        logicalActionId: claim.actionKey,
-        executionKey: claim.executionKey,
-        admissionRevision: claim.admissionRevision
-      });
-      if (observed.changed === true) this.admissionState = observed.state;
-      const completed = this.admissionEventResult({
+      const completed = reduceAdmissionRecord(this.admissionState, {
         kind: 'TERMINAL_COMPLETION',
         evidence: {
           logicalActionId: claim.actionKey,
@@ -312,16 +339,34 @@ class DurableLifecycleBackend {
           checkpointAcknowledged: true
         }
       });
-      if (completed.changed === true) this.admissionState = completed.state;
+      if (completed.status !== 'RECORDED' || completed.changed !== true) return {status: 'CONFLICT'};
+      nextAdmissionState = completed.state;
+      current.oid = input.newOid;
+      current.revision = input.newRevision;
+      claim.expectedOid = input.newOid;
+      claim.expectedRevision = input.newRevision;
+      this.admissionState = nextAdmissionState;
       claim.status = 'COMMITTED';
       claim.lastStage = 'RECEIPT_DELIVERED';
       claim.receiptId = transition.receiptId;
       claim.completionState = transition.completionState;
       claim.verdict = transition.verdict;
     } else if (transition.kind === 'UNKNOWN') {
-      this.applyUnknownAdmission(claim, transition.stage);
+      const unknownState = this.applyUnknownAdmission(claim, transition.stage);
+      if (!unknownState) return {status: 'CONFLICT'};
+      nextAdmissionState = unknownState;
+      current.oid = input.newOid;
+      current.revision = input.newRevision;
+      claim.expectedOid = input.newOid;
+      claim.expectedRevision = input.newRevision;
+      this.admissionState = nextAdmissionState;
       claim.status = 'UNKNOWN';
       claim.lastStage = transition.stage;
+    } else {
+      current.oid = input.newOid;
+      current.revision = input.newRevision;
+      claim.expectedOid = input.newOid;
+      claim.expectedRevision = input.newRevision;
     }
     return {status: 'COMMITTED', oid: input.newOid};
   }
@@ -1030,4 +1075,221 @@ test('composition: async start->pending->restart->observe->boundary->receipt and
   assert.equal(duplicateUnknownObserve.status, 'UNKNOWN');
   assert.equal(duplicateUnknownObserve.reason, 'RECEIPT_FOUND_RECONCILE_REQUIRED');
   assert.equal(unknownReceiptPosts, 1);
+});
+
+test('restart after STALE_BEFORE_DISPATCH remains UNKNOWN and never posts receipt', async () => {
+  const clock = {value: START + 100};
+  const collected = await collectReady({nowMs: clock.value});
+  const backend = new DurableLifecycleBackend();
+  const store = createCoordinatorStateStore({backend, enabled: true});
+  let validations = 0;
+  const staleBeforeDispatch = await startReviewLifecycle({
+    ...lifecycleInput({
+      collected,
+      store,
+      clock,
+      dispatchReview: async input => ({status: 'ACKNOWLEDGED', reviewRequestId: input.reviewRequestId, sessionId: input.sessionId}),
+      observeReview: async () => ({status: 'PENDING'}),
+      revalidate: async () => {
+        validations++;
+        if (validations === 1) return collected;
+        return collectReady({nowMs: clock.value, headSha: 'c'.repeat(40), baseSha: BASE});
+      },
+      receipt: {
+        postOnce: async () => ({status: 'CREATED', receiptId: 'should-not-happen'}),
+        lookupByActionKey: async () => ({status: 'NOT_FOUND', complete: true, receiptIds: []})
+      }
+    })
+  });
+  assert.equal(staleBeforeDispatch.status, 'UNKNOWN');
+  assert.equal(staleBeforeDispatch.reason, 'STALE_OR_UNKNOWN_BEFORE_DISPATCH');
+  const retained = await store.reconcile(collected.executionKey);
+  assert.equal(retained.status, 'READY');
+  assert.equal(retained.claim.status, 'UNKNOWN');
+  assert.equal(retained.claim.lastStage, 'STALE_BEFORE_DISPATCH');
+
+  const restartedStore = createCoordinatorStateStore({backend, enabled: true});
+  let receiptPosts = 0;
+  const observeAfterRestart = await observeReviewLifecycle({
+    ...lifecycleInput({
+      collected,
+      store: restartedStore,
+      clock,
+      dispatchReview: async () => ({status: 'ACKNOWLEDGED'}),
+      observeReview: async () => makeBoundaryCompletion({
+        reviewRequestId: retained.claim.reviewRequestId,
+        sessionId: retained.claim.sessionId,
+        collected,
+        nowMs: clock.value
+      }),
+      revalidate: async () => collected,
+      receipt: {
+        postOnce: async () => {
+          receiptPosts++;
+          return {status: 'CREATED', receiptId: 'retry'};
+        },
+        lookupByActionKey: async () => ({status: 'FOUND', complete: true, receiptIds: ['retry']})
+      }
+    }),
+    executionKey: collected.executionKey
+  });
+  assert.equal(observeAfterRestart.status, 'UNKNOWN');
+  assert.equal(observeAfterRestart.reason, 'TERMINAL_UNKNOWN_REQUIRES_MANUAL_RECONCILIATION');
+  assert.equal(receiptPosts, 0);
+});
+
+test('fresh collection with rotated auth after old auth expiry works after restart without old brand revival', async () => {
+  const backend = new DurableLifecycleBackend();
+  let store = createCoordinatorStateStore({backend, enabled: true});
+  const clock = {value: START + 100};
+  const initialCollected = await collectReady({
+    nowMs: clock.value,
+    authEvidenceId: 'fixture-auth-old',
+    authVerifiedAtMs: START,
+    authExpiresAtMs: START + 1000
+  });
+  assert.equal(initialCollected.status, 'READY');
+  const started = await startReviewLifecycle({
+    ...lifecycleInput({
+      collected: initialCollected,
+      store,
+      clock,
+      dispatchReview: async input => ({status: 'ACKNOWLEDGED', reviewRequestId: input.reviewRequestId, sessionId: input.sessionId}),
+      observeReview: async () => ({status: 'PENDING'}),
+      revalidate: async () => initialCollected,
+      receipt: {
+        postOnce: async () => ({status: 'CREATED', receiptId: 'unused'}),
+        lookupByActionKey: async () => ({status: 'NOT_FOUND', complete: true, receiptIds: []})
+      }
+    }),
+    reviewDeadlineMs: 600000
+  });
+  assert.equal(started.status, 'REVIEW_PENDING');
+
+  const serialized = JSON.stringify({executionKey: initialCollected.executionKey});
+  const reconstructed = JSON.parse(serialized);
+  clock.value = START + 400000;
+  store = createCoordinatorStateStore({backend, enabled: true});
+
+  const oldBrandObserve = await observeReviewLifecycle({
+    ...lifecycleInput({
+      collected: initialCollected,
+      store,
+      clock,
+      dispatchReview: async () => ({status: 'ACKNOWLEDGED'}),
+      observeReview: async () => ({status: 'PENDING'}),
+      revalidate: async () => initialCollected,
+      receipt: {
+        postOnce: async () => ({status: 'CREATED', receiptId: 'bad'}),
+        lookupByActionKey: async () => ({status: 'NOT_FOUND', complete: true, receiptIds: []})
+      }
+    }),
+    executionKey: reconstructed.executionKey
+  });
+  assert.equal(oldBrandObserve.status, 'WAITING');
+  assert.equal(oldBrandObserve.reason, 'FRESH_COLLECTION_REQUIRED');
+
+  const freshCollected = await collectReady({
+    nowMs: clock.value,
+    authEvidenceId: 'fixture-auth-new',
+    authVerifiedAtMs: clock.value - 1000,
+    authExpiresAtMs: clock.value + 600000
+  });
+  assert.equal(freshCollected.status, 'READY');
+  assert.notEqual(freshCollected.provenance.authenticationEvidence.evidenceId, initialCollected.provenance.authenticationEvidence.evidenceId);
+
+  const restartedPending = await observeReviewLifecycle({
+    ...lifecycleInput({
+      collected: freshCollected,
+      store,
+      clock,
+      dispatchReview: async () => ({status: 'ACKNOWLEDGED'}),
+      observeReview: async () => ({status: 'PENDING'}),
+      revalidate: async () => freshCollected,
+      receipt: {
+        postOnce: async () => ({status: 'CREATED', receiptId: 'unused'}),
+        lookupByActionKey: async () => ({status: 'NOT_FOUND', complete: true, receiptIds: []})
+      }
+    }),
+    executionKey: reconstructed.executionKey
+  });
+  assert.equal(restartedPending.status, 'REVIEW_PENDING');
+});
+
+test('receipt posted then final commit failure restarts into readback-only path without repost', async () => {
+  const backend = new DurableLifecycleBackend({failTransitionKinds: ['RECEIPT_DELIVERED']});
+  let store = createCoordinatorStateStore({backend, enabled: true});
+  const clock = {value: START + 100};
+  const collected = await collectReady({nowMs: clock.value});
+  const started = await startReviewLifecycle({
+    ...lifecycleInput({
+      collected,
+      store,
+      clock,
+      dispatchReview: async input => ({status: 'ACKNOWLEDGED', reviewRequestId: input.reviewRequestId, sessionId: input.sessionId}),
+      observeReview: async () => ({status: 'PENDING'}),
+      revalidate: async () => collected,
+      receipt: {
+        postOnce: async () => ({status: 'CREATED', receiptId: 'unused'}),
+        lookupByActionKey: async () => ({status: 'NOT_FOUND', complete: true, receiptIds: []})
+      }
+    })
+  });
+  assert.equal(started.status, 'REVIEW_PENDING');
+
+  let postCount = 0;
+  const firstObserve = await observeReviewLifecycle({
+    ...lifecycleInput({
+      collected,
+      store,
+      clock,
+      dispatchReview: async () => ({status: 'ACKNOWLEDGED'}),
+      observeReview: async () => makeBoundaryCompletion({
+        reviewRequestId: started.reviewRequestId,
+        sessionId: started.sessionId,
+        collected,
+        nowMs: clock.value
+      }),
+      revalidate: async () => collected,
+      receipt: {
+        postOnce: async () => {
+          postCount++;
+          return {status: 'CREATED', receiptId: 'receipt-crash'};
+        },
+        lookupByActionKey: async () => ({status: 'FOUND', complete: true, receiptIds: ['receipt-crash']})
+      }
+    }),
+    executionKey: collected.executionKey
+  });
+  assert.equal(firstObserve.status, 'UNKNOWN');
+  assert.equal(firstObserve.reason, 'RECEIPT_STATE_COMMIT_UNKNOWN');
+  assert.equal(postCount, 1);
+
+  const persisted = await store.reconcile(collected.executionKey);
+  assert.equal(persisted.status, 'READY');
+  assert.equal(persisted.claim.lastStage, 'RECEIPT_POSTING');
+
+  store = createCoordinatorStateStore({backend, enabled: true});
+  const restarted = await observeReviewLifecycle({
+    ...lifecycleInput({
+      collected,
+      store,
+      clock,
+      dispatchReview: async () => ({status: 'ACKNOWLEDGED'}),
+      observeReview: async () => ({status: 'PENDING'}),
+      revalidate: async () => collected,
+      receipt: {
+        postOnce: async () => {
+          postCount++;
+          return {status: 'CREATED', receiptId: 'receipt-retry'};
+        },
+        lookupByActionKey: async () => ({status: 'FOUND', complete: true, receiptIds: ['receipt-crash']})
+      }
+    }),
+    executionKey: collected.executionKey
+  });
+  assert.equal(restarted.status, 'UNKNOWN');
+  assert.equal(restarted.reason, 'RECEIPT_FOUND_RECONCILE_REQUIRED');
+  assert.equal(postCount, 1);
+  assert.equal(backend.admissionState.activeGate.executionKey, collected.executionKey);
 });
