@@ -138,21 +138,55 @@ function normalizeState(input) {
     fail('STATE_INVALID');
   }
   const activeGate = normalizeGate(state.activeGate, 'STATE_INVALID');
+  const reconciliation = normalizeReconciliation(state.reconciliation, 'STATE_INVALID');
   const claimsRaw = readArray(state.claims, 'STATE_INVALID');
   if (claimsRaw.length > MAX_RETAINED_CLAIMS) fail('STATE_INVALID');
   const claims = claimsRaw.map(value => normalizeClaim(value, 'STATE_INVALID'));
-  const seen = new Set();
+  const seenLogical = new Set();
+  const seenExecution = new Set();
   for (const claim of claims) {
-    if (seen.has(claim.logicalActionId)) fail('STATE_INVALID');
-    seen.add(claim.logicalActionId);
+    if (seenLogical.has(claim.logicalActionId) || seenExecution.has(claim.executionKey)) fail('STATE_INVALID');
+    seenLogical.add(claim.logicalActionId);
+    seenExecution.add(claim.executionKey);
+    if (claim.admissionRevision > state.revision) fail('STATE_INVALID');
+    if (claim.status === 'ADMITTED') {
+      if (claim.completion !== 'PENDING') fail('STATE_INVALID');
+    } else if (claim.status === 'COMPLETED_UNACKED') {
+      if (claim.effectObserved !== true || claim.completion !== 'UNACKNOWLEDGED') fail('STATE_INVALID');
+    } else if (claim.status === 'COMPLETED_ACKED') {
+      if (claim.effectObserved !== true || claim.completion !== 'ACKNOWLEDGED') fail('STATE_INVALID');
+    } else if (claim.status === 'UNKNOWN') {
+      if (claim.completion !== 'PENDING') fail('STATE_INVALID');
+    }
+  }
+  if (state.consumedQuota !== claims.length) fail('STATE_INVALID');
+  if (claims.some(claim => claim.status === 'ADMITTED') && activeGate === null) fail('STATE_INVALID');
+  if (claims.some(claim => claim.status === 'COMPLETED_UNACKED') && activeGate === null) fail('STATE_INVALID');
+  const unknownClaims = claims.filter(claim => claim.status === 'UNKNOWN');
+  if (reconciliation.status === 'CLEAR') {
+    if (unknownClaims.length > 0) fail('STATE_INVALID');
+  } else {
+    if (unknownClaims.length !== 1) fail('STATE_INVALID');
+    if (activeGate === null) fail('STATE_INVALID');
+    const unknownClaim = unknownClaims[0];
+    if (unknownClaim.logicalActionId !== reconciliation.logicalActionId
+      || unknownClaim.executionKey !== reconciliation.executionKey) {
+      fail('STATE_INVALID');
+    }
+    if (activeGate.logicalActionId !== reconciliation.logicalActionId
+      || activeGate.executionKey !== reconciliation.executionKey
+      || activeGate.admissionRevision !== unknownClaim.admissionRevision) {
+      fail('STATE_INVALID');
+    }
   }
   if (activeGate !== null) {
     const matched = claims.find(claim => claim.logicalActionId === activeGate.logicalActionId
       && claim.executionKey === activeGate.executionKey
       && claim.admissionRevision === activeGate.admissionRevision);
     if (!matched) fail('STATE_INVALID');
+    if (!['ADMITTED', 'COMPLETED_UNACKED', 'UNKNOWN'].includes(matched.status)) fail('STATE_INVALID');
   }
-  const reconciliation = normalizeReconciliation(state.reconciliation, 'STATE_INVALID');
+  if (activeGate === null && claims.some(claim => claim.status === 'UNKNOWN')) fail('STATE_INVALID');
   return deepFreeze({
     enabled: state.enabled,
     revision: state.revision,
@@ -260,10 +294,28 @@ function claimIndexByLogicalAction(state, logicalActionId) {
   return state.claims.findIndex(claim => claim.logicalActionId === logicalActionId);
 }
 
+function claimIndexByExecutionKey(state, executionKey) {
+  return state.claims.findIndex(claim => claim.executionKey === executionKey);
+}
+
 function exactIdentityMatch(claim, identity) {
   return claim && claim.logicalActionId === identity.logicalActionId
     && claim.executionKey === identity.executionKey
     && claim.admissionRevision === identity.admissionRevision;
+}
+
+function nextRevisionAvailable(state) {
+  return state.revision < Number.MAX_SAFE_INTEGER;
+}
+
+function finalize(state, status, reason, changed) {
+  return deepFreeze({
+    status,
+    reason,
+    changed,
+    state: normalizeState(state),
+    ...noAuthorityFields()
+  });
 }
 
 export function createAdmissionRecordState(options = {}) {
@@ -313,8 +365,12 @@ export function reduceAdmissionRecord(inputState, inputEvent) {
     if (event.expectedRevision !== state.revision) return blocked(state, 'STALE_REVISION');
     if (event.expectedTotalQuota !== state.totalQuota) return blocked(state, 'TOTAL_QUOTA_MISMATCH');
     if (state.activeGate !== null) return blocked(state, 'ACTIVE_GATE_HELD');
+    if (!nextRevisionAvailable(state)) return blocked(state, 'REVISION_EXHAUSTED');
     if (claimIndexByLogicalAction(state, event.logicalActionId) !== -1) {
       return blocked(state, 'DUPLICATE_LOGICAL_ACTION');
+    }
+    if (claimIndexByExecutionKey(state, event.executionKey) !== -1) {
+      return blocked(state, 'DUPLICATE_EXECUTION_KEY');
     }
     if (state.claims.length >= MAX_RETAINED_CLAIMS) return blocked(state, 'CLAIM_RETENTION_LIMIT');
     if (state.consumedQuota >= state.totalQuota) return blocked(state, 'QUOTA_EXHAUSTED');
@@ -337,18 +393,13 @@ export function reduceAdmissionRecord(inputState, inputEvent) {
       admissionRevision: claim.admissionRevision
     };
 
-    return deepFreeze({
-      status: 'ADMITTED',
-      reason: 'SIMULATED_ATOMIC_ADMISSION',
-      changed: true,
-      state: next,
-      ...noAuthorityFields()
-    });
+    return finalize(next, 'ADMITTED', 'SIMULATED_ATOMIC_ADMISSION', true);
   }
 
   if (event.kind === 'EFFECT_OBSERVED') {
     if (state.reconciliation.status === 'UNKNOWN') return blocked(state, 'UNKNOWN_LATCHED');
     if (!state.activeGate) return blocked(state, 'NO_ACTIVE_GATE');
+    if (!nextRevisionAvailable(state)) return blocked(state, 'REVISION_EXHAUSTED');
     if (!exactIdentityMatch(state.activeGate, event)) return blocked(state, 'ACTIVE_GATE_MISMATCH');
     const index = claimIndexByLogicalAction(state, event.logicalActionId);
     if (index < 0) return blocked(state, 'CLAIM_NOT_FOUND');
@@ -360,18 +411,13 @@ export function reduceAdmissionRecord(inputState, inputEvent) {
     next.revision += 1;
     next.claims[index].effectObserved = true;
 
-    return deepFreeze({
-      status: 'RECORDED',
-      reason: 'EFFECT_OBSERVED',
-      changed: true,
-      state: next,
-      ...noAuthorityFields()
-    });
+    return finalize(next, 'RECORDED', 'EFFECT_OBSERVED', true);
   }
 
   if (event.kind === 'TERMINAL_COMPLETION') {
     if (state.reconciliation.status === 'UNKNOWN') return blocked(state, 'UNKNOWN_LATCHED');
     if (!state.activeGate) return blocked(state, 'NO_ACTIVE_GATE');
+    if (!nextRevisionAvailable(state)) return blocked(state, 'REVISION_EXHAUSTED');
     if (!exactIdentityMatch(state.activeGate, event.evidence)) return blocked(state, 'ACTIVE_GATE_MISMATCH');
     const index = claimIndexByLogicalAction(state, event.evidence.logicalActionId);
     if (index < 0) return blocked(state, 'CLAIM_NOT_FOUND');
@@ -386,17 +432,13 @@ export function reduceAdmissionRecord(inputState, inputEvent) {
     next.claims[index].status = event.evidence.checkpointAcknowledged ? 'COMPLETED_ACKED' : 'COMPLETED_UNACKED';
     if (event.evidence.checkpointAcknowledged) next.activeGate = null;
 
-    return deepFreeze({
-      status: 'RECORDED',
-      reason: event.evidence.checkpointAcknowledged ? 'TERMINAL_ACKNOWLEDGED' : 'TERMINAL_UNACKNOWLEDGED',
-      changed: true,
-      state: next,
-      ...noAuthorityFields()
-    });
+    return finalize(next, 'RECORDED',
+      event.evidence.checkpointAcknowledged ? 'TERMINAL_ACKNOWLEDGED' : 'TERMINAL_UNACKNOWLEDGED', true);
   }
 
   if (event.kind === 'MARK_UNKNOWN') {
     if (state.reconciliation.status === 'UNKNOWN') return blocked(state, 'UNKNOWN_ALREADY_LATCHED');
+    if (!nextRevisionAvailable(state)) return blocked(state, 'REVISION_EXHAUSTED');
     const index = claimIndexByLogicalAction(state, event.logicalActionId);
     if (index < 0) return blocked(state, 'CLAIM_NOT_FOUND');
     const claim = state.claims[index];
@@ -413,13 +455,7 @@ export function reduceAdmissionRecord(inputState, inputEvent) {
       observations: []
     };
 
-    return deepFreeze({
-      status: 'UNKNOWN',
-      reason: `${event.stage}_OUTCOME_UNKNOWN`,
-      changed: true,
-      state: next,
-      ...noAuthorityFields()
-    });
+    return finalize(next, 'UNKNOWN', `${event.stage}_OUTCOME_UNKNOWN`, true);
   }
 
   if (state.reconciliation.status !== 'UNKNOWN') return blocked(state, 'NO_UNKNOWN_LATCH');
@@ -427,6 +463,7 @@ export function reduceAdmissionRecord(inputState, inputEvent) {
     || event.executionKey !== state.reconciliation.executionKey) {
     return blocked(state, 'RECONCILIATION_IDENTITY_MISMATCH');
   }
+  if (!nextRevisionAvailable(state)) return blocked(state, 'REVISION_EXHAUSTED');
   if (state.reconciliation.observations.length >= MAX_READBACK_OBSERVATIONS) {
     return blocked(state, 'READBACK_OBSERVATION_LIMIT');
   }
@@ -435,13 +472,7 @@ export function reduceAdmissionRecord(inputState, inputEvent) {
   next.revision += 1;
   next.reconciliation.observations.push(event.observation);
 
-  return deepFreeze({
-    status: 'UNKNOWN',
-    reason: 'UNKNOWN_ANNOTATED',
-    changed: true,
-    state: next,
-    ...noAuthorityFields()
-  });
+  return finalize(next, 'UNKNOWN', 'UNKNOWN_ANNOTATED', true);
 }
 
 export const ADMISSION_RECORD_LIMITS = Object.freeze({

@@ -33,6 +33,8 @@ A successful `SIMULATE_ADMISSION` transition updates **revision + claim + consum
 - Expected revision and expected total quota must match.
 - Only one active gate can exist.
 - Existing logical claim blocks duplicate logical action, including fresh execution keys.
+- Retained execution keys are also unique and cannot be reused by a different logical action.
+- Reconstructed state must satisfy relational invariants (claims/quota/revision/status/gate/UNKNOWN latch bindings), not just field shapes.
 - Rejections are fail-closed and return unchanged state.
 - Quota and retained claims are never refunded/deleted by this reducer.
 
@@ -49,12 +51,18 @@ Readback events may annotate observations (`committed`, `notobserved`, `unresolv
 
 `UNKNOWN` survives JSON serialization/reconstruction and continues blocking competing admissions while the latch/gate is present.
 
+Malformed reconstructed records (for example `ADMITTED` or `UNKNOWN` claims without valid gate/latch bindings) are rejected before any transition.
+
 ## Completion and gate release
 
 - Completion evidence must be exact-bound to logical action, execution key, and admission revision.
 - Unacknowledged completion does **not** release the active gate.
 - Only acknowledged terminal completion may release the gate.
 - Claim and consumed quota remain retained permanently after release.
+
+## Revision safety
+
+Every mutating transition requires a safe next revision. If `revision` is already `Number.MAX_SAFE_INTEGER`, the reducer blocks unchanged with `REVISION_EXHAUSTED`.
 
 ## Explicit non-claim
 

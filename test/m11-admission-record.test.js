@@ -187,6 +187,36 @@ test('existing claim blocks duplicate logical action with fresh execution key', 
   assert.equal(blockedByRetainedClaim.reason, 'DUPLICATE_LOGICAL_ACTION');
 });
 
+test('retained execution key cannot be reused after acknowledged completion', () => {
+  let state = createAdmissionRecordState({enabled: true, totalQuota: 2});
+  state = reduceAdmissionRecord(state, admissionEvent({
+    expectedRevision: 0,
+    expectedTotalQuota: 2,
+    logicalActionId: ACTION_A,
+    executionKey: EXEC_A
+  })).state;
+  state = reduceAdmissionRecord(state, effectEvent({
+    logicalActionId: ACTION_A,
+    executionKey: EXEC_A,
+    admissionRevision: 1
+  })).state;
+  state = reduceAdmissionRecord(state, completionEvent({
+    logicalActionId: ACTION_A,
+    executionKey: EXEC_A,
+    admissionRevision: 1,
+    checkpointAcknowledged: true
+  })).state;
+
+  const reusedExecution = reduceAdmissionRecord(state, admissionEvent({
+    expectedRevision: state.revision,
+    expectedTotalQuota: 2,
+    logicalActionId: ACTION_B,
+    executionKey: EXEC_A
+  }));
+  assert.equal(reusedExecution.status, 'BLOCKED');
+  assert.equal(reusedExecution.reason, 'DUPLICATE_EXECUTION_KEY');
+});
+
 test('reservation before effect and effect before receipt ack are enforced', () => {
   const state = createAdmissionRecordState({enabled: true, totalQuota: 2});
 
@@ -353,6 +383,240 @@ test('UNKNOWN is terminal, survives roundtrip, and readback never resumes author
   assert.equal(stillBlocked.status, 'BLOCKED');
   assert.equal(stillBlocked.reason, 'UNKNOWN_LATCHED');
   assertNoAuthority(stillBlocked);
+});
+
+test('reachable conservative UNKNOWN checkpoint state roundtrips and remains blocked', () => {
+  let state = createAdmissionRecordState({enabled: true, totalQuota: 2});
+  state = reduceAdmissionRecord(state, admissionEvent({
+    expectedRevision: 0,
+    expectedTotalQuota: 2,
+    logicalActionId: ACTION_A,
+    executionKey: EXEC_A
+  })).state;
+  state = reduceAdmissionRecord(state, effectEvent({
+    logicalActionId: ACTION_A,
+    executionKey: EXEC_A,
+    admissionRevision: 1
+  })).state;
+  state = reduceAdmissionRecord(state, unknownEvent({
+    logicalActionId: ACTION_A,
+    executionKey: EXEC_A,
+    stage: 'CHECKPOINT'
+  })).state;
+  const restored = JSON.parse(JSON.stringify(state));
+
+  const annotated = reduceAdmissionRecord(restored, readbackEvent({
+    logicalActionId: ACTION_A,
+    executionKey: EXEC_A,
+    observation: 'unresolved'
+  }));
+  assert.equal(annotated.status, 'UNKNOWN');
+  assert.equal(annotated.state.reconciliation.status, 'UNKNOWN');
+  assert.equal(annotated.state.claims[0].status, 'UNKNOWN');
+  assert.equal(annotated.state.claims[0].effectObserved, true);
+  assert.notEqual(annotated.state.activeGate, null);
+});
+
+test('malformed reconstructed states fail before transition', () => {
+  const invalidAdmittedNoGate = {
+    enabled: true,
+    revision: 1,
+    totalQuota: 2,
+    consumedQuota: 1,
+    activeGate: null,
+    claims: [{
+      logicalActionId: ACTION_A,
+      executionKey: EXEC_A,
+      admissionRevision: 1,
+      status: 'ADMITTED',
+      effectObserved: false,
+      completion: 'PENDING'
+    }],
+    reconciliation: {
+      status: 'CLEAR',
+      stage: null,
+      logicalActionId: null,
+      executionKey: null,
+      observations: []
+    }
+  };
+  assert.throws(() => reduceAdmissionRecord(invalidAdmittedNoGate, admissionEvent({
+    expectedRevision: 1,
+    expectedTotalQuota: 2,
+    logicalActionId: ACTION_B,
+    executionKey: EXEC_B
+  })), {code: 'STATE_INVALID'});
+
+  const invalidUnknownClear = {
+    enabled: true,
+    revision: 2,
+    totalQuota: 2,
+    consumedQuota: 1,
+    activeGate: null,
+    claims: [{
+      logicalActionId: ACTION_A,
+      executionKey: EXEC_A,
+      admissionRevision: 1,
+      status: 'UNKNOWN',
+      effectObserved: true,
+      completion: 'PENDING'
+    }],
+    reconciliation: {
+      status: 'CLEAR',
+      stage: null,
+      logicalActionId: null,
+      executionKey: null,
+      observations: []
+    }
+  };
+  assert.throws(() => reduceAdmissionRecord(invalidUnknownClear, readbackEvent({
+    logicalActionId: ACTION_A,
+    executionKey: EXEC_A,
+    observation: 'committed'
+  })), {code: 'STATE_INVALID'});
+
+  const invalidDuplicateExecution = {
+    enabled: true,
+    revision: 2,
+    totalQuota: 3,
+    consumedQuota: 2,
+    activeGate: {
+      logicalActionId: ACTION_B,
+      executionKey: EXEC_B,
+      admissionRevision: 2
+    },
+    claims: [
+      {
+        logicalActionId: ACTION_A,
+        executionKey: EXEC_A,
+        admissionRevision: 1,
+        status: 'COMPLETED_ACKED',
+        effectObserved: true,
+        completion: 'ACKNOWLEDGED'
+      },
+      {
+        logicalActionId: ACTION_B,
+        executionKey: EXEC_A,
+        admissionRevision: 2,
+        status: 'ADMITTED',
+        effectObserved: false,
+        completion: 'PENDING'
+      }
+    ],
+    reconciliation: {
+      status: 'CLEAR',
+      stage: null,
+      logicalActionId: null,
+      executionKey: null,
+      observations: []
+    }
+  };
+  assert.throws(() => reduceAdmissionRecord(invalidDuplicateExecution, effectEvent({
+    logicalActionId: ACTION_B,
+    executionKey: EXEC_B,
+    admissionRevision: 2
+  })), {code: 'STATE_INVALID'});
+});
+
+test('revision overflow blocks unchanged on every mutating transition kind', () => {
+  const max = Number.MAX_SAFE_INTEGER;
+  const base = {
+    enabled: true,
+    revision: max,
+    totalQuota: 2,
+    consumedQuota: 1,
+    activeGate: {
+      logicalActionId: ACTION_A,
+      executionKey: EXEC_A,
+      admissionRevision: 1
+    },
+    claims: [{
+      logicalActionId: ACTION_A,
+      executionKey: EXEC_A,
+      admissionRevision: 1,
+      status: 'ADMITTED',
+      effectObserved: true,
+      completion: 'PENDING'
+    }],
+    reconciliation: {
+      status: 'CLEAR',
+      stage: null,
+      logicalActionId: null,
+      executionKey: null,
+      observations: []
+    }
+  };
+  const admissionState = {
+    ...base,
+    consumedQuota: 0,
+    activeGate: null,
+    claims: []
+  };
+  const admission = reduceAdmissionRecord(admissionState, admissionEvent({
+    expectedRevision: max,
+    expectedTotalQuota: 2,
+    logicalActionId: ACTION_B,
+    executionKey: EXEC_B
+  }));
+  assert.equal(admission.status, 'BLOCKED');
+  assert.equal(admission.reason, 'REVISION_EXHAUSTED');
+  assert.equal(admission.changed, false);
+  assert.deepEqual(admission.state, admissionState);
+
+  const effect = reduceAdmissionRecord(base, effectEvent({
+    logicalActionId: ACTION_A,
+    executionKey: EXEC_A,
+    admissionRevision: 1
+  }));
+  assert.equal(effect.reason, 'REVISION_EXHAUSTED');
+  assert.equal(effect.changed, false);
+  assert.deepEqual(effect.state, base);
+
+  const completion = reduceAdmissionRecord(base, completionEvent({
+    logicalActionId: ACTION_A,
+    executionKey: EXEC_A,
+    admissionRevision: 1,
+    checkpointAcknowledged: true
+  }));
+  assert.equal(completion.reason, 'REVISION_EXHAUSTED');
+  assert.equal(completion.changed, false);
+  assert.deepEqual(completion.state, base);
+
+  const markUnknown = reduceAdmissionRecord(base, unknownEvent({
+    logicalActionId: ACTION_A,
+    executionKey: EXEC_A,
+    stage: 'CHECKPOINT'
+  }));
+  assert.equal(markUnknown.reason, 'REVISION_EXHAUSTED');
+  assert.equal(markUnknown.changed, false);
+  assert.deepEqual(markUnknown.state, base);
+
+  const unknownBase = {
+    ...base,
+    claims: [{
+      logicalActionId: ACTION_A,
+      executionKey: EXEC_A,
+      admissionRevision: 1,
+      status: 'UNKNOWN',
+      effectObserved: true,
+      completion: 'PENDING'
+    }],
+    reconciliation: {
+      status: 'UNKNOWN',
+      stage: 'CHECKPOINT',
+      logicalActionId: ACTION_A,
+      executionKey: EXEC_A,
+      observations: []
+    }
+  };
+  const readback = reduceAdmissionRecord(unknownBase, readbackEvent({
+    logicalActionId: ACTION_A,
+    executionKey: EXEC_A,
+    observation: 'unresolved'
+  }));
+  assert.equal(readback.reason, 'REVISION_EXHAUSTED');
+  assert.equal(readback.changed, false);
+  assert.deepEqual(readback.state, unknownBase);
 });
 
 test('rejections leave prior frozen input unchanged', () => {
