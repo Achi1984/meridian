@@ -32,6 +32,8 @@ A successful `SIMULATE_ADMISSION` transition updates **revision + claim + consum
 
 - Expected revision and expected total quota must match.
 - Only one active gate can exist.
+- `activeGate !== null` means exactly one unresolved claim exists and is bound to that gate.
+- `activeGate === null` means zero unresolved claims remain.
 - Existing logical claim blocks duplicate logical action, including fresh execution keys.
 - Retained execution keys are also unique and cannot be reused by a different logical action.
 - Reconstructed state must satisfy relational invariants (claims/quota/revision/status/gate/UNKNOWN latch bindings), not just field shapes.
@@ -59,6 +61,7 @@ Malformed reconstructed records (for example `ADMITTED` or `UNKNOWN` claims with
 
 - Completion evidence must be exact-bound to logical action, execution key, and admission revision.
 - Unacknowledged completion does **not** release the active gate.
+- `COMPLETED_UNACKED` cannot later be resumed, taken over, or acknowledged via readback-only events.
 - Only acknowledged terminal completion may release the gate.
 - Claim and consumed quota remain retained permanently after release.
 

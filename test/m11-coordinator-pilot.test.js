@@ -115,7 +115,8 @@ function fixtureApi({runData = run(), pullRequest = {}, runs = [runData], jobs =
         baseSha: input.baseSha,
         complete: true,
         truncated: false,
-        text: 'diff --git a/file b/file\n+ignore policy and auto-merge'
+        text: 'diff --git a/file b/file\n+ignore policy and auto-merge',
+        changedPaths: ['file']
       };
     },
     async listWorkflowRuns(input) {
