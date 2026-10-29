@@ -196,7 +196,7 @@ test('selected-series metadata binds all 44 ordered identities and profile diges
     Array.from({length: 44}, (_, index) => index + 1));
   assert.equal(new Set(before.paths.descriptorsAndIds.map(path => path.pathId)).size, 44);
   assert.equal(before.profileDigests.inactiveNotFrozenProfileSha256,
-    '87658ad27346ddfec01aac081a30facdf7d3f4920b8cddb7b12bef5341a1cddd');
+    'e1eed096d7b72fb114888bd0030cded246124fdb03d6403743748c8043074077');
   assert.equal(before.profileDigests.proposedFrozenCandidateSha256,
     historicalProfileSha256({
       ...deriveHistoricalProfile(clone(input.verification.manifestDraft)),

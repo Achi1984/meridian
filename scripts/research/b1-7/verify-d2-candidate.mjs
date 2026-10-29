@@ -19,7 +19,7 @@ const IMPLEMENTATION_ID = 'MERIDIAN-B1-7-ENGINE-R3';
 const IMPLEMENTATION_SHA256 = 'ab73261f01b27b8655ffea7979fec03eb1a9bea667b6fc4cda8d77b75c4f3e06';
 const INPUT_MANIFEST_SHA256 = '37fecaa0d003c9ec862fb57b3b312c0289c1dd370607ade99bac584d357f81a9';
 const INPUT_SHA256 = '24c992c39d5c722464b19483ad4b0f1e55c8a434b6a1ac137a8dd10438398a7b';
-const SOURCE_IDENTITY_SHA256 = '4a27722939d62cdca5600b6ad6491bfbc4228b66c35b0ba6326eec8c4c35fd9a';
+const SOURCE_IDENTITY_SHA256 = 'b25e5136a653e04f91785fc832af4140060eba09e2caa3a5b3501b563bafab04';
 const PATHS_MANIFEST_SHA256 = '5303d2b5ddc3d40de984504435ecc73d4b4734aa6bd423fb64833913f5526442';
 const COMPUTATION_ORDER_SHA256 = '5339191d01d68a09ae10b9e8aa75194e5beb16d358f27fd5eb6a1f7c94757265';
 const COST_ASSUMPTIONS_SHA256 = '11d1014790c255db8cc0cd73c4a74f78b6fd9c08aadd4ac03e2910f538acb4eb';
@@ -68,20 +68,20 @@ const SOURCE_HASHES = {
   validator: '2052c0fae0082622f48a18abb4a6dacc0ffa679fb5da01df5779b398f5a578fc',
   loader: '93d05a81625fed4e7f56f889a1b3b2950ac98191f183dff99f5c7f44a276f02d',
   protocol: PROTOCOL_SHA256,
-  bridge: '7240f8202937804d271bb8f3b000e56a77eacdc669fb08049d315606dc3285a7',
+  bridge: 'f5f80ea186fee15d076d8291425a81e9ff5e5dead895ca20b54764f9bf486696',
   admission: 'eb3bef19553a299c27023bc4558157b75267fa99adf23661e5efb5730b905f04',
   profile: '1df24e3372acb900ead091aef55f6f6fc2288a81bcf769e7587fb36e12aaad17',
   adapter: '79bef665862be2a1751d201c6303c571344c42cdc7fe76897c66ff74561c5c5f',
   adapterRuntime: '2d912e011e441abee4c884236a8a4c09791b502151f470e7388cd2333b1ee165',
   supervisor: 'd5e9004fe5375afdfaef7fb877403c917d184126f81a15f9de76a9bc79d44b9b',
-  journal: '83c1d37557afff72adfc08dbd2a0036db3fb7c45a895a679b7015c3f23cc055e'
+  journal: 'd817302fe3d95911027f712046a8e9d7efaad7dc0a6e1fb66612a22a715f3131'
 };
 const METADATA_FILES = {
   d1Verification: ['docs/research/d1-20261019/verification.json', '223548051320d00866666d87b1b543243fecf9d1a5ca647be2d7a09d0b1f0f05'],
   d1Readme: ['docs/research/d1-20261019/README.md', 'fc9a8639ae307a21b8c6dc9ef39e2a4fabc0be50f9c17e447f97e874bb41fd05'],
   d1VerifierArchive: ['docs/research/d1-20261019/executed-verifier.mjs.txt', '30e2b8bf80d93f2bb76b70a0afc28092180b729b1b0bd4ccf203359d28b6c156'],
-  inactiveProfileJson: ['scripts/research-supervisor/historical_run_profile.json', 'fbb6c24c001ef28b51b44a88b9e7738b9de2cdb8d08a3b2a1e79a9585be46afd'],
-  pathBridgeManifest: ['scripts/research-supervisor/b1_bridge_manifest.json', '7240f8202937804d271bb8f3b000e56a77eacdc669fb08049d315606dc3285a7'],
+  inactiveProfileJson: ['scripts/research-supervisor/historical_run_profile.json', 'eb0a9d0d89972334f1a197fea7f8dba7474b2088d9057011a089b2f0413e0dcb'],
+  pathBridgeManifest: ['scripts/research-supervisor/b1_bridge_manifest.json', 'f5f80ea186fee15d076d8291425a81e9ff5e5dead895ca20b54764f9bf486696'],
   protocolJson: ['research/protocols/b1-7-20261018/protocol.json', PROTOCOL_SHA256],
   candidateBuilder: ['scripts/research/b1-7/prepare-d2-candidate.mjs', 'ed599c66a68325849ee83dc8e9b25c95b43ab5649e7a336fd48cfb4377fc4549']
 };
@@ -133,9 +133,9 @@ const COMPUTATION_ORDER = [
   38, 39, 40, 41, 43
 ];
 const PATH_PROFILE_DIGESTS = {
-  inactiveNotFrozenProfileSha256: '87658ad27346ddfec01aac081a30facdf7d3f4920b8cddb7b12bef5341a1cddd',
-  populatedUnfrozenCandidateSha256: '3141e104ee832c8b46bc80bda5a9110c750841204178e8afc868d31aba305572',
-  proposedFrozenCandidateSha256: '097dd4c68039bc768abebf2791273d704ebe5a9dec28fa753c552af1d25e74e4'
+  inactiveNotFrozenProfileSha256: 'e1eed096d7b72fb114888bd0030cded246124fdb03d6403743748c8043074077',
+  populatedUnfrozenCandidateSha256: 'da29e303945ccd689662105f2ab6ee4f44c5d8c9066d8b868cfc54840954dc9e',
+  proposedFrozenCandidateSha256: 'f722b167e9fafbb1b060d51a59a7b23af810fadbe03621bfe93569b39729b678'
 };
 const LIMITS = {
   trials: 1, paths: 44, processes: 1, batchSeconds: 1800, pathSeconds: 60,
