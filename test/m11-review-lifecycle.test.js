@@ -1850,16 +1850,26 @@ test('sequence A injection: observe unknown plus failed UNKNOWN persistence leav
   let store = createCoordinatorStateStore({backend, enabled: true});
   const clock = {value: START + 100};
   const collected = await collectReady({nowMs: clock.value});
+  const counters = {dispatch: 0, observe: 0, post: 0};
   const started = await startReviewLifecycle({
     ...lifecycleInput({
       collected,
       store,
       clock,
-      dispatchReview: async input => ({status: 'ACKNOWLEDGED', reviewRequestId: input.reviewRequestId, sessionId: input.sessionId}),
-      observeReview: async () => ({status: 'PENDING'}),
+      dispatchReview: async input => {
+        counters.dispatch++;
+        return {status: 'ACKNOWLEDGED', reviewRequestId: input.reviewRequestId, sessionId: input.sessionId};
+      },
+      observeReview: async () => {
+        counters.observe++;
+        return {status: 'PENDING'};
+      },
       revalidate: async () => collected,
       receipt: {
-        postOnce: async () => ({status: 'CREATED', receiptId: 'unused'}),
+        postOnce: async () => {
+          counters.post++;
+          return {status: 'CREATED', receiptId: 'unused'};
+        },
         lookupByActionKey: async () => ({status: 'NOT_FOUND', complete: true, receiptIds: []})
       }
     })
@@ -1873,11 +1883,15 @@ test('sequence A injection: observe unknown plus failed UNKNOWN persistence leav
       clock,
       dispatchReview: async () => ({status: 'ACKNOWLEDGED'}),
       observeReview: async () => {
+        counters.observe++;
         throw new Error('observe unavailable');
       },
       revalidate: async () => collected,
       receipt: {
-        postOnce: async () => ({status: 'CREATED', receiptId: 'unused'}),
+        postOnce: async () => {
+          counters.post++;
+          return {status: 'CREATED', receiptId: 'unused'};
+        },
         lookupByActionKey: async () => ({status: 'NOT_FOUND', complete: true, receiptIds: []})
       }
     }),
@@ -1888,14 +1902,39 @@ test('sequence A injection: observe unknown plus failed UNKNOWN persistence leav
   const retained = await store.reconcile(collected.executionKey);
   assert.equal(retained.status, 'READY');
   assert.equal(retained.claim.lastStage, 'OBSERVE_PREPARING');
+  const retainedClaimBeforeRestart = structuredClone(retained.claim);
   assert.equal(backend.admissionState.activeGate.executionKey, collected.executionKey);
   assert.equal(backend.admissionState.consumedQuota, 1);
   assert.equal(backend.admissionState.claims.length, 1);
 
   backend = reconstructBackendFromJson(backend);
   store = createCoordinatorStateStore({backend, enabled: true});
-  let observeCalls = 0;
-  let receiptPosts = 0;
+  const duplicateStart = await startReviewLifecycle({
+    ...lifecycleInput({
+      collected,
+      store,
+      clock,
+      dispatchReview: async input => {
+        counters.dispatch++;
+        return {status: 'ACKNOWLEDGED', reviewRequestId: input.reviewRequestId, sessionId: input.sessionId};
+      },
+      observeReview: async () => {
+        counters.observe++;
+        return {status: 'PENDING'};
+      },
+      revalidate: async () => collected,
+      receipt: {
+        postOnce: async () => {
+          counters.post++;
+          return {status: 'CREATED', receiptId: 'unused'};
+        },
+        lookupByActionKey: async () => ({status: 'NOT_FOUND', complete: true, receiptIds: []})
+      }
+    })
+  });
+  assert.equal(duplicateStart.status, 'WAITING');
+  assert.equal(duplicateStart.reason, 'ALREADY_CLAIMED');
+  const countersAfterDuplicateStart = {...counters};
   const restarted = await observeReviewLifecycle({
     ...lifecycleInput({
       collected,
@@ -1903,7 +1942,7 @@ test('sequence A injection: observe unknown plus failed UNKNOWN persistence leav
       clock,
       dispatchReview: async () => ({status: 'ACKNOWLEDGED'}),
       observeReview: async () => {
-        observeCalls++;
+        counters.observe++;
         return makeBoundaryCompletion({
           reviewRequestId: started.reviewRequestId,
           sessionId: started.sessionId,
@@ -1914,7 +1953,7 @@ test('sequence A injection: observe unknown plus failed UNKNOWN persistence leav
       revalidate: async () => collected,
       receipt: {
         postOnce: async () => {
-          receiptPosts++;
+          counters.post++;
           return {status: 'CREATED', receiptId: 'unexpected'};
         },
         lookupByActionKey: async () => ({status: 'FOUND', complete: true, receiptIds: ['unexpected']})
@@ -1924,8 +1963,20 @@ test('sequence A injection: observe unknown plus failed UNKNOWN persistence leav
   });
   assert.equal(restarted.status, 'UNKNOWN');
   assert.equal(restarted.reason, 'PERSISTENCE_UNCERTAINTY_RECONCILE_REQUIRED');
-  assert.equal(observeCalls, 0);
-  assert.equal(receiptPosts, 0);
+  assert.deepEqual(counters, countersAfterDuplicateStart);
+  assert.equal(counters.dispatch, 1);
+  assert.equal(counters.observe, 1);
+  assert.equal(counters.post, 0);
+  assert.equal(backend.admissionState.consumedQuota, 1);
+  assert.equal(backend.admissionState.claims.length, 1);
+  assert.equal(backend.admissionState.activeGate.executionKey, collected.executionKey);
+  const retainedAfterRestart = await store.reconcile(collected.executionKey);
+  assert.equal(retainedAfterRestart.status, 'READY');
+  assert.equal(retainedAfterRestart.claim.lastStage, retainedClaimBeforeRestart.lastStage);
+  assert.equal(retainedAfterRestart.claim.actionKey, retainedClaimBeforeRestart.actionKey);
+  assert.equal(retainedAfterRestart.claim.executionKey, retainedClaimBeforeRestart.executionKey);
+  assert.equal(retainedAfterRestart.claim.reviewRequestId, retainedClaimBeforeRestart.reviewRequestId);
+  assert.equal(retainedAfterRestart.claim.sessionId, retainedClaimBeforeRestart.sessionId);
 });
 
 test('sequence B injection: stale-before-receipt plus failed UNKNOWN persistence leaves RECEIPT_PREPARING fence nonadvancing after JSON reconstruction', async () => {
@@ -1933,16 +1984,26 @@ test('sequence B injection: stale-before-receipt plus failed UNKNOWN persistence
   let store = createCoordinatorStateStore({backend, enabled: true});
   const clock = {value: START + 100};
   const collected = await collectReady({nowMs: clock.value});
+  const counters = {dispatch: 0, observe: 0, post: 0};
   const started = await startReviewLifecycle({
     ...lifecycleInput({
       collected,
       store,
       clock,
-      dispatchReview: async input => ({status: 'ACKNOWLEDGED', reviewRequestId: input.reviewRequestId, sessionId: input.sessionId}),
-      observeReview: async () => ({status: 'PENDING'}),
+      dispatchReview: async input => {
+        counters.dispatch++;
+        return {status: 'ACKNOWLEDGED', reviewRequestId: input.reviewRequestId, sessionId: input.sessionId};
+      },
+      observeReview: async () => {
+        counters.observe++;
+        return {status: 'PENDING'};
+      },
       revalidate: async () => collected,
       receipt: {
-        postOnce: async () => ({status: 'CREATED', receiptId: 'unused'}),
+        postOnce: async () => {
+          counters.post++;
+          return {status: 'CREATED', receiptId: 'unused'};
+        },
         lookupByActionKey: async () => ({status: 'NOT_FOUND', complete: true, receiptIds: []})
       }
     })
@@ -1956,19 +2017,25 @@ test('sequence B injection: stale-before-receipt plus failed UNKNOWN persistence
       store,
       clock,
       dispatchReview: async () => ({status: 'ACKNOWLEDGED'}),
-      observeReview: async () => makeBoundaryCompletion({
-        reviewRequestId: started.reviewRequestId,
-        sessionId: started.sessionId,
-        collected,
-        nowMs: clock.value
-      }),
+      observeReview: async () => {
+        counters.observe++;
+        return makeBoundaryCompletion({
+          reviewRequestId: started.reviewRequestId,
+          sessionId: started.sessionId,
+          collected,
+          nowMs: clock.value
+        });
+      },
       revalidate: async () => {
         revalidateCalls++;
         if (revalidateCalls === 1) return collected;
         return {...collected, headSha: 'f'.repeat(40)};
       },
       receipt: {
-        postOnce: async () => ({status: 'CREATED', receiptId: 'unexpected'}),
+        postOnce: async () => {
+          counters.post++;
+          return {status: 'CREATED', receiptId: 'unexpected'};
+        },
         lookupByActionKey: async () => ({status: 'FOUND', complete: true, receiptIds: ['unexpected']})
       }
     }),
@@ -1979,14 +2046,39 @@ test('sequence B injection: stale-before-receipt plus failed UNKNOWN persistence
   const retained = await store.reconcile(collected.executionKey);
   assert.equal(retained.status, 'READY');
   assert.equal(retained.claim.lastStage, 'RECEIPT_PREPARING');
+  const retainedClaimBeforeRestart = structuredClone(retained.claim);
   assert.equal(backend.admissionState.activeGate.executionKey, collected.executionKey);
   assert.equal(backend.admissionState.consumedQuota, 1);
   assert.equal(backend.admissionState.claims.length, 1);
 
   backend = reconstructBackendFromJson(backend);
   store = createCoordinatorStateStore({backend, enabled: true});
-  let observeCalls = 0;
-  let receiptPosts = 0;
+  const duplicateStart = await startReviewLifecycle({
+    ...lifecycleInput({
+      collected,
+      store,
+      clock,
+      dispatchReview: async input => {
+        counters.dispatch++;
+        return {status: 'ACKNOWLEDGED', reviewRequestId: input.reviewRequestId, sessionId: input.sessionId};
+      },
+      observeReview: async () => {
+        counters.observe++;
+        return {status: 'PENDING'};
+      },
+      revalidate: async () => collected,
+      receipt: {
+        postOnce: async () => {
+          counters.post++;
+          return {status: 'CREATED', receiptId: 'unused'};
+        },
+        lookupByActionKey: async () => ({status: 'NOT_FOUND', complete: true, receiptIds: []})
+      }
+    })
+  });
+  assert.equal(duplicateStart.status, 'WAITING');
+  assert.equal(duplicateStart.reason, 'ALREADY_CLAIMED');
+  const countersAfterDuplicateStart = {...counters};
   const restarted = await observeReviewLifecycle({
     ...lifecycleInput({
       collected,
@@ -1994,7 +2086,7 @@ test('sequence B injection: stale-before-receipt plus failed UNKNOWN persistence
       clock,
       dispatchReview: async () => ({status: 'ACKNOWLEDGED'}),
       observeReview: async () => {
-        observeCalls++;
+        counters.observe++;
         return makeBoundaryCompletion({
           reviewRequestId: started.reviewRequestId,
           sessionId: started.sessionId,
@@ -2005,7 +2097,7 @@ test('sequence B injection: stale-before-receipt plus failed UNKNOWN persistence
       revalidate: async () => collected,
       receipt: {
         postOnce: async () => {
-          receiptPosts++;
+          counters.post++;
           return {status: 'CREATED', receiptId: 'unexpected'};
         },
         lookupByActionKey: async () => ({status: 'FOUND', complete: true, receiptIds: ['unexpected']})
@@ -2015,8 +2107,20 @@ test('sequence B injection: stale-before-receipt plus failed UNKNOWN persistence
   });
   assert.equal(restarted.status, 'UNKNOWN');
   assert.equal(restarted.reason, 'PERSISTENCE_UNCERTAINTY_RECONCILE_REQUIRED');
-  assert.equal(observeCalls, 0);
-  assert.equal(receiptPosts, 0);
+  assert.deepEqual(counters, countersAfterDuplicateStart);
+  assert.equal(counters.dispatch, 1);
+  assert.equal(counters.observe, 1);
+  assert.equal(counters.post, 0);
+  assert.equal(backend.admissionState.consumedQuota, 1);
+  assert.equal(backend.admissionState.claims.length, 1);
+  assert.equal(backend.admissionState.activeGate.executionKey, collected.executionKey);
+  const retainedAfterRestart = await store.reconcile(collected.executionKey);
+  assert.equal(retainedAfterRestart.status, 'READY');
+  assert.equal(retainedAfterRestart.claim.lastStage, retainedClaimBeforeRestart.lastStage);
+  assert.equal(retainedAfterRestart.claim.actionKey, retainedClaimBeforeRestart.actionKey);
+  assert.equal(retainedAfterRestart.claim.executionKey, retainedClaimBeforeRestart.executionKey);
+  assert.equal(retainedAfterRestart.claim.reviewRequestId, retainedClaimBeforeRestart.reviewRequestId);
+  assert.equal(retainedAfterRestart.claim.sessionId, retainedClaimBeforeRestart.sessionId);
 });
 
 test('durable COMPLETE review result resumes receipt before deadline when receipt preparation never began', async () => {
@@ -2182,20 +2286,26 @@ test('ack and pending entry windows with UNKNOWN persistence failure remain nona
     let store = createCoordinatorStateStore({backend, enabled: true});
     const clock = {value: START + 100};
     const collected = await collectReady({nowMs: clock.value});
-    let dispatchCount = 0;
+    const counters = {dispatch: 0, observe: 0, post: 0};
     const started = await startReviewLifecycle({
       ...lifecycleInput({
         collected,
         store,
         clock,
         dispatchReview: async input => {
-          dispatchCount++;
+          counters.dispatch++;
           return {status: 'ACKNOWLEDGED', reviewRequestId: input.reviewRequestId, sessionId: input.sessionId};
         },
-        observeReview: async () => ({status: 'PENDING'}),
+        observeReview: async () => {
+          counters.observe++;
+          return {status: 'PENDING'};
+        },
         revalidate: async () => collected,
         receipt: {
-          postOnce: async () => ({status: 'CREATED', receiptId: 'unused'}),
+          postOnce: async () => {
+            counters.post++;
+            return {status: 'CREATED', receiptId: 'unused'};
+          },
           lookupByActionKey: async () => ({status: 'NOT_FOUND', complete: true, receiptIds: []})
         }
       })
@@ -2207,10 +2317,16 @@ test('ack and pending entry windows with UNKNOWN persistence failure remain nona
         store,
         clock,
         dispatchReview: async () => ({status: 'ACKNOWLEDGED'}),
-        observeReview: async () => ({status: 'PENDING'}),
+        observeReview: async () => {
+          counters.observe++;
+          return {status: 'PENDING'};
+        },
         revalidate: async () => ({...collected, headSha: 'f'.repeat(40)}),
         receipt: {
-          postOnce: async () => ({status: 'CREATED', receiptId: 'unexpected'}),
+          postOnce: async () => {
+            counters.post++;
+            return {status: 'CREATED', receiptId: 'unexpected'};
+          },
           lookupByActionKey: async () => ({status: 'FOUND', complete: true, receiptIds: ['unexpected']})
         }
       }),
@@ -2221,6 +2337,7 @@ test('ack and pending entry windows with UNKNOWN persistence failure remain nona
     const retained = await store.reconcile(collected.executionKey);
     assert.equal(retained.status, 'READY');
     assert.equal(retained.claim.lastStage, 'OBSERVE_PREPARING');
+    const retainedClaimBeforeRestart = structuredClone(retained.claim);
     backend = reconstructBackendFromJson(backend);
     store = createCoordinatorStateStore({backend, enabled: true});
     const duplicateStart = await startReviewLifecycle({
@@ -2229,21 +2346,26 @@ test('ack and pending entry windows with UNKNOWN persistence failure remain nona
         store,
         clock,
         dispatchReview: async input => {
-          dispatchCount++;
+          counters.dispatch++;
           return {status: 'ACKNOWLEDGED', reviewRequestId: input.reviewRequestId, sessionId: input.sessionId};
         },
-        observeReview: async () => ({status: 'PENDING'}),
+        observeReview: async () => {
+          counters.observe++;
+          return {status: 'PENDING'};
+        },
         revalidate: async () => collected,
         receipt: {
-          postOnce: async () => ({status: 'CREATED', receiptId: 'unused'}),
+          postOnce: async () => {
+            counters.post++;
+            return {status: 'CREATED', receiptId: 'unused'};
+          },
           lookupByActionKey: async () => ({status: 'NOT_FOUND', complete: true, receiptIds: []})
         }
       })
     });
     assert.equal(duplicateStart.status, 'WAITING');
     assert.equal(duplicateStart.reason, 'ALREADY_CLAIMED');
-    let observeCalls = 0;
-    let receiptPosts = 0;
+    const countersAfterDuplicateStart = {...counters};
     const restarted = await observeReviewLifecycle({
       ...lifecycleInput({
         collected,
@@ -2251,7 +2373,7 @@ test('ack and pending entry windows with UNKNOWN persistence failure remain nona
         clock,
         dispatchReview: async () => ({status: 'ACKNOWLEDGED'}),
         observeReview: async () => {
-          observeCalls++;
+          counters.observe++;
           return makeBoundaryCompletion({
             reviewRequestId: started.reviewRequestId,
             sessionId: started.sessionId,
@@ -2262,7 +2384,7 @@ test('ack and pending entry windows with UNKNOWN persistence failure remain nona
         revalidate: async () => collected,
         receipt: {
           postOnce: async () => {
-            receiptPosts++;
+            counters.post++;
             return {status: 'CREATED', receiptId: 'unexpected'};
           },
           lookupByActionKey: async () => ({status: 'FOUND', complete: true, receiptIds: ['unexpected']})
@@ -2272,12 +2394,20 @@ test('ack and pending entry windows with UNKNOWN persistence failure remain nona
     });
     assert.equal(restarted.status, 'UNKNOWN');
     assert.equal(restarted.reason, 'PERSISTENCE_UNCERTAINTY_RECONCILE_REQUIRED');
-    assert.equal(dispatchCount, 1);
-    assert.equal(observeCalls, 0);
-    assert.equal(receiptPosts, 0);
+    assert.deepEqual(counters, countersAfterDuplicateStart);
+    assert.equal(counters.dispatch, 1);
+    assert.equal(counters.observe, 0);
+    assert.equal(counters.post, 0);
     assert.equal(backend.admissionState.consumedQuota, 1);
     assert.equal(backend.admissionState.claims.length, 1);
     assert.equal(backend.admissionState.activeGate.executionKey, collected.executionKey);
+    const retainedAfterRestart = await store.reconcile(collected.executionKey);
+    assert.equal(retainedAfterRestart.status, 'READY');
+    assert.equal(retainedAfterRestart.claim.lastStage, retainedClaimBeforeRestart.lastStage);
+    assert.equal(retainedAfterRestart.claim.actionKey, retainedClaimBeforeRestart.actionKey);
+    assert.equal(retainedAfterRestart.claim.executionKey, retainedClaimBeforeRestart.executionKey);
+    assert.equal(retainedAfterRestart.claim.reviewRequestId, retainedClaimBeforeRestart.reviewRequestId);
+    assert.equal(retainedAfterRestart.claim.sessionId, retainedClaimBeforeRestart.sessionId);
   }
 
   {
@@ -2285,16 +2415,26 @@ test('ack and pending entry windows with UNKNOWN persistence failure remain nona
     let store = createCoordinatorStateStore({backend, enabled: true});
     const clock = {value: START + 100};
     const collected = await collectReady({nowMs: clock.value});
+    const counters = {dispatch: 0, observe: 0, post: 0};
     const started = await startReviewLifecycle({
       ...lifecycleInput({
         collected,
         store,
         clock,
-        dispatchReview: async input => ({status: 'ACKNOWLEDGED', reviewRequestId: input.reviewRequestId, sessionId: input.sessionId}),
-        observeReview: async () => ({status: 'PENDING'}),
+        dispatchReview: async input => {
+          counters.dispatch++;
+          return {status: 'ACKNOWLEDGED', reviewRequestId: input.reviewRequestId, sessionId: input.sessionId};
+        },
+        observeReview: async () => {
+          counters.observe++;
+          return {status: 'PENDING'};
+        },
         revalidate: async () => collected,
         receipt: {
-          postOnce: async () => ({status: 'CREATED', receiptId: 'unused'}),
+          postOnce: async () => {
+            counters.post++;
+            return {status: 'CREATED', receiptId: 'unused'};
+          },
           lookupByActionKey: async () => ({status: 'NOT_FOUND', complete: true, receiptIds: []})
         }
       })
@@ -2306,10 +2446,16 @@ test('ack and pending entry windows with UNKNOWN persistence failure remain nona
         store,
         clock,
         dispatchReview: async () => ({status: 'ACKNOWLEDGED'}),
-        observeReview: async () => ({status: 'PENDING'}),
+        observeReview: async () => {
+          counters.observe++;
+          return {status: 'PENDING'};
+        },
         revalidate: async () => collected,
         receipt: {
-          postOnce: async () => ({status: 'CREATED', receiptId: 'unused'}),
+          postOnce: async () => {
+            counters.post++;
+            return {status: 'CREATED', receiptId: 'unused'};
+          },
           lookupByActionKey: async () => ({status: 'NOT_FOUND', complete: true, receiptIds: []})
         }
       }),
@@ -2323,10 +2469,16 @@ test('ack and pending entry windows with UNKNOWN persistence failure remain nona
         store,
         clock,
         dispatchReview: async () => ({status: 'ACKNOWLEDGED'}),
-        observeReview: async () => ({status: 'PENDING'}),
+        observeReview: async () => {
+          counters.observe++;
+          return {status: 'PENDING'};
+        },
         revalidate: async () => driftCollected,
         receipt: {
-          postOnce: async () => ({status: 'CREATED', receiptId: 'unexpected'}),
+          postOnce: async () => {
+            counters.post++;
+            return {status: 'CREATED', receiptId: 'unexpected'};
+          },
           lookupByActionKey: async () => ({status: 'FOUND', complete: true, receiptIds: ['unexpected']})
         }
       }),
@@ -2337,10 +2489,35 @@ test('ack and pending entry windows with UNKNOWN persistence failure remain nona
     const retained = await store.reconcile(collected.executionKey);
     assert.equal(retained.status, 'READY');
     assert.equal(retained.claim.lastStage, 'OBSERVE_PREPARING');
+    const retainedClaimBeforeRestart = structuredClone(retained.claim);
     backend = reconstructBackendFromJson(backend);
     store = createCoordinatorStateStore({backend, enabled: true});
-    let observeCalls = 0;
-    let receiptPosts = 0;
+    const duplicateStart = await startReviewLifecycle({
+      ...lifecycleInput({
+        collected,
+        store,
+        clock,
+        dispatchReview: async input => {
+          counters.dispatch++;
+          return {status: 'ACKNOWLEDGED', reviewRequestId: input.reviewRequestId, sessionId: input.sessionId};
+        },
+        observeReview: async () => {
+          counters.observe++;
+          return {status: 'PENDING'};
+        },
+        revalidate: async () => collected,
+        receipt: {
+          postOnce: async () => {
+            counters.post++;
+            return {status: 'CREATED', receiptId: 'unused'};
+          },
+          lookupByActionKey: async () => ({status: 'NOT_FOUND', complete: true, receiptIds: []})
+        }
+      })
+    });
+    assert.equal(duplicateStart.status, 'WAITING');
+    assert.equal(duplicateStart.reason, 'ALREADY_CLAIMED');
+    const countersAfterDuplicateStart = {...counters};
     const restarted = await observeReviewLifecycle({
       ...lifecycleInput({
         collected,
@@ -2348,7 +2525,7 @@ test('ack and pending entry windows with UNKNOWN persistence failure remain nona
         clock,
         dispatchReview: async () => ({status: 'ACKNOWLEDGED'}),
         observeReview: async () => {
-          observeCalls++;
+          counters.observe++;
           return makeBoundaryCompletion({
             reviewRequestId: started.reviewRequestId,
             sessionId: started.sessionId,
@@ -2359,7 +2536,7 @@ test('ack and pending entry windows with UNKNOWN persistence failure remain nona
         revalidate: async () => collected,
         receipt: {
           postOnce: async () => {
-            receiptPosts++;
+            counters.post++;
             return {status: 'CREATED', receiptId: 'unexpected'};
           },
           lookupByActionKey: async () => ({status: 'FOUND', complete: true, receiptIds: ['unexpected']})
@@ -2369,8 +2546,20 @@ test('ack and pending entry windows with UNKNOWN persistence failure remain nona
     });
     assert.equal(restarted.status, 'UNKNOWN');
     assert.equal(restarted.reason, 'PERSISTENCE_UNCERTAINTY_RECONCILE_REQUIRED');
-    assert.equal(observeCalls, 0);
-    assert.equal(receiptPosts, 0);
+    assert.deepEqual(counters, countersAfterDuplicateStart);
+    assert.equal(counters.dispatch, 1);
+    assert.equal(counters.observe, 1);
+    assert.equal(counters.post, 0);
+    assert.equal(backend.admissionState.consumedQuota, 1);
+    assert.equal(backend.admissionState.claims.length, 1);
+    assert.equal(backend.admissionState.activeGate.executionKey, collected.executionKey);
+    const retainedAfterRestart = await store.reconcile(collected.executionKey);
+    assert.equal(retainedAfterRestart.status, 'READY');
+    assert.equal(retainedAfterRestart.claim.lastStage, retainedClaimBeforeRestart.lastStage);
+    assert.equal(retainedAfterRestart.claim.actionKey, retainedClaimBeforeRestart.actionKey);
+    assert.equal(retainedAfterRestart.claim.executionKey, retainedClaimBeforeRestart.executionKey);
+    assert.equal(retainedAfterRestart.claim.reviewRequestId, retainedClaimBeforeRestart.reviewRequestId);
+    assert.equal(retainedAfterRestart.claim.sessionId, retainedClaimBeforeRestart.sessionId);
   }
 });
 
@@ -2380,16 +2569,26 @@ test('persisted-result entry windows with UNKNOWN persistence failure remain non
     let store = createCoordinatorStateStore({backend, enabled: true});
     const clock = {value: START + 100};
     const collected = await collectReady({nowMs: clock.value});
+    const counters = {dispatch: 0, observe: 0, post: 0};
     const started = await startReviewLifecycle({
       ...lifecycleInput({
         collected,
         store,
         clock,
-        dispatchReview: async input => ({status: 'ACKNOWLEDGED', reviewRequestId: input.reviewRequestId, sessionId: input.sessionId}),
-        observeReview: async () => ({status: 'PENDING'}),
+        dispatchReview: async input => {
+          counters.dispatch++;
+          return {status: 'ACKNOWLEDGED', reviewRequestId: input.reviewRequestId, sessionId: input.sessionId};
+        },
+        observeReview: async () => {
+          counters.observe++;
+          return {status: 'PENDING'};
+        },
         revalidate: async () => collected,
         receipt: {
-          postOnce: async () => ({status: 'CREATED', receiptId: 'unused'}),
+          postOnce: async () => {
+            counters.post++;
+            return {status: 'CREATED', receiptId: 'unused'};
+          },
           lookupByActionKey: async () => ({status: 'NOT_FOUND', complete: true, receiptIds: []})
         }
       })
@@ -2401,15 +2600,21 @@ test('persisted-result entry windows with UNKNOWN persistence failure remain non
         store,
         clock,
         dispatchReview: async () => ({status: 'ACKNOWLEDGED'}),
-        observeReview: async () => makeBoundaryCompletion({
-          reviewRequestId: started.reviewRequestId,
-          sessionId: started.sessionId,
-          collected,
-          nowMs: clock.value
-        }),
+        observeReview: async () => {
+          counters.observe++;
+          return makeBoundaryCompletion({
+            reviewRequestId: started.reviewRequestId,
+            sessionId: started.sessionId,
+            collected,
+            nowMs: clock.value
+          });
+        },
         revalidate: async () => collected,
         receipt: {
-          postOnce: async () => ({status: 'CREATED', receiptId: 'unexpected'}),
+          postOnce: async () => {
+            counters.post++;
+            return {status: 'CREATED', receiptId: 'unexpected'};
+          },
           lookupByActionKey: async () => ({status: 'FOUND', complete: true, receiptIds: ['unexpected']})
         }
       }),
@@ -2420,6 +2625,7 @@ test('persisted-result entry windows with UNKNOWN persistence failure remain non
     const persisted = await store.reconcile(collected.executionKey);
     assert.equal(persisted.status, 'READY');
     assert.equal(persisted.claim.lastStage, 'REVIEW_RESULT');
+    const persistedResultClaim = structuredClone(persisted.claim);
 
     backend = reconstructBackendFromJson(backend);
     store = createCoordinatorStateStore({backend, enabled: true});
@@ -2433,14 +2639,20 @@ test('persisted-result entry windows with UNKNOWN persistence failure remain non
         store,
         clock,
         dispatchReview: async () => ({status: 'ACKNOWLEDGED'}),
-        observeReview: async () => ({status: 'PENDING'}),
+        observeReview: async () => {
+          counters.observe++;
+          return {status: 'PENDING'};
+        },
         revalidate: async () => {
           revalidateCalls++;
           if (mode === 'revalidation') return {...observedCollected, headSha: 'e'.repeat(40)};
           return observedCollected;
         },
         receipt: {
-          postOnce: async () => ({status: 'CREATED', receiptId: 'unexpected'}),
+          postOnce: async () => {
+            counters.post++;
+            return {status: 'CREATED', receiptId: 'unexpected'};
+          },
           lookupByActionKey: async () => ({status: 'FOUND', complete: true, receiptIds: ['unexpected']})
         }
       }),
@@ -2453,11 +2665,36 @@ test('persisted-result entry windows with UNKNOWN persistence failure remain non
     const retained = await store.reconcile(collected.executionKey);
     assert.equal(retained.status, 'READY');
     assert.equal(retained.claim.lastStage, 'RECEIPT_PREPARING');
+    const retainedClaimBeforeRestart = structuredClone(retained.claim);
 
     backend = reconstructBackendFromJson(backend);
     store = createCoordinatorStateStore({backend, enabled: true});
-    let observeCalls = 0;
-    let receiptPosts = 0;
+    const duplicateStart = await startReviewLifecycle({
+      ...lifecycleInput({
+        collected,
+        store,
+        clock,
+        dispatchReview: async input => {
+          counters.dispatch++;
+          return {status: 'ACKNOWLEDGED', reviewRequestId: input.reviewRequestId, sessionId: input.sessionId};
+        },
+        observeReview: async () => {
+          counters.observe++;
+          return {status: 'PENDING'};
+        },
+        revalidate: async () => collected,
+        receipt: {
+          postOnce: async () => {
+            counters.post++;
+            return {status: 'CREATED', receiptId: 'unused'};
+          },
+          lookupByActionKey: async () => ({status: 'NOT_FOUND', complete: true, receiptIds: []})
+        }
+      })
+    });
+    assert.equal(duplicateStart.status, 'WAITING');
+    assert.equal(duplicateStart.reason, 'ALREADY_CLAIMED');
+    const countersAfterDuplicateStart = {...counters};
     const restarted = await observeReviewLifecycle({
       ...lifecycleInput({
         collected,
@@ -2465,7 +2702,7 @@ test('persisted-result entry windows with UNKNOWN persistence failure remain non
         clock,
         dispatchReview: async () => ({status: 'ACKNOWLEDGED'}),
         observeReview: async () => {
-          observeCalls++;
+          counters.observe++;
           return makeBoundaryCompletion({
             reviewRequestId: started.reviewRequestId,
             sessionId: started.sessionId,
@@ -2476,7 +2713,7 @@ test('persisted-result entry windows with UNKNOWN persistence failure remain non
         revalidate: async () => collected,
         receipt: {
           postOnce: async () => {
-            receiptPosts++;
+            counters.post++;
             return {status: 'CREATED', receiptId: 'unexpected'};
           },
           lookupByActionKey: async () => ({status: 'FOUND', complete: true, receiptIds: ['unexpected']})
@@ -2486,11 +2723,22 @@ test('persisted-result entry windows with UNKNOWN persistence failure remain non
     });
     assert.equal(restarted.status, 'UNKNOWN');
     assert.equal(restarted.reason, 'PERSISTENCE_UNCERTAINTY_RECONCILE_REQUIRED');
-    assert.equal(observeCalls, 0);
-    assert.equal(receiptPosts, 0);
+    assert.deepEqual(counters, countersAfterDuplicateStart);
+    assert.equal(counters.dispatch, 1);
+    assert.equal(counters.observe, 1);
+    assert.equal(counters.post, 0);
     assert.equal(backend.admissionState.consumedQuota, 1);
     assert.equal(backend.admissionState.claims.length, 1);
     assert.equal(backend.admissionState.activeGate.executionKey, collected.executionKey);
+    const retainedAfterRestart = await store.reconcile(collected.executionKey);
+    assert.equal(retainedAfterRestart.status, 'READY');
+    assert.equal(retainedAfterRestart.claim.lastStage, retainedClaimBeforeRestart.lastStage);
+    assert.equal(retainedAfterRestart.claim.actionKey, retainedClaimBeforeRestart.actionKey);
+    assert.equal(retainedAfterRestart.claim.executionKey, retainedClaimBeforeRestart.executionKey);
+    assert.equal(retainedAfterRestart.claim.reviewRequestId, retainedClaimBeforeRestart.reviewRequestId);
+    assert.equal(retainedAfterRestart.claim.sessionId, retainedClaimBeforeRestart.sessionId);
+    assert.equal(retainedAfterRestart.claim.completionState, persistedResultClaim.completionState);
+    assert.equal(retainedAfterRestart.claim.verdict, persistedResultClaim.verdict);
   }
 });
 
@@ -2500,16 +2748,26 @@ test('null and undefined observation are ambiguous (not pending) and remain bloc
     let store = createCoordinatorStateStore({backend, enabled: true});
     const clock = {value: START + 100};
     const collected = await collectReady({nowMs: clock.value});
+    const counters = {dispatch: 0, observe: 0, post: 0};
     const started = await startReviewLifecycle({
       ...lifecycleInput({
         collected,
         store,
         clock,
-        dispatchReview: async input => ({status: 'ACKNOWLEDGED', reviewRequestId: input.reviewRequestId, sessionId: input.sessionId}),
-        observeReview: async () => ({status: 'PENDING'}),
+        dispatchReview: async input => {
+          counters.dispatch++;
+          return {status: 'ACKNOWLEDGED', reviewRequestId: input.reviewRequestId, sessionId: input.sessionId};
+        },
+        observeReview: async () => {
+          counters.observe++;
+          return {status: 'PENDING'};
+        },
         revalidate: async () => collected,
         receipt: {
-          postOnce: async () => ({status: 'CREATED', receiptId: 'unused'}),
+          postOnce: async () => {
+            counters.post++;
+            return {status: 'CREATED', receiptId: 'unused'};
+          },
           lookupByActionKey: async () => ({status: 'NOT_FOUND', complete: true, receiptIds: []})
         }
       })
@@ -2522,10 +2780,16 @@ test('null and undefined observation are ambiguous (not pending) and remain bloc
         store,
         clock,
         dispatchReview: async () => ({status: 'ACKNOWLEDGED'}),
-        observeReview: async () => observed,
+        observeReview: async () => {
+          counters.observe++;
+          return observed;
+        },
         revalidate: async () => collected,
         receipt: {
-          postOnce: async () => ({status: 'CREATED', receiptId: 'unexpected'}),
+          postOnce: async () => {
+            counters.post++;
+            return {status: 'CREATED', receiptId: 'unexpected'};
+          },
           lookupByActionKey: async () => ({status: 'FOUND', complete: true, receiptIds: ['unexpected']})
         }
       }),
@@ -2536,11 +2800,36 @@ test('null and undefined observation are ambiguous (not pending) and remain bloc
     const retained = await store.reconcile(collected.executionKey);
     assert.equal(retained.status, 'READY');
     assert.equal(retained.claim.lastStage, 'OBSERVE_PREPARING');
+    const retainedClaimBeforeRestart = structuredClone(retained.claim);
 
     backend = reconstructBackendFromJson(backend);
     store = createCoordinatorStateStore({backend, enabled: true});
-    let observeCalls = 0;
-    let receiptPosts = 0;
+    const duplicateStart = await startReviewLifecycle({
+      ...lifecycleInput({
+        collected,
+        store,
+        clock,
+        dispatchReview: async input => {
+          counters.dispatch++;
+          return {status: 'ACKNOWLEDGED', reviewRequestId: input.reviewRequestId, sessionId: input.sessionId};
+        },
+        observeReview: async () => {
+          counters.observe++;
+          return {status: 'PENDING'};
+        },
+        revalidate: async () => collected,
+        receipt: {
+          postOnce: async () => {
+            counters.post++;
+            return {status: 'CREATED', receiptId: 'unused'};
+          },
+          lookupByActionKey: async () => ({status: 'NOT_FOUND', complete: true, receiptIds: []})
+        }
+      })
+    });
+    assert.equal(duplicateStart.status, 'WAITING');
+    assert.equal(duplicateStart.reason, 'ALREADY_CLAIMED');
+    const countersAfterDuplicateStart = {...counters};
     const restarted = await observeReviewLifecycle({
       ...lifecycleInput({
         collected,
@@ -2548,13 +2837,13 @@ test('null and undefined observation are ambiguous (not pending) and remain bloc
         clock,
         dispatchReview: async () => ({status: 'ACKNOWLEDGED'}),
         observeReview: async () => {
-          observeCalls++;
+          counters.observe++;
           return {status: 'PENDING'};
         },
         revalidate: async () => collected,
         receipt: {
           postOnce: async () => {
-            receiptPosts++;
+            counters.post++;
             return {status: 'CREATED', receiptId: 'unexpected'};
           },
           lookupByActionKey: async () => ({status: 'FOUND', complete: true, receiptIds: ['unexpected']})
@@ -2564,7 +2853,19 @@ test('null and undefined observation are ambiguous (not pending) and remain bloc
     });
     assert.equal(restarted.status, 'UNKNOWN');
     assert.equal(restarted.reason, 'PERSISTENCE_UNCERTAINTY_RECONCILE_REQUIRED');
-    assert.equal(observeCalls, 0);
-    assert.equal(receiptPosts, 0);
+    assert.deepEqual(counters, countersAfterDuplicateStart);
+    assert.equal(counters.dispatch, 1);
+    assert.equal(counters.observe, 1);
+    assert.equal(counters.post, 0);
+    assert.equal(backend.admissionState.consumedQuota, 1);
+    assert.equal(backend.admissionState.claims.length, 1);
+    assert.equal(backend.admissionState.activeGate.executionKey, collected.executionKey);
+    const retainedAfterRestart = await store.reconcile(collected.executionKey);
+    assert.equal(retainedAfterRestart.status, 'READY');
+    assert.equal(retainedAfterRestart.claim.lastStage, retainedClaimBeforeRestart.lastStage);
+    assert.equal(retainedAfterRestart.claim.actionKey, retainedClaimBeforeRestart.actionKey);
+    assert.equal(retainedAfterRestart.claim.executionKey, retainedClaimBeforeRestart.executionKey);
+    assert.equal(retainedAfterRestart.claim.reviewRequestId, retainedClaimBeforeRestart.reviewRequestId);
+    assert.equal(retainedAfterRestart.claim.sessionId, retainedClaimBeforeRestart.sessionId);
   }
 });
