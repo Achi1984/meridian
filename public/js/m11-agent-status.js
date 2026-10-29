@@ -1,0 +1,529 @@
+const TASK_LABELS = Object.freeze({
+  QUEUED: 'Wartend',
+  RUNNING: 'Laufend',
+  REVIEWING: 'Prüfung',
+  BLOCKED: 'Blockiert',
+  DONE: 'Erledigt',
+  UNKNOWN: 'Unbekannt'
+});
+
+const COORDINATOR_LABELS = Object.freeze({
+  PREPARATION: 'Vorbereitung',
+  PILOT: 'Pilot',
+  ACTIVE: 'Aktiv',
+  STOPPED: 'Gestoppt',
+  UNKNOWN: 'Unbekannt'
+});
+
+const FRESHNESS_LABELS = Object.freeze({
+  CURRENT: 'Aktuell',
+  STALE: 'Veraltet',
+  UNKNOWN: 'Unbekannt'
+});
+
+const ALLOWED_GITHUB_PATHS = new Set(['issues', 'pull', 'actions', 'commit', 'discussions', 'releases']);
+const SAFE_TEXT_RE = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F<>]/;
+const VALID_EVIDENCE_TYPES = new Set(['github-workflow', 'github-issue', 'github-pr', 'copilot-session', 'manual', 'unknown']);
+
+function isPlainObject(value) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+  try {
+    return Object.getPrototypeOf(value) === Object.prototype;
+  } catch {
+    return false;
+  }
+}
+
+function readOwnDataValue(obj, key) {
+  if (!isPlainObject(obj)) {
+    return undefined;
+  }
+  const descriptor = Object.getOwnPropertyDescriptor(obj, key);
+  if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value') || descriptor.enumerable !== true || descriptor.get !== undefined || descriptor.set !== undefined) {
+    return undefined;
+  }
+  return descriptor.value;
+}
+
+function hasExactDataKeys(obj, expectedKeys) {
+  if (!isPlainObject(obj)) {
+    return false;
+  }
+  const keys = Reflect.ownKeys(obj);
+  if (keys.length !== expectedKeys.length || keys.some(key => typeof key !== 'string' || !expectedKeys.includes(key))) {
+    return false;
+  }
+  for (const key of expectedKeys) {
+    const descriptor = Object.getOwnPropertyDescriptor(obj, key);
+    if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value') || descriptor.enumerable !== true || descriptor.get !== undefined || descriptor.set !== undefined) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function readRequiredOwnData(obj, key, label) {
+  if (!isPlainObject(obj)) {
+    throw new TypeError(`${label} must be a plain object`);
+  }
+  const descriptor = Object.getOwnPropertyDescriptor(obj, key);
+  if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value') || descriptor.enumerable !== true || descriptor.get !== undefined || descriptor.set !== undefined) {
+    throw new TypeError(`${label} must be an own enumerable data property`);
+  }
+  return descriptor.value;
+}
+
+function isExactArray(value) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+    return false;
+  }
+  try {
+    const descriptors = Object.getOwnPropertyDescriptors(value);
+    const keys = Reflect.ownKeys(descriptors);
+    if (keys.length !== value.length + 1 || !keys.includes('length')) {
+      return false;
+    }
+    for (const key of keys) {
+      if (key === 'length') continue;
+      if (typeof key !== 'string' || !/^(0|[1-9][0-9]*)$/.test(key) || Number(key) >= value.length) {
+        return false;
+      }
+      const descriptor = descriptors[key];
+      if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value') || descriptor.enumerable !== true || descriptor.get !== undefined || descriptor.set !== undefined) {
+        return false;
+      }
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function safeText(value, maxLength = 200) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const text = value.trim();
+  if (!text || text.length > maxLength || SAFE_TEXT_RE.test(text)) {
+    return null;
+  }
+  return text;
+}
+
+function validateGithubUrl(value) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const text = value.trim();
+  if (!text || /[\x00-\x1F\x7F<>]/.test(text)) {
+    return null;
+  }
+  try {
+    const parsed = new URL(text);
+    if (parsed.protocol !== 'https:') return null;
+    if (parsed.username || parsed.password || parsed.port || parsed.hostname.toLowerCase() !== 'github.com') {
+      return null;
+    }
+    if (parsed.search) return null;
+    const hash = parsed.hash ? parsed.hash.slice(1) : '';
+    if (hash && !/^(?:issuecomment|discussioncomment)-\d+$/.test(hash)) return null;
+    const path = parsed.pathname.split('/').filter(Boolean);
+    if (path.length < 2) return null;
+    const [owner, repo, kind, ...rest] = path;
+    if (!owner || !repo || owner.includes('.') || repo.includes('.')) return null;
+    if (!kind || !ALLOWED_GITHUB_PATHS.has(kind)) return null;
+    if (kind === 'issues' && rest.length === 1 && /^\d+$/.test(rest[0])) return parsed.href;
+    if (kind === 'pull' && rest.length === 1 && /^\d+$/.test(rest[0])) return parsed.href;
+    if (kind === 'commit' && rest.length === 1 && /^[0-9a-fA-F]{7,40}$/.test(rest[0])) return parsed.href;
+    if (kind === 'discussions' && rest.length === 1 && /^\d+$/.test(rest[0])) return parsed.href;
+    if (kind === 'actions' && rest.length === 2 && rest[0] === 'runs' && /^\d+$/.test(rest[1])) return parsed.href;
+    if (kind === 'releases' && rest.length === 2 && rest[0] === 'tag' && /^[A-Za-z0-9._-]+$/.test(rest[1])) return parsed.href;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function isoMs(value) {
+  if (typeof value !== 'string') return null;
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(value)) return null;
+  const ms = Date.parse(value);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function deriveFreshness(observedAt, expiresAt, nowMs) {
+  const observed = isoMs(observedAt);
+  const expires = isoMs(expiresAt);
+  if (typeof nowMs !== 'number' || !Number.isFinite(nowMs)) return 'UNKNOWN';
+  if (observed === null || expires === null) return 'UNKNOWN';
+  if (observed > nowMs) return 'UNKNOWN';
+  if (expires <= nowMs) return 'STALE';
+  return 'CURRENT';
+}
+
+function validateEvidenceBinding(binding, expectedAgentId, expectedTaskId, expectedMode, nowMs) {
+  if (binding === null || binding === undefined) {
+    return null;
+  }
+  if (!isPlainObject(binding)) {
+    return null;
+  }
+  const bindingKeys = Reflect.ownKeys(binding);
+  const expectedKeys = bindingKeys.length === 8 ? ['agentId', 'taskId', 'value', 'observedAt', 'expiresAt', 'evidenceUrl', 'evidenceType', 'freshness'] : ['agentId', 'taskId', 'value', 'observedAt', 'expiresAt', 'evidenceUrl', 'evidenceType'];
+  if (!hasExactDataKeys(binding, expectedKeys)) {
+    return null;
+  }
+  const bindingFreshness = readOwnDataValue(binding, 'freshness');
+  if (bindingFreshness !== undefined && bindingFreshness !== null && !['CURRENT', 'STALE', 'UNKNOWN'].includes(bindingFreshness)) {
+    throw new TypeError('M11 evidence binding freshness must be CURRENT, STALE, or UNKNOWN');
+  }
+  const agentId = safeText(readOwnDataValue(binding, 'agentId'), 120);
+  const taskId = safeText(readOwnDataValue(binding, 'taskId'), 120);
+  const value = safeText(readOwnDataValue(binding, 'value'), 200);
+  const evidenceType = safeText(readOwnDataValue(binding, 'evidenceType'), 80);
+  const evidenceUrl = validateGithubUrl(readOwnDataValue(binding, 'evidenceUrl'));
+  if (!agentId || !taskId || !value || !evidenceType || !evidenceUrl) {
+    return null;
+  }
+  if (agentId !== expectedAgentId || taskId !== expectedTaskId) {
+    return null;
+  }
+  if (expectedMode && value !== expectedMode) {
+    return null;
+  }
+  if (!VALID_EVIDENCE_TYPES.has(evidenceType)) {
+    return null;
+  }
+  const observedAt = isoMs(readOwnDataValue(binding, 'observedAt'));
+  const expiresAt = isoMs(readOwnDataValue(binding, 'expiresAt'));
+  if (observedAt === null || expiresAt === null || observedAt > expiresAt) {
+    return null;
+  }
+  const freshness = deriveFreshness(readOwnDataValue(binding, 'observedAt'), readOwnDataValue(binding, 'expiresAt'), nowMs);
+  if (freshness === 'UNKNOWN') {
+    return null;
+  }
+  if (evidenceType === 'manual' || evidenceType === 'unknown') {
+    return null;
+  }
+  return Object.freeze({
+    agentId,
+    taskId,
+    value,
+    observedAt: readOwnDataValue(binding, 'observedAt'),
+    expiresAt: readOwnDataValue(binding, 'expiresAt'),
+    evidenceUrl,
+    evidenceType,
+    freshness
+  });
+}
+
+function validateSerializedStatus(raw, nowMs) {
+  if (!isPlainObject(raw)) throw new TypeError('M11 agent status input must be a plain object');
+  const keys = Reflect.ownKeys(raw);
+  const allowedKeys = new Set(['schemaVersion', 'rows']);
+  const fullKeys = new Set(['schemaVersion', 'status', 'freshness', 'rows']);
+  const isMinimal = keys.length === 2 && keys.every(key => allowedKeys.has(key));
+  const isSerialized = keys.length === 4 && keys.every(key => fullKeys.has(key));
+  if (!isMinimal && !isSerialized) {
+    throw new TypeError('M11 agent status must contain schemaVersion and rows');
+  }
+  const schemaDescriptor = Object.getOwnPropertyDescriptor(raw, 'schemaVersion');
+  const rowsDescriptor = Object.getOwnPropertyDescriptor(raw, 'rows');
+  if (!schemaDescriptor || !Object.prototype.hasOwnProperty.call(schemaDescriptor, 'value') || schemaDescriptor.enumerable !== true || schemaDescriptor.get !== undefined || schemaDescriptor.set !== undefined) {
+    throw new TypeError('M11 agent status schemaVersion must be a plain data property');
+  }
+  if (!rowsDescriptor || !Object.prototype.hasOwnProperty.call(rowsDescriptor, 'value') || rowsDescriptor.enumerable !== true || rowsDescriptor.get !== undefined || rowsDescriptor.set !== undefined) {
+    throw new TypeError('M11 agent status rows must be a plain data property');
+  }
+  if (raw.schemaVersion !== 1) throw new TypeError('Unsupported M11 agent status schemaVersion');
+  const statusDescriptor = Object.getOwnPropertyDescriptor(raw, 'status');
+  const freshnessDescriptor = Object.getOwnPropertyDescriptor(raw, 'freshness');
+  const statusValue = Object.prototype.hasOwnProperty.call(raw, 'status') ? readRequiredOwnData(raw, 'status', 'M11 agent status status') : undefined;
+  const freshnessValue = Object.prototype.hasOwnProperty.call(raw, 'freshness') ? readRequiredOwnData(raw, 'freshness', 'M11 agent status freshness') : undefined;
+  if (Object.prototype.hasOwnProperty.call(raw, 'status') && (!statusDescriptor || !Object.prototype.hasOwnProperty.call(statusDescriptor, 'value') || statusDescriptor.enumerable !== true || statusDescriptor.get !== undefined || statusDescriptor.set !== undefined)) {
+    throw new TypeError('M11 agent status status must be a plain data property');
+  }
+  if (Object.prototype.hasOwnProperty.call(raw, 'freshness') && (!freshnessDescriptor || !Object.prototype.hasOwnProperty.call(freshnessDescriptor, 'value') || freshnessDescriptor.enumerable !== true || freshnessDescriptor.get !== undefined || freshnessDescriptor.set !== undefined)) {
+    throw new TypeError('M11 agent status freshness must be a plain data property');
+  }
+  if (isSerialized) {
+    if (statusValue !== 'READY') throw new TypeError('M11 agent status status must be READY for serialized input');
+    if (!['CURRENT', 'STALE', 'UNKNOWN'].includes(freshnessValue)) throw new TypeError('Invalid M11 agent status freshness');
+  } else {
+    if (statusValue !== undefined && statusValue !== 'READY') throw new TypeError('Invalid M11 agent status status');
+    if (freshnessValue !== undefined && !['CURRENT', 'STALE', 'UNKNOWN'].includes(freshnessValue)) throw new TypeError('Invalid M11 agent status freshness');
+  }
+  if (!isExactArray(raw.rows) || raw.rows.length === 0 || raw.rows.length > 50) {
+    throw new TypeError('M11 agent status rows must be a non-empty array up to 50 items');
+  }
+  if (typeof nowMs !== 'number' || !Number.isFinite(nowMs)) throw new TypeError('Invalid injected clock');
+
+  const rows = [];
+  for (const row of raw.rows) {
+    if (!isPlainObject(row)) throw new TypeError('M11 agent status row must be a plain object');
+    const rowKeys = Reflect.ownKeys(row);
+    const expected = ['agentId', 'agentName', 'taskId', 'taskLabel', 'taskState', 'coordinatorMode', 'providerRequested', 'providerVerified', 'modelRequested', 'modelVerified', 'providerEvidence', 'modelEvidence', 'coordinatorEvidence', 'taskUrl', 'observedAt', 'expiresAt', 'evidenceUrl', 'evidenceType', 'blocker', 'nextAction', 'ownerDecisionRequired', 'ownerDecisionReason'];
+    const expectedWithFreshness = [...expected, 'freshness'];
+    const exactKeys = rowKeys.length === expectedWithFreshness.length ? expectedWithFreshness : expected;
+    if (rowKeys.length !== exactKeys.length || rowKeys.some(key => typeof key !== 'string' || !exactKeys.includes(key))) {
+      throw new TypeError('M11 agent status row field set is invalid');
+    }
+
+    const agentId = safeText(row.agentId, 120);
+    const agentName = safeText(row.agentName, 120);
+    const taskId = safeText(row.taskId, 120);
+    const taskLabel = safeText(row.taskLabel, 160);
+    if (!agentId || !agentName || !taskId || !taskLabel) throw new TypeError('Agent and task identity are required');
+    if (!['QUEUED','RUNNING','REVIEWING','BLOCKED','DONE','UNKNOWN'].includes(row.taskState)) throw new TypeError('Invalid taskState');
+    if (!['PREPARATION','PILOT','ACTIVE','STOPPED','UNKNOWN'].includes(row.coordinatorMode)) throw new TypeError('Invalid coordinatorMode');
+    const providerRequested = safeText(row.providerRequested, 80);
+    const modelRequested = safeText(row.modelRequested, 120);
+    if (!providerRequested || !modelRequested) throw new TypeError('Requested provider and model are required');
+    const rowProviderVerified = safeText(row.providerVerified, 80);
+    const rowModelVerified = safeText(row.modelVerified, 120);
+    if (rowProviderVerified === null || rowModelVerified === null) throw new TypeError('Provider and model verification values must be strings or UNKNOWN');
+    const taskUrl = validateGithubUrl(row.taskUrl);
+    if (!taskUrl) throw new TypeError('Task URL must be a valid public GitHub URL');
+    const observedAt = isoMs(row.observedAt);
+    const expiresAt = isoMs(row.expiresAt);
+    if (observedAt === null || expiresAt === null || observedAt > expiresAt) throw new TypeError('Observation and expiry timestamps are invalid');
+    const evidenceType = safeText(row.evidenceType, 80);
+    if (evidenceType && !VALID_EVIDENCE_TYPES.has(evidenceType)) throw new TypeError('Evidence type is invalid');
+    const providerEvidence = validateEvidenceBinding(row.providerEvidence, agentId, taskId, undefined, nowMs);
+    const modelEvidence = validateEvidenceBinding(row.modelEvidence, agentId, taskId, undefined, nowMs);
+    const coordinatorEvidence = validateEvidenceBinding(row.coordinatorEvidence, agentId, taskId, row.coordinatorMode, nowMs);
+    const evidenceFreshnesses = [providerEvidence && providerEvidence.freshness, modelEvidence && modelEvidence.freshness, coordinatorEvidence && coordinatorEvidence.freshness].filter(Boolean);
+    const outerFreshness = deriveFreshness(row.observedAt, row.expiresAt, nowMs);
+    const effectiveFreshness = evidenceFreshnesses.length === 0 ? 'UNKNOWN'
+      : outerFreshness === 'STALE' || evidenceFreshnesses.includes('STALE') ? 'STALE'
+        : outerFreshness === 'UNKNOWN' ? 'UNKNOWN'
+          : 'CURRENT';
+    const effectiveProviderVerified = effectiveFreshness === 'CURRENT' && providerEvidence ? providerEvidence.value : 'UNKNOWN';
+    const effectiveModelVerified = effectiveFreshness === 'CURRENT' && modelEvidence ? modelEvidence.value : 'UNKNOWN';
+    const effectiveTaskState = row.taskState === 'RUNNING' || row.taskState === 'REVIEWING'
+      ? (effectiveFreshness === 'CURRENT' && (providerEvidence || modelEvidence) ? row.taskState : 'UNKNOWN')
+      : row.taskState;
+    const effectiveCoordinatorMode = row.coordinatorMode === 'ACTIVE'
+      ? (effectiveFreshness === 'CURRENT' && coordinatorEvidence && coordinatorEvidence.value === 'ACTIVE' ? row.coordinatorMode : 'UNKNOWN')
+      : row.coordinatorMode;
+    const blocker = row.blocker === null || row.blocker === undefined ? null : safeText(row.blocker, 200);
+    const nextAction = safeText(row.nextAction, 200);
+    if (!nextAction) throw new TypeError('Next action is required');
+    const ownerDecisionRequired = row.ownerDecisionRequired === true || row.ownerDecisionRequired === false;
+    if (!ownerDecisionRequired) throw new TypeError('ownerDecisionRequired must be a boolean');
+    const ownerDecisionReason = row.ownerDecisionRequired === true ? safeText(row.ownerDecisionReason, 200) : (row.ownerDecisionReason === null || row.ownerDecisionReason === undefined ? null : safeText(row.ownerDecisionReason, 200));
+    if (row.ownerDecisionRequired === true && (!ownerDecisionReason || !ownerDecisionReason.length)) throw new TypeError('An owner decision reason is required when ownerDecisionRequired is true');
+    if (row.ownerDecisionRequired === false && ownerDecisionReason !== null) throw new TypeError('A false ownerDecisionRequired must not include a reason');
+
+    rows.push(Object.freeze({
+      agentId,
+      agentName,
+      taskId,
+      taskLabel,
+      taskState: effectiveTaskState,
+      coordinatorMode: effectiveCoordinatorMode,
+      providerRequested,
+      providerVerified: effectiveProviderVerified,
+      modelRequested,
+      modelVerified: effectiveModelVerified,
+      providerEvidence,
+      modelEvidence,
+      coordinatorEvidence,
+      taskUrl,
+      observedAt: row.observedAt,
+      expiresAt: row.expiresAt,
+      evidenceUrl: row.evidenceUrl === null || row.evidenceUrl === undefined ? null : validateGithubUrl(row.evidenceUrl),
+      evidenceType: evidenceType || 'unknown',
+      blocker,
+      nextAction,
+      ownerDecisionRequired: row.ownerDecisionRequired,
+      ownerDecisionReason,
+      freshness: effectiveFreshness
+    }));
+  }
+
+  const derivedFreshness = rows.every(row => row.freshness === 'CURRENT')
+    ? 'CURRENT'
+    : rows.some(row => row.freshness === 'STALE')
+      ? 'STALE'
+      : 'UNKNOWN';
+
+  return Object.freeze({
+    schemaVersion: 1,
+    status: 'READY',
+    freshness: derivedFreshness,
+    rows: Object.freeze(rows)
+  });
+}
+
+function node(doc, tag, text) {
+  const element = doc.createElement(tag);
+  if (text !== undefined && text !== null) {
+    element.textContent = String(text);
+  }
+  return element;
+}
+
+function displayMapping(value, fallback = 'Unbekannt') {
+  if (typeof value !== 'string') return fallback;
+  const trimmed = value.trim();
+  if (!trimmed) return fallback;
+  if (trimmed === 'UNKNOWN') return 'Unbekannt';
+  if (trimmed === 'CURRENT') return 'Aktuell';
+  if (trimmed === 'STALE') return 'Veraltet';
+  if (trimmed === 'ACTIVE') return 'Aktiv';
+  if (trimmed === 'STOPPED') return 'Gestoppt';
+  if (trimmed === 'PREPARATION') return 'Vorbereitung';
+  if (trimmed === 'PILOT') return 'Pilot';
+  if (trimmed === 'RUNNING') return 'Laufend';
+  if (trimmed === 'REVIEWING') return 'Prüfung';
+  if (trimmed === 'QUEUED') return 'Wartend';
+  if (trimmed === 'BLOCKED') return 'Blockiert';
+  if (trimmed === 'DONE') return 'Erledigt';
+  return trimmed;
+}
+
+function appendMetaList(parent, entries) {
+  for (const [label, value] of entries) {
+    const row = node(parent.ownerDocument, 'div');
+    row.className = 'm11-agent-status__meta-row';
+    const labelNode = node(parent.ownerDocument, 'span', label);
+    labelNode.className = 'm11-agent-status__meta-label';
+    const valueNode = node(parent.ownerDocument, 'span', displayMapping(value, 'Unbekannt'));
+    valueNode.className = 'm11-agent-status__meta-value';
+    row.append(labelNode, valueNode);
+    parent.append(row);
+  }
+}
+
+function renderRow(document, row) {
+  const card = node(document, 'article');
+  card.className = 'm11-agent-status__card';
+  card.setAttribute('data-task-state', row.taskState);
+  card.setAttribute('data-freshness', row.freshness);
+
+  const heading = node(document, 'div');
+  heading.className = 'm11-agent-status__heading';
+  const title = node(document, 'h3', `${row.agentName} · ${row.taskLabel}`);
+  title.className = 'm11-agent-status__title';
+  const badge = node(document, 'span', TASK_LABELS[row.taskState] || 'Unbekannt');
+  badge.className = 'm11-agent-status__badge';
+  heading.append(title, badge);
+  card.append(heading);
+
+  const meta = node(document, 'div');
+  meta.className = 'm11-agent-status__meta';
+  appendMetaList(meta, [
+    ['Agent', row.agentId],
+    ['Aufgabe', row.taskId],
+    ['Status', TASK_LABELS[row.taskState] || 'Unbekannt'],
+    ['Koordinator', COORDINATOR_LABELS[row.coordinatorMode] || 'Unbekannt'],
+    ['Frische', FRESHNESS_LABELS[row.freshness] || 'Unbekannt'],
+    ['Anbieter angefragt', safeText(row.providerRequested, 80) || 'Unbekannt'],
+    ['Anbieter verifiziert', displayMapping(row.providerVerified, 'UNKNOWN')],
+    ['Modell angefragt', safeText(row.modelRequested, 120) || 'Unbekannt'],
+    ['Modell verifiziert', displayMapping(row.modelVerified, 'UNKNOWN')]
+  ]);
+  card.append(meta);
+
+  const links = node(document, 'div');
+  links.className = 'm11-agent-status__links';
+  const taskLink = node(document, 'a', 'Aufgabe öffnen');
+  taskLink.href = row.taskUrl;
+  taskLink.className = 'm11-agent-status__link';
+  taskLink.rel = 'noreferrer noopener';
+  taskLink.target = '_blank';
+  links.append(taskLink);
+  if (row.evidenceUrl) {
+    const evidenceLink = node(document, 'a', 'Beleg öffnen');
+    evidenceLink.href = row.evidenceUrl;
+    evidenceLink.className = 'm11-agent-status__link';
+    evidenceLink.rel = 'noreferrer noopener';
+    evidenceLink.target = '_blank';
+    links.append(evidenceLink);
+  }
+  card.append(links);
+
+  const details = node(document, 'div');
+  details.className = 'm11-agent-status__details';
+  const summary = node(document, 'div');
+  summary.className = 'm11-agent-status__summary';
+  summary.textContent = `Blocker: ${row.blocker === null ? '—' : row.blocker} · Nächste Aktion: ${row.nextAction || 'Keine weitere Aktion angegeben'}`;
+  details.append(summary);
+
+  const noteList = node(document, 'ul');
+  noteList.className = 'm11-agent-status__notes';
+  const observed = node(document, 'li', `Beobachtet: ${row.observedAt}`);
+  const expires = node(document, 'li', `Gültig bis: ${row.expiresAt}`);
+  const evidence = node(document, 'li', `Beleg: ${row.evidenceType || 'unknown'}`);
+  noteList.append(observed, expires, evidence);
+  details.append(noteList);
+
+  if (row.ownerDecisionRequired) {
+    const owner = node(document, 'p', `Entscheidung erforderlich: ${row.ownerDecisionReason || 'Unbekannt'}`);
+    owner.className = 'm11-agent-status__owner-decision';
+    details.append(owner);
+  }
+  card.append(details);
+  return card;
+}
+
+export function renderM11AgentStatus(root, input, options = {}) {
+  if (!root || typeof root !== 'object') {
+    throw new TypeError('M11 agent status root element is required');
+  }
+  const document = root.ownerDocument || (typeof globalThis.document !== 'undefined' ? globalThis.document : null);
+  if (!document) {
+    throw new TypeError('M11 agent status rendering requires a document');
+  }
+  if (typeof input !== 'string') {
+    throw new TypeError('M11 agent status renderer expects a JSON string');
+  }
+  if (typeof options.now !== 'function') {
+    throw new TypeError('M11 agent status requires a valid injected clock');
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(input);
+  } catch {
+    throw new TypeError('M11 agent status payload is not valid JSON');
+  }
+  const nowMs = options.now();
+  if (typeof nowMs !== 'number' || !Number.isFinite(nowMs)) {
+    throw new TypeError('Invalid injected clock');
+  }
+  const normalized = validateSerializedStatus(parsed, nowMs);
+  root.replaceChildren();
+  const section = node(document, 'section');
+  section.className = 'm11-agent-status';
+  section.setAttribute('data-status', normalized.freshness);
+  section.setAttribute('aria-live', 'polite');
+
+  const header = node(document, 'div');
+  header.className = 'm11-agent-status__header';
+  const heading = node(document, 'h2', 'M11 Agent Status');
+  heading.className = 'm11-agent-status__header-title';
+  const state = node(document, 'span', FRESHNESS_LABELS[normalized.freshness] || 'Unbekannt');
+  state.className = 'm11-agent-status__state';
+  header.append(heading, state);
+  section.append(header);
+
+  const list = node(document, 'div');
+  list.className = 'm11-agent-status__list';
+  for (const row of normalized.rows) {
+    list.append(renderRow(document, row));
+  }
+  section.append(list);
+  root.append(section);
+  return section;
+}
+
+export function mountM11AgentStatus(target, input, options = {}) {
+  if (!target || typeof target !== 'object') {
+    throw new TypeError('M11 agent status mount target is required');
+  }
+  return renderM11AgentStatus(target, input, options);
+}
