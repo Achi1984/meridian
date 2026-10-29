@@ -161,6 +161,7 @@ export function createM11CoordinatorGithubReceiptApi({
   getTrustedAuthEvidence,
   intentStore,
   authorizationAuthority,
+  publicationEvidenceStore,
   defaultDeadlineMs = 4500,
   maxResponseBytes = 131072,
   maxTotalBytes = 1048576,
@@ -332,6 +333,23 @@ export function createM11CoordinatorGithubReceiptApi({
         return await operation(value.signal, async scope => {
           const expected = await resolve(value.actionKey, scope);
           const wire = transport(expected, scope);
+          const requireSendEvidence = async id => {
+            need(typeof publicationEvidenceStore?.getPublicationEvidence === 'function');
+            wire.check();
+            const evidence = record(await publicationEvidenceStore.getPublicationEvidence({
+              executionKey: value.actionKey, signal: scope.signal
+            }), ['status', 'commentId', 'executionKey', 'intentHash', 'canonicalBodyHash',
+              'transitionId', 'fence', 'authorizationId']);
+            wire.check();
+            need(evidence.status === 'RECORDED' && decimal(evidence.commentId)
+              && evidence.commentId === id && evidence.executionKey === value.actionKey
+              && evidence.intentHash === expected.intentHash
+              && evidence.canonicalBodyHash === expected.intent.canonicalBodyHash
+              && evidence.transitionId === expected.intent.posting.transitionId
+              && evidence.fence === expected.intent.posting.fence
+              && identifier(evidence.authorizationId));
+            return canonical(evidence);
+          };
           const relevant = raw => raw.body === expected.body
             || raw.body.includes(`Execution: ${encoded(value.actionKey)}`)
             || raw.body.includes(expected.intentHash);
@@ -367,9 +385,14 @@ export function createM11CoordinatorGithubReceiptApi({
             throw new Error('RECEIPT_INVENTORY_INCOMPLETE');
           };
           const first = await scan();
+          const sendEvidence = first.matches.length === 1
+            ? await requireSendEvidence(first.matches[0]) : null;
           const second = await scan();
           wire.check();
           need(canonical(first) === canonical(second) && first.matches.length <= 1);
+          if (sendEvidence !== null) {
+            need(await requireSendEvidence(first.matches[0]) === sendEvidence);
+          }
           return Object.freeze({status: first.matches.length === 1 ? 'FOUND' : 'NOT_FOUND',
             complete: true, receiptIds: Object.freeze(first.matches)});
         });

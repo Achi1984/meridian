@@ -95,6 +95,18 @@ capability-boolean authorization.
   must fail closed on duplicate/expired/revoked/unknown grants across all
   instances and processes, even if its own acknowledgement is lost. No issuer
   is exposed by this adapter.
+* `publicationEvidenceStore.getPublicationEvidence({executionKey, signal})` is
+  an injected trusted **read-only** source of durable actual-send evidence.
+  It must return exactly `{status: 'RECORDED', commentId, executionKey,
+  intentHash, canonicalBodyHash, transitionId, fence, authorizationId}`.
+  IDs are canonical decimal strings; `authorizationId` identifies the consumed
+  authorization that actually produced this comment ID under that execution's
+  posting transition/fence. The store/verifier must independently establish this
+  relationship from authenticated retained sender evidence and durable consumed
+  authorization records, not infer it from a comment's body, marker, shared
+  actor/app identity, or a requester's assertion. Missing, ambiguous, or
+  unverified records must not produce `RECORDED`. The adapter does not implement
+  this trusted store/verifier, create send records, or mint provenance.
 
 The consumption request contains exactly `intentHash`, `canonicalBodyHash`,
 `executionKey`, `transitionId`, `fence`, `evidenceId`, `principal`, and an abort
@@ -152,13 +164,23 @@ It scans the full permitted mailbox inventory twice and requires identical
 ordered snapshots, strictly increasing unique IDs, valid response destinations,
 and consistent bounded pagination. Matching execution tags or intent markers
 with wrong body, author/app, timestamps, or edited state are ambiguous, not
-ignored. A copied marker alone or shared bot login cannot prove provenance.
-An exact copy by the same trusted actor/app is not cryptographically
-distinguishable from the original; if both are present the result is UNKNOWN.
-Compromise/misuse of that principal is outside this source adapter's proof.
+ignored. A copied marker or even an exact full-body copy from another workflow
+sharing the same actor/app cannot prove workflow provenance; credential
+compromise is not required for this ambiguity.
+
+For a unique candidate, lookup reads the trusted publication evidence before
+the second inventory scan and again afterward. Both records must be identical
+and bind the observed comment ID to this execution, intent hash, canonical body
+hash, posting transition/fence, and actual consumed authorization ID. A wrong
+authorized comment ID, missing/ambiguous record, or changed authorization ID
+returns UNKNOWN. These reads share the total deadline and auth-continuity checks.
+Neither the candidate nor a successful POST response synthesizes a send record
+inside this adapter. In particular, lost ACK after server acceptance remains
+UNKNOWN/manual reconciliation when no positive authoritative send record exists.
 
 `FOUND, complete: true` means exactly one authoritative exact match in both
-complete permitted inventories. Multiple matches, conflicting snapshots,
+complete permitted inventories **plus matching independently trusted actual-send
+evidence**. Multiple matches, conflicting snapshots,
 changed inventories, malformed/off-origin/looping/skipped/truncated pagination,
 page/byte/deadline exhaustion, and auth drift return `UNKNOWN, complete: false`.
 Direct GET of one ID would not prove inventory uniqueness and is not used.
@@ -174,7 +196,7 @@ Likewise FOUND is evidence for lifecycle admission, not authority to write.
 | Bound | Default | Maximum configurable |
 | --- | ---: | ---: |
 | Canonical POST body | 8192 UTF-8 bytes | fixed |
-| Total operation deadline, including stores/authority/streaming | 4500 ms | 10000 ms |
+| Total operation deadline, including intent/send-evidence stores/authority/streaming | 4500 ms | 10000 ms |
 | One response's decoded bytes | 131072 | 1048576 |
 | All responses combined (both inventory scans) | 1048576 | 4194304 |
 | Pages per inventory scan | 10 | 20 |
@@ -195,9 +217,14 @@ node --test test/m11-coordinator-github-receipt-api.test.js
 ```
 
 It exercises synthetic create/readback, JSON reconstruction, shared
-whole-sequence POST/GET counts, concurrent/reconstructed consumption, lost ACK,
+whole-sequence POST/GET counts, serialized available/consumed authority records
+reloaded by independent instances, durable consumed-state restart, consumption
+persisted with ACK lost, concurrent atomic consumption, lost POST ACK,
 timeouts/abort/stalled streams, decoded and total byte bounds, publisher/hash/
 copy/edit checks, zero/one/many matches, conflicting/mutating pagination, and
-auth expiry/rotation. No live GitHub POST or authentication is exercised.
+auth expiry/rotation, same-actor/app full-body copies, missing/wrong/ambiguous
+actual-send evidence, and valid evidence with revalidation. Synthetic authority
+persistence is a serialized in-memory fixture, not a hosted atomic store or
+production crash-durability proof. No live GitHub POST or authentication is exercised.
 Lead full CI and Claude review remain integration gates; focused success does
 not claim those gates, production readiness, provisioning, or hosted safety.

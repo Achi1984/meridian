@@ -57,6 +57,13 @@ function fixture(options = {}) {
   // The trusted host pre-issues this at the posting transition, not during consume.
   state.authorization = {status: 'CONSUMED', authorizationId: 'authorization-1', ...binding,
     issuedAtMs: NOW - 500, expiresAtMs: NOW + 10000};
+  const sendEvidence = (commentId = '101') => ({
+    status: 'RECORDED', commentId, executionKey: binding.executionKey,
+    intentHash: binding.intentHash, canonicalBodyHash: binding.canonicalBodyHash,
+    transitionId: binding.transitionId, fence: binding.fence, authorizationId: 'authorization-1'
+  });
+  state.publicationEvidence = null;
+  state.evidenceReads = 0;
   const comment = (id = 101, changes = {}) => ({
     id, url: `${ROOT}/issues/comments/${id}`,
     issue_url: `${ROOT}/issues/942`,
@@ -83,12 +90,19 @@ function fixture(options = {}) {
       state.authorization = null;
       return grant;
     }},
+    publicationEvidenceStore: {async getPublicationEvidence({executionKey, signal}) {
+      assert.equal(executionKey, binding.executionKey);
+      assert.equal(signal.aborted, false);
+      state.evidenceReads++;
+      return clone(state.publicationEvidence);
+    }},
     fetchImpl: async (url, init) => {
       state.calls.push({url: String(url), ...init});
       if (state.handle) return state.handle(String(url), init);
       if (init.method === 'POST') {
         const row = comment(101, {body: JSON.parse(init.body).body});
         state.rows.push(row);
+        state.publicationEvidence = sendEvidence();
         return response(url, row, {status: 201});
       }
       return response(url, state.rows);
@@ -99,7 +113,7 @@ function fixture(options = {}) {
     actionKey: described.intent.receipt.executionKey, executionKey: described.intent.receipt.executionKey,
     receipt: clone(described.intent.receipt)
   };
-  return {state, described, dependencies, adapter, input, comment};
+  return {state, described, dependencies, adapter, input, comment, sendEvidence};
 }
 
 function counts(state, post, get) {
@@ -113,6 +127,118 @@ function counts(state, post, get) {
     if (call.method === 'GET') assert.equal(call.body, undefined);
   }
 }
+
+function durableAuthority(f, disk, {loseAck = false} = {}) {
+  return {
+    async consumePostingAuthorization({signal, ...binding}) {
+      assert.equal(signal.aborted, false);
+      const saved = JSON.parse(disk.json);
+      const grant = saved.available;
+      if (!grant) return null;
+      for (const [key, value] of Object.entries(binding)) assert.equal(grant[key], value);
+      // Synthetic atomic persistence precedes the acknowledgement; every instance
+      // rereads serialized state instead of retaining a live grant.
+      disk.json = JSON.stringify({available: null, consumed: [...saved.consumed, grant]});
+      f.state.consumptions++;
+      if (loseAck) throw new Error('consumption persisted; ACK lost');
+      return clone(grant);
+    }
+  };
+}
+
+test('serialized consumed authorization survives restart with zero additional POSTs', async () => {
+  const f = fixture();
+  const disk = {json: JSON.stringify({available: f.state.authorization, consumed: []})};
+  assert.equal((await f.adapter({authorizationAuthority: durableAuthority(f, disk)}).postOnce(f.input)).status, 'CREATED');
+  const restartedDisk = clone(disk);
+  f.state.intent = clone(f.described.intent);
+  f.state.publicationEvidence = clone(f.state.publicationEvidence);
+  const restarted = f.adapter({authorizationAuthority: durableAuthority(f, restartedDisk)});
+  assert.equal((await restarted.postOnce(clone(f.input))).status, 'NOT_ATTEMPTED');
+  assert.equal((await restarted.lookupByActionKey({actionKey: f.input.actionKey})).status, 'FOUND');
+  assert.equal(JSON.parse(restartedDisk.json).available, null);
+  assert.equal(JSON.parse(restartedDisk.json).consumed.length, 1);
+  assert.equal(f.state.consumptions, 1);
+  counts(f.state, 1, 2);
+});
+
+test('persisted consumption with lost ACK survives JSON restart without any POST', async () => {
+  const f = fixture();
+  const disk = {json: JSON.stringify({available: f.state.authorization, consumed: []})};
+  assert.equal((await f.adapter({authorizationAuthority: durableAuthority(f, disk, {loseAck: true})}).postOnce(f.input)).status, 'NOT_ATTEMPTED');
+  const restartedDisk = clone(disk);
+  assert.equal((await f.adapter({authorizationAuthority: durableAuthority(f, restartedDisk)}).postOnce(clone(f.input))).status, 'NOT_ATTEMPTED');
+  assert.equal(JSON.parse(restartedDisk.json).consumed.length, 1);
+  assert.equal(f.state.consumptions, 1);
+  counts(f.state, 0, 0);
+});
+
+test('concurrent independent authority instances atomically consume serialized availability once', async () => {
+  const f = fixture();
+  const disk = {json: JSON.stringify({available: clone(f.state.authorization), consumed: []})};
+  const results = await Promise.all(Array.from({length: 4}, () =>
+    f.adapter({authorizationAuthority: durableAuthority(f, disk)}).postOnce(clone(f.input))));
+  assert.equal(results.filter(result => result.status === 'CREATED').length, 1);
+  assert.equal(results.filter(result => result.status === 'NOT_ATTEMPTED').length, 3);
+  assert.equal(JSON.parse(disk.json).consumed.length, 1);
+  assert.equal(f.state.consumptions, 1);
+  const restarted = f.adapter({authorizationAuthority: durableAuthority(f, clone(disk))});
+  assert.equal((await restarted.postOnce(f.input)).status, 'NOT_ATTEMPTED');
+  counts(f.state, 1, 0);
+});
+
+test('exact same-actor/app copies require independent authoritative send evidence', async t => {
+  const cases = {
+    'full copy from another workflow': f => { f.state.publicationEvidence = null; },
+    'missing evidence dependency': () => ({publicationEvidenceStore: undefined}),
+    'wrong authorized comment ID': f => { f.state.publicationEvidence.commentId = '102'; },
+    'wrong execution': f => { f.state.publicationEvidence.executionKey = 'other'; },
+    'wrong intent hash': f => { f.state.publicationEvidence.intentHash = '0'.repeat(64); },
+    'wrong body hash': f => { f.state.publicationEvidence.canonicalBodyHash = '0'.repeat(64); },
+    'wrong transition': f => { f.state.publicationEvidence.transitionId = 'other'; },
+    'wrong fence': f => { f.state.publicationEvidence.fence = 'other'; },
+    'missing authorization': f => { f.state.publicationEvidence.authorizationId = ''; },
+    'ambiguous evidence': f => { f.state.publicationEvidence = [f.state.publicationEvidence]; },
+    'not recorded': f => { f.state.publicationEvidence.status = 'UNKNOWN'; },
+    'valid durable send evidence': () => {}
+  };
+  for (const [name, change] of Object.entries(cases)) {
+    await t.test(name, async () => {
+      const f = fixture();
+      f.state.authorization = null;
+      f.state.rows = [f.comment()];
+      f.state.publicationEvidence = clone(f.sendEvidence());
+      const overrides = change(f) ?? {};
+      const result = await f.adapter(overrides).lookupByActionKey({actionKey: f.input.actionKey});
+      assert.equal(result.status, name === 'valid durable send evidence' ? 'FOUND' : 'UNKNOWN');
+      assert.equal(result.complete, name === 'valid durable send evidence');
+      assert.equal(f.state.consumptions, 0);
+      counts(f.state, 0, name === 'valid durable send evidence' ? 2 : 1);
+    });
+  }
+});
+
+test('send evidence is revalidated after inventory and cannot drift, rotate auth, or stall', async t => {
+  for (const mode of ['drift', 'authorization-drift', 'auth-rotation', 'stalled']) {
+    await t.test(mode, async () => {
+      const f = fixture({defaultDeadlineMs: 20});
+      f.state.rows = [f.comment()];
+      const api = f.adapter({publicationEvidenceStore: {getPublicationEvidence: async () => {
+        f.state.evidenceReads++;
+        if (mode === 'stalled') return new Promise(() => {});
+        if (mode === 'auth-rotation') f.state.evidence.evidenceId = 'rotated';
+        const evidence = f.sendEvidence();
+        if (f.state.evidenceReads === 2) {
+          if (mode === 'drift') evidence.commentId = '102';
+          if (mode === 'authorization-drift') evidence.authorizationId = 'another-grant';
+        }
+        return evidence;
+      }}});
+      assert.equal((await api.lookupByActionKey({actionKey: f.input.actionKey})).status, 'UNKNOWN');
+      counts(f.state, 0, ['drift', 'authorization-drift'].includes(mode) ? 2 : 1);
+    });
+  }
+});
 
 test('default disabled; booleans, tokens and posting state alone grant no authority', async () => {
   const f = fixture();
@@ -151,7 +277,7 @@ test('concurrent calls consume locally before first await; reconstructed instanc
   counts(f.state, 1, 0);
 });
 
-test('lost ACK after server acceptance is UNKNOWN; restart performs GET only and cannot repost', async () => {
+test('lost ACK without authoritative send evidence stays UNKNOWN; restart cannot repost', async () => {
   const f = fixture();
   f.state.handle = async (url, init) => {
     if (init.method === 'POST') {
@@ -161,8 +287,28 @@ test('lost ACK after server acceptance is UNKNOWN; restart performs GET only and
     return response(url, f.state.rows);
   };
   assert.equal((await f.adapter().postOnce(f.input)).status, 'UNKNOWN');
-  assert.equal((await f.adapter().lookupByActionKey({actionKey: f.input.actionKey})).status, 'FOUND');
+  assert.equal((await f.adapter().lookupByActionKey({actionKey: f.input.actionKey})).status, 'UNKNOWN');
   assert.equal((await f.adapter().postOnce(f.input)).status, 'NOT_ATTEMPTED');
+  counts(f.state, 1, 1);
+});
+
+test('lost POST ACK reconciles only with independently retained actual-send evidence', async () => {
+  const f = fixture();
+  const disk = {json: JSON.stringify({available: clone(f.state.authorization), consumed: []})};
+  f.state.handle = (url, init) => {
+    if (init.method === 'POST') {
+      f.state.rows.push(f.comment());
+      assert.equal(JSON.parse(disk.json).consumed[0].authorizationId, 'authorization-1');
+      f.state.publicationEvidence = clone(f.sendEvidence());
+      throw new Error('sender evidence retained independently; caller ACK lost');
+    }
+    return response(url, f.state.rows);
+  };
+  assert.equal((await f.adapter({authorizationAuthority: durableAuthority(f, disk)}).postOnce(f.input)).status, 'UNKNOWN');
+  const restarted = f.adapter({authorizationAuthority: durableAuthority(f, clone(disk))});
+  assert.equal((await restarted.lookupByActionKey({actionKey: f.input.actionKey})).status, 'FOUND');
+  assert.equal((await restarted.postOnce(f.input)).status, 'NOT_ATTEMPTED');
+  assert.equal(f.state.consumptions, 1);
   counts(f.state, 1, 2);
 });
 
@@ -276,6 +422,7 @@ test('GET inventory zero/one/many; NOT_FOUND and readback never authorize anothe
       const f = fixture();
       f.state.authorization = null;
       f.state.rows = Array.from({length: count}, (_, i) => f.comment(101 + i));
+      if (count === 1) f.state.publicationEvidence = f.sendEvidence();
       const result = await f.adapter().lookupByActionKey({actionKey: f.input.actionKey});
       assert.equal(result.status, ['NOT_FOUND', 'FOUND', 'UNKNOWN'][count]);
       assert.equal(result.complete, count < 2);
@@ -318,6 +465,7 @@ test('wrong actor/app, copied marker, edits, destination, timestamps and hash fa
 test('unrelated comments are inventory, not matches; lookup requires durable intent even without POST', async () => {
   const f = fixture();
   f.state.rows = [f.comment(100, {body: 'unrelated', user: {id: 55, login: 'someone', type: 'User'}}), f.comment(101)];
+  f.state.publicationEvidence = f.sendEvidence();
   assert.equal((await f.adapter().lookupByActionKey({actionKey: f.input.actionKey})).status, 'FOUND');
   f.state.intent = {...f.described.intent, canonicalBodyHash: '0'.repeat(64)};
   assert.equal((await f.adapter().lookupByActionKey({actionKey: f.input.actionKey})).status, 'UNKNOWN');
@@ -326,6 +474,7 @@ test('unrelated comments are inventory, not matches; lookup requires durable int
 
 test('complete bounded pagination is scanned twice; no direct GET substitutes for uniqueness', async () => {
   const f = fixture();
+  f.state.publicationEvidence = f.sendEvidence();
   const page1 = Array.from({length: 100}, (_, i) => f.comment(i + 1, {body: 'unrelated'}));
   f.state.handle = url => url.endsWith('page=1')
     ? response(url, page1, {headers: {link: `<${COMMENTS}?per_page=100&page=2>; rel="next", <${COMMENTS}?per_page=100&page=2>; rel="last"`}})
@@ -381,6 +530,7 @@ test('page cap, duplicate IDs, conflicting snapshots and changing inventories ca
   for (const mode of ['page-cap', 'duplicate', 'conflicting', 'mutation', 'reorder']) {
     await t.test(mode, async () => {
       const f = fixture({maxPages: 1});
+      f.state.publicationEvidence = f.sendEvidence();
       f.state.handle = url => {
         const call = f.state.calls.length;
         if (mode === 'page-cap') return response(url,
@@ -446,6 +596,7 @@ test('streaming byte limits do not trust content-length and apply across the who
   for (const mode of ['header', 'stream', 'total', 'get-stalled']) {
     await t.test(mode, async () => {
       const f = fixture({maxResponseBytes: 8192, maxTotalBytes: mode === 'total' ? 8192 : 16384, defaultDeadlineMs: 20});
+      f.state.publicationEvidence = f.sendEvidence();
       f.state.handle = url => {
         if (mode === 'get-stalled') return response(url, null, {body: new ReadableStream({pull: () => new Promise(() => {})})});
         const rows = [f.comment(), f.comment(102, {body: 'x'.repeat(4000)})];
@@ -500,6 +651,7 @@ test('auth expiry/rotation during request, streaming, pagination, or authorizati
   for (const mode of ['expiry', 'evidence', 'principal', 'credential', 'stream', 'pagination', 'authority']) {
     await t.test(mode, async () => {
       const f = fixture();
+      f.state.publicationEvidence = f.sendEvidence();
       const rotate = () => {
         if (mode === 'expiry') f.state.evidence.expiresAtMs = NOW;
         else if (mode === 'principal') f.state.evidence.principal = 'rotated';
