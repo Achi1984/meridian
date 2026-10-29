@@ -26,6 +26,10 @@ function fail(code) {
   throw new BoundaryError(code);
 }
 
+function isNonEmptySafeText(value, maxBytes = MAX_TEXT_BYTES) {
+  return isSafeText(value, maxBytes) && value.trim().length > 0;
+}
+
 function isSafeText(value, maxBytes = MAX_TEXT_BYTES) {
   return typeof value === 'string'
     && value.isWellFormed()
@@ -73,7 +77,7 @@ function readStringArray(value, {maxItems, maxBytes, code, dedupe = true}) {
 function readReviewer(value, code) {
   const reviewer = readRecord(value, ['provider', 'agent', 'model', 'transport'], code);
   for (const key of Object.keys(reviewer)) {
-    if (!isSafeText(reviewer[key], MAX_REVIEWER_FIELD_BYTES)) fail(code);
+    if (!isNonEmptySafeText(reviewer[key], MAX_REVIEWER_FIELD_BYTES)) fail(code);
   }
   return Object.freeze({...reviewer});
 }
@@ -96,9 +100,9 @@ function normalizeExpectedIdentity(expected) {
     'headSha', 'baseSha', 'diffDigest', 'changedPaths'
   ], 'EXPECTED_IDENTITY_INVALID');
   const reviewer = readReviewer(input.reviewer, 'EXPECTED_IDENTITY_INVALID');
-  if (!isSafeText(input.reviewRequestId, MAX_ID_BYTES)
-    || !isSafeText(input.sessionId, MAX_ID_BYTES)
-    || !isSafeText(input.repository, MAX_ID_BYTES)
+  if (!isNonEmptySafeText(input.reviewRequestId, MAX_ID_BYTES)
+    || !isNonEmptySafeText(input.sessionId, MAX_ID_BYTES)
+    || !isNonEmptySafeText(input.repository, MAX_ID_BYTES)
     || !Number.isSafeInteger(input.pullRequest) || input.pullRequest <= 0
     || typeof input.headSha !== 'string' || !/^[a-f0-9]{40}$/.test(input.headSha)
     || typeof input.baseSha !== 'string' || !/^[a-f0-9]{40}$/.test(input.baseSha)
@@ -120,8 +124,8 @@ function normalizeModelOutput(modelOutput) {
     'complete', 'truncated', 'turnLimit', 'summary'
   ], 'MODEL_OUTPUT_INVALID');
   const reviewer = readReviewer(input.reviewer, 'MODEL_OUTPUT_INVALID');
-  if (!isSafeText(input.reviewRequestId, MAX_ID_BYTES)
-    || !isSafeText(input.sessionId, MAX_ID_BYTES)
+  if (!isNonEmptySafeText(input.reviewRequestId, MAX_ID_BYTES)
+    || !isNonEmptySafeText(input.sessionId, MAX_ID_BYTES)
     || !MODEL_VERDICTS.has(input.verdict)
     || typeof input.complete !== 'boolean'
     || typeof input.truncated !== 'boolean'
@@ -135,6 +139,9 @@ function normalizeModelOutput(modelOutput) {
     code: 'MODEL_OUTPUT_INVALID',
     dedupe: true
   });
+  if (!coverageParts.every(part => REQUIRED_REVIEW_PARTS.includes(part))) {
+    fail('MODEL_OUTPUT_INVALID');
+  }
   return Object.freeze({
     ...input,
     reviewer,
@@ -147,8 +154,8 @@ function normalizeTrustedRuntimeEvidence(evidence, nowMs) {
   const input = readRecord(evidence, [
     'evidenceId', 'provider', 'observedAtMs', 'expiresAtMs', 'runtime'
   ], 'TRUSTED_RUNTIME_EVIDENCE_INVALID');
-  if (!isSafeText(input.evidenceId, MAX_ID_BYTES)
-    || !isSafeText(input.provider, MAX_REVIEWER_FIELD_BYTES)
+  if (!isNonEmptySafeText(input.evidenceId, MAX_ID_BYTES)
+    || !isNonEmptySafeText(input.provider, MAX_REVIEWER_FIELD_BYTES)
     || !Number.isSafeInteger(input.observedAtMs)
     || !Number.isSafeInteger(input.expiresAtMs)
     || input.observedAtMs <= 0
@@ -176,9 +183,9 @@ function normalizeTrustedRuntimeEvidence(evidence, nowMs) {
     code: 'TRUSTED_RUNTIME_EVIDENCE_INVALID',
     dedupe: true
   });
-  if (!isSafeText(runtime.reviewRequestId, MAX_ID_BYTES)
-    || !isSafeText(runtime.sessionId, MAX_ID_BYTES)
-    || !isSafeText(runtime.repository, MAX_ID_BYTES)
+  if (!isNonEmptySafeText(runtime.reviewRequestId, MAX_ID_BYTES)
+    || !isNonEmptySafeText(runtime.sessionId, MAX_ID_BYTES)
+    || !isNonEmptySafeText(runtime.repository, MAX_ID_BYTES)
     || !Number.isSafeInteger(runtime.pullRequest) || runtime.pullRequest <= 0
     || typeof runtime.headSha !== 'string' || !/^[a-f0-9]{40}$/.test(runtime.headSha)
     || typeof runtime.baseSha !== 'string' || !/^[a-f0-9]{40}$/.test(runtime.baseSha)
@@ -212,24 +219,49 @@ function resultBase() {
   };
 }
 
-export function evaluateReviewBoundary({
-  trustedRuntimeSeam,
-  trustedRuntimeEvidence,
-  modelOutput,
-  expectedIdentity,
-  now = Date.now
-} = {}) {
-  const frozenNow = now();
-  if (!Number.isSafeInteger(frozenNow) || frozenNow <= 0) {
-    return Object.freeze({status: 'UNKNOWN', reason: 'CLOCK_INVALID', ...resultBase()});
+function readEvaluationInput(input) {
+  const value = input === undefined ? {} : input;
+  if (!value || typeof value !== 'object' || Array.isArray(value)
+    || types.isProxy(value) || Object.getPrototypeOf(value) !== Object.prototype) {
+    fail('INPUT_ENVELOPE_INVALID');
   }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const names = Reflect.ownKeys(descriptors);
+  const allowed = new Set(['trustedRuntimeSeam', 'trustedRuntimeEvidence', 'modelOutput', 'expectedIdentity', 'now']);
+  const out = {};
+  for (const name of names) {
+    if (typeof name !== 'string' || !allowed.has(name)) fail('INPUT_ENVELOPE_INVALID');
+    const descriptor = descriptors[name];
+    if (!descriptor || !Object.hasOwn(descriptor, 'value') || !descriptor.enumerable) {
+      fail('INPUT_ENVELOPE_INVALID');
+    }
+    out[name] = descriptor.value;
+  }
+  return out;
+}
 
+function readClockNow(nowFn) {
+  if (typeof nowFn !== 'function') fail('CLOCK_INVALID');
+  let nowMs;
   try {
-    const seam = readRecord(trustedRuntimeSeam, ['verifyRuntimeEvidence'], 'TRUSTED_RUNTIME_SEAM_REQUIRED');
+    nowMs = nowFn();
+  } catch {
+    fail('CLOCK_INVALID');
+  }
+  if (!Number.isSafeInteger(nowMs) || nowMs <= 0) fail('CLOCK_INVALID');
+  return nowMs;
+}
+
+export function evaluateReviewBoundary(input) {
+  try {
+    const envelope = readEvaluationInput(input);
+    const frozenNow = readClockNow(envelope.now);
+
+    const seam = readRecord(envelope.trustedRuntimeSeam, ['verifyRuntimeEvidence'], 'TRUSTED_RUNTIME_SEAM_REQUIRED');
     if (typeof seam.verifyRuntimeEvidence !== 'function') fail('TRUSTED_RUNTIME_SEAM_REQUIRED');
 
-    const expected = normalizeExpectedIdentity(expectedIdentity);
-    const untrusted = normalizeModelOutput(modelOutput);
+    const expected = normalizeExpectedIdentity(envelope.expectedIdentity);
+    const untrusted = normalizeModelOutput(envelope.modelOutput);
 
     if (untrusted.reviewRequestId !== expected.reviewRequestId
       || untrusted.sessionId !== expected.sessionId
@@ -242,11 +274,12 @@ export function evaluateReviewBoundary({
 
     let verified;
     try {
-      verified = seam.verifyRuntimeEvidence(trustedRuntimeEvidence, {nowMs: frozenNow, expectedIdentity: expected});
+      verified = seam.verifyRuntimeEvidence(envelope.trustedRuntimeEvidence, {nowMs: frozenNow, expectedIdentity: expected});
     } catch {
       return Object.freeze({status: 'UNKNOWN', reason: 'RUNTIME_SEAM_UNAVAILABLE', ...resultBase()});
     }
-    const trusted = normalizeTrustedRuntimeEvidence(verified, frozenNow);
+    const postVerifyNow = readClockNow(envelope.now);
+    const trusted = normalizeTrustedRuntimeEvidence(verified, postVerifyNow);
     const runtime = trusted.runtime;
 
     if (runtime.reviewRequestId !== expected.reviewRequestId
@@ -273,6 +306,7 @@ export function evaluateReviewBoundary({
     const reviewComplete = terminalComplete
       && hasRequiredCoverage(runtime.coverageParts)
       && ownHasAllPaths(expected.changedPaths, runtime.changedPaths)
+      && hasRequiredCoverage(untrusted.coverageParts)
       && untrusted.complete === true
       && untrusted.truncated === false
       && untrusted.turnLimit === false;
@@ -293,6 +327,15 @@ export function evaluateReviewBoundary({
       completionState,
       verdict: finalVerdict,
       reviewer: expected.reviewer,
+      identity: Object.freeze({
+        reviewRequestId: expected.reviewRequestId,
+        sessionId: expected.sessionId,
+        repository: expected.repository,
+        pullRequest: expected.pullRequest,
+        headSha: expected.headSha,
+        baseSha: expected.baseSha,
+        diffDigest: expected.diffDigest
+      }),
       trustedRuntime: Object.freeze({
         evidenceId: trusted.evidenceId,
         provider: trusted.provider,
@@ -320,7 +363,7 @@ export function evaluateReviewBoundary({
     });
   } catch (error) {
     if (error instanceof BoundaryError) {
-      const unknown = new Set(['TRUSTED_RUNTIME_SEAM_REQUIRED', 'CLOCK_INVALID']);
+      const unknown = new Set(['TRUSTED_RUNTIME_SEAM_REQUIRED', 'CLOCK_INVALID', 'RUNTIME_SEAM_UNAVAILABLE']);
       return Object.freeze({
         status: unknown.has(error.code) ? 'UNKNOWN' : 'BLOCKED',
         reason: error.code,

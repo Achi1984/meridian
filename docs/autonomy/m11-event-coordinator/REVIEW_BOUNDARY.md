@@ -5,6 +5,7 @@
 - **trusted runtime evidence** (through an explicit injected seam),
 - **untrusted model output**, and
 - **expected exact identity** (request/session/reviewer/repo/head/base/diff + changed paths).
+- **injected trusted clock** (`now`) for bounded expiry checks.
 
 It is intentionally isolated and not wired into existing coordinator runtime yet.
 
@@ -19,8 +20,10 @@ It is intentionally isolated and not wired into existing coordinator runtime yet
 ## Trust seam requirement
 
 The caller must supply `trustedRuntimeSeam.verifyRuntimeEvidence(...)`.
+The caller must also supply `now` as a trusted function.
 The boundary does not accept arbitrary object branding as proof of external authenticity.
 The seam output must pass strict own-data schema checks (no getters/proxies/prototype tricks, no extra fields, bounded arrays/strings).
+Input envelopes using accessors or proxy-backed traps are rejected before any accessor invocation.
 
 Expired, contradictory, or malformed runtime evidence blocks admission.
 
@@ -32,8 +35,10 @@ Successful completion requires all of:
 2. Runtime terminal state indicates successful completion (`completed` + `end_turn`, no truncation, no turn-limit).
 3. Runtime coverage witness includes all `REQUIRED_REVIEW_PARTS`.
 4. Runtime changed-path witness contains all expected changed paths.
+5. Model coverage parts are allowlisted to `REQUIRED_REVIEW_PARTS`; missing model parts cannot produce `COMPLETE`.
 
 Runtime terminal/truncation/turn-limit and runtime witnesses override model claims.
+Clock and evidence expiry are checked before and after runtime verification so evidence cannot expire during verifier execution.
 
 ## Output compatibility notes (for future core adapter)
 
@@ -41,6 +46,7 @@ The boundary returns a safe structured record containing:
 
 - status and completion state (`ADMITTED`/`BLOCKED`/`UNKNOWN`),
 - final verdict (`GREEN_LIGHT`/`REVISION_REQUIRED`/`NEEDS_MORE_EVIDENCE`),
+- immutable exact identity projection (request/session/repo/PR/head/base/diff),
 - immutable trusted evidence identity (`evidenceId`, provider, observed/expires),
 - runtime witness projection,
 - untrusted model diagnostic projection,

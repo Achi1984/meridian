@@ -103,6 +103,15 @@ test('admits valid complete path and never grants mutation authority', () => {
   assert.equal(result.status, 'ADMITTED');
   assert.equal(result.completionState, 'COMPLETE');
   assert.equal(result.verdict, 'GREEN_LIGHT');
+  assert.deepEqual(result.identity, {
+    reviewRequestId: 'req-973',
+    sessionId: 'session-973',
+    repository: 'Achi1984/meridian',
+    pullRequest: 973,
+    headSha: HEAD,
+    baseSha: BASE,
+    diffDigest: DIFF
+  });
   assert.equal(result.dispatch, false);
   assert.equal(result.merge, false);
   assert.equal(result.activation, false);
@@ -250,4 +259,140 @@ test('requires trusted runtime seam and keeps UNKNOWN with no authority', () => 
   assert.equal(result.merge, false);
   assert.equal(result.activation, false);
   assert.equal(result.externalEffects, false);
+});
+
+test('blocks model COMPLETE when model coverage is empty or partial despite full runtime coverage', () => {
+  const emptyModelCoverage = run({
+    modelOutput: modelOutput({coverageParts: []})
+  });
+  assert.equal(emptyModelCoverage.status, 'ADMITTED');
+  assert.equal(emptyModelCoverage.completionState, 'INCOMPLETE');
+  assert.equal(emptyModelCoverage.verdict, 'NEEDS_MORE_EVIDENCE');
+
+  const partialModelCoverage = run({
+    modelOutput: modelOutput({coverageParts: REQUIRED_REVIEW_PARTS.slice(0, -1)})
+  });
+  assert.equal(partialModelCoverage.status, 'ADMITTED');
+  assert.equal(partialModelCoverage.completionState, 'INCOMPLETE');
+  assert.equal(partialModelCoverage.verdict, 'NEEDS_MORE_EVIDENCE');
+});
+
+test('rejects bogus model coverage parts', () => {
+  const result = run({
+    modelOutput: modelOutput({coverageParts: ['bogus']})
+  });
+  assert.equal(result.status, 'BLOCKED');
+  assert.equal(result.reason, 'MODEL_OUTPUT_INVALID');
+});
+
+test('rejects top-level getter and proxy envelopes without invoking traps', () => {
+  let getterInvoked = 0;
+  const envelopeWithGetter = {};
+  Object.defineProperty(envelopeWithGetter, 'trustedRuntimeSeam', {
+    enumerable: true,
+    get() {
+      getterInvoked += 1;
+      return seam(runtimeEvidence());
+    }
+  });
+  Object.assign(envelopeWithGetter, {
+    trustedRuntimeEvidence: {},
+    modelOutput: modelOutput(),
+    expectedIdentity: expectedIdentity(),
+    now: () => NOW
+  });
+  const getterResult = evaluateReviewBoundary(envelopeWithGetter);
+  assert.equal(getterInvoked, 0);
+  assert.equal(getterResult.status, 'BLOCKED');
+  assert.equal(getterResult.reason, 'INPUT_ENVELOPE_INVALID');
+
+  let getTrapInvoked = 0;
+  const proxyEnvelope = new Proxy({
+    trustedRuntimeSeam: seam(runtimeEvidence()),
+    trustedRuntimeEvidence: {},
+    modelOutput: modelOutput(),
+    expectedIdentity: expectedIdentity(),
+    now: () => NOW
+  }, {
+    get(target, prop, receiver) {
+      getTrapInvoked += 1;
+      return Reflect.get(target, prop, receiver);
+    }
+  });
+  const proxyResult = evaluateReviewBoundary(proxyEnvelope);
+  assert.equal(getTrapInvoked, 0);
+  assert.equal(proxyResult.status, 'BLOCKED');
+  assert.equal(proxyResult.reason, 'INPUT_ENVELOPE_INVALID');
+});
+
+test('returns UNKNOWN for missing, non-function, and throwing clock inputs', () => {
+  const missingClock = evaluateReviewBoundary({
+    trustedRuntimeSeam: seam(runtimeEvidence()),
+    trustedRuntimeEvidence: {},
+    modelOutput: modelOutput(),
+    expectedIdentity: expectedIdentity()
+  });
+  assert.equal(missingClock.status, 'UNKNOWN');
+  assert.equal(missingClock.reason, 'CLOCK_INVALID');
+  assert.equal(missingClock.retryAllowed, false);
+  assert.equal(missingClock.dispatch, false);
+  assert.equal(missingClock.merge, false);
+  assert.equal(missingClock.activation, false);
+  assert.equal(missingClock.externalEffects, false);
+
+  const nonFunctionClock = evaluateReviewBoundary({
+    trustedRuntimeSeam: seam(runtimeEvidence()),
+    trustedRuntimeEvidence: {},
+    modelOutput: modelOutput(),
+    expectedIdentity: expectedIdentity(),
+    now: 123
+  });
+  assert.equal(nonFunctionClock.status, 'UNKNOWN');
+  assert.equal(nonFunctionClock.reason, 'CLOCK_INVALID');
+
+  const throwingClock = evaluateReviewBoundary({
+    trustedRuntimeSeam: seam(runtimeEvidence()),
+    trustedRuntimeEvidence: {},
+    modelOutput: modelOutput(),
+    expectedIdentity: expectedIdentity(),
+    now() {
+      throw new Error('clock exploded');
+    }
+  });
+  assert.equal(throwingClock.status, 'UNKNOWN');
+  assert.equal(throwingClock.reason, 'CLOCK_INVALID');
+});
+
+test('rechecks evidence expiry after verifier returns', () => {
+  let currentNow = NOW;
+  const result = evaluateReviewBoundary({
+    trustedRuntimeSeam: {
+      verifyRuntimeEvidence() {
+        currentNow = NOW + 120_000;
+        return runtimeEvidence({expiresAtMs: NOW + 60_000});
+      }
+    },
+    trustedRuntimeEvidence: {},
+    modelOutput: modelOutput(),
+    expectedIdentity: expectedIdentity(),
+    now: () => currentNow
+  });
+  assert.equal(result.status, 'BLOCKED');
+  assert.equal(result.reason, 'TRUSTED_RUNTIME_EVIDENCE_EXPIRED');
+});
+
+test('rejects empty identity and reviewer fields', () => {
+  const emptyIdentity = run({
+    expectedIdentity: expectedIdentity({reviewRequestId: '   '})
+  });
+  assert.equal(emptyIdentity.status, 'BLOCKED');
+  assert.equal(emptyIdentity.reason, 'EXPECTED_IDENTITY_INVALID');
+
+  const emptyReviewer = run({
+    modelOutput: modelOutput({
+      reviewer: {...modelOutput().reviewer, provider: ' '}
+    })
+  });
+  assert.equal(emptyReviewer.status, 'BLOCKED');
+  assert.equal(emptyReviewer.reason, 'MODEL_OUTPUT_INVALID');
 });
