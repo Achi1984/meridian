@@ -1,3 +1,16 @@
+import { types as utilTypes } from 'node:util';
+
+const ALLOWED_PUBLIC_GITHUB_PATHS = new Set([
+  'issues',
+  'pull',
+  'actions',
+  'commit',
+  'discussions',
+  'releases'
+]);
+
+const SAFE_TEXT_RE = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F<>]/;
+
 export const M11_TASK_STATES = Object.freeze([
   'QUEUED',
   'RUNNING',
@@ -31,18 +44,17 @@ export const M11_EVIDENCE_TYPES = Object.freeze([
 ]);
 
 export const POWERED_BY_PUBLIC_GITHUB = Object.freeze({
-  hostnames: Object.freeze(['github.com', 'www.github.com'])
+  hostnames: Object.freeze(['github.com'])
 });
 
-const SAFE_PROTOCOLS = new Set(['http:', 'https:']);
 const VERIFIED_EVIDENCE_TYPES = new Set(['github-workflow', 'github-issue', 'github-pr', 'copilot-session']);
-const SUSPICIOUS_QUERY_KEYS = /(?:^|[?&;])(token|auth|password|passwd|secret|key|sig|signature|session|jwt|access_token|client_secret|authorization)(?:=|$)/i;
+const GITHUB_ANCHOR_RE = /^(?:issuecomment|discussioncomment)-\d+$/;
 
 function isSafePlainObject(value) {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+  if (utilTypes && typeof utilTypes.isProxy === 'function' && utilTypes.isProxy(value)) return false;
   try {
     if (Object.getPrototypeOf(value) !== Object.prototype) return false;
-    if (Object.getOwnPropertySymbols(value).length > 0) return false;
     const descriptors = Object.getOwnPropertyDescriptors(value);
     const keys = Reflect.ownKeys(descriptors);
     return keys.every(key => typeof key === 'string')
@@ -53,7 +65,7 @@ function isSafePlainObject(value) {
 }
 
 function isSafeArray(value) {
-  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) return false;
+  if (!Array.isArray(value) || (utilTypes && typeof utilTypes.isProxy === 'function' && utilTypes.isProxy(value))) return false;
   try {
     const descriptors = Object.getOwnPropertyDescriptors(value);
     const keys = Reflect.ownKeys(descriptors);
@@ -77,13 +89,15 @@ function ensureFiniteClock(nowMs, label = 'clock') {
 }
 
 function readClock(options = {}) {
-  if (Object.hasOwn(options, 'now') && typeof options.now !== 'function') {
+  if (!isSafePlainObject(options) || !Object.hasOwn(options, 'now')) {
     throw new TypeError('Invalid injected clock');
   }
-  const provider = typeof options.now === 'function' ? options.now : Date.now;
+  if (typeof options.now !== 'function') {
+    throw new TypeError('Invalid injected clock');
+  }
   let value;
   try {
-    value = provider();
+    value = options.now();
   } catch {
     throw new TypeError('Invalid injected clock');
   }
@@ -94,7 +108,7 @@ function readClock(options = {}) {
 function safeText(value, maxLength = 200) {
   if (typeof value !== 'string') return null;
   const text = value.trim();
-  if (!text || text.length > maxLength || /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F<>]/.test(text)) {
+  if (!text || text.length > maxLength || SAFE_TEXT_RE.test(text)) {
     return null;
   }
   return text;
@@ -106,35 +120,23 @@ function safeGitHubUrl(value) {
   if (!text || /[\x00-\x1F\x7F<>]/.test(text)) return null;
   try {
     const parsed = new URL(text);
-    if (!SAFE_PROTOCOLS.has(parsed.protocol)) return null;
-    if (parsed.username || parsed.password) return null;
-    const host = parsed.hostname.toLowerCase();
-    if (!POWERED_BY_PUBLIC_GITHUB.hostnames.includes(host)) return null;
-    if (parsed.port) return null;
-    const suspiciousQuery = parsed.search && SUSPICIOUS_QUERY_KEYS.test(parsed.search);
-    const suspiciousHash = parsed.hash && SUSPICIOUS_QUERY_KEYS.test(parsed.hash);
-    if (suspiciousQuery || suspiciousHash) return null;
-    const noPublicHost = /(localhost|127\.0\.0\.1|0\.0\.0\.0|::1|\.local(?:host)?|\.internal|\.home|\.lan|\.localdomain|\.local$)/i.test(host);
-    if (noPublicHost) return null;
+    if (parsed.protocol !== 'https:') return null;
+    if (parsed.username || parsed.password || parsed.port || parsed.hostname.toLowerCase() !== 'github.com') return null;
+    if (parsed.search) return null;
+    const hash = parsed.hash ? parsed.hash.slice(1) : '';
+    if (hash && !GITHUB_ANCHOR_RE.test(hash)) return null;
     const parts = parsed.pathname.split('/').filter(Boolean);
     if (parts.length < 2) return null;
     const [owner, repo, kind, ...rest] = parts;
-    if (!owner || !repo || /\.+$/.test(owner) || /\.+$/.test(repo)) return null;
-    const validKinds = new Set(['issues', 'pull', 'actions', 'commit', 'discussions', 'releases', 'compare']);
-    if (kind && !validKinds.has(kind)) return null;
-    if (!kind) return parsed.href;
-    if (kind === 'issues' && rest.length > 1) return null;
-    if (kind === 'pull' && rest.length > 1) return null;
-    if (kind === 'commit' && rest.length > 1) return null;
-    if (kind === 'discussions' && rest.length > 1) return null;
-    if (kind === 'releases' && rest.length > 1) return null;
-    if (kind === 'actions') {
-      if (rest.length === 0) return parsed.href;
-      if (rest[0] === 'runs' && rest.length <= 2) return parsed.href;
-      return null;
-    }
-    if (kind === 'compare' && rest.length <= 2) return parsed.href;
-    return parsed.href;
+    if (!owner || !repo || owner.includes('.') || repo.includes('.')) return null;
+    if (!kind || !ALLOWED_PUBLIC_GITHUB_PATHS.has(kind)) return null;
+    if (kind === 'issues' && rest.length === 1 && /^\d+$/.test(rest[0])) return parsed.href;
+    if (kind === 'pull' && rest.length === 1 && /^\d+$/.test(rest[0])) return parsed.href;
+    if (kind === 'commit' && rest.length === 1 && /^[0-9a-fA-F]{7,40}$/.test(rest[0])) return parsed.href;
+    if (kind === 'discussions' && rest.length === 1 && /^\d+$/.test(rest[0])) return parsed.href;
+    if (kind === 'actions' && rest.length === 2 && rest[0] === 'runs' && /^\d+$/.test(rest[1])) return parsed.href;
+    if (kind === 'releases' && rest.length === 2 && rest[0] === 'tag' && /^[A-Za-z0-9._-]+$/.test(rest[1])) return parsed.href;
+    return null;
   } catch {
     return null;
   }
@@ -159,7 +161,7 @@ function deriveFreshness(observedAt, expiresAt, nowMs) {
 
 function validateRow(row, nowMs) {
   ensureFiniteClock(nowMs, 'now value');
-  if (!isSafePlainObject(row)) {
+  if (!isSafePlainObject(row) || (utilTypes && typeof utilTypes.isProxy === 'function' && utilTypes.isProxy(row))) {
     throw new TypeError('M11 agent status row must be a plain object');
   }
   const keys = [
@@ -196,23 +198,17 @@ function validateRow(row, nowMs) {
   }
 
   const providerRequested = safeText(row.providerRequested, 80);
-  const providerVerified = safeText(row.providerVerified, 80);
+  const providerVerifiedRaw = safeText(row.providerVerified, 80);
   const modelRequested = safeText(row.modelRequested, 120);
-  const modelVerified = safeText(row.modelVerified, 120);
+  const modelVerifiedRaw = safeText(row.modelVerified, 120);
   if (!providerRequested || !modelRequested) {
     throw new TypeError('Requested provider and model are required');
   }
-  if (providerVerified !== 'UNKNOWN' && !providerVerified) {
+  if (providerVerifiedRaw !== 'UNKNOWN' && !providerVerifiedRaw) {
     throw new TypeError('Provider verification is invalid');
   }
-  if (modelVerified !== 'UNKNOWN' && !modelVerified) {
+  if (modelVerifiedRaw !== 'UNKNOWN' && !modelVerifiedRaw) {
     throw new TypeError('Model verification is invalid');
-  }
-  if (providerVerified !== 'UNKNOWN' && providerVerified !== providerRequested) {
-    throw new TypeError('Provider verification must match the requested provider or be UNKNOWN');
-  }
-  if (modelVerified !== 'UNKNOWN' && modelVerified !== modelRequested) {
-    throw new TypeError('Model verification must match the requested model or be UNKNOWN');
   }
 
   const taskUrl = safeGitHubUrl(row.taskUrl);
@@ -222,11 +218,22 @@ function validateRow(row, nowMs) {
 
   const evidenceType = safeText(row.evidenceType, 80);
   const evidenceUrl = row.evidenceUrl === null || row.evidenceUrl === undefined ? null : safeGitHubUrl(row.evidenceUrl);
-  if ((providerVerified !== 'UNKNOWN' || modelVerified !== 'UNKNOWN') && (!evidenceUrl || !evidenceType || !VERIFIED_EVIDENCE_TYPES.has(evidenceType))) {
-    throw new TypeError('Verified provider/model claims require explicit public GitHub evidence');
-  }
   if (evidenceType && !M11_EVIDENCE_TYPES.includes(evidenceType)) {
     throw new TypeError('Evidence type is invalid');
+  }
+
+  const observedAt = isoMs(row.observedAt);
+  const expiresAt = isoMs(row.expiresAt);
+  if (observedAt === null || expiresAt === null || observedAt > expiresAt) {
+    throw new TypeError('Observation and expiry timestamps are invalid');
+  }
+  const freshness = deriveFreshness(row.observedAt, row.expiresAt, nowMs);
+
+  const providerVerified = freshness === 'CURRENT' ? providerVerifiedRaw : 'UNKNOWN';
+  const modelVerified = freshness === 'CURRENT' ? modelVerifiedRaw : 'UNKNOWN';
+
+  if ((providerVerified !== 'UNKNOWN' || modelVerified !== 'UNKNOWN') && (!evidenceUrl || !evidenceType || !VERIFIED_EVIDENCE_TYPES.has(evidenceType))) {
+    throw new TypeError('Verified provider/model claims require explicit public GitHub evidence');
   }
   if (evidenceType === 'manual' || evidenceType === 'unknown') {
     if (providerVerified !== 'UNKNOWN' || modelVerified !== 'UNKNOWN') {
@@ -236,18 +243,9 @@ function validateRow(row, nowMs) {
   if (evidenceUrl === null && (providerVerified !== 'UNKNOWN' || modelVerified !== 'UNKNOWN')) {
     throw new TypeError('Evidence URL is required when provider or model is verified');
   }
-  if (evidenceUrl === null && evidenceType) {
-    if (evidenceType !== 'unknown' && evidenceType !== 'manual') {
-      throw new TypeError('Evidence URL must be supplied for typed evidence');
-    }
+  if (evidenceUrl === null && evidenceType && evidenceType !== 'unknown' && evidenceType !== 'manual') {
+    throw new TypeError('Evidence URL must be supplied for typed evidence');
   }
-
-  const observedAt = isoMs(row.observedAt);
-  const expiresAt = isoMs(row.expiresAt);
-  if (observedAt === null || expiresAt === null || observedAt > expiresAt) {
-    throw new TypeError('Observation and expiry timestamps are invalid');
-  }
-  const freshness = deriveFreshness(row.observedAt, row.expiresAt, nowMs);
 
   const blocker = row.blocker === null || row.blocker === undefined ? null : safeText(row.blocker, 200);
   const nextAction = safeText(row.nextAction, 200);
@@ -294,11 +292,12 @@ function validateRow(row, nowMs) {
 }
 
 export function normalizeM11AgentStatus(input, options = {}) {
-  if (!isSafePlainObject(input)) {
+  if (!isSafePlainObject(input) || (utilTypes && typeof utilTypes.isProxy === 'function' && utilTypes.isProxy(input))) {
     throw new TypeError('M11 agent status input must be a plain object');
   }
-  const currentKeys = Object.keys(input);
-  if (currentKeys.length !== 2 || !currentKeys.includes('schemaVersion') || !currentKeys.includes('rows')) {
+  const descriptors = Object.getOwnPropertyDescriptors(input);
+  const keys = Reflect.ownKeys(descriptors);
+  if (keys.length !== 2 || !keys.includes('schemaVersion') || !keys.includes('rows')) {
     throw new TypeError('M11 agent status must contain schemaVersion and rows');
   }
   if (input.schemaVersion !== 1) {
@@ -331,13 +330,17 @@ export function normalizeM11AgentStatus(input, options = {}) {
   });
 }
 
-export function validateM11AgentStatusRow(row, nowMs = Date.now()) {
-  ensureFiniteClock(nowMs, 'now value');
+export function validateM11AgentStatusRow(row, nowMs) {
+  if (typeof nowMs !== 'number' || !Number.isFinite(nowMs)) {
+    throw new TypeError('Invalid now value');
+  }
   return validateRow(row, nowMs);
 }
 
-export function deriveM11Freshness(observedAt, expiresAt, nowMs = Date.now()) {
-  ensureFiniteClock(nowMs, 'now value');
+export function deriveM11Freshness(observedAt, expiresAt, nowMs) {
+  if (typeof nowMs !== 'number' || !Number.isFinite(nowMs)) {
+    throw new TypeError('Invalid now value');
+  }
   return deriveFreshness(observedAt, expiresAt, nowMs);
 }
 

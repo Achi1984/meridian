@@ -119,12 +119,14 @@ test('missing, malformed, expired or future evidence fail closed without inventi
   assert.throws(() => validateM11AgentStatusRow(sample({providerVerified: 'gitlab'}), NOW), {name: 'TypeError'});
   assert.throws(() => validateM11AgentStatusRow(sample({modelVerified: 'claude-3'}), NOW), {name: 'TypeError'});
   assert.throws(() => validateM11AgentStatusRow(sample({ownerDecisionRequired: true, ownerDecisionReason: null}), NOW), {name: 'TypeError'});
+  assert.throws(() => validateM11AgentStatusRow(sample({providerVerified: 'UNKNOWN'}), NOW), {name: 'TypeError'});
 });
 
 test('hostile URLs, extra fields and text are rejected before rendering', () => {
   const withExtraField = sample();
   withExtraField.extra = 'nope';
   assert.throws(() => validateM11AgentStatusRow(sample({taskUrl: 'javascript:alert(1)'}), NOW), {name: 'TypeError'});
+  assert.throws(() => validateM11AgentStatusRow(sample({taskUrl: 'https://github.com/acme/meridian/issues/42?token=secret'}), NOW), {name: 'TypeError'});
   assert.throws(() => validateM11AgentStatusRow(sample({evidenceUrl: 'file:///etc/passwd'}), NOW), {name: 'TypeError'});
   assert.throws(() => validateM11AgentStatusRow(sample({nextAction: '<script>alert(1)</script>'}), NOW), {name: 'TypeError'});
   assert.throws(() => normalizeM11AgentStatus({schemaVersion: 1, rows: [withExtraField]}, {now: () => NOW}), {name: 'TypeError'});
@@ -135,7 +137,8 @@ test('hostile URLs, extra fields and text are rejected before rendering', () => 
     }
   });
   assert.throws(() => validateM11AgentStatusRow(proxy, NOW), {name: 'TypeError'});
-  assert.throws(() => validateM11AgentStatusRow(sample({modelVerified: 'gpt-4'}), NOW), {name: 'TypeError'});
+  assert.doesNotThrow(() => validateM11AgentStatusRow(sample({modelRequested: 'gpt-5', modelVerified: 'gpt-4'}), NOW));
+  assert.throws(() => validateM11AgentStatusRow(sample({providerVerified: 'UNKNOWN', modelVerified: 'UNKNOWN', evidenceType: 'manual'}), NOW), {name: 'TypeError'});
 });
 
 test('rendering is DOM-safe and text-only for public output', () => {
