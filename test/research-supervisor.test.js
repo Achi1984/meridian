@@ -116,6 +116,9 @@ function runPython(args, timeoutMs, label) {
     timeout: timeoutMs,
     maxBuffer
   });
+  for (const line of String(result.stdout || "").split(/\r?\n/)) {
+    if (line.startsWith("SYNTHETIC_SUPERVISOR_TIMING ")) console.log(line);
+  }
   assert.equal(result.error, undefined, diagnostic(label, result));
   assert.equal(result.status, 0, diagnostic(label, result));
   return result;

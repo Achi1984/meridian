@@ -15,8 +15,14 @@ nav:[],views:[],decision:document.querySelectorAll('[data-decision-owner]').leng
 decisionBackground:getComputedStyle(document.querySelector('.decision')).backgroundImage,
 sourceLabels:[...document.querySelectorAll('#view-command .trust-cell span')].map(n=>n.textContent),
 attentionColor:tokenColor('--attention'),positiveColor:tokenColor('--positive'),
-unknownBotsAccents:[getComputedStyle(document.querySelector('#view-command .trust-cell:nth-child(2)')).borderTopColor,getComputedStyle(document.querySelector('#view-bots .view-placeholder')).borderTopColor],
+commandBotsAccent:getComputedStyle(document.querySelector('#view-command .trust-cell:nth-child(2)')).borderTopColor,
 unknownBotsBackground:getComputedStyle(document.querySelector('#view-command .trust-cell:nth-child(2)')).backgroundImage,
+obsoleteBotsPlaceholderAbsent:!document.querySelector('#view-bots .view-placeholder'),
+botReadMounted:!!document.querySelector('#bot-read-root .bot-read-state'),
+botReadState:document.querySelector('#bot-read-root .bot-read-state')?.dataset.state,
+botCards:document.querySelectorAll('#bot-read-root .bot-card').length,
+botSnapshotCountVisible:/Bots im Snapshot/.test(document.querySelector('#bot-read-root').innerText),
+confirmedActiveCountVisible:/\\b\\d+\\s+(?:aktive|laufende)\\s+Bots\\b/i.test(document.querySelector('#bot-read-root').innerText),
 stateColor:getComputedStyle(document.querySelector('.preview-status strong')).color};
 for(const b of document.querySelectorAll('#nav button')){
 const l=b.querySelector('span:last-child'),s=getComputedStyle(l);
@@ -46,7 +52,7 @@ for(const width of [320,375,390,430]){
  const x=await withMobileChrome(chrome,width,hosted.url,async call=>{
   await unlockAppThroughGate(call);
   const result=await call('Runtime.evaluate',{expression:probe,returnByValue:true});
-  assert.ok(!result.exceptionDetails,'shell measurement expression must execute in the unlocked app');
+  assert.ok(!result.exceptionDetails,'shell measurement expression must execute in the unlocked app: '+JSON.stringify(result.exceptionDetails));
   return result.result?.value;
  });
  console.log('V11_CDP_WIDTH',width,JSON.stringify(x));
@@ -54,11 +60,15 @@ for(const width of [320,375,390,430]){
  assert.equal(x.dpr,1);assert.ok(x.body<=width+1&&x.root<=width+1,'overflow '+width);
  assert.equal(x.decision,1);assert.equal(x.nav.length,5);
  assert.match(x.decisionBackground,/125deg.*rgb\(27, 53, 80\)/,'A1 gradient must survive CSS cascade');
- assert.deepEqual(x.sourceLabels,['Gesperrt','Unbekannt','Unbekannt'],'unrefreshed readers do not verify sources');
- for(const accent of x.unknownBotsAccents){
-  assert.equal(accent,x.attentionColor,'unknown BOTS surface uses attention, not category status');
-  assert.notEqual(accent,x.positiveColor,'unknown BOTS surface cannot imply positive verification');
- }
+ assert.deepEqual(x.sourceLabels,['Noch nicht geladen','Unbekannt','Unbekannt'],'unrefreshed readers do not verify sources');
+ assert.equal(x.commandBotsAccent,x.attentionColor,'unknown BOTS surface uses attention, not category status');
+ assert.notEqual(x.commandBotsAccent,x.positiveColor,'unknown BOTS surface cannot imply positive verification');
+ assert.equal(x.obsoleteBotsPlaceholderAbsent,true,'removed Bot placeholder must stay absent');
+ assert.equal(x.botReadMounted,true,'Bot reader mounts before a manual read');
+ assert.equal(x.botReadState,'locked','Bot reader is locked before refresh');
+ assert.equal(x.botCards,0,'locked Bot reader has no snapshot cards');
+ assert.equal(x.botSnapshotCountVisible,false,'locked Bot reader does not claim a snapshot count');
+ assert.equal(x.confirmedActiveCountVisible,false,'snapshot data does not imply a confirmed running-bot count');
  assert.match(x.unknownBotsBackground,/rgb\(53, 43, 24\)/,'unknown BOTS trust-cell uses amber dark background');
  assert.equal(x.stateColor,'rgb(240, 202, 133)','A2 unknown-state color stays independent');
  const categoryColors={command:'rgb(169, 212, 255)',depot:'rgb(123, 182, 255)',bots:'rgb(46, 207, 154)',market:'rgb(182, 155, 255)',strategies:'rgb(212, 154, 255)'};

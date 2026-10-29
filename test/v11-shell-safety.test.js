@@ -31,7 +31,11 @@ test('A0: exactly one decision and unknown data fail closed',()=>{
  assert.equal((html.match(/data-decision-owner=/g)||[]).length,1);
  assert.match(html,/data-preview-mode="manual-bot-depot-read-only"/);
  assert.match(html,/data-execution-impact="false"/);
- assert.match(html,/JETZT WICHTIG[\s\S]*?UNGEKLÄRT/);
+ const decision=html.match(/<section\b(?=[^>]*\bdata-decision-owner=)[^>]*>[\s\S]*?<\/section>/)?.[0];
+ assert.ok(decision,'single risk decision section exists');
+ assert.match(decision,/RISIKOSTATUS[\s\S]*?UNBEKANNT/);
+ assert.match(decision,/Keine bestätigte Risikoprüfung/);
+ assert.match(decision,/Fehlende Daten sind keine Entwarnung/);
  assert.match(html,/<div class="portfolio-value"[^>]*>—<\/div>/);
  assert.match(html,/Gesamtwert nicht verifiziert/);
  assert.match(html,/Fehlende Daten sind keine Entwarnung/);
@@ -45,7 +49,7 @@ test('A0: no live imports, network, credentials, orders or PWA bootstrap',()=>{
  assert.doesNotMatch(html,/<(?:img|base|object|embed|source|video|audio|link)\b|<meta[^>]*http-equiv=["']refresh|\bon[a-z]+\s*=|javascript:|url\s*\(/i);
  assert.equal(scripts.length,1,'navigation-only inline script');
  for(const module of ['app-access-bootstrap.js','bot-read-bootstrap.js','depot-read-bootstrap.js','strategy-workspace-bootstrap.js'])
-   assert.ok(html.includes(`<script type="module" src="./${module}?v=B14-M11"></script>`));
+   assert.ok(html.includes(`<script type="module" src="./${module}?v=B15-M11"></script>`));
  assert.equal((html.match(/<form\b/g)||[]).length,1,'one app-opening form');
  assert.equal((html.match(/type="password"/g)||[]).length,1,'one masked app password input');
  const withoutGate=html.replace(/<form id="app-access-form">[\s\S]*?<\/form>/,'')

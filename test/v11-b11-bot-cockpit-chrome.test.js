@@ -11,7 +11,7 @@ const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium
   .find(path=>path&&existsSync(path));
 const v11Root=fileURLToPath(new URL('../v11/',import.meta.url));
 const source=readFileSync(join(v11Root,'index.html'),'utf8');
-const bootstrap='<script type="module" src="./bot-read-bootstrap.js?v=B14-M11"></script>';
+const bootstrap='<script type="module" src="./bot-read-bootstrap.js?v=B15-M11"></script>';
 const fixtureScript=`<script>
 window.__botReadMode='fresh';window.__botReads=0;window.__resolveBotRead=null;window.__botErrors=[];
 window.__appAccessReads=0;
@@ -22,18 +22,24 @@ window.__botSnapshot=age=>({schemaVersion:'MERIDIAN-ASSET-WATCH-BRIDGE-V1',sourc
  executionImpact:false,detailsComplete:true,sourceStatusOk:true,fresh:true,usableForOverwrite:true,
  botCount:6,bots:[
   {botRef:'a'.repeat(20),symbol:'BTCUSDT',side:'LONG',cateType:'inverse',botType:'futures_grid',
-   leverage:5,pnl:{usd:-25}},
+   leverage:5,investment:{usd:125.5678},pnl:{usd:-25}},
   {botRef:'b'.repeat(20),symbol:'BTCUSDT',side:'SHORT',cateType:'linear',botType:'futures_grid',
-   leverage:2,pnl:{usd:-25}},
+   leverage:2,investment:{usd:0.004},pnl:{usd:-25}},
   {botRef:'c'.repeat(20),symbol:'ETHUSDT',side:'NEUTRAL',cateType:'linear',botType:'futures_grid',
-   leverage:8,pnl:{usd:-3.5}},
+   leverage:8,investment:{quoteAmount:0.0000123456789,currency:'ETH'},pnl:{usd:-3.5}},
   {botRef:'d'.repeat(20),symbol:'ADAUSDT',side:null,cateType:null,botType:'futures_grid',
    leverage:null,pnl:{usd:null}},
   {botRef:'e'.repeat(20),symbol:'XRPUSDT',side:'SHORT',cateType:'inverse',botType:'futures_grid',
-   leverage:3,pnl:{usd:-8}},
+   leverage:3,investment:{quoteAmount:0.42,currency:'XRP'},pnl:{usd:0.005}},
   {botRef:'f'.repeat(20),symbol:'SOLUSDT',side:'LONG',cateType:'linear',botType:'futures_grid',
    leverage:null,pnl:{usd:0}}
  ]});
+window.__largeBotSnapshot=age=>{const snapshot=window.__botSnapshot(age);
+ snapshot.botCount=20;snapshot.bots=Array.from({length:20},(_,index)=>({
+  botRef:index.toString(16).padStart(20,'0'),symbol:index<2?'BTCUSDT':'SYNTH'+String(index).padStart(2,'0')+'USDT',
+  side:['LONG','SHORT','NEUTRAL'][index%3],cateType:index%2?'linear':'inverse',botType:'futures_grid',
+  leverage:index%10+1,investment:{usd:index+1},pnl:{usd:-(index+1)}
+ }));return snapshot;};
 window.fetch=async(url)=>{if(String(url).endsWith('/app-access')){
   window.__appAccessReads++;
   return new Response(JSON.stringify({version:'7.64-CANONICAL-PORTFOLIO-HISTORY-V3',points:[]}),
@@ -47,7 +53,7 @@ window.fetch=async(url)=>{if(String(url).endsWith('/app-access')){
    {headers:{'content-type':'application/json'}}));
  });
  const age=window.__botReadMode==='stale'?3600000:window.__botReadMode==='expires'?100:0;
- const payload=window.__botReadMode==='empty'
+ const payload=window.__botReadMode==='large'?window.__largeBotSnapshot(age):window.__botReadMode==='empty'
   ? {...window.__botSnapshot(0),botCount:0,bots:[]} : window.__botSnapshot(age);
  if(window.__botReadMode==='expires')payload.freshnessLimitMs=200;
  return new Response(JSON.stringify(payload),{headers:{'content-type':'application/json'}});
@@ -81,7 +87,7 @@ function createShellServer() {
   });
 }
 
-test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and invalidation at five viewports',
+test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and invalidation at six viewports',
   {timeout:180000},async()=>{
     if(typeof WebSocket!=='function'){
       const env={...process.env};delete env.NODE_TEST_CONTEXT;
@@ -89,15 +95,16 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
         {env,encoding:'utf8',timeout:175000});
       assert.equal(child.status,0,String(child.stdout).slice(-3000)+String(child.stderr).slice(-1000));
       const rows=child.stdout.split('\n').filter(line=>line.includes('V11_B11_SIZE'));
-      assert.equal(rows.length,5);rows.forEach(row=>console.log(row));return;
+      assert.equal(rows.length,6);rows.forEach(row=>console.log(row));return;
     }
     assert.ok(chrome,'Chrome required; actual-shell acceptance must not silently skip');
     const server=createShellServer();
     await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
     const url=`http://127.0.0.1:${server.address().port}/v11/index.html`;
-    const sizes=[{width:320,height:568,mobile:true},{width:375,height:667,mobile:true},
+    const sizes=[{width:320,height:568,mobile:true},{width:355,height:700,mobile:true},{width:375,height:667,mobile:true},
       {width:390,height:844,mobile:true},{width:430,height:932,mobile:true},{width:1440,height:900,mobile:false}];
     const evidence=process.env.V11_B11_EVIDENCE_DIR;
+    const screenshotWidths=new Set([320,390]);
     try{
       for(const size of sizes){
         const measurements=await withMobileChrome(chrome,size.width,url,async call=>{
@@ -118,16 +125,38 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           const assertPopulatedLayout=async label=>{
             const layout=await evaluate(`(()=>{
               const x=scrollX,y=scrollY,root=document.documentElement;
+              const cards=[...document.querySelectorAll('#bot-read-root .bot-card')];
               const nodes=[...document.querySelectorAll('#bot-read-root .bot-card,#bot-read-root .bot-card summary,#bot-read-root .bot-card-metrics')];
               const clipped=nodes.filter(node=>node.scrollWidth>node.clientWidth+1).length;
+              const intersects=(a,b)=>a.left<b.right-1&&a.right>b.left+1&&a.top<b.bottom-1&&a.bottom>b.top+1;
+              const relationships=cards.map(card=>{
+                const summary=card.querySelector('summary'),top=card.querySelector('.bot-card-top');
+                const identity=card.querySelector('.bot-card-identity'),heading=card.querySelector('.bot-card-heading');
+                const badges=card.querySelector('.bot-card-badges'),pnl=card.querySelector('.bot-card-pnl');
+                const pnlLabel=pnl.firstElementChild,pnlAmount=pnl.lastElementChild;
+                const capital=card.querySelector('.bot-card-capital'),capitalLabel=capital.firstElementChild;
+                const capitalAmount=capital.lastElementChild,disclosure=card.querySelector('.bot-card-disclosure');
+                const pairs=[[identity,pnl],[heading,badges],[pnlLabel,pnlAmount],
+                  [capitalLabel,capitalAmount],[top,capital],[top,disclosure],[capital,disclosure]];
+                return {id:card.id,siblings:pairs.every(([a,b])=>a.parentElement===b.parentElement&&
+                    !intersects(a.getBoundingClientRect(),b.getBoundingClientRect())),
+                  verticalOrder:heading.getBoundingClientRect().bottom<=badges.getBoundingClientRect().top+1&&
+                    pnlLabel.getBoundingClientRect().bottom<=pnlAmount.getBoundingClientRect().top+1&&
+                    top.getBoundingClientRect().bottom<=capital.getBoundingClientRect().top+1&&
+                    top.getBoundingClientRect().bottom<=disclosure.getBoundingClientRect().top+1};
+              });
               window.scrollTo(0,root.scrollHeight);
               const last=document.querySelector('#view-bots').lastElementChild.getBoundingClientRect();
               const nav=document.getElementById('nav').getBoundingClientRect();
-              const result={clipped,overflow:root.scrollWidth>root.clientWidth+1,lastClear:last.bottom<=nav.top+1};
+              const result={clipped,relationships,cardTargets:cards.every(card=>
+                card.querySelector('summary').getBoundingClientRect().height>=44),
+                overflow:root.scrollWidth>root.clientWidth+1,lastClear:last.bottom<=nav.top+1};
               window.scrollTo(x,y);return result;
             })()`);
             assert.equal(layout.overflow,false,label+' page overflow');
             assert.equal(layout.clipped,0,label+' card clipping');
+            assert.ok(layout.relationships.every(card=>card.siblings&&card.verticalOrder),label+' sibling geometry '+JSON.stringify(layout.relationships));
+            assert.equal(layout.cardTargets,true,label+' card touch targets');
             assert.equal(layout.lastClear,true,label+' bottom navigation clearance');
           };
           const key=async(name,code,keyCode)=>{
@@ -158,6 +187,21 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
             const command=document.getElementById('command-bot-overview');
             return {cards:cards.length,ids:cards.map(c=>c.id),count:root.innerText.includes('6 Bots im Snapshot'),
               duplicate:cards.filter(c=>c.innerText.includes('BTCUSDT')).length,
+              cardHeights:cards.map(c=>c.getBoundingClientRect().height),
+              cardGeometry:cards.map(c=>({open:c.open,summary:c.querySelector('summary').getBoundingClientRect().height,
+                width:c.getBoundingClientRect().width,body:c.querySelector('.bot-card-body').getBoundingClientRect().height,
+                rows:getComputedStyle(c.querySelector('summary')).gridTemplateRows,
+                top:c.querySelector('.bot-card-top').getBoundingClientRect().height,
+                identity:c.querySelector('.bot-card-identity').getBoundingClientRect().height,
+                pnl:c.querySelector('.bot-card-pnl').getBoundingClientRect().height,
+                heading:c.querySelector('.bot-card-heading').getBoundingClientRect().height,
+                badges:c.querySelector('.bot-card-badges').getBoundingClientRect().height,
+                badgeRects:[...c.querySelectorAll('.bot-card-badge')].map(b=>({text:b.innerText,width:b.getBoundingClientRect().width,height:b.getBoundingClientRect().height})),
+                text:c.querySelector('summary').innerText})),
+              referenceLabels:cards.map(c=>c.querySelector('summary').getAttribute('aria-label')),
+              referencesVisible:cards.some(c=>c.querySelector('summary').innerText.includes('Referenz')),
+              tinyPositive:cards.find(c=>c.id.endsWith('e'.repeat(20)))?.querySelector('.bot-pnl-positive')?.innerText,
+              tinyCapital:cards.find(c=>c.id.endsWith('b'.repeat(20)))?.querySelector('.bot-card-capital strong')?.innerText,
               command:command.innerText,lossButtons:command.querySelectorAll('button').length,
               commandState:command.dataset.state,
               touch:[...root.querySelectorAll('input,select,button')].filter(e=>!e.hidden).map(e=>[e.tagName,e.getAttribute('aria-label')||e.textContent,e.getBoundingClientRect().height]),
@@ -165,16 +209,70 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           })()`);
           assert.equal(fresh.cards,6);assert.equal(new Set(fresh.ids).size,6);assert.equal(fresh.duplicate,2);
           assert.equal(fresh.count,true);assert.equal(fresh.commandState,'fresh');assert.equal(fresh.lossButtons,3);
-          assert.match(fresh.command,/Lesestatus: aktueller Snapshot/);assert.match(fresh.command,/Richtung: Long 2 · Short 2 · Neutral 1 · Unbekannt 1/);
-          assert.match(fresh.command,/P\/L laut Quelle/);
-          assert.ok(fresh.touch.every(([, ,height])=>height>=44),JSON.stringify(fresh.touch));
+          assert.ok(fresh.cardHeights.every(height=>Number.isFinite(height)&&height>0),
+            JSON.stringify(fresh.cardGeometry));
+          let categoryFit=null;
+          if([355,375,390,430].includes(size.width)){
+            const category=await evaluate(`(()=>{
+              const select=document.getElementById('bot-category-filter');
+              const canvas=document.createElement('canvas'),context=canvas.getContext('2d');
+              context.font=getComputedStyle(select).font;
+              return {label:select.labels[0].innerText,value:select.value,
+                text:select.selectedOptions[0].textContent,width:select.getBoundingClientRect().width,
+                textWidth:context.measureText(select.selectedOptions[0].textContent).width,
+                gridColumn:getComputedStyle(select.parentElement).gridColumn,
+                visible:select.getBoundingClientRect().left>=0&&select.getBoundingClientRect().right<=innerWidth&&
+                  select.scrollWidth<=select.clientWidth+1};
+            })()`);
+            assert.deepEqual({label:category.label,value:category.value,text:category.text},
+              {label:'Kontraktart',value:'all',text:'Alle Kontraktarten'});
+            assert.ok(category.width>=category.textWidth+40,JSON.stringify(category));
+            assert.equal(category.gridColumn,size.width<360?'auto':'1 / -1',JSON.stringify(category));
+            assert.equal(category.visible,true,JSON.stringify(category));
+            categoryFit={width:category.width,selectedTextWidth:category.textWidth,gridColumn:category.gridColumn};
+          }
+          assert.equal(new Set(fresh.referenceLabels).size,6,'duplicate symbols have distinct accessible names');
+          assert.equal(fresh.referencesVisible,false,'full references stay out of collapsed visual cards');
+          assert.equal(fresh.tinyPositive,'+<0,01 USD');
+          assert.equal(fresh.tinyCapital,'<0,01 USD/USDT');
+          const visibleAmounts=await evaluate(`[...document.querySelectorAll('#bot-read-root .bot-card')].map(card=>({id:card.id,text:card.querySelector('summary').innerText}))`);
+          assert.match(visibleAmounts.find(row=>row.id.endsWith('a'.repeat(20))).text,/-25,00 USD/);
+          assert.match(visibleAmounts.find(row=>row.id.endsWith('e'.repeat(20))).text,/\+<0,01 USD/);
+          const zero=visibleAmounts.find(row=>row.id.endsWith('f'.repeat(20))).text;
+          assert.match(zero,/P\/L laut Quelle\s*Nicht verfügbar/);
+          assert.doesNotMatch(zero,/0,00 USD/);
+          const missing=visibleAmounts.find(row=>row.id.endsWith('d'.repeat(20))).text;
+          assert.match(missing,/P\/L laut Quelle\s*Nicht verfügbar/);
+          assert.doesNotMatch(missing,/0,00 USD/);
+          const pnlContrast=await evaluate(`(()=>{
+            const ratio=(foreground,background)=>{
+              const channel=value=>{value/=255;return value<=0.04045?value/12.92:((value+0.055)/1.055)**2.4};
+              const luminance=color=>{const [r,g,b]=color.match(/\\d+/g).map(Number);
+                return .2126*channel(r)+.7152*channel(g)+.0722*channel(b);};
+              const a=luminance(foreground),b=luminance(background);
+              return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);
+            };
+            return [...document.querySelectorAll('#bot-read-root .bot-pnl-negative,#bot-read-root .bot-pnl-positive')]
+              .map(node=>ratio(getComputedStyle(node).color,getComputedStyle(node.closest('.bot-card')).backgroundColor));
+          })()`);
+          assert.ok(pnlContrast.length>=2&&pnlContrast.every(ratio=>ratio>=4.5),JSON.stringify(pnlContrast));
+          assert.match(fresh.command,/6 Bots · nur lesend/);assert.match(fresh.command,/Quelle & Zeit/);
+          assert.match(fresh.command,/Bestätigte negative P\/L-Werte/);
+          const commandMetadata=await evaluate(`document.querySelector('#command-bot-overview .command-bot-metadata').innerText`);
+          assert.match(commandMetadata,/Quelle: Pionex Bot API · Richtung: Long 2 · Short 2 · Neutral 1 · Unbekannt 1/);
+          const exactCommandTimestamp=commandMetadata.match(/\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z/)?.[0];
+          assert.ok(exactCommandTimestamp);
+          assert.ok(fresh.command.includes(new Intl.DateTimeFormat('de-DE',{dateStyle:'medium',timeStyle:'short',
+            timeZone:'UTC'}).format(new Date(exactCommandTimestamp))+' UTC'),fresh.command);
+          assert.ok(fresh.touch.every(([, ,height])=>height>=43.99),JSON.stringify(fresh.touch));
           assert.equal(fresh.leak,false);
           const lossNames=await evaluate(`[...document.querySelectorAll('#command-bot-overview button')].map(button=>({text:button.textContent,name:button.getAttribute('aria-label')}))`);
           assert.equal(new Set(lossNames.map(row=>row.text)).size,3,'distinct visible loss labels');
           assert.equal(new Set(lossNames.map(row=>row.name)).size,3,'distinct accessible loss labels');
+          assert.ok(lossNames.every(row=>!/[a-f0-9]{20}/.test(row.text)),'technical refs are not in primary rows');
           assert.match(lossNames[0].name,/BTCUSDT · Long · Referenz a{20}/);
           assert.match(lossNames[1].name,/BTCUSDT · Short · Referenz b{20}/);
-          assert.match(lossNames[0].name,/-25 USD/);assert.match(lossNames[1].name,/-25 USD/);
+          assert.match(lossNames[0].name,/-25,00 USD/);assert.match(lossNames[1].name,/-25,00 USD/);
           await assertPopulatedLayout('populated collapsed');
           // Native disclosure state follows botRef, not symbol, through local selection.
           await evaluate(`document.querySelector('#bot-card-${'a'.repeat(20)} summary').focus()`);
@@ -223,12 +321,104 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
             await evaluate(`document.querySelector('#bot-card-'+ '${ref}'.repeat(20)+' summary').focus()`);
             await key('Enter','Enter',13);
           }
-          if(evidence){
+          if(evidence&&screenshotWidths.has(size.width)){
             mkdirSync(evidence,{recursive:true});
-            await evaluate("document.querySelector('.bot-overview-filters').scrollIntoView({block:'start'})");
+            await evaluate("document.querySelector('#bot-read-root .bot-card').scrollIntoView({block:'start'})");
+            assert.ok(await evaluate(`[...document.querySelectorAll('#bot-read-root .bot-card')]
+              .filter(card=>{const rect=card.getBoundingClientRect();return rect.top<innerHeight&&rect.bottom>0}).length>0`));
             const image=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
-            writeFileSync(join(evidence,`v11-b11-${size.width}x${size.height}-bots.png`),
+            writeFileSync(join(evidence,size.width===320?'after-320x568.png':'after-390x844.png'),
               Buffer.from(image.data,'base64'));
+          }
+          let botLargeText=null;
+          if([320,355,390].includes(size.width)){
+            const normalHeights=await evaluate(`[...document.querySelectorAll('#bot-read-root .bot-card')].map(card=>card.getBoundingClientRect().height)`);
+            const enlarged=await evaluate(`(()=>{
+              const nodes=[...document.querySelectorAll('#bot-read-root .bot-card *')];
+              const sizes=nodes.map(node=>parseFloat(getComputedStyle(node).fontSize));
+              nodes.forEach((node,index)=>{if(Number.isFinite(sizes[index]))node.style.fontSize=(sizes[index]*1.35)+'px';});
+              const cards=[...document.querySelectorAll('#bot-read-root .bot-card')];
+              const wordRects=node=>{
+                const walker=document.createTreeWalker(node,NodeFilter.SHOW_TEXT),words=[];
+                let text;
+                while((text=walker.nextNode())){
+                  for(const match of text.textContent.matchAll(/\\S+/g)){
+                    const range=document.createRange();
+                    range.setStart(text,match.index);range.setEnd(text,match.index+match[0].length);
+                    words.push({word:match[0],rects:[...range.getClientRects()].map(rect=>({
+                      left:rect.left,right:rect.right,top:rect.top,bottom:rect.bottom}))});
+                  }
+                }
+                return words;
+              };
+              const cardsText=cards.map(card=>{
+                const bounds=card.getBoundingClientRect();
+                const pnlNode=card.querySelector('.bot-card-pnl strong'),pnlRange=document.createRange();
+                pnlRange.selectNodeContents(pnlNode);
+                const nestedPnlWords=wordRects(card.querySelector('.bot-card-pnl'));
+                const pnlLabel=card.querySelector('.bot-card-pnl>span'),pnlLabelRange=document.createRange();
+                pnlLabelRange.selectNodeContents(pnlLabel);
+                const nodes=[card.querySelector('.bot-card-pnl'),card.querySelector('.bot-card-pnl>span'),
+                  card.querySelector('.bot-card-pnl strong'),
+                  ...card.querySelectorAll('.bot-card-capital>span,.bot-card-capital strong,.bot-card-badge')];
+                const texts=nodes.map(node=>{
+                  const rect=node.getBoundingClientRect();
+                  const words=wordRects(node);
+                  return {text:node.textContent,words,inside:rect.left>=bounds.left&&rect.right<=bounds.right&&
+                    rect.top>=bounds.top&&rect.bottom<=bounds.bottom&&node.scrollWidth<=node.clientWidth+1,
+                    wordsInside:words.every(word=>word.rects.length===1&&word.rects[0].left>=bounds.left&&
+                      word.rects[0].right<=bounds.right&&word.rects[0].top>=bounds.top&&
+                      word.rects[0].bottom<=bounds.bottom)};
+                });
+                return {id:card.id,pnl:pnlNode.textContent,pnlLineCount:pnlRange.getClientRects().length,
+                  pnlLabel:pnlLabel.textContent,pnlLabelLineCount:pnlLabelRange.getClientRects().length,
+                  capitalLabel:card.querySelector('.bot-card-capital>span').textContent,
+                  nestedPnlWordCount:nestedPnlWords.length,
+                  bounds:{left:bounds.left,right:bounds.right,width:bounds.width},
+                  pnlBounds:card.querySelector('.bot-card-pnl').getBoundingClientRect().toJSON(),
+                  height:card.getBoundingClientRect().height,texts};
+              });
+              const ratios=nodes.map((node,index)=>({
+                before:sizes[index],after:parseFloat(getComputedStyle(node).fontSize)}))
+                .filter(row=>Number.isFinite(row.before)&&row.before>0)
+                .map(row=>row.after/row.before);
+              return {overflow:document.documentElement.scrollWidth>innerWidth+1,
+                heights:cards.map(card=>card.getBoundingClientRect().height),
+                targets:cards.every(card=>card.querySelector('summary').getBoundingClientRect().height>=44),
+                clipping:cards.some(card=>card.scrollWidth>card.clientWidth+1),
+                scale:ratios.length?{min:Math.min(...ratios),max:Math.max(...ratios),count:ratios.length}:null,
+                cardsText};
+            })()`);
+            assert.equal(enlarged.overflow,false,JSON.stringify(enlarged));
+            assert.ok(enlarged.heights.every((height,index)=>height>=normalHeights[index]),JSON.stringify(enlarged));
+            assert.equal(enlarged.targets,true,JSON.stringify(enlarged));
+            assert.equal(enlarged.clipping,false,JSON.stringify(enlarged));
+            assert.ok(enlarged.scale&&Math.abs(enlarged.scale.min-1.35)<0.01&&
+              Math.abs(enlarged.scale.max-1.35)<0.01,JSON.stringify(enlarged.scale));
+            const textCoverageFailures=enlarged.cardsText.flatMap(card=>[
+              ...(card.nestedPnlWordCount<5?[{id:card.id,nestedPnlWordCount:card.nestedPnlWordCount}]:[]),
+              ...card.texts.filter(text=>!text.words.length||!text.inside||!text.wordsInside)
+                .map(text=>({id:card.id,text:text.text,words:text.words,inside:text.inside,wordsInside:text.wordsInside}))
+            ]);
+            assert.deepEqual(textCoverageFailures,[]);
+            assert.equal(enlarged.cardsText.find(card=>card.id.endsWith('d'.repeat(20)))?.pnl,'Nicht verfügbar');
+            assert.equal(enlarged.cardsText.find(card=>card.id.endsWith('f'.repeat(20)))?.pnl,'Nicht verfügbar');
+            assert.equal(enlarged.cardsText.find(card=>card.id.endsWith('e'.repeat(20)))?.pnl,'+<0,01 USD');
+            assert.ok(enlarged.cardsText.filter(card=>['a','b'].some(ref=>card.id.endsWith(ref.repeat(20))))
+              .every(card=>card.pnl==='-25,00 USD'));
+            assert.ok(enlarged.cardsText.every(card=>card.pnlLabel==='P/L laut Quelle'&&card.capitalLabel==='Kapital'));
+            assert.ok(enlarged.cardsText.every(card=>card.pnlLineCount===1&&card.pnlLabelLineCount===1),
+              JSON.stringify(enlarged.cardsText));
+            botLargeText={...enlarged,values:enlarged.cardsText.map(card=>({pnl:card.pnl,pnlLabel:card.pnlLabel,
+              capitalLabel:card.capitalLabel,height:card.height,nestedPnlWordCount:card.nestedPnlWordCount,
+              pnlLineCount:card.pnlLineCount,
+              pnlLabelLineCount:card.pnlLabelLineCount}))};
+            await assertPopulatedLayout('1.35x enlarged text');
+            if(evidence&&size.width===320){
+              await evaluate(`document.getElementById('bot-card-${'d'.repeat(20)}').scrollIntoView({block:'start'})`);
+              const image=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+              writeFileSync(join(evidence,'after-320x568-enlarged-text.png'),Buffer.from(image.data,'base64'));
+            }
           }
 
           await evaluate('window.scrollTo(0,0)');
@@ -244,11 +434,13 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           await evaluate(`(()=>{const select=document.getElementById('bot-sort-filter');select.value='pnl';
             select.dispatchEvent(new Event('change',{bubbles:true}));})()`);
           assert.deepEqual(await evaluate(`[...document.querySelectorAll('#bot-read-root .bot-card')].map(c=>c.querySelector('.bot-card-heading').innerText.split(' · ')[0])`),
-            ['BTCUSDT','BTCUSDT','XRPUSDT','ETHUSDT','ADAUSDT','SOLUSDT']);
+            ['BTCUSDT','BTCUSDT','ETHUSDT','XRPUSDT','ADAUSDT','SOLUSDT']);
           await evaluate(`(()=>{const dir=document.getElementById('bot-direction-filter');dir.value='unknown';
             dir.dispatchEvent(new Event('change',{bubbles:true}));})()`);
           assert.equal(await evaluate(`document.querySelector('#bot-read-root .bot-card .bot-card-heading').innerText`),
-            'ADAUSDT · Unbekannt');
+            'ADAUSDT');
+          assert.equal(await evaluate(`document.querySelector('#bot-read-root .bot-card .bot-card-direction').innerText`),
+            'Unbekannt');
           await evaluate(`(()=>{const dir=document.getElementById('bot-direction-filter');dir.value='all';
             dir.dispatchEvent(new Event('change',{bubbles:true}));
             const type=document.getElementById('bot-category-filter');type.value='coin-m';
@@ -257,18 +449,87 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           await evaluate(`(()=>{const search=document.getElementById('bot-symbol-search');search.value='NO_MATCH';
             search.dispatchEvent(new Event('input',{bubbles:true}));})()`);
           const none=await evaluate(`document.getElementById('bot-read-root').innerText`);
-          assert.match(none,/0 Treffer von 6 Bots/);assert.match(none,/Keine Bots entsprechen den Filtern/);
+          assert.match(none,/0 von 6 Bots im Snapshot/);assert.match(none,/Keine Bots entsprechen den Filtern/);
           assert.doesNotMatch(none,/Keine Bots in diesem Snapshot/);
           assert.equal(await evaluate('window.__botReads'),1,'local filter, sort, reset and navigation must not fetch');
 
           await evaluate(`document.querySelector('#nav [data-v="command"]').click()`);
           const commandTargets=await evaluate(`[...document.querySelectorAll('#command-bot-overview button')].map(b=>b.getBoundingClientRect().height)`);
           assert.ok(commandTargets.every(height=>height>=44),JSON.stringify(commandTargets));
-          if(evidence){
+          await evaluate(`document.querySelector('#command-bot-overview .command-bot-details summary').focus()`);
+          await key('Enter','Enter',13);
+          assert.equal(await evaluate(`document.querySelector('#command-bot-overview .command-bot-details').open`),true);
+          assert.match(await evaluate(`document.querySelector('#command-bot-overview .command-bot-details').innerText`),
+            /Technische Referenz: a{20}[\s\S]*P\/L laut Quelle · Originalwert: -25 USD/);
+          await key('Enter','Enter',13);
+          await evaluate(`document.querySelector('#command-bot-overview .command-bot-metadata summary').focus()`);
+          await key('Enter','Enter',13);
+          assert.match(await evaluate(`document.querySelector('#command-bot-overview .command-bot-metadata').innerText`),
+            /Snapshot-Zeit exakt \(UTC\):\s*\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z/);
+          await key('Enter','Enter',13);
+          if(evidence&&screenshotWidths.has(size.width)){
             await evaluate("document.getElementById('command-bot-overview').scrollIntoView({block:'start'})");
             const image=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
-            writeFileSync(join(evidence,`v11-b11-${size.width}x${size.height}-command.png`),
+            writeFileSync(join(evidence,size.width===320?'command-320x568.png':'command-390x844.png'),
               Buffer.from(image.data,'base64'));
+          }
+          const commandLayout=await evaluate(`(()=>{
+            const root=document.getElementById('command-bot-overview');
+            const rows=[...root.querySelectorAll('.command-bot-row')];
+            return {overflow:document.documentElement.scrollWidth>innerWidth+1,
+              identities:rows.map(row=>{
+                const identity=row.firstElementChild.firstElementChild,range=document.createRange();
+                range.selectNodeContents(identity);
+                return {text:identity.innerText,width:identity.getBoundingClientRect().width,
+                  lines:range.getClientRects().length};
+              }),
+              rowHeights:rows.map(row=>row.getBoundingClientRect().height),
+              actionHeights:[...root.querySelectorAll('button,summary')].map(node=>node.getBoundingClientRect().height)};
+          })()`);
+          assert.equal(commandLayout.overflow,false,JSON.stringify(commandLayout));
+          if(size.width===320)assert.ok(commandLayout.identities.every(identity=>
+            identity.text.includes(' · ')&&identity.width>=160&&identity.lines===1),
+            JSON.stringify(commandLayout.identities));
+          assert.ok(commandLayout.actionHeights.every(height=>height>=43.99),JSON.stringify(commandLayout));
+          let commandLargeText=null;
+          if([320,355,390].includes(size.width)){
+            commandLargeText=await evaluate(`(()=>{
+              const root=document.getElementById('command-bot-overview');
+              const nodes=[...root.querySelectorAll('*')];
+              const sizes=nodes.map(node=>parseFloat(getComputedStyle(node).fontSize));
+              nodes.forEach((node,index)=>{
+                if(Number.isFinite(sizes[index]))node.style.fontSize=(sizes[index]*1.35)+'px';
+              });
+              const rows=[...root.querySelectorAll('.command-bot-row')];
+              return {overflow:document.documentElement.scrollWidth>innerWidth+1,
+                overlap:rows.some(row=>{
+                  const button=row.firstElementChild.getBoundingClientRect();
+                  const details=row.lastElementChild.getBoundingClientRect();
+                  return button.left<details.right-1&&button.right>details.left+1&&
+                    button.top<details.bottom-1&&button.bottom>details.top+1;
+                }),
+                identities:rows.map(row=>{
+                  const identity=row.firstElementChild.firstElementChild,range=document.createRange();
+                  range.selectNodeContents(identity);
+                  return {text:identity.innerText,width:identity.getBoundingClientRect().width,
+                    lines:range.getClientRects().length,detailsTop:row.lastElementChild.getBoundingClientRect().top,
+                    buttonBottom:row.firstElementChild.getBoundingClientRect().bottom};
+                }),
+                rowHeights:rows.map(row=>row.getBoundingClientRect().height),
+                actionHeights:[...root.querySelectorAll('button,summary')].map(node=>node.getBoundingClientRect().height)};
+            })()`);
+            assert.equal(commandLargeText.overflow,false,JSON.stringify(commandLargeText));
+            assert.equal(commandLargeText.overlap,false,JSON.stringify(commandLargeText));
+            assert.ok(commandLargeText.identities.every(identity=>identity.text.includes(' · ')&&
+               identity.width>=160&&identity.lines===1&&
+               (size.width!==320||identity.detailsTop>=identity.buttonBottom-1)),
+               JSON.stringify(commandLargeText.identities));
+            assert.ok(commandLargeText.actionHeights.every(height=>height>=43.99),JSON.stringify(commandLargeText));
+          }
+          if(evidence&&commandLargeText&&size.width===320){
+            const enlargedShot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+            writeFileSync(join(evidence,'command-320x568-enlarged-text.png'),
+              Buffer.from(enlargedShot.data,'base64'));
           }
           await evaluate('window.scrollTo(0,0)');
           await evaluate(`document.querySelector('#command-bot-overview button').focus()`);
@@ -355,6 +616,51 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           assert.equal(await evaluate(`document.getElementById('command-bot-overview').dataset.state`),'stale');
           assert.doesNotMatch(await evaluate(`document.getElementById('command-bot-overview').innerText`),/Bots im Snapshot|BTCUSDT|Snapshot-Zeit/);
           assert.equal(await evaluate('window.__botReads'),10,'only explicit refresh actions reach the mock source');
+          if(size.width===320||size.width===390){
+            await evaluate(`window.__botReadMode='fresh';document.getElementById('bot-read-refresh').click()`);
+            await evaluate('new Promise(resolve=>setTimeout(resolve,60))');
+            await evaluate(`window.__botReadMode='large';document.getElementById('bot-read-refresh').click()`);
+            await evaluate('new Promise(resolve=>setTimeout(resolve,60))');
+            assert.equal(await evaluate(`document.querySelectorAll('#bot-read-root .bot-card').length`),20);
+            await evaluate('window.scrollTo(0,0)');
+            const largeLayout=await evaluate(`(()=>{
+              const root=document.getElementById('bot-read-root'),first=root.querySelector('.bot-card');
+              const filter=root.querySelector('.bot-overview-filters'),actions=filter.nextElementSibling;
+              const filtersRect=filter.getBoundingClientRect(),actionsRect=actions.getBoundingClientRect();
+              const firstRect=first.getBoundingClientRect();
+              return {count:root.querySelectorAll('.bot-card').length,
+                filtersBeforeCards:Boolean(filter.compareDocumentPosition(first)&Node.DOCUMENT_POSITION_FOLLOWING),
+                actionsBeforeCards:Boolean(actions.compareDocumentPosition(first)&Node.DOCUMENT_POSITION_FOLLOWING),
+                controlsReachable:filtersRect.top<firstRect.top&&actionsRect.top<firstRect.top&&
+                  filtersRect.bottom<=firstRect.top&&actionsRect.bottom<=firstRect.top,
+                overflow:document.documentElement.scrollWidth>innerWidth+1,
+                clipping:[...root.querySelectorAll('.bot-card')].some(card=>card.scrollWidth>card.clientWidth+1),
+                refs:new Set([...root.querySelectorAll('.bot-card')].map(card=>card.id)).size};
+            })()`);
+            assert.deepEqual(largeLayout,{count:20,filtersBeforeCards:true,actionsBeforeCards:true,
+              controlsReachable:true,overflow:false,clipping:false,refs:20},
+              `20-bot controls and geometry at ${size.width}px`);
+            await evaluate(`(()=>{
+              const search=document.getElementById('bot-symbol-search');search.value='NO_MATCH';
+              search.dispatchEvent(new Event('input',{bubbles:true}));
+              document.querySelector('#nav [data-v="command"]').click();
+              const jump=document.querySelector('#command-bot-overview button');
+              window.__largeJumpRef=jump.getAttribute('aria-label').match(/Referenz ([a-f0-9]{20})/)[1];
+              jump.focus();
+            })()`);
+            await key('Enter','Enter',13);
+            assert.equal(await evaluate(`document.getElementById('bot-card-'+window.__largeJumpRef)?.open`),true,
+              'keyboard jump selects the stable reference in a 20-bot snapshot');
+            const largeBack=`[...document.querySelectorAll('#bot-read-root button')].find(button=>button.textContent==='Zur vorherigen Auswahl zurück')`;
+            assert.equal(await evaluate(`(${largeBack}).hidden`),false);
+            await evaluate(`(${largeBack}).focus()`);await key('Enter','Enter',13);
+            assert.deepEqual(await evaluate(`({query:document.getElementById('bot-symbol-search').value,
+              focus:document.activeElement===document.getElementById('bot-symbol-search'),
+              hidden:(${largeBack}).hidden,reads:window.__botReads,
+              overflow:document.documentElement.scrollWidth>innerWidth+1})`),
+              {query:'NO_MATCH',focus:true,hidden:true,reads:12,overflow:false},
+              'keyboard return restores the selection without a new read or horizontal overflow');
+          }
           const finalLayout=await evaluate(`(()=>{
             window.scrollTo(0,document.documentElement.scrollHeight);
             const nav=document.getElementById('nav').getBoundingClientRect();
@@ -365,16 +671,10 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           })()`);
           assert.equal(finalLayout.overflow,false);assert.equal(finalLayout.navHeight,true);
           assert.equal(finalLayout.lastClear,true);
-          if(evidence){
-            mkdirSync(evidence,{recursive:true});
-            await evaluate("document.getElementById('bot-read-root').scrollIntoView({block:'start'})");
-            const image=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
-            writeFileSync(join(evidence,`v11-b11-${size.width}x${size.height}-stale.png`),
-              Buffer.from(image.data,'base64'));
-          }
-          return {width:size.width,height:size.height,mixedRows:fresh.cards,requests:10,
+          return {width:size.width,height:size.height,mixedRows:fresh.cards,
+            collapsedCardHeights:fresh.cardHeights,requests:await evaluate('window.__botReads'),
             filtersNoRequest:true,commandJumpFocused:jump.focused,statesCleared:true,
-            overflow:finalLayout.overflow,controls44px:fresh.touch};
+            overflow:finalLayout.overflow,controls44px:fresh.touch,categoryFit,botLargeText,commandLayout,commandLargeText};
         },size.height);
         console.log('V11_B11_SIZE',`${size.width}x${size.height}`,JSON.stringify(measurements));
       }

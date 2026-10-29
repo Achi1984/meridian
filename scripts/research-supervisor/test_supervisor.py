@@ -1,5 +1,6 @@
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -22,9 +23,12 @@ import supervisor
 
 FAULT_ADAPTER = ROOT / "test_fault_adapter.mjs"
 HISTORICAL_TEST_ADAPTER = ROOT / "test_b1_historical_fixture.mjs"
+MAX_DIAGNOSTIC_ELAPSED_MS = 60_000
+HISTORICAL_FIXTURE_LIMITS = {"path_seconds": 10, "batch_seconds": 20}
 
 
-def _generated_historical_result_diagnostic(result):
+def _generated_historical_result_diagnostic(
+        result, elapsed_ms=None, configured_batch_seconds=None):
     diagnostic = {}
     if type(result) is dict:
         for key in ("state", "reason"):
@@ -42,6 +46,13 @@ def _generated_historical_result_diagnostic(result):
             diagnostic["pathCount"] = len(paths)
             diagnostic["completedPathCount"] = sum(
                 type(path) is dict and path.get("state") == "completed" for path in paths)
+    if (type(elapsed_ms) in (int, float) and
+            0 <= elapsed_ms <= MAX_DIAGNOSTIC_ELAPSED_MS and math.isfinite(elapsed_ms)):
+        diagnostic["elapsedMs"] = round(elapsed_ms, 3)
+    if (type(configured_batch_seconds) in (int, float) and
+            0 < configured_batch_seconds <= journal.MAX_BATCH_SECONDS and
+            math.isfinite(configured_batch_seconds)):
+        diagnostic["configuredBatchSeconds"] = configured_batch_seconds
     rendered = json.dumps(diagnostic, sort_keys=True, separators=(",", ":"))
     return rendered if len(rendered) <= 1024 else rendered[:1021] + "..."
 
@@ -253,7 +264,7 @@ connection.close()
               patch.object(supervisor.subprocess, "Popen", side_effect=spawn)):
             return supervisor.run_b1_batch(
                 self.database, claim,
-                limits=limits or {"path_seconds": 10, "batch_seconds": 20})
+                limits=limits or HISTORICAL_FIXTURE_LIMITS)
 
     def test_generated_historical_result_diagnostic_is_allowlisted_and_bounded(self):
         trial_id = "a" * 64
@@ -272,7 +283,8 @@ connection.close()
             "extraField": {"value": "not permitted"},
         }
 
-        diagnostic = _generated_historical_result_diagnostic(result)
+        diagnostic = _generated_historical_result_diagnostic(
+            result, 1234.6, HISTORICAL_FIXTURE_LIMITS["batch_seconds"])
         rendered = json.loads(diagnostic)
 
         self.assertEqual(rendered, {
@@ -281,6 +293,8 @@ connection.close()
             "trialId": trial_id,
             "pathCount": 2,
             "completedPathCount": 1,
+            "elapsedMs": 1234.6,
+            "configuredBatchSeconds": 20,
         })
         self.assertNotIn("attempts", rendered)
         self.assertLessEqual(len(diagnostic), 1024)
@@ -288,13 +302,37 @@ connection.close()
         self.assertNotIn("../private/path", diagnostic)
         self.assertNotIn("/home/runner/private", diagnostic)
         self.assertNotIn(private_text, diagnostic)
+        for invalid_elapsed in (-1, True, float("nan"), float("inf"),
+                                float("-inf"), MAX_DIAGNOSTIC_ELAPSED_MS + 1,
+                                10 ** 400, private_text):
+            with self.subTest(invalid_elapsed=repr(invalid_elapsed)):
+                invalid = json.loads(
+                    _generated_historical_result_diagnostic(
+                        result, invalid_elapsed, HISTORICAL_FIXTURE_LIMITS["batch_seconds"]))
+                self.assertNotIn("elapsedMs", invalid)
+                self.assertEqual(invalid["configuredBatchSeconds"], 20)
+        for invalid_batch_seconds in (0, -1, True, float("nan"), float("inf"),
+                                      float("-inf"), journal.MAX_BATCH_SECONDS + 1,
+                                      10 ** 400, private_text):
+            with self.subTest(invalid_batch_seconds=repr(invalid_batch_seconds)):
+                invalid = json.loads(
+                    _generated_historical_result_diagnostic(
+                        result, 1234.6, invalid_batch_seconds))
+                self.assertEqual(invalid["elapsedMs"], 1234.6)
+                self.assertNotIn("configuredBatchSeconds", invalid)
 
     def test_generated_historical_profile_runs_all_paths_and_refuses_repeat(self):
         profile_path, claim = self.prepare_historical_fixture("historical-success")
-        result = self.run_historical_fixture(
-            profile_path, claim, "SUCCESS",
-            limits={"path_seconds": 10, "batch_seconds": 35})
-        diagnostic = _generated_historical_result_diagnostic(result)
+        started_at = time.monotonic()
+        result = None
+        try:
+            result = self.run_historical_fixture(
+                profile_path, claim, "SUCCESS", limits=HISTORICAL_FIXTURE_LIMITS)
+        finally:
+            elapsed_ms = (time.monotonic() - started_at) * 1000
+            diagnostic = _generated_historical_result_diagnostic(
+                result, elapsed_ms, HISTORICAL_FIXTURE_LIMITS["batch_seconds"])
+            print(f"SYNTHETIC_SUPERVISOR_TIMING {diagnostic}", flush=True)
         self.assertEqual(result["state"], "completed", diagnostic)
         self.assertEqual(result["attempts"], 1, diagnostic)
         self.assertEqual(len(result["paths"]), 44, diagnostic)
@@ -1005,11 +1043,41 @@ process.stdout.write(JSON.stringify(runBatch({
 
     def test_path_timeout_kills_real_child_and_persists_timed_out_trial(self):
         started = time.monotonic()
-        result = self.run_fault("b" * 64, {"path_seconds": 0.15, "batch_seconds": 0.7})
-        self.assertEqual(result["state"], "timed_out")
-        self.assertEqual(result["reason"], "DEADLINE_EXCEEDED")
-        self.assertEqual(result["paths"][0]["state"], "started")
-        self.assertLess(time.monotonic() - started, 2)
+        original_popen = subprocess.Popen
+        children = []
+
+        def spawn(*args, **kwargs):
+            child = original_popen(*args, **kwargs)
+            if Path(args[0][-1]).resolve() == FAULT_ADAPTER.resolve():
+                children.append(child)
+            return child
+
+        with patch.object(supervisor.subprocess, "Popen", side_effect=spawn):
+            result = self.run_fault(
+                "b" * 64, {"path_seconds": 1.0, "batch_seconds": 4.0})
+        elapsed = time.monotonic() - started
+        paths = result.get("paths") if type(result) is dict else None
+        diagnostic = json.dumps({
+            "elapsed_seconds": round(elapsed, 3),
+            "state": result.get("state") if type(result) is dict else None,
+            "reason": result.get("reason") if type(result) is dict else None,
+            "path_count": len(paths) if type(paths) is list else None,
+        }, sort_keys=True, separators=(",", ":"))
+        self.assertLessEqual(len(diagnostic), 512)
+        self.assertEqual(result["state"], "timed_out", diagnostic)
+        self.assertEqual(result["reason"], "DEADLINE_EXCEEDED", diagnostic)
+        self.assertIsInstance(paths, list, diagnostic)
+        self.assertTrue(paths, diagnostic)
+        self.assertEqual(paths[0]["state"], "started", diagnostic)
+        self.assertEqual(len(children), 1, diagnostic)
+        self.assertIsNotNone(children[0].poll(), diagnostic)
+        current = journal.inspect(self.database, result["trialId"])
+        self.assertEqual((current["state"], current["attempts"]), ("timed_out", 1), diagnostic)
+        self.assertFalse(current["unresolved"], diagnostic)
+        self.assertEqual(current["paths"][0]["state"], "started", diagnostic)
+        self.assertEqual(journal.scheduler_tick(self.database, self.policy)["state"],
+                         "idle", diagnostic)
+        self.assertLess(elapsed, 2.9, diagnostic)
 
     def test_whole_batch_deadline_preempts_a_long_path(self):
         started = time.monotonic()
@@ -1150,21 +1218,16 @@ process.stdout.write(JSON.stringify(runBatch({
         self.assertEqual(settle.call_args.args[2:4], ("TIMED_OUT", "DEADLINE_EXCEEDED"), diagnostic)
 
     def test_output_flood_and_parent_exit_with_inherited_pipe_are_bounded(self):
-        cases = (
-            ("c" * 64, "failed", "STDOUT_BOUND",
-             {"path_seconds": 5, "batch_seconds": 10}, 8),
-            ("9" * 64, "failed", "STDERR_BOUND",
-             {"path_seconds": 5, "batch_seconds": 10}, 8),
-            ("d" * 64, "timed_out", "DEADLINE_EXCEEDED",
-             {"path_seconds": 0.2, "batch_seconds": 0.4}, 2),
-        )
-        for source, expected_state, reason, limits, elapsed_bound in cases:
+        for source, reason in (("c" * 64, "STDOUT_BOUND"), ("9" * 64, "STDERR_BOUND"),
+                               ("d" * 64, "DEADLINE_EXCEEDED")):
             with self.subTest(source=source):
                 started = time.monotonic()
-                result = self.run_fault(source, limits, "trial-" + source[0])
-                self.assertEqual(result["state"], expected_state)
+                batch_seconds = 0.4 if source.startswith("d") else 10
+                result = self.run_fault(source, {"path_seconds": 0.2, "batch_seconds": batch_seconds},
+                                        "trial-" + source[0])
+                self.assertEqual(result["state"], "timed_out" if source.startswith("d") else "failed")
                 self.assertEqual(result["reason"], reason)
-                self.assertLess(time.monotonic() - started, elapsed_bound)
+                self.assertLess(time.monotonic() - started, 2)
 
     def test_missed_and_false_path_events_never_count_as_completed(self):
         missed = self.run_fault("f" * 64, key="trial-missed")
