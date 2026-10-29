@@ -35,6 +35,13 @@ function sha(value) {
   return typeof value === 'string' && /^[a-f0-9]{40}$/.test(value);
 }
 
+function validChangedPath(path) {
+  return typeof path === 'string'
+    && path.length > 0
+    && path.isWellFormed()
+    && Buffer.byteLength(path, 'utf8') <= 512;
+}
+
 function hasExactKeys(value, keys) {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
     && Object.getPrototypeOf(value) === Object.prototype
@@ -343,7 +350,12 @@ export async function collectExactPair({hint, config, api, now = Date.now}) {
     if (diff === TIMED_OUT) return fail('TIME_BUDGET_EXHAUSTED');
     if (!diff || diff.headSha !== run.headSha || diff.baseSha !== run.baseSha
       || diff.complete !== true || diff.truncated !== false || typeof diff.text !== 'string'
-      || Buffer.byteLength(diff.text, 'utf8') === 0 || Buffer.byteLength(diff.text, 'utf8') > MAX_DIFF_BYTES) {
+      || Buffer.byteLength(diff.text, 'utf8') === 0 || Buffer.byteLength(diff.text, 'utf8') > MAX_DIFF_BYTES
+      || !Array.isArray(diff.changedPaths)
+      || diff.changedPaths.length === 0
+      || diff.changedPaths.length > 1024
+      || diff.changedPaths.some(path => !validChangedPath(path))
+      || new Set(diff.changedPaths).size !== diff.changedPaths.length) {
       return fail('DIFF_UNAVAILABLE_OR_INCOMPLETE');
     }
 
@@ -430,6 +442,8 @@ export async function collectExactPair({hint, config, api, now = Date.now}) {
       }),
       diff: diff.text,
       diffDigest: createHash('sha256').update(diff.text).digest('hex'),
+      changedPaths: Object.freeze([...diff.changedPaths]),
+      changedPathDigest: createHash('sha256').update(JSON.stringify(diff.changedPaths)).digest('hex'),
       actionKey: logicalActionKey,
       executionKey
     });

@@ -289,6 +289,7 @@ test('exact-pair happy path maps authoritative GitHub payloads', async () => {
   assert.equal(diff.complete, true);
   assert.equal(diff.truncated, false);
   assert.match(diff.text, /diff --git/);
+  assert.deepEqual(diff.changedPaths, ['x.js']);
   assert.equal(calls.filter(call => call.path === '/repos/Achi1984/meridian/pulls/973').length, 3);
   assert.equal(calls.filter(call => call.path === `/repos/Achi1984/meridian/compare/${BASE}...${HEAD}`).length, 2);
 
@@ -318,6 +319,103 @@ test('exact-pair happy path maps authoritative GitHub payloads', async () => {
   assert.equal(jobsPage.items[0].steps[0].name, 'Research and auth regression tests');
   assert.equal(jobsPage.items[0].status, 'completed');
   assert.ok(calls.every(call => call.method === 'GET'));
+});
+
+test('compare inventory enforces changed-path integrity for quoted/non-ascii/renamed and mismatch cases', async () => {
+  const files = [
+    {filename: 'dir/quoted name.js', patch: '@@ -1 +1 @@\n-a\n+b'},
+    {filename: 'unicodé/ßeta.js', patch: '@@ -1 +1 @@\n-a\n+b'},
+    {filename: 'dst/new-name.js', previous_filename: 'src/old-name.js', status: 'renamed', patch: '@@ -1 +1 @@\n-a\n+b'}
+  ];
+  const goodApi = createM11CoordinatorGithubReadApi({
+    fetchImpl: makeFetch([
+      {match: url => url.pathname === '/repos/Achi1984/meridian/pulls/973', handle: ({url}) => json(pullPayload({changedFiles: 3}), {url: url.toString()})},
+      {
+        match: url => url.pathname === `/repos/Achi1984/meridian/compare/${BASE}...${HEAD}`,
+        handle: ({url, options}) => options?.headers?.accept === 'application/vnd.github.v3.diff'
+          ? makeResponse({status: 200, body: 'diff --git a/a b/a\n', url: url.toString()})
+          : json(comparePayload({files}), {url: url.toString()})
+      }
+    ]).fetchImpl,
+    credentials: credentials(),
+    now: () => NOW_MS
+  });
+  const good = await goodApi.getPullRequestDiff({
+    repository: REPOSITORY,
+    pullRequest: 973,
+    headSha: HEAD,
+    baseSha: BASE
+  });
+  assert.equal(good.complete, true);
+  assert.deepEqual(good.changedPaths, ['dir/quoted name.js', 'unicodé/ßeta.js', 'dst/new-name.js']);
+
+  const mismatchApi = createM11CoordinatorGithubReadApi({
+    fetchImpl: makeFetch([
+      {match: url => url.pathname === '/repos/Achi1984/meridian/pulls/973', handle: ({url}) => json(pullPayload({changedFiles: 4}), {url: url.toString()})},
+      {
+        match: url => url.pathname === `/repos/Achi1984/meridian/compare/${BASE}...${HEAD}`,
+        handle: ({url, options}) => options?.headers?.accept === 'application/vnd.github.v3.diff'
+          ? makeResponse({status: 200, body: 'diff --git a/a b/a\n', url: url.toString()})
+          : json(comparePayload({files}), {url: url.toString()})
+      }
+    ]).fetchImpl,
+    credentials: credentials(),
+    now: () => NOW_MS
+  });
+  const mismatch = await mismatchApi.getPullRequestDiff({
+    repository: REPOSITORY,
+    pullRequest: 973,
+    headSha: HEAD,
+    baseSha: BASE
+  });
+  assert.equal(mismatch.complete, false);
+  assert.deepEqual(mismatch.changedPaths, []);
+
+  for (const invalidChangedFiles of [null, '3', 1.5, -1]) {
+    const invalidCountApi = createM11CoordinatorGithubReadApi({
+      fetchImpl: makeFetch([
+        {match: url => url.pathname === '/repos/Achi1984/meridian/pulls/973', handle: ({url}) => json(pullPayload({changedFiles: invalidChangedFiles}), {url: url.toString()})},
+        {
+          match: url => url.pathname === `/repos/Achi1984/meridian/compare/${BASE}...${HEAD}`,
+          handle: ({url, options}) => options?.headers?.accept === 'application/vnd.github.v3.diff'
+            ? makeResponse({status: 200, body: 'diff --git a/a b/a\n', url: url.toString()})
+            : json(comparePayload({files}), {url: url.toString()})
+        }
+      ]).fetchImpl,
+      credentials: credentials(),
+      now: () => NOW_MS
+    });
+    const invalidCount = await invalidCountApi.getPullRequestDiff({
+      repository: REPOSITORY,
+      pullRequest: 973,
+      headSha: HEAD,
+      baseSha: BASE
+    });
+    assert.equal(invalidCount.complete, false);
+    assert.deepEqual(invalidCount.changedPaths, []);
+  }
+
+  const renamedMissingPrevApi = createM11CoordinatorGithubReadApi({
+    fetchImpl: makeFetch([
+      {match: url => url.pathname === '/repos/Achi1984/meridian/pulls/973', handle: ({url}) => json(pullPayload({changedFiles: 1}), {url: url.toString()})},
+      {
+        match: url => url.pathname === `/repos/Achi1984/meridian/compare/${BASE}...${HEAD}`,
+        handle: ({url, options}) => options?.headers?.accept === 'application/vnd.github.v3.diff'
+          ? makeResponse({status: 200, body: 'diff --git a/a b/a\n', url: url.toString()})
+          : json(comparePayload({files: [{filename: 'new.js', status: 'renamed', patch: '@@ -1 +1 @@'}]}), {url: url.toString()})
+      }
+    ]).fetchImpl,
+    credentials: credentials(),
+    now: () => NOW_MS
+  });
+  const renamedMissingPrev = await renamedMissingPrevApi.getPullRequestDiff({
+    repository: REPOSITORY,
+    pullRequest: 973,
+    headSha: HEAD,
+    baseSha: BASE
+  });
+  assert.equal(renamedMissingPrev.complete, false);
+  assert.deepEqual(renamedMissingPrev.changedPaths, []);
 });
 
 test('missing historical base and empty pull_request associations remain explicit', async () => {

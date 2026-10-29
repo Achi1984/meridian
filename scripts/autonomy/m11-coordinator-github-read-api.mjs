@@ -226,6 +226,17 @@ function extractCompareHeadSha(comparePayload) {
   return isSha(tail?.sha) ? tail.sha : null;
 }
 
+function validChangedPath(path) {
+  return typeof path === 'string'
+    && path.length > 0
+    && path.isWellFormed()
+    && Buffer.byteLength(path, 'utf8') <= 512;
+}
+
+function nonNegativeSafeInteger(value) {
+  return Number.isSafeInteger(value) && value >= 0;
+}
+
 export function createM11CoordinatorGithubReadApi({
   fetchImpl = globalThis.fetch,
   credentials,
@@ -476,16 +487,38 @@ export function createM11CoordinatorGithubReadApi({
       );
       if (hasNext) complete = false;
       if (!Array.isArray(compare?.files)) complete = false;
-      if (!positiveInteger(finalPr.changedFiles) && finalPr.changedFiles !== 0) complete = false;
-      if (Array.isArray(compare?.files) && Number.isSafeInteger(finalPr.changedFiles)
+      if (!nonNegativeSafeInteger(finalPr.changedFiles)) complete = false;
+      if (Array.isArray(compare?.files) && nonNegativeSafeInteger(finalPr.changedFiles)
         && finalPr.changedFiles !== compare.files.length) complete = false;
       if (Array.isArray(compare?.files) && compare.files.some(file => typeof file?.patch !== 'string')) {
         complete = false;
+      }
+      const changedPaths = [];
+      if (Array.isArray(compare?.files)) {
+        for (const file of compare.files) {
+          if (!validChangedPath(file?.filename)) {
+            complete = false;
+            break;
+          }
+          if (file?.status === 'renamed' && !validChangedPath(file?.previous_filename)) {
+            complete = false;
+            break;
+          }
+          if (changedPaths.includes(file.filename)) {
+            complete = false;
+            break;
+          }
+          changedPaths.push(file.filename);
+        }
       }
       if (!positiveInteger(compare?.total_commits) || compare.total_commits > 250) complete = false;
       if (typeof compare?.merge_base_commit?.sha !== 'string' || compare.merge_base_commit.sha !== baseSha) {
         complete = false;
       }
+      if (!Array.isArray(compare?.files) || changedPaths.length !== compare.files.length) complete = false;
+      if (!nonNegativeSafeInteger(finalPr.changedFiles)
+        || changedPaths.length !== finalPr.changedFiles) complete = false;
+      if (changedPaths.length === 0) complete = false;
 
       const text = diffResult.text;
       if (typeof text !== 'string' || text.length === 0) complete = false;
@@ -494,7 +527,8 @@ export function createM11CoordinatorGithubReadApi({
         baseSha,
         complete,
         truncated: !complete,
-        text: typeof text === 'string' ? text : ''
+        text: typeof text === 'string' ? text : '',
+        changedPaths: complete ? Object.freeze(changedPaths) : Object.freeze([])
       };
     },
 
