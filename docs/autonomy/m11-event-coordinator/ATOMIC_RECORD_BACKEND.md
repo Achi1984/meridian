@@ -26,6 +26,8 @@ Envelope fields:
   - record `digest`
   - public tip (`publicOid`, `publicRevision`)
 - Reconstruction validates chain linkage, digests, and reducer/projection replay consistency.
+- Candidate envelopes are fully replay-validated **before** any transport replacement call.
+- Chain capacity/byte bound exhaustion is rejected with no write attempt and no chain truncation.
 - Any inconsistency (chain parent/digest, public tip drift, admission/projection mismatch, or missing retained claim) rejects the envelope.
 - `snapshot.chainValid` is returned only for validated/reconstructed history.
 

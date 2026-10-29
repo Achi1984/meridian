@@ -28,15 +28,15 @@ const TRANSITION_KEYSETS = Object.freeze({
   REVIEW_PENDING: ['kind', 'actionKey', 'executionKey', 'reviewRequestId', 'sessionId', 'reviewer', 'repository', 'pullRequest',
     'headSha', 'baseSha', 'diffDigest', 'changedPathDigest', 'changedPathCount', 'runId',
     'runAttempt', 'workflowId', 'selectionRevision', 'reviewDeadlineAt'],
-  DISPATCH_ACKED: ['kind', 'actionKey', 'executionKey', 'reviewRequestId', 'sessionId'],
-  OBSERVE_PREPARING: ['kind', 'actionKey', 'executionKey'],
-  OBSERVE_PENDING: ['kind', 'actionKey', 'executionKey'],
-  REVIEW_RESULT: ['kind', 'actionKey', 'executionKey', 'completionState', 'verdict',
+  DISPATCH_ACKED: ['kind', 'reviewRequestId', 'sessionId'],
+  OBSERVE_PREPARING: ['kind'],
+  OBSERVE_PENDING: ['kind'],
+  REVIEW_RESULT: ['kind', 'completionState', 'verdict',
     'reviewRequestId', 'sessionId', 'evidenceId', 'reason'],
-  RECEIPT_PREPARING: ['kind', 'actionKey', 'executionKey', 'completionState', 'verdict'],
-  RECEIPT_POSTING: ['kind', 'actionKey', 'executionKey'],
-  RECEIPT_DELIVERED: ['kind', 'actionKey', 'executionKey', 'receiptId', 'completionState', 'verdict'],
-  UNKNOWN: ['kind', 'actionKey', 'executionKey', 'stage', 'reviewRequestId', 'sessionId', 'reason']
+  RECEIPT_PREPARING: ['kind', 'completionState', 'verdict'],
+  RECEIPT_POSTING: ['kind'],
+  RECEIPT_DELIVERED: ['kind', 'receiptId', 'completionState', 'verdict'],
+  UNKNOWN: ['kind', 'stage', 'reviewRequestId', 'sessionId', 'reason']
 });
 
 export const ATOMIC_RECORD_BACKEND_LIMITS = Object.freeze({
@@ -78,10 +78,15 @@ function mapAdmissionBlockToClaimStatus(reason) {
   return 'UNKNOWN';
 }
 
-function validCompletionPair(completionState, verdict) {
+function validObservedCompletionPair(completionState, verdict) {
   return (completionState === 'COMPLETE' && verdict === 'GREEN_LIGHT')
     || (completionState === 'REVISION_REQUIRED' && verdict === 'REVISION_REQUIRED')
     || (completionState === 'INCOMPLETE' && verdict === 'NEEDS_MORE_EVIDENCE');
+}
+
+function validTerminalCompletionPair(completionState, verdict) {
+  return (completionState === 'COMPLETE' && verdict === 'GREEN_LIGHT')
+    || (completionState === 'REVISION_REQUIRED' && verdict === 'REVISION_REQUIRED');
 }
 
 function makeClaimId(actionKey, executionKey, admissionRevision, storageVersion) {
@@ -99,7 +104,71 @@ function verifyTransitionShape(kind, transition) {
   if (!keys || !transition || typeof transition !== 'object' || Array.isArray(transition)) return false;
   if (kind !== 'CLAIM_CREATED' && transition.kind !== kind) return false;
   if (bytes(transition) > MAX_TRANSITION_BYTES) return false;
-  return Object.keys(transition).every(key => keys.includes(key));
+  if (!Object.keys(transition).every(key => keys.includes(key))) return false;
+  if (kind === 'REVIEW_PENDING') {
+    return validKey(transition.actionKey) && validKey(transition.executionKey)
+      && typeof transition.reviewRequestId === 'string' && transition.reviewRequestId.length > 0
+      && typeof transition.sessionId === 'string' && transition.sessionId.length > 0
+      && transition.reviewer && typeof transition.reviewer === 'object' && !Array.isArray(transition.reviewer)
+      && typeof transition.repository === 'string' && transition.repository.length > 0
+      && Number.isSafeInteger(transition.pullRequest) && transition.pullRequest > 0
+      && typeof transition.headSha === 'string' && transition.headSha.length > 0
+      && typeof transition.baseSha === 'string' && transition.baseSha.length > 0
+      && typeof transition.diffDigest === 'string' && transition.diffDigest.length > 0
+      && typeof transition.changedPathDigest === 'string' && transition.changedPathDigest.length > 0
+      && Number.isSafeInteger(transition.changedPathCount) && transition.changedPathCount > 0
+      && Number.isSafeInteger(transition.runId) && transition.runId > 0
+      && Number.isSafeInteger(transition.runAttempt) && transition.runAttempt > 0
+      && Number.isSafeInteger(transition.workflowId) && transition.workflowId > 0
+      && Number.isSafeInteger(transition.selectionRevision) && transition.selectionRevision > 0
+      && Number.isSafeInteger(transition.reviewDeadlineAt) && transition.reviewDeadlineAt > 0;
+  }
+  if (kind === 'DISPATCH_ACKED') {
+    return typeof transition.reviewRequestId === 'string' && transition.reviewRequestId.length > 0
+      && typeof transition.sessionId === 'string' && transition.sessionId.length > 0;
+  }
+  if (kind === 'OBSERVE_PREPARING' || kind === 'OBSERVE_PENDING') {
+    return true;
+  }
+  if (kind === 'REVIEW_RESULT') {
+    if (!validObservedCompletionPair(transition.completionState, transition.verdict)) return false;
+    if (transition.completionState === 'INCOMPLETE') {
+      return typeof transition.reason === 'string' && transition.reason.length > 0
+        && !Object.hasOwn(transition, 'reviewRequestId')
+        && !Object.hasOwn(transition, 'sessionId');
+    }
+    return typeof transition.reviewRequestId === 'string' && transition.reviewRequestId.length > 0
+      && typeof transition.sessionId === 'string' && transition.sessionId.length > 0
+      && (!Object.hasOwn(transition, 'evidenceId')
+        || (typeof transition.evidenceId === 'string' && transition.evidenceId.length > 0))
+      && (!Object.hasOwn(transition, 'reason')
+        || (typeof transition.reason === 'string' && transition.reason.length > 0));
+  }
+  if (kind === 'RECEIPT_PREPARING') {
+    return validTerminalCompletionPair(transition.completionState, transition.verdict);
+  }
+  if (kind === 'RECEIPT_POSTING') return true;
+  if (kind === 'RECEIPT_DELIVERED') {
+    return typeof transition.receiptId === 'string' && transition.receiptId.length > 0
+      && validTerminalCompletionPair(transition.completionState, transition.verdict);
+  }
+  if (kind === 'UNKNOWN') {
+    return typeof transition.stage === 'string' && transition.stage.length > 0
+      && (!Object.hasOwn(transition, 'reviewRequestId')
+        || (typeof transition.reviewRequestId === 'string' && transition.reviewRequestId.length > 0))
+      && (!Object.hasOwn(transition, 'sessionId')
+        || (typeof transition.sessionId === 'string' && transition.sessionId.length > 0))
+      && (!Object.hasOwn(transition, 'reason')
+        || (typeof transition.reason === 'string' && transition.reason.length > 0));
+  }
+  if (kind === 'CLAIM_CREATED') {
+    return validKey(transition.actionKey)
+      && validKey(transition.executionKey)
+      && typeof transition.claimId === 'string' && transition.claimId.length > 0
+      && validOwner(transition.owner)
+      && Number.isSafeInteger(transition.createdAt);
+  }
+  return false;
 }
 
 function transitionDigest(kind, transition) {
@@ -178,11 +247,11 @@ function canApplyTransition(claim, transition) {
   }
   if (transition.kind === 'REVIEW_RESULT') {
     return claim.status === 'REVIEW_PENDING' && claim.lastStage === 'OBSERVE_PREPARING'
-      && validCompletionPair(transition.completionState, transition.verdict);
+      && validObservedCompletionPair(transition.completionState, transition.verdict);
   }
   if (transition.kind === 'RECEIPT_PREPARING') {
     return claim.status === 'REVIEWED' && claim.lastStage === 'REVIEW_RESULT'
-      && validCompletionPair(claim.completionState, claim.verdict)
+      && validTerminalCompletionPair(claim.completionState, claim.verdict)
       && transition.completionState === claim.completionState
       && transition.verdict === claim.verdict;
   }
@@ -194,7 +263,7 @@ function canApplyTransition(claim, transition) {
       && typeof transition.receiptId === 'string' && transition.receiptId.length > 0
       && transition.completionState === claim.completionState
       && transition.verdict === claim.verdict
-      && validCompletionPair(transition.completionState, transition.verdict);
+      && validTerminalCompletionPair(transition.completionState, transition.verdict);
   }
   return false;
 }
@@ -313,6 +382,16 @@ function buildTransitionRecord({
   };
   record.digest = recordDigest(record);
   return record;
+}
+
+function ensureTransitionChainCapacity(chain, nextRecord) {
+  if (chain.length >= MAX_TRANSITION_CHAIN) {
+    throw new Error('TRANSITION_CHAIN_CAPACITY_EXCEEDED');
+  }
+  const projectedBytes = bytes([...chain, nextRecord]);
+  if (projectedBytes > MAX_CHAIN_BYTES) {
+    throw new Error('TRANSITION_CHAIN_BYTES_EXCEEDED');
+  }
 }
 
 function replayAndValidateEnvelope(envelope) {
@@ -563,9 +642,16 @@ export function createCoordinatorAtomicRecordBackend({
       publicSnapshot,
       transition
     });
+    ensureTransitionChainCapacity(nextEnvelope.transitionChain, record);
     nextEnvelope.transitionChain.push(record);
-    if (nextEnvelope.transitionChain.length > MAX_TRANSITION_CHAIN) {
-      nextEnvelope.transitionChain.shift();
+  }
+
+  function validateCandidateEnvelope(nextEnvelope) {
+    try {
+      normalizeEnvelope(clone(nextEnvelope));
+      return true;
+    } catch {
+      return false;
     }
   }
 
@@ -635,18 +721,23 @@ export function createCoordinatorAtomicRecordBackend({
         lastStage: 'CLAIMED'
       };
       nextEnvelope.claims.push(claim);
-      appendRecord(nextEnvelope, {
-        kind: 'CLAIM_CREATED',
-        claim,
-        transition: {
-          actionKey: claim.actionKey,
-          executionKey: claim.executionKey,
-          owner: claim.owner,
-          createdAt: claim.createdAt,
-          claimId: claim.claimId
-        },
-        publicSnapshot: nextEnvelope.snapshot
-      });
+      try {
+        appendRecord(nextEnvelope, {
+          kind: 'CLAIM_CREATED',
+          claim,
+          transition: {
+            actionKey: claim.actionKey,
+            executionKey: claim.executionKey,
+            owner: claim.owner,
+            createdAt: claim.createdAt,
+            claimId: claim.claimId
+          },
+          publicSnapshot: nextEnvelope.snapshot
+        });
+      } catch {
+        return Object.freeze({status: 'UNKNOWN'});
+      }
+      if (!validateCandidateEnvelope(nextEnvelope)) return Object.freeze({status: 'UNKNOWN'});
 
       let replaced;
       try {
@@ -739,12 +830,17 @@ export function createCoordinatorAtomicRecordBackend({
       const claimIndex = nextEnvelope.claims.findIndex(entry => entry.executionKey === nextClaim.executionKey);
       if (claimIndex < 0) return Object.freeze({status: 'CONFLICT'});
       nextEnvelope.claims[claimIndex] = nextClaim;
-      appendRecord(nextEnvelope, {
-        kind: commit.transition.kind,
-        claim: nextClaim,
-        transition: commit.transition,
-        publicSnapshot: nextEnvelope.snapshot
-      });
+      try {
+        appendRecord(nextEnvelope, {
+          kind: commit.transition.kind,
+          claim: nextClaim,
+          transition: commit.transition,
+          publicSnapshot: nextEnvelope.snapshot
+        });
+      } catch {
+        return Object.freeze({status: 'CONFLICT'});
+      }
+      if (!validateCandidateEnvelope(nextEnvelope)) return Object.freeze({status: 'CONFLICT'});
 
       const replaced = await replaceEnvelope(envelope.storageVersion, nextEnvelope);
       if (replaced?.status === 'CONFLICT') return Object.freeze({status: 'CONFLICT'});
