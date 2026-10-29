@@ -385,7 +385,7 @@ test('UNKNOWN is terminal, survives roundtrip, and readback never resumes author
   assertNoAuthority(stillBlocked);
 });
 
-test('reachable conservative UNKNOWN checkpoint state roundtrips and remains blocked', () => {
+test('reachable conservative UNKNOWN from unacknowledged completion roundtrips and remains blocked', () => {
   let state = createAdmissionRecordState({enabled: true, totalQuota: 2});
   state = reduceAdmissionRecord(state, admissionEvent({
     expectedRevision: 0,
@@ -397,6 +397,12 @@ test('reachable conservative UNKNOWN checkpoint state roundtrips and remains blo
     logicalActionId: ACTION_A,
     executionKey: EXEC_A,
     admissionRevision: 1
+  })).state;
+  state = reduceAdmissionRecord(state, completionEvent({
+    logicalActionId: ACTION_A,
+    executionKey: EXEC_A,
+    admissionRevision: 1,
+    checkpointAcknowledged: false
   })).state;
   state = reduceAdmissionRecord(state, unknownEvent({
     logicalActionId: ACTION_A,
@@ -414,7 +420,42 @@ test('reachable conservative UNKNOWN checkpoint state roundtrips and remains blo
   assert.equal(annotated.state.reconciliation.status, 'UNKNOWN');
   assert.equal(annotated.state.claims[0].status, 'UNKNOWN');
   assert.equal(annotated.state.claims[0].effectObserved, true);
+  assert.equal(annotated.state.claims[0].completion, 'UNACKNOWLEDGED');
   assert.notEqual(annotated.state.activeGate, null);
+  assertNoAuthority(annotated);
+});
+
+test('MARK_UNKNOWN on released historical claim is explicitly blocked unchanged', () => {
+  let state = createAdmissionRecordState({enabled: true, totalQuota: 2});
+  state = reduceAdmissionRecord(state, admissionEvent({
+    expectedRevision: 0,
+    expectedTotalQuota: 2,
+    logicalActionId: ACTION_A,
+    executionKey: EXEC_A
+  })).state;
+  state = reduceAdmissionRecord(state, effectEvent({
+    logicalActionId: ACTION_A,
+    executionKey: EXEC_A,
+    admissionRevision: 1
+  })).state;
+  state = reduceAdmissionRecord(state, completionEvent({
+    logicalActionId: ACTION_A,
+    executionKey: EXEC_A,
+    admissionRevision: 1,
+    checkpointAcknowledged: true
+  })).state;
+  const before = JSON.parse(JSON.stringify(state));
+
+  const blocked = reduceAdmissionRecord(state, unknownEvent({
+    logicalActionId: ACTION_A,
+    executionKey: EXEC_A,
+    stage: 'CHECKPOINT'
+  }));
+  assert.equal(blocked.status, 'BLOCKED');
+  assert.equal(blocked.reason, 'NO_ACTIVE_GATE');
+  assert.equal(blocked.changed, false);
+  assert.deepEqual(blocked.state, before);
+  assertNoAuthority(blocked);
 });
 
 test('malformed reconstructed states fail before transition', () => {
@@ -512,6 +553,56 @@ test('malformed reconstructed states fail before transition', () => {
     }
   };
   assert.throws(() => reduceAdmissionRecord(invalidDuplicateExecution, effectEvent({
+    logicalActionId: ACTION_B,
+    executionKey: EXEC_B,
+    admissionRevision: 2
+  })), {code: 'STATE_INVALID'});
+
+  const invalidMultipleUnresolvedWithGateMatch = {
+    enabled: true,
+    revision: 3,
+    totalQuota: 4,
+    consumedQuota: 3,
+    activeGate: {
+      logicalActionId: ACTION_B,
+      executionKey: EXEC_B,
+      admissionRevision: 2
+    },
+    claims: [
+      {
+        logicalActionId: ACTION_A,
+        executionKey: EXEC_A,
+        admissionRevision: 1,
+        status: 'ADMITTED',
+        effectObserved: false,
+        completion: 'PENDING'
+      },
+      {
+        logicalActionId: ACTION_B,
+        executionKey: EXEC_B,
+        admissionRevision: 2,
+        status: 'COMPLETED_UNACKED',
+        effectObserved: true,
+        completion: 'UNACKNOWLEDGED'
+      },
+      {
+        logicalActionId: 'e'.repeat(64),
+        executionKey: 'f'.repeat(64),
+        admissionRevision: 3,
+        status: 'COMPLETED_ACKED',
+        effectObserved: true,
+        completion: 'ACKNOWLEDGED'
+      }
+    ],
+    reconciliation: {
+      status: 'CLEAR',
+      stage: null,
+      logicalActionId: null,
+      executionKey: null,
+      observations: []
+    }
+  };
+  assert.throws(() => reduceAdmissionRecord(invalidMultipleUnresolvedWithGateMatch, effectEvent({
     logicalActionId: ACTION_B,
     executionKey: EXEC_B,
     admissionRevision: 2

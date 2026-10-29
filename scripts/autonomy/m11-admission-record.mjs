@@ -156,12 +156,13 @@ function normalizeState(input) {
     } else if (claim.status === 'COMPLETED_ACKED') {
       if (claim.effectObserved !== true || claim.completion !== 'ACKNOWLEDGED') fail('STATE_INVALID');
     } else if (claim.status === 'UNKNOWN') {
-      if (claim.completion !== 'PENDING') fail('STATE_INVALID');
+      if (!['PENDING', 'UNACKNOWLEDGED'].includes(claim.completion)) fail('STATE_INVALID');
+      if (claim.completion === 'UNACKNOWLEDGED' && claim.effectObserved !== true) fail('STATE_INVALID');
     }
   }
   if (state.consumedQuota !== claims.length) fail('STATE_INVALID');
-  if (claims.some(claim => claim.status === 'ADMITTED') && activeGate === null) fail('STATE_INVALID');
-  if (claims.some(claim => claim.status === 'COMPLETED_UNACKED') && activeGate === null) fail('STATE_INVALID');
+  const unresolvedClaims = claims.filter(claim => ['ADMITTED', 'COMPLETED_UNACKED', 'UNKNOWN'].includes(claim.status));
+  if (activeGate === null && unresolvedClaims.length > 0) fail('STATE_INVALID');
   const unknownClaims = claims.filter(claim => claim.status === 'UNKNOWN');
   if (reconciliation.status === 'CLEAR') {
     if (unknownClaims.length > 0) fail('STATE_INVALID');
@@ -180,11 +181,14 @@ function normalizeState(input) {
     }
   }
   if (activeGate !== null) {
+    if (unresolvedClaims.length !== 1) fail('STATE_INVALID');
     const matched = claims.find(claim => claim.logicalActionId === activeGate.logicalActionId
       && claim.executionKey === activeGate.executionKey
       && claim.admissionRevision === activeGate.admissionRevision);
     if (!matched) fail('STATE_INVALID');
     if (!['ADMITTED', 'COMPLETED_UNACKED', 'UNKNOWN'].includes(matched.status)) fail('STATE_INVALID');
+    if (unresolvedClaims[0] !== matched) fail('STATE_INVALID');
+    if (claims.some(claim => claim !== matched && claim.status !== 'COMPLETED_ACKED')) fail('STATE_INVALID');
   }
   if (activeGate === null && claims.some(claim => claim.status === 'UNKNOWN')) fail('STATE_INVALID');
   return deepFreeze({
@@ -439,10 +443,13 @@ export function reduceAdmissionRecord(inputState, inputEvent) {
   if (event.kind === 'MARK_UNKNOWN') {
     if (state.reconciliation.status === 'UNKNOWN') return blocked(state, 'UNKNOWN_ALREADY_LATCHED');
     if (!nextRevisionAvailable(state)) return blocked(state, 'REVISION_EXHAUSTED');
+    if (!state.activeGate) return blocked(state, 'NO_ACTIVE_GATE');
     const index = claimIndexByLogicalAction(state, event.logicalActionId);
     if (index < 0) return blocked(state, 'CLAIM_NOT_FOUND');
     const claim = state.claims[index];
     if (claim.executionKey !== event.executionKey) return blocked(state, 'CLAIM_IDENTITY_MISMATCH');
+    if (!exactIdentityMatch(state.activeGate, claim)) return blocked(state, 'ACTIVE_GATE_MISMATCH');
+    if (claim.status === 'COMPLETED_ACKED') return blocked(state, 'CLAIM_ALREADY_RELEASED');
 
     const next = cloneState(state);
     next.revision += 1;

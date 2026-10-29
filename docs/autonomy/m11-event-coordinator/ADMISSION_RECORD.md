@@ -35,6 +35,7 @@ A successful `SIMULATE_ADMISSION` transition updates **revision + claim + consum
 - Existing logical claim blocks duplicate logical action, including fresh execution keys.
 - Retained execution keys are also unique and cannot be reused by a different logical action.
 - Reconstructed state must satisfy relational invariants (claims/quota/revision/status/gate/UNKNOWN latch bindings), not just field shapes.
+- Reconstructed state must have **exactly one unresolved claim** (`ADMITTED`/`COMPLETED_UNACKED`/`UNKNOWN`) bound to `activeGate`; all remaining retained claims must be `COMPLETED_ACKED`.
 - Rejections are fail-closed and return unchanged state.
 - Quota and retained claims are never refunded/deleted by this reducer.
 
@@ -50,6 +51,7 @@ Readback events may annotate observations (`committed`, `notobserved`, `unresolv
 - clear retained claim.
 
 `UNKNOWN` survives JSON serialization/reconstruction and continues blocking competing admissions while the latch/gate is present.
+Conservative UNKNOWN can preserve prior `UNACKNOWLEDGED` completion state (for example checkpoint uncertainty after unacknowledged completion) while remaining non-authorizing and gate-bound.
 
 Malformed reconstructed records (for example `ADMITTED` or `UNKNOWN` claims without valid gate/latch bindings) are rejected before any transition.
 
