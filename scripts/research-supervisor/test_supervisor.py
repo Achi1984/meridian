@@ -1570,6 +1570,8 @@ process.stdout.write(JSON.stringify(runBatch({
     def test_b1_exclusive_lock_after_child_failure_returns_unsettled_and_reaps_child(self):
         claim = self.new_b1_claim("trial-b1-child-failure-lock")
         alias = self.b1_fault_adapter("path")
+        marker = alias.parent / "phase-path.ready"
+        marker.unlink(missing_ok=True)
         original_popen = subprocess.Popen
         children = []
         result = []
@@ -1594,28 +1596,13 @@ process.stdout.write(JSON.stringify(runBatch({
         thread = threading.Thread(target=execute)
         thread.start()
         lock = None
-        last_journal_state = None
         try:
             deadline = time.monotonic() + 5
-            while time.monotonic() < deadline:
-                try:
-                    current = journal.inspect_b1(self.database, claim["trialId"])
-                    last_journal_state = {
-                        "state": current.get("state"),
-                        "reason": current.get("reason"),
-                        "attempts": current.get("attempts"),
-                        "unresolved": current.get("unresolved"),
-                        "paths": [path.get("state") for path in current.get("paths", [])],
-                    }
-                    if current["paths"] and current["paths"][0]["state"] == "started":
-                        break
-                except journal.JournalError as error:
-                    if error.code != "DATABASE_BUSY":
-                        raise
+            while time.monotonic() < deadline and thread.is_alive() and not marker.exists():
                 time.sleep(0.005)
-            else:
+            if not marker.exists():
                 diagnostic = _b1_readiness_diagnostic(
-                    thread, result, failure, children, last_journal_state)
+                    thread, result, failure, children, {"ready_marker": str(marker)})
                 self.fail(
                     "B1 fault child did not durably start its first path; "
                     f"diagnostic={diagnostic}")
@@ -1632,6 +1619,7 @@ process.stdout.write(JSON.stringify(runBatch({
             if lock is not None:
                 self.release_lock(lock)
             thread.join(6)
+            marker.unlink(missing_ok=True)
 
         current = journal.inspect_b1(self.database, claim["trialId"])
         self.assertTrue(current["unresolved"])
