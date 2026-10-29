@@ -363,6 +363,11 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
   const resetFilterState=()=>{
     applyFilters({query:'',direction:'all',category:'all',sort:'symbol'});
   };
+  const releaseDepotSubscription=()=>{
+    const unsubscribe=unsubscribeDepot;
+    unsubscribeDepot=()=>{};
+    try {unsubscribe();} catch {}
+  };
   const notifySnapshot=state=>{
     const data=projection(state);
     try{onSnapshot?.(data,jumpToBot);}catch{}
@@ -434,11 +439,10 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
     if (!client || ['refresh','lock','revalidate','dispose'].some(key=>typeof client[key]!=='function')) throw new Error();
     unsubscribeDepot=subscribeDepotPortfolio(renderPortfolio);
   } catch {
-    unsubscribeDepot();
+    releaseDepotSubscription();
     try {client?.dispose?.();} catch {}
     update({status:'unavailable'});
     disposed=true;
-    unsubscribeDepot();
     refresh.disabled=true;lock.disabled=true;
     throw new Error('Botansicht nicht verfügbar');
   }
@@ -463,6 +467,7 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
     dispose(){
       if(disposed)return;
       disposed=true;
+      releaseDepotSubscription();
       refresh.removeEventListener('click',onRefresh);lock.removeEventListener('click',onLock);
       search.removeEventListener('input',updateFilters);
       directionSelect.removeEventListener('change',updateFilters);

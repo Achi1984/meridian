@@ -198,6 +198,25 @@ test('Bots reuse only the canonical Depot total and clear it on stale or locked 
   assert.match(h.target.textContent,/Depotdaten ausgeblendet/);
   h.view.dispose();
 });
+test('dispose unsubscribes Depot updates and remains harmless when repeated',()=>{
+  const model={status:'FRESH_SNAPSHOT',readOnly:true,executionAllowed:false,totalUsd:1234.56,currency:'USD',
+    snapshotAt:'2026-10-12T19:59:00.000Z',sourceAt:'2026-10-12T19:58:00.000Z',
+    source:'SERVER_PORTFOLIO_CURRENT',expiresAt:Date.parse('2026-10-12T20:14:00.000Z')};
+  publishDepotPortfolioState({status:'fresh',model});
+  const h=mounted(),portfolio=all(h.target,'div').find(node=>
+    String(node.className||'').split(' ').includes('bot-portfolio-total'));
+  assert.match(portfolio.textContent,/1\.234,56 USD/);
+  h.view.dispose();
+  const detachedText=portfolio.textContent;
+
+  publishDepotPortfolioState({status:'fresh',model:{...model,totalUsd:9876.54}});
+  h.view.dispose();
+  assert.equal(portfolio.textContent,detachedText);
+  assert.equal(h.target.textContent,'');
+  assert.equal(h.calls.dispose,1);
+  publishDepotPortfolioState({status:'locked'});
+  assert.equal(portfolio.textContent,detachedText);
+});
 test('generated Bots controls precede snapshot content and the card list',()=>{
   const h=mounted();h.publish(fresh());
   const section=h.target.children[0],filterIndex=section.children.findIndex(node=>node.className==='bot-overview-filters');
