@@ -1,6 +1,6 @@
 const CAPTURE_SCHEMA_VERSION = 1;
 const CAPTURE_VERSION = 'm11-claude-runtime-capture@v1';
-const SUPPORTED_ADAPTER_VERSION = 'mutable@v1';
+const SUPPORTED_PARSER_CONTRACT_VERSION = CAPTURE_VERSION;
 const MAX_BYTES = 2 * 1024 * 1024;
 const MAX_RECORDS = 4096;
 const MAX_DEPTH = 24;
@@ -18,6 +18,10 @@ const ALLOWED_RESULT_SUBTYPES = new Set([
 
 class ParseError extends Error {}
 
+function hasOwn(value, key) {
+  return Object.prototype.hasOwnProperty.call(value, key);
+}
+
 function isSafeText(value, maxBytes) {
   return typeof value === 'string'
     && value.length > 0
@@ -25,9 +29,43 @@ function isSafeText(value, maxBytes) {
     && Buffer.byteLength(value, 'utf8') <= maxBytes;
 }
 
+function isSafeOptionalText(value, maxBytes) {
+  return value === undefined || value === null || isSafeText(value, maxBytes);
+}
+
+function isRecord(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === null || proto === Object.prototype;
+}
+
+function safeParserVersion(input) {
+  return isSafeText(input, MAX_MODEL_BYTES) ? input : null;
+}
+
+function ownString(value, key, maxBytes) {
+  if (!hasOwn(value, key)) return {present: false, value: null};
+  const item = value[key];
+  if (!isSafeText(item, maxBytes)) return {present: true, invalid: true, value: null};
+  return {present: true, invalid: false, value: item};
+}
+
+function collectModelFromModelUsage(record, models) {
+  if (!hasOwn(record, 'modelUsage')) return null;
+  const usage = record.modelUsage;
+  if (!isRecord(usage)) return 'RESULT_MODEL_USAGE_INVALID';
+  const keys = Object.keys(usage);
+  if (keys.length === 0 || keys.some(key => !isSafeText(key, MAX_MODEL_BYTES))) {
+    return 'RESULT_MODEL_USAGE_INVALID';
+  }
+  if (keys.length > 1) return 'MODEL_CONFLICT';
+  models.add(keys[0]);
+  return null;
+}
+
 function freezeCandidate(candidate) {
   return Object.freeze({
-    adapterVersion: candidate.adapterVersion,
+    parserContractVersion: candidate.parserContractVersion,
     sessionId: candidate.sessionId,
     requestedModel: candidate.requestedModel,
     observedModel: candidate.observedModel,
@@ -82,7 +120,8 @@ class JsonParser {
   #parseObject(depth) {
     this.#expect('{');
     this.#skipWhitespace();
-    const out = {};
+    const out = Object.create(null);
+    const keys = new Set();
     if (this.#peek() === '}') {
       this.index += 1;
       return out;
@@ -90,11 +129,17 @@ class JsonParser {
     while (true) {
       if (this.#peek() !== '"') throw new ParseError('INVALID_OBJECT_KEY');
       const key = this.#parseString();
-      if (Object.hasOwn(out, key)) throw new ParseError('DUPLICATE_KEY');
+      if (keys.has(key)) throw new ParseError('DUPLICATE_KEY');
+      keys.add(key);
       this.#skipWhitespace();
       this.#expect(':');
       this.#skipWhitespace();
-      out[key] = this.#parseValue(depth);
+      Object.defineProperty(out, key, {
+        value: this.#parseValue(depth),
+        enumerable: true,
+        writable: true,
+        configurable: true
+      });
       this.#skipWhitespace();
       const next = this.#peek();
       if (next === '}') {
@@ -227,11 +272,18 @@ function reject(diagnostic) {
   return report(diagnostic);
 }
 
-export function captureClaudeRuntimeCandidate(rawBytes) {
+export function captureClaudeRuntimeCandidate(rawBytes, {parserContractVersion, requestedModel} = {}) {
   try {
+    const parserVersion = safeParserVersion(parserContractVersion);
+    if (!parserVersion) return reject('PARSER_CONTRACT_VERSION_INVALID');
+    if (parserVersion !== SUPPORTED_PARSER_CONTRACT_VERSION) {
+      return reject('UNSUPPORTED_PARSER_CONTRACT_VERSION');
+    }
+    if (!isSafeOptionalText(requestedModel, MAX_MODEL_BYTES)) return reject('REQUESTED_MODEL_INVALID');
+
     const data = parseJsonBytes(rawBytes);
     if (!Array.isArray(data) || data.length === 0 || data.length > MAX_RECORDS
-      || !data.every(item => item && typeof item === 'object' && !Array.isArray(item))) {
+      || !data.every(item => isRecord(item))) {
       return reject('INPUT_REJECTED');
     }
 
@@ -242,6 +294,7 @@ export function captureClaudeRuntimeCandidate(rawBytes) {
     let resultIndex = -1;
 
     const observedModels = new Set();
+    let resolvedSessionId = null;
     for (let index = 0; index < data.length; index++) {
       const record = data[index];
       if (record?.type === 'system' && record?.subtype === 'init') {
@@ -253,10 +306,19 @@ export function captureClaudeRuntimeCandidate(rawBytes) {
         resultRecord = record;
         resultIndex = index;
       }
-      if (isSafeText(record?.model, MAX_MODEL_BYTES)) observedModels.add(record.model);
-      if (record?.usage && typeof record.usage === 'object' && !Array.isArray(record.usage)
-        && isSafeText(record.usage.model, MAX_MODEL_BYTES)) {
-        observedModels.add(record.usage.model);
+
+      if (record?.type !== 'result' && hasOwn(record, 'session_id')) {
+        if (!isSafeText(record.session_id, MAX_ID_BYTES)) return reject('SESSION_ID_INVALID');
+        if (!resolvedSessionId) resolvedSessionId = record.session_id;
+        else if (resolvedSessionId !== record.session_id) return reject('SESSION_CONFLICT');
+      }
+
+      if (record?.type === 'assistant') {
+        const message = record.message;
+        if (isRecord(message) && hasOwn(message, 'model')) {
+          if (!isSafeText(message.model, MAX_MODEL_BYTES)) return reject('ASSISTANT_MODEL_INVALID');
+          observedModels.add(message.model);
+        }
       }
     }
 
@@ -264,10 +326,17 @@ export function captureClaudeRuntimeCandidate(rawBytes) {
     if (resultCount !== 1 || !resultRecord) return reject('RESULT_MISSING_OR_AMBIGUOUS');
     if (resultIndex !== data.length - 1) return reject('RESULT_NOT_TERMINAL');
 
-    if (!isSafeText(initRecord.adapter_version, MAX_ID_BYTES)) return reject('ADAPTER_VERSION_INVALID');
-    if (initRecord.adapter_version !== SUPPORTED_ADAPTER_VERSION) return reject('UNSUPPORTED_ADAPTER_VERSION');
     if (!isSafeText(initRecord.session_id, MAX_ID_BYTES)) return reject('SESSION_ID_INVALID');
-    if (!isSafeText(initRecord.model, MAX_MODEL_BYTES)) return reject('REQUESTED_MODEL_INVALID');
+    if (resolvedSessionId && resolvedSessionId !== initRecord.session_id) return reject('SESSION_CONFLICT');
+
+    const initModel = ownString(initRecord, 'model', MAX_MODEL_BYTES);
+    if (initModel.invalid) return reject('INIT_MODEL_INVALID');
+    if (initModel.present) observedModels.add(initModel.value);
+
+    const resultSession = ownString(resultRecord, 'session_id', MAX_ID_BYTES);
+    if (resultSession.invalid) return reject('RESULT_SESSION_ID_INVALID');
+    if (resultSession.present && resultSession.value !== initRecord.session_id) return reject('SESSION_CONFLICT');
+    if (resolvedSessionId && resolvedSessionId !== initRecord.session_id) return reject('SESSION_CONFLICT');
 
     const resultSubtype = resultRecord?.subtype;
     if (!isSafeText(resultSubtype, MAX_SUBTYPE_BYTES)
@@ -279,22 +348,19 @@ export function captureClaudeRuntimeCandidate(rawBytes) {
       return reject('RESULT_TURN_COUNT_INVALID');
     }
 
-    const sessionId = isSafeText(resultRecord?.session_id, MAX_ID_BYTES)
-      ? resultRecord.session_id
-      : initRecord.session_id;
-    if (isSafeText(resultRecord?.session_id, MAX_ID_BYTES)
-      && resultRecord.session_id !== initRecord.session_id) {
-      return reject('SESSION_CONFLICT');
-    }
+    const resultModelUsage = collectModelFromModelUsage(resultRecord, observedModels);
+    if (resultModelUsage) return reject(resultModelUsage);
 
-    observedModels.add(initRecord.model);
-    if (observedModels.size !== 1) return reject('MODEL_CONFLICT');
+    const observedModel = observedModels.size === 0 ? 'UNKNOWN' : observedModels.size === 1
+      ? [...observedModels][0]
+      : null;
+    if (!observedModel) return reject('MODEL_CONFLICT');
 
     const candidate = {
-      adapterVersion: initRecord.adapter_version,
-      sessionId,
-      requestedModel: initRecord.model,
-      observedModel: [...observedModels][0],
+      parserContractVersion: parserVersion,
+      sessionId: initRecord.session_id,
+      requestedModel: requestedModel ?? 'UNKNOWN',
+      observedModel,
       resultSubtype,
       isError: resultRecord.is_error,
       numTurns: resultRecord.num_turns
@@ -312,5 +378,5 @@ export {
   MAX_BYTES,
   MAX_DEPTH,
   MAX_RECORDS,
-  SUPPORTED_ADAPTER_VERSION
+  SUPPORTED_PARSER_CONTRACT_VERSION
 };
