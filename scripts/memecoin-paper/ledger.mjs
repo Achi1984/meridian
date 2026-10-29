@@ -2,7 +2,7 @@ const INITIAL_CAPITAL_CENTS = 100_000n;
 const MAX_ENTRY_CENTS = 8_000n;
 const MAX_POSITIONS = 3;
 const MAX_EVENTS = 10_000;
-const DAY_LOSS_BPS = 300n;
+const DAILY_LOSS_LIMIT_CENTS = 3_000n;
 const BPS = 10_000n;
 const MAX_QUOTE_AGE_MS = 5 * 60 * 1000;
 const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
@@ -235,7 +235,7 @@ export class PaperLedger {
       this.#record({type: "LOCAL_DAY_OPEN", day: localDay, openingEquityCents: snapshot.equityCents.toString()});
     }
     const loss = this.dailyOpeningEquityCents - snapshot.equityCents;
-    const threshold = this.dailyOpeningEquityCents * DAY_LOSS_BPS / BPS;
+    const threshold = DAILY_LOSS_LIMIT_CENTS;
     if (loss >= threshold) this.dailyLossTripped = true;
     return {
       status: this.dailyLossTripped ? "DAILY_LOSS_LIMIT" : "PASS",
@@ -693,7 +693,7 @@ export const PAPER_LEDGER_POLICY = Object.freeze({
   initialStopBps: 600,
   trailingActivationBps: 1200,
   trailingDistanceBps: 600,
-  dailyLossBps: DAY_LOSS_BPS.toString(),
+  dailyLossLimitCents: DAILY_LOSS_LIMIT_CENTS.toString(),
   timezone: "Europe/Vienna",
   restartPolicy: "UNRECOVERABLE_FAIL_CLOSED",
   executionMode: "SIMULATED_ONLY"

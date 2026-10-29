@@ -530,7 +530,7 @@ test("missing exit evidence is unresolved and never invents liquidation profit",
   assert.equal(ledger.summary().cashCents, "92000");
 });
 
-test("daily loss gate uses Europe/Vienna opening equity and unknown marks block entries", () => {
+test("daily loss gate uses fixed USD 30 against each Vienna day's opening equity", () => {
   const dayStart = Date.parse("2026-01-01T22:59:00Z");
   const nextViennaDay = Date.parse("2026-01-01T23:00:00Z");
   const dailyLedger = new PaperLedger({now: dayStart});
@@ -539,27 +539,69 @@ test("daily loss gate uses Europe/Vienna opening equity and unknown marks block 
   assert.equal(dailyLedger.day, "2026-01-02");
   assert.equal(rollover.dailyOpeningEquityCents, 100000n);
 
-  const now = Date.now();
-  const candidate = syntheticCandidate(now);
+  const now = Date.parse("2026-01-01T10:00:00Z");
   const ledger = new PaperLedger({now});
-  const auth = authorize(ledger, candidate, now);
-  ledger.executeEntry(auth, fillQuote(candidate, now), {now: now + 2000});
-  const unknown = ledger.riskSnapshot({now: now + 3000, marks: []});
+  const winner = syntheticCandidate(now);
+  const winnerAuth = authorize(ledger, winner, now);
+  ledger.executeEntry(winnerAuth, fillQuote(winner, now), {now: now + 2000});
+  ledger.observeExitQuote(exitQuote(winner, now + 3000, 20_000));
+  const winnerExit = exitQuote(winner, now + 4000, 18_799);
+  assert.equal(ledger.observeExitQuote(winnerExit).status, "CLOSED_PAPER");
+  assert.equal(ledger.summary().cashCents, "107039");
+
+  const candidate = syntheticCandidate(now + 5000, {
+    mint: "11111111111111111111111111111112"
+  });
+  for (const item of [...Object.values(candidate.evidence), ...Object.values(candidate.analystEvidence)]) {
+    item.binding.mint = candidate.mint;
+  }
+  const auth = authorize(ledger, candidate, now + 5000);
+  ledger.executeEntry(auth, fillQuote(candidate, now + 5000), {now: now + 7000});
+
+  const openingMark = exitQuote(candidate, nextViennaDay, 10_000);
+  const opened = ledger.riskSnapshot({now: nextViennaDay, marks: [openingMark]});
+  assert.equal(opened.status, "PASS");
+  assert.equal(opened.dailyOpeningEquityCents, 107039n);
+  assert.equal(opened.limitCents, 3000n);
+
+  const unknown = ledger.riskSnapshot({now: nextViennaDay + 1000, marks: []});
   assert.equal(unknown.status, "EQUITY_UNKNOWN");
   assert.equal(unknown.entriesAllowed, false);
-  const lossMark = {
-    ...exitQuote(candidate, now + 3000, 6000),
-    costs: ZERO_COSTS
-  };
-  const loss = ledger.riskSnapshot({now: now + 3000, marks: [lossMark]});
+
+  const allowedLoss = ledger.riskSnapshot({
+    now: nextViennaDay + 2000,
+    marks: [exitQuote(candidate, nextViennaDay + 2000, 6252)]
+  });
+  assert.equal(allowedLoss.status, "PASS");
+  assert.equal(allowedLoss.lossCents, 2999n);
+  assert.equal(allowedLoss.limitCents, 3000n);
+  assert.equal(allowedLoss.entriesAllowed, true);
+
+  const loss = ledger.riskSnapshot({
+    now: nextViennaDay + 3000,
+    marks: [exitQuote(candidate, nextViennaDay + 3000, 6251)]
+  });
   assert.equal(loss.status, "DAILY_LOSS_LIMIT");
-  assert.equal(loss.lossCents, 3200n);
+  assert.equal(loss.lossCents, 3000n);
   assert.equal(loss.limitCents, 3000n);
   assert.equal(loss.entriesAllowed, false);
   assert.equal(loss.exitRequests[0].status, "CLOSED_PAPER");
   assert.equal(loss.exitRequests[0].reason, "DAILY_LOSS_LIMIT");
   assert.equal(loss.openPositions, 0);
   assert.equal(loss.equityCents, loss.cashCents);
+
+  const sameDay = ledger.riskSnapshot({now: nextViennaDay + 4000, marks: []});
+  assert.equal(sameDay.status, "DAILY_LOSS_LIMIT");
+  assert.equal(sameDay.entriesAllowed, false);
+  assert.equal(sameDay.dailyOpeningEquityCents, 107039n);
+
+  const followingViennaDay = Date.parse("2026-01-02T23:00:00Z");
+  const newDay = ledger.riskSnapshot({now: followingViennaDay, marks: []});
+  assert.equal(newDay.status, "PASS");
+  assert.equal(newDay.entriesAllowed, true);
+  assert.equal(newDay.dailyOpeningEquityCents, 104039n);
+  assert.equal(PAPER_LEDGER_POLICY.dailyLossLimitCents, "3000");
+  assert.equal(PaperLedger.restartDisposition().status, "UNRECOVERABLE_FAIL_CLOSED");
 });
 
 test("eight-hour report stops new work and leaves open positions explicitly unresolved", () => {

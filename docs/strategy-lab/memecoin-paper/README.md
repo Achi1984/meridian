@@ -109,9 +109,10 @@ gap-through exits use the later observed quote, not the stop. Quotes must be
 later than the decision sample. Missing executable quotes/costs leave valuation
 unavailable or the position unfilled.
 
-The daily loss gate is 3% of local-day opening marked equity (USD 30 on the
-initial USD 1,000), using Europe/Vienna calendar days and net costs. Unknown
-marks block entries. When the loss gate trips, the risk stage requests
+The daily loss gate is a fixed USD 30 (3% of initial USD 1,000), measured
+against each Europe/Vienna local day's opening marked equity and net costs; the
+limit does not scale with gains or losses from prior days. Unknown marks block
+entries. When the loss gate trips, the risk stage requests
 risk-reducing simulated exits only where a fresh identity-bound hypothetical
 executable quote and explicit costs are available; unresolved positions remain
 open. This in-memory prototype cannot persist that gate safely across process
