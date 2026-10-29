@@ -24,11 +24,144 @@ import supervisor
 FAULT_ADAPTER = ROOT / "test_fault_adapter.mjs"
 HISTORICAL_TEST_ADAPTER = ROOT / "test_b1_historical_fixture.mjs"
 MAX_DIAGNOSTIC_ELAPSED_MS = 60_000
+MAX_DIAGNOSTIC_PATHS = 44
+MAX_DIAGNOSTIC_CPU_COUNT = 1024
 HISTORICAL_FIXTURE_LIMITS = {"path_seconds": 10, "batch_seconds": 20}
+HISTORICAL_JOURNAL_STATES = {
+    "queued", "claimed", "running", "completed", "rejected",
+    "failed", "timed_out", "partial", "unknown",
+}
+
+
+def _bounded_diagnostic_ms(value):
+    if type(value) not in (int, float) or value < 0 or value > MAX_DIAGNOSTIC_ELAPSED_MS:
+        return None
+    try:
+        if not math.isfinite(value):
+            return None
+        return round(float(value), 3)
+    except (OverflowError, TypeError, ValueError):
+        return None
+
+
+def _record_path_timing(timings, index, field, started_at, clock):
+    try:
+        if type(index) is not int or not 0 <= index < MAX_DIAGNOSTIC_PATHS:
+            return
+        if index not in timings and len(timings) >= MAX_DIAGNOSTIC_PATHS:
+            return
+        if type(started_at) not in (int, float):
+            return
+        elapsed_ms = _bounded_diagnostic_ms((clock() - started_at) * 1000)
+        if elapsed_ms is None:
+            return
+        record = timings.setdefault(index, {"index": index})
+        record[field] = elapsed_ms
+    except BaseException:
+        pass
+
+
+def _timed_path_callback(callback, phase, timings, started_at, clock=time.monotonic):
+    attempt_field = f"{phase}AttemptMs"
+    accepted_field = f"{phase}AcceptedMs"
+
+    def wrapped(*args, **kwargs):
+        index = args[2] if len(args) > 2 else kwargs.get("index")
+        _record_path_timing(timings, index, attempt_field, started_at, clock)
+        try:
+            result = callback(*args, **kwargs)
+        except BaseException:
+            raise
+        _record_path_timing(timings, index, accepted_field, started_at, clock)
+        return result
+
+    return wrapped
+
+
+def _best_effort_historical_journal_inspection(database, trial_id, profile_path):
+    try:
+        with (patch.object(journal, "HISTORICAL_PROFILE_PATH", profile_path),
+              patch.dict(os.environ, {"MERIDIAN_HISTORICAL_TEST_MODE": "1"})):
+            inspected = journal.inspect_b1(database, trial_id)
+        return (inspected, None) if type(inspected) is dict else (None, "INSPECTION_UNAVAILABLE")
+    except BaseException:
+        return None, "INSPECTION_UNAVAILABLE"
+
+
+def _best_effort_host_metrics():
+    cpu_count = None
+    load1 = None
+    try:
+        cpu_count = os.cpu_count()
+    except BaseException:
+        pass
+    try:
+        getloadavg = getattr(os, "getloadavg", None)
+        if callable(getloadavg):
+            loads = getloadavg()
+            if type(loads) in (tuple, list) and loads:
+                load1 = loads[0]
+    except BaseException:
+        pass
+    return cpu_count, load1
+
+
+def _timing_diagnostic_fields(timings):
+    records = []
+    if type(timings) is dict:
+        for index in sorted(key for key in timings
+                            if type(key) is int and 0 <= key < MAX_DIAGNOSTIC_PATHS)[:MAX_DIAGNOSTIC_PATHS]:
+            record = timings.get(index)
+            if type(record) is not dict or type(record.get("index")) is not int \
+                    or record["index"] != index:
+                continue
+            values = {
+                field: _bounded_diagnostic_ms(record.get(field))
+                for field in ("startAttemptMs", "startAcceptedMs",
+                              "completionAttemptMs", "completionAcceptedMs")
+            }
+            records.append((index, values))
+
+    fields = {}
+    start_attempts = [(index, values["startAttemptMs"])
+                      for index, values in records if values["startAttemptMs"] is not None]
+    start_accepted_count = sum(values["startAcceptedMs"] is not None
+                               for _, values in records)
+    completion_attempt_count = sum(values["completionAttemptMs"] is not None
+                                   for _, values in records)
+    completed = [(index, values["completionAcceptedMs"])
+                 for index, values in records if values["completionAcceptedMs"] is not None]
+    latencies = [
+        values["completionAcceptedMs"] - values["startAcceptedMs"]
+        for _, values in records
+        if values["startAcceptedMs"] is not None
+        and values["completionAcceptedMs"] is not None
+        and values["completionAcceptedMs"] >= values["startAcceptedMs"]
+    ]
+
+    if start_attempts:
+        fields["startupToFirstPathMs"] = min(value for _, value in start_attempts)
+    fields["pathStartAttemptCount"] = len(start_attempts)
+    fields["pathStartAcceptedCount"] = start_accepted_count
+    fields["pathCompletionAttemptCount"] = completion_attempt_count
+    fields["pathCompletionAcceptedCount"] = len(completed)
+    if completed:
+        fields["completedPathIndices0Based"] = sorted(index for index, _ in completed)
+        fields["lastCompletedIndex0Based"] = max(completed, key=lambda item: item[1])[0]
+    if latencies:
+        ordered = sorted(latencies)
+        fields["maxPathMs"] = round(ordered[-1], 3)
+        middle = len(ordered) // 2
+        median = ordered[middle] if len(ordered) % 2 else (
+            ordered[middle - 1] + ordered[middle]) / 2
+        fields["medianPathMs"] = round(median, 3)
+    return fields
 
 
 def _generated_historical_result_diagnostic(
-        result, elapsed_ms=None, configured_batch_seconds=None):
+        result, elapsed_ms=None, configured_batch_seconds=None, *,
+        path_timings=None, journal_snapshot=None, inspection_error=None,
+        cpu_count=None, load1=None):
     diagnostic = {}
     if type(result) is dict:
         for key in ("state", "reason"):
@@ -42,19 +175,50 @@ def _generated_historical_result_diagnostic(
         if type(attempts) is int and attempts in (0, 1):
             diagnostic["attempts"] = attempts
         paths = result.get("paths")
-        if type(paths) is list:
+        if type(paths) is list and len(paths) <= MAX_DIAGNOSTIC_PATHS:
             diagnostic["pathCount"] = len(paths)
             diagnostic["completedPathCount"] = sum(
                 type(path) is dict and path.get("state") == "completed" for path in paths)
-    if (type(elapsed_ms) in (int, float) and
-            0 <= elapsed_ms <= MAX_DIAGNOSTIC_ELAPSED_MS and math.isfinite(elapsed_ms)):
-        diagnostic["elapsedMs"] = round(elapsed_ms, 3)
+
+    bounded_elapsed = _bounded_diagnostic_ms(elapsed_ms)
+    if bounded_elapsed is not None:
+        diagnostic["elapsedMs"] = bounded_elapsed
     if (type(configured_batch_seconds) in (int, float) and
             0 < configured_batch_seconds <= journal.MAX_BATCH_SECONDS and
             math.isfinite(configured_batch_seconds)):
         diagnostic["configuredBatchSeconds"] = configured_batch_seconds
-    rendered = json.dumps(diagnostic, sort_keys=True, separators=(",", ":"))
-    return rendered if len(rendered) <= 1024 else rendered[:1021] + "..."
+
+    diagnostic.update(_timing_diagnostic_fields(path_timings))
+    if type(journal_snapshot) is dict:
+        state = journal_snapshot.get("state")
+        if type(state) is str and state in HISTORICAL_JOURNAL_STATES:
+            diagnostic["journalState"] = state
+        attempts = journal_snapshot.get("attempts")
+        if type(attempts) is int and attempts in (0, 1):
+            diagnostic["journalAttemptCount"] = attempts
+        paths = journal_snapshot.get("paths")
+        if type(paths) is list and len(paths) <= MAX_DIAGNOSTIC_PATHS:
+            diagnostic["journalPathCount"] = len(paths)
+            diagnostic["journalCompletedPathCount"] = sum(
+                type(path) is dict and path.get("state") == "completed" for path in paths)
+    if inspection_error == "INSPECTION_UNAVAILABLE":
+        diagnostic["journalInspectionError"] = inspection_error
+
+    if type(cpu_count) is int and 1 <= cpu_count <= MAX_DIAGNOSTIC_CPU_COUNT:
+        diagnostic["cpuCount"] = cpu_count
+    bounded_load1 = _bounded_diagnostic_ms(load1)
+    if bounded_load1 is not None:
+        diagnostic["load1"] = bounded_load1
+
+    rendered = json.dumps(diagnostic, sort_keys=True, separators=(",", ":"), allow_nan=False)
+    if len(rendered) <= 1024:
+        return rendered
+    for key in ("completedPathIndices0Based", "trialId", "reason", "state"):
+        diagnostic.pop(key, None)
+        rendered = json.dumps(diagnostic, sort_keys=True, separators=(",", ":"), allow_nan=False)
+        if len(rendered) <= 1024:
+            return rendered
+    return "{}"
 
 
 def _b1_readiness_diagnostic(thread, result, failure, children, last_state):
@@ -282,9 +446,31 @@ connection.close()
             "freeText": private_text,
             "extraField": {"value": "not permitted"},
         }
+        timings = {
+            index: {
+                "index": index,
+                "startAttemptMs": 10 + index,
+                "startAcceptedMs": 11 + index,
+                "completionAttemptMs": 21 + index,
+                "completionAcceptedMs": 23 + index,
+                "pathId": private_text,
+            }
+            for index in range(MAX_DIAGNOSTIC_PATHS)
+        }
+        journal_snapshot = {
+            "state": "completed",
+            "attempts": 1,
+            "paths": [
+                {"state": "completed", "pathId": private_text, "payload": private_text}
+                for _ in range(MAX_DIAGNOSTIC_PATHS)
+            ],
+            "reason": private_text,
+        }
 
         diagnostic = _generated_historical_result_diagnostic(
-            result, 1234.6, HISTORICAL_FIXTURE_LIMITS["batch_seconds"])
+            result, 1234.6, HISTORICAL_FIXTURE_LIMITS["batch_seconds"],
+            path_timings=timings, journal_snapshot=journal_snapshot,
+            cpu_count=8, load1=1.25)
         rendered = json.loads(diagnostic)
 
         self.assertEqual(rendered, {
@@ -295,6 +481,21 @@ connection.close()
             "completedPathCount": 1,
             "elapsedMs": 1234.6,
             "configuredBatchSeconds": 20,
+            "startupToFirstPathMs": 10,
+            "pathStartAttemptCount": 44,
+            "pathStartAcceptedCount": 44,
+            "pathCompletionAttemptCount": 44,
+            "pathCompletionAcceptedCount": 44,
+            "completedPathIndices0Based": list(range(44)),
+            "lastCompletedIndex0Based": 43,
+            "maxPathMs": 12,
+            "medianPathMs": 12,
+            "journalState": "completed",
+            "journalAttemptCount": 1,
+            "journalPathCount": 44,
+            "journalCompletedPathCount": 44,
+            "cpuCount": 8,
+            "load1": 1.25,
         })
         self.assertNotIn("attempts", rendered)
         self.assertLessEqual(len(diagnostic), 1024)
@@ -302,13 +503,17 @@ connection.close()
         self.assertNotIn("../private/path", diagnostic)
         self.assertNotIn("/home/runner/private", diagnostic)
         self.assertNotIn(private_text, diagnostic)
+        self.assertNotIn("pathId", rendered)
+        self.assertNotIn("payload", rendered)
+
         for invalid_elapsed in (-1, True, float("nan"), float("inf"),
                                 float("-inf"), MAX_DIAGNOSTIC_ELAPSED_MS + 1,
                                 10 ** 400, private_text):
             with self.subTest(invalid_elapsed=repr(invalid_elapsed)):
                 invalid = json.loads(
                     _generated_historical_result_diagnostic(
-                        result, invalid_elapsed, HISTORICAL_FIXTURE_LIMITS["batch_seconds"]))
+                        result, invalid_elapsed, HISTORICAL_FIXTURE_LIMITS["batch_seconds"],
+                        path_timings=timings, journal_snapshot=journal_snapshot))
                 self.assertNotIn("elapsedMs", invalid)
                 self.assertEqual(invalid["configuredBatchSeconds"], 20)
         for invalid_batch_seconds in (0, -1, True, float("nan"), float("inf"),
@@ -317,22 +522,189 @@ connection.close()
             with self.subTest(invalid_batch_seconds=repr(invalid_batch_seconds)):
                 invalid = json.loads(
                     _generated_historical_result_diagnostic(
-                        result, 1234.6, invalid_batch_seconds))
+                        result, 1234.6, invalid_batch_seconds,
+                        path_timings=timings, journal_snapshot=journal_snapshot))
                 self.assertEqual(invalid["elapsedMs"], 1234.6)
                 self.assertNotIn("configuredBatchSeconds", invalid)
 
+        invalid_values = (None, True, float("nan"), float("inf"), -1,
+                          MAX_DIAGNOSTIC_ELAPSED_MS + 1, 10 ** 400, private_text)
+        for field in ("startAttemptMs", "startAcceptedMs",
+                      "completionAttemptMs", "completionAcceptedMs"):
+            for invalid_value in invalid_values:
+                with self.subTest(field=field, invalid_value=repr(invalid_value)):
+                    invalid_timing = {
+                        0: {"index": 0, field: invalid_value},
+                    }
+                    invalid = json.loads(_generated_historical_result_diagnostic(
+                        result, path_timings=invalid_timing))
+                    self.assertNotIn("startupToFirstPathMs", invalid)
+                    self.assertNotIn("maxPathMs", invalid)
+                    self.assertNotIn("medianPathMs", invalid)
+                    self.assertEqual(invalid["pathStartAttemptCount"], 0)
+                    self.assertEqual(invalid["pathCompletionAcceptedCount"], 0)
+        for invalid_index in (True, -1, MAX_DIAGNOSTIC_PATHS, private_text):
+            with self.subTest(invalid_index=repr(invalid_index)):
+                invalid = json.loads(_generated_historical_result_diagnostic(
+                    result, path_timings={invalid_index: {
+                        "index": invalid_index, "completionAcceptedMs": 1,
+                    }}))
+                self.assertEqual(invalid["pathCompletionAcceptedCount"], 0)
+                self.assertNotIn("completedPathIndices0Based", invalid)
+
+        for invalid_cpu_count in (None, True, 0, -1, MAX_DIAGNOSTIC_CPU_COUNT + 1,
+                                  1.5, private_text):
+            with self.subTest(invalid_cpu_count=repr(invalid_cpu_count)):
+                invalid = json.loads(_generated_historical_result_diagnostic(
+                    result, cpu_count=invalid_cpu_count))
+                self.assertNotIn("cpuCount", invalid)
+        for invalid_load1 in (None, True, float("nan"), float("inf"), -1,
+                              MAX_DIAGNOSTIC_ELAPSED_MS + 1, 10 ** 400, private_text):
+            with self.subTest(invalid_load1=repr(invalid_load1)):
+                invalid = json.loads(_generated_historical_result_diagnostic(
+                    result, load1=invalid_load1))
+                self.assertNotIn("load1", invalid)
+
+        invalid_snapshot = {
+            "state": private_text,
+            "paths": [{"state": "completed"}] * (MAX_DIAGNOSTIC_PATHS + 1),
+        }
+        for invalid_attempts in (None, True, float("nan"), -1, 2, 10 ** 400, private_text):
+            with self.subTest(invalid_attempts=repr(invalid_attempts)):
+                invalid_snapshot["attempts"] = invalid_attempts
+                invalid = json.loads(_generated_historical_result_diagnostic(
+                    result, journal_snapshot=invalid_snapshot,
+                    inspection_error=private_text))
+                self.assertNotIn("journalState", invalid)
+                self.assertNotIn("journalAttemptCount", invalid)
+                self.assertNotIn("journalPathCount", invalid)
+                self.assertNotIn("journalCompletedPathCount", invalid)
+                self.assertNotIn("journalInspectionError", invalid)
+                self.assertNotIn(private_text, json.dumps(invalid))
+        unavailable = json.loads(_generated_historical_result_diagnostic(
+            result, inspection_error="INSPECTION_UNAVAILABLE"))
+        self.assertEqual(unavailable["journalInspectionError"], "INSPECTION_UNAVAILABLE")
+        missing = json.loads(_generated_historical_result_diagnostic(result))
+        self.assertNotIn("cpuCount", missing)
+        self.assertNotIn("load1", missing)
+        self.assertNotIn("journalState", missing)
+        self.assertLessEqual(len(json.dumps(rendered, separators=(",", ":"))), 1024)
+
+        returned = object()
+        forwarded = []
+        timing = {}
+        ticks = iter((10.1, 10.2))
+
+        def original_callback(*args, **kwargs):
+            forwarded.append((args, kwargs))
+            return returned
+
+        wrapped = _timed_path_callback(
+            original_callback, "start", timing, 10.0, clock=lambda: next(ticks))
+        callback_args = (object(), object(), 0, private_text)
+        callback_kwargs = {"deadline": object()}
+        self.assertIs(wrapped(*callback_args, **callback_kwargs), returned)
+        self.assertEqual(len(forwarded[0][0]), len(callback_args))
+        for actual, expected in zip(forwarded[0][0], callback_args):
+            self.assertIs(actual, expected)
+        self.assertIs(forwarded[0][1]["deadline"], callback_kwargs["deadline"])
+        self.assertEqual(timing, {
+            0: {"index": 0, "startAttemptMs": 100, "startAcceptedMs": 200},
+        })
+        self.assertNotIn(private_text, repr(timing))
+
+        expected_error = RuntimeError(private_text)
+        failure_effects = []
+        failed_ticks = iter((10.1,))
+
+        def failing_callback(*args, **kwargs):
+            failure_effects.append((args, kwargs))
+            raise expected_error
+
+        failed_timing = {}
+        failed_wrapper = _timed_path_callback(
+            failing_callback, "completion", failed_timing, 10.0,
+            clock=lambda: next(failed_ticks))
+        with self.assertRaises(RuntimeError) as caught:
+            failed_wrapper(*callback_args, **callback_kwargs)
+        self.assertIs(caught.exception, expected_error)
+        self.assertEqual(failure_effects, [(callback_args, callback_kwargs)])
+        self.assertEqual(failed_timing, {
+            0: {"index": 0, "completionAttemptMs": 100},
+        })
+        failure_diagnostic = json.loads(_generated_historical_result_diagnostic(
+            result, path_timings=failed_timing))
+        self.assertEqual(failure_diagnostic["pathCompletionAttemptCount"], 1)
+        self.assertEqual(failure_diagnostic["pathCompletionAcceptedCount"], 0)
+
+        effects = []
+        successful_with_monitor_error = _timed_path_callback(
+            lambda *args, **kwargs: effects.append((args, kwargs)) or returned,
+            "completion", {}, 10.0, clock=lambda: (_ for _ in ()).throw(
+                RuntimeError(private_text)))
+        self.assertIs(successful_with_monitor_error(*callback_args, **callback_kwargs), returned)
+        self.assertEqual(effects, [(callback_args, callback_kwargs)])
+
+        with (patch.object(os, "cpu_count", side_effect=RuntimeError(private_text)),
+              patch.object(os, "getloadavg", new=None, create=True)):
+            unavailable_cpu, unavailable_load = _best_effort_host_metrics()
+        self.assertIsNone(unavailable_cpu)
+        self.assertIsNone(unavailable_load)
+        portable = json.loads(_generated_historical_result_diagnostic(
+            result, cpu_count=unavailable_cpu, load1=unavailable_load))
+        self.assertNotIn("cpuCount", portable)
+        self.assertNotIn("load1", portable)
+
+        before_inspection = Path(self.database).read_bytes()
+        with patch.object(journal, "inspect_b1", side_effect=RuntimeError(private_text)):
+            unavailable_snapshot, unavailable_error = _best_effort_historical_journal_inspection(
+                self.database, trial_id, Path(self.temporary.name) / "unused-profile.json")
+        self.assertIsNone(unavailable_snapshot)
+        self.assertEqual(unavailable_error, "INSPECTION_UNAVAILABLE")
+        self.assertEqual(Path(self.database).read_bytes(), before_inspection)
+        self.assertNotIn(private_text, _generated_historical_result_diagnostic(
+            result, inspection_error=unavailable_error))
+
     def test_generated_historical_profile_runs_all_paths_and_refuses_repeat(self):
         profile_path, claim = self.prepare_historical_fixture("historical-success")
-        started_at = time.monotonic()
+        try:
+            started_at = time.monotonic()
+        except BaseException:
+            started_at = None
+        path_timings = {}
+        original_path_started = journal.record_b1_path_started
+        original_path_completed = journal.record_b1_path_completed
         result = None
         try:
-            result = self.run_historical_fixture(
-                profile_path, claim, "SUCCESS", limits=HISTORICAL_FIXTURE_LIMITS)
+            with (patch.object(
+                    journal, "record_b1_path_started",
+                    new=_timed_path_callback(
+                        original_path_started, "start", path_timings, started_at)),
+                  patch.object(
+                    journal, "record_b1_path_completed",
+                    new=_timed_path_callback(
+                        original_path_completed, "completion", path_timings, started_at))):
+                result = self.run_historical_fixture(
+                    profile_path, claim, "SUCCESS", limits=HISTORICAL_FIXTURE_LIMITS)
         finally:
-            elapsed_ms = (time.monotonic() - started_at) * 1000
-            diagnostic = _generated_historical_result_diagnostic(
-                result, elapsed_ms, HISTORICAL_FIXTURE_LIMITS["batch_seconds"])
-            print(f"SYNTHETIC_SUPERVISOR_TIMING {diagnostic}", flush=True)
+            diagnostic = "{}"
+            try:
+                try:
+                    elapsed_ms = (
+                        (time.monotonic() - started_at) * 1000
+                        if type(started_at) in (int, float) else None)
+                except BaseException:
+                    elapsed_ms = None
+                inspected, inspection_error = _best_effort_historical_journal_inspection(
+                    self.database, claim["trialId"], profile_path)
+                cpu_count, load1 = _best_effort_host_metrics()
+                diagnostic = _generated_historical_result_diagnostic(
+                    result, elapsed_ms, HISTORICAL_FIXTURE_LIMITS["batch_seconds"],
+                    path_timings=path_timings, journal_snapshot=inspected,
+                    inspection_error=inspection_error, cpu_count=cpu_count, load1=load1)
+                print(f"SYNTHETIC_SUPERVISOR_TIMING {diagnostic}", flush=True)
+            except BaseException:
+                pass
         self.assertEqual(result["state"], "completed", diagnostic)
         self.assertEqual(result["attempts"], 1, diagnostic)
         self.assertEqual(len(result["paths"]), 44, diagnostic)
