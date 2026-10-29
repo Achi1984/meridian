@@ -8,11 +8,19 @@ const MAX_PAGES = 20;
 const MAX_ITEMS = 500;
 const MAX_RUNTIME_MS = 10000;
 const MAX_DIFF_BYTES = 262144;
+const COLLECTION_TTL_MS = 300000;
+const REQUIRED_JOBS = Object.freeze([
+  Object.freeze({name: 'syntax', required: true, requiredSteps: Object.freeze([
+    'Research and auth regression tests'
+  ])})
+]);
+const OPTIONAL_JOBS = Object.freeze([]);
 const verifiedCollections = new WeakSet();
 const TIMED_OUT = Symbol('timed-out');
 
-export const isVerifiedCollection = value => value !== null
-  && typeof value === 'object' && verifiedCollections.has(value);
+export const isVerifiedCollection = (value, timestamp = Date.now()) => value !== null
+  && typeof value === 'object' && verifiedCollections.has(value)
+  && Number.isSafeInteger(timestamp) && timestamp >= value.collectedAt && timestamp < value.expiresAt;
 
 function fail(reason) {
   return Object.freeze({status: 'BLOCKED', reason});
@@ -36,11 +44,13 @@ function hasExactKeys(value, keys) {
 function validPage(page) {
   return page !== null && typeof page === 'object' && !Array.isArray(page)
     && Array.isArray(page.items) && typeof page.hasNextPage === 'boolean'
-    && page.items.length <= MAX_ITEMS;
+    && Number.isSafeInteger(page.totalCount) && page.totalCount >= 0
+    && page.totalCount <= MAX_ITEMS && page.items.length <= MAX_ITEMS;
 }
 
 async function readAllPages(readPage, maxPages, deadline) {
   const items = [];
+  let totalCount = null;
   for (let pageNumber = 1; pageNumber <= maxPages; pageNumber++) {
     if (performance.now() > deadline) return null;
     const remaining = Math.max(0, deadline - performance.now());
@@ -59,15 +69,47 @@ async function readAllPages(readPage, maxPages, deadline) {
       clearTimeout(timer);
     }
     if (page === TIMED_OUT) return null;
-    if (!validPage(page) || items.length + page.items.length > MAX_ITEMS) return null;
+    if (!validPage(page) || (totalCount !== null && page.totalCount !== totalCount)
+      || items.length + page.items.length > MAX_ITEMS) return null;
+    totalCount = page.totalCount;
+    if (items.length + page.items.length > totalCount) return null;
     items.push(...page.items);
-    if (!page.hasNextPage) return items;
+    if (!page.hasNextPage) return items.length === totalCount ? items : null;
   }
   return null;
 }
 
 function collectionDigest(data) {
   return createHash('sha256').update(JSON.stringify(data)).digest('hex');
+}
+
+export function validateWorkflowJobs(jobs, runIdentity, policy = {required: REQUIRED_JOBS, optional: OPTIONAL_JOBS}) {
+  if (!Array.isArray(jobs) || !runIdentity || !Number.isSafeInteger(runIdentity.runId)
+    || !Number.isSafeInteger(runIdentity.runAttempt) || !Number.isSafeInteger(runIdentity.workflowId)
+    || !policy || !Array.isArray(policy.required) || !Array.isArray(policy.optional)) return false;
+  const allowed = new Map();
+  for (const [entries, required] of [[policy.required, true], [policy.optional, false]]) {
+    for (const entry of entries) {
+      if (!entry || typeof entry.name !== 'string' || entry.name.length === 0 || allowed.has(entry.name)) return false;
+      allowed.set(entry.name, {required, requiredSteps: entry.requiredSteps || []});
+    }
+  }
+  const seen = new Set();
+  for (const job of jobs) {
+    if (!job || !positive(job.id) || typeof job.name !== 'string' || seen.has(job.name)
+      || !allowed.has(job.name) || job.runId !== runIdentity.runId
+      || job.runAttempt !== runIdentity.runAttempt || job.workflowId !== runIdentity.workflowId
+      || job.status !== 'completed') return false;
+    seen.add(job.name);
+    const rule = allowed.get(job.name);
+    if (job.conclusion !== 'success'
+      && !(rule.required === false && job.conclusion === 'skipped')) return false;
+    if (!Array.isArray(job.steps) || rule.requiredSteps.some(name => {
+      const matches = job.steps.filter(step => step?.name === name);
+      return matches.length !== 1 || matches[0].status !== 'completed' || matches[0].conclusion !== 'success';
+    })) return false;
+  }
+  return policy.required.every(job => seen.has(job.name));
 }
 
 export async function collectExactPair({hint, config, api, now = Date.now}) {
@@ -211,14 +253,22 @@ export async function collectExactPair({hint, config, api, now = Date.now}) {
       signal
     }), config.maxPages, deadline);
     if (!jobs || jobs.length === 0) return fail('JOB_PAGINATION_INCOMPLETE');
-    const acceptedJobStates = new Set(['success', 'skipped']);
-    if (jobs.some(job => !job || !['completed'].includes(job.status)
-      || !acceptedJobStates.has(job.conclusion))) return fail('CI_JOBS_NOT_ALL_SUCCESSFUL');
+    if (!validateWorkflowJobs(jobs, {
+      runId: run.id,
+      runAttempt: run.runAttempt,
+      workflowId: run.workflowId
+    })) return fail('CI_JOB_INVENTORY_OR_IDENTITY_MISMATCH');
     if (run.status !== 'completed' || run.conclusion !== 'success') {
       return fail(run.conclusion === 'action_required' ? 'ACTION_REQUIRED' : 'CI_NOT_SUCCESSFUL');
     }
     if (performance.now() > deadline) return fail('TIME_BUDGET_EXHAUSTED');
 
+    const logicalActionKey = collectionDigest([
+      REPOSITORY, pullRequestNumber, run.headSha, run.baseSha, 'CI_TO_INDEPENDENT_REVIEW'
+    ]);
+    const executionKey = collectionDigest([
+      logicalActionKey, run.workflowId, run.id, run.runAttempt
+    ]);
     const data = Object.freeze({
       status: 'READY',
       repository: REPOSITORY,
@@ -233,11 +283,18 @@ export async function collectExactPair({hint, config, api, now = Date.now}) {
       actor: run.actor,
       triggeringActor: run.triggeringActor,
       selectionRevision: run.runNumber,
+      collectedAt: timestamp,
+      expiresAt: Math.min(config.expiresAt, timestamp + COLLECTION_TTL_MS),
+      provenance: Object.freeze({
+        kind: 'AUTHENTICATED_READ_ADAPTER',
+        workflowId: run.workflowId,
+        runId: run.id,
+        runAttempt: run.runAttempt
+      }),
       diff: diff.text,
       diffDigest: createHash('sha256').update(diff.text).digest('hex'),
-      actionKey: collectionDigest([REPOSITORY, pullRequestNumber, run.headSha, run.baseSha,
-        run.workflowId, run.id, run.runAttempt, run.runNumber,
-        createHash('sha256').update(diff.text).digest('hex')])
+      actionKey: logicalActionKey,
+      executionKey
     });
     verifiedCollections.add(data);
     return data;

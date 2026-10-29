@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {collectExactPair, isVerifiedCollection} from '../scripts/autonomy/m11-coordinator-collector.mjs';
+import {collectExactPair, isVerifiedCollection, validateWorkflowJobs} from '../scripts/autonomy/m11-coordinator-collector.mjs';
 import {createCoordinatorStateStore} from '../scripts/autonomy/m11-coordinator-state-store.mjs';
-import {reconcileUnknownReceipt, runReviewCoordinator} from '../scripts/autonomy/m11-coordinator-review.mjs';
+import {reconcileUnknownReceipt, runReviewCoordinator as runReviewCoordinatorImpl} from '../scripts/autonomy/m11-coordinator-review.mjs';
 import {REQUIRED_REVIEW_PARTS} from '../scripts/autonomy/m11-event-coordinator.mjs';
 
 const REPOSITORY = 'Achi1984/meridian';
@@ -15,6 +15,18 @@ const PR = 973;
 const WORKFLOW_ID = 347821227;
 const WORKFLOW_PATH = '.github/workflows/backend-safety.yml';
 const ACTOR = 'Achi1984';
+const REVIEWER_IDENTITY = Object.freeze({
+  provider: 'claude',
+  agent: 'claude-code-action',
+  model: 'test-model',
+  transport: 'injected-test'
+});
+const REVIEWER_CAPABILITY = Object.freeze({
+  state: 'ENABLED',
+  ...REVIEWER_IDENTITY,
+  observedAt: START,
+  expiresAt: END
+});
 
 function config(overrides = {}) {
   return {
@@ -45,6 +57,20 @@ function run(overrides = {}) {
     pullRequests: [PR],
     actor: ACTOR,
     triggeringActor: ACTOR,
+    ...overrides
+  };
+}
+
+function validJob(runData = run(), overrides = {}) {
+  return {
+    id: 1,
+    name: 'syntax',
+    runId: runData.id,
+    runAttempt: runData.runAttempt,
+    workflowId: runData.workflowId,
+    status: 'completed',
+    conclusion: 'success',
+    steps: [{name: 'Research and auth regression tests', status: 'completed', conclusion: 'success'}],
     ...overrides
   };
 }
@@ -86,12 +112,13 @@ function fixtureApi({runData = run(), pullRequest = {}, runs = [runData], jobs =
     async listWorkflowRuns(input) {
       calls.push(['runs', input]);
       if (runPages) return runPages[input.page - 1] || null;
-      return {items: runs, hasNextPage: false};
+      return {items: runs, totalCount: runs.length, hasNextPage: false};
     },
     async listWorkflowJobs(input) {
       calls.push(['jobs', input]);
       if (jobPages) return jobPages[input.page - 1] || null;
-      return {items: jobs || [{id: 1, status: 'completed', conclusion: 'success'}], hasNextPage: false};
+      const items = jobs || [validJob(runData)];
+      return {items, totalCount: items.length, hasNextPage: false};
     }
   };
   return {api, calls};
@@ -112,8 +139,11 @@ async function collect(apiFixture = fixtureApi(), overrides = {}) {
   });
 }
 
-function structuredReview(overrides = {}) {
+function structuredReview(reviewRequestId, overrides = {}) {
   return {
+    reviewRequestId,
+    sessionId: 'session-test-1',
+    reviewer: {...REVIEWER_IDENTITY},
     coverageParts: [...REQUIRED_REVIEW_PARTS],
     verdict: 'GREEN_LIGHT',
     complete: true,
@@ -122,6 +152,15 @@ function structuredReview(overrides = {}) {
     summary: 'Synthetic review receipt.',
     ...overrides
   };
+}
+
+function runReviewCoordinator(input) {
+  return runReviewCoordinatorImpl({
+    reviewerIdentity: REVIEWER_IDENTITY,
+    capabilityEvidence: REVIEWER_CAPABILITY,
+    revalidate: async () => input.collected,
+    ...input
+  });
 }
 
 function receiptAdapter(postOnce = async () => ({status: 'CREATED', receiptId: 'comment-test'}),
@@ -133,17 +172,16 @@ class AtomicMemoryBackend {
   constructor() {
     this.capabilities = {
       immutableCommits: true,
+      validatedRevisionChain: true,
       atomicCreateOnlyClaims: true,
+      atomicSingleWriterClaim: true,
       atomicPacketQuota: true,
-      atomicExpectedOidCAS: true,
-      durableFencing: true
+      atomicExpectedOidCAS: true
     };
-    this.snapshot = {revision: 0, oid: 'root', fencingToken: 0, lease: null};
+    this.snapshot = {revision: 0, oid: 'root', chainValid: true};
     this.claims = new Map();
-    this.packetKeys = new Set();
     this.commits = new Map();
     this.nextCommit = 0;
-    this.clock = START + 100;
     this.tail = Promise.resolve();
   }
 
@@ -163,101 +201,102 @@ class AtomicMemoryBackend {
     return structuredClone(this.snapshot);
   }
 
-  async acquireLease(input) {
-    return this.atomic(() => {
-      const current = this.snapshot;
-      if (input.expectedRevision !== current.revision || input.expectedOid !== current.oid
-        || input.expectedFence !== current.fencingToken) return {status: 'STALE_EXPECTATION'};
-      if (current.lease && current.lease.expiresAt > input.now) return {status: 'LEASE_BUSY'};
-      const fencingToken = current.fencingToken + 1;
-      current.fencingToken = fencingToken;
-      current.lease = {owner: input.owner, expiresAt: input.leaseExpiresAt, fencingToken};
-      return {status: 'ACQUIRED', fencingToken};
-    });
-  }
-
   async createOnlyClaim(input) {
     return this.atomic(() => {
-      if (this.claims.has(input.actionKey)) return {status: 'EXISTS'};
-      if (!this.packetKeys.has(input.packetKey) && this.packetKeys.size >= input.maxPackets) {
+      if (input.maxActiveClaims !== 1) return {status: 'INVALID_LIMIT'};
+      if (this.claims.has(input.executionKey)) return {status: 'EXISTS'};
+      if ([...this.claims.values()].some(claim => claim.status !== 'COMMITTED')) return {status: 'BUSY'};
+      if (input.expectedRevision !== this.snapshot.revision || input.expectedOid !== this.snapshot.oid) {
+        return {status: 'STALE_EXPECTATION'};
+      }
+      if (this.claims.size >= input.maxPackets) {
         return {status: 'BUDGET_EXHAUSTED'};
       }
-      this.packetKeys.add(input.packetKey);
-      this.claims.set(input.actionKey, {status: 'CLAIMED', ...input});
-      return {status: 'CREATED'};
+      const claimId = `claim-${this.claims.size + 1}`;
+      this.claims.set(input.executionKey, {
+        status: 'CLAIMED', lastStage: 'CLAIMED', claimId, ...input
+      });
+      return {status: 'CREATED', claimId};
     });
   }
 
   async createImmutableCommit(input) {
     const oid = `commit-${++this.nextCommit}`;
     this.commits.set(oid, structuredClone(input));
-    return {oid, parentOid: input.parentOid};
+    return {
+      oid,
+      parentOid: input.parentOid,
+      revision: input.revision,
+      commitNonce: input.commitNonce
+    };
   }
 
   async compareAndSwapRef(input) {
     return this.atomic(() => {
       const current = this.snapshot;
-      const claim = this.claims.get(input.actionKey);
-      if (!claim || current.oid !== input.expectedOid || current.revision !== input.expectedRevision
-        || current.fencingToken !== input.expectedFence || current.lease?.fencingToken !== input.expectedFence
-        || current.lease.owner !== claim.owner || this.commits.get(input.newOid)?.parentOid !== current.oid) {
+      const claim = this.claims.get(input.executionKey);
+      if (!claim || claim.actionKey !== input.actionKey || claim.claimId !== input.claimId
+        || current.oid !== input.expectedOid || current.revision !== input.expectedRevision
+        || this.commits.get(input.newOid)?.parentOid !== current.oid
+        || this.commits.get(input.newOid)?.revision !== input.newRevision
+        || this.commits.get(input.newOid)?.commitNonce.length !== 32) {
         return {status: 'CONFLICT'};
       }
       current.oid = input.newOid;
       current.revision = input.newRevision;
       const commit = this.commits.get(input.newOid);
       claim.status = commit.transition.kind === 'UNKNOWN' ? 'UNKNOWN'
-        : commit.transition.kind === 'RECEIPT_DELIVERED' ? 'COMMITTED' : 'REVIEWED';
-      return {status: 'COMMITTED'};
+        : commit.transition.kind === 'RECEIPT_DELIVERED' ? 'COMMITTED'
+          : commit.transition.kind === 'RECEIPT_POSTING' ? 'RECEIPT_POSTING' : 'REVIEWED';
+      claim.lastStage = commit.transition.stage || commit.transition.kind;
+      return {status: 'COMMITTED', oid: input.newOid};
     });
   }
 
-  async readClaim(actionKey) {
-    return this.claims.get(actionKey) || {status: 'NOT_COMMITTED'};
-  }
-
-  async releaseLease(input) {
-    return this.atomic(() => {
-      const current = this.snapshot;
-      if (current.oid !== input.expectedOid || current.revision !== input.expectedRevision
-        || current.fencingToken !== input.fencingToken || current.lease?.owner !== input.owner
-        || current.lease?.fencingToken !== input.fencingToken) return {status: 'CONFLICT'};
-      current.lease = null;
-      return {status: 'RELEASED'};
-    });
+  async readClaim(executionKey) {
+    return this.claims.get(executionKey) || null;
   }
 }
 
-async function claimStore(store, backend, actionKey, owner = 'test-writer', packetKey = 'f'.repeat(64)) {
+async function claimStore(store, backend, actionKey, owner = 'test-writer', packetKey = 'f'.repeat(64),
+  executionKey = actionKey) {
   const {snapshot} = await store.read();
   return store.claim({
     actionKey,
+    executionKey,
     packetKey,
     expectedRevision: snapshot.revision,
     expectedOid: snapshot.oid,
-    expectedFence: snapshot.fencingToken,
     owner,
-    leaseExpiresAt: backend.clock + 1000,
-    now: backend.clock
+    now: START + 100
   });
 }
 
 function fakeReviewStore({secondCommit = 'COMMITTED'} = {}) {
   const calls = [];
-  let claimed = false;
   let revision = 0;
+  const claims = new Map();
   const store = {
     available: true,
     async read() {
       calls.push('read');
-      return {status: 'READY', snapshot: {revision, oid: `oid-${revision}`, fencingToken: 1}};
+      return {status: 'READY', snapshot: {revision, oid: `oid-${revision}`}};
     },
     async claim(input) {
-      calls.push(['claim', input.actionKey]);
-      if (claimed) return {status: 'ALREADY_CLAIMED'};
-      claimed = true;
-      return {status: 'CLAIMED', lease: {actionKey: input.actionKey, owner: 'test-writer',
-        fencingToken: 1, expectedRevision: revision, expectedOid: `oid-${revision}`}};
+      calls.push(['claim', input.executionKey]);
+      if (claims.has(input.executionKey)) return {status: 'ALREADY_CLAIMED'};
+      const claim = {
+        actionKey: input.actionKey,
+        executionKey: input.executionKey,
+        claimId: `claim-${claims.size + 1}`,
+        owner: 'test-writer',
+        expectedRevision: revision,
+        expectedOid: `oid-${revision}`
+      };
+      claims.set(input.executionKey, {
+        ...claim, status: 'CLAIMED', lastStage: 'CLAIMED'
+      });
+      return {status: 'CLAIMED', claim};
     },
     async commit(input) {
       calls.push(['commit', input.transition.kind]);
@@ -265,21 +304,21 @@ function fakeReviewStore({secondCommit = 'COMMITTED'} = {}) {
         return {status: secondCommit};
       }
       revision++;
-      return {
-        status: 'COMMITTED',
-        lease: {...input.lease, expectedRevision: revision, expectedOid: `oid-${revision}`}
-      };
+      const updatedClaim = {...input.claim, expectedRevision: revision, expectedOid: `oid-${revision}`};
+      const durableClaim = claims.get(input.claim.executionKey);
+      durableClaim.status = input.transition.kind === 'UNKNOWN' ? 'UNKNOWN'
+        : input.transition.kind === 'RECEIPT_DELIVERED' ? 'COMMITTED'
+          : input.transition.kind === 'RECEIPT_POSTING' ? 'RECEIPT_POSTING' : 'REVIEWED';
+      durableClaim.lastStage = input.transition.stage || input.transition.kind;
+      return {status: 'COMMITTED', claim: updatedClaim};
     },
-    async reconcile(actionKey) {
-      calls.push(['reconcile', actionKey]);
-      return {status: 'UNKNOWN'};
-    },
-    async release(input) {
-      calls.push(['release', input.lease.actionKey]);
-      return {status: 'RELEASED'};
+    async reconcile(executionKey) {
+      calls.push(['reconcile', executionKey]);
+      const claim = claims.get(executionKey);
+      return claim ? {status: 'READY', claim: {...claim}} : {status: 'UNKNOWN', claim: null};
     }
   };
-  return {store, calls};
+  return {store, calls, claims};
 }
 
 test('default-disabled collector and review coordinator make no injected calls', async () => {
@@ -306,6 +345,12 @@ test('workflow proposal remains outside active workflow discovery with default-d
   assert.match(template, /maxPackets <= 3/);
   assert.match(template, /<= 86400000/);
   assert.match(template, /Template placeholder/);
+  assert.equal((template.match(/persist-credentials: false/g) || []).length, 4);
+  assert.match(template, /CLAUDE_CODE_OAUTH_TOKEN: \$\{\{ secrets\.CLAUDE_CODE_OAUTH_TOKEN \}\}/);
+  assert.doesNotMatch(template, /id-token:/);
+  assert.match(template, /commit-receipt:[\s\S]*contents: write[\s\S]*issues: write/);
+  const writerJob = template.slice(template.indexOf('  commit-receipt:'));
+  assert.doesNotMatch(writerJob, /CLAUDE_CODE_OAUTH_TOKEN|secrets\./);
   assert.doesNotMatch(template, /pull_request_target|workflow_dispatch|contents: write[\s\S]*merge/);
 });
 
@@ -325,12 +370,12 @@ test('collector ignores arbitrary issue text and rejects unauthenticated or malf
 test('collector emits a bound envelope only for fully paginated authoritative exact-pair success', async () => {
   const fixture = fixtureApi({
     runPages: [
-      {items: [run()], hasNextPage: true},
-      {items: [{...run({id: 6999, runNumber: 19})}], hasNextPage: false}
+      {items: [run()], totalCount: 2, hasNextPage: true},
+      {items: [{...run({id: 6999, runNumber: 19})}], totalCount: 2, hasNextPage: false}
     ],
     jobPages: [
-      {items: [{id: 1, status: 'completed', conclusion: 'success'}], hasNextPage: true},
-      {items: [{id: 2, status: 'completed', conclusion: 'skipped'}], hasNextPage: false}
+      {items: [], totalCount: 1, hasNextPage: true},
+      {items: [validJob()], totalCount: 1, hasNextPage: false}
     ]
   });
   const result = await collect(fixture);
@@ -341,12 +386,34 @@ test('collector emits a bound envelope only for fully paginated authoritative ex
   assert.equal(result.baseSha, BASE);
   assert.equal(result.runId, 7001);
   assert.equal(result.runAttempt, 1);
+  assert.match(result.actionKey, /^[a-f0-9]{64}$/);
+  assert.match(result.executionKey, /^[a-f0-9]{64}$/);
+  assert.notEqual(result.actionKey, result.executionKey);
+  assert.equal(isVerifiedCollection(result, START + 100), true);
+  assert.equal(isVerifiedCollection(result, result.expiresAt), false);
   assert.equal(result.workflowId, WORKFLOW_ID);
-  assert.equal(isVerifiedCollection(result), true);
+  assert.equal(isVerifiedCollection(result, START + 100), true);
   assert.equal(Object.hasOwn(result, 'body'), false);
   assert.equal(fixture.calls.filter(([kind]) => kind === 'runs').length, 2);
   assert.equal(fixture.calls.filter(([kind]) => kind === 'jobs').length, 2);
   assert.equal(fixture.calls.filter(([kind]) => kind === 'diff').length, 1);
+});
+
+test('stable logical dedupe is separate from the run-attempt execution generation', async () => {
+  const first = await collect();
+  const secondRun = run({runAttempt: 2});
+  const second = await collect(fixtureApi({runData: secondRun, runs: [secondRun]}), {
+    hint: {
+      eventName: 'workflow_run',
+      repository: REPOSITORY,
+      workflowRunId: secondRun.id,
+      workflowRunAttempt: secondRun.runAttempt
+    }
+  });
+  assert.equal(first.status, 'READY');
+  assert.equal(second.status, 'READY');
+  assert.equal(first.actionKey, second.actionKey);
+  assert.notEqual(first.executionKey, second.executionKey);
 });
 
 test('collector fails closed on changed pair, fork, actor, workflow, stale attempt and incomplete pages', async () => {
@@ -362,8 +429,14 @@ test('collector fails closed on changed pair, fork, actor, workflow, stale attem
     runs: [run({runAttempt: 2}), run({runAttempt: 1, runNumber: 19})]
   }));
   assert.equal(staleAttempt.reason, 'STALE_OR_AMBIGUOUS_CURRENT_RUN');
-  const incomplete = await collect(fixtureApi({runPages: Array(5).fill({items: [run()], hasNextPage: true})}));
+  const incomplete = await collect(fixtureApi({
+    runPages: Array(5).fill({items: [run()], totalCount: 10, hasNextPage: true})
+  }));
   assert.equal(incomplete.reason, 'RUN_PAGINATION_INCOMPLETE');
+  const mismatchedTotal = await collect(fixtureApi({
+    runPages: [{items: [run()], totalCount: 2, hasNextPage: false}]
+  }));
+  assert.equal(mismatchedTotal.reason, 'RUN_PAGINATION_INCOMPLETE');
   const truncatedDiff = await collect(fixtureApi({
     diffResponse: {headSha: HEAD, baseSha: BASE, complete: false, truncated: true, text: 'partial'}
   }));
@@ -379,27 +452,62 @@ test('collector waits on pending, action_required, failed jobs, and expired pilo
   assert.equal(pending.reason, 'CI_NOT_SUCCESSFUL');
   const actionRequired = await collect(fixtureApi({
     runData: run({conclusion: 'action_required'}),
-    jobs: [{id: 1, status: 'completed', conclusion: 'success'}]
+    jobs: [validJob(run({conclusion: 'action_required'}))]
   }));
   assert.equal(actionRequired.reason, 'ACTION_REQUIRED');
   const failedJob = await collect(fixtureApi({
-    jobs: [{id: 1, status: 'completed', conclusion: 'failure'}]
+    jobs: [validJob(run(), {conclusion: 'failure'})]
   }));
-  assert.equal(failedJob.reason, 'CI_JOBS_NOT_ALL_SUCCESSFUL');
+  assert.equal(failedJob.reason, 'CI_JOB_INVENTORY_OR_IDENTITY_MISMATCH');
   const expired = await collect(fixtureApi(), {now: () => END});
   assert.equal(expired.reason, 'OUTSIDE_PILOT_WINDOW');
 });
 
-test('store requires explicit atomic CAS, create-only claims, immutable commits, and fencing capabilities', async () => {
+test('collector pins required job and exact attempt; skipped is allowed only by explicit optional policy', async () => {
+  const required = validJob();
+  const identity = {runId: 7001, runAttempt: 1, workflowId: WORKFLOW_ID};
+  assert.equal(validateWorkflowJobs([required], identity), true);
+  assert.equal(validateWorkflowJobs([], identity), false);
+  assert.equal(validateWorkflowJobs([validJob(run(), {conclusion: 'skipped'})], identity), false);
+  assert.equal(validateWorkflowJobs([required, {...required, id: 2}], identity), false);
+  assert.equal(validateWorkflowJobs([validJob(run(), {runAttempt: 2})], identity), false);
+  const explicitOptional = {
+    required: [{name: 'syntax', requiredSteps: ['Research and auth regression tests']}],
+    optional: [{name: 'optional-metrics'}]
+  };
+  assert.equal(validateWorkflowJobs([
+    required,
+    {...validJob(run(), {id: 2, name: 'optional-metrics', conclusion: 'skipped', steps: []})}
+  ], identity, explicitOptional), true);
+  assert.equal(validateWorkflowJobs([
+    required,
+    {...validJob(run(), {id: 2, name: 'optional-metrics', conclusion: 'failure', steps: []})}
+  ], identity, explicitOptional), false);
+
+  const absent = await collect(fixtureApi({jobs: []}));
+  const skipped = await collect(fixtureApi({jobs: [validJob(run(), {conclusion: 'skipped'})]}));
+  const duplicate = await collect(fixtureApi({jobs: [required, {...required, id: 2}]}));
+  const wrongAttempt = await collect(fixtureApi({jobs: [validJob(run(), {runAttempt: 2})]}));
+  assert.equal(absent.reason, 'JOB_PAGINATION_INCOMPLETE');
+  for (const result of [skipped, duplicate, wrongAttempt]) {
+    assert.equal(result.reason, 'CI_JOB_INVENTORY_OR_IDENTITY_MISMATCH');
+  }
+});
+
+test('store requires explicit atomic CAS, one-shot claims, immutable commits, and packet quota', async () => {
   const disabled = createCoordinatorStateStore();
   assert.equal(disabled.available, false);
   assert.equal((await disabled.claim({})).reason, 'DISABLED');
   const unproven = createCoordinatorStateStore({enabled: true, backend: {capabilities: {}}});
   assert.equal(unproven.available, false);
   assert.equal(unproven.disabledReason, 'ATOMIC_BACKEND_CAPABILITIES_UNPROVEN');
+  const corruptBackend = new AtomicMemoryBackend();
+  corruptBackend.snapshot.chainValid = false;
+  const corruptStore = createCoordinatorStateStore({backend: corruptBackend, enabled: true});
+  assert.equal((await corruptStore.read()).reason, 'STATE_CHAIN_INVALID');
 });
 
-test('two concurrent state claimers produce one winner; retries cannot delete or replace claims', async () => {
+test('two concurrent state claimers produce one winner; retries cannot replace a one-shot claim', async () => {
   const backend = new AtomicMemoryBackend();
   const store = createCoordinatorStateStore({backend, enabled: true});
   const keyA = 'a'.repeat(64);
@@ -413,40 +521,58 @@ test('two concurrent state claimers produce one winner; retries cannot delete or
   assert.equal(backend.claims.size, 1);
 
   const winner = results.find(result => result.status === 'CLAIMED');
-  const actionKey = winner.lease.actionKey;
-  backend.clock += 2000;
-  const snapshot = await store.read();
+  const actionKey = winner.claim.actionKey;
+  const executionKey = winner.claim.executionKey;
+  const snapshot = (await store.read()).snapshot;
   const retry = await store.claim({
     actionKey,
+    executionKey,
     packetKey: 'f'.repeat(64),
-    expectedRevision: snapshot.snapshot.revision,
-    expectedOid: snapshot.snapshot.oid,
-    expectedFence: snapshot.snapshot.fencingToken,
+    expectedRevision: snapshot.revision,
+    expectedOid: snapshot.oid,
     owner: 'writer-three',
-    leaseExpiresAt: backend.clock + 1000,
-    now: backend.clock
+    now: START + 200
   });
   assert.equal(retry.status, 'ALREADY_CLAIMED');
   assert.equal(backend.claims.size, 1);
-  assert.equal(backend.snapshot.lease, null);
 });
 
-test('stale lease fencing loses the expected-OID CAS while the new fence can commit', async () => {
+test('a claim response lost after durable creation remains UNKNOWN and cannot be retried', async () => {
+  const backend = new AtomicMemoryBackend();
+  const originalCreate = backend.createOnlyClaim.bind(backend);
+  backend.createOnlyClaim = async input => {
+    await originalCreate(input);
+    throw new Error('simulated response loss');
+  };
+  const store = createCoordinatorStateStore({backend, enabled: true});
+  const actionKey = '9'.repeat(64);
+  const executionKey = '8'.repeat(64);
+  const lost = await claimStore(store, backend, actionKey, 'writer-one', 'f'.repeat(64), executionKey);
+  assert.equal(lost.status, 'CLAIM_UNKNOWN');
+  assert.equal(backend.claims.size, 1);
+  backend.createOnlyClaim = originalCreate;
+  const retry = await claimStore(store, backend, actionKey, 'writer-two', 'f'.repeat(64), executionKey);
+  assert.equal(retry.status, 'ALREADY_CLAIMED');
+  assert.equal(backend.claims.size, 1);
+});
+
+test('expected-OID CAS rejects a stale commit and a terminal claim permits the next writer', async () => {
   const backend = new AtomicMemoryBackend();
   const store = createCoordinatorStateStore({backend, enabled: true});
-  const stale = await claimStore(store, backend, 'c'.repeat(64), 'old-writer');
-  assert.equal(stale.status, 'CLAIMED');
-  backend.clock += 2000;
-  const current = await claimStore(store, backend, 'd'.repeat(64), 'new-writer');
-  assert.equal(current.status, 'CLAIMED');
-  const staleCommit = await store.commit({lease: stale.lease, transition: {kind: 'STALE'}});
+  const first = await claimStore(store, backend, 'c'.repeat(64), 'old-writer');
+  assert.equal(first.status, 'CLAIMED');
+  const terminal = await store.commit({claim: first.claim, transition: {kind: 'RECEIPT_DELIVERED'}});
+  assert.equal(terminal.status, 'COMMITTED');
+  assert.equal(terminal.revision, 1);
+  assert.match(backend.commits.get(terminal.oid).commitNonce, /^[a-f0-9]{32}$/);
+  const next = await claimStore(store, backend, 'd'.repeat(64), 'new-writer');
+  assert.equal(next.status, 'CLAIMED');
+  const staleCommit = await store.commit({claim: first.claim, transition: {kind: 'STALE'}});
   assert.equal(staleCommit.status, 'CONFLICT_RECONCILE');
-  const currentCommit = await store.commit({lease: current.lease, transition: {kind: 'TEST_COMMIT'}});
-  assert.equal(currentCommit.status, 'COMMITTED');
-  assert.equal(currentCommit.revision, 1);
+  assert.equal(backend.snapshot.revision, 1);
 });
 
-test('durable packet quota admits at most three distinct packets and reuses an existing packet key', async () => {
+test('durable global packet budget admits three claims and counts each CI execution generation', async () => {
   const backend = new AtomicMemoryBackend();
   const store = createCoordinatorStateStore({backend, enabled: true});
   for (let index = 0; index < 3; index++) {
@@ -454,40 +580,35 @@ test('durable packet quota admits at most three distinct packets and reuses an e
     const packetKey = (index + 101).toString(16).padStart(64, '0');
     const claimed = await claimStore(store, backend, actionKey, `writer-${index}`, packetKey);
     assert.equal(claimed.status, 'CLAIMED');
-    const committed = await store.commit({lease: claimed.lease, transition: {kind: 'RECEIPT_DELIVERED'}});
+    const committed = await store.commit({claim: claimed.claim, transition: {kind: 'RECEIPT_DELIVERED'}});
     assert.equal(committed.status, 'COMMITTED');
-    assert.equal((await store.release(committed.lease)).status, 'RELEASED');
   }
-  const samePacket = await claimStore(store, backend, 'a'.repeat(64), 'same-packet-writer',
-    (101).toString(16).padStart(64, '0'));
-  assert.equal(samePacket.status, 'CLAIMED');
-  assert.equal((await store.release(samePacket.lease)).status, 'RELEASED');
   const tooMany = await claimStore(store, backend, 'f'.repeat(64), 'fourth-writer', '9'.repeat(64));
   assert.equal(tooMany.status, 'BUDGET_EXHAUSTED');
-  assert.equal(backend.packetKeys.size, 3);
-  assert.equal(backend.snapshot.lease, null);
+  assert.equal(backend.claims.size, 3);
 });
 
 test('store reconstructs after restart and unknown commit outcomes require reconciliation', async () => {
   const backend = new AtomicMemoryBackend();
   const store = createCoordinatorStateStore({backend, enabled: true});
   const claimed = await claimStore(store, backend, 'e'.repeat(64));
-  const commit = await store.commit({lease: claimed.lease, transition: {kind: 'UNKNOWN', stage: 'RECEIPT'}});
+  const commit = await store.commit({
+    claim: claimed.claim, transition: {kind: 'UNKNOWN', stage: 'RECEIPT_DELIVERY'}
+  });
   assert.equal(commit.status, 'COMMITTED');
   const restartedStore = createCoordinatorStateStore({backend, enabled: true});
   const reconstructed = await restartedStore.read();
   assert.equal(reconstructed.snapshot.revision, 1);
   assert.equal(reconstructed.snapshot.oid, commit.oid);
-  assert.equal((await restartedStore.reconcile('e'.repeat(64))).status, 'UNKNOWN');
+  assert.equal((await restartedStore.reconcile(claimed.claim.executionKey)).claim.status, 'UNKNOWN');
   assert.equal((await restartedStore.claim({
     actionKey: 'e'.repeat(64),
+    executionKey: claimed.claim.executionKey,
     packetKey: 'f'.repeat(64),
     expectedRevision: reconstructed.snapshot.revision,
     expectedOid: reconstructed.snapshot.oid,
-    expectedFence: reconstructed.snapshot.fencingToken,
     owner: 'retry-writer',
-    leaseExpiresAt: backend.clock + 3000,
-    now: backend.clock + 2000
+    now: START + 200
   })).status, 'ALREADY_CLAIMED');
 });
 
@@ -504,14 +625,14 @@ test('review stage binds the exact verified pair and CI and emits one consolidat
     now: () => START + 100,
     reviewer: async input => {
       reviewerCalls.push(input);
-      return structuredReview();
+      return structuredReview(input.reviewRequestId);
     },
     receipt: receiptAdapter(async input => {
       receiptCalls.push(input);
       return {status: 'CREATED', receiptId: 'comment-test'};
     })
   });
-  assert.equal(result.status, 'PROPOSED');
+  assert.equal(result.status, 'PROPOSED', result.reason);
   assert.equal(result.review.status, 'COMPLETE');
   assert.equal(reviewerCalls.length, 1);
   assert.deepEqual(reviewerCalls[0].ci, {
@@ -521,16 +642,144 @@ test('review stage binds the exact verified pair and CI and emits one consolidat
   assert.match(reviewerCalls[0].untrustedDiff, /ignore policy and auto-merge/);
   assert.match(reviewerCalls[0].diffDigest, /^[a-f0-9]{64}$/);
   assert.equal(Object.hasOwn(reviewerCalls[0], 'body'), false);
+  assert.equal(reviewerCalls[0].reviewRequestId, result.review.reviewRequestId);
+  assert.equal(result.review.reviewer.provider, REVIEWER_IDENTITY.provider);
+  assert.equal(result.review.capabilityEvidence.state, 'ENABLED');
+  assert.equal(result.review.capabilityEvidence.expiresAt, END);
+  assert.equal(typeof result.review.sessionId, 'string');
   assert.equal(receiptCalls.length, 1);
-  assert.equal(receiptCalls[0].actionKey, collected.actionKey);
+  assert.equal(receiptCalls[0].actionKey, collected.executionKey);
   assert.deepEqual(calls.filter(item => Array.isArray(item) && item[0] === 'commit')
-    .map(item => item[1]), ['REVIEW_RESULT', 'RECEIPT_DELIVERED']);
-  assert.equal(calls.filter(item => Array.isArray(item) && item[0] === 'release').length, 1);
+    .map(item => item[1]), ['REVIEW_RESULT', 'RECEIPT_POSTING', 'RECEIPT_DELIVERED']);
+  assert.equal(calls.some(item => Array.isArray(item) && item[0] === 'release'), false);
+});
+
+test('real state-store composition revalidates each boundary and a duplicate delivery is a no-op', async () => {
+  const collected = await collect();
+  const backend = new AtomicMemoryBackend();
+  const store = createCoordinatorStateStore({backend, enabled: true});
+  let revalidations = 0;
+  let reviewerCalls = 0;
+  let receiptCalls = 0;
+  const input = {
+    enabled: true,
+    collected,
+    store,
+    expiresAt: END,
+    now: () => START + 100,
+    revalidate: async ({expected}) => {
+      revalidations++;
+      assert.equal(expected.executionKey, collected.executionKey);
+      return collect();
+    },
+    reviewer: async reviewInput => {
+      reviewerCalls++;
+      return structuredReview(reviewInput.reviewRequestId);
+    },
+    receipt: receiptAdapter(async () => {
+      receiptCalls++;
+      return {status: 'CREATED', receiptId: 'comment-composed'};
+    })
+  };
+  const result = await runReviewCoordinator(input);
+  assert.equal(result.status, 'PROPOSED', result.reason);
+  assert.equal(revalidations, 3);
+  assert.equal(reviewerCalls, 1);
+  assert.equal(receiptCalls, 1);
+  assert.equal(backend.snapshot.revision, 3);
+  assert.equal(backend.claims.get(collected.executionKey).status, 'COMMITTED');
+  assert.equal(typeof store.release, 'undefined');
+
+  const duplicate = await runReviewCoordinator(input);
+  assert.equal(duplicate.reason, 'ALREADY_CLAIMED');
+  assert.equal(reviewerCalls, 1);
+  assert.equal(receiptCalls, 1);
+});
+
+test('unknown claim response blocks model invocation and a same-generation replay', async () => {
+  const collected = await collect();
+  const backend = new AtomicMemoryBackend();
+  const originalCreate = backend.createOnlyClaim.bind(backend);
+  backend.createOnlyClaim = async input => {
+    await originalCreate(input);
+    throw new Error('simulated claim response loss');
+  };
+  const store = createCoordinatorStateStore({backend, enabled: true});
+  let reviewerCalls = 0;
+  let receiptCalls = 0;
+  const input = {
+    enabled: true,
+    collected,
+    store,
+    expiresAt: END,
+    now: () => START + 100,
+    reviewer: async reviewInput => {
+      reviewerCalls++;
+      return structuredReview(reviewInput.reviewRequestId);
+    },
+    receipt: receiptAdapter(async () => { receiptCalls++; return {status: 'CREATED', receiptId: 'no'}; })
+  };
+  const unknown = await runReviewCoordinator(input);
+  assert.equal(unknown.status, 'UNKNOWN');
+  assert.equal(unknown.reason, 'CLAIM_OUTCOME_UNKNOWN');
+  assert.equal(reviewerCalls, 0);
+  assert.equal(receiptCalls, 0);
+  backend.createOnlyClaim = originalCreate;
+  const replay = await runReviewCoordinator(input);
+  assert.equal(replay.reason, 'ALREADY_CLAIMED');
+  assert.equal(reviewerCalls, 0);
+  assert.equal(receiptCalls, 0);
+});
+
+test('head movement before claim or before receipt stops progression and preserves UNKNOWN', async () => {
+  const collected = await collect();
+  const movedHead = 'c'.repeat(40);
+  const movedRun = run({headSha: movedHead});
+  const moved = await collect(fixtureApi({
+    runData: movedRun,
+    pullRequest: {headSha: movedHead}
+  }));
+  const beforeClaimBackend = new AtomicMemoryBackend();
+  const beforeClaimStore = createCoordinatorStateStore({backend: beforeClaimBackend, enabled: true});
+  let reviewerCalls = 0;
+  const baseInput = {
+    enabled: true,
+    collected,
+    expiresAt: END,
+    now: () => START + 100,
+    reviewer: async input => { reviewerCalls++; return structuredReview(input.reviewRequestId); },
+    receipt: receiptAdapter()
+  };
+  const staleBeforeClaim = await runReviewCoordinator({
+    ...baseInput,
+    store: beforeClaimStore,
+    revalidate: async () => moved
+  });
+  assert.equal(staleBeforeClaim.reason, 'STALE_OR_UNKNOWN_BEFORE_CLAIM');
+  assert.equal(beforeClaimBackend.claims.size, 0);
+  assert.equal(reviewerCalls, 0);
+
+  const beforeReceiptBackend = new AtomicMemoryBackend();
+  const beforeReceiptStore = createCoordinatorStateStore({backend: beforeReceiptBackend, enabled: true});
+  let validations = 0;
+  let posts = 0;
+  const staleBeforeReceipt = await runReviewCoordinator({
+    ...baseInput,
+    store: beforeReceiptStore,
+    revalidate: async () => (++validations < 3 ? collected : moved),
+    receipt: receiptAdapter(async () => { posts++; return {status: 'CREATED', receiptId: 'must-not-post'}; })
+  });
+  assert.equal(staleBeforeReceipt.reason, 'STALE_OR_UNKNOWN_BEFORE_RECEIPT');
+  assert.equal(reviewerCalls, 1);
+  assert.equal(posts, 0);
+  const durable = beforeReceiptBackend.claims.get(collected.executionKey);
+  assert.equal(durable.status, 'UNKNOWN');
+  assert.equal(durable.lastStage, 'STALE_BEFORE_RECEIPT');
 });
 
 test('partial, truncated, turn-limited, or malformed structured review never becomes green', async () => {
   const collected = await collect();
-  const incomplete = structuredReview({
+  const incomplete = input => structuredReview(input.reviewRequestId, {
     coverageParts: ['scope', 'tests'],
     truncated: true,
     turnLimit: true
@@ -542,7 +791,7 @@ test('partial, truncated, turn-limited, or malformed structured review never bec
     store,
     expiresAt: END,
     now: () => START + 100,
-    reviewer: async () => incomplete,
+    reviewer: async input => incomplete(input),
     receipt: receiptAdapter()
   });
   assert.equal(result.status, 'PROPOSED');
@@ -558,7 +807,7 @@ test('partial, truncated, turn-limited, or malformed structured review never bec
     store: malformedStore.store,
     expiresAt: END,
     now: () => START + 100,
-    reviewer: async () => ({...structuredReview(), verdict: 'AUTO_MERGE'}),
+    reviewer: async input => ({...structuredReview(input.reviewRequestId), verdict: 'AUTO_MERGE'}),
     receipt: receiptAdapter(async () => { posted++; return {status: 'CREATED', receiptId: 'comment-test'}; })
   });
   assert.equal(malformed.status, 'UNKNOWN');
@@ -598,7 +847,7 @@ test('crash/unknown before and after a side effect never triggers a blind review
   const receiptInput = {
     ...input,
     store: receiptFailureStore.store,
-    reviewer: async () => { successfulReviewCalls++; return structuredReview(); },
+    reviewer: async input => { successfulReviewCalls++; return structuredReview(input.reviewRequestId); },
     receipt: throwingReceipt
   };
   const unknownReceipt = await runReviewCoordinator(receiptInput);
@@ -609,15 +858,15 @@ test('crash/unknown before and after a side effect never triggers a blind review
   assert.equal(receiptCalls, 1);
   const reconciledMissing = await reconcileUnknownReceipt({
     enabled: true,
-    actionKey: collected.actionKey,
+    executionKey: collected.executionKey,
     store: receiptFailureStore.store,
     receipt: throwingReceipt
   });
-  assert.equal(reconciledMissing.status, 'NOT_APPLIED');
+  assert.equal(reconciledMissing.status, 'UNKNOWN');
   assert.equal(reconciledMissing.retryAllowed, false);
   const reconciledFound = await reconcileUnknownReceipt({
     enabled: true,
-    actionKey: collected.actionKey,
+    executionKey: collected.executionKey,
     store: receiptFailureStore.store,
     receipt: receiptAdapter(undefined, async () => ({
       status: 'FOUND', complete: true, receiptIds: ['comment-123']
@@ -625,6 +874,30 @@ test('crash/unknown before and after a side effect never triggers a blind review
   });
   assert.equal(reconciledFound.status, 'APPLIED');
   assert.equal(reconciledFound.retryAllowed, false);
+  const conflicting = await reconcileUnknownReceipt({
+    enabled: true,
+    executionKey: collected.executionKey,
+    store: {
+      ...receiptFailureStore.store,
+      async reconcile() {
+        return {
+          status: 'READY',
+          claim: {
+            actionKey: collected.actionKey,
+            executionKey: collected.executionKey,
+            claimId: 'claim-conflict',
+            status: 'CLAIMED',
+            lastStage: 'CLAIMED'
+          }
+        };
+      }
+    },
+    receipt: receiptAdapter(undefined, async () => ({
+      status: 'FOUND', complete: true, receiptIds: ['comment-123']
+    }))
+  });
+  assert.equal(conflicting.status, 'UNKNOWN');
+  assert.equal(conflicting.retryAllowed, false);
 });
 
 test('claim crash before reviewer invocation and slow review preserve one-shot behavior', async () => {
@@ -644,11 +917,11 @@ test('claim crash before reviewer invocation and slow review preserve one-shot b
     store: preSideEffect.store,
     expiresAt: END,
     now: () => clock,
-    reviewer: async () => { reviewerCalls++; return structuredReview(); },
+    reviewer: async input => { reviewerCalls++; return structuredReview(input.reviewRequestId); },
     receipt: receiptAdapter()
   };
   const beforeInvocation = await runReviewCoordinator(input);
-  assert.equal(beforeInvocation.reason, 'TIME_BUDGET_BEFORE_REVIEW');
+  assert.equal(beforeInvocation.reason, 'STALE_OR_UNKNOWN_BEFORE_REVIEW');
   assert.equal(reviewerCalls, 0);
   clock = START + 100;
   const duplicate = await runReviewCoordinator(input);
@@ -675,7 +948,7 @@ test('claim crash before reviewer invocation and slow review preserve one-shot b
       } finally {
         finishSlowReview();
       }
-      return structuredReview();
+      return structuredReview(input.reviewRequestId);
     },
     receipt: receiptAdapter(async () => { receiptCalls++; return {status: 'CREATED', receiptId: 'comment-test'}; })
   });
@@ -695,17 +968,39 @@ test('expiry and unavailable state/API fail closed before reviewer or receipt ca
     store: fakeReviewStore().store,
     expiresAt: START + 50,
     now: () => START + 100,
-    reviewer: async () => { sideEffects++; return structuredReview(); },
+    reviewer: async input => { sideEffects++; return structuredReview(input.reviewRequestId); },
     receipt: receiptAdapter(async () => { sideEffects++; return {status: 'CREATED', receiptId: 'comment-test'}; })
   });
-  assert.equal(expired.reason, 'PILOT_EXPIRED');
+  assert.equal(expired.reason, 'PILOT_OR_COLLECTION_EXPIRED');
+  const unprovenCapability = await runReviewCoordinator({
+    enabled: true,
+    collected,
+    store: fakeReviewStore().store,
+    expiresAt: END,
+    now: () => START + 100,
+    capabilityEvidence: {...REVIEWER_CAPABILITY, state: 'EXERCISED'},
+    reviewer: async input => { sideEffects++; return structuredReview(input.reviewRequestId); },
+    receipt: receiptAdapter(async () => { sideEffects++; return {status: 'CREATED', receiptId: 'comment-test'}; })
+  });
+  assert.equal(unprovenCapability.reason, 'REVIEWER_CAPABILITY_UNAVAILABLE');
+  const expiredCapability = await runReviewCoordinator({
+    enabled: true,
+    collected,
+    store: fakeReviewStore().store,
+    expiresAt: END,
+    now: () => START + 100,
+    capabilityEvidence: {...REVIEWER_CAPABILITY, expiresAt: START + 50},
+    reviewer: async input => { sideEffects++; return structuredReview(input.reviewRequestId); },
+    receipt: receiptAdapter(async () => { sideEffects++; return {status: 'CREATED', receiptId: 'comment-test'}; })
+  });
+  assert.equal(expiredCapability.reason, 'REVIEWER_CAPABILITY_UNAVAILABLE');
   const unavailable = await runReviewCoordinator({
     enabled: true,
     collected,
     store: {...fakeReviewStore().store, available: false},
     expiresAt: END,
     now: () => START + 100,
-    reviewer: async () => { sideEffects++; return structuredReview(); },
+    reviewer: async input => { sideEffects++; return structuredReview(input.reviewRequestId); },
     receipt: receiptAdapter(async () => { sideEffects++; return {status: 'CREATED', receiptId: 'comment-test'}; })
   });
   assert.equal(unavailable.reason, 'REQUIRED_ADAPTER_UNAVAILABLE');
@@ -722,7 +1017,7 @@ test('remote receipt exactly-once semantics remain unknown and are never inferre
     store,
     expiresAt: END,
     now: () => START + 100,
-    reviewer: async () => structuredReview(),
+    reviewer: async input => structuredReview(input.reviewRequestId),
     receipt: receiptAdapter(async () => {
       posts++;
       return {status: 'CREATED', receiptId: 'comment-test'};

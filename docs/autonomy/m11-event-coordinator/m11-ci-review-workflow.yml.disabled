@@ -38,6 +38,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: main
+          persist-credentials: false
       - name: Enforce manifest and bounded pilot gates
         id: gate
         run: |
@@ -71,7 +72,7 @@ jobs:
       - name: Template placeholder — authenticated read collector not wired
         run: echo "INERT TEMPLATE: no collector client is enabled"
 
-  state:
+  claim:
     needs: collect
     if: >-
       ${{
@@ -88,11 +89,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: main
-      - name: Template placeholder — no proven atomic GitHub CAS adapter
-        run: echo "INERT TEMPLATE: state mutation is unavailable"
+          persist-credentials: false
+      - name: Template placeholder — create-only claim and quota not wired
+        run: echo "INERT TEMPLATE: no claim or state mutation is enabled"
 
   review:
-    needs: state
+    needs: claim
     if: >-
       ${{
         vars.M11_COORDINATOR_ENABLED == 'true' &&
@@ -101,6 +103,7 @@ jobs:
         github.event.workflow_run.conclusion == 'success'
       }}
     permissions:
+      actions: read
       contents: read
       pull-requests: read
     runs-on: ubuntu-latest
@@ -109,10 +112,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: main
-      - name: Template placeholder — reviewer secret and invocation not wired
-        run: echo "INERT TEMPLATE: no model call is enabled"
+          persist-credentials: false
+      - name: Template placeholder — reviewer secret isolated from state writer
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: echo "INERT TEMPLATE: no model invocation is enabled"
 
-  receipt:
+  commit-receipt:
     needs: review
     if: >-
       ${{
@@ -122,6 +128,7 @@ jobs:
         github.event.workflow_run.conclusion == 'success'
       }}
     permissions:
+      contents: write
       issues: write
     runs-on: ubuntu-latest
     steps:
@@ -129,5 +136,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: main
-      - name: Template placeholder — receipt delivery not wired
+          persist-credentials: false
+      - name: Template placeholder — model-free state reconciliation and receipt
         run: echo "INERT TEMPLATE: no GitHub write is enabled"

@@ -72,8 +72,20 @@
       "CORRECTION_OR_LEAD_MERGE",
       "FOUR_EXACT_MERGE_POSTCHECKS"
     ],
+    "dedupe": {
+      "logicalActionKey": "REPOSITORY_PR_HEAD_BASE_PHASE",
+      "executionGeneration": "LOGICAL_ACTION_KEY_WORKFLOW_ID_RUN_ID_RUN_ATTEMPT",
+      "claim": "IRREVERSIBLE_CREATE_ONLY_NO_LEASE_NO_TAKEOVER",
+      "globalReservations": 3,
+      "unknown": "MANUAL_RECONCILIATION_NO_RETRY"
+    },
+    "reviewEnvelope": {
+      "binding": "REVIEW_REQUEST_ID_SESSION_PROVIDER_AGENT_MODEL_TRANSPORT_EXACT_CI_PAIR",
+      "coverage": "ONE_SESSION_ONLY_NO_CROSS_SESSION_UNION",
+      "invocation": "DISABLED"
+    },
     "eventAuthentication": "INJECTED_AUTHENTICATED_READ_ADAPTER_REQUIRED; NO_GITHUB_ADAPTER_INCLUDED",
-    "stateStore": "BACKEND_INTERFACE_ONLY; EXPECTED_OID_CAS_AND_HOSTED_FENCING_UNPROVEN",
+    "stateStore": "BACKEND_INTERFACE_ONLY; ONE_SHOT_CLAIMS_ONLY; EXPECTED_OID_CAS_CHAIN_VALIDATION_AND_HOSTED_ATOMICITY_UNPROVEN",
     "nativeAssignment": "USER_TO_SERVER_TOKEN_REQUIRED_NOT_PROVISIONED",
     "claudeTrigger": "NO_REVIEWER_ADAPTER_WIRED; OWNER_COMMENT_ONLY_CURRENT_RESOURCE",
     "implementedSourceFiles": [
@@ -91,8 +103,9 @@
     ],
     "remainingActivationWork": [
       "Implement and independently verify an authenticated GitHub read adapter behind scripts/autonomy/m11-coordinator-collector.mjs",
-      "Implement and independently verify a hosted atomic expected-OID CAS/fence and durable packet-quota backend",
-      "Implement separately isolated Claude reviewer and GitHub receipt-write/readback adapters",
+      "Implement and independently verify a hosted create-only one-shot claim, single-writer, atomic three-reservation and expected-OID state backend",
+      "Run isolated L1-L8 GitHub ref, receipt read-after-write and pinned Claude read-token/OIDC validation before any mutation",
+      "Implement separately isolated Claude reviewer and GitHub receipt-write/readback adapters; bind one session and report capability evidence with expiry",
       "Approve exact permissions, allowlists, start/end, and move the inert template into .github/workflows only after independent review"
     ],
     "proposedPermissionNames": [
@@ -109,13 +122,18 @@
       "EXACT_PAIR_CI_SUCCESS_REQUIRED",
       "DUPLICATE_DELIVERY_INVOKES_REVIEW_ONCE",
       "CAS_COMPETITION_HAS_ONE_WINNER",
-      "DURABLE_THREE_PACKET_QUOTA",
-      "RESTART_RECONSTRUCTS_STATE_AND_FENCE",
+      "DURABLE_THREE_RESERVATION_GLOBAL_QUOTA",
+      "RESTART_RECONSTRUCTS_ONE_SHOT_CLAIM_AND_STATE",
       "CRASH_AND_UNKNOWN_RESULT_REQUIRE_RECONCILIATION",
+      "STALE_REVALIDATION_BEFORE_CLAIM_REVIEW_AND_RECEIPT",
+      "CI_JOB_NAME_RUN_ID_ATTEMPT_AND_WORKFLOW_ID_PINNED",
+      "REVIEW_SESSION_AND_EXECUTION_GENERATION_BOUND",
+      "CAPABILITY_EVIDENCE_STATES_AND_EXPIRY",
       "PARTIAL_OR_TRUNCATED_REVIEW_NEVER_GREEN",
       "ONE_CONSOLIDATED_RECEIPT",
       "DEFAULT_DISABLED_AND_NO_LIVE_IO_IN_TESTS",
-      "HOSTED_CAS_AND_REMOTE_EXACTLY_ONCE_REMAIN_UNPROVEN",
+      "HOSTED_EXPECTED_OID_CAS_AND_REMOTE_EXACTLY_ONCE_REMAIN_UNPROVEN",
+      "NO_LEASE_TAKEOVER_OR_AUTOMATIC_RETRY",
       "NO_MERGE_DEPLOY_OR_APPROVAL_BYPASS_CAPABILITY"
     ],
     "actionRequiredApproval": "OWNER_ONLY",
