@@ -212,7 +212,7 @@ class InvocationTests(unittest.TestCase):
         )
         self.assertEqual(
             self.current_sources['publisher_test_auto_setup.py'],
-            'e416e768b699cf9a33eecaa15dde5f19944750de00598c74b77d2521ab5d0c85',
+            'cd7ccf8d3410cdd955a91532bec9bbc88d737b9642d179ef7ffd51d810cfcda3',
         )
         with self.assertRaises(ValueError):
             self.invoke()
