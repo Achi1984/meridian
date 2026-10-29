@@ -133,9 +133,15 @@ function verifyTransitionShape(kind, transition) {
   if (kind === 'REVIEW_RESULT') {
     if (!validObservedCompletionPair(transition.completionState, transition.verdict)) return false;
     if (transition.completionState === 'INCOMPLETE') {
-      return typeof transition.reason === 'string' && transition.reason.length > 0
+      const timeoutDerived = typeof transition.reason === 'string' && transition.reason.length > 0
         && !Object.hasOwn(transition, 'reviewRequestId')
-        && !Object.hasOwn(transition, 'sessionId');
+        && !Object.hasOwn(transition, 'sessionId')
+        && !Object.hasOwn(transition, 'evidenceId');
+      const boundaryDerived = !Object.hasOwn(transition, 'reason')
+        && typeof transition.reviewRequestId === 'string' && transition.reviewRequestId.length > 0
+        && typeof transition.sessionId === 'string' && transition.sessionId.length > 0
+        && typeof transition.evidenceId === 'string' && transition.evidenceId.length > 0;
+      return timeoutDerived || boundaryDerived;
     }
     return typeof transition.reviewRequestId === 'string' && transition.reviewRequestId.length > 0
       && typeof transition.sessionId === 'string' && transition.sessionId.length > 0
@@ -246,8 +252,23 @@ function canApplyTransition(claim, transition) {
     return claim.status === 'REVIEW_PENDING' && claim.lastStage === 'OBSERVE_PREPARING';
   }
   if (transition.kind === 'REVIEW_RESULT') {
-    return claim.status === 'REVIEW_PENDING' && claim.lastStage === 'OBSERVE_PREPARING'
-      && validObservedCompletionPair(transition.completionState, transition.verdict);
+    if (!(claim.status === 'REVIEW_PENDING' && claim.lastStage === 'OBSERVE_PREPARING'
+      && validObservedCompletionPair(transition.completionState, transition.verdict))) {
+      return false;
+    }
+    if (transition.completionState === 'INCOMPLETE') {
+      if (typeof transition.reason === 'string' && transition.reason.length > 0) {
+        return !Object.hasOwn(transition, 'reviewRequestId')
+          && !Object.hasOwn(transition, 'sessionId')
+          && !Object.hasOwn(transition, 'evidenceId');
+      }
+      return transition.reviewRequestId === claim.reviewRequestId
+        && transition.sessionId === claim.sessionId
+        && typeof transition.evidenceId === 'string'
+        && transition.evidenceId.length > 0;
+    }
+    return transition.reviewRequestId === claim.reviewRequestId
+      && transition.sessionId === claim.sessionId;
   }
   if (transition.kind === 'RECEIPT_PREPARING') {
     return claim.status === 'REVIEWED' && claim.lastStage === 'REVIEW_RESULT'

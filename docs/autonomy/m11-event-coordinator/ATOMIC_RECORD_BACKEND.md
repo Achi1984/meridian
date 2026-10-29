@@ -41,6 +41,7 @@ Envelope fields:
   - `CLAIMED -> REVIEW_PENDING -> DISPATCH_ACKED -> OBSERVE_PREPARING -> REVIEW_RESULT -> RECEIPT_PREPARING -> RECEIPT_POSTING -> RECEIPT_DELIVERED`
 - `OBSERVE_PENDING` remains eligible by allowing `OBSERVE_PREPARING` from `OBSERVE_PENDING`.
 - Completion pairs are validated (`completionState`/`verdict`), and final delivered transition cannot overwrite accepted pair values.
+- `REVIEW_RESULT` accepts both deadline-derived incomplete (`reason` form) and boundary-derived incomplete (`reviewRequestId`/`sessionId`/`evidenceId` form); incomplete results never open receipt preparation or release gate/quota.
 - `UNKNOWN` is terminal for progression; non-unknown resume is rejected.
 
 ## One-attempt write semantics

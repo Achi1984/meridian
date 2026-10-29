@@ -866,3 +866,101 @@ test('lifecycle composition: ACK-loss after persisted delivered resumes as autho
   const quotaBlocked = await claimViaStore(restartedFacade.store, {actionKey: '9'.repeat(64), executionKey: '0'.repeat(64)});
   assert.equal(quotaBlocked.status, 'BUDGET_EXHAUSTED');
 });
+
+test('lifecycle composition: boundary-derived NEEDS_MORE_EVIDENCE persists durable INCOMPLETE and duplicate resume is readback-only', async () => {
+  const collected = await collectReady();
+  const counters = {dispatch: 0, observe: 0, post: 0, readback: 0};
+  const {backend} = makeBackend({totalQuota: 1});
+  const store = createCoordinatorStateStore({backend, enabled: true});
+
+  const start = await startReviewLifecycle({
+    enabled: true,
+    collected,
+    store,
+    reviewerIdentity: REVIEWER,
+    dispatchReview: async input => {
+      counters.dispatch += 1;
+      return {status: 'ACKNOWLEDGED', reviewRequestId: input.reviewRequestId, sessionId: input.sessionId};
+    },
+    revalidate: async () => collected,
+    now: () => START + 800,
+    expiresAt: END
+  });
+  assert.equal(start.status, 'REVIEW_PENDING');
+
+  const firstObserve = await observeReviewLifecycle({
+    enabled: true,
+    executionKey: collected.executionKey,
+    collected,
+    store,
+    observeReview: async () => {
+      counters.observe += 1;
+      return buildCompletedObservation({
+        start,
+        collected,
+        completionState: 'INCOMPLETE',
+        verdict: 'NEEDS_MORE_EVIDENCE'
+      });
+    },
+    revalidate: async () => collected,
+    trustedRuntimeSeam: {verifyRuntimeEvidence: value => value},
+    receipt: {
+      postOnce: async () => {
+        counters.post += 1;
+        return {status: 'CREATED', receiptId: 'receipt-unexpected'};
+      },
+      lookupByActionKey: async () => {
+        counters.readback += 1;
+        return {status: 'FOUND', complete: true, receiptIds: ['receipt-unexpected']};
+      }
+    },
+    now: () => START + 900,
+    expiresAt: END
+  });
+  assert.equal(firstObserve.status, 'INCOMPLETE');
+  assert.equal(firstObserve.completionState, 'INCOMPLETE');
+  assert.equal(firstObserve.verdict, 'NEEDS_MORE_EVIDENCE');
+
+  const durable = await backend.exportCanonicalEnvelope();
+  const durableClaim = durable.claims.find(item => item.executionKey === collected.executionKey);
+  assert.equal(durableClaim.status, 'REVIEWED');
+  assert.equal(durableClaim.lastStage, 'REVIEW_RESULT');
+  assert.equal(durableClaim.completionState, 'INCOMPLETE');
+  assert.equal(durableClaim.verdict, 'NEEDS_MORE_EVIDENCE');
+  assert.equal(durable.admissionState.activeGate.executionKey, collected.executionKey);
+  assert.equal(durable.admissionState.consumedQuota, 1);
+  assert.deepEqual(counters, {dispatch: 1, observe: 1, post: 0, readback: 0});
+
+  const restartedFacade = rebuildStoreFromEnvelope(JSON.parse(JSON.stringify(durable)));
+  const resumed = await observeReviewLifecycle({
+    enabled: true,
+    executionKey: collected.executionKey,
+    collected,
+    store: restartedFacade.store,
+    observeReview: async () => {
+      counters.observe += 1;
+      return {status: 'PENDING'};
+    },
+    revalidate: async () => collected,
+    trustedRuntimeSeam: {verifyRuntimeEvidence: value => value},
+    receipt: {
+      postOnce: async () => {
+        counters.post += 1;
+        return {status: 'CREATED', receiptId: 'receipt-replay'};
+      },
+      lookupByActionKey: async () => {
+        counters.readback += 1;
+        return {status: 'FOUND', complete: true, receiptIds: ['receipt-replay']};
+      }
+    },
+    now: () => START + 1000,
+    expiresAt: END
+  });
+  assert.equal(resumed.status, 'INCOMPLETE');
+  assert.equal(resumed.completionState, 'INCOMPLETE');
+  assert.equal(resumed.verdict, 'NEEDS_MORE_EVIDENCE');
+  assert.deepEqual(counters, {dispatch: 1, observe: 1, post: 0, readback: 0});
+  const afterResumeEnvelope = await restartedFacade.backend.exportCanonicalEnvelope();
+  assert.equal(afterResumeEnvelope.admissionState.activeGate.executionKey, collected.executionKey);
+  assert.equal(afterResumeEnvelope.admissionState.consumedQuota, 1);
+});
