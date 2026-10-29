@@ -1097,7 +1097,7 @@ async function browserRun(call,start,width,height,server){
       };
       const refresh=()=>evaluate(`document.getElementById('bot-read-refresh').click();true`);
       const openApp=async()=>evaluate(`(()=>{const input=document.getElementById('app-access-password');input.value='synthetic-b3-token';document.getElementById('app-access-form').requestSubmit();return true;})()`);
-      const readState=()=>evaluate(`document.querySelector('#bot-read-root [data-state]')?.dataset.state`);
+      const readState=()=>evaluate(`document.querySelector('#bot-read-root .bot-read-state')?.dataset.state`);
       await refresh();await waitUntil(async()=>await readState()==='fresh');
       assert.equal(server.metrics().reads,initialReads+1,'one explicit read');
       assert.equal(await evaluate(`document.querySelectorAll('#bot-read-root li').length`),2);
