@@ -488,7 +488,7 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
             const select=document.getElementById('bot-sort-filter');select.value='leverage';
             select.dispatchEvent(new Event('change',{bubbles:true}));})()`);
           assert.deepEqual(await evaluate(`[...document.querySelectorAll('#bot-read-root .bot-card')].map(c=>c.querySelector('.bot-card-heading').innerText.split(' · ')[0])`,
-          ),['ETHUSDT','BTCUSDT','XRPUSDT','BTCUSDT','ADAUSDT','MOONUSDT','SOLUSDT']);
+          ),['ETHUSDT','BTCUSDT','XRPUSDT','BTCUSDT','MOONUSDT','ADAUSDT','SOLUSDT']);
           await evaluate(`(()=>{const select=document.getElementById('bot-sort-filter');select.value='pnl';
             select.dispatchEvent(new Event('change',{bubbles:true}));})()`);
           assert.deepEqual(await evaluate(`[...document.querySelectorAll('#bot-read-root .bot-card')].map(c=>c.querySelector('.bot-card-heading').innerText.split(' · ')[0])`),
