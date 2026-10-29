@@ -24,12 +24,20 @@
   },
   "evidenceSnapshot": {
     "mainSha": "a40b714ea4a60b2b367d8db834ad65b7782f5a46",
-    "observedAtUtc": "2026-10-29T05:29:35Z",
+    "observedAtUtc": "2026-10-29T05:34:23Z",
     "mainPostchecks": {
       "release-safety": {
         "runId": 40823600133,
         "runAttempt": 1,
-        "status": "in_progress"
+        "jobId": 123281454123,
+        "status": "failure",
+        "failedStep": "Research and auth regression tests",
+        "testTotals": {
+          "passed": 2876,
+          "failed": 1,
+          "skipped": 0
+        },
+        "failureDetail": "Failed test name and assertion unavailable from the returned job-log tail; not inferred"
       },
       "runtime-smoke": {
         "runId": 40823600130,

@@ -12,12 +12,15 @@ Reconciliation snapshot: current `main` is
 branch includes that merge. Its current diff is limited to the five coordinator
 files; `scripts/research-supervisor/test_supervisor.py` matches main byte for
 byte. The earlier coordinator CI run `40632733971` is for the former
-`eacb230…` / `d62004e…` pair and is stale. At the latest recorded main
-postcheck snapshot, Release Coordinator `40823600127`, Runtime Smoke
-`40823600130`, and Pages `40823599573` were successful on merge SHA `a40b714…`;
-Release Safety `40823600133` was still in progress. This is not a complete
-four-check postcheck set. No full CI has been run on the current #973 head/base
-pair, and no independent Claude acceptance of that exact pair is claimed.
+`eacb230…` / `d62004e…` pair and is stale. On main merge SHA `a40b714…`,
+Release Coordinator `40823600127`, Runtime Smoke `40823600130`, and Pages
+`40823599573` succeeded; Release Safety `40823600133` completed with failure
+(attempt 1, job `123281454123`; Research and auth regression tests: 2,876 pass,
+1 fail, 0 skipped). The available job-log response did not include the failed
+test name or assertion, so neither is inferred here. This is not a complete
+four-check postcheck set. No retry was requested. No full CI has been run on the
+current #973 head/base pair, and no independent Claude acceptance of that exact
+pair is claimed.
 Issue #989 remains open: the merged #1000 change added bounded diagnostics but
 did not establish or fix the historical timing root cause.
 
@@ -31,7 +34,7 @@ new workflow or credential works:
 | Existing Copilot request workflow | `.github/workflows/copilot-coding-pilot.yml` accepts a fixed historical source SHA (`99eff911…`), successful Release Safety, attempt cap, and owner `triggering_actor`; only its generation job has `copilot-requests: write`. Publishing has separate contents-write and publisher-App scope. | A one-packet, immutable pilot, not general current-PR dispatch. Its scoped permission does not prove this coordinator can call the Copilot API. |
 | Existing CI event pilot | `.github/workflows/copilot-ci-event-pilot.yml` is pinned to the old `feat/v11-version-history-20261010` branch, October 10 deadline, three-run cap, and read-only event summary; it also declares `copilot-requests: write`. | Expired, branch-specific observation experiment. It is not a current coordinator listener or general author/continuation path. |
 | Claude reviewer trigger | `.github/workflows/claude-mailbox-review.yml` only accepts issue #942 comments by `Achi1984` containing `@claude` and `CROSS_MODEL_REQUEST`. It declares `contents: read`, `issues: write`, `pull-requests: read`, `actions: read`, and `id-token: write`; Claude is read-only, with `Edit,Write` disallowed and 35 turns. | An owner-authored mailbox request can launch a bounded independent review. A bot comment, arbitrary issue text, or coordinator event cannot pass this gate. This does not approve CI or request PR review automatically. |
-| Exact-pair hosted CI and independent review observation | Release Safety run `40821781547`, attempt 2, job `123277027311`, passed 2,877/2,877 on PR #1000 head `a013a202…` / base `34eb7df…`; independent Claude returned `GREEN_LIGHT` for that exact diagnostic-only diff in #942 receipt `6488670460`. #1000 was subsequently merged as `a40b714…`. | Evidence for that separate test-diagnostic packet only; it is not review or full CI for #973. The exact-merge Release Safety run on main `40823600133` was still running at the recorded snapshot. |
+| Exact-pair hosted CI and independent review observation | Release Safety run `40821781547`, attempt 2, job `123277027311`, passed 2,877/2,877 on PR #1000 head `a013a202…` / base `34eb7df…`; independent Claude returned `GREEN_LIGHT` for that exact diagnostic-only diff in #942 receipt `6488670460`. #1000 was subsequently merged as `a40b714…`. | Evidence for that separate test-diagnostic packet only; it is not review or full CI for #973. The exact-merge Release Safety run on main `40823600133` completed with 2,876 pass / 1 fail; the failed test identity is unavailable from the returned log tail. |
 | CI permissions / approval | `.github/workflows/backend-safety.yml` declares only `contents: read` and `pull-requests: read`; no workflow-write or approval capability is declared. | `action_required` cannot be approved by this packet. The interactive connector and `GITHUB_TOKEN` are not evidence of an unattended approval path. |
 | Merge and postchecks | No coordinator merge adapter exists. Four exact-merge checks are configured in the manifest, but the coordinator has no authenticated collector or execution path for them. | Source merge remains Lead-owned; automatic merge/deploy, approval bypass, and automatic post-merge continuation are unsupported. |
 
