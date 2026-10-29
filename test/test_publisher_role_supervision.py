@@ -100,7 +100,29 @@ class SupervisionTests(unittest.TestCase):
         self.assert_reaped()
 
     def test_nonzero_exit_after_driver_success(self):
-        self.assert_unknown(self.run_worker(self.factory(nonzero=True))); self.assert_reaped()
+        started=time.monotonic()
+        exit7=self.root/'nonzero-exit7'
+        def load_unpinned_supervisor():
+            path=m.ROOT/'publisher_test_password_setup.py'
+            module=importlib.util.module_from_spec(
+                importlib.util.spec_from_file_location('pinned_role_supervisor_unpinned',path))
+            exec(compile(path.read_text(),str(path),'exec'),module.__dict__)
+            return module
+        @contextlib.contextmanager
+        def nonzero_after_success(phase):
+            with self.factory()(phase) as services:
+                yield services
+            exit7.write_text('exit7')
+            os._exit(7)
+        with (
+            patch.object(m,'load_supervisor',side_effect=load_unpinned_supervisor),
+            patch.object(m.transition,'drive_transition',return_value={'synthetic':'ok'}),
+            patch.object(m,'_confirmed',return_value=True),
+            patch.dict(BUDGETS,{'exit':3.0}),
+        ):
+            self.assert_unknown(self.run_worker(nonzero_after_success)); self.assert_reaped()
+        self.assertEqual(exit7.read_text(),'exit7')
+        self.assertLess(time.monotonic()-started,4.5)
 
     def test_malformed_driver_and_truthy_flags_rejected(self):
         original=m.transition.drive_transition

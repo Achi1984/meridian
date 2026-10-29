@@ -39,6 +39,9 @@ if (input.sourceSha256 === "e".repeat(64)) {
   const ack = JSON.parse(acknowledgement.value);
   if (ack.event !== "parent_started" || ack.index !== input.index || ack.pathId !== path.id)
     process.exit(4);
+  writeFileSync(
+    `/tmp/meridian-m11-fault-ack-${process.ppid}-${input.sourceSha256[0]}-${input.index}.ready`,
+    `${input.sourceSha256}:${input.index}`);
   process.stdin.destroy();
   if (input.sourceSha256 === "b".repeat(64)) await new Promise(resolve => setTimeout(resolve, 3000));
   if (input.sourceSha256 === "c".repeat(64)) {
@@ -46,9 +49,18 @@ if (input.sourceSha256 === "e".repeat(64)) {
   } else if (input.sourceSha256 === "9".repeat(64)) {
     process.stderr.write("X".repeat(6000));
   } else if (input.sourceSha256 === "d".repeat(64)) {
-    spawn(process.execPath, ["-e", "setTimeout(()=>{},10000)"], {
+    const marker = `/tmp/meridian-m11-inherited-pipe-${process.ppid}`;
+    if (marker) writeFileSync(`${marker}.parent`, String(process.pid));
+    const descendant = spawn(process.execPath, ["-e",
+      "const fs=require('fs');const p=process.argv[1];if(p)fs.writeFileSync(p,`${process.pid}:${process.ppid}`);setTimeout(()=>{},10000)",
+      `${marker}.descendant`], {
       stdio: ["ignore", "inherit", "inherit"]
     });
+    if (marker && descendant.pid > 0) {
+      const deadline = Date.now() + 2000;
+      while (!existsSync(`${marker}.descendant`) && Date.now() < deadline)
+        await new Promise(resolve => setTimeout(resolve, 5));
+    }
     process.exit(0);
   } else if (input.sourceSha256 === "3".repeat(64) && input.index === 0) {
     await new Promise(resolve => setTimeout(resolve, 350));

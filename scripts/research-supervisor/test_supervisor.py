@@ -1861,17 +1861,93 @@ process.stdout.write(JSON.stringify(runBatch({
         ], diagnostic)
         self.assertEqual(settle.call_args.args[2:4], ("TIMED_OUT", "DEADLINE_EXCEEDED"), diagnostic)
 
-    def test_output_flood_and_parent_exit_with_inherited_pipe_are_bounded(self):
-        for source, reason in (("c" * 64, "STDOUT_BOUND"), ("9" * 64, "STDERR_BOUND"),
-                               ("d" * 64, "DEADLINE_EXCEEDED")):
+    def test_output_flood_is_failed_with_stream_bounds_after_started_ack(self):
+        for source, reason in (("c" * 64, "STDOUT_BOUND"), ("9" * 64, "STDERR_BOUND")):
             with self.subTest(source=source):
+                ack_marker = Path(f"/tmp/meridian-m11-fault-ack-{os.getpid()}-{source[0]}-0.ready")
+                if ack_marker.exists():
+                    ack_marker.unlink()
                 started = time.monotonic()
-                batch_seconds = 0.4 if source.startswith("d") else 10
-                result = self.run_fault(source, {"path_seconds": 0.2, "batch_seconds": batch_seconds},
-                                        "trial-" + source[0])
-                self.assertEqual(result["state"], "timed_out" if source.startswith("d") else "failed")
-                self.assertEqual(result["reason"], reason)
-                self.assertLess(time.monotonic() - started, 2)
+                result = self.run_fault(
+                    source, {"path_seconds": 1.0, "batch_seconds": 4.0},
+                    "trial-" + source[0])
+                elapsed = time.monotonic() - started
+                diagnostic = json.dumps({
+                    "elapsed_seconds": round(elapsed, 3),
+                    "state": result.get("state"),
+                    "reason": result.get("reason"),
+                    "paths": result.get("paths"),
+                    "ack_marker_exists": ack_marker.exists(),
+                }, sort_keys=True, separators=(",", ":"))
+                self.assertEqual(result["state"], "failed", diagnostic)
+                self.assertEqual(result["reason"], reason, diagnostic)
+                self.assertTrue(ack_marker.exists(), diagnostic)
+                self.assertEqual(ack_marker.read_text(), f"{source}:0", diagnostic)
+                self.assertEqual(result["paths"][0]["state"], "started", diagnostic)
+                current = journal.inspect(self.database, result["trialId"])
+                self.assertEqual((current["state"], current["attempts"]), ("failed", 1), diagnostic)
+                self.assertFalse(current["unresolved"], diagnostic)
+                self.assertEqual(current["paths"][0]["state"], "started", diagnostic)
+                self.assertEqual(journal.scheduler_tick(self.database, self.policy)["state"],
+                                 "idle", diagnostic)
+                self.assertLess(elapsed, 2.0, diagnostic)
+
+    def test_parent_exit_with_inherited_pipe_times_out_after_started_ack(self):
+        marker = Path(f"/tmp/meridian-m11-inherited-pipe-{os.getpid()}")
+        ack_marker = Path(f"/tmp/meridian-m11-fault-ack-{os.getpid()}-d-0.ready")
+        for path in (ack_marker, Path(str(marker) + ".parent"), Path(str(marker) + ".descendant")):
+            if path.exists():
+                path.unlink()
+        started = time.monotonic()
+        original_popen = subprocess.Popen
+        children = []
+
+        def spawn(*args, **kwargs):
+            child = original_popen(*args, **kwargs)
+            if Path(args[0][-1]).resolve() == FAULT_ADAPTER.resolve():
+                children.append(child)
+            return child
+
+        with patch.object(supervisor.subprocess, "Popen", side_effect=spawn):
+            result = self.run_fault(
+                "d" * 64, {"path_seconds": 1.0, "batch_seconds": 4.0},
+                "trial-d")
+        elapsed = time.monotonic() - started
+        paths = result.get("paths") if type(result) is dict else None
+        diagnostic = json.dumps({
+            "elapsed_seconds": round(elapsed, 3),
+            "state": result.get("state") if type(result) is dict else None,
+            "reason": result.get("reason") if type(result) is dict else None,
+            "path_state": paths[0]["state"] if type(paths) is list and paths else None,
+            "ack_marker_exists": ack_marker.exists(),
+            "parent_marker_exists": Path(str(marker) + ".parent").exists(),
+            "descendant_marker_exists": Path(str(marker) + ".descendant").exists(),
+        }, sort_keys=True, separators=(",", ":"))
+        self.assertEqual(result["state"], "timed_out", diagnostic)
+        self.assertEqual(result["reason"], "DEADLINE_EXCEEDED", diagnostic)
+        self.assertTrue(ack_marker.exists(), diagnostic)
+        self.assertEqual(ack_marker.read_text(), f"{'d'*64}:0", diagnostic)
+        parent_marker = Path(str(marker) + ".parent")
+        descendant_marker = Path(str(marker) + ".descendant")
+        self.assertTrue(parent_marker.exists(), diagnostic)
+        self.assertTrue(descendant_marker.exists(), diagnostic)
+        parent_pid = int(parent_marker.read_text())
+        descendant_pid, descendant_parent = [int(value) for value in descendant_marker.read_text().split(":")]
+        self.assertEqual(descendant_parent, parent_pid, diagnostic)
+        self.assertEqual(len(children), 1, diagnostic)
+        self.assertEqual(children[0].pid, parent_pid, diagnostic)
+        self.assertIsNotNone(children[0].poll(), diagnostic)
+        self.assertGreater(descendant_pid, 0, diagnostic)
+        self.assertIsInstance(paths, list, diagnostic)
+        self.assertTrue(paths, diagnostic)
+        self.assertEqual(paths[0]["state"], "started", diagnostic)
+        current = journal.inspect(self.database, result["trialId"])
+        self.assertEqual((current["state"], current["attempts"]), ("timed_out", 1), diagnostic)
+        self.assertFalse(current["unresolved"], diagnostic)
+        self.assertEqual(current["paths"][0]["state"], "started", diagnostic)
+        self.assertEqual(journal.scheduler_tick(self.database, self.policy)["state"], "idle", diagnostic)
+        self.assertGreater(elapsed, 0.9, diagnostic)
+        self.assertLess(elapsed, 2.5, diagnostic)
 
     def test_missed_and_false_path_events_never_count_as_completed(self):
         missed = self.run_fault("f" * 64, key="trial-missed")
