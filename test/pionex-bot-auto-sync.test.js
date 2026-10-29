@@ -33,6 +33,39 @@ test('running bot list uses one unfiltered signed GET and filters supported type
   assert.equal(u.searchParams.has('buOrderTypes'),false);
 });
 
+test('running bot list follows documented continuation tokens and exposes bounded cutoff',async()=>{
+  const calls=[];
+  const fetchImpl=async url=>{
+    calls.push(new URL(url));
+    const page=calls.length;
+    return {ok:true,status:200,text:async()=>JSON.stringify({result:true,data:{
+      results:[{buOrderId:'synthetic-'+page,buOrderType:'futures_grid'}],
+      nextPageToken:page<3?'synthetic-page-'+(page+1):null,
+      previousPageToken:page>1?'synthetic-page-'+(page-1):null
+    }})};
+  };
+  const complete=await fetchRunningBotOrders({apiKey:'read-key',apiSecret:'read-secret',fetchImpl,
+    now:()=>1700000000000,maxPages:3,delayMs:0});
+  assert.equal(complete.pages,3);assert.equal(complete.pageLimit,3);
+  assert.equal(complete.paginationComplete,true);assert.equal(complete.truncated,false);
+  assert.equal(complete.orders.length,3);
+  assert.equal(calls[1].searchParams.get('pageToken'),'synthetic-page-2');
+  assert.equal(calls[2].searchParams.get('pageToken'),'synthetic-page-3');
+
+  calls.length=0;
+  const bounded=await fetchRunningBotOrders({apiKey:'read-key',apiSecret:'read-secret',fetchImpl,
+    now:()=>1700000000000,maxPages:1,delayMs:0});
+  assert.equal(bounded.pages,1);assert.equal(bounded.pageLimit,1);
+  assert.equal(bounded.paginationComplete,false);assert.equal(bounded.truncated,true);
+  assert.equal(calls.length,1);
+
+  calls.length=0;
+  const clamped=await fetchRunningBotOrders({apiKey:'read-key',apiSecret:'read-secret',fetchImpl,
+    now:()=>1700000000000,maxPages:100,delayMs:0});
+  assert.equal(clamped.pageLimit,20,'caller input cannot raise the fixed bound');
+  assert.equal(clamped.paginationComplete,true);assert.equal(clamped.pages,3);
+});
+
 test('bot list diagnostics expose only privacy-safe aggregate types and statuses',()=>{
   const d=summarizePionexBotList([
     {buOrderType:'futures_grid',buOrderId:'secret-1',status:'running',base:'BTC'},
@@ -70,6 +103,25 @@ test('running futures-grid rows normalize without inventing unsupported values',
   assert.equal(x.totalProfitPct,4.5);
   assert.equal(x.positionOpenPrice,85900);
   assert.equal(x.source,'PIONEX_BOT_API');
+});
+
+test('documented Futures Moon category stays distinct from the Futures Grid bot type and neutral direction',()=>{
+  const standard=normalizePionexBotOrder({
+    buOrderType:'futures_grid',buOrderId:'synthetic-standard-grid',base:'BTC.PERP',quote:'USDT',
+    cateType:'linear',status:'running',buOrderData:{status:'running',trend:'long',bottom:'50000',top:'80000'}
+  });
+  const moon=normalizePionexBotOrder({
+    buOrderType:'futures_grid',buOrderId:'synthetic-moon-grid',base:'BTC.PERP',quote:'USDT',
+    cateType:'FUTURES_MOON',status:'running',
+    buOrderData:{status:'running',trend:'no_trend',movingTop:'80000',movingBottom:'50000',
+      estimateLiquidationPriceUp:'79000',estimateLiquidationPriceDown:'51000'}
+  });
+  assert.equal(standard.botType,'futures_grid');assert.equal(standard.cateType,'linear');
+  assert.equal(moon.botType,'futures_grid');assert.equal(moon.cateType,'FUTURES_MOON');
+  assert.equal(moon.lower,50000);assert.equal(moon.upper,80000);
+  assert.equal(moon.side,'NEUTRAL');assert.equal(moon.liquidationPrice,null);
+  assert.equal(moon.liquidationLowerBound,51000);assert.equal(moon.liquidationUpperBound,79000);
+  assert.notEqual(standard.botOrderId,moon.botOrderId);
 });
 
 
@@ -256,11 +308,16 @@ test('coverage reports observed unsupported rows without inventing their provide
     {buOrderType:'futures_grid'},{buOrderType:'future_hedge_grid'},
     {buOrderType:'synthetic_unverified_enum'}
   ],{detailRows:2});
-  assert.deepEqual(coverage,{status:'PARTIAL',providerContractStatus:'UNVERIFIED',
-    listRows:3,recognizedRows:2,representedRows:2,unsupportedRows:1,unhydratedRows:0});
+  assert.deepEqual(coverage,{status:'PARTIAL',providerContractStatus:'DOCUMENTED',
+    liveAccountVerification:'NOT_PERFORMED',listRows:3,recognizedRows:2,representedRows:2,
+    unsupportedRows:1,unhydratedRows:0,paginationComplete:true,pages:null,pageLimit:20});
   assert.doesNotMatch(JSON.stringify(coverage),/synthetic_unverified_enum/);
-  assert.equal(buildPionexBotCoverage([{buOrderType:'futures_grid'}],{detailRows:1}).status,'UNVERIFIED',
-    'full handling of observed rows does not verify the provider product contract');
+  assert.equal(buildPionexBotCoverage([{buOrderType:'futures_grid'}],{detailRows:1}).status,'DOCUMENTED',
+    'the public contract is documented without claiming live account verification');
+  const cutoff=buildPionexBotCoverage([{buOrderType:'futures_grid'}],{
+    detailRows:1,pages:20,pageLimit:20,paginationComplete:false
+  });
+  assert.equal(cutoff.status,'PARTIAL');assert.equal(cutoff.paginationComplete,false);
 });
 
 test('current BTC reciprocal sample renders asset-quoted BE and TP instead of raw inverse values',()=>{

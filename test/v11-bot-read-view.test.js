@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {renderBotReadState,createBotReadView,renderCommandBotOverview} from '../v11/bot-read-view.js';
 import {buildBotReadModel} from '../v11/bot-read-model.js';
 import {createBotReadClient} from '../v11/bot-read-client.js';
-import {publishDepotPortfolioState} from '../v11/depot-portfolio-state.js?v=B16-M11';
+import {publishDepotPortfolioState} from '../v11/depot-portfolio-state.js?v=B17-M11';
 
 // Deliberately minimal DOM contract fixture, not browser/layout acceptance.
 class Node {
@@ -62,7 +62,29 @@ test('neutral rows display independent liquidation bounds and explicit partial c
   assert.match(target.textContent,/Untergrenze50000/);assert.match(target.textContent,/Obergrenze60000/);
   assert.doesNotMatch(target.textContent,/Liquidationspreis laut Quelle/);
   assert.match(target.textContent,/Teilabdeckung/);
-  assert.match(target.textContent,/Futures Moon Provider-Typkennung und Detailvertrag sind nicht verifiziert/);
+  assert.match(target.textContent,/Futures Moon ist als cateType von futures_grid dokumentiert/);
+});
+test('Futures Moon renders as a documented category distinct from the Futures Grid type',()=>{
+  const state=fresh(),standard=state.model.bots[0],moon={...structuredClone(standard),
+    ref:'b'.repeat(20),symbol:'ETH',side:'NEUTRAL',productCategory:'FUTURES_MOON'};
+  state.model.bots=[standard,moon];
+  state.model.coverage={status:'DOCUMENTED',providerContractStatus:'DOCUMENTED',
+    liveAccountVerification:'NOT_PERFORMED',listRows:2,recognizedRows:2,representedRows:2,
+    unsupportedRows:0,unhydratedRows:0,paginationComplete:true,pages:1,pageLimit:20};
+  const target=root();renderBotReadState(target,state);
+  assert.match(target.textContent,/Typ: Futures Grid · Kategorie: COIN-M/);
+  assert.match(target.textContent,/Richtung: Neutral · Typ: Futures Grid · Kategorie: Futures Moon/);
+  assert.match(target.textContent,/Dokumentierter API-Vertrag; Live-Kontobestand nicht unabhängig verifiziert/);
+  assert.equal(all(target,'span').filter(node=>String(node.className||'').split(' ').includes('bot-card-product')).length,1);
+});
+test('page-limit continuation is explicitly partial and never described as complete coverage',()=>{
+  const state=fresh();
+  state.model.coverage={status:'PARTIAL',providerContractStatus:'DOCUMENTED',
+    liveAccountVerification:'NOT_PERFORMED',listRows:1,recognizedRows:1,representedRows:1,
+    unsupportedRows:0,unhydratedRows:0,paginationComplete:false,pages:20,pageLimit:20};
+  const target=root();renderBotReadState(target,state);
+  assert.match(target.textContent,/Teilabdeckung/);
+  assert.match(target.textContent,/Weitere Listenseiten waren beim Erreichen des Seitenlimits noch vorhanden/);
 });
 test('live status is attached empty and retains identity across all state transitions',()=>{
   const target=root(),replace=target.replaceChildren.bind(target);let mounts=0;

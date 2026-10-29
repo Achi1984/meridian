@@ -11,11 +11,11 @@ const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium
   .find(path=>path&&existsSync(path));
 const v11Root=fileURLToPath(new URL('../v11/',import.meta.url));
 const source=readFileSync(join(v11Root,'index.html'),'utf8');
-const bootstrap='<script type="module" src="./bot-read-bootstrap.js?v=B16-M11"></script>';
+const bootstrap='<script type="module" src="./bot-read-bootstrap.js?v=B17-M11"></script>';
 const fixtureScript=`<script>
 window.__botReadMode='fresh';window.__botReads=0;window.__resolveBotRead=null;window.__botErrors=[];
 window.__appAccessReads=0;
-window.__portfolioReady=import('./depot-portfolio-state.js?v=B16-M11').then(({publishDepotPortfolioState})=>
+window.__portfolioReady=import('./depot-portfolio-state.js?v=B17-M11').then(({publishDepotPortfolioState})=>
  publishDepotPortfolioState({status:'fresh',model:{status:'FRESH_SNAPSHOT',readOnly:true,executionAllowed:false,
   totalUsd:1234.56,snapshotAt:new Date().toISOString(),sourceAt:new Date().toISOString(),
   source:'SERVER_PORTFOLIO_CURRENT',expiresAt:Date.now()+60000}}));

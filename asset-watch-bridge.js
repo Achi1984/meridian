@@ -43,7 +43,8 @@ function sanitizedBot(bot={}){
     botRef:botRef(bot),
     symbol,
     side,
-    cateType:projectedEnum(bot.cateType,['inverse','linear']),
+    cateType:projectedEnum(bot.cateType,['inverse','linear','FUTURES_MOON',
+      'FUTURE_GRID_COIN_MARGINED','FULLY_HEDGING','SPOT']),
     botType:projectedEnum(bot.botType,['futures_grid','future_hedge_grid']),
     sideSource:projectedEnum(bot.sideSource,['economic_inverse_asset','trend_inverse_asset','trend']),
     leverage:num(bot.leverage),
@@ -92,11 +93,17 @@ function coverageFor(risk={}){
   const unhydratedRows=count(raw.unhydratedRows)??(
     count(risk.supportedRows)!==null&&representedRows!==null
       ?Math.max(0,risk.supportedRows-representedRows):count(risk.rejectedCount));
-  const partial=unsupportedRows>0||unhydratedRows>0;
+  const paginationComplete=raw.paginationComplete===false?false:
+    raw.paginationComplete===true?true:null;
+  const pages=count(raw.pages),pageLimit=count(raw.pageLimit);
+  const partial=unsupportedRows>0||unhydratedRows>0||paginationComplete===false;
   return {
-    status:partial?'PARTIAL':raw.status==='UNVERIFIED'?'UNVERIFIED':'UNKNOWN',
-    providerContractStatus:'UNVERIFIED',
-    listRows,recognizedRows,representedRows,unsupportedRows,unhydratedRows
+    status:partial?'PARTIAL':raw.status==='DOCUMENTED'?'DOCUMENTED':
+      raw.status==='UNVERIFIED'?'UNVERIFIED':'UNKNOWN',
+    providerContractStatus:raw.providerContractStatus==='DOCUMENTED'?'DOCUMENTED':'UNVERIFIED',
+    liveAccountVerification:raw.liveAccountVerification==='NOT_PERFORMED'?'NOT_PERFORMED':'UNKNOWN',
+    listRows,recognizedRows,representedRows,unsupportedRows,unhydratedRows,
+    paginationComplete,pages,pageLimit
   };
 }
 function candidate({name,risk,status,lastSuccessAt,now,staleMs}){
@@ -162,7 +169,8 @@ export function buildAssetWatchApiSnapshot(data,{now=Date.now(),staleMs=DEFAULT_
   const droppedRows=sourceRows.length-bots.length;
   coverage.representedRows=bots.length;
   coverage.unhydratedRows=coverage.unhydratedRows===null?droppedRows:coverage.unhydratedRows+droppedRows;
-  if(coverage.unsupportedRows>0||coverage.unhydratedRows>0)coverage.status='PARTIAL';
+  if(coverage.unsupportedRows>0||coverage.unhydratedRows>0||coverage.paginationComplete===false)
+    coverage.status='PARTIAL';
   const snapshotAt=selected?.snapshotAt||null;
   const ageMs=tsMs(snapshotAt)==null?null:Math.max(0,now-tsMs(snapshotAt));
   const usableForDisplay=selected?.usable===true;

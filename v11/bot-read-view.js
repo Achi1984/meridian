@@ -1,7 +1,7 @@
 // Inactive component: mount explicitly with the existing read-client factory.
 // No network, credentials, storage or engine imports belong to this renderer.
-import {buildBotOverviewModel} from './bot-overview-model.js?v=B16-M11';
-import {subscribeDepotPortfolio} from './depot-portfolio-state.js?v=B16-M11';
+import {buildBotOverviewModel} from './bot-overview-model.js?v=B17-M11';
+import {subscribeDepotPortfolio} from './depot-portfolio-state.js?v=B17-M11';
 
 const LABELS = {
   locked: ['Gesperrt', 'App mit Meridian-Passwort öffnen, dann Bots manuell aktualisieren.'],
@@ -14,13 +14,20 @@ const TYPES = {futures_grid:'Futures Grid', future_hedge_grid:'Futures Hedge Gri
 const MISSING = 'Nicht verfügbar';
 function coverageText(coverage={}){
   const count=value=>Number.isSafeInteger(value)&&value>=0?String(value):'unbekannt';
-  const contract='Futures Moon Provider-Typkennung und Detailvertrag sind nicht verifiziert.';
-  if(coverage.status==='PARTIAL')
+  const contract='Futures Moon ist als cateType von futures_grid dokumentiert; dies bestätigt keinen Live-Kontobestand.';
+  if(coverage.status==='PARTIAL'){
+    const pagination=coverage.paginationComplete===false
+      ?' Weitere Listenseiten waren beim Erreichen des Seitenlimits noch vorhanden.':'';
+    const pages=Number.isSafeInteger(coverage.pages)?' Über '+count(coverage.pages)+' Listenseiten.':'';
     return 'Teilabdeckung: '+count(coverage.representedRows)+' von '+count(coverage.listRows)+
       ' beobachteten Listeneinträgen dargestellt; '+count(coverage.unsupportedRows)+
       ' nicht unterstützte und '+count(coverage.unhydratedRows)+' nicht dargestellte Einträge. '+
-      contract+' Keine Botdatensätze abgeleitet.';
-  return 'Abdeckung nicht verifiziert. '+contract+' Keine Botdatensätze abgeleitet.';
+      contract+pages+pagination;
+  }
+  if(coverage.status==='DOCUMENTED')
+    return 'Dokumentierter API-Vertrag; Live-Kontobestand nicht unabhängig verifiziert. '+
+      count(coverage.representedRows)+' von '+count(coverage.listRows)+' beobachteten Listeneinträgen dargestellt.';
+  return 'Abdeckung nicht verifiziert. '+contract;
 }
 const number = value => typeof value === 'number' && Number.isFinite(value) && value !== 0 ? value : null;
 const formatNumber = value => new Intl.NumberFormat('de-DE', {maximumSignificantDigits:10}).format(value);
@@ -65,8 +72,9 @@ function projection(state, filters = {}) {
       const hasUsdInvestment=investmentUsd>0;
       const hasQuoteInvestment=investmentCurrency && investmentAmount>0;
       const moneyCurrency=investmentCurrency==='USD'||investmentCurrency==='USDT';
+      const productCategory=bot.productCategory==='FUTURES_MOON'?'Futures Moon':null;
       return {symbol:bot.symbol, side:row.direction==='unknown'?'Unbekannt':row.direction[0].toUpperCase()+row.direction.slice(1),
-        ref:row.ref,type:ownLabel(TYPES,bot.type),
+        ref:row.ref,type:ownLabel(TYPES,bot.type),productCategory,
         category:row.category==='coin-m'?'COIN-M':row.category==='linear'?'Linear':'Unbekannt',
         leverage:valueLabel(bot.metrics?.leverage,'×',true),
         leverageDetail:formatExact(bot.metrics?.leverage,'×'),
@@ -169,7 +177,12 @@ export function renderBotReadState(root, state, filters = {}) {
         const badges=element(document,'span');badges.className='bot-card-badges';
         const direction=element(document,'span',bot.side);direction.className='bot-card-badge bot-card-direction';
         const leverage=element(document,'span','Hebel '+(bot.leverage===MISSING?'—':bot.leverage));leverage.className='bot-card-badge bot-card-leverage';
-        badges.append(direction,leverage);identity.append(heading,badges);
+        badges.append(direction,leverage);
+        if(bot.productCategory){
+          const category=element(document,'span',bot.productCategory);category.className='bot-card-badge bot-card-product';
+          badges.append(category);
+        }
+        identity.append(heading,badges);
         const pnl=element(document,'span');pnl.className='bot-card-pnl';
         const pnlAmount=element(document,'strong',bot.pnl);
         if(bot.pnlTone)pnlAmount.className='bot-pnl-'+bot.pnlTone;
@@ -183,7 +196,8 @@ export function renderBotReadState(root, state, filters = {}) {
         summary.append(top,capital,disclosure);
         const body=element(document,'div');body.className='bot-card-body';
         body.append(element(document,'p','Technische Referenz: '+bot.ref));
-        body.append(element(document,'p','Richtung: '+bot.side+' · Typ: '+bot.type+' · Kategorie: '+bot.category));
+        body.append(element(document,'p','Richtung: '+bot.side+' · Typ: '+bot.type+' · Kategorie: '+
+          (bot.productCategory||bot.category)));
         const metrics=element(document,'dl');metrics.className='bot-card-metrics';
         const liquidationMetrics=bot.side==='Neutral'
           ?[['Liquidationsschätzung · Untergrenze',bot.liquidationLowerBound],

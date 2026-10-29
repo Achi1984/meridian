@@ -1,24 +1,36 @@
 # V11 Bots: Futures Moon coverage receipt
 
-The checked-in provider evidence supports only `futures_grid` and
-`future_hedge_grid`. The documented detail path is
-`GET /api/v1/bot/orders/futuresGrid/order`; the repository does not contain an
-authoritative Futures Moon list enum, detail endpoint, or detail payload fixture.
-Futures Moon is therefore not presented as a verified bot type and no record is
-fabricated or aliased to another product.
+The official Pionex schemas document Futures Moon within the existing Futures
+Grid product; they do not define a separate `buOrderType`:
 
-Bot snapshots now report observed list counts and partial/unverified coverage
-separately from the validated bot rows. The display explicitly leaves the
-provider contract unverified. A support claim is blocked until evidence supplies
-the exact list type value, list inclusion/pagination contract, detail endpoint
-and response envelope, stable bot identity, status/direction fields, and price
-units/normalization rules.
+- [Bot orders list](https://www.pionex.com/docs/api-docs/bot-api/bot-orders)
+  maps `buOrderType=futures_grid` to `FuturesGridOrderData`. Omitting
+  `buOrderTypes` requests all supported types. The response list is
+  `data.results`, with `nextPageToken`/`previousPageToken`; the next request
+  supplies `pageToken`.
+- [Futures Grid detail](https://www.pionex.com/docs/api-docs/bot-api/futures-grid)
+  documents `FuturesGridOrderData.cateType`, including `FUTURES_MOON` (“Futures
+  moon order”), and the independent `movingTop`, `movingBottom`,
+  `estimateLiquidationPriceUp`, and `estimateLiquidationPriceDown` fields.
 
-Neutral liquidation estimates retain separate normalized lower and upper bounds;
-missing or invalid bounds remain unavailable. Bots reuse only the fresh
-canonical Depot total already projected by the Depot reader, including its
-currency, source, timestamps, expiry, and locked/stale state. The projection
-does not issue another request or add bot capital/P&L to the total.
+Accordingly, `FUTURES_MOON` is preserved as the category of a
+`futures_grid` list/detail row through normalization, wallet fallback,
+sanitization, and V11 display. It is not treated as a new bot type, direction,
+or identity. Bot identity remains the existing stable hash of the provider
+order ID. The list adapter follows continuation tokens up to a bounded 20-page
+limit; if a token remains at the limit, the observed rows are shown as partial
+coverage and are not eligible to overwrite the shared snapshot.
 
-Regression fixtures and browser checks use synthetic values only. They are not
-live-provider verification.
+These public schemas establish documented product/category and pagination
+contracts, not whether any particular account currently has a Futures Moon
+bot. No private account values, screenshots, authenticated calls, or live
+provider verification are included. Coverage counts refer only to list rows
+actually observed and details successfully represented.
+
+Neutral liquidation bounds remain independent. Missing or invalid values stay
+unavailable; inverse-asset prices are normalized before display. Bots reuse
+the fresh canonical Depot total and its currency, source, timestamps, expiry,
+and locked/stale state without issuing another request or adding bot capital
+or P/L to the total.
+
+Regression fixtures and browser checks use synthetic values only.

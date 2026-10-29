@@ -1,7 +1,7 @@
-import {buildCurrentDepotModel} from './depot-current-model.js?v=B16-M11';
-import {buildDepotHistoryModel} from './depot-history-model.js?v=B16-M11';
-import {buildDepotReadModel} from './depot-read-model.js?v=B16-M11';
-import {parseBotReadCredential} from './bot-read-client.js?v=B16-M11';
+import {buildCurrentDepotModel} from './depot-current-model.js?v=B17-M11';
+import {buildDepotHistoryModel} from './depot-history-model.js?v=B17-M11';
+import {buildDepotReadModel} from './depot-read-model.js?v=B17-M11';
+import {parseBotReadCredential} from './bot-read-client.js?v=B17-M11';
 
 const ENDPOINT = 'https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/portfolio-history?range=1w';
 const CURRENT_ENDPOINT='https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/dashboard';

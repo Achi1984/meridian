@@ -121,6 +121,24 @@ test('explicit COIN-M provenance is preserved without reversing the existing sid
   assert.equal(x.bots[0].sideSource,'economic_inverse_asset');assert.equal(x.bots[0].side,'SHORT');
   assert.equal(x.source,'PIONEX_BOT_API');assert.equal(x.usableForOverwrite,true);assert.deepEqual(input,before);
 });
+test('documented Futures Moon category crosses the sanitized bridge independently of bot type and side',()=>{
+  const input=state({pionexRisk:{snapshotAt:'2026-09-28T20:40:00.000Z',detailsComplete:true,
+    coverage:{status:'DOCUMENTED',providerContractStatus:'DOCUMENTED',liveAccountVerification:'NOT_PERFORMED',
+      listRows:2,recognizedRows:2,representedRows:2,unsupportedRows:0,unhydratedRows:0,
+      paginationComplete:true,pages:2,pageLimit:20},
+    bots:[bot({botOrderId:'synthetic-standard',symbol:'BTC',cateType:'linear',botType:'futures_grid'}),
+      bot({botOrderId:'synthetic-moon',symbol:'BTC',side:'NEUTRAL',cateType:' FUTURES_MOON ',
+        botType:'futures_grid',liquidationLowerBound:50000,liquidationUpperBound:60000})]}});
+  const x=buildAssetWatchApiSnapshot(input,{now:NOW});
+  assert.equal(x.bots.length,2);
+  assert.deepEqual(x.bots.map(row=>[row.botType,row.cateType,row.side]),[
+    ['futures_grid','linear','LONG'],['futures_grid','FUTURES_MOON','NEUTRAL']
+  ]);
+  assert.equal(x.coverage.status,'DOCUMENTED');
+  assert.equal(x.coverage.providerContractStatus,'DOCUMENTED');
+  assert.equal(x.coverage.liveAccountVerification,'NOT_PERFORMED');
+  assert.equal(x.usableForOverwrite,true);
+});
 test('missing or arbitrary provenance stays null and cannot leak caller text',()=>{
   const x=buildAssetWatchApiSnapshot(state(),{now:NOW});
   for(const key of ['cateType','botType','sideSource'])assert.equal(x.bots[0][key],null);
@@ -175,4 +193,17 @@ test('partial provider coverage and duplicate identities preserve valid rows wit
   assert.equal(x.coverage.representedRows,1);assert.equal(x.coverage.unhydratedRows,1);
   assert.equal(x.usableForDisplay,true);assert.equal(x.usableForOverwrite,false);
   assert.doesNotMatch(JSON.stringify(x),/synthetic-id-1|raw-secret-bot-id/);
+});
+
+test('a remaining continuation token keeps page-limited bridge coverage partial and non-overwritable',()=>{
+  const input=state({pionexRisk:{snapshotAt:'2026-09-28T20:40:00.000Z',detailsComplete:true,
+    coverage:{status:'PARTIAL',providerContractStatus:'DOCUMENTED',liveAccountVerification:'NOT_PERFORMED',
+      listRows:1,recognizedRows:1,representedRows:1,unsupportedRows:0,unhydratedRows:0,
+      paginationComplete:false,pages:20,pageLimit:20},
+    bots:[bot({botOrderId:'synthetic-page-row',cateType:'FUTURES_MOON',botType:'futures_grid'})]}});
+  const x=buildAssetWatchApiSnapshot(input,{now:NOW});
+  assert.equal(x.botCount,1);assert.equal(x.bots[0].cateType,'FUTURES_MOON');
+  assert.equal(x.coverage.paginationComplete,false);assert.equal(x.coverage.pages,20);
+  assert.equal(x.coverage.pageLimit,20);assert.equal(x.coverage.status,'PARTIAL');
+  assert.equal(x.usableForDisplay,true);assert.equal(x.usableForOverwrite,false);
 });

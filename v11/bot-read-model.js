@@ -10,9 +10,15 @@ function coverage(snapshot) {
   const counts={listRows:rowCount(raw.listRows),recognizedRows:rowCount(raw.recognizedRows),
     representedRows:rowCount(raw.representedRows),unsupportedRows:rowCount(raw.unsupportedRows),
     unhydratedRows:rowCount(raw.unhydratedRows)};
-  const partial=raw.status==='PARTIAL'||counts.unsupportedRows>0||counts.unhydratedRows>0;
-  return {...counts,status:partial?'PARTIAL':raw.status==='UNVERIFIED'?'UNVERIFIED':'UNKNOWN',
-    providerContractStatus:'UNVERIFIED'};
+  const paginationComplete=raw.paginationComplete===false?false:
+    raw.paginationComplete===true?true:null;
+  const partial=raw.status==='PARTIAL'||counts.unsupportedRows>0||counts.unhydratedRows>0||
+    paginationComplete===false;
+  return {...counts,status:partial?'PARTIAL':raw.status==='DOCUMENTED'?'DOCUMENTED':
+      raw.status==='UNVERIFIED'?'UNVERIFIED':'UNKNOWN',
+    providerContractStatus:raw.providerContractStatus==='DOCUMENTED'?'DOCUMENTED':'UNVERIFIED',
+    liveAccountVerification:raw.liveAccountVerification==='NOT_PERFORMED'?'NOT_PERFORMED':'UNKNOWN',
+    paginationComplete,pages:rowCount(raw.pages),pageLimit:rowCount(raw.pageLimit)};
 }
 
 // V1 bridge coerces absent numeric inputs to zero. Until provenance is fixed,
@@ -60,9 +66,12 @@ export function buildBotReadModel(snapshot, {now = Date.now()} = {}) {
         seen.has(bot.botRef) || typeof bot.symbol !== 'string' ||
         !/^[A-Z0-9][A-Z0-9_/-]{0,31}$/.test(bot.symbol)) return result;
     seen.add(bot.botRef);
+    const cateType=enumValue(bot.cateType,['inverse','linear','FUTURES_MOON',
+      'FUTURE_GRID_COIN_MARGINED','FULLY_HEDGING','SPOT']);
     bots.push({ref: bot.botRef, symbol: bot.symbol,
       side: enumValue(bot.side, ['LONG', 'SHORT', 'NEUTRAL']),
-      category: enumValue(bot.cateType, ['inverse', 'linear']),
+      category: enumValue(cateType, ['inverse', 'linear']),
+      productCategory: cateType==='FUTURES_MOON'?'FUTURES_MOON':null,
       type: enumValue(bot.botType, ['futures_grid', 'future_hedge_grid']),
       sideSource: enumValue(bot.sideSource, ['economic_inverse_asset', 'trend_inverse_asset', 'trend']),
       metrics: metrics(bot)});

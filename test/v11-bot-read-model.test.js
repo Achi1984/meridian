@@ -48,6 +48,21 @@ test('unsupported provenance remains unknown and cannot infer type from symbol',
   for(const key of ['side','category','type','sideSource'])assert.equal(out.bots[0][key],null);
   assert.doesNotMatch(JSON.stringify(out),/SECRET/);
 });
+test('documented Futures Moon category is distinct from Futures Grid type and neutral direction',()=>{
+  const input=fixture();input.bots[0].cateType='FUTURES_MOON';input.bots[0].side='NEUTRAL';
+  input.coverage={status:'DOCUMENTED',providerContractStatus:'DOCUMENTED',
+    liveAccountVerification:'NOT_PERFORMED',listRows:1,recognizedRows:1,representedRows:1,
+    unsupportedRows:0,unhydratedRows:0,paginationComplete:true,pages:1,pageLimit:20};
+  const model=buildBotReadModel(input,{now});
+  assert.equal(model.status,'FRESH_SNAPSHOT');
+  assert.equal(model.bots[0].type,'futures_grid');
+  assert.equal(model.bots[0].productCategory,'FUTURES_MOON');
+  assert.equal(model.bots[0].category,null);
+  assert.equal(model.bots[0].side,'NEUTRAL');
+  assert.deepEqual(model.coverage,{status:'DOCUMENTED',providerContractStatus:'DOCUMENTED',
+    liveAccountVerification:'NOT_PERFORMED',listRows:1,recognizedRows:1,representedRows:1,
+    unsupportedRows:0,unhydratedRows:0,paginationComplete:true,pages:1,pageLimit:20});
+});
 test('malformed identities and symbols fail closed without partial rows',()=>{
   for(const [key,value] of [['botRef','SECRET'],['symbol','<script>'],['symbol','A'.repeat(33)]]){
     const input=fixture();input.bots[0][key]=value;
@@ -86,7 +101,8 @@ test('missing, coerced zero, invalid and negative positive-only metrics remain u
 
 test('neutral liquidation bounds and unverified provider coverage remain independent and explicit',()=>{
   const input=fixture();
-  input.coverage={status:'PARTIAL',providerContractStatus:'UNVERIFIED',listRows:3,
+  input.coverage={status:'PARTIAL',providerContractStatus:'DOCUMENTED',
+    liveAccountVerification:'NOT_PERFORMED',listRows:3,
     recognizedRows:2,representedRows:1,unsupportedRows:1,unhydratedRows:1};
   input.bots[0].side='NEUTRAL';
   input.bots[0].limits={liquidationLowerBound:50000,liquidationUpperBound:null};
@@ -95,8 +111,9 @@ test('neutral liquidation bounds and unverified provider coverage remain indepen
   assert.equal(model.bots[0].side,'NEUTRAL');
   assert.equal(model.bots[0].metrics.liquidationLowerBound,50000);
   assert.equal(model.bots[0].metrics.liquidationUpperBound,null);
-  assert.deepEqual(model.coverage,{status:'PARTIAL',providerContractStatus:'UNVERIFIED',
-    listRows:3,recognizedRows:2,representedRows:1,unsupportedRows:1,unhydratedRows:1});
+  assert.deepEqual(model.coverage,{status:'PARTIAL',providerContractStatus:'DOCUMENTED',
+    liveAccountVerification:'NOT_PERFORMED',listRows:3,recognizedRows:2,representedRows:1,
+    unsupportedRows:1,unhydratedRows:1,paginationComplete:null,pages:null,pageLimit:null});
   const unknown=buildBotReadModel(fixture(),{now});
   assert.equal(unknown.coverage.status,'UNKNOWN','legacy snapshots cannot assert full provider coverage');
 });
