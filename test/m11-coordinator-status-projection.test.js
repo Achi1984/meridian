@@ -340,3 +340,42 @@ test('multiple complete histories preserve exact row identity and reject a singl
   presentation.operations[1].expiresAt = iso(NOW);
   unavailable(await project(envelope, presentation), 'INVALID_CONTEXT');
 });
+
+test('more than 50 claims are rejected by count precheck, not presented as replay-valid history', async () => {
+  const f = fixture();
+  await claimNext(f);
+  const envelope = await f.backend.exportCanonicalEnvelope();
+  const oversized = structuredClone(envelope);
+  oversized.claims = Array.from({length: 51}, (_, n) => ({
+    ...envelope.claims[0], executionKey: key(n + 100)
+  }));
+  oversized.transitionChain = [];
+  unavailable(await projectCoordinatorStatus(JSON.stringify(oversized), 'invalid-context', NOW), 'ROW_LIMIT_EXCEEDED');
+  oversized.claims.length = 50;
+  unavailable(await project(oversized, context(envelope)), 'INVALID_SOURCE');
+  const oversizedContext = context(envelope);
+  oversizedContext.operations = Array.from({length: 51}, (_, n) => ({
+    ...oversizedContext.operations[0], executionKey: key(n + 100)
+  }));
+  unavailable(await project(envelope, oversizedContext), 'INVALID_CONTEXT');
+  checkDTO(await project(envelope), ['UNKNOWN']);
+});
+
+test('synthetic DTO-only normalizer boundary accepts 50 rows and rejects 51; not a projection history fixture', async () => {
+  const f = fixture();
+  await claimNext(f);
+  const projected = await project(await f.backend.exportCanonicalEnvelope());
+  const [template] = checkDTO(projected, ['UNKNOWN']).rows;
+  const syntheticRows = Array.from({length: 51}, (_, n) => ({
+    ...template, agentId: key(n + 100), taskId: key(n + 100)
+  }));
+  const dto = normalizeM11AgentStatus({schemaVersion: 1, rows: syntheticRows.slice(0, 50)}, {now: () => NOW});
+  assert.equal(dto.rows.length, 50);
+  assert.deepEqual(normalizeM11AgentStatus(JSON.parse(JSON.stringify(dto)), {now: () => NOW}), dto);
+  assert.equal(dto.freshness, 'UNKNOWN');
+  assert.deepEqual(dto.rows.map(row => row.agentId), syntheticRows.slice(0, 50).map(row => row.agentId));
+  assert.throws(
+    () => normalizeM11AgentStatus({schemaVersion: 1, rows: syntheticRows}, {now: () => NOW}),
+    /rows must be a non-empty array up to 50 items/
+  );
+});

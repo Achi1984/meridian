@@ -83,6 +83,9 @@ export async function projectCoordinatorStatus(envelopeJson, contextJson, nowMs)
     if (typeof nowMs !== 'number' || !Number.isFinite(nowMs)) throw new Error();
     diagnostic = 'INVALID_SOURCE';
     const input = boundedJson(envelopeJson, COORDINATOR_STATUS_PROJECTION_LIMITS.envelopeBytes);
+    diagnostic = 'ROW_LIMIT_EXCEEDED';
+    if (Array.isArray(input?.claims) && input.claims.length > COORDINATOR_STATUS_PROJECTION_LIMITS.rows) throw new Error();
+    diagnostic = 'INVALID_SOURCE';
     const transport = Object.freeze({
       async readCanonicalEnvelope() { return structuredClone(input); },
       async replaceCanonicalEnvelope() {
@@ -93,9 +96,6 @@ export async function projectCoordinatorStatus(envelopeJson, contextJson, nowMs)
     const backend = createCoordinatorAtomicRecordBackend({transport, now: () => nowMs});
     const envelope = await backend.exportCanonicalEnvelope();
     if (replaceAttempts !== 0) throw new Error();
-    diagnostic = 'ROW_LIMIT_EXCEEDED';
-    if (envelope.claims.length > COORDINATOR_STATUS_PROJECTION_LIMITS.rows) throw new Error();
-    diagnostic = 'INVALID_SOURCE';
     if (envelope.snapshot.oid.length > 128) throw new Error();
     diagnostic = 'INVALID_CONTEXT';
     const context = presentationContext(

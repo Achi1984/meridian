@@ -103,11 +103,13 @@ Backend limits remain additional constraints.
 
 Diagnostics are fixed codes, never parser messages or raw source values:
 `INVALID_CLOCK`, `INVALID_SOURCE`, `ROW_LIMIT_EXCEEDED`, `INVALID_CONTEXT`,
-`PROJECTION_FAILED`, and `READ_ONLY_VIOLATION`. Source replay precedes the row
-limit and context checks; invalid history remains `INVALID_SOURCE`, not a
-successful truncated projection.
+`PROJECTION_FAILED`, and `READ_ONLY_VIOLATION`. After bounded JSON parsing, a
+claims array longer than 50 is rejected by a count precheck before replay or
+context validation. This is not a replay-validity assertion. Inputs within
+that count still require complete backend replay; invalid history returns
+`INVALID_SOURCE`, never a successful truncated projection.
 
-## Focused verification and boundary blocker
+## Focused verification and reachable backend bound
 
 ```sh
 node --test test/m11-coordinator-status-projection.test.js
@@ -118,16 +120,23 @@ and revision-required receipt delivery, incomplete results, and UNKNOWN stages.
 They check normalizer roundtrips, no runtime attestations, corrupt replay,
 claim/admission mismatches, context identity, resource bounds, clocks/URLs,
 exact expiry, unchanged inputs, zero replace attempts, and determinism.
+Separate boundary tests exercise >50-claim precheck rejection using an explicitly
+invalid oversized history, and the actual normalizer's acceptance of 50 rows
+and rejection of 51 using **synthetic DTO-only rows**. The latter is not a
+50-claim canonical envelope or a positive projection result. All positive
+projection fixtures remain real backend-generated, replay-valid envelopes.
 Full CI and Claude review are left to the Lead.
 
-**The required replay-valid 50/51-claim boundary remains blocked by the existing
-backend, not demonstrated by these tests.** Its retained-claim limit is 64,
+**The backend's reachable history bound is distinct from the DTO row limit.**
+Its retained-claim limit is 64,
 but its cumulative transition-chain byte limit is only 262,144. Each subsequent
 claim requires the previous claim to release the single active gate through a
 complete receipt cycle (eight records minimum). Minimal backend-generated
 cycles reach 44 completed claims at 261,219 chain bytes; the next claim fails
-during review preparation. Even schema-valid shortened claim/OID identities
-cannot fit the 49 complete histories required before admitting claim 50.
-Padding claims, dropping history, or bypassing replay would not test this
-contract. Raising the backend chain limit requires an explicit scope exception
-or a prerequisite backend change; none is made here.
+during review preparation. This measured capacity describes those minimal
+backend-generated cycles, not a universal maximum for arbitrary histories;
+larger records exhaust the byte budget sooner. No replay-valid 50-claim
+envelope is fabricated. Backend byte/history limits remain unchanged, and
+neither padding claims nor dropping history is used for positive projections.
+Per the clarified contract, count-precheck and synthetic DTO-only boundary
+coverage are separate from backend-reachable projection coverage.
