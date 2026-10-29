@@ -19,7 +19,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 PINS = {
-    'scripts/publisher_test_readonly_inspection.py': 'cef46e32d0d20e20f0051d06920c984fe19977a9354b2ea8cce6c0dd582dd5b9',
+    'scripts/publisher_test_readonly_inspection.py': '5feb20a9b4007fd7d65d4230a50f9055bb7dbfeb9053acbdc091363ae8f6d22d',
     'docs/autonomy/event-adapter/review-binding/fixtures/publication-ledger.sql': 'c7cab138a398936dd59845db9838947b4a308a3d387b2c4102060ac3ae646736',
     'docs/autonomy/event-adapter/review-binding/fixtures/publication-send-record.sql': '84018bd5f335652592ad3bccc4574407e14b90d7751da55480e000da6cf37bce',
 }
