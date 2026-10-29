@@ -132,6 +132,7 @@ export class PaperLedger {
     this.positions = new Map();
     this.reservations = new Map();
     this.authorizationDigests = new Map();
+    this.authorizationResults = new Map();
     this.eventDigests = new Map();
     this.results = new Map();
     this.entriesByTickMint = new Set();
@@ -178,6 +179,34 @@ export class PaperLedger {
     return true;
   }
 
+  #releaseReservation(authorizationId, status, reason) {
+    const authorization = this.reservations.get(authorizationId);
+    if (!authorization) return this.authorizationResults.get(authorizationId) ?? null;
+    this.reservations.delete(authorizationId);
+    const result = Object.freeze({status, reason, authorizationId, mint: authorization.mint});
+    this.authorizationResults.set(authorizationId, result);
+    this.#record({type: "RISK_RESERVATION_RELEASED", authorizationId, mint: authorization.mint, reason});
+    return result;
+  }
+
+  #revokeReservations(reason) {
+    for (const authorizationId of this.reservations.keys()) {
+      this.#releaseReservation(authorizationId, "REVOKED", reason);
+    }
+  }
+
+  #expireReservations(now, localDay) {
+    for (const [authorizationId, authorization] of this.reservations) {
+      const authorizedAt = time(authorization.authorizedAt);
+      if (authorization.authorizedDay !== localDay) {
+        this.#releaseReservation(authorizationId, "REVOKED", "authorization cannot cross a Vienna calendar day");
+      } else if (authorizedAt === null || now < authorizedAt ||
+          now - authorizedAt > MAX_QUOTE_AGE_MS) {
+        this.#releaseReservation(authorizationId, "EXPIRED", "risk authorization exceeded five-minute validity");
+      }
+    }
+  }
+
   #snapshotEquity({now, marks}) {
     const parsedNow = time(now);
     if (parsedNow === null || !Array.isArray(marks)) {
@@ -222,6 +251,10 @@ export class PaperLedger {
     const localDay = viennaDay(parsedNow);
     if (parsedNow === null || localDay === null) {
       return {status: "EQUITY_UNKNOWN", entriesAllowed: false, reason: "valid current time required"};
+    }
+    this.#expireReservations(parsedNow, localDay);
+    if (localDay !== this.day) {
+      this.#revokeReservations("local calendar day changed; old risk authority cannot roll over");
     }
     const snapshot = this.#snapshotEquity({now: parsedNow, marks});
     if (snapshot.status !== "PASS") {
@@ -282,7 +315,7 @@ export class PaperLedger {
       if (this.authorizationDigests.get(authorizationId) !== requestDigest) {
         return {status: "REJECT", reason: "authorization identity reused with different request"};
       }
-      return this.reservations.get(authorizationId) ?? this.results.get(authorizationId) ??
+      return this.reservations.get(authorizationId) ?? this.authorizationResults.get(authorizationId) ??
         {status: "DUPLICATE", reason: "authorization already consumed"};
     }
     if (!this.newWorkAllowed) return {status: "REJECT", reason: "session is stopped"};
@@ -293,9 +326,13 @@ export class PaperLedger {
     if (!decisionBoundToCandidate(filterResult, candidate)) {
       return {status: "REJECT", reason: "hard-filter decision is not bound to this candidate sample"};
     }
-    if (scoreResult?.status !== "PASS" || scoreResult.score < 70) {
+    if (scoreResult?.status !== "PASS") {
       return {status: "REJECT", reason: "proposed analyst score must be at least 70"};
     }
+    if (!Number.isInteger(scoreResult.score) || scoreResult.score < 0 || scoreResult.score > 100) {
+      return {status: "REJECT", reason: "analyst score must be a finite integer from 0 to 100"};
+    }
+    if (scoreResult.score < 70) return {status: "REJECT", reason: "proposed analyst score must be at least 70"};
     if (!decisionBoundToCandidate(scoreResult, candidate)) {
       return {status: "REJECT", reason: "analyst decision is not bound to this candidate sample"};
     }
@@ -312,6 +349,7 @@ export class PaperLedger {
     }
     const gate = this.#updateDailyGate({now, marks});
     if (!gate.entriesAllowed) {
+      if (gate.status === "DAILY_LOSS_LIMIT") this.#revokeReservations("daily loss limit tripped");
       const exitRequests = this.#requestDailyLossExits(gate, now);
       return {
         status: "REJECT",
@@ -320,11 +358,14 @@ export class PaperLedger {
         exitRequests
       };
     }
-    if (this.positions.size + this.reservations.size >= MAX_POSITIONS) {
+    const reservedMints = new Set([...this.reservations.values()].map(item => item.mint));
+    const distinctMints = new Set([...this.positions.keys(), ...reservedMints]);
+    if (distinctMints.size >= MAX_POSITIONS) {
       return {status: "REJECT", reason: "maximum of three distinct open or reserved positions reached"};
     }
     const tickMint = `${tickId}:${candidate.mint}`;
-    if (this.entriesByTickMint.has(tickMint) || this.positions.has(candidate.mint)) {
+    if (this.entriesByTickMint.has(tickMint) || this.positions.has(candidate.mint) ||
+        reservedMints.has(candidate.mint)) {
       return {status: "REJECT", reason: "same-tick re-entry or pyramiding is not allowed"};
     }
     const reserved = [...this.reservations.values()]
@@ -345,6 +386,7 @@ export class PaperLedger {
       tickId,
       sampledAt: new Date(candidateSample).toISOString(),
       authorizedAt: new Date(currentTime).toISOString(),
+      authorizedDay: viennaDay(currentTime),
       maxSpendCents: maxSpend,
       stopLossBps: 600,
       trailingActivationBps: 1200,
@@ -360,7 +402,7 @@ export class PaperLedger {
     return authorization;
   }
 
-  executeEntry(authorization, quote, {now = Date.now()} = {}) {
+  executeEntry(authorization, quote, {now = Date.now(), marks = []} = {}) {
     const eventId = quote?.eventId;
     if (typeof eventId !== "string" || !SAFE_ID.test(eventId)) {
       return {status: "REJECT", reason: "stable bounded entry event identity required"};
@@ -381,18 +423,45 @@ export class PaperLedger {
     }
     const auth = this.reservations.get(authorization?.authorizationId);
     if (!auth || auth !== authorization) return {status: "REJECT", reason: "live risk reservation required"};
+    const currentTime = time(now);
+    const authorizedTime = time(auth.authorizedAt);
+    const localDay = currentTime === null ? null : viennaDay(currentTime);
+    if (currentTime === null) return {status: "UNFILLED", reason: "valid execution time is required"};
+    if (auth.authorizedDay !== localDay) {
+      this.#releaseReservation(auth.authorizationId, "REVOKED", "authorization cannot cross a Vienna calendar day");
+      return {status: "REJECT", reason: "authorization expired at Vienna calendar-day boundary"};
+    }
+    if (authorizedTime === null || currentTime < authorizedTime ||
+        currentTime - authorizedTime > MAX_QUOTE_AGE_MS) {
+      this.#releaseReservation(auth.authorizationId, "EXPIRED", "risk authorization exceeded five-minute validity");
+      return {status: "REJECT", reason: "risk authorization is expired"};
+    }
+    if (this.dailyLossTripped) {
+      this.#revokeReservations("daily loss limit already tripped");
+      return {status: "REJECT", reason: "daily loss limit already tripped"};
+    }
     const identity = {mint: auth.mint, chainId: auth.chainId, pool: auth.pool, quote: auth.quote};
     const fillTime = time(quote.observedAt);
     const authTime = time(auth.sampledAt);
-    const authorizedTime = time(auth.authorizedAt);
-    const currentTime = time(now);
     if (!quoteIdentityValid(quote, identity) || quote.mode !== "HYPOTHETICAL" ||
-        !quote.executable ||         fillTime === null || authTime === null || authorizedTime === null || currentTime === null ||
+        !quote.executable || fillTime === null || authTime === null ||
         fillTime <= authTime || fillTime <= authorizedTime ||
-        currentTime - fillTime < 0 || currentTime - fillTime > MAX_QUOTE_AGE_MS ||
+        fillTime > currentTime || currentTime - fillTime > MAX_QUOTE_AGE_MS ||
         quote.decimals !== auth.decimals ||
         !Number.isSafeInteger(quote.priceMicros) || quote.priceMicros <= 0) {
       return {status: "UNFILLED", reason: "later identity-bound hypothetical executable quote is unavailable"};
+    }
+    const gate = this.#updateDailyGate({now: currentTime, marks});
+    if (gate.status === "EQUITY_UNKNOWN") {
+      return {status: "UNFILLED", reason: "fresh complete marks/equity are required; reservation retained"};
+    }
+    if (gate.status === "DAILY_LOSS_LIMIT") {
+      this.#revokeReservations("daily loss limit tripped before entry fill");
+      this.#requestDailyLossExits(gate, currentTime);
+      return {status: "REJECT", reason: "daily loss limit tripped before entry fill"};
+    }
+    if (!gate.entriesAllowed || this.reservations.get(auth.authorizationId) !== auth) {
+      return {status: "REJECT", reason: "risk reservation was stopped or revoked"};
     }
     let costs;
     let scale;
@@ -402,15 +471,39 @@ export class PaperLedger {
     } catch (error) {
       return {status: "UNFILLED", reason: error.message};
     }
-    const maxNotional = auth.maxSpendCents - costs.total;
-    if (maxNotional <= 0n) return {status: "UNFILLED", reason: "entry costs exceed risk budget"};
-    const tokenAtoms = maxNotional * 10_000n * scale / BigInt(quote.priceMicros);
-    const notional = tokenAtoms * BigInt(quote.priceMicros) / (scale * 10_000n);
+    const otherReservations = [...this.reservations.values()]
+      .filter(item => item.authorizationId !== auth.authorizationId)
+      .reduce((sum, item) => sum + item.maxSpendCents, 0n);
+    const available = this.cashCents - otherReservations;
+    const currentLimit = [auth.maxSpendCents, MAX_ENTRY_CENTS, gate.equityCents * 8n / 100n, available]
+      .reduce((minimum, amount) => amount < minimum ? amount : minimum);
+    const maxNotional = currentLimit - costs.total;
+    if (maxNotional <= 0n) return {status: "UNFILLED", reason: "entry costs exceed current risk budget"};
+    const notionalDenominator = scale * 10_000n;
+    const tokenAtoms = maxNotional * notionalDenominator / BigInt(quote.priceMicros);
+    const rawNotional = tokenAtoms * BigInt(quote.priceMicros);
+    const notional = (rawNotional + notionalDenominator - 1n) / notionalDenominator;
     const allIn = notional + costs.total;
-    if (tokenAtoms <= 0n || allIn > auth.maxSpendCents || allIn > this.cashCents) {
+    if (tokenAtoms <= 0n || allIn > currentLimit || allIn > this.cashCents) {
       return {status: "UNFILLED", reason: "conservative base-unit rounding leaves no affordable fill"};
     }
-    if (!this.newWorkAllowed || !this.#canRecord(2)) {
+    const pendingMints = new Set([...this.reservations.values()]
+      .filter(item => item.authorizationId !== auth.authorizationId).map(item => item.mint));
+    const commitDistinctMints = new Set([...this.positions.keys(), ...pendingMints]);
+    const commitReservedOther = [...this.reservations.values()]
+      .filter(item => item.authorizationId !== auth.authorizationId)
+      .reduce((sum, item) => sum + item.maxSpendCents, 0n);
+    const commitLimit = [
+      auth.maxSpendCents,
+      MAX_ENTRY_CENTS,
+      gate.equityCents * 8n / 100n,
+      this.cashCents - commitReservedOther
+    ].reduce((minimum, amount) => amount < minimum ? amount : minimum);
+    if (!this.newWorkAllowed || this.dailyLossTripped ||
+        this.reservations.get(auth.authorizationId) !== auth ||
+        this.positions.has(auth.mint) || pendingMints.has(auth.mint) ||
+        commitDistinctMints.size >= MAX_POSITIONS ||
+        allIn > commitLimit || !this.#canRecord(2)) {
       return {status: "UNFILLED", reason: "session stopped or audit capacity unavailable"};
     }
     const stopPriceMicros = BigInt(quote.priceMicros) * 9_400n / BPS;
@@ -453,6 +546,9 @@ export class PaperLedger {
     this.positions.set(auth.mint, position);
     this.lastEquitySnapshot = null;
     this.reservations.delete(auth.authorizationId);
+    this.authorizationResults.set(auth.authorizationId, Object.freeze({
+      status: "CONSUMED", authorizationId: auth.authorizationId, eventId, mint: auth.mint
+    }));
     for (const [key, value] of Object.entries(costs.values)) this.costTotals.entry[key] += value;
     this.eventDigests.set(eventId, eventDigest);
     this.results.set(eventId, result);
@@ -598,6 +694,7 @@ export class PaperLedger {
 
   riskSnapshot({now, marks = []}) {
     const gate = this.#updateDailyGate({now, marks});
+    if (gate.status === "DAILY_LOSS_LIMIT") this.#revokeReservations("daily loss limit tripped");
     const exitRequests = this.#requestDailyLossExits(gate, now);
     return {
       ...gate,

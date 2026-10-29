@@ -72,7 +72,11 @@ function paperInputs(candidate, now) {
   return {filters, analysis};
 }
 
-function authorize(ledger, candidate, now, {authorizationId = `auth-${candidate.mint}`, tickId = "tick-1"} = {}) {
+function authorize(ledger, candidate, now, {
+  authorizationId = `auth-${candidate.mint}`,
+  tickId = "tick-1",
+  marks = []
+} = {}) {
   const {filters, analysis} = paperInputs(candidate, now);
   return ledger.authorizeEntry({
     authorizationId,
@@ -80,7 +84,8 @@ function authorize(ledger, candidate, now, {authorizationId = `auth-${candidate.
     filterResult: filters,
     scoreResult: analysis,
     tickId,
-    now: now + 1000
+    now: now + 1000,
+    marks
   });
 }
 
@@ -434,16 +439,206 @@ test("risk reservations cap three distinct positions and prevent same-tick re-en
   assert.equal(duplicateMint.status, "REJECT");
 });
 
+test("pending reservations reject a second authorization for the same mint before either fills", () => {
+  const now = Date.now();
+  const candidate = syntheticCandidate(now);
+  const ledger = new PaperLedger({now});
+  const first = authorize(ledger, candidate, now, {authorizationId: "same-mint-first", tickId: "tick-a"});
+  const second = authorize(ledger, candidate, now, {authorizationId: "same-mint-second", tickId: "tick-b"});
+  assert.equal(first.status, "AUTHORIZED");
+  assert.equal(second.status, "REJECT");
+
+  const firstFill = ledger.executeEntry(first, fillQuote(candidate, now, {
+    eventId: "same-mint-entry-a"
+  }), {now: now + 2000});
+  assert.equal(firstFill.status, "FILLED_PAPER");
+  const cashAfterFirstFill = ledger.summary().cashCents;
+  const secondFill = ledger.executeEntry(second, fillQuote(candidate, now, {
+    eventId: "same-mint-entry-b"
+  }), {now: now + 2000});
+  assert.equal(secondFill.status, "REJECT");
+  assert.equal(ledger.summary().cashCents, cashAfterFirstFill);
+  assert.equal(ledger.summary().openPositions.length, 1);
+  assert.equal(ledger.summary().openPositions[0].tokenAtoms, firstFill.tokenAtoms);
+});
+
+test("analyst score must be a finite integer within the supported range", () => {
+  const now = Date.now();
+  const candidate = syntheticCandidate(now);
+  const filters = validFilters(candidate, now);
+  const validScore = analyzeCandidate(candidate, {
+    now, filterResult: filters,
+    smartWalletAllowlist: SYNTHETIC_SMART_WALLET_ALLOWLIST
+  });
+  for (const invalid of [NaN, Infinity, -1, 101, undefined, 69.5]) {
+    const ledger = new PaperLedger({now});
+    const result = ledger.authorizeEntry({
+      authorizationId: `invalid-score-${String(invalid)}`,
+      candidate,
+      filterResult: filters,
+      scoreResult: {...validScore, score: invalid},
+      tickId: "invalid-score-tick",
+      now: now + 1000
+    });
+    assert.equal(result.status, "REJECT", `score ${String(invalid)} must be rejected`);
+  }
+});
+
 test("same-sample, stale, and identity-mismatched fills stay unfilled", () => {
   const now = Date.now();
   const candidate = syntheticCandidate(now);
   const ledger = new PaperLedger({now});
   const auth = authorize(ledger, candidate, now);
   assert.equal(ledger.executeEntry(auth, fillQuote(candidate, now, {observedAt: now + 1000}), {now: now + 1000}).status, "UNFILLED");
-  const staleAuth = authorize(ledger, candidate, now, {authorizationId: "auth-2", tickId: "tick-2"});
-  assert.equal(ledger.executeEntry(staleAuth, fillQuote(candidate, now), {now: now + 600_000}).status, "UNFILLED");
-  const wrongAuth = authorize(ledger, candidate, now, {authorizationId: "auth-3", tickId: "tick-3"});
-  assert.equal(ledger.executeEntry(wrongAuth, fillQuote(candidate, now, {pool: "11111111111111111111111111111112"}), {now: now + 2000}).status, "UNFILLED");
+  assert.equal(ledger.reservations.get(auth.authorizationId), auth);
+
+  const staleLedger = new PaperLedger({now});
+  const staleAuth = authorize(staleLedger, candidate, now, {authorizationId: "auth-stale", tickId: "tick-stale"});
+  const staleNow = Date.parse(staleAuth.authorizedAt) + 300_001;
+  assert.equal(staleLedger.executeEntry(staleAuth, fillQuote(candidate, now, {
+    eventId: "expired-execution",
+    observedAt: staleNow
+  }), {now: staleNow}).status, "REJECT");
+  assert.equal(staleLedger.authorizationResults.get(staleAuth.authorizationId).status, "EXPIRED");
+
+  const identityLedger = new PaperLedger({now});
+  const wrongAuth = authorize(identityLedger, candidate, now, {authorizationId: "auth-wrong", tickId: "tick-wrong"});
+  assert.equal(identityLedger.executeEntry(wrongAuth, fillQuote(candidate, now, {
+    pool: "11111111111111111111111111111112"
+  }), {now: now + 2000}).status, "UNFILLED");
+});
+
+test("entry revalidates fresh marks and retains retryable reservations on unknown marks", () => {
+  const now = Date.now();
+  const firstCandidate = syntheticCandidate(now);
+  const secondCandidate = identityCandidate("11111111111111111111111111111112", now + 2500);
+  const ledger = new PaperLedger({now});
+  const firstAuth = authorize(ledger, firstCandidate, now);
+  assert.equal(ledger.executeEntry(firstAuth, fillQuote(firstCandidate, now), {now: now + 2000}).status, "FILLED_PAPER");
+
+  const currentMark = exitQuote(firstCandidate, now + 3000, 10_000);
+  const secondAuth = authorize(ledger, secondCandidate, now + 3000, {
+    authorizationId: "unknown-mark-auth",
+    tickId: "unknown-mark-tick",
+    marks: [currentMark]
+  });
+  const cashBefore = ledger.summary().cashCents;
+  const unknown = ledger.executeEntry(secondAuth, fillQuote(secondCandidate, now + 3000, {
+    eventId: "unknown-mark-entry"
+  }), {now: now + 5000});
+  assert.equal(unknown.status, "UNFILLED");
+  assert.match(unknown.reason, /fresh complete marks/);
+  assert.equal(ledger.summary().cashCents, cashBefore);
+  assert.equal(ledger.summary().openPositions.length, 1);
+  assert.equal(ledger.reservations.get(secondAuth.authorizationId), secondAuth);
+
+  const staleMark = exitQuote(firstCandidate, now + 3000 - 300_001, 10_000);
+  const stale = ledger.executeEntry(secondAuth, fillQuote(secondCandidate, now + 3000, {
+    eventId: "stale-mark-entry"
+  }), {now: now + 5000, marks: [staleMark]});
+  assert.equal(stale.status, "UNFILLED");
+  assert.match(stale.reason, /fresh complete marks/);
+  assert.equal(ledger.summary().cashCents, cashBefore);
+});
+
+test("a daily loss trip revokes earlier reservations before they can fill", () => {
+  const now = Date.now();
+  const firstCandidate = syntheticCandidate(now);
+  const secondCandidate = identityCandidate("11111111111111111111111111111112", now + 2500);
+  const ledger = new PaperLedger({now});
+  const firstAuth = authorize(ledger, firstCandidate, now);
+  ledger.executeEntry(firstAuth, fillQuote(firstCandidate, now), {now: now + 2000});
+  const mark = exitQuote(firstCandidate, now + 3000, 10_000);
+  const secondAuth = authorize(ledger, secondCandidate, now + 3000, {
+    authorizationId: "pre-loss-reservation",
+    tickId: "pre-loss-tick",
+    marks: [mark]
+  });
+  assert.equal(secondAuth.status, "AUTHORIZED");
+
+  const lossMark = exitQuote(firstCandidate, now + 4000, 6000);
+  const gate = ledger.riskSnapshot({now: now + 4000, marks: [lossMark]});
+  assert.equal(gate.status, "DAILY_LOSS_LIMIT");
+  assert.equal(ledger.reservations.has(secondAuth.authorizationId), false);
+  assert.equal(ledger.authorizationResults.get(secondAuth.authorizationId).status, "REVOKED");
+  const cashAfterGate = ledger.summary().cashCents;
+  const attempt = ledger.executeEntry(secondAuth, fillQuote(secondCandidate, now + 3000, {
+    eventId: "pre-loss-entry"
+  }), {now: now + 5000, marks: []});
+  assert.equal(attempt.status, "REJECT");
+  assert.equal(ledger.summary().cashCents, cashAfterGate);
+  assert.equal(ledger.summary().openPositions.length, 0);
+});
+
+test("execution resizes to current equity's 8% cap after an authorized mark decline", () => {
+  const now = Date.now();
+  const firstCandidate = syntheticCandidate(now);
+  const secondCandidate = identityCandidate("11111111111111111111111111111112", now + 2500);
+  const ledger = new PaperLedger({now});
+  const firstAuth = authorize(ledger, firstCandidate, now);
+  ledger.executeEntry(firstAuth, fillQuote(firstCandidate, now), {now: now + 2000});
+  const entryMark = exitQuote(firstCandidate, now + 3000, 10_000);
+  const secondAuth = authorize(ledger, secondCandidate, now + 3000, {
+    authorizationId: "equity-revalidation-auth",
+    tickId: "equity-revalidation-tick",
+    marks: [entryMark]
+  });
+  assert.equal(secondAuth.maxSpendCents, 8000n);
+  const declinedMark = exitQuote(firstCandidate, now + 4000, 7500);
+  const fill = ledger.executeEntry(secondAuth, fillQuote(secondCandidate, now + 4000, {
+    eventId: "equity-revalidated-entry",
+    observedAt: now + 5000
+  }), {now: now + 5000, marks: [declinedMark]});
+  assert.equal(fill.status, "FILLED_PAPER");
+  assert.ok(BigInt(fill.allInCents) <= 7840n);
+  assert.equal(ledger.summary().openPositions.length, 2);
+});
+
+test("authorization expires after five minutes and cannot cross Vienna midnight", () => {
+  const now = Date.parse("2026-01-01T10:00:00Z");
+  const candidate = syntheticCandidate(now);
+  const ledger = new PaperLedger({now});
+  const boundaryAuth = authorize(ledger, candidate, now, {
+    authorizationId: "auth-age-boundary",
+    tickId: "tick-age-boundary"
+  });
+  const boundaryNow = Date.parse(boundaryAuth.authorizedAt) + 5 * 60 * 1000;
+  const boundaryQuote = fillQuote(candidate, now, {
+    eventId: "auth-age-boundary-entry",
+    observedAt: boundaryNow,
+    priceMicros: 10_000
+  });
+  assert.equal(ledger.executeEntry(boundaryAuth, boundaryQuote, {now: boundaryNow}).status, "FILLED_PAPER");
+
+  const nextCandidate = identityCandidate("11111111111111111111111111111112", boundaryNow + 1000);
+  const expiredAuth = authorize(ledger, nextCandidate, boundaryNow + 1000, {
+    authorizationId: "auth-expired",
+    tickId: "tick-expired",
+    marks: [exitQuote(candidate, boundaryNow + 1000, 10_000)]
+  });
+  const expiredNow = Date.parse(expiredAuth.authorizedAt) + 5 * 60 * 1000 + 1;
+  const expired = ledger.executeEntry(expiredAuth, fillQuote(nextCandidate, expiredNow - 1000, {
+    eventId: "auth-expired-entry",
+    observedAt: expiredNow
+  }), {now: expiredNow, marks: [exitQuote(candidate, expiredNow, 10_000)]});
+  assert.equal(expired.status, "REJECT");
+  assert.equal(ledger.authorizationResults.get(expiredAuth.authorizationId).status, "EXPIRED");
+
+  const midnightBase = Date.parse("2026-01-01T22:58:00Z");
+  const midnightCandidate = syntheticCandidate(midnightBase);
+  const midnightLedger = new PaperLedger({now: midnightBase});
+  const midnightAuth = authorize(midnightLedger, midnightCandidate, midnightBase, {
+    authorizationId: "auth-midnight",
+    tickId: "tick-midnight"
+  });
+  const afterMidnight = Date.parse("2026-01-01T23:01:00Z");
+  const crossed = midnightLedger.executeEntry(midnightAuth, fillQuote(midnightCandidate, midnightBase, {
+    eventId: "auth-midnight-entry",
+    observedAt: afterMidnight
+  }), {now: afterMidnight});
+  assert.equal(crossed.status, "REJECT");
+  assert.equal(midnightLedger.authorizationResults.get(midnightAuth.authorizationId).status, "REVOKED");
+  assert.equal(midnightLedger.summary().cashCents, "100000");
 });
 
 test("decimal dust and invalid decimals fail closed without float ledger accounting", () => {
@@ -458,6 +653,33 @@ test("decimal dust and invalid decimals fail closed without float ledger account
   assert.equal(ledger.summary().cashCents, "100000");
   assert.throws(() => new PaperLedger({initialCapitalCents: 100000.5, now}), /integer/);
   assert.equal(PAPER_LEDGER_POLICY.initialCapitalCents, "100000");
+});
+
+test("entry debit rounds nonintegral cents upward at the affordable base-unit boundary", () => {
+  const now = Date.now();
+  const candidate = syntheticCandidate(now);
+  candidate.decimals = 0;
+  candidate.evidence.tokenDecimals.value = 0;
+  const ledger = new PaperLedger({now});
+  const auth = authorize(ledger, candidate, now);
+  const fill = ledger.executeEntry(auth, fillQuote(candidate, now, {
+    eventId: "ceil-entry-debit",
+    priceMicros: 30_001,
+    decimals: 0
+  }), {now: now + 2000});
+  assert.equal(fill.status, "FILLED_PAPER");
+  assert.equal(fill.tokenAtoms, "2666");
+  assert.equal(fill.notionalCents, "7999");
+  assert.equal(fill.allInCents, "7999");
+  assert.ok(BigInt(fill.allInCents) <= auth.maxSpendCents);
+  assert.equal(ledger.summary().cashCents, "92001");
+
+  const mark = exitQuote(candidate, now + 3000, 30_001);
+  const equity = ledger.riskSnapshot({now: now + 3000, marks: [mark]});
+  assert.equal(equity.status, "PASS");
+  assert.equal(equity.grossOpenValueCents, 7998n);
+  assert.equal(equity.netUnrealizedPnlCents, -1n);
+  assert.equal(equity.equityCents, 99999n);
 });
 
 test("cost assumptions are explicit, integer cents, and charged once", () => {

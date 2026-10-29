@@ -95,7 +95,12 @@ no more than the minimum of USD 80, 8% of current marked equity, and available
 unreserved cash. Three distinct open/reserved mints is the maximum. No leverage,
 shorting, pyramiding, or same-tick re-entry is supported. Reservations and
 fills use stable event identities; repeated identities with changed payloads
-are rejected.
+are rejected. A mint cannot have more than one pending reservation. At fill,
+the executor requires fresh complete marks for every open position, reruns the
+daily gate and equity sizing, and will not exceed the then-current 8% cap.
+Retryable missing marks or quote/cost evidence retain the reservation only
+until its five-minute expiry; expiry, Vienna-day rollover, and a daily-loss
+trip revoke it.
 
 Token quantities are integer base units with validated decimals (0–18);
 monetary totals and P&L use integer cents/BigInt. Rounding is conservative
