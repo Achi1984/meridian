@@ -1,0 +1,142 @@
+.m11-agent-status {
+  box-sizing: border-box;
+  background: #111827;
+  color: #e5e7eb;
+  border: 1px solid #374151;
+  border-radius: 12px;
+  padding: 1rem;
+  font-family: Arial, Helvetica, sans-serif;
+  line-height: 1.45;
+}
+
+.m11-agent-status__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.m11-agent-status__header-title {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.m11-agent-status__state {
+  border-radius: 999px;
+  background: #1f2937;
+  border: 1px solid #4b5563;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.8rem;
+}
+
+.m11-agent-status__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0.75rem;
+}
+
+.m11-agent-status__card {
+  border: 1px solid #374151;
+  border-radius: 10px;
+  padding: 0.9rem;
+  background: #0f172a;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.m11-agent-status__heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.m11-agent-status__title {
+  margin: 0;
+  font-size: 1rem;
+  word-break: break-word;
+}
+
+.m11-agent-status__badge {
+  background: #1d4ed8;
+  color: #e0f2fe;
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+.m11-agent-status__meta {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.m11-agent-status__meta-row {
+  display: grid;
+  grid-template-columns: minmax(115px, 1fr) minmax(0, 2fr);
+  gap: 0.45rem;
+  font-size: 0.86rem;
+}
+
+.m11-agent-status__meta-label {
+  color: #9ca3af;
+}
+
+.m11-agent-status__meta-value {
+  word-break: break-word;
+}
+
+.m11-agent-status__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.m11-agent-status__link {
+  color: #bfdbfe;
+  text-decoration: underline;
+  font-size: 0.85rem;
+}
+
+.m11-agent-status__details {
+  display: grid;
+  gap: 0.5rem;
+  color: #d1d5db;
+  font-size: 0.82rem;
+}
+
+.m11-agent-status__summary {
+  word-break: break-word;
+}
+
+.m11-agent-status__notes {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.m11-agent-status__owner-decision {
+  margin: 0;
+  color: #fca5a5;
+}
+
+@media (max-width: 640px) {
+  .m11-agent-status {
+    padding: 0.75rem;
+  }
+
+  .m11-agent-status__header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .m11-agent-status__list {
+    grid-template-columns: 1fr;
+  }
+
+  .m11-agent-status__meta-row {
+    grid-template-columns: 1fr;
+  }
+}
