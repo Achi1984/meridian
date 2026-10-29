@@ -122,14 +122,13 @@ test('accessible Bot filters report no matches separately and reset without read
   assert.equal(search.getAttribute('aria-label'),'Symbol suchen');
   assert.equal(direction.getAttribute('aria-label'),'Richtung');
   search.value='ETH';for(const listener of search.listeners.get('input')||[])listener();
-  assert.match(h.target.textContent,/0 Treffer von 1 Bots/);
+  assert.match(h.target.textContent,/0 von 1 Bots im Snapshot/);
   assert.match(h.target.textContent,/Keine Bots entsprechen den Filtern/);
   assert.doesNotMatch(h.target.textContent,/BTC · Short/);
   direction.value='short';for(const listener of direction.listeners.get('change')||[])listener();
-  assert.match(h.target.textContent,/Aktive Auswahl: Symbol ETH · Richtung short/);
+  assert.match(h.target.textContent,/0 von 1 Bots im Snapshot/);
   const reset=all(h.target,'button').find(node=>node.text==='Filter zurücksetzen');
-  reset.click();assert.match(h.target.textContent,/1 Treffer von 1 Bots/);
-  assert.match(h.target.textContent,/Keine aktiven Filter/);
+  reset.click();assert.match(h.target.textContent,/1 von 1 Bots im Snapshot/);
   assert.equal(h.calls.refresh,0,'local filtering and reset never read a snapshot');
 });
 test('mount is inactive, preserves controls and blocks repeated loading clicks',()=>{
@@ -143,6 +142,15 @@ test('mount is inactive, preserves controls and blocks repeated loading clicks',
   assert.equal(refresh.getAttribute('aria-disabled'),'true');assert.equal(all(h.target,'button').find(node=>node.text==='Bots aktualisieren'),refresh);
   h.publish(fresh());assert.equal(refresh.getAttribute('aria-disabled'),'false');
   assert.equal(all(h.target,'button').find(node=>node.text==='Botansicht sperren'),lock);lock.click();assert.equal(h.calls.lock,1);assert.doesNotMatch(h.target.textContent,/BTC/);
+});
+test('generated Bots controls precede snapshot content and the card list',()=>{
+  const h=mounted();h.publish(fresh());
+  const section=h.target.children[0],filterIndex=section.children.findIndex(node=>node.className==='bot-overview-filters');
+  const contentIndex=section.children.findIndex(node=>node.contains(all(h.target,'ul')[0]));
+  const actionIndex=section.children.findIndex(node=>all(node,'button').some(button=>
+    ['Bots aktualisieren','Botansicht sperren'].includes(button.text)));
+  assert.ok(filterIndex>=0&&filterIndex<contentIndex,'search, filter, sort and reset are above cards');
+  assert.ok(actionIndex>=0&&actionIndex<contentIndex,'refresh and lock remain above cards');
 });
 test('lock clears UI even if client lock throws',()=>{
   const h=mounted({lock(){throw new Error('secret');}});h.publish(fresh());h.buttons[1].click();
@@ -300,39 +308,136 @@ test('collapsed native cards distinguish equal symbols and render only whitelist
   renderBotReadState(target,state);
   assert.equal(all(target,'details').length,2);assert.equal(all(target,'summary').length,2);
   assert.ok(all(target,'details').every(node=>node.getAttribute('open')===null));
-  assert.match(target.textContent,/Referenz a{20}/);assert.match(target.textContent,/Referenz b{20}/);
-  assert.match(target.textContent,/5×/);assert.match(target.textContent,/125,5 USD\/USDT/);
-  assert.match(target.textContent,/P\/L laut Quelle: -2,75 USD/);assert.match(target.textContent,/0,00001234/);
-  assert.match(target.textContent,/Grid-GewinnNicht verfügbar/);assert.match(target.textContent,/RisikopufferNicht verfügbar/);
-  assert.match(target.textContent,/Liquidationspreis laut QuelleNicht verfügbar/);assert.doesNotMatch(target.textContent,/SECRET|999|100 %/);
-  assert.deepEqual(all(target,'details').map(node=>node.id),['bot-card-'+ 'a'.repeat(20),'bot-card-'+ 'b'.repeat(20)]);
-  renderBotReadState(target,{status:'locked'});assert.equal(all(target,'details').length,0);
-  assert.doesNotMatch(target.textContent,/125,5|a{20}|b{20}/);
-});
+   const [first,second]=all(target,'details'),[firstSummary,secondSummary]=all(target,'summary');
+   assert.doesNotMatch(firstSummary.textContent,/Referenz|Bot 1/);
+   assert.equal(firstSummary.getAttribute('aria-label'),
+     'BTC · Short · Hebel 5× · P/L laut Quelle -2,75 USD · Kapital 125,50 USD/USDT · ID-Ende aaaaaa · Details anzeigen');
+   assert.equal(secondSummary.getAttribute('aria-label'),
+     'BTC · Short · Hebel 5× · P/L laut Quelle -2,75 USD · Kapital 125,50 USD/USDT · ID-Ende bbbbbb · Details anzeigen');
+   assert.match(firstSummary.textContent,/BTCShortHebel 5×/);
+   assert.match(firstSummary.textContent,/Kapital125,50 USD\/USDT/);
+   assert.match(firstSummary.textContent,/P\/L laut Quelle-2,75 USD/);
+   assert.match(firstSummary.textContent,/Details/);
+   assert.match(first.textContent,/Technische Referenz: a{20}/);
+   assert.match(second.textContent,/Technische Referenz: b{20}/);
+   assert.match(target.textContent,/Hebel · Originalwert5×/);
+   assert.match(target.textContent,/Kapital · Originalwert125.5 USD\/USDT/);
+   assert.match(target.textContent,/P\/L laut Quelle · Originalwert-2.75 USD/);
+   assert.match(target.textContent,/0.00001234/);
+   assert.match(target.textContent,/Grid-GewinnNicht verfügbar/);assert.match(target.textContent,/RisikopufferNicht verfügbar/);
+   assert.match(target.textContent,/Liquidationspreis laut QuelleNicht verfügbar/);assert.doesNotMatch(target.textContent,/SECRET|999|100 %/);
+   assert.deepEqual(all(target,'details').map(node=>node.id),['bot-card-'+ 'a'.repeat(20),'bot-card-'+ 'b'.repeat(20)]);
+   assert.match(all(target,'div').find(node=>node.getAttribute('role')==='status').textContent,/bestätigt keinen laufenden Bot-Prozess/);
+   assert.equal(all(target,'time').length,1,'freshness context appears once');
+   renderBotReadState(target,{status:'locked'});assert.equal(all(target,'details').length,0);
+   assert.doesNotMatch(target.textContent,/125.5|a{20}|b{20}/);
+ });
 
- test('P/L alone receives semantic color; missing and coerced zeros remain neutral',()=>{
-  for(const [value,tone] of [[-2.75,'negative'],[2.75,'positive'],[0,null],[-0,null],[null,null],[undefined,null],['2',null],[NaN,null],[Infinity,null]]){
-    const state=fresh(),target=root();state.model.bots[0].metrics={pnlUsd:value,leverage:5,investmentUsd:120};
-    renderBotReadState(target,state);
-    const colored=all(target,'strong').filter(node=>node.className?.startsWith('bot-pnl-'));
-    assert.equal(colored.length,tone?1:0);
-    if(tone){assert.equal(colored[0].className,'bot-pnl-'+tone);assert.equal(colored[0].textContent,value<0?'-2,75 USD':'2,75 USD');}
-  }
-});
+ test('signed P/L keeps tiny values visible and zero or missing values unconfirmed',()=>{
+   for(const [value,tone] of [[-2.75,'negative'],[2.75,'positive'],[0,null],[-0,null],[null,null],[undefined,null],['2',null],[NaN,null],[Infinity,null]]){
+     const state=fresh(),target=root();state.model.bots[0].metrics={pnlUsd:value,leverage:5,investmentUsd:120};
+     renderBotReadState(target,state);
+     const colored=all(target,'strong').filter(node=>node.className?.startsWith('bot-pnl-'));
+     assert.equal(colored.length,tone?1:0);
+     if(tone){assert.equal(colored[0].className,'bot-pnl-'+tone);assert.equal(colored[0].textContent,value<0?'-2,75 USD':'+2,75 USD');}
+     else assert.match(target.textContent,/P\/L laut QuelleNicht verfügbar/);
+   }
+   for(const [value,expected] of [[-0.0004,'-<0,01 USD'],[0.0004,'+<0,01 USD'],[0.01,'+0,01 USD'],[1234567890123.4568,'+1.234.567.890.123,46 USD']]){
+     const state=fresh(),target=root();state.model.bots[0].metrics={pnlUsd:value};
+     renderBotReadState(target,state);
+     const summary=all(target,'summary')[0];
+     assert.ok(summary.textContent.includes(expected),expected);
+     assert.ok(all(target,'strong').some(node=>node.textContent===expected));
+   }
+ });
+
+ test('duplicate-symbol accessible names include visible metrics and disambiguate reference-tail collisions',()=>{
+   const state=fresh(),target=root(),template=state.model.bots[0];
+   state.model.bots=[
+     {...template,ref:'a'.repeat(14)+'abcdef',metrics:{leverage:5,investmentUsd:125.5,pnlUsd:-2.75}},
+     {...template,ref:'b'.repeat(14)+'abcdef',metrics:{leverage:2,investmentUsd:80,pnlUsd:1.25}}
+   ];
+   renderBotReadState(target,state);
+   const names=all(target,'summary').map(summary=>summary.getAttribute('aria-label'));
+   assert.deepEqual(names,[
+     'BTC · Short · Hebel 5× · P/L laut Quelle -2,75 USD · Kapital 125,50 USD/USDT · ID-Ende aabcdef · Details anzeigen',
+     'BTC · Short · Hebel 2× · P/L laut Quelle +1,25 USD · Kapital 80,00 USD/USDT · ID-Ende babcdef · Details anzeigen'
+   ]);
+   assert.ok(names.every(name=>!name.includes('a'.repeat(14))&&!name.includes('b'.repeat(14))));
+ });
+
+ test('USD, USDT and COIN-M capital keep source units and original detail precision',()=>{
+   const cases=[
+     {investmentUsd:125.5678,investmentAmount:99.9876,investmentCurrency:'USDT',
+       collapsed:'125,57 USD/USDT',detail:'125.5678 USD/USDT'},
+     {investmentUsd:0.004,investmentAmount:99.9876,investmentCurrency:'USDT',
+       collapsed:'<0,01 USD/USDT',detail:'0.004 USD/USDT'},
+     {investmentUsd:null,investmentAmount:12.3456,investmentCurrency:'USDT',
+       collapsed:'12,35 USDT',detail:'12.3456 USDT'},
+     {investmentUsd:null,investmentAmount:0.0000123456789,investmentCurrency:'BTC',
+       collapsed:'0,0000123456789 BTC',detail:'0.0000123456789 BTC'}
+   ];
+   for(const input of cases){
+     const state=fresh(),target=root();
+     state.model.bots[0].metrics={...input,leverage:5.1234567890123,pnlUsd:0.0034567890123};
+     renderBotReadState(target,state);
+     const summary=all(target,'summary')[0];
+     assert.ok(summary.textContent.includes(input.collapsed),input.collapsed);
+     assert.match(target.textContent,new RegExp(input.detail.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')));
+     assert.match(target.textContent,/Hebel · Originalwert5.1234567890123×/);
+     assert.match(target.textContent,/P\/L laut Quelle · Originalwert0.0034567890123 USD/);
+     assert.match(summary.textContent,/\+<0,01 USD/);
+   }
+ });
+
+ test('sorting continues to use unrounded source P/L values',()=>{
+   const state=duplicateSnapshot(),target=root();
+   state.model.bots[0].metrics={pnlUsd:-0.001};
+   state.model.bots[1].metrics={pnlUsd:0.002};
+   renderBotReadState(target,state,{sort:'pnl'});
+   assert.deepEqual(all(target,'details').map(card=>card.id),['bot-card-'+ 'a'.repeat(20),'bot-card-'+ 'b'.repeat(20)]);
+ });
 
 
 test('Command equal-symbol equal-loss actions have distinct references and directions',()=>{
   const target=root(),selected=[];
   renderCommandBotOverview(target,{status:'fresh',source:'PIONEX_BOT_API',snapshotAt:'2026-10-18T10:00:00Z',count:2,
     distribution:{long:1,short:1,neutral:0,unknown:0},losses:[
-      {ref:'a'.repeat(20),symbol:'BTC',direction:'long',pnl:'-25 USD'},
-      {ref:'b'.repeat(20),symbol:'BTC',direction:'short',pnl:'-25 USD'}]},ref=>selected.push(ref));
+      {ref:'a'.repeat(20),symbol:'BTC',direction:'long',pnl:'-25,00 USD',pnlDetail:'-25 USD',pnlTone:'negative'},
+      {ref:'b'.repeat(20),symbol:'BTC',direction:'short',pnl:'-25,00 USD',pnlDetail:'-25 USD',pnlTone:'negative'}]},ref=>selected.push(ref));
   const buttons=all(target,'button');
   assert.notEqual(buttons[0].textContent,buttons[1].textContent);
   assert.notEqual(buttons[0].getAttribute('aria-label'),buttons[1].getAttribute('aria-label'));
-  assert.match(buttons[0].textContent,/BTC · Long · Referenz a{20}/);
-  assert.match(buttons[1].textContent,/BTC · Short · Referenz b{20}/);
+  assert.match(buttons[0].textContent,/BTC · Long/);assert.match(buttons[0].textContent,/-25,00 USD/);
+  assert.match(buttons[1].textContent,/BTC · Short/);assert.match(buttons[1].textContent,/-25,00 USD/);
+  assert.doesNotMatch(buttons[0].textContent,/Referenz/);
+  assert.match(buttons[0].getAttribute('aria-label'),/Referenz a{20}/);
+  assert.match(buttons[1].getAttribute('aria-label'),/Referenz b{20}/);
+  assert.match(all(target,'details').find(node=>node.className==='command-bot-details').textContent,/Technische Referenz: a{20}/);
+  const detailNames=all(target,'summary').filter(node=>node.getAttribute('aria-label')?.startsWith('Details zu'));
+  assert.deepEqual(detailNames.map(node=>node.getAttribute('aria-label')),[
+    'Details zu BTC · Long · Referenz '+'a'.repeat(20),'Details zu BTC · Short · Referenz '+'b'.repeat(20)]);
+  assert.match(target.textContent,/18\.10\.2026, 10:00 UTC/);
+  assert.equal(all(target,'time')[0].textContent,'2026-10-18T10:00:00Z');
+  assert.equal(all(target,'time')[0].getAttribute('datetime'),'2026-10-18T10:00:00Z');
+  assert.match(target.textContent,/Quelle & Zeit/);assert.match(target.textContent,/Long 1 · Short 1 · Neutral 0 · Unbekannt 0/);
   buttons.forEach(button=>button.click());assert.deepEqual(selected,['a'.repeat(20),'b'.repeat(20)]);
+});
+test('Command keeps unavailable status distinct from unknown fresh metadata',()=>{
+  const target=root();
+  renderCommandBotOverview(target,{status:'fresh',source:'unknown',count:null,distribution:{},
+    snapshotAt:'invalid',losses:[]});
+  assert.equal(target.getAttribute('data-state'),'fresh');
+  assert.match(target.textContent,/Zeit unbekannt · Unbekannt Bots · nur lesend/);
+  assert.match(target.textContent,/Quelle: Unbekannt/);
+  assert.match(target.textContent,/Richtung: Long Unbekannt · Short Unbekannt · Neutral Unbekannt · Unbekannt Unbekannt/);
+  assert.match(target.textContent,/Keine bestätigten negativen P\/L-Werte/);
+  assert.equal(all(target,'time')[0].getAttribute('datetime'),null);
+  for(const status of ['locked','stale','unavailable']){
+    renderCommandBotOverview(target,{status});
+    assert.equal(target.getAttribute('data-state'),status);
+    assert.notEqual(target.textContent,'Zeit unbekannt · Unbekannt Bots · nur lesend');
+  }
 });
 
 

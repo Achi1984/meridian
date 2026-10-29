@@ -1,6 +1,6 @@
-import {appAccess} from './app-access.js?v=B14-M11-DEPOT976';
-import {createDepotReadClient} from './depot-read-client.js?v=B14-M11-DEPOT976';
-import {createDepotReadView} from './depot-read-view.js?v=B14-M11-DEPOT976';
+import {appAccess} from './app-access.js?v=B15-M11';
+import {createDepotReadClient} from './depot-read-client.js?v=B15-M11';
+import {createDepotReadView} from './depot-read-view.js?v=B15-M11';
 
 // Mounting controls never starts a request. Only the view's manual refresh can read.
 export function mountDepotReadAccess(document,window,{
