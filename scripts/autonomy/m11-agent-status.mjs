@@ -306,7 +306,11 @@ function validateRow(row, nowMs) {
   const modelEvidence = validateEvidenceBinding(row.modelEvidence, agentId, taskId, undefined, nowMs);
   const coordinatorEvidence = validateEvidenceBinding(row.coordinatorEvidence, agentId, taskId, row.coordinatorMode, nowMs);
 
-  const rowFreshness = deriveFreshness(row.observedAt, row.expiresAt, nowMs);
+  const evidencePresent = (row.providerEvidence !== undefined && row.providerEvidence !== null)
+    || (row.modelEvidence !== undefined && row.modelEvidence !== null)
+    || (row.coordinatorEvidence !== undefined && row.coordinatorEvidence !== null);
+  const hasAnyEvidence = Boolean(providerEvidence || modelEvidence || coordinatorEvidence);
+  const rowFreshness = evidencePresent ? deriveFreshness(row.observedAt, row.expiresAt, nowMs) : 'UNKNOWN';
   const providerVerified = rowFreshness === 'CURRENT' && providerEvidence ? providerEvidence.value : 'UNKNOWN';
   const modelVerified = rowFreshness === 'CURRENT' && modelEvidence ? modelEvidence.value : 'UNKNOWN';
 
@@ -367,33 +371,41 @@ export function normalizeM11AgentStatus(input, options = {}) {
   if (!isPlainObject(input)) {
     throw new TypeError('M11 agent status input must be a plain object');
   }
-  const schemaDesc = Object.getOwnPropertyDescriptor(input, 'schemaVersion');
-  const rowsDesc = Object.getOwnPropertyDescriptor(input, 'rows');
-  if (!schemaDesc || !rowsDesc) {
+  const topKeys = Reflect.ownKeys(input);
+  const allowedTopKeys = new Set(['schemaVersion', 'rows']);
+  const fullTopKeys = new Set(['schemaVersion', 'status', 'freshness', 'rows']);
+  const isMinimalInput = topKeys.length === 2 && topKeys.every(key => allowedTopKeys.has(key));
+  const isSerializedInput = topKeys.length === 4 && topKeys.every(key => fullTopKeys.has(key));
+  if (!isMinimalInput && !isSerializedInput) {
     throw new TypeError('M11 agent status must contain schemaVersion and rows');
   }
-  if (input.schemaVersion !== 1) {
+
+  const schemaValue = readOwnDataValue(input, 'schemaVersion');
+  const rowsValue = readOwnDataValue(input, 'rows');
+  const statusValue = readOwnDataValue(input, 'status');
+  const freshnessValue = readOwnDataValue(input, 'freshness');
+  if (schemaValue !== 1) {
     throw new TypeError('Unsupported M11 agent status schemaVersion');
   }
-  if (!isExactArray(rowsDesc.value) || rowsDesc.value.length === 0 || rowsDesc.value.length > 50) {
+  if (statusValue !== undefined && statusValue !== 'READY') {
+    throw new TypeError('Invalid M11 agent status status');
+  }
+  if (freshnessValue !== undefined && !M11_FRESHNESS_STATES.includes(freshnessValue)) {
+    throw new TypeError('Invalid M11 agent status freshness');
+  }
+  if (!isExactArray(rowsValue) || rowsValue.length === 0 || rowsValue.length > 50) {
     throw new TypeError('M11 agent status rows must be a non-empty array up to 50 items');
   }
 
   const nowMs = readClock(options);
   const rows = [];
-  for (let index = 0; index < rowsDesc.value.length; index += 1) {
-    const row = rowsDesc.value[index];
+  for (let index = 0; index < rowsValue.length; index += 1) {
+    const row = rowsValue[index];
     if (isProxy(row) || !isPlainObject(row)) {
       throw new TypeError('M11 agent status row must be a plain object');
     }
     rows.push(validateRow(row, nowMs));
   }
-
-  const knownRows = rows.map(row => ({
-    ...row,
-    providerVerified: row.providerEvidence ? row.providerEvidence.value : 'UNKNOWN',
-    modelVerified: row.modelEvidence ? row.modelEvidence.value : 'UNKNOWN'
-  }));
 
   const freshness = rows.every(row => row.freshness === 'CURRENT')
     ? 'CURRENT'
@@ -405,7 +417,7 @@ export function normalizeM11AgentStatus(input, options = {}) {
     schemaVersion: 1,
     status: 'READY',
     freshness,
-    rows: Object.freeze(knownRows)
+    rows: Object.freeze(rows)
   });
 }
 

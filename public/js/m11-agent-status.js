@@ -205,12 +205,16 @@ function validateEvidenceBinding(binding, expectedAgentId, expectedTaskId, expec
 function validateSerializedStatus(raw, nowMs) {
   if (!isPlainObject(raw)) throw new TypeError('M11 agent status input must be a plain object');
   const keys = Reflect.ownKeys(raw);
-  if (!keys.includes('schemaVersion') || !keys.includes('status') || !keys.includes('freshness') || !keys.includes('rows')) {
-    throw new TypeError('M11 agent status must contain schemaVersion, status, freshness and rows');
+  const allowedKeys = new Set(['schemaVersion', 'rows']);
+  const fullKeys = new Set(['schemaVersion', 'status', 'freshness', 'rows']);
+  const isMinimal = keys.length === 2 && keys.every(key => allowedKeys.has(key));
+  const isSerialized = keys.length === 4 && keys.every(key => fullKeys.has(key));
+  if (!isMinimal && !isSerialized) {
+    throw new TypeError('M11 agent status must contain schemaVersion and rows');
   }
   if (raw.schemaVersion !== 1) throw new TypeError('Unsupported M11 agent status schemaVersion');
-  if (raw.status !== 'READY') throw new TypeError('Invalid M11 agent status status');
-  if (!['CURRENT', 'STALE', 'UNKNOWN'].includes(raw.freshness)) throw new TypeError('Invalid M11 agent status freshness');
+  if (raw.status !== undefined && raw.status !== 'READY') throw new TypeError('Invalid M11 agent status status');
+  if (raw.freshness !== undefined && !['CURRENT', 'STALE', 'UNKNOWN'].includes(raw.freshness)) throw new TypeError('Invalid M11 agent status freshness');
   if (!isExactArray(raw.rows) || raw.rows.length === 0 || raw.rows.length > 50) {
     throw new TypeError('M11 agent status rows must be a non-empty array up to 50 items');
   }
@@ -235,9 +239,9 @@ function validateSerializedStatus(raw, nowMs) {
     const providerRequested = safeText(row.providerRequested, 80);
     const modelRequested = safeText(row.modelRequested, 120);
     if (!providerRequested || !modelRequested) throw new TypeError('Requested provider and model are required');
-    const providerVerified = safeText(row.providerVerified, 80);
-    const modelVerified = safeText(row.modelVerified, 120);
-    if (providerVerified === null || modelVerified === null) throw new TypeError('Provider and model verification values must be strings or UNKNOWN');
+    const rowProviderVerified = safeText(row.providerVerified, 80);
+    const rowModelVerified = safeText(row.modelVerified, 120);
+    if (rowProviderVerified === null || rowModelVerified === null) throw new TypeError('Provider and model verification values must be strings or UNKNOWN');
     const taskUrl = validateGithubUrl(row.taskUrl);
     if (!taskUrl) throw new TypeError('Task URL must be a valid public GitHub URL');
     const observedAt = isoMs(row.observedAt);
@@ -245,18 +249,18 @@ function validateSerializedStatus(raw, nowMs) {
     if (observedAt === null || expiresAt === null || observedAt > expiresAt) throw new TypeError('Observation and expiry timestamps are invalid');
     const evidenceType = safeText(row.evidenceType, 80);
     if (evidenceType && !VALID_EVIDENCE_TYPES.has(evidenceType)) throw new TypeError('Evidence type is invalid');
-    const freshness = deriveFreshness(row.observedAt, row.expiresAt, nowMs);
-    if (!['CURRENT','STALE','UNKNOWN'].includes(row.freshness)) throw new TypeError('Invalid row freshness');
+    const rowFreshness = deriveFreshness(row.observedAt, row.expiresAt, nowMs);
     const providerEvidence = validateEvidenceBinding(row.providerEvidence, agentId, taskId, undefined, nowMs);
     const modelEvidence = validateEvidenceBinding(row.modelEvidence, agentId, taskId, undefined, nowMs);
     const coordinatorEvidence = validateEvidenceBinding(row.coordinatorEvidence, agentId, taskId, row.coordinatorMode, nowMs);
-    const providerVerified = freshness === 'CURRENT' && providerEvidence ? providerEvidence.value : 'UNKNOWN';
-    const modelVerified = freshness === 'CURRENT' && modelEvidence ? modelEvidence.value : 'UNKNOWN';
+    const effectiveFreshness = rowFreshness;
+    const effectiveProviderVerified = effectiveFreshness === 'CURRENT' && providerEvidence ? providerEvidence.value : 'UNKNOWN';
+    const effectiveModelVerified = effectiveFreshness === 'CURRENT' && modelEvidence ? modelEvidence.value : 'UNKNOWN';
     const effectiveTaskState = row.taskState === 'RUNNING' || row.taskState === 'REVIEWING'
-      ? (freshness === 'CURRENT' && (providerEvidence || modelEvidence) ? row.taskState : 'UNKNOWN')
+      ? (effectiveFreshness === 'CURRENT' && (providerEvidence || modelEvidence) ? row.taskState : 'UNKNOWN')
       : row.taskState;
     const effectiveCoordinatorMode = row.coordinatorMode === 'ACTIVE'
-      ? (freshness === 'CURRENT' && coordinatorEvidence && coordinatorEvidence.value === 'ACTIVE' ? row.coordinatorMode : 'UNKNOWN')
+      ? (effectiveFreshness === 'CURRENT' && coordinatorEvidence && coordinatorEvidence.value === 'ACTIVE' ? row.coordinatorMode : 'UNKNOWN')
       : row.coordinatorMode;
     const blocker = row.blocker === null || row.blocker === undefined ? null : safeText(row.blocker, 200);
     const nextAction = safeText(row.nextAction, 200);
@@ -275,9 +279,9 @@ function validateSerializedStatus(raw, nowMs) {
       taskState: effectiveTaskState,
       coordinatorMode: effectiveCoordinatorMode,
       providerRequested,
-      providerVerified,
+      providerVerified: effectiveProviderVerified,
       modelRequested,
-      modelVerified,
+      modelVerified: effectiveModelVerified,
       providerEvidence,
       modelEvidence,
       coordinatorEvidence,
@@ -290,14 +294,20 @@ function validateSerializedStatus(raw, nowMs) {
       nextAction,
       ownerDecisionRequired: row.ownerDecisionRequired,
       ownerDecisionReason,
-      freshness
+      freshness: effectiveFreshness
     }));
   }
+
+  const derivedFreshness = rows.every(row => row.freshness === 'CURRENT')
+    ? 'CURRENT'
+    : rows.some(row => row.freshness === 'STALE')
+      ? 'STALE'
+      : 'UNKNOWN';
 
   return Object.freeze({
     schemaVersion: 1,
     status: 'READY',
-    freshness: raw.freshness,
+    freshness: derivedFreshness,
     rows: Object.freeze(rows)
   });
 }
