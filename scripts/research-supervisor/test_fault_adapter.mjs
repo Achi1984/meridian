@@ -1,6 +1,6 @@
 import {spawn} from "node:child_process";
 import {createHash} from "node:crypto";
-import {existsSync, writeFileSync} from "node:fs";
+import {existsSync, readlinkSync, writeFileSync} from "node:fs";
 import {createInterface} from "node:readline";
 
 const paths = [
@@ -39,9 +39,11 @@ if (input.sourceSha256 === "e".repeat(64)) {
   const ack = JSON.parse(acknowledgement.value);
   if (ack.event !== "parent_started" || ack.index !== input.index || ack.pathId !== path.id)
     process.exit(4);
-  writeFileSync(
-    `/tmp/meridian-m11-fault-ack-${process.ppid}-${input.sourceSha256[0]}-${input.index}.ready`,
-    `${input.sourceSha256}:${input.index}`);
+  if (["c", "9", "d"].includes(input.sourceSha256[0])) {
+    writeFileSync(
+      `/tmp/meridian-m11-fault-ack-${process.ppid}-${input.sourceSha256[0]}-${input.index}.ready`,
+      `${input.sourceSha256}:${input.index}`);
+  }
   process.stdin.destroy();
   if (input.sourceSha256 === "b".repeat(64)) await new Promise(resolve => setTimeout(resolve, 3000));
   if (input.sourceSha256 === "c".repeat(64)) {
@@ -50,13 +52,18 @@ if (input.sourceSha256 === "e".repeat(64)) {
     process.stderr.write("X".repeat(6000));
   } else if (input.sourceSha256 === "d".repeat(64)) {
     const marker = `/tmp/meridian-m11-inherited-pipe-${process.ppid}`;
-    if (marker) writeFileSync(`${marker}.parent`, String(process.pid));
+    writeFileSync(`${marker}.parent`, String(process.pid));
+    writeFileSync(`${marker}.parentfds`, JSON.stringify({
+      fd1: readlinkSync('/proc/self/fd/1'),
+      fd2: readlinkSync('/proc/self/fd/2')
+    }));
     const descendant = spawn(process.execPath, ["-e",
-      "const fs=require('fs');const p=process.argv[1];if(p)fs.writeFileSync(p,`${process.pid}:${process.ppid}`);setTimeout(()=>{},10000)",
-      `${marker}.descendant`], {
+      "const fs=require('fs');const p=process.argv[1];const term=process.argv[2];if(p)fs.writeFileSync(p,JSON.stringify({pid:process.pid,ppid:process.ppid,fd1:fs.readlinkSync('/proc/self/fd/1'),fd2:fs.readlinkSync('/proc/self/fd/2')}));process.on('SIGTERM',()=>{if(term)fs.writeFileSync(term,'term');process.exit(0);});setTimeout(()=>{},10000)",
+      `${marker}.descendant`,
+      `${marker}.descendant.term`], {
       stdio: ["ignore", "inherit", "inherit"]
     });
-    if (marker && descendant.pid > 0) {
+    if (descendant.pid > 0) {
       const deadline = Date.now() + 2000;
       while (!existsSync(`${marker}.descendant`) && Date.now() < deadline)
         await new Promise(resolve => setTimeout(resolve, 5));

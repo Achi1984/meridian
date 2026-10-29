@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import select
 import signal
+import stat
 import subprocess
 import sys
 import tempfile
@@ -102,26 +103,50 @@ class SupervisionTests(unittest.TestCase):
     def test_nonzero_exit_after_driver_success(self):
         started=time.monotonic()
         exit7=self.root/'nonzero-exit7'
-        def load_unpinned_supervisor():
-            path=m.ROOT/'publisher_test_password_setup.py'
-            module=importlib.util.module_from_spec(
-                importlib.util.spec_from_file_location('pinned_role_supervisor_unpinned',path))
-            exec(compile(path.read_text(),str(path),'exec'),module.__dict__)
-            return module
+        confirmed=self.root/'driver-confirmed'
+        observed=[]
+        real_waitpid=m.os.waitpid
+        original_drive=m.transition.drive_transition
+        def observe_drive(*args,**kwargs):
+            result=original_drive(*args,**kwargs)
+            if (type(result) is dict and result.get('outcome')=='CONFIRMED'
+                    and result.get('operationClaimConfirmed') is True
+                    and result.get('connectionCleanupConfirmed') is True):
+                confirmed.write_text('confirmed')
+            return result
+        def observe_waitpid(pid,options):
+            found,status=real_waitpid(pid,options)
+            worker=(self.root/'worker')
+            if worker.exists() and found==int(worker.read_text()):
+                observed.append((found,status))
+            return found,status
         @contextlib.contextmanager
         def nonzero_after_success(phase):
             with self.factory()(phase) as services:
+                original=services.record
+                def record(binding,stage,status):
+                    if stage=='finished' and status=='CONFIRMED':
+                        confirmed.write_text('confirmed')
+                    return original(binding,stage,status)
+                services.record=record
                 yield services
             exit7.write_text('exit7')
             os._exit(7)
-        with (
-            patch.object(m,'load_supervisor',side_effect=load_unpinned_supervisor),
-            patch.object(m.transition,'drive_transition',return_value={'synthetic':'ok'}),
-            patch.object(m,'_confirmed',return_value=True),
-            patch.dict(BUDGETS,{'exit':3.0}),
-        ):
-            self.assert_unknown(self.run_worker(nonzero_after_success)); self.assert_reaped()
+        supervisor_path=m.ROOT/'publisher_test_password_setup.py'
+        original_mode=stat.S_IMODE(os.stat(supervisor_path).st_mode)
+        os.chmod(supervisor_path,original_mode & ~0o022)
+        try:
+            with (
+                patch.object(m.transition,'drive_transition',side_effect=observe_drive),
+                patch.object(m.os,'waitpid',side_effect=observe_waitpid),
+                patch.dict(BUDGETS,{'exit':3.0}),
+            ):
+                self.assert_unknown(self.run_worker(nonzero_after_success)); self.assert_reaped()
+        finally:
+            os.chmod(supervisor_path,original_mode)
+        self.assertEqual(confirmed.read_text(),'confirmed')
         self.assertEqual(exit7.read_text(),'exit7')
+        self.assertTrue(any(os.WIFEXITED(status) and os.WEXITSTATUS(status)==7 for _,status in observed),observed)
         self.assertLess(time.monotonic()-started,4.5)
 
     def test_malformed_driver_and_truthy_flags_rejected(self):
