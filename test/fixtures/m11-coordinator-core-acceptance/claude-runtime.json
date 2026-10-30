@@ -1,0 +1,28 @@
+[
+  {
+    "type": "system",
+    "subtype": "init",
+    "session_id": "synthetic-session-001",
+    "model": "synthetic-model"
+  },
+  {
+    "type": "assistant",
+    "session_id": "synthetic-session-001",
+    "message": {
+      "model": "synthetic-model"
+    }
+  },
+  {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "num_turns": 3,
+    "session_id": "synthetic-session-001",
+    "modelUsage": {
+      "synthetic-model": {
+        "input_tokens": 1,
+        "output_tokens": 1
+      }
+    }
+  }
+]
