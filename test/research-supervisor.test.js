@@ -79,6 +79,7 @@ const groups = [
       "test_competing_process_claims_allow_only_one_and_budget_survives_new_ids",
       "test_contract_rejects_unbounded_or_nonzero_model_budget",
       "test_crash_after_claim_before_start_is_unresolved_and_reconcilable",
+      "test_cleanup_owned_live_descendants_signals_only_same_owned_live_identity",
       "test_enqueue_conflict_is_immutable_and_duplicate_is_idempotent",
       "test_explicit_scheduler_off_and_pinned_policy_rejection_are_durable",
       "test_failed_settlement_rolls_back_and_keeps_active_until_reconciliation",
@@ -145,8 +146,8 @@ test("durable bounded research supervisor synthetic suite", () => {
   assert.equal(new Set(assigned).size, assigned.length, "explicit unittest groups contain duplicates");
   assert.deepEqual([...assigned].sort(), [...discovered].sort(),
     "explicit unittest groups must cover actual unittest discovery exactly");
-  assert.deepEqual(groups.map(group => group.methods.length), [3, 3, 2, 16, 18],
-    "the discovered suite must retain the reviewed 3/3/2/16/18 partition");
+  assert.deepEqual(groups.map(group => group.methods.length), [3, 3, 2, 16, 19],
+    "the discovered suite must retain the reviewed 3/3/2/16/19 partition");
 
   const timings = [];
   for (const group of groups) {

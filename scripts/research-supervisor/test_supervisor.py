@@ -174,6 +174,34 @@ def _classify_pid_state(pid, expected_start_ticks):
     return {**snapshot, "classification": "zombie" if snapshot["state"] == "Z" else "live"}
 
 
+def _cleanup_owned_live_descendants(descendant_identity, classify=_classify_pid_state,
+                                    kill_process=os.kill, kill_signal=signal.SIGKILL):
+    signaled = []
+    for identity in descendant_identity:
+        if type(identity) is not dict:
+            continue
+        pid = identity.get("pid")
+        start_ticks = identity.get("start_ticks")
+        expected_pgrp = identity.get("pgrp")
+        if type(pid) is not int or type(start_ticks) is not int or type(expected_pgrp) is not int:
+            continue
+        state = classify(pid, start_ticks)
+        if type(state) is not dict:
+            continue
+        if state.get("classification") != "live" or state.get("status") != "ok":
+            continue
+        if state.get("pid") != pid or state.get("start_ticks") != start_ticks:
+            continue
+        if state.get("pgrp") != expected_pgrp:
+            continue
+        try:
+            kill_process(pid, kill_signal)
+            signaled.append(pid)
+        except ProcessLookupError:
+            pass
+    return signaled
+
+
 def _historical_helper_diagnostic_fields(metrics):
     if type(metrics) is not dict:
         return {}
@@ -1988,6 +2016,39 @@ process.stdout.write(JSON.stringify(runBatch({
                 self.assertEqual(classification.get("reason"), expected_reason)
                 self.assertNotEqual(classification.get("classification"), "dead")
 
+    def test_cleanup_owned_live_descendants_signals_only_same_owned_live_identity(self):
+        identity = {"pid": 22222, "start_ticks": 33333, "pgrp": 44444}
+
+        def classify_factory(response):
+            def classify(pid, start_ticks):
+                self.assertEqual((pid, start_ticks), (identity["pid"], identity["start_ticks"]))
+                return {**response, "pid": pid, "start_ticks": start_ticks}
+            return classify
+
+        no_signal_cases = (
+            ("pid_reused", {"classification": "pid_reused", "status": "ok", "pgrp": identity["pgrp"]}),
+            ("zombie", {"classification": "zombie", "status": "ok", "pgrp": identity["pgrp"]}),
+            ("missing", {"classification": "dead", "status": "missing", "pgrp": identity["pgrp"]}),
+            ("unknown", {"classification": "unknown", "status": "unknown", "reason": "STAT_FORMAT",
+                         "pgrp": identity["pgrp"]}),
+            ("live_unowned_group", {"classification": "live", "status": "ok", "pgrp": identity["pgrp"] + 1}),
+        )
+        for name, response in no_signal_cases:
+            with self.subTest(name=name):
+                observed = []
+                _cleanup_owned_live_descendants(
+                    [identity],
+                    classify=classify_factory(response),
+                    kill_process=lambda pid, sig: observed.append((pid, sig)))
+                self.assertEqual(observed, [])
+
+        observed = []
+        _cleanup_owned_live_descendants(
+            [identity],
+            classify=classify_factory({"classification": "live", "status": "ok", "pgrp": identity["pgrp"]}),
+            kill_process=lambda pid, sig: observed.append((pid, sig)))
+        self.assertEqual(observed, [(identity["pid"], signal.SIGKILL)])
+
     def test_parent_exit_with_inherited_pipe_times_out_after_started_ack(self):
         marker = Path(f"/tmp/meridian-m11-inherited-pipe-{os.getpid()}")
         ack_marker = Path(f"/tmp/meridian-m11-fault-ack-{os.getpid()}-d-0.ready")
@@ -2109,14 +2170,7 @@ process.stdout.write(JSON.stringify(runBatch({
         finally:
             if thread is not None and thread.is_alive():
                 thread.join(timeout=6)
-            for identity in descendant_identity:
-                state = _classify_pid_state(identity["pid"], identity["start_ticks"])
-                if state.get("classification") != "live":
-                    continue
-                try:
-                    os.kill(identity["pid"], signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
+            _cleanup_owned_live_descendants(descendant_identity)
             for path in (ack_marker, parent_marker, parent_fds_marker, descendant_marker, descendant_term_marker):
                 if path.exists():
                     path.unlink()
