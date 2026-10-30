@@ -397,6 +397,38 @@ test('successful sync replaces bot rows and stamps a fresh Pionex source',()=>{
   assert.deepEqual(next.pionexBotSync.supportedTypes,['futures_grid','future_hedge_grid']);
 });
 
+test('incomplete refresh preserves the authoritative snapshot and clears only after a complete refresh',()=>{
+  const complete={source:'PIONEX_BOT_API',updatedAt:'2026-09-26T15:00:00.000Z',
+    snapshotAt:'2026-09-26T15:00:00.000Z',detailsComplete:true,paginationComplete:true,
+    coverage:{status:'DOCUMENTED',paginationComplete:true},bots:[{id:'synthetic-a'},{id:'synthetic-b'}],botCount:2};
+  const initial=mergePionexSyncState({privateRevision:1},{
+    risk:complete,status:'OK',attemptAt:complete.updatedAt,successAt:complete.updatedAt,configured:true,pages:2
+  });
+  const partial={...complete,updatedAt:'2026-09-26T16:00:00.000Z',snapshotAt:'2026-09-26T16:00:00.000Z',
+    paginationComplete:false,coverage:{status:'PARTIAL',paginationComplete:false},
+    bots:[{id:'synthetic-new-page'}],botCount:1};
+  const truncated=mergePionexSyncState(initial,{
+    risk:partial,status:'OK',attemptAt:partial.updatedAt,successAt:partial.updatedAt,configured:true,pages:20,truncated:true
+  });
+  assert.deepEqual(truncated.pionexRisk,initial.pionexRisk);
+  assert.deepEqual(truncated.pionexRiskPartial,partial);
+  assert.equal(truncated.pionexBotSync.status,'PARTIAL');
+  assert.equal(truncated.pionexBotSync.truncated,true);
+  assert.equal(truncated.pionexBotSync.lastSuccessAt,complete.updatedAt);
+  assert.equal(truncated.pionexBotSync.error,'incomplete_bot_coverage');
+
+  const refreshed={...complete,updatedAt:'2026-09-26T17:00:00.000Z',snapshotAt:'2026-09-26T17:00:00.000Z',
+    bots:[{id:'synthetic-a'},{id:'synthetic-b'},{id:'synthetic-c'}],botCount:3};
+  const recovered=mergePionexSyncState(truncated,{
+    risk:refreshed,status:'OK',attemptAt:refreshed.updatedAt,successAt:refreshed.updatedAt,configured:true,pages:3
+  });
+  assert.deepEqual(recovered.pionexRisk.bots,refreshed.bots);
+  assert.equal(Object.hasOwn(recovered,'pionexRiskPartial'),false);
+  assert.equal(recovered.pionexBotSync.status,'OK');
+  assert.equal(recovered.pionexBotSync.truncated,false);
+  assert.equal(recovered.pionexBotSync.lastSuccessAt,refreshed.updatedAt);
+});
+
 test('futures-grid details are loaded with the signed read-only detail endpoint',async()=>{
   const calls=[];
   const fetchImpl=async(url,options)=>{

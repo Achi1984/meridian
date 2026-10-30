@@ -306,19 +306,27 @@ function configured(env){
 
 export function mergePionexSyncState(current,{risk=null,status,error=null,attemptAt,successAt=null,configured:cfg=false,pages=0,truncated=false,diagnostics=null}={}){
   const base=clone(current)||{},prevRisk=base.pionexRisk||{},prevSync=base.pionexBotSync||{};
-  if(risk)base.pionexRisk={...prevRisk,...risk};
+  const paginationIncomplete=truncated||risk?.paginationComplete===false||
+    risk?.coverage?.paginationComplete===false;
+  const incompleteRisk=!!risk&&(paginationIncomplete||risk.detailsComplete===false||
+    risk.coverage?.status==='PARTIAL');
+  if(incompleteRisk)base.pionexRiskPartial=clone(risk);
+  else if(risk){
+    base.pionexRisk={...prevRisk,...risk};
+    delete base.pionexRiskPartial;
+  }
   base.pionexBotSync={
     configured:!!cfg,
     readOnly:true,
     endpoint:'GET /api/v1/bot/orders',
     queryMode:'ALL_RUNNING_LOCAL_ALLOWLIST',
     supportedTypes:[...PIONEX_SUPPORTED_BOT_TYPES],
-    status:String(status||'UNKNOWN'),
+    status:incompleteRisk?'PARTIAL':String(status||'UNKNOWN'),
     lastAttemptAt:attemptAt||new Date().toISOString(),
-    lastSuccessAt:successAt||prevSync.lastSuccessAt||null,
-    error:error?String(error):null,
+    lastSuccessAt:(incompleteRisk?null:successAt)||prevSync.lastSuccessAt||null,
+    error:error?String(error):incompleteRisk?'incomplete_bot_coverage':null,
     pages:Number(pages)||0,
-    truncated:!!truncated,
+    truncated:!!paginationIncomplete,
     diagnostics:diagnostics?clone(diagnostics):(prevSync.diagnostics||null)
   };
   base.privateRevision=(Number.isInteger(base.privateRevision)?base.privateRevision:0)+1;
@@ -370,9 +378,15 @@ export async function runPionexBotSyncOnce({env=process.env,fetchImpl=fetch,now=
       paginationComplete,
       syncMode:'BOT_READING_DETAIL_HYDRATED'
     };
+    const incomplete=!risk.detailsComplete||!risk.paginationComplete||risk.coverage.status==='PARTIAL';
     let applied=false,guarded=false;
     await updatePrivateState(env,current=>{
       const previousCount=Array.isArray(current?.pionexRisk?.bots)?current.pionexRisk.bots.length:0;
+      if(incomplete){
+        applied=true;
+        return mergePionexSyncState(current,{risk,status:'PARTIAL',error:'incomplete_bot_coverage',
+          attemptAt:at,configured:true,pages,truncated,diagnostics});
+      }
       if(previousCount>0&&risk.botCount===0){
         guarded=true;
         return mergePionexSyncState(current,{status:'EMPTY_GUARD',error:'zero_supported_running_bots',attemptAt:at,configured:true,pages,truncated,diagnostics});
@@ -381,7 +395,9 @@ export async function runPionexBotSyncOnce({env=process.env,fetchImpl=fetch,now=
       return mergePionexSyncState(current,{risk,status:'OK',attemptAt:at,successAt:at,configured:true,pages,truncated,diagnostics});
     });
     if(guarded)return {ok:false,reason:'empty_guard',botCount:0,apiRows:risk.apiRows,supportedRows:risk.supportedRows,detailRows:risk.detailRows,pages,truncated,diagnostics};
-    return {ok:applied,botCount:risk.botCount,apiRows:risk.apiRows,supportedRows:risk.supportedRows,detailRows:risk.detailRows,detailsComplete:risk.detailsComplete,pages,truncated,paginationComplete,coverage:risk.coverage,diagnostics};
+    return {ok:applied&&!incomplete,status:incomplete?'PARTIAL':'OK',reason:incomplete?'incomplete_coverage':null,
+      botCount:risk.botCount,apiRows:risk.apiRows,supportedRows:risk.supportedRows,detailRows:risk.detailRows,
+      detailsComplete:risk.detailsComplete,pages,truncated,paginationComplete,coverage:risk.coverage,diagnostics};
   }catch(e){
     const msg=String(e?.message||e);
     try{if(env.DATABASE_URL)await updatePrivateState(env,current=>mergePionexSyncState(current,{status:'ERROR',error:msg,attemptAt:at,configured:creds.ok}))}catch{}

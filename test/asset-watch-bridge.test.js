@@ -207,3 +207,21 @@ test('a remaining continuation token keeps page-limited bridge coverage partial 
   assert.equal(x.coverage.pageLimit,20);assert.equal(x.coverage.status,'PARTIAL');
   assert.equal(x.usableForDisplay,true);assert.equal(x.usableForOverwrite,false);
 });
+
+test('latest incomplete diagnostic rows remain displayable without replacing the complete snapshot',()=>{
+  const complete={snapshotAt:'2026-09-28T20:40:00.000Z',detailsComplete:true,
+    coverage:{status:'DOCUMENTED',paginationComplete:true},
+    bots:[bot({botOrderId:'synthetic-complete',symbol:'ADA'})]};
+  const partial={snapshotAt:'2026-09-28T20:44:00.000Z',detailsComplete:true,paginationComplete:false,
+    coverage:{status:'PARTIAL',paginationComplete:false,pages:20,pageLimit:20},
+    bots:[bot({botOrderId:'synthetic-partial',symbol:'BTC',cateType:'FUTURES_MOON'})]};
+  const input=state({pionexRisk:complete,pionexRiskPartial:partial,
+    pionexBotSync:{status:'PARTIAL',truncated:true,lastSuccessAt:'2026-09-28T20:40:00.000Z'}});
+  const x=buildAssetWatchApiSnapshot(input,{now:NOW});
+  assert.equal(input.pionexRisk.bots[0].symbol,'ADA');
+  assert.equal(x.bots.length,1);assert.equal(x.bots[0].symbol,'BTC');
+  assert.equal(x.bots[0].cateType,'FUTURES_MOON');
+  assert.equal(x.coverage.paginationComplete,false);assert.equal(x.coverage.status,'PARTIAL');
+  assert.equal(x.sourceStatusOk,true);assert.equal(x.usableForDisplay,true);
+  assert.equal(x.usableForOverwrite,false);
+});

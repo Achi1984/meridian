@@ -40,6 +40,17 @@ test('r20+ uses selected Pionex source and raw source row count',()=>{
   assert.match(js,/botFeedSource:String\(feed\?\.source/);
 });
 
+test('r20 refuses explicitly incomplete primary and wallet bot coverage as authoritative',()=>{
+  const selector=js.match(/function selectPionexRisk\(d=\{\}\)\{[\s\S]*?\n\}/)?.[0]||'';
+  assert.ok(selector);
+  assert.match(selector,/d\?\.pionexBotSync\?\.truncated!==true/);
+  assert.match(selector,/primary\?\.paginationComplete!==false/);
+  assert.match(selector,/primary\?\.coverage\?\.status!=='PARTIAL'/);
+  assert.match(selector,/wallet\?\.paginationComplete!==false/);
+  assert.match(selector,/wallet\?\.coverage\?\.status!=='PARTIAL'/);
+  assert.match(js,/feedComplete=feed\?\.detailsComplete===true&&feed\?\.paginationComplete!==false&&feed\?\.coverage\?\.status!=='PARTIAL'/);
+});
+
 test('r20 production version is consistent',()=>{
   assert.match(html,/v9 · r20 · COIN-M COMMAND CENTER/);
   assert.match(html,/9\.0-r20/);

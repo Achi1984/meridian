@@ -110,7 +110,7 @@ function candidate({name,risk,status,lastSuccessAt,now,staleMs}){
   if(!risk||typeof risk!=='object')return null;
   const snapshotAt=risk.snapshotAt||risk.updatedAt||lastSuccessAt||null;
   const detailsComplete=risk.detailsComplete===true;
-  const statusOk=String(status||'').toUpperCase()==='OK';
+  const statusOk=['OK','PARTIAL'].includes(String(status||'').toUpperCase());
   const fresh=freshAt(snapshotAt,now,staleMs);
   const rows=Array.isArray(risk.bots)?risk.bots:[];
   return {
@@ -128,7 +128,7 @@ function candidate({name,risk,status,lastSuccessAt,now,staleMs}){
 function pickSource(data,now,staleMs){
   const primary=candidate({
     name:'PIONEX_BOT_API',
-    risk:data?.pionexRisk,
+    risk:data?.pionexRiskPartial||data?.pionexRisk,
     status:data?.pionexBotSync?.status,
     lastSuccessAt:data?.pionexBotSync?.lastSuccessAt,
     now,staleMs
