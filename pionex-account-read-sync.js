@@ -84,14 +84,19 @@ function inverseWalletProfitUsd(wallet,row,walletPrices={}){
   if(!(px>0))return{value:null,token,source:'NO_WALLET_USD_PRICE'};
   return{value:profit*px,token,source:'WALLET_PROFIT_X_PIONEX_WALLET_PRICE'};
 }
+function walletCategoryCount(value){
+  if(typeof value!=='number'&&!(typeof value==='string'&&value===value.trim()&&/^(0|[1-9]\d*)$/.test(value)))return null;
+  const count=Number(value);
+  return Number.isSafeInteger(count)&&count>=0?count:null;
+}
 function normalizeWalletCategories(rows=[]){
   return (Array.isArray(rows)?rows:[]).map(x=>({
     type:text(x?.type),
     title:text(x?.title),
     totalInUsdt:num(x?.totalInUsdt),
-    count:Number.isInteger(Number(x?.count))?Number(x.count):null,
+    count:walletCategoryCount(x?.count),
     hasMore:x?.hasMore===true,
-    listCount:Array.isArray(x?.list)?x.list.length:0,
+    listCount:Array.isArray(x?.list)?x.list.length:null,
     entryFields:fieldNames(x?.list),
     balanceCount:Array.isArray(x?.balances)?x.balances.length:0,
     positionCount:Array.isArray(x?.positions)?x.positions.length:0,
@@ -112,7 +117,24 @@ function recognizedWalletCategory(category){
 }
 function verifiedWalletCategory(category){
   return recognizedWalletCategory(category)||
-    category?.hasMore===false&&category?.count===0&&Array.isArray(category?.list)&&category.list.length===0;
+    category?.hasMore===false&&walletCategoryCount(category?.count)===0&&Array.isArray(category?.list)&&category.list.length===0;
+}
+function walletCategoryShape(detail){
+  if(!Array.isArray(detail))return null;
+  const index=detail.findIndex(category=>!verifiedWalletCategory(category));
+  if(index<0)return null;
+  const category=detail[index];
+  const kind=value=>value===undefined?'MISSING':value===null?'NULL':
+    ['number','string','boolean'].includes(typeof value)?(typeof value).toUpperCase():'OTHER';
+  const count=walletCategoryCount(category?.count);
+  return {
+    countKind:kind(category?.count),
+    zeroVerified:count===null?null:count===0,
+    listKind:Array.isArray(category?.list)?'ARRAY':category?.list===undefined?'MISSING':
+      category.list===null?'NULL':'OTHER',
+    listEmpty:Array.isArray(category?.list)?category.list.length===0:null,
+    hasMoreFalse:typeof category?.hasMore==='boolean'?category.hasMore===false:null
+  };
 }
 function unrecognizedNonemptyCategoryCount(detail){
   if(!Array.isArray(detail))return null;
@@ -120,7 +142,7 @@ function unrecognizedNonemptyCategoryCount(detail){
   for(const category of detail){
     if(verifiedWalletCategory(category))continue;
     if(Array.isArray(category?.list)&&category.list.length>0||
-      Number.isSafeInteger(category?.count)&&category.count>0)count++;
+      walletCategoryCount(category?.count)>0)count++;
     else return null;
   }
   return count;
@@ -147,7 +169,7 @@ export function normalizeWalletBotEntries(detail=[]){
   }
   return out;
 }
-export async function probeWalletBotDetails(entries=[],{apiKey,apiSecret,fetchImpl=fetch,now=Date.now,delayMs=125,maxRows=50,paginationComplete=null,categoriesVerified=null,unrecognizedNonemptyCategoryCount=null}={}){
+export async function probeWalletBotDetails(entries=[],{apiKey,apiSecret,fetchImpl=fetch,now=Date.now,delayMs=125,maxRows=50,paginationComplete=null,categoriesVerified=null,unrecognizedNonemptyCategoryCount=null,unverifiedCategoryShape=null}={}){
   const rows=Array.isArray(entries)?entries:[];
   if(rows.length>maxRows)throw new Error('pionex_wallet_bot_probe_row_limit');
   const details=[],failures=[];
@@ -170,6 +192,7 @@ export async function probeWalletBotDetails(entries=[],{apiKey,apiSecret,fetchIm
     paginationComplete,
     categoriesVerified,
     unrecognizedNonemptyCategoryCount,
+    unverifiedCategoryShape,
     candidateCount:rows.length,
     successCount:details.length,
     failureCount:failures.length,
@@ -251,6 +274,7 @@ export function buildWalletBotRisk(probe={},iso=new Date().toISOString(),walletP
     unsupportedCount:Number.isSafeInteger(probe.candidateCount)&&probe.candidateCount>=0&&
       hasTypeCounts?unsupported:null,
     unrecognizedNonemptyCategoryCount:probe.unrecognizedNonemptyCategoryCount,
+    unverifiedCategoryShape:probe.unverifiedCategoryShape,
     typeCounts:hasTypeCounts?{
       futures_grid:Object.hasOwn(typeCounts,'futures_grid')?typeCounts.futures_grid:0,
       futures_lite:Object.hasOwn(typeCounts,'futures_lite')?typeCounts.futures_lite:0,
@@ -320,10 +344,11 @@ export function normalizeWalletOverview(data={}){
     botCategoryCount:botCategories.length,
     botReportedCount:botCategories.reduce((n,x)=>n+(Number.isFinite(x.count)?x.count:x.listCount),0),
     botListCount:botCategories.reduce((n,x)=>n+x.listCount,0),
-    botPaginationComplete:Array.isArray(bot.detail)&&bot.detail.every(x=>x?.hasMore===false)&&
-      botCategories.every(x=>x.count!==null&&x.count>=0&&x.count===x.listCount),
+    botPaginationComplete:Array.isArray(bot.detail)&&bot.detail.every(x=>x?.hasMore===false&&
+      Array.isArray(x?.list)&&walletCategoryCount(x?.count)===x.list.length),
     botScopeCategoriesVerified:Array.isArray(bot.detail)&&bot.detail.every(verifiedWalletCategory),
     botUnrecognizedNonemptyCategoryCount:unrecognizedNonemptyCategoryCount(bot.detail),
+    botUnverifiedCategoryShape:walletCategoryShape(bot.detail),
     traderCategoryCount:traderCategories.length,
     source:'PIONEX_WALLET_READ_API'
   };
@@ -343,7 +368,8 @@ export async function fetchPionexReadSnapshot({apiKey,apiSecret,fetchImpl=fetch,
     apiKey,apiSecret,fetchImpl,now,paginationComplete:wallet.botPaginationComplete,
     categoriesVerified:Array.isArray(walletResult.value?.data?.botAccount?.detail)
       ?wallet.botScopeCategoriesVerified:null,
-    unrecognizedNonemptyCategoryCount:wallet.botUnrecognizedNonemptyCategoryCount
+    unrecognizedNonemptyCategoryCount:wallet.botUnrecognizedNonemptyCategoryCount,
+    unverifiedCategoryShape:wallet.botUnverifiedCategoryShape
   }):null;
   const spotBalances=normalizeSpotBalances(spot?.data||{});
   const at=new Date(now()).toISOString();
