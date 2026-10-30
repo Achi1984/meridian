@@ -1,11 +1,13 @@
 """Actual fork + local journal tests; SQL/prewrite/approval remain synthetic."""
 import contextlib
+from collections import deque
 import ctypes
 import importlib.util
 import os
 from pathlib import Path
 import select
 import signal
+import struct
 import subprocess
 import sys
 import tempfile
@@ -20,6 +22,8 @@ f=importlib.util.module_from_spec(spec); spec.loader.exec_module(f)
 import publisher_role_supervision as m
 import publisher_role_journal as journal
 BUDGETS=dict.fromkeys(('setup','connect','mutation','cleanup','exit'),0.15)
+# Phase work stays short; owned-child exit needs a separate scheduler allowance.
+BUDGETS['exit']=1.0
 SUPERVISOR_ROOT_ENV='MERIDIAN_SUPERVISOR_TEST_ROOT'
 if os.environ.get(SUPERVISOR_ROOT_ENV):
     m.ROOT=Path(os.environ[SUPERVISOR_ROOT_ENV])
@@ -30,6 +34,7 @@ class SupervisionTests(unittest.TestCase):
         self.tmp=tempfile.TemporaryDirectory(prefix='meridian-supervision-')
         self.root=Path(self.tmp.name); self.jroot=self.root/'journal'; self.jroot.mkdir(mode=0o700)
         self.parent=os.getpid()
+        self.enterContext(self.private_supervisor_root())
     def tearDown(self): self.tmp.cleanup()
     @contextlib.contextmanager
     def private_supervisor_root(self):
@@ -47,12 +52,14 @@ class SupervisionTests(unittest.TestCase):
         def factory(phase):
             assert os.getpid()!=parent
             (root/'worker').write_text(str(os.getpid()))
-            if hang=='factory': time.sleep(5)
+            if hang=='factory':
+                (root/'ready').write_text(hang); time.sleep(5)
             with journal.LocalRoleJournal(jroot) as handle:
                 class Services(f.Services):
                     def hit(self,name):
                         super().hit(name)
-                        if hang==name: time.sleep(5)
+                        if hang==name:
+                            (root/'ready').write_text(name); time.sleep(5)
                         if fail==name: raise RuntimeError('synthetic failure')
                     def phase(self,token): phase(token)
                     def claim(self,binding):
@@ -67,17 +74,62 @@ class SupervisionTests(unittest.TestCase):
                 if exit_error: raise RuntimeError('synthetic context failure')
         return factory
     def run_worker(self,factory=None):
-        return m.supervise_transition(f.binding(),f.baseline(),[],factory or self.factory(),_test_budgets=BUDGETS)
+        events=deque(maxlen=64); started=time.monotonic()
+        read,waitpid,kill,reap=m.os.read,m.os.waitpid,m.os.kill,m._fallback_reap
+        def note(kind,value):
+            if os.getpid()==self.parent:
+                count=1
+                if events and events[-1][1:3]==(kind,value):
+                    count=events.pop()[3]+1
+                events.append((round(time.monotonic()-started,4),kind,value,count))
+        def observe_read(fd,size):
+            value=read(fd,size)
+            if size==5 and len(value)==4: note('pid_receipt',struct.unpack('!I',value)[0])
+            elif size==1 and value in (b'A',b'C',b'P',b'M',b'L',b'F',b'U',b'O'):
+                note('phase',value.decode())
+            return value
+        def observe_waitpid(pid,options):
+            try: value=waitpid(pid,options)
+            except ChildProcessError:
+                note('waitpid',(pid,'ECHILD')); raise
+            note('waitpid',(pid,value))
+            return value
+        def observe_kill(pid,sig):
+            if os.getpid()==self.parent and (self.root/'ready').exists():
+                note('ready',(self.root/'ready').read_text())
+            try: value=kill(pid,sig)
+            except OSError as exc:
+                note('kill',(pid,int(sig),exc.errno)); raise
+            note('kill',(pid,int(sig),'sent'))
+            return value
+        def observe_reap(pid,seconds):
+            note('fallback_start',(pid,seconds))
+            try: value=reap(pid,seconds)
+            except BaseException as exc:
+                note('fallback_exception',type(exc).__name__); raise
+            note('fallback_end',value)
+            return value
+        with (
+            patch.object(m.os,'read',side_effect=observe_read),
+            patch.object(m.os,'waitpid',side_effect=observe_waitpid),
+            patch.object(m.os,'kill',side_effect=observe_kill),
+            patch.object(m,'_fallback_reap',side_effect=observe_reap),
+        ):
+            result=m.supervise_transition(f.binding(),f.baseline(),[],factory or self.factory(),_test_budgets=BUDGETS)
+        note('return',result['outcome'])
+        self.diagnostics=list(events)
+        return result
     def assert_unknown(self,result):
         self.assertEqual(result['outcome'],'INDETERMINATE')
         self.assertFalse(result['parentObservedConfirmedChildExit'])
-        self.assertFalse(result['retryAuthorized'])
+        self.assertTrue(all(v is False for k,v in result.items() if k!='outcome'))
     def assert_reaped(self):
         if (self.root/'worker').exists():
             pid=int((self.root/'worker').read_text())
             try: observed=os.waitpid(pid,os.WNOHANG)
             except ChildProcessError: return
-            self.fail(f'child {pid} not already reaped at return: waitpid={observed!r}')
+            self.fail(f'child {pid} not already reaped at return: waitpid={observed!r}; '
+                      f'parent trace={getattr(self,"diagnostics",[])}')
 
     def test_actual_fork_driver_journal_success_and_restart_replay(self):
         with self.private_supervisor_root():
@@ -96,8 +148,17 @@ class SupervisionTests(unittest.TestCase):
             with self.subTest(step=step):
                 # Separate private root per case; consumed slots must never be reset.
                 self.jroot=self.root/step; self.jroot.mkdir(mode=0o700)
-                started=time.monotonic(); self.assert_unknown(self.run_worker(self.factory(hang=step)))
-                self.assertLess(time.monotonic()-started,2); self.assert_reaped()
+                (self.root/'ready').unlink(missing_ok=True)
+                started=time.monotonic(); result=self.run_worker(self.factory(hang=step))
+                self.assert_reaped()
+                elapsed=time.monotonic()-started
+                print(f'bounded step={step} ready={(self.root/"ready").exists()} '
+                      f'elapsed={elapsed:.4f} phase=0.15 exit=1.0 trace={self.diagnostics}',file=sys.stderr)
+                # Connect timeout + two reap allowances + 0.7s parent overhead < 3s.
+                self.assert_unknown(result); self.assertLess(elapsed,3,self.diagnostics)
+                self.assertEqual((self.root/'ready').read_text(),step,self.diagnostics)
+                phases=[event[2] for event in self.diagnostics if event[1]=='phase']
+                self.assertEqual(phases,['A','C'],self.diagnostics)
 
     def test_mutation_and_context_cleanup_timeouts(self):
         for step in ('alter','commit','close','record_finished','exit'):
@@ -178,9 +239,7 @@ class SupervisionTests(unittest.TestCase):
             before=set(os.listdir('/proc/self/fd'))
             handlers=(signal.getsignal(signal.SIGTERM),signal.getsignal(signal.SIGALRM))
             started=time.monotonic()
-            # CI scheduling can consume the old 150ms test-only reap allowance.
-            # Preserve immediate reaping checks; do not poll to manufacture success.
-            with patch.dict(BUDGETS,{'exit':1.0}),patch.object(m,'_worker',side_effect=stopped):
+            with patch.object(m,'_worker',side_effect=stopped):
                 self.assert_unknown(self.run_worker())
             self.assertLess(time.monotonic()-started,5)
             self.assert_reaped()
@@ -215,6 +274,55 @@ class SupervisionTests(unittest.TestCase):
             self.assertEqual(m._fallback_reap(123,0.1),'already_reaped'); kill.assert_not_called()
         with patch.object(m.os,'waitpid',return_value=(123,0)),patch.object(m.os,'kill') as kill:
             self.assertEqual(m._fallback_reap(123,0.1),'fallback_reaped'); kill.assert_not_called()
+        for label,observations,ticks,expected in (
+            ('delayed_exit',[(0,0),(0,0),(123,0)],[0,0,0.01,0.01],'fallback_reaped'),
+            ('deadline',[(0,0),(0,0)],[0,0,0.099,0.1],'unconfirmed'),
+            ('deadline_before_poll',[(0,0)],[0,0.1],'unconfirmed'),
+            ('ownership_lost',[(0,0),ChildProcessError],[0,0],'fallback_reaped'),
+        ):
+            with (
+                self.subTest(cleanup=label),
+                patch.object(m.os,'waitpid',side_effect=observations) as wait,
+                patch.object(m.os,'kill') as kill,
+                patch.object(m.time,'monotonic',side_effect=ticks),
+                patch.object(m.time,'sleep') as sleep,
+            ):
+                self.assertEqual(m._fallback_reap(123,0.1),expected)
+                self.assertEqual(wait.call_count,len(observations))
+                kill.assert_called_once_with(123,signal.SIGKILL)
+                self.assertLessEqual(sum(call.args[0] for call in sleep.call_args_list),0.1)
+            if label=='ownership_lost':
+                with patch.object(m.os,'waitpid',side_effect=ChildProcessError),patch.object(m.os,'kill') as kill:
+                    self.assertEqual(m._fallback_reap(123,0.1),'already_reaped'); kill.assert_not_called()
+        with (
+            patch.object(m.os,'waitpid',side_effect=[(0,0),(123,0)]),
+            patch.object(m.os,'kill',side_effect=ProcessLookupError),
+            patch.object(m.time,'monotonic',side_effect=[0,0]),
+        ):
+            self.assertEqual(m._fallback_reap(123,0.1),'fallback_reaped')
+        for boundary in ('waitpid','kill'):
+            with (
+                self.subTest(exception=boundary),
+                patch.object(m.os,'waitpid',**(
+                    {'side_effect':OSError} if boundary=='waitpid' else {'return_value':(0,0)}
+                )),
+                patch.object(m.os,'kill',side_effect=PermissionError) as kill,
+            ):
+                with self.assertRaises(OSError): m._fallback_reap(123,0.1)
+                self.assertEqual(kill.call_count,0 if boundary=='waitpid' else 1)
+        for cleanup in ('unconfirmed',OSError('synthetic cleanup failure')):
+            with self.subTest(cleanup=type(cleanup).__name__),self.private_supervisor_root():
+                self.jroot=self.root/type(cleanup).__name__; self.jroot.mkdir(mode=0o700)
+                before=set(os.listdir('/proc/self/fd'))
+                handlers=(signal.getsignal(signal.SIGTERM),signal.getsignal(signal.SIGALRM))
+                with patch.object(m,'_fallback_reap',**(
+                    {'side_effect':cleanup} if isinstance(cleanup,Exception) else {'return_value':cleanup}
+                )):
+                    self.assert_unknown(self.run_worker())
+                self.assert_reaped()
+                self.assertEqual(set(os.listdir('/proc/self/fd')),before)
+                self.assertEqual((signal.getsignal(signal.SIGTERM),signal.getsignal(signal.SIGALRM)),handlers)
+                self.assertEqual(signal.getitimer(signal.ITIMER_REAL),(0,0))
 
     def test_source_pin_rejects_changed_source_before_factory(self):
         with patch.object(m,'SUPERVISOR_SHA256','0'*64): self.assert_unknown(self.run_worker())
