@@ -7,11 +7,38 @@ const LABELS = {
   locked: ['Gesperrt', 'App mit Meridian-Passwort öffnen, dann Bots manuell aktualisieren.'],
   loading: ['Wird geladen', 'Der aktuelle Bot-Snapshot wird geprüft.'],
   fresh: ['Aktueller Snapshot · nur lesend', ''],
-  stale: ['Daten veraltet', 'Botdetails werden bis zur nächsten aktuellen Abfrage ausgeblendet.'],
+  stale: ['Daten veraltet', 'Botdetails werden ausgeblendet. Bitte Bots manuell aktualisieren.'],
   unavailable: ['Nicht verfügbar', 'Botdaten konnten nicht verifiziert werden. Bitte erneut aktualisieren.']
 };
 const TYPES = {futures_grid:'Futures Grid', future_hedge_grid:'Futures Hedge Grid'};
 const MISSING = 'Nicht verfügbar';
+const EMPTY_SNAPSHOT = 'Keine darstellbaren Bots in diesem Snapshot. Dies bestätigt kein leeres Wallet.';
+const SCOPE_REASONS = {
+  UNSUPPORTED_SCOPE:'Der unterstützte Datenumfang ist nicht bestätigt.',
+  SUPPORTED_HYDRATION_MISSING:'Details unterstützter Bots fehlen.',
+  SANITIZATION_LOSS_OR_DUPLICATE:'Einträge konnten nicht vollständig und eindeutig dargestellt werden.',
+  PAGINATION_INCOMPLETE:'Die Listenseiten sind nicht vollständig bestätigt.',
+  EXPLICIT_PARTIAL:'Die Quelle meldet einen unvollständigen Datenumfang.',
+  SYNC_PARTIAL:'Die Synchronisierung meldet einen unvollständigen Datenumfang.',
+  DETAILS_INCOMPLETE:'Die Botdetails sind nicht vollständig bestätigt.',
+  SOURCE_STATUS_NOT_OK:'Der Quellstatus ist nicht bestätigt.',
+  SOURCE_STALE:'Die Quelldaten sind veraltet.',
+  SOURCE_UNAVAILABLE:'Die Quelle ist nicht verfügbar.'
+};
+function scopeText(data) {
+  if(data.source!=='PIONEX_WALLET_BOT_DETAIL')return null;
+  const reasons=data.overwriteRejectionReasons;
+  const validReasons=Array.isArray(reasons)&&reasons.length<=Object.keys(SCOPE_REASONS).length&&
+    Array.from(reasons).every(reason=>typeof reason==='string'&&Object.hasOwn(SCOPE_REASONS,reason));
+  const confirmed=data.overwriteScope==='WALLET_FUTURES_GRID'&&data.usableForOverwrite===true&&
+    ['NONE','KNOWN_EXCLUDED_PRODUCTS'].includes(data.excludedScope)&&validReasons&&reasons.length===0;
+  const explanation=confirmed?'von der Quelle bestätigt.':'nicht bestätigt.';
+  const exclusions=data.excludedScope==='KNOWN_EXCLUDED_PRODUCTS'
+    ?' Bekannte ausgeschlossene Produkte gehören nicht zu diesem Datenumfang.':'';
+  const rejection=validReasons?reasons.map(reason=>SCOPE_REASONS[reason]).join(' '):'';
+  return 'Futures-Grid-Datenumfang: '+explanation+exclusions+(rejection?' '+rejection:'')+
+    ' Keine Bestätigung der Vollständigkeit des Wallets, der Sicherheit, einer Handelsfreigabe oder laufender Bots.';
+}
 function coverageText(coverage={}){
   const count=value=>Number.isSafeInteger(value)&&value>=0?String(value):'unbekannt';
   const contract='Futures Moon ist als cateType von futures_grid dokumentiert; dies bestätigt keinen Live-Kontobestand.';
@@ -96,7 +123,9 @@ function projection(state, filters = {}) {
     const losses=overview.losses.map(loss=>({ref:loss.ref,symbol:loss.symbol,direction:loss.direction,
       pnl:formatMoney(loss.pnl,'USD',true),pnlDetail:formatExact(loss.pnl,' USD'),pnlTone:loss.pnl<0?'negative':'positive'}));
     return {status,count:overview.count,distribution:overview.distribution,coverage:model.coverage,bots,losses,
-      snapshotAt:overview.snapshotAt,source:overview.source};
+      snapshotAt:overview.snapshotAt,source:overview.source,overwriteScope:model.overwriteScope,
+      excludedScope:model.excludedScope,usableForOverwrite:model.usableForOverwrite,
+      overwriteRejectionReasons:model.overwriteRejectionReasons};
   } catch { return {status:'unavailable',bots:[]}; }
 }
 function element(document, tag, text) {
@@ -152,7 +181,9 @@ export function renderBotReadState(root, state, filters = {}) {
     const resultCount=element(document,'p',data.bots.length+' von '+data.count+' Bots im Snapshot');
     resultCount.setAttribute('role','status');resultCount.setAttribute('aria-live','polite');
     details.append(resultCount,element(document,'p',coverageText(data.coverage)));
-    if (!data.count) details.append(element(document,'p','Keine Bots in diesem Snapshot enthalten.'));
+    const scope=scopeText(data);
+    if(scope)details.append(element(document,'p',scope));
+    if (!data.count) details.append(element(document,'p',EMPTY_SNAPSHOT));
     else if (!data.bots.length) details.append(element(document,'p','Keine Bots entsprechen den Filtern.'));
     else {
       const list=element(document,'ul');list.className='bot-card-list';
@@ -223,11 +254,13 @@ export function renderBotReadState(root, state, filters = {}) {
 export function renderCommandBotOverview(root, data, onJump) {
   if (!root) return;
   const document=root.ownerDocument;
-  root.replaceChildren();
   root.setAttribute('data-state',data.status);
+  root.setAttribute('role','status');root.setAttribute('aria-live','polite');
+  root.setAttribute('aria-atomic','true');
+  root.replaceChildren();
   if(data.status!=='fresh'){
-    const labels={locked:'Gesperrt',loading:'Wird geladen',stale:'Daten veraltet',unavailable:'Nicht verfügbar'};
-    root.append(element(document,'p',labels[data.status]||'Nicht verfügbar'));
+    const labels=Object.hasOwn(LABELS,data.status)?LABELS[data.status]:LABELS.unavailable;
+    root.append(element(document,'p',labels[0]),element(document,'p',labels[1]));
     return;
   }
   const sources={PIONEX_BOT_API:'Pionex Bot API',PIONEX_WALLET_BOT_DETAIL:'Pionex Wallet Botdetail'};
@@ -248,6 +281,8 @@ export function renderCommandBotOverview(root, data, onJump) {
   metadata.append(metadataSummary);
   const metadataBody=element(document,'div');
   metadataBody.append(element(document,'p',coverageText(data.coverage)));
+  const scope=scopeText(data);
+  if(scope)metadataBody.append(element(document,'p',scope));
   metadataBody.append(element(document,'p','Quelle: '+source+' · Richtung: Long '+distributionCount('long')+
     ' · Short '+distributionCount('short')+' · Neutral '+distributionCount('neutral')+
     ' · Unbekannt '+distributionCount('unknown')));
@@ -255,6 +290,7 @@ export function renderCommandBotOverview(root, data, onJump) {
   if(timestamp)exactTimestamp.setAttribute('datetime',timestamp);
   metadataBody.append(element(document,'p','Snapshot-Zeit exakt (UTC): '),exactTimestamp);
   metadata.append(metadataBody);root.append(metadata);
+  if(data.count===0)root.append(element(document,'p',EMPTY_SNAPSHOT));
   if(!data.losses.length)root.append(element(document,'p','Keine bestätigten negativen P/L-Werte.'));
   else{
     root.append(element(document,'p','Bestätigte negative P/L-Werte · keine Risikorangfolge.'));

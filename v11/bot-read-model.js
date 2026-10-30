@@ -5,6 +5,19 @@ const MAX_AGE = 15 * 60 * 1000;
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const enumValue = (value, allowed) => allowed.includes(value) ? value : null;
 const rowCount = value => Number.isSafeInteger(value) && value >= 0 ? value : null;
+const REJECTION_REASONS = ['UNSUPPORTED_SCOPE', 'SUPPORTED_HYDRATION_MISSING',
+  'SANITIZATION_LOSS_OR_DUPLICATE', 'PAGINATION_INCOMPLETE', 'EXPLICIT_PARTIAL',
+  'SYNC_PARTIAL', 'DETAILS_INCOMPLETE', 'SOURCE_STATUS_NOT_OK', 'SOURCE_STALE', 'SOURCE_UNAVAILABLE'];
+function scope(snapshot) {
+  const reasons = snapshot.overwriteRejectionReasons;
+  return {
+    overwriteScope: enumValue(snapshot.overwriteScope, ['WALLET_FUTURES_GRID', 'PRIMARY_BOT_API', 'NONE']),
+    excludedScope: enumValue(snapshot.excludedScope, ['KNOWN_EXCLUDED_PRODUCTS', 'UNVERIFIED', 'NONE']),
+    usableForOverwrite: typeof snapshot.usableForOverwrite === 'boolean' ? snapshot.usableForOverwrite : null,
+    overwriteRejectionReasons: Array.isArray(reasons) && reasons.length <= REJECTION_REASONS.length &&
+      Array.from(reasons).every(reason => REJECTION_REASONS.includes(reason)) ? [...reasons] : null
+  };
+}
 function coverage(snapshot) {
   const raw=object(snapshot?.coverage)?snapshot.coverage:{};
   const counts={listRows:rowCount(raw.listRows),recognizedRows:rowCount(raw.recognizedRows),
@@ -39,7 +52,9 @@ function metrics(bot) {
 
 export function buildBotReadModel(snapshot, {now = Date.now()} = {}) {
   const result = {status: 'UNKNOWN', source: null, snapshotAt: null, ageMs: null,
-    readOnly: true, executionAllowed: false, coverage:coverage(snapshot), bots: []};
+    readOnly: true, executionAllowed: false, coverage:coverage(snapshot),
+    overwriteScope: null, excludedScope: null, usableForOverwrite: null,
+    overwriteRejectionReasons: null, bots: []};
   if (!object(snapshot) || !Number.isFinite(now)) return result;
   if (snapshot.schemaVersion !== SCHEMA || !SOURCES.includes(snapshot.source) ||
       snapshot.readOnly !== true || snapshot.executionImpact !== false) return result;
@@ -77,5 +92,5 @@ export function buildBotReadModel(snapshot, {now = Date.now()} = {}) {
       metrics: metrics(bot)});
   }
   return {...result, status: 'FRESH_SNAPSHOT', source: snapshot.source,
-    snapshotAt: stamp, ageMs: age, expiresAt: time + limit, bots};
+    snapshotAt: stamp, ageMs: age, expiresAt: time + limit, ...scope(snapshot), bots};
 }

@@ -149,7 +149,8 @@ test('sparse and undefined rows clear prior private data without throwing',()=>{
 });
 test('empty fresh snapshot reports absence rather than implying safety or active bots',()=>{
   const target=root(),state=fresh();state.model.bots=[];renderBotReadState(target,state);
-  assert.match(target.textContent,/0 Bots im Snapshot/);assert.match(target.textContent,/Keine Bots in diesem Snapshot/);
+  assert.match(target.textContent,/0 Bots im Snapshot/);assert.match(target.textContent,/Keine darstellbaren Bots in diesem Snapshot/);
+  assert.match(target.textContent,/Dies bestätigt kein leeres Wallet/);
   assert.doesNotMatch(target.textContent,/SAFE|sicher|0 aktive Bots/);
 });
 test('accessible Bot filters report no matches separately and reset without reading again',()=>{
@@ -279,11 +280,15 @@ test('canonical calendar validation matches corrected model and rejects normaliz
 test('real client to model to renderer pipeline expires data, locks on logout and remains inert until refresh',async()=>{
   const target=root(),events=[];let clock=Date.parse('2026-10-12T20:01:00Z'),credential='synthetic-token',calls=0;
   const client=createBotReadClient({getToken:()=>credential,now:()=>clock,
-    fetchImpl:async()=>{calls++;return new Response(JSON.stringify(snapshot('2026-10-12T20:00:00Z')));},
+    fetchImpl:async()=>{calls++;return new Response(JSON.stringify(walletScopeSnapshot()));},
     onChange:state=>{events.push(state.status);renderBotReadState(target,state);}});
   assert.equal(calls,0);await client.refresh();assert.deepEqual(events,['loading','fresh']);
   assert.match(target.textContent,/BTC/);assert.doesNotMatch(target.textContent,/synthetic-token/);
+  assert.match(target.textContent,/Futures-Grid-Datenumfang: von der Quelle bestätigt/);
   clock+=900000;client.revalidate();assert.equal(events.at(-1),'stale');assert.equal(all(target,'li').length,0);
+  assert.doesNotMatch(target.textContent,/von der Quelle bestätigt|2026-10-12/);
+  clock-=900000;client.revalidate();assert.equal(events.at(-1),'stale');
+  assert.doesNotMatch(target.textContent,/BTC|Futures-Grid-Datenumfang|2026-10-12/);
   credential='';client.revalidate();assert.equal(events.at(-1),'locked');assert.equal(all(target,'li').length,0);
   client.dispose();await client.refresh();assert.equal(calls,1);
 });
@@ -564,4 +569,138 @@ test('reset discards pending return and unknown Command targets do not change se
   change(search,'input','BTC');h.jump('f'.repeat(20));assert.equal(search.value,'BTC');assert.equal(returnButton(h).hidden,true);
   h.jump('a'.repeat(20));all(h.target,'button').find(node=>node.text==='Filter zurücksetzen').click();
   assert.equal(returnButton(h).hidden,true);returnButton(h).click();assert.equal(search.value,'');
+});
+
+const walletScopeSnapshot=()=>({...snapshot('2026-10-12T20:00:00Z'),usableForDisplay:true,
+  overwriteScope:'WALLET_FUTURES_GRID',excludedScope:'KNOWN_EXCLUDED_PRODUCTS',overwriteRejectionReasons:[],
+  coverage:{status:'PARTIAL',listRows:2,recognizedRows:1,representedRows:1,
+    unsupportedRows:1,unhydratedRows:0,paginationComplete:true}});
+function scopeViews(input){
+  const bots=root(),command=root();
+  const model=buildBotReadModel(input,{now:Date.parse('2026-10-12T20:01:00Z')});
+  const view=createBotReadView(bots,{createClient:({onChange})=>{
+    onChange({status:model.status==='FRESH_SNAPSHOT'?'fresh':model.status==='STALE'?'stale':'unavailable',model});
+    return {refresh(){},lock(){},revalidate(){},dispose(){}};
+  },onSnapshot:data=>renderCommandBotOverview(command,data)});
+  return {bots,command,view};
+}
+test('both views separate global wallet partial coverage from confirmed supported grid scope',()=>{
+  for(const excludedScope of ['KNOWN_EXCLUDED_PRODUCTS','NONE']){
+    const input=walletScopeSnapshot();input.excludedScope=excludedScope;
+    const {bots,command,view}=scopeViews(input);
+    for(const target of [bots,command]){
+      assert.match(target.textContent,/Teilabdeckung: 1 von 2/);
+      assert.match(target.textContent,/Futures-Grid-Datenumfang: von der Quelle bestätigt/);
+      assert.equal(target.textContent.includes('Bekannte ausgeschlossene Produkte'),excludedScope==='KNOWN_EXCLUDED_PRODUCTS');
+      assert.match(target.textContent,/Keine Bestätigung der Vollständigkeit des Wallets/);
+      assert.doesNotMatch(target.textContent,/WALLET_FUTURES_GRID|KNOWN_EXCLUDED_PRODUCTS|usableForOverwrite/);
+    }
+    view.dispose();
+  }
+});
+test('missing malformed unknown and rejecting scope evidence never confirms the grid scope in either view',()=>{
+  const invalid=[
+    ['usableForOverwrite',false],['usableForOverwrite',undefined],['usableForOverwrite','true'],
+    ['overwriteScope',undefined],['overwriteScope','NONE'],['overwriteScope','PRIMARY_BOT_API'],
+    ['overwriteScope','PRIVATE<script>'],['overwriteScope',{}],
+    ['excludedScope',undefined],['excludedScope','UNVERIFIED'],['excludedScope','PRIVATE<script>'],
+    ['excludedScope',{}],['overwriteRejectionReasons',undefined],['overwriteRejectionReasons',null],
+    ['overwriteRejectionReasons',{}],['overwriteRejectionReasons',''],
+    ['overwriteRejectionReasons',['PRIVATE<script>']],['overwriteRejectionReasons',[null]],
+    ['overwriteRejectionReasons',[{}]],['overwriteRejectionReasons',Array(1)],
+    ['overwriteRejectionReasons',['SOURCE_STALE','PRIVATE<script>']],
+    ['overwriteRejectionReasons',Array(11).fill('SOURCE_STALE')]
+  ];
+  for(const reason of ['UNSUPPORTED_SCOPE','SUPPORTED_HYDRATION_MISSING','SANITIZATION_LOSS_OR_DUPLICATE',
+    'PAGINATION_INCOMPLETE','EXPLICIT_PARTIAL','SYNC_PARTIAL','DETAILS_INCOMPLETE',
+    'SOURCE_STATUS_NOT_OK','SOURCE_STALE','SOURCE_UNAVAILABLE'])
+    invalid.push(['overwriteRejectionReasons',[reason]]);
+  for(const [key,value] of invalid){
+    const input=walletScopeSnapshot();input[key]=value;
+    const {bots,command,view}=scopeViews(input);
+    assert.match(bots.textContent,/BTC/);
+    for(const target of [bots,command]){
+      assert.match(target.textContent,/1 Bots/);
+      assert.match(target.textContent,/Futures-Grid-Datenumfang: nicht bestätigt/,key);
+      assert.doesNotMatch(target.textContent,/von der Quelle bestätigt|PRIVATE|script|SOURCE_STALE|UNSUPPORTED_SCOPE/);
+    }
+    view.dispose();
+  }
+});
+test('known rejection reasons render only fixed German explanations and primary API has no wallet claim',()=>{
+  const input=walletScopeSnapshot();
+  input.overwriteRejectionReasons=['SUPPORTED_HYDRATION_MISSING','PAGINATION_INCOMPLETE'];
+  const rejected=scopeViews(input);
+  for(const target of [rejected.bots,rejected.command]){
+    assert.match(target.textContent,/Details unterstützter Bots fehlen/);
+    assert.match(target.textContent,/Die Listenseiten sind nicht vollständig bestätigt/);
+    assert.doesNotMatch(target.textContent,/SUPPORTED_HYDRATION_MISSING|PAGINATION_INCOMPLETE/);
+  }
+  rejected.view.dispose();
+  input.source='PIONEX_BOT_API';input.overwriteRejectionReasons=[];
+  const primary=scopeViews(input),legacyInput={...input};
+  for(const key of ['overwriteScope','excludedScope','usableForOverwrite','overwriteRejectionReasons'])delete legacyInput[key];
+  const legacy=scopeViews(legacyInput);
+  assert.equal(primary.bots.textContent,legacy.bots.textContent);
+  assert.equal(primary.command.textContent,legacy.command.textContent);
+  for(const target of [primary.bots,primary.command])
+    assert.doesNotMatch(target.textContent,/Futures-Grid-Datenumfang|ausgeschlossene Produkte|Wallet/);
+  primary.view.dispose();legacy.view.dispose();
+});
+test('empty scope snapshots differ from filter-empty results and reset or status updates do not fetch',()=>{
+  const input=walletScopeSnapshot();input.bots=[];input.botCount=0;
+  const empty=scopeViews(input);
+  for(const target of [empty.bots,empty.command]){
+    assert.match(target.textContent,/Keine darstellbaren Bots in diesem Snapshot/);
+    assert.match(target.textContent,/Dies bestätigt kein leeres Wallet/);
+    assert.doesNotMatch(target.textContent,/Keine Bots entsprechen den Filtern/);
+  }
+  empty.view.dispose();
+  const h=mounted(),model=buildBotReadModel(walletScopeSnapshot(),{now:Date.parse('2026-10-12T20:01:00Z')});
+  h.publish({status:'fresh',model});
+  const live=all(h.target,'div').find(node=>node.getAttribute('role')==='status');
+  change(all(h.target,'input')[0],'input','NO_MATCH');
+  assert.match(h.target.textContent,/Keine Bots entsprechen den Filtern/);
+  assert.doesNotMatch(h.target.textContent,/Keine darstellbaren Bots|kein leeres Wallet/);
+  assert.match(h.target.textContent,/Futures-Grid-Datenumfang: von der Quelle bestätigt/);
+  all(h.target,'button').find(node=>node.text==='Filter zurücksetzen').click();
+  assert.match(h.target.textContent,/BTC/);
+  h.publish({status:'stale',model});
+  assert.equal(all(h.target,'div').find(node=>node.getAttribute('role')==='status'),live);
+  assert.match(h.target.textContent,/Bitte Bots manuell aktualisieren/);
+  assert.doesNotMatch(h.target.textContent,/BTC|Futures-Grid-Datenumfang|2026-10-12/);
+  assert.equal(h.calls.refresh,0);h.view.dispose();
+});
+test('both views clear scope rows times and badges on invalidation and keep stable accessible status',()=>{
+  const h=mounted(),command=root(),model=buildBotReadModel(walletScopeSnapshot(),{now:Date.parse('2026-10-12T20:01:00Z')});
+  model.bots[0].productCategory='FUTURES_MOON';
+  renderCommandBotOverview(command,{status:'locked'});
+  const live=all(command,'div').find(node=>node.getAttribute('role')==='status');
+  assert.equal(live.getAttribute('aria-live'),'polite');assert.equal(live.getAttribute('aria-atomic'),'true');
+  for(const status of ['stale','unavailable','locked','loading']){
+    h.publish({status:'fresh',model});
+    renderCommandBotOverview(command,{...model,status:'fresh',count:1,losses:[]});
+    h.publish({status,model});renderCommandBotOverview(command,{...model,status});
+    for(const target of [h.target,command]){
+      assert.equal(all(target,'li').length,0);assert.equal(all(target,'time').length,0);
+      assert.doesNotMatch(target.textContent,/BTC|2026-10-12|Futures-Grid-Datenumfang|Futures Moon/);
+      assert.match(target.textContent,new RegExp({stale:'Daten veraltet',unavailable:'Nicht verfügbar',
+        locked:'Gesperrt',loading:'Wird geladen'}[status]));
+      if(status==='stale')assert.match(target.textContent,/Bitte Bots manuell aktualisieren/);
+    }
+    assert.equal(all(command,'div').find(node=>node.getAttribute('role')==='status'),live);
+  }
+  assert.equal(h.calls.refresh,0);h.view.dispose();
+});
+test('invalid and expired source envelopes cannot publish scope confirmation through either view',()=>{
+  for(const mutate of [input=>input.sourceSnapshotAt='2026-10-12T19:00:00Z',
+    input=>input.schemaVersion='INVALID',input=>input.botCount=2]){
+    const input=walletScopeSnapshot();mutate(input);
+    const {bots,command,view}=scopeViews(input);
+    for(const target of [bots,command]){
+      assert.equal(all(target,'time').length,0);assert.equal(all(target,'li').length,0);
+      assert.doesNotMatch(target.textContent,/BTC|Futures-Grid-Datenumfang|2026-10-12/);
+    }
+    view.dispose();
+  }
 });

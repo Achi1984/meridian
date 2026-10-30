@@ -125,3 +125,58 @@ test('capital fallback preserves only an explicit bounded source currency and po
   input.bots[0].investment.currency='<script>';
   assert.equal(buildBotReadModel(input,{now}).bots[0].metrics.investmentCurrency,null);
 });
+
+const scopedFixture=()=>({...fixture(),usableForDisplay:true,overwriteScope:'WALLET_FUTURES_GRID',
+  excludedScope:'KNOWN_EXCLUDED_PRODUCTS',overwriteRejectionReasons:[],
+  coverage:{status:'PARTIAL',listRows:2,recognizedRows:1,representedRows:1,
+    unsupportedRows:1,unhydratedRows:0,paginationComplete:true}});
+test('wallet scope evidence is projected independently of unchanged global partial coverage',()=>{
+  const input=scopedFixture(),before=structuredClone(input),model=buildBotReadModel(input,{now});
+  assert.equal(model.status,'FRESH_SNAPSHOT');assert.equal(model.coverage.status,'PARTIAL');
+  assert.equal(model.overwriteScope,'WALLET_FUTURES_GRID');
+  assert.equal(model.excludedScope,'KNOWN_EXCLUDED_PRODUCTS');
+  assert.equal(model.usableForOverwrite,true);assert.deepEqual(model.overwriteRejectionReasons,[]);
+  assert.notEqual(model.overwriteRejectionReasons,input.overwriteRejectionReasons);
+  assert.deepEqual(input,before);assert.equal(model.executionAllowed,false);
+});
+test('rejection evidence is bounded and validated atomically, never filtered into an empty array',()=>{
+  for(const reasons of [undefined,null,'',{},['PRIVATE<script>'],[null],[{}],[false],
+    [undefined],Array(1),['SOURCE_STALE','PRIVATE'],Array(11).fill('SOURCE_STALE')]){
+    const input=scopedFixture();input.overwriteRejectionReasons=reasons;
+    const model=buildBotReadModel(input,{now});
+    assert.equal(model.status,'FRESH_SNAPSHOT');
+    assert.equal(model.overwriteRejectionReasons,null);
+    assert.doesNotMatch(JSON.stringify(model),/PRIVATE|script/);
+  }
+  const reasons=['UNSUPPORTED_SCOPE','SUPPORTED_HYDRATION_MISSING','SANITIZATION_LOSS_OR_DUPLICATE',
+    'PAGINATION_INCOMPLETE','EXPLICIT_PARTIAL','SYNC_PARTIAL','DETAILS_INCOMPLETE',
+    'SOURCE_STATUS_NOT_OK','SOURCE_STALE','SOURCE_UNAVAILABLE'];
+  const input=scopedFixture();input.overwriteRejectionReasons=reasons;
+  assert.deepEqual(buildBotReadModel(input,{now}).overwriteRejectionReasons,reasons);
+});
+test('scope fields allow only exact enums and booleans while legacy display remains compatible',()=>{
+  for(const value of [undefined,null,{},[],true,'PRIVATE<script>','constructor',' WALLET_FUTURES_GRID ']){
+    const input=scopedFixture();input.overwriteScope=value;input.excludedScope=value;
+    input.usableForOverwrite=value;
+    const model=buildBotReadModel(input,{now});
+    assert.equal(model.status,'FRESH_SNAPSHOT');
+    assert.equal(model.overwriteScope,null);assert.equal(model.excludedScope,null);
+    assert.equal(model.usableForOverwrite,value===true?true:null);
+    assert.doesNotMatch(JSON.stringify(model),/PRIVATE|script|constructor/);
+  }
+  const input=scopedFixture();input.usableForOverwrite=false;
+  assert.equal(buildBotReadModel(input,{now}).usableForOverwrite,false);
+  const legacy=buildBotReadModel(fixture(),{now});
+  assert.equal(legacy.status,'FRESH_SNAPSHOT');assert.equal(legacy.overwriteScope,null);
+  assert.equal(legacy.excludedScope,null);assert.equal(legacy.overwriteRejectionReasons,null);
+});
+test('invalid and stale snapshots withhold scope evidence along with rows',()=>{
+  for(const mutate of [input=>input.schemaVersion='bad',input=>input.botCount=2,
+    input=>input.bots[0].symbol='<script>',input=>input.sourceSnapshotAt='2026-10-12T19:00:00Z']){
+    const input=scopedFixture();mutate(input);
+    const model=buildBotReadModel(input,{now});
+    assert.notEqual(model.status,'FRESH_SNAPSHOT');assert.deepEqual(model.bots,[]);
+    for(const key of ['overwriteScope','excludedScope','usableForOverwrite','overwriteRejectionReasons'])
+      assert.equal(model[key],null,key);
+  }
+});
