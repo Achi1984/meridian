@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
+import {performance} from 'node:perf_hooks';
 
 import {
   createAtomicRecordEnvelope,
@@ -90,6 +91,30 @@ function zeroChunkBody() {
       };
     }
   };
+}
+
+function continuousByteBody() {
+  return {
+    getReader() {
+      return {
+        read() {
+          return Promise.resolve({done: false, value: Uint8Array.of(32)});
+        },
+        cancel() {
+          return Promise.resolve();
+        },
+        releaseLock() {}
+      };
+    }
+  };
+}
+
+function deferred() {
+  let resolve;
+  const promise = new Promise(done => {
+    resolve = done;
+  });
+  return {promise, resolve};
 }
 
 function credentials() {
@@ -504,7 +529,7 @@ test('real state-store lifecycle persists history and counters across transport 
   assert.equal(afterRestart.admissionState.activeGate, null);
 });
 
-test('replace validates wrong version, stale expected head conflict, and no binding', async () => {
+test('replace validates wrong version, stale expected head UNKNOWN, and no binding', async () => {
   const server = buildServer();
   const transport = createM11CoordinatorGithubStateTransport({
     enabled: true,
@@ -535,11 +560,14 @@ test('replace validates wrong version, stale expected head conflict, and no bind
   const n2 = await makeNextEnvelopeFromClaim(e2, {action: key('f'), execution: key('1')});
   const winner = await t1.replaceCanonicalEnvelope({expectedStorageVersion: 0, nextEnvelope: n1});
   assert.equal(winner.status, 'REPLACED');
-  const loser = await t2.replaceCanonicalEnvelope({expectedStorageVersion: 0, nextEnvelope: n2});
-  assert.equal(loser.status, 'CONFLICT');
+  await assert.rejects(
+    t2.replaceCanonicalEnvelope({expectedStorageVersion: 0, nextEnvelope: n2}),
+    error => error?.code === GITHUB_STATE_TRANSPORT_ERROR.MUTATION_UNKNOWN
+  );
+  assert.equal(server.requestLog.filter(entry => entry.path === '/graphql').length, 2);
 });
 
-test('only explicit atomic-head mismatch evidence is a conflict', async () => {
+test('unsupported conflict evidence and mixed GraphQL errors remain UNKNOWN', async () => {
   for (const payload of [
     {errors: [{message: 'expectedHeadOid is stale'}]},
     {data: {createCommitOnBranch: null}, errors: [{extensions: {code: 'EXPECTED_HEAD_OID_MISMATCH'}}]}
@@ -565,7 +593,62 @@ test('only explicit atomic-head mismatch evidence is a conflict', async () => {
   }
 });
 
-test('two competing transports: exactly one winner via expectedHeadOid CAS', async () => {
+test('generic HTTP 409 is UNKNOWN and never retried', async () => {
+  const server = buildServer();
+  server.setMutateHook(({requestUrl}) => makeResponse({
+    status: 409,
+    url: requestUrl,
+    body: 'not a confirmed expected-head conflict'
+  }));
+  const transport = createM11CoordinatorGithubStateTransport({
+    enabled: true,
+    fetchImpl: server.fetchImpl,
+    credentials: credentials()
+  });
+  const current = await transport.readCanonicalEnvelope();
+  const next = await makeNextEnvelopeFromClaim(current);
+  await assert.rejects(
+    transport.replaceCanonicalEnvelope({expectedStorageVersion: 0, nextEnvelope: next}),
+    error => error?.code === GITHUB_STATE_TRANSPORT_ERROR.MUTATION_UNKNOWN
+  );
+  assert.equal(server.requestLog.filter(entry => entry.path === '/graphql').length, 1);
+});
+
+test('malformed GraphQL errors and errors with valid commit data are UNKNOWN', async () => {
+  for (const errors of [
+    {message: 'not an error list'},
+    'not an error list',
+    null,
+    [{message: 'write failed'}]
+  ]) {
+    const server = buildServer();
+    server.setMutateHook(({branchHead, requestUrl}) => makeResponse({
+      url: requestUrl,
+      body: JSON.stringify({
+        data: {
+          createCommitOnBranch: {
+            commit: {oid: oid('error-response-commit'), parents: {nodes: [{oid: branchHead}]}}
+          }
+        },
+        errors
+      })
+    }));
+    const transport = createM11CoordinatorGithubStateTransport({
+      enabled: true,
+      fetchImpl: server.fetchImpl,
+      credentials: credentials()
+    });
+    const current = await transport.readCanonicalEnvelope();
+    const next = await makeNextEnvelopeFromClaim(current);
+    await assert.rejects(
+      transport.replaceCanonicalEnvelope({expectedStorageVersion: 0, nextEnvelope: next}),
+      error => error?.code === GITHUB_STATE_TRANSPORT_ERROR.MUTATION_UNKNOWN
+    );
+    assert.equal(server.requestLog.filter(entry => entry.path === '/graphql').length, 1);
+  }
+});
+
+test('two competing transports: one replacement and one UNKNOWN CAS result', async () => {
   const server = buildServer();
   const a = createM11CoordinatorGithubStateTransport({
     enabled: true,
@@ -581,12 +664,13 @@ test('two competing transports: exactly one winner via expectedHeadOid CAS', asy
   const readB = await b.readCanonicalEnvelope();
   const nextA = await makeNextEnvelopeFromClaim(readA, {action: key('2'), execution: key('3')});
   const nextB = await makeNextEnvelopeFromClaim(readB, {action: key('4'), execution: key('5')});
-  const [left, right] = await Promise.all([
+  const results = await Promise.allSettled([
     a.replaceCanonicalEnvelope({expectedStorageVersion: 0, nextEnvelope: nextA}),
     b.replaceCanonicalEnvelope({expectedStorageVersion: 0, nextEnvelope: nextB})
   ]);
-  const statuses = [left.status, right.status].sort();
-  assert.deepEqual(statuses, ['CONFLICT', 'REPLACED']);
+  assert.equal(results.filter(result => result.status === 'fulfilled' && result.value.status === 'REPLACED').length, 1);
+  assert.equal(results.filter(result => result.status === 'rejected'
+    && result.reason?.code === GITHUB_STATE_TRANSPORT_ERROR.MUTATION_UNKNOWN).length, 1);
   const graphqlCalls = server.requestLog.filter(entry => entry.path === '/graphql');
   assert.equal(graphqlCalls.length, 2);
 });
@@ -722,6 +806,110 @@ test('same storageVersion observed at different readHeadOid is UNKNOWN', async (
     transport.readCanonicalEnvelope(),
     error => error?.code === GITHUB_STATE_TRANSPORT_ERROR.SAME_VERSION_DIFFERENT_OID
   );
+  await assert.rejects(
+    transport.readCanonicalEnvelope(),
+    error => error?.code === GITHUB_STATE_TRANSPORT_ERROR.SAME_VERSION_DIFFERENT_OID
+  );
+  await assert.rejects(
+    transport.replaceCanonicalEnvelope({expectedStorageVersion: 0, nextEnvelope: createAtomicRecordEnvelope()}),
+    error => error?.code === GITHUB_STATE_TRANSPORT_ERROR.SAME_VERSION_DIFFERENT_OID
+  );
+});
+
+test('consumed version identity remains sticky and contradictory reads stay poisoned', async () => {
+  const server = buildServer();
+  const transport = createM11CoordinatorGithubStateTransport({
+    enabled: true,
+    fetchImpl: server.fetchImpl,
+    credentials: credentials()
+  });
+  const current = await transport.readCanonicalEnvelope();
+  const next = await makeNextEnvelopeFromClaim(current);
+  server.setMutateHook(({requestUrl}) => makeResponse({
+    url: requestUrl,
+    body: JSON.stringify({errors: [{message: 'ambiguous write result'}]})
+  }));
+  await assert.rejects(
+    transport.replaceCanonicalEnvelope({expectedStorageVersion: 0, nextEnvelope: next}),
+    error => error?.code === GITHUB_STATE_TRANSPORT_ERROR.MUTATION_UNKNOWN
+  );
+
+  server.commitText(JSON.stringify(createAtomicRecordEnvelope()));
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await assert.rejects(
+      transport.readCanonicalEnvelope(),
+      error => error?.code === GITHUB_STATE_TRANSPORT_ERROR.SAME_VERSION_DIFFERENT_OID
+    );
+  }
+  await assert.rejects(
+    transport.replaceCanonicalEnvelope({expectedStorageVersion: 0, nextEnvelope: next}),
+    error => error?.code === GITHUB_STATE_TRANSPORT_ERROR.SAME_VERSION_DIFFERENT_OID
+  );
+  assert.equal(server.requestLog.filter(entry => entry.path === '/graphql').length, 1);
+});
+
+test('contradictory read during mutation readback poisons the shared version identity', async () => {
+  const server = buildServer();
+  const readbackCaptured = deferred();
+  const releaseReadback = deferred();
+  let writeAcknowledged = false;
+  let delayedReadback = false;
+  server.setMutateHook(({contentText, branchHead, requestUrl}) => {
+    const commitOid = server.commitText(contentText, branchHead);
+    return makeResponse({
+      url: requestUrl,
+      body: JSON.stringify({
+        data: {
+          createCommitOnBranch: {
+            commit: {oid: commitOid, parents: {nodes: [{oid: branchHead}]}}
+          }
+        }
+      })
+    });
+  });
+  const fetchImpl = async (url, options) => {
+    const requestUrl = new URL(url);
+    const response = await server.fetchImpl(url, options);
+    if (requestUrl.pathname === '/graphql') {
+      writeAcknowledged = true;
+      return response;
+    }
+    if (writeAcknowledged
+      && requestUrl.pathname === `/repos/${REPOSITORY}/git/ref/heads/${STATE_BRANCH}`
+      && !delayedReadback) {
+      delayedReadback = true;
+      readbackCaptured.resolve();
+      await releaseReadback.promise;
+    }
+    return response;
+  };
+  const transport = createM11CoordinatorGithubStateTransport({
+    enabled: true,
+    fetchImpl,
+    credentials: credentials()
+  });
+  const current = await transport.readCanonicalEnvelope();
+  const next = await makeNextEnvelopeFromClaim(current, {action: key('c'), execution: key('d')});
+  const mutation = transport.replaceCanonicalEnvelope({expectedStorageVersion: 0, nextEnvelope: next});
+  await readbackCaptured.promise;
+
+  const competingEnvelope = await makeNextEnvelopeFromClaim(createAtomicRecordEnvelope(), {
+    action: key('e'),
+    execution: key('f')
+  });
+  server.commitText(JSON.stringify(competingEnvelope));
+  const competingRead = await transport.readCanonicalEnvelope();
+  assert.equal(competingRead.storageVersion, 1);
+  releaseReadback.resolve();
+  await assert.rejects(
+    mutation,
+    error => error?.code === GITHUB_STATE_TRANSPORT_ERROR.SAME_VERSION_DIFFERENT_OID
+  );
+  await assert.rejects(
+    transport.readCanonicalEnvelope(),
+    error => error?.code === GITHUB_STATE_TRANSPORT_ERROR.SAME_VERSION_DIFFERENT_OID
+  );
+  assert.equal(server.requestLog.filter(entry => entry.path === '/graphql').length, 1);
 });
 
 test('read remains immutable even if branch moves after ref resolution', async () => {
@@ -891,7 +1079,7 @@ test('commit, tree, blob, and state-path identities must match the requested res
   }
 });
 
-test('one deadline covers response bodies, ignored aborts, and empty chunks', async () => {
+test('one monotonic deadline covers hanging, continuous, ignored, and empty streams', async () => {
   const hangingServer = buildServer();
   let hangingCalls = 0;
   const hangingFetch = async (url, options) => {
@@ -930,6 +1118,23 @@ test('one deadline covers response bodies, ignored aborts, and empty chunks', as
   );
   assert.equal(emptyServer.requestLog.length, 1);
 
+  const continuousServer = buildServer();
+  const continuousFetch = async (url, options) => {
+    const response = await continuousServer.fetchImpl(url, options);
+    return {...response, body: continuousByteBody()};
+  };
+  const continuous = createM11CoordinatorGithubStateTransport({
+    enabled: true,
+    fetchImpl: continuousFetch,
+    credentials: credentials(),
+    defaultDeadlineMs: 30
+  });
+  await assert.rejects(
+    continuous.readCanonicalEnvelope(),
+    error => error?.code === GITHUB_STATE_TRANSPORT_ERROR.TRANSPORT_UNAVAILABLE
+  );
+  assert.equal(continuousServer.requestLog.length, 1);
+
   const delayedServer = buildServer();
   let delayedCalls = 0;
   const delayedFetch = (url, options) => {
@@ -951,6 +1156,32 @@ test('one deadline covers response bodies, ignored aborts, and empty chunks', as
   await new Promise(resolve => setTimeout(resolve, 60));
   assert.equal(delayedCalls, 1);
   assert.equal(delayedServer.requestLog.length, 0);
+
+  const authServer = buildServer();
+  let slowAuthorization = false;
+  const authorization = {
+    getAuthorizationHeader() {
+      if (slowAuthorization) {
+        const deadline = performance.now() + 30;
+        while (performance.now() < deadline) {}
+      }
+      return '******';
+    }
+  };
+  const authTransport = createM11CoordinatorGithubStateTransport({
+    enabled: true,
+    fetchImpl: authServer.fetchImpl,
+    credentials: authorization,
+    defaultDeadlineMs: 10
+  });
+  const authCurrent = await authTransport.readCanonicalEnvelope();
+  const authNext = await makeNextEnvelopeFromClaim(authCurrent);
+  slowAuthorization = true;
+  await assert.rejects(
+    authTransport.replaceCanonicalEnvelope({expectedStorageVersion: 0, nextEnvelope: authNext}),
+    error => error?.code === GITHUB_STATE_TRANSPORT_ERROR.TRANSPORT_UNAVAILABLE
+  );
+  assert.equal(authServer.requestLog.filter(entry => entry.path === '/graphql').length, 0);
 });
 
 test('abort before mutation and during readback sends no follow-up requests', async () => {

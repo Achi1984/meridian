@@ -1,4 +1,5 @@
 import {createHash} from 'node:crypto';
+import {performance} from 'node:perf_hooks';
 import {createCoordinatorAtomicRecordBackend} from './m11-coordinator-atomic-record-backend.mjs';
 
 const API_ORIGIN = 'https://api.github.com';
@@ -119,6 +120,7 @@ function readResponseLength(response, maxResponseBytes) {
 
 function createOperation({signal, deadlineMs, maxResponseBytes}) {
   const controller = new AbortController();
+  const deadlineAt = performance.now() + deadlineMs;
   let rejectAbort;
   let abortError = null;
   const aborted = new Promise((resolve, reject) => {
@@ -141,11 +143,17 @@ function createOperation({signal, deadlineMs, maxResponseBytes}) {
     signal: controller.signal,
     maxResponseBytes,
     race(promise) {
+      this.assertActive();
       if (abortError) return Promise.reject(abortError);
       return Promise.race([Promise.resolve(promise), aborted]);
     },
     assertActive() {
+      if (!abortError && performance.now() >= deadlineAt) abort();
       if (abortError) throw abortError;
+    },
+    async yield() {
+      await this.race(new Promise(resolve => setImmediate(resolve)));
+      this.assertActive();
     },
     reserveRequest() {
       this.assertActive();
@@ -170,6 +178,7 @@ async function readTextBounded(response, operation) {
   const decoder = new TextDecoder('utf-8', {fatal: true});
   let total = 0;
   let chunks = 0;
+  let chunksSinceYield = 0;
   let text = '';
   const cancel = () => {
     try {
@@ -188,7 +197,11 @@ async function readTextBounded(response, operation) {
       }
       operation.assertActive();
       if (chunk.done) break;
+      if (!chunk.value || !ArrayBuffer.isView(chunk.value)) {
+        fail(GITHUB_STATE_TRANSPORT_ERROR.MALFORMED_RESPONSE);
+      }
       chunks += 1;
+      chunksSinceYield += 1;
       if (chunks > MAX_RESPONSE_CHUNKS) fail(GITHUB_STATE_TRANSPORT_ERROR.RESPONSE_TOO_LARGE);
       total += chunk.value.byteLength;
       if (total > operation.maxResponseBytes) fail(GITHUB_STATE_TRANSPORT_ERROR.RESPONSE_TOO_LARGE);
@@ -198,9 +211,10 @@ async function readTextBounded(response, operation) {
       } catch {
         fail(GITHUB_STATE_TRANSPORT_ERROR.MALFORMED_RESPONSE);
       }
-      if (chunk.value.byteLength === 0) {
+      if (chunk.value.byteLength === 0 || chunksSinceYield >= 64) {
         try {
-          await operation.race(new Promise(resolve => setImmediate(resolve)));
+          await operation.yield();
+          chunksSinceYield = 0;
         } catch {
           fail(GITHUB_STATE_TRANSPORT_ERROR.TRANSPORT_UNAVAILABLE);
         }
@@ -211,6 +225,7 @@ async function readTextBounded(response, operation) {
     } catch {
       fail(GITHUB_STATE_TRANSPORT_ERROR.MALFORMED_RESPONSE);
     }
+    operation.assertActive();
     return text;
   } finally {
     operation.signal.removeEventListener('abort', cancel);
@@ -219,11 +234,6 @@ async function readTextBounded(response, operation) {
       reader.releaseLock();
     } catch {}
   }
-}
-
-function isConfirmedMutationConflict(errors) {
-  return Array.isArray(errors) && errors.length > 0
-    && errors.every(item => item?.extensions?.code === 'EXPECTED_HEAD_OID_MISMATCH');
 }
 
 function validateAppendOnlyHistory(currentEnvelope, nextEnvelope) {
@@ -276,6 +286,7 @@ export function createM11CoordinatorGithubStateTransport({
 
   const branchRef = `heads/${STATE_BRANCH_NAME}`;
   const storageBindings = new Map();
+  const storageIdentities = new Map();
   const poisonedStorageVersions = new Set();
   const consumedStorageVersions = new Set();
   const inFlightMutations = new Set();
@@ -290,6 +301,7 @@ export function createM11CoordinatorGithubStateTransport({
       } catch {
         fail(GITHUB_STATE_TRANSPORT_ERROR.MUTATION_UNKNOWN);
       }
+      operation.assertActive();
       const requestBytes = Buffer.byteLength(serializedBody, 'utf8');
       if (requestBytes > MAX_REQUEST_BYTES) fail(GITHUB_STATE_TRANSPORT_ERROR.RESPONSE_TOO_LARGE);
       operation.addBytes(requestBytes);
@@ -304,6 +316,7 @@ export function createM11CoordinatorGithubStateTransport({
       || /[\r\n]/.test(authorization)) {
       fail(GITHUB_STATE_TRANSPORT_ERROR.TRANSPORT_UNAVAILABLE);
     }
+    operation.assertActive();
     let response;
     try {
       const pendingResponse = Promise.resolve(fetchImpl(requestUrl, {
@@ -329,6 +342,7 @@ export function createM11CoordinatorGithubStateTransport({
     } catch {
       fail(GITHUB_STATE_TRANSPORT_ERROR.TRANSPORT_UNAVAILABLE);
     }
+    operation.assertActive();
 
     if (!response || typeof response.status !== 'number') {
       fail(GITHUB_STATE_TRANSPORT_ERROR.TRANSPORT_UNAVAILABLE);
@@ -346,14 +360,12 @@ export function createM11CoordinatorGithubStateTransport({
     if (responseUrl.href !== requestUrl.href) fail(GITHUB_STATE_TRANSPORT_ERROR.MALFORMED_RESPONSE);
     if (response.status >= 500) fail(GITHUB_STATE_TRANSPORT_ERROR.TRANSPORT_UNAVAILABLE);
     if (response.status === 404) fail(GITHUB_STATE_TRANSPORT_ERROR.TRANSPORT_UNAVAILABLE);
-    if (response.status === 409) {
-      return {status: 409, payload: null};
-    }
     if (response.status < 200 || response.status >= 300) {
       fail(GITHUB_STATE_TRANSPORT_ERROR.MUTATION_UNKNOWN);
     }
     const text = await readTextBounded(response, operation);
     const payload = parseJson(text);
+    operation.assertActive();
     return {status: response.status, payload};
   }
 
@@ -403,6 +415,7 @@ export function createM11CoordinatorGithubStateTransport({
     } catch {
       fail(GITHUB_STATE_TRANSPORT_ERROR.CORRUPT_CHAIN);
     }
+    operation.assertActive();
     return Object.freeze({
       readHeadOid,
       envelope,
@@ -414,17 +427,20 @@ export function createM11CoordinatorGithubStateTransport({
 
   function registerReadBinding(binding) {
     const version = binding.envelope.storageVersion;
-    const existing = storageBindings.get(version);
-    if (existing && existing.readHeadOid !== binding.readHeadOid) {
+    if (poisonedStorageVersions.has(version)) {
+      fail(GITHUB_STATE_TRANSPORT_ERROR.SAME_VERSION_DIFFERENT_OID);
+    }
+    const identity = storageIdentities.get(version);
+    if (identity && (identity.readHeadOid !== binding.readHeadOid
+      || identity.envelopeDigest !== binding.envelopeDigest)) {
       storageBindings.delete(version);
       poisonedStorageVersions.add(version);
       fail(GITHUB_STATE_TRANSPORT_ERROR.SAME_VERSION_DIFFERENT_OID);
     }
-    if (existing && existing.envelopeDigest !== binding.envelopeDigest) {
-      storageBindings.delete(version);
-      poisonedStorageVersions.add(version);
-      fail(GITHUB_STATE_TRANSPORT_ERROR.SAME_VERSION_DIFFERENT_OID);
-    }
+    if (!identity) storageIdentities.set(version, Object.freeze({
+      readHeadOid: binding.readHeadOid,
+      envelopeDigest: binding.envelopeDigest
+    }));
     if (!consumedStorageVersions.has(version)) storageBindings.set(version, binding);
   }
 
@@ -484,20 +500,36 @@ mutation CreateCommitOnBranch($input: CreateCommitOnBranchInput!) {
       }
     });
 
-    if (response.status === 409) return Object.freeze({status: 'CONFLICT'});
-    const errors = response.payload?.errors;
-    if (Array.isArray(errors) && errors.length > 0) {
-      if (response.payload?.data !== undefined) fail(GITHUB_STATE_TRANSPORT_ERROR.MUTATION_UNKNOWN);
-      if (isConfirmedMutationConflict(errors)) {
-        return Object.freeze({status: 'CONFLICT'});
+    if (Object.hasOwn(response.payload, 'errors')) {
+      const errors = response.payload.errors;
+      if (!Array.isArray(errors)
+        || errors.some(item => !item || typeof item !== 'object' || Array.isArray(item)
+          || typeof item.message !== 'string'
+          || (Object.hasOwn(item, 'extensions')
+            && (!item.extensions || typeof item.extensions !== 'object' || Array.isArray(item.extensions))))) {
+        fail(GITHUB_STATE_TRANSPORT_ERROR.MUTATION_UNKNOWN);
       }
+      if (errors.length > 0) {
+        fail(GITHUB_STATE_TRANSPORT_ERROR.MUTATION_UNKNOWN);
+      }
+    }
+    if (!response.payload.data || typeof response.payload.data !== 'object'
+      || Array.isArray(response.payload.data)) {
       fail(GITHUB_STATE_TRANSPORT_ERROR.MUTATION_UNKNOWN);
     }
-    const commit = response.payload?.data?.createCommitOnBranch?.commit;
+    const result = response.payload.data.createCommitOnBranch;
+    if (!result || typeof result !== 'object' || Array.isArray(result)) {
+      fail(GITHUB_STATE_TRANSPORT_ERROR.MUTATION_UNKNOWN);
+    }
+    const commit = result.commit;
+    if (!commit || typeof commit !== 'object' || Array.isArray(commit)
+      || !Array.isArray(commit.parents?.nodes)) {
+      fail(GITHUB_STATE_TRANSPORT_ERROR.MUTATION_UNKNOWN);
+    }
     const commitOid = commit?.oid;
     const parentOid = commit?.parents?.nodes?.[0]?.oid;
     if (!HEX40.test(commitOid) || !HEX40.test(parentOid)) {
-      fail(GITHUB_STATE_TRANSPORT_ERROR.MUTATION_ACK_LOST);
+      fail(GITHUB_STATE_TRANSPORT_ERROR.MUTATION_UNKNOWN);
     }
     if (parentOid !== expectedHeadOid) {
       fail(GITHUB_STATE_TRANSPORT_ERROR.MUTATION_ACK_LOST);
@@ -535,6 +567,7 @@ mutation CreateCommitOnBranch($input: CreateCommitOnBranchInput!) {
         } catch {
           fail(GITHUB_STATE_TRANSPORT_ERROR.INVALID_NEXT_ENVELOPE);
         }
+        operation.assertActive();
         if (!isSafeStorageVersion(canonicalNext.storageVersion)) {
           fail(GITHUB_STATE_TRANSPORT_ERROR.INVALID_NEXT_ENVELOPE);
         }
@@ -544,22 +577,21 @@ mutation CreateCommitOnBranch($input: CreateCommitOnBranchInput!) {
         validateAppendOnlyHistory(binding.envelope, canonicalNext);
 
         const candidateText = encodeEnvelope(canonicalNext);
+        operation.assertActive();
         const candidateDigest = digestText(candidateText);
         const mutation = await mutateWithExpectedHead(operation, {
           expectedHeadOid: binding.readHeadOid,
           contentText: candidateText
         });
         operation.assertActive();
-        if (mutation.status === 'CONFLICT') {
-          return Object.freeze({status: 'CONFLICT', storageVersion: expectedStorageVersion});
-        }
         const readback = await readStateByRef(operation);
         operation.assertActive();
         const readbackMatches = readback.readHeadOid === mutation.commitOid
           && readback.envelopeDigest === candidateDigest
           && readback.envelope.storageVersion === canonicalNext.storageVersion;
         if (!readbackMatches) fail(GITHUB_STATE_TRANSPORT_ERROR.READBACK_MISMATCH);
-        storageBindings.set(readback.envelope.storageVersion, readback);
+        registerReadBinding(readback);
+        operation.assertActive();
         return Object.freeze({status: 'REPLACED', storageVersion: readback.envelope.storageVersion});
       } finally {
         inFlightMutations.delete(expectedStorageVersion);
