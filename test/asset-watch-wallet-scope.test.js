@@ -298,6 +298,24 @@ test('nonempty unrecognized categories are distinguished without exposing catego
   });
 });
 
+test('unverified category shape remains unknown rather than claiming no unrecognized nonempty categories',async()=>{
+  const empty=await produce({extraCategories:[{
+    type:'PRIVATE_CANARY_EMPTY',count:0,hasMore:false,list:[]
+  }]});
+  assert.deepEqual(scopeSummary(empty,true),VALID_SCOPE_DIAGNOSTICS);
+  for(const category of [
+    {type:'PRIVATE_CANARY_MISSING',hasMore:false},
+    {type:'PRIVATE_CANARY_NULL',count:null,hasMore:false,list:[]},
+    {type:'PRIVATE_CANARY_MORE',count:0,hasMore:true,list:[]}
+  ]){
+    const state=await produce({extraCategories:[category]});
+    assert.deepEqual(scopeSummary(state,false),{
+      ...VALID_SCOPE_DIAGNOSTICS,exclusionsVerified:false,categoriesVerified:false,
+      unrecognizedNonemptyCategoryCount:null
+    });
+  }
+});
+
 test('count mismatches use actual producer and bridge verification predicates',async()=>{
   const state=await produce(),account=state.pionexAccount;
   account.walletBotProbe.buOrderTypeCounts.futures_lite=0;
@@ -310,6 +328,12 @@ test('count mismatches use actual producer and bridge verification predicates',a
   mismatch.pionexAccount.walletBotRisk.supportedScope.excludedRows=0;
   assert.deepEqual(scopeSummary(mismatch,false),{
     ...VALID_SCOPE_DIAGNOSTICS,excludedRowsEqualsUnsupported:false
+  });
+  account.walletBotProbe.buOrderTypeCounts.futures_lite=null;
+  account.walletBotRisk=buildWalletBotRisk(account.walletBotProbe,AT);
+  assert.deepEqual(scopeSummary(state,false),{
+    ...VALID_SCOPE_DIAGNOSTICS,exclusionsVerified:false,excludedRowsEqualsUnsupported:false,
+    countsVerified:false,typeCounts:{futures_grid:1,futures_lite:null,OTHER:0}
   });
 });
 

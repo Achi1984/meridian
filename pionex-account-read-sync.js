@@ -114,6 +114,17 @@ function verifiedWalletCategory(category){
   return recognizedWalletCategory(category)||
     category?.hasMore===false&&category?.count===0&&Array.isArray(category?.list)&&category.list.length===0;
 }
+function unrecognizedNonemptyCategoryCount(detail){
+  if(!Array.isArray(detail))return null;
+  let count=0;
+  for(const category of detail){
+    if(verifiedWalletCategory(category))continue;
+    if(Array.isArray(category?.list)&&category.list.length>0||
+      Number.isSafeInteger(category?.count)&&category.count>0)count++;
+    else return null;
+  }
+  return count;
+}
 export function normalizeWalletBotEntries(detail=[]){
   const out=[];
   for(const category of Array.isArray(detail)?detail:[]){
@@ -241,8 +252,8 @@ export function buildWalletBotRisk(probe={},iso=new Date().toISOString(),walletP
       hasTypeCounts?unsupported:null,
     unrecognizedNonemptyCategoryCount:probe.unrecognizedNonemptyCategoryCount,
     typeCounts:hasTypeCounts?{
-      futures_grid:typeCounts.futures_grid??0,
-      futures_lite:typeCounts.futures_lite??0,
+      futures_grid:Object.hasOwn(typeCounts,'futures_grid')?typeCounts.futures_grid:0,
+      futures_lite:Object.hasOwn(typeCounts,'futures_lite')?typeCounts.futures_lite:0,
       OTHER:Object.entries(typeCounts).filter(([type])=>!['futures_grid','futures_lite'].includes(type))
         .reduce((sum,[,count])=>Number.isSafeInteger(count)&&count>=0?sum+count:NaN,0)
     }:null
@@ -312,9 +323,7 @@ export function normalizeWalletOverview(data={}){
     botPaginationComplete:Array.isArray(bot.detail)&&bot.detail.every(x=>x?.hasMore===false)&&
       botCategories.every(x=>x.count!==null&&x.count>=0&&x.count===x.listCount),
     botScopeCategoriesVerified:Array.isArray(bot.detail)&&bot.detail.every(verifiedWalletCategory),
-    botUnrecognizedNonemptyCategoryCount:Array.isArray(bot.detail)?bot.detail.filter(x=>
-      !recognizedWalletCategory(x)&&(Array.isArray(x?.list)&&x.list.length>0||
-        typeof x?.count==='number'&&x.count>0)).length:null,
+    botUnrecognizedNonemptyCategoryCount:unrecognizedNonemptyCategoryCount(bot.detail),
     traderCategoryCount:traderCategories.length,
     source:'PIONEX_WALLET_READ_API'
   };
