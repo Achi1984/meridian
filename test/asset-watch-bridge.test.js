@@ -267,3 +267,94 @@ test('merge-to-bridge preserves every independent incomplete signal as display-o
     if(entry.name!=='raw partial status')assert.equal(x.coverage.paginationComplete,false,entry.name);
   }
 });
+
+function partialWithWallet(){
+  const input=state();
+  input.pionexRiskPartial={...input.pionexRisk,paginationComplete:false,
+    coverage:{status:'PARTIAL',paginationComplete:false}};
+  input.pionexBotSync={status:'PARTIAL',truncated:true};
+  input.pionexAccount={walletBotRisk:{...structuredClone(input.pionexRisk),
+    coverage:{status:'DOCUMENTED',paginationComplete:true,unsupportedRows:0,unhydratedRows:0},
+    bots:[bot({botOrderId:'synthetic-wallet',symbol:'SUI'})]}};
+  return input;
+}
+
+test('strict mirror can select a complete wallet without changing private partial display or state',()=>{
+  const input=partialWithWallet(),before=structuredClone(input);
+  const display=buildAssetWatchApiSnapshot(input,{now:NOW});
+  const strict=buildAssetWatchApiSnapshot(input,{now:NOW,preferOverwrite:true});
+  assert.equal(display.source,'PIONEX_BOT_API');
+  assert.equal(display.usableForDisplay,true);
+  assert.equal(display.usableForOverwrite,false);
+  assert.equal(strict.source,'PIONEX_WALLET_BOT_DETAIL');
+  assert.equal(strict.usableForOverwrite,true);
+  assert.equal(strict.coverage.status,'DOCUMENTED');
+  assert.equal(strict.coverage.unhydratedRows,0);
+  assert.deepEqual(input,before);
+});
+
+test('strict selection never promotes a stale, incomplete, unhydrated, unsupported or dropped-row wallet',()=>{
+  const cases=[
+    input=>{delete input.pionexAccount},
+    input=>{input.pionexAccount.walletBotRisk.snapshotAt='2026-09-28T19:00:00.000Z'},
+    input=>{input.pionexAccount.walletBotRisk.detailsComplete=false},
+    input=>{input.pionexAccountSync.status='ERROR'},
+    input=>{input.pionexAccountSync.status='PARTIAL'},
+    input=>{input.pionexAccountSync.truncated=true},
+    input=>{input.pionexAccount.walletBotRisk.coverage.paginationComplete=false},
+    input=>{input.pionexAccount.walletBotRisk.coverage.unsupportedRows=1},
+    input=>{input.pionexAccount.walletBotRisk.coverage.unhydratedRows=1},
+    input=>{input.pionexAccount.walletBotRisk.bots.push(bot({botOrderId:'synthetic-wallet'}))},
+    input=>{input.pionexAccount.walletBotRisk.bots.push(bot({botOrderId:'synthetic-invalid',side:null}))}
+  ];
+  for(const [index,mutate] of cases.entries()){
+    const input=partialWithWallet();mutate(input);
+    const before=structuredClone(input);
+    const x=buildAssetWatchApiSnapshot(input,{now:NOW,preferOverwrite:true});
+    assert.equal(x.usableForOverwrite,false,`case ${index}`);
+    assert.equal(x.coverage.status,'PARTIAL',`case ${index}`);
+    assert.deepEqual(input,before);
+  }
+});
+
+test('strict selection preserves complete primary precedence and qualifies after dropped-row checks',()=>{
+  const input=partialWithWallet();
+  delete input.pionexRiskPartial;
+  input.pionexBotSync={status:'OK'};
+  assert.equal(buildAssetWatchApiSnapshot(input,{now:NOW,preferOverwrite:true}).source,'PIONEX_BOT_API');
+  input.pionexRisk.bots.push(structuredClone(input.pionexRisk.bots[0]));
+  const display=buildAssetWatchApiSnapshot(input,{now:NOW});
+  assert.equal(display.coverage.unhydratedRows,1);
+  assert.equal(display.usableForOverwrite,false);
+  const strict=buildAssetWatchApiSnapshot(input,{now:NOW,preferOverwrite:true});
+  assert.equal(strict.source,'PIONEX_WALLET_BOT_DETAIL');
+  assert.equal(strict.usableForOverwrite,true);
+  delete input.pionexAccount;
+  const unsafe=buildAssetWatchApiSnapshot(input,{now:NOW,preferOverwrite:true});
+  assert.equal(unsafe.usableForOverwrite,false);
+  assert.equal(unsafe.coverage.unhydratedRows,1);
+});
+
+test('complete to partial to complete keeps canonical state intact through strict mirror selection',()=>{
+  let input=partialWithWallet();
+  delete input.pionexRiskPartial;
+  input.pionexBotSync={status:'OK',lastSuccessAt:input.pionexRisk.snapshotAt};
+  const canonical=structuredClone(input.pionexRisk);
+  assert.equal(buildAssetWatchApiSnapshot(input,{now:NOW,preferOverwrite:true}).source,'PIONEX_BOT_API');
+  const partial={...canonical,paginationComplete:false,coverage:{status:'PARTIAL',paginationComplete:false}};
+  input=mergePionexSyncState(input,{risk:partial,status:'PARTIAL',configured:true,truncated:true,
+    attemptAt:'2026-09-28T20:43:00.000Z'});
+  const before=structuredClone(input);
+  assert.equal(buildAssetWatchApiSnapshot(input,{now:NOW,preferOverwrite:true}).source,'PIONEX_WALLET_BOT_DETAIL');
+  assert.deepEqual(input,before);
+  assert.deepEqual(input.pionexRisk,canonical);
+  assert.equal(buildAssetWatchApiSnapshot(input,{now:NOW}).usableForOverwrite,false);
+  const recovered={...canonical,snapshotAt:'2026-09-28T20:44:00.000Z',updatedAt:'2026-09-28T20:44:00.000Z'};
+  input=mergePionexSyncState(input,{risk:recovered,status:'OK',configured:true,truncated:false,
+    attemptAt:recovered.updatedAt,successAt:recovered.updatedAt});
+  assert.equal(Object.hasOwn(input,'pionexRiskPartial'),false);
+  const strict=buildAssetWatchApiSnapshot(input,{now:NOW,preferOverwrite:true});
+  assert.equal(strict.source,'PIONEX_BOT_API');
+  assert.equal(strict.usableForOverwrite,true);
+  assert.deepEqual(input.pionexRisk.bots,canonical.bots);
+});
