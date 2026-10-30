@@ -412,6 +412,42 @@ test('collapsed native cards distinguish equal symbols and render only whitelist
    assert.doesNotMatch(target.textContent,/125.5|a{20}|b{20}/);
  });
 
+test('TP indicators are read-only, unknown evidence stays neutral, and mismatch warnings show exact values',()=>{
+  const input=snapshot('2026-10-12T20:00:00Z');
+  input.bots[0].limits={takeProfit:90,upper:100};
+  const mismatching=buildBotReadModel(input,{now:Date.parse(input.sourceSnapshotAt)+60000});
+  const target=root();renderBotReadState(target,{status:'fresh',model:mismatching});
+  let indicators=all(target,'input').filter(node=>node.getAttribute('aria-label')?.startsWith('TP'));
+  assert.equal(indicators.length,2);
+  assert.ok(indicators.every(node=>node.disabled));
+  assert.equal(indicators[0].checked,true);assert.equal(indicators[0].indeterminate,false);
+  assert.equal(indicators[1].checked,false);
+  assert.match(target.textContent,/TP weicht von oberer Range ab/);
+  assert.match(target.textContent,/TP-Wert: 90 · obere Range: 100/);
+
+  input.bots[0].limits={takeProfit:100,upper:100};
+  const matching=buildBotReadModel(input,{now:Date.parse(input.sourceSnapshotAt)+60000});
+  renderBotReadState(target,{status:'fresh',model:matching});
+  indicators=all(target,'input').filter(node=>node.getAttribute('aria-label')?.startsWith('TP'));
+  assert.ok(indicators.every(node=>node.checked&&!node.indeterminate));
+  assert.doesNotMatch(target.textContent,/TP nicht prüfbar|TP weicht von oberer Range ab/);
+
+  input.bots[0].limits={takeProfit:null,upper:100};
+  const unknown=buildBotReadModel(input,{now:Date.parse(input.sourceSnapshotAt)+60000});
+  renderBotReadState(target,{status:'fresh',model:unknown});
+  indicators=all(target,'input').filter(node=>node.getAttribute('aria-label')?.startsWith('TP'));
+  assert.ok(indicators.every(node=>node.disabled&&node.indeterminate));
+  assert.match(target.textContent,/TP nicht prüfbar/);
+  assert.match(target.textContent,/Quelle unterscheidet ein nicht gesetztes TP nicht/);
+  assert.doesNotMatch(target.textContent,/Kein TP gesetzt|TP weicht von oberer Range ab/);
+
+  renderBotReadState(target,{status:'stale'});
+  assert.equal(all(target,'input').filter(node=>node.getAttribute('aria-label')?.startsWith('TP')).length,0);
+  assert.doesNotMatch(target.textContent,/TP nicht prüfbar|TP-Wert: 90|obere Range: 100/);
+  renderBotReadState(target,{status:'locked'});
+  assert.equal(all(target,'input').filter(node=>node.getAttribute('aria-label')?.startsWith('TP')).length,0);
+});
+
  test('signed P/L keeps tiny values visible and zero or missing values unconfirmed',()=>{
    for(const [value,tone] of [[-2.75,'negative'],[2.75,'positive'],[0,null],[-0,null],[null,null],[undefined,null],['2',null],[NaN,null],[Infinity,null]]){
      const state=fresh(),target=root();state.model.bots[0].metrics={pnlUsd:value,leverage:5,investmentUsd:120};

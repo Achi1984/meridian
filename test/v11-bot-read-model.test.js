@@ -99,6 +99,28 @@ test('missing, coerced zero, invalid and negative positive-only metrics remain u
   assert.equal(buildBotReadModel(input,{now}).bots[0].metrics.lower,null);
 });
 
+test('TP comparison is exact, uses the upper grid boundary for short bots, and fails closed on unknown evidence',()=>{
+  const withLimits=(takeProfit,upper)=>{const input=fixture();input.bots[0].side='SHORT';
+    input.bots[0].limits={takeProfit,upper};return buildBotReadModel(input,{now}).bots[0].takeProfitCheck;};
+  assert.deepEqual(withLimits(1e2,100),{set:true,matchesUpper:true,reason:null});
+  assert.deepEqual(withLimits(90,100),{set:true,matchesUpper:false,reason:null},
+    'short bots are still compared to the actual upper grid boundary');
+  for(const absentOrInvalid of [undefined,null,0,-1,'100',NaN,Infinity,{}]){
+    const check=withLimits(absentOrInvalid,100);
+    assert.equal(check.set,null);assert.equal(check.matchesUpper,null);
+    assert.match(check.reason,/unterscheidet ein nicht gesetztes TP nicht/);
+  }
+  assert.equal(withLimits(100,undefined).matchesUpper,null);
+  assert.match(withLimits(100,undefined).reason,/obere Range fehlt/);
+});
+
+test('TP comparison normalizes decimal notation without display rounding or tolerance',()=>{
+  const withLimits=(takeProfit,upper)=>{const input=fixture();
+    input.bots[0].limits={takeProfit,upper};return buildBotReadModel(input,{now}).bots[0].takeProfitCheck;};
+  assert.equal(withLimits(1e-7,0.0000001).matchesUpper,true);
+  assert.equal(withLimits(0.1+0.2,0.3).matchesUpper,false);
+});
+
 test('neutral liquidation bounds and unverified provider coverage remain independent and explicit',()=>{
   const input=fixture();
   input.coverage={status:'PARTIAL',providerContractStatus:'DOCUMENTED',

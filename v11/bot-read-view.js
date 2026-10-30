@@ -12,6 +12,7 @@ const LABELS = {
 };
 const TYPES = {futures_grid:'Futures Grid', future_hedge_grid:'Futures Hedge Grid'};
 const MISSING = 'Nicht verfügbar';
+const TP_UNKNOWN_REASON = 'Der TP-Status ist nicht eindeutig bestätigt.';
 const EMPTY_SNAPSHOT = 'Keine darstellbaren Bots in diesem Snapshot. Dies bestätigt kein leeres Wallet.';
 const SCOPE_REASONS = {
   UNSUPPORTED_SCOPE:'Der unterstützte Datenumfang ist nicht bestätigt.',
@@ -100,6 +101,10 @@ function projection(state, filters = {}) {
       const hasQuoteInvestment=investmentCurrency && investmentAmount>0;
       const moneyCurrency=investmentCurrency==='USD'||investmentCurrency==='USDT';
       const productCategory=bot.productCategory==='FUTURES_MOON'?'Futures Moon':null;
+      const tpCheck=bot.takeProfitCheck;
+      const takeProfitSet=tpCheck?.set===true?true:tpCheck?.set===false?false:null;
+      const takeProfitMatchesUpper=tpCheck?.matchesUpper===true?true:
+        tpCheck?.matchesUpper===false?false:null;
       return {symbol:bot.symbol, side:row.direction==='unknown'?'Unbekannt':row.direction[0].toUpperCase()+row.direction.slice(1),
         ref:row.ref,type:ownLabel(TYPES,bot.type),productCategory,
         category:row.category==='coin-m'?'COIN-M':row.category==='linear'?'Linear':'Unbekannt',
@@ -118,7 +123,10 @@ function projection(state, filters = {}) {
         liquidation:formatExact(bot.metrics?.liquidationPrice),
         liquidationLowerBound:formatExact(bot.metrics?.liquidationLowerBound),
         liquidationUpperBound:formatExact(bot.metrics?.liquidationUpperBound),
-        takeProfit:formatExact(bot.metrics?.takeProfit),stopLoss:formatExact(bot.metrics?.stopLoss)};
+        takeProfit:formatExact(bot.metrics?.takeProfit),stopLoss:formatExact(bot.metrics?.stopLoss),
+        upperRange:formatExact(bot.metrics?.upper),takeProfitSet,takeProfitMatchesUpper,
+        takeProfitCheckReason:takeProfitMatchesUpper===null
+          ?typeof tpCheck?.reason==='string'?tpCheck.reason:TP_UNKNOWN_REASON:null};
     });
     const losses=overview.losses.map(loss=>({ref:loss.ref,symbol:loss.symbol,direction:loss.direction,
       pnl:formatMoney(loss.pnl,'USD',true),pnlDetail:formatExact(loss.pnl,' USD'),pnlTone:loss.pnl<0?'negative':'positive'}));
@@ -132,6 +140,17 @@ function element(document, tag, text) {
   const node=document.createElement(tag);
   if (text !== undefined) node.textContent=text;
   return node;
+}
+function tpIndicator(document, label, value) {
+  const state=value===true?'ja':value===false?'nein':'nicht prüfbar';
+  const symbol=value===true?'✓':value===false?'✗':'—';
+  const wrapper=element(document,'label');wrapper.className='bot-tp-indicator';
+  const checkbox=element(document,'input');checkbox.type='checkbox';checkbox.disabled=true;
+  checkbox.checked=value===true;checkbox.indeterminate=value===null;
+  checkbox.setAttribute('aria-label',label+': '+state);
+  if(value===null)checkbox.setAttribute('aria-checked','mixed');
+  wrapper.append(checkbox,element(document,'span',symbol+' '+label+': '+state));
+  return wrapper;
 }
 
 // Keep the empty live region attached before populating it, then retain its identity.
@@ -241,6 +260,23 @@ export function renderBotReadState(root, state, filters = {}) {
           ...liquidationMetrics,['Risikopuffer',MISSING],
           ['Take-Profit',bot.takeProfit],['Stop-Loss',bot.stopLoss]]) {
           const group=element(document,'div');group.append(element(document,'dt',label),element(document,'dd',value));metrics.append(group);
+        }
+        const tpSet=element(document,'div'),tpMatch=element(document,'div');
+        tpSet.append(element(document,'dt','TP gesetzt'),element(document,'dd'));
+        tpSet.children[1].append(tpIndicator(document,'TP gesetzt',bot.takeProfitSet));
+        tpMatch.append(element(document,'dt','TP = obere Range'),element(document,'dd'));
+        tpMatch.children[1].append(tpIndicator(document,'TP = obere Range',bot.takeProfitMatchesUpper));
+        metrics.append(tpSet,tpMatch);
+        const tpWarning=bot.takeProfitSet===false||bot.takeProfitMatchesUpper===false;
+        if(tpWarning){
+          const warning=element(document,'p');warning.className='bot-tp-warning';
+          const heading=bot.takeProfitSet===false?'Kein TP gesetzt':'TP weicht von oberer Range ab';
+          warning.append(element(document,'strong','⚠ Warnung: '+heading+'. '),
+            element(document,'span','TP-Wert: '+bot.takeProfit+' · obere Range: '+bot.upperRange));
+          body.append(warning);
+        }else if(bot.takeProfitMatchesUpper===null){
+          const reason=element(document,'p','TP nicht prüfbar: '+bot.takeProfitCheckReason);
+          reason.className='bot-tp-status-reason';body.append(reason);
         }
         body.append(element(document,'p','Preisgrenzen und TP/SL: Einheit von der Quelle nicht ausgewiesen. P/L kann je nach Quelle Gesamt- oder offenen Gewinn enthalten.'),metrics,element(document,'p','Nicht verfügbar: Die Quelle liefert keinen eindeutig bestätigten Wert. Auch Nullwerte bleiben unbestätigt, weil sie fehlende Angaben bedeuten können. Grid-Gewinn und Risikopuffer sind im Snapshot nicht enthalten. Fehlende TP/SL-Werte bestätigen keine deaktivierten Schutzaufträge.'));
         card.append(summary,body);item.append(card);list.append(item);
