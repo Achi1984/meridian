@@ -31,20 +31,23 @@ The implementation does **not** create/provision the branch/path and does not pr
 - Single GraphQL mutation: `createCommitOnBranch` with `expectedHeadOid`.
 - Exact branch selector: `{ repositoryNameWithOwner, branchName }`.
 - One file addition/replacement for `state/m11-coordinator.json`; no deletions/force semantics.
+- GraphQL `FileAddition.contents` is UTF-8 encoded and RFC 4648 base64 encoded.
 - No mutation retry.
-- Explicit conflict only when proved (expected-head mismatch class); ambiguous/lost-ack paths fail closed.
+- Conflict is reported only for HTTP 409 or an explicit structured expected-head mismatch; message text and partial GraphQL data/errors remain UNKNOWN.
 - After mutation, transport requires authoritative branch readback to match returned commit OID and exact candidate bytes before returning `REPLACED`.
+- Each `storageVersion` read binding is a one-use opportunity for the lifetime of the transport instance, including after an ambiguous mutation.
 
 ## Safety bounds
 
 - Redirects are rejected.
-- Off-origin responses are rejected.
-- Streamed response bytes are bounded.
-- Deadlines are bounded.
+- Response origin and exact URL/resource identities are checked.
+- Each response and request body is capped at 1 MiB; each operation is capped at five requests and 10 MiB aggregate I/O.
+- One operation-wide deadline (at most 30 seconds) covers fetch, streamed bodies, and readback; cancellation races uncooperative fetch/read promises and yields on empty chunks.
 - Errors are stable enum codes (`GITHUB_STATE_TRANSPORT_ERROR`) and exclude credential/body logging.
 
 ## Current limitations (unchanged by this packet)
 
 - `hostedAtomicityProven` remains `false`.
 - External reset/delete/foreign-writer/ABA defenses are still deployment prerequisites, not solved here.
-- Later reads can reconcile uncertain outcomes; transport never auto-reposts on unknown acknowledgements.
+- Later reads can observe and reconcile canonical state, but cannot reauthorize a consumed storage version within the same instance. The one-use fence is memory-only and does not protect against a new transport instance/process.
+- Transport never auto-reposts on unknown acknowledgements.

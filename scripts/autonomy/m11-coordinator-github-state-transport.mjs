@@ -8,6 +8,12 @@ const STATE_BRANCH_NAME = 'meridian-coordinator-state';
 const STATE_FILE_PATH = 'state/m11-coordinator.json';
 const DEFAULT_DEADLINE_MS = 10000;
 const DEFAULT_MAX_RESPONSE_BYTES = 1024 * 1024;
+const MAX_DEADLINE_MS = 30000;
+const MAX_RESPONSE_BYTES = 1024 * 1024;
+const MAX_OPERATION_BYTES = 10 * 1024 * 1024;
+const MAX_REQUEST_BYTES = 1024 * 1024;
+const MAX_OPERATION_REQUESTS = 5;
+const MAX_RESPONSE_CHUNKS = 65536;
 const USER_AGENT = 'meridian-m11-github-state-transport/1.0';
 const HEX40 = /^[a-f0-9]{40}$/;
 
@@ -65,12 +71,14 @@ function digestText(text) {
 
 function decodeBase64Content(value) {
   if (typeof value !== 'string') fail(GITHUB_STATE_TRANSPORT_ERROR.MALFORMED_RESPONSE);
-  let sanitized = value.replace(/\n/g, '');
-  if (sanitized.length === 0 || sanitized.length % 4 !== 0 || /[^A-Za-z0-9+/=]/.test(sanitized)) {
+  const sanitized = value.replace(/\r?\n/g, '');
+  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(sanitized)) {
     fail(GITHUB_STATE_TRANSPORT_ERROR.MALFORMED_RESPONSE);
   }
   try {
-    return Buffer.from(sanitized, 'base64').toString('utf8');
+    const bytes = Buffer.from(sanitized, 'base64');
+    if (bytes.toString('base64') !== sanitized) fail(GITHUB_STATE_TRANSPORT_ERROR.MALFORMED_RESPONSE);
+    return new TextDecoder('utf-8', {fatal: true}).decode(bytes);
   } catch {
     fail(GITHUB_STATE_TRANSPORT_ERROR.MALFORMED_RESPONSE);
   }
@@ -109,49 +117,103 @@ function readResponseLength(response, maxResponseBytes) {
   }
 }
 
-function bindAbort(signal, controller) {
-  if (!signal) return () => {};
-  if (signal.aborted) {
-    controller.abort(signal.reason);
-    return () => {};
-  }
-  const abort = () => controller.abort(signal.reason);
-  signal.addEventListener('abort', abort, {once: true});
-  return () => signal.removeEventListener('abort', abort);
+function createOperation({signal, deadlineMs, maxResponseBytes}) {
+  const controller = new AbortController();
+  let rejectAbort;
+  let abortError = null;
+  const aborted = new Promise((resolve, reject) => {
+    rejectAbort = reject;
+  });
+  aborted.catch(() => {});
+  const abort = () => {
+    if (abortError) return;
+    abortError = new GithubStateTransportError(GITHUB_STATE_TRANSPORT_ERROR.TRANSPORT_UNAVAILABLE);
+    controller.abort();
+    rejectAbort(abortError);
+  };
+  const onAbort = () => abort();
+  if (signal?.aborted) abort();
+  else signal?.addEventListener('abort', onAbort, {once: true});
+  const timeout = setTimeout(abort, deadlineMs);
+  let requestCount = 0;
+  let totalBytes = 0;
+  return {
+    signal: controller.signal,
+    maxResponseBytes,
+    race(promise) {
+      if (abortError) return Promise.reject(abortError);
+      return Promise.race([Promise.resolve(promise), aborted]);
+    },
+    assertActive() {
+      if (abortError) throw abortError;
+    },
+    reserveRequest() {
+      this.assertActive();
+      requestCount += 1;
+      if (requestCount > MAX_OPERATION_REQUESTS) fail(GITHUB_STATE_TRANSPORT_ERROR.RESPONSE_TOO_LARGE);
+    },
+    addBytes(count) {
+      totalBytes += count;
+      if (totalBytes > MAX_OPERATION_BYTES) fail(GITHUB_STATE_TRANSPORT_ERROR.RESPONSE_TOO_LARGE);
+    },
+    finish() {
+      clearTimeout(timeout);
+      signal?.removeEventListener('abort', onAbort);
+    }
+  };
 }
 
-async function readTextBounded(response, {signal, maxResponseBytes}) {
-  readResponseLength(response, maxResponseBytes);
+async function readTextBounded(response, operation) {
+  readResponseLength(response, operation.maxResponseBytes);
   const reader = response.body?.getReader?.();
   if (!reader) fail(GITHUB_STATE_TRANSPORT_ERROR.MALFORMED_RESPONSE);
   const decoder = new TextDecoder('utf-8', {fatal: true});
   let total = 0;
+  let chunks = 0;
   let text = '';
   const cancel = () => {
     try {
       Promise.resolve(reader.cancel()).catch(() => {});
     } catch {}
   };
-  signal?.addEventListener?.('abort', cancel, {once: true});
+  operation.signal.addEventListener('abort', cancel, {once: true});
   try {
     while (true) {
-      if (signal?.aborted) fail(GITHUB_STATE_TRANSPORT_ERROR.TRANSPORT_UNAVAILABLE);
+      operation.assertActive();
       let chunk;
       try {
-        chunk = await reader.read();
+        chunk = await operation.race(reader.read());
       } catch {
         fail(GITHUB_STATE_TRANSPORT_ERROR.TRANSPORT_UNAVAILABLE);
       }
-      if (signal?.aborted) fail(GITHUB_STATE_TRANSPORT_ERROR.TRANSPORT_UNAVAILABLE);
+      operation.assertActive();
       if (chunk.done) break;
+      chunks += 1;
+      if (chunks > MAX_RESPONSE_CHUNKS) fail(GITHUB_STATE_TRANSPORT_ERROR.RESPONSE_TOO_LARGE);
       total += chunk.value.byteLength;
-      if (total > maxResponseBytes) fail(GITHUB_STATE_TRANSPORT_ERROR.RESPONSE_TOO_LARGE);
-      text += decoder.decode(chunk.value, {stream: true});
+      if (total > operation.maxResponseBytes) fail(GITHUB_STATE_TRANSPORT_ERROR.RESPONSE_TOO_LARGE);
+      operation.addBytes(chunk.value.byteLength);
+      try {
+        text += decoder.decode(chunk.value, {stream: true});
+      } catch {
+        fail(GITHUB_STATE_TRANSPORT_ERROR.MALFORMED_RESPONSE);
+      }
+      if (chunk.value.byteLength === 0) {
+        try {
+          await operation.race(new Promise(resolve => setImmediate(resolve)));
+        } catch {
+          fail(GITHUB_STATE_TRANSPORT_ERROR.TRANSPORT_UNAVAILABLE);
+        }
+      }
     }
-    text += decoder.decode();
+    try {
+      text += decoder.decode();
+    } catch {
+      fail(GITHUB_STATE_TRANSPORT_ERROR.MALFORMED_RESPONSE);
+    }
     return text;
   } finally {
-    signal?.removeEventListener?.('abort', cancel);
+    operation.signal.removeEventListener('abort', cancel);
     cancel();
     try {
       reader.releaseLock();
@@ -159,12 +221,9 @@ async function readTextBounded(response, {signal, maxResponseBytes}) {
   }
 }
 
-function isMutationConflict(errors) {
-  if (!Array.isArray(errors) || errors.length === 0) return false;
-  return errors.every(item => {
-    const message = typeof item?.message === 'string' ? item.message : '';
-    return /expectedHeadOid|head oid|head sha|stale/i.test(message);
-  });
+function isConfirmedMutationConflict(errors) {
+  return Array.isArray(errors) && errors.length > 0
+    && errors.every(item => item?.extensions?.code === 'EXPECTED_HEAD_OID_MISMATCH');
 }
 
 function validateAppendOnlyHistory(currentEnvelope, nextEnvelope) {
@@ -196,18 +255,19 @@ async function canonicalReplay(envelope) {
 
 export function createM11CoordinatorGithubStateTransport({
   enabled = false,
-  fetchImpl = globalThis.fetch,
+  fetchImpl,
   credentials = null,
   now = Date.now,
   defaultDeadlineMs = DEFAULT_DEADLINE_MS,
   maxResponseBytes = DEFAULT_MAX_RESPONSE_BYTES
 } = {}) {
+  if (typeof enabled !== 'boolean') throw new Error('enabled must be a boolean');
   if (typeof fetchImpl !== 'function') throw new Error('fetchImpl must be a function');
-  if (!Number.isSafeInteger(defaultDeadlineMs) || defaultDeadlineMs < 1) {
-    throw new Error('defaultDeadlineMs must be a positive integer');
+  if (!Number.isSafeInteger(defaultDeadlineMs) || defaultDeadlineMs < 1 || defaultDeadlineMs > MAX_DEADLINE_MS) {
+    throw new Error('defaultDeadlineMs must be between 1 and 30000');
   }
-  if (!Number.isSafeInteger(maxResponseBytes) || maxResponseBytes < 1024) {
-    throw new Error('maxResponseBytes must be >= 1024');
+  if (!Number.isSafeInteger(maxResponseBytes) || maxResponseBytes < 1024 || maxResponseBytes > MAX_RESPONSE_BYTES) {
+    throw new Error('maxResponseBytes must be between 1024 and 1048576');
   }
   if (enabled && (!credentials || typeof credentials.getAuthorizationHeader !== 'function')) {
     throw new Error('credentials.getAuthorizationHeader is required when enabled');
@@ -217,32 +277,57 @@ export function createM11CoordinatorGithubStateTransport({
   const branchRef = `heads/${STATE_BRANCH_NAME}`;
   const storageBindings = new Map();
   const poisonedStorageVersions = new Set();
+  const consumedStorageVersions = new Set();
   const inFlightMutations = new Set();
 
-  async function requestJson({path, method = 'GET', body = null, signal = null}) {
-    const timeoutController = new AbortController();
-    const releaseAbort = bindAbort(signal, timeoutController);
-    const timeout = setTimeout(() => timeoutController.abort(new Error('TIMEOUT')), defaultDeadlineMs);
+  async function requestJson(operation, {path, method = 'GET', body = null}) {
+    operation.reserveRequest();
+    const requestUrl = new URL(path, API_ORIGIN);
+    let serializedBody = null;
+    if (body !== null) {
+      try {
+        serializedBody = JSON.stringify(body);
+      } catch {
+        fail(GITHUB_STATE_TRANSPORT_ERROR.MUTATION_UNKNOWN);
+      }
+      const requestBytes = Buffer.byteLength(serializedBody, 'utf8');
+      if (requestBytes > MAX_REQUEST_BYTES) fail(GITHUB_STATE_TRANSPORT_ERROR.RESPONSE_TOO_LARGE);
+      operation.addBytes(requestBytes);
+    }
+    let authorization;
+    try {
+      authorization = credentials?.getAuthorizationHeader?.();
+    } catch {
+      fail(GITHUB_STATE_TRANSPORT_ERROR.TRANSPORT_UNAVAILABLE);
+    }
+    if (typeof authorization !== 'string' || authorization.length === 0 || authorization.length > 8192
+      || /[\r\n]/.test(authorization)) {
+      fail(GITHUB_STATE_TRANSPORT_ERROR.TRANSPORT_UNAVAILABLE);
+    }
     let response;
     try {
-      response = await fetchImpl(new URL(path, API_ORIGIN), {
+      const pendingResponse = Promise.resolve(fetchImpl(requestUrl, {
         method,
         redirect: 'error',
-        signal: timeoutController.signal,
+        signal: operation.signal,
         headers: {
           accept: 'application/vnd.github+json',
-          authorization: credentials?.getAuthorizationHeader?.(),
+          authorization,
           'user-agent': USER_AGENT,
           'x-github-api-version': '2022-11-28',
           ...(body === null ? {} : {'content-type': 'application/json; charset=utf-8'})
         },
-        ...(body === null ? {} : {body: JSON.stringify(body)})
-      });
+        ...(body === null ? {} : {body: serializedBody})
+      }));
+      pendingResponse.then(lateResponse => {
+        if (!operation.signal.aborted) return;
+        try {
+          Promise.resolve(lateResponse?.body?.cancel?.()).catch(() => {});
+        } catch {}
+      }, () => {});
+      response = await operation.race(pendingResponse);
     } catch {
       fail(GITHUB_STATE_TRANSPORT_ERROR.TRANSPORT_UNAVAILABLE);
-    } finally {
-      clearTimeout(timeout);
-      releaseAbort();
     }
 
     if (!response || typeof response.status !== 'number') {
@@ -251,8 +336,14 @@ export function createM11CoordinatorGithubStateTransport({
     if (response.type === 'opaqueredirect' || response.redirected) {
       fail(GITHUB_STATE_TRANSPORT_ERROR.REDIRECT_FORBIDDEN);
     }
-    const responseUrl = new URL(response.url || '', API_ORIGIN);
+    let responseUrl;
+    try {
+      responseUrl = new URL(response.url || '');
+    } catch {
+      fail(GITHUB_STATE_TRANSPORT_ERROR.MALFORMED_RESPONSE);
+    }
     if (responseUrl.origin !== API_ORIGIN) fail(GITHUB_STATE_TRANSPORT_ERROR.OFF_ORIGIN);
+    if (responseUrl.href !== requestUrl.href) fail(GITHUB_STATE_TRANSPORT_ERROR.MALFORMED_RESPONSE);
     if (response.status >= 500) fail(GITHUB_STATE_TRANSPORT_ERROR.TRANSPORT_UNAVAILABLE);
     if (response.status === 404) fail(GITHUB_STATE_TRANSPORT_ERROR.TRANSPORT_UNAVAILABLE);
     if (response.status === 409) {
@@ -261,39 +352,48 @@ export function createM11CoordinatorGithubStateTransport({
     if (response.status < 200 || response.status >= 300) {
       fail(GITHUB_STATE_TRANSPORT_ERROR.MUTATION_UNKNOWN);
     }
-    const text = await readTextBounded(response, {signal, maxResponseBytes});
+    const text = await readTextBounded(response, operation);
     const payload = parseJson(text);
     return {status: response.status, payload};
   }
 
-  async function readStateByRef() {
-    const refResponse = await requestJson({
+  async function readStateByRef(operation) {
+    const refResponse = await requestJson(operation, {
       path: `/repos/Achi1984/meridian/git/ref/${branchRef}`
     });
     const readHeadOid = refResponse.payload?.object?.sha;
-    if (!HEX40.test(readHeadOid)) fail(GITHUB_STATE_TRANSPORT_ERROR.MALFORMED_RESPONSE);
+    if (refResponse.payload?.ref !== `refs/${branchRef}`
+      || refResponse.payload?.object?.type !== 'commit'
+      || !HEX40.test(readHeadOid)) fail(GITHUB_STATE_TRANSPORT_ERROR.MALFORMED_RESPONSE);
 
-    const commitResponse = await requestJson({
+    const commitResponse = await requestJson(operation, {
       path: `/repos/Achi1984/meridian/git/commits/${readHeadOid}`
     });
     const treeSha = commitResponse.payload?.tree?.sha;
-    if (!HEX40.test(treeSha)) fail(GITHUB_STATE_TRANSPORT_ERROR.MALFORMED_RESPONSE);
-
-    const treeResponse = await requestJson({
-      path: `/repos/Achi1984/meridian/git/trees/${treeSha}?recursive=1`
-    });
-    if (treeResponse.payload?.truncated === true || !Array.isArray(treeResponse.payload?.tree)) {
+    if (commitResponse.payload?.sha !== readHeadOid || !HEX40.test(treeSha)) {
       fail(GITHUB_STATE_TRANSPORT_ERROR.MALFORMED_RESPONSE);
     }
-    const node = treeResponse.payload.tree.find(entry => entry?.path === STATE_FILE_PATH);
+
+    const treeResponse = await requestJson(operation, {
+      path: `/repos/Achi1984/meridian/git/trees/${treeSha}?recursive=1`
+    });
+    if (treeResponse.payload?.sha !== treeSha || treeResponse.payload?.truncated === true
+      || !Array.isArray(treeResponse.payload?.tree)) {
+      fail(GITHUB_STATE_TRANSPORT_ERROR.MALFORMED_RESPONSE);
+    }
+    const matchingNodes = treeResponse.payload.tree.filter(entry => entry?.path === STATE_FILE_PATH);
+    if (matchingNodes.length !== 1) fail(GITHUB_STATE_TRANSPORT_ERROR.MALFORMED_RESPONSE);
+    const node = matchingNodes[0];
     if (!node || node.type !== 'blob' || !HEX40.test(node.sha)) {
       fail(GITHUB_STATE_TRANSPORT_ERROR.MALFORMED_RESPONSE);
     }
 
-    const blobResponse = await requestJson({
+    const blobResponse = await requestJson(operation, {
       path: `/repos/Achi1984/meridian/git/blobs/${node.sha}`
     });
-    if (blobResponse.payload?.encoding !== 'base64') fail(GITHUB_STATE_TRANSPORT_ERROR.MALFORMED_RESPONSE);
+    if (blobResponse.payload?.sha !== node.sha || blobResponse.payload?.encoding !== 'base64') {
+      fail(GITHUB_STATE_TRANSPORT_ERROR.MALFORMED_RESPONSE);
+    }
     const envelopeText = decodeBase64Content(blobResponse.payload?.content);
     const envelopeDigest = digestText(envelopeText);
     const parsedEnvelope = parseJson(envelopeText);
@@ -325,7 +425,7 @@ export function createM11CoordinatorGithubStateTransport({
       poisonedStorageVersions.add(version);
       fail(GITHUB_STATE_TRANSPORT_ERROR.SAME_VERSION_DIFFERENT_OID);
     }
-    storageBindings.set(version, binding);
+    if (!consumedStorageVersions.has(version)) storageBindings.set(version, binding);
   }
 
   function consumeMutationOpportunity(expectedStorageVersion) {
@@ -338,14 +438,18 @@ export function createM11CoordinatorGithubStateTransport({
     if (inFlightMutations.has(expectedStorageVersion)) {
       fail(GITHUB_STATE_TRANSPORT_ERROR.LOCAL_CONCURRENT_MUTATION);
     }
+    if (consumedStorageVersions.has(expectedStorageVersion)) {
+      fail(GITHUB_STATE_TRANSPORT_ERROR.NO_READ_BINDING);
+    }
     const binding = storageBindings.get(expectedStorageVersion);
     if (!binding) fail(GITHUB_STATE_TRANSPORT_ERROR.NO_READ_BINDING);
     storageBindings.delete(expectedStorageVersion);
+    consumedStorageVersions.add(expectedStorageVersion);
     inFlightMutations.add(expectedStorageVersion);
     return binding;
   }
 
-  async function mutateWithExpectedHead({expectedHeadOid, contentText}) {
+  async function mutateWithExpectedHead(operation, {expectedHeadOid, contentText}) {
     const query = `
 mutation CreateCommitOnBranch($input: CreateCommitOnBranchInput!) {
   createCommitOnBranch(input: $input) {
@@ -359,7 +463,7 @@ mutation CreateCommitOnBranch($input: CreateCommitOnBranchInput!) {
     }
   }
 }`.trim();
-    const response = await requestJson({
+    const response = await requestJson(operation, {
       path: GRAPHQL_PATH,
       method: 'POST',
       body: {
@@ -373,7 +477,7 @@ mutation CreateCommitOnBranch($input: CreateCommitOnBranchInput!) {
             expectedHeadOid,
             message: {headline: 'm11 coordinator state update'},
             fileChanges: {
-              additions: [{path: STATE_FILE_PATH, contents: contentText}]
+              additions: [{path: STATE_FILE_PATH, contents: Buffer.from(contentText, 'utf8').toString('base64')}]
             }
           }
         }
@@ -381,8 +485,10 @@ mutation CreateCommitOnBranch($input: CreateCommitOnBranchInput!) {
     });
 
     if (response.status === 409) return Object.freeze({status: 'CONFLICT'});
-    if (Array.isArray(response.payload?.errors) && response.payload.errors.length > 0) {
-      if (isMutationConflict(response.payload.errors)) {
+    const errors = response.payload?.errors;
+    if (Array.isArray(errors) && errors.length > 0) {
+      if (response.payload?.data !== undefined) fail(GITHUB_STATE_TRANSPORT_ERROR.MUTATION_UNKNOWN);
+      if (isConfirmedMutationConflict(errors)) {
         return Object.freeze({status: 'CONFLICT'});
       }
       fail(GITHUB_STATE_TRANSPORT_ERROR.MUTATION_UNKNOWN);
@@ -407,14 +513,21 @@ mutation CreateCommitOnBranch($input: CreateCommitOnBranchInput!) {
 
     async readCanonicalEnvelope({signal = null} = {}) {
       if (enabled !== true) fail(GITHUB_STATE_TRANSPORT_ERROR.DISABLED);
-      const binding = await readStateByRef({signal});
-      registerReadBinding(binding);
-      return clone(binding.envelope);
+      const operation = createOperation({signal, deadlineMs: defaultDeadlineMs, maxResponseBytes});
+      try {
+        const binding = await readStateByRef(operation);
+        operation.assertActive();
+        registerReadBinding(binding);
+        return clone(binding.envelope);
+      } finally {
+        operation.finish();
+      }
     },
 
     async replaceCanonicalEnvelope({expectedStorageVersion, nextEnvelope, signal = null}) {
       if (enabled !== true) fail(GITHUB_STATE_TRANSPORT_ERROR.DISABLED);
       const binding = consumeMutationOpportunity(expectedStorageVersion);
+      const operation = createOperation({signal, deadlineMs: defaultDeadlineMs, maxResponseBytes});
       try {
         let canonicalNext;
         try {
@@ -432,15 +545,16 @@ mutation CreateCommitOnBranch($input: CreateCommitOnBranchInput!) {
 
         const candidateText = encodeEnvelope(canonicalNext);
         const candidateDigest = digestText(candidateText);
-        const mutation = await mutateWithExpectedHead({
+        const mutation = await mutateWithExpectedHead(operation, {
           expectedHeadOid: binding.readHeadOid,
-          contentText: candidateText,
-          signal
+          contentText: candidateText
         });
+        operation.assertActive();
         if (mutation.status === 'CONFLICT') {
           return Object.freeze({status: 'CONFLICT', storageVersion: expectedStorageVersion});
         }
-        const readback = await readStateByRef({signal});
+        const readback = await readStateByRef(operation);
+        operation.assertActive();
         const readbackMatches = readback.readHeadOid === mutation.commitOid
           && readback.envelopeDigest === candidateDigest
           && readback.envelope.storageVersion === canonicalNext.storageVersion;
@@ -449,6 +563,7 @@ mutation CreateCommitOnBranch($input: CreateCommitOnBranchInput!) {
         return Object.freeze({status: 'REPLACED', storageVersion: readback.envelope.storageVersion});
       } finally {
         inFlightMutations.delete(expectedStorageVersion);
+        operation.finish();
       }
     }
   });

@@ -35,13 +35,59 @@ function streamFromString(text) {
   });
 }
 
-function makeResponse({status = 200, body = '{}', headers = {}, url, redirected = false}) {
+function decodeGraphqlContents(content) {
+  if (typeof content !== 'string'
+    || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(content)) {
+    return null;
+  }
+  try {
+    const bytes = Buffer.from(content, 'base64');
+    if (bytes.toString('base64') !== content) return null;
+    return new TextDecoder('utf-8', {fatal: true}).decode(bytes);
+  } catch {
+    return null;
+  }
+}
+
+function makeResponse({status = 200, body = '{}', headers = {}, url, redirected = false, bodyStream = null}) {
   return {
     status,
     url,
     redirected,
     headers: new Headers(headers),
-    body: streamFromString(body)
+    body: bodyStream ?? streamFromString(body)
+  };
+}
+
+function hangingBody() {
+  return {
+    getReader() {
+      return {
+        read() {
+          return new Promise(() => {});
+        },
+        cancel() {
+          return Promise.resolve();
+        },
+        releaseLock() {}
+      };
+    }
+  };
+}
+
+function zeroChunkBody() {
+  return {
+    getReader() {
+      return {
+        read() {
+          return Promise.resolve({done: false, value: new Uint8Array()});
+        },
+        cancel() {
+          return Promise.resolve();
+        },
+        releaseLock() {}
+      };
+    }
   };
 }
 
@@ -65,6 +111,7 @@ function buildServer(initialEnvelope = createAtomicRecordEnvelope()) {
   let blobOverride = null;
   let forceOversize = false;
   let forceRedirect = false;
+  let lastDecodedContent = null;
 
   function nextSha(prefix) {
     sequence += 1;
@@ -151,25 +198,33 @@ function buildServer(initialEnvelope = createAtomicRecordEnvelope()) {
     if (method === 'POST' && requestUrl.pathname === '/graphql') {
       const parsed = JSON.parse(body || '{}');
       const input = parsed?.variables?.input;
-      if (typeof mutateHook === 'function') {
-        const hooked = mutateHook({input, branchHead, requestUrl: requestUrl.toString()});
-        if (hooked) return hooked;
-      }
       const additions = input?.fileChanges?.additions;
       const path = additions?.[0]?.path;
-      const content = additions?.[0]?.contents;
+      const contentText = decodeGraphqlContents(additions?.[0]?.contents);
       if (input?.branch?.repositoryNameWithOwner !== REPOSITORY
         || input?.branch?.branchName !== STATE_BRANCH
-        || input?.expectedHeadOid !== branchHead
         || !Array.isArray(additions) || additions.length !== 1
-        || path !== STATE_PATH || typeof content !== 'string'
+        || path !== STATE_PATH
         || Array.isArray(input?.fileChanges?.deletions)) {
         return jsonResponse(requestUrl.toString(), {
-          errors: [{message: 'expectedHeadOid mismatch'}]
+          errors: [{message: 'invalid mutation shape'}]
         });
       }
+      if (input?.expectedHeadOid !== branchHead) {
+        return jsonResponse(requestUrl.toString(), {
+          errors: [{message: 'expectedHeadOid mismatch', extensions: {code: 'EXPECTED_HEAD_OID_MISMATCH'}}]
+        });
+      }
+      if (contentText === null) {
+        return jsonResponse(requestUrl.toString(), {errors: [{message: 'contents must be RFC4648 base64'}]});
+      }
+      if (typeof mutateHook === 'function') {
+        const hooked = mutateHook({input, contentText, branchHead, requestUrl: requestUrl.toString()});
+        if (hooked) return hooked;
+      }
       const parent = branchHead;
-      const newHead = createCommitWithText(content, parent);
+      lastDecodedContent = contentText;
+      const newHead = createCommitWithText(contentText, parent);
       return jsonResponse(requestUrl.toString(), {
         data: {
           createCommitOnBranch: {
@@ -202,6 +257,9 @@ function buildServer(initialEnvelope = createAtomicRecordEnvelope()) {
     },
     setForceRedirect(value) {
       forceRedirect = value;
+    },
+    lastDecodedContent() {
+      return lastDecodedContent;
     },
     readHead() {
       return branchHead;
@@ -246,6 +304,34 @@ test('default-disabled transport performs zero I/O and throws DISABLED', async (
   assert.equal(transport.disabledReason, GITHUB_STATE_TRANSPORT_ERROR.DISABLED);
   await assert.rejects(transport.readCanonicalEnvelope(), error => error?.code === GITHUB_STATE_TRANSPORT_ERROR.DISABLED);
   assert.equal(called, false);
+});
+
+test('configuration and authorization are explicitly typed and bounded', async () => {
+  const fetchImpl = async () => makeResponse({url: 'https://api.github.com/'});
+  assert.throws(() => createM11CoordinatorGithubStateTransport({enabled: 1, fetchImpl}), /enabled must be a boolean/);
+  assert.throws(() => createM11CoordinatorGithubStateTransport({enabled: true}), /fetchImpl must be a function/);
+  assert.throws(
+    () => createM11CoordinatorGithubStateTransport({enabled: false, fetchImpl, defaultDeadlineMs: 30001}),
+    /defaultDeadlineMs/
+  );
+  assert.throws(
+    () => createM11CoordinatorGithubStateTransport({enabled: false, fetchImpl, maxResponseBytes: 1024 * 1024 + 1}),
+    /maxResponseBytes/
+  );
+  let fetchCalled = false;
+  const invalidAuthorization = createM11CoordinatorGithubStateTransport({
+    enabled: true,
+    fetchImpl: async () => {
+      fetchCalled = true;
+      return makeResponse({url: 'https://api.github.com/'});
+    },
+    credentials: {getAuthorizationHeader: () => ({})}
+  });
+  await assert.rejects(
+    invalidAuthorization.readCanonicalEnvelope(),
+    error => error?.code === GITHUB_STATE_TRANSPORT_ERROR.TRANSPORT_UNAVAILABLE
+  );
+  assert.equal(fetchCalled, false);
 });
 
 test('real backend replay supports claim transition and restart from persisted JSON', async () => {
@@ -322,6 +408,32 @@ test('replace validates wrong version, stale expected head conflict, and no bind
   assert.equal(loser.status, 'CONFLICT');
 });
 
+test('only explicit atomic-head mismatch evidence is a conflict', async () => {
+  for (const payload of [
+    {errors: [{message: 'expectedHeadOid is stale'}]},
+    {data: {createCommitOnBranch: null}, errors: [{extensions: {code: 'EXPECTED_HEAD_OID_MISMATCH'}}]}
+  ]) {
+    const server = buildServer();
+    server.setMutateHook(({requestUrl}) => makeResponse({
+      status: 200,
+      url: requestUrl,
+      body: JSON.stringify(payload)
+    }));
+    const transport = createM11CoordinatorGithubStateTransport({
+      enabled: true,
+      fetchImpl: server.fetchImpl,
+      credentials: credentials()
+    });
+    const current = await transport.readCanonicalEnvelope();
+    const next = await makeNextEnvelopeFromClaim(current);
+    await assert.rejects(
+      transport.replaceCanonicalEnvelope({expectedStorageVersion: 0, nextEnvelope: next}),
+      error => error?.code === GITHUB_STATE_TRANSPORT_ERROR.MUTATION_UNKNOWN
+    );
+    assert.equal(server.requestLog.filter(entry => entry.path === '/graphql').length, 1);
+  }
+});
+
 test('two competing transports: exactly one winner via expectedHeadOid CAS', async () => {
   const server = buildServer();
   const a = createM11CoordinatorGithubStateTransport({
@@ -381,8 +493,8 @@ test('concurrent duplicate replace on same transport fails locally before second
 
 test('lost ACK is UNKNOWN/no-retry and persisted write is later readable', async () => {
   const server = buildServer();
-  server.setMutateHook(({input, branchHead, requestUrl}) => {
-    const newHead = server.commitText(input.fileChanges.additions[0].contents);
+  server.setMutateHook(({contentText, branchHead, requestUrl}) => {
+    const newHead = server.commitText(contentText);
     return makeResponse({
       status: 200,
       url: requestUrl,
@@ -410,13 +522,39 @@ test('lost ACK is UNKNOWN/no-retry and persisted write is later readable', async
   const graphqlCalls = server.requestLog.filter(entry => entry.path === '/graphql');
   assert.equal(graphqlCalls.length, 1);
 
-  const reader = createM11CoordinatorGithubStateTransport({
+  const durable = await transport.readCanonicalEnvelope();
+  assert.equal(durable.storageVersion, 1);
+  await assert.rejects(
+    transport.replaceCanonicalEnvelope({expectedStorageVersion: 0, nextEnvelope: next}),
+    error => error?.code === GITHUB_STATE_TRANSPORT_ERROR.NO_READ_BINDING
+  );
+  assert.equal(server.requestLog.filter(entry => entry.path === '/graphql').length, 1);
+});
+
+test('lost ACK without a write cannot reauthorize the consumed version', async () => {
+  const server = buildServer();
+  server.setMutateHook(({requestUrl}) => makeResponse({
+    status: 200,
+    url: requestUrl,
+    body: JSON.stringify({errors: [{message: 'write result was not confirmed'}]})
+  }));
+  const transport = createM11CoordinatorGithubStateTransport({
     enabled: true,
     fetchImpl: server.fetchImpl,
     credentials: credentials()
   });
-  const durable = await reader.readCanonicalEnvelope();
-  assert.equal(durable.storageVersion, 1);
+  const current = await transport.readCanonicalEnvelope();
+  const next = await makeNextEnvelopeFromClaim(current);
+  await assert.rejects(
+    transport.replaceCanonicalEnvelope({expectedStorageVersion: 0, nextEnvelope: next}),
+    error => error?.code === GITHUB_STATE_TRANSPORT_ERROR.MUTATION_UNKNOWN
+  );
+  await Promise.all([transport.readCanonicalEnvelope(), transport.readCanonicalEnvelope()]);
+  await assert.rejects(
+    transport.replaceCanonicalEnvelope({expectedStorageVersion: 0, nextEnvelope: next}),
+    error => error?.code === GITHUB_STATE_TRANSPORT_ERROR.NO_READ_BINDING
+  );
+  assert.equal(server.requestLog.filter(entry => entry.path === '/graphql').length, 1);
 });
 
 test('corrupt transition chain fails closed', async () => {
@@ -511,12 +649,243 @@ test('malformed, oversize, and redirect responses fail closed', async () => {
     redirected.readCanonicalEnvelope(),
     error => error?.code === GITHUB_STATE_TRANSPORT_ERROR.REDIRECT_FORBIDDEN
   );
+
+  const wrongRefServer = buildServer();
+  const wrongRefFetch = async (url, options) => {
+    const response = await wrongRefServer.fetchImpl(url, options);
+    if (new URL(url).pathname !== `/repos/${REPOSITORY}/git/ref/heads/${STATE_BRANCH}`) return response;
+    return makeResponse({
+      url: response.url,
+      body: JSON.stringify({
+        ref: 'refs/heads/main',
+        object: {type: 'commit', sha: wrongRefServer.readHead()}
+      })
+    });
+  };
+  const wrongRef = createM11CoordinatorGithubStateTransport({
+    enabled: true,
+    fetchImpl: wrongRefFetch,
+    credentials: credentials()
+  });
+  await assert.rejects(
+    wrongRef.readCanonicalEnvelope(),
+    error => error?.code === GITHUB_STATE_TRANSPORT_ERROR.MALFORMED_RESPONSE
+  );
+
+  const wrongUrlServer = buildServer();
+  const wrongUrlFetch = async (url, options) => {
+    const response = await wrongUrlServer.fetchImpl(url, options);
+    if (new URL(url).pathname !== `/repos/${REPOSITORY}/git/ref/heads/${STATE_BRANCH}`) return response;
+    return {...response, url: 'https://api.github.com/repos/Achi1984/meridian/git/ref/heads/main'};
+  };
+  const wrongUrl = createM11CoordinatorGithubStateTransport({
+    enabled: true,
+    fetchImpl: wrongUrlFetch,
+    credentials: credentials()
+  });
+  await assert.rejects(
+    wrongUrl.readCanonicalEnvelope(),
+    error => error?.code === GITHUB_STATE_TRANSPORT_ERROR.MALFORMED_RESPONSE
+  );
+
+  const invalidUtf8Server = buildServer();
+  const invalidUtf8Fetch = async (url, options) => {
+    const response = await invalidUtf8Server.fetchImpl(url, options);
+    if (!new URL(url).pathname.startsWith(`/repos/${REPOSITORY}/git/blobs/`)) return response;
+    const payload = JSON.parse(await new Response(response.body).text());
+    payload.content = '/w==';
+    return makeResponse({url: response.url, body: JSON.stringify(payload)});
+  };
+  const invalidUtf8 = createM11CoordinatorGithubStateTransport({
+    enabled: true,
+    fetchImpl: invalidUtf8Fetch,
+    credentials: credentials()
+  });
+  await assert.rejects(
+    invalidUtf8.readCanonicalEnvelope(),
+    error => error?.code === GITHUB_STATE_TRANSPORT_ERROR.MALFORMED_RESPONSE
+  );
+});
+
+test('commit, tree, blob, and state-path identities must match the requested resources', async () => {
+  const cases = [
+    {
+      name: 'commit SHA',
+      matches: path => path.startsWith(`/repos/${REPOSITORY}/git/commits/`),
+      corrupt: payload => {
+        payload.sha = oid('wrong-commit');
+      }
+    },
+    {
+      name: 'tree SHA',
+      matches: path => path.startsWith(`/repos/${REPOSITORY}/git/trees/`),
+      corrupt: payload => {
+        payload.sha = oid('wrong-tree');
+      }
+    },
+    {
+      name: 'blob SHA',
+      matches: path => path.startsWith(`/repos/${REPOSITORY}/git/blobs/`),
+      corrupt: payload => {
+        payload.sha = oid('wrong-blob');
+      }
+    },
+    {
+      name: 'unique state path',
+      matches: path => path.startsWith(`/repos/${REPOSITORY}/git/trees/`),
+      corrupt: payload => {
+        payload.tree.push({...payload.tree[0]});
+      }
+    }
+  ];
+  for (const testCase of cases) {
+    const server = buildServer();
+    const fetchImpl = async (url, options) => {
+      const response = await server.fetchImpl(url, options);
+      if (!testCase.matches(new URL(url).pathname)) return response;
+      const payload = JSON.parse(await new Response(response.body).text());
+      testCase.corrupt(payload);
+      return makeResponse({url: response.url, body: JSON.stringify(payload)});
+    };
+    const transport = createM11CoordinatorGithubStateTransport({
+      enabled: true,
+      fetchImpl,
+      credentials: credentials()
+    });
+    await assert.rejects(
+      transport.readCanonicalEnvelope(),
+      error => error?.code === GITHUB_STATE_TRANSPORT_ERROR.MALFORMED_RESPONSE,
+      testCase.name
+    );
+  }
+});
+
+test('one deadline covers response bodies, ignored aborts, and empty chunks', async () => {
+  const hangingServer = buildServer();
+  let hangingCalls = 0;
+  const hangingFetch = async (url, options) => {
+    hangingCalls += 1;
+    const response = await hangingServer.fetchImpl(url, options);
+    return {...response, body: hangingBody()};
+  };
+  const hanging = createM11CoordinatorGithubStateTransport({
+    enabled: true,
+    fetchImpl: hangingFetch,
+    credentials: credentials(),
+    defaultDeadlineMs: 20
+  });
+  await assert.rejects(
+    hanging.readCanonicalEnvelope(),
+    error => error?.code === GITHUB_STATE_TRANSPORT_ERROR.TRANSPORT_UNAVAILABLE
+  );
+  await new Promise(resolve => setTimeout(resolve, 30));
+  assert.equal(hangingCalls, 1);
+  assert.equal(hangingServer.requestLog.length, 1);
+
+  const emptyServer = buildServer();
+  const emptyFetch = async (url, options) => {
+    const response = await emptyServer.fetchImpl(url, options);
+    return {...response, body: zeroChunkBody()};
+  };
+  const emptyStream = createM11CoordinatorGithubStateTransport({
+    enabled: true,
+    fetchImpl: emptyFetch,
+    credentials: credentials(),
+    defaultDeadlineMs: 20
+  });
+  await assert.rejects(
+    emptyStream.readCanonicalEnvelope(),
+    error => error?.code === GITHUB_STATE_TRANSPORT_ERROR.TRANSPORT_UNAVAILABLE
+  );
+  assert.equal(emptyServer.requestLog.length, 1);
+
+  const delayedServer = buildServer();
+  let delayedCalls = 0;
+  const delayedFetch = (url, options) => {
+    delayedCalls += 1;
+    return new Promise(resolve => {
+      setTimeout(() => resolve(makeResponse({url: new URL(url).toString()})), 50);
+    });
+  };
+  const delayed = createM11CoordinatorGithubStateTransport({
+    enabled: true,
+    fetchImpl: delayedFetch,
+    credentials: credentials(),
+    defaultDeadlineMs: 10
+  });
+  await assert.rejects(
+    delayed.readCanonicalEnvelope(),
+    error => error?.code === GITHUB_STATE_TRANSPORT_ERROR.TRANSPORT_UNAVAILABLE
+  );
+  await new Promise(resolve => setTimeout(resolve, 60));
+  assert.equal(delayedCalls, 1);
+  assert.equal(delayedServer.requestLog.length, 0);
+});
+
+test('abort before mutation and during readback sends no follow-up requests', async () => {
+  const server = buildServer();
+  const transport = createM11CoordinatorGithubStateTransport({
+    enabled: true,
+    fetchImpl: server.fetchImpl,
+    credentials: credentials()
+  });
+  const current = await transport.readCanonicalEnvelope();
+  const next = await makeNextEnvelopeFromClaim(current);
+  const beforeMutation = new AbortController();
+  beforeMutation.abort();
+  await assert.rejects(
+    transport.replaceCanonicalEnvelope({
+      expectedStorageVersion: 0,
+      nextEnvelope: next,
+      signal: beforeMutation.signal
+    }),
+    error => error?.code === GITHUB_STATE_TRANSPORT_ERROR.TRANSPORT_UNAVAILABLE
+  );
+  assert.equal(server.requestLog.filter(entry => entry.path === '/graphql').length, 0);
+
+  const readbackServer = buildServer();
+  const readbackAbort = new AbortController();
+  let postSeen = false;
+  const readbackFetch = async (url, options) => {
+    const requestUrl = new URL(url);
+    if (postSeen && requestUrl.pathname.endsWith(`/git/ref/heads/${STATE_BRANCH}`)) {
+      return makeResponse({
+        url: requestUrl.toString(),
+        bodyStream: hangingBody()
+      });
+    }
+    const response = await readbackServer.fetchImpl(url, options);
+    if (requestUrl.pathname === '/graphql') {
+      postSeen = true;
+      setTimeout(() => readbackAbort.abort(), 5);
+    }
+    return response;
+  };
+  const duringReadback = createM11CoordinatorGithubStateTransport({
+    enabled: true,
+    fetchImpl: readbackFetch,
+    credentials: credentials(),
+    defaultDeadlineMs: 1000
+  });
+  const readbackCurrent = await duringReadback.readCanonicalEnvelope();
+  const readbackNext = await makeNextEnvelopeFromClaim(readbackCurrent);
+  await assert.rejects(
+    duringReadback.replaceCanonicalEnvelope({
+      expectedStorageVersion: 0,
+      nextEnvelope: readbackNext,
+      signal: readbackAbort.signal
+    }),
+    error => error?.code === GITHUB_STATE_TRANSPORT_ERROR.TRANSPORT_UNAVAILABLE
+  );
+  const afterPost = readbackServer.requestLog.filter(entry => entry.path === '/graphql').length;
+  assert.equal(afterPost, 1);
+  assert.equal(readbackServer.requestLog.filter(entry => entry.path.includes('/git/commits/')).length, 1);
 });
 
 test('readback mismatch returns UNKNOWN after acknowledged mutation', async () => {
   const server = buildServer();
   server.setMutateHook(({input, branchHead, requestUrl}) => {
-    const committedHead = server.commitText(input.fileChanges.additions[0].contents);
+    const committedHead = server.commitText(decodeGraphqlContents(input.fileChanges.additions[0].contents));
     server.commitText(JSON.stringify(createAtomicRecordEnvelope()));
     return makeResponse({
       status: 200,
@@ -543,7 +912,7 @@ test('readback mismatch returns UNKNOWN after acknowledged mutation', async () =
   );
 });
 
-test('GraphQL mutation uses one file path, expectedHeadOid CAS, no deletions/force/main', async () => {
+test('GraphQL mutation base64-encodes exact contents and uses expectedHeadOid CAS', async () => {
   const server = buildServer();
   const transport = createM11CoordinatorGithubStateTransport({
     enabled: true,
@@ -552,6 +921,7 @@ test('GraphQL mutation uses one file path, expectedHeadOid CAS, no deletions/for
   });
   const current = await transport.readCanonicalEnvelope();
   const next = await makeNextEnvelopeFromClaim(current, {action: key('e'), execution: key('f')});
+  const headBefore = server.readHead();
   const result = await transport.replaceCanonicalEnvelope({expectedStorageVersion: 0, nextEnvelope: next});
   assert.equal(result.status, 'REPLACED');
 
@@ -563,6 +933,11 @@ test('GraphQL mutation uses one file path, expectedHeadOid CAS, no deletions/for
   assert.equal(input.branch.branchName, STATE_BRANCH);
   assert.equal(input.fileChanges.additions.length, 1);
   assert.equal(input.fileChanges.additions[0].path, STATE_PATH);
+  assert.equal(
+    input.fileChanges.additions[0].contents,
+    Buffer.from(JSON.stringify(next), 'utf8').toString('base64')
+  );
+  assert.equal(server.lastDecodedContent(), JSON.stringify(next));
   assert.equal(Object.hasOwn(input.fileChanges, 'deletions'), false);
   assert.equal(Object.hasOwn(input, 'force'), false);
   assert.equal(JSON.stringify(payload).includes('main'), false);
@@ -570,6 +945,19 @@ test('GraphQL mutation uses one file path, expectedHeadOid CAS, no deletions/for
   const restPaths = server.requestLog.map(entry => `${entry.method} ${entry.path}${entry.search}`);
   assert.ok(restPaths.some(item => item.includes(`/git/ref/heads/${STATE_BRANCH}`)));
   assert.ok(restPaths.every(item => !item.includes('/heads/main')));
+
+  const plaintextPayload = structuredClone(payload);
+  plaintextPayload.variables.input.expectedHeadOid = server.readHead();
+  plaintextPayload.variables.input.fileChanges.additions[0].contents = JSON.stringify(next);
+  const headBeforePlaintext = server.readHead();
+  const plaintextResponse = await server.fetchImpl('https://api.github.com/graphql', {
+    method: 'POST',
+    body: JSON.stringify(plaintextPayload)
+  });
+  const plaintextResult = await new Response(plaintextResponse.body).json();
+  assert.match(plaintextResult.errors[0].message, /RFC4648 base64/);
+  assert.equal(server.readHead(), headBeforePlaintext);
+  assert.notEqual(server.readHead(), headBefore);
   assert.deepEqual(GITHUB_STATE_TRANSPORT_PROPOSED_TARGET, {
     repositoryNameWithOwner: REPOSITORY,
     branchName: STATE_BRANCH,
