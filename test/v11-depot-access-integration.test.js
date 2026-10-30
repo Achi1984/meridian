@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {createAppAccess} from '../v11/app-access.js';
 import {createDepotReadClient} from '../v11/depot-read-client.js';
 import {mountDepotReadAccess} from '../v11/depot-read-bootstrap.js';
+import {subscribeDepotPortfolio} from '../v11/depot-portfolio-state.js?v=B17-M11';
 class Node {
   constructor(document,tag){this.ownerDocument=document;this.tagName=tag;this.children=[];this.dataset={};this.attrs={};this.listeners=new Map();this.text='';}
   set textContent(value){this.text=String(value);this.children=[];}
@@ -126,10 +127,14 @@ function harness(bodies){
 }
 test('fresh current and history; fresh→stale revalidation never keeps OK reasons',async()=>{
   const t=harness({dashboard:dashboard(),prices:prices(),history:history()});
+  const portfolioStates=[];const unsubscribe=subscribeDepotPortfolio(state=>portfolioStates.push(state));
   await t.access.verify('synthetic-password');
   assert.equal(t.last().status,'not_loaded');
   t.click();await t.done();
   assert.equal(t.last().status,'fresh');assert.equal(t.last().model.source,'SERVER_PORTFOLIO_CURRENT');assert.equal(t.last().model.totalUsd,280);
+  assert.equal(portfolioStates.at(-1).model.totalUsd,280);assert.equal(portfolioStates.at(-1).model.currency,'USD');
+  assert.equal(portfolioStates.at(-1).model.snapshotAt,t.last().model.snapshotAt);
+  assert.equal(t.reads.length,3,'Bots consume the canonical Depot state without another read');
   assert.deepEqual(t.last().reasons,{current:'OK',prices:'RECEIVED',history:'OK'});
   assert.equal(t.h.command.dataset.state,'fresh');
   // current expires first; the independently valid stored history remains
@@ -138,9 +143,11 @@ test('fresh current and history; fresh→stale revalidation never keeps OK reaso
   assert.deepEqual(t.last().reasons,{current:'STALE',prices:'RECEIVED',history:'OK'});
   t.clock(NOW+1000000);t.access.revalidateReaders();
   assert.equal(t.last().status,'stale');assert.equal(t.state(),'stale');
+  assert.equal(portfolioStates.at(-1).model,null,'stale totals are cleared for every subscriber');
   assert.deepEqual(t.last().reasons,{current:'STALE',prices:'RECEIVED',history:'STALE'});
   assert.match(t.h.text(),/Aktuell: veraltet · Historie: veraltet/);assert.doesNotMatch(t.h.text(),/: OK/);
   assert.equal(t.reads.length,3,'revalidation never reads');
+  unsubscribe();
   t.m.dispose();
 });
 test('independently valid current or history survive a failure of the other source',async()=>{

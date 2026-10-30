@@ -1,4 +1,5 @@
-import {createDepotHistoryView} from './depot-history-view.js?v=B15-M11';
+import {createDepotHistoryView} from './depot-history-view.js?v=B17-M11';
+import {publishDepotPortfolioState} from './depot-portfolio-state.js?v=B17-M11';
 // DOM text only. Neither credentials nor raw response bodies are rendered.
 const LABELS={
   locked:['Gesperrt','App mit Meridian-Passwort öffnen, dann Depot manuell aktualisieren.'],
@@ -32,6 +33,7 @@ export function createDepotReadView(root,{getToken,createClient,commandRoot=null
     if(kind==='fresh'&&(m?.status!=='FRESH_SNAPSHOT'||m.readOnly!==true||m.executionAllowed!==false||
       ![m.totalUsd,m.spotUsd,m.tradingUsd].every(x=>typeof x==='number'&&Number.isFinite(x)&&x>=0)||
       typeof m.snapshotAt!=='string'||typeof m.sourceAt!=='string'))kind='unavailable';
+    publishDepotPortfolioState(kind==='fresh'?{status:kind,model:m}:{status:kind});
     section.dataset.state=kind;
     const current=kind==='fresh'&&m?.source==='SERVER_PORTFOLIO_CURRENT';
     if(commandRoot){

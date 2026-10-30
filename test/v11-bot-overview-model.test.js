@@ -36,6 +36,27 @@ test('sorts deterministically with unknown leverage and P/L last and V1 zero unc
   assert.deepEqual(buildBotOverviewModel(source).distribution, {long: 1, short: 1, neutral: 1, unknown: 1});
 });
 
+test('Moon with confirmed leverage sorts before unknown leverage in the cockpit snapshot', () => {
+  const source = {...snapshot(), bots: [
+    bot('a', 'BTCUSDT', 'LONG', 'inverse', 5, -25),
+    bot('b', 'BTCUSDT', 'SHORT', 'linear', 2, -25),
+    bot('c', 'ETHUSDT', 'NEUTRAL', 'linear', 8, -3.5),
+    bot('d', 'ADAUSDT', null, null, null, null),
+    bot('e', 'XRPUSDT', 'SHORT', 'inverse', 3, 0.005),
+    bot('f', 'SOLUSDT', 'LONG', 'linear', null, 0),
+    {ref:'f00df00df00df00df00d',symbol:'MOONUSDT',side:'LONG',category:null,
+      productCategory:'FUTURES_MOON',metrics:{leverage:1,pnlUsd:null}}
+  ]};
+  const sortedLeverage = buildBotOverviewModel(source, {sort: 'leverage'}).bots;
+  const sortedPnl = buildBotOverviewModel(source, {sort: 'pnl'}).bots;
+
+  assert.equal(sortedLeverage.length, 7);
+  assert.deepEqual(sortedLeverage.map(row => row.symbol),
+    ['ETHUSDT','BTCUSDT','XRPUSDT','BTCUSDT','MOONUSDT','ADAUSDT','SOLUSDT']);
+  assert.deepEqual(sortedPnl.map(row => row.symbol),
+    ['BTCUSDT','BTCUSDT','ETHUSDT','XRPUSDT','ADAUSDT','MOONUSDT','SOLUSDT']);
+});
+
 test('Command losses include only confirmed negative source P/L and are capped at three', () => {
   const source = snapshot();
   source.bots.push(bot('e', 'XRPUSDT', 'LONG', 'linear', 2, -1));

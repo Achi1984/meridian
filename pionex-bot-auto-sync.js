@@ -5,6 +5,7 @@ import {PIONEX_FUTURES_GRID_DETAIL_PATH,PIONEX_SUPPORTED_BOT_TYPES,hydratePionex
 const { Pool }=pg;
 const API_BASE='https://api.pionex.com';
 const PRIVATE_STATE_KEY='private_dashboard_v1';
+export const PIONEX_BOT_LIST_PAGE_LIMIT=20;
 const ACTIVE_TYPES=new Set(PIONEX_SUPPORTED_BOT_TYPES);
 const ACTIVE_STATUSES=new Set([
   'prepare','lock_currency','condition_lock','open_position','init_grid','running',
@@ -117,6 +118,14 @@ function liquidationFor(order,d,side){
   valid.sort((a,b)=>Math.abs(a-entry)-Math.abs(b-entry));
   return valid[0];
 }
+function liquidationBoundsFor(order,d){
+  const up=firstAssetPrice(order,d,['estimateLiquidationPriceUp']);
+  const down=firstAssetPrice(order,d,['estimateLiquidationPriceDown']);
+  if(up!=null&&down!=null)return{lower:Math.min(up,down),upper:Math.max(up,down)};
+  if(up!=null)return quoteInverseConvention(order)?{lower:up,upper:null}:{lower:null,upper:up};
+  if(down!=null)return quoteInverseConvention(order)?{lower:null,upper:down}:{lower:down,upper:null};
+  return{lower:null,upper:null};
+}
 function tpFor(order,d){
   if(String(d?.profitStopType||'').toLowerCase()==='price'){
     const x=assetPrice(order,d?.profitStop);if(x>0)return x;
@@ -130,7 +139,8 @@ function slFor(order,d){
   return firstAssetPrice(order,d,['stopLoss','stopLossPrice','lossStopPrice']);
 }
 function rangeFor(order,d){
-  const a=assetPrice(order,d?.bottom),b=assetPrice(order,d?.top);
+  const a=firstAssetPrice(order,d,['bottom','movingBottom']);
+  const b=firstAssetPrice(order,d,['top','movingTop']);
   if(a>0&&b>0)return{lower:Math.min(a,b),upper:Math.max(a,b)};
   return{lower:a,upper:b};
 }
@@ -152,7 +162,8 @@ function optionalPnlPct(d){
 export function normalizePionexBotOrder(order){
   const check=inspectPionexBotOrder(order);
   if(!check.typePass||!check.statusPass||!check.symbolPass||!check.sidePass)return null;
-  const d=order.buOrderData||{},side=check.side,symbol=resolvedSymbol(order).symbol,range=rangeFor(order,d);
+  const d=order.buOrderData||{},side=check.side,symbol=resolvedSymbol(order).symbol,range=rangeFor(order,d),
+    liquidationBounds=liquidationBoundsFor(order,d);
   const row={
     id:String(order.buOrderId||order.id||symbol),
     botOrderId:String(order.buOrderId||''),
@@ -166,6 +177,8 @@ export function normalizePionexBotOrder(order){
     lower:range.lower,
     upper:range.upper,
     liquidationPrice:liquidationFor(order,d,side),
+    liquidationLowerBound:liquidationBounds.lower,
+    liquidationUpperBound:liquidationBounds.upper,
     takeProfit:tpFor(order,d),
     stopLoss:slFor(order,d),
     investmentUsd:reliableUsdInvestment(d),
@@ -186,6 +199,33 @@ export function normalizePionexBotOrder(order){
   return row;
 }
 
+export function buildPionexBotCoverage(orders=[],hydration={}){
+  const rows=Array.isArray(orders)?orders:[];
+  const recognizedRows=rows.filter(row=>ACTIVE_TYPES.has(String(row?.buOrderType||'').trim())).length;
+  const unsupportedRows=rows.length-recognizedRows;
+  const representedRows=Number.isSafeInteger(hydration?.detailRows)&&hydration.detailRows>=0
+    ?hydration.detailRows:0;
+  const unhydratedRows=Math.max(0,recognizedRows-representedRows);
+  const paginationComplete=hydration?.paginationComplete!==false;
+  const pages=Number.isSafeInteger(hydration?.pages)&&hydration.pages>=0?hydration.pages:null;
+  const pageLimit=Number.isSafeInteger(hydration?.pageLimit)&&hydration.pageLimit>0
+    ?hydration.pageLimit:PIONEX_BOT_LIST_PAGE_LIMIT;
+  const partial=unsupportedRows>0||unhydratedRows>0||!paginationComplete;
+  return {
+    status:partial?'PARTIAL':'DOCUMENTED',
+    providerContractStatus:'DOCUMENTED',
+    liveAccountVerification:'NOT_PERFORMED',
+    listRows:rows.length,
+    recognizedRows,
+    representedRows,
+    unsupportedRows,
+    unhydratedRows,
+    paginationComplete,
+    pages,
+    pageLimit
+  };
+}
+
 export async function pionexGet(path,params,{apiKey,apiSecret,fetchImpl=fetch,now=Date.now}={}){
   if(!apiKey||!apiSecret)throw new Error('pionex_bot_credentials_missing');
   const all={...params,timestamp:now()},query=canonicalQuery(all,true),sig=signPionexGet(path,all,apiSecret);
@@ -201,8 +241,10 @@ export async function pionexGet(path,params,{apiKey,apiSecret,fetchImpl=fetch,no
   return j;
 }
 
-export async function fetchRunningBotOrders({apiKey,apiSecret,fetchImpl=fetch,now=Date.now,maxPages=20}={}){
-  const results=[];let pageToken=null,pages=0;
+export async function fetchRunningBotOrders({apiKey,apiSecret,fetchImpl=fetch,now=Date.now,maxPages=PIONEX_BOT_LIST_PAGE_LIMIT,delayMs=125}={}){
+  const results=[],pageLimit=Number.isSafeInteger(maxPages)
+    ?Math.min(PIONEX_BOT_LIST_PAGE_LIMIT,Math.max(1,maxPages)):PIONEX_BOT_LIST_PAGE_LIMIT;
+  let pageToken=null,pages=0;
   do{
     const j=await pionexGet('/api/v1/bot/orders',{
       status:'running',
@@ -212,9 +254,9 @@ export async function fetchRunningBotOrders({apiKey,apiSecret,fetchImpl=fetch,no
     results.push(...rows);
     pageToken=data?.nextPageToken?String(data.nextPageToken):null;
     pages++;
-    if(pageToken)await new Promise(r=>setTimeout(r,125));
-  }while(pageToken&&pages<maxPages);
-  return {orders:results,pages,truncated:!!pageToken};
+    if(pageToken&&pages<pageLimit&&delayMs>0)await new Promise(r=>setTimeout(r,delayMs));
+  }while(pageToken&&pages<pageLimit);
+  return {orders:results,pages,pageLimit,truncated:!!pageToken,paginationComplete:!pageToken};
 }
 
 export function summarizePionexBotList(orders=[]){
@@ -264,19 +306,27 @@ function configured(env){
 
 export function mergePionexSyncState(current,{risk=null,status,error=null,attemptAt,successAt=null,configured:cfg=false,pages=0,truncated=false,diagnostics=null}={}){
   const base=clone(current)||{},prevRisk=base.pionexRisk||{},prevSync=base.pionexBotSync||{};
-  if(risk)base.pionexRisk={...prevRisk,...risk};
+  const paginationIncomplete=truncated===true||risk?.paginationComplete===false||
+    risk?.coverage?.paginationComplete===false;
+  const incompleteRisk=!!risk&&(paginationIncomplete||risk.detailsComplete===false||
+    String(risk.coverage?.status||'').toUpperCase()==='PARTIAL');
+  if(incompleteRisk)base.pionexRiskPartial=clone(risk);
+  else if(risk){
+    base.pionexRisk={...prevRisk,...risk};
+    delete base.pionexRiskPartial;
+  }
   base.pionexBotSync={
     configured:!!cfg,
     readOnly:true,
     endpoint:'GET /api/v1/bot/orders',
     queryMode:'ALL_RUNNING_LOCAL_ALLOWLIST',
     supportedTypes:[...PIONEX_SUPPORTED_BOT_TYPES],
-    status:String(status||'UNKNOWN'),
+    status:incompleteRisk?'PARTIAL':String(status||'UNKNOWN'),
     lastAttemptAt:attemptAt||new Date().toISOString(),
-    lastSuccessAt:successAt||prevSync.lastSuccessAt||null,
-    error:error?String(error):null,
+    lastSuccessAt:(incompleteRisk?null:successAt)||prevSync.lastSuccessAt||null,
+    error:error?String(error):incompleteRisk?'incomplete_bot_coverage':null,
     pages:Number(pages)||0,
-    truncated:!!truncated,
+    truncated:!!paginationIncomplete,
     diagnostics:diagnostics?clone(diagnostics):(prevSync.diagnostics||null)
   };
   base.privateRevision=(Number.isInteger(base.privateRevision)?base.privateRevision:0)+1;
@@ -303,21 +353,25 @@ async function updatePrivateState(env,mutate){
   finally{client.release()}
 }
 
-export async function runPionexBotSyncOnce({env=process.env,fetchImpl=fetch,now=Date.now}={}){
+export async function runPionexBotSyncOnce({
+  env=process.env,fetchImpl=fetch,now=Date.now,updateState=updatePrivateState,
+  maxPages=PIONEX_BOT_LIST_PAGE_LIMIT,listDelayMs=125,detailDelayMs=125
+}={}){
   if(running)return {ok:false,reason:'already_running'};running=true;
   const at=new Date(now()).toISOString(),creds=configured(env);
   try{
     if(!env.DATABASE_URL)return {ok:false,reason:'no_database'};
     if(!creds.ok){
-      await updatePrivateState(env,current=>mergePionexSyncState(current,{status:'DISABLED_MISSING_CREDENTIALS',attemptAt:at,configured:false}));
+      await updateState(env,current=>mergePionexSyncState(current,{status:'DISABLED_MISSING_CREDENTIALS',attemptAt:at,configured:false}));
       return {ok:false,reason:'missing_credentials'};
     }
-    const {orders,pages,truncated}=await fetchRunningBotOrders({apiKey:creds.apiKey,apiSecret:creds.apiSecret,fetchImpl,now});
-    const diagnostics=summarizePionexBotList(orders);
-    if(truncated)throw new Error('pionex_bot_pagination_truncated');
+    const {orders,pages,pageLimit,truncated,paginationComplete}=await fetchRunningBotOrders({
+      apiKey:creds.apiKey,apiSecret:creds.apiSecret,fetchImpl,now,maxPages,delayMs:listDelayMs
+    });
+    const diagnostics={...summarizePionexBotList(orders),pages,pageLimit,paginationComplete};
     const hydrated=await hydratePionexBotSummaries(orders,{
       loadDetail:buOrderId=>fetchFuturesGridOrderDetail({buOrderId,apiKey:creds.apiKey,apiSecret:creds.apiSecret,fetchImpl,now}),
-      validateDetail:row=>normalizePionexBotOrder(row)!=null
+      validateDetail:row=>normalizePionexBotOrder(row)!=null,delayMs:detailDelayMs
     });
     const risk={
       ...buildPionexRiskSnapshot(hydrated.orders,at),
@@ -325,23 +379,33 @@ export async function runPionexBotSyncOnce({env=process.env,fetchImpl=fetch,now=
       supportedRows:hydrated.supportedRows,
       detailRows:hydrated.detailRows,
       detailsComplete:hydrated.detailsComplete,
+      coverage:buildPionexBotCoverage(orders,{...hydrated,pages,pageLimit,paginationComplete}),
+      paginationComplete,
       syncMode:'BOT_READING_DETAIL_HYDRATED'
     };
+    const incomplete=!risk.detailsComplete||!risk.paginationComplete||risk.coverage.status==='PARTIAL';
     let applied=false,guarded=false;
-    await updatePrivateState(env,current=>{
+    await updateState(env,current=>{
       const previousCount=Array.isArray(current?.pionexRisk?.bots)?current.pionexRisk.bots.length:0;
+      if(incomplete){
+        applied=true;
+        return mergePionexSyncState(current,{risk,status:'PARTIAL',error:'incomplete_bot_coverage',
+          attemptAt:at,configured:true,pages,truncated,diagnostics});
+      }
       if(previousCount>0&&risk.botCount===0){
         guarded=true;
-        return mergePionexSyncState(current,{status:'EMPTY_GUARD',error:'zero_supported_running_bots',attemptAt:at,configured:true,pages,truncated:false,diagnostics});
+        return mergePionexSyncState(current,{status:'EMPTY_GUARD',error:'zero_supported_running_bots',attemptAt:at,configured:true,pages,truncated,diagnostics});
       }
       applied=true;
-      return mergePionexSyncState(current,{risk,status:'OK',attemptAt:at,successAt:at,configured:true,pages,truncated:false,diagnostics});
+      return mergePionexSyncState(current,{risk,status:'OK',attemptAt:at,successAt:at,configured:true,pages,truncated,diagnostics});
     });
-    if(guarded)return {ok:false,reason:'empty_guard',botCount:0,apiRows:risk.apiRows,supportedRows:risk.supportedRows,detailRows:risk.detailRows,pages,diagnostics};
-    return {ok:applied,botCount:risk.botCount,apiRows:risk.apiRows,supportedRows:risk.supportedRows,detailRows:risk.detailRows,detailsComplete:risk.detailsComplete,pages,truncated:false,diagnostics};
+    if(guarded)return {ok:false,reason:'empty_guard',botCount:0,apiRows:risk.apiRows,supportedRows:risk.supportedRows,detailRows:risk.detailRows,pages,truncated,diagnostics};
+    return {ok:applied&&!incomplete,status:incomplete?'PARTIAL':'OK',reason:incomplete?'incomplete_coverage':null,
+      botCount:risk.botCount,apiRows:risk.apiRows,supportedRows:risk.supportedRows,detailRows:risk.detailRows,
+      detailsComplete:risk.detailsComplete,pages,truncated,paginationComplete,coverage:risk.coverage,diagnostics};
   }catch(e){
     const msg=String(e?.message||e);
-    try{if(env.DATABASE_URL)await updatePrivateState(env,current=>mergePionexSyncState(current,{status:'ERROR',error:msg,attemptAt:at,configured:creds.ok}))}catch{}
+    try{if(env.DATABASE_URL)await updateState(env,current=>mergePionexSyncState(current,{status:'ERROR',error:msg,attemptAt:at,configured:creds.ok}))}catch{}
     return {ok:false,reason:msg};
   }finally{running=false}
 }

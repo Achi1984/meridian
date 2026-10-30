@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {buildAssetWatchApiSnapshot} from '../asset-watch-bridge.js';
+import {mergePionexSyncState} from '../pionex-bot-auto-sync.js';
 
 const NOW=Date.parse('2026-09-28T20:45:00.000Z');
 function bot(overrides={}){
@@ -13,6 +14,8 @@ function bot(overrides={}){
     lower:0.05,
     upper:0.15,
     liquidationPrice:0.06089,
+    liquidationLowerBound:null,
+    liquidationUpperBound:null,
     takeProfit:0.15,
     stopLoss:null,
     grids:287,
@@ -51,6 +54,8 @@ test('asset-watch bridge exports only a fresh complete read-only Pionex bot snap
   assert.equal(x.bots[0].limits.lower,0.05);
   assert.equal(x.bots[0].limits.upper,0.15);
   assert.equal(x.bots[0].limits.liquidationPrice,0.06089);
+  assert.equal(x.bots[0].limits.liquidationLowerBound,null);
+  assert.equal(x.bots[0].limits.liquidationUpperBound,null);
   assert.equal(x.bots[0].limits.takeProfit,0.15);
   assert.equal(x.bots[0].grid.grids,287);
   assert.equal(x.bots[0].position.positionOpenPrice,0.11576);
@@ -117,6 +122,24 @@ test('explicit COIN-M provenance is preserved without reversing the existing sid
   assert.equal(x.bots[0].sideSource,'economic_inverse_asset');assert.equal(x.bots[0].side,'SHORT');
   assert.equal(x.source,'PIONEX_BOT_API');assert.equal(x.usableForOverwrite,true);assert.deepEqual(input,before);
 });
+test('documented Futures Moon category crosses the sanitized bridge independently of bot type and side',()=>{
+  const input=state({pionexRisk:{snapshotAt:'2026-09-28T20:40:00.000Z',detailsComplete:true,
+    coverage:{status:'DOCUMENTED',providerContractStatus:'DOCUMENTED',liveAccountVerification:'NOT_PERFORMED',
+      listRows:2,recognizedRows:2,representedRows:2,unsupportedRows:0,unhydratedRows:0,
+      paginationComplete:true,pages:2,pageLimit:20},
+    bots:[bot({botOrderId:'synthetic-standard',symbol:'BTC',cateType:'linear',botType:'futures_grid'}),
+      bot({botOrderId:'synthetic-moon',symbol:'BTC',side:'NEUTRAL',cateType:' FUTURES_MOON ',
+        botType:'futures_grid',liquidationLowerBound:50000,liquidationUpperBound:60000})]}});
+  const x=buildAssetWatchApiSnapshot(input,{now:NOW});
+  assert.equal(x.bots.length,2);
+  assert.deepEqual(x.bots.map(row=>[row.botType,row.cateType,row.side]),[
+    ['futures_grid','linear','LONG'],['futures_grid','FUTURES_MOON','NEUTRAL']
+  ]);
+  assert.equal(x.coverage.status,'DOCUMENTED');
+  assert.equal(x.coverage.providerContractStatus,'DOCUMENTED');
+  assert.equal(x.coverage.liveAccountVerification,'NOT_PERFORMED');
+  assert.equal(x.usableForOverwrite,true);
+});
 test('missing or arbitrary provenance stays null and cannot leak caller text',()=>{
   const x=buildAssetWatchApiSnapshot(state(),{now:NOW});
   for(const key of ['cateType','botType','sideSource'])assert.equal(x.bots[0][key],null);
@@ -153,4 +176,94 @@ test('whitespace-padded supported provenance follows existing upstream type vali
   const input=state();input.pionexRisk.bots=[bot({botType:' arbitrary-secret ',cateType:1,sideSource:{value:'trend'}})];
   const x=buildAssetWatchApiSnapshot(input,{now:NOW});
   for(const key of ['botType','cateType','sideSource'])assert.equal(x.bots[0][key],null);
+});
+
+test('partial provider coverage and duplicate identities preserve valid rows without claiming completeness',()=>{
+  const first=bot({botOrderId:'synthetic-id-1',symbol:'BTC',side:'NEUTRAL',
+    liquidationLowerBound:50000,liquidationUpperBound:60000});
+  const input=state({pionexRisk:{snapshotAt:'2026-09-28T20:40:00.000Z',detailsComplete:true,
+    apiRows:3,supportedRows:2,botCount:2,
+    coverage:{status:'PARTIAL',providerContractStatus:'UNVERIFIED',listRows:3,
+      recognizedRows:2,representedRows:2,unsupportedRows:1,unhydratedRows:0},
+    bots:[first,structuredClone(first)]}});
+  const x=buildAssetWatchApiSnapshot(input,{now:NOW});
+  assert.equal(x.botCount,1);assert.equal(x.bots.length,1);
+  assert.equal(x.bots[0].limits.liquidationLowerBound,50000);
+  assert.equal(x.bots[0].limits.liquidationUpperBound,60000);
+  assert.equal(x.coverage.status,'PARTIAL');assert.equal(x.coverage.unsupportedRows,1);
+  assert.equal(x.coverage.representedRows,1);assert.equal(x.coverage.unhydratedRows,1);
+  assert.equal(x.usableForDisplay,true);assert.equal(x.usableForOverwrite,false);
+  assert.doesNotMatch(JSON.stringify(x),/synthetic-id-1|raw-secret-bot-id/);
+});
+
+test('a remaining continuation token keeps page-limited bridge coverage partial and non-overwritable',()=>{
+  const input=state({pionexRisk:{snapshotAt:'2026-09-28T20:40:00.000Z',detailsComplete:true,
+    coverage:{status:'PARTIAL',providerContractStatus:'DOCUMENTED',liveAccountVerification:'NOT_PERFORMED',
+      listRows:1,recognizedRows:1,representedRows:1,unsupportedRows:0,unhydratedRows:0,
+      paginationComplete:false,pages:20,pageLimit:20},
+    bots:[bot({botOrderId:'synthetic-page-row',cateType:'FUTURES_MOON',botType:'futures_grid'})]}});
+  const x=buildAssetWatchApiSnapshot(input,{now:NOW});
+  assert.equal(x.botCount,1);assert.equal(x.bots[0].cateType,'FUTURES_MOON');
+  assert.equal(x.coverage.paginationComplete,false);assert.equal(x.coverage.pages,20);
+  assert.equal(x.coverage.pageLimit,20);assert.equal(x.coverage.status,'PARTIAL');
+  assert.equal(x.usableForDisplay,true);assert.equal(x.usableForOverwrite,false);
+});
+
+test('latest incomplete diagnostic rows remain displayable without replacing the complete snapshot',()=>{
+  const complete={snapshotAt:'2026-09-28T20:40:00.000Z',detailsComplete:true,
+    coverage:{status:'DOCUMENTED',paginationComplete:true},
+    bots:[bot({botOrderId:'synthetic-complete',symbol:'ADA'})]};
+  const partial={snapshotAt:'2026-09-28T20:44:00.000Z',detailsComplete:true,paginationComplete:false,
+    coverage:{status:'PARTIAL',paginationComplete:false,pages:20,pageLimit:20},
+    bots:[bot({botOrderId:'synthetic-partial',symbol:'BTC',cateType:'FUTURES_MOON'})]};
+  const input=state({pionexRisk:complete,pionexRiskPartial:partial,
+    pionexBotSync:{status:'PARTIAL',truncated:true,lastSuccessAt:'2026-09-28T20:40:00.000Z'}});
+  const x=buildAssetWatchApiSnapshot(input,{now:NOW});
+  assert.equal(input.pionexRisk.bots[0].symbol,'ADA');
+  assert.equal(x.bots.length,1);assert.equal(x.bots[0].symbol,'BTC');
+  assert.equal(x.bots[0].cateType,'FUTURES_MOON');
+  assert.equal(x.coverage.paginationComplete,false);assert.equal(x.coverage.status,'PARTIAL');
+  assert.equal(x.sourceStatusOk,true);assert.equal(x.usableForDisplay,true);
+  assert.equal(x.usableForOverwrite,false);
+});
+
+test('a partial sync cannot relabel its preserved complete snapshot as a current candidate',()=>{
+  const input=state({pionexBotSync:{status:'PARTIAL',truncated:true}});
+  const x=buildAssetWatchApiSnapshot(input,{now:NOW});
+  assert.equal(x.source,'PIONEX_BOT_API');
+  assert.equal(x.coverage.status,'PARTIAL');
+  assert.equal(x.sourceStatusOk,true);
+  assert.equal(x.usableForDisplay,true);
+  assert.equal(x.usableForOverwrite,false);
+});
+
+test('merge-to-bridge preserves every independent incomplete signal as display-only coverage',()=>{
+  const cases=[
+    {name:'top-level pagination false',riskFlags:{paginationComplete:false},
+      coverage:{status:'DOCUMENTED',paginationComplete:true}},
+    {name:'nested pagination false',riskFlags:{paginationComplete:true},
+      coverage:{status:'DOCUMENTED',paginationComplete:false}},
+    {name:'raw partial status',riskFlags:{paginationComplete:true},
+      coverage:{status:'PARTIAL',paginationComplete:true}},
+    {name:'truncated-only sync argument',riskFlags:{paginationComplete:true},
+      coverage:{status:'DOCUMENTED',paginationComplete:true},truncated:true}
+  ];
+  for(const [index,entry] of cases.entries()){
+    const complete={snapshotAt:'2026-09-28T20:40:00.000Z',updatedAt:'2026-09-28T20:40:00.000Z',
+      detailsComplete:true,paginationComplete:true,coverage:{status:'DOCUMENTED',paginationComplete:true},
+      bots:[bot({botOrderId:`synthetic-complete-${index}`,symbol:'ADA'})],botCount:1};
+    const partial={...complete,snapshotAt:'2026-09-28T20:44:00.000Z',updatedAt:'2026-09-28T20:44:00.000Z',
+      ...entry.riskFlags,coverage:{...entry.coverage},bots:[bot({botOrderId:`synthetic-partial-${index}`,symbol:'BTC'})]};
+    const merged=mergePionexSyncState({
+      pionexRisk:complete,pionexBotSync:{status:'OK',lastSuccessAt:complete.updatedAt}
+    },{risk:partial,status:'OK',attemptAt:partial.updatedAt,successAt:partial.updatedAt,
+      configured:true,pages:20,truncated:entry.truncated||false});
+    const x=buildAssetWatchApiSnapshot(merged,{now:NOW});
+    assert.deepEqual(merged.pionexRisk.bots,complete.bots,entry.name+' preserves complete rows');
+    assert.equal(merged.pionexBotSync.lastSuccessAt,complete.updatedAt,entry.name+' preserves last success');
+    assert.equal(x.coverage.status,'PARTIAL',entry.name+' remains partial');
+    assert.equal(x.usableForDisplay,true,entry.name+' remains displayable');
+    assert.equal(x.usableForOverwrite,false,entry.name+' cannot overwrite');
+    if(entry.name!=='raw partial status')assert.equal(x.coverage.paginationComplete,false,entry.name);
+  }
 });

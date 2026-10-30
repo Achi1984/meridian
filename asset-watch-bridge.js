@@ -7,6 +7,7 @@ function num(v){
   const n=Number(v);
   return Number.isFinite(n)?n:null;
 }
+const positiveMetric=value=>typeof value==='number'&&Number.isFinite(value)&&value>0?value:null;
 function text(v){
   const s=String(v??'').trim();
   return s||null;
@@ -42,7 +43,8 @@ function sanitizedBot(bot={}){
     botRef:botRef(bot),
     symbol,
     side,
-    cateType:projectedEnum(bot.cateType,['inverse','linear']),
+    cateType:projectedEnum(bot.cateType,['inverse','linear','FUTURES_MOON',
+      'FUTURE_GRID_COIN_MARGINED','FULLY_HEDGING','SPOT']),
     botType:projectedEnum(bot.botType,['futures_grid','future_hedge_grid']),
     sideSource:projectedEnum(bot.sideSource,['economic_inverse_asset','trend_inverse_asset','trend']),
     leverage:num(bot.leverage),
@@ -50,6 +52,8 @@ function sanitizedBot(bot={}){
       lower:num(bot.lower),
       upper:num(bot.upper),
       liquidationPrice:num(bot.liquidationPrice),
+      liquidationLowerBound:positiveMetric(bot.liquidationLowerBound),
+      liquidationUpperBound:positiveMetric(bot.liquidationUpperBound),
       takeProfit:num(bot.takeProfit),
       stopLoss:num(bot.stopLoss)
     },
@@ -79,11 +83,44 @@ function sanitizedBot(bot={}){
     source:text(bot.source)
   };
 }
-function candidate({name,risk,status,lastSuccessAt,now,staleMs}){
+function coverageFor(risk={}, {truncated=false,status=null}={}){
+  const raw=risk?.coverage&&typeof risk.coverage==='object'?risk.coverage:{};
+  const rawStatus=String(raw.status||'').toUpperCase();
+  const syncStatus=String(status||'').toUpperCase();
+  const count=value=>Number.isSafeInteger(value)&&value>=0?value:null;
+  const listRows=count(raw.listRows)??count(risk.apiRows);
+  const recognizedRows=count(raw.recognizedRows)??count(risk.supportedRows);
+  const representedRows=count(raw.representedRows)??count(risk.botCount);
+  const unsupportedRows=count(raw.unsupportedRows)??count(risk.unsupportedRows);
+  const unhydratedRows=count(raw.unhydratedRows)??(
+    count(risk.supportedRows)!==null&&representedRows!==null
+      ?Math.max(0,risk.supportedRows-representedRows):count(risk.rejectedCount));
+  const paginationComplete=truncated===true||risk.paginationComplete===false||
+    raw.paginationComplete===false?false:
+      risk.paginationComplete===true||raw.paginationComplete===true?true:null;
+  const pages=count(raw.pages),pageLimit=count(raw.pageLimit);
+  const partial=unsupportedRows>0||unhydratedRows>0||paginationComplete===false||
+    rawStatus==='PARTIAL'||syncStatus==='PARTIAL'||risk.detailsComplete===false;
+  return {
+    status:partial?'PARTIAL':raw.status==='DOCUMENTED'?'DOCUMENTED':
+      raw.status==='UNVERIFIED'?'UNVERIFIED':'UNKNOWN',
+    providerContractStatus:raw.providerContractStatus==='DOCUMENTED'?'DOCUMENTED':'UNVERIFIED',
+    liveAccountVerification:raw.liveAccountVerification==='NOT_PERFORMED'?'NOT_PERFORMED':'UNKNOWN',
+    listRows,recognizedRows,representedRows,unsupportedRows,unhydratedRows,
+    paginationComplete,pages,pageLimit
+  };
+}
+function candidate({name,risk,status,lastSuccessAt,truncated=false,now,staleMs}){
   if(!risk||typeof risk!=='object')return null;
   const snapshotAt=risk.snapshotAt||risk.updatedAt||lastSuccessAt||null;
   const detailsComplete=risk.detailsComplete===true;
-  const statusOk=String(status||'').toUpperCase()==='OK';
+  const normalizedStatus=String(status||'').toUpperCase();
+  const coverage=coverageFor(risk,{truncated,status});
+  const incomplete=truncated===true||risk.paginationComplete===false||
+    risk.coverage?.paginationComplete===false||
+    String(risk.coverage?.status||'').toUpperCase()==='PARTIAL'||
+    normalizedStatus==='PARTIAL'||risk.detailsComplete===false;
+  const statusOk=normalizedStatus==='OK'||(normalizedStatus==='PARTIAL'&&incomplete);
   const fresh=freshAt(snapshotAt,now,staleMs);
   const rows=Array.isArray(risk.bots)?risk.bots:[];
   return {
@@ -91,8 +128,10 @@ function candidate({name,risk,status,lastSuccessAt,now,staleMs}){
     risk,
     snapshotAt,
     detailsComplete,
+    coverage,
     statusOk,
     fresh,
+    incomplete,
     rows,
     usable:statusOk&&detailsComplete&&fresh
   };
@@ -100,8 +139,9 @@ function candidate({name,risk,status,lastSuccessAt,now,staleMs}){
 function pickSource(data,now,staleMs){
   const primary=candidate({
     name:'PIONEX_BOT_API',
-    risk:data?.pionexRisk,
+    risk:data?.pionexRiskPartial||data?.pionexRisk,
     status:data?.pionexBotSync?.status,
+    truncated:data?.pionexBotSync?.truncated===true,
     lastSuccessAt:data?.pionexBotSync?.lastSuccessAt,
     now,staleMs
   });
@@ -109,6 +149,7 @@ function pickSource(data,now,staleMs){
     name:'PIONEX_WALLET_BOT_DETAIL',
     risk:data?.pionexAccount?.walletBotRisk,
     status:data?.pionexAccountSync?.status,
+    truncated:data?.pionexAccountSync?.truncated===true,
     lastSuccessAt:data?.pionexAccountSync?.lastSuccessAt,
     now,staleMs
   });
@@ -132,10 +173,21 @@ function fingerprint(bots){
 
 export function buildAssetWatchApiSnapshot(data,{now=Date.now(),staleMs=DEFAULT_STALE_MS}={}){
   const selected=pickSource(data||{},now,staleMs);
-  const bots=stableSortBots((selected?.rows||[]).map(sanitizedBot).filter(b=>b.symbol&&b.side&&b.botRef));
+  const sourceRows=selected?.rows||[],seen=new Set();
+  const bots=stableSortBots(sourceRows.map(sanitizedBot).filter(bot=>{
+    if(!bot.symbol||!bot.side||!bot.botRef||seen.has(bot.botRef))return false;
+    seen.add(bot.botRef);return true;
+  }));
+  const coverage=selected?.coverage||coverageFor();
+  const droppedRows=sourceRows.length-bots.length;
+  coverage.representedRows=bots.length;
+  coverage.unhydratedRows=coverage.unhydratedRows===null?droppedRows:coverage.unhydratedRows+droppedRows;
+  if(coverage.unsupportedRows>0||coverage.unhydratedRows>0||coverage.paginationComplete===false)
+    coverage.status='PARTIAL';
   const snapshotAt=selected?.snapshotAt||null;
   const ageMs=tsMs(snapshotAt)==null?null:Math.max(0,now-tsMs(snapshotAt));
-  const usableForOverwrite=selected?.usable===true;
+  const usableForDisplay=selected?.usable===true;
+  const usableForOverwrite=usableForDisplay&&!selected?.incomplete&&coverage.status!=='PARTIAL';
   return {
     schemaVersion:'MERIDIAN-ASSET-WATCH-BRIDGE-V1',
     readOnly:true,
@@ -146,8 +198,10 @@ export function buildAssetWatchApiSnapshot(data,{now=Date.now(),staleMs=DEFAULT_
     sourceAgeMs:ageMs,
     freshnessLimitMs:staleMs,
     detailsComplete:selected?.detailsComplete===true,
+    coverage,
     sourceStatusOk:selected?.statusOk===true,
     fresh:selected?.fresh===true,
+    usableForDisplay,
     usableForOverwrite,
     overwriteRule:'ONLY_WHEN_usableForOverwrite_IS_TRUE',
     botCount:bots.length,
@@ -160,4 +214,3 @@ export function buildAssetWatchApiSnapshot(data,{now=Date.now(),staleMs=DEFAULT_
     }
   };
 }
-
