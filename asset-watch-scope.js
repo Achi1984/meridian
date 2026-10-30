@@ -27,7 +27,7 @@ function safeCategoryFailure(value,reasons){
   const shape=safeCategoryShape(value);
   if(!shape)return null;
   return {
-    categoryClass:['TRADING_BOT','FUTURES_LITE','SPOT','ARBITRAGE','OTHER','MISSING']
+    categoryClass:['TRADING_BOT','FUTURES_LITE','COPY_TRADE','SPOT','ARBITRAGE','LENDING','OTHER','MISSING']
       .includes(value.categoryClass)?value.categoryClass:null,
     reason:reasons.includes(value.reason)?value.reason:null,
     ...shape,
@@ -54,3 +54,4 @@ export function safeScopeDiagnostics(value){
       [key,safeScopeCount(value.typeCounts?.[key])]))
   };
 }
+

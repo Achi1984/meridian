@@ -171,7 +171,7 @@ test('independent category failures enforce closed classes, reasons and typed ma
     'HAS_MORE','HAS_MORE_UNKNOWN'];
   for(const field of ['firstScopeFailure','firstPaginationFailure']){
     const reasons=field==='firstScopeFailure'?scopeReasons:paginationReasons;
-    for(const categoryClass of ['TRADING_BOT','FUTURES_LITE','SPOT','ARBITRAGE','OTHER','MISSING']){
+    for(const categoryClass of ['TRADING_BOT','FUTURES_LITE','COPY_TRADE','SPOT','ARBITRAGE','LENDING','OTHER','MISSING']){
       for(const reason of [...scopeReasons,...paginationReasons,'PRIVATE_CANARY']){
         for(const countMatchesList of [true,false,null,'PRIVATE_CANARY']){
           const failure={categoryClass,reason,countKind:'NUMBER',zeroVerified:false,listKind:'ARRAY',
@@ -217,3 +217,4 @@ test('category shape diagnostics accept only closed enums and typed evidence at 
       .scopeDiagnostics.unverifiedCategoryShape,null);
   }
 });
+

@@ -22,7 +22,7 @@ function primaryRisk(unknown=false){
 }
 
 async function produce({rows=[grid(),lite()],hasMore=false,count=rows.length,
-  missingDetail=false,badDetail=false,extraCategories=[],missingCategories=false}={}){
+  missingDetail=false,badDetail=false,failedId=null,extraCategories=[],missingCategories=false}={}){
   const snapshot=await fetchPionexReadSnapshot({
     apiKey:'synthetic-key',apiSecret:'synthetic-secret',now:()=>Date.parse(AT),
     fetchImpl:async(raw,options)=>{
@@ -33,7 +33,7 @@ async function produce({rows=[grid(),lite()],hasMore=false,count=rows.length,
         data={botAccount:{detail:missingCategories?undefined:
           [{type:'TRADING_BOT',count,hasMore,list:rows},...extraCategories]}};
       }else if(url.pathname==='/api/v1/bot/orders/futuresGrid/order'){
-        if(missingDetail&&url.searchParams.get('buOrderId')===rows[0].buOrderId)
+        if((missingDetail&&url.searchParams.get('buOrderId')===rows[0].buOrderId)||url.searchParams.get('buOrderId')===failedId)
           return Response.json({result:false,code:'SYNTHETIC_DETAIL_MISSING'});
         data=badDetail?{status:'running',buOrderData:{status:'running'}}:detail();
       }else assert.ok(['/api/v1/account/balances','/uapi/v1/account/balances',
@@ -490,15 +490,15 @@ test('fabricated diagnostic flags cannot authorize an absent wallet scope',async
 });
 
 test('independent category failures survive producer, JSON, bridge and receipt regardless of ordering',async()=>{
-  const spot={type:'SPOT',count:1,hasMore:false,list:[{id:'PRIVATE_CANARY_SPOT'}]};
+  const spot={type:'PRIVATE_CANARY_UNKNOWN',count:1,hasMore:false,list:[{id:'PRIVATE_CANARY_SPOT'}]};
   const spotShape={countKind:'NUMBER',zeroVerified:false,listKind:'ARRAY',
     listEmpty:false,hasMoreFalse:true};
   for(const [category,categoryClass,reason,shape,matches,scopeFailures] of [
-    [{type:'ARBITRAGE',count:null,hasMore:false,list:[]},'ARBITRAGE','COUNT_INVALID',
+    [{type:'PRIVATE_CANARY_UNKNOWN',count:null,hasMore:false,list:[]},'OTHER','COUNT_INVALID',
       {countKind:'NULL',zeroVerified:null,listKind:'ARRAY',listEmpty:true,hasMoreFalse:true},null,2],
     [{type:'PRIVATE_CANARY_CATEGORY',count:0,hasMore:false},'OTHER','LIST_MISSING_OR_INVALID',
       {countKind:'NUMBER',zeroVerified:true,listKind:'MISSING',listEmpty:null,hasMoreFalse:true},null,2],
-    [{type:'ARBITRAGE',count:1,hasMore:false,list:[]},'ARBITRAGE','COUNT_LIST_MISMATCH',
+    [{type:'PRIVATE_CANARY_UNKNOWN',count:1,hasMore:false,list:[]},'OTHER','COUNT_LIST_MISMATCH',
       {countKind:'NUMBER',zeroVerified:false,listKind:'ARRAY',listEmpty:true,hasMoreFalse:true},false,2],
     [{type:'FUTURES_LITE',count:0,hasMore:true,list:[]},'FUTURES_LITE','HAS_MORE',
       {countKind:'NUMBER',zeroVerified:true,listKind:'ARRAY',listEmpty:true,hasMoreFalse:false},true,1],
@@ -522,7 +522,7 @@ test('independent category failures survive producer, JSON, bridge and receipt r
       assert.deepEqual(diagnostic.firstPaginationFailure,categoryFailure(categoryClass,reason,shape,matches));
       const spotFirst=extraCategories[0]===spot||scopeFailures===1;
       assert.deepEqual(diagnostic.firstScopeFailure,spotFirst
-        ?categoryFailure('SPOT','UNRECOGNIZED_NONEMPTY',spotShape,true)
+        ?categoryFailure('OTHER','UNRECOGNIZED_NONEMPTY',spotShape,true)
         :categoryFailure(categoryClass,category.count===1?'UNRECOGNIZED_NONEMPTY':
           'UNRECOGNIZED_UNVERIFIED',shape,matches));
       assert.equal(account.walletBotRisk.apiRows,2,'unrecognized categories are not candidates');
@@ -538,13 +538,13 @@ test('independent category failures survive producer, JSON, bridge and receipt r
   assert.equal(diagnostic.firstPaginationFailure,null);
   assert.equal(state.pionexAccount.walletBotRisk.paginationComplete,true);
   const multiple=scopeSummary(await produce({extraCategories:[
-    spot,{type:'ARBITRAGE',count:null},{type:'PRIVATE_CANARY_CATEGORY',count:0,list:[]}
+    spot,{type:'PRIVATE_CANARY_UNKNOWN',count:null},{type:'PRIVATE_CANARY_CATEGORY',count:0,list:[]}
   ]}),false);
   assert.equal(multiple.scopeFailureCount,3);
   assert.equal(multiple.paginationFailureCount,2);
   assert.equal(multiple.unrecognizedNonemptyCategoryCount,null);
-  assert.equal(multiple.firstScopeFailure.categoryClass,'SPOT');
-  assert.equal(multiple.firstPaginationFailure.categoryClass,'ARBITRAGE');
+  assert.equal(multiple.firstScopeFailure.categoryClass,'OTHER');
+  assert.equal(multiple.firstPaginationFailure.categoryClass,'OTHER');
 });
 
 test('recognized-only pagination failures never fabricate a category scope failure',async()=>{
@@ -565,4 +565,55 @@ test('recognized-only pagination failures never fabricate a category scope failu
     assert.equal(state.pionexAccount.walletBotRisk.supportedScope.exclusionsVerified,true);
     assert.deepEqual(chain(state).snapshot.overwriteRejectionReasons,['PAGINATION_INCOMPLETE']);
   }
+});
+
+
+test('six wallet categories retain copy candidates and explicitly scoped summary exclusions',async()=>{
+  const extras=[
+    {type:'copy_trade',count:2,hasMore:false,list:[grid('synthetic-copy-grid'),{...lite(),buOrderId:'synthetic-copy-lite'}]},
+    {type:'spot',count:3,hasMore:false,list:[{coin:'PRIVATE_CANARY'}]},
+    {type:'arbitrage',count:1,hasMore:false,list:[{productId:'PRIVATE_CANARY'}]},
+    {type:'lending',count:0,hasMore:false,list:null}
+  ];
+  const state=await produce({extraCategories:extras}),risk=state.pionexAccount.walletBotRisk;
+  assert.equal(risk.apiRows,4);assert.equal(risk.supportedRows,2);assert.equal(risk.unsupportedRows,2);
+  assert.equal(risk.paginationComplete,true);assert.equal(risk.supportedScope.exclusionsVerified,true);
+  const result=chain(state);assert.equal(result.validation.ok,true);assert.equal(result.snapshot.bots.length,2);
+  const diagnostic=JSON.parse(assetWatchStrictGateDiagnostics(result.envelope,null)).scopeDiagnostics;
+  assert.equal(diagnostic.scopeFailureCount,0);assert.equal(diagnostic.paginationFailureCount,0);
+  assert.doesNotMatch(JSON.stringify(result.envelope.receipt),/PRIVATE_CANARY|synthetic-copy/);
+});
+test('copy category preserves row type, identity, hydration and pagination gates',async()=>{
+  const copy=list=>({type:'COPY_TRADE',count:list.length,hasMore:false,list});
+  for(const category of [copy([{buOrderId:'unknown-copy',buOrderType:'unknown'}]),
+    copy([grid()]),copy([{buOrderType:'futures_grid'}]),
+    {...copy([grid('copy-grid')]),count:2},{...copy([grid('copy-grid')]),hasMore:true}]){
+    const result=chain(await produce({extraCategories:[category]}));
+    assert.equal(result.snapshot.usableForOverwrite,false);assert.equal(result.validation.ok,false);
+  }
+  rejected(chain(await produce({extraCategories:[copy([grid('copy-grid')])],failedId:'copy-grid'})),
+    'SUPPORTED_HYDRATION_MISSING');
+});
+test('named wallet summaries cannot conceal bot candidates or malformed summary evidence',async()=>{
+  for(const type of ['SPOT','ARBITRAGE']){
+    for(const list of [[grid('hidden')],[{buOrderId:null}],[{buOrderType:'futures_lite'}],[{baseList:[]}],null,[null]]){
+      const state=await produce({extraCategories:[{type,count:1,hasMore:false,list}]});
+      rejected(chain(state),'UNSUPPORTED_SCOPE');
+    }
+  }
+  rejected(chain(await produce({extraCategories:[{type:'UNKNOWN',count:1,hasMore:false,list:[{coin:'X'}]}]})),
+    'UNSUPPORTED_SCOPE');
+});
+test('only explicit empty lending accepts a null list',async()=>{
+  for(const count of [0,'0'])for(const list of [null,[]]){
+    const state=await produce({extraCategories:[{type:'LENDING',count,hasMore:false,list}]});
+    assert.equal(chain(state).validation.ok,true);
+  }
+  for(const category of [
+    {count:0,hasMore:false}, {count:null,hasMore:false,list:null},
+    {count:false,hasMore:false,list:null},{count:'',hasMore:false,list:null},
+    {count:1,hasMore:false,list:null},{count:0,hasMore:true,list:null},
+    {count:0,hasMore:false,list:[{}]},{count:0,hasMore:false,list:{}},
+    {count:-1,hasMore:false,list:null},{count:0.5,hasMore:false,list:null}
+  ])rejected(chain(await produce({extraCategories:[{type:'LENDING',...category}]})),'UNSUPPORTED_SCOPE');
 });
