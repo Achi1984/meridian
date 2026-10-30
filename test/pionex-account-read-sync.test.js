@@ -165,6 +165,28 @@ test('wallet inverse cateType survives into Coin-M symbol normalization',()=>{
   assert.equal(risk.bots[0].assetDeclaredSide,'LONG');
 });
 
+test('wallet fallback preserves the documented Futures Moon category independently from neutral direction',()=>{
+  const risk=buildWalletBotRisk({
+    candidateCount:1,
+    buOrderTypeCounts:{futures_grid:1},
+    successBuOrderTypeCounts:{futures_grid:1},
+    details:[{
+      wallet:{buOrderId:'synthetic-moon-wallet',buOrderType:'futures_grid',
+        cateType:'FUTURES_MOON',baseList:['BTC.PERP'],investmentToken:'USDT'},
+      detail:{base:'BTC.PERP',quote:'USDT',status:'running',buOrderData:{
+        status:'running',trend:'no_trend',movingTop:'80000',movingBottom:'50000',
+        estimateLiquidationPriceUp:'79000',estimateLiquidationPriceDown:'51000'
+      }}
+    }]
+  },'2026-09-28T15:00:00.000Z');
+  assert.equal(risk.detailsComplete,true);assert.equal(risk.bots.length,1);
+  assert.equal(risk.bots[0].botType,'futures_grid');
+  assert.equal(risk.bots[0].cateType,'FUTURES_MOON');
+  assert.equal(risk.bots[0].side,'NEUTRAL');
+  assert.equal(risk.bots[0].liquidationLowerBound,51000);
+  assert.equal(risk.bots[0].liquidationUpperBound,79000);
+});
+
 test('wallet bot risk fails closed when any supported detail cannot normalize',()=>{
   const risk=buildWalletBotRisk({
     candidateCount:1,
