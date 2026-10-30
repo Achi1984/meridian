@@ -43,6 +43,13 @@ test('each strict receipt flag still fails the real smoke and emits only safe bo
         scopeDiagnostics:{scopePresent:true,schemaOk:true,botTypeOk:true,exclusionsVerified:false,
           excludedRowsEqualsUnsupported:false,categoriesVerified:false,countsVerified:true,
           candidateCount:2,unsupportedCount:1,unrecognizedNonemptyCategoryCount:1,
+          scopeFailureCount:2,paginationFailureCount:1,
+          firstScopeFailure:{categoryClass:'SPOT',reason:'UNRECOGNIZED_NONEMPTY',
+            countKind:'NUMBER',zeroVerified:false,listKind:'ARRAY',listEmpty:false,
+            hasMoreFalse:true,countMatchesList:true,category:'PRIVATE_MARKER'},
+          firstPaginationFailure:{categoryClass:'ARBITRAGE',reason:'COUNT_INVALID',
+            countKind:'NULL',zeroVerified:null,listKind:'ARRAY',listEmpty:true,
+            hasMoreFalse:true,countMatchesList:null,category:'PRIVATE_MARKER'},
           typeCounts:{futures_grid:1,futures_lite:0,OTHER:1,PRIVATE_MARKER:123456789},
           payload:'PRIVATE_MARKER'},
         token:'PRIVATE_MARKER',bots:[{id:'PRIVATE_MARKER'}]};
@@ -76,6 +83,9 @@ test('each strict receipt flag still fails the real smoke and emits only safe bo
     assert.match(result.stderr,/"deploymentSha":"a{40}"/);
     assert.match(result.stderr,/"scopePresent":true,"schemaOk":true,"botTypeOk":true,"exclusionsVerified":false/);
     assert.match(result.stderr,/"unrecognizedNonemptyCategoryCount":1/);
+    assert.match(result.stderr,/"scopeFailureCount":2,"paginationFailureCount":1/);
+    assert.match(result.stderr,/"firstScopeFailure":\{"categoryClass":"SPOT","reason":"UNRECOGNIZED_NONEMPTY"/);
+    assert.match(result.stderr,/"firstPaginationFailure":\{"categoryClass":"ARBITRAGE","reason":"COUNT_INVALID"/);
     assert.match(result.stderr,/"typeCounts":\{"futures_grid":1,"futures_lite":0,"OTHER":1\}/);
     assert.doesNotMatch(result.stdout+result.stderr,/PRIVATE_MARKER|UNEXPECTED_REQUEST/);
     assert.ok(result.stderr.length<4096);
@@ -115,6 +125,11 @@ test('scope diagnostics are closed, bounded and re-sanitized at both public boun
       scopePresent:true,schemaOk:canary,botTypeOk:false,exclusionsVerified:'true',
       excludedRowsEqualsUnsupported:null,categoriesVerified:false,countsVerified:true,
       candidateCount:count,unsupportedCount:count,unrecognizedNonemptyCategoryCount:count,
+      scopeFailureCount:count,paginationFailureCount:count,
+      firstScopeFailure:{categoryClass:canary,reason:canary,countMatchesList:canary,
+        countKind:canary,zeroVerified:canary,listKind:canary,listEmpty:canary,hasMoreFalse:canary,
+        category:canary,id:canary,count:123456789,list:[canary]},
+      firstPaginationFailure:{categoryClass:canary,reason:canary,countMatchesList:canary},
       unverifiedCategoryShape:{countKind:canary,zeroVerified:canary,listKind:canary,
         listEmpty:canary,hasMoreFalse:canary,category:canary,count:123456789,list:[canary]},
       typeCounts:{futures_grid:count,futures_lite:count,OTHER:count,[canary]:123456789},
@@ -125,6 +140,11 @@ test('scope diagnostics are closed, bounded and re-sanitized at both public boun
       scopePresent:true,schemaOk:null,botTypeOk:false,exclusionsVerified:null,
       excludedRowsEqualsUnsupported:null,categoriesVerified:false,countsVerified:true,
       candidateCount:expected,unsupportedCount:expected,unrecognizedNonemptyCategoryCount:expected,
+      scopeFailureCount:expected,paginationFailureCount:expected,
+      firstScopeFailure:{categoryClass:null,reason:null,countKind:null,zeroVerified:null,
+        listKind:null,listEmpty:null,hasMoreFalse:null,countMatchesList:null},
+      firstPaginationFailure:{categoryClass:null,reason:null,countKind:null,zeroVerified:null,
+        listKind:null,listEmpty:null,hasMoreFalse:null,countMatchesList:null},
       unverifiedCategoryShape:{countKind:null,zeroVerified:null,listKind:null,
         listEmpty:null,hasMoreFalse:null},
       typeCounts:{futures_grid:expected,futures_lite:expected,OTHER:expected}
@@ -135,13 +155,48 @@ test('scope diagnostics are closed, bounded and re-sanitized at both public boun
       const raw=assetWatchStrictGateDiagnostics({receipt:input},null);
       assert.deepEqual(JSON.parse(raw).scopeDiagnostics,expectedDiagnostic);
       assert.doesNotMatch(raw,/PRIVATE_CANARY|123456789|writerSha|payload|credential/);
-      assert.ok(raw.length<1536);
+      assert.ok(raw.length<2560);
     }
   }
   for(const value of [undefined,null,false,'PRIVATE_CANARY',[]]){
     assert.equal(assetWatchMirrorPublicReceipt({scopeDiagnostics:value}).scopeDiagnostics,null);
     assert.equal(JSON.parse(assetWatchStrictGateDiagnostics({receipt:{scopeDiagnostics:value}},null))
       .scopeDiagnostics,null);
+  }
+});
+
+test('independent category failures enforce closed classes, reasons and typed matches at public boundaries',()=>{
+  const scopeReasons=['UNRECOGNIZED_NONEMPTY','UNRECOGNIZED_UNVERIFIED'];
+  const paginationReasons=['COUNT_INVALID','LIST_MISSING_OR_INVALID','COUNT_LIST_MISMATCH',
+    'HAS_MORE','HAS_MORE_UNKNOWN'];
+  for(const field of ['firstScopeFailure','firstPaginationFailure']){
+    const reasons=field==='firstScopeFailure'?scopeReasons:paginationReasons;
+    for(const categoryClass of ['TRADING_BOT','FUTURES_LITE','SPOT','ARBITRAGE','OTHER','MISSING']){
+      for(const reason of [...scopeReasons,...paginationReasons,'PRIVATE_CANARY']){
+        for(const countMatchesList of [true,false,null,'PRIVATE_CANARY']){
+          const failure={categoryClass,reason,countKind:'NUMBER',zeroVerified:false,listKind:'ARRAY',
+            listEmpty:false,hasMoreFalse:true,countMatchesList,category:'PRIVATE_CANARY'};
+          const expected={...failure,reason:reasons.includes(reason)?reason:null,
+            countMatchesList:typeof countMatchesList==='boolean'?countMatchesList:null};
+          delete expected.category;
+          const scopeDiagnostics={[field]:failure};
+          const receipt=assetWatchMirrorPublicReceipt({scopeDiagnostics});
+          assert.deepEqual(receipt.scopeDiagnostics[field],expected);
+          for(const input of [receipt,{scopeDiagnostics}]){
+            const raw=assetWatchStrictGateDiagnostics({receipt:input},null);
+            assert.deepEqual(JSON.parse(raw).scopeDiagnostics[field],expected);
+            assert.doesNotMatch(raw,/PRIVATE_CANARY/);
+            assert.ok(raw.length<2560);
+          }
+        }
+      }
+    }
+    for(const value of [undefined,null,false,'PRIVATE_CANARY',[]]){
+      const scopeDiagnostics={[field]:value};
+      assert.equal(assetWatchMirrorPublicReceipt({scopeDiagnostics}).scopeDiagnostics[field],null);
+      assert.equal(JSON.parse(assetWatchStrictGateDiagnostics({receipt:{scopeDiagnostics}},null))
+        .scopeDiagnostics[field],null);
+    }
   }
 });
 

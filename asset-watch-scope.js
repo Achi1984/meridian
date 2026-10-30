@@ -23,6 +23,17 @@ function safeCategoryShape(value){
     hasMoreFalse:typeof value.hasMoreFalse==='boolean'?value.hasMoreFalse:null
   };
 }
+function safeCategoryFailure(value,reasons){
+  const shape=safeCategoryShape(value);
+  if(!shape)return null;
+  return {
+    categoryClass:['TRADING_BOT','FUTURES_LITE','SPOT','ARBITRAGE','OTHER','MISSING']
+      .includes(value.categoryClass)?value.categoryClass:null,
+    reason:reasons.includes(value.reason)?value.reason:null,
+    ...shape,
+    countMatchesList:typeof value.countMatchesList==='boolean'?value.countMatchesList:null
+  };
+}
 export function safeScopeDiagnostics(value){
   if(!value||typeof value!=='object'||Array.isArray(value))return null;
   const flags=['scopePresent','schemaOk','botTypeOk','exclusionsVerified',
@@ -33,6 +44,12 @@ export function safeScopeDiagnostics(value){
     unsupportedCount:safeScopeCount(value.unsupportedCount),
     unrecognizedNonemptyCategoryCount:safeScopeCount(value.unrecognizedNonemptyCategoryCount),
     unverifiedCategoryShape:safeCategoryShape(value.unverifiedCategoryShape),
+    scopeFailureCount:safeScopeCount(value.scopeFailureCount),
+    paginationFailureCount:safeScopeCount(value.paginationFailureCount),
+    firstScopeFailure:safeCategoryFailure(value.firstScopeFailure,
+      ['UNRECOGNIZED_NONEMPTY','UNRECOGNIZED_UNVERIFIED']),
+    firstPaginationFailure:safeCategoryFailure(value.firstPaginationFailure,
+      ['COUNT_INVALID','LIST_MISSING_OR_INVALID','COUNT_LIST_MISMATCH','HAS_MORE','HAS_MORE_UNKNOWN']),
     typeCounts:Object.fromEntries(['futures_grid','futures_lite','OTHER'].map(key=>
       [key,safeScopeCount(value.typeCounts?.[key])]))
   };
