@@ -33,12 +33,15 @@ window.__botSnapshot=age=>({schemaVersion:'MERIDIAN-ASSET-WATCH-BRIDGE-V1',sourc
   liveAccountVerification:'NOT_PERFORMED',listRows:8,recognizedRows:7,representedRows:7,
   unsupportedRows:1,unhydratedRows:0,paginationComplete:false,pages:20,pageLimit:20},bots:[
   {botRef:'a'.repeat(20),symbol:'BTCUSDT',side:'LONG',cateType:'inverse',botType:'futures_grid',
-   leverage:5,investment:{usd:125.5678},pnl:{usd:-25}},
+   leverage:5,investment:{usd:125.5678},pnl:{usd:-25},
+   limits:{takeProfit:90,upper:100,takeProfitEvidence:'PRICE_SET'}},
   {botRef:'b'.repeat(20),symbol:'BTCUSDT',side:'SHORT',cateType:'linear',botType:'futures_grid',
-   leverage:2,investment:{usd:0.004},pnl:{usd:-25}},
+   leverage:2,investment:{usd:0.004},pnl:{usd:-25},
+   limits:{takeProfit:100,upper:100,takeProfitEvidence:'PRICE_SET'}},
   {botRef:'c'.repeat(20),symbol:'ETHUSDT',side:'NEUTRAL',cateType:'linear',botType:'futures_grid',
    leverage:8,investment:{quoteAmount:0.0000123456789,currency:'ETH'},pnl:{usd:-3.5},
-   limits:{liquidationLowerBound:2000,liquidationUpperBound:3000}},
+   limits:{liquidationLowerBound:2000,liquidationUpperBound:3000,takeProfit:null,
+     upper:3000,takeProfitEvidence:'UNKNOWN'}},
   {botRef:'d'.repeat(20),symbol:'ADAUSDT',side:null,cateType:null,botType:'futures_grid',
    leverage:null,pnl:{usd:null}},
   {botRef:'e'.repeat(20),symbol:'XRPUSDT',side:'SHORT',cateType:'inverse',botType:'futures_grid',
@@ -143,6 +146,19 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
               const nodes=[...document.querySelectorAll('#bot-read-root .bot-portfolio-total,#bot-read-root .bot-card,#bot-read-root .bot-card summary,#bot-read-root .bot-card-metrics')];
               const clipped=nodes.filter(node=>node.scrollWidth>node.clientWidth+1).length;
               const intersects=(a,b)=>a.left<b.right-1&&a.right>b.left+1&&a.top<b.bottom-1&&a.bottom>b.top+1;
+              const tpStatusCards=['a','c'].map(ref=>cards.find(card=>card.id.endsWith(ref.repeat(20))));
+              const tpStatusMeasurements=tpStatusCards.map(card=>{
+                const status=card?.querySelector('.bot-card-capital [aria-label]');
+                const cardRect=card?.getBoundingClientRect(),statusRect=status?.getBoundingClientRect();
+                const range=document.createRange();
+                if(status)range.selectNodeContents(status);
+                const textRects=[...range.getClientRects()];
+                return {text:status?.textContent,visible:status&&status.getClientRects().length>0&&statusRect.width>0&&
+                  statusRect.left>=cardRect.left-1&&statusRect.right<=cardRect.right+1&&
+                  status.scrollWidth<=status.clientWidth+1&&textRects.length>0&&
+                  textRects.every(rect=>rect.left>=cardRect.left-1&&rect.right<=cardRect.right+1)};
+              });
+              const tpStatusesVisible=tpStatusMeasurements.every(status=>status.visible);
               const relationships=cards.map(card=>{
                 const summary=card.querySelector('summary'),top=card.querySelector('.bot-card-top');
                 const identity=card.querySelector('.bot-card-identity'),heading=card.querySelector('.bot-card-heading');
@@ -162,7 +178,7 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
               window.scrollTo(0,root.scrollHeight);
               const last=document.querySelector('#view-bots').lastElementChild.getBoundingClientRect();
               const nav=document.getElementById('nav').getBoundingClientRect();
-              const result={clipped,relationships,cardTargets:cards.every(card=>
+              const result={clipped,relationships,tpStatusesVisible,tpStatusMeasurements,cardTargets:cards.every(card=>
                 card.querySelector('summary').getBoundingClientRect().height>=44),
                 overflow:root.scrollWidth>root.clientWidth+1,lastClear:last.bottom<=nav.top+1};
               window.scrollTo(x,y);return result;
@@ -170,6 +186,8 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
             assert.equal(layout.overflow,false,label+' page overflow');
             assert.equal(layout.clipped,0,label+' card clipping');
             assert.ok(layout.relationships.every(card=>card.siblings&&card.verticalOrder),label+' sibling geometry '+JSON.stringify(layout.relationships));
+            assert.equal(layout.tpStatusesVisible,true,label+' TP summary status visibility '+
+              JSON.stringify(layout.tpStatusMeasurements));
             assert.equal(layout.cardTargets,true,label+' card touch targets');
             assert.equal(layout.lastClear,true,label+' bottom navigation clearance');
           };
@@ -254,7 +272,16 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
               tinyCapital:cards.find(c=>c.id.endsWith('b'.repeat(20)))?.querySelector('.bot-card-capital strong')?.innerText,
               command:command.innerText,lossButtons:command.querySelectorAll('button').length,
               commandState:command.dataset.state,
-              touch:[...root.querySelectorAll('input,select,button')].filter(e=>!e.hidden).map(e=>[e.tagName,e.getAttribute('aria-label')||e.textContent,e.getBoundingClientRect().height]),
+              summaryTexts:['a','b','c'].map(ref=>cards.find(c=>c.id.endsWith(ref.repeat(20)))
+                ?.querySelector('summary').innerText),
+              referenceLabels:cards.map(c=>c.querySelector('summary').getAttribute('aria-label')),
+              tpReferenceLabels:['a','b','c'].map(ref=>cards.find(c=>c.id.endsWith(ref.repeat(20)))
+                ?.querySelector('summary').getAttribute('aria-label')),
+              touch:[...root.querySelectorAll('input,select,button')].filter(e=>{
+                const rect=e.getBoundingClientRect(),style=getComputedStyle(e);
+                return !e.hidden&&!e.disabled&&e.getClientRects().length>0&&rect.width>0&&rect.height>0&&
+                  style.display!=='none'&&style.visibility!=='hidden';
+              }).map(e=>[e.tagName,e.id,e.getAttribute('aria-label')||e.textContent.trim(),e.getBoundingClientRect().height]),
               leak:/synthetic-token|private failure/.test(document.body.innerText)};
           })()`);
           assert.equal(fresh.cards,7);assert.equal(new Set(fresh.ids).size,7);assert.equal(fresh.duplicate,2);
@@ -267,6 +294,11 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           assert.match(fresh.coverage,/Teilabdeckung/);
           assert.match(fresh.coverage,/Weitere Listenseiten waren beim Erreichen des Seitenlimits noch vorhanden/);
           assert.equal(fresh.count,true);assert.equal(fresh.commandState,'fresh');assert.equal(fresh.lossButtons,3);
+          assert.match(fresh.summaryTexts[0],/⚠ TP ≠ obere Range/);
+          assert.match(fresh.tpReferenceLabels[0],/Warnung: TP weicht von oberer Range ab/);
+          assert.doesNotMatch(fresh.summaryTexts[1],/TP/,'matching price TP needs no warning');
+          assert.match(fresh.summaryTexts[2],/TP nicht prüfbar/);
+          assert.match(fresh.tpReferenceLabels[2],/TP nicht prüfbar/);
           assert.ok(fresh.cardHeights.every(height=>Number.isFinite(height)&&height>0),
             JSON.stringify(fresh.cardGeometry));
           let categoryFit=null;
@@ -322,7 +354,12 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           assert.ok(exactCommandTimestamp);
           assert.ok(fresh.command.includes(new Intl.DateTimeFormat('de-DE',{dateStyle:'medium',timeStyle:'short',
             timeZone:'UTC'}).format(new Date(exactCommandTimestamp))+' UTC'),fresh.command);
-          assert.ok(fresh.touch.every(([, ,height])=>height>=43.99),JSON.stringify(fresh.touch));
+          assert.ok(['bot-symbol-search','bot-direction-filter','bot-category-filter','bot-sort-filter',
+            'bot-read-refresh','bot-read-lock'].every(id=>fresh.touch.some(([,targetId])=>targetId===id)),
+            'visible search, selects and bot actions remain measured '+JSON.stringify(fresh.touch));
+          assert.ok(fresh.touch.some(([, ,label])=>label==='Alle Botfilter zurücksetzen'),
+            'visible filter reset remains measured '+JSON.stringify(fresh.touch));
+          assert.ok(fresh.touch.every(([, , ,height])=>height>=43.99),JSON.stringify(fresh.touch));
           assert.equal(fresh.leak,false);
           const lossNames=await evaluate(`[...document.querySelectorAll('#command-bot-overview button')].map(button=>({text:button.textContent,name:button.getAttribute('aria-label')}))`);
           assert.equal(new Set(lossNames.map(row=>row.text)).size,3,'distinct visible loss labels');
@@ -336,6 +373,35 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           await evaluate(`document.querySelector('#bot-card-${'a'.repeat(20)} summary').focus()`);
           await key('Enter','Enter',13);
           assert.equal(await evaluate(`document.getElementById('bot-card-${'a'.repeat(20)}').open`),true);
+          const mismatchDetails=await evaluate(`(()=>{
+            const card=document.getElementById('bot-card-${'a'.repeat(20)}');
+            const checks=[...card.querySelectorAll('.bot-tp-indicator input')];
+            let changes=0;checks.forEach(input=>input.addEventListener('change',()=>changes++));
+            checks.forEach(input=>input.click());
+            return {text:card.querySelector('.bot-card-body').innerText,
+              labels:checks.map(input=>input.getAttribute('aria-label')),
+              disabled:checks.map(input=>input.disabled),checked:checks.map(input=>input.checked),
+              visible:checks.map(input=>input.getClientRects().length>0),changes};
+          })()`);
+          assert.match(mismatchDetails.text,/TP-Wert: 90 · obere Range: 100/);
+          assert.deepEqual(mismatchDetails.labels,['TP gesetzt: ja','TP = obere Range: nein']);
+          assert.deepEqual(mismatchDetails.disabled,[true,true]);
+          assert.deepEqual(mismatchDetails.checked,[true,false]);
+          assert.deepEqual(mismatchDetails.visible,[true,true]);
+          assert.equal(mismatchDetails.changes,0,'disabled TP indicators cannot be operated');
+          await evaluate(`document.getElementById('bot-card-${'c'.repeat(20)}').open=true`);
+          const unknownDetails=await evaluate(`(()=>{
+            const card=document.getElementById('bot-card-${'c'.repeat(20)}');
+            return {text:card.querySelector('.bot-card-body').innerText,
+              labels:[...card.querySelectorAll('.bot-tp-indicator input')].map(input=>input.getAttribute('aria-label')),
+              disabled:[...card.querySelectorAll('.bot-tp-indicator input')].map(input=>input.disabled),
+              indeterminate:[...card.querySelectorAll('.bot-tp-indicator input')].map(input=>input.indeterminate)};
+          })()`);
+          assert.match(unknownDetails.text,/TP nicht prüfbar/);
+          assert.deepEqual(unknownDetails.labels,['TP gesetzt: nicht prüfbar','TP = obere Range: nicht prüfbar']);
+          assert.deepEqual(unknownDetails.disabled,[true,true]);
+          assert.deepEqual(unknownDetails.indeterminate,[true,true]);
+          await evaluate(`document.getElementById('bot-card-${'c'.repeat(20)}').open=false`);
           await evaluate(`(()=>{const dir=document.getElementById('bot-direction-filter');dir.value='short';
             dir.dispatchEvent(new Event('change',{bubbles:true}));})()`);
           assert.equal(await evaluate(`document.getElementById('bot-card-${'b'.repeat(20)}').open`),false,
