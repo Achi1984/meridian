@@ -220,8 +220,12 @@ const VALID_SCOPE_DIAGNOSTICS={
   excludedRowsEqualsUnsupported:true,categoriesVerified:true,countsVerified:true,
   candidateCount:2,unsupportedCount:1,unrecognizedNonemptyCategoryCount:0,
   unverifiedCategoryShape:null,
+  scopeFailureCount:0,paginationFailureCount:0,firstScopeFailure:null,firstPaginationFailure:null,
   typeCounts:{futures_grid:1,futures_lite:1,OTHER:0}
 };
+function categoryFailure(categoryClass,reason,shape,countMatchesList){
+  return {categoryClass,reason,...shape,countMatchesList};
+}
 function scopeSummary(state,expectedEligible){
   const result=chain(state);
   assert.equal(result.snapshot.usableForOverwrite,expectedEligible);
@@ -232,7 +236,7 @@ function scopeSummary(state,expectedEligible){
   assert.deepEqual(Object.keys(diagnostic).sort(),Object.keys(VALID_SCOPE_DIAGNOSTICS).sort());
   assert.deepEqual(Object.keys(diagnostic.typeCounts),['futures_grid','futures_lite','OTHER']);
   assert.doesNotMatch(raw,/synthetic-private|BTC|USDT|synthetic-key|synthetic-secret|PRIVATE_CANARY|https:|123456789/);
-  assert.ok(raw.length<1536,'normal postdeploy failure summary remains bounded');
+  assert.ok(raw.length<2560,'normal postdeploy failure summary remains bounded');
   const withoutDiagnostics=structuredClone(state);
   delete withoutDiagnostics.pionexAccount.walletBotRisk.scopeDiagnostics;
   const old=chain(withoutDiagnostics);
@@ -263,6 +267,7 @@ test('missing scope is distinct from missing producer diagnostic evidence',async
     excludedRowsEqualsUnsupported:null,categoriesVerified:null,countsVerified:null,
     candidateCount:null,unsupportedCount:null,unrecognizedNonemptyCategoryCount:null,
     unverifiedCategoryShape:null,
+    scopeFailureCount:null,paginationFailureCount:null,firstScopeFailure:null,firstPaginationFailure:null,
     typeCounts:{futures_grid:null,futures_lite:null,OTHER:null}
   });
   const empty=buildWalletBotRisk();
@@ -275,6 +280,10 @@ test('missing scope is distinct from missing producer diagnostic evidence',async
   const diagnostic=scopeSummary(absentCategories,false);
   assert.equal(diagnostic.categoriesVerified,null);
   assert.equal(diagnostic.unrecognizedNonemptyCategoryCount,null);
+  assert.equal(diagnostic.scopeFailureCount,null);
+  assert.equal(diagnostic.paginationFailureCount,null);
+  assert.equal(diagnostic.firstScopeFailure,null);
+  assert.equal(diagnostic.firstPaginationFailure,null);
   assert.equal(absentCategories.pionexAccount.walletBotRisk.supportedScope.exclusionsVerified,false);
 });
 
@@ -294,11 +303,12 @@ test('nonempty unrecognized categories are distinguished without exposing catego
     totalInUsdt:123456789,list:[{...grid('PRIVATE_CANARY_ID'),symbol:'PRIVATE_CANARY_SYMBOL',
       amount:123456789,url:'https://PRIVATE_CANARY.invalid',credential:'PRIVATE_CANARY_CREDENTIAL'}]
   }]});
+  const shape={countKind:'NUMBER',zeroVerified:false,listKind:'ARRAY',listEmpty:false,hasMoreFalse:true};
   assert.deepEqual(scopeSummary(state,false),{
     ...VALID_SCOPE_DIAGNOSTICS,exclusionsVerified:false,categoriesVerified:false,
     unrecognizedNonemptyCategoryCount:1,
-    unverifiedCategoryShape:{countKind:'NUMBER',zeroVerified:false,listKind:'ARRAY',
-      listEmpty:false,hasMoreFalse:true}
+    unverifiedCategoryShape:shape,scopeFailureCount:1,
+    firstScopeFailure:categoryFailure('OTHER','UNRECOGNIZED_NONEMPTY',shape,true)
   });
 });
 
@@ -318,7 +328,12 @@ test('unverified category shape remains unknown rather than claiming no unrecogn
     const state=await produce({extraCategories:[category]});
     assert.deepEqual(scopeSummary(state,false),{
       ...VALID_SCOPE_DIAGNOSTICS,exclusionsVerified:false,categoriesVerified:false,
-      unrecognizedNonemptyCategoryCount:null,unverifiedCategoryShape:shape
+      unrecognizedNonemptyCategoryCount:null,unverifiedCategoryShape:shape,
+      scopeFailureCount:1,paginationFailureCount:1,
+      firstScopeFailure:categoryFailure('OTHER','UNRECOGNIZED_UNVERIFIED',shape,
+        category.count===0?true:null),
+      firstPaginationFailure:categoryFailure('OTHER',category.count===0?'HAS_MORE':'COUNT_INVALID',
+        shape,category.count===0?true:null)
     });
   }
 });
@@ -358,11 +373,13 @@ test('unknown, coercion-only and invalid empty-category counts remain unknown an
     assert.equal(state.pionexAccount.walletBotRisk.paginationComplete,false);
     const result=chain(state);
     rejected(result,'UNSUPPORTED_SCOPE');rejected(result,'PAGINATION_INCOMPLETE');
+    const shape={countKind,zeroVerified:null,listKind:'ARRAY',listEmpty:true,hasMoreFalse:true};
     assert.deepEqual(scopeSummary(state,false),{
       ...VALID_SCOPE_DIAGNOSTICS,exclusionsVerified:false,categoriesVerified:false,
       unrecognizedNonemptyCategoryCount:null,
-      unverifiedCategoryShape:{countKind,zeroVerified:null,listKind:'ARRAY',
-        listEmpty:true,hasMoreFalse:true}
+      unverifiedCategoryShape:shape,scopeFailureCount:1,paginationFailureCount:1,
+      firstScopeFailure:categoryFailure('OTHER','UNRECOGNIZED_UNVERIFIED',shape,null),
+      firstPaginationFailure:categoryFailure('OTHER','COUNT_INVALID',shape,null)
     });
   }
 });
@@ -373,11 +390,13 @@ test('empty-category exclusions require an explicit empty array and explicit no-
       {type:'PRIVATE_CANARY_EMPTY',count:'0',hasMore:false,list}
     ]});
     rejected(chain(state),'UNSUPPORTED_SCOPE');rejected(chain(state),'PAGINATION_INCOMPLETE');
+    const shape={countKind:'STRING',zeroVerified:true,listKind,listEmpty:null,hasMoreFalse:true};
     assert.deepEqual(scopeSummary(state,false),{
       ...VALID_SCOPE_DIAGNOSTICS,exclusionsVerified:false,categoriesVerified:false,
       unrecognizedNonemptyCategoryCount:null,
-      unverifiedCategoryShape:{countKind:'STRING',zeroVerified:true,listKind,
-        listEmpty:null,hasMoreFalse:true}
+      unverifiedCategoryShape:shape,scopeFailureCount:1,paginationFailureCount:1,
+      firstScopeFailure:categoryFailure('OTHER','UNRECOGNIZED_UNVERIFIED',shape,null),
+      firstPaginationFailure:categoryFailure('OTHER','LIST_MISSING_OR_INVALID',shape,null)
     });
   }
   for(const hasMore of [undefined,null,true,'false',0]){
@@ -468,4 +487,82 @@ test('fabricated diagnostic flags cannot authorize an absent wallet scope',async
   assert.equal(diagnostic.botTypeOk,null);
   assert.equal(diagnostic.exclusionsVerified,null);
   assert.equal(diagnostic.excludedRowsEqualsUnsupported,null);
+});
+
+test('independent category failures survive producer, JSON, bridge and receipt regardless of ordering',async()=>{
+  const spot={type:'SPOT',count:1,hasMore:false,list:[{id:'PRIVATE_CANARY_SPOT'}]};
+  const spotShape={countKind:'NUMBER',zeroVerified:false,listKind:'ARRAY',
+    listEmpty:false,hasMoreFalse:true};
+  for(const [category,categoryClass,reason,shape,matches,scopeFailures] of [
+    [{type:'ARBITRAGE',count:null,hasMore:false,list:[]},'ARBITRAGE','COUNT_INVALID',
+      {countKind:'NULL',zeroVerified:null,listKind:'ARRAY',listEmpty:true,hasMoreFalse:true},null,2],
+    [{type:'PRIVATE_CANARY_CATEGORY',count:0,hasMore:false},'OTHER','LIST_MISSING_OR_INVALID',
+      {countKind:'NUMBER',zeroVerified:true,listKind:'MISSING',listEmpty:null,hasMoreFalse:true},null,2],
+    [{type:'ARBITRAGE',count:1,hasMore:false,list:[]},'ARBITRAGE','COUNT_LIST_MISMATCH',
+      {countKind:'NUMBER',zeroVerified:false,listKind:'ARRAY',listEmpty:true,hasMoreFalse:true},false,2],
+    [{type:'FUTURES_LITE',count:0,hasMore:true,list:[]},'FUTURES_LITE','HAS_MORE',
+      {countKind:'NUMBER',zeroVerified:true,listKind:'ARRAY',listEmpty:true,hasMoreFalse:false},true,1],
+    [{type:'TRADING_BOT',count:0,list:[]},'TRADING_BOT','HAS_MORE_UNKNOWN',
+      {countKind:'NUMBER',zeroVerified:true,listKind:'ARRAY',listEmpty:true,hasMoreFalse:null},true,1],
+    [{count:0,hasMore:null,list:[]},'MISSING','HAS_MORE_UNKNOWN',
+      {countKind:'NUMBER',zeroVerified:true,listKind:'ARRAY',listEmpty:true,hasMoreFalse:null},true,2]
+  ]){
+    for(const extraCategories of [[spot,category],[category,spot]]){
+      const state=await produce({extraCategories});
+      const account=state.pionexAccount;
+      const diagnostic=scopeSummary(state,false);
+      const producer=account.wallet.botCategoryDiagnostics;
+      assert.deepEqual(account.walletBotProbe.categoryDiagnostics,producer);
+      for(const key of Object.keys(producer)){
+        assert.deepEqual(account.walletBotRisk.scopeDiagnostics[key],producer[key]);
+        assert.deepEqual(diagnostic[key],producer[key]);
+      }
+      assert.equal(diagnostic.scopeFailureCount,scopeFailures);
+      assert.equal(diagnostic.paginationFailureCount,1);
+      assert.deepEqual(diagnostic.firstPaginationFailure,categoryFailure(categoryClass,reason,shape,matches));
+      const spotFirst=extraCategories[0]===spot||scopeFailures===1;
+      assert.deepEqual(diagnostic.firstScopeFailure,spotFirst
+        ?categoryFailure('SPOT','UNRECOGNIZED_NONEMPTY',spotShape,true)
+        :categoryFailure(categoryClass,category.count===1?'UNRECOGNIZED_NONEMPTY':
+          'UNRECOGNIZED_UNVERIFIED',shape,matches));
+      assert.equal(account.walletBotRisk.apiRows,2,'unrecognized categories are not candidates');
+      assert.deepEqual(diagnostic.typeCounts,{futures_grid:1,futures_lite:1,OTHER:0});
+      rejected(chain(state),'UNSUPPORTED_SCOPE');
+      rejected(chain(state),'PAGINATION_INCOMPLETE');
+    }
+  }
+  const state=await produce({extraCategories:[spot]});
+  const diagnostic=scopeSummary(state,false);
+  assert.equal(diagnostic.scopeFailureCount,1);
+  assert.equal(diagnostic.paginationFailureCount,0);
+  assert.equal(diagnostic.firstPaginationFailure,null);
+  assert.equal(state.pionexAccount.walletBotRisk.paginationComplete,true);
+  const multiple=scopeSummary(await produce({extraCategories:[
+    spot,{type:'ARBITRAGE',count:null},{type:'PRIVATE_CANARY_CATEGORY',count:0,list:[]}
+  ]}),false);
+  assert.equal(multiple.scopeFailureCount,3);
+  assert.equal(multiple.paginationFailureCount,2);
+  assert.equal(multiple.unrecognizedNonemptyCategoryCount,null);
+  assert.equal(multiple.firstScopeFailure.categoryClass,'SPOT');
+  assert.equal(multiple.firstPaginationFailure.categoryClass,'ARBITRAGE');
+});
+
+test('recognized-only pagination failures never fabricate a category scope failure',async()=>{
+  for(const [options,reason,matches] of [
+    [{hasMore:true},'HAS_MORE',true],
+    [{hasMore:null},'HAS_MORE_UNKNOWN',true],
+    [{count:3},'COUNT_LIST_MISMATCH',false],
+    [{count:null},'COUNT_INVALID',null]
+  ]){
+    const state=await produce(options);
+    const diagnostic=scopeSummary(state,false);
+    assert.equal(diagnostic.scopeFailureCount,0);
+    assert.equal(diagnostic.firstScopeFailure,null);
+    assert.equal(diagnostic.paginationFailureCount,1);
+    assert.equal(diagnostic.firstPaginationFailure.categoryClass,'TRADING_BOT');
+    assert.equal(diagnostic.firstPaginationFailure.reason,reason);
+    assert.equal(diagnostic.firstPaginationFailure.countMatchesList,matches);
+    assert.equal(state.pionexAccount.walletBotRisk.supportedScope.exclusionsVerified,true);
+    assert.deepEqual(chain(state).snapshot.overwriteRejectionReasons,['PAGINATION_INCOMPLETE']);
+  }
 });
