@@ -392,9 +392,9 @@ test('collapsed native cards distinguish equal symbols and render only whitelist
    const [first,second]=all(target,'details'),[firstSummary,secondSummary]=all(target,'summary');
    assert.doesNotMatch(firstSummary.textContent,/Referenz|Bot 1/);
    assert.equal(firstSummary.getAttribute('aria-label'),
-     'BTC · Short · Hebel 5× · P/L laut Quelle -2,75 USD · Kapital 125,50 USD/USDT · ID-Ende aaaaaa · Details anzeigen');
+     'BTC · Short · Hebel 5× · P/L laut Quelle -2,75 USD · Kapital 125,50 USD/USDT · TP nicht prüfbar · ID-Ende aaaaaa · Details anzeigen');
    assert.equal(secondSummary.getAttribute('aria-label'),
-     'BTC · Short · Hebel 5× · P/L laut Quelle -2,75 USD · Kapital 125,50 USD/USDT · ID-Ende bbbbbb · Details anzeigen');
+     'BTC · Short · Hebel 5× · P/L laut Quelle -2,75 USD · Kapital 125,50 USD/USDT · TP nicht prüfbar · ID-Ende bbbbbb · Details anzeigen');
    assert.match(firstSummary.textContent,/BTCShortHebel 5×/);
    assert.match(firstSummary.textContent,/Kapital125,50 USD\/USDT/);
    assert.match(firstSummary.textContent,/P\/L laut Quelle-2,75 USD/);
@@ -450,6 +450,24 @@ test('TP indicators are read-only, unknown evidence stays neutral, and mismatch 
   assert.equal(all(target,'input').filter(node=>node.getAttribute('aria-label')?.startsWith('TP')).length,0);
 });
 
+test('collapsed card summary visibly labels TP mismatch and unknown status',()=>{
+  const input=snapshot('2026-10-12T20:00:00Z');
+  input.bots[0].limits={takeProfit:90,upper:100,takeProfitEvidence:'PRICE_SET'};
+  const target=root(),mismatch=buildBotReadModel(input,{now:Date.parse(input.sourceSnapshotAt)+60000});
+  renderBotReadState(target,{status:'fresh',model:mismatch});
+  const summary=all(target,'summary')[0];
+  assert.match(summary.textContent,/⚠ TP ≠ obere Range/);
+  assert.match(summary.getAttribute('aria-label'),/BTC.*Warnung: TP weicht von oberer Range ab/);
+  assert.ok(all(target,'details')[0].getAttribute('open')===null,'warning is in the collapsed summary');
+
+  input.bots[0].limits={takeProfit:null,upper:100,takeProfitEvidence:'UNKNOWN'};
+  const unknown=buildBotReadModel(input,{now:Date.parse(input.sourceSnapshotAt)+60000});
+  renderBotReadState(target,{status:'fresh',model:unknown});
+  assert.match(all(target,'summary')[0].textContent,/TP nicht prüfbar/);
+  assert.match(all(target,'summary')[0].getAttribute('aria-label'),/TP nicht prüfbar/);
+  assert.doesNotMatch(all(target,'summary')[0].textContent,/TP ≠ obere Range|Kein TP gesetzt/);
+});
+
  test('producer-to-view pipeline preserves typed price evidence and keeps missing evidence neutral',()=>{
    const stamp='2026-10-12T19:59:00Z',now=Date.parse('2026-10-12T20:00:00Z');
    const makeSnapshot=profitStopType=>buildAssetWatchApiSnapshot({
@@ -465,6 +483,7 @@ test('TP indicators are read-only, unknown evidence stays neutral, and mismatch 
    const model=buildBotReadModel(comparable,{now});
    assert.deepEqual(model.bots[0].takeProfitCheck,{set:true,matchesUpper:false,reason:null});
    const target=root();renderBotReadState(target,{status:'fresh',model});
+   assert.match(all(target,'summary')[0].textContent,/⚠ TP ≠ obere Range/);
    assert.match(target.textContent,/TP weicht von oberer Range ab/);
    assert.match(target.textContent,/TP-Wert: 90000 · obere Range: 100000/);
 
@@ -506,8 +525,8 @@ test('TP indicators are read-only, unknown evidence stays neutral, and mismatch 
    renderBotReadState(target,state);
    const names=all(target,'summary').map(summary=>summary.getAttribute('aria-label'));
    assert.deepEqual(names,[
-     'BTC · Short · Hebel 5× · P/L laut Quelle -2,75 USD · Kapital 125,50 USD/USDT · ID-Ende aabcdef · Details anzeigen',
-     'BTC · Short · Hebel 2× · P/L laut Quelle +1,25 USD · Kapital 80,00 USD/USDT · ID-Ende babcdef · Details anzeigen'
+     'BTC · Short · Hebel 5× · P/L laut Quelle -2,75 USD · Kapital 125,50 USD/USDT · TP nicht prüfbar · ID-Ende aabcdef · Details anzeigen',
+     'BTC · Short · Hebel 2× · P/L laut Quelle +1,25 USD · Kapital 80,00 USD/USDT · TP nicht prüfbar · ID-Ende babcdef · Details anzeigen'
    ]);
    assert.ok(names.every(name=>!name.includes('a'.repeat(14))&&!name.includes('b'.repeat(14))));
  });

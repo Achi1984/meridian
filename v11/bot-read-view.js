@@ -108,6 +108,8 @@ function projection(state, filters = {}) {
       const takeProfitSet=knownTakeProfit?true:null;
       const takeProfitMatchesUpper=knownTakeProfit&&knownUpper&&
         (tpCheck?.matchesUpper===true||tpCheck?.matchesUpper===false)?tpCheck.matchesUpper:null;
+      const takeProfitSummary=takeProfitMatchesUpper===false?'⚠ TP ≠ obere Range':
+        takeProfitMatchesUpper===null?'TP nicht prüfbar':null;
       return {symbol:bot.symbol, side:row.direction==='unknown'?'Unbekannt':row.direction[0].toUpperCase()+row.direction.slice(1),
         ref:row.ref,type:ownLabel(TYPES,bot.type),productCategory,
         category:row.category==='coin-m'?'COIN-M':row.category==='linear'?'Linear':'Unbekannt',
@@ -128,6 +130,7 @@ function projection(state, filters = {}) {
         liquidationUpperBound:formatExact(bot.metrics?.liquidationUpperBound),
         takeProfit:formatExact(bot.metrics?.takeProfit),stopLoss:formatExact(bot.metrics?.stopLoss),
         upperRange:formatExact(bot.metrics?.upper),takeProfitSet,takeProfitMatchesUpper,
+        takeProfitSummary,
         takeProfitCheckReason:takeProfitMatchesUpper===null
           ?knownTakeProfit?TP_UPPER_UNKNOWN_REASON:TP_UNKNOWN_REASON:null};
     });
@@ -223,7 +226,9 @@ export function renderBotReadState(root, state, filters = {}) {
         if(region.expanded.has(bot.ref))card.setAttribute('open','');
         summary.setAttribute('aria-label',bot.symbol+' · '+bot.side+' · Hebel '+
           (bot.leverage===MISSING?'—':bot.leverage)+' · P/L laut Quelle '+bot.pnl+' · Kapital '+
-          bot.investment+' · ID-Ende '+referenceTail(bot.ref)+' · Details anzeigen');
+          bot.investment+(bot.takeProfitSummary?' · '+(bot.takeProfitSummary==='⚠ TP ≠ obere Range'
+            ?'Warnung: TP weicht von oberer Range ab':'TP nicht prüfbar'):'')+
+          ' · ID-Ende '+referenceTail(bot.ref)+' · Details anzeigen');
         const top=element(document,'span');top.className='bot-card-top';
         const identity=element(document,'span');identity.className='bot-card-identity';
         const heading=element(document,'span',bot.symbol);heading.className='bot-card-heading';
@@ -243,6 +248,11 @@ export function renderBotReadState(root, state, filters = {}) {
         top.append(identity,pnl);
         const capital=element(document,'span');capital.className='bot-card-capital';
         capital.append(element(document,'span','Kapital'),element(document,'strong',bot.investment));
+        const tpSummary=element(document,'span',bot.takeProfitSummary||'');
+        tpSummary.className='bot-card-tp-status';
+        tpSummary.setAttribute('aria-label',bot.takeProfitSummary==='⚠ TP ≠ obere Range'
+          ?'Warnung: TP weicht von oberer Range ab':'TP nicht prüfbar');
+        if(bot.takeProfitSummary)capital.append(tpSummary);
         const disclosure=element(document,'span','Details');disclosure.className='bot-card-disclosure';
         const chevron=element(document,'span','⌄');chevron.setAttribute('aria-hidden','true');
         disclosure.append(chevron);
