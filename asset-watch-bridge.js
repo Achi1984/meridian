@@ -110,7 +110,10 @@ function candidate({name,risk,status,lastSuccessAt,now,staleMs}){
   if(!risk||typeof risk!=='object')return null;
   const snapshotAt=risk.snapshotAt||risk.updatedAt||lastSuccessAt||null;
   const detailsComplete=risk.detailsComplete===true;
-  const statusOk=['OK','PARTIAL'].includes(String(status||'').toUpperCase());
+  const normalizedStatus=String(status||'').toUpperCase();
+  const statusOk=normalizedStatus==='OK'||(normalizedStatus==='PARTIAL'&&
+    (risk.paginationComplete===false||risk.coverage?.paginationComplete===false||
+      risk.coverage?.status==='PARTIAL'||risk.detailsComplete===false));
   const fresh=freshAt(snapshotAt,now,staleMs);
   const rows=Array.isArray(risk.bots)?risk.bots:[];
   return {

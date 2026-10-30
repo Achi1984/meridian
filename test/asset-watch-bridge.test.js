@@ -225,3 +225,12 @@ test('latest incomplete diagnostic rows remain displayable without replacing the
   assert.equal(x.sourceStatusOk,true);assert.equal(x.usableForDisplay,true);
   assert.equal(x.usableForOverwrite,false);
 });
+
+test('a partial sync cannot relabel its preserved complete snapshot as a current candidate',()=>{
+  const input=state({pionexBotSync:{status:'PARTIAL',truncated:true}});
+  const x=buildAssetWatchApiSnapshot(input,{now:NOW});
+  assert.equal(x.source,'PIONEX_BOT_API');
+  assert.equal(x.sourceStatusOk,false);
+  assert.equal(x.usableForDisplay,false);
+  assert.equal(x.usableForOverwrite,false);
+});
