@@ -37,8 +37,24 @@ export function mountAgentStatus(document,window,{
       throw new Error('Status unavailable');
     }
   }
-  function clear(){cancelExpiry();client?.clear();empty();}
+  function clear(reason='empty'){
+    cancelExpiry();client?.clear(reason);empty(reason==='unavailable');
+  }
+  function acceptSnapshot(serializedDTO){
+    if(disposed)return false;
+    try{
+      if(pageHidden||!access.isUnlocked()){clear('unavailable');return false;}
+      return client.accept(serializedDTO);
+    }catch{
+      clear('unavailable');return false;
+    }
+  }
+  function clearSnapshot(reason='empty'){
+    if(disposed)return;
+    clear(reason);
+  }
   function revalidate(){
+    if(disposed||pageHidden)return;
     if(!access.isUnlocked()){clear();return;}
     client?.revalidate();
   }
@@ -46,7 +62,7 @@ export function mountAgentStatus(document,window,{
   function pageshow(){pageHidden=false;}
   function dispose(){
     if(disposed)return;
-    clear();disposed=true;
+    disposed=true;clear();
     unregister();client?.dispose();
     window.removeEventListener('pagehide',pagehide);
     window.removeEventListener('pageshow',pageshow);
@@ -61,7 +77,7 @@ export function mountAgentStatus(document,window,{
     dispose();empty(true);
     return null;
   }
-  return Object.freeze({dispose});
+  return Object.freeze({acceptSnapshot,clearSnapshot,dispose});
 }
 
 if(typeof document!=='undefined'&&typeof window!=='undefined')mountAgentStatus(document,window);
