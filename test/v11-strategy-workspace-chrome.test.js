@@ -733,7 +733,10 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
           const tableViewport=await evaluate(`(()=>{
             const region=document.querySelector('[id$="-path-table"]');
             region.focus();
-            return {scrollable:region.scrollWidth>region.clientWidth,
+            return {width:innerWidth,clientWidth:region.clientWidth,scrollWidth:region.scrollWidth,
+              scrollable:region.scrollWidth>region.clientWidth,
+              scrollLeft:region.scrollLeft,focused:document.activeElement===region,
+              overflowX:getComputedStyle(region).overflowX,
               column:region.querySelector('th').getBoundingClientRect().width};
           })()`);
           assert.ok(tableViewport.column>=190,'path actions have a legible column at mobile widths');
@@ -753,6 +756,7 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
             })()`);
             assert.equal(focusState.focused,true,'horizontal path region must receive focus before keyboard input');
             await key('ArrowRight','ArrowRight',39);
+<<<<<<< HEAD
             const scrollResult=await evaluate(`new Promise(resolve=>{
               const region=document.querySelector('[id$="-path-table"]');
               const started=performance.now(),timeoutMs=1200;
@@ -775,6 +779,21 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
             assert.equal(scrollResult.scrolled,true,
               'native ArrowRight did not scroll the horizontally scrollable path region before the bounded timeout: '+
                 JSON.stringify({focusState,scrollResult}));
+=======
+            const afterKeyboardScroll=await evaluate(`new Promise(resolve=>{
+              const region=document.querySelector('[id$="-path-table"]');
+              const metrics=()=>({width:innerWidth,clientWidth:region.clientWidth,scrollWidth:region.scrollWidth,
+                scrollLeft:region.scrollLeft,focused:document.activeElement===region,
+                overflowX:getComputedStyle(region).overflowX});
+              const finish=()=>{clearTimeout(timer);region.removeEventListener('scroll',onScroll);resolve(metrics());};
+              const onScroll=()=>{if(region.scrollLeft>0)finish();};
+              const timer=setTimeout(finish,1000);
+              region.addEventListener('scroll',onScroll,{passive:true});
+              if(region.scrollLeft>0)finish();
+            })`);
+            assert.ok(afterKeyboardScroll.scrollLeft>0,
+              JSON.stringify({tableViewport,afterKeyboardScroll}));
+>>>>>>> origin/main
           }
           for(const dimension of ['segmentId','variantId','scenarioId','status']){
             for(const filterValue of new Set(producerCase.result.paths.map(path=>path[dimension]))){
