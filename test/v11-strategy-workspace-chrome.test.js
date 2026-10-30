@@ -723,7 +723,10 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
           const tableViewport=await evaluate(`(()=>{
             const region=document.querySelector('[id$="-path-table"]');
             region.focus();
-            return {scrollable:region.scrollWidth>region.clientWidth,
+            return {width:innerWidth,clientWidth:region.clientWidth,scrollWidth:region.scrollWidth,
+              scrollable:region.scrollWidth>region.clientWidth,
+              scrollLeft:region.scrollLeft,focused:document.activeElement===region,
+              overflowX:getComputedStyle(region).overflowX,
               column:region.querySelector('th').getBoundingClientRect().width};
           })()`);
           assert.ok(tableViewport.column>=190,'path actions have a legible column at mobile widths');
@@ -732,7 +735,16 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
             await key('ArrowRight','ArrowRight',39);
             // Native scroll animation settles before its position is inspected.
             await evaluate(`new Promise(resolve=>setTimeout(resolve,150))`);
-            assert.ok(await evaluate(`document.querySelector('[id$="-path-table"]').scrollLeft>0`));
+            const afterKeyboardScroll=await evaluate(`(()=>{
+              const region=document.querySelector('[id$="-path-table"]');
+              return {width:innerWidth,clientWidth:region.clientWidth,scrollWidth:region.scrollWidth,
+                scrollLeft:region.scrollLeft,focused:document.activeElement===region,
+                overflowX:getComputedStyle(region).overflowX};
+            })()`);
+            if(process.env.V11_SCROLL_DIAGNOSTICS)
+              console.log('V11_PATH_TABLE_SCROLL',JSON.stringify({tableViewport,afterKeyboardScroll}));
+            assert.ok(afterKeyboardScroll.scrollLeft>0,
+              JSON.stringify({tableViewport,afterKeyboardScroll}));
           }
           for(const dimension of ['segmentId','variantId','scenarioId','status']){
             for(const filterValue of new Set(producerCase.result.paths.map(path=>path[dimension]))){
