@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import {OVERWRITE_SCOPES,EXCLUDED_SCOPES,safeOverwriteRejectionReasons} from './asset-watch-scope.js';
+import {OVERWRITE_SCOPES,EXCLUDED_SCOPES,safeOverwriteRejectionReasons,safeScopeDiagnostics} from './asset-watch-scope.js';
 
 const AAD='MERIDIAN-ASSET-WATCH-MIRROR-V1';
 const RECEIPT_SCHEMA='MERIDIAN-ASSET-WATCH-MIRROR-RECEIPT-V1';
@@ -26,6 +26,7 @@ export function assetWatchMirrorPublicReceipt(snapshot){
     overwriteScope:OVERWRITE_SCOPES.includes(snapshot?.overwriteScope)?snapshot.overwriteScope:'NONE',
     excludedScope:EXCLUDED_SCOPES.includes(snapshot?.excludedScope)?snapshot.excludedScope:'UNVERIFIED',
     overwriteRejectionReasons:safeOverwriteRejectionReasons(snapshot?.overwriteRejectionReasons),
+    scopeDiagnostics:safeScopeDiagnostics(snapshot?.scopeDiagnostics),
     source:String(snapshot?.source||'UNAVAILABLE'),
     sourceSnapshotAt:snapshot?.sourceSnapshotAt||null,
     sourceAgeMs:Number.isFinite(Number(snapshot?.sourceAgeMs))?Number(snapshot.sourceAgeMs):null,

@@ -3,7 +3,7 @@ import pg from 'pg';
 import {pionexReadGet} from './pionex-read-client.js';
 import {PIONEX_FUTURES_GRID_DETAIL_PATH,mergePionexOrderDetail} from './pionex-bot-detail-read.js';
 import {inspectPionexBotOrder,normalizePionexBotOrder} from './pionex-bot-auto-sync.js';
-import {WALLET_SCOPE} from './asset-watch-scope.js';
+import {WALLET_SCOPE,safeScopeDiagnostics} from './asset-watch-scope.js';
 
 const {Pool}=pg;
 const PRIVATE_STATE_KEY='private_dashboard_v1';
@@ -107,11 +107,29 @@ function countBy(rows,key){
   }
   return out;
 }
+function recognizedWalletCategory(category){
+  return ['TRADING_BOT','FUTURES_LITE'].includes(String(category?.type||'').toUpperCase());
+}
+function verifiedWalletCategory(category){
+  return recognizedWalletCategory(category)||
+    category?.hasMore===false&&category?.count===0&&Array.isArray(category?.list)&&category.list.length===0;
+}
+function unrecognizedNonemptyCategoryCount(detail){
+  if(!Array.isArray(detail))return null;
+  let count=0;
+  for(const category of detail){
+    if(verifiedWalletCategory(category))continue;
+    if(Array.isArray(category?.list)&&category.list.length>0||
+      Number.isSafeInteger(category?.count)&&category.count>0)count++;
+    else return null;
+  }
+  return count;
+}
 export function normalizeWalletBotEntries(detail=[]){
   const out=[];
   for(const category of Array.isArray(detail)?detail:[]){
     const categoryType=String(category?.type||'').toUpperCase();
-    if(!['TRADING_BOT','FUTURES_LITE'].includes(categoryType))continue;
+    if(!recognizedWalletCategory(category))continue;
     for(const row of Array.isArray(category?.list)?category.list:[]){
       const buOrderId=text(row?.buOrderId);
       out.push({
@@ -129,7 +147,7 @@ export function normalizeWalletBotEntries(detail=[]){
   }
   return out;
 }
-export async function probeWalletBotDetails(entries=[],{apiKey,apiSecret,fetchImpl=fetch,now=Date.now,delayMs=125,maxRows=50,paginationComplete=null,categoriesVerified=null}={}){
+export async function probeWalletBotDetails(entries=[],{apiKey,apiSecret,fetchImpl=fetch,now=Date.now,delayMs=125,maxRows=50,paginationComplete=null,categoriesVerified=null,unrecognizedNonemptyCategoryCount=null}={}){
   const rows=Array.isArray(entries)?entries:[];
   if(rows.length>maxRows)throw new Error('pionex_wallet_bot_probe_row_limit');
   const details=[],failures=[];
@@ -151,6 +169,7 @@ export async function probeWalletBotDetails(entries=[],{apiKey,apiSecret,fetchIm
   return {
     paginationComplete,
     categoriesVerified,
+    unrecognizedNonemptyCategoryCount,
     candidateCount:rows.length,
     successCount:details.length,
     failureCount:failures.length,
@@ -223,6 +242,22 @@ export function buildWalletBotRisk(probe={},iso=new Date().toISOString(),walletP
   const excludedRows=Number.isSafeInteger(typeCounts.futures_lite)?typeCounts.futures_lite:0;
   const exclusionsVerified=probe.categoriesVerified===true&&countsVerified&&Object.keys(typeCounts)
     .every(type=>['futures_grid','futures_lite'].includes(type))&&excludedRows===unsupported;
+  const hasTypeCounts=probe.buOrderTypeCounts!=null&&typeof probe.buOrderTypeCounts==='object'&&
+    !Array.isArray(probe.buOrderTypeCounts);
+  const scopeDiagnostics=safeScopeDiagnostics({
+    categoriesVerified:probe.categoriesVerified,
+    countsVerified:hasTypeCounts&&probe.candidateCount!=null?countsVerified:null,
+    candidateCount:probe.candidateCount,
+    unsupportedCount:Number.isSafeInteger(probe.candidateCount)&&probe.candidateCount>=0&&
+      hasTypeCounts?unsupported:null,
+    unrecognizedNonemptyCategoryCount:probe.unrecognizedNonemptyCategoryCount,
+    typeCounts:hasTypeCounts?{
+      futures_grid:Object.hasOwn(typeCounts,'futures_grid')?typeCounts.futures_grid:0,
+      futures_lite:Object.hasOwn(typeCounts,'futures_lite')?typeCounts.futures_lite:0,
+      OTHER:Object.entries(typeCounts).filter(([type])=>!['futures_grid','futures_lite'].includes(type))
+        .reduce((sum,[,count])=>Number.isSafeInteger(count)&&count>=0?sum+count:NaN,0)
+    }:null
+  });
   return {
     source:'PIONEX_WALLET_BOT_DETAIL',
     syncMode:'WALLET_BOT_DETAIL_FALLBACK',
@@ -232,6 +267,7 @@ export function buildWalletBotRisk(probe={},iso=new Date().toISOString(),walletP
     supportedRows:expected,
     detailRows:detailSuccess,
     unsupportedRows:unsupported,
+    scopeDiagnostics,
     supportedScope:{
       schemaVersion:WALLET_SCOPE,botType:'futures_grid',
       exclusionsVerified,excludedRows,
@@ -286,9 +322,8 @@ export function normalizeWalletOverview(data={}){
     botListCount:botCategories.reduce((n,x)=>n+x.listCount,0),
     botPaginationComplete:Array.isArray(bot.detail)&&bot.detail.every(x=>x?.hasMore===false)&&
       botCategories.every(x=>x.count!==null&&x.count>=0&&x.count===x.listCount),
-    botScopeCategoriesVerified:Array.isArray(bot.detail)&&bot.detail.every(x=>
-      ['TRADING_BOT','FUTURES_LITE'].includes(String(x?.type||'').toUpperCase())||
-      x?.hasMore===false&&x?.count===0&&Array.isArray(x?.list)&&x.list.length===0),
+    botScopeCategoriesVerified:Array.isArray(bot.detail)&&bot.detail.every(verifiedWalletCategory),
+    botUnrecognizedNonemptyCategoryCount:unrecognizedNonemptyCategoryCount(bot.detail),
     traderCategoryCount:traderCategories.length,
     source:'PIONEX_WALLET_READ_API'
   };
@@ -306,7 +341,9 @@ export async function fetchPionexReadSnapshot({apiKey,apiSecret,fetchImpl=fetch,
   const wallet=walletResult.ok?normalizeWalletOverview(walletResult.value?.data||{}):null;
   const walletBotProbe=walletResult.ok?await probeWalletBotDetails(wallet?.botEntries||[],{
     apiKey,apiSecret,fetchImpl,now,paginationComplete:wallet.botPaginationComplete,
-    categoriesVerified:wallet.botScopeCategoriesVerified
+    categoriesVerified:Array.isArray(walletResult.value?.data?.botAccount?.detail)
+      ?wallet.botScopeCategoriesVerified:null,
+    unrecognizedNonemptyCategoryCount:wallet.botUnrecognizedNonemptyCategoryCount
   }):null;
   const spotBalances=normalizeSpotBalances(spot?.data||{});
   const at=new Date(now()).toISOString();

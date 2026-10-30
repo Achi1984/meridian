@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {fetchPionexReadSnapshot,mergePionexAccountState} from '../pionex-account-read-sync.js';
+import {fetchPionexReadSnapshot,mergePionexAccountState,buildWalletBotRisk} from '../pionex-account-read-sync.js';
 import {buildPionexRiskSnapshot,buildPionexBotCoverage,mergePionexSyncState} from '../pionex-bot-auto-sync.js';
 import {buildAssetWatchApiSnapshot} from '../asset-watch-bridge.js';
 import {assetWatchMirrorKeyHashFromShareToken,encryptAssetWatchMirror,
@@ -22,7 +22,7 @@ function primaryRisk(unknown=false){
 }
 
 async function produce({rows=[grid(),lite()],hasMore=false,count=rows.length,
-  missingDetail=false,badDetail=false,extraCategories=[]}={}){
+  missingDetail=false,badDetail=false,extraCategories=[],missingCategories=false}={}){
   const snapshot=await fetchPionexReadSnapshot({
     apiKey:'synthetic-key',apiSecret:'synthetic-secret',now:()=>Date.parse(AT),
     fetchImpl:async(raw,options)=>{
@@ -30,7 +30,8 @@ async function produce({rows=[grid(),lite()],hasMore=false,count=rows.length,
       const url=new URL(raw);
       let data={};
       if(url.pathname==='/api/v1/wallet/balancesFull'){
-        data={botAccount:{detail:[{type:'TRADING_BOT',count,hasMore,list:rows},...extraCategories]}};
+        data={botAccount:{detail:missingCategories?undefined:
+          [{type:'TRADING_BOT',count,hasMore,list:rows},...extraCategories]}};
       }else if(url.pathname==='/api/v1/bot/orders/futuresGrid/order'){
         if(missingDetail&&url.searchParams.get('buOrderId')===rows[0].buOrderId)
           return Response.json({result:false,code:'SYNTHETIC_DETAIL_MISSING'});
@@ -46,7 +47,8 @@ async function produce({rows=[grid(),lite()],hasMore=false,count=rows.length,
 }
 function chain(state,options={}){
   const before=structuredClone(state);
-  const snapshot=buildAssetWatchApiSnapshot(state,{now:NOW,preferOverwrite:true,...options});
+  const persisted=JSON.parse(JSON.stringify(state));
+  const snapshot=buildAssetWatchApiSnapshot(persisted,{now:NOW,preferOverwrite:true,...options});
   const envelope=encryptAssetWatchMirror(snapshot,assetWatchMirrorKeyHashFromShareToken(TOKEN),
     {now:new Date(NOW).toISOString()});
   assert.deepEqual(decryptAssetWatchMirror(envelope,TOKEN),snapshot);
@@ -82,7 +84,7 @@ test('actual mixed wallet producer authorizes only complete grids through the en
   assert.equal(model.coverage.status,'PARTIAL');assert.equal(model.coverage.unsupportedRows,1);
   assert.equal(model.bots.length,1);
   const publicDiagnostic=JSON.stringify(envelope.receipt);
-  assert.doesNotMatch(publicDiagnostic,/synthetic-private|BTC|USDT|Rows|Count|ciphertext|synthetic-key|synthetic-secret/);
+  assert.doesNotMatch(publicDiagnostic,/synthetic-private|BTC|USDT|ciphertext|synthetic-key|synthetic-secret/);
   const unscoped=structuredClone(envelope);delete unscoped.receipt.overwriteScope;
   assert.equal(validateAssetWatchMirrorEnvelope(unscoped,{nowMs:NOW}).reason,'wallet_scope_invalid');
 });
@@ -211,4 +213,151 @@ test('public reason diagnostics discard arbitrary caller data and remain bounded
   assert.equal(diagnostic.overwriteScope,null);assert.equal(diagnostic.excludedScope,null);
   assert.doesNotMatch(JSON.stringify(diagnostic),/PRIVATE_MARKER|123|bots|ciphertext|unsupportedRows/);
   assert.ok(JSON.stringify(diagnostic).length<1024);
+});
+
+const VALID_SCOPE_DIAGNOSTICS={
+  scopePresent:true,schemaOk:true,botTypeOk:true,exclusionsVerified:true,
+  excludedRowsEqualsUnsupported:true,categoriesVerified:true,countsVerified:true,
+  candidateCount:2,unsupportedCount:1,unrecognizedNonemptyCategoryCount:0,
+  typeCounts:{futures_grid:1,futures_lite:1,OTHER:0}
+};
+function scopeSummary(state,expectedEligible){
+  const result=chain(state);
+  assert.equal(result.snapshot.usableForOverwrite,expectedEligible);
+  assert.equal(result.validation.ok,expectedEligible);
+  const raw=assetWatchStrictGateDiagnostics(result.envelope,null);
+  const diagnostic=JSON.parse(raw).scopeDiagnostics;
+  assert.deepEqual(diagnostic,result.snapshot.scopeDiagnostics);
+  assert.deepEqual(Object.keys(diagnostic).sort(),Object.keys(VALID_SCOPE_DIAGNOSTICS).sort());
+  assert.deepEqual(Object.keys(diagnostic.typeCounts),['futures_grid','futures_lite','OTHER']);
+  assert.doesNotMatch(raw,/synthetic-private|BTC|USDT|synthetic-key|synthetic-secret|PRIVATE_CANARY|https:|123456789/);
+  assert.ok(raw.length<1536,'normal postdeploy failure summary remains bounded');
+  const withoutDiagnostics=structuredClone(state);
+  delete withoutDiagnostics.pionexAccount.walletBotRisk.scopeDiagnostics;
+  const old=chain(withoutDiagnostics);
+  const {scopeDiagnostics:currentDiag,...currentSnapshot}=result.snapshot;
+  const {scopeDiagnostics:oldDiag,...oldSnapshot}=old.snapshot;
+  assert.deepEqual(currentSnapshot,oldSnapshot,'diagnostic metadata cannot affect selection or eligibility');
+  const oldEnvelope=structuredClone(result.envelope);
+  delete oldEnvelope.receipt.scopeDiagnostics;
+  assert.deepEqual(validateAssetWatchMirrorEnvelope(oldEnvelope,{nowMs:NOW}),result.validation,
+    'receipt diagnostics cannot affect strict acceptance');
+  return diagnostic;
+}
+
+test('bounded scope summary survives actual producer, JSON persistence, bridge and public receipt',async()=>{
+  assert.deepEqual(scopeSummary(await produce(),true),VALID_SCOPE_DIAGNOSTICS);
+});
+
+test('missing scope is distinct from missing producer diagnostic evidence',async()=>{
+  const state=await produce();
+  delete state.pionexAccount.walletBotRisk.supportedScope;
+  assert.deepEqual(scopeSummary(state,false),{
+    ...VALID_SCOPE_DIAGNOSTICS,scopePresent:false,schemaOk:null,botTypeOk:null,
+    exclusionsVerified:null,excludedRowsEqualsUnsupported:null
+  });
+  delete state.pionexAccount.walletBotRisk.scopeDiagnostics;
+  assert.deepEqual(scopeSummary(state,false),{
+    scopePresent:false,schemaOk:null,botTypeOk:null,exclusionsVerified:null,
+    excludedRowsEqualsUnsupported:null,categoriesVerified:null,countsVerified:null,
+    candidateCount:null,unsupportedCount:null,unrecognizedNonemptyCategoryCount:null,
+    typeCounts:{futures_grid:null,futures_lite:null,OTHER:null}
+  });
+  const empty=buildWalletBotRisk();
+  assert.equal(empty.scopeDiagnostics.categoriesVerified,null);
+  assert.equal(empty.scopeDiagnostics.countsVerified,null);
+  assert.equal(empty.scopeDiagnostics.candidateCount,null);
+  assert.equal(empty.scopeDiagnostics.unsupportedCount,null);
+  assert.deepEqual(empty.scopeDiagnostics.typeCounts,{futures_grid:null,futures_lite:null,OTHER:null});
+  const absentCategories=await produce({missingCategories:true});
+  const diagnostic=scopeSummary(absentCategories,false);
+  assert.equal(diagnostic.categoriesVerified,null);
+  assert.equal(diagnostic.unrecognizedNonemptyCategoryCount,null);
+  assert.equal(absentCategories.pionexAccount.walletBotRisk.supportedScope.exclusionsVerified,false);
+});
+
+test('unknown products are aggregated into OTHER without exposing private type strings',async()=>{
+  for(const buOrderType of ['PRIVATE_CANARY_PRODUCT',null]){
+    const state=await produce({rows:[grid(),{...lite(),buOrderType}]});
+    assert.deepEqual(scopeSummary(state,false),{
+      ...VALID_SCOPE_DIAGNOSTICS,exclusionsVerified:false,excludedRowsEqualsUnsupported:false,
+      typeCounts:{futures_grid:1,futures_lite:0,OTHER:1}
+    });
+  }
+});
+
+test('nonempty unrecognized categories are distinguished without exposing category payloads',async()=>{
+  const state=await produce({extraCategories:[{
+    type:'PRIVATE_CANARY_CATEGORY',title:'PRIVATE_CANARY_TITLE',count:1,hasMore:false,
+    totalInUsdt:123456789,list:[{...grid('PRIVATE_CANARY_ID'),symbol:'PRIVATE_CANARY_SYMBOL',
+      amount:123456789,url:'https://PRIVATE_CANARY.invalid',credential:'PRIVATE_CANARY_CREDENTIAL'}]
+  }]});
+  assert.deepEqual(scopeSummary(state,false),{
+    ...VALID_SCOPE_DIAGNOSTICS,exclusionsVerified:false,categoriesVerified:false,
+    unrecognizedNonemptyCategoryCount:1
+  });
+});
+
+test('unverified category shape remains unknown rather than claiming no unrecognized nonempty categories',async()=>{
+  const empty=await produce({extraCategories:[{
+    type:'PRIVATE_CANARY_EMPTY',count:0,hasMore:false,list:[]
+  }]});
+  assert.deepEqual(scopeSummary(empty,true),VALID_SCOPE_DIAGNOSTICS);
+  for(const category of [
+    {type:'PRIVATE_CANARY_MISSING',hasMore:false},
+    {type:'PRIVATE_CANARY_NULL',count:null,hasMore:false,list:[]},
+    {type:'PRIVATE_CANARY_MORE',count:0,hasMore:true,list:[]}
+  ]){
+    const state=await produce({extraCategories:[category]});
+    assert.deepEqual(scopeSummary(state,false),{
+      ...VALID_SCOPE_DIAGNOSTICS,exclusionsVerified:false,categoriesVerified:false,
+      unrecognizedNonemptyCategoryCount:null
+    });
+  }
+});
+
+test('count mismatches use actual producer and bridge verification predicates',async()=>{
+  const state=await produce(),account=state.pionexAccount;
+  account.walletBotProbe.buOrderTypeCounts.futures_lite=0;
+  account.walletBotRisk=buildWalletBotRisk(account.walletBotProbe,AT);
+  assert.deepEqual(scopeSummary(state,false),{
+    ...VALID_SCOPE_DIAGNOSTICS,exclusionsVerified:false,excludedRowsEqualsUnsupported:false,
+    countsVerified:false,typeCounts:{futures_grid:1,futures_lite:0,OTHER:0}
+  });
+  const mismatch=await produce();
+  mismatch.pionexAccount.walletBotRisk.supportedScope.excludedRows=0;
+  assert.deepEqual(scopeSummary(mismatch,false),{
+    ...VALID_SCOPE_DIAGNOSTICS,excludedRowsEqualsUnsupported:false
+  });
+  account.walletBotProbe.buOrderTypeCounts.futures_lite=null;
+  account.walletBotRisk=buildWalletBotRisk(account.walletBotProbe,AT);
+  assert.deepEqual(scopeSummary(state,false),{
+    ...VALID_SCOPE_DIAGNOSTICS,exclusionsVerified:false,excludedRowsEqualsUnsupported:false,
+    countsVerified:false,typeCounts:{futures_grid:1,futures_lite:null,OTHER:0}
+  });
+});
+
+test('invalid schema, bot type and missing boolean evidence do not change strict scope gates',async()=>{
+  for(const [field,value,expected] of [
+    ['schemaVersion','PRIVATE_CANARY_SCHEMA',{schemaOk:false}],
+    ['botType','PRIVATE_CANARY_TYPE',{botTypeOk:false}],
+    ['exclusionsVerified',undefined,{exclusionsVerified:null}],
+    ['exclusionsVerified','PRIVATE_CANARY_BOOLEAN',{exclusionsVerified:null}],
+    ['excludedRows',undefined,{excludedRowsEqualsUnsupported:null}]
+  ]){
+    const state=await produce();state.pionexAccount.walletBotRisk.supportedScope[field]=value;
+    assert.deepEqual(scopeSummary(state,false),{...VALID_SCOPE_DIAGNOSTICS,...expected});
+  }
+});
+
+test('fabricated diagnostic flags cannot authorize an absent wallet scope',async()=>{
+  const state=await produce();
+  delete state.pionexAccount.walletBotRisk.supportedScope;
+  state.pionexAccount.walletBotRisk.scopeDiagnostics=structuredClone(VALID_SCOPE_DIAGNOSTICS);
+  const diagnostic=scopeSummary(state,false);
+  assert.equal(diagnostic.scopePresent,false);
+  assert.equal(diagnostic.schemaOk,null);
+  assert.equal(diagnostic.botTypeOk,null);
+  assert.equal(diagnostic.exclusionsVerified,null);
+  assert.equal(diagnostic.excludedRowsEqualsUnsupported,null);
 });
