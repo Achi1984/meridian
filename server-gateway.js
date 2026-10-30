@@ -508,7 +508,7 @@ const server=http.createServer(async(req,res)=>{
       if(!data)return writeJson(res,503,{error:"private_dashboard_unavailable"},origin||"");
       const shareState=await stateGet(ASSET_WATCH_SHARE_STATE_KEY);
       if(!assetWatchShareEnabled(shareState))return writeJson(res,503,{error:"asset_watch_share_not_configured"},origin||"");
-      const snapshot=buildAssetWatchApiSnapshot(data);
+      const snapshot=buildAssetWatchApiSnapshot(data,{preferOverwrite:true});
       const envelope=encryptAssetWatchMirror(snapshot,shareState.tokenHash);
       return writeJson(res,200,envelope,origin||"");
     }

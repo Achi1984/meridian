@@ -71,8 +71,27 @@ test('each strict receipt flag still fails the real smoke and emits only safe bo
   }
 });
 
-test('only the public strict live mirror opts into overwrite-qualified selection',()=>{
+test('both authoritative encrypted mirrors opt in while both private display routes remain display-first',()=>{
   const source=fs.readFileSync(new URL('../server-gateway.js',import.meta.url),'utf8');
-  assert.match(source,/u\.pathname==="\/api\/asset-watch\/live-mirror"[\s\S]*?buildAssetWatchApiSnapshot\(data,\{preferOverwrite:true\}\)/);
-  assert.equal((source.match(/preferOverwrite:true/g)||[]).length,1);
+  const live=source.slice(source.indexOf('if(req.method==="GET"&&u.pathname==="/api/asset-watch/live-mirror")'),
+    source.indexOf('if(req.method==="GET"&&u.pathname==="/api/private/asset-watch/github-oidc-mirror")'));
+  const oidc=source.slice(source.indexOf('if(req.method==="GET"&&u.pathname==="/api/private/asset-watch/github-oidc-mirror")'),
+    source.indexOf('if(isProtected(u.pathname)&&!authorizedRead(req))'));
+  for(const route of [live,oidc]){
+    assert.match(route,/buildAssetWatchApiSnapshot\(data,\{preferOverwrite:true\}\)/);
+    assert.match(route,/encryptAssetWatchMirror\(snapshot,shareState\.tokenHash\)/);
+  }
+  assert.match(oidc,/const verified=await verifyGithubActionsOidc\(bearer\(req\)\);/);
+  assert.match(oidc,/if\(!verified\.ok\)return writeJson\(res,401,/);
+  for(const condition of [
+    'if(req.method==="GET"&&u.pathname==="/api/private/asset-watch"&&await authorizedAssetWatchShare(u))',
+    'if(req.method==="GET"&&u.pathname==="/api/private/asset-watch")'
+  ]){
+    const start=source.indexOf(condition);
+    assert.notEqual(start,-1);
+    const route=source.slice(start,source.indexOf('\n    }',start));
+    assert.match(route,/writeJson\(res,200,buildAssetWatchApiSnapshot\(data\),origin\|\|""\)/);
+    assert.doesNotMatch(route,/preferOverwrite/);
+  }
+  assert.equal((source.match(/preferOverwrite:true/g)||[]).length,2);
 });
