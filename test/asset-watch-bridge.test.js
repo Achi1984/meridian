@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {buildAssetWatchApiSnapshot} from '../asset-watch-bridge.js';
+import {mergePionexSyncState} from '../pionex-bot-auto-sync.js';
 
 const NOW=Date.parse('2026-09-28T20:45:00.000Z');
 function bot(overrides={}){
@@ -230,7 +231,39 @@ test('a partial sync cannot relabel its preserved complete snapshot as a current
   const input=state({pionexBotSync:{status:'PARTIAL',truncated:true}});
   const x=buildAssetWatchApiSnapshot(input,{now:NOW});
   assert.equal(x.source,'PIONEX_BOT_API');
-  assert.equal(x.sourceStatusOk,false);
-  assert.equal(x.usableForDisplay,false);
+  assert.equal(x.coverage.status,'PARTIAL');
+  assert.equal(x.sourceStatusOk,true);
+  assert.equal(x.usableForDisplay,true);
   assert.equal(x.usableForOverwrite,false);
+});
+
+test('merge-to-bridge preserves every independent incomplete signal as display-only coverage',()=>{
+  const cases=[
+    {name:'top-level pagination false',riskFlags:{paginationComplete:false},
+      coverage:{status:'DOCUMENTED',paginationComplete:true}},
+    {name:'nested pagination false',riskFlags:{paginationComplete:true},
+      coverage:{status:'DOCUMENTED',paginationComplete:false}},
+    {name:'raw partial status',riskFlags:{paginationComplete:true},
+      coverage:{status:'PARTIAL',paginationComplete:true}},
+    {name:'truncated-only sync argument',riskFlags:{paginationComplete:true},
+      coverage:{status:'DOCUMENTED',paginationComplete:true},truncated:true}
+  ];
+  for(const [index,entry] of cases.entries()){
+    const complete={snapshotAt:'2026-09-28T20:40:00.000Z',updatedAt:'2026-09-28T20:40:00.000Z',
+      detailsComplete:true,paginationComplete:true,coverage:{status:'DOCUMENTED',paginationComplete:true},
+      bots:[bot({botOrderId:`synthetic-complete-${index}`,symbol:'ADA'})],botCount:1};
+    const partial={...complete,snapshotAt:'2026-09-28T20:44:00.000Z',updatedAt:'2026-09-28T20:44:00.000Z',
+      ...entry.riskFlags,coverage:{...entry.coverage},bots:[bot({botOrderId:`synthetic-partial-${index}`,symbol:'BTC'})]};
+    const merged=mergePionexSyncState({
+      pionexRisk:complete,pionexBotSync:{status:'OK',lastSuccessAt:complete.updatedAt}
+    },{risk:partial,status:'OK',attemptAt:partial.updatedAt,successAt:partial.updatedAt,
+      configured:true,pages:20,truncated:entry.truncated||false});
+    const x=buildAssetWatchApiSnapshot(merged,{now:NOW});
+    assert.deepEqual(merged.pionexRisk.bots,complete.bots,entry.name+' preserves complete rows');
+    assert.equal(merged.pionexBotSync.lastSuccessAt,complete.updatedAt,entry.name+' preserves last success');
+    assert.equal(x.coverage.status,'PARTIAL',entry.name+' remains partial');
+    assert.equal(x.usableForDisplay,true,entry.name+' remains displayable');
+    assert.equal(x.usableForOverwrite,false,entry.name+' cannot overwrite');
+    if(entry.name!=='raw partial status')assert.equal(x.coverage.paginationComplete,false,entry.name);
+  }
 });

@@ -306,10 +306,10 @@ function configured(env){
 
 export function mergePionexSyncState(current,{risk=null,status,error=null,attemptAt,successAt=null,configured:cfg=false,pages=0,truncated=false,diagnostics=null}={}){
   const base=clone(current)||{},prevRisk=base.pionexRisk||{},prevSync=base.pionexBotSync||{};
-  const paginationIncomplete=truncated||risk?.paginationComplete===false||
+  const paginationIncomplete=truncated===true||risk?.paginationComplete===false||
     risk?.coverage?.paginationComplete===false;
   const incompleteRisk=!!risk&&(paginationIncomplete||risk.detailsComplete===false||
-    risk.coverage?.status==='PARTIAL');
+    String(risk.coverage?.status||'').toUpperCase()==='PARTIAL');
   if(incompleteRisk)base.pionexRiskPartial=clone(risk);
   else if(risk){
     base.pionexRisk={...prevRisk,...risk};
@@ -353,20 +353,25 @@ async function updatePrivateState(env,mutate){
   finally{client.release()}
 }
 
-export async function runPionexBotSyncOnce({env=process.env,fetchImpl=fetch,now=Date.now}={}){
+export async function runPionexBotSyncOnce({
+  env=process.env,fetchImpl=fetch,now=Date.now,updateState=updatePrivateState,
+  maxPages=PIONEX_BOT_LIST_PAGE_LIMIT,listDelayMs=125,detailDelayMs=125
+}={}){
   if(running)return {ok:false,reason:'already_running'};running=true;
   const at=new Date(now()).toISOString(),creds=configured(env);
   try{
     if(!env.DATABASE_URL)return {ok:false,reason:'no_database'};
     if(!creds.ok){
-      await updatePrivateState(env,current=>mergePionexSyncState(current,{status:'DISABLED_MISSING_CREDENTIALS',attemptAt:at,configured:false}));
+      await updateState(env,current=>mergePionexSyncState(current,{status:'DISABLED_MISSING_CREDENTIALS',attemptAt:at,configured:false}));
       return {ok:false,reason:'missing_credentials'};
     }
-    const {orders,pages,pageLimit,truncated,paginationComplete}=await fetchRunningBotOrders({apiKey:creds.apiKey,apiSecret:creds.apiSecret,fetchImpl,now});
+    const {orders,pages,pageLimit,truncated,paginationComplete}=await fetchRunningBotOrders({
+      apiKey:creds.apiKey,apiSecret:creds.apiSecret,fetchImpl,now,maxPages,delayMs:listDelayMs
+    });
     const diagnostics={...summarizePionexBotList(orders),pages,pageLimit,paginationComplete};
     const hydrated=await hydratePionexBotSummaries(orders,{
       loadDetail:buOrderId=>fetchFuturesGridOrderDetail({buOrderId,apiKey:creds.apiKey,apiSecret:creds.apiSecret,fetchImpl,now}),
-      validateDetail:row=>normalizePionexBotOrder(row)!=null
+      validateDetail:row=>normalizePionexBotOrder(row)!=null,delayMs:detailDelayMs
     });
     const risk={
       ...buildPionexRiskSnapshot(hydrated.orders,at),
@@ -380,7 +385,7 @@ export async function runPionexBotSyncOnce({env=process.env,fetchImpl=fetch,now=
     };
     const incomplete=!risk.detailsComplete||!risk.paginationComplete||risk.coverage.status==='PARTIAL';
     let applied=false,guarded=false;
-    await updatePrivateState(env,current=>{
+    await updateState(env,current=>{
       const previousCount=Array.isArray(current?.pionexRisk?.bots)?current.pionexRisk.bots.length:0;
       if(incomplete){
         applied=true;
@@ -400,7 +405,7 @@ export async function runPionexBotSyncOnce({env=process.env,fetchImpl=fetch,now=
       detailsComplete:risk.detailsComplete,pages,truncated,paginationComplete,coverage:risk.coverage,diagnostics};
   }catch(e){
     const msg=String(e?.message||e);
-    try{if(env.DATABASE_URL)await updatePrivateState(env,current=>mergePionexSyncState(current,{status:'ERROR',error:msg,attemptAt:at,configured:creds.ok}))}catch{}
+    try{if(env.DATABASE_URL)await updateState(env,current=>mergePionexSyncState(current,{status:'ERROR',error:msg,attemptAt:at,configured:creds.ok}))}catch{}
     return {ok:false,reason:msg};
   }finally{running=false}
 }

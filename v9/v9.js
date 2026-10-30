@@ -1,6 +1,7 @@
 import {createMarketRefreshController} from './market-refresh-state.mjs?v=10.0-r130';
 import {canonicalPortfolioSnapshot,latestPortfolioHistorySnapshot,authoritativePionexEquitySnapshot,sourceTimestampAge,holdingUsd} from '../portfolio-data-contract.js?v=10.0-r130';
 import {buildLivePriceOverlay,clearStaleLivePrices} from '../v8-clean/live-price-core-r18.js?v=10.0-r130';
+import {selectPionexRisk,pionexFeedComplete,pionexCandidateValid,publishPionexSnapshot} from './pionex-risk-snapshot.js?v=10.0-r130';
 // Legacy-route kill switch: cached /v9/ shells must migrate to v10.
 if(!window.MERIDIAN_V10){
   const qs=new URLSearchParams(location.search);
@@ -660,14 +661,6 @@ function notifyData(){
  if(window.MERIDIAN_V10)window.dispatchEvent(new CustomEvent('meridian:data'));
  else go(current)
 }
-function selectPionexRisk(d={}){
- const primary=d?.pionexRisk||null,wallet=d?.pionexAccount?.walletBotRisk||null,primaryStatus=String(d?.pionexBotSync?.status||'UNKNOWN'),accountStatus=String(d?.pionexAccountSync?.status||'UNKNOWN'),freshRisk=x=>{const ts=parseTs(x?.updatedAt||x?.snapshotAt);return ts!=null&&ts<=Date.now()+5*60*1000&&Date.now()-ts<=15*60*1000};
- const primaryOk=primaryStatus==='OK'&&d?.pionexBotSync?.truncated!==true&&primary?.paginationComplete!==false&&primary?.coverage?.status!=='PARTIAL'&&freshRisk(primary)&&Array.isArray(primary?.bots)&&primary.bots.length>0&&primary?.detailsComplete===true;
- const walletOk=accountStatus==='OK'&&wallet?.paginationComplete!==false&&wallet?.coverage?.status!=='PARTIAL'&&freshRisk(wallet)&&wallet?.detailsComplete===true&&Array.isArray(wallet?.bots)&&wallet.bots.length>0;
- if(primaryOk)return{risk:primary,status:'BOT_API_OK',kind:'BOT_API'};
- if(walletOk)return{risk:wallet,status:'WALLET_DETAIL_OK',kind:'WALLET_DETAIL'};
- return{risk:primary,status:primaryStatus,kind:'BOT_API'};
-}
 let syncBusy=false;
 async function sync(){
  if(syncBusy)return false;
@@ -702,8 +695,8 @@ async function sync(){
     matchedRows=candidateBots.filter(liveMatched),
     actionComplete=matchedRows.length===live.length&&matchedRows.length>0&&matchedRows.every(b=>b._livePnl===true&&b._liveLiq===true),
     identityComplete=apiNative||(candidateUnmatched.length===0&&candidateAmbiguous===0),
-    feedComplete=feed?.detailsComplete===true&&feed?.paginationComplete!==false&&feed?.coverage?.status!=='PARTIAL'&&['BOT_API_OK','WALLET_DETAIL_OK'].includes(selected.status),
-    candidateValid=trustedTs&&monotonicTs&&live.length>0&&actionComplete&&identityComplete&&feedComplete;
+    feedComplete=pionexFeedComplete(feed,selected.status),
+    candidateValid=pionexCandidateValid({trustedTs,monotonicTs,liveLength:live.length,actionComplete,identityComplete,feed,selectedStatus:selected.status});
 
   state.pionexBotSync=d?.pionexBotSync||null;
   state.pionexAccountSync=d?.pionexAccountSync||null;
@@ -733,8 +726,7 @@ async function sync(){
       botFeedSource:String(feed?.source||'PRIVATE_PIONEX_SNAPSHOT'),
       source
      };
-   Object.assign(state,snapshot);
-   state.lastGoodBotSnapshot={...snapshot,bots:candidateBots.map(b=>({...b})),publishedAt:now};
+   publishPionexSnapshot(state,snapshot,now,candidateValid);
    state.botRefreshStatus='OK';state.botRefreshCompletedAt=now;state.botRefreshError=null;
   }else{
    const reasons=[];

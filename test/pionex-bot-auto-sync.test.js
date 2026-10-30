@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import {
   canonicalQuery,signPionexGet,inspectPionexBotOrder,normalizePionexBotOrder,
   buildPionexRiskSnapshot,mergePionexSyncState,fetchFuturesGridOrderDetail,
-  fetchRunningBotOrders,summarizePionexBotList,buildPionexBotCoverage
+  fetchRunningBotOrders,summarizePionexBotList,buildPionexBotCoverage,runPionexBotSyncOnce
 } from '../pionex-bot-auto-sync.js';
 
 test('Pionex GET signing is canonical and deterministic',()=>{
@@ -427,6 +427,52 @@ test('incomplete refresh preserves the authoritative snapshot and clears only af
   assert.equal(recovered.pionexBotSync.status,'OK');
   assert.equal(recovered.pionexBotSync.truncated,false);
   assert.equal(recovered.pionexBotSync.lastSuccessAt,refreshed.updatedAt);
+});
+
+test('sync orchestration persists partial pages separately and accepts the next complete refresh',async()=>{
+  const at=Date.parse('2026-09-26T18:00:00.000Z');
+  const env={DATABASE_URL:'synthetic://state',PIONEX_BOT_READ_API_KEY:'synthetic-key',PIONEX_BOT_READ_API_SECRET:'synthetic-secret'};
+  const listFor=ids=>ids.map(id=>({buOrderType:'futures_grid',buOrderId:id,base:'BTC.PERP',status:'running',
+    buOrderData:{status:'running',trend:'long',leverage:2,bottom:'1',top:'2'}}));
+  const details=new Map();
+  const fetchImpl=async raw=>{
+    const url=new URL(raw);
+    if(url.pathname==='/api/v1/bot/orders/futuresGrid/order'){
+      const id=url.searchParams.get('buOrderId');
+      return{ok:true,status:200,text:async()=>JSON.stringify({result:true,data:details.get(id)})};
+    }
+    return{ok:true,status:200,text:async()=>JSON.stringify({result:true,data:{
+      results:details.get('list')||[],nextPageToken:details.get('next')||null
+    }})};
+  };
+  let state={privateRevision:1};
+  const updateState=async(_env,mutate)=>{state=mutate(state);return true};
+  const run=()=>runPionexBotSyncOnce({env,fetchImpl,now:()=>at,updateState,maxPages:1,listDelayMs:0,detailDelayMs:0});
+  const setRows=(ids,next=null)=>{
+    details.set('list',listFor(ids));details.set('next',next);
+    for(const id of ids)details.set(id,{status:'running',trend:'long',leverage:2,bottom:'1',top:'2'});
+  };
+
+  setRows(['synthetic-a','synthetic-b']);
+  const first=await run();
+  assert.equal(first.status,'OK');assert.equal(state.pionexRisk.bots.length,2);
+  const authoritative=structuredClone(state.pionexRisk);
+  const lastSuccessAt=state.pionexBotSync.lastSuccessAt;
+
+  setRows(['synthetic-page-only'],'synthetic-next-page');
+  const partial=await run();
+  assert.equal(partial.status,'PARTIAL');assert.equal(partial.ok,false);
+  assert.deepEqual(state.pionexRisk,authoritative);
+  assert.equal(state.pionexBotSync.lastSuccessAt,lastSuccessAt);
+  assert.equal(state.pionexBotSync.truncated,true);
+  assert.deepEqual(state.pionexRiskPartial.bots.map(row=>row.botOrderId),['synthetic-page-only']);
+
+  setRows(['synthetic-a','synthetic-b','synthetic-c']);
+  const recovered=await run();
+  assert.equal(recovered.status,'OK');assert.equal(recovered.ok,true);
+  assert.deepEqual(state.pionexRisk.bots.map(row=>row.botOrderId),['synthetic-a','synthetic-b','synthetic-c']);
+  assert.equal(Object.hasOwn(state,'pionexRiskPartial'),false);
+  assert.equal(state.pionexBotSync.truncated,false);
 });
 
 test('futures-grid details are loaded with the signed read-only detail endpoint',async()=>{

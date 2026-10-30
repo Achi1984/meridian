@@ -83,8 +83,10 @@ function sanitizedBot(bot={}){
     source:text(bot.source)
   };
 }
-function coverageFor(risk={}){
+function coverageFor(risk={}, {truncated=false,status=null}={}){
   const raw=risk?.coverage&&typeof risk.coverage==='object'?risk.coverage:{};
+  const rawStatus=String(raw.status||'').toUpperCase();
+  const syncStatus=String(status||'').toUpperCase();
   const count=value=>Number.isSafeInteger(value)&&value>=0?value:null;
   const listRows=count(raw.listRows)??count(risk.apiRows);
   const recognizedRows=count(raw.recognizedRows)??count(risk.supportedRows);
@@ -93,10 +95,12 @@ function coverageFor(risk={}){
   const unhydratedRows=count(raw.unhydratedRows)??(
     count(risk.supportedRows)!==null&&representedRows!==null
       ?Math.max(0,risk.supportedRows-representedRows):count(risk.rejectedCount));
-  const paginationComplete=raw.paginationComplete===false?false:
-    raw.paginationComplete===true?true:null;
+  const paginationComplete=truncated===true||risk.paginationComplete===false||
+    raw.paginationComplete===false?false:
+      risk.paginationComplete===true||raw.paginationComplete===true?true:null;
   const pages=count(raw.pages),pageLimit=count(raw.pageLimit);
-  const partial=unsupportedRows>0||unhydratedRows>0||paginationComplete===false;
+  const partial=unsupportedRows>0||unhydratedRows>0||paginationComplete===false||
+    rawStatus==='PARTIAL'||syncStatus==='PARTIAL'||risk.detailsComplete===false;
   return {
     status:partial?'PARTIAL':raw.status==='DOCUMENTED'?'DOCUMENTED':
       raw.status==='UNVERIFIED'?'UNVERIFIED':'UNKNOWN',
@@ -106,14 +110,17 @@ function coverageFor(risk={}){
     paginationComplete,pages,pageLimit
   };
 }
-function candidate({name,risk,status,lastSuccessAt,now,staleMs}){
+function candidate({name,risk,status,lastSuccessAt,truncated=false,now,staleMs}){
   if(!risk||typeof risk!=='object')return null;
   const snapshotAt=risk.snapshotAt||risk.updatedAt||lastSuccessAt||null;
   const detailsComplete=risk.detailsComplete===true;
   const normalizedStatus=String(status||'').toUpperCase();
-  const statusOk=normalizedStatus==='OK'||(normalizedStatus==='PARTIAL'&&
-    (risk.paginationComplete===false||risk.coverage?.paginationComplete===false||
-      risk.coverage?.status==='PARTIAL'||risk.detailsComplete===false));
+  const coverage=coverageFor(risk,{truncated,status});
+  const incomplete=truncated===true||risk.paginationComplete===false||
+    risk.coverage?.paginationComplete===false||
+    String(risk.coverage?.status||'').toUpperCase()==='PARTIAL'||
+    normalizedStatus==='PARTIAL'||risk.detailsComplete===false;
+  const statusOk=normalizedStatus==='OK'||(normalizedStatus==='PARTIAL'&&incomplete);
   const fresh=freshAt(snapshotAt,now,staleMs);
   const rows=Array.isArray(risk.bots)?risk.bots:[];
   return {
@@ -121,9 +128,10 @@ function candidate({name,risk,status,lastSuccessAt,now,staleMs}){
     risk,
     snapshotAt,
     detailsComplete,
-    coverage:coverageFor(risk),
+    coverage,
     statusOk,
     fresh,
+    incomplete,
     rows,
     usable:statusOk&&detailsComplete&&fresh
   };
@@ -133,6 +141,7 @@ function pickSource(data,now,staleMs){
     name:'PIONEX_BOT_API',
     risk:data?.pionexRiskPartial||data?.pionexRisk,
     status:data?.pionexBotSync?.status,
+    truncated:data?.pionexBotSync?.truncated===true,
     lastSuccessAt:data?.pionexBotSync?.lastSuccessAt,
     now,staleMs
   });
@@ -140,6 +149,7 @@ function pickSource(data,now,staleMs){
     name:'PIONEX_WALLET_BOT_DETAIL',
     risk:data?.pionexAccount?.walletBotRisk,
     status:data?.pionexAccountSync?.status,
+    truncated:data?.pionexAccountSync?.truncated===true,
     lastSuccessAt:data?.pionexAccountSync?.lastSuccessAt,
     now,staleMs
   });
@@ -177,7 +187,7 @@ export function buildAssetWatchApiSnapshot(data,{now=Date.now(),staleMs=DEFAULT_
   const snapshotAt=selected?.snapshotAt||null;
   const ageMs=tsMs(snapshotAt)==null?null:Math.max(0,now-tsMs(snapshotAt));
   const usableForDisplay=selected?.usable===true;
-  const usableForOverwrite=usableForDisplay&&coverage.status!=='PARTIAL';
+  const usableForOverwrite=usableForDisplay&&!selected?.incomplete&&coverage.status!=='PARTIAL';
   return {
     schemaVersion:'MERIDIAN-ASSET-WATCH-BRIDGE-V1',
     readOnly:true,
