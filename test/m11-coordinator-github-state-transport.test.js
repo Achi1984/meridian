@@ -7,6 +7,7 @@ import {
   createAtomicRecordMemoryTransport,
   createCoordinatorAtomicRecordBackend
 } from '../scripts/autonomy/m11-coordinator-atomic-record-backend.mjs';
+import {createCoordinatorStateStore} from '../scripts/autonomy/m11-coordinator-state-store.mjs';
 import {
   createM11CoordinatorGithubStateTransport,
   GITHUB_STATE_TRANSPORT_ERROR,
@@ -371,6 +372,136 @@ test('real backend replay supports claim transition and restart from persisted J
   const restarted = createCoordinatorAtomicRecordBackend({transport: restartedTransport});
   const restartEnvelope = await restarted.exportCanonicalEnvelope();
   assert.deepEqual(restartEnvelope, envelope);
+});
+
+test('real state-store lifecycle persists history and counters across transport restart', async () => {
+  const server = buildServer();
+  const transport = createM11CoordinatorGithubStateTransport({
+    enabled: true,
+    fetchImpl: server.fetchImpl,
+    credentials: credentials()
+  });
+  const backend = createCoordinatorAtomicRecordBackend({transport, now: () => 2000});
+  const store = createCoordinatorStateStore({backend, enabled: true});
+  const initial = await store.read();
+  assert.equal(initial.status, 'READY');
+
+  const actionKey = key('1');
+  const executionKey = key('2');
+  const claimed = await store.claim({
+    actionKey,
+    executionKey,
+    packetKey: key('3'),
+    expectedRevision: initial.snapshot.revision,
+    expectedOid: initial.snapshot.oid,
+    owner: 'transport-owner',
+    now: 2000
+  });
+  assert.equal(claimed.status, 'CLAIMED');
+
+  let currentClaim = claimed.claim;
+  const transitions = [
+    {
+      kind: 'REVIEW_PENDING',
+      actionKey,
+      executionKey,
+      reviewRequestId: 'transport-review',
+      sessionId: 'transport-session',
+      reviewer: {provider: 'synthetic', agent: 'agent', model: 'model', transport: 'test'},
+      repository: REPOSITORY,
+      pullRequest: 1,
+      headSha: 'a'.repeat(40),
+      baseSha: 'b'.repeat(40),
+      diffDigest: 'c'.repeat(64),
+      changedPathDigest: 'd'.repeat(64),
+      changedPathCount: 1,
+      runId: 9001,
+      runAttempt: 1,
+      workflowId: 9002,
+      selectionRevision: 7,
+      reviewDeadlineAt: 3000
+    },
+    {kind: 'DISPATCH_ACKED', reviewRequestId: 'transport-review', sessionId: 'transport-session'},
+    {kind: 'OBSERVE_PREPARING'},
+    {
+      kind: 'REVIEW_RESULT',
+      completionState: 'COMPLETE',
+      verdict: 'GREEN_LIGHT',
+      reviewRequestId: 'transport-review',
+      sessionId: 'transport-session'
+    },
+    {kind: 'RECEIPT_PREPARING', completionState: 'COMPLETE', verdict: 'GREEN_LIGHT'},
+    {kind: 'RECEIPT_POSTING'},
+    {
+      kind: 'RECEIPT_DELIVERED',
+      receiptId: 'transport-receipt',
+      completionState: 'COMPLETE',
+      verdict: 'GREEN_LIGHT'
+    }
+  ];
+  for (const transition of transitions) {
+    const result = await store.commit({claim: currentClaim, transition});
+    assert.equal(result.status, 'COMMITTED', transition.kind);
+    currentClaim = result.claim;
+  }
+
+  const beforeRestart = await backend.exportCanonicalEnvelope();
+  const readyBeforeRestart = await store.read();
+  const reconciledBeforeRestart = await store.reconcile(executionKey);
+  const transitionKinds = [
+    'REVIEW_PENDING',
+    'DISPATCH_ACKED',
+    'OBSERVE_PREPARING',
+    'REVIEW_RESULT',
+    'RECEIPT_PREPARING',
+    'RECEIPT_POSTING',
+    'RECEIPT_DELIVERED'
+  ];
+  assert.deepEqual(beforeRestart.transitionChain.map(record => record.kind), ['CLAIM_CREATED', ...transitionKinds]);
+  assert.equal(beforeRestart.storageVersion, 8);
+  assert.equal(beforeRestart.transitionChain.length, 8);
+  assert.equal(beforeRestart.snapshot.revision, 7);
+  assert.equal(readyBeforeRestart.status, 'READY');
+  assert.deepEqual(readyBeforeRestart.snapshot, beforeRestart.snapshot);
+  assert.equal(reconciledBeforeRestart.status, 'READY');
+  assert.equal(reconciledBeforeRestart.claim.lastStage, 'RECEIPT_DELIVERED');
+  assert.equal(beforeRestart.admissionState.totalQuota, 3);
+  assert.equal(beforeRestart.admissionState.consumedQuota, 1);
+  assert.equal(beforeRestart.admissionState.activeGate, null);
+  for (const kind of transitionKinds) {
+    assert.equal(backend.committedTransitionCount(kind), 1, kind);
+  }
+  const perKindHistoryCounts = Object.fromEntries(transitionKinds.map(kind => [
+    kind,
+    beforeRestart.transitionChain.filter(record => record.kind === kind).length
+  ]));
+  assert.deepEqual(perKindHistoryCounts, Object.fromEntries(transitionKinds.map(kind => [kind, 1])));
+
+  const persistedText = server.lastDecodedContent();
+  assert.equal(persistedText, JSON.stringify(beforeRestart));
+  const writes = server.requestLog.filter(entry => entry.path === '/graphql');
+  assert.equal(writes.length, 8);
+  const finalWrite = JSON.parse(writes.at(-1).body);
+  const encodedEnvelope = finalWrite.variables.input.fileChanges.additions[0].contents;
+  assert.equal(encodedEnvelope, Buffer.from(persistedText, 'utf8').toString('base64'));
+  assert.equal(decodeGraphqlContents(encodedEnvelope), persistedText);
+
+  const restartedTransport = createM11CoordinatorGithubStateTransport({
+    enabled: true,
+    fetchImpl: server.fetchImpl,
+    credentials: credentials()
+  });
+  const restartedBackend = createCoordinatorAtomicRecordBackend({transport: restartedTransport});
+  const restartedStore = createCoordinatorStateStore({backend: restartedBackend, enabled: true});
+  const afterRestart = await restartedBackend.exportCanonicalEnvelope();
+  const readyAfterRestart = await restartedStore.read();
+  const reconciledAfterRestart = await restartedStore.reconcile(executionKey);
+  assert.deepEqual(afterRestart, beforeRestart);
+  assert.deepEqual(readyAfterRestart, readyBeforeRestart);
+  assert.equal(reconciledAfterRestart.status, 'READY');
+  assert.equal(reconciledAfterRestart.claim.lastStage, 'RECEIPT_DELIVERED');
+  assert.equal(afterRestart.admissionState.consumedQuota, 1);
+  assert.equal(afterRestart.admissionState.activeGate, null);
 });
 
 test('replace validates wrong version, stale expected head conflict, and no binding', async () => {
