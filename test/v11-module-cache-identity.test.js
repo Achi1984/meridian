@@ -80,6 +80,18 @@ test('served M11 module graph has one existing B17 identity for every local edge
   }
 });
 
+test('agent-status browser harness shares the served B17 bootstrap, client and access modules',()=>{
+  const source=readFileSync(new URL('./v11-agent-status-chrome.test.js',import.meta.url),'utf8');
+  const imports=[...source.matchAll(/import\('([^']+)'\)/g)].map(match=>new URL(match[1],'http://localhost'));
+  const statusModules=imports.filter(url=>url.pathname.startsWith('/v11/'))
+    .map(url=>url.pathname.slice('/v11/'.length)+url.search).sort();
+  assert.deepEqual(statusModules,[
+    'agent-status-bootstrap.js?v=B17-M11',
+    'agent-status-client.js?v=B17-M11',
+    'app-access.js?v=B17-M11'
+  ]);
+});
+
 test('nested stale B15 edges fail the same graph assertion',()=>{
   const fixtureRoot=new URL('file:///fixture/v11/');
   const fixture=new Map([
