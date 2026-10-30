@@ -113,11 +113,31 @@ function countBy(rows,key){
   return out;
 }
 function recognizedWalletCategory(category){
-  return ['TRADING_BOT','FUTURES_LITE'].includes(String(category?.type||'').toUpperCase());
+  return ['TRADING_BOT','FUTURES_LITE','COPY_TRADE'].includes(String(category?.type||'').toUpperCase());
+}
+// Completeness is scoped to candidate-bearing categories, not wallet balances.
+function excludedWalletSummary(category){
+  const type=String(category?.type||'').toUpperCase();
+  if(!['SPOT','ARBITRAGE'].includes(type)||!Array.isArray(category?.list)||
+    walletCategoryCount(category?.count)===null||category?.hasMore!==false)return false;
+  return category.list.every(row=>row&&typeof row==='object'&&!Array.isArray(row)&&
+    !['buOrderId','buOrderType','botOrderId','botType','cateType','baseList'].some(key=>Object.hasOwn(row,key)));
+}
+function emptyLending(category){
+  return String(category?.type||'').toUpperCase()==='LENDING'&&
+    walletCategoryCount(category?.count)===0&&category?.hasMore===false&&
+    (category.list===null||Array.isArray(category.list)&&category.list.length===0);
 }
 function verifiedWalletCategory(category){
-  return recognizedWalletCategory(category)||
+  return recognizedWalletCategory(category)||excludedWalletSummary(category)||emptyLending(category)||
     category?.hasMore===false&&walletCategoryCount(category?.count)===0&&Array.isArray(category?.list)&&category.list.length===0;
+}
+function walletCategoryPaginationFailure(category){
+  if(excludedWalletSummary(category)||emptyLending(category))return null;
+  const count=walletCategoryCount(category?.count),list=category?.list;
+  return count===null?'COUNT_INVALID':!Array.isArray(list)?'LIST_MISSING_OR_INVALID':
+    count!==list.length?'COUNT_LIST_MISMATCH':category?.hasMore===true?'HAS_MORE':
+    category?.hasMore!==false?'HAS_MORE_UNKNOWN':null;
 }
 function walletCategoryShape(detail){
   if(!Array.isArray(detail))return null;
@@ -145,7 +165,7 @@ function walletCategoryFailureDiagnostics(detail){
     const count=walletCategoryCount(category?.count),list=category?.list;
     const type=String(category?.type||'').toUpperCase();
     const failure=reason=>({
-      categoryClass:!type?'MISSING':['TRADING_BOT','FUTURES_LITE','SPOT','ARBITRAGE'].includes(type)?type:'OTHER',
+      categoryClass:!type?'MISSING':['TRADING_BOT','FUTURES_LITE','COPY_TRADE','SPOT','ARBITRAGE','LENDING'].includes(type)?type:'OTHER',
       reason,...categoryShape(category),
       countMatchesList:count!==null&&Array.isArray(list)?count===list.length:null
     });
@@ -154,9 +174,7 @@ function walletCategoryFailureDiagnostics(detail){
       firstScopeFailure??=failure(Array.isArray(list)&&list.length>0||count>0
         ?'UNRECOGNIZED_NONEMPTY':'UNRECOGNIZED_UNVERIFIED');
     }
-    const reason=count===null?'COUNT_INVALID':!Array.isArray(list)?'LIST_MISSING_OR_INVALID':
-      count!==list.length?'COUNT_LIST_MISMATCH':category?.hasMore===true?'HAS_MORE':
-      category?.hasMore!==false?'HAS_MORE_UNKNOWN':null;
+    const reason=walletCategoryPaginationFailure(category);
     if(reason){
       paginationFailureCount++;
       firstPaginationFailure??=failure(reason);
@@ -375,8 +393,7 @@ export function normalizeWalletOverview(data={}){
     botCategoryCount:botCategories.length,
     botReportedCount:botCategories.reduce((n,x)=>n+(Number.isFinite(x.count)?x.count:x.listCount),0),
     botListCount:botCategories.reduce((n,x)=>n+x.listCount,0),
-    botPaginationComplete:Array.isArray(bot.detail)&&bot.detail.every(x=>x?.hasMore===false&&
-      Array.isArray(x?.list)&&walletCategoryCount(x?.count)===x.list.length),
+    botPaginationComplete:Array.isArray(bot.detail)&&bot.detail.every(x=>walletCategoryPaginationFailure(x)===null),
     botScopeCategoriesVerified:Array.isArray(bot.detail)&&bot.detail.every(verifiedWalletCategory),
     botUnrecognizedNonemptyCategoryCount:unrecognizedNonemptyCategoryCount(bot.detail),
     botUnverifiedCategoryShape:walletCategoryShape(bot.detail),
@@ -554,3 +571,4 @@ export function startPionexAccountReadSync({env=process.env,fetchImpl=fetch}={})
   console.log('[PIONEX_ACCOUNT_READ] enabled · every '+mins+' min');
   return {enabled:true,configured:true,intervalMin:mins,readOnly:true};
 }
+
