@@ -756,44 +756,32 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
             })()`);
             assert.equal(focusState.focused,true,'horizontal path region must receive focus before keyboard input');
             await key('ArrowRight','ArrowRight',39);
-<<<<<<< HEAD
-            const scrollResult=await evaluate(`new Promise(resolve=>{
-              const region=document.querySelector('[id$="-path-table"]');
-              const started=performance.now(),timeoutMs=1200;
-              const inspect=()=>{
-                const keyEvent=window.__pathTableArrowRight||null;
-                const result={scrolled:region.scrollLeft>0,scrollLeft:region.scrollLeft,
-                  scrollWidth:region.scrollWidth,clientWidth:region.clientWidth,
-                  activeElementIsRegion:document.activeElement===region,keyEvent,
-                  elapsedMs:Math.round(performance.now()-started)};
-                if(result.scrolled||result.elapsedMs>=timeoutMs)return resolve(result);
-                setTimeout(inspect,25);
-              };
-              inspect();
-            })`);
-            assert.equal(scrollResult.activeElementIsRegion,true,
-              'ArrowRight must not move focus away from the scroll region: '+JSON.stringify(scrollResult));
-            assert.deepEqual(scrollResult.keyEvent,
-              {key:'ArrowRight',code:'ArrowRight',targetIsRegion:true,defaultPrevented:false},
-              'the focused scroll region must receive an unhandled native ArrowRight event: '+JSON.stringify(scrollResult));
-            assert.equal(scrollResult.scrolled,true,
-              'native ArrowRight did not scroll the horizontally scrollable path region before the bounded timeout: '+
-                JSON.stringify({focusState,scrollResult}));
-=======
             const afterKeyboardScroll=await evaluate(`new Promise(resolve=>{
               const region=document.querySelector('[id$="-path-table"]');
+              const started=performance.now(),timeoutMs=1200;
               const metrics=()=>({width:innerWidth,clientWidth:region.clientWidth,scrollWidth:region.scrollWidth,
                 scrollLeft:region.scrollLeft,focused:document.activeElement===region,
-                overflowX:getComputedStyle(region).overflowX});
+                overflowX:getComputedStyle(region).overflowX,keyEvent:window.__pathTableArrowRight||null,
+                elapsedMs:Math.round(performance.now()-started)});
+              let timer;
               const finish=()=>{clearTimeout(timer);region.removeEventListener('scroll',onScroll);resolve(metrics());};
               const onScroll=()=>{if(region.scrollLeft>0)finish();};
-              const timer=setTimeout(finish,1000);
+              const inspect=()=>{
+                if(region.scrollLeft>0||performance.now()-started>=timeoutMs)return finish();
+                setTimeout(inspect,25);
+              };
+              timer=setTimeout(finish,timeoutMs);
               region.addEventListener('scroll',onScroll,{passive:true});
-              if(region.scrollLeft>0)finish();
+              inspect();
             })`);
+            assert.equal(afterKeyboardScroll.focused,true,
+              'ArrowRight must not move focus away from the scroll region: '+JSON.stringify(afterKeyboardScroll));
+            assert.deepEqual(afterKeyboardScroll.keyEvent,
+              {key:'ArrowRight',code:'ArrowRight',targetIsRegion:true,defaultPrevented:false},
+              'the focused scroll region must receive an unhandled native ArrowRight event: '+JSON.stringify(afterKeyboardScroll));
             assert.ok(afterKeyboardScroll.scrollLeft>0,
-              JSON.stringify({tableViewport,afterKeyboardScroll}));
->>>>>>> origin/main
+              'native ArrowRight did not scroll the horizontally scrollable path region before the bounded timeout: '+
+                JSON.stringify({focusState,tableViewport,afterKeyboardScroll}));
           }
           for(const dimension of ['segmentId','variantId','scenarioId','status']){
             for(const filterValue of new Set(producerCase.result.paths.map(path=>path[dimension]))){
