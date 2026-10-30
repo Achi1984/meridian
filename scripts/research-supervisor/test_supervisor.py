@@ -139,6 +139,35 @@ def _timed_historical_helper(callback, helper, metrics, clock=time.monotonic):
     return wrapped
 
 
+def _proc_snapshot(pid):
+    try:
+        raw = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return None
+    close = raw.rfind(")")
+    if close < 0:
+        return None
+    fields = raw[close + 2:].split()
+    if len(fields) < 20:
+        return None
+    return {
+        "pid": pid,
+        "state": fields[0],
+        "ppid": int(fields[1]),
+        "pgrp": int(fields[2]),
+        "start_ticks": fields[19],
+    }
+
+
+def _classify_pid_state(pid, expected_start_ticks):
+    snapshot = _proc_snapshot(pid)
+    if snapshot is None:
+        return {"classification": "dead", "pid": pid}
+    if str(snapshot["start_ticks"]) != str(expected_start_ticks):
+        return {**snapshot, "classification": "pid_reused"}
+    return {**snapshot, "classification": "zombie" if snapshot["state"] == "Z" else "live"}
+
+
 def _historical_helper_diagnostic_fields(metrics):
     if type(metrics) is not dict:
         return {}
@@ -1919,6 +1948,8 @@ process.stdout.write(JSON.stringify(runBatch({
         descendant_marker = Path(str(marker) + ".descendant")
         descendant_term_marker = Path(str(marker) + ".descendant.term")
         descendants = []
+        descendant_identity = []
+        descendant_exit_states = []
         for path in (ack_marker, parent_marker, parent_fds_marker, descendant_marker, descendant_term_marker):
             if path.exists():
                 path.unlink()
@@ -1970,6 +2001,16 @@ process.stdout.write(JSON.stringify(runBatch({
                 parent_fds = json.loads(parent_fds_marker.read_text())
                 self.assertEqual((descendant["fd1"], descendant["fd2"]),
                                  (parent_fds["fd1"], parent_fds["fd2"]))
+                initial_snapshot = _proc_snapshot(descendant["pid"])
+                self.assertIsNotNone(initial_snapshot)
+                self.assertEqual(initial_snapshot["pgrp"], parent_pid)
+                descendant_identity.append({
+                    "pid": descendant["pid"],
+                    "ppid_at_spawn": descendant["ppid"],
+                    "ppid": initial_snapshot["ppid"],
+                    "pgrp": initial_snapshot["pgrp"],
+                    "start_ticks": initial_snapshot["start_ticks"],
+                })
                 os.kill(descendant["pid"], 0)
                 thread.join(timeout=6)
             self.assertFalse(thread.is_alive())
@@ -1977,6 +2018,8 @@ process.stdout.write(JSON.stringify(runBatch({
             self.assertEqual(len(result), 1)
             settled = result[0]
             elapsed = time.monotonic() - started
+            for identity in descendant_identity:
+                descendant_exit_states.append(_classify_pid_state(identity["pid"], identity["start_ticks"]))
             paths = settled.get("paths") if type(settled) is dict else None
             diagnostic = json.dumps({
                 "elapsed_seconds": round(elapsed, 3),
@@ -1988,14 +2031,16 @@ process.stdout.write(JSON.stringify(runBatch({
                 "descendant_marker_exists": descendant_marker.exists(),
                 "descendant_term_exists": descendant_term_marker.exists(),
                 "descendant_count": len(descendants),
+                "descendant_identity": descendant_identity,
+                "descendant_exit_states": descendant_exit_states,
                 "child_returncode": None if not children else children[0].poll(),
             }, sort_keys=True, separators=(",", ":"))
             self.assertEqual(settled["state"], "timed_out", diagnostic)
             self.assertEqual(settled["reason"], "DEADLINE_EXCEEDED", diagnostic)
             self.assertEqual(ack_marker.read_text(), f"{'d'*64}:0", diagnostic)
-            for pid in descendants:
-                with self.assertRaises(ProcessLookupError, msg=diagnostic):
-                    os.kill(pid, 0)
+            for state in descendant_exit_states:
+                self.assertIn(state.get("classification"), ("dead", "zombie", "pid_reused"), diagnostic)
+                self.assertNotEqual(state.get("classification"), "live", diagnostic)
             self.assertIsNotNone(children[0].poll(), diagnostic)
             self.assertIsInstance(paths, list, diagnostic)
             self.assertTrue(paths, diagnostic)
