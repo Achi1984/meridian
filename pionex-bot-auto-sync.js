@@ -126,11 +126,12 @@ function liquidationBoundsFor(order,d){
   if(down!=null)return quoteInverseConvention(order)?{lower:null,upper:down}:{lower:down,upper:null};
   return{lower:null,upper:null};
 }
-function tpFor(order,d){
-  if(String(d?.profitStopType||'').toLowerCase()==='price'){
-    const x=assetPrice(order,d?.profitStop);if(x>0)return x;
+function takeProfitFor(order,d){
+  if(String(d?.profitStopType||'').trim().toLowerCase()==='price'){
+    const price=assetPrice(order,d?.profitStop);
+    if(price>0)return {price,evidence:'PRICE_SET'};
   }
-  return null;
+  return {price:null,evidence:'UNKNOWN'};
 }
 function slFor(order,d){
   if(String(d?.lossStopType||'').toLowerCase()==='price'){
@@ -163,7 +164,7 @@ export function normalizePionexBotOrder(order){
   const check=inspectPionexBotOrder(order);
   if(!check.typePass||!check.statusPass||!check.symbolPass||!check.sidePass)return null;
   const d=order.buOrderData||{},side=check.side,symbol=resolvedSymbol(order).symbol,range=rangeFor(order,d),
-    liquidationBounds=liquidationBoundsFor(order,d);
+    liquidationBounds=liquidationBoundsFor(order,d),takeProfit=takeProfitFor(order,d);
   const row={
     id:String(order.buOrderId||order.id||symbol),
     botOrderId:String(order.buOrderId||''),
@@ -179,7 +180,8 @@ export function normalizePionexBotOrder(order){
     liquidationPrice:liquidationFor(order,d,side),
     liquidationLowerBound:liquidationBounds.lower,
     liquidationUpperBound:liquidationBounds.upper,
-    takeProfit:tpFor(order,d),
+    takeProfit:takeProfit.price,
+    takeProfitEvidence:takeProfit.evidence,
     stopLoss:slFor(order,d),
     investmentUsd:reliableUsdInvestment(d),
     pnlUsd:optionalPnl(d),
