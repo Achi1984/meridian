@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import {OVERWRITE_SCOPES,EXCLUDED_SCOPES,safeOverwriteRejectionReasons} from './asset-watch-scope.js';
 
 const AAD='MERIDIAN-ASSET-WATCH-MIRROR-V1';
 const RECEIPT_SCHEMA='MERIDIAN-ASSET-WATCH-MIRROR-RECEIPT-V1';
@@ -22,6 +23,9 @@ export function assetWatchMirrorPublicReceipt(snapshot){
     sourceStatusOk:snapshot?.sourceStatusOk===true,
     fresh:snapshot?.fresh===true,
     usableForOverwrite:snapshot?.usableForOverwrite===true,
+    overwriteScope:OVERWRITE_SCOPES.includes(snapshot?.overwriteScope)?snapshot.overwriteScope:'NONE',
+    excludedScope:EXCLUDED_SCOPES.includes(snapshot?.excludedScope)?snapshot.excludedScope:'UNVERIFIED',
+    overwriteRejectionReasons:safeOverwriteRejectionReasons(snapshot?.overwriteRejectionReasons),
     source:String(snapshot?.source||'UNAVAILABLE'),
     sourceSnapshotAt:snapshot?.sourceSnapshotAt||null,
     sourceAgeMs:Number.isFinite(Number(snapshot?.sourceAgeMs))?Number(snapshot.sourceAgeMs):null,
@@ -49,6 +53,8 @@ export function validateAssetWatchMirrorEnvelope(envelope,{
     r.fresh===true && r.usableForOverwrite===true &&
     !!r.sourceSnapshotAt;
   if(!shapeOk)return{ok:false,reason:'receipt_invalid'};
+  if(r.source==='PIONEX_WALLET_BOT_DETAIL'&&r.overwriteScope!=='WALLET_FUTURES_GRID')
+    return{ok:false,reason:'wallet_scope_invalid'};
 
   const sourceAt=Date.parse(r.sourceSnapshotAt);
   const generatedAt=Date.parse(x.generatedAt);

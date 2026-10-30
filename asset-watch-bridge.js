@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import {WALLET_SCOPE,safeOverwriteRejectionReasons} from './asset-watch-scope.js';
 
 const DEFAULT_STALE_MS=15*60*1000;
 const FUTURE_SKEW_MS=5*60*1000;
@@ -100,7 +101,8 @@ function coverageFor(risk={}, {truncated=false,status=null}={}){
       risk.paginationComplete===true||raw.paginationComplete===true?true:null;
   const pages=count(raw.pages),pageLimit=count(raw.pageLimit);
   const partial=unsupportedRows>0||unhydratedRows>0||paginationComplete===false||
-    rawStatus==='PARTIAL'||syncStatus==='PARTIAL'||risk.detailsComplete===false;
+    rawStatus==='PARTIAL'||syncStatus==='PARTIAL'||risk.detailsComplete===false||
+    risk.supportedScope?.exclusionsVerified===false;
   return {
     status:partial?'PARTIAL':raw.status==='DOCUMENTED'?'DOCUMENTED':
       raw.status==='UNVERIFIED'?'UNVERIFIED':'UNKNOWN',
@@ -132,6 +134,7 @@ function candidate({name,risk,status,lastSuccessAt,truncated=false,now,staleMs})
     statusOk,
     fresh,
     incomplete,
+    syncStatus:normalizedStatus,
     rows,
     usable:statusOk&&detailsComplete&&fresh
   };
@@ -182,7 +185,8 @@ export function buildAssetWatchApiSnapshot(data,{now=Date.now(),staleMs=DEFAULT_
 function projectSnapshot(selected,now,staleMs){
   const sourceRows=selected?.rows||[],seen=new Set();
   const bots=stableSortBots(sourceRows.map(sanitizedBot).filter(bot=>{
-    if(!bot.symbol||!bot.side||!bot.botRef||seen.has(bot.botRef))return false;
+    if(!bot.symbol||!/^[A-Z0-9][A-Z0-9_/-]{0,31}$/.test(bot.symbol)||
+      !bot.side||!bot.botRef||seen.has(bot.botRef))return false;
     seen.add(bot.botRef);return true;
   }));
   const coverage={...(selected?.coverage||coverageFor())};
@@ -194,7 +198,35 @@ function projectSnapshot(selected,now,staleMs){
   const snapshotAt=selected?.snapshotAt||null;
   const ageMs=tsMs(snapshotAt)==null?null:Math.max(0,now-tsMs(snapshotAt));
   const usableForDisplay=selected?.usable===true;
-  const usableForOverwrite=usableForDisplay&&!selected?.incomplete&&coverage.status!=='PARTIAL';
+  const risk=selected?.risk||{},scope=risk.supportedScope;
+  const wallet=selected?.name==='PIONEX_WALLET_BOT_DETAIL';
+  const walletScopeVerified=wallet&&scope?.schemaVersion===WALLET_SCOPE&&
+    scope.botType==='futures_grid'&&scope.exclusionsVerified===true&&
+    Number.isSafeInteger(scope.excludedRows)&&scope.excludedRows>=0&&
+    scope.excludedRows===coverage.unsupportedRows&&
+    risk.apiRows===coverage.listRows&&risk.supportedRows===coverage.recognizedRows&&
+    risk.unsupportedRows===coverage.unsupportedRows&&coverage.recognizedRows>0&&
+    coverage.listRows===coverage.recognizedRows+coverage.unsupportedRows;
+  const reasons=[];
+  if(!selected)reasons.push('SOURCE_UNAVAILABLE');
+  if(wallet?!walletScopeVerified:coverage.unsupportedRows>0)reasons.push('UNSUPPORTED_SCOPE');
+  if(coverage.unhydratedRows>0||wallet&&
+    (risk.detailRows!==risk.supportedRows||bots.length!==risk.supportedRows||
+      risk.normalizedRows!==bots.length||risk.botCount!==bots.length))
+    reasons.push('SUPPORTED_HYDRATION_MISSING');
+  if(droppedRows>0||wallet&&(risk.rejectedCount>0||scope?.identityComplete===false||
+    bots.some(bot=>bot.botType!=='futures_grid')))
+    reasons.push('SANITIZATION_LOSS_OR_DUPLICATE');
+  if(coverage.paginationComplete===false||wallet&&coverage.paginationComplete!==true)
+    reasons.push('PAGINATION_INCOMPLETE');
+  if(String(risk.coverage?.status||'').toUpperCase()==='PARTIAL')reasons.push('EXPLICIT_PARTIAL');
+  if(selected?.syncStatus==='PARTIAL')reasons.push('SYNC_PARTIAL');
+  if(!selected?.detailsComplete)reasons.push('DETAILS_INCOMPLETE');
+  if(!selected?.statusOk)reasons.push('SOURCE_STATUS_NOT_OK');
+  if(!selected?.fresh)reasons.push('SOURCE_STALE');
+  const overwriteRejectionReasons=safeOverwriteRejectionReasons(reasons);
+  const usableForOverwrite=usableForDisplay&&!selected?.incomplete&&
+    overwriteRejectionReasons.length===0;
   return {
     schemaVersion:'MERIDIAN-ASSET-WATCH-BRIDGE-V1',
     readOnly:true,
@@ -210,6 +242,11 @@ function projectSnapshot(selected,now,staleMs){
     fresh:selected?.fresh===true,
     usableForDisplay,
     usableForOverwrite,
+    overwriteScope:walletScopeVerified?'WALLET_FUTURES_GRID':
+      wallet||!selected?'NONE':'PRIMARY_BOT_API',
+    excludedScope:wallet&&!walletScopeVerified?'UNVERIFIED':coverage.unsupportedRows>0
+      ?walletScopeVerified?'KNOWN_EXCLUDED_PRODUCTS':'UNVERIFIED':'NONE',
+    overwriteRejectionReasons,
     overwriteRule:'ONLY_WHEN_usableForOverwrite_IS_TRUE',
     botCount:bots.length,
     snapshotFingerprint:fingerprint(bots),
