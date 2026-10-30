@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import {assetWatchStrictGateDiagnostics} from '../scripts/runtime-smoke-diagnostics.mjs';
+import {assetWatchMirrorPublicReceipt} from '../asset-watch-mirror-crypto.js';
 
 test('strict diagnostics allow only typed flags, source enum, timestamps, ages and deployment SHA',()=>{
   const receipt={readOnly:true,executionImpact:false,detailsComplete:true,sourceStatusOk:true,
@@ -16,7 +17,7 @@ test('strict diagnostics allow only typed flags, source enum, timestamps, ages a
     readOnly:true,executionImpact:false,detailsComplete:true,sourceStatusOk:true,fresh:true,
     usableForOverwrite:false,source:'PIONEX_BOT_API',sourceSnapshotAt:receipt.sourceSnapshotAt,
     generatedAt:envelope.generatedAt,sourceAgeMs:1000,freshnessLimitMs:900000,deploymentSha:'a'.repeat(40),
-    overwriteScope:null,excludedScope:null,overwriteRejectionReasons:[]
+    overwriteScope:null,excludedScope:null,overwriteRejectionReasons:[],scopeDiagnostics:null
   });
   assert.doesNotMatch(raw,/PRIVATE_MARKER|ciphertext|iv"|tag"|token|bots|coverage/);
   const hostile=Object.fromEntries(Object.keys(receipt).map(key=>[key,'PRIVATE_MARKER'.repeat(10000)]));
@@ -39,6 +40,11 @@ test('each strict receipt flag still fails the real smoke and emits only safe bo
         bridgeSchemaVersion:'MERIDIAN-ASSET-WATCH-BRIDGE-V1',readOnly:true,executionImpact:false,
         detailsComplete:true,sourceStatusOk:true,fresh:true,usableForOverwrite:true,
         source:'PIONEX_BOT_API',sourceSnapshotAt:at,sourceAgeMs:0,freshnessLimitMs:900000,
+        scopeDiagnostics:{scopePresent:true,schemaOk:true,botTypeOk:true,exclusionsVerified:false,
+          excludedRowsEqualsUnsupported:false,categoriesVerified:false,countsVerified:true,
+          candidateCount:2,unsupportedCount:1,unrecognizedNonemptyCategoryCount:1,
+          typeCounts:{futures_grid:1,futures_lite:0,OTHER:1,PRIVATE_MARKER:123456789},
+          payload:'PRIVATE_MARKER'},
         token:'PRIVATE_MARKER',bots:[{id:'PRIVATE_MARKER'}]};
       receipt[${JSON.stringify(flag)}]=${flag==='executionImpact'};
       globalThis.fetch=async raw=>{
@@ -68,6 +74,9 @@ test('each strict receipt flag still fails the real smoke and emits only safe bo
     assert.match(result.stderr,/Asset Watch live receipt strict gate failed: \{/);
     assert.match(result.stderr,new RegExp('"'+flag+'":'+(flag==='executionImpact')));
     assert.match(result.stderr,/"deploymentSha":"a{40}"/);
+    assert.match(result.stderr,/"scopePresent":true,"schemaOk":true,"botTypeOk":true,"exclusionsVerified":false/);
+    assert.match(result.stderr,/"unrecognizedNonemptyCategoryCount":1/);
+    assert.match(result.stderr,/"typeCounts":\{"futures_grid":1,"futures_lite":0,"OTHER":1\}/);
     assert.doesNotMatch(result.stdout+result.stderr,/PRIVATE_MARKER|UNEXPECTED_REQUEST/);
     assert.ok(result.stderr.length<4096);
   }
@@ -96,4 +105,38 @@ test('both authoritative encrypted mirrors opt in while both private display rou
     assert.doesNotMatch(route,/preferOverwrite/);
   }
   assert.equal((source.match(/preferOverwrite:true/g)||[]).length,2);
+});
+
+test('scope diagnostics are closed, bounded and re-sanitized at both public boundaries',()=>{
+  const canary='PRIVATE_CANARY'.repeat(10000);
+  for(const count of [-1,1.5,NaN,Infinity,Number.MAX_SAFE_INTEGER,1_000_001,'1',true,{},null,0,1_000_000]){
+    const expected=typeof count==='number'&&Number.isInteger(count)&&count>=0&&count<=1_000_000?count:null;
+    const scopeDiagnostics={
+      scopePresent:true,schemaOk:canary,botTypeOk:false,exclusionsVerified:'true',
+      excludedRowsEqualsUnsupported:null,categoriesVerified:false,countsVerified:true,
+      candidateCount:count,unsupportedCount:count,unrecognizedNonemptyCategoryCount:count,
+      typeCounts:{futures_grid:count,futures_lite:count,OTHER:count,[canary]:123456789},
+      category:canary,id:canary,symbol:canary,amount:123456789,url:canary,credential:canary,
+      payload:{secret:canary},writerSha:canary
+    };
+    const expectedDiagnostic={
+      scopePresent:true,schemaOk:null,botTypeOk:false,exclusionsVerified:null,
+      excludedRowsEqualsUnsupported:null,categoriesVerified:false,countsVerified:true,
+      candidateCount:expected,unsupportedCount:expected,unrecognizedNonemptyCategoryCount:expected,
+      typeCounts:{futures_grid:expected,futures_lite:expected,OTHER:expected}
+    };
+    const receipt=assetWatchMirrorPublicReceipt({scopeDiagnostics});
+    assert.deepEqual(receipt.scopeDiagnostics,expectedDiagnostic);
+    for(const input of [receipt,{scopeDiagnostics}]){
+      const raw=assetWatchStrictGateDiagnostics({receipt:input},null);
+      assert.deepEqual(JSON.parse(raw).scopeDiagnostics,expectedDiagnostic);
+      assert.doesNotMatch(raw,/PRIVATE_CANARY|123456789|writerSha|payload|credential/);
+      assert.ok(raw.length<1536);
+    }
+  }
+  for(const value of [undefined,null,false,'PRIVATE_CANARY',[]]){
+    assert.equal(assetWatchMirrorPublicReceipt({scopeDiagnostics:value}).scopeDiagnostics,null);
+    assert.equal(JSON.parse(assetWatchStrictGateDiagnostics({receipt:{scopeDiagnostics:value}},null))
+      .scopeDiagnostics,null);
+  }
 });

@@ -33,7 +33,7 @@ test('public receipt exposes strict-live validity without bot details',()=>{
     schemaVersion:'MERIDIAN-ASSET-WATCH-MIRROR-RECEIPT-V1',
     bridgeSchemaVersion:'MERIDIAN-ASSET-WATCH-BRIDGE-V1',
     readOnly:true,executionImpact:false,detailsComplete:false,sourceStatusOk:true,fresh:false,usableForOverwrite:false,
-    overwriteScope:'NONE',excludedScope:'UNVERIFIED',overwriteRejectionReasons:[],
+    overwriteScope:'NONE',excludedScope:'UNVERIFIED',overwriteRejectionReasons:[],scopeDiagnostics:null,
     source:'PIONEX_BOT_API',sourceSnapshotAt:'2026-09-29T04:00:00Z',sourceAgeMs:1800000,freshnessLimitMs:900000
   });
   assert.doesNotMatch(JSON.stringify(receipt),/BTCUSDT|secret-ref/);

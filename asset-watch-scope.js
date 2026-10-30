@@ -10,3 +10,19 @@ export function safeOverwriteRejectionReasons(value){
   return Array.isArray(value)?[...new Set(value.slice(0,REASONS.length)
     .filter(reason=>REASONS.includes(reason)))]:[];
 }
+export function safeScopeCount(value){
+  return Number.isSafeInteger(value)&&value>=0&&value<=1_000_000?value:null;
+}
+export function safeScopeDiagnostics(value){
+  if(!value||typeof value!=='object'||Array.isArray(value))return null;
+  const flags=['scopePresent','schemaOk','botTypeOk','exclusionsVerified',
+    'excludedRowsEqualsUnsupported','categoriesVerified','countsVerified'];
+  return {
+    ...Object.fromEntries(flags.map(key=>[key,typeof value[key]==='boolean'?value[key]:null])),
+    candidateCount:safeScopeCount(value.candidateCount),
+    unsupportedCount:safeScopeCount(value.unsupportedCount),
+    unrecognizedNonemptyCategoryCount:safeScopeCount(value.unrecognizedNonemptyCategoryCount),
+    typeCounts:Object.fromEntries(['futures_grid','futures_lite','OTHER'].map(key=>
+      [key,safeScopeCount(value.typeCounts?.[key])]))
+  };
+}

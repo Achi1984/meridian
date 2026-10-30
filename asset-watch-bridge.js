@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import {WALLET_SCOPE,safeOverwriteRejectionReasons} from './asset-watch-scope.js';
+import {WALLET_SCOPE,safeOverwriteRejectionReasons,safeScopeDiagnostics} from './asset-watch-scope.js';
 
 const DEFAULT_STALE_MS=15*60*1000;
 const FUTURE_SKEW_MS=5*60*1000;
@@ -200,10 +200,13 @@ function projectSnapshot(selected,now,staleMs){
   const usableForDisplay=selected?.usable===true;
   const risk=selected?.risk||{},scope=risk.supportedScope;
   const wallet=selected?.name==='PIONEX_WALLET_BOT_DETAIL';
-  const walletScopeVerified=wallet&&scope?.schemaVersion===WALLET_SCOPE&&
-    scope.botType==='futures_grid'&&scope.exclusionsVerified===true&&
+  const schemaOk=scope?.schemaVersion===WALLET_SCOPE;
+  const botTypeOk=scope?.botType==='futures_grid';
+  const excludedRowsEqualsUnsupported=scope?.excludedRows===coverage.unsupportedRows;
+  const walletScopeVerified=wallet&&schemaOk&&
+    botTypeOk&&scope.exclusionsVerified===true&&
     Number.isSafeInteger(scope.excludedRows)&&scope.excludedRows>=0&&
-    scope.excludedRows===coverage.unsupportedRows&&
+    excludedRowsEqualsUnsupported&&
     risk.apiRows===coverage.listRows&&risk.supportedRows===coverage.recognizedRows&&
     risk.unsupportedRows===coverage.unsupportedRows&&coverage.recognizedRows>0&&
     coverage.listRows===coverage.recognizedRows+coverage.unsupportedRows;
@@ -247,6 +250,16 @@ function projectSnapshot(selected,now,staleMs){
     excludedScope:wallet&&!walletScopeVerified?'UNVERIFIED':coverage.unsupportedRows>0
       ?walletScopeVerified?'KNOWN_EXCLUDED_PRODUCTS':'UNVERIFIED':'NONE',
     overwriteRejectionReasons,
+    scopeDiagnostics:wallet?safeScopeDiagnostics({
+      ...safeScopeDiagnostics(risk.scopeDiagnostics),
+      scopePresent:scope!=null,
+      schemaOk:scope?.schemaVersion==null?null:schemaOk,
+      botTypeOk:scope?.botType==null?null:botTypeOk,
+      exclusionsVerified:scope?.exclusionsVerified,
+      excludedRowsEqualsUnsupported:Number.isSafeInteger(scope?.excludedRows)&&scope.excludedRows>=0&&
+        Number.isSafeInteger(coverage.unsupportedRows)&&coverage.unsupportedRows>=0
+        ?excludedRowsEqualsUnsupported:null
+    }):null,
     overwriteRule:'ONLY_WHEN_usableForOverwrite_IS_TRUE',
     botCount:bots.length,
     snapshotFingerprint:fingerprint(bots),
