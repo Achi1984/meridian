@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import {assetWatchStrictGateDiagnostics} from './runtime-smoke-diagnostics.mjs';
 
 const release=JSON.parse(fs.readFileSync('version.json','utf8'));
 const EXPECTED_VERSION=String(release.version||'');
@@ -80,7 +81,7 @@ async function smoke(){
   if(liveMirror?.schemaVersion!=='MERIDIAN-ASSET-WATCH-MIRROR-V1'||liveMirror?.alg!=='A256GCM')fail('Asset Watch live mirror envelope invalid');
   if(!liveMirror?.iv||!liveMirror?.tag||!liveMirror?.ciphertext)fail('Asset Watch live mirror ciphertext missing');
   if(receipt?.schemaVersion!=='MERIDIAN-ASSET-WATCH-MIRROR-RECEIPT-V1'||receipt?.bridgeSchemaVersion!=='MERIDIAN-ASSET-WATCH-BRIDGE-V1')fail('Asset Watch live receipt schema invalid');
-  if(receipt?.readOnly!==true||receipt?.executionImpact!==false||receipt?.detailsComplete!==true||receipt?.sourceStatusOk!==true||receipt?.fresh!==true||receipt?.usableForOverwrite!==true)fail('Asset Watch live receipt strict gate failed');
+  if(receipt?.readOnly!==true||receipt?.executionImpact!==false||receipt?.detailsComplete!==true||receipt?.sourceStatusOk!==true||receipt?.fresh!==true||receipt?.usableForOverwrite!==true)fail('Asset Watch live receipt strict gate failed: '+assetWatchStrictGateDiagnostics(liveMirror,health));
   const liveSourceAt=Date.parse(receipt?.sourceSnapshotAt||''),liveGeneratedAt=Date.parse(liveMirror?.generatedAt||''),liveLimit=Number(receipt?.freshnessLimitMs);
   if(!Number.isFinite(liveSourceAt)||!Number.isFinite(liveGeneratedAt)||!Number.isFinite(liveLimit)||liveLimit<=0||liveLimit>15*60*1000)fail('Asset Watch live freshness fields invalid');
   if(liveGeneratedAt-liveSourceAt<0||liveGeneratedAt-liveSourceAt>liveLimit)fail('Asset Watch live source stale');

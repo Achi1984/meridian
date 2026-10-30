@@ -136,7 +136,7 @@ function candidate({name,risk,status,lastSuccessAt,truncated=false,now,staleMs})
     usable:statusOk&&detailsComplete&&fresh
   };
 }
-function pickSource(data,now,staleMs){
+function pickSource(data,now,staleMs,preferOverwrite){
   const primary=candidate({
     name:'PIONEX_BOT_API',
     risk:data?.pionexRiskPartial||data?.pionexRisk,
@@ -153,6 +153,11 @@ function pickSource(data,now,staleMs){
     lastSuccessAt:data?.pionexAccountSync?.lastSuccessAt,
     now,staleMs
   });
+  if(preferOverwrite){
+    const qualified=[primary,wallet].find(item=>
+      item&&projectSnapshot(item,now,staleMs).usableForOverwrite);
+    if(qualified)return qualified;
+  }
   if(primary?.usable)return primary;
   if(wallet?.usable)return wallet;
   const available=[primary,wallet].filter(Boolean);
@@ -171,14 +176,16 @@ function fingerprint(bots){
   return crypto.createHash('sha256').update(raw).digest('hex');
 }
 
-export function buildAssetWatchApiSnapshot(data,{now=Date.now(),staleMs=DEFAULT_STALE_MS}={}){
-  const selected=pickSource(data||{},now,staleMs);
+export function buildAssetWatchApiSnapshot(data,{now=Date.now(),staleMs=DEFAULT_STALE_MS,preferOverwrite=false}={}){
+  return projectSnapshot(pickSource(data||{},now,staleMs,preferOverwrite),now,staleMs);
+}
+function projectSnapshot(selected,now,staleMs){
   const sourceRows=selected?.rows||[],seen=new Set();
   const bots=stableSortBots(sourceRows.map(sanitizedBot).filter(bot=>{
     if(!bot.symbol||!bot.side||!bot.botRef||seen.has(bot.botRef))return false;
     seen.add(bot.botRef);return true;
   }));
-  const coverage=selected?.coverage||coverageFor();
+  const coverage={...(selected?.coverage||coverageFor())};
   const droppedRows=sourceRows.length-bots.length;
   coverage.representedRows=bots.length;
   coverage.unhydratedRows=coverage.unhydratedRows===null?droppedRows:coverage.unhydratedRows+droppedRows;
