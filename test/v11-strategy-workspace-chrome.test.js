@@ -242,7 +242,17 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
       const metrics=await withMobileChrome(chrome,size.width,hosted.url,async call=>{
         const evaluate=async expression=>{
           const result=await call('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});
-          assert.ok(!result.exceptionDetails,'M11 strategy page expression failed');
+          const exception=result.exceptionDetails;
+          if(exception){
+            const name=String(exception.exception?.className||'Exception')
+              .replace(/[^A-Za-z0-9_.-]/g,'').slice(0,40)||'Exception';
+            const detail=String(exception.exception?.description||exception.text||'')
+              .split('\n',1)[0]
+              .replace(/\b(password|token|secret|credential)\b\s*[:=]\s*[^\s,;]+/gi,'$1=[redacted]')
+              .replace(/\bBearer\s+\S+/gi,'******')
+              .replace(/[^\x20-\x7e]/g,'?').slice(0,180);
+            assert.fail(`M11 strategy page expression failed (${name})${detail?': '+detail:''}`);
+          }
           return result.result?.value;
         };
         const waitForProducerText=text=>evaluate(`new Promise(resolve=>{
@@ -732,20 +742,46 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
           assert.ok(tableViewport.column>=190,'path actions have a legible column at mobile widths');
           if(size.width<840){
             assert.equal(tableViewport.scrollable,true);
+            const focusState=await evaluate(`(()=>{
+              const region=document.querySelector('[id$="-path-table"]');
+              region.focus();
+              window.__pathTableArrowRight=null;
+              region.addEventListener('keydown',event=>{
+                if(event.key==='ArrowRight')window.__pathTableArrowRight={
+                  key:event.key,code:event.code,targetIsRegion:event.target===region,
+                  defaultPrevented:event.defaultPrevented};
+              },{once:true});
+              return {focused:document.activeElement===region,scrollLeft:region.scrollLeft,
+                scrollWidth:region.scrollWidth,clientWidth:region.clientWidth};
+            })()`);
+            assert.equal(focusState.focused,true,'horizontal path region must receive focus before keyboard input');
             await key('ArrowRight','ArrowRight',39);
             const afterKeyboardScroll=await evaluate(`new Promise(resolve=>{
               const region=document.querySelector('[id$="-path-table"]');
+              const started=performance.now(),timeoutMs=1200;
               const metrics=()=>({width:innerWidth,clientWidth:region.clientWidth,scrollWidth:region.scrollWidth,
                 scrollLeft:region.scrollLeft,focused:document.activeElement===region,
-                overflowX:getComputedStyle(region).overflowX});
+                overflowX:getComputedStyle(region).overflowX,keyEvent:window.__pathTableArrowRight||null,
+                elapsedMs:Math.round(performance.now()-started)});
+              let timer;
               const finish=()=>{clearTimeout(timer);region.removeEventListener('scroll',onScroll);resolve(metrics());};
               const onScroll=()=>{if(region.scrollLeft>0)finish();};
-              const timer=setTimeout(finish,1000);
+              const inspect=()=>{
+                if(region.scrollLeft>0||performance.now()-started>=timeoutMs)return finish();
+                setTimeout(inspect,25);
+              };
+              timer=setTimeout(finish,timeoutMs);
               region.addEventListener('scroll',onScroll,{passive:true});
-              if(region.scrollLeft>0)finish();
+              inspect();
             })`);
+            assert.equal(afterKeyboardScroll.focused,true,
+              'ArrowRight must not move focus away from the scroll region: '+JSON.stringify(afterKeyboardScroll));
+            assert.deepEqual(afterKeyboardScroll.keyEvent,
+              {key:'ArrowRight',code:'ArrowRight',targetIsRegion:true,defaultPrevented:false},
+              'the focused scroll region must receive an unhandled native ArrowRight event: '+JSON.stringify(afterKeyboardScroll));
             assert.ok(afterKeyboardScroll.scrollLeft>0,
-              JSON.stringify({tableViewport,afterKeyboardScroll}));
+              'native ArrowRight did not scroll the horizontally scrollable path region before the bounded timeout: '+
+                JSON.stringify({focusState,tableViewport,afterKeyboardScroll}));
           }
           for(const dimension of ['segmentId','variantId','scenarioId','status']){
             for(const filterValue of new Set(producerCase.result.paths.map(path=>path[dimension]))){
@@ -957,7 +993,7 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         assert.match(afterStaleRead.alertText,/Export konnte nicht angenommen werden\. Kein Ergebnis wird angezeigt\./);
         assert.doesNotMatch(afterStaleRead.text,/Lifecycle completed|Engine-Ergebnis\s+COMPLETED/);
         const hostilePresentation=await evaluate(`(async()=>{
-          const {renderArenaResultView}=await import('/v11/arena-result-view.js?v=B15-M11');
+          const {renderArenaResultView}=await import('/v11/arena-result-view.js?v=B17-M11');
           const hostile='"><img src=x onerror="alert(1)">'+ 'identity'.repeat(60);
           const root=document.createElement('div');
           root.style.cssText='max-width:100%;min-width:0';
@@ -982,7 +1018,7 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         assert.ok(hostilePresentation.columns>=190);
         if(size.width===320){
           const disposal=await evaluate(`(async()=>{
-            const {createStrategyArenaView}=await import('/v11/strategy-arena.js?v=B15-M11');
+            const {createStrategyArenaView}=await import('/v11/strategy-arena.js?v=B17-M11');
             const existingIds=new Set([...document.querySelectorAll('#strategy-arena-root [id^="arena-producer-"]')].map(node=>node.id));
             const root=document.createElement('div');document.body.append(root);
             const view=createStrategyArenaView(root,{fetchImpl:async()=>{throw Error('synthetic provenance read failure');}});

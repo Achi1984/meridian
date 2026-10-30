@@ -4,12 +4,15 @@ import fs from 'node:fs';
 
 const read=path=>fs.readFileSync(new URL(`../${path}`,import.meta.url),'utf8');
 const v9=read('v9/v9.js');
+const pionexSnapshot=read('v9/pionex-risk-snapshot.js');
 const v10=read('v10/v10.js');
 
 test('R128 keeps the last-known-good bot snapshot until a complete candidate is accepted',()=>{
   assert.match(v9,/botRefreshStatus:'IDLE'.*lastGoodBotSnapshot:null/s);
-  assert.match(v9,/candidateValid=trustedTs&&monotonicTs&&live\.length>0&&actionComplete&&identityComplete&&feedComplete/);
-  assert.match(v9,/if\(candidateValid\)\{[\s\S]*Object\.assign\(state,snapshot\);[\s\S]*state\.lastGoodBotSnapshot=\{\.\.\.snapshot,bots:candidateBots\.map\(b=>\(\{\.\.\.b\}\)\),publishedAt:now\}/);
+  assert.match(v9,/candidateValid=pionexCandidateValid\(/);
+  assert.match(v9,/if\(candidateValid\)\{[\s\S]*publishPionexSnapshot\(state,snapshot,now,candidateValid\)/);
+  assert.match(pionexSnapshot,/if\(valid!==true\|\|!state\|\|!snapshot\|\|!Array\.isArray\(snapshot\.bots\)\)return false/);
+  assert.match(pionexSnapshot,/state\.lastGoodBotSnapshot=\{\.\.\.snapshot,bots:snapshot\.bots\.map\(bot=>\(\{\.\.\.bot\}\)\),publishedAt:now\}/);
 });
 
 test('R128 partial and fetch-error refreshes do not revoke trust from the last good bot snapshot',()=>{

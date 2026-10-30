@@ -4,6 +4,22 @@ const SOURCES = ['PIONEX_BOT_API', 'PIONEX_WALLET_BOT_DETAIL'];
 const MAX_AGE = 15 * 60 * 1000;
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const enumValue = (value, allowed) => allowed.includes(value) ? value : null;
+const rowCount = value => Number.isSafeInteger(value) && value >= 0 ? value : null;
+function coverage(snapshot) {
+  const raw=object(snapshot?.coverage)?snapshot.coverage:{};
+  const counts={listRows:rowCount(raw.listRows),recognizedRows:rowCount(raw.recognizedRows),
+    representedRows:rowCount(raw.representedRows),unsupportedRows:rowCount(raw.unsupportedRows),
+    unhydratedRows:rowCount(raw.unhydratedRows)};
+  const paginationComplete=raw.paginationComplete===false?false:
+    raw.paginationComplete===true?true:null;
+  const partial=raw.status==='PARTIAL'||counts.unsupportedRows>0||counts.unhydratedRows>0||
+    paginationComplete===false;
+  return {...counts,status:partial?'PARTIAL':raw.status==='DOCUMENTED'?'DOCUMENTED':
+      raw.status==='UNVERIFIED'?'UNVERIFIED':'UNKNOWN',
+    providerContractStatus:raw.providerContractStatus==='DOCUMENTED'?'DOCUMENTED':'UNVERIFIED',
+    liveAccountVerification:raw.liveAccountVerification==='NOT_PERFORMED'?'NOT_PERFORMED':'UNKNOWN',
+    paginationComplete,pages:rowCount(raw.pages),pageLimit:rowCount(raw.pageLimit)};
+}
 
 // V1 bridge coerces absent numeric inputs to zero. Until provenance is fixed,
 // zero cannot be distinguished from missing and must never imply a known value.
@@ -15,13 +31,15 @@ function metrics(bot) {
     investmentCurrency: typeof bot.investment?.currency === 'string' && /^[A-Z0-9]{2,12}$/.test(bot.investment.currency) ? bot.investment.currency : null,
     pnlUsd: metric(bot.pnl?.usd), lower: metric(bot.limits?.lower, true),
     upper: metric(bot.limits?.upper, true), liquidationPrice: metric(bot.limits?.liquidationPrice, true),
+    liquidationLowerBound: metric(bot.limits?.liquidationLowerBound, true),
+    liquidationUpperBound: metric(bot.limits?.liquidationUpperBound, true),
     takeProfit: metric(bot.limits?.takeProfit, true), stopLoss: metric(bot.limits?.stopLoss, true),
     gridProfitUsd: null, riskBufferPct: null};
 }
 
 export function buildBotReadModel(snapshot, {now = Date.now()} = {}) {
   const result = {status: 'UNKNOWN', source: null, snapshotAt: null, ageMs: null,
-    readOnly: true, executionAllowed: false, bots: []};
+    readOnly: true, executionAllowed: false, coverage:coverage(snapshot), bots: []};
   if (!object(snapshot) || !Number.isFinite(now)) return result;
   if (snapshot.schemaVersion !== SCHEMA || !SOURCES.includes(snapshot.source) ||
       snapshot.readOnly !== true || snapshot.executionImpact !== false) return result;
@@ -37,7 +55,8 @@ export function buildBotReadModel(snapshot, {now = Date.now()} = {}) {
   if (age > limit) return {...result, status: 'STALE', source: snapshot.source,
     snapshotAt: stamp, ageMs: age};
   if (snapshot.detailsComplete !== true || snapshot.sourceStatusOk !== true ||
-      snapshot.fresh !== true || snapshot.usableForOverwrite !== true) return result;
+      snapshot.fresh !== true ||
+      !(snapshot.usableForDisplay === true || snapshot.usableForOverwrite === true)) return result;
   if (!Array.isArray(snapshot.bots) || snapshot.bots.length > 100 ||
       snapshot.botCount !== snapshot.bots.length) return result;
   const seen = new Set();
@@ -47,9 +66,12 @@ export function buildBotReadModel(snapshot, {now = Date.now()} = {}) {
         seen.has(bot.botRef) || typeof bot.symbol !== 'string' ||
         !/^[A-Z0-9][A-Z0-9_/-]{0,31}$/.test(bot.symbol)) return result;
     seen.add(bot.botRef);
+    const cateType=enumValue(bot.cateType,['inverse','linear','FUTURES_MOON',
+      'FUTURE_GRID_COIN_MARGINED','FULLY_HEDGING','SPOT']);
     bots.push({ref: bot.botRef, symbol: bot.symbol,
       side: enumValue(bot.side, ['LONG', 'SHORT', 'NEUTRAL']),
-      category: enumValue(bot.cateType, ['inverse', 'linear']),
+      category: enumValue(cateType, ['inverse', 'linear']),
+      productCategory: cateType==='FUTURES_MOON'?'FUTURES_MOON':null,
       type: enumValue(bot.botType, ['futures_grid', 'future_hedge_grid']),
       sideSource: enumValue(bot.sideSource, ['economic_inverse_asset', 'trend_inverse_asset', 'trend']),
       metrics: metrics(bot)});
