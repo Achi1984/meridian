@@ -139,6 +139,69 @@ def _timed_historical_helper(callback, helper, metrics, clock=time.monotonic):
     return wrapped
 
 
+def _proc_snapshot(pid):
+    try:
+        raw = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return {"pid": pid, "status": "missing"}
+    except PermissionError:
+        return {"pid": pid, "status": "unknown", "reason": "READ_PERMISSION"}
+    except OSError:
+        return {"pid": pid, "status": "unknown", "reason": "READ_ERROR"}
+    close = raw.rfind(")")
+    if close < 0:
+        return {"pid": pid, "status": "unknown", "reason": "STAT_FORMAT"}
+    fields = raw[close + 2:].split()
+    if len(fields) < 20:
+        return {"pid": pid, "status": "unknown", "reason": "STAT_FIELDS"}
+    try:
+        ppid = int(fields[1])
+        pgrp = int(fields[2])
+        start_ticks = int(fields[19])
+    except ValueError:
+        return {"pid": pid, "status": "unknown", "reason": "STAT_NUMERIC"}
+    return {"pid": pid, "status": "ok", "state": fields[0], "ppid": ppid, "pgrp": pgrp, "start_ticks": start_ticks}
+
+
+def _classify_pid_state(pid, expected_start_ticks):
+    snapshot = _proc_snapshot(pid)
+    if snapshot.get("status") == "missing":
+        return {"classification": "dead", "pid": pid}
+    if snapshot.get("status") != "ok":
+        return {**snapshot, "classification": "unknown"}
+    if int(snapshot["start_ticks"]) != int(expected_start_ticks):
+        return {**snapshot, "classification": "pid_reused"}
+    return {**snapshot, "classification": "zombie" if snapshot["state"] == "Z" else "live"}
+
+
+def _cleanup_owned_live_descendants(descendant_identity, classify=_classify_pid_state,
+                                    kill_process=os.kill, kill_signal=signal.SIGKILL):
+    signaled = []
+    for identity in descendant_identity:
+        if type(identity) is not dict:
+            continue
+        pid = identity.get("pid")
+        start_ticks = identity.get("start_ticks")
+        expected_pgrp = identity.get("pgrp")
+        if type(pid) is not int or type(start_ticks) is not int or type(expected_pgrp) is not int:
+            continue
+        state = classify(pid, start_ticks)
+        if type(state) is not dict:
+            continue
+        if state.get("classification") != "live" or state.get("status") != "ok":
+            continue
+        if state.get("pid") != pid or state.get("start_ticks") != start_ticks:
+            continue
+        if state.get("pgrp") != expected_pgrp:
+            continue
+        try:
+            kill_process(pid, kill_signal)
+            signaled.append(pid)
+        except ProcessLookupError:
+            pass
+    return signaled
+
+
 def _historical_helper_diagnostic_fields(metrics):
     if type(metrics) is not dict:
         return {}
@@ -1911,6 +1974,81 @@ process.stdout.write(JSON.stringify(runBatch({
                     if ack_marker.exists():
                         ack_marker.unlink()
 
+    def test_pid_classification_fails_closed_on_unknown_proc_evidence(self):
+        pid = 43210
+        expected_start = 98765
+
+        def proc_stat_line(state="S", ppid=111, pgrp=111, start_ticks=expected_start):
+            fields = [state, str(ppid), str(pgrp)] + (["0"] * 16) + [str(start_ticks)]
+            return f"{pid} (node) {' '.join(fields)}\n"
+
+        with patch.object(Path, "read_text", return_value=proc_stat_line(state="S")):
+            self.assertEqual(
+                _classify_pid_state(pid, expected_start)["classification"],
+                "live")
+
+        with patch.object(Path, "read_text", return_value=proc_stat_line(state="Z")):
+            self.assertEqual(
+                _classify_pid_state(pid, expected_start)["classification"],
+                "zombie")
+
+        with patch.object(Path, "read_text", return_value=proc_stat_line(start_ticks=expected_start + 1)):
+            self.assertEqual(
+                _classify_pid_state(pid, expected_start)["classification"],
+                "pid_reused")
+
+        with patch.object(Path, "read_text", side_effect=FileNotFoundError):
+            self.assertEqual(
+                _classify_pid_state(pid, expected_start)["classification"],
+                "dead")
+
+        unknown_cases = (
+            ("malformed", {"return_value": f"{pid} node missing-delimiter"}, "STAT_FORMAT"),
+            ("short", {"return_value": f"{pid} (node) S 1 1"}, "STAT_FIELDS"),
+            ("invalid_numeric", {"return_value": proc_stat_line(ppid="x")}, "STAT_NUMERIC"),
+            ("permission", {"side_effect": PermissionError()}, "READ_PERMISSION"),
+        )
+        for name, kwargs, expected_reason in unknown_cases:
+            with self.subTest(name=name):
+                with patch.object(Path, "read_text", **kwargs):
+                    classification = _classify_pid_state(pid, expected_start)
+                self.assertEqual(classification.get("classification"), "unknown")
+                self.assertEqual(classification.get("reason"), expected_reason)
+                self.assertNotEqual(classification.get("classification"), "dead")
+
+    def test_cleanup_owned_live_descendants_signals_only_same_owned_live_identity(self):
+        identity = {"pid": 22222, "start_ticks": 33333, "pgrp": 44444}
+
+        def classify_factory(response):
+            def classify(pid, start_ticks):
+                self.assertEqual((pid, start_ticks), (identity["pid"], identity["start_ticks"]))
+                return {**response, "pid": pid, "start_ticks": start_ticks}
+            return classify
+
+        no_signal_cases = (
+            ("pid_reused", {"classification": "pid_reused", "status": "ok", "pgrp": identity["pgrp"]}),
+            ("zombie", {"classification": "zombie", "status": "ok", "pgrp": identity["pgrp"]}),
+            ("missing", {"classification": "dead", "status": "missing", "pgrp": identity["pgrp"]}),
+            ("unknown", {"classification": "unknown", "status": "unknown", "reason": "STAT_FORMAT",
+                         "pgrp": identity["pgrp"]}),
+            ("live_unowned_group", {"classification": "live", "status": "ok", "pgrp": identity["pgrp"] + 1}),
+        )
+        for name, response in no_signal_cases:
+            with self.subTest(name=name):
+                observed = []
+                _cleanup_owned_live_descendants(
+                    [identity],
+                    classify=classify_factory(response),
+                    kill_process=lambda pid, sig: observed.append((pid, sig)))
+                self.assertEqual(observed, [])
+
+        observed = []
+        _cleanup_owned_live_descendants(
+            [identity],
+            classify=classify_factory({"classification": "live", "status": "ok", "pgrp": identity["pgrp"]}),
+            kill_process=lambda pid, sig: observed.append((pid, sig)))
+        self.assertEqual(observed, [(identity["pid"], signal.SIGKILL)])
+
     def test_parent_exit_with_inherited_pipe_times_out_after_started_ack(self):
         marker = Path(f"/tmp/meridian-m11-inherited-pipe-{os.getpid()}")
         ack_marker = Path(f"/tmp/meridian-m11-fault-ack-{os.getpid()}-d-0.ready")
@@ -1919,6 +2057,9 @@ process.stdout.write(JSON.stringify(runBatch({
         descendant_marker = Path(str(marker) + ".descendant")
         descendant_term_marker = Path(str(marker) + ".descendant.term")
         descendants = []
+        descendant_identity = []
+        descendant_pre_cleanup_states = []
+        descendant_exit_states = []
         for path in (ack_marker, parent_marker, parent_fds_marker, descendant_marker, descendant_term_marker):
             if path.exists():
                 path.unlink()
@@ -1970,6 +2111,20 @@ process.stdout.write(JSON.stringify(runBatch({
                 parent_fds = json.loads(parent_fds_marker.read_text())
                 self.assertEqual((descendant["fd1"], descendant["fd2"]),
                                  (parent_fds["fd1"], parent_fds["fd2"]))
+                initial_snapshot = _proc_snapshot(descendant["pid"])
+                self.assertEqual(initial_snapshot.get("status"), "ok")
+                self.assertEqual(initial_snapshot["pgrp"], parent_pid)
+                descendant_identity.append({
+                    "pid": descendant["pid"],
+                    "ppid_at_spawn": descendant["ppid"],
+                    "ppid": initial_snapshot["ppid"],
+                    "pgrp": initial_snapshot["pgrp"],
+                    "start_ticks": initial_snapshot["start_ticks"],
+                })
+                pre_cleanup_state = _classify_pid_state(
+                    descendant["pid"], initial_snapshot["start_ticks"])
+                descendant_pre_cleanup_states.append(pre_cleanup_state)
+                self.assertEqual(pre_cleanup_state.get("classification"), "live")
                 os.kill(descendant["pid"], 0)
                 thread.join(timeout=6)
             self.assertFalse(thread.is_alive())
@@ -1977,6 +2132,8 @@ process.stdout.write(JSON.stringify(runBatch({
             self.assertEqual(len(result), 1)
             settled = result[0]
             elapsed = time.monotonic() - started
+            for identity in descendant_identity:
+                descendant_exit_states.append(_classify_pid_state(identity["pid"], identity["start_ticks"]))
             paths = settled.get("paths") if type(settled) is dict else None
             diagnostic = json.dumps({
                 "elapsed_seconds": round(elapsed, 3),
@@ -1988,14 +2145,17 @@ process.stdout.write(JSON.stringify(runBatch({
                 "descendant_marker_exists": descendant_marker.exists(),
                 "descendant_term_exists": descendant_term_marker.exists(),
                 "descendant_count": len(descendants),
+                "descendant_identity": descendant_identity,
+                "descendant_pre_cleanup_states": descendant_pre_cleanup_states,
+                "descendant_exit_states": descendant_exit_states,
                 "child_returncode": None if not children else children[0].poll(),
             }, sort_keys=True, separators=(",", ":"))
             self.assertEqual(settled["state"], "timed_out", diagnostic)
             self.assertEqual(settled["reason"], "DEADLINE_EXCEEDED", diagnostic)
             self.assertEqual(ack_marker.read_text(), f"{'d'*64}:0", diagnostic)
-            for pid in descendants:
-                with self.assertRaises(ProcessLookupError, msg=diagnostic):
-                    os.kill(pid, 0)
+            for state in descendant_exit_states:
+                self.assertIn(state.get("classification"), ("dead", "zombie", "pid_reused"), diagnostic)
+                self.assertNotEqual(state.get("classification"), "live", diagnostic)
             self.assertIsNotNone(children[0].poll(), diagnostic)
             self.assertIsInstance(paths, list, diagnostic)
             self.assertTrue(paths, diagnostic)
@@ -2010,11 +2170,7 @@ process.stdout.write(JSON.stringify(runBatch({
         finally:
             if thread is not None and thread.is_alive():
                 thread.join(timeout=6)
-            for pid in descendants:
-                try:
-                    os.kill(pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
+            _cleanup_owned_live_descendants(descendant_identity)
             for path in (ack_marker, parent_marker, parent_fds_marker, descendant_marker, descendant_term_marker):
                 if path.exists():
                     path.unlink()
