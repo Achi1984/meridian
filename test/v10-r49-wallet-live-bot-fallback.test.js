@@ -5,10 +5,12 @@ import fs from 'node:fs';
 const account=fs.readFileSync(new URL('../pionex-account-read-sync.js',import.meta.url),'utf8');
 const gateway=fs.readFileSync(new URL('../server-gateway.js',import.meta.url),'utf8');
 const v9=fs.readFileSync(new URL('../v9/v9.js',import.meta.url),'utf8');
+const pionexRisk=fs.readFileSync(new URL('../v9/pionex-risk-snapshot.js',import.meta.url),'utf8');
 const v10=fs.readFileSync(new URL('../v10/v10.js',import.meta.url),'utf8');
 const root=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
 const v9html=fs.readFileSync(new URL('../v9/index.html',import.meta.url),'utf8');
 const release=JSON.parse(fs.readFileSync(new URL('../version.json',import.meta.url),'utf8'));
+const {selectPionexRisk}=await import('../v9/pionex-risk-snapshot.js');
 
 test('r49 builds wallet-derived live bot risk only from validated futures_grid details',()=>{
   assert.match(account,/function buildWalletBotRisk/);
@@ -19,11 +21,47 @@ test('r49 builds wallet-derived live bot risk only from validated futures_grid d
 });
 
 test('r49 selects wallet detail only when fresh and complete',()=>{
-  assert.match(v9,/function selectPionexRisk/);
-  assert.match(v9,/WALLET_DETAIL_OK/);
-  assert.match(v9,/freshRisk/);
-  assert.match(v9,/15\*60\*1000/);
-  assert.match(v9,/wallet\?\.detailsComplete===true/);
+  assert.match(v9,/import \{selectPionexRisk,pionexFeedComplete,pionexCandidateValid,publishPionexSnapshot\} from '\.\/pionex-risk-snapshot\.js\?v=10\.0-r130'/);
+  assert.match(v9,/selected=selectPionexRisk\(d\)/);
+  assert.match(pionexRisk,/WALLET_DETAIL_OK/);
+  assert.match(pionexRisk,/freshRisk/);
+  assert.match(pionexRisk,/15\*60\*1000/);
+  assert.match(pionexRisk,/wallet\?\.detailsComplete===true/);
+});
+
+test('r49 selector accepts only fresh complete wallet details and preserves primary priority',()=>{
+  const now=Date.parse('2026-10-30T10:00:00.000Z'),freshAt=new Date(now-60000).toISOString();
+  const wallet={updatedAt:freshAt,detailsComplete:true,bots:[{id:'synthetic-wallet'}]};
+  const walletOnly=selectPionexRisk({
+    pionexBotSync:{status:'DISABLED_MISSING_CREDENTIALS'},
+    pionexAccountSync:{status:'OK'},
+    pionexAccount:{walletBotRisk:wallet}
+  },now);
+  assert.equal(walletOnly.kind,'WALLET_DETAIL');
+  assert.equal(walletOnly.status,'WALLET_DETAIL_OK');
+  assert.equal(walletOnly.risk,wallet);
+
+  for(const candidate of [
+    {...wallet,updatedAt:new Date(now-16*60*1000).toISOString()},
+    {...wallet,detailsComplete:false}
+  ]){
+    const rejected=selectPionexRisk({
+      pionexBotSync:{status:'DISABLED_MISSING_CREDENTIALS'},
+      pionexAccountSync:{status:'OK'},
+      pionexAccount:{walletBotRisk:candidate}
+    },now);
+    assert.notEqual(rejected.status,'WALLET_DETAIL_OK');
+  }
+
+  const primary={updatedAt:freshAt,detailsComplete:true,paginationComplete:true,
+    coverage:{status:'DOCUMENTED',paginationComplete:true},bots:[{id:'synthetic-primary'}]};
+  const preferred=selectPionexRisk({
+    pionexRisk:primary,pionexBotSync:{status:'OK'},
+    pionexAccountSync:{status:'OK'},pionexAccount:{walletBotRisk:wallet}
+  },now);
+  assert.equal(preferred.kind,'BOT_API');
+  assert.equal(preferred.status,'BOT_API_OK');
+  assert.equal(preferred.risk,primary);
 });
 
 test('r49 keeps classic Bot API status separate from active wallet source',()=>{

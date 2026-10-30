@@ -5,6 +5,7 @@ import fs from 'node:fs';
 const account=fs.readFileSync(new URL('../pionex-account-read-sync.js',import.meta.url),'utf8');
 const gateway=fs.readFileSync(new URL('../server-gateway.js',import.meta.url),'utf8');
 const v9=fs.readFileSync(new URL('../v9/v9.js',import.meta.url),'utf8');
+const pionexRisk=fs.readFileSync(new URL('../v9/pionex-risk-snapshot.js',import.meta.url),'utf8');
 const v10=fs.readFileSync(new URL('../v10/v10.js',import.meta.url),'utf8');
 const root=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
 const v9html=fs.readFileSync(new URL('../v9/index.html',import.meta.url),'utf8');
@@ -33,8 +34,10 @@ test('r50 UI shows normalization coverage without relaxing the guard',()=>{
 });
 
 test('r50 leaves source selection and trading decisions unchanged',()=>{
-  assert.match(v9,/wallet\?\.detailsComplete===true/);
-  assert.match(v9,/freshRisk/);
+  assert.match(v9,/import \{selectPionexRisk,pionexFeedComplete,pionexCandidateValid,publishPionexSnapshot\} from '\.\/pionex-risk-snapshot\.js\?v=10\.0-r130'/);
+  assert.match(v9,/selected=selectPionexRisk\(d\)/);
+  assert.match(pionexRisk,/wallet\?\.detailsComplete===true/);
+  assert.match(pionexRisk,/freshRisk/);
   const readiness=v9.slice(v9.indexOf('function safetyReadyBot'),v9.indexOf('function exposureIntegrity'));
   assert.doesNotMatch(readiness,/rejectReasonCounts|statusCounts|trendCounts|detailEnvelopeFields/);
   const plan=v9.slice(v9.indexOf('function profitLockPlan'),v9.indexOf('function topProfitPlan'));
