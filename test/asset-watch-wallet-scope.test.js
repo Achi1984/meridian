@@ -219,6 +219,7 @@ const VALID_SCOPE_DIAGNOSTICS={
   scopePresent:true,schemaOk:true,botTypeOk:true,exclusionsVerified:true,
   excludedRowsEqualsUnsupported:true,categoriesVerified:true,countsVerified:true,
   candidateCount:2,unsupportedCount:1,unrecognizedNonemptyCategoryCount:0,
+  unverifiedCategoryShape:null,
   typeCounts:{futures_grid:1,futures_lite:1,OTHER:0}
 };
 function scopeSummary(state,expectedEligible){
@@ -261,6 +262,7 @@ test('missing scope is distinct from missing producer diagnostic evidence',async
     scopePresent:false,schemaOk:null,botTypeOk:null,exclusionsVerified:null,
     excludedRowsEqualsUnsupported:null,categoriesVerified:null,countsVerified:null,
     candidateCount:null,unsupportedCount:null,unrecognizedNonemptyCategoryCount:null,
+    unverifiedCategoryShape:null,
     typeCounts:{futures_grid:null,futures_lite:null,OTHER:null}
   });
   const empty=buildWalletBotRisk();
@@ -294,7 +296,9 @@ test('nonempty unrecognized categories are distinguished without exposing catego
   }]});
   assert.deepEqual(scopeSummary(state,false),{
     ...VALID_SCOPE_DIAGNOSTICS,exclusionsVerified:false,categoriesVerified:false,
-    unrecognizedNonemptyCategoryCount:1
+    unrecognizedNonemptyCategoryCount:1,
+    unverifiedCategoryShape:{countKind:'NUMBER',zeroVerified:false,listKind:'ARRAY',
+      listEmpty:false,hasMoreFalse:true}
   });
 });
 
@@ -303,16 +307,120 @@ test('unverified category shape remains unknown rather than claiming no unrecogn
     type:'PRIVATE_CANARY_EMPTY',count:0,hasMore:false,list:[]
   }]});
   assert.deepEqual(scopeSummary(empty,true),VALID_SCOPE_DIAGNOSTICS);
-  for(const category of [
-    {type:'PRIVATE_CANARY_MISSING',hasMore:false},
-    {type:'PRIVATE_CANARY_NULL',count:null,hasMore:false,list:[]},
-    {type:'PRIVATE_CANARY_MORE',count:0,hasMore:true,list:[]}
+  for(const [category,shape] of [
+    [{type:'PRIVATE_CANARY_MISSING',hasMore:false},
+      {countKind:'MISSING',zeroVerified:null,listKind:'MISSING',listEmpty:null,hasMoreFalse:true}],
+    [{type:'PRIVATE_CANARY_NULL',count:null,hasMore:false,list:[]},
+      {countKind:'NULL',zeroVerified:null,listKind:'ARRAY',listEmpty:true,hasMoreFalse:true}],
+    [{type:'PRIVATE_CANARY_MORE',count:0,hasMore:true,list:[]},
+      {countKind:'NUMBER',zeroVerified:true,listKind:'ARRAY',listEmpty:true,hasMoreFalse:false}]
   ]){
     const state=await produce({extraCategories:[category]});
     assert.deepEqual(scopeSummary(state,false),{
       ...VALID_SCOPE_DIAGNOSTICS,exclusionsVerified:false,categoriesVerified:false,
-      unrecognizedNonemptyCategoryCount:null
+      unrecognizedNonemptyCategoryCount:null,unverifiedCategoryShape:shape
     });
+  }
+});
+
+test('explicit numeric and canonical string empty categories preserve grid/lite authority through the real chain',async()=>{
+  const baseline=(await produce()).pionexAccount.walletBotRisk.bots;
+  for(const count of [0,'0']){
+    const category={type:'PRIVATE_CANARY_EMPTY',count,hasMore:false,list:[]};
+    const state=await produce({extraCategories:[category]});
+    const wallet=state.pionexAccount.wallet,risk=state.pionexAccount.walletBotRisk;
+    assert.equal(wallet.botCategories[1].count,0);
+    assert.equal(wallet.botCategories[1].listCount,0);
+    assert.equal(risk.paginationComplete,true);
+    assert.equal(risk.supportedScope.exclusionsVerified,true);
+    assert.equal(risk.supportedRows,1);assert.equal(risk.unsupportedRows,1);
+    assert.deepEqual(scopeSummary(state,true),VALID_SCOPE_DIAGNOSTICS);
+    assert.deepEqual(risk.bots,baseline);
+  }
+  const stringCounts=await produce({count:'2',extraCategories:[
+    {type:'FUTURES_LITE',count:'0',hasMore:false,list:[]}
+  ]});
+  assert.deepEqual(scopeSummary(stringCounts,true),VALID_SCOPE_DIAGNOSTICS);
+});
+
+test('unknown, coercion-only and invalid empty-category counts remain unknown and fail closed',async()=>{
+  for(const [count,countKind] of [
+    [undefined,'MISSING'],[null,'NULL'],['','STRING'],[' ','STRING'],['\t\n','STRING'],
+    [false,'BOOLEAN'],[true,'BOOLEAN'],[-1,'NUMBER'],[0.5,'NUMBER'],
+    [Number.MAX_SAFE_INTEGER+1,'NUMBER'],['9007199254740992','STRING'],
+    ['-1','STRING'],['0.5','STRING'],    ['0.0','STRING'],['00','STRING'],[' 0 ','STRING'],['0\n','STRING'],['0\r','STRING'],['0\u2028','STRING'],
+    ['+0','STRING'],['-0','STRING'],['0e0','STRING'],['0x0','STRING'],['PRIVATE_CANARY_COUNT','STRING'],
+    [[], 'OTHER'],[{},'OTHER']
+  ]){
+    const category={type:'PRIVATE_CANARY_EMPTY',count,hasMore:false,list:[]};
+    const state=await produce({extraCategories:[category]});
+    assert.equal(state.pionexAccount.wallet.botCategories[1].count,null);
+    assert.equal(state.pionexAccount.walletBotRisk.paginationComplete,false);
+    const result=chain(state);
+    rejected(result,'UNSUPPORTED_SCOPE');rejected(result,'PAGINATION_INCOMPLETE');
+    assert.deepEqual(scopeSummary(state,false),{
+      ...VALID_SCOPE_DIAGNOSTICS,exclusionsVerified:false,categoriesVerified:false,
+      unrecognizedNonemptyCategoryCount:null,
+      unverifiedCategoryShape:{countKind,zeroVerified:null,listKind:'ARRAY',
+        listEmpty:true,hasMoreFalse:true}
+    });
+  }
+});
+
+test('empty-category exclusions require an explicit empty array and explicit no-more-pages',async()=>{
+  for(const [list,listKind] of [[undefined,'MISSING'],[null,'NULL'],[{},'OTHER'],['','OTHER']]){
+    const state=await produce({extraCategories:[
+      {type:'PRIVATE_CANARY_EMPTY',count:'0',hasMore:false,list}
+    ]});
+    rejected(chain(state),'UNSUPPORTED_SCOPE');rejected(chain(state),'PAGINATION_INCOMPLETE');
+    assert.deepEqual(scopeSummary(state,false),{
+      ...VALID_SCOPE_DIAGNOSTICS,exclusionsVerified:false,categoriesVerified:false,
+      unrecognizedNonemptyCategoryCount:null,
+      unverifiedCategoryShape:{countKind:'STRING',zeroVerified:true,listKind,
+        listEmpty:null,hasMoreFalse:true}
+    });
+  }
+  for(const hasMore of [undefined,null,true,'false',0]){
+    const state=await produce({extraCategories:[
+      {type:'PRIVATE_CANARY_EMPTY',count:'0',hasMore,list:[]}
+    ]});
+    rejected(chain(state),'UNSUPPORTED_SCOPE');rejected(chain(state),'PAGINATION_INCOMPLETE');
+    const diagnostic=scopeSummary(state,false);
+    assert.equal(diagnostic.unverifiedCategoryShape.hasMoreFalse,hasMore===true?false:null);
+  }
+});
+
+test('zero counts cannot hide nonempty unknown categories and positive string counts remain nonempty evidence',async()=>{
+  for(const count of [0,'0',1,'1']){
+    const state=await produce({extraCategories:[
+      {type:'PRIVATE_CANARY_NONEMPTY',count,hasMore:false,list:[grid('PRIVATE_CANARY_ID')]}
+    ]});
+    rejected(chain(state),'UNSUPPORTED_SCOPE');
+    const diagnostic=scopeSummary(state,false);
+    assert.equal(diagnostic.categoriesVerified,false);
+    assert.equal(diagnostic.unrecognizedNonemptyCategoryCount,1);
+    assert.equal(diagnostic.unverifiedCategoryShape.listEmpty,false);
+    assert.equal(diagnostic.unverifiedCategoryShape.zeroVerified,count===0||count==='0');
+  }
+  const state=await produce({extraCategories:[
+    {type:'PRIVATE_CANARY_NONEMPTY',count:'1',hasMore:false,list:[]}
+  ]});
+  assert.equal(scopeSummary(state,false).unrecognizedNonemptyCategoryCount,1);
+});
+
+test('recognized categories cannot bypass missing-count or missing-list pagination checks',async()=>{
+  for(const count of [null,'',false,-1,0.5,'PRIVATE_CANARY_COUNT']){
+    const state=await produce({count});
+    assert.equal(state.pionexAccount.wallet.botCategories[0].count,null);
+    rejected(chain(state),'PAGINATION_INCOMPLETE');
+  }
+  for(const category of [
+    {type:'TRADING_BOT',hasMore:false,list:[]},
+    {type:'FUTURES_LITE',count:0,hasMore:false},
+    {hasMore:false}
+  ]){
+    const state=await produce({extraCategories:[category]});
+    rejected(chain(state),'PAGINATION_INCOMPLETE');
   }
 });
 

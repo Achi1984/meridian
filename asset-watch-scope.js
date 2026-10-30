@@ -13,6 +13,16 @@ export function safeOverwriteRejectionReasons(value){
 export function safeScopeCount(value){
   return Number.isSafeInteger(value)&&value>=0&&value<=1_000_000?value:null;
 }
+function safeCategoryShape(value){
+  if(!value||typeof value!=='object'||Array.isArray(value))return null;
+  return {
+    countKind:['MISSING','NULL','NUMBER','STRING','BOOLEAN','OTHER'].includes(value.countKind)?value.countKind:null,
+    zeroVerified:typeof value.zeroVerified==='boolean'?value.zeroVerified:null,
+    listKind:['MISSING','NULL','ARRAY','OTHER'].includes(value.listKind)?value.listKind:null,
+    listEmpty:typeof value.listEmpty==='boolean'?value.listEmpty:null,
+    hasMoreFalse:typeof value.hasMoreFalse==='boolean'?value.hasMoreFalse:null
+  };
+}
 export function safeScopeDiagnostics(value){
   if(!value||typeof value!=='object'||Array.isArray(value))return null;
   const flags=['scopePresent','schemaOk','botTypeOk','exclusionsVerified',
@@ -22,6 +32,7 @@ export function safeScopeDiagnostics(value){
     candidateCount:safeScopeCount(value.candidateCount),
     unsupportedCount:safeScopeCount(value.unsupportedCount),
     unrecognizedNonemptyCategoryCount:safeScopeCount(value.unrecognizedNonemptyCategoryCount),
+    unverifiedCategoryShape:safeCategoryShape(value.unverifiedCategoryShape),
     typeCounts:Object.fromEntries(['futures_grid','futures_lite','OTHER'].map(key=>
       [key,safeScopeCount(value.typeCounts?.[key])]))
   };

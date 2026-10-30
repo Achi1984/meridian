@@ -115,6 +115,8 @@ test('scope diagnostics are closed, bounded and re-sanitized at both public boun
       scopePresent:true,schemaOk:canary,botTypeOk:false,exclusionsVerified:'true',
       excludedRowsEqualsUnsupported:null,categoriesVerified:false,countsVerified:true,
       candidateCount:count,unsupportedCount:count,unrecognizedNonemptyCategoryCount:count,
+      unverifiedCategoryShape:{countKind:canary,zeroVerified:canary,listKind:canary,
+        listEmpty:canary,hasMoreFalse:canary,category:canary,count:123456789,list:[canary]},
       typeCounts:{futures_grid:count,futures_lite:count,OTHER:count,[canary]:123456789},
       category:canary,id:canary,symbol:canary,amount:123456789,url:canary,credential:canary,
       payload:{secret:canary},writerSha:canary
@@ -123,6 +125,8 @@ test('scope diagnostics are closed, bounded and re-sanitized at both public boun
       scopePresent:true,schemaOk:null,botTypeOk:false,exclusionsVerified:null,
       excludedRowsEqualsUnsupported:null,categoriesVerified:false,countsVerified:true,
       candidateCount:expected,unsupportedCount:expected,unrecognizedNonemptyCategoryCount:expected,
+      unverifiedCategoryShape:{countKind:null,zeroVerified:null,listKind:null,
+        listEmpty:null,hasMoreFalse:null},
       typeCounts:{futures_grid:expected,futures_lite:expected,OTHER:expected}
     };
     const receipt=assetWatchMirrorPublicReceipt({scopeDiagnostics});
@@ -138,5 +142,23 @@ test('scope diagnostics are closed, bounded and re-sanitized at both public boun
     assert.equal(assetWatchMirrorPublicReceipt({scopeDiagnostics:value}).scopeDiagnostics,null);
     assert.equal(JSON.parse(assetWatchStrictGateDiagnostics({receipt:{scopeDiagnostics:value}},null))
       .scopeDiagnostics,null);
+  }
+});
+
+test('category shape diagnostics accept only closed enums and typed evidence at both public boundaries',()=>{
+  for(const countKind of ['MISSING','NULL','NUMBER','STRING','BOOLEAN','OTHER']){
+    for(const listKind of ['MISSING','NULL','ARRAY','OTHER']){
+      const shape={countKind,zeroVerified:null,listKind,listEmpty:false,hasMoreFalse:true};
+      const receipt=assetWatchMirrorPublicReceipt({scopeDiagnostics:{unverifiedCategoryShape:shape}});
+      assert.deepEqual(receipt.scopeDiagnostics.unverifiedCategoryShape,shape);
+      assert.deepEqual(JSON.parse(assetWatchStrictGateDiagnostics({receipt},null))
+        .scopeDiagnostics.unverifiedCategoryShape,shape);
+    }
+  }
+  for(const unverifiedCategoryShape of [undefined,null,false,'PRIVATE_CANARY',[]]){
+    const receipt=assetWatchMirrorPublicReceipt({scopeDiagnostics:{unverifiedCategoryShape}});
+    assert.equal(receipt.scopeDiagnostics.unverifiedCategoryShape,null);
+    assert.equal(JSON.parse(assetWatchStrictGateDiagnostics({receipt},null))
+      .scopeDiagnostics.unverifiedCategoryShape,null);
   }
 });
