@@ -430,7 +430,7 @@ test('incomplete refresh preserves the authoritative snapshot and clears only af
 });
 
 test('sync orchestration persists partial pages separately and accepts the next complete refresh',async()=>{
-  const at=Date.parse('2026-09-26T18:00:00.000Z');
+  let at=Date.parse('2026-09-26T18:00:00.000Z');
   const env={DATABASE_URL:'synthetic://state',PIONEX_BOT_READ_API_KEY:'synthetic-key',PIONEX_BOT_READ_API_SECRET:'synthetic-secret'};
   const listFor=ids=>ids.map(id=>({buOrderType:'futures_grid',buOrderId:id,base:'BTC.PERP',status:'running',
     buOrderData:{status:'running',trend:'long',leverage:2,bottom:'1',top:'2'}}));
@@ -459,6 +459,7 @@ test('sync orchestration persists partial pages separately and accepts the next 
   const authoritative=structuredClone(state.pionexRisk);
   const lastSuccessAt=state.pionexBotSync.lastSuccessAt;
 
+  at+=60000;
   setRows(['synthetic-page-only'],'synthetic-next-page');
   const partial=await run();
   assert.equal(partial.status,'PARTIAL');assert.equal(partial.ok,false);
@@ -467,12 +468,14 @@ test('sync orchestration persists partial pages separately and accepts the next 
   assert.equal(state.pionexBotSync.truncated,true);
   assert.deepEqual(state.pionexRiskPartial.bots.map(row=>row.botOrderId),['synthetic-page-only']);
 
+  at+=60000;
   setRows(['synthetic-a','synthetic-b','synthetic-c']);
   const recovered=await run();
   assert.equal(recovered.status,'OK');assert.equal(recovered.ok,true);
   assert.deepEqual(state.pionexRisk.bots.map(row=>row.botOrderId),['synthetic-a','synthetic-b','synthetic-c']);
   assert.equal(Object.hasOwn(state,'pionexRiskPartial'),false);
   assert.equal(state.pionexBotSync.truncated,false);
+  assert.notEqual(state.pionexBotSync.lastSuccessAt,lastSuccessAt);
 });
 
 test('futures-grid details are loaded with the signed read-only detail endpoint',async()=>{
