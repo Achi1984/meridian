@@ -3,6 +3,7 @@ import pg from 'pg';
 import {pionexReadGet} from './pionex-read-client.js';
 import {PIONEX_FUTURES_GRID_DETAIL_PATH,mergePionexOrderDetail} from './pionex-bot-detail-read.js';
 import {inspectPionexBotOrder,normalizePionexBotOrder} from './pionex-bot-auto-sync.js';
+import {WALLET_SCOPE} from './asset-watch-scope.js';
 
 const {Pool}=pg;
 const PRIVATE_STATE_KEY='private_dashboard_v1';
@@ -113,7 +114,6 @@ export function normalizeWalletBotEntries(detail=[]){
     if(!['TRADING_BOT','FUTURES_LITE'].includes(categoryType))continue;
     for(const row of Array.isArray(category?.list)?category.list:[]){
       const buOrderId=text(row?.buOrderId);
-      if(!buOrderId)continue;
       out.push({
         walletCategory:categoryType,
         buOrderId,
@@ -129,7 +129,7 @@ export function normalizeWalletBotEntries(detail=[]){
   }
   return out;
 }
-export async function probeWalletBotDetails(entries=[],{apiKey,apiSecret,fetchImpl=fetch,now=Date.now,delayMs=125,maxRows=50}={}){
+export async function probeWalletBotDetails(entries=[],{apiKey,apiSecret,fetchImpl=fetch,now=Date.now,delayMs=125,maxRows=50,paginationComplete=null,categoriesVerified=null}={}){
   const rows=Array.isArray(entries)?entries:[];
   if(rows.length>maxRows)throw new Error('pionex_wallet_bot_probe_row_limit');
   const details=[],failures=[];
@@ -149,6 +149,8 @@ export async function probeWalletBotDetails(entries=[],{apiKey,apiSecret,fetchIm
     if(i<rows.length-1&&delayMs>0)await new Promise(r=>setTimeout(r,delayMs));
   }
   return {
+    paginationComplete,
+    categoriesVerified,
     candidateCount:rows.length,
     successCount:details.length,
     failureCount:failures.length,
@@ -215,6 +217,12 @@ export function buildWalletBotRisk(probe={},iso=new Date().toISOString(),walletP
   }
   const ids=new Set(bots.map(x=>String(x?.botOrderId||x?.id||'')));
   const unique=ids.size===bots.length,detailsComplete=expected>0&&detailSuccess===expected&&bots.length===expected&&rejected.length===0&&unique;
+  const typeCounts=probe?.buOrderTypeCounts||{};
+  const countsVerified=Object.values(typeCounts).every(value=>Number.isSafeInteger(value)&&value>=0)&&
+    Object.values(typeCounts).reduce((sum,value)=>sum+value,0)===probe.candidateCount;
+  const excludedRows=Number.isSafeInteger(typeCounts.futures_lite)?typeCounts.futures_lite:0;
+  const exclusionsVerified=probe.categoriesVerified===true&&countsVerified&&Object.keys(typeCounts)
+    .every(type=>['futures_grid','futures_lite'].includes(type))&&excludedRows===unsupported;
   return {
     source:'PIONEX_WALLET_BOT_DETAIL',
     syncMode:'WALLET_BOT_DETAIL_FALLBACK',
@@ -224,6 +232,12 @@ export function buildWalletBotRisk(probe={},iso=new Date().toISOString(),walletP
     supportedRows:expected,
     detailRows:detailSuccess,
     unsupportedRows:unsupported,
+    supportedScope:{
+      schemaVersion:WALLET_SCOPE,botType:'futures_grid',
+      exclusionsVerified,excludedRows,
+      identityComplete:!probe.failures?.some(row=>['duplicate_id','missing_id'].includes(row.reason))
+    },
+    paginationComplete:probe.paginationComplete===true?true:probe.paginationComplete===false?false:null,
     normalizedRows:bots.length,
     detailsComplete,
     bots,
@@ -270,6 +284,11 @@ export function normalizeWalletOverview(data={}){
     botCategoryCount:botCategories.length,
     botReportedCount:botCategories.reduce((n,x)=>n+(Number.isFinite(x.count)?x.count:x.listCount),0),
     botListCount:botCategories.reduce((n,x)=>n+x.listCount,0),
+    botPaginationComplete:Array.isArray(bot.detail)&&bot.detail.every(x=>x?.hasMore===false)&&
+      botCategories.every(x=>x.count!==null&&x.count>=0&&x.count===x.listCount),
+    botScopeCategoriesVerified:Array.isArray(bot.detail)&&bot.detail.every(x=>
+      ['TRADING_BOT','FUTURES_LITE'].includes(String(x?.type||'').toUpperCase())||
+      x?.hasMore===false&&x?.count===0&&Array.isArray(x?.list)&&x.list.length===0),
     traderCategoryCount:traderCategories.length,
     source:'PIONEX_WALLET_READ_API'
   };
@@ -285,7 +304,10 @@ export async function fetchPionexReadSnapshot({apiKey,apiSecret,fetchImpl=fetch,
   const futures=normalizeFuturesBalances(fut?.data||{});
   const normalizedPositions=normalizeFuturesPositions(positions?.data||{});
   const wallet=walletResult.ok?normalizeWalletOverview(walletResult.value?.data||{}):null;
-  const walletBotProbe=walletResult.ok?await probeWalletBotDetails(wallet?.botEntries||[],{apiKey,apiSecret,fetchImpl,now}):null;
+  const walletBotProbe=walletResult.ok?await probeWalletBotDetails(wallet?.botEntries||[],{
+    apiKey,apiSecret,fetchImpl,now,paginationComplete:wallet.botPaginationComplete,
+    categoriesVerified:wallet.botScopeCategoriesVerified
+  }):null;
   const spotBalances=normalizeSpotBalances(spot?.data||{});
   const at=new Date(now()).toISOString();
   const walletBotRisk=walletBotProbe?buildWalletBotRisk(walletBotProbe,at,wallet?.prices||{}):null;

@@ -15,14 +15,16 @@ test('strict diagnostics allow only typed flags, source enum, timestamps, ages a
   assert.deepEqual(JSON.parse(raw),{
     readOnly:true,executionImpact:false,detailsComplete:true,sourceStatusOk:true,fresh:true,
     usableForOverwrite:false,source:'PIONEX_BOT_API',sourceSnapshotAt:receipt.sourceSnapshotAt,
-    generatedAt:envelope.generatedAt,sourceAgeMs:1000,freshnessLimitMs:900000,deploymentSha:'a'.repeat(40)
+    generatedAt:envelope.generatedAt,sourceAgeMs:1000,freshnessLimitMs:900000,deploymentSha:'a'.repeat(40),
+    overwriteScope:null,excludedScope:null,overwriteRejectionReasons:[]
   });
   assert.doesNotMatch(raw,/PRIVATE_MARKER|ciphertext|iv"|tag"|token|bots|coverage/);
   const hostile=Object.fromEntries(Object.keys(receipt).map(key=>[key,'PRIVATE_MARKER'.repeat(10000)]));
   const bounded=assetWatchStrictGateDiagnostics({receipt:hostile,generatedAt:hostile.source},
     {deploymentSha:hostile.source});
   assert.ok(bounded.length<512);
-  assert.ok(Object.values(JSON.parse(bounded)).every(value=>value===null));
+  assert.ok(Object.entries(JSON.parse(bounded)).every(([key,value])=>
+    key==='overwriteRejectionReasons'?Array.isArray(value)&&value.length===0:value===null));
   assert.doesNotThrow(()=>assetWatchStrictGateDiagnostics(null,null));
 });
 

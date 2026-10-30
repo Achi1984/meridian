@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {buildAssetWatchApiSnapshot} from '../asset-watch-bridge.js';
 import {mergePionexSyncState} from '../pionex-bot-auto-sync.js';
+import {buildWalletBotRisk} from '../pionex-account-read-sync.js';
 
 const NOW=Date.parse('2026-09-28T20:45:00.000Z');
 function bot(overrides={}){
@@ -42,6 +43,13 @@ function state(overrides={}){
     pionexAccountSync:{status:'OK',lastSuccessAt:'2026-09-28T20:39:00.000Z'},
     ...overrides
   };
+}
+function walletRisk(row){
+  return buildWalletBotRisk({candidateCount:1,paginationComplete:true,categoriesVerified:true,
+    buOrderTypeCounts:{futures_grid:1},successBuOrderTypeCounts:{futures_grid:1},
+    details:[{wallet:{buOrderId:row.botOrderId,buOrderType:'futures_grid'},
+      detail:{base:row.symbol,quote:'USDT',status:'running',buOrderData:{status:'running',trend:'long'}}}]
+  },'2026-09-28T20:41:00.000Z');
 }
 
 test('asset-watch bridge exports only a fresh complete read-only Pionex bot snapshot',()=>{
@@ -87,12 +95,7 @@ test('wallet bot detail is an authenticated failover when primary bot sync is st
     pionexRisk:{snapshotAt:'2026-09-28T19:00:00.000Z',detailsComplete:true,bots:[bot({symbol:'BTC'})]},
     pionexBotSync:{status:'ERROR',lastSuccessAt:'2026-09-28T19:00:00.000Z'},
     pionexAccount:{
-      walletBotRisk:{
-        snapshotAt:'2026-09-28T20:41:00.000Z',
-        updatedAt:'2026-09-28T20:41:00.000Z',
-        detailsComplete:true,
-        bots:[bot({symbol:'SUI',source:'PIONEX_WALLET_BOT_DETAIL'})]
-      }
+      walletBotRisk:walletRisk(bot({symbol:'SUI'}))
     },
     pionexAccountSync:{status:'OK',lastSuccessAt:'2026-09-28T20:41:00.000Z'}
   }),{now:NOW});
@@ -273,9 +276,9 @@ function partialWithWallet(){
   input.pionexRiskPartial={...input.pionexRisk,paginationComplete:false,
     coverage:{status:'PARTIAL',paginationComplete:false}};
   input.pionexBotSync={status:'PARTIAL',truncated:true};
-  input.pionexAccount={walletBotRisk:{...structuredClone(input.pionexRisk),
+  input.pionexAccount={walletBotRisk:{...walletRisk(bot({botOrderId:'synthetic-wallet',symbol:'SUI'})),
     coverage:{status:'DOCUMENTED',paginationComplete:true,unsupportedRows:0,unhydratedRows:0},
-    bots:[bot({botOrderId:'synthetic-wallet',symbol:'SUI'})]}};
+  }};
   return input;
 }
 

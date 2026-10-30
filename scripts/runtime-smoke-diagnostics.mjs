@@ -1,3 +1,5 @@
+import {OVERWRITE_SCOPES,EXCLUDED_SCOPES,safeOverwriteRejectionReasons} from '../asset-watch-scope.js';
+
 const FLAGS=['readOnly','executionImpact','detailsComplete','sourceStatusOk','fresh','usableForOverwrite'];
 const SOURCES=['PIONEX_BOT_API','PIONEX_WALLET_BOT_DETAIL','UNAVAILABLE'];
 
@@ -7,6 +9,9 @@ export function assetWatchStrictGateDiagnostics(envelope,health){
     key,typeof receipt[key]==='boolean'?receipt[key]:null
   ]));
   result.source=SOURCES.includes(receipt.source)?receipt.source:null;
+  result.overwriteScope=OVERWRITE_SCOPES.includes(receipt.overwriteScope)?receipt.overwriteScope:null;
+  result.excludedScope=EXCLUDED_SCOPES.includes(receipt.excludedScope)?receipt.excludedScope:null;
+  result.overwriteRejectionReasons=safeOverwriteRejectionReasons(receipt.overwriteRejectionReasons);
   for(const key of ['sourceSnapshotAt','generatedAt']){
     const value=key==='generatedAt'?envelope?.generatedAt:receipt[key];
     result[key]=typeof value==='string'&&value.length<=32&&Number.isFinite(Date.parse(value))
