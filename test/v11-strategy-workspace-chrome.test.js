@@ -733,16 +733,17 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
           if(size.width<840){
             assert.equal(tableViewport.scrollable,true);
             await key('ArrowRight','ArrowRight',39);
-            // Native scroll animation settles before its position is inspected.
-            await evaluate(`new Promise(resolve=>setTimeout(resolve,150))`);
-            const afterKeyboardScroll=await evaluate(`(()=>{
+            const afterKeyboardScroll=await evaluate(`new Promise(resolve=>{
               const region=document.querySelector('[id$="-path-table"]');
-              return {width:innerWidth,clientWidth:region.clientWidth,scrollWidth:region.scrollWidth,
+              const metrics=()=>({width:innerWidth,clientWidth:region.clientWidth,scrollWidth:region.scrollWidth,
                 scrollLeft:region.scrollLeft,focused:document.activeElement===region,
-                overflowX:getComputedStyle(region).overflowX};
-            })()`);
-            if(process.env.V11_SCROLL_DIAGNOSTICS)
-              console.log('V11_PATH_TABLE_SCROLL',JSON.stringify({tableViewport,afterKeyboardScroll}));
+                overflowX:getComputedStyle(region).overflowX});
+              const finish=()=>{clearTimeout(timer);region.removeEventListener('scroll',onScroll);resolve(metrics());};
+              const onScroll=()=>{if(region.scrollLeft>0)finish();};
+              const timer=setTimeout(finish,1000);
+              region.addEventListener('scroll',onScroll,{passive:true});
+              if(region.scrollLeft>0)finish();
+            })`);
             assert.ok(afterKeyboardScroll.scrollLeft>0,
               JSON.stringify({tableViewport,afterKeyboardScroll}));
           }
