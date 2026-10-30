@@ -12,7 +12,8 @@ const LABELS = {
 };
 const TYPES = {futures_grid:'Futures Grid', future_hedge_grid:'Futures Hedge Grid'};
 const MISSING = 'Nicht verfügbar';
-const TP_UNKNOWN_REASON = 'Der TP-Status ist nicht eindeutig bestätigt.';
+const TP_UNKNOWN_REASON = 'Die Quelle bestätigt keinen direkt vergleichbaren TP-Preis; fehlende Werte belegen kein ungesetztes TP.';
+const TP_UPPER_UNKNOWN_REASON = 'Die obere Range fehlt oder ist nicht eindeutig bestätigt.';
 const EMPTY_SNAPSHOT = 'Keine darstellbaren Bots in diesem Snapshot. Dies bestätigt kein leeres Wallet.';
 const SCOPE_REASONS = {
   UNSUPPORTED_SCOPE:'Der unterstützte Datenumfang ist nicht bestätigt.',
@@ -102,9 +103,11 @@ function projection(state, filters = {}) {
       const moneyCurrency=investmentCurrency==='USD'||investmentCurrency==='USDT';
       const productCategory=bot.productCategory==='FUTURES_MOON'?'Futures Moon':null;
       const tpCheck=bot.takeProfitCheck;
-      const takeProfitSet=tpCheck?.set===true?true:tpCheck?.set===false?false:null;
-      const takeProfitMatchesUpper=tpCheck?.matchesUpper===true?true:
-        tpCheck?.matchesUpper===false?false:null;
+      const knownTakeProfit=number(bot.metrics?.takeProfit)>0&&bot.takeProfitEvidence==='PRICE_SET';
+      const knownUpper=number(bot.metrics?.upper)>0;
+      const takeProfitSet=knownTakeProfit?true:null;
+      const takeProfitMatchesUpper=knownTakeProfit&&knownUpper&&
+        (tpCheck?.matchesUpper===true||tpCheck?.matchesUpper===false)?tpCheck.matchesUpper:null;
       return {symbol:bot.symbol, side:row.direction==='unknown'?'Unbekannt':row.direction[0].toUpperCase()+row.direction.slice(1),
         ref:row.ref,type:ownLabel(TYPES,bot.type),productCategory,
         category:row.category==='coin-m'?'COIN-M':row.category==='linear'?'Linear':'Unbekannt',
@@ -126,7 +129,7 @@ function projection(state, filters = {}) {
         takeProfit:formatExact(bot.metrics?.takeProfit),stopLoss:formatExact(bot.metrics?.stopLoss),
         upperRange:formatExact(bot.metrics?.upper),takeProfitSet,takeProfitMatchesUpper,
         takeProfitCheckReason:takeProfitMatchesUpper===null
-          ?typeof tpCheck?.reason==='string'?tpCheck.reason:TP_UNKNOWN_REASON:null};
+          ?knownTakeProfit?TP_UPPER_UNKNOWN_REASON:TP_UNKNOWN_REASON:null};
     });
     const losses=overview.losses.map(loss=>({ref:loss.ref,symbol:loss.symbol,direction:loss.direction,
       pnl:formatMoney(loss.pnl,'USD',true),pnlDetail:formatExact(loss.pnl,' USD'),pnlTone:loss.pnl<0?'negative':'positive'}));

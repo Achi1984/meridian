@@ -4,6 +4,8 @@ import {renderBotReadState,createBotReadView,renderCommandBotOverview} from '../
 import {buildBotReadModel} from '../v11/bot-read-model.js';
 import {createBotReadClient} from '../v11/bot-read-client.js';
 import {publishDepotPortfolioState} from '../v11/depot-portfolio-state.js?v=B17-M11';
+import {normalizePionexBotOrder} from '../pionex-bot-auto-sync.js';
+import {buildAssetWatchApiSnapshot} from '../asset-watch-bridge.js';
 
 // Deliberately minimal DOM contract fixture, not browser/layout acceptance.
 class Node {
@@ -414,7 +416,7 @@ test('collapsed native cards distinguish equal symbols and render only whitelist
 
 test('TP indicators are read-only, unknown evidence stays neutral, and mismatch warnings show exact values',()=>{
   const input=snapshot('2026-10-12T20:00:00Z');
-  input.bots[0].limits={takeProfit:90,upper:100};
+  input.bots[0].limits={takeProfit:90,upper:100,takeProfitEvidence:'PRICE_SET'};
   const mismatching=buildBotReadModel(input,{now:Date.parse(input.sourceSnapshotAt)+60000});
   const target=root();renderBotReadState(target,{status:'fresh',model:mismatching});
   let indicators=all(target,'input').filter(node=>node.getAttribute('aria-label')?.startsWith('TP'));
@@ -425,20 +427,20 @@ test('TP indicators are read-only, unknown evidence stays neutral, and mismatch 
   assert.match(target.textContent,/TP weicht von oberer Range ab/);
   assert.match(target.textContent,/TP-Wert: 90 · obere Range: 100/);
 
-  input.bots[0].limits={takeProfit:100,upper:100};
+  input.bots[0].limits={takeProfit:100,upper:100,takeProfitEvidence:'PRICE_SET'};
   const matching=buildBotReadModel(input,{now:Date.parse(input.sourceSnapshotAt)+60000});
   renderBotReadState(target,{status:'fresh',model:matching});
   indicators=all(target,'input').filter(node=>node.getAttribute('aria-label')?.startsWith('TP'));
   assert.ok(indicators.every(node=>node.checked&&!node.indeterminate));
   assert.doesNotMatch(target.textContent,/TP nicht prüfbar|TP weicht von oberer Range ab/);
 
-  input.bots[0].limits={takeProfit:null,upper:100};
+  input.bots[0].limits={takeProfit:null,upper:100,takeProfitEvidence:'UNKNOWN'};
   const unknown=buildBotReadModel(input,{now:Date.parse(input.sourceSnapshotAt)+60000});
   renderBotReadState(target,{status:'fresh',model:unknown});
   indicators=all(target,'input').filter(node=>node.getAttribute('aria-label')?.startsWith('TP'));
   assert.ok(indicators.every(node=>node.disabled&&node.indeterminate));
   assert.match(target.textContent,/TP nicht prüfbar/);
-  assert.match(target.textContent,/Quelle unterscheidet ein nicht gesetztes TP nicht/);
+  assert.match(target.textContent,/belegen kein ungesetztes TP/);
   assert.doesNotMatch(target.textContent,/Kein TP gesetzt|TP weicht von oberer Range ab/);
 
   renderBotReadState(target,{status:'stale'});
@@ -447,6 +449,35 @@ test('TP indicators are read-only, unknown evidence stays neutral, and mismatch 
   renderBotReadState(target,{status:'locked'});
   assert.equal(all(target,'input').filter(node=>node.getAttribute('aria-label')?.startsWith('TP')).length,0);
 });
+
+ test('producer-to-view pipeline preserves typed price evidence and keeps missing evidence neutral',()=>{
+   const stamp='2026-10-12T19:59:00Z',now=Date.parse('2026-10-12T20:00:00Z');
+   const makeSnapshot=profitStopType=>buildAssetWatchApiSnapshot({
+     pionexRisk:{snapshotAt:stamp,detailsComplete:true,bots:[normalizePionexBotOrder({
+       buOrderType:'futures_grid',buOrderId:'synthetic-tp-pipeline',base:'BTC.PERP',quote:'USDT',
+       status:'running',buOrderData:{status:'running',trend:'short',bottom:'50000',top:'100000',
+         profitStopType,profitStop:profitStopType==='price'?'90000':undefined}
+     })]},
+     pionexBotSync:{status:'OK',lastSuccessAt:stamp}
+   },{now});
+   const comparable=makeSnapshot('price');
+   assert.equal(comparable.bots[0].limits.takeProfitEvidence,'PRICE_SET');
+   const model=buildBotReadModel(comparable,{now});
+   assert.deepEqual(model.bots[0].takeProfitCheck,{set:true,matchesUpper:false,reason:null});
+   const target=root();renderBotReadState(target,{status:'fresh',model});
+   assert.match(target.textContent,/TP weicht von oberer Range ab/);
+   assert.match(target.textContent,/TP-Wert: 90000 · obere Range: 100000/);
+
+   for(const type of [undefined,'percent','unknown']){
+     const snapshot=makeSnapshot(type);
+     assert.equal(snapshot.bots[0].limits.takeProfitEvidence,'UNKNOWN');
+     const unknown=buildBotReadModel(snapshot,{now});
+     assert.equal(unknown.bots[0].takeProfitCheck.set,null);
+     renderBotReadState(target,{status:'fresh',model:unknown});
+     assert.match(target.textContent,/TP nicht prüfbar/);
+     assert.doesNotMatch(target.textContent,/Kein TP gesetzt|TP weicht von oberer Range ab/);
+   }
+ });
 
  test('signed P/L keeps tiny values visible and zero or missing values unconfirmed',()=>{
    for(const [value,tone] of [[-2.75,'negative'],[2.75,'positive'],[0,null],[-0,null],[null,null],[undefined,null],['2',null],[NaN,null],[Infinity,null]]){

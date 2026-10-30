@@ -100,23 +100,27 @@ test('missing, coerced zero, invalid and negative positive-only metrics remain u
 });
 
 test('TP comparison is exact, uses the upper grid boundary for short bots, and fails closed on unknown evidence',()=>{
-  const withLimits=(takeProfit,upper)=>{const input=fixture();input.bots[0].side='SHORT';
-    input.bots[0].limits={takeProfit,upper};return buildBotReadModel(input,{now}).bots[0].takeProfitCheck;};
+  const withLimits=(takeProfit,upper,evidence='PRICE_SET')=>{const input=fixture();input.bots[0].side='SHORT';
+    input.bots[0].limits={takeProfit,upper,takeProfitEvidence:evidence};
+    return buildBotReadModel(input,{now}).bots[0].takeProfitCheck;};
   assert.deepEqual(withLimits(1e2,100),{set:true,matchesUpper:true,reason:null});
   assert.deepEqual(withLimits(90,100),{set:true,matchesUpper:false,reason:null},
     'short bots are still compared to the actual upper grid boundary');
   for(const absentOrInvalid of [undefined,null,0,-1,'100',NaN,Infinity,{}]){
-    const check=withLimits(absentOrInvalid,100);
+    const check=withLimits(absentOrInvalid,100,'UNKNOWN');
     assert.equal(check.set,null);assert.equal(check.matchesUpper,null);
-    assert.match(check.reason,/unterscheidet ein nicht gesetztes TP nicht/);
+    assert.match(check.reason,/belegen kein ungesetztes TP/);
   }
   assert.equal(withLimits(100,undefined).matchesUpper,null);
   assert.match(withLimits(100,undefined).reason,/obere Range fehlt/);
+  assert.equal(withLimits(100,100,'CONFIRMED_UNSET').set,null,
+    'the bridge/model reject unsupported absence claims without a source contract');
 });
 
 test('TP comparison normalizes decimal notation without display rounding or tolerance',()=>{
   const withLimits=(takeProfit,upper)=>{const input=fixture();
-    input.bots[0].limits={takeProfit,upper};return buildBotReadModel(input,{now}).bots[0].takeProfitCheck;};
+    input.bots[0].limits={takeProfit,upper,takeProfitEvidence:'PRICE_SET'};
+    return buildBotReadModel(input,{now}).bots[0].takeProfitCheck;};
   assert.equal(withLimits(1e-7,0.0000001).matchesUpper,true);
   assert.equal(withLimits(0.1+0.2,0.3).matchesUpper,false);
 });

@@ -49,10 +49,10 @@ function decimalKey(value) {
   }
   return digits + 'e' + power;
 }
-function takeProfitCheck(metrics) {
-  if (metrics.takeProfit === null) return {
+function takeProfitCheck(metrics, evidence) {
+  if (evidence !== 'PRICE_SET' || metrics.takeProfit === null) return {
     set: null, matchesUpper: null,
-    reason: 'Die Quelle unterscheidet ein nicht gesetztes TP nicht von einem fehlenden oder ungültigen Wert.'
+    reason: 'Die Quelle bestätigt keinen direkt vergleichbaren TP-Preis; fehlende Werte belegen kein ungesetztes TP.'
   };
   if (metrics.upper === null) return {
     set: true, matchesUpper: null,
@@ -106,13 +106,15 @@ export function buildBotReadModel(snapshot, {now = Date.now()} = {}) {
     const cateType=enumValue(bot.cateType,['inverse','linear','FUTURES_MOON',
       'FUTURE_GRID_COIN_MARGINED','FULLY_HEDGING','SPOT']);
     const projectedMetrics=metrics(bot);
+    const takeProfitEvidence=bot.limits?.takeProfitEvidence==='PRICE_SET'?'PRICE_SET':'UNKNOWN';
     bots.push({ref: bot.botRef, symbol: bot.symbol,
       side: enumValue(bot.side, ['LONG', 'SHORT', 'NEUTRAL']),
       category: enumValue(cateType, ['inverse', 'linear']),
       productCategory: cateType==='FUTURES_MOON'?'FUTURES_MOON':null,
       type: enumValue(bot.botType, ['futures_grid', 'future_hedge_grid']),
       sideSource: enumValue(bot.sideSource, ['economic_inverse_asset', 'trend_inverse_asset', 'trend']),
-      metrics: projectedMetrics, takeProfitCheck: takeProfitCheck(projectedMetrics)});
+      metrics: projectedMetrics, takeProfitEvidence,
+      takeProfitCheck: takeProfitCheck(projectedMetrics,takeProfitEvidence)});
   }
   return {...result, status: 'FRESH_SNAPSHOT', source: snapshot.source,
     snapshotAt: stamp, ageMs: age, expiresAt: time + limit, ...scope(snapshot), bots};

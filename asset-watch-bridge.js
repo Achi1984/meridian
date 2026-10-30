@@ -40,6 +40,10 @@ function projectedEnum(value,allowed){
 function sanitizedBot(bot={}){
   const symbol=String(bot.symbol||'').trim().toUpperCase()||null;
   const side=normalizedSide(bot.side);
+  const rawTakeProfit=typeof bot.takeProfit==='number'&&Number.isFinite(bot.takeProfit)&&bot.takeProfit>0
+    ?bot.takeProfit:null;
+  const takeProfitEvidence=bot.takeProfitEvidence==='PRICE_SET'&&rawTakeProfit!==null?'PRICE_SET':'UNKNOWN';
+  const takeProfit=takeProfitEvidence==='PRICE_SET'?rawTakeProfit:null;
   return {
     botRef:botRef(bot),
     symbol,
@@ -55,7 +59,8 @@ function sanitizedBot(bot={}){
       liquidationPrice:num(bot.liquidationPrice),
       liquidationLowerBound:positiveMetric(bot.liquidationLowerBound),
       liquidationUpperBound:positiveMetric(bot.liquidationUpperBound),
-      takeProfit:num(bot.takeProfit),
+      takeProfit,
+      takeProfitEvidence,
       stopLoss:num(bot.stopLoss)
     },
     grid:{
