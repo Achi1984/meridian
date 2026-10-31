@@ -1289,10 +1289,15 @@ async function browserRun(call,start,width,height,server){
       assert.equal(server.metrics().depotReads,initial,'mount/navigation never reads Depot');
       const refresh=()=>evaluate(`document.querySelector('#depot-read-root button').focus();document.querySelector('#depot-read-root button').click();true`);
       await refresh();await waitUntil(async()=>await readState()==='fresh');
-      const depot=await evaluate(`(()=>{const root=document.getElementById('depot-read-root');return {
+      const depot=await evaluate(`(()=>{const root=document.getElementById('depot-read-root');
+        const confirm=root.querySelector('.ledger-review button:last-of-type');
+        const confirmHidden=confirm.hidden;
+        // Geometry only: expose and restore the control without clicking or submitting.
+        confirm.hidden=false;const confirmHeight=confirm.getBoundingClientRect().height;confirm.hidden=confirmHidden;
+        return {confirmHidden,confirmHeight,
         text:root.textContent,amount:root.querySelector('.depot-total').textContent,overflow:document.documentElement.scrollWidth>innerWidth+1,
         status:root.querySelector('[role=status]').getAttribute('aria-live'),focus:document.activeElement===root.querySelector('button'),
-        targets:[...root.querySelectorAll('button')].every(x=>x.getBoundingClientRect().height>=44)};})()`);
+        targets:[...root.querySelectorAll('button')].filter(x=>x.getClientRects().length>0).every(x=>x.getBoundingClientRect().height>=44)};})()`);
       assert.equal(await evaluate(`document.querySelector('#command-portfolio .portfolio-value').textContent`),depot.amount);
       assert.match(await evaluate(`document.querySelector('#command-portfolio .portfolio-description').textContent`),/Gespeicherte/);
       const commandReads=server.metrics().depotReads;
@@ -1302,6 +1307,8 @@ async function browserRun(call,start,width,height,server){
       await evaluate(`document.querySelector('#nav button[data-v="depot"]').click();true`);
       assert.match(depot.amount,/15.450/);assert.match(depot.text,/Datenlücken/);assert.match(depot.text,/keine Live-Kurse/);
       assert.doesNotMatch(depot.text,/synthetic-b7-password/);assert.equal(depot.overflow,false);assert.equal(depot.status,'polite');assert.equal(depot.focus,true);assert.equal(depot.targets,true);
+      assert.equal(depot.confirmHidden,true,'Ledger confirmation is hidden until quantities are reviewed');
+      assert.ok(depot.confirmHeight>=44,'Ledger confirmation keeps a 44px target when shown');
       if(process.env.V11_A2_EVIDENCE_DIR){mkdirSync(process.env.V11_A2_EVIDENCE_DIR,{recursive:true});
         const shot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
         writeFileSync(join(process.env.V11_A2_EVIDENCE_DIR,'v11-depot-'+width+'-fresh.png'),Buffer.from(shot.data,'base64'));}
