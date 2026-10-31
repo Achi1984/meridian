@@ -1,8 +1,8 @@
-import {buildPionexHistoryModel} from './pionex-history-model.js?v=B16-M11-FIX8';
-import {buildCurrentDepotModel,buildPionexDepotModel} from './depot-current-model.js?v=B16-M11-FIX8';
-import {buildDepotHistoryModel} from './depot-history-model.js?v=B16-M11-FIX8';
-import {buildDepotReadModel} from './depot-read-model.js?v=B16-M11-FIX8';
-import {parseBotReadCredential} from './bot-read-client.js?v=B16-M11-FIX8';
+import {buildPionexHistoryModel} from './pionex-history-model.js?v=B16-M11-FIX9';
+import {buildCurrentDepotModel,buildPionexDepotModel} from './depot-current-model.js?v=B16-M11-FIX9';
+import {buildDepotHistoryModel} from './depot-history-model.js?v=B16-M11-FIX9';
+import {buildDepotReadModel} from './depot-read-model.js?v=B16-M11-FIX9';
+import {parseBotReadCredential} from './bot-read-client.js?v=B16-M11-FIX9';
 
 const ENDPOINT = 'https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/portfolio-history?range=1w';
 const CURRENT_ENDPOINT='https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/dashboard';

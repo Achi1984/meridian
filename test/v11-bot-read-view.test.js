@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {renderBotReadState,createBotReadView,renderCommandBotOverview} from '../v11/bot-read-view.js';
 import {buildBotReadModel} from '../v11/bot-read-model.js';
 import {createBotReadClient} from '../v11/bot-read-client.js';
-import {publishDepotPortfolioState} from '../v11/depot-portfolio-state.js?v=B16-M11-FIX8';
+import {publishDepotPortfolioState} from '../v11/depot-portfolio-state.js?v=B16-M11-FIX9';
 import {normalizePionexBotOrder} from '../pionex-bot-auto-sync.js';
 import {buildAssetWatchApiSnapshot} from '../asset-watch-bridge.js';
 
@@ -47,12 +47,12 @@ test('confirmed zero P/L renders in summary and detail, while legacy zero stays 
   }
 });
 function mounted(overrides={}){
-  const target=root(),calls={refresh:0,lock:0,dispose:0,revalidate:0};let publish,jump;
+  const target=root(),calls={refresh:0,lock:0,dispose:0,revalidate:0};let publish,jump,snapshot;
   const client={refresh(){calls.refresh++;publish({status:'loading'});},lock(){calls.lock++;publish({status:'locked'});},
     dispose(){calls.dispose++;},revalidate(){calls.revalidate++;},...overrides};
   const getter=()=>{throw new Error('renderer must not read token');};
-  const view=createBotReadView(target,{getToken:getter,onSnapshot:(_,navigate)=>{jump=navigate;},createClient:options=>{assert.equal(options.getToken,getter);publish=options.onChange;return client;}});
-  return {target,view,calls,publish:state=>publish(state),jump:ref=>jump(ref),
+  const view=createBotReadView(target,{getToken:getter,onSnapshot:(data,navigate)=>{snapshot=data;jump=navigate;},createClient:options=>{assert.equal(options.getToken,getter);publish=options.onChange;return client;}});
+  return {target,view,calls,publish:state=>publish(state),jump:ref=>jump(ref),snapshot:()=>snapshot,
     buttons:all(target,'button').filter(node=>['Bots aktualisieren','Botansicht sperren'].includes(node.text))};
 }
 test('fresh rows use bounded labels, UTC time, correct side and no arbitrary data',()=>{
@@ -443,7 +443,7 @@ test('TP indicators are read-only, unknown evidence stays neutral, and mismatch 
   renderBotReadState(target,{status:'fresh',model:matching});
   indicators=all(target,'input').filter(node=>node.getAttribute('aria-label')?.startsWith('TP'));
   assert.ok(indicators.every(node=>node.checked&&!node.indeterminate));
-  assert.doesNotMatch(target.textContent,/TP nicht prüfbar|TP weicht von oberer Range ab/);
+  assert.doesNotMatch(target.querySelector('.bot-card-body').textContent,/TP nicht prüfbar|TP weicht von oberer Range ab/);
 
   input.bots[0].limits={takeProfit:null,upper:100,takeProfitEvidence:'UNKNOWN'};
   const unknown=buildBotReadModel(input,{now:Date.parse(input.sourceSnapshotAt)+60000});
@@ -894,4 +894,53 @@ test('missing P/L explains only bounded reason codes and never exposes raw sourc
     renderBotReadState(target,state);
     assert.equal(target.querySelector('.bot-pnl-unavailable-reason'),null,'valid P/L must not show stale missing-value diagnosis');
   }
+});
+
+
+function coverageSnapshot(){
+  const state=fresh();state.readIdentity=1;state.model.ageMs=1000;state.model.expiresAt=Date.parse(state.model.snapshotAt)+900000;
+  const bot=(ref,side,pnlUsd,tp,upper,matchesUpper)=>({ref:ref.repeat(20),symbol:'BTC',side,type:'futures_grid',category:'linear',
+    metrics:{pnlUsd,pnlEvidence:'EXPLICIT_USD_VALUE',takeProfit:tp,upper},takeProfitEvidence:tp?'PRICE_SET':null,
+    takeProfitCheck:{set:tp?true:null,matchesUpper}});
+  state.model.bots=[bot('a','LONG',-10,120,100,false),bot('b','SHORT',0,100,100,true),bot('c','LONG',null,null,100,null)];return state;
+}
+test('Command and Bots share global TP and confirmed P/L coverage without a trading claim',()=>{
+  const h=mounted(),state=coverageSnapshot(),command=root();h.publish(state);
+  renderCommandBotOverview(command,h.snapshot(),h.jump);
+  const summary=target=>target.querySelector('.bot-data-summary');
+  assert.equal(summary(h.target).textContent,summary(command).textContent);
+  for(const text of ['TP abweichend: 1','TP nicht prüfbar: 1','TP entspricht oberer Range: 1','P/L bestätigt: 2 von 3','P/L nicht verfügbar: 1'])assert.ok(summary(command).textContent.includes(text),text);
+  assert.match(summary(command).textContent,/keine Handelsfreigabe oder Risikobewertung/);
+  assert.doesNotMatch(summary(command).textContent,/TP fehlt|TP nicht gesetzt/);
+  const fields=all(h.target,'select'),before=summary(h.target).textContent;
+  change(fields.find(n=>n.id==='bot-tp-filter'),'change','unknown');
+  change(fields.find(n=>n.id==='bot-pnl-filter'),'change','unavailable');
+  assert.equal(all(h.target,'li').length,1);assert.equal(summary(h.target).textContent,before);
+  assert.match(h.target.textContent,/1 von 3 Bots im Snapshot/);assert.equal(h.calls.refresh,0);
+  for(const status of ['loading','stale','unavailable','locked']){
+    h.publish({status});renderCommandBotOverview(command,h.snapshot());
+    assert.equal(summary(h.target),null);assert.equal(summary(command),null);
+  }
+  h.view.dispose();
+});
+test('new filters combine, preserve disclosure and Command return, reset and clear on a new snapshot without reads',()=>{
+  const h=mounted(),state=coverageSnapshot();h.publish(state);
+  const fields=Object.fromEntries(all(h.target,'select').map(node=>[node.id,node]));
+  const tp=fields['bot-tp-filter'],pnl=fields['bot-pnl-filter'],direction=fields['bot-direction-filter'],category=fields['bot-category-filter'],sort=fields['bot-sort-filter'];
+  const search=all(h.target,'input').find(node=>node.id==='bot-symbol-search');
+  all(h.target,'button').find(n=>n.text==='Alle aufklappen').click();
+  change(search,'input','BTC');change(direction,'change','long');change(category,'change','linear');
+  change(tp,'change','mismatch');change(pnl,'change','available');change(sort,'change','tp');
+  assert.equal(all(h.target,'li').length,1);assert.equal(all(h.target,'details')[0].getAttribute('open'),'');
+  h.jump('b'.repeat(20));assert.equal(tp.value,'all');assert.equal(pnl.value,'all');
+  returnButton(h).click();
+  assert.deepEqual([search.value,direction.value,category.value,sort.value,tp.value,pnl.value],['BTC','long','linear','tp','mismatch','available']);
+  assert.equal(all(h.target,'li').length,1);assert.equal(all(h.target,'details')[0].getAttribute('open'),'');
+  all(h.target,'button').find(n=>n.text==='Filter zurücksetzen').click();
+  assert.deepEqual([search.value,direction.value,category.value,sort.value,tp.value,pnl.value],['','all','all','symbol','all','all']);
+  assert.equal(all(h.target,'li').length,3);assert.equal(returnButton(h).hidden,true);
+  change(tp,'change','match');change(pnl,'change','available');assert.equal(all(h.target,'li').length,1,'confirmed zero P/L stays available');
+  h.publish({...coverageSnapshot(),readIdentity:2});assert.equal(tp.value,'all');assert.equal(pnl.value,'all');
+  assert.ok(all(h.target,'details').every(n=>n.getAttribute('open')===null));assert.equal(h.calls.refresh,0);
+  h.view.dispose();assert.equal(tp.listeners.get('change').size,0);assert.equal(pnl.listeners.get('change').size,0);
 });

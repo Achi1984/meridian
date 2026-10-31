@@ -70,3 +70,70 @@ test('malformed or duplicate bot references fail closed', () => {
   assert.deepEqual(buildBotOverviewModel(source), {status: 'unavailable', bots: []});
   assert.deepEqual(buildBotOverviewModel({...snapshot(), readOnly: false}), {status: 'unavailable', bots: []});
 });
+
+function reviewedSnapshot() {
+  const source = snapshot();
+  source.ageMs = 1000;source.expiresAt = Date.parse(source.snapshotAt) + 900000;
+  for (const [index,matches] of [[0,false],[1,true],[2,false]]) {
+    const row=source.bots[index];
+    row.takeProfitEvidence='PRICE_SET';row.metrics.takeProfit=110;row.metrics.upper=100;
+    row.takeProfitCheck={set:true,matchesUpper:matches};
+  }
+  source.bots[1].metrics.pnlEvidence='EXPLICIT_USD_VALUE';
+  return source;
+}
+
+test('TP and P/L snapshot counts stay global while combined filters change visible matches only', () => {
+  const source=reviewedSnapshot(),before=structuredClone(source);
+  const all=buildBotOverviewModel(source),filtered=buildBotOverviewModel(source,{query:'ETH',direction:'short',category:'linear',tpStatus:'mismatch',pnlAvailability:'available'});
+  assert.deepEqual(all.counts,{tp:{mismatch:2,match:1,unknown:1},pnl:{available:3,unavailable:1}});
+  assert.deepEqual(filtered.counts,all.counts);assert.equal(filtered.count,4);assert.equal(filtered.visibleCount,1);
+  assert.equal(filtered.bots[0].ref,'a'.repeat(20));assert.equal(filtered.bots[0].tpStatus,'mismatch');
+  assert.deepEqual(filtered.losses,all.losses);assert.deepEqual(source,before);
+  const unknown=buildBotOverviewModel(source,{tpStatus:'unknown',pnlAvailability:'unavailable'});
+  assert.equal(unknown.visibleCount,1);assert.equal(unknown.bots[0].ref,'d'.repeat(20));
+  assert.equal(buildBotOverviewModel(source,{tpStatus:'match',pnlAvailability:'unavailable'}).visibleCount,0);
+  assert.equal(buildBotOverviewModel({...source,bots:[]}).counts.pnl.available,0);
+});
+
+test('TP status consumes the existing comparison and requires complete positive evidence', () => {
+  const source=reviewedSnapshot();
+  // Deliberately different raw prices: overview must not implement a second comparison.
+  assert.equal(buildBotOverviewModel(source,{tpStatus:'match'}).bots[0].ref,'b'.repeat(20));
+  for(const mutate of [
+    b=>{delete b.takeProfitCheck;},b=>{b.takeProfitCheck.matchesUpper='true';},
+    b=>{b.takeProfitCheck.set=false;},b=>{b.takeProfitEvidence='UNKNOWN';},
+    b=>{b.metrics.takeProfit=null;},b=>{b.metrics.takeProfit='110';},
+    b=>{b.metrics.upper=0;},b=>{b.metrics.upper=-1;},b=>{b.metrics.upper=Infinity;}
+  ]){
+    const input=reviewedSnapshot();mutate(input.bots[0]);
+    assert.equal(buildBotOverviewModel(input).bots.find(b=>b.ref==='a'.repeat(20)).tpStatus,'unknown');
+  }
+});
+
+test('TP ordering is mismatch then unknown then match with deterministic symbol and identity ties', () => {
+  const source=reviewedSnapshot();
+  assert.deepEqual(buildBotOverviewModel(source,{sort:'tp'}).bots.map(b=>b.ref[0]),['a','c','d','b']);
+  const zero=buildBotOverviewModel(source,{pnlAvailability:'available',sort:'pnl'});
+  assert.deepEqual(zero.bots.map(b=>b.pnl),[-8,-2,0]);
+  delete source.bots[1].metrics.pnlEvidence;
+  assert.equal(buildBotOverviewModel(source).counts.pnl.available,2);
+  assert.equal(buildBotOverviewModel(source,{pnlAvailability:'unavailable'}).visibleCount,2);
+  assert.ok(buildBotOverviewModel(reviewedSnapshot()).losses.every(b=>b.pnl<0));
+});
+
+test('unrecognized filter inputs safely use defaults and stale or locked snapshots expose no counts', () => {
+  const source=reviewedSnapshot();
+  assert.deepEqual(buildBotOverviewModel(source,{tpStatus:'missing',pnlAvailability:true,sort:'risk'}),buildBotOverviewModel(source));
+  for(const status of ['STALE','UNKNOWN','LOCKED'])assert.deepEqual(buildBotOverviewModel({...source,status}),{status:'unavailable',bots:[]});
+});
+
+test('freshness metadata is bounded source metadata without a new clock or inferred expiry', () => {
+  const source=reviewedSnapshot(),result=buildBotOverviewModel(source);
+  assert.equal(result.ageMs,1000);assert.equal(result.expiresAt,source.expiresAt);
+  assert.equal(buildBotOverviewModel(snapshot()).expiresAt,null);
+  assert.equal(buildBotOverviewModel(snapshot()).ageMs,null);
+  for(const ageMs of [null,'1000',true,-1,900001,Infinity])assert.equal(buildBotOverviewModel({...source,ageMs}).ageMs,null);
+  for(const expiresAt of [null,'1',true,Date.parse(source.snapshotAt),source.expiresAt+1,Infinity])assert.equal(buildBotOverviewModel({...source,expiresAt}).expiresAt,null);
+  assert.equal(buildBotOverviewModel({...source,ageMs:1001,expiresAt:Date.parse(source.snapshotAt)+1000}).expiresAt,null);
+});
