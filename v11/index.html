@@ -255,6 +255,7 @@
     .depot-range button[aria-pressed="true"]{background:#1e3a5f;border-color:#93c5fd}
     .depot-history p{overflow-wrap:anywhere;font-size:14px}
     .bot-card-body{padding:0 14px 14px;border-top:1px solid #39516b}
+    @media(max-width:600px){.bot-card summary{grid-template-columns:minmax(0,1fr);grid-template-areas:"top" "capital" "disclosure"}.bot-card-disclosure{justify-self:end}}
     .bot-disclosure-controls{display:flex;flex-wrap:wrap;gap:8px}
     .bot-disclosure-controls>p{flex-basis:100%;margin:0}
     /* B16: separate identity, actions and status with room for mobile safe areas. */

@@ -14,7 +14,7 @@ const sizes=[{width:320,height:568,mobile:true},{width:375,height:667,mobile:tru
 const views=['command','depot','bots','market','strategies'];
 const evidence=process.env.V11_B10_EVIDENCE_DIR;
 
-test('V11 B10 Chrome: compact hierarchy, keyboard disclosure and reachable views at exact sizes',{timeout:120000},async()=>{
+test('V11 B16 Chrome: readable mobile hierarchy, keyboard disclosure and reachable views at exact sizes',{timeout:120000},async()=>{
   if(typeof WebSocket!=='function'){
     const env={...process.env};delete env.NODE_TEST_CONTEXT;
     const child=spawnSync(process.execPath,['--experimental-websocket',fileURLToPath(import.meta.url)],
@@ -47,6 +47,10 @@ test('V11 B10 Chrome: compact hierarchy, keyboard disclosure and reachable views
         width:innerWidth,height:innerHeight,scrollY,viewport:document.documentElement.clientWidth,
         body:document.body.scrollWidth,root:document.documentElement.scrollWidth,
         header:Math.round(document.querySelector('.topbar').getBoundingClientRect().height),
+        headerPadding:parseFloat(getComputedStyle(document.querySelector('.topbar')).paddingTop),
+        headerControlsFit:[...document.querySelectorAll('.identity,.header-actions,.terminal-entry,#autonomy-status summary')].every(node=>{
+          const r=node.getBoundingClientRect();return r.top>=0&&r.left>=0&&r.right<=innerWidth&&node.scrollWidth<=node.clientWidth+1;
+        }),
         statusOpen:document.getElementById('autonomy-status').open,
         statusText:document.querySelector('#autonomy-status summary').innerText,
         commandHeading:document.querySelector('#command-heading').innerText,
@@ -68,16 +72,21 @@ test('V11 B10 Chrome: compact hierarchy, keyboard disclosure and reachable views
       assert.equal(initial.statusOpen,false);assert.match(initial.statusText,/Unbekannt/);
       assert.equal(initial.commandHeading,'Command');assert.equal(initial.primaryImmediatelyAfterHeading,'command-portfolio');
       assert.ok(initial.portfolioBeforeRisk,'portfolio must precede explanatory risk content');
-      assert.ok(initial.header<190,'compact header: '+initial.header+'px');
+      assert.ok(initial.header<Math.min(360,size.height*0.65),'bounded readable header: '+initial.header+'px');
+      assert.ok(initial.headerPadding>=20,'header includes breathing room before safe-area padding');
+      assert.equal(initial.headerControlsFit,true,'header labels and controls fit their available rows');
       assert.ok(initial.disclosureHeight>=44);assert.equal(initial.targets,true,'all primary touch controls meet 44px');
-      if(size.width===320||size.width===375){
-        assert.ok(initial.portfolioRects.value.top>=0&&initial.portfolioRects.value.bottom<=initial.portfolioRects.navTop,
-          'portfolio value must be fully visible above fixed navigation at '+size.width+'x'+size.height+': '+JSON.stringify(initial.portfolioRects));
-        assert.ok(initial.portfolioRects.value.bottom>initial.portfolioRects.value.top,
-          'portfolio value rectangle must have visible dimensions at '+size.width+'x'+size.height);
-        assert.ok(initial.portfolioRects.status.top>=0&&initial.portfolioRects.status.bottom<=initial.portfolioRects.navTop,
-          'portfolio status must be fully visible above fixed navigation at '+size.width+'x'+size.height+': '+JSON.stringify(initial.portfolioRects));
+      for(const selector of ['.portfolio-value','.portfolio-description']){
+        const reachable=await evaluate(`(()=>{
+          const node=document.querySelector('#command-portfolio ${selector}');
+          node.scrollIntoView({block:'center'});
+          const r=node.getBoundingClientRect(),nav=document.getElementById('nav').getBoundingClientRect();
+          return {top:r.top,bottom:r.bottom,height:r.height,navTop:nav.top};
+        })()`);
+        assert.ok(reachable.height>0&&reachable.top>=0&&reachable.bottom<=reachable.navTop,
+          'portfolio content must remain fully scroll-reachable above navigation: '+selector+' '+JSON.stringify(reachable));
       }
+      await evaluate('window.scrollTo(0,0)');
 
       await evaluate('document.querySelector("#autonomy-status summary").focus()');
       await key('Enter','Enter',13);

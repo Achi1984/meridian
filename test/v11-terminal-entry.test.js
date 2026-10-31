@@ -764,6 +764,7 @@ const b16HeaderLayoutDeltas=[
   ]
 ];
 const b16CorrectionMarkupDeltas=[
+  ["","    @media(max-width:600px){.bot-card summary{grid-template-columns:minmax(0,1fr);grid-template-areas:\"top\" \"capital\" \"disclosure\"}.bot-card-disclosure{justify-self:end}}\n"],
   ['<strong>BOTS</strong><span>Unbekannt</span>','<strong>BOTS</strong><span id="command-bots-status">Unbekannt</span>'],
   ['Diese Datenquelle enthält keine einzelnen Positionen. Bestände und Verteilung bleiben nicht verfügbar.',
    'Einzelne Bestände und ihre Verteilung werden in dieser Ansicht noch nicht angezeigt.']
