@@ -777,6 +777,9 @@ function restoreB16Corrections(source){
   return source;
 }
 function restoreB2(source){
+  const ledgerReviewCss="    .ledger-review{margin-top:24px;border-top:1px solid #334155;padding-top:16px;overflow-wrap:anywhere}\n    .ledger-review button{max-width:100%;text-align:left}\n    .ledger-review li{margin-bottom:8px;overflow-wrap:anywhere}\n";
+  assert.equal(source.split(ledgerReviewCss).length-1,1,'one exact FIX3 Ledger review CSS addition');
+  source=source.replace(ledgerReviewCss,'');
   source=restoreB16Corrections(source);
   assert.equal(source.split(b16ReleaseHistoryRow).length-1,1,'one B16 release history row');
   source=source.replace(b16ReleaseHistoryRow,'');
@@ -886,7 +889,7 @@ test('Terminal öffnen preserves the reviewed history-close baseline and stays o
   assert.equal(gitBlob(restored),preimageBlob,'all source bytes except terminal-entry insertions, the checked viewport pair and exact Depot/revision deltas must match the reviewed history-close baseline');
 });
 
-const moduleNames=['app-access-bootstrap.js','app-access.js','agent-status-bootstrap.js','agent-status-client.js','bot-read-bootstrap.js','bot-read-client.js','bot-read-view.js','bot-read-model.js','bot-overview-model.js','depot-read-bootstrap.js','depot-read-client.js','depot-read-model.js','depot-read-view.js','depot-history-model.js','depot-history-view.js','depot-current-model.js','depot-portfolio-state.js','strategy-workspace-bootstrap.js','strategy-catalog.js','research-evidence.js','strategy-arena.js','arena-inspection-report.js','arena-historical-result.js','arena-historical-export.js','arena-result-view.js'];
+const moduleNames=['ledger-review-client.js','ledger-review-model.js','ledger-review-view.js','app-access-bootstrap.js','app-access.js','agent-status-bootstrap.js','agent-status-client.js','bot-read-bootstrap.js','bot-read-client.js','bot-read-view.js','bot-read-model.js','bot-overview-model.js','depot-read-bootstrap.js','depot-read-client.js','depot-read-model.js','depot-read-view.js','depot-history-model.js','depot-history-view.js','depot-current-model.js','depot-portfolio-state.js','strategy-workspace-bootstrap.js','strategy-catalog.js','research-evidence.js','strategy-arena.js','arena-inspection-report.js','arena-historical-result.js','arena-historical-export.js','arena-result-view.js'];
 function deploymentServer(){
   const inlineScript=html.match(/<script>([\s\S]*?)<\/script>/i)?.[1];
   assert.ok(inlineScript,'actual UI-only navigation script');

@@ -5,7 +5,7 @@ import {mountLedgerReview} from './ledger-review-view.js?v=B16-M11-FIX3';
 
 // Mounting controls never starts a request. Only the view's manual refresh can read.
 export function mountDepotReadAccess(document,window,{
-  access=appAccess,createClient=createDepotReadClient,createView=createDepotReadView,
+  access=appAccess,createClient=createDepotReadClient,createView=createDepotReadView,createLedgerView=mountLedgerReview,
   now=Date.now,schedule=setTimeout,cancelSchedule=clearTimeout
 }={}){
   const root=document.getElementById('depot-read-root');
@@ -39,7 +39,7 @@ export function mountDepotReadAccess(document,window,{
         }};
       }});
     unsubscribe=access.subscribe(s=>{if(!disposed&&s?.status==='unlocked')view?.revalidate();});
-    ledgerReview=mountLedgerReview(root,{access});
+    ledgerReview=createLedgerView(root,{access});
   }catch{
     cancelExpiry();unregister();unsubscribe();ledgerReview?.dispose();
     try{client?.dispose();}catch{}

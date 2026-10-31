@@ -86,7 +86,7 @@ function mounted(response){
   document.getElementById=id=>nodes.get(id);
   const access=accessController();
   let client,token,reads=0,clock=NOW;const states=[],timers=new Map();let next=0;
-  const mount=mountDepotReadAccess(document,window,{access,now:()=>clock,schedule:(f,ms)=>{timers.set(++next,{f,ms});return next;},cancelSchedule:id=>timers.delete(id),
+  const mount=mountDepotReadAccess(document,window,{access,createLedgerView:()=>({dispose(){}}),now:()=>clock,schedule:(f,ms)=>{timers.set(++next,{f,ms});return next;},cancelSchedule:id=>timers.delete(id),
     createClient:options=>{token=options.getToken;return createDepotReadClient({...options,now:()=>clock,fetchImpl:async()=>{reads++;return response();}});},
     createView:(_r,o)=>{client=o.createClient({getToken:o.getToken,onChange:s=>states.push(s)});return {revalidate:()=>client.revalidate(),dispose:()=>client.dispose()};}});
   return {document,window,nodes,states,timers,mount,client:()=>client,access,token:()=>token(),reads:()=>reads,
@@ -153,3 +153,4 @@ test('B8 any private auth rejection revokes all value and chart access',async()=
  const out=[];const c=createDepotReadClient({getToken:()=> 'password',onChange:s=>out.push(s),fetchImpl:async url=>new Response('{}',{status:url.includes('/dashboard')?403:200})});
  await c.refresh();assert.equal(out.at(-1).status,'locked');assert.equal(out.at(-1).history,null);c.dispose();
 });
+
