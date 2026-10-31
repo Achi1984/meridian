@@ -73,9 +73,9 @@ test('real V11 status panel: mobile, keyboard, expiry and fail-closed lifecycle'
 
         // All synthetic data and producer handles exist only in this CDP test harness.
         await evaluate(`(async()=>{
-          const {mountAgentStatus}=await import('/v11/agent-status-bootstrap.js?v=B16-M11-FIX2');
-          const {createAgentStatusClient}=await import('/v11/agent-status-client.js?v=B16-M11-FIX2');
-          const {appAccess}=await import('/v11/app-access.js?v=B16-M11-FIX2');
+          const {mountAgentStatus}=await import('/v11/agent-status-bootstrap.js?v=B16-M11-FIX3');
+          const {createAgentStatusClient}=await import('/v11/agent-status-client.js?v=B16-M11-FIX3');
+          const {appAccess}=await import('/v11/app-access.js?v=B16-M11-FIX3');
           const base=Date.parse('2026-10-29T12:00:00.000Z'),iso=t=>new Date(t).toISOString();
           const binding=value=>({agentId:'synthetic-agent',taskId:'synthetic-task',value,
             observedAt:iso(base-1000),expiresAt:iso(base+1000),
