@@ -776,7 +776,13 @@ function restoreB16Corrections(source){
   }
   return source;
 }
+function restoreBotOverviewCss(source){
+  const botSummaryCss="    .bot-data-summary{display:flex;flex-wrap:wrap;gap:6px 12px;margin:10px 0;padding:10px 12px;border:1px solid #34465c;border-radius:10px}\n    .bot-data-summary>p{margin:0;min-width:0;overflow-wrap:anywhere;font-size:13px}\n    .bot-data-summary>p:last-child{flex-basis:100%;color:var(--muted);font-size:12px}\n";
+  assert.equal(source.split(botSummaryCss).length-1,1,'one exact FIX9 Bot overview summary CSS addition');
+  return source.replace(botSummaryCss,'');
+}
 function restoreB2(source){
+  source=restoreBotOverviewCss(source);
   const ledgerReviewCss="    .ledger-review{margin-top:24px;border-top:1px solid #334155;padding-top:16px;overflow-wrap:anywhere}\n    .ledger-review button{max-width:100%;text-align:left}\n    .ledger-review li{margin-bottom:8px;overflow-wrap:anywhere}\n";
   assert.equal(source.split(ledgerReviewCss).length-1,1,'one exact FIX3 Ledger review CSS addition');
   source=source.replace(ledgerReviewCss,'');
@@ -787,8 +793,8 @@ function restoreB2(source){
     assert.equal(source.split(after).length-1,1,'one exact B16 release metadata delta');
     source=source.replace(after,before);
   }
-  assert.equal(source.split('?v=B16-M11-FIX8').length-1,5,'five B16 release entrypoints');
-  source=source.replaceAll('?v=B16-M11-FIX8','?v=B17-M11');
+  assert.equal(source.split('?v=B16-M11-FIX9').length-1,5,'five B16 release entrypoints');
+  source=source.replaceAll('?v=B16-M11-FIX9','?v=B17-M11');
   for(const addition of [
     '  <link rel="stylesheet" href="../public/css/m11-agent-status.css">\n',
     '        <div id="agent-status-root" role="status" aria-live="polite">Keine verifizierten Statusdaten.</div>\n',
@@ -863,7 +869,7 @@ function restoreB2(source){
 test('Terminal öffnen preserves the reviewed history-close baseline and stays outside version history',()=>{
   const html=restoreB2(globalHtml);
   assert.equal(globalHtml.split(compactBotsMarkup).length-1,1,'one compact Bots section');
-  assert.equal(restoreB16Corrections(globalHtml).split(botPresentationCssAfter).length-1,1,'one exact compact-card CSS block before explicit B16 deltas');
+  assert.equal(restoreB16Corrections(restoreBotOverviewCss(globalHtml)).split(botPresentationCssAfter).length-1,1,'one exact compact-card CSS block before explicit B16 deltas');
   assert.equal(css.trimEnd(),html.match(/    \/\* Fixed packet A:[\s\S]*?    \.terminal-entry-link:focus-visible\{[^\n]*\}\n/)?.[0]?.trimEnd());
   assert.equal(html.split(entry).length-1,1);
   const anchor=[...html.matchAll(/<a\b[^>]*class="terminal-entry-link"[^>]*>[\s\S]*?<\/a>/g)];
@@ -925,7 +931,7 @@ function deploymentServer(){
   const server=createServer((request,response)=>{
     const url=new URL(request.url,'http://127.0.0.1'),path=url.pathname;
     requests.push({method:request.method,path}); // never record headers or token values
-    const versionedModule=path.startsWith('/meridian/v11/')&&moduleNames.includes(path.slice('/meridian/v11/'.length))&&url.search==='?v=B16-M11-FIX8';
+    const versionedModule=path.startsWith('/meridian/v11/')&&moduleNames.includes(path.slice('/meridian/v11/'.length))&&url.search==='?v=B16-M11-FIX9';
     if(request.method!=='GET'||(url.search&&!versionedModule)){response.writeHead(404);response.end();return;}
     if(path===authEndpoint){
       authReads++;
@@ -981,7 +987,7 @@ function deploymentServer(){
     if(path!=='/meridian/v11/'&&path!=='/meridian/v10/'){response.writeHead(404);response.end();return;}
     const preview=path==='/meridian/v11/';
     const origin='http://127.0.0.1:'+server.address().port;
-    const scriptSource=preview?`'sha256-${scriptHash}' `+[...modules.keys()].map(path=>origin+path+(path.startsWith('/meridian/v11/')?'?v=B16-M11-FIX8':'')).join(' '):"'none'";
+    const scriptSource=preview?`'sha256-${scriptHash}' `+[...modules.keys()].map(path=>origin+path+(path.startsWith('/meridian/v11/')?'?v=B16-M11-FIX9':'')).join(' '):"'none'";
     const policy=`default-src 'none'; script-src ${scriptSource}; style-src 'unsafe-inline'${preview?' '+origin+statusCssPath:''}; connect-src ${preview?origin+endpoint+' '+origin+depotEndpoint+' '+origin+pionexEndpoint+' '+origin+currentEndpoint+' '+origin+priceEndpoint+' '+origin+authEndpoint+' '+origin+'/meridian/docs/strategy-lab/campaign-20261013.json':"'none'"}; worker-src 'none'; child-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'none'`;
     policies.set(path,policy);
     response.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Content-Security-Policy':policy});response.end(preview?html:terminal);
@@ -1002,11 +1008,11 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     const start=server.base+'v11/';
     const page=await fetch(start);
     assert.equal(page.status,200);
-    const catalogUrl=new URL('strategy-catalog.js?v=B16-M11-FIX8',start);
+    const catalogUrl=new URL('strategy-catalog.js?v=B16-M11-FIX9',start);
     const catalog=await fetch(catalogUrl);
     assert.equal(catalog.status,200);
     const source=await catalog.text();
-    const imported=source.match(/from ['"](\.\/research-evidence\.js\?v=B16-M11-FIX8)['"]/);
+    const imported=source.match(/from ['"](\.\/research-evidence\.js\?v=B16-M11-FIX9)['"]/);
     assert.ok(imported,'catalog imports the read-only evidence module');
     const dependency=new URL(imported[1],catalogUrl);
     const response=await fetch(dependency);
@@ -1016,9 +1022,9 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     const scriptPolicy=page.headers.get('content-security-policy').split(';').find(part=>part.trim().startsWith('script-src '));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(dependency.href),'exact dependency URL must be in script-src');
     assert.equal(server.allowedPaths.has(dependency.pathname),true);
-    const arenaUrl=new URL('strategy-arena.js?v=B16-M11-FIX8',start);
+    const arenaUrl=new URL('strategy-arena.js?v=B16-M11-FIX9',start);
     const arenaSource=await (await fetch(arenaUrl)).text();
-    const inspectionImport=arenaSource.match(/from ['"](\.\/arena-inspection-report\.js\?v=B16-M11-FIX8)['"]/);
+    const inspectionImport=arenaSource.match(/from ['"](\.\/arena-inspection-report\.js\?v=B16-M11-FIX9)['"]/);
     assert.ok(inspectionImport,'Arena imports the metadata-only report adapter');
     const inspectionUrl=new URL(inspectionImport[1],arenaUrl);
     const inspection=await fetch(inspectionUrl);
@@ -1027,7 +1033,7 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     assert.equal(await inspection.text(),readFileSync(new URL('../v11/arena-inspection-report.js',import.meta.url),'utf8'));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(inspectionUrl.href));
     assert.equal(server.allowedPaths.has(inspectionUrl.pathname),true);
-    const historicalImport=arenaSource.match(/from ['"](\.\/arena-historical-result\.js\?v=B16-M11-FIX8)['"]/);
+    const historicalImport=arenaSource.match(/from ['"](\.\/arena-historical-result\.js\?v=B16-M11-FIX9)['"]/);
     assert.ok(historicalImport,'Arena imports the bounded historical fixture adapter');
     const historicalUrl=new URL(historicalImport[1],arenaUrl);
     const historical=await fetch(historicalUrl);
@@ -1036,7 +1042,7 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     assert.equal(await historical.text(),readFileSync(new URL('../v11/arena-historical-result.js',import.meta.url),'utf8'));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(historicalUrl.href));
     assert.equal(server.allowedPaths.has(historicalUrl.pathname),true);
-    const producerImport=arenaSource.match(/from ['"](\.\/arena-historical-export\.js\?v=B16-M11-FIX8)['"]/);
+    const producerImport=arenaSource.match(/from ['"](\.\/arena-historical-export\.js\?v=B16-M11-FIX9)['"]/);
     assert.ok(producerImport,'Arena imports the bounded producer export adapter');
     const producerUrl=new URL(producerImport[1],arenaUrl);
     const producer=await fetch(producerUrl);
@@ -1045,7 +1051,7 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     assert.equal(await producer.text(),readFileSync(new URL('../v11/arena-historical-export.js',import.meta.url),'utf8'));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(producerUrl.href),'exact producer dependency URL must be in script-src');
     assert.equal(server.allowedPaths.has(producerUrl.pathname),true);
-    const rendererImport=arenaSource.match(/from ['"](\.\/arena-result-view\.js\?v=B16-M11-FIX8)['"]/);
+    const rendererImport=arenaSource.match(/from ['"](\.\/arena-result-view\.js\?v=B16-M11-FIX9)['"]/);
     assert.ok(rendererImport,'Arena imports the isolated result renderer');
     const rendererUrl=new URL(rendererImport[1],arenaUrl);
     const renderer=await fetch(rendererUrl);
@@ -1055,8 +1061,8 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(rendererUrl.href),'exact renderer dependency URL must be in script-src');
     assert.equal(server.allowedPaths.has(rendererUrl.pathname),true);
     for(const [path,file,type] of [
-      ['agent-status-bootstrap.js?v=B16-M11-FIX8','v11/agent-status-bootstrap.js','javascript'],
-      ['agent-status-client.js?v=B16-M11-FIX8','v11/agent-status-client.js','javascript'],
+      ['agent-status-bootstrap.js?v=B16-M11-FIX9','v11/agent-status-bootstrap.js','javascript'],
+      ['agent-status-client.js?v=B16-M11-FIX9','v11/agent-status-client.js','javascript'],
       ['../public/js/m11-agent-status.js','public/js/m11-agent-status.js','javascript'],
       ['../public/css/m11-agent-status.css','public/css/m11-agent-status.css','css']
     ]){
@@ -1175,12 +1181,14 @@ async function browserRun(call,start,width,height,server){
       assert.equal(bots.activeProcessPlaceholder,null,'snapshot rows do not imply active bot processes');
       assert.equal(bots.staticStatusCells,0,'freshness and read-only context appears with the current snapshot');
       assert.equal(server.metrics().reads,initialReads,'mount and navigation never fetch');
-      assert.equal(bots.controls,8,'shared app password removes the redundant Bot credential controls');
+      assert.equal(bots.controls,10,'shared access plus TP and P/L data filters expose no redundant Bot credentials');
       assert.deepEqual(bots.controlDetails,[
         {tag:'input',id:'bot-symbol-search',type:'search',label:'Symbol suchen',hidden:false,disabled:false},
         {tag:'select',id:'bot-direction-filter',type:'select-one',label:'Richtung',hidden:false,disabled:false},
         {tag:'select',id:'bot-category-filter',type:'select-one',label:'Kontraktart',hidden:false,disabled:false},
         {tag:'select',id:'bot-sort-filter',type:'select-one',label:'Sortierung',hidden:false,disabled:false},
+        {tag:'select',id:'bot-tp-filter',type:'select-one',label:'TP-Prüfung',hidden:false,disabled:false},
+        {tag:'select',id:'bot-pnl-filter',type:'select-one',label:'P/L-Verfügbarkeit',hidden:false,disabled:false},
         {tag:'button',id:'',type:'button',label:'Alle Botfilter zurücksetzen',hidden:false,disabled:false},
         {tag:'button',id:'',type:'button',label:'Zur vorherigen Auswahl zurück',hidden:true,disabled:false},
         {tag:'button',id:'bot-read-refresh',type:'button',label:'Bots aktualisieren',hidden:false,disabled:false},

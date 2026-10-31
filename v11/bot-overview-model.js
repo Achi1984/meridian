@@ -3,6 +3,26 @@ const CATEGORIES = new Set(['inverse', 'linear']);
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const confirmed = value => typeof value === 'number' && Number.isFinite(value) && value !== 0;
 const compareText = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+const TP_ORDER = {mismatch: 0, unknown: 1, match: 2};
+const positive = value => typeof value === 'number' && Number.isFinite(value) && value > 0;
+
+function takeProfitStatus(bot) {
+  const check = bot.takeProfitCheck;
+  if (bot.takeProfitEvidence !== 'PRICE_SET' || !positive(bot.metrics?.takeProfit) ||
+      !positive(bot.metrics?.upper) || check?.set !== true) return 'unknown';
+  // Reuse the exact comparison already performed by the read model.
+  return check.matchesUpper === true ? 'match' : check.matchesUpper === false ? 'mismatch' : 'unknown';
+}
+
+function freshness(snapshot) {
+  const stamp = Date.parse(snapshot.snapshotAt);
+  const ageMs = Number.isSafeInteger(snapshot.ageMs) && snapshot.ageMs >= 0 &&
+    snapshot.ageMs <= 900000 ? snapshot.ageMs : null;
+  const expiresAt = Number.isSafeInteger(snapshot.expiresAt) && snapshot.expiresAt > stamp &&
+    snapshot.expiresAt <= stamp + 900000 && (ageMs === null || ageMs <= snapshot.expiresAt - stamp)
+    ? snapshot.expiresAt : null;
+  return {ageMs, expiresAt};
+}
 
 function direction(side) {
   if (!DIRECTIONS.has(side)) return 'unknown';
@@ -44,28 +64,39 @@ export function buildBotOverviewModel(snapshot, filters = {}) {
     const leverage = confirmed(bot.metrics?.leverage) && bot.metrics.leverage > 0
       ? bot.metrics.leverage : null;
     bots.push({ref: bot.ref, symbol: bot.symbol, direction: direction(bot.side),
-      category: category(bot.category), leverage, pnl});
+      category: category(bot.category), leverage, pnl, tpStatus: takeProfitStatus(bot)});
   }
 
   const distribution = {long: 0, short: 0, neutral: 0, unknown: 0};
-  for (const bot of bots) distribution[bot.direction]++;
+  const counts = {tp: {mismatch: 0, match: 0, unknown: 0}, pnl: {available: 0, unavailable: 0}};
+  for (const bot of bots) {
+    distribution[bot.direction]++;
+    counts.tp[bot.tpStatus]++;
+    counts.pnl[bot.pnl === null ? 'unavailable' : 'available']++;
+  }
   const query = typeof filters.query === 'string' ? filters.query.trim().toUpperCase() : '';
   const selectedDirection = ['long', 'short', 'neutral', 'unknown'].includes(filters.direction)
     ? filters.direction : 'all';
   const selectedCategory = ['coin-m', 'linear', 'unknown'].includes(filters.category)
     ? filters.category : 'all';
+  const selectedTp = ['mismatch', 'match', 'unknown'].includes(filters.tpStatus) ? filters.tpStatus : 'all';
+  const selectedPnl = ['available', 'unavailable'].includes(filters.pnlAvailability) ? filters.pnlAvailability : 'all';
   const rows = bots.filter(bot =>
     (!query || bot.symbol.includes(query)) &&
     (selectedDirection === 'all' || bot.direction === selectedDirection) &&
-    (selectedCategory === 'all' || bot.category === selectedCategory));
-  const sort = ['leverage', 'pnl'].includes(filters.sort) ? filters.sort : 'symbol';
+    (selectedCategory === 'all' || bot.category === selectedCategory) &&
+    (selectedTp === 'all' || bot.tpStatus === selectedTp) &&
+    (selectedPnl === 'all' || (bot.pnl === null ? 'unavailable' : 'available') === selectedPnl));
+  const sort = ['leverage', 'pnl', 'tp'].includes(filters.sort) ? filters.sort : 'symbol';
   rows.sort((a, b) => sort === 'leverage'
     ? compareKnown(a, b, 'leverage', true)
-    : sort === 'pnl' ? compareKnown(a, b, 'pnl') : compareText(a.symbol, b.symbol) || compareText(a.ref, b.ref));
+    : sort === 'pnl' ? compareKnown(a, b, 'pnl')
+    : sort === 'tp' ? TP_ORDER[a.tpStatus] - TP_ORDER[b.tpStatus] || compareText(a.symbol, b.symbol) || compareText(a.ref, b.ref)
+    : compareText(a.symbol, b.symbol) || compareText(a.ref, b.ref));
 
   const losses = bots.filter(bot => bot.pnl !== null && bot.pnl < 0)
     .sort((a, b) => a.pnl - b.pnl || compareText(a.symbol, b.symbol) || compareText(a.ref, b.ref))
     .slice(0, 3);
   return {status: 'fresh', snapshotAt: snapshot.snapshotAt, source: snapshot.source ?? null,
-    count: bots.length, distribution, bots: rows, losses};
+    count: bots.length, visibleCount: rows.length, counts, ...freshness(snapshot), distribution, bots: rows, losses};
 }

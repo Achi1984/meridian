@@ -12,16 +12,16 @@ const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium
 const MOON_BOT_REF='f00df00df00df00df00d';
 const v11Root=fileURLToPath(new URL('../v11/',import.meta.url));
 const source=readFileSync(join(v11Root,'index.html'),'utf8');
-const bootstrap='<script type="module" src="./bot-read-bootstrap.js?v=B16-M11-FIX8"></script>';
+const bootstrap='<script type="module" src="./bot-read-bootstrap.js?v=B16-M11-FIX9"></script>';
 const fixtureScript=`<script>
 window.__botReadMode='fresh';window.__botReads=0;window.__resolveBotRead=null;window.__botErrors=[];
 window.__appAccessReads=0;
-window.__portfolioReady=import('./depot-portfolio-state.js?v=B16-M11-FIX8').then(({publishDepotPortfolioState})=>
+window.__portfolioReady=import('./depot-portfolio-state.js?v=B16-M11-FIX9').then(({publishDepotPortfolioState})=>
  publishDepotPortfolioState({status:'fresh',model:{status:'FRESH_SNAPSHOT',readOnly:true,executionAllowed:false,
   totalUsd:1234.56,snapshotAt:new Date().toISOString(),sourceAt:new Date().toISOString(),
   source:'SERVER_PIONEX_CURRENT',expiresAt:Date.now()+60000}}));
 window.__publishPortfolio=async state=>{
- const {publishDepotPortfolioState}=await import('./depot-portfolio-state.js?v=B16-M11-FIX8');
+ const {publishDepotPortfolioState}=await import('./depot-portfolio-state.js?v=B16-M11-FIX9');
  publishDepotPortfolioState(state);
 };
 window.addEventListener('error',event=>window.__botErrors.push(event.message));
@@ -49,7 +49,7 @@ window.__botSnapshot=age=>({schemaVersion:'MERIDIAN-ASSET-WATCH-BRIDGE-V1',sourc
   {botRef:'f'.repeat(20),symbol:'SOLUSDT',side:'LONG',cateType:'linear',botType:'futures_grid',
    leverage:null,pnl:{usd:0}},
   {botRef:'${MOON_BOT_REF}',symbol:'MOONUSDT',side:'LONG',cateType:'FUTURES_MOON',botType:'futures_grid',
-   leverage:1,pnl:{usd:null}}
+   leverage:1,pnl:{usd:0,evidence:'EXPLICIT_USD_VALUE'}}
  ]});
 window.__largeBotSnapshot=age=>{const snapshot=window.__botSnapshot(age);
  snapshot.botCount=20;snapshot.bots=Array.from({length:20},(_,index)=>({
@@ -335,6 +335,39 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           const missing=visibleAmounts.find(row=>row.id.endsWith('d'.repeat(20))).text;
           assert.match(missing,/P\/L laut Quelle\s*Nicht verfügbar/);
           assert.doesNotMatch(missing,/0,00 USD/);
+          const confirmedZero=visibleAmounts.find(row=>row.id.endsWith(MOON_BOT_REF)).text;
+          assert.match(confirmedZero,/P\/L laut Quelle\s*0,00 USD/);
+          assert.equal(await evaluate(`document.getElementById('bot-card-${MOON_BOT_REF}').querySelector('.bot-pnl-negative,.bot-pnl-positive')===null`),true,
+            'confirmed zero is available but neither a loss nor a positive profit');
+          const globalSummary=await evaluate(`document.querySelector('#bot-read-root .bot-data-summary').innerText`);
+          for(const text of ['TP abweichend: 1','TP nicht prüfbar: 5','TP entspricht oberer Range: 1',
+            'P/L bestätigt: 5 von 7','P/L nicht verfügbar: 2'])assert.ok(globalSummary.includes(text),globalSummary);
+          const commandSummary=await evaluate(`document.querySelector('#command-bot-overview .bot-data-summary').innerText`);
+          for(const text of ['TP abweichend: 1','TP nicht prüfbar: 5','TP entspricht oberer Range: 1',
+            'P/L bestätigt: 5 von 7','P/L nicht verfügbar: 2'])assert.ok(commandSummary.includes(text),commandSummary);
+          const selectLocal=async(id,value)=>evaluate(`(()=>{const select=document.getElementById(${JSON.stringify(id)});
+            select.value=${JSON.stringify(value)};select.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+          const visibleRefs=()=>evaluate(`[...document.querySelectorAll('#bot-read-root .bot-card')].map(card=>card.id.replace('bot-card-',''))`);
+          for(const [state,refs] of [['mismatch',['a'.repeat(20)]],['match',['b'.repeat(20)]],
+            ['unknown',['d'.repeat(20),'c'.repeat(20),MOON_BOT_REF,'f'.repeat(20),'e'.repeat(20)]]]){
+            await selectLocal('bot-tp-filter',state);
+            assert.deepEqual(await visibleRefs(),refs,'TP filter '+state);
+            assert.equal(await evaluate(`document.querySelector('#bot-read-root .bot-data-summary').innerText`),globalSummary,
+              'TP counts describe the whole snapshot, not the visible subset');
+          }
+          await selectLocal('bot-tp-filter','all');
+          await selectLocal('bot-pnl-filter','available');
+          assert.deepEqual(await visibleRefs(),['a'.repeat(20),'b'.repeat(20),'c'.repeat(20),MOON_BOT_REF,'e'.repeat(20)],
+            'confirmed zero belongs to available P/L');
+          await selectLocal('bot-pnl-filter','unavailable');
+          assert.deepEqual(await visibleRefs(),['d'.repeat(20),'f'.repeat(20)],'missing and legacy zero stay unknown');
+          await selectLocal('bot-pnl-filter','all');
+          await selectLocal('bot-sort-filter','tp');
+          assert.deepEqual(await visibleRefs(),['a'.repeat(20),'d'.repeat(20),'c'.repeat(20),MOON_BOT_REF,'f'.repeat(20),'e'.repeat(20),'b'.repeat(20)],
+            'TP priority uses mismatch, unknown, match with stable symbol/reference ties');
+          await evaluate(`document.querySelector('[aria-label="Alle Botfilter zurücksetzen"]').click()`);
+          assert.equal(await evaluate('window.__botReads'),1,'new filters and TP sort use the same snapshot');
+
           const pnlContrast=await evaluate(`(()=>{
             const ratio=(foreground,background)=>{
               const channel=value=>{value/=255;return value<=0.04045?value/12.92:((value+0.055)/1.055)**2.4};
@@ -356,7 +389,7 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           assert.ok(fresh.command.includes(new Intl.DateTimeFormat('de-DE',{dateStyle:'medium',timeStyle:'short',
             timeZone:'UTC'}).format(new Date(exactCommandTimestamp))+' UTC'),fresh.command);
           assert.ok(['bot-symbol-search','bot-direction-filter','bot-category-filter','bot-sort-filter',
-            'bot-read-refresh','bot-read-lock'].every(id=>fresh.touch.some(([,targetId])=>targetId===id)),
+            'bot-tp-filter','bot-pnl-filter','bot-read-refresh','bot-read-lock'].every(id=>fresh.touch.some(([,targetId])=>targetId===id)),
             'visible search, selects and bot actions remain measured '+JSON.stringify(fresh.touch));
           assert.ok(fresh.touch.some(([, ,label])=>label==='Alle Botfilter zurücksetzen'),
             'visible filter reset remains measured '+JSON.stringify(fresh.touch));
@@ -451,6 +484,13 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           await evaluate(`(()=>{const search=document.getElementById('bot-symbol-search');search.value='ETH';
             search.focus();search.dispatchEvent(new Event('input',{bubbles:true}));})()`);
           assert.equal(await evaluate(`document.activeElement===document.getElementById('bot-symbol-search')`),true);
+          await selectLocal('bot-direction-filter','neutral');
+          await selectLocal('bot-category-filter','linear');
+          await selectLocal('bot-tp-filter','unknown');
+          await selectLocal('bot-pnl-filter','available');
+          assert.deepEqual(await visibleRefs(),['c'.repeat(20)],'search, direction, category, TP and P/L intersect');
+          assert.match(await evaluate(`document.getElementById('bot-read-root').innerText`),/1 von 7 Bots im Snapshot/);
+          assert.equal(await evaluate(`document.querySelector('#bot-read-root .bot-data-summary').innerText`),globalSummary);
           await evaluate(`document.querySelector('#nav [data-v="command"]').click();
             document.querySelectorAll('#command-bot-overview button')[1].focus()`);
           await key('Enter','Enter',13);
@@ -463,20 +503,30 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           await evaluate(`window.dispatchEvent(new Event('focus'));window.dispatchEvent(new Event('pageshow'))`);
           assert.deepEqual(await evaluate(`({query:document.getElementById('bot-symbol-search').value,
             sort:document.getElementById('bot-sort-filter').value,
+            direction:document.getElementById('bot-direction-filter').value,category:document.getElementById('bot-category-filter').value,
+            tp:document.getElementById('bot-tp-filter').value,pnl:document.getElementById('bot-pnl-filter').value,
             backHidden:(${backSelector}).hidden,
             targetOpen:document.getElementById('bot-card-${'b'.repeat(20)}').open,
             reads:window.__botReads})`),
-            {query:'',sort:'symbol',backHidden:false,targetOpen:true,reads:1},
+            {query:'',sort:'symbol',direction:'all',category:'all',tp:'all',pnl:'all',backHidden:false,targetOpen:true,reads:1},
             'focus/pageshow reproject the same read without clearing jump context or fetching');
           await evaluate(`(${backSelector}).focus()`);await key('Enter','Enter',13);
           assert.deepEqual(await evaluate(`({query:document.getElementById('bot-symbol-search').value,
             sort:document.getElementById('bot-sort-filter').value,
+            direction:document.getElementById('bot-direction-filter').value,category:document.getElementById('bot-category-filter').value,
+            tp:document.getElementById('bot-tp-filter').value,pnl:document.getElementById('bot-pnl-filter').value,
             focus:document.activeElement===document.getElementById('bot-symbol-search'),
             hidden:(${backSelector}).hidden,reads:window.__botReads})`),
-            {query:'ETH',sort:'pnl',focus:true,hidden:true,reads:1});
+            {query:'ETH',sort:'pnl',direction:'neutral',category:'linear',tp:'unknown',pnl:'available',focus:true,hidden:true,reads:1});
           await evaluate(`document.querySelector('[aria-label="Alle Botfilter zurücksetzen"]').click()`);
           assert.equal(await evaluate(`document.getElementById('bot-card-${'a'.repeat(20)}').open`),true);
           assert.equal(await evaluate(`document.getElementById('bot-card-${'b'.repeat(20)}').open`),true);
+          assert.deepEqual(await evaluate(`({query:document.getElementById('bot-symbol-search').value,
+            sort:document.getElementById('bot-sort-filter').value,direction:document.getElementById('bot-direction-filter').value,
+            category:document.getElementById('bot-category-filter').value,tp:document.getElementById('bot-tp-filter').value,
+            pnl:document.getElementById('bot-pnl-filter').value,count:document.querySelectorAll('#bot-read-root .bot-card').length})`),
+            {query:'',sort:'symbol',direction:'all',category:'all',tp:'all',pnl:'all',count:7},
+            'reset clears all six controls while retaining native disclosure state');
           // Close through native keyboard before the existing baseline screenshot.
           for(const ref of ['a','b']){
             await evaluate(`document.querySelector('#bot-card-'+ '${ref}'.repeat(20)+' summary').focus()`);
@@ -595,7 +645,7 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           await evaluate(`(()=>{const select=document.getElementById('bot-sort-filter');select.value='pnl';
             select.dispatchEvent(new Event('change',{bubbles:true}));})()`);
           assert.deepEqual(await evaluate(`[...document.querySelectorAll('#bot-read-root .bot-card')].map(c=>c.querySelector('.bot-card-heading').innerText.split(' · ')[0])`),
-            ['BTCUSDT','BTCUSDT','ETHUSDT','XRPUSDT','ADAUSDT','MOONUSDT','SOLUSDT']);
+            ['BTCUSDT','BTCUSDT','ETHUSDT','MOONUSDT','XRPUSDT','ADAUSDT','SOLUSDT']);
           await evaluate(`(()=>{const dir=document.getElementById('bot-direction-filter');dir.value='unknown';
             dir.dispatchEvent(new Event('change',{bubbles:true}));})()`);
           assert.equal(await evaluate(`document.querySelector('#bot-read-root .bot-card .bot-card-heading').innerText`),
@@ -850,3 +900,4 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
       await new Promise(resolve=>server.close(resolve));
     }
   });
+
