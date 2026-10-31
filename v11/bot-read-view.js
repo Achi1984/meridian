@@ -1,7 +1,7 @@
 // Inactive component: mount explicitly with the existing read-client factory.
 // No network, credentials, storage or engine imports belong to this renderer.
-import {buildBotOverviewModel} from './bot-overview-model.js?v=B16-M11-FIX8';
-import {subscribeDepotPortfolio} from './depot-portfolio-state.js?v=B16-M11-FIX8';
+import {buildBotOverviewModel} from './bot-overview-model.js?v=B16-M11-FIX9';
+import {subscribeDepotPortfolio} from './depot-portfolio-state.js?v=B16-M11-FIX9';
 
 const LABELS = {
   locked: ['Gesperrt', 'App mit Meridian-Passwort öffnen, dann Bots manuell aktualisieren.'],
@@ -153,7 +153,7 @@ function projection(state, filters = {}) {
     });
     const losses=overview.losses.map(loss=>({ref:loss.ref,symbol:loss.symbol,direction:loss.direction,
       pnl:formatMoney(loss.pnl,'USD',true),pnlDetail:formatExact(loss.pnl,' USD'),pnlTone:loss.pnl<0?'negative':'positive'}));
-    return {status,count:overview.count,distribution:overview.distribution,coverage:model.coverage,bots,losses,
+    return {status,count:overview.count,visibleCount:overview.visibleCount,counts:overview.counts,ageMs:overview.ageMs,expiresAt:overview.expiresAt,distribution:overview.distribution,coverage:model.coverage,bots,losses,
       snapshotAt:overview.snapshotAt,source:overview.source,overwriteScope:model.overwriteScope,
       excludedScope:model.excludedScope,usableForOverwrite:model.usableForOverwrite,
       overwriteRejectionReasons:model.overwriteRejectionReasons};
@@ -174,6 +174,27 @@ function tpIndicator(document, label, value) {
   if(value===null)checkbox.setAttribute('aria-checked','mixed');
   wrapper.append(checkbox,element(document,'span',symbol+' '+label+': '+state));
   return wrapper;
+}
+
+// Snapshot-wide data coverage, shared by Command and Bots; never a trading signal.
+function appendDataSummary(root,data){
+  const document=root.ownerDocument,summary=element(document,'div');summary.className='bot-data-summary';
+  const valid=value=>Number.isSafeInteger(value)&&value>=0;
+  const tp=data.counts?.tp,pnl=data.counts?.pnl;
+  if(!valid(data.count)||!tp||!pnl||![tp.mismatch,tp.unknown,tp.match,pnl.available,pnl.unavailable].every(valid)||
+    tp.mismatch+tp.unknown+tp.match!==data.count||pnl.available+pnl.unavailable!==data.count)return;
+  summary.setAttribute('aria-label','Datenprüfung im gesamten Bot-Snapshot');
+  for(const [label,value] of [['TP abweichend',tp.mismatch],['TP nicht prüfbar',tp.unknown],['TP entspricht oberer Range',tp.match]])
+    summary.append(element(document,'p',label+': '+value));
+  summary.append(element(document,'p','P/L bestätigt: '+pnl.available+' von '+data.count),
+    element(document,'p','P/L nicht verfügbar: '+pnl.unavailable),
+    element(document,'p','Gesamter Snapshot · keine Handelsfreigabe oder Risikobewertung.'));
+  root.append(summary);
+}
+function appendExpiry(root,data){
+  if(!Number.isSafeInteger(data.expiresAt)||data.expiresAt<=0||data.expiresAt>8640000000000000)return;
+  const document=root.ownerDocument,line=element(document,'p','Snapshot gültig bis (UTC): '),time=element(document,'time',new Date(data.expiresAt).toISOString());
+  time.setAttribute('datetime',new Date(data.expiresAt).toISOString());line.append(time);root.append(line);
 }
 
 // Keep the empty live region attached before populating it, then retain its identity.
@@ -222,7 +243,8 @@ export function renderBotReadState(root, state, filters = {}) {
   if (data.status === 'fresh') {
     const resultCount=element(document,'p',data.bots.length+' von '+data.count+' Bots im Snapshot');
     resultCount.setAttribute('role','status');resultCount.setAttribute('aria-live','polite');
-    details.append(resultCount,element(document,'p',coverageText(data.coverage)));
+    details.append(resultCount);appendDataSummary(details,data);
+    details.append(element(document,'p',coverageText(data.coverage)));appendExpiry(details,data);
     const scope=scopeText(data);
     if(scope)details.append(element(document,'p',scope));
     if (!data.count) details.append(element(document,'p',EMPTY_SNAPSHOT));
@@ -414,7 +436,8 @@ export function renderCommandBotOverview(root, data, onJump, statusRoot=null) {
   const exactTimestamp=element(document,'time',timestamp||'Zeit unbekannt');
   if(timestamp)exactTimestamp.setAttribute('datetime',timestamp);
   metadataBody.append(element(document,'p','Snapshot-Zeit exakt (UTC): '),exactTimestamp);
-  metadata.append(metadataBody);root.append(metadata);
+  appendExpiry(metadataBody,data);
+  metadata.append(metadataBody);root.append(metadata);appendDataSummary(root,data);
   if(data.count===0)root.append(element(document,'p',EMPTY_SNAPSHOT));
   if(!data.losses.length)root.append(element(document,'p','Keine bestätigten negativen P/L-Werte.'));
   else{
@@ -483,7 +506,7 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
     }
   }
   filterPanel.className='bot-overview-filters';
-  const filterState={query:'',direction:'all',category:'all',sort:'symbol'};
+  const filterState={query:'',direction:'all',category:'all',sort:'symbol',tpStatus:'all',pnlAvailability:'all'};
   const search=element(document,'input');search.type='search';search.id='bot-symbol-search';
   search.setAttribute('aria-label','Symbol suchen');search.setAttribute('type','search');
   const searchLabel=element(document,'label','Symbol suchen');searchLabel.setAttribute('for','bot-symbol-search');
@@ -504,7 +527,11 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
   const categorySelect=select('Kontraktart','bot-category-filter','category',[
     ['all','Alle Kontraktarten'],['coin-m','COIN-M'],['linear','Linear'],['unknown','Unbekannt']]);
   const sortSelect=select('Sortierung','bot-sort-filter','sort',[
-    ['symbol','Symbol (A–Z)'],['leverage','Bestätigter Hebel'],['pnl','P/L laut Quelle']]);
+    ['symbol','Symbol (A–Z)'],['leverage','Bestätigter Hebel'],['pnl','P/L laut Quelle'],['tp','TP-Prüfstatus']]);
+  const tpSelect=select('TP-Prüfung','bot-tp-filter','tpStatus',[
+    ['all','Alle TP-Zustände'],['mismatch','TP abweichend'],['unknown','TP nicht prüfbar'],['match','TP entspricht oberer Range']]);
+  const pnlSelect=select('P/L-Verfügbarkeit','bot-pnl-filter','pnlAvailability',[
+    ['all','Alle P/L-Angaben'],['available','P/L bestätigt'],['unavailable','P/L nicht verfügbar']]);
   const reset=element(document,'button','Filter zurücksetzen');reset.setAttribute('type','button');
   reset.setAttribute('aria-label','Alle Botfilter zurücksetzen');filterPanel.append(reset);
   const returnSelection=element(document,'button','Zur vorherigen Auswahl zurück');
@@ -520,9 +547,10 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
     Object.assign(filterState,selection);
     search.value=filterState.query;directionSelect.value=filterState.direction;
     categorySelect.value=filterState.category;sortSelect.value=filterState.sort;
+    tpSelect.value=filterState.tpStatus;pnlSelect.value=filterState.pnlAvailability;
   };
   const resetFilterState=()=>{
-    applyFilters({query:'',direction:'all',category:'all',sort:'symbol'});
+    applyFilters({query:'',direction:'all',category:'all',sort:'symbol',tpStatus:'all',pnlAvailability:'all'});
   };
   const releaseDepotSubscription=()=>{
     const unsubscribe=unsubscribeDepot;
@@ -562,6 +590,7 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
     if(disposed||latestState?.status!=='fresh')return;
     filterState.query=search.value;filterState.direction=directionSelect.value;
     filterState.category=categorySelect.value;filterState.sort=sortSelect.value;
+    filterState.tpStatus=tpSelect.value;filterState.pnlAvailability=pnlSelect.value;
     renderBotReadState(content,latestState,filterState);
   };
   const resetFilters=()=>{
@@ -592,6 +621,7 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
   directionSelect.addEventListener('change',updateFilters);
   categorySelect.addEventListener('change',updateFilters);
   sortSelect.addEventListener('change',updateFilters);
+  tpSelect.addEventListener('change',updateFilters);pnlSelect.addEventListener('change',updateFilters);
   reset.addEventListener('click',resetFilters);
   returnSelection.addEventListener('click',returnToSelection);
   update({status:'locked'});
@@ -634,6 +664,7 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
       directionSelect.removeEventListener('change',updateFilters);
       categorySelect.removeEventListener('change',updateFilters);
       sortSelect.removeEventListener('change',updateFilters);
+      tpSelect.removeEventListener('change',updateFilters);pnlSelect.removeEventListener('change',updateFilters);
       reset.removeEventListener('click',resetFilters);
       returnSelection.removeEventListener('click',returnToSelection);
       clearPreviousSelection();
@@ -645,3 +676,4 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
     }
   };
 }
+
