@@ -1,4 +1,4 @@
-import {appAccess} from './app-access.js?v=B16-M11-FIX7';
+import {appAccess} from './app-access.js?v=B16-M11-FIX8';
 
 export function mountAppAccess(document,window,{access=appAccess}={}){
   const app=document.getElementById('app');

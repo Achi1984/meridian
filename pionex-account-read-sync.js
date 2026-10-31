@@ -72,7 +72,7 @@ function normalizeWalletPrices(prices={}){
   const out={};
   for(const [coin,row] of Object.entries(prices&&typeof prices==='object'?prices:{})){
     const symbol=String(coin||'').trim().toUpperCase();if(!symbol)continue;
-    const priceInUsd=num(row?.priceInUsd),priceInBtc=num(row?.priceInBtc);
+    const priceInUsd=optionalWalletNumber(row?.priceInUsd),priceInBtc=optionalWalletNumber(row?.priceInBtc);
     if(priceInUsd!=null||priceInBtc!=null)out[symbol]={priceInUsd,priceInBtc};
   }
   return out;
@@ -80,8 +80,10 @@ function normalizeWalletPrices(prices={}){
 // Wallet profit is optional: null, blanks and nonnumeric shapes are not zero.
 function optionalWalletNumber(value){
   if(typeof value!=='number'&&typeof value!=='string')return null;
-  if(typeof value==='string'&&!value.trim())return null;
-  return num(value);
+  if(typeof value==='string'&&!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(value.trim()))return null;
+  const parsed=num(value);
+  if(typeof value==='string'&&parsed===0&&/[1-9]/.test(value.trim().split(/[eE]/)[0]))return null;
+  return parsed;
 }
 function pnlUnavailableReason(value,walletProfit,walletSource){
   if(Number.isFinite(value))return null;
@@ -95,7 +97,8 @@ function inverseWalletProfitUsd(wallet,row,walletPrices={}){
   if(cate!=='inverse'||profit==null||!token||token!==symbol)return{value:null,token:token||null,source:'NONE'};
   const rawPx=walletPrices?.[token]?.priceInUsd,px=optionalWalletNumber(rawPx);
   if(!(px>0))return{value:null,token,source:'NO_WALLET_USD_PRICE'};
-  return{value:Number.isFinite(profit*px)?profit*px:null,token,source:'WALLET_PROFIT_X_PIONEX_WALLET_PRICE'};
+  const converted=profit*px;
+  return{value:Number.isFinite(converted)&&!(converted===0&&profit!==0)?converted:null,token,source:'WALLET_PROFIT_X_PIONEX_WALLET_PRICE'};
 }
 function walletCategoryCount(value){
   if(typeof value!=='number'&&!(typeof value==='string'&&value===value.trim()&&/^(0|[1-9]\d*)$/.test(value)))return null;
