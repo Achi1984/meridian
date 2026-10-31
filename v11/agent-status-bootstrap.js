@@ -1,5 +1,5 @@
-import {appAccess} from './app-access.js?v=B16-M11-FIX6';
-import {createAgentStatusClient} from './agent-status-client.js?v=B16-M11-FIX6';
+import {appAccess} from './app-access.js?v=B16-M11-FIX7';
+import {createAgentStatusClient} from './agent-status-client.js?v=B16-M11-FIX7';
 import {renderM11AgentStatus} from '../public/js/m11-agent-status.js';
 
 export function mountAgentStatus(document,window,{

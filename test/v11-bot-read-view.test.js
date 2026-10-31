@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {renderBotReadState,createBotReadView,renderCommandBotOverview} from '../v11/bot-read-view.js';
 import {buildBotReadModel} from '../v11/bot-read-model.js';
 import {createBotReadClient} from '../v11/bot-read-client.js';
-import {publishDepotPortfolioState} from '../v11/depot-portfolio-state.js?v=B16-M11-FIX6';
+import {publishDepotPortfolioState} from '../v11/depot-portfolio-state.js?v=B16-M11-FIX7';
 import {normalizePionexBotOrder} from '../pionex-bot-auto-sync.js';
 import {buildAssetWatchApiSnapshot} from '../asset-watch-bridge.js';
 
@@ -36,6 +36,16 @@ const fresh=()=>({status:'fresh',model:{status:'FRESH_SNAPSHOT',readOnly:true,ex
   source:'PIONEX_BOT_API',snapshotAt:'2026-10-12T20:00:00Z',
   bots:[{ref:'a'.repeat(20),symbol:'BTC',side:'SHORT',type:'futures_grid',category:'inverse',
     metrics:{leverage:null,pnlUsd:null},secret:'NEVER DISPLAY'}]}});
+test('confirmed zero P/L renders in summary and detail, while legacy zero stays unavailable',()=>{
+  for(const evidence of ['EXPLICIT_USD_VALUE','INVERSE_WALLET_USD_VALUE',null,'unknown']){
+    const state=fresh(),target=root();state.model.bots[0].metrics={pnlUsd:0,pnlEvidence:evidence};
+    renderBotReadState(target,state);
+    const known=evidence==='EXPLICIT_USD_VALUE'||evidence==='INVERSE_WALLET_USD_VALUE';
+    assert.match(all(target,'summary')[0].textContent,known?/P\/L laut Quelle0,00 USD/:/P\/L laut QuelleNicht verfügbar/);
+    all(target,'button').find(node=>node.text==='Originalwerte anzeigen').click();
+    assert.match(target.textContent,known?/P\/L laut Quelle · Originalwert0 USD/:/P\/L laut Quelle · OriginalwertNicht verfügbar/);
+  }
+});
 function mounted(overrides={}){
   const target=root(),calls={refresh:0,lock:0,dispose:0,revalidate:0};let publish,jump;
   const client={refresh(){calls.refresh++;publish({status:'loading'});},lock(){calls.lock++;publish({status:'locked'});},

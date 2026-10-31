@@ -28,16 +28,16 @@ test('actual native profit without confirmed conversion reports unit uncertainty
 test('existing inverse conversion differentiates missing USD price and known results',()=>{
   for(const priceInUsd of [undefined,null,'',false,0,-1,'bad'])expect(row({cateType:'inverse',investmentToken:'BTC',profit:2},{},{BTC:{priceInUsd}}),'WALLET_USD_PRICE_MISSING');
   expect(row({cateType:'inverse',investmentToken:'BTC',profit:-2},{},{BTC:{priceInUsd:10}}),null,-20);
-  expect(row({cateType:'inverse',investmentToken:'BTC',profit:0},{},{BTC:{priceInUsd:10}}),'ZERO_VALUE_UNCONFIRMED');
+  expect(row({cateType:'inverse',investmentToken:'BTC',profit:0},{},{BTC:{priceInUsd:10}}),null,0);
 });
-test('detail USD value has precedence, preserving conservative explicit zero policy',()=>{
-  expect(row({profit:100},{totalProfitUsd:0}),'ZERO_VALUE_UNCONFIRMED');
+test('detail USD value has precedence and explicit zero is confirmed',()=>{
+  expect(row({profit:100},{totalProfitUsd:0}),null,0);
   expect(row({profit:100},{totalProfitUsd:-3}),null,-3);
 });
 test('old persisted and old bridge rows remain generic; untrusted reason strings are bounded',()=>{
   const bot=row();delete bot.pnlUnavailableReason;
   const s=snapshot(bot);assert.equal(metrics(s).pnlUnavailableReason,'USD_VALUE_MISSING');
-  delete s.bots[0].pnl.unavailableReason;assert.equal(s.bots[0].pnl.usd,0);
+  delete s.bots[0].pnl.unavailableReason;assert.equal(s.bots[0].pnl.usd,null);
   assert.equal(metrics(s).pnlUnavailableReason,'USD_VALUE_MISSING');
   for(const invalid of ['<script>',{},'X'.repeat(10000)]){
     assert.equal(snapshot({...bot,pnlUnavailableReason:invalid}).bots[0].pnl.unavailableReason,'USD_VALUE_MISSING');

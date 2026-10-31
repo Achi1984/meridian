@@ -39,10 +39,13 @@ function projectedEnum(value,allowed){
 }
 const PNL_UNAVAILABLE_REASONS=['USD_VALUE_MISSING','WALLET_PROFIT_UNIT_UNCONFIRMED',
   'WALLET_USD_PRICE_MISSING','ZERO_VALUE_UNCONFIRMED'];
+const PNL_EVIDENCE=['EXPLICIT_USD_VALUE','INVERSE_WALLET_USD_VALUE'];
+const strictPnl=value=>typeof value==='number'&&Number.isFinite(value)?value:null;
+function pnlEvidence(bot){return strictPnl(bot.pnlUsd)!==null?projectedEnum(bot.pnlEvidence,PNL_EVIDENCE):null;}
 function projectedPnlReason(bot){
   const raw=bot.pnlUsd;
-  if(typeof raw==='number'&&Number.isFinite(raw)&&raw!==0)return null;
-  // Preserve an explicit provider reason before the legacy null-to-zero projection.
+  if(strictPnl(raw)!==null&&(raw!==0||pnlEvidence(bot)!==null))return null;
+  // Preserve bounded reasons for unavailable and legacy unconfirmed values.
   return projectedEnum(bot.pnlUnavailableReason,PNL_UNAVAILABLE_REASONS)||
     (raw===0?'ZERO_VALUE_UNCONFIRMED':'USD_VALUE_MISSING');
 }
@@ -92,7 +95,8 @@ function sanitizedBot(bot={}){
       quoteAmount:num(bot.quoteInvestment)
     },
     pnl:{
-      usd:num(bot.pnlUsd),
+      usd:strictPnl(bot.pnlUsd),
+      evidence:pnlEvidence(bot),
       unavailableReason:projectedPnlReason(bot),
       totalProfitPct:num(bot.totalProfitPct)
     },
