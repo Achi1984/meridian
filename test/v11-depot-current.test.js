@@ -130,3 +130,31 @@ test('bounds, private wrapper, overflow and fallback sources do not yield a valu
   const p=fixture();p.data.portfolio.pionexEquitySource='secret<error>';
   const m=buildCurrentDepotModel(p,options());unknown(m);assert.doesNotMatch(JSON.stringify(m),/secret/);
 });
+
+test('source diagnostics distinguish stale and missing authorities without disclosing values or symbols',()=>{
+  const cases=[
+    [p=>p.data.portfolio.pionexEquityUpdatedAt=iso(NOW-900001),{},['PIONEX_STALE_OR_UNTIMED']],
+    [p=>delete p.data.portfolio.pionexEquityUsd,{},['PIONEX_SOURCE_MISSING']],
+    [p=>p.data.portfolio.manualVenueBalances[0].updatedAt=iso(NOW-86400001),{},['OKX_SOURCE_STALE']],
+    [p=>p.data.portfolio.manualVenueBalances=p.data.portfolio.manualVenueBalances.slice(1),{},['OKX_SOURCE_MISSING']],
+    [p=>{delete p.data.portfolio.ledgerAuthorityAt;p.data.portfolio.manualVenueBalances=p.data.portfolio.manualVenueBalances.slice(0,1);},{},['LEDGER_SOURCE_MISSING']],
+    [p=>{p.data.portfolio.ledgerAuthorityAt=iso(NOW-86400001);p.data.portfolio.manualVenueBalances[1].updatedAt=iso(NOW-86400001);},{},['LEDGER_SOURCE_STALE']],
+    [()=>{},{tickersAt:NOW-180001},['PRICE_SOURCE_STALE']],
+    [()=>{},{tickers:[{symbol:'ETHUSDT',price:'100'}]},['REQUIRED_PRICE_MISSING']]
+  ];
+  for(const [mutate,extra,expected] of cases){
+    const p=fixture();mutate(p);const m=buildCurrentDepotModel(p,{...options(),...extra});
+    unknown(m);assert.deepEqual(m.sourceIssues,expected);
+    assert.doesNotMatch(JSON.stringify(m),/BTC|ETH|999|2026|PRIVATE_PORTFOLIO/);
+  }
+  const both=fixture();delete both.data.portfolio.ledgerAuthorityAt;both.data.portfolio.manualVenueBalances=[];
+  assert.deepEqual(buildCurrentDepotModel(both,options()).sourceIssues,['LEDGER_SOURCE_MISSING','OKX_SOURCE_MISSING']);
+});
+test('diagnostics ignore superseded old authority and never copy malformed source labels',()=>{
+  const p=fixture();p.data.portfolio.manualVenueBalances.unshift({venue:'OKX',valueUsd:999,updatedAt:iso(NOW-86400001)});
+  p.data.portfolio.ledgerAuthorityAt=iso(NOW-86400001);
+  const m=buildCurrentDepotModel(p,options());assert.equal(m.status,'FRESH_SNAPSHOT');assert.equal(m.sourceIssues,undefined);
+  p.data.portfolio.pionexEquitySource='secret-account-token';
+  const invalid=buildCurrentDepotModel(p,options());unknown(invalid);
+  assert.deepEqual(invalid.sourceIssues,['PIONEX_SOURCE_INVALID']);assert.doesNotMatch(JSON.stringify(invalid),/secret-account-token/);
+});

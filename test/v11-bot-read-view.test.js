@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {renderBotReadState,createBotReadView,renderCommandBotOverview} from '../v11/bot-read-view.js';
 import {buildBotReadModel} from '../v11/bot-read-model.js';
 import {createBotReadClient} from '../v11/bot-read-client.js';
-import {publishDepotPortfolioState} from '../v11/depot-portfolio-state.js?v=B16-M11-FIX1';
+import {publishDepotPortfolioState} from '../v11/depot-portfolio-state.js?v=B16-M11-FIX2';
 import {normalizePionexBotOrder} from '../pionex-bot-auto-sync.js';
 import {buildAssetWatchApiSnapshot} from '../asset-watch-bridge.js';
 
@@ -61,7 +61,7 @@ test('neutral rows display independent liquidation bounds and explicit partial c
   const target=root();renderBotReadState(target,state);
   assert.match(target.textContent,/Liquidationsschätzung · Untergrenze/);
   assert.match(target.textContent,/Liquidationsschätzung · Obergrenze/);
-  assert.match(target.textContent,/Untergrenze50000/);assert.match(target.textContent,/Obergrenze60000/);
+  assert.match(target.textContent,/Untergrenze50\.000/);assert.match(target.textContent,/Obergrenze60\.000/);
   assert.doesNotMatch(target.textContent,/Liquidationspreis laut Quelle/);
   assert.match(target.textContent,/Teilabdeckung/);
   assert.match(target.textContent,/Futures Moon ist als cateType von futures_grid dokumentiert/);
@@ -401,6 +401,7 @@ test('collapsed native cards distinguish equal symbols and render only whitelist
    assert.match(firstSummary.textContent,/Aufklappen/);
    assert.match(first.textContent,/Technische Referenz: a{20}/);
    assert.match(second.textContent,/Technische Referenz: b{20}/);
+   all(first,'button').find(node=>node.text==='Originalwerte anzeigen').click();
    assert.match(target.textContent,/Hebel · Originalwert5×/);
    assert.match(target.textContent,/Kapital · Originalwert125.5 USD\/USDT/);
    assert.match(target.textContent,/P\/L laut Quelle · Originalwert-2.75 USD/);
@@ -548,6 +549,7 @@ test('collapsed card summary visibly labels TP mismatch and unknown status',()=>
      renderBotReadState(target,state);
      const summary=all(target,'summary')[0];
      assert.ok(summary.textContent.includes(input.collapsed),input.collapsed);
+     all(target,'button').find(node=>node.text==='Originalwerte anzeigen').click();
      assert.match(target.textContent,new RegExp(input.detail.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')));
      assert.match(target.textContent,/Hebel · Originalwert5.1234567890123×/);
      assert.match(target.textContent,/P\/L laut Quelle · Originalwert0.0034567890123 USD/);
@@ -836,5 +838,50 @@ test('invalid and expired source envelopes cannot publish scope confirmation thr
       assert.doesNotMatch(target.textContent,/BTC|Futures-Grid-Datenumfang|2026-10-12/);
     }
     view.dispose();
+  }
+});
+
+test('readable detail toggle retains exact source values, tiny nonzero prices and TP evidence',()=>{
+  const target=root(),state=fresh(),bot=state.model.bots[0];
+  bot.metrics={leverage:10,investmentUsd:1000,pnlUsd:-0.0000000123456789,
+    lower:71805.1,upper:97148,liquidationPrice:71165.18612216676,takeProfit:180000,
+    stopLoss:0.000000000123456789};
+  bot.takeProfitEvidence='PRICE_SET';bot.takeProfitCheck={matchesUpper:false};
+  const original=structuredClone(bot);
+  renderBotReadState(target,state);
+  const metrics=all(target,'dl')[0],toggle=all(target,'button').find(node=>node.text==='Originalwerte anzeigen');
+  assert.match(metrics.textContent,/Liquidationspreis laut Quelle71\.165,19/);
+  assert.match(metrics.textContent,/Grid-Untergrenze71\.805,1/);
+  assert.match(metrics.textContent,/Stop-Loss0,000000000123457/);
+  assert.doesNotMatch(metrics.textContent,/Originalwert|71165\.18612216676/);
+  assert.match(target.textContent,/TP-Wert: 180000 · obere Range: 97148/);
+  assert.equal(toggle.getAttribute('aria-pressed'),'false');
+  toggle.focus();toggle.click();
+  assert.equal(toggle.getAttribute('aria-pressed'),'true');assert.equal(target.ownerDocument.activeElement,toggle);
+  assert.match(metrics.textContent,/Liquidationspreis laut Quelle71165\.18612216676/);
+  assert.match(metrics.textContent,/P\/L laut Quelle · Originalwert-1\.23456789e-8 USD/);
+  assert.match(metrics.textContent,/Stop-Loss1\.23456789e-10/);
+  assert.match(metrics.textContent,/Grid-GewinnNicht verfügbar/);
+  toggle.click();assert.match(metrics.textContent,/Liquidationspreis laut Quelle71\.165,19/);
+  assert.deepEqual(bot,original,'formatting cannot mutate comparison or source data');
+  assert.equal(all(target,'details').length,1,'format toggle does not create nested bot disclosures');
+  assert.ok(all(target,'button').some(node=>node.text==='Bot zuklappen'));
+  renderBotReadState(target,{status:'locked'});assert.doesNotMatch(target.textContent,/71\.165|71165|Originalwerte/);
+});
+
+test('missing P/L explains only bounded reason codes and never exposes raw source messages',()=>{
+  const labels={USD_VALUE_MISSING:'Kein bestätigter P/L-Wert in USD vorhanden.',
+    WALLET_PROFIT_UNIT_UNCONFIRMED:'Die Einheit des gelieferten Gewinnwerts ist nicht bestätigt.',
+    WALLET_USD_PRICE_MISSING:'Für den gelieferten Gewinnwert fehlt ein bestätigter USD-Umrechnungskurs.',
+    ZERO_VALUE_UNCONFIRMED:'Ein Nullwert ist vorhanden'};
+  for(const code of [...Object.keys(labels),undefined,'RAW_SECRET','constructor']){
+    const target=root(),state=fresh();state.model.bots[0].metrics.pnlUnavailableReason=code;
+    renderBotReadState(target,state);
+    const reason=target.querySelector('.bot-pnl-unavailable-reason');
+    assert.ok(reason.textContent.includes(Object.hasOwn(labels,code)?labels[code]:labels.USD_VALUE_MISSING));
+    assert.doesNotMatch(target.textContent,/RAW_SECRET|constructor/);
+    state.model.bots[0].metrics.pnlUsd=12.34;
+    renderBotReadState(target,state);
+    assert.equal(target.querySelector('.bot-pnl-unavailable-reason'),null,'valid P/L must not show stale missing-value diagnosis');
   }
 });

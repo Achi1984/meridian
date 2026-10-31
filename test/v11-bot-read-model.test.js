@@ -83,7 +83,7 @@ test('calendar normalization cannot make an invalid timestamp fresh',()=>{
 test('source metric projection preserves nonzero finite numeric values without coercion or derived risk',()=>{
   const input=fixture();Object.assign(input.bots[0],{leverage:5,investment:{usd:120},pnl:{usd:-2.5},
     limits:{lower:0.000001,upper:100,liquidationPrice:90,takeProfit:110,stopLoss:95},grid:{profitUsd:999},riskBufferPct:99});
-  assert.deepEqual(buildBotReadModel(input,{now}).bots[0].metrics,{leverage:5,investmentUsd:120,investmentAmount:null,investmentCurrency:null,pnlUsd:-2.5,
+  assert.deepEqual(buildBotReadModel(input,{now}).bots[0].metrics,{leverage:5,investmentUsd:120,investmentAmount:null,investmentCurrency:null,pnlUsd:-2.5,pnlUnavailableReason:null,
     lower:0.000001,upper:100,liquidationPrice:90,liquidationLowerBound:null,liquidationUpperBound:null,
     takeProfit:110,stopLoss:95,gridProfitUsd:null,riskBufferPct:null});
 });
@@ -91,7 +91,9 @@ test('missing, coerced zero, invalid and negative positive-only metrics remain u
   for(const value of [undefined,null,'',0,-0,'12',true,Infinity,NaN,{},[]]) {
     const input=fixture();Object.assign(input.bots[0],{leverage:value,investment:{usd:value},pnl:{usd:value},
       limits:{lower:value,upper:value,liquidationPrice:value,takeProfit:value,stopLoss:value}});
-    assert.ok(Object.values(buildBotReadModel(input,{now}).bots[0].metrics).every(item=>item===null));
+    const {pnlUnavailableReason,...numericMetrics}=buildBotReadModel(input,{now}).bots[0].metrics;
+    assert.equal(pnlUnavailableReason,'USD_VALUE_MISSING');
+    assert.ok(Object.values(numericMetrics).every(item=>item===null));
   }
   const input=fixture();Object.assign(input.bots[0],{leverage:-2,investment:{usd:-2},limits:{lower:-2}});
   assert.equal(buildBotReadModel(input,{now}).bots[0].metrics.leverage,null);
