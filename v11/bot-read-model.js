@@ -5,6 +5,19 @@ const MAX_AGE = 15 * 60 * 1000;
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const enumValue = (value, allowed) => allowed.includes(value) ? value : null;
 const rowCount = value => Number.isSafeInteger(value) && value >= 0 ? value : null;
+const REJECTION_REASONS = ['UNSUPPORTED_SCOPE', 'SUPPORTED_HYDRATION_MISSING',
+  'SANITIZATION_LOSS_OR_DUPLICATE', 'PAGINATION_INCOMPLETE', 'EXPLICIT_PARTIAL',
+  'SYNC_PARTIAL', 'DETAILS_INCOMPLETE', 'SOURCE_STATUS_NOT_OK', 'SOURCE_STALE', 'SOURCE_UNAVAILABLE'];
+function scope(snapshot) {
+  const reasons = snapshot.overwriteRejectionReasons;
+  return {
+    overwriteScope: enumValue(snapshot.overwriteScope, ['WALLET_FUTURES_GRID', 'PRIMARY_BOT_API', 'NONE']),
+    excludedScope: enumValue(snapshot.excludedScope, ['KNOWN_EXCLUDED_PRODUCTS', 'UNVERIFIED', 'NONE']),
+    usableForOverwrite: typeof snapshot.usableForOverwrite === 'boolean' ? snapshot.usableForOverwrite : null,
+    overwriteRejectionReasons: Array.isArray(reasons) && reasons.length <= REJECTION_REASONS.length &&
+      Array.from(reasons).every(reason => REJECTION_REASONS.includes(reason)) ? [...reasons] : null
+  };
+}
 function coverage(snapshot) {
   const raw=object(snapshot?.coverage)?snapshot.coverage:{};
   const counts={listRows:rowCount(raw.listRows),recognizedRows:rowCount(raw.recognizedRows),
@@ -25,6 +38,28 @@ function coverage(snapshot) {
 // zero cannot be distinguished from missing and must never imply a known value.
 const metric = (value, positive = false) => typeof value === 'number' && Number.isFinite(value) &&
   value !== 0 && (!positive || value > 0) ? value : null;
+function decimalKey(value) {
+  const [coefficient, exponentText = '0'] = String(value).toLowerCase().split('e');
+  const [whole, fraction = ''] = coefficient.split('.');
+  let digits = (whole + fraction).replace(/^0+/, '');
+  let power = Number(exponentText) - fraction.length;
+  while (digits.endsWith('0')) {
+    digits = digits.slice(0, -1);
+    power++;
+  }
+  return digits + 'e' + power;
+}
+function takeProfitCheck(metrics, evidence) {
+  if (evidence !== 'PRICE_SET' || metrics.takeProfit === null) return {
+    set: null, matchesUpper: null,
+    reason: 'Die Quelle bestätigt keinen direkt vergleichbaren TP-Preis; fehlende Werte belegen kein ungesetztes TP.'
+  };
+  if (metrics.upper === null) return {
+    set: true, matchesUpper: null,
+    reason: 'Die obere Range fehlt oder ist nicht eindeutig bestätigt.'
+  };
+  return {set: true, matchesUpper: decimalKey(metrics.takeProfit) === decimalKey(metrics.upper), reason: null};
+}
 function metrics(bot) {
   return {leverage: metric(bot.leverage, true), investmentUsd: metric(bot.investment?.usd, true),
     investmentAmount: metric(bot.investment?.quoteAmount, true),
@@ -39,7 +74,9 @@ function metrics(bot) {
 
 export function buildBotReadModel(snapshot, {now = Date.now()} = {}) {
   const result = {status: 'UNKNOWN', source: null, snapshotAt: null, ageMs: null,
-    readOnly: true, executionAllowed: false, coverage:coverage(snapshot), bots: []};
+    readOnly: true, executionAllowed: false, coverage:coverage(snapshot),
+    overwriteScope: null, excludedScope: null, usableForOverwrite: null,
+    overwriteRejectionReasons: null, bots: []};
   if (!object(snapshot) || !Number.isFinite(now)) return result;
   if (snapshot.schemaVersion !== SCHEMA || !SOURCES.includes(snapshot.source) ||
       snapshot.readOnly !== true || snapshot.executionImpact !== false) return result;
@@ -68,14 +105,17 @@ export function buildBotReadModel(snapshot, {now = Date.now()} = {}) {
     seen.add(bot.botRef);
     const cateType=enumValue(bot.cateType,['inverse','linear','FUTURES_MOON',
       'FUTURE_GRID_COIN_MARGINED','FULLY_HEDGING','SPOT']);
+    const projectedMetrics=metrics(bot);
+    const takeProfitEvidence=bot.limits?.takeProfitEvidence==='PRICE_SET'?'PRICE_SET':'UNKNOWN';
     bots.push({ref: bot.botRef, symbol: bot.symbol,
       side: enumValue(bot.side, ['LONG', 'SHORT', 'NEUTRAL']),
       category: enumValue(cateType, ['inverse', 'linear']),
       productCategory: cateType==='FUTURES_MOON'?'FUTURES_MOON':null,
       type: enumValue(bot.botType, ['futures_grid', 'future_hedge_grid']),
       sideSource: enumValue(bot.sideSource, ['economic_inverse_asset', 'trend_inverse_asset', 'trend']),
-      metrics: metrics(bot)});
+      metrics: projectedMetrics, takeProfitEvidence,
+      takeProfitCheck: takeProfitCheck(projectedMetrics,takeProfitEvidence)});
   }
   return {...result, status: 'FRESH_SNAPSHOT', source: snapshot.source,
-    snapshotAt: stamp, ageMs: age, expiresAt: time + limit, bots};
+    snapshotAt: stamp, ageMs: age, expiresAt: time + limit, ...scope(snapshot), bots};
 }

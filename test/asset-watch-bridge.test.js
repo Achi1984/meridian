@@ -64,7 +64,8 @@ test('asset-watch bridge exports only a fresh complete read-only Pionex bot snap
   assert.equal(x.bots[0].limits.liquidationPrice,0.06089);
   assert.equal(x.bots[0].limits.liquidationLowerBound,null);
   assert.equal(x.bots[0].limits.liquidationUpperBound,null);
-  assert.equal(x.bots[0].limits.takeProfit,0.15);
+  assert.equal(x.bots[0].limits.takeProfit,null);
+  assert.equal(x.bots[0].limits.takeProfitEvidence,'UNKNOWN');
   assert.equal(x.bots[0].grid.grids,287);
   assert.equal(x.bots[0].position.positionOpenPrice,0.11576);
   assert.equal(x.bots[0].position.breakEvenPrice,null);
@@ -159,6 +160,39 @@ test('existing wallet selection and stale protection preserve typed provenance',
   const x=buildAssetWatchApiSnapshot(input,{now:NOW});assert.equal(x.source,'PIONEX_WALLET_BOT_DETAIL');
   assert.equal(x.bots[0].cateType,'inverse');assert.equal(x.bots[0].botType,'future_hedge_grid');assert.equal(x.bots[0].sideSource,'trend_inverse_asset');
   const stale=buildAssetWatchApiSnapshot(input,{now:NOW+3600000});assert.equal(stale.usableForOverwrite,false);assert.equal(stale.fresh,false);
+});
+
+test('bridge retains only bounded comparable TP evidence and never promotes null or zero to absence',()=>{
+  for(const [takeProfit,takeProfitEvidence,expectedPrice,expectedEvidence] of [
+    [0.15,'PRICE_SET',0.15,'PRICE_SET'],
+    [null,'PRICE_SET',null,'UNKNOWN'],
+    [0,'PRICE_SET',null,'UNKNOWN'],
+    [0.15,'CONFIRMED_UNSET',null,'UNKNOWN'],
+    [0.15,'OTHER_TP_TYPE',null,'UNKNOWN'],
+    [null,null,null,'UNKNOWN']
+  ]){
+    const input=state();input.pionexRisk.bots=[bot({takeProfit,takeProfitEvidence})];
+    const result=buildAssetWatchApiSnapshot(input,{now:NOW});
+    assert.equal(result.bots[0].limits.takeProfit,expectedPrice);
+    assert.equal(result.bots[0].limits.takeProfitEvidence,expectedEvidence);
+  }
+});
+
+test('wallet detail normalization carries explicit price evidence through its existing projection',()=>{
+  const risk=buildWalletBotRisk({candidateCount:1,paginationComplete:true,categoriesVerified:true,
+    buOrderTypeCounts:{futures_grid:1},successBuOrderTypeCounts:{futures_grid:1},
+    details:[{wallet:{buOrderId:'synthetic-wallet-tp',buOrderType:'futures_grid',cateType:'linear'},
+      detail:{base:'BTC.PERP',quote:'USDT',status:'running',buOrderData:{status:'running',trend:'long',
+        bottom:'50000',top:'100000',profitStopType:'price',profitStop:'100000'}}}]
+  },'2026-09-28T20:41:00.000Z');
+  assert.equal(risk.bots[0].takeProfit,100000);
+  assert.equal(risk.bots[0].takeProfitEvidence,'PRICE_SET');
+  const input=state({pionexRisk:{snapshotAt:'2026-09-28T19:00:00.000Z',detailsComplete:true,bots:[]},
+    pionexBotSync:{status:'ERROR'},pionexAccount:{walletBotRisk:risk},
+    pionexAccountSync:{status:'OK',lastSuccessAt:'2026-09-28T20:41:00.000Z'}});
+  const projected=buildAssetWatchApiSnapshot(input,{now:NOW});
+  assert.equal(projected.source,'PIONEX_WALLET_BOT_DETAIL');
+  assert.equal(projected.bots[0].limits.takeProfitEvidence,'PRICE_SET');
 });
 test('fingerprint detects provenance changes while raw IDs remain absent',()=>{
   const input=state();input.pionexRisk.bots=[bot({cateType:'linear',botType:'futures_grid',sideSource:'trend'})];

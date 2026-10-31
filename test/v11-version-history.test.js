@@ -11,7 +11,8 @@ test('version disclosure distinguishes published terminal from integrated previe
  assert.match(html,/Terminal 10\.0-r130/);
  assert.match(html,/Terminal 10\.0-r128/);
  assert.match(html,/Terminal 10\.0-r127<\/strong><span class="version-status">Historischer Stand/);
- assert.match(html,/id="version-toggle"[^>]*>11 · Vorschau B15<small>/);
+ assert.match(html,/id="version-toggle"[^>]*>11 · Vorschau B16<small>/);
+ assert.match(html,/<li><strong>Meridian 11 · B16<\/strong><span class="version-status">Vorschau<\/span><p>Wallet-Abdeckung/);
  assert.match(html,/<li><strong>Meridian 11 · B15<\/strong><span class="version-status">Entwurf<\/span><p>Kompakte Bot-Karten und Command-Zeilen/);
  assert.match(html,/<li><strong>Meridian 11 · B14<\/strong><span class="version-status">Entwurf<\/span><p>Research Results Explorer/);
  assert.match(html,/issues\/953">Umfang #953/);

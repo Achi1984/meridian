@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createAppAccess} from '../v11/app-access.js';
 import {createDepotReadClient} from '../v11/depot-read-client.js';
 import {mountDepotReadAccess} from '../v11/depot-read-bootstrap.js';
-import {subscribeDepotPortfolio} from '../v11/depot-portfolio-state.js?v=B17-M11';
+import {subscribeDepotPortfolio} from '../v11/depot-portfolio-state.js?v=B16-M11-RELEASE1';
 class Node {
   constructor(document,tag){this.ownerDocument=document;this.tagName=tag;this.children=[];this.dataset={};this.attrs={};this.listeners=new Map();this.text='';}
   set textContent(value){this.text=String(value);this.children=[];}

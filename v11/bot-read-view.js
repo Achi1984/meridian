@@ -1,17 +1,46 @@
 // Inactive component: mount explicitly with the existing read-client factory.
 // No network, credentials, storage or engine imports belong to this renderer.
-import {buildBotOverviewModel} from './bot-overview-model.js?v=B17-M11';
-import {subscribeDepotPortfolio} from './depot-portfolio-state.js?v=B17-M11';
+import {buildBotOverviewModel} from './bot-overview-model.js?v=B16-M11-RELEASE1';
+import {subscribeDepotPortfolio} from './depot-portfolio-state.js?v=B16-M11-RELEASE1';
 
 const LABELS = {
   locked: ['Gesperrt', 'App mit Meridian-Passwort öffnen, dann Bots manuell aktualisieren.'],
   loading: ['Wird geladen', 'Der aktuelle Bot-Snapshot wird geprüft.'],
   fresh: ['Aktueller Snapshot · nur lesend', ''],
-  stale: ['Daten veraltet', 'Botdetails werden bis zur nächsten aktuellen Abfrage ausgeblendet.'],
+  stale: ['Daten veraltet', 'Botdetails werden ausgeblendet. Bitte Bots manuell aktualisieren.'],
   unavailable: ['Nicht verfügbar', 'Botdaten konnten nicht verifiziert werden. Bitte erneut aktualisieren.']
 };
 const TYPES = {futures_grid:'Futures Grid', future_hedge_grid:'Futures Hedge Grid'};
 const MISSING = 'Nicht verfügbar';
+const TP_UNKNOWN_REASON = 'Die Quelle bestätigt keinen direkt vergleichbaren TP-Preis; fehlende Werte belegen kein ungesetztes TP.';
+const TP_UPPER_UNKNOWN_REASON = 'Die obere Range fehlt oder ist nicht eindeutig bestätigt.';
+const EMPTY_SNAPSHOT = 'Keine darstellbaren Bots in diesem Snapshot. Dies bestätigt kein leeres Wallet.';
+const SCOPE_REASONS = {
+  UNSUPPORTED_SCOPE:'Der unterstützte Datenumfang ist nicht bestätigt.',
+  SUPPORTED_HYDRATION_MISSING:'Details unterstützter Bots fehlen.',
+  SANITIZATION_LOSS_OR_DUPLICATE:'Einträge konnten nicht vollständig und eindeutig dargestellt werden.',
+  PAGINATION_INCOMPLETE:'Die Listenseiten sind nicht vollständig bestätigt.',
+  EXPLICIT_PARTIAL:'Die Quelle meldet einen unvollständigen Datenumfang.',
+  SYNC_PARTIAL:'Die Synchronisierung meldet einen unvollständigen Datenumfang.',
+  DETAILS_INCOMPLETE:'Die Botdetails sind nicht vollständig bestätigt.',
+  SOURCE_STATUS_NOT_OK:'Der Quellstatus ist nicht bestätigt.',
+  SOURCE_STALE:'Die Quelldaten sind veraltet.',
+  SOURCE_UNAVAILABLE:'Die Quelle ist nicht verfügbar.'
+};
+function scopeText(data) {
+  if(data.source!=='PIONEX_WALLET_BOT_DETAIL')return null;
+  const reasons=data.overwriteRejectionReasons;
+  const validReasons=Array.isArray(reasons)&&reasons.length<=Object.keys(SCOPE_REASONS).length&&
+    Array.from(reasons).every(reason=>typeof reason==='string'&&Object.hasOwn(SCOPE_REASONS,reason));
+  const confirmed=data.overwriteScope==='WALLET_FUTURES_GRID'&&data.usableForOverwrite===true&&
+    ['NONE','KNOWN_EXCLUDED_PRODUCTS'].includes(data.excludedScope)&&validReasons&&reasons.length===0;
+  const explanation=confirmed?'von der Quelle bestätigt.':'nicht bestätigt.';
+  const exclusions=data.excludedScope==='KNOWN_EXCLUDED_PRODUCTS'
+    ?' Bekannte ausgeschlossene Produkte gehören nicht zu diesem Datenumfang.':'';
+  const rejection=validReasons?reasons.map(reason=>SCOPE_REASONS[reason]).join(' '):'';
+  return 'Futures-Grid-Datenumfang: '+explanation+exclusions+(rejection?' '+rejection:'')+
+    ' Keine Bestätigung der Vollständigkeit des Wallets, der Sicherheit, einer Handelsfreigabe oder laufender Bots.';
+}
 function coverageText(coverage={}){
   const count=value=>Number.isSafeInteger(value)&&value>=0?String(value):'unbekannt';
   const contract='Futures Moon ist als cateType von futures_grid dokumentiert; dies bestätigt keinen Live-Kontobestand.';
@@ -73,6 +102,14 @@ function projection(state, filters = {}) {
       const hasQuoteInvestment=investmentCurrency && investmentAmount>0;
       const moneyCurrency=investmentCurrency==='USD'||investmentCurrency==='USDT';
       const productCategory=bot.productCategory==='FUTURES_MOON'?'Futures Moon':null;
+      const tpCheck=bot.takeProfitCheck;
+      const knownTakeProfit=number(bot.metrics?.takeProfit)>0&&bot.takeProfitEvidence==='PRICE_SET';
+      const knownUpper=number(bot.metrics?.upper)>0;
+      const takeProfitSet=knownTakeProfit?true:null;
+      const takeProfitMatchesUpper=knownTakeProfit&&knownUpper&&
+        (tpCheck?.matchesUpper===true||tpCheck?.matchesUpper===false)?tpCheck.matchesUpper:null;
+      const takeProfitSummary=takeProfitMatchesUpper===false?'⚠ TP ≠ obere Range':
+        takeProfitMatchesUpper===null?'TP nicht prüfbar':null;
       return {symbol:bot.symbol, side:row.direction==='unknown'?'Unbekannt':row.direction[0].toUpperCase()+row.direction.slice(1),
         ref:row.ref,type:ownLabel(TYPES,bot.type),productCategory,
         category:row.category==='coin-m'?'COIN-M':row.category==='linear'?'Linear':'Unbekannt',
@@ -91,18 +128,35 @@ function projection(state, filters = {}) {
         liquidation:formatExact(bot.metrics?.liquidationPrice),
         liquidationLowerBound:formatExact(bot.metrics?.liquidationLowerBound),
         liquidationUpperBound:formatExact(bot.metrics?.liquidationUpperBound),
-        takeProfit:formatExact(bot.metrics?.takeProfit),stopLoss:formatExact(bot.metrics?.stopLoss)};
+        takeProfit:formatExact(bot.metrics?.takeProfit),stopLoss:formatExact(bot.metrics?.stopLoss),
+        upperRange:formatExact(bot.metrics?.upper),takeProfitSet,takeProfitMatchesUpper,
+        takeProfitSummary,
+        takeProfitCheckReason:takeProfitMatchesUpper===null
+          ?knownTakeProfit?TP_UPPER_UNKNOWN_REASON:TP_UNKNOWN_REASON:null};
     });
     const losses=overview.losses.map(loss=>({ref:loss.ref,symbol:loss.symbol,direction:loss.direction,
       pnl:formatMoney(loss.pnl,'USD',true),pnlDetail:formatExact(loss.pnl,' USD'),pnlTone:loss.pnl<0?'negative':'positive'}));
     return {status,count:overview.count,distribution:overview.distribution,coverage:model.coverage,bots,losses,
-      snapshotAt:overview.snapshotAt,source:overview.source};
+      snapshotAt:overview.snapshotAt,source:overview.source,overwriteScope:model.overwriteScope,
+      excludedScope:model.excludedScope,usableForOverwrite:model.usableForOverwrite,
+      overwriteRejectionReasons:model.overwriteRejectionReasons};
   } catch { return {status:'unavailable',bots:[]}; }
 }
 function element(document, tag, text) {
   const node=document.createElement(tag);
   if (text !== undefined) node.textContent=text;
   return node;
+}
+function tpIndicator(document, label, value) {
+  const state=value===true?'ja':value===false?'nein':'nicht prüfbar';
+  const symbol=value===true?'✓':value===false?'✗':'—';
+  const wrapper=element(document,'label');wrapper.className='bot-tp-indicator';
+  const checkbox=element(document,'input');checkbox.type='checkbox';checkbox.disabled=true;
+  checkbox.checked=value===true;checkbox.indeterminate=value===null;
+  checkbox.setAttribute('aria-label',label+': '+state);
+  if(value===null)checkbox.setAttribute('aria-checked','mixed');
+  wrapper.append(checkbox,element(document,'span',symbol+' '+label+': '+state));
+  return wrapper;
 }
 
 // Keep the empty live region attached before populating it, then retain its identity.
@@ -152,7 +206,9 @@ export function renderBotReadState(root, state, filters = {}) {
     const resultCount=element(document,'p',data.bots.length+' von '+data.count+' Bots im Snapshot');
     resultCount.setAttribute('role','status');resultCount.setAttribute('aria-live','polite');
     details.append(resultCount,element(document,'p',coverageText(data.coverage)));
-    if (!data.count) details.append(element(document,'p','Keine Bots in diesem Snapshot enthalten.'));
+    const scope=scopeText(data);
+    if(scope)details.append(element(document,'p',scope));
+    if (!data.count) details.append(element(document,'p',EMPTY_SNAPSHOT));
     else if (!data.bots.length) details.append(element(document,'p','Keine Bots entsprechen den Filtern.'));
     else {
       const list=element(document,'ul');list.className='bot-card-list';
@@ -170,7 +226,9 @@ export function renderBotReadState(root, state, filters = {}) {
         if(region.expanded.has(bot.ref))card.setAttribute('open','');
         summary.setAttribute('aria-label',bot.symbol+' · '+bot.side+' · Hebel '+
           (bot.leverage===MISSING?'—':bot.leverage)+' · P/L laut Quelle '+bot.pnl+' · Kapital '+
-          bot.investment+' · ID-Ende '+referenceTail(bot.ref)+' · Details anzeigen');
+          bot.investment+(bot.takeProfitSummary?' · '+(bot.takeProfitSummary==='⚠ TP ≠ obere Range'
+            ?'Warnung: TP weicht von oberer Range ab':'TP nicht prüfbar'):'')+
+          ' · ID-Ende '+referenceTail(bot.ref)+' · Details anzeigen');
         const top=element(document,'span');top.className='bot-card-top';
         const identity=element(document,'span');identity.className='bot-card-identity';
         const heading=element(document,'span',bot.symbol);heading.className='bot-card-heading';
@@ -190,6 +248,11 @@ export function renderBotReadState(root, state, filters = {}) {
         top.append(identity,pnl);
         const capital=element(document,'span');capital.className='bot-card-capital';
         capital.append(element(document,'span','Kapital'),element(document,'strong',bot.investment));
+        const tpSummary=element(document,'span',bot.takeProfitSummary||'');
+        tpSummary.className='bot-card-tp-status';
+        tpSummary.setAttribute('aria-label',bot.takeProfitSummary==='⚠ TP ≠ obere Range'
+          ?'Warnung: TP weicht von oberer Range ab':'TP nicht prüfbar');
+        if(bot.takeProfitSummary)capital.append(tpSummary);
         const disclosure=element(document,'span','Details');disclosure.className='bot-card-disclosure';
         const chevron=element(document,'span','⌄');chevron.setAttribute('aria-hidden','true');
         disclosure.append(chevron);
@@ -211,6 +274,23 @@ export function renderBotReadState(root, state, filters = {}) {
           ['Take-Profit',bot.takeProfit],['Stop-Loss',bot.stopLoss]]) {
           const group=element(document,'div');group.append(element(document,'dt',label),element(document,'dd',value));metrics.append(group);
         }
+        const tpSet=element(document,'div'),tpMatch=element(document,'div');
+        tpSet.append(element(document,'dt','TP gesetzt'),element(document,'dd'));
+        tpSet.children[1].append(tpIndicator(document,'TP gesetzt',bot.takeProfitSet));
+        tpMatch.append(element(document,'dt','TP = obere Range'),element(document,'dd'));
+        tpMatch.children[1].append(tpIndicator(document,'TP = obere Range',bot.takeProfitMatchesUpper));
+        metrics.append(tpSet,tpMatch);
+        const tpWarning=bot.takeProfitSet===false||bot.takeProfitMatchesUpper===false;
+        if(tpWarning){
+          const warning=element(document,'p');warning.className='bot-tp-warning';
+          const heading=bot.takeProfitSet===false?'Kein TP gesetzt':'TP weicht von oberer Range ab';
+          warning.append(element(document,'strong','⚠ Warnung: '+heading+'. '),
+            element(document,'span','TP-Wert: '+bot.takeProfit+' · obere Range: '+bot.upperRange));
+          body.append(warning);
+        }else if(bot.takeProfitMatchesUpper===null){
+          const reason=element(document,'p','TP nicht prüfbar: '+bot.takeProfitCheckReason);
+          reason.className='bot-tp-status-reason';body.append(reason);
+        }
         body.append(element(document,'p','Preisgrenzen und TP/SL: Einheit von der Quelle nicht ausgewiesen. P/L kann je nach Quelle Gesamt- oder offenen Gewinn enthalten.'),metrics,element(document,'p','Nicht verfügbar: Die Quelle liefert keinen eindeutig bestätigten Wert. Auch Nullwerte bleiben unbestätigt, weil sie fehlende Angaben bedeuten können. Grid-Gewinn und Risikopuffer sind im Snapshot nicht enthalten. Fehlende TP/SL-Werte bestätigen keine deaktivierten Schutzaufträge.'));
         card.append(summary,body);item.append(card);list.append(item);
       }
@@ -223,11 +303,13 @@ export function renderBotReadState(root, state, filters = {}) {
 export function renderCommandBotOverview(root, data, onJump) {
   if (!root) return;
   const document=root.ownerDocument;
-  root.replaceChildren();
   root.setAttribute('data-state',data.status);
+  root.setAttribute('role','status');root.setAttribute('aria-live','polite');
+  root.setAttribute('aria-atomic','true');
+  root.replaceChildren();
   if(data.status!=='fresh'){
-    const labels={locked:'Gesperrt',loading:'Wird geladen',stale:'Daten veraltet',unavailable:'Nicht verfügbar'};
-    root.append(element(document,'p',labels[data.status]||'Nicht verfügbar'));
+    const labels=Object.hasOwn(LABELS,data.status)?LABELS[data.status]:LABELS.unavailable;
+    root.append(element(document,'p',labels[0]),element(document,'p',labels[1]));
     return;
   }
   const sources={PIONEX_BOT_API:'Pionex Bot API',PIONEX_WALLET_BOT_DETAIL:'Pionex Wallet Botdetail'};
@@ -248,6 +330,8 @@ export function renderCommandBotOverview(root, data, onJump) {
   metadata.append(metadataSummary);
   const metadataBody=element(document,'div');
   metadataBody.append(element(document,'p',coverageText(data.coverage)));
+  const scope=scopeText(data);
+  if(scope)metadataBody.append(element(document,'p',scope));
   metadataBody.append(element(document,'p','Quelle: '+source+' · Richtung: Long '+distributionCount('long')+
     ' · Short '+distributionCount('short')+' · Neutral '+distributionCount('neutral')+
     ' · Unbekannt '+distributionCount('unknown')));
@@ -255,6 +339,7 @@ export function renderCommandBotOverview(root, data, onJump) {
   if(timestamp)exactTimestamp.setAttribute('datetime',timestamp);
   metadataBody.append(element(document,'p','Snapshot-Zeit exakt (UTC): '),exactTimestamp);
   metadata.append(metadataBody);root.append(metadata);
+  if(data.count===0)root.append(element(document,'p',EMPTY_SNAPSHOT));
   if(!data.losses.length)root.append(element(document,'p','Keine bestätigten negativen P/L-Werte.'));
   else{
     root.append(element(document,'p','Bestätigte negative P/L-Werte · keine Risikorangfolge.'));
