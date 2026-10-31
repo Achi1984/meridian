@@ -195,6 +195,7 @@ export function normalizePionexBotOrder(order){
     stopLoss:slFor(order,d),
     investmentUsd:reliableUsdInvestment(d),
     pnlUsd:optionalPnl(d),
+    pnlEvidence:optionalPnl(d)!==null?'EXPLICIT_USD_VALUE':null,
     totalProfitPct:optionalPnlPct(d),
     grids:n(d.row),
     position:n(d.position),

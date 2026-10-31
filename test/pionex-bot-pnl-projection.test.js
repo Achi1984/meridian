@@ -32,14 +32,15 @@ test('optional P/L skips absent or invalid alternatives and preserves a valid fa
   assert.equal(normalize({totalProfitUsd:null,pnlUsd:12.34}).pnlUsd,12.34);
 });
 
-test('explicit numeric zero keeps P/L precedence while the existing UI zero policy stays conservative',()=>{
+test('explicit numeric zero keeps P/L precedence and confirmation through the read model',()=>{
   for(const zero of [0,'0','0.00']){
     const row=normalize({totalProfitUsd:zero,pnlUsd:12.34,totalProfitPct:zero,pnlPct:1.25});
     assert.equal(row.pnlUsd,0);
     assert.equal(row.totalProfitPct,0);
     const {snapshot,model}=project(row);
     assert.equal(snapshot.bots[0].pnl.usd,0);
-    assert.equal(model.bots[0].metrics.pnlUsd,null);
+    assert.equal(model.bots[0].metrics.pnlUsd,0);
+    assert.equal(model.bots[0].metrics.pnlEvidence,'EXPLICIT_USD_VALUE');
   }
 });
 
@@ -49,4 +50,23 @@ test('missing P/L remains unknown throughout the existing projection',()=>{
   assert.equal(row.totalProfitPct,null);
   const {model}=project(row);
   assert.equal(model.bots[0].metrics.pnlUsd,null);
+});
+
+test('legacy zero and malformed values cannot acquire source confirmation at the bridge',()=>{
+  for(const value of [null,undefined,'',' ',false,true,[],{},'0',Infinity,NaN]){
+    const {snapshot,model}=project({...normalize(),pnlUsd:value,pnlEvidence:'EXPLICIT_USD_VALUE'});
+    assert.equal(snapshot.bots[0].pnl.usd,null);
+    assert.equal(snapshot.bots[0].pnl.evidence,null);
+    assert.equal(model.bots[0].metrics.pnlUsd,null);
+  }
+  for(const evidence of [undefined,null,'',true,{},'EXPLICIT_USD_VALUE_FAKE']){
+    const {model}=project({...normalize(),pnlUsd:0,pnlEvidence:evidence});
+    assert.equal(model.bots[0].metrics.pnlUsd,null);
+  }
+  for(const value of [-12.34,12.34]){
+    const {model}=project({...normalize(),pnlUsd:value,pnlEvidence:null});
+    assert.equal(model.bots[0].metrics.pnlUsd,value);
+  }
+  const row=normalize({totalProfitUsd:null,pnlEvidence:'EXPLICIT_USD_VALUE'});
+  assert.equal(row.pnlEvidence,null);
 });

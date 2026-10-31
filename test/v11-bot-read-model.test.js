@@ -83,7 +83,7 @@ test('calendar normalization cannot make an invalid timestamp fresh',()=>{
 test('source metric projection preserves nonzero finite numeric values without coercion or derived risk',()=>{
   const input=fixture();Object.assign(input.bots[0],{leverage:5,investment:{usd:120},pnl:{usd:-2.5},
     limits:{lower:0.000001,upper:100,liquidationPrice:90,takeProfit:110,stopLoss:95},grid:{profitUsd:999},riskBufferPct:99});
-  assert.deepEqual(buildBotReadModel(input,{now}).bots[0].metrics,{leverage:5,investmentUsd:120,investmentAmount:null,investmentCurrency:null,pnlUsd:-2.5,pnlUnavailableReason:null,
+  assert.deepEqual(buildBotReadModel(input,{now}).bots[0].metrics,{leverage:5,investmentUsd:120,investmentAmount:null,investmentCurrency:null,pnlUsd:-2.5,pnlEvidence:null,pnlUnavailableReason:null,
     lower:0.000001,upper:100,liquidationPrice:90,liquidationLowerBound:null,liquidationUpperBound:null,
     takeProfit:110,stopLoss:95,gridProfitUsd:null,riskBufferPct:null});
 });

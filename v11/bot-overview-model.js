@@ -14,7 +14,7 @@ function category(value) {
 }
 
 function compareKnown(a, b, key, descending = false) {
-  const aKnown = confirmed(a[key]), bKnown = confirmed(b[key]);
+  const aKnown = confirmed(a[key]) || key==='pnl'&&a[key]===0, bKnown = confirmed(b[key]) || key==='pnl'&&b[key]===0;
   if (aKnown !== bKnown) return aKnown ? -1 : 1;
   if (aKnown && a[key] !== b[key]) return (descending ? b[key] - a[key] : a[key] - b[key]);
   return compareText(a.symbol, b.symbol) || compareText(a.ref, b.ref);
@@ -38,7 +38,9 @@ export function buildBotOverviewModel(snapshot, filters = {}) {
       return {status: 'unavailable', bots: []};
     }
     seen.add(bot.ref);
-    const pnl = confirmed(bot.metrics?.pnlUsd) ? bot.metrics.pnlUsd : null;
+    const pnl = confirmed(bot.metrics?.pnlUsd) || bot.metrics?.pnlUsd===0&&
+      ['EXPLICIT_USD_VALUE','INVERSE_WALLET_USD_VALUE'].includes(bot.metrics?.pnlEvidence)
+      ? bot.metrics.pnlUsd : null;
     const leverage = confirmed(bot.metrics?.leverage) && bot.metrics.leverage > 0
       ? bot.metrics.leverage : null;
     bots.push({ref: bot.ref, symbol: bot.symbol, direction: direction(bot.side),

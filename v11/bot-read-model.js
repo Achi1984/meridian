@@ -34,8 +34,8 @@ function coverage(snapshot) {
     paginationComplete,pages:rowCount(raw.pages),pageLimit:rowCount(raw.pageLimit)};
 }
 
-// V1 bridge coerces absent numeric inputs to zero. Until provenance is fixed,
-// zero cannot be distinguished from missing and must never imply a known value.
+// Legacy V1 bridge rows can conflate missing values with zero. Other metrics
+// remain conservative; P/L accepts zero only with bounded source evidence below.
 const metric = (value, positive = false) => typeof value === 'number' && Number.isFinite(value) &&
   value !== 0 && (!positive || value > 0) ? value : null;
 function decimalKey(value) {
@@ -62,12 +62,15 @@ function takeProfitCheck(metrics, evidence) {
 }
 const PNL_UNAVAILABLE_REASONS=['USD_VALUE_MISSING','WALLET_PROFIT_UNIT_UNCONFIRMED',
   'WALLET_USD_PRICE_MISSING','ZERO_VALUE_UNCONFIRMED'];
+const PNL_EVIDENCE=['EXPLICIT_USD_VALUE','INVERSE_WALLET_USD_VALUE'];
 function metrics(bot) {
+  const pnlEvidence=enumValue(bot.pnl?.evidence,PNL_EVIDENCE);
+  const pnlUsd=bot.pnl?.usd===0&&pnlEvidence?0:metric(bot.pnl?.usd);
   return {leverage: metric(bot.leverage, true), investmentUsd: metric(bot.investment?.usd, true),
     investmentAmount: metric(bot.investment?.quoteAmount, true),
     investmentCurrency: typeof bot.investment?.currency === 'string' && /^[A-Z0-9]{2,12}$/.test(bot.investment.currency) ? bot.investment.currency : null,
-    pnlUsd: metric(bot.pnl?.usd),
-    pnlUnavailableReason: metric(bot.pnl?.usd)!==null?null:
+    pnlUsd, pnlEvidence:pnlUsd!==null?pnlEvidence:null,
+    pnlUnavailableReason: pnlUsd!==null?null:
       enumValue(bot.pnl?.unavailableReason,PNL_UNAVAILABLE_REASONS)||'USD_VALUE_MISSING',
     lower: metric(bot.limits?.lower, true),
     upper: metric(bot.limits?.upper, true), liquidationPrice: metric(bot.limits?.liquidationPrice, true),

@@ -1,7 +1,7 @@
 // Inactive component: mount explicitly with the existing read-client factory.
 // No network, credentials, storage or engine imports belong to this renderer.
-import {buildBotOverviewModel} from './bot-overview-model.js?v=B16-M11-FIX6';
-import {subscribeDepotPortfolio} from './depot-portfolio-state.js?v=B16-M11-FIX6';
+import {buildBotOverviewModel} from './bot-overview-model.js?v=B16-M11-FIX7';
+import {subscribeDepotPortfolio} from './depot-portfolio-state.js?v=B16-M11-FIX7';
 
 const LABELS = {
   locked: ['Gesperrt', 'App mit Meridian-Passwort öffnen, dann Bots manuell aktualisieren.'],
@@ -135,9 +135,9 @@ function projection(state, filters = {}) {
             valueLabel(investmentAmount,' '+investmentCurrency,true) : MISSING,
         investmentDetail:hasUsdInvestment ? formatExact(investmentUsd,' USD/USDT') :
           hasQuoteInvestment ? formatExact(investmentAmount,' '+investmentCurrency) : MISSING,
-        pnl:formatMoney(row.pnl,'USD',true),
-        pnlDetail:formatExact(bot.metrics?.pnlUsd,' USD'),
-        pnlTone:row.pnl === null ? null : row.pnl < 0 ? 'negative' : 'positive',
+        pnl:row.pnl===0?'0,00 USD':formatMoney(row.pnl,'USD',true),
+        pnlDetail:row.pnl===0?'0 USD':formatExact(bot.metrics?.pnlUsd,' USD'),
+        pnlTone:row.pnl === null || row.pnl===0 ? null : row.pnl < 0 ? 'negative' : 'positive',
         pnlValue:row.pnl,leverageValue:row.leverage,
         pnlReason:row.pnl===null?(Object.hasOwn(PNL_REASONS,bot.metrics?.pnlUnavailableReason)
           ?PNL_REASONS[bot.metrics.pnlUnavailableReason]:PNL_REASONS.USD_VALUE_MISSING):null,
@@ -357,7 +357,7 @@ export function renderBotReadState(root, state, filters = {}) {
           const reason=element(document,'p','TP nicht prüfbar: '+bot.takeProfitCheckReason);
           reason.className='bot-tp-status-reason';body.append(reason);
         }
-        body.append(element(document,'p','Preisgrenzen und TP/SL: Einheit von der Quelle nicht ausgewiesen. P/L kann je nach Quelle Gesamt- oder offenen Gewinn enthalten.'),originalToggle,formatHint,metrics,element(document,'p','Nicht verfügbar: Die Quelle liefert keinen eindeutig bestätigten Wert. Auch Nullwerte bleiben unbestätigt, weil sie fehlende Angaben bedeuten können. Grid-Gewinn und Risikopuffer sind im Snapshot nicht enthalten. Fehlende TP/SL-Werte bestätigen keine deaktivierten Schutzaufträge.'));
+        body.append(element(document,'p','Preisgrenzen und TP/SL: Einheit von der Quelle nicht ausgewiesen. P/L kann je nach Quelle Gesamt- oder offenen Gewinn enthalten.'),originalToggle,formatHint,metrics,element(document,'p','Nicht verfügbar: Die Quelle liefert keinen eindeutig bestätigten Wert. Nullwerte ohne bestätigte P/L-Herkunft bleiben unbestätigt. Grid-Gewinn und Risikopuffer sind im Snapshot nicht enthalten. Fehlende TP/SL-Werte bestätigen keine deaktivierten Schutzaufträge.'));
         const close=element(document,'button','Bot zuklappen');close.setAttribute('type','button');
         close.setAttribute('aria-label',bot.symbol+' · '+bot.side+' · ID-Ende '+referenceTail(bot.ref)+' zuklappen');
         close.addEventListener('click',()=>{setDisclosure(false);summary.focus();});
