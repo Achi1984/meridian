@@ -12,6 +12,7 @@ import { createAssetWatchShareToken,verifyAssetWatchShareToken,rotateAssetWatchS
 import { verifyGithubActionsOidc } from "./github-actions-oidc.js";
 import { encryptAssetWatchMirror } from "./asset-watch-mirror-crypto.js";
 import { reconcilePortfolioAuthority,portfolioAuthorityReceipt } from "./portfolio-authority-update.js";
+import { confirmReviewedLedger } from "./ledger-reviewed-authority.js";
 import { capturePortfolioHistoryOnce } from "./portfolio-history-runtime.js";
 import { buildPaperExecutionAuditExport } from "./paper-execution-audit-v2-export.js";
 
@@ -450,9 +451,12 @@ const server=http.createServer(async(req,res)=>{
       }
       const current=await stateGet(PRIVATE_STATE_KEY);
       if(!current)return writeJson(res,503,{error:"private_dashboard_unavailable"},origin||"");
-      const merged=reconcilePortfolioAuthority(current,body);
-      if(!merged.ok)return writeJson(res,400,{error:merged.error,currentRevision:merged.currentRevision},origin||"");
-      await stateSet(PRIVATE_STATE_KEY,merged.data);
+      const reviewed=body?.action==="confirm_ledger_reviewed";
+      const merged=reviewed
+        ?await confirmReviewedLedger({db:pool(),key:PRIVATE_STATE_KEY,current,body})
+        :reconcilePortfolioAuthority(current,body);
+      if(!merged.ok)return writeJson(res,merged.status||400,{error:merged.error,currentRevision:merged.currentRevision},origin||"");
+      if(!reviewed)await stateSet(PRIVATE_STATE_KEY,merged.data);
       let history=null;
       try{history=await capturePortfolioHistoryOnce({db:pool(),data:merged.data,dedupeMs:0})}
       catch(e){history={ok:false,reason:String(e?.message||e)}}
@@ -555,3 +559,4 @@ const server=http.createServer(async(req,res)=>{
   }catch(e){return writeJson(res,500,{error:String(e?.message||e)});}
 });
 server.listen(EXTERNAL_PORT,"0.0.0.0",()=>console.log(`[GATEWAY] MERIDIAN ${String(RELEASE.version||RELEASE.ui||"?")} / ${String(RELEASE.buildId||"?")} on :${EXTERNAL_PORT} -> internal :${INTERNAL_PORT}`));
+

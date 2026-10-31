@@ -1,6 +1,7 @@
-import {appAccess} from './app-access.js?v=B16-M11-FIX2';
-import {createDepotReadClient} from './depot-read-client.js?v=B16-M11-FIX2';
-import {createDepotReadView} from './depot-read-view.js?v=B16-M11-FIX2';
+import {appAccess} from './app-access.js?v=B16-M11-FIX3';
+import {createDepotReadClient} from './depot-read-client.js?v=B16-M11-FIX3';
+import {createDepotReadView} from './depot-read-view.js?v=B16-M11-FIX3';
+import {mountLedgerReview} from './ledger-review-view.js?v=B16-M11-FIX3';
 
 // Mounting controls never starts a request. Only the view's manual refresh can read.
 export function mountDepotReadAccess(document,window,{
@@ -9,7 +10,7 @@ export function mountDepotReadAccess(document,window,{
 }={}){
   const root=document.getElementById('depot-read-root');
   if(!root)return null;
-  let client,view,unregister=()=>{},unsubscribe=()=>{},disposed=false,expiryTimer=null,expiryGeneration=0;
+  let client,view,ledgerReview,unregister=()=>{},unsubscribe=()=>{},disposed=false,expiryTimer=null,expiryGeneration=0;
   function cancelExpiry(){
     expiryGeneration++;
     if(expiryTimer!==null){cancelSchedule(expiryTimer);expiryTimer=null;}
@@ -38,16 +39,18 @@ export function mountDepotReadAccess(document,window,{
         }};
       }});
     unsubscribe=access.subscribe(s=>{if(!disposed&&s?.status==='unlocked')view?.revalidate();});
+    ledgerReview=mountLedgerReview(root,{access});
   }catch{
-    cancelExpiry();unregister();unsubscribe();
+    cancelExpiry();unregister();unsubscribe();ledgerReview?.dispose();
     try{client?.dispose();}catch{}
     root.textContent='Depotansicht nicht verfügbar. Bitte Seite neu laden.';
     return null;
   }
   return {dispose(){
     if(disposed)return;
-    disposed=true;unsubscribe();access.lock();cancelExpiry();unregister();view.dispose();client=null;
+    disposed=true;unsubscribe();access.lock();cancelExpiry();unregister();ledgerReview?.dispose();view.dispose();client=null;
   }};
 }
 
 if(typeof document!=='undefined'&&typeof window!=='undefined')mountDepotReadAccess(document,window);
+
