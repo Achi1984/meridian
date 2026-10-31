@@ -38,7 +38,7 @@ test('runtime smoke requires the exact deployed workflow SHA by default',()=>{
   assert.match(workflow,/MERIDIAN_SMOKE_REQUIRE_SHA: '1'/);
   assert.match(smoke,/const REQUIRE_SHA=!!EXPECTED_SHA&&process\.env\.MERIDIAN_SMOKE_REQUIRE_SHA!=='0'/);
   assert.match(smoke,/if\(REQUIRE_SHA&&sha\.shaMatch!==true\)fail\(/);
-  assert.match(smoke,/Deployment SHA mismatch/);
+  assert.match(smoke,/fail\('DEPLOYMENT_NOT_READY: expected deployment SHA is not serving yet'\)/);
 });
 
 test('runtime smoke surfaces the safe OKX authority configuration boolean',()=>{

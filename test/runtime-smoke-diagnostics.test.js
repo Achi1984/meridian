@@ -75,7 +75,7 @@ test('each strict receipt flag still fails the real smoke and emits only safe bo
     `;
     const result=spawnSync(process.execPath,['--input-type=module','--eval',code],{
       cwd:new URL('..',import.meta.url),encoding:'utf8',timeout:10000,
-      env:{...process.env,MERIDIAN_SMOKE_RETRIES:'1',MERIDIAN_SMOKE_DELAY_MS:'0'}
+      env:{...process.env,GITHUB_SHA:'a'.repeat(40),MERIDIAN_SMOKE_REQUIRE_SHA:'1',MERIDIAN_SMOKE_RETRIES:'1',MERIDIAN_SMOKE_DELAY_MS:'0'}
     });
     assert.equal(result.status,1,flag);
     assert.match(result.stderr,/Asset Watch live receipt strict gate failed: \{/);
@@ -217,4 +217,5 @@ test('category shape diagnostics accept only closed enums and typed evidence at 
       .scopeDiagnostics.unverifiedCategoryShape,null);
   }
 });
+
 
