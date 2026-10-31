@@ -1,3 +1,19 @@
+> **Continuity reconciliation — 2026-10-31 **
+> Current integration is PR1074 at `4c2631fa34ca07e95c3d0c04a388f078b99edf5f`.
+> PR1073 is COMPLETE (942/6541251700); PR1074 is COMPLETE
+> (942/6545551700), with candidate CI3352/3352 and cumulative Claude GREEN
+> (6544996830,6545086305). Main Safety41214502721/job124578635492 passed
+> 3352/3352 after one unchanged retry; the initial CDP-start timeout is preserved.
+> Runtime41214502864 and Pages/Mirror/Coordinator succeeded on the exact merge.
+> Active mailbox remains #942. Rollover requires coordinated workflow routing,
+> checkpoint and watchdog-comment binding; this candidate changes none of them.
+> Historical pending recovery chains999/1050/1052/1063/1065/1067 have a prepared,
+> unposted SUPERSEDED closure referencing1069/6540136819. Historical failed or
+> unknown runs remain failed or unknown, never retroactively COMPLETE.
+> Ledger confirmation is owner-explicit; OKX credential setup remains unresolved.
+> The older current-labeled entries below are historical. Research, trading,
+> credential, schedule, spending and runtime authority are unchanged.
+
 > **Current continuity reconciliation — 2026-10-27**
 > Verified and latest observed `main`: `f59c540e006c7931e9be2ca338ddd0039a1a9546`.
 > PR #910 is merged and complete; all four postchecks succeeded (PR receipt
