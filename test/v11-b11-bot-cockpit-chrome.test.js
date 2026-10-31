@@ -12,16 +12,16 @@ const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium
 const MOON_BOT_REF='f00df00df00df00df00d';
 const v11Root=fileURLToPath(new URL('../v11/',import.meta.url));
 const source=readFileSync(join(v11Root,'index.html'),'utf8');
-const bootstrap='<script type="module" src="./bot-read-bootstrap.js?v=B16-M11-FIX4"></script>';
+const bootstrap='<script type="module" src="./bot-read-bootstrap.js?v=B16-M11-FIX5"></script>';
 const fixtureScript=`<script>
 window.__botReadMode='fresh';window.__botReads=0;window.__resolveBotRead=null;window.__botErrors=[];
 window.__appAccessReads=0;
-window.__portfolioReady=import('./depot-portfolio-state.js?v=B16-M11-FIX4').then(({publishDepotPortfolioState})=>
+window.__portfolioReady=import('./depot-portfolio-state.js?v=B16-M11-FIX5').then(({publishDepotPortfolioState})=>
  publishDepotPortfolioState({status:'fresh',model:{status:'FRESH_SNAPSHOT',readOnly:true,executionAllowed:false,
   totalUsd:1234.56,snapshotAt:new Date().toISOString(),sourceAt:new Date().toISOString(),
-  source:'SERVER_PORTFOLIO_CURRENT',expiresAt:Date.now()+60000}}));
+  source:'SERVER_PIONEX_CURRENT',expiresAt:Date.now()+60000}}));
 window.__publishPortfolio=async state=>{
- const {publishDepotPortfolioState}=await import('./depot-portfolio-state.js?v=B16-M11-FIX4');
+ const {publishDepotPortfolioState}=await import('./depot-portfolio-state.js?v=B16-M11-FIX5');
  publishDepotPortfolioState(state);
 };
 window.addEventListener('error',event=>window.__botErrors.push(event.message));
@@ -214,7 +214,7 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           assert.equal(initial.reads,0);assert.equal(initial.overflow,false);assert.equal(initial.navTargets,true);
           assert.equal(initial.botState,'locked',JSON.stringify(initial));
           assert.match(initial.portfolio,/1\.234,56 USD/);assert.match(initial.portfolio,/Aktuell/);
-          assert.match(initial.portfolio,/Gesamtwert laut Depot/);
+          assert.match(initial.portfolio,/Pionex-Wert; kein Gesamtvermögen/);
           assert.match(initial.portfolio,/Stand \(UTC\)/);assert.match(initial.portfolio,/Quellzeit \(UTC\)/);
           assert.equal(initial.portfolioTimes.length,3,JSON.stringify(initial.portfolioTimes));
           assert.doesNotMatch(initial.portfolio,/1\.360,13/,'bot capital is not added to the confirmed total');
@@ -230,18 +230,18 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           assert.doesNotMatch(portfolioState,/1\.234,56 USD/);
           await evaluate(`window.__publishPortfolio({status:'fresh',model:{status:'FRESH_SNAPSHOT',readOnly:true,
             executionAllowed:false,totalUsd:null,snapshotAt:new Date().toISOString(),sourceAt:new Date().toISOString(),
-            source:'SERVER_PORTFOLIO_CURRENT',expiresAt:Date.now()+60000}})`);
+            source:'SERVER_PIONEX_CURRENT',expiresAt:Date.now()+60000}})`);
           portfolioState=await evaluate(`document.querySelector('#bot-read-root .bot-portfolio-total').innerText`);
           assert.match(portfolioState,/kein bestätigter Gesamtwert/);
           assert.doesNotMatch(portfolioState,/0,00 USD|1\.234,56 USD/);
           await evaluate(`window.__publishPortfolio({status:'fresh',model:{status:'FRESH_SNAPSHOT',readOnly:true,
             executionAllowed:false,totalUsd:0,snapshotAt:new Date().toISOString(),sourceAt:new Date().toISOString(),
-            source:'SERVER_PORTFOLIO_CURRENT',expiresAt:Date.now()+60000}})`);
+            source:'SERVER_PIONEX_CURRENT',expiresAt:Date.now()+60000}})`);
           portfolioState=await evaluate(`document.querySelector('#bot-read-root .bot-portfolio-total').innerText`);
           assert.match(portfolioState,/0,00 USD/);
           await evaluate(`window.__publishPortfolio({status:'fresh',model:{status:'FRESH_SNAPSHOT',readOnly:true,
             executionAllowed:false,totalUsd:1234.56,snapshotAt:new Date().toISOString(),sourceAt:new Date().toISOString(),
-            source:'SERVER_PORTFOLIO_CURRENT',expiresAt:Date.now()+60000}})`);
+            source:'SERVER_PIONEX_CURRENT',expiresAt:Date.now()+60000}})`);
           await evaluate(`window.__botReadMode='fresh';document.getElementById('bot-read-refresh').click()`);
           await evaluate('new Promise(resolve=>setTimeout(resolve,60))');
           assert.equal(await evaluate('window.__botReads'),1);

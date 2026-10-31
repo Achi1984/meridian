@@ -4,7 +4,7 @@ import {createAppAccess} from '../v11/app-access.js';
 import {createDepotReadView} from '../v11/depot-read-view.js';
 import {createDepotReadClient} from '../v11/depot-read-client.js';
 import {mountDepotReadAccess} from '../v11/depot-read-bootstrap.js';
-import {subscribeDepotPortfolio} from '../v11/depot-portfolio-state.js?v=B16-M11-FIX4';
+import {subscribeDepotPortfolio} from '../v11/depot-portfolio-state.js?v=B16-M11-FIX5';
 class Node {
   constructor(document,tag){this.ownerDocument=document;this.tagName=tag;this.children=[];this.dataset={};this.attrs={};this.listeners=new Map();this.text='';}
   set textContent(value){this.text=String(value);this.children=[];}
@@ -245,4 +245,18 @@ test('source detail rendering accepts fixed codes only and clears prior diagnosi
   assert.doesNotMatch(h.text(),/secret-wallet-token/);
   assert.equal(h.text().split('OKX-Bewertungsquelle ist veraltet.').length-1,1);
   render({status:'locked'});assert.doesNotMatch(h.text(),/OKX-Bewertungsquelle/);view.dispose();
+});
+
+test('Pionex-only view excludes mixed history and rejects aggregate models',()=>{
+  const h=setup();let render;
+  const v=createDepotReadView(h.root,{pionexOnly:true,commandRoot:h.command,getToken:()=>null,
+    createClient:o=>{render=o.onChange;return {dispose(){},revalidate(){},refresh(){},lock(){}};}});
+  const model={status:'FRESH_SNAPSHOT',readOnly:true,executionAllowed:false,totalUsd:3450,spotUsd:null,tradingUsd:3450,
+    currency:'USD/USDT',snapshotAt:'2026-10-31T18:00:00Z',sourceAt:'2026-10-31T18:00:00Z',expiresAt:1793469900000,source:'SERVER_PIONEX_CURRENT'};
+  render({status:'fresh',model,history:{'1d':{status:'FRESH_SNAPSHOT',points:[{totalUsd:999999}]}}});
+  assert.match(h.text(),/3.450,00 USD\/USDT/);assert.match(h.text(),/Pionex-Verlauf/);
+  assert.match(h.text(),/Gesamthistorie enthält mehrere Quellen/);assert.doesNotMatch(h.text(),/999.999|Spot laut Depotquelle|Ledger|OKX/);
+  assert.match(h.fields.get('.portfolio-description').textContent,/Pionex/);
+  render({status:'fresh',model:{...model,source:'SERVER_PORTFOLIO_CURRENT',spotUsd:2000}});
+  assert.equal(h.command.dataset.state,'unavailable');assert.doesNotMatch(h.text(),/3.450,00/);v.dispose();
 });

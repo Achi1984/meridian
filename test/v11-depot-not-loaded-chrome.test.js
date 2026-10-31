@@ -85,7 +85,7 @@ test('V11 Depot Chrome: central unlock shows not-loaded on both surfaces without
           const rects=[...document.querySelectorAll('#command-portfolio .portfolio-description,#command-portfolio [data-command-depot-status]')].map(n=>n.getBoundingClientRect());
           return {depot:root.querySelector('[data-state]')?.dataset.state,command:cmd.dataset.state,
             depotText:root.textContent,commandText:cmd.textContent,
-            ledgerConfirmHidden:[...root.querySelectorAll('button')].find(b=>b.textContent==='Diese geprüften Ledger-Mengen bestätigen')?.hidden===true,
+            ledgerHidden:root.querySelector('.ledger-review')===null,
             overflow:document.documentElement.scrollWidth>innerWidth+1,
             targets:[...root.querySelectorAll('button')].filter(b=>!b.hidden).every(b=>b.getBoundingClientRect().height>=44),
             overlap:rects.some((a,i)=>rects.slice(i+1).some(b=>a.left<b.right&&b.left<a.right&&a.top<b.bottom&&b.top<a.bottom)),
@@ -108,7 +108,7 @@ test('V11 Depot Chrome: central unlock shows not-loaded on both surfaces without
         await shot('command-not-loaded');
         await showDepot();s=await snap();
         assert.equal(s.depot,'not_loaded');assert.match(s.depotText,/Noch nicht geladen/);assert.match(s.depotText,/Depot manuell aktualisieren/);
-        assert.equal(s.overflow,false);assert.equal(s.targets,true);assert.equal(s.ledgerConfirmHidden,true,'no confirmation action before Ledger quantities are reviewed');assert.equal(s.leak,false);
+        assert.equal(s.overflow,false);assert.equal(s.targets,true);assert.equal(s.ledgerHidden,true,'Ledger controls are outside Pionex-only scope');assert.equal(s.leak,false);
         await shot('depot-not-loaded');
         assert.equal(counts.dashboard+counts.prices,0);assert.equal(counts.history,1);
 
@@ -121,13 +121,13 @@ test('V11 Depot Chrome: central unlock shows not-loaded on both surfaces without
         await call('Input.dispatchKeyEvent',{type:'keyUp',key:'Tab',code:'Tab',windowsVirtualKeyCode:9,modifiers:8});
         assert.equal(await evaluate("document.activeElement.textContent"),'Depot aktualisieren','Shift+Tab returns to refresh');
         await key('Enter','Enter',13);
-        for(let i=0;i<200&&counts.history<2;i++)await sleep(25);
+        for(let i=0;i<200&&counts.dashboard<1;i++)await sleep(25);
         await sleep(100);
-        assert.equal(counts.dashboard,1);assert.equal(counts.prices,1);assert.equal(counts.history,2);
+        assert.equal(counts.dashboard,1);assert.equal(counts.prices,0);assert.equal(counts.history,1);
         s=await snap();
         assert.equal(s.depot,'unavailable');assert.match(s.depotText,/Nicht verfügbar/);
-        assert.match(s.depotText,/Aktuell: unvollständig/);assert.match(s.depotText,/Historie: unvollständig/);
-        assert.equal(s.overflow,false);assert.equal(s.targets,true);assert.equal(s.ledgerConfirmHidden,true,'no confirmation action before Ledger quantities are reviewed');assert.equal(s.leak,false);
+        assert.match(s.depotText,/Aktuell: unvollständig/);assert.match(s.depotText,/Pionex-Verlauf/);assert.doesNotMatch(s.depotText,/Ledger|OKX/);
+        assert.equal(s.overflow,false);assert.equal(s.targets,true);assert.equal(s.ledgerHidden,true,'Ledger controls are outside Pionex-only scope');assert.equal(s.leak,false);
         await showCommand();s=await snap();
         assert.equal(s.command,'unavailable');assert.equal(s.overlap,false);assert.equal(s.overflow,false);
         await shot('command-unavailable');
@@ -140,7 +140,7 @@ test('V11 Depot Chrome: central unlock shows not-loaded on both surfaces without
         await unlock();await showDepot();s=await snap();
         assert.equal(s.depot,'not_loaded');assert.equal(s.command,'not_loaded');
         assert.doesNotMatch(s.depotText,/unvollständig/);
-        assert.equal(counts.dashboard,1);assert.equal(counts.prices,1,'re-unlock must not read Depot sources');
+        assert.equal(counts.dashboard,1);assert.equal(counts.prices,0,'re-unlock must not read Depot sources');
         if(failure)throw failure;
         return {width:size.width,height:size.height,counts};
       },size.height);

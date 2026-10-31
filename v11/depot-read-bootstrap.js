@@ -1,12 +1,12 @@
-import {appAccess} from './app-access.js?v=B16-M11-FIX4';
-import {createDepotReadClient} from './depot-read-client.js?v=B16-M11-FIX4';
-import {createDepotReadView} from './depot-read-view.js?v=B16-M11-FIX4';
-import {mountLedgerReview} from './ledger-review-view.js?v=B16-M11-FIX4';
+import {appAccess} from './app-access.js?v=B16-M11-FIX5';
+import {createDepotReadClient} from './depot-read-client.js?v=B16-M11-FIX5';
+import {createDepotReadView} from './depot-read-view.js?v=B16-M11-FIX5';
+import {mountLedgerReview} from './ledger-review-view.js?v=B16-M11-FIX5';
 
 // Mounting controls never starts a request. Only the view's manual refresh can read.
 export function mountDepotReadAccess(document,window,{
   access=appAccess,createClient=createDepotReadClient,createView=createDepotReadView,createLedgerView=mountLedgerReview,
-  now=Date.now,schedule=setTimeout,cancelSchedule=clearTimeout
+  pionexOnly=false,now=Date.now,schedule=setTimeout,cancelSchedule=clearTimeout
 }={}){
   const root=document.getElementById('depot-read-root');
   if(!root)return null;
@@ -16,9 +16,9 @@ export function mountDepotReadAccess(document,window,{
     if(expiryTimer!==null){cancelSchedule(expiryTimer);expiryTimer=null;}
   }
   try{
-    view=createView(root,{commandRoot:document.getElementById('command-portfolio'),getToken:access.getToken,
+    view=createView(root,{pionexOnly,commandRoot:document.getElementById('command-portfolio'),getToken:access.getToken,
       createClient:options=>{
-        const reader=createClient({...options,getToken:access.getToken,onChange:state=>{
+        const reader=createClient({...options,pionexOnly,getToken:access.getToken,onChange:state=>{
           cancelExpiry();
           if(disposed)return;
           if(state.status==='locked'&&access.isUnlocked()){access.lock();return;}
@@ -39,7 +39,7 @@ export function mountDepotReadAccess(document,window,{
         }};
       }});
     unsubscribe=access.subscribe(s=>{if(!disposed&&s?.status==='unlocked')view?.revalidate();});
-    ledgerReview=createLedgerView(root,{access});
+    if(!pionexOnly)ledgerReview=createLedgerView(root,{access});
   }catch{
     cancelExpiry();unregister();unsubscribe();ledgerReview?.dispose();
     try{client?.dispose();}catch{}
@@ -52,5 +52,5 @@ export function mountDepotReadAccess(document,window,{
   }};
 }
 
-if(typeof document!=='undefined'&&typeof window!=='undefined')mountDepotReadAccess(document,window);
+if(typeof document!=='undefined'&&typeof window!=='undefined')mountDepotReadAccess(document,window,{pionexOnly:true});
 

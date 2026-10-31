@@ -1,7 +1,7 @@
 // Inactive component: mount explicitly with the existing read-client factory.
 // No network, credentials, storage or engine imports belong to this renderer.
-import {buildBotOverviewModel} from './bot-overview-model.js?v=B16-M11-FIX4';
-import {subscribeDepotPortfolio} from './depot-portfolio-state.js?v=B16-M11-FIX4';
+import {buildBotOverviewModel} from './bot-overview-model.js?v=B16-M11-FIX5';
+import {subscribeDepotPortfolio} from './depot-portfolio-state.js?v=B16-M11-FIX5';
 
 const LABELS = {
   locked: ['Gesperrt', 'App mit Meridian-Passwort öffnen, dann Bots manuell aktualisieren.'],
@@ -456,17 +456,17 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
   function renderPortfolio(state={}){
     const status=state?.status||'unavailable',model=state?.model;
     portfolio.setAttribute('data-state',status);
-    portfolio.replaceChildren(element(document,'h4','Bestätigtes Depot-Gesamtportfolio'));
-    const valid=status==='fresh'&&model?.currency==='USD'&&typeof model.totalUsd==='number'&&
+    portfolio.replaceChildren(element(document,'h4','Pionex-Bewertung'));
+    const valid=status==='fresh'&&model?.source==='SERVER_PIONEX_CURRENT'&&model?.currency==='USD/USDT'&&typeof model.totalUsd==='number'&&
       Number.isFinite(model.totalUsd)&&model.totalUsd>=0;
     const value=element(document,'p',valid
       ?new Intl.NumberFormat('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}).format(model.totalUsd)+' '+model.currency
       :'—');
     value.className='depot-total';
-    value.setAttribute('aria-label',valid?'Bestätigtes Depot-Gesamtportfolio: '+value.textContent:'Depot-Gesamtportfolio nicht verfügbar');
+    value.setAttribute('aria-label',valid?'Pionex-Bewertung: '+value.textContent:'Pionex-Bewertung nicht verfügbar');
     portfolio.append(value);
     if(valid){
-      const source=model.source==='SERVER_PORTFOLIO_CURRENT'?'Serverseitige Depotbewertung':'Gespeicherte Depotbewertung';
+      const source=model.source==='SERVER_PIONEX_CURRENT'?'Serverseitige Pionex-Bewertung':model.source==='SERVER_PORTFOLIO_CURRENT'?'Serverseitige Depotbewertung':'Gespeicherte Depotbewertung';
       const asOf=element(document,'time',model.snapshotAt);asOf.setAttribute('datetime',model.snapshotAt);
       const sourceAt=element(document,'time',model.sourceAt);sourceAt.setAttribute('datetime',model.sourceAt);
       const expires=Number.isSafeInteger(model.expiresAt)?new Date(model.expiresAt).toISOString():'unbekannt';
@@ -474,7 +474,7 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
       portfolio.append(element(document,'p','Aktuell · '+source+' · Stand (UTC): '),asOf,
         element(document,'p','Quellzeit (UTC): '),sourceAt,
         element(document,'p','Gültig bis (UTC): '),expiry,
-        element(document,'p','Gesamtwert laut Depot. Bot-Kapital und P/L bleiben getrennt und werden nicht addiert.'));
+        element(document,'p','Pionex-Wert; kein Gesamtvermögen. Bot-Kapital und P/L bleiben getrennt und werden nicht addiert.'));
     }else{
       const labels={locked:'Gesperrt · Depotdaten ausgeblendet.',not_loaded:'Noch nicht geladen · Depot manuell aktualisieren.',
         loading:'Wird geladen · kein bestätigter Gesamtwert verfügbar.',stale:'Daten veraltet · Gesamtwert ausgeblendet.',

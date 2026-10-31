@@ -1,4 +1,4 @@
-const SOURCES=new Set(['SERVER_PORTFOLIO_CURRENT','POSTGRES_CANONICAL_HISTORY']);
+const SOURCES=new Set(['SERVER_PORTFOLIO_CURRENT','POSTGRES_CANONICAL_HISTORY','SERVER_PIONEX_CURRENT']);
 const STATUSES=new Set(['locked','not_loaded','loading','stale','unavailable']);
 const validTime=value=>{
   if(typeof value!=='string')return false;
@@ -18,7 +18,7 @@ export function publishDepotPortfolioState(state={}){
       SOURCES.has(model.source)&&typeof model.totalUsd==='number'&&Number.isFinite(model.totalUsd)&&model.totalUsd>=0&&
       validTime(model.snapshotAt)&&validTime(model.sourceAt)&&Number.isSafeInteger(model.expiresAt)&&
       model.expiresAt>0&&model.expiresAt<=8640000000000000){
-      current={status,model:{totalUsd:model.totalUsd,currency:'USD',snapshotAt:model.snapshotAt,
+      current={status,model:{totalUsd:model.totalUsd,currency:model.source==='SERVER_PIONEX_CURRENT'?'USD/USDT':'USD',snapshotAt:model.snapshotAt,
         sourceAt:model.sourceAt,source:model.source,expiresAt:model.expiresAt}};
     }else current={status:'unavailable',model:null};
   }else current={status:STATUSES.has(status)?status:'unavailable',model:null};
