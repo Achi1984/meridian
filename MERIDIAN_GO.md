@@ -39,6 +39,36 @@
 
 # MERIDIAN GO
 
+## Owner delivery model — effective 2026-10-30
+
+Owner confirmed: “Ok speichere diese Arbeitsweise und nutze die Github Agents ideal um voran zu kommen”.
+Authoritative receipt: #1061/comment6535067336.
+
+- Deliver one coherent release candidate instead of a serial chain of small feature merges.
+  B16 combines the reviewed UI and TP sources with release metadata/cache on one isolated
+  integration branch. Preserve attribution; close original PRs only after verified incorporation.
+- Keep one implementation owner per branch/problem. Assign other agents disjoint useful work,
+  never duplicate diagnosis, tests or review merely to occupy capacity. Prefer GitHub coding
+  agents when dispatch works; use isolated direct connector implementation when it is blocked.
+  Distinguish assigned, queued, running and delivered states.
+- Authors run focused meaningful tests. Hosted CI runs the full final candidate suite, then
+  Claude performs one independent final review of the stable successful candidate. Supply exact
+  head/base, synthetic merge binding, totals/steps, scope and residual risks together.
+  Changed source needs applicable new validation; unchanged source does not need redundant review.
+  Required main postchecks, guarded merges and live acceptance remain mandatory.
+- Read existing cached health, logs and provider contracts before adding diagnostic telemetry.
+  Add telemetry only for evidence genuinely unavailable elsewhere. Never guess categories or
+  relax safeguards merely to make checks green.
+- Verify the actual deployed SHA before attributing a failed live check to new source.
+  Recovery stays bounded: no blind reruns or polling loops. Privacy and trading limits remain.
+- Lead owns integration and decisions, reports milestones or concrete blockers, and continues
+  already-authorized work within an active session without another Go. Do not imply background
+  continuation beyond agents that are actually running.
+
+This records the adopted working model, not technical workflow changes. Duplicate branch/PR
+CI and deployment-precheck improvements remain separate patches. No tests, approval gates,
+workflow triggers, permissions, schedules, spending or activation are changed by this section.
+
 ## Owner working model — effective 2026-10-17
 
 Owner instruction at 2026-10-17T07:04:42+02:00: “Go merke dir die Arbeitsweise

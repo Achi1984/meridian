@@ -97,6 +97,7 @@ test('running futures-grid rows normalize without inventing unsupported values',
   assert.equal(x.upper,100000);
   assert.equal(x.liquidationPrice,62001.6);
   assert.equal(x.takeProfit,100000);
+  assert.equal(x.takeProfitEvidence,'PRICE_SET');
   assert.equal(x.stopLoss,61000);
   assert.equal(x.investmentUsd,123.45);
   assert.equal(x.pnlUsd,12.34);
@@ -361,8 +362,27 @@ test('grid bounds are not invented as take-profit when no explicit TP exists',()
     buOrderData:{status:'running',trend:'long',leverage:5,bottom:'50000',top:'100000'}
   });
   assert.equal(x.takeProfit,null);
+  assert.equal(x.takeProfitEvidence,'UNKNOWN');
   assert.equal(x.lower,50000);
   assert.equal(x.upper,100000);
+});
+
+test('only an explicitly typed valid price yields comparable TP evidence',()=>{
+  const order=type=>normalizePionexBotOrder({
+    buOrderType:'futures_grid',buOrderId:'tp-evidence',base:'BTC.PERP',quote:'USDT',status:'running',
+    buOrderData:{status:'running',trend:'long',bottom:'50000',top:'100000',
+      profitStopType:type,profitStop:'90000'}
+  });
+  assert.equal(order('price').takeProfitEvidence,'PRICE_SET');
+  for(const type of [undefined,null,'','percent','unknown',{},17]){
+    const row=order(type);
+    assert.equal(row.takeProfit,null);assert.equal(row.takeProfitEvidence,'UNKNOWN');
+  }
+  const malformed=normalizePionexBotOrder({
+    buOrderType:'futures_grid',buOrderId:'malformed-tp',base:'BTC.PERP',quote:'USDT',status:'running',
+    buOrderData:{status:'running',trend:'long',profitStopType:'price',profitStop:'not-a-price'}
+  });
+  assert.equal(malformed.takeProfit,null);assert.equal(malformed.takeProfitEvidence,'UNKNOWN');
 });
 
 test('risk snapshot keeps only supported active futures bot rows',()=>{

@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import {renderBotReadState,createBotReadView,renderCommandBotOverview} from '../v11/bot-read-view.js';
 import {buildBotReadModel} from '../v11/bot-read-model.js';
 import {createBotReadClient} from '../v11/bot-read-client.js';
-import {publishDepotPortfolioState} from '../v11/depot-portfolio-state.js?v=B17-M11';
+import {publishDepotPortfolioState} from '../v11/depot-portfolio-state.js?v=B16-M11-RELEASE1';
+import {normalizePionexBotOrder} from '../pionex-bot-auto-sync.js';
+import {buildAssetWatchApiSnapshot} from '../asset-watch-bridge.js';
 
 // Deliberately minimal DOM contract fixture, not browser/layout acceptance.
 class Node {
@@ -149,7 +151,8 @@ test('sparse and undefined rows clear prior private data without throwing',()=>{
 });
 test('empty fresh snapshot reports absence rather than implying safety or active bots',()=>{
   const target=root(),state=fresh();state.model.bots=[];renderBotReadState(target,state);
-  assert.match(target.textContent,/0 Bots im Snapshot/);assert.match(target.textContent,/Keine Bots in diesem Snapshot/);
+  assert.match(target.textContent,/0 Bots im Snapshot/);assert.match(target.textContent,/Keine darstellbaren Bots in diesem Snapshot/);
+  assert.match(target.textContent,/Dies bestätigt kein leeres Wallet/);
   assert.doesNotMatch(target.textContent,/SAFE|sicher|0 aktive Bots/);
 });
 test('accessible Bot filters report no matches separately and reset without reading again',()=>{
@@ -279,11 +282,15 @@ test('canonical calendar validation matches corrected model and rejects normaliz
 test('real client to model to renderer pipeline expires data, locks on logout and remains inert until refresh',async()=>{
   const target=root(),events=[];let clock=Date.parse('2026-10-12T20:01:00Z'),credential='synthetic-token',calls=0;
   const client=createBotReadClient({getToken:()=>credential,now:()=>clock,
-    fetchImpl:async()=>{calls++;return new Response(JSON.stringify(snapshot('2026-10-12T20:00:00Z')));},
+    fetchImpl:async()=>{calls++;return new Response(JSON.stringify(walletScopeSnapshot()));},
     onChange:state=>{events.push(state.status);renderBotReadState(target,state);}});
   assert.equal(calls,0);await client.refresh();assert.deepEqual(events,['loading','fresh']);
   assert.match(target.textContent,/BTC/);assert.doesNotMatch(target.textContent,/synthetic-token/);
+  assert.match(target.textContent,/Futures-Grid-Datenumfang: von der Quelle bestätigt/);
   clock+=900000;client.revalidate();assert.equal(events.at(-1),'stale');assert.equal(all(target,'li').length,0);
+  assert.doesNotMatch(target.textContent,/von der Quelle bestätigt|2026-10-12/);
+  clock-=900000;client.revalidate();assert.equal(events.at(-1),'stale');
+  assert.doesNotMatch(target.textContent,/BTC|Futures-Grid-Datenumfang|2026-10-12/);
   credential='';client.revalidate();assert.equal(events.at(-1),'locked');assert.equal(all(target,'li').length,0);
   client.dispose();await client.refresh();assert.equal(calls,1);
 });
@@ -385,9 +392,9 @@ test('collapsed native cards distinguish equal symbols and render only whitelist
    const [first,second]=all(target,'details'),[firstSummary,secondSummary]=all(target,'summary');
    assert.doesNotMatch(firstSummary.textContent,/Referenz|Bot 1/);
    assert.equal(firstSummary.getAttribute('aria-label'),
-     'BTC · Short · Hebel 5× · P/L laut Quelle -2,75 USD · Kapital 125,50 USD/USDT · ID-Ende aaaaaa · Details anzeigen');
+     'BTC · Short · Hebel 5× · P/L laut Quelle -2,75 USD · Kapital 125,50 USD/USDT · TP nicht prüfbar · ID-Ende aaaaaa · Details anzeigen');
    assert.equal(secondSummary.getAttribute('aria-label'),
-     'BTC · Short · Hebel 5× · P/L laut Quelle -2,75 USD · Kapital 125,50 USD/USDT · ID-Ende bbbbbb · Details anzeigen');
+     'BTC · Short · Hebel 5× · P/L laut Quelle -2,75 USD · Kapital 125,50 USD/USDT · TP nicht prüfbar · ID-Ende bbbbbb · Details anzeigen');
    assert.match(firstSummary.textContent,/BTCShortHebel 5×/);
    assert.match(firstSummary.textContent,/Kapital125,50 USD\/USDT/);
    assert.match(firstSummary.textContent,/P\/L laut Quelle-2,75 USD/);
@@ -405,6 +412,90 @@ test('collapsed native cards distinguish equal symbols and render only whitelist
    assert.equal(all(target,'time').length,1,'freshness context appears once');
    renderBotReadState(target,{status:'locked'});assert.equal(all(target,'details').length,0);
    assert.doesNotMatch(target.textContent,/125.5|a{20}|b{20}/);
+ });
+
+test('TP indicators are read-only, unknown evidence stays neutral, and mismatch warnings show exact values',()=>{
+  const input=snapshot('2026-10-12T20:00:00Z');
+  input.bots[0].limits={takeProfit:90,upper:100,takeProfitEvidence:'PRICE_SET'};
+  const mismatching=buildBotReadModel(input,{now:Date.parse(input.sourceSnapshotAt)+60000});
+  const target=root();renderBotReadState(target,{status:'fresh',model:mismatching});
+  let indicators=all(target,'input').filter(node=>node.getAttribute('aria-label')?.startsWith('TP'));
+  assert.equal(indicators.length,2);
+  assert.ok(indicators.every(node=>node.disabled));
+  assert.equal(indicators[0].checked,true);assert.equal(indicators[0].indeterminate,false);
+  assert.equal(indicators[1].checked,false);
+  assert.match(target.textContent,/TP weicht von oberer Range ab/);
+  assert.match(target.textContent,/TP-Wert: 90 · obere Range: 100/);
+
+  input.bots[0].limits={takeProfit:100,upper:100,takeProfitEvidence:'PRICE_SET'};
+  const matching=buildBotReadModel(input,{now:Date.parse(input.sourceSnapshotAt)+60000});
+  renderBotReadState(target,{status:'fresh',model:matching});
+  indicators=all(target,'input').filter(node=>node.getAttribute('aria-label')?.startsWith('TP'));
+  assert.ok(indicators.every(node=>node.checked&&!node.indeterminate));
+  assert.doesNotMatch(target.textContent,/TP nicht prüfbar|TP weicht von oberer Range ab/);
+
+  input.bots[0].limits={takeProfit:null,upper:100,takeProfitEvidence:'UNKNOWN'};
+  const unknown=buildBotReadModel(input,{now:Date.parse(input.sourceSnapshotAt)+60000});
+  renderBotReadState(target,{status:'fresh',model:unknown});
+  indicators=all(target,'input').filter(node=>node.getAttribute('aria-label')?.startsWith('TP'));
+  assert.ok(indicators.every(node=>node.disabled&&node.indeterminate));
+  assert.match(target.textContent,/TP nicht prüfbar/);
+  assert.match(target.textContent,/belegen kein ungesetztes TP/);
+  assert.doesNotMatch(target.textContent,/Kein TP gesetzt|TP weicht von oberer Range ab/);
+
+  renderBotReadState(target,{status:'stale'});
+  assert.equal(all(target,'input').filter(node=>node.getAttribute('aria-label')?.startsWith('TP')).length,0);
+  assert.doesNotMatch(target.textContent,/TP nicht prüfbar|TP-Wert: 90|obere Range: 100/);
+  renderBotReadState(target,{status:'locked'});
+  assert.equal(all(target,'input').filter(node=>node.getAttribute('aria-label')?.startsWith('TP')).length,0);
+});
+
+test('collapsed card summary visibly labels TP mismatch and unknown status',()=>{
+  const input=snapshot('2026-10-12T20:00:00Z');
+  input.bots[0].limits={takeProfit:90,upper:100,takeProfitEvidence:'PRICE_SET'};
+  const target=root(),mismatch=buildBotReadModel(input,{now:Date.parse(input.sourceSnapshotAt)+60000});
+  renderBotReadState(target,{status:'fresh',model:mismatch});
+  const summary=all(target,'summary')[0];
+  assert.match(summary.textContent,/⚠ TP ≠ obere Range/);
+  assert.match(summary.getAttribute('aria-label'),/BTC.*Warnung: TP weicht von oberer Range ab/);
+  assert.ok(all(target,'details')[0].getAttribute('open')===null,'warning is in the collapsed summary');
+
+  input.bots[0].limits={takeProfit:null,upper:100,takeProfitEvidence:'UNKNOWN'};
+  const unknown=buildBotReadModel(input,{now:Date.parse(input.sourceSnapshotAt)+60000});
+  renderBotReadState(target,{status:'fresh',model:unknown});
+  assert.match(all(target,'summary')[0].textContent,/TP nicht prüfbar/);
+  assert.match(all(target,'summary')[0].getAttribute('aria-label'),/TP nicht prüfbar/);
+  assert.doesNotMatch(all(target,'summary')[0].textContent,/TP ≠ obere Range|Kein TP gesetzt/);
+});
+
+ test('producer-to-view pipeline preserves typed price evidence and keeps missing evidence neutral',()=>{
+   const stamp='2026-10-12T19:59:00Z',now=Date.parse('2026-10-12T20:00:00Z');
+   const makeSnapshot=profitStopType=>buildAssetWatchApiSnapshot({
+     pionexRisk:{snapshotAt:stamp,detailsComplete:true,bots:[normalizePionexBotOrder({
+       buOrderType:'futures_grid',buOrderId:'synthetic-tp-pipeline',base:'BTC.PERP',quote:'USDT',
+       status:'running',buOrderData:{status:'running',trend:'short',bottom:'50000',top:'100000',
+         profitStopType,profitStop:profitStopType==='price'?'90000':undefined}
+     })]},
+     pionexBotSync:{status:'OK',lastSuccessAt:stamp}
+   },{now});
+   const comparable=makeSnapshot('price');
+   assert.equal(comparable.bots[0].limits.takeProfitEvidence,'PRICE_SET');
+   const model=buildBotReadModel(comparable,{now});
+   assert.deepEqual(model.bots[0].takeProfitCheck,{set:true,matchesUpper:false,reason:null});
+   const target=root();renderBotReadState(target,{status:'fresh',model});
+   assert.match(all(target,'summary')[0].textContent,/⚠ TP ≠ obere Range/);
+   assert.match(target.textContent,/TP weicht von oberer Range ab/);
+   assert.match(target.textContent,/TP-Wert: 90000 · obere Range: 100000/);
+
+   for(const type of [undefined,'percent','unknown']){
+     const snapshot=makeSnapshot(type);
+     assert.equal(snapshot.bots[0].limits.takeProfitEvidence,'UNKNOWN');
+     const unknown=buildBotReadModel(snapshot,{now});
+     assert.equal(unknown.bots[0].takeProfitCheck.set,null);
+     renderBotReadState(target,{status:'fresh',model:unknown});
+     assert.match(target.textContent,/TP nicht prüfbar/);
+     assert.doesNotMatch(target.textContent,/Kein TP gesetzt|TP weicht von oberer Range ab/);
+   }
  });
 
  test('signed P/L keeps tiny values visible and zero or missing values unconfirmed',()=>{
@@ -434,8 +525,8 @@ test('collapsed native cards distinguish equal symbols and render only whitelist
    renderBotReadState(target,state);
    const names=all(target,'summary').map(summary=>summary.getAttribute('aria-label'));
    assert.deepEqual(names,[
-     'BTC · Short · Hebel 5× · P/L laut Quelle -2,75 USD · Kapital 125,50 USD/USDT · ID-Ende aabcdef · Details anzeigen',
-     'BTC · Short · Hebel 2× · P/L laut Quelle +1,25 USD · Kapital 80,00 USD/USDT · ID-Ende babcdef · Details anzeigen'
+     'BTC · Short · Hebel 5× · P/L laut Quelle -2,75 USD · Kapital 125,50 USD/USDT · TP nicht prüfbar · ID-Ende aabcdef · Details anzeigen',
+     'BTC · Short · Hebel 2× · P/L laut Quelle +1,25 USD · Kapital 80,00 USD/USDT · TP nicht prüfbar · ID-Ende babcdef · Details anzeigen'
    ]);
    assert.ok(names.every(name=>!name.includes('a'.repeat(14))&&!name.includes('b'.repeat(14))));
  });
@@ -564,4 +655,138 @@ test('reset discards pending return and unknown Command targets do not change se
   change(search,'input','BTC');h.jump('f'.repeat(20));assert.equal(search.value,'BTC');assert.equal(returnButton(h).hidden,true);
   h.jump('a'.repeat(20));all(h.target,'button').find(node=>node.text==='Filter zurücksetzen').click();
   assert.equal(returnButton(h).hidden,true);returnButton(h).click();assert.equal(search.value,'');
+});
+
+const walletScopeSnapshot=()=>({...snapshot('2026-10-12T20:00:00Z'),usableForDisplay:true,
+  overwriteScope:'WALLET_FUTURES_GRID',excludedScope:'KNOWN_EXCLUDED_PRODUCTS',overwriteRejectionReasons:[],
+  coverage:{status:'PARTIAL',listRows:2,recognizedRows:1,representedRows:1,
+    unsupportedRows:1,unhydratedRows:0,paginationComplete:true}});
+function scopeViews(input){
+  const bots=root(),command=root();
+  const model=buildBotReadModel(input,{now:Date.parse('2026-10-12T20:01:00Z')});
+  const view=createBotReadView(bots,{createClient:({onChange})=>{
+    onChange({status:model.status==='FRESH_SNAPSHOT'?'fresh':model.status==='STALE'?'stale':'unavailable',model});
+    return {refresh(){},lock(){},revalidate(){},dispose(){}};
+  },onSnapshot:data=>renderCommandBotOverview(command,data)});
+  return {bots,command,view};
+}
+test('both views separate global wallet partial coverage from confirmed supported grid scope',()=>{
+  for(const excludedScope of ['KNOWN_EXCLUDED_PRODUCTS','NONE']){
+    const input=walletScopeSnapshot();input.excludedScope=excludedScope;
+    const {bots,command,view}=scopeViews(input);
+    for(const target of [bots,command]){
+      assert.match(target.textContent,/Teilabdeckung: 1 von 2/);
+      assert.match(target.textContent,/Futures-Grid-Datenumfang: von der Quelle bestätigt/);
+      assert.equal(target.textContent.includes('Bekannte ausgeschlossene Produkte'),excludedScope==='KNOWN_EXCLUDED_PRODUCTS');
+      assert.match(target.textContent,/Keine Bestätigung der Vollständigkeit des Wallets/);
+      assert.doesNotMatch(target.textContent,/WALLET_FUTURES_GRID|KNOWN_EXCLUDED_PRODUCTS|usableForOverwrite/);
+    }
+    view.dispose();
+  }
+});
+test('missing malformed unknown and rejecting scope evidence never confirms the grid scope in either view',()=>{
+  const invalid=[
+    ['usableForOverwrite',false],['usableForOverwrite',undefined],['usableForOverwrite','true'],
+    ['overwriteScope',undefined],['overwriteScope','NONE'],['overwriteScope','PRIMARY_BOT_API'],
+    ['overwriteScope','PRIVATE<script>'],['overwriteScope',{}],
+    ['excludedScope',undefined],['excludedScope','UNVERIFIED'],['excludedScope','PRIVATE<script>'],
+    ['excludedScope',{}],['overwriteRejectionReasons',undefined],['overwriteRejectionReasons',null],
+    ['overwriteRejectionReasons',{}],['overwriteRejectionReasons',''],
+    ['overwriteRejectionReasons',['PRIVATE<script>']],['overwriteRejectionReasons',[null]],
+    ['overwriteRejectionReasons',[{}]],['overwriteRejectionReasons',Array(1)],
+    ['overwriteRejectionReasons',['SOURCE_STALE','PRIVATE<script>']],
+    ['overwriteRejectionReasons',Array(11).fill('SOURCE_STALE')]
+  ];
+  for(const reason of ['UNSUPPORTED_SCOPE','SUPPORTED_HYDRATION_MISSING','SANITIZATION_LOSS_OR_DUPLICATE',
+    'PAGINATION_INCOMPLETE','EXPLICIT_PARTIAL','SYNC_PARTIAL','DETAILS_INCOMPLETE',
+    'SOURCE_STATUS_NOT_OK','SOURCE_STALE','SOURCE_UNAVAILABLE'])
+    invalid.push(['overwriteRejectionReasons',[reason]]);
+  for(const [key,value] of invalid){
+    const input=walletScopeSnapshot();input[key]=value;
+    const {bots,command,view}=scopeViews(input);
+    assert.match(bots.textContent,/BTC/);
+    for(const target of [bots,command]){
+      assert.match(target.textContent,/1 Bots/);
+      assert.match(target.textContent,/Futures-Grid-Datenumfang: nicht bestätigt/,key);
+      assert.doesNotMatch(target.textContent,/von der Quelle bestätigt|PRIVATE|script|SOURCE_STALE|UNSUPPORTED_SCOPE/);
+    }
+    view.dispose();
+  }
+});
+test('known rejection reasons render only fixed German explanations and primary API has no wallet claim',()=>{
+  const input=walletScopeSnapshot();
+  input.overwriteRejectionReasons=['SUPPORTED_HYDRATION_MISSING','PAGINATION_INCOMPLETE'];
+  const rejected=scopeViews(input);
+  for(const target of [rejected.bots,rejected.command]){
+    assert.match(target.textContent,/Details unterstützter Bots fehlen/);
+    assert.match(target.textContent,/Die Listenseiten sind nicht vollständig bestätigt/);
+    assert.doesNotMatch(target.textContent,/SUPPORTED_HYDRATION_MISSING|PAGINATION_INCOMPLETE/);
+  }
+  rejected.view.dispose();
+  input.source='PIONEX_BOT_API';input.overwriteRejectionReasons=[];
+  const primary=scopeViews(input),legacyInput={...input};
+  for(const key of ['overwriteScope','excludedScope','usableForOverwrite','overwriteRejectionReasons'])delete legacyInput[key];
+  const legacy=scopeViews(legacyInput);
+  assert.equal(primary.bots.textContent,legacy.bots.textContent);
+  assert.equal(primary.command.textContent,legacy.command.textContent);
+  for(const target of [primary.bots,primary.command])
+    assert.doesNotMatch(target.textContent,/Futures-Grid-Datenumfang|ausgeschlossene Produkte|Wallet/);
+  primary.view.dispose();legacy.view.dispose();
+});
+test('empty scope snapshots differ from filter-empty results and reset or status updates do not fetch',()=>{
+  const input=walletScopeSnapshot();input.bots=[];input.botCount=0;
+  const empty=scopeViews(input);
+  for(const target of [empty.bots,empty.command]){
+    assert.match(target.textContent,/Keine darstellbaren Bots in diesem Snapshot/);
+    assert.match(target.textContent,/Dies bestätigt kein leeres Wallet/);
+    assert.doesNotMatch(target.textContent,/Keine Bots entsprechen den Filtern/);
+  }
+  empty.view.dispose();
+  const h=mounted(),model=buildBotReadModel(walletScopeSnapshot(),{now:Date.parse('2026-10-12T20:01:00Z')});
+  h.publish({status:'fresh',model});
+  const live=all(h.target,'div').find(node=>node.getAttribute('role')==='status');
+  change(all(h.target,'input')[0],'input','NO_MATCH');
+  assert.match(h.target.textContent,/Keine Bots entsprechen den Filtern/);
+  assert.doesNotMatch(h.target.textContent,/Keine darstellbaren Bots|kein leeres Wallet/);
+  assert.match(h.target.textContent,/Futures-Grid-Datenumfang: von der Quelle bestätigt/);
+  all(h.target,'button').find(node=>node.text==='Filter zurücksetzen').click();
+  assert.match(h.target.textContent,/BTC/);
+  h.publish({status:'stale',model});
+  assert.equal(all(h.target,'div').find(node=>node.getAttribute('role')==='status'),live);
+  assert.match(h.target.textContent,/Bitte Bots manuell aktualisieren/);
+  assert.doesNotMatch(h.target.textContent,/BTC|Futures-Grid-Datenumfang|2026-10-12/);
+  assert.equal(h.calls.refresh,0);h.view.dispose();
+});
+test('both views clear scope rows times and badges on invalidation and keep stable accessible status',()=>{
+  const h=mounted(),command=root(),model=buildBotReadModel(walletScopeSnapshot(),{now:Date.parse('2026-10-12T20:01:00Z')});
+  model.bots[0].productCategory='FUTURES_MOON';
+  renderCommandBotOverview(command,{status:'locked'});
+  const live=all(command,'div').find(node=>node.getAttribute('role')==='status');
+  assert.equal(live.getAttribute('aria-live'),'polite');assert.equal(live.getAttribute('aria-atomic'),'true');
+  for(const status of ['stale','unavailable','locked','loading']){
+    h.publish({status:'fresh',model});
+    renderCommandBotOverview(command,{...model,status:'fresh',count:1,losses:[]});
+    h.publish({status,model});renderCommandBotOverview(command,{...model,status});
+    for(const target of [h.target,command]){
+      assert.equal(all(target,'li').length,0);assert.equal(all(target,'time').length,0);
+      assert.doesNotMatch(target.textContent,/BTC|2026-10-12|Futures-Grid-Datenumfang|Futures Moon/);
+      assert.match(target.textContent,new RegExp({stale:'Daten veraltet',unavailable:'Nicht verfügbar',
+        locked:'Gesperrt',loading:'Wird geladen'}[status]));
+      if(status==='stale')assert.match(target.textContent,/Bitte Bots manuell aktualisieren/);
+    }
+    assert.equal(all(command,'div').find(node=>node.getAttribute('role')==='status'),live);
+  }
+  assert.equal(h.calls.refresh,0);h.view.dispose();
+});
+test('invalid and expired source envelopes cannot publish scope confirmation through either view',()=>{
+  for(const mutate of [input=>input.sourceSnapshotAt='2026-10-12T19:00:00Z',
+    input=>input.schemaVersion='INVALID',input=>input.botCount=2]){
+    const input=walletScopeSnapshot();mutate(input);
+    const {bots,command,view}=scopeViews(input);
+    for(const target of [bots,command]){
+      assert.equal(all(target,'time').length,0);assert.equal(all(target,'li').length,0);
+      assert.doesNotMatch(target.textContent,/BTC|Futures-Grid-Datenumfang|2026-10-12/);
+    }
+    view.dispose();
+  }
 });
