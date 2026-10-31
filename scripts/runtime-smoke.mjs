@@ -43,6 +43,10 @@ function shaInfo(h){
 
 async function smoke(){
   const nonce=Date.now();
+  // Establish deployment readiness before evaluating product behavior on that build.
+  const health=await json(`${GATEWAY}/gateway-health?smoke=${nonce}`);
+  const sha=shaInfo(health);
+  if(REQUIRE_SHA&&sha.shaMatch!==true)fail('DEPLOYMENT_NOT_READY: expected deployment SHA is not serving yet');
   const pages=await json(`${PAGES_BASE}/version.json?smoke=${nonce}`);
   if(!sameRelease(pages))fail(`GitHub Pages stale: expected ${EXPECTED_VERSION}/${EXPECTED_BUILD}, got ${pages?.version}/${pages?.buildId}`);
   if(!EXPECTED_TERMINAL||String(pages?.terminalBuild||'')!==EXPECTED_TERMINAL)fail(`GitHub Pages terminal metadata stale: expected ${EXPECTED_TERMINAL}, got ${pages?.terminalBuild}`);
@@ -59,7 +63,6 @@ async function smoke(){
   if(!terminalHtml.includes(`const LOCAL_BUILD='${EXPECTED_TERMINAL}'`))fail('v10 shell missing stale-build self-heal');
   if(!terminalHtml.includes("../version.json?boot="))fail('v10 shell missing no-store version probe');
 
-  const health=await json(`${GATEWAY}/gateway-health?smoke=${nonce}`);
   if(!health?.ok)fail('Gateway health not ok');
   if(!sameRelease(health))fail(`Northflank stale: expected ${EXPECTED_VERSION}/${EXPECTED_BUILD}, got ${health?.version}/${health?.buildId}`);
   if(String(health?.terminalBuild||'')!==EXPECTED_TERMINAL)fail(`Gateway terminal metadata stale: expected ${EXPECTED_TERMINAL}, got ${health?.terminalBuild}`);
@@ -103,8 +106,6 @@ async function smoke(){
     if(experiments.some(b=>['pairs','squeeze'].includes(b.id)&&b.openTrades!==0))fail('R42 unavailable specialist must not trade');
   }
 
-  const sha=shaInfo(health);
-  if(REQUIRE_SHA&&sha.shaMatch!==true)fail(`Deployment SHA mismatch: expected ${EXPECTED_SHA||'unknown'}, got ${sha.deploymentSha||'missing'}`);
 
   return {
     ok:true,
@@ -148,3 +149,4 @@ for(let attempt=1;attempt<=RETRIES;attempt++){
 }
 console.error('[runtime-smoke] FAILED:',String(last?.stack||last));
 process.exit(1);
+

@@ -49,6 +49,29 @@ integration, quality and merge decisions. Agents implement their assigned scope
 or independently review it. This overrides older role descriptions below;
 single-writer, independent review and all runtime authorization gates remain.
 
+## Delivery efficiency — owner instruction 2026-10-31
+
+Owner: “Verbessere den Prozess nachhaltig”. Use one coherent release candidate
+with one branch writer and disjoint agent tasks. Reuse completed diagnosis and
+read existing cached health/log evidence before adding telemetry. The author runs
+focused regression tests; hosted CI validates the complete candidate before one
+independent final review. Supply the exact head/base, synthetic merge binding,
+full test totals and required-step results in the first review request. Do not
+repeat an unchanged source review; changed head/base still requires applicable
+fresh validation. Never claim assigned work is running without evidence.
+
+Release Safety runs for PR candidates and main, not a duplicate codex branch
+push. Superseded PR runs may be cancelled; main postchecks use unique run groups
+and are never cancelled by this rule. Runtime smoke checks the expected deployed
+SHA before business behavior, reporting DEPLOYMENT_NOT_READY while that SHA is
+not serving. Existing bounded retry limits and failure exit semantics remain;
+readiness is not acceptance and all live checks must still pass.
+
+Exact-pair full CI, independent review, guarded merge, required main postchecks,
+actual deployed SHA and live acceptance remain mandatory. No permission, secret,
+schedule, spending, research-stage or trading authority changes. Workflow changes
+remain separately reviewed; this instruction is not blanket future authority.
+
 ## Owner merge delegation — effective 2026-10-17
 
 This newer owner instruction supersedes the older per-merge approval rules in
@@ -198,3 +221,4 @@ Owner instruction 2026-10-15T19:57:13+02:00, execution Go19:58:27:
 - WIP limit: at most three active work packages, remaining proposals in backlog. Owner approved 2026-10-15T20:16:49+02:00: "Ja Freigabe erteilt"; decision6199107184 resolved in place.
 
 Mailbox639 routing is active after owner-approved PR818 merge7dc94b9108e25d742bef7652fb7511c5cb5108ea (FINAL_MERGE_STATUS6199370528). Four disabled Autopilot prompts now resolve checkpoint routing and remain disabled; management routing was already dynamic. Pending requests and external automation routing reconciled; successor smoke6199499751 passed. Predecessor571 closed as historical archive6199526147. First hosted watchdog PATCH remains unproven.
+
