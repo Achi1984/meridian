@@ -103,3 +103,36 @@ test('gateway retains auth and only legacy path uses blind stateSet',()=>{
   assert.match(route,/if\(!reviewed\)await stateSet\(PRIVATE_STATE_KEY,merged.data\)/);
   assert.ok(route.indexOf('if(!merged.ok)')<route.indexOf('capturePortfolioHistoryOnce'));
 });
+test('unlock emits not_loaded without reads and revalidation preserves loading review saving and confirmed',async()=>{
+  let token=null,calls=0,resolve,states=[];
+  const c=createLedgerReviewClient({getToken:()=>token,onChange:s=>states.push(s),fetchImpl:()=>{calls++;return new Promise(r=>resolve=r);}});
+  c.revalidate();assert.equal(states.at(-1).status,'locked');
+  token='password';c.revalidate();assert.equal(states.at(-1).status,'not_loaded');assert.equal(calls,0);
+  const before=states.length;c.revalidate();assert.equal(states.length,before);
+  const read=c.load();c.revalidate();assert.equal(states.at(-1).status,'loading');assert.equal(calls,1);
+  resolve(response(payload()));await read;
+  const review=states.at(-1);c.revalidate();assert.equal(states.at(-1),review);assert.equal(review.status,'review');
+  const write=c.confirm();c.revalidate();assert.equal(states.at(-1).status,'saving');assert.equal(calls,2);
+  resolve(response({ok:true,action:'confirm_ledger_reviewed',updatedAt:'2026-10-31T12:00:00Z'}));await write;
+  const confirmed=states.at(-1);c.revalidate();assert.equal(states.at(-1),confirmed);assert.equal(confirmed.status,'confirmed');
+  token=null;c.revalidate();assert.equal(states.at(-1).status,'locked');
+  token='password';c.revalidate();assert.equal(states.at(-1).status,'not_loaded');assert.equal(calls,2);c.dispose();
+});
+test('real Ledger view changes locked hint on unlock without fetching or exposing confirmation',()=>{
+  class Node{
+    constructor(doc){this.ownerDocument=doc;this.children=[];this.text='';this.events={};}
+    set textContent(t){this.text=t;this.children=[];}get textContent(){return this.text+this.children.map(n=>n.textContent).join(' ');}
+    append(...n){this.children.push(...n);}replaceChildren(...n){this.text='';this.children=n;}
+    setAttribute(){}addEventListener(t,f){this.events[t]=f;}removeEventListener(t){delete this.events[t];}
+  }
+  const doc={createElement:()=>new Node(doc)},root=doc.createElement();let token=null,notify,clear,calls=0;
+  const access={getToken:()=>token,lock(){token=null;clear();},registerReader(fn){clear=fn;return()=>{};},subscribe(fn){notify=fn;return()=>{};}};
+  const mounted=mountLedgerReview(root,{access,createClient:options=>createLedgerReviewClient({...options,fetchImpl:()=>{calls++;throw Error('unexpected read');}})});
+  const section=root.children[0],load=section.children[2],confirm=section.children[4];
+  assert.match(root.textContent,/App entsperren/);assert.equal(load.disabled,true);
+  token='password';notify({status:'unlocked'});
+  assert.doesNotMatch(root.textContent,/App entsperren/);assert.match(root.textContent,/Noch keine Bestände bestätigt/);
+  assert.equal(load.disabled,false);assert.equal(confirm.hidden,true);assert.equal(calls,0);
+  access.lock();assert.match(root.textContent,/App entsperren/);assert.equal(load.disabled,true);assert.equal(confirm.hidden,true);
+  mounted.dispose();
+});

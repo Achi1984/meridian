@@ -46,11 +46,11 @@ test('A0: exactly one decision and unknown data fail closed',()=>{
 test('A0: no live imports, network, credentials, orders or PWA bootstrap',()=>{
  assert.deepEqual([...html.matchAll(/<script\b[^>]*>/gi)].map(match=>match[0]),[
    '<script>',
-   '<script type="module" src="./app-access-bootstrap.js?v=B16-M11-FIX3">',
-   '<script type="module" src="./bot-read-bootstrap.js?v=B16-M11-FIX3">',
-   '<script type="module" src="./depot-read-bootstrap.js?v=B16-M11-FIX3">',
-   '<script type="module" src="./strategy-workspace-bootstrap.js?v=B16-M11-FIX3">',
-   '<script type="module" src="./agent-status-bootstrap.js?v=B16-M11-FIX3">'
+   '<script type="module" src="./app-access-bootstrap.js?v=B16-M11-FIX4">',
+   '<script type="module" src="./bot-read-bootstrap.js?v=B16-M11-FIX4">',
+   '<script type="module" src="./depot-read-bootstrap.js?v=B16-M11-FIX4">',
+   '<script type="module" src="./strategy-workspace-bootstrap.js?v=B16-M11-FIX4">',
+   '<script type="module" src="./agent-status-bootstrap.js?v=B16-M11-FIX4">'
  ],'one unchanged navigation script and five exact approved module entries');
  assert.match(html,/<script>/,'script must have no attributes');
  const agentStatusStylesheet='<link rel="stylesheet" href="../public/css/m11-agent-status.css">';
@@ -58,7 +58,7 @@ test('A0: no live imports, network, credentials, orders or PWA bootstrap',()=>{
  assert.doesNotMatch(html.replace(agentStatusStylesheet,''),/<(?:img|base|object|embed|source|video|audio|link)\b|<meta[^>]*http-equiv=["']refresh|\bon[a-z]+\s*=|javascript:|url\s*\(/i);
  assert.equal(scripts.length,1,'navigation-only inline script');
  for(const module of ['app-access-bootstrap.js','bot-read-bootstrap.js','depot-read-bootstrap.js','strategy-workspace-bootstrap.js','agent-status-bootstrap.js'])
-  assert.ok(html.includes(`<script type="module" src="./${module}?v=B16-M11-FIX3"></script>`));
+  assert.ok(html.includes(`<script type="module" src="./${module}?v=B16-M11-FIX4"></script>`));
  assert.equal((html.match(/<form\b/g)||[]).length,1,'one app-opening form');
  assert.equal((html.match(/type="password"/g)||[]).length,1,'one masked app password input');
  const withoutGate=html.replace(/<form id="app-access-form">[\s\S]*?<\/form>/,'')

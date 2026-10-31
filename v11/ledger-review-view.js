@@ -1,5 +1,6 @@
-import {createLedgerReviewClient} from './ledger-review-client.js?v=B16-M11-FIX3';
+import {createLedgerReviewClient} from './ledger-review-client.js?v=B16-M11-FIX4';
 const TEXT={
+  not_loaded:'Ledger-Mengen zur Prüfung laden. Noch keine Bestände bestätigt.',
   locked:'App entsperren, um gespeicherte Ledger-Mengen zu prüfen.',
   loading:'Gespeicherte Ledger-Mengen werden geladen.',
   saving:'Ledger-Bestätigung wird gespeichert.',
@@ -33,7 +34,7 @@ export function mountLedgerReview(root,{access,createClient=createLedgerReviewCl
   const read=()=>client.load(),write=()=>client.confirm();
   load.addEventListener('click',read);confirm.addEventListener('click',write);
   const unregister=access.registerReader(()=>client.lock(),()=>client.revalidate());
-  const unsubscribe=access.subscribe(s=>{if(s.status==='unlocked'){load.disabled=false;client.revalidate();}});
+  const unsubscribe=access.subscribe(s=>{if(s.status==='unlocked')client.revalidate();});
   client.revalidate();
   return {dispose(){client.dispose();disposed=true;unregister();unsubscribe();load.removeEventListener('click',read);confirm.removeEventListener('click',write);section.replaceChildren();section.remove?.();}};
 }

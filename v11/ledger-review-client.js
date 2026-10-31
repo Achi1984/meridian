@@ -1,10 +1,10 @@
-import {ledgerReviewHoldings} from './ledger-review-model.js?v=B16-M11-FIX3';
-import {parseDepotReadCredential} from './depot-read-client.js?v=B16-M11-FIX3';
+import {ledgerReviewHoldings} from './ledger-review-model.js?v=B16-M11-FIX4';
+import {parseDepotReadCredential} from './depot-read-client.js?v=B16-M11-FIX4';
 const BASE='https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/';
 export function createLedgerReviewClient({getToken,onChange=()=>{},onLock=()=>{},fetchImpl=globalThis.fetch}={}){
-  let pending=null,rows=null,reviewToken=null,generation=0,disposed=false;
+  let pending=null,rows=null,reviewToken=null,generation=0,disposed=false,status=null;
   const token=()=>{try{const t=getToken();return parseDepotReadCredential(t)?t.trim():null;}catch{return null;}};
-  const emit=(status,extra={})=>{if(!disposed)onChange({status,...extra});};
+  const emit=(nextStatus,extra={})=>{if(!disposed){status=nextStatus;onChange({status,...extra});}};
   function lock(){generation++;pending?.abort();pending=null;rows=null;reviewToken=null;emit('locked');}
   async function request(write){
     if(disposed||pending)return;
@@ -49,6 +49,11 @@ export function createLedgerReviewClient({getToken,onChange=()=>{},onLock=()=>{}
     finally{clearTimeout(timer);ctl.abort();if(id===generation)pending=null;}
   }
   return {load:()=>request(false),confirm:()=>request(true),lock,
-    revalidate(){if(!token()||(reviewToken&&token()!==reviewToken))lock();},
+    revalidate(){
+      if(disposed)return;
+      const credential=token();
+      if(!credential||(reviewToken&&credential!==reviewToken))lock();
+      else if(!pending&&(status===null||status==='locked'))emit('not_loaded');
+    },
     dispose(){lock();disposed=true;}};
 }

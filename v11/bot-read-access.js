@@ -1,4 +1,4 @@
-import {parseBotReadCredential} from './bot-read-client.js?v=B16-M11-FIX3';
+import {parseBotReadCredential} from './bot-read-client.js?v=B16-M11-FIX4';
 
 // Inactive memory-only credential holder. No authentication or account activation.
 // The caller supplies the existing client's lock operation; no token is sent to it.
