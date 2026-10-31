@@ -898,7 +898,7 @@ function deploymentServer(){
   const statusCss=readFileSync(new URL('../public/css/m11-agent-status.css',import.meta.url),'utf8');
   const policies=new Map(),requests=[],modules=new Map(),pending=new Set();
   let reads=0,aborts=0,depotReads=0,depotAborts=0,authReads=0,mode='fresh';
-  const endpoint='/meridian/__test/bot-snapshot',depotEndpoint='/meridian/__test/depot-snapshot',currentEndpoint='/meridian/__test/depot-current',priceEndpoint='/meridian/__test/depot-prices',authEndpoint='/meridian/__test/app-access';
+  const endpoint='/meridian/__test/bot-snapshot',depotEndpoint='/meridian/__test/portfolio-history',pionexEndpoint='/meridian/__test/pionex-history',currentEndpoint='/meridian/__test/depot-current',priceEndpoint='/meridian/__test/depot-prices',authEndpoint='/meridian/__test/app-access';
   for(const name of moduleNames){
     let body=readFileSync(new URL('../v11/'+name,import.meta.url),'utf8');
     if(name==='bot-read-client.js'){
@@ -951,15 +951,21 @@ function deploymentServer(){
       response.writeHead(200,{'Content-Type':'application/json'});response.end(JSON.stringify({private:true,data:{portfolio:{holdings:[{venue:'Ledger',quantity:'invalid'}],manualVenueBalances:[{venue:'OKX',valueUsd:'invalid'}],pionexEquityUsd:3450,pionexEquityUpdatedAt:time}}}));return;
     }
     if(path===priceEndpoint){response.writeHead(500);response.end('{}');return;}
-    if(path===depotEndpoint){
+    if(path===depotEndpoint||path===pionexEndpoint){
       depotReads++;
       if(!request.headers.authorization||mode==='denied'){response.writeHead(401);response.end('{}');return;}
       if(mode==='pending'){
         pending.add(response);response.on('close',()=>{pending.delete(response);if(!response.writableEnded)depotAborts++;});return;
       }
-      if(mode==='current'||mode==='error'){response.writeHead(503,{'Content-Type':'application/json'});response.end('{}');return;}
+      if(mode==='current'||mode==='error'||mode==='historyError'){response.writeHead(503,{'Content-Type':'application/json'});response.end('{}');return;}
       const stamp=Date.now()-(mode==='stale'?901000:1000);
       response.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});
+      if(path===pionexEndpoint&&mode!=='mixed'){
+        const points=[2,1,0].map(n=>({timestamp:stamp-n*300000,sourceAt:stamp-n*300000-1000,
+          valueUsd:3450-n*50,scope:'PIONEX',currency:'USD/USDT',source:'PIONEX_WALLET_READ_API',authorityVersion:'PIONEX_FRESH_V1'}));
+        response.end(JSON.stringify({version:'PIONEX_HISTORY_V1',source:'POSTGRES_PIONEX_HISTORY',scope:'PIONEX',
+          currency:'USD/USDT',generatedAt:new Date().toISOString(),excludedPoints:0,points}));return;
+      }
       const points=[2,1,0].map((n)=>({timestamp:stamp-n*300000,spotUsd:12000-n*50,tradingUsd:3450,totalUsd:15450-n*50,
         sourceStatus:{spot:'STRICT_AUTHORITY',trading:'PIONEX_EQUITY',tradingFresh:true,tradingAuthorityVersion:'PIONEX_FRESH_V1',
         tradingSource:'PIONEX_WALLET_READ_API',tradingUpdatedAt:stamp-n*300000-1000}}));
@@ -976,7 +982,7 @@ function deploymentServer(){
     const preview=path==='/meridian/v11/';
     const origin='http://127.0.0.1:'+server.address().port;
     const scriptSource=preview?`'sha256-${scriptHash}' `+[...modules.keys()].map(path=>origin+path+(path.startsWith('/meridian/v11/')?'?v=B16-M11-FIX6':'')).join(' '):"'none'";
-    const policy=`default-src 'none'; script-src ${scriptSource}; style-src 'unsafe-inline'${preview?' '+origin+statusCssPath:''}; connect-src ${preview?origin+endpoint+' '+origin+depotEndpoint+' '+origin+currentEndpoint+' '+origin+priceEndpoint+' '+origin+authEndpoint+' '+origin+'/meridian/docs/strategy-lab/campaign-20261013.json':"'none'"}; worker-src 'none'; child-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'none'`;
+    const policy=`default-src 'none'; script-src ${scriptSource}; style-src 'unsafe-inline'${preview?' '+origin+statusCssPath:''}; connect-src ${preview?origin+endpoint+' '+origin+depotEndpoint+' '+origin+pionexEndpoint+' '+origin+currentEndpoint+' '+origin+priceEndpoint+' '+origin+authEndpoint+' '+origin+'/meridian/docs/strategy-lab/campaign-20261013.json':"'none'"}; worker-src 'none'; child-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'none'`;
     policies.set(path,policy);
     response.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Content-Security-Policy':policy});response.end(preview?html:terminal);
   });
@@ -984,7 +990,7 @@ function deploymentServer(){
     server.once('error',reject);server.listen(0,'127.0.0.1',()=>resolve({
       base:`http://127.0.0.1:${server.address().port}/meridian/`,policies,requests,
       metrics:()=>({reads,aborts,depotReads,depotAborts,authReads,pending:pending.size}),setMode:value=>{mode=value;},
-      allowedPaths:new Set(['/meridian/v11/','/meridian/v10/',endpoint,depotEndpoint,currentEndpoint,priceEndpoint,authEndpoint,statusCssPath,...modules.keys()]),
+      allowedPaths:new Set(['/meridian/v11/','/meridian/v10/',endpoint,depotEndpoint,pionexEndpoint,currentEndpoint,priceEndpoint,authEndpoint,statusCssPath,...modules.keys()]),
       close:()=>new Promise((done,fail)=>{for(const response of pending)response.destroy();server.close(error=>error?fail(error):done());server.closeAllConnections();})
     }));
   });
@@ -1264,7 +1270,7 @@ async function browserRun(call,start,width,height,server){
       await refresh();assert.equal(server.metrics().reads,initialReads+1,'locked credential cannot request');
       await openApp();await waitUntil(async()=>await evaluate(`!document.getElementById('app').hidden`));
       server.setMode('pending');const aborts=server.metrics().aborts;
-      await refresh();await waitUntil(()=>server.metrics().pending===2);
+      await refresh();await waitUntil(()=>server.metrics().pending===1);
       await evaluate(`Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));delete document.hidden;true`);
       assert.equal(await evaluate(`document.getElementById('app').hidden`),true,'private content is hidden while backgrounded');
       assert.equal(server.metrics().aborts,aborts,'brief backgrounding does not revoke app access');
@@ -1315,8 +1321,19 @@ async function browserRun(call,start,width,height,server){
       if(process.env.V11_B10_EVIDENCE_DIR&&width===375){mkdirSync(process.env.V11_B10_EVIDENCE_DIR,{recursive:true});
         const shot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
         writeFileSync(join(process.env.V11_B10_EVIDENCE_DIR,'v11-b10-synthetic-depot-filled-375x844.png'),Buffer.from(shot.data,'base64'));}
-      assert.equal(await evaluate(`document.querySelector('#depot-read-root svg')===null`),true,'mixed venue history is never shown as Pionex');
+      const chart=await evaluate(`(()=>{const svg=document.querySelector('#depot-read-root svg');return {label:svg?.getAttribute('aria-label'),points:svg?.querySelectorAll('circle').length,lines:svg?.querySelectorAll('polyline').length};})()`);
+      assert.match(chart.label,/Gespeicherter Pionex-Wert, 3 Messpunkte/);assert.match(chart.label,/USD\/USDT/);
+      assert.equal(chart.points,3);assert.equal(chart.lines,1,'fresh Pionex source observations form one segment');
       assert.equal(server.metrics().depotReads,initial+2,'dashboard and separate history request only');
+      const rangeReads=server.metrics().depotReads;
+      await evaluate(`document.querySelector('#depot-read-root button[data-range="1w"]').click();true`);
+      assert.equal(server.metrics().depotReads,rangeReads,'range selection reuses the stored Pionex series');
+      assert.equal(await evaluate(`document.querySelectorAll('#depot-read-root svg circle').length`),3);
+      server.setMode('mixed');await refresh();await waitUntil(async()=>await readState()==='fresh');
+      assert.equal(await evaluate(`document.querySelector('#depot-read-root svg')===null`),true,'mixed venue history is never shown as Pionex');
+      server.setMode('historyError');await refresh();await waitUntil(async()=>await readState()==='fresh');
+      assert.equal(await evaluate(`document.querySelector('#depot-read-root svg')===null`),true,'history failure clears the previous chart');
+      assert.match(await evaluate(`document.querySelector('#depot-read-root .depot-total').textContent`),/3.450/,'history failure preserves independent current Pionex valuation');
       assert.match(await evaluate(`document.querySelector('#command-portfolio .portfolio-description').textContent`),/Pionex/);
       server.setMode('error');await refresh();await waitUntil(async()=>await readState()==='unavailable');
       assert.equal(await evaluate(`document.querySelector('#depot-read-root .depot-total')===null`),true);

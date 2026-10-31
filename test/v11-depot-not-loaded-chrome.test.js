@@ -40,7 +40,7 @@ test('V11 Depot Chrome: central unlock shows not-loaded on both surfaces without
           await call('Input.dispatchKeyEvent',{type:'keyDown',key:name,code,windowsVirtualKeyCode:keyCode,...(text?{text,unmodifiedText:text}:{})});
           await call('Input.dispatchKeyEvent',{type:'keyUp',key:name,code,windowsVirtualKeyCode:keyCode});
         };
-        const counts={dashboard:0,prices:0,history:0};let failure=null;
+        const counts={dashboard:0,prices:0,history:0,pionexHistory:0};let failure=null;
         const cors=[{name:'Access-Control-Allow-Origin',value:'*'},{name:'Cache-Control',value:'no-store'}];
         call.onEvent('Fetch.requestPaused',event=>{void (async()=>{
           const url=event.request.url;
@@ -49,10 +49,10 @@ test('V11 Depot Chrome: central unlock shows not-loaded on both surfaces without
               {name:'Access-Control-Allow-Methods',value:'GET'},{name:'Access-Control-Allow-Headers',value:'authorization,accept'}]});
             return;
           }
-          const kind=url.includes('/api/private/dashboard')?'dashboard':url.includes('portfolio-history')?'history':url.includes('binance.vision')?'prices':null;
+          const kind=url.includes('/api/private/dashboard')?'dashboard':url.includes('portfolio-history')?'history':url.includes('pionex-history')?'pionexHistory':url.includes('binance.vision')?'prices':null;
           if(!kind)throw Error('unexpected request');
           counts[kind]++;
-          const body=kind==='prices'?[]:kind==='history'?{points:[]}:{};
+          const body=kind==='prices'?[]:kind==='history'||kind==='pionexHistory'?{points:[]}:{};
           await call('Fetch.fulfillRequest',{requestId:event.requestId,responseCode:200,
             responseHeaders:[...cors,{name:'Content-Type',value:'application/json'}],body:Buffer.from(JSON.stringify(body)).toString('base64')});
         })().catch(error=>{failure=error;});});
@@ -102,7 +102,7 @@ test('V11 Depot Chrome: central unlock shows not-loaded on both surfaces without
 
         await unlock();
         assert.equal(counts.dashboard+counts.prices,0,'unlock must not read Depot sources');
-        assert.equal(counts.history,1,'only the central verification request');
+        assert.equal(counts.history,1,'only the central verification request');assert.equal(counts.pionexHistory,0,'unlock must not read Pionex history');
         await showCommand();let s=await snap();
         assert.equal(s.command,'not_loaded');assert.match(s.commandText,/Noch nicht geladen/);assert.equal(s.overflow,false);assert.equal(s.overlap,false);
         await shot('command-not-loaded');
@@ -121,9 +121,8 @@ test('V11 Depot Chrome: central unlock shows not-loaded on both surfaces without
         await call('Input.dispatchKeyEvent',{type:'keyUp',key:'Tab',code:'Tab',windowsVirtualKeyCode:9,modifiers:8});
         assert.equal(await evaluate("document.activeElement.textContent"),'Depot aktualisieren','Shift+Tab returns to refresh');
         await key('Enter','Enter',13);
-        for(let i=0;i<200&&counts.dashboard<1;i++)await sleep(25);
-        await sleep(100);
-        assert.equal(counts.dashboard,1);assert.equal(counts.prices,0);assert.equal(counts.history,1);
+        for(let i=0;i<200&&(await snap()).depot==='loading';i++){if(failure)throw failure;await sleep(25);}
+        assert.equal(counts.dashboard,1);assert.equal(counts.prices,0);assert.equal(counts.history,1);assert.equal(counts.pionexHistory,1,'one separate history read per manual refresh');
         s=await snap();
         assert.equal(s.depot,'unavailable');assert.match(s.depotText,/Nicht verfügbar/);
         assert.match(s.depotText,/Aktuell: unvollständig/);assert.match(s.depotText,/Pionex-Verlauf/);assert.doesNotMatch(s.depotText,/Ledger|OKX/);
@@ -140,7 +139,7 @@ test('V11 Depot Chrome: central unlock shows not-loaded on both surfaces without
         await unlock();await showDepot();s=await snap();
         assert.equal(s.depot,'not_loaded');assert.equal(s.command,'not_loaded');
         assert.doesNotMatch(s.depotText,/unvollständig/);
-        assert.equal(counts.dashboard,1);assert.equal(counts.prices,0,'re-unlock must not read Depot sources');
+        assert.equal(counts.dashboard,1);assert.equal(counts.pionexHistory,1,'re-unlock must not read Pionex history');assert.equal(counts.prices,0,'re-unlock must not read Depot sources');
         if(failure)throw failure;
         return {width:size.width,height:size.height,counts};
       },size.height);

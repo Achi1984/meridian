@@ -26,7 +26,7 @@ export async function ensurePionexHistorySchema(db){
     value_usd DOUBLE PRECISION NOT NULL CHECK(value_usd>=0), source TEXT NOT NULL,
     authority_version TEXT NOT NULL, source_revision INTEGER NULL,
     UNIQUE(source_at,source))`);
-  await db.query('CREATE INDEX IF NOT EXISTS meridian_pionex_history_capture_idx ON meridian_pionex_history(captured_at)');
+  await db.query('CREATE INDEX IF NOT EXISTS meridian_pionex_history_source_idx ON meridian_pionex_history(source_at,id)');
 }
 export async function appendPionexHistory(db,data,opts={}){
   if(!db)return {ok:false,reason:'NO_DATABASE'};
@@ -41,12 +41,15 @@ export async function readPionexHistory(db,opts={}){
   const now=Number.isFinite(opts.now)?opts.now:Date.now(),rangeMs=Math.min(7*86400000,Math.max(3600000,Number(opts.rangeMs)||86400000));
   const envelope={version:PIONEX_HISTORY_VERSION,source:'POSTGRES_PIONEX_HISTORY',scope:'PIONEX',currency:'USD/USDT',generatedAt:new Date(now).toISOString(),rangeMs,points:[],excludedPoints:0};
   if(!db)return {...envelope,source:'NO_DATABASE'};
-  const r=await db.query(`SELECT captured_at,source_at,value_usd,source,authority_version,source_revision FROM meridian_pionex_history
-    WHERE captured_at>=to_timestamp($1/1000.0) AND captured_at<=to_timestamp($2/1000.0)
-    ORDER BY captured_at ASC,id ASC LIMIT 2200`,[now-rangeMs,now]);
+  const r=await db.query(`SELECT captured_at,source_at,value_usd,source,authority_version,source_revision FROM (
+    SELECT id,captured_at,source_at,value_usd,source,authority_version,source_revision FROM meridian_pionex_history
+    WHERE source_at>=to_timestamp($1/1000.0) AND source_at<=to_timestamp($2/1000.0)
+      AND captured_at<=to_timestamp($2/1000.0)
+    ORDER BY source_at DESC,id DESC LIMIT 2200
+    ) recent ORDER BY source_at ASC,id ASC`,[now-rangeMs,now]);
   for(const row of r.rows){
     const p={timestamp:time(row.captured_at instanceof Date?row.captured_at.toISOString():row.captured_at),sourceAt:time(row.source_at instanceof Date?row.source_at.toISOString():row.source_at),valueUsd:number(row.value_usd),source:row.source,authorityVersion:row.authority_version,scope:'PIONEX',currency:'USD/USDT'};
-    if(pionexHistoryPointValid(p)&&p.timestamp>=now-rangeMs&&p.timestamp<=now)envelope.points.push(p);else envelope.excludedPoints++;
+    if(pionexHistoryPointValid(p)&&p.sourceAt>=now-rangeMs&&p.sourceAt<=now&&p.timestamp<=now)envelope.points.push(p);else envelope.excludedPoints++;
   }
   return envelope;
 }

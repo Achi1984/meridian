@@ -4,7 +4,7 @@ This draft has executable integration hooks. Merging/deploying it activates pers
 
 ## Effects after approved deployment
 
-The existing five-minute portfolio capture loop (same scheduler and settings) creates `meridian_pionex_history` and its captured-time index with CREATE IF NOT EXISTS. It stores one observation per `(source_at, source)` from the already loaded private dashboard state before the existing public-price fetch. No new provider request, credential, scheduler, workflow, trading action, or private-state mutation is introduced. The existing aggregate table and its full-authority gate remain unchanged. Failure of the new write does not suppress the existing aggregate attempt.
+The existing five-minute portfolio capture loop (same scheduler and settings) creates `meridian_pionex_history` and its source-time index with CREATE IF NOT EXISTS. It stores one observation per `(source_at, source)` from the already loaded private dashboard state before the existing public-price fetch. No new provider request, credential, scheduler, workflow, trading action, or private-state mutation is introduced. The existing aggregate table and its full-authority gate remain unchanged. Failure of the new write does not suppress the existing aggregate attempt.
 
 Each row has capture time, source time, Pionex value, source identity, authority version, and optional private revision. No aggregate values or old historical rows are copied. Null, malformed, stale (>15 minutes), and future source observations are rejected; exact zero is accepted. Same-source-time conflicts retain the first stored observation rather than adding apparent measurements. A newer source observation with an unchanged value remains a real point. No retention/deletion job is added.
 

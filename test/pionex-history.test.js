@@ -27,6 +27,20 @@ test('read rejects incomplete provenance rather than zero filling',async()=>{
  const result=await readPionexHistory({query:async()=>({rows:[row,{...row,value_usd:null},{...row,source_at:null}]})},{now});
  assert.equal(result.points.length,1);assert.equal(result.excludedPoints,2);
 });
+test('history read selects the latest bounded observations by source time and rejects out-of-window sources',async()=>{
+ const p=pionexHistorySnapshot(data(),now),start=now-3600000;
+ const row={captured_at:new Date(start+1000),source_at:new Date(start),value_usd:'123',source:p.source,authority_version:p.authorityVersion};
+ let statement,parameters;
+ const result=await readPionexHistory({query:async(sql,args)=>{statement=sql;parameters=args;return {rows:[
+   {...row,source_at:new Date(start-1)},row,
+   {...row,source_at:new Date(now),captured_at:new Date(now+1)}
+ ]};}},{now,rangeMs:3600000});
+ assert.deepEqual(parameters,[start,now]);
+ assert.match(statement,/WHERE source_at>=/);
+ assert.match(statement,/ORDER BY source_at DESC,id DESC LIMIT 2200\s*\) recent ORDER BY source_at ASC,id ASC/);
+ assert.equal(result.points.length,1);assert.equal(result.points[0].sourceAt,start);
+ assert.equal(result.excludedPoints,2);
+});
 test('empty/single/constant histories, real source time and gap boundaries',()=>{
  assert.equal(buildPionexHistoryModel(payload([]),{now}).status,'empty');
  const p=at=>pionexHistorySnapshot(data(0,at),at+1000);
