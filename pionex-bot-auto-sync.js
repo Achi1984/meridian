@@ -153,11 +153,21 @@ function reliableUsdInvestment(d){
   }
   return null;
 }
+function firstOptionalPnlNumber(d,keys){
+  for(const key of keys){
+    const value=d?.[key];
+    if(typeof value!=='number'&&typeof value!=='string')continue;
+    if(typeof value==='string'&&value.trim()==='')continue;
+    const parsed=Number(value);
+    if(Number.isFinite(parsed))return parsed;
+  }
+  return null;
+}
 function optionalPnl(d){
-  return firstNum(d,['totalProfitUsd','totalProfitUSDT','pnlUsd','unrealizedPnlUsd','floatingProfitUsd']);
+  return firstOptionalPnlNumber(d,['totalProfitUsd','totalProfitUSDT','pnlUsd','unrealizedPnlUsd','floatingProfitUsd']);
 }
 function optionalPnlPct(d){
-  return firstNum(d,['totalProfitPct','pnlPct','profitPct']);
+  return firstOptionalPnlNumber(d,['totalProfitPct','pnlPct','profitPct']);
 }
 
 export function normalizePionexBotOrder(order){

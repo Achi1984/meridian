@@ -40,6 +40,29 @@ test('Pionex selects newer direct authority over an older wallet and accepts zer
   p.data.pionexAccount.updatedAt=iso(NOW-1000);p.data.pionexAccount.wallet.totalInUsdt=0;
   assert.equal(buildCurrentDepotModel(p,options()).tradingUsd,0);
 });
+test('obsolete invalid direct Pionex source cannot shadow the fresh selected wallet',()=>{
+  for(const change of [p=>p.pionexEquitySource='FALLBACK_SCREENSHOT',p=>p.pionexEquityUpdatedAt='invalid',p=>p.pionexEquityUsd=true]){
+    const p=fixture();change(p.data.portfolio);
+    p.data.pionexAccount={walletStatus:'OK',updatedAt:iso(NOW-1000),wallet:{totalInUsdt:40}};
+    p.data.pionexAccountSync={status:'OK'};
+    const m=buildCurrentDepotModel(p,options());
+    assert.equal(m.status,'FRESH_SNAPSHOT');assert.equal(m.tradingUsd,40);assert.equal(m.totalUsd,290);
+  }
+});
+test('selected invalid direct Pionex authority is still rejected and missing venues remain incomplete',()=>{
+  for(const change of [p=>p.pionexEquitySource='FALLBACK_SCREENSHOT',p=>p.pionexEquityUsd=true,
+    p=>p.pionexEquityUsd='01',p=>p.pionexEquityUpdatedAt='2026-10-13T24:00:00Z']){
+    const p=fixture();change(p.data.portfolio);
+    p.data.pionexAccount={walletStatus:'OK',updatedAt:iso(NOW-50000),wallet:{totalInUsdt:40}};
+    p.data.pionexAccountSync={status:'OK'};
+    unknown(buildCurrentDepotModel(p,options()));
+  }
+  const p=fixture();p.data.portfolio.pionexEquitySource='FALLBACK_SCREENSHOT';
+  p.data.pionexAccount={walletStatus:'OK',updatedAt:p.data.portfolio.pionexEquityUpdatedAt,wallet:{totalInUsdt:40}};
+  p.data.pionexAccountSync={status:'OK'};
+  assert.equal(buildCurrentDepotModel(p,options()).tradingUsd,40);
+  p.data.portfolio.manualVenueBalances=[];unknown(buildCurrentDepotModel(p,options()));
+});
 test('all selected source deadlines are enforced, with no provenance from request time',()=>{
   for(const mutate of [p=>p.data.portfolio.pionexEquityUpdatedAt=iso(NOW-900001),
     p=>p.data.portfolio.manualVenueBalances[0].updatedAt=iso(NOW-86400001)]){

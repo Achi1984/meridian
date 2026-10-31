@@ -1,7 +1,7 @@
 // Inactive component: mount explicitly with the existing read-client factory.
 // No network, credentials, storage or engine imports belong to this renderer.
-import {buildBotOverviewModel} from './bot-overview-model.js?v=B16-M11-RELEASE1';
-import {subscribeDepotPortfolio} from './depot-portfolio-state.js?v=B16-M11-RELEASE1';
+import {buildBotOverviewModel} from './bot-overview-model.js?v=B16-M11-FIX1';
+import {subscribeDepotPortfolio} from './depot-portfolio-state.js?v=B16-M11-FIX1';
 
 const LABELS = {
   locked: ['Gesperrt', 'App mit Meridian-Passwort öffnen, dann Bots manuell aktualisieren.'],
@@ -211,7 +211,17 @@ export function renderBotReadState(root, state, filters = {}) {
     if (!data.count) details.append(element(document,'p',EMPTY_SNAPSHOT));
     else if (!data.bots.length) details.append(element(document,'p','Keine Bots entsprechen den Filtern.'));
     else {
+      const disclosureControls=element(document,'div'),expandAll=element(document,'button','Alle aufklappen'),collapseAll=element(document,'button','Alle zuklappen');
+      disclosureControls.className='bot-disclosure-controls';
+      expandAll.setAttribute('type','button');collapseAll.setAttribute('type','button');
+      expandAll.setAttribute('aria-label','Alle angezeigten Bots aufklappen');
+      collapseAll.setAttribute('aria-label','Alle angezeigten Bots zuklappen');
+      disclosureControls.append(expandAll,collapseAll,element(document,'p','Gilt für die aktuell angezeigten Bots.'));
+      details.append(disclosureControls);
       const list=element(document,'ul');list.className='bot-card-list';
+      const disclosures=[];
+      expandAll.addEventListener('click',()=>disclosures.forEach(set=>set(true)));
+      collapseAll.addEventListener('click',()=>disclosures.forEach(set=>set(false)));
       list.setAttribute('aria-label','Bots im aktuellen Snapshot');
       const referenceTail=ref=>{
         let length=Math.min(6,ref.length);
@@ -224,11 +234,11 @@ export function renderBotReadState(root, state, filters = {}) {
         card.className='bot-card';
         card.id='bot-card-'+bot.ref;
         if(region.expanded.has(bot.ref))card.setAttribute('open','');
-        summary.setAttribute('aria-label',bot.symbol+' · '+bot.side+' · Hebel '+
+        const summaryLabel=bot.symbol+' · '+bot.side+' · Hebel '+
           (bot.leverage===MISSING?'—':bot.leverage)+' · P/L laut Quelle '+bot.pnl+' · Kapital '+
           bot.investment+(bot.takeProfitSummary?' · '+(bot.takeProfitSummary==='⚠ TP ≠ obere Range'
             ?'Warnung: TP weicht von oberer Range ab':'TP nicht prüfbar'):'')+
-          ' · ID-Ende '+referenceTail(bot.ref)+' · Details anzeigen');
+          ' · ID-Ende '+referenceTail(bot.ref);
         const top=element(document,'span');top.className='bot-card-top';
         const identity=element(document,'span');identity.className='bot-card-identity';
         const heading=element(document,'span',bot.symbol);heading.className='bot-card-heading';
@@ -253,9 +263,24 @@ export function renderBotReadState(root, state, filters = {}) {
         tpSummary.setAttribute('aria-label',bot.takeProfitSummary==='⚠ TP ≠ obere Range'
           ?'Warnung: TP weicht von oberer Range ab':'TP nicht prüfbar');
         if(bot.takeProfitSummary)capital.append(tpSummary);
-        const disclosure=element(document,'span','Details');disclosure.className='bot-card-disclosure';
+        const disclosure=element(document,'span');disclosure.className='bot-card-disclosure';
+        const disclosureLabel=element(document,'span');
         const chevron=element(document,'span','⌄');chevron.setAttribute('aria-hidden','true');
-        disclosure.append(chevron);
+        disclosure.append(disclosureLabel,chevron);
+        const syncDisclosure=()=>{
+          const open=card.getAttribute('open')!==null;
+          disclosureLabel.textContent=open?'Zuklappen':'Aufklappen';
+          summary.setAttribute('aria-label',summaryLabel+' · '+disclosureLabel.textContent);
+          if(details.contains(card)){
+            if(open)region.expanded.add(bot.ref);else region.expanded.delete(bot.ref);
+          }
+        };
+        const setDisclosure=open=>{
+          if(open)card.setAttribute('open','');else card.removeAttribute('open');
+          syncDisclosure();
+        };
+        card.addEventListener('toggle',syncDisclosure);
+        syncDisclosure();disclosures.push(setDisclosure);
         summary.append(top,capital,disclosure);
         const body=element(document,'div');body.className='bot-card-body';
         body.append(element(document,'p','Technische Referenz: '+bot.ref));
@@ -292,6 +317,10 @@ export function renderBotReadState(root, state, filters = {}) {
           reason.className='bot-tp-status-reason';body.append(reason);
         }
         body.append(element(document,'p','Preisgrenzen und TP/SL: Einheit von der Quelle nicht ausgewiesen. P/L kann je nach Quelle Gesamt- oder offenen Gewinn enthalten.'),metrics,element(document,'p','Nicht verfügbar: Die Quelle liefert keinen eindeutig bestätigten Wert. Auch Nullwerte bleiben unbestätigt, weil sie fehlende Angaben bedeuten können. Grid-Gewinn und Risikopuffer sind im Snapshot nicht enthalten. Fehlende TP/SL-Werte bestätigen keine deaktivierten Schutzaufträge.'));
+        const close=element(document,'button','Bot zuklappen');close.setAttribute('type','button');
+        close.setAttribute('aria-label',bot.symbol+' · '+bot.side+' · ID-Ende '+referenceTail(bot.ref)+' zuklappen');
+        close.addEventListener('click',()=>{setDisclosure(false);summary.focus();});
+        body.append(close);
         card.append(summary,body);item.append(card);list.append(item);
       }
       details.append(list);
@@ -300,7 +329,13 @@ export function renderBotReadState(root, state, filters = {}) {
   return data.status;
 }
 
-export function renderCommandBotOverview(root, data, onJump) {
+export function renderCommandBotOverview(root, data, onJump, statusRoot=null) {
+  if(statusRoot){
+    const confirmed=data.status==='fresh'&&Number.isSafeInteger(data.count)&&data.count>=0;
+    statusRoot.textContent=confirmed?data.count+' Bots im Snapshot':
+      (Object.hasOwn(LABELS,data.status)?LABELS[data.status]:LABELS.unavailable)[0];
+    if(data.status==='fresh'&&!confirmed)statusRoot.textContent=LABELS.unavailable[0];
+  }
   if (!root) return;
   const document=root.ownerDocument;
   root.setAttribute('data-state',data.status);

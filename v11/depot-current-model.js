@@ -67,11 +67,14 @@ export function buildCurrentDepotModel(payload,{tickers,tickersAt,now=Date.now()
     const portfolio={holdings:usedHoldings,manualVenueBalances:balances,authorityMode:'STRICT_VENUE_SNAPSHOT',
       externalVenueSnapshotComplete:true,externalVenueExpectedVenues:ledgerActive?['OKX']:['Ledger','OKX'],
       requiredHoldingVenues:ledgerActive?['Ledger']:[]};
+    // Select authority before validating the direct candidate: obsolete direct
+    // metadata must not veto an independently fresh wallet. The internal tag
+    // identifies that candidate without trusting its supplied source label.
+    const directCandidate='M11_DIRECT_PIONEX_CANDIDATE';
     if(!missing(p.pionexEquityUsd)){
-      need(amount(p.pionexEquityUsd));
-      portfolio.pionexEquityUsd=decimal(p.pionexEquityUsd);
-      portfolio.pionexEquityUpdatedAt=iso(stamp(p.pionexEquityUpdatedAt,now));
-      portfolio.pionexEquitySource=source(p.pionexEquitySource,'PRIVATE_PORTFOLIO_SNAPSHOT');
+      portfolio.pionexEquityUsd=p.pionexEquityUsd;
+      portfolio.pionexEquityUpdatedAt=p.pionexEquityUpdatedAt;
+      portfolio.pionexEquitySource=directCandidate;
     }
     let account;
     if(data.pionexAccount?.walletStatus==='OK'&&data.pionexAccountSync?.status==='OK'){
@@ -84,6 +87,11 @@ export function buildCurrentDepotModel(payload,{tickers,tickersAt,now=Date.now()
     if(!pionex.found){
       const stale=pionex.reason==='WALLET_STALE_OR_UNTIMED'||pionex.reason==='PRIVATE_STALE_OR_UNTIMED';
       need(false,stale?'STALE':'CURRENT_SOURCE_INCOMPLETE');
+    }
+    if(pionex.source===directCandidate){
+      need(amount(p.pionexEquityUsd));
+      pionex.updatedAt=iso(stamp(p.pionexEquityUpdatedAt,now));
+      pionex.source=source(p.pionexEquitySource,'PRIVATE_PORTFOLIO_SNAPSHOT');
     }
     const pionexTime=stamp(pionex.updatedAt,now);
     // Replace the direct candidate with the actual authoritative choice before summing.

@@ -741,15 +741,51 @@ const commandPresentationDeltas=[
 ];
 const b16ReleaseDeltas=[[">11 · Vorschau B15<small>", ">11 · Vorschau B16<small>"], ["Diese Vorschau · B15:</b> Kompakte Bot-Karten und Command-Zeilen; synthetische Darstellungstests, keine Betriebsfreigabe.", "Diese Vorschau · B16:</b> Wallet-Abdeckung und bestätigte Futures-Grid-Daten getrennt; TP-Status mit oberer Grid-Grenze verglichen. Rein lesend, keine Handelsfreigabe."]];
 const b16ReleaseHistoryRow="        <li><strong>Meridian 11 · B16</strong><span class=\"version-status\">Vorschau</span><p>Wallet-Abdeckung und bestätigte Futures-Grid-Daten werden getrennt erklärt. Bot-Karten zeigen den prüfbaren TP-Status und Abweichungen zur oberen Grid-Grenze. Ohne zuverlässige Quelldaten erscheint „TP nicht prüfbar“. Rein lesend: keine TP-Änderung oder Handelsfreigabe.</p></li>\n";
+const b16HeaderLayoutDeltas=[
+  [
+    "    @media(max-width:350px){.header-inner{gap:8px}.version-toggle{padding:6px 8px}}\n    .container{max-width:var(--container);margin:0 auto;padding:18px 16px calc(100px + var(--safe-bottom))}\n",
+    "    .container{max-width:var(--container);margin:0 auto;padding:18px 16px calc(100px + var(--safe-bottom))}\n"
+  ],
+  [
+    "    .bot-read-view .bot-card[open] summary .bot-card-disclosure span{transform:rotate(45deg)}\n",
+    "    .bot-read-view .bot-card[open] summary .bot-card-disclosure span:last-child{transform:rotate(45deg)}\n"
+  ],
+  [
+    "    .bot-card-disclosure span{font-size:18px;line-height:1;transition:transform .18s ease}\n",
+    "    .bot-card-disclosure span:last-child{font-size:18px;line-height:1;transition:transform .18s ease}\n"
+  ],
+  [
+    "    @media(max-width:350px){.header-inner{flex-wrap:wrap}.header-actions{margin-left:auto}.app-access-card{padding:18px}}\n    @media(max-width:350px){.header-inner{flex-wrap:nowrap}.identity{gap:6px}.mark{width:32px;height:32px}.brand{font-size:12px}.brand small{display:none}.header-actions{gap:4px}.version-toggle{padding:4px;font-size:10px;letter-spacing:0}.version-toggle small{display:none}}\n",
+    "    @media(max-width:350px){.app-access-card{padding:18px}}\n"
+  ],
+  [
+    "    /* B10: compact preview chrome and keep the validated portfolio first. */\n    .topbar{padding-top:calc(8px + env(safe-area-inset-top,0px));padding-bottom:8px}\n    .topbar{padding-left:max(16px,calc((100% - var(--container))/2));padding-right:max(16px,calc((100% - var(--container))/2))}\n    .header-inner{gap:8px}\n    .identity{gap:8px}\n    .mark{width:32px;height:32px;border-radius:10px;font-size:20px}\n    .brand{font-size:16px}\n    .terminal-entry{margin-top:8px}\n",
+    "    .bot-disclosure-controls{display:flex;flex-wrap:wrap;gap:8px}\n    .bot-disclosure-controls>p{flex-basis:100%;margin:0}\n    /* B16: separate identity, actions and status with room for mobile safe areas. */\n    .topbar{padding-top:calc(20px + env(safe-area-inset-top,0px));padding-bottom:16px;padding-left:max(16px,env(safe-area-inset-left,0px),calc((100% - var(--container))/2));padding-right:max(16px,env(safe-area-inset-right,0px),calc((100% - var(--container))/2))}\n    .header-inner{gap:16px}\n    .header-actions{gap:12px}\n    .version-toggle{padding:8px 12px}\n    .terminal-entry{margin-top:12px}\n    @media(max-width:600px){\n      .header-inner{flex-direction:column;align-items:stretch;gap:16px}\n      .identity{gap:11px}\n      .header-actions{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px}\n      .version-toggle{white-space:normal;font-size:12px}\n      .version-toggle small{display:block;font-size:11px;margin-top:3px}\n      .app-access-lock{padding:10px 16px}\n      .strategy-entry-link{width:100%;min-height:48px}\n      .topbar .autonomy-strip{margin-top:12px}\n      .topbar .autonomy-strip>summary{padding:12px;min-height:48px}\n    }\n"
+  ]
+];
+const b16CorrectionMarkupDeltas=[
+  ["","    @media(max-width:600px){.bot-card summary{grid-template-columns:minmax(0,1fr);grid-template-areas:\"top\" \"capital\" \"disclosure\"}.bot-card-disclosure{justify-self:end}}\n"],
+  ['<strong>BOTS</strong><span>Unbekannt</span>','<strong>BOTS</strong><span id="command-bots-status">Unbekannt</span>'],
+  ['Diese Datenquelle enthält keine einzelnen Positionen. Bestände und Verteilung bleiben nicht verfügbar.',
+   'Einzelne Bestände und ihre Verteilung werden in dieser Ansicht noch nicht angezeigt.']
+];
+function restoreB16Corrections(source){
+  for(const [before,after] of [...b16HeaderLayoutDeltas,...b16CorrectionMarkupDeltas]){
+    assert.equal(source.split(after).length-1,1,'one exact B16 header layout delta');
+    source=source.replace(after,before);
+  }
+  return source;
+}
 function restoreB2(source){
+  source=restoreB16Corrections(source);
   assert.equal(source.split(b16ReleaseHistoryRow).length-1,1,'one B16 release history row');
   source=source.replace(b16ReleaseHistoryRow,'');
   for(const [before,after] of b16ReleaseDeltas){
     assert.equal(source.split(after).length-1,1,'one exact B16 release metadata delta');
     source=source.replace(after,before);
   }
-  assert.equal(source.split('?v=B16-M11-RELEASE1').length-1,5,'five B16 release entrypoints');
-  source=source.replaceAll('?v=B16-M11-RELEASE1','?v=B17-M11');
+  assert.equal(source.split('?v=B16-M11-FIX1').length-1,5,'five B16 release entrypoints');
+  source=source.replaceAll('?v=B16-M11-FIX1','?v=B17-M11');
   for(const addition of [
     '  <link rel="stylesheet" href="../public/css/m11-agent-status.css">\n',
     '        <div id="agent-status-root" role="status" aria-live="polite">Keine verifizierten Statusdaten.</div>\n',
@@ -824,7 +860,7 @@ function restoreB2(source){
 test('Terminal öffnen preserves the reviewed history-close baseline and stays outside version history',()=>{
   const html=restoreB2(globalHtml);
   assert.equal(globalHtml.split(compactBotsMarkup).length-1,1,'one compact Bots section');
-  assert.equal(globalHtml.split(botPresentationCssAfter).length-1,1,'one exact compact-card CSS block');
+  assert.equal(restoreB16Corrections(globalHtml).split(botPresentationCssAfter).length-1,1,'one exact compact-card CSS block before explicit B16 deltas');
   assert.equal(css.trimEnd(),html.match(/    \/\* Fixed packet A:[\s\S]*?    \.terminal-entry-link:focus-visible\{[^\n]*\}\n/)?.[0]?.trimEnd());
   assert.equal(html.split(entry).length-1,1);
   const anchor=[...html.matchAll(/<a\b[^>]*class="terminal-entry-link"[^>]*>[\s\S]*?<\/a>/g)];
@@ -886,7 +922,7 @@ function deploymentServer(){
   const server=createServer((request,response)=>{
     const url=new URL(request.url,'http://127.0.0.1'),path=url.pathname;
     requests.push({method:request.method,path}); // never record headers or token values
-    const versionedModule=path.startsWith('/meridian/v11/')&&moduleNames.includes(path.slice('/meridian/v11/'.length))&&url.search==='?v=B16-M11-RELEASE1';
+    const versionedModule=path.startsWith('/meridian/v11/')&&moduleNames.includes(path.slice('/meridian/v11/'.length))&&url.search==='?v=B16-M11-FIX1';
     if(request.method!=='GET'||(url.search&&!versionedModule)){response.writeHead(404);response.end();return;}
     if(path===authEndpoint){
       authReads++;
@@ -931,7 +967,7 @@ function deploymentServer(){
     if(path!=='/meridian/v11/'&&path!=='/meridian/v10/'){response.writeHead(404);response.end();return;}
     const preview=path==='/meridian/v11/';
     const origin='http://127.0.0.1:'+server.address().port;
-    const scriptSource=preview?`'sha256-${scriptHash}' `+[...modules.keys()].map(path=>origin+path+(path.startsWith('/meridian/v11/')?'?v=B16-M11-RELEASE1':'')).join(' '):"'none'";
+    const scriptSource=preview?`'sha256-${scriptHash}' `+[...modules.keys()].map(path=>origin+path+(path.startsWith('/meridian/v11/')?'?v=B16-M11-FIX1':'')).join(' '):"'none'";
     const policy=`default-src 'none'; script-src ${scriptSource}; style-src 'unsafe-inline'${preview?' '+origin+statusCssPath:''}; connect-src ${preview?origin+endpoint+' '+origin+depotEndpoint+' '+origin+currentEndpoint+' '+origin+priceEndpoint+' '+origin+authEndpoint+' '+origin+'/meridian/docs/strategy-lab/campaign-20261013.json':"'none'"}; worker-src 'none'; child-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'none'`;
     policies.set(path,policy);
     response.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Content-Security-Policy':policy});response.end(preview?html:terminal);
@@ -952,11 +988,11 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     const start=server.base+'v11/';
     const page=await fetch(start);
     assert.equal(page.status,200);
-    const catalogUrl=new URL('strategy-catalog.js?v=B16-M11-RELEASE1',start);
+    const catalogUrl=new URL('strategy-catalog.js?v=B16-M11-FIX1',start);
     const catalog=await fetch(catalogUrl);
     assert.equal(catalog.status,200);
     const source=await catalog.text();
-    const imported=source.match(/from ['"](\.\/research-evidence\.js\?v=B16-M11-RELEASE1)['"]/);
+    const imported=source.match(/from ['"](\.\/research-evidence\.js\?v=B16-M11-FIX1)['"]/);
     assert.ok(imported,'catalog imports the read-only evidence module');
     const dependency=new URL(imported[1],catalogUrl);
     const response=await fetch(dependency);
@@ -966,9 +1002,9 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     const scriptPolicy=page.headers.get('content-security-policy').split(';').find(part=>part.trim().startsWith('script-src '));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(dependency.href),'exact dependency URL must be in script-src');
     assert.equal(server.allowedPaths.has(dependency.pathname),true);
-    const arenaUrl=new URL('strategy-arena.js?v=B16-M11-RELEASE1',start);
+    const arenaUrl=new URL('strategy-arena.js?v=B16-M11-FIX1',start);
     const arenaSource=await (await fetch(arenaUrl)).text();
-    const inspectionImport=arenaSource.match(/from ['"](\.\/arena-inspection-report\.js\?v=B16-M11-RELEASE1)['"]/);
+    const inspectionImport=arenaSource.match(/from ['"](\.\/arena-inspection-report\.js\?v=B16-M11-FIX1)['"]/);
     assert.ok(inspectionImport,'Arena imports the metadata-only report adapter');
     const inspectionUrl=new URL(inspectionImport[1],arenaUrl);
     const inspection=await fetch(inspectionUrl);
@@ -977,7 +1013,7 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     assert.equal(await inspection.text(),readFileSync(new URL('../v11/arena-inspection-report.js',import.meta.url),'utf8'));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(inspectionUrl.href));
     assert.equal(server.allowedPaths.has(inspectionUrl.pathname),true);
-    const historicalImport=arenaSource.match(/from ['"](\.\/arena-historical-result\.js\?v=B16-M11-RELEASE1)['"]/);
+    const historicalImport=arenaSource.match(/from ['"](\.\/arena-historical-result\.js\?v=B16-M11-FIX1)['"]/);
     assert.ok(historicalImport,'Arena imports the bounded historical fixture adapter');
     const historicalUrl=new URL(historicalImport[1],arenaUrl);
     const historical=await fetch(historicalUrl);
@@ -986,7 +1022,7 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     assert.equal(await historical.text(),readFileSync(new URL('../v11/arena-historical-result.js',import.meta.url),'utf8'));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(historicalUrl.href));
     assert.equal(server.allowedPaths.has(historicalUrl.pathname),true);
-    const producerImport=arenaSource.match(/from ['"](\.\/arena-historical-export\.js\?v=B16-M11-RELEASE1)['"]/);
+    const producerImport=arenaSource.match(/from ['"](\.\/arena-historical-export\.js\?v=B16-M11-FIX1)['"]/);
     assert.ok(producerImport,'Arena imports the bounded producer export adapter');
     const producerUrl=new URL(producerImport[1],arenaUrl);
     const producer=await fetch(producerUrl);
@@ -995,7 +1031,7 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     assert.equal(await producer.text(),readFileSync(new URL('../v11/arena-historical-export.js',import.meta.url),'utf8'));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(producerUrl.href),'exact producer dependency URL must be in script-src');
     assert.equal(server.allowedPaths.has(producerUrl.pathname),true);
-    const rendererImport=arenaSource.match(/from ['"](\.\/arena-result-view\.js\?v=B16-M11-RELEASE1)['"]/);
+    const rendererImport=arenaSource.match(/from ['"](\.\/arena-result-view\.js\?v=B16-M11-FIX1)['"]/);
     assert.ok(rendererImport,'Arena imports the isolated result renderer');
     const rendererUrl=new URL(rendererImport[1],arenaUrl);
     const renderer=await fetch(rendererUrl);
@@ -1005,8 +1041,8 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(rendererUrl.href),'exact renderer dependency URL must be in script-src');
     assert.equal(server.allowedPaths.has(rendererUrl.pathname),true);
     for(const [path,file,type] of [
-      ['agent-status-bootstrap.js?v=B16-M11-RELEASE1','v11/agent-status-bootstrap.js','javascript'],
-      ['agent-status-client.js?v=B16-M11-RELEASE1','v11/agent-status-client.js','javascript'],
+      ['agent-status-bootstrap.js?v=B16-M11-FIX1','v11/agent-status-bootstrap.js','javascript'],
+      ['agent-status-client.js?v=B16-M11-FIX1','v11/agent-status-client.js','javascript'],
       ['../public/js/m11-agent-status.js','public/js/m11-agent-status.js','javascript'],
       ['../public/css/m11-agent-status.css','public/css/m11-agent-status.css','css']
     ]){

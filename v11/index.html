@@ -46,7 +46,6 @@
     .version-history-list li{border-top:1px solid var(--line);padding-top:9px}
     .version-history-list strong{font-size:12px;color:var(--text)}
     .version-status{font-size:10px;color:#f0ca85;margin-left:6px;white-space:nowrap}
-    @media(max-width:350px){.header-inner{gap:8px}.version-toggle{padding:6px 8px}}
     .container{max-width:var(--container);margin:0 auto;padding:18px 16px calc(100px + var(--safe-bottom))}
     .view[hidden]{display:none!important}
     .view{animation:appear .16s ease-out}
@@ -187,7 +186,7 @@
     .bot-card summary::-webkit-details-marker{display:none}
     .bot-card summary::marker{content:""}
     .bot-read-view .bot-card[open] summary span:last-child{transform:none}
-    .bot-read-view .bot-card[open] summary .bot-card-disclosure span{transform:rotate(45deg)}
+    .bot-read-view .bot-card[open] summary .bot-card-disclosure span:last-child{transform:rotate(45deg)}
     .bot-card summary:focus-visible{outline:3px solid #53ddc0;outline-offset:-3px}
     .bot-card-top{grid-area:top;display:grid;grid-template-columns:minmax(0,1fr) minmax(92px,40%);gap:8px;align-items:center;min-width:0}
     .bot-card-identity{min-width:0}
@@ -200,7 +199,7 @@
     .bot-card-capital{grid-area:capital;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;min-width:0;font-size:12px;color:var(--muted)}
     .bot-card-capital strong{font-size:12px;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
     .bot-card-disclosure{grid-area:disclosure;display:inline-flex;align-items:center;justify-content:flex-end;gap:4px;min-width:44px;min-height:44px;padding-left:8px;color:#a9d4ff;font-size:12px;white-space:nowrap}
-    .bot-card-disclosure span{font-size:18px;line-height:1;transition:transform .18s ease}
+    .bot-card-disclosure span:last-child{font-size:18px;line-height:1;transition:transform .18s ease}
     .bot-card-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:8px;margin:10px 0}
     .bot-card-metrics>div,.bot-card-metrics dd{min-width:0;overflow-wrap:anywhere}
     .bot-card-metrics dt{font-size:12px;color:var(--muted)}
@@ -246,8 +245,7 @@
     .app-access-card button{width:100%;margin-top:12px;font-weight:700}
     .app-access-card :focus-visible,.app-access-lock:focus-visible{outline:3px solid #9bc9ff;outline-offset:3px}
     .header-actions{display:flex;align-items:center;gap:8px;flex:none}
-    @media(max-width:350px){.header-inner{flex-wrap:wrap}.header-actions{margin-left:auto}.app-access-card{padding:18px}}
-    @media(max-width:350px){.header-inner{flex-wrap:nowrap}.identity{gap:6px}.mark{width:32px;height:32px}.brand{font-size:12px}.brand small{display:none}.header-actions{gap:4px}.version-toggle{padding:4px;font-size:10px;letter-spacing:0}.version-toggle small{display:none}}
+    @media(max-width:350px){.app-access-card{padding:18px}}
     .depot-read-view .depot-total{font-size:28px;font-weight:750;line-height:1.3}
     .depot-read-view dl{display:grid;grid-template-columns:minmax(0,1fr);gap:6px}
     .depot-read-view dd{margin:0 0 12px;font-weight:650;overflow-wrap:anywhere}
@@ -257,14 +255,26 @@
     .depot-range button[aria-pressed="true"]{background:#1e3a5f;border-color:#93c5fd}
     .depot-history p{overflow-wrap:anywhere;font-size:14px}
     .bot-card-body{padding:0 14px 14px;border-top:1px solid #39516b}
-    /* B10: compact preview chrome and keep the validated portfolio first. */
-    .topbar{padding-top:calc(8px + env(safe-area-inset-top,0px));padding-bottom:8px}
-    .topbar{padding-left:max(16px,calc((100% - var(--container))/2));padding-right:max(16px,calc((100% - var(--container))/2))}
-    .header-inner{gap:8px}
-    .identity{gap:8px}
-    .mark{width:32px;height:32px;border-radius:10px;font-size:20px}
-    .brand{font-size:16px}
-    .terminal-entry{margin-top:8px}
+    @media(max-width:600px){.bot-card summary{grid-template-columns:minmax(0,1fr);grid-template-areas:"top" "capital" "disclosure"}.bot-card-disclosure{justify-self:end}}
+    .bot-disclosure-controls{display:flex;flex-wrap:wrap;gap:8px}
+    .bot-disclosure-controls>p{flex-basis:100%;margin:0}
+    /* B16: separate identity, actions and status with room for mobile safe areas. */
+    .topbar{padding-top:calc(20px + env(safe-area-inset-top,0px));padding-bottom:16px;padding-left:max(16px,env(safe-area-inset-left,0px),calc((100% - var(--container))/2));padding-right:max(16px,env(safe-area-inset-right,0px),calc((100% - var(--container))/2))}
+    .header-inner{gap:16px}
+    .header-actions{gap:12px}
+    .version-toggle{padding:8px 12px}
+    .terminal-entry{margin-top:12px}
+    @media(max-width:600px){
+      .header-inner{flex-direction:column;align-items:stretch;gap:16px}
+      .identity{gap:11px}
+      .header-actions{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px}
+      .version-toggle{white-space:normal;font-size:12px}
+      .version-toggle small{display:block;font-size:11px;margin-top:3px}
+      .app-access-lock{padding:10px 16px}
+      .strategy-entry-link{width:100%;min-height:48px}
+      .topbar .autonomy-strip{margin-top:12px}
+      .topbar .autonomy-strip>summary{padding:12px;min-height:48px}
+    }
     .autonomy-strip{max-width:var(--container);margin:8px auto 0;padding:0;border:1px solid #34465c;border-radius:12px;background:#101824;overflow-wrap:anywhere}
     .autonomy-strip>summary{min-height:44px;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;letter-spacing:0;line-height:1.4}
     .autonomy-strip>summary>span:first-child{min-width:0;overflow-wrap:anywhere}
@@ -426,7 +436,7 @@
         <p class="caption">Keine Schätzung, kein Ersatzwert und keine simulierte Performance.</p>
         <div class="trust-grid" aria-label="Datenquellenstatus">
           <div class="trust-cell"><strong>DEPOT</strong><span data-command-depot-status>Unbekannt</span></div>
-          <div class="trust-cell"><strong>BOTS</strong><span>Unbekannt</span></div>
+          <div class="trust-cell"><strong>BOTS</strong><span id="command-bots-status">Unbekannt</span></div>
           <div class="trust-cell"><strong>MARKT</strong><span>Unbekannt</span></div>
         </div>
       </section>
@@ -483,7 +493,7 @@
       </section>
       <section class="card card-muted" aria-labelledby="depot-holdings-heading">
         <h2 id="depot-holdings-heading">Deine Bestände</h2>
-        <p class="caption">Diese Datenquelle enthält keine einzelnen Positionen. Bestände und Verteilung bleiben nicht verfügbar.</p>
+        <p class="caption">Einzelne Bestände und ihre Verteilung werden in dieser Ansicht noch nicht angezeigt.</p>
       </section>
     </section>
     <section id="view-bots" class="view" aria-labelledby="bots-heading" hidden>
@@ -600,10 +610,10 @@
   }
 })();
 </script>
-<script type="module" src="./app-access-bootstrap.js?v=B16-M11-RELEASE1"></script>
-<script type="module" src="./bot-read-bootstrap.js?v=B16-M11-RELEASE1"></script>
-<script type="module" src="./depot-read-bootstrap.js?v=B16-M11-RELEASE1"></script>
-<script type="module" src="./strategy-workspace-bootstrap.js?v=B16-M11-RELEASE1"></script>
-<script type="module" src="./agent-status-bootstrap.js?v=B16-M11-RELEASE1"></script>
+<script type="module" src="./app-access-bootstrap.js?v=B16-M11-FIX1"></script>
+<script type="module" src="./bot-read-bootstrap.js?v=B16-M11-FIX1"></script>
+<script type="module" src="./depot-read-bootstrap.js?v=B16-M11-FIX1"></script>
+<script type="module" src="./strategy-workspace-bootstrap.js?v=B16-M11-FIX1"></script>
+<script type="module" src="./agent-status-bootstrap.js?v=B16-M11-FIX1"></script>
 </body>
 </html>
