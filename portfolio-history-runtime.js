@@ -56,6 +56,7 @@ export async function capturePortfolioHistoryOnce(opts={}){
   let pionexHistory;
   try{await ensurePionexHistorySchema(p);pionexHistory=await appendPionexHistory(p,current,{timestamp:opts.timestamp??clock()});}
   catch{pionexHistory={ok:false,reason:'PIONEX_HISTORY_CAPTURE_FAILED'};}
+  if(!pionexHistory.ok)console.error('[PIONEX_HISTORY]',pionexHistory.reason==='PIONEX_AUTHORITY_INCOMPLETE'?'PIONEX_AUTHORITY_INCOMPLETE':'PIONEX_HISTORY_CAPTURE_FAILED');
   let prices={},priceStatus='LIVE',priceReason=null,fetchSucceeded=true;
   try{prices=opts.fetchPrices?await opts.fetchPrices():opts.prices??await publicPrices()}catch(_e){priceStatus='STORED_PRICE_FALLBACK';priceReason='PRICE_FETCH_FAILED';fetchSucceeded=false;console.error('[PORTFOLIO_HISTORY] prices',priceReason)}
   if(!prices||typeof prices!=='object')prices={};

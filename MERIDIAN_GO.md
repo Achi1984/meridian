@@ -1,3 +1,24 @@
+> **Current delivery status — 2026-10-31, receipt cutoff 942/6548075649**
+> Observed main: `fb51293011fa923a6427705ccfd30d667310e773` (PR #1078).
+> PR #1076 is COMPLETE at `976be55b729edd3d67c22b304eb9b486ecf382ee`;
+> receipt [942/6546538434](https://github.com/Achi1984/meridian/issues/942#issuecomment-6546538434)
+> includes verified Pionex-only desktop acceptance, not real iPhone Safari acceptance.
+> PR #1077 at `073810c26441aa6bae6113f37cd1cd7162407e4c` has green postchecks;
+> [942/6547532817](https://github.com/Achi1984/meridian/issues/942#issuecomment-6547532817)
+> leaves live acceptance open after Cloud Browser transport timeouts. Private UI,
+> stored history points and schema privileges were not independently verified.
+> PR #1078 has green exact-merge postchecks at the observed main above;
+> [942/6548075649](https://github.com/Achi1984/meridian/issues/942#issuecomment-6548075649)
+> records candidate CI 3369/3369 and cumulative Claude GREEN 6547784536/6547541367.
+> Live acceptance remains open after Cloud Browser transport timeouts; no actual
+> live zero-bot or stored-history point is claimed. Next: complete the open live
+> acceptance and review the separate reliability source packet, not yet deployed.
+> Do not rerun passed CI to solve a browser transport problem.
+> Mailbox remains #942; routing, watchdog binding and authority flags are unchanged.
+> Older current-labeled blocks below are historical snapshots. Preserve their
+> failures, unknown results and authorization flags; they do not override this
+> bounded delivery summary. No private amounts or new activation authority.
+
 > **Continuity reconciliation — 2026-10-31 **
 > Current integration is PR1074 at `4c2631fa34ca07e95c3d0c04a388f078b99edf5f`.
 > PR1073 is COMPLETE (942/6541251700); PR1074 is COMPLETE

@@ -1,4 +1,4 @@
-import {DEPOT_WINDOWS} from './depot-history-model.js?v=B16-M11-FIX7';
+import {DEPOT_WINDOWS} from './depot-history-model.js?v=B16-M11-FIX8';
 export function createDepotHistoryView(root,{onRange,pionexOnly=false}={}){
   const money=x=>pionexOnly?new Intl.NumberFormat('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}).format(x)+' USD/USDT':new Intl.NumberFormat('de-DE',{style:'currency',currency:'USD'}).format(x);
   const name=pionexOnly?'Pionex-Verlauf':'Depotverlauf';
@@ -14,8 +14,10 @@ export function createDepotHistoryView(root,{onRange,pionexOnly=false}={}){
   function render(model,range='1d'){
     for(const b of buttons)b.setAttribute('aria-pressed',String(b.dataset.range===range));
     output.replaceChildren();
+    if(pionexOnly&&['ready','empty'].includes(model?.status)&&model.scope==='PIONEX'&&model.currency==='USD/USDT'&&model.truncated===true)
+      output.append(el('p','Begrenzter Verlauf: Dieser Abruf ist auf höchstens 2.200 der neuesten gespeicherten Messpunkte begrenzt. Ältere Punkte sind nicht enthalten.'));
     if(!model||model.status!=='ready'||pionexOnly&&(model.scope!=='PIONEX'||model.currency!=='USD/USDT')){
-      output.append(el('p',model?.status==='empty'?'Für diesen Zeitraum sind noch keine vollständigen Bewertungen gespeichert.':'Verlauf nicht verfügbar. Depot manuell aktualisieren.'));return;
+      output.append(el('p',model?.status==='empty'?(pionexOnly?'Noch keine Pionex-Verlaufspunkte im gewählten Zeitraum.':'Für diesen Zeitraum sind noch keine vollständigen Bewertungen gespeichert.'):'Verlauf nicht verfügbar. Depot manuell aktualisieren.'));return;
     }
     const vals=model.points.map(p=>p.totalUsd),low=Math.min(...vals),high=Math.max(...vals),span=high-low||Math.max(1,high*.01),base=high===low?low-span/2:low;
     const ns='http://www.w3.org/2000/svg',svg=d.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 320 174');svg.setAttribute('role','img');

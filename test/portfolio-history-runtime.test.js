@@ -5,6 +5,26 @@ import { SPOT_PRICE_AUTHORITY_MAX_AGE_MS } from '../portfolio-data-contract.js';
 import { canonicalHistoryPointComplete } from '../portfolio-history-store.js';
 
 const NOW=Date.parse('2026-10-28T04:00:00Z');
+test('Pionex capture failures emit one bounded reason without blocking aggregate capture or leaking errors',async()=>{
+ const original=console.error,sentinel='secret://db/provider/token?private=12345';
+ try{
+  for(const failureSql of ['CREATE TABLE IF NOT EXISTS meridian_pionex_history','CREATE INDEX IF NOT EXISTS meridian_pionex_history','INSERT INTO meridian_pionex_history']){
+   const logs=[],writes=[];console.error=(...parts)=>logs.push(parts.join(' '));
+   const db={query:async(sql,args)=>{writes.push(sql);if(sql.startsWith(failureSql))throw Error(sentinel);return {rows:[]};}};
+   const result=await capturePortfolioHistoryOnce({db,data:dataFor(),prices:{BTC:110},now:()=>NOW,timestamp:NOW});
+   assert.equal(result.ok,true);assert.equal(result.inserted,true);
+   assert.deepEqual(result.pionexHistory,{ok:false,reason:'PIONEX_HISTORY_CAPTURE_FAILED'});
+   assert.deepEqual(logs,['[PIONEX_HISTORY] PIONEX_HISTORY_CAPTURE_FAILED']);
+   assert.equal(writes.filter(sql=>sql.startsWith('INSERT INTO meridian_portfolio_history')).length,1);
+   assert.doesNotMatch(JSON.stringify(result)+logs.join(''),/secret:|token\?|12345/);
+  }
+  const logs=[];console.error=(...parts)=>logs.push(parts.join(' '));
+  const data=dataFor();data.portfolio.pionexEquityUsd=null;
+  const result=await capturePortfolioHistoryOnce({db:fakeDb(),data,prices:{BTC:110},now:()=>NOW,timestamp:NOW});
+  assert.equal(result.pionexHistory.reason,'PIONEX_AUTHORITY_INCOMPLETE');
+  assert.deepEqual(logs,['[PIONEX_HISTORY] PIONEX_AUTHORITY_INCOMPLETE']);
+ }finally{console.error=original;}
+});
 function dataFor(symbols=['BTC']){
   return{
     livePrices:Object.fromEntries(symbols.map(symbol=>[symbol,{price:100}])),

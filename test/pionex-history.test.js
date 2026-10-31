@@ -37,9 +37,24 @@ test('history read selects the latest bounded observations by source time and re
  ]};}},{now,rangeMs:3600000});
  assert.deepEqual(parameters,[start,now]);
  assert.match(statement,/WHERE source_at>=/);
- assert.match(statement,/ORDER BY source_at DESC,id DESC LIMIT 2200\s*\) recent ORDER BY source_at ASC,id ASC/);
+ assert.match(statement,/ORDER BY source_at DESC,id DESC LIMIT 2201\s*\) recent ORDER BY source_at ASC,id ASC/);
  assert.equal(result.points.length,1);assert.equal(result.points[0].sourceAt,start);
  assert.equal(result.excludedPoints,2);
+});
+
+test('history reports overflow while retaining only the latest 2200 observations',async()=>{
+ const p=pionexHistorySnapshot(data(),now);
+ const rows=Array.from({length:2201},(_,i)=>({captured_at:new Date(now-2200+i),source_at:new Date(now-2200+i),value_usd:i,source:p.source,authority_version:p.authorityVersion}));
+ for(const count of [0,1,2200,2201]){
+   const result=await readPionexHistory({query:async()=>({rows:rows.slice(0,count)})},{now});
+   assert.equal(result.truncated,count>2200);assert.equal(result.points.length,Math.min(2200,count));
+   assert.equal(result.excludedPoints,0);
+   if(count===2201){assert.equal(result.points[0].valueUsd,1);assert.equal(result.points.at(-1).valueUsd,2200);}
+ }
+ const invalid=rows.map((r,i)=>i===100?{...r,value_usd:null}:r);
+ const result=await readPionexHistory({query:async()=>({rows:invalid})},{now});
+ assert.equal(result.truncated,true);assert.equal(result.points.length,2199);assert.equal(result.excludedPoints,1);
+ assert.equal((await readPionexHistory(null,{now})).truncated,false);
 });
 test('empty/single/constant histories, real source time and gap boundaries',()=>{
  assert.equal(buildPionexHistoryModel(payload([]),{now}).status,'empty');

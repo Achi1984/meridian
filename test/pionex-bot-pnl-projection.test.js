@@ -20,7 +20,7 @@ function project(row){
 }
 
 test('optional P/L skips absent or invalid alternatives and preserves a valid fallback through the read model',()=>{
-  for(const missing of [undefined,null,'','   ',false,true,[],{},'invalid',Infinity]){
+  for(const missing of [undefined,null,'','   ',false,true,[],{},'invalid',Infinity,'0x0','0X10','0b0','0o0','1_000','1,2','1e','Infinity']){
     const row=normalize({totalProfitUsd:missing,totalProfitUSDT:missing,pnlUsd:'-12.34',
       totalProfitPct:missing,pnlPct:'-1.25'});
     assert.equal(row.pnlUsd,-12.34);
@@ -30,6 +30,19 @@ test('optional P/L skips absent or invalid alternatives and preserves a valid fa
     assert.equal(model.bots[0].metrics.pnlUsd,-12.34);
   }
   assert.equal(normalize({totalProfitUsd:null,pnlUsd:12.34}).pnlUsd,12.34);
+});
+
+test('P/L decimal and scientific strings retain zero and signed values without accepting alternate radix syntax',()=>{
+  for(const [source,expected] of [['0',0],['+0.00',0],['0e-999',0],['0e-4',0],[' 1.25e2 ',125],['-.5E+1',-5],['1.',1],['.25',0.25],['-12.34',-12.34]]){
+    const row=normalize({totalProfitUsd:source,totalProfitPct:source});
+    assert.equal(row.pnlUsd,expected);assert.equal(row.totalProfitPct,expected);
+    assert.equal(row.pnlEvidence,'EXPLICIT_USD_VALUE');
+    assert.equal(project(row).model.bots[0].metrics.pnlUsd,expected);
+  }
+  for(const source of ['0x0','0b0','0o0','+0x0','1e999','1e-999','-0.1e-999','NaN']){
+    const row=normalize({totalProfitUsd:source,totalProfitPct:source});
+    assert.equal(row.pnlUsd,null);assert.equal(row.pnlEvidence,null);assert.equal(row.totalProfitPct,null);
+  }
 });
 
 test('explicit numeric zero keeps P/L precedence and confirmation through the read model',()=>{

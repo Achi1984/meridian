@@ -157,8 +157,9 @@ function firstOptionalPnlNumber(d,keys){
   for(const key of keys){
     const value=d?.[key];
     if(typeof value!=='number'&&typeof value!=='string')continue;
-    if(typeof value==='string'&&value.trim()==='')continue;
+    if(typeof value==='string'&&!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(value.trim()))continue;
     const parsed=Number(value);
+    if(typeof value==='string'&&parsed===0&&/[1-9]/.test(value.trim().split(/[eE]/)[0]))continue;
     if(Number.isFinite(parsed))return parsed;
   }
   return null;
