@@ -1,5 +1,5 @@
-import {createDepotHistoryView} from './depot-history-view.js?v=B16-M11-FIX9';
-import {publishDepotPortfolioState} from './depot-portfolio-state.js?v=B16-M11-FIX9';
+import {createDepotHistoryView} from './depot-history-view.js?v=B16-M11-FIX10';
+import {publishDepotPortfolioState} from './depot-portfolio-state.js?v=B16-M11-FIX10';
 // DOM text only. Neither credentials nor raw response bodies are rendered.
 const LABELS={
   locked:['Gesperrt','App mit Meridian-Passwort öffnen, dann Depot manuell aktualisieren.'],

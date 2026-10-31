@@ -14,15 +14,15 @@ function fixture() {
   const sources=['bot-read-model.js','bot-overview-model.js','bot-read-client.js','bot-read-view.js'].map(name=>{
     let source=readFileSync(new URL('../v11/'+name,import.meta.url),'utf8');
     if(name==='bot-read-client.js') {
-      const expected="import {buildBotReadModel} from './bot-read-model.js?v=B16-M11-FIX9';";
+      const expected="import {buildBotReadModel} from './bot-read-model.js?v=B16-M11-FIX10';";
       assert.equal(source.split(expected).length,2,'known client import boundary');
       source=source.replace(expected,'');
     }
     if(name==='bot-read-view.js') {
-      const expected="import {buildBotOverviewModel} from './bot-overview-model.js?v=B16-M11-FIX9';";
+      const expected="import {buildBotOverviewModel} from './bot-overview-model.js?v=B16-M11-FIX10';";
       assert.equal(source.split(expected).length,2,'known overview model import boundary');
       source=source.replace(expected,'');
-      const depotExpected="import {subscribeDepotPortfolio} from './depot-portfolio-state.js?v=B16-M11-FIX9';";
+      const depotExpected="import {subscribeDepotPortfolio} from './depot-portfolio-state.js?v=B16-M11-FIX10';";
       assert.equal(source.split(depotExpected).length,2,'known shared Depot state boundary');
       source=source.replace(depotExpected,'');
     }
