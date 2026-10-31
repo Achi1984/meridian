@@ -1212,9 +1212,26 @@ async function browserRun(call,start,width,height,server){
       assert.ok(card.body<=width+1&&card.root<=width+1,'expanded card overflow');
       const expanded=await evaluate(`document.querySelector('#bot-read-root .bot-card-body').textContent`);
       assert.match(expanded,/Technische Referenz: a{20}/);
-      assert.match(expanded,/Grid-Untergrenze2000/);assert.match(expanded,/P\/L laut Quelle · Originalwert-12.5 USD/);
+      assert.match(expanded,/Grid-Untergrenze2\.000/);assert.match(expanded,/P\/L laut Quelle-12,5 USD/);
+      assert.match(expanded,/Kapital0,42 ETH/);assert.doesNotMatch(expanded,/ · Originalwert/);
       assert.match(expanded,/Nicht verfügbar/);
-      assert.equal(server.metrics().reads,initialReads+1,'disclosure must never request data');
+      const originalToggle='#bot-read-root .bot-card-body button[aria-pressed]';
+      assert.equal(await evaluate(`document.querySelector('${originalToggle}').textContent`),'Originalwerte anzeigen');
+      assert.equal(await evaluate(`document.querySelector('${originalToggle}').getAttribute('aria-pressed')`),'false');
+      await evaluate(`document.querySelector('${originalToggle}').click();true`);
+      assert.equal(await evaluate(`document.querySelector('${originalToggle}').getAttribute('aria-pressed')`),'true');
+      const original=await evaluate(`document.querySelector('#bot-read-root .bot-card-metrics').textContent`);
+      assert.match(original,/Grid-Untergrenze2000/);
+      assert.match(original,/P\/L laut Quelle · Originalwert-12\.5 USD/);
+      assert.match(original,/Kapital · Originalwert0\.42 ETH/);
+      assert.equal((await cardMetrics()).open,true,'original values keep the native disclosure open');
+      assert.equal(await evaluate(`document.querySelector('${originalToggle}').textContent`),'Gerundete Ansicht anzeigen');
+      await evaluate(`document.querySelector('${originalToggle}').click();true`);
+      assert.equal(await evaluate(`document.querySelector('${originalToggle}').getAttribute('aria-pressed')`),'false');
+      assert.equal(await evaluate(`document.querySelector('#bot-read-root .bot-card-body').textContent`),expanded,
+        'returning to rounded view restores the same detail text');
+      assert.equal((await cardMetrics()).open,true,'format changes keep the native disclosure open');
+      assert.equal(server.metrics().reads,initialReads+1,'disclosure and both format changes must never request data');
       const clearance=await evaluate(`(()=>{const card=document.querySelector('#bot-read-root .bot-card'),nav=document.querySelector('#nav');card.scrollIntoView({block:'end'});window.scrollBy(0,nav.getBoundingClientRect().height);const c=card.getBoundingClientRect(),n=nav.getBoundingClientRect();return {clear:c.bottom<=n.top+1,bottom:c.bottom,navTop:n.top,cardHeight:c.height,viewport:innerHeight}})()`);
       assert.equal(clearance.clear,true,'expanded card clears bottom navigation: '+JSON.stringify(clearance));
       const evidence=process.env.V11_A2_EVIDENCE_DIR;
