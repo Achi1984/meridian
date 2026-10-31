@@ -5,7 +5,11 @@ on:
   push:
     branches:
       - main
-      - codex/**
+
+# Superseded PR candidates may stop; every main run keeps its own group.
+concurrency:
+  group: release-safety-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || format('run-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -84,3 +88,4 @@ jobs:
           path: artifacts/v11-visual-qa/*.png
           if-no-files-found: error
           retention-days: 7
+
