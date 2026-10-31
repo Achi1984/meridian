@@ -1,4 +1,5 @@
-import {appAccess} from './app-access.js?v=B16-M11-FIX9';
+import {mountReleaseUpdate} from './release-update.js?v=B16-M11-FIX10';
+import {appAccess} from './app-access.js?v=B16-M11-FIX10';
 
 export function mountAppAccess(document,window,{access=appAccess}={}){
   const app=document.getElementById('app');
@@ -83,4 +84,7 @@ export function mountAppAccess(document,window,{access=appAccess}={}){
   }};
 }
 
-if(typeof document!=='undefined'&&typeof window!=='undefined')mountAppAccess(document,window);
+if(typeof document!=='undefined'&&typeof window!=='undefined'){
+  mountAppAccess(document,window);
+  mountReleaseUpdate(document,window,{access:appAccess});
+}

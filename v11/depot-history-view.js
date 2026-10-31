@@ -1,4 +1,4 @@
-import {DEPOT_WINDOWS} from './depot-history-model.js?v=B16-M11-FIX9';
+import {DEPOT_WINDOWS} from './depot-history-model.js?v=B16-M11-FIX10';
 export function createDepotHistoryView(root,{onRange,pionexOnly=false}={}){
   const money=x=>pionexOnly?new Intl.NumberFormat('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}).format(x)+' USD/USDT':new Intl.NumberFormat('de-DE',{style:'currency',currency:'USD'}).format(x);
   const name=pionexOnly?'Pionex-Verlauf':'Depotverlauf';

@@ -49,7 +49,7 @@ test('real V11 status panel: mobile, keyboard, expiry and fail-closed lifecycle'
             summary:panel.querySelector('summary').textContent,open:panel.open,
             overflow:document.documentElement.scrollWidth>innerWidth+1,
             panelOverflow:panel.scrollWidth>panel.clientWidth+1,
-            requests:performance.getEntriesByType('resource').filter(r=>['fetch','xmlhttprequest'].includes(r.initiatorType)).map(r=>r.name),
+            requests:performance.getEntriesByType('resource').filter(r=>['fetch','xmlhttprequest'].includes(r.initiatorType)).map(r=>r.name).filter(url=>url!==new URL('./index.html',location.href).href),
             css:[...document.styleSheets].some(s=>s.href?.endsWith('/public/css/m11-agent-status.css')),
             styled:root.querySelector('.m11-agent-status')?getComputedStyle(root.querySelector('.m11-agent-status')).display:null,
             depot:document.querySelector('#depot-read-root [data-state]')?.dataset.state,
@@ -73,9 +73,9 @@ test('real V11 status panel: mobile, keyboard, expiry and fail-closed lifecycle'
 
         // All synthetic data and producer handles exist only in this CDP test harness.
         await evaluate(`(async()=>{
-          const {mountAgentStatus}=await import('/v11/agent-status-bootstrap.js?v=B16-M11-FIX9');
-          const {createAgentStatusClient}=await import('/v11/agent-status-client.js?v=B16-M11-FIX9');
-          const {appAccess}=await import('/v11/app-access.js?v=B16-M11-FIX9');
+          const {mountAgentStatus}=await import('/v11/agent-status-bootstrap.js?v=B16-M11-FIX10');
+          const {createAgentStatusClient}=await import('/v11/agent-status-client.js?v=B16-M11-FIX10');
+          const {appAccess}=await import('/v11/app-access.js?v=B16-M11-FIX10');
           const base=Date.parse('2026-10-29T12:00:00.000Z'),iso=t=>new Date(t).toISOString();
           const binding=value=>({agentId:'synthetic-agent',taskId:'synthetic-task',value,
             observedAt:iso(base-1000),expiresAt:iso(base+1000),
