@@ -36,6 +36,21 @@ test('version history: native keyboard, focus and compact viewport at five width
    };
    await call('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:true,screenWidth:width,screenHeight:height});
    await unlockAppThroughGate(call);
+   const header=await evaluate(`(()=>{const rect=s=>{const r=document.querySelector(s).getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};};return {identity:rect('.identity'),version:rect('#version-toggle'),lock:rect('#app-access-lock'),strategy:rect('.strategy-entry-link'),status:rect('#autonomy-status'),brandVisible:getComputedStyle(document.querySelector('.brand small')).display!=='none',historyVisible:getComputedStyle(document.querySelector('.version-toggle small')).display!=='none',root:document.documentElement.scrollWidth};})()`);
+   assert.ok(header.identity.top>=20,'identity has breathing room below the safe area');
+   assert.ok(header.brandVisible&&header.historyVisible,'identity and version descriptions remain visible');
+   for(const target of [header.version,header.lock,header.strategy]){
+    assert.ok(target.width>=44&&target.height>=44,'header actions retain touch targets');
+    assert.ok(target.left>=16&&target.right<=width-16+1,'header actions stay inside horizontal safe padding');
+   }
+   assert.ok(header.version.right+11<=header.lock.left,'build and lock controls have a clear gap');
+   assert.ok(header.strategy.top>=Math.max(header.version.bottom,header.lock.bottom)+11,'strategy action has a separate spaced row');
+   assert.ok(header.status.top>=header.strategy.bottom+7,'status is separated from navigation');
+   assert.ok(header.root<=width+1,'header does not introduce horizontal scrolling');
+   if(width<=600){
+    assert.ok(header.version.top>=header.identity.bottom+15,'mobile identity occupies its own row');
+    assert.ok(header.strategy.width>=width-33,'mobile strategy action uses available width');
+   }
    const before=await evaluate(`JSON.stringify({value:document.querySelector('.portfolio-value').textContent,sources:[...document.querySelectorAll('.trust-cell span')].map(x=>x.textContent),decision:document.querySelector('[data-decision-owner]').textContent})`);
    assert.equal(await evaluate(`document.getElementById('version-panel').hidden`),true);
    await evaluate(`document.getElementById('version-toggle').focus()`);

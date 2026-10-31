@@ -741,7 +741,42 @@ const commandPresentationDeltas=[
 ];
 const b16ReleaseDeltas=[[">11 · Vorschau B15<small>", ">11 · Vorschau B16<small>"], ["Diese Vorschau · B15:</b> Kompakte Bot-Karten und Command-Zeilen; synthetische Darstellungstests, keine Betriebsfreigabe.", "Diese Vorschau · B16:</b> Wallet-Abdeckung und bestätigte Futures-Grid-Daten getrennt; TP-Status mit oberer Grid-Grenze verglichen. Rein lesend, keine Handelsfreigabe."]];
 const b16ReleaseHistoryRow="        <li><strong>Meridian 11 · B16</strong><span class=\"version-status\">Vorschau</span><p>Wallet-Abdeckung und bestätigte Futures-Grid-Daten werden getrennt erklärt. Bot-Karten zeigen den prüfbaren TP-Status und Abweichungen zur oberen Grid-Grenze. Ohne zuverlässige Quelldaten erscheint „TP nicht prüfbar“. Rein lesend: keine TP-Änderung oder Handelsfreigabe.</p></li>\n";
+const b16HeaderLayoutDeltas=[
+  [
+    "    @media(max-width:350px){.header-inner{gap:8px}.version-toggle{padding:6px 8px}}\n    .container{max-width:var(--container);margin:0 auto;padding:18px 16px calc(100px + var(--safe-bottom))}\n",
+    "    .container{max-width:var(--container);margin:0 auto;padding:18px 16px calc(100px + var(--safe-bottom))}\n"
+  ],
+  [
+    "    .bot-read-view .bot-card[open] summary .bot-card-disclosure span{transform:rotate(45deg)}\n",
+    "    .bot-read-view .bot-card[open] summary .bot-card-disclosure span:last-child{transform:rotate(45deg)}\n"
+  ],
+  [
+    "    .bot-card-disclosure span{font-size:18px;line-height:1;transition:transform .18s ease}\n",
+    "    .bot-card-disclosure span:last-child{font-size:18px;line-height:1;transition:transform .18s ease}\n"
+  ],
+  [
+    "    @media(max-width:350px){.header-inner{flex-wrap:wrap}.header-actions{margin-left:auto}.app-access-card{padding:18px}}\n    @media(max-width:350px){.header-inner{flex-wrap:nowrap}.identity{gap:6px}.mark{width:32px;height:32px}.brand{font-size:12px}.brand small{display:none}.header-actions{gap:4px}.version-toggle{padding:4px;font-size:10px;letter-spacing:0}.version-toggle small{display:none}}\n",
+    "    @media(max-width:350px){.app-access-card{padding:18px}}\n"
+  ],
+  [
+    "    /* B10: compact preview chrome and keep the validated portfolio first. */\n    .topbar{padding-top:calc(8px + env(safe-area-inset-top,0px));padding-bottom:8px}\n    .topbar{padding-left:max(16px,calc((100% - var(--container))/2));padding-right:max(16px,calc((100% - var(--container))/2))}\n    .header-inner{gap:8px}\n    .identity{gap:8px}\n    .mark{width:32px;height:32px;border-radius:10px;font-size:20px}\n    .brand{font-size:16px}\n    .terminal-entry{margin-top:8px}\n",
+    "    .bot-disclosure-controls{display:flex;flex-wrap:wrap;gap:8px}\n    .bot-disclosure-controls>p{flex-basis:100%;margin:0}\n    /* B16: separate identity, actions and status with room for mobile safe areas. */\n    .topbar{padding-top:calc(20px + env(safe-area-inset-top,0px));padding-bottom:16px;padding-left:max(16px,env(safe-area-inset-left,0px),calc((100% - var(--container))/2));padding-right:max(16px,env(safe-area-inset-right,0px),calc((100% - var(--container))/2))}\n    .header-inner{gap:16px}\n    .header-actions{gap:12px}\n    .version-toggle{padding:8px 12px}\n    .terminal-entry{margin-top:12px}\n    @media(max-width:600px){\n      .header-inner{flex-direction:column;align-items:stretch;gap:16px}\n      .identity{gap:11px}\n      .header-actions{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px}\n      .version-toggle{white-space:normal;font-size:12px}\n      .version-toggle small{display:block;font-size:11px;margin-top:3px}\n      .app-access-lock{padding:10px 16px}\n      .strategy-entry-link{width:100%;min-height:48px}\n      .topbar .autonomy-strip{margin-top:12px}\n      .topbar .autonomy-strip>summary{padding:12px;min-height:48px}\n    }\n"
+  ]
+];
+const b16CorrectionMarkupDeltas=[
+  ['<strong>BOTS</strong><span>Unbekannt</span>','<strong>BOTS</strong><span id="command-bots-status">Unbekannt</span>'],
+  ['Diese Datenquelle enthält keine einzelnen Positionen. Bestände und Verteilung bleiben nicht verfügbar.',
+   'Einzelne Bestände und ihre Verteilung werden in dieser Ansicht noch nicht angezeigt.']
+];
+function restoreB16Corrections(source){
+  for(const [before,after] of [...b16HeaderLayoutDeltas,...b16CorrectionMarkupDeltas]){
+    assert.equal(source.split(after).length-1,1,'one exact B16 header layout delta');
+    source=source.replace(after,before);
+  }
+  return source;
+}
 function restoreB2(source){
+  source=restoreB16Corrections(source);
   assert.equal(source.split(b16ReleaseHistoryRow).length-1,1,'one B16 release history row');
   source=source.replace(b16ReleaseHistoryRow,'');
   for(const [before,after] of b16ReleaseDeltas){
@@ -824,7 +859,7 @@ function restoreB2(source){
 test('Terminal öffnen preserves the reviewed history-close baseline and stays outside version history',()=>{
   const html=restoreB2(globalHtml);
   assert.equal(globalHtml.split(compactBotsMarkup).length-1,1,'one compact Bots section');
-  assert.equal(globalHtml.split(botPresentationCssAfter).length-1,1,'one exact compact-card CSS block');
+  assert.equal(restoreB16Corrections(globalHtml).split(botPresentationCssAfter).length-1,1,'one exact compact-card CSS block before explicit B16 deltas');
   assert.equal(css.trimEnd(),html.match(/    \/\* Fixed packet A:[\s\S]*?    \.terminal-entry-link:focus-visible\{[^\n]*\}\n/)?.[0]?.trimEnd());
   assert.equal(html.split(entry).length-1,1);
   const anchor=[...html.matchAll(/<a\b[^>]*class="terminal-entry-link"[^>]*>[\s\S]*?<\/a>/g)];

@@ -370,6 +370,33 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           assert.match(lossNames[1].name,/BTCUSDT · Short · Referenz b{20}/);
           assert.match(lossNames[0].name,/-25,00 USD/);assert.match(lossNames[1].name,/-25,00 USD/);
           await assertPopulatedLayout('populated collapsed');
+          // Native summary works repeatedly; bottom close and bulk actions do not fetch.
+          const disclosureSelector='#bot-card-'+ 'a'.repeat(20);
+          const openCount=()=>evaluate(`document.querySelectorAll('#bot-read-root .bot-card[open]').length`);
+          await evaluate(`document.querySelector('${disclosureSelector} summary').focus()`);
+          for(const expected of [true,false,true]){
+            await key('Enter','Enter',13);
+            assert.equal(await evaluate(`document.querySelector('${disclosureSelector}').open`),expected);
+            assert.equal(await evaluate(`getComputedStyle(document.querySelector('${disclosureSelector} .bot-card-body')).display`),expected?'block':'none');
+          }
+          await evaluate(`document.querySelector('${disclosureSelector} .bot-card-body button').click()`);
+          assert.equal(await openCount(),0);
+          assert.equal(await evaluate(`document.activeElement===document.querySelector('${disclosureSelector} summary')`),true);
+          await key(' ','Space',32);
+          assert.equal(await openCount(),1);
+          await key(' ','Space',32);
+          assert.equal(await openCount(),0);
+          for(const expected of [true,false,true]){
+            await evaluate(`document.querySelector('${disclosureSelector} summary').click()`);
+            assert.equal(await evaluate(`document.querySelector('${disclosureSelector}').open`),expected);
+          }
+          await evaluate(`document.querySelector('[aria-label="Alle angezeigten Bots aufklappen"]').click()`);
+          assert.equal(await openCount(),7);
+          await evaluate(`document.querySelector('${disclosureSelector} summary').click()`);
+          assert.equal(await openCount(),6,'mixed disclosure state');
+          await evaluate(`document.querySelector('[aria-label="Alle angezeigten Bots zuklappen"]').click()`);
+          assert.equal(await openCount(),0);
+          assert.equal(await evaluate('window.__botReads'),1,'disclosure controls never read again');
           // Native disclosure state follows botRef, not symbol, through local selection.
           await evaluate(`document.querySelector('#bot-card-${'a'.repeat(20)} summary').focus()`);
           await key('Enter','Enter',13);

@@ -392,13 +392,13 @@ test('collapsed native cards distinguish equal symbols and render only whitelist
    const [first,second]=all(target,'details'),[firstSummary,secondSummary]=all(target,'summary');
    assert.doesNotMatch(firstSummary.textContent,/Referenz|Bot 1/);
    assert.equal(firstSummary.getAttribute('aria-label'),
-     'BTC · Short · Hebel 5× · P/L laut Quelle -2,75 USD · Kapital 125,50 USD/USDT · TP nicht prüfbar · ID-Ende aaaaaa · Details anzeigen');
+     'BTC · Short · Hebel 5× · P/L laut Quelle -2,75 USD · Kapital 125,50 USD/USDT · TP nicht prüfbar · ID-Ende aaaaaa · Aufklappen');
    assert.equal(secondSummary.getAttribute('aria-label'),
-     'BTC · Short · Hebel 5× · P/L laut Quelle -2,75 USD · Kapital 125,50 USD/USDT · TP nicht prüfbar · ID-Ende bbbbbb · Details anzeigen');
+     'BTC · Short · Hebel 5× · P/L laut Quelle -2,75 USD · Kapital 125,50 USD/USDT · TP nicht prüfbar · ID-Ende bbbbbb · Aufklappen');
    assert.match(firstSummary.textContent,/BTCShortHebel 5×/);
    assert.match(firstSummary.textContent,/Kapital125,50 USD\/USDT/);
    assert.match(firstSummary.textContent,/P\/L laut Quelle-2,75 USD/);
-   assert.match(firstSummary.textContent,/Details/);
+   assert.match(firstSummary.textContent,/Aufklappen/);
    assert.match(first.textContent,/Technische Referenz: a{20}/);
    assert.match(second.textContent,/Technische Referenz: b{20}/);
    assert.match(target.textContent,/Hebel · Originalwert5×/);
@@ -525,8 +525,8 @@ test('collapsed card summary visibly labels TP mismatch and unknown status',()=>
    renderBotReadState(target,state);
    const names=all(target,'summary').map(summary=>summary.getAttribute('aria-label'));
    assert.deepEqual(names,[
-     'BTC · Short · Hebel 5× · P/L laut Quelle -2,75 USD · Kapital 125,50 USD/USDT · TP nicht prüfbar · ID-Ende aabcdef · Details anzeigen',
-     'BTC · Short · Hebel 2× · P/L laut Quelle +1,25 USD · Kapital 80,00 USD/USDT · TP nicht prüfbar · ID-Ende babcdef · Details anzeigen'
+     'BTC · Short · Hebel 5× · P/L laut Quelle -2,75 USD · Kapital 125,50 USD/USDT · TP nicht prüfbar · ID-Ende aabcdef · Aufklappen',
+     'BTC · Short · Hebel 2× · P/L laut Quelle +1,25 USD · Kapital 80,00 USD/USDT · TP nicht prüfbar · ID-Ende babcdef · Aufklappen'
    ]);
    assert.ok(names.every(name=>!name.includes('a'.repeat(14))&&!name.includes('b'.repeat(14))));
  });
@@ -627,6 +627,36 @@ test('Command keeps unavailable status distinct from unknown fresh metadata',()=
 const change=(node,type,value)=>{node.value=value;for(const listener of node.listeners.get(type)||[])listener();};
 const returnButton=h=>all(h.target,'button').find(node=>node.text==='Zur vorherigen Auswahl zurück');
 function duplicateSnapshot(){const state=fresh();state.model.bots.push({...state.model.bots[0],ref:'b'.repeat(20),side:'LONG'});return state;}
+test('disclosure actions open and close visible bots and preserve filtered-out state',()=>{
+  const h=mounted(),state=duplicateSnapshot();h.publish(state);
+  const cards=()=>all(h.target,'details');
+  const button=text=>all(h.target,'button').find(node=>node.text===text);
+  const nativeToggle=(card,open)=>{
+    if(open)card.setAttribute('open','');else card.removeAttribute('open');
+    for(const listener of card.listeners.get('toggle')||[])listener();
+  };
+  const first=cards()[0],summary=first.querySelector('summary');
+  for(const open of [true,false,true]){
+    nativeToggle(first,open);
+    assert.equal(first.getAttribute('open')!==null,open);
+    assert.match(summary.getAttribute('aria-label'),open?/Zuklappen$/:/Aufklappen$/);
+  }
+  button('Alle aufklappen').click();assert.ok(cards().every(card=>card.getAttribute('open')!==null));
+  button('Alle zuklappen').click();assert.ok(cards().every(card=>card.getAttribute('open')===null));
+  nativeToggle(cards()[0],true);
+  change(all(h.target,'select')[0],'change','long');
+  button('Alle aufklappen').click();assert.equal(cards().length,1);
+  button('Alle zuklappen').click();
+  change(all(h.target,'select')[0],'change','all');
+  assert.deepEqual(cards().map(card=>card.getAttribute('open')!==null),[true,false]);
+  button('Bot zuklappen').click();
+  assert.equal(cards()[0].getAttribute('open'),null);
+  assert.equal(h.target.ownerDocument.activeElement,cards()[0].querySelector('summary'));
+  change(all(h.target,'select')[2],'change','pnl');
+  assert.ok(cards().every(card=>card.getAttribute('open')===null));
+  assert.equal(h.calls.refresh,0);assert.equal(h.calls.lock,0);
+});
+
 test('disclosures retain exact reference through filtering sorting and reset within one snapshot',()=>{
   const h=mounted(),state=duplicateSnapshot();h.publish(state);
   all(h.target,'details')[0].setAttribute('open','');
