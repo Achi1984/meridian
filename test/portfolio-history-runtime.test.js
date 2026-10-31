@@ -18,8 +18,10 @@ function dataFor(symbols=['BTC']){
   };
 }
 function fakeDb(existing=[]){
+  // Two independent tables now share this capture loop. Aggregate admission
+  // assertions must inspect its table, not forbid valid Pionex-only writes.
   const calls=[];let insertArgs=null;
-  return{calls,get insertArgs(){return insertArgs},query:async(sql,args)=>{calls.push(sql);if(sql.startsWith('SELECT captured_at'))return{rows:existing};if(sql.startsWith('INSERT INTO'))insertArgs=args;return{rows:[]}}};
+  return{calls,get insertArgs(){return insertArgs},query:async(sql,args)=>{calls.push(sql);if(sql.startsWith('SELECT captured_at'))return{rows:existing};if(sql.startsWith('INSERT INTO meridian_portfolio_history'))insertArgs=args;return{rows:[]}}};
 }
 
 test('runtime prices normalize wrapped assets and attach fetch rather than observation provenance',()=>{
@@ -44,6 +46,8 @@ test('a failed price fetch cannot freshen retained positive legacy prices or adm
   const out=await capturePortfolioHistoryOnce({db,data,fetchPrices:async()=>{throw new Error('feed_unavailable')},now:()=>NOW,timestamp:NOW});
   assert.equal(out.ok,false);
   assert.equal(out.reason,'PORTFOLIO_AUTHORITY_INCOMPLETE');
+  assert.equal(out.pionexHistory.ok,true);
+  assert.equal(db.calls.filter(sql=>sql.startsWith('INSERT INTO meridian_pionex_history')).length,1);
   assert.equal(out.priceStatus,'STORED_PRICE_FALLBACK');
   assert.equal(out.priceReason,'PRICE_FETCH_FAILED');
   assert.deepEqual(out.snapshot.sourceStatus.spotPriceProvenance.requiredSymbols,['BTC']);
@@ -53,7 +57,7 @@ test('a failed price fetch cannot freshen retained positive legacy prices or adm
   assert.equal(data.livePriceMeta.updatedAt,NOW);
   assert.equal(data.livePriceMeta.fresh,true);
   assert.equal(data.livePriceMeta.perSymbol?.BTC,undefined);
-  assert.equal(db.calls.some(sql=>sql.startsWith('INSERT INTO')),false);
+  assert.equal(db.calls.some(sql=>sql.startsWith('INSERT INTO meridian_portfolio_history')),false);
 });
 
 test('a partial symbol response retains the missing mark and refuses a complete point',async()=>{
@@ -73,7 +77,7 @@ test('a partial symbol response retains the missing mark and refuses a complete 
   assert.equal(out.snapshot.sourceStatus.spotPriceProvenance.fetchStatus,'PARTIAL');
   assert.equal(out.snapshot.sourceStatus.spotPriceProvenance.symbols.BTC.valid,true);
   assert.equal(out.snapshot.sourceStatus.spotPriceProvenance.symbols.ETH.reason,'PROVENANCE_MISSING_OR_UNSUPPORTED');
-  assert.equal(db.calls.some(sql=>sql.startsWith('INSERT INTO')),false);
+  assert.equal(db.calls.some(sql=>sql.startsWith('INSERT INTO meridian_portfolio_history')),false);
 });
 
 test('capture rejects future and expired per-symbol fetch times before store admission',async()=>{
@@ -81,7 +85,7 @@ test('capture rejects future and expired per-symbol fetch times before store adm
   const future=await capturePortfolioHistoryOnce({db:futureDb,data:futureData,prices:{BTC:110},now:()=>NOW,timestamp:NOW-1});
   assert.equal(future.ok,false);
   assert.equal(future.snapshot.sourceStatus.spotPriceProvenance.symbols.BTC.reason,'FETCH_TIME_FUTURE');
-  assert.equal(futureDb.calls.some(sql=>sql.startsWith('INSERT INTO')),false);
+  assert.equal(futureDb.calls.some(sql=>sql.startsWith('INSERT INTO meridian_portfolio_history')),false);
 
   const expiredData=dataFor(),expiredDb=fakeDb();
   const expiredAt=NOW-SPOT_PRICE_AUTHORITY_MAX_AGE_MS-1;
@@ -90,7 +94,7 @@ test('capture rejects future and expired per-symbol fetch times before store adm
   const expired=await capturePortfolioHistoryOnce({db:expiredDb,data:expiredData,fetchPrices:async()=>{throw new Error('feed_unavailable')},now:()=>NOW,timestamp:NOW});
   assert.equal(expired.ok,false);
   assert.equal(expired.snapshot.sourceStatus.spotPriceProvenance.symbols.BTC.reason,'FETCH_TIME_EXPIRED');
-  assert.equal(expiredDb.calls.some(sql=>sql.startsWith('INSERT INTO')),false);
+  assert.equal(expiredDb.calls.some(sql=>sql.startsWith('INSERT INTO meridian_portfolio_history')),false);
 });
 
 test('provider failure preserves a retained mark inside the freshness bound and rejects one just beyond it',async()=>{
@@ -124,7 +128,7 @@ test('provider failure preserves a retained mark inside the freshness bound and 
   assert.equal(expired.snapshot.sourceStatus.spotPriceProvenance.symbols.BTC.reason,'FETCH_TIME_EXPIRED');
   assert.equal(expired.snapshot.sourceStatus.spotPriceProvenance.symbols.BTC.fetchedAt,expiredAt);
   assert.equal(expiredData.livePriceMeta.fetchedAt,expiredAt);
-  assert.equal(expiredDb.calls.some(sql=>sql.startsWith('INSERT INTO')),false);
+  assert.equal(expiredDb.calls.some(sql=>sql.startsWith('INSERT INTO meridian_portfolio_history')),false);
 });
 
 test('capture never admits whitespace or trim-colliding holding symbols',async()=>{
@@ -150,7 +154,7 @@ test('capture never admits whitespace or trim-colliding holding symbols',async()
     }else assert.deepEqual(out.snapshot.sourceStatus.spotPriceProvenance.symbols,{},label);
     assert.equal(out.snapshot.sourceStatus.spotPriceProvenance.symbols[' BTC '],undefined,label);
     assert.deepEqual(data.portfolio.holdings.map(h=>h.symbol),originalSymbols,label);
-    assert.equal(db.calls.some(sql=>sql.startsWith('INSERT INTO')),false,label);
+    assert.equal(db.calls.some(sql=>sql.startsWith('INSERT INTO meridian_portfolio_history')),false,label);
   }
 });
 
@@ -183,7 +187,7 @@ test('capture rejects malformed, unsupported, or mismatched per-symbol provenanc
     const out=await capturePortfolioHistoryOnce({db,data,prices:{},now:()=>NOW,timestamp:NOW});
     assert.equal(out.ok,false,label);
     assert.equal(out.snapshot.sourceStatus.spotPriceProvenance.symbols.BTC.valid,false,label);
-    assert.equal(db.calls.some(sql=>sql.startsWith('INSERT INTO')),false,label);
+    assert.equal(db.calls.some(sql=>sql.startsWith('INSERT INTO meridian_portfolio_history')),false,label);
   }
 });
 
@@ -212,7 +216,7 @@ test('complete fetched prices insert with source and fetch times while preservin
   assert.equal(out.snapshot.sourceStatus.spotPriceProvenance.status,'COMPLETE');
   assert.equal(out.snapshot.sourceStatus.spotPriceProvenance.symbols.BTC.providerObservedAt,null);
   assert.equal(out.snapshot.sourceStatus.spotPriceProvenance.symbols.BTC.fetchedAt,NOW-1);
-  assert.equal(db.calls.some(sql=>sql.startsWith('INSERT INTO')),true);
+  assert.equal(db.calls.some(sql=>sql.startsWith('INSERT INTO meridian_portfolio_history')),true);
   const storedSourceStatus=JSON.parse(db.insertArgs[7]);
   assert.deepEqual(storedSourceStatus.spotPriceProvenance,out.snapshot.sourceStatus.spotPriceProvenance);
   assert.equal(canonicalHistoryPointComplete({timestamp:NOW,spotUsd:out.snapshot.spotUsd,tradingUsd:out.snapshot.tradingUsd,totalUsd:out.snapshot.totalUsd,sourceStatus:storedSourceStatus}),true);
@@ -229,3 +233,4 @@ test('no required spot holdings preserve complete independent venue and trading 
   assert.equal(out.snapshot.authorityComplete,true);
   assert.equal(out.snapshot.sourceStatus.spotPriceProvenance.status,'NO_REQUIRED_SYMBOLS');
 });
+

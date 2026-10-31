@@ -2,6 +2,7 @@
 // Reads private quantities from PostgreSQL, refreshes public market prices, and stores one canonical total basis.
 
 import pg from 'pg';
+import {ensurePionexHistorySchema,appendPionexHistory} from './pionex-history-store.js';
 import { appendPortfolioHistory, ensurePortfolioHistorySchema } from './portfolio-history-store.js';
 import { canonicalPriceSymbol } from './portfolio-data-contract.js';
 
@@ -51,6 +52,10 @@ export async function capturePortfolioHistoryOnce(opts={}){
   await ensurePortfolioHistorySchema(p);
   const current=opts.data||await stateGet();if(!current)return{ok:false,reason:'PRIVATE_DASHBOARD_UNAVAILABLE'};
   const clock=()=>{const value=typeof opts.now==='function'?opts.now():typeof opts.clock==='function'?opts.clock():opts.now;return typeof value==='number'&&Number.isFinite(value)?value:Date.now()};
+  // Independent capture from the already loaded state; aggregate completeness stays unchanged.
+  let pionexHistory;
+  try{await ensurePionexHistorySchema(p);pionexHistory=await appendPionexHistory(p,current,{timestamp:opts.timestamp??clock()});}
+  catch{pionexHistory={ok:false,reason:'PIONEX_HISTORY_CAPTURE_FAILED'};}
   let prices={},priceStatus='LIVE',priceReason=null,fetchSucceeded=true;
   try{prices=opts.fetchPrices?await opts.fetchPrices():opts.prices??await publicPrices()}catch(_e){priceStatus='STORED_PRICE_FALLBACK';priceReason='PRICE_FETCH_FAILED';fetchSucceeded=false;console.error('[PORTFOLIO_HISTORY] prices',priceReason)}
   if(!prices||typeof prices!=='object')prices={};
@@ -58,7 +63,7 @@ export async function capturePortfolioHistoryOnce(opts={}){
   const enriched=mergeRuntimePrices(current,prices,{attemptAt,fetchedAt,fetchSucceeded,fetchReason:priceReason});
   if(fetchSucceeded&&enriched.livePriceMeta.fetchStatus==='PARTIAL')priceStatus='PARTIAL';
   const result=await appendPortfolioHistory(p,enriched,{timestamp,dedupeMs:opts.dedupeMs??4*60*1000});
-  return{...result,priceStatus,...(priceReason?{priceReason}:{})};
+  return{...result,pionexHistory,priceStatus,...(priceReason?{priceReason}:{})};
 }
 export function startPortfolioHistoryCapture(){
   if(!DATABASE_URL){console.log('[PORTFOLIO_HISTORY] disabled · missing database');return{enabled:false}}
@@ -66,3 +71,4 @@ export function startPortfolioHistoryCapture(){
   setTimeout(run,20000);const timer=setInterval(run,INTERVAL_MIN*60000);timer.unref?.();
   console.log(`[PORTFOLIO_HISTORY] enabled · every ${INTERVAL_MIN} min`);return{enabled:true,intervalMin:INTERVAL_MIN};
 }
+

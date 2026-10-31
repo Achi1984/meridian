@@ -5,6 +5,7 @@ import pg from "pg";
 import { researchComparison } from "./research-analytics.js";
 import { mergePrivateDashboard, privateDashboardPublicReceipt } from "./private-dashboard-update.js";
 import { mergeVenueHoldings } from "./private-holdings-sync.js";
+import {readPionexHistory} from "./pionex-history-store.js";
 import { readPortfolioHistory } from "./portfolio-history-store.js";
 import { marketKlinesSnapshot } from "./market-feed-gateway.js";
 import { buildAssetWatchApiSnapshot } from "./asset-watch-bridge.js";
@@ -540,6 +541,9 @@ const server=http.createServer(async(req,res)=>{
       const data=await stateGet(PRIVATE_STATE_KEY);
       return data?writeJson(res,200,{private:true,data},origin||""):writeJson(res,503,{error:"private_dashboard_unavailable"},origin||"");
     }
+    if(req.method==="GET"&&u.pathname==="/api/private/pionex-history"){
+      return writeJson(res,200,await readPionexHistory(pool(),{rangeMs:portfolioHistoryRangeMs(u.searchParams.get("range"))}),origin||"");
+    }
     if(req.method==="GET"&&u.pathname==="/api/private/portfolio-history"){
       return writeJson(res,200,await readPortfolioHistory(pool(),{rangeMs:portfolioHistoryRangeMs(u.searchParams.get('range')),limit:2200}),origin||"");
     }
@@ -559,4 +563,5 @@ const server=http.createServer(async(req,res)=>{
   }catch(e){return writeJson(res,500,{error:String(e?.message||e)});}
 });
 server.listen(EXTERNAL_PORT,"0.0.0.0",()=>console.log(`[GATEWAY] MERIDIAN ${String(RELEASE.version||RELEASE.ui||"?")} / ${String(RELEASE.buildId||"?")} on :${EXTERNAL_PORT} -> internal :${INTERNAL_PORT}`));
+
 

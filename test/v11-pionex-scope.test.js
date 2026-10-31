@@ -18,12 +18,14 @@ test('Pionex wallet selection preserves existing newest authority contract',()=>
  assert.equal(buildPionexDepotModel(d,{now}).totalUsd,123.45);
  d.data.pionexAccountSync.status='FAILED';assert.notEqual(buildPionexDepotModel(d,{now}).status,'FRESH_SNAPSHOT');
 });
-test('Pionex client makes one dashboard read, no prices/history, expires and never falls back',async()=>{
+test('Pionex client reads dashboard and separate history, no prices or aggregate history, expires and never falls back',async()=>{
  let clock=now,token='password',states=[],calls=[],payload=data();
  const c=createDepotReadClient({pionexOnly:true,getToken:()=>token,now:()=>clock,onChange:s=>states.push(s),fetchImpl:async(url,opts)=>{calls.push({url,opts});return new Response(JSON.stringify(payload),{status:200});}});
  c.revalidate();assert.equal(states.at(-1).status,'not_loaded');assert.equal(calls.length,0);
- await c.refresh();assert.equal(calls.length,1);assert.match(calls[0].url,/\/dashboard$/);assert.equal(calls[0].opts.headers.authorization,'Bearer password');assert.equal(states.at(-1).model.totalUsd,3450);assert.equal(states.at(-1).history,null);
- clock=now+900000;c.revalidate();assert.equal(states.at(-1).status,'stale');assert.equal(states.at(-1).model,null);assert.equal(calls.length,1);
- payload={private:true,data:{portfolio:{}}};await c.refresh();assert.equal(states.at(-1).status,'unavailable');assert.equal(states.at(-1).model,null);assert.equal(states.at(-1).history,null);assert.equal(calls.length,2);
+ await c.refresh();assert.equal(calls.length,2);assert.match(calls[0].url,/\/dashboard$/);assert.equal(calls[0].opts.headers.authorization,'Bearer password');assert.equal(states.at(-1).model.totalUsd,3450);assert.equal(states.at(-1).history['1w'].status,'unavailable');
+ clock=now+900000;c.revalidate();assert.equal(states.at(-1).status,'stale');assert.equal(states.at(-1).model,null);assert.equal(calls.length,2);
+ payload={private:true,data:{portfolio:{}}};await c.refresh();assert.equal(states.at(-1).status,'unavailable');assert.equal(states.at(-1).model,null);assert.equal(states.at(-1).history['1w'].status,'unavailable');assert.equal(calls.length,4);
+ assert.match(calls[1].url,/pionex-history/);
  token=null;c.revalidate();assert.equal(states.at(-1).status,'locked');c.dispose();
 });
+

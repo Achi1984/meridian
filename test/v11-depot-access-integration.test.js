@@ -4,7 +4,7 @@ import {createAppAccess} from '../v11/app-access.js';
 import {createDepotReadView} from '../v11/depot-read-view.js';
 import {createDepotReadClient} from '../v11/depot-read-client.js';
 import {mountDepotReadAccess} from '../v11/depot-read-bootstrap.js';
-import {subscribeDepotPortfolio} from '../v11/depot-portfolio-state.js?v=B16-M11-FIX5';
+import {subscribeDepotPortfolio} from '../v11/depot-portfolio-state.js?v=B16-M11-FIX6';
 class Node {
   constructor(document,tag){this.ownerDocument=document;this.tagName=tag;this.children=[];this.dataset={};this.attrs={};this.listeners=new Map();this.text='';}
   set textContent(value){this.text=String(value);this.children=[];}
@@ -255,8 +255,9 @@ test('Pionex-only view excludes mixed history and rejects aggregate models',()=>
     currency:'USD/USDT',snapshotAt:'2026-10-31T18:00:00Z',sourceAt:'2026-10-31T18:00:00Z',expiresAt:1793469900000,source:'SERVER_PIONEX_CURRENT'};
   render({status:'fresh',model,history:{'1d':{status:'FRESH_SNAPSHOT',points:[{totalUsd:999999}]}}});
   assert.match(h.text(),/3.450,00 USD\/USDT/);assert.match(h.text(),/Pionex-Verlauf/);
-  assert.match(h.text(),/Gesamthistorie enthält mehrere Quellen/);assert.doesNotMatch(h.text(),/999.999|Spot laut Depotquelle|Ledger|OKX/);
+  assert.match(h.text(),/Verlauf nicht verfügbar/);assert.doesNotMatch(h.text(),/999.999|Spot laut Depotquelle|Ledger|OKX/);
   assert.match(h.fields.get('.portfolio-description').textContent,/Pionex/);
   render({status:'fresh',model:{...model,source:'SERVER_PORTFOLIO_CURRENT',spotUsd:2000}});
   assert.equal(h.command.dataset.state,'unavailable');assert.doesNotMatch(h.text(),/3.450,00/);v.dispose();
 });
+
