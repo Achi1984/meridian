@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {renderBotReadState,createBotReadView,renderCommandBotOverview} from '../v11/bot-read-view.js';
 import {buildBotReadModel} from '../v11/bot-read-model.js';
 import {createBotReadClient} from '../v11/bot-read-client.js';
-import {publishDepotPortfolioState} from '../v11/depot-portfolio-state.js?v=B16-M11-RELEASE1';
+import {publishDepotPortfolioState} from '../v11/depot-portfolio-state.js?v=B16-M11-FIX1';
 import {normalizePionexBotOrder} from '../pionex-bot-auto-sync.js';
 import {buildAssetWatchApiSnapshot} from '../asset-watch-bridge.js';
 
@@ -563,6 +563,24 @@ test('collapsed card summary visibly labels TP mismatch and unknown status',()=>
    assert.deepEqual(all(target,'details').map(card=>card.id),['bot-card-'+ 'a'.repeat(20),'bot-card-'+ 'b'.repeat(20)]);
  });
 
+
+test('Command source pill follows snapshot validity and clears counts on expiry, error and lock',()=>{
+  const target=root(),pill=root();
+  const snapshot={status:'fresh',count:33,snapshotAt:'2026-10-18T10:00:00Z',losses:[]};
+  for(const [status,label] of [['loading','Wird geladen'],['stale','Daten veraltet'],
+    ['unavailable','Nicht verfügbar'],['locked','Gesperrt'],['unexpected','Nicht verfügbar']]){
+    renderCommandBotOverview(target,snapshot,null,pill);
+    assert.equal(pill.textContent,'33 Bots im Snapshot');
+    renderCommandBotOverview(target,{status},null,pill);
+    assert.equal(pill.textContent,label);
+    assert.doesNotMatch(pill.textContent,/33/);
+  }
+  renderCommandBotOverview(target,{...snapshot,count:0},null,pill);
+  assert.equal(pill.textContent,'0 Bots im Snapshot');
+  assert.match(target.textContent,/Dies bestätigt kein leeres Wallet/);
+  renderCommandBotOverview(target,{...snapshot,count:null},null,pill);
+  assert.equal(pill.textContent,'Nicht verfügbar');
+});
 
 test('Command equal-symbol equal-loss actions have distinct references and directions',()=>{
   const target=root(),selected=[];

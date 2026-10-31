@@ -426,7 +426,7 @@
         <p class="caption">Keine Schätzung, kein Ersatzwert und keine simulierte Performance.</p>
         <div class="trust-grid" aria-label="Datenquellenstatus">
           <div class="trust-cell"><strong>DEPOT</strong><span data-command-depot-status>Unbekannt</span></div>
-          <div class="trust-cell"><strong>BOTS</strong><span>Unbekannt</span></div>
+          <div class="trust-cell"><strong>BOTS</strong><span id="command-bots-status">Unbekannt</span></div>
           <div class="trust-cell"><strong>MARKT</strong><span>Unbekannt</span></div>
         </div>
       </section>
@@ -483,7 +483,7 @@
       </section>
       <section class="card card-muted" aria-labelledby="depot-holdings-heading">
         <h2 id="depot-holdings-heading">Deine Bestände</h2>
-        <p class="caption">Diese Datenquelle enthält keine einzelnen Positionen. Bestände und Verteilung bleiben nicht verfügbar.</p>
+        <p class="caption">Einzelne Bestände und ihre Verteilung werden in dieser Ansicht noch nicht angezeigt.</p>
       </section>
     </section>
     <section id="view-bots" class="view" aria-labelledby="bots-heading" hidden>
@@ -600,10 +600,10 @@
   }
 })();
 </script>
-<script type="module" src="./app-access-bootstrap.js?v=B16-M11-RELEASE1"></script>
-<script type="module" src="./bot-read-bootstrap.js?v=B16-M11-RELEASE1"></script>
-<script type="module" src="./depot-read-bootstrap.js?v=B16-M11-RELEASE1"></script>
-<script type="module" src="./strategy-workspace-bootstrap.js?v=B16-M11-RELEASE1"></script>
-<script type="module" src="./agent-status-bootstrap.js?v=B16-M11-RELEASE1"></script>
+<script type="module" src="./app-access-bootstrap.js?v=B16-M11-FIX1"></script>
+<script type="module" src="./bot-read-bootstrap.js?v=B16-M11-FIX1"></script>
+<script type="module" src="./depot-read-bootstrap.js?v=B16-M11-FIX1"></script>
+<script type="module" src="./strategy-workspace-bootstrap.js?v=B16-M11-FIX1"></script>
+<script type="module" src="./agent-status-bootstrap.js?v=B16-M11-FIX1"></script>
 </body>
 </html>

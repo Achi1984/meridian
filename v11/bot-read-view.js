@@ -1,7 +1,7 @@
 // Inactive component: mount explicitly with the existing read-client factory.
 // No network, credentials, storage or engine imports belong to this renderer.
-import {buildBotOverviewModel} from './bot-overview-model.js?v=B16-M11-RELEASE1';
-import {subscribeDepotPortfolio} from './depot-portfolio-state.js?v=B16-M11-RELEASE1';
+import {buildBotOverviewModel} from './bot-overview-model.js?v=B16-M11-FIX1';
+import {subscribeDepotPortfolio} from './depot-portfolio-state.js?v=B16-M11-FIX1';
 
 const LABELS = {
   locked: ['Gesperrt', 'App mit Meridian-Passwort öffnen, dann Bots manuell aktualisieren.'],
@@ -300,7 +300,13 @@ export function renderBotReadState(root, state, filters = {}) {
   return data.status;
 }
 
-export function renderCommandBotOverview(root, data, onJump) {
+export function renderCommandBotOverview(root, data, onJump, statusRoot=null) {
+  if(statusRoot){
+    const confirmed=data.status==='fresh'&&Number.isSafeInteger(data.count)&&data.count>=0;
+    statusRoot.textContent=confirmed?data.count+' Bots im Snapshot':
+      (Object.hasOwn(LABELS,data.status)?LABELS[data.status]:LABELS.unavailable)[0];
+    if(data.status==='fresh'&&!confirmed)statusRoot.textContent=LABELS.unavailable[0];
+  }
   if (!root) return;
   const document=root.ownerDocument;
   root.setAttribute('data-state',data.status);

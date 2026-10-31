@@ -1,6 +1,6 @@
-import {appAccess} from './app-access.js?v=B16-M11-RELEASE1';
-import {createBotReadClient} from './bot-read-client.js?v=B16-M11-RELEASE1';
-import {createBotReadView,renderCommandBotOverview} from './bot-read-view.js?v=B16-M11-RELEASE1';
+import {appAccess} from './app-access.js?v=B16-M11-FIX1';
+import {createBotReadClient} from './bot-read-client.js?v=B16-M11-FIX1';
+import {createBotReadView,renderCommandBotOverview} from './bot-read-view.js?v=B16-M11-FIX1';
 
 // Mounting controls never starts a request. Only the view's manual refresh can read.
 export function mountBotReadAccess(document,window,{
@@ -10,6 +10,7 @@ export function mountBotReadAccess(document,window,{
   const root=document.getElementById('bot-read-root');
   if(!root)return null;
   const commandRoot=document.getElementById('command-bot-overview');
+  const commandStatus=document.getElementById('command-bots-status');
   let client,view,unregister=()=>{},disposed=false,expiryTimer=null,expiryGeneration=0;
   function cancelExpiry(){
     expiryGeneration++;
@@ -17,7 +18,7 @@ export function mountBotReadAccess(document,window,{
   }
   try{
     view=createView(root,{getToken:access.getToken,
-      onSnapshot:(snapshot,jumpToBot)=>renderCommandBotOverview(commandRoot,snapshot,jumpToBot),
+      onSnapshot:(snapshot,jumpToBot)=>renderCommandBotOverview(commandRoot,snapshot,jumpToBot,commandStatus),
       createClient:options=>{
         const reader=createClient({...options,getToken:access.getToken,onChange:state=>{
           cancelExpiry();
@@ -43,6 +44,7 @@ export function mountBotReadAccess(document,window,{
     cancelExpiry();unregister();
     try{client?.dispose();}catch{}
     root.textContent='Botansicht nicht verfügbar. Bitte Seite neu laden.';
+    renderCommandBotOverview(commandRoot,{status:'unavailable'},null,commandStatus);
     return null;
   }
   return {dispose(){

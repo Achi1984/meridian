@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createAppAccess} from '../v11/app-access.js';
 import {createDepotReadClient} from '../v11/depot-read-client.js';
 import {mountDepotReadAccess} from '../v11/depot-read-bootstrap.js';
-import {subscribeDepotPortfolio} from '../v11/depot-portfolio-state.js?v=B16-M11-RELEASE1';
+import {subscribeDepotPortfolio} from '../v11/depot-portfolio-state.js?v=B16-M11-FIX1';
 class Node {
   constructor(document,tag){this.ownerDocument=document;this.tagName=tag;this.children=[];this.dataset={};this.attrs={};this.listeners=new Map();this.text='';}
   set textContent(value){this.text=String(value);this.children=[];}
@@ -60,11 +60,17 @@ test('manual refresh reads, reports unavailable categories; revalidation preserv
   assert.equal(h.urls.length-before,3);
   assert.equal(h.root.children[1].dataset.state,'unavailable');
   assert.match(h.text(),/Nicht verfügbar/);assert.match(h.text(),/Aktuell: unvollständig/);
+  assert.equal(h.fields.get('.portfolio-description').textContent,'Keine verifizierbare Depotbewertung. Fehlende Daten sind nicht null.');
+  assert.match(h.fields.get('.caption').textContent,/Aktuell: unvollständig/);
+  assert.doesNotMatch(h.fields.get('.caption').textContent,/Keine verifizierbare Depotbewertung/);
+  assert.equal(h.fields.get('.caption').hidden,false);
   assert.doesNotMatch(h.text(),/synthetic-password/);
   h.access.revalidateReaders();
   assert.equal(h.root.children[1].dataset.state,'unavailable','attempted state is not replaced by not_loaded');
   h.access.lock();
   assert.match(h.text(),/Gesperrt/);assert.equal(h.command.dataset.state,'locked');
+  assert.equal(h.fields.get('.caption').textContent,'');
+  assert.equal(h.fields.get('.caption').hidden,true);
   await h.access.verify('synthetic-password');
   assert.match(h.text(),/Noch nicht geladen/);
   m.dispose();
