@@ -1,5 +1,5 @@
-import {createDepotHistoryView} from './depot-history-view.js?v=B16-M11-FIX5';
-import {publishDepotPortfolioState} from './depot-portfolio-state.js?v=B16-M11-FIX5';
+import {createDepotHistoryView} from './depot-history-view.js?v=B16-M11-FIX6';
+import {publishDepotPortfolioState} from './depot-portfolio-state.js?v=B16-M11-FIX6';
 // DOM text only. Neither credentials nor raw response bodies are rendered.
 const LABELS={
   locked:['Gesperrt','App mit Meridian-Passwort öffnen, dann Depot manuell aktualisieren.'],
@@ -45,7 +45,7 @@ export function createDepotReadView(root,{getToken,createClient,commandRoot=null
   const format=x=>pionexOnly?new Intl.NumberFormat('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}).format(x)+' USD/USDT':money(x);
   let disposed=false,range='1d',lastHistory=null;
   const chartRoot=el('section');section.append(chartRoot);
-  const chart=pionexOnly?{render(){chartRoot.replaceChildren(el('h3','Pionex-Verlauf'),el('p','Noch kein separat bestätigter Pionex-Verlauf verfügbar. Die gespeicherte Gesamthistorie enthält mehrere Quellen und wird hier nicht als Pionex-Verlauf angezeigt.'));},dispose(){}}:createDepotHistoryView(chartRoot,{onRange:key=>{range=key;chart.render(lastHistory?.[range],range);}});
+  const chart=createDepotHistoryView(chartRoot,{pionexOnly,onRange:key=>{range=key;chart.render(lastHistory?.[range],range);}});
   let rendered=false;
   function render(state){
     if(disposed)return;rendered=true;
@@ -99,3 +99,4 @@ export function createDepotReadView(root,{getToken,createClient,commandRoot=null
   return {revalidate:()=>client.revalidate(),dispose(){if(disposed)return;client.dispose();
     render({status:'locked'});disposed=true;refresh.removeEventListener('click',update);lock.removeEventListener('click',clear);root.replaceChildren();}};
 }
+
