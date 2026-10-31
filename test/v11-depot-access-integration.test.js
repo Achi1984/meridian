@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createAppAccess} from '../v11/app-access.js';
+import {createDepotReadView} from '../v11/depot-read-view.js';
 import {createDepotReadClient} from '../v11/depot-read-client.js';
 import {mountDepotReadAccess} from '../v11/depot-read-bootstrap.js';
-import {subscribeDepotPortfolio} from '../v11/depot-portfolio-state.js?v=B16-M11-FIX1';
+import {subscribeDepotPortfolio} from '../v11/depot-portfolio-state.js?v=B16-M11-FIX2';
 class Node {
   constructor(document,tag){this.ownerDocument=document;this.tagName=tag;this.children=[];this.dataset={};this.attrs={};this.listeners=new Map();this.text='';}
   set textContent(value){this.text=String(value);this.children=[];}
@@ -212,4 +213,36 @@ test('deferred completion after dispose is ignored deterministically',async()=>{
   assert.equal(t.states.length,count,'late completion emits nothing');
   assert.equal(t.h.root.children.length,0);assert.equal(t.h.fields.get('.portfolio-value').textContent,'—');
   assert.equal(t.access.isUnlocked(),false);
+});
+
+test('source diagnosis survives model/client/view projection and is erased on lock without extra reads',async()=>{
+  const p=dashboard();p.data.portfolio.manualVenueBalances[0].updatedAt=iso(NOW-86400001);
+  const t=harness({dashboard:p,prices:prices(),history:history(false)});
+  await t.access.verify('synthetic-password');t.click();await t.done();
+  assert.equal(t.last().status,'unavailable');assert.equal(t.last().model,null);
+  assert.deepEqual(t.last().sourceIssues,['OKX_SOURCE_STALE']);
+  assert.match(t.h.text(),/OKX-Bewertungsquelle ist veraltet/);
+  assert.equal(t.reads.length,3);assert.doesNotMatch(t.h.text(),/BTC|synthetic-password|2026-10-12/);
+  t.access.revalidateReaders();assert.deepEqual(t.last().sourceIssues,['OKX_SOURCE_STALE']);assert.equal(t.reads.length,3);
+  t.access.lock();assert.deepEqual(t.last().sourceIssues,[]);assert.doesNotMatch(t.h.text(),/OKX-Bewertungsquelle/);t.m.dispose();
+});
+test('revalidation reports expiry of the held projection without falsely blaming an individual source',async()=>{
+  const t=harness({dashboard:dashboard(),prices:prices(),history:history(false)});
+  await t.access.verify('synthetic-password');t.click();await t.done();assert.deepEqual(t.last().sourceIssues,[]);
+  t.clock(NOW+200000);t.access.revalidateReaders();
+  assert.deepEqual(t.last().sourceIssues,['CURRENT_SNAPSHOT_EXPIRED']);
+  assert.match(t.h.text(),/inzwischen abgelaufen/);assert.doesNotMatch(t.h.text(),/OKX-Bewertungsquelle|Pionex-Gesamteigenkapital ist/);
+  assert.equal(t.reads.length,3);t.m.dispose();
+});
+
+test('source detail rendering accepts fixed codes only and clears prior diagnosis on lock',()=>{
+  const h=setup();let render;
+  const view=createDepotReadView(h.root,{createClient:options=>{
+    render=options.onChange;return {refresh(){},lock(){render({status:'locked'});},revalidate(){},dispose(){}};
+  }});
+  render({status:'unavailable',sourceIssues:['secret-wallet-token','OKX_SOURCE_STALE','OKX_SOURCE_STALE']});
+  assert.match(h.text(),/OKX-Bewertungsquelle ist veraltet/);
+  assert.doesNotMatch(h.text(),/secret-wallet-token/);
+  assert.equal(h.text().split('OKX-Bewertungsquelle ist veraltet.').length-1,1);
+  render({status:'locked'});assert.doesNotMatch(h.text(),/OKX-Bewertungsquelle/);view.dispose();
 });

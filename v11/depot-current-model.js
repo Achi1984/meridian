@@ -36,6 +36,7 @@ function source(value,fallback){
 export function buildCurrentDepotModel(payload,{tickers,tickersAt,now=Date.now()}={}){
   const empty={status:'UNKNOWN',readOnly:true,executionAllowed:false,totalUsd:null,spotUsd:null,tradingUsd:null,
     snapshotAt:null,sourceAt:null,source:null,expiresAt:null,excludedIncompletePoints:0};
+  let sourceIssues=['CURRENT_SOURCE_INVALID'];
   try{
     need(Number.isSafeInteger(now)&&now>0&&now<=8640000000000000);
     need(object(payload)&&payload.private===true&&object(payload.data)&&object(payload.data.portfolio));
@@ -43,23 +44,29 @@ export function buildCurrentDepotModel(payload,{tickers,tickersAt,now=Date.now()
     const rows=missing(p.manualVenueBalances)?[]:p.manualVenueBalances;
     need(Array.isArray(rows)&&rows.length<=100);
     const normalized=rows.map(row=>{
+      sourceIssues=['VENUE_SOURCE_INVALID'];
       need(object(row));
       const venue=row.venue??row.name;
       need(typeof venue==='string'&&/^[A-Za-z0-9 _-]{1,40}$/.test(venue)&&venue.trim());
+      sourceIssues=[venue.trim().toLowerCase()==='ledger'?'LEDGER_SOURCE_INVALID':venue.trim().toLowerCase()==='okx'?'OKX_SOURCE_INVALID':'VENUE_SOURCE_INVALID'];
       const value=row.valueUsd??row.value??row.totalUsd??row.equityUsd;
       need(amount(value));
       const time=stamp(row.updatedAt??row.snapshotAt??row.asOf,now);
       return {venue:venue.trim(),valueUsd:decimal(value),updatedAt:iso(time),source:source(row.source,'PRIVATE_VENUE_BALANCE')};
     });
+    sourceIssues=['CURRENT_SOURCE_INVALID'];
     const holdings=missing(p.holdings)?[]:p.holdings;
     need(Array.isArray(holdings)&&holdings.length<=1000);
     const ledger=[];
     for(const h of holdings){
+      sourceIssues=['CURRENT_SOURCE_INVALID'];
       need(object(h));
       if(typeof h.venue!=='string'||h.venue.trim().toLowerCase()!=='ledger')continue;
+      sourceIssues=['LEDGER_SOURCE_INVALID'];
       need(amount(h.quantity)&&typeof h.symbol==='string'&&/^[A-Z0-9._-]{1,20}$/.test(h.symbol));
       if(decimal(h.quantity)>0)ledger.push({venue:'Ledger',symbol:h.symbol,quantity:decimal(h.quantity)});
     }
+    sourceIssues=['LEDGER_SOURCE_INVALID'];
     const authority=missing(p.ledgerAuthorityAt)?null:stamp(p.ledgerAuthorityAt,now);
     const ledgerActive=authority!==null&&now-authority<=DAY&&ledger.length>0;
     const usedHoldings=ledgerActive?ledger.map(h=>({...h,updatedAt:iso(authority)})):[];
@@ -70,6 +77,7 @@ export function buildCurrentDepotModel(payload,{tickers,tickersAt,now=Date.now()
     // Select authority before validating the direct candidate: obsolete direct
     // metadata must not veto an independently fresh wallet. The internal tag
     // identifies that candidate without trusting its supplied source label.
+    sourceIssues=['PIONEX_SOURCE_INVALID'];
     const directCandidate='M11_DIRECT_PIONEX_CANDIDATE';
     if(!missing(p.pionexEquityUsd)){
       portfolio.pionexEquityUsd=p.pionexEquityUsd;
@@ -86,6 +94,7 @@ export function buildCurrentDepotModel(payload,{tickers,tickersAt,now=Date.now()
     const pionex=authoritativePionexEquitySnapshot(selected,now);
     if(!pionex.found){
       const stale=pionex.reason==='WALLET_STALE_OR_UNTIMED'||pionex.reason==='PRIVATE_STALE_OR_UNTIMED';
+      sourceIssues=[stale?'PIONEX_STALE_OR_UNTIMED':'PIONEX_SOURCE_MISSING'];
       need(false,stale?'STALE':'CURRENT_SOURCE_INCOMPLETE');
     }
     if(pionex.source===directCandidate){
@@ -98,7 +107,9 @@ export function buildCurrentDepotModel(payload,{tickers,tickersAt,now=Date.now()
     selected.portfolio={...portfolio,pionexEquityUsd:pionex.value,pionexEquitySource:pionex.source,pionexEquityUpdatedAt:iso(pionexTime)};
     let priceTime=null;
     if(ledgerActive){
-      priceTime=stamp(tickersAt,now);need(now-priceTime<=PRICE_AGE,'STALE');
+      sourceIssues=['PRICE_SOURCE_INVALID'];
+      priceTime=stamp(tickersAt,now);
+      if(now-priceTime>PRICE_AGE){sourceIssues=['PRICE_SOURCE_STALE'];need(false,'STALE');}
       need(Array.isArray(tickers)&&tickers.length>0&&tickers.length<=10000);
       const seen=new Set(),clean=[];
       for(const row of tickers){
@@ -111,9 +122,24 @@ export function buildCurrentDepotModel(payload,{tickers,tickersAt,now=Date.now()
       }
       selected=buildLivePriceOverlay(selected,clean,priceTime);
     }
+    sourceIssues=['CURRENT_SOURCE_INVALID'];
     const snapshot=canonicalPortfolioSnapshot(selected,now);
     const spot=snapshot.spotAuthority;
     if(spot.complete!==true){
+      // Report only fixed categories from the selected authority, never venue
+      // names, symbols, values, timestamps or raw validation errors.
+      const present=new Set(spot.venues.map(v=>v.toLowerCase()));
+      sourceIssues=[];
+      for(const venue of portfolio.externalVenueExpectedVenues){
+        const key=venue.toLowerCase();if(present.has(key))continue;
+        const candidates=balances.filter(r=>r.venue.toLowerCase()===key);
+        const expired=candidates.length?Math.max(...candidates.map(r=>Date.parse(r.updatedAt)))<now-DAY:
+          key==='ledger'&&authority!==null&&now-authority>DAY;
+        sourceIssues.push(key==='ledger'?(expired?'LEDGER_SOURCE_STALE':'LEDGER_SOURCE_MISSING'):
+          (expired?'OKX_SOURCE_STALE':'OKX_SOURCE_MISSING'));
+      }
+      if(!spot.holdingsPricingComplete)sourceIssues.push('REQUIRED_PRICE_MISSING');
+      if(!sourceIssues.length)sourceIssues=['CURRENT_SOURCE_INCOMPLETE'];
       const old=balances.some(r=>r.venue.toLowerCase()!=='pionex'&&now-Date.parse(r.updatedAt)>DAY)||authority!==null&&now-authority>DAY;
       need(false,old?'STALE':'CURRENT_SOURCE_INCOMPLETE');
     }
@@ -129,6 +155,6 @@ export function buildCurrentDepotModel(payload,{tickers,tickersAt,now=Date.now()
       source:'SERVER_PORTFOLIO_CURRENT',expiresAt};
   }catch(error){
     return {...empty,status:error?.message==='STALE'?'STALE':'UNKNOWN',
-      reason:error?.message==='STALE'?'SOURCE_EXPIRED':'CURRENT_SOURCE_INCOMPLETE'};
+      reason:error?.message==='STALE'?'SOURCE_EXPIRED':'CURRENT_SOURCE_INCOMPLETE',sourceIssues};
   }
 }

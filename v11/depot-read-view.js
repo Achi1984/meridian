@@ -1,5 +1,5 @@
-import {createDepotHistoryView} from './depot-history-view.js?v=B16-M11-FIX1';
-import {publishDepotPortfolioState} from './depot-portfolio-state.js?v=B16-M11-FIX1';
+import {createDepotHistoryView} from './depot-history-view.js?v=B16-M11-FIX2';
+import {publishDepotPortfolioState} from './depot-portfolio-state.js?v=B16-M11-FIX2';
 // DOM text only. Neither credentials nor raw response bodies are rendered.
 const LABELS={
   locked:['Gesperrt','App mit Meridian-Passwort öffnen, dann Depot manuell aktualisieren.'],
@@ -12,6 +12,21 @@ const LABELS={
 const REASONS={TRANSPORT:'nicht erreichbar',INCOMPLETE:'unvollständig',STALE:'veraltet',EMPTY:'keine vollständigen Bewertungen im Zeitraum'};
 const diagnose=r=>r?[['Aktuell',r.current],['Kurse',r.prices],['Historie',r.history]].filter(([,v])=>Object.hasOwn(REASONS,v))
   .map(([k,v])=>k+': '+REASONS[v]).join(' · '):'';
+const SOURCE_ISSUES={
+  LEDGER_SOURCE_STALE:'Ledger-Bestandsquelle ist veraltet.',LEDGER_SOURCE_MISSING:'Aktuelle Ledger-Bestandsquelle fehlt.',
+  LEDGER_SOURCE_INVALID:'Ledger-Bestandsquelle ist nicht prüfbar.',
+  OKX_SOURCE_STALE:'OKX-Bewertungsquelle ist veraltet.',OKX_SOURCE_MISSING:'Aktuelle OKX-Bewertungsquelle fehlt.',
+  OKX_SOURCE_INVALID:'OKX-Bewertungsquelle ist nicht prüfbar.',
+  PIONEX_STALE_OR_UNTIMED:'Pionex-Gesamteigenkapital ist veraltet oder ohne gültigen Zeitpunkt.',
+  PIONEX_SOURCE_MISSING:'Aktuelles Pionex-Gesamteigenkapital fehlt.',PIONEX_SOURCE_INVALID:'Pionex-Gesamteigenkapital ist nicht prüfbar.',
+  PRICE_SOURCE_STALE:'Benötigte Bewertungskurse sind veraltet.',PRICE_SOURCE_INVALID:'Benötigte Bewertungskurse sind nicht prüfbar.',
+  REQUIRED_PRICE_MISSING:'Mindestens ein benötigter Bewertungskurs fehlt oder ist nicht bestätigt.',
+  VENUE_SOURCE_INVALID:'Eine Depotquelle ist nicht prüfbar.',CURRENT_SOURCE_INVALID:'Die aktuellen Depotdaten sind nicht prüfbar.',
+  CURRENT_SOURCE_INCOMPLETE:'Die aktuellen Depotquellen sind unvollständig.',
+  CURRENT_SNAPSHOT_EXPIRED:'Die geladene Bewertung ist inzwischen abgelaufen. Bitte Depot manuell aktualisieren.'
+};
+const sourceDetails=issues=>Array.isArray(issues)?[...new Set(issues)].slice(0,3)
+  .filter(code=>typeof code==='string'&&Object.hasOwn(SOURCE_ISSUES,code)).map(code=>SOURCE_ISSUES[code]).join(' '):'';
 const money=x=>new Intl.NumberFormat('de-DE',{style:'currency',currency:'USD'}).format(x);
 export function createDepotReadView(root,{getToken,createClient,commandRoot=null}={}){
   const document=root.ownerDocument;
@@ -52,7 +67,10 @@ export function createDepotReadView(root,{getToken,createClient,commandRoot=null
       commandRoot.dataset.state=kind;
     }
     status.replaceChildren(el('strong',current?'Depotbewertung':LABELS[kind][0]),el('p',current?'Aus serverseitigen Depotdaten. Lokale Ergänzungen aus V10 sind nicht enthalten.':LABELS[kind][1]));
-    if(kind==='unavailable'||kind==='stale'){const why=diagnose(state?.reasons);if(why)status.append(el('p',why));}
+    if(kind==='unavailable'||kind==='stale'){
+      const why=diagnose(state?.reasons);if(why)status.append(el('p',why));
+      const sources=sourceDetails(state?.sourceIssues);if(sources)status.append(el('p',sources));
+    }
     details.replaceChildren();details.setAttribute('aria-busy',String(kind==='loading'));
     if(kind!=='fresh')return;
     const total=el('p',money(m.totalUsd));total.className='depot-total';

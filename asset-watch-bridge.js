@@ -37,6 +37,15 @@ function projectedEnum(value,allowed){
   const normalized=value.trim();
   return allowed.includes(normalized)?normalized:null;
 }
+const PNL_UNAVAILABLE_REASONS=['USD_VALUE_MISSING','WALLET_PROFIT_UNIT_UNCONFIRMED',
+  'WALLET_USD_PRICE_MISSING','ZERO_VALUE_UNCONFIRMED'];
+function projectedPnlReason(bot){
+  const raw=bot.pnlUsd;
+  if(typeof raw==='number'&&Number.isFinite(raw)&&raw!==0)return null;
+  // Preserve an explicit provider reason before the legacy null-to-zero projection.
+  return projectedEnum(bot.pnlUnavailableReason,PNL_UNAVAILABLE_REASONS)||
+    (raw===0?'ZERO_VALUE_UNCONFIRMED':'USD_VALUE_MISSING');
+}
 function sanitizedBot(bot={}){
   const symbol=String(bot.symbol||'').trim().toUpperCase()||null;
   const side=normalizedSide(bot.side);
@@ -84,6 +93,7 @@ function sanitizedBot(bot={}){
     },
     pnl:{
       usd:num(bot.pnlUsd),
+      unavailableReason:projectedPnlReason(bot),
       totalProfitPct:num(bot.totalProfitPct)
     },
     source:text(bot.source)

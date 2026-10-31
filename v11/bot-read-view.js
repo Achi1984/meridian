@@ -1,7 +1,7 @@
 // Inactive component: mount explicitly with the existing read-client factory.
 // No network, credentials, storage or engine imports belong to this renderer.
-import {buildBotOverviewModel} from './bot-overview-model.js?v=B16-M11-FIX1';
-import {subscribeDepotPortfolio} from './depot-portfolio-state.js?v=B16-M11-FIX1';
+import {buildBotOverviewModel} from './bot-overview-model.js?v=B16-M11-FIX2';
+import {subscribeDepotPortfolio} from './depot-portfolio-state.js?v=B16-M11-FIX2';
 
 const LABELS = {
   locked: ['Gesperrt', 'App mit Meridian-Passwort öffnen, dann Bots manuell aktualisieren.'],
@@ -12,6 +12,12 @@ const LABELS = {
 };
 const TYPES = {futures_grid:'Futures Grid', future_hedge_grid:'Futures Hedge Grid'};
 const MISSING = 'Nicht verfügbar';
+const PNL_REASONS={
+  USD_VALUE_MISSING:'Kein bestätigter P/L-Wert in USD vorhanden.',
+  WALLET_PROFIT_UNIT_UNCONFIRMED:'Die Einheit des gelieferten Gewinnwerts ist nicht bestätigt. Deshalb wird kein USD-Wert angezeigt.',
+  WALLET_USD_PRICE_MISSING:'Für den gelieferten Gewinnwert fehlt ein bestätigter USD-Umrechnungskurs.',
+  ZERO_VALUE_UNCONFIRMED:'Ein Nullwert ist vorhanden, bestätigt aber keinen Gewinn oder Verlust von null.'
+};
 const TP_UNKNOWN_REASON = 'Die Quelle bestätigt keinen direkt vergleichbaren TP-Preis; fehlende Werte belegen kein ungesetztes TP.';
 const TP_UPPER_UNKNOWN_REASON = 'Die obere Range fehlt oder ist nicht eindeutig bestätigt.';
 const EMPTY_SNAPSHOT = 'Keine darstellbaren Bots in diesem Snapshot. Dies bestätigt kein leeres Wallet.';
@@ -64,6 +70,15 @@ const formatExact = (value, unit = '') => {
   const valid = number(value);
   return valid === null ? MISSING : String(valid) + unit;
 };
+function readableDetail(exact) {
+  if(exact===MISSING)return exact;
+  const match=/^(-?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?)(.*)$/i.exec(exact);
+  if(!match)return exact;
+  const value=Number(match[1]);
+  if(!Number.isFinite(value))return MISSING;
+  const options=Math.abs(value)>=1?{maximumFractionDigits:2}:{maximumSignificantDigits:6};
+  return new Intl.NumberFormat('de-DE',options).format(value)+match[2];
+}
 function formatMoney(value, currency, signed = false) {
   const valid = number(value);
   if (valid === null) return MISSING;
@@ -124,6 +139,8 @@ function projection(state, filters = {}) {
         pnlDetail:formatExact(bot.metrics?.pnlUsd,' USD'),
         pnlTone:row.pnl === null ? null : row.pnl < 0 ? 'negative' : 'positive',
         pnlValue:row.pnl,leverageValue:row.leverage,
+        pnlReason:row.pnl===null?(Object.hasOwn(PNL_REASONS,bot.metrics?.pnlUnavailableReason)
+          ?PNL_REASONS[bot.metrics.pnlUnavailableReason]:PNL_REASONS.USD_VALUE_MISSING):null,
         lower:formatExact(bot.metrics?.lower),upper:formatExact(bot.metrics?.upper),
         liquidation:formatExact(bot.metrics?.liquidationPrice),
         liquidationLowerBound:formatExact(bot.metrics?.liquidationLowerBound),
@@ -286,25 +303,49 @@ export function renderBotReadState(root, state, filters = {}) {
         body.append(element(document,'p','Technische Referenz: '+bot.ref));
         body.append(element(document,'p','Richtung: '+bot.side+' · Typ: '+bot.type+' · Kategorie: '+
           (bot.productCategory||bot.category)));
+        if(bot.pnlReason){
+          const explanation=element(document,'p',bot.pnlReason);explanation.className='bot-pnl-unavailable-reason';
+          body.append(explanation);
+        }
         const metrics=element(document,'dl');metrics.className='bot-card-metrics';
         const liquidationMetrics=bot.side==='Neutral'
           ?[['Liquidationsschätzung · Untergrenze',bot.liquidationLowerBound],
             ['Liquidationsschätzung · Obergrenze',bot.liquidationUpperBound]]
           :[['Liquidationspreis laut Quelle',bot.liquidation]];
-        for (const [label,value] of [
+        const metricRows=[
           ['Hebel · Originalwert',bot.leverageDetail],['Kapital · Originalwert',bot.investmentDetail],
           ['P/L laut Quelle · Originalwert',bot.pnlDetail],
           ['Grid-Untergrenze',bot.lower],['Grid-Obergrenze',bot.upper],['Grid-Gewinn',MISSING],
           ...liquidationMetrics,['Risikopuffer',MISSING],
-          ['Take-Profit',bot.takeProfit],['Stop-Loss',bot.stopLoss]]) {
-          const group=element(document,'div');group.append(element(document,'dt',label),element(document,'dd',value));metrics.append(group);
-        }
+          ['Take-Profit',bot.takeProfit],['Stop-Loss',bot.stopLoss]];
         const tpSet=element(document,'div'),tpMatch=element(document,'div');
         tpSet.append(element(document,'dt','TP gesetzt'),element(document,'dd'));
         tpSet.children[1].append(tpIndicator(document,'TP gesetzt',bot.takeProfitSet));
         tpMatch.append(element(document,'dt','TP = obere Range'),element(document,'dd'));
         tpMatch.children[1].append(tpIndicator(document,'TP = obere Range',bot.takeProfitMatchesUpper));
-        metrics.append(tpSet,tpMatch);
+        let showOriginal=false;
+        const originalToggle=element(document,'button','Originalwerte anzeigen');
+        originalToggle.setAttribute('type','button');
+        originalToggle.setAttribute('aria-pressed','false');
+        originalToggle.setAttribute('aria-label',bot.symbol+' · ID-Ende '+referenceTail(bot.ref)+' · Originalwerte anzeigen');
+        const formatHint=element(document,'p','Werte zur besseren Lesbarkeit gerundet. Originalwerte sind einblendbar; der TP-Vergleich nutzt die unveränderten Werte.');
+        const renderMetrics=()=>{
+          metrics.replaceChildren();
+          for(const [label,value] of metricRows){
+            const group=element(document,'div');
+            group.append(element(document,'dt',showOriginal?label:label.replace(' · Originalwert','')),
+              element(document,'dd',showOriginal?value:readableDetail(value)));
+            metrics.append(group);
+          }
+          metrics.append(tpSet,tpMatch);
+          originalToggle.textContent=showOriginal?'Gerundete Ansicht anzeigen':'Originalwerte anzeigen';
+          originalToggle.setAttribute('aria-pressed',String(showOriginal));
+          originalToggle.setAttribute('aria-label',bot.symbol+' · ID-Ende '+referenceTail(bot.ref)+' · '+originalToggle.textContent);
+          formatHint.textContent=showOriginal?'Originalwerte aus dem Snapshot. Der TP-Vergleich bleibt unverändert.':
+            'Werte zur besseren Lesbarkeit gerundet. Originalwerte sind einblendbar; der TP-Vergleich nutzt die unveränderten Werte.';
+        };
+        originalToggle.addEventListener('click',()=>{showOriginal=!showOriginal;renderMetrics();});
+        renderMetrics();
         const tpWarning=bot.takeProfitSet===false||bot.takeProfitMatchesUpper===false;
         if(tpWarning){
           const warning=element(document,'p');warning.className='bot-tp-warning';
@@ -316,7 +357,7 @@ export function renderBotReadState(root, state, filters = {}) {
           const reason=element(document,'p','TP nicht prüfbar: '+bot.takeProfitCheckReason);
           reason.className='bot-tp-status-reason';body.append(reason);
         }
-        body.append(element(document,'p','Preisgrenzen und TP/SL: Einheit von der Quelle nicht ausgewiesen. P/L kann je nach Quelle Gesamt- oder offenen Gewinn enthalten.'),metrics,element(document,'p','Nicht verfügbar: Die Quelle liefert keinen eindeutig bestätigten Wert. Auch Nullwerte bleiben unbestätigt, weil sie fehlende Angaben bedeuten können. Grid-Gewinn und Risikopuffer sind im Snapshot nicht enthalten. Fehlende TP/SL-Werte bestätigen keine deaktivierten Schutzaufträge.'));
+        body.append(element(document,'p','Preisgrenzen und TP/SL: Einheit von der Quelle nicht ausgewiesen. P/L kann je nach Quelle Gesamt- oder offenen Gewinn enthalten.'),originalToggle,formatHint,metrics,element(document,'p','Nicht verfügbar: Die Quelle liefert keinen eindeutig bestätigten Wert. Auch Nullwerte bleiben unbestätigt, weil sie fehlende Angaben bedeuten können. Grid-Gewinn und Risikopuffer sind im Snapshot nicht enthalten. Fehlende TP/SL-Werte bestätigen keine deaktivierten Schutzaufträge.'));
         const close=element(document,'button','Bot zuklappen');close.setAttribute('type','button');
         close.setAttribute('aria-label',bot.symbol+' · '+bot.side+' · ID-Ende '+referenceTail(bot.ref)+' zuklappen');
         close.addEventListener('click',()=>{setDisclosure(false);summary.focus();});

@@ -60,11 +60,16 @@ function takeProfitCheck(metrics, evidence) {
   };
   return {set: true, matchesUpper: decimalKey(metrics.takeProfit) === decimalKey(metrics.upper), reason: null};
 }
+const PNL_UNAVAILABLE_REASONS=['USD_VALUE_MISSING','WALLET_PROFIT_UNIT_UNCONFIRMED',
+  'WALLET_USD_PRICE_MISSING','ZERO_VALUE_UNCONFIRMED'];
 function metrics(bot) {
   return {leverage: metric(bot.leverage, true), investmentUsd: metric(bot.investment?.usd, true),
     investmentAmount: metric(bot.investment?.quoteAmount, true),
     investmentCurrency: typeof bot.investment?.currency === 'string' && /^[A-Z0-9]{2,12}$/.test(bot.investment.currency) ? bot.investment.currency : null,
-    pnlUsd: metric(bot.pnl?.usd), lower: metric(bot.limits?.lower, true),
+    pnlUsd: metric(bot.pnl?.usd),
+    pnlUnavailableReason: metric(bot.pnl?.usd)!==null?null:
+      enumValue(bot.pnl?.unavailableReason,PNL_UNAVAILABLE_REASONS)||'USD_VALUE_MISSING',
+    lower: metric(bot.limits?.lower, true),
     upper: metric(bot.limits?.upper, true), liquidationPrice: metric(bot.limits?.liquidationPrice, true),
     liquidationLowerBound: metric(bot.limits?.liquidationLowerBound, true),
     liquidationUpperBound: metric(bot.limits?.liquidationUpperBound, true),

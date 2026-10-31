@@ -1,7 +1,7 @@
-import {buildCurrentDepotModel} from './depot-current-model.js?v=B16-M11-FIX1';
-import {buildDepotHistoryModel} from './depot-history-model.js?v=B16-M11-FIX1';
-import {buildDepotReadModel} from './depot-read-model.js?v=B16-M11-FIX1';
-import {parseBotReadCredential} from './bot-read-client.js?v=B16-M11-FIX1';
+import {buildCurrentDepotModel} from './depot-current-model.js?v=B16-M11-FIX2';
+import {buildDepotHistoryModel} from './depot-history-model.js?v=B16-M11-FIX2';
+import {buildDepotReadModel} from './depot-read-model.js?v=B16-M11-FIX2';
+import {parseBotReadCredential} from './bot-read-client.js?v=B16-M11-FIX2';
 
 const ENDPOINT = 'https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/portfolio-history?range=1w';
 const CURRENT_ENDPOINT='https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/dashboard';
@@ -51,7 +51,7 @@ export function createDepotReadClient({getToken,onChange=()=>{},fetchImpl=global
   let generation=0,pending=null,disposed=false,current=null,stored=null,history=null,attempted=false,src=null;
   const token=()=>{try{const value=getToken();return parseDepotReadCredential(value)?value.trim():null;}catch{return null;}};
   let snapshotToken=null;
-  const emit=(status,model=null)=>{if(!disposed)try{onChange({status,model,history,reasons:reasons()});}catch{}};
+  const emit=(status,model=null)=>{if(!disposed)try{onChange({status,model,history,reasons:reasons(),sourceIssues:sourceIssues()});}catch{}};
   const stop=()=>{generation++;pending?.abort();pending=null;};
   const wipe=()=>{current=null;stored=null;history=null;src=null;snapshotToken=null;};
   // Fixed categories only, derived at emit time so a fresh->stale projection never keeps an OK label.
@@ -63,6 +63,11 @@ export function createDepotReadClient({getToken,onChange=()=>{},fetchImpl=global
       current:valid(current)?'OK':src.dashboardFailed?'TRANSPORT':src.c==='STALE'||current?'STALE':'INCOMPLETE',
       prices:src.pricesFailed?'TRANSPORT':'RECEIVED',
       history:valid(stored)?'OK':src.archiveFailed?'TRANSPORT':src.h==='STALE'||stored?.status==='FRESH_SNAPSHOT'?'STALE':src.historyEmpty?'EMPTY':'INCOMPLETE'};
+  }
+  function sourceIssues(){
+    if(!src||src.dashboardFailed)return [];
+    if(current?.status==='FRESH_SNAPSHOT')return now()>current.expiresAt?['CURRENT_SNAPSHOT_EXPIRED']:[];
+    return src.sourceIssues||[];
   }
   function project(){
     const clock=now(),valid=m=>m?.status==='FRESH_SNAPSHOT'&&clock<=m.expiresAt;
@@ -104,7 +109,7 @@ export function createDepotReadClient({getToken,onChange=()=>{},fetchImpl=global
     if(!current&&!stored&&h.status==='STALE')stored={status:'STALE'};
     const failed=r=>r.failed||r.data===undefined;
     src={dashboardFailed:failed(dashboard),pricesFailed:failed(prices),archiveFailed:failed(archive),c:c.status,h:h.status,
-      historyEmpty:history['1w']?.status==='empty'};
+      historyEmpty:history['1w']?.status==='empty',sourceIssues:c.sourceIssues};
     project();
   }
   function revalidate(){if(disposed)return;if(!token()||(snapshotToken&&token()!==snapshotToken)){lock();return;}if(current||stored)project();else if(!attempted&&!pending)emit('not_loaded');}
