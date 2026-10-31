@@ -787,8 +787,8 @@ function restoreB2(source){
     assert.equal(source.split(after).length-1,1,'one exact B16 release metadata delta');
     source=source.replace(after,before);
   }
-  assert.equal(source.split('?v=B16-M11-FIX4').length-1,5,'five B16 release entrypoints');
-  source=source.replaceAll('?v=B16-M11-FIX4','?v=B17-M11');
+  assert.equal(source.split('?v=B16-M11-FIX5').length-1,5,'five B16 release entrypoints');
+  source=source.replaceAll('?v=B16-M11-FIX5','?v=B17-M11');
   for(const addition of [
     '  <link rel="stylesheet" href="../public/css/m11-agent-status.css">\n',
     '        <div id="agent-status-root" role="status" aria-live="polite">Keine verifizierten Statusdaten.</div>\n',
@@ -925,7 +925,7 @@ function deploymentServer(){
   const server=createServer((request,response)=>{
     const url=new URL(request.url,'http://127.0.0.1'),path=url.pathname;
     requests.push({method:request.method,path}); // never record headers or token values
-    const versionedModule=path.startsWith('/meridian/v11/')&&moduleNames.includes(path.slice('/meridian/v11/'.length))&&url.search==='?v=B16-M11-FIX4';
+    const versionedModule=path.startsWith('/meridian/v11/')&&moduleNames.includes(path.slice('/meridian/v11/'.length))&&url.search==='?v=B16-M11-FIX5';
     if(request.method!=='GET'||(url.search&&!versionedModule)){response.writeHead(404);response.end();return;}
     if(path===authEndpoint){
       authReads++;
@@ -942,10 +942,15 @@ function deploymentServer(){
       response.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});
       response.end(JSON.stringify({schemaVersion:'MERIDIAN-ASSET-WATCH-BRIDGE-V1',source:'PIONEX_WALLET_BOT_DETAIL',sourceSnapshotAt:new Date().toISOString(),freshnessLimitMs:900000,readOnly:true,executionImpact:false,detailsComplete:true,sourceStatusOk:true,fresh:true,usableForOverwrite:true,botCount:2,bots:[{botRef:'a'.repeat(20),symbol:'BTC',side:'SHORT',cateType:'inverse',botType:'futures_grid',sideSource:'economic_inverse_asset',leverage:3,investment:{usd:null,quoteAmount:0.42,currency:'ETH'},pnl:{usd:-12.5},limits:{lower:2000,upper:4000,liquidationPrice:1800,takeProfit:4500,stopLoss:1900}},{botRef:'b'.repeat(20),symbol:'ETH',side:'LONG',cateType:'linear',botType:'futures_grid',leverage:2,investment:{usd:100},pnl:{usd:8.25}}]}));return;
     }
-    if(path===priceEndpoint||path===currentEndpoint){
-      if(path===priceEndpoint)assert.equal(request.headers.authorization,undefined);else assert.ok(request.headers.authorization);
-      response.writeHead(200,{'Content-Type':'application/json'});response.end(JSON.stringify(path===priceEndpoint?[]:mode==='current'?{private:true,data:{portfolio:{holdings:[],manualVenueBalances:[{venue:'Ledger',valueUsd:10000,updatedAt:new Date().toISOString()},{venue:'OKX',valueUsd:2000,updatedAt:new Date().toISOString()}],pionexEquityUsd:3450,pionexEquityUpdatedAt:new Date().toISOString()}}}:{}));return;
+    if(path===currentEndpoint){
+      depotReads++;
+      if(!request.headers.authorization||mode==='denied'){response.writeHead(401);response.end('{}');return;}
+      if(mode==='pending'){pending.add(response);response.on('close',()=>{pending.delete(response);if(!response.writableEnded)depotAborts++;});return;}
+      if(mode==='error'){response.writeHead(503);response.end('{}');return;}
+      const time=new Date(Date.now()-(mode==='stale'?901000:1000)).toISOString();
+      response.writeHead(200,{'Content-Type':'application/json'});response.end(JSON.stringify({private:true,data:{portfolio:{holdings:[{venue:'Ledger',quantity:'invalid'}],manualVenueBalances:[{venue:'OKX',valueUsd:'invalid'}],pionexEquityUsd:3450,pionexEquityUpdatedAt:time}}}));return;
     }
+    if(path===priceEndpoint){response.writeHead(500);response.end('{}');return;}
     if(path===depotEndpoint){
       depotReads++;
       if(!request.headers.authorization||mode==='denied'){response.writeHead(401);response.end('{}');return;}
@@ -970,7 +975,7 @@ function deploymentServer(){
     if(path!=='/meridian/v11/'&&path!=='/meridian/v10/'){response.writeHead(404);response.end();return;}
     const preview=path==='/meridian/v11/';
     const origin='http://127.0.0.1:'+server.address().port;
-    const scriptSource=preview?`'sha256-${scriptHash}' `+[...modules.keys()].map(path=>origin+path+(path.startsWith('/meridian/v11/')?'?v=B16-M11-FIX4':'')).join(' '):"'none'";
+    const scriptSource=preview?`'sha256-${scriptHash}' `+[...modules.keys()].map(path=>origin+path+(path.startsWith('/meridian/v11/')?'?v=B16-M11-FIX5':'')).join(' '):"'none'";
     const policy=`default-src 'none'; script-src ${scriptSource}; style-src 'unsafe-inline'${preview?' '+origin+statusCssPath:''}; connect-src ${preview?origin+endpoint+' '+origin+depotEndpoint+' '+origin+currentEndpoint+' '+origin+priceEndpoint+' '+origin+authEndpoint+' '+origin+'/meridian/docs/strategy-lab/campaign-20261013.json':"'none'"}; worker-src 'none'; child-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'none'`;
     policies.set(path,policy);
     response.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Content-Security-Policy':policy});response.end(preview?html:terminal);
@@ -991,11 +996,11 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     const start=server.base+'v11/';
     const page=await fetch(start);
     assert.equal(page.status,200);
-    const catalogUrl=new URL('strategy-catalog.js?v=B16-M11-FIX4',start);
+    const catalogUrl=new URL('strategy-catalog.js?v=B16-M11-FIX5',start);
     const catalog=await fetch(catalogUrl);
     assert.equal(catalog.status,200);
     const source=await catalog.text();
-    const imported=source.match(/from ['"](\.\/research-evidence\.js\?v=B16-M11-FIX4)['"]/);
+    const imported=source.match(/from ['"](\.\/research-evidence\.js\?v=B16-M11-FIX5)['"]/);
     assert.ok(imported,'catalog imports the read-only evidence module');
     const dependency=new URL(imported[1],catalogUrl);
     const response=await fetch(dependency);
@@ -1005,9 +1010,9 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     const scriptPolicy=page.headers.get('content-security-policy').split(';').find(part=>part.trim().startsWith('script-src '));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(dependency.href),'exact dependency URL must be in script-src');
     assert.equal(server.allowedPaths.has(dependency.pathname),true);
-    const arenaUrl=new URL('strategy-arena.js?v=B16-M11-FIX4',start);
+    const arenaUrl=new URL('strategy-arena.js?v=B16-M11-FIX5',start);
     const arenaSource=await (await fetch(arenaUrl)).text();
-    const inspectionImport=arenaSource.match(/from ['"](\.\/arena-inspection-report\.js\?v=B16-M11-FIX4)['"]/);
+    const inspectionImport=arenaSource.match(/from ['"](\.\/arena-inspection-report\.js\?v=B16-M11-FIX5)['"]/);
     assert.ok(inspectionImport,'Arena imports the metadata-only report adapter');
     const inspectionUrl=new URL(inspectionImport[1],arenaUrl);
     const inspection=await fetch(inspectionUrl);
@@ -1016,7 +1021,7 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     assert.equal(await inspection.text(),readFileSync(new URL('../v11/arena-inspection-report.js',import.meta.url),'utf8'));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(inspectionUrl.href));
     assert.equal(server.allowedPaths.has(inspectionUrl.pathname),true);
-    const historicalImport=arenaSource.match(/from ['"](\.\/arena-historical-result\.js\?v=B16-M11-FIX4)['"]/);
+    const historicalImport=arenaSource.match(/from ['"](\.\/arena-historical-result\.js\?v=B16-M11-FIX5)['"]/);
     assert.ok(historicalImport,'Arena imports the bounded historical fixture adapter');
     const historicalUrl=new URL(historicalImport[1],arenaUrl);
     const historical=await fetch(historicalUrl);
@@ -1025,7 +1030,7 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     assert.equal(await historical.text(),readFileSync(new URL('../v11/arena-historical-result.js',import.meta.url),'utf8'));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(historicalUrl.href));
     assert.equal(server.allowedPaths.has(historicalUrl.pathname),true);
-    const producerImport=arenaSource.match(/from ['"](\.\/arena-historical-export\.js\?v=B16-M11-FIX4)['"]/);
+    const producerImport=arenaSource.match(/from ['"](\.\/arena-historical-export\.js\?v=B16-M11-FIX5)['"]/);
     assert.ok(producerImport,'Arena imports the bounded producer export adapter');
     const producerUrl=new URL(producerImport[1],arenaUrl);
     const producer=await fetch(producerUrl);
@@ -1034,7 +1039,7 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     assert.equal(await producer.text(),readFileSync(new URL('../v11/arena-historical-export.js',import.meta.url),'utf8'));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(producerUrl.href),'exact producer dependency URL must be in script-src');
     assert.equal(server.allowedPaths.has(producerUrl.pathname),true);
-    const rendererImport=arenaSource.match(/from ['"](\.\/arena-result-view\.js\?v=B16-M11-FIX4)['"]/);
+    const rendererImport=arenaSource.match(/from ['"](\.\/arena-result-view\.js\?v=B16-M11-FIX5)['"]/);
     assert.ok(rendererImport,'Arena imports the isolated result renderer');
     const rendererUrl=new URL(rendererImport[1],arenaUrl);
     const renderer=await fetch(rendererUrl);
@@ -1044,8 +1049,8 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(rendererUrl.href),'exact renderer dependency URL must be in script-src');
     assert.equal(server.allowedPaths.has(rendererUrl.pathname),true);
     for(const [path,file,type] of [
-      ['agent-status-bootstrap.js?v=B16-M11-FIX4','v11/agent-status-bootstrap.js','javascript'],
-      ['agent-status-client.js?v=B16-M11-FIX4','v11/agent-status-client.js','javascript'],
+      ['agent-status-bootstrap.js?v=B16-M11-FIX5','v11/agent-status-bootstrap.js','javascript'],
+      ['agent-status-client.js?v=B16-M11-FIX5','v11/agent-status-client.js','javascript'],
       ['../public/js/m11-agent-status.js','public/js/m11-agent-status.js','javascript'],
       ['../public/css/m11-agent-status.css','public/css/m11-agent-status.css','css']
     ]){
@@ -1290,47 +1295,29 @@ async function browserRun(call,start,width,height,server){
       const refresh=()=>evaluate(`document.querySelector('#depot-read-root button').focus();document.querySelector('#depot-read-root button').click();true`);
       await refresh();await waitUntil(async()=>await readState()==='fresh');
       const depot=await evaluate(`(()=>{const root=document.getElementById('depot-read-root');
-        const confirm=root.querySelector('.ledger-review button:last-of-type');
-        const confirmHidden=confirm.hidden;
-        // Geometry only: expose and restore the control without clicking or submitting.
-        confirm.hidden=false;const confirmHeight=confirm.getBoundingClientRect().height;confirm.hidden=confirmHidden;
-        return {confirmHidden,confirmHeight,
+        return {noLedger:!root.querySelector('.ledger-review'),
         text:root.textContent,amount:root.querySelector('.depot-total').textContent,overflow:document.documentElement.scrollWidth>innerWidth+1,
         status:root.querySelector('[role=status]').getAttribute('aria-live'),focus:document.activeElement===root.querySelector('button'),
         targets:[...root.querySelectorAll('button')].filter(x=>x.getClientRects().length>0).every(x=>x.getBoundingClientRect().height>=44)};})()`);
       assert.equal(await evaluate(`document.querySelector('#command-portfolio .portfolio-value').textContent`),depot.amount);
-      assert.match(await evaluate(`document.querySelector('#command-portfolio .portfolio-description').textContent`),/Gespeicherte/);
+      assert.match(await evaluate(`document.querySelector('#command-portfolio .portfolio-description').textContent`),/Pionex/);
       const commandReads=server.metrics().depotReads;
       await evaluate(`document.querySelector('#nav button[data-v="command"]').click();true`);
       assert.equal(server.metrics().depotReads,commandReads,'Command navigation does not fetch');
       assert.equal(await evaluate(`document.documentElement.scrollWidth<=innerWidth+1`),true);
       await evaluate(`document.querySelector('#nav button[data-v="depot"]').click();true`);
-      assert.match(depot.amount,/15.450/);assert.match(depot.text,/Datenlücken/);assert.match(depot.text,/keine Live-Kurse/);
+      assert.match(depot.amount,/3.450/);assert.match(depot.amount,/USD\/USDT/);assert.match(depot.text,/kein Gesamtvermögen/i);assert.match(depot.text,/Gesamthistorie enthält mehrere Quellen/);
       assert.doesNotMatch(depot.text,/synthetic-b7-password/);assert.equal(depot.overflow,false);assert.equal(depot.status,'polite');assert.equal(depot.focus,true);assert.equal(depot.targets,true);
-      assert.equal(depot.confirmHidden,true,'Ledger confirmation is hidden until quantities are reviewed');
-      assert.ok(depot.confirmHeight>=44,'Ledger confirmation keeps a 44px target when shown');
+      assert.equal(depot.noLedger,true);assert.doesNotMatch(depot.text,/Ledger|OKX/);
       if(process.env.V11_A2_EVIDENCE_DIR){mkdirSync(process.env.V11_A2_EVIDENCE_DIR,{recursive:true});
         const shot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
         writeFileSync(join(process.env.V11_A2_EVIDENCE_DIR,'v11-depot-'+width+'-fresh.png'),Buffer.from(shot.data,'base64'));}
       if(process.env.V11_B10_EVIDENCE_DIR&&width===375){mkdirSync(process.env.V11_B10_EVIDENCE_DIR,{recursive:true});
         const shot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
         writeFileSync(join(process.env.V11_B10_EVIDENCE_DIR,'v11-b10-synthetic-depot-filled-375x844.png'),Buffer.from(shot.data,'base64'));}
-      const beforeRange=server.metrics().depotReads;
-      for(const range of ['1h','1d','1w']){await evaluate(`document.querySelector('[data-range="${range}"]').click();true`);assert.equal(await evaluate(`document.querySelector('[data-range="${range}"]').getAttribute('aria-pressed')`),'true');}
-      assert.equal(server.metrics().depotReads,beforeRange,'range changes never request data');
-      server.setMode('curve');await refresh();await waitUntil(async()=>await readState()==='fresh');
-      assert.equal(await evaluate(`document.querySelectorAll('.depot-history svg polyline').length`),1);
-      assert.equal(await evaluate(`document.querySelectorAll('.depot-history svg circle').length`),3);
-      assert.equal(await evaluate(`document.querySelectorAll('.depot-history svg text').length`),3);
-      assert.match(await evaluate(`document.querySelector('.depot-history').textContent`),/Vorhandene Messungen/);
-      await evaluate(`document.querySelector('.depot-history').scrollIntoView({block:'center'});true`);
-      assert.equal(await evaluate(`document.documentElement.scrollWidth<=innerWidth+1`),true);
-      if(process.env.V11_A2_EVIDENCE_DIR){const shot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});writeFileSync(join(process.env.V11_A2_EVIDENCE_DIR,'v11-depot-history-'+width+'.png'),Buffer.from(shot.data,'base64'));}
-      server.setMode('current');await refresh();await waitUntil(async()=>await readState()==='fresh');
-      assert.match(await evaluate(`document.querySelector('#depot-read-root').textContent`),/serverseitigen Depotdaten/);
-      assert.match(await evaluate(`document.querySelector('#depot-read-root .depot-total').textContent`),/15.450/);
-      assert.match(await evaluate(`document.querySelector('.depot-history').textContent`),/Verlauf nicht verfügbar/);
-      assert.match(await evaluate(`document.querySelector('#command-portfolio .portfolio-description').textContent`),/Serverseitige/);
+      assert.equal(await evaluate(`document.querySelector('#depot-read-root svg')===null`),true,'mixed venue history is never shown as Pionex');
+      assert.equal(server.metrics().depotReads,initial+1,'one dashboard request only');
+      assert.match(await evaluate(`document.querySelector('#command-portfolio .portfolio-description').textContent`),/Pionex/);
       server.setMode('error');await refresh();await waitUntil(async()=>await readState()==='unavailable');
       assert.equal(await evaluate(`document.querySelector('#depot-read-root .depot-total')===null`),true);
       if(process.env.V11_B10_EVIDENCE_DIR&&width===375){await evaluate(`document.getElementById('depot-read-root').scrollIntoView({block:'center'});true`);

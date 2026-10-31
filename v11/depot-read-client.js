@@ -1,7 +1,7 @@
-import {buildCurrentDepotModel} from './depot-current-model.js?v=B16-M11-FIX4';
-import {buildDepotHistoryModel} from './depot-history-model.js?v=B16-M11-FIX4';
-import {buildDepotReadModel} from './depot-read-model.js?v=B16-M11-FIX4';
-import {parseBotReadCredential} from './bot-read-client.js?v=B16-M11-FIX4';
+import {buildCurrentDepotModel,buildPionexDepotModel} from './depot-current-model.js?v=B16-M11-FIX5';
+import {buildDepotHistoryModel} from './depot-history-model.js?v=B16-M11-FIX5';
+import {buildDepotReadModel} from './depot-read-model.js?v=B16-M11-FIX5';
+import {parseBotReadCredential} from './bot-read-client.js?v=B16-M11-FIX5';
 
 const ENDPOINT = 'https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/portfolio-history?range=1w';
 const CURRENT_ENDPOINT='https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/dashboard';
@@ -47,7 +47,7 @@ async function readBounded(response, signal) {
 
 // Manual reads only. Independent source failures preserve other verified results.
 export function createDepotReadClient({getToken,onChange=()=>{},fetchImpl=globalThis.fetch,
-  now=Date.now,schedule=setTimeout,cancelSchedule=clearTimeout}={}){
+  pionexOnly=false,now=Date.now,schedule=setTimeout,cancelSchedule=clearTimeout}={}){
   let generation=0,pending=null,disposed=false,current=null,stored=null,history=null,attempted=false,src=null;
   const token=()=>{try{const value=getToken();return parseDepotReadCredential(value)?value.trim():null;}catch{return null;}};
   let snapshotToken=null;
@@ -61,8 +61,8 @@ export function createDepotReadClient({getToken,onChange=()=>{},fetchImpl=global
     const clock=now(),valid=m=>m?.status==='FRESH_SNAPSHOT'&&clock<=m.expiresAt;
     return {
       current:valid(current)?'OK':src.dashboardFailed?'TRANSPORT':src.c==='STALE'||current?'STALE':'INCOMPLETE',
-      prices:src.pricesFailed?'TRANSPORT':'RECEIVED',
-      history:valid(stored)?'OK':src.archiveFailed?'TRANSPORT':src.h==='STALE'||stored?.status==='FRESH_SNAPSHOT'?'STALE':src.historyEmpty?'EMPTY':'INCOMPLETE'};
+      prices:pionexOnly?'NOT_APPLICABLE':src.pricesFailed?'TRANSPORT':'RECEIVED',
+      history:pionexOnly?'NOT_APPLICABLE':valid(stored)?'OK':src.archiveFailed?'TRANSPORT':src.h==='STALE'||stored?.status==='FRESH_SNAPSHOT'?'STALE':src.historyEmpty?'EMPTY':'INCOMPLETE'};
   }
   function sourceIssues(){
     if(!src||src.dashboardFailed)return [];
@@ -97,6 +97,15 @@ export function createDepotReadClient({getToken,onChange=()=>{},fetchImpl=global
     if(disposed)return;stop();wipe();const credential=token();if(!credential){emit('locked');return;}
     attempted=true;const id=generation,ctl=new AbortController();pending=ctl;snapshotToken=credential;emit('loading');
     if(id!==generation||disposed)return;
+    if(pionexOnly){
+      const dashboard=await read(CURRENT_ENDPOINT,credential,ctl.signal);
+      if(disposed||id!==generation)return;
+      pending=null;if(token()!==credential||dashboard.locked){lock();return;}
+      const c=buildPionexDepotModel(dashboard.data,{now:now()});
+      current=c.status==='FRESH_SNAPSHOT'?c:c.status==='STALE'?{status:'STALE'}:null;
+      src={dashboardFailed:dashboard.failed||dashboard.data===undefined,c:c.status,sourceIssues:c.sourceIssues};
+      project();return;
+    }
     const [dashboard,prices,archive]=await Promise.all([read(CURRENT_ENDPOINT,credential,ctl.signal),read(PRICE_ENDPOINT,null,ctl.signal),read(ENDPOINT,credential,ctl.signal)]);
     if(disposed||id!==generation)return;
     pending=null;if(token()!==credential||dashboard.locked||archive.locked){lock();return;}

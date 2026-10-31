@@ -158,3 +158,46 @@ export function buildCurrentDepotModel(payload,{tickers,tickersAt,now=Date.now()
       reason:error?.message==='STALE'?'SOURCE_EXPIRED':'CURRENT_SOURCE_INCOMPLETE',sourceIssues};
   }
 }
+
+// Pionex-only display scope: unrelated holdings and venue references cannot veto it.
+export function buildPionexDepotModel(payload,{now=Date.now()}={}){
+  const empty={status:'UNKNOWN',readOnly:true,executionAllowed:false,scope:'PIONEX',currency:'USD/USDT',totalUsd:null,spotUsd:null,tradingUsd:null,snapshotAt:null,sourceAt:null,source:null,expiresAt:null,excludedIncompletePoints:0};
+  let sourceIssues=['PIONEX_SOURCE_INVALID'];
+  try{
+    need(Number.isSafeInteger(now)&&now>0&&now<=8640000000000000);
+    need(object(payload)&&payload.private===true&&object(payload.data)&&object(payload.data.portfolio));
+    const data=payload.data,p=data.portfolio,portfolio={};
+    // Select authority before validating the direct candidate: obsolete direct
+    // metadata must not veto an independently fresh wallet. The internal tag
+    // identifies that candidate without trusting its supplied source label.
+    sourceIssues=['PIONEX_SOURCE_INVALID'];
+    const directCandidate='M11_DIRECT_PIONEX_CANDIDATE';
+    if(!missing(p.pionexEquityUsd)){
+      portfolio.pionexEquityUsd=p.pionexEquityUsd;
+      portfolio.pionexEquityUpdatedAt=p.pionexEquityUpdatedAt;
+      portfolio.pionexEquitySource=directCandidate;
+    }
+    let account;
+    if(data.pionexAccount?.walletStatus==='OK'&&data.pionexAccountSync?.status==='OK'){
+      need(object(data.pionexAccount.wallet)&&amount(data.pionexAccount.wallet.totalInUsdt));
+      account={walletStatus:'OK',updatedAt:iso(stamp(data.pionexAccount.updatedAt??data.pionexAccount.snapshotAt,now)),
+        wallet:{totalInUsdt:decimal(data.pionexAccount.wallet.totalInUsdt)}};
+    }
+    let selected={portfolio,pionexAccount:account,pionexAccountSync:account?{status:'OK'}:undefined};
+    const pionex=authoritativePionexEquitySnapshot(selected,now);
+    if(!pionex.found){
+      const stale=pionex.reason==='WALLET_STALE_OR_UNTIMED'||pionex.reason==='PRIVATE_STALE_OR_UNTIMED';
+      sourceIssues=[stale?'PIONEX_STALE_OR_UNTIMED':'PIONEX_SOURCE_MISSING'];
+      need(false,stale?'STALE':'CURRENT_SOURCE_INCOMPLETE');
+    }
+    if(pionex.source===directCandidate){
+      need(amount(p.pionexEquityUsd));
+      pionex.updatedAt=iso(stamp(p.pionexEquityUpdatedAt,now));
+      pionex.source=source(p.pionexEquitySource,'PRIVATE_PORTFOLIO_SNAPSHOT');
+    }
+    const pionexTime=stamp(pionex.updatedAt,now);
+    need(amount(pionex.value));
+    return {...empty,status:'FRESH_SNAPSHOT',totalUsd:pionex.value,tradingUsd:pionex.value,
+      snapshotAt:iso(pionexTime),sourceAt:iso(pionexTime),source:'SERVER_PIONEX_CURRENT',expiresAt:pionexTime+PIONEX_AGE};
+  }catch(error){return {...empty,status:error?.message==='STALE'?'STALE':'UNKNOWN',reason:error?.message==='STALE'?'SOURCE_EXPIRED':'CURRENT_SOURCE_INCOMPLETE',sourceIssues};}
+}
