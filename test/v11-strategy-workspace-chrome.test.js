@@ -353,6 +353,76 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         assert.equal(catalog.models.length,5);
         assert.equal(catalog.overflow,false);
         assert.ok(catalog.controls.every(height=>height>=44));
+        const paperReadiness=await evaluate(`(()=>{
+          const panel=document.getElementById('paper-readiness-root');
+          const groups=[...panel.querySelectorAll('[data-paper-readiness]')];
+          return {count:document.querySelectorAll('#paper-readiness-root').length,
+            visible:panel.getBoundingClientRect().height>0,
+            precedesCatalog:!!(panel.compareDocumentPosition(document.getElementById('strategy-catalog'))&Node.DOCUMENT_POSITION_FOLLOWING),
+            text:panel.innerText,groups:groups.map(node=>({id:node.dataset.paperReadiness,open:node.open,
+              height:node.querySelector('summary').getBoundingClientRect().height})),
+            interactiveActions:panel.querySelectorAll('button,input,select,form,a').length,
+            overflow:panel.scrollWidth>panel.clientWidth+1||document.documentElement.scrollWidth>innerWidth+1,
+            requests:performance.getEntriesByType('resource').length};
+        })()`);
+        assert.equal(paperReadiness.count,1);
+        assert.equal(paperReadiness.visible,true);
+        assert.equal(paperReadiness.precedesCatalog,true);
+        assert.match(paperReadiness.text,/kein laufender Paper-Betrieb/);
+        assert.match(paperReadiness.text,/Paperstart gesperrt · Echtgeldhandel nicht freigegeben/);
+        assert.match(paperReadiness.text,/D2 ohne Edge; Qualifikation offen/);
+        assert.match(paperReadiness.text,/Quellenstand 2026-10-31/);
+        assert.match(paperReadiness.text,/Nächster Schritt/);
+        assert.match(paperReadiness.text,/Vertrag zur Klärung ungewisser Buchungen/);
+        assert.deepEqual(paperReadiness.groups.map(row=>row.id),['prepared','gates','choices']);
+        assert.ok(paperReadiness.groups.every(row=>!row.open&&row.height>=44));
+        assert.equal(paperReadiness.interactiveActions,0);
+        assert.equal(paperReadiness.overflow,false);
+        await evaluate(`document.querySelector('[data-paper-readiness="choices"] summary').focus()`);
+        await key('Enter','Enter',13);
+        const paperChoices=await evaluate(`(()=>{
+          const panel=document.getElementById('paper-readiness-root');
+          const group=panel.querySelector('[data-paper-readiness="choices"]');
+          return {open:group.open,focused:document.activeElement===group.querySelector('summary'),
+            count:group.querySelectorAll(':scope > ul > li').length,text:group.innerText,
+            overflow:panel.scrollWidth>panel.clientWidth+1||document.documentElement.scrollWidth>innerWidth+1};
+        })()`);
+        assert.equal(paperChoices.open,true);
+        assert.equal(paperChoices.focused,true);
+        assert.equal(paperChoices.count,12);
+        assert.match(paperChoices.text,/Diese Übersicht speichert keine Auswahl/);
+        assert.match(paperChoices.text,/Gebühren, Slippage und Liquidität/);
+        assert.equal(paperChoices.overflow,false);
+        await key('Enter','Enter',13);
+        assert.equal(await evaluate(`document.querySelector('[data-paper-readiness="choices"]').open`),false);
+        await evaluate(`document.querySelector('[data-paper-readiness="gates"] summary').click()`);
+        const paperGates=await evaluate(`(()=>{
+          const panel=document.getElementById('paper-readiness-root');
+          const group=panel.querySelector('[data-paper-readiness="gates"]');
+          return {open:group.open,text:group.innerText,
+            overflow:panel.scrollWidth>panel.clientWidth+1||document.documentElement.scrollWidth>innerWidth+1};
+        })()`);
+        assert.equal(paperGates.open,true);
+        assert.match(paperGates.text,/NO_EDGE/);
+        assert.match(paperGates.text,/keine Bewertung aller zwölf Hypothesen/);
+        assert.match(paperGates.text,/unabhängige Abnahme.*bleibt offen/);
+        assert.equal(paperGates.overflow,false);
+        await evaluate(`document.querySelector('[data-paper-readiness="gates"] summary').click()`);
+        await evaluate(`document.querySelector('[data-paper-readiness="prepared"] summary').click()`);
+        const paperPrepared=await evaluate(`(()=>{
+          const panel=document.getElementById('paper-readiness-root');
+          const group=panel.querySelector('[data-paper-readiness="prepared"]');
+          group.querySelectorAll('details').forEach(node=>{node.open=true;});
+          return {open:group.open,text:group.innerText,
+            overflow:panel.scrollWidth>panel.clientWidth+1||document.documentElement.scrollWidth>innerWidth+1,
+            requests:performance.getEntriesByType('resource').length};
+        })()`);
+        assert.equal(paperPrepared.open,true);
+        assert.match(paperPrepared.text,/Synthetische Tests belegen keine Strategiequalität oder Betriebsbereitschaft/);
+        assert.match(paperPrepared.text,/SYNTHETIC_PAPER_HARNESS_RECEIPT/);
+        assert.equal(paperPrepared.overflow,false);
+        assert.equal(paperPrepared.requests,paperReadiness.requests);
+        await evaluate(`document.querySelector('[data-paper-readiness="prepared"] summary').click()`);
         assert.deepEqual(catalog.comparison.selectors.map(node=>node.value),['H1','H2']);
         assert.deepEqual(catalog.comparison.families,['H1','H2']);
         assert.match(catalog.comparison.text,/Hypotheses|Hypothese|Hypoth/i);
@@ -1133,7 +1203,8 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         assert.ok(!requestPaths.some(path=>/\/v10\/|\/api\/|\/klines|\/ticker|\/market/i.test(path)));
         return {width:size.width,sourceFetches:requestPaths.filter(path=>path==='/docs/strategy-lab/campaign-20261013.json').length,
           families:catalog.families,models:arena.cards,overflow:catalog.overflow,synthetic:true,
-          explorerPaths:44,selectionLimit:2,quarterlyValues:'producer-exact',importReset:true};
+          explorerPaths:44,selectionLimit:2,quarterlyValues:'producer-exact',importReset:true,
+          paperReadiness:{groups:3,choices:12,activationActions:0,overflow:false}};
       },size.height);
       assert.equal(metrics.sourceFetches-previousSourceRequests,1);
       assert.equal(metrics.families,12);
