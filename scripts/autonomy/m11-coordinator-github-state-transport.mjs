@@ -558,9 +558,10 @@ mutation CreateCommitOnBranch($input: CreateCommitOnBranchInput!) {
 
     async replaceCanonicalEnvelope({expectedStorageVersion, nextEnvelope, signal = null}) {
       if (enabled !== true) fail(GITHUB_STATE_TRANSPORT_ERROR.DISABLED);
-      const binding = consumeMutationOpportunity(expectedStorageVersion);
       const operation = createOperation({signal, deadlineMs: defaultDeadlineMs, maxResponseBytes});
       try {
+        operation.assertActive();
+        const binding = consumeMutationOpportunity(expectedStorageVersion);
         let canonicalNext;
         try {
           canonicalNext = await canonicalReplay(nextEnvelope);

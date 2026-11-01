@@ -1204,6 +1204,12 @@ test('abort before mutation and during readback sends no follow-up requests', as
     error => error?.code === GITHUB_STATE_TRANSPORT_ERROR.TRANSPORT_UNAVAILABLE
   );
   assert.equal(server.requestLog.filter(entry => entry.path === '/graphql').length, 0);
+  const resumedMutation = await transport.replaceCanonicalEnvelope({
+    expectedStorageVersion: 0,
+    nextEnvelope: next
+  });
+  assert.equal(resumedMutation.status, 'REPLACED');
+  assert.equal(server.requestLog.filter(entry => entry.path === '/graphql').length, 1);
 
   const readbackServer = buildServer();
   const readbackAbort = new AbortController();
