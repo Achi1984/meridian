@@ -33,6 +33,9 @@ const fixture = async name => JSON.parse(await readFile(path.join(fixtureRoot, n
 async function manifestFor({mints = [IDENTITY.mint], pools = [IDENTITY.pool], budget = {}} = {}) {
   const manifest = JSON.parse(await readFile(path.join(root, "scripts/memecoin-paper/run-manifest.json"), "utf8"));
   manifest.enabled = true;
+  manifest.runId = "provider-evidence-generated-test";
+  manifest.startAt = NOW;
+  manifest.endAt = NOW + manifest.durationMs;
   manifest.stopSwitch.engaged = false;
   manifest.providers.forEach(provider => { provider.enabled = true; });
   manifest.allowedMints = mints;
@@ -148,6 +151,9 @@ test("arbitrary URLs, RPC methods, credentials, and caller headers are rejected 
   await assert.rejects(acquireProviderEvidence({
     ...setup({manifest, transport, headers: {authorization: "******"}})
   }), /caller headers and URLs are forbidden/);
+  await assert.rejects(acquireProviderEvidence({
+    ...setup({manifest, transport, credentials: "include"})
+  }), /caller headers and URLs are forbidden/);
   assert.throws(() => assertAllowedSolanaRpcMethod("sendTransaction"), /read-only allowlist/);
   const credentialManifest = structuredClone(manifest);
   credentialManifest.http.credentials = true;
@@ -258,7 +264,7 @@ test("response byte cap accepts its exact boundary and rejects boundary plus one
   const plusOne = await acquire({manifest, transport: async () =>
     response(`${exactBody} `)});
   assert.equal(plusOne.events[0].status, "RESPONSE_TOO_LARGE");
-  assert.equal(plusOne.counters.bytes, 0);
+  assert.equal(plusOne.counters.bytes, responseLimit + 1);
   assert.equal(plusOne.counters.requests, 1);
 });
 
@@ -327,6 +333,21 @@ test("caller abort and stale or future source times fail closed without follow-u
   assert.ok(aborted.events.every(event => event.status === "ABORTED"));
   assert.match(aborted.stoppedReason, /aborted/);
 
+  const immediateCaller = new AbortController();
+  calls = 0;
+  const immediateAbort = await acquire({
+    manifest,
+    candidates: [IDENTITY, ALT_IDENTITY],
+    signal: immediateCaller.signal,
+    transport: async request => {
+      calls += 1;
+      immediateCaller.abort(new Error("abort during dispatch"));
+      return response(await payloadFor(request));
+    }
+  });
+  assert.equal(calls, 1);
+  assert.equal(immediateAbort.events[0].status, "ABORTED");
+
   const basePair = await fixture("dex-pair.json");
   for (const pairCreatedAt of [NOW + 1, NOW - DEFAULT_FRESHNESS.maxPairAgeMs - 1]) {
     const changedManifest = await manifestFor();
@@ -370,6 +391,15 @@ test("malformed schemas, decimal strings, and oversized payloads are rejected", 
   });
   assert.ok(badLargestAmount.events.some(event => event.status === "INVALID_LARGEST_ACCOUNTS"));
 
+  const badAccountData = await acquire({
+    transport: async request => {
+      const body = await payloadFor(request);
+      if (request.kind === "getAccountInfo") body.result.value.data[0] = "not-base64";
+      return response(body);
+    }
+  });
+  assert.ok(badAccountData.events.some(event => event.status === "INVALID_ACCOUNT_INFO"));
+
   const malformedJson = await acquire({
     transport: async request => request.kind === "pair"
       ? response("{not-json")
@@ -383,7 +413,7 @@ test("malformed schemas, decimal strings, and oversized payloads are rejected", 
   }});
   const oversized = await acquire({manifest, transport: async () => response(" ".repeat(129))});
   assert.equal(oversized.events[0].status, "RESPONSE_TOO_LARGE");
-  assert.equal(oversized.counters.bytes, 0);
+  assert.equal(oversized.counters.bytes, 129);
 });
 
 test("mismatched pool or quote identity cannot be mixed into candidate evidence", async () => {
@@ -436,6 +466,17 @@ test("market cap never falls back to FDV and source time stays distinct from rec
   });
   assert.equal(withoutMarketCap.candidates[0].candidate.evidence.marketCapUsd.value, null);
   assert.match(withoutMarketCap.candidates[0].candidate.evidence.marketCapUsd.coverage.reason, /fdv is not a substitute/);
+
+  const negativeChange = await acquire({
+    transport: async request => {
+      const body = await payloadFor(request);
+      if (request.provider === "dex") body.pairs[0].priceChange.h1 = -25;
+      return response(body);
+    }
+  });
+  const filters = filterCandidate(negativeChange.candidates[0].candidate, {now: NOW});
+  assert.equal(negativeChange.candidates[0].candidate.evidence.priceChange1hPct.value, -25);
+  assert.equal(filters.checks.priceRunup.status, "PASS");
 });
 
 test("generated adapter evidence feeds the existing filter into a stable, attributable no-trade result", async () => {
@@ -479,5 +520,20 @@ test("freshness policy and candidate count are explicit and bounded before I/O",
     transport: () => { calls += 1; },
     clock: () => NOW
   }), /freshness policy/);
+  assert.equal(calls, 0);
+
+  const outsideWindow = await acquire({
+    manifest,
+    clock: () => NOW + manifest.durationMs,
+    transport: () => { calls += 1; }
+  });
+  assert.equal(outsideWindow.events[0].status, "OUTSIDE_RUN_WINDOW");
+  assert.equal(calls, 0);
+
+  const invalidWindow = structuredClone(manifest);
+  invalidWindow.endAt = NOW + 1;
+  await assert.rejects(acquireProviderEvidence({
+    ...setup({manifest: invalidWindow, transport: () => { calls += 1; }})
+  }), /exact eight-hour window/);
   assert.equal(calls, 0);
 });

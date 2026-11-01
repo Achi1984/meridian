@@ -13,6 +13,7 @@ const DEX_SOURCE = "DexScreener public API";
 const RPC_SOURCE = "Solana JSON-RPC";
 const MAX_TIMEOUT_MS = 30_000;
 const DEFAULT_TIMEOUT_MS = 5_000;
+const EIGHT_HOURS_MS = 8 * 60 * 60 * 1000;
 const FIXED_BUDGET_CEILINGS = Object.freeze({
   maxRequestsPerRun: 960,
   maxRequestsPerProvider: 480,
@@ -40,6 +41,9 @@ function validateResponseTarget(response, request) {
   if (response.redirected === true) {
     throw requestFailure("REDIRECT_BLOCKED", "provider followed a redirect");
   }
+  if (response.url !== undefined && typeof response.url !== "string") {
+    throw requestFailure("INVALID_RESPONSE_URL", "provider response URL was invalid");
+  }
   if (typeof response.url === "string" && response.url !== "") {
     let returned;
     try { returned = new URL(response.url); } catch {
@@ -60,6 +64,12 @@ function validTime(value) {
 
 function readClock(clock) {
   try { return clock(); } catch { return null; }
+}
+
+function manifestTime(value) {
+  const parsed = typeof value === "number" ? value
+    : typeof value === "string" ? Date.parse(value) : null;
+  return validTime(parsed) ? parsed : null;
 }
 
 function assertAddress(value, label) {
@@ -94,6 +104,13 @@ function validateManifest(manifest) {
       manifest.http?.tokenProvidedUrls !== false) {
     throw new TypeError("manifest must deny credentials, redirects, and caller-selected URLs");
   }
+  const startAt = manifestTime(manifest.startAt);
+  const endAt = manifestTime(manifest.endAt);
+  if (typeof manifest.runId !== "string" || manifest.runId.trim().length < 1 ||
+      manifest.runId.length > 128 || manifest.durationMs !== EIGHT_HOURS_MS ||
+      startAt === null || endAt === null || endAt - startAt !== EIGHT_HOURS_MS) {
+    throw new TypeError("enabled manifest must bind a run ID and exact eight-hour window");
+  }
   const providers = manifest.providers;
   if (!Array.isArray(providers) || providers.length !== 2 ||
       !providers.some(item => item?.name === DEX_SOURCE && item.host === DEX_HOST) ||
@@ -121,7 +138,7 @@ function validateManifest(manifest) {
       allowedPools.size !== manifest.allowedPools.length) {
     throw new TypeError("manifest allowlists must not contain duplicates");
   }
-  return {budget: validatedBudget, allowedMints, allowedPools};
+  return {budget: validatedBudget, allowedMints, allowedPools, startAt, endAt};
 }
 
 function validateFreshnessPolicy(policy) {
@@ -257,12 +274,12 @@ async function readJson(response, {signal, maxBytes, consume}) {
       if (!(value instanceof Uint8Array)) {
         throw requestFailure("INVALID_RESPONSE_CHUNK", "provider response stream was malformed");
       }
-      if (size + value.byteLength > maxBytes) {
+      consume(value.byteLength);
+      size += value.byteLength;
+      if (size > maxBytes) {
         throw requestFailure("RESPONSE_TOO_LARGE", "provider response exceeded its byte limit");
       }
-      consume(value.byteLength);
       chunks.push(value);
-      size += value.byteLength;
     }
   } catch (error) {
     try { reader.cancel?.().catch?.(() => {}); } catch { /* reader may already be closed */ }
@@ -295,13 +312,17 @@ async function readJson(response, {signal, maxBytes, consume}) {
 function validateDexNumbers(pair) {
   for (const [value, label] of [
     [pair.marketCap, "marketCap"], [pair.fdv, "fdv"],
-    [pair.liquidity?.usd, "liquidity.usd"], [pair.volume?.h1, "volume.h1"],
-    [pair.priceChange?.h1, "priceChange.h1"]
+    [pair.liquidity?.usd, "liquidity.usd"], [pair.volume?.h1, "volume.h1"]
   ]) {
     if (value !== undefined && value !== null &&
         (typeof value !== "number" || !Number.isFinite(value) || value < 0)) {
       throw requestFailure("INVALID_DECIMAL", `${label} was not a valid nonnegative number`);
     }
+  }
+  const priceChange = pair.priceChange?.h1;
+  if (priceChange !== undefined && priceChange !== null &&
+      (typeof priceChange !== "number" || !Number.isFinite(priceChange) || priceChange < -100)) {
+    throw requestFailure("INVALID_DECIMAL", "priceChange.h1 was not a valid percentage");
   }
   if (pair.pairCreatedAt !== undefined && pair.pairCreatedAt !== null &&
       !validTime(pair.pairCreatedAt)) {
@@ -328,10 +349,10 @@ function findDexPair(payload, requested, receivedAt, freshness) {
       pair.quoteToken?.address !== requested.quote) {
     throw requestFailure("IDENTITY_MISMATCH",
       "returned chain, mint, pool, or quote did not match the request", {
-        chainId: pair?.chainId ?? null,
-        mint: pair?.baseToken?.address ?? null,
-        pool: pair?.pairAddress ?? null,
-        quote: pair?.quoteToken?.address ?? null
+        chainId: typeof pair?.chainId === "string" ? pair.chainId.slice(0, 64) : null,
+        mint: typeof pair?.baseToken?.address === "string" ? pair.baseToken.address.slice(0, 64) : null,
+        pool: typeof pair?.pairAddress === "string" ? pair.pairAddress.slice(0, 64) : null,
+        quote: typeof pair?.quoteToken?.address === "string" ? pair.quoteToken.address.slice(0, 64) : null
       });
   }
   validateDexNumbers(pair);
@@ -365,6 +386,7 @@ function validateAccountInfo(value) {
   if (!isRecord(value) || typeof value.owner !== "string" || !BASE58.test(value.owner) ||
       !Array.isArray(value.data) || value.data.length !== 2 ||
       typeof value.data[0] !== "string" || value.data[0].length > 1_000_000 ||
+      !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value.data[0]) ||
       value.data[1] !== "base64") {
     throw requestFailure("INVALID_ACCOUNT_INFO", "getAccountInfo value schema was invalid");
   }
@@ -474,7 +496,7 @@ function normalizeCandidate(identity, responses, sampledAt, identityMismatch) {
   if (supply?.value) {
     const request = supply.request;
     evidence.tokenDecimals = supportedRecord(supply.value.result.value.decimals, request, supply.receivedAt,
-    supply.slot, {complete: true, amountAtoms: supply.value.result.value.amount});
+      supply.slot, {complete: true, amountAtoms: supply.value.result.value.amount});
   }
   if (largest?.value) {
     const request = largest.request;
@@ -524,12 +546,17 @@ function normalizeCandidate(identity, responses, sampledAt, identityMismatch) {
 }
 
 async function performRequest(request, {
-  transport, signal, timeoutMs, maxBytes, release, consume, clock, freshness
+  transport, signal, timeoutMs, maxBytes, release, consume, clock, freshness, runWindow
 }) {
   const requestedAt = readClock(clock);
   if (!validTime(requestedAt)) {
     release();
     return {event: eventFor(request, "INVALID_CLOCK", "injected clock returned invalid time", null, null)};
+  }
+  if (requestedAt < runWindow.startAt || requestedAt >= runWindow.endAt) {
+    release();
+    return {event: eventFor(request, "OUTSIDE_RUN_WINDOW",
+      "request time was outside the configured eight-hour window", requestedAt, null)};
   }
   if (signal?.aborted) {
     release();
@@ -541,11 +568,17 @@ async function performRequest(request, {
   const timeout = setTimeout(() => controller.abort(new Error("request timed out")), timeoutMs);
   let responseBytes = 0;
   try {
-    const response = await raceWithAbort(Promise.resolve().then(() => transport(request, {
+    if (controller.signal.aborted) throw controller.signal.reason;
+    const pendingResponse = transport(request, {
       signal: controller.signal,
       redirect: "error",
       credentials: "omit"
-    })), controller.signal);
+    });
+    if (controller.signal.aborted) {
+      Promise.resolve(pendingResponse).catch(() => {});
+      throw controller.signal.reason;
+    }
+    const response = await raceWithAbort(Promise.resolve(pendingResponse), controller.signal);
     if (controller.signal.aborted) throw controller.signal.reason;
     validateResponseTarget(response, request);
     if (response.status >= 300 && response.status < 400) {
@@ -565,6 +598,9 @@ async function performRequest(request, {
     if (!validTime(receivedAt) || receivedAt < requestedAt ||
         receivedAt - requestedAt > freshness.maxAcquisitionDurationMs) {
       throw requestFailure("STALE_ACQUISITION", "response acquisition exceeded freshness policy");
+    }
+    if (receivedAt < runWindow.startAt || receivedAt >= runWindow.endAt) {
+      throw requestFailure("OUTSIDE_RUN_WINDOW", "response completed outside the configured eight-hour window");
     }
     let value;
     let slot = null;
@@ -620,7 +656,7 @@ export async function acquireProviderEvidence(options) {
   if (typeof transport !== "function" || typeof clock !== "function") {
     throw new TypeError("enabled acquisition requires injected transport and clock functions");
   }
-  const {budget, allowedMints, allowedPools} = validateManifest(manifest);
+  const {budget, allowedMints, allowedPools, startAt, endAt} = validateManifest(manifest);
   const freshness = validateFreshnessPolicy(freshnessPolicy);
   if (!Number.isSafeInteger(requestTimeoutMs) || requestTimeoutMs < 1 ||
       requestTimeoutMs > MAX_TIMEOUT_MS) {
@@ -676,7 +712,7 @@ export async function acquireProviderEvidence(options) {
       const consume = amount => { counter.bytes += amount; };
       pending.push(performRequest(request, {
         transport, signal, timeoutMs: requestTimeoutMs, maxBytes,
-        release, consume, clock, freshness
+        release, consume, clock, freshness, runWindow: {startAt, endAt}
       }).then(outcome => ({request, outcome})));
     }
     const completed = await Promise.all(pending);
@@ -690,6 +726,9 @@ export async function acquireProviderEvidence(options) {
       events.push(outcome.event);
       if (outcome.event.status === "ABORTED" || outcome.event.status === "TIMEOUT") {
         stoppedReason = "aborted or timed out; no further requests dispatched";
+      }
+      if (outcome.event.status === "OUTSIDE_RUN_WINDOW") {
+        stoppedReason = "eight-hour run window ended; no further requests dispatched";
       }
     }
   }
