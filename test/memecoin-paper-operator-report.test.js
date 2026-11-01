@@ -63,10 +63,15 @@ test("incomplete reports preserve unknown accounting instead of implying zero", 
   const report = projectOperatorReport(reportFixtures.incompleteReplay());
   assert.equal(report.experiment.reportStatus, "INCOMPLETE");
   assert.equal(report.experiment.endAt, null);
-  assert.equal(report.trading.status, "ZERO_TRADES");
+  assert.equal(report.trading.status, "UNKNOWN");
+  assert.equal(report.trading.paperEntryFills, null);
   assert.equal(report.valuation.cashCents, "92000");
   assert.equal(report.valuation.unrealizedNetPnlCents, null);
   assert.equal(report.controls.openPositionCount, 1);
+
+  const contradictory = reportFixtures.positiveReplay();
+  contradictory.simulatedFill = null;
+  assert.throws(() => projectOperatorReport(contradictory), /zero-fill evidence conflicts/);
 });
 
 test("checkpoint receipts expose evidenced unresolved exits, clock faults, and restart stops", () => {
@@ -179,6 +184,18 @@ test("untrusted metadata is bounded and safely escaped in readable text", () => 
   assert.ok(text.indexOf("PAPER OPERATOR REPORT") < text.indexOf("mint="));
   assert.doesNotMatch(text.slice(0, text.indexOf("Details (")), /So111|EPjFW|111111/);
   assert.ok(Buffer.byteLength(text) < 262_144);
+
+  const alteredDto = structuredClone(report);
+  alteredDto.valuation.cashCents = "1\nFORGED";
+  alteredDto.candidates.considered = "2\u001b[31m";
+  alteredDto.costs.totalCents = "https://unsafe.example/";
+  alteredDto.trading.paperEntryFills = "5";
+  const safeDtoText = renderOperatorReport(alteredDto);
+  assert.match(safeDtoText, /Cash: UNKNOWN/);
+  assert.match(safeDtoText, /Candidates: considered UNKNOWN/);
+  assert.match(safeDtoText, /Paper entry fills: UNKNOWN/);
+  assert.match(safeDtoText, /Reported costs: UNKNOWN/);
+  assert.doesNotMatch(safeDtoText, /FORGED|https?:\/\/|unsafe\.example/);
 });
 
 test("input, amount, count, and report-contract limits are enforced", () => {

@@ -706,7 +706,11 @@ function makeReport(data, report) {
   const receipts = data.results;
   const fills = data.variant === "replay" ? data.fillEvidence :
     receipts.filter(item => item.method === "executeEntry").map(item => item.result);
-  const fillCount = fills === null ? null : fills.filter(item => item?.status === "FILLED_PAPER").length;
+  const hasFillEvidence = data.variant === "replay" ? fills !== null :
+    receipts.some(item => item.method === "executeEntry");
+  const observedFillCount = hasFillEvidence
+    ? fills.filter(item => item?.status === "FILLED_PAPER").length : null;
+  const fillCount = observedFillCount === 0 && !data.complete ? null : observedFillCount;
   const runEnd = data.runEnd;
   const accounting = isRecord(runEnd?.accounting) ? runEnd.accounting : null;
   const ledgerPositions = Array.isArray(summary.openPositions) ? summary.openPositions : null;
@@ -718,6 +722,23 @@ function makeReport(data, report) {
   })) ?? [];
   const openPositionCount = ledgerPositions ? ledgerPositions.length :
     endingPositions ? endingPositions.length : null;
+  const costs = reportedCosts(summary);
+  if (data.complete && fillCount === 0) {
+    const initialCapital = decimal(summary.initialCapitalCents);
+    const cashAtEnd = decimal(summary.cashCents) ??
+      decimal(runEnd?.accounting?.cashCents);
+    const realizedGross = decimal(summary.pnl?.realizedGrossCents, {signed: true}) ??
+      decimal(runEnd?.accounting?.realizedGrossPnlCents, {signed: true});
+    const realizedNet = decimal(summary.pnl?.realizedNetCents, {signed: true}) ??
+      decimal(runEnd?.accounting?.realizedNetPnlCents, {signed: true});
+    if ((openPositionCount !== null && openPositionCount > 0) ||
+        (initialCapital !== null && cashAtEnd !== null && initialCapital !== cashAtEnd) ||
+        (realizedGross !== null && realizedGross !== "0") ||
+        (realizedNet !== null && realizedNet !== "0") ||
+        (costs.totalCents !== null && costs.totalCents !== "0")) {
+      throw new TypeError("zero-fill evidence conflicts with ledger activity");
+    }
+  }
   const positions = positionRows.slice(0, 40).map(position => {
     const ending = endingByMint.get(position.mint);
     return {
@@ -832,7 +853,7 @@ function makeReport(data, report) {
         ? positions.filter(position => position.markStatus !== "MARKED").length : null,
       basis: accounting ? "finishRun accounting receipt" : "run-end marks/accounting unavailable"
     },
-    costs: reportedCosts(summary),
+    costs,
     unresolvedFills: unresolvedFills(data),
     provenance: (candidates.details ?? []).slice(0, 40).map(candidate => ({
       chainId: candidate.chainId,
@@ -863,54 +884,77 @@ export function renderOperatorReport(report) {
   if (!isRecord(report) || report.schema !== REPORT_TYPE) {
     throw new TypeError("strict operator report DTO required");
   }
-  const experiment = report.experiment;
-  const candidates = report.candidates;
-  const controls = report.controls;
-  const valuation = report.valuation;
-  const amount = value => value === null || value === undefined ? "UNKNOWN" : `${value} cents`;
-  const count = value => value === null || value === undefined ? "UNKNOWN" : String(value);
+  const experiment = isRecord(report.experiment) ? report.experiment : {};
+  const evidence = isRecord(report.evidence) ? report.evidence : {};
+  const candidates = isRecord(report.candidates) ? report.candidates : {};
+  const trading = isRecord(report.trading) ? report.trading : {};
+  const controls = isRecord(report.controls) ? report.controls : {};
+  const valuation = isRecord(report.valuation) ? report.valuation : {};
+  const costs = isRecord(report.costs) ? report.costs : {};
+  const rows = value => Array.isArray(value) ? value.slice(0, 40).filter(isRecord) : [];
+  const amount = (value, signed = false) => {
+    try {
+      const exact = decimal(value, {signed});
+      return exact === null ? "UNKNOWN" : `${exact} cents`;
+    } catch {
+      return "UNKNOWN";
+    }
+  };
+  const count = value => {
+    try {
+      const exact = countValue(value);
+      return exact === null ? "UNKNOWN" : String(exact);
+    } catch {
+      return "UNKNOWN";
+    }
+  };
+  const noTradeReasons = rows(trading.noTradeReasons);
+  const stops = rows(controls.stops);
+  const fills = rows(report.unresolvedFills);
+  const provenance = rows(report.provenance);
+  const evidenceSources = Array.isArray(evidence.sources) ? evidence.sources.slice(0, 20) : [];
   const lines = [
     "PAPER OPERATOR REPORT",
     `Report status: ${cleanText(experiment.reportStatus, 32) ?? "UNKNOWN"}`,
     `Experiment: ${cleanText(experiment.id, 120) ?? "UNKNOWN"}`,
     `Run bounds: ${cleanText(experiment.startAt, 32) ?? "UNKNOWN"} to ${cleanText(experiment.endAt, 32) ?? "UNKNOWN"}`,
-    `Evidence freshness: ${cleanText(report.evidence.status, 32) ?? "UNKNOWN"} (reported timestamps; not recomputed)`,
+    `Evidence freshness: ${cleanText(evidence.status, 32) ?? "UNKNOWN"} (reported timestamps; not recomputed)`,
     `Candidates: considered ${count(candidates.considered)}, accepted ${count(candidates.accepted)}, rejected ${count(candidates.rejected)}, unknown ${count(candidates.unknown)}`,
-    `Paper entry fills: ${count(report.trading.paperEntryFills)} (${cleanText(report.trading.status, 32) ?? "UNKNOWN"})`,
+    `Paper entry fills: ${count(trading.paperEntryFills)} (${cleanText(trading.status, 32) ?? "UNKNOWN"})`,
     `Source readiness: ${cleanText(experiment.sourceReadiness, 32) ?? "UNKNOWN"}; operationally running: NOT EVIDENCED`,
     `Cash: ${amount(valuation.cashCents)}; reservations: ${count(controls.reservations)}; open positions: ${count(controls.openPositionCount)}`,
-    `Valuation: ${cleanText(valuation.status, 32) ?? "UNKNOWN"}; realized gross/net ${amount(valuation.realizedGrossPnlCents)} / ${amount(valuation.realizedNetPnlCents)}; unrealized gross/net ${amount(valuation.unrealizedGrossPnlCents)} / ${amount(valuation.unrealizedNetPnlCents)}`,
-    `Reported costs: ${amount(report.costs.totalCents)}`,
-    `Unresolved positions: ${count(valuation.unresolvedPositions)}; unresolved fills: ${report.unresolvedFills.length}`,
+    `Valuation: ${cleanText(valuation.status, 32) ?? "UNKNOWN"}; realized gross/net ${amount(valuation.realizedGrossPnlCents, true)} / ${amount(valuation.realizedNetPnlCents, true)}; unrealized gross/net ${amount(valuation.unrealizedGrossPnlCents, true)} / ${amount(valuation.unrealizedNetPnlCents, true)}`,
+    `Reported costs: ${amount(costs.totalCents)}`,
+    `Unresolved positions: ${count(valuation.unresolvedPositions)}; unresolved fills: ${count(fills.length)}`,
     "No-trade reasons:"
   ];
-  if (report.trading.noTradeReasons.length) {
-    for (const reason of report.trading.noTradeReasons) {
+  if (noTradeReasons.length) {
+    for (const reason of noTradeReasons) {
       lines.push(`- ${cleanText(reason.gate, 80) ?? "unknown gate"} [${cleanText(reason.status, 32) ?? "UNKNOWN"}]: ${cleanText(reason.reason) ?? "reason unavailable"}`);
     }
   } else {
     lines.push("- None attributable from the supplied result/receipt snapshot.");
   }
   lines.push("Risk and clock stops:");
-  if (controls.stops.length) {
-    for (const stop of controls.stops) {
+  if (stops.length) {
+    for (const stop of stops) {
       lines.push(`- ${cleanText(stop.kind, 64) ?? "STOP"} [${cleanText(stop.status, 32) ?? "UNKNOWN"}]: ${cleanText(stop.reason) ?? "reason unavailable"}`);
     }
   } else {
     lines.push("- None evidenced in the supplied result/receipt snapshot.");
   }
-  if (report.unresolvedFills.length) {
+  if (fills.length) {
     lines.push("Unresolved fills:");
-    for (const fill of report.unresolvedFills) {
+    for (const fill of fills) {
       lines.push(`- ${cleanText(fill.kind, 40)} [${cleanText(fill.status, 32)}]: ${cleanText(fill.reason) ?? "reason unavailable"}`);
     }
   }
   lines.push("Details (identifiers and provenance; sanitized):");
-  for (const candidate of report.provenance) {
+  for (const candidate of provenance) {
     const relatedPool = candidate.relatedPool ? ` duplicatePool=${cleanText(candidate.relatedPool, 80)}` : "";
     lines.push(`- chain=${cleanText(candidate.chainId, 32) ?? "UNKNOWN"} mint=${cleanText(candidate.mint, 80) ?? "UNKNOWN"} pool=${cleanText(candidate.pool, 80) ?? "UNKNOWN"}${relatedPool} quote=${cleanText(candidate.quote, 80) ?? "UNKNOWN"} sampledAt=${cleanText(candidate.sampledAt, 32) ?? "UNKNOWN"} status=${cleanText(candidate.status, 32) ?? "UNKNOWN"}`);
   }
-  lines.push(`Evidence sources: ${(report.evidence.sources ?? []).map(item => cleanText(item, 120)).filter(Boolean).join(", ") || "UNKNOWN"}`);
+  lines.push(`Evidence sources: ${evidenceSources.map(item => cleanText(item, 120)).filter(Boolean).join(", ") || "UNKNOWN"}`);
   const rendered = `${lines.join("\n")}\n`;
   if (Buffer.byteLength(rendered) > OUTPUT_LIMIT_BYTES) throw new TypeError("rendered operator report exceeds 256 KiB");
   return rendered;

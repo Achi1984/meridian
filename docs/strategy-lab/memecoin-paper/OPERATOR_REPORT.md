@@ -53,10 +53,13 @@ counts, or duplicate command IDs with different contents are rejected. An
 identical duplicate receipt is counted once. Untrusted text is length-bounded;
 control/ANSI characters and URLs are neutralized before rendering.
 
-`ZERO_TRADES` is a valid result when the supplied replay or complete receipt
-snapshot explicitly contains no `FILLED_PAPER` entry. It does not imply
-profitability or operational safety. Missing candidate, reservation, mark,
-cost, or clock details remain `UNKNOWN`. The report says
+`ZERO_TRADES` is asserted only for a complete finished report with explicit
+fill-decision evidence and no `FILLED_PAPER` entry. The ledger must also be
+consistent with zero activity; a position, changed cash, realized P&L, or
+reported cost without a fill is rejected as contradictory evidence. An
+incomplete snapshot without a fill receipt reports `UNKNOWN`, not zero. A valid
+zero-trade result does not imply profitability or operational safety. Missing
+candidate, reservation, mark, cost, or clock details remain `UNKNOWN`. The report says
 `operationally running: NOT EVIDENCED`: it is not a live monitor. Synthetic
 evidence is labelled as such, and `BLOCKED`/`NOT_READY` source readiness is not
 runtime operation. Checkpoint hashes and result digests are treated as the
