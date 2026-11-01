@@ -39,23 +39,31 @@ function bridge(bytes, options = {}) {
   });
 }
 
-function response(bytes, {status = 200, contentLength = String(bytes.byteLength)} = {}) {
+function response(bytes, {
+  status = 200,
+  contentLength = String(bytes.byteLength),
+  contentType = 'application/json; charset=utf-8',
+  onCancel = () => {},
+  stalled = false
+} = {}) {
+  const body = new ReadableStream({
+    start(controller) {
+      if (bytes.byteLength) controller.enqueue(bytes);
+      if (!stalled) controller.close();
+    },
+    cancel() { return onCancel(); }
+  });
   return {
     status,
     ok: status >= 200 && status < 300,
     headers: {
       get(name) {
-        if (name === 'content-type') return 'application/json; charset=utf-8';
+        if (name === 'content-type') return contentType;
         if (name === 'content-length') return contentLength;
         return null;
       }
     },
-    body: new ReadableStream({
-      start(controller) {
-        controller.enqueue(bytes);
-        controller.close();
-      }
-    })
+    body
   };
 }
 
@@ -242,6 +250,41 @@ test('browser connector rejects a response that exceeds the byte bound', async (
   connector.dispose();
 });
 
+test('all early response rejections cancel unread bodies, release locks, and abort source signals', async () => {
+  const bytes = envelopeBytes(reportFixture());
+  const cases = [
+    {status: 503, statusResult: 'UNAVAILABLE', reason: 'SOURCE_HTTP_UNAVAILABLE'},
+    {status: 401, statusResult: 'REJECTED', reason: 'AUTH_REQUIRED'},
+    {contentType: 'text/plain', statusResult: 'REJECTED', reason: 'INVALID_CONTENT_TYPE'},
+    {
+      contentLength: String(MAX_PAPER_REPORT_BYTES + 1),
+      statusResult: 'REJECTED',
+      reason: 'OVERSIZED'
+    }
+  ];
+
+  for (const options of cases) {
+    let cancellations = 0;
+    let signal;
+    const body = response(bytes, {...options, onCancel: () => { cancellations += 1; }});
+    const connector = createPaperReportConnector({
+      enabled: true,
+      transport: request => {
+        signal = request.signal;
+        return body;
+      },
+      now: () => NOW
+    });
+    const result = await connector.read();
+    assert.equal(result.status, options.statusResult);
+    assert.equal(result.reason, options.reason);
+    assert.equal(cancellations, 1);
+    assert.equal(body.body.locked, false);
+    assert.equal(signal.aborted, true);
+    connector.dispose();
+  }
+});
+
 test('timeout aborts transport and an unresolved source cannot start concurrent work', async () => {
   let aborted = false;
   const connector = createPaperReportConnector({
@@ -275,6 +318,103 @@ test('timeout aborts transport and an unresolved source cannot start concurrent 
   assert.equal(calls, 1);
   bounded.dispose();
   release(envelopeBytes(reportFixture()));
+});
+
+test('timeout and disposal cancel pending streaming reads and release reader locks', async () => {
+  for (const dispose of [false, true]) {
+    let cancellations = 0;
+    let body;
+    const connector = createPaperReportConnector({
+      enabled: true,
+      timeoutMs: 15,
+      transport: () => {
+        body = response(new Uint8Array(), {
+          stalled: true,
+          onCancel: () => { cancellations += 1; }
+        });
+        return body;
+      }
+    });
+    const pending = connector.read();
+    for (let attempt = 0; attempt < 20 && !body?.body.locked; attempt += 1) {
+      await new Promise(resolve => setImmediate(resolve));
+    }
+    assert.equal(body.body.locked, true);
+    if (dispose) connector.dispose();
+    const result = await pending;
+    assert.equal(result.status, dispose ? 'DISPOSED' : 'TIMEOUT');
+    assert.equal(cancellations, 1);
+    assert.equal(body.body.locked, false);
+    if (!dispose) connector.dispose();
+  }
+});
+
+test('a late transport response is cancelled and holds the single-flight lock until settled', async () => {
+  let resolveLateResponse;
+  let firstSignal;
+  let calls = 0;
+  let cancellations = 0;
+  const bytes = envelopeBytes(reportFixture());
+  const connector = createPaperReportConnector({
+    enabled: true,
+    timeoutMs: 10,
+    transport: ({signal}) => {
+      calls += 1;
+      if (calls === 1) {
+        firstSignal = signal;
+        return new Promise(resolve => { resolveLateResponse = resolve; });
+      }
+      return Promise.resolve(response(bytes));
+    },
+    now: () => NOW
+  });
+
+  assert.equal((await connector.read()).status, 'TIMEOUT');
+  assert.equal(firstSignal.aborted, true);
+  assert.equal((await connector.read()).status, 'BUSY');
+  const late = response(bytes, {
+    status: 503,
+    onCancel: () => { cancellations += 1; }
+  });
+  resolveLateResponse(late);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(cancellations, 1);
+  assert.equal(late.body.locked, false);
+  assert.equal((await connector.read()).status, 'AVAILABLE');
+  assert.equal(calls, 2);
+  connector.dispose();
+});
+
+test('a pending body cancellation keeps single-flight locked after timeout', async () => {
+  let finishCancellation;
+  let body;
+  let calls = 0;
+  const bytes = envelopeBytes(reportFixture());
+  const connector = createPaperReportConnector({
+    enabled: true,
+    timeoutMs: 10,
+    transport: () => {
+      calls += 1;
+      if (calls === 1) {
+        body = response(bytes, {
+          status: 503,
+          onCancel: () => new Promise(resolve => { finishCancellation = resolve; })
+        });
+        return body;
+      }
+      return response(bytes);
+    },
+    now: () => NOW
+  });
+  assert.equal((await connector.read()).status, 'TIMEOUT');
+  assert.equal(body.body.locked, false);
+  assert.equal((await connector.read()).status, 'BUSY');
+  assert.equal(calls, 1);
+  finishCancellation();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal((await connector.read()).status, 'AVAILABLE');
+  assert.equal(calls, 2);
+  connector.dispose();
 });
 
 test('dispose aborts a pending browser request and returns a distinct state', async () => {
