@@ -1,0 +1,16 @@
+diff --git a/docs/operations/pages-publication.yml.disabled b/.github/workflows/pages-publication.yml
+rename from docs/operations/pages-publication.yml.disabled
+rename to .github/workflows/pages-publication.yml
+index 20002686c294ba7099ec56705618dc3891584d6b..1dd11512cec3d9a8dd5dfd93fae3b7c8ccbfa74c 100644
+--- a/docs/operations/pages-publication.yml.disabled
++++ b/.github/workflows/pages-publication.yml
+@@ -1,6 +1,6 @@
+-# INERT REVIEW TEMPLATE. Not loaded by GitHub Actions at this path/extension.
+-# Activation requires the separately approved source switch and reviewed move to
+-# .github/workflows/pages-publication.yml. Do not run beside branch publishing.
++# ACTIVE Pages publisher: activation of the PR1092 inert template.
++# Valid only while Settings > Pages > Source = GitHub Actions. Never run beside
++# branch publishing. Rollback: docs/operations/pages-recovery-20261101/RUNBOOK.md
+ name: MERIDIAN Pages Publication
+ on:
+   push:
