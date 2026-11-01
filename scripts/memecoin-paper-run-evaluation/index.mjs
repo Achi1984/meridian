@@ -1,4 +1,5 @@
 import {createHash} from "node:crypto";
+import {constants as fsConstants} from "node:fs";
 import {open} from "node:fs/promises";
 import path from "node:path";
 import {pathToFileURL} from "node:url";
@@ -13,9 +14,23 @@ export const MAX_INPUT_BYTES = Object.freeze({
 
 const EIGHT_HOURS_MS = 8 * 60 * 60 * 1000;
 const MAX_DEADLINE_FINALIZATION_DELAY_MS = 60 * 1000;
+const MAX_DATE_MS = 8_640_000_000_000_000;
 const SAFE_ID = /^[A-Za-z0-9._:-]{1,80}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
 const INPUT_NAMES = Object.keys(MAX_INPUT_BYTES);
+const TYPED_ARRAY_PROTOTYPE = Object.getPrototypeOf(Uint8Array.prototype);
+const TYPED_ARRAY_TAG = Object.getOwnPropertyDescriptor(
+  TYPED_ARRAY_PROTOTYPE, Symbol.toStringTag
+).get;
+const TYPED_ARRAY_BUFFER = Object.getOwnPropertyDescriptor(
+  TYPED_ARRAY_PROTOTYPE, "buffer"
+).get;
+const TYPED_ARRAY_BYTE_OFFSET = Object.getOwnPropertyDescriptor(
+  TYPED_ARRAY_PROTOTYPE, "byteOffset"
+).get;
+const TYPED_ARRAY_BYTE_LENGTH = Object.getOwnPropertyDescriptor(
+  TYPED_ARRAY_PROTOTYPE, "byteLength"
+).get;
 
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value) &&
@@ -42,18 +57,35 @@ function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
+function copyBoundedUint8Array(input, maxBytes) {
+  try {
+    if (TYPED_ARRAY_TAG.call(input) !== "Uint8Array") return null;
+    const byteLength = TYPED_ARRAY_BYTE_LENGTH.call(input);
+    if (byteLength > maxBytes) return {oversized: true};
+    const view = new Uint8Array(
+      TYPED_ARRAY_BUFFER.call(input),
+      TYPED_ARRAY_BYTE_OFFSET.call(input),
+      byteLength
+    );
+    return {bytes: Buffer.from(view)};
+  } catch {
+    return null;
+  }
+}
+
 function parseArtifact(input, name) {
   if (input === undefined || input === null) {
     return {status: "MISSING", reason: "artifact bytes were not supplied", value: null, digest: null};
   }
-  if (!(input instanceof Uint8Array)) {
+  const copied = copyBoundedUint8Array(input, MAX_INPUT_BYTES[name]);
+  if (!copied) {
     return {status: "INVALID", reason: "artifact must be supplied as exported bytes", value: null, digest: null};
   }
-  const bytes = Buffer.from(input);
-  const digest = sha256(bytes);
-  if (bytes.byteLength > MAX_INPUT_BYTES[name]) {
-    return {status: "INVALID", reason: "artifact exceeds its byte limit", value: null, digest};
+  if (copied.oversized) {
+    return {status: "INVALID", reason: "artifact exceeds its byte limit", value: null, digest: null};
   }
+  const bytes = copied.bytes;
+  const digest = sha256(bytes);
   try {
     const text = new TextDecoder("utf-8", {fatal: true}).decode(bytes);
     const value = JSON.parse(text);
@@ -84,7 +116,8 @@ function validConfig(config, expectedRunId) {
   const manifest = config?.manifest;
   return config?.version === 1 && config.mode === "READ_ONLY_PAPER" &&
     config.runId === expectedRunId && Number.isSafeInteger(startAt) && startAt > 0 &&
-    Number.isSafeInteger(endAt) && endAt - startAt === EIGHT_HOURS_MS &&
+    startAt <= MAX_DATE_MS && Number.isSafeInteger(endAt) && endAt <= MAX_DATE_MS &&
+    endAt - startAt === EIGHT_HOURS_MS &&
     isRecord(manifest) && manifest.enabled === true && manifest.mode === "READ_ONLY_PAPER" &&
     manifest.execution === "SIMULATED_ONLY" && manifest.runId === expectedRunId &&
     manifest.startAt === startAt && manifest.endAt === endAt &&
@@ -97,6 +130,29 @@ function makeCriterion(id, status, reason, details = {}) {
   return {id, status, reason, ...details};
 }
 
+function validDateText(value) {
+  return typeof value === "string" &&
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) &&
+    Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
+}
+
+function validText(value, maxBytes, nullable = true) {
+  return (nullable && value === null) ||
+    (typeof value === "string" && Buffer.byteLength(value, "utf8") <= maxBytes &&
+      (nullable || value.length > 0));
+}
+
+function validCoverageShape(value) {
+  if (!isRecord(value)) return false;
+  const counts = ["observedTotal", "total", "displayed", "unaccounted"];
+  const flags = ["displayTruncated", "sourceTruncated"];
+  return Object.keys(value).every(key => [...counts, ...flags].includes(key)) &&
+    counts.every(key => !Object.hasOwn(value, key) || value[key] === null ||
+      Number.isSafeInteger(value[key]) && value[key] >= 0) &&
+    flags.every(key => !Object.hasOwn(value, key) || value[key] === null ||
+      typeof value[key] === "boolean");
+}
+
 function coverageStatus(report) {
   const audit = report?.dto?.evidence?.coverage?.audit;
   if (!isRecord(audit) || audit.present !== true) {
@@ -106,6 +162,10 @@ function coverageStatus(report) {
   if (audit.truncated === true) {
     return makeCriterion("checkpoint_audit_coverage", "UNKNOWN",
       "The exported checkpoint audit is explicitly truncated.");
+  }
+  if (audit.replayLoggerTruncated === true || audit.ledgerAuditTruncated === true) {
+    return makeCriterion("checkpoint_audit_coverage", "UNKNOWN",
+      "A checkpoint audit component is explicitly truncated.");
   }
   const counts = [
     audit.observedRows, audit.totalRows, audit.ledgerEventsReported, audit.ledgerEventsAudited
@@ -125,6 +185,138 @@ function coverageStatus(report) {
   }
   return makeCriterion("checkpoint_audit_coverage", "PASS",
     "The report declares complete audit coverage and reconciled ledger-event counts.");
+}
+
+function candidateCoverageStatus(report) {
+  const coverage = report?.dto?.candidates?.detailsCoverage;
+  const details = report?.dto?.candidates?.details;
+  const summary = report?.dto?.candidates;
+  if (!isRecord(coverage)) {
+    return makeCriterion("candidate_detail_coverage", "UNKNOWN",
+      "Candidate detail coverage is unavailable.");
+  }
+  if (!Array.isArray(details)) {
+    return makeCriterion("candidate_detail_coverage", "UNKNOWN",
+      "Candidate detail rows are unavailable.");
+  }
+  const counts = [coverage.displayed, coverage.observedTotal, coverage.total, coverage.unaccounted];
+  if (counts.some(value => !Number.isSafeInteger(value) || value < 0) ||
+      typeof coverage.displayTruncated !== "boolean" ||
+      typeof coverage.sourceTruncated !== "boolean") {
+    return makeCriterion("candidate_detail_coverage", "UNKNOWN",
+      "Candidate detail coverage counters or truncation flags are unavailable.");
+  }
+  if (coverage.displayed > coverage.observedTotal || coverage.observedTotal > coverage.total ||
+      coverage.unaccounted > coverage.observedTotal) {
+    return makeCriterion("candidate_detail_coverage", "FAIL",
+      "Candidate detail counters contradict their reported totals.");
+  }
+  if (coverage.displayed !== details.length) {
+    return makeCriterion("candidate_detail_coverage", "FAIL",
+      "Displayed candidate count does not match the supplied detail rows.");
+  }
+  const summaryCounts = ["considered", "accepted", "rejected", "unknown"].map(key =>
+    summary?.[key]);
+  if (summaryCounts.some(value => value !== null && value !== undefined &&
+      (!Number.isSafeInteger(value) || value < 0))) {
+    return makeCriterion("candidate_detail_coverage", "FAIL",
+      "Candidate summary counts are not non-negative safe integers.");
+  }
+  if (Number.isSafeInteger(summary?.considered) && Number.isSafeInteger(coverage.total) &&
+      summary.considered !== coverage.total) {
+    return makeCriterion("candidate_detail_coverage", "FAIL",
+      "Candidate considered count conflicts with the detail coverage total.");
+  }
+  if (coverage.unaccounted === 0 && coverage.sourceTruncated === false &&
+      Number.isSafeInteger(summary?.considered) &&
+      ["accepted", "rejected", "unknown"].every(key => Number.isSafeInteger(summary[key])) &&
+      summary.accepted + summary.rejected + summary.unknown !== summary.considered) {
+    return makeCriterion("candidate_detail_coverage", "FAIL",
+      "Complete candidate outcome counts do not sum to the considered total.");
+  }
+  if (coverage.unaccounted === 0 && coverage.sourceTruncated === false &&
+      coverage.displayTruncated === false && coverage.displayed === details.length &&
+      ["accepted", "rejected", "unknown"].every(key => Number.isSafeInteger(summary?.[key]))) {
+    const rowCounts = {
+      accepted: details.filter(row => row?.status === "ACCEPTED").length,
+      rejected: details.filter(row => row?.status === "REJECT").length,
+      unknown: details.filter(row => row?.status === "UNKNOWN").length
+    };
+    if (Object.keys(rowCounts).some(key => rowCounts[key] !== summary[key])) {
+      return makeCriterion("candidate_detail_coverage", "FAIL",
+        "Complete candidate detail outcomes conflict with the summary counts.");
+    }
+  }
+  const validCandidate = candidate => isRecord(candidate) &&
+    Object.keys(candidate).every(key =>
+      ["chainId", "mint", "pool", "relatedPool", "quote", "sampledAt", "status",
+        "reasons", "reasonsCoverage"].includes(key)) &&
+    ["chainId", "mint", "pool", "relatedPool", "quote", "sampledAt", "status",
+      "reasons", "reasonsCoverage"].every(key => Object.hasOwn(candidate, key)) &&
+    validText(candidate.chainId, 32) && validText(candidate.mint, 80) &&
+    validText(candidate.pool, 80) && validText(candidate.relatedPool, 80) &&
+    validText(candidate.quote, 80) &&
+    (candidate.sampledAt === null || validDateText(candidate.sampledAt)) &&
+    ["ACCEPTED", "REJECT", "UNKNOWN"].includes(candidate.status) &&
+    Array.isArray(candidate.reasons) && validCoverageShape(candidate.reasonsCoverage) &&
+    candidate.reasons.every(reason => isRecord(reason) &&
+      Object.keys(reason).every(key =>
+        ["gate", "status", "reason", "source", "observedAt"].includes(key)) &&
+      ["gate", "status", "reason", "source", "observedAt"]
+        .every(key => Object.hasOwn(reason, key)) &&
+      validText(reason.gate, 80) && validText(reason.status, 32) &&
+      validText(reason.reason, 512) && validText(reason.source, 120) &&
+      (reason.observedAt === null || validDateText(reason.observedAt)));
+  if (!details.every(validCandidate)) {
+    return makeCriterion("candidate_detail_coverage", "FAIL",
+      "One or more candidate or rejection-reason rows are malformed.");
+  }
+  let nestedReasonCoverageUnknown = false;
+  for (const candidate of details) {
+    if (["chainId", "mint", "pool", "quote"].some(key =>
+      typeof candidate[key] !== "string" || candidate[key].length === 0) ||
+        (candidate.status === "REJECT" && candidate.reasons.length === 0) ||
+        candidate.reasons.some(reason => reason.status === null || reason.reason === null)) {
+      nestedReasonCoverageUnknown = true;
+    }
+    const reasonsCoverage = candidate.reasonsCoverage;
+    if (reasonsCoverage.displayed !== null && reasonsCoverage.displayed !== undefined &&
+        reasonsCoverage.displayed !== candidate.reasons.length) {
+      return makeCriterion("candidate_detail_coverage", "FAIL",
+        "Displayed rejection-reason count does not match its detail rows.");
+    }
+    const reasonCounts = [
+      reasonsCoverage.observedTotal, reasonsCoverage.total, reasonsCoverage.displayed,
+      reasonsCoverage.unaccounted
+    ];
+    if (reasonCounts.some(value => value !== null && value !== undefined &&
+        !Number.isSafeInteger(value)) ||
+        (Number.isSafeInteger(reasonsCoverage.observedTotal) &&
+          Number.isSafeInteger(reasonsCoverage.total) &&
+          reasonsCoverage.observedTotal > reasonsCoverage.total)) {
+      return makeCriterion("candidate_detail_coverage", "FAIL",
+        "Rejection-reason coverage counters are inconsistent.");
+    }
+    if (reasonCounts.some(value => !Number.isSafeInteger(value)) ||
+        reasonsCoverage.displayTruncated !== false || reasonsCoverage.sourceTruncated !== false ||
+        reasonsCoverage.unaccounted !== 0 ||
+        reasonsCoverage.observedTotal !== candidate.reasons.length ||
+        reasonsCoverage.total !== candidate.reasons.length) {
+      nestedReasonCoverageUnknown = true;
+    }
+  }
+  if (nestedReasonCoverageUnknown || coverage.displayTruncated ||
+      coverage.sourceTruncated || coverage.unaccounted > 0 ||
+      coverage.displayed !== coverage.total || coverage.observedTotal !== coverage.total) {
+    return makeCriterion("candidate_detail_coverage", "UNKNOWN",
+      "Candidate details are truncated, unaccounted, or only partially represented.");
+  }
+  if (summary.discoveryTruncated === true || summary.scoutAuditTruncated === true) {
+    return makeCriterion("candidate_detail_coverage", "UNKNOWN",
+      "Candidate discovery or Scout audit is explicitly truncated.");
+  }
+  return makeCriterion("candidate_detail_coverage", "PASS",
+    "Candidate detail coverage is complete according to the supplied report.");
 }
 
 function providerAccountingStatus(terminal, report, config) {
@@ -160,7 +352,8 @@ function providerAccountingStatus(terminal, report, config) {
     ["bytes", "bytes"],
     ["providerEvents", "providerEvents"],
     ["dexRequests", "dexRequests"],
-    ["rpcRequests", "rpcRequests"]
+    ["rpcRequests", "rpcRequests"],
+    ["candidates", "candidates"]
   ];
   if (!isRecord(budgets) || budgetPairs.some(([total, budget]) =>
     !Number.isSafeInteger(budgets[budget]) || budgets[budget] < 0)) {
@@ -190,11 +383,19 @@ function evaluateDuration(config, terminal, report) {
   }
   const {startAt, endAt} = config;
   const {effectiveEndAt, finalizedAt, latenessMs, basis} = finalization;
+  const startIso = Number.isSafeInteger(startAt) && Number.isFinite(new Date(startAt).getTime())
+    ? new Date(startAt).toISOString() : null;
+  const endIso = Number.isSafeInteger(effectiveEndAt) &&
+    Number.isFinite(new Date(effectiveEndAt).getTime())
+    ? new Date(effectiveEndAt).toISOString() : null;
+  const finalizedAtValid = Number.isSafeInteger(finalizedAt) &&
+    Number.isFinite(new Date(finalizedAt).getTime());
   if (![effectiveEndAt, finalizedAt, latenessMs].every(Number.isSafeInteger) ||
       latenessMs < 0 || effectiveEndAt < startAt || effectiveEndAt > endAt ||
-      finalizedAt < effectiveEndAt ||
-      report?.dto?.experiment?.startAt !== new Date(startAt).toISOString() ||
-      report?.dto?.experiment?.endAt !== new Date(effectiveEndAt).toISOString()) {
+      !finalizedAtValid || finalizedAt < effectiveEndAt ||
+      startIso === null || endIso === null ||
+      report?.dto?.experiment?.startAt !== startIso ||
+      report?.dto?.experiment?.endAt !== endIso) {
     return {
       criterion: makeCriterion("observation_duration", "FAIL",
         "Run bounds, report timestamps, and finalization evidence are inconsistent."),
@@ -212,7 +413,7 @@ function evaluateDuration(config, terminal, report) {
         validDeadline
           ? "The evidenced window reaches the configured deadline."
           : "Deadline stop does not reconcile to the full configured window."),
-      completionMode: "FULL_DEADLINE",
+      completionMode: validDeadline ? "FULL_DEADLINE" : "INCONSISTENT",
       scheduledMs: endAt - startAt,
       evidencedMs: effectiveEndAt - startAt
     };
@@ -229,7 +430,7 @@ function evaluateDuration(config, terminal, report) {
           : evidencedMs === endAt - startAt
             ? "Operator stop occurred at the scheduled end."
             : "A valid early operator stop is accepted as a completed stop, not a full-deadline run."),
-      completionMode: "OPERATOR_STOP",
+      completionMode: validStop ? "OPERATOR_STOP" : "INCONSISTENT",
       scheduledMs: endAt - startAt,
       evidencedMs
     };
@@ -243,10 +444,223 @@ function evaluateDuration(config, terminal, report) {
   };
 }
 
+function hasFields(value, fields) {
+  return isRecord(value) && fields.every(field => Object.hasOwn(value, field));
+}
+
+function hasExactFields(value, fields) {
+  return hasFields(value, fields) && Object.keys(value).length === fields.length;
+}
+
+function nullableCount(value) {
+  return value === null || Number.isSafeInteger(value) && value >= 0;
+}
+
+function nullableFlag(value) {
+  return value === null || typeof value === "boolean";
+}
+
+function nullableAmount(value, signed = false) {
+  return value === null || typeof value === "string" &&
+    (signed ? /^-?(?:0|[1-9]\d{0,128})$/ : /^(?:0|[1-9]\d{0,128})$/).test(value) &&
+    value !== "-0";
+}
+
+function completeCoverage(value) {
+  const fields = [
+    "observedTotal", "total", "displayed", "displayTruncated", "sourceTruncated", "unaccounted"
+  ];
+  return hasExactFields(value, fields) &&
+    ["observedTotal", "total", "displayed", "unaccounted"].every(key =>
+      nullableCount(value[key])) &&
+    ["displayTruncated", "sourceTruncated"].every(key => nullableFlag(value[key]));
+}
+
+function completeReasonRow(reason) {
+  const required = ["gate", "status", "reason", "source", "observedAt"];
+  const allowed = [...required, "mint"];
+  return isRecord(reason) &&
+    required.every(key => Object.hasOwn(reason, key)) &&
+    Object.keys(reason).every(key => allowed.includes(key)) &&
+    validText(reason.gate, 80) && validText(reason.status, 32) &&
+    validText(reason.reason, 512) && validText(reason.source, 120) &&
+    (!Object.hasOwn(reason, "mint") || validText(reason.mint, 80)) &&
+    (reason.observedAt === null || validDateText(reason.observedAt));
+}
+
+function completeStopRow(row) {
+  const fields = ["kind", "status", "reason", "observedAt", "source"];
+  return hasExactFields(row, fields) && validText(row.kind, 64) &&
+    validText(row.status, 32) && validText(row.reason, 512) &&
+    (row.observedAt === null || validDateText(row.observedAt)) && validText(row.source, 120);
+}
+
+function completePositionRow(row) {
+  const fields = [
+    "mint", "tokenAtoms", "decimals", "entryCostCents", "stopPriceMicros",
+    "trailingActive", "markStatus"
+  ];
+  return hasExactFields(row, fields) && validText(row.mint, 80) &&
+    nullableAmount(row.tokenAtoms) && nullableCount(row.decimals) &&
+    nullableAmount(row.entryCostCents) && nullableAmount(row.stopPriceMicros) &&
+    nullableFlag(row.trailingActive) && validText(row.markStatus, 32);
+}
+
+function completeUnresolvedFill(row) {
+  const fields = ["kind", "receiptId", "status", "reason"];
+  return hasExactFields(row, fields) && validText(row.kind, 40) &&
+    validText(row.receiptId, 120) && validText(row.status, 32) &&
+    validText(row.reason, 512);
+}
+
+function completeProvenanceRow(row) {
+  const fields = ["chainId", "mint", "pool", "relatedPool", "quote", "sampledAt", "status"];
+  return hasExactFields(row, fields) && validText(row.chainId, 32) &&
+    validText(row.mint, 80) && validText(row.pool, 80) &&
+    validText(row.relatedPool, 80) && validText(row.quote, 80) &&
+    (row.sampledAt === null || validDateText(row.sampledAt)) &&
+    validText(row.status, 32);
+}
+
+function completeCandidateDetail(candidate) {
+  const fields = [
+    "chainId", "mint", "pool", "relatedPool", "quote", "sampledAt", "status",
+    "reasons", "reasonsCoverage"
+  ];
+  return hasExactFields(candidate, fields) &&
+    validText(candidate.chainId, 32) && validText(candidate.mint, 80) &&
+    validText(candidate.pool, 80) && validText(candidate.relatedPool, 80) &&
+    validText(candidate.quote, 80) &&
+    (candidate.sampledAt === null || validDateText(candidate.sampledAt)) &&
+    ["ACCEPTED", "REJECT", "UNKNOWN"].includes(candidate.status) &&
+    Array.isArray(candidate.reasons) && candidate.reasons.length <= 40 &&
+    completeCoverage(candidate.reasonsCoverage) &&
+    candidate.reasons.every(completeReasonRow);
+}
+
+function completeOperatorDto(dto) {
+  const topFields = [
+    "schema", "experiment", "evidence", "candidates", "trading", "controls",
+    "valuation", "costs", "unresolvedFills", "unresolvedFillsCoverage",
+    "provenance", "provenanceCoverage"
+  ];
+  const experimentFields = [
+    "id", "source", "evidenceKind", "sourceProvenance", "reportStatus",
+    "sourceReadiness", "operationalStatus", "startAt", "endAt"
+  ];
+  const discoveryFields = [
+    "observedRecords", "scoutAuditRows", "unaccountedObservedRecords",
+    "sourceTruncated", "scoutAuditTruncated", "exhaustive"
+  ];
+  const auditFields = [
+    "present", "observedRows", "truncated", "totalRows", "replayLoggerTruncated",
+    "ledgerAuditTruncated", "ledgerEventsReported", "ledgerEventsAudited"
+  ];
+  const candidateFields = [
+    "considered", "accepted", "rejected", "unknown", "audited",
+    "authorizationReceiptCount", "unaccountedObserved", "discoveryTruncated",
+    "scoutAuditTruncated", "basis", "details", "detailsCoverage"
+  ];
+  const tradingFields = [
+    "status", "paperEntryFills", "basis", "noTradeReasons", "noTradeReasonsCoverage"
+  ];
+  const controlFields = [
+    "stops", "stopsCoverage", "reservations", "openPositionCount",
+    "openPositions", "openPositionsCoverage"
+  ];
+  const valuationFields = [
+    "status", "cashCents", "realizedGrossPnlCents", "realizedNetPnlCents",
+    "grossOpenValueCents", "estimatedExitCostsCents", "unrealizedGrossPnlCents",
+    "unrealizedNetPnlCents", "unresolvedPositions", "basis"
+  ];
+  const costFields = ["basis", "entryByType", "exitByType", "totalByType", "totalCents"];
+  const costKeys = ["feeCents", "spreadCents", "slippageCents", "priceImpactCents", "networkCents"];
+  const coverageFields = ["discovery", "audit"];
+  const textArray = (items, max) => Array.isArray(items) && items.length <= max &&
+    items.every(item => validText(item, 120, false));
+  const countFieldsValid = (record, fields) => fields.every(key => nullableCount(record[key]));
+  const flagFieldsValid = (record, fields) => fields.every(key => nullableFlag(record[key]));
+  const exactCoverage = value => completeCoverage(value);
+  if (!hasExactFields(dto, topFields) || dto.schema !== "MEMECOIN_PAPER_OPERATOR_REPORT_V1" ||
+      !hasExactFields(dto.experiment, experimentFields) ||
+      !validText(dto.experiment.id, 80, false) || !validText(dto.experiment.source, 120, false) ||
+      !validText(dto.experiment.evidenceKind, 64, false) ||
+      !validText(dto.experiment.sourceProvenance, 64, false) ||
+      !["FINISHED", "INCOMPLETE"].includes(dto.experiment.reportStatus) ||
+      !validText(dto.experiment.sourceReadiness, 64) ||
+      dto.experiment.operationalStatus !== "NOT_EVIDENCED" ||
+      (dto.experiment.startAt !== null && !validDateText(dto.experiment.startAt)) ||
+      (dto.experiment.endAt !== null && !validDateText(dto.experiment.endAt)) ||
+      !hasExactFields(dto.evidence, ["status", "observedFrom", "observedThrough", "basis", "sources", "coverage"]) ||
+      !["PASS", "REJECT", "UNKNOWN"].includes(dto.evidence.status) ||
+      !validText(dto.evidence.basis, 512) || !textArray(dto.evidence.sources, 20) ||
+      (dto.evidence.observedFrom !== null && !validDateText(dto.evidence.observedFrom)) ||
+      (dto.evidence.observedThrough !== null && !validDateText(dto.evidence.observedThrough)) ||
+      !hasExactFields(dto.evidence.coverage, coverageFields) ||
+      !hasExactFields(dto.evidence.coverage.discovery, discoveryFields) ||
+      !hasExactFields(dto.evidence.coverage.audit, auditFields) ||
+      !countFieldsValid(dto.evidence.coverage.discovery, [
+        "observedRecords", "scoutAuditRows", "unaccountedObservedRecords"
+      ]) || !flagFieldsValid(dto.evidence.coverage.discovery, [
+        "sourceTruncated", "scoutAuditTruncated", "exhaustive"
+      ]) ||
+      !flagFieldsValid(dto.evidence.coverage.audit, [
+        "present", "truncated", "replayLoggerTruncated", "ledgerAuditTruncated"
+      ]) || !countFieldsValid(dto.evidence.coverage.audit, [
+        "observedRows", "totalRows", "ledgerEventsReported", "ledgerEventsAudited"
+      ]) ||
+      !hasExactFields(dto.candidates, candidateFields) ||
+      !countFieldsValid(dto.candidates, [
+        "considered", "accepted", "rejected", "unknown", "audited",
+        "authorizationReceiptCount", "unaccountedObserved"
+      ]) || !flagFieldsValid(dto.candidates, ["discoveryTruncated", "scoutAuditTruncated"]) ||
+      !validText(dto.candidates.basis, 512) || !Array.isArray(dto.candidates.details) ||
+      dto.candidates.details.length > 40 ||
+      !dto.candidates.details.every(completeCandidateDetail) ||
+      !exactCoverage(dto.candidates.detailsCoverage) ||
+      !hasExactFields(dto.trading, tradingFields) ||
+      !validText(dto.trading.status, 64, false) ||
+      !nullableCount(dto.trading.paperEntryFills) || !validText(dto.trading.basis, 512) ||
+      !Array.isArray(dto.trading.noTradeReasons) || dto.trading.noTradeReasons.length > 40 ||
+      !dto.trading.noTradeReasons.every(completeReasonRow) ||
+      !exactCoverage(dto.trading.noTradeReasonsCoverage) ||
+      !hasExactFields(dto.controls, controlFields) ||
+      !Array.isArray(dto.controls.stops) || dto.controls.stops.length > 40 ||
+      !dto.controls.stops.every(completeStopRow) ||
+      !exactCoverage(dto.controls.stopsCoverage) || !nullableCount(dto.controls.reservations) ||
+      !nullableCount(dto.controls.openPositionCount) ||
+      !Array.isArray(dto.controls.openPositions) || dto.controls.openPositions.length > 40 ||
+      !dto.controls.openPositions.every(completePositionRow) ||
+      !exactCoverage(dto.controls.openPositionsCoverage) ||
+      !hasExactFields(dto.valuation, valuationFields) ||
+      !validText(dto.valuation.status, 64, false) ||
+      !nullableAmount(dto.valuation.cashCents) ||
+      !nullableAmount(dto.valuation.realizedGrossPnlCents, true) ||
+      !nullableAmount(dto.valuation.realizedNetPnlCents, true) ||
+      !nullableAmount(dto.valuation.grossOpenValueCents) ||
+      !nullableAmount(dto.valuation.estimatedExitCostsCents) ||
+      !nullableAmount(dto.valuation.unrealizedGrossPnlCents, true) ||
+      !nullableAmount(dto.valuation.unrealizedNetPnlCents, true) ||
+      !nullableCount(dto.valuation.unresolvedPositions) || !validText(dto.valuation.basis, 512) ||
+      !hasExactFields(dto.costs, costFields) || !validText(dto.costs.basis, 512) ||
+      ![dto.costs.entryByType, dto.costs.exitByType, dto.costs.totalByType]
+        .every(cost => hasExactFields(cost, costKeys) &&
+          costKeys.every(key => nullableAmount(cost[key]))) ||
+      !nullableAmount(dto.costs.totalCents) ||
+      !Array.isArray(dto.unresolvedFills) || dto.unresolvedFills.length > 40 ||
+      !dto.unresolvedFills.every(completeUnresolvedFill) ||
+      !exactCoverage(dto.unresolvedFillsCoverage) || !Array.isArray(dto.provenance) ||
+      dto.provenance.length > 40 || !dto.provenance.every(completeProvenanceRow) ||
+      !exactCoverage(dto.provenanceCoverage)) {
+    return false;
+  }
+  return true;
+}
+
 function reportStatus(report, expectedRunId, configHash) {
   const dto = report?.dto;
   const experiment = dto?.experiment;
-  if (!isRecord(report) || !isRecord(dto) || dto.schema !== "MEMECOIN_PAPER_OPERATOR_REPORT_V1" ||
+  if (!isRecord(report) || !completeOperatorDto(dto) ||
       !isRecord(experiment) || typeof report.text !== "string") {
     return makeCriterion("operator_report", "FAIL", "Persisted operator-report record is malformed.");
   }
@@ -312,18 +726,94 @@ function terminalStatus(terminal, report) {
     return makeCriterion("terminal_completion", "UNKNOWN",
       "The persisted status does not establish a terminal FINISHED run.");
   }
+  if (!completeOperatorDto(report?.dto)) {
+    return makeCriterion("terminal_completion", "FAIL",
+      "Persisted operator DTO is structurally incomplete.");
+  }
   if (terminal.controllerStatus === "UNKNOWN" || terminal.controllerStatus === "NOT_STARTED" ||
       terminal.stopReason === "UNKNOWN" || terminal.reportStatus === "UNKNOWN") {
     return makeCriterion("terminal_completion", "UNKNOWN",
       "Controller, stop reason, or report projection remains unknown.");
   }
+  const terminalObservation = terminal.observation;
+  const reportObservation = report?.observation;
+  const observationFields = [
+    "entryAuthorizations", "simulatedFills", "executableQuoteAndCostEvidence"
+  ];
+  if (!isRecord(terminalObservation) || !isRecord(reportObservation) ||
+      observationFields.some(key => !Object.hasOwn(terminalObservation, key) ||
+        !Object.hasOwn(reportObservation, key)) ||
+      !isRecord(terminalObservation.windowFinalization) ||
+      !isRecord(reportObservation.windowFinalization)) {
+    return makeCriterion("terminal_completion", "UNKNOWN",
+      "Observation-only activity and finalization fields are incomplete.");
+  }
+  if (observationFields.some(key =>
+    terminalObservation[key] !== reportObservation[key]) ||
+      canonicalJson(terminalObservation.windowFinalization) !==
+        canonicalJson(reportObservation.windowFinalization)) {
+    return makeCriterion("terminal_completion", "FAIL",
+      "Terminal and report observation fields conflict.");
+  }
+  const reportTrading = report?.dto?.trading;
+  const reportExperiment = report?.dto?.experiment;
+  if (reportExperiment?.reportStatus === "INCOMPLETE") {
+    return makeCriterion("terminal_completion", "FAIL",
+      "Terminal completion conflicts with an operator DTO marked INCOMPLETE.");
+  }
+  if (reportExperiment?.reportStatus !== "FINISHED") {
+    return makeCriterion("terminal_completion", "UNKNOWN",
+      "The operator DTO does not establish a finished report.");
+  }
+  if (!isRecord(reportTrading) || terminal.reportTradingStatus !== reportTrading.status) {
+    return makeCriterion("terminal_completion", "FAIL",
+      "Terminal report-trading status does not match the persisted operator DTO.");
+  }
+  if (!["UNKNOWN", "NO_ENTRY_OBSERVED", "ZERO_TRADES", "TRADES_RECORDED"]
+    .includes(reportTrading.status)) {
+    return makeCriterion("terminal_completion", "FAIL",
+      "Operator report contains an unsupported trading status.");
+  }
+  if (reportTrading.paperEntryFills !== null &&
+      reportTrading.paperEntryFills !== undefined &&
+      (!Number.isSafeInteger(reportTrading.paperEntryFills) || reportTrading.paperEntryFills < 0)) {
+    return makeCriterion("terminal_completion", "FAIL",
+      "Operator report fill count is not a non-negative safe integer.");
+  }
+  if (reportTrading.paperEntryFills > 0 || reportTrading.status === "TRADES_RECORDED") {
+    return makeCriterion("terminal_completion", "FAIL",
+      "Paper-fill evidence conflicts with an observation-only terminal marker.");
+  }
+  if (reportTrading.paperEntryFills === null || reportTrading.paperEntryFills === undefined ||
+      reportTrading.status === "UNKNOWN") {
+    return makeCriterion("terminal_completion", "UNKNOWN",
+      "The report does not establish a known zero-fill observation.");
+  }
+  const finalizedAt = terminalObservation.windowFinalization.finalizedAt;
+  const {effectiveEndAt, latenessMs} = terminalObservation.windowFinalization;
+  if (![effectiveEndAt, finalizedAt, latenessMs].every(Number.isSafeInteger) ||
+      effectiveEndAt < 0 || finalizedAt < effectiveEndAt || latenessMs < 0 ||
+      finalizedAt > MAX_DATE_MS || effectiveEndAt > MAX_DATE_MS ||
+      finalizedAt - effectiveEndAt !== latenessMs) {
+    return makeCriterion("terminal_completion", "FAIL",
+      "Terminal window-finalization timestamps are invalid or inconsistent.");
+  }
+  if (terminal.terminalAt === undefined || terminal.terminalAt === null) {
+    return makeCriterion("terminal_completion", "UNKNOWN",
+      "Terminal marker timestamp is missing.");
+  }
+  if (!Number.isSafeInteger(terminal.terminalAt) || terminal.terminalAt < finalizedAt ||
+      terminal.terminalAt > MAX_DATE_MS) {
+    return makeCriterion("terminal_completion", "FAIL",
+      "Terminal timestamp is invalid or precedes observation finalization.");
+  }
   if (terminal.controllerStatus !== "FINISHED" ||
       !["DEADLINE", "OPERATOR_STOP"].includes(terminal.stopReason) ||
       terminal.failureCode !== null || terminal.reportStatus !== "PROJECTED" ||
       terminal.observationOnly !== true || terminal.executionStarted !== false ||
-      report?.observation?.entryAuthorizations !== 0 ||
-      report?.observation?.simulatedFills !== 0 ||
-      report?.observation?.executableQuoteAndCostEvidence !== "UNAVAILABLE") {
+      terminalObservation.entryAuthorizations !== 0 ||
+      terminalObservation.simulatedFills !== 0 ||
+      terminalObservation.executableQuoteAndCostEvidence !== "UNAVAILABLE") {
     return makeCriterion("terminal_completion", "FAIL",
       "Terminal status, stop reason, report projection, or observation-only invariants conflict.");
   }
@@ -377,10 +867,23 @@ function evaluateCriteria(expectedRunId, expectedConfigHash, artifacts) {
     ? coverageStatus(report)
     : makeCriterion("checkpoint_audit_coverage", "UNKNOWN",
       "Checkpoint audit coverage cannot be assessed without a valid operator report.");
+  const candidates = artifacts.report.status === "VALID"
+    ? candidateCoverageStatus(report)
+    : makeCriterion("candidate_detail_coverage", "UNKNOWN",
+      "Candidate detail coverage cannot be assessed without a valid operator report.");
   const accounting = artifacts.terminal.status === "VALID" && artifacts.report.status === "VALID"
     ? providerAccountingStatus(terminal, report, config)
     : makeCriterion("provider_accounting", "UNKNOWN",
       "Terminal and report accounting are not both available.");
+  const identityBound = identity.status === "PASS";
+  const boundCriterion = (criterion, label) => identityBound ? criterion :
+    makeCriterion(criterion.id, "UNKNOWN",
+      `The expected run/config identity is not established; ${label} cannot be attributed to this run.`);
+  const boundTerminalCheck = boundCriterion(terminalCheck, "terminal completion");
+  const boundDurationCheck = boundCriterion(duration.criterion, "observation duration");
+  const boundAccounting = boundCriterion(accounting, "provider accounting");
+  const boundCheckpoint = boundCriterion(checkpoint, "checkpoint audit coverage");
+  const boundCandidates = boundCriterion(candidates, "candidate detail coverage");
   const criteria = [
     makeCriterion("artifact_integrity", artifactStatus(artifacts),
       artifactStatus(artifacts) === "PASS"
@@ -389,19 +892,27 @@ function evaluateCriteria(expectedRunId, expectedConfigHash, artifacts) {
       {artifacts: Object.fromEntries(Object.entries(artifacts).map(([name, item]) =>
         [name, {status: item.status, reason: item.reason}]))}),
     identity,
-    terminalCheck,
+    boundTerminalCheck,
     reportCheck,
-    duration.criterion,
-    accounting,
-    checkpoint,
+    boundDurationCheck,
+    boundAccounting,
+    boundCheckpoint,
+    boundCandidates,
     makeCriterion("time_series_coverage", "UNKNOWN",
       "No time-series samples were supplied; uptime and gaps are unavailable."),
     makeCriterion("clock_provenance", "UNKNOWN",
-      "The caller-supplied clock and exported artifact provenance are not externally verified.")
+      "The caller-supplied clock and exported artifact provenance are not externally verified."),
+    makeCriterion("executable_quote_cost_evidence", "UNKNOWN",
+      "Executable quote and validated cost evidence are unavailable."),
+    makeCriterion("simulated_trade_test_readiness", "UNKNOWN",
+      "A separate simulated-trade test has not been evaluated by this observation-only report.")
   ];
   const status = criteria.some(item => item.status === "FAIL") ? "FAIL" :
     criteria.some(item => item.status === "UNKNOWN") ? "UNKNOWN" : "PASS";
-  return {criteria, status, identity, reportCheck, terminalCheck, duration, accounting, checkpoint};
+  return {
+    criteria, status, identity, reportCheck, terminalCheck: boundTerminalCheck, duration,
+    accounting: boundAccounting, checkpoint: boundCheckpoint, candidates: boundCandidates
+  };
 }
 
 export function evaluateObservation({
@@ -423,6 +934,9 @@ export function evaluateObservation({
   const totals = evaluation.accounting.totals ?? null;
   const reportDto = report?.dto;
   const duration = evaluation.duration;
+  const completionMode = evaluation.identity.status === "PASS" &&
+    evaluation.terminalCheck.status === "PASS"
+    ? duration.completionMode : "UNKNOWN";
   return {
     schema: EVALUATION_SCHEMA,
     expectedRunId: typeof expectedRunId === "string" ? expectedRunId : null,
@@ -430,12 +944,16 @@ export function evaluateObservation({
     overall: evaluation.status,
     observation: {
       completionStatus: evaluation.terminalCheck.status,
-      completionMode: duration.completionMode,
+      completionMode,
       stopReason: typeof terminal?.stopReason === "string" ? terminal.stopReason : null,
+      failureCode: terminal?.failureCode ?? null,
+      controllerStatus: terminal?.controllerStatus ?? "UNKNOWN",
+      reportStatus: terminal?.reportStatus ?? "UNKNOWN",
       scheduledDurationMs: duration.scheduledMs,
       evidencedDurationMs: duration.evidencedMs,
-      fullDeadlineCompleted: duration.completionMode === "FULL_DEADLINE" &&
-        duration.criterion.status === "PASS"
+      fullDeadlineCompleted: completionMode === "FULL_DEADLINE" &&
+        duration.criterion.status === "PASS" &&
+        evaluation.terminalCheck.status === "PASS"
     },
     criteria: evaluation.criteria,
     accounting: {
@@ -464,6 +982,7 @@ export function evaluateObservation({
       inputDigests: Object.fromEntries(Object.entries(artifacts).map(([name, item]) =>
         [name, item.digest])),
       checkpointAudit: evaluation.checkpoint.status,
+      candidateDetails: evaluation.candidates.status,
       timeSeries: "UNAVAILABLE",
       uptimeAndGaps: "UNAVAILABLE",
       externallyVerifiedClock: false,
@@ -485,6 +1004,10 @@ export function evaluateObservation({
 
 function markdownEscape(value) {
   return String(value).replaceAll("\\", "\\\\").replaceAll("`", "\\`")
+    .replaceAll("!", "\\!").replaceAll("[", "\\[").replaceAll("]", "\\]")
+    .replaceAll("(", "\\(").replaceAll(")", "\\)")
+    .replaceAll("*", "\\*").replaceAll("_", "\\_").replaceAll("~", "\\~")
+    .replaceAll("#", "\\#")
     .replaceAll("|", "\\|").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
     .replaceAll("\r", " ").replaceAll("\n", " ");
 }
@@ -550,8 +1073,17 @@ async function readBoundedFile(filePath, maxBytes) {
   if (typeof filePath !== "string" || !path.isAbsolute(filePath)) {
     throw new TypeError("input paths must be absolute");
   }
-  const handle = await open(filePath, "r");
+  if (!Number.isInteger(fsConstants.O_NONBLOCK) || !Number.isInteger(fsConstants.O_NOFOLLOW)) {
+    throw new Error("platform does not support nonblocking no-follow input opens");
+  }
+  const handle = await open(
+    filePath,
+    fsConstants.O_RDONLY | fsConstants.O_NONBLOCK | fsConstants.O_NOFOLLOW
+  );
   try {
+    if (!(await handle.stat()).isFile()) {
+      throw new TypeError("input path must resolve to a regular file");
+    }
     const buffer = Buffer.alloc(maxBytes + 1);
     let length = 0;
     while (length < buffer.length) {
