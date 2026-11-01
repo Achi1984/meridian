@@ -2,6 +2,9 @@ import {createHash} from "node:crypto";
 import {PaperLedger, PAPER_LEDGER_POLICY} from "./ledger.mjs";
 import {canonicalCheckpointBytes, MAX_CHECKPOINT_BYTES} from "./checkpoint-store.mjs";
 
+import {pinClockPolicy, normalizeClockSample, admitClock} from "./clock-policy.mjs";
+
+const CLOCK_SESSION_VERSION = "memecoin-paper-ledger-v3-anchored-clock";
 const FORMAT_VERSION = 1;
 const POLICY_VERSION = "memecoin-paper-ledger-v2-monotonic-time";
 const EIGHT_HOURS_MS = 8 * 60 * 60 * 1000;
@@ -160,7 +163,8 @@ function validateInputShape(method, input, header) {
   return cloned;
 }
 
-function headerFor({runId, startedAt}) {
+function headerFor({runId, startedAt, clockPolicy}) {
+  if (clockPolicy !== undefined && !clockPolicy) throw new TypeError("explicit clock policy must be complete");
   if (typeof runId !== "string" || !SAFE_ID.test(runId)) {
     throw new TypeError("runId must be a bounded safe identifier");
   }
@@ -174,7 +178,8 @@ function headerFor({runId, startedAt}) {
     startedAt,
     deadlineAt,
     initialCapitalCents: "100000",
-    policyVersion: POLICY_VERSION,
+    policyVersion: clockPolicy ? CLOCK_SESSION_VERSION : POLICY_VERSION,
+    ...(clockPolicy ? {clockPolicy: pinClockPolicy(clockPolicy, startedAt)} : {}),
     policy: {...PAPER_LEDGER_POLICY},
     runtime: runtimeFingerprint()
   };
@@ -203,6 +208,7 @@ function assertRecord(record, sequence, runId, predecessorHash) {
 }
 
 function invokeLedger(ledger, authorizationRefs, record, inputs) {
+  if (record.guard === "clock-fault") return {status: "REJECT", reason: record.clockReceipt.reason, entriesAllowed: false, clockAdmissionBlocked: true, financialStateUnchanged: true};
   if (record.guard === "deadline") {
     return ledger.finishRun({
       startedAt: record.runStart,
@@ -251,6 +257,10 @@ export class PaperCheckpointSession {
   #unknown = false;
   #closed = false;
   #latestCommandTime;
+  #clock;
+  #clockFault = false;
+  #clockRestart = false;
+  #previousMonotonicMs;
 
   constructor(store, header, ledger, records, headHash) {
     this.#store = store;
@@ -259,13 +269,14 @@ export class PaperCheckpointSession {
     this.#records = records;
     this.#headHash = headHash;
     this.#headSequence = records.length - 1;
-    this.#latestCommandTime = records.at(-1).inputs.now ?? header.startedAt;
+    this.#latestCommandTime = [...records].reverse().find(r => r.guard !== "clock-fault")?.inputs.now ?? header.startedAt;
+    this.#previousMonotonicMs = header.clockPolicy?.anchorMonotonicMs;
     for (const record of records.slice(1)) {
-      this.#commandDigests.set(record.commandId, inputIdentity(record.method, record.inputs, record.guard ?? null));
+      this.#commandDigests.set(record.commandId, inputIdentity(record.method, record.inputs, header.clockPolicy ? null : (record.guard ?? null)));
     }
   }
 
-  static async open({store, runId, startedAt} = {}) {
+  static async open({store, runId, startedAt, clockPolicy, clock} = {}) {
     if (!store || typeof store.readCheckpoint !== "function" ||
         typeof store.commitCheckpoint !== "function") {
       throw new TypeError("an exclusively opened checkpoint store is required");
@@ -274,7 +285,9 @@ export class PaperCheckpointSession {
     try {
       checkpoint = await store.readCheckpoint();
       if (checkpoint.status === "ABSENT") {
-        const header = headerFor({runId, startedAt});
+        const header = headerFor({runId, startedAt, clockPolicy});
+        if (clockPolicy && (!clock || typeof clock.sample !== "function")) throw new TypeError("anchored mode requires a session clock port");
+        if (!clockPolicy && clock !== undefined) throw new TypeError("a clock port requires an explicit clock policy");
         const ledger = new PaperLedger({now: header.startedAt, runId: header.runId});
         const headerResult = {
           ...header,
@@ -300,14 +313,16 @@ export class PaperCheckpointSession {
         if (committed.status !== "ACK") {
           throw checkpointError("CHECKPOINT_UNKNOWN", committed.reason ?? "initial checkpoint was not acknowledged");
         }
-        return new PaperCheckpointSession(store, header, ledger, records, committed.hash);
+        const session = new PaperCheckpointSession(store, header, ledger, records, committed.hash);
+        session.#clock = clock ? Object.freeze({sample: clock.sample.bind(clock)}) : undefined;
+        return session;
       }
       if (checkpoint.status !== "OK") {
         const code = checkpoint.status === "CORRUPT" ? "CHECKPOINT_CORRUPT" : "CHECKPOINT_UNKNOWN";
         throw checkpointError(code, checkpoint.reason ?? `checkpoint status is ${checkpoint.status}`);
       }
       const parsed = JSON.parse(checkpoint.bytes.toString("utf8"));
-      return PaperCheckpointSession.#restore(store, parsed, checkpoint.hash, {runId, startedAt});
+      return PaperCheckpointSession.#restore(store, parsed, checkpoint.hash, {runId, startedAt, clockPolicy, clock});
     } catch (error) {
       if (typeof store.close === "function") await store.close().catch(() => {});
       throw error;
@@ -322,7 +337,8 @@ export class PaperCheckpointSession {
       throw checkpointError("CHECKPOINT_CORRUPT", "checkpoint header or record count is invalid");
     }
     const header = checkpoint.runHeader;
-    const expectedHeader = headerFor({runId: header.runId, startedAt: header.startedAt});
+    const expectedHeader = headerFor({runId: header.runId, startedAt: header.startedAt, clockPolicy: requested.clockPolicy});
+    if (!requested.clockPolicy && requested.clock !== undefined) throw checkpointError("CHECKPOINT_INCOMPATIBLE", "clock port cannot upgrade a fixture journal");
     if (!canonicalCheckpointBytes(header).equals(canonicalCheckpointBytes(expectedHeader)) ||
         (requested.runId !== undefined && requested.runId !== header.runId) ||
         (requested.startedAt !== undefined && requested.startedAt !== header.startedAt)) {
@@ -335,6 +351,8 @@ export class PaperCheckpointSession {
     const commandDigests = new Set();
     const results = new Map();
     let latestTime = header.startedAt;
+    let previousMonotonicMs = header.clockPolicy?.anchorMonotonicMs;
+    let clockFault = false;
     for (let sequence = 0; sequence < checkpoint.records.length; sequence += 1) {
       const stored = checkpoint.records[sequence];
       assertRecord(stored, sequence, header.runId, predecessorHash);
@@ -366,18 +384,33 @@ export class PaperCheckpointSession {
         } else {
           commandInputs = validateInputShape(record.method, commandInputs, header);
         }
-        if (commandInputs.now < latestTime) {
+        if (header.clockPolicy) {
+          if (clockFault) throw checkpointError("CHECKPOINT_CORRUPT", "new command after clock fault");
+          let expectedReceipt;
+          if (record.clockReceipt?.reason === "CLOCK_RESTART_BLOCKED") {
+            expectedReceipt = {status: "FAULT", reason: "CLOCK_RESTART_BLOCKED", sample: null, effectiveUtcMs: null};
+          } else {
+            const sample = normalizeClockSample(record.clockReceipt?.sample);
+            expectedReceipt = admitClock(header.clockPolicy, previousMonotonicMs, sample, commandInputs.now);
+          }
+          if (!canonicalCheckpointBytes(record.clockReceipt ?? null).equals(canonicalCheckpointBytes(expectedReceipt))) {
+            throw checkpointError("CHECKPOINT_CORRUPT", "clock receipt is inconsistent");
+          }
+          clockFault = expectedReceipt.status === "FAULT";
+          if (!clockFault) previousMonotonicMs = expectedReceipt.sample.monotonicMs;
+        } else if (record.clockReceipt !== undefined) {
+          throw checkpointError("CHECKPOINT_CORRUPT", "fixture journal contains a clock receipt");
+        }
+        if (!clockFault && commandInputs.now < latestTime) {
           throw checkpointError("CHECKPOINT_CORRUPT", "command time moves backwards");
         }
-        latestTime = commandInputs.now;
-        const mustGuard = record.method !== "finishRun" && commandInputs.now > header.deadlineAt;
+        if (!clockFault) latestTime = commandInputs.now;
+        const expectedGuard = clockFault ? "clock-fault" :
+          (record.method !== "finishRun" && commandInputs.now > header.deadlineAt ? "deadline" : undefined);
         commandDigests.add(record.commandId);
-        if ((record.guard !== undefined && record.guard !== "deadline") ||
-            Boolean(record.guard) !== mustGuard ||
-            ((record.guard === "deadline" || record.method === "finishRun") &&
-             record.runStart !== header.startedAt) ||
-            (record.guard === undefined && record.method !== "finishRun" &&
-             record.runStart !== undefined)) {
+        const needsStart = !clockFault && (expectedGuard === "deadline" || record.method === "finishRun");
+        if (record.guard !== expectedGuard ||
+            (needsStart ? record.runStart !== header.startedAt : record.runStart !== undefined)) {
           throw checkpointError("CHECKPOINT_CORRUPT", "command guard or fixed run start is invalid");
         }
         record.inputs = commandInputs;
@@ -400,10 +433,14 @@ export class PaperCheckpointSession {
     session.#authorizationRefs = authorizationRefs;
     session.#commandDigests = new Map();
     session.#results = results;
+    session.#clockFault = clockFault;
+    session.#clockRestart = Boolean(header.clockPolicy);
+    session.#previousMonotonicMs = previousMonotonicMs;
+    session.#latestCommandTime = latestTime;
     for (const stored of checkpoint.records.slice(1)) {
       const decoded = {...stored, inputs: decodeCanonical(stored.inputs)};
       session.#commandDigests.set(stored.commandId,
-        inputIdentity(stored.method, decoded.inputs, stored.guard ?? null));
+        inputIdentity(stored.method, decoded.inputs, header.clockPolicy ? null : (stored.guard ?? null)));
     }
     return session;
   }
@@ -416,7 +453,8 @@ export class PaperCheckpointSession {
       deadlineAt: this.#header.deadlineAt,
       sequence: this.#headSequence,
       hash: this.#headHash,
-      policyVersion: this.#header.policyVersion
+      policyVersion: this.#header.policyVersion,
+      ...(this.#header.clockPolicy ? {clockMode: this.#header.clockPolicy.mode, clockAdmissionBlocked: this.#clockFault || this.#clockRestart} : {})
     });
   }
 
@@ -438,20 +476,28 @@ export class PaperCheckpointSession {
     }
     let guard = null;
     if (inputs.now > this.#header.deadlineAt && method !== "finishRun") guard = "deadline";
-    const digest = inputIdentity(method, inputs, guard);
+    const digest = inputIdentity(method, inputs, this.#header.clockPolicy ? null : guard);
     if (this.#commandDigests.has(commandId)) {
       if (this.#commandDigests.get(commandId) !== digest) {
         return {status: "REJECT", reason: "command identity reused with different payload"};
       }
       return cloneResult(this.#results.get(commandId));
     }
-    // Known exact command retries are read-only and remain available at their old time.
-    // New backward commands are rejected without ledger or checkpoint side effects.
-    if (inputs.now < this.#latestCommandTime) {
+    // Exact acknowledged retries above are reads and do not sample a new clock.
+    if (this.#clockFault) return {status: "REJECT", reason: "CLOCK_FAULT_LATCHED", entriesAllowed: false};
+    if (this.#records.length >= MAX_RECORDS) return {status: "REJECT", reason: "checkpoint command capacity reached"};
+    let clockReceipt;
+    if (this.#header.clockPolicy) {
+      if (this.#clockRestart) {
+        clockReceipt = {status: "FAULT", reason: "CLOCK_RESTART_BLOCKED", sample: null, effectiveUtcMs: null};
+      } else {
+        let sample = null;
+        try { sample = normalizeClockSample(this.#clock.sample()); } catch { /* Missing clock is a durable fault. */ }
+        clockReceipt = admitClock(this.#header.clockPolicy, this.#previousMonotonicMs, sample, inputs.now);
+      }
+      if (clockReceipt.status === "FAULT") guard = "clock-fault";
+    } else if (inputs.now < this.#latestCommandTime) {
       return {status: "REJECT", reason: "NON_MONOTONIC_TIME", entriesAllowed: false};
-    }
-    if (this.#records.length >= MAX_RECORDS) {
-      return {status: "REJECT", reason: "checkpoint command capacity reached"};
     }
 
     const record = {
@@ -463,11 +509,9 @@ export class PaperCheckpointSession {
       inputs,
       resultDigest: ""
     };
-    if (guard) {
-      record.guard = guard;
-      record.runStart = this.#header.startedAt;
-    }
-    if (method === "finishRun") record.runStart = this.#header.startedAt;
+    if (clockReceipt) record.clockReceipt = clockReceipt;
+    if (guard) record.guard = guard;
+    if (guard !== "clock-fault" && (guard === "deadline" || method === "finishRun")) record.runStart = this.#header.startedAt;
     let result;
     try {
       result = invokeLedger(this.#ledger, this.#authorizationRefs, record, inputs);
@@ -511,7 +555,11 @@ export class PaperCheckpointSession {
         reason: committed.reason ?? "command result has no durable acknowledgement"
       };
     }
-    this.#latestCommandTime = inputs.now;
+    if (guard === "clock-fault") this.#clockFault = true;
+    else {
+      this.#latestCommandTime = inputs.now;
+      if (clockReceipt) this.#previousMonotonicMs = clockReceipt.sample.monotonicMs;
+    }
     this.#records = nextRecords;
     this.#headSequence = record.sequence;
     this.#headHash = committed.hash;

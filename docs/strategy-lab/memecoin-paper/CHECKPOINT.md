@@ -84,3 +84,49 @@ clock skew and forward-jump handling. A caller can still supply monotonic but
 false future times; this patch does not establish wall-clock authority, an
 active watchdog, automatic recovery or permission to run. The manifest remains
 disabled and `UNRECOVERABLE_FAIL_CLOSED`.
+
+
+## Opt-in anchored clock admission (policy v3)
+
+The default above remains the caller-time v2 fixture contract, including existing
+orchestration behavior. There is no implicit upgrade. A separate
+`memecoin-paper-ledger-v3-anchored-clock` header pins an explicit `clockPolicy`:
+`version: "anchored-clock-v1"`, `mode` (`synthetic` or `external`), bounded
+`sourceId`, `anchorUtcMs` (equal to `startedAt`), `anchorMonotonicMs`,
+`anchorUncertaintyMs`, `maxAnchorUncertaintyMs`, `maxSkewMs`, and
+`maxObservationGapMs`. All numeric fields are nonnegative integer milliseconds;
+the observation gap limit must be positive. There are no default limits.
+
+A new anchored session also requires a synchronous `clock.sample()` port returning
+exactly `{sourceId, mode, wallUtcMs, monotonicMs}`. Effective UTC is the pinned UTC
+anchor plus elapsed monotonic milliseconds. Each new command's explicit `now`
+must equal that derived UTC. Wall divergence is checked against `maxSkewMs` in
+both directions; observation gaps have a separate bound. Elapsed time is never
+inferred from the wall clock. Source/mode mismatch, malformed or missing samples,
+regression, overflow, excess gap/skew, or caller-time mismatch block admission.
+No clock is obtained from `Date.now()` as a fallback.
+
+A fault is a control record in the existing canonical, hash-chained checkpoint,
+published through the same durable ACK protocol. It never invokes the ledger:
+financial state, reservations, daily gate, ledger time and audit remain unchanged.
+An acknowledged fault latches all new mutating commands closed. Unacknowledged
+publication produces UNKNOWN and disables usable session reads, as before.
+Snapshots and exact acknowledged retries remain reads after an acknowledged
+fault; retries neither resample the clock nor append another record.
+
+Recovery validates persisted receipts and replays financial commands without
+sampling any current clock. The exact pinned policy must be supplied again.
+Reopened anchored sessions are read-only: the first attempted new command records
+`CLOCK_RESTART_BLOCKED`, because a monotonic counter does not prove process
+continuity. There is no automatic restart, re-anchor, mode change or migration.
+The existing eight-hour guard uses admitted UTC and is still command-triggered.
+
+**Scope and remaining activation blocker:** `external` is a required configuration
+label, not a certificate of UTC provenance. No real source, source-authentication
+adapter, operating skew/gap/uncertainty limits, watchdog or activation is selected
+by this packet. Tests use named synthetic limits only; synthetic receipts cannot
+match an external-mode policy. The operator must establish trusted anchoring and
+source integrity separately before any real-data run. The manifest remains
+disabled and `UNRECOVERABLE_FAIL_CLOSED`.
+
+Focused clock regression: `node --test test/memecoin-paper-clock.test.js`.
