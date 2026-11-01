@@ -196,7 +196,7 @@ function validateRoutePlan(routePlan) {
 
 function parseProviderExpiry(value) {
   if (value === undefined || value === null) return null;
-  if (typeof value !== "string" || !/^\d{10,13}$/.test(value)) {
+  if (typeof value !== "string" || !/^\d{10}$/.test(value)) {
     throw invalid("RESPONSE_EXPIRY_INVALID");
   }
   const seconds = Number(value);

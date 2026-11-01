@@ -167,6 +167,21 @@ test("future chronology, expired provider quote, and mismatched mint fail closed
   const expiredResult = await adapterFor(expired.body).adapter.getQuote(request());
   assert.ok(expiredResult.reasons.includes("PROVIDER_QUOTE_EXPIRED"));
 
+  const millisecondsExpiry = syntheticOrderResponse({
+    router: "jupiterz",
+    expireAt: String(NOW - 1_000)
+  });
+  const millisecondsResult = await adapterFor(millisecondsExpiry.body).adapter.getQuote(request());
+  assert.ok(millisecondsResult.reasons.includes("RESPONSE_EXPIRY_INVALID"));
+
+  const futureExpiry = syntheticOrderResponse({
+    router: "jupiterz",
+    expireAt: String(Math.floor((NOW + 60_000) / 1_000))
+  });
+  const futureExpiryResult = await adapterFor(futureExpiry.body).adapter.getQuote(request());
+  assert.equal(futureExpiryResult.route.providerExpiresAt, NOW + 60_000);
+  assert.equal(futureExpiryResult.route.expirySource, "PROVIDER_RFQ_BOUNDED_BY_LOCAL_POLICY");
+
   const mismatched = syntheticOrderResponse({
     inputMint: "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE"
   });
