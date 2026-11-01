@@ -1,4 +1,4 @@
-import {B17_EVIDENCE_SNAPSHOT, projectResearchEvidence} from './research-evidence.js?v=B16-M11-FIX11';
+import {B17_EVIDENCE_SNAPSHOT, projectResearchEvidence} from './research-evidence.js?v=B16-M11-FIX12';
 
 export const CAMPAIGN_SOURCE = '../docs/strategy-lab/campaign-20261013.json';
 export const FAMILY_IDS = Object.freeze(['H1','H2','H3','H4','H5','H6','H7','H8','H9','H10','H11','H12']);

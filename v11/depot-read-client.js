@@ -1,8 +1,8 @@
-import {buildPionexHistoryModel} from './pionex-history-model.js?v=B16-M11-FIX11';
-import {buildCurrentDepotModel,buildPionexDepotModel} from './depot-current-model.js?v=B16-M11-FIX11';
-import {buildDepotHistoryModel} from './depot-history-model.js?v=B16-M11-FIX11';
-import {buildDepotReadModel} from './depot-read-model.js?v=B16-M11-FIX11';
-import {parseBotReadCredential} from './bot-read-client.js?v=B16-M11-FIX11';
+import {buildPionexHistoryModel} from './pionex-history-model.js?v=B16-M11-FIX12';
+import {buildCurrentDepotModel,buildPionexDepotModel,buildOkxDepotModel} from './depot-current-model.js?v=B16-M11-FIX12';
+import {buildDepotHistoryModel} from './depot-history-model.js?v=B16-M11-FIX12';
+import {buildDepotReadModel} from './depot-read-model.js?v=B16-M11-FIX12';
+import {parseBotReadCredential} from './bot-read-client.js?v=B16-M11-FIX12';
 
 const ENDPOINT = 'https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/portfolio-history?range=1w';
 const CURRENT_ENDPOINT='https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/dashboard';
@@ -48,13 +48,13 @@ async function readBounded(response, signal) {
 
 // Manual reads only. Independent source failures preserve other verified results.
 export function createDepotReadClient({getToken,onChange=()=>{},fetchImpl=globalThis.fetch,
-  pionexOnly=false,now=Date.now,schedule=setTimeout,cancelSchedule=clearTimeout}={}){
-  let generation=0,pending=null,disposed=false,current=null,stored=null,history=null,attempted=false,src=null;
+  pionexOnly=false,okxAggregate=false,now=Date.now,schedule=setTimeout,cancelSchedule=clearTimeout}={}){
+  let generation=0,pending=null,disposed=false,current=null,stored=null,history=null,attempted=false,src=null,okx=null;
   const token=()=>{try{const value=getToken();return parseDepotReadCredential(value)?value.trim():null;}catch{return null;}};
   let snapshotToken=null;
-  const emit=(status,model=null)=>{if(!disposed)try{onChange({status,model,history,reasons:reasons(),sourceIssues:sourceIssues()});}catch{}};
+  const emit=(status,model=null)=>{if(!disposed)try{onChange({status,model,history,...(okxAggregate?{okx:okx?.status==='ready'&&now()>okx.expiresAt?{...okx,status:'stale',totalUsd:null}:okx}:{}),reasons:reasons(),sourceIssues:sourceIssues()});}catch{}};
   const stop=()=>{generation++;pending?.abort();pending=null;};
-  const wipe=()=>{current=null;stored=null;history=null;src=null;snapshotToken=null;};
+  const wipe=()=>{current=null;stored=null;history=null;src=null;okx=null;snapshotToken=null;};
   // Fixed categories only, derived at emit time so a fresh->stale projection never keeps an OK label.
   // prices: RECEIVED means transport success only; coverage is validated inside the current model.
   function reasons(){
@@ -102,6 +102,7 @@ export function createDepotReadClient({getToken,onChange=()=>{},fetchImpl=global
       const [dashboard,archive]=await Promise.all([read(CURRENT_ENDPOINT,credential,ctl.signal),read(ENDPOINT.replace('portfolio-history','pionex-history'),credential,ctl.signal)]);
       if(disposed||id!==generation)return;
       pending=null;if(token()!==credential||dashboard.locked||archive.locked){lock();return;}
+      if(okxAggregate)okx=buildOkxDepotModel(dashboard.data,{now:now()});
       const c=buildPionexDepotModel(dashboard.data,{now:now()});
       current=c.status==='FRESH_SNAPSHOT'?c:c.status==='STALE'?{status:'STALE'}:null;
       history=Object.fromEntries(['1h','1d','1w'].map(range=>[range,buildPionexHistoryModel(archive.data,{now:now(),range})]));
@@ -123,7 +124,7 @@ export function createDepotReadClient({getToken,onChange=()=>{},fetchImpl=global
       historyEmpty:history['1w']?.status==='empty',sourceIssues:c.sourceIssues};
     project();
   }
-  function revalidate(){if(disposed)return;if(!token()||(snapshotToken&&token()!==snapshotToken)){lock();return;}if(current||stored)project();else if(!attempted&&!pending)emit('not_loaded');}
+  function revalidate(){if(disposed)return;if(!token()||(snapshotToken&&token()!==snapshotToken)){lock();return;}if(current||stored||okx)project();else if(!attempted&&!pending)emit('not_loaded');}
   function dispose(){if(disposed)return;lock();disposed=true;}
   return {refresh,lock,revalidate,dispose};
 }

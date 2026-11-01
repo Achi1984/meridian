@@ -1,13 +1,13 @@
-import {appAccess} from './app-access.js?v=B16-M11-FIX11';
-import {createDepotReadClient} from './depot-read-client.js?v=B16-M11-FIX11';
-import {createDepotReadView} from './depot-read-view.js?v=B16-M11-FIX11';
-import {mountLedgerReview} from './ledger-review-view.js?v=B16-M11-FIX11';
-import {mountLedgerManual} from './ledger-manual-view.js?v=B16-M11-FIX11';
+import {appAccess} from './app-access.js?v=B16-M11-FIX12';
+import {createDepotReadClient} from './depot-read-client.js?v=B16-M11-FIX12';
+import {createDepotReadView} from './depot-read-view.js?v=B16-M11-FIX12';
+import {mountLedgerReview} from './ledger-review-view.js?v=B16-M11-FIX12';
+import {mountLedgerManual} from './ledger-manual-view.js?v=B16-M11-FIX12';
 
 // Mounting controls never starts a request. Only the view's manual refresh can read.
 export function mountDepotReadAccess(document,window,{
   access=appAccess,createClient=createDepotReadClient,createView=createDepotReadView,createLedgerView=mountLedgerReview,
-  pionexOnly=false,ledgerManual=false,createLedgerManualView=mountLedgerManual,now=Date.now,schedule=setTimeout,cancelSchedule=clearTimeout
+  pionexOnly=false,okxAggregate=false,ledgerManual=false,createLedgerManualView=mountLedgerManual,now=Date.now,schedule=setTimeout,cancelSchedule=clearTimeout
 }={}){
   const root=document.getElementById('depot-read-root');
   if(!root)return null;
@@ -17,16 +17,17 @@ export function mountDepotReadAccess(document,window,{
     if(expiryTimer!==null){cancelSchedule(expiryTimer);expiryTimer=null;}
   }
   try{
-    view=createView(root,{pionexOnly,commandRoot:document.getElementById('command-portfolio'),getToken:access.getToken,
+    view=createView(root,{pionexOnly,okxAggregate,commandRoot:document.getElementById('command-portfolio'),getToken:access.getToken,
       createClient:options=>{
-        const reader=createClient({...options,pionexOnly,getToken:access.getToken,onChange:state=>{
+        const reader=createClient({...options,pionexOnly,okxAggregate,getToken:access.getToken,onChange:state=>{
           cancelExpiry();
           if(disposed)return;
           if(state.status==='locked'&&access.isUnlocked()){access.lock();return;}
           options.onChange?.(state);
-          if(state.status==='fresh'&&Number.isFinite(state.model?.expiresAt)){
+          const expiries=[state.status==='fresh'?state.model?.expiresAt:null,state.okx?.status==='ready'?state.okx.expiresAt:null].filter(Number.isFinite);
+          if(expiries.length){
             const generation=expiryGeneration;
-            const delay=Math.max(0,state.model.expiresAt-now()+1);
+            const delay=Math.max(0,Math.min(...expiries)-now()+1);
             expiryTimer=schedule(()=>{
               if(disposed||generation!==expiryGeneration)return;
               expiryTimer=null;reader.revalidate();
@@ -54,6 +55,6 @@ export function mountDepotReadAccess(document,window,{
   }};
 }
 
-if(typeof document!=='undefined'&&typeof window!=='undefined')mountDepotReadAccess(document,window,{pionexOnly:true,ledgerManual:true});
+if(typeof document!=='undefined'&&typeof window!=='undefined')mountDepotReadAccess(document,window,{pionexOnly:true,ledgerManual:true,okxAggregate:true});
 
 

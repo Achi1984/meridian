@@ -201,3 +201,21 @@ export function buildPionexDepotModel(payload,{now=Date.now()}={}){
       snapshotAt:iso(pionexTime),sourceAt:iso(pionexTime),source:'SERVER_PIONEX_CURRENT',expiresAt:pionexTime+PIONEX_AGE};
   }catch(error){return {...empty,status:error?.message==='STALE'?'STALE':'UNKNOWN',reason:error?.message==='STALE'?'SOURCE_EXPIRED':'CURRENT_SOURCE_INCOMPLETE',sourceIssues};}
 }
+
+// This projection is independent of Pionex, Ledger and the combined historical model.
+// Existing OKX sync runs every ten minutes; expire its cached source after fifteen.
+export function buildOkxDepotModel(payload,{now=Date.now()}={}){
+  const empty={status:'unavailable',currency:'USD',totalUsd:null,source:null,sourceAt:null,expiresAt:null};
+  try{
+    need(Number.isSafeInteger(now)&&now>0);
+    need(object(payload)&&payload.private===true&&object(payload.data?.portfolio));
+    const rows=payload.data.portfolio.manualVenueBalances;
+    need(Array.isArray(rows)&&rows.length<=100);
+    const okx=rows.filter(row=>object(row)&&String(row.venue??row.name).trim().toLowerCase()==='okx');
+    need(okx.length===1);
+    const row=okx[0];need(row.source==='OKX_READ_API_ASSET_VALUATION'&&amount(row.valueUsd));
+    const at=stamp(row.updatedAt,now),expiresAt=at+15*60*1000;
+    const origin={...empty,source:'OKX_READ_API_ASSET_VALUATION',sourceAt:iso(at),expiresAt};
+    return now>expiresAt?{...origin,status:'stale'}:{...origin,status:'ready',totalUsd:decimal(row.valueUsd)};
+  }catch{return empty;}
+}

@@ -57,7 +57,7 @@ test('OKX authority fetch is GET-only and uses the configured regional base URL'
   const now=Date.parse('2026-10-02T16:30:00Z'),seen=[];
   const fetchImpl=async(url,opts)=>{
     seen.push({url,opts});
-    return {ok:true,status:200,text:async()=>JSON.stringify({code:'0',data:[{totalBal:'321.09',ts:String(now-1000)}]})};
+    return new Response(JSON.stringify({code:'0',data:[{totalBal:'321.09',ts:String(now-1000)}]}));
   };
   const x=await fetchOkxPortfolioAuthoritySnapshot({
     env:{OKX_READ_API_KEY:'k',OKX_READ_API_SECRET:'s',OKX_READ_API_PASSPHRASE:'p',OKX_READ_API_BASE_URL:'https://eea.okx.com'},
@@ -67,6 +67,7 @@ test('OKX authority fetch is GET-only and uses the configured regional base URL'
   assert.equal(seen.length,1);
   assert.equal(seen[0].url,'https://eea.okx.com/api/v5/asset/asset-valuation?ccy=USD');
   assert.equal(seen[0].opts.method,'GET');
+  assert.equal(seen[0].opts.redirect,'error');
   assert.equal(seen[0].opts.body,undefined);
 });
 
@@ -114,4 +115,19 @@ test('health exposes only a boolean OKX authority configuration diagnostic',()=>
   assert.match(gateway,/const OKX_PORTFOLIO_AUTHORITY_CONFIGURED=!!\(/);
   assert.match(gateway,/okxPortfolioAuthorityConfigured:OKX_PORTFOLIO_AUTHORITY_CONFIGURED/);
   assert.doesNotMatch(gateway,/okxPortfolioAuthorityConfigured:[^\n]*OKX_READ_API_SECRET/);
+});
+
+test('OKX authority rejects ambiguous numeric types, duplicate rows and oversized streams',async()=>{
+  const now=Date.parse('2026-01-01T00:00:00Z'),row={totalBal:'0',ts:String(now)};
+  assert.equal(parseOkxAssetValuation({code:'0',data:[row]},{nowMs:now}).totalUsd,0);
+  for(const value of [true,false,[],{},' 1','1e3','Infinity'])assert.throws(()=>parseOkxAssetValuation({code:'0',data:[{...row,totalBal:value}]},{nowMs:now}));
+  for(const ts of [0,-1,true,'1.5'])assert.throws(()=>parseOkxAssetValuation({code:'0',data:[{...row,ts}]},{nowMs:now}));
+  assert.throws(()=>parseOkxAssetValuation({code:'0',data:[row,row]},{nowMs:now}));
+  const env={OKX_READ_API_KEY:'fixture',OKX_READ_API_SECRET:'fixture',OKX_READ_API_PASSPHRASE:'fixture'};
+  for(const reply of [new Response('{}',{headers:{'content-length':'65537'}}),new Response('x'.repeat(65537))]){
+    await assert.rejects(fetchOkxPortfolioAuthoritySnapshot({env,now:()=>now,fetchImpl:async()=>reply}),/response_too_large/);
+  }
+  await assert.rejects(fetchOkxPortfolioAuthoritySnapshot({env,now:()=>now,fetchImpl:async(_url,options)=>{
+    assert.equal(options.redirect,'error');throw new Error('redirect rejected');
+  }}),/redirect rejected/);
 });

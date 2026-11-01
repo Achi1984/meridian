@@ -40,7 +40,7 @@ function scanGraph(entries,{root=v11Root,read=readModule,fileExists=exists}={}){
         external.add(specifier);
         continue;
       }
-      assert.equal(target.search,'?v=B16-M11-FIX11',`internal v11 import must use B16-M11-FIX11: ${url.pathname} -> ${specifier}`);
+      assert.equal(target.search,'?v=B16-M11-FIX12',`internal v11 import must use B16-M11-FIX12: ${url.pathname} -> ${specifier}`);
       assert.ok(fileExists(target),`internal v11 module exists: ${specifier}`);
       const name=target.pathname.slice(root.pathname.length);
       modules.add(name);
@@ -51,7 +51,7 @@ function scanGraph(entries,{root=v11Root,read=readModule,fileExists=exists}={}){
     }
   }
   for(const entry of entries){
-    assert.equal(entry.search,'?v=B16-M11-FIX11','served M11 entrypoint must use B16-M11-FIX11');
+    assert.equal(entry.search,'?v=B16-M11-FIX12','served M11 entrypoint must use B16-M11-FIX12');
     assert.ok(fileExists(entry),`served M11 entrypoint exists: ${entry.pathname}`);
     visit(entry);
   }
@@ -77,7 +77,7 @@ test('served M11 module graph has one existing B17 identity for every local edge
   assert.ok(graph.references.get('bot-read-client.js')>=2,'shared bot client is reached by both read surfaces');
   for(const [module,identities] of graph.identities){
     assert.equal(identities.size,1,`${module} must resolve to one shared URL identity`);
-    assert.match([...identities][0],/\?v=B16-M11-FIX11$/);
+    assert.match([...identities][0],/\?v=B16-M11-FIX12$/);
   }
 });
 
@@ -87,24 +87,24 @@ test('agent-status browser harness shares the served B17 bootstrap, client and a
   const statusModules=imports.filter(url=>url.pathname.startsWith('/v11/'))
     .map(url=>url.pathname.slice('/v11/'.length)+url.search).sort();
   assert.deepEqual(statusModules,[
-    'agent-status-bootstrap.js?v=B16-M11-FIX11',
-    'agent-status-client.js?v=B16-M11-FIX11',
-    'app-access.js?v=B16-M11-FIX11'
+    'agent-status-bootstrap.js?v=B16-M11-FIX12',
+    'agent-status-client.js?v=B16-M11-FIX12',
+    'app-access.js?v=B16-M11-FIX12'
   ]);
 });
 
 test('nested stale B15 edges fail the same graph assertion',()=>{
   const fixtureRoot=new URL('file:///fixture/v11/');
   const fixture=new Map([
-    ['/fixture/v11/entry.js',"import './nested.js?v=B16-M11-FIX11';"],
+    ['/fixture/v11/entry.js',"import './nested.js?v=B16-M11-FIX12';"],
     ['/fixture/v11/nested.js',"import './leaf.js?v=B16-M11';"],
     ['/fixture/v11/leaf.js','export const ready=true;']
   ]);
-  assert.throws(()=>scanGraph([new URL('entry.js?v=B16-M11-FIX11',fixtureRoot)],{
+  assert.throws(()=>scanGraph([new URL('entry.js?v=B16-M11-FIX12',fixtureRoot)],{
     root:fixtureRoot,
     read:url=>fixture.get(url.pathname),
     fileExists:url=>fixture.has(url.pathname)
-  }),/internal v11 import must use B16-M11-FIX11/);
+  }),/internal v11 import must use B16-M11-FIX12/);
 });
 
 test('B17 cache preview remains isolated from terminal, root and PWA release identities',()=>{
