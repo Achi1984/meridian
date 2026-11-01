@@ -1,5 +1,5 @@
-import {createDepotHistoryView} from './depot-history-view.js?v=B16-M11-FIX11';
-import {publishDepotPortfolioState} from './depot-portfolio-state.js?v=B16-M11-FIX11';
+import {createDepotHistoryView} from './depot-history-view.js?v=B16-M11-FIX12';
+import {publishDepotPortfolioState} from './depot-portfolio-state.js?v=B16-M11-FIX12';
 // DOM text only. Neither credentials nor raw response bodies are rendered.
 const LABELS={
   locked:['Gesperrt','App mit Meridian-Passwort öffnen, dann Depot manuell aktualisieren.'],
@@ -28,7 +28,7 @@ const SOURCE_ISSUES={
 const sourceDetails=issues=>Array.isArray(issues)?[...new Set(issues)].slice(0,3)
   .filter(code=>typeof code==='string'&&Object.hasOwn(SOURCE_ISSUES,code)).map(code=>SOURCE_ISSUES[code]).join(' '):'';
 const money=x=>new Intl.NumberFormat('de-DE',{style:'currency',currency:'USD'}).format(x);
-export function createDepotReadView(root,{getToken,createClient,commandRoot=null,pionexOnly=false}={}){
+export function createDepotReadView(root,{getToken,createClient,commandRoot=null,pionexOnly=false,okxAggregate=false}={}){
   const document=root.ownerDocument;
   if(pionexOnly){
     const title=document.getElementById?.('depot-summary-heading');if(title)title.textContent='Pionex-Bewertung';
@@ -46,9 +46,20 @@ export function createDepotReadView(root,{getToken,createClient,commandRoot=null
   let disposed=false,range='1d',lastHistory=null;
   const chartRoot=el('section');section.append(chartRoot);
   const chart=createDepotHistoryView(chartRoot,{pionexOnly,onRange:key=>{range=key;chart.render(lastHistory?.[range],range);}});
+  const okxCard=okxAggregate?el('section'):null;
+  if(okxCard){okxCard.className='card okx-aggregate';root.append(okxCard);}
+  function renderOkx(state){
+    if(!okxCard)return;
+    okxCard.replaceChildren(el('h3','OKX · Gesamtbewertung'),el('p','Separater Börsenstand in USD. Nicht zum Pionex-Wert addiert; keine Einzelpositionen.'));
+    const model=state?.okx,hidden=['locked','not_loaded','loading'].includes(state?.status);
+    const valid=!hidden&&model?.status==='ready'&&model.source==='OKX_READ_API_ASSET_VALUATION'&&Number.isFinite(model.totalUsd)&&model.totalUsd>=0;
+    const label=state?.status==='locked'?'App entsperren, um den gespeicherten OKX-Stand zu laden.':state?.status==='not_loaded'?'Noch nicht geladen. Depot aktualisieren lädt den gespeicherten Börsenstand.':state?.status==='loading'?'Gespeicherter OKX-Stand wird geladen.':model?.status==='stale'?'OKX-Stand veraltet. Bewertung ausgeblendet.':'Kein aktueller OKX-API-Stand verfügbar.';
+    okxCard.append(el('p',valid?money(model.totalUsd):label));
+    if(!hidden&&model?.source==='OKX_READ_API_ASSET_VALUATION'&&typeof model.sourceAt==='string')okxCard.append(el('p','Quelle: OKX Read API · Stand: '+model.sourceAt+' · nach 15 Minuten veraltet.'));
+  }
   let rendered=false;
   function render(state){
-    if(disposed)return;rendered=true;
+    if(disposed)return;rendered=true;renderOkx(state);
     let kind=Object.hasOwn(LABELS,state?.status)?state.status:'unavailable';
     const m=state?.model;
     lastHistory=state?.history||null;chart.render(lastHistory?.[range],range);

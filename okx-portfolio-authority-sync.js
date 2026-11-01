@@ -10,7 +10,7 @@ const DEFAULT_INTERVAL_MIN=10;
 const DEFAULT_MAX_SOURCE_AGE_MS=5*60*1000;
 let pool=null,running=false,poolUrl='';
 
-const finite=v=>v===null||v===undefined||v===''?null:(Number.isFinite(Number(v))?Number(v):null);
+const finite=v=>typeof v==='number'&&Number.isFinite(v)?v:typeof v==='string'&&/^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(v)&&Number.isFinite(Number(v))?Number(v):null;
 const clean=v=>String(v||'').trim();
 
 export function readOkxPortfolioAuthorityCredentials(env={}){
@@ -34,10 +34,10 @@ export function okxPortfolioAuthorityHeaders(path,{apiKey,apiSecret,passphrase,n
 }
 
 export function parseOkxAssetValuation(body={},opts={}){
-  if(String(body?.code)!=='0')throw new Error('okx_asset_valuation_api_error');
-  const row=Array.isArray(body?.data)?body.data[0]:null,totalUsd=finite(row?.totalBal),timestampMs=finite(row?.ts),nowMs=finite(opts.nowMs)??Date.now(),maxAgeMs=Math.max(0,finite(opts.maxAgeMs)??DEFAULT_MAX_SOURCE_AGE_MS);
+  if(body?.code!=='0')throw new Error('okx_asset_valuation_api_error');
+  const row=Array.isArray(body?.data)&&body.data.length===1?body.data[0]:null,totalUsd=finite(row?.totalBal),timestampMs=finite(row?.ts),nowMs=finite(opts.nowMs)??Date.now(),maxAgeMs=Math.max(0,finite(opts.maxAgeMs)??DEFAULT_MAX_SOURCE_AGE_MS);
   if(totalUsd==null||totalUsd<0)throw new Error('okx_asset_valuation_invalid_total');
-  if(timestampMs==null)throw new Error('okx_asset_valuation_timestamp_missing');
+  if(!Number.isSafeInteger(timestampMs)||timestampMs<=0)throw new Error('okx_asset_valuation_timestamp_missing');
   if(timestampMs>nowMs+30000)throw new Error('okx_asset_valuation_future_timestamp');
   const ageMs=Math.max(0,nowMs-timestampMs);
   if(ageMs>maxAgeMs)throw new Error('okx_asset_valuation_stale');
@@ -55,10 +55,28 @@ export async function fetchOkxPortfolioAuthoritySnapshot({env=process.env,fetchI
   const creds=readOkxPortfolioAuthorityCredentials(env);
   if(!creds.ok)throw new Error('okx_credentials_missing');
   const path=okxPortfolioAuthorityPath(),base=okxPortfolioAuthorityBaseUrl(env),nowMs=Number(now()),headers=okxPortfolioAuthorityHeaders(path,{...creds,now:nowMs});
-  const response=await fetchImpl(base+path,{method:'GET',headers:{accept:'application/json',...headers},signal:AbortSignal.timeout(12000)});
-  const text=await response.text();
-  let body={};try{body=text?JSON.parse(text):{}}catch{throw new Error('okx_asset_valuation_invalid_json')}
+  const signal=AbortSignal.timeout(12000);
+  const response=await fetchImpl(base+path,{method:'GET',redirect:'error',headers:{accept:'application/json',...headers},signal});
   if(!response.ok)throw new Error('okx_asset_valuation_http_'+response.status);
+  const limit=64*1024,length=response.headers?.get('content-length');
+  if(length!=null&&(!/^\d+$/.test(length)||Number(length)>limit))throw new Error('okx_asset_valuation_response_too_large');
+  const reader=response.body?.getReader();
+  if(!reader)throw new Error('okx_asset_valuation_invalid_body');
+  let size=0,text='',body;const decoder=new TextDecoder('utf-8',{fatal:true});
+  const cancel=()=>{try{Promise.resolve(reader.cancel()).catch(()=>{});}catch{}};
+  signal.addEventListener('abort',cancel,{once:true});
+  try{
+    while(true){
+      if(signal.aborted)throw new Error('okx_asset_valuation_timeout');
+      const {done,value}=await reader.read();
+      if(signal.aborted)throw new Error('okx_asset_valuation_timeout');
+      if(done)break;
+      size+=value.byteLength;if(size>limit)throw new Error('okx_asset_valuation_response_too_large');
+      text+=decoder.decode(value,{stream:true});
+    }
+    text+=decoder.decode();
+    try{body=JSON.parse(text);}catch{throw new Error('okx_asset_valuation_invalid_json');}
+  }finally{signal.removeEventListener('abort',cancel);cancel();try{reader.releaseLock();}catch{}}
   return parseOkxAssetValuation(body,{nowMs,maxAgeMs});
 }
 

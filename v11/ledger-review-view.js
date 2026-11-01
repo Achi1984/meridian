@@ -1,4 +1,4 @@
-import {createLedgerReviewClient} from './ledger-review-client.js?v=B16-M11-FIX11';
+import {createLedgerReviewClient} from './ledger-review-client.js?v=B16-M11-FIX12';
 const TEXT={
   not_loaded:'Ledger-Mengen zur Prüfung laden. Noch keine Bestände bestätigt.',
   locked:'App entsperren, um gespeicherte Ledger-Mengen zu prüfen.',
