@@ -732,6 +732,7 @@ function makeReport(data, report) {
   if (data.complete && observedFillCount === 0) {
     const auditFill = data.audit.some(event => isRecord(event) &&
       (event.type === "PAPER_FILL" || event.type === "PAPER_ENTRY" ||
+       event.type === "STOP_ARMED" || event.type === "PAPER_EXIT" ||
        event.status === "FILLED_PAPER"));
     if (auditFill) throw new TypeError("zero-fill receipt conflicts with a recorded paper fill");
     const initialCapital = decimal(summary.initialCapitalCents);

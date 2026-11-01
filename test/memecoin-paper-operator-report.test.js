@@ -80,9 +80,11 @@ test("incomplete reports preserve unknown accounting instead of implying zero", 
   assert.equal(missingEvidence.trading.status, "UNKNOWN");
   assert.equal(missingEvidence.trading.paperEntryFills, null);
 
-  const conflictingAudit = reportFixtures.zeroTradeReplay();
-  conflictingAudit.audit.push({type: "PAPER_FILL", status: "FILLED_PAPER"});
-  assert.throws(() => projectOperatorReport(conflictingAudit), /recorded paper fill/);
+  for (const type of ["PAPER_FILL", "STOP_ARMED", "PAPER_EXIT"]) {
+    const conflictingAudit = reportFixtures.zeroTradeReplay();
+    conflictingAudit.audit.push({type});
+    assert.throws(() => projectOperatorReport(conflictingAudit), /recorded paper fill/);
+  }
 });
 
 test("checkpoint receipts expose evidenced unresolved exits, clock faults, and restart stops", () => {
