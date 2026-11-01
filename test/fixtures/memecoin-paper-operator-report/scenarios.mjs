@@ -15,6 +15,7 @@ function ledgerSummary({
   unrealizedGrossCents = "-999",
   unrealizedNetCents = "-999",
   costs = null,
+  eventCount = 3,
   openPositions = null
 } = {}) {
   return {
@@ -38,7 +39,7 @@ function ledgerSummary({
       trailingActive: false,
       highWaterPriceMicros: "10000"
     }],
-    eventCount: 3,
+    eventCount,
     auditTruncated: false,
     restartDisposition: "UNRECOVERABLE_FAIL_CLOSED",
     executionRealistic: false
@@ -55,7 +56,10 @@ function replay({
   cashCents = "92000",
   realizedGrossCents = "50",
   realizedNetCents = "30",
+  unrealizedGrossCents = "-999",
+  unrealizedNetCents = "-999",
   costs = null,
+  eventCount = 3,
   accounting = {
     cashCents: "92000",
     grossOpenValueCents: "7990",
@@ -135,7 +139,10 @@ function replay({
       accounting,
       note: "Open positions are not liquidated at run end; no end-of-run fill is invented."
     },
-    ledger: ledgerSummary({cashCents, realizedGrossCents, realizedNetCents, costs, openPositions: positions}),
+    ledger: ledgerSummary({
+      cashCents, realizedGrossCents, realizedNetCents, unrealizedGrossCents,
+      unrealizedNetCents, costs, eventCount, openPositions: positions
+    }),
     audit: [
       selected,
       duplicate,
@@ -156,8 +163,24 @@ function checkpoint({
   positions = [],
   cashCents = "100000",
   realizedNetCents = "0",
-  clockAdmissionBlocked = false
+  clockAdmissionBlocked = false,
+  eventCount = null
 } = {}) {
+  const auditEvents = [];
+  for (const receipt of results) {
+    if (receipt.method === "authorizeEntry" && receipt.result?.status === "AUTHORIZED") {
+      auditEvents.push({type: "RISK_AUTHORIZED"});
+    }
+    if (receipt.method === "executeEntry" && receipt.result?.status === "FILLED_PAPER") {
+      auditEvents.push({type: "STOP_ARMED"}, {type: "PAPER_FILL"});
+    }
+    if (receipt.method === "observeExitQuote" && receipt.result?.status === "CLOSED_PAPER") {
+      auditEvents.push({type: "PAPER_EXIT"});
+    }
+    if (receipt.method === "finishRun" && receipt.result?.status === "FINISHED") {
+      auditEvents.push({type: "RUN_FINISHED"});
+    }
+  }
   const metadata = {
     runId: "operator-fixture-run",
     startedAt: START,
@@ -184,9 +207,10 @@ function checkpoint({
         unrealizedGrossCents: null,
         unrealizedNetCents: null,
         costs: {entry: {...COSTS_ZERO}, exit: {...COSTS_ZERO}},
+        eventCount: eventCount ?? auditEvents.length,
         openPositions: positions
       }),
-      auditEvents: []
+      auditEvents
     }
   };
 }
@@ -235,7 +259,10 @@ export const reportFixtures = Object.freeze({
     cashCents: "100000",
     realizedGrossCents: "0",
     realizedNetCents: "0",
+    unrealizedGrossCents: "0",
+    unrealizedNetCents: "0",
     costs: {entry: {...COSTS_ZERO}, exit: {...COSTS_ZERO}},
+    eventCount: 1,
     positions: emptyPosition(),
     markStatus: "MARKED",
     extraAudit: []
@@ -258,7 +285,10 @@ export const reportFixtures = Object.freeze({
     cashCents: "100000",
     realizedGrossCents: "0",
     realizedNetCents: "0",
+    unrealizedGrossCents: "0",
+    unrealizedNetCents: "0",
     costs: {entry: {...COSTS_ZERO}, exit: {...COSTS_ZERO}},
+    eventCount: 1,
     positions: emptyPosition()
   }),
   missingMarksReplay: () => replay({

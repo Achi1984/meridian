@@ -55,11 +55,13 @@ control/ANSI characters and URLs are neutralized before rendering.
 
 `ZERO_TRADES` is asserted only for a complete finished report with explicit
 fill-decision evidence and no `FILLED_PAPER` entry. The ledger must also be
-consistent with zero activity; a position, changed cash, realized P&L, or
-reported cost without a fill is rejected as contradictory evidence. An
-incomplete snapshot without a fill receipt reports `UNKNOWN`, not zero. A valid
-zero-trade result does not imply profitability or operational safety. Missing
-candidate, reservation, mark, cost, or clock details remain `UNKNOWN`. The report says
+fully accounted and consistent with zero activity, including cash, realized and
+unrealized P&L, costs, open positions, and an untruncated audit/event count. A
+position, changed cash, nonzero P&L/cost, or `PAPER_FILL` audit event without a
+fill receipt is rejected as contradictory evidence. Missing corroboration and
+incomplete snapshots report `UNKNOWN`, not zero. A valid zero-trade result does
+not imply profitability or operational safety. Missing candidate, reservation,
+mark, cost, or clock details remain `UNKNOWN`. The report says
 `operationally running: NOT EVIDENCED`: it is not a live monitor. Synthetic
 evidence is labelled as such, and `BLOCKED`/`NOT_READY` source readiness is not
 runtime operation. Checkpoint hashes and result digests are treated as the

@@ -9,6 +9,10 @@ const SAFE_RECEIPT_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/;
 const RECEIPT_METHODS = new Set([
   "authorizeEntry", "executeEntry", "observeExitQuote", "riskSnapshot", "finishRun"
 ]);
+const LEDGER_EVENT_TYPES = new Set([
+  "RISK_RESERVATION_RELEASED", "LOCAL_DAY_OPEN", "RISK_AUTHORIZED", "STOP_ARMED",
+  "PAPER_FILL", "PAPER_EXIT", "RISK_MARK", "RUN_FINISHED"
+]);
 const COST_FIELDS = Object.freeze([
   "feeCents", "spreadCents", "slippageCents", "priceImpactCents", "networkCents"
 ]);
@@ -242,6 +246,7 @@ function replayData(report) {
     summary: ledger,
     runEnd,
     audit,
+    auditPresent: Array.isArray(report.audit),
     results: [],
     metadata: null,
     discovery: isRecord(report.discovery) ? report.discovery : null,
@@ -312,6 +317,7 @@ function checkpointData(report) {
     summary,
     runEnd,
     audit: Array.isArray(snapshot?.auditEvents) ? snapshot.auditEvents : [],
+    auditPresent: Array.isArray(snapshot?.auditEvents),
     results,
     metadata,
     discovery: null,
@@ -710,7 +716,6 @@ function makeReport(data, report) {
     receipts.some(item => item.method === "executeEntry");
   const observedFillCount = hasFillEvidence
     ? fills.filter(item => item?.status === "FILLED_PAPER").length : null;
-  const fillCount = observedFillCount === 0 && !data.complete ? null : observedFillCount;
   const runEnd = data.runEnd;
   const accounting = isRecord(runEnd?.accounting) ? runEnd.accounting : null;
   const ledgerPositions = Array.isArray(summary.openPositions) ? summary.openPositions : null;
@@ -723,21 +728,48 @@ function makeReport(data, report) {
   const openPositionCount = ledgerPositions ? ledgerPositions.length :
     endingPositions ? endingPositions.length : null;
   const costs = reportedCosts(summary);
-  if (data.complete && fillCount === 0) {
+  let fillCount = observedFillCount === 0 && !data.complete ? null : observedFillCount;
+  if (data.complete && observedFillCount === 0) {
+    const auditFill = data.audit.some(event => isRecord(event) &&
+      (event.type === "PAPER_FILL" || event.type === "PAPER_ENTRY" ||
+       event.status === "FILLED_PAPER"));
+    if (auditFill) throw new TypeError("zero-fill receipt conflicts with a recorded paper fill");
     const initialCapital = decimal(summary.initialCapitalCents);
     const cashAtEnd = decimal(summary.cashCents) ??
       decimal(runEnd?.accounting?.cashCents);
-    const realizedGross = decimal(summary.pnl?.realizedGrossCents, {signed: true}) ??
-      decimal(runEnd?.accounting?.realizedGrossPnlCents, {signed: true});
-    const realizedNet = decimal(summary.pnl?.realizedNetCents, {signed: true}) ??
-      decimal(runEnd?.accounting?.realizedNetPnlCents, {signed: true});
-    if ((openPositionCount !== null && openPositionCount > 0) ||
-        (initialCapital !== null && cashAtEnd !== null && initialCapital !== cashAtEnd) ||
-        (realizedGross !== null && realizedGross !== "0") ||
-        (realizedNet !== null && realizedNet !== "0") ||
-        (costs.totalCents !== null && costs.totalCents !== "0")) {
+    const pnl = isRecord(summary.pnl) ? summary.pnl : {};
+    const realizedGross = decimal(pnl.realizedGrossCents, {signed: true});
+    const realizedNet = decimal(pnl.realizedNetCents, {signed: true});
+    const unrealizedGross = decimal(pnl.unrealizedGrossCents, {signed: true});
+    const unrealizedNet = decimal(pnl.unrealizedNetCents, {signed: true});
+    const eventCount = countValue(summary.eventCount);
+    const ledgerEventCount = data.audit.filter(event =>
+      isRecord(event) && LEDGER_EVENT_TYPES.has(event.type)).length;
+    if (eventCount !== null && data.auditPresent && summary.auditTruncated !== true &&
+        !report.auditTruncated && eventCount !== ledgerEventCount) {
+      throw new TypeError("ledger event count conflicts with its audit");
+    }
+    const explicitZeroLedger = initialCapital !== null && summary.cashCents !== null &&
+      summary.cashCents !== undefined && cashAtEnd !== null &&
+      ["realizedGrossCents", "realizedNetCents", "unrealizedGrossCents", "unrealizedNetCents"]
+        .every(key => pnl[key] !== null && pnl[key] !== undefined) &&
+      realizedGross === "0" && realizedNet === "0" &&
+      unrealizedGross === "0" && unrealizedNet === "0" &&
+      costs.totalCents !== null && ledgerPositions !== null && openPositionCount === 0 &&
+      eventCount !== null && data.auditPresent &&
+      summary.auditTruncated !== true && !report.auditTruncated &&
+      eventCount === ledgerEventCount;
+    const contradictoryLedger = (openPositionCount !== null && openPositionCount > 0) ||
+      (initialCapital !== null && cashAtEnd !== null && initialCapital !== cashAtEnd) ||
+      (realizedGross !== null && realizedGross !== "0") ||
+      (realizedNet !== null && realizedNet !== "0") ||
+      (unrealizedGross !== null && unrealizedGross !== "0") ||
+      (unrealizedNet !== null && unrealizedNet !== "0") ||
+      (costs.totalCents !== null && costs.totalCents !== "0");
+    if (contradictoryLedger) {
       throw new TypeError("zero-fill evidence conflicts with ledger activity");
     }
+    if (!explicitZeroLedger) fillCount = null;
   }
   const positions = positionRows.slice(0, 40).map(position => {
     const ending = endingByMint.get(position.mint);
@@ -842,9 +874,11 @@ function makeReport(data, report) {
     valuation: {
       status: accounting ? "MARKED_AT_RUN_END" :
         positions.some(position => position.markStatus !== "MARKED") ? "UNRESOLVED" : "UNKNOWN",
-      cashCents: decimal(summary.cashCents),
-      realizedGrossPnlCents: decimal(summary.pnl?.realizedGrossCents, {signed: true}),
-      realizedNetPnlCents: decimal(summary.pnl?.realizedNetCents, {signed: true}),
+      cashCents: decimal(summary.cashCents) ?? decimal(accounting?.cashCents),
+      realizedGrossPnlCents: decimal(summary.pnl?.realizedGrossCents, {signed: true}) ??
+        decimal(accounting?.realizedGrossPnlCents, {signed: true}),
+      realizedNetPnlCents: decimal(summary.pnl?.realizedNetCents, {signed: true}) ??
+        decimal(accounting?.realizedNetPnlCents, {signed: true}),
       grossOpenValueCents: accounting ? decimal(accounting.grossOpenValueCents) : null,
       estimatedExitCostsCents: accounting ? decimal(accounting.estimatedExitCostsCents) : null,
       unrealizedGrossPnlCents: accounting ? decimal(accounting.grossUnrealizedPnlCents, {signed: true}) : null,

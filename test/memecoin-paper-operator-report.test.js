@@ -71,7 +71,18 @@ test("incomplete reports preserve unknown accounting instead of implying zero", 
 
   const contradictory = reportFixtures.positiveReplay();
   contradictory.simulatedFill = null;
+  contradictory.ledger.eventCount = 1;
   assert.throws(() => projectOperatorReport(contradictory), /zero-fill evidence conflicts/);
+
+  const missingAccounting = reportFixtures.zeroTradeReplay();
+  delete missingAccounting.ledger;
+  const missingEvidence = projectOperatorReport(missingAccounting);
+  assert.equal(missingEvidence.trading.status, "UNKNOWN");
+  assert.equal(missingEvidence.trading.paperEntryFills, null);
+
+  const conflictingAudit = reportFixtures.zeroTradeReplay();
+  conflictingAudit.audit.push({type: "PAPER_FILL", status: "FILLED_PAPER"});
+  assert.throws(() => projectOperatorReport(conflictingAudit), /recorded paper fill/);
 });
 
 test("checkpoint receipts expose evidenced unresolved exits, clock faults, and restart stops", () => {
@@ -104,10 +115,22 @@ test("checkpoint receipts expose evidenced unresolved exits, clock faults, and r
         status: "UNFILLED", reason: "fresh complete marks are required"
       }),
       reportFixtures.receipt("finish:empty", "finishRun", {
-        status: "FINISHED", elapsedMs: 1000, openPositions: [], accounting: null
+        status: "FINISHED", elapsedMs: 1000, openPositions: [], accounting: {
+          cashCents: "100000",
+          grossOpenValueCents: "0",
+          estimatedExitCostsCents: "0",
+          grossUnrealizedPnlCents: "0",
+          netUnrealizedPnlCents: "0",
+          realizedGrossPnlCents: "0",
+          realizedNetPnlCents: "0",
+          reconciliation: "fixture supplied totals"
+        }
       })
     ]
   });
+  noEntry.snapshot.summary.pnl.unrealizedGrossCents = "0";
+  noEntry.snapshot.summary.pnl.unrealizedNetCents = "0";
+  noEntry.snapshot.summary.lastKnownEquityCents = "100000";
   const noEntryReport = projectOperatorReport(noEntry);
   assert.equal(noEntryReport.trading.status, "ZERO_TRADES");
   assert.ok(noEntryReport.trading.noTradeReasons.some(item => item.gate === "entry-fill"));
