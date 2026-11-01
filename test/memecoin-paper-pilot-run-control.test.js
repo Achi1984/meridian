@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   createPilotRunControl,
+  PILOT_EVIDENCE_SOURCE,
+  READ_ONLY_PAPER,
   SYNTHETIC_TEST_ONLY
 } from "../scripts/memecoin-paper/pilot-run-control.mjs";
 import {
@@ -21,10 +23,16 @@ const DEFAULT_BUDGETS = Object.freeze({
   callbackSettlementMs: 5
 });
 
-function setup({runtime = createFakeRuntime(), overrides = {}, budgets = {}, signal} = {}) {
+function setup({
+  runtime = createFakeRuntime(),
+  overrides = {},
+  budgets = {},
+  signal,
+  mode = SYNTHETIC_TEST_ONLY
+} = {}) {
   const fake = createFakeCallbacks(overrides);
   const control = createPilotRunControl({
-    mode: SYNTHETIC_TEST_ONLY,
+    mode,
     callbacks: fake.callbacks,
     clock: runtime.clock,
     scheduler: runtime.scheduler,
@@ -46,14 +54,18 @@ test("the default-disabled invocation performs no callbacks and owns no timers",
     status: "DISABLED",
     state: "CREATED",
     mode: "DISABLED",
+    evidenceSource: "NONE",
+    acquisitionStarted: false,
     executionStarted: false,
-    reason: "SYNTHETIC_TEST_ONLY mode was not explicitly selected"
+    externalExecutionStatus: "NOT_ASSESSED",
+    runtimeAuthority: "EXTERNAL",
+    reason: "No supported pilot mode was explicitly selected"
   });
   assert.equal(control.stop(), false);
   assert.deepEqual(fake.calls, []);
 });
 
-test("only explicit synthetic mode is accepted; boolean real-mode claims are not", () => {
+test("accepted modes are explicit labels, not host authentication or run authority", async () => {
   const fake = createFakeCallbacks();
   const runtime = createFakeRuntime();
   const common = {
@@ -62,14 +74,76 @@ test("only explicit synthetic mode is accepted; boolean real-mode claims are not
     scheduler: runtime.scheduler,
     budgets: DEFAULT_BUDGETS
   };
-  assert.throws(() => createPilotRunControl({...common, mode: "REAL"}), /unsupported/);
-  assert.throws(() => createPilotRunControl({...common, mode: true}), /unsupported/);
+  assert.throws(() => createPilotRunControl({...common, mode: "REAL"}), /supported/);
+  assert.throws(() => createPilotRunControl({...common, mode: true}), /supported/);
+  assert.throws(() => createPilotRunControl({...common, mode: "LIVE"}), /supported/);
   assert.throws(() => createPilotRunControl({
     ...common,
     mode: SYNTHETIC_TEST_ONLY,
     realRunAuthorized: true
   }), /unknown pilot run control option/);
+  assert.throws(() => createPilotRunControl({
+    ...common,
+    mode: READ_ONLY_PAPER,
+    hostVerified: true,
+    runAuthorized: true
+  }), /unknown pilot run control option/);
+  const readonly = setup({
+    mode: READ_ONLY_PAPER,
+    overrides: {
+      acquire(input) {
+        return {
+          evidenceSource: input.evidenceSource,
+          events: [{providerCallbackFixture: true, id: "read-only-event"}],
+          requestsUsed: 1,
+          done: true
+        };
+      },
+      step() {
+        return {unresolvedPositions: [{source: "read-only callback fixture"}]};
+      }
+    }
+  });
+  const summary = await readonly.control.start();
+  assert.equal(summary.mode, READ_ONLY_PAPER);
+  assert.equal(summary.evidenceSource, PILOT_EVIDENCE_SOURCE[READ_ONLY_PAPER]);
+  assert.equal(summary.acquisitionStarted, true);
+  assert.equal(summary.executionStarted, false);
+  assert.equal(summary.externalExecutionStatus, "NOT_ASSESSED");
+  assert.equal(summary.runtimeAuthority, "EXTERNAL");
+  assert.equal(readonly.calls.find(call => call.name === "acquire").input.mode, READ_ONLY_PAPER);
+  assert.equal(readonly.calls.find(call => call.name === "acquire").input.evidenceSource,
+    PILOT_EVIDENCE_SOURCE[READ_ONLY_PAPER]);
+  assert.equal(readonly.calls.find(call => call.name === "step").input.mode, READ_ONLY_PAPER);
+  assert.equal(readonly.calls.find(call => call.name === "step").input.event.providerCallbackFixture, true);
+  assert.equal(readonly.calls.find(call => call.name === "checkpoint").input.evidenceSource,
+    PILOT_EVIDENCE_SOURCE[READ_ONLY_PAPER]);
+  const reportCall = readonly.calls.find(call => call.name === "report");
+  assert.equal(reportCall.input.mode, READ_ONLY_PAPER);
+  assert.equal(reportCall.input.evidenceSource, PILOT_EVIDENCE_SOURCE[READ_ONLY_PAPER]);
+  assert.equal(reportCall.input.summary.mode, READ_ONLY_PAPER);
   assert.deepEqual(fake.calls, []);
+});
+
+test("READ_ONLY_PAPER rejects acquisition evidence labelled as synthetic", async () => {
+  const {control, calls} = setup({
+    mode: READ_ONLY_PAPER,
+    overrides: {
+      acquire() {
+        return {
+          evidenceSource: PILOT_EVIDENCE_SOURCE[SYNTHETIC_TEST_ONLY],
+          events: [{synthetic: true, id: "mislabelled"}],
+          requestsUsed: 1
+        };
+      }
+    }
+  });
+  const summary = await control.start();
+  assert.equal(summary.status, "UNKNOWN");
+  assert.equal(summary.failureCode, "INVALID_ACQUISITION_RESULT");
+  assert.equal(summary.evidenceSource, PILOT_EVIDENCE_SOURCE[READ_ONLY_PAPER]);
+  assert.equal(calls.filter(call => call.name === "step").length, 0);
+  assert.equal(calls.filter(call => call.name === "checkpoint").length, 0);
 });
 
 test("an acknowledged one-cycle budget ends once and preserves supplied unresolved positions", async () => {
@@ -79,6 +153,11 @@ test("an acknowledged one-cycle budget ends once and preserves supplied unresolv
   const summary = await run;
   assert.equal(summary.status, "FINISHED");
   assert.equal(summary.state, "FINISHED");
+  assert.equal(summary.mode, SYNTHETIC_TEST_ONLY);
+  assert.equal(summary.evidenceSource, PILOT_EVIDENCE_SOURCE[SYNTHETIC_TEST_ONLY]);
+  assert.equal(summary.acquisitionStarted, true);
+  assert.equal(summary.externalExecutionStatus, "NOT_ASSESSED");
+  assert.equal(summary.runtimeAuthority, "EXTERNAL");
   assert.equal(summary.reason, "BUDGET_EXHAUSTED");
   assert.deepEqual(summary.counts, {requests: 1, events: 1, cycles: 1, completedSteps: 1});
   assert.deepEqual(summary.checkpointAcknowledgement, {

@@ -1,4 +1,9 @@
 export const SYNTHETIC_TEST_ONLY = "SYNTHETIC_TEST_ONLY";
+export const READ_ONLY_PAPER = "READ_ONLY_PAPER";
+export const PILOT_EVIDENCE_SOURCE = Object.freeze({
+  [SYNTHETIC_TEST_ONLY]: "SYNTHETIC_FIXTURE_ONLY",
+  [READ_ONLY_PAPER]: "READ_ONLY_PROVIDER_CALLBACK"
+});
 
 const MAX_DURATION_MS = 8 * 60 * 60 * 1000;
 const MAX_CALLBACK_SETTLEMENT_MS = 60_000;
@@ -10,8 +15,12 @@ const DISABLED_SUMMARY = Object.freeze({
   status: "DISABLED",
   state: "CREATED",
   mode: "DISABLED",
+  evidenceSource: "NONE",
+  acquisitionStarted: false,
   executionStarted: false,
-  reason: "SYNTHETIC_TEST_ONLY mode was not explicitly selected"
+  externalExecutionStatus: "NOT_ASSESSED",
+  runtimeAuthority: "EXTERNAL",
+  reason: "No supported pilot mode was explicitly selected"
 });
 
 function isRecord(value) {
@@ -46,13 +55,13 @@ function validateOptions(options) {
   if (Reflect.ownKeys(options).some(key => typeof key !== "string" || !allowed.has(key))) {
     throw new TypeError("unknown pilot run control option");
   }
-  if (options.mode !== SYNTHETIC_TEST_ONLY) {
-    throw new TypeError("real and other run modes are unsupported");
+  if (![SYNTHETIC_TEST_ONLY, READ_ONLY_PAPER].includes(options.mode)) {
+    throw new TypeError("only SYNTHETIC_TEST_ONLY and READ_ONLY_PAPER modes are supported");
   }
   if (!isRecord(options.callbacks) || CALLBACKS.some(name =>
     !Object.hasOwn(options.callbacks, name) || typeof options.callbacks[name] !== "function") ||
       Reflect.ownKeys(options.callbacks).some(key => !CALLBACKS.includes(key))) {
-    throw new TypeError("synthetic mode requires exactly the injected acquire, step, checkpoint, and report callbacks");
+    throw new TypeError("pilot control requires exactly the injected acquire, step, checkpoint, and report callbacks");
   }
   if (typeof options.clock !== "function") throw new TypeError("an injected monotonic clock is required");
   if (!isRecord(options.scheduler) ||
@@ -82,7 +91,15 @@ function validateOptions(options) {
       options.budgets.callbackSettlementMs, "callbackSettlementMs", MAX_CALLBACK_SETTLEMENT_MS
     )
   };
-  return {callbacks: options.callbacks, clock: options.clock, scheduler: options.scheduler, signal, budgets};
+  return {
+    mode: options.mode,
+    evidenceSource: PILOT_EVIDENCE_SOURCE[options.mode],
+    callbacks: options.callbacks,
+    clock: options.clock,
+    scheduler: options.scheduler,
+    signal,
+    budgets
+  };
 }
 
 function diagnosticCode(value) {
@@ -156,6 +173,7 @@ export function createPilotRunControl(options = {}) {
     });
   }
   const config = validateOptions(options);
+  const {mode, evidenceSource} = config;
   let state = "CREATED";
   let runPromise = null;
   let stopBeforeStart = false;
@@ -294,7 +312,7 @@ export function createPilotRunControl(options = {}) {
   }
 
   function callbackPayload(payload, signal) {
-    return Object.freeze({...payload, signal});
+    return Object.freeze({...payload, mode, evidenceSource, signal});
   }
 
   async function invoke(name, callback, payload) {
@@ -441,8 +459,12 @@ export function createPilotRunControl(options = {}) {
     return {
       status,
       state,
-      mode: SYNTHETIC_TEST_ONLY,
+      mode,
+      evidenceSource,
+      acquisitionStarted: callbackStates.acquire !== "NOT_STARTED",
       executionStarted: false,
+      externalExecutionStatus: "NOT_ASSESSED",
+      runtimeAuthority: "EXTERNAL",
       reason: stopReason,
       failureCode,
       startedAtMonotonicMs: startedAt,
@@ -487,7 +509,12 @@ export function createPilotRunControl(options = {}) {
     const reportInput = deepFreeze({...currentSummary(status), reportStatus: "EMITTING"});
     let reportStatus = "UNKNOWN";
     const reportPromise = Promise.resolve().then(() =>
-      config.callbacks.report(Object.freeze({summary: reportInput, signal: reportController.signal}))
+      config.callbacks.report(Object.freeze({
+        summary: reportInput,
+        mode,
+        evidenceSource,
+        signal: reportController.signal
+      }))
     ).then(
       () => ({kind: "completed"}),
       () => ({kind: "failed"})
@@ -567,7 +594,8 @@ export function createPilotRunControl(options = {}) {
       if (!isRecord(acquisition) || !isDenseDataArray(acquisition.events) ||
           (acquisition.done !== undefined && typeof acquisition.done !== "boolean") ||
           !Number.isSafeInteger(acquisition.requestsUsed) || acquisition.requestsUsed < 0 ||
-          acquisition.requestsUsed > MAX_BUDGET) {
+          acquisition.requestsUsed > MAX_BUDGET ||
+          acquisition.evidenceSource !== evidenceSource) {
         requestAccountingStatus = "UNKNOWN";
         failureStatus = "UNKNOWN";
         failureCode = "INVALID_ACQUISITION_RESULT";
@@ -685,6 +713,12 @@ export function createPilotRunControl(options = {}) {
   function snapshot() {
     return deepFreeze({
       state,
+      mode,
+      evidenceSource,
+      acquisitionStarted: callbackStates.acquire !== "NOT_STARTED",
+      executionStarted: false,
+      externalExecutionStatus: "NOT_ASSESSED",
+      runtimeAuthority: "EXTERNAL",
       reason: stopReason,
       counts: {...counts},
       callbackCompletion: {...callbackStates},

@@ -1,10 +1,14 @@
 # Offline Paper pilot run control
 
-**Disposition: isolated control-contract prototype only. No Paper run is
-startable or authorized.** This module is default-disabled, has no live mode or
-CLI, and performs no acquisition, strategy, ledger, checkpoint-store, or report
-work of its own. It does not change the disabled manifest or the #996 risk
-policy. Supplying callbacks is not authorization to bind them to real sources.
+**Disposition: isolated control-contract prototype only. This module does not
+start, authorize, or activate a Paper run.** It performs no acquisition,
+strategy, ledger, checkpoint-store, or report work of its own. Its optional
+`READ_ONLY_PAPER` label supports injection of a read-only acquisition callback;
+it is not a live mode, an owner-authority check, or evidence that a worker is
+approved. No CLI, automatic start, provider, or execution adapter is added.
+The controller exposes no order, wallet, or real-money API. The disabled
+manifest and #996 risk policy are unchanged. Supplying callbacks does not
+authorize their binding to real sources.
 
 ## Invocation and bounds
 
@@ -12,15 +16,18 @@ policy. Supplying callbacks is not authorization to bind them to real sources.
 `createPilotRunControl(options)`. Importing it has no timer, filesystem,
 network, process, provider, or strategy side effects. Calling it without a
 `mode` creates a disabled controller; `start()` returns `DISABLED` and calls
-nothing. The only accepted mode is the unmistakable
-`SYNTHETIC_TEST_ONLY` string. `REAL`, boolean enable/authorization options, and
-other modes are rejected. There is no auto-start.
+nothing. The only accepted modes are the unmistakably labelled
+`SYNTHETIC_TEST_ONLY` and `READ_ONLY_PAPER`. `LIVE`, `REAL`, boolean
+enable/authorization options, and other modes are rejected. Mode is an explicit
+label only: it does not authenticate a host, verify a read-only worker, or
+authorize a run. Runtime authority is external and remains `EXTERNAL`.
+There is no auto-start.
 
-The explicit test-only controller shape is:
+The explicit controller invocation shape is:
 
 ```js
 const control = createPilotRunControl({
-  mode: SYNTHETIC_TEST_ONLY,
+  mode: READ_ONLY_PAPER,
   callbacks: {acquire, step, checkpoint, report},
   clock: monotonicNow,
   scheduler: {setTimeout, clearTimeout},
@@ -31,6 +38,16 @@ const control = createPilotRunControl({
 });
 const terminal = await control.start();
 ```
+
+The module exports `SYNTHETIC_TEST_ONLY`, `READ_ONLY_PAPER`, and
+`PILOT_EVIDENCE_SOURCE`. `SYNTHETIC_TEST_ONLY` labels fixture evidence as
+`SYNTHETIC_FIXTURE_ONLY`; `READ_ONLY_PAPER` labels an injected acquisition
+boundary as `READ_ONLY_PROVIDER_CALLBACK`. `acquire` must return this exact
+mode-matched value in its `evidenceSource` field along with `events` and
+`requestsUsed`. A mismatched or absent source label stops before stepping with
+`UNKNOWN`. The labels are caller-contract consistency checks, not source
+authentication. Callback implementations must independently guarantee their
+own read-only behavior and accurate request accounting.
 
 `control.stop()` is the idempotent operator-stop hook. It can be requested
 before or during a run. Repeated `start()` calls share the same one-shot
@@ -53,15 +70,22 @@ settles, so slow work cannot overlap or cause catch-up bursts.
 
 ## Callback contracts
 
-All callbacks are injected functions and receive one object containing the
-listed fields and an `AbortSignal`.
+All callbacks are injected functions and receive one object containing
+`mode`, `evidenceSource`, the listed fields, and an `AbortSignal`. The report
+callback receives `{summary, mode, evidenceSource, signal}`. The terminal
+summary also reports `acquisitionStarted`, `executionStarted: false`,
+`externalExecutionStatus: "NOT_ASSESSED"`, and `runtimeAuthority: "EXTERNAL"`.
+`executionStarted: false` means this controller invokes no trading/engine
+execution API; it cannot prove that arbitrary injected callbacks have no
+external side effects. These fields do not assert host verification or run
+authorization.
 
 | Callback | Input | Return contract |
 | --- | --- | --- |
-| `acquire` | `cycleIndex`, `remainingRequests`, `remainingEvents`, `deadlineAtMonotonicMs` | `{events: Array, requestsUsed: nonnegative safe integer, done?: boolean}`. `events` must fit the remaining event budget. |
+| `acquire` | `mode`, `evidenceSource`, `cycleIndex`, `remainingRequests`, `remainingEvents`, `deadlineAtMonotonicMs` | `{evidenceSource: exact mode-matched label, events: Array, requestsUsed: nonnegative safe integer, done?: boolean}`. `events` must fit the remaining event budget. |
 | `step` | `cycleIndex`, `eventIndex`, `event` | Optional `{unresolvedPositions: bounded plain-data array}`. These are supplied evidence only; the controller does not derive positions, liquidation, or P&L. |
 | `checkpoint` | `cycleIndex`, `eventCount`, `completedSteps`, `unresolvedPositions`, `positionEvidenceStatus`, `positionEvidenceSourceStep`, `lastKnownPositionEvidence` | `{status: "ACKNOWLEDGED", sequence: nonnegative safe integer, hash: lowercase SHA-256 hex}` only after the integration verifies the durable receipt. Any other result is `UNKNOWN`. |
-| `report` | `{summary, signal}` | Its return value is not a durability acknowledgement. The callback is attempted once and bounded by `callbackSettlementMs`; a failed or late report does not change the run's terminal status. |
+| `report` | `mode`, `evidenceSource`, `summary`, `signal` | Its return value is not a durability acknowledgement. The callback is attempted once and bounded by `callbackSettlementMs`; a failed or late report does not change the run's terminal status. |
 
 Acquisition, step, and checkpoint work is sequential. Position evidence is
 current only when the latest successfully completed `step` explicitly supplies
@@ -131,9 +155,12 @@ references for a future integration sketch, not dependencies of this module:
 
 - PR #1108 adds `acquireProviderEvidence(options)` in
   `provider-evidence.mjs`. A proposed `acquire` glue layer would adapt its
-  bounded `events` and `counters.requests` into `{events, requestsUsed}` while
-  enforcing both controller and provider budgets. It must also keep unsupported
-  evidence `UNKNOWN`. The branch-only module is not imported here.
+  bounded `events` and `counters.requests` into the mode-labelled
+  `{evidenceSource, events, requestsUsed}` contract while enforcing controller
+  and provider budgets. The read-only mode/evidence-source values are now
+  explicit for #1112 to propagate, but are not source-authentication evidence.
+  Unsupported evidence remains `UNKNOWN`. The branch-only module is not
+  imported here.
 - PR #1104 adds `projectOperatorReport(input)` and
   `renderOperatorReport(report)` in `operator-report.mjs`. Those project
   existing replay/checkpoint result shapes; this controller summary is not one
@@ -154,6 +181,8 @@ verification, and run authority; authorization is unconditionally false.
 It records that the provider request adapter, real-run orchestration, stop,
 watchdog, and reporting commands are not implemented. This controller supplies
 only isolated control plumbing and does not clear any of those launch blockers.
+`READ_ONLY_PAPER` does not mean "approved to run"; it only tells downstream
+callbacks and reports which mode/evidence-source contract they must use.
 Trusted clock provenance/skew policy, host-specific storage durability,
 independent review, exact run configuration, and owner authorization remain
 unresolved deployment prerequisites. The monotonic clock and callback

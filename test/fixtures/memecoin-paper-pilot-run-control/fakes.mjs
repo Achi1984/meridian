@@ -81,7 +81,12 @@ export function createFakeCallbacks(overrides = {}) {
     acquire(input) {
       calls.push({name: "acquire", input});
       const cycle = acquisitionIndex++;
-      return {events: [{synthetic: true, id: `event-${cycle}`}], requestsUsed: 1, done: false};
+      return {
+        evidenceSource: input.evidenceSource,
+        events: [{synthetic: true, id: `event-${cycle}`}],
+        requestsUsed: 1,
+        done: false
+      };
     },
     step(input) {
       calls.push({name: "step", input});
@@ -104,7 +109,13 @@ export function createFakeCallbacks(overrides = {}) {
     const original = callbacks[name];
     callbacks[name] = input => {
       calls.push({name, input});
-      return overrides[name](input, {calls, original});
+      const result = overrides[name](input, {calls, original});
+      const labelAcquisition = value => name === "acquire" && value && typeof value === "object" &&
+        !Object.hasOwn(value, "evidenceSource")
+        ? {...value, evidenceSource: input.evidenceSource}
+        : value;
+      if (result && typeof result.then === "function") return result.then(labelAcquisition);
+      return labelAcquisition(result);
     };
   }
   return {callbacks, calls};
