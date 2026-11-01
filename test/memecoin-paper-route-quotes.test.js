@@ -215,7 +215,7 @@ test("malformed, truncated, and over-cap responses are rejected", async () => {
   assert.ok(oversizedBody.reasons.includes("RESPONSE_TOO_LARGE"));
 });
 
-test("timeout, redirect, and authentication denial do not retry or follow redirects", async () => {
+test("timeout, redirect, authentication denial, and rate limiting do not retry or follow redirects", async () => {
   let calls = 0;
   const timed = createJupiterV2QuoteAdapter({
     enabled: true,
@@ -248,6 +248,14 @@ test("timeout, redirect, and authentication denial do not retry or follow redire
     assert.ok(denied.reasons.includes("AUTH_DENIED"));
   }
   assert.equal(calls, 1);
+
+  let limitedCalls = 0;
+  const limited = await adapterFor((_url, _init) => {
+    limitedCalls += 1;
+    return {status: 429, headers: new Headers(), body: null};
+  }).adapter.getQuote(request());
+  assert.ok(limited.reasons.includes("RATE_LIMITED"));
+  assert.equal(limitedCalls, 1);
 });
 
 test("keyless per-instance request budget blocks a second request inside two seconds", async () => {

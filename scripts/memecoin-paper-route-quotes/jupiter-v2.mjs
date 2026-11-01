@@ -47,7 +47,9 @@ function invalid(code) {
 }
 
 function validateIdentity(identity) {
-  return isRecord(identity) && identity.chainId === "solana" &&
+  return isRecord(identity) && !Reflect.ownKeys(identity).some(key =>
+    !["chainId", "mint", "pool", "quote", "decimals"].includes(key)) &&
+    identity.chainId === "solana" &&
     BASE58.test(identity.mint ?? "") && BASE58.test(identity.pool ?? "") &&
     BASE58.test(identity.quote ?? "") &&
     Number.isInteger(identity.decimals) && identity.decimals >= 0 && identity.decimals <= 18;
@@ -64,8 +66,7 @@ function validateRequest(request) {
   if (![request.inputMint, request.outputMint].every(mint => BASE58.test(mint ?? "")) ||
       request.inputMint === request.outputMint ||
       ![identity.mint, identity.quote].includes(request.inputMint) ||
-      ![identity.mint, identity.quote].includes(request.outputMint) ||
-      request.inputMint === request.outputMint) {
+      ![identity.mint, identity.quote].includes(request.outputMint)) {
     throw invalid("REQUEST_MINT_BINDING_INVALID");
   }
   for (const [mint, decimals] of [
@@ -160,6 +161,7 @@ function validateRoutePlan(routePlan) {
   return routePlan.map((step, index) => {
     if (!isRecord(step) || Reflect.ownKeys(step).some(key =>
       !["swapInfo", "percent", "bps", "usdValue"].includes(key)) ||
+        !Object.hasOwn(step, "percent") || !Object.hasOwn(step, "bps") ||
         !isRecord(step.swapInfo) ||
         Reflect.ownKeys(step.swapInfo).some(key =>
           !["ammKey", "label", "inputMint", "outputMint", "inAmount", "outAmount"].includes(key))) {
@@ -167,7 +169,7 @@ function validateRoutePlan(routePlan) {
     }
     const info = step.swapInfo;
     if (!BASE58.test(info.ammKey ?? "") ||
-        (info.label !== undefined && (typeof info.label !== "string" || info.label.length > 120)) ||
+        typeof info.label !== "string" || info.label.length > 120 ||
         !BASE58.test(info.inputMint ?? "") || !BASE58.test(info.outputMint ?? "") ||
         !validAmount(info.inAmount, {positive: true}) ||
         !validAmount(info.outAmount, {positive: true})) {
@@ -283,7 +285,7 @@ function validateResponse(body, request) {
     throw invalid("RESPONSE_PRICE_IMPACT_MISSING");
   }
   let platformFee = null;
-  if (body.platformFee !== undefined && body.platformFee !== null) {
+  if (body.platformFee !== undefined) {
     if (!isRecord(body.platformFee) ||
         Reflect.ownKeys(body.platformFee).some(key => !["amount", "feeBps", "feeMint"].includes(key)) ||
         (body.platformFee.amount !== undefined && !validAmount(body.platformFee.amount)) ||
