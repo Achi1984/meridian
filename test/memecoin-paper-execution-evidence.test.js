@@ -359,6 +359,7 @@ test("unavailable LP, owner, developer, bundle, and smart-wallet evidence cannot
     holdUntil: BASE_TIME + 8 * 60 * 60 * 1000
   });
   assert.equal(filters.status, "UNKNOWN");
+  assert.equal(filters.checks.tokenDecimals.status, "PASS");
   for (const gate of ["lpProtection", "top10Owners", "devHoldings", "bundledLaunch"]) {
     assert.equal(filters.checks[gate].status, "UNKNOWN");
   }
