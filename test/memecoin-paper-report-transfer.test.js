@@ -8,6 +8,7 @@ import test from "node:test";
 import {projectOperatorReport} from "../scripts/memecoin-paper/operator-report.mjs";
 import {canonicalJson} from "../scripts/memecoin-paper/pilot-online.mjs";
 import {
+  PAPER_REPORT_RECEIPT_MAX_BYTES,
   PAPER_REPORT_TRANSFER_SCHEMA,
   transferPostRunReport
 } from "../scripts/memecoin-paper-report-transfer/transfer.mjs";
@@ -80,6 +81,39 @@ function request(bytes, {
 
 function bodyBytes(value) {
   return Buffer.from(canonicalJson(value), "utf8");
+}
+
+function receiptResponse(status, requestBody, {
+  receipt,
+  rawBody,
+  contentType = "application/json",
+  contentLength,
+  omitContentLength = false,
+  keepOpen = false,
+  cancel
+} = {}) {
+  const envelope = JSON.parse(Buffer.from(requestBody).toString("utf8"));
+  const bytes = rawBody ?? Buffer.from(JSON.stringify(receipt ?? {
+    ok: true,
+    runId: envelope.runId,
+    configHash: envelope.configHash,
+    digest: configHash(requestBody),
+    idempotent: status === 200
+  }), "utf8");
+  const stream = new ReadableStream({
+    start(controller) {
+      if (bytes.length) controller.enqueue(bytes);
+      if (!keepOpen) controller.close();
+    },
+    cancel
+  });
+  const headers = new Map([["content-type", contentType]]);
+  if (!omitContentLength) headers.set("content-length", String(contentLength ?? bytes.length));
+  return {
+    status,
+    headers: {get: name => headers.get(name.toLowerCase()) ?? null},
+    body: stream
+  };
 }
 
 class MemoryStore {
@@ -185,10 +219,14 @@ test("one-shot transfer validates terminal/config and sends only the fixed bound
   const result = await transferPostRunReport(makeWorkerOptions(fixture, {
     fetchImpl: async (url, options) => {
       observed.push({url, options});
-      return {status: 201};
+      return receiptResponse(201, options.body);
     }
   }));
-  assert.deepEqual(result, {status: "TRANSFERRED", httpStatus: 201});
+  assert.deepEqual(result, {
+    status: "TRANSFERRED",
+    httpStatus: 201,
+    digest: configHash(observed[0].options.body)
+  });
   assert.equal(observed.length, 1);
   assert.equal(observed[0].url, "https://gateway.example/api/private/paper-report/upload");
   assert.equal(observed[0].options.redirect, "error");
@@ -203,7 +241,9 @@ test("one-shot transfer validates terminal/config and sends only the fixed bound
 test("partial and UNKNOWN terminal states and expected run/config mismatches never send", async t => {
   const fixture = await workerFixture(t);
   let sends = 0;
-  const base = makeWorkerOptions(fixture, {fetchImpl: async () => { sends++; return {status: 201}; }});
+  const base = makeWorkerOptions(fixture, {
+    fetchImpl: async (_url, options) => { sends++; return receiptResponse(201, options.body); }
+  });
   for (const changed of [
     {readStatus: async () => ({status: "UNKNOWN", runId: RUN_ID, configHash: fixture.hash})},
     {readStatus: async () => ({status: "FINISHED", runId: RUN_ID, configHash: fixture.hash}),
@@ -235,7 +275,9 @@ test("exporter rejects symlinked run files and run directories", async t => {
   const real = await workerFixture(t);
   const outside = path.join(root, "outside");
   await symlink(path.join(real.root, RUN_ID), outside);
-  const result = await transferPostRunReport(makeWorkerOptions(real, {root, fetchImpl: async () => ({status: 201})}));
+  const result = await transferPostRunReport(makeWorkerOptions(real, {
+    root, fetchImpl: async (_url, options) => receiptResponse(201, options.body)
+  }));
   assert.equal(result.status, "REJECTED");
   assert.equal(result.reason, "run_directory_unsafe_or_missing");
 });
@@ -277,19 +319,24 @@ test("exporter deadline aborts transport and bounds transfer duration", async t 
 test("never-settling fetch returns UNKNOWN once and retains a single in-flight transfer", async t => {
   const fixture = await workerFixture(t);
   let releaseFetch;
+  let requestBody;
   const options = makeWorkerOptions(fixture, {
     timeoutMs: 5,
     schedule(callback) { return setTimeout(callback, 0); },
-    fetchImpl: () => new Promise(resolve => { releaseFetch = resolve; })
+    fetchImpl: (_url, options) => {
+      requestBody = options.body;
+      return new Promise(resolve => { releaseFetch = resolve; });
+    }
   });
   const first = await transferPostRunReport(options);
+  assert.equal(first.status, "UNKNOWN");
   assert.equal(first.reason, "transfer_outcome_unknown");
   assert.equal((await transferPostRunReport(options)).reason, "transfer_busy");
-  releaseFetch({status: 201});
+  releaseFetch(receiptResponse(201, requestBody));
   await new Promise(resolve => setImmediate(resolve));
   assert.equal((await transferPostRunReport({
     ...options,
-    fetchImpl: async () => ({status: 201})
+    fetchImpl: async (_url, options) => receiptResponse(201, options.body)
   })).status, "TRANSFERRED");
 });
 
@@ -318,8 +365,86 @@ test("late HTTP response body is cancelled before releasing the transfer slot", 
   await new Promise(resolve => setImmediate(resolve));
   assert.equal((await transferPostRunReport({
     ...options,
-    fetchImpl: async () => ({status: 201})
+    fetchImpl: async (_url, requestOptions) => receiptResponse(201, requestOptions.body)
   })).status, "TRANSFERRED");
+});
+
+test("exporter requires a bounded, fully bound upload acknowledgement before success", async t => {
+  const fixture = await workerFixture(t);
+  const invalidCases = [
+    {rawBody: Buffer.alloc(0)},
+    {rawBody: Buffer.from("{")},
+    {receipt: {ok: true}},
+    {receipt: {ok: true, runId: "other", configHash: fixture.hash,
+      digest: "0".repeat(64), idempotent: false}},
+    {receipt: {ok: true, runId: RUN_ID, configHash: "b".repeat(64),
+      digest: "0".repeat(64), idempotent: false}},
+    {receipt: {ok: true, runId: RUN_ID, configHash: fixture.hash,
+      digest: "0".repeat(64), idempotent: false}},
+    {receipt: {ok: true, runId: RUN_ID, configHash: fixture.hash,
+      digest: "0".repeat(64), idempotent: true}},
+    {receipt: {ok: true, runId: RUN_ID, configHash: fixture.hash,
+      digest: "0".repeat(64), idempotent: false}, contentType: "text/plain"}
+  ];
+  for (const invalid of invalidCases) {
+    const result = await transferPostRunReport(makeWorkerOptions(fixture, {
+      fetchImpl: async (_url, options) => receiptResponse(201, options.body, invalid)
+    }));
+    assert.deepEqual(result, {status: "UNKNOWN", reason: "upload_receipt_unverified"});
+  }
+  for (const [status, idempotent] of [[201, true], [200, false]]) {
+    const result = await transferPostRunReport(makeWorkerOptions(fixture, {
+      fetchImpl: async (_url, options) => receiptResponse(status, options.body, {
+        receipt: {
+          ok: true,
+          runId: RUN_ID,
+          configHash: fixture.hash,
+          digest: configHash(options.body),
+          idempotent
+        }
+      })
+    }));
+    assert.deepEqual(result, {status: "UNKNOWN", reason: "upload_receipt_unverified"});
+  }
+
+  const replay = await transferPostRunReport(makeWorkerOptions(fixture, {
+    fetchImpl: async (_url, options) => receiptResponse(200, options.body)
+  }));
+  assert.equal(replay.status, "TRANSFERRED");
+  assert.equal(replay.httpStatus, 200);
+
+  let cancelled = false;
+  const oversized = await transferPostRunReport(makeWorkerOptions(fixture, {
+    fetchImpl: async (_url, options) => receiptResponse(201, options.body, {
+      rawBody: Buffer.alloc(PAPER_REPORT_RECEIPT_MAX_BYTES + 1, 0x20),
+      omitContentLength: true,
+      keepOpen: true,
+      cancel: () => { cancelled = true; }
+    })
+  }));
+  assert.deepEqual(oversized, {status: "UNKNOWN", reason: "upload_receipt_unverified"});
+  assert.equal(cancelled, true);
+});
+
+test("receipt body timeout cancels and releases the reader but keeps caller outcome UNKNOWN", async t => {
+  const fixture = await workerFixture(t);
+  let cancelled = false;
+  let stream;
+  const result = await transferPostRunReport(makeWorkerOptions(fixture, {
+    timeoutMs: 20,
+    fetchImpl: async () => {
+      stream = new ReadableStream({cancel() { cancelled = true; }});
+      return {
+        status: 201,
+        headers: {get: name => name === "content-type" ? "application/json" : null},
+        body: stream
+      };
+    }
+  }));
+  assert.deepEqual(result, {status: "UNKNOWN", reason: "transfer_outcome_unknown"});
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(cancelled, true);
+  assert.equal(stream.locked, false);
 });
 
 test("gateway checks enablement and the dedicated upload credential before reading the body", async () => {
@@ -386,6 +511,14 @@ test("gateway stores immutable reports, serves a fixed read envelope, and valida
   const retry = await handlePaperReportUpload(request(bytes), {config: gatewayConfig, store, now: () => NOW});
   assert.equal(first.status, 201);
   assert.equal(retry.status, 200);
+  assert.deepEqual(first.body, {
+    ok: true,
+    runId: RUN_ID,
+    configHash: gatewayConfig.expectedConfigHash,
+    digest: configHash(bytes),
+    idempotent: false
+  });
+  assert.equal(retry.body.idempotent, true);
   const read = await handlePaperReportRead({
     method: "GET",
     url: "/api/private/paper-report",

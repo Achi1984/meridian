@@ -26,8 +26,8 @@ The worker sends a canonical JSON envelope, at most 256 KiB:
 The gateway validates the envelope with the existing Paper report DTO contract,
 rejects observations in the future, and binds `runId` and `configHash` to its
 single configured run. It stores a content digest and immutable JSON in the
-dedicated `meridian_paper_reports` table. The user-facing response omits
-`configHash` and is the existing bounded
+dedicated `meridian_paper_reports` table. The GET response omits `configHash`
+and is the existing bounded
 `MEMECOIN_PAPER_REPORT_BRIDGE_ENVELOPE_V1`:
 
 ```json
@@ -37,6 +37,14 @@ dedicated `meridian_paper_reports` table. The user-facing response omits
   "report": {"schema": "MEMECOIN_PAPER_OPERATOR_REPORT_V1"}
 }
 ```
+
+The upload acknowledgement is a bounded JSON object with exactly `ok`, `runId`,
+`configHash`, `digest`, and `idempotent`. A first insert returns `201` with
+`idempotent: false`; an identical replay returns `200` with `idempotent: true`.
+The exporter reports `TRANSFERRED` only after it has read the complete bounded
+acknowledgement and matched `ok`, the pinned run/config, the locally calculated
+SHA-256 of the canonical transfer envelope, and the status/idempotency pair.
+Malformed, empty, oversized, mismatched, or timed-out receipts are never success.
 
 Neither endpoint establishes provider authenticity, liveness, fill execution,
 or trading permission. The report's provenance remains caller-labelled and
@@ -74,15 +82,19 @@ While a timed-out/cancelled operation is still active, the bounded store returns
 `paper_report_busy` rather than admit additional DB work. A conflicting payload
 still returns `409` and never overwrites.
 
-The worker's bounded caller also reports `transfer_outcome_unknown` if its
-deadline expires before fetch and response-body cleanup settle. It retains one
+The worker's bounded caller returns status `UNKNOWN` with reason
+`transfer_outcome_unknown` if its deadline expires before fetch and response-body
+cleanup settle. Missing, malformed, oversized, or mismatched acknowledgements
+also return `UNKNOWN` (`upload_receipt_unverified`), because the gateway may
+already have committed the report. It retains one
 process-local transfer slot until that transport and cleanup settle; another
 invocation in that process returns `transfer_busy`. Do not launch parallel
 exporters. Once the previous operation is known to have settled, a manual retry
 uses the immutable same-report policy above.
 
-The worker command exits `0` only after a `200`/`201` gateway response and prints
-only a bounded status/reason code. It rejects disabled or invalid configuration,
+The worker command exits `0` only after a `200`/`201` gateway response with a
+verified acknowledgement and prints only a bounded status/reason code. It
+rejects disabled or invalid configuration,
 run-directory/config/terminal mismatch, missing or partial reports, invalid
 origin, timeout, and transport failure without printing source paths, report
 contents, or credentials.
@@ -168,5 +180,9 @@ node --test test/memecoin-paper-report-transfer.test.js
 ```
 
 Tests use generated reports, temporary directories, injected transports, and
-injected database clients. They do not contact a host, provider, or real
-database.
+injected database clients. In particular, the transaction/concurrency store
+tests use an in-memory SQL client stub; they do not establish PostgreSQL's actual
+unique-key locking/transaction behavior. These tests do not contact a host,
+provider, or real database. Validate those semantics against a separately
+provisioned test PostgreSQL instance before deployment; no database was
+provisioned or contacted for this change.

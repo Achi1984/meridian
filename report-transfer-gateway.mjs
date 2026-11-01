@@ -275,6 +275,7 @@ export async function handlePaperReportUpload(req, {
       return response(saved === "IDENTICAL" ? 200 : 201, {
         ok: true,
         runId: parsed.envelope.runId,
+        configHash: parsed.envelope.configHash,
         digest: parsed.digest,
         idempotent: saved === "IDENTICAL"
       });

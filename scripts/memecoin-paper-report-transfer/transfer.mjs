@@ -11,6 +11,7 @@ export const PAPER_REPORT_TRANSFER_SCHEMA = "MEMECOIN_PAPER_REPORT_TRANSFER_ENVE
 export const PAPER_REPORT_UPLOAD_PATH = "/api/private/paper-report/upload";
 export const PAPER_REPORT_MAX_BYTES = 256 * 1024;
 export const PAPER_REPORT_TIMEOUT_MS = 10_000;
+export const PAPER_REPORT_RECEIPT_MAX_BYTES = 2_048;
 
 const SAFE_RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$/;
 const HASH = /^[a-f0-9]{64}$/;
@@ -19,6 +20,10 @@ let activeTransfer = null;
 
 function failure(reason) {
   return {status: "REJECTED", reason};
+}
+
+function unknown(reason) {
+  return {status: "UNKNOWN", reason};
 }
 
 function sha256(bytes) {
@@ -193,6 +198,7 @@ export async function transferPostRunReport({
     return failure("report_invalid");
   }
   if (body.length > PAPER_REPORT_MAX_BYTES) return failure("report_too_large");
+  const expectedDigest = sha256(body);
 
   const controller = new AbortController();
   let timer;
@@ -204,7 +210,7 @@ export async function transferPostRunReport({
     timer = schedule(() => {
       timedOut = true;
       controller.abort();
-      timeoutResolve(failure("transfer_outcome_unknown"));
+      timeoutResolve(unknown("transfer_outcome_unknown"));
     }, timeoutMs);
     if (timer === undefined || timer === null) return failure("deadline_unavailable");
     const work = Promise.resolve().then(() => fetchImpl(`${origin}${PAPER_REPORT_UPLOAD_PATH}`, {
@@ -218,21 +224,47 @@ export async function transferPostRunReport({
       redirect: "error",
       signal: controller.signal
     })).then(async response => {
-      await cancelResponseBody(response);
-      if (timedOut || controller.signal.aborted) return failure("transfer_outcome_unknown");
-      if (response?.status === 201 || response?.status === 200) {
-        return {status: "TRANSFERRED", httpStatus: response.status};
+      if (timedOut || controller.signal.aborted) {
+        await cancelResponseBody(response);
+        return unknown("transfer_outcome_unknown");
       }
-      if (response?.status === 409) return failure("report_conflict");
-      return failure("gateway_rejected");
-    }, () => failure(timedOut ? "transfer_outcome_unknown" : "transfer_unavailable"));
+      if (response?.status === 409) {
+        await cancelResponseBody(response);
+        return failure("report_conflict");
+      }
+      if (response?.status !== 200 && response?.status !== 201) {
+        await cancelResponseBody(response);
+        if (response?.status >= 500) return unknown("gateway_outcome_unknown");
+        return failure("gateway_rejected");
+      }
+      let receipt;
+      try {
+        receipt = await readBoundedReceipt(response, {
+          signal: controller.signal,
+          runId,
+          configHash: expectedConfigHash,
+          digest: expectedDigest
+        });
+      } catch {
+        return unknown(timedOut ? "transfer_outcome_unknown" : "upload_receipt_unverified");
+      }
+      if (timedOut || controller.signal.aborted) return unknown("transfer_outcome_unknown");
+      if (!receipt) return unknown("upload_receipt_unverified");
+      const expectedIdempotent = response.status === 200;
+      if (receipt.ok !== true || receipt.runId !== runId ||
+          receipt.configHash !== expectedConfigHash || receipt.digest !== expectedDigest ||
+          receipt.idempotent !== expectedIdempotent) {
+        return unknown("upload_receipt_unverified");
+      }
+      return {status: "TRANSFERRED", httpStatus: response.status, digest: expectedDigest};
+    }).catch(() => unknown(timedOut ? "transfer_outcome_unknown" : "transfer_unavailable"));
     trackedWork = work.finally(() => {
       if (activeTransfer === trackedWork) activeTransfer = null;
     });
     activeTransfer = trackedWork;
     return await Promise.race([trackedWork, deadline]);
   } catch {
-    return failure(timedOut ? "transfer_outcome_unknown" : "transfer_unavailable");
+    return timedOut ? unknown("transfer_outcome_unknown") : failure("transfer_unavailable");
   } finally {
     if (timer !== undefined && timer !== null) {
       try { cancelSchedule(timer); } catch { }
@@ -253,6 +285,78 @@ async function cancelResponseBody(response) {
     }
   } catch {
   } finally {
+    try { reader?.releaseLock(); } catch { }
+  }
+}
+
+async function readBoundedReceipt(response, {signal, runId, configHash, digest}) {
+  const body = response?.body;
+  if (!body || typeof body.getReader !== "function") {
+    await cancelResponseBody(response);
+    return null;
+  }
+  const contentType = response.headers?.get?.("content-type") ?? "";
+  const contentLength = response.headers?.get?.("content-length");
+  if (!/^application\/json(?:\s*;\s*charset=utf-8)?$/i.test(contentType) ||
+      (contentLength !== null && contentLength !== undefined &&
+        (!/^(0|[1-9]\d*)$/.test(contentLength) ||
+          Number(contentLength) > PAPER_REPORT_RECEIPT_MAX_BYTES))) {
+    await cancelResponseBody(response);
+    return null;
+  }
+
+  let reader;
+  let abort;
+  let cancelled = Promise.resolve();
+  const chunks = [];
+  let size = 0;
+  let complete = false;
+  try {
+    reader = body.getReader();
+    abort = () => {
+      try { cancelled = Promise.resolve(reader.cancel()).catch(() => {}); } catch { }
+    };
+    signal.addEventListener("abort", abort, {once: true});
+    if (signal.aborted) abort();
+    while (true) {
+      if (signal.aborted) return null;
+      const next = await reader.read();
+      if (signal.aborted) return null;
+      if (next.done) {
+        complete = true;
+        break;
+      }
+      if (!(next.value instanceof Uint8Array)) return null;
+      size += next.value.byteLength;
+      if (size > PAPER_REPORT_RECEIPT_MAX_BYTES || chunks.length >= 16) return null;
+      chunks.push(next.value);
+    }
+    if (contentLength !== null && contentLength !== undefined &&
+        Number(contentLength) !== size) return null;
+    const bytes = new Uint8Array(size);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    let receipt;
+    try {
+      receipt = JSON.parse(new TextDecoder("utf-8", {fatal: true}).decode(bytes));
+    } catch {
+      return null;
+    }
+    if (!receipt || typeof receipt !== "object" || Array.isArray(receipt) ||
+        Object.keys(receipt).sort().join(",") !== "configHash,digest,idempotent,ok,runId" ||
+        receipt.runId !== runId || receipt.configHash !== configHash ||
+        receipt.digest !== digest || typeof receipt.idempotent !== "boolean" ||
+        receipt.ok !== true) return null;
+    return receipt;
+  } finally {
+    if (abort) signal.removeEventListener("abort", abort);
+    if (!complete) {
+      try { cancelled = Promise.resolve(reader?.cancel()).catch(() => {}); } catch { }
+    }
+    await cancelled;
     try { reader?.releaseLock(); } catch { }
   }
 }
