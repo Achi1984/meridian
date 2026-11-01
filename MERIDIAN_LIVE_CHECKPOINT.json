@@ -138,6 +138,48 @@
       },
       "nextStep": "COMPLETE_OPEN_CLOUD_BROWSER_LIVE_ACCEPTANCE_FOR_1077_AND_1078; REVIEW_SEPARATE_RELIABILITY_SOURCE_PACKET"
     },
+    "paperObservation20261101": {
+      "recordedDate": "2026-11-01",
+      "scope": "SOURCE_STATUS_ONLY_NO_RUNTIME_OR_AUTHORITY_CHANGE",
+      "record": "docs/handover/PAPER_OBSERVATION_20261101.md",
+      "receiptCutoff": "942/6562590266",
+      "sourceMainSha": "0fc051c59bad28931bc2ff5b3de81858cbde07a8",
+      "deployedWorkerSha": "14b9412564c300cc44a1f514c4dfebd55495b4aa",
+      "worker": {
+        "service": "meridian-paper-observer",
+        "build": "fine-floor-4780",
+        "ciCd": "DISABLED",
+        "dataVolume": "meridian-paper-data:/var/data/meridian-paper",
+        "monthlyCeilingUsd": 0.9
+      },
+      "lastObservedRun": {
+        "id": "observation-20261101-r1",
+        "windowStartAt": "2026-11-01T19:02:21.383Z",
+        "windowEndAt": "2026-11-02T03:02:21.383Z",
+        "firstHeartbeatAt": "2026-11-01T19:03:21.480Z",
+        "checkpointBytes": 1792,
+        "checkpointModifiedAt": "2026-11-01T19:02:23.675Z",
+        "currentLiveness": "NOT_RECHECKED",
+        "terminalResult": "PENDING"
+      },
+      "acceptanceRun": {
+        "id": "acceptance-20261101-r1",
+        "state": "FINISHED_OPERATOR_STOP",
+        "report": "PROJECTED",
+        "providerRequests": 4,
+        "configHash": "df6b1a49cc641bc6c061b87c409f61768d3a5417490f820285c7db87ebcfba99",
+        "persistedReadback": "CONFIRMED",
+        "restartGuard": "CONFIRMED"
+      },
+      "development": {
+        "pr1118": "COMPLETE",
+        "pr1117": "SAFETY_SUCCESS_CLAUDE_FINAL_PENDING",
+        "pr1114": "SOURCE_ONLY_SAFETY_SUCCESS_CLAUDE_FINAL_PENDING",
+        "pr1121": "AUTHORING_NOT_ACCEPTED",
+        "pr1122": "AUTHORING_NOT_ACCEPTED",
+        "pr1124": "AUTHORING_NOT_ACCEPTED"
+      }
+    },
     "continuity20261031": {
       "updatedAt": "2026-10-31",
       "authority": "SOURCE_STATUS_ONLY_NO_ROUTING_OR_RUNTIME_CHANGE",
@@ -208,7 +250,7 @@
         "Real PostgreSQL concurrency and browser confirm submission not demonstrated."
       ]
     },
-    "updatedAt": "2026-10-28",
+    "updatedAt": "2026-11-01",
     "m11BotsPresentationSuccessor": {
       "issue": 994,
       "successorPullRequest": 995,

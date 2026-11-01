@@ -1,4 +1,30 @@
-> **Current delivery status — 2026-10-31, receipt cutoff 942/6548075649**
+> **Current Paper observation and development status — 2026-11-01**
+> Source main is `0fc051c59bad28931bc2ff5b3de81858cbde07a8`; PR #1118 is COMPLETE
+> with all four exact-merge postchecks (mailbox #942/comment6562590266). This is
+> source status, not the deployed worker SHA: `meridian-paper-observer` remains
+> `14b9412564c300cc44a1f514c4dfebd55495b4aa`, build `fine-floor-4780`, CI/CD
+> disabled. Its dedicated 6GB `meridian-paper-data` volume is mounted at
+> `/var/data/meridian-paper`, with the recorded owner-approved $0.90/month ceiling.
+>
+> `observation-20261101-r1` is LAST OBSERVED at its first heartbeat
+> (1114/6562485487, 2026-11-01T19:03:21.480Z); current liveness was not rechecked
+> and its terminal result remains PENDING. The separate
+> `acceptance-20261101-r1` finished `OPERATOR_STOP`, with a projected report and
+> four requests; persisted readback and the restart guard were confirmed. Neither
+> run authorizes entries or simulated fills. Clock/source authenticity is
+> unverified; no power-loss durability or direct file-download claim is made.
+>
+> Development: #1117 head `82fd0feb14605776370a09eec1114b33276b07e1` has
+> Safety success `41341319345`; independent Claude final is pending. #1114 head
+> `ee158d629b621fd3f5e9b79a486b213ea4630998` is source-only; Safety
+> `41341539153` completed successfully at 19:30:55Z; independent final review is
+> pending. #1121/#1122/#1124 remain authoring, not accepted. See the concise
+> [Paper observation handoff](docs/handover/PAPER_OBSERVATION_20261101.md).
+> `lastSeenCommentId` is intentionally unchanged; this bounded update does not
+> claim that every intervening mailbox request has been reconciled. Research/D2
+> authority and all existing protocol flags are unchanged.
+
+> **Historical delivery status — 2026-10-31, receipt cutoff 942/6548075649**
 > Observed main: `fb51293011fa923a6427705ccfd30d667310e773` (PR #1078).
 > PR #1076 is COMPLETE at `976be55b729edd3d67c22b304eb9b486ecf382ee`;
 > receipt [942/6546538434](https://github.com/Achi1984/meridian/issues/942#issuecomment-6546538434)
@@ -288,4 +314,3 @@ Owner instruction 2026-10-15T19:57:13+02:00, execution Go19:58:27:
 - WIP limit: at most three active work packages, remaining proposals in backlog. Owner approved 2026-10-15T20:16:49+02:00: "Ja Freigabe erteilt"; decision6199107184 resolved in place.
 
 Mailbox639 routing is active after owner-approved PR818 merge7dc94b9108e25d742bef7652fb7511c5cb5108ea (FINAL_MERGE_STATUS6199370528). Four disabled Autopilot prompts now resolve checkpoint routing and remain disabled; management routing was already dynamic. Pending requests and external automation routing reconciled; successor smoke6199499751 passed. Predecessor571 closed as historical archive6199526147. First hosted watchdog PATCH remains unproven.
-
