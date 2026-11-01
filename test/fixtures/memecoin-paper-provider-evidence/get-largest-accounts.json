@@ -1,0 +1,25 @@
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "result": {
+    "context": {
+      "slot": 350000002
+    },
+    "value": [
+      {
+        "address": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+        "amount": "90000000000000000001",
+        "decimals": 6,
+        "uiAmount": null,
+        "uiAmountString": "90000000000000.000001"
+      },
+      {
+        "address": "GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
+        "amount": "10000000000000000002",
+        "decimals": 6,
+        "uiAmount": null,
+        "uiAmountString": "10000000000000.000002"
+      }
+    ]
+  }
+}
