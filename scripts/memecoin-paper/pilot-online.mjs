@@ -935,9 +935,12 @@ export function createPilotOnline(options = {}) {
         }
       };
       const watcher = monitorStopRequest();
-      controllerSummary = await control.start();
-      monitor = false;
-      await watcher;
+      try {
+        controllerSummary = await control.start();
+      } finally {
+        monitor = false;
+        await watcher;
+      }
       if (!(await settleCallbackWork())) {
         callbackWorkUnsettled = true;
         failureCode = "CALLBACK_WORK_UNSETTLED";
@@ -1166,8 +1169,10 @@ export async function main(argv = process.argv.slice(2)) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  main().catch(error => {
-    process.stderr.write(`${error.message}\n`);
+  main().then(result => {
+    process.exitCode = ["BLOCKED", "UNKNOWN"].includes(result?.status) ? 2 : 0;
+  }).catch(error => {
+    process.stdout.write(`${JSON.stringify({status: "BLOCKED", reason: error.message})}\n`);
     process.exitCode = 1;
   });
 }

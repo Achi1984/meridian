@@ -1,0 +1,8 @@
+{
+  "scope": "SYNTHETIC_TEST_ONLY",
+  "runId": "host-verification-fixture-v1",
+  "startedAt": 1793563200000,
+  "deadlineAt": 1793592000000,
+  "commandId": "fixture-risk-snapshot",
+  "finishCommandId": "fixture-finish-at-deadline"
+}
