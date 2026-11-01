@@ -6,8 +6,15 @@ const startedAt = Date.parse("2026-01-01T10:00:00Z");
 if (!directory || !crashPhase) process.exit(2);
 
 if (crashPhase === "hold") {
+  if (!process.send) throw new Error("hold fixture requires an IPC parent");
   await CheckpointStore.open(directory);
-  process.stdout.write("ready\n");
+  // A pending Promise alone does not keep Node alive. The message listener
+  // references the IPC channel until the parent terminates the lock holder.
+  process.on("message", message => {
+    if (message === "ping") process.send("holding");
+  });
+  process.once("disconnect", () => process.exit(75));
+  process.send("ready");
   await new Promise(() => {});
 }
 
