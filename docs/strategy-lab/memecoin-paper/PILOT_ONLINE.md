@@ -237,12 +237,30 @@ than guessing if the lock exists without a terminal marker. `report` reads the
 separately persisted projection and does not manufacture one from a controller
 summary.
 
+## CLI exit codes
+
+The CLI preserves its result on stdout; consumers should parse that output rather
+than infer a run state from the exit code alone.
+
+| Exit code | Meaning |
+| --- | --- |
+| `0` | `DISABLED` with no arguments, `FINISHED`, `NOT_STARTED`, an available report, or an accepted/idempotent stop request |
+| `1` | Invalid arguments or a start/command error; stdout contains a structured `BLOCKED` result |
+| `2` | A structured `UNKNOWN` or `BLOCKED` result, including an uncertain start, unavailable report, or blocked status/stop operation |
+
+This is a compatibility change for scripts that treated an uncertain or blocked
+operation as successful because the process previously exited zero. A durable
+lock without a terminal marker remains `UNKNOWN` and exits `2`; it is never
+reinterpreted as `RUNNING`. `UNKNOWN` is never changed to `FINISHED` to obtain a
+zero exit code.
+
 ## Tests and next acceptance
 
 Run focused tests only:
 
 ```sh
-node --test test/memecoin-paper-pilot-online.test.js \
+node --test test/memecoin-paper-pilot-cli.test.js \
+  test/memecoin-paper-pilot-online.test.js \
   test/memecoin-paper-pilot-assembly.test.js \
   test/memecoin-paper-pilot-integration.test.js \
   test/memecoin-paper-provider-evidence.test.js \
