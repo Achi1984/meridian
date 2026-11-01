@@ -364,6 +364,58 @@ test("malformed and oversized artifacts are bounded and reported as failures", (
   });
 });
 
+test("malformed and out-of-range config timestamps return structured pure and CLI results", async t => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "paper-run-evaluation-dates-"));
+  t.after(() => rm(directory, {recursive: true, force: true}));
+  const input = fixture();
+  const files = {};
+  for (const [name, content] of Object.entries({
+    config: input.configBytes,
+    lock: input.lockBytes,
+    terminal: input.terminalBytes,
+    report: input.reportBytes
+  })) {
+    files[name] = path.join(directory, `${name}.json`);
+    await writeFile(files[name], content);
+  }
+
+  const malformed = JSON.parse(input.configBytes.toString("utf8"));
+  malformed.startAt = "not-a-timestamp";
+  malformed.manifest.startAt = malformed.startAt;
+  const outOfRange = JSON.parse(input.configBytes.toString("utf8"));
+  outOfRange.startAt = 8_640_000_000_000_001;
+  outOfRange.endAt = outOfRange.startAt + DURATION;
+  outOfRange.manifest.startAt = outOfRange.startAt;
+  outOfRange.manifest.endAt = outOfRange.endAt;
+
+  for (const config of [malformed, outOfRange]) {
+    const configBytes = bytes(config);
+    const pureResult = evaluateObservation({...input, configBytes});
+    assert.equal(criterion(pureResult, "run_config_identity").status, "FAIL");
+    assert.equal(criterion(pureResult, "observation_duration").status, "UNKNOWN");
+    assert.equal(pureResult.observation.completionStatus, "UNKNOWN");
+    assert.equal(pureResult.observation.fullDeadlineCompleted, false);
+
+    await writeFile(files.config, configBytes);
+    const cliResult = spawnSync(process.execPath, [
+      CLI,
+      "--run-id", RUN_ID,
+      "--config-sha256", input.expectedConfigHash,
+      "--config", files.config,
+      "--lock", files.lock,
+      "--terminal", files.terminal,
+      "--report", files.report
+    ], {encoding: "utf8", timeout: 1_000});
+    assert.equal(cliResult.error, undefined);
+    assert.equal(cliResult.status, 0, cliResult.stderr);
+    const evaluation = JSON.parse(cliResult.stdout);
+    assert.equal(criterion(evaluation, "run_config_identity").status, "FAIL");
+    assert.equal(criterion(evaluation, "observation_duration").status, "UNKNOWN");
+    assert.equal(evaluation.observation.completionStatus, "UNKNOWN");
+    assert.equal(evaluation.observation.fullDeadlineCompleted, false);
+  }
+});
+
 test("missing and partial coverage stay UNKNOWN and uptime is never inferred", () => {
   const valid = fixture();
   const partial = JSON.parse(valid.reportBytes.toString("utf8"));

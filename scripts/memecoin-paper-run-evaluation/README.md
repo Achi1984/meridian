@@ -97,8 +97,10 @@ The frozen window is **2026-11-01T19:02:21.383Z through
 2026-11-02T03:02:21.383Z** (Vienna **20:02–04:02 CET, UTC+1 throughout**).
 This is the planned window, not a result or claim that the run completed.
 
-After the scheduled end, and only after an authorized operator confirms a
-terminal run state:
+The expected deadline is **not** evidence that the observation finished. After
+the scheduled end, and only after an authorized operator confirms the terminal
+marker is `FINISHED` and its run ID/config hash agree with the independently
+approved launch identity:
 
 1. Obtain the exact four exports above from that same run through the
    owner-approved read-only route. Do not restart, update, stop, or probe an
@@ -119,6 +121,12 @@ terminal run state:
    run.
 6. Keep simulated-trade testing as a separate future decision. This evaluation
    cannot start it and does not change any existing hard gate.
+
+| Outcome | Evidence required | Interpretation / next action |
+| --- | --- | --- |
+| Completed observation | Matching run/config identity, consistent `FINISHED` terminal and report, and reconciled finalization. A `DEADLINE` stop with duration `PASS` is full-window completion; a valid `OPERATOR_STOP` is an accepted early completion. | Report the observed stop reason and evidenced duration. Do not claim uptime or gap-free observation without time-series evidence. |
+| Incomplete or corrupt evidence | Missing, nonterminal, `UNKNOWN`, malformed, truncated, or contradictory artifacts or fields. | Criteria remain `UNKNOWN` or `FAIL`; do not claim completion. Obtain valid exports through the approved read-only process. |
+| Simulated-trade prerequisites missing | No separate, independently reviewed simulated-trade evidence and/or executable quote/cost, complete time-series, and external clock/provenance evidence. | Eligibility and runtime authorization remain `false`; this observation does not authorize or start a trade test. Resolve prerequisites and make a separate decision under existing hard gates. |
 
 ## Focused tests
 
