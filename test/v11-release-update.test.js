@@ -18,7 +18,7 @@ function fixture(options={}){
     currentUrl:'https://example.test/meridian/v11/?view=bots#view-bots',
     now:()=>clock,canReload:()=>safe,navigate:url=>navigation.push(url),onUpdate:value=>updates.push(value),
     schedule:fn=>{timers.set(++serial,fn);return serial;},cancelSchedule:id=>timers.delete(id),
-    fetchImpl:async(url,init)=>{requests.push({url,init});return response('B16-M11-FIX11');},...options});
+    fetchImpl:async(url,init)=>{requests.push({url,init});return response('B16-M11-FIX12');},...options});
   return {update,requests,navigation,updates,timers,setSafe:value=>{safe=value;},advance:()=>{clock+=60000;}};
 }
 
@@ -27,7 +27,7 @@ test('release identity requires exactly five coherent approved local entries',()
   assert.equal(readReleaseHtml(html('B17-M11')),'B17-M11');
   for(const invalid of [[],sources('B16-M11-FIX11').slice(1),[...sources('B16-M11-FIX11'),'./extra.js?v=B16-M11-FIX11'],
     [...sources('B16-M11-FIX11').slice(1),sources('B16-M11-FIX11')[1]],
-    sources('B16-M11-FIX11').map((s,i)=>i===0?s.replace('FIX10','FIX11'):s),
+    sources('B16-M11-FIX11').map((s,i)=>i===0?s.replace('FIX11','FIX12'):s),
     sources('B16-M11-FIX11').map(s=>s.replace('./','https://other.test/')),
     sources('B0-M11'),sources('B16-M11-FIX0')])assert.equal(readReleaseSources(invalid),null);
   assert.equal(readReleaseHtml(html('B17-M11').replace('11-preview','10')),null);
@@ -44,7 +44,7 @@ test('locked safe tab checks only public HTML without credentials and reloads a 
   const init=f.requests[0].init;
   assert.equal(init.cache,'no-store');assert.equal(init.credentials,'omit');assert.equal(init.redirect,'error');
   assert.equal(init.referrerPolicy,'no-referrer');assert.deepEqual(init.headers,{accept:'text/html'});
-  assert.deepEqual(f.navigation,['https://example.test/meridian/v11/?view=bots&m11build=B16-M11-FIX11#view-bots']);
+  assert.deepEqual(f.navigation,['https://example.test/meridian/v11/?view=bots&m11build=B16-M11-FIX12#view-bots']);
   f.advance();await f.update.check();f.update.reconsider();assert.equal(f.navigation.length,1);
   assert.equal(f.requests.length,1);assert.equal(f.timers.size,0);
 });
@@ -60,7 +60,7 @@ test('same release, older CDN response and incoherent release never reload',asyn
 
 test('unlocked or typing tab defers reload; explicit button action can apply',async()=>{
   const f=fixture();f.setSafe(false);await f.update.check();
-  assert.deepEqual(f.updates,['B16-M11-FIX11']);assert.equal(f.navigation.length,0);
+  assert.deepEqual(f.updates,['B16-M11-FIX12']);assert.equal(f.navigation.length,0);
   assert.equal(f.update.applyUpdate(),true);assert.equal(f.navigation.length,1);
 });
 
@@ -70,8 +70,8 @@ test('pending release is automatically applied when the tab becomes safe',async(
 });
 
 test('URL attempt marker prevents automatic reload loops even when HTML remains stale',async()=>{
-  const f=fixture({currentUrl:'https://example.test/meridian/v11/?m11build=B16-M11-FIX11'});
-  await f.update.check();assert.equal(f.navigation.length,0);assert.deepEqual(f.updates,['B16-M11-FIX11']);
+  const f=fixture({currentUrl:'https://example.test/meridian/v11/?m11build=B16-M11-FIX12'});
+  await f.update.check();assert.equal(f.navigation.length,0);assert.deepEqual(f.updates,['B16-M11-FIX12']);
   f.advance();await f.update.check();assert.equal(f.navigation.length,0);
   assert.equal(f.update.applyUpdate(),true,'only an explicit retry may navigate again');
 });
