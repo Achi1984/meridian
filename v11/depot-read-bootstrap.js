@@ -1,12 +1,13 @@
-import {appAccess} from './app-access.js?v=B16-M11-FIX10';
-import {createDepotReadClient} from './depot-read-client.js?v=B16-M11-FIX10';
-import {createDepotReadView} from './depot-read-view.js?v=B16-M11-FIX10';
-import {mountLedgerReview} from './ledger-review-view.js?v=B16-M11-FIX10';
+import {appAccess} from './app-access.js?v=B16-M11-FIX11';
+import {createDepotReadClient} from './depot-read-client.js?v=B16-M11-FIX11';
+import {createDepotReadView} from './depot-read-view.js?v=B16-M11-FIX11';
+import {mountLedgerReview} from './ledger-review-view.js?v=B16-M11-FIX11';
+import {mountLedgerManual} from './ledger-manual-view.js?v=B16-M11-FIX11';
 
 // Mounting controls never starts a request. Only the view's manual refresh can read.
 export function mountDepotReadAccess(document,window,{
   access=appAccess,createClient=createDepotReadClient,createView=createDepotReadView,createLedgerView=mountLedgerReview,
-  pionexOnly=false,now=Date.now,schedule=setTimeout,cancelSchedule=clearTimeout
+  pionexOnly=false,ledgerManual=false,createLedgerManualView=mountLedgerManual,now=Date.now,schedule=setTimeout,cancelSchedule=clearTimeout
 }={}){
   const root=document.getElementById('depot-read-root');
   if(!root)return null;
@@ -39,7 +40,8 @@ export function mountDepotReadAccess(document,window,{
         }};
       }});
     unsubscribe=access.subscribe(s=>{if(!disposed&&s?.status==='unlocked')view?.revalidate();});
-    if(!pionexOnly)ledgerReview=createLedgerView(root,{access});
+    if(ledgerManual)ledgerReview=createLedgerManualView(root,{access});
+    else if(!pionexOnly)ledgerReview=createLedgerView(root,{access});
   }catch{
     cancelExpiry();unregister();unsubscribe();ledgerReview?.dispose();
     try{client?.dispose();}catch{}
@@ -52,5 +54,6 @@ export function mountDepotReadAccess(document,window,{
   }};
 }
 
-if(typeof document!=='undefined'&&typeof window!=='undefined')mountDepotReadAccess(document,window,{pionexOnly:true});
+if(typeof document!=='undefined'&&typeof window!=='undefined')mountDepotReadAccess(document,window,{pionexOnly:true,ledgerManual:true});
+
 

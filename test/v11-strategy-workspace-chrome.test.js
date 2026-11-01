@@ -311,6 +311,14 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
           if(await evaluate(`document.querySelectorAll('#strategy-catalog [data-strategy-id^="H"]').length===12`))break;
           await new Promise(resolve=>setTimeout(resolve,25));
         }
+        // Measure settled layout, not the active view's translateY appearance animation.
+        // With reduced motion getAnimations() is empty and this resolves immediately.
+        await evaluate(`(async()=>{
+          const view=document.getElementById('view-strategies');
+          if(view.hidden||!view.classList.contains('active'))throw Error('Strategies view is not active');
+          await Promise.all(view.getAnimations().map(animation=>animation.finished));
+          return true;
+        })()`);
         const catalog=await evaluate(`(()=>{
           const root=document.documentElement,view=document.getElementById('view-strategies');
           return {visible:!view.hidden,active:document.querySelector('.view.active').id,
@@ -352,7 +360,7 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         assert.match(catalog.h9,/BLOCKED_DATA/);
         assert.equal(catalog.models.length,5);
         assert.equal(catalog.overflow,false);
-        assert.ok(catalog.controls.every(height=>height>=44));
+        assert.ok(catalog.controls.every(height=>height>=44),`settled controls at ${size.width}px: ${JSON.stringify(catalog.controls)}`);
         const paperReadiness=await evaluate(`(()=>{
           const panel=document.getElementById('paper-readiness-root');
           const groups=[...panel.querySelectorAll('[data-paper-readiness]')];
@@ -1063,7 +1071,7 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         assert.match(afterStaleRead.alertText,/Export konnte nicht angenommen werden\. Kein Ergebnis wird angezeigt\./);
         assert.doesNotMatch(afterStaleRead.text,/Lifecycle completed|Engine-Ergebnis\s+COMPLETED/);
         const hostilePresentation=await evaluate(`(async()=>{
-          const {renderArenaResultView}=await import('/v11/arena-result-view.js?v=B16-M11-FIX10');
+          const {renderArenaResultView}=await import('/v11/arena-result-view.js?v=B16-M11-FIX11');
           const hostile='"><img src=x onerror="alert(1)">'+ 'identity'.repeat(60);
           const root=document.createElement('div');
           root.style.cssText='max-width:100%;min-width:0';
@@ -1088,7 +1096,7 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         assert.ok(hostilePresentation.columns>=190);
         if(size.width===320){
           const disposal=await evaluate(`(async()=>{
-            const {createStrategyArenaView}=await import('/v11/strategy-arena.js?v=B16-M11-FIX10');
+            const {createStrategyArenaView}=await import('/v11/strategy-arena.js?v=B16-M11-FIX11');
             const existingIds=new Set([...document.querySelectorAll('#strategy-arena-root [id^="arena-producer-"]')].map(node=>node.id));
             const root=document.createElement('div');document.body.append(root);
             const view=createStrategyArenaView(root,{fetchImpl:async()=>{throw Error('synthetic provenance read failure');}});
@@ -1213,3 +1221,4 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
     }
   }finally{await new Promise(resolve=>hosted.server.close(resolve));}
 });
+
