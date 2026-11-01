@@ -1,10 +1,25 @@
 # Paper host verification procedure
 
-**Disposition: source-level preparation only.** This procedure is for a later,
-separately approved host-verification operation. No host is designated or
-verified, no run is authorized, and no eight-hour run may start from this packet.
-The run manifest, stop switch, scheduler, provider adapter, and operator command
-are not enabled or implemented here.
+**Disposition: owner run request recorded; technical activation remains blocked.**
+The owner has explicitly requested the existing #996 eight-hour virtual-capital
+Paper test online. That request is not evidence that a specific host, volume,
+source integration, provider path, stop control, or exact run configuration is
+ready. This packet does not start a run. The manifest remains disabled, the
+stop switch remains engaged, and no runtime authorization is produced here.
+
+## Repository-backed host, storage, and stop inventory
+
+The checked-in configuration does not identify a suitable compute host:
+
+| Interface | What the repository actually configures | What remains unknown or unavailable |
+|---|---|---|
+| Compute host | `scripts/memecoin-paper/run-manifest.json` names the public provider endpoints only. No Paper-specific machine, region, account, runner label, volume, or deployment target is present. `Dockerfile` describes the general Node gateway image; `vercel.json` configures an unrelated asset-watch function. Neither designates a Paper host. | Actual host identity, ownership, runtime deployment, filesystem/mount, capacity, and host-side operational access. Do not treat the coding-agent checkout or a generic CI runner as the selected host. |
+| Storage | `CheckpointStore.open(absoluteDirectory)` uses a local directory, lifetime lock, file sync, same-directory rename, directory sync, and bounded readback. The harness uses an owned temporary directory under Node's `os.tmpdir()`. | No configured production checkpoint path, volume identity, filesystem failure-domain, external sync guarantee, or recovery proof for any host. Local API behavior is not evidence about a deployment volume. |
+| Stop/deadline | The manifest is `enabled: false` with `stopSwitch.engaged: true`. `PaperCheckpointSession` enforces its fixed deadline when a command is invoked; `finishRun` is an explicit journal command. | No active stop-switch reader, host watchdog, scheduler, signal-to-session adapter, or operator stop command exists for this pilot. A fixed deadline does not stop an idle process. |
+| Provider/source | The manifest lists DexScreener and Solana JSON-RPC endpoint names with both providers disabled. `adapters.mjs` sets `NETWORK_ENABLED = false`; its request method throws. | No online downloader, validated completeness for required evidence, real-data run controller, or source integration into the Paper orchestration path. `runSyntheticPaperOrchestration` accepts only the exact disabled manifest and generated scenarios. |
+
+These are source/configuration findings, not host probes. The running harness
+cannot discover or attest a host hidden outside the repository.
 
 ## Offline harness
 
@@ -39,24 +54,52 @@ eight hours. An ambiguous publication remains `UNKNOWN`; visible candidate bytes
 do not establish durable acknowledgment, and uncertain records are not retried
 or cleaned up as successful.
 
-## Later manual host verification
+## Executable candidate-host verification
 
-This is an evidence-gathering sequence, not an executable launcher. The existing
-checkpoint APIs support local store/session operations, explicit command times,
-bounded readback, and read-only pending reconciliation. There is no supported
-host provisioning, real provider probe, runtime activation, watchdog, stop
-command, or operator-report command in this packet. Do not substitute invented
-commands for those missing interfaces.
+An owner/operator may run this existing offline harness from the exact reviewed
+checkout on a separately designated candidate host. It creates generated
+checkpoint fixtures only in unique directories below that host's
+`os.tmpdir()`. Run from the repository root:
 
-| Step | Prerequisite | Evidence to collect | Passing outcome | Stop condition |
-|---|---|---|---|---|
-| 1. Designate an eligible host through the owner’s separate process. | Written host identity, responsible operator, exact reviewed source/config/run identities, and explicit run authorization; none are supplied here. | Independently attributable host and owner authorization records, plus exact checkout/head and configuration identities. | These are separately reviewed and bound to the proposed run. | Missing/ambiguous authorization or identity; do not provision or run. |
-| 2. Establish host and storage properties without modifying production data. | Host and storage owner approval; a disposable, explicitly owned test directory; supported filesystem/volume documentation. | Host/OS/filesystem/volume identity, mount and failure-domain details, supported file and directory flush semantics, and externally attributable recovery evidence. | Independent evidence supports the required persistence semantics for this exact host and volume. Local process-kill tests alone do not pass this gate. | Any unknown durability property, failed flush, shared/unreviewed volume, or evidence mismatch; retain test artifacts and stop. |
-| 3. Establish clock authority. | A designated trusted time source and accepted skew, rollback, and forward-jump policy. | Source identity, synchronization/health evidence, observed offset and uncertainty, and operator-visible failure behavior. | The agreed clock policy is independently verified for this host and run window. The checkpoint’s supplied integer milliseconds do not establish this. | Clock source/policy absent, stale, outside tolerance, or unavailable; no run. |
-| 4. Verify the existing store/session on the designated host using synthetic-only inputs. | Steps 1–3 not yet imply execution authority; use a new disposable directory under an explicitly owned path. Review the exact commands and paths before running. | Captured test output; source/config/run hashes; exact ACK sequence/hash/run identity; child exit/reaping records; unresolved pending/corrupt cases; cleanup inventory. | All focused cases pass and test files are removed only from their verified owned directory. Preserve unresolved `UNKNOWN` evidence; never infer power-loss durability. | Any timeout, unreaped child, unexpected file/symlink, hash/sequence/run mismatch, `UNKNOWN`, corruption, or cleanup-boundary failure; stop and preserve evidence. |
-| 5. Obtain separate operational and owner decisions. | Verified provider/data capability, run controller and stop/report interfaces, exact bounded run configuration, and independent source/CI/review gates. These are external or not implemented. | Provider-specific supported evidence coverage and limits; cost/capacity approval if applicable; run-window/stop/incident procedures; final exact-head review and explicit owner decision. | All missing prerequisites are supplied and independently reviewed before any run request. | Any missing evidence, unsupported source/API, cost/capacity uncertainty, or absent owner approval; no activation. |
+```sh
+node --test test/memecoin-paper-host-verification.test.js
+SYNTHETIC_TEST_ONLY=SYNTHETIC_TEST_ONLY node scripts/memecoin-paper/host-verification.mjs
+```
 
-No evidence for a real host, durable volume, trusted clock authority, provider
-coverage, capacity, cost, recovery rehearsal, stop controller, or operator report
-is present in this repository packet. A full eight-hour operation remains a
-separate later decision; there is no signoff here.
+Capture the second command's JSON output together with the externally supplied
+host identity, checkout commit, operator, date, and storage/volume identity in
+the owner's approved evidence system. Do not add host names, credentials, or
+private configuration to this repository. Require `status: PASS`,
+`scope: SYNTHETIC_ONLY`, `runtimeAuthorization: false`,
+`hostDurability: NOT_VERIFIED`, and `hostClockProvenance: UNVERIFIED`.
+Any failed check, timeout, un-reaped child, unresolved `UNKNOWN`, or output
+identity mismatch is a stop; preserve its reported fixture directory and
+evidence. A pass establishes only that these synthetic checks ran on that
+process/filesystem. It does not certify the selected production volume,
+power-loss recovery, host suitability, trusted time, or online operation.
+
+## Remaining gates for the requested online test
+
+1. Select and independently identify the compute host and actual checkpoint
+   volume; verify ownership, mount/failure domain, capacity, and storage
+   durability using that host/volume's supported operational evidence.
+2. Integrate and review the exact source that is intended to run there. This
+   branch's source hashes do not establish that it is deployed or integrated.
+3. Implement and review the real bounded data collection and run controller.
+   Current providers are disabled, the adapter is offline-only, and the
+   synthetic orchestration rejects enabled providers and non-fixture inputs.
+   The manifest also has empty mint/pool allowlists and unset run identity and
+   timestamps.
+4. Provide a host-enforced stop/timeout path and operator-visible incident
+   procedure. The command-invoked session deadline is not a watchdog; there is
+   no active stop-switch interface.
+5. Establish trusted host clock provenance/skew policy and independently
+   review the exact run manifest, accounting/restart behavior, provider evidence
+   coverage, stop behavior, and final source/CI results before activation.
+
+The executable commands above are the minimal supported later **synthetic host
+verification**, not commands to start the eight-hour Paper test. No host target,
+volume, trusted clock, real-data provider implementation, active stop control,
+or online launch command is identified by the repository. The owner request is
+recorded; those technical blockers still prevent this packet from claiming the
+online test is startable.
