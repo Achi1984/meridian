@@ -898,7 +898,7 @@ test('Terminal öffnen preserves the reviewed history-close baseline and stays o
   assert.equal(gitBlob(restored),preimageBlob,'all source bytes except terminal-entry insertions, the checked viewport pair and exact Depot/revision deltas must match the reviewed history-close baseline');
 });
 
-const moduleNames=['ledger-manual-client.js','ledger-manual-model.js','ledger-manual-view.js','paper-readiness.js','paper-readiness-view.js','release-update.js','ledger-review-client.js','ledger-review-model.js','ledger-review-view.js','app-access-bootstrap.js','app-access.js','agent-status-bootstrap.js','agent-status-client.js','bot-read-bootstrap.js','bot-read-client.js','bot-read-view.js','bot-read-model.js','bot-overview-model.js','depot-read-bootstrap.js','depot-read-client.js','depot-read-model.js','depot-read-view.js','depot-history-model.js','pionex-history-model.js','depot-history-view.js','depot-current-model.js','depot-portfolio-state.js','strategy-workspace-bootstrap.js','strategy-catalog.js','research-evidence.js','strategy-arena.js','arena-inspection-report.js','arena-historical-result.js','arena-historical-export.js','arena-result-view.js'];
+const moduleNames=['ledger-manual-client.js','ledger-manual-model.js','ledger-manual-view.js','paper-cockpit-model.js','paper-cockpit-view.js','paper-readiness.js','paper-readiness-view.js','release-update.js','ledger-review-client.js','ledger-review-model.js','ledger-review-view.js','app-access-bootstrap.js','app-access.js','agent-status-bootstrap.js','agent-status-client.js','bot-read-bootstrap.js','bot-read-client.js','bot-read-view.js','bot-read-model.js','bot-overview-model.js','depot-read-bootstrap.js','depot-read-client.js','depot-read-model.js','depot-read-view.js','depot-history-model.js','pionex-history-model.js','depot-history-view.js','depot-current-model.js','depot-portfolio-state.js','strategy-workspace-bootstrap.js','strategy-catalog.js','research-evidence.js','strategy-arena.js','arena-inspection-report.js','arena-historical-result.js','arena-historical-export.js','arena-result-view.js'];
 function deploymentServer(){
   const inlineScript=html.match(/<script>([\s\S]*?)<\/script>/i)?.[1];
   assert.ok(inlineScript,'actual UI-only navigation script');
@@ -1076,6 +1076,8 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
       ['../ledger-manual-snapshot.js','ledger-manual-snapshot.js','javascript'],
       ['paper-readiness.js?v=B16-M11-FIX11','v11/paper-readiness.js','javascript'],
       ['paper-readiness-view.js?v=B16-M11-FIX11','v11/paper-readiness-view.js','javascript'],
+      ['paper-cockpit-model.js?v=B16-M11-FIX11','v11/paper-cockpit-model.js','javascript'],
+      ['paper-cockpit-view.js?v=B16-M11-FIX11','v11/paper-cockpit-view.js','javascript'],
       ['release-update.js?v=B16-M11-FIX11','v11/release-update.js','javascript'],
       ['agent-status-bootstrap.js?v=B16-M11-FIX11','v11/agent-status-bootstrap.js','javascript'],
       ['agent-status-client.js?v=B16-M11-FIX11','v11/agent-status-client.js','javascript'],
