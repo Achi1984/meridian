@@ -1,8 +1,9 @@
 # Release receipt reconciliation — 2026-11-01
 
-Evidence-only continuity update. Mailbox #942 was inspected through comment
+Evidence-only continuity update. The current content of mailbox comment
 [6557001049](https://github.com/Achi1984/meridian/issues/942#issuecomment-6557001049)
-at 10:56:35 UTC. Live `main` is
+was inspected on 2026-11-01. The comment ID is the receipt reference; no exact
+arrival/edit timestamp for its current body is inferred. Live `main` is
 [`c60bb6a`](https://github.com/Achi1984/meridian/commit/c60bb6a2516ab88000ece3c339bcc740280a9ba7),
 the merge of PR #1089. Suggested bodies below are drafts for the Lead; no final
 receipt was posted here. Missing evidence is explicitly UNKNOWN/PENDING.
@@ -36,8 +37,34 @@ sampled; confirmed-zero behavior is covered by automated tests only
 | PR | Current head | Evidence and state | NEXT |
 |---|---|---|---|
 | #1090 | `5a874e9ef0282745bfd9a320ac6fe6b6dbcc330b` | Open, not merged. Exact-pair Safety 41293507578/job 124809463393: 3476/3476; final independent source review GREEN at [942/6556341901](https://github.com/Achi1984/meridian/issues/942#issuecomment-6556341901). No merge SHA exists. | Lead-controlled integration decision; no runtime or activation authority. |
-| #1092 | `2e788edc522542d26e489d553be33fa44a680d62` | Open, inert Pages proposal only; local focused tests 7/7 and R1/R2 source/evidence responses exist. It adds no active workflow and does not clear the Pages hold. The bounded R3 review requested at [942/6556998549](https://github.com/Achi1984/meridian/issues/942#issuecomment-6556998549) was still in progress at [6557001049](https://github.com/Achi1984/meridian/issues/942#issuecomment-6557001049). | Keep inert; wait for R3 and the separate Pages decision. No activation. |
-| #1093 | `a3a173e9e3f33a5a405771c72294faea70cfbfca` | Open, not merged. The PR reports 22 focused tests; earlier source GREEN is not evidence of independent full-run totals. R3 request [942/6556998549](https://github.com/Achi1984/meridian/issues/942#issuecomment-6556998549) asks to verify run 41294377989/job 124812037024 totals and remaining ledger/manifest coverage; it was still in progress at the cutoff. Full-run totals and R3 verdict are PENDING, not inferred. | Await bounded R3 evidence; no merge or activation. |
+| #1092 | `2e788edc522542d26e489d553be33fa44a680d62` | Open, inert Pages proposal only; cumulative R3 `GREEN_LIGHT` at [942/6557001049](https://github.com/Achi1984/meridian/issues/942#issuecomment-6557001049), carrying forward source review 6556370988 and hosted evidence 6556969851. The concurrency-doc quotation was Lead-supplied, not independently fetched; syntax remains unvalidated and backend deployment lock unresolved. | Keep inert; real syntax validation and concrete Owner approval remain required before activation. No claim that Pages hold is cleared. |
+| #1093 | `a3a173e9e3f33a5a405771c72294faea70cfbfca` | Open, not merged. Cumulative R3 `GREEN_LIGHT` at [942/6557001049](https://github.com/Achi1984/meridian/issues/942#issuecomment-6557001049), including changed-source review 6556873372 and independently inspected hosted run 41294377989/job 124812037024: exact base/head synthetic merge, all required steps success, top-level totals 3477/3477, 0 failed/cancelled/skipped/todo. Ledger 826-line and disabled manifest 59-line interactions reviewed. | Source verdict only; no merge or activation authority. Earlier R1/R2 evidence gaps remain historical context, not the current verdict. |
+| #1096 | `61044c0709fd071a734d3aa60db2c01e54f0b54f` (base `c60bb6a2516ab88000ece3c339bcc740280a9ba7`) | Open assembly combining source from #1090/#1093; exact-head run 41300459231/job 124830116400 succeeded, top-level tests 3483/3483 and all required steps success. PR description reports 91 focused composition tests. This run is not an independent final review. | Final independent review pending; no merge SHA, deployment or activation. |
+
+The previous #1095 head `7d6b65dc04e54781bc66ff45c74c92f7b7c3b89d` check
+[41300167359](https://github.com/Achi1984/meridian/actions/runs/41300167359)
+concluded `action_required` with zero jobs. This is not a pass and is not
+reinterpreted as CI success. No rerun was initiated; the Lead owns CI/review
+decisions for the corrected exact head.
+
+The current delivery model is captured by Owner decision
+[#1061/6557059096](https://github.com/Achi1984/meridian/issues/1061#issuecomment-6557059096),
+model-specific ownership/status
+[#1061/6557083232](https://github.com/Achi1984/meridian/issues/1061#issuecomment-6557083232),
+and bounded continuity supplement
+[#1095/6557083054](https://github.com/Achi1984/meridian/pull/1095#issuecomment-6557083054).
+It uses coherent larger packages, one writer per branch, and parallel disjoint
+owners; model selection, assignment, queued/running session and delivery are
+separate states. Terra assembled #1090+#1093 as #1096 (CI passed, final review
+pending). Opus 5.5 was submitted for the inert Pages packet and later reported
+working; no packet delivery is recorded here. Gemini 4 Argon was submitted for
+coordinator #1046/#1059 integration and observed in setup/source work; no final
+delivery is recorded here. Copilot's #1095 continuity draft is delivered but
+not accepted; its underlying model is unconfirmed. Status was last described at
+[#1061/6557101515](https://github.com/Achi1984/meridian/issues/1061#issuecomment-6557101515).
+Author-focused validation, exact-head Actions CI, one
+independent Claude review, and Lead integration/merge/postchecks remain distinct
+gates. No additional task or source edit was initiated by this continuity update.
 
 ## Older recovery chain and proposed closure
 
@@ -114,11 +141,13 @@ of dependent work until the existing hold is reconciled.
 ```text
 FINAL_MERGE_STATUS PR1090-1092-1093 SOURCE_PROPOSALS_OPEN
 release-class: engineering / inert-proposals
-state: OPEN_NOT_MERGED; #1090 exact-pair CI and source GREEN; #1092 remains
-inert with R3 pending; #1093 full-run totals/R3 remain pending.
-evidence: exact current heads and receipts above; 942/6556998549 is pending at
-the inspected cutoff.
-NEXT: await each bounded evidence/review result; keep Pages held and all
+state: OPEN_NOT_MERGED; #1092 and #1093 have cumulative source GREEN_LIGHT at
+942/6557001049; #1093 hosted CI totals independently verified 3477/3477.
+Both are source-only verdicts and do not clear the Pages lock or authorize
+activation. #1090's source acceptance does not stand in for final review of
+assembly #1096.
+evidence: exact source heads, hosted totals, model ownership and #1096 state above.
+NEXT: await independent final review of #1096; keep Pages held and all
 activation, OKX/Northflank and authority states unchanged.
 ```
 

@@ -101,10 +101,10 @@
   "bootstrapFile": "MERIDIAN_GO.md",
   "currentWork": {
     "latestDelivery20261101": {
-      "recordedAt": "2026-11-01T10:56:35Z",
+      "contentInspectedOn": "2026-11-01",
       "scope": "RECEIPT_RECONCILIATION_ONLY_NO_ROUTING_OR_AUTHORITY_CHANGE",
       "observedMainSha": "c60bb6a2516ab88000ece3c339bcc740280a9ba7",
-      "receiptCutoff": "942/6557001049",
+      "inspectedMailboxComment": "942/6557001049",
       "main1089": {
         "state": "MERGED_POSTCHECKS_PAGES_FAILED",
         "mergeSha": "c60bb6a2516ab88000ece3c339bcc740280a9ba7",
@@ -133,14 +133,51 @@
       },
       "open1092": {
         "head": "2e788edc522542d26e489d553be33fa44a680d62",
-        "state": "OPEN_INERT_PROPOSAL_PAGES_HOLD_REMAINS_R3_PENDING"
+        "state": "OPEN_INERT_CUMULATIVE_GREEN_LIGHT_PAGES_HOLD_REMAINS",
+        "limits": "LEAD_SUPPLIED_DOC_QUOTE_NOT_INDEPENDENTLY_FETCHED; SYNTAX_AND_ACTIVATION_UNVALIDATED; BACKEND_LOCK_UNRESOLVED"
       },
       "open1093": {
         "head": "a3a173e9e3f33a5a405771c72294faea70cfbfca",
-        "state": "OPEN_EARLIER_GREEN_FULL_CI_TOTALS_UNVERIFIED_R3_PENDING"
+        "state": "OPEN_CUMULATIVE_GREEN_LIGHT",
+        "ci": {
+          "run": 41294377989,
+          "job": 124812037024,
+          "passed": 3477,
+          "failed": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "requiredSteps": "ALL_SUCCESS"
+        }
       },
       "desktopAcceptance": "PR1077_TO_1080_CLOUD_BROWSER_ONLY_NO_REAL_IPHONE_SAFARI",
-      "nextStep": "KEEP_PAGES_HOLD; AWAIT_1092_1093_R3_EVIDENCE; COMPLETE_1087_LIVE_LEDGER_ACCEPTANCE; DO_NOT_POST_FINAL_RECEIPTS_OR_ACTIVATE_ROLLOVER"
+      "open1096": {
+        "head": "61044c0709fd071a734d3aa60db2c01e54f0b54f",
+        "base": "c60bb6a2516ab88000ece3c339bcc740280a9ba7",
+        "state": "OPEN_ASSEMBLY_FINAL_INDEPENDENT_REVIEW_PENDING",
+        "ci": {
+          "run": 41300459231,
+          "job": 124830116400,
+          "passed": 3483,
+          "failed": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "requiredSteps": "ALL_SUCCESS"
+        }
+      },
+      "prior1095Check": {
+        "head": "7d6b65dc04e54781bc66ff45c74c92f7b7c3b89d",
+        "run": 41300167359,
+        "state": "ACTION_REQUIRED_ZERO_JOBS_NOT_A_PASS"
+      },
+      "deliveryModel": {
+        "source": "1061/6557059096",
+        "statusSupplement": "1061/6557083232",
+        "terra": "1090_PLUS_1093_ASSEMBLY_1096_CI_PASSED_FINAL_REVIEW_PENDING",
+        "opus55": "PAGES_PACKET_SUBMITTED_QUEUED_THEN_WORKING_NOT_DELIVERED",
+        "gemini4Argon": "COORDINATOR_1046_1059_SUBMITTED_SETUP_SOURCE_WORK_NO_FINAL_DELIVERY",
+        "copilot": "1095_CONTINUITY_DRAFT_DELIVERED_NOT_ACCEPTED_UNDERLYING_MODEL_UNCONFIRMED"
+      },
+      "nextStep": "LEAD_EXACT_HEAD_CI_AND_INDEPENDENT_REVIEW_FOR_1095; FINAL_INDEPENDENT_REVIEW_1096; KEEP_PAGES_HOLD; NO_MERGE_OR_ACTIVATION"
     },
     "latestDelivery20261031": {
       "recordedDate": "2026-10-31",

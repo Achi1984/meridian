@@ -1,4 +1,4 @@
-> **Current delivery status — 2026-11-01, inspected mailbox cutoff 942/6557001049 (10:56:35 UTC)**
+> **Current delivery status — 2026-11-01, mailbox comment 942/6557001049; current content inspected 2026-11-01**
 > Live `main` is `c60bb6a2516ab88000ece3c339bcc740280a9ba7` (PR #1089).
 > PRs #1077–1080 are merged with exact-merge postchecks; comment
 > [942/6549113883](https://github.com/Achi1984/meridian/issues/942#issuecomment-6549113883)
@@ -14,15 +14,46 @@
 > attempt 2 remains FAILED: deployment creation returned HTTP 400 because the
 > previous deployment was reported in progress. No successful deployment receipt
 > followed; the Pages hold remains. PR #1092 is an inert proposal and does not
-> resolve that hold.
-> PR #1090 remains open at `5a874e9ef0282745bfd9a320ac6fe6b6dbcc330b`
-> (exact-pair CI 3476/3476 and independent source GREEN); #1092 remains open,
-> inert and awaiting the bounded R3 review; #1093 remains open, and its earlier
-> GREEN lacks independently verified full-run totals. The follow-up
-> [942/6556998549](https://github.com/Achi1984/meridian/issues/942#issuecomment-6556998549)
-> was still in progress at the inspected cutoff
-> ([6557001049](https://github.com/Achi1984/meridian/issues/942#issuecomment-6557001049)).
-> No merge is claimed for these three PRs.
+> resolve that hold; the backend deployment lock remains unresolved.
+> PR #1092 is open and inert; its cumulative R3 verdict is GREEN_LIGHT, but the
+> supplied concurrency-doc quote was not independently fetched and deployment
+> syntax/activation remain unvalidated. PR #1093 is open with cumulative
+> GREEN_LIGHT; existing exact-pair hosted CI 41294377989/job 124812037024 passed
+> 3477/3477, all required steps succeeded, and the ledger/manifest interaction
+> was reviewed. Neither verdict is merge or activation approval.
+> PR #1090 remains open; its source review and exact-pair CI do not substitute
+> for final review of the assembly. PR #1096 is the open assembly at
+> `61044c0709fd071a734d3aa60db2c01e54f0b54f`, base
+> `c60bb6a2516ab88000ece3c339bcc740280a9ba7`; hosted run
+> [41300459231](https://github.com/Achi1984/meridian/actions/runs/41300459231)
+> passed 3483/3483 with all required steps successful. Independent final review
+> is pending; it is not merged. The previous #1095 check
+> [41300167359](https://github.com/Achi1984/meridian/actions/runs/41300167359)
+> ended `action_required` with zero jobs and is not a pass.
+> The current content of #942/6557001049 was inspected on 2026-11-01; its
+> comment ID is the receipt reference, not an asserted edit/arrival timestamp.
+> No merge is claimed for #1090, #1092, #1093 or #1096.
+>
+> **Delivery model — Owner decision #1061 / 6557059096; model/session status
+> supplement #1061/6557083232 and PR #1095 comment 6557083054.** Use coherent
+> larger candidates, one implementation owner per branch, and parallel disjoint
+> work only. GitHub model selection, assignment, queued/running session, source
+> delivery and final acceptance are distinct states; do not duplicate work to
+> occupy models. Terra assembled #1090+#1093 as #1096 (CI passed; independent
+> review pending). Opus 5.5 was submitted for the inert Pages packet and later
+> reported working; no packet delivery is recorded here. Gemini 4 Argon was
+> submitted for #1046/#1059 coordinator integration and observed in setup/source
+> work; no final delivery is recorded here. Copilot’s #1095 continuity draft is
+> delivered but not accepted; its underlying model is not independently established.
+> Preserve source attribution and original PRs until Lead verifies incorporation.
+> Authors run focused checks; Actions supplies exact-head CI; one independent
+> Claude final review follows stable successful CI; Lead owns integration, merge
+> and postchecks. The current assignments and status boundaries are recorded at
+> [#1061/6557083232](https://github.com/Achi1984/meridian/issues/1061#issuecomment-6557083232)
+> and [#1061/6557101515](https://github.com/Achi1984/meridian/issues/1061#issuecomment-6557101515).
+> No extra assignment or source work was started here.
+> Next: Lead-owned exact-head CI/review for #1095 and final independent review
+> of #1096; keep Pages held and all authority/activation states unchanged.
 > Historical #999/#1050/#1052/#1063/#1065/#1067 merges and their individual
 > failures/unknowns remain preserved; only the pending recovery chain has a
 > proposed, unposted SUPERSEDED closure tied to actual #1069 evidence. No later
