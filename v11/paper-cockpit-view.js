@@ -143,12 +143,29 @@ export function renderPaperCockpit(root, report = null, document = root?.ownerDo
   root.replaceChildren();
   root.className = 'card paper-cockpit';
   root.setAttribute('style', 'min-width:0;max-width:100%;overflow-wrap:anywhere');
+  root.setAttribute('data-state', options.state || 'unavailable');
   root.setAttribute('aria-labelledby', 'paper-cockpit-heading');
   node(document, root, 'h2', 'Paper cockpit').id = 'paper-cockpit-heading';
   const readonlyLabel = node(document, root, 'p',
     'Nur lesend · keine Start-, Stopp- oder Handelsaktionen.', 'limited');
   readonlyLabel.setAttribute('style', 'max-width:100%;white-space:normal;overflow-wrap:anywhere');
-  const available = renderReport(root, report, document, options);
+  if (typeof options.onRefresh === 'function') {
+    const refresh = node(document, root, 'button', 'Paper report manuell laden / aktualisieren');
+    refresh.type = 'button';
+    refresh.disabled = options.loading === true;
+    refresh.setAttribute('style',
+      'min-width:44px;min-height:44px;max-width:100%;padding:10px 12px;white-space:normal;overflow-wrap:anywhere');
+    refresh.addEventListener('click', options.onRefresh);
+    const status = node(document, root, 'p', options.message || 'Reportstatus unbekannt.');
+    status.setAttribute('role', 'status');
+    status.setAttribute('aria-live', 'polite');
+    status.setAttribute('aria-atomic', 'true');
+  }
+  const freshnessPolicy = options.freshnessPolicy;
+  const reportOptions = freshnessPolicy
+    ? {now: freshnessPolicy.now(), staleAfterMs: freshnessPolicy.staleAfterMs}
+    : options;
+  const available = renderReport(root, report, document, reportOptions);
 
   const demo = document.createElement('details');
   demo.className = 'card card-muted';

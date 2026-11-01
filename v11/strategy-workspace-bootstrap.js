@@ -1,17 +1,18 @@
 import {CAMPAIGN_SOURCE, renderStrategyCatalog} from './strategy-catalog.js?v=B16-M11-FIX11';
 import {createStrategyArenaView} from './strategy-arena.js?v=B16-M11-FIX11';
-import {renderPaperCockpit} from './paper-cockpit-view.js?v=B16-M11-FIX11';
+import {mountPaperCockpit} from './paper-cockpit-controller.js?v=B16-M11-FIX12';
 import {renderPaperReadiness} from './paper-readiness-view.js?v=B16-M11-FIX11';
 
 const catalogRoot = document.getElementById('strategy-catalog');
 const catalogStatus = document.getElementById('strategy-load-status');
 const arenaRoot = document.getElementById('strategy-arena-root');
 const arena = createStrategyArenaView(arenaRoot);
+let paperCockpit = null;
 if(catalogRoot?.parentNode){
   const paperRoot=document.createElement('section');
   paperRoot.id='paper-cockpit-root';
   catalogRoot.parentNode.insertBefore(paperRoot,catalogRoot);
-  renderPaperCockpit(paperRoot);
+  paperCockpit=mountPaperCockpit(paperRoot,document,window);
   const readinessRoot=document.createElement('section');
   readinessRoot.id='paper-readiness-root';
   catalogRoot.parentNode.insertBefore(readinessRoot,catalogRoot);
@@ -44,7 +45,9 @@ async function loadWorkspace() {
 }
 
 document.getElementById('nav')?.addEventListener('click',event=>{
-  if (event.target.closest?.('button[data-v="strategies"]')) loadWorkspace();
+  const button=event.target.closest?.('button[data-v]');
+  paperCockpit?.setActive(button?.dataset.v==='strategies');
+  if (button?.dataset.v==='strategies') loadWorkspace();
 });
 
 document.addEventListener('click',event=>{
