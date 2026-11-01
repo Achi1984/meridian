@@ -28,7 +28,8 @@ booleans are not authentication. The fixed fixture clock is test input, not a
 trusted host clock. For unresolved synthetic publications, the result records
 the pending marker and visible checkpoint identities before cleaning only the
 verified, owned temporary fixture directory; that cleanup is not a successful
-reconciliation.
+reconciliation. If a synthetic check fails, its owned fixture directory is
+preserved and reported for inspection rather than cleaned up.
 
 Child-process termination checks observe the temporary filesystem after a child
 exits and exercise the existing pending-publication behavior. They prove neither

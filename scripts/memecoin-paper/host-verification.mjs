@@ -27,7 +27,6 @@ const MAX_FIXTURE_BYTES = 16 * 1024;
 const MAX_CHILD_MS = 5_000;
 const MAX_REAP_MS = 1_000;
 const MAX_RESULT_BYTES = 64 * 1024;
-const HASH_PATTERN = /^[a-f0-9]{64}$/;
 const SOURCE_PATHS = [
   "scripts/memecoin-paper/host-verification.mjs",
   "scripts/memecoin-paper/checkpoint-store.mjs",
@@ -63,9 +62,12 @@ async function withOwnedDirectory(callback) {
         !path.basename(actual).startsWith(OWNED_DIRECTORY_PREFIX)) {
       throw new Error("temporary verification directory escaped its owned boundary");
     }
-    return await callback(directory);
-  } finally {
+    const result = await callback(directory);
     await removeOwnedDirectory(directory, temporaryRoot);
+    return result;
+  } catch (error) {
+    if (error && typeof error === "object") error.syntheticEvidenceDirectory = directory;
+    throw error;
   }
 }
 
@@ -79,6 +81,7 @@ async function removeOwnedDirectory(directory, temporaryRoot) {
   if (!info.isDirectory() || info.isSymbolicLink() || await realpath(absolute) !== absolute) {
     throw new Error("refusing cleanup of a replaced or linked temporary directory");
   }
+  const entries = [];
   for (const name of await readdir(absolute)) {
     if (!OWNED_FILES.has(name) && !CHILD_FILE_PATTERN.test(name)) {
       throw new Error("refusing cleanup of an unexpected temporary entry");
@@ -88,8 +91,9 @@ async function removeOwnedDirectory(directory, temporaryRoot) {
     if (!entryInfo.isFile() || entryInfo.isSymbolicLink()) {
       throw new Error("refusing cleanup of a non-file temporary entry");
     }
-    await unlink(entry);
+    entries.push(entry);
   }
+  for (const entry of entries) await unlink(entry);
   await rmdir(absolute);
 }
 
@@ -405,11 +409,15 @@ async function withCheck(checks, name, operation) {
   try {
     checks.push({name, status: "PASS", evidence: await operation()});
   } catch (error) {
-    checks.push({
+    const check = {
       name,
       status: "FAIL",
       errorCode: typeof error?.code === "string" ? error.code.slice(0, 80) : "CHECK_FAILED"
-    });
+    };
+    if (typeof error?.syntheticEvidenceDirectory === "string") {
+      check.preservedFixtureDirectory = error.syntheticEvidenceDirectory.slice(0, 1_024);
+    }
+    checks.push(check);
   }
 }
 
