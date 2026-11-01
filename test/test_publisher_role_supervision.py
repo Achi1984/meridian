@@ -75,6 +75,7 @@ class SupervisionTests(unittest.TestCase):
         return factory
     def run_worker(self,factory=None):
         events=deque(maxlen=64); started=time.monotonic()
+        self.worker_pids=[]
         read,waitpid,kill,reap=m.os.read,m.os.waitpid,m.os.kill,m._fallback_reap
         def note(kind,value):
             if os.getpid()==self.parent:
@@ -84,7 +85,10 @@ class SupervisionTests(unittest.TestCase):
                 events.append((round(time.monotonic()-started,4),kind,value,count))
         def observe_read(fd,size):
             value=read(fd,size)
-            if size==5 and len(value)==4: note('pid_receipt',struct.unpack('!I',value)[0])
+            if size==5 and len(value)==4:
+                pid=struct.unpack('!I',value)[0]
+                self.worker_pids.append(pid)
+                note('pid_receipt',pid)
             elif size==1 and value in (b'A',b'C',b'P',b'M',b'L',b'F',b'U',b'O'):
                 note('phase',value.decode())
             return value
@@ -124,10 +128,13 @@ class SupervisionTests(unittest.TestCase):
         self.assertFalse(result['parentObservedConfirmedChildExit'])
         self.assertTrue(all(v is False for k,v in result.items() if k!='outcome'))
     def assert_reaped(self):
+        # PID receipt precedes factory work; a deadline can interrupt the child's
+        # marker after truncation but before its buffered write reaches disk.
         if (self.root/'worker').exists():
-            pid=int((self.root/'worker').read_text())
+            self.assertTrue(self.worker_pids,getattr(self,'diagnostics',[]))
+        for pid in self.worker_pids:
             try: observed=os.waitpid(pid,os.WNOHANG)
-            except ChildProcessError: return
+            except ChildProcessError: continue
             self.fail(f'child {pid} not already reaped at return: waitpid={observed!r}; '
                       f'parent trace={getattr(self,"diagnostics",[])}')
 
@@ -165,6 +172,19 @@ class SupervisionTests(unittest.TestCase):
             with self.subTest(step=step):
                 self.jroot=self.root/step; self.jroot.mkdir(mode=0o700)
                 self.assert_unknown(self.run_worker(self.factory(hang=step))); self.assert_reaped()
+
+    def test_interrupted_worker_marker_keeps_reaping_assertion(self):
+        # Reproduce a deadline between write_text's truncate and buffered write.
+        original_write=Path.write_text
+        def interrupted_write(path,data,*args,**kwargs):
+            if path==self.root/'worker':
+                original_write(path,'',*args,**kwargs)
+                os.kill(os.getpid(),signal.SIGSTOP)
+            return original_write(path,data,*args,**kwargs)
+        with patch.object(Path,'write_text',interrupted_write):
+            self.assert_unknown(self.run_worker())
+        self.assertEqual((self.root/'worker').read_text(),'')
+        self.assert_reaped()
 
     def test_context_exit_failure_never_confirmed(self):
         self.assert_unknown(self.run_worker(self.factory(exit_error=True))); self.assert_reaped()
