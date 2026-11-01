@@ -17,7 +17,10 @@ import { reconcilePortfolioAuthority,portfolioAuthorityReceipt } from "./portfol
 import { confirmReviewedLedger } from "./ledger-reviewed-authority.js";
 import { capturePortfolioHistoryOnce } from "./portfolio-history-runtime.js";
 import { buildPaperExecutionAuditExport } from "./paper-execution-audit-v2-export.js";
-import { createPrivateReportStore } from "./private-report-store.mjs";
+import {
+  createPrivateReportStore,
+  PAPER_REPORT_POOL_OPTIONS
+} from "./private-report-store.mjs";
 import {
   handleReportGatewayRequest,
   reportTransferGatewayConfig
@@ -122,10 +125,30 @@ async function readJsonBody(req,maxBytes=131072){
 }
 
 let privatePool=null;
+let privatePaperReportPool=null;
+let privatePaperReportStore=null;
 function pool(){
   if(!DATABASE_URL)return null;
   if(!privatePool)privatePool=new Pool({connectionString:DATABASE_URL,ssl:{rejectUnauthorized:false}});
   return privatePool;
+}
+function paperReportPool(){
+  if(!DATABASE_URL)return null;
+  if(!privatePaperReportPool){
+    privatePaperReportPool=new Pool({
+      connectionString:DATABASE_URL,
+      ssl:{rejectUnauthorized:false},
+      ...PAPER_REPORT_POOL_OPTIONS
+    });
+  }
+  return privatePaperReportPool;
+}
+function paperReportStore(){
+  if(!DATABASE_URL)return null;
+  if(!privatePaperReportStore){
+    privatePaperReportStore=createPrivateReportStore(paperReportPool());
+  }
+  return privatePaperReportStore;
 }
 async function stateGet(key){
   const p=pool(); if(!p)return null;
@@ -294,11 +317,24 @@ const server=http.createServer(async(req,res)=>{
     const origin=allowOrigin(req);
     if(req.method==="OPTIONS")return corsPreflight(req,res,origin);
     if(origin===null)return writeJson(res,403,{error:"origin_not_allowed"});
-    const reportRoute=await handleReportGatewayRequest(req,{
-      config:PAPER_REPORT_CONFIG,
-      getStore:()=>DATABASE_URL?createPrivateReportStore(pool()):null,
-      authorizedRead
-    });
+    const reportController=new AbortController();
+    const abortReport=()=>reportController.abort();
+    const abortReportOnClose=()=>{if(!res.writableEnded)abortReport();};
+    req.once("aborted",abortReport);
+    res.once("close",abortReportOnClose);
+    if(req.aborted||res.destroyed)abortReport();
+    let reportRoute;
+    try{
+      reportRoute=await handleReportGatewayRequest(req,{
+        config:PAPER_REPORT_CONFIG,
+        getStore:paperReportStore,
+        authorizedRead,
+        signal:reportController.signal
+      });
+    }finally{
+      req.removeListener("aborted",abortReport);
+      res.removeListener("close",abortReportOnClose);
+    }
     if(reportRoute){
       const result=reportRoute;
       if(result.status===408||result.status===413){

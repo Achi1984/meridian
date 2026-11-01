@@ -15,6 +15,7 @@ export const PAPER_REPORT_TIMEOUT_MS = 10_000;
 const SAFE_RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$/;
 const HASH = /^[a-f0-9]{64}$/;
 const MAX_CONFIG_BYTES = 64 * 1024;
+let activeTransfer = null;
 
 function failure(reason) {
   return {status: "REJECTED", reason};
@@ -126,6 +127,7 @@ export async function transferPostRunReport({
   if (typeof uploadToken !== "string" || !/^[A-Za-z0-9._~-]{32,512}$/.test(uploadToken)) {
     return failure("upload_credential_missing");
   }
+  if (activeTransfer) return failure("transfer_busy");
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 ||
       timeoutMs > PAPER_REPORT_TIMEOUT_MS || typeof fetchImpl !== "function" ||
       typeof now !== "function" || typeof schedule !== "function" ||
@@ -194,10 +196,18 @@ export async function transferPostRunReport({
 
   const controller = new AbortController();
   let timer;
+  let timeoutResolve;
+  let timedOut = false;
+  let trackedWork;
   try {
-    timer = schedule(() => controller.abort(), timeoutMs);
+    const deadline = new Promise(resolve => { timeoutResolve = resolve; });
+    timer = schedule(() => {
+      timedOut = true;
+      controller.abort();
+      timeoutResolve(failure("transfer_outcome_unknown"));
+    }, timeoutMs);
     if (timer === undefined || timer === null) return failure("deadline_unavailable");
-    const response = await fetchImpl(`${origin}${PAPER_REPORT_UPLOAD_PATH}`, {
+    const work = Promise.resolve().then(() => fetchImpl(`${origin}${PAPER_REPORT_UPLOAD_PATH}`, {
       method: "POST",
       headers: {
         authorization: "Bearer " + uploadToken,
@@ -207,20 +217,43 @@ export async function transferPostRunReport({
       body,
       redirect: "error",
       signal: controller.signal
+    })).then(async response => {
+      await cancelResponseBody(response);
+      if (timedOut || controller.signal.aborted) return failure("transfer_outcome_unknown");
+      if (response?.status === 201 || response?.status === 200) {
+        return {status: "TRANSFERRED", httpStatus: response.status};
+      }
+      if (response?.status === 409) return failure("report_conflict");
+      return failure("gateway_rejected");
+    }, () => failure(timedOut ? "transfer_outcome_unknown" : "transfer_unavailable"));
+    trackedWork = work.finally(() => {
+      if (activeTransfer === trackedWork) activeTransfer = null;
     });
-    if (controller.signal.aborted) return failure("transfer_timeout");
-    if (response?.status === 201 || response?.status === 200) {
-      return {status: "TRANSFERRED", httpStatus: response.status};
-    }
-    if (response?.status === 409) return failure("report_conflict");
-    return failure("gateway_rejected");
+    activeTransfer = trackedWork;
+    return await Promise.race([trackedWork, deadline]);
   } catch {
-    return failure(controller.signal.aborted ? "transfer_timeout" : "transfer_unavailable");
+    return failure(timedOut ? "transfer_outcome_unknown" : "transfer_unavailable");
   } finally {
-    controller.abort();
     if (timer !== undefined && timer !== null) {
       try { cancelSchedule(timer); } catch { }
     }
+  }
+}
+
+async function cancelResponseBody(response) {
+  const body = response?.body;
+  if (!body) return;
+  let reader;
+  try {
+    if (typeof body.getReader === "function") {
+      reader = body.getReader();
+      await reader.cancel();
+    } else if (typeof body.cancel === "function") {
+      await body.cancel();
+    }
+  } catch {
+  } finally {
+    try { reader?.releaseLock(); } catch { }
   }
 }
 

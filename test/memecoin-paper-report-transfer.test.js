@@ -19,6 +19,10 @@ import {
   readBoundedRequestBody
 } from "../report-transfer-gateway.mjs";
 import {createPrivateReportStore} from "../private-report-store.mjs";
+import {
+  PAPER_REPORT_POOL_OPTIONS,
+  PAPER_REPORT_STORE_LIMITS
+} from "../private-report-store.mjs";
 import {reportFixtures} from "./fixtures/memecoin-paper-operator-report/scenarios.mjs";
 
 const RUN_ID = "paper-transfer-run-20261101";
@@ -267,7 +271,55 @@ test("exporter deadline aborts transport and bounds transfer duration", async t 
       return {status: 201};
     }
   }));
-  assert.equal(result.reason, "transfer_timeout");
+  assert.equal(result.reason, "transfer_outcome_unknown");
+});
+
+test("never-settling fetch returns UNKNOWN once and retains a single in-flight transfer", async t => {
+  const fixture = await workerFixture(t);
+  let releaseFetch;
+  const options = makeWorkerOptions(fixture, {
+    timeoutMs: 5,
+    schedule(callback) { return setTimeout(callback, 0); },
+    fetchImpl: () => new Promise(resolve => { releaseFetch = resolve; })
+  });
+  const first = await transferPostRunReport(options);
+  assert.equal(first.reason, "transfer_outcome_unknown");
+  assert.equal((await transferPostRunReport(options)).reason, "transfer_busy");
+  releaseFetch({status: 201});
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal((await transferPostRunReport({
+    ...options,
+    fetchImpl: async () => ({status: 201})
+  })).status, "TRANSFERRED");
+});
+
+test("late HTTP response body is cancelled before releasing the transfer slot", async t => {
+  const fixture = await workerFixture(t);
+  let resolveFetch;
+  let finishCancel;
+  let cancelStarted = false;
+  const options = makeWorkerOptions(fixture, {
+    timeoutMs: 5,
+    schedule(callback) { return setTimeout(callback, 0); },
+    fetchImpl: () => new Promise(resolve => { resolveFetch = resolve; })
+  });
+  assert.equal((await transferPostRunReport(options)).reason, "transfer_outcome_unknown");
+  resolveFetch({
+    status: 201,
+    body: {cancel: () => {
+      cancelStarted = true;
+      return new Promise(resolve => { finishCancel = resolve; });
+    }}
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(cancelStarted, true);
+  assert.equal((await transferPostRunReport(options)).reason, "transfer_busy");
+  finishCancel();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal((await transferPostRunReport({
+    ...options,
+    fetchImpl: async () => ({status: 201})
+  })).status, "TRANSFERRED");
 });
 
 test("gateway checks enablement and the dedicated upload credential before reading the body", async () => {
@@ -442,6 +494,10 @@ test("PostgreSQL store uses unique-key transactions for identical and conflictin
             const row = rows.get(values[0]);
             return {rows: row ? [{config_hash: row.config_hash, content_sha256: row.content_sha256}] : []};
           }
+          if (sql.includes("SELECT run_id")) {
+            const row = rows.get(values[0]);
+            return {rows: row ? [row] : []};
+          }
           return {rowCount: 0, rows: []};
         },
         release() {}
@@ -459,14 +515,279 @@ test("PostgreSQL store uses unique-key transactions for identical and conflictin
   const differentEnvelope = transferEnvelope(reportFixture());
   differentEnvelope.report.valuation.cashCents = "123";
   const different = {...first, digest: configHash(bodyBytes(differentEnvelope)), envelope: differentEnvelope};
-  const results = await Promise.all([
+  const identicalResults = await Promise.all([
     store.insertImmutable(first),
-    store.insertImmutable(first),
-    store.insertImmutable(different)
+    store.insertImmutable(first)
   ]);
-  assert.deepEqual(results.sort(), ["CONFLICT", "IDENTICAL", "INSERTED"]);
+  assert.deepEqual(identicalResults.sort(), ["IDENTICAL", "INSERTED"]);
+  assert.equal(await store.insertImmutable(different), "CONFLICT");
   assert.deepEqual(commands.filter(value => ["BEGIN", "COMMIT"].includes(value)).length, 6);
   assert.equal((await store.get(RUN_ID)).content_sha256, digest);
+});
+
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((ok, fail) => { resolve = ok; reject = fail; });
+  return {promise, resolve, reject};
+}
+
+function rowFor(input) {
+  return {
+    run_id: input.runId,
+    config_hash: input.configHash,
+    content_sha256: input.digest,
+    envelope: input.envelope
+  };
+}
+
+test("report store has bounded dedicated pool, statement, lock, and operation budgets", () => {
+  assert.deepEqual(PAPER_REPORT_POOL_OPTIONS, {
+    max: 2,
+    connectionTimeoutMillis: 1_500,
+    statement_timeout: 3_500,
+    lock_timeout: 1_000,
+    idle_in_transaction_session_timeout: 4_500
+  });
+  assert.deepEqual(PAPER_REPORT_STORE_LIMITS, {maxConcurrent: 2, operationTimeoutMs: 6_000});
+});
+
+test("stalled connection acquisition times out to UNKNOWN but retains admission until it settles", async () => {
+  let connectCalls = 0;
+  const db = {
+    connect() {
+      connectCalls++;
+      return new Promise(() => {});
+    },
+    query() { throw new Error("pool query must not be used"); }
+  };
+  const store = createPrivateReportStore(db, {maxConcurrent: 1, operationTimeoutMs: 5});
+  const input = {
+    runId: RUN_ID, configHash: gatewayConfig.expectedConfigHash,
+    digest: "b".repeat(64), envelope: transferEnvelope()
+  };
+  await assert.rejects(store.insertImmutable(input), error =>
+    error.code === "PAPER_REPORT_OUTCOME_UNKNOWN");
+  assert.equal(store.activeCount(), 1);
+  await assert.rejects(store.insertImmutable(input), error => error.code === "STORE_BUSY");
+  assert.equal(connectCalls, 1);
+  assert.equal(store.activeCount(), 1);
+});
+
+test("cancelled pending query rolls back before releasing the held store slot", async () => {
+  const pendingInsert = deferred();
+  let insertStarted;
+  insertStarted = deferred();
+  let rollbackCount = 0;
+  let commitCount = 0;
+  const db = {
+    async connect() {
+      return {
+        async query(sql) {
+          if (sql === "INSERT INTO meridian_paper_reports") return pendingInsert.promise;
+          if (sql.startsWith("INSERT INTO")) {
+            insertStarted.resolve();
+            return pendingInsert.promise;
+          }
+          if (sql === "ROLLBACK") rollbackCount++;
+          if (sql === "COMMIT") commitCount++;
+          return {rowCount: 0, rows: []};
+        },
+        release() {}
+      };
+    },
+    async query() { return {rows: []}; }
+  };
+  const store = createPrivateReportStore(db, {operationTimeoutMs: 1_000});
+  const controller = new AbortController();
+  const operation = store.insertImmutable({
+    runId: RUN_ID, configHash: gatewayConfig.expectedConfigHash,
+    digest: "c".repeat(64), envelope: transferEnvelope(), signal: controller.signal
+  });
+  await insertStarted.promise;
+  controller.abort();
+  await assert.rejects(operation, error => error.code === "PAPER_REPORT_OUTCOME_UNKNOWN");
+  assert.equal(store.activeCount(), 1);
+  pendingInsert.resolve({rowCount: 1, rows: [{run_id: RUN_ID}]});
+  for (let tries = 0; store.activeCount() && tries < 10; tries++) {
+    await new Promise(resolve => setImmediate(resolve));
+  }
+  assert.equal(rollbackCount, 1);
+  assert.equal(commitCount, 0);
+  assert.equal(store.activeCount(), 0);
+});
+
+test("timed-out insert lock wait reports UNKNOWN and retains the slot until rollback settles", async () => {
+  const pendingLock = deferred();
+  const lockStarted = deferred();
+  let rollbackCount = 0;
+  let commitCount = 0;
+  const db = {
+    async connect() {
+      return {
+        async query(sql) {
+          if (sql.startsWith("INSERT INTO")) {
+            lockStarted.resolve();
+            return pendingLock.promise;
+          }
+          if (sql === "ROLLBACK") rollbackCount++;
+          if (sql === "COMMIT") commitCount++;
+          return {rowCount: 0, rows: []};
+        },
+        release() {}
+      };
+    },
+    async query() { return {rows: []}; }
+  };
+  const store = createPrivateReportStore(db, {maxConcurrent: 1, operationTimeoutMs: 5});
+  const operation = store.insertImmutable({
+    runId: RUN_ID, configHash: gatewayConfig.expectedConfigHash,
+    digest: "d".repeat(64), envelope: transferEnvelope()
+  });
+  await lockStarted.promise;
+  await assert.rejects(operation, error => error.code === "PAPER_REPORT_OUTCOME_UNKNOWN");
+  assert.equal(store.activeCount(), 1);
+  pendingLock.resolve({rowCount: 1, rows: [{run_id: RUN_ID}]});
+  for (let tries = 0; store.activeCount() && tries < 10; tries++) {
+    await new Promise(resolve => setImmediate(resolve));
+  }
+  assert.equal(rollbackCount, 1);
+  assert.equal(commitCount, 0);
+  assert.equal(store.activeCount(), 0);
+});
+
+test("failed rollback destroys the client and keeps the write outcome UNKNOWN", async () => {
+  let releaseError = null;
+  const db = {
+    async connect() {
+      return {
+        async query(sql) {
+          if (sql.startsWith("INSERT INTO")) return {rowCount: 0, rows: []};
+          if (sql.startsWith("SELECT config_hash")) return {rows: []};
+          if (sql === "ROLLBACK") throw new Error("rollback failed");
+          return {rowCount: 0, rows: []};
+        },
+        release(error) { releaseError = error; }
+      };
+    },
+    async query() { return {rows: []}; }
+  };
+  const store = createPrivateReportStore(db);
+  await assert.rejects(store.insertImmutable({
+    runId: RUN_ID, configHash: gatewayConfig.expectedConfigHash,
+    digest: "e".repeat(64), envelope: transferEnvelope()
+  }), error => error.code === "PAPER_REPORT_OUTCOME_UNKNOWN");
+  assert.equal(releaseError?.code, "PAPER_REPORT_OUTCOME_UNKNOWN");
+});
+
+test("late database commit returns UNKNOWN, caps repeated requests, and permits idempotent retry", async () => {
+  const commitGate = deferred();
+  const committed = new Map();
+  let delayedCommit = true;
+  const db = {
+    async connect() {
+      let pending = null;
+      return {
+        async query(sql, values = []) {
+          if (sql.startsWith("INSERT INTO meridian_paper_reports")) {
+            const [runId, configHashValue, digestValue, json] = values;
+            if (committed.has(runId)) return {rowCount: 0, rows: []};
+            pending = {
+              run_id: runId,
+              config_hash: configHashValue,
+              content_sha256: digestValue,
+              envelope: JSON.parse(json)
+            };
+            return {rowCount: 1, rows: [{run_id: runId}]};
+          }
+          if (sql.startsWith("SELECT config_hash")) {
+            const row = committed.get(values[0]);
+            return {rows: row ? [{
+              config_hash: row.config_hash,
+              content_sha256: row.content_sha256
+            }] : []};
+          }
+          if (sql === "COMMIT") {
+            if (delayedCommit) {
+              delayedCommit = false;
+              await commitGate.promise;
+            }
+            if (pending) committed.set(pending.run_id, pending);
+            return {rowCount: 0, rows: []};
+          }
+          return {rowCount: 0, rows: []};
+        },
+        release() {}
+      };
+    },
+    async query(sql, values) {
+      const row = committed.get(values[0]);
+      return {rows: row ? [row] : []};
+    }
+  };
+  const store = createPrivateReportStore(db, {maxConcurrent: 1, operationTimeoutMs: 5});
+  const envelope = transferEnvelope();
+  const bytes = bodyBytes(envelope);
+  const first = await handlePaperReportUpload(request(bytes), {
+    config: gatewayConfig,
+    store,
+    now: () => NOW
+  });
+  assert.equal(first.status, 503);
+  assert.equal(first.body.error, "paper_report_outcome_unknown");
+  assert.equal(committed.has(RUN_ID), false);
+  assert.equal(store.activeCount(), 1);
+
+  const repeated = await handlePaperReportUpload(request(bytes), {
+    config: gatewayConfig,
+    store,
+    now: () => NOW
+  });
+  assert.equal(repeated.status, 503);
+  assert.equal(repeated.body.error, "paper_report_busy");
+
+  commitGate.resolve();
+  for (let tries = 0; store.activeCount() && tries < 10; tries++) {
+    await new Promise(resolve => setImmediate(resolve));
+  }
+  assert.equal(store.activeCount(), 0);
+  assert.equal(committed.has(RUN_ID), true);
+
+  const retry = await handlePaperReportUpload(request(bytes), {
+    config: gatewayConfig,
+    store,
+    now: () => NOW
+  });
+  assert.equal(retry.status, 200);
+  assert.equal(retry.body.idempotent, true);
+});
+
+test("bounded route admissions reject repeated body requests before reading beyond the cap", async () => {
+  const bytes = bodyBytes(transferEnvelope());
+  const store = new MemoryStore();
+  const waiting = [];
+  const readBody = () => new Promise(resolve => waiting.push(resolve));
+  const pending = Array.from({length: 4}, () => handlePaperReportUpload(request(bytes), {
+    config: gatewayConfig,
+    store,
+    readBody,
+    now: () => NOW
+  }));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(waiting.length, 4);
+  let fifthRead = false;
+  const fifth = await handlePaperReportUpload(request(bytes), {
+    config: gatewayConfig,
+    store,
+    readBody: async () => { fifthRead = true; return bytes; },
+    now: () => NOW
+  });
+  assert.equal(fifth.status, 503);
+  assert.equal(fifth.body.error, "paper_report_busy");
+  assert.equal(fifthRead, false);
+  for (const resolve of waiting) resolve(bytes);
+  const results = await Promise.all(pending);
+  assert.equal(results.length, 4);
 });
 
 test("gateway route is fixed, upload precedes the read guard, and existing routes remain present", () => {

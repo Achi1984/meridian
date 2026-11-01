@@ -46,8 +46,8 @@ unauthenticated.
 
 | Method and path | Authentication | Success | Errors |
 | --- | --- | --- | --- |
-| `POST /api/private/paper-report/upload` | Dedicated upload bearer only | `201` stored; `200` identical replay | `400 invalid_request_body`, `invalid_content_length`, `invalid_report_envelope`, or `paper_report_query_not_supported`; `401 paper_report_upload_auth_required`; `405 method_not_allowed`; `408 request_body_timeout`; `413 request_body_too_large`; `415 unsupported_content_type`; `409 paper_report_conflict`; `503 paper_report_upload_disabled` or `paper_report_store_unavailable`; `403 origin_not_allowed` when an Origin is disallowed |
-| `GET /api/private/paper-report` | Existing `MERIDIAN_READ_TOKEN_SHA256` bearer | `200` bounded report envelope with `Cache-Control: no-store` | `400 paper_report_query_not_supported`; `401 read_token_required`; `404 paper_report_not_found`; `405 method_not_allowed`; `503 paper_report_disabled`, `paper_report_store_unavailable`, or `paper_report_corrupt`; `403 origin_not_allowed` when an Origin is disallowed |
+| `POST /api/private/paper-report/upload` | Dedicated upload bearer only | `201` committed; `200` identical replay | `400 invalid_request_body`, `invalid_content_length`, `invalid_report_envelope`, or `paper_report_query_not_supported`; `401 paper_report_upload_auth_required`; `405 method_not_allowed`; `408 request_body_timeout` or `request_cancelled`; `413 request_body_too_large`; `415 unsupported_content_type`; `409 paper_report_conflict`; `503 paper_report_upload_disabled`, `paper_report_busy`, `paper_report_store_unavailable`, or `paper_report_outcome_unknown`; `403 origin_not_allowed` when an Origin is disallowed |
+| `GET /api/private/paper-report` | Existing `MERIDIAN_READ_TOKEN_SHA256` bearer | `200` bounded report envelope with `Cache-Control: no-store` | `400 paper_report_query_not_supported`; `401 read_token_required`; `404 paper_report_not_found`; `405 method_not_allowed`; `503 paper_report_disabled`, `paper_report_busy`, `paper_report_store_timeout`, `paper_report_store_unavailable`, or `paper_report_corrupt`; `403 origin_not_allowed` when an Origin is disallowed |
 
 `OPTIONS` uses the gateway's existing CORS preflight (`204` when allowed,
 `403 origin_not_allowed` otherwise).
@@ -57,6 +57,29 @@ before reading any request body and requires JSON. Both routes reject request
 selectors, enforce applicable body limits and deadlines, and return generic
 storage failures without database details or paths. Upload credentials and
 bodies are never placed in a URL or logged. The read token cannot upload.
+At most four report HTTP requests may be admitted simultaneously. The dedicated
+report PostgreSQL pool has at most two connections, a 1.5-second connection
+budget, a 3.5-second statement budget, a 1-second lock-wait budget, and a
+4.5-second idle-transaction budget. Report store operations admit at most two
+operations and return by a 6-second caller deadline. An operation that remains
+in flight continues to occupy its slot after the caller receives a response;
+it is never detached and counted as finished.
+
+An upload receiving `paper_report_outcome_unknown` may have committed even
+though the response could not confirm it. Do not change the report or start an
+automatic retry loop. Once the outstanding DB operation settles, resend the
+same pinned report once: a completed prior commit will return `200` as an
+identical replay; if the prior transaction rolled back, it can return `201`.
+While a timed-out/cancelled operation is still active, the bounded store returns
+`paper_report_busy` rather than admit additional DB work. A conflicting payload
+still returns `409` and never overwrites.
+
+The worker's bounded caller also reports `transfer_outcome_unknown` if its
+deadline expires before fetch and response-body cleanup settle. It retains one
+process-local transfer slot until that transport and cleanup settle; another
+invocation in that process returns `transfer_busy`. Do not launch parallel
+exporters. Once the previous operation is known to have settled, a manual retry
+uses the immutable same-report policy above.
 
 The worker command exits `0` only after a `200`/`201` gateway response and prints
 only a bounded status/reason code. It rejects disabled or invalid configuration,
