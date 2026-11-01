@@ -129,6 +129,7 @@ test('report-shaped read-only snapshot renders lifecycle, observation mode and u
   assert.match(root.textContent, /Observed through: 2026-11-01T10:02:00.000Z/);
   assert.doesNotMatch(root.textContent, /\bRUNNING\b|grün|active worker/i);
   assert.equal(visit(root).some(item => ['button', 'input', 'select', 'form'].includes(item.tagName)), false);
+  assert.match(visit(root).find(item => item.className === 'limited').attrs.style,/white-space:normal/);
 });
 
 test('stale, partial and unknown evidence remain explicit and never become a running state', () => {

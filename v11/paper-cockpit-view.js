@@ -143,7 +143,9 @@ export function renderPaperCockpit(root, report = null, document = root?.ownerDo
   root.className = 'card paper-cockpit';
   root.setAttribute('aria-labelledby', 'paper-cockpit-heading');
   node(document, root, 'h2', 'Paper cockpit').id = 'paper-cockpit-heading';
-  node(document, root, 'p', 'Nur lesend · keine Start-, Stopp- oder Handelsaktionen.', 'limited');
+  const readonlyLabel = node(document, root, 'p',
+    'Nur lesend · keine Start-, Stopp- oder Handelsaktionen.', 'limited');
+  readonlyLabel.setAttribute('style', 'max-width:100%;white-space:normal;overflow-wrap:anywhere');
   const available = renderReport(root, report, document, options);
 
   const demo = document.createElement('details');
