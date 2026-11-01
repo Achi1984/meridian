@@ -900,7 +900,7 @@ test('Terminal öffnen preserves the reviewed history-close baseline and stays o
   const reviewedHtml=beforeB2.replace(botsAfter,botsBefore).replace(botsRevisionLabel,revisionAfter).replace(botsRevisionRow,'');
   assert.equal(reviewedHtml.split(revisionAfter).length-1,1,'one current preview revision label');
   assert.equal(html.split(revisionRow).length-1,1,'one matching preview history row');
-  const restored=restorePaperModuleIdentity(reviewedHtml).replace(css,'').replace(entry,'').replace(depotAfter,depotBefore)
+  const restored=reviewedHtml.replace(css,'').replace(entry,'').replace(depotAfter,depotBefore)
     .replace(revisionAfter,revisionBefore).replace(revisionRow,'')
     .replace(viewportPair,'min-height:100dvh;min-height:100vh;');
   assert.equal(gitBlob(restored),preimageBlob,'all source bytes except terminal-entry insertions, the checked viewport pair and exact Depot/revision deltas must match the reviewed history-close baseline');
@@ -1103,17 +1103,17 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(rendererUrl.href),'exact renderer dependency URL must be in script-src');
     assert.equal(server.allowedPaths.has(rendererUrl.pathname),true);
     for(const [path,file,type] of [
-      ['ledger-manual-client.js?v=B16-M11-FIX11','v11/ledger-manual-client.js','javascript'],
-      ['ledger-manual-model.js?v=B16-M11-FIX11','v11/ledger-manual-model.js','javascript'],
-      ['ledger-manual-view.js?v=B16-M11-FIX11','v11/ledger-manual-view.js','javascript'],
+      ['ledger-manual-client.js?v=B16-M11-FIX12','v11/ledger-manual-client.js','javascript'],
+      ['ledger-manual-model.js?v=B16-M11-FIX12','v11/ledger-manual-model.js','javascript'],
+      ['ledger-manual-view.js?v=B16-M11-FIX12','v11/ledger-manual-view.js','javascript'],
       ['../ledger-manual-snapshot.js','ledger-manual-snapshot.js','javascript'],
-      ['paper-readiness.js?v=B16-M11-FIX11','v11/paper-readiness.js','javascript'],
-      ['paper-readiness-view.js?v=B16-M11-FIX11','v11/paper-readiness-view.js','javascript'],
-      ['paper-cockpit-model.js?v=B16-M11-FIX11','v11/paper-cockpit-model.js','javascript'],
-      ['paper-cockpit-view.js?v=B16-M11-FIX11','v11/paper-cockpit-view.js','javascript'],
-      ['release-update.js?v=B16-M11-FIX11','v11/release-update.js','javascript'],
-      ['agent-status-bootstrap.js?v=B16-M11-FIX11','v11/agent-status-bootstrap.js','javascript'],
-      ['agent-status-client.js?v=B16-M11-FIX11','v11/agent-status-client.js','javascript'],
+      ['paper-readiness.js?v=B16-M11-FIX12','v11/paper-readiness.js','javascript'],
+      ['paper-readiness-view.js?v=B16-M11-FIX12','v11/paper-readiness-view.js','javascript'],
+      ['paper-cockpit-model.js?v=B16-M11-FIX12','v11/paper-cockpit-model.js','javascript'],
+      ['paper-cockpit-view.js?v=B16-M11-FIX12','v11/paper-cockpit-view.js','javascript'],
+      ['release-update.js?v=B16-M11-FIX12','v11/release-update.js','javascript'],
+      ['agent-status-bootstrap.js?v=B16-M11-FIX12','v11/agent-status-bootstrap.js','javascript'],
+      ['agent-status-client.js?v=B16-M11-FIX12','v11/agent-status-client.js','javascript'],
       ['../public/js/m11-agent-status.js','public/js/m11-agent-status.js','javascript'],
       ['../public/css/m11-agent-status.css','public/css/m11-agent-status.css','css']
     ]){
