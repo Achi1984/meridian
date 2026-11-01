@@ -85,7 +85,7 @@ imported files are unchanged from those heads:
   `test/memecoin-paper-operator-report.test.js`, and
   `test/fixtures/memecoin-paper-operator-report/scenarios.mjs`.
 
-The focused assembly suite asserts those heads are ancestors and executes all
+The focused assembly suite asserts those configured pins and executes all
 three producer modules. It covers a full eight-hour deadline (480
 one-minute checkpoints plus the final receipt), 160 provider polls/640
 requests, report bounds, mismatched source identity, uncertain checkpoint with
@@ -105,6 +105,15 @@ Clock regression, early wall-clock time, unsettled work, or more than 60 seconds
 of deadline finalization delay remains `UNKNOWN`. Manual stops continue to use
 their actual validated time. The integration test covers 250 ms and 30 s
 settlement delays plus rejection beyond the fixed delay bound.
+
+The runner independently tracks the underlying promises for every controller
+callback. After controller completion it waits up to the configured callback
+settlement bound before checkpoint readback, report projection, or session close.
+If work remains unsettled, it returns `UNKNOWN`, leaves the session open, writes
+no terminal report/marker, and preserves the durable run lock so restart is
+blocked; a late callback completion cannot revise that result. Provider
+transport also rechecks the wall clock immediately before dispatch, so clock
+regression or a closed window prevents subsequent network requests.
 
 The checked-in assembly module is the explicit source composition:
 

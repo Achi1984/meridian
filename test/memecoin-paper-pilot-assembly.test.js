@@ -5,6 +5,7 @@ import path from "node:path";
 import {fileURLToPath} from "node:url";
 import test from "node:test";
 import {CheckpointStore} from "../scripts/memecoin-paper/checkpoint-store.mjs";
+import {PaperCheckpointSession} from "../scripts/memecoin-paper/checkpoint-session.mjs";
 import {createPinnedAssembly} from "../scripts/memecoin-paper/pilot-online-assembly.mjs";
 import {createPilotOnline, readPilotReport, readPilotStatus} from "../scripts/memecoin-paper/pilot-online.mjs";
 import {createRunConfig, writeRunConfig} from "../scripts/memecoin-paper/create-run-config.mjs";
@@ -24,7 +25,7 @@ const IDENTITY = Object.freeze({
   quote: "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD"
 });
 
-function virtualScheduler({paused = false} = {}) {
+function virtualScheduler({paused = false, deadlineOvershootMs = 0, runShortTimers = false} = {}) {
   let now = 0;
   let nextId = 0;
   let queued = false;
@@ -36,11 +37,12 @@ function virtualScheduler({paused = false} = {}) {
     setImmediate(() => {
       queued = false;
       if (isPaused) return;
-      const next = [...timers.values()].filter(timer => timer.delay === 60_000 || timer.delay > 60_000)
+      const next = [...timers.values()].filter(timer =>
+        runShortTimers || timer.delay === 60_000 || timer.delay > 60_000)
         .sort((left, right) => left.at - right.at || left.id - right.id)[0];
       if (!next || next.at - now > 60_000) return;
       timers.delete(next.id);
-      now = Math.max(now, next.at);
+      now = Math.max(now, next.at) + (next.delay > 60_000 ? deadlineOvershootMs : 0);
       next.callback();
       queue();
     });
@@ -65,7 +67,11 @@ async function createHarness(t, {
   mismatchPair = false,
   paused = false,
   deadlineWallDelayMs = 0,
+  deadlineOvershootMs = 0,
+  runShortTimers = false,
+  wallClockRegressionAfterDispatch = false,
   openCheckpointStore,
+  openCheckpointSession,
   onFirstCheckpoint
 } = {}) {
   const rootDirectory = await mkdtemp(path.join(os.tmpdir(), "meridian-paper-assembly-"));
@@ -79,9 +85,15 @@ async function createHarness(t, {
     startAt: START_AT,
     ...IDENTITY
   });
-  const virtual = virtualScheduler({paused});
+  const virtual = virtualScheduler({paused, deadlineOvershootMs, runShortTimers});
   const network = await createSyntheticProviderFetch(IDENTITY, {mismatchPair});
-  const importedAssembly = await createPinnedAssembly({fetchImpl: network.fetch});
+  const dispatchTimes = [];
+  const importedAssembly = await createPinnedAssembly({
+    fetchImpl: (url, init) => {
+      dispatchTimes.push(virtual.clock());
+      return network.fetch(url, init);
+    }
+  });
   let reportInput;
   let controllerReportSummary;
   let firstCheckpointResolve;
@@ -123,14 +135,17 @@ async function createHarness(t, {
     configPath,
     assembly,
     wallClock: () => START_AT + virtual.clock() +
-      (virtual.clock() >= 8 * 60 * 60 * 1000 ? deadlineWallDelayMs : 0),
+      (wallClockRegressionAfterDispatch && network.calls > 0
+        ? -1
+        : virtual.clock() >= 8 * 60 * 60 * 1000 ? deadlineWallDelayMs : 0),
     monotonicClock: virtual.clock,
     scheduler: virtual.scheduler,
-    openCheckpointStore
+    openCheckpointStore,
+    openCheckpointSession
   };
   const runner = createPilotOnline(runnerOptions);
   return {
-    assembly, configPath, dataDirectory, firstCheckpoint, network, runner,
+    assembly, configPath, dataDirectory, dispatchTimes, firstCheckpoint, network, runner,
     runnerOptions, virtual,
     get reportInput() { return reportInput; },
     get controllerReportSummary() { return controllerReportSummary; }
@@ -253,6 +268,25 @@ test("deadline beyond bounded wall-clock settlement remains UNKNOWN", async t =>
   assert.equal(checkpoint.records.some(record => record.method === "finishRun"), false);
 });
 
+test("monotonic timer overshoot never dispatches provider work at or after the window end", async t => {
+  const harness = await createHarness(t, {deadlineOvershootMs: 250});
+  const terminal = await harness.runner.start();
+  assert.equal(terminal.status, "FINISHED");
+  assert.equal(terminal.stopReason, "DEADLINE");
+  assert.equal(harness.virtual.clock(), 8 * 60 * 60 * 1000 + 250);
+  assert.equal(harness.network.calls, 640);
+  assert.ok(harness.dispatchTimes.length > 0);
+  assert.ok(harness.dispatchTimes.every(time => time < 8 * 60 * 60 * 1000));
+});
+
+test("wall-clock regression blocks subsequent provider transport dispatch", async t => {
+  const harness = await createHarness(t, {wallClockRegressionAfterDispatch: true});
+  const terminal = await harness.runner.start();
+  assert.equal(terminal.status, "UNKNOWN");
+  assert.equal(harness.network.calls, 1);
+  assert.deepEqual(harness.dispatchTimes, [0]);
+});
+
 test("actual provider identity mismatch remains UNKNOWN and is not retried", async t => {
   const harness = await createHarness(t, {mismatchPair: true});
   const terminal = await harness.runner.start();
@@ -287,6 +321,88 @@ test("actual checkpoint uncertainty is terminal and does not retry the write", a
   assert.equal(harness.network.calls, 4);
   assert.equal(commits, 2);
   assert.ok(reads >= 3);
+});
+
+test("unsettled checkpoint work blocks terminal session I/O and late completion", async t => {
+  let releaseCheckpoint;
+  let enteredCheckpoint;
+  const checkpointGate = new Promise(resolve => { releaseCheckpoint = resolve; });
+  const entered = new Promise(resolve => { enteredCheckpoint = resolve; });
+  const io = {callbackWritePending: false, readbacks: 0, overlappingReadbacks: 0,
+    overlappingCloses: 0, closes: 0, projections: 0};
+  const harness = await createHarness(t, {
+    runShortTimers: true,
+    openCheckpointStore: async directory => {
+      const store = await CheckpointStore.open(directory);
+      return {
+        async readCheckpoint() {
+          if (io.callbackWritePending) io.overlappingReadbacks += 1;
+          io.readbacks += 1;
+          return store.readCheckpoint();
+        },
+        commitCheckpoint: input => store.commitCheckpoint(input),
+        async close() {
+          if (io.callbackWritePending) io.overlappingCloses += 1;
+          io.closes += 1;
+          return store.close();
+        }
+      };
+    },
+    openCheckpointSession: async options => {
+      const session = await PaperCheckpointSession.open(options);
+      return {
+        get metadata() { return session.metadata; },
+        snapshot: () => session.snapshot(),
+        async riskSnapshot(...args) {
+          io.callbackWritePending = true;
+          enteredCheckpoint();
+          try {
+            await checkpointGate;
+            return await session.riskSnapshot(...args);
+          } finally {
+            io.callbackWritePending = false;
+          }
+        },
+        finishRun: (...args) => session.finishRun(...args),
+        async close() {
+          if (io.callbackWritePending) io.overlappingCloses += 1;
+          io.closes += 1;
+          return session.close();
+        }
+      };
+    }
+  });
+  const originalProjector = harness.assembly.projectOperatorReport;
+  harness.assembly.projectOperatorReport = input => {
+    io.projections += 1;
+    return originalProjector(input);
+  };
+  const running = harness.runner.start();
+  await entered;
+  const readbacksAtPending = io.readbacks;
+  assert.equal((await harness.runner.stop()).status, "STOP_REQUESTED");
+  const terminal = await running;
+  assert.equal(terminal.status, "UNKNOWN");
+  assert.equal(terminal.reason.includes("did not settle"), true);
+  assert.equal(io.readbacks, readbacksAtPending);
+  assert.equal(io.closes, 0);
+  assert.equal(io.overlappingReadbacks, 0);
+  assert.equal(io.overlappingCloses, 0);
+  assert.equal(io.projections, 0);
+  assert.equal(await readPilotReport(harness.dataDirectory).then(value => value.status), "BLOCKED");
+  releaseCheckpoint();
+  await harness.firstCheckpoint;
+  assert.equal(terminal.status, "UNKNOWN");
+  assert.equal((await readPilotStatus(harness.dataDirectory)).status, "UNKNOWN");
+  await assert.rejects(
+    createPilotOnline(harness.runnerOptions).start(),
+    /persistent run state already exists/
+  );
+  assert.equal(io.readbacks, readbacksAtPending + 1);
+  assert.equal(io.closes, 0);
+  assert.equal(io.overlappingReadbacks, 0);
+  assert.equal(io.overlappingCloses, 0);
+  assert.equal(io.projections, 0);
 });
 
 test("actual controller honors operator stop before the full deadline", async t => {

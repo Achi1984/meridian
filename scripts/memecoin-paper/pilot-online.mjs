@@ -618,6 +618,8 @@ export function createPilotOnline(options = {}) {
     let reportStatus = "BLOCKED";
     let reportTradingStatus = "UNKNOWN";
     let failureCode = null;
+    let callbackWorkUnsettled = false;
+    const callbackWork = new Set();
     let configHash = null;
     let config;
     let assembly;
@@ -635,7 +637,7 @@ export function createPilotOnline(options = {}) {
       if (!Number.isSafeInteger(value) || !Number.isFinite(new Date(value).getTime()) ||
           (lastWallClockValue !== null && value < lastWallClockValue)) {
         wallClockFault = true;
-        return value;
+        return null;
       }
       lastWallClockValue = value;
       return value;
@@ -647,6 +649,49 @@ export function createPilotOnline(options = {}) {
     };
     const openCheckpointStore = options.openCheckpointStore ?? CheckpointStore.open;
     const openCheckpointSession = options.openCheckpointSession ?? PaperCheckpointSession.open;
+    const trackCallback = callback => payload => {
+      const task = Promise.resolve().then(() => callback(payload));
+      callbackWork.add(task);
+      task.then(
+        () => callbackWork.delete(task),
+        () => callbackWork.delete(task)
+      );
+      return task;
+    };
+    const settleCallbackWork = () => {
+      if (callbackWork.size === 0) return Promise.resolve(true);
+      return new Promise(resolve => {
+        let timer;
+        let ownsTimer = false;
+        let settled = false;
+        const finish = result => {
+          if (settled) return;
+          settled = true;
+          if (ownsTimer) {
+            try { scheduler.clearTimeout(timer); } catch { /* leave uncertain work blocked */ }
+          }
+          resolve(result && callbackWork.size === 0);
+        };
+        try {
+          timer = scheduler.setTimeout(
+            () => finish(false),
+            config.budgets.callbackSettlementMs
+          );
+          ownsTimer = timer !== undefined && timer !== null;
+          if (!ownsTimer) {
+            finish(false);
+            return;
+          }
+        } catch {
+          finish(false);
+          return;
+        }
+        Promise.all([...callbackWork].map(task => task.then(
+          () => undefined,
+          () => undefined
+        ))).then(() => finish(true));
+      });
+    };
     if (typeof wallClock !== "function" || typeof monotonicClock !== "function" ||
         !isRecord(scheduler) || typeof scheduler.setTimeout !== "function" ||
         typeof scheduler.clearTimeout !== "function" ||
@@ -755,7 +800,14 @@ export function createPilotOnline(options = {}) {
             manifest: plan.manifest,
             candidates: plan.candidates,
             enabled: true,
-            transport: assembly.transport,
+            transport: (request, requestOptions) => {
+              const now = readWallClock();
+              if (wallClockFault || !Number.isSafeInteger(now) ||
+                  now < config.startAt || now >= config.endAt) {
+                throw new Error("provider dispatch blocked by invalid clock or closed run window");
+              }
+              return assembly.transport(request, requestOptions);
+            },
             clock: readWallClock,
             signal,
             freshnessPolicy: assembly.freshnessPolicy,
@@ -839,6 +891,7 @@ export function createPilotOnline(options = {}) {
           controllerReportObserved = true;
         }
       };
+      for (const name of Object.keys(callbacks)) callbacks[name] = trackCallback(callbacks[name]);
       const durationMs = config.endAt - readWallClock();
       boundedInteger(durationMs, "remaining run duration", 1, EIGHT_HOURS_MS);
       control = assembly.createPilotRunControl({
@@ -885,6 +938,18 @@ export function createPilotOnline(options = {}) {
       controllerSummary = await control.start();
       monitor = false;
       await watcher;
+      if (!(await settleCallbackWork())) {
+        callbackWorkUnsettled = true;
+        failureCode = "CALLBACK_WORK_UNSETTLED";
+        observations.controllerStatus = summaryCode(controllerSummary?.status);
+        observations.stopReason = summaryCode(controllerSummary?.reason);
+        observations.failureCode = failureCode;
+        return {
+          status: "UNKNOWN",
+          runId: config.runId,
+          reason: "underlying callback work did not settle within the configured bound; session remains open and restart is forbidden"
+        };
+      }
       if (!controllerReportObserved && controllerSummary?.status === "FINISHED") {
         failureCode ??= "CONTROLLER_REPORT_CALLBACK_MISSING";
       }
@@ -968,6 +1033,19 @@ export function createPilotOnline(options = {}) {
       observations.stopReason = summaryCode(controllerSummary?.reason);
       observations.failureCode = summaryCode(failureCode ?? controllerSummary?.failureCode);
       if (!lockCreated) throw error;
+      if (callbackWork.size > 0) {
+        control?.stop();
+        callbackWorkUnsettled = !(await settleCallbackWork());
+      }
+      if (callbackWorkUnsettled) {
+        failureCode = "CALLBACK_WORK_UNSETTLED";
+        observations.failureCode = failureCode;
+        return {
+          status: "UNKNOWN",
+          runId: config.runId,
+          reason: "underlying callback work did not settle within the configured bound; session remains open and restart is forbidden"
+        };
+      }
       if (session) {
         try {
           const finalHead = await verifyCheckpoint(session, store);
@@ -987,8 +1065,10 @@ export function createPilotOnline(options = {}) {
         }
       }
     } finally {
-      if (session) await session.close().catch(() => {});
-      else if (store) await store.close().catch(() => {});
+      if (!callbackWorkUnsettled) {
+        if (session) await session.close().catch(() => {});
+        else if (store) await store.close().catch(() => {});
+      }
     }
     if (lockCreated) {
       const terminalStatus = failureCode || controllerSummary?.status !== "FINISHED"
