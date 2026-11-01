@@ -17,7 +17,7 @@ const expectedModules=[
   'bot-overview-model.js','bot-read-bootstrap.js','bot-read-client.js','bot-read-model.js','bot-read-view.js',
   'depot-current-model.js','depot-history-model.js','depot-history-view.js','depot-portfolio-state.js','depot-read-bootstrap.js',
   'depot-read-client.js','depot-read-model.js','depot-read-view.js',
-  'ledger-manual-client.js','ledger-manual-model.js','ledger-manual-view.js','ledger-review-client.js','ledger-review-model.js','ledger-review-view.js','paper-readiness-view.js','paper-readiness.js','pionex-history-model.js','release-update.js','research-evidence.js',
+  'ledger-manual-client.js','ledger-manual-model.js','ledger-manual-view.js','ledger-review-client.js','ledger-review-model.js','ledger-review-view.js','paper-cockpit-model.js','paper-cockpit-view.js','paper-readiness-view.js','paper-readiness.js','pionex-history-model.js','release-update.js','research-evidence.js',
   'strategy-arena.js','strategy-catalog.js','strategy-workspace-bootstrap.js'
 ];
 
@@ -125,4 +125,3 @@ test('B17 cache preview remains isolated from terminal, root and PWA release ide
   assert.match(serviceWorker,/MERIDIAN_SW_RETIRE — v7\.35/);
   assert.doesNotMatch(v11Html,/<link\b[^>]*rel=["']manifest|serviceWorker/i);
 });
-
