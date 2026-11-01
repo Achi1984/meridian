@@ -1,7 +1,8 @@
 # One-shot READ_ONLY_PAPER worker
 
-**Implementation status: runnable lifecycle adapter with fake-only tests;
-production assembly and real-module acceptance remain BLOCKED.** The adapter
+**Implementation status: runnable observation-only lifecycle and explicit
+pinned-module assembly; real-module acceptance remains BLOCKED in this base
+checkout.** The adapter
 does not start on import or without an explicit `READ_ONLY_PAPER` start command.
 It is observation-only: it invokes the fixed public-data provider, runs the
 existing hard filter and analyst boundaries, and deliberately never calls
@@ -46,47 +47,43 @@ trailing distance after 12% activation, 3% daily loss limit, and an eight-hour
 window. This runner does not duplicate that policy or derive P&L, liquidation,
 or a simulated fill. Missing provider evidence remains `UNKNOWN`, blocking entry.
 
-## Source pins and acceptance status
+## Pinned source assembly and acceptance status
 
-These are current source-candidate heads, not approvals or proof of a combined
-integration. They are checked against the run configuration and assembly
-exports. Re-pin after the producer owners freeze their candidates.
+The explicit `scripts/memecoin-paper/pilot-online-assembly.mjs` assembly lazily
+loads producer modules only when that file is selected with `--assembly`. It
+supplies the provider's fixed public-fetch adapter and freshness policy; it
+does not fetch code, start on import, or bypass the producer exports.
+`createPinnedAssembly()` verifies the documented export names before returning
+the runner interface. The provider, controller, and report sources are absent
+from this base checkout, so this composition cannot yet be executed here.
 
 | Dependency | Pin | Expected export | Status |
 | --- | --- | --- | --- |
 | Base | `fa04cf49842f0350bd4fc21f466984612a139396` | Checkpoint session/store; `filterCandidate`; `analyzeCandidate` | Present in this checkout |
-| Provider #1108 | `b000c6a6dcfcce102e61821e8316174a15a0dd58` | `acquireProviderEvidence(options)` | Candidate; independent review pending |
-| Controller #1110 | `89a20bf118e059c6153ac75b51f2ed6947d46332` | `createPilotRunControl(options)` with `READ_ONLY_PAPER` and acquire/step/checkpoint/report callbacks | Candidate; source lane not yet final |
-| Report #1104 | `14075eef9ef0eebde3249718a6f6e3c51016bdee` | `projectOperatorReport(input)` and `renderOperatorReport(report)` | Candidate; review/CI status must be rechecked at source assembly |
+| Provider #1108 | `b000c6a6dcfcce102e61821e8316174a15a0dd58` | `acquireProviderEvidence(options)` | Owner-reported independent GREEN_LIGHT; not exercised in this checkout |
+| Controller #1110 | `89a20bf118e059c6153ac75b51f2ed6947d46332` | `createPilotRunControl(options)` with `READ_ONLY_PAPER` and acquire/step/checkpoint/report callbacks | Owner-reported independent GREEN_LIGHT; not exercised in this checkout |
+| Report #1104 | `14075eef9ef0eebde3249718a6f6e3c51016bdee` | `projectOperatorReport(input)` and `renderOperatorReport(report)` | Owner-reported independent GREEN_LIGHT; not exercised in this checkout |
 
-`pilot-online.test.js` injects fake provider/controller/report dependencies and
-temporary storage. It does **not** import or execute the pinned producer modules.
-No exact-head combined integration has been run; this package must not be
-described as end-to-end accepted or as host/run-ready.
+Lifecycle edge tests retain injected fakes. A separate accelerated-clock
+eight-hour regression imports the real pinned producers, uses generated
+provider fixture responses and temporary storage, verifies all controller
+cycles plus the terminal receipt and complete report, and fits the 1,000-row,
+1 MiB input, and 256 KiB output bounds. It skips with an explicit BLOCKED
+reason when producer sources and their synthetic fixture set are absent. A
+skip is not integration acceptance.
 
-The explicit assembly module supplied to `--assembly` must export:
+The checked-in assembly module is the explicit source composition:
 
 ```js
-export const pins = {
-  provider: "b000c6a6dcfcce102e61821e8316174a15a0dd58",
-  controller: "89a20bf118e059c6153ac75b51f2ed6947d46332",
-  report: "14075eef9ef0eebde3249718a6f6e3c51016bdee"
-};
-export const acquireProviderEvidence = /* exact provider export */;
-export const createPilotRunControl = /* exact controller export */;
-export const projectOperatorReport = /* exact report export */;
-export const renderOperatorReport = /* exact report export */;
-export const freshnessPolicy = /* explicit bounded provider policy */;
-export const transport = /* fixed-request fetch adapter; no custom URL/headers */;
+await createPinnedAssembly();
 ```
 
-The transport receives the provider's fixed request object plus `{signal,
-redirect, credentials}` and must return the Fetch `Response` without following
-redirects or adding credentials. It must not probe providers during import.
-The assembly is deployment integration material and is intentionally not
-checked in as an unowned fifth source path. Before acceptance, the lead must
-freeze one assembly checkout containing these exact dependency heads and verify
-its source tree and host image.
+The transport accepts only the fixed public origins, exact pair path or
+allowlisted read-only RPC methods, `redirect: "error"`, and
+`credentials: "omit"`. Tests inject a fake Fetch implementation; production
+uses built-in Fetch only after an explicit start command. This source composition
+does not prove that the declared commit heads were assembled: the lead must
+verify their ancestry and execute the exact-head regression.
 
 ## Configuration and Northflank contract
 
@@ -106,7 +103,7 @@ credential is part of this contract.
 Northflank is the current owner-selected target, superseding the earlier Render
 choice. The lead must configure a separate one-instance worker in the existing
 project with a dedicated persistent volume mounted at the chosen absolute
-`--data-dir` (proposed `/data/meridian-paper`), no public port, no scheduled
+`--data-dir` (proposed `/var/data/meridian-paper`), no public port, no scheduled
 restarts, and no reuse of existing Meridian service secrets. Verify mount
 persistence, filesystem rename/fsync semantics, host clock, Northflank access,
 cost, and the security incident/credential posture before assembly or launch.
@@ -115,24 +112,24 @@ launch until the lead confirms those host facts and the complete run manifest.
 An interrupted or uncertain run remains locked and stopped; recovery is
 deliberately manual and cannot be done by restarting the worker.
 
-Build the external assembly only after the source owners freeze their interfaces.
-The exact command shape for the lead's authorized one-shot is:
+The lead's authorized one-shot uses the checked-in composition and explicit
+persistent mount:
 
 ```sh
 node scripts/memecoin-paper/pilot-online.mjs start \
   --mode READ_ONLY_PAPER \
-  --config /data/meridian-paper/run-config.json \
-  --assembly /app/paper-pilot-assembly.mjs \
-  --data-dir /data/meridian-paper
+  --config /var/data/meridian-paper/run-config.json \
+  --assembly /app/scripts/memecoin-paper/pilot-online-assembly.mjs \
+  --data-dir /var/data/meridian-paper
 ```
 
 Operational commands use the same persistent directory and need no provider
 assembly:
 
 ```sh
-node scripts/memecoin-paper/pilot-online.mjs status --data-dir /data/meridian-paper
-node scripts/memecoin-paper/pilot-online.mjs stop --data-dir /data/meridian-paper
-node scripts/memecoin-paper/pilot-online.mjs report --data-dir /data/meridian-paper
+node scripts/memecoin-paper/pilot-online.mjs status --data-dir /var/data/meridian-paper
+node scripts/memecoin-paper/pilot-online.mjs stop --data-dir /var/data/meridian-paper
+node scripts/memecoin-paper/pilot-online.mjs report --data-dir /var/data/meridian-paper
 ```
 
 `stop` writes an identity-bound durable request that the worker observes; the
@@ -143,26 +140,36 @@ summary.
 
 ## Tests and next acceptance
 
-Run the focused fake-only suite in this base:
-
-```sh
-node --test test/memecoin-paper-pilot-online.test.js test/memecoin-paper-pilot-integration.test.js
-```
-
-The next required exact-head acceptance is in the authorized integration
-checkout after it contains this runner and the three frozen producer pins:
+Run the online lifecycle and synthetic contract suites in this base:
 
 ```sh
 node --test test/memecoin-paper-pilot-online.test.js \
-  test/memecoin-paper-pilot-integration.test.js \
+  test/memecoin-paper-pilot-integration.test.js
+```
+
+The producer-specific tests and full-duration integration test are unavailable
+in this base checkout. In the exact-head integration checkout, first verify all
+dependency commits are ancestors of `HEAD`, then run:
+
+```sh
+for pin in fa04cf49842f0350bd4fc21f466984612a139396 \
+  b000c6a6dcfcce102e61821e8316174a15a0dd58 \
+  89a20bf118e059c6153ac75b51f2ed6947d46332 \
+  14075eef9ef0eebde3249718a6f6e3c51016bdee; do
+  git merge-base --is-ancestor "$pin" HEAD || exit 1
+done
+node --test test/memecoin-paper-pilot-online.test.js \
   test/memecoin-paper-pilot-run-control.test.js \
   test/memecoin-paper-provider-evidence.test.js \
   test/memecoin-paper-operator-report.test.js
 ```
 
-That command alone still does not make the fake-only assembly test a
-real-module integration test. The lead must add/run the explicit assembly
-acceptance against the exact pinned modules, confirm `UNKNOWN` on mixed source
-identity and lost acknowledgement, and record exact-head CI plus independent
-review before authorizing a host launch. No provider probe, worker provisioning,
-wallet/order, or Paper/Live run has been performed by this coding task.
+The regression uses 480 one-minute controller cycles plus the terminal receipt
+(481 report receipts), samples the single allowlisted identity every third
+cycle (160 provider acquisitions and 640 requests), and preserves complete
+receipt/audit coverage within producer limits. `ZERO_TRADES` means the
+observation ledger records no entry or fill; it is not simulated-trading
+performance validation. Exact-head tests, independent review, host
+volume/clock/security checks, and lead launch authority remain required. No
+provider probe, worker provisioning, wallet/order, or Paper/Live run has been
+performed by this coding task.

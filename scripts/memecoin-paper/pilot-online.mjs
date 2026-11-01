@@ -18,7 +18,8 @@ export const PILOT_DEPENDENCY_PINS = Object.freeze({
 const SAFE_ID = /^[A-Za-z0-9._:-]{1,80}$/;
 const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 const MAX_CONFIG_BYTES = 64 * 1024;
-const MAX_REPORT_BYTES = 1024 * 1024;
+const MAX_REPORT_BYTES = 256 * 1024;
+const PROVIDER_POLL_CYCLE_INTERVAL = 3;
 const HOSTS = Object.freeze({
   dex: "api.dexscreener.com",
   rpc: "api.mainnet-beta.solana.com"
@@ -187,14 +188,14 @@ function validateConfig(config, now) {
   boundedInteger(config.budgets.providerEvents, "providerEvents", 1, Math.min(10_000, poll.maxEvents));
   boundedInteger(config.budgets.candidates, "candidates", 1, Math.min(300, poll.maxCandidates));
   boundedInteger(config.budgets.events, "events", 1, 1_000);
-  boundedInteger(config.budgets.cycles, "cycles", 1, 480);
+  boundedInteger(config.budgets.cycles, "cycles", 1, 481);
   if (config.budgets.pollIntervalMs !== 60_000) {
     throw new TypeError("pollIntervalMs must remain fixed at 60000 ms");
   }
   boundedInteger(config.budgets.callbackSettlementMs, "callbackSettlementMs",
     config.budgets.requestTimeoutMs, 60_000);
   boundedInteger(config.budgets.requestTimeoutMs, "requestTimeoutMs", 1, 30_000);
-  if (config.budgets.events > config.budgets.candidates ||
+  if (config.budgets.candidates > config.budgets.events ||
       config.budgets.requests > config.budgets.dexRequests + config.budgets.rpcRequests) {
     throw new TypeError("run budgets are internally inconsistent");
   }
@@ -638,7 +639,10 @@ export function createPilotOnline(options = {}) {
         assembly = validateAssembly(options.assembly);
       } else {
         const imported = await import(pathToFileURL(options.assemblyPath).href);
-        assembly = validateAssembly(imported.default ?? imported);
+        const supplied = typeof imported.createPinnedAssembly === "function"
+          ? await imported.createPinnedAssembly()
+          : imported.default ?? imported;
+        assembly = validateAssembly(supplied);
       }
       validatePins(assembly.pins, "assembly");
       const rootStat = await lstat(paths.root);
@@ -684,6 +688,14 @@ export function createPilotOnline(options = {}) {
       const callbacks = {
         async acquire({cycleIndex, remainingRequests, remainingEvents, signal}) {
           if (signal?.aborted) throw new Error("provider acquisition cancelled");
+          if (cycleIndex % PROVIDER_POLL_CYCLE_INTERVAL !== 0) {
+            return {
+              events: [],
+              requestsUsed: 0,
+              done: false,
+              evidenceSource: "READ_ONLY_PROVIDER_CALLBACK"
+            };
+          }
           const candidatesAvailable = Math.min(
             config.budgets.events - totals.candidates,
             config.budgets.candidates - totals.candidates
@@ -694,7 +706,7 @@ export function createPilotOnline(options = {}) {
             return {
               events: [],
               requestsUsed: 0,
-              done: true,
+              done: false,
               evidenceSource: "READ_ONLY_PROVIDER_CALLBACK"
             };
           }
@@ -732,11 +744,7 @@ export function createPilotOnline(options = {}) {
           return {
             events,
             requestsUsed: result.counters.requests,
-            done: result.status !== "ACQUISITION_FINISHED" ||
-              totals.requests >= config.budgets.requests ||
-              totals.providerEvents >= config.budgets.providerEvents ||
-              totals.candidates >= config.budgets.candidates ||
-              totals.candidates >= config.budgets.events,
+            done: result.status !== "ACQUISITION_FINISHED",
             evidenceSource: "READ_ONLY_PROVIDER_CALLBACK"
           };
         },
