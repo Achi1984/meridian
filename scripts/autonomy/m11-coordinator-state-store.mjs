@@ -31,6 +31,10 @@ function unavailable(reason) {
   return Object.freeze({status: 'BLOCKED', reason});
 }
 
+function signalAborted(signal) {
+  return signal?.aborted === true;
+}
+
 function supportsRequiredSemantics(backend) {
   return backend && backend.capabilities
     && REQUIRED_CAPABILITIES.every(capability => backend.capabilities[capability] === true)
@@ -43,22 +47,28 @@ export function createCoordinatorStateStore({backend = null, enabled = false} = 
   const disabledReason = enabled !== true ? 'DISABLED'
     : supportsRequiredSemantics(backend) ? null : 'ATOMIC_BACKEND_CAPABILITIES_UNPROVEN';
 
-  async function read() {
+  async function read({signal} = {}) {
     if (!available) return unavailable(disabledReason);
+    if (signalAborted(signal)) return unavailable('STATE_READ_ABORTED');
     try {
-      const snapshot = await backend.readSnapshot();
+      const snapshot = signal
+        ? await backend.readSnapshot({signal})
+        : await backend.readSnapshot();
+      if (signalAborted(signal)) return unavailable('STATE_READ_ABORTED');
       if (!snapshot || !Number.isSafeInteger(snapshot.revision) || snapshot.revision < 0
         || typeof snapshot.oid !== 'string' || snapshot.oid.length < 1
         || snapshot.chainValid !== true) return unavailable('STATE_CHAIN_INVALID');
       return Object.freeze({status: 'READY', snapshot});
     } catch {
+      if (signalAborted(signal)) return unavailable('STATE_READ_ABORTED');
       return unavailable('STATE_READ_FAILED');
     }
   }
 
   async function claim({actionKey, executionKey, packetKey, maxPackets = 3,
-    expectedRevision, expectedOid, owner, now}) {
+    expectedRevision, expectedOid, owner, now, signal}) {
     if (!available) return unavailable(disabledReason);
+    if (signalAborted(signal)) return Object.freeze({status: 'CLAIM_UNKNOWN'});
     if (!validKey(actionKey) || !validKey(executionKey) || !validKey(packetKey) || maxPackets !== 3
       || !Number.isSafeInteger(expectedRevision) || expectedRevision < 0
       || typeof expectedOid !== 'string' || expectedOid.length < 1
@@ -73,8 +83,10 @@ export function createCoordinatorStateStore({backend = null, enabled = false} = 
         owner,
         expectedRevision,
         expectedOid,
-        createdAt: now
+        createdAt: now,
+        ...(signal ? {signal} : {})
       });
+      if (signalAborted(signal)) return Object.freeze({status: 'CLAIM_UNKNOWN'});
       if (!claimResult || claimResult.status !== 'CREATED'
         || typeof claimResult.claimId !== 'string' || claimResult.claimId.length === 0) {
         if (claimResult?.status === 'BUDGET_EXHAUSTED') return Object.freeze({status: 'BUDGET_EXHAUSTED'});
@@ -96,8 +108,9 @@ export function createCoordinatorStateStore({backend = null, enabled = false} = 
     }
   }
 
-  async function commit({claim, transition}) {
+  async function commit({claim, transition, signal}) {
     if (!available) return unavailable(disabledReason);
+    if (signalAborted(signal)) return Object.freeze({status: 'UNKNOWN_RECONCILE'});
     if (!claim || !validKey(claim.actionKey) || !validKey(claim.executionKey)
       || typeof claim.claimId !== 'string' || claim.claimId.length === 0 || !validOwner(claim.owner)
       || !Number.isSafeInteger(claim.expectedRevision) || claim.expectedRevision < 0
@@ -112,8 +125,10 @@ export function createCoordinatorStateStore({backend = null, enabled = false} = 
         executionKey: claim.executionKey,
         claimId: claim.claimId,
         commitNonce: randomBytes(16).toString('hex'),
-        transition
+        transition,
+        ...(signal ? {signal} : {})
       });
+      if (signalAborted(signal)) return Object.freeze({status: 'UNKNOWN_RECONCILE'});
       if (!commit || typeof commit.oid !== 'string' || commit.parentOid !== claim.expectedOid
         || commit.revision !== claim.expectedRevision + 1
         || typeof commit.commitNonce !== 'string' || !/^[a-f0-9]{32}$/.test(commit.commitNonce)) {
@@ -126,8 +141,10 @@ export function createCoordinatorStateStore({backend = null, enabled = false} = 
         newRevision: claim.expectedRevision + 1,
         actionKey: claim.actionKey,
         executionKey: claim.executionKey,
-        claimId: claim.claimId
+        claimId: claim.claimId,
+        ...(signal ? {signal} : {})
       });
+      if (signalAborted(signal)) return Object.freeze({status: 'UNKNOWN_RECONCILE'});
       return result?.status === 'COMMITTED' && result.oid === commit.oid
         ? Object.freeze({
           status: 'COMMITTED',
@@ -141,11 +158,15 @@ export function createCoordinatorStateStore({backend = null, enabled = false} = 
     }
   }
 
-  async function reconcile(executionKey) {
+  async function reconcile(executionKey, {signal} = {}) {
     if (!available) return unavailable(disabledReason);
     if (!validKey(executionKey)) return unavailable('INVALID_EXECUTION_KEY');
+    if (signalAborted(signal)) return Object.freeze({status: 'UNKNOWN', claim: null});
     try {
-      const durableClaim = await backend.readClaim(executionKey);
+      const durableClaim = signal
+        ? await backend.readClaim(executionKey, {signal})
+        : await backend.readClaim(executionKey);
+      if (signalAborted(signal)) return Object.freeze({status: 'UNKNOWN', claim: durableClaim || null});
       if (!durableClaim || durableClaim.executionKey !== executionKey
         || !validKey(durableClaim.actionKey) || typeof durableClaim.claimId !== 'string'
         || durableClaim.claimId.length === 0 || typeof durableClaim.status !== 'string'

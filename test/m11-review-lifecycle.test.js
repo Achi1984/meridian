@@ -2563,6 +2563,42 @@ test('ack and pending entry windows with UNKNOWN persistence failure remain nona
   }
 });
 
+test('observe lifecycle forwards its budget signal to scalar-key claim reconciliation', async () => {
+  const clock = {value: START + 100};
+  const collected = await collectReady({nowMs: clock.value});
+  const backend = new DurableLifecycleBackend();
+  const stateStore = createCoordinatorStateStore({backend, enabled: true});
+  let reconcileSignal;
+  const store = {
+    ...stateStore,
+    async reconcile(executionKey, options) {
+      assert.equal(executionKey, collected.executionKey);
+      reconcileSignal = options.signal;
+      return {status: 'UNKNOWN', claim: null};
+    }
+  };
+  const result = await observeReviewLifecycle({
+    ...lifecycleInput({
+      collected,
+      store,
+      clock,
+      dispatchReview: async () => ({status: 'ACKNOWLEDGED'}),
+      observeReview: async () => ({status: 'PENDING'}),
+      revalidate: async () => collected,
+      receipt: {
+        postOnce: async () => ({status: 'NOT_ATTEMPTED'}),
+        lookupByActionKey: async () => ({status: 'NOT_FOUND', complete: true, receiptIds: []})
+      }
+    }),
+    executionKey: collected.executionKey
+  });
+
+  assert.equal(result.status, 'UNKNOWN');
+  assert.equal(result.reason, 'DURABLE_CLAIM_EVIDENCE_MISSING_OR_CONFLICTING');
+  assert.ok(reconcileSignal instanceof AbortSignal);
+  assert.equal(reconcileSignal.aborted, false);
+});
+
 test('persisted-result entry windows with UNKNOWN persistence failure remain nonadvancing after JSON reconstruction', async () => {
   for (const mode of ['revalidation', 'pin-mismatch']) {
     let backend = new DurableLifecycleBackend({failTransitionKinds: ['RECEIPT_PREPARING', 'UNKNOWN']});
