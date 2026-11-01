@@ -17,6 +17,11 @@ import { reconcilePortfolioAuthority,portfolioAuthorityReceipt } from "./portfol
 import { confirmReviewedLedger } from "./ledger-reviewed-authority.js";
 import { capturePortfolioHistoryOnce } from "./portfolio-history-runtime.js";
 import { buildPaperExecutionAuditExport } from "./paper-execution-audit-v2-export.js";
+import { createPrivateReportStore } from "./private-report-store.mjs";
+import {
+  handleReportGatewayRequest,
+  reportTransferGatewayConfig
+} from "./report-transfer-gateway.mjs";
 
 const { Pool } = pg;
 const RELEASE=JSON.parse(await fs.readFile(new URL("./version.json",import.meta.url),"utf8"));
@@ -33,6 +38,7 @@ const ALLOWED_ORIGINS = new Set(
 const PRIVATE_STATE_KEY = "private_dashboard_v1";
 const ASSET_WATCH_SHARE_STATE_KEY = "asset_watch_share_v1";
 const DATABASE_URL = process.env.DATABASE_URL || "";
+const PAPER_REPORT_CONFIG = reportTransferGatewayConfig();
 const PIONEX_BOT_READ_CONFIGURED=!!(
   String(process.env.PIONEX_BOT_READ_API_KEY||process.env.PIONEX_API_KEY||'').trim() &&
   String(process.env.PIONEX_BOT_READ_API_SECRET||process.env.PIONEX_API_SECRET||'').trim()
@@ -288,6 +294,19 @@ const server=http.createServer(async(req,res)=>{
     const origin=allowOrigin(req);
     if(req.method==="OPTIONS")return corsPreflight(req,res,origin);
     if(origin===null)return writeJson(res,403,{error:"origin_not_allowed"});
+    const reportRoute=await handleReportGatewayRequest(req,{
+      config:PAPER_REPORT_CONFIG,
+      getStore:()=>DATABASE_URL?createPrivateReportStore(pool()):null,
+      authorizedRead
+    });
+    if(reportRoute){
+      const result=reportRoute;
+      if(result.status===408||result.status===413){
+        res.shouldKeepAlive=false;
+        res.once("finish",()=>{if(!req.complete)req.destroy();});
+      }
+      return writeJson(res,result.status,result.body,origin||"");
+    }
     if(req.method==="GET"&&u.pathname==="/gateway-health"){
       const [current,shareState,m15,h1,h4,d1]=await Promise.all([
         stateGet(PRIVATE_STATE_KEY),
@@ -577,6 +596,3 @@ const server=http.createServer(async(req,res)=>{
   }catch(e){return writeJson(res,500,{error:String(e?.message||e)});}
 });
 server.listen(EXTERNAL_PORT,"0.0.0.0",()=>console.log(`[GATEWAY] MERIDIAN ${String(RELEASE.version||RELEASE.ui||"?")} / ${String(RELEASE.buildId||"?")} on :${EXTERNAL_PORT} -> internal :${INTERNAL_PORT}`));
-
-
-
