@@ -37,7 +37,7 @@ function isRecord(value) {
     (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null);
 }
 
-function canonicalJson(value, seen = new WeakSet()) {
+export function canonicalJson(value, seen = new WeakSet()) {
   if (value === null || typeof value === "boolean" || typeof value === "string") {
     return JSON.stringify(value);
   }
@@ -650,8 +650,21 @@ export function createPilotOnline(options = {}) {
         throw new Error("pilot data directory must be a pre-mounted real directory");
       }
       const existing = await readdir(paths.root);
-      if (existing.some(name => name !== "checkpoint")) {
+      if (existing.some(name => name !== "checkpoint" && name !== "run-config.json")) {
         throw new Error("persistent run state already exists; restart or recovery is forbidden");
+      }
+      const configAlreadyPersisted = existing.includes("run-config.json");
+      if (configAlreadyPersisted) {
+        const configStat = await lstat(paths.config);
+        if (!configStat.isFile() || configStat.isSymbolicLink()) {
+          throw new Error("persistent run configuration must be a regular file");
+        }
+        const persistedConfig = await readCanonicalJson(
+          paths.config, MAX_CONFIG_BYTES, "persistent run configuration"
+        );
+        if (!persistedConfig.bytes.equals(loaded.bytes)) {
+          throw new Error("persistent run configuration differs from the explicitly supplied config");
+        }
       }
       await mkdir(paths.checkpoint, {recursive: true, mode: 0o700});
       await syncDirectory(paths.root);
@@ -668,7 +681,7 @@ export function createPilotOnline(options = {}) {
         state: "STARTED"
       });
       lockCreated = true;
-      await writeExclusive(paths.config, loaded.value);
+      if (!configAlreadyPersisted) await writeExclusive(paths.config, loaded.value);
       store = await openCheckpointStore(paths.checkpoint);
       session = await openCheckpointSession({
         store,
