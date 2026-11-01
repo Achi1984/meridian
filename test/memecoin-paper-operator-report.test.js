@@ -91,6 +91,13 @@ test("incomplete reports preserve unknown accounting instead of implying zero", 
 test("checkpoint receipts expose evidenced unresolved exits, clock faults, and restart stops", () => {
   const exitReport = projectOperatorReport(reportFixtures.unresolvedExit());
   assert.equal(exitReport.experiment.reportStatus, "FINISHED");
+  assert.equal(exitReport.candidates.considered, null);
+  assert.equal(exitReport.candidates.authorizationReceiptCount, 1);
+  assert.equal(exitReport.candidates.detailsCoverage.total, null);
+  assert.equal(exitReport.candidates.detailsCoverage.sourceTruncated, null);
+  assert.equal(exitReport.candidates.detailsCoverage.unaccounted, null);
+  assert.equal(exitReport.provenanceCoverage.total, null);
+  assert.equal(exitReport.provenanceCoverage.sourceTruncated, null);
   assert.equal(exitReport.trading.paperEntryFills, 1);
   assert.equal(exitReport.unresolvedFills.length, 1);
   assert.equal(exitReport.unresolvedFills[0].kind, "EXIT_UNRESOLVED");
@@ -300,6 +307,16 @@ test("discovery and Scout audit truncation preserve unaccounted candidate rows",
   assert.equal(auditTruncated.evidence.coverage.audit.truncated, true);
   assert.equal(auditTruncated.evidence.coverage.audit.totalRows, null);
   assert.equal(auditTruncated.trading.status, "UNKNOWN");
+  assert.equal(auditTruncated.trading.noTradeReasonsCoverage.total, null);
+  assert.equal(auditTruncated.trading.noTradeReasonsCoverage.unaccounted, null);
+
+  const unknownFillCount = reportFixtures.blockedScan();
+  unknownFillCount.auditTruncated = true;
+  const unknownReasons = projectOperatorReport(unknownFillCount);
+  assert.equal(unknownReasons.trading.paperEntryFills, null);
+  assert.equal(unknownReasons.trading.noTradeReasonsCoverage.total, null);
+  assert.equal(unknownReasons.trading.noTradeReasonsCoverage.unaccounted, null);
+  assert.match(renderOperatorReport(unknownReasons), /Displayed no-trade reasons: total UNKNOWN/);
 
   const missingTotal = reportFixtures.blockedScan();
   delete missingTotal.discovery.observedRecords;

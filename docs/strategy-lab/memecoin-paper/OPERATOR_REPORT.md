@@ -34,18 +34,26 @@ The projection uses only the existing shapes:
 - Checkpoint orchestration provides `metadata`, ordered `results`, and
   `snapshot.summary`/`snapshot.auditEvents`. The experiment and clock state
   come from metadata, financial state from the summary, and actions/stops from
-  acknowledged results. Authorization receipts are not a complete scan record,
-  so the report explicitly says scan counts are unavailable when those receipts
-  are absent.
+  acknowledged results. Authorization receipts are not Scout scan records: the
+  report exposes their count and observed outcomes separately, while total scan
+  counts, scan truncation, and scan remainder stay `UNKNOWN` without discovery
+  evidence.
 
-Inputs are limited to 1 MiB, 50,000 data nodes, 1,000 audit/receipt rows, and
-24 levels of nesting. Output is limited to 256 KiB. Amounts must be bounded
-integer decimal strings or BigInts from an existing result; all displayed
-aggregates use exact BigInt addition. The projector does not derive strategy
-P&L, revalue positions, infer missing zeroes, or compute freshness against the
-current clock. When a finish receipt has no complete run-end marks, unrealized
-valuation is `UNKNOWN` and the open position remains unresolved even if an older
-summary contains a prior mark.
+Inputs are limited to 1 MiB, 50,000 data nodes, 1,000 audit/receipt/position
+rows, and 24 levels of nesting. Output is limited to 256 KiB. Amounts must be
+bounded integer decimal strings or BigInts from an existing result; all
+displayed aggregates use exact BigInt addition. These are bounded projection
+limits, not a guarantee that the input contains all evidence from an eight-hour
+run. Oversized audit/receipt inputs or projected outputs are rejected, not
+silently shortened and represented as complete. A caller handing this report to
+an online display (including the planned M11 integration) must preserve its
+coverage/truncation fields and identify bounded or partial evidence; it must
+not claim the report alone captures a complete run when source evidence exceeds
+these limits. The projector does not derive strategy P&L, revalue positions,
+infer missing zeroes, or compute freshness against the current clock. When a
+finish receipt has no complete run-end marks, unrealized valuation is `UNKNOWN`
+and the open position remains unresolved even if an older summary contains a
+prior mark.
 
 Conflicting experiment IDs, inconsistent run windows, mismatched open-position
 identity/counts, conflicting summary/run-end accounting, receipt sequence
@@ -104,7 +112,7 @@ Experiment: operator-fixture-run
 Run bounds: 2026-01-01T10:00:00.000Z to 2026-01-01T18:00:00.000Z
 Evidence freshness: UNKNOWN (reported timestamps; not recomputed)
 Candidates: considered 2, accepted 0, rejected 1, unknown 1
-Candidate evidence: audited 2; unaccounted observed 0; discovery truncated NO; Scout audit truncated NO
+Candidate evidence: Scout-audited 2; authorization receipts UNKNOWN; unaccounted observed 0; discovery truncated NO; Scout audit truncated NO
 Paper entry fills: 0 (ZERO_TRADES)
 Source readiness: BLOCKED; operationally running: NOT EVIDENCED
 Cash: 100000 cents; reservations: UNKNOWN; open positions: 0
@@ -144,8 +152,8 @@ Report status: FINISHED
 Experiment: operator-fixture-run
 Run bounds: 2026-01-01T10:00:00.000Z to 2026-01-01T11:00:00.000Z
 Evidence freshness: UNKNOWN (reported timestamps; not recomputed)
-Candidates: considered 1, accepted 1, rejected 0, unknown 0
-Candidate evidence: audited 1; unaccounted observed UNKNOWN; discovery truncated UNKNOWN; Scout audit truncated UNKNOWN
+Candidates: considered UNKNOWN, accepted 1, rejected 0, unknown 0
+Candidate evidence: Scout-audited UNKNOWN; authorization receipts 1; unaccounted observed UNKNOWN; discovery truncated UNKNOWN; Scout audit truncated UNKNOWN
 Paper entry fills: 1 (TRADES_RECORDED)
 Source readiness: NOT_READY; operationally running: NOT EVIDENCED
 Cash: 92000 cents; reservations: UNKNOWN; open positions: 1
@@ -154,12 +162,12 @@ Reported costs: 0 cents
 Unresolved positions: 1; unresolved fills: 1
 Discovery coverage: UNKNOWN observed records; UNKNOWN Scout audit rows; source truncated UNKNOWN; audit truncated UNKNOWN; unaccounted observed UNKNOWN
 Audit coverage: 4 rows observed; total 4; truncated NO (replay logger UNKNOWN, ledger NO)
-Displayed candidate details: total 1, observed 1, displayed 1 (display capped: NO; source truncated: NO; unaccounted: 0)
+Displayed candidate details: total UNKNOWN, observed 1, displayed 1 (display capped: NO; source truncated: UNKNOWN; unaccounted: UNKNOWN)
 Displayed no-trade reasons: total 0, observed 0, displayed 0 (display capped: NO; source truncated: UNKNOWN; unaccounted: 0)
 Displayed risk/clock stops: total 1, observed 1, displayed 1 (display capped: NO; source truncated: NO; unaccounted: 0)
 Displayed open positions: total 1, observed 1, displayed 1 (display capped: NO; source truncated: NO; unaccounted: 0)
 Displayed unresolved fills: total 1, observed 1, displayed 1 (display capped: NO; source truncated: NO; unaccounted: 0)
-Displayed provenance: total 1, observed 1, displayed 1 (display capped: NO; source truncated: NO; unaccounted: 0)
+Displayed provenance: total UNKNOWN, observed 1, displayed 1 (display capped: NO; source truncated: UNKNOWN; unaccounted: UNKNOWN)
 No-trade reasons:
 - None attributable from the supplied result/receipt snapshot.
 Risk and clock stops:

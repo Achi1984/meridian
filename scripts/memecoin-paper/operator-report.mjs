@@ -408,7 +408,8 @@ function checkpointCandidates(results) {
   const authorizations = results.filter(item => item.method === "authorizeEntry");
   if (!authorizations.length) return {
     considered: null, accepted: null, rejected: null, unknown: null,
-    audited: 0, unaccountedObserved: null, discoveryTruncated: null,
+    audited: null, authorizationReceiptCount: 0,
+    unaccountedObserved: null, discoveryTruncated: null,
     scoutAuditTruncated: null, details: [],
     basis: "authorization receipts absent; scan counts unavailable"
   };
@@ -454,15 +455,16 @@ function checkpointCandidates(results) {
     });
   }
   return {
-    considered: authorizations.length,
+    considered: null,
     accepted,
     rejected,
     unknown,
-    audited: authorizations.length,
+    audited: null,
+    authorizationReceiptCount: authorizations.length,
     unaccountedObserved: null,
     discoveryTruncated: null,
     scoutAuditTruncated: null,
-    basis: "unique authorization receipts only; scout scan counts are not in this receipt",
+    basis: "authorization receipt outcomes only; total Scout scan counts are not in this receipt",
     details
   };
 }
@@ -472,7 +474,8 @@ function candidatesFor(data) {
   const rows = data.scoutRows;
   if (!data.discovery && rows.length === 0) return {
     considered: null, accepted: null, rejected: null, unknown: null,
-    audited: 0, unaccountedObserved: null, discoveryTruncated: null,
+    audited: 0, authorizationReceiptCount: null,
+    unaccountedObserved: null, discoveryTruncated: null,
     scoutAuditTruncated: null, details: [],
     basis: "candidate discovery receipt unavailable"
   };
@@ -535,6 +538,7 @@ function candidatesFor(data) {
     rejected,
     unknown,
     audited: rows.length,
+    authorizationReceiptCount: null,
     unaccountedObserved,
     discoveryTruncated: data.discovery?.truncated ?? null,
     scoutAuditTruncated: unaccountedObserved === null ? null : unaccountedObserved > 0,
@@ -923,7 +927,7 @@ function makeReport(data, report) {
   const unresolvedSourceTruncated = data.variant === "checkpoint"
     ? false : data.auditPresent ? data.auditTruncated : null;
   const sources = evidenceSummary(data, candidates);
-  const candidateListTruncated = data.variant === "checkpoint" ? false :
+  const candidateListTruncated = data.variant === "checkpoint" ? null :
     truncationFlag(candidates.discoveryTruncated, candidates.scoutAuditTruncated);
   const candidateDetails = (candidates.details ?? []).slice(0, 40).map(candidate => ({
     ...candidate,
@@ -953,6 +957,7 @@ function makeReport(data, report) {
       rejected: candidates.rejected,
       unknown: candidates.unknown,
       audited: candidates.audited,
+      authorizationReceiptCount: candidates.authorizationReceiptCount,
       unaccountedObserved: candidates.unaccountedObserved,
       discoveryTruncated: candidates.discoveryTruncated,
       scoutAuditTruncated: candidates.scoutAuditTruncated,
@@ -972,7 +977,7 @@ function makeReport(data, report) {
       noTradeReasonsCoverage: listCoverage(
         allReasons.length,
         fillCount === 0 && reasonSourceTruncated === false ? allReasons.length :
-          fillCount !== 0 ? allReasons.length : null,
+          fillCount !== null && fillCount !== 0 ? allReasons.length : null,
         reasonSourceTruncated
       )
     },
@@ -1101,7 +1106,7 @@ export function renderOperatorReport(report) {
     `Run bounds: ${cleanText(experiment.startAt, 32) ?? "UNKNOWN"} to ${cleanText(experiment.endAt, 32) ?? "UNKNOWN"}`,
     `Evidence freshness: ${cleanText(evidence.status, 32) ?? "UNKNOWN"} (reported timestamps; not recomputed)`,
     `Candidates: considered ${count(candidates.considered)}, accepted ${count(candidates.accepted)}, rejected ${count(candidates.rejected)}, unknown ${count(candidates.unknown)}`,
-    `Candidate evidence: audited ${count(candidates.audited)}; unaccounted observed ${count(candidates.unaccountedObserved)}; discovery truncated ${flag(candidates.discoveryTruncated)}; Scout audit truncated ${flag(candidates.scoutAuditTruncated)}`,
+    `Candidate evidence: Scout-audited ${count(candidates.audited)}; authorization receipts ${count(candidates.authorizationReceiptCount)}; unaccounted observed ${count(candidates.unaccountedObserved)}; discovery truncated ${flag(candidates.discoveryTruncated)}; Scout audit truncated ${flag(candidates.scoutAuditTruncated)}`,
     `Paper entry fills: ${count(trading.paperEntryFills)} (${cleanText(trading.status, 32) ?? "UNKNOWN"})`,
     `Source readiness: ${cleanText(experiment.sourceReadiness, 32) ?? "UNKNOWN"}; operationally running: NOT EVIDENCED`,
     `Cash: ${amount(valuation.cashCents)}; reservations: ${count(controls.reservations)}; open positions: ${count(controls.openPositionCount)}`,
