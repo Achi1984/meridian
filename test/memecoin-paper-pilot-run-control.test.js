@@ -87,14 +87,88 @@ test("an acknowledged one-cycle budget ends once and preserves supplied unresolv
     hash: "1".padStart(64, "0")
   });
   assert.deepEqual(summary.positionEvidence, {
-    status: "SUPPLIED",
-    unresolvedPositions: [{source: "synthetic callback evidence", eventId: "event-0"}]
+    status: "UNKNOWN",
+    unresolvedPositions: null,
+    lastKnown: {
+      status: "STALE",
+      reason: "STOP_REQUESTED:BUDGET_EXHAUSTED",
+      sourceStep: 1,
+      unresolvedPositions: [{source: "synthetic callback evidence", eventId: "event-0"}]
+    }
   });
   assert.equal(calls.filter(call => call.name === "report").length, 1);
   assert.equal(calls.find(call => call.name === "report").input.summary.status, "FINISHED");
   assert.equal(runtime.pendingTimers(), 0);
   assert.ok(calls.filter(call => call.name !== "report").every(call =>
     call.name !== "step" || call.input.event.synthetic === true));
+});
+
+test("position evidence from an earlier step is stale when the latest step omits it", async () => {
+  for (const earlier of [[], [{id: "synthetic-open-position"}]]) {
+    const {control, calls} = setup({
+      budgets: {events: 2},
+      overrides: {
+        acquire() {
+          return {
+            events: [
+              {synthetic: true, id: "with-evidence"},
+              {synthetic: true, id: "without-evidence"}
+            ],
+            requestsUsed: 1
+          };
+        },
+        step(input) {
+          return input.eventIndex === 0 ? {unresolvedPositions: earlier} : undefined;
+        }
+      }
+    });
+    const summary = await control.start();
+    const checkpoint = calls.find(call => call.name === "checkpoint").input;
+    const report = calls.find(call => call.name === "report").input.summary;
+    assert.equal(checkpoint.positionEvidenceStatus, "UNKNOWN");
+    assert.equal(checkpoint.unresolvedPositions, null);
+    assert.deepEqual(checkpoint.lastKnownPositionEvidence, {
+      status: "STALE",
+      reason: "LATEST_STEP_DID_NOT_SUPPLY_POSITION_EVIDENCE",
+      sourceStep: 1,
+      unresolvedPositions: earlier
+    });
+    assert.equal(summary.positionEvidence.status, "UNKNOWN");
+    assert.equal(summary.positionEvidence.unresolvedPositions, null);
+    assert.deepEqual(report.positionEvidence, summary.positionEvidence);
+  }
+});
+
+test("invalid latest-step evidence cannot retain earlier empty or nonempty evidence as current", async () => {
+  for (const earlier of [[], [{id: "synthetic-open-position"}]]) {
+    const {control, calls} = setup({
+      budgets: {events: 2},
+      overrides: {
+        acquire() {
+          return {
+            events: [
+              {synthetic: true, id: "valid"},
+              {synthetic: true, id: "invalid"}
+            ],
+            requestsUsed: 1
+          };
+        },
+        step(input) {
+          return input.eventIndex === 0
+            ? {unresolvedPositions: earlier}
+            : {unresolvedPositions: "not-an-array"};
+        }
+      }
+    });
+    const summary = await control.start();
+    const checkpoint = calls.find(call => call.name === "checkpoint").input;
+    assert.equal(checkpoint.positionEvidenceStatus, "UNKNOWN");
+    assert.equal(checkpoint.unresolvedPositions, null);
+    assert.equal(checkpoint.lastKnownPositionEvidence.status, "STALE");
+    assert.equal(checkpoint.lastKnownPositionEvidence.reason, "LATEST_STEP_POSITION_EVIDENCE_INVALID");
+    assert.deepEqual(checkpoint.lastKnownPositionEvidence.unresolvedPositions, earlier);
+    assert.equal(summary.positionEvidence.status, "UNKNOWN");
+  }
 });
 
 test("the exact monotonic deadline and a late acquisition both prevent a new step", async () => {
@@ -237,6 +311,111 @@ test("parent cancellation aborts an active step, does not checkpoint, and remove
   assert.equal(runtime.pendingTimers(), 0);
 });
 
+test("failed latest step marks prior position evidence stale and reports it as non-current", async () => {
+  for (const previous of [[], [{id: "synthetic-position"}]]) {
+    const {control, calls} = setup({
+      budgets: {events: 2},
+      overrides: {
+        acquire() {
+          return {
+            events: [{synthetic: true, id: "valid"}, {synthetic: true, id: "failure"}],
+            requestsUsed: 1
+          };
+        },
+        step(input) {
+          if (input.eventIndex === 0) return {unresolvedPositions: previous};
+          throw new Error("synthetic latest step failure");
+        }
+      }
+    });
+    const summary = await control.start();
+    const report = calls.find(call => call.name === "report").input.summary;
+    assert.equal(summary.status, "UNKNOWN");
+    assert.equal(summary.positionEvidence.status, "UNKNOWN");
+    assert.equal(summary.positionEvidence.unresolvedPositions, null);
+    assert.equal(summary.positionEvidence.lastKnown.status, "STALE");
+    assert.equal(summary.positionEvidence.lastKnown.reason, "LATEST_STEP_FAILED");
+    assert.deepEqual(summary.positionEvidence.lastKnown.unresolvedPositions, previous);
+    assert.deepEqual(report.positionEvidence, summary.positionEvidence);
+    assert.equal(calls.filter(call => call.name === "checkpoint").length, 0);
+  }
+});
+
+test("unsettled step and operator stop leave previous position evidence stale", async () => {
+  for (const previous of [[], [{id: "synthetic-position"}]]) {
+    const runtime = createFakeRuntime();
+    const barrier = deferred();
+    const {control, calls} = setup({
+      runtime,
+      budgets: {events: 2},
+      overrides: {
+        acquire() {
+          return {
+            events: [{synthetic: true, id: "valid"}, {synthetic: true, id: "unsettled"}],
+            requestsUsed: 1
+          };
+        },
+        step(input) {
+          return input.eventIndex === 0
+            ? {unresolvedPositions: previous}
+            : barrier.promise;
+        }
+      }
+    });
+    const run = control.start();
+    await flushMicrotasks();
+    assert.equal(calls.filter(call => call.name === "step").length, 2);
+    assert.equal(control.stop(), true);
+    await runtime.advance(DEFAULT_BUDGETS.callbackSettlementMs);
+    const summary = await run;
+    const report = calls.find(call => call.name === "report").input.summary;
+    assert.equal(summary.status, "UNKNOWN");
+    assert.equal(summary.reason, "OPERATOR_STOP");
+    assert.equal(summary.positionEvidence.status, "UNKNOWN");
+    assert.equal(summary.positionEvidence.unresolvedPositions, null);
+    assert.equal(summary.positionEvidence.lastKnown.status, "STALE");
+    assert.equal(summary.positionEvidence.lastKnown.reason, "LATEST_STEP_UNSETTLED");
+    assert.deepEqual(summary.positionEvidence.lastKnown.unresolvedPositions, previous);
+    assert.deepEqual(report.positionEvidence, summary.positionEvidence);
+    assert.equal(calls.filter(call => call.name === "checkpoint").length, 0);
+    barrier.resolve({unresolvedPositions: [{id: "late-position"}]});
+    await flushMicrotasks();
+    assert.deepEqual(control.snapshot().callbackCompletion.step, "UNSETTLED");
+    assert.equal(runtime.pendingTimers(), 0);
+  }
+});
+
+test("operator stop between cycles stales evidence from the last acknowledged checkpoint", async () => {
+  const {control, calls, runtime} = setup({
+    budgets: {requests: 2, events: 2, cycles: 2},
+    overrides: {
+      acquire() {
+        return {
+          events: [{synthetic: true, id: "first-cycle"}],
+          requestsUsed: 1,
+          done: false
+        };
+      }
+    }
+  });
+  const run = control.start();
+  await flushMicrotasks();
+  assert.equal(calls.filter(call => call.name === "checkpoint").length, 1);
+  assert.equal(calls.find(call => call.name === "checkpoint").input.positionEvidenceStatus, "SUPPLIED");
+  assert.equal(calls.filter(call => call.name === "acquire").length, 1);
+  assert.equal(control.stop(), true);
+  const summary = await run;
+  const report = calls.find(call => call.name === "report").input.summary;
+  assert.equal(summary.reason, "OPERATOR_STOP");
+  assert.equal(summary.positionEvidence.status, "UNKNOWN");
+  assert.equal(summary.positionEvidence.unresolvedPositions, null);
+  assert.equal(summary.positionEvidence.lastKnown.status, "STALE");
+  assert.equal(summary.positionEvidence.lastKnown.reason, "STOP_REQUESTED:OPERATOR_STOP");
+  assert.deepEqual(report.positionEvidence, summary.positionEvidence);
+  assert.equal(calls.filter(call => call.name === "acquire").length, 1);
+  assert.equal(runtime.pendingTimers(), 0);
+});
+
 test("a slow acquisition never overlaps and polling begins only after cycle settlement", async () => {
   const runtime = createFakeRuntime();
   const barrier = deferred();
@@ -349,7 +528,9 @@ test("unknown checkpoint acknowledgement withholds durable FINISHED status", asy
   const summary = await control.start();
   assert.equal(summary.status, "UNKNOWN");
   assert.equal(summary.checkpointAcknowledgement.status, "UNKNOWN");
-  assert.equal(summary.positionEvidence.status, "SUPPLIED");
+  assert.equal(summary.positionEvidence.status, "UNKNOWN");
+  assert.equal(summary.positionEvidence.lastKnown.status, "STALE");
+  assert.equal(calls.find(call => call.name === "report").input.summary.positionEvidence.status, "UNKNOWN");
   assert.equal(calls.find(call => call.name === "report").input.summary.status, "UNKNOWN");
 });
 

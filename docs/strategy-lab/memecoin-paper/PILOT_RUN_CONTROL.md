@@ -60,8 +60,19 @@ listed fields and an `AbortSignal`.
 | --- | --- | --- |
 | `acquire` | `cycleIndex`, `remainingRequests`, `remainingEvents`, `deadlineAtMonotonicMs` | `{events: Array, requestsUsed: nonnegative safe integer, done?: boolean}`. `events` must fit the remaining event budget. |
 | `step` | `cycleIndex`, `eventIndex`, `event` | Optional `{unresolvedPositions: bounded plain-data array}`. These are supplied evidence only; the controller does not derive positions, liquidation, or P&L. |
-| `checkpoint` | `cycleIndex`, `eventCount`, `completedSteps`, `unresolvedPositions`, `positionEvidenceStatus` | `{status: "ACKNOWLEDGED", sequence: nonnegative safe integer, hash: lowercase SHA-256 hex}` only after the integration verifies the durable receipt. Any other result is `UNKNOWN`. |
+| `checkpoint` | `cycleIndex`, `eventCount`, `completedSteps`, `unresolvedPositions`, `positionEvidenceStatus`, `lastKnownPositionEvidence` | `{status: "ACKNOWLEDGED", sequence: nonnegative safe integer, hash: lowercase SHA-256 hex}` only after the integration verifies the durable receipt. Any other result is `UNKNOWN`. |
 | `report` | `{summary, signal}` | Its return value is not a durability acknowledgement. The callback is attempted once and bounded by `callbackSettlementMs`; a failed or late report does not change the run's terminal status. |
+
+Acquisition, step, and checkpoint work is sequential. Position evidence is
+current only when the latest successfully completed `step` explicitly supplies
+a valid `unresolvedPositions` array; an explicit empty array is distinct from
+missing evidence. Starting another step invalidates current evidence. If that
+step omits or supplies invalid evidence, fails, is unsettled, or settles after
+stop, the current status remains `UNKNOWN`. Earlier data may be retained only
+under `lastKnownPositionEvidence` with `status: "STALE"` and its source step; it
+is never exposed as the current unresolved-position list. A stop also marks
+current evidence stale. Checkpoint and terminal-report payloads carry both the
+current status/list and the separately labelled last-known evidence.
 
 Acquisition, step, and checkpoint work is sequential. On stop, the active
 callback receives an aborted signal. If it does not settle within the configured
@@ -76,10 +87,11 @@ The terminal report receives the status and acknowledgement known before
 reporting begins. In particular, it cannot turn an `UNKNOWN` checkpoint into a
 durable `FINISHED` result. An absent acknowledgement, uncertain write, invalid
 clock, callback failure, or unbounded settlement produces `UNKNOWN`. Supplied
-unresolved-position evidence is retained in a bounded summary; absence is
-reported as `UNKNOWN`, not as an empty portfolio. No code here fabricates
-liquidation or P&L. Timer handles and the parent abort listener are cleaned up
-when the one-shot operation terminates.
+unresolved-position evidence is retained in a bounded summary only as current
+when its freshness contract above is satisfied; absent evidence is reported as
+`UNKNOWN`, not as an empty portfolio. No code here fabricates liquidation or
+P&L. Timer handles and the parent abort listener are cleaned up when the
+one-shot operation terminates.
 
 ## Existing contracts and proposed future glue
 

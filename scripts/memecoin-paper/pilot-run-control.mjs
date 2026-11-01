@@ -177,6 +177,7 @@ export function createPilotRunControl(options = {}) {
   let checkpointHash = null;
   let unresolvedPositions = null;
   let positionEvidenceStatus = "UNKNOWN";
+  let lastKnownPositionEvidence = null;
   let requestAccountingStatus = "KNOWN";
   const controlAbort = new AbortController();
   const callbackStates = {acquire: "NOT_STARTED", step: "NOT_STARTED", checkpoint: "NOT_STARTED"};
@@ -200,12 +201,28 @@ export function createPilotRunControl(options = {}) {
     }
   }
 
+  function invalidatePositionEvidence(reason) {
+    if (positionEvidenceStatus === "SUPPLIED") {
+      lastKnownPositionEvidence = {
+        status: "STALE",
+        reason,
+        sourceStep: counts.completedSteps,
+        unresolvedPositions
+      };
+    } else if (lastKnownPositionEvidence) {
+      lastKnownPositionEvidence = {...lastKnownPositionEvidence, status: "STALE", reason};
+    }
+    positionEvidenceStatus = "UNKNOWN";
+    unresolvedPositions = null;
+  }
+
   function requestStop(reason) {
     if (state === "FINISHED" || state === "UNKNOWN" || state === "FAILED") return false;
     if (stopReason !== null) return false;
     stopReason = reason;
     state = "STOPPING";
     if (activeCallback?.name === "step" || activeCallback?.name === "checkpoint") uncertain = true;
+    invalidatePositionEvidence(`STOP_REQUESTED:${reason}`);
     clearDeadlineTimer();
     cycleWait?.();
     try { controlAbort.abort(reason); } catch { /* AbortController implementations may reject a reason */ }
@@ -250,18 +267,25 @@ export function createPilotRunControl(options = {}) {
   }
 
   function markPositionEvidence(result) {
-    if (!isRecord(result) || !Object.hasOwn(result, "unresolvedPositions")) return;
+    if (!isRecord(result) || !Object.hasOwn(result, "unresolvedPositions")) {
+      invalidatePositionEvidence("LATEST_STEP_DID_NOT_SUPPLY_POSITION_EVIDENCE");
+      return;
+    }
     if (!Array.isArray(result.unresolvedPositions)) {
-      unresolvedPositions = null;
-      positionEvidenceStatus = "UNKNOWN";
+      invalidatePositionEvidence("LATEST_STEP_POSITION_EVIDENCE_INVALID");
       return;
     }
     try {
       unresolvedPositions = cloneEvidence(result.unresolvedPositions);
       positionEvidenceStatus = "SUPPLIED";
+      lastKnownPositionEvidence = {
+        status: "LAST_KNOWN",
+        reason: null,
+        sourceStep: counts.completedSteps,
+        unresolvedPositions
+      };
     } catch {
-      unresolvedPositions = null;
-      positionEvidenceStatus = "UNKNOWN";
+      invalidatePositionEvidence("LATEST_STEP_POSITION_EVIDENCE_INVALID");
     }
   }
 
@@ -418,7 +442,9 @@ export function createPilotRunControl(options = {}) {
       requestAccountingStatus,
       positionEvidence: {
         status: positionEvidenceStatus,
-        unresolvedPositions
+        unresolvedPositions: positionEvidenceStatus === "SUPPLIED"
+          ? cloneEvidence(unresolvedPositions) : null,
+        lastKnown: lastKnownPositionEvidence ? cloneEvidence(lastKnownPositionEvidence) : null
       },
       reportStatus: "NOT_EMITTED"
     };
@@ -557,14 +583,21 @@ export function createPilotRunControl(options = {}) {
         }
         const event = acquisition.events[eventIndex];
         counts.events += 1;
+        invalidatePositionEvidence("STEP_IN_PROGRESS");
         const stepped = await invoke("step", config.callbacks.step, {
           cycleIndex,
           eventIndex,
           event
         });
-        if (stepped.kind === "success" || stepped.kind === "late-success") {
+        if (stepped.kind === "success" && !stopReason) {
           counts.completedSteps += 1;
           markPositionEvidence(stepped.value);
+        } else if (stepped.kind === "failure") {
+          invalidatePositionEvidence("LATEST_STEP_FAILED");
+        } else if (stepped.kind === "unsettled") {
+          invalidatePositionEvidence("LATEST_STEP_UNSETTLED");
+        } else if (stepped.kind === "late-success" || stepped.kind === "late-failure") {
+          invalidatePositionEvidence("LATEST_STEP_SETTLED_AFTER_STOP");
         }
         if (stepped.kind === "failure" || stepped.kind === "unsettled") {
           uncertain = true;
@@ -582,8 +615,11 @@ export function createPilotRunControl(options = {}) {
         cycleIndex,
         eventCount: counts.events,
         completedSteps: counts.completedSteps,
-        unresolvedPositions: positionEvidenceStatus === "SUPPLIED" ? unresolvedPositions : null,
-        positionEvidenceStatus
+        unresolvedPositions: positionEvidenceStatus === "SUPPLIED"
+          ? cloneEvidence(unresolvedPositions) : null,
+        positionEvidenceStatus,
+        lastKnownPositionEvidence: lastKnownPositionEvidence
+          ? cloneEvidence(lastKnownPositionEvidence) : null
       });
       if (checkpointed.kind === "success" || checkpointed.kind === "late-success") {
         acceptCheckpoint(checkpointed.value);
