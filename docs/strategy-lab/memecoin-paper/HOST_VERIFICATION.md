@@ -1,142 +1,154 @@
 # Paper host verification procedure
 
-**Disposition: owner authorization to progress is recorded; technical launch
-blockers remain.** In #996 comment
-[6560721313](https://github.com/Achi1984/meridian/issues/996#issuecomment-6560721313),
-the owner said to continue and bring this existing eight-hour, USD 1,000 virtual
-capital Paper test online. This authorizes progress toward that one-shot
-simulated run, not real-money/live-exchange execution, unlimited spending, or
-bypassing technical gates. No additional generic owner signoff is requested by
-this procedure. This packet does not start a run; the harness continues to
-report `runtimeAuthorization: false`, and the manifest remains disabled with
-its stop switch engaged.
+## Status and observed Northflank target
 
-## Repository-backed host, storage, and stop inventory
+The owner authorized progress toward the existing eight-hour, USD 1,000
+virtual-capital Paper observation in #996 comment
+[6560721313](https://github.com/Achi1984/meridian/issues/996#issuecomment-6560721313).
+That authority does not turn a host check into a Paper run or establish host
+readiness. The operator reported that the separate Northflank service
+`meridian-paper-observer` is deployed from `main` commit
+`14b9412564c300cc44a1f514c4dfebd55495b4aa`, build `fine-floor-4780`, with one
+`node`-user instance, no ports, no environment variables, CI/CD off, and an
+inert `node -e` process. The operator also reported a dedicated 6 GB volume
+`meridian-paper-data` bound at `/var/data/meridian-paper`; the displayed storage
+estimate was USD 0.90/month, excluding unverified compute cost. These are
+operator observations, not observations by this harness. Existing
+`achi-meridian` and `meridian-db` must remain untouched.
 
-The repository identifies an existing application-host candidate, but not a
-verified Paper execution target:
+The operator reports Northflank Shell is unavailable for the team. No shell,
+SSH, new credentials, or service exec is required by the procedure below.
+Northflank documents runtime command and entrypoint overrides at
+[Override command or entrypoint](https://northflank.com/docs/v1/application/run/override-command-entrypoint).
+The deployed service currently runs an inert command; it has not run the Paper
+worker. The Paper image contract in [`Dockerfile.paper`](../../../Dockerfile.paper)
+uses `ENTRYPOINT ["node", "scripts/memecoin-paper/pilot-online.mjs"]` and
+`USER node`. Consequently, a CMD/command override alone appends arguments to
+that existing pilot entrypoint. To run the separate acceptance utility, choose
+Northflank's **custom entrypoint plus custom command** mode, setting the
+entrypoint to `node` and the command to the utility invocation below.
 
-| Interface | What the repository actually configures | What remains unknown or unavailable |
-|---|---|---|
-| Compute host | [`MERIDIAN_CONTEXT.md`](../../../MERIDIAN_CONTEXT.md#L78-L85) says Northflank deploys canonical `main`; [`runtime-smoke.yml`](../../../.github/workflows/runtime-smoke.yml#L36-L44) and [`runtime-smoke.mjs`](../../../scripts/runtime-smoke.mjs#L8-L9) identify and check the public Northflank gateway. This makes that deployed gateway a concrete candidate to ask the operator about. | These references establish the app gateway, not that it runs this branch or supports an isolated Paper process. No Paper service identity, Northflank exec/job command, host shell access, or operator credentials/access path is defined here. No host probe was made. |
-| Storage | `CheckpointStore.open(absoluteDirectory)` uses a local directory, lifetime lock, file sync, same-directory rename, directory sync, and bounded exact readback. Its process-interruption behavior is exercised on owned temporary directories by this harness. | No Paper checkpoint path, Northflank volume/mount identity, or provider-specific persistence/sync guarantee is configured. Local API and process-exit observations describe tested behavior only; they do not establish which volume the gateway uses. Assess the documented storage failure/restart boundary for a selected host; do not require a guarantee against every possible eight-hour outage. |
-| Stop/deadline | The manifest is `enabled: false` with `stopSwitch.engaged: true`. `PaperCheckpointSession` enforces its fixed deadline when a command is invoked; `finishRun` is an explicit journal command. | No active stop-switch reader, host watchdog, scheduler, signal-to-session adapter, or operator stop command exists for this pilot. A fixed deadline does not stop an idle process. Required access is an operator-supported way to start and stop a one-shot process on the selected host; no such Paper command is checked in. |
-| Provider/source | The manifest lists DexScreener and Solana JSON-RPC endpoint names with both providers disabled. `adapters.mjs` sets `NETWORK_ENABLED = false`; its request method throws. | No online downloader, validated completeness for required evidence, real-data run controller, or source integration into the Paper orchestration path. `runSyntheticPaperOrchestration` accepts only the exact disabled manifest and generated scenarios. |
+The current deployed image predates `host-acceptance.mjs`; it cannot run this
+utility until the dedicated observer image is rebuilt from the reviewed source
+that includes it. No build, deployment, service setting, or host command was
+changed by this task.
 
-These are source/configuration findings, not host probes. The running harness
-cannot discover or attest host settings hidden outside the repository. The
-separate D2 execution-context assessment makes the same distinction between
-Northflank app hosting and a persistent execution target
-([`D2_EXECUTION_CONTEXT_SETUP.md`](../D2_EXECUTION_CONTEXT_SETUP.md#L12-L15)).
+## Offline checkpoint harness
 
-## Offline harness
-
-The harness exercises the existing `CheckpointStore` and
-`PaperCheckpointSession` interfaces with a generated fixture. It does not add a
-storage engine, readiness projection, provider access, strategy replay, or PnL
-calculation. Importing the module is inert; execution requires this explicit
-opt-in:
-
-```sh
-SYNTHETIC_TEST_ONLY=SYNTHETIC_TEST_ONLY node scripts/memecoin-paper/host-verification.mjs
-node --test test/memecoin-paper-host-verification.test.js
-```
-
-The machine-readable result binds hashes of the observed source, config, and run
-fixture bytes and keeps generated-fixture checks under `syntheticEvidence`.
-`hostEvidence` is a separate, empty `NOT_PROVIDED` section. Every result says
+[`host-verification.mjs`](../../../scripts/memecoin-paper/host-verification.mjs)
+remains an offline-only test of the existing checkpoint store/session with
+generated fixtures. Import is inert; the harness requires explicit
+`SYNTHETIC_TEST_ONLY=SYNTHETIC_TEST_ONLY`. It reports
 `SYNTHETIC_ONLY`, `runtimeAuthorization: false`,
-`hostDurability: NOT_VERIFIED`, and clock provenance `UNVERIFIED`. Hashes and
-booleans are not authentication. The fixed fixture clock is test input, not a
-trusted host clock. For unresolved synthetic publications, the result records
-the pending marker and visible checkpoint identities before cleaning only the
-verified, owned temporary fixture directory; that cleanup is not a successful
-reconciliation. If a synthetic check fails, its owned fixture directory is
-preserved and reported for inspection rather than cleaned up.
+`hostDurability: NOT_VERIFIED`, and clock provenance `UNVERIFIED`. The process
+interruption cases test process/readback behavior only—not power-loss,
+hardware, filesystem, volume, cross-host, or hosted-runner durability. UNKNOWN
+evidence is preserved and never replayed automatically.
 
-Child-process termination checks observe the temporary filesystem after a child
-exits and exercise the existing pending-publication behavior. They prove neither
-power-loss recovery nor hardware, filesystem, volume, `fsync`, cross-host, or
-hosted-runner durability. They also do not demonstrate autonomous operation for
-eight hours. An ambiguous publication remains `UNKNOWN`; visible candidate bytes
-do not establish durable acknowledgment, and uncertain records are not retried
-or cleaned up as successful.
-
-## Executable candidate-host verification
-
-An owner/operator may run this existing offline harness from the exact reviewed
-checkout on a separately designated candidate host. It creates generated
-checkpoint fixtures only in unique directories below that host's
-`os.tmpdir()`. Run from the repository root:
+Run focused, network-free checks from the repository root:
 
 ```sh
-node --test test/memecoin-paper-host-verification.test.js
+node --test test/memecoin-paper-host-verification.test.js \
+  test/memecoin-paper-host-acceptance.test.js
 SYNTHETIC_TEST_ONLY=SYNTHETIC_TEST_ONLY node scripts/memecoin-paper/host-verification.mjs
 ```
 
-Capture the second command's JSON output together with the externally supplied
-host identity, checkout commit, operator, date, and storage/volume identity in
-the owner's approved evidence system. Do not add host names, credentials, or
-private configuration to this repository. Require `status: PASS`,
-`scope: SYNTHETIC_ONLY`, `runtimeAuthorization: false`,
-`hostDurability: NOT_VERIFIED`, and `hostClockProvenance: UNVERIFIED`.
-Any failed check, timeout, un-reaped child, unresolved `UNKNOWN`, or output
-identity mismatch is a stop; preserve its reported fixture directory and
-evidence. A pass establishes only that these synthetic checks ran on that
-process/filesystem. It does not certify the selected production volume,
-power-loss recovery, host suitability, trusted time, or online operation.
+The second command is synthetic and must not be presented as host evidence.
 
-## Concrete handoff for the requested online test
+## Explicit candidate-host acceptance utility
 
-The minimum next operator input is **whether the existing Northflank gateway
-supports a reviewed one-off command/job for this Paper code, and which mounted
-path it would use**. The repository has no Northflank service identifier or
-operator command for that access; do not infer one from the gateway health URL.
-If it supports that operation, collect its non-secret service/deployment
-identity, exact deployed commit, writable test path, and the provider's
-documented persistence and restart behavior. If not, the owner/operator must
-identify an already available suitable execution context; this packet does not
-select or provision another host.
+[`host-acceptance.mjs`](../../../scripts/memecoin-paper/host-acceptance.mjs)
+has no import-time effects and refuses to run without the `verify` command,
+`--provider-preflight`, a safe unique evidence ID, and explicit Solana
+mint/pool/quote identities. It never imports or starts `pilot-online.mjs`.
+Use only the exact candidate identity approved for the later run; the current
+integrated operator contract documents the source-page example below. The
+preflight creates a temporary in-memory `READ_ONLY_PAPER` manifest for this
+single check. It is not the eventual eight-hour run config and does not change
+the disabled/stop-gated run manifest.
 
-Then perform these bounded gates:
+For the dedicated observer image **after it includes the reviewed utility**,
+set Northflank CMD override to custom entrypoint + custom command:
 
-1. **Source/config integration:** verify that the exact reviewed Paper source is
-   integrated/deployed. The current manifest has disabled providers, empty
-   mint/pool allowlists, and null run identity/start/end. `adapters.mjs` is
-   offline-only, and the synthetic orchestration rejects real inputs. The
-   missing implementation is an enabled-by-explicit-configuration, bounded
-   public-data collection path and one-shot run controller—not a new Paper
-   ledger or another readiness validator.
-2. **Storage behavior:** identify the selected checkpoint directory and its
-   volume boundary. Compare the provider's documented write/flush and restart
-   behavior to the store's file-sync/rename/directory-sync/readback contract.
-   Record what that documentation guarantees and what it leaves unspecified.
-   Process-kill/readback results are supporting observations, not proof of
-   machine power-loss behavior. If a process stops with unresolved state, retain
-   `UNKNOWN`, do not resume or replay automatically, and report the run
-   incomplete. No claim that a host must survive every possible outage is
-   required.
-3. **Stop and clock behavior:** identify the concrete operator stop/access path
-   and how it stops the one-shot process; the checked-in stop switch is not
-   wired to it. Confirm the trusted clock source/skew policy used for run
-   timestamps. A command-invoked deadline alone is insufficient to stop an idle
-   collector.
-4. **Exact bounded run config:** populate the approved one-shot run identity,
-   start/end, and permitted mint/pool scope using the existing owner direction
-   and risk policy; keep provider/request/time/byte/event limits bounded.
-   Preserve unknown evidence as blocked entries; do not weaken gates to obtain
-   trades.
-5. **Evidence and completion:** run the synthetic candidate-host commands above
-   first, then collect actual source/provider, storage, clock, stop, and run
-   outputs under the operator's approved evidence process. A synthetic pass
-   never substitutes for those observations. Stop and report incomplete on
-   `UNKNOWN`, missing evidence, exceeded bounds, or unavailable stop control.
+```text
+Custom entrypoint: node
+Custom command: scripts/memecoin-paper/host-acceptance.mjs verify --evidence-id host-preflight-<UNIQUE_ID> --mint DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263 --pool 5zpyutJu9ee6jFymDGoK7F6S5Kczqtc9FomP3ueKuyA9 --quote So11111111111111111111111111111111111111112 --provider-preflight
+```
 
-The commands documented above verify only synthetic host behavior; they are
-not the missing online start/stop commands. The Northflank gateway is the only
-documented current app-host candidate, while its Paper execution access and
-volume configuration are `UNKNOWN`. Exact source integration, enabled bounded
-provider/controller, populated run config, storage-boundary behavior, trusted
-clock, and host operator stop access remain the concrete launch blockers. The
-owner's authorization to progress is recorded; this procedure does not
-autonomously activate the service.
+Use an evidence ID made only of letters, digits, `.`, `_`, and `-`, without
+`..`; never reuse it for a different candidate. The explicit preflight performs
+at most four public requests (one fixed DexScreener GET and three fixed
+Solana JSON-RPC reads), no credentials, no arbitrary URLs, no redirects, and no
+retries. Per-response bytes are capped at 256 KiB (1 MiB total); requests have
+5-second limits and a 6-second abort. It logs only event summaries, not raw
+provider responses. It is a live public-data preflight if an operator runs it;
+this task did not make those calls.
+
+On its first invocation the utility:
+
+1. Records the actual process UID/GID and volume-root UID/GID/mode/device. It
+   blocks before writes or provider calls unless the mounted root is a real
+   non-symlink directory owned by the actual runtime UID.
+2. Creates a new, private evidence directory under
+   `/var/data/meridian-paper/host-acceptance/<UNIQUE_ID>/`, then writes a
+   generated marker, calls file `fsync`, renames within that directory, syncs
+   the directory, and verifies byte-for-byte readback.
+3. Reports wall-clock samples against monotonic elapsed time. Clock provenance
+   always remains `UNVERIFIED`; neither `Date.now()` nor this brief comparison
+   establishes trusted clock authority.
+4. Calls the integrated fixed-endpoint provider assembly only after the volume
+   write/readback succeeds. It stores a bounded, hashed `result.json` and emits
+   one JSON result to platform logs. A pass means only these specific checks
+   passed; `hostDurability` remains `NOT_VERIFIED`,
+   `runtimeAuthorization` remains false, and `pilotStarted` remains false.
+
+The durable files are `probe.json` and `result.json`. Do not delete, overwrite,
+or reuse the evidence directory. If the service restarts with the same CMD and
+evidence ID, the utility verifies the existing file/hash identities and emits
+`RESTART_VERIFIED` with `providerRequestsThisInvocation: 0`; it never repeats
+the provider calls. If the first invocation was interrupted or either file is
+missing/corrupt, it reports `UNKNOWN` and preserves the incomplete evidence
+without repair or replay. Provider failure is retained as `BLOCKED`; a
+subsequent start does not retry it.
+
+### Lead-run acceptance sequence
+
+1. Confirm this is still the separate `meridian-paper-observer` service and the
+   bound `meridian-paper-data` volume at `/var/data/meridian-paper`; keep the
+   gateway/database unchanged. Confirm the deployed image contains the exact
+   reviewed utility and assembly. A Dockerfile `chown` does not prove mounted
+   volume ownership.
+2. Record the unique evidence ID and the exact `node` UID expected for the
+   image. Apply the custom entrypoint/command above, then inspect Northflank
+   **platform logs**. Require JSON `status: PASS`, `hostCheck: PASS`,
+   `providerPreflight.status: PASS`, matching runtime/root UID, four received
+   events, `runtimeAuthorization: false`, `pilotStarted: false`,
+   `hostDurability: NOT_VERIFIED`, and `clockProvenance: UNVERIFIED`.
+   `BLOCKED`/`UNKNOWN`, UID mismatch, missing fields, timeout, or nonzero exit
+   means stop and preserve all files/logs.
+3. If Northflank restarts the exited process, require the same ID to report
+   `RESTART_VERIFIED` and zero provider requests in that invocation. If it does
+   not restart automatically, use only the platform's documented service
+   restart control once, then require that same result. Do not rely on an
+   assumed restart-policy toggle. This tests that the evidence is visible
+   after a container restart; it still does not prove power-loss durability.
+4. Preserve logs and retrieve
+   `/var/data/meridian-paper/host-acceptance/<UNIQUE_ID>/` using an already
+   available Northflank file-transfer path only after the operator verifies
+   current CLI help, service/project IDs, and access. Northflank documents
+   service file transfer at
+   [Copy files](https://northflank.com/docs/v1/api/copy-files), but file
+   retrieval capability for this account/service has not been observed. If
+   unavailable, logs alone do not provide the volume files; mark retrieval
+   `UNKNOWN` and stop rather than assuming Shell or SSH access.
+5. Restore the service's reviewed inert command after capturing the evidence.
+   This host acceptance never runs `start`, `stop`, `status`, or `report` for
+   the Paper pilot. An eight-hour run remains a separate later operation using
+   its own new run ID, frozen config, and run directory.
+
+The host check's UID match, `fsync`/rename/readback, and same-ID restart readback
+are bounded observations. `sameDeviceAsParent` is informational, not volume
+authentication. They do not prove a provider-specific durability guarantee,
+trusted clock, source-page correctness, hard-gate completeness, executed
+trades, PnL, or suitability for an eight-hour run. The report hash is an
+integrity identifier, not authentication.
