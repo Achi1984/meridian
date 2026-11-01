@@ -217,6 +217,39 @@ test('missing token synthesizes an auth-required response and the shared owner l
   }
 });
 
+test('late 401/403 responses cannot invalidate a disposed, relocked, or replacement session', async () => {
+  for (const status of [401, 403]) {
+    for (const lifecycle of ['dispose', 'lock-reunlock', 'new-session']) {
+      let release;
+      let bodyCancelled = false;
+      const h = harness({fetchImpl: async () => new Promise(resolve => {
+        release = () => resolve(new Response(new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode('late unauthorized response'));
+          },
+          cancel() { bodyCancelled = true; }
+        }), {status, headers: {'content-type': 'application/json'}}));
+      })});
+      h.controller.setActive(true);
+      const pending = h.controller.refresh();
+      await until(() => typeof release === 'function');
+
+      const replacementToken = lifecycle === 'lock-reunlock' ? TOKEN : 'replacement-session-token';
+      if (lifecycle === 'dispose') h.controller.dispose();
+      else h.access.lock();
+      h.access.unlock(replacementToken);
+      await pending;
+      release();
+      await until(() => bodyCancelled);
+
+      assert.equal(h.access.isUnlocked(), true, `${status} after ${lifecycle} leaves access unlocked`);
+      assert.equal(h.access.getToken(), replacementToken, `${status} after ${lifecycle} preserves the current credential`);
+      assert.doesNotMatch(h.root.textContent, /Observation-only|90071992547409931234/);
+      if (lifecycle !== 'dispose') h.controller.dispose();
+    }
+  }
+});
+
 test('lock, navigation, pagehide and disposal clear private DOM; late uncancellable reads cannot repaint or multiply', async () => {
   let release;
   let calls = 0;

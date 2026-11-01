@@ -50,6 +50,7 @@ export function mountPaperCockpit(root, document, window, {
   let disposed = false;
   let reading = false;
   let generation = 0;
+  let requestOwner = null;
 
   function render() {
     if (disposed) return;
@@ -84,9 +85,20 @@ export function mountPaperCockpit(root, document, window, {
     if (report) render();
   }
 
+  function ownsRequest(owner, signal) {
+    return owner !== null && owner.generation === generation && !signal?.aborted &&
+      !disposed && active && access.isUnlocked() && access.getToken() === owner.token;
+  }
+
   function transport({signal}) {
-    const token = access.getToken();
-    if (!token) return Promise.resolve(new Response(null, {status: 401}));
+    const owner = requestOwner;
+    const token = owner?.token;
+    if (!owner || !ownsRequest(owner, signal)) {
+      return Promise.resolve(new Response(null, {status: 503}));
+    }
+    if (!token) {
+      return Promise.resolve(new Response(null, {status: 401}));
+    }
     return fetchImpl(PAPER_REPORT_ENDPOINT, {
       method: 'GET',
       headers: {accept: 'application/json', authorization: 'Bearer ' + token},
@@ -96,7 +108,8 @@ export function mountPaperCockpit(root, document, window, {
       referrerPolicy: 'no-referrer',
       signal
     }).then(response => {
-      if (response.status === 401 || response.status === 403) access.lock();
+      if ((response.status === 401 || response.status === 403) &&
+          ownsRequest(owner, signal)) access.lock();
       return response;
     });
   }
@@ -143,6 +156,14 @@ export function mountPaperCockpit(root, document, window, {
       render();
       return;
     }
+    const token = access.getToken();
+    if (!token || !access.isUnlocked()) {
+      if (access.isUnlocked()) access.lock();
+      report = null;
+      state = 'auth-required';
+      render();
+      return;
+    }
     if (connector?.isDisposed?.()) {
       if (connector.isBusy?.()) {
         state = 'loading';
@@ -164,6 +185,8 @@ export function mountPaperCockpit(root, document, window, {
       });
     }
     const id = ++generation;
+    const owner = {generation: id, token};
+    requestOwner = owner;
     reading = true;
     state = 'loading';
     render();
@@ -175,6 +198,8 @@ export function mountPaperCockpit(root, document, window, {
       report = null;
       state = 'unavailable';
       render();
+    } finally {
+      if (requestOwner === owner) requestOwner = null;
     }
   }
 
