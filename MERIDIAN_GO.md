@@ -1,7 +1,10 @@
 > **Current Paper observation and development status — 2026-11-01**
-> Source main is `0fc051c59bad28931bc2ff5b3de81858cbde07a8`; PR #1118 is COMPLETE
-> with all four exact-merge postchecks (mailbox #942/comment6562590266). This is
-> source status, not the deployed worker SHA: `meridian-paper-observer` remains
+> Source main is `24757a2fdb43e6d68a6001b3a25ae86c9bad066b`. PR #1118 is COMPLETE
+> at prior main `0fc051c59bad28931bc2ff5b3de81858cbde07a8`, with all four
+> exact-merge postchecks (mailbox #942/comment6562590266). PR #1117 is MERGED at
+> current main, with required postchecks PENDING (PR #1126 handoff comment
+> 6562912356); do not mark it COMPLETE yet. Source status is not the
+> deployed worker SHA: `meridian-paper-observer` remains
 > `14b9412564c300cc44a1f514c4dfebd55495b4aa`, build `fine-floor-4780`, CI/CD
 > disabled. Its dedicated 6GB `meridian-paper-data` volume is mounted at
 > `/var/data/meridian-paper`, with the recorded owner-approved $0.90/month ceiling.
@@ -14,8 +17,8 @@
 > run authorizes entries or simulated fills. Clock/source authenticity is
 > unverified; no power-loss durability or direct file-download claim is made.
 >
-> Development: #1117 head `82fd0feb14605776370a09eec1114b33276b07e1` has
-> Safety success `41341319345`; independent Claude final is pending. #1114 head
+> Development: #1117 reviewed head was `82fd0feb14605776370a09eec1114b33276b07e1`
+> on base `0fc051c`; it is now merged, with main postchecks pending. #1114 head
 > `ee158d629b621fd3f5e9b79a486b213ea4630998` is source-only; Safety
 > `41341539153` completed successfully at 19:30:55Z; independent final review is
 > pending. #1121/#1122/#1124 remain authoring, not accepted. See the concise

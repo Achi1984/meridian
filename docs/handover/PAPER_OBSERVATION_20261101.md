@@ -3,9 +3,15 @@
 ## Current Paper status
 
 This is a source-status continuity record, not a liveness check or authority
-change. The current accepted source main is
-`0fc051c59bad28931bc2ff5b3de81858cbde07a8`; PR #1118 is COMPLETE at that SHA
-with all four exact-merge postchecks (mailbox #942/comment6562590266).
+change. Current source main is
+`24757a2fdb43e6d68a6001b3a25ae86c9bad066b`. PR #1118 is COMPLETE at prior
+main `0fc051c59bad28931bc2ff5b3de81858cbde07a8`, with all four exact-merge
+postchecks (mailbox #942/comment6562590266). PR #1117 has since merged at
+`24757a2fdb43e6d68a6001b3a25ae86c9bad066b`; its required exact-merge main
+postchecks are PENDING (handoff PR #1126/comment6562912356), so it is not
+COMPLETE. The reviewed head's focused cockpit tests were reported 8/8
+(`82fd0fe`, PR #1117/comment6562695510); they were not rerun after this clean
+merge.
 
 The deployed Northflank worker is a separate artifact:
 
@@ -42,7 +48,7 @@ or real trading are involved. Research/D2 authority is unchanged.
 | PR | Current source status |
 | --- | --- |
 | #1118 | COMPLETE at `0fc051c59bad28931bc2ff5b3de81858cbde07a8`; all four exact-merge postchecks passed. Receipt: #942/comment6562590266. |
-| #1117 | Head `82fd0feb14605776370a09eec1114b33276b07e1` on `0fc051c`; Safety run `41341319345` succeeded. Independent Claude final review is pending. |
+| #1117 | MERGED at `24757a2fdb43e6d68a6001b3a25ae86c9bad066b`; exact-merge main postchecks PENDING, not COMPLETE. Reviewed head `82fd0feb14605776370a09eec1114b33276b07e1` on base `0fc051c`; focused cockpit tests 8/8 and Safety run `41341319345` succeeded before merge. |
 | #1114 | Head `ee158d629b621fd3f5e9b79a486b213ea4630998` on `0fc051c`; source-only host utility, not in the deployed image. Safety run `41341539153` completed successfully at 2026-11-01T19:30:55Z; independent final review is pending. |
 | #1121 | Head `5b28a287caf3fde632f7ce90b29faa97206a649a`; authoring, not accepted. |
 | #1122 | Head `adebda8cb0dde6e6c18e5d2848049fd44d40ad8a`; authoring, not accepted. |

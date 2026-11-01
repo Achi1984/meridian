@@ -143,7 +143,21 @@
       "scope": "SOURCE_STATUS_ONLY_NO_RUNTIME_OR_AUTHORITY_CHANGE",
       "record": "docs/handover/PAPER_OBSERVATION_20261101.md",
       "receiptCutoff": "942/6562590266",
-      "sourceMainSha": "0fc051c59bad28931bc2ff5b3de81858cbde07a8",
+      "sourceMainSha": "24757a2fdb43e6d68a6001b3a25ae86c9bad066b",
+      "pr1118": {
+        "state": "COMPLETE",
+        "mergeSha": "0fc051c59bad28931bc2ff5b3de81858cbde07a8",
+        "receipt": "942/6562590266",
+        "postchecks": "ALL_FOUR_SUCCESS_ON_EXACT_MERGE"
+      },
+      "pr1117": {
+        "state": "MERGED_POSTCHECKS_PENDING",
+        "mergeSha": "24757a2fdb43e6d68a6001b3a25ae86c9bad066b",
+        "reviewedHead": "82fd0feb14605776370a09eec1114b33276b07e1",
+        "reviewedBase": "0fc051c59bad28931bc2ff5b3de81858cbde07a8",
+        "safetyRun": 41341319345,
+        "integrationComment": "PR1126/6562912356"
+      },
       "deployedWorkerSha": "14b9412564c300cc44a1f514c4dfebd55495b4aa",
       "worker": {
         "service": "meridian-paper-observer",
@@ -172,8 +186,8 @@
         "restartGuard": "CONFIRMED"
       },
       "development": {
-        "pr1118": "COMPLETE",
-        "pr1117": "SAFETY_SUCCESS_CLAUDE_FINAL_PENDING",
+        "pr1118": "COMPLETE_AT_0FC051C",
+        "pr1117": "MERGED_POSTCHECKS_PENDING_AT_24757A2",
         "pr1114": "SOURCE_ONLY_SAFETY_SUCCESS_CLAUDE_FINAL_PENDING",
         "pr1121": "AUTHORING_NOT_ACCEPTED",
         "pr1122": "AUTHORING_NOT_ACCEPTED",
