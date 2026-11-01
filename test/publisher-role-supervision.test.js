@@ -11,6 +11,6 @@ test('role supervision actual fork and local journal boundaries', {timeout: 3000
   assert.ifError(run.error);
   t.diagnostic(run.stderr);
   assert.equal(run.status, 0, `${run.stdout}\n${run.stderr}`);
-  assert.match(run.stderr, /Ran 14 tests/);
+  assert.match(run.stderr, /Ran 15 tests/);
   assert.match(run.stderr, /\nOK\s*$/);
 });
