@@ -121,6 +121,7 @@ function computeMark(position, mark, now) {
 }
 
 export class PaperLedger {
+  #latestCommandTime;
   constructor({initialCapitalCents = INITIAL_CAPITAL_CENTS, now = Date.now(), runId = "synthetic-only"} = {}) {
     this.initialCapitalCents = moneyCents(initialCapitalCents, "initialCapitalCents");
     if (this.initialCapitalCents !== INITIAL_CAPITAL_CENTS) {
@@ -143,6 +144,7 @@ export class PaperLedger {
       exit: {feeCents: 0n, spreadCents: 0n, slippageCents: 0n, priceImpactCents: 0n, networkCents: 0n}
     };
     this.lastEquitySnapshot = null;
+    this.#latestCommandTime = time(now);
     this.day = viennaDay(now);
     if (!this.day) throw new TypeError("valid initialization time is required");
     this.dailyOpeningEquityCents = this.initialCapitalCents;
@@ -158,6 +160,17 @@ export class PaperLedger {
       entriesAllowed: false,
       reason: "No durable journal or atomic restart recovery is implemented; do not resume an interrupted run."
     };
+  }
+
+  // Exact identity replays return stored results before this admission boundary.
+  // Every newly admitted timestamp advances the fence, even if later evidence rejects.
+  #admitTime(now) {
+    const current = time(now);
+    if (current === null || current < this.#latestCommandTime) {
+      return {status: "REJECT", reason: "NON_MONOTONIC_TIME", entriesAllowed: false};
+    }
+    this.#latestCommandTime = current;
+    return null;
   }
 
   #record(event) {
@@ -252,6 +265,10 @@ export class PaperLedger {
     if (parsedNow === null || localDay === null) {
       return {status: "EQUITY_UNKNOWN", entriesAllowed: false, reason: "valid current time required"};
     }
+    const clockFailure = this.#admitTime(parsedNow);
+    if (clockFailure || localDay < this.day) {
+      return clockFailure ?? {status: "REJECT", reason: "NON_MONOTONIC_TIME", entriesAllowed: false};
+    }
     this.#expireReservations(parsedNow, localDay);
     if (localDay !== this.day) {
       this.#revokeReservations("local calendar day changed; old risk authority cannot roll over");
@@ -318,6 +335,8 @@ export class PaperLedger {
       return this.reservations.get(authorizationId) ?? this.authorizationResults.get(authorizationId) ??
         {status: "DUPLICATE", reason: "authorization already consumed"};
     }
+    const clockFailure = this.#admitTime(now);
+    if (clockFailure) return clockFailure;
     if (!this.newWorkAllowed) return {status: "REJECT", reason: "session is stopped"};
     if (!this.#canRecord()) return {status: "REJECT", reason: "audit capacity reached"};
     if (filterResult?.status !== "PASS" || !filterResult.accepted) {
@@ -424,6 +443,8 @@ export class PaperLedger {
       }
       return this.results.get(eventId);
     }
+    const clockFailure = this.#admitTime(now);
+    if (clockFailure) return clockFailure;
     const auth = this.reservations.get(authorization?.authorizationId);
     if (!auth || auth !== authorization) return {status: "REJECT", reason: "live risk reservation required"};
     const currentTime = time(now);
@@ -662,6 +683,8 @@ export class PaperLedger {
       }
       return this.results.get(eventId);
     }
+    const clockFailure = this.#admitTime(now);
+    if (clockFailure) return clockFailure;
     const position = this.positions.get(quote?.mint);
     if (!position) return {status: "UNKNOWN", reason: "no open position for mint"};
     const observed = time(quote.observedAt);
@@ -717,6 +740,8 @@ export class PaperLedger {
     if (start === null || end === null || end < start) {
       return {status: "INVALID_RUN_WINDOW", entriesAllowed: false};
     }
+    const clockFailure = this.#admitTime(end);
+    if (clockFailure) return clockFailure;
     this.newWorkAllowed = false;
     if (end - start > 8 * 60 * 60 * 1000) {
       return {status: "INVALID_RUN_WINDOW", entriesAllowed: false, reason: "eight-hour run limit exceeded"};
@@ -795,6 +820,7 @@ export const PAPER_LEDGER_POLICY = Object.freeze({
   trailingDistanceBps: 600,
   dailyLossLimitCents: DAILY_LOSS_LIMIT_CENTS.toString(),
   timezone: "Europe/Vienna",
+  clockPolicy: "NONDECREASING_CALLER_TIME_V1",
   restartPolicy: "UNRECOVERABLE_FAIL_CLOSED",
   executionMode: "SIMULATED_ONLY"
 });

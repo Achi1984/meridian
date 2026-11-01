@@ -143,3 +143,10 @@ security and full-source review must validate all evidence adapters, bounded
 budgets, and either a durable atomic journal or a separately approved restart
 protocol. No filter should be weakened to force trades; zero accepted coins is
 a correct outcome when providers cannot supply the evidence.
+
+
+The optional offline [checkpoint wrapper](CHECKPOINT.md) replays acknowledged
+commands through the in-memory ledger; it does not change the disabled manifest
+or permit an interrupted run to resume automatically. Its caller-time ordering
+fence blocks clock rollback, but trusted clock provenance/skew and forward-jump
+policy remain activation blockers before any real-data run.
