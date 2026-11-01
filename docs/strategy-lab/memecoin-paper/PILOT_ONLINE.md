@@ -93,6 +93,19 @@ no write retry, operator stop, restart denial, and import-time inertness. The
 result is observation-only `ZERO_TRADES`, not strategy-performance validation.
 Combined hosted CI/review and host verification remain outstanding.
 
+At the deadline, a clean controller `DEADLINE` may finalize the immutable ledger
+at the configured `endAt` only after the terminal report is emitted, request
+accounting is known, the checkpoint acknowledgement is bound, and every
+callback is settled (a checkpoint acknowledged while settling the deadline is
+allowed; late acquisition/step callbacks are not). No new provider/step work is
+admitted after the controller deadline. The report sidecar and terminal marker
+separately retain `effectiveEndAt`, actual `finalizedAt`, and `latenessMs`;
+the report never claims physical finalization happened at the window boundary.
+Clock regression, early wall-clock time, unsettled work, or more than 60 seconds
+of deadline finalization delay remains `UNKNOWN`. Manual stops continue to use
+their actual validated time. The integration test covers 250 ms and 30 s
+settlement delays plus rejection beyond the fixed delay bound.
+
 The checked-in assembly module is the explicit source composition:
 
 ```js

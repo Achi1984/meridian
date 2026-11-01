@@ -9,6 +9,7 @@ import {analyzeCandidate, filterCandidate} from "./stages.mjs";
 
 export const READ_ONLY_PAPER = "READ_ONLY_PAPER";
 export const EIGHT_HOURS_MS = 8 * 60 * 60 * 1000;
+export const MAX_DEADLINE_FINALIZATION_DELAY_MS = 60_000;
 export const PILOT_DEPENDENCY_PINS = Object.freeze({
   provider: "b000c6a6dcfcce102e61821e8316174a15a0dd58",
   controller: "89a20bf118e059c6153ac75b51f2ed6947d46332",
@@ -534,6 +535,14 @@ async function persistReport(assembly, paths, input, identity, observation) {
     `Hard-filter outcomes: PASS=${observation.filterOutcomes.PASS}, REJECT=${observation.filterOutcomes.REJECT}, UNKNOWN=${observation.filterOutcomes.UNKNOWN}`,
     `Analyst outcomes: PASS=${observation.analysisOutcomes.PASS}, REJECT=${observation.analysisOutcomes.REJECT}, UNKNOWN=${observation.analysisOutcomes.UNKNOWN}, SCORE_UNAVAILABLE=${observation.analysisOutcomes.SCORE_UNAVAILABLE}, BLOCKED=${observation.analysisOutcomes.BLOCKED}`,
     `Controller status: ${observation.controllerStatus}; stop reason: ${observation.stopReason}; failure: ${observation.failureCode}`,
+    ...(observation.windowFinalization ? [
+      `Effective observation-window end: ${new Date(observation.windowFinalization.effectiveEndAt).toISOString()}`,
+      `Actual ledger finalization: ${new Date(observation.windowFinalization.finalizedAt).toISOString()}`,
+      `Finalization lateness: ${observation.windowFinalization.latenessMs} ms (${observation.windowFinalization.basis})`
+    ] : ["Window finalization timing: UNKNOWN"]),
+    ...(observation.controllerPositionEvidence ? [
+      `Controller position evidence: ${observation.controllerPositionEvidence.status}; last-known status: ${summaryCode(observation.controllerPositionEvidence.lastKnown?.status)}`
+    ] : []),
     "Entry authorizations: 0",
     "Simulated fills: 0",
     "Executable quote and validated cost evidence: UNAVAILABLE"
@@ -598,6 +607,7 @@ export function createPilotOnline(options = {}) {
       controllerStatus: "NOT_STARTED",
       stopReason: "UNKNOWN",
       failureCode: "UNKNOWN",
+      windowFinalization: null,
       entryAuthorizations: 0,
       simulatedFills: 0,
       executableQuoteAndCostEvidence: "UNAVAILABLE"
@@ -612,6 +622,24 @@ export function createPilotOnline(options = {}) {
     let config;
     let assembly;
     const wallClock = options.wallClock ?? Date.now;
+    let lastWallClockValue = null;
+    let wallClockFault = false;
+    const readWallClock = () => {
+      let value;
+      try {
+        value = wallClock();
+      } catch {
+        wallClockFault = true;
+        return null;
+      }
+      if (!Number.isSafeInteger(value) || !Number.isFinite(new Date(value).getTime()) ||
+          (lastWallClockValue !== null && value < lastWallClockValue)) {
+        wallClockFault = true;
+        return value;
+      }
+      lastWallClockValue = value;
+      return value;
+    };
     const monotonicClock = options.monotonicClock ?? (() => performance.now());
     const scheduler = options.scheduler ?? {
       setTimeout: (callback, delay) => setTimeout(callback, delay),
@@ -634,7 +662,7 @@ export function createPilotOnline(options = {}) {
       }
       const loaded = await readCanonicalJson(options.configPath, MAX_CONFIG_BYTES, "run configuration");
       configHash = digest(loaded.bytes);
-      config = validateConfig(loaded.value, wallClock());
+      config = validateConfig(loaded.value, readWallClock());
       if (options.assembly !== undefined) {
         assembly = validateAssembly(options.assembly);
       } else {
@@ -728,7 +756,7 @@ export function createPilotOnline(options = {}) {
             candidates: plan.candidates,
             enabled: true,
             transport: assembly.transport,
-            clock: wallClock,
+            clock: readWallClock,
             signal,
             freshnessPolicy: assembly.freshnessPolicy,
             requestTimeoutMs: config.budgets.requestTimeoutMs
@@ -766,7 +794,7 @@ export function createPilotOnline(options = {}) {
               !isRecord(event.candidate)) {
             throw new Error("read-only observation step is invalid or cancelled");
           }
-          const now = wallClock();
+          const now = readWallClock();
           const filters = filterCandidate(event.candidate, {now, holdUntil: config.endAt});
           const analysis = analyzeCandidate(event.candidate, {
             now,
@@ -784,7 +812,7 @@ export function createPilotOnline(options = {}) {
         },
         async checkpoint({cycleIndex, signal}) {
           if (signal?.aborted) throw new Error("checkpoint callback cancelled");
-          const now = wallClock();
+          const now = readWallClock();
           if (!Number.isSafeInteger(now) || now < config.startAt || now > config.endAt) {
             throw new Error("checkpoint time is outside the pinned run window");
           }
@@ -811,7 +839,7 @@ export function createPilotOnline(options = {}) {
           controllerReportObserved = true;
         }
       };
-      const durationMs = config.endAt - wallClock();
+      const durationMs = config.endAt - readWallClock();
       boundedInteger(durationMs, "remaining run duration", 1, EIGHT_HOURS_MS);
       control = assembly.createPilotRunControl({
         mode: READ_ONLY_PAPER,
@@ -863,6 +891,12 @@ export function createPilotOnline(options = {}) {
       observations.controllerStatus = summaryCode(controllerSummary?.status);
       observations.stopReason = summaryCode(controllerSummary?.reason);
       observations.failureCode = summaryCode(failureCode ?? controllerSummary?.failureCode);
+      if (isRecord(controllerSummary?.positionEvidence)) {
+        observations.controllerPositionEvidence = {
+          status: summaryCode(controllerSummary.positionEvidence.status),
+          lastKnown: controllerSummary.positionEvidence.lastKnown ?? null
+        };
+      }
 
       const priorMetadata = session.metadata;
       const checkpointAck = controllerSummary?.checkpointAcknowledgement;
@@ -870,12 +904,43 @@ export function createPilotOnline(options = {}) {
         checkpointAck.sequence === priorMetadata.sequence && checkpointAck.hash === priorMetadata.hash;
       let finishingReceipt = null;
       if (controllerSummary?.status === "FINISHED" && !failureCode && controllerAckBound) {
-        const now = wallClock();
-        if (!Number.isSafeInteger(now) || now < config.startAt || now > config.endAt) {
-          failureCode = "FINISH_TIME_UNKNOWN";
+        const finalizedAt = readWallClock();
+        const isDeadline = controllerSummary.reason === "DEADLINE";
+        const callbackCompletion = controllerSummary.callbackCompletion;
+        const deadlineCallbacksSettled = isRecord(callbackCompletion) &&
+          ["acquire", "step"].every(name =>
+            callbackCompletion[name] === "NOT_STARTED" || callbackCompletion[name] === "COMPLETED") &&
+          (callbackCompletion.checkpoint === "NOT_STARTED" ||
+            callbackCompletion.checkpoint === "COMPLETED" ||
+            callbackCompletion.checkpoint === "COMPLETED_AFTER_STOP") &&
+          Object.keys(callbackCompletion).every(name =>
+            ["acquire", "step", "checkpoint"].includes(name));
+        const deadlineEvidenceBound = !isDeadline || (
+          controllerReportObserved &&
+          controllerSummary.reportStatus === "EMITTED" &&
+          controllerSummary.requestAccountingStatus === "KNOWN" &&
+          deadlineCallbacksSettled &&
+          priorMetadata.sequence === receipts.length
+        );
+        if (isDeadline && !deadlineEvidenceBound) {
+          failureCode = "DEADLINE_FINALIZATION_EVIDENCE_UNKNOWN";
+        } else if (wallClockFault || !Number.isSafeInteger(finalizedAt) ||
+            finalizedAt < config.startAt ||
+            (isDeadline
+              ? finalizedAt < config.endAt ||
+                finalizedAt - config.endAt > MAX_DEADLINE_FINALIZATION_DELAY_MS
+              : finalizedAt > config.endAt)) {
+          failureCode = isDeadline ? "DEADLINE_FINALIZATION_TIME_UNKNOWN" : "FINISH_TIME_UNKNOWN";
         } else {
+          const effectiveEndAt = isDeadline ? config.endAt : finalizedAt;
+          observations.windowFinalization = {
+            basis: isDeadline ? "SETTLED_DEADLINE_EFFECTIVE_WINDOW_END" : "VALIDATED_ACTUAL_STOP_TIME",
+            effectiveEndAt,
+            finalizedAt,
+            latenessMs: finalizedAt - effectiveEndAt
+          };
           const commandId = `pilot:${config.runId}:finish`;
-          const result = await session.finishRun(commandId, {now, marks: []});
+          const result = await session.finishRun(commandId, {now: effectiveEndAt, marks: []});
           finishingReceipt = await commandReceipt(
             session, store, commandId, "finishRun", result, receipts.length
           );
@@ -943,7 +1008,7 @@ export function createPilotOnline(options = {}) {
           observation: observations,
           observationOnly: true,
           executionStarted: false,
-          terminalAt: wallClock()
+          terminalAt: readWallClock()
         });
       } catch {
         return {
