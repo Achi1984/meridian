@@ -125,6 +125,58 @@ Choose a random, high-entropy upload secret using the deployment's existing
 secret manager, then set its SHA-256 digest on the gateway and the secret itself
 on the worker. Provisioning and activation are not performed by this change.
 
+## Operator handoff
+
+This is **code-ready only**. The report-transfer migration, gateway deployment,
+worker configuration, and credentials have not been applied or provisioned.
+Before enabling either side, apply
+`migrations/20261101_meridian_paper_reports.sql` through the operator-reviewed
+migration process and deploy the gateway code/configuration. The gateway must
+receive `MERIDIAN_PAPER_REPORT_UPLOAD_ENABLED`,
+`MERIDIAN_PAPER_REPORT_EXPECTED_RUN_ID`,
+`MERIDIAN_PAPER_REPORT_EXPECTED_CONFIG_SHA256`, and
+`MERIDIAN_PAPER_REPORT_UPLOAD_TOKEN_SHA256` (hash only). Inject
+`MERIDIAN_PAPER_REPORT_TRANSFER_ENABLED`,
+`MERIDIAN_PAPER_REPORT_DATA_ROOT`,
+`MERIDIAN_PAPER_REPORT_EXPECTED_RUN_ID`,
+`MERIDIAN_PAPER_REPORT_EXPECTED_CONFIG_SHA256`,
+`MERIDIAN_PAPER_REPORT_GATEWAY_ORIGIN`, and
+`MERIDIAN_PAPER_REPORT_UPLOAD_TOKEN` into the worker configuration/secret
+manager. Keep `MERIDIAN_READ_TOKEN_SHA256` separate.
+
+Do not treat the planned run end time (nominally `2026-11-02T03:02:21.383Z`,
+`2026-11-02T04:02` Vienna time) as terminal evidence. First independently verify
+the preserved run is actually terminal `FINISHED`; confirm the same pinned run
+ID and config SHA-256 in persisted config, status, lock, terminal marker, and
+existing report identity/accounting. `AVAILABLE` alone, a lock, or elapsed time
+is not proof. Do not modify or restart the observation to obtain evidence.
+
+Only after those checks and prerequisites, invoke from the configured worker
+runtime with the required settings already present in its environment (the
+secret value is never placed in the command):
+
+```sh
+MERIDIAN_PAPER_REPORT_TRANSFER_ENABLED=true \
+  node scripts/memecoin-paper-report-transfer/transfer.mjs \
+  --run-id "$MERIDIAN_PAPER_REPORT_EXPECTED_RUN_ID"
+```
+
+`TRANSFERRED` means the exporter verified the complete acknowledgement (at most
+2,048 bytes), its `ok`, exact run ID/config hash, SHA-256 of its canonical
+envelope, and `201` /
+`idempotent:false` or `200` / `idempotent:true` pairing. `UNKNOWN` means delivery
+may have committed; do not mutate the source report or loop/retry automatically.
+Wait until the exporter has settled its in-flight request/body cleanup, then a
+single manual resend of the same pinned report is safe: the gateway returns
+`200` for an identical committed replay or `201` if the earlier transaction did
+not commit. Stop and investigate a conflict; it never overwrites the stored row.
+
+To roll back, disable worker transfer and gateway upload first, then remove the
+worker upload secret and gateway upload hash. Preserve the private report row
+and migration unless the retention owner separately authorizes deletion. Rollback,
+UNKNOWN handling, and retry never restart, stop, or otherwise alter the
+observation.
+
 ## Persistence and replay policy
 
 Apply `migrations/20261101_meridian_paper_reports.sql` through the normal
