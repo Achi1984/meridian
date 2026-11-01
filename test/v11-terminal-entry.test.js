@@ -1132,12 +1132,16 @@ async function browserRun(call,start,width,height,server){
     const input=document.getElementById('app-access-password'),button=document.querySelector('#app-access-form button');
     return {appHidden:document.getElementById('app').hidden,gateHidden:document.getElementById('app-access-gate').hidden,
       password:input.type,height:button.getBoundingClientRect().height,inputHeight:input.getBoundingClientRect().height,
-      passwordFields:document.querySelectorAll('input[type="password"]').length,
+      passwordFields:document.querySelectorAll('#app-access-gate input[type="password"]').length,
+      visiblePasswordFields:[...document.querySelectorAll('input[type="password"]')].filter(node=>node.getClientRects().length>0).length,
+      ledgerWriteKey:(()=>{const keys=document.querySelectorAll('.ledger-manual input[name="ledger-write-key"]');
+        const key=keys[0];return {count:keys.length,type:key?.type,empty:key?.value==='',hidden:key?.getClientRects().length===0};})(),
       duplicateFields:document.querySelectorAll('#bot-read-token,#depot-read-token').length,
       focused:document.activeElement===input};
   })()`);
   assert.deepEqual({...lockedGate,height:0,inputHeight:0},{appHidden:true,gateHidden:false,password:'password',
-    height:0,inputHeight:0,passwordFields:1,duplicateFields:0,focused:true});
+    height:0,inputHeight:0,passwordFields:1,visiblePasswordFields:1,
+    ledgerWriteKey:{count:1,type:'password',empty:true,hidden:true},duplicateFields:0,focused:true});
   assert.ok(lockedGate.height>=44&&lockedGate.inputHeight>=44,'unlock controls are at least 44px tall');
   const authReadsBefore=server.metrics().authReads;
   await evaluate(`document.getElementById('app-access-password').value='synthetic-b3-token';document.getElementById('app-access-password').focus();true`);
@@ -1288,7 +1292,12 @@ async function browserRun(call,start,width,height,server){
         const positiveShot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
         writeFileSync(join(evidence,`v11-bot-compact-${width}-positive.png`),Buffer.from(positiveShot.data,'base64'));
       }
+      // A typed separate write key is also cleared when any reader locks the app.
+      await evaluate(`document.querySelector('.ledger-manual input[name="ledger-write-key"]').value='synthetic-not-a-credential';true`);
       await evaluate(`document.getElementById('bot-read-lock').click();true`);
+      assert.deepEqual(await evaluate(`(()=>{const key=document.querySelector('.ledger-manual input[name="ledger-write-key"]');
+        return {empty:key.value==='',hidden:key.getClientRects().length===0,type:key.type};})()`),
+        {empty:true,hidden:true,type:'password'},'global lock clears and hides the separate masked Ledger key');
       assert.equal(await readState(),'locked');assert.equal(await evaluate(`document.querySelector('#depot-read-root svg')===null`),true);assert.equal(await evaluate(`document.querySelectorAll('#bot-read-root li').length`),0);
       assert.equal(await evaluate(`document.getElementById('app').hidden`),true,'reader lock also hides the complete private app');
       await refresh();assert.equal(server.metrics().reads,initialReads+1,'locked credential cannot request');
