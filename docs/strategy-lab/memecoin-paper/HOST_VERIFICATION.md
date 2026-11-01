@@ -33,6 +33,28 @@ utility until the dedicated observer image is rebuilt from the reviewed source
 that includes it. No build, deployment, service setting, or host command was
 changed by this task.
 
+## Lead-reported host evidence and active run boundary
+
+The following are **operator-reported observations** in PR #1114, not checks run
+by this agent. The linked report is the evidence source; hashes and logs are
+identifiers, not independent authentication.
+
+| Observation | Reported result | What it establishes / does not establish |
+|---|---|---|
+| Volume probe (`host-probe-20261101-r1`; comment [6562423375](https://github.com/Achi1984/meridian/pull/1114#issuecomment-6562423375)) | On deployed `main` image `14b9412564c300cc44a1f514c4dfebd55495b4aa`, runtime UID/GID 1000; `/proc/self/mountinfo` matched the expected mount. Exclusive create, file `fsync`, same-directory rename, directory `fsync`, byte/hash readback passed at 18:55:54Z. | Supports that the process and selected mounted path completed those operations at that time. The first newline-normalized attempt reported `MOUNT_NOT_PROVEN` and made no writes; only the corrected command passed. This is not power-loss or provider durability proof. |
+| Container restart readback (comment [6562423375](https://github.com/Achi1984/meridian/pull/1114#issuecomment-6562423375)) | `PERSISTED_READBACK` passed at 18:56:31Z with the same SHA-256, `c5642cebfef93d86451aaddbd2ff13c7b7dea37bcbbc4ddc8e992420e0807948`. | Confirms the reported artifact was read after a container restart. It does not show survival of host, volume, or power loss. |
+| Separate short acceptance run (comments [6562454779](https://github.com/Achi1984/meridian/issues/942#issuecomment-6562454779) and [6562477627](https://github.com/Achi1984/meridian/issues/942#issuecomment-6562477627)) | Lead reports `STOP_REQUESTED`; terminal `FINISHED` / `OPERATOR_STOP`, no terminal failure, report `PROJECTED`, four provider requests (one Dex, three RPC), 3,740 bytes, one candidate, zero entries/fills. Acceptance persisted across restart at 19:00:56Z with `ACCEPTANCE_RESTART_BLOCKED`; report readable from the durable volume via platform logs. | Supports the short stop/report/restart-denial path as reported. Filter `UNKNOWN` and executable quote `UNAVAILABLE` remain; this is not trade/quote readiness and does not prove a separate downloaded artifact copy. |
+| Active eight-hour observation (comments [6562477627](https://github.com/Achi1984/meridian/issues/942#issuecomment-6562477627) and [6562485487](https://github.com/Achi1984/meridian/pull/1114#issuecomment-6562485487)) | Lead reports run `observation-20261101-r1` invoked at 19:02:21Z, window `2026-11-01T19:02:21.383Z`–`2026-11-02T03:02:21.383Z`, with a new run/config path and permanent restart guard. The follow-up reports a heartbeat at 19:03:21.480Z and a 1,792-byte checkpoint modified at 19:02:23.675Z; final report was pending. | Treat this one-shot as active/pending per the Lead's handoff, not as a run independently observed here. Do not restart, redeploy, change its CMD/config, stop it, or reuse its paths. Its actual filter remained `UNKNOWN` and executable quote evidence unavailable; this is not trade/quote readiness. |
+
+Clock provenance remains `UNVERIFIED`: timestamps in the operator report do
+not identify an independently trusted host clock or establish its skew. The
+actual artifact files have not been independently retrieved by this agent.
+The Lead reports the acceptance report is readable from the volume via platform
+logs, but that does not verify a downloadable volume copy or a file-transfer
+route for this team/service. Platform logs and same-volume restart readback do
+not prove host/volume power-loss persistence. No provider-capacity guarantee,
+quote/trade readiness, or completed eight-hour report is claimed here.
+
 ## Offline checkpoint harness
 
 [`host-verification.mjs`](../../../scripts/memecoin-paper/host-verification.mjs)
@@ -111,40 +133,54 @@ missing/corrupt, it reports `UNKNOWN` and preserves the incomplete evidence
 without repair or replay. Provider failure is retained as `BLOCKED`; a
 subsequent start does not retry it.
 
-### Lead-run acceptance sequence
+### Future host-utility packaging (not an instruction to touch the active worker)
+
+The host-acceptance utility described below is source-only on this branch and
+is absent from the currently deployed image. Do not deploy it, change the CMD,
+or restart the worker while `observation-20261101-r1` is active. The short
+acceptance run has already exercised stop/report/restart behavior; do not run a
+second host acceptance lap. After the active run is complete and its terminal
+artifacts are preserved, any later packaging/acceptance requires a separately
+reviewed image and an operator-selected, new evidence ID. This procedure makes
+no runtime change or host call.
+
+If reviewed and run later, the host utility requires a custom Northflank
+entrypoint `node` (because `Dockerfile.paper` has the pilot as its ENTRYPOINT)
+and this command form:
+
+```text
+scripts/memecoin-paper/host-acceptance.mjs verify --evidence-id host-preflight-<UNIQUE_ID> --mint <APPROVED_MINT> --pool <APPROVED_POOL> --quote <APPROVED_QUOTE> --provider-preflight
+```
+
+It would issue at most four credential-free, fixed-endpoint public requests.
+It is a new online provider preflight, not a way to verify current run status;
+do not use it to inspect or interrupt the active one-shot run.
+
+### Remaining evidence and retrieval handoff
 
 1. Confirm this is still the separate `meridian-paper-observer` service and the
    bound `meridian-paper-data` volume at `/var/data/meridian-paper`; keep the
-   gateway/database unchanged. Confirm the deployed image contains the exact
-   reviewed utility and assembly. A Dockerfile `chown` does not prove mounted
-   volume ownership.
-2. Record the unique evidence ID and the exact `node` UID expected for the
-   image. Apply the custom entrypoint/command above, then inspect Northflank
-   **platform logs**. Require JSON `status: PASS`, `hostCheck: PASS`,
-   `providerPreflight.status: PASS`, matching runtime/root UID, four received
-   events, `runtimeAuthorization: false`, `pilotStarted: false`,
-   `hostDurability: NOT_VERIFIED`, and `clockProvenance: UNVERIFIED`.
-   `BLOCKED`/`UNKNOWN`, UID mismatch, missing fields, timeout, or nonzero exit
-   means stop and preserve all files/logs.
-3. If Northflank restarts the exited process, require the same ID to report
-   `RESTART_VERIFIED` and zero provider requests in that invocation. If it does
-   not restart automatically, use only the platform's documented service
-   restart control once, then require that same result. Do not rely on an
-   assumed restart-policy toggle. This tests that the evidence is visible
-   after a container restart; it still does not prove power-loss durability.
-4. Preserve logs and retrieve
-   `/var/data/meridian-paper/host-acceptance/<UNIQUE_ID>/` using an already
-   available Northflank file-transfer path only after the operator verifies
-   current CLI help, service/project IDs, and access. Northflank documents
-   service file transfer at
-   [Copy files](https://northflank.com/docs/v1/api/copy-files), but file
-   retrieval capability for this account/service has not been observed. If
-   unavailable, logs alone do not provide the volume files; mark retrieval
-   `UNKNOWN` and stop rather than assuming Shell or SSH access.
-5. Restore the service's reviewed inert command after capturing the evidence.
-   This host acceptance never runs `start`, `stop`, `status`, or `report` for
-   the Paper pilot. An eight-hour run remains a separate later operation using
-   its own new run ID, frozen config, and run directory.
+   gateway/database unchanged. Do not change or restart the active worker. Its
+   reported existing storage and short acceptance results are listed above;
+   they must not be repeated during the active run.
+2. The eight-hour run is not complete until the Lead records terminal status,
+   final report, and the persisted report/checkpoint identity after its stated
+   deadline. Preserve the active process, its run/config directory, logs, and
+   any `UNKNOWN` records; do not replay uncertain work.
+3. Use platform logs for the current stop/status/report evidence only through
+   the run's existing operator procedure. The short acceptance reports those
+   commands and persisted report readback passed; it did not establish that the
+   active run has finished or that logs are a substitute for volume artifacts.
+4. For terminal artifact retrieval, use an already available Northflank
+   file-transfer capability only after the Lead verifies current CLI help,
+   service/project IDs, and access. Northflank documents service file transfer
+   at [Copy files](https://northflank.com/docs/v1/api/copy-files), but this
+   account/service's download ability is not verified. If unavailable, record
+   retrieval as `UNKNOWN`; do not assume Shell, SSH, or a CLI path.
+5. Do not deploy the host utility or run its provider preflight while the
+   one-shot is active. After terminal evidence is preserved, future source
+   packaging or a separate host preflight is outside this handoff and requires
+   a new review. The utility never starts or authorizes the Paper pilot.
 
 The host check's UID match, `fsync`/rename/readback, and same-ID restart readback
 are bounded observations. `sameDeviceAsParent` is informational, not volume
