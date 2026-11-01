@@ -35,6 +35,22 @@ and must not retry the mutation or repost a receipt. A confirmed commit still
 requires the existing authoritative readback. The canonical posting fence,
 restart behavior, and one-use version binding remain in effect.
 
+## Pinned #1097 integration compatibility
+
+The pinned #1097 test
+`test/m11-coordinator-github-runtime-integration.test.js`, case
+`runtime deadline does not cancel backend HTTP: a bounded late write retains
+lookup-only recovery`, asserts that the transport signal is not aborted after
+the lifecycle budget expires, then releases the held request and expects the
+late write and readbacks to finish. That expectation conflicts with this
+package's signal propagation: the lifecycle abort now reaches the transport,
+which may stop the request and backend follow-up reads. If the remote mutation
+already committed, the result remains ambiguous; a later assembly must
+reconcile canonical state through a separate read and preserve lookup-only,
+no-repost behavior. This branch intentionally does not edit the pinned #1097
+integration test or its documentation; that assertion needs reconciliation
+during later assembly.
+
 Tests use deterministic barriers and fake transport/HTTP responses to cover
 pre-abort, cancellation during reads and readback, cancellation before CAS,
 lost acknowledgements, possible commits, duplicate/restart behavior, and
