@@ -1,0 +1,79 @@
+# INERT REVIEW TEMPLATE. Not loaded by GitHub Actions at this path/extension.
+# Activation requires the separately approved source switch and reviewed move to
+# .github/workflows/pages-publication.yml. Do not run beside branch publishing.
+name: MERIDIAN Pages Publication
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Exact approved current main SHA; must equal this workflow SHA
+        required: true
+        type: string
+      previous_deployment_sha:
+        description: Exact reconciled prior successful Pages deployment SHA
+        required: true
+        type: string
+
+permissions:
+  contents: read
+concurrency:
+  group: meridian-pages-production
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  build:
+    if: github.repository == 'Achi1984/meridian' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Build with existing Jekyll pipeline
+        uses: actions/jekyll-build-pages@44a6e6beabd48582f863aeeb6cb2151cc1716697
+        with:
+          source: .
+          destination: ./_site
+      - name: Upload existing Pages artifact scope
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa
+        with:
+          path: ./_site
+          name: github-pages
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: https://achi1984.github.io/meridian/
+    env:
+      EXPECTED_SHA: ${{ inputs.expected_sha || github.sha }}
+      PREVIOUS_DEPLOYMENT_SHA: ${{ inputs.previous_deployment_sha || github.event.before }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Reconcile exact main and Pages state
+        id: ready
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/pages-publication-readiness.mjs
+      - name: Deploy once
+        if: steps.ready.outputs.disposition == 'READY'
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346
+        with:
+          artifact_name: github-pages
+      - name: Verify Pages terminal state
+        env:
+          PUBLICATION_PHASE: after
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/pages-publication-readiness.mjs
