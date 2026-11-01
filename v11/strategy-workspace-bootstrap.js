@@ -1,7 +1,7 @@
-import {CAMPAIGN_SOURCE, renderStrategyCatalog} from './strategy-catalog.js?v=B16-M11-FIX11';
-import {createStrategyArenaView} from './strategy-arena.js?v=B16-M11-FIX11';
+import {CAMPAIGN_SOURCE, renderStrategyCatalog} from './strategy-catalog.js?v=B16-M11-FIX12';
+import {createStrategyArenaView} from './strategy-arena.js?v=B16-M11-FIX12';
 import {mountPaperCockpit} from './paper-cockpit-controller.js?v=B16-M11-FIX12';
-import {renderPaperReadiness} from './paper-readiness-view.js?v=B16-M11-FIX11';
+import {renderPaperReadiness} from './paper-readiness-view.js?v=B16-M11-FIX12';
 
 const catalogRoot = document.getElementById('strategy-catalog');
 const catalogStatus = document.getElementById('strategy-load-status');

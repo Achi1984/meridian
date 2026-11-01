@@ -7,6 +7,10 @@ import {fileURLToPath} from 'node:url';
 import {withMobileChrome} from './helpers/v11-cdp.mjs';
 import {unlockAppThroughGate} from './helpers/v11-app-access-browser.mjs';
 import {startV11StaticServer} from './helpers/v11-static-server.mjs';
+import {projectOperatorReport} from '../scripts/memecoin-paper/operator-report.mjs';
+import {reportFixtures} from './fixtures/memecoin-paper-operator-report/scenarios.mjs';
+import {PAPER_REPORT_ENVELOPE_SCHEMA} from '../scripts/memecoin-paper-report-bridge/index.mjs';
+import {PAPER_REPORT_ENDPOINT} from '../v11/paper-cockpit-controller.js';
 
 const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium'].find(path=>path&&existsSync(path));
 const sizes=[
@@ -15,6 +19,42 @@ const sizes=[
   {width:1440,height:900,mobile:false}
 ];
 const evidence=process.env.V11_PAPER_COCKPIT_EVIDENCE_DIR;
+const PAPER_PASSWORD='synthetic-browser-gate-password';
+
+async function interceptGeneratedPaperReport(call,report){
+  const body=Buffer.from(JSON.stringify({
+    schema:PAPER_REPORT_ENVELOPE_SCHEMA,runId:report.experiment.id,report
+  })).toString('base64');
+  let reads=0,failure=null;
+  const off=call.onEvent('Fetch.requestPaused',event=>{
+    void (async()=>{
+      assert.equal(event.request.url,PAPER_REPORT_ENDPOINT);
+      if(event.request.method==='OPTIONS'){
+        await call('Fetch.fulfillRequest',{requestId:event.requestId,responseCode:204,responseHeaders:[
+          {name:'Access-Control-Allow-Origin',value:'*'},
+          {name:'Access-Control-Allow-Methods',value:'GET'},
+          {name:'Access-Control-Allow-Headers',value:'accept,authorization'},
+          {name:'Access-Control-Max-Age',value:'0'}]});
+        return;
+      }
+      assert.equal(event.request.method,'GET');
+      const authorization=Object.entries(event.request.headers||{})
+        .find(([name])=>name.toLowerCase()==='authorization')?.[1];
+      assert.equal(authorization,'Bearer '+PAPER_PASSWORD);
+      reads++;
+      await call('Fetch.fulfillRequest',{requestId:event.requestId,responseCode:200,responseHeaders:[
+        {name:'Access-Control-Allow-Origin',value:'*'},
+        {name:'Content-Type',value:'application/json; charset=utf-8'},
+        {name:'Cache-Control',value:'no-store'}],body});
+    })().catch(error=>{failure=error;});
+  });
+  await call('Fetch.enable',{patterns:[{urlPattern:PAPER_REPORT_ENDPOINT+'*',requestStage:'Request'}]});
+  return {
+    count:()=>reads,
+    assertHealthy(){if(failure)throw failure;},
+    async close(){off();await call('Fetch.disable');}
+  };
+}
 
 test('M11 Paper cockpit demo is responsive and keyboard accessible at five widths',{timeout:240000},async()=>{
   if(typeof WebSocket!=='function'){
@@ -44,14 +84,48 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         await call('Emulation.setDeviceMetricsOverride',{width:size.width,height:size.height,
           deviceScaleFactor:1,mobile:size.mobile,screenWidth:size.width,screenHeight:size.height});
         await unlockAppThroughGate(call);
+        const report=projectOperatorReport(reportFixtures.readOnlyCheckpoint());
+        report.evidence.observedThrough=new Date().toISOString();
+        report.valuation.cashCents='90071992547409931234';
+        const intercepted=await interceptGeneratedPaperReport(call,report);
         await evaluate(`document.querySelector('#nav button[data-v="strategies"]').click()`);
+        assert.equal(intercepted.count(),0,'unlock and navigation do not read a Paper report');
         for(let attempt=0;attempt<150;attempt++){
           if(await evaluate(`document.querySelector('#paper-cockpit-root.paper-cockpit') !== null`))break;
           await new Promise(resolve=>setTimeout(resolve,10));
         }
+        const liveRead=await evaluate(`(()=>{
+          const button=document.querySelector('#paper-cockpit-root button');
+          return button?{text:button.textContent,height:button.getBoundingClientRect().height,
+            disabled:button.disabled}:null;
+        })()`);
+        assert.ok(liveRead,'native browser module graph mounts the real controller');
+        assert.equal(liveRead.height>=44,true,'manual report read target is at least 44px');
+        assert.equal(intercepted.count(),0,'controller mount remains a no-read operation');
+        await evaluate(`document.querySelector('#paper-cockpit-root button').click()`);
+        for(let attempt=0;attempt<150;attempt++){
+          if(await evaluate(`document.querySelector('#paper-cockpit-root').textContent.includes('Observation-only')`))break;
+          await new Promise(resolve=>setTimeout(resolve,10));
+        }
+        intercepted.assertHealthy();
+        assert.equal(intercepted.count(),1,'one click produces exactly one generated-report GET');
+        const delivered=await evaluate(`(()=>{
+          const root=document.querySelector('#paper-cockpit-root');
+          return {report:root.textContent.includes('Observation-only'),
+            exactCash:root.textContent.includes('90071992547409931234 cents'),
+            terminal:root.textContent.includes('Terminal report: INCOMPLETE'),
+            noWorkerClaim:!root.textContent.includes('RUNNING')};
+        })()`);
+        assert.deepEqual(delivered,{report:true,exactCash:true,terminal:true,noWorkerClaim:true});
+        await evaluate(`document.querySelector('#nav button[data-v="command"]').click()`);
+        assert.equal(await evaluate(`!document.querySelector('#paper-cockpit-root').textContent.includes('Observation-only')`),true,
+          'navigation clears private report DOM');
+        await evaluate(`document.querySelector('#nav button[data-v="strategies"]').click()`);
+        assert.equal(intercepted.count(),1,'returning to the cockpit does not read automatically');
+        await intercepted.close();
         await evaluate(`(async()=>{
-          const model=await import('./paper-cockpit-model.js?v=B16-M11-FIX11');
-          const view=await import('./paper-cockpit-view.js?v=B16-M11-FIX11');
+          const model=await import('./paper-cockpit-model.js?v=B16-M11-FIX12');
+          const view=await import('./paper-cockpit-view.js?v=B16-M11-FIX12');
           const report=model.getDemoPaperCockpitReport();
           const demoReport=model.getDemoPaperCockpitReport();
           report.experiment.id='run-'+('R'.repeat(220));
@@ -65,7 +139,10 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
           demoReport.trading.noTradeReasons=[{
             gate:'demo-gate-'+('G'.repeat(96)),status:'UNKNOWN',reason:'demo-reason-'+('R'.repeat(220))
           }];
-          view.renderPaperCockpit(document.getElementById('paper-cockpit-root'),report,document,{demoReport});
+          view.renderPaperCockpit(document.getElementById('paper-cockpit-root'),report,document,{
+            demoReport,state:'ready',message:'Manual one-shot report read.',
+            onRefresh:()=>{},loading:false
+          });
           return true;
         })()`);
         const before=await evaluate(`(()=>{
@@ -82,6 +159,7 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
             demoOpen:demo.open,summaryText:summary.innerText.trim(),
             accessibleName:summary.getAttribute('aria-label'),
             summaryHeight:summary.getBoundingClientRect().height,
+            refreshHeight:root.querySelector('button').getBoundingClientRect().height,
             cashLabel:cash.querySelector('span').textContent,cashTone:cash.querySelector('span').className,
             pnlLabel:pnl.querySelector('span').textContent,pnlTone:pnl.querySelector('span').className,
             reservationText:[...root.querySelectorAll('p')].find(item=>item.textContent.includes('Reported reservation count'))?.textContent,
@@ -95,6 +173,7 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         assert.ok(before.panelScrollWidth<=before.panelWidth+1,
           'cockpit panel overflow at '+size.width+': '+JSON.stringify(before));
         assert.equal(before.demoOpen,false);
+        assert.ok(before.refreshHeight>=44,'manual refresh target below 44px: '+JSON.stringify(before));
         assert.ok(before.summaryHeight>=44,'demo summary target below 44px: '+JSON.stringify(before));
         assert.ok(before.accessibleName.includes(before.summaryText),
           'accessible name must contain its visible label: '+JSON.stringify(before));
@@ -111,6 +190,9 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
           return document.activeElement===document.getElementById('app-main');
         })()`);
         assert.equal(focus,true);
+        await key('Tab','Tab',9);
+        const refreshTab=await evaluate(`document.activeElement===document.querySelector('#paper-cockpit-root button')`);
+        assert.equal(refreshTab,true,'native Tab focuses the manual report read affordance');
         await key('Tab','Tab',9);
         const tabState=await evaluate(`(()=>{
           const summary=document.querySelector('#paper-cockpit-root > details > summary');
@@ -175,6 +257,7 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
           width:size.width,viewport:before.viewport,documentWidth:before.documentWidth,
           panelWidth:before.panelWidth,panelScrollWidth:before.panelScrollWidth,
           summaryHeight:before.summaryHeight,nativeTab:tabState.focused,
+          refreshHeight:before.refreshHeight,
           enterOpen:true,spaceClose:true,spaceReopen:true,cash:before.cashLabel,
           cashTone:before.cashTone,pnl:before.pnlLabel,pnlTone:before.pnlTone,
           expandedDocumentWidth:reopened.documentWidth,expandedBodyWidth:reopened.bodyWidth,

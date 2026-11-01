@@ -1,7 +1,7 @@
 import {
   getDemoPaperCockpitReport,
   presentPaperCockpitReport
-} from './paper-cockpit-model.js?v=B16-M11-FIX11';
+} from './paper-cockpit-model.js?v=B16-M11-FIX12';
 
 const unavailable = 'Nicht verfügbar';
 const shown = value => Number.isSafeInteger(value) && value >= 0 ? String(value) : 'UNKNOWN';
@@ -166,6 +166,11 @@ export function renderPaperCockpit(root, report = null, document = root?.ownerDo
     ? {now: freshnessPolicy.now(), staleAfterMs: freshnessPolicy.staleAfterMs}
     : options;
   const available = renderReport(root, report, document, reportOptions);
+  if (available) {
+    const model = presentPaperCockpitReport(report, reportOptions);
+    node(document, root, 'p',
+      `Terminal report: ${model.experiment.status} · not evidence of current worker liveness.`, 'caption');
+  }
 
   const demo = document.createElement('details');
   demo.className = 'card card-muted';
