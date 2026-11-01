@@ -416,7 +416,7 @@ test("malformed schemas, decimal strings, and oversized payloads are rejected", 
   assert.equal(oversized.counters.bytes, 129);
 });
 
-test("mismatched pool or quote identity cannot be mixed into candidate evidence", async () => {
+test("mismatched pair identity invalidates all evidence despite successful sibling RPC responses", async () => {
   for (const [field, value] of [
     ["poolAddress", ALT_IDENTITY.pool],
     ["quoteAddress", ALT_IDENTITY.mint],
@@ -436,10 +436,50 @@ test("mismatched pool or quote identity cannot be mixed into candidate evidence"
       }
     });
     assert.equal(result.events[0].status, "IDENTITY_MISMATCH");
+    assert.ok(result.events.filter(event => event.endpointKind !== "pair")
+      .every(event => event.status === "RECEIVED"));
     assert.equal(result.candidates[0].identityStatus, "UNKNOWN");
-    assert.equal(result.candidates[0].candidate.evidence.marketCapUsd.coverage.complete, false);
+    const candidate = result.candidates[0].candidate;
+    for (const field of [
+      "pairCreatedAt", "marketCapUsd", "decimals", "tokenSupplyAtoms",
+      "transactionCounts1h", "largestTokenAccounts", "mintAccountInfo"
+    ]) {
+      assert.equal(candidate[field], null, `${field} must not leak sibling response data after identity mismatch`);
+    }
+    for (const [key, evidence] of Object.entries(candidate.evidence)) {
+      assert.equal(evidence.value, null, `${key} value`);
+      assert.equal(evidence.verified, false, `${key} verified`);
+      assert.equal(evidence.slot, null, `${key} slot`);
+      assert.equal(evidence.coverage.complete, false, `${key} coverage`);
+      assert.match(evidence.coverage.reason, /identity mismatch/);
+    }
+    assert.equal(result.candidates[0].coverage.identityMismatchInvalidatedCandidateEvidence, true);
+    assert.equal(result.candidates[0].coverage.tokenSupply, "UNKNOWN");
+    assert.equal(result.candidates[0].coverage.largestAccounts, "UNKNOWN");
+    const filters = filterCandidate(candidate, {now: NOW});
+    assert.equal(filters.status, "UNKNOWN");
+    assert.equal(filters.accepted, false);
+    assert.ok(Object.entries(filters.checks)
+      .filter(([key]) => key !== "identity")
+      .every(([, check]) => check.status === "UNKNOWN"));
     if (field === "quoteAddress") assert.equal(result.events[0].returned.quote, value);
   }
+});
+
+test("pair response without pairCreatedAt is rejected without using its market values", async () => {
+  const result = await acquire({
+    transport: async request => {
+      const body = await payloadFor(request);
+      if (request.provider === "dex") delete body.pairs[0].pairCreatedAt;
+      return response(body);
+    }
+  });
+  assert.equal(result.events[0].status, "MISSING_PAIR_CREATED_AT");
+  assert.equal(result.candidates[0].candidate.pairCreatedAt, null);
+  assert.equal(result.candidates[0].candidate.marketCapUsd, null);
+  assert.equal(result.candidates[0].candidate.evidence.pairCreatedAt.verified, false);
+  assert.equal(result.candidates[0].candidate.evidence.marketCapUsd.coverage.complete, false);
+  assert.equal(filterCandidate(result.candidates[0].candidate, {now: NOW}).checks.pairAge.status, "UNKNOWN");
 });
 
 test("market cap never falls back to FDV and source time stays distinct from receipt time", async () => {

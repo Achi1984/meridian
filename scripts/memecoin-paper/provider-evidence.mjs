@@ -356,7 +356,10 @@ function findDexPair(payload, requested, receivedAt, freshness) {
       });
   }
   validateDexNumbers(pair);
-  if (!validTime(pair.pairCreatedAt) || pair.pairCreatedAt > receivedAt + freshness.maxFutureSkewMs ||
+  if (!validTime(pair.pairCreatedAt)) {
+    throw requestFailure("MISSING_PAIR_CREATED_AT", "pairCreatedAt is required for pair evidence");
+  }
+  if (pair.pairCreatedAt > receivedAt + freshness.maxFutureSkewMs ||
       receivedAt - pair.pairCreatedAt > freshness.maxPairAgeMs) {
     throw requestFailure("SOURCE_TIME_OUTSIDE_POLICY", "pair creation time was future-dated or outside freshness policy");
   }
@@ -438,7 +441,7 @@ function supportedRecord(value, request, observedAt, slot, coverage = {complete:
     sourceTimeKind: coverage.sourceTime === true
       ? "pairCreatedAt" : (request.provider === "dex" ? "not-provided-for-market-snapshot" : "slot-only"),
     slot,
-    verified: true,
+    verified: coverage.complete === true,
     coverage,
     binding: {
       chainId: request.requested.chainId,
@@ -472,7 +475,7 @@ function normalizeCandidate(identity, responses, sampledAt, identityMismatch) {
   }
   if (identityMismatch) {
     for (const key of FILTER_KEYS) {
-      evidence[key] = unknownRecord("provider returned a mismatched chain, mint, pool, or quote identity",
+      evidence[key] = unknownRecord("provider identity mismatch invalidated all candidate evidence",
         {provider: "boundary", kind: "pair", requested: identity}, observedAt);
     }
   } else if (pairData) {
@@ -493,12 +496,12 @@ function normalizeCandidate(identity, responses, sampledAt, identityMismatch) {
           {complete: true, sourceTime: key === "pairCreatedAt"});
     }
   }
-  if (supply?.value) {
+  if (!identityMismatch && supply?.value) {
     const request = supply.request;
     evidence.tokenDecimals = supportedRecord(supply.value.result.value.decimals, request, supply.receivedAt,
       supply.slot, {complete: true, amountAtoms: supply.value.result.value.amount});
   }
-  if (largest?.value) {
+  if (!identityMismatch && largest?.value) {
     const request = largest.request;
     const parsed = parseSolanaLargestAccounts({
       result: {context: {slot: largest.slot}, value: largest.value.result.value}
@@ -507,14 +510,14 @@ function normalizeCandidate(identity, responses, sampledAt, identityMismatch) {
       parsed.note ?? "top20 token accounts are neither complete supply coverage nor unique-owner aggregation",
       request, largest.receivedAt, largest.slot);
   }
-  if (accountInfo) {
+  if (!identityMismatch && accountInfo) {
     for (const key of ["mintAuthorityRevoked", "freezeAuthorityRevoked", "tokenExtensions"]) {
       evidence[key] = unknownRecord(
         "getAccountInfo bytes were not decoded as verified mint authorities or Token-2022 extensions",
         accountInfo.request, accountInfo.receivedAt, accountInfo.slot);
     }
   }
-  const transactions = pairData?.transactions1h ?? null;
+  const transactions = identityMismatch ? null : pairData?.transactions1h ?? null;
   return {
     candidate: {
       chainId: identity.chainId,
@@ -523,24 +526,25 @@ function normalizeCandidate(identity, responses, sampledAt, identityMismatch) {
       quote: identity.quote,
       source: DEX_SOURCE,
       sampledAt,
-      pairCreatedAt: pairData?.pairCreatedAt ?? null,
-      marketCapUsd: pairData?.marketCapUsd ?? null,
-      decimals: supply?.value?.result?.value?.decimals ?? null,
-      tokenSupplyAtoms: supply?.value?.result?.value?.amount ?? null,
+      pairCreatedAt: identityMismatch ? null : pairData?.pairCreatedAt ?? null,
+      marketCapUsd: identityMismatch ? null : pairData?.marketCapUsd ?? null,
+      decimals: identityMismatch ? null : supply?.value?.result?.value?.decimals ?? null,
+      tokenSupplyAtoms: identityMismatch ? null : supply?.value?.result?.value?.amount ?? null,
       transactionCounts1h: transactions,
-      largestTokenAccounts: largest?.value?.result?.value ?? null,
-      mintAccountInfo: accountInfo?.value?.result?.value ?? null,
+      largestTokenAccounts: identityMismatch ? null : largest?.value?.result?.value ?? null,
+      mintAccountInfo: identityMismatch ? null : accountInfo?.value?.result?.value ?? null,
       evidence
     },
     identityStatus: identityMismatch ? "UNKNOWN" : "BOUND_TO_REQUEST",
     coverage: {
       pair: pairData ? "PARTIAL" : "UNKNOWN",
-      tokenSupply: supply ? "AMOUNT_AND_DECIMALS_ONLY" : "UNKNOWN",
-      largestAccounts: largest ? "TOP20_TOKEN_ACCOUNTS_ONLY" : "UNKNOWN",
+      tokenSupply: identityMismatch ? "UNKNOWN" : supply ? "AMOUNT_AND_DECIMALS_ONLY" : "UNKNOWN",
+      largestAccounts: identityMismatch ? "UNKNOWN" : largest ? "TOP20_TOKEN_ACCOUNTS_ONLY" : "UNKNOWN",
       mintAuthorities: "UNKNOWN",
       tokenExtensions: "UNKNOWN",
       sourceEventTimeForMarketData: "UNAVAILABLE",
-      receiptTimeIsNotSourceEventTime: true
+      receiptTimeIsNotSourceEventTime: true,
+      ...(identityMismatch ? {identityMismatchInvalidatedCandidateEvidence: true} : {})
     }
   };
 }

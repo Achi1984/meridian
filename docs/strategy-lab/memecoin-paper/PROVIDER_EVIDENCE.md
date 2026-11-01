@@ -34,22 +34,30 @@ schemas are checked. Non-200 responses, including 429, are counted as attempted
 requests; error bodies are not read and no request is retried.
 
 The request, response, run-byte, event and candidate limits are read from the
-manifest and validated against bounded ceilings. Requests reserve a complete
-per-response byte allowance synchronously before dispatch; at most four requests
-are in flight in this implementation. Response bodies are consumed as streams,
-capped before JSON parsing, and each attempted request emits one bounded event.
-Per-request deadlines compose with caller abort; abort or exhausted budgets stop
-dispatching further batches. Failed attempts consume request budget. These
-configuration limits and generated concurrency tests are not provider
-rate-limit, availability, or capacity guarantees.
+manifest and validated against bounded ceilings. Their counters reset on each
+`acquireProviderEvidence()` invocation: they are invocation bounds, not cumulative
+limits across a pilot run or repeated calls. Integration #1112 owns any cumulative
+run-level accounting and must stop before invoking this boundary when its shared
+budget is exhausted. Requests reserve a complete per-response byte allowance
+synchronously before dispatch; at most four requests are in flight in this
+implementation. Response bodies are consumed as streams, capped before JSON
+parsing, and each attempted request emits one bounded event. Per-request deadlines
+compose with caller abort; abort or exhausted budgets stop dispatching further
+batches. Failed attempts consume request budget. These configuration limits and
+generated concurrency tests are not provider rate-limit, availability, or capacity
+guarantees.
 
 The caller must supply a freshness policy and clock. The policy checks bounded
 acquisition duration, pair creation time against the caller's maximum pair age,
 and future skew. `observedAt` is the injected-clock time when a response was
 received, not a source event timestamp. DexScreener does not supply a market
 snapshot timestamp in this adapter's request; RPC supplies context slots, not a
-wall-clock source timestamp. The adapter preserves these distinctions and does
-not infer source-event time from response receipt.
+wall-clock source timestamp. Each RPC call is independent: finalized commitment
+does not make the three responses share one context slot, and this adapter does
+not require or prove cross-response slot consistency or an atomic cross-provider
+snapshot. A valid `pairCreatedAt` is required; if it is absent, the pair response
+is rejected and its market values are not normalized. The adapter preserves
+these distinctions and does not infer source-event time from response receipt.
 
 ## Normalized coverage and hard-gate limits
 
@@ -71,8 +79,13 @@ and requested identity binding. Decimal token amounts remain strings.
 The generated end-to-end test passes the normalized candidate to the existing
 filter. Supported market fields are attributable and pass their individual
 checks; missing authority, LP, ownership, developer, bundle, and extension
-evidence leaves the overall result `UNKNOWN` and `accepted: false`. This is a
-no-trade filter demonstration, not a strategy simulation or market observation.
+evidence leaves the overall result `UNKNOWN` and `accepted: false`. If pair
+identity mismatches on chain, mint, pool, or quote, all candidate evidence and
+derived candidate fields are invalidated, even when sibling RPC calls in that
+batch succeeded. Their request diagnostics remain in events; the RPC values
+cannot be mixed into candidate filter evidence. Unknown evidence is marked
+`verified: false` and `coverage.complete: false`. This is a no-trade filter
+demonstration, not a strategy simulation or market observation.
 
 ## Public documentation checked
 
