@@ -38,9 +38,12 @@ establish finality, validate freshness policy, or prove that the data is current
 
 The 82-byte Mint base reports the raw supply as an integer string, decimals, and
 initialized state. Each authority is separately `ABSENT`, `PRESENT`, or
-`UNAVAILABLE`; only a fully decoded canonical `None` option is reported absent.
-The decoder requires the unused key bytes in a `None` option to be zero, a
-strictness beyond SPL's unpacker, and rejects other option tags.
+`UNAVAILABLE`. The four-byte little-endian `COption<Pubkey>` tag is authoritative:
+tag `0` is absent even if its 32-byte key body retains an earlier public key, and
+tag `1` is present. This matches SPL's pack/unpack semantics, where packing
+`None` clears the tag without needing to clear the old key bytes. Other option
+tags fail closed. An absent authority is only decoded account state; it does not
+authenticate the RPC data or authorize a safety pass.
 
 Token-2022 TLV interpretation is intentionally limited to the following
 verified mint extensions:

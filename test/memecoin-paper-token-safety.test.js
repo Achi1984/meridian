@@ -160,16 +160,22 @@ test("unsupported encodings and invalid authority option tags are unavailable", 
     .reasonCodes.includes("INVALID_AUTHORITY_OPTION:mint"));
 });
 
-test("noncanonical absent-authority payload and uninitialized mint do not imply renunciation", () => {
-  const noncanonical = createSyntheticMintBytes();
-  noncanonical[4] = 1;
-  const invalidAuthority = decode(replaceAccountData(
-    createSyntheticEvidence(),
-    noncanonical.toString("base64")
-  ));
-  assert.ok(invalidAuthority.reasonCodes.includes("NONCANONICAL_NONE_AUTHORITY:mint"));
-  assert.equal(invalidAuthority.authorities.mint.revoked, null);
+test("None tag with retained previous key bytes is a valid absent authority", () => {
+  const evidence = createSyntheticEvidence({mintAuthority: "absent-retaining-key"});
+  const encoded = evidence.rpcResult.value.data[0];
+  const bytes = Buffer.from(encoded, "base64");
+  assert.equal(bytes.readUInt32LE(0), 0);
+  assert.ok(bytes.subarray(4, 36).some(byte => byte !== 0));
 
+  const result = decode(evidence);
+  assert.equal(result.status, "DECODED_UNVERIFIED");
+  assert.equal(result.authorities.mint.state, "ABSENT");
+  assert.equal(result.authorities.mint.revoked, true);
+  assert.equal(result.authorizationEligible, false);
+  assert.equal(result.hardGateEligible, false);
+});
+
+test("uninitialized mint does not imply authority renunciation", () => {
   const uninitialized = decode(createSyntheticEvidence({initialized: 0}));
   assert.ok(uninitialized.reasonCodes.includes("MINT_NOT_INITIALIZED"));
   assert.equal(uninitialized.authorities.mint.state, "UNAVAILABLE");

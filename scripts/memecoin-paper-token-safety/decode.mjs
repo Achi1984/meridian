@@ -125,8 +125,7 @@ function parseCOptionAddress(bytes, offset, field) {
   const tag = bytes.readUInt32LE(offset);
   const addressBytes = bytes.subarray(offset + 4, offset + 36);
   if (tag === 0) {
-    if (addressBytes.some(byte => byte !== 0)) throw new Error(`NONCANONICAL_NONE_AUTHORITY:${field}`);
-    return {state: "ABSENT", revoked: true, address: null, reason: "CANONICAL_NONE_AUTHORITY_OPTION"};
+    return {state: "ABSENT", revoked: true, address: null, reason: "NONE_AUTHORITY_OPTION_TAG"};
   }
   if (tag !== 1) throw new Error(`INVALID_AUTHORITY_OPTION:${field}`);
   return {

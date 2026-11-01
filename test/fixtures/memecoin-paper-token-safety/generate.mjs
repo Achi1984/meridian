@@ -15,6 +15,10 @@ function authorityOption(state, fill) {
   if (state === "present") {
     option.writeUInt32LE(1, 0);
     option.fill(fill, 4);
+  } else if (state === "absent-retaining-key") {
+    option.writeUInt32LE(1, 0);
+    option.fill(fill, 4);
+    option.writeUInt32LE(0, 0);
   } else if (state !== "absent") {
     option.writeUInt32LE(state, 0);
   }
