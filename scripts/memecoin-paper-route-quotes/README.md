@@ -82,8 +82,16 @@ must enforce the official organization-wide limit across all its callers.
 
 The response is strictly checked against the pinned V2 response shape and
 bound to the requested mints, raw input amount, selected-pool identity,
-caller-supplied decimals, `ExactIn` mode, explicit slippage, output threshold,
-route-plan legs, and price-impact field. A single route step is reported as
+caller-supplied decimals, `ExactIn` mode, and explicit slippage request; it
+captures the raw output threshold, route-plan legs, and price-impact field.
+The minimum-output
+threshold is only checked as a positive integer no greater than `outAmount`;
+its consistency with `slippageBps` is explicitly `UNVERIFIED`. The pinned V2
+documentation describes a minimum output after slippage but does not specify a
+raw-integer formula or rounding rule, so this adapter does not invent or claim
+that relationship. A threshold of `"1"` with `outAmount: "17057460"` and
+`slippageBps: 50` remains parseable but visibly unverified, and cannot authorize
+anything. A single route step is reported as
 `SINGLE_POOL_MATCH` only when its `ammKey`, mints, amounts, and full-route
 allocation match the request. Any route plan with multiple steps is
 `MULTI_LEG_UNBOUND`; it never becomes a fixed-pool match. A matching `ammKey`

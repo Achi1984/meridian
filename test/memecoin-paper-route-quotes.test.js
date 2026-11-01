@@ -128,6 +128,72 @@ test("quote-only request uses the fixed V2 order route with bounded credential-f
   }
 });
 
+test("rejected response status and headers cancel their unread streaming bodies", async () => {
+  for (const [status, contentType, reason] of [
+    [403, "application/json", "AUTH_DENIED"],
+    [200, "text/plain", "CONTENT_TYPE_INVALID"]
+  ]) {
+    let cancelled = false;
+    const stream = new ReadableStream({
+      cancel() {
+        cancelled = true;
+      }
+    });
+    const {adapter} = adapterFor(() => ({
+      status,
+      redirected: false,
+      url: "",
+      headers: new Headers({"content-type": contentType}),
+      body: stream
+    }));
+    const result = await adapter.getQuote(request());
+    assert.ok(result.reasons.includes(reason));
+    assert.equal(cancelled, true);
+    assert.equal(stream.locked, false);
+  }
+});
+
+test("request values are snapshotted before deferred transport and later mutations do not rebind evidence", async () => {
+  const mutableIdentity = {...IDENTITY};
+  const mutableRequest = request({identity: mutableIdentity});
+  const fixture = syntheticOrderResponse();
+  let releaseTransport;
+  const transportResponse = new Promise(resolve => {
+    releaseTransport = resolve;
+  });
+  let requestUrl;
+  const adapter = createJupiterV2QuoteAdapter({
+    enabled: true,
+    clock: () => NOW,
+    transport: async url => {
+      requestUrl = url;
+      return transportResponse;
+    }
+  });
+  const pending = adapter.getQuote(mutableRequest);
+  await Promise.resolve();
+  mutableRequest.inputMint = SYNTHETIC_QUOTE;
+  mutableRequest.outputMint = "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
+  mutableRequest.amount = "1";
+  mutableRequest.slippageBps = 10_000;
+  mutableRequest.candidateSampledAt = NOW + 100_000;
+  mutableIdentity.pool = "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD";
+  releaseTransport(response(fixture.body));
+
+  const result = await pending;
+  assert.equal(new URL(requestUrl).searchParams.get("inputMint"), SYNTHETIC_MINT);
+  assert.equal(new URL(requestUrl).searchParams.get("outputMint"), SYNTHETIC_QUOTE);
+  assert.equal(new URL(requestUrl).searchParams.get("amount"), "100000000");
+  assert.equal(new URL(requestUrl).searchParams.get("slippageBps"), "50");
+  assert.equal(result.request.inputMint, SYNTHETIC_MINT);
+  assert.equal(result.request.outputMint, SYNTHETIC_QUOTE);
+  assert.equal(result.request.amount, "100000000");
+  assert.equal(result.request.slippageBps, 50);
+  assert.equal(result.routeBinding.selectedPool, SYNTHETIC_POOL);
+  assert.equal(result.routeBinding.status, "SINGLE_POOL_MATCH");
+  assert.equal(result.normalization.reasons.includes("QUOTE_IDENTITY_MISMATCH:pool"), false);
+});
+
 test("multi-leg routes are explicitly unbound and cannot claim the selected pool", async () => {
   const fixture = syntheticOrderResponse();
   const first = fixture.body.routePlan[0];
@@ -146,6 +212,23 @@ test("multi-leg routes are explicitly unbound and cannot claim the selected pool
   assert.equal(result.routeBinding.status, "MULTI_LEG_UNBOUND");
   assert.ok(result.reasons.includes("MULTI_LEG_ROUTE_NOT_FIXED_POOL"));
   assert.notEqual(result.routeBinding.status, "SINGLE_POOL_MATCH");
+  assert.equal(result.authorizationEligible, false);
+});
+
+test("minimum output consistency is explicitly unverified when its rounding formula is undocumented", async () => {
+  const fixture = syntheticOrderResponse({
+    outAmount: "17057460",
+    otherAmountThreshold: "1",
+    slippageBps: 50
+  });
+  const result = await adapterFor(fixture.body).adapter.getQuote(request());
+  assert.equal(result.route.outAmount, "17057460");
+  assert.equal(result.route.minOutAmount, "1");
+  assert.equal(result.route.slippageBps, 50);
+  assert.deepEqual(result.route.minimumOutputConsistency, {
+    status: "UNVERIFIED",
+    reason: "Pinned V2 documentation does not specify the integer threshold formula or rounding semantics."
+  });
   assert.equal(result.authorizationEligible, false);
 });
 

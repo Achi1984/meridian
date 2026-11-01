@@ -49,21 +49,43 @@ function invalid(code) {
 function validateIdentity(identity) {
   return isRecord(identity) && !Reflect.ownKeys(identity).some(key =>
     !["chainId", "mint", "pool", "quote", "decimals"].includes(key)) &&
-    identity.chainId === "solana" &&
-    BASE58.test(identity.mint ?? "") && BASE58.test(identity.pool ?? "") &&
-    BASE58.test(identity.quote ?? "") &&
+    typeof identity.chainId === "string" && identity.chainId === "solana" &&
+    typeof identity.mint === "string" && BASE58.test(identity.mint) &&
+    typeof identity.pool === "string" && BASE58.test(identity.pool) &&
+    typeof identity.quote === "string" && BASE58.test(identity.quote) &&
     Number.isInteger(identity.decimals) && identity.decimals >= 0 && identity.decimals <= 18;
 }
 
-function validateRequest(request) {
-  if (!isRecord(request) || Reflect.ownKeys(request).some(key =>
-    !["identity", "inputMint", "outputMint", "inputDecimals", "outputDecimals",
-      "amount", "slippageBps", "candidateSampledAt", "authorizedAt"].includes(key))) {
-    throw invalid("REQUEST_SCHEMA_INVALID");
+function copyDataRecord(value, allowedKeys, errorCode) {
+  if (!isRecord(value)) throw invalid(errorCode);
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const copy = Object.create(null);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== "string" || !allowedKeys.includes(key)) throw invalid(errorCode);
+    const descriptor = descriptors[key];
+    if (!Object.hasOwn(descriptor, "value")) throw invalid(errorCode);
+    copy[key] = descriptor.value;
   }
+  return copy;
+}
+
+function snapshotRequest(request) {
+  const snapshot = copyDataRecord(request, [
+    "identity", "inputMint", "outputMint", "inputDecimals", "outputDecimals",
+    "amount", "slippageBps", "candidateSampledAt", "authorizedAt"
+  ], "REQUEST_SCHEMA_INVALID");
+  if (isRecord(snapshot.identity)) {
+    snapshot.identity = copyDataRecord(snapshot.identity,
+      ["chainId", "mint", "pool", "quote", "decimals"], "REQUEST_IDENTITY_INVALID");
+  }
+  return snapshot;
+}
+
+function validateRequest(request) {
   const {identity} = request;
   if (!validateIdentity(identity)) throw invalid("REQUEST_IDENTITY_INVALID");
-  if (![request.inputMint, request.outputMint].every(mint => BASE58.test(mint ?? "")) ||
+  if (![request.inputMint, request.outputMint].every(mint =>
+    typeof mint === "string" && BASE58.test(mint)) ||
       request.inputMint === request.outputMint ||
       ![identity.mint, identity.quote].includes(request.inputMint) ||
       ![identity.mint, identity.quote].includes(request.outputMint)) {
@@ -99,35 +121,79 @@ function parseResponseJson(bytes) {
   }
 }
 
-async function readBoundedBody(response) {
-  const contentLength = response.headers?.get?.("content-length");
-  if (contentLength !== null && contentLength !== undefined) {
-    if (!/^\d+$/.test(contentLength)) throw invalid("CONTENT_LENGTH_INVALID");
-    if (Number(contentLength) > MAX_RESPONSE_BYTES) throw invalid("RESPONSE_TOO_LARGE");
+async function discardResponseBody(response) {
+  const body = response?.body;
+  if (!body) return;
+  if (typeof body.getReader === "function") {
+    let reader;
+    try {
+      reader = body.getReader();
+      await reader.cancel();
+    } catch {
+      try {
+        await body.cancel?.();
+      } catch {
+        return;
+      }
+    } finally {
+      try {
+        reader?.releaseLock();
+      } catch {
+        return;
+      }
+    }
+    return;
   }
-  const contentType = response.headers?.get?.("content-type") ?? "";
-  if (!/^application\/json(?:\s*;|$)/i.test(contentType)) {
-    throw invalid("CONTENT_TYPE_INVALID");
+  try {
+    await body.cancel?.();
+  } catch {
+    return;
   }
-  if (!response.body?.getReader) throw invalid("RESPONSE_BODY_MISSING");
+}
 
+async function readBoundedBody(response, onReader) {
+  if (!response.body?.getReader) throw invalid("RESPONSE_BODY_MISSING");
   const reader = response.body.getReader();
+  onReader(async () => {
+    try {
+      await reader.cancel();
+    } catch {
+      return;
+    }
+  });
   const chunks = [];
   let length = 0;
   try {
+    const contentLength = response.headers?.get?.("content-length");
+    if (contentLength !== null && contentLength !== undefined) {
+      if (!/^\d+$/.test(contentLength)) throw invalid("CONTENT_LENGTH_INVALID");
+      if (Number(contentLength) > MAX_RESPONSE_BYTES) throw invalid("RESPONSE_TOO_LARGE");
+    }
+    const contentType = response.headers?.get?.("content-type") ?? "";
+    if (!/^application\/json(?:\s*;|$)/i.test(contentType)) {
+      throw invalid("CONTENT_TYPE_INVALID");
+    }
     while (true) {
       const {done, value} = await reader.read();
       if (done) break;
       if (!(value instanceof Uint8Array)) throw invalid("RESPONSE_BODY_INVALID");
       length += value.byteLength;
-      if (length > MAX_RESPONSE_BYTES) {
-        void reader.cancel().catch(() => {});
-        throw invalid("RESPONSE_TOO_LARGE");
-      }
+      if (length > MAX_RESPONSE_BYTES) throw invalid("RESPONSE_TOO_LARGE");
       chunks.push(value);
     }
+  } catch (error) {
+    try {
+      await reader.cancel();
+    } catch {
+      // The response stream may already be closed or aborted.
+    }
+    throw error;
   } finally {
-    reader.releaseLock();
+    try {
+      reader.releaseLock();
+    } finally {
+      onReader(null);
+    }
   }
   const bytes = new Uint8Array(length);
   let offset = 0;
@@ -308,6 +374,10 @@ function validateResponse(body, request) {
     inAmount: body.inAmount,
     outAmount: body.outAmount,
     minOutAmount: body.otherAmountThreshold,
+    minimumOutputConsistency: {
+      status: "UNVERIFIED",
+      reason: "Pinned V2 documentation does not specify the integer threshold formula or rounding semantics."
+    },
     swapMode: body.swapMode,
     slippageBps: body.slippageBps,
     priceImpact: body.priceImpact === undefined
@@ -479,12 +549,14 @@ export function createJupiterV2QuoteAdapter({
   let lastRequestAt = null;
   return Object.freeze({
     async getQuote(request) {
+      let snapshot;
       let beforeRequest;
       try {
-        validateRequest(request);
+        snapshot = snapshotRequest(request);
+        validateRequest(snapshot);
         beforeRequest = clock();
-        if (!validTime(beforeRequest) || beforeRequest <= request.candidateSampledAt ||
-            beforeRequest <= request.authorizedAt) {
+        if (!validTime(beforeRequest) || beforeRequest <= snapshot.candidateSampledAt ||
+            beforeRequest <= snapshot.authorizedAt) {
           throw invalid("REQUEST_CHRONOLOGY_INVALID");
         }
         if (lastRequestAt !== null) {
@@ -495,20 +567,22 @@ export function createJupiterV2QuoteAdapter({
         }
       } catch (error) {
         const code = error?.code ?? "REQUEST_INVALID";
-        return resultBase([code], request, beforeRequest ?? 0);
+        return resultBase([code], snapshot ?? null, beforeRequest ?? 0);
       }
 
       let requestUrl;
       try {
-        requestUrl = buildUrl(request);
+        requestUrl = buildUrl(snapshot);
       } catch (error) {
-        return resultBase([error?.code ?? "REQUEST_INVALID"], request, beforeRequest);
+        return resultBase([error?.code ?? "REQUEST_INVALID"], snapshot, beforeRequest);
       }
 
       lastRequestAt = beforeRequest;
       const controller = new AbortController();
       let timeoutExpired = false;
       let timeoutHandle;
+      let response;
+      let cancelActiveReader = null;
       const timeout = new Promise((_, reject) => {
         timeoutHandle = setTimeout(() => {
           timeoutExpired = true;
@@ -517,7 +591,6 @@ export function createJupiterV2QuoteAdapter({
         }, timeoutMs);
       });
       const operation = (async () => {
-        let response;
         try {
           response = await transport(requestUrl, {
             method: "GET",
@@ -531,18 +604,34 @@ export function createJupiterV2QuoteAdapter({
         } catch {
           throw invalid("TRANSPORT_ERROR");
         }
+        if (controller.signal.aborted) {
+          await discardResponseBody(response);
+          throw invalid(timeoutExpired ? "REQUEST_TIMEOUT" : "TRANSPORT_ABORTED");
+        }
         if (!response || !Number.isInteger(response.status)) throw invalid("TRANSPORT_RESPONSE_INVALID");
         if (isRedirected(response, requestUrl) || (response.status >= 300 && response.status < 400)) {
+          await discardResponseBody(response);
           throw invalid("REDIRECT_REJECTED");
         }
-        if (response.status === 401 || response.status === 403) throw invalid("AUTH_DENIED");
-        if (response.status === 429) throw invalid("RATE_LIMITED");
-        if (response.status !== 200) throw invalid("HTTP_ERROR");
-        const body = await readBoundedBody(response);
-        const route = validateResponse(body, request);
+        if (response.status === 401 || response.status === 403) {
+          await discardResponseBody(response);
+          throw invalid("AUTH_DENIED");
+        }
+        if (response.status === 429) {
+          await discardResponseBody(response);
+          throw invalid("RATE_LIMITED");
+        }
+        if (response.status !== 200) {
+          await discardResponseBody(response);
+          throw invalid("HTTP_ERROR");
+        }
+        const body = await readBoundedBody(response, cancelReader => {
+          cancelActiveReader = cancelReader;
+        });
+        const route = validateResponse(body, snapshot);
         const observedAt = clock();
         if (!validTime(observedAt) || observedAt < beforeRequest) throw invalid("CLOCK_INVALID");
-        if (observedAt <= request.candidateSampledAt || observedAt <= request.authorizedAt) {
+        if (observedAt <= snapshot.candidateSampledAt || observedAt <= snapshot.authorizedAt) {
           throw invalid("QUOTE_CHRONOLOGY_INVALID");
         }
         const providerExpiresAt = route.providerExpiresAt;
@@ -563,7 +652,7 @@ export function createJupiterV2QuoteAdapter({
                 ? "PROVIDER_RFQ_AND_LOCAL_POLICY"
                 : "PROVIDER_RFQ_BOUNDED_BY_LOCAL_POLICY"
           },
-          binding: routeBinding(route, request.identity, request),
+          binding: routeBinding(route, snapshot.identity, snapshot),
           now: observedAt
         };
       })();
@@ -576,16 +665,19 @@ export function createJupiterV2QuoteAdapter({
           ...(observed.binding.status === "MULTI_LEG_UNBOUND" ? ["MULTI_LEG_ROUTE_NOT_FIXED_POOL"] : []),
           ...(observed.binding.status === "SELECTED_POOL_MISMATCH" ? ["SELECTED_POOL_NOT_BOUND"] : []),
           ...(observed.binding.status === "UNAVAILABLE" ? ["ROUTE_PLAN_UNAVAILABLE"] : [])
-        ], request, observed.now);
+        ], snapshot, observed.now);
         result.route = observed.route;
         result.routeBinding = observed.binding;
-        result.normalization = normalizeObservedRoute(request, observed.route);
+        result.normalization = normalizeObservedRoute(snapshot, observed.route);
         return result;
       } catch (error) {
+        controller.abort();
+        if (cancelActiveReader) await cancelActiveReader();
+        else if (response) await discardResponseBody(response);
         const code = timeoutExpired ? "REQUEST_TIMEOUT" : error?.code ?? "TRANSPORT_ERROR";
-        const failed = resultBase([code], request, beforeRequest);
+        const failed = resultBase([code], snapshot, beforeRequest);
         failed.normalization = normalizeUnavailable(
-          request.identity, request.candidateSampledAt, request.authorizedAt, beforeRequest
+          snapshot.identity, snapshot.candidateSampledAt, snapshot.authorizedAt, beforeRequest
         );
         return failed;
       } finally {
