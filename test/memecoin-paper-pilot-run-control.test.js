@@ -89,6 +89,7 @@ test("an acknowledged one-cycle budget ends once and preserves supplied unresolv
   assert.deepEqual(summary.positionEvidence, {
     status: "UNKNOWN",
     unresolvedPositions: null,
+    sourceStep: null,
     lastKnown: {
       status: "STALE",
       reason: "STOP_REQUESTED:BUDGET_EXHAUSTED",
@@ -127,6 +128,7 @@ test("position evidence from an earlier step is stale when the latest step omits
     const report = calls.find(call => call.name === "report").input.summary;
     assert.equal(checkpoint.positionEvidenceStatus, "UNKNOWN");
     assert.equal(checkpoint.unresolvedPositions, null);
+    assert.equal(checkpoint.positionEvidenceSourceStep, null);
     assert.deepEqual(checkpoint.lastKnownPositionEvidence, {
       status: "STALE",
       reason: "LATEST_STEP_DID_NOT_SUPPLY_POSITION_EVIDENCE",
@@ -164,6 +166,7 @@ test("invalid latest-step evidence cannot retain earlier empty or nonempty evide
     const checkpoint = calls.find(call => call.name === "checkpoint").input;
     assert.equal(checkpoint.positionEvidenceStatus, "UNKNOWN");
     assert.equal(checkpoint.unresolvedPositions, null);
+    assert.equal(checkpoint.positionEvidenceSourceStep, null);
     assert.equal(checkpoint.lastKnownPositionEvidence.status, "STALE");
     assert.equal(checkpoint.lastKnownPositionEvidence.reason, "LATEST_STEP_POSITION_EVIDENCE_INVALID");
     assert.deepEqual(checkpoint.lastKnownPositionEvidence.unresolvedPositions, earlier);
@@ -359,6 +362,9 @@ test("unsettled step and operator stop leave previous position evidence stale", 
           return input.eventIndex === 0
             ? {unresolvedPositions: previous}
             : barrier.promise;
+        },
+        report() {
+          throw new Error("synthetic report failed after unsettled step");
         }
       }
     });
@@ -377,10 +383,12 @@ test("unsettled step and operator stop leave previous position evidence stale", 
     assert.equal(summary.positionEvidence.lastKnown.reason, "LATEST_STEP_UNSETTLED");
     assert.deepEqual(summary.positionEvidence.lastKnown.unresolvedPositions, previous);
     assert.deepEqual(report.positionEvidence, summary.positionEvidence);
+    assert.equal(summary.reportStatus, "FAILED");
     assert.equal(calls.filter(call => call.name === "checkpoint").length, 0);
-    barrier.resolve({unresolvedPositions: [{id: "late-position"}]});
+    barrier.reject(new Error("synthetic late step failure"));
     await flushMicrotasks();
     assert.deepEqual(control.snapshot().callbackCompletion.step, "UNSETTLED");
+    assert.equal(control.snapshot().state, "UNKNOWN");
     assert.equal(runtime.pendingTimers(), 0);
   }
 });
@@ -401,7 +409,18 @@ test("operator stop between cycles stales evidence from the last acknowledged ch
   const run = control.start();
   await flushMicrotasks();
   assert.equal(calls.filter(call => call.name === "checkpoint").length, 1);
+  const checkpoint = calls.find(call => call.name === "checkpoint").input;
   assert.equal(calls.find(call => call.name === "checkpoint").input.positionEvidenceStatus, "SUPPLIED");
+  assert.equal(checkpoint.positionEvidenceSourceStep, 1);
+  assert.deepEqual(checkpoint.unresolvedPositions, [
+    {source: "synthetic callback evidence", eventId: "first-cycle"}
+  ]);
+  assert.deepEqual(checkpoint.lastKnownPositionEvidence, {
+    status: "LAST_KNOWN",
+    reason: null,
+    sourceStep: 1,
+    unresolvedPositions: [{source: "synthetic callback evidence", eventId: "first-cycle"}]
+  });
   assert.equal(calls.filter(call => call.name === "acquire").length, 1);
   assert.equal(control.stop(), true);
   const summary = await run;
@@ -414,6 +433,78 @@ test("operator stop between cycles stales evidence from the last acknowledged ch
   assert.deepEqual(report.positionEvidence, summary.positionEvidence);
   assert.equal(calls.filter(call => call.name === "acquire").length, 1);
   assert.equal(runtime.pendingTimers(), 0);
+});
+
+test("position evidence keeps its source step across an empty acquisition cycle", async () => {
+  const runtime = createFakeRuntime();
+  let acquisitions = 0;
+  const {control, calls} = setup({
+    runtime,
+    budgets: {requests: 2, events: 2, cycles: 2},
+    overrides: {
+      acquire() {
+        acquisitions += 1;
+        return {
+          events: acquisitions === 1 ? [{synthetic: true, id: "position-sample"}] : [],
+          requestsUsed: 1,
+          done: acquisitions === 2
+        };
+      }
+    }
+  });
+  const run = control.start();
+  await flushMicrotasks();
+  assert.equal(calls.filter(call => call.name === "checkpoint").length, 1);
+  await runtime.advance(DEFAULT_BUDGETS.pollIntervalMs);
+  const summary = await run;
+  const checkpoints = calls.filter(call => call.name === "checkpoint");
+  assert.equal(checkpoints.length, 2);
+  assert.equal(checkpoints[1].input.positionEvidenceStatus, "SUPPLIED");
+  assert.equal(checkpoints[1].input.positionEvidenceSourceStep, 1);
+  assert.deepEqual(checkpoints[1].input.unresolvedPositions, [
+    {source: "synthetic callback evidence", eventId: "position-sample"}
+  ]);
+  assert.equal(summary.positionEvidence.status, "UNKNOWN");
+  assert.equal(summary.positionEvidence.lastKnown.sourceStep, 1);
+});
+
+test("missing and null polling timer handles stop UNKNOWN after the first acknowledged cycle", async () => {
+  for (const missingHandle of [undefined, null]) {
+    const runtime = createFakeRuntime();
+    let timerCalls = 0;
+    const scheduler = {
+      setTimeout(callback, delay) {
+        timerCalls += 1;
+        if (timerCalls === 2) return missingHandle;
+        return runtime.scheduler.setTimeout(callback, delay);
+      },
+      clearTimeout(handle) {
+        runtime.scheduler.clearTimeout(handle);
+      }
+    };
+    const fake = createFakeCallbacks({
+      acquire() {
+        return {events: [{synthetic: true, id: "first-only"}], requestsUsed: 1};
+      }
+    });
+    const control = createPilotRunControl({
+      mode: SYNTHETIC_TEST_ONLY,
+      callbacks: fake.callbacks,
+      clock: runtime.clock,
+      scheduler,
+      budgets: {...DEFAULT_BUDGETS, requests: 2, events: 2, cycles: 2}
+    });
+    const summary = await control.start();
+    assert.equal(summary.status, "UNKNOWN");
+    assert.equal(summary.reason, "SCHEDULER_FAILED");
+    assert.equal(summary.failureCode, "SCHEDULER_FAILED");
+    assert.equal(summary.checkpointAcknowledgement.status, "ACKNOWLEDGED");
+    assert.equal(fake.calls.filter(call => call.name === "acquire").length, 1);
+    assert.equal(fake.calls.filter(call => call.name === "step").length, 1);
+    assert.equal(fake.calls.filter(call => call.name === "checkpoint").length, 1);
+    assert.equal(fake.calls.filter(call => call.name === "report").length, 1);
+    assert.equal(runtime.pendingTimers(), 0);
+  }
 });
 
 test("a slow acquisition never overlaps and polling begins only after cycle settlement", async () => {
@@ -532,6 +623,131 @@ test("unknown checkpoint acknowledgement withholds durable FINISHED status", asy
   assert.equal(summary.positionEvidence.lastKnown.status, "STALE");
   assert.equal(calls.find(call => call.name === "report").input.summary.positionEvidence.status, "UNKNOWN");
   assert.equal(calls.find(call => call.name === "report").input.summary.status, "UNKNOWN");
+});
+
+test("checkpoint acknowledgement sequences reject regression and conflicting same-sequence hashes", async () => {
+  const scenarios = [
+    [
+      {status: "ACKNOWLEDGED", sequence: 2, hash: "2".padStart(64, "0")},
+      {status: "ACKNOWLEDGED", sequence: 1, hash: "1".padStart(64, "0")}
+    ],
+    [
+      {status: "ACKNOWLEDGED", sequence: 2, hash: "2".padStart(64, "0")},
+      {status: "ACKNOWLEDGED", sequence: 2, hash: "a".repeat(64)}
+    ]
+  ];
+  for (const acknowledgements of scenarios) {
+    const runtime = createFakeRuntime();
+    let acquisition = 0;
+    let checkpoint = 0;
+    const {control, calls} = setup({
+      runtime,
+      budgets: {requests: 2, events: 2, cycles: 2},
+      overrides: {
+        acquire() {
+          acquisition += 1;
+          return {
+            events: [{synthetic: true, id: `step-${acquisition}`}],
+            requestsUsed: 1
+          };
+        },
+        checkpoint() {
+          return acknowledgements[checkpoint++];
+        }
+      }
+    });
+    const run = control.start();
+    await flushMicrotasks();
+    await runtime.advance(DEFAULT_BUDGETS.pollIntervalMs);
+    const summary = await run;
+    assert.equal(summary.status, "UNKNOWN");
+    assert.equal(summary.reason, "CHECKPOINT_ACK_UNKNOWN");
+    assert.equal(summary.checkpointAcknowledgement.status, "UNKNOWN");
+    assert.equal(calls.filter(call => call.name === "acquire").length, 2);
+    assert.equal(calls.filter(call => call.name === "checkpoint").length, 2);
+  }
+});
+
+test("repeated identical checkpoint ACK is accepted only when event and step progress is unchanged", async () => {
+  for (const secondCycleHasEvent of [false, true]) {
+    const runtime = createFakeRuntime();
+    let acquisition = 0;
+    const repeatedAck = {
+      status: "ACKNOWLEDGED",
+      sequence: 1,
+      hash: "1".padStart(64, "0")
+    };
+    const {control, calls} = setup({
+      runtime,
+      budgets: {requests: 2, events: 2, cycles: 2},
+      overrides: {
+        acquire() {
+          acquisition += 1;
+          return {
+            events: acquisition === 1 || secondCycleHasEvent
+              ? [{synthetic: true, id: `cycle-${acquisition}`}]
+              : [],
+            requestsUsed: 1,
+            done: acquisition === 2
+          };
+        },
+        checkpoint() {
+          return repeatedAck;
+        }
+      }
+    });
+    const run = control.start();
+    await flushMicrotasks();
+    await runtime.advance(DEFAULT_BUDGETS.pollIntervalMs);
+    const summary = await run;
+    assert.equal(calls.filter(call => call.name === "checkpoint").length, 2);
+    if (secondCycleHasEvent) {
+      assert.equal(summary.status, "UNKNOWN");
+      assert.equal(summary.reason, "CHECKPOINT_ACK_UNKNOWN");
+      assert.equal(summary.checkpointAcknowledgement.status, "UNKNOWN");
+    } else {
+      assert.equal(summary.status, "FINISHED");
+      assert.equal(summary.checkpointAcknowledgement.status, "ACKNOWLEDGED");
+      assert.equal(summary.checkpointAcknowledgement.sequence, repeatedAck.sequence);
+      assert.equal(summary.checkpointAcknowledgement.hash, repeatedAck.hash);
+    }
+  }
+});
+
+test("a late checkpoint ACK after operator stop is retained without resuming work", async () => {
+  const runtime = createFakeRuntime();
+  const barrier = deferred();
+  let checkpointSignal;
+  const {control, calls} = setup({
+    runtime,
+    overrides: {
+      checkpoint(input) {
+        checkpointSignal = input.signal;
+        return barrier.promise;
+      }
+    }
+  });
+  const run = control.start();
+  await flushMicrotasks();
+  assert.equal(calls.filter(call => call.name === "checkpoint").length, 1);
+  assert.equal(control.stop(), true);
+  assert.equal(checkpointSignal.aborted, true);
+  barrier.resolve({
+    status: "ACKNOWLEDGED",
+    sequence: 1,
+    hash: "1".padStart(64, "0")
+  });
+  const summary = await run;
+  const report = calls.find(call => call.name === "report").input.summary;
+  assert.equal(summary.status, "FINISHED");
+  assert.equal(summary.reason, "OPERATOR_STOP");
+  assert.equal(summary.callbackCompletion.checkpoint, "COMPLETED_AFTER_STOP");
+  assert.equal(summary.checkpointAcknowledgement.status, "ACKNOWLEDGED");
+  assert.equal(report.status, "FINISHED");
+  assert.equal(report.checkpointAcknowledgement.status, "ACKNOWLEDGED");
+  assert.equal(calls.filter(call => call.name === "acquire").length, 1);
+  assert.equal(calls.filter(call => call.name === "checkpoint").length, 1);
+  assert.equal(runtime.pendingTimers(), 0);
 });
 
 test("step and terminal report failures remain separate from checkpoint evidence", async () => {

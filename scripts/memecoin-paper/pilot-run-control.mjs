@@ -175,8 +175,10 @@ export function createPilotRunControl(options = {}) {
   let checkpointStatus = "NOT_ATTEMPTED";
   let checkpointSequence = null;
   let checkpointHash = null;
+  let checkpointProgress = null;
   let unresolvedPositions = null;
   let positionEvidenceStatus = "UNKNOWN";
+  let positionEvidenceSourceStep = null;
   let lastKnownPositionEvidence = null;
   let requestAccountingStatus = "KNOWN";
   const controlAbort = new AbortController();
@@ -214,6 +216,7 @@ export function createPilotRunControl(options = {}) {
     }
     positionEvidenceStatus = "UNKNOWN";
     unresolvedPositions = null;
+    positionEvidenceSourceStep = null;
   }
 
   function requestStop(reason) {
@@ -278,10 +281,11 @@ export function createPilotRunControl(options = {}) {
     try {
       unresolvedPositions = cloneEvidence(result.unresolvedPositions);
       positionEvidenceStatus = "SUPPLIED";
+      positionEvidenceSourceStep = counts.completedSteps;
       lastKnownPositionEvidence = {
         status: "LAST_KNOWN",
         reason: null,
-        sourceStep: counts.completedSteps,
+        sourceStep: positionEvidenceSourceStep,
         unresolvedPositions
       };
     } catch {
@@ -391,7 +395,12 @@ export function createPilotRunControl(options = {}) {
       try {
         handle = config.scheduler.setTimeout(() => finish(true), config.budgets.pollIntervalMs);
         ownsTimer = handle !== undefined && handle !== null;
-        if (!ownsTimer) finish(false);
+        if (!ownsTimer) {
+          failureStatus = "UNKNOWN";
+          failureCode = "SCHEDULER_FAILED";
+          requestStop("SCHEDULER_FAILED");
+          finish(false);
+        }
       } catch {
         failureStatus = "UNKNOWN";
         failureCode = "SCHEDULER_FAILED";
@@ -401,13 +410,18 @@ export function createPilotRunControl(options = {}) {
     });
   }
 
-  function acceptCheckpoint(value) {
+  function acceptCheckpoint(value, progress) {
     const valid = isRecord(value) && value.status === "ACKNOWLEDGED" &&
       Number.isSafeInteger(value.sequence) && value.sequence >= 0 &&
       typeof value.hash === "string" && HASH.test(value.hash);
+    const sameSequence = valid && checkpointSequence !== null && value.sequence === checkpointSequence;
+    const progressAdvanced = checkpointProgress !== null &&
+      (progress.eventCount > checkpointProgress.eventCount ||
+        progress.completedSteps > checkpointProgress.completedSteps);
     if (!valid ||
         (checkpointSequence !== null && value.sequence < checkpointSequence) ||
-        (checkpointSequence !== null && value.sequence === checkpointSequence && value.hash !== checkpointHash)) {
+        (sameSequence && value.hash !== checkpointHash) ||
+        (sameSequence && progressAdvanced)) {
       checkpointStatus = "UNKNOWN";
       uncertain = true;
       failureStatus ??= "UNKNOWN";
@@ -418,6 +432,7 @@ export function createPilotRunControl(options = {}) {
     checkpointStatus = "ACKNOWLEDGED";
     checkpointSequence = value.sequence;
     checkpointHash = value.hash;
+    checkpointProgress = progress;
     uncertain = false;
     return true;
   }
@@ -444,6 +459,7 @@ export function createPilotRunControl(options = {}) {
         status: positionEvidenceStatus,
         unresolvedPositions: positionEvidenceStatus === "SUPPLIED"
           ? cloneEvidence(unresolvedPositions) : null,
+        sourceStep: positionEvidenceStatus === "SUPPLIED" ? positionEvidenceSourceStep : null,
         lastKnown: lastKnownPositionEvidence ? cloneEvidence(lastKnownPositionEvidence) : null
       },
       reportStatus: "NOT_EMITTED"
@@ -618,11 +634,16 @@ export function createPilotRunControl(options = {}) {
         unresolvedPositions: positionEvidenceStatus === "SUPPLIED"
           ? cloneEvidence(unresolvedPositions) : null,
         positionEvidenceStatus,
+        positionEvidenceSourceStep: positionEvidenceStatus === "SUPPLIED"
+          ? positionEvidenceSourceStep : null,
         lastKnownPositionEvidence: lastKnownPositionEvidence
           ? cloneEvidence(lastKnownPositionEvidence) : null
       });
       if (checkpointed.kind === "success" || checkpointed.kind === "late-success") {
-        acceptCheckpoint(checkpointed.value);
+        acceptCheckpoint(checkpointed.value, {
+          eventCount: counts.events,
+          completedSteps: counts.completedSteps
+        });
       } else {
         checkpointStatus = "UNKNOWN";
         uncertain = true;

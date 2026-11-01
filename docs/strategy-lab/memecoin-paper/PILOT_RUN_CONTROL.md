@@ -60,7 +60,7 @@ listed fields and an `AbortSignal`.
 | --- | --- | --- |
 | `acquire` | `cycleIndex`, `remainingRequests`, `remainingEvents`, `deadlineAtMonotonicMs` | `{events: Array, requestsUsed: nonnegative safe integer, done?: boolean}`. `events` must fit the remaining event budget. |
 | `step` | `cycleIndex`, `eventIndex`, `event` | Optional `{unresolvedPositions: bounded plain-data array}`. These are supplied evidence only; the controller does not derive positions, liquidation, or P&L. |
-| `checkpoint` | `cycleIndex`, `eventCount`, `completedSteps`, `unresolvedPositions`, `positionEvidenceStatus`, `lastKnownPositionEvidence` | `{status: "ACKNOWLEDGED", sequence: nonnegative safe integer, hash: lowercase SHA-256 hex}` only after the integration verifies the durable receipt. Any other result is `UNKNOWN`. |
+| `checkpoint` | `cycleIndex`, `eventCount`, `completedSteps`, `unresolvedPositions`, `positionEvidenceStatus`, `positionEvidenceSourceStep`, `lastKnownPositionEvidence` | `{status: "ACKNOWLEDGED", sequence: nonnegative safe integer, hash: lowercase SHA-256 hex}` only after the integration verifies the durable receipt. Any other result is `UNKNOWN`. |
 | `report` | `{summary, signal}` | Its return value is not a durability acknowledgement. The callback is attempted once and bounded by `callbackSettlementMs`; a failed or late report does not change the run's terminal status. |
 
 Acquisition, step, and checkpoint work is sequential. Position evidence is
@@ -72,16 +72,25 @@ stop, the current status remains `UNKNOWN`. Earlier data may be retained only
 under `lastKnownPositionEvidence` with `status: "STALE"` and its source step; it
 is never exposed as the current unresolved-position list. A stop also marks
 current evidence stale. Checkpoint and terminal-report payloads carry both the
-current status/list and the separately labelled last-known evidence.
+current status/list and the separately labelled last-known evidence. Current
+evidence includes `positionEvidenceSourceStep`; empty acquisition cycles do not
+refresh that provenance or imply a new position observation.
 
-Acquisition, step, and checkpoint work is sequential. On stop, the active
-callback receives an aborted signal. If it does not settle within the configured
-settlement bound, the controller returns `UNKNOWN`, starts no new work, and
-does not retry or recover it. A completed step is not treated as durable until
-the checkpoint hook acknowledges it. If a checkpoint hook settles with a
-valid acknowledgement while stopping, that acknowledgement is retained without
-resuming the run. Callback completion, checkpoint acknowledgement, and the
-returned terminal summary are separate fields.
+The checkpoint sequence cannot regress. Reusing the same sequence with a
+different hash is `UNKNOWN`. An identical sequence/hash ACK may be repeated
+only when event and completed-step counts have not advanced since that ACK; a
+repeat after new work cannot acknowledge that work. This is only a local
+consistency check: the controller does not authenticate hashes or receipt
+contents. The injected checkpoint integration remains responsible for proving
+that each ACK is the durable readback for the state it claims to acknowledge.
+
+On stop, the active callback receives an aborted signal. If it does not settle
+within the configured settlement bound, the controller returns `UNKNOWN`,
+starts no new work, and does not retry or recover it. A completed step is not
+treated as durable until the checkpoint hook acknowledges it. If a checkpoint
+hook settles with a valid acknowledgement while stopping, that acknowledgement
+is retained without resuming the run. Callback completion, checkpoint
+acknowledgement, and the returned terminal summary are separate fields.
 
 The terminal report receives the status and acknowledgement known before
 reporting begins. In particular, it cannot turn an `UNKNOWN` checkpoint into a
@@ -92,6 +101,12 @@ when its freshness contract above is satisfied; absent evidence is reported as
 `UNKNOWN`, not as an empty portfolio. No code here fabricates liquidation or
 P&L. Timer handles and the parent abort listener are cleaned up when the
 one-shot operation terminates.
+
+If active work becomes unsettled and the terminal report callback then throws
+or rejects, `reportStatus` is `FAILED`; the run remains `UNKNOWN`. A rejection
+that arrives after the settlement timeout is consumed but cannot revise the
+already returned terminal summary or change terminal state. Report completion
+or failure does not acknowledge checkpoint durability.
 
 ## Existing contracts and proposed future glue
 
@@ -155,7 +170,9 @@ node --test test/memecoin-paper-pilot-run-control.test.js
 
 The tests cover default-disabled behavior, mode rejection, deadline boundaries,
 operator and parent cancellation, callback settlement, sequential acquisition,
-all work budgets, unknown checkpoint acknowledgement, late results, report
-failure/timeout, one-shot terminal emission, monotonic regression, and cleanup.
+all work budgets, checkpoint sequence and repeat-ACK boundaries, missing timer
+handles, late checkpoint acknowledgements, position-evidence provenance,
+unknown acknowledgements, late results, report failure/timeout, one-shot
+terminal emission, monotonic regression, and cleanup.
 This is not evidence of real-source readiness, durable host behavior, or
 permission to start the eight-hour Paper pilot.
