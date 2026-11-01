@@ -146,21 +146,30 @@ evidence and blocks.
 
 ## Verify success with the existing public check
 
-The repository's existing public postmerge/version check is the `MERIDIAN
-Runtime Smoke` workflow in `.github/workflows/runtime-smoke.yml`, running
-`scripts/runtime-smoke.mjs`. It runs on main pushes and requires its `GITHUB_SHA`
-to match the deployed gateway SHA. It verifies Pages `version.json` fields
-`version`, `buildId` and `terminalBuild`, plus the terminal HTML/JS and manifest.
-On the inspected base, `version.json.terminalBuild` is `10.0-r130`; use the
-expected marker from the exact activation main if that source value changes.
+Pages technical acceptance requires both the publication run to conclude
+successfully with the after-step returning `VERIFIED`, and a public `version.json`
+read whose `version`, `buildId` and `terminalBuild` match the expected values
+from the exact reviewed main. On the inspected base,
+`version.json.terminalBuild` is `10.0-r130`; use the marker from the exact
+activation main if that source value changes. These checks establish Pages
+technical evidence only.
 
-Completion requires the actual publication run to conclude successfully, the
-after-step to return `VERIFIED`, and the ordinary main-push Runtime Smoke run to
-pass for the exact deployed SHA and current version marker. These are source
-defined criteria, not results established by this inert package. Keep dependent
-merges held until all required checks and the explicit recorded decision are
-complete. Do not manually rerun the smoke or use it as a substitute for Pages
-terminal-state evidence.
+Overall release acceptance is separate. The existing `MERIDIAN Runtime Smoke`
+workflow in `.github/workflows/runtime-smoke.yml` runs
+`scripts/runtime-smoke.mjs` on main pushes. It checks the public Pages version,
+terminal assets and manifest, and also requires the gateway deployment SHA to
+match the exact pushed `GITHUB_SHA`. With the gateway runtime paused, that
+gateway exact-SHA condition is not currently satisfiable. If Runtime Smoke is
+blocked for that reason, record it as an overall release acceptance blocker,
+not a Pages deployment failure. Do not waive the check or reinterpret a Pages
+pass as full release acceptance.
+
+Even if the Pages technical checks pass, full release acceptance and hold
+lifting remain blocked until a separate concrete Owner decision addresses the
+paused gateway or explicitly records alternative acceptance. No such decision
+or waiver is granted by this runbook. Keep dependent merges held until all
+applicable overall gates and that decision are complete. Do not manually rerun
+the smoke or use it as a substitute for Pages terminal-state evidence.
 
 ## Rollback and stop procedure
 

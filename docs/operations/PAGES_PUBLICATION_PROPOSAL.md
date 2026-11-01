@@ -20,6 +20,8 @@ This seven-file candidate is based on main
   (blob `645e2ccb0c814c716be2c5b82a5610b0a77282df`) and in-memory validator
   (blob `2889bc500491450cbb08df73fb5f47cebd246438`).
 
+The helper, focused tests and this proposal were modified from recorded PR #1092 head `2e788edc522542d26e489d553be33fa44a680d62`, the runbook and validator were modified from recorded PR #1098 head `5e48ae5c945ba76c62a80a21037d2741a783107c`, and the workflow template and activation patch remain byte-identical to their source blobs `20002686c294ba7099ec56705618dc3891584d6b` and `645e2ccb0c814c716be2c5b82a5610b0a77282df`.
+
 The original PRs remain untouched and are not merge prerequisites. Review and
 merge this consolidated candidate first. Any later activation change must verify
 the template blob expected by its patch; any change to the pins, source,
@@ -101,12 +103,22 @@ failed/cancelled deployment or timeout blocks publication; it never issues a wri
    behavior for its own pending deployment; this proposal adds no cancellation,
    particularly none of a successful prior deployment.
 6. The after-step requires current Pages status `succeed` and unchanged main. This
-   API evidence does not replace the exact public build/version check in
-   `.github/workflows/runtime-smoke.yml`. That workflow runs
-   `scripts/runtime-smoke.mjs`, which binds the gateway deployment SHA to the
-   pushed SHA and verifies Pages `version.json` including `terminalBuild`.
-   The marker on the inspected base is `10.0-r130`; activation must use the marker
-   in the exact reviewed main, not assume a later value.
+   is Pages deployment evidence, not overall release acceptance. Pages technical
+   acceptance also requires a public `version.json` read matching the expected
+   `version`, `buildId` and `terminalBuild` from the exact reviewed main. The
+   marker on the inspected base is `10.0-r130`; do not assume it remains current.
+
+The separate overall release acceptance includes the existing `MERIDIAN Runtime
+Smoke` check in `.github/workflows/runtime-smoke.yml`. Its
+`scripts/runtime-smoke.mjs` verifies the public Pages version and also requires
+the gateway deployment SHA to match the exact pushed SHA. With the gateway
+runtime paused, that exact-SHA condition is not currently satisfiable. A
+Runtime Smoke failure for that reason is an overall release acceptance blocker,
+not a Pages deployment failure; it must not be used to relabel Pages evidence or
+waived. Even if Pages technical acceptance passes, full release acceptance and
+the merge hold remain blocked until a separate concrete Owner decision addresses
+the paused gateway or explicitly records alternative acceptance. No such
+decision or waiver is granted by this proposal.
 
 The workflow status alone cannot prove Pages' internal admission lock cleared or
 that a source-switch gap preserved the currently served content. The runbook makes
@@ -145,10 +157,15 @@ CI and applicable postmerge gates are complete. This draft grants no approval.
 5. Only after the single-writer window and approved settings readback, merge the
    reviewed activation change. Follow the runbook's observed-disposition branches.
    Never run both branch and custom publishers simultaneously.
-6. Keep dependent merges held until the existing `MERIDIAN Runtime Smoke` run
-   checks the exact deployed SHA and current public version markers, Pages reports
-   terminal success, and the prescribed decision is recorded. Do not treat this
-   source-only candidate or a readiness disposition as that evidence.
+6. Establish Pages technical acceptance from after-step `VERIFIED` plus the
+   matching public `version.json` marker. Separately, retain every required
+   overall release/postmerge gate. The existing `MERIDIAN Runtime Smoke` also
+   requires the gateway exact-SHA check, which is currently unsatisfiable while
+   the gateway is paused; that blocks overall release acceptance without
+   constituting a Pages failure. Keep the merge hold until the required gates
+   pass and a separate concrete Owner decision addresses the paused gateway or
+   explicitly records alternative acceptance. Do not waive a check or treat this
+   source-only candidate or readiness disposition as acceptance.
 
 Rollback is a separate recorded setup action: freeze new merges/dispatches, let any
 active publisher reach a known terminal state, remove the active custom workflow
