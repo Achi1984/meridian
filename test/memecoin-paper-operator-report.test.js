@@ -221,6 +221,14 @@ test("untrusted metadata is bounded and safely escaped in readable text", () => 
   assert.match(safeDtoText, /Paper entry fills: UNKNOWN/);
   assert.match(safeDtoText, /Reported costs: UNKNOWN/);
   assert.doesNotMatch(safeDtoText, /FORGED|https?:\/\/|unsafe\.example/);
+
+  const oscInput = reportFixtures.blockedScan();
+  oscInput.filters.checks.liquidity.reason = "\u001b]".repeat(20_000);
+  const oscReport = projectOperatorReport(oscInput);
+  const sanitizedReason = oscReport.candidates.details
+    .find(candidate => candidate.status === "UNKNOWN").reasons[0].reason;
+  assert.ok(sanitizedReason.length <= 240);
+  assert.doesNotMatch(sanitizedReason, /\u001b/);
 });
 
 test("input, amount, count, and report-contract limits are enforced", () => {

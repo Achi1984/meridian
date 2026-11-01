@@ -116,7 +116,7 @@ function inputBytes(value) {
 
 function cleanText(value, limit = MAX_TEXT) {
   if (typeof value !== "string") return null;
-  return value
+  return value.slice(0, limit * 4)
     .replace(/\u001b(?:\[[0-?]*[ -/]*[@-~]|\][^\u0007]*(?:\u0007|\u001b\\))/g, "[escape]")
     .replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g, " ")
     .replace(/https?:\/\/\S+/gi, "[url]")
