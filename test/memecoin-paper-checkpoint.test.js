@@ -210,11 +210,26 @@ test("journaled riskSnapshot restores the fixed 2999/3000-cent gate and rejected
     marks: []
   })).status, "DAILY_LOSS_LIMIT");
   const expectedSnapshot = session.snapshot();
+  const expectedMetadata = session.metadata;
+  for (const now of [START - 1, START, nextViennaDay + 4999]) {
+    assert.equal((await session.riskSnapshot(`backwards-${now}`, {now, marks: []})).reason,
+      "NON_MONOTONIC_TIME");
+    assert.equal((await session.finishRun(`backwards-finish-${now}`, {now, marks: []})).reason,
+      "NON_MONOTONIC_TIME");
+    assert.deepEqual(session.snapshot(), expectedSnapshot);
+    assert.deepEqual(session.metadata, expectedMetadata);
+  }
   await session.close();
 
   const resumedStore = await CheckpointStore.open(directory);
   const resumed = await PaperCheckpointSession.open({store: resumedStore});
   assert.deepEqual(resumed.snapshot(), expectedSnapshot);
+  assert.equal((await resumed.riskSnapshot("old-day-after-reopen", {now: START, marks: []})).reason,
+    "NON_MONOTONIC_TIME");
+  assert.deepEqual(resumed.metadata, expectedMetadata);
+  assert.equal((await resumed.riskSnapshot("equal-time-after-reopen", {
+    now: nextViennaDay + 5000, marks: []
+  })).status, "DAILY_LOSS_LIMIT");
   assert.deepEqual(await resumed.riskSnapshot("loss-3000", {
     now: nextViennaDay + 3000,
     marks: [markQuote(candidate, nextViennaDay + 3000, 6251)]
@@ -342,4 +357,29 @@ test("child crashes distinguish unpublished data from ambiguous publication", as
     }
     await store.close();
   }
+});
+
+
+test("restore rejects internally rehashed backward command time before replay", async t => {
+  const directory = await tempDirectory(t);
+  const {session} = await openSession(directory);
+  await session.riskSnapshot("risk", {now: START + 1, marks: []});
+  await session.close();
+  const filename = path.join(directory, "checkpoint.json");
+  const checkpoint = JSON.parse(await readFile(filename, "utf8"));
+  checkpoint.records[1].inputs.now = START - 1;
+  await writeFile(filename, canonicalCheckpointBytes(checkpoint));
+  await assert.rejects(openSession(directory), error =>
+    error.code === "CHECKPOINT_CORRUPT" && /time moves backwards/.test(error.message));
+});
+
+test("old clock policy checkpoints are not silently migrated", async t => {
+  const directory = await tempDirectory(t);
+  const {session} = await openSession(directory);
+  await session.close();
+  const filename = path.join(directory, "checkpoint.json");
+  const checkpoint = JSON.parse(await readFile(filename, "utf8"));
+  checkpoint.runHeader.policyVersion = "memecoin-paper-ledger-v1";
+  await writeFile(filename, canonicalCheckpointBytes(checkpoint));
+  await assert.rejects(openSession(directory), {code: "CHECKPOINT_INCOMPATIBLE"});
 });

@@ -3,7 +3,7 @@ import {PaperLedger, PAPER_LEDGER_POLICY} from "./ledger.mjs";
 import {canonicalCheckpointBytes, MAX_CHECKPOINT_BYTES} from "./checkpoint-store.mjs";
 
 const FORMAT_VERSION = 1;
-const POLICY_VERSION = "memecoin-paper-ledger-v1";
+const POLICY_VERSION = "memecoin-paper-ledger-v2-monotonic-time";
 const EIGHT_HOURS_MS = 8 * 60 * 60 * 1000;
 const MAX_RECORDS = 10_000;
 const MAX_INPUT_NODES = 100_000;
@@ -250,6 +250,7 @@ export class PaperCheckpointSession {
   #results = new Map();
   #unknown = false;
   #closed = false;
+  #latestCommandTime;
 
   constructor(store, header, ledger, records, headHash) {
     this.#store = store;
@@ -258,6 +259,7 @@ export class PaperCheckpointSession {
     this.#records = records;
     this.#headHash = headHash;
     this.#headSequence = records.length - 1;
+    this.#latestCommandTime = records.at(-1).inputs.now ?? header.startedAt;
     for (const record of records.slice(1)) {
       this.#commandDigests.set(record.commandId, inputIdentity(record.method, record.inputs, record.guard ?? null));
     }
@@ -332,6 +334,7 @@ export class PaperCheckpointSession {
     const authorizationRefs = new Map();
     const commandDigests = new Set();
     const results = new Map();
+    let latestTime = header.startedAt;
     for (let sequence = 0; sequence < checkpoint.records.length; sequence += 1) {
       const stored = checkpoint.records[sequence];
       assertRecord(stored, sequence, header.runId, predecessorHash);
@@ -363,6 +366,10 @@ export class PaperCheckpointSession {
         } else {
           commandInputs = validateInputShape(record.method, commandInputs, header);
         }
+        if (commandInputs.now < latestTime) {
+          throw checkpointError("CHECKPOINT_CORRUPT", "command time moves backwards");
+        }
+        latestTime = commandInputs.now;
         const mustGuard = record.method !== "finishRun" && commandInputs.now > header.deadlineAt;
         commandDigests.add(record.commandId);
         if ((record.guard !== undefined && record.guard !== "deadline") ||
@@ -438,6 +445,11 @@ export class PaperCheckpointSession {
       }
       return cloneResult(this.#results.get(commandId));
     }
+    // Known exact command retries are read-only and remain available at their old time.
+    // New backward commands are rejected without ledger or checkpoint side effects.
+    if (inputs.now < this.#latestCommandTime) {
+      return {status: "REJECT", reason: "NON_MONOTONIC_TIME", entriesAllowed: false};
+    }
     if (this.#records.length >= MAX_RECORDS) {
       return {status: "REJECT", reason: "checkpoint command capacity reached"};
     }
@@ -499,6 +511,7 @@ export class PaperCheckpointSession {
         reason: committed.reason ?? "command result has no durable acknowledgement"
       };
     }
+    this.#latestCommandTime = inputs.now;
     this.#records = nextRecords;
     this.#headSequence = record.sequence;
     this.#headHash = committed.hash;

@@ -931,3 +931,60 @@ test("one-shot manifest remains disabled, unset, bounded, and allowlists no user
   assert.ok(manifest.pollBudget.maxBytesPerResponse > 0);
   assert.ok(manifest.pollBudget.maxBytesPerRun > manifest.pollBudget.maxBytesPerResponse);
 });
+
+
+test("clock rollback cannot reset a tripped daily loss gate or mutate direct-ledger state", () => {
+  const start = Date.parse("2026-01-02T10:00:00Z");
+  const ledger = new PaperLedger({now: start});
+  const candidate = syntheticCandidate(start);
+  const auth = authorize(ledger, candidate, start);
+  const quote = fillQuote(candidate, start);
+  const fill = ledger.executeEntry(auth, quote, {now: start + 2000});
+  const loss = ledger.riskSnapshot({now: start + 3000,
+    marks: [exitQuote(candidate, start + 3000, 6250)]});
+  assert.equal(loss.status, "DAILY_LOSS_LIMIT");
+  const before = {summary: ledger.summary(), audit: ledger.auditEvents(),
+    day: ledger.day, opening: ledger.dailyOpeningEquityCents};
+  for (const now of [start - 86400000, start + 2999]) {
+    const rejected = ledger.riskSnapshot({now, marks: []});
+    assert.equal(rejected.reason, "NON_MONOTONIC_TIME");
+    assert.equal(rejected.entriesAllowed, false);
+    assert.equal(ledger.finishRun({startedAt: start - 86400000, now}).reason, "NON_MONOTONIC_TIME");
+    assert.deepEqual({summary: ledger.summary(), audit: ledger.auditEvents(),
+      day: ledger.day, opening: ledger.dailyOpeningEquityCents}, before);
+    assert.equal(ledger.dailyLossTripped, true);
+  }
+  // Old exact event lookup is not a new command and does not move the clock.
+  assert.deepEqual(ledger.executeEntry(auth, quote, {now: start + 2000}), fill);
+  assert.equal(ledger.riskSnapshot({now: start + 3000, marks: []}).status, "DAILY_LOSS_LIMIT");
+  const tomorrow = ledger.riskSnapshot({now: start + 86400000, marks: []});
+  assert.equal(tomorrow.status, "PASS");
+  assert.equal(ledger.day, "2026-01-03");
+});
+
+test("all direct-ledger mutation paths reject older command times before side effects", () => {
+  const start = Date.parse("2026-01-02T10:00:00Z");
+  const ledger = new PaperLedger({now: start});
+  const candidate = syntheticCandidate(start);
+  const auth = authorize(ledger, candidate, start);
+  ledger.riskSnapshot({now: start + 3000, marks: []});
+  const before = {summary: ledger.summary(), audit: ledger.auditEvents(), reservations: [...ledger.reservations]};
+  assert.equal(ledger.executeEntry(auth, fillQuote(candidate, start), {now: start + 2000}).reason,
+    "NON_MONOTONIC_TIME");
+  assert.equal(ledger.observeExitQuote(exitQuote(candidate, start + 2000, 9000)).reason,
+    "NON_MONOTONIC_TIME");
+  assert.equal(authorize(ledger, candidate, start, {authorizationId: "new-old", tickId: "new-old"}).reason,
+    "NON_MONOTONIC_TIME");
+  assert.deepEqual({summary: ledger.summary(), audit: ledger.auditEvents(), reservations: [...ledger.reservations]}, before);
+  assert.equal(ledger.executeEntry(auth, fillQuote(candidate, start, {observedAt: start + 3000}),
+    {now: start + 3000}).status, "FILLED_PAPER");
+});
+
+test("forward UTC time across Vienna DST fallback is admitted without day regression", () => {
+  const start = Date.parse("2026-10-25T00:59:59Z");
+  const ledger = new PaperLedger({now: start});
+  assert.equal(ledger.riskSnapshot({now: Date.parse("2026-10-25T01:00:00Z"), marks: []}).status, "PASS");
+  assert.equal(ledger.day, "2026-10-25");
+  assert.equal(ledger.riskSnapshot({now: Date.parse("2026-10-25T23:00:00Z"), marks: []}).status, "PASS");
+  assert.equal(ledger.day, "2026-10-26");
+});
