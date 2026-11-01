@@ -328,6 +328,16 @@ test("all capped report lists distinguish exact totals from 40-row display caps"
   assert.equal(candidateReport.candidates.detailsCoverage.displayTruncated, true);
   assert.equal(candidateReport.provenance.length, 40);
   assert.equal(candidateReport.provenanceCoverage.total, 41);
+  const fortyCandidateRows = structuredClone(replay);
+  fortyCandidateRows.audit = [
+    ...fortyCandidateRows.audit.filter(row => row.stage === "Scout").slice(0, 40),
+    ...fortyCandidateRows.audit.filter(row => row.stage !== "Scout")
+  ];
+  fortyCandidateRows.discovery.observedRecords = 40;
+  const fortyCandidateReport = projectOperatorReport(fortyCandidateRows);
+  assert.equal(fortyCandidateReport.candidates.detailsCoverage.displayed, 40);
+  assert.equal(fortyCandidateReport.candidates.detailsCoverage.displayTruncated, false);
+  assert.equal(fortyCandidateReport.provenanceCoverage.displayTruncated, false);
 
   const manyReasons = reportFixtures.blockedScan();
   manyReasons.filters.checks = Object.fromEntries(Array.from({length: 41}, (_, index) => [
@@ -339,6 +349,16 @@ test("all capped report lists distinguish exact totals from 40-row display caps"
   assert.equal(reasonReport.trading.noTradeReasons.length, 40);
   assert.equal(reasonReport.trading.noTradeReasonsCoverage.total, 42);
   assert.equal(reasonReport.trading.noTradeReasonsCoverage.displayTruncated, true);
+  const fortyReasons = reportFixtures.blockedScan();
+  fortyReasons.filters.checks = Object.fromEntries(Array.from({length: 39}, (_, index) => [
+    `gate-${index}`,
+    {status: "UNKNOWN", reason: `missing evidence ${index}`}
+  ]));
+  fortyReasons.analysis.components = {};
+  const fortyReasonReport = projectOperatorReport(fortyReasons);
+  assert.equal(fortyReasonReport.trading.noTradeReasonsCoverage.total, 40);
+  assert.equal(fortyReasonReport.trading.noTradeReasonsCoverage.displayed, 40);
+  assert.equal(fortyReasonReport.trading.noTradeReasonsCoverage.displayTruncated, false);
 
   const stopResults = Array.from({length: 41}, (_, index) =>
     reportFixtures.receipt(`clock:${index}`, "riskSnapshot", {
@@ -349,6 +369,9 @@ test("all capped report lists distinguish exact totals from 40-row display caps"
   assert.equal(stops.controls.stopsCoverage.total, 41);
   assert.equal(stops.controls.stopsCoverage.displayed, 40);
   assert.equal(stops.controls.stopsCoverage.displayTruncated, true);
+  const fortyStops = projectOperatorReport(reportFixtures.checkpoint({results: stopResults.slice(0, 40)}));
+  assert.equal(fortyStops.controls.stopsCoverage.displayed, 40);
+  assert.equal(fortyStops.controls.stopsCoverage.displayTruncated, false);
 
   const positions = Array.from({length: 41}, (_, index) => ({
     ...reportFixtures.positiveReplay().ledger.openPositions[0],
@@ -358,6 +381,9 @@ test("all capped report lists distinguish exact totals from 40-row display caps"
   assert.equal(positionReport.controls.openPositions.length, 40);
   assert.equal(positionReport.controls.openPositionsCoverage.total, 41);
   assert.equal(positionReport.controls.openPositionsCoverage.displayTruncated, true);
+  const fortyPositionReport = projectOperatorReport(reportFixtures.checkpoint({positions: positions.slice(0, 40)}));
+  assert.equal(fortyPositionReport.controls.openPositionsCoverage.displayed, 40);
+  assert.equal(fortyPositionReport.controls.openPositionsCoverage.displayTruncated, false);
 
   const unresolvedResults = Array.from({length: 41}, (_, index) =>
     reportFixtures.receipt(`entry:${index}`, "executeEntry", {
@@ -368,4 +394,9 @@ test("all capped report lists distinguish exact totals from 40-row display caps"
   assert.equal(unresolved.unresolvedFillsCoverage.total, 41);
   assert.equal(unresolved.unresolvedFillsCoverage.displayed, 40);
   assert.equal(renderOperatorReport(unresolved).match(/unresolved fills: 41/)[0], "unresolved fills: 41");
+  const fortyUnresolved = projectOperatorReport(
+    reportFixtures.checkpoint({results: unresolvedResults.slice(0, 40)})
+  );
+  assert.equal(fortyUnresolved.unresolvedFillsCoverage.displayed, 40);
+  assert.equal(fortyUnresolved.unresolvedFillsCoverage.displayTruncated, false);
 });

@@ -155,13 +155,15 @@ function countValue(value) {
 
 function listCoverage(observedTotal, total, sourceTruncated = null, unaccounted = null) {
   const observed = countValue(observedTotal);
+  const knownTotal = countValue(total);
   return {
     observedTotal: observed,
-    total: countValue(total),
+    total: knownTotal,
     displayed: observed === null ? 0 : Math.min(observed, 40),
     displayTruncated: observed === null ? null : observed > 40,
     sourceTruncated,
-    unaccounted: countValue(unaccounted)
+    unaccounted: countValue(unaccounted) ??
+      (observed !== null && knownTotal !== null ? Math.max(knownTotal - observed, 0) : null)
   };
 }
 
@@ -921,6 +923,8 @@ function makeReport(data, report) {
   const unresolvedSourceTruncated = data.variant === "checkpoint"
     ? false : data.auditPresent ? data.auditTruncated : null;
   const sources = evidenceSummary(data, candidates);
+  const candidateListTruncated = data.variant === "checkpoint" ? false :
+    truncationFlag(candidates.discoveryTruncated, candidates.scoutAuditTruncated);
   const candidateDetails = (candidates.details ?? []).slice(0, 40).map(candidate => ({
     ...candidate,
     reasons: candidate.reasons.slice(0, 40),
@@ -957,7 +961,7 @@ function makeReport(data, report) {
       detailsCoverage: listCoverage(
         candidates.details?.length ?? 0,
         candidates.considered,
-        truncationFlag(candidates.discoveryTruncated, candidates.scoutAuditTruncated),
+        candidateListTruncated,
         candidates.unaccountedObserved
       )
     },
@@ -1024,7 +1028,7 @@ function makeReport(data, report) {
     provenanceCoverage: listCoverage(
       candidates.details?.length ?? 0,
       candidates.considered,
-      truncationFlag(candidates.discoveryTruncated, candidates.scoutAuditTruncated),
+      candidateListTruncated,
       candidates.unaccountedObserved
     )
   };
