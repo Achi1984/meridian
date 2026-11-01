@@ -153,6 +153,23 @@ function countValue(value) {
   return value;
 }
 
+function listCoverage(observedTotal, total, sourceTruncated = null, unaccounted = null) {
+  const observed = countValue(observedTotal);
+  return {
+    observedTotal: observed,
+    total: countValue(total),
+    displayed: observed === null ? 0 : Math.min(observed, 40),
+    displayTruncated: observed === null ? null : observed > 40,
+    sourceTruncated,
+    unaccounted: countValue(unaccounted)
+  };
+}
+
+function truncationFlag(...values) {
+  if (values.includes(true)) return true;
+  return values.length > 0 && values.every(value => value === false) ? false : null;
+}
+
 function stableValue(value) {
   if (typeof value === "bigint") return {$bigint: value.toString()};
   if (value instanceof Map) {
@@ -210,6 +227,10 @@ function replayData(report) {
   const runEnd = isRecord(report.runEnd) ? report.runEnd : null;
   const audit = Array.isArray(report.audit) ? report.audit : [];
   if (audit.length > MAX_ROWS) throw new TypeError("replay audit exceeds row limits");
+  if (report.discovery && Object.hasOwn(report.discovery, "truncated") &&
+      typeof report.discovery.truncated !== "boolean") {
+    throw new TypeError("replay discovery truncation state is invalid");
+  }
   const scoutRows = audit.filter(row => row?.stage === "Scout");
   const selected = scoutRows.filter(row => row.status === "SELECTED");
   const startTimes = selected.map(row => timestamp(row.sampledAt)).filter(Boolean).sort();
@@ -256,6 +277,13 @@ function replayData(report) {
     source: report.source,
     sourceReady: report.realDataPreparation?.status === "BLOCKED" ? "BLOCKED" :
       report.liveCandidateEvidence === false ? "NOT_READY" : "UNKNOWN",
+    discoveryTruncated: typeof report.discovery?.truncated === "boolean"
+      ? report.discovery.truncated : null,
+    auditTruncated: truncationFlag(report.auditTruncated, ledger.auditTruncated),
+    replayAuditTruncated: typeof report.auditTruncated === "boolean"
+      ? report.auditTruncated : null,
+    ledgerAuditTruncated: typeof ledger.auditTruncated === "boolean"
+      ? ledger.auditTruncated : null,
     startAt,
     endAt,
     complete: Boolean(runEnd && runEnd.status === "FINISHED"),
@@ -326,6 +354,11 @@ function checkpointData(report) {
     analysis: null,
     source: report.source,
     sourceReady: report.liveCandidateEvidence === false ? "NOT_READY" : "UNKNOWN",
+    discoveryTruncated: null,
+    auditTruncated: truncationFlag(summary.auditTruncated),
+    replayAuditTruncated: null,
+    ledgerAuditTruncated: typeof summary.auditTruncated === "boolean"
+      ? summary.auditTruncated : null,
     startAt,
     endAt,
     complete: Boolean(runEnd && runEnd.status === "FINISHED"),
@@ -366,13 +399,15 @@ function candidateReasons(filter, analysis) {
       });
     }
   }
-  return reasons.slice(0, 40);
+  return reasons;
 }
 
 function checkpointCandidates(results) {
   const authorizations = results.filter(item => item.method === "authorizeEntry");
   if (!authorizations.length) return {
     considered: null, accepted: null, rejected: null, unknown: null,
+    audited: 0, unaccountedObserved: null, discoveryTruncated: null,
+    scoutAuditTruncated: null, details: [],
     basis: "authorization receipts absent; scan counts unavailable"
   };
   let accepted = 0;
@@ -421,8 +456,12 @@ function checkpointCandidates(results) {
     accepted,
     rejected,
     unknown,
+    audited: authorizations.length,
+    unaccountedObserved: null,
+    discoveryTruncated: null,
+    scoutAuditTruncated: null,
     basis: "unique authorization receipts only; scout scan counts are not in this receipt",
-    details: details.slice(0, 40)
+    details
   };
 }
 
@@ -431,13 +470,15 @@ function candidatesFor(data) {
   const rows = data.scoutRows;
   if (!data.discovery && rows.length === 0) return {
     considered: null, accepted: null, rejected: null, unknown: null,
+    audited: 0, unaccountedObserved: null, discoveryTruncated: null,
+    scoutAuditTruncated: null, details: [],
     basis: "candidate discovery receipt unavailable"
   };
   const observed = countValue(data.discovery?.observedRecords);
   const selected = rows.filter(row => row.status === "SELECTED");
   const scoutRejected = rows.filter(row => row.status === "REJECT");
-  if (observed !== null && !data.discovery?.truncated && observed !== rows.length) {
-    throw new TypeError("scout observation count conflicts with its audit");
+  if (observed !== null && observed < rows.length) {
+    throw new TypeError("scout audit exceeds its reported observation count");
   }
   if (selected.length > 1) {
     throw new TypeError("replay report has more candidate rows than its single-candidate contract");
@@ -480,8 +521,10 @@ function candidatesFor(data) {
       reasons: candidateReasons(data.filter, data.analysis)
     });
   }
-  const considered = observed ?? rows.length;
-  if (!data.discovery?.truncated && considered !== accepted + rejected + unknown) {
+  const considered = observed;
+  const unaccountedObserved = observed === null ? null : observed - rows.length;
+  if (unaccountedObserved === 0 && !data.discovery?.truncated &&
+      considered !== accepted + rejected + unknown) {
     throw new TypeError("candidate outcome counts are inconsistent");
   }
   return {
@@ -489,8 +532,12 @@ function candidatesFor(data) {
     accepted,
     rejected,
     unknown,
+    audited: rows.length,
+    unaccountedObserved,
+    discoveryTruncated: data.discovery?.truncated ?? null,
+    scoutAuditTruncated: unaccountedObserved === null ? null : unaccountedObserved > 0,
     basis: "bounded Scout audit and reported Filter/Analyst outcomes",
-    details: details.slice(0, 40)
+    details
   };
 }
 
@@ -626,7 +673,7 @@ function stopEvents(data) {
   if (data.runEnd?.status === "INVALID_RUN_WINDOW") {
     add("RUN_WINDOW", "STOPPED", data.runEnd.reason ?? data.runEnd.status, null, "finishRun receipt");
   }
-  return stops.slice(0, 40);
+  return stops;
 }
 
 function unresolvedFills(data) {
@@ -673,10 +720,10 @@ function unresolvedFills(data) {
       }
     }
   }
-  return result.slice(0, 40);
+  return result;
 }
 
-function evidenceSummary(data) {
+function evidenceSummary(data, candidates) {
   const observed = [];
   const statuses = [];
   const sources = [];
@@ -700,7 +747,32 @@ function evidenceSummary(data) {
     observedFrom: sorted[0] ?? null,
     observedThrough: sorted.at(-1) ?? null,
     basis: "source-reported sample/check timestamps; no wall-clock freshness recomputation",
-    sources: [...new Set(sources.filter(Boolean))].slice(0, 20)
+    sources: [...new Set(sources.filter(Boolean))].slice(0, 20),
+    coverage: {
+      discovery: {
+        observedRecords: countValue(data.discovery?.observedRecords),
+        scoutAuditRows: data.variant === "replay" ? data.scoutRows.length : null,
+        unaccountedObservedRecords: data.variant === "replay"
+          ? candidates.unaccountedObserved : null,
+        sourceTruncated: data.discoveryTruncated,
+        scoutAuditTruncated: data.variant === "replay"
+          ? candidates.scoutAuditTruncated : null,
+        exhaustive: typeof data.discovery?.exhaustive === "boolean"
+          ? data.discovery.exhaustive : null
+      },
+      audit: {
+        present: data.auditPresent,
+        observedRows: data.auditPresent ? data.audit.length : null,
+        truncated: data.auditTruncated,
+        totalRows: data.auditTruncated === false && data.auditPresent ? data.audit.length : null,
+        replayLoggerTruncated: data.replayAuditTruncated,
+        ledgerAuditTruncated: data.ledgerAuditTruncated,
+        ledgerEventsReported: countValue(data.summary?.eventCount),
+        ledgerEventsAudited: data.auditPresent
+          ? data.audit.filter(event => isRecord(event) && LEDGER_EVENT_TYPES.has(event.type)).length
+          : null
+      }
+    }
   };
 }
 
@@ -772,7 +844,7 @@ function makeReport(data, report) {
     }
     if (!explicitZeroLedger) fillCount = null;
   }
-  const positions = positionRows.slice(0, 40).map(position => {
+  const positions = positionRows.map(position => {
     const ending = endingByMint.get(position.mint);
     return {
       mint: cleanText(position.mint, 80),
@@ -786,6 +858,8 @@ function makeReport(data, report) {
   });
   const reserveValues = receipts.filter(item => item.method === "riskSnapshot")
     .map(item => item.result?.reservedPositions).filter(value => value !== undefined);
+  const allStops = stopEvents(data);
+  const allUnresolvedFills = unresolvedFills(data);
   const noTradeReasons = [];
   if (fillCount === 0) {
     for (const candidate of candidates.details ?? []) {
@@ -838,8 +912,24 @@ function makeReport(data, report) {
       }
     }
   }
-  const reasons = [...new Map(noTradeReasons.map(reason => [JSON.stringify(reason), reason])).values()].slice(0, 40);
-  const sources = evidenceSummary(data);
+  const allReasons = [...new Map(noTradeReasons.map(reason => [JSON.stringify(reason), reason])).values()];
+  const reasonSourceTruncated = truncationFlag(
+    data.auditPresent ? data.auditTruncated : null,
+    candidates.scoutAuditTruncated,
+    candidates.discoveryTruncated
+  );
+  const unresolvedSourceTruncated = data.variant === "checkpoint"
+    ? false : data.auditPresent ? data.auditTruncated : null;
+  const sources = evidenceSummary(data, candidates);
+  const candidateDetails = (candidates.details ?? []).slice(0, 40).map(candidate => ({
+    ...candidate,
+    reasons: candidate.reasons.slice(0, 40),
+    reasonsCoverage: listCoverage(
+      candidate.reasons.length,
+      candidate.reasons.length,
+      false
+    )
+  }));
   const dto = {
     schema: REPORT_TYPE,
     experiment: {
@@ -858,19 +948,46 @@ function makeReport(data, report) {
       accepted: candidates.accepted,
       rejected: candidates.rejected,
       unknown: candidates.unknown,
+      audited: candidates.audited,
+      unaccountedObserved: candidates.unaccountedObserved,
+      discoveryTruncated: candidates.discoveryTruncated,
+      scoutAuditTruncated: candidates.scoutAuditTruncated,
       basis: cleanText(candidates.basis),
-      details: candidates.details ?? []
+      details: candidateDetails,
+      detailsCoverage: listCoverage(
+        candidates.details?.length ?? 0,
+        candidates.considered,
+        truncationFlag(candidates.discoveryTruncated, candidates.scoutAuditTruncated),
+        candidates.unaccountedObserved
+      )
     },
     trading: {
       status: fillCount === null ? "UNKNOWN" : fillCount === 0 ? "ZERO_TRADES" : "TRADES_RECORDED",
       paperEntryFills: fillCount,
-      noTradeReasons: reasons
+      noTradeReasons: allReasons.slice(0, 40),
+      noTradeReasonsCoverage: listCoverage(
+        allReasons.length,
+        fillCount === 0 && reasonSourceTruncated === false ? allReasons.length :
+          fillCount !== 0 ? allReasons.length : null,
+        reasonSourceTruncated
+      )
     },
     controls: {
-      stops: stopEvents(data),
+      stops: allStops.slice(0, 40),
+      stopsCoverage: listCoverage(
+        allStops.length,
+        data.variant === "checkpoint" || data.auditTruncated === false ? allStops.length : null,
+        data.variant === "checkpoint" ? false :
+          data.auditPresent ? data.auditTruncated : null
+      ),
       reservations: reserveValues.length ? countValue(reserveValues.at(-1)) : null,
       openPositionCount,
-      openPositions: positions
+      openPositions: positions.slice(0, 40),
+      openPositionsCoverage: listCoverage(
+        ledgerPositions || endingPositions ? positionRows.length : null,
+        openPositionCount,
+        false
+      )
     },
     valuation: {
       status: accounting ? "MARKED_AT_RUN_END" :
@@ -889,7 +1006,12 @@ function makeReport(data, report) {
       basis: accounting ? "finishRun accounting receipt" : "run-end marks/accounting unavailable"
     },
     costs,
-    unresolvedFills: unresolvedFills(data),
+    unresolvedFills: allUnresolvedFills.slice(0, 40),
+    unresolvedFillsCoverage: listCoverage(
+      allUnresolvedFills.length,
+      unresolvedSourceTruncated === false ? allUnresolvedFills.length : null,
+      unresolvedSourceTruncated
+    ),
     provenance: (candidates.details ?? []).slice(0, 40).map(candidate => ({
       chainId: candidate.chainId,
       mint: candidate.mint,
@@ -898,7 +1020,13 @@ function makeReport(data, report) {
       quote: candidate.quote,
       sampledAt: candidate.sampledAt,
       status: candidate.status
-    }))
+    })),
+    provenanceCoverage: listCoverage(
+      candidates.details?.length ?? 0,
+      candidates.considered,
+      truncationFlag(candidates.discoveryTruncated, candidates.scoutAuditTruncated),
+      candidates.unaccountedObserved
+    )
   };
   const bytes = Buffer.byteLength(JSON.stringify(dto));
   if (bytes > OUTPUT_LIMIT_BYTES) throw new TypeError("operator report exceeds 256 KiB");
@@ -947,6 +1075,20 @@ export function renderOperatorReport(report) {
   const stops = rows(controls.stops);
   const fills = rows(report.unresolvedFills);
   const provenance = rows(report.provenance);
+  const flag = value => value === true ? "YES" : value === false ? "NO" : "UNKNOWN";
+  const coverage = value => isRecord(value) ? value : {};
+  const coverageLine = (label, value) => {
+    const item = coverage(value);
+    return `${label}: total ${count(item.total)}, observed ${count(item.observedTotal)}, displayed ${count(item.displayed)} (display capped: ${flag(item.displayTruncated)}; source truncated: ${flag(item.sourceTruncated)}; unaccounted: ${count(item.unaccounted)})`;
+  };
+  const discoveryCoverage = coverage(evidence.coverage?.discovery);
+  const auditCoverage = coverage(evidence.coverage?.audit);
+  const detailCoverage = coverage(candidates.detailsCoverage);
+  const noTradeCoverage = coverage(trading.noTradeReasonsCoverage);
+  const stopCoverage = coverage(controls.stopsCoverage);
+  const positionCoverage = coverage(controls.openPositionsCoverage);
+  const unresolvedCoverage = coverage(report.unresolvedFillsCoverage);
+  const provenanceCoverage = coverage(report.provenanceCoverage);
   const evidenceSources = Array.isArray(evidence.sources) ? evidence.sources.slice(0, 20) : [];
   const lines = [
     "PAPER OPERATOR REPORT",
@@ -955,12 +1097,21 @@ export function renderOperatorReport(report) {
     `Run bounds: ${cleanText(experiment.startAt, 32) ?? "UNKNOWN"} to ${cleanText(experiment.endAt, 32) ?? "UNKNOWN"}`,
     `Evidence freshness: ${cleanText(evidence.status, 32) ?? "UNKNOWN"} (reported timestamps; not recomputed)`,
     `Candidates: considered ${count(candidates.considered)}, accepted ${count(candidates.accepted)}, rejected ${count(candidates.rejected)}, unknown ${count(candidates.unknown)}`,
+    `Candidate evidence: audited ${count(candidates.audited)}; unaccounted observed ${count(candidates.unaccountedObserved)}; discovery truncated ${flag(candidates.discoveryTruncated)}; Scout audit truncated ${flag(candidates.scoutAuditTruncated)}`,
     `Paper entry fills: ${count(trading.paperEntryFills)} (${cleanText(trading.status, 32) ?? "UNKNOWN"})`,
     `Source readiness: ${cleanText(experiment.sourceReadiness, 32) ?? "UNKNOWN"}; operationally running: NOT EVIDENCED`,
     `Cash: ${amount(valuation.cashCents)}; reservations: ${count(controls.reservations)}; open positions: ${count(controls.openPositionCount)}`,
     `Valuation: ${cleanText(valuation.status, 32) ?? "UNKNOWN"}; realized gross/net ${amount(valuation.realizedGrossPnlCents, true)} / ${amount(valuation.realizedNetPnlCents, true)}; unrealized gross/net ${amount(valuation.unrealizedGrossPnlCents, true)} / ${amount(valuation.unrealizedNetPnlCents, true)}`,
     `Reported costs: ${amount(costs.totalCents)}`,
-    `Unresolved positions: ${count(valuation.unresolvedPositions)}; unresolved fills: ${count(fills.length)}`,
+    `Unresolved positions: ${count(valuation.unresolvedPositions)}; unresolved fills: ${count(unresolvedCoverage.total)}`,
+    `Discovery coverage: ${count(discoveryCoverage.observedRecords)} observed records; ${count(discoveryCoverage.scoutAuditRows)} Scout audit rows; source truncated ${flag(discoveryCoverage.sourceTruncated)}; audit truncated ${flag(discoveryCoverage.scoutAuditTruncated)}; unaccounted observed ${count(discoveryCoverage.unaccountedObservedRecords)}`,
+    `Audit coverage: ${count(auditCoverage.observedRows)} rows observed; total ${count(auditCoverage.totalRows)}; truncated ${flag(auditCoverage.truncated)} (replay logger ${flag(auditCoverage.replayLoggerTruncated)}, ledger ${flag(auditCoverage.ledgerAuditTruncated)})`,
+    coverageLine("Displayed candidate details", detailCoverage),
+    coverageLine("Displayed no-trade reasons", noTradeCoverage),
+    coverageLine("Displayed risk/clock stops", stopCoverage),
+    coverageLine("Displayed open positions", positionCoverage),
+    coverageLine("Displayed unresolved fills", unresolvedCoverage),
+    coverageLine("Displayed provenance", provenanceCoverage),
     "No-trade reasons:"
   ];
   if (noTradeReasons.length) {

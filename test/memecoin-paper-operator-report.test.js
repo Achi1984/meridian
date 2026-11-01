@@ -24,7 +24,8 @@ test("projects exact fixed-point totals and stable positive, negative, and zero-
   assert.equal(positive.controls.stops.filter(item => item.kind === "RUN_WINDOW").length, 1);
   assert.deepEqual(Object.keys(positive), [
     "schema", "experiment", "evidence", "candidates", "trading", "controls",
-    "valuation", "costs", "unresolvedFills", "provenance"
+    "valuation", "costs", "unresolvedFills", "unresolvedFillsCoverage",
+    "provenance", "provenanceCoverage"
   ]);
   assert.equal(JSON.stringify(positive), JSON.stringify(projectOperatorReport(positiveInput)));
 
@@ -268,4 +269,103 @@ test("zero candidate scan, missing candidate contracts, and non-finite times sta
   inconsistent.audit.find(event => event.stage === "Scout" && event.status === "SELECTED").sampledAt =
     "2026-01-02T00:00:00.000Z";
   assert.throws(() => projectOperatorReport(inconsistent), /time identity/);
+});
+
+test("discovery and Scout audit truncation preserve unaccounted candidate rows", () => {
+  const partial = reportFixtures.blockedScan();
+  const scoutRows = partial.audit.filter(row => row.stage === "Scout");
+  const selected = scoutRows.find(row => row.status === "SELECTED");
+  const duplicate = scoutRows.find(row => row.status === "REJECT");
+  const otherRows = partial.audit.filter(row => row.stage !== "Scout");
+  partial.audit = [selected, ...Array.from({length: 4}, () => structuredClone(duplicate)), ...otherRows];
+  partial.discovery.observedRecords = 100;
+  partial.discovery.truncated = true;
+
+  const report = projectOperatorReport(partial);
+  assert.equal(report.candidates.considered, 100);
+  assert.equal(report.candidates.audited, 5);
+  assert.equal(report.candidates.accepted, 0);
+  assert.equal(report.candidates.rejected, 4);
+  assert.equal(report.candidates.unknown, 1);
+  assert.equal(report.candidates.unaccountedObserved, 95);
+  assert.equal(report.candidates.discoveryTruncated, true);
+  assert.equal(report.candidates.scoutAuditTruncated, true);
+  assert.equal(report.candidates.detailsCoverage.total, 100);
+  assert.equal(report.candidates.detailsCoverage.unaccounted, 95);
+  assert.equal(report.evidence.coverage.discovery.scoutAuditRows, 5);
+  assert.equal(report.trading.status, "ZERO_TRADES");
+
+  partial.auditTruncated = true;
+  const auditTruncated = projectOperatorReport(partial);
+  assert.equal(auditTruncated.evidence.coverage.audit.truncated, true);
+  assert.equal(auditTruncated.evidence.coverage.audit.totalRows, null);
+  assert.equal(auditTruncated.trading.status, "UNKNOWN");
+
+  const missingTotal = reportFixtures.blockedScan();
+  delete missingTotal.discovery.observedRecords;
+  const unknownTotal = projectOperatorReport(missingTotal);
+  assert.equal(unknownTotal.candidates.considered, null);
+  assert.equal(unknownTotal.candidates.unaccountedObserved, null);
+  assert.equal(unknownTotal.candidates.detailsCoverage.total, null);
+});
+
+test("all capped report lists distinguish exact totals from 40-row display caps", () => {
+  const replay = reportFixtures.blockedScan();
+  const scoutRows = replay.audit.filter(row => row.stage === "Scout");
+  const selected = scoutRows.find(row => row.status === "SELECTED");
+  const duplicate = scoutRows.find(row => row.status === "REJECT");
+  replay.audit = [
+    selected,
+    ...Array.from({length: 40}, () => structuredClone(duplicate)),
+    ...replay.audit.filter(row => row.stage !== "Scout")
+  ];
+  replay.discovery.observedRecords = 41;
+  const candidateReport = projectOperatorReport(replay);
+  assert.equal(candidateReport.candidates.details.length, 40);
+  assert.equal(candidateReport.candidates.detailsCoverage.observedTotal, 41);
+  assert.equal(candidateReport.candidates.detailsCoverage.total, 41);
+  assert.equal(candidateReport.candidates.detailsCoverage.displayed, 40);
+  assert.equal(candidateReport.candidates.detailsCoverage.displayTruncated, true);
+  assert.equal(candidateReport.provenance.length, 40);
+  assert.equal(candidateReport.provenanceCoverage.total, 41);
+
+  const manyReasons = reportFixtures.blockedScan();
+  manyReasons.filters.checks = Object.fromEntries(Array.from({length: 41}, (_, index) => [
+    `gate-${index}`,
+    {status: "UNKNOWN", reason: `missing evidence ${index}`}
+  ]));
+  manyReasons.analysis.components = {};
+  const reasonReport = projectOperatorReport(manyReasons);
+  assert.equal(reasonReport.trading.noTradeReasons.length, 40);
+  assert.equal(reasonReport.trading.noTradeReasonsCoverage.total, 42);
+  assert.equal(reasonReport.trading.noTradeReasonsCoverage.displayTruncated, true);
+
+  const stopResults = Array.from({length: 41}, (_, index) =>
+    reportFixtures.receipt(`clock:${index}`, "riskSnapshot", {
+      status: "BLOCKED", reason: "CLOCK_FAULT_LATCHED", entriesAllowed: false
+    }));
+  const stops = projectOperatorReport(reportFixtures.checkpoint({results: stopResults}));
+  assert.equal(stops.controls.stops.length, 40);
+  assert.equal(stops.controls.stopsCoverage.total, 41);
+  assert.equal(stops.controls.stopsCoverage.displayed, 40);
+  assert.equal(stops.controls.stopsCoverage.displayTruncated, true);
+
+  const positions = Array.from({length: 41}, (_, index) => ({
+    ...reportFixtures.positiveReplay().ledger.openPositions[0],
+    mint: `mint-${index}`
+  }));
+  const positionReport = projectOperatorReport(reportFixtures.checkpoint({positions}));
+  assert.equal(positionReport.controls.openPositions.length, 40);
+  assert.equal(positionReport.controls.openPositionsCoverage.total, 41);
+  assert.equal(positionReport.controls.openPositionsCoverage.displayTruncated, true);
+
+  const unresolvedResults = Array.from({length: 41}, (_, index) =>
+    reportFixtures.receipt(`entry:${index}`, "executeEntry", {
+      status: "UNFILLED", reason: "fixture entry was not filled"
+    }));
+  const unresolved = projectOperatorReport(reportFixtures.checkpoint({results: unresolvedResults}));
+  assert.equal(unresolved.unresolvedFills.length, 40);
+  assert.equal(unresolved.unresolvedFillsCoverage.total, 41);
+  assert.equal(unresolved.unresolvedFillsCoverage.displayed, 40);
+  assert.equal(renderOperatorReport(unresolved).match(/unresolved fills: 41/)[0], "unresolved fills: 41");
 });
