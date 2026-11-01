@@ -36,8 +36,30 @@ function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
+function validateResponseTarget(response, request) {
+  if (response.redirected === true) {
+    throw requestFailure("REDIRECT_BLOCKED", "provider followed a redirect");
+  }
+  if (typeof response.url === "string" && response.url !== "") {
+    let returned;
+    try { returned = new URL(response.url); } catch {
+      throw requestFailure("INVALID_RESPONSE_URL", "provider response URL was invalid");
+    }
+    const expected = new URL(request.url);
+    if (returned.origin !== expected.origin || returned.pathname !== expected.pathname ||
+        returned.search !== expected.search || returned.hash !== "" ||
+        returned.username !== "" || returned.password !== "") {
+      throw requestFailure("INVALID_RESPONSE_URL", "provider response came from an unapproved host or path");
+    }
+  }
+}
+
 function validTime(value) {
   return Number.isSafeInteger(value) && Number.isFinite(new Date(value).getTime());
+}
+
+function readClock(clock) {
+  try { return clock(); } catch { return null; }
 }
 
 function assertAddress(value, label) {
@@ -451,17 +473,17 @@ function normalizeCandidate(identity, responses, sampledAt, identityMismatch) {
   }
   if (supply?.value) {
     const request = supply.request;
-    evidence.tokenDecimals = supportedRecord(supply.value.decimals, request, supply.receivedAt,
-      supply.slot, {complete: true, amountAtoms: supply.value.amount});
+    evidence.tokenDecimals = supportedRecord(supply.value.result.value.decimals, request, supply.receivedAt,
+    supply.slot, {complete: true, amountAtoms: supply.value.result.value.amount});
   }
   if (largest?.value) {
     const request = largest.request;
     const parsed = parseSolanaLargestAccounts({
-    result: {context: {slot: largest.slot}, value: largest.value.result.value}
+      result: {context: {slot: largest.slot}, value: largest.value.result.value}
     }, {observedAt: largest.receivedAt, slot: largest.slot});
     evidence.top10OwnerPct = unknownRecord(
-    parsed.note ?? "top20 token accounts are neither complete supply coverage nor unique-owner aggregation",
-    request, largest.receivedAt, largest.slot);
+      parsed.note ?? "top20 token accounts are neither complete supply coverage nor unique-owner aggregation",
+      request, largest.receivedAt, largest.slot);
   }
   if (accountInfo) {
     for (const key of ["mintAuthorityRevoked", "freezeAuthorityRevoked", "tokenExtensions"]) {
@@ -481,8 +503,8 @@ function normalizeCandidate(identity, responses, sampledAt, identityMismatch) {
       sampledAt,
       pairCreatedAt: pairData?.pairCreatedAt ?? null,
       marketCapUsd: pairData?.marketCapUsd ?? null,
-      decimals: supply?.value?.decimals ?? null,
-      tokenSupplyAtoms: supply?.value?.amount ?? null,
+      decimals: supply?.value?.result?.value?.decimals ?? null,
+      tokenSupplyAtoms: supply?.value?.result?.value?.amount ?? null,
       transactionCounts1h: transactions,
       largestTokenAccounts: largest?.value?.result?.value ?? null,
       mintAccountInfo: accountInfo?.value?.result?.value ?? null,
@@ -504,7 +526,7 @@ function normalizeCandidate(identity, responses, sampledAt, identityMismatch) {
 async function performRequest(request, {
   transport, signal, timeoutMs, maxBytes, release, consume, clock, freshness
 }) {
-  const requestedAt = clock();
+  const requestedAt = readClock(clock);
   if (!validTime(requestedAt)) {
     release();
     return {event: eventFor(request, "INVALID_CLOCK", "injected clock returned invalid time", null, null)};
@@ -525,6 +547,7 @@ async function performRequest(request, {
       credentials: "omit"
     })), controller.signal);
     if (controller.signal.aborted) throw controller.signal.reason;
+    validateResponseTarget(response, request);
     if (response.status >= 300 && response.status < 400) {
       throw requestFailure("REDIRECT_BLOCKED", "provider redirect was blocked");
     }
@@ -538,7 +561,7 @@ async function performRequest(request, {
         consume(amount);
       }
     });
-    const receivedAt = clock();
+    const receivedAt = readClock(clock);
     if (!validTime(receivedAt) || receivedAt < requestedAt ||
         receivedAt - requestedAt > freshness.maxAcquisitionDurationMs) {
       throw requestFailure("STALE_ACQUISITION", "response acquisition exceeded freshness policy");
@@ -563,7 +586,7 @@ async function performRequest(request, {
     const event = eventFor(request, "RECEIVED", null, requestedAt, receivedAt, responseBytes, returned);
     return {event, value, slot, request, receivedAt, parsed: request.provider === "dex" ? value : null};
   } catch (error) {
-    const receivedAt = clock();
+    const receivedAt = readClock(clock);
     const reason = error?.status ? error.message
       : controller.signal.aborted
         ? (signal?.aborted ? "caller aborted during request" : "request deadline exceeded")
@@ -609,7 +632,13 @@ export async function acquireProviderEvidence(options) {
   if (!Array.isArray(candidates) || candidates.length > budget.maxCandidates) {
     throw new TypeError("candidate count exceeded the manifest limit");
   }
-  const identities = planRequests(candidates, {allowedMints, allowedPools});
+  const identities = candidates.map(candidate => Object.freeze({
+    chainId: candidate.chainId,
+    mint: candidate.mint,
+    pool: candidate.pool,
+    quote: candidate.quote
+  }));
+  const requests = planRequests(identities, {allowedMints, allowedPools});
   const counter = {
     requests: 0, bytes: 0, reservedBytes: 0, events: 0,
     byProvider: {dex: 0, rpc: 0}
@@ -619,8 +648,8 @@ export async function acquireProviderEvidence(options) {
   let stoppedReason = null;
   let nextRequestId = 0;
 
-  for (let offset = 0; offset < identities.length && !stoppedReason; offset += 4) {
-    const batch = identities.slice(offset, offset + 4);
+  for (let offset = 0; offset < requests.length && !stoppedReason; offset += 4) {
+    const batch = requests.slice(offset, offset + 4);
     const pending = [];
     for (const planned of batch) {
       if (signal?.aborted) {
@@ -665,7 +694,7 @@ export async function acquireProviderEvidence(options) {
     }
   }
 
-  const finalNow = clock();
+  const finalNow = readClock(clock);
   const sampledAt = Math.max(validTime(finalNow) ? finalNow : 0,
     ...events.map(event => validTime(event.receivedAt) ? event.receivedAt : 0));
   const normalized = identities.map((identity, index) => {
