@@ -34,7 +34,8 @@ function staticServer(){
       response.writeHead(200,{'content-type':'application/json','cache-control':'no-store'});
       response.end(JSON.stringify({version:'7.64-CANONICAL-PORTFOLIO-HISTORY-V3',points:[]}));return;
     }
-    const roots=[['/v11/',v11],['/research/',join(repository,'research')],['/docs/',join(repository,'docs')]];
+    const roots=[['/v11/',v11],['/research/',join(repository,'research')],
+      ['/docs/',join(repository,'docs')],['/scripts/',join(repository,'scripts')]];
     const match=roots.find(([prefix])=>url.pathname.startsWith(prefix));
     if(!match){response.writeHead(404);response.end();return;}
     const [prefix,root]=match;
