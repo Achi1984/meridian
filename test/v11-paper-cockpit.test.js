@@ -230,8 +230,8 @@ test('zero fills and missing fill evidence are distinct; empty and absent positi
 
 test('strategy workspace mounts the read-only cockpit once above the existing readiness card', () => {
   const source = readFileSync(new URL('../v11/strategy-workspace-bootstrap.js', import.meta.url), 'utf8');
-  assert.equal((source.match(/renderPaperCockpit\(paperRoot\)/g) || []).length, 1);
-  assert.ok(source.indexOf("import {renderPaperCockpit}") < source.indexOf("import {renderPaperReadiness}"));
+  assert.equal((source.match(/mountPaperCockpit\(paperRoot,document,window\)/g) || []).length, 1);
+  assert.ok(source.indexOf("import {mountPaperCockpit}") < source.indexOf("import {renderPaperReadiness}"));
   assert.ok(source.indexOf('insertBefore(paperRoot,catalogRoot)') <
     source.indexOf('insertBefore(readinessRoot,catalogRoot)'));
   assert.equal((source.match(/\bfetch\s*\(/g) || []).length, 1, 'only the existing local strategy catalog fetch remains');

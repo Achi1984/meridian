@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {renderBotReadState,createBotReadView,renderCommandBotOverview} from '../v11/bot-read-view.js';
 import {buildBotReadModel} from '../v11/bot-read-model.js';
 import {createBotReadClient} from '../v11/bot-read-client.js';
-import {publishDepotPortfolioState} from '../v11/depot-portfolio-state.js?v=B16-M11-FIX11';
+import {publishDepotPortfolioState} from '../v11/depot-portfolio-state.js?v=B16-M11-FIX12';
 import {normalizePionexBotOrder} from '../pionex-bot-auto-sync.js';
 import {buildAssetWatchApiSnapshot} from '../asset-watch-bridge.js';
 
@@ -944,4 +944,3 @@ test('new filters combine, preserve disclosure and Command return, reset and cle
   assert.ok(all(h.target,'details').every(n=>n.getAttribute('open')===null));assert.equal(h.calls.refresh,0);
   h.view.dispose();assert.equal(tp.listeners.get('change').size,0);assert.equal(pnl.listeners.get('change').size,0);
 });
-
