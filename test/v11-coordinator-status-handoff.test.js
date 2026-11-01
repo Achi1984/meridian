@@ -7,8 +7,8 @@ import {
 import {createCoordinatorStateStore} from '../scripts/autonomy/m11-coordinator-state-store.mjs';
 import {projectCoordinatorStatus} from '../scripts/autonomy/m11-coordinator-status-projection.mjs';
 import {mountAgentStatus} from '../v11/agent-status-bootstrap.js';
-import {createAgentStatusClient} from '../v11/agent-status-client.js?v=B16-M11-FIX10';
-import {createAppAccess} from '../v11/app-access.js?v=B16-M11-FIX10';
+import {createAgentStatusClient} from '../v11/agent-status-client.js?v=B16-M11-FIX11';
+import {createAppAccess} from '../v11/app-access.js?v=B16-M11-FIX11';
 
 const NOW=1700000000000;
 const TASK_URL='https://github.com/Achi1984/meridian/issues/1036';
@@ -234,3 +234,4 @@ test('handoff adds no producer, Node projector, persistence or summary promotion
   const html=readFileSync(new URL('../v11/index.html',import.meta.url),'utf8');
   assert.match(html,/<summary><span id="autonomy-heading">Autonome Entwicklung · <strong>Unbekannt<\/strong>/);
 });
+

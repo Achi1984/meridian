@@ -1,4 +1,4 @@
-import {buildBotReadModel} from './bot-read-model.js?v=B16-M11-FIX10';
+import {buildBotReadModel} from './bot-read-model.js?v=B16-M11-FIX11';
 
 const ENDPOINT = 'https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/asset-watch';
 // Exact canonical gateway links only. Never use a supplied URL as a fetch target.
@@ -142,3 +142,4 @@ export function createBotReadClient({getToken, onChange = () => {}, fetchImpl = 
   }
   return {refresh, lock, revalidate, dispose};
 }
+

@@ -5,6 +5,7 @@ import pg from "pg";
 import { researchComparison } from "./research-analytics.js";
 import { mergePrivateDashboard, privateDashboardPublicReceipt } from "./private-dashboard-update.js";
 import { mergeVenueHoldings } from "./private-holdings-sync.js";
+import { saveLedgerManualSnapshot } from "./ledger-manual-snapshot.js";
 import {readPionexHistory} from "./pionex-history-store.js";
 import { readPortfolioHistory } from "./portfolio-history-store.js";
 import { marketKlinesSnapshot } from "./market-feed-gateway.js";
@@ -389,6 +390,19 @@ const server=http.createServer(async(req,res)=>{
         holdingsSyncEndpoint:"/api/private/holdings-sync"
       },origin||"");
     }
+    if(req.method==="POST"&&u.pathname==="/api/private/ledger-snapshot"){
+      if(!authorizedRead(req)||!authorizedWrite(req))return writeJson(res,401,{error:"ledger_write_authorization_required"},origin||"");
+      let body;
+      try{body=await readJsonBody(req,32768);}catch(e){
+        if(e?.code==="BODY_TOO_LARGE")return writeJson(res,413,{error:"request_body_too_large"},origin||"");
+        if(e?.code==="INVALID_JSON")return writeJson(res,400,{error:"invalid_json"},origin||"");
+        throw e;
+      }
+      const current=await stateGet(PRIVATE_STATE_KEY);
+      if(!current)return writeJson(res,503,{error:"private_dashboard_unavailable"},origin||"");
+      const result=await saveLedgerManualSnapshot({db:pool(),key:PRIVATE_STATE_KEY,current,body});
+      return writeJson(res,result.ok?200:result.status||400,result,origin||"");
+    }
     if(req.method==="POST"&&u.pathname==="/api/private/holdings-sync"){
       let body;
       try{body=await readJsonBody(req,32768);}catch(e){
@@ -563,5 +577,6 @@ const server=http.createServer(async(req,res)=>{
   }catch(e){return writeJson(res,500,{error:String(e?.message||e)});}
 });
 server.listen(EXTERNAL_PORT,"0.0.0.0",()=>console.log(`[GATEWAY] MERIDIAN ${String(RELEASE.version||RELEASE.ui||"?")} / ${String(RELEASE.buildId||"?")} on :${EXTERNAL_PORT} -> internal :${INTERNAL_PORT}`));
+
 
 

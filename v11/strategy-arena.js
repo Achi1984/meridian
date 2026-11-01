@@ -1,7 +1,7 @@
-import {MAX_INSPECTION_REPORT_BYTES, parseArenaInspectionReport} from './arena-inspection-report.js?v=B16-M11-FIX10';
-import {MAX_HISTORICAL_FIXTURE_BYTES, parseArenaHistoricalResultFixture} from './arena-historical-result.js?v=B16-M11-FIX10';
-import {MAX_HISTORICAL_EXPORT_BYTES, parseArenaHistoricalExport} from './arena-historical-export.js?v=B16-M11-FIX10';
-import {renderArenaResultView} from './arena-result-view.js?v=B16-M11-FIX10';
+import {MAX_INSPECTION_REPORT_BYTES, parseArenaInspectionReport} from './arena-inspection-report.js?v=B16-M11-FIX11';
+import {MAX_HISTORICAL_FIXTURE_BYTES, parseArenaHistoricalResultFixture} from './arena-historical-result.js?v=B16-M11-FIX11';
+import {MAX_HISTORICAL_EXPORT_BYTES, parseArenaHistoricalExport} from './arena-historical-export.js?v=B16-M11-FIX11';
+import {renderArenaResultView} from './arena-result-view.js?v=B16-M11-FIX11';
 import {ARENA_CANDIDATES, ARENA_RULESET, ARENA_SYMBOLS, replayStrategyPaperArena} from '../research/strategy-paper-arena.js';
 
 const DIAGNOSTIC_PATH = 'research/results/strategy-arena-20261016/';
@@ -458,3 +458,4 @@ export function createStrategyArenaView(root, options={}) {
     root.removeEventListener('click',listen);root.removeEventListener('change',listen);root.replaceChildren();
   }};
 }
+

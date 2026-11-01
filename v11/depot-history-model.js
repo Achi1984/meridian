@@ -1,4 +1,4 @@
-import {buildDepotReadModel} from './depot-read-model.js?v=B16-M11-FIX10';
+import {buildDepotReadModel} from './depot-read-model.js?v=B16-M11-FIX11';
 export const DEPOT_WINDOWS=Object.freeze({'1h':3600000,'1d':86400000,'1w':604800000});
 // Captured values only: no extrapolation, resampling, cash-flow or return claim.
 export function buildDepotHistoryModel(raw,{now=Date.now(),range='1d'}={}){
@@ -25,3 +25,4 @@ export function buildDepotHistoryModel(raw,{now=Date.now(),range='1d'}={}){
   if(segment.length)segments.push(segment);
   return {status:points.length?'ready':'empty',start,end,points,segments,gaps};
 }
+

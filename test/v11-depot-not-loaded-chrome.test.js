@@ -84,10 +84,10 @@ test('V11 Depot Chrome: central unlock shows not-loaded on both surfaces without
           const view=document.getElementById('view-depot');
           const rects=[...document.querySelectorAll('#command-portfolio .portfolio-description,#command-portfolio [data-command-depot-status]')].map(n=>n.getBoundingClientRect());
           return {depot:root.querySelector('[data-state]')?.dataset.state,command:cmd.dataset.state,
-            depotText:root.textContent,commandText:cmd.textContent,
+            depotText:root.querySelector('[data-state]')?.textContent,ledgerText:root.querySelector('.ledger-manual')?.textContent,commandText:cmd.textContent,
             ledgerHidden:root.querySelector('.ledger-review')===null,
             overflow:document.documentElement.scrollWidth>innerWidth+1,
-            targets:[...root.querySelectorAll('button')].filter(b=>!b.hidden).every(b=>b.getBoundingClientRect().height>=44),
+            targets:[...root.querySelectorAll('button')].filter(b=>b.getClientRects().length>0).every(b=>b.getBoundingClientRect().height>=44),
             overlap:rects.some((a,i)=>rects.slice(i+1).some(b=>a.left<b.right&&b.left<a.right&&a.top<b.bottom&&b.top<a.bottom)),
             leak:/synthetic-browser-gate-password/.test(document.body.innerText)};
         })()`);
@@ -108,7 +108,7 @@ test('V11 Depot Chrome: central unlock shows not-loaded on both surfaces without
         await shot('command-not-loaded');
         await showDepot();s=await snap();
         assert.equal(s.depot,'not_loaded');assert.match(s.depotText,/Noch nicht geladen/);assert.match(s.depotText,/Depot manuell aktualisieren/);
-        assert.equal(s.overflow,false);assert.equal(s.targets,true);assert.equal(s.ledgerHidden,true,'Ledger controls are outside Pionex-only scope');assert.equal(s.leak,false);
+        assert.equal(s.overflow,false);assert.equal(s.targets,true);assert.equal(s.ledgerHidden,true,'Legacy Ledger review stays hidden');assert.equal(s.leak,false);
         await shot('depot-not-loaded');
         assert.equal(counts.dashboard+counts.prices,0);assert.equal(counts.history,1);
 
@@ -125,8 +125,8 @@ test('V11 Depot Chrome: central unlock shows not-loaded on both surfaces without
         assert.equal(counts.dashboard,1);assert.equal(counts.prices,0);assert.equal(counts.history,1);assert.equal(counts.pionexHistory,1,'one separate history read per manual refresh');
         s=await snap();
         assert.equal(s.depot,'unavailable');assert.match(s.depotText,/Nicht verfügbar/);
-        assert.match(s.depotText,/Aktuell: unvollständig/);assert.match(s.depotText,/Pionex-Verlauf/);assert.doesNotMatch(s.depotText,/Ledger|OKX/);
-        assert.equal(s.overflow,false);assert.equal(s.targets,true);assert.equal(s.ledgerHidden,true,'Ledger controls are outside Pionex-only scope');assert.equal(s.leak,false);
+        assert.match(s.depotText,/Aktuell: unvollständig/);assert.match(s.depotText,/Pionex-Verlauf/);assert.doesNotMatch(s.depotText,/Ledger|OKX/);assert.match(s.ledgerText,/Ledger laden, bevor Mengen gespeichert werden/);
+        assert.equal(s.overflow,false);assert.equal(s.targets,true);assert.equal(s.ledgerHidden,true,'Legacy Ledger review stays hidden');assert.equal(s.leak,false);
         await showCommand();s=await snap();
         assert.equal(s.command,'unavailable');assert.equal(s.overlap,false);assert.equal(s.overflow,false);
         await shot('command-unavailable');
