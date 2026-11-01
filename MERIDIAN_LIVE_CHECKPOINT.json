@@ -96,10 +96,52 @@
     "policyProposalCommentId": 6096562356,
     "protocol": "STREAM-SAFE-V8"
   },
-  "lastSeenCommentId": 6449657435,
+  "lastSeenCommentId": 6557001049,
   "quickCommand": "Go Meridian",
   "bootstrapFile": "MERIDIAN_GO.md",
   "currentWork": {
+    "latestDelivery20261101": {
+      "recordedAt": "2026-11-01T10:56:35Z",
+      "scope": "RECEIPT_RECONCILIATION_ONLY_NO_ROUTING_OR_AUTHORITY_CHANGE",
+      "observedMainSha": "c60bb6a2516ab88000ece3c339bcc740280a9ba7",
+      "receiptCutoff": "942/6557001049",
+      "main1089": {
+        "state": "MERGED_POSTCHECKS_PAGES_FAILED",
+        "mergeSha": "c60bb6a2516ab88000ece3c339bcc740280a9ba7",
+        "candidateCi": {
+          "run": 41291117410,
+          "job": 124802416166,
+          "passed": 3470,
+          "failed": 0,
+          "cancelled": 0,
+          "skipped": 0
+        },
+        "postchecks": {
+          "safety": 41293348203,
+          "runtime": 41293348208,
+          "coordinator": 41293348206,
+          "pages": {
+            "run": 41293347696,
+            "attempt": 2,
+            "state": "FAILED_HTTP_400_PRIOR_DEPLOYMENT_REPORTED_IN_PROGRESS"
+          }
+        }
+      },
+      "open1090": {
+        "head": "5a874e9ef0282745bfd9a320ac6fe6b6dbcc330b",
+        "state": "OPEN_SOURCE_GREEN_NOT_MERGED"
+      },
+      "open1092": {
+        "head": "2e788edc522542d26e489d553be33fa44a680d62",
+        "state": "OPEN_INERT_PROPOSAL_PAGES_HOLD_REMAINS_R3_PENDING"
+      },
+      "open1093": {
+        "head": "a3a173e9e3f33a5a405771c72294faea70cfbfca",
+        "state": "OPEN_EARLIER_GREEN_FULL_CI_TOTALS_UNVERIFIED_R3_PENDING"
+      },
+      "desktopAcceptance": "PR1077_TO_1080_CLOUD_BROWSER_ONLY_NO_REAL_IPHONE_SAFARI",
+      "nextStep": "KEEP_PAGES_HOLD; AWAIT_1092_1093_R3_EVIDENCE; COMPLETE_1087_LIVE_LEDGER_ACCEPTANCE; DO_NOT_POST_FINAL_RECEIPTS_OR_ACTIVATE_ROLLOVER"
+    },
     "latestDelivery20261031": {
       "recordedDate": "2026-10-31",
       "scope": "SOURCE_STATUS_ONLY_NO_ROUTING_OR_AUTHORITY_CHANGE",

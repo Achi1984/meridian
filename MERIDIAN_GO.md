@@ -1,3 +1,37 @@
+> **Current delivery status — 2026-11-01, inspected mailbox cutoff 942/6557001049 (10:56:35 UTC)**
+> Live `main` is `c60bb6a2516ab88000ece3c339bcc740280a9ba7` (PR #1089).
+> PRs #1077–1080 are merged with exact-merge postchecks; comment
+> [942/6549113883](https://github.com/Achi1984/meridian/issues/942#issuecomment-6549113883)
+> records desktop Cloud Browser acceptance for #1077–1080, not real iPhone Safari.
+> PR #1082 is merged as source-only Paper preparation; no Paper/runtime activation.
+> PR #1087 is merged, but live Ledger acceptance and private quantity/write-token
+> prerequisites remain pending. Detailed receipts, evidence gaps and suggested
+> unposted receipt bodies are in
+> [RELEASE_RECEIPT_RECONCILIATION_20261101.md](docs/operations/RELEASE_RECEIPT_RECONCILIATION_20261101.md).
+> PR #1089 is merged at current main; candidate CI passed 3470/3470, and main
+> Safety, Runtime and Coordinator postchecks succeeded. Pages run
+> [41293347696](https://github.com/Achi1984/meridian/actions/runs/41293347696)
+> attempt 2 remains FAILED: deployment creation returned HTTP 400 because the
+> previous deployment was reported in progress. No successful deployment receipt
+> followed; the Pages hold remains. PR #1092 is an inert proposal and does not
+> resolve that hold.
+> PR #1090 remains open at `5a874e9ef0282745bfd9a320ac6fe6b6dbcc330b`
+> (exact-pair CI 3476/3476 and independent source GREEN); #1092 remains open,
+> inert and awaiting the bounded R3 review; #1093 remains open, and its earlier
+> GREEN lacks independently verified full-run totals. The follow-up
+> [942/6556998549](https://github.com/Achi1984/meridian/issues/942#issuecomment-6556998549)
+> was still in progress at the inspected cutoff
+> ([6557001049](https://github.com/Achi1984/meridian/issues/942#issuecomment-6557001049)).
+> No merge is claimed for these three PRs.
+> Historical #999/#1050/#1052/#1063/#1065/#1067 merges and their individual
+> failures/unknowns remain preserved; only the pending recovery chain has a
+> proposed, unposted SUPERSEDED closure tied to actual #1069 evidence. No later
+> release retroactively changes their test or postcheck results.
+> Mailbox #942, watchdog binding and authorization flags are unchanged.
+> Rollover remains separately prepared; OKX/Northflank setup remains paused.
+> No Paper/trading activation. The Owner’s removed UI daily cap remains removed
+> as already documented below; this update does not revive it.
+
 > **Current delivery status — 2026-10-31, receipt cutoff 942/6548075649**
 > Observed main: `fb51293011fa923a6427705ccfd30d667310e773` (PR #1078).
 > PR #1076 is COMPLETE at `976be55b729edd3d67c22b304eb9b486ecf382ee`;
