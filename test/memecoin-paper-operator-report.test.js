@@ -146,6 +146,76 @@ test("checkpoint receipts expose evidenced unresolved exits, clock faults, and r
   assert.ok(noEntryReport.trading.noTradeReasons.some(item => item.gate === "entry-fill"));
 });
 
+test("read-only checkpoint labels stay unverified and header-only no-entry evidence is honest", () => {
+  const headerOnly = reportFixtures.readOnlyCheckpoint();
+  const report = projectOperatorReport(headerOnly);
+  assert.equal(report.experiment.evidenceKind, "READ_ONLY_PAPER_CHECKPOINT_RECEIPTS");
+  assert.equal(report.experiment.sourceProvenance, "CALLER_LABEL_ONLY_NOT_AUTHENTICATED");
+  assert.equal(report.experiment.source, "READ_ONLY_PAPER_CHECKPOINT");
+  assert.equal(report.experiment.reportStatus, "INCOMPLETE");
+  assert.equal(report.trading.status, "NO_ENTRY_OBSERVED");
+  assert.equal(report.trading.paperEntryFills, 0);
+  assert.match(report.trading.basis, /run completion is not evidenced/);
+  assert.equal(report.valuation.unrealizedNetPnlCents, null);
+  const text = renderOperatorReport(report);
+  assert.match(text, /Source label: READ_ONLY_PAPER_CHECKPOINT; provenance: CALLER_LABEL_ONLY_NOT_AUTHENTICATED/);
+  assert.match(text, /no authentication, host verification, execution authorization, or profitability inferred/);
+  assert.match(text, /Paper entry fills: 0 \(NO_ENTRY_OBSERVED;/);
+  assert.equal(projectOperatorReport(reportFixtures.blockedScan()).experiment.evidenceKind, "SYNTHETIC_FIXTURE");
+
+  const completedNoEntry = reportFixtures.readOnlyCheckpoint({
+    results: [reportFixtures.receipt("finish:empty", "finishRun", {
+      status: "FINISHED",
+      elapsedMs: 1000,
+      auditTruncated: false,
+      openPositions: [],
+      accounting: {
+        cashCents: "100000",
+        grossOpenValueCents: "0",
+        estimatedExitCostsCents: "0",
+        grossUnrealizedPnlCents: "0",
+        netUnrealizedPnlCents: "0",
+        realizedGrossPnlCents: "0",
+        realizedNetPnlCents: "0"
+      }
+    })]
+  });
+  completedNoEntry.snapshot.summary.pnl.unrealizedGrossCents = "0";
+  completedNoEntry.snapshot.summary.pnl.unrealizedNetCents = "0";
+  const completedReport = projectOperatorReport(completedNoEntry);
+  assert.equal(completedNoEntry.results.some(item => item.method === "executeEntry"), false);
+  assert.equal(completedReport.experiment.reportStatus, "FINISHED");
+  assert.equal(completedReport.trading.status, "ZERO_TRADES");
+  assert.equal(completedReport.trading.paperEntryFills, 0);
+
+  const incompleteAudit = reportFixtures.readOnlyCheckpoint();
+  incompleteAudit.snapshot.summary.auditTruncated = true;
+  const unknown = projectOperatorReport(incompleteAudit);
+  assert.equal(unknown.trading.status, "UNKNOWN");
+  assert.equal(unknown.trading.paperEntryFills, null);
+  assert.match(unknown.trading.basis, /unavailable/);
+  assert.equal(unknown.evidence.coverage.audit.truncated, true);
+
+  const conflictingAudit = reportFixtures.readOnlyCheckpoint();
+  conflictingAudit.snapshot.auditEvents.push({type: "RISK_AUTHORIZED"});
+  conflictingAudit.snapshot.summary.eventCount = 1;
+  assert.equal(projectOperatorReport(conflictingAudit).trading.status, "UNKNOWN");
+
+  const missingSource = reportFixtures.readOnlyCheckpoint();
+  delete missingSource.source;
+  assert.throws(() => projectOperatorReport(missingSource), /source contract is incomplete/);
+  const missingResults = reportFixtures.readOnlyCheckpoint();
+  delete missingResults.results;
+  assert.throws(() => projectOperatorReport(missingResults), /source contract is incomplete/);
+  const mixedSource = reportFixtures.readOnlyCheckpoint();
+  mixedSource.source = "SYNTHETIC_FIXTURE_ONLY";
+  assert.throws(() => projectOperatorReport(mixedSource), /source contract is incomplete/);
+
+  const conflictingRun = reportFixtures.readOnlyCheckpoint();
+  conflictingRun.snapshot.summary.runId = "other-run";
+  assert.throws(() => projectOperatorReport(conflictingRun), /mixed experiment identity/);
+});
+
 test("exact duplicate receipts are idempotent while conflicts and mixed identities fail closed", () => {
   const duplicate = reportFixtures.checkpoint({
     results: [reportFixtures.receipt("same-command", "riskSnapshot", {status: "PASS"})]

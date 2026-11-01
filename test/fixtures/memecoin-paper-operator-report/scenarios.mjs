@@ -339,6 +339,12 @@ export const reportFixtures = Object.freeze({
       status: "REJECT", reason: "CLOCK_RESTART_BLOCKED", entriesAllowed: false, reservedPositions: 0
     })]
   }),
+  readOnlyCheckpoint: (options = {}) => {
+    const report = checkpoint(options);
+    report.reportType = "READ_ONLY_PAPER_CHECKPOINT";
+    report.source = "READ_ONLY_PAPER_CHECKPOINT";
+    return report;
+  },
   receipt,
   checkpoint
 });

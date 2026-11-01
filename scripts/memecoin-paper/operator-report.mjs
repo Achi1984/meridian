@@ -18,8 +18,10 @@ const COST_FIELDS = Object.freeze([
 ]);
 const REPORT_SOURCES = new Set([
   "SYNTHETIC_FIXTURE_REPLAY_ONLY",
-  "SYNTHETIC_CHECKPOINT_ORCHESTRATION_ONLY"
+  "SYNTHETIC_CHECKPOINT_ORCHESTRATION_ONLY",
+  "READ_ONLY_PAPER_CHECKPOINT"
 ]);
+const READ_ONLY_CHECKPOINT_SOURCE = "READ_ONLY_PAPER_CHECKPOINT";
 const CLOCK_REASONS = new Set([
   "CLOCK_FAULT_LATCHED", "CLOCK_RESTART_BLOCKED", "CLOCK_SOURCE_MISMATCH",
   "CLOCK_SAMPLE_INVALID", "CLOCK_REGRESSION", "CLOCK_SKEW_EXCEEDED",
@@ -294,10 +296,24 @@ function replayData(report) {
 }
 
 function checkpointData(report) {
+  const readOnlySource = report.reportType === READ_ONLY_CHECKPOINT_SOURCE;
   const metadata = isRecord(report.metadata) ? report.metadata : null;
   const snapshot = isRecord(report.snapshot) ? report.snapshot : null;
   const summary = isRecord(snapshot?.summary) ? snapshot.summary : {};
   const results = uniqueReceipts(Array.isArray(report.results) ? report.results : []);
+  const audit = Array.isArray(snapshot?.auditEvents) ? snapshot.auditEvents : [];
+  if (audit.length > MAX_ROWS) throw new TypeError("checkpoint audit exceeds row limits");
+  if (readOnlySource && (report.source !== READ_ONLY_CHECKPOINT_SOURCE ||
+      !metadata || typeof metadata.runId !== "string" || !SAFE_RECEIPT_ID.test(metadata.runId) ||
+      !Number.isSafeInteger(metadata.startedAt) || !Number.isSafeInteger(metadata.deadlineAt) ||
+      !Number.isSafeInteger(metadata.sequence) || !Array.isArray(report.results) || !snapshot ||
+      !Array.isArray(snapshot.auditEvents) ||
+      !Number.isSafeInteger(summary.eventCount) || typeof summary.auditTruncated !== "boolean")) {
+    throw new TypeError("read-only checkpoint source contract is incomplete");
+  }
+  if (readOnlySource && summary.runId !== metadata.runId) {
+    throw new TypeError("report contains mixed experiment identity");
+  }
   if (metadata) {
     if (Object.hasOwn(metadata, "clockAdmissionBlocked") &&
         typeof metadata.clockAdmissionBlocked !== "boolean") {
@@ -313,6 +329,11 @@ function checkpointData(report) {
         deadlineAt !== startedAt + 8 * 60 * 60 * 1000) {
       throw new TypeError("checkpoint time bounds are inconsistent");
     }
+  }
+  if (readOnlySource && summary.auditTruncated === false &&
+      summary.eventCount !== audit.filter(event =>
+        isRecord(event) && LEDGER_EVENT_TYPES.has(event.type)).length) {
+    throw new TypeError("checkpoint ledger event count conflicts with its complete audit");
   }
   const runId = metadata?.runId ?? summary.runId ?? null;
   const startAt = timestamp(metadata?.startedAt);
@@ -343,10 +364,11 @@ function checkpointData(report) {
   }
   return {
     variant: "checkpoint",
+    readOnlySource,
     runId,
     summary,
     runEnd,
-    audit: Array.isArray(snapshot?.auditEvents) ? snapshot.auditEvents : [],
+    audit,
     auditPresent: Array.isArray(snapshot?.auditEvents),
     results,
     metadata,
@@ -354,7 +376,7 @@ function checkpointData(report) {
     scoutRows: [],
     filter: null,
     analysis: null,
-    source: report.source,
+    source: readOnlySource ? READ_ONLY_CHECKPOINT_SOURCE : report.source,
     sourceReady: report.liveCandidateEvidence === false ? "NOT_READY" : "UNKNOWN",
     discoveryTruncated: null,
     auditTruncated: truncationFlag(summary.auditTruncated),
@@ -807,6 +829,48 @@ function makeReport(data, report) {
     endingPositions ? endingPositions.length : null;
   const costs = reportedCosts(summary);
   let fillCount = observedFillCount === 0 && !data.complete ? null : observedFillCount;
+  let tradingStatus = fillCount === null ? "UNKNOWN" :
+    fillCount === 0 ? "ZERO_TRADES" : "TRADES_RECORDED";
+  let tradingBasis = fillCount === null ? "fill or ledger corroboration unavailable" :
+    fillCount === 0 ? "complete fill and ledger evidence" : "reported paper fill receipts";
+  if (data.readOnlySource && !hasFillEvidence) {
+    const authorizations = receipts.filter(item => item.method === "authorizeEntry")
+      .map(item => item.result?.status);
+    const noAuthorization = authorizations.every(status => status === "REJECT");
+    const auditFill = data.audit.some(event => isRecord(event) &&
+      (event.type === "RISK_AUTHORIZED" || event.type === "RISK_RESERVATION_RELEASED" ||
+       event.type === "PAPER_FILL" || event.type === "PAPER_ENTRY" ||
+       event.type === "STOP_ARMED" || event.type === "PAPER_EXIT" ||
+       event.status === "FILLED_PAPER"));
+    const initialCapital = decimal(summary.initialCapitalCents);
+    const cashAtEnd = decimal(summary.cashCents);
+    const realizedGross = decimal(summary.pnl?.realizedGrossCents, {signed: true});
+    const realizedNet = decimal(summary.pnl?.realizedNetCents, {signed: true});
+    const ledgerEventCount = data.audit.filter(event =>
+      isRecord(event) && LEDGER_EVENT_TYPES.has(event.type)).length;
+    const noEntrySnapshot = noAuthorization && !auditFill && data.auditPresent &&
+      data.auditTruncated === false && summary.auditTruncated === false &&
+      countValue(summary.eventCount) === ledgerEventCount &&
+      initialCapital !== null && cashAtEnd === initialCapital &&
+      realizedGross === "0" && realizedNet === "0" && costs.totalCents === "0" &&
+      Array.isArray(ledgerPositions) && ledgerPositions.length === 0;
+    if (noEntrySnapshot) {
+      fillCount = 0;
+      const pnl = isRecord(summary.pnl) ? summary.pnl : {};
+      const completeZeroAccounting = data.complete && data.runEnd?.auditTruncated === false &&
+        ["realizedGrossCents", "realizedNetCents", "unrealizedGrossCents", "unrealizedNetCents"]
+          .every(key => decimal(pnl[key], {signed: true}) === "0") &&
+        isRecord(data.runEnd.accounting) &&
+        ["grossOpenValueCents", "estimatedExitCostsCents", "grossUnrealizedPnlCents",
+          "netUnrealizedPnlCents", "realizedGrossPnlCents", "realizedNetPnlCents"]
+          .every(key => decimal(data.runEnd.accounting[key], {signed: true}) === "0") &&
+        decimal(data.runEnd.accounting.cashCents) === initialCapital;
+      tradingStatus = completeZeroAccounting ? "ZERO_TRADES" : "NO_ENTRY_OBSERVED";
+      tradingBasis = completeZeroAccounting
+        ? "completed checkpoint with no authorized entry and complete zero-activity ledger/audit"
+        : "checkpoint snapshot with no authorized entry and complete zero-activity ledger/audit; run completion is not evidenced";
+    }
+  }
   if (data.complete && observedFillCount === 0) {
     const auditFill = data.audit.some(event => isRecord(event) &&
       (event.type === "PAPER_FILL" || event.type === "PAPER_ENTRY" ||
@@ -849,6 +913,14 @@ function makeReport(data, report) {
       throw new TypeError("zero-fill evidence conflicts with ledger activity");
     }
     if (!explicitZeroLedger) fillCount = null;
+    if (fillCount === null) {
+      tradingStatus = "UNKNOWN";
+      tradingBasis = "zero-fill ledger corroboration unavailable";
+    }
+  }
+  if (fillCount !== null && !(data.readOnlySource && !hasFillEvidence)) {
+    tradingStatus = fillCount === 0 ? "ZERO_TRADES" : "TRADES_RECORDED";
+    tradingBasis = fillCount === 0 ? "complete fill and ledger evidence" : "reported paper fill receipts";
   }
   const positions = positionRows.map(position => {
     const ending = endingByMint.get(position.mint);
@@ -943,7 +1015,9 @@ function makeReport(data, report) {
     experiment: {
       id: checkIdentity(report, data.runId, summary),
       source: cleanText(data.source, 120),
-      evidenceKind: "SYNTHETIC_FIXTURE",
+      evidenceKind: data.readOnlySource ? "READ_ONLY_PAPER_CHECKPOINT_RECEIPTS" : "SYNTHETIC_FIXTURE",
+      sourceProvenance: data.readOnlySource
+        ? "CALLER_LABEL_ONLY_NOT_AUTHENTICATED" : "SYNTHETIC_FIXTURE_DECLARED",
       reportStatus: data.complete ? "FINISHED" : "INCOMPLETE",
       sourceReadiness: data.sourceReady,
       operationalStatus: "NOT_EVIDENCED",
@@ -971,8 +1045,9 @@ function makeReport(data, report) {
       )
     },
     trading: {
-      status: fillCount === null ? "UNKNOWN" : fillCount === 0 ? "ZERO_TRADES" : "TRADES_RECORDED",
+      status: tradingStatus,
       paperEntryFills: fillCount,
+      basis: cleanText(tradingBasis),
       noTradeReasons: allReasons.slice(0, 40),
       noTradeReasonsCoverage: listCoverage(
         allReasons.length,
@@ -1103,11 +1178,12 @@ export function renderOperatorReport(report) {
     "PAPER OPERATOR REPORT",
     `Report status: ${cleanText(experiment.reportStatus, 32) ?? "UNKNOWN"}`,
     `Experiment: ${cleanText(experiment.id, 120) ?? "UNKNOWN"}`,
+    `Source label: ${cleanText(experiment.source, 120) ?? "UNKNOWN"}; provenance: ${cleanText(experiment.sourceProvenance, 64) ?? "UNKNOWN"}${experiment.sourceProvenance === "CALLER_LABEL_ONLY_NOT_AUTHENTICATED" ? "; no authentication, host verification, execution authorization, or profitability inferred" : ""}`,
     `Run bounds: ${cleanText(experiment.startAt, 32) ?? "UNKNOWN"} to ${cleanText(experiment.endAt, 32) ?? "UNKNOWN"}`,
     `Evidence freshness: ${cleanText(evidence.status, 32) ?? "UNKNOWN"} (reported timestamps; not recomputed)`,
     `Candidates: considered ${count(candidates.considered)}, accepted ${count(candidates.accepted)}, rejected ${count(candidates.rejected)}, unknown ${count(candidates.unknown)}`,
     `Candidate evidence: Scout-audited ${count(candidates.audited)}; authorization receipts ${count(candidates.authorizationReceiptCount)}; unaccounted observed ${count(candidates.unaccountedObserved)}; discovery truncated ${flag(candidates.discoveryTruncated)}; Scout audit truncated ${flag(candidates.scoutAuditTruncated)}`,
-    `Paper entry fills: ${count(trading.paperEntryFills)} (${cleanText(trading.status, 32) ?? "UNKNOWN"})`,
+    `Paper entry fills: ${count(trading.paperEntryFills)} (${cleanText(trading.status, 32) ?? "UNKNOWN"}; ${cleanText(trading.basis) ?? "basis UNKNOWN"})`,
     `Source readiness: ${cleanText(experiment.sourceReadiness, 32) ?? "UNKNOWN"}; operationally running: NOT EVIDENCED`,
     `Cash: ${amount(valuation.cashCents)}; reservations: ${count(controls.reservations)}; open positions: ${count(controls.openPositionCount)}`,
     `Valuation: ${cleanText(valuation.status, 32) ?? "UNKNOWN"}; realized gross/net ${amount(valuation.realizedGrossPnlCents, true)} / ${amount(valuation.realizedNetPnlCents, true)}; unrealized gross/net ${amount(valuation.unrealizedGrossPnlCents, true)} / ${amount(valuation.unrealizedNetPnlCents, true)}`,

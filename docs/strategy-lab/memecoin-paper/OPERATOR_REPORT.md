@@ -1,10 +1,11 @@
 # Offline Paper operator report
 
 This is a read-only projection of the existing disabled Paper prototype's
-`SYNTHETIC_FIXTURE_REPLAY_ONLY` result or
-`SYNTHETIC_CHECKPOINT_ORCHESTRATION_ONLY` result/receipt snapshot. It does not
-add a runner, read a checkpoint journal, touch the disabled manifest, call a
-provider, schedule work, or integrate with the UI.
+`SYNTHETIC_FIXTURE_REPLAY_ONLY` result,
+`SYNTHETIC_CHECKPOINT_ORCHESTRATION_ONLY` result/receipt snapshot, or the
+explicitly caller-labeled `READ_ONLY_PAPER_CHECKPOINT` checkpoint snapshot. It
+does not add a runner, read a checkpoint journal, touch the disabled manifest,
+call a provider, schedule work, or integrate with the UI.
 
 ```js
 import {runSyntheticReplay} from "../../../scripts/memecoin-paper/replay.mjs";
@@ -38,9 +39,25 @@ The projection uses only the existing shapes:
   report exposes their count and observed outcomes separately, while total scan
   counts, scan truncation, and scan remainder stay `UNKNOWN` without discovery
   evidence.
+- The `READ_ONLY_PAPER_CHECKPOINT` contract uses the same checkpoint shape and
+  requires both `reportType` and `source` to equal
+  `"READ_ONLY_PAPER_CHECKPOINT"`, a safe `metadata.runId`, integer `startedAt`,
+  `deadlineAt`, and `sequence`, plus
+  `snapshot.summary.eventCount`, `snapshot.summary.auditTruncated`, and an
+  `snapshot.auditEvents` array. The summary run identity, receipt sequence, and
+  untruncated ledger event count must agree. This discriminator/source string is
+  only a caller-provided label: the report marks it
+  `CALLER_LABEL_ONLY_NOT_AUTHENTICATED` and does not infer real-data
+  authenticity, host verification, execution authorization, or profitability.
+  The synthetic fixture contracts retain their separate
+  `SYNTHETIC_FIXTURE_DECLARED` provenance.
 
 Inputs are limited to 1 MiB, 50,000 data nodes, 1,000 audit/receipt/position
-rows, and 24 levels of nesting. Output is limited to 256 KiB. Amounts must be
+rows, and 24 levels of nesting. For an eight-hour checkpoint, the result must
+contain the complete acknowledged receipt sequence and the snapshot's complete
+audit prefix within those limits; a sequence over 1,000 or audit over 1,000
+rows is rejected. The projector does not accept a dropped receipt prefix as a
+complete report. Output is limited to 256 KiB. Amounts must be
 bounded integer decimal strings or BigInts from an existing result; all
 displayed aggregates use exact BigInt addition. These are bounded projection
 limits, not a guarantee that the input contains all evidence from an eight-hour
@@ -49,7 +66,10 @@ silently shortened and represented as complete. A caller handing this report to
 an online display (including the planned M11 integration) must preserve its
 coverage/truncation fields and identify bounded or partial evidence; it must
 not claim the report alone captures a complete run when source evidence exceeds
-these limits. The projector does not derive strategy P&L, revalue positions,
+these limits. An accepted checkpoint report still cannot claim complete Scout
+scan totals: scan history is unavailable unless a separate discovery receipt
+supplies it, and authorization receipts are not scan totals. The projector does
+not derive strategy P&L, revalue positions,
 infer missing zeroes, or compute freshness against the current clock. When a
 finish receipt has no complete run-end marks, unrealized valuation is `UNKNOWN`
 and the open position remains unresolved even if an older summary contains a
@@ -89,7 +109,15 @@ not imply profitability or operational safety. Missing candidate, reservation,
 mark, cost, or clock details remain `UNKNOWN`. The report says
 `operationally running: NOT EVIDENCED`: it is not a live monitor. Synthetic
 evidence is labelled as such, and `BLOCKED`/`NOT_READY` source readiness is not
-runtime operation. Checkpoint hashes and result digests are treated as the
+runtime operation. A `READ_ONLY_PAPER_CHECKPOINT` with no `AUTHORIZED`
+`authorizeEntry` result and no `executeEntry` receipt may report
+`NO_ENTRY_OBSERVED` and zero observed fills
+only when the complete, untruncated ledger snapshot corroborates unchanged
+capital, zero realized P&L and costs, no open positions, and an exact audit
+event count. A header-only sequence-zero snapshot therefore says
+`NO_ENTRY_OBSERVED`, remains `INCOMPLETE`, and does not imply a finished
+zero-trade run; missing or truncated corroboration leaves the fill status
+`UNKNOWN`. Checkpoint hashes and result digests are treated as the
 existing binding fields, not as authenticated signatures or provenance.
 
 Run the focused offline suite:
@@ -109,11 +137,12 @@ fixture evidence, not an observation:
 PAPER OPERATOR REPORT
 Report status: FINISHED
 Experiment: operator-fixture-run
+Source label: SYNTHETIC_FIXTURE_ONLY; provenance: SYNTHETIC_FIXTURE_DECLARED
 Run bounds: 2026-01-01T10:00:00.000Z to 2026-01-01T18:00:00.000Z
 Evidence freshness: UNKNOWN (reported timestamps; not recomputed)
 Candidates: considered 2, accepted 0, rejected 1, unknown 1
 Candidate evidence: Scout-audited 2; authorization receipts UNKNOWN; unaccounted observed 0; discovery truncated NO; Scout audit truncated NO
-Paper entry fills: 0 (ZERO_TRADES)
+Paper entry fills: 0 (ZERO_TRADES; complete fill and ledger evidence)
 Source readiness: BLOCKED; operationally running: NOT EVIDENCED
 Cash: 100000 cents; reservations: UNKNOWN; open positions: 0
 Valuation: MARKED_AT_RUN_END; realized gross/net 0 cents / 0 cents; unrealized gross/net 0 cents / 0 cents
@@ -150,11 +179,12 @@ The complete example is synthetic:
 PAPER OPERATOR REPORT
 Report status: FINISHED
 Experiment: operator-fixture-run
+Source label: SYNTHETIC_FIXTURE_ONLY; provenance: SYNTHETIC_FIXTURE_DECLARED
 Run bounds: 2026-01-01T10:00:00.000Z to 2026-01-01T11:00:00.000Z
 Evidence freshness: UNKNOWN (reported timestamps; not recomputed)
 Candidates: considered UNKNOWN, accepted 1, rejected 0, unknown 0
 Candidate evidence: Scout-audited UNKNOWN; authorization receipts 1; unaccounted observed UNKNOWN; discovery truncated UNKNOWN; Scout audit truncated UNKNOWN
-Paper entry fills: 1 (TRADES_RECORDED)
+Paper entry fills: 1 (TRADES_RECORDED; reported paper fill receipts)
 Source readiness: NOT_READY; operationally running: NOT EVIDENCED
 Cash: 92000 cents; reservations: UNKNOWN; open positions: 1
 Valuation: UNRESOLVED; realized gross/net 0 cents / 0 cents; unrealized gross/net UNKNOWN / UNKNOWN
