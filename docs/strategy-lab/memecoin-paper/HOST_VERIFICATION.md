@@ -1,25 +1,33 @@
 # Paper host verification procedure
 
-**Disposition: owner run request recorded; technical activation remains blocked.**
-The owner has explicitly requested the existing #996 eight-hour virtual-capital
-Paper test online. That request is not evidence that a specific host, volume,
-source integration, provider path, stop control, or exact run configuration is
-ready. This packet does not start a run. The manifest remains disabled, the
-stop switch remains engaged, and no runtime authorization is produced here.
+**Disposition: owner authorization to progress is recorded; technical launch
+blockers remain.** In #996 comment
+[6560721313](https://github.com/Achi1984/meridian/issues/996#issuecomment-6560721313),
+the owner said to continue and bring this existing eight-hour, USD 1,000 virtual
+capital Paper test online. This authorizes progress toward that one-shot
+simulated run, not real-money/live-exchange execution, unlimited spending, or
+bypassing technical gates. No additional generic owner signoff is requested by
+this procedure. This packet does not start a run; the harness continues to
+report `runtimeAuthorization: false`, and the manifest remains disabled with
+its stop switch engaged.
 
 ## Repository-backed host, storage, and stop inventory
 
-The checked-in configuration does not identify a suitable compute host:
+The repository identifies an existing application-host candidate, but not a
+verified Paper execution target:
 
 | Interface | What the repository actually configures | What remains unknown or unavailable |
 |---|---|---|
-| Compute host | `scripts/memecoin-paper/run-manifest.json` names the public provider endpoints only. No Paper-specific machine, region, account, runner label, volume, or deployment target is present. `Dockerfile` describes the general Node gateway image; `vercel.json` configures an unrelated asset-watch function. Neither designates a Paper host. | Actual host identity, ownership, runtime deployment, filesystem/mount, capacity, and host-side operational access. Do not treat the coding-agent checkout or a generic CI runner as the selected host. |
-| Storage | `CheckpointStore.open(absoluteDirectory)` uses a local directory, lifetime lock, file sync, same-directory rename, directory sync, and bounded readback. The harness uses an owned temporary directory under Node's `os.tmpdir()`. | No configured production checkpoint path, volume identity, filesystem failure-domain, external sync guarantee, or recovery proof for any host. Local API behavior is not evidence about a deployment volume. |
-| Stop/deadline | The manifest is `enabled: false` with `stopSwitch.engaged: true`. `PaperCheckpointSession` enforces its fixed deadline when a command is invoked; `finishRun` is an explicit journal command. | No active stop-switch reader, host watchdog, scheduler, signal-to-session adapter, or operator stop command exists for this pilot. A fixed deadline does not stop an idle process. |
+| Compute host | [`MERIDIAN_CONTEXT.md`](../../../MERIDIAN_CONTEXT.md#L78-L85) says Northflank deploys canonical `main`; [`runtime-smoke.yml`](../../../.github/workflows/runtime-smoke.yml#L36-L44) and [`runtime-smoke.mjs`](../../../scripts/runtime-smoke.mjs#L8-L9) identify and check the public Northflank gateway. This makes that deployed gateway a concrete candidate to ask the operator about. | These references establish the app gateway, not that it runs this branch or supports an isolated Paper process. No Paper service identity, Northflank exec/job command, host shell access, or operator credentials/access path is defined here. No host probe was made. |
+| Storage | `CheckpointStore.open(absoluteDirectory)` uses a local directory, lifetime lock, file sync, same-directory rename, directory sync, and bounded exact readback. Its process-interruption behavior is exercised on owned temporary directories by this harness. | No Paper checkpoint path, Northflank volume/mount identity, or provider-specific persistence/sync guarantee is configured. Local API and process-exit observations describe tested behavior only; they do not establish which volume the gateway uses. Assess the documented storage failure/restart boundary for a selected host; do not require a guarantee against every possible eight-hour outage. |
+| Stop/deadline | The manifest is `enabled: false` with `stopSwitch.engaged: true`. `PaperCheckpointSession` enforces its fixed deadline when a command is invoked; `finishRun` is an explicit journal command. | No active stop-switch reader, host watchdog, scheduler, signal-to-session adapter, or operator stop command exists for this pilot. A fixed deadline does not stop an idle process. Required access is an operator-supported way to start and stop a one-shot process on the selected host; no such Paper command is checked in. |
 | Provider/source | The manifest lists DexScreener and Solana JSON-RPC endpoint names with both providers disabled. `adapters.mjs` sets `NETWORK_ENABLED = false`; its request method throws. | No online downloader, validated completeness for required evidence, real-data run controller, or source integration into the Paper orchestration path. `runSyntheticPaperOrchestration` accepts only the exact disabled manifest and generated scenarios. |
 
 These are source/configuration findings, not host probes. The running harness
-cannot discover or attest a host hidden outside the repository.
+cannot discover or attest host settings hidden outside the repository. The
+separate D2 execution-context assessment makes the same distinction between
+Northflank app hosting and a persistent execution target
+([`D2_EXECUTION_CONTEXT_SETUP.md`](../D2_EXECUTION_CONTEXT_SETUP.md#L12-L15)).
 
 ## Offline harness
 
@@ -78,28 +86,57 @@ evidence. A pass establishes only that these synthetic checks ran on that
 process/filesystem. It does not certify the selected production volume,
 power-loss recovery, host suitability, trusted time, or online operation.
 
-## Remaining gates for the requested online test
+## Concrete handoff for the requested online test
 
-1. Select and independently identify the compute host and actual checkpoint
-   volume; verify ownership, mount/failure domain, capacity, and storage
-   durability using that host/volume's supported operational evidence.
-2. Integrate and review the exact source that is intended to run there. This
-   branch's source hashes do not establish that it is deployed or integrated.
-3. Implement and review the real bounded data collection and run controller.
-   Current providers are disabled, the adapter is offline-only, and the
-   synthetic orchestration rejects enabled providers and non-fixture inputs.
-   The manifest also has empty mint/pool allowlists and unset run identity and
-   timestamps.
-4. Provide a host-enforced stop/timeout path and operator-visible incident
-   procedure. The command-invoked session deadline is not a watchdog; there is
-   no active stop-switch interface.
-5. Establish trusted host clock provenance/skew policy and independently
-   review the exact run manifest, accounting/restart behavior, provider evidence
-   coverage, stop behavior, and final source/CI results before activation.
+The minimum next operator input is **whether the existing Northflank gateway
+supports a reviewed one-off command/job for this Paper code, and which mounted
+path it would use**. The repository has no Northflank service identifier or
+operator command for that access; do not infer one from the gateway health URL.
+If it supports that operation, collect its non-secret service/deployment
+identity, exact deployed commit, writable test path, and the provider's
+documented persistence and restart behavior. If not, the owner/operator must
+identify an already available suitable execution context; this packet does not
+select or provision another host.
 
-The executable commands above are the minimal supported later **synthetic host
-verification**, not commands to start the eight-hour Paper test. No host target,
-volume, trusted clock, real-data provider implementation, active stop control,
-or online launch command is identified by the repository. The owner request is
-recorded; those technical blockers still prevent this packet from claiming the
-online test is startable.
+Then perform these bounded gates:
+
+1. **Source/config integration:** verify that the exact reviewed Paper source is
+   integrated/deployed. The current manifest has disabled providers, empty
+   mint/pool allowlists, and null run identity/start/end. `adapters.mjs` is
+   offline-only, and the synthetic orchestration rejects real inputs. The
+   missing implementation is an enabled-by-explicit-configuration, bounded
+   public-data collection path and one-shot run controller—not a new Paper
+   ledger or another readiness validator.
+2. **Storage behavior:** identify the selected checkpoint directory and its
+   volume boundary. Compare the provider's documented write/flush and restart
+   behavior to the store's file-sync/rename/directory-sync/readback contract.
+   Record what that documentation guarantees and what it leaves unspecified.
+   Process-kill/readback results are supporting observations, not proof of
+   machine power-loss behavior. If a process stops with unresolved state, retain
+   `UNKNOWN`, do not resume or replay automatically, and report the run
+   incomplete. No claim that a host must survive every possible outage is
+   required.
+3. **Stop and clock behavior:** identify the concrete operator stop/access path
+   and how it stops the one-shot process; the checked-in stop switch is not
+   wired to it. Confirm the trusted clock source/skew policy used for run
+   timestamps. A command-invoked deadline alone is insufficient to stop an idle
+   collector.
+4. **Exact bounded run config:** populate the approved one-shot run identity,
+   start/end, and permitted mint/pool scope using the existing owner direction
+   and risk policy; keep provider/request/time/byte/event limits bounded.
+   Preserve unknown evidence as blocked entries; do not weaken gates to obtain
+   trades.
+5. **Evidence and completion:** run the synthetic candidate-host commands above
+   first, then collect actual source/provider, storage, clock, stop, and run
+   outputs under the operator's approved evidence process. A synthetic pass
+   never substitutes for those observations. Stop and report incomplete on
+   `UNKNOWN`, missing evidence, exceeded bounds, or unavailable stop control.
+
+The commands documented above verify only synthetic host behavior; they are
+not the missing online start/stop commands. The Northflank gateway is the only
+documented current app-host candidate, while its Paper execution access and
+volume configuration are `UNKNOWN`. Exact source integration, enabled bounded
+provider/controller, populated run config, storage-boundary behavior, trusted
+clock, and host operator stop access remain the concrete launch blockers. The
+owner's authorization to progress is recorded; this procedure does not
+autonomously activate the service.
