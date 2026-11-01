@@ -138,6 +138,9 @@ export async function transferPostRunReport({
       typeof now !== "function" || typeof schedule !== "function" ||
       typeof cancelSchedule !== "function") return failure("transfer_configuration_invalid");
 
+  const owner = {};
+  activeTransfer = owner;
+  const operation = (async () => {
   let runPath;
   try {
     runPath = await assertSafeRunDirectory(root, runId);
@@ -258,16 +261,27 @@ export async function transferPostRunReport({
       }
       return {status: "TRANSFERRED", httpStatus: response.status, digest: expectedDigest};
     }).catch(() => unknown(timedOut ? "transfer_outcome_unknown" : "transfer_unavailable"));
-    trackedWork = work.finally(() => {
-      if (activeTransfer === trackedWork) activeTransfer = null;
-    });
-    activeTransfer = trackedWork;
+    trackedWork = work.finally(() => { owner.settlementDone = true; });
+    owner.settlement = trackedWork;
     return await Promise.race([trackedWork, deadline]);
   } catch {
     return timedOut ? unknown("transfer_outcome_unknown") : failure("transfer_unavailable");
   } finally {
     if (timer !== undefined && timer !== null) {
       try { cancelSchedule(timer); } catch { }
+    }
+  }
+  })();
+  try {
+    return await operation;
+  } finally {
+    const release = () => {
+      if (activeTransfer === owner) activeTransfer = null;
+    };
+    if (owner.settlement && !owner.settlementDone) {
+      owner.settlement.then(release, release);
+    } else {
+      release();
     }
   }
 }

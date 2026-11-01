@@ -238,6 +238,118 @@ test("one-shot transfer validates terminal/config and sends only the fixed bound
   assert.deepEqual(JSON.parse(observed[0].options.body), transferEnvelope(fixture.report, {hash: fixture.hash}));
 });
 
+test("synchronous admission allows one deferred preflight owner and releases it after success", async t => {
+  const fixture = await workerFixture(t);
+  const statusGate = deferred();
+  const statusStarted = deferred();
+  let statusReads = 0;
+  let reportReads = 0;
+  let sends = 0;
+  const options = makeWorkerOptions(fixture, {
+    readStatus: () => {
+      statusReads++;
+      statusStarted.resolve();
+      return statusGate.promise;
+    },
+    readReport: async (...args) => {
+      reportReads++;
+      return makeWorkerOptions(fixture).readReport(...args);
+    },
+    fetchImpl: async (_url, requestOptions) => {
+      sends++;
+      return receiptResponse(201, requestOptions.body);
+    }
+  });
+
+  const first = transferPostRunReport(options);
+  await statusStarted.promise;
+  assert.deepEqual(await transferPostRunReport(options), {status: "REJECTED", reason: "transfer_busy"});
+  assert.deepEqual(await transferPostRunReport(options), {status: "REJECTED", reason: "transfer_busy"});
+  assert.equal(statusReads, 1);
+  assert.equal(reportReads, 0);
+  assert.equal(sends, 0);
+
+  statusGate.resolve({status: "FINISHED", runId: RUN_ID, configHash: fixture.hash});
+  assert.equal((await first).status, "TRANSFERRED");
+  assert.equal(reportReads, 1);
+  assert.equal(sends, 1);
+  assert.equal((await transferPostRunReport({
+    ...options,
+    readStatus: makeWorkerOptions(fixture).readStatus
+  })).status, "TRANSFERRED");
+  assert.equal(sends, 2);
+});
+
+test("a deferred preflight failure releases only its owner", async t => {
+  const fixture = await workerFixture(t);
+  const statusGate = deferred();
+  const statusStarted = deferred();
+  const options = makeWorkerOptions(fixture, {
+    readStatus: () => {
+      statusStarted.resolve();
+      return statusGate.promise;
+    },
+    fetchImpl: async (_url, requestOptions) => receiptResponse(201, requestOptions.body)
+  });
+  const first = transferPostRunReport(options);
+  await statusStarted.promise;
+  assert.deepEqual(await transferPostRunReport(options), {status: "REJECTED", reason: "transfer_busy"});
+  assert.deepEqual(await transferPostRunReport(options), {status: "REJECTED", reason: "transfer_busy"});
+
+  statusGate.reject(new Error("synthetic preflight failure"));
+  assert.deepEqual(await first, {status: "REJECTED", reason: "run_state_unavailable"});
+  assert.equal((await transferPostRunReport({
+    ...options,
+    readStatus: makeWorkerOptions(fixture).readStatus
+  })).status, "TRANSFERRED");
+});
+
+test("deferred preflight ownership remains held through timeout and late response cleanup", async t => {
+  const fixture = await workerFixture(t);
+  const statusGate = deferred();
+  const statusStarted = deferred();
+  const fetchStarted = deferred();
+  let resolveFetch;
+  let finishCancel;
+  let cancelStarted = false;
+  const options = makeWorkerOptions(fixture, {
+    timeoutMs: 5,
+    schedule(callback) { return setTimeout(callback, 0); },
+    readStatus: () => {
+      statusStarted.resolve();
+      return statusGate.promise;
+    },
+    fetchImpl: () => {
+      fetchStarted.resolve();
+      return new Promise(resolve => { resolveFetch = resolve; });
+    }
+  });
+  const first = transferPostRunReport(options);
+  await statusStarted.promise;
+  assert.deepEqual(await transferPostRunReport(options), {status: "REJECTED", reason: "transfer_busy"});
+
+  statusGate.resolve({status: "FINISHED", runId: RUN_ID, configHash: fixture.hash});
+  await fetchStarted.promise;
+  assert.deepEqual(await first, {status: "UNKNOWN", reason: "transfer_outcome_unknown"});
+  resolveFetch({
+    status: 201,
+    body: {cancel: () => {
+      cancelStarted = true;
+      return new Promise(resolve => { finishCancel = resolve; });
+    }}
+  });
+  while (!cancelStarted) await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(await transferPostRunReport(options), {status: "REJECTED", reason: "transfer_busy"});
+  finishCancel();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal((await transferPostRunReport({
+    ...options,
+    timeoutMs: 10,
+    readStatus: makeWorkerOptions(fixture).readStatus,
+    fetchImpl: async (_url, requestOptions) => receiptResponse(201, requestOptions.body)
+  })).status, "TRANSFERRED");
+});
+
 test("partial and UNKNOWN terminal states and expected run/config mismatches never send", async t => {
   const fixture = await workerFixture(t);
   let sends = 0;
