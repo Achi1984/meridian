@@ -14,7 +14,7 @@ const tick=()=>new Promise(resolve=>setImmediate(resolve));
 function fixture(options={}){
   let clock=1000,safe=true;
   const requests=[],navigation=[],updates=[],timers=new Map();let serial=0;
-  const update=createReleaseUpdate({currentRelease:'B16-M11-FIX10',
+  const update=createReleaseUpdate({currentRelease:'B16-M11-FIX11',
     currentUrl:'https://example.test/meridian/v11/?view=bots#view-bots',
     now:()=>clock,canReload:()=>safe,navigate:url=>navigation.push(url),onUpdate:value=>updates.push(value),
     schedule:fn=>{timers.set(++serial,fn);return serial;},cancelSchedule:id=>timers.delete(id),
@@ -23,19 +23,19 @@ function fixture(options={}){
 }
 
 test('release identity requires exactly five coherent approved local entries',()=>{
-  assert.equal(readReleaseSources(sources('B16-M11-FIX10')),'B16-M11-FIX10');
+  assert.equal(readReleaseSources(sources('B16-M11-FIX11')),'B16-M11-FIX11');
   assert.equal(readReleaseHtml(html('B17-M11')),'B17-M11');
-  for(const invalid of [[],sources('B16-M11-FIX10').slice(1),[...sources('B16-M11-FIX10'),'./extra.js?v=B16-M11-FIX10'],
-    [...sources('B16-M11-FIX10').slice(1),sources('B16-M11-FIX10')[1]],
-    sources('B16-M11-FIX10').map((s,i)=>i===0?s.replace('FIX10','FIX11'):s),
-    sources('B16-M11-FIX10').map(s=>s.replace('./','https://other.test/')),
+  for(const invalid of [[],sources('B16-M11-FIX11').slice(1),[...sources('B16-M11-FIX11'),'./extra.js?v=B16-M11-FIX11'],
+    [...sources('B16-M11-FIX11').slice(1),sources('B16-M11-FIX11')[1]],
+    sources('B16-M11-FIX11').map((s,i)=>i===0?s.replace('FIX10','FIX11'):s),
+    sources('B16-M11-FIX11').map(s=>s.replace('./','https://other.test/')),
     sources('B0-M11'),sources('B16-M11-FIX0')])assert.equal(readReleaseSources(invalid),null);
   assert.equal(readReleaseHtml(html('B17-M11').replace('11-preview','10')),null);
   assert.equal(readReleaseHtml('x'.repeat(128*1024+1)),null);
 });
 
 test('served index is recognized without a second manually maintained version manifest',()=>{
-  assert.equal(readReleaseHtml(readFileSync(new URL('../v11/index.html',import.meta.url),'utf8')),'B16-M11-FIX10');
+  assert.equal(readReleaseHtml(readFileSync(new URL('../v11/index.html',import.meta.url),'utf8')),'B16-M11-FIX11');
 });
 
 test('locked safe tab checks only public HTML without credentials and reloads a newer release once',async()=>{
@@ -50,7 +50,7 @@ test('locked safe tab checks only public HTML without credentials and reloads a 
 });
 
 test('same release, older CDN response and incoherent release never reload',async()=>{
-  for(const value of ['B16-M11-FIX10','B16-M11-FIX9','B15-M11']){
+  for(const value of ['B16-M11-FIX11','B16-M11-FIX9','B15-M11']){
     const f=fixture({fetchImpl:async()=>response(value)});await f.update.check();
     assert.equal(f.navigation.length,0);assert.equal(f.updates.length,0);
   }
@@ -80,8 +80,8 @@ test('initial/pageshow/focus bursts share one in-flight request and a one-minute
   let resolve,count=0;
   const f=fixture({fetchImpl:()=>{count++;return new Promise(r=>{resolve=r;});}});
   const first=f.update.check();await f.update.check();assert.equal(count,1);
-  resolve(response('B16-M11-FIX10'));await first;await f.update.check();assert.equal(count,1);
-  f.advance();const next=f.update.check();assert.equal(count,2);resolve(response('B16-M11-FIX10'));await next;
+  resolve(response('B16-M11-FIX11'));await first;await f.update.check();assert.equal(count,1);
+  f.advance();const next=f.update.check();assert.equal(count,2);resolve(response('B16-M11-FIX11'));await next;
 });
 
 test('offline, non-HTML and oversized responses leave the loaded app usable',async()=>{
@@ -123,7 +123,7 @@ function mounted({status='locked',typed='',hidden=false}={}){
   gate.parentNode=body;body.insertBefore=node=>body.children.unshift(node);
   document.hidden=hidden;document.activeElement=input;document.createElement=tag=>new Element(tag.toUpperCase());
   document.getElementById=id=>id==='app-access-password'?input:id==='app-access-gate'?gate:null;
-  document.querySelectorAll=()=>sources('B16-M11-FIX10').map(src=>({getAttribute:()=>src}));
+  document.querySelectorAll=()=>sources('B16-M11-FIX11').map(src=>({getAttribute:()=>src}));
   const navigation=[];window.location={href:'https://example.test/v11/',replace:url=>navigation.push(url)};
   let listener,requests=0;
   const access={subscribe:fn=>{listener=fn;fn({status});return ()=>{listener=null;};}};
@@ -159,3 +159,4 @@ test('intermediate locked notification during verification cannot reload a pendi
   assert.equal(f.navigation.length,0);
   f.window.events.get('focus')();assert.equal(f.navigation.length,0);f.mount.dispose();
 });
+

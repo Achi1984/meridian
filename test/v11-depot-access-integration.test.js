@@ -4,7 +4,7 @@ import {createAppAccess} from '../v11/app-access.js';
 import {createDepotReadView} from '../v11/depot-read-view.js';
 import {createDepotReadClient} from '../v11/depot-read-client.js';
 import {mountDepotReadAccess} from '../v11/depot-read-bootstrap.js';
-import {subscribeDepotPortfolio} from '../v11/depot-portfolio-state.js?v=B16-M11-FIX10';
+import {subscribeDepotPortfolio} from '../v11/depot-portfolio-state.js?v=B16-M11-FIX11';
 class Node {
   constructor(document,tag){this.ownerDocument=document;this.tagName=tag;this.children=[];this.dataset={};this.attrs={};this.listeners=new Map();this.text='';}
   set textContent(value){this.text=String(value);this.children=[];}
@@ -35,6 +35,17 @@ function setup({status=200}={}){
 function mountReal(h){
   return mountDepotReadAccess(h.d,{},{access:h.access,createClient:o=>createDepotReadClient({...o,fetchImpl:(u,i)=>h.fetchFor(u,i)})});
 }
+test('manual Ledger mount is exclusive, preserves Pionex scope, and disposes once without reads',()=>{
+  for(const pionexOnly of [true,false]){
+    const h=setup();let legacy=0,manual=0,disposed=0,scope;
+    const mounted=mountDepotReadAccess(h.d,{}, {access:h.access,pionexOnly,ledgerManual:true,
+      createView(_root,options){scope=options.pionexOnly;return {revalidate(){},dispose(){}};},
+      createLedgerView(){legacy++;return {dispose(){throw Error('legacy leak');}};},
+      createLedgerManualView(_root,{access}){assert.equal(access,h.access);manual++;return {dispose(){disposed++;}};}});
+    assert.ok(mounted);assert.equal(scope,pionexOnly);assert.equal(manual,1);assert.equal(legacy,0);assert.equal(h.urls.length,0);
+    mounted.dispose();mounted.dispose();assert.equal(disposed,1);
+  }
+});
 test('locked start, central verify gives not_loaded with no extra Depot reads, Command aligned',async()=>{
   const h=setup();const m=mountReal(h);
   assert.match(h.text(),/Gesperrt/);assert.equal(h.urls.length,0);
@@ -260,4 +271,5 @@ test('Pionex-only view excludes mixed history and rejects aggregate models',()=>
   render({status:'fresh',model:{...model,source:'SERVER_PORTFOLIO_CURRENT',spotUsd:2000}});
   assert.equal(h.command.dataset.state,'unavailable');assert.doesNotMatch(h.text(),/3.450,00/);v.dispose();
 });
+
 

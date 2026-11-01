@@ -1,6 +1,6 @@
-import {CAMPAIGN_SOURCE, renderStrategyCatalog} from './strategy-catalog.js?v=B16-M11-FIX10';
-import {createStrategyArenaView} from './strategy-arena.js?v=B16-M11-FIX10';
-import {renderPaperReadiness} from './paper-readiness-view.js?v=B16-M11-FIX10';
+import {CAMPAIGN_SOURCE, renderStrategyCatalog} from './strategy-catalog.js?v=B16-M11-FIX11';
+import {createStrategyArenaView} from './strategy-arena.js?v=B16-M11-FIX11';
+import {renderPaperReadiness} from './paper-readiness-view.js?v=B16-M11-FIX11';
 
 const catalogRoot = document.getElementById('strategy-catalog');
 const catalogStatus = document.getElementById('strategy-load-status');
@@ -49,3 +49,4 @@ document.addEventListener('click',event=>{
   document.querySelector('#nav button[data-v="strategies"]')?.click();
   loadWorkspace();
 });
+
