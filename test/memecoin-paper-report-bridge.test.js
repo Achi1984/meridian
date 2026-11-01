@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import test from 'node:test';
 import {
   createPaperReportBridge,
@@ -292,4 +293,18 @@ test('dispose aborts a pending browser request and returns a distinct state', as
   connector.dispose();
   assert.equal((await pending).status, 'DISPOSED');
   assert.equal(signal.aborted, true);
+});
+
+test('bridge remains disconnected from filesystem, route, listener, and bootstrap wiring', () => {
+  const bridgeSource = readFileSync(new URL(
+    '../scripts/memecoin-paper-report-bridge/index.mjs', import.meta.url
+  ), 'utf8');
+  const connectorSource = readFileSync(new URL('../v11/paper-report-connector.js', import.meta.url), 'utf8');
+  const bootstrap = readFileSync(new URL('../v11/strategy-workspace-bootstrap.js', import.meta.url), 'utf8');
+  const gateway = readFileSync(new URL('../server-gateway.js', import.meta.url), 'utf8');
+
+  assert.doesNotMatch(bridgeSource, /node:fs|createServer|\.listen\s*\(|\bfetch\s*\(|setInterval/);
+  assert.doesNotMatch(connectorSource, /createServer|\.listen\s*\(|\bfetch\s*\(|setInterval/);
+  assert.doesNotMatch(bootstrap, /paper-report-connector|createPaperReportConnector/);
+  assert.doesNotMatch(gateway, /paper-report/);
 });
