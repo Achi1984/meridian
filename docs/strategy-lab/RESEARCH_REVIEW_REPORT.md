@@ -1,9 +1,11 @@
 # Offline B1 research review report
 
 This source-only utility renders a bounded Markdown report from caller-supplied
-bytes accepted by the unchanged `v11/arena-historical-export.js` parser. It is
-limited to that parser's pinned synthetic profiles. It does not import genuine
-D2 results; a D2 V2 contract remains unapproved and unsupported.
+bytes accepted by either the unchanged synthetic-only V1 parser
+(`v11/arena-historical-export.js`) or the separately versioned historical V2
+parser (`v11/arena-historical-export-v2.js`). V2 accepts a bounded
+historical-shaped observation as an unverified caller assertion; it does not
+authenticate or independently accept a genuine D2 result.
 
 The report keeps the 44 manifest-order path IDs and the separate 44-entry
 computation order even when no path result exists. Progress observations,
@@ -47,17 +49,30 @@ coverage through the import API or CLI.
 
 ## Evidence boundary
 
-Every report is explicitly synthetic-only/unverified under the accepted parser
-contract. Hashes bind bytes and identities, not source authenticity, caller
-identity, or consent. The report does not read files, journals, or market data;
-does not access a network; and imports no engine or captured-input loader. It
-does not run, replay, rank, calculate returns, add metrics, or grant research,
-Holdout, Paper, or Live authority. Historical diagnostic is not Holdout; costs
-remain assumptions; `NO_FINITE_TRADE_STOP` remains unchanged; genuine D2 import
-is unsupported.
+V1 remains limited to its pinned synthetic profiles and does not accept genuine
+D2 results. V2 is a separate offline historical review contract. It verifies
+supplied result and summary bytes, their structural relationship, and internal
+canonical identity relationships; these checks do not establish provenance,
+source authenticity, caller identity, or consent. Optional original progress
+payload bytes are verified only when supplied. Optional supplemental evidence
+is bounded, typed by category, and remains unverified where `inspect_b1` has no
+corresponding contract.
+
+Neither format reads files, journals, or market data; accesses a network; or
+imports an engine or captured-input loader. The report does not run, replay,
+rank, calculate returns, add metrics, or grant research, Holdout, Paper, or Live
+authority. Historical diagnostic is not Holdout; costs remain assumptions;
+`NO_FINITE_TRADE_STOP` remains unchanged. V2 cannot establish authenticity or
+independent acceptance and makes no execution, promotion, profitability, or
+causal claim.
 
 Generated-only coverage:
 
 ```sh
 node --test test/b1-7-review-report.test.js
 ```
+
+The shared formatter renders the separately versioned historical V2 contract
+without changing V1. V2 byte, identity, optional-evidence, and provenance
+limits are documented in
+[HISTORICAL_RESULT_EXPORT_V2.md](HISTORICAL_RESULT_EXPORT_V2.md).
