@@ -17,6 +17,14 @@ import { reconcilePortfolioAuthority,portfolioAuthorityReceipt } from "./portfol
 import { confirmReviewedLedger } from "./ledger-reviewed-authority.js";
 import { capturePortfolioHistoryOnce } from "./portfolio-history-runtime.js";
 import { buildPaperExecutionAuditExport } from "./paper-execution-audit-v2-export.js";
+import {
+  createPrivateReportStore,
+  PAPER_REPORT_POOL_OPTIONS
+} from "./private-report-store.mjs";
+import {
+  handleReportGatewayRequest,
+  reportTransferGatewayConfig
+} from "./report-transfer-gateway.mjs";
 
 const { Pool } = pg;
 const RELEASE=JSON.parse(await fs.readFile(new URL("./version.json",import.meta.url),"utf8"));
@@ -33,6 +41,7 @@ const ALLOWED_ORIGINS = new Set(
 const PRIVATE_STATE_KEY = "private_dashboard_v1";
 const ASSET_WATCH_SHARE_STATE_KEY = "asset_watch_share_v1";
 const DATABASE_URL = process.env.DATABASE_URL || "";
+const PAPER_REPORT_CONFIG = reportTransferGatewayConfig();
 const PIONEX_BOT_READ_CONFIGURED=!!(
   String(process.env.PIONEX_BOT_READ_API_KEY||process.env.PIONEX_API_KEY||'').trim() &&
   String(process.env.PIONEX_BOT_READ_API_SECRET||process.env.PIONEX_API_SECRET||'').trim()
@@ -116,10 +125,30 @@ async function readJsonBody(req,maxBytes=131072){
 }
 
 let privatePool=null;
+let privatePaperReportPool=null;
+let privatePaperReportStore=null;
 function pool(){
   if(!DATABASE_URL)return null;
   if(!privatePool)privatePool=new Pool({connectionString:DATABASE_URL,ssl:{rejectUnauthorized:false}});
   return privatePool;
+}
+function paperReportPool(){
+  if(!DATABASE_URL)return null;
+  if(!privatePaperReportPool){
+    privatePaperReportPool=new Pool({
+      connectionString:DATABASE_URL,
+      ssl:{rejectUnauthorized:false},
+      ...PAPER_REPORT_POOL_OPTIONS
+    });
+  }
+  return privatePaperReportPool;
+}
+function paperReportStore(){
+  if(!DATABASE_URL)return null;
+  if(!privatePaperReportStore){
+    privatePaperReportStore=createPrivateReportStore(paperReportPool());
+  }
+  return privatePaperReportStore;
 }
 async function stateGet(key){
   const p=pool(); if(!p)return null;
@@ -288,6 +317,32 @@ const server=http.createServer(async(req,res)=>{
     const origin=allowOrigin(req);
     if(req.method==="OPTIONS")return corsPreflight(req,res,origin);
     if(origin===null)return writeJson(res,403,{error:"origin_not_allowed"});
+    const reportController=new AbortController();
+    const abortReport=()=>reportController.abort();
+    const abortReportOnClose=()=>{if(!res.writableEnded)abortReport();};
+    req.once("aborted",abortReport);
+    res.once("close",abortReportOnClose);
+    if(req.aborted||res.destroyed)abortReport();
+    let reportRoute;
+    try{
+      reportRoute=await handleReportGatewayRequest(req,{
+        config:PAPER_REPORT_CONFIG,
+        getStore:paperReportStore,
+        authorizedRead,
+        signal:reportController.signal
+      });
+    }finally{
+      req.removeListener("aborted",abortReport);
+      res.removeListener("close",abortReportOnClose);
+    }
+    if(reportRoute){
+      const result=reportRoute;
+      if(result.status===408||result.status===413){
+        res.shouldKeepAlive=false;
+        res.once("finish",()=>{if(!req.complete)req.destroy();});
+      }
+      return writeJson(res,result.status,result.body,origin||"");
+    }
     if(req.method==="GET"&&u.pathname==="/gateway-health"){
       const [current,shareState,m15,h1,h4,d1]=await Promise.all([
         stateGet(PRIVATE_STATE_KEY),
@@ -577,6 +632,3 @@ const server=http.createServer(async(req,res)=>{
   }catch(e){return writeJson(res,500,{error:String(e?.message||e)});}
 });
 server.listen(EXTERNAL_PORT,"0.0.0.0",()=>console.log(`[GATEWAY] MERIDIAN ${String(RELEASE.version||RELEASE.ui||"?")} / ${String(RELEASE.buildId||"?")} on :${EXTERNAL_PORT} -> internal :${INTERNAL_PORT}`));
-
-
-
