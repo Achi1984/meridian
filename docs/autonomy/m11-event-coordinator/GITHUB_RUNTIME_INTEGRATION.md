@@ -1,19 +1,11 @@
 # GitHub state transport through runtime composition
 
-Issue #1045 acceptance is **SOURCE_COMPOSITION_ONLY / PUBLICATION_NOT_READY**.
-Only the new integration test, external fake HTTP fixture, and this document
-belong to this packet. No production module, workflow, journal or state target
-is changed or provisioned.
-
-## Dependency and scope
-
-The isolated branch starts at exact composition dependency
-`7199f8d71df4638f77c3e55993e7c99ad9553d84` (PR #1044), then merges pinned main
-`9f3b9a29513116a631d0eab4c708002b11dfffda`, which contains the actual transport
-from PR #1042. The local checkout was shallow; ancestry was deepened before the
-ordinary merge. The #1044 branch is untouched. Until #1044 is integrated and
-this packet is refreshed to integrated main, this is dependency-based evidence,
-not final current-main acceptance. It does not depend on #999, #997 or #1028.
+Acceptance is **SOURCE_COMPOSITION_ONLY / PUBLICATION_NOT_READY**. The
+integration test, external fake HTTP fixture and this document change no
+production module, workflow, journal or state target. The transport, runtime
+composition and status projection are already on main; the earlier PR #1044
+dependency is obsolete. Provenance and consolidated results are in
+`INTEGRATION_ACCEPTANCE_20261101.md`.
 
 `test/m11-coordinator-github-runtime-integration.test.js` imports the actual
 GitHub transport and runtime composition. Backend, store, lifecycle, boundary
@@ -38,7 +30,7 @@ Run only:
 node --test test/m11-coordinator-github-runtime-integration.test.js
 ```
 
-Four top-level scenarios cover:
+Five top-level scenarios cover:
 
 1. Connected start persists `REVIEW_PENDING` before dispatch; serialized restart
    observes without redispatch. Admitted synthetic completion reaches
@@ -46,16 +38,20 @@ Four top-level scenarios cover:
    receipt `COMMITTED`. Another reconstruction performs read-only lookup:
    even FOUND remains UNKNOWN. Status projection performs four real transport
    GETs, no mutations or reviewer calls, and leaves provider/model/runtime
-   evidence UNKNOWN/null. A focused nested assertion retains actual capture's
+   evidence UNKNOWN/null; the stored posting fence is labelled as such, still
+   `UNKNOWN` (not `BLOCKED` or `DONE`). A focused nested assertion retains actual capture's
    UNVERIFIED rejection by the real boundary.
 2. Two real transport/runtime instances reach the same expected-head CAS.
    One dispatches; the other is conservatively UNKNOWN after the HTTP/GraphQL
    conflict. Quota and claim remain singular; another start does not mutate or
    redispatch.
-3. Fake Git state commits `RECEIPT_POSTING`, then loses its HTTP acknowledgement.
+3. Duplicate start deliveries (same instance and after serialized
+   reconstruction) return `ALREADY_CLAIMED` with no HTTP mutation, GraphQL
+   request, conflict, dispatch or receipt POST; canonical bytes are unchanged.
+4. Fake Git state commits `RECEIPT_POSTING`, then loses its HTTP acknowledgement.
    The actual transport/backend/lifecycle return UNKNOWN. Neither same-instance
    observation nor reconstructed FOUND lookup retries a mutation or dispatch.
-4. Runtime's 500 ms deadline expires while a posting mutation is held inside
+5. Runtime's 500 ms deadline expires while a posting mutation is held inside
    injected HTTP. Backend does not forward the lifecycle AbortSignal, so the
    transport's independently bounded 3000 ms operation remains active. Before
    release, canonical state is `RECEIPT_PREPARING`; after release, the late
@@ -72,30 +68,17 @@ posting fence, not a durable transport fence or an ABA defense.
 
 ## Evidence and limits
 
-Focused command above ran once on 2026-10-30: **5 tests passed, 0 failed,
-0 cancelled, 0 skipped, 0 todo** (four top-level scenarios and one nested capture
-check; 838.300125 ms total). No assertion corrections or test reruns were needed.
-Independent read-only source review returned GREEN LIGHT with no significant
-issues. That review is not the final integrated exact-head/cross-model approval.
-No new production safety blocker was exposed: late posting remains fenced and
-lookup-only, but the absence of shared cancellation is a real production limit.
-
-At delivery, PR #1044 remains open and its head has independently advanced to
-`377c0d93df846e7d5b2cfa85603ba7b00a8e3a0c`; this packet does not adopt that
-newer head or claim acceptance against it. Against pinned main the draft also
-shows the three inherited #1044 composition files; this packet's acceptance
-commit itself adds exactly the three owned test/fixture/document files.
-
-No full local suite or CI rerun/dispatch was performed; final integrated
-exact-head CI and independent review remain integration-slot gates. This packet
-must remain draft until the dependency is integrated and those gates pass.
+Results from the single focused run are recorded in
+`INTEGRATION_ACCEPTANCE_20261101.md`. Independent review and full hosted CI
+remain integration-slot gates. The late-write path exposes a real production
+limit (no shared cancellation across runtime and backend HTTP), reported rather
+than hidden.
 
 No hosted atomicity, production readiness, publication authority or trusted
 provider provenance is proven. Existing exhaustive transport validation and
 projector/capture unit coverage are not duplicated. Source publication remains
-NOT_READY; the tests must not be weakened to manufacture completion. Any actual
-production safety blocker discovered by these seams is reported here rather
-than repaired outside the three owned files.
+NOT_READY; the tests must not be weakened to manufacture completion. Production blockers
+discovered by these seams are reported, not worked around.
 
 All runtime HTTP is injected synthetic HTTP. No real API probe, credential,
 provider/account call, provisioning, receipt publication, runtime/feed/trading

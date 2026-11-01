@@ -340,6 +340,30 @@ test('competing real transports atomically contest one expected Git head; only o
   assert.equal(server.counts.receiptPosts, 0);
 });
 
+test('duplicate start deliveries, including after reconstruction, never mutate or redispatch', async () => {
+  const collected = await collect();
+  const server = createFakeGithub();
+  const first = harness(server, collected);
+  assert.equal((await first.runtime.start(first.input)).status, 'REVIEW_PENDING');
+  const settled = server.canonicalBytes();
+  const counts = {...server.counts};
+  const restored = createFakeGithub({serialized: server.serialize()});
+  const second = harness(restored, await collect());
+  for (const h of [first, second]) {
+    const duplicate = await h.runtime.start(h.input);
+    assert.equal(duplicate.reason, 'ALREADY_CLAIMED');
+    sourceOnly(duplicate);
+  }
+  for (const key of ['graphql', 'accepted', 'conflicts', 'dispatch', 'receiptPosts']) {
+    assert.equal(server.counts[key], counts[key], key);
+    assert.equal(restored.counts[key], counts[key], key);
+  }
+  assert.equal(server.canonicalBytes(), settled);
+  assert.equal(restored.canonicalBytes(), settled);
+  assert.equal(server.envelope().claims.length, 1);
+  assert.equal(server.envelope().admissionState.consumedQuota, 1);
+});
+
 test('persisted RECEIPT_POSTING with lost HTTP acknowledgement is UNKNOWN, never blindly retried', async () => {
   const server = createFakeGithub({
     afterMutation({request}) {
