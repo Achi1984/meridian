@@ -187,13 +187,17 @@ test('generated sample is visibly synthetic and uses the same report DTO contrac
 test('known exact signed amounts preserve sign; absent or malformed amounts stay unavailable', () => {
   const snapshot = report();
   snapshot.valuation.cashCents = '1000000000000000000000001';
+  snapshot.controls.reservations = 2;
   snapshot.valuation.realizedGrossPnlCents = '250';
   snapshot.valuation.realizedNetPnlCents = '-125';
   snapshot.valuation.unrealizedGrossPnlCents = '0';
   snapshot.valuation.unrealizedNetPnlCents = '12.5';
   const model = presentPaperCockpitReport(snapshot);
-  assert.equal(model.valuation.cash.label, '+1000000000000000000000001 cents');
+  assert.equal(model.valuation.cash.label, '1000000000000000000000001 cents');
+  assert.equal(model.valuation.cash.tone, 'tone-muted');
+  assert.equal(model.controls.reservations, 2);
   assert.equal(model.valuation.realizedGross.label, '+250 cents');
+  assert.equal(model.valuation.realizedGross.tone, 'tone-safe');
   assert.equal(model.valuation.realizedNet.label, '−125 cents');
   assert.equal(model.valuation.realizedNet.tone, 'tone-danger');
   assert.equal(model.valuation.unrealizedGross.label, '0 cents');

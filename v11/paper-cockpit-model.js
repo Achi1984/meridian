@@ -110,9 +110,10 @@ export function presentPaperCockpitReport(report, {now = null, staleAfterMs = nu
   const valuation = isRecord(report.valuation) ? report.valuation : {};
   const signedCents = key => exactCents(valuation[key], true);
   const cents = key => exactCents(valuation[key]);
-  const amount = value => {
+  const amount = (value, signed = false) => {
     if (value === null) return {label: 'Unavailable', tone: 'tone-muted'};
     if (value === '0') return {label: '0 cents', tone: 'tone-muted'};
+    if (!signed) return {label: `${value} cents`, tone: 'tone-muted'};
     return {
       label: `${value.startsWith('-') ? '−' : '+'}${value.replace(/^-/, '')} cents`,
       tone: value.startsWith('-') ? 'tone-danger' : 'tone-safe'
@@ -162,16 +163,17 @@ export function presentPaperCockpitReport(report, {now = null, staleAfterMs = nu
       openPositionCount: count(controls.openPositionCount),
       openPositions: rows(controls.openPositions, ['mint', 'markStatus']),
       positionsCoverage: isRecord(controls.openPositionsCoverage) ? controls.openPositionsCoverage : null,
+      reservations: count(controls.reservations),
       stops: rows(controls.stops, ['code', 'kind', 'status', 'reason']),
       stopsCoverage: isRecord(controls.stopsCoverage) ? controls.stopsCoverage : null
     },
     valuation: {
       status: text(valuation.status) ?? 'UNKNOWN',
       cash: amount(cents('cashCents')),
-      realizedGross: amount(signedCents('realizedGrossPnlCents')),
-      realizedNet: amount(signedCents('realizedNetPnlCents')),
-      unrealizedGross: amount(signedCents('unrealizedGrossPnlCents')),
-      unrealizedNet: amount(signedCents('unrealizedNetPnlCents'))
+      realizedGross: amount(signedCents('realizedGrossPnlCents'), true),
+      realizedNet: amount(signedCents('realizedNetPnlCents'), true),
+      unrealizedGross: amount(signedCents('unrealizedGrossPnlCents'), true),
+      unrealizedNet: amount(signedCents('unrealizedNetPnlCents'), true)
     },
     unresolvedFills: rows(report.unresolvedFills, ['kind', 'status', 'reason']),
     unresolvedFillsCoverage: isRecord(report.unresolvedFillsCoverage)

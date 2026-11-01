@@ -118,6 +118,7 @@ function renderReport(root, report, document, options = {}) {
   positions.className = 'card card-muted';
   node(document, positions, 'h3', 'Open positions');
   node(document, positions, 'p', `Reported position count: ${shown(model.controls.openPositionCount)}.`);
+  node(document, positions, 'p', `Reported reservation count: ${shown(model.controls.reservations)}.`);
   appendList(document, positions, 'Position evidence', model.controls.openPositions, row =>
     `${row.mint ?? 'Instrument UNKNOWN'} · ${row.markStatus ?? 'mark status UNKNOWN'}`);
   if (model.controls.positionsCoverage) node(document, positions, 'p',
@@ -141,6 +142,7 @@ export function renderPaperCockpit(root, report = null, document = root?.ownerDo
   if (!root || !document) return null;
   root.replaceChildren();
   root.className = 'card paper-cockpit';
+  root.setAttribute('style', 'min-width:0;max-width:100%;overflow-wrap:anywhere');
   root.setAttribute('aria-labelledby', 'paper-cockpit-heading');
   node(document, root, 'h2', 'Paper cockpit').id = 'paper-cockpit-heading';
   const readonlyLabel = node(document, root, 'p',
@@ -151,7 +153,7 @@ export function renderPaperCockpit(root, report = null, document = root?.ownerDo
   const demo = document.createElement('details');
   demo.className = 'card card-muted';
   const summary = node(document, demo, 'summary', 'Generated demo fixture · synthetic only');
-  summary.setAttribute('aria-label', 'Generated demo fixture anzeigen; keine Live-Daten');
+  summary.setAttribute('aria-label', 'Generated demo fixture · synthetic only anzeigen; keine Live-Daten');
   node(document, demo, 'p', 'Das folgende Beispiel ist künstlich erzeugt und keine Beobachtung oder Produktions-Telemetrie.', 'caption');
   renderReport(demo, getDemoPaperCockpitReport(), document);
   root.append(demo);
