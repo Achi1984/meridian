@@ -706,6 +706,65 @@ test('concurrent duplicate replace on same transport fails locally before second
   assert.equal(graphqlCalls.length, 1);
 });
 
+test('rejected overlapping calls cannot release the active mutation marker', async () => {
+  const server = buildServer();
+  const mutationStarted = deferred();
+  const releaseMutation = deferred();
+  let fetchCalls = 0;
+  let mutationCalls = 0;
+  const fetchImpl = async (url, options) => {
+    fetchCalls += 1;
+    if (new URL(url).pathname === '/graphql') {
+      mutationCalls += 1;
+      if (mutationCalls === 1) {
+        mutationStarted.resolve();
+        await releaseMutation.promise;
+      }
+    }
+    return server.fetchImpl(url, options);
+  };
+  const transport = createM11CoordinatorGithubStateTransport({
+    enabled: true,
+    fetchImpl,
+    credentials: credentials()
+  });
+  const current = await transport.readCanonicalEnvelope();
+  const next = await makeNextEnvelopeFromClaim(current);
+
+  const first = transport.replaceCanonicalEnvelope({expectedStorageVersion: 0, nextEnvelope: next});
+  await mutationStarted.promise;
+  const aborted = new AbortController();
+  aborted.abort();
+  await assert.rejects(
+    transport.replaceCanonicalEnvelope({
+      expectedStorageVersion: 0,
+      nextEnvelope: next,
+      signal: aborted.signal
+    }),
+    error => error?.code === GITHUB_STATE_TRANSPORT_ERROR.TRANSPORT_UNAVAILABLE
+  );
+  const callsWhileFirstHeld = fetchCalls;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await assert.rejects(
+      transport.replaceCanonicalEnvelope({expectedStorageVersion: 0, nextEnvelope: next}),
+      error => error?.code === GITHUB_STATE_TRANSPORT_ERROR.LOCAL_CONCURRENT_MUTATION
+    );
+  }
+  assert.equal(fetchCalls, callsWhileFirstHeld);
+  assert.equal(mutationCalls, 1);
+  assert.equal(server.requestLog.filter(entry => entry.path === '/graphql').length, 0);
+
+  releaseMutation.resolve();
+  assert.equal((await first).status, 'REPLACED');
+  assert.equal(server.requestLog.filter(entry => entry.path === '/graphql').length, 1);
+  const callsAfterFirst = fetchCalls;
+  await assert.rejects(
+    transport.replaceCanonicalEnvelope({expectedStorageVersion: 0, nextEnvelope: next}),
+    error => error?.code === GITHUB_STATE_TRANSPORT_ERROR.NO_READ_BINDING
+  );
+  assert.equal(fetchCalls, callsAfterFirst);
+});
+
 test('lost ACK is UNKNOWN/no-retry and persisted write is later readable', async () => {
   const server = buildServer();
   server.setMutateHook(({contentText, branchHead, requestUrl}) => {

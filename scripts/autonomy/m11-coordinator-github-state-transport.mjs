@@ -559,9 +559,11 @@ mutation CreateCommitOnBranch($input: CreateCommitOnBranchInput!) {
     async replaceCanonicalEnvelope({expectedStorageVersion, nextEnvelope, signal = null}) {
       if (enabled !== true) fail(GITHUB_STATE_TRANSPORT_ERROR.DISABLED);
       const operation = createOperation({signal, deadlineMs: defaultDeadlineMs, maxResponseBytes});
+      let ownsInFlightMarker = false;
       try {
         operation.assertActive();
         const binding = consumeMutationOpportunity(expectedStorageVersion);
+        ownsInFlightMarker = true;
         let canonicalNext;
         try {
           canonicalNext = await canonicalReplay(nextEnvelope);
@@ -595,7 +597,7 @@ mutation CreateCommitOnBranch($input: CreateCommitOnBranchInput!) {
         operation.assertActive();
         return Object.freeze({status: 'REPLACED', storageVersion: readback.envelope.storageVersion});
       } finally {
-        inFlightMutations.delete(expectedStorageVersion);
+        if (ownsInFlightMarker) inFlightMutations.delete(expectedStorageVersion);
         operation.finish();
       }
     }
