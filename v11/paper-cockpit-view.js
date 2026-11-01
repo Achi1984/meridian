@@ -155,7 +155,7 @@ export function renderPaperCockpit(root, report = null, document = root?.ownerDo
   const summary = node(document, demo, 'summary', 'Generated demo fixture · synthetic only');
   summary.setAttribute('aria-label', 'Generated demo fixture · synthetic only anzeigen; keine Live-Daten');
   node(document, demo, 'p', 'Das folgende Beispiel ist künstlich erzeugt und keine Beobachtung oder Produktions-Telemetrie.', 'caption');
-  renderReport(demo, getDemoPaperCockpitReport(), document);
+  renderReport(demo, options.demoReport ?? getDemoPaperCockpitReport(), document);
   root.append(demo);
   return {status: available ? 'REPORT_PRESENTED' : 'UNAVAILABLE'};
 }

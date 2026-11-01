@@ -53,6 +53,7 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
           const model=await import('./paper-cockpit-model.js?v=B16-M11-FIX11');
           const view=await import('./paper-cockpit-view.js?v=B16-M11-FIX11');
           const report=model.getDemoPaperCockpitReport();
+          const demoReport=model.getDemoPaperCockpitReport();
           report.experiment.id='run-'+('R'.repeat(220));
           report.controls.reservations=3;
           report.valuation.cashCents='92000';
@@ -60,7 +61,11 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
           report.trading.noTradeReasons=[{
             gate:'gate-'+('G'.repeat(96)),status:'UNKNOWN',reason:'reason-'+('R'.repeat(220))
           }];
-          view.renderPaperCockpit(document.getElementById('paper-cockpit-root'),report,document);
+          demoReport.experiment.id='demo-'+('D'.repeat(220));
+          demoReport.trading.noTradeReasons=[{
+            gate:'demo-gate-'+('G'.repeat(96)),status:'UNKNOWN',reason:'demo-reason-'+('R'.repeat(220))
+          }];
+          view.renderPaperCockpit(document.getElementById('paper-cockpit-root'),report,document,{demoReport});
           return true;
         })()`);
         const before=await evaluate(`(()=>{
@@ -127,10 +132,36 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
           return {open:details.open,focused:document.activeElement===details.querySelector('summary')};
         })()`),{open:false,focused:true},'Space closes the demo and preserves summary focus');
         await key(' ','Space',32);
-        assert.deepEqual(await evaluate(`(()=>{
+        const reopened=await evaluate(`(()=>{
           const details=document.querySelector('#paper-cockpit-root > details');
-          return {open:details.open,focused:document.activeElement===details.querySelector('summary')};
-        })()`),{open:true,focused:true},'Space reopens the demo and preserves summary focus');
+          const root=document.querySelector('#paper-cockpit-root');
+          return {
+            open:details.open,focused:document.activeElement===details.querySelector('summary'),
+            width:innerWidth,viewport:document.documentElement.clientWidth,
+            documentWidth:document.documentElement.scrollWidth,bodyWidth:document.body.scrollWidth,
+            panelWidth:root.clientWidth,panelScrollWidth:root.scrollWidth,
+            detailsWidth:details.clientWidth,detailsScrollWidth:details.scrollWidth,
+            longRunId:details.textContent.includes('demo-'+('D'.repeat(220))),
+            longReason:details.textContent.includes('demo-reason-'+('R'.repeat(220))),
+            overflowingDescendants:[...details.querySelectorAll('*')]
+              .filter(element=>element.scrollWidth>element.clientWidth+1)
+              .map(element=>({tag:element.tagName,className:element.className,
+                clientWidth:element.clientWidth,scrollWidth:element.scrollWidth}))
+          };
+        })()`);
+        assert.equal(reopened.open,true,'native Space must reopen the demo');
+        assert.equal(reopened.focused,true,'native Space must preserve summary focus');
+        assert.equal(reopened.width,size.width);
+        assert.ok(reopened.documentWidth<=reopened.viewport+1&&reopened.bodyWidth<=reopened.viewport+1,
+          'expanded demo document/body overflow at '+size.width+': '+JSON.stringify(reopened));
+        assert.ok(reopened.panelScrollWidth<=reopened.panelWidth+1,
+          'expanded cockpit panel overflow at '+size.width+': '+JSON.stringify(reopened));
+        assert.ok(reopened.detailsScrollWidth<=reopened.detailsWidth+1,
+          'expanded demo details overflow at '+size.width+': '+JSON.stringify(reopened));
+        assert.equal(reopened.longRunId,true,'long run ID must render inside the expanded demo');
+        assert.equal(reopened.longReason,true,'long rejection reason must render inside the expanded demo');
+        assert.deepEqual(reopened.overflowingDescendants,[],
+          'expanded demo descendants must fit at '+size.width+': '+JSON.stringify(reopened));
         if(evidence){
           mkdirSync(evidence,{recursive:true});
           await evaluate(`(()=>{
@@ -145,7 +176,11 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
           panelWidth:before.panelWidth,panelScrollWidth:before.panelScrollWidth,
           summaryHeight:before.summaryHeight,nativeTab:tabState.focused,
           enterOpen:true,spaceClose:true,spaceReopen:true,cash:before.cashLabel,
-          cashTone:before.cashTone,pnl:before.pnlLabel,pnlTone:before.pnlTone
+          cashTone:before.cashTone,pnl:before.pnlLabel,pnlTone:before.pnlTone,
+          expandedDocumentWidth:reopened.documentWidth,expandedBodyWidth:reopened.bodyWidth,
+          expandedPanelWidth:reopened.panelWidth,expandedDetailsWidth:reopened.detailsWidth,
+          expandedDetailsScrollWidth:reopened.detailsScrollWidth,
+          expandedLongRunId:reopened.longRunId,expandedLongReason:reopened.longReason
         };
       },size.height);
       console.log('V11_PAPER_COCKPIT_SIZE',JSON.stringify(metrics));
