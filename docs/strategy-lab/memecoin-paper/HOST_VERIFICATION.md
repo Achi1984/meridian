@@ -25,7 +25,10 @@ fixture bytes and keeps generated-fixture checks under `syntheticEvidence`.
 `SYNTHETIC_ONLY`, `runtimeAuthorization: false`,
 `hostDurability: NOT_VERIFIED`, and clock provenance `UNVERIFIED`. Hashes and
 booleans are not authentication. The fixed fixture clock is test input, not a
-trusted host clock.
+trusted host clock. For unresolved synthetic publications, the result records
+the pending marker and visible checkpoint identities before cleaning only the
+verified, owned temporary fixture directory; that cleanup is not a successful
+reconciliation.
 
 Child-process termination checks observe the temporary filesystem after a child
 exits and exercise the existing pending-publication behavior. They prove neither

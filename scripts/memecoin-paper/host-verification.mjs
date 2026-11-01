@@ -200,18 +200,35 @@ async function ambiguousWrite(fixture) {
     const pendingBytes = await boundedFileBytes(path.join(directory, ".checkpoint-pending"), 16 * 1024);
     const restartedStore = await CheckpointStore.open(directory);
     assert.equal((await restartedStore.readCheckpoint()).status, "UNKNOWN");
-    assert.equal((await restartedStore.reconcilePending()).status, "UNKNOWN");
+    const reconciliation = await restartedStore.reconcilePending();
+    assert.equal(reconciliation.status, "UNKNOWN");
     await assert.rejects(
       PaperCheckpointSession.open({store: restartedStore}),
       {code: "CHECKPOINT_UNKNOWN"}
     );
     assert.deepEqual(await boundedFileBytes(path.join(directory, ".checkpoint-pending"), 16 * 1024), pendingBytes);
+    const visibleBytes = await boundedFileBytes(path.join(directory, "checkpoint.json"), 8 * 1024 * 1024);
+    const visibleCheckpoint = JSON.parse(visibleBytes.toString("utf8"));
     return {
       result: result.status,
       restartRead: "UNKNOWN",
       reconciliation: "UNKNOWN",
       unresolvedRecordRetained: true,
-      automaticReplay: false
+      automaticReplay: false,
+      unresolvedEvidence: {
+        pendingMarker: {
+          sha256: sha256(pendingBytes),
+          record: JSON.parse(pendingBytes.toString("utf8"))
+        },
+        visibleCheckpoint: {
+          sha256: sha256(visibleBytes),
+          sequence: visibleCheckpoint.sequence,
+          runId: visibleCheckpoint.runHeader.runId,
+          commandId: visibleCheckpoint.records.at(-1).commandId
+        },
+        reconcileVisibleSequence: reconciliation.visibleSequence,
+        reconcileVisibleHash: reconciliation.visibleHash
+      }
     };
   });
 }
@@ -294,17 +311,32 @@ async function interruptedChild(fixture, phase, expectedSequence, expectedPendin
       assert.equal(reconciliation.visibleSequence, expectedSequence);
     }
     const pendingBefore = await boundedFileBytes(path.join(directory, ".checkpoint-pending"), 16 * 1024);
+    const pendingRecord = JSON.parse(pendingBefore.toString("utf8"));
+    const visibleBytes = await boundedFileBytes(path.join(directory, "checkpoint.json"), 8 * 1024 * 1024);
+    const visibleCheckpoint = JSON.parse(visibleBytes.toString("utf8"));
     await assert.rejects(PaperCheckpointSession.open({store}), {code: "CHECKPOINT_UNKNOWN"});
     assert.deepEqual(await boundedFileBytes(path.join(directory, ".checkpoint-pending"), 16 * 1024), pendingBefore);
     return {
       phase,
+      childPid: child.pid,
       childExit: child.code,
       childReaped: child.reaped,
       restartRead: checkpoint.status,
       reconciliation: reconciliation.status,
       visibleSequence: expectedSequence,
       automaticReplay: false,
-      unresolvedRecordRetained: true
+      unresolvedRecordRetained: true,
+      unresolvedEvidence: {
+        pendingMarker: {sha256: sha256(pendingBefore), record: pendingRecord},
+        visibleCheckpoint: {
+          sha256: sha256(visibleBytes),
+          sequence: visibleCheckpoint.sequence,
+          runId: visibleCheckpoint.runHeader.runId,
+          commandId: visibleCheckpoint.records.at(-1).commandId
+        },
+        reconcileVisibleSequence: reconciliation.visibleSequence ?? null,
+        reconcileVisibleHash: reconciliation.visibleHash ?? null
+      }
     };
   });
 }
