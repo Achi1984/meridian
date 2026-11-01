@@ -312,7 +312,7 @@ test("checkpoint rejects corrupt and oversized bytes", async t => {
   await assert.rejects(PaperCheckpointSession.open({store: smallStore}), {code: "CHECKPOINT_CORRUPT"});
 });
 
-test("exclusive ownership rejects concurrent writers without lock stealing", async t => {
+test("exclusive ownership rejects concurrent writers without lock stealing", {timeout: 10_000}, async t => {
   const directory = await tempDirectory(t);
   const first = await CheckpointStore.open(directory);
   await assert.rejects(CheckpointStore.open(directory), {code: "CHECKPOINT_BUSY"});
@@ -321,15 +321,26 @@ test("exclusive ownership rejects concurrent writers without lock stealing", asy
   await next.close();
 
   const child = spawn(process.execPath, [CHILD_FIXTURE, directory, "hold"], {
-    stdio: ["ignore", "pipe", "ignore"]
+    stdio: ["ignore", "ignore", "ignore", "ipc"]
   });
-  await new Promise((resolve, reject) => {
-    child.stdout.once("data", resolve);
-    child.once("error", reject);
+  // Subscribe before any await: an early child exit must fail, never be missed.
+  const exited = once(child, "exit");
+  t.after(async () => {
+    if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+    await exited.catch(() => {});
   });
+  const message = () => Promise.race([
+    once(child, "message").then(([value]) => value),
+    exited.then(([code, signal]) => { throw new Error(`lock holder exited early: ${code ?? signal}`); })
+  ]);
+  assert.equal(await message(), "ready");
   await assert.rejects(CheckpointStore.open(directory), {code: "CHECKPOINT_BUSY"});
-  child.kill("SIGTERM");
-  await once(child, "exit");
+  const holding = message();
+  child.send("ping");
+  assert.equal(await holding, "holding");
+  await assert.rejects(CheckpointStore.open(directory), {code: "CHECKPOINT_BUSY"});
+  assert.equal(child.kill("SIGTERM"), true);
+  assert.deepEqual(await exited, [null, "SIGTERM"]);
   await rm(path.join(directory, ".checkpoint-lock"));
   const afterExit = await CheckpointStore.open(directory);
   await afterExit.close();
