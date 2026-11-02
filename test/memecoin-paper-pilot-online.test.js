@@ -125,9 +125,13 @@ test("bounded online composition produces only a receipt-bound no-entry report",
   assert.equal(projectedInput.snapshot.summary.cashCents, "100000");
   assert.deepEqual(projectedInput.snapshot.summary.openPositions, []);
   assert.equal("summary" in projectedInput, false);
-  assert.equal(await readPilotStatus(harness.dataDirectory).then(value => value.status), "FINISHED");
+  const status = await readPilotStatus(harness.dataDirectory);
+  assert.equal(status.status, "FINISHED");
+  assert.equal(status.observationAuditStatus, "PERSISTED");
   const report = await readPilotReport(harness.dataDirectory);
   assert.equal(report.status, "AVAILABLE");
+  assert.equal(report.runStatus, "FINISHED");
+  assert.equal(report.observationAudit.state, "TERMINAL");
   assert.equal(report.report.trading.status, "NO_ENTRY_OBSERVED");
   assert.equal(report.observation.filterOutcomes.UNKNOWN, 1);
   assert.equal(report.observation.entryAuthorizations, 0);
@@ -435,6 +439,7 @@ test("missing durable terminal marker cannot present an audit as complete", asyn
 
   const report = await readPilotReport(harness.dataDirectory);
   assert.equal(report.status, "UNKNOWN");
+  assert.equal(report.runStatus, "UNKNOWN");
   assert.equal(report.observationAudit.state, "TERMINAL");
   assert.match(report.reason, /terminal marker is unavailable/);
   assert.match(report.text, /snapshot is diagnostics only and may be incomplete/);

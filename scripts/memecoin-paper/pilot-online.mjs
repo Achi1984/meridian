@@ -396,7 +396,7 @@ export async function readPilotReport(dataDirectory) {
        audit.terminal.stopReason !== (status.stopReason ?? null))) {
     return {status: "UNKNOWN", reason: "observation audit does not match the durable terminal run state"};
   }
-  if (audit && !hasTerminalMarker) {
+  if (audit?.state === "TERMINAL" && !hasTerminalMarker) {
     return {
       status: "UNKNOWN",
       runStatus: status.status,
