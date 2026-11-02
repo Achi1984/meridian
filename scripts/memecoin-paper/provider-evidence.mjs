@@ -543,16 +543,12 @@ function normalizeCandidate(identity, responses, sampledAt, identityMismatch, fr
         mintAccountMatch: true,
         accountSlot: mintSafetyEvidence.sourceBinding.slot
       });
-  } else if (mintSafetyEvidence?.reasonCodes.some(reason =>
-    reason === "TOKEN_SUPPLY_AMOUNT_MISMATCH" || reason === "TOKEN_SUPPLY_DECIMALS_MISMATCH")) {
+  } else if (mintSafetyEvidence) {
     evidence.tokenDecimals = unknownRecord(
-      mintSafetyEvidence.reasonCodes.filter(reason =>
-        reason === "TOKEN_SUPPLY_AMOUNT_MISMATCH" || reason === "TOKEN_SUPPLY_DECIMALS_MISMATCH")
-        .join("; "),
+      mintSafetyEvidence.reasonCodes.join("; "),
       supply?.request ?? accountInfo?.request ?? {provider: "boundary", kind: "getTokenSupply", requested: identity},
       supply?.receivedAt ?? accountInfo?.receivedAt ?? sampledAt,
       supply?.slot ?? null);
-  } else if (mintSafetyEvidence) {
     for (const key of ["mintAuthorityRevoked", "freezeAuthorityRevoked", "tokenExtensions"]) {
       const fact = mintSafetyEvidence.facts[key];
       evidence[key] = unknownRecord(fact.reason,

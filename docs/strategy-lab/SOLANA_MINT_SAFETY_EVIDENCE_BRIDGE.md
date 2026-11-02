@@ -19,6 +19,9 @@ No caller label or hash establishes authenticity.
 Missing, stale, malformed, contradictory, or unsupported evidence remains
 `UNKNOWN` with reason codes. Active authorities and configured supported
 Token-2022 restrictions remain explicit facts for the existing filter to reject.
+A live transfer-fee configuration or transfer-hook authority is itself a
+restriction, even when the current fee is zero or no hook program is configured.
+Any source-binding failure also invalidates the supply-only decimal record.
 LP protection, owner concentration, developer attribution, bundle analysis,
 smart-wallet provenance, and other non-mint facts remain unknown. The bridge
 never enables authorization or hard-gate eligibility.

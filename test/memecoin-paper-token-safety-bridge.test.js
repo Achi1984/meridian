@@ -240,6 +240,45 @@ test("the existing filter rejects generated active authorities and risky Token-2
   assert.equal(riskyFilters.checks.tokenExtensions.status, "REJECT");
 });
 
+test("mutable Token-2022 fee and hook authorities remain restrictions", async () => {
+  const feeConfig = syntheticTransferFeeConfig({
+    olderMaxFee: 0n,
+    olderBasisPoints: 0,
+    newerMaxFee: 0n,
+    newerBasisPoints: 0
+  });
+  const hookConfig = Buffer.alloc(64);
+  hookConfig.fill(8, 0, 32);
+  const acquired = await providerEvidence({
+    ownerProgram: TOKEN_2022_PROGRAM,
+    extensions: [syntheticTlv(1, feeConfig), syntheticTlv(14, hookConfig)]
+  });
+  const candidate = acquired.candidates[0].candidate;
+
+  assert.equal(candidate.mintSafetyEvidence.status, "SOURCE_BOUND");
+  assert.equal(candidate.mintSafetyEvidence.decoded.extensions.restrictions
+    .transferFeeConfig.configuredNonzeroFee, false);
+  assert.equal(candidate.mintSafetyEvidence.decoded.extensions.restrictions
+    .transferHook.hookProgramConfigured, false);
+  assert.equal(candidate.evidence.tokenExtensions.value.transferFee, true);
+  assert.equal(candidate.evidence.tokenExtensions.value.transferHook, true);
+  assert.equal(filterCandidate(candidate, {now: NOW}).checks.tokenExtensions.status, "REJECT");
+});
+
+test("source-binding failures invalidate decimals before the filter can pass", async () => {
+  const acquired = await providerEvidence({supplySlot: 123_457});
+  const candidate = acquired.candidates[0].candidate;
+  const decimals = candidate.evidence.tokenDecimals;
+
+  assert.equal(candidate.mintSafetyEvidence.status, "UNBOUND");
+  assert.ok(decimals.coverage.reason.includes("MINT_ACCOUNT_AND_TOKEN_SUPPLY_SLOT_MISMATCH"));
+  assert.equal(decimals.verified, false);
+  assert.equal(decimals.source, "Solana JSON-RPC getTokenSupply");
+  assert.equal(decimals.observedAt, NOW);
+  assert.equal(decimals.slot, 123_457);
+  assert.equal(filterCandidate(candidate, {now: NOW}).checks.tokenDecimals.status, "UNKNOWN");
+});
+
 test("u64 supply atoms compare exactly beyond JavaScript safe integer precision", () => {
   const amount = 9_007_199_254_740_993n;
   const exact = bridge({supplyAtoms: amount, supplyAmount: amount.toString()});

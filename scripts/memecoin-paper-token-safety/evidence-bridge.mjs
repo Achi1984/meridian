@@ -161,8 +161,10 @@ export function bridgeMintSafetyEvidence({
       mintAuthorityRevoked: fact(decoded.authorities.mint.revoked),
       freezeAuthorityRevoked: fact(decoded.authorities.freeze.revoked),
       tokenExtensions: fact({
-        transferFee: restrictions.transferFeeConfig.configuredNonzeroFee === true,
-        transferHook: restrictions.transferHook.hookProgramConfigured === true,
+        transferFee: restrictions.transferFeeConfig.configuredNonzeroFee === true ||
+          typeof restrictions.transferFeeConfig.configAuthority === "string",
+        transferHook: restrictions.transferHook.hookProgramConfigured === true ||
+          typeof restrictions.transferHook.authority === "string",
         defaultFrozen: restrictions.defaultAccountState.newAccountsDefaultFrozen === true,
         permanentDelegate: restrictions.permanentDelegate.delegateState === "PRESENT"
       }),
