@@ -45,6 +45,11 @@ function digestSafeCode(value) {
   return typeof value === "string" && /^[A-Z0-9_:-]{1,64}$/.test(value) ? value : "UNKNOWN";
 }
 
+function validFailureCode(value) {
+  return typeof value === "string" &&
+    (/^[A-Z0-9_:-]{1,80}$/.test(value) || /^[A-Za-z0-9_]{1,48}$/.test(value));
+}
+
 function safeText(value, maxLength = MAX_TEXT_LENGTH, onTruncate = () => {}) {
   if (typeof value !== "string") return null;
   const sanitized = value
@@ -461,7 +466,7 @@ export function createObservationAudit({
         runStatus: runStatus === null ? null : digestSafeCode(runStatus),
         controllerStatus: controllerStatus === null ? null : digestSafeCode(controllerStatus),
         stopReason: stopReason === null ? null : digestSafeCode(stopReason),
-        failureCode: failureCode === null ? null : digestSafeCode(failureCode)
+        failureCode: failureCode === null ? null : validFailureCode(failureCode) ? failureCode : "UNKNOWN"
       };
     },
     snapshot() {
@@ -526,8 +531,9 @@ export function validateObservationAudit(audit, {runId, configHash} = {}) {
       (audit.state === "RUNNING" && audit.terminal !== null) ||
       (audit.state === "TERMINAL" &&
        (!hasExactKeys(audit.terminal, ["runStatus", "controllerStatus", "stopReason", "failureCode"]) ||
-        !["runStatus", "controllerStatus", "stopReason", "failureCode"]
-          .every(field => validAuditCode(audit.terminal[field])))) ||
+        !["runStatus", "controllerStatus", "stopReason"]
+          .every(field => validAuditCode(audit.terminal[field])) ||
+        !(audit.terminal.failureCode === null || validFailureCode(audit.terminal.failureCode)))) ||
       !isRecord(audit.summary) ||
       !isRecord(audit.summary.requests) || !isRecord(audit.summary.candidates)) return false;
   const providerAccounting = audit.accounting.status === "KNOWN"
