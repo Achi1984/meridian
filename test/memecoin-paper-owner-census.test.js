@@ -361,6 +361,23 @@ test("cancellation prevents dispatch and replayed identity data is rejected", as
   assert.equal(replay.boundIdentity.mint, alternate.mint);
 });
 
+test("abort immediately after acquisition prevents queued transport dispatch", async () => {
+  const controller = new AbortController();
+  let calls = 0;
+  const pending = acquire({
+    signal: controller.signal,
+    transport: async () => {
+      calls += 1;
+      return response(rpcPayload([]));
+    }
+  });
+  controller.abort();
+  const result = await pending;
+  assert.equal(result.reason, "CANCELLED");
+  assert.equal(result.provenance.requestCount, 0);
+  assert.equal(calls, 0);
+});
+
 test("active cancellation and elapsed-time timeout stop the single request", async () => {
   const controller = new AbortController();
   let calls = 0;
@@ -384,6 +401,85 @@ test("active cancellation and elapsed-time timeout stop the single request", asy
   });
   assert.equal(timeout.reason, "TIMEOUT");
   assert.equal(timeout.provenance.requestCount, 1);
+});
+
+test("monotonic deadline rejects processing overrun despite a fixed observation clock", async () => {
+  const descriptor = Object.getOwnPropertyDescriptor(performance, "now");
+  let responseComplete = false;
+  let completedChecks = 0;
+  Object.defineProperty(performance, "now", {
+    configurable: true,
+    value: () => {
+      if (!responseComplete) return 0;
+      completedChecks += 1;
+      return completedChecks === 1 ? 0 : 501;
+    }
+  });
+  try {
+    const bytes = new TextEncoder().encode(JSON.stringify(rpcPayload([
+      tokenAccount({owner: key(8), amount: 100n})
+    ])));
+    let reads = 0;
+    const reader = {
+      read() {
+        reads += 1;
+        if (reads === 1) return Promise.resolve({done: false, value: bytes});
+        responseComplete = true;
+        return Promise.resolve({done: true});
+      },
+      cancel() { return Promise.resolve(); },
+      releaseLock() {}
+    };
+    const result = await acquire({
+      bounds: {...BOUNDS, maxElapsedMs: 500},
+      observedAt: NOW,
+      transport: async () => ({status: 200, body: {getReader: () => reader}})
+    });
+    assert.equal(result.reason, "TIMEOUT");
+    assert.equal(result.rawCensus, null);
+    assert.equal(result.status, "UNKNOWN");
+    assert.equal(completedChecks, 2);
+  } finally {
+    if (descriptor) Object.defineProperty(performance, "now", descriptor);
+    else delete performance.now;
+  }
+});
+
+test("cancellation at a decoding batch boundary prevents reconciliation", async () => {
+  const controller = new AbortController();
+  const accounts = Array.from({length: 300}, (_, index) => {
+    const account = tokenAccount({owner: key(8), amount: index === 299 ? 100n : 0n});
+    const pubkey = Buffer.alloc(32);
+    pubkey.writeUInt32LE(index, 28);
+    account.pubkey = encodeBase58(pubkey);
+    return account;
+  });
+  const bytes = new TextEncoder().encode(JSON.stringify(rpcPayload(accounts)));
+  let cancelled = 0;
+  let reads = 0;
+  const reader = {
+    read() {
+      reads += 1;
+      return reads === 1
+        ? Promise.resolve({done: false, value: bytes})
+        : Promise.resolve({done: true});
+    },
+    cancel() { cancelled += 1; return Promise.resolve(); },
+    releaseLock() {}
+  };
+  const result = await acquire({
+    signal: controller.signal,
+    transport: async () => {
+      setTimeout(() => controller.abort(), 0);
+      return {status: 200, body: {getReader: () => reader}};
+    }
+  });
+  assert.equal(result.reason, "CANCELLED");
+  assert.equal(result.rawCensus, null);
+  assert.equal(result.status, "UNKNOWN");
+  assert.equal(reads, 2);
+  assert.equal(cancelled, 0);
+  assert.equal(result.provenance.requestCount, 1);
 });
 
 test("malformed program ownership and non-success responses do not retry", async () => {

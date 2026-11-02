@@ -7,6 +7,7 @@ const TOKEN_PROGRAMS = new Set([LEGACY_TOKEN_PROGRAM, TOKEN_2022_PROGRAM]);
 const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 const BASE58_VALUES = new Map([...BASE58_ALPHABET].map((character, index) => [character, index]));
 const TOKEN_ACCOUNT_BYTES = 165;
+const DECODE_BATCH_SIZE = 256;
 const MAX_READ_ITERATIONS = 65_536;
 const MAX_EMPTY_READS = 256;
 const READ_YIELD_INTERVAL = 64;
@@ -174,6 +175,7 @@ function makeRequest(identity, programId) {
 
 function createDeadline(parentSignal, timeoutMs) {
   const controller = new AbortController();
+  const startedMonotonicAt = performance.now();
   let reasonCode = null;
   let rejectAbort;
   const aborted = new Promise((_, reject) => { rejectAbort = reject; });
@@ -191,6 +193,10 @@ function createDeadline(parentSignal, timeoutMs) {
   const timer = setTimeout(() => abort("TIMEOUT"), timeoutMs);
   const check = () => {
     if (controller.signal.aborted) throw controller.signal.reason;
+    if (performance.now() - startedMonotonicAt >= timeoutMs) {
+      abort("TIMEOUT");
+      throw controller.signal.reason;
+    }
   };
   return {
     signal: controller.signal,
@@ -330,13 +336,18 @@ function decodeTokenAccount(item, identity, programId) {
   };
 }
 
-function ownerTotals(accounts, identity, programId, bounds) {
+async function ownerTotals(accounts, identity, programId, bounds, deadline) {
   if (accounts.length > bounds.maxAccounts) fail("ACCOUNT_COUNT_LIMIT");
   const seenAccounts = new Set();
   const owners = new Map();
   let decodeWork = 0;
   let sum = 0n;
-  for (const item of accounts) {
+  for (let index = 0; index < accounts.length; index += 1) {
+    if (index > 0 && index % DECODE_BATCH_SIZE === 0) {
+      await deadline.wait(new Promise(resolve => setTimeout(resolve, 0)));
+    }
+    deadline.check();
+    const item = accounts[index];
     if (!isRecord(item) || typeof item.pubkey !== "string") fail("MALFORMED_PROGRAM_ACCOUNT");
     if (seenAccounts.has(item.pubkey)) fail("DUPLICATE_TOKEN_ACCOUNT");
     seenAccounts.add(item.pubkey);
@@ -353,6 +364,7 @@ function ownerTotals(accounts, identity, programId, bounds) {
   if (sum > U64_MAX || [...owners.values()].some(amount => amount > U64_MAX)) {
     fail("AMOUNT_OVERFLOW");
   }
+  deadline.check();
   return {owners, sum, accountCount: accounts.length, decodeWork};
 }
 
@@ -473,13 +485,15 @@ export async function acquireOwnerCensus({
     requestPlan = makeRequestPlan(boundIdentity, mint.programId);
     const request = makeRequest(boundIdentity, mint.programId);
     deadline = createDeadline(signal, bounds.maxElapsedMs);
-    if (deadline.signal.aborted) fail("CANCELLED");
-    requests += 1;
-    await deadline.wait(Promise.resolve().then(() => transport(request, {
-      credentials: "omit",
-      redirect: "error",
-      signal: deadline.signal
-    })).then(received => {
+    await deadline.wait(Promise.resolve().then(() => {
+      deadline.check();
+      requests += 1;
+      return transport(request, {
+        credentials: "omit",
+        redirect: "error",
+        signal: deadline.signal
+      });
+    }).then(received => {
       if (deadline.signal.aborted) cancelBody(received?.body);
       else response = received;
       return received;
@@ -501,6 +515,7 @@ export async function acquireOwnerCensus({
     const streamed = await readBoundedBody(response, bounds.maxResponseBytes, deadline,
       count => { responseBytes = count; });
     const rpc = parseRpcResponse(streamed.bytes);
+    deadline.check();
     slot = rpc.slot.toString();
     const slotSkew = rpc.slot >= mint.slot ? rpc.slot - mint.slot : mint.slot - rpc.slot;
     if (slotSkew > BigInt(bounds.maxSlotSkew)) {
@@ -510,7 +525,7 @@ export async function acquireOwnerCensus({
     if (timeSkewMs > bounds.maxTimeSkewMs) {
       fail("TIME_SKEW", {slot, mintSlot: mint.slot.toString(), timeSkewMs});
     }
-    const totals = ownerTotals(rpc.accounts, boundIdentity, mint.programId, bounds);
+    const totals = await ownerTotals(rpc.accounts, boundIdentity, mint.programId, bounds, deadline);
     if (totals.sum !== mint.supply) {
       fail("SUPPLY_MISMATCH", {
         slot,
@@ -528,7 +543,8 @@ export async function acquireOwnerCensus({
       fail("STALE_OR_ELAPSED");
     }
     const owners = sortOwners(totals.owners);
-    return {
+    deadline.check();
+    const result = {
       status: "UNKNOWN",
       reason: "RPC_CENSUS_RECONCILED_BUT_SOURCE_COMPLETENESS_IS_UNAUTHENTICATED",
       source: RPC_SOURCE,
@@ -601,6 +617,8 @@ export async function acquireOwnerCensus({
       },
       requestPlan
     };
+    deadline.check();
+    return result;
   } catch (error) {
     const code = error instanceof CensusFailure ? error.code
       : deadline?.reasonCode() ?? "CENSUS_FAILED";
