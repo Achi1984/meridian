@@ -993,7 +993,6 @@ export function createPilotOnline(options = {}) {
         );
         if (isDeadline && !deadlineEvidenceBound) {
           failureCode = "DEADLINE_FINALIZATION_EVIDENCE_UNKNOWN";
-          observations.failureCode = failureCode;
         } else if (wallClockFault || !Number.isSafeInteger(finalizedAt) ||
             finalizedAt < config.startAt ||
             (isDeadline
@@ -1001,7 +1000,6 @@ export function createPilotOnline(options = {}) {
                 finalizedAt - config.endAt > MAX_DEADLINE_FINALIZATION_DELAY_MS
               : finalizedAt > config.endAt)) {
           failureCode = isDeadline ? "DEADLINE_FINALIZATION_TIME_UNKNOWN" : "FINISH_TIME_UNKNOWN";
-          observations.failureCode = failureCode;
         } else {
           const effectiveEndAt = isDeadline ? config.endAt : finalizedAt;
           observations.windowFinalization = {
@@ -1019,7 +1017,6 @@ export function createPilotOnline(options = {}) {
         }
       } else if (controllerSummary?.status === "FINISHED" && !failureCode) {
         failureCode = "CONTROLLER_CHECKPOINT_ACK_UNBOUND";
-        observations.failureCode = failureCode;
       }
       const finalHead = await verifyCheckpoint(session, store);
       if (finalHead.metadata.sequence !== receipts.length) {

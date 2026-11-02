@@ -95,6 +95,15 @@ outputs hardcode `runtimeAuthorization: false` and
 `simulatedTradeTestEligibility: false`. A PASS, if one is ever possible with
 complete supplied evidence, is not runtime or trading authority.
 
+## Deferred producer correction
+
+This offline package does not change the report producer. Frozen exports with
+missing or `UNKNOWN` failure-code evidence remain `UNKNOWN`; do not treat absent
+failure evidence as a clean completion. A separately scoped producer correction
+should preserve the distinction between no recorded failure (`null`) and
+unavailable failure status (`UNKNOWN`), and propagate late terminal failure
+codes consistently into persisted observations.
+
 ## Post-run operator checklist: `observation-20261101-r1`
 
 The frozen window is **2026-11-01T19:02:21.383Z through
