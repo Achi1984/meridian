@@ -45,6 +45,13 @@ freshness **UNKNOWN**. A caller may inject a display-only clock and
 `staleAfterMs` policy to label an observation stale; that is not a producer
 health check or operational freshness guarantee.
 
+While the cockpit is selected, a successful report schedules one local,
+one-shot display update at the strict stale boundary. It reclassifies the
+retained report without reading the endpoint again, and is not polling. Replacing
+or clearing the report and disposing the cockpit cancel or replace the timer.
+Freshness-only revalidation preserves the generated-demo disclosure's expanded
+and focused state; locking and navigation still clear private report data.
+
 ## Current connection status and future contract
 
 No runtime report endpoint is connected. The page makes no request, does not

@@ -81,14 +81,15 @@ export function mountPaperCockpit(root, document, window, {
     }, Math.min(remaining, 2_147_483_647));
   }
 
-  function render() {
+  function render({preserveDemoState = false} = {}) {
     if (disposed) return;
     renderPaperCockpit(root, report, document, {
       state,
       message: STATE_MESSAGES[state] || STATE_MESSAGES.unknown,
       onRefresh: enabled && active ? read : null,
       loading: reading,
-      freshnessPolicy: policy
+      freshnessPolicy: policy,
+      preserveDemoState
     });
     scheduleFreshnessUpdate();
   }
@@ -114,7 +115,7 @@ export function mountPaperCockpit(root, document, window, {
     }
     if (report) {
       if (!reading) state = classifyReport(report);
-      render();
+      render({preserveDemoState: true});
     }
   }
 

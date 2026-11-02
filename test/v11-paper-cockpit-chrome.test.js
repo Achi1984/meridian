@@ -85,7 +85,7 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
           deviceScaleFactor:1,mobile:size.mobile,screenWidth:size.width,screenHeight:size.height});
         await unlockAppThroughGate(call);
         const report=projectOperatorReport(reportFixtures.readOnlyCheckpoint());
-        report.evidence.observedThrough=new Date().toISOString();
+        report.evidence.observedThrough=new Date(Date.now()-298000).toISOString();
         report.valuation.cashCents='90071992547409931234';
         const intercepted=await interceptGeneratedPaperReport(call,report);
         await evaluate(`document.querySelector('#nav button[data-v="strategies"]').click()`);
@@ -125,6 +125,25 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
             noWorkerClaim:!root.textContent.includes('RUNNING')};
         })()`);
         assert.deepEqual(delivered,{report:true,exactCash:true,terminal:true,noWorkerClaim:true});
+        if(size.width===sizes[0].width){
+          await evaluate(`(()=>{
+            const details=document.querySelector('#paper-cockpit-root > details');
+            details.open=true;
+            details.querySelector(':scope > summary').focus();
+          })()`);
+          for(let attempt=0;attempt<400;attempt++){
+            if(await evaluate(`document.querySelector('#paper-cockpit-root').dataset.state==='stale'`))break;
+            await new Promise(resolve=>setTimeout(resolve,10));
+          }
+          assert.deepEqual(await evaluate(`(()=>{
+            const details=document.querySelector('#paper-cockpit-root > details');
+            const summary=details.querySelector(':scope > summary');
+            return {state:document.querySelector('#paper-cockpit-root').dataset.state,
+              open:details.open,focused:document.activeElement===summary};
+          })()`),{state:'stale',open:true,focused:true},
+          'the freshness deadline preserves the expanded, focused demo without a new read');
+          assert.equal(intercepted.count(),1,'freshness revalidation does not issue another request');
+        }
         await evaluate(`document.querySelector('#nav').click()`);
         assert.equal(await evaluate(`document.querySelector('#paper-cockpit-root').textContent.includes('Observation-only')`),true,
           'clicking navigation whitespace does not deactivate the visible Strategies report');

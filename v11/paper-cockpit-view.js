@@ -148,6 +148,13 @@ export function renderPaperCockpit(root, report = null, document = root?.ownerDo
   const activeElement = document.activeElement;
   const refreshWasFocused = activeElement?.tagName?.toLowerCase() === 'button' &&
     contains(root, activeElement);
+  const existingDemo = options.preserveDemoState
+    ? Array.from(root.children || []).find(child => child.tagName?.toLowerCase() === 'details')
+    : null;
+  const existingSummary = existingDemo &&
+    Array.from(existingDemo.children || []).find(child => child.tagName?.toLowerCase() === 'summary');
+  const demoWasOpen = existingDemo?.open === true;
+  const demoSummaryWasFocused = existingSummary === activeElement;
   root.replaceChildren();
   root.className = 'card paper-cockpit';
   root.setAttribute('style', 'min-width:0;max-width:100%;overflow-wrap:anywhere');
@@ -184,10 +191,12 @@ export function renderPaperCockpit(root, report = null, document = root?.ownerDo
 
   const demo = document.createElement('details');
   demo.className = 'card card-muted';
+  demo.open = demoWasOpen;
   const summary = node(document, demo, 'summary', 'Generated demo fixture · synthetic only');
   summary.setAttribute('aria-label', 'Generated demo fixture · synthetic only anzeigen; keine Live-Daten');
   node(document, demo, 'p', 'Das folgende Beispiel ist künstlich erzeugt und keine Beobachtung oder Produktions-Telemetrie.', 'caption');
   renderReport(demo, options.demoReport ?? getDemoPaperCockpitReport(), document);
   root.append(demo);
+  if (demoSummaryWasFocused) summary.focus();
   return {status: available ? 'REPORT_PRESENTED' : 'UNAVAILABLE'};
 }

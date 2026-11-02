@@ -93,8 +93,12 @@ function harness({
     const visit = element => [element, ...element.children.flatMap(visit)];
     return visit(root).find(element => element.tagName === 'BUTTON');
   };
+  const findElement = tag => {
+    const visit = element => [element, ...element.children.flatMap(visit)];
+    return visit(root).find(element => element.tagName.toLowerCase() === tag);
+  };
   return {
-    root, document, window, access, controller, findButton, policy,
+    root, document, window, access, controller, findButton, findElement, policy,
     revalidate() { for (const revalidate of readers.values()) revalidate(); }
   };
 }
@@ -288,10 +292,17 @@ test('freshness deadline is one-shot, strict at the boundary, and replaced with 
   clock.runDue();
   assert.notEqual(h.root.attrs['data-state'], 'stale', 'the threshold itself remains within policy');
   assert.equal(clock.timers.size, 1, 'the timer waits until the strict stale boundary');
+  const demo = h.findElement('details');
+  demo.open = true;
+  demo.children.find(element => element.tagName.toLowerCase() === 'summary').focus();
   now++;
   clock.runDue();
   assert.equal(h.root.attrs['data-state'], 'stale');
   assert.match(h.root.textContent, /stale under the shared display-only freshness policy/i);
+  assert.equal(h.findElement('details').open, true, 'freshness revalidation keeps the demo expanded');
+  assert.equal(h.document.activeElement,
+    h.findElement('details').children.find(element => element.tagName.toLowerCase() === 'summary'),
+    'freshness revalidation restores focus to the demo summary');
   assert.equal(calls, 2, 'deadline revalidation never issues another read');
   assert.equal(clock.timers.size, 0, 'stale reports have no further deadline timer');
   h.controller.dispose();
