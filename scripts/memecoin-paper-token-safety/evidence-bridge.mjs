@@ -25,9 +25,11 @@ function requestMint(outcome, kind, identity) {
   try {
     const body = JSON.parse(request.body);
     if (body.jsonrpc !== "2.0" || body.id !== request.id || body.method !== kind ||
-        !Array.isArray(body.params) || body.params[0] !== identity.mint ||
-        body.params[1]?.commitment !== "finalized" ||
-        (kind === "getAccountInfo" && body.params[1]?.encoding !== "base64")) {
+        !Array.isArray(body.params) || body.params.length !== 2 ||
+        body.params[0] !== identity.mint || !isRecord(body.params[1]) ||
+        body.params[1].commitment !== "finalized" ||
+        Object.keys(body.params[1]).length !== (kind === "getAccountInfo" ? 2 : 1) ||
+        (kind === "getAccountInfo" && body.params[1].encoding !== "base64")) {
       return null;
     }
   } catch {

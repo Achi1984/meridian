@@ -226,6 +226,31 @@ test("active authorities reject and configured Token-2022 restrictions remain vi
   });
 });
 
+test("the existing filter rejects generated active authorities and risky Token-2022 facts", async () => {
+  const active = await providerEvidence({mintAuthority: "present", freezeAuthority: "present"});
+  const activeFilters = filterCandidate(active.candidates[0].candidate, {now: NOW});
+  assert.equal(activeFilters.checks.mintAuthority.status, "REJECT");
+  assert.equal(activeFilters.checks.freezeAuthority.status, "REJECT");
+
+  const risky = await providerEvidence({
+    ownerProgram: TOKEN_2022_PROGRAM,
+    extensions: [syntheticTlv(1, syntheticTransferFeeConfig())]
+  });
+  const riskyFilters = filterCandidate(risky.candidates[0].candidate, {now: NOW});
+  assert.equal(riskyFilters.checks.tokenExtensions.status, "REJECT");
+});
+
+test("u64 supply atoms compare exactly beyond JavaScript safe integer precision", () => {
+  const amount = 9_007_199_254_740_993n;
+  const exact = bridge({supplyAtoms: amount, supplyAmount: amount.toString()});
+  assert.equal(exact.status, "SOURCE_BOUND");
+  assert.equal(exact.sourceBinding.supplyAmountAtoms, "9007199254740993");
+
+  const rounded = bridge({supplyAtoms: amount, supplyAmount: "9007199254740992"});
+  assert.equal(rounded.status, "UNBOUND");
+  assert.ok(rounded.reasonCodes.includes("TOKEN_SUPPLY_AMOUNT_MISMATCH"));
+});
+
 test("request, owner, supply, slot, and time mismatches leave facts unknown with reasons", () => {
   const wrongMint = makeBridgeInput();
   const forgedMint = "YMN9Qj5jPNp7j14VPcML1B6xGgcPWVZUGLFU3Mnyfaf";
