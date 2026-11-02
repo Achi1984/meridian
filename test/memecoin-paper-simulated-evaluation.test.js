@@ -170,6 +170,9 @@ test("actual open unvalued positions remain UNKNOWN without fabricated terminal 
   assert.equal(evaluation.evidence.openPositions, 1);
   assert.equal(check(evaluation, "terminal_valuation").status, "UNKNOWN");
   assert.equal(runExport.runnerReport.terminalResult.openPositions[0].markStatus, "VALUATION_UNAVAILABLE");
+  assert.equal(runExport.runnerReport.summary.pnl.unrealizedGrossCents, null);
+  assert.equal(runExport.runnerReport.summary.pnl.unrealizedNetCents, null);
+  assert.equal(check(evaluation, "runner_accounting").status, "UNKNOWN");
 });
 
 test("actual deadline completion keeps the post-deadline finish time without backdating", async t => {
@@ -192,6 +195,41 @@ test("actual deadline completion keeps the post-deadline finish time without bac
   assert.equal(evaluation.outcome, "ZERO_ENTRY_COMPLETE");
   assert.equal(check(evaluation, "time_lifecycle").status, "PASS");
   assert.equal(check(evaluation, "deadline_reason").status, "PASS");
+});
+
+test("actual acknowledged deadline before the first risk snapshot reconciles an empty ledger", async t => {
+  const startedAt = START;
+  const deadlineAt = startedAt + EIGHT_HOURS;
+  const {result: run, export: runExport} = await produce(t, {
+    fault: "DEADLINE_BEFORE_FIRST_RISK_SNAPSHOT",
+    runId: "actual-deadline-before-risk",
+    startedAt,
+    wallStart: deadlineAt - 60_000,
+    budgets: {...BUDGETS, durationMs: EIGHT_HOURS}
+  });
+  const finishAt = runExport.checkpoint.records.at(-1).inputs.now;
+  const evaluation = evaluate(runExport);
+
+  assert.equal(run.status, "FINISHED");
+  assert.equal(runExport.runnerReport.reason, "DEADLINE");
+  assert.deepEqual(runExport.checkpoint.records.map(record => record.method), [
+    "constructor", "finishRun"
+  ]);
+  assert.ok(finishAt > deadlineAt);
+  assert.equal(runExport.persistence, "ACKNOWLEDGED");
+  assert.equal(runExport.exportBinding, "PRESTART_BOUND");
+  assert.equal(runExport.bindingReceipt.runId, runExport.runId);
+  assert.equal(runExport.runnerReport.terminalResult.accounting.grossUnrealizedPnlCents, "0");
+  assert.equal(runExport.runnerReport.terminalResult.accounting.netUnrealizedPnlCents, "0");
+  assert.equal(runExport.runnerReport.summary.pnl.unrealizedGrossCents, "0");
+  assert.equal(runExport.runnerReport.summary.pnl.unrealizedNetCents, "0");
+  assert.equal(check(evaluation, "runner_accounting").status, "PASS",
+    JSON.stringify(check(evaluation, "runner_accounting")));
+  assert.equal(check(evaluation, "time_lifecycle").status, "PASS");
+  assert.equal(check(evaluation, "deadline_reason").status, "PASS");
+  assert.equal(evaluation.overall, "PASS");
+  assert.equal(evaluation.evidence.terminalAt, new Date(finishAt).toISOString());
+  assert.equal(evaluation.outcome, "ZERO_ENTRY_COMPLETE");
 });
 
 test("sequence-zero lost acknowledgement stays UNKNOWN and has no invented terminal receipt", async t => {

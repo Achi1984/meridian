@@ -382,6 +382,19 @@ export function createPaperExecutionRunner({
     if (state !== "UNKNOWN") {
       try {
         summary = session.snapshot().summary;
+        if (terminalResult?.status === "FINISHED" &&
+            terminalResult.openPositions?.length === 0 &&
+            terminalResult.accounting?.grossUnrealizedPnlCents === "0" &&
+            terminalResult.accounting?.netUnrealizedPnlCents === "0") {
+          summary = {
+            ...summary,
+            pnl: {
+              ...summary.pnl,
+              unrealizedGrossCents: terminalResult.accounting.grossUnrealizedPnlCents,
+              unrealizedNetCents: terminalResult.accounting.netUnrealizedPnlCents
+            }
+          };
+        }
       } catch {
         state = "UNKNOWN";
         return report("UNKNOWN", "checkpoint/session readback became unavailable");

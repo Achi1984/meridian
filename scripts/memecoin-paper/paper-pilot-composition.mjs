@@ -38,6 +38,7 @@ const syntheticClocks = new WeakMap();
 const offlineFixtureAdaptersBySource = new WeakMap();
 const FIXTURE_FAULTS = new Set([
   "NONE", "DISCONNECT", "CALLBACK_TIMEOUT", "LATE_DEADLINE", "WAIT_FOR_STOP",
+  "DEADLINE_BEFORE_FIRST_RISK_SNAPSHOT",
   "CLOCK_JUMP", "LOST_ACK", "LOST_INITIAL_ACK", "NO_CANDIDATES", "TWO_OPEN_POSITIONS",
   "MISSING_EVIDENCE", "MISSING_COSTS",
   "NO_MARK", "REQUEST_BUDGET", "SPOOF_SOURCE", "QUOTE_AFTER_RECEIPT"
@@ -784,6 +785,10 @@ export function createPaperPilotComposition(options = {}) {
     counters.events = 1;
     const operationInputs = [];
     const quoteReceipts = new Map();
+    if (fault === "DEADLINE_BEFORE_FIRST_RISK_SNAPSHOT") {
+      const remainingMs = deadlineAt - clock.wallClock();
+      if (remainingMs > 0) clock.advance(remainingMs + 1);
+    }
     let adapterFailureCode = null;
     let strategyOverride = null;
     let candidates = [];
