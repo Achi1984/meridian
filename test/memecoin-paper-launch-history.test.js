@@ -68,6 +68,7 @@ function defaultTransport({pages = [PAGE_ONE, PAGE_TWO], transaction = signature
     assert.equal(request.headers.authorization, undefined);
     const body = JSON.parse(request.body);
     calls.push({method: body.method, params: body.params});
+    if (body.method === "getSlot") return rpcResponse(request, {result: 125});
     if (body.method === "getSignaturesForAddress") {
       const before = body.params[1].before;
       const page = plannedPages.find(item => item.before === (before ?? null))?.result ??
@@ -102,18 +103,24 @@ test("bounded pagination crosses the inclusive lower slot, retains page boundari
   const result = await acquire(transport);
 
   assert.deepEqual(calls.map(call => call.method), [
+    "getSlot",
     "getSignaturesForAddress",
     "getSignaturesForAddress",
     "getTransaction",
     "getTransaction",
     "getTransaction"
   ]);
-  assert.deepEqual(calls[0].params[1], {
+  assert.deepEqual(calls[1].params[1], {
     limit: 2,
     commitment: "finalized"
   });
-  assert.equal(calls[1].params[1].before, TXIDS[1]);
+  assert.equal(calls[2].params[1].before, TXIDS[1]);
   assert.equal(result.coverage.complete, true);
+  assert.deepEqual(result.coverage.finalizedAnchor, {status: "CAPTURED", slot: 125});
+  assert.equal(result.coverage.sourceHistoryCompleteness,
+    "UNKNOWN_ARCHIVAL_OR_INDEX_TRUNCATION");
+  assert.equal(classifyLaunchHistory({history: result, mint: MINT}).priorRugFinding.status,
+    "UNKNOWN");
   assert.equal(result.coverage.scope, "declared-subjects-and-inclusive-slot-interval-only");
   assert.equal(result.coverage.subjects[0].terminationReason, "LOWER_SLOT_BOUND_REACHED");
   assert.deepEqual(result.coverage.subjects[0].pageBoundaries.map(page => [
@@ -123,7 +130,7 @@ test("bounded pagination crosses the inclusive lower slot, retains page boundari
     TXIDS[2], TXIDS[1], TXIDS[0]
   ]);
   assert.ok(result.transactions.every(item => item.status === "SUCCESS"));
-  assert.equal(result.counters.requests, 5);
+  assert.equal(result.counters.requests, 6);
   assert.ok(result.events.every(event => event.responseBytes > 0));
 });
 
@@ -144,7 +151,9 @@ test("page limits and null signature results preserve incomplete coverage, never
 
   const nullResult = await acquire(async request => {
     const body = JSON.parse(request.body);
-    return rpcResponse(request, {result: body.method === "getSignaturesForAddress" ? null : null});
+    return rpcResponse(request, {
+      result: body.method === "getSlot" ? 125 : null
+    });
   });
   assert.equal(nullResult.coverage.complete, false);
   assert.equal(nullResult.coverage.subjects[0].terminationReason, "NULL_RESULT");
@@ -169,6 +178,26 @@ test("repeated cursors are retained as an incomplete page and never retried", as
   assert.equal(result.coverage.complete, false);
   assert.equal(result.coverage.subjects[0].terminationReason, "REPEATED_CURSOR");
   assert.equal(result.coverage.subjects[0].pageBoundaries[1].status, "REPEATED_CURSOR");
+});
+
+test("future interval beyond finalized anchor is incomplete even when history is empty", async () => {
+  const methods = [];
+  const result = await acquireLaunchHistory({
+    subjects: [SUBJECT],
+    startSlot: 1_000_000_000,
+    endSlot: 1_000_000_100,
+    transport: async request => {
+      const body = JSON.parse(request.body);
+      methods.push(body.method);
+      return rpcResponse(request, {result: body.method === "getSlot" ? 999_999_999 : []});
+    },
+    clock: () => 1_000
+  });
+  assert.deepEqual(methods, ["getSlot"]);
+  assert.equal(result.coverage.finalizedAnchor.slot, 999_999_999);
+  assert.equal(result.coverage.subjects[0].terminationReason,
+    "END_SLOT_AFTER_FINALIZED_ANCHOR");
+  assert.equal(result.coverage.complete, false);
 });
 
 test("signature deduplication retains all declared subjects and retrieves a shared transaction once", async () => {
@@ -231,6 +260,7 @@ test("missing and unsupported transaction versions remain explicit incomplete ev
 
   const rpcVersionError = await acquire(async request => {
     const body = JSON.parse(request.body);
+    if (body.method === "getSlot") return rpcResponse(request, {result: 125});
     if (body.method === "getSignaturesForAddress") {
       return rpcResponse(request, {result: [PAGE_ONE[0]]});
     }
@@ -243,15 +273,19 @@ test("missing and unsupported transaction versions remain explicit incomplete ev
 });
 
 test("RPC errors, failed signatures, and absent error fields are not normalized into success", async () => {
-  const rpcError = await acquire(async request => rpcResponse(request, {
-    error: {code: -32000, message: "history unavailable"}
-  }));
+  const rpcError = await acquire(async request => {
+    const body = JSON.parse(request.body);
+    return body.method === "getSlot"
+      ? rpcResponse(request, {result: 125})
+      : rpcResponse(request, {error: {code: -32000, message: "history unavailable"}});
+  });
   assert.equal(rpcError.coverage.subjects[0].terminationReason, "RPC_ERROR");
   assert.equal(rpcError.coverage.subjects[0].pageBoundaries[0].error.message, "history unavailable");
 
   const failedSignature = {...PAGE_ONE[0], err: {InstructionError: [0, "Custom"]}};
   const failed = await acquire(async request => {
     const body = JSON.parse(request.body);
+    if (body.method === "getSlot") return rpcResponse(request, {result: 125});
     return rpcResponse(request, {
       result: body.method === "getSignaturesForAddress" ? [failedSignature] : null
     });
@@ -261,9 +295,12 @@ test("RPC errors, failed signatures, and absent error fields are not normalized 
 
   const missingErrField = {...PAGE_ONE[0]};
   delete missingErrField.err;
-  const malformed = await acquire(async request => rpcResponse(request, {
-    result: [missingErrField]
-  }));
+  const malformed = await acquire(async request => {
+    const body = JSON.parse(request.body);
+    return rpcResponse(request, {
+      result: body.method === "getSlot" ? 125 : [missingErrField]
+    });
+  });
   assert.equal(malformed.coverage.subjects[0].terminationReason, "MALFORMED_PAGE");
   assert.equal(malformed.coverage.complete, false);
 });
@@ -368,7 +405,11 @@ test("subject, source, slot interval, byte, work, and cancellation bounds fail c
   }), /inclusive slot interval/);
 
   const oversized = await acquire(async request => new Response(
-    JSON.stringify({jsonrpc: "2.0", id: JSON.parse(request.body).id, result: PAGE_ONE}),
+    JSON.stringify({
+      jsonrpc: "2.0",
+      id: JSON.parse(request.body).id,
+      result: JSON.parse(request.body).method === "getSlot" ? 125 : PAGE_ONE
+    }),
     {status: 200}
   ), {limits: {pageSize: 2, maxBytesPerResponse: 24}});
   assert.equal(oversized.coverage.complete, false);
@@ -378,7 +419,7 @@ test("subject, source, slot interval, byte, work, and cancellation bounds fail c
     limits: {pageSize: 2, maxWorkUnits: 1}
   });
   assert.equal(workLimited.coverage.complete, false);
-  assert.equal(workLimited.coverage.subjects[0].terminationReason, "SIGNATURE_OR_WORK_LIMIT");
+  assert.equal(workLimited.coverage.subjects[0].terminationReason, "WORK_LIMIT");
 
   const timedOut = await acquire((_request, {signal}) => new Promise((resolve, reject) => {
     const timer = setTimeout(() => resolve(new Response("{}")), 1_000);
@@ -405,4 +446,97 @@ test("subject, source, slot interval, byte, work, and cancellation bounds fail c
   assert.equal(cancelled.coverage.complete, false);
   assert.equal(cancelled.coverage.terminationReason, "CANCELLED");
   assert.equal(DEFAULT_LAUNCH_HISTORY_LIMITS.requestTimeoutMs, 5_000);
+});
+
+test("clock failures before request dispatch do not leave timeout rejections or listeners", async () => {
+  for (const invalidClockValue of [NaN, () => { throw new Error("clock failed"); }]) {
+    let clockCalls = 0;
+    const unhandled = [];
+    const onUnhandled = error => unhandled.push(error);
+    process.on("unhandledRejection", onUnhandled);
+    let calls = 0;
+    const result = await acquireLaunchHistory({
+      subjects: [SUBJECT],
+      ...INTERVAL,
+      transport: async request => {
+        calls += 1;
+        return rpcResponse(request, {result: 125});
+      },
+      clock: () => {
+        clockCalls += 1;
+        if (clockCalls === 3) {
+          if (typeof invalidClockValue === "function") return invalidClockValue();
+          return invalidClockValue;
+        }
+        return 1_000;
+      },
+      limits: {requestTimeoutMs: 5}
+    });
+    await new Promise(resolve => setTimeout(resolve, 20));
+    process.removeListener("unhandledRejection", onUnhandled);
+    assert.equal(calls, 0);
+    assert.equal(result.coverage.finalizedAnchor.status, "INVALID_CLOCK");
+    assert.equal(result.coverage.complete, false);
+    assert.deepEqual(unhandled, []);
+  }
+});
+
+test("request timeout cancels an active response reader without waiting or retrying", async () => {
+  let pageRequests = 0;
+  let cancellations = 0;
+  const transport = async request => {
+    const body = JSON.parse(request.body);
+    if (body.method === "getSlot") return rpcResponse(request, {result: 125});
+    pageRequests += 1;
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(
+          `{"jsonrpc":"2.0","id":${body.id},"result":[`
+        ));
+      },
+      pull() {
+        return new Promise(() => {});
+      },
+      cancel() {
+        cancellations += 1;
+        return new Promise(() => {});
+      }
+    });
+    return new Response(stream, {status: 200});
+  };
+  const result = await acquire(transport, {
+    limits: {pageSize: 2, requestTimeoutMs: 10}
+  });
+  assert.equal(pageRequests, 1);
+  assert.equal(cancellations, 1);
+  assert.equal(result.coverage.complete, false);
+  assert.equal(result.coverage.subjects[0].terminationReason, "TIMEOUT");
+});
+
+test("late response after timeout is cancelled without issuing a retry", async () => {
+  let transportCalls = 0;
+  let lateBodyCancellations = 0;
+  const result = await acquire(async request => {
+    transportCalls += 1;
+    if (JSON.parse(request.body).method === "getSlot") {
+      return rpcResponse(request, {result: 125});
+    }
+    await new Promise(resolve => setTimeout(resolve, 30));
+    return {
+      status: 200,
+      redirected: false,
+      url: SOLANA_RPC_ORIGIN,
+      headers: new Headers(),
+      body: {
+        cancel() {
+          lateBodyCancellations += 1;
+          return new Promise(() => {});
+        }
+      }
+    };
+  }, {limits: {pageSize: 2, requestTimeoutMs: 5}});
+  await new Promise(resolve => setTimeout(resolve, 40));
+  assert.equal(transportCalls, 2);
+  assert.equal(lateBodyCancellations, 1);
+  assert.equal(result.coverage.subjects[0].terminationReason, "TIMEOUT");
 });

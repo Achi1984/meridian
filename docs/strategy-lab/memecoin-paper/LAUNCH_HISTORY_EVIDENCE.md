@@ -18,6 +18,7 @@ The only requests are:
 
 | Method | Fixed request |
 |---|---|
+| `getSlot` | Fixed Solana mainnet RPC origin; `finalized`; captured before history paging and transaction retrieval |
 | `getSignaturesForAddress` | Fixed Solana mainnet RPC origin; `finalized`; caller subject address; fixed bounded `limit`; optional server cursor `before` |
 | `getTransaction` | Same fixed origin; only successful signatures within the declared slot interval; `finalized`, `jsonParsed`, and `maxSupportedTransactionVersion: 0` |
 
@@ -28,6 +29,15 @@ repeated within a subject stop pagination as `REPEATED_CURSOR`; signatures
 repeated across different declared subjects are deduplicated and retain all
 subject addresses. The result reports coverage only for those addresses and
 that inclusive interval.
+
+The request first captures a `getSlot({commitment:"finalized"})` anchor. If that
+anchor is unavailable or below `endSlot`, history paging does not start and
+coverage is incomplete; an empty signature result cannot make a future interval
+complete. Even when the requested interval is at or below the anchor and page
+boundaries plus transaction retrieval complete, `coverage.complete` means only
+complete for the returned RPC pages over the declared interval. The receipt
+always marks archival/index truncation completeness `UNKNOWN`; source exhaustion
+cannot establish that the RPC retained all older address history.
 
 Default limits are 10 subjects, 100 signatures per page, 20 pages per subject,
 2,000 signatures, 1,000 transactions, 2,100 requests, 1 MiB per response, 10 MiB

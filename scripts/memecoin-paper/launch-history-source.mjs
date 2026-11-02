@@ -116,7 +116,16 @@ function transactionVersion(result) {
   return {supported: false, value: version ?? null};
 }
 
-async function readJsonBounded(response, state, limits) {
+function cancelWithoutWaiting(target, reason) {
+  try {
+    const cancellation = target?.cancel?.(reason);
+    if (cancellation && typeof cancellation.then === "function") {
+      cancellation.catch(() => {});
+    }
+  } catch {}
+}
+
+async function readJsonBounded(response, state, limits, signal) {
   if (!response?.body || typeof response.body.getReader !== "function") {
     throw failure("MISSING_RESPONSE_STREAM", "RPC response has no readable body");
   }
@@ -128,6 +137,11 @@ async function readJsonBounded(response, state, limits) {
     }
   }
   const reader = response.body.getReader();
+  const onAbort = () => {
+    signal.removeEventListener("abort", onAbort);
+    cancelWithoutWaiting(reader, signal.reason);
+  };
+  signal?.addEventListener("abort", onAbort, {once: true});
   const chunks = [];
   let responseBytes = 0;
   try {
@@ -145,9 +159,10 @@ async function readJsonBounded(response, state, limits) {
       chunks.push(value);
     }
   } catch (error) {
-    try { await reader.cancel(error); } catch {}
+    cancelWithoutWaiting(reader, error);
     throw error;
   } finally {
+    signal?.removeEventListener("abort", onAbort);
     reader.releaseLock();
   }
   state.bytes += responseBytes;
@@ -217,44 +232,59 @@ async function requestRpc(state, limits, method, params) {
   const request = makeRequest(id, method, params);
   state.requests += 1;
   state.workUnits += 1;
-  const controller = new AbortController();
-  let timer;
-  let abortHandler;
-  const timeoutPromise = new Promise((_, reject) => {
-    timer = setTimeout(() => {
-      controller.abort();
-      reject(failure("TIMEOUT", "RPC request timed out"));
-    }, limits.requestTimeoutMs);
-  });
-  const abortedPromise = new Promise((_, reject) => {
-    if (!state.signal) return;
-    abortHandler = () => {
-      controller.abort();
-      reject(failure("CANCELLED", "launch history acquisition was cancelled"));
-    };
-    state.signal.addEventListener("abort", abortHandler, {once: true});
-  });
   let startedAt;
   try { startedAt = state.clock(); } catch {
     return {ok: false, status: "INVALID_CLOCK"};
   }
-  if (!Number.isSafeInteger(startedAt) || startedAt < 0) {
+  if (!Number.isSafeInteger(startedAt) || startedAt < state.startedAt) {
     return {ok: false, status: "INVALID_CLOCK"};
   }
+  const controller = new AbortController();
+  let timer;
+  let abortHandler;
+  let response;
   try {
-    const response = await Promise.race([
-      Promise.resolve().then(() => state.transport(request, {signal: controller.signal})),
+    const timeoutPromise = new Promise((_, reject) => {
+      timer = setTimeout(() => {
+        controller.abort();
+        reject(failure("TIMEOUT", "RPC request timed out"));
+      }, limits.requestTimeoutMs);
+    });
+    const abortedPromise = new Promise((_, reject) => {
+      if (!state.signal) return;
+      abortHandler = () => {
+        controller.abort();
+        reject(failure("CANCELLED", "launch history acquisition was cancelled"));
+      };
+      state.signal.addEventListener("abort", abortHandler, {once: true});
+      if (state.signal.aborted) abortHandler();
+    });
+    const transportPromise = Promise.resolve().then(() => {
+      if (controller.signal.aborted) {
+        throw failure("CANCELLED", "launch history acquisition was cancelled");
+      }
+      return state.transport(request, {signal: controller.signal});
+    });
+    transportPromise.then(lateResponse => {
+      if (controller.signal.aborted) {
+        cancelWithoutWaiting(lateResponse?.body, controller.signal.reason);
+      }
+    }, () => {});
+    response = await Promise.race([
+      transportPromise,
       timeoutPromise,
       abortedPromise
     ]);
     if (!responseTargetIsAllowed(response, request)) {
+      cancelWithoutWaiting(response?.body, "RPC response origin is not allowed");
       throw failure("INVALID_RESPONSE_URL", "RPC response origin or redirect is not allowed");
     }
     if (response.status !== 200) {
+      cancelWithoutWaiting(response?.body, "RPC response status is not successful");
       return {ok: false, status: `HTTP_${response.status}`};
     }
     const {payload, bytes: responseBytes} = await Promise.race([
-      readJsonBounded(response, state, limits),
+      readJsonBounded(response, state, limits, controller.signal),
       timeoutPromise,
       abortedPromise
     ]);
@@ -295,6 +325,8 @@ async function requestRpc(state, limits, method, params) {
     }
     return {ok: true, result: payload.result};
   } catch (error) {
+    controller.abort(error);
+    cancelWithoutWaiting(response?.body, error);
     const code = error?.code ?? "TRANSPORT_ERROR";
     return {ok: false, status: code, error: {message: parseErrorMessage(error)}};
   } finally {
@@ -344,6 +376,20 @@ export async function acquireLaunchHistory(options) {
     transactions: new Map(),
     stopReason: null
   };
+  const anchorOutcome = await requestRpc(state, limits, "getSlot", [
+    {commitment: "finalized"}
+  ]);
+  let finalizedAnchor;
+  if (!anchorOutcome.ok) {
+    finalizedAnchor = {status: anchorOutcome.status, slot: null};
+    state.stopReason = anchorOutcome.status;
+  } else if (!Number.isSafeInteger(anchorOutcome.result) || anchorOutcome.result < 0) {
+    finalizedAnchor = {status: "INVALID_RESULT", slot: null};
+    state.stopReason = "INVALID_FINALIZED_ANCHOR";
+  } else {
+    finalizedAnchor = {status: "CAPTURED", slot: anchorOutcome.result};
+    if (anchorOutcome.result < endSlot) state.stopReason = "END_SLOT_AFTER_FINALIZED_ANCHOR";
+  }
   const subjectCoverage = [];
   for (const subject of subjects) {
     const coverage = createCoverageSubject(subject);
@@ -630,8 +676,13 @@ export async function acquireLaunchHistory(options) {
     },
     coverage: {
       scope: "declared-subjects-and-inclusive-slot-interval-only",
+      finalizedAnchor,
+      sourceHistoryCompleteness: "UNKNOWN_ARCHIVAL_OR_INDEX_TRUNCATION",
+      sourceHistoryNote: "pagination completeness is relative to this RPC response; archival retention is not independently established",
       complete: signatureCoverageComplete && transactionCoverageComplete &&
-        eligible.length === transactions.length,
+        eligible.length === transactions.length &&
+        finalizedAnchor.status === "CAPTURED" &&
+        finalizedAnchor.slot >= endSlot,
       signaturePagesComplete: signatureCoverageComplete,
       successfulTransactionRetrievalComplete: transactionCoverageComplete &&
         eligible.length === transactions.length,
