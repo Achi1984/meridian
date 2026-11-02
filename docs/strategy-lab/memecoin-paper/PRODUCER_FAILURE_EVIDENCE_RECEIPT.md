@@ -1,6 +1,6 @@
 # Producer failure-evidence reconciliation receipt
 
-**Implementation head:** `fbe2d962d31ccbcd14b12d58b8de7319c231d276`  
+**Implementation head:** `64b6e77ba05d2a3d7fec2fef28ffeb6ee17bc56d`
 **Base:** `4d2195e4d4bb8ab467430358d6e5567dc795db4b` (main, including #1136)  
 **Scope:** source/tests only; no launch, provider/network calls, credentials, orders, deployment, activation, dependencies, workflows, or frozen-export repairs.
 
@@ -18,11 +18,11 @@ Unavailable failure evidence is `UNKNOWN`, not `null`. Conflicting persisted rep
 
 ## Validation and next-run impact
 
-- `node --test test/memecoin-paper-pilot-online.test.js` — passed, 23 tests.
+- `node --test test/memecoin-paper-pilot-online.test.js` — passed, 24 tests.
 - `node --test --test-name-pattern='deadline beyond bounded|unbound terminal checkpoint|unsettled checkpoint work' test/memecoin-paper-pilot-assembly.test.js` — passed, 3 real-module tests with generated inputs, fake time, and temporary storage.
 - `git diff --check` — passed.
 - Secret scan — no secrets detected.
 - CodeQL checker — 0 alerts; JavaScript analysis was skipped because the database exceeded its size limit.
 - Next run remains observation-only and one-shot. No launch or network behavior changes; terminal evidence now reconciles or fails closed, and unsettled work still prevents terminal output and restart.
 
-Hosted Actions full-suite execution and independent GitHub review remain pending; merge only after both complete successfully.
+Independent diff review found no other issues after the conflicting-evidence fix. Hosted Actions full-suite execution and independent GitHub PR review remain pending; merge only after both complete successfully.
