@@ -22,6 +22,7 @@ Unavailable failure evidence is `UNKNOWN`, not `null`. Conflicting persisted rep
 - `node --test --test-name-pattern='deadline beyond bounded|unbound terminal checkpoint|unsettled checkpoint work' test/memecoin-paper-pilot-assembly.test.js` — passed, 3 real-module tests with generated inputs, fake time, and temporary storage.
 - `git diff --check` — passed.
 - Secret scan — no secrets detected.
+- CodeQL checker — 0 alerts; JavaScript analysis was skipped because the database exceeded its size limit.
 - Next run remains observation-only and one-shot. No launch or network behavior changes; terminal evidence now reconciles or fails closed, and unsettled work still prevents terminal output and restart.
 
 Hosted Actions full-suite execution and independent GitHub review remain pending; merge only after both complete successfully.
