@@ -21,6 +21,13 @@ const sizes=[
 const evidence=process.env.V11_PAPER_COCKPIT_EVIDENCE_DIR;
 const PAPER_PASSWORD='synthetic-browser-gate-password';
 
+function runFlaggedBrowserTest(name,timeout){
+  const env={...process.env};delete env.NODE_TEST_CONTEXT;
+  return spawnSync(process.execPath,['--experimental-websocket','--test',
+    `--test-name-pattern=^${name}$`,fileURLToPath(import.meta.url)],
+    {env,encoding:'utf8',timeout});
+}
+
 async function interceptGeneratedPaperReport(call,report){
   const body=Buffer.from(JSON.stringify({
     schema:PAPER_REPORT_ENVELOPE_SCHEMA,runId:report.experiment.id,report
@@ -58,11 +65,10 @@ async function interceptGeneratedPaperReport(call,report){
 
 test('M11 Paper cockpit demo is responsive and keyboard accessible at five widths',{timeout:240000},async()=>{
   if(typeof WebSocket!=='function'){
-    const env={...process.env};delete env.NODE_TEST_CONTEXT;
-    const child=spawnSync(process.execPath,['--experimental-websocket',fileURLToPath(import.meta.url)],
-      {env,encoding:'utf8',timeout:235000});
+    const child=runFlaggedBrowserTest(
+      'M11 Paper cockpit demo is responsive and keyboard accessible at five widths',235000);
     assert.equal(child.status,0,String(child.stdout).slice(-2500)+String(child.stderr).slice(-1000));
-    const rows=child.stdout.split('\n').filter(line=>line.startsWith('V11_PAPER_COCKPIT_SIZE '));
+    const rows=child.stdout.split('\n').filter(line=>/^(?:# )?V11_PAPER_COCKPIT_SIZE /.test(line));
     assert.equal(rows.length,sizes.length);rows.forEach(row=>console.log(row));return;
   }
   assert.ok(chrome,'Chrome required; cockpit browser acceptance cannot be skipped');
@@ -348,6 +354,14 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
 });
 
 test('early Strategies navigation remains active when its module bootstrap initializes',{timeout:60000},async()=>{
+  if(typeof WebSocket!=='function'){
+    const name='early Strategies navigation remains active when its module bootstrap initializes';
+    const child=runFlaggedBrowserTest(name,55000);
+    assert.equal(child.status,0,String(child.stdout).slice(-2500)+String(child.stderr).slice(-1000));
+    assert.match(child.stdout,new RegExp(`ok 1 - ${name}`),
+      'the flagged child must execute this browser regression, not silently skip it');
+    return;
+  }
   assert.ok(chrome,'Chrome required; early navigation race cannot be skipped');
   const hosted=await startV11StaticServer();
   try{
