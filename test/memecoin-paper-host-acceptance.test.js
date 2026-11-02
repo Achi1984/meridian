@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import {spawnSync} from "node:child_process";
 import test from "node:test";
-import {chmod, lstat, mkdir, mkdtemp, readFile, rm, symlink, writeFile} from "node:fs/promises";
+import {chmod, lstat, mkdir, mkdtemp, readFile, rename, rm, symlink, writeFile} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import {fileURLToPath} from "node:url";
@@ -21,7 +21,7 @@ async function fixture(t) {
   const root = await mkdtemp(path.join(os.tmpdir(), "meridian-paper-host-acceptance-"));
   t.after(() => rm(root, {recursive: true, force: true}));
   const volume = path.join(root, "volume");
-  await mkdir(volume);
+  await mkdir(volume, {mode: 0o700});
   return {root, volume, dataRoot: path.join(volume, "application-data")};
 }
 
@@ -73,27 +73,16 @@ test("host acceptance is explicit and imports do not create or start anything", 
 
 test("root-owned mount and runtime-owned child pass temp-volume preflight; restart makes zero requests", async t => {
   const harness = await fixture(t);
-  await mkdir(harness.dataRoot, {mode: 0o700});
+  harness.volume = os.tmpdir();
+  harness.dataRoot = harness.root;
+  assert.equal((await lstat(harness.volume)).uid, 0);
   const runtimeUid = process.getuid();
-  const metadataLstat = async filename => {
-    const info = await lstat(filename);
-    if (filename !== harness.volume) return info;
-    return {
-      ...info,
-      uid: 0,
-      gid: 1000,
-      isDirectory: () => info.isDirectory(),
-      isSymbolicLink: () => info.isSymbolicLink()
-    };
-  };
   const verified = await verifyOwnedDataRoot({
     mountRoot: harness.volume,
     dataRoot: harness.dataRoot,
-    runtimeUid,
-    lstatPath: metadataLstat
+    runtimeUid
   });
   assert.equal(verified.mountInfo.uid, 0);
-  assert.equal(verified.mountInfo.gid, 1000);
   assert.equal(verified.info.uid, runtimeUid);
   assert.equal(verified.sameDeviceAsMountRoot, true);
 
@@ -115,6 +104,7 @@ test("root-owned mount and runtime-owned child pass temp-volume preflight; resta
     candidate: IDENTITY,
     providerPreflight: true,
     mountRoot: harness.volume,
+    dataRoot: harness.dataRoot,
     assemblyLoader
   };
   const first = await runHostAcceptance(input);
@@ -122,6 +112,7 @@ test("root-owned mount and runtime-owned child pass temp-volume preflight; resta
   assert.equal(first.scope, "HOST_ACCEPTANCE_ONLY");
   assert.equal(first.dataRoot, harness.dataRoot);
   assert.equal(first.dataRootUid, runtimeUid);
+  assert.equal(first.volumeRootUid, 0);
   assert.equal(first.dataRootSameDeviceAsMountRoot, true);
   assert.equal(first.hostDurability, "NOT_VERIFIED");
   assert.equal(first.clockProvenance, "UNVERIFIED");
@@ -150,6 +141,88 @@ test("root-owned mount and runtime-owned child pass temp-volume preflight; resta
   assert.equal(restarted.persistedEvidenceSha256, first.evidenceHash);
   assert.equal(restarted.providerRequestsThisInvocation, 0);
   assert.equal(acquisitions, 1);
+});
+
+test("replaceable mount blocks fresh evidence and same-ID replay after tree replacement", async t => {
+  const harness = await fixture(t);
+  let acquisitions = 0;
+  const input = {
+    mode: "HOST_ACCEPTANCE_ONLY",
+    evidenceId: "replacement-check",
+    candidate: IDENTITY,
+    providerPreflight: true,
+    mountRoot: harness.volume,
+    assemblyLoader: async () => successfulAssembly(() => { acquisitions += 1; })
+  };
+  for (const mode of [0o770, 0o777]) {
+    await chmod(harness.volume, mode);
+    const blocked = await runHostAcceptance(input);
+    assert.equal(blocked.status, "BLOCKED");
+    assert.equal(blocked.failureCode, "HOST_ACCEPTANCE_MOUNT_ROOT_REPLACEABLE");
+    assert.equal(blocked.providerRequests, 0);
+    assert.equal(acquisitions, 0);
+    await assert.rejects(lstat(harness.dataRoot), {code: "ENOENT"});
+  }
+
+  await chmod(harness.volume, 0o700);
+  assert.equal((await runHostAcceptance(input)).status, "PASS");
+  const preservedRoot = path.join(harness.volume, "preserved-data");
+  await rename(harness.dataRoot, preservedRoot);
+  await symlink(harness.root, harness.dataRoot);
+  await chmod(harness.volume, 0o777);
+  const replaced = await runHostAcceptance(input);
+  assert.equal(replaced.failureCode, "HOST_ACCEPTANCE_MOUNT_ROOT_REPLACEABLE");
+  assert.equal(replaced.providerRequests, 0);
+  assert.equal(acquisitions, 1);
+  assert.equal(JSON.parse(await readFile(path.join(
+    preservedRoot, "host-acceptance", input.evidenceId, "result.json"
+  ), "utf8")).status, "PASS");
+  await assert.rejects(lstat(path.join(harness.root, "host-acceptance")), {code: "ENOENT"});
+});
+
+test("safe existing volume with historical runs can use a separate private child without mutating old artifacts", async t => {
+  const harness = await fixture(t);
+  const oldRun = path.join(harness.volume, "runs", "old-run");
+  await mkdir(oldRun, {recursive: true, mode: 0o700});
+  const artifacts = {checkpoint: "old checkpoint", lock: "permanent restart guard"};
+  for (const [name, content] of Object.entries(artifacts)) {
+    await writeFile(path.join(oldRun, name), content, {mode: 0o600});
+  }
+  const input = {
+    mode: "HOST_ACCEPTANCE_ONLY",
+    evidenceId: "existing-volume",
+    candidate: IDENTITY,
+    providerPreflight: true,
+    mountRoot: harness.volume,
+    assemblyLoader: async () => successfulAssembly()
+  };
+  assert.equal((await runHostAcceptance(input)).status, "PASS");
+  assert.equal((await runHostAcceptance(input)).providerRequestsThisInvocation, 0);
+  for (const [name, content] of Object.entries(artifacts)) {
+    assert.equal(await readFile(path.join(oldRun, name), "utf8"), content);
+  }
+});
+
+test("sticky mount is rejected when its owner is neither root nor the runtime UID", async t => {
+  const harness = await fixture(t);
+  await mkdir(harness.dataRoot, {mode: 0o700});
+  const runtimeUid = process.getuid();
+  await assert.rejects(verifyOwnedDataRoot({
+    mountRoot: harness.volume,
+    dataRoot: harness.dataRoot,
+    runtimeUid,
+    lstatPath: async filename => {
+      const info = await lstat(filename);
+      if (filename !== harness.volume) return info;
+      return {
+        ...info,
+        uid: runtimeUid + 1,
+        mode: 0o41777,
+        isDirectory: () => true,
+        isSymbolicLink: () => false
+      };
+    }
+  }), {code: "HOST_ACCEPTANCE_MOUNT_ROOT_REPLACEABLE"});
 });
 
 test("a runtime-UID ownership mismatch blocks writes and provider requests", async t => {

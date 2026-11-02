@@ -190,6 +190,7 @@ export async function verifyOwnedDataRoot({
       await realpathPath(mountRoot) !== mountRoot) {
     throw hostAcceptanceError("MOUNT_ROOT_UNSAFE", "configured physical mount root must be a real, non-symlink directory");
   }
+  verifyMountBoundary(mountInfo, runtimeUid);
   const dataInfo = await lstatPath(dataRoot);
   if (!dataInfo.isDirectory() || dataInfo.isSymbolicLink() ||
       await realpathPath(dataRoot) !== dataRoot) {
@@ -205,6 +206,16 @@ export async function verifyOwnedDataRoot({
     throw hostAcceptanceError("DATA_ROOT_DEVICE_MISMATCH", "private data root must be on the physical mount root device");
   }
   return {mountInfo, info: dataInfo, sameDeviceAsMountRoot: true};
+}
+
+function verifyMountBoundary(info, runtimeUid) {
+  if ((info.uid !== 0 && info.uid !== runtimeUid) ||
+      ((info.mode & 0o022) !== 0 && (info.mode & 0o1000) === 0)) {
+    throw hostAcceptanceError(
+      "MOUNT_ROOT_REPLACEABLE",
+      "mount root must have a trusted owner and prevent other UIDs replacing the private child"
+    );
+  }
 }
 
 function assertPrivateDataRootPath(mountRoot, dataRoot) {
@@ -418,6 +429,22 @@ export async function runHostAcceptance({
   }
   assertPrivateDataRootPath(mountRoot, dataRoot);
   const mount = await verifyMountRoot(mountRoot);
+  try {
+    verifyMountBoundary(mount.info, runtimeUid);
+  } catch (error) {
+    return {
+      status: "BLOCKED",
+      scope: "HOST_ACCEPTANCE_ONLY",
+      failureCode: error.code,
+      runtimeUid,
+      volumeRootUid: mount.info.uid,
+      providerRequests: 0,
+      pilotStarted: false,
+      runtimeAuthorization: false,
+      hostDurability: "NOT_VERIFIED",
+      clockProvenance: "UNVERIFIED"
+    };
+  }
   if (await legacyEvidenceExists(mountRoot)) {
     return {
       status: "BLOCKED",
@@ -733,7 +760,7 @@ export async function main(argv = process.argv.slice(2)) {
     mode: "HOST_ACCEPTANCE_ONLY",
     evidenceId: args["--evidence-id"],
     candidate: {mint: args["--mint"], pool: args["--pool"], quote: args["--quote"]},
-    ...(args["--data-root"] ? {dataRoot: args["--data-root"]} : {}),
+    dataRoot: args["--data-root"],
     providerPreflight: args["--provider-preflight"]
   });
   process.stdout.write(`${JSON.stringify(result)}\n`);
