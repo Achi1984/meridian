@@ -1,50 +1,64 @@
+import {createHash} from "node:crypto";
+
 const HISTORY_SOURCE_VERSION = "solana-launch-history-source-v1";
 const RPC_SOURCE = "Solana JSON-RPC";
 const RPC_ORIGIN = "https://api.mainnet-beta.solana.com";
 const DIGEST = /^[a-f0-9]{64}$/;
-const LIMITS = Object.freeze({
+const DEFAULT_LIMITS = Object.freeze({
   maxRequests: 2_100,
   maxResponseBytes: 1_048_576,
   maxBytes: 10_485_760,
   maxWorkUnits: 5_000,
   maxSignatures: 2_000,
   maxTransactions: 1_000,
-  requestTimeoutMs: 5_000,
+  maxBoundarySlotSpan: 100_000,
   maxElapsedMs: 15_000
 });
 const HARD_LIMITS = Object.freeze({
-  maxRequests: 2_100,
-  maxResponseBytes: 1_048_576,
-  maxBytes: 10_485_760,
-  maxWorkUnits: 5_000,
+  ...DEFAULT_LIMITS,
+  maxElapsedMs: 30_000,
   maxSignatures: 20_000,
-  maxTransactions: 1_000,
-  requestTimeoutMs: 30_000,
-  maxElapsedMs: 30_000
+  maxTransactions: 10_000,
+  maxBoundarySlotSpan: 1_000_000
 });
-
-function resolveLimits(value = LIMITS) {
-  if (!isRecord(value) ||
-      Object.keys(value).some(key => !Object.hasOwn(LIMITS, key))) {
-    throw new TypeError("invalid history window limits");
-  }
-  const resolved = {...LIMITS, ...value};
-  if (Object.entries(resolved).some(([key, limit]) =>
-    !Number.isSafeInteger(limit) || limit < 1 || limit > HARD_LIMITS[key])) {
-    throw new TypeError("history window limits exceed hard bounds");
-  }
-  return Object.freeze(resolved);
-}
 
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-function validTime(value) {
-  return Number.isSafeInteger(value) && value >= 0;
+function canonicalize(value, seen = new Set(), depth = 0) {
+  if (depth > 64) throw new TypeError("receipt payload is too deep");
+  if (value === null || typeof value === "string" || typeof value === "boolean") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (Array.isArray(value)) {
+    if (seen.has(value)) throw new TypeError("receipt payload is cyclic");
+    seen.add(value);
+    const result = value.map(item => canonicalize(item, seen, depth + 1));
+    seen.delete(value);
+    return result;
+  }
+  if (!isRecord(value) || (Object.getPrototypeOf(value) !== Object.prototype &&
+      Object.getPrototypeOf(value) !== null) || seen.has(value)) {
+    throw new TypeError("receipt payload is not plain JSON data");
+  }
+  seen.add(value);
+  const result = {};
+  for (const key of Object.keys(value).sort()) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !Object.hasOwn(descriptor, "value")) {
+      throw new TypeError("receipt payload contains an accessor");
+    }
+    result[key] = canonicalize(descriptor.value, seen, depth + 1);
+  }
+  seen.delete(value);
+  return result;
 }
 
-function validIdentity(identity) {
+export function canonicalHistoryDigest(payload) {
+  return createHash("sha256").update(JSON.stringify(canonicalize(payload)), "utf8").digest("hex");
+}
+
+function identityValid(identity) {
   return isRecord(identity) && identity.chainId === "solana" &&
     ["mint", "pool", "quote"].every(key =>
       typeof identity[key] === "string" &&
@@ -52,12 +66,17 @@ function validIdentity(identity) {
 }
 
 function identitySnapshot(identity) {
-  return validIdentity(identity) ? {
+  return identityValid(identity) ? {
     chainId: identity.chainId,
     mint: identity.mint,
     pool: identity.pool,
     quote: identity.quote
   } : null;
+}
+
+function sameIdentity(left, right) {
+  return identityValid(left) && identityValid(right) &&
+    ["chainId", "mint", "pool", "quote"].every(key => left[key] === right[key]);
 }
 
 function validSignal(signal) {
@@ -67,128 +86,233 @@ function validSignal(signal) {
     typeof signal.removeEventListener === "function");
 }
 
-function sameIdentity(left, right) {
-  return validIdentity(left) && validIdentity(right) &&
-    ["chainId", "mint", "pool", "quote"].every(key => left[key] === right[key]);
+function validTime(value) {
+  return Number.isSafeInteger(value) && value >= 0;
 }
 
-function validReceipt(receipt, endInclusiveMs) {
-  return isRecord(receipt) && typeof receipt.id === "string" &&
+function validReceipt(receipt, source, minimumReceivedAt = 0) {
+  return isRecord(receipt) && receipt.status === "SOURCE_BOUND" &&
+    receipt.source === source && typeof receipt.id === "string" &&
     receipt.id.trim().length > 0 && receipt.id.length <= 256 &&
     DIGEST.test(receipt.payloadSha256 ?? "") && validTime(receipt.receivedAt) &&
-    receipt.receivedAt >= endInclusiveMs;
+    receipt.receivedAt >= minimumReceivedAt;
 }
 
-function validPoolProof(poolProof, identity) {
-  return isRecord(poolProof) && poolProof.status === "SOURCE_BOUND" &&
-    poolProof.verified === true &&
-    poolProof.chainId === identity.chainId &&
-    poolProof.baseMint === identity.mint &&
-    poolProof.pool === identity.pool &&
-    poolProof.quoteMint === identity.quote &&
-    validTime(poolProof.observedAt) &&
-    Number.isSafeInteger(poolProof.slot) && poolProof.slot >= 0 &&
-    validReceipt(poolProof.receipt, poolProof.observedAt);
+function receiptPayload(timeEvidence) {
+  return {
+    source: timeEvidence.source,
+    identity: timeEvidence.identity,
+    requested: timeEvidence.requested,
+    timeBounds: timeEvidence.timeBounds,
+    coverage: timeEvidence.coverage,
+    events: timeEvidence.events
+  };
 }
 
-function blockTimeMs(row) {
-  if (!isRecord(row) || !Number.isSafeInteger(row.blockTime) || row.blockTime < 0) return null;
-  const value = row.blockTime * 1000;
-  return Number.isSafeInteger(value) ? value : null;
+export function timestampEvidenceDigest(timeEvidence) {
+  return canonicalHistoryDigest(receiptPayload(timeEvidence));
+}
+
+function blockTimeMs(value) {
+  if (!isRecord(value) || !Number.isSafeInteger(value.blockTime) || value.blockTime < 0) return null;
+  const milliseconds = value.blockTime * 1000;
+  return Number.isSafeInteger(milliseconds) ? milliseconds : null;
 }
 
 function boundaryPoint(value) {
   const observedAt = blockTimeMs(value);
   return isRecord(value) && observedAt !== null &&
     Number.isSafeInteger(value.slot) && value.slot >= 0
-    ? {slot: value.slot, observedAt}
+    ? {slot: value.slot, blockTime: value.blockTime, observedAt}
     : null;
 }
 
-function validTimeBoundaries(timeBounds, startExclusiveMs, endInclusiveMs, receiptId) {
-  if (!isRecord(timeBounds) || timeBounds.complete !== true ||
-      timeBounds.monotonicSlots !== true || timeBounds.receiptId !== receiptId) return false;
-  const lowerBefore = boundaryPoint(timeBounds.startExclusive?.before);
-  const lowerAfter = boundaryPoint(timeBounds.startExclusive?.after);
-  const upperBefore = boundaryPoint(timeBounds.endInclusive?.before);
-  const upperAfter = boundaryPoint(timeBounds.endInclusive?.after);
-  if (!lowerBefore || !lowerAfter || !upperBefore || !upperAfter) return false;
-  return lowerBefore.slot < lowerAfter.slot &&
-    lowerBefore.observedAt <= startExclusiveMs &&
-    lowerAfter.observedAt > startExclusiveMs &&
-    lowerAfter.slot <= upperBefore.slot &&
-    lowerAfter.observedAt <= upperBefore.observedAt &&
-    upperBefore.observedAt <= endInclusiveMs &&
-    upperBefore.slot < upperAfter.slot &&
-    upperAfter.observedAt > endInclusiveMs;
-}
-
-function validCollectorReceipts(result, limits) {
-  if (!Array.isArray(result.events) || result.events.length < 1 ||
-      result.events.length > limits.maxRequests) return false;
+function validEvents(events, limits, {
+  minimumReceivedAt = 0,
+  methods = null
+} = {}) {
+  if (!Array.isArray(events) || events.length < 1 || events.length > limits.maxRequests) return null;
   let bytes = 0;
-  for (const event of result.events) {
+  let latestReceivedAt = 0;
+  for (const event of events) {
     if (!isRecord(event) || !DIGEST.test(event.responseSha256 ?? "") ||
-        !Number.isSafeInteger(event.bytes) || event.bytes < 0 ||
-        event.bytes > limits.maxResponseBytes) return false;
-    bytes += event.bytes;
-    if (!Number.isSafeInteger(bytes) || bytes > limits.maxBytes) return false;
+        !Number.isSafeInteger(event.responseBytes) || event.responseBytes < 0 ||
+        event.responseBytes > limits.maxResponseBytes ||
+        !validTime(event.responseReceivedAt) ||
+        event.responseReceivedAt < minimumReceivedAt ||
+        (methods && (!methods.has(event.method) || event.status !== "RESPONSE_RECEIVED"))) return null;
+    bytes += event.responseBytes;
+    if (!Number.isSafeInteger(bytes) || bytes > limits.maxBytes) return null;
+    latestReceivedAt = Math.max(latestReceivedAt, event.responseReceivedAt);
   }
-  return result.counters?.requests === result.events.length &&
-    result.counters.bytes === bytes;
+  return {bytes, latestReceivedAt};
 }
 
-function validCounters(result, limits) {
-  const counters = result.counters;
-  return isRecord(counters) &&
-    Number.isSafeInteger(counters.requests) && counters.requests > 0 &&
-    counters.requests <= limits.maxRequests &&
-    Number.isSafeInteger(counters.bytes) && counters.bytes >= 0 &&
-    counters.bytes <= limits.maxBytes &&
-    Number.isSafeInteger(counters.workUnits) && counters.workUnits >= 0 &&
-    counters.workUnits <= limits.maxWorkUnits &&
-    Number.isSafeInteger(counters.signatures) && counters.signatures >= 0 &&
-    counters.signatures <= limits.maxSignatures &&
-    Number.isSafeInteger(counters.successfulTransactions) &&
-    counters.successfulTransactions >= 0 &&
-    counters.successfulTransactions <= limits.maxTransactions;
+function resolveLimits(input = {}) {
+  if (!isRecord(input) || Object.keys(input).some(key => !Object.hasOwn(DEFAULT_LIMITS, key))) {
+    throw new TypeError("invalid bounded history-window limits");
+  }
+  const limits = {...DEFAULT_LIMITS, ...input};
+  if (Object.entries(limits).some(([key, value]) =>
+    !Number.isSafeInteger(value) || value < 1 || value > HARD_LIMITS[key]) ||
+      limits.maxResponseBytes > limits.maxBytes) {
+    throw new TypeError("history-window limits exceed fixed ceilings");
+  }
+  return Object.freeze(limits);
 }
 
-function validCoverage(result, identity, receiptId, startExclusiveMs, endInclusiveMs) {
-  const coverage = result.coverage;
-  const subjects = coverage?.subjects;
-  return isRecord(coverage) && coverage.complete === true &&
-    coverage.truncated !== true && coverage.cursorExhausted !== false &&
-    coverage.signaturePagesComplete === true &&
-    coverage.successfulTransactionRetrievalComplete === true &&
-    coverage.sourceHistoryCompleteness === "COMPLETE" &&
-    coverage.terminationReason === "DECLARED_INTERVAL_COVERED" &&
-    coverage.finalizedAnchor?.status === "CAPTURED" &&
-    Number.isSafeInteger(coverage.finalizedAnchor.slot) &&
-    coverage.finalizedAnchor.slot >= result.slotInterval?.endInclusive &&
-    Array.isArray(subjects) && subjects.length === 1 &&
-    subjects[0]?.address === identity.pool &&
-    subjects[0]?.signatureCoverageComplete === true &&
-    ["SOURCE_EXHAUSTED", "LOWER_SLOT_BOUND_REACHED"].includes(subjects[0]?.terminationReason) &&
-    validTimeBoundaries(coverage.timeBounds, startExclusiveMs, endInclusiveMs, receiptId);
+function unavailable(identity, requested, reason, collector = null) {
+  return {
+    status: "UNKNOWN",
+    reason,
+    source: typeof collector?.source === "string" ? collector.source : RPC_SOURCE,
+    identity: identitySnapshot(identity),
+    requested,
+    transactions: [],
+    receipt: null,
+    sourceReceipts: [],
+    coverage: {
+      complete: false,
+      truncated: collector?.coverage?.complete === false,
+      cursorExhausted: false,
+      sourceHistoryCompleteness: collector?.coverage?.sourceHistoryCompleteness ?? "UNKNOWN"
+    },
+    sourceAuthentication: "NOT_ESTABLISHED"
+  };
 }
 
-function validTransactions(result, slotInterval, timeBounds, startExclusiveMs, endInclusiveMs, limits) {
-  if (!Array.isArray(result.transactions) ||
-      result.transactions.length > limits.maxTransactions ||
-      result.transactions.length !== result.counters.successfulTransactions) return null;
-  const lowerSlot = timeBounds.startExclusive.after.slot;
-  const upperSlot = timeBounds.endInclusive.before.slot;
+function waitForCallback(callback, request, signal, timeoutMs) {
+  return new Promise(resolve => {
+    let settled = false;
+    const controller = new AbortController();
+    const finish = outcome => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+      resolve(outcome);
+    };
+    const onAbort = () => {
+      controller.abort(signal?.reason);
+      finish({status: "CANCELLED"});
+    };
+    const timer = setTimeout(() => {
+      controller.abort();
+      finish({status: "TIME_LIMIT"});
+    }, timeoutMs);
+    signal?.addEventListener("abort", onAbort, {once: true});
+    if (signal?.aborted) {
+      onAbort();
+      return;
+    }
+    Promise.resolve().then(() => callback({...request, signal: controller.signal})).then(
+      value => finish({status: "RESULT", value}),
+      () => finish({status: "COLLECTOR_UNKNOWN"})
+    );
+  });
+}
+
+function validateTimeEvidence(value, identity, requested, limits) {
+  if (!isRecord(value) || value.status !== "SOURCE_BOUND" || value.source !== RPC_SOURCE ||
+      !sameIdentity(value.identity, identity) ||
+      value.requested?.startExclusiveMs !== requested.startExclusiveMs ||
+      value.requested?.endInclusiveMs !== requested.endInclusiveMs) return null;
+  const eventTotals = validEvents(value.events, limits, {
+    methods: new Set(["getBlockTime"])
+  });
+  const bounds = value.timeBounds;
+  const receipt = value.receipt;
+  if (!eventTotals || !validReceipt(receipt, value.source, requested.endInclusiveMs) ||
+      receipt.payloadSha256 !== timestampEvidenceDigest(value) ||
+      receipt.receivedAt < eventTotals.latestReceivedAt ||
+      !isRecord(value.coverage) || value.coverage.complete !== true ||
+      value.coverage.monotonicSlots !== true ||
+      value.coverage.scope !== "selected-pool-inclusive-slot-range" ||
+      !isRecord(bounds) || bounds.receiptId !== receipt.id) return null;
+  const startBefore = boundaryPoint(bounds.startExclusive?.before);
+  const startAfter = boundaryPoint(bounds.startExclusive?.after);
+  const endBefore = boundaryPoint(bounds.endInclusive?.before);
+  const endAfter = boundaryPoint(bounds.endInclusive?.after);
+  if (!startBefore || !startAfter || !endBefore || !endAfter ||
+      startBefore.slot >= startAfter.slot ||
+      startBefore.observedAt > requested.startExclusiveMs ||
+      startAfter.observedAt <= requested.startExclusiveMs ||
+      startAfter.slot > endBefore.slot ||
+      startAfter.observedAt > endBefore.observedAt ||
+      endBefore.observedAt > requested.endInclusiveMs ||
+      endBefore.slot >= endAfter.slot ||
+      endAfter.observedAt <= requested.endInclusiveMs ||
+      endAfter.slot - startBefore.slot > limits.maxBoundarySlotSpan) return null;
+  return {startBefore, startAfter, endBefore, endAfter, receipt, events: value.events};
+}
+
+function validCollector(collector, identity, slotInterval, limits) {
+  if (!isRecord(collector) || collector.sourceVersion !== HISTORY_SOURCE_VERSION ||
+      collector.source !== RPC_SOURCE || collector.rpcOrigin !== RPC_ORIGIN ||
+      collector.commitment !== "finalized" ||
+      !Array.isArray(collector.declaredSubjects) || collector.declaredSubjects.length !== 1 ||
+      collector.declaredSubjects[0]?.address !== identity.pool ||
+      collector.coverage?.scope !== "declared-subjects-and-inclusive-slot-interval-only" ||
+      !Number.isSafeInteger(collector.slotInterval?.startInclusive) ||
+      !Number.isSafeInteger(collector.slotInterval?.endInclusive) ||
+      collector.slotInterval.startInclusive < 0 ||
+      collector.slotInterval.endInclusive < collector.slotInterval.startInclusive ||
+      collector.coverage?.complete !== true ||
+      collector.coverage?.signaturePagesComplete !== true ||
+      collector.coverage?.successfulTransactionRetrievalComplete !== true ||
+      collector.coverage?.terminationReason !== "DECLARED_INTERVAL_COVERED" ||
+      collector.coverage?.finalizedAnchor?.status !== "CAPTURED" ||
+      collector.coverage.finalizedAnchor.slot < collector.slotInterval.endInclusive ||
+      collector.coverage?.subjects?.length !== 1 ||
+      collector.coverage.subjects[0]?.address !== identity.pool ||
+      collector.coverage.subjects[0]?.signatureCoverageComplete !== true ||
+      !["SOURCE_EXHAUSTED", "LOWER_SLOT_BOUND_REACHED"].includes(
+        collector.coverage.subjects[0]?.terminationReason) ||
+      collector.coverage.sourceHistoryCompleteness !== "COMPLETE") return null;
+
+  const counters = collector.counters;
+  const events = validEvents(collector.events, limits, {
+    methods: new Set(["getSlot", "getSignaturesForAddress", "getTransaction"])
+  });
+  if (!isRecord(counters) || !events ||
+      counters.requests !== collector.events.length ||
+      counters.bytes !== events.bytes || counters.bytes > limits.maxBytes ||
+      !Number.isSafeInteger(counters.workUnits) || counters.workUnits < 0 ||
+      counters.workUnits > limits.maxWorkUnits ||
+      !Number.isSafeInteger(counters.signatures) || counters.signatures < 0 ||
+      counters.signatures > limits.maxSignatures ||
+      !Number.isSafeInteger(counters.successfulTransactions) ||
+      counters.successfulTransactions < 0 ||
+      counters.successfulTransactions > limits.maxTransactions ||
+      !Array.isArray(collector.signatures) ||
+      collector.signatures.length !== counters.signatures ||
+      !Array.isArray(collector.transactions) ||
+      collector.transactions.length !== counters.successfulTransactions) return null;
+  return {events, counters};
+}
+
+function validateRows(collector, identity, interval, timeBounds, requested) {
+  const lowerSlot = timeBounds.startAfter.slot;
+  const upperSlot = timeBounds.endBefore.slot;
+  const signatureById = new Map();
+  for (const signature of collector.signatures) {
+    if (!isRecord(signature) || typeof signature.signature !== "string" ||
+        !signature.signature || signatureById.has(signature.signature) ||
+        !Number.isSafeInteger(signature.slot) ||
+        !Array.isArray(signature.subjectAddresses) ||
+        signature.subjectAddresses.length !== 1 ||
+        signature.subjectAddresses[0] !== identity.pool) return null;
+    signatureById.set(signature.signature, signature);
+  }
   let previousSlot = -1;
   let previousTime = -1;
-  const seen = new Set();
-  const withinWindow = [];
+  const transactions = [];
   const timedSlots = [
-    timeBounds.startExclusive.before,
-    timeBounds.startExclusive.after,
-    ...result.transactions,
-    timeBounds.endInclusive.before,
-    timeBounds.endInclusive.after
+    timeBounds.startBefore,
+    timeBounds.startAfter,
+    ...collector.transactions,
+    timeBounds.endBefore,
+    timeBounds.endAfter
   ].map(row => isRecord(row)
     ? {slot: row.slot, observedAt: blockTimeMs(row)}
     : {slot: -1, observedAt: null})
@@ -202,92 +326,58 @@ function validTransactions(result, slotInterval, timeBounds, startExclusiveMs, e
     priorTimedSlot = point.slot;
     priorSlotTime = point.observedAt;
   }
-  for (const row of result.transactions) {
+  for (const row of collector.transactions) {
     const observedAt = blockTimeMs(row);
-    if (!isRecord(row) || typeof row.signature !== "string" || !row.signature ||
-        row.signature.length > 256 || seen.has(row.signature) ||
-        !Number.isSafeInteger(row.slot) || row.slot < previousSlot ||
-        row.slot < slotInterval.startInclusive || row.slot > slotInterval.endInclusive ||
-        !Array.isArray(row.subjectAddresses) || row.subjectAddresses.length !== 1 ||
-        row.subjectAddresses[0] !== result.identity.pool ||
+    const signature = signatureById.get(row?.signature);
+    if (!isRecord(row) || !signature ||
+        row.status !== "SUCCESS" ||
+        row.slot !== signature.slot ||
+        signature.err !== null ||
+        signature.errorStatus !== null ||
+        (signature.blockTime !== null && signature.blockTime !== row.blockTime) ||
+        !Array.isArray(row.subjectAddresses) ||
+        row.subjectAddresses.length !== 1 ||
+        row.subjectAddresses[0] !== identity.pool ||
+        !Number.isSafeInteger(row.slot) ||
+        row.slot < previousSlot ||
+        row.slot < interval.startInclusive || row.slot > interval.endInclusive ||
         !isRecord(row.transaction) || !isRecord(row.meta) ||
-        row.status !== "SUCCESS" || observedAt === null || observedAt < previousTime ||
-        (row.observedAt !== undefined && row.observedAt !== observedAt)) return null;
-    seen.add(row.signature);
+        observedAt === null || observedAt < previousTime) return null;
     previousSlot = row.slot;
     previousTime = observedAt;
-    if (observedAt > startExclusiveMs && observedAt <= endInclusiveMs &&
+    if (observedAt > requested.startExclusiveMs && observedAt <= requested.endInclusiveMs &&
         (row.slot < lowerSlot || row.slot > upperSlot)) return null;
-    if (observedAt > startExclusiveMs && observedAt <= endInclusiveMs) {
-      withinWindow.push({...row, observedAt});
+    if (observedAt > requested.startExclusiveMs && observedAt <= requested.endInclusiveMs) {
+      transactions.push({...row, observedAt});
     }
   }
-  return withinWindow;
+  return transactions;
 }
 
-function unavailable(identity, requested, reason, sourceResult = null) {
-  const receipts = Array.isArray(sourceResult?.events)
-    ? sourceResult.events.slice(0, LIMITS.maxRequests).map(event => isRecord(event) ? {
-      endpointKind: typeof event.endpointKind === "string" ? event.endpointKind.slice(0, 64) : null,
-      responseSha256: DIGEST.test(event.responseSha256 ?? "") ? event.responseSha256 : null,
-      bytes: Number.isSafeInteger(event.bytes) && event.bytes >= 0 ? event.bytes : null
-    } : null)
-    : [];
-  const receipt = validReceipt(sourceResult?.receipt, 0)
-    ? {
-      id: sourceResult.receipt.id,
-      payloadSha256: sourceResult.receipt.payloadSha256,
-      receivedAt: sourceResult.receipt.receivedAt
-    }
-    : null;
+function aggregateReceiptPayload(collector, identity, requested, timeEvidence, events) {
   return {
-    status: "UNKNOWN",
-    reason,
-    source: typeof sourceResult?.source === "string" ? sourceResult.source.slice(0, 128) : RPC_SOURCE,
-    identity: identitySnapshot(identity),
+    schema: "SOLANA_RECEIPTED_TIME_WINDOW_V1",
+    sourceVersion: collector.sourceVersion,
+    source: collector.source,
+    rpcOrigin: collector.rpcOrigin,
+    commitment: collector.commitment,
+    identity,
     requested,
-    transactions: [],
-    receipt,
-    sourceReceipts: receipts,
-    sourceReceiptsTruncated: Array.isArray(sourceResult?.events) &&
-      sourceResult.events.length > LIMITS.maxRequests,
-    coverage: {complete: false, truncated: null, cursorExhausted: false}
+    declaredSubjects: collector.declaredSubjects,
+    slotInterval: collector.slotInterval,
+    signatures: collector.signatures,
+    transactions: collector.transactions,
+    events,
+    counters: collector.counters,
+    collectorCoverage: collector.coverage,
+    timeBounds: timeEvidence.timeBounds,
+    timeEvidenceReceipt: timeEvidence.receipt
   };
-}
-
-function waitForCollection(collector, request, signal, limits) {
-  return new Promise(resolve => {
-    let settled = false;
-    const controller = new AbortController();
-    const finish = value => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      signal?.removeEventListener("abort", onAbort);
-      resolve(value);
-    };
-    const onAbort = () => {
-      controller.abort(signal?.reason);
-      finish({kind: "CANCELLED"});
-    };
-    const timer = setTimeout(() => {
-      controller.abort();
-      finish({kind: "TIME_LIMIT"});
-    }, limits.maxElapsedMs);
-    signal?.addEventListener("abort", onAbort, {once: true});
-    if (signal?.aborted) {
-      onAbort();
-      return;
-    }
-    Promise.resolve().then(() => collector({...request, signal: controller.signal})).then(
-      value => finish({kind: "RESULT", value}),
-      () => finish({kind: "COLLECTOR_UNKNOWN"})
-    );
-  });
 }
 
 export function createHistoryWindowSource({
   slotHistoryCollector,
+  timeBoundarySource,
   enabled = false,
   limits: suppliedLimits
 } = {}) {
@@ -300,73 +390,161 @@ export function createHistoryWindowSource({
       };
       if (!enabled) return unavailable(identity, requested, "DISABLED");
       if (signal?.aborted) return unavailable(identity, requested, "CANCELLED");
-      if (typeof slotHistoryCollector !== "function" ||
-          !validSignal(signal) ||
-          !validIdentity(identity) || !validPoolProof(poolProof, identity) ||
+      if (!validSignal(signal) || !identityValid(identity) ||
+          !isRecord(poolProof) || poolProof.status !== "SOURCE_BOUND" ||
+          poolProof.verified !== true ||
+          poolProof.chainId !== identity.chainId ||
+          poolProof.baseMint !== identity.mint ||
+          poolProof.pool !== identity.pool ||
+          poolProof.quoteMint !== identity.quote ||
+          !validTime(poolProof.observedAt) ||
+          !validReceipt(poolProof.receipt, poolProof.source, poolProof.observedAt) ||
           !validTime(startExclusiveMs) || !validTime(endInclusiveMs) ||
-          startExclusiveMs >= endInclusiveMs) {
+          startExclusiveMs >= endInclusiveMs ||
+          typeof timeBoundarySource?.readWindow !== "function" ||
+          typeof slotHistoryCollector !== "function") {
         return unavailable(identity, requested, "INVALID_OR_UNBOUND_REQUEST");
       }
 
-      const outcome = await waitForCollection(slotHistoryCollector, {
+      const startedAt = performance.now();
+      const requestBase = {
         identity: identitySnapshot(identity),
+        requested: {...requested},
         poolProof,
-        startExclusiveMs,
-        endInclusiveMs,
-        signal,
         limits
-      }, signal, limits);
-      if (outcome.kind !== "RESULT") {
-        return unavailable(identity, requested, outcome.kind);
+      };
+      const timeOutcome = await waitForCallback(
+        timeBoundarySource.readWindow.bind(timeBoundarySource),
+        requestBase,
+        signal,
+        limits.maxElapsedMs
+      );
+      if (timeOutcome.status !== "RESULT") {
+        return unavailable(identity, requested, timeOutcome.status);
+      }
+      const timeEvidence = timeOutcome.value;
+      let validatedTime;
+      try {
+        validatedTime = validateTimeEvidence(timeEvidence, identity, requested, limits);
+      } catch {
+        validatedTime = null;
+      }
+      if (!validatedTime) {
+        return unavailable(identity, requested, "TIME_BOUNDARY_RECEIPT_UNKNOWN");
       }
 
-      const result = outcome.value;
-      if (!isRecord(result) || result.sourceVersion !== HISTORY_SOURCE_VERSION ||
-          result.source !== RPC_SOURCE || result.rpcOrigin !== RPC_ORIGIN ||
-          result.commitment !== "finalized" ||
-          !sameIdentity(result.identity, identity) ||
-          result.requested?.startExclusiveMs !== startExclusiveMs ||
-          result.requested?.endInclusiveMs !== endInclusiveMs ||
-          !validReceipt(result.receipt, endInclusiveMs) ||
-          !validCounters(result, limits) || !validCollectorReceipts(result, limits)) {
-        return unavailable(identity, requested, "COLLECTOR_RECEIPT_OR_IDENTITY_UNKNOWN", result);
+      const slotInterval = {
+        startInclusive: validatedTime.startBefore.slot,
+        endInclusive: validatedTime.endAfter.slot
+      };
+      const remainingMs = Math.floor(limits.maxElapsedMs - (performance.now() - startedAt));
+      if (remainingMs <= 0) return unavailable(identity, requested, "TIME_LIMIT");
+      const collectorOutcome = await waitForCallback(
+        slotHistoryCollector,
+        {
+          ...requestBase,
+          subjects: [{
+            address: identity.pool,
+            source: poolProof.source,
+            evidenceId: poolProof.receipt.id
+          }],
+          startSlot: slotInterval.startInclusive,
+          endSlot: slotInterval.endInclusive,
+          signal
+        },
+        signal,
+        remainingMs
+      );
+      if (collectorOutcome.status !== "RESULT") {
+        return unavailable(identity, requested, collectorOutcome.status);
+      }
+      const collector = collectorOutcome.value;
+      const collectorValidation = validCollector(collector, identity, slotInterval, limits);
+      if (!collectorValidation) {
+        return unavailable(
+          identity,
+          requested,
+          collector?.coverage?.sourceHistoryCompleteness === "UNKNOWN_ARCHIVAL_OR_INDEX_TRUNCATION"
+            ? "COLLECTOR_HISTORY_COMPLETENESS_UNKNOWN"
+            : "COLLECTOR_COVERAGE_OR_RECEIPT_UNKNOWN",
+          collector
+        );
       }
 
-      const slotInterval = result.slotInterval;
-      if (!isRecord(slotInterval) ||
-          !Array.isArray(result.declaredSubjects) || result.declaredSubjects.length !== 1 ||
-          result.declaredSubjects[0]?.address !== identity.pool ||
-          !Number.isSafeInteger(slotInterval.startInclusive) ||
-          !Number.isSafeInteger(slotInterval.endInclusive) ||
-          slotInterval.startInclusive < 0 ||
-          slotInterval.startInclusive > slotInterval.endInclusive ||
-          !validCoverage(result, identity, result.receipt.id, startExclusiveMs, endInclusiveMs)) {
-        return unavailable(identity, requested, "TIME_BOUNDARY_OR_HISTORY_COVERAGE_UNKNOWN", result);
+      const windowSpan = {
+        startInclusive: collector.slotInterval.startInclusive,
+        endInclusive: collector.slotInterval.endInclusive
+      };
+      if (windowSpan.startInclusive > validatedTime.startBefore.slot ||
+          windowSpan.endInclusive < validatedTime.endAfter.slot) {
+        return unavailable(identity, requested, "COLLECTED_SLOT_INTERVAL_DOES_NOT_COVER_TIME_FENCES", collector);
       }
-
-      const transactions = validTransactions(
-        result, slotInterval, result.coverage.timeBounds, startExclusiveMs, endInclusiveMs, limits
+      const timeEvents = validEvents(timeEvidence.events, limits, {
+        minimumReceivedAt: requested.endInclusiveMs,
+        methods: new Set(["getBlockTime"])
+      });
+      if (!timeEvents || !validReceipt(
+        timeEvidence.receipt, timeEvidence.source, requested.endInclusiveMs
+      )) {
+        return unavailable(identity, requested, "TIME_EVIDENCE_RECEIPT_UNKNOWN", collector);
+      }
+      const collectorEvents = validEvents(collector.events, limits, {
+        minimumReceivedAt: requested.endInclusiveMs,
+        methods: new Set(["getSlot", "getSignaturesForAddress", "getTransaction"])
+      });
+      if (!collectorEvents || !Array.isArray(collector.declaredSubjects) ||
+          collector.declaredSubjects.length !== 1 ||
+          collector.declaredSubjects[0].address !== identity.pool ||
+          collector.coverage.scope !== "declared-subjects-and-inclusive-slot-interval-only") {
+        return unavailable(identity, requested, "COLLECTOR_SCOPE_OR_RECEIPT_UNKNOWN", collector);
+      }
+      const transactions = validateRows(
+        collector, identity, windowSpan, validatedTime, requested
       );
       if (!transactions) {
-        return unavailable(identity, requested, "TRANSACTION_TIMESTAMP_OR_ORDER_UNKNOWN", result);
+        return unavailable(identity, requested, "TRANSACTION_TIMESTAMP_OR_ORDER_UNKNOWN", collector);
       }
+      const sourceReceipts = {
+        collector: collector.events,
+        timeBoundaries: timeEvidence.events
+      };
+      let payloadSha256;
+      try {
+        payloadSha256 = canonicalHistoryDigest(aggregateReceiptPayload(
+          collector, identitySnapshot(identity), requested, timeEvidence, sourceReceipts
+        ));
+      } catch {
+        return unavailable(identity, requested, "AGGREGATE_RECEIPT_INVALID", collector);
+      }
+      const receivedAt = Math.max(
+        collectorEvents.latestReceivedAt,
+        timeEvents.latestReceivedAt,
+        timeEvidence.receipt.receivedAt
+      );
+      const receipt = {
+        status: "SOURCE_BOUND",
+        id: `history-window:${payloadSha256.slice(0, 40)}`,
+        source: collector.source,
+        payloadSha256,
+        receivedAt
+      };
       return {
         status: "COMPLETE",
-        source: result.source,
-        sourceVersion: result.sourceVersion,
-        identity: {...identity},
+        source: collector.source,
+        sourceVersion: collector.sourceVersion,
+        identity: identitySnapshot(identity),
         requested,
-        slotInterval: {...slotInterval},
+        slotInterval: {...collector.slotInterval},
         transactions,
-        receipt: result.receipt,
-        sourceReceipts: result.events,
+        receipt,
+        sourceReceipts,
         coverage: {
           complete: true,
           truncated: false,
           cursorExhausted: true,
-          timeBoundaryCoverage: "PROVEN_BY_RECEIPTED_BLOCKTIME_FENCES",
+          timeBoundaryCoverage: "RECEIPTED_BLOCKTIME_FENCES",
           timestampBasis: "SOLANA_RPC_ESTIMATED_BLOCK_TIME_SECONDS",
-          sourceHistoryCompleteness: result.coverage.sourceHistoryCompleteness,
+          sourceHistoryCompleteness: collector.coverage.sourceHistoryCompleteness,
           sourceAuthentication: "NOT_ESTABLISHED",
           archivalRetention: "NOT_ESTABLISHED"
         },
