@@ -39,9 +39,13 @@ synthetic candidate and quote fixtures. It demonstrates authorization, an entry
 quote later than the candidate and authorization, a simulated fill with
 nonzero costs, then a later risk-only stop exit after the candidate source is
 exhausted, followed by a durable terminal receipt. The output includes the
-checkpoint directory and reportable receipt. The checkpoint uses the existing
-local fsync/readback contract; this does not establish cross-host or power-loss
-durability.
+checkpoint directory, reportable receipt, and `durableReadback`. Before
+returning success, the demo reopens the checkpoint through the store read API
+and checks canonical bytes, checkpoint hash and sequence, final `finishRun`
+record, command ID, and result digest against the terminal result. The
+integration test independently reopens that on-disk checkpoint and checks entry
+and exit costs as well. The checkpoint uses the existing local fsync/readback
+contract; this does not establish cross-host or power-loss durability.
 
 Focused tests:
 

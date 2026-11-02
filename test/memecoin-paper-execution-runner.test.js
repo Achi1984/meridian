@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
+import {rm} from "node:fs/promises";
 import test from "node:test";
-import {createPaperExecutionRunner} from "../scripts/memecoin-paper/execution-runner.mjs";
+import {CheckpointStore} from "../scripts/memecoin-paper/checkpoint-store.mjs";
+import {
+  createPaperExecutionRunner,
+  runOfflineDemo
+} from "../scripts/memecoin-paper/execution-runner.mjs";
 import {
   SYNTHETIC_SMART_WALLET_ALLOWLIST,
   SYNTHETIC_SOURCE,
@@ -158,6 +163,57 @@ test("offline lifecycle fills from a later synthetic quote and exits on a later 
   assert.ok(Object.values(entry.quote.costs).some(amount => amount > 0));
   assert.ok(report.terminalReceipt);
   assert.equal(report.terminalReceipt.sequence, calls.length);
+});
+
+test("offline demo durably reads back costs, stop exit, and terminal result", async () => {
+  const report = await runOfflineDemo();
+  let store;
+  try {
+    assert.equal(report.status, "FINISHED");
+    assert.equal(report.reason, "SOURCES_EXHAUSTED");
+    assert.equal(report.executionMode, "SIMULATED_ONLY");
+    assert.equal(report.provenance, SYNTHETIC_SOURCE);
+    assert.equal(report.realDataSourceCoverage, "NOT_ASSESSED");
+    assert.ok(report.operationResults.some(item => item.status === "FILLED_PAPER"));
+    assert.ok(report.operationResults.some(item => item.status === "CLOSED_PAPER"));
+    assert.equal(report.summary.openPositions.length, 0);
+    for (const kind of ["entry", "exit"]) {
+      const costs = report.summary.costs[kind];
+      assert.ok(costs);
+      assert.ok(Object.values(costs).reduce((sum, amount) => sum + BigInt(amount), 0n) > 0n);
+    }
+
+    store = await CheckpointStore.open(report.checkpointDirectory);
+    const readback = await store.readCheckpoint();
+    assert.equal(readback.status, "OK");
+    const checkpoint = JSON.parse(readback.bytes.toString("utf8"));
+    const finalRecord = checkpoint.records.at(-1);
+    const receipt = report.terminalReceipt;
+    assert.equal(readback.sequence, receipt.sequence);
+    assert.equal(readback.hash, receipt.hash);
+    assert.equal(checkpoint.sequence, receipt.sequence);
+    assert.equal(finalRecord.method, "finishRun");
+    assert.equal(finalRecord.commandId, report.terminalResult.commandId);
+    assert.equal(finalRecord.resultDigest, report.terminalResult.receipt.resultDigest);
+    assert.deepEqual(report.durableReadback, {
+      status: "OK",
+      sequence: readback.sequence,
+      hash: readback.hash,
+      method: finalRecord.method,
+      commandId: finalRecord.commandId,
+      resultDigest: finalRecord.resultDigest
+    });
+    const entryRecord = checkpoint.records.find(record => record.method === "executeEntry");
+    const exitRecord = checkpoint.records.find(record => record.method === "observeExitQuote");
+    for (const record of [entryRecord, exitRecord]) {
+      assert.ok(record);
+      assert.ok(Object.values(record.inputs.quote.costs)
+        .reduce((sum, amount) => sum + BigInt(amount), 0n) > 0n);
+    }
+  } finally {
+    await store?.close();
+    await rm(report.checkpointDirectory, {recursive: true, force: true});
+  }
 });
 
 test("missing hard-filter or analyst evidence blocks entry", async () => {

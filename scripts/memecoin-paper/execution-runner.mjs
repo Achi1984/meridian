@@ -636,7 +636,43 @@ export async function runOfflineDemo() {
       limits: {maxTicks: 8, maxCandidates: 2, maxQuotes: 8, maxOperations: 32}
     });
     const report = await runner.run();
-    return {...report, checkpointDirectory: directory};
+    const readback = await store.readCheckpoint();
+    if (readback.status !== "OK" || !Buffer.isBuffer(readback.bytes)) {
+      throw new Error("offline demo checkpoint readback is unavailable");
+    }
+    let checkpoint;
+    try {
+      checkpoint = JSON.parse(readback.bytes.toString("utf8"));
+    } catch {
+      throw new Error("offline demo checkpoint readback is invalid");
+    }
+    const canonicalBytes = canonicalCheckpointBytes(checkpoint);
+    const finalRecord = checkpoint.records?.at(-1);
+    const receipt = report.terminalReceipt;
+    const resultReceipt = report.terminalResult?.receipt;
+    const readbackHash = createHash("sha256").update(readback.bytes).digest("hex");
+    if (!canonicalBytes.equals(readback.bytes) || readbackHash !== readback.hash ||
+        !receipt || !resultReceipt || receipt.runId !== runId ||
+        resultReceipt.runId !== runId || receipt.sequence !== readback.sequence ||
+        receipt.sequence !== checkpoint.sequence || receipt.hash !== readback.hash ||
+        resultReceipt.hash !== readback.hash || receipt.resultDigest !== resultReceipt.resultDigest ||
+        finalRecord?.method !== "finishRun" || finalRecord.sequence !== receipt.sequence ||
+        finalRecord.commandId !== report.terminalResult.commandId ||
+        finalRecord.resultDigest !== receipt.resultDigest) {
+      throw new Error("offline demo terminal result does not match durable checkpoint readback");
+    }
+    return {
+      ...report,
+      checkpointDirectory: directory,
+      durableReadback: {
+        status: readback.status,
+        sequence: readback.sequence,
+        hash: readback.hash,
+        method: finalRecord.method,
+        commandId: finalRecord.commandId,
+        resultDigest: finalRecord.resultDigest
+      }
+    };
   } finally {
     await session?.close();
     if (!session) await store.close().catch(() => {});
