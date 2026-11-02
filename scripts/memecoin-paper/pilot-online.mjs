@@ -313,7 +313,16 @@ export async function readPilotStatus(dataDirectory) {
         terminal.runId !== lock.runId || terminal.configHash !== lock.configHash) {
       return {status: "UNKNOWN", reason: "terminal marker does not bind the durable run lock"};
     }
-    return terminal;
+    if (!validTerminalFailureEvidence(terminal)) {
+      return {status: "UNKNOWN", failureCode: "UNKNOWN",
+        reason: "terminal failure evidence is missing, invalid, or inconsistent"};
+    }
+    const failureCode = terminalFailureEvidence(terminal);
+    return {
+      ...terminal,
+      status: terminal.status === "FINISHED" && failureCode !== null ? "UNKNOWN" : terminal.status,
+      failureCode
+    };
   }
   return {
     status: "UNKNOWN",
@@ -393,7 +402,8 @@ export async function readPilotReport(dataDirectory) {
        audit.terminal.runStatus !== status.status ||
        audit.terminal.controllerStatus !==
          (status.controllerStatus === "NOT_STARTED" ? null : status.controllerStatus ?? null) ||
-       audit.terminal.stopReason !== (status.stopReason ?? null))) {
+       audit.terminal.stopReason !== (status.stopReason ?? null) ||
+       audit.terminal.failureCode !== terminalFailureEvidence(status))) {
     return {status: "UNKNOWN", reason: "observation audit does not match the durable terminal run state"};
   }
   if (audit?.state === "TERMINAL" && !hasTerminalMarker) {
@@ -461,6 +471,7 @@ export async function readPilotReport(dataDirectory) {
   let reportValid = false;
   try {
     const accounting = report?.observation?.providerAccounting;
+    const failureCode = terminalFailureEvidence(status);
     reportValid = report?.runId === status.runId && report.configHash === status.configHash &&
       isRecord(report.dto?.experiment) &&
       report.dto.experiment.source === "READ_ONLY_PAPER_CHECKPOINT" &&
@@ -468,6 +479,7 @@ export async function readPilotReport(dataDirectory) {
       report.dto.experiment.sourceProvenance === "CALLER_LABEL_ONLY_NOT_AUTHENTICATED" &&
       isRecord(accounting) && isRecord(status.providerAccounting) &&
       canonicalJson(accounting) === canonicalJson(status.providerAccounting) &&
+      report.observation.failureCode === failureCode &&
       report.observation.entryAuthorizations === 0 &&
       report.observation.simulatedFills === 0 &&
       report.observation.executableQuoteAndCostEvidence === "UNAVAILABLE";
@@ -635,6 +647,46 @@ function summaryCode(value) {
   return typeof value === "string" && /^[A-Z0-9_:-]{1,80}$/.test(value) ? value : "UNKNOWN";
 }
 
+function validFailureCode(value) {
+  return typeof value === "string" &&
+    (/^[A-Z0-9_:-]{1,80}$/.test(value) || /^[A-Za-z0-9_]{1,48}$/.test(value));
+}
+
+function validTerminalFailureEvidence(terminal) {
+  return terminal?.observation?.failureCode === terminal?.failureCode &&
+    (validFailureCode(terminal?.failureCode) ||
+      (terminal?.status === "FINISHED" && terminal?.failureCode === null));
+}
+
+function terminalFailureEvidence(terminal) {
+  return validTerminalFailureEvidence(terminal) ? terminal.failureCode : "UNKNOWN";
+}
+
+function failureCodeEvidence(failureCode, controllerSummary) {
+  if (failureCode !== null && failureCode !== undefined) {
+    return validFailureCode(failureCode) ? failureCode : "UNKNOWN";
+  }
+  if (controllerSummary?.failureCode !== null && controllerSummary?.failureCode !== undefined) {
+    return validFailureCode(controllerSummary.failureCode) ? controllerSummary.failureCode : "UNKNOWN";
+  }
+  return controllerSummary?.status === "FINISHED" ? null : "UNKNOWN";
+}
+
+function caughtFailureCode(failureCode, error) {
+  let caughtCode = null;
+  try {
+    const code = error?.code;
+    if (validFailureCode(code) && code !== "UNKNOWN") caughtCode = code;
+  } catch {
+    // Ignore unavailable error diagnostics and retain bounded evidence.
+  }
+  if (failureCode !== null && failureCode !== undefined &&
+      failureCode !== "UNKNOWN" && validFailureCode(failureCode)) {
+    return failureCode;
+  }
+  return caughtCode ?? (failureCode === "UNKNOWN" ? "UNKNOWN" : "PILOT_RUN_BLOCKED");
+}
+
 async function persistReport(assembly, paths, input, identity, observation) {
   const dto = assembly.projectOperatorReport(input);
   if (!isRecord(dto?.experiment) || dto.experiment.source !== "READ_ONLY_PAPER_CHECKPOINT" ||
@@ -792,7 +844,9 @@ export function createPilotOnline(options = {}) {
       } catch {
         auditPersistenceStatus = "FAILED";
         auditFailureCode = "OBSERVATION_AUDIT_WRITE_FAILED";
-        failureCode ??= auditFailureCode;
+        if (failureCode === null || failureCode === undefined || failureCode === "UNKNOWN") {
+          failureCode = auditFailureCode;
+        }
         observations.failureCode = failureCode;
         reportStatus = "UNKNOWN";
         return false;
@@ -1113,15 +1167,17 @@ export function createPilotOnline(options = {}) {
         return {
           status: "UNKNOWN",
           runId: config.runId,
+          failureCode,
           reason: "underlying callback work did not settle within the configured bound; session remains open and restart is forbidden"
         };
       }
+      failureCode = failureCodeEvidence(failureCode, controllerSummary);
       if (!controllerReportObserved && controllerSummary?.status === "FINISHED") {
         failureCode ??= "CONTROLLER_REPORT_CALLBACK_MISSING";
       }
       observations.controllerStatus = summaryCode(controllerSummary?.status);
       observations.stopReason = summaryCode(controllerSummary?.reason);
-      observations.failureCode = summaryCode(failureCode ?? controllerSummary?.failureCode);
+      observations.failureCode = failureCodeEvidence(failureCode, controllerSummary);
       if (isRecord(controllerSummary?.positionEvidence)) {
         observations.controllerPositionEvidence = {
           status: summaryCode(controllerSummary.positionEvidence.status),
@@ -1180,6 +1236,8 @@ export function createPilotOnline(options = {}) {
       } else if (controllerSummary?.status === "FINISHED" && !failureCode) {
         failureCode = "CONTROLLER_CHECKPOINT_ACK_UNBOUND";
       }
+      observations.failureCode = failureCodeEvidence(failureCode, controllerSummary);
+      failureCode = observations.failureCode;
       const finalHead = await verifyCheckpoint(session, store);
       if (finalHead.metadata.sequence !== receipts.length) {
         throw new Error("terminal checkpoint sequence does not match retained durable receipts");
@@ -1194,10 +1252,11 @@ export function createPilotOnline(options = {}) {
       reportStatus = "PROJECTED";
       reportTradingStatus = projected.dto?.trading?.status ?? "UNKNOWN";
     } catch (error) {
-      failureCode ??= typeof error?.code === "string" ? error.code : "PILOT_RUN_BLOCKED";
+      failureCode = caughtFailureCode(failureCode, error);
+      failureCode = failureCodeEvidence(failureCode, controllerSummary);
       observations.controllerStatus = summaryCode(controllerSummary?.status);
       observations.stopReason = summaryCode(controllerSummary?.reason);
-      observations.failureCode = summaryCode(failureCode ?? controllerSummary?.failureCode);
+      observations.failureCode = failureCode;
       if (!lockCreated) throw error;
       if (callbackWork.size > 0) {
         control?.stop();
@@ -1209,6 +1268,7 @@ export function createPilotOnline(options = {}) {
         return {
           status: "UNKNOWN",
           runId: config.runId,
+          failureCode,
           reason: "underlying callback work did not settle within the configured bound; session remains open and restart is forbidden"
         };
       }
@@ -1237,6 +1297,8 @@ export function createPilotOnline(options = {}) {
       }
     }
     if (lockCreated) {
+      failureCode = failureCodeEvidence(failureCode, controllerSummary);
+      observations.failureCode = failureCode;
       let terminalStatus = failureCode || controllerSummary?.status !== "FINISHED"
         ? "UNKNOWN" : "FINISHED";
       if (audit) {
