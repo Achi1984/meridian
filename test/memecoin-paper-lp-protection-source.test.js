@@ -349,6 +349,175 @@ test("pre-aborted collection sends no request", async () => {
   assert.equal(calls, 0);
 });
 
+test("reader cleanup never blocks cancellation or timeout", async t => {
+  for (const behavior of ["never settles", "rejects", "throws"]) {
+    await t.test(`reader cancel ${behavior}`, async () => {
+      const controller = new AbortController();
+      let cancelCalls = 0;
+      const response = {
+        status: 200,
+        headers: {get: name => name === "content-type" ? "application/json" : null},
+        body: {
+          getReader: () => ({
+            read: () => new Promise(() => {}),
+            cancel: () => {
+              cancelCalls += 1;
+              if (behavior === "never settles") return new Promise(() => {});
+              if (behavior === "rejects") return Promise.reject(new Error("cancel failed"));
+              throw new Error("cancel failed");
+            },
+            releaseLock() {}
+          })
+        }
+      };
+      const pending = collectLpProtectionSource({
+        identity: IDENTITY,
+        poolProof: poolProof(),
+        enabled: true,
+        transport: async () => response,
+        clock: () => NOW,
+        holdUntil: HOLD_UNTIL,
+        signal: controller.signal
+      });
+      const abortTimer = setTimeout(() => controller.abort(), 10);
+      try {
+        const result = await Promise.race([
+          pending,
+          new Promise((_, reject) => setTimeout(
+            () => reject(new Error("reader cleanup exceeded abort deadline")),
+            300
+          ))
+        ]);
+        assert.equal(result.reasonCode, "CANCELLED");
+        assert.equal(cancelCalls, 1);
+      } finally {
+        clearTimeout(abortTimer);
+      }
+    });
+  }
+
+  await t.test("request timeout is not extended by a never-settling cancel", async () => {
+    let cancelCalls = 0;
+    const response = {
+      status: 200,
+      headers: {get: name => name === "content-type" ? "application/json" : null},
+      body: {
+        getReader: () => ({
+          read: () => new Promise(() => {}),
+          cancel: () => {
+            cancelCalls += 1;
+            return new Promise(() => {});
+          },
+          releaseLock() {}
+        })
+      }
+    };
+    const result = await Promise.race([
+      collectLpProtectionSource({
+        identity: IDENTITY,
+        poolProof: poolProof(),
+        enabled: true,
+        transport: async () => response,
+        clock: () => NOW,
+        holdUntil: HOLD_UNTIL
+      }),
+      new Promise((_, reject) => setTimeout(
+        () => reject(new Error("request timeout was extended by stream cleanup")),
+        5_500
+      ))
+    ]);
+    assert.equal(result.reasonCode, "TIMEOUT");
+    assert.equal(cancelCalls, 1);
+  });
+});
+
+test("a response body arriving after cancellation is discarded without waiting", async () => {
+  const controller = new AbortController();
+  let resolveResponse;
+  let cancelBody;
+  const bodyCancelled = new Promise(resolve => { cancelBody = resolve; });
+  const response = new Response(new ReadableStream({
+    cancel() {
+      cancelBody();
+      return new Promise(() => {});
+    }
+  }), {
+    status: 200,
+    headers: {"content-type": "application/json"}
+  });
+  const pending = collectLpProtectionSource({
+    identity: IDENTITY,
+    poolProof: poolProof(),
+    enabled: true,
+    transport: (_request, {signal}) => {
+      const delayed = new Promise(resolve => { resolveResponse = resolve; });
+      signal.addEventListener("abort", () => {
+        setTimeout(() => resolveResponse(response), 10);
+      }, {once: true});
+      return delayed;
+    },
+    clock: () => NOW,
+    holdUntil: HOLD_UNTIL,
+    signal: controller.signal
+  });
+  const abortTimer = setTimeout(() => controller.abort(), 10);
+  try {
+    const result = await pending;
+    assert.equal(result.reasonCode, "CANCELLED");
+    await Promise.race([
+      bodyCancelled,
+      new Promise((_, reject) => setTimeout(
+        () => reject(new Error("late response body was not discarded")),
+        300
+      ))
+    ]);
+  } finally {
+    clearTimeout(abortTimer);
+  }
+});
+
+test("injected clock observations and pool-proof chronology are monotonic", async t => {
+  await t.test("backward receipt observation is invalid", async () => {
+    const proof = poolProof();
+    const built = transportFor({proof, accounts: [tokenAccount()]});
+    const observations = [NOW, NOW, NOW, NOW - 1_000];
+    const result = await collectLpProtectionSource({
+      identity: IDENTITY,
+      poolProof: proof,
+      enabled: true,
+      transport: built.transport,
+      clock: () => observations.shift() ?? NOW,
+      holdUntil: HOLD_UNTIL
+    });
+    assert.equal(result.status, "UNKNOWN");
+    assert.equal(result.reasonCode, "INVALID_CLOCK");
+    assert.equal(result.counters.requests, 1);
+  });
+
+  await t.test("pool proof observed after collection start is invalid", async () => {
+    const proof = poolProof();
+    proof.observedAt = NOW + 1;
+    let calls = 0;
+    const result = await collectLpProtectionSource({
+      identity: IDENTITY,
+      poolProof: proof,
+      enabled: true,
+      transport: () => { calls += 1; },
+      clock: () => NOW,
+      holdUntil: HOLD_UNTIL
+    });
+    assert.equal(result.status, "UNKNOWN");
+    assert.equal(result.reasonCode, "INVALID_CLOCK");
+    assert.equal(calls, 0);
+  });
+
+  await t.test("an earlier pool-proof observation remains valid", async () => {
+    const proof = poolProof({observedAt: NOW - 1});
+    const {result} = await collect({proof, accounts: [tokenAccount()]});
+    assert.equal(result.status, "MEASURED_UNVERIFIED");
+  });
+});
+
 test("HTTP errors and foreign response URLs stop without retries", async t => {
   await t.test("HTTP 429", async () => {
     let calls = 0;

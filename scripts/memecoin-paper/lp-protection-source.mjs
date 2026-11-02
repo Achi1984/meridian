@@ -294,6 +294,19 @@ async function raceWithAbort(promise, signal) {
   }
 }
 
+function cleanupWithoutWaiting(operation) {
+  let pending;
+  try { pending = operation(); } catch { return; }
+  Promise.resolve(pending).catch(() => {});
+}
+
+function cancelResponseBody(response) {
+  try {
+    const body = response?.body;
+    if (typeof body?.cancel === "function") cleanupWithoutWaiting(() => body.cancel());
+  } catch {}
+}
+
 async function readBody(response, {signal, maxBytes, consumeBytes}) {
   if (!response?.body || typeof response.body.getReader !== "function") {
     throw failure("RESPONSE_STREAM_MISSING");
@@ -312,10 +325,10 @@ async function readBody(response, {signal, maxBytes, consumeBytes}) {
       chunks.push(Buffer.from(value));
     }
   } catch (error) {
-    await reader.cancel().catch(() => {});
+    cleanupWithoutWaiting(() => reader.cancel());
     throw error;
   } finally {
-    reader.releaseLock();
+    try { reader.releaseLock(); } catch {}
   }
   return Buffer.concat(chunks, total);
 }
@@ -337,12 +350,24 @@ async function requestJson(method, params, id, {
   const parentAbort = () => controller.abort();
   signal?.addEventListener("abort", parentAbort, {once: true});
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  let response = null;
+  let responseBodyRead = false;
+  let requestAborted = false;
+  const onRequestAbort = () => { requestAborted = true; };
+  controller.signal.addEventListener("abort", onRequestAbort, {once: true});
+  const pendingResponse = Promise.resolve().then(() => transport(request, {
+    signal: controller.signal,
+    redirect: "error",
+    credentials: "omit"
+  }));
+  pendingResponse.then(
+    lateResponse => {
+      if (requestAborted) cancelResponseBody(lateResponse);
+    },
+    () => {}
+  );
   try {
-    const response = await raceWithAbort(Promise.resolve(transport(request, {
-      signal: controller.signal,
-      redirect: "error",
-      credentials: "omit"
-    })), controller.signal);
+    response = await raceWithAbort(pendingResponse, controller.signal);
     if (controller.signal.aborted) throw failure(signal?.aborted ? "CANCELLED" : "TIMEOUT");
     if (response?.redirected === true || (response?.url && (() => {
       let returned;
@@ -367,6 +392,7 @@ async function requestJson(method, params, id, {
       maxBytes: MAX_RESPONSE_BYTES,
       consumeBytes
     });
+    responseBodyRead = true;
     let payload;
     try { payload = JSON.parse(new TextDecoder("utf-8", {fatal: true}).decode(bytes)); } catch {
       throw failure("RESPONSE_JSON_INVALID");
@@ -388,6 +414,8 @@ async function requestJson(method, params, id, {
   } finally {
     clearTimeout(timeout);
     signal?.removeEventListener("abort", parentAbort);
+    controller.signal.removeEventListener("abort", onRequestAbort);
+    if (response && !responseBodyRead) cancelResponseBody(response);
   }
 }
 
@@ -455,6 +483,17 @@ export async function collectLpProtectionSource({
     return unknownResult(identity, "LOCAL_CLOCK_INVALID", events, counters);
   }
   if (!validTime(started)) return unknownResult(identity, "LOCAL_CLOCK_INVALID", events, counters);
+  let lastClockObservation = started;
+  const observeClock = minimum => {
+    let observed;
+    try { observed = clock(); } catch { throw failure("INVALID_CLOCK"); }
+    if (!validTime(observed) || observed < lastClockObservation ||
+        (minimum !== undefined && observed < minimum)) {
+      throw failure("INVALID_CLOCK");
+    }
+    lastClockObservation = observed;
+    return observed;
+  };
   const startedMonotonicAt = performance.now();
   const consumeBytes = bytes => {
     counters.bytes += bytes;
@@ -462,8 +501,8 @@ export async function collectLpProtectionSource({
   };
   const request = async (method, params) => {
     if (signal?.aborted) throw failure("CANCELLED");
-    const requestAt = clock();
-    if (counters.requests >= 2 || !validTime(requestAt) ||
+    const requestAt = observeClock(poolProof?.observedAt);
+    if (counters.requests >= 2 ||
         requestAt - started > MAX_DURATION_MS ||
         performance.now() - startedMonotonicAt > MAX_DURATION_MS) {
       throw failure("TIMEOUT");
@@ -477,8 +516,8 @@ export async function collectLpProtectionSource({
       timeoutMs: MAX_REQUEST_MS,
       consumeBytes
     });
-    const receivedAt = clock();
-    if (!validTime(receivedAt) || receivedAt < requestAt || receivedAt - started > MAX_DURATION_MS ||
+    const receivedAt = observeClock(requestAt);
+    if (receivedAt - started > MAX_DURATION_MS ||
         performance.now() - startedMonotonicAt > MAX_DURATION_MS) {
       throw failure("TIMEOUT");
     }
@@ -497,8 +536,10 @@ export async function collectLpProtectionSource({
   };
 
   try {
-    const now = clock();
-    if (!validTime(now)) throw failure("LOCAL_CLOCK_INVALID");
+    if (validTime(poolProof?.observedAt) && poolProof.observedAt > started) {
+      throw failure("INVALID_CLOCK");
+    }
+    const now = observeClock(poolProof?.observedAt);
     const {lpMint, supply: proofSupply, denominator} = validatePoolProof(poolProof, identity, now);
     if (!validTime(holdUntil) || holdUntil <= now) throw failure("HOLD_WINDOW_INVALID");
     const supplyResult = await request("getTokenSupply", [
