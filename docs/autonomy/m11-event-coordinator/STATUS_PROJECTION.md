@@ -85,11 +85,16 @@ Owner-decision fields are false/null; no retry or dispatch advice is inferred.
 | Stored source condition | Task state | Fixed explanatory task label |
 | --- | --- | --- |
 | `COMMITTED` and `RECEIPT_DELIVERED` | `DONE` | Stored receipt cycle completed; not runtime completion |
-| `REVIEWED` and completion `REVISION_REQUIRED` | `BLOCKED` | Stored review requires revision; not a current runtime assessment |
+| `REVIEWED` at `REVIEW_RESULT` with completion `REVISION_REQUIRED` | `BLOCKED` | Stored review requires revision; not a current runtime assessment |
+| `REVIEWED` and `RECEIPT_PREPARING` | `UNKNOWN` | Stored receipt preparation; publication unconfirmed |
+| `RECEIPT_POSTING` and `RECEIPT_POSTING` | `UNKNOWN` | Stored receipt posting fence; delivery unconfirmed |
+| `UNKNOWN` and `RECEIPT_DELIVERY_UNKNOWN` | `UNKNOWN` | Stored receipt delivery outcome unknown; no retry authority |
 | Every other state/stage | `UNKNOWN` | Stored operation state; current runtime unknown |
 
 `DONE` describes the stored receipt cycle only, even when the cycle's verdict
 requires revision. `RUNNING`, `REVIEWING`, and `ACTIVE` are never emitted.
+Receipt-stage labels only distinguish persisted recovery boundaries; they do not
+change task state, evidence, freshness, or the non-actionable next action.
 
 ## Bounds and diagnostics
 
