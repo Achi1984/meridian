@@ -7,6 +7,7 @@ const SAFE_ID = /^[A-Za-z0-9._:-]{1,120}$/;
 const MAX_RECORDS = 10_000;
 const MAX_EVENTS = 10_000;
 const WINDOW_MS = 8 * 60 * 60 * 1000;
+const MAX_TIMESTAMP_MS = 8_640_000_000_000_000;
 const COSTS = ["feeCents", "spreadCents", "slippageCents", "priceImpactCents", "networkCents"];
 const SCHEMAS = {
   authorizeEntry: ["eventId", "tickId", "candidate", "smartWalletAllowlist", "now", "marks"],
@@ -125,7 +126,7 @@ export function createPaperExecutionStep({session, store, runId, startedAt, endA
   let inputBytes = 0;
   let commands = 0;
   const finishInputReserve = canonicalCheckpointBytes({
-    eventId: "x".repeat(120), now: startedAt + WINDOW_MS, marks: []
+    eventId: "x".repeat(120), now: MAX_TIMESTAMP_MS, marks: []
   }).length;
   const events = new Map();
   const authorizations = new Map();
@@ -165,7 +166,7 @@ export function createPaperExecutionStep({session, store, runId, startedAt, endA
       state = "STOPPED";
       return reject("deadline reached; finish explicitly with observed marks");
     }
-    if (input.now > startedAt + WINDOW_MS) {
+    if (method !== "finishRun" && input.now > startedAt + WINDOW_MS) {
       state = "STOPPED";
       return reject("fixed eight-hour deadline exceeded");
     }
@@ -233,7 +234,7 @@ export function createPaperExecutionStep({session, store, runId, startedAt, endA
     const candidate = {...checkpoint, sequence: record.sequence, records: [...checkpoint.records, record]};
     const finishReserve = final ? 0 : canonicalCheckpointBytes({
       ...record, commandId: `step:${"0".repeat(64)}`, method: "finishRun",
-      inputs: {now: endAt, marks: [], startedAt}, runStart: startedAt
+      inputs: {now: MAX_TIMESTAMP_MS, marks: [], startedAt}, runStart: startedAt
     }).length + 64;
     if (canonicalCheckpointBytes(candidate).length + finishReserve > bounds.maxBytes) {
       return reject("checkpoint byte capacity reached before dispatch");

@@ -888,6 +888,33 @@ test("eight-hour report stops new work and leaves open positions explicitly unre
   assert.equal(PaperLedger.restartDisposition().entriesAllowed, false);
 });
 
+test("delayed terminal accounting uses actual time once and leaves unmarked positions open", () => {
+  const startedAt = Date.now();
+  const candidate = syntheticCandidate(startedAt);
+  const ledger = new PaperLedger({now: startedAt});
+  const auth = authorize(ledger, candidate, startedAt);
+  ledger.executeEntry(auth, fillQuote(candidate, startedAt), {now: startedAt + 2000});
+
+  const finishedAt = startedAt + EIGHT_HOURS + 60_000;
+  const report = ledger.finishRun({startedAt, now: finishedAt, marks: []});
+  assert.equal(report.status, "FINISHED");
+  assert.equal(report.elapsedMs, EIGHT_HOURS + 60_000);
+  assert.equal(report.equityCents, null);
+  assert.deepEqual(report.openPositions, [{
+    mint: candidate.mint,
+    markStatus: "VALUATION_UNAVAILABLE"
+  }]);
+  assert.equal(ledger.summary().openPositions.length, 1);
+  assert.equal(ledger.auditEvents().at(-1).observedAt, new Date(finishedAt).toISOString());
+  assert.equal(ledger.auditEvents().filter(event => event.type === "PAPER_EXIT").length, 0);
+
+  const repeated = ledger.finishRun({startedAt, now: finishedAt + 1000, marks: []});
+  assert.equal(repeated.status, "REJECT");
+  assert.equal(repeated.reason, "run already finished");
+  assert.equal(ledger.auditEvents().filter(event => event.type === "RUN_FINISHED").length, 1);
+  assert.equal(ledger.summary().openPositions.length, 1);
+});
+
 test("audit output is bounded and removes URLs/control characters from hostile fields", () => {
   const logger = new AuditLogger({maxEvents: 1, maxTextLength: 40});
   assert.equal(logger.record({reason: "hostile\u0000 https://token.example/path?secret=x"}), true);
