@@ -88,7 +88,7 @@ function parseArtifact(input, name) {
   const bytes = copied.bytes;
   const digest = sha256(bytes);
   try {
-    const text = new TextDecoder("utf-8", {fatal: true}).decode(bytes);
+    const text = new TextDecoder("utf-8", {fatal: true, ignoreBOM: true}).decode(bytes);
     const value = JSON.parse(text);
     if (!isRecord(value) || canonicalJson(value) !== text) {
       throw new TypeError("artifact must be a canonical JSON object");
@@ -252,6 +252,10 @@ function candidateCoverageStatus(report, config) {
     return makeCriterion("candidate_detail_coverage", "FAIL",
       "Candidate detail counters contradict their reported totals.");
   }
+  if (coverage.unaccounted !== coverage.total - coverage.observedTotal) {
+    return makeCriterion("candidate_detail_coverage", "FAIL",
+      "Candidate unaccounted count does not reconcile to the source and observed totals.");
+  }
   if (coverage.displayed !== details.length) {
     return makeCriterion("candidate_detail_coverage", "FAIL",
       "Displayed candidate count does not match the supplied detail rows.");
@@ -312,6 +316,22 @@ function candidateCoverageStatus(report, config) {
     return makeCriterion("candidate_detail_coverage", "FAIL",
       "One or more candidate or rejection-reason rows are malformed.");
   }
+  const rowCounts = {
+    accepted: details.filter(row => row.status === "ACCEPTED").length,
+    rejected: details.filter(row => row.status === "REJECT").length,
+    unknown: details.filter(row => row.status === "UNKNOWN").length
+  };
+  if (Object.keys(rowCounts).some(key =>
+    Number.isSafeInteger(summary?.[key]) && rowCounts[key] > summary[key])) {
+    return makeCriterion("candidate_detail_coverage", "FAIL",
+      "Candidate detail outcomes exceed their matching summary counts.");
+  }
+  if (["accepted", "rejected", "unknown"].every(key =>
+    Number.isSafeInteger(summary?.[key])) &&
+      summary.accepted + summary.rejected + summary.unknown !== coverage.observedTotal) {
+    return makeCriterion("candidate_detail_coverage", "FAIL",
+      "Candidate outcome counts do not reconcile to the observed detail total.");
+  }
   if (details.some(candidate => candidate.sampledAt !== null) && !config) {
     return makeCriterion("candidate_detail_coverage", "UNKNOWN",
       "Candidate sample timestamps cannot be checked without validated run bounds.");
@@ -368,6 +388,50 @@ function candidateCoverageStatus(report, config) {
   }
   return makeCriterion("candidate_detail_coverage", "PASS",
     "Candidate detail coverage is complete according to the supplied report.");
+}
+
+function unresolvedExecutionStatus(report) {
+  const rows = report?.dto?.unresolvedFills;
+  const coverage = report?.dto?.unresolvedFillsCoverage;
+  if (!Array.isArray(rows) || !isRecord(coverage)) {
+    return makeCriterion("unresolved_execution_attempts", "UNKNOWN",
+      "Unresolved execution-attempt evidence is unavailable.");
+  }
+  const counts = ["observedTotal", "total", "displayed", "unaccounted"]
+    .map(key => coverage[key]);
+  if (counts.some(value => value !== null && value !== undefined &&
+      (!Number.isSafeInteger(value) || value < 0)) ||
+      typeof coverage.displayTruncated !== "boolean" ||
+      typeof coverage.sourceTruncated !== "boolean") {
+    return makeCriterion("unresolved_execution_attempts", "FAIL",
+      "Unresolved execution-attempt coverage counters are malformed.");
+  }
+  if (coverage.displayed !== rows.length ||
+      Number.isSafeInteger(coverage.observedTotal) && coverage.observedTotal < rows.length ||
+      Number.isSafeInteger(coverage.total) &&
+        Number.isSafeInteger(coverage.observedTotal) &&
+        coverage.total < coverage.observedTotal ||
+      Number.isSafeInteger(coverage.unaccounted) &&
+        Number.isSafeInteger(coverage.total) &&
+        coverage.unaccounted > coverage.total ||
+      Number.isSafeInteger(coverage.unaccounted) &&
+        Number.isSafeInteger(coverage.total) &&
+        Number.isSafeInteger(coverage.observedTotal) &&
+        coverage.unaccounted !== coverage.total - coverage.observedTotal) {
+    return makeCriterion("unresolved_execution_attempts", "FAIL",
+      "Unresolved execution-attempt details contradict their coverage counters.");
+  }
+  if (rows.length > 0 || counts.some(value => Number.isSafeInteger(value) && value > 0)) {
+    return makeCriterion("unresolved_execution_attempts", "FAIL",
+      "One or more unresolved execution attempts are recorded.");
+  }
+  if (counts.every(value => value === 0) &&
+      coverage.displayTruncated === false && coverage.sourceTruncated === false) {
+    return makeCriterion("unresolved_execution_attempts", "PASS",
+      "The report establishes zero unresolved execution attempts.");
+  }
+  return makeCriterion("unresolved_execution_attempts", "UNKNOWN",
+    "Unresolved execution-attempt coverage is incomplete or unavailable.");
 }
 
 function providerAccountingStatus(terminal, report, config) {
@@ -828,7 +892,7 @@ function failureCodeStatus(terminal, report) {
     "No failure code is recorded across the terminal and report.");
 }
 
-function terminalStatus(terminal, report, checkpointCoverage) {
+function terminalStatus(terminal, report, checkpointCoverage, candidateCoverage, executionAttempts) {
   const failureCodes = terminal ? failureCodeStatus(terminal, report) : null;
   if (failureCodes?.status === "FAIL") return failureCodes;
   if (!terminal) {
@@ -964,6 +1028,18 @@ function terminalStatus(terminal, report, checkpointCoverage) {
         ? `Checkpoint audit coverage is contradictory: ${checkpointCoverage.reason}`
         : `Checkpoint audit coverage is incomplete: ${checkpointCoverage.reason}`);
   }
+  if (candidateCoverage.status !== "PASS") {
+    return makeCriterion("terminal_completion", candidateCoverage.status,
+      candidateCoverage.status === "FAIL"
+        ? `Candidate evidence is contradictory: ${candidateCoverage.reason}`
+        : `Candidate evidence is incomplete: ${candidateCoverage.reason}`);
+  }
+  if (executionAttempts.status !== "PASS") {
+    return makeCriterion("terminal_completion", executionAttempts.status,
+      executionAttempts.status === "FAIL"
+        ? `Unresolved execution-attempt evidence conflicts with completion: ${executionAttempts.reason}`
+        : `Unresolved execution-attempt evidence is incomplete: ${executionAttempts.reason}`);
+  }
   return makeCriterion("terminal_completion", "PASS",
     terminal.stopReason === "DEADLINE"
       ? "Run finished at its deadline without an observed execution path."
@@ -994,17 +1070,26 @@ function evaluateCriteria(expectedRunId, expectedConfigHash, artifacts) {
       ? makeCriterion("operator_report", "FAIL", artifacts.report.reason)
       : reportStatus(artifacts.report.value, expectedRunId, configHash);
   const report = artifacts.report.status === "VALID" ? artifacts.report.value : null;
+  const terminal = artifacts.terminal.status === "VALID" ? artifacts.terminal.value : null;
+  const config = artifacts.config.status === "VALID" ? artifacts.config.value : null;
   const checkpoint = artifacts.report.status === "VALID"
     ? coverageStatus(report)
     : makeCriterion("checkpoint_audit_coverage", "UNKNOWN",
       "Checkpoint audit coverage cannot be assessed without a valid operator report.");
-  const terminal = artifacts.terminal.status === "VALID" ? artifacts.terminal.value : null;
-  const config = artifacts.config.status === "VALID" ? artifacts.config.value : null;
+  const candidates = artifacts.report.status === "VALID"
+    ? candidateCoverageStatus(report,
+      config && validConfig(config, expectedRunId) ? config : null)
+    : makeCriterion("candidate_detail_coverage", "UNKNOWN",
+      "Candidate detail coverage cannot be assessed without a valid operator report.");
+  const executionAttempts = artifacts.report.status === "VALID"
+    ? unresolvedExecutionStatus(report)
+    : makeCriterion("unresolved_execution_attempts", "UNKNOWN",
+      "Unresolved execution attempts cannot be assessed without a valid operator report.");
   const terminalCheck = artifacts.terminal.status === "MISSING"
     ? makeCriterion("terminal_completion", "UNKNOWN", "No terminal marker was supplied.")
     : artifacts.terminal.status === "INVALID"
       ? makeCriterion("terminal_completion", "FAIL", artifacts.terminal.reason)
-    : terminalStatus(terminal, report, checkpoint);
+    : terminalStatus(terminal, report, checkpoint, candidates, executionAttempts);
   const duration = config && validConfig(config, expectedRunId) && terminal && report
     ? evaluateDuration(config, terminal, report)
     : {
@@ -1014,11 +1099,6 @@ function evaluateCriteria(expectedRunId, expectedConfigHash, artifacts) {
       scheduledMs: EIGHT_HOURS_MS,
       evidencedMs: null
     };
-  const candidates = artifacts.report.status === "VALID"
-    ? candidateCoverageStatus(report,
-      config && validConfig(config, expectedRunId) ? config : null)
-    : makeCriterion("candidate_detail_coverage", "UNKNOWN",
-      "Candidate detail coverage cannot be assessed without a valid operator report.");
   const accounting = artifacts.terminal.status === "VALID" && artifacts.report.status === "VALID"
     ? providerAccountingStatus(terminal, report, config)
     : makeCriterion("provider_accounting", "UNKNOWN",
@@ -1032,6 +1112,9 @@ function evaluateCriteria(expectedRunId, expectedConfigHash, artifacts) {
   const boundAccounting = boundCriterion(accounting, "provider accounting");
   const boundCheckpoint = boundCriterion(checkpoint, "checkpoint audit coverage");
   const boundCandidates = boundCriterion(candidates, "candidate detail coverage");
+  const boundExecutionAttempts = boundCriterion(
+    executionAttempts, "unresolved execution attempts"
+  );
   const criteria = [
     makeCriterion("artifact_integrity", artifactStatus(artifacts),
       artifactStatus(artifacts) === "PASS"
@@ -1046,6 +1129,7 @@ function evaluateCriteria(expectedRunId, expectedConfigHash, artifacts) {
     boundAccounting,
     boundCheckpoint,
     boundCandidates,
+    boundExecutionAttempts,
     makeCriterion("time_series_coverage", "UNKNOWN",
       "No time-series samples were supplied; uptime and gaps are unavailable."),
     makeCriterion("clock_provenance", "UNKNOWN",
@@ -1059,7 +1143,8 @@ function evaluateCriteria(expectedRunId, expectedConfigHash, artifacts) {
     criteria.some(item => item.status === "UNKNOWN") ? "UNKNOWN" : "PASS";
   return {
     criteria, status, identity, reportCheck, terminalCheck: boundTerminalCheck, duration,
-    accounting: boundAccounting, checkpoint: boundCheckpoint, candidates: boundCandidates
+    accounting: boundAccounting, checkpoint: boundCheckpoint, candidates: boundCandidates,
+    executionAttempts: boundExecutionAttempts
   };
 }
 
@@ -1084,11 +1169,14 @@ export function evaluateObservation({
   const duration = evaluation.duration;
   const completionEvidenceBound = evaluation.identity.status === "PASS" &&
     evaluation.reportCheck.status === "PASS";
+  const acceptedEarlyStop = duration.completionMode === "OPERATOR_STOP" &&
+    duration.criterion.status === "UNKNOWN";
   const completionStatus = !completionEvidenceBound ? "UNKNOWN" :
     evaluation.terminalCheck.status !== "PASS" ? evaluation.terminalCheck.status :
       evaluation.accounting.status === "FAIL" ? "FAIL" :
         evaluation.accounting.status !== "PASS" ? "UNKNOWN" :
-          duration.criterion.status === "FAIL" ? "FAIL" : "PASS";
+          duration.criterion.status === "FAIL" ? "FAIL" :
+            duration.criterion.status !== "PASS" && !acceptedEarlyStop ? "UNKNOWN" : "PASS";
   const completionMode = completionEvidenceBound && evaluation.terminalCheck.status === "PASS"
     ? duration.completionMode : "UNKNOWN";
   return {

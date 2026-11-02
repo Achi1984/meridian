@@ -79,6 +79,11 @@ the full scheduled duration ran. Both display the scheduled and evidenced
 durations separately. An explicit `UNKNOWN`, missing marker, nonterminal state,
 or mismatch is never treated as completion success.
 
+Completion also requires candidate coverage to reconcile and the report to
+establish zero unresolved execution attempts. Contradictory candidate or
+execution-attempt evidence fails completion; incomplete coverage leaves it
+`UNKNOWN`.
+
 Accounting counters are copied as safe integers and reconciled between the
 terminal marker and report; missing counters stay unavailable, not zero.
 Provider request/event and per-provider totals must reconcile and remain within

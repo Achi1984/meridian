@@ -53,8 +53,32 @@ function reportRecord({
   checkpoint.metadata.sequence = checkpoint.results.length;
   checkpoint.snapshot.summary.runId = runId;
   const dto = projectOperatorReport(checkpoint);
+  Object.assign(dto.candidates, {
+    considered: 0,
+    accepted: 0,
+    rejected: 0,
+    unknown: 0,
+    audited: 0,
+    authorizationReceiptCount: 0,
+    unaccountedObserved: 0,
+    discoveryTruncated: false,
+    scoutAuditTruncated: false
+  });
+  dto.candidates.detailsCoverage = {
+    observedTotal: 0,
+    total: 0,
+    displayed: 0,
+    displayTruncated: false,
+    sourceTruncated: false,
+    unaccounted: 0
+  };
   if (candidateRejection) {
+    dto.candidates.considered = 1;
+    dto.candidates.accepted = 0;
     dto.candidates.rejected = 1;
+    dto.candidates.unknown = 0;
+    dto.candidates.audited = 1;
+    dto.candidates.authorizationReceiptCount = 1;
     dto.candidates.detailsCoverage = {
       observedTotal: 1,
       total: 1,
@@ -502,6 +526,26 @@ test("malformed and oversized artifacts are bounded and reported as failures", (
   });
 });
 
+test("BOM-prefixed artifacts fail canonical decoding and retain exact source hashes", () => {
+  const valid = fixture();
+  const bom = Buffer.from([0xef, 0xbb, 0xbf]);
+  for (const name of ["config", "lock", "terminal", "report"]) {
+    const sourceBytes = Buffer.concat([bom, valid[`${name}Bytes`]]);
+    const result = evaluateObservation({
+      ...valid,
+      [`${name}Bytes`]: sourceBytes
+    });
+    const integrity = criterion(result, "artifact_integrity");
+    assert.equal(integrity.status, "FAIL", `${name} BOM must be rejected`);
+    assert.equal(integrity.artifacts[name].status, "INVALID", `${name} must be invalid`);
+    assert.equal(result.coverage.inputDigests[name],
+      createHash("sha256").update(sourceBytes).digest("hex"),
+      `${name} digest must hash the exact supplied bytes`);
+    assert.notEqual(result.observation.completionStatus, "PASS");
+    assert.equal(result.observation.fullDeadlineCompleted, false);
+  }
+});
+
 test("malformed and out-of-range config timestamps return structured pure and CLI results", async t => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "paper-run-evaluation-dates-"));
   t.after(() => rm(directory, {recursive: true, force: true}));
@@ -739,6 +783,18 @@ test("candidate rejection reasons are preserved without manufacturing rejected c
   inconsistentSummary.dto.candidates.considered = 0;
   const inconsistentCounts = evaluateObservation({...input, reportBytes: bytes(inconsistentSummary)});
   assert.equal(criterion(inconsistentCounts, "candidate_detail_coverage").status, "FAIL");
+  assert.equal(criterion(inconsistentCounts, "terminal_completion").status, "FAIL");
+  assert.equal(inconsistentCounts.observation.fullDeadlineCompleted, false);
+
+  const inconsistentDetail = JSON.parse(input.reportBytes.toString("utf8"));
+  inconsistentDetail.dto.candidates.details[0].status = "ACCEPTED";
+  const inconsistentDetailResult = evaluateObservation({
+    ...input,
+    reportBytes: bytes(inconsistentDetail)
+  });
+  assert.equal(criterion(inconsistentDetailResult, "candidate_detail_coverage").status, "FAIL");
+  assert.equal(criterion(inconsistentDetailResult, "terminal_completion").status, "FAIL");
+  assert.equal(inconsistentDetailResult.observation.fullDeadlineCompleted, false);
 });
 
 test("partial candidate accounting with unaccounted rows remains UNKNOWN", () => {
@@ -760,6 +816,74 @@ test("partial candidate accounting with unaccounted rows remains UNKNOWN", () =>
 
   const result = evaluateObservation(input);
   assert.equal(criterion(result, "candidate_detail_coverage").status, "UNKNOWN");
+  assert.equal(criterion(result, "terminal_completion").status, "UNKNOWN");
+  assert.equal(result.observation.completionStatus, "UNKNOWN");
+});
+
+test("completion requires coherent candidate evidence and zero unresolved execution attempts", () => {
+  const input = fixture();
+  const report = reportRecord({
+    configHash: input.expectedConfigHash
+  });
+  report.dto.unresolvedFills = [{
+    kind: "ENTRY_UNFILLED",
+    receiptId: "entry-attempt-1",
+    status: "UNFILLED",
+    reason: "paper entry did not fill"
+  }];
+  report.dto.unresolvedFillsCoverage = {
+    observedTotal: 1,
+    total: 1,
+    displayed: 1,
+    displayTruncated: false,
+    sourceTruncated: false,
+    unaccounted: 0
+  };
+  const unresolved = evaluateObservation({...input, reportBytes: bytes(report)});
+  assert.equal(criterion(unresolved, "unresolved_execution_attempts").status, "FAIL");
+  assert.equal(criterion(unresolved, "terminal_completion").status, "FAIL");
+  assert.equal(unresolved.observation.completionStatus, "FAIL");
+  assert.equal(unresolved.observation.fullDeadlineCompleted, false);
+
+  const contradictoryCoverage = reportRecord({
+    configHash: input.expectedConfigHash
+  });
+  contradictoryCoverage.dto.unresolvedFills = report.dto.unresolvedFills;
+  contradictoryCoverage.dto.unresolvedFillsCoverage = {
+    observedTotal: 1,
+    total: 0,
+    displayed: 1,
+    displayTruncated: false,
+    sourceTruncated: false,
+    unaccounted: 0
+  };
+  const contradictory = evaluateObservation({
+    ...input,
+    reportBytes: bytes(contradictoryCoverage)
+  });
+  assert.equal(criterion(contradictory, "unresolved_execution_attempts").status, "FAIL");
+  assert.equal(criterion(contradictory, "terminal_completion").status, "FAIL");
+  assert.equal(contradictory.observation.fullDeadlineCompleted, false);
+
+  const unknownCoverage = reportRecord({
+    configHash: input.expectedConfigHash
+  });
+  unknownCoverage.dto.unresolvedFillsCoverage = {
+    observedTotal: 0,
+    total: null,
+    displayed: 0,
+    displayTruncated: false,
+    sourceTruncated: true,
+    unaccounted: null
+  };
+  const unknown = evaluateObservation({
+    ...input,
+    reportBytes: bytes(unknownCoverage)
+  });
+  assert.equal(criterion(unknown, "unresolved_execution_attempts").status, "UNKNOWN");
+  assert.equal(criterion(unknown, "terminal_completion").status, "UNKNOWN");
+  assert.equal(unknown.observation.completionStatus, "UNKNOWN");
+  assert.equal(unknown.observation.fullDeadlineCompleted, false);
 });
 
 test("unavailable candidate detail stays distinct from a rejection reason", () => {
@@ -1179,6 +1303,44 @@ test("CLI Markdown preserves failure, unavailable values, and exact large amount
   assert.match(markdown, /- Cash cents: UNKNOWN/);
   assert.match(markdown, /- Total costs cents: UNKNOWN/);
   assert.match(markdown, /- Realized net P&L cents: -900719925474099312345/);
+});
+
+test("CLI Markdown rejects BOM-prefixed exports and reports their exact source digest", async t => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "paper-run-evaluation-bom-"));
+  t.after(() => rm(directory, {recursive: true, force: true}));
+  const input = fixture();
+  const files = {};
+  for (const [name, content] of Object.entries({
+    config: input.configBytes,
+    lock: Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), input.lockBytes]),
+    terminal: input.terminalBytes,
+    report: input.reportBytes
+  })) {
+    files[name] = path.join(directory, `${name}.json`);
+    await writeFile(files[name], content);
+  }
+  const output = path.join(directory, "evaluation.md");
+  const result = spawnSync(process.execPath, [
+    CLI,
+    "--run-id", RUN_ID,
+    "--config-sha256", input.expectedConfigHash,
+    "--config", files.config,
+    "--lock", files.lock,
+    "--terminal", files.terminal,
+    "--report", files.report,
+    "--format", "markdown",
+    "--output", output
+  ], {encoding: "utf8"});
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, "");
+  const markdown = await readFile(output, "utf8");
+  const lockHash = createHash("sha256").update(
+    Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), input.lockBytes])
+  ).digest("hex");
+  assert.match(markdown, /\| artifact\\_integrity \| FAIL \|/);
+  assert.ok(markdown.includes(`- lock: ${lockHash}`));
+  assert.match(markdown, /- Completion: UNKNOWN/);
+  assert.match(markdown, /- Full deadline completed: false/);
 });
 
 test("CLI rejects symlink and FIFO inputs without blocking", async t => {
