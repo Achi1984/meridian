@@ -151,9 +151,12 @@ ID and config SHA-256 in persisted config, status, lock, terminal marker, and
 existing report identity/accounting. `AVAILABLE` alone, a lock, or elapsed time
 is not proof. Do not modify or restart the observation to obtain evidence.
 
-The reviewed `Dockerfile.paper` image includes both
-`scripts/memecoin-paper-report-transfer/` and its
-`scripts/memecoin-paper-report-bridge/` contract dependency. Build it from the
+The reviewed `Dockerfile.paper` image includes the exporter, the Paper source
+tree it imports, the report bridge contract, and the token-safety bridge imported
+transitively by the normal pilot's pinned assembly. In the merged source,
+`pilot-online-assembly.mjs` dynamically loads `provider-evidence.mjs`, which
+imports `memecoin-paper-token-safety/evidence-bridge.mjs` → `decode.mjs`; the
+token-safety directory is therefore required in the image. Build it from the
 repository root only after reviewing the source and build context:
 
 ```sh

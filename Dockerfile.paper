@@ -5,6 +5,7 @@ WORKDIR /app
 COPY --chown=node:node scripts/memecoin-paper/ ./scripts/memecoin-paper/
 COPY --chown=node:node scripts/memecoin-paper-report-bridge/ ./scripts/memecoin-paper-report-bridge/
 COPY --chown=node:node scripts/memecoin-paper-report-transfer/ ./scripts/memecoin-paper-report-transfer/
+COPY --chown=node:node scripts/memecoin-paper-token-safety/ ./scripts/memecoin-paper-token-safety/
 RUN mkdir -p /var/data/meridian-paper && chown node:node /var/data/meridian-paper
 
 ENV NODE_ENV=production

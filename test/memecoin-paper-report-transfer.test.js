@@ -213,10 +213,12 @@ test("exporter is disabled by default without reading or sending data", async t 
   assert.equal(reads, 0);
 });
 
-test("Paper worker image includes the exporter and bridge contract", () => {
+test("Paper worker image includes the exporter and its transitive local modules", () => {
   const dockerfile = readFileSync(new URL("../Dockerfile.paper", import.meta.url), "utf8");
+  assert.match(dockerfile, /COPY --chown=node:node scripts\/memecoin-paper\//);
   assert.match(dockerfile, /COPY --chown=node:node scripts\/memecoin-paper-report-transfer\//);
   assert.match(dockerfile, /COPY --chown=node:node scripts\/memecoin-paper-report-bridge\//);
+  assert.match(dockerfile, /COPY --chown=node:node scripts\/memecoin-paper-token-safety\//);
   assert.match(dockerfile, /ENTRYPOINT \["node", "scripts\/memecoin-paper\/pilot-online\.mjs"\]/);
 });
 
@@ -441,8 +443,7 @@ test("exporter rejects symlinked run files and run directories", async t => {
   const root = await mkdtemp(path.join(os.tmpdir(), "paper-transfer-link-"));
   t.after(() => rm(root, {recursive: true, force: true}));
   const real = await workerFixture(t);
-  const outside = path.join(root, "outside");
-  await symlink(path.join(real.root, RUN_ID), outside);
+  await symlink(path.join(real.root, RUN_ID), path.join(root, RUN_ID));
   const result = await transferPostRunReport(makeWorkerOptions(real, {
     root, fetchImpl: async (_url, options) => receiptResponse(201, options.body)
   }));
@@ -774,6 +775,49 @@ test("gateway rejects run/config mismatch, future data, wrong media type, and qu
   });
   assert.deepEqual([mismatch.status, badHash.status, future.status, media.status, query.status,
     malformed.status], [400, 400, 400, 415, 400, 400]);
+});
+
+test("gateway rejects future experiment dates before immutable storage and accepts past or null dates", async () => {
+  let insertCalls = 0;
+  const store = {
+    async insertImmutable() {
+      insertCalls++;
+      return "INSERTED";
+    }
+  };
+  for (const dates of [
+    {startAt: "2026-12-01T00:00:00.000Z", endAt: null},
+    {startAt: null, endAt: "2026-12-01T00:00:00.000Z"}
+  ]) {
+    const report = reportFixture();
+    Object.assign(report.experiment, dates);
+    const result = await handlePaperReportUpload(
+      request(bodyBytes(transferEnvelope(report))),
+      {config: gatewayConfig, store, now: () => NOW}
+    );
+    assert.equal(result.status, 400);
+    assert.equal(insertCalls, 0);
+  }
+
+  for (const dates of [
+    {startAt: "2026-10-31T00:00:00.000Z", endAt: "2026-11-01T19:00:00.000Z"},
+    {startAt: null, endAt: null}
+  ]) {
+    const reportStore = {
+      async insertImmutable() {
+        insertCalls++;
+        return "INSERTED";
+      }
+    };
+    const report = reportFixture();
+    Object.assign(report.experiment, dates);
+    const result = await handlePaperReportUpload(
+      request(bodyBytes(transferEnvelope(report))),
+      {config: gatewayConfig, store: reportStore, now: () => NOW}
+    );
+    assert.equal(result.status, 201);
+  }
+  assert.equal(insertCalls, 2);
 });
 
 test("gateway rejects an oversized declared body without consuming it", async () => {

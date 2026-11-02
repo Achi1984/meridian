@@ -99,6 +99,9 @@ function parseEnvelope(bytes, config, now) {
   }
   if (decoded.report.schema !== PAPER_REPORT_SCHEMA ||
       decoded.report.experiment.reportStatus !== "FINISHED") return null;
+  const {startAt, endAt} = decoded.report.experiment;
+  if ((startAt !== null && startAt !== undefined && Date.parse(startAt) > now) ||
+      (endAt !== null && endAt !== undefined && Date.parse(endAt) > now)) return null;
   return {
     envelope: {
       schema: PAPER_REPORT_TRANSFER_SCHEMA,
