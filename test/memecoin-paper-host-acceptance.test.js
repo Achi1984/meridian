@@ -255,16 +255,18 @@ test("private data root rejects symlinks, escapes, and group-writable permission
 test("CLI validates explicit data-root bounds and emits its stable failure code", async t => {
   const harness = await fixture(t);
   const escapedRoot = path.join(harness.root, "outside-mount");
-  const child = spawnSync(process.execPath, [
+  const command = [
     HOST_ACCEPTANCE_PATH,
     "verify",
     "--evidence-id", "cli-path-check",
     "--mint", IDENTITY.mint,
     "--pool", IDENTITY.pool,
     "--quote", IDENTITY.quote,
-    "--data-root", escapedRoot,
-    "--provider-preflight"
-  ], {encoding: "utf8"});
+    "--data-root"
+  ];
+  const child = spawnSync(process.execPath, [...command, escapedRoot, "--provider-preflight"], {
+    encoding: "utf8"
+  });
   assert.equal(child.status, 2);
   assert.deepEqual(JSON.parse(child.stdout), {
     status: "UNKNOWN",
@@ -276,6 +278,20 @@ test("CLI validates explicit data-root bounds and emits its stable failure code"
     clockProvenance: "UNVERIFIED"
   });
   await assert.rejects(lstat(escapedRoot), {code: "ENOENT"});
+
+  const emptyValue = spawnSync(process.execPath, [...command, "", "--provider-preflight"], {
+    encoding: "utf8"
+  });
+  assert.equal(emptyValue.status, 2);
+  assert.deepEqual(JSON.parse(emptyValue.stdout), {
+    status: "UNKNOWN",
+    scope: "HOST_ACCEPTANCE_ONLY",
+    failureCode: "HOST_ACCEPTANCE_CLI_ARGUMENTS_INVALID",
+    pilotStarted: false,
+    runtimeAuthorization: false,
+    hostDurability: "NOT_VERIFIED",
+    clockProvenance: "UNVERIFIED"
+  });
 });
 
 test("incomplete existing evidence remains UNKNOWN and is not repaired or replayed", async t => {
@@ -372,9 +388,11 @@ test("provider preflight failure is retained and a restart cannot repeat it", as
   const first = await runHostAcceptance(input);
   assert.equal(first.status, "BLOCKED");
   assert.equal(first.providerPreflight.status, "BLOCKED");
+  assert.equal(first.failureCode, "HOST_ACCEPTANCE_PROVIDER_PREFLIGHT_BLOCKED");
   assert.equal(first.providerPreflight.requestCount, 1);
   const repeat = await runHostAcceptance(input);
   assert.equal(repeat.status, "BLOCKED");
+  assert.equal(repeat.failureCode, first.failureCode);
   assert.equal(repeat.providerRequestsThisInvocation, 0);
   assert.equal(acquisitions, 1);
 });

@@ -290,6 +290,13 @@ async function verifyExisting(evidenceDirectory, evidenceId, candidateHash, runt
     status: record.status === "PASS" ? "RESTART_VERIFIED" : record.status,
     scope: "HOST_ACCEPTANCE_ONLY",
     evidenceId,
+    ...(record.failureCode
+      ? {failureCode: record.failureCode}
+      : record.status === "BLOCKED"
+        ? {failureCode: "HOST_ACCEPTANCE_PROVIDER_PREFLIGHT_BLOCKED"}
+        : record.status === "UNKNOWN"
+          ? {failureCode: "HOST_ACCEPTANCE_EVIDENCE_UNKNOWN"}
+          : {}),
     persistedEvidenceSha256: record.evidenceHash,
     providerRequestsThisInvocation: 0,
     pilotStarted: false,
@@ -631,7 +638,16 @@ export async function runHostAcceptance({
   const wallEnd = wallClock();
   const monotonicEnd = monotonicClock();
   const hostStatus = probeSha256 ? "PASS" : "UNKNOWN";
-  const status = hostStatus === "PASS" && providerResult.status === "PASS" ? "PASS" : "BLOCKED";
+  const status = hostStatus === "UNKNOWN" || providerResult.status === "UNKNOWN"
+    ? "UNKNOWN"
+    : hostStatus === "PASS" && providerResult.status === "PASS"
+      ? "PASS"
+      : "BLOCKED";
+  if (!failureCode && providerResult.status !== "PASS") {
+    failureCode = providerResult.status === "BLOCKED"
+      ? "HOST_ACCEPTANCE_PROVIDER_PREFLIGHT_BLOCKED"
+      : "HOST_ACCEPTANCE_PROVIDER_PREFLIGHT_UNKNOWN";
+  }
   const payload = {
     schema: "MERIDIAN_PAPER_HOST_ACCEPTANCE_V1",
     status,
@@ -692,7 +708,8 @@ function parseArguments(argv) {
     const key = argv[index];
     if (!["--evidence-id", "--mint", "--pool", "--quote", "--data-root", "--provider-preflight"].includes(key) ||
         Object.hasOwn(values, key) ||
-        (key !== "--provider-preflight" && typeof argv[index + 1] !== "string")) {
+        (key !== "--provider-preflight" &&
+          (typeof argv[index + 1] !== "string" || argv[index + 1].length === 0))) {
       throw hostAcceptanceError(
         "CLI_ARGUMENTS_INVALID",
         "expected unique required options and at most one optional --data-root"

@@ -227,10 +227,11 @@ The CLI emits a JSON `failureCode` and exits `2` for non-success (success exits
 | `HOST_ACCEPTANCE_DATA_ROOT_UNSAFE`, `HOST_ACCEPTANCE_DATA_ROOT_OWNER_MISMATCH`, `HOST_ACCEPTANCE_DATA_ROOT_PERMISSIONS`, `HOST_ACCEPTANCE_DATA_ROOT_DEVICE_MISMATCH` | Existing private child failed a safety gate; do not repair/chown it or continue. |
 | `HOST_ACCEPTANCE_EVIDENCE_PARENT_CREATE_FAILED`, `HOST_ACCEPTANCE_EVIDENCE_DIRECTORY_CREATE_FAILED`, `HOST_ACCEPTANCE_EVIDENCE_DIRECTORY_UNSAFE`, `HOST_ACCEPTANCE_EVIDENCE_DIRECTORY_SYNC_FAILED` | Acceptance evidence location failed its safety/create/sync check; leave any created files untouched and stop. |
 | `HOST_ACCEPTANCE_EVIDENCE_UNKNOWN` | Existing ID is incomplete, invalid, or mismatched; preserve it and do not retry/replay. |
-| `HOST_ACCEPTANCE_VOLUME_PROBE_<code>` | Probe creation/readback failed; treat request count as unknown and preserve evidence. |
-| `HOST_ACCEPTANCE_PROVIDER_PREFLIGHT_<code>` | Provider assembly failed after the probe; it is retained and must not be retried under that evidence ID. |
+| `HOST_ACCEPTANCE_VOLUME_PROBE_<code>` | Probe creation/readback failed; top-level status is `UNKNOWN`, request count is unknown, and evidence is preserved. |
+| `HOST_ACCEPTANCE_PROVIDER_PREFLIGHT_BLOCKED`, `HOST_ACCEPTANCE_PROVIDER_PREFLIGHT_<code>` | Provider assembly returned a bounded failure or failed after the probe; it is retained and must not be retried under that evidence ID. |
 | `HOST_ACCEPTANCE_RESULT_WRITE_UNKNOWN` | Final result could not be durably read back; preserve the probe and result directory as `UNKNOWN`. |
 | `HOST_ACCEPTANCE_CLI_COMMAND_INVALID`, `HOST_ACCEPTANCE_CLI_ARGUMENTS_INVALID`, `HOST_ACCEPTANCE_EVIDENCE_ID_INVALID`, `HOST_ACCEPTANCE_CANDIDATE_INVALID`, `HOST_ACCEPTANCE_MODE_OR_PREFLIGHT_REQUIRED` | Invocation is invalid; correct the command without reusing an evidence ID that may already have written files. |
+| `HOST_ACCEPTANCE_FAILED` | An unexpected error occurred outside a classified check; preserve all output/artifacts and treat the result as `UNKNOWN`. |
 
 Rollback is limited to the isolated preflight service: stop/scale it to zero,
 restore that service's recorded image/entrypoint/command settings if needed, and
