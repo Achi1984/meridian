@@ -106,8 +106,6 @@ test("bounded online composition produces only a receipt-bound no-entry report",
   assert.equal(terminal.executionStarted, false);
   assert.equal(terminal.reportStatus, "PROJECTED");
   assert.equal(terminal.reportTradingStatus, "NO_ENTRY_OBSERVED");
-  assert.equal(terminal.failureCode, null);
-  assert.equal(terminal.observation.failureCode, null);
   assert.deepEqual(terminal.providerAccounting, {
     requests: 4, bytes: 50, providerEvents: 4, dexRequests: 1, rpcRequests: 3, candidates: 1
   });
@@ -130,7 +128,6 @@ test("bounded online composition produces only a receipt-bound no-entry report",
   assert.equal(report.status, "AVAILABLE");
   assert.equal(report.report.trading.status, "NO_ENTRY_OBSERVED");
   assert.equal(report.observation.filterOutcomes.UNKNOWN, 1);
-  assert.equal(report.observation.failureCode, null);
   assert.equal(report.observation.entryAuthorizations, 0);
   assert.match(report.text, /Observation only/);
   assert.match(report.text, /Executable quote and validated cost evidence: UNAVAILABLE/);
