@@ -127,21 +127,34 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         assert.deepEqual(delivered,{report:true,exactCash:true,terminal:true,noWorkerClaim:true});
         if(size.width===sizes[0].width){
           await evaluate(`(()=>{
-            const details=document.querySelector('#paper-cockpit-root > details');
-            details.open=true;
-            details.querySelector(':scope > summary').focus();
-          })()`);
+          const root=document.querySelector('#paper-cockpit-root');
+          const details=document.querySelector('#paper-cockpit-root > details');
+          window.paperCockpitFreshnessRefs={
+            details,summary:details.querySelector(':scope > summary'),
+            button:root.querySelector('button'),liveRegion:root.querySelector('[role="status"]')
+          };
+          details.open=true;
+          window.paperCockpitFreshnessRefs.button.focus();
+        })()`);
           for(let attempt=0;attempt<400;attempt++){
             if(await evaluate(`document.querySelector('#paper-cockpit-root').dataset.state==='stale'`))break;
             await new Promise(resolve=>setTimeout(resolve,10));
           }
           assert.deepEqual(await evaluate(`(()=>{
+            const root=document.querySelector('#paper-cockpit-root');
             const details=document.querySelector('#paper-cockpit-root > details');
             const summary=details.querySelector(':scope > summary');
-            return {state:document.querySelector('#paper-cockpit-root').dataset.state,
-              open:details.open,focused:document.activeElement===summary};
-          })()`),{state:'stale',open:true,focused:true},
-          'the freshness deadline preserves the expanded, focused demo without a new read');
+            const refs=window.paperCockpitFreshnessRefs;
+            return {state:root.dataset.state,open:details.open,
+              sameDetails:details===refs.details,sameSummary:summary===refs.summary,
+              sameButton:root.querySelector('button')===refs.button,
+              sameLiveRegion:root.querySelector('[role="status"]')===refs.liveRegion,
+              focused:document.activeElement===refs.button,
+              status:refs.liveRegion.textContent};
+          })()`),{state:'stale',open:true,sameDetails:true,sameSummary:true,
+            sameButton:true,sameLiveRegion:true,focused:true,
+            status:'The report is stale under the shared display-only freshness policy.'},
+          'the freshness deadline updates the mounted live region and preserves interactive focus without a read');
           assert.equal(intercepted.count(),1,'freshness revalidation does not issue another request');
         }
         await evaluate(`document.querySelector('#nav').click()`);

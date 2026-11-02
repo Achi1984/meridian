@@ -49,8 +49,10 @@ While the cockpit is selected, a successful report schedules one local,
 one-shot display update at the strict stale boundary. It reclassifies the
 retained report without reading the endpoint again, and is not polling. Replacing
 or clearing the report and disposing the cockpit cancel or replace the timer.
-Freshness-only revalidation preserves the generated-demo disclosure's expanded
-and focused state; locking and navigation still clear private report data.
+Freshness-only revalidation updates the report in place, keeping the live-region
+node, refresh control, and generated-demo disclosure mounted so focus and
+disclosure state remain stable. Locking and navigation still clear private
+report data.
 
 ## Current connection status and future contract
 

@@ -97,8 +97,12 @@ function harness({
     const visit = element => [element, ...element.children.flatMap(visit)];
     return visit(root).find(element => element.tagName.toLowerCase() === tag);
   };
+  const findByAttribute = (key, value) => {
+    const visit = element => [element, ...element.children.flatMap(visit)];
+    return visit(root).find(element => element.attrs[key] === value);
+  };
   return {
-    root, document, window, access, controller, findButton, findElement, policy,
+    root, document, window, access, controller, findButton, findElement, findByAttribute, policy,
     revalidate() { for (const revalidate of readers.values()) revalidate(); }
   };
 }
@@ -276,6 +280,10 @@ test('freshness deadline is one-shot, strict at the boundary, and replaced with 
   assert.equal(clock.timers.size, 1, 'a successful read arms one deadline timer');
   const firstTimerId = clock.timers.keys().next().value;
   assert.equal(clock.timers.get(firstTimerId).delay, 60_001);
+  const liveRegion = h.findByAttribute('role', 'status');
+  const refreshButton = h.findButton();
+  const demo = h.findElement('details');
+  const summary = demo.children.find(element => element.tagName.toLowerCase() === 'summary');
 
   now += 1_000;
   const pending = h.controller.refresh();
@@ -292,17 +300,25 @@ test('freshness deadline is one-shot, strict at the boundary, and replaced with 
   clock.runDue();
   assert.notEqual(h.root.attrs['data-state'], 'stale', 'the threshold itself remains within policy');
   assert.equal(clock.timers.size, 1, 'the timer waits until the strict stale boundary');
-  const demo = h.findElement('details');
   demo.open = true;
-  demo.children.find(element => element.tagName.toLowerCase() === 'summary').focus();
+  refreshButton.focus();
   now++;
   clock.runDue();
   assert.equal(h.root.attrs['data-state'], 'stale');
   assert.match(h.root.textContent, /stale under the shared display-only freshness policy/i);
+  assert.equal(h.findByAttribute('role', 'status'), liveRegion,
+    'freshness updates change the existing live region rather than replacing it');
+  assert.equal(h.findButton(), refreshButton, 'freshness updates retain the refresh control');
+  assert.equal(h.findElement('details'), demo, 'freshness updates retain the disclosure');
   assert.equal(h.findElement('details').open, true, 'freshness revalidation keeps the demo expanded');
-  assert.equal(h.document.activeElement,
-    h.findElement('details').children.find(element => element.tagName.toLowerCase() === 'summary'),
-    'freshness revalidation restores focus to the demo summary');
+  assert.equal(h.document.activeElement, refreshButton,
+    'freshness updates do not remove focus from the refresh control');
+  summary.focus();
+  h.revalidate();
+  assert.equal(h.document.activeElement, summary,
+    'focus/visibility-style revalidation leaves disclosure-summary focus in place');
+  assert.equal(h.findByAttribute('role', 'status'), liveRegion,
+    'revalidation retains the live-region node');
   assert.equal(calls, 2, 'deadline revalidation never issues another read');
   assert.equal(clock.timers.size, 0, 'stale reports have no further deadline timer');
   h.controller.dispose();
