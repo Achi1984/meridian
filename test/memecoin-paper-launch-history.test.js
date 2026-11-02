@@ -180,6 +180,23 @@ test("repeated cursors are retained as an incomplete page and never retried", as
   assert.equal(result.coverage.subjects[0].pageBoundaries[1].status, "REPEATED_CURSOR");
 });
 
+test("signature slots must remain non-increasing across page boundaries", async () => {
+  const {transport} = defaultTransport({
+    pages: [
+      [PAGE_ONE[0], PAGE_ONE[1]],
+      [{signature: "newer-cross-page-slot", slot: 111, err: null},
+        {signature: "older-cross-page-slot", slot: 90, err: null}]
+    ]
+  });
+  const result = await acquire(transport);
+  assert.equal(result.coverage.subjects[0].pageBoundaries[1].status, "MALFORMED_PAGE");
+  assert.equal(result.coverage.subjects[0].pageBoundaries[1].firstSlot, 111);
+  assert.equal(result.coverage.subjects[0].pageBoundaries[0].lastSlot, 110);
+  assert.equal(result.coverage.complete, false);
+  assert.equal(classifyLaunchHistory({history: result, mint: MINT}).priorRugFinding.status,
+    "UNKNOWN");
+});
+
 test("future interval beyond finalized anchor is incomplete even when history is empty", async () => {
   const methods = [];
   const result = await acquireLaunchHistory({
@@ -414,6 +431,7 @@ test("subject, source, slot interval, byte, work, and cancellation bounds fail c
   ), {limits: {pageSize: 2, maxBytesPerResponse: 24}});
   assert.equal(oversized.coverage.complete, false);
   assert.equal(oversized.coverage.subjects[0].terminationReason, "RESPONSE_TOO_LARGE");
+  assert.ok(oversized.counters.bytes > 24);
 
   const workLimited = await acquire(defaultTransport().transport, {
     limits: {pageSize: 2, maxWorkUnits: 1}
@@ -431,12 +449,27 @@ test("subject, source, slot interval, byte, work, and cancellation bounds fail c
   assert.equal(timedOut.coverage.complete, false);
   assert.equal(timedOut.coverage.subjects[0].terminationReason, "TIMEOUT");
 
-  const elapsedLimited = await acquire(async request => {
-    await new Promise(resolve => setTimeout(resolve, 70));
+  const deadlineStartedAt = performance.now();
+  let deadlineSignalAborted = false;
+  const elapsedLimited = await acquire(async (request, {signal}) => {
+    if (JSON.parse(request.body).method === "getSlot") {
+      return rpcResponse(request, {result: 125});
+    }
+    await new Promise(resolve => {
+      const timer = setTimeout(resolve, 1_000);
+      signal.addEventListener("abort", () => {
+        deadlineSignalAborted = true;
+        clearTimeout(timer);
+        resolve();
+      }, {once: true});
+    });
     return rpcResponse(request, {result: []});
   }, {limits: {pageSize: 2, maxDurationMs: 50}});
+  const elapsedMs = performance.now() - deadlineStartedAt;
   assert.equal(elapsedLimited.coverage.complete, false);
   assert.equal(elapsedLimited.coverage.subjects[0].terminationReason, "TIME_LIMIT");
+  assert.ok(elapsedMs <= 500, `request exceeded global deadline: ${elapsedMs}ms`);
+  assert.equal(deadlineSignalAborted, true);
 
   const controller = new AbortController();
   controller.abort();
@@ -464,7 +497,7 @@ test("clock failures before request dispatch do not leave timeout rejections or 
       },
       clock: () => {
         clockCalls += 1;
-        if (clockCalls === 3) {
+        if (clockCalls === 4) {
           if (typeof invalidClockValue === "function") return invalidClockValue();
           return invalidClockValue;
         }
@@ -472,9 +505,9 @@ test("clock failures before request dispatch do not leave timeout rejections or 
       },
       limits: {requestTimeoutMs: 5}
     });
-    await new Promise(resolve => setTimeout(resolve, 20));
+    await new Promise(resolve => setTimeout(resolve, 40));
     process.removeListener("unhandledRejection", onUnhandled);
-    assert.equal(calls, 0);
+    assert.equal(calls, 1);
     assert.equal(result.coverage.finalizedAnchor.status, "INVALID_CLOCK");
     assert.equal(result.coverage.complete, false);
     assert.deepEqual(unhandled, []);
@@ -511,6 +544,59 @@ test("request timeout cancels an active response reader without waiting or retry
   assert.equal(cancellations, 1);
   assert.equal(result.coverage.complete, false);
   assert.equal(result.coverage.subjects[0].terminationReason, "TIMEOUT");
+  assert.ok(result.counters.bytes > 0);
+});
+
+test("late reader chunks cannot mutate byte counters after timeout has returned", async () => {
+  let releaseRead;
+  let readerCancelled = false;
+  let pageRequests = 0;
+  const transport = async request => {
+    const body = JSON.parse(request.body);
+    if (body.method === "getSlot") return rpcResponse(request, {result: 125});
+    pageRequests += 1;
+    let reads = 0;
+    const reader = {
+      read() {
+        reads += 1;
+        if (reads === 1) {
+          return Promise.resolve({
+            done: false,
+            value: new TextEncoder().encode(`{"jsonrpc":"2.0","id":${body.id},`)
+          });
+        }
+        return new Promise(resolve => { releaseRead = resolve; });
+      },
+      cancel() {
+        readerCancelled = true;
+        return new Promise(() => {});
+      },
+      releaseLock() {}
+    };
+    return {
+      status: 200,
+      redirected: false,
+      url: SOLANA_RPC_ORIGIN,
+      headers: {get: () => null},
+      body: {getReader: () => reader}
+    };
+  };
+  const result = await acquire(transport, {
+    limits: {pageSize: 2, requestTimeoutMs: 10}
+  });
+  const bytesAtReturn = result.counters.bytes;
+  const finalizedAnchorBytes = new TextEncoder().encode(JSON.stringify({
+    jsonrpc: "2.0", id: 1, result: 125
+  })).byteLength;
+  assert.equal(pageRequests, 1);
+  assert.equal(readerCancelled, true);
+  assert.ok(bytesAtReturn > finalizedAnchorBytes);
+  releaseRead?.({
+    done: false,
+    value: new TextEncoder().encode("late bytes which must not be counted")
+  });
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(result.counters.bytes, bytesAtReturn);
 });
 
 test("late response after timeout is cancelled without issuing a retry", async () => {

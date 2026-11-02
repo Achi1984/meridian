@@ -137,23 +137,28 @@ async function readJsonBounded(response, state, limits, signal) {
     }
   }
   const reader = response.body.getReader();
+  let sealed = false;
   const onAbort = () => {
+    sealed = true;
     signal.removeEventListener("abort", onAbort);
     cancelWithoutWaiting(reader, signal.reason);
   };
   signal?.addEventListener("abort", onAbort, {once: true});
+  if (signal?.aborted) onAbort();
   const chunks = [];
   let responseBytes = 0;
   try {
     for (;;) {
       const {done, value} = await reader.read();
+      if (sealed) throw failure("CANCELLED", "response reader was sealed");
       if (done) break;
       if (!(value instanceof Uint8Array)) {
         throw failure("INVALID_RESPONSE_CHUNK", "RPC response contains an invalid byte chunk");
       }
       responseBytes += value.byteLength;
+      state.bytes += value.byteLength;
       if (responseBytes > limits.maxBytesPerResponse ||
-          state.bytes + responseBytes > limits.maxBytesPerRun) {
+          state.bytes > limits.maxBytesPerRun) {
         throw failure("RESPONSE_TOO_LARGE", "RPC response exceeds a byte limit");
       }
       chunks.push(value);
@@ -165,7 +170,6 @@ async function readJsonBounded(response, state, limits, signal) {
     signal?.removeEventListener("abort", onAbort);
     reader.releaseLock();
   }
-  state.bytes += responseBytes;
   const bytes = new Uint8Array(responseBytes);
   let offset = 0;
   for (const chunk of chunks) {
@@ -244,17 +248,27 @@ async function requestRpc(state, limits, method, params) {
   let abortHandler;
   let response;
   try {
+    const remainingDuration = limits.maxDurationMs -
+      (performance.now() - state.startedMonotonic);
+    if (remainingDuration <= 0) return {ok: false, status: "TIME_LIMIT"};
+    const globalDeadlineWins = remainingDuration <= limits.requestTimeoutMs;
+    const timeoutMs = Math.min(limits.requestTimeoutMs, remainingDuration);
     const timeoutPromise = new Promise((_, reject) => {
       timer = setTimeout(() => {
-        controller.abort();
-        reject(failure("TIMEOUT", "RPC request timed out"));
-      }, limits.requestTimeoutMs);
+        const timeoutError = failure(
+          globalDeadlineWins ? "TIME_LIMIT" : "TIMEOUT",
+          globalDeadlineWins ? "overall acquisition deadline was reached" : "RPC request timed out"
+        );
+        controller.abort(timeoutError);
+        reject(timeoutError);
+      }, timeoutMs);
     });
     const abortedPromise = new Promise((_, reject) => {
       if (!state.signal) return;
       abortHandler = () => {
-        controller.abort();
-        reject(failure("CANCELLED", "launch history acquisition was cancelled"));
+        const abortError = failure("CANCELLED", "launch history acquisition was cancelled");
+        controller.abort(abortError);
+        reject(abortError);
       };
       state.signal.addEventListener("abort", abortHandler, {once: true});
       if (state.signal.aborted) abortHandler();
@@ -288,7 +302,10 @@ async function requestRpc(state, limits, method, params) {
       timeoutPromise,
       abortedPromise
     ]);
-    const receivedAt = state.clock();
+    let receivedAt;
+    try { receivedAt = state.clock(); } catch {
+      throw failure("INVALID_CLOCK", "injected clock returned an invalid time");
+    }
     if (!Number.isSafeInteger(receivedAt) || receivedAt < startedAt) {
       throw failure("INVALID_CLOCK", "injected clock returned an invalid time");
     }
@@ -397,6 +414,7 @@ export async function acquireLaunchHistory(options) {
     const seenForSubject = new Set();
     let before;
     let pageCount = 0;
+    let previousPageLastSlot = null;
     for (;;) {
       const timeFailure = checkTime(state, limits);
       if (state.signal?.aborted || timeFailure || state.stopReason) {
@@ -460,7 +478,7 @@ export async function acquireLaunchHistory(options) {
         break;
       }
       const page = outcome.result;
-      let priorSlot = Number.POSITIVE_INFINITY;
+      let priorSlot = previousPageLastSlot ?? Number.POSITIVE_INFINITY;
       let malformed = false;
       let repeated = false;
       let limitHit = false;
@@ -536,6 +554,7 @@ export async function acquireLaunchHistory(options) {
         state.stopReason ??= limitHit ? "WORK_LIMIT" : null;
         break;
       }
+      if (page.length > 0) previousPageLastSlot = last.slot;
       if (page.length === 0) {
         coverage.signatureCoverageComplete = true;
         coverage.terminationReason = "SOURCE_EXHAUSTED";

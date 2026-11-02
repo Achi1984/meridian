@@ -46,8 +46,11 @@ deadline. Fixed hard ceilings prevent callers from raising the bounds without
 limit. Elapsed time uses a monotonic timer; timestamps still come from the
 injected clock. Request and response origins are fixed, redirects rejected,
 credentials omitted, and response bytes are streamed under both byte limits.
-There are no retries. An injected transport is not authenticated merely because
-its request object contains the fixed URL.
+Each request timeout is clipped to the remaining overall acquisition deadline.
+Consumed response bytes are counted as chunks arrive, including bytes consumed
+before a timeout or size failure; an aborted reader is sealed against later
+counter changes. There are no retries. An injected transport is not
+authenticated merely because its request object contains the fixed URL.
 
 `coverage.complete` is true only when every declared subject reaches the lower
 slot boundary or the RPC history is exhausted, and every successful in-range
