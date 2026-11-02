@@ -80,8 +80,9 @@ async function waitForActiveRun(harness, child) {
   while (Date.now() < deadline) {
     try {
       await Promise.all([access(lockPath), access(checkpointPath)]);
+      const checkpoint = JSON.parse(await readFile(checkpointPath, "utf8"));
       assert.equal(await fileExists(path.join(harness.dataDirectory, "terminal.json")), false);
-      return;
+      if (checkpoint.sequence >= 1) return;
     } catch (error) {
       if (error.code !== "ENOENT") throw error;
     }

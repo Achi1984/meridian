@@ -25,6 +25,20 @@ export function canonicalJson(value) {
 export function createRunConfig(overrides = {}) {
   const startAt = overrides.startAt ?? FIXTURE_START;
   const candidates = overrides.candidates ?? FIXTURE_IDENTITIES;
+  const budgets = {
+    requests: 8,
+    dexRequests: 2,
+    rpcRequests: 6,
+    bytes: 1_024,
+    providerEvents: 8,
+    candidates: 2,
+    events: 2,
+    cycles: 4,
+    pollIntervalMs: 60_000,
+    callbackSettlementMs: 35_000,
+    requestTimeoutMs: 5_000,
+    ...overrides.budgets
+  };
   const manifest = {
     enabled: true,
     mode: READ_ONLY_PAPER,
@@ -55,20 +69,15 @@ export function createRunConfig(overrides = {}) {
       maxCandidates: 2
     }
   };
-  const budgets = {
-    requests: 8,
-    dexRequests: 2,
-    rpcRequests: 6,
-    bytes: 1_024,
-    providerEvents: 8,
-    candidates: 2,
-    events: 2,
-    cycles: 4,
-    pollIntervalMs: 60_000,
-    callbackSettlementMs: 35_000,
-    requestTimeoutMs: 5_000,
-    ...overrides.budgets
-  };
+  manifest.pollBudget.maxRequestsPerRun = Math.max(
+    manifest.pollBudget.maxRequestsPerRun, budgets.requests
+  );
+  manifest.pollBudget.maxRequestsPerProvider = Math.max(
+    manifest.pollBudget.maxRequestsPerProvider, budgets.dexRequests, budgets.rpcRequests
+  );
+  manifest.pollBudget.maxBytesPerRun = Math.max(manifest.pollBudget.maxBytesPerRun, budgets.bytes);
+  manifest.pollBudget.maxEvents = Math.max(manifest.pollBudget.maxEvents, budgets.providerEvents);
+  manifest.pollBudget.maxCandidates = Math.max(manifest.pollBudget.maxCandidates, budgets.candidates);
   return {
     version: 1,
     mode: READ_ONLY_PAPER,
@@ -86,6 +95,7 @@ export function createFakeAssembly({
   resultFactory,
   onStep,
   onReportInput,
+  summaryFailureCode,
   waitForStop = false,
   maxCycles = 1
 } = {}) {
@@ -110,15 +120,28 @@ export function createFakeAssembly({
     async acquireProviderEvidence({candidates}) {
       calls.provider += 1;
       if (resultFactory) return resultFactory(candidates, calls.provider);
+      const events = candidates.flatMap((candidate, candidateIndex) => [
+        ["DexScreener public API", "pair"],
+        ["Solana JSON-RPC", "getAccountInfo"],
+        ["Solana JSON-RPC", "getTokenLargestAccounts"],
+        ["Solana JSON-RPC", "getTokenSupply"]
+      ].map(([provider, endpointKind], requestIndex) => ({
+        requestId: requestIndex + 1,
+        provider,
+        endpointKind,
+        requested: candidate,
+        returned: candidate,
+        status: "RECEIVED",
+        reason: null,
+        requestedAt: FIXTURE_START + 1_000 + candidateIndex,
+        receivedAt: FIXTURE_START + 1_010 + candidateIndex,
+        observedAtBasis: "response-receipt-not-source-event-time",
+        bytes: requestIndex === 0 ? 50 : 0
+      })));
       return {
         status: "ACQUISITION_FINISHED",
         networkAccessed: true,
-        events: [
-          {type: "provider-request", audit: "not a controller event"},
-          {type: "provider-request", audit: "not a controller event"},
-          {type: "provider-request", audit: "not a controller event"},
-          {type: "provider-request", audit: "not a controller event"}
-        ],
+        events: events.slice(0, 4),
         candidates: candidates.map(identity => ({
           candidate: {
             ...identity,
@@ -213,7 +236,8 @@ export function createFakeAssembly({
             mode,
             reason,
             counts: {requests, events, cycles: calls.checkpoint, completedSteps: calls.steps},
-            checkpointAcknowledgement: acknowledgement
+            checkpointAcknowledgement: acknowledgement,
+            ...(summaryFailureCode ? {failureCode: summaryFailureCode} : {})
           };
           await callbacks.report({
             summary,
