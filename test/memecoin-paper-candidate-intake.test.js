@@ -6,6 +6,7 @@ import {
   mkdir,
   writeFile,
   stat,
+  lstat,
   rm,
   readdir,
   rename,
@@ -361,6 +362,24 @@ test("input byte and row limits are enforced, and rejection output remains bound
   assert.equal(bounded.rejections.truncated, true);
 });
 
+test("FIFO input is rejected promptly before reading", async t => {
+  if (process.platform !== "linux") return t.skip("FIFO regression uses Linux file descriptors");
+  const directory = await harness(t);
+  const fifo = path.join(directory, "snapshots.fifo");
+  const created = spawnSync("mkfifo", [fifo], {encoding: "utf8"});
+  assert.equal(created.status, 0, created.stderr);
+  const moduleUrl = new URL("../scripts/memecoin-paper/candidate-intake.mjs", import.meta.url).href;
+  const result = spawnSync(process.execPath, [
+    "--input-type=module",
+    "-e",
+    `import(${JSON.stringify(moduleUrl)}).then(({readSnapshotFile}) => readSnapshotFile(process.argv[1]))`,
+    fifo
+  ], {encoding: "utf8", timeout: 1_000});
+  assert.equal(result.error, undefined, result.error?.message);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /input must be a regular file/);
+});
+
 test("exclusive output preserves existing files, cleans partial failures, and rejects unsafe directories", async t => {
   const directory = await harness(t);
   const existing = path.join(directory, "existing.json");
@@ -430,6 +449,55 @@ test("directory swaps cannot redirect staged publication or cleanup", async t =>
   assert.equal((await stat(path.join(replacementDirectory, replacementStageName, "config"))).mode & 0o777,
     0o644);
   assert.deepEqual(await readdir(movedDirectory), []);
+});
+
+test("staging replacement and failed exclusive open preserve unowned files and directories", async t => {
+  const directory = await harness(t);
+
+  const privateDirectory = path.join(directory, "private-target");
+  await mkdir(privateDirectory, {mode: 0o700});
+  const privateConfig = path.join(privateDirectory, "config");
+  await writeFile(privateConfig, "pre-existing private config");
+  const symlinkOutput = path.join(directory, "symlink-replacement.json");
+  const symlinkStage = path.join(directory, "moved-symlink-stage");
+  let symlinkStageName;
+  await assert.rejects(writeExclusiveConfig(symlinkOutput, Buffer.from("intended"), {
+    beforeOpenStagingDirectory: async stagingPath => {
+      symlinkStageName = path.basename(stagingPath);
+      await rename(stagingPath, symlinkStage);
+      await symlink(privateDirectory, stagingPath);
+    }
+  }), /ELOOP|ENOTDIR/);
+  assert.deepEqual(await readFile(privateConfig), Buffer.from("pre-existing private config"));
+  assert.ok((await lstat(path.join(directory, symlinkStageName))).isSymbolicLink());
+
+  const realOutput = path.join(directory, "real-replacement.json");
+  const realStage = path.join(directory, "moved-real-stage");
+  let realStageName;
+  await assert.rejects(writeExclusiveConfig(realOutput, Buffer.from("intended"), {
+    beforeOpenStagingDirectory: async stagingPath => {
+      realStageName = path.basename(stagingPath);
+      await rename(stagingPath, realStage);
+      await mkdir(stagingPath, {mode: 0o700});
+      await writeFile(path.join(stagingPath, "config"), "unowned replacement config");
+      await writeFile(path.join(stagingPath, "sentinel"), "unowned replacement contents");
+    }
+  }), /identity changed/);
+  assert.deepEqual(await readFile(path.join(directory, realStageName, "config")),
+    Buffer.from("unowned replacement config"));
+  assert.deepEqual(await readFile(path.join(directory, realStageName, "sentinel")),
+    Buffer.from("unowned replacement contents"));
+
+  const failedOutput = path.join(directory, "exclusive-open-failure.json");
+  let failedStageName;
+  await assert.rejects(writeExclusiveConfig(failedOutput, Buffer.from("intended"), {
+    beforeOpenStagedConfig: async (stagedOutput, stagingDirectory) => {
+      failedStageName = path.basename(stagingDirectory);
+      await writeFile(stagedOutput, "pre-existing staged config");
+    }
+  }), {code: "EEXIST"});
+  assert.deepEqual(await readFile(path.join(directory, failedStageName, "config")),
+    Buffer.from("pre-existing staged config"));
 });
 
 test("post-publication directory open and sync failures report verified uncertain durability", async t => {

@@ -1,5 +1,6 @@
 import {createHash} from "node:crypto";
-import {open, lstat, link, mkdtemp, rm} from "node:fs/promises";
+import {constants} from "node:fs";
+import {open, lstat, link, mkdtemp, rmdir, unlink} from "node:fs/promises";
 import path from "node:path";
 import {pathToFileURL} from "node:url";
 import {parseDexScreenerPair} from "./adapters.mjs";
@@ -354,6 +355,10 @@ function sameDirectory(left, right) {
   return left.isDirectory() && right.isDirectory() && left.dev === right.dev && left.ino === right.ino;
 }
 
+function sameFile(left, right) {
+  return left.isFile() && right.isFile() && left.dev === right.dev && left.ino === right.ino;
+}
+
 function descriptorPath(handle) {
   if (process.platform !== "linux") {
     throw new TypeError("safe config publication requires Linux directory handles");
@@ -372,11 +377,15 @@ export async function writeExclusiveConfig(output, bytes, {
   write = (handle, data) => handle.writeFile(data),
   sync = handle => handle.sync(),
   openDirectory = directory => open(directory, "r"),
-  syncDirectory = handle => handle.sync()
+  syncDirectory = handle => handle.sync(),
+  beforeOpenStagingDirectory = async () => {},
+  beforeOpenStagedConfig = async () => {}
 } = {}) {
   if (typeof output !== "string" || !path.isAbsolute(output) || !Buffer.isBuffer(bytes) ||
       typeof write !== "function" || typeof sync !== "function" ||
-      typeof openDirectory !== "function" || typeof syncDirectory !== "function") {
+      typeof openDirectory !== "function" || typeof syncDirectory !== "function" ||
+      typeof beforeOpenStagingDirectory !== "function" ||
+      typeof beforeOpenStagedConfig !== "function") {
     throw new TypeError("an absolute output path and config bytes are required");
   }
   const resolved = path.resolve(output);
@@ -389,6 +398,7 @@ export async function writeExclusiveConfig(output, bytes, {
   let stagingHandle;
   let stagingIdentity;
   let handle;
+  let stagedFileCreated = false;
   let publicationStatus = "PUBLISHED_DURABLE";
   try {
     directoryHandle = await open(directory, "r");
@@ -396,15 +406,25 @@ export async function writeExclusiveConfig(output, bytes, {
     await assertDirectoryBinding(directory, expectedDirectory, directoryHandle);
     stagingDirectory = await mkdtemp(path.join(directoryPath, ".candidate-intake-"));
     stagingName = path.basename(stagingDirectory);
-    stagingHandle = await open(stagingDirectory, "r");
-    const stagingPath = descriptorPath(stagingHandle);
-    const stagingInfo = await stagingHandle.stat();
-    if (!stagingInfo.isDirectory() || (stagingInfo.mode & 0o077) !== 0) {
+    const createdStagingInfo = await lstat(stagingDirectory);
+    if (!createdStagingInfo.isDirectory() || (createdStagingInfo.mode & 0o077) !== 0) {
       throw new TypeError("private config staging directory was not created safely");
     }
-    stagingIdentity = {dev: stagingInfo.dev, ino: stagingInfo.ino};
+    stagingIdentity = {dev: createdStagingInfo.dev, ino: createdStagingInfo.ino};
+    await beforeOpenStagingDirectory(stagingDirectory);
+    stagingHandle = await open(
+      stagingDirectory,
+      constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW
+    );
+    const stagingPath = descriptorPath(stagingHandle);
+    const stagingInfo = await stagingHandle.stat();
+    if (!sameDirectory(createdStagingInfo, stagingInfo) || (stagingInfo.mode & 0o077) !== 0) {
+      throw new TypeError("private config staging directory identity changed before opening");
+    }
     const stagedOutput = path.join(stagingPath, "config");
+    await beforeOpenStagedConfig(stagedOutput, stagingDirectory);
     handle = await open(stagedOutput, "wx", 0o600);
+    stagedFileCreated = true;
     await handle.chmod(0o600);
     await write(handle, bytes);
     await sync(handle);
@@ -449,17 +469,23 @@ export async function writeExclusiveConfig(output, bytes, {
       publicationStatus = "PUBLISHED_DURABILITY_UNCERTAIN";
     }
   } finally {
+    if (handle && stagedFileCreated && stagingHandle) {
+      try {
+        const stagedOutput = path.join(descriptorPath(stagingHandle), "config");
+        const [openedInfo, currentInfo] = await Promise.all([handle.stat(), lstat(stagedOutput)]);
+        if (sameFile(openedInfo, currentInfo)) await unlink(stagedOutput);
+      } catch {}
+    }
     if (handle) try { await handle.close(); } catch {}
     if (stagingHandle) {
-      try { await rm(path.join(descriptorPath(stagingHandle), "config"), {force: true}); } catch {}
       try { await stagingHandle.close(); } catch {}
     }
-    if (stagingDirectory && stagingName && directoryHandle) {
+    if (stagingDirectory && stagingName && directoryHandle && stagingIdentity) {
       try {
         const stagingPath = path.join(descriptorPath(directoryHandle), stagingName);
         const current = await lstat(stagingPath);
         if (current.dev === stagingIdentity.dev && current.ino === stagingIdentity.ino) {
-          await rm(stagingPath, {recursive: true, force: true});
+          await rmdir(stagingPath);
         }
       } catch {}
     }
@@ -472,7 +498,10 @@ export async function readSnapshotFile(inputPath) {
   if (typeof inputPath !== "string" || !path.isAbsolute(inputPath)) {
     throw new TypeError("input path must be absolute");
   }
-  const handle = await open(inputPath, "r");
+  const handle = await open(
+    inputPath,
+    constants.O_RDONLY | constants.O_NONBLOCK | constants.O_NOFOLLOW
+  );
   let bytes;
   try {
     const info = await handle.stat();
