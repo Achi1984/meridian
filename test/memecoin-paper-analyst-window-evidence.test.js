@@ -214,9 +214,14 @@ test("truncated history, ambiguous routes, unpriced flow and a zero sell side do
   assert.equal(truncatedPacket.metrics.qualifiedSmartWallets, undefined);
 
   const missingTransaction = makeFixture();
-  missingTransaction.transactions.push({
-    ...missingTransaction.transactions[0], transaction: null, meta: null
-  });
+  const unavailableRow = {
+    ...makeSwap(990_000, missingTransaction.candidateT - 10_000),
+    transaction: null,
+    meta: null
+  };
+  assert.equal(decodeCpmmSuccessfulSwap(unavailableRow, missingTransaction).reason,
+    "TRANSACTION_UNAVAILABLE");
+  missingTransaction.transactions.push(unavailableRow);
   assert.equal((await packet(missingTransaction)).metrics.uniqueBuyers1h, undefined);
 
   const ambiguous = makeFixture();
