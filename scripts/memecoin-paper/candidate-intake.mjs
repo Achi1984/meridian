@@ -1,5 +1,5 @@
 import {createHash} from "node:crypto";
-import {open, lstat, readFile, rm} from "node:fs/promises";
+import {open, lstat, rm} from "node:fs/promises";
 import path from "node:path";
 import {pathToFileURL} from "node:url";
 import {parseDexScreenerPair} from "./adapters.mjs";
@@ -178,6 +178,14 @@ function inspectSnapshot(snapshot, rowIndex, {now, startAt, endAt}, rejections) 
     addRejection(rejections, reason("FUTURE_PAIR_TIME", rowIndex, identity));
     return null;
   }
+  if (sampledAt - pair.pairCreatedAt < FILTER_POLICY.minPairAgeMs) {
+    addRejection(rejections, reason("PAIR_YOUNGER_THAN_MINIMUM_AT_SAMPLE", rowIndex, identity));
+    return null;
+  }
+  if (sampledAt - pair.pairCreatedAt > FILTER_POLICY.maxPairAgeMs) {
+    addRejection(rejections, reason("PAIR_OLDER_THAN_MAXIMUM_AT_SAMPLE", rowIndex, identity));
+    return null;
+  }
   if (pair.marketCap === undefined || pair.marketCap === null) {
     addRejection(rejections, reason("MISSING_MARKET_CAP", rowIndex, identity));
     return null;
@@ -212,10 +220,11 @@ function inspectSnapshot(snapshot, rowIndex, {now, startAt, endAt}, rejections) 
 }
 
 function compareCandidates(left, right) {
+  const lexical = (a, b) => a < b ? -1 : a > b ? 1 : 0;
   return right.sampledAt - left.sampledAt ||
-    left.candidate.pool.localeCompare(right.candidate.pool) ||
-    left.candidate.quote.localeCompare(right.candidate.quote) ||
-    left.candidate.mint.localeCompare(right.candidate.mint);
+    lexical(left.candidate.pool, right.candidate.pool) ||
+    lexical(left.candidate.quote, right.candidate.quote) ||
+    lexical(left.candidate.mint, right.candidate.mint);
 }
 
 function selectionFrom(options) {
@@ -261,9 +270,13 @@ export function buildCandidateIntakePlan({
   if (selection) {
     ordered = eligible.filter(({candidate}) =>
       candidate.chainId === selection.chainId && candidate.mint === selection.mint &&
-      candidate.pool === selection.pool && candidate.quote === selection.quote);
+      candidate.pool === selection.pool && candidate.quote === selection.quote).sort(compareCandidates);
     if (ordered.length === 0) {
       addRejection(rejections, reason("EXPLICIT_IDENTITY_NOT_ELIGIBLE", -1, selection));
+    } else {
+      for (const duplicate of ordered.slice(1)) {
+        addRejection(rejections, reason("DUPLICATE_MINT_POOL_NOT_MIXED", -1, duplicate.candidate));
+      }
     }
   } else {
     const byMint = new Map();
@@ -376,15 +389,35 @@ export async function readSnapshotFile(inputPath) {
   if (typeof inputPath !== "string" || !path.isAbsolute(inputPath)) {
     throw new TypeError("input path must be absolute");
   }
-  const bytes = await readFile(inputPath);
-  if (bytes.byteLength > MAX_INPUT_BYTES) {
-    throw new TypeError(`input exceeded the ${MAX_INPUT_BYTES}-byte limit`);
+  const handle = await open(inputPath, "r");
+  let bytes;
+  try {
+    const info = await handle.stat();
+    if (!info.isFile()) throw new TypeError("input must be a regular file");
+    if (info.size > MAX_INPUT_BYTES) {
+      throw new TypeError(`input exceeded the ${MAX_INPUT_BYTES}-byte limit`);
+    }
+    const chunks = [];
+    let size = 0;
+    while (size <= MAX_INPUT_BYTES) {
+      const buffer = Buffer.alloc(Math.min(64 * 1024, MAX_INPUT_BYTES + 1 - size));
+      const {bytesRead} = await handle.read(buffer, 0, buffer.byteLength, null);
+      if (bytesRead === 0) break;
+      size += bytesRead;
+      if (size > MAX_INPUT_BYTES) {
+        throw new TypeError(`input exceeded the ${MAX_INPUT_BYTES}-byte limit`);
+      }
+      chunks.push(buffer.subarray(0, bytesRead));
+    }
+    bytes = Buffer.concat(chunks, size);
+  } finally {
+    await handle.close();
   }
   let parsed;
   try {
-    parsed = JSON.parse(bytes.toString("utf8"));
+    parsed = JSON.parse(new TextDecoder("utf-8", {fatal: true}).decode(bytes));
   } catch {
-    throw new TypeError("input was not valid JSON");
+    throw new TypeError("input was not valid UTF-8 JSON");
   }
   if (!isRecord(parsed) || !Array.isArray(parsed.snapshots) ||
       parsed.snapshots.length > MAX_SNAPSHOTS) {

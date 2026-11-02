@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import {spawnSync} from "node:child_process";
 import {readFile, mkdtemp, mkdir, writeFile, stat, rm} from "node:fs/promises";
 import {createHash} from "node:crypto";
 import os from "node:os";
@@ -77,7 +78,7 @@ test("offline intake normalizes caller snapshots and emits only a canonical obse
   const directory = await harness(t);
   const output = path.join(directory, "run-config.json");
   const pair = await pairFixture({
-    pairCreatedAt: START_AT - FILTER_POLICY.minPairAgeMs,
+    pairCreatedAt: NOW - FILTER_POLICY.minPairAgeMs,
     status: "PASS",
     verified: true,
     evidence: {marketCapUsd: {verified: true, status: "PASS"}}
@@ -86,15 +87,6 @@ test("offline intake normalizes caller snapshots and emits only a canonical obse
   const parsed = parseDexScreenerPair(pair, {sampledAt: NOW, observedAt: NOW});
   assert.equal(parsed.status, "PARTIAL");
   assert.equal(parsed.marketCapUsd, 1_000_000);
-
-  const result = await runCandidateIntake({
-    input: path.join(directory, "snapshots.json"),
-    output,
-    runId: "candidate-intake-test",
-    startAt: START_AT,
-    now: NOW
-  }).catch(error => error);
-  assert.equal(result.code, "ENOENT");
   await writeFile(path.join(directory, "snapshots.json"),
     JSON.stringify(input([raw])));
   const ready = await runCandidateIntake({
@@ -188,35 +180,50 @@ test("the actual fixed four-request provider path normalizes data but missing ri
   assert.deepEqual(requests.map(request => request.kind), [
     "pair", "getAccountInfo", "getTokenLargestAccounts", "getTokenSupply"
   ]);
+  assert.equal(requests[0].url,
+    `https://api.dexscreener.com/latest/dex/pairs/solana/${IDENTITY.pool}`);
+  assert.ok(requests.slice(1).every(request =>
+    request.url === "https://api.mainnet-beta.solana.com" && request.method === "POST"));
   assert.equal(result.status, "ACQUISITION_FINISHED");
   assert.equal(result.events.length, 4);
+  assert.equal(result.counters.requests, 4);
   assert.equal(result.events[0].observedAtBasis, "response-receipt-not-source-event-time");
   const candidate = result.candidates[0].candidate;
   assert.equal(candidate.evidence.marketCapUsd.value, 1_000_000);
   assert.equal(candidate.evidence.pairCreatedAt.value, pair.pairCreatedAt);
-  assert.equal(candidate.evidence.top10OwnerPct.verified, false);
-  assert.equal(candidate.evidence.mintAuthorityRevoked.verified, false);
+  for (const key of [
+    "top10OwnerPct", "mintAuthorityRevoked", "freezeAuthorityRevoked",
+    "lpProtection", "devAssociatedPct", "crediblePriorRug", "bundledLaunchPct",
+    "tokenExtensions"
+  ]) {
+    assert.equal(candidate.evidence[key].value, null, `${key} remains unavailable`);
+    assert.equal(candidate.evidence[key].verified, false, `${key} is not verified`);
+  }
   const filters = filterCandidate(candidate, {now: NOW, holdUntil: NOW + 8 * 60 * 60 * 1000});
   assert.equal(filters.status, "UNKNOWN");
   assert.equal(filters.accepted, false);
   assert.equal(filters.checks.marketCap.status, "PASS");
-  assert.equal(filters.checks.top10Owners.status, "UNKNOWN");
-  assert.equal(filters.checks.mintAuthority.status, "UNKNOWN");
+  for (const key of [
+    "top10Owners", "mintAuthority", "freezeAuthority", "lpProtection",
+    "devHoldings", "priorRug", "bundledLaunch", "tokenExtensions"
+  ]) {
+    assert.equal(filters.checks[key].status, "UNKNOWN", `${key} remains UNKNOWN`);
+  }
 });
 
 test("deterministic selection deduplicates mints without combining pool identities", async () => {
   const preferred = await pairFixture({
     pairAddress: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-    pairCreatedAt: START_AT - FILTER_POLICY.minPairAgeMs
+    pairCreatedAt: NOW - FILTER_POLICY.minPairAgeMs
   });
   const otherPool = await pairFixture({
     pairAddress: "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE",
-    pairCreatedAt: START_AT - FILTER_POLICY.minPairAgeMs
+    pairCreatedAt: NOW - FILTER_POLICY.minPairAgeMs
   });
   const otherMint = await pairFixture({
     baseToken: {address: "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"},
     pairAddress: "GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
-    pairCreatedAt: START_AT - FILTER_POLICY.minPairAgeMs
+    pairCreatedAt: NOW - FILTER_POLICY.minPairAgeMs
   });
   const first = plan([snapshot(otherPool), snapshot(otherMint), snapshot(preferred)]);
   const second = plan([snapshot(preferred), snapshot(otherMint), snapshot(otherPool)]);
@@ -233,14 +240,14 @@ test("deterministic selection deduplicates mints without combining pool identiti
 
 test("pair age boundaries reserve the complete eight-hour window and enforce the minimum age", async () => {
   const atMinimum = await pairFixture({
-    pairCreatedAt: START_AT - FILTER_POLICY.minPairAgeMs
+    pairCreatedAt: NOW - FILTER_POLICY.minPairAgeMs
   });
   assert.equal(plan([snapshot(atMinimum)]).status, "OBSERVATION_PLAN_READY");
   const tooYoung = await pairFixture({
-    pairCreatedAt: START_AT - FILTER_POLICY.minPairAgeMs + 1
+    pairCreatedAt: NOW - FILTER_POLICY.minPairAgeMs + 1
   });
   assert.ok(plan([snapshot(tooYoung)]).rejections.items
-    .some(item => item.code === "PAIR_YOUNGER_THAN_MINIMUM_AT_START"));
+    .some(item => item.code === "PAIR_YOUNGER_THAN_MINIMUM_AT_SAMPLE"));
 
   const atMaximum = await pairFixture({
     pairCreatedAt: END_AT - FILTER_POLICY.maxPairAgeMs
@@ -254,22 +261,26 @@ test("pair age boundaries reserve the complete eight-hour window and enforce the
 });
 
 test("missing and future times, wrong chains, identity mismatch, FDV-only and invalid numbers block intake", async () => {
-  const base = await pairFixture({pairCreatedAt: START_AT - FILTER_POLICY.minPairAgeMs});
+  const base = await pairFixture({pairCreatedAt: NOW - FILTER_POLICY.minPairAgeMs});
   const missingSample = {...snapshot(base)};
   delete missingSample.sampledAt;
   const futureSample = snapshot(base, {sampledAt: NOW + 1});
   const missingCreatedAt = await pairFixture();
   delete missingCreatedAt.pairCreatedAt;
+  const futurePairTime = await pairFixture({pairCreatedAt: NOW + 1});
   const wrongChain = await pairFixture({chainId: "ethereum"});
   const fdvOnly = await pairFixture({marketCap: undefined, fdv: 99_000_000});
   const invalidNumber = await pairFixture({marketCap: Number.POSITIVE_INFINITY});
+  const nonNumeric = await pairFixture({marketCap: "1000000"});
   const cases = [
     [missingSample, "MISSING_OR_INVALID_SAMPLE_TIME"],
     [futureSample, "FUTURE_SAMPLE_TIME"],
     [snapshot(missingCreatedAt), "MISSING_OR_INVALID_PAIR_TIME"],
+    [snapshot(futurePairTime), "FUTURE_PAIR_TIME"],
     [snapshot(wrongChain), "WRONG_CHAIN"],
     [snapshot(fdvOnly), "MISSING_MARKET_CAP"],
-    [snapshot(invalidNumber), "INVALID_MARKET_CAP"]
+    [snapshot(invalidNumber), "INVALID_MARKET_CAP"],
+    [snapshot(nonNumeric), "INVALID_MARKET_CAP"]
   ];
   for (const [candidate, code] of cases) {
     const result = plan([candidate]);
@@ -290,7 +301,7 @@ test("missing and future times, wrong chains, identity mismatch, FDV-only and in
 });
 
 test("planning revalidates snapshot freshness and refuses stale timestamps", async () => {
-  const pair = await pairFixture({pairCreatedAt: START_AT - FILTER_POLICY.minPairAgeMs});
+  const pair = await pairFixture({pairCreatedAt: NOW - 60 * 60 * 1000});
   const freshBoundary = snapshot(pair, {
     sampledAt: NOW - FILTER_POLICY.maxEvidenceAgeMs
   });
@@ -338,15 +349,50 @@ test("exclusive output preserves existing files, cleans partial failures, and re
 test("no eligible candidate creates no config, and bounded rejection metadata stays caller-only", async t => {
   const directory = await harness(t);
   const output = path.join(directory, "never-created.json");
+  const inputPath = path.join(directory, "snapshots.json");
   const pair = await pairFixture({
-    pairCreatedAt: START_AT - FILTER_POLICY.minPairAgeMs,
+    pairCreatedAt: NOW - FILTER_POLICY.minPairAgeMs,
     marketCap: null,
     fdv: 50_000_000
   });
+  await writeFile(inputPath, JSON.stringify(input([snapshot(pair)])));
   const result = plan([snapshot(pair)], {output});
   assert.equal(result.status, "OBSERVATION_PLAN_BLOCKED");
   assert.equal(result.executionAuthorized, false);
   assert.equal(result.provenance.source, CALLER_SNAPSHOT_SOURCE);
   assert.ok(result.rejections.items.some(item => item.code === "MISSING_MARKET_CAP"));
+  const run = await runCandidateIntake({
+    input: inputPath,
+    output,
+    runId: "blocked-intake-test",
+    startAt: START_AT,
+    now: NOW
+  });
+  assert.equal(run.status, "OBSERVATION_PLAN_BLOCKED");
   await assert.rejects(readFile(output), {code: "ENOENT"});
+});
+
+test("the documented executable CLI writes the config and returns bounded plan metadata", async t => {
+  const directory = await harness(t);
+  const inputPath = path.join(directory, "snapshots.json");
+  const output = path.join(directory, "run-config.json");
+  const now = Date.now();
+  const startAt = now + 60_000;
+  const pair = await pairFixture({
+    pairCreatedAt: now - 60 * 60 * 1000
+  });
+  await writeFile(inputPath, JSON.stringify(input([snapshot(pair, {sampledAt: now})])));
+  const cli = path.join(ROOT, "scripts/memecoin-paper/candidate-intake.mjs");
+  const result = spawnSync(process.execPath, [
+    cli, "--input", inputPath, "--output", output,
+    "--run-id", "candidate-intake-cli-test", "--start-at", String(startAt)
+  ], {encoding: "utf8", timeout: 5_000});
+  assert.equal(result.status, 0, result.stderr);
+  const report = JSON.parse(result.stdout);
+  assert.equal(report.status, "OBSERVATION_PLAN_READY");
+  assert.equal(report.executionAuthorized, false);
+  assert.equal(report.hardGateStatus, "UNKNOWN");
+  assert.equal(report.configHash, createHash("sha256")
+    .update(await readFile(output)).digest("hex"));
+  assert.deepEqual(report.identity, IDENTITY);
 });
