@@ -301,9 +301,10 @@ export function offlineFixtureAdapters(options = {}) {
   const adapters = Object.freeze({
     async acquireCandidates({now, signal, recordRequest}) {
       if (fault === "DISCONNECT") throw Object.assign(new Error("fixture disconnect"), {code: "DISCONNECTED"});
-      if (fault === "CALLBACK_TIMEOUT" || fault === "LATE_DEADLINE") {
+      if (fault === "CALLBACK_TIMEOUT") {
         await new Promise(resolve => setTimeout(resolve, 30));
       }
+      if (fault === "LATE_DEADLINE") clock.advance(10_001);
       if (fault === "WAIT_FOR_STOP") {
         return new Promise(resolve => signal.addEventListener("abort", () => resolve([]), {once: true}));
       }

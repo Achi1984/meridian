@@ -173,22 +173,25 @@ test("actual open unvalued positions remain UNKNOWN without fabricated terminal 
 });
 
 test("actual deadline completion keeps the post-deadline finish time without backdating", async t => {
-  const startedAt = Date.now() - EIGHT_HOURS + 100;
+  const startedAt = START;
   const deadlineAt = startedAt + EIGHT_HOURS;
   const {result: run, export: runExport} = await produce(t, {
     fault: "LATE_DEADLINE",
     runId: "actual-late-deadline",
     startedAt,
-    wallStart: deadlineAt - 10
+    wallStart: deadlineAt - 10_000
   });
   const finishAt = runExport.checkpoint.records.at(-1).inputs.now;
   const evaluation = evaluate(runExport);
+  const nonPassChecks = evaluation.checks.filter(item => item.status !== "PASS");
 
   assert.equal(run.status, "FINISHED");
   assert.equal(runExport.runnerReport.reason, "DEADLINE");
   assert.ok(finishAt > deadlineAt);
   assert.equal(evaluation.evidence.terminalAt, new Date(finishAt).toISOString());
-  assert.equal(evaluation.overall, "PASS");
+  assert.ok(runExport.runnerReport.operationResults.some(item =>
+    item.method === "riskSnapshot"), "a complete risk snapshot must precede the late acquisition");
+  assert.equal(evaluation.overall, "PASS", JSON.stringify(nonPassChecks, null, 2));
   assert.equal(evaluation.outcome, "ZERO_ENTRY_COMPLETE");
   assert.equal(check(evaluation, "time_lifecycle").status, "PASS");
   assert.equal(check(evaluation, "deadline_reason").status, "PASS");
