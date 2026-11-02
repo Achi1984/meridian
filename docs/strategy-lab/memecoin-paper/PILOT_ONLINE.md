@@ -237,6 +237,19 @@ than guessing if the lock exists without a terminal marker. `report` reads the
 separately persisted projection and does not manufacture one from a controller
 summary.
 
+The pilot also atomically updates `observation-audit.json` independently of the
+ledger checkpoint. It binds to the run ID and canonical-config SHA-256, retains
+allowlisted provider request outcomes and per-candidate filter/analyst reasons,
+and omits response bodies, headers, and credentials. Its hard limits are 4 MiB,
+960 request rows, 300 candidate rows, 20 checks per candidate stage, 160
+characters per free-text field, 800 atomic updates, and 512 MiB cumulative
+serialized writes per run. Missing or truncated details are declared as
+omissions and remain `UNKNOWN`; truncation is flagged. The report command
+displays an audit-only summary while no operator report exists. A write failure
+is recorded as a pilot failure instead of being presented as complete
+diagnostics. This artifact is observational, separate from the ledger, and
+cannot repair historical runs or authorize deployment or another observation.
+
 ## CLI exit codes
 
 The CLI preserves its result on stdout; consumers should parse that output rather
@@ -259,13 +272,7 @@ zero exit code.
 Run focused tests only:
 
 ```sh
-node --test test/memecoin-paper-pilot-cli.test.js \
-  test/memecoin-paper-pilot-online.test.js \
-  test/memecoin-paper-pilot-assembly.test.js \
-  test/memecoin-paper-pilot-integration.test.js \
-  test/memecoin-paper-provider-evidence.test.js \
-  test/memecoin-paper-pilot-run-control.test.js \
-  test/memecoin-paper-operator-report.test.js
+node --test test/memecoin-paper-observation-audit.test.js test/memecoin-paper-pilot-online.test.js test/memecoin-paper-pilot-assembly.test.js test/memecoin-paper-pilot-cli.test.js test/memecoin-paper-pilot-integration.test.js test/memecoin-paper-provider-evidence.test.js test/memecoin-paper-pilot-run-control.test.js test/memecoin-paper-operator-report.test.js
 ```
 
 The online/assembly tests use fake public transport/time and temporary storage.
