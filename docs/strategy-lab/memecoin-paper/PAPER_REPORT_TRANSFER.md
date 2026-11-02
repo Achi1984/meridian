@@ -169,19 +169,25 @@ with `node` for the one-shot exporter. The worker environment file supplies the
 required settings without placing secret values in the command. Set
 `WORKER_PAPER_DATA_ROOT` to the host-side preserved run-data directory and
 `MERIDIAN_PAPER_REPORT_EXPECTED_RUN_ID` to the independently verified run ID;
-mount the preserved run data read-only:
+the pilot writes its run files directly into its `--data-dir`, so this host-side
+directory contains `run-config.json`, `run.lock`, `terminal.json`, and
+`operator-report.json` at its root. Set `RUN_ID` below to that same independently
+verified run ID and ensure it matches the expected ID in the worker environment
+file. Mount the flat host directory at the container's run-ID child path; the
+exporter root remains the parent directory and the files are read-only:
 
 The exporter requires Linux with a usable `/proc/self/fd`; unsupported platforms
 fail closed before reading or sending report data.
 
 ```sh
+RUN_ID=<independently-verified-run-id>
 docker run --rm --entrypoint node \
   --env-file "$WORKER_ENV_FILE" \
-  --mount "type=bind,src=$WORKER_PAPER_DATA_ROOT,dst=/var/data/meridian-paper,readonly" \
+  --mount "type=bind,src=$WORKER_PAPER_DATA_ROOT,dst=/var/data/meridian-paper/$RUN_ID,readonly" \
   --env MERIDIAN_PAPER_REPORT_DATA_ROOT=/var/data/meridian-paper \
   meridian-paper:report-transfer \
   scripts/memecoin-paper-report-transfer/transfer.mjs \
-  --run-id "$MERIDIAN_PAPER_REPORT_EXPECTED_RUN_ID"
+  --run-id "$RUN_ID"
 ```
 
 `TRANSFERRED` means the exporter verified the complete acknowledgement (at most

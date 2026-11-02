@@ -150,12 +150,13 @@ async function workerFixture(t, {
   runId = RUN_ID,
   configRunId = runId,
   report = reportFixture(),
-  linkReport = false
+  linkReport = false,
+  flatData = false
 } = {}) {
   const root = await mkdtemp(path.join(os.tmpdir(), "paper-transfer-"));
   t.after(() => rm(root, {recursive: true, force: true}));
-  const runDirectory = path.join(root, runId);
-  await mkdir(runDirectory);
+  const runDirectory = flatData ? root : path.join(root, runId);
+  if (!flatData) await mkdir(runDirectory);
   const configBytes = Buffer.from(canonicalJson({
     mode: "READ_ONLY_PAPER",
     runId: configRunId
@@ -236,11 +237,48 @@ test("exporter is disabled by default without reading or sending data", async t 
 
 test("Paper worker image includes the exporter and its transitive local modules", () => {
   const dockerfile = readFileSync(new URL("../Dockerfile.paper", import.meta.url), "utf8");
+  const handoff = readFileSync(new URL("../docs/strategy-lab/memecoin-paper/PAPER_REPORT_TRANSFER.md", import.meta.url), "utf8");
   assert.match(dockerfile, /COPY --chown=node:node scripts\/memecoin-paper\//);
   assert.match(dockerfile, /COPY --chown=node:node scripts\/memecoin-paper-report-transfer\//);
   assert.match(dockerfile, /COPY --chown=node:node scripts\/memecoin-paper-report-bridge\//);
   assert.match(dockerfile, /COPY --chown=node:node scripts\/memecoin-paper-token-safety\//);
   assert.match(dockerfile, /ENTRYPOINT \["node", "scripts\/memecoin-paper\/pilot-online\.mjs"\]/);
+  assert.match(handoff, /dst=\/var\/data\/meridian-paper\/\$RUN_ID/);
+  assert.match(handoff, /MERIDIAN_PAPER_REPORT_DATA_ROOT=\/var\/data\/meridian-paper/);
+});
+
+test("exporter handles the deployed flat-volume bind mount layout and rejects a wrong run", async t => {
+  const hostFixture = await workerFixture(t, {flatData: true});
+  const containerRoot = await mkdtemp(path.join(os.tmpdir(), "paper-transfer-mounted-"));
+  t.after(() => rm(containerRoot, {recursive: true, force: true}));
+  const mountTarget = path.join(containerRoot, RUN_ID);
+  await mkdir(mountTarget);
+  for (const name of ["run.lock", "terminal.json", "run-config.json", "operator-report.json"]) {
+    await rename(path.join(hostFixture.root, name), path.join(mountTarget, name));
+  }
+  const deployedFixture = {...hostFixture, root: containerRoot};
+  let sends = 0;
+  const result = await transferPostRunReport({
+    ...makeWorkerOptions(deployedFixture),
+    readStatus: undefined,
+    readReport: undefined,
+    fetchImpl: async (_url, options) => {
+      sends++;
+      return receiptResponse(201, options.body);
+    }
+  });
+  assert.equal(result.status, "TRANSFERRED");
+  assert.equal(sends, 1);
+
+  const wrongRun = await transferPostRunReport({
+    ...makeWorkerOptions(deployedFixture),
+    runId: "different-run",
+    readStatus: undefined,
+    readReport: undefined,
+    fetchImpl: async () => { sends++; }
+  });
+  assert.deepEqual(wrongRun, {status: "REJECTED", reason: "run_scope_mismatch"});
+  assert.equal(sends, 1);
 });
 
 test("one-shot transfer validates terminal/config and sends only the fixed bounded envelope", async t => {
