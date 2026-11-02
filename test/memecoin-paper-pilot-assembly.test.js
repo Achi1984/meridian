@@ -389,7 +389,8 @@ test("unsettled checkpoint work blocks terminal session I/O and late completion"
   assert.equal(io.overlappingReadbacks, 0);
   assert.equal(io.overlappingCloses, 0);
   assert.equal(io.projections, 0);
-  assert.equal(await readPilotReport(harness.dataDirectory).then(value => value.status), "BLOCKED");
+  assert.equal(await readPilotReport(harness.dataDirectory).then(value => value.status), "AUDIT_ONLY");
+  assert.match(await readPilotReport(harness.dataDirectory).then(value => value.text), /Audit state: RUNNING/);
   releaseCheckpoint();
   await harness.firstCheckpoint;
   assert.equal(terminal.status, "UNKNOWN");
