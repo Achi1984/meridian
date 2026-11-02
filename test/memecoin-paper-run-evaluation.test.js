@@ -635,8 +635,8 @@ test("bounded audit counts fail closed and gate terminal completion", () => {
       truncated: false,
       replayLoggerTruncated: false,
       ledgerAuditTruncated: false,
-      ledgerEventsReported: 0,
-      ledgerEventsAudited: 0
+      ledgerEventsReported: 1,
+      ledgerEventsAudited: 1
     });
     change(report.dto.evidence.coverage.audit);
     input.reportBytes = bytes(report);
@@ -658,10 +658,15 @@ test("bounded audit counts fail closed and gate terminal completion", () => {
     ["complete declaration conflicts with component truncation", audit => {
       audit.ledgerAuditTruncated = true;
     }],
+    ["finished report has no reported or audited ledger event", audit => {
+      audit.ledgerEventsReported = 0;
+      audit.ledgerEventsAudited = 0;
+    }],
     ["partial audit still cannot contain more events than the source reports", audit => {
       audit.truncated = true;
       audit.totalRows = null;
       audit.ledgerAuditTruncated = true;
+      audit.ledgerEventsReported = 0;
       audit.ledgerEventsAudited = 1;
     }]
   ]) {
@@ -676,10 +681,30 @@ test("bounded audit counts fail closed and gate terminal completion", () => {
     audit.totalRows = null;
     audit.ledgerAuditTruncated = true;
     audit.ledgerEventsReported = 4;
+    audit.ledgerEventsAudited = 1;
   });
   assert.equal(criterion(partial, "checkpoint_audit_coverage").status, "UNKNOWN");
   assert.equal(criterion(partial, "terminal_completion").status, "UNKNOWN");
   assert.equal(partial.observation.fullDeadlineCompleted, false);
+
+  const mixedEvidence = fixture();
+  const mixedReport = JSON.parse(mixedEvidence.reportBytes.toString("utf8"));
+  Object.assign(mixedReport.dto.evidence.coverage.audit, {
+    present: true,
+    observedRows: 1,
+    totalRows: 1,
+    truncated: false,
+    replayLoggerTruncated: false,
+    ledgerAuditTruncated: false,
+    ledgerEventsReported: 0,
+    ledgerEventsAudited: 0
+  });
+  mixedReport.dto.controls.openPositionCount = null;
+  mixedEvidence.reportBytes = bytes(mixedReport);
+  const mixedResult = evaluateObservation(mixedEvidence);
+  assert.equal(criterion(mixedResult, "checkpoint_audit_coverage").status, "FAIL");
+  assert.equal(criterion(mixedResult, "terminal_completion").status, "FAIL");
+  assert.equal(mixedResult.observation.fullDeadlineCompleted, false);
 });
 
 test("failure codes reconcile across terminal and report before completion", () => {
@@ -779,12 +804,80 @@ test("candidate rejection reasons are preserved without manufacturing rejected c
   const endBoundaryResult = evaluateObservation({...input, reportBytes: bytes(endBoundary)});
   assert.equal(criterion(endBoundaryResult, "candidate_detail_coverage").status, "PASS");
 
+  for (const [label, stopReason, elapsedMs, timestampField, offsetMs] of [
+    ["sample after early stop", "OPERATOR_STOP", 60 * 60 * 1000, "sampledAt", 60 * 60 * 1000 + 1],
+    ["reason after early stop", "OPERATOR_STOP", 60 * 60 * 1000, "reason", 60 * 60 * 1000 + 1],
+    ["reason after deadline", "DEADLINE", DURATION, "reason", DURATION + 1]
+  ]) {
+    const stopped = fixture({stopReason, elapsedMs});
+    const stoppedReport = JSON.parse(stopped.reportBytes.toString("utf8"));
+    stoppedReport.dto.candidates.considered = 1;
+    stoppedReport.dto.candidates.rejected = 1;
+    stoppedReport.dto.candidates.unknown = 0;
+    stoppedReport.dto.candidates.audited = 1;
+    stoppedReport.dto.candidates.authorizationReceiptCount = 1;
+    stoppedReport.dto.candidates.unaccountedObserved = 0;
+    stoppedReport.dto.candidates.detailsCoverage = {
+      observedTotal: 1,
+      total: 1,
+      displayed: 1,
+      displayTruncated: false,
+      sourceTruncated: false,
+      unaccounted: 0
+    };
+    stoppedReport.dto.candidates.details = [{
+      chainId: "solana",
+      mint: MINT,
+      pool: POOL,
+      relatedPool: null,
+      quote: QUOTE,
+      sampledAt: new Date(START).toISOString(),
+      status: "REJECT",
+      reasons: [{
+        gate: "liquidity",
+        status: "REJECT",
+        reason: "liquidity below threshold",
+        source: "fixture",
+        observedAt: new Date(START).toISOString()
+      }],
+      reasonsCoverage: {
+        observedTotal: 1,
+        total: 1,
+        displayed: 1,
+        displayTruncated: false,
+        sourceTruncated: false,
+        unaccounted: 0
+      }
+    }];
+    const candidate = stoppedReport.dto.candidates.details[0];
+    if (timestampField === "sampledAt") {
+      candidate.sampledAt = new Date(START + offsetMs).toISOString();
+    } else {
+      candidate.reasons[0].observedAt = new Date(START + offsetMs).toISOString();
+    }
+    stopped.reportBytes = bytes(stoppedReport);
+    const result = evaluateObservation(stopped);
+    assert.equal(criterion(result, "candidate_detail_coverage").status, "FAIL", label);
+    assert.equal(criterion(result, "terminal_completion").status, "FAIL", label);
+    assert.equal(result.observation.fullDeadlineCompleted, false, label);
+  }
+
   const inconsistentSummary = JSON.parse(input.reportBytes.toString("utf8"));
   inconsistentSummary.dto.candidates.considered = 0;
   const inconsistentCounts = evaluateObservation({...input, reportBytes: bytes(inconsistentSummary)});
   assert.equal(criterion(inconsistentCounts, "candidate_detail_coverage").status, "FAIL");
   assert.equal(criterion(inconsistentCounts, "terminal_completion").status, "FAIL");
   assert.equal(inconsistentCounts.observation.fullDeadlineCompleted, false);
+
+  const inconsistentAuditCount = JSON.parse(input.reportBytes.toString("utf8"));
+  inconsistentAuditCount.dto.candidates.audited = 0;
+  const inconsistentAuditResult = evaluateObservation({
+    ...input,
+    reportBytes: bytes(inconsistentAuditCount)
+  });
+  assert.equal(criterion(inconsistentAuditResult, "candidate_detail_coverage").status, "FAIL");
+  assert.equal(criterion(inconsistentAuditResult, "terminal_completion").status, "FAIL");
+  assert.equal(inconsistentAuditResult.observation.fullDeadlineCompleted, false);
 
   const inconsistentDetail = JSON.parse(input.reportBytes.toString("utf8"));
   inconsistentDetail.dto.candidates.details[0].status = "ACCEPTED";
@@ -795,6 +888,19 @@ test("candidate rejection reasons are preserved without manufacturing rejected c
   assert.equal(criterion(inconsistentDetailResult, "candidate_detail_coverage").status, "FAIL");
   assert.equal(criterion(inconsistentDetailResult, "terminal_completion").status, "FAIL");
   assert.equal(inconsistentDetailResult.observation.fullDeadlineCompleted, false);
+
+  const missingSummary = JSON.parse(input.reportBytes.toString("utf8"));
+  for (const key of [
+    "considered", "accepted", "rejected", "unknown", "audited",
+    "authorizationReceiptCount", "unaccountedObserved"
+  ]) {
+    missingSummary.dto.candidates[key] = null;
+  }
+  const missingSummaryResult = evaluateObservation({...input, reportBytes: bytes(missingSummary)});
+  assert.equal(criterion(missingSummaryResult, "candidate_detail_coverage").status, "UNKNOWN");
+  assert.equal(criterion(missingSummaryResult, "terminal_completion").status, "UNKNOWN");
+  assert.equal(missingSummaryResult.observation.completionStatus, "UNKNOWN");
+  assert.equal(missingSummaryResult.observation.fullDeadlineCompleted, false);
 });
 
 test("partial candidate accounting with unaccounted rows remains UNKNOWN", () => {
@@ -804,6 +910,7 @@ test("partial candidate accounting with unaccounted rows remains UNKNOWN", () =>
     candidateRejection: true
   });
   report.dto.candidates.considered = 10;
+  report.dto.candidates.unaccountedObserved = 9;
   report.dto.candidates.detailsCoverage = {
     observedTotal: 1,
     total: 10,
@@ -965,6 +1072,42 @@ test("terminal observation activity cannot conflict with a zero-activity report"
     assert.equal(authorizedResult.observation.fullDeadlineCompleted, false);
   }
 
+  const acceptedDetail = fixture();
+  const acceptedDetailReport = JSON.parse(acceptedDetail.reportBytes.toString("utf8"));
+  acceptedDetailReport.dto.candidates.considered = 1;
+  acceptedDetailReport.dto.candidates.accepted = null;
+  acceptedDetailReport.dto.candidates.detailsCoverage = {
+    observedTotal: 1,
+    total: 1,
+    displayed: 1,
+    displayTruncated: false,
+    sourceTruncated: false,
+    unaccounted: 0
+  };
+  acceptedDetailReport.dto.candidates.details = [{
+    chainId: "solana",
+    mint: MINT,
+    pool: POOL,
+    relatedPool: null,
+    quote: QUOTE,
+    sampledAt: new Date(START).toISOString(),
+    status: "ACCEPTED",
+    reasons: [],
+    reasonsCoverage: {
+      observedTotal: 0,
+      total: 0,
+      displayed: 0,
+      displayTruncated: false,
+      sourceTruncated: false,
+      unaccounted: 0
+    }
+  }];
+  acceptedDetail.reportBytes = bytes(acceptedDetailReport);
+  const acceptedDetailResult = evaluateObservation(acceptedDetail);
+  assert.equal(criterion(acceptedDetailResult, "candidate_detail_coverage").status, "UNKNOWN");
+  assert.equal(criterion(acceptedDetailResult, "terminal_completion").status, "FAIL");
+  assert.equal(acceptedDetailResult.observation.fullDeadlineCompleted, false);
+
   const unsupportedTradingStatus = fixture();
   const unsupportedReport = JSON.parse(unsupportedTradingStatus.reportBytes.toString("utf8"));
   unsupportedReport.dto.trading.status = "UNRECOGNIZED";
@@ -1047,6 +1190,74 @@ test("completion requires a finished report DTO and a coherent epoch terminal ti
   assert.equal(criterion(earlierTimestampResult, "terminal_completion").status, "FAIL");
 });
 
+test("position rows, counters, and stop states gate observation-only completion", () => {
+  const positionCases = [
+    ["missing count", dto => {
+      dto.controls.openPositionCount = null;
+    }, "UNKNOWN"],
+    ["missing unresolved count", dto => {
+      dto.valuation.unresolvedPositions = null;
+    }, "UNKNOWN"],
+    ["missing coverage", dto => {
+      dto.controls.openPositionsCoverage.total = null;
+    }, "UNKNOWN"],
+    ["coverage claims a position", dto => {
+      dto.controls.openPositionsCoverage.total = 1;
+    }, "FAIL"],
+    ["count claims a position without a row", dto => {
+      dto.controls.openPositionCount = 1;
+    }, "FAIL"],
+    ["unresolved position counter is positive", dto => {
+      dto.valuation.unresolvedPositions = 1;
+    }, "FAIL"],
+    ["position row conflicts with zero count", dto => {
+      dto.controls.openPositions.push({
+        mint: MINT,
+        tokenAtoms: "1",
+        decimals: 9,
+        entryCostCents: "1",
+        stopPriceMicros: null,
+        trailingActive: false,
+        markStatus: "UNAVAILABLE"
+      });
+    }, "FAIL"]
+  ];
+  for (const [label, change, expected] of positionCases) {
+    const input = fixture();
+    const report = JSON.parse(input.reportBytes.toString("utf8"));
+    change(report.dto);
+    input.reportBytes = bytes(report);
+    const result = evaluateObservation(input);
+    assert.equal(criterion(result, "terminal_completion").status, expected, label);
+    assert.equal(result.observation.completionStatus, expected, label);
+    assert.equal(result.observation.fullDeadlineCompleted, false, label);
+  }
+
+  const closedPaper = fixture();
+  const report = JSON.parse(closedPaper.reportBytes.toString("utf8"));
+  report.dto.controls.stops = [{
+    kind: "EXIT",
+    status: "CLOSED_PAPER",
+    reason: "paper exit executed",
+    observedAt: new Date(START + DURATION).toISOString(),
+    source: "checkpoint audit"
+  }];
+  report.dto.controls.stopsCoverage = {
+    observedTotal: 1,
+    total: 1,
+    displayed: 1,
+    displayTruncated: false,
+    sourceTruncated: false,
+    unaccounted: 0
+  };
+  closedPaper.reportBytes = bytes(report);
+  const closedPaperResult = evaluateObservation(closedPaper);
+  assert.equal(criterion(closedPaperResult, "terminal_completion").status, "FAIL");
+  assert.match(criterion(closedPaperResult, "terminal_completion").reason, /CLOSED_PAPER/);
+  assert.equal(closedPaperResult.observation.completionStatus, "FAIL");
+  assert.equal(closedPaperResult.observation.fullDeadlineCompleted, false);
+});
+
 test("provider totals distinguish zero from missing, reject mismatches, and retain exact integers", () => {
   const zero = evaluate();
   assert.equal(criterion(zero, "provider_accounting").status, "PASS");
@@ -1088,6 +1299,20 @@ test("provider totals distinguish zero from missing, reject mismatches, and reta
     }
   });
   assert.equal(criterion(inconsistentRequests, "provider_accounting").status, "FAIL");
+
+  const bytesWithoutRequests = evaluate({
+    providerAccounting: {
+      requests: 0,
+      bytes: 1,
+      providerEvents: 0,
+      dexRequests: 0,
+      rpcRequests: 0,
+      candidates: 0
+    }
+  });
+  assert.equal(criterion(bytesWithoutRequests, "provider_accounting").status, "FAIL");
+  assert.equal(bytesWithoutRequests.observation.completionStatus, "FAIL");
+  assert.equal(bytesWithoutRequests.observation.fullDeadlineCompleted, false);
 
   const exact = evaluate({
     providerAccounting: {

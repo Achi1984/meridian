@@ -224,11 +224,16 @@ function coverageStatus(report) {
     return makeCriterion("checkpoint_audit_coverage", "FAIL",
       "Complete checkpoint ledger-event counts do not reconcile.");
   }
+  if (audit.ledgerEventsReported === 0 &&
+      report?.dto?.experiment?.reportStatus === "FINISHED") {
+    return makeCriterion("checkpoint_audit_coverage", "FAIL",
+      "A finished checkpoint report must include at least one audited ledger event.");
+  }
   return makeCriterion("checkpoint_audit_coverage", "PASS",
     "The report declares complete audit coverage and reconciled ledger-event counts.");
 }
 
-function candidateCoverageStatus(report, config) {
+function candidateCoverageStatus(report, config, terminal) {
   const coverage = report?.dto?.candidates?.detailsCoverage;
   const details = report?.dto?.candidates?.details;
   const summary = report?.dto?.candidates;
@@ -260,28 +265,33 @@ function candidateCoverageStatus(report, config) {
     return makeCriterion("candidate_detail_coverage", "FAIL",
       "Displayed candidate count does not match the supplied detail rows.");
   }
-  const summaryCounts = ["considered", "accepted", "rejected", "unknown"].map(key =>
-    summary?.[key]);
+  const summaryKeys = [
+    "considered", "accepted", "rejected", "unknown", "audited",
+    "authorizationReceiptCount", "unaccountedObserved"
+  ];
+  const summaryCounts = summaryKeys.map(key => summary?.[key]);
   if (summaryCounts.some(value => value !== null && value !== undefined &&
       (!Number.isSafeInteger(value) || value < 0))) {
     return makeCriterion("candidate_detail_coverage", "FAIL",
       "Candidate summary counts are not non-negative safe integers.");
   }
-  if (Number.isSafeInteger(summary?.considered) && Number.isSafeInteger(coverage.total) &&
-      summary.considered !== coverage.total) {
+  if (summaryCounts.some(value => !Number.isSafeInteger(value))) {
+    return makeCriterion("candidate_detail_coverage", "UNKNOWN",
+      "One or more candidate summary counters are unavailable.");
+  }
+  if (summary.considered !== coverage.total ||
+      summary.unaccountedObserved !== coverage.unaccounted) {
     return makeCriterion("candidate_detail_coverage", "FAIL",
-      "Candidate considered count conflicts with the detail coverage total.");
+      "Candidate considered or unaccounted count conflicts with detail coverage.");
+  }
+  if (summary.accepted + summary.rejected + summary.unknown !== coverage.observedTotal ||
+      summary.audited > summary.considered || summary.audited !== coverage.observedTotal ||
+      summary.authorizationReceiptCount !== details.length) {
+    return makeCriterion("candidate_detail_coverage", "FAIL",
+      "Observed candidate outcomes, audited count, or authorization receipts do not reconcile.");
   }
   if (coverage.unaccounted === 0 && coverage.sourceTruncated === false &&
-      Number.isSafeInteger(summary?.considered) &&
-      ["accepted", "rejected", "unknown"].every(key => Number.isSafeInteger(summary[key])) &&
-      summary.accepted + summary.rejected + summary.unknown !== summary.considered) {
-    return makeCriterion("candidate_detail_coverage", "FAIL",
-      "Complete candidate outcome counts do not sum to the considered total.");
-  }
-  if (coverage.unaccounted === 0 && coverage.sourceTruncated === false &&
-      coverage.displayTruncated === false && coverage.displayed === details.length &&
-      ["accepted", "rejected", "unknown"].every(key => Number.isSafeInteger(summary?.[key]))) {
+      coverage.displayTruncated === false && coverage.displayed === details.length) {
     const rowCounts = {
       accepted: details.filter(row => row?.status === "ACCEPTED").length,
       rejected: details.filter(row => row?.status === "REJECT").length,
@@ -326,21 +336,28 @@ function candidateCoverageStatus(report, config) {
     return makeCriterion("candidate_detail_coverage", "FAIL",
       "Candidate detail outcomes exceed their matching summary counts.");
   }
-  if (["accepted", "rejected", "unknown"].every(key =>
-    Number.isSafeInteger(summary?.[key])) &&
-      summary.accepted + summary.rejected + summary.unknown !== coverage.observedTotal) {
+  if (summary.accepted + summary.rejected + summary.unknown !== coverage.observedTotal) {
     return makeCriterion("candidate_detail_coverage", "FAIL",
       "Candidate outcome counts do not reconcile to the observed detail total.");
   }
-  if (details.some(candidate => candidate.sampledAt !== null) && !config) {
+  const finalization = terminal?.observation?.windowFinalization;
+  const observedEndAt = Date.parse(report?.dto?.experiment?.endAt);
+  const intervalIsBound = config && Number.isSafeInteger(finalization?.effectiveEndAt) &&
+    finalization.effectiveEndAt === observedEndAt &&
+    report?.dto?.experiment?.startAt === new Date(config.startAt).toISOString() &&
+    observedEndAt >= config.startAt && observedEndAt <= config.endAt;
+  const timestampedRows = details.flatMap(candidate => [
+    candidate.sampledAt,
+    ...candidate.reasons.map(reason => reason.observedAt)
+  ]).filter(value => value !== null);
+  if (timestampedRows.length > 0 && !intervalIsBound) {
     return makeCriterion("candidate_detail_coverage", "UNKNOWN",
-      "Candidate sample timestamps cannot be checked without validated run bounds.");
+      "Candidate timestamps cannot be checked against a reconciled observation interval.");
   }
-  if (config && details.some(candidate => candidate.sampledAt !== null &&
-      (Date.parse(candidate.sampledAt) < config.startAt ||
-        Date.parse(candidate.sampledAt) > config.endAt))) {
+  if (intervalIsBound && timestampedRows.some(value =>
+    Date.parse(value) < config.startAt || Date.parse(value) > observedEndAt)) {
     return makeCriterion("candidate_detail_coverage", "FAIL",
-      "One or more candidate sample timestamps fall outside the configured run window.");
+      "One or more candidate or rejection-reason timestamps fall outside the evidenced observation interval.");
   }
   let nestedReasonCoverageUnknown = false;
   for (const candidate of details) {
@@ -382,12 +399,82 @@ function candidateCoverageStatus(report, config) {
     return makeCriterion("candidate_detail_coverage", "UNKNOWN",
       "Candidate details are truncated, unaccounted, or only partially represented.");
   }
-  if (summary.discoveryTruncated === true || summary.scoutAuditTruncated === true) {
+  if (summary.discoveryTruncated !== false || summary.scoutAuditTruncated !== false) {
     return makeCriterion("candidate_detail_coverage", "UNKNOWN",
-      "Candidate discovery or Scout audit is explicitly truncated.");
+      "Candidate discovery or Scout audit completeness is unavailable or truncated.");
   }
   return makeCriterion("candidate_detail_coverage", "PASS",
     "Candidate detail coverage is complete according to the supplied report.");
+}
+
+function openPositionEvidenceStatus(dto) {
+  const controls = dto.controls;
+  const coverage = controls.openPositionsCoverage;
+  const counts = [
+    controls.openPositionCount,
+    dto.valuation.unresolvedPositions,
+    coverage.observedTotal,
+    coverage.total,
+    coverage.displayed,
+    coverage.unaccounted
+  ];
+  if (controls.openPositions.length > 0 ||
+      counts.some(value => Number.isSafeInteger(value) && value > 0)) {
+    return makeCriterion("terminal_completion", "FAIL",
+      "Open-position rows or counters contradict a zero-position observation.");
+  }
+  if (controls.openPositionCount === null || dto.valuation.unresolvedPositions === null ||
+      counts.some(value => !Number.isSafeInteger(value)) ||
+      coverage.displayTruncated !== false || coverage.sourceTruncated !== false) {
+    return makeCriterion("terminal_completion", "UNKNOWN",
+      "Open-position count, unresolved-position count, or complete position coverage is unavailable.");
+  }
+  if (controls.openPositionCount !== controls.openPositions.length ||
+      coverage.observedTotal !== controls.openPositionCount ||
+      coverage.total !== controls.openPositionCount ||
+      coverage.displayed !== controls.openPositions.length ||
+      coverage.unaccounted !== 0) {
+    return makeCriterion("terminal_completion", "FAIL",
+      "Open-position rows, summary counts, and coverage counters do not reconcile.");
+  }
+  return makeCriterion("terminal_completion", "PASS",
+    "Complete position counters and rows establish zero open and unresolved positions.");
+}
+
+function paperExitEvidenceStatus(dto) {
+  const rows = dto.controls.stops;
+  const coverage = dto.controls.stopsCoverage;
+  if (rows.some(row => row.status === "CLOSED_PAPER")) {
+    return makeCriterion("terminal_completion", "FAIL",
+      "A CLOSED_PAPER stop row records an executed paper exit.");
+  }
+  const counts = [
+    coverage.observedTotal, coverage.total, coverage.displayed, coverage.unaccounted
+  ];
+  if (counts.some(value => value !== null && value !== undefined &&
+      (!Number.isSafeInteger(value) || value < 0))) {
+    return makeCriterion("terminal_completion", "FAIL",
+      "Stop-row coverage contains an invalid counter.");
+  }
+  if (Number.isSafeInteger(coverage.displayed) && coverage.displayed !== rows.length ||
+      Number.isSafeInteger(coverage.observedTotal) &&
+        Number.isSafeInteger(coverage.total) && coverage.observedTotal > coverage.total ||
+      Number.isSafeInteger(coverage.unaccounted) &&
+        Number.isSafeInteger(coverage.observedTotal) &&
+        Number.isSafeInteger(coverage.total) &&
+        coverage.unaccounted !== coverage.total - coverage.observedTotal) {
+    return makeCriterion("terminal_completion", "FAIL",
+      "Stop rows and coverage counters do not reconcile.");
+  }
+  if (counts.some(value => !Number.isSafeInteger(value)) ||
+      coverage.displayTruncated !== false || coverage.sourceTruncated !== false ||
+      coverage.displayed !== rows.length || coverage.observedTotal !== coverage.total ||
+      coverage.unaccounted !== 0) {
+    return makeCriterion("terminal_completion", "UNKNOWN",
+      "Stop-row coverage is incomplete; absence of a paper exit cannot be established.");
+  }
+  return makeCriterion("terminal_completion", "PASS",
+    "Complete stop rows contain no CLOSED_PAPER exit.");
 }
 
 function unresolvedExecutionStatus(report) {
@@ -454,6 +541,10 @@ function providerAccountingStatus(terminal, report, config) {
   if (keys.some(key => terminalTotals[key] !== reportTotals[key])) {
     return makeCriterion("provider_accounting", "FAIL",
       "Terminal and operator-report provider counters do not match.");
+  }
+  if (terminalTotals.requests === 0 && terminalTotals.bytes > 0) {
+    return makeCriterion("provider_accounting", "FAIL",
+      "Provider response bytes are nonzero despite zero dispatched requests.");
   }
   const requestSum = terminalTotals.dexRequests + terminalTotals.rpcRequests;
   if (!Number.isSafeInteger(requestSum) || requestSum !== terminalTotals.requests ||
@@ -899,6 +990,16 @@ function terminalStatus(terminal, report, checkpointCoverage, candidateCoverage,
     return makeCriterion("terminal_completion", "UNKNOWN",
       "No terminal marker is available.");
   }
+  for (const [criterion, label] of [
+    [checkpointCoverage, "Checkpoint audit coverage"],
+    [candidateCoverage, "Candidate evidence"],
+    [executionAttempts, "Execution-attempt evidence"]
+  ]) {
+    if (criterion.status === "FAIL") {
+      return makeCriterion("terminal_completion", "FAIL",
+        `${label} contradicts completion: ${criterion.reason}`);
+    }
+  }
   if (terminal.status === "UNKNOWN") {
     return makeCriterion("terminal_completion", "UNKNOWN",
       "The persisted terminal marker is explicitly UNKNOWN.");
@@ -990,10 +1091,15 @@ function terminalStatus(terminal, report, checkpointCoverage, candidateCoverage,
     return makeCriterion("terminal_completion", "FAIL",
       "Nonzero financial or open-position evidence conflicts with a zero-fill observation.");
   }
-  if (report.dto.candidates.accepted > 0 || report.dto.controls.reservations > 0) {
+  if (report.dto.candidates.accepted > 0 || report.dto.controls.reservations > 0 ||
+      report.dto.candidates.details.some(candidate => candidate.status === "ACCEPTED")) {
     return makeCriterion("terminal_completion", "FAIL",
       "Candidate authorization or reservation evidence conflicts with an observation-only terminal marker.");
   }
+  const exitEvidence = paperExitEvidenceStatus(report.dto);
+  if (exitEvidence.status !== "PASS") return exitEvidence;
+  const positionEvidence = openPositionEvidenceStatus(report.dto);
+  if (positionEvidence.status !== "PASS") return positionEvidence;
   const finalizedAt = terminalObservation.windowFinalization.finalizedAt;
   const {effectiveEndAt, latenessMs} = terminalObservation.windowFinalization;
   if (![effectiveEndAt, finalizedAt, latenessMs].every(Number.isSafeInteger) ||
@@ -1078,7 +1184,8 @@ function evaluateCriteria(expectedRunId, expectedConfigHash, artifacts) {
       "Checkpoint audit coverage cannot be assessed without a valid operator report.");
   const candidates = artifacts.report.status === "VALID"
     ? candidateCoverageStatus(report,
-      config && validConfig(config, expectedRunId) ? config : null)
+      config && validConfig(config, expectedRunId) ? config : null,
+      terminal)
     : makeCriterion("candidate_detail_coverage", "UNKNOWN",
       "Candidate detail coverage cannot be assessed without a valid operator report.");
   const executionAttempts = artifacts.report.status === "VALID"
