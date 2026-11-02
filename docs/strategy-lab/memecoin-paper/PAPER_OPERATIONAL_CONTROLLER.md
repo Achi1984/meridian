@@ -118,6 +118,12 @@ stop is already recorded reports `STOP_ALREADY_REQUESTED`. Control records and
 reads have fixed size limits, require regular non-symlink files, and stay within
 the selected run directory.
 
+Any error after creation of the unique run directory returns `UNKNOWN` with its
+run ID and directory, and requires reconciliation. Do not retry that run ID even
+when composition execution is not confirmed or the export ACK is uncertain. Check
+the durable status, start binding, checkpoint, and export independently; missing
+or unacknowledged files remain `UNKNOWN`.
+
 ## Canonical report persistence and read-only export
 
 On completion, the wrapper serializes exactly the composition's
@@ -130,6 +136,9 @@ and its pre-start binding. It never reconstructs an export from a DTO or
 checkpoint. Export persistence (`ACKNOWLEDGED`, `UNKNOWN`, or `NOT_STARTED`) is
 separate from the report's own checkpoint persistence and evaluator outcome.
 All missing values, open/unvalued positions, and `UNKNOWN` outcomes are retained.
+If publication may have happened but its acknowledgement/readback is lost, the
+result is `UNKNOWN`; the wrapper neither retries publication nor overwrites the
+unique run export.
 
 Download is a read-only stdout operation. Supply independently reviewed run,
 config-digest, and producer expectations; a failing evaluator check refuses

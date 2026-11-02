@@ -27,6 +27,8 @@ const DISABLED = Object.freeze({
   executionStarted: false,
   reason: "Operational paper controller requires `start --enable` and a reviewed manifest"
 });
+const RECONCILIATION_INSTRUCTION =
+  "Do not retry or overwrite this run ID. Inspect controller-status.json, start-binding.json, checkpoint.json, and run-export.json independently. Preserve absent or unacknowledged artifacts as UNKNOWN; never reconstruct result.report from a DTO or checkpoint.";
 
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value) &&
@@ -184,12 +186,17 @@ async function readStopRequest(directory) {
   }
 }
 
-async function publishAndVerifyReport(directory, report, config) {
+async function publishAndVerifyReport(directory, report, config, onPhase) {
   const bytes = canonicalCheckpointBytes(report);
   if (bytes.byteLength === 0 || bytes.byteLength > MAX_EXPORT_BYTES) {
     throw new RangeError("canonical run export exceeds its byte limit");
   }
   await writeAtomic(directory, "run-export.json", bytes, false);
+  await onPhase?.("EXPORT_PUBLISHED", Object.freeze({
+    runId: config.runId,
+    runDirectory: directory,
+    exportBytes: bytes.byteLength
+  }));
   const readback = await readBoundedFile(path.join(directory, "run-export.json"), MAX_EXPORT_BYTES);
   if (!readback.equals(bytes)) throw new Error("run export readback differs from canonical result.report");
   const evaluation = evaluateMemecoinPaperRunExport(readback, {
@@ -209,13 +216,36 @@ async function publishAndVerifyReport(directory, report, config) {
   return evaluation.overall;
 }
 
-async function launch(manifestPath, runsDirectory) {
+function uncertainRun(config, runDirectory, {
+  runStatus = null,
+  executionStarted = "UNKNOWN",
+  exportStatus = "UNKNOWN"
+} = {}) {
+  return {
+    status: "UNKNOWN",
+    runStatus,
+    runId: config.runId,
+    runDirectory,
+    runDirectoryCreated: true,
+    executionStarted,
+    persistence: "UNKNOWN",
+    exportStatus,
+    statusPersistence: "UNKNOWN",
+    evaluatorOverall: null,
+    reconciliationRequired: true,
+    reconciliationInstruction: RECONCILIATION_INSTRUCTION
+  };
+}
+
+async function launch(manifestPath, runsDirectory, onPhase) {
   absolutePath(manifestPath, "manifest path");
   absolutePath(runsDirectory, "runs directory");
   await assertDirectory(runsDirectory, "runs directory");
   const manifest = parseManifest(await readJsonFile(manifestPath, MAX_MANIFEST_BYTES));
   const {config, externalReadOnlyInput} = manifest;
   const runDirectory = path.join(runsDirectory, config.runId);
+  let runDirectoryCreated = false;
+  let runMayHaveStarted = false;
   const abort = new AbortController();
   const pilot = createPaperPilotComposition({
     config,
@@ -223,35 +253,48 @@ async function launch(manifestPath, runsDirectory) {
     externalReadOnlyInput,
     signal: abort.signal
   });
-  await mkdir(runDirectory, {mode: 0o700});
-  const lock = await open(path.join(runDirectory, "controller.lock"), "wx", 0o600);
-  try {
-    await lock.writeFile(JSON.stringify({runId: config.runId, pid: process.pid}));
-    await lock.sync();
-    await syncDirectory(runDirectory);
-  } catch (error) {
-    await lock.close();
-    throw error;
-  }
-
-  const requestStop = () => {
-    if (!pilot.stop()) abort.abort();
-  };
-  const onSignal = () => requestStop();
-  process.on("SIGINT", onSignal);
-  process.on("SIGTERM", onSignal);
+  let lock;
+  let onSignal;
+  let pending;
+  let settled = false;
   let exportStatus = "NOT_STARTED";
   let evaluatorOverall = null;
   let state = "INITIALIZING";
-  let settled = false;
-  let pending;
   let statusWriteFailed = false;
+  const requestStop = () => {
+    if (!pilot.stop()) abort.abort();
+  };
+  onSignal = () => requestStop();
+  process.on("SIGINT", onSignal);
+  process.on("SIGTERM", onSignal);
   try {
+    await mkdir(runDirectory, {mode: 0o700});
+    runDirectoryCreated = true;
+    await onPhase?.("RUN_DIRECTORY_CREATED", Object.freeze({
+      runId: config.runId,
+      runDirectory
+    }));
+    lock = await open(path.join(runDirectory, "controller.lock"), "wx", 0o600);
+    await lock.writeFile(JSON.stringify({runId: config.runId, pid: process.pid}));
+    await lock.sync();
+    await syncDirectory(runDirectory);
+
     await persistStatus(runDirectory, statusRecord(
       config.runId, state, exportStatus, Date.now()
     ));
+    await onPhase?.("BEFORE_COMPOSITION_START", Object.freeze({
+      runId: config.runId,
+      runDirectory,
+      state: "INITIALIZING"
+    }));
     if (await hasStopRequest(runDirectory)) requestStop();
     pending = pilot.start().finally(() => { settled = true; });
+    runMayHaveStarted = true;
+    await onPhase?.("COMPOSITION_STARTED", Object.freeze({
+      runId: config.runId,
+      runDirectory,
+      state: pilot.status().state
+    }));
     let lastStatusWrite = Date.now();
     while (!settled) {
       await new Promise(resolve => setTimeout(resolve, 25));
@@ -274,33 +317,78 @@ async function launch(manifestPath, runsDirectory) {
     state = result.status;
     if (result.report) {
       try {
-        evaluatorOverall = await publishAndVerifyReport(runDirectory, result.report, config);
+        evaluatorOverall = await publishAndVerifyReport(runDirectory, result.report, config, onPhase);
         exportStatus = "ACKNOWLEDGED";
       } catch {
         exportStatus = "UNKNOWN";
       }
     }
     if (!statusWriteFailed) {
-      await persistStatus(runDirectory, statusRecord(
+      try {
+        await persistStatus(runDirectory, statusRecord(
         config.runId, state, exportStatus, Date.now(), evaluatorOverall
-      )).catch(() => {});
+        ));
+      } catch {
+        statusWriteFailed = true;
+      }
     }
-    return {
-      status: state,
+    const reconciliationRequired = statusWriteFailed || exportStatus === "UNKNOWN";
+    const output = {
+      status: reconciliationRequired ? "UNKNOWN" : state,
+      ...(reconciliationRequired ? {runStatus: state} : {}),
       runId: config.runId,
+      runDirectory,
+      runDirectoryCreated: true,
+      executionStarted: result.executionStarted,
       exportStatus,
+      statusPersistence: statusWriteFailed ? "UNKNOWN" : "ACKNOWLEDGED",
       evaluatorOverall,
-      runDirectory
+      ...(reconciliationRequired ? {
+        persistence: "UNKNOWN",
+        reconciliationRequired: true,
+        reconciliationInstruction: RECONCILIATION_INSTRUCTION
+      } : {})
     };
+    await onPhase?.("RUN_SETTLED", Object.freeze({
+      runId: config.runId,
+      runDirectory,
+      state,
+      exportStatus,
+      evaluatorOverall
+    }));
+    return output;
+  } catch (error) {
+    if (!runDirectoryCreated) {
+      if (error.code === "EEXIST") throw error;
+      try {
+        await assertDirectory(runDirectory, "run directory");
+        runDirectoryCreated = true;
+      } catch {
+        throw error;
+      }
+    }
+    if (pending && !settled) requestStop();
+    if (pending) await pending.catch(() => {});
+    await persistStatus(runDirectory, statusRecord(
+      config.runId, "UNKNOWN", "UNKNOWN", Date.now()
+    )).catch(() => {});
+    return uncertainRun(config, runDirectory, {
+      runStatus: runMayHaveStarted ? "UNKNOWN" : "NOT_STARTED",
+      executionStarted: runMayHaveStarted ? true : "UNKNOWN"
+    });
   } finally {
-    process.removeListener("SIGINT", onSignal);
-    process.removeListener("SIGTERM", onSignal);
+    if (onSignal) {
+      process.removeListener("SIGINT", onSignal);
+      process.removeListener("SIGTERM", onSignal);
+    }
     if (pending) {
       if (!settled) requestStop();
       await pending.catch(() => {});
     }
-    await lock.close();
-    await unlink(path.join(runDirectory, "controller.lock")).catch(() => {});
+    if (lock) {
+      await lock.close().catch(() => {});
+      await unlink(path.join(runDirectory, "controller.lock")).catch(() => {});
+    }
   }
 }
 
@@ -401,10 +489,26 @@ async function exportCommand(runsDirectory, runId, configSha256, producerRevisio
   return bytes;
 }
 
-export async function main(argv = process.argv.slice(2)) {
+export async function runOperationalController(argv = [], options = {}) {
+  let onPhase;
+  try {
+    if ((!exactKeys(options, []) && !exactKeys(options, ["onPhase"])) ||
+        (options.onPhase !== undefined && typeof options.onPhase !== "function")) {
+      throw new TypeError("controller options may only provide a phase observer");
+    }
+    onPhase = options.onPhase;
+  } catch {
+    return {
+      exitCode: 2,
+      output: `${JSON.stringify({
+        status: "BLOCKED",
+        code: "INVALID_OR_UNAVAILABLE",
+        executionStarted: false
+      })}\n`
+    };
+  }
   if (argv.length === 0) {
-    process.stdout.write(`${JSON.stringify(DISABLED)}\n`);
-    return 0;
+    return {exitCode: 0, output: `${JSON.stringify(DISABLED)}\n`, result: DISABLED};
   }
   const command = argv[0];
   try {
@@ -414,16 +518,16 @@ export async function main(argv = process.argv.slice(2)) {
           !flags.manifest || !flags["runs-dir"]) {
         throw new TypeError("start requires --enable, --manifest, and --runs-dir");
       }
-      const result = await launch(flags.manifest, flags["runs-dir"]);
-      process.stdout.write(`${JSON.stringify(result)}\n`);
-      return result.status === "FINISHED" && result.exportStatus === "ACKNOWLEDGED" &&
+      const result = await launch(flags.manifest, flags["runs-dir"], onPhase);
+      const exitCode = result.status === "FINISHED" && result.exportStatus === "ACKNOWLEDGED" &&
         result.evaluatorOverall === "PASS" ? 0 : 2;
+      return {exitCode, output: `${JSON.stringify(result)}\n`, result};
     }
     if (command === "status") {
       const flags = parseFlags(argv.slice(1), ["runs-dir", "run-id"]);
       if (Object.keys(flags).length !== 2) throw new TypeError("status requires --runs-dir and --run-id");
-      process.stdout.write(`${JSON.stringify(await statusCommand(flags["runs-dir"], flags["run-id"]))}\n`);
-      return 0;
+      const result = await statusCommand(flags["runs-dir"], flags["run-id"]);
+      return {exitCode: 0, output: `${JSON.stringify(result)}\n`, result};
     }
     if (command === "stop") {
       const flags = parseFlags(argv.slice(1), ["runs-dir", "run-id", "command-id"]);
@@ -431,8 +535,11 @@ export async function main(argv = process.argv.slice(2)) {
         throw new TypeError("stop requires --runs-dir, --run-id, and --command-id");
       }
       const result = await stopCommand(flags["runs-dir"], flags["run-id"], flags["command-id"]);
-      process.stdout.write(`${JSON.stringify(result)}\n`);
-      return result.status === "STOP_REQUESTED" ? 0 : 2;
+      return {
+        exitCode: result.status === "STOP_REQUESTED" ? 0 : 2,
+        output: `${JSON.stringify(result)}\n`,
+        result
+      };
     }
     if (command === "export") {
       const flags = parseFlags(argv.slice(1), [
@@ -444,18 +551,23 @@ export async function main(argv = process.argv.slice(2)) {
       const bytes = await exportCommand(
         flags["runs-dir"], flags["run-id"], flags["config-sha256"], flags["producer-revision"]
       );
-      process.stdout.write(bytes);
-      return 0;
+      return {exitCode: 0, output: bytes};
     }
     throw new TypeError("unknown command");
   } catch (error) {
-    process.stdout.write(`${JSON.stringify({
+    const result = {
       status: "BLOCKED",
       code: error.code === "EEXIST" ? "RESTART_NOT_ALLOWED" : "INVALID_OR_UNAVAILABLE",
       executionStarted: false
-    })}\n`);
-    return 2;
+    };
+    return {exitCode: 2, output: `${JSON.stringify(result)}\n`, result};
   }
+}
+
+export async function main(argv = process.argv.slice(2)) {
+  const response = await runOperationalController(argv);
+  process.stdout.write(response.output);
+  return response.exitCode;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {

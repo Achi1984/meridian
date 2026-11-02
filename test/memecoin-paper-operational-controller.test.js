@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import {spawn, spawnSync} from "node:child_process";
+import {spawnSync} from "node:child_process";
 import {createHash} from "node:crypto";
 import {
   access, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile
@@ -12,6 +12,7 @@ import {canonicalCheckpointBytes} from "../scripts/memecoin-paper/checkpoint-sto
 import {
   evaluateMemecoinPaperRunExport
 } from "../scripts/memecoin-paper-simulated-evaluation/index.mjs";
+import {runOperationalController} from "../scripts/memecoin-paper/paper-operational-controller.mjs";
 
 const CLI = fileURLToPath(new URL(
   "../scripts/memecoin-paper/paper-operational-controller.mjs", import.meta.url
@@ -199,50 +200,122 @@ test("explicit external-only run persists the exact report and read-only export 
   assert.equal(await readFile(exportPath, "utf8"), "{");
 });
 
-test("SIGTERM during initialization stops cleanly without issuing source requests", async t => {
-  const {runsDirectory, manifestPath, manifest} = await harness(t, "signal-stop-run");
-  const child = spawn(process.execPath, [
-    CLI, "start", "--enable", "--manifest", manifestPath, "--runs-dir", runsDirectory
-  ], {stdio: ["ignore", "pipe", "pipe"]});
-  let stdout = "";
-  let stderr = "";
-  child.stdout.setEncoding("utf8").on("data", chunk => { stdout += chunk; });
-  child.stderr.setEncoding("utf8").on("data", chunk => { stderr += chunk; });
-  t.after(() => child.kill("SIGKILL"));
-  const closed = new Promise(resolve => {
-    child.once("close", (code, signal) => resolve({code, signal}));
-  });
-  const statusPath = path.join(
-    runsDirectory, manifest.config.runId, "controller-status.json"
-  );
-  let statusReady = false;
-  for (let attempt = 0; attempt < 2_000; attempt += 1) {
-    try {
-      await access(statusPath);
-      statusReady = true;
-      break;
-    } catch {
-      await new Promise(resolve => setTimeout(resolve, 2));
-    }
+test("SIGTERM is held at pre-initialization and confirmed-start phase barriers", async t => {
+  for (const [runId, targetPhase] of [
+    ["signal-after-directory-created", "RUN_DIRECTORY_CREATED"],
+    ["signal-before-initialization", "BEFORE_COMPOSITION_START"],
+    ["signal-after-confirmed-start", "COMPOSITION_STARTED"]
+  ]) {
+    const {runsDirectory, manifestPath, manifest} = await harness(t, runId);
+    const observed = [];
+    const response = await runOperationalController([
+      "start", "--enable", "--manifest", manifestPath, "--runs-dir", runsDirectory
+    ], {
+      onPhase(phase, details) {
+        observed.push(phase);
+        if (phase === targetPhase) {
+          if (targetPhase === "COMPOSITION_STARTED") assert.equal(details.state, "RUNNING");
+          process.emit("SIGTERM");
+        }
+      }
+    });
+    const result = response.result;
+    const runDirectory = path.join(runsDirectory, runId);
+    const reportBytes = await readFile(path.join(runDirectory, "run-export.json"));
+    const report = JSON.parse(reportBytes);
+    const status = JSON.parse(await readFile(path.join(runDirectory, "controller-status.json"), "utf8"));
+
+    assert.ok(observed.includes(targetPhase));
+    assert.equal(response.exitCode, 2);
+    assert.equal(result.status, "UNKNOWN");
+    assert.equal(result.runStatus, "STOPPED");
+    assert.equal(result.runId, runId);
+    assert.equal(result.runDirectory, runDirectory);
+    assert.equal(result.reconciliationRequired, true);
+    assert.equal(status.state, "STOPPED");
+    assert.equal(status.exportStatus, "UNKNOWN");
+    assert.deepEqual(reportBytes, canonicalCheckpointBytes(report));
+    assert.equal(report.persistence, "NOT_STARTED");
+    assert.equal(report.runnerReport, null);
+    assert.equal(report.checkpoint, null);
+    await assert.rejects(access(path.join(runDirectory, "checkpoint.json")), {code: "ENOENT"});
+    await assert.rejects(access(path.join(runDirectory, "start-binding.json")), {code: "ENOENT"});
   }
-  assert.equal(statusReady, true, stderr);
-  child.kill("SIGTERM");
-  const exited = await closed;
-  assert.equal(exited.signal, null, stderr);
-  assert.equal(exited.code, 2, stdout);
-  const result = JSON.parse(stdout);
+});
+
+test("post-directory I/O failure returns UNKNOWN identity and forbids retry", async t => {
+  const {runsDirectory, manifestPath, manifest} = await harness(t, "injected-start-failure");
+  const response = await runOperationalController([
+    "start", "--enable", "--manifest", manifestPath, "--runs-dir", runsDirectory
+  ], {
+    onPhase(phase) {
+      if (phase === "RUN_DIRECTORY_CREATED") throw new Error("injected post-begin I/O failure");
+    }
+  });
+  const result = response.result;
   const runDirectory = path.join(runsDirectory, manifest.config.runId);
-  const statusRecord = await readFile(path.join(runDirectory, "controller-status.json"), "utf8");
-  const exportText = await readFile(path.join(runDirectory, "run-export.json"), "utf8").catch(() => null);
-  assert.equal(result.status, "STOPPED");
-  assert.equal(result.exportStatus, "UNKNOWN",
-    JSON.stringify({result, statusRecord, exportText}));
-  assert.equal(result.evaluatorOverall, null);
-  const report = JSON.parse(exportText);
-  assert.deepEqual(Buffer.from(exportText), canonicalCheckpointBytes(report));
-  assert.equal(report.persistence, "NOT_STARTED");
-  assert.equal(report.runnerReport, null);
-  assert.equal(report.checkpoint, null);
+  assert.equal(response.exitCode, 2);
+  assert.equal(result.status, "UNKNOWN");
+  assert.equal(result.runStatus, "NOT_STARTED");
+  assert.equal(result.executionStarted, "UNKNOWN");
+  assert.equal(result.runDirectoryCreated, true);
+  assert.equal(result.runId, manifest.config.runId);
+  assert.equal(result.runDirectory, runDirectory);
+  assert.equal(result.reconciliationRequired, true);
+  assert.match(result.reconciliationInstruction, /Do not retry or overwrite/);
+  const status = JSON.parse(await readFile(path.join(runDirectory, "controller-status.json"), "utf8"));
+  assert.equal(status.state, "UNKNOWN");
+  assert.equal(status.exportStatus, "UNKNOWN");
+  assert.deepEqual(await readdir(runDirectory), ["controller-status.json"]);
+
+  const retry = command([
+    "start", "--enable", "--manifest", manifestPath, "--runs-dir", runsDirectory
+  ]);
+  assert.equal(retry.status, 2);
+  assert.equal(parseOutput(retry).code, "RESTART_NOT_ALLOWED");
+});
+
+test("post-publication acknowledgement loss preserves exact export and blocks overwrite", async t => {
+  const {runsDirectory, manifestPath, manifest} = await harness(t, "injected-export-ack-loss");
+  const response = await runOperationalController([
+    "start", "--enable", "--manifest", manifestPath, "--runs-dir", runsDirectory
+  ], {
+    onPhase(phase) {
+      if (phase === "EXPORT_PUBLISHED") throw new Error("injected publication acknowledgement loss");
+    }
+  });
+  const result = response.result;
+  const runDirectory = path.join(runsDirectory, manifest.config.runId);
+  const exportPath = path.join(runDirectory, "run-export.json");
+  const bytes = await readFile(exportPath);
+  const report = JSON.parse(bytes);
+  assert.equal(response.exitCode, 2);
+  assert.equal(result.status, "UNKNOWN");
+  assert.equal(result.runStatus, "FINISHED");
+  assert.equal(result.executionStarted, true);
+  assert.equal(result.exportStatus, "UNKNOWN");
+  assert.equal(result.reconciliationRequired, true);
+  assert.deepEqual(bytes, canonicalCheckpointBytes(report));
+  assert.equal(report.schemaVersion, "memecoin-paper-run-export/v1");
+  assert.equal(report.persistence, "ACKNOWLEDGED");
+
+  const configSha256 = createHash("sha256")
+    .update(canonicalCheckpointBytes(manifest.config)).digest("hex");
+  const evaluation = evaluateMemecoinPaperRunExport(bytes, {
+    runId: manifest.config.runId,
+    configSha256,
+    producerRevision: PRODUCER_REVISION
+  });
+  assert.equal(evaluation.checks.find(item => item.id === "historical_run_binding").status, "PASS");
+  assert.equal(evaluation.checks.find(item => item.id === "checkpoint_digest").status, "PASS");
+  assert.equal(evaluation.checks.find(item => item.id === "checkpoint_chain").status, "PASS");
+
+  const retry = command([
+    "start", "--enable", "--manifest", manifestPath, "--runs-dir", runsDirectory
+  ]);
+  assert.equal(retry.status, 2);
+  assert.equal(parseOutput(retry).code, "RESTART_NOT_ALLOWED");
+  assert.deepEqual(await readFile(exportPath), bytes);
 });
 
 test("manifest and control paths are bounded and non-symlinked", async t => {
