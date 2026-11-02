@@ -3,6 +3,7 @@ FROM node:20-alpine
 WORKDIR /app
 
 COPY --chown=node:node scripts/memecoin-paper/ ./scripts/memecoin-paper/
+COPY --chown=node:node scripts/memecoin-paper-token-safety/ ./scripts/memecoin-paper-token-safety/
 RUN mkdir -p /var/data/meridian-paper && chown node:node /var/data/meridian-paper
 
 ENV NODE_ENV=production
