@@ -1,12 +1,42 @@
+import {createHash} from "node:crypto";
+import {PAPER_LEDGER_POLICY} from "./ledger.mjs";
 import {createJupiterV2QuoteAdapter} from "../memecoin-paper-route-quotes/jupiter-v2.mjs";
 
 const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 const INTEGER = /^(0|[1-9]\d{0,39})$/;
+const SHA256 = /^[a-f0-9]{64}$/;
+const SAFE_ID = /^[A-Za-z0-9._:-]{1,120}$/;
 const MAX_TIMEOUT_MS = 5_000;
 const MAX_CAUSAL_AGE_MS = 5 * 60 * 1000;
 const MAX_REQUESTS = 100;
 const COSTS = Object.freeze(["fee", "spread", "slippage", "priceImpact", "network"]);
 const SOURCE = "Jupiter Swap API V2 /order";
+const SOLANA_USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+const SCENARIO_VERSION = "1";
+const QUOTED_NET_BASIS = "QUOTED_ROUTE_AMOUNTS_AS_MODELED_NET_SWAP_BASIS";
+const NO_INCREMENTAL_CHARGE = "NO_INCREMENTAL_CHARGE_UNDER_SCENARIO_BASIS";
+const SCENARIO_CONFIG_KEYS = Object.freeze([
+  "optIn", "scenarioId", "scenarioVersion", "scenario", "identity", "usdcMint",
+  "usdcDecimals", "usdcUsdMicrosPerToken", "quoteBasis", "adverseAdjustmentBps",
+  "networkReserveCents", "feeCents", "spreadCents", "priceImpactCents",
+  "zeroChargeDisposition", "reviewEvidence"
+]);
+const SCENARIO_CASES = Object.freeze({
+  BASELINE: Object.freeze({
+    scenarioId: "MEMECOIN_PAPER_QUOTE_ADVERSE_V1_BASELINE",
+    adverseAdjustmentBps: 100,
+    networkReserveCents: "10"
+  }),
+  STRESS: Object.freeze({
+    scenarioId: "MEMECOIN_PAPER_QUOTE_ADVERSE_V1_STRESS",
+    adverseAdjustmentBps: 300,
+    networkReserveCents: "50"
+  })
+});
+const PAPER_ENTRY_LIMIT_CENTS = BigInt(PAPER_LEDGER_POLICY.maxEntryCents);
+const MICRO_USD_PER_CENT = 10_000n;
+const BPS = 10_000n;
+const SCENARIO_COST_DENOMINATOR = BPS * MICRO_USD_PER_CENT;
 
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -31,6 +61,334 @@ function copyRecord(value, keys, label) {
     });
   }
   return result;
+}
+
+function copyPlainRecord(value, keys, label) {
+  if (!isRecord(value) ||
+      ![Object.prototype, null].includes(Object.getPrototypeOf(value))) {
+    throw new TypeError(`${label} must be a plain record`);
+  }
+  return copyRecord(value, keys, label);
+}
+
+function sameIdentity(actual, expected) {
+  return ["chainId", "mint", "pool", "quote", "decimals"]
+    .every(key => actual?.[key] === expected?.[key]);
+}
+
+function ceilDiv(numerator, denominator) {
+  return (numerator + denominator - 1n) / denominator;
+}
+
+function scenarioConfig(value) {
+  const raw = copyPlainRecord(value, SCENARIO_CONFIG_KEYS, "review scenario");
+  const requiredKeys = SCENARIO_CONFIG_KEYS.filter(key => key !== "reviewEvidence");
+  if (requiredKeys.some(key => !Object.hasOwn(raw, key))) {
+    throw new TypeError("review scenario requires every explicit configuration field");
+  }
+  raw.identity = copyPlainRecord(raw.identity,
+    ["chainId", "mint", "pool", "quote", "decimals"], "scenario identity");
+  if (Object.hasOwn(raw, "reviewEvidence")) {
+    raw.reviewEvidence = copyPlainRecord(raw.reviewEvidence, [
+      "evidenceId", "evidenceSha256", "scenarioConfigSha256", "identity",
+      "reviewerRef", "purpose", "decision", "recordedAt"
+    ], "review evidence");
+    raw.reviewEvidence.identity = copyPlainRecord(raw.reviewEvidence.identity,
+      ["chainId", "mint", "pool", "quote", "decimals"], "review evidence identity");
+    const evidence = raw.reviewEvidence;
+    const evidenceIdentity = evidence.identity;
+    if (typeof evidence.evidenceId !== "string" || !SAFE_ID.test(evidence.evidenceId) ||
+        typeof evidence.evidenceSha256 !== "string" || !SHA256.test(evidence.evidenceSha256) ||
+        typeof evidence.scenarioConfigSha256 !== "string" ||
+        !SHA256.test(evidence.scenarioConfigSha256) ||
+        typeof evidence.reviewerRef !== "string" || !SAFE_ID.test(evidence.reviewerRef) ||
+        typeof evidence.purpose !== "string" || evidence.purpose.length > 64 ||
+        typeof evidence.decision !== "string" || evidence.decision.length > 64 ||
+        !validTime(evidence.recordedAt) ||
+        evidenceIdentity.chainId !== "solana" ||
+        typeof evidenceIdentity.mint !== "string" || evidenceIdentity.mint.length > 44 ||
+        typeof evidenceIdentity.pool !== "string" || evidenceIdentity.pool.length > 44 ||
+        typeof evidenceIdentity.quote !== "string" || evidenceIdentity.quote.length > 44 ||
+        !Number.isInteger(evidenceIdentity.decimals) ||
+        evidenceIdentity.decimals < 0 || evidenceIdentity.decimals > 18) {
+      throw new TypeError("review evidence fields exceed their bounded schema");
+    }
+  } else {
+    raw.reviewEvidence = null;
+  }
+  const scenario = typeof raw.scenario === "string" &&
+    Object.hasOwn(SCENARIO_CASES, raw.scenario) ? SCENARIO_CASES[raw.scenario] : null;
+  if (raw.optIn !== true || !scenario || raw.scenarioId !== scenario.scenarioId ||
+      raw.scenarioVersion !== SCENARIO_VERSION ||
+      raw.identity.chainId !== "solana" ||
+      typeof raw.identity.mint !== "string" || !BASE58.test(raw.identity.mint) ||
+      typeof raw.identity.pool !== "string" || !BASE58.test(raw.identity.pool) ||
+      raw.identity.quote !== SOLANA_USDC_MINT ||
+      !Number.isInteger(raw.identity.decimals) || raw.identity.decimals < 0 ||
+      raw.identity.decimals > 18 || raw.usdcMint !== SOLANA_USDC_MINT ||
+      raw.usdcDecimals !== 6 || raw.usdcUsdMicrosPerToken !== "1000000" ||
+      raw.quoteBasis !== QUOTED_NET_BASIS ||
+      raw.adverseAdjustmentBps !== scenario.adverseAdjustmentBps ||
+      raw.networkReserveCents !== scenario.networkReserveCents ||
+      raw.feeCents !== "0" || raw.spreadCents !== "0" ||
+      raw.priceImpactCents !== "0" ||
+      raw.zeroChargeDisposition !== NO_INCREMENTAL_CHARGE) {
+    throw new TypeError("review scenario configuration is unsupported or inconsistent");
+  }
+  const canonical = {
+    optIn: raw.optIn,
+    scenarioId: raw.scenarioId,
+    scenarioVersion: raw.scenarioVersion,
+    scenario: raw.scenario,
+    identity: {
+      chainId: raw.identity.chainId,
+      mint: raw.identity.mint,
+      pool: raw.identity.pool,
+      quote: raw.identity.quote,
+      decimals: raw.identity.decimals
+    },
+    usdcMint: raw.usdcMint,
+    usdcDecimals: raw.usdcDecimals,
+    usdcUsdMicrosPerToken: raw.usdcUsdMicrosPerToken,
+    quoteBasis: raw.quoteBasis,
+    adverseAdjustmentBps: raw.adverseAdjustmentBps,
+    networkReserveCents: raw.networkReserveCents,
+    feeCents: raw.feeCents,
+    spreadCents: raw.spreadCents,
+    priceImpactCents: raw.priceImpactCents,
+    zeroChargeDisposition: raw.zeroChargeDisposition
+  };
+  const encoded = JSON.stringify(canonical);
+  if (Buffer.byteLength(encoded) > 8_192) {
+    throw new RangeError("review scenario exceeds configuration capacity");
+  }
+  return {
+    config: canonical,
+    sha256: createHash("sha256").update(encoded).digest("hex"),
+    reviewEvidence: raw.reviewEvidence
+  };
+}
+
+export function reviewScenarioConfigSha256(value) {
+  return scenarioConfig(value).sha256;
+}
+
+function validateReviewEvidence(value, config, observedAt) {
+  try {
+    const evidence = value;
+    return typeof evidence?.evidenceId === "string" &&
+      SAFE_ID.test(evidence.evidenceId) &&
+      typeof evidence.reviewerRef === "string" &&
+      SAFE_ID.test(evidence.reviewerRef) &&
+      typeof evidence.evidenceSha256 === "string" &&
+      SHA256.test(evidence.evidenceSha256) &&
+      evidence.scenarioConfigSha256 === config.sha256 &&
+      sameIdentity(evidence.identity, config.config.identity) &&
+      evidence.purpose === "OFFLINE_SCENARIO_REVIEW_ONLY" &&
+      evidence.decision === "APPROVE_SCENARIO_REVIEW_ONLY" &&
+      validTime(evidence.recordedAt) && evidence.recordedAt <= observedAt
+      ? {status: "ASSERTED_UNVERIFIED", evidenceId: evidence.evidenceId,
+        evidenceSha256: evidence.evidenceSha256}
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function blockedScenarioProjection(reasons) {
+  return {
+    status: "BLOCKED",
+    reasons: [...new Set(reasons)],
+    actualCostCoverage: "UNKNOWN",
+    scenarioCostCoverage: "BLOCKED",
+    authorizationEligible: false,
+    executionRealistic: false,
+    integrationEligible: false
+  };
+}
+
+function unavailableScenario(parsedScenario, reason) {
+  if (!parsedScenario) return null;
+  return blockedScenarioProjection([
+    parsedScenario.error ? "SCENARIO_CONFIGURATION_INVALID" : reason
+  ]);
+}
+
+function maximumEntryInputAtoms(routeInputAtoms, adjustmentBps, networkReserveCents) {
+  const reserve = BigInt(networkReserveCents);
+  const costAt = atoms => ceilDiv(atoms, MICRO_USD_PER_CENT) +
+    ceilDiv(atoms * BigInt(adjustmentBps), SCENARIO_COST_DENOMINATOR) + reserve;
+  let low = 0n;
+  let high = routeInputAtoms < PAPER_ENTRY_LIMIT_CENTS * MICRO_USD_PER_CENT
+    ? routeInputAtoms : PAPER_ENTRY_LIMIT_CENTS * MICRO_USD_PER_CENT;
+  while (low < high) {
+    const middle = (low + high + 1n) / 2n;
+    if (costAt(middle) <= PAPER_ENTRY_LIMIT_CENTS) low = middle;
+    else high = middle - 1n;
+  }
+  return low;
+}
+
+function projectReviewScenario(request, observation, candidateReasons, parsedScenario) {
+  if (parsedScenario?.error) {
+    return blockedScenarioProjection(["SCENARIO_CONFIGURATION_INVALID"]);
+  }
+  const parsed = parsedScenario?.parsed;
+  if (!parsed) return null;
+  const {config} = parsed;
+  if (!sameIdentity(config.identity, request.identity) ||
+      config.usdcDecimals !== request.quoteDecimals) {
+    return blockedScenarioProjection(["SCENARIO_IDENTITY_OR_DECIMALS_MISMATCH"]);
+  }
+  const route = observation.route;
+  const receivedAt = route?.observedAt;
+  const unsafeQuoteReasons = [
+    "SELECTED_POOL_ROUTE_NOT_IDENTITY_BOUND",
+    "POST_RESPONSE_CHRONOLOGY_INVALID",
+    "CAUSAL_REFERENCE_STALE",
+    "QUOTE_EXPIRED"
+  ];
+  if (!route || unsafeQuoteReasons.some(reason => candidateReasons.includes(reason))) {
+    return blockedScenarioProjection(["SCENARIO_SOURCE_QUOTE_NOT_CAUSAL_AND_BOUND"]);
+  }
+  const reviewEvidence = validateReviewEvidence(parsed.reviewEvidence, parsed, receivedAt);
+  if (!reviewEvidence) {
+    return blockedScenarioProjection(["SCENARIO_REVIEW_EVIDENCE_MISSING_UNAPPROVED_OR_MISMATCHED"]);
+  }
+
+  const baseAtoms = BigInt(request.side === "ENTRY" ? route.outAmount : route.inAmount);
+  const quoteAtoms = BigInt(request.side === "ENTRY" ? route.inAmount : route.outAmount);
+  const baseScale = 10n ** BigInt(request.identity.decimals);
+  const quoteScale = 10n ** BigInt(config.usdcDecimals);
+  const priceNumerator = quoteAtoms * BigInt(config.usdcUsdMicrosPerToken) * baseScale;
+  const priceDenominator = baseAtoms * quoteScale;
+  const priceMicros = request.side === "ENTRY"
+    ? ceilDiv(priceNumerator, priceDenominator)
+    : priceNumerator / priceDenominator;
+  if (priceMicros <= 0n || priceMicros > BigInt(Number.MAX_SAFE_INTEGER)) {
+    return blockedScenarioProjection(["SCENARIO_PRICE_MICROS_ZERO_OR_UNSAFE"]);
+  }
+
+  const adjustmentBps = BigInt(config.adverseAdjustmentBps);
+  const reserveCents = BigInt(config.networkReserveCents);
+  let modeledQuoteAtoms;
+  let modeledBaseAtoms;
+  let grossQuoteCents;
+  let slippageCents;
+  let totalScenarioCosts;
+  let quoteValueAfterCostsCents;
+  if (request.side === "ENTRY") {
+    modeledQuoteAtoms = maximumEntryInputAtoms(
+      quoteAtoms, config.adverseAdjustmentBps, config.networkReserveCents
+    );
+    if (modeledQuoteAtoms <= 0n) {
+      return blockedScenarioProjection(["SCENARIO_ENTRY_SIZE_BELOW_DUST_OR_COST_RESERVE"]);
+    }
+    modeledBaseAtoms = baseAtoms * modeledQuoteAtoms / quoteAtoms;
+    if (modeledBaseAtoms <= 0n) {
+      return blockedScenarioProjection(["SCENARIO_LINEAR_SIZE_ROUNDS_TO_ZERO"]);
+    }
+    grossQuoteCents = ceilDiv(modeledQuoteAtoms, MICRO_USD_PER_CENT);
+    slippageCents = ceilDiv(
+      modeledQuoteAtoms * adjustmentBps, SCENARIO_COST_DENOMINATOR
+    );
+    totalScenarioCosts = slippageCents + reserveCents;
+    quoteValueAfterCostsCents = grossQuoteCents + totalScenarioCosts;
+  } else {
+    modeledQuoteAtoms = quoteAtoms;
+    modeledBaseAtoms = baseAtoms;
+    grossQuoteCents = quoteAtoms / MICRO_USD_PER_CENT;
+    slippageCents = ceilDiv(quoteAtoms * adjustmentBps, SCENARIO_COST_DENOMINATOR);
+    totalScenarioCosts = slippageCents + reserveCents;
+    quoteValueAfterCostsCents = grossQuoteCents - totalScenarioCosts;
+  }
+
+  const costsCents = {
+    feeCents: config.feeCents,
+    spreadCents: config.spreadCents,
+    slippageCents: slippageCents.toString(),
+    priceImpactCents: config.priceImpactCents,
+    networkCents: config.networkReserveCents
+  };
+  return {
+    status: "REVIEW_PROJECTION_ONLY",
+    scenarioCostCoverage: "COMPLETE",
+    actualCostCoverage: "UNKNOWN",
+    scenario: {
+      id: config.scenarioId,
+      version: config.scenarioVersion,
+      case: config.scenario,
+      configurationSha256: parsed.sha256,
+      approvalPurpose: "OFFLINE_SCENARIO_REVIEW_ONLY",
+      approvalEvidence: reviewEvidence,
+      approvalEvidenceProvenance: "CALLER_ASSERTED_NOT_AUTHENTICATED",
+      quoteBasis: config.quoteBasis,
+      quoteUsdAssumption: {
+        mint: config.usdcMint,
+        decimals: config.usdcDecimals,
+        microUsdPerToken: config.usdcUsdMicrosPerToken,
+        assumption: "USDC_EQUALS_USD1_EXPERIMENTAL_NOT_MEASURED"
+      },
+      adverseAdjustmentBps: config.adverseAdjustmentBps,
+      networkReserveCents: config.networkReserveCents,
+      zeroChargeDisposition: config.zeroChargeDisposition
+    },
+    identity: {...request.identity},
+    source: SOURCE,
+    sourceProvenance: "INJECTED_TRANSPORT_NOT_AUTHENTICATED",
+    side: request.side,
+    receiptTime: receivedAt,
+    receiptTimeProvenance: "INJECTED_LOCAL_CLOCK_AFTER_RESPONSE_BODY; NOT_AUTHENTICATED",
+    priceMicros: Number(priceMicros),
+    priceRounding: request.side === "ENTRY"
+      ? "ceil_exact_USD_per_token_microUSD"
+      : "floor_exact_USD_per_token_microUSD",
+    amountProjection: {
+      basis: "LINEAR_SCALING_ONLY_UP_TO_SOURCE_QUOTED_INPUT_NOT_AN_EXECUTABLE_EXACT_SIZE_ROUTE",
+      sourceQuotedInputAtoms: route.inAmount,
+      maximumModeledInputAtoms: (request.side === "ENTRY" ? modeledQuoteAtoms : baseAtoms).toString(),
+      sourceQuotedBaseAtoms: baseAtoms.toString(),
+      maximumModeledBaseAtoms: modeledBaseAtoms.toString(),
+      entryAllInLimitCents: request.side === "ENTRY" ? PAPER_ENTRY_LIMIT_CENTS.toString() : null,
+      dynamicRiskCaps: "NOT_EVALUATED; existing authorization, equity, cash, and hard evidence gates remain unchanged",
+      modeledAllInCents: request.side === "ENTRY"
+        ? quoteValueAfterCostsCents.toString() : null
+    },
+    costBasis: "QUOTED_ROUTE_AMOUNTS_AS_MODELED_NET_SWAP_BASIS",
+    costsCents,
+    costDisposition: {
+      feeCents: NO_INCREMENTAL_CHARGE,
+      spreadCents: NO_INCREMENTAL_CHARGE,
+      slippageCents: "EXPERIMENTAL_ADVERSE_SCENARIO_ADJUSTMENT_ROUNDED_UP",
+      priceImpactCents: NO_INCREMENTAL_CHARGE,
+      networkCents: "EXPERIMENTAL_FIXED_USD_RESERVE_PER_SIDE"
+    },
+    quoteValue: {
+      grossBeforeExtraScenarioCostsCents: grossQuoteCents.toString(),
+      direction: request.side === "ENTRY" ? "DEBIT_ROUNDED_UP" : "CREDIT_ROUNDED_DOWN",
+      totalExtraScenarioCostsCents: totalScenarioCosts.toString(),
+      afterExtraScenarioCostsCents: quoteValueAfterCostsCents.toString(),
+      label: "MODELED_SINGLE_SIDE_QUOTE_VALUE_NOT_PNL"
+    },
+    pnl: {
+      status: "NOT_COMPUTED_SINGLE_SIDE_PROJECTION",
+      beforeExtraScenarioCostsCents: null,
+      afterExtraScenarioCostsCents: null,
+      reason: "A paired entry, exit, identity-bound marks, and scenario configuration are required."
+    },
+    providerFieldsRetainedSeparately: {
+      feeBps: route.feeBps,
+      feeMint: route.feeMint,
+      platformFee: route.platformFee,
+      networkFeesLamports: route.reportedNetworkFeesLamports,
+      priceImpact: route.priceImpact,
+      slippageToleranceBps: route.slippageBps
+    },
+    authorizationEligible: false,
+    executionRealistic: false,
+    integrationEligible: false,
+    integrationBoundary: "Independent review evidence verification, size-cap enforcement, and unchanged Paper hard/risk gates are required."
+  };
 }
 
 function copyRequest(value) {
@@ -101,7 +459,7 @@ function unknownCosts(route = null) {
   };
 }
 
-function emptyResult(status, reasons, request = null) {
+function emptyResult(status, reasons, request = null, scenarioProjection = null) {
   return {
     status,
     reasons: [...new Set(reasons)],
@@ -117,7 +475,8 @@ function emptyResult(status, reasons, request = null) {
     } : null,
     quoteCandidate: null,
     costEvidence: unknownCosts(),
-    authorizationEligible: false
+    authorizationEligible: false,
+    scenarioProjection
   };
 }
 
@@ -297,22 +656,38 @@ export function createMarketQuoteAdapter({
   });
 
   return Object.freeze({
-    async getPaperQuote(value, {signal} = {}) {
+    async getPaperQuote(value, {signal, reviewScenario} = {}) {
       if (signal !== undefined && (!signal || typeof signal.aborted !== "boolean" ||
           typeof signal.addEventListener !== "function" ||
           typeof signal.removeEventListener !== "function")) {
         return emptyResult("UNAVAILABLE", ["ABORT_SIGNAL_INVALID"]);
       }
+      let parsedScenario = null;
+      if (reviewScenario !== undefined) {
+        try {
+          parsedScenario = {parsed: scenarioConfig(reviewScenario)};
+        } catch {
+          parsedScenario = {error: true};
+        }
+      }
       let request;
       try {
         request = copyRequest(value);
       } catch {
-        return emptyResult("UNAVAILABLE", ["REQUEST_INVALID"]);
+        return emptyResult("UNAVAILABLE", ["REQUEST_INVALID"], null,
+          unavailableScenario(parsedScenario, "SCENARIO_REQUEST_INVALID"));
       }
-      if (signal?.aborted) return emptyResult("UNAVAILABLE", ["REQUEST_CANCELLED"], request);
-      if (inFlight) return emptyResult("UNAVAILABLE", ["REQUEST_ALREADY_IN_FLIGHT"], request);
+      if (signal?.aborted) {
+        return emptyResult("UNAVAILABLE", ["REQUEST_CANCELLED"], request,
+          unavailableScenario(parsedScenario, "SCENARIO_REQUEST_CANCELLED"));
+      }
+      if (inFlight) {
+        return emptyResult("UNAVAILABLE", ["REQUEST_ALREADY_IN_FLIGHT"], request,
+          unavailableScenario(parsedScenario, "SCENARIO_REQUEST_ALREADY_IN_FLIGHT"));
+      }
       if (requestsStarted >= maxRequests) {
-        return emptyResult("UNAVAILABLE", ["REQUEST_BUDGET_EXHAUSTED"], request);
+        return emptyResult("UNAVAILABLE", ["REQUEST_BUDGET_EXHAUSTED"], request,
+          unavailableScenario(parsedScenario, "SCENARIO_REQUEST_BUDGET_EXHAUSTED"));
       }
       inFlight = true;
       requestsStarted += 1;
@@ -332,12 +707,17 @@ export function createMarketQuoteAdapter({
           authorizedAt: request.side === "ENTRY" ? request.authorizedAt : request.positionOpenedAt
         });
         if (signal?.aborted) {
-          return emptyResult("UNAVAILABLE", ["REQUEST_CANCELLED"], request);
+          return emptyResult("UNAVAILABLE", ["REQUEST_CANCELLED"], request,
+            unavailableScenario(parsedScenario, "SCENARIO_REQUEST_CANCELLED"));
         }
         if (!observed.route) {
-          return emptyResult("UNAVAILABLE", observed.reasons, request);
+          return emptyResult("UNAVAILABLE", observed.reasons, request,
+            unavailableScenario(parsedScenario, "SCENARIO_SOURCE_QUOTE_NOT_CAUSAL_AND_BOUND"));
         }
         const {candidate, reasons} = buildCandidate(request, observed);
+        const scenarioProjection = projectReviewScenario(
+          request, observed, reasons, parsedScenario
+        );
         return {
           status: "UNAVAILABLE",
           reasons: [...new Set([...observed.reasons, ...reasons])],
@@ -354,10 +734,12 @@ export function createMarketQuoteAdapter({
           },
           quoteCandidate: candidate,
           costEvidence: candidate.costs,
-          authorizationEligible: false
+          authorizationEligible: false,
+          scenarioProjection
         };
       } catch {
-        return emptyResult("UNAVAILABLE", ["QUOTE_ADAPTER_ERROR"], request);
+        return emptyResult("UNAVAILABLE", ["QUOTE_ADAPTER_ERROR"], request,
+          unavailableScenario(parsedScenario, "SCENARIO_QUOTE_ADAPTER_ERROR"));
       } finally {
         inFlight = false;
         externalSignal = null;

@@ -7,7 +7,9 @@ import {createPaperExecutionStep} from "../scripts/memecoin-paper/execution-step
 import {CheckpointStore} from "../scripts/memecoin-paper/checkpoint-store.mjs";
 import {PaperCheckpointSession} from "../scripts/memecoin-paper/checkpoint-session.mjs";
 import {normalizeExactCosts} from "../scripts/memecoin-paper-execution-evidence/normalize.mjs";
-import {createMarketQuoteAdapter} from "../scripts/memecoin-paper/market-quote-adapter.mjs";
+import {
+  createMarketQuoteAdapter, reviewScenarioConfigSha256
+} from "../scripts/memecoin-paper/market-quote-adapter.mjs";
 import {
   SYNTHETIC_MINT, SYNTHETIC_POOL, SYNTHETIC_QUOTE, SYNTHETIC_SOURCE
 } from "../scripts/memecoin-paper/synthetic-fixtures.mjs";
@@ -63,6 +65,43 @@ function adapterFor(body, options = {}) {
     ...options
   });
   return {adapter, calls};
+}
+
+function reviewScenario(caseName = "BASELINE", overrides = {}) {
+  const assumptions = caseName === "STRESS"
+    ? {scenarioId: "MEMECOIN_PAPER_QUOTE_ADVERSE_V1_STRESS",
+      adverseAdjustmentBps: 300, networkReserveCents: "50"}
+    : {scenarioId: "MEMECOIN_PAPER_QUOTE_ADVERSE_V1_BASELINE",
+      adverseAdjustmentBps: 100, networkReserveCents: "10"};
+  const config = {
+    optIn: true,
+    scenarioId: assumptions.scenarioId,
+    scenarioVersion: "1",
+    scenario: caseName,
+    identity: {...IDENTITY},
+    usdcMint: SYNTHETIC_QUOTE,
+    usdcDecimals: 6,
+    usdcUsdMicrosPerToken: "1000000",
+    quoteBasis: "QUOTED_ROUTE_AMOUNTS_AS_MODELED_NET_SWAP_BASIS",
+    adverseAdjustmentBps: assumptions.adverseAdjustmentBps,
+    networkReserveCents: assumptions.networkReserveCents,
+    feeCents: "0",
+    spreadCents: "0",
+    priceImpactCents: "0",
+    zeroChargeDisposition: "NO_INCREMENTAL_CHARGE_UNDER_SCENARIO_BASIS",
+    ...overrides
+  };
+  config.reviewEvidence ??= {
+    evidenceId: "method-review-1",
+    evidenceSha256: "a".repeat(64),
+    scenarioConfigSha256: reviewScenarioConfigSha256(config),
+    identity: {...config.identity},
+    reviewerRef: "independent-methodology-review",
+    purpose: "OFFLINE_SCENARIO_REVIEW_ONLY",
+    decision: "APPROVE_SCENARIO_REVIEW_ONLY",
+    recordedAt: NOW - 2_500
+  };
+  return config;
 }
 
 test("disabled adapter is inert and exposes no executable quote", async () => {
@@ -284,6 +323,284 @@ test("the existing cost normalizer maps a complete explicit synthetic scenario w
   assert.equal(normalized.totalCents, "7");
   assert.equal(normalized.provenance, "CALLER_ASSERTED_NOT_SOURCE_VERIFIED");
   assert.equal(normalized.authorizationEligible, false);
+});
+
+test("explicit baseline scenario projects net-basis costs without changing actual quote eligibility", async () => {
+  const result = await adapterFor(entryResponse().body).adapter.getPaperQuote(request(), {
+    reviewScenario: reviewScenario()
+  });
+  const projection = result.scenarioProjection;
+
+  assert.equal(projection.status, "REVIEW_PROJECTION_ONLY");
+  assert.equal(projection.scenarioCostCoverage, "COMPLETE");
+  assert.equal(projection.actualCostCoverage, "UNKNOWN");
+  assert.equal(projection.scenario.case, "BASELINE");
+  assert.equal(projection.scenario.quoteUsdAssumption.assumption,
+    "USDC_EQUALS_USD1_EXPERIMENTAL_NOT_MEASURED");
+  assert.equal(projection.scenario.approvalEvidenceProvenance,
+    "CALLER_ASSERTED_NOT_AUTHENTICATED");
+  assert.equal(projection.scenario.approvalEvidence.status, "ASSERTED_UNVERIFIED");
+  assert.equal(projection.costBasis, "QUOTED_ROUTE_AMOUNTS_AS_MODELED_NET_SWAP_BASIS");
+  assert.deepEqual(projection.costsCents, {
+    feeCents: "0",
+    spreadCents: "0",
+    slippageCents: "80",
+    priceImpactCents: "0",
+    networkCents: "10"
+  });
+  assert.equal(projection.costDisposition.feeCents,
+    "NO_INCREMENTAL_CHARGE_UNDER_SCENARIO_BASIS");
+  assert.equal(projection.costDisposition.spreadCents,
+    "NO_INCREMENTAL_CHARGE_UNDER_SCENARIO_BASIS");
+  assert.equal(projection.costDisposition.priceImpactCents,
+    "NO_INCREMENTAL_CHARGE_UNDER_SCENARIO_BASIS");
+  assert.equal(projection.amountProjection.maximumModeledInputAtoms, "79100000");
+  assert.equal(projection.amountProjection.modeledAllInCents, "8000");
+  assert.equal(projection.quoteValue.grossBeforeExtraScenarioCostsCents, "7910");
+  assert.equal(projection.quoteValue.afterExtraScenarioCostsCents, "8000");
+  assert.equal(projection.quoteValue.label, "MODELED_SINGLE_SIDE_QUOTE_VALUE_NOT_PNL");
+  assert.equal(projection.pnl.status, "NOT_COMPUTED_SINGLE_SIDE_PROJECTION");
+  assert.equal(projection.executionRealistic, false);
+  assert.equal(projection.integrationEligible, false);
+  assert.equal(projection.authorizationEligible, false);
+  assert.equal(result.quoteCandidate.priceMicros, null);
+  assert.equal(result.costEvidence.status, "UNKNOWN");
+  assert.equal(result.authorizationEligible, false);
+  assert.deepEqual(projection.providerFieldsRetainedSeparately, {
+    feeBps: 2,
+    feeMint: SYNTHETIC_MINT,
+    platformFee: {amount: "100", feeBps: 2, feeMint: SYNTHETIC_MINT},
+    networkFeesLamports: {signature: 5000, prioritization: 2500, rent: 0},
+    priceImpact: {field: "priceImpact", value: 0.02, unit: "percentage_points"},
+    slippageToleranceBps: 50
+  });
+});
+
+test("baseline and stress exit projections use conservative rational rounding and remain identity-bound", async () => {
+  const exitBody = syntheticOrderResponse({
+    inputMint: SYNTHETIC_MINT,
+    outputMint: SYNTHETIC_QUOTE,
+    inAmount: "1000000",
+    outAmount: "5842157",
+    otherAmountThreshold: "5812946"
+  }).body;
+  const exitRequest = request({
+    side: "EXIT",
+    amountAtoms: "1000000",
+    positionOpenedAt: NOW - 1_000
+  });
+  delete exitRequest.authorizedAt;
+  const baseline = await adapterFor(exitBody).adapter.getPaperQuote(exitRequest, {
+    reviewScenario: reviewScenario()
+  });
+  const stress = await adapterFor(exitBody).adapter.getPaperQuote(exitRequest, {
+    reviewScenario: reviewScenario("STRESS")
+  });
+  const base = baseline.scenarioProjection;
+  const stressed = stress.scenarioProjection;
+  const entry = await adapterFor(entryResponse().body).adapter.getPaperQuote(request(), {
+    reviewScenario: reviewScenario()
+  });
+  const stressEntry = await adapterFor(entryResponse().body).adapter.getPaperQuote(request(), {
+    reviewScenario: reviewScenario("STRESS")
+  });
+  const mark = await adapterFor(exitBody).adapter.getPaperQuote(exitRequest, {
+    reviewScenario: reviewScenario()
+  });
+
+  assert.equal(base.status, "REVIEW_PROJECTION_ONLY");
+  assert.equal(base.side, "EXIT");
+  assert.equal(base.priceMicros, 5_842_157);
+  assert.equal(base.priceRounding, "floor_exact_USD_per_token_microUSD");
+  assert.deepEqual(base.costsCents, {
+    feeCents: "0", spreadCents: "0", slippageCents: "6",
+    priceImpactCents: "0", networkCents: "10"
+  });
+  assert.equal(stressed.scenarioCostCoverage, "COMPLETE");
+  assert.equal(stressed.side, "EXIT");
+  assert.ok(BigInt(stressed.quoteValue.afterExtraScenarioCostsCents) <=
+    BigInt(base.quoteValue.afterExtraScenarioCostsCents));
+  assert.ok(BigInt(stressed.quoteValue.totalExtraScenarioCostsCents) >
+    BigInt(base.quoteValue.totalExtraScenarioCostsCents));
+  assert.equal(base.identity.mint, IDENTITY.mint);
+  assert.equal(entry.scenarioProjection.scenario.configurationSha256,
+    base.scenario.configurationSha256);
+  assert.equal(stressEntry.scenarioProjection.amountProjection.modeledAllInCents, "8000");
+  assert.ok(BigInt(stressEntry.scenarioProjection.costsCents.slippageCents) >
+    BigInt(entry.scenarioProjection.costsCents.slippageCents));
+  assert.ok(BigInt(stressEntry.scenarioProjection.amountProjection.maximumModeledInputAtoms) <
+    BigInt(entry.scenarioProjection.amountProjection.maximumModeledInputAtoms));
+  assert.notEqual(base.scenario.configurationSha256, stressed.scenario.configurationSha256);
+  assert.equal(mark.scenarioProjection.side, "EXIT");
+  assert.equal(mark.scenarioProjection.scenario.configurationSha256,
+    base.scenario.configurationSha256);
+
+  const restarted = await adapterFor(exitBody).adapter.getPaperQuote(exitRequest, {
+    reviewScenario: reviewScenario()
+  });
+  assert.equal(restarted.scenarioProjection.scenario.configurationSha256,
+    base.scenario.configurationSha256);
+  assert.equal(restarted.scenarioProjection.identity.pool, base.identity.pool);
+});
+
+test("review scenario configuration is snapshotted before the injected quote transport awaits", async () => {
+  const fixture = entryResponse();
+  let release;
+  const waiting = new Promise(resolve => { release = resolve; });
+  const adapter = createMarketQuoteAdapter({
+    enabled: true,
+    clock: () => NOW,
+    transport: async () => {
+      await waiting;
+      return response(fixture.body);
+    }
+  });
+  const config = reviewScenario();
+  const pending = adapter.getPaperQuote(request(), {reviewScenario: config});
+  await new Promise(resolve => setImmediate(resolve));
+  config.reviewEvidence.decision = "NOT_APPROVED";
+  config.identity.mint = SYNTHETIC_POOL;
+  release();
+  const result = await pending;
+
+  assert.equal(result.scenarioProjection.status, "REVIEW_PROJECTION_ONLY");
+  assert.equal(result.scenarioProjection.identity.mint, IDENTITY.mint);
+  assert.equal(result.scenarioProjection.scenario.approvalEvidence.status,
+    "ASSERTED_UNVERIFIED");
+});
+
+test("review scenario opt-in, evidence, identity, mint, and chronology fail closed", async () => {
+  const body = entryResponse().body;
+  const absent = await adapterFor(body).adapter.getPaperQuote(request());
+  assert.equal(absent.scenarioProjection, null);
+
+  const missingEvidence = reviewScenario();
+  delete missingEvidence.reviewEvidence;
+  const missing = await adapterFor(body).adapter.getPaperQuote(request(), {
+    reviewScenario: missingEvidence
+  });
+  assert.equal(missing.scenarioProjection.status, "BLOCKED");
+
+  const unapprovedConfig = reviewScenario();
+  unapprovedConfig.reviewEvidence.decision = "NOT_APPROVED";
+  const unapproved = await adapterFor(body).adapter.getPaperQuote(request(), {
+    reviewScenario: unapprovedConfig
+  });
+  assert.equal(unapproved.scenarioProjection.status, "BLOCKED");
+  assert.ok(unapproved.scenarioProjection.reasons.includes(
+    "SCENARIO_REVIEW_EVIDENCE_MISSING_UNAPPROVED_OR_MISMATCHED"
+  ));
+
+  const mismatchedConfig = reviewScenario();
+  mismatchedConfig.reviewEvidence.scenarioConfigSha256 = "b".repeat(64);
+  const mismatched = await adapterFor(body).adapter.getPaperQuote(request(), {
+    reviewScenario: mismatchedConfig
+  });
+  assert.equal(mismatched.scenarioProjection.status, "BLOCKED");
+
+  const wrongQuoteMint = reviewScenario();
+  wrongQuoteMint.usdcMint = SYNTHETIC_MINT;
+  const wrongMint = await adapterFor(body).adapter.getPaperQuote(request(), {
+    reviewScenario: wrongQuoteMint
+  });
+  assert.equal(wrongMint.scenarioProjection.status, "BLOCKED");
+  assert.ok(wrongMint.scenarioProjection.reasons.includes("SCENARIO_CONFIGURATION_INVALID"));
+
+  const wrongIdentity = reviewScenario("BASELINE", {
+    identity: {...IDENTITY, mint: SYNTHETIC_POOL}
+  });
+  const identityMismatch = await adapterFor(body).adapter.getPaperQuote(request(), {
+    reviewScenario: wrongIdentity
+  });
+  assert.equal(identityMismatch.scenarioProjection.status, "BLOCKED");
+  assert.ok(identityMismatch.scenarioProjection.reasons.includes(
+    "SCENARIO_IDENTITY_OR_DECIMALS_MISMATCH"
+  ));
+
+  const futureEvidence = reviewScenario();
+  futureEvidence.reviewEvidence.recordedAt = NOW + 10_000;
+  const future = await adapterFor(body).adapter.getPaperQuote(request(), {
+    reviewScenario: futureEvidence
+  });
+  assert.equal(future.scenarioProjection.status, "BLOCKED");
+});
+
+test("scenario conversion rejects zero/unsafe prices and refuses size extrapolation or over-cap entries", async () => {
+  const quoteDust = entryResponse({
+    inAmount: "1", outAmount: "3", otherAmountThreshold: "1"
+  });
+  const subcent = await adapterFor(quoteDust.body).adapter.getPaperQuote(request({
+    amountAtoms: "1"
+  }), {reviewScenario: reviewScenario()});
+  assert.equal(subcent.scenarioProjection.status, "REVIEW_PROJECTION_ONLY");
+  assert.equal(subcent.scenarioProjection.priceMicros, 333334);
+  assert.equal(subcent.scenarioProjection.priceRounding,
+    "ceil_exact_USD_per_token_microUSD");
+  assert.equal(subcent.scenarioProjection.amountProjection.maximumModeledInputAtoms, "1");
+  assert.ok(BigInt(subcent.scenarioProjection.amountProjection.maximumModeledInputAtoms) <=
+    BigInt(subcent.scenarioProjection.amountProjection.sourceQuotedInputAtoms));
+
+  const nineDecimalIdentity = {...IDENTITY, decimals: 9};
+  const nineDecimalQuote = entryResponse({
+    inAmount: "100000000",
+    outAmount: "17057460000",
+    otherAmountThreshold: "1"
+  });
+  const nineDecimal = await adapterFor(nineDecimalQuote.body).adapter.getPaperQuote(request({
+    identity: nineDecimalIdentity
+  }), {reviewScenario: reviewScenario("BASELINE", {identity: nineDecimalIdentity})});
+  assert.equal(nineDecimal.scenarioProjection.priceMicros,
+    Number((100_000_000n * 1_000_000n + 17_057_460n - 1n) / 17_057_460n));
+
+  const exitDust = syntheticOrderResponse({
+    inputMint: SYNTHETIC_MINT,
+    outputMint: SYNTHETIC_QUOTE,
+    inAmount: "3",
+    outAmount: "1",
+    otherAmountThreshold: "1"
+  });
+  const exitDustRequest = request({
+    side: "EXIT", amountAtoms: "3", positionOpenedAt: NOW - 1_000
+  });
+  delete exitDustRequest.authorizedAt;
+  const credit = await adapterFor(exitDust.body).adapter.getPaperQuote(exitDustRequest, {
+    reviewScenario: reviewScenario()
+  });
+  assert.equal(credit.scenarioProjection.priceMicros, 333333);
+  assert.equal(credit.scenarioProjection.priceRounding,
+    "floor_exact_USD_per_token_microUSD");
+  assert.equal(credit.scenarioProjection.quoteValue.grossBeforeExtraScenarioCostsCents, "0");
+  assert.equal(credit.scenarioProjection.quoteValue.direction, "CREDIT_ROUNDED_DOWN");
+
+  const zeroPrice = syntheticOrderResponse({
+    inputMint: SYNTHETIC_MINT,
+    outputMint: SYNTHETIC_QUOTE,
+    inAmount: "9999999999999999999999999999999999999999",
+    outAmount: "1",
+    otherAmountThreshold: "1"
+  });
+  const zeroRequest = request({
+    side: "EXIT",
+    amountAtoms: "9999999999999999999999999999999999999999",
+    positionOpenedAt: NOW - 1_000
+  });
+  delete zeroRequest.authorizedAt;
+  const zero = await adapterFor(zeroPrice.body).adapter.getPaperQuote(zeroRequest, {
+    reviewScenario: reviewScenario()
+  });
+  assert.equal(zero.scenarioProjection.status, "BLOCKED");
+  assert.ok(zero.scenarioProjection.reasons.includes("SCENARIO_PRICE_MICROS_ZERO_OR_UNSAFE"));
+
+  const unsafePrice = entryResponse({
+    inAmount: "9999999999999999999999999999999999999999",
+    outAmount: "1",
+    otherAmountThreshold: "1"
+  });
+  const unsafe = await adapterFor(unsafePrice.body).adapter.getPaperQuote(request({
+    amountAtoms: "9999999999999999999999999999999999999999"
+  }), {reviewScenario: reviewScenario()});
+  assert.equal(unsafe.scenarioProjection.status, "BLOCKED");
+  assert.ok(unsafe.scenarioProjection.reasons.includes("SCENARIO_PRICE_MICROS_ZERO_OR_UNSAFE"));
 });
 
 test("provider expiry, malformed/truncated responses, and over-cap streams fail closed", async () => {

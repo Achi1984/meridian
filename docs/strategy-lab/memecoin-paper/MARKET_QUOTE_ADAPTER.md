@@ -133,6 +133,115 @@ Until one of those decisions/contracts exists, missing coverage remains
 `UNKNOWN` and the existing consumer rejects the adapter candidate. No live
 market scan, credentials, signing, submission, or runner connection is added.
 
+## Versioned review-only scenario projection
+
+The adapter exposes a separate `scenarioProjection` only when
+`getPaperQuote(request, {reviewScenario})` receives a complete explicit
+configuration. Omission returns `scenarioProjection: null`; malformed,
+unapproved, mismatched, stale, or unbound evidence returns `BLOCKED`. Nothing
+in the adapter or consumer defaults into a scenario. The two fixed experimental
+cases are:
+
+| Case | Adverse scenario adjustment | Fixed network reserve per side |
+| --- | ---: | ---: |
+| `BASELINE` | 100 bp | 10 US cents |
+| `STRESS` | 300 bp | 50 US cents |
+
+These are methodology-review inputs, **not measured fees, approved operating
+assumptions, or guaranteed upper bounds**. The caller must pass the complete
+configuration, including the case-specific ID/version, full chain/mint/pool/
+quote/decimal identity, fixed-point `USDC/USD = 1` assumption, cost basis,
+all five cost inputs and dispositions, and review-evidence record. USDC must be
+the native Solana mint documented by [Circle](https://developers.circle.com/stablecoins/usdc-contract-addresses)
+(`EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v`) at exactly six decimals; the
+peg remains an explicit experimental assumption, not a price observation.
+`reviewScenarioConfigSha256(config)` supplies the deterministic hash to bind
+the review evidence to every scenario assumption and identity field.
+
+For example, the caller explicitly builds (not inherits/defaults) a baseline
+configuration before attaching the offline review artifact:
+
+```js
+const config = {
+  optIn: true,
+  scenarioId: "MEMECOIN_PAPER_QUOTE_ADVERSE_V1_BASELINE",
+  scenarioVersion: "1",
+  scenario: "BASELINE",
+  identity,
+  usdcMint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+  usdcDecimals: 6,
+  usdcUsdMicrosPerToken: "1000000",
+  quoteBasis: "QUOTED_ROUTE_AMOUNTS_AS_MODELED_NET_SWAP_BASIS",
+  adverseAdjustmentBps: 100,
+  networkReserveCents: "10",
+  feeCents: "0",
+  spreadCents: "0",
+  priceImpactCents: "0",
+  zeroChargeDisposition: "NO_INCREMENTAL_CHARGE_UNDER_SCENARIO_BASIS"
+};
+const reviewScenario = {
+  ...config,
+  reviewEvidence: {
+    evidenceId, evidenceSha256, reviewerRef,
+    scenarioConfigSha256: reviewScenarioConfigSha256(config),
+    identity,
+    purpose: "OFFLINE_SCENARIO_REVIEW_ONLY",
+    decision: "APPROVE_SCENARIO_REVIEW_ONLY",
+    recordedAt
+  }
+};
+const {scenarioProjection} = await adapter.getPaperQuote(request, {reviewScenario});
+```
+
+`evidenceId`, `evidenceSha256`, `reviewerRef`, and `recordedAt` above must come
+from an actual offline review artifact; the example supplies no synthetic
+approval. The adapter checks only schema and binding, never the truth or
+authority of those fields.
+
+The review evidence must name an evidence artifact and reviewer reference,
+carry a SHA-256-shaped artifact digest, bind the exact configuration hash and
+identity, state `purpose: "OFFLINE_SCENARIO_REVIEW_ONLY"` and
+`decision: "APPROVE_SCENARIO_REVIEW_ONLY"`, and predate the local response
+receipt. The adapter only checks this caller-supplied structure and binding:
+output provenance is `CALLER_ASSERTED_NOT_AUTHENTICATED`. It does not verify
+the artifact, reviewer, approval, or clock, and it does not assert that the
+owner approved operating or execution use. Independent evidence verification
+is mandatory at any future integration boundary.
+
+The declared basis is
+`QUOTED_ROUTE_AMOUNTS_AS_MODELED_NET_SWAP_BASIS`: route fee, spread, and
+size-impact already reflected in the quoted ratio are not charged a second
+time. The preview sets their additional cost fields to zero only with
+`NO_INCREMENTAL_CHARGE_UNDER_SCENARIO_BASIS`; these are not claims of actual
+zero costs. Raw provider fee, lamport, price-impact, and slippage-tolerance
+fields remain separately visible and do not become actual-cost evidence.
+Scenario slippage is the selected adverse adjustment, converted to cents with
+integer arithmetic and rounded up; network is the explicit fixed USD reserve
+for each side. The provider slippage tolerance/minimum output is never charged
+again.
+
+USDC conversion and token-price arithmetic use `BigInt` rational operations.
+The model's USD-per-token `priceMicros` rounds up for entry and down for exit.
+Debit values round up and credit values round down to cents. Entry sizing is
+linearly projected only up to the source-quoted input amount and is further
+capped so the modeled gross value plus scenario costs does not exceed the
+existing fixed `$80` entry limit (`8,000` cents). The current consumer's
+authorization, available-cash, 8%-of-equity, hard-evidence, and other risk
+limits are not recalculated here; they remain unchanged. The projection is not
+an executable exact-size route, and any integration must enforce the explicit
+input-size cap rather than extrapolate from `priceMicros`.
+
+`quoteValue.grossBeforeExtraScenarioCostsCents` and
+`quoteValue.afterExtraScenarioCostsCents` are **single-side modeled quote
+values, not PnL**. The adapter does not compute PnL before/after costs: that
+requires a paired identity-bound entry, exit, and marks. Scenario cost
+coverage `COMPLETE` means only that this declared scenario has all arithmetic
+inputs. Alongside it, actual cost coverage remains `UNKNOWN`, quote candidate
+price/costs remain unavailable, and `authorizationEligible`,
+`executionRealistic`, and `integrationEligible` remain false. The scenario
+projection is not passed to the runner or Paper consumer, and existing hard
+filters and cost gates are not weakened.
+
 ## Offline validation
 
 `node --test test/memecoin-paper-market-quote-adapter.test.js` runs only
@@ -140,5 +249,8 @@ generated synthetic fixtures and injected transports. It verifies inert
 construction, exact entry/exit chronology and amounts, source/route identity,
 successful exact route-ratio normalization alongside unresolved costs, quote
 expiry, decimal precision, invalid input, bounded response handling and
-cancellation, and rejection by the existing Paper consumer. It makes no network
-request and does not claim that synthetic responses are real market evidence.
+cancellation, rejection by the existing Paper consumer, and opt-in baseline/
+stress projections including cost non-overlap, rounding, configuration/evidence
+binding, size caps, and identity stability across recreated adapters. It makes
+no network request and does not claim that synthetic responses are real market
+evidence.
