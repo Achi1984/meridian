@@ -187,7 +187,7 @@ function coverageStatus(report) {
     "The report declares complete audit coverage and reconciled ledger-event counts.");
 }
 
-function candidateCoverageStatus(report) {
+function candidateCoverageStatus(report, config) {
   const coverage = report?.dto?.candidates?.detailsCoverage;
   const details = report?.dto?.candidates?.details;
   const summary = report?.dto?.candidates;
@@ -270,6 +270,16 @@ function candidateCoverageStatus(report) {
   if (!details.every(validCandidate)) {
     return makeCriterion("candidate_detail_coverage", "FAIL",
       "One or more candidate or rejection-reason rows are malformed.");
+  }
+  if (details.some(candidate => candidate.sampledAt !== null) && !config) {
+    return makeCriterion("candidate_detail_coverage", "UNKNOWN",
+      "Candidate sample timestamps cannot be checked without validated run bounds.");
+  }
+  if (config && details.some(candidate => candidate.sampledAt !== null &&
+      (Date.parse(candidate.sampledAt) < config.startAt ||
+        Date.parse(candidate.sampledAt) > config.endAt))) {
+    return makeCriterion("candidate_detail_coverage", "FAIL",
+      "One or more candidate sample timestamps fall outside the configured run window.");
   }
   let nestedReasonCoverageUnknown = false;
   for (const candidate of details) {
@@ -831,6 +841,10 @@ function terminalStatus(terminal, report) {
     return makeCriterion("terminal_completion", "FAIL",
       "Nonzero financial or open-position evidence conflicts with a zero-fill observation.");
   }
+  if (report.dto.candidates.accepted > 0 || report.dto.controls.reservations > 0) {
+    return makeCriterion("terminal_completion", "FAIL",
+      "Candidate authorization or reservation evidence conflicts with an observation-only terminal marker.");
+  }
   const finalizedAt = terminalObservation.windowFinalization.finalizedAt;
   const {effectiveEndAt, latenessMs} = terminalObservation.windowFinalization;
   if (![effectiveEndAt, finalizedAt, latenessMs].every(Number.isSafeInteger) ||
@@ -910,7 +924,8 @@ function evaluateCriteria(expectedRunId, expectedConfigHash, artifacts) {
     : makeCriterion("checkpoint_audit_coverage", "UNKNOWN",
       "Checkpoint audit coverage cannot be assessed without a valid operator report.");
   const candidates = artifacts.report.status === "VALID"
-    ? candidateCoverageStatus(report)
+    ? candidateCoverageStatus(report,
+      config && validConfig(config, expectedRunId) ? config : null)
     : makeCriterion("candidate_detail_coverage", "UNKNOWN",
       "Candidate detail coverage cannot be assessed without a valid operator report.");
   const accounting = artifacts.terminal.status === "VALID" && artifacts.report.status === "VALID"
@@ -980,7 +995,9 @@ export function evaluateObservation({
     evaluation.reportCheck.status === "PASS";
   const completionStatus = !completionEvidenceBound ? "UNKNOWN" :
     evaluation.terminalCheck.status !== "PASS" ? evaluation.terminalCheck.status :
-      duration.criterion.status === "FAIL" ? "FAIL" : "PASS";
+      evaluation.accounting.status === "FAIL" ? "FAIL" :
+        evaluation.accounting.status !== "PASS" ? "UNKNOWN" :
+          duration.criterion.status === "FAIL" ? "FAIL" : "PASS";
   const completionMode = completionEvidenceBound && evaluation.terminalCheck.status === "PASS"
     ? duration.completionMode : "UNKNOWN";
   return {
@@ -1102,6 +1119,16 @@ export function renderEvaluationMarkdown(evaluation) {
     "## Provider accounting",
     "",
     ...providerRows,
+    "",
+    "## Paper accounting",
+    "",
+    `- Paper entry fills: ${evaluation.accounting.paperEntryFills ?? "UNKNOWN"}`,
+    `- Cash cents: ${markdownEscape(evaluation.accounting.cashCents ?? "UNKNOWN")}`,
+    `- Realized gross P&L cents: ${markdownEscape(evaluation.accounting.realizedGrossPnlCents ?? "UNKNOWN")}`,
+    `- Realized net P&L cents: ${markdownEscape(evaluation.accounting.realizedNetPnlCents ?? "UNKNOWN")}`,
+    `- Unrealized gross P&L cents: ${markdownEscape(evaluation.accounting.unrealizedGrossPnlCents ?? "UNKNOWN")}`,
+    `- Unrealized net P&L cents: ${markdownEscape(evaluation.accounting.unrealizedNetPnlCents ?? "UNKNOWN")}`,
+    `- Total costs cents: ${markdownEscape(evaluation.accounting.totalCostsCents ?? "UNKNOWN")}`,
     "",
     "## Checkpoint and candidate evidence",
     "",

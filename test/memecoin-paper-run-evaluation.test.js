@@ -617,6 +617,23 @@ test("candidate rejection reasons are preserved without manufacturing rejected c
   const invalidDate = evaluateObservation({...input, reportBytes: bytes(invalidDateRows)});
   assert.equal(criterion(invalidDate, "candidate_detail_coverage").status, "FAIL");
 
+  for (const sampledAt of [START - 1, START + DURATION + 1]) {
+    const outsideWindow = reportRecord({
+      configHash: input.expectedConfigHash,
+      candidateRejection: true
+    });
+    outsideWindow.dto.candidates.details[0].sampledAt = new Date(sampledAt).toISOString();
+    const result = evaluateObservation({...input, reportBytes: bytes(outsideWindow)});
+    assert.equal(criterion(result, "candidate_detail_coverage").status, "FAIL");
+  }
+  const endBoundary = reportRecord({
+    configHash: input.expectedConfigHash,
+    candidateRejection: true
+  });
+  endBoundary.dto.candidates.details[0].sampledAt = new Date(START + DURATION).toISOString();
+  const endBoundaryResult = evaluateObservation({...input, reportBytes: bytes(endBoundary)});
+  assert.equal(criterion(endBoundaryResult, "candidate_detail_coverage").status, "PASS");
+
   const inconsistentSummary = JSON.parse(input.reportBytes.toString("utf8"));
   inconsistentSummary.dto.candidates.considered = 0;
   const inconsistentCounts = evaluateObservation({...input, reportBytes: bytes(inconsistentSummary)});
@@ -685,6 +702,8 @@ test("Markdown rendering neutralizes untrusted image and link syntax", () => {
   for (const [name, digest] of Object.entries(evaluation.coverage.inputDigests)) {
     assert.ok(markdown.includes(`- ${name}: ${digest}`));
   }
+  assert.match(markdown, /## Paper accounting/);
+  assert.match(markdown, /- Paper entry fills: 0/);
 
   const missingReport = evaluateObservation({...input, reportBytes: undefined});
   assert.ok(renderEvaluationMarkdown(missingReport).includes("- report: UNKNOWN"));
@@ -705,6 +724,21 @@ test("terminal observation activity cannot conflict with a zero-activity report"
   reportActivity.reportBytes = bytes(report);
   const reportConflict = evaluateObservation(reportActivity);
   assert.equal(criterion(reportConflict, "terminal_completion").status, "FAIL");
+
+  for (const field of ["accepted", "reservations"]) {
+    const authorized = fixture();
+    const authorizedReport = JSON.parse(authorized.reportBytes.toString("utf8"));
+    if (field === "accepted") {
+      authorizedReport.dto.candidates.accepted = 1;
+    } else {
+      authorizedReport.dto.controls.reservations = 1;
+    }
+    authorized.reportBytes = bytes(authorizedReport);
+    const authorizedResult = evaluateObservation(authorized);
+    assert.equal(criterion(authorizedResult, "terminal_completion").status, "FAIL");
+    assert.equal(authorizedResult.observation.completionStatus, "FAIL");
+    assert.equal(authorizedResult.observation.fullDeadlineCompleted, false);
+  }
 
   const unsupportedTradingStatus = fixture();
   const unsupportedReport = JSON.parse(unsupportedTradingStatus.reportBytes.toString("utf8"));
@@ -804,6 +838,19 @@ test("provider totals distinguish zero from missing, reject mismatches, and reta
   mismatchReport.observation.providerAccounting.bytes = 1;
   const mismatch = evaluateObservation({...mismatchedCounters, reportBytes: bytes(mismatchReport)});
   assert.equal(criterion(mismatch, "provider_accounting").status, "FAIL");
+  assert.equal(mismatch.observation.completionStatus, "FAIL");
+  assert.equal(mismatch.observation.fullDeadlineCompleted, false);
+
+  const unavailableCounters = fixture();
+  const unavailableReport = JSON.parse(unavailableCounters.reportBytes.toString("utf8"));
+  delete unavailableReport.observation.providerAccounting.bytes;
+  const unavailable = evaluateObservation({
+    ...unavailableCounters,
+    reportBytes: bytes(unavailableReport)
+  });
+  assert.equal(criterion(unavailable, "provider_accounting").status, "UNKNOWN");
+  assert.equal(unavailable.observation.completionStatus, "UNKNOWN");
+  assert.equal(unavailable.observation.fullDeadlineCompleted, false);
 
   const inconsistentRequests = evaluate({
     providerAccounting: {
@@ -840,6 +887,19 @@ test("provider totals distinguish zero from missing, reject mismatches, and reta
   assert.equal(exactAmountResult.accounting.cashCents, "900719925474099312345");
   assert.equal(JSON.parse(JSON.stringify(exactAmountResult)).accounting.cashCents,
     "900719925474099312345");
+  const exactAmountMarkdown = renderEvaluationMarkdown(exactAmountResult);
+  assert.match(exactAmountMarkdown, /- Cash cents: 900719925474099312345/);
+
+  const unavailableAmountReport = JSON.parse(exactAmount.reportBytes.toString("utf8"));
+  unavailableAmountReport.dto.valuation.cashCents = null;
+  unavailableAmountReport.dto.costs.totalCents = null;
+  const unavailableAmountResult = evaluateObservation({
+    ...exactAmount,
+    reportBytes: bytes(unavailableAmountReport)
+  });
+  const unavailableAmountMarkdown = renderEvaluationMarkdown(unavailableAmountResult);
+  assert.match(unavailableAmountMarkdown, /- Cash cents: UNKNOWN/);
+  assert.match(unavailableAmountMarkdown, /- Total costs cents: UNKNOWN/);
 
   const overBudget = evaluate({
     providerAccounting: {
