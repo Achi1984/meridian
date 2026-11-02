@@ -55,6 +55,7 @@ From the repository root:
 node --test scripts/memecoin-paper-run-export-transfer/test/transfer.test.mjs
 node --check scripts/memecoin-paper-run-export-transfer/index.mjs
 node --check scripts/memecoin-paper-run-export-transfer/test/transfer.test.mjs
+node scripts/secret-check.mjs
 ```
 
 Tests create an actual synthetic composition export, transfer and independently
