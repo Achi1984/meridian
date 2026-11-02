@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import {createHash} from "node:crypto";
-import {mkdtemp, mkdir, rm, symlink, writeFile} from "node:fs/promises";
+import {mkdtemp, mkdir, rename, rm, symlink, writeFile} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import {readFileSync} from "node:fs";
@@ -155,23 +155,37 @@ async function workerFixture(t, {
   }));
   const hash = configHash(configBytes);
   await writeFile(path.join(runDirectory, "run-config.json"), configBytes);
-  await writeFile(path.join(runDirectory, "run.lock"), JSON.stringify({
+  await writeFile(path.join(runDirectory, "run.lock"), canonicalJson({
     version: 1,
     runId,
     configHash: hash
   }));
-  await writeFile(path.join(runDirectory, "terminal.json"), JSON.stringify({
+  const observation = {
+    providerAccounting: {},
+    entryAuthorizations: 0,
+    simulatedFills: 0,
+    executableQuoteAndCostEvidence: "UNAVAILABLE"
+  };
+  await writeFile(path.join(runDirectory, "terminal.json"), canonicalJson({
     version: 1,
     status: "FINISHED",
     runId,
-    configHash: hash
+    configHash: hash,
+    providerAccounting: {}
   }));
+  const storedReport = canonicalJson({
+    runId,
+    configHash: hash,
+    dto: report,
+    observation,
+    text: "synthetic report"
+  });
   if (linkReport) {
     const outside = path.join(root, "outside-report.json");
-    await writeFile(outside, "{}");
+    await writeFile(outside, storedReport);
     await symlink(outside, path.join(runDirectory, "operator-report.json"));
   } else {
-    await writeFile(path.join(runDirectory, "operator-report.json"), "{}");
+    await writeFile(path.join(runDirectory, "operator-report.json"), storedReport);
   }
   return {root, hash, report};
 }
@@ -245,6 +259,21 @@ test("one-shot transfer validates terminal/config and sends only the fixed bound
   assert.ok(observed[0].options.body.length <= 256 * 1024);
   assert.equal(observed[0].options.body.includes(UPLOAD_TOKEN), false);
   assert.deepEqual(JSON.parse(observed[0].options.body), transferEnvelope(fixture.report, {hash: fixture.hash}));
+});
+
+test("default exporter reads status and report from the captured run snapshot", async t => {
+  const fixture = await workerFixture(t);
+  let uploaded;
+  const result = await transferPostRunReport(makeWorkerOptions(fixture, {
+    readStatus: undefined,
+    readReport: undefined,
+    fetchImpl: async (_url, options) => {
+      uploaded = JSON.parse(options.body.toString("utf8"));
+      return receiptResponse(201, options.body);
+    }
+  }));
+  assert.equal(result.status, "TRANSFERRED");
+  assert.deepEqual(uploaded, transferEnvelope(fixture.report, {hash: fixture.hash}));
 });
 
 test("synchronous admission allows one deferred preflight owner and releases it after success", async t => {
@@ -353,13 +382,13 @@ test("deferred preflight ownership remains held through timeout and late respons
   while (!cancelStarted) await new Promise(resolve => setImmediate(resolve));
   assert.deepEqual(await transferPostRunReport(options), {status: "REJECTED", reason: "transfer_busy"});
   finishCancel();
-  await new Promise(resolve => setImmediate(resolve));
-  assert.equal((await transferPostRunReport({
+  const retryResult = await transferAfterOwnerSettles({
     ...options,
     timeoutMs: 10,
     readStatus: makeWorkerOptions(fixture).readStatus,
     fetchImpl: async (_url, requestOptions) => receiptResponse(201, requestOptions.body)
-  })).status, "TRANSFERRED");
+  });
+  assert.equal(retryResult.status, "TRANSFERRED");
 });
 
 test("preflight deadline returns UNKNOWN, retains ownership, and blocks late dispatch", async t => {
@@ -451,6 +480,92 @@ test("exporter rejects symlinked run files and run directories", async t => {
   assert.equal(result.reason, "run_directory_unsafe_or_missing");
 });
 
+test("report path replacement during deferred status read cannot redirect or upload", async t => {
+  const fixture = await workerFixture(t);
+  const statusGate = deferred();
+  const statusStarted = deferred();
+  const reportPath = path.join(fixture.root, RUN_ID, "operator-report.json");
+  const originalPath = path.join(fixture.root, RUN_ID, "captured-report.json");
+  const outsidePath = path.join(fixture.root, "outside-report.json");
+  await writeFile(outsidePath, '{"outside":"must not be uploaded"}');
+  let sends = 0;
+  const options = makeWorkerOptions(fixture, {
+    readStatus: () => {
+      statusStarted.resolve();
+      return statusGate.promise;
+    },
+    readReport: undefined,
+    fetchImpl: async () => { sends++; return {status: 201}; }
+  });
+  const pending = transferPostRunReport(options);
+  await statusStarted.promise;
+
+  await rename(reportPath, originalPath);
+  await symlink(outsidePath, reportPath);
+  statusGate.resolve({
+    status: "FINISHED",
+    runId: RUN_ID,
+    configHash: fixture.hash,
+    providerAccounting: {}
+  });
+
+  assert.deepEqual(await pending, {status: "REJECTED", reason: "run_snapshot_changed"});
+  assert.equal(sends, 0);
+});
+
+test("run-directory replacement during deferred status read cannot redirect reads", async t => {
+  const fixture = await workerFixture(t);
+  const statusGate = deferred();
+  const statusStarted = deferred();
+  const runDirectory = path.join(fixture.root, RUN_ID);
+  const preservedDirectory = path.join(fixture.root, "preserved-run");
+  const replacementDirectory = path.join(fixture.root, "replacement-run");
+  await mkdir(replacementDirectory);
+  let sends = 0;
+  const options = makeWorkerOptions(fixture, {
+    readStatus: () => {
+      statusStarted.resolve();
+      return statusGate.promise;
+    },
+    readReport: undefined,
+    fetchImpl: async () => { sends++; return {status: 201}; }
+  });
+  const pending = transferPostRunReport(options);
+  await statusStarted.promise;
+
+  await rename(runDirectory, preservedDirectory);
+  await symlink(replacementDirectory, runDirectory);
+  statusGate.resolve({
+    status: "FINISHED",
+    runId: RUN_ID,
+    configHash: fixture.hash,
+    providerAccounting: {}
+  });
+
+  assert.deepEqual(await pending, {status: "REJECTED", reason: "run_snapshot_changed"});
+  assert.equal(sends, 0);
+});
+
+test("exporter rejects nonregular report files before status reads or upload", async t => {
+  const fixture = await workerFixture(t);
+  const reportPath = path.join(fixture.root, RUN_ID, "operator-report.json");
+  await rm(reportPath);
+  await mkdir(reportPath);
+  let statusReads = 0;
+  let sends = 0;
+  const result = await transferPostRunReport(makeWorkerOptions(fixture, {
+    readStatus: async () => {
+      statusReads++;
+      return {status: "FINISHED", runId: RUN_ID, configHash: fixture.hash};
+    },
+    readReport: undefined,
+    fetchImpl: async () => { sends++; return {status: 201}; }
+  }));
+  assert.deepEqual(result, {status: "REJECTED", reason: "run_directory_unsafe_or_missing"});
+  assert.equal(statusReads, 0);
+  assert.equal(sends, 0);
+});
+
 test("invalid origins and redirects fail without retries or credential leakage", async t => {
   const fixture = await workerFixture(t);
   let calls = 0;
@@ -513,8 +628,7 @@ test("never-settling fetch returns UNKNOWN once and retains a single in-flight t
   assert.equal(first.reason, "transfer_outcome_unknown");
   assert.equal((await transferPostRunReport(options)).reason, "transfer_busy");
   releaseFetch(receiptResponse(201, requestBody));
-  await new Promise(resolve => setImmediate(resolve));
-  assert.equal((await transferPostRunReport({
+  assert.equal((await transferAfterOwnerSettles({
     ...options,
     fetchImpl: async (_url, options) => receiptResponse(201, options.body)
   })).status, "TRANSFERRED");
@@ -551,8 +665,7 @@ test("late HTTP response body is cancelled before releasing the transfer slot", 
   assert.equal(cancelStarted, true);
   assert.equal((await transferPostRunReport(options)).reason, "transfer_busy");
   finishCancel();
-  await new Promise(resolve => setImmediate(resolve));
-  assert.equal((await transferPostRunReport({
+  assert.equal((await transferAfterOwnerSettles({
     ...options,
     fetchImpl: async (_url, requestOptions) => receiptResponse(201, requestOptions.body)
   })).status, "TRANSFERRED");
@@ -695,7 +808,7 @@ test("receipt timeout preserves pending cancellation cleanup and transfer owners
     await new Promise(resolve => setImmediate(resolve));
   }
   assert.equal(released, true);
-  const retry = await transferPostRunReport({
+  const retry = await transferAfterOwnerSettles({
     ...options,
     timeoutMs: 1_000,
     fetchImpl: async (_url, requestOptions) => receiptResponse(201, requestOptions.body)
@@ -994,6 +1107,16 @@ function deferred() {
   let reject;
   const promise = new Promise((ok, fail) => { resolve = ok; reject = fail; });
   return {promise, resolve, reject};
+}
+
+async function transferAfterOwnerSettles(options, attempts = 50) {
+  let result;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    result = await transferPostRunReport(options);
+    if (result.reason !== "transfer_busy") return result;
+    await new Promise(resolve => setImmediate(resolve));
+  }
+  return result;
 }
 
 function rowFor(input) {

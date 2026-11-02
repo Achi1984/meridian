@@ -171,6 +171,9 @@ required settings without placing secret values in the command. Set
 `MERIDIAN_PAPER_REPORT_EXPECTED_RUN_ID` to the independently verified run ID;
 mount the preserved run data read-only:
 
+The exporter requires Linux with a usable `/proc/self/fd`; unsupported platforms
+fail closed before reading or sending report data.
+
 ```sh
 docker run --rm --entrypoint node \
   --env-file "$WORKER_ENV_FILE" \
