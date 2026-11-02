@@ -178,10 +178,16 @@ export function createPaperExecutionStep({session, store, runId, startedAt, endA
     let inputs;
     if (method === "authorizeEntry") {
       if (authorizations.size >= bounds.maxPendingAuthorizations) return reject("pending authorization capacity reached");
-      const filterResult = filterCandidate(input.candidate, {now: input.now, holdUntil: endAt});
-      const scoreResult = analyzeCandidate(input.candidate, {
-        now: input.now, filterResult, smartWalletAllowlist: input.smartWalletAllowlist
-      });
+      let filterResult;
+      let scoreResult;
+      try {
+        filterResult = filterCandidate(input.candidate, {now: input.now, holdUntil: endAt});
+        scoreResult = analyzeCandidate(input.candidate, {
+          now: input.now, filterResult, smartWalletAllowlist: input.smartWalletAllowlist
+        });
+      } catch {
+        return reject("candidate evidence cannot be evaluated");
+      }
       if (!filterResult.accepted || scoreResult.status !== "PASS") {
         return {status: "BLOCKED", entriesAllowed: false, filterResult, scoreResult};
       }

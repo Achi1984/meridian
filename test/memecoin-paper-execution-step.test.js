@@ -394,6 +394,12 @@ test("malformed plain-data inputs reject without poisoning the adapter", async t
     invalid.candidate.unused = unused;
     assert.equal((await step.authorizeEntry(invalid)).status, "REJECT");
   }
+  for (const [index, field] of ["mint", "pool", "quote"].entries()) {
+    const invalid = authorization(`malformed-${index}`);
+    invalid.candidate[field] = {toString: null};
+    assert.equal((await step.authorizeEntry(invalid)).status, "REJECT");
+    assert.equal(session.metadata.sequence, 0);
+  }
   assert.equal((await step.executeEntry({eventId: "null", authorizationId: "auth", quote: null,
     now: START, marks: []})).status, "REJECT");
   assert.equal(session.metadata.sequence, 0);
