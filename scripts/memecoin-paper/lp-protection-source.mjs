@@ -2,12 +2,14 @@ import {createHash} from "node:crypto";
 
 export const LP_PROTECTION_SOURCE_VERSION =
   "raydium-cpmm-lp-protection@3d69122790e97cd6aff24e8ba95940793773f58c";
-export const LP_PROTECTION_DECODER_VERSION = "raydium-cpmm-lp-census-v1";
+export const LP_PROTECTION_DECODER_VERSION = "raydium-cpmm-lp-burn-v2";
+export const LP_BURN_FIXTURE_TRUST_POLICY = "PINNED_SPL_TOKEN_SOURCE_FIXTURE_ONLY";
 export const RAYDIUM_CPMM_PROGRAM_ID = "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C";
 
 const RPC_URL = "https://api.mainnet-beta.solana.com";
 const TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+const BASE58_CHARACTERS = /^[1-9A-HJ-NP-Za-km-z]+$/;
 const DECIMAL_INTEGER = /^(?:0|[1-9]\d{0,19})$/;
 const MAX_RESPONSE_BYTES = 1_048_576;
 const MAX_RUN_BYTES = 2_097_152;
@@ -16,6 +18,7 @@ const MAX_CLAIMS = 10_000;
 const MAX_DURATION_MS = 15_000;
 const MAX_REQUEST_MS = 5_000;
 const MAX_EVIDENCE_AGE_MS = 5 * 60 * 1000;
+const INITIAL_LP_RESERVE_ATOMS = 100n;
 const U64_MAX = (1n << 64n) - 1n;
 const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 const BASE58_VALUES = new Map([...BASE58_ALPHABET].map((character, index) => [character, index]));
@@ -55,8 +58,8 @@ function modPow(base, exponent, modulus) {
   return result;
 }
 
-function decodeBase58(value) {
-  if (typeof value !== "string" || !BASE58.test(value)) return null;
+function decodeBase58Bytes(value) {
+  if (typeof value !== "string" || value.length > 88 || !BASE58_CHARACTERS.test(value)) return null;
   let decoded = 0n;
   for (const character of value) {
     const digit = BASE58_VALUES.get(character);
@@ -73,7 +76,13 @@ function decodeBase58(value) {
   while (zeroes < value.length && value[zeroes] === "1") zeroes += 1;
   const result = Buffer.alloc(zeroes + bytes.length);
   result.set(bytes, zeroes);
-  return result.length === 32 ? result : null;
+  return encodeBase58(result) === value ? result : null;
+}
+
+function decodeBase58(value) {
+  if (typeof value !== "string" || !BASE58.test(value)) return null;
+  const result = decodeBase58Bytes(value);
+  return result?.length === 32 ? result : null;
 }
 
 function encodeBase58(bytes) {
@@ -279,6 +288,164 @@ function validateClaimAnnotations(
   return {locks, burns};
 }
 
+function decodeBurnTransactions(
+  burnTransactions,
+  {identity, lpMint, holdUntil, now, slot, currentSupply, poolCounter, fixtureTrustPolicy}
+) {
+  if (!Array.isArray(burnTransactions) || burnTransactions.length > MAX_CLAIMS ||
+      !validTime(holdUntil) || holdUntil <= now) {
+    throw failure("BURN_EVIDENCE_INVALID");
+  }
+  const reserveKnown = poolCounter >= INITIAL_LP_RESERVE_ATOMS;
+  if (!reserveKnown) throw failure("POOL_COUNTER_BELOW_INITIAL_RESERVE");
+  const protectionDenominator = poolCounter - INITIAL_LP_RESERVE_ATOMS;
+  const signatures = new Set();
+  const transactionsSeen = [];
+  const instructionsSeen = [];
+  let totalBurnAtoms = 0n;
+  let totalResponseBytes = 0;
+  for (const evidence of burnTransactions) {
+    if (!isRecord(evidence) || evidence.pool !== identity.pool || evidence.lpMint !== lpMint ||
+        evidence.source !== "Solana JSON-RPC getTransaction" ||
+        evidence.commitment !== "finalized" || evidence.holdUntil !== holdUntil ||
+        typeof evidence.claimedBurnAtoms !== "string" ||
+        !DECIMAL_INTEGER.test(evidence.claimedBurnAtoms) ||
+        evidence.denominatorAtoms !== protectionDenominator.toString() ||
+        decodeBase58Bytes(evidence.signature)?.length !== 64 ||
+        signatures.has(evidence.signature) || !Number.isSafeInteger(evidence.slot) ||
+        evidence.slot < 0 || evidence.slot > slot ||
+        typeof evidence.responseJson !== "string" ||
+        !/^[a-f0-9]{64}$/.test(evidence.responseSha256 ?? "")) {
+      throw failure(signatures.has(evidence?.signature)
+        ? "DUPLICATE_BURN_EVIDENCE"
+        : "BURN_EVIDENCE_INVALID");
+    }
+    signatures.add(evidence.signature);
+    const responseBytes = Buffer.from(evidence.responseJson, "utf8");
+    totalResponseBytes += responseBytes.length;
+    if (responseBytes.length > MAX_RESPONSE_BYTES || totalResponseBytes > MAX_RUN_BYTES) {
+      throw failure("BURN_EVIDENCE_TOO_LARGE");
+    }
+    if (sha256(responseBytes) !== evidence.responseSha256) {
+      throw failure("BURN_RESPONSE_DIGEST_MISMATCH");
+    }
+    let response;
+    try { response = JSON.parse(responseBytes.toString("utf8")); } catch {
+      throw failure("BURN_RESPONSE_INVALID");
+    }
+    const tx = response?.result;
+    if (response?.jsonrpc !== "2.0" || !isRecord(tx) || tx.slot !== evidence.slot ||
+        !isRecord(tx.meta) || tx.meta.err !== null ||
+        !Array.isArray(tx.transaction?.signatures) ||
+        !tx.transaction.signatures.includes(evidence.signature) ||
+        !Array.isArray(tx.transaction.message?.instructions) ||
+        !Array.isArray(tx.meta.innerInstructions)) {
+      throw failure("BURN_TRANSACTION_NOT_FINALIZED_OR_INCOMPLETE");
+    }
+    const allInstructions = [...tx.transaction.message.instructions];
+    for (const group of tx.meta.innerInstructions) {
+      if (!isRecord(group) || !Array.isArray(group.instructions)) {
+        throw failure("BURN_TRANSACTION_INSTRUCTIONS_INCOMPLETE");
+      }
+      allInstructions.push(...group.instructions);
+    }
+    let transactionBurnAtoms = 0n;
+    let sawAnyBurn = false;
+    for (const instruction of allInstructions) {
+      if (!isRecord(instruction) || !decodeBase58(instruction.programId)) {
+        throw failure("BURN_TRANSACTION_INSTRUCTIONS_INCOMPLETE");
+      }
+      if (instruction.programId === RAYDIUM_CPMM_PROGRAM_ID) {
+        throw failure("BURN_RELEASE_PATH_PRESENT");
+      }
+      if (instruction.programId !== TOKEN_PROGRAM) continue;
+      const parsed = instruction.parsed;
+      if (parsed === undefined) throw failure("BURN_TRANSACTION_INSTRUCTIONS_INCOMPLETE");
+      if (!isRecord(parsed) || !["burn", "burnChecked"].includes(parsed.type) ||
+          !isRecord(parsed.info)) {
+        continue;
+      }
+      sawAnyBurn = true;
+      const info = parsed.info;
+      if (info.mint !== lpMint) continue;
+      const amount = info.amount ?? info.tokenAmount?.amount;
+      const decimals = info.decimals ?? info.tokenAmount?.decimals;
+      if (!decodeBase58(info.account) || !decodeBase58(info.authority) ||
+          typeof amount !== "string" || !DECIMAL_INTEGER.test(amount) ||
+          (parsed.type === "burnChecked" &&
+            (!Number.isSafeInteger(decimals) || decimals !== 9)) ||
+          (info.decimals !== undefined && info.tokenAmount?.decimals !== undefined &&
+            info.decimals !== info.tokenAmount.decimals) ||
+          (info.amount !== undefined && info.tokenAmount?.amount !== undefined &&
+            info.amount !== info.tokenAmount.amount)) {
+        throw failure("BURN_INSTRUCTION_INVALID");
+      }
+      const atoms = decimalAtoms(amount, "BURN_INSTRUCTION_AMOUNT");
+      if (atoms === 0n) throw failure("BURN_INSTRUCTION_INVALID");
+      transactionBurnAtoms += atoms;
+      if (transactionBurnAtoms > U64_MAX) throw failure("BURN_INSTRUCTION_AMOUNT_INVALID");
+      instructionsSeen.push({
+        signature: evidence.signature,
+        slot: evidence.slot,
+        responseSha256: evidence.responseSha256,
+        pool: identity.pool,
+        mint: lpMint,
+        holdUntil,
+        status: "DECODED_UNVERIFIED_FINALIZED_SPL_BURN",
+        tokenAccount: info.account,
+        authority: info.authority,
+        amountAtoms: atoms.toString(),
+        instruction: parsed.type,
+        releasePath: "NONE; burned units cannot be transferred, unlocked, or withdrawn",
+        administrativeRecoveryPath:
+          "NONE FOR BURNED UNITS; mint authority may issue new units under unverified deployment semantics"
+      });
+    }
+    if (transactionBurnAtoms === 0n) {
+      throw failure(sawAnyBurn ? "BURN_MINT_MISMATCH" : "BURN_INSTRUCTION_MISSING");
+    }
+    if (transactionBurnAtoms !== decimalAtoms(evidence.claimedBurnAtoms, "BURN_CLAIM_AMOUNT")) {
+      throw failure("BURN_CLAIM_AMOUNT_MISMATCH");
+    }
+    transactionsSeen.push({
+      source: evidence.source,
+      commitment: evidence.commitment,
+      signature: evidence.signature,
+      slot: evidence.slot,
+      responseSha256: evidence.responseSha256,
+      pool: identity.pool,
+      mint: lpMint,
+      claimedBurnAtoms: transactionBurnAtoms.toString(),
+      denominatorAtoms: protectionDenominator.toString(),
+      holdUntil,
+      status: "DECODED_UNVERIFIED_FINALIZED_SPL_BURN"
+    });
+    totalBurnAtoms += transactionBurnAtoms;
+    if (totalBurnAtoms > U64_MAX) throw failure("BURN_INSTRUCTION_AMOUNT_INVALID");
+  }
+  const historyComplete = currentSupply + totalBurnAtoms === protectionDenominator;
+  const fullCoverage = historyComplete && protectionDenominator > 0n &&
+    totalBurnAtoms === protectionDenominator && currentSupply === 0n;
+  const fixturePolicyAccepted = fixtureTrustPolicy === LP_BURN_FIXTURE_TRUST_POLICY;
+  return {
+    transactions: transactionsSeen,
+    instructions: instructionsSeen,
+    burnAtoms: totalBurnAtoms,
+    denominatorAtoms: protectionDenominator,
+    historyComplete,
+    fullCoverage,
+    trustPolicy: fixturePolicyAccepted ? LP_BURN_FIXTURE_TRUST_POLICY : "NONE",
+    fixtureStatus: fixturePolicyAccepted && fullCoverage ? "PASS" : "UNKNOWN",
+    fixtureReason: !fixturePolicyAccepted
+      ? "fixture-only source semantics were not explicitly opted into"
+      : fullCoverage
+      ? "all issued LP units are accounted for as finalized SPL burns under the explicit fixture-only source policy"
+      : historyComplete
+        ? "burn coverage is partial; no numeric partial-protection policy is accepted"
+        : "burn evidence does not reconcile current supply to the pool counter less the pinned initialization reserve"
+  };
+}
+
 async function raceWithAbort(promise, signal) {
   if (signal?.aborted) throw failure("CANCELLED");
   if (!signal) return promise;
@@ -452,7 +619,9 @@ export async function collectLpProtectionSource({
   signal,
   holdUntil,
   lockClaims,
-  burnClaims
+  burnClaims,
+  burnTransactions,
+  fixtureTrustPolicy
 } = {}) {
   if (enabled !== true) {
     return {
@@ -595,6 +764,22 @@ export async function collectLpProtectionSource({
       {lockClaims, burnClaims}, addresses, lpMint.address, holdUntil, now, poolProof.slot
     );
     const gap = denominator - supply;
+    const burnAssessment = burnTransactions === undefined ? null : decodeBurnTransactions(
+      burnTransactions,
+      {
+        identity,
+        lpMint: lpMint.address,
+        holdUntil,
+        now,
+        slot: poolProof.slot,
+        currentSupply: supply,
+        poolCounter: denominator,
+        fixtureTrustPolicy
+      }
+    );
+    const burnHistoryComplete = burnAssessment?.historyComplete === true;
+    const protectedAtoms = burnHistoryComplete ? burnAssessment.burnAtoms.toString() : null;
+    const protectionDenominatorAtoms = burnAssessment?.denominatorAtoms.toString() ?? null;
     const observedAt = events.at(-1)?.receivedAt ?? now;
     const coverage = {
       complete: true,
@@ -612,17 +797,40 @@ export async function collectLpProtectionSource({
       programCustodyUnknownAtoms: custodyAtoms.toString(),
       frozenAccountAtoms: frozenAtoms.toString(),
       poolCounterMinusMintSupplyAtoms: gap.toString(),
-      actualBurnAtoms: null,
-      actualBurnEvidenceStatus: "UNAVAILABLE; no transaction-bound burn proof is consumed",
-      protectedAtoms: null,
+      actualBurnAtoms: burnHistoryComplete ? burnAssessment.burnAtoms.toString() : null,
+      actualBurnEvidenceStatus: burnAssessment === null
+        ? "UNAVAILABLE; no transaction-bound burn proof is consumed"
+        : burnHistoryComplete
+          ? "RECONCILED finalized SPL burn instructions; current supply plus burns equals the issued LP denominator"
+          : "INCOMPLETE; supplied finalized SPL burn instructions do not reconcile to the issued LP denominator",
+      protectionDenominatorAtoms,
+      protectedAtoms,
       protectedPct: null,
       protectionPolicy: "FULL_COVERAGE_ONLY; no partial threshold accepted",
       historicalBurnsIncludedInCurrentSupply: false,
-      historicalBurnClaimsCountedAtoms: "0",
+      historicalBurnClaimsCountedAtoms: burnHistoryComplete
+        ? burnAssessment.burnAtoms.toString()
+        : "0",
       lockClaimsCountedAtoms: "0",
-      poolCounterGapClassification: "UNKNOWN; pinned source includes a 100-unit initialization reserve and deployment semantics are unverified",
+      poolCounterGapClassification: burnAssessment?.historyComplete === true
+        ? "RECONCILED; issued denominator is pool counter less the pinned 100-unit initialization reserve"
+        : "UNKNOWN; pinned source includes a 100-unit initialization reserve and deployment semantics are unverified",
       protectionSemanticsReviewed: false,
       sourceAuthenticated: false
+    };
+    const fixtureEvaluation = burnAssessment === null ? null : {
+      mechanism: "SPL_TOKEN_BURN",
+      trustPolicy: burnAssessment.trustPolicy,
+      status: burnAssessment.fixtureStatus,
+      reason: burnAssessment.fixtureReason,
+      protectedAtoms,
+      denominatorAtoms: protectionDenominatorAtoms,
+      currentMintSupplyAtoms: supply.toString(),
+      holdUntil,
+      releasePath: "NONE FOR BURNED UNITS; Raydium CPMM withdrawal transactions are excluded",
+      administrativePath:
+        "No SPL burn reversal; mint authority can issue new units under unverified deployment semantics",
+      deploymentPolicy: "UNVERIFIED; fixture policy is not operational deployment evidence"
     };
     const lpProtection = {
       schema: "RAYDIUM_CPMM_LP_PROTECTION_V1",
@@ -649,7 +857,8 @@ export async function collectLpProtectionSource({
         pool: identity.pool,
         model: "unverified",
         denominatorAtoms: denominator.toString(),
-        protectedAtoms: null,
+        protectedAtoms,
+        protectionDenominatorAtoms,
         signerAddressAtoms: signerAtoms.toString(),
         potentiallyUnprotectedAtoms: signerAtoms.toString(),
         unknownProtectionAtoms: (denominator - signerAtoms).toString(),
@@ -657,7 +866,8 @@ export async function collectLpProtectionSource({
         frozenAccountAtoms: frozenAtoms.toString(),
         noncirculatingPoolCounterAtoms: gap.toString()
       },
-      reason: "exact balances are measured, but source-only withdrawal rules and unreviewed custody do not prove an irreversible lock or deployed-binary match"
+      burnAssessment: fixtureEvaluation,
+      reason: "operational protection remains unverified because source-shaped transaction evidence and deployed-program policy are not authenticated"
     };
     return {
       status: "MEASURED_UNVERIFIED",
@@ -673,7 +883,11 @@ export async function collectLpProtectionSource({
       events,
       counters,
       accounts,
-      claims,
+      claims: {
+        ...claims,
+        decodedBurnTransactions: burnAssessment?.transactions ?? [],
+        decodedBurnInstructions: burnAssessment?.instructions ?? []
+      },
       measurement: {
         denominatorAtoms: denominator.toString(),
         currentMintSupplyAtoms: supply.toString(),
@@ -684,11 +898,13 @@ export async function collectLpProtectionSource({
         programCustodyUnknownAtoms: custodyAtoms.toString(),
         frozenAccountAtoms: frozenAtoms.toString(),
         poolCounterMinusMintSupplyAtoms: gap.toString(),
-        actualBurnAtoms: null,
-        actualBurnEvidenceStatus: "UNAVAILABLE; no transaction-bound burn proof is consumed",
-        protectedAtoms: null,
+        actualBurnAtoms: coverage.actualBurnAtoms,
+        actualBurnEvidenceStatus: coverage.actualBurnEvidenceStatus,
+        protectedAtoms,
+        protectionDenominatorAtoms,
         protectedPct: null,
-        coverage
+        coverage,
+        burnAssessment: fixtureEvaluation
       },
       lpProtection,
       adapterEvidence: {

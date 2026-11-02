@@ -236,3 +236,64 @@ export function transportFor({
   };
   return {transport, requests, responseBodies};
 }
+
+export function finalizedBurnEvidence({
+  amountAtoms = "1000",
+  denominatorAtoms = "1000",
+  mint = LP_MINT,
+  instructionMint = mint,
+  instructionProgramId = TOKEN_PROGRAM,
+  pool = IDENTITY.pool,
+  slot = 1_000,
+  signature = encodeBase58(Buffer.alloc(64, 2)),
+  holdUntil = NOW + 60_000,
+  includesCpmmInstruction = false,
+  transactionError = null,
+  innerInstructions = []
+} = {}) {
+  const instructions = [{
+    programId: instructionProgramId,
+    program: "spl-token",
+    parsed: {
+      type: "burnChecked",
+      info: {
+        account: encodeBase58(Buffer.alloc(32, 8)),
+        mint: instructionMint,
+        authority: WALLET_AUTHORITY,
+        amount: amountAtoms,
+        decimals: 9
+      }
+    }
+  }];
+  if (includesCpmmInstruction) {
+    instructions.push({programId: CPMM_PROGRAM, program: "raydium_cpmm", parsed: {type: "withdraw"}});
+  }
+  const responseJson = JSON.stringify({
+    jsonrpc: "2.0",
+    id: 1,
+    result: {
+      slot,
+      transaction: {
+        signatures: [signature],
+        message: {accountKeys: [], instructions}
+      },
+      meta: {
+        err: transactionError,
+        innerInstructions
+      }
+    }
+  });
+  return {
+    source: "Solana JSON-RPC getTransaction",
+    commitment: "finalized",
+    pool,
+    lpMint: mint,
+    claimedBurnAtoms: amountAtoms,
+    denominatorAtoms,
+    holdUntil,
+    signature,
+    slot,
+    responseJson,
+    responseSha256: createHash("sha256").update(responseJson).digest("hex")
+  };
+}

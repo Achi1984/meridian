@@ -6,6 +6,7 @@ import {
   collectLpProtectionSource,
   LP_PROTECTION_DECODER_VERSION,
   LP_PROTECTION_SOURCE_VERSION,
+  LP_BURN_FIXTURE_TRUST_POLICY,
   RAYDIUM_CPMM_PROGRAM_ID
 } from "../scripts/memecoin-paper/lp-protection-source.mjs";
 import {
@@ -15,6 +16,7 @@ import {
   PDA_AUTHORITY,
   TOKEN_PROGRAM_ID,
   WALLET_AUTHORITY,
+  finalizedBurnEvidence,
   poolProof,
   tokenAccount,
   transportFor
@@ -32,6 +34,8 @@ async function collect({
   transport,
   lockClaims,
   burnClaims,
+  burnTransactions,
+  fixtureTrustPolicy,
   holdUntil = HOLD_UNTIL,
   signal
 } = {}) {
@@ -51,6 +55,8 @@ async function collect({
     holdUntil,
     lockClaims,
     burnClaims,
+    burnTransactions,
+    fixtureTrustPolicy,
     signal
   });
   return {...built, result};
@@ -237,6 +243,246 @@ test("duplicate lock and burn evidence is rejected instead of double-counted", a
     assert.equal(result.claims.burns[0].countedProtectedAtoms, "0");
     assert.equal(result.measurement.coverage.historicalBurnClaimsCountedAtoms, "0");
     assert.equal(result.measurement.currentMintSupplyAtoms, "1000");
+  });
+});
+
+test("finalized SPL burns support exact fixture-only protection without operational PASS", async t => {
+  await t.test("full burn reconciles exact denominator under explicit fixture policy", async () => {
+    const proof = poolProof({supplyAtoms: "0", poolSupplyAtoms: "1100"});
+    const evidence = finalizedBurnEvidence({holdUntil: HOLD_UNTIL});
+    const {result} = await collect({
+      proof,
+      accounts: [],
+      burnTransactions: [evidence],
+      fixtureTrustPolicy: LP_BURN_FIXTURE_TRUST_POLICY,
+      holdUntil: HOLD_UNTIL
+    });
+    assert.equal(result.measurement.actualBurnAtoms, "1000");
+    assert.equal(result.measurement.protectionDenominatorAtoms, "1000");
+    assert.equal(result.measurement.protectedAtoms, "1000");
+    assert.equal(result.measurement.coverage.actualBurnEvidenceStatus.startsWith("RECONCILED"), true);
+    assert.equal(result.measurement.burnAssessment.status, "PASS");
+    assert.equal(result.measurement.burnAssessment.trustPolicy, LP_BURN_FIXTURE_TRUST_POLICY);
+    assert.equal(result.measurement.burnAssessment.holdUntil, HOLD_UNTIL);
+    assert.match(result.measurement.burnAssessment.releasePath, /NONE/);
+    assert.match(result.measurement.burnAssessment.administrativePath, /mint authority/);
+    assert.equal(result.claims.decodedBurnTransactions[0].claimedBurnAtoms, "1000");
+    assert.match(result.claims.decodedBurnTransactions[0].responseSha256, /^[a-f0-9]{64}$/);
+    assert.equal(result.claims.decodedBurnInstructions[0].amountAtoms, "1000");
+    assert.equal(result.lpProtection.status, "UNKNOWN");
+    assert.equal(result.lpProtection.verified, false);
+    assert.equal(result.adapterEvidence.verified, false);
+  });
+
+  await t.test("partial exact burn is measured but never passes", async () => {
+    const proof = poolProof({supplyAtoms: "500", poolSupplyAtoms: "1100"});
+    const {result} = await collect({
+      proof,
+      accounts: [tokenAccount({amountAtoms: "500"})],
+      burnTransactions: [finalizedBurnEvidence({amountAtoms: "500", holdUntil: HOLD_UNTIL})],
+      fixtureTrustPolicy: LP_BURN_FIXTURE_TRUST_POLICY,
+      holdUntil: HOLD_UNTIL
+    });
+    assert.equal(result.measurement.protectedAtoms, "500");
+    assert.equal(result.measurement.protectionDenominatorAtoms, "1000");
+    assert.equal(result.measurement.burnAssessment.status, "UNKNOWN");
+    assert.match(result.measurement.burnAssessment.reason, /partial/);
+    assert.equal(result.lpProtection.status, "UNKNOWN");
+  });
+
+  await t.test("missing burn history cannot be inferred from zero current supply", async () => {
+    const proof = poolProof({supplyAtoms: "0", poolSupplyAtoms: "1100"});
+    const {result} = await collect({
+      proof,
+      accounts: [],
+      burnTransactions: [],
+      fixtureTrustPolicy: LP_BURN_FIXTURE_TRUST_POLICY,
+      holdUntil: HOLD_UNTIL
+    });
+    assert.equal(result.measurement.protectedAtoms, null);
+    assert.equal(result.measurement.burnAssessment.status, "UNKNOWN");
+    assert.match(result.measurement.burnAssessment.reason, /does not reconcile/);
+    assert.equal(result.lpProtection.status, "UNKNOWN");
+  });
+
+  await t.test("an exact full burn is not a fixture PASS without explicit trust policy", async () => {
+    const proof = poolProof({supplyAtoms: "0", poolSupplyAtoms: "1100"});
+    const {result} = await collect({
+      proof,
+      accounts: [],
+      burnTransactions: [finalizedBurnEvidence({holdUntil: HOLD_UNTIL})],
+      holdUntil: HOLD_UNTIL
+    });
+    assert.equal(result.measurement.protectedAtoms, "1000");
+    assert.equal(result.measurement.burnAssessment.status, "UNKNOWN");
+    assert.equal(result.measurement.burnAssessment.trustPolicy, "NONE");
+  });
+
+  await t.test("CPMM withdrawal/release path in same transaction is rejected", async () => {
+    const proof = poolProof({supplyAtoms: "0", poolSupplyAtoms: "1100"});
+    const evidence = finalizedBurnEvidence({
+      holdUntil: HOLD_UNTIL,
+      includesCpmmInstruction: true
+    });
+    const {result} = await collect({
+      proof,
+      accounts: [],
+      burnTransactions: [evidence],
+      fixtureTrustPolicy: LP_BURN_FIXTURE_TRUST_POLICY,
+      holdUntil: HOLD_UNTIL
+    });
+    assert.equal(result.reasonCode, "BURN_RELEASE_PATH_PRESENT");
+    assert.equal(result.lpProtection.status, "UNKNOWN");
+  });
+
+  await t.test("wrong LP mint in the burn instruction is rejected", async () => {
+    const proof = poolProof({supplyAtoms: "0", poolSupplyAtoms: "1100"});
+    const {result} = await collect({
+      proof,
+      accounts: [],
+      burnTransactions: [finalizedBurnEvidence({
+        holdUntil: HOLD_UNTIL,
+        instructionMint: IDENTITY.quote
+      })],
+      fixtureTrustPolicy: LP_BURN_FIXTURE_TRUST_POLICY,
+      holdUntil: HOLD_UNTIL
+    });
+    assert.equal(result.reasonCode, "BURN_MINT_MISMATCH");
+  });
+
+  await t.test("wrong burn program and out-of-snapshot slot are rejected", async t => {
+    const proof = poolProof({supplyAtoms: "0", poolSupplyAtoms: "1100"});
+    await t.test("instruction is not from the pinned SPL Token program", async () => {
+      const {result} = await collect({
+        proof,
+        accounts: [],
+        burnTransactions: [finalizedBurnEvidence({
+          holdUntil: HOLD_UNTIL,
+          instructionProgramId: IDENTITY.quote
+        })],
+        fixtureTrustPolicy: LP_BURN_FIXTURE_TRUST_POLICY,
+        holdUntil: HOLD_UNTIL
+      });
+      assert.equal(result.reasonCode, "BURN_INSTRUCTION_MISSING");
+    });
+    await t.test("transaction is later than the pinned pool snapshot", async () => {
+      const {result} = await collect({
+        proof,
+        accounts: [],
+        burnTransactions: [finalizedBurnEvidence({holdUntil: HOLD_UNTIL, slot: proof.slot + 1})],
+        fixtureTrustPolicy: LP_BURN_FIXTURE_TRUST_POLICY,
+        holdUntil: HOLD_UNTIL
+      });
+      assert.equal(result.reasonCode, "BURN_EVIDENCE_INVALID");
+    });
+    await t.test("transaction slot differs from supplied source slot", async () => {
+      const evidence = finalizedBurnEvidence({holdUntil: HOLD_UNTIL});
+      const {result} = await collect({
+        proof,
+        accounts: [],
+        burnTransactions: [{...evidence, slot: evidence.slot - 1}],
+        fixtureTrustPolicy: LP_BURN_FIXTURE_TRUST_POLICY,
+        holdUntil: HOLD_UNTIL
+      });
+      assert.equal(result.reasonCode, "BURN_TRANSACTION_NOT_FINALIZED_OR_INCOMPLETE");
+    });
+  });
+
+  await t.test("pool, amount, and denominator claims are bound to decoded evidence", async t => {
+    const proof = poolProof({supplyAtoms: "0", poolSupplyAtoms: "1100"});
+    await t.test("wrong pool", async () => {
+      const {result} = await collect({
+        proof,
+        accounts: [],
+        burnTransactions: [finalizedBurnEvidence({pool: IDENTITY.quote, holdUntil: HOLD_UNTIL})],
+        fixtureTrustPolicy: LP_BURN_FIXTURE_TRUST_POLICY,
+        holdUntil: HOLD_UNTIL
+      });
+      assert.equal(result.reasonCode, "BURN_EVIDENCE_INVALID");
+    });
+    await t.test("claimed amount differs from decoded instructions", async () => {
+      const {result} = await collect({
+        proof,
+        accounts: [],
+        burnTransactions: [{
+          ...finalizedBurnEvidence({holdUntil: HOLD_UNTIL}),
+          claimedBurnAtoms: "999"
+        }],
+        fixtureTrustPolicy: LP_BURN_FIXTURE_TRUST_POLICY,
+        holdUntil: HOLD_UNTIL
+      });
+      assert.equal(result.reasonCode, "BURN_CLAIM_AMOUNT_MISMATCH");
+    });
+    await t.test("claimed denominator differs from pool-bound denominator", async () => {
+      const {result} = await collect({
+        proof,
+        accounts: [],
+        burnTransactions: [{
+          ...finalizedBurnEvidence({holdUntil: HOLD_UNTIL}),
+          denominatorAtoms: "999"
+        }],
+        fixtureTrustPolicy: LP_BURN_FIXTURE_TRUST_POLICY,
+        holdUntil: HOLD_UNTIL
+      });
+      assert.equal(result.reasonCode, "BURN_EVIDENCE_INVALID");
+    });
+  });
+
+  await t.test("duplicate, failed, and digest-changed transactions fail closed", async t => {
+    const proof = poolProof({supplyAtoms: "0", poolSupplyAtoms: "1100"});
+    const evidence = finalizedBurnEvidence({holdUntil: HOLD_UNTIL});
+    await t.test("duplicate transaction signature", async () => {
+      const {result} = await collect({
+        proof,
+        accounts: [],
+        burnTransactions: [evidence, evidence],
+        fixtureTrustPolicy: LP_BURN_FIXTURE_TRUST_POLICY,
+        holdUntil: HOLD_UNTIL
+      });
+      assert.equal(result.reasonCode, "DUPLICATE_BURN_EVIDENCE");
+    });
+    await t.test("failed transaction", async () => {
+      const failed = finalizedBurnEvidence({
+        holdUntil: HOLD_UNTIL,
+        transactionError: {InstructionError: [0, "Custom"]}
+      });
+      const {result} = await collect({
+        proof,
+        accounts: [],
+        burnTransactions: [failed],
+        fixtureTrustPolicy: LP_BURN_FIXTURE_TRUST_POLICY,
+        holdUntil: HOLD_UNTIL
+      });
+      assert.equal(result.reasonCode, "BURN_TRANSACTION_NOT_FINALIZED_OR_INCOMPLETE");
+    });
+    await t.test("changed response digest", async () => {
+      const changed = {...evidence, responseJson: evidence.responseJson.replace('"amount":"1000"', '"amount":"900"')};
+      const {result} = await collect({
+        proof,
+        accounts: [],
+        burnTransactions: [changed],
+        fixtureTrustPolicy: LP_BURN_FIXTURE_TRUST_POLICY,
+        holdUntil: HOLD_UNTIL
+      });
+      assert.equal(result.reasonCode, "BURN_RESPONSE_DIGEST_MISMATCH");
+    });
+    await t.test("CPMM invocation in inner instructions is excluded", async () => {
+      const inner = finalizedBurnEvidence({
+        holdUntil: HOLD_UNTIL,
+        innerInstructions: [{
+          index: 0,
+          instructions: [{programId: RAYDIUM_CPMM_PROGRAM_ID, parsed: {type: "withdraw"}}]
+        }]
+      });
+      const {result} = await collect({
+        proof,
+        accounts: [],
+        burnTransactions: [inner],
+        fixtureTrustPolicy: LP_BURN_FIXTURE_TRUST_POLICY,
+        holdUntil: HOLD_UNTIL
+      });
+      assert.equal(result.reasonCode, "BURN_RELEASE_PATH_PRESENT");
+    });
   });
 });
 

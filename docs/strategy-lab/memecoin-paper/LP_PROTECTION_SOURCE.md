@@ -31,20 +31,59 @@ denominator. It also separates program-derived-address custody candidates,
 frozen-account balances, and the difference between the pool state's LP
 counter and current LP mint supply. These categories are diagnostic and do not
 assert that a key is controlled, a PDA is unrecoverable, or a frozen account
-cannot be thawed. `protectedAtoms` and `protectedPct` stay null. The pool-counter
-difference is not classified as burned supply: it can include the 100-unit
-initialization reserve described by the pinned CPMM source. Historical burn
-annotations are diagnostic only and never added to current mint supply, which
-already reflects completed SPL burns.
+cannot be thawed. Without transaction-bound SPL burn evidence,
+`protectedAtoms`/`protectionDenominatorAtoms` stay null. The pool-counter
+difference is not itself classified as burned supply: it includes the
+100-raw-unit initialization reserve described by the pinned CPMM source.
+Historical burn annotations remain diagnostic only and are never added to
+current mint supply.
+
+## Supported mechanism: standalone SPL Token burns
+
+The supported source-level mechanism is SPL Token `Burn`/`BurnChecked`, not
+Raydium Burn & Earn. The pinned Token Program processor burns the amount from
+the source account and subtracts it from mint supply. A burned unit cannot be
+transferred, unlocked, or withdrawn later. A burn that occurs in a transaction
+which invokes the pinned Raydium CPMM program is rejected: CPMM's normal
+`withdraw` burns LP while returning pool assets, so that burn is not protection.
+
+The collector does not fetch transactions. Callers may supply bounded
+`burnTransactions` records containing the selected pool and LP mint, a
+finalized commitment claim, signature, source slot, exact `claimedBurnAtoms`,
+the exact `denominatorAtoms`, requested `holdUntil`, raw JSON-RPC `responseJson`,
+and its SHA-256 digest. The decoder verifies the digest and transaction
+signature/slot/success fields, requires a complete `innerInstructions` array,
+decodes parsed classic SPL Token burns for this exact LP mint, rejects any
+transaction invoking CPMM, and verifies each claim amount against its burn
+instructions. Repeated signatures, failed transactions, mismatched mint,
+amount, denominator, or digest fail closed.
+
+For this pinned CPMM model, the protection denominator is
+`PoolState.lp_supply - 100`: initialization sets the counter to total liquidity
+while minting 100 fewer raw units, and deposit/withdraw instructions adjust the
+counter by the LP amount minted/burned. A complete burn history must reconcile
+`currentMintSupply + eligibleBurns == protectionDenominator`; otherwise the
+history is incomplete and no protected amount is asserted. Full source-semantic
+coverage requires a zero current supply and eligible burns equal to the exact
+denominator. Partial coverage is measured exactly when history reconciles but
+remains `UNKNOWN`; no partial threshold is accepted.
+
+Passing `LP_BURN_FIXTURE_TRUST_POLICY` explicitly allows the decoder to report a
+`PASS` only in its `burnAssessment` fixture-only field for a coherent synthetic
+full-burn case. This does not change `lpProtection.status` from `UNKNOWN`,
+does not set `verified`, and does not make adapter evidence acceptable.
+Burned units have no release/admin recovery path; the mint authority may issue
+new units, which is a separate, unverified deployment and policy question.
 
 ## Semantic result and blockers
 
-The output always leaves `lpProtection.status` as `UNKNOWN`,
-`verified: false`, `review: null`, and `protectedAtoms`/`protectedPct` unset.
-The exact holder census and supply reconciliation are not a proof of
-irreversible protection. A claimed lock is recorded as either early-unlocked
-or unsupported; duplicate lock accounts and duplicate burn signatures fail
-closed. No partial-coverage threshold is accepted.
+The output always leaves `lpProtection.status` as `UNKNOWN`, `verified: false`,
+and `review: null`. Exact, digest-bound burn quantities may populate
+`protectedAtoms` and `protectionDenominatorAtoms` when the entire burn history
+reconciles, but this remains unverified source evidence. A claimed lock is
+recorded as either early-unlocked or unsupported; duplicate lock accounts and
+duplicate burn signatures fail closed. No partial-coverage threshold is
+accepted.
 
 The pinned official Raydium CPMM source is
 [`raydium-cp-swap@3d69122790e97cd6aff24e8ba95940793773f58c`](https://github.com/raydium-io/raydium-cp-swap/tree/3d69122790e97cd6aff24e8ba95940793773f58c).
@@ -72,8 +111,8 @@ No positive live-deployment claim is supported until all of these are
 independently established:
 
 - The deployed mainnet program-data account, loader state, upgrade authority,
-  and executable bytes match the reviewed source build; the source and IDL
-  commit hashes are not deployed-binary hashes.
+  and executable bytes for both CPMM and classic SPL Token match their reviewed
+  source semantics; source commit hashes are not deployed-binary hashes.
 - A selected pool's full, same-context LP account census is authentic and
   complete beyond the injected RPC response claim.
 - Any alleged custodian/lock program's deployed code and account semantics
@@ -81,9 +120,10 @@ independently established:
   by an administrator or owner before the requested hold ends. The official
   Burn & Earn program address reference notes that its implementation source
   is not public; no such lock model is accepted here.
-- Historical burns, if supplied as annotations, are independently tied to
-  unique finalized transactions and are not subtracted from the current mint
-  supply a second time.
+- The complete standalone SPL burn history through the selected snapshot is
+  independently tied to unique finalized transactions and reconciles exactly
+  to the current mint supply and pool counter. Current supply already reflects
+  completed burns and must not be reduced by those burns again.
 
 Consequently, a synthetic zero-supply scenario can reconcile the complete
 account census and measure the pool-counter gap, but remains `UNKNOWN`; it is
@@ -107,13 +147,17 @@ threshold is introduced.
   layout and LP supply counter meaning.
 - [CPMM `withdraw`](https://github.com/raydium-io/raydium-cp-swap/blob/3d69122790e97cd6aff24e8ba95940793773f58c/programs/cp-swap/src/instructions/withdraw.rs#L12-L220)
   and [pool status update](https://github.com/raydium-io/raydium-cp-swap/blob/3d69122790e97cd6aff24e8ba95940793773f58c/programs/cp-swap/src/instructions/admin/update_pool_status.rs#L1-L22):
-  signer-bound withdrawal, LP burn, and reversible status control.
+  signer-bound withdrawal, LP burn plus asset transfers, state-counter decrement,
+  and reversible status control.
+- [CPMM deposit](https://github.com/raydium-io/raydium-cp-swap/blob/3d69122790e97cd6aff24e8ba95940793773f58c/programs/cp-swap/src/instructions/deposit.rs):
+  LP minting and matching state-counter increment.
 - [Solana `getTokenSupply`](https://solana.com/docs/rpc/http/gettokensupply)
   and [Solana `getProgramAccounts`](https://solana.com/docs/rpc/http/getprogramaccounts):
   finalized account response and context-slot semantics.
 - [SPL Token processor at pinned commit](https://github.com/solana-program/token/blob/737788ff5bcc3f1f44cfb222f25483187650be76/program/src/processor.rs):
-  official token-program implementation. A completed burn reduces mint supply;
-  this collector does not add historical burn amounts back to current supply.
+  official `Burn`/`BurnChecked` implementation; finalized burns reduce current
+  mint supply and cannot be reversed. The exact deployed Token Program bytes
+  remain unverified.
 
 The official source and IDL references describe reviewed source interfaces and
 logic only. The live mainnet deployment, lock contract, RPC authenticity, and
@@ -129,6 +173,7 @@ node --test test/memecoin-paper-lp-protection-source.test.js
 
 Fixtures exercise source-shaped pool proofs, same-slot supply/census
 reconciliation, exact integer classification, identity/program mismatches,
-early unlock, duplicate lock/burn claims, supply/context changes, and
-unsupported admin/lock assertions. They contain no captured chain data and
-perform no network request.
+early unlock, duplicate lock/burn claims, finalized SPL burn decoding,
+full/partial coverage, CPMM withdrawal-path exclusion, digest and amount
+binding, supply/context changes, and unsupported admin/lock assertions. The
+fixtures contain no captured chain data and perform no network request.
