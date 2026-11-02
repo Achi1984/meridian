@@ -21,6 +21,8 @@ const MAX_LIMITS = Object.freeze({
 });
 const HASH = /^[a-f0-9]{64}$/;
 
+class InputBudgetError extends RangeError {}
+
 function integerTime(value) {
   return Number.isSafeInteger(value) && Number.isFinite(new Date(value).getTime());
 }
@@ -43,19 +45,63 @@ function operationId(runId, startedAt, sequence, purpose) {
   return `runner:${purpose}:${digest}`;
 }
 
-function detachInput(value) {
+function detachInput(value, remainingBytes) {
   let nodes = 0;
+  let bytes = 0;
   const seen = new WeakSet();
+  function charge(count) {
+    bytes += count;
+    if (bytes > remainingBytes) throw new InputBudgetError("runner input byte budget reached");
+  }
+  function chargeString(value) {
+    let length = 2;
+    for (let index = 0; index < value.length; index += 1) {
+      const code = value.charCodeAt(index);
+      if (code === 34 || code === 92) length += 2;
+      else if (code <= 0x1f) {
+        length += code === 8 || code === 9 || code === 10 || code === 12 || code === 13 ? 2 : 6;
+      }
+      else if (code >= 0xd800 && code <= 0xdbff) {
+        const next = value.charCodeAt(index + 1);
+        if (next >= 0xdc00 && next <= 0xdfff) {
+          length += 4;
+          index += 1;
+        } else {
+          length += 6;
+        }
+      } else if (code >= 0xdc00 && code <= 0xdfff) length += 6;
+      else if (code <= 0x7f) length += 1;
+      else if (code <= 0x7ff) length += 2;
+      else length += 3;
+      if (length > remainingBytes - bytes) {
+        throw new InputBudgetError("runner input byte budget reached");
+      }
+    }
+    charge(length);
+  }
   function copy(item, depth = 0) {
     if (++nodes > 100_000 || depth > 64) throw new RangeError("runner input node/depth budget reached");
-    if (item === null || typeof item === "boolean" || typeof item === "string" ||
-        typeof item === "bigint") {
-      if (typeof item === "string" && item.length > 262_144) throw new RangeError("runner input string is oversized");
-      if (typeof item === "bigint" && item.toString().length > 40) throw new RangeError("runner integer is oversized");
+    if (item === null || typeof item === "boolean") {
+      charge(item === null || item === true ? 4 : 5);
+      return item;
+    }
+    if (typeof item === "string") {
+      if (item.length > 262_144) throw new RangeError("runner input string is oversized");
+      chargeString(item);
+      return item;
+    }
+    if (typeof item === "bigint") {
+      const encoded = JSON.stringify({$bigint: item.toString()});
+      if (encoded.length > 55) throw new RangeError("runner integer is oversized");
+      charge(encoded.length);
       return item;
     }
     if (typeof item === "number" && Number.isFinite(item) &&
-        (!Number.isInteger(item) || Number.isSafeInteger(item))) return Object.is(item, -0) ? 0 : item;
+        (!Number.isInteger(item) || Number.isSafeInteger(item))) {
+      const normalized = Object.is(item, -0) ? 0 : item;
+      charge(JSON.stringify(normalized).length);
+      return normalized;
+    }
     if (!item || typeof item !== "object" || seen.has(item) ||
         (!Array.isArray(item) && Object.getPrototypeOf(item) !== Object.prototype)) {
       throw new TypeError("runner input must be bounded plain data");
@@ -71,10 +117,17 @@ function detachInput(value) {
       throw new TypeError("runner input contains hidden fields or a non-dense array");
     }
     const result = array ? [] : {};
-    for (const name of names) {
+    charge(2);
+    for (let index = 0; index < names.length; index += 1) {
+      const name = names[index];
       const descriptor = Object.getOwnPropertyDescriptor(item, name);
       if (!descriptor || !("value" in descriptor) || name === "$bigint" || name === "$map") {
         throw new TypeError("runner input contains an accessor or reserved key");
+      }
+      if (index) charge(1);
+      if (!array) {
+        chargeString(name);
+        charge(1);
       }
       Object.defineProperty(result, name, {
         value: copy(descriptor.value, depth + 1),
@@ -87,7 +140,9 @@ function detachInput(value) {
     return result;
   }
   const detached = copy(value);
-  return {value: detached, bytes: canonicalCheckpointBytes(detached).length};
+  const canonicalBytes = canonicalCheckpointBytes(detached);
+  if (canonicalBytes.length !== bytes) throw new TypeError("runner input canonical byte accounting mismatch");
+  return {value: detached, bytes: canonicalBytes.length};
 }
 
 function syntheticCandidateEvidence(candidate) {
@@ -165,6 +220,7 @@ export function createPaperExecutionRunner({
   let candidateBudgetReached = false;
   const receipts = [];
   const results = [];
+  let verifiedTerminalReceipt = null;
   const candidatesByMint = new Map();
   const pendingAuthorizationIds = new Set();
   let latestMarks = [];
@@ -210,7 +266,7 @@ export function createPaperExecutionRunner({
       receipts: receipts.map(item => ({...item})),
       operationResults: results.map(item => ({...item})),
       terminalResult,
-      terminalReceipt: receipts.at(-1) ?? null,
+      terminalReceipt: verifiedTerminalReceipt ? {...verifiedTerminalReceipt} : null,
       summary
     };
   }
@@ -275,7 +331,7 @@ export function createPaperExecutionRunner({
     }
     if (response === null || response === undefined) return null;
     try {
-      const detached = detachInput(response);
+      const detached = detachInput(response, bounds.maxInputBytes - inputBytes);
       if (inputBytes + detached.bytes > bounds.maxInputBytes) return null;
       inputBytes += detached.bytes;
       return detached.value;
@@ -351,7 +407,7 @@ export function createPaperExecutionRunner({
     }
     const nowForRisk = readTime();
     if (nowForRisk >= endAt) return {deadline: true, marks: []};
-    const risk = await invoke("riskSnapshot", {
+    let risk = await invoke("riskSnapshot", {
       eventId: nextId("risk"),
       now: nowForRisk,
       marks
@@ -367,6 +423,49 @@ export function createPaperExecutionRunner({
     marks = marks.filter(mark => openMints.has(mark.mint));
     if (risk.ledgerUnknown) return {ledgerUnknown: true, marks};
     if (risk.result?.status === "REJECT") return {stop: true, marks: []};
+    if (risk.result?.status === "DAILY_LOSS_LIMIT") {
+      let openPositions;
+      try {
+        openPositions = session.snapshot().summary.openPositions;
+      } catch {
+        return {unknown: true};
+      }
+      if (openPositions.length) {
+        const priorMarks = new Map(marks.map(mark => [mark.mint, mark]));
+        const refreshedMarks = [];
+        for (const position of openPositions) {
+          const candidate = candidatesByMint.get(position.mint);
+          if (!candidate) continue;
+          const observedAt = readTime();
+          if (observedAt >= endAt) return {deadline: true, marks: []};
+          const quote = await quoteFor({purpose: "RISK_EXIT", candidate, position, now: observedAt, tick});
+          const priorMark = priorMarks.get(position.mint);
+          if (!syntheticQuote(quote, candidate) || quote.observedAt > observedAt ||
+              (priorMark && quote.observedAt <= priorMark.observedAt)) continue;
+          refreshedMarks.push({...quote, eventId: nextId("risk-exit-mark")});
+        }
+        if (refreshedMarks.length !== openPositions.length) {
+          return {stop: true, reason: "DAILY_LOSS_LIMIT", marks: []};
+        }
+        const refreshedAt = readTime();
+        if (refreshedAt >= endAt) return {deadline: true, marks: []};
+        risk = await invoke("riskSnapshot", {
+          eventId: nextId("risk-exit"),
+          now: refreshedAt,
+          marks: refreshedMarks
+        });
+        if (risk.unknown) return {unknown: true};
+        if (risk.ledgerUnknown) return {ledgerUnknown: true, marks: []};
+        if (risk.budget || risk.unacknowledged || risk.stop) return {stop: true, marks: []};
+        try {
+          openMints = new Set(session.snapshot().summary.openPositions.map(position => position.mint));
+        } catch {
+          return {unknown: true};
+        }
+        marks = refreshedMarks.filter(mark => openMints.has(mark.mint));
+      }
+      return {stop: true, reason: "DAILY_LOSS_LIMIT", marks};
+    }
     return {marks, result: risk.result};
   }
 
@@ -475,6 +574,7 @@ export function createPaperExecutionRunner({
     }
     sequence = receipt.sequence;
     receipts.push({...receipt});
+    verifiedTerminalReceipt = {...receipt};
     results.push({method: "finishRun", status: result.status, receipt: {...receipt}});
     state = "FINISHED";
     if (result.status === "UNKNOWN") ledgerUnknownReason = "terminal ledger result is UNKNOWN with a verified receipt";
@@ -502,7 +602,7 @@ export function createPaperExecutionRunner({
           return finish("LEDGER_UNKNOWN", null, risk.marks);
         }
         latestMarks = risk.marks;
-        if (risk.stop) return finish("RISK_OPERATION_UNAVAILABLE");
+        if (risk.stop) return finish(risk.reason ?? "RISK_OPERATION_UNAVAILABLE");
         if (risk.deadline) return finish("DEADLINE");
         const afterRiskStop = await checkStop(tickCount - 1);
         if (afterRiskStop.deadline) return finish("DEADLINE", afterRiskStop.now);
@@ -530,14 +630,15 @@ export function createPaperExecutionRunner({
           try {
             if (response === null || response === undefined) item = response;
             else {
-              const detached = detachInput(response);
+              const detached = detachInput(response, bounds.maxInputBytes - inputBytes);
               if (inputBytes + detached.bytes > bounds.maxInputBytes) {
                 return finish("INPUT_BUDGET");
               }
               inputBytes += detached.bytes;
               item = detached.value;
             }
-          } catch {
+          } catch (error) {
+            if (error instanceof InputBudgetError) return finish("INPUT_BUDGET");
             return finish("INVALID_CANDIDATE_SOURCE_ITEM");
           }
           if (item?.done === true) {

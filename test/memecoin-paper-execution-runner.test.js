@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
-import {rm} from "node:fs/promises";
+import {mkdtemp, rm} from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 import {CheckpointStore} from "../scripts/memecoin-paper/checkpoint-store.mjs";
+import {PaperCheckpointSession} from "../scripts/memecoin-paper/checkpoint-session.mjs";
+import {createPaperExecutionStep} from "../scripts/memecoin-paper/execution-step.mjs";
 import {
   createPaperExecutionRunner,
   runOfflineDemo
@@ -141,6 +145,37 @@ function makeRunner({
     limits
   });
   return {...system, runner};
+}
+
+async function makeRealRunner(t, {
+  runId = RUN_ID,
+  candidateSource = {poll: async () => ({done: true})},
+  quoteSource = async () => null,
+  clock = () => START + 1_000,
+  wrapRunnerSession = session => session
+} = {}) {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "paper-runner-review-"));
+  const store = await CheckpointStore.open(directory);
+  const session = await PaperCheckpointSession.open({store, runId, startedAt: START});
+  t.after(async () => {
+    await session.close();
+    await rm(directory, {recursive: true, force: true});
+  });
+  const runner = createPaperExecutionRunner({
+    executionStep: createPaperExecutionStep({session, store, runId, startedAt: START, endAt: END}),
+    session: wrapRunnerSession(session),
+    runId,
+    startedAt: START,
+    endAt: END,
+    executionMode: "SIMULATED_ONLY",
+    provenance: SYNTHETIC_SOURCE,
+    candidateSource,
+    quoteSource,
+    clock,
+    stopSource: () => false,
+    smartWalletAllowlist: SYNTHETIC_SMART_WALLET_ALLOWLIST
+  });
+  return {directory, runner, session, store};
 }
 
 test("offline lifecycle fills from a later synthetic quote and exits on a later risk-only pass", async () => {
@@ -376,6 +411,137 @@ test("candidate input byte budget is enforced before entry dispatch", async () =
   assert.equal(report.reason, "INPUT_BUDGET");
   assert.equal(polls, 1);
   assert.equal(calls.some(call => call.method === "authorizeEntry"), false);
+});
+
+test("repeated 256 KiB strings are rejected by cumulative byte accounting", async () => {
+  const repeated = "x".repeat(262_144);
+  const {calls, runner} = makeRunner({
+    sourcePoll: async () => ({candidate: syntheticCandidate(START), repeated: Array(4).fill(repeated)}),
+    limits: {maxInputBytes: 128 * 1024}
+  });
+  const report = await runner.run();
+
+  assert.equal(report.status, "FINISHED");
+  assert.equal(report.reason, "INPUT_BUDGET");
+  assert.equal(calls.some(call => call.method === "authorizeEntry"), false);
+});
+
+test("real checkpoint daily-loss exit refreshes consumed marks and durably closes survivors", async t => {
+  const mints = [
+    "So11111111111111111111111111111111111111112",
+    `${"1".repeat(31)}2`,
+    `${"1".repeat(31)}3`
+  ];
+  const candidates = mints.map(mint => {
+    const candidate = syntheticCandidate(START, {mint});
+    for (const evidence of [...Object.values(candidate.evidence), ...Object.values(candidate.analystEvidence)]) {
+      evidence.binding.mint = mint;
+    }
+    return candidate;
+  });
+  let candidateIndex = 0;
+  let clockTime = START;
+  const quoteCounts = new Map();
+  const {runner, store} = await makeRealRunner(t, {
+    runId: "runner-daily-loss-review",
+    candidateSource: {
+      poll: async () => candidateIndex < candidates.length
+        ? {candidate: candidates[candidateIndex++]}
+        : {done: true}
+    },
+    quoteSource: async ({candidate, now, purpose}) => {
+      const count = quoteCounts.get(candidate.mint) ?? 0;
+      quoteCounts.set(candidate.mint, count + 1);
+      const gap = purpose === "EXIT" && candidateIndex === candidates.length &&
+        candidate.mint === mints[0] && count >= 2;
+      return {
+        source: SYNTHETIC_SOURCE,
+        fixtureOnly: true,
+        chainId: candidate.chainId,
+        mint: candidate.mint,
+        pool: candidate.pool,
+        quote: candidate.quote,
+        decimals: candidate.decimals,
+        observedAt: now,
+        priceMicros: gap ? 1_000 : 10_000,
+        mode: "HYPOTHETICAL",
+        executable: true,
+        costs: {feeCents: 2, spreadCents: 1, slippageCents: 1, priceImpactCents: 1, networkCents: 2}
+      };
+    },
+    clock: () => (clockTime += 1_000)
+  });
+  const report = await runner.run();
+
+  assert.equal(report.status, "FINISHED");
+  assert.equal(report.reason, "DAILY_LOSS_LIMIT");
+  assert.equal(report.summary.openPositions.length, 0);
+  assert.equal(report.operationResults.filter(item => item.method === "executeEntry" &&
+    item.status === "FILLED_PAPER").length, 3);
+  assert.equal(report.operationResults.some(item => item.method === "observeExitQuote" &&
+    item.status === "CLOSED_PAPER"), true);
+  assert.ok(Object.values(report.summary.costs.entry)
+    .reduce((sum, amount) => sum + BigInt(amount), 0n) > 0n);
+  assert.ok(Object.values(report.summary.costs.exit)
+    .reduce((sum, amount) => sum + BigInt(amount), 0n) > 0n);
+
+  const readback = await store.readCheckpoint();
+  assert.equal(readback.status, "OK");
+  const checkpoint = JSON.parse(readback.bytes.toString("utf8"));
+  assert.equal(checkpoint.records.at(-1).method, "finishRun");
+  assert.equal(readback.sequence, report.terminalReceipt.sequence);
+  assert.equal(readback.hash, report.terminalReceipt.hash);
+  const lastObservations = new Map();
+  for (const record of checkpoint.records.filter(item => item.method === "observeExitQuote")) {
+    const quote = record.inputs.quote;
+    lastObservations.set(quote.mint, Math.max(lastObservations.get(quote.mint) ?? 0, quote.observedAt));
+  }
+  const refreshedRisk = checkpoint.records.filter(item => item.method === "riskSnapshot")
+    .findLast(record => record.inputs.marks.some(mark => mark.mint === mints[1] || mark.mint === mints[2]));
+  assert.ok(refreshedRisk);
+  for (const mint of mints.slice(1)) {
+    const mark = refreshedRisk.inputs.marks.find(item => item.mint === mint);
+    assert.ok(mark.observedAt > lastObservations.get(mint));
+  }
+});
+
+test("real checkpoint UNKNOWN after an intermediate acknowledgement has no terminal receipt", async t => {
+  let snapshots = 0;
+  const {runner, store} = await makeRealRunner(t, {
+    runId: "runner-unknown-review",
+    wrapRunnerSession: session => ({
+      metadata: session.metadata,
+      snapshot() {
+        snapshots += 1;
+        if (snapshots === 2) throw new Error("session readback unavailable");
+        return session.snapshot();
+      }
+    })
+  });
+  const report = await runner.run();
+
+  assert.equal(report.status, "UNKNOWN");
+  assert.deepEqual(report.receipts.map(receipt => receipt.sequence), [1]);
+  assert.equal(report.terminalReceipt, null);
+  const readback = await store.readCheckpoint();
+  assert.equal(readback.status, "OK");
+  assert.equal(JSON.parse(readback.bytes.toString("utf8")).records.at(-1).method, "riskSnapshot");
+});
+
+test("real checkpoint clock stop preserves intermediate acknowledgement but no terminal receipt", async t => {
+  let clockReads = 0;
+  const {runner, store} = await makeRealRunner(t, {
+    runId: "runner-clock-stop-review",
+    clock: () => (++clockReads <= 4 ? START + clockReads * 1_000 : Number.NaN)
+  });
+  const report = await runner.run();
+
+  assert.equal(report.status, "STOPPED");
+  assert.deepEqual(report.receipts.map(receipt => receipt.sequence), [1]);
+  assert.equal(report.terminalReceipt, null);
+  const readback = await store.readCheckpoint();
+  assert.equal(readback.status, "OK");
+  assert.equal(JSON.parse(readback.bytes.toString("utf8")).records.at(-1).method, "riskSnapshot");
 });
 
 test("shutdown requested during candidate polling blocks authorization", async () => {
