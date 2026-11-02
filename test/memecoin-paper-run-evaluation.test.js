@@ -927,6 +927,42 @@ test("partial candidate accounting with unaccounted rows remains UNKNOWN", () =>
   assert.equal(result.observation.completionStatus, "UNKNOWN");
 });
 
+test("candidate receipt counts reconcile to pre-display totals under display truncation", () => {
+  const input = fixture();
+  const report = reportRecord({
+    configHash: input.expectedConfigHash,
+    candidateRejection: true
+  });
+  const detail = report.dto.candidates.details[0];
+  report.dto.candidates.considered = 41;
+  report.dto.candidates.rejected = 41;
+  report.dto.candidates.audited = 41;
+  report.dto.candidates.authorizationReceiptCount = 41;
+  report.dto.candidates.unaccountedObserved = 0;
+  report.dto.candidates.details = Array.from({length: 41}, () => detail).slice(0, 40);
+  report.dto.candidates.detailsCoverage = {
+    observedTotal: 41,
+    total: 41,
+    displayed: 40,
+    displayTruncated: true,
+    sourceTruncated: false,
+    unaccounted: 0
+  };
+  input.reportBytes = bytes(report);
+
+  const truncated = evaluateObservation(input);
+  assert.equal(criterion(truncated, "candidate_detail_coverage").status, "UNKNOWN");
+  assert.equal(criterion(truncated, "terminal_completion").status, "UNKNOWN");
+  assert.equal(truncated.observation.fullDeadlineCompleted, false);
+
+  const inconsistent = JSON.parse(input.reportBytes.toString("utf8"));
+  inconsistent.dto.candidates.authorizationReceiptCount = 40;
+  const contradiction = evaluateObservation({...input, reportBytes: bytes(inconsistent)});
+  assert.equal(criterion(contradiction, "candidate_detail_coverage").status, "FAIL");
+  assert.equal(criterion(contradiction, "terminal_completion").status, "FAIL");
+  assert.equal(contradiction.observation.fullDeadlineCompleted, false);
+});
+
 test("completion requires coherent candidate evidence and zero unresolved execution attempts", () => {
   const input = fixture();
   const report = reportRecord({
@@ -1327,6 +1363,55 @@ test("stop coverage cannot omit rows or claim more retained rows than observed",
     const result = evaluateObservation({...input, reportBytes: bytes(report)});
     assert.equal(criterion(result, "terminal_completion").status, "FAIL", label);
     assert.equal(result.observation.completionStatus, "FAIL", label);
+    assert.equal(result.observation.fullDeadlineCompleted, false, label);
+  }
+});
+
+test("stop status evidence is classified against known producer statuses", () => {
+  for (const [kind, status] of [
+    ["RISK_GATE", "DAILY_LOSS_LIMIT"],
+    ["RISK_GATE", "EQUITY_UNKNOWN"],
+    ["RISK_GATE", "REJECT"],
+    ["CLOCK_STOP", "BLOCKED"],
+    ["RESTART_STOP", "REJECT"],
+    ["RUN_WINDOW", "STOPPED"]
+  ]) {
+    const input = fixture();
+    const report = JSON.parse(input.reportBytes.toString("utf8"));
+    report.dto.controls.stops[0] = {
+      kind,
+      status,
+      reason: "producer-contract status",
+      observedAt: null,
+      source: "checkpoint audit"
+    };
+    input.reportBytes = bytes(report);
+    const result = evaluateObservation(input);
+    assert.equal(criterion(result, "terminal_completion").status, "PASS", `${kind}/${status}`);
+    assert.equal(result.observation.fullDeadlineCompleted, true, `${kind}/${status}`);
+  }
+
+  for (const status of [null, "UNKNOWN", "UNSUPPORTED"]) {
+    const input = fixture();
+    const report = JSON.parse(input.reportBytes.toString("utf8"));
+    report.dto.controls.stops[0].status = status;
+    input.reportBytes = bytes(report);
+    const result = evaluateObservation(input);
+    assert.equal(criterion(result, "terminal_completion").status, "UNKNOWN", String(status));
+    assert.match(criterion(result, "terminal_completion").reason, /unsupported/);
+    assert.equal(result.observation.fullDeadlineCompleted, false, String(status));
+  }
+
+  for (const [label, change] of [
+    ["missing status", row => { delete row.status; }],
+    ["unsupported kind", row => { row.kind = "constructor"; }]
+  ]) {
+    const input = fixture();
+    const report = JSON.parse(input.reportBytes.toString("utf8"));
+    change(report.dto.controls.stops[0]);
+    input.reportBytes = bytes(report);
+    const result = evaluateObservation(input);
+    assert.equal(criterion(result, "terminal_completion").status, "UNKNOWN", label);
     assert.equal(result.observation.fullDeadlineCompleted, false, label);
   }
 });

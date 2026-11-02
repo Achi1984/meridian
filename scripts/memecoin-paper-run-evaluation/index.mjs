@@ -18,6 +18,13 @@ const MAX_AUDIT_ROWS = 1_000;
 const MAX_DATE_MS = 8_640_000_000_000_000;
 const SAFE_ID = /^[A-Za-z0-9._:-]{1,80}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
+const NON_EXECUTING_STOP_STATUSES = new Map([
+  ["RISK_GATE", new Set(["DAILY_LOSS_LIMIT", "EQUITY_UNKNOWN", "REJECT"])],
+  ["CLOCK_STOP", new Set(["BLOCKED", "REJECT"])],
+  ["RESTART_STOP", new Set(["BLOCKED", "REJECT"])],
+  ["RUN_WINDOW", new Set(["STOPPED"])],
+  ["POSITION_STOP", new Set()]
+]);
 const INPUT_NAMES = Object.keys(MAX_INPUT_BYTES);
 const TYPED_ARRAY_PROTOTYPE = Object.getPrototypeOf(Uint8Array.prototype);
 const TYPED_ARRAY_TAG = Object.getOwnPropertyDescriptor(
@@ -253,7 +260,8 @@ function candidateCoverageStatus(report, config, terminal) {
       "Candidate detail coverage counters or truncation flags are unavailable.");
   }
   if (coverage.displayed > coverage.observedTotal || coverage.observedTotal > coverage.total ||
-      coverage.unaccounted > coverage.total) {
+      coverage.unaccounted > coverage.total ||
+      coverage.displayTruncated !== (coverage.observedTotal > coverage.displayed)) {
     return makeCriterion("candidate_detail_coverage", "FAIL",
       "Candidate detail counters contradict their reported totals.");
   }
@@ -286,7 +294,7 @@ function candidateCoverageStatus(report, config, terminal) {
   }
   if (summary.accepted + summary.rejected + summary.unknown !== coverage.observedTotal ||
       summary.audited > summary.considered || summary.audited !== coverage.observedTotal ||
-      summary.authorizationReceiptCount !== details.length) {
+      summary.authorizationReceiptCount !== coverage.observedTotal) {
     return makeCriterion("candidate_detail_coverage", "FAIL",
       "Observed candidate outcomes, audited count, or authorization receipts do not reconcile.");
   }
@@ -470,6 +478,10 @@ function paperExitEvidenceStatus(dto) {
         coverage.unaccounted !== coverage.total - coverage.observedTotal) {
     return makeCriterion("terminal_completion", "FAIL",
       "Stop rows and coverage counters do not reconcile.");
+  }
+  if (rows.some(row => !NON_EXECUTING_STOP_STATUSES.get(row.kind)?.has(row.status))) {
+    return makeCriterion("terminal_completion", "UNKNOWN",
+      "A stop row has an unavailable or unsupported kind/status; absence of a paper exit cannot be established.");
   }
   if (counts.some(value => !Number.isSafeInteger(value)) ||
       coverage.displayTruncated !== false || coverage.sourceTruncated !== false ||
@@ -729,8 +741,12 @@ function completeReasonRow(reason) {
 
 function completeStopRow(row) {
   const fields = ["kind", "status", "reason", "observedAt", "source"];
-  return hasExactFields(row, fields) && validText(row.kind, 64) &&
-    validText(row.status, 32) && validText(row.reason, 512) &&
+  const requiredFields = ["kind", "reason", "observedAt", "source"];
+  return isRecord(row) && requiredFields.every(key => Object.hasOwn(row, key)) &&
+    Object.keys(row).every(key => fields.includes(key)) &&
+    validText(row.kind, 64) &&
+    (!Object.hasOwn(row, "status") || validText(row.status, 32)) &&
+    validText(row.reason, 512) &&
     (row.observedAt === null || validDateText(row.observedAt)) && validText(row.source, 120);
 }
 
