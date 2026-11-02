@@ -934,8 +934,10 @@ export function evaluateObservation({
   const totals = evaluation.accounting.totals ?? null;
   const reportDto = report?.dto;
   const duration = evaluation.duration;
-  const completionMode = evaluation.identity.status === "PASS" &&
-    evaluation.terminalCheck.status === "PASS"
+  const completionStatus = evaluation.identity.status === "PASS" &&
+    evaluation.reportCheck.status === "PASS"
+    ? evaluation.terminalCheck.status : "UNKNOWN";
+  const completionMode = completionStatus === "PASS"
     ? duration.completionMode : "UNKNOWN";
   return {
     schema: EVALUATION_SCHEMA,
@@ -943,7 +945,7 @@ export function evaluateObservation({
     expectedConfigHash: typeof expectedConfigHash === "string" ? expectedConfigHash : null,
     overall: evaluation.status,
     observation: {
-      completionStatus: evaluation.terminalCheck.status,
+      completionStatus,
       completionMode,
       stopReason: typeof terminal?.stopReason === "string" ? terminal.stopReason : null,
       failureCode: terminal?.failureCode ?? null,
@@ -953,7 +955,8 @@ export function evaluateObservation({
       evidencedDurationMs: duration.evidencedMs,
       fullDeadlineCompleted: completionMode === "FULL_DEADLINE" &&
         duration.criterion.status === "PASS" &&
-        evaluation.terminalCheck.status === "PASS"
+        completionStatus === "PASS" &&
+        evaluation.reportCheck.status === "PASS"
     },
     criteria: evaluation.criteria,
     accounting: {

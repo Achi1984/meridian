@@ -324,6 +324,32 @@ test("run/config identity mismatches fail closed", () => {
   assert.notEqual(wrongRun.overall, "PASS");
 });
 
+test("completion headline requires a valid persisted operator report", () => {
+  for (const corruptReport of [
+    report => {
+      delete report.text;
+    },
+    report => {
+      report.dto.experiment.source = "OTHER_SOURCE";
+    }
+  ]) {
+    const input = fixture();
+    const report = JSON.parse(input.reportBytes.toString("utf8"));
+    corruptReport(report);
+    input.reportBytes = bytes(report);
+
+    const result = evaluateObservation(input);
+    assert.equal(criterion(result, "run_config_identity").status, "PASS");
+    assert.equal(criterion(result, "terminal_completion").status, "PASS");
+    assert.equal(criterion(result, "operator_report").status, "FAIL");
+    assert.equal(result.observation.completionStatus, "UNKNOWN");
+    assert.equal(result.observation.completionMode, "UNKNOWN");
+    assert.equal(result.observation.fullDeadlineCompleted, false);
+    assert.equal(result.observation.stopReason, "DEADLINE");
+    assert.equal(result.observation.reportStatus, "PROJECTED");
+  }
+});
+
 test("malformed and oversized artifacts are bounded and reported as failures", () => {
   const valid = fixture();
   const malformed = evaluateObservation({...valid, terminalBytes: Buffer.from("{")});
@@ -482,6 +508,30 @@ test("candidate rejection reasons are preserved without manufacturing rejected c
   inconsistentSummary.dto.candidates.considered = 0;
   const inconsistentCounts = evaluateObservation({...input, reportBytes: bytes(inconsistentSummary)});
   assert.equal(criterion(inconsistentCounts, "candidate_detail_coverage").status, "FAIL");
+});
+
+test("unavailable candidate detail stays distinct from a rejection reason", () => {
+  const input = fixture();
+  const report = reportRecord({
+    configHash: input.expectedConfigHash,
+    candidateRejection: true
+  });
+  report.dto.candidates.rejected = 0;
+  report.dto.candidates.unknown = 1;
+  report.dto.candidates.details[0].status = "UNKNOWN";
+  report.dto.candidates.details[0].reasons[0].status = "UNKNOWN";
+  report.dto.candidates.details[0].reasons[0].reason = "filter detail unavailable";
+  input.reportBytes = bytes(report);
+
+  const result = evaluateObservation(input);
+  assert.equal(criterion(result, "candidate_detail_coverage").status, "PASS");
+  assert.deepEqual(result.checkpointEvidence.rejectionReasons, []);
+  assert.equal(result.checkpointEvidence.candidates[0].status, "UNKNOWN");
+  assert.deepEqual(result.checkpointEvidence.candidates[0].reasons, [{
+    gate: "liquidity",
+    status: "UNKNOWN",
+    reason: "filter detail unavailable"
+  }]);
 });
 
 test("Markdown rendering neutralizes untrusted image and link syntax", () => {
