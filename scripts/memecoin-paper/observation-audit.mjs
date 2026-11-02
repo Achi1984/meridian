@@ -81,6 +81,10 @@ function validAuditText(value, maxLength = MAX_TEXT_LENGTH) {
   return value === null || (typeof value === "string" && value.length <= maxLength);
 }
 
+function validAuditCode(value) {
+  return value === null || (typeof value === "string" && /^[A-Z0-9_:-]{1,64}$/.test(value));
+}
+
 function requestClassification(status) {
   if (typeof status !== "string") return "UNKNOWN";
   if (status === "RECEIVED") return "SUCCESS";
@@ -442,7 +446,9 @@ export function validateObservationAudit(audit, {runId, configHash} = {}) {
       typeof audit.truncation.byteLimit !== "boolean" ||
       typeof audit.truncation.textFields !== "boolean" ||
       (audit.state === "RUNNING" && audit.terminal !== null) ||
-      (audit.state === "TERMINAL" && !isRecord(audit.terminal)) ||
+      (audit.state === "TERMINAL" && (!isRecord(audit.terminal) ||
+       !["runStatus", "controllerStatus", "stopReason", "failureCode"]
+         .every(field => validAuditCode(audit.terminal[field])))) ||
       !isRecord(audit.summary.requests) || !isRecord(audit.summary.candidates)) return false;
   const providerAccounting = audit.accounting.status === "KNOWN"
     ? audit.accounting.providerAccounting : null;

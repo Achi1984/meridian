@@ -376,6 +376,22 @@ test("malformed persisted request status returns structured UNKNOWN", async t =>
   assert.match(report.reason, /schema or durable run identity contract/);
 });
 
+test("malformed terminal audit fields return structured UNKNOWN from report reads", async t => {
+  const harness = await createHarness(t);
+  assert.equal((await harness.runner.start()).status, "FINISHED");
+  const auditPath = path.join(harness.dataDirectory, "observation-audit.json");
+  const persisted = JSON.parse(await readFile(auditPath, "utf8"));
+  for (const field of ["runStatus", "controllerStatus", "stopReason", "failureCode"]) {
+    const audit = structuredClone(persisted);
+    audit.terminal[field] = {toString: null};
+    await writeFile(auditPath, canonicalJson(audit));
+
+    const report = await readPilotReport(harness.dataDirectory);
+    assert.equal(report.status, "UNKNOWN");
+    assert.match(report.reason, /schema or durable run identity contract/);
+  }
+});
+
 test("unreadable operator report retains and warns about independently validated audit", async t => {
   const harness = await createHarness(t);
   assert.equal((await harness.runner.start()).status, "FINISHED");
