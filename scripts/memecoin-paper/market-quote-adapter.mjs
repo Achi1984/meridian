@@ -36,7 +36,6 @@ const SCENARIO_CASES = Object.freeze({
 const PAPER_ENTRY_LIMIT_CENTS = BigInt(PAPER_LEDGER_POLICY.maxEntryCents);
 const MICRO_USD_PER_CENT = 10_000n;
 const BPS = 10_000n;
-const SCENARIO_COST_DENOMINATOR = BPS * MICRO_USD_PER_CENT;
 
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -214,16 +213,28 @@ function unavailableScenario(parsedScenario, reason) {
   ]);
 }
 
-function maximumEntryInputAtoms(routeInputAtoms, adjustmentBps, networkReserveCents) {
-  const reserve = BigInt(networkReserveCents);
-  const costAt = atoms => ceilDiv(atoms, MICRO_USD_PER_CENT) +
-    ceilDiv(atoms * BigInt(adjustmentBps), SCENARIO_COST_DENOMINATOR) + reserve;
+function grossCentsAtPrice(baseAtoms, priceMicros, baseScale, side) {
+  const numerator = baseAtoms * priceMicros;
+  const denominator = baseScale * MICRO_USD_PER_CENT;
+  return side === "ENTRY"
+    ? ceilDiv(numerator, denominator)
+    : numerator / denominator;
+}
+
+function slippageCentsAtGross(grossCents, adjustmentBps) {
+  return ceilDiv(grossCents * BigInt(adjustmentBps), BPS);
+}
+
+function maximumEntryBaseAtoms(routeBaseAtoms, priceMicros, baseScale, adjustmentBps, reserve) {
+  const allInAt = atoms => {
+    const gross = grossCentsAtPrice(atoms, priceMicros, baseScale, "ENTRY");
+    return gross + slippageCentsAtGross(gross, adjustmentBps) + reserve;
+  };
   let low = 0n;
-  let high = routeInputAtoms < PAPER_ENTRY_LIMIT_CENTS * MICRO_USD_PER_CENT
-    ? routeInputAtoms : PAPER_ENTRY_LIMIT_CENTS * MICRO_USD_PER_CENT;
+  let high = routeBaseAtoms;
   while (low < high) {
     const middle = (low + high + 1n) / 2n;
-    if (costAt(middle) <= PAPER_ENTRY_LIMIT_CENTS) low = middle;
+    if (allInAt(middle) <= PAPER_ENTRY_LIMIT_CENTS) low = middle;
     else high = middle - 1n;
   }
   return low;
@@ -278,28 +289,35 @@ function projectReviewScenario(request, observation, candidateReasons, parsedSce
   let totalScenarioCosts;
   let quoteValueAfterCostsCents;
   if (request.side === "ENTRY") {
-    modeledQuoteAtoms = maximumEntryInputAtoms(
-      quoteAtoms, config.adverseAdjustmentBps, config.networkReserveCents
+    modeledBaseAtoms = maximumEntryBaseAtoms(
+      baseAtoms, priceMicros, baseScale, adjustmentBps, reserveCents
     );
-    if (modeledQuoteAtoms <= 0n) {
+    if (modeledBaseAtoms <= 0n) {
       return blockedScenarioProjection(["SCENARIO_ENTRY_SIZE_BELOW_DUST_OR_COST_RESERVE"]);
     }
-    modeledBaseAtoms = baseAtoms * modeledQuoteAtoms / quoteAtoms;
-    if (modeledBaseAtoms <= 0n) {
-      return blockedScenarioProjection(["SCENARIO_LINEAR_SIZE_ROUNDS_TO_ZERO"]);
+    modeledQuoteAtoms = ceilDiv(quoteAtoms * modeledBaseAtoms, baseAtoms);
+    if (modeledQuoteAtoms > quoteAtoms) {
+      return blockedScenarioProjection(["SCENARIO_SIZE_EXCEEDS_SOURCE_QUOTE"]);
     }
-    grossQuoteCents = ceilDiv(modeledQuoteAtoms, MICRO_USD_PER_CENT);
-    slippageCents = ceilDiv(
-      modeledQuoteAtoms * adjustmentBps, SCENARIO_COST_DENOMINATOR
+    grossQuoteCents = grossCentsAtPrice(
+      modeledBaseAtoms, priceMicros, baseScale, "ENTRY"
     );
+    slippageCents = slippageCentsAtGross(grossQuoteCents, adjustmentBps);
     totalScenarioCosts = slippageCents + reserveCents;
     quoteValueAfterCostsCents = grossQuoteCents + totalScenarioCosts;
   } else {
-    modeledQuoteAtoms = quoteAtoms;
-    modeledBaseAtoms = baseAtoms;
-    grossQuoteCents = quoteAtoms / MICRO_USD_PER_CENT;
-    slippageCents = ceilDiv(quoteAtoms * adjustmentBps, SCENARIO_COST_DENOMINATOR);
+    modeledBaseAtoms = BigInt(request.amountAtoms);
+    if (modeledBaseAtoms > baseAtoms) {
+      return blockedScenarioProjection(["SCENARIO_SIZE_EXCEEDS_SOURCE_QUOTE"]);
+    }
+    grossQuoteCents = grossCentsAtPrice(
+      modeledBaseAtoms, priceMicros, baseScale, "EXIT"
+    );
+    slippageCents = slippageCentsAtGross(grossQuoteCents, adjustmentBps);
     totalScenarioCosts = slippageCents + reserveCents;
+    if (totalScenarioCosts > grossQuoteCents) {
+      return blockedScenarioProjection(["SCENARIO_COSTS_EXCEED_ROUNDED_EXIT_CREDIT"]);
+    }
     quoteValueAfterCostsCents = grossQuoteCents - totalScenarioCosts;
   }
 
@@ -340,13 +358,14 @@ function projectReviewScenario(request, observation, candidateReasons, parsedSce
     receiptTime: receivedAt,
     receiptTimeProvenance: "INJECTED_LOCAL_CLOCK_AFTER_RESPONSE_BODY; NOT_AUTHENTICATED",
     priceMicros: Number(priceMicros),
+    rawExactQuotePerBase: exactPriceRatio(request, route),
     priceRounding: request.side === "ENTRY"
       ? "ceil_exact_USD_per_token_microUSD"
       : "floor_exact_USD_per_token_microUSD",
     amountProjection: {
-      basis: "LINEAR_SCALING_ONLY_UP_TO_SOURCE_QUOTED_INPUT_NOT_AN_EXECUTABLE_EXACT_SIZE_ROUTE",
+      basis: "ROUTE_CAP_WITH_MODELED_VALUE_AND_COSTS_FROM_PUBLISHED_ROUNDED_PRICE; NOT_AN_EXECUTABLE_EXACT_SIZE_ROUTE",
       sourceQuotedInputAtoms: route.inAmount,
-      maximumModeledInputAtoms: (request.side === "ENTRY" ? modeledQuoteAtoms : baseAtoms).toString(),
+      maximumModeledInputAtoms: (request.side === "ENTRY" ? modeledQuoteAtoms : modeledBaseAtoms).toString(),
       sourceQuotedBaseAtoms: baseAtoms.toString(),
       maximumModeledBaseAtoms: modeledBaseAtoms.toString(),
       entryAllInLimitCents: request.side === "ENTRY" ? PAPER_ENTRY_LIMIT_CENTS.toString() : null,

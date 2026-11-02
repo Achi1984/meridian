@@ -354,10 +354,20 @@ test("explicit baseline scenario projects net-basis costs without changing actua
     "NO_INCREMENTAL_CHARGE_UNDER_SCENARIO_BASIS");
   assert.equal(projection.costDisposition.priceImpactCents,
     "NO_INCREMENTAL_CHARGE_UNDER_SCENARIO_BASIS");
-  assert.equal(projection.amountProjection.maximumModeledInputAtoms, "79100000");
+  assert.equal(projection.amountProjection.maximumModeledInputAtoms, "79099990");
   assert.equal(projection.amountProjection.modeledAllInCents, "8000");
   assert.equal(projection.quoteValue.grossBeforeExtraScenarioCostsCents, "7910");
   assert.equal(projection.quoteValue.afterExtraScenarioCostsCents, "8000");
+  const ledgerGross = (BigInt(projection.amountProjection.maximumModeledBaseAtoms) *
+    BigInt(projection.priceMicros) +
+    10n ** BigInt(IDENTITY.decimals) * 10_000n - 1n) /
+    (10n ** BigInt(IDENTITY.decimals) * 10_000n);
+  const scenarioCosts = BigInt(projection.costsCents.slippageCents) +
+    BigInt(projection.costsCents.networkCents);
+  assert.equal(projection.quoteValue.grossBeforeExtraScenarioCostsCents, ledgerGross.toString());
+  assert.equal(projection.quoteValue.totalExtraScenarioCostsCents, scenarioCosts.toString());
+  assert.equal(projection.amountProjection.modeledAllInCents,
+    (ledgerGross + scenarioCosts).toString());
   assert.equal(projection.quoteValue.label, "MODELED_SINGLE_SIDE_QUOTE_VALUE_NOT_PNL");
   assert.equal(projection.pnl.status, "NOT_COMPUTED_SINGLE_SIDE_PROJECTION");
   assert.equal(projection.executionRealistic, false);
@@ -380,13 +390,13 @@ test("baseline and stress exit projections use conservative rational rounding an
   const exitBody = syntheticOrderResponse({
     inputMint: SYNTHETIC_MINT,
     outputMint: SYNTHETIC_QUOTE,
-    inAmount: "1000000",
-    outAmount: "5842157",
-    otherAmountThreshold: "5812946"
+    inAmount: "3000000",
+    outAmount: "3703702",
+    otherAmountThreshold: "3685184"
   }).body;
   const exitRequest = request({
     side: "EXIT",
-    amountAtoms: "1000000",
+    amountAtoms: "3000000",
     positionOpenedAt: NOW - 1_000
   });
   delete exitRequest.authorizedAt;
@@ -410,12 +420,27 @@ test("baseline and stress exit projections use conservative rational rounding an
 
   assert.equal(base.status, "REVIEW_PROJECTION_ONLY");
   assert.equal(base.side, "EXIT");
-  assert.equal(base.priceMicros, 5_842_157);
+  assert.equal(base.priceMicros, 1_234_567);
   assert.equal(base.priceRounding, "floor_exact_USD_per_token_microUSD");
   assert.deepEqual(base.costsCents, {
-    feeCents: "0", spreadCents: "0", slippageCents: "6",
+    feeCents: "0", spreadCents: "0", slippageCents: "4",
     priceImpactCents: "0", networkCents: "10"
   });
+  const exitLedgerGross = BigInt(base.amountProjection.maximumModeledBaseAtoms) *
+    BigInt(base.priceMicros) /
+    (10n ** BigInt(IDENTITY.decimals) * 10_000n);
+  const exitScenarioCosts = BigInt(base.costsCents.slippageCents) +
+    BigInt(base.costsCents.networkCents);
+  assert.equal(base.quoteValue.grossBeforeExtraScenarioCostsCents, exitLedgerGross.toString());
+  assert.equal(base.quoteValue.totalExtraScenarioCostsCents, exitScenarioCosts.toString());
+  assert.equal(base.quoteValue.afterExtraScenarioCostsCents,
+    (exitLedgerGross - exitScenarioCosts).toString());
+  assert.equal(base.amountProjection.maximumModeledBaseAtoms, "3000000");
+  assert.equal(base.quoteValue.grossBeforeExtraScenarioCostsCents, "370");
+  assert.equal(base.quoteValue.totalExtraScenarioCostsCents, "14");
+  assert.equal(base.quoteValue.afterExtraScenarioCostsCents, "356");
+  assert.equal(base.rawExactQuotePerBase.numerator, "1851851");
+  assert.equal(base.rawExactQuotePerBase.denominator, "1500000");
   assert.equal(stressed.scenarioCostCoverage, "COMPLETE");
   assert.equal(stressed.side, "EXIT");
   assert.ok(BigInt(stressed.quoteValue.afterExtraScenarioCostsCents) <=
@@ -526,6 +551,47 @@ test("review scenario opt-in, evidence, identity, mint, and chronology fail clos
 });
 
 test("scenario conversion rejects zero/unsafe prices and refuses size extrapolation or over-cap entries", async () => {
+  const subMicroRoute = entryResponse({
+    inAmount: "100000000",
+    outAmount: "1000000000000000",
+    otherAmountThreshold: "1"
+  });
+  const subMicro = await adapterFor(subMicroRoute.body).adapter.getPaperQuote(request({
+    amountAtoms: "100000000"
+  }), {reviewScenario: reviewScenario()});
+  const subMicroProjection = subMicro.scenarioProjection;
+  assert.equal(subMicroProjection.status, "REVIEW_PROJECTION_ONLY");
+  assert.equal(subMicroProjection.priceMicros, 1);
+  assert.equal(subMicroProjection.amountProjection.maximumModeledBaseAtoms,
+    "79100000000000");
+  assert.equal(subMicroProjection.amountProjection.maximumModeledInputAtoms,
+    "7910000");
+  assert.equal(subMicroProjection.quoteValue.grossBeforeExtraScenarioCostsCents, "7910");
+  assert.equal(subMicroProjection.costsCents.slippageCents, "80");
+  assert.equal(subMicroProjection.costsCents.networkCents, "10");
+  assert.equal(subMicroProjection.amountProjection.modeledAllInCents, "8000");
+  assert.deepEqual(subMicroProjection.rawExactQuotePerBase, {
+    numerator: "1",
+    denominator: "10000000",
+    unit: "quote-token per base-token",
+    source: "exact raw inAmount/outAmount and caller-supplied decimals; not a USD price"
+  });
+  const subMicroQuantity = BigInt(subMicroProjection.amountProjection.maximumModeledBaseAtoms);
+  const subMicroScale = 10n ** BigInt(IDENTITY.decimals);
+  const subMicroLedgerGross = (subMicroQuantity * BigInt(subMicroProjection.priceMicros) +
+    subMicroScale * 10_000n - 1n) / (subMicroScale * 10_000n);
+  const subMicroCosts = BigInt(subMicroProjection.costsCents.slippageCents) +
+    BigInt(subMicroProjection.costsCents.networkCents);
+  assert.equal(subMicroProjection.quoteValue.grossBeforeExtraScenarioCostsCents,
+    subMicroLedgerGross.toString());
+  assert.equal(subMicroProjection.quoteValue.totalExtraScenarioCostsCents,
+    subMicroCosts.toString());
+  assert.equal(subMicroProjection.amountProjection.modeledAllInCents,
+    (subMicroLedgerGross + subMicroCosts).toString());
+  assert.ok(subMicroQuantity <= 1_000_000_000_000_000n);
+  assert.ok(BigInt(subMicroProjection.amountProjection.maximumModeledInputAtoms) <=
+    100_000_000n);
+
   const quoteDust = entryResponse({
     inAmount: "1", outAmount: "3", otherAmountThreshold: "1"
   });
@@ -555,21 +621,22 @@ test("scenario conversion rejects zero/unsafe prices and refuses size extrapolat
   const exitDust = syntheticOrderResponse({
     inputMint: SYNTHETIC_MINT,
     outputMint: SYNTHETIC_QUOTE,
-    inAmount: "3",
-    outAmount: "1",
-    otherAmountThreshold: "1"
+    inAmount: "1000000",
+    outAmount: "5842157",
+    otherAmountThreshold: "5812946"
   });
   const exitDustRequest = request({
-    side: "EXIT", amountAtoms: "3", positionOpenedAt: NOW - 1_000
+    side: "EXIT", amountAtoms: "1000000", positionOpenedAt: NOW - 1_000
   });
   delete exitDustRequest.authorizedAt;
   const credit = await adapterFor(exitDust.body).adapter.getPaperQuote(exitDustRequest, {
     reviewScenario: reviewScenario()
   });
-  assert.equal(credit.scenarioProjection.priceMicros, 333333);
+  assert.equal(credit.scenarioProjection.status, "REVIEW_PROJECTION_ONLY");
+  assert.equal(credit.scenarioProjection.priceMicros, 5_842_157);
   assert.equal(credit.scenarioProjection.priceRounding,
     "floor_exact_USD_per_token_microUSD");
-  assert.equal(credit.scenarioProjection.quoteValue.grossBeforeExtraScenarioCostsCents, "0");
+  assert.equal(credit.scenarioProjection.quoteValue.grossBeforeExtraScenarioCostsCents, "584");
   assert.equal(credit.scenarioProjection.quoteValue.direction, "CREDIT_ROUNDED_DOWN");
 
   const zeroPrice = syntheticOrderResponse({

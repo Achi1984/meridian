@@ -222,10 +222,19 @@ again.
 
 USDC conversion and token-price arithmetic use `BigInt` rational operations.
 The model's USD-per-token `priceMicros` rounds up for entry and down for exit.
-Debit values round up and credit values round down to cents. Entry sizing is
-linearly projected only up to the source-quoted input amount and is further
-capped so the modeled gross value plus scenario costs does not exceed the
-existing fixed `$80` entry limit (`8,000` cents). The current consumer's
+All modeled quantities, gross cents, and adverse costs are derived from that
+same published rounded `priceMicros` basis; the exact raw quote/base ratio is
+retained separately for comparison, never mixed into rounded-price accounting.
+Gross debit cents round up for entry, and gross credit cents round down for
+exit, matching the ledger's integer `priceMicros` calculation. Adverse
+adjustment cents round up from that same rounded-price gross. Entry quantity is
+bounded by the source-quoted output amount and binary-searched so this rounded
+gross plus scenario costs does not exceed the existing fixed `$80` entry limit
+(`8,000` cents); its modeled input is only a linear projection within the
+source-quoted amount. Exit quantity is bounded by the source-quoted input and
+the requested position amount. Gross, costs, and net quote value therefore
+reconcile arithmetically to the public price and quantity under the documented
+rounding rules, without claiming an executable exact-size route. The current consumer's
 authorization, available-cash, 8%-of-equity, hard-evidence, and other risk
 limits are not recalculated here; they remain unchanged. The projection is not
 an executable exact-size route, and any integration must enforce the explicit
