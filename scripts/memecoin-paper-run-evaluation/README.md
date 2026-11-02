@@ -54,6 +54,10 @@ explicit output. Inputs must be regular, non-symlink files; the CLI rejects
 platforms that cannot open inputs nonblocking without following symlinks. The
 module has no import-time work.
 
+Both output formats include the independently expected config SHA-256 and a
+digest for each supplied source artifact. Missing or unavailable source digests
+are shown as `UNKNOWN`.
+
 The pure `evaluateObservation` API accepts the same expected run ID, expected
 config SHA-256, and four `Uint8Array` inputs. `renderEvaluationMarkdown`
 renders the resulting evaluation without I/O.

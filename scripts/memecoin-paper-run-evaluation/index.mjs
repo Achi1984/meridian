@@ -730,10 +730,9 @@ function terminalStatus(terminal, report) {
     return makeCriterion("terminal_completion", "FAIL",
       "Persisted operator DTO is structurally incomplete.");
   }
-  if (terminal.controllerStatus === "UNKNOWN" || terminal.controllerStatus === "NOT_STARTED" ||
-      terminal.stopReason === "UNKNOWN" || terminal.reportStatus === "UNKNOWN") {
+  if (terminal.reportStatus === "UNKNOWN") {
     return makeCriterion("terminal_completion", "UNKNOWN",
-      "Controller, stop reason, or report projection remains unknown.");
+      "The report projection remains unknown.");
   }
   const terminalObservation = terminal.observation;
   const reportObservation = report?.observation;
@@ -747,6 +746,22 @@ function terminalStatus(terminal, report) {
       !isRecord(reportObservation.windowFinalization)) {
     return makeCriterion("terminal_completion", "UNKNOWN",
       "Observation-only activity and finalization fields are incomplete.");
+  }
+  const controllerFields = ["controllerStatus", "stopReason"];
+  if (controllerFields.some(key => !Object.hasOwn(terminal, key) ||
+      !Object.hasOwn(terminalObservation, key) || !Object.hasOwn(reportObservation, key))) {
+    return makeCriterion("terminal_completion", "UNKNOWN",
+      "Controller status or stop reason is missing from terminal/report observation evidence.");
+  }
+  if (controllerFields.some(key => terminalObservation[key] !== reportObservation[key] ||
+      terminalObservation[key] !== terminal[key])) {
+    return makeCriterion("terminal_completion", "FAIL",
+      "Controller status or stop reason conflicts across the terminal and report observations.");
+  }
+  if ([terminal.controllerStatus, terminal.stopReason].some(value =>
+    value === "UNKNOWN" || value === "NOT_STARTED")) {
+    return makeCriterion("terminal_completion", "UNKNOWN",
+      "Controller status or stop reason remains unknown.");
   }
   if (observationFields.some(key =>
     terminalObservation[key] !== reportObservation[key]) ||
@@ -934,10 +949,12 @@ export function evaluateObservation({
   const totals = evaluation.accounting.totals ?? null;
   const reportDto = report?.dto;
   const duration = evaluation.duration;
-  const completionStatus = evaluation.identity.status === "PASS" &&
-    evaluation.reportCheck.status === "PASS"
-    ? evaluation.terminalCheck.status : "UNKNOWN";
-  const completionMode = completionStatus === "PASS"
+  const completionEvidenceBound = evaluation.identity.status === "PASS" &&
+    evaluation.reportCheck.status === "PASS";
+  const completionStatus = !completionEvidenceBound ? "UNKNOWN" :
+    evaluation.terminalCheck.status !== "PASS" ? evaluation.terminalCheck.status :
+      duration.criterion.status === "FAIL" ? "FAIL" : "PASS";
+  const completionMode = completionEvidenceBound && evaluation.terminalCheck.status === "PASS"
     ? duration.completionMode : "UNKNOWN";
   return {
     schema: EVALUATION_SCHEMA,
@@ -1036,12 +1053,18 @@ export function renderEvaluationMarkdown(evaluation) {
     "# Offline observation-run evaluation",
     "",
     `- Expected run: ${markdownEscape(evaluation.expectedRunId ?? "UNKNOWN")}`,
+    `- Expected config SHA-256: ${markdownEscape(evaluation.expectedConfigHash ?? "UNKNOWN")}`,
     `- Overall evidence result: **${evaluation.overall}**`,
     `- Completion: ${evaluation.observation.completionStatus} (${evaluation.observation.completionMode})`,
     `- Stop reason: ${markdownEscape(evaluation.observation.stopReason ?? "UNKNOWN")}`,
     `- Scheduled duration: ${evaluation.observation.scheduledDurationMs} ms`,
     `- Evidenced duration: ${evaluation.observation.evidencedDurationMs ?? "UNKNOWN"} ms`,
     `- Full deadline completed: ${evaluation.observation.fullDeadlineCompleted}`,
+    "",
+    "## Source SHA-256 digests",
+    "",
+    ...Object.entries(evaluation.coverage.inputDigests).map(([name, digest]) =>
+      `- ${markdownEscape(name)}: ${markdownEscape(digest ?? "UNKNOWN")}`),
     "",
     "## Operational criteria",
     "",

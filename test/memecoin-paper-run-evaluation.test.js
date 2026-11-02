@@ -40,7 +40,9 @@ function reportRecord({
   configHash,
   elapsedMs = DURATION,
   providerAccounting,
-  candidateRejection = false
+  candidateRejection = false,
+  controllerStatus = "FINISHED",
+  stopReason = "DEADLINE"
 } = {}) {
   const checkpoint = reportFixtures.readOnlyCheckpoint({
     results: [reportFixtures.receipt("finish", "finishRun", {status: "FINISHED", elapsedMs})]
@@ -99,6 +101,8 @@ function reportRecord({
         rpcRequests: 0,
         candidates: 0
       },
+      controllerStatus,
+      stopReason,
       entryAuthorizations: 0,
       simulatedFills: 0,
       executableQuoteAndCostEvidence: "UNAVAILABLE",
@@ -167,6 +171,8 @@ function fixture({
         finalizedAt: stopReason === "OPERATOR_STOP" ? effectiveEndAt : effectiveEndAt + 500,
         latenessMs: stopReason === "OPERATOR_STOP" ? 0 : 500
       },
+      controllerStatus: status === "FINISHED" ? "FINISHED" : status,
+      stopReason,
       entryAuthorizations: 0,
       simulatedFills: 0,
       executableQuoteAndCostEvidence: "UNAVAILABLE"
@@ -179,7 +185,9 @@ function fixture({
     runId,
     configHash,
     elapsedMs: stopReason === "OPERATOR_STOP" ? elapsedMs : DURATION,
-    providerAccounting
+    providerAccounting,
+    controllerStatus: status === "FINISHED" ? "FINISHED" : status,
+    stopReason
   });
   report.observation.windowFinalization = terminal.observation.windowFinalization;
   return {
@@ -289,7 +297,18 @@ test("finalization beyond the supported timestamp range cannot pass a deadline",
     JSON.stringify(criterion(lateResult, "terminal_completion")));
   assert.equal(criterion(lateResult, "observation_duration").status, "FAIL");
   assert.equal(lateResult.observation.completionMode, "INCONSISTENT");
+  assert.equal(lateResult.observation.completionStatus, "FAIL");
   assert.equal(lateResult.observation.fullDeadlineCompleted, false);
+
+  const reportEndMismatch = fixture();
+  const mismatchReport = JSON.parse(reportEndMismatch.reportBytes.toString("utf8"));
+  mismatchReport.dto.experiment.endAt = new Date(START + DURATION - 1).toISOString();
+  reportEndMismatch.reportBytes = bytes(mismatchReport);
+  const mismatchResult = evaluateObservation(reportEndMismatch);
+  assert.equal(criterion(mismatchResult, "observation_duration").status, "FAIL");
+  assert.equal(mismatchResult.observation.completionStatus, "FAIL");
+  assert.equal(mismatchResult.observation.completionMode, "INCONSISTENT");
+  assert.equal(mismatchResult.observation.fullDeadlineCompleted, false);
 });
 
 test("UNKNOWN and nonterminal markers never count as completed observations", () => {
@@ -348,6 +367,53 @@ test("completion headline requires a valid persisted operator report", () => {
     assert.equal(result.observation.stopReason, "DEADLINE");
     assert.equal(result.observation.reportStatus, "PROJECTED");
   }
+});
+
+test("controller status and stop reason reconcile across terminal and both report observations", () => {
+  for (const [location, field, value] of [
+    ["report", "stopReason", "OPERATOR_STOP"],
+    ["report", "controllerStatus", "UNKNOWN"],
+    ["terminalObservation", "stopReason", "OPERATOR_STOP"],
+    ["terminalObservation", "controllerStatus", "UNKNOWN"]
+  ]) {
+    const input = fixture();
+    const target = location === "report"
+      ? JSON.parse(input.reportBytes.toString("utf8")).observation
+      : JSON.parse(input.terminalBytes.toString("utf8")).observation;
+    target[field] = value;
+    if (location === "report") input.reportBytes = bytes({
+      ...JSON.parse(input.reportBytes.toString("utf8")),
+      observation: target
+    });
+    else input.terminalBytes = bytes({
+      ...JSON.parse(input.terminalBytes.toString("utf8")),
+      observation: target
+    });
+
+    const result = evaluateObservation(input);
+    assert.equal(criterion(result, "terminal_completion").status, "FAIL", `${location}.${field}`);
+    assert.notEqual(result.observation.completionStatus, "PASS");
+    assert.equal(result.observation.fullDeadlineCompleted, false);
+  }
+
+  const missingEvidence = fixture();
+  const report = JSON.parse(missingEvidence.reportBytes.toString("utf8"));
+  delete report.observation.stopReason;
+  missingEvidence.reportBytes = bytes(report);
+  const missingResult = evaluateObservation(missingEvidence);
+  assert.equal(criterion(missingResult, "terminal_completion").status, "UNKNOWN");
+  assert.equal(missingResult.observation.completionStatus, "UNKNOWN");
+  assert.equal(missingResult.observation.fullDeadlineCompleted, false);
+
+  const unknownStatus = fixture({
+    status: "UNKNOWN",
+    controllerStatus: "UNKNOWN",
+    stopReason: "UNKNOWN"
+  });
+  const unknownResult = evaluateObservation(unknownStatus);
+  assert.equal(criterion(unknownResult, "terminal_completion").status, "UNKNOWN");
+  assert.equal(unknownResult.observation.completionStatus, "UNKNOWN");
+  assert.equal(unknownResult.observation.fullDeadlineCompleted, false);
 });
 
 test("malformed and oversized artifacts are bounded and reported as failures", () => {
@@ -546,6 +612,14 @@ test("Markdown rendering neutralizes untrusted image and link syntax", () => {
   const markdown = renderEvaluationMarkdown(evaluateObservation(input));
   assert.doesNotMatch(markdown, /!\[x\]\(https:\/\/example\.invalid\/track\)/);
   assert.ok(markdown.includes("\\!\\[x\\]\\(https://example.invalid/track\\)"));
+  assert.ok(markdown.includes(`Expected config SHA-256: ${input.expectedConfigHash}`));
+  const evaluation = evaluateObservation(input);
+  for (const [name, digest] of Object.entries(evaluation.coverage.inputDigests)) {
+    assert.ok(markdown.includes(`- ${name}: ${digest}`));
+  }
+
+  const missingReport = evaluateObservation({...input, reportBytes: undefined});
+  assert.ok(renderEvaluationMarkdown(missingReport).includes("- report: UNKNOWN"));
 });
 
 test("terminal observation activity cannot conflict with a zero-activity report", () => {
