@@ -1,3 +1,5 @@
+import {createHash} from "node:crypto";
+
 export const LAUNCH_HISTORY_SOURCE_VERSION = "solana-launch-history-source-v1";
 export const SOLANA_RPC_ORIGIN = "https://api.mainnet-beta.solana.com";
 export const DEFAULT_LAUNCH_HISTORY_LIMITS = Object.freeze({
@@ -31,6 +33,7 @@ const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 const ALLOWED_OPTIONS = new Set([
   "subjects", "startSlot", "endSlot", "transport", "clock", "signal", "limits"
 ]);
+const TIME_BOUNDARY_RPC_METHODS = new Set(["getSlot", "getBlocks", "getBlockTime"]);
 
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -183,7 +186,7 @@ async function readJsonBounded(response, state, limits, signal) {
     throw failure("INVALID_UTF8", "RPC response is not valid UTF-8");
   }
   try {
-    return {payload: JSON.parse(text), bytes: responseBytes};
+    return {payload: JSON.parse(text), bytes: responseBytes, rawBytes: bytes};
   } catch {
     throw failure("INVALID_JSON", "RPC response is not valid JSON");
   }
@@ -201,6 +204,28 @@ function responseTargetIsAllowed(response, request) {
   } catch {
     return false;
   }
+}
+
+function validTimeBoundaryParams(method, params) {
+  const exactCommitment = value => {
+    if (!isRecord(value) ||
+        (Object.getPrototypeOf(value) !== Object.prototype &&
+         Object.getPrototypeOf(value) !== null) ||
+        Reflect.ownKeys(value).length !== 1) return false;
+    const descriptor = Object.getOwnPropertyDescriptor(value, "commitment");
+    return descriptor?.enumerable === true && Object.hasOwn(descriptor, "value") &&
+      descriptor.value === "finalized";
+  };
+  if (!Array.isArray(params) ||
+      Reflect.ownKeys(params).length !== params.length + 1) return false;
+  if (method === "getSlot") return params.length === 1 && exactCommitment(params[0]);
+  if (method === "getBlocks") {
+    return params.length === 3 && Number.isSafeInteger(params[0]) && params[0] >= 0 &&
+      Number.isSafeInteger(params[1]) && params[1] >= params[0] &&
+      params[1] - params[0] < 100_000 && exactCommitment(params[2]);
+  }
+  return method === "getBlockTime" && params.length === 1 &&
+    Number.isSafeInteger(params[0]) && params[0] >= 0;
 }
 
 function makeRequest(id, method, params) {
@@ -297,7 +322,7 @@ async function requestRpc(state, limits, method, params) {
       cancelWithoutWaiting(response?.body, "RPC response status is not successful");
       return {ok: false, status: `HTTP_${response.status}`};
     }
-    const {payload, bytes: responseBytes} = await Promise.race([
+    const {payload, bytes: responseBytes, rawBytes} = await Promise.race([
       readJsonBounded(response, state, limits, controller.signal),
       timeoutPromise,
       abortedPromise
@@ -313,10 +338,13 @@ async function requestRpc(state, limits, method, params) {
     if (elapsedFailure) throw failure(elapsedFailure, "launch history time limit was reached");
     const event = {
       requestId: id,
+      origin: SOLANA_RPC_ORIGIN,
       method,
       requestStartedAt: startedAt,
       responseReceivedAt: receivedAt,
       responseBytes,
+      responseSha256: createHash("sha256").update(rawBytes).digest("hex"),
+      ...(TIME_BOUNDARY_RPC_METHODS.has(method) ? {params} : {}),
       status: "RESPONSE_RECEIVED"
     };
     state.events.push(event);
@@ -517,12 +545,16 @@ export async function acquireLaunchHistory(options) {
           record = {
             signature: entry.signature,
             slot: entry.slot,
+            blockTime: Number.isSafeInteger(entry.blockTime) && entry.blockTime >= 0
+              ? entry.blockTime : null,
             err: entry.err,
             subjectAddresses: [],
             errorStatus: signatureError(entry.err)
           };
           state.signatures.set(entry.signature, record);
         } else if (record.slot !== entry.slot ||
+            record.blockTime !== (Number.isSafeInteger(entry.blockTime) && entry.blockTime >= 0
+              ? entry.blockTime : null) ||
             JSON.stringify(record.err) !== JSON.stringify(entry.err)) {
           record.errorStatus = "CONFLICTING_SIGNATURE_RECORD";
           conflict = true;
@@ -608,6 +640,7 @@ export async function acquireLaunchHistory(options) {
       transactionRecord = {
         signature: signature.signature,
         slot: signature.slot,
+        blockTime: null,
         subjectAddresses: [...signature.subjectAddresses],
         status: outcome.status,
         error: outcome.error ?? null,
@@ -620,6 +653,7 @@ export async function acquireLaunchHistory(options) {
       transactionRecord = {
         signature: signature.signature,
         slot: signature.slot,
+        blockTime: null,
         subjectAddresses: [...signature.subjectAddresses],
         status: "MISSING_TRANSACTION",
         error: null,
@@ -645,6 +679,8 @@ export async function acquireLaunchHistory(options) {
       transactionRecord = {
         signature: signature.signature,
         slot: signature.slot,
+        blockTime: Number.isSafeInteger(outcome.result.blockTime) &&
+          outcome.result.blockTime >= 0 ? outcome.result.blockTime : null,
         subjectAddresses: [...signature.subjectAddresses],
         status,
         error: null,
@@ -709,4 +745,103 @@ export async function acquireLaunchHistory(options) {
       terminationReason: state.stopReason ?? "DECLARED_INTERVAL_COVERED"
     }
   };
+}
+
+export function createBoundedHistoryRpcReader({
+  transport,
+  clock,
+  limits: suppliedLimits = {},
+  maxDurationMs,
+  signal
+} = {}) {
+  if (typeof transport !== "function" || typeof clock !== "function") {
+    throw new TypeError("injected bounded RPC transport and clock are required");
+  }
+  if (signal !== undefined &&
+      (signal === null || typeof signal.aborted !== "boolean" ||
+       typeof signal.addEventListener !== "function" ||
+       typeof signal.removeEventListener !== "function")) {
+    throw new TypeError("bounded RPC signal must be an AbortSignal");
+  }
+  if (!isRecord(suppliedLimits) || Reflect.ownKeys(suppliedLimits).some(key =>
+    typeof key !== "string" || !Object.hasOwn(HARD_LIMITS, key))) {
+    throw new TypeError("bounded RPC limits contain an unsupported field");
+  }
+  const limits = {};
+  for (const [name, defaultValue] of Object.entries(DEFAULT_LAUNCH_HISTORY_LIMITS)) {
+    const value = suppliedLimits[name] ?? defaultValue;
+    if (!Number.isSafeInteger(value) || value < 1 || value > HARD_LIMITS[name]) {
+      throw new TypeError(`${name} is outside the fixed hard limit`);
+    }
+    limits[name] = value;
+  }
+  if (maxDurationMs !== undefined) {
+    if (!Number.isSafeInteger(maxDurationMs) || maxDurationMs < 1 ||
+        maxDurationMs > limits.maxDurationMs) {
+      throw new TypeError("bounded RPC duration is outside its fixed limit");
+    }
+    limits.maxDurationMs = maxDurationMs;
+  }
+  if (limits.maxBytesPerResponse > limits.maxBytesPerRun) {
+    throw new TypeError("bounded RPC response/run limits are inconsistent");
+  }
+  const startedAt = clock();
+  if (!Number.isSafeInteger(startedAt) || startedAt < 0) {
+    throw new TypeError("injected bounded RPC clock must return a nonnegative safe integer");
+  }
+  const state = {
+    transport,
+    clock,
+    signal,
+    startedAt,
+    startedMonotonic: performance.now(),
+    requests: 0,
+    bytes: 0,
+    workUnits: 0,
+    requestId: 0,
+    events: []
+  };
+  let busy = false;
+  return Object.freeze({
+    async read({method, params, signal: requestSignal} = {}) {
+      if (!TIME_BOUNDARY_RPC_METHODS.has(method)) {
+        return {ok: false, status: "METHOD_NOT_ALLOWED", event: null};
+      }
+      if (!validTimeBoundaryParams(method, params)) {
+        return {ok: false, status: "INVALID_PARAMS", event: null};
+      }
+      if (busy) return {ok: false, status: "READER_BUSY", event: null};
+      if (requestSignal !== undefined &&
+          (requestSignal === null || typeof requestSignal.aborted !== "boolean" ||
+           typeof requestSignal.addEventListener !== "function" ||
+           typeof requestSignal.removeEventListener !== "function")) {
+        return {ok: false, status: "INVALID_SIGNAL", event: null};
+      }
+      busy = true;
+      state.signal = requestSignal ?? signal;
+      try {
+        const outcome = await requestRpc(state, limits, method, params);
+        return {
+          ...outcome,
+          event: state.events.at(-1) ?? null,
+          counters: {
+            requests: state.requests,
+            bytes: state.bytes,
+            workUnits: state.workUnits
+          }
+        };
+      } finally {
+        state.signal = signal;
+        busy = false;
+      }
+    },
+    counters() {
+      return {
+        requests: state.requests,
+        bytes: state.bytes,
+        workUnits: state.workUnits,
+        elapsedMs: Math.floor(performance.now() - state.startedMonotonic)
+      };
+    }
+  });
 }
