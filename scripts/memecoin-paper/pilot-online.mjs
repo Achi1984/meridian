@@ -5,6 +5,14 @@ import {performance} from "node:perf_hooks";
 import {pathToFileURL} from "node:url";
 import {PaperCheckpointSession} from "./checkpoint-session.mjs";
 import {CheckpointStore, canonicalCheckpointBytes} from "./checkpoint-store.mjs";
+import {
+  createObservationAudit,
+  MAX_OBSERVATION_AUDIT_BYTES,
+  OBSERVATION_AUDIT_FILE,
+  persistObservationAudit,
+  renderObservationAudit,
+  validateObservationAudit
+} from "./observation-audit.mjs";
 import {analyzeCandidate, filterCandidate} from "./stages.mjs";
 
 export const READ_ONLY_PAPER = "READ_ONLY_PAPER";
@@ -265,16 +273,20 @@ function pathsFor(directory) {
     terminal: path.join(root, "terminal.json"),
     config: path.join(root, "run-config.json"),
     checkpoint: path.join(root, "checkpoint"),
+    observationAudit: path.join(root, OBSERVATION_AUDIT_FILE),
     reportJson: path.join(root, "operator-report.json"),
     reportText: path.join(root, "operator-report.md")
   };
 }
 
-async function readOptionalJson(filePath, maxBytes = 16 * 1024) {
+async function readOptionalJson(filePath, maxBytes = 16 * 1024, includePresence = false) {
   try {
-    return (await readCanonicalJson(filePath, maxBytes, path.basename(filePath))).value;
+    const value = (await readCanonicalJson(filePath, maxBytes, path.basename(filePath))).value;
+    return includePresence ? {present: true, value} : value;
   } catch (error) {
-    if (error.code === "ENOENT") return null;
+    if (error.code === "ENOENT") {
+      return includePresence ? {present: false, value: null} : null;
+    }
     throw error;
   }
 }
@@ -352,34 +364,140 @@ export async function readPilotReport(dataDirectory) {
   const paths = pathsFor(dataDirectory);
   let status;
   let report;
+  let audit;
   try {
-    [status, report] = await Promise.all([
-      readPilotStatus(dataDirectory),
-      readOptionalJson(paths.reportJson, MAX_REPORT_BYTES)
-    ]);
+    status = await readPilotStatus(dataDirectory);
   } catch {
-    return {status: "UNKNOWN", reason: "persisted operator report is unreadable"};
+    return {status: "UNKNOWN", reason: "durable run status is unreadable"};
   }
-  if (!report) return {status: "BLOCKED", runStatus: status.status, reason: "no durable operator report exists"};
-  const accounting = report.observation?.providerAccounting;
-  if (report.runId !== status.runId || report.configHash !== status.configHash ||
-      !isRecord(report.dto?.experiment) ||
-      report.dto.experiment.source !== "READ_ONLY_PAPER_CHECKPOINT" ||
-      report.dto.experiment.evidenceKind !== "READ_ONLY_PAPER_CHECKPOINT_RECEIPTS" ||
-      report.dto.experiment.sourceProvenance !== "CALLER_LABEL_ONLY_NOT_AUTHENTICATED" ||
-      !isRecord(accounting) || !isRecord(status.providerAccounting) ||
-      canonicalJson(accounting) !== canonicalJson(status.providerAccounting) ||
-      report.observation.entryAuthorizations !== 0 ||
-      report.observation.simulatedFills !== 0 ||
-      report.observation.executableQuoteAndCostEvidence !== "UNAVAILABLE") {
-    return {status: "UNKNOWN", reason: "report failed its provenance or durable identity contract"};
+  const [reportResult, auditResult] = await Promise.allSettled([
+    readOptionalJson(paths.reportJson, MAX_REPORT_BYTES, true),
+    readOptionalJson(paths.observationAudit, MAX_OBSERVATION_AUDIT_BYTES)
+  ]);
+  const reportUnreadable = reportResult.status === "rejected";
+  const reportMissing = !reportUnreadable && !reportResult.value.present;
+  const auditUnreadable = auditResult.status === "rejected";
+  if (!reportUnreadable) report = reportResult.value.value;
+  if (!auditUnreadable) audit = auditResult.value;
+  if (auditUnreadable) {
+    return {status: "UNKNOWN", reason: "persisted observation audit is unreadable"};
   }
+  if (audit && !validateObservationAudit(audit, {
+    runId: status.runId, configHash: status.configHash
+  })) {
+    return {status: "UNKNOWN", reason: "observation audit failed its schema or durable run identity contract"};
+  }
+  const hasTerminalMarker = ["PERSISTED", "FAILED"].includes(status.observationAuditStatus);
+  if (audit && status.observationAuditStatus === "PERSISTED" &&
+      (audit.state !== "TERMINAL" ||
+       audit.terminal.runStatus !== status.status ||
+       audit.terminal.controllerStatus !==
+         (status.controllerStatus === "NOT_STARTED" ? null : status.controllerStatus ?? null) ||
+       audit.terminal.stopReason !== (status.stopReason ?? null))) {
+    return {status: "UNKNOWN", reason: "observation audit does not match the durable terminal run state"};
+  }
+  if (audit?.state === "TERMINAL" && !hasTerminalMarker) {
+    return {
+      status: "UNKNOWN",
+      runStatus: status.status,
+      observationAudit: audit,
+      reason: "durable terminal marker is unavailable; observation audit may be incomplete",
+      text: `## Operator report unavailable\nThe run has no durable terminal marker; the following run/config-bound snapshot is diagnostics only and may be incomplete.\n\n${renderObservationAudit(audit)}`
+    };
+  }
+  if (status.observationAuditStatus === "PERSISTED" && !audit) {
+    return {status: "UNKNOWN", reason: "terminal marker requires an observation audit that is unavailable"};
+  }
+  const reportFallback = reason => {
+    const auditText = audit
+      ? renderObservationAudit(audit)
+      : "No independently validated observation audit is available.";
+    const auditWarning = audit
+      ? "The following run/config-bound audit is independently validated and is diagnostics only; it does not replace the operator report."
+      : "No independently validated observation audit is available.";
+    const persistenceWarning = status.observationAuditStatus === "FAILED"
+      ? "\n\nFinal audit persistence failed; any retained artifact is the last successfully written snapshot and may be incomplete."
+      : "";
+    return {
+      status: "UNKNOWN",
+      runStatus: status.status,
+      observationAudit: audit,
+      reason,
+      text: `## Operator report unavailable\n${auditWarning}\n\n${auditText}${persistenceWarning}`
+    };
+  };
+  if (reportUnreadable) {
+    return reportFallback("The persisted operator report is unreadable");
+  }
+  if (reportMissing) {
+    if (status.observationAuditStatus === "FAILED") {
+      const lastSnapshot = audit
+        ? renderObservationAudit(audit)
+        : "No durable observation audit snapshot is available.";
+      return {
+        status: "UNKNOWN",
+        runStatus: status.status,
+        observationAudit: audit,
+        reason: "observation audit persistence failed; retained diagnostics may be incomplete",
+        text: `${lastSnapshot}\n\n## Bounded observation audit\nFinal persistence failed; any retained artifact is the last successfully written snapshot and may be incomplete.`
+      };
+    }
+    if (audit) {
+      return {
+        status: "AUDIT_ONLY",
+        runStatus: status.status,
+        observationAudit: audit,
+        text: renderObservationAudit(audit)
+      };
+    }
+    return {
+      status: status.observationAuditStatus === "FAILED" ? "UNKNOWN" : "BLOCKED",
+      runStatus: status.status,
+      reason: status.observationAuditStatus === "FAILED"
+        ? "observation audit persistence failed; no diagnostic artifact is available"
+        : "no durable operator report or observation audit exists"
+    };
+  }
+  let reportValid = false;
+  try {
+    const accounting = report?.observation?.providerAccounting;
+    reportValid = report?.runId === status.runId && report.configHash === status.configHash &&
+      isRecord(report.dto?.experiment) &&
+      report.dto.experiment.source === "READ_ONLY_PAPER_CHECKPOINT" &&
+      report.dto.experiment.evidenceKind === "READ_ONLY_PAPER_CHECKPOINT_RECEIPTS" &&
+      report.dto.experiment.sourceProvenance === "CALLER_LABEL_ONLY_NOT_AUTHENTICATED" &&
+      isRecord(accounting) && isRecord(status.providerAccounting) &&
+      canonicalJson(accounting) === canonicalJson(status.providerAccounting) &&
+      report.observation.entryAuthorizations === 0 &&
+      report.observation.simulatedFills === 0 &&
+      report.observation.executableQuoteAndCostEvidence === "UNAVAILABLE";
+  } catch {
+    reportValid = false;
+  }
+  if (!reportValid) {
+    return reportFallback("The persisted operator report is malformed or fails its provenance and identity contract");
+  }
+  if (status.observationAuditStatus === "FAILED") {
+    const auditText = audit
+      ? renderObservationAudit(audit)
+      : "No durable observation audit snapshot is available.";
+    return {
+      status: "UNKNOWN",
+      runStatus: status.status,
+      report: report.dto,
+      observationAudit: audit,
+      reason: "observation audit persistence failed; retained diagnostics may be incomplete",
+      text: `${report.text}\n\n${auditText}\n\n## Bounded observation audit\nFinal persistence failed; any retained artifact is the last successfully written snapshot and may be incomplete.`
+    };
+  }
+  const text = audit ? `${report.text}\n\n${renderObservationAudit(audit)}` : report.text;
   return {
     status: "AVAILABLE",
     runStatus: status.status,
     report: report.dto,
     observation: report.observation,
-    text: report.text
+    observationAudit: audit,
+    text
   };
 }
 
@@ -409,18 +527,21 @@ function addCounters(totals, counters, budgets) {
       counters.events !== counters.requests || counters.reservedBytes !== 0) {
     throw new Error("provider request accounting is incomplete or inconsistent");
   }
-  totals.requests += counters.requests;
-  totals.bytes += counters.bytes;
-  totals.providerEvents += counters.events;
-  totals.dexRequests += counters.byProvider.dex;
-  totals.rpcRequests += counters.byProvider.rpc;
+  const next = {
+    requests: totals.requests + counters.requests,
+    bytes: totals.bytes + counters.bytes,
+    providerEvents: totals.providerEvents + counters.events,
+    dexRequests: totals.dexRequests + counters.byProvider.dex,
+    rpcRequests: totals.rpcRequests + counters.byProvider.rpc
+  };
   for (const [key, limit] of [
     ["requests", budgets.requests], ["bytes", budgets.bytes],
     ["providerEvents", budgets.providerEvents], ["dexRequests", budgets.dexRequests],
     ["rpcRequests", budgets.rpcRequests]
   ]) {
-    if (totals[key] > limit) throw new Error(`cumulative ${key} budget exceeded`);
+    if (next[key] > limit) throw new Error(`cumulative ${key} budget exceeded`);
   }
+  Object.assign(totals, next);
 }
 
 function makeInvocationManifest(config, totals, candidateCount) {
@@ -618,6 +739,9 @@ export function createPilotOnline(options = {}) {
     let reportStatus = "BLOCKED";
     let reportTradingStatus = "UNKNOWN";
     let failureCode = null;
+    let audit = null;
+    let auditPersistenceStatus = "NOT_STARTED";
+    let auditFailureCode = null;
     let callbackWorkUnsettled = false;
     const callbackWork = new Set();
     let configHash = null;
@@ -657,6 +781,22 @@ export function createPilotOnline(options = {}) {
         () => callbackWork.delete(task)
       );
       return task;
+    };
+    const persistAudit = async () => {
+      if (!audit || auditPersistenceStatus === "FAILED") return false;
+      audit.setProviderAccounting(totals);
+      try {
+        await persistObservationAudit(paths.observationAudit, audit);
+        auditPersistenceStatus = "PERSISTED";
+        return true;
+      } catch {
+        auditPersistenceStatus = "FAILED";
+        auditFailureCode = "OBSERVATION_AUDIT_WRITE_FAILED";
+        failureCode ??= auditFailureCode;
+        observations.failureCode = failureCode;
+        reportStatus = "UNKNOWN";
+        return false;
+      }
     };
     const settleCallbackWork = () => {
       if (callbackWork.size === 0) return Promise.resolve(true);
@@ -770,6 +910,17 @@ export function createPilotOnline(options = {}) {
       if (!Array.isArray(initialPositions) || initialPositions.length !== 0) {
         throw new Error("new one-shot run has unresolved prior positions; recovery is blocked");
       }
+      audit = createObservationAudit({
+        runId: config.runId,
+        configHash,
+        maxRequests: config.budgets.requests,
+        maxCandidates: config.budgets.candidates
+      });
+      if (!(await persistAudit())) {
+        throw Object.assign(new Error("bounded observation audit could not be persisted"), {
+          code: auditFailureCode
+        });
+      }
 
       const callbacks = {
         async acquire({cycleIndex, remainingRequests, remainingEvents, signal}) {
@@ -813,6 +964,7 @@ export function createPilotOnline(options = {}) {
             freshnessPolicy: assembly.freshnessPolicy,
             requestTimeoutMs: config.budgets.requestTimeoutMs
           });
+          audit.recordProviderEvents(result?.events, cycleIndex);
           addCounters(totals, result?.counters, config.budgets);
           if (totals.candidates + (result?.candidates?.length ?? 0) > config.budgets.candidates ||
               (result?.candidates?.length ?? 0) > remainingEvents ||
@@ -834,6 +986,11 @@ export function createPilotOnline(options = {}) {
             return {kind: "READ_ONLY_OBSERVATION", candidate};
           });
           totals.candidates += events.length;
+          if (!(await persistAudit())) {
+            throw Object.assign(new Error("bounded observation audit could not be persisted"), {
+              code: auditFailureCode
+            });
+          }
           return {
             events,
             requestsUsed: result.counters.requests,
@@ -841,7 +998,7 @@ export function createPilotOnline(options = {}) {
             evidenceSource: "READ_ONLY_PROVIDER_CALLBACK"
           };
         },
-        async step({event, signal}) {
+        async step({cycleIndex, event, signal}) {
           if (signal?.aborted || event?.kind !== "READ_ONLY_OBSERVATION" ||
               !isRecord(event.candidate)) {
             throw new Error("read-only observation step is invalid or cancelled");
@@ -859,6 +1016,12 @@ export function createPilotOnline(options = {}) {
             ? analysis.status : "UNKNOWN";
           observations.filterOutcomes[filterStatus] += 1;
           observations.analysisOutcomes[analysisStatus] += 1;
+          audit.recordCandidate(event.candidate, filters, analysis, cycleIndex);
+          if (!(await persistAudit())) {
+            throw Object.assign(new Error("bounded observation audit could not be persisted"), {
+              code: auditFailureCode
+            });
+          }
           const positions = session.snapshot().summary.openPositions;
           return Array.isArray(positions) ? {unresolvedPositions: positions} : {};
         },
@@ -1074,8 +1237,19 @@ export function createPilotOnline(options = {}) {
       }
     }
     if (lockCreated) {
-      const terminalStatus = failureCode || controllerSummary?.status !== "FINISHED"
+      let terminalStatus = failureCode || controllerSummary?.status !== "FINISHED"
         ? "UNKNOWN" : "FINISHED";
+      if (audit) {
+        audit.setTerminal({
+          runStatus: terminalStatus,
+          controllerStatus: controllerSummary?.status ?? null,
+          stopReason: controllerSummary?.reason ?? null,
+          failureCode: failureCode ?? controllerSummary?.failureCode ?? null
+        });
+        await persistAudit();
+        terminalStatus = failureCode || controllerSummary?.status !== "FINISHED"
+          ? "UNKNOWN" : "FINISHED";
+      }
       try {
         await writeExclusive(paths.terminal, {
           version: 1,
@@ -1089,6 +1263,8 @@ export function createPilotOnline(options = {}) {
           reportTradingStatus,
           providerAccounting: totals,
           observation: observations,
+          observationAuditStatus: auditPersistenceStatus,
+          observationAuditFailureCode: auditFailureCode,
           observationOnly: true,
           executionStarted: false,
           terminalAt: readWallClock()

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import {mkdirSync, unlinkSync} from "node:fs";
 import {mkdtemp, mkdir, readFile, rm, writeFile} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -20,6 +21,7 @@ import {
   FIXTURE_RUN_ID,
   FIXTURE_START
 } from "./fixtures/memecoin-paper-pilot-online/generate.mjs";
+import {createObservationFixture} from "./fixtures/memecoin-paper-observation-audit/generate.mjs";
 
 async function createHarness(t, {
   config: configOptions,
@@ -123,17 +125,101 @@ test("bounded online composition produces only a receipt-bound no-entry report",
   assert.equal(projectedInput.snapshot.summary.cashCents, "100000");
   assert.deepEqual(projectedInput.snapshot.summary.openPositions, []);
   assert.equal("summary" in projectedInput, false);
-  assert.equal(await readPilotStatus(harness.dataDirectory).then(value => value.status), "FINISHED");
+  const status = await readPilotStatus(harness.dataDirectory);
+  assert.equal(status.status, "FINISHED");
+  assert.equal(status.observationAuditStatus, "PERSISTED");
   const report = await readPilotReport(harness.dataDirectory);
   assert.equal(report.status, "AVAILABLE");
+  assert.equal(report.runStatus, "FINISHED");
+  assert.equal(report.observationAudit.state, "TERMINAL");
   assert.equal(report.report.trading.status, "NO_ENTRY_OBSERVED");
   assert.equal(report.observation.filterOutcomes.UNKNOWN, 1);
   assert.equal(report.observation.entryAuthorizations, 0);
+  assert.equal(report.observationAudit.summary.candidates.filterOutcomes.UNKNOWN, 1);
+  assert.equal(report.observationAudit.records.providerRequests[0].status, "RECEIVED");
+  assert.match(report.text, /Bounded observation audit/);
   assert.match(report.text, /Observation only/);
   assert.match(report.text, /Executable quote and validated cost evidence: UNAVAILABLE/);
   const checkpoint = JSON.parse(await readFile(path.join(harness.dataDirectory, "checkpoint", "checkpoint.json"), "utf8"));
   assert.equal(checkpoint.sequence, 2);
   assert.equal(checkpoint.records.at(-1).method, "finishRun");
+});
+
+test("audit terminal preserves a controller failure code omitted from local failure state", async t => {
+  const harness = await createHarness(t, {
+    fakeAssemblyOptions: {summaryFailureCode: "MONOTONIC_CLOCK_INVALID"}
+  });
+
+  const terminal = await harness.runner.start();
+  const audit = JSON.parse(await readFile(
+    path.join(harness.dataDirectory, "observation-audit.json"), "utf8"
+  ));
+
+  assert.equal(terminal.observation.failureCode, "MONOTONIC_CLOCK_INVALID");
+  assert.equal(audit.terminal.failureCode, "MONOTONIC_CLOCK_INVALID");
+});
+
+test("generated 159-candidate observation persists every blocked reason without ledger entries", async t => {
+  const fixture = createObservationFixture(159);
+  const harness = await createHarness(t, {
+    config: {
+      candidates: fixture.candidates,
+      budgets: {
+        requests: fixture.accounting.requests,
+        dexRequests: fixture.accounting.dexRequests,
+        rpcRequests: fixture.accounting.rpcRequests,
+        bytes: fixture.accounting.bytes,
+        providerEvents: fixture.accounting.providerEvents,
+        candidates: fixture.accounting.candidates,
+        events: fixture.accounting.candidates
+      }
+    },
+    fakeAssemblyOptions: {
+      resultFactory(candidates) {
+        return {
+          status: "ACQUISITION_FINISHED",
+          events: fixture.providerEvents,
+          candidates: candidates.map(identity => ({
+            candidate: {
+              ...identity,
+              source: "DexScreener public API",
+              sampledAt: FIXTURE_START + 1_000,
+              evidence: {}
+            },
+            identityStatus: "BOUND_TO_REQUEST",
+            coverage: {pair: "UNKNOWN", tokenSupply: "UNKNOWN"}
+          })),
+          counters: {
+            requests: fixture.accounting.requests,
+            bytes: fixture.accounting.bytes,
+            events: fixture.accounting.providerEvents,
+            reservedBytes: 0,
+            byProvider: {
+              dex: fixture.accounting.dexRequests,
+              rpc: fixture.accounting.rpcRequests
+            }
+          }
+        };
+      }
+    }
+  });
+  const terminal = await harness.runner.start();
+  const report = await readPilotReport(harness.dataDirectory);
+  const audit = JSON.parse(await readFile(path.join(harness.dataDirectory, "observation-audit.json"), "utf8"));
+
+  assert.equal(terminal.status, "FINISHED");
+  assert.equal(report.status, "AVAILABLE");
+  assert.equal(audit.records.candidates.length, 159);
+  assert.equal(audit.summary.candidates.filterOutcomes.UNKNOWN, 159);
+  assert.equal(audit.summary.candidates.analystOutcomes.BLOCKED, 159);
+  assert.equal(audit.summary.requests.successful, 318);
+  assert.equal(audit.summary.requests.failed, 318);
+  assert.equal(audit.summary.requests.totalsReconciled, true);
+  assert.equal(audit.summary.candidates.totalsReconciled, true);
+  assert.ok(audit.records.candidates.every(item =>
+    item.filter.checks.some(check => check.reason === "required evidence missing")));
+  const checkpoint = JSON.parse(await readFile(path.join(harness.dataDirectory, "checkpoint", "checkpoint.json"), "utf8"));
+  assert.deepEqual(checkpoint.records.map(item => item.method), ["constructor", "riskSnapshot", "finishRun"]);
 });
 
 test("provider, request, event, and candidate budgets accumulate across cycles", async t => {
@@ -185,6 +271,11 @@ test("operator stop is durable and ends one run without enabling restart", async
   const terminal = await running;
   assert.equal(terminal.status, "FINISHED");
   assert.equal(terminal.stopReason, "OPERATOR_STOP");
+  const audit = JSON.parse(await readFile(
+    path.join(harness.dataDirectory, "observation-audit.json"), "utf8"
+  ));
+  assert.equal(audit.terminal.stopReason, "OPERATOR_STOP");
+  assert.equal(audit.terminal.failureCode, null);
   const repeat = await requestPilotStop(harness.dataDirectory);
   assert.equal(repeat.status, "ALREADY_TERMINAL");
   const secondRunner = createPilotOnline({
@@ -194,8 +285,187 @@ test("operator stop is durable and ends one run without enabling restart", async
     assembly: harness.assembly,
     wallClock: () => FIXTURE_START + 1_000
   });
+
   await assert.rejects(secondRunner.start(), /persistent run state already exists/);
   assert.equal(harness.calls.provider, 1);
+});
+
+test("audit persistence failure is reported as UNKNOWN and does not claim successful diagnostics", async t => {
+  let auditPath;
+  const fixture = createObservationFixture(1);
+  const harness = await createHarness(t, {
+    fakeAssemblyOptions: {
+      maxCycles: 4,
+      onStep() {
+        if (!auditPath) return;
+        unlinkSync(auditPath);
+        mkdirSync(auditPath);
+      },
+      resultFactory(candidates) {
+        return {
+          status: "ACQUISITION_FINISHED",
+          events: fixture.providerEvents.slice(0, 4),
+          candidates: candidates.map(identity => ({
+            candidate: {
+              ...identity,
+              source: "DexScreener public API",
+              sampledAt: FIXTURE_START + 1_000,
+              evidence: {}
+            },
+            identityStatus: "BOUND_TO_REQUEST"
+          })),
+          counters: {
+            requests: 4, bytes: 32, events: 4, reservedBytes: 0,
+            byProvider: {dex: 1, rpc: 3}
+          }
+        };
+      }
+    }
+  });
+  auditPath = path.join(harness.dataDirectory, "observation-audit.json");
+
+  const terminal = await harness.runner.start();
+  assert.equal(terminal.status, "UNKNOWN");
+  assert.equal(terminal.failureCode, "OBSERVATION_AUDIT_WRITE_FAILED");
+  assert.equal(terminal.observationAuditStatus, "FAILED");
+  assert.equal(terminal.observationAuditFailureCode, "OBSERVATION_AUDIT_WRITE_FAILED");
+  assert.equal((await readPilotReport(harness.dataDirectory)).status, "UNKNOWN");
+});
+
+test("failed terminal audit update exposes an earlier snapshot as incomplete, never audit-only success", async t => {
+  const harness = await createHarness(t);
+  assert.equal((await harness.runner.start()).status, "FINISHED");
+  const auditPath = path.join(harness.dataDirectory, "observation-audit.json");
+  const terminalPath = path.join(harness.dataDirectory, "terminal.json");
+  const audit = JSON.parse(await readFile(auditPath, "utf8"));
+  const terminal = JSON.parse(await readFile(terminalPath, "utf8"));
+  audit.state = "RUNNING";
+  audit.terminal = null;
+  terminal.status = "UNKNOWN";
+  terminal.failureCode = "OBSERVATION_AUDIT_WRITE_FAILED";
+  terminal.observationAuditStatus = "FAILED";
+  terminal.observationAuditFailureCode = "OBSERVATION_AUDIT_WRITE_FAILED";
+  await writeFile(auditPath, canonicalJson(audit));
+  await writeFile(terminalPath, canonicalJson(terminal));
+
+  const report = await readPilotReport(harness.dataDirectory);
+  assert.equal(report.status, "UNKNOWN");
+  assert.equal(report.observationAudit.state, "RUNNING");
+  assert.match(report.text, /last successfully written snapshot and may be incomplete/);
+});
+
+test("malformed check names and declared audit limits return structured UNKNOWN", async t => {
+  const harness = await createHarness(t);
+  assert.equal((await harness.runner.start()).status, "FINISHED");
+  const auditPath = path.join(harness.dataDirectory, "observation-audit.json");
+  const persisted = JSON.parse(await readFile(auditPath, "utf8"));
+  for (const mutate of [
+    audit => { audit.records.candidates[0].filter.checks[0].name = null; },
+    audit => { audit.bounds.maxProviderRequestRows = 1; },
+    audit => { audit.bounds.maxChecksPerCandidate = 1; },
+    audit => { audit.summary = null; },
+    audit => { audit.summary.requests.successful = {toString: null}; }
+  ]) {
+    const malformed = structuredClone(persisted);
+    mutate(malformed);
+    await writeFile(auditPath, canonicalJson(malformed));
+    const report = await readPilotReport(harness.dataDirectory);
+    assert.equal(report.status, "UNKNOWN");
+    assert.match(report.reason, /schema or durable run identity contract/);
+  }
+});
+
+test("malformed persisted request status returns structured UNKNOWN", async t => {
+  const harness = await createHarness(t);
+  assert.equal((await harness.runner.start()).status, "FINISHED");
+  const auditPath = path.join(harness.dataDirectory, "observation-audit.json");
+  const audit = JSON.parse(await readFile(auditPath, "utf8"));
+  audit.records.providerRequests[0].status = {toString: null};
+  await writeFile(auditPath, canonicalJson(audit));
+
+  const report = await readPilotReport(harness.dataDirectory);
+  assert.equal(report.status, "UNKNOWN");
+  assert.match(report.reason, /schema or durable run identity contract/);
+});
+
+test("malformed persisted request diagnostics return structured UNKNOWN", async t => {
+  const harness = await createHarness(t);
+  assert.equal((await harness.runner.start()).status, "FINISHED");
+  const auditPath = path.join(harness.dataDirectory, "observation-audit.json");
+  const audit = JSON.parse(await readFile(auditPath, "utf8"));
+  audit.records.providerRequests[0].reason = {toString: null};
+  await writeFile(auditPath, canonicalJson(audit));
+
+  const report = await readPilotReport(harness.dataDirectory);
+  assert.equal(report.status, "UNKNOWN");
+  assert.match(report.reason, /schema or durable run identity contract/);
+});
+
+test("malformed terminal audit fields return structured UNKNOWN from report reads", async t => {
+  const harness = await createHarness(t);
+  assert.equal((await harness.runner.start()).status, "FINISHED");
+  const auditPath = path.join(harness.dataDirectory, "observation-audit.json");
+  const persisted = JSON.parse(await readFile(auditPath, "utf8"));
+  for (const field of ["runStatus", "controllerStatus", "stopReason", "failureCode"]) {
+    const audit = structuredClone(persisted);
+    audit.terminal[field] = {toString: null};
+    await writeFile(auditPath, canonicalJson(audit));
+
+    const report = await readPilotReport(harness.dataDirectory);
+    assert.equal(report.status, "UNKNOWN");
+    assert.match(report.reason, /schema or durable run identity contract/);
+  }
+});
+
+test("persisted terminal audits must match durable terminal state", async t => {
+  for (const mutateAudit of [
+    audit => {
+      audit.state = "RUNNING";
+      audit.terminal = null;
+    },
+    audit => {
+      audit.terminal.runStatus = "UNKNOWN";
+    }
+  ]) {
+    const harness = await createHarness(t);
+    assert.equal((await harness.runner.start()).status, "FINISHED");
+    const auditPath = path.join(harness.dataDirectory, "observation-audit.json");
+    const audit = JSON.parse(await readFile(auditPath, "utf8"));
+    mutateAudit(audit);
+    await writeFile(auditPath, canonicalJson(audit));
+
+    const report = await readPilotReport(harness.dataDirectory);
+    assert.equal(report.status, "UNKNOWN");
+    assert.match(report.reason, /does not match the durable terminal run state/);
+  }
+});
+
+test("missing durable terminal marker cannot present an audit as complete", async t => {
+  const harness = await createHarness(t);
+  assert.equal((await harness.runner.start()).status, "FINISHED");
+  unlinkSync(path.join(harness.dataDirectory, "terminal.json"));
+
+  const report = await readPilotReport(harness.dataDirectory);
+  assert.equal(report.status, "UNKNOWN");
+  assert.equal(report.runStatus, "UNKNOWN");
+  assert.equal(report.observationAudit.state, "TERMINAL");
+  assert.match(report.reason, /terminal marker is unavailable/);
+  assert.match(report.text, /snapshot is diagnostics only and may be incomplete/);
+});
+
+test("unreadable operator report retains and warns about independently validated audit", async t => {
+  const harness = await createHarness(t);
+  assert.equal((await harness.runner.start()).status, "FINISHED");
+  const reportPath = path.join(harness.dataDirectory, "operator-report.json");
+  for (const content of ["{malformed", "{}", "null"]) {
+    await writeFile(reportPath, content);
+    const report = await readPilotReport(harness.dataDirectory);
+    assert.equal(report.status, "UNKNOWN");
+    assert.equal(report.observationAudit.runId, FIXTURE_RUN_ID);
+    assert.match(report.text, /Operator report unavailable/);
+    assert.match(report.text, /run\/config-bound audit is independently validated/);
+    assert.match(report.text, /Provider requests:/);
+  }
 });
 
 test("ambiguous checkpoint readback is terminal UNKNOWN and never retried", async t => {
