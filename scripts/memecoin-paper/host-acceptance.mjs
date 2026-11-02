@@ -47,9 +47,15 @@ function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
+function hostAcceptanceError(code, message) {
+  const error = new Error(message);
+  error.code = `HOST_ACCEPTANCE_${code}`;
+  return error;
+}
+
 function assertEvidenceId(value) {
   if (typeof value !== "string" || !SAFE_ID.test(value) || value.includes("..")) {
-    throw new TypeError("evidence ID must be a safe, unique path component");
+    throw hostAcceptanceError("EVIDENCE_ID_INVALID", "evidence ID must be a safe, unique path component");
   }
   return value;
 }
@@ -96,7 +102,7 @@ async function writeAtomicNew(directory, filename, bytes) {
 function verifyCandidate({mint, pool, quote}) {
   if (![mint, pool, quote].every(value =>
     typeof value === "string" && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value))) {
-    throw new TypeError("explicit Solana mint, pool, and quote identities are required");
+    throw hostAcceptanceError("CANDIDATE_INVALID", "explicit Solana mint, pool, and quote identities are required");
   }
   return {chainId: "solana", mint, pool, quote};
 }
@@ -148,13 +154,23 @@ function clockObservation(wallStart, wallEnd, monotonicStart, monotonicEnd) {
 async function verifyMountRoot(mountRoot) {
   if (typeof mountRoot !== "string" || !path.isAbsolute(mountRoot) ||
       path.resolve(mountRoot) !== mountRoot) {
-    throw new TypeError("mount root must be an absolute normalized path");
+    throw hostAcceptanceError("MOUNT_ROOT_INVALID", "mount root must be an absolute normalized path");
   }
-  const info = await lstat(mountRoot);
+  let info;
+  try {
+    info = await lstat(mountRoot);
+  } catch {
+    throw hostAcceptanceError("MOUNT_ROOT_UNAVAILABLE", "physical mount root is unavailable");
+  }
   if (!info.isDirectory() || info.isSymbolicLink() || await realpath(mountRoot) !== mountRoot) {
-    throw new Error("configured volume root must be a real, non-symlink directory");
+    throw hostAcceptanceError("MOUNT_ROOT_UNSAFE", "configured physical mount root must be a real, non-symlink directory");
   }
-  const parentInfo = await stat(path.dirname(mountRoot));
+  let parentInfo;
+  try {
+    parentInfo = await stat(path.dirname(mountRoot));
+  } catch {
+    throw hostAcceptanceError("MOUNT_ANCESTRY_UNAVAILABLE", "physical mount root ancestry is unavailable");
+  }
   return {
     info,
     sameDeviceAsParent: info.dev === parentInfo.dev
@@ -172,16 +188,21 @@ export async function verifyOwnedDataRoot({
   const mountInfo = await lstatPath(mountRoot);
   if (!mountInfo.isDirectory() || mountInfo.isSymbolicLink() ||
       await realpathPath(mountRoot) !== mountRoot) {
-    throw new Error("configured volume root must be a real, non-symlink directory");
+    throw hostAcceptanceError("MOUNT_ROOT_UNSAFE", "configured physical mount root must be a real, non-symlink directory");
   }
   const dataInfo = await lstatPath(dataRoot);
   if (!dataInfo.isDirectory() || dataInfo.isSymbolicLink() ||
-      dataInfo.uid !== runtimeUid || (dataInfo.mode & 0o022) !== 0 ||
       await realpathPath(dataRoot) !== dataRoot) {
-    throw new Error("private data root must be a real, non-symlink directory owned by the runtime UID");
+    throw hostAcceptanceError("DATA_ROOT_UNSAFE", "private data root must be a real, non-symlink directory");
+  }
+  if (dataInfo.uid !== runtimeUid) {
+    throw hostAcceptanceError("DATA_ROOT_OWNER_MISMATCH", "private data root must be owned by the runtime UID");
+  }
+  if ((dataInfo.mode & 0o022) !== 0) {
+    throw hostAcceptanceError("DATA_ROOT_PERMISSIONS", "private data root must not be group/world writable");
   }
   if (dataInfo.dev !== mountInfo.dev) {
-    throw new Error("private data root must be on the physical mount root device");
+    throw hostAcceptanceError("DATA_ROOT_DEVICE_MISMATCH", "private data root must be on the physical mount root device");
   }
   return {mountInfo, info: dataInfo, sameDeviceAsMountRoot: true};
 }
@@ -193,7 +214,10 @@ function assertPrivateDataRootPath(mountRoot, dataRoot) {
       path.resolve(dataRoot) !== dataRoot || path.dirname(dataRoot) !== mountRoot ||
       !SAFE_DATA_ROOT_NAME.test(path.basename(dataRoot)) ||
       path.basename(dataRoot) === EVIDENCE_ROOT_NAME) {
-    throw new TypeError("private data root must be one safe direct child of the physical mount root");
+    throw hostAcceptanceError(
+      "DATA_ROOT_INVALID",
+      "private data root must be one safe direct child of the physical mount root"
+    );
   }
 }
 
@@ -202,7 +226,10 @@ async function verifyEvidenceDirectory(directory, runtimeUid, device, descriptio
   if (!info.isDirectory() || info.isSymbolicLink() || info.uid !== runtimeUid ||
       (info.mode & 0o022) !== 0 || info.dev !== device ||
       await realpath(directory) !== directory) {
-    throw new Error(`${description} must be a real, private runtime-owned directory on the data-root device`);
+    throw hostAcceptanceError(
+      "EVIDENCE_DIRECTORY_UNSAFE",
+      `${description} must be a real, private runtime-owned directory on the data-root device`
+    );
   }
   return info;
 }
@@ -356,17 +383,24 @@ export async function runHostAcceptance({
   monotonicClock = () => performance.now()
 } = {}) {
   if (mode !== "HOST_ACCEPTANCE_ONLY" || providerPreflight !== true) {
-    throw new TypeError("explicit HOST_ACCEPTANCE_ONLY mode and --provider-preflight are required");
+    throw hostAcceptanceError(
+      "MODE_OR_PREFLIGHT_REQUIRED",
+      "explicit HOST_ACCEPTANCE_ONLY mode and --provider-preflight are required"
+    );
   }
   evidenceId = assertEvidenceId(evidenceId);
   const candidate = verifyCandidate(candidateInput ?? {});
   const candidateHash = sha256(Buffer.from(canonicalJson(candidate), "utf8"));
   const actualUid = typeof process.getuid === "function" ? process.getuid() : null;
   if (actualUid === 0 || !Number.isInteger(runtimeUid) || runtimeUid !== actualUid) {
+    const failureCode = actualUid === 0
+      ? "HOST_ACCEPTANCE_PRIVILEGED_RUNTIME"
+      : "HOST_ACCEPTANCE_RUNTIME_UID_MISMATCH";
     return {
       status: "BLOCKED",
       scope: "HOST_ACCEPTANCE_ONLY",
       reason: "host acceptance requires the actual unprivileged process UID",
+      failureCode,
       runtimeUid,
       pilotStarted: false,
       runtimeAuthorization: false,
@@ -375,13 +409,14 @@ export async function runHostAcceptance({
       clockProvenance: "UNVERIFIED"
     };
   }
-  const mount = await verifyMountRoot(mountRoot);
   assertPrivateDataRootPath(mountRoot, dataRoot);
+  const mount = await verifyMountRoot(mountRoot);
   if (await legacyEvidenceExists(mountRoot)) {
     return {
       status: "BLOCKED",
       scope: "HOST_ACCEPTANCE_ONLY",
       reason: "legacy evidence at the physical mount root is preserved; private data-root layout is required",
+      failureCode: "HOST_ACCEPTANCE_LEGACY_EVIDENCE_PRESENT",
       runtimeUid,
       expectedMountPath: mountRoot,
       dataRoot,
@@ -404,6 +439,7 @@ export async function runHostAcceptance({
         status: "BLOCKED",
         scope: "HOST_ACCEPTANCE_ONLY",
         reason: "private runtime-owned data root could not be created",
+        failureCode: "HOST_ACCEPTANCE_DATA_ROOT_CREATE_FAILED",
         runtimeUid,
         expectedMountPath: mountRoot,
         dataRoot,
@@ -418,11 +454,14 @@ export async function runHostAcceptance({
   let ownedDataRoot;
   try {
     ownedDataRoot = await verifyOwnedDataRoot({mountRoot, dataRoot, runtimeUid});
-  } catch {
+  } catch (error) {
     return {
       status: "BLOCKED",
       scope: "HOST_ACCEPTANCE_ONLY",
       reason: "private data root is not safe, same-device, and owned by the actual runtime UID",
+      failureCode: error.code?.startsWith("HOST_ACCEPTANCE_")
+        ? error.code
+        : "HOST_ACCEPTANCE_DATA_ROOT_UNSAFE",
       runtimeUid,
       runtimeGid,
       volumeRootUid: mount.info.uid,
@@ -442,37 +481,101 @@ export async function runHostAcceptance({
     await mkdir(evidenceParent, {mode: 0o700});
     await syncDirectory(dataRoot);
   } catch (error) {
-    if (error.code !== "EEXIST") throw error;
+    if (error.code !== "EEXIST") {
+      return {
+        status: "BLOCKED",
+        scope: "HOST_ACCEPTANCE_ONLY",
+        evidenceId,
+        reason: "private host acceptance directory could not be created",
+        failureCode: "HOST_ACCEPTANCE_EVIDENCE_PARENT_CREATE_FAILED",
+        providerRequests: 0,
+        pilotStarted: false,
+        runtimeAuthorization: false,
+        hostDurability: "NOT_VERIFIED",
+        clockProvenance: "UNVERIFIED"
+      };
+    }
   }
-  await verifyEvidenceDirectory(
-    evidenceParent, runtimeUid, ownedDataRoot.info.dev, "host acceptance parent"
-  );
+  try {
+    await verifyEvidenceDirectory(
+      evidenceParent, runtimeUid, ownedDataRoot.info.dev, "host acceptance parent"
+    );
+  } catch (error) {
+    return {
+      status: "BLOCKED",
+      scope: "HOST_ACCEPTANCE_ONLY",
+      evidenceId,
+      reason: "host acceptance parent is unsafe",
+      failureCode: error.code?.startsWith("HOST_ACCEPTANCE_")
+        ? error.code
+        : "HOST_ACCEPTANCE_EVIDENCE_DIRECTORY_UNSAFE",
+      providerRequests: 0,
+      pilotStarted: false,
+      runtimeAuthorization: false,
+      hostDurability: "NOT_VERIFIED",
+      clockProvenance: "UNVERIFIED"
+    };
+  }
 
+  let existingEvidence = false;
   try {
     await mkdir(evidenceDirectory, {mode: 0o700});
+  } catch (error) {
+    if (error.code === "EEXIST") {
+      existingEvidence = true;
+    } else {
+      return {
+        status: "BLOCKED",
+        scope: "HOST_ACCEPTANCE_ONLY",
+        evidenceId,
+        reason: "new evidence directory could not be created",
+        failureCode: "HOST_ACCEPTANCE_EVIDENCE_DIRECTORY_CREATE_FAILED",
+        providerRequests: 0,
+        pilotStarted: false,
+        runtimeAuthorization: false,
+        hostDurability: "NOT_VERIFIED",
+        clockProvenance: "UNVERIFIED"
+      };
+    }
+  }
+  if (existingEvidence) {
+    try {
+      return await verifyExisting(evidenceDirectory, evidenceId, candidateHash, runtimeUid, dataRoot);
+    } catch {
+      return {
+        status: "UNKNOWN",
+        scope: "HOST_ACCEPTANCE_ONLY",
+        evidenceId,
+        reason: "existing host acceptance evidence is incomplete or invalid; it was preserved",
+        failureCode: "HOST_ACCEPTANCE_EVIDENCE_UNKNOWN",
+        providerRequestsThisInvocation: 0,
+        pilotStarted: false,
+        runtimeAuthorization: false,
+        hostDurability: "NOT_VERIFIED",
+        clockProvenance: "UNVERIFIED"
+      };
+    }
+  }
+  try {
     await syncDirectory(evidenceParent);
     await verifyEvidenceDirectory(
       evidenceDirectory, runtimeUid, ownedDataRoot.info.dev, "new acceptance evidence directory"
     );
   } catch (error) {
-    if (error.code === "EEXIST") {
-      try {
-        return await verifyExisting(evidenceDirectory, evidenceId, candidateHash, runtimeUid, dataRoot);
-      } catch {
-        return {
-          status: "UNKNOWN",
-          scope: "HOST_ACCEPTANCE_ONLY",
-          evidenceId,
-          reason: "existing host acceptance evidence is incomplete or invalid; it was preserved",
-          providerRequestsThisInvocation: 0,
-          pilotStarted: false,
-          runtimeAuthorization: false,
-          hostDurability: "NOT_VERIFIED",
-          clockProvenance: "UNVERIFIED"
-        };
-      }
-    }
-    throw error;
+    return {
+      status: "UNKNOWN",
+      scope: "HOST_ACCEPTANCE_ONLY",
+      evidenceId,
+      reason: "new evidence directory did not pass its safety check",
+      failureCode: error.code?.startsWith("HOST_ACCEPTANCE_")
+        ? error.code
+        : "HOST_ACCEPTANCE_EVIDENCE_DIRECTORY_SYNC_FAILED",
+      providerRequestsThisInvocation: 0,
+      pilotStarted: false,
+      runtimeAuthorization: false,
+      hostDurability: "NOT_VERIFIED",
+      clockProvenance: "UNVERIFIED"
+    };
   }
 
   const wallStart = wallClock();
@@ -514,8 +617,8 @@ export async function runHostAcceptance({
         ? error.name.toUpperCase()
         : "FAILED";
     failureCode = probeSha256
-      ? `PROVIDER_PREFLIGHT_${failureType}`
-      : `VOLUME_PROBE_${failureType}`;
+      ? `HOST_ACCEPTANCE_PROVIDER_PREFLIGHT_${failureType}`
+      : `HOST_ACCEPTANCE_VOLUME_PROBE_${failureType}`;
     providerResult = {
       status: "UNKNOWN",
       requestCount: null,
@@ -568,6 +671,7 @@ export async function runHostAcceptance({
     return {
       ...payload,
       status: "UNKNOWN",
+      failureCode: "HOST_ACCEPTANCE_RESULT_WRITE_UNKNOWN",
       evidenceHash: null,
       evidencePreserved: true,
       resultReadback: "UNKNOWN"
@@ -578,7 +682,10 @@ export async function runHostAcceptance({
 
 function parseArguments(argv) {
   if (argv[0] !== "verify") {
-    throw new TypeError("explicit verify command required; this utility never starts the Paper pilot");
+    throw hostAcceptanceError(
+      "CLI_COMMAND_INVALID",
+      "explicit verify command required; this utility never starts the Paper pilot"
+    );
   }
   const values = {};
   for (let index = 1; index < argv.length; index += 1) {
@@ -586,13 +693,19 @@ function parseArguments(argv) {
     if (!["--evidence-id", "--mint", "--pool", "--quote", "--data-root", "--provider-preflight"].includes(key) ||
         Object.hasOwn(values, key) ||
         (key !== "--provider-preflight" && typeof argv[index + 1] !== "string")) {
-      throw new TypeError("expected unique required options and at most one optional --data-root");
+      throw hostAcceptanceError(
+        "CLI_ARGUMENTS_INVALID",
+        "expected unique required options and at most one optional --data-root"
+      );
     }
     values[key] = key === "--provider-preflight" ? true : argv[++index];
   }
   if (!values["--provider-preflight"] || !values["--evidence-id"] ||
       !values["--mint"] || !values["--pool"] || !values["--quote"]) {
-    throw new TypeError("verify requires --evidence-id, --mint, --pool, --quote, and --provider-preflight");
+    throw hostAcceptanceError(
+      "CLI_ARGUMENTS_INVALID",
+      "verify requires --evidence-id, --mint, --pool, --quote, and --provider-preflight"
+    );
   }
   return values;
 }
@@ -613,15 +726,14 @@ export async function main(argv = process.argv.slice(2)) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   main().catch(error => {
-    const failureType = typeof error?.code === "string" && /^[A-Z0-9_]{1,32}$/.test(error.code)
+    const failureCode = typeof error?.code === "string" &&
+      /^HOST_ACCEPTANCE_[A-Z0-9_]{1,64}$/.test(error.code)
       ? error.code
-      : typeof error?.name === "string" && /^[A-Za-z]{1,24}$/.test(error.name)
-        ? error.name.toUpperCase()
-        : "FAILED";
+      : "HOST_ACCEPTANCE_FAILED";
     process.stdout.write(`${JSON.stringify({
       status: "UNKNOWN",
       scope: "HOST_ACCEPTANCE_ONLY",
-      failureCode: `HOST_ACCEPTANCE_${failureType}`,
+      failureCode,
       pilotStarted: false,
       runtimeAuthorization: false,
       hostDurability: "NOT_VERIFIED",

@@ -94,7 +94,7 @@ set Northflank CMD override to custom entrypoint + custom command:
 
 ```text
 Custom entrypoint: node
-Custom command: scripts/memecoin-paper/host-acceptance.mjs verify --evidence-id host-preflight-<UNIQUE_ID> --mint DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263 --pool 5zpyutJu9ee6jFymDGoK7F6S5Kczqtc9FomP3ueKuyA9 --quote So11111111111111111111111111111111111111112 --provider-preflight
+Custom command: scripts/memecoin-paper/host-acceptance.mjs verify --evidence-id host-preflight-<UNIQUE_ID> --mint DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263 --pool 5zpyutJu9ee6jFymDGoK7F6S5Kczqtc9FomP3ueKuyA9 --quote So11111111111111111111111111111111111111112 --data-root /var/data/meridian-paper/application-data --provider-preflight
 ```
 
 Use an evidence ID made only of letters, digits, `.`, `_`, and `-`, without
@@ -170,6 +170,74 @@ scripts/memecoin-paper/host-acceptance.mjs verify --evidence-id host-preflight-<
 It would issue at most four credential-free, fixed-endpoint public requests.
 It is a new online provider preflight, not a way to verify current run status;
 do not use it to inspect or interrupt the active one-shot run.
+
+### Host preflight provisioning, rollout, and rollback
+
+This is an operator plan for a separately authorized future check, not an
+instruction to change the current service. The command above is compatible with
+Northflank's custom entrypoint + custom command override: `node` is the
+entrypoint, and the complete script invocation is the command. Do not use a
+CMD-only override because `Dockerfile.paper` already supplies the pilot
+entrypoint. The CLI has no `--mount-root` option: the physical mount stays at
+`/var/data/meridian-paper`; only the bounded `--data-root` child is selectable.
+
+Provision and run it as a separate one-shot observer service/revision:
+
+1. First preserve the old service configuration, logs, mounted volume, and all
+   existing run/evidence paths. Confirm any active observation is terminal and
+   its terminal artifacts have been preserved. Do not update, restart, or
+   repoint that service.
+2. Build the reviewed source commit into an image and record its immutable
+   digest. In Northflank, create a separate one-shot service using that image,
+   keep the image's unprivileged `node` user, and attach a dedicated empty
+   volume at `/var/data/meridian-paper`. Do not attach the existing run volume
+   if it contains data that must remain untouched. Do not add credentials or
+   provider configuration.
+3. The mounted parent may be platform-owned (including UID 0), but it must let
+   the unprivileged process create the private child. A writable parent group
+   can permit `mkdir`; group ownership does not satisfy the child's required
+   runtime-UID ownership. The utility creates a missing `application-data`
+   child with mode `0700`. If the child is already present, it must already
+   satisfy runtime UID, non-symlink, non-group/world-writable, realpath, and
+   same-device checks. Do not run as root, run a privileged init, `chown`,
+   broaden permissions, or move old artifacts to make these checks pass. If
+   Northflank cannot provision an empty volume/path with these properties,
+   stop and leave the preflight unrun.
+4. Configure custom entrypoint `node` and the complete command above, replacing
+   `<UNIQUE_ID>` with a new, never-reused safe ID and using the specifically
+   approved candidate identities. Start only this one-shot service after
+   independent review, required CI, and operator authorization. Its provider
+   preflight is live public-data access, capped at four requests with no retry.
+5. Preserve the service output and volume artifacts. `PASS` is limited to this
+   host preflight; it does not activate or authorize the Paper pilot. A
+   same-ID restart is read-only and returns `RESTART_VERIFIED` with zero new
+   provider requests. Never rerun with the same ID after an `UNKNOWN` outcome.
+
+The CLI emits a JSON `failureCode` and exits `2` for non-success (success exits
+`0`). Stable preflight codes are:
+
+| `failureCode` | Meaning / operator action |
+|---|---|
+| `HOST_ACCEPTANCE_RUNTIME_UID_MISMATCH` | Configured UID differs from the process UID; preserve state and use the image's intended unprivileged user. |
+| `HOST_ACCEPTANCE_PRIVILEGED_RUNTIME` | Process is root; stop. The utility must not run as root. |
+| `HOST_ACCEPTANCE_MOUNT_ROOT_INVALID`, `HOST_ACCEPTANCE_MOUNT_ROOT_UNAVAILABLE`, `HOST_ACCEPTANCE_MOUNT_ROOT_UNSAFE`, `HOST_ACCEPTANCE_MOUNT_ANCESTRY_UNAVAILABLE` | Fixed physical mount path or its ancestry is absent/unsafe; correct Northflank mount configuration without modifying evidence. |
+| `HOST_ACCEPTANCE_DATA_ROOT_INVALID` | `--data-root` is not one safe direct child of the physical mount. |
+| `HOST_ACCEPTANCE_LEGACY_EVIDENCE_PRESENT` | Old evidence exists directly under the mount root; preserve it and use a separate empty volume/service rather than migrate it. |
+| `HOST_ACCEPTANCE_DATA_ROOT_CREATE_FAILED` | The runtime user could not create the private child; provision an appropriate new empty volume/path or stop. |
+| `HOST_ACCEPTANCE_DATA_ROOT_UNSAFE`, `HOST_ACCEPTANCE_DATA_ROOT_OWNER_MISMATCH`, `HOST_ACCEPTANCE_DATA_ROOT_PERMISSIONS`, `HOST_ACCEPTANCE_DATA_ROOT_DEVICE_MISMATCH` | Existing private child failed a safety gate; do not repair/chown it or continue. |
+| `HOST_ACCEPTANCE_EVIDENCE_PARENT_CREATE_FAILED`, `HOST_ACCEPTANCE_EVIDENCE_DIRECTORY_CREATE_FAILED`, `HOST_ACCEPTANCE_EVIDENCE_DIRECTORY_UNSAFE`, `HOST_ACCEPTANCE_EVIDENCE_DIRECTORY_SYNC_FAILED` | Acceptance evidence location failed its safety/create/sync check; leave any created files untouched and stop. |
+| `HOST_ACCEPTANCE_EVIDENCE_UNKNOWN` | Existing ID is incomplete, invalid, or mismatched; preserve it and do not retry/replay. |
+| `HOST_ACCEPTANCE_VOLUME_PROBE_<code>` | Probe creation/readback failed; treat request count as unknown and preserve evidence. |
+| `HOST_ACCEPTANCE_PROVIDER_PREFLIGHT_<code>` | Provider assembly failed after the probe; it is retained and must not be retried under that evidence ID. |
+| `HOST_ACCEPTANCE_RESULT_WRITE_UNKNOWN` | Final result could not be durably read back; preserve the probe and result directory as `UNKNOWN`. |
+| `HOST_ACCEPTANCE_CLI_COMMAND_INVALID`, `HOST_ACCEPTANCE_CLI_ARGUMENTS_INVALID`, `HOST_ACCEPTANCE_EVIDENCE_ID_INVALID`, `HOST_ACCEPTANCE_CANDIDATE_INVALID`, `HOST_ACCEPTANCE_MODE_OR_PREFLIGHT_REQUIRED` | Invocation is invalid; correct the command without reusing an evidence ID that may already have written files. |
+
+Rollback is limited to the isolated preflight service: stop/scale it to zero,
+restore that service's recorded image/entrypoint/command settings if needed, and
+keep its volume attached and preserved for review. Do not delete the volume,
+evidence, or logs. Leave the prior observer service and its volume/configuration
+unchanged. If any failure is ambiguous, keep artifacts intact, report
+`UNKNOWN`, and do not rerun or migrate them.
 
 ### Remaining evidence and retrieval handoff
 

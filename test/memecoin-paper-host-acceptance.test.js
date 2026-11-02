@@ -1,10 +1,15 @@
 import assert from "node:assert/strict";
+import {spawnSync} from "node:child_process";
 import test from "node:test";
 import {chmod, lstat, mkdir, mkdtemp, readFile, rm, symlink, writeFile} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import {fileURLToPath} from "node:url";
 import {runHostAcceptance, verifyOwnedDataRoot} from "../scripts/memecoin-paper/host-acceptance.mjs";
 
+const HOST_ACCEPTANCE_PATH = fileURLToPath(
+  new URL("../scripts/memecoin-paper/host-acceptance.mjs", import.meta.url)
+);
 const IDENTITY = Object.freeze({
   chainId: "solana",
   mint: "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
@@ -66,8 +71,32 @@ test("host acceptance is explicit and imports do not create or start anything", 
   }), /explicit HOST_ACCEPTANCE_ONLY/);
 });
 
-test("bounded volume probe persists evidence and the same-ID restart never repeats providers", async t => {
+test("root-owned mount and runtime-owned child pass temp-volume preflight; restart makes zero requests", async t => {
   const harness = await fixture(t);
+  await mkdir(harness.dataRoot, {mode: 0o700});
+  const runtimeUid = process.getuid();
+  const metadataLstat = async filename => {
+    const info = await lstat(filename);
+    if (filename !== harness.volume) return info;
+    return {
+      ...info,
+      uid: 0,
+      gid: 1000,
+      isDirectory: () => info.isDirectory(),
+      isSymbolicLink: () => info.isSymbolicLink()
+    };
+  };
+  const verified = await verifyOwnedDataRoot({
+    mountRoot: harness.volume,
+    dataRoot: harness.dataRoot,
+    runtimeUid,
+    lstatPath: metadataLstat
+  });
+  assert.equal(verified.mountInfo.uid, 0);
+  assert.equal(verified.mountInfo.gid, 1000);
+  assert.equal(verified.info.uid, runtimeUid);
+  assert.equal(verified.sameDeviceAsMountRoot, true);
+
   let acquisitions = 0;
   const assemblyLoader = async () => successfulAssembly(options => {
     acquisitions += 1;
@@ -92,6 +121,7 @@ test("bounded volume probe persists evidence and the same-ID restart never repea
   assert.equal(first.status, "PASS");
   assert.equal(first.scope, "HOST_ACCEPTANCE_ONLY");
   assert.equal(first.dataRoot, harness.dataRoot);
+  assert.equal(first.dataRootUid, runtimeUid);
   assert.equal(first.dataRootSameDeviceAsMountRoot, true);
   assert.equal(first.hostDurability, "NOT_VERIFIED");
   assert.equal(first.clockProvenance, "UNVERIFIED");
@@ -140,35 +170,9 @@ test("a runtime-UID ownership mismatch blocks writes and provider requests", asy
   });
   assert.equal(result.status, "BLOCKED");
   assert.equal(result.providerRequests, 0);
+  assert.equal(result.failureCode, "HOST_ACCEPTANCE_RUNTIME_UID_MISMATCH");
   assert.equal(result.runtimeUid, runtimeUid);
   assert.equal(acquisitions, 0);
-});
-
-test("root-owned physical mount metadata is distinct from the runtime-owned data root", async t => {
-  const harness = await fixture(t);
-  await mkdir(harness.dataRoot, {mode: 0o700});
-  const runtimeUid = process.getuid();
-  const metadataLstat = async filename => {
-    const info = await lstat(filename);
-    if (filename !== harness.volume) return info;
-    return {
-      ...info,
-      uid: 0,
-      gid: 1000,
-      isDirectory: () => info.isDirectory(),
-      isSymbolicLink: () => info.isSymbolicLink()
-    };
-  };
-  const verified = await verifyOwnedDataRoot({
-    mountRoot: harness.volume,
-    dataRoot: harness.dataRoot,
-    runtimeUid,
-    lstatPath: metadataLstat
-  });
-  assert.equal(verified.mountInfo.uid, 0);
-  assert.equal(verified.mountInfo.gid, 1000);
-  assert.equal(verified.info.uid, runtimeUid);
-  assert.equal(verified.sameDeviceAsMountRoot, true);
 });
 
 test("private data root rejects a non-runtime owner and a different device", async t => {
@@ -190,7 +194,7 @@ test("private data root rejects a non-runtime owner and a different device", asy
     dataRoot: harness.dataRoot,
     runtimeUid,
     lstatPath: mismatchLstat
-  }), /owned by the runtime UID/);
+  }), {code: "HOST_ACCEPTANCE_DATA_ROOT_OWNER_MISMATCH"});
 
   const differentDeviceLstat = async filename => {
     const info = await lstat(filename);
@@ -207,7 +211,7 @@ test("private data root rejects a non-runtime owner and a different device", asy
     dataRoot: harness.dataRoot,
     runtimeUid,
     lstatPath: differentDeviceLstat
-  }), /physical mount root device/);
+  }), {code: "HOST_ACCEPTANCE_DATA_ROOT_DEVICE_MISMATCH"});
 });
 
 test("private data root rejects symlinks, escapes, and group-writable permissions", async t => {
@@ -221,13 +225,13 @@ test("private data root rejects symlinks, escapes, and group-writable permission
     mountRoot: harness.volume,
     dataRoot: linkedRoot,
     runtimeUid
-  }), /runtime UID|non-symlink/);
+  }), {code: "HOST_ACCEPTANCE_DATA_ROOT_UNSAFE"});
 
   await assert.rejects(verifyOwnedDataRoot({
     mountRoot: harness.volume,
     dataRoot: outside,
     runtimeUid
-  }), /one safe direct child/);
+  }), {code: "HOST_ACCEPTANCE_DATA_ROOT_INVALID"});
   const escapedRoot = path.join(harness.root, "must-not-be-created");
   await assert.rejects(runHostAcceptance({
     mode: "HOST_ACCEPTANCE_ONLY",
@@ -236,7 +240,7 @@ test("private data root rejects symlinks, escapes, and group-writable permission
     providerPreflight: true,
     mountRoot: harness.volume,
     dataRoot: escapedRoot
-  }), /one safe direct child/);
+  }), {code: "HOST_ACCEPTANCE_DATA_ROOT_INVALID"});
   await assert.rejects(lstat(escapedRoot), {code: "ENOENT"});
 
   await mkdir(harness.dataRoot, {mode: 0o700});
@@ -245,7 +249,33 @@ test("private data root rejects symlinks, escapes, and group-writable permission
     mountRoot: harness.volume,
     dataRoot: harness.dataRoot,
     runtimeUid
-  }), /owned by the runtime UID/);
+  }), {code: "HOST_ACCEPTANCE_DATA_ROOT_PERMISSIONS"});
+});
+
+test("CLI validates explicit data-root bounds and emits its stable failure code", async t => {
+  const harness = await fixture(t);
+  const escapedRoot = path.join(harness.root, "outside-mount");
+  const child = spawnSync(process.execPath, [
+    HOST_ACCEPTANCE_PATH,
+    "verify",
+    "--evidence-id", "cli-path-check",
+    "--mint", IDENTITY.mint,
+    "--pool", IDENTITY.pool,
+    "--quote", IDENTITY.quote,
+    "--data-root", escapedRoot,
+    "--provider-preflight"
+  ], {encoding: "utf8"});
+  assert.equal(child.status, 2);
+  assert.deepEqual(JSON.parse(child.stdout), {
+    status: "UNKNOWN",
+    scope: "HOST_ACCEPTANCE_ONLY",
+    failureCode: "HOST_ACCEPTANCE_DATA_ROOT_INVALID",
+    pilotStarted: false,
+    runtimeAuthorization: false,
+    hostDurability: "NOT_VERIFIED",
+    clockProvenance: "UNVERIFIED"
+  });
+  await assert.rejects(lstat(escapedRoot), {code: "ENOENT"});
 });
 
 test("incomplete existing evidence remains UNKNOWN and is not repaired or replayed", async t => {
@@ -271,6 +301,7 @@ test("incomplete existing evidence remains UNKNOWN and is not repaired or replay
     }
   });
   assert.equal(result.status, "UNKNOWN");
+  assert.equal(result.failureCode, "HOST_ACCEPTANCE_EVIDENCE_UNKNOWN");
   assert.equal(result.providerRequestsThisInvocation, 0);
   assert.equal(acquisitions, 0);
   assert.equal(await readFile(probePath, "utf8"), "partial evidence");
@@ -297,6 +328,7 @@ test("legacy evidence at the physical mount root fails closed without mutation",
     }
   });
   assert.equal(result.status, "BLOCKED");
+  assert.equal(result.failureCode, "HOST_ACCEPTANCE_LEGACY_EVIDENCE_PRESENT");
   assert.equal(result.providerRequests, 0);
   assert.equal(acquisitions, 0);
   assert.equal(await readFile(marker, "utf8"), "do not migrate or overwrite");
