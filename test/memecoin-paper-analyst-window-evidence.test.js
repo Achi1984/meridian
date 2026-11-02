@@ -9,6 +9,9 @@ import {
   PROPOSED_ANALYST_WINDOW_POLICY
 } from "../scripts/memecoin-paper/analyst-window-evidence.mjs";
 import {
+  adaptMarketEvidence as adaptCanonicalMarketEvidence
+} from "../scripts/memecoin-paper/market-evidence-adapter.mjs";
+import {
   estimateCpmmDecodeWork,
   decodeCpmmSuccessfulSwap,
   RAYDIUM_CPMM_LAYOUT
@@ -19,6 +22,7 @@ import {
   SCORE_SPEC
 } from "../scripts/memecoin-paper/stages.mjs";
 import {makeFixture, makeSwap} from "./fixtures/memecoin-paper-analyst-window-evidence/source-shaped.mjs";
+import {fixtureInput as canonicalFixtureInput} from "./fixtures/memecoin-paper-analyst-window-evidence/canonical-input.mjs";
 
 function base58(bytes) {
   const alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
@@ -137,8 +141,10 @@ test("failed swaps, transfers, LP changes, routed calls and stale pool identity 
     "TRANSACTION_LAYOUT_UNAVAILABLE");
 });
 
-test("actual decoded fixture produces a typed canonical-adapter bridge without inventing slots", async () => {
+test("actual decoded fixture passes canonical adapter, hard filters and Analyst with typed null slots", async () => {
   const fixture = makeFixture({duplicateFirstRow: true});
+  const canonicalInput = canonicalFixtureInput(fixture.candidateT);
+  fixture.candidate = canonicalInput.providerCandidate;
   const evidence = await packet(fixture);
   assert.equal(evidence.status, "COMPLETE");
   assert.equal(evidence.metrics.uniqueBuyers1h.value, 101);
@@ -178,17 +184,74 @@ test("actual decoded fixture produces a typed canonical-adapter bridge without i
     assert.equal(item.slot, null, key);
     assert.equal(item.coverage.slotProvenance, evidence.metrics[key].coverage.provenanceType, key);
   }
-  const unavailable = await evaluateWithCanonicalMarketAdapter({
-    providerCandidate: fixture.candidate,
-    evidence: {},
+  const evaluation = await evaluateWithCanonicalMarketAdapter({
+    canonicalAdapter: input => adaptCanonicalMarketEvidence({
+      ...input,
+      holdUntil: fixture.decisionAt + 8 * 60 * 60 * 1000
+    }),
+    providerCandidate: canonicalInput.providerCandidate,
+    evidence: canonicalInput.evidence,
     packet: evidence,
     reviewEvidence,
     now: fixture.decisionAt
   });
-  assert.equal(unavailable.analysis.status, "SCORE_UNAVAILABLE");
-  assert.equal(unavailable.executionAuthorized, false);
+  assert.equal(evaluation.status, "NORMALIZED");
+  assert.equal(evaluation.filters.status, "PASS");
+  assert.equal(evaluation.analysis.status, "PASS");
+  assert.ok(Number.isInteger(evaluation.analysis.score));
+  assert.equal(evaluation.executionAuthorized, false);
+  assert.equal(evaluation.adapted.executionAuthorized, false);
+  for (const item of Object.values(evaluation.adapted.candidate.analystEvidence)) {
+    assert.equal(item.slot, null);
+    assert.equal(typeof item.coverage.slotProvenance, "string");
+  }
   assert.equal(evidence.executionAuthorized, false);
   assert.equal(evidence.authorizationEligible, false);
+});
+
+test("canonical adapter keeps null slots confined to typed Analyst records", async () => {
+  const candidateT = Date.parse("2026-10-30T12:00:00Z");
+  const decisionAt = candidateT + 2;
+  const run = input => adaptCanonicalMarketEvidence({
+    ...input,
+    now: decisionAt,
+    holdUntil: decisionAt + 8 * 60 * 60 * 1000
+  });
+
+  const nullHardSlot = canonicalFixtureInput(candidateT);
+  nullHardSlot.providerCandidate.evidence.tokenDecimals.slot = null;
+  const hardResult = run(nullHardSlot);
+  assert.equal(hardResult.candidate.evidence.tokenDecimals.verified, false);
+  assert.equal(filterCandidate(hardResult.candidate, {
+    now: decisionAt, holdUntil: decisionAt + 8 * 60 * 60 * 1000
+  }).accepted, false);
+
+  const cases = [
+    ["unknown provenance", "uniqueBuyers1h", item => {
+      item.slot = null;
+      item.coverage.slotProvenance = "UNRECOGNIZED_SLOT_KIND";
+    }],
+    ["missing source", "momentum15m", item => { delete item.source; }],
+    ["incomplete coverage", "buySellUsdRatio1h", item => { item.coverage.complete = false; }],
+    ["wrong identity", "holderGrowthPct1h", item => {
+      item.identity = {...item.identity, quote: "11111111111111111111111111111111"};
+    }],
+    ["stale sample", "momentum15m", item => { item.observedAt = candidateT - 300_001; }]
+  ];
+  for (const [label, key, mutate] of cases) {
+    const input = canonicalFixtureInput(candidateT);
+    mutate(input.analystEvidence[key]);
+    const result = run(input);
+    assert.equal(result.candidate.analystEvidence[key].verified, false, label);
+    const filters = filterCandidate(result.candidate, {
+      now: decisionAt, holdUntil: decisionAt + 8 * 60 * 60 * 1000
+    });
+    const analysis = analyzeCandidate(result.candidate, {
+      now: decisionAt, filterResult: filters,
+      smartWalletAllowlist: result.smartWalletAllowlist
+    });
+    assert.notEqual(analysis.status, "PASS", label);
+  }
 });
 
 test("each missing Analyst component yields SCORE_UNAVAILABLE with no weight redistribution", async () => {

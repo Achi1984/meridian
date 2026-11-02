@@ -151,21 +151,24 @@ No missing metric causes weight redistribution. The current score weights
 The packet emits `slot: null` for off-chain observations and derived
 multi-observation windows. `bridgeAnalystWindowPacket` prepares typed records
 for the canonical market adapter; it does not stamp candidate evidence itself.
-That canonical adapter is on the separate #1158/#1157 change and currently
-rejects null slots for supplemental Analyst records. Do not bypass it or borrow
-an unrelated RPC slot. Its single-writer handoff is narrowly scoped: permit
-`slot: null` for Analyst records only when `coverage.slotProvenance` is one of
-`OFFCHAIN_TIMESTAMP_NO_SOLANA_SLOT`,
-`DERIVED_ONCHAIN_WINDOW_NO_SINGLE_SLOT`,
-`DERIVED_ONCHAIN_WINDOW_WITH_EXACT_HISTORICAL_USD_PRICES_NO_SINGLE_SLOT`,
-`CENSUS_ENDPOINTS_TYPED_PROVENANCE_NO_SINGLE_SLOT`, or
-`DERIVED_ONCHAIN_WINDOW_WITH_EXTERNALLY_REVIEWED_ALLOWLIST_NO_SINGLE_SLOT`.
-Retain required numeric slots and `ONCHAIN_SLOT` provenance for on-chain
-records, and keep every existing identity, review, coverage, freshness, and
-hard-evidence check. Until that change lands, this packet cannot claim the full
-canonical-adapter → filter → scorer acceptance path;
-`evaluateWithCanonicalMarketAdapter` only runs that path when the canonical
-adapter is supplied.
+The canonical adapter accepts null slots for Analyst records only with these
+metric-specific `coverage.slotProvenance` values:
+
+- `momentum15m`, `liquidityMarketCapPct`:
+  `OFFCHAIN_TIMESTAMP_NO_SOLANA_SLOT`
+- `uniqueBuyers1h`: `DERIVED_ONCHAIN_WINDOW_NO_SINGLE_SLOT`
+- `buySellUsdRatio1h`:
+  `DERIVED_ONCHAIN_WINDOW_WITH_EXACT_HISTORICAL_USD_PRICES_NO_SINGLE_SLOT`
+- `holderGrowthPct1h`: `CENSUS_ENDPOINTS_TYPED_PROVENANCE_NO_SINGLE_SLOT`
+- `qualifiedSmartWallets`:
+  `DERIVED_ONCHAIN_WINDOW_WITH_EXTERNALLY_REVIEWED_ALLOWLIST_NO_SINGLE_SLOT`
+
+Numeric slots remain required for on-chain and all hard-evidence records.
+Identity binding, source, review, complete coverage, freshness, and all
+pre-existing hard-evidence checks are unchanged. The source-shaped test
+demonstrates the actual canonical adapter → hard filter → Analyst path with
+nonzero acquisition latency; it remains synthetic-only and authorizes no
+execution.
 
 ## Decisions required before real-source use
 

@@ -17,6 +17,14 @@ const BASE_FILTER_KEYS = Object.freeze([
   "tokenExtensions"
 ]);
 const ANALYST_KEYS = Object.freeze(Object.keys(SCORE_SPEC.weights));
+const ANALYST_NULL_SLOT_PROVENANCE = Object.freeze({
+  momentum15m: "OFFCHAIN_TIMESTAMP_NO_SOLANA_SLOT",
+  uniqueBuyers1h: "DERIVED_ONCHAIN_WINDOW_NO_SINGLE_SLOT",
+  buySellUsdRatio1h: "DERIVED_ONCHAIN_WINDOW_WITH_EXACT_HISTORICAL_USD_PRICES_NO_SINGLE_SLOT",
+  holderGrowthPct1h: "CENSUS_ENDPOINTS_TYPED_PROVENANCE_NO_SINGLE_SLOT",
+  liquidityMarketCapPct: "OFFCHAIN_TIMESTAMP_NO_SOLANA_SLOT",
+  qualifiedSmartWallets: "DERIVED_ONCHAIN_WINDOW_WITH_EXTERNALLY_REVIEWED_ALLOWLIST_NO_SINGLE_SLOT"
+});
 const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 const DECIMAL_INTEGER = /^(0|[1-9]\d{0,38})$/;
 const SAFE_LABEL = /^[A-Za-z0-9][A-Za-z0-9 .:_/-]{0,127}$/;
@@ -171,14 +179,17 @@ function providerEvidence(candidate, key, now, identity) {
   return record;
 }
 
-function reviewable(item, candidate, now, identity) {
+function reviewable(item, candidate, now, identity, {analystKey = null} = {}) {
+  const validSlot = Number.isSafeInteger(item?.slot) && item.slot >= 0 ||
+    (analystKey !== null && item?.slot === null &&
+      item.coverage?.slotProvenance === ANALYST_NULL_SLOT_PROVENANCE[analystKey]);
   if (!isRecord(item) || !safeLabel(item.source) ||
       !safeReference(item.sourceVersion) ||
       item.source.length + item.sourceVersion.length + 1 > 256 ||
       !sameIdentity(item.identity, identity) ||
       !validTime(item.observedAt) || item.observedAt > candidate.sampledAt ||
       now < item.observedAt || now - item.observedAt > FILTER_POLICY.maxEvidenceAgeMs ||
-      !Number.isSafeInteger(item.slot) || item.slot < 0 ||
+      !validSlot ||
       !isRecord(item.coverage) || item.coverage.complete !== true ||
       !isRecord(item.review) || item.review.status !== "REVIEWED" ||
       !safeReference(item.review.reviewerId) ||
@@ -190,8 +201,8 @@ function reviewable(item, candidate, now, identity) {
   return {metadata: item};
 }
 
-function supplementalRecord(item, value, coverage, candidate, now, identity) {
-  const checked = reviewable(item, candidate, now, identity);
+function supplementalRecord(item, value, coverage, candidate, now, identity, options = {}) {
+  const checked = reviewable(item, candidate, now, identity, options);
   if (!checked.metadata) return unknownEvidence(checked.reason, identity, item);
   return {
     value,
@@ -413,13 +424,14 @@ function bundledLaunch(item, census, candidate, now, identity) {
 }
 
 function analystRecord(key, item, candidate, now, identity, providerEvidence) {
-  const checked = reviewable(item, candidate, now, identity);
+  const checked = reviewable(item, candidate, now, identity, {analystKey: key});
   const value = item?.value;
   if (!checked.metadata || !isRecord(value)) {
     return unknownWithReason(identity, checked.reason ?? "analyst evidence is missing", item);
   }
   let normalized;
   const coverage = {windowMs: item.coverage.windowMs};
+  if (item.slot === null) coverage.slotProvenance = item.coverage.slotProvenance;
   switch (key) {
     case "momentum15m":
       if (!isFiniteNumber(value.percent) || item.coverage.windowMs !== 15 * 60 * 1000) break;
@@ -474,7 +486,7 @@ function analystRecord(key, item, candidate, now, identity, providerEvidence) {
   if (normalized === undefined || (normalized !== null && !Number.isFinite(normalized))) {
     return unknownWithReason(identity, `${key} source values or coverage are incomplete`, item);
   }
-  return supplementalRecord(item, normalized, coverage, candidate, now, identity);
+  return supplementalRecord(item, normalized, coverage, candidate, now, identity, {analystKey: key});
 }
 
 function outputCandidate(candidate, evidence, analystEvidence) {
@@ -547,7 +559,9 @@ export function adaptMarketEvidence({
       normalizedEvidence);
   }
   const wallets = analystEvidence.qualifiedSmartWallets;
-  const walletChecked = reviewable(wallets, candidate, now, identity);
+  const walletChecked = reviewable(wallets, candidate, now, identity, {
+    analystKey: "qualifiedSmartWallets"
+  });
   const walletValue = wallets?.value;
   const smartWalletAllowlist = walletChecked.metadata && isRecord(walletValue) &&
     Number.isSafeInteger(walletValue.count) && walletValue.count >= 0 &&

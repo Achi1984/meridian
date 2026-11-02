@@ -946,6 +946,7 @@ export function bridgeAnalystWindowPacket(packet, {identity, reviewEvidence = {}
       observedAt: evidence.observedAt,
       slot: evidence.slot,
       value,
+      review,
       coverage: {
         ...evidence.coverage,
         complete: true,
