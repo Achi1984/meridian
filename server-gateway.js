@@ -19,8 +19,8 @@ import { capturePortfolioHistoryOnce } from "./portfolio-history-runtime.js";
 import { buildPaperExecutionAuditExport } from "./paper-execution-audit-v2-export.js";
 import {
   attachPrivateReportPoolErrorHandler,
+  createPrivatePaperReportPoolOptions,
   createPrivateReportStore,
-  PAPER_REPORT_POOL_OPTIONS
 } from "./private-report-store.mjs";
 import {
   handleReportGatewayRequest,
@@ -137,11 +137,9 @@ function pool(){
 function paperReportPool(){
   if(!DATABASE_URL)return null;
   if(!privatePaperReportPool){
-    privatePaperReportPool=attachPrivateReportPoolErrorHandler(new Pool({
-      connectionString:DATABASE_URL,
-      ssl:{rejectUnauthorized:false},
-      ...PAPER_REPORT_POOL_OPTIONS
-    }));
+    privatePaperReportPool=attachPrivateReportPoolErrorHandler(new Pool(
+      createPrivatePaperReportPoolOptions(DATABASE_URL)
+    ));
   }
   return privatePaperReportPool;
 }

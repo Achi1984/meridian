@@ -26,6 +26,7 @@ import {
 } from "../report-transfer-gateway.mjs";
 import {
   attachPrivateReportPoolErrorHandler,
+  createPrivatePaperReportPoolOptions,
   createPrivateReportStore
 } from "../private-report-store.mjs";
 import {
@@ -1345,6 +1346,39 @@ test("report store has bounded dedicated pool, statement, lock, and operation bu
   assert.deepEqual(PAPER_REPORT_STORE_LIMITS, {maxConcurrent: 2, operationTimeoutMs: 6_000});
 });
 
+test("dedicated report pool requires verified TLS and rejects connection-string overrides", () => {
+  const defaults = createPrivatePaperReportPoolOptions("postgres://localhost/report");
+  assert.deepEqual(defaults.ssl, {rejectUnauthorized: true});
+  assert.equal(defaults.max, PAPER_REPORT_POOL_OPTIONS.max);
+  for (const connectionString of [
+    "postgres://localhost/report?sslmode=require",
+    "postgres://localhost/report?sslmode=disable",
+    "postgres://localhost/report?sslrootcert=%2Ftmp%2Fca.pem",
+    "host=localhost dbname=report sslmode='require'",
+    "host=localhost dbname=report sslcert=/tmp/client.pem"
+  ]) {
+    assert.throws(
+      () => createPrivatePaperReportPoolOptions(connectionString),
+      /must not override TLS options/
+    );
+  }
+  assert.throws(
+    () => createPrivatePaperReportPoolOptions("postgres://localhost/report", {
+      nodeTlsRejectUnauthorized: "0"
+    }),
+    /TLS verification is disabled/
+  );
+  const ca = "-----BEGIN CERTIFICATE-----\nsynthetic CA\n-----END CERTIFICATE-----";
+  assert.deepEqual(
+    createPrivatePaperReportPoolOptions("postgres://localhost/report", {ca}).ssl,
+    {rejectUnauthorized: true, ca}
+  );
+  assert.throws(
+    () => createPrivatePaperReportPoolOptions("postgres://localhost/report", {ca: "invalid"}),
+    /invalid private report database CA certificate/
+  );
+});
+
 test("stalled connection acquisition times out to UNKNOWN but retains admission until it settles", async () => {
   let connectCalls = 0;
   const db = {
@@ -1590,6 +1624,7 @@ test("gateway route is fixed, upload precedes the read guard, and existing route
   const reportRoutes = readFileSync(new URL("../report-transfer-gateway.mjs", import.meta.url), "utf8");
   assert.ok(dispatch > 0 && dispatch < readGuard);
   assert.match(source, /attachPrivateReportPoolErrorHandler\(new Pool\(/);
+  assert.match(source, /createPrivatePaperReportPoolOptions\(DATABASE_URL\)/);
   assert.match(source, /writeReportRouteResponse\(req,res,reportRoute,origin,writeJson\)/);
   assert.match(reportRoutes, /pathname === "\/api\/private\/paper-report\/upload"/);
   assert.match(reportRoutes, /pathname === "\/api\/private\/paper-report"/);

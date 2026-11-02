@@ -6,6 +6,54 @@ export const PAPER_REPORT_POOL_OPTIONS = Object.freeze({
   idle_in_transaction_session_timeout: 4_500
 });
 
+const SSL_CONNECTION_PARAMETERS = new Set(["sslmode", "sslcert", "sslkey", "sslrootcert"]);
+
+function assertNoConnectionStringTlsOverrides(connectionString) {
+  const value = String(connectionString || "");
+  let hasTlsOverride = false;
+  if (/^postgres(?:ql)?:\/\//i.test(value)) {
+    try {
+      const url = new URL(value);
+      hasTlsOverride = [...url.searchParams.keys()]
+        .some(name => SSL_CONNECTION_PARAMETERS.has(name.toLowerCase()));
+    } catch {
+      throw new TypeError("invalid private report database URL");
+    }
+  } else {
+    hasTlsOverride = [...value.matchAll(/(?:^|\s)(sslmode|sslcert|sslkey|sslrootcert)\s*=/gi)]
+      .length > 0;
+  }
+  if (hasTlsOverride) {
+    throw new TypeError("private report database URL must not override TLS options");
+  }
+}
+
+export function createPrivatePaperReportPoolOptions(connectionString, {
+  ca = process.env.MERIDIAN_PAPER_REPORT_DATABASE_CA || "",
+  nodeTlsRejectUnauthorized = process.env.NODE_TLS_REJECT_UNAUTHORIZED
+} = {}) {
+  if (typeof connectionString !== "string" || !connectionString.trim()) {
+    throw new TypeError("private report database URL is required");
+  }
+  assertNoConnectionStringTlsOverrides(connectionString);
+  if (nodeTlsRejectUnauthorized === "0") {
+    throw new TypeError("private report database TLS verification is disabled");
+  }
+  const trustedCa = String(ca || "").trim();
+  if (trustedCa && (
+    Buffer.byteLength(trustedCa) > 65_536 ||
+    !trustedCa.includes("-----BEGIN CERTIFICATE-----") ||
+    !trustedCa.includes("-----END CERTIFICATE-----")
+  )) {
+    throw new TypeError("invalid private report database CA certificate");
+  }
+  return {
+    connectionString,
+    ssl: {rejectUnauthorized: true, ...(trustedCa ? {ca: trustedCa} : {})},
+    ...PAPER_REPORT_POOL_OPTIONS
+  };
+}
+
 export const PAPER_REPORT_STORE_LIMITS = Object.freeze({
   maxConcurrent: 2,
   operationTimeoutMs: 6_000
