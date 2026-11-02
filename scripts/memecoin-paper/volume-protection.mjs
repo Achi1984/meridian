@@ -13,6 +13,7 @@ export const PROTECTED_MODE = 0o3775;
 
 const PATH_COMPONENTS = ["/", "/var", "/var/data", TARGET];
 const IDENTITY_KEYS = ["dev", "ino", "uid", "gid"];
+const MOUNT_IDENTITY_FAILURE = "VOLUME_PROTECTION_MOUNT_IDENTITY_MISMATCH";
 
 function failure(code) {
   const error = new Error(code);
@@ -33,7 +34,7 @@ function isSafeDirectory(info) {
   return info.isDirectory() && !info.isSymbolicLink();
 }
 
-export function parseMountInfo(mountInfo) {
+function mountIdForTarget(mountInfo) {
   const matches = [];
   for (const line of mountInfo.split(/\r?\n/)) {
     const separator = line.indexOf(" - ");
@@ -46,9 +47,27 @@ export function parseMountInfo(mountInfo) {
       "012": "\n",
       "134": "\\"
     })[code]);
-    if (mountPoint === TARGET) matches.push(mountPoint);
+    if (mountPoint !== TARGET) continue;
+    const validRecord = fields.length >= 6 &&
+      /^[1-9]\d*$/.test(fields[0]) &&
+      /^[1-9]\d*$/.test(fields[1]) &&
+      /^\d+:\d+$/.test(fields[2]) &&
+      fields[5].length > 0;
+    matches.push(validRecord ? fields[0] : null);
   }
-  return matches.length === 1;
+  return matches.length === 1 ? matches[0] : null;
+}
+
+function descriptorMountId(fdInfo) {
+  if (typeof fdInfo !== "string") return null;
+  const entries = fdInfo.split(/\r?\n/).filter(line => /^mnt_id(?:\b|:)/.test(line));
+  if (entries.length !== 1) return null;
+  const match = /^mnt_id:\s*([1-9]\d*)\s*$/.exec(entries[0]);
+  return match ? match[1] : null;
+}
+
+export function parseMountInfo(mountInfo) {
+  return typeof mountInfo === "string" && mountIdForTarget(mountInfo) !== null;
 }
 
 async function validatePath(fsOps) {
@@ -74,10 +93,23 @@ async function protectMount(fsOps, {verifyOnly = false} = {}) {
   try {
     await validatePath(fsOps);
     const mountInfo = await fsOps.readFile("/proc/self/mountinfo", "utf8");
-    if (!parseMountInfo(mountInfo)) throw failure("VOLUME_PROTECTION_MOUNTPOINT_MISMATCH");
+    const expectedMountId = mountIdForTarget(mountInfo);
+    if (expectedMountId === null) throw failure("VOLUME_PROTECTION_MOUNTPOINT_MISMATCH");
 
     const flags = fsConstants.O_RDONLY | fsConstants.O_DIRECTORY | fsConstants.O_NOFOLLOW;
     handle = await fsOps.open(TARGET, flags);
+    if (!Number.isSafeInteger(handle.fd) || handle.fd < 0) {
+      throw failure(MOUNT_IDENTITY_FAILURE);
+    }
+    let fdInfo;
+    try {
+      fdInfo = await fsOps.readFile(`/proc/self/fdinfo/${handle.fd}`, "utf8");
+    } catch {
+      throw failure(MOUNT_IDENTITY_FAILURE);
+    }
+    if (descriptorMountId(fdInfo) !== expectedMountId) {
+      throw failure(MOUNT_IDENTITY_FAILURE);
+    }
     const descriptorBefore = await handle.stat();
     const pathBefore = await fsOps.lstat(TARGET);
 

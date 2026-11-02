@@ -39,6 +39,8 @@ function fixture({
   lstatOverride,
   canonicalPath = TARGET,
   descriptorStat,
+  descriptorInfo = "pos:\t0\nflags:\t0100000\nmnt_id:\t41\n",
+  failDescriptorInfo = false,
   failReadback = false,
   failChmod = false,
   failClose = false,
@@ -66,11 +68,14 @@ function fixture({
     },
     async readFile(filename, encoding) {
       events.push(["readFile", filename, encoding]);
-      return mountInfo;
+      if (filename === "/proc/self/mountinfo") return mountInfo;
+      if (failDescriptorInfo) throw new Error("descriptor evidence unavailable");
+      return descriptorInfo;
     },
     async open(filename, flags) {
       events.push(["open", filename, flags]);
       return {
+        fd: 123,
         async stat() {
           events.push(["fstat"]);
           descriptorStats += 1;
@@ -158,6 +163,34 @@ test("mountinfo requires one exact decoded mountpoint", () => {
     "41 20 0:50 / /var/data/meridian-paper rw - ext4 /dev/one rw",
     "42 20 0:51 / /var/data/meridian-paper rw - ext4 /dev/two rw"
   ].join("\n")), false);
+  assert.equal(parseMountInfo(
+    "invalid 20 0:50 / /var/data/meridian-paper rw - ext4 /dev/mock rw"
+  ), false);
+});
+
+test("descriptor mount identity must match the unique target mount before mutation", async t => {
+  for (const [label, options] of [
+    ["covering mount descriptor", {descriptorInfo: "mnt_id:\t42\n"}],
+    ["missing descriptor evidence", {descriptorInfo: "pos:\t0\n"}],
+    ["malformed descriptor evidence", {descriptorInfo: "mnt_id:\tnot-a-number\n"}],
+    ["unreadable descriptor evidence", {failDescriptorInfo: true}]
+  ]) {
+    await t.test(label, async () => {
+      const harness = fixture(options);
+      const result = await runOneShot({
+        mode: "REPAIR",
+        fsOps: harness.fsOps,
+        credentials: harness.credentials
+      });
+      assert.equal(result.status, "BLOCKED");
+      assert.equal(result.failureCode, "VOLUME_PROTECTION_MOUNT_IDENTITY_MISMATCH");
+      assert.equal(harness.chmodCalls, 0);
+      assert.equal(harness.events.some(([operation]) => operation === "fchmod"), false);
+      assert.equal(harness.events.some(([operation, filename]) =>
+        operation === "readFile" && filename === "/proc/self/fdinfo/123"), true);
+      assertDropped(harness);
+    });
+  }
 });
 
 test("applies exactly one descriptor-bound mode change and drops credentials", async () => {
@@ -185,7 +218,8 @@ test("applies exactly one descriptor-bound mode change and drops credentials", a
   assert.deepEqual(harness.events.filter(([operation]) =>
     ["readFile", "open"].includes(operation)).map(([operation, filename]) => [operation, filename]), [
     ["readFile", "/proc/self/mountinfo"],
-    ["open", TARGET]
+    ["open", TARGET],
+    ["readFile", "/proc/self/fdinfo/123"]
   ]);
   assert.equal(harness.events.some(([operation]) => operation === "readdir"), false);
   assertDropped(harness);
