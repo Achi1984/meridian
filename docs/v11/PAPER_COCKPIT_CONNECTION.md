@@ -23,6 +23,9 @@ evidence or assert operational health. Lock, session expiry, navigation away,
 pagehide, and disposal clear the private report view and abort the current read.
 If an aborted transport does not settle, its connector remains reserved and a
 new connector is not created until that source settles.
+After a back/forward-cache restore, a previously selected cockpit regains its
+manual refresh affordance, but its report remains cleared; unlock and a new
+explicit read are required.
 
 ## Deployment boundary
 

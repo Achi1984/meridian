@@ -27,6 +27,7 @@ class Element {
   append(...nodes) { this.children.push(...nodes); }
   replaceChildren(...nodes) { this.text = ''; this.children = nodes; }
   setAttribute(key, value) { this.attrs[key] = String(value); }
+  focus() { this.ownerDocument.activeElement = this; }
   addEventListener(name, callback) {
     if (!this.events.has(name)) this.events.set(name, new Set());
     this.events.get(name).add(callback);
@@ -83,7 +84,10 @@ function harness({unlocked = true, token = TOKEN, fetchImpl, policy = {now: () =
     const visit = element => [element, ...element.children.flatMap(visit)];
     return visit(root).find(element => element.tagName === 'BUTTON');
   };
-  return {root, document, window, access, controller, findButton, policy};
+  return {
+    root, document, window, access, controller, findButton, policy,
+    revalidate() { for (const revalidate of readers.values()) revalidate(); }
+  };
 }
 
 function generatedReport({observedAt = NOW, partial = false} = {}) {
@@ -159,6 +163,90 @@ test('a shared display freshness policy classifies stale in both connector and c
   assert.match(h.root.textContent, /data|stale/i);
   assert.match(h.root.textContent, /stale under the shared display-only freshness policy/i);
   assert.match(h.root.textContent, /AktualitätSTALE/);
+  h.controller.dispose();
+});
+
+test('revalidation reclassifies retained freshness without reading and preserves loading', async () => {
+  let now = NOW;
+  let calls = 0;
+  let release;
+  const h = harness({
+    fetchImpl: async () => {
+      calls++;
+      if (calls === 1) return paperResponse(generatedReport());
+      return new Promise(resolve => { release = resolve; });
+    },
+    policy: {now: () => now, staleAfterMs: 60_000}
+  });
+  h.controller.setActive(true);
+  await h.controller.refresh();
+  assert.notEqual(h.root.attrs['data-state'], 'stale');
+
+  now += 60_001;
+  h.revalidate();
+  assert.equal(calls, 1, 'revalidation does not issue another read');
+  assert.equal(h.root.attrs['data-state'], 'stale');
+  assert.match(h.root.textContent, /stale under the shared display-only freshness policy/i);
+
+  const pending = h.controller.refresh();
+  await until(() => typeof release === 'function');
+  h.revalidate();
+  assert.equal(h.root.attrs['data-state'], 'loading');
+  assert.match(h.root.textContent, /one-shot report read is in progress/i);
+  assert.equal(calls, 2, 'revalidation does not multiply an in-flight read');
+  release(paperResponse(generatedReport()));
+  await pending;
+  h.controller.dispose();
+});
+
+test('pageshow restores selected cockpit activity without restoring data or starting a read', () => {
+  let calls = 0;
+  const h = harness({fetchImpl: async () => {
+    calls++;
+    return paperResponse(generatedReport());
+  }});
+  h.controller.setActive(true);
+  h.window.fire('pagehide');
+  assert.equal(h.root.attrs['data-state'], 'unavailable');
+  assert.equal(h.findButton(), undefined);
+  assert.equal(h.access.isUnlocked(), false);
+
+  h.window.fire('pageshow');
+  assert.equal(h.root.attrs['data-state'], 'auth-required');
+  assert.ok(h.findButton(), 'previously selected cockpit regains its manual read affordance');
+  assert.doesNotMatch(h.root.textContent, /Observation-only|90071992547409931234/);
+  assert.equal(calls, 0);
+
+  h.access.unlock();
+  assert.equal(h.root.attrs['data-state'], 'ready');
+  assert.ok(h.findButton());
+  assert.equal(calls, 0, 'unlock and restoration never start a read');
+  h.controller.dispose();
+});
+
+test('refresh rerenders preserve keyboard focus without stealing later focus', async () => {
+  const releases = [];
+  const h = harness({fetchImpl: async () => new Promise(resolve => releases.push(resolve))});
+  h.controller.setActive(true);
+
+  h.findButton().focus();
+  h.findButton().click();
+  await until(() => releases.length === 1);
+  assert.equal(h.document.activeElement, h.findButton());
+  assert.equal(h.findButton().attrs['aria-disabled'], 'true');
+  assert.equal(h.findButton().attrs['aria-busy'], 'true');
+  releases[0](paperResponse(generatedReport()));
+  await until(() => h.root.textContent.includes('Observation-only'));
+  assert.equal(h.document.activeElement, h.findButton(), 'completion retains refresh-button focus');
+
+  h.findButton().focus();
+  h.findButton().click();
+  await until(() => releases.length === 2);
+  const elsewhere = new Element(h.document, 'button');
+  elsewhere.focus();
+  releases[1](paperResponse(generatedReport()));
+  await until(() => h.root.attrs['data-state'] !== 'loading');
+  assert.equal(h.document.activeElement, elsewhere, 'completion does not steal focus after the user moves');
   h.controller.dispose();
 });
 

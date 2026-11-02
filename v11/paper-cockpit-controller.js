@@ -49,6 +49,7 @@ export function mountPaperCockpit(root, document, window, {
   let active = false;
   let disposed = false;
   let reading = false;
+  let restoreActiveOnPageShow = false;
   let generation = 0;
   let requestOwner = null;
 
@@ -82,7 +83,23 @@ export function mountPaperCockpit(root, document, window, {
       clearPrivate();
       return;
     }
-    if (report) render();
+    if (report) {
+      if (!reading) state = classifyReport(report);
+      render();
+    }
+  }
+
+  function classifyReport(report) {
+    const model = presentPaperCockpitReport(report, {
+      now: policy.now(),
+      staleAfterMs: policy.staleAfterMs
+    });
+    if (model.evidence.freshness.status === 'STALE') return 'stale';
+    if (model.evidence.coverage === 'PARTIAL') return 'partial';
+    if (model.evidence.coverage === 'UNKNOWN' ||
+        model.evidence.freshness.status === 'UNKNOWN') return 'unknown';
+    if (['FINISHED', 'INCOMPLETE'].includes(model.experiment.status)) return 'terminal';
+    return 'unknown';
   }
 
   function ownsRequest(owner, signal) {
@@ -129,16 +146,7 @@ export function mountPaperCockpit(root, document, window, {
       state = 'stale';
     } else if (result.status === 'AVAILABLE' && result.report) {
       report = result.report;
-      const model = presentPaperCockpitReport(report, {
-        now: policy.now(),
-        staleAfterMs: policy.staleAfterMs
-      });
-      if (model.evidence.freshness.status === 'STALE') state = 'stale';
-      else if (model.evidence.coverage === 'PARTIAL') state = 'partial';
-      else if (model.evidence.coverage === 'UNKNOWN' ||
-          model.evidence.freshness.status === 'UNKNOWN') state = 'unknown';
-      else if (['FINISHED', 'INCOMPLETE'].includes(model.experiment.status)) state = 'terminal';
-      else state = 'unknown';
+      state = classifyReport(report);
     } else if (result.status === 'BUSY') {
       state = 'loading';
     } else {
@@ -214,14 +222,24 @@ export function mountPaperCockpit(root, document, window, {
   }
 
   function pagehide() {
+    restoreActiveOnPageShow = active;
     active = false;
     clearPrivate();
     access.lock();
   }
 
+  function pageshow() {
+    if (disposed || !restoreActiveOnPageShow) return;
+    restoreActiveOnPageShow = false;
+    active = true;
+    state = initialState(access, enabled);
+    render();
+  }
+
   const unregister = access.registerReader(clearPrivate, revalidate);
   const unsubscribe = access.subscribe(onAccess);
   window.addEventListener('pagehide', pagehide);
+  window.addEventListener('pageshow', pageshow);
   render();
 
   return Object.freeze({
@@ -245,6 +263,7 @@ export function mountPaperCockpit(root, document, window, {
       unregister();
       unsubscribe();
       window.removeEventListener('pagehide', pagehide);
+      window.removeEventListener('pageshow', pageshow);
       root.replaceChildren();
     }
   });

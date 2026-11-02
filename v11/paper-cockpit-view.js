@@ -58,6 +58,11 @@ function appendList(document, parent, heading, rows, renderRow) {
   parent.append(list);
 }
 
+function contains(root, target) {
+  if (root === target) return true;
+  return Array.from(root.children || []).some(child => contains(child, target));
+}
+
 function renderReport(root, report, document, options = {}) {
   const model = presentPaperCockpitReport(report, options);
   if (!model.available) {
@@ -140,6 +145,9 @@ function renderReport(root, report, document, options = {}) {
 
 export function renderPaperCockpit(root, report = null, document = root?.ownerDocument, options = {}) {
   if (!root || !document) return null;
+  const activeElement = document.activeElement;
+  const refreshWasFocused = activeElement?.tagName?.toLowerCase() === 'button' &&
+    contains(root, activeElement);
   root.replaceChildren();
   root.className = 'card paper-cockpit';
   root.setAttribute('style', 'min-width:0;max-width:100%;overflow-wrap:anywhere');
@@ -152,10 +160,12 @@ export function renderPaperCockpit(root, report = null, document = root?.ownerDo
   if (typeof options.onRefresh === 'function') {
     const refresh = node(document, root, 'button', 'Paper report manuell laden / aktualisieren');
     refresh.type = 'button';
-    refresh.disabled = options.loading === true;
+    refresh.setAttribute('aria-disabled', String(options.loading === true));
+    refresh.setAttribute('aria-busy', String(options.loading === true));
     refresh.setAttribute('style',
       'min-width:44px;min-height:44px;max-width:100%;padding:10px 12px;white-space:normal;overflow-wrap:anywhere');
     refresh.addEventListener('click', options.onRefresh);
+    if (refreshWasFocused) refresh.focus();
     const status = node(document, root, 'p', options.message || 'Reportstatus unbekannt.');
     status.setAttribute('role', 'status');
     status.setAttribute('aria-live', 'polite');
