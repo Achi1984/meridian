@@ -122,6 +122,7 @@ function computeMark(position, mark, now) {
 
 export class PaperLedger {
   #latestCommandTime;
+  #runFinished;
   constructor({initialCapitalCents = INITIAL_CAPITAL_CENTS, now = Date.now(), runId = "synthetic-only"} = {}) {
     this.initialCapitalCents = moneyCents(initialCapitalCents, "initialCapitalCents");
     if (this.initialCapitalCents !== INITIAL_CAPITAL_CENTS) {
@@ -149,6 +150,7 @@ export class PaperLedger {
     if (!this.day) throw new TypeError("valid initialization time is required");
     this.dailyOpeningEquityCents = this.initialCapitalCents;
     this.dailyLossTripped = false;
+    this.#runFinished = false;
     if (typeof runId !== "string" || !SAFE_ID.test(runId)) throw new TypeError("runId must be a bounded safe identifier");
     this.runId = runId;
     this.newWorkAllowed = true;
@@ -742,12 +744,13 @@ export class PaperLedger {
     }
     const clockFailure = this.#admitTime(end);
     if (clockFailure) return clockFailure;
-    this.newWorkAllowed = false;
-    if (end - start > 8 * 60 * 60 * 1000) {
-      return {status: "INVALID_RUN_WINDOW", entriesAllowed: false, reason: "eight-hour run limit exceeded"};
+    if (this.#runFinished) {
+      return {status: "REJECT", reason: "run already finished", entriesAllowed: false};
     }
+    this.newWorkAllowed = false;
     const valued = this.#snapshotEquity({now: end, marks});
     const remaining = [...this.positions.keys()];
+    this.#runFinished = true;
     this.#record({type: "RUN_FINISHED", observedAt: new Date(end).toISOString(), openMints: remaining});
     return {
       status: "FINISHED",

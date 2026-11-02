@@ -118,11 +118,13 @@ but do not permanently disable a corrected attempt with a new event ID while
 capacity remains.
 
 At `now >= endAt`, new non-finish work stops without dispatch; call `finishRun`
-explicitly with actual time and available marks. Finish can also stop early.
-Calls after the fixed eight-hour deadline are rejected without dispatch and
-cannot manufacture an on-time finish. Finish never liquidates positions or
-invents quotes/costs. This adapter cannot be reconstructed on an advanced
-checkpoint, even though the underlying session separately supports replay.
+explicitly with actual observed time and available marks. Finish can also stop
+early. After the fixed eight-hour deadline, only `finishRun` may be dispatched;
+all entry, quote, and risk work remains closed. The timestamp is never backdated
+to the deadline. Finish never liquidates positions or invents quotes/costs, and
+positions without a valid current mark remain open with unavailable valuation.
+Terminal accounting is at most once, including after checkpoint replay. This
+adapter cannot be reconstructed on an advanced checkpoint.
 
 ## Validation
 
