@@ -149,6 +149,23 @@ function makeRunner({
   return {...system, runner};
 }
 
+function quoteFixture(candidate, purpose, observedAt) {
+  return {
+    source: SYNTHETIC_SOURCE,
+    fixtureOnly: true,
+    chainId: candidate.chainId,
+    mint: candidate.mint,
+    pool: candidate.pool,
+    quote: candidate.quote,
+    decimals: candidate.decimals,
+    observedAt,
+    priceMicros: purpose === "ENTRY" ? 10_000 : 9_000,
+    mode: "HYPOTHETICAL",
+    executable: true,
+    costs: {feeCents: 2, spreadCents: 1, slippageCents: 1, priceImpactCents: 1, networkCents: 2}
+  };
+}
+
 async function makeRealRunner(t, {
   runId = RUN_ID,
   candidateSource = {poll: async () => ({done: true})},
@@ -208,6 +225,72 @@ test("offline lifecycle fills from a later synthetic quote and exits on a later 
   assert.ok(Object.values(entry.quote.costs).some(amount => amount > 0));
   assert.ok(report.terminalReceipt);
   assert.equal(report.terminalReceipt.sequence, calls.length);
+});
+
+test("entry quote acquired during the source call is checked against response time", async () => {
+  let clockTime = START;
+  let requestTime;
+  const {calls, runner} = makeRunner({
+    clock: () => (clockTime += 1_000),
+    quote: async ({purpose, candidate, now}) => {
+      if (purpose === "ENTRY") {
+        requestTime = now;
+        clockTime = now + 1_000;
+      }
+      return quoteFixture(candidate, purpose, purpose === "ENTRY" ? now + 1_000 : now);
+    }
+  });
+  const report = await runner.run();
+
+  const authorization = calls.find(call => call.method === "authorizeEntry").input;
+  const entry = calls.find(call => call.method === "executeEntry").input;
+  assert.equal(report.status, "FINISHED");
+  assert.ok(entry.quote.observedAt > requestTime);
+  assert.ok(entry.quote.observedAt > authorization.now);
+  assert.ok(entry.quote.observedAt <= entry.now);
+});
+
+test("exit quote acquired during the source call is checked against response time", async () => {
+  let clockTime = START;
+  let exitRequestTime;
+  const {calls, runner, summary} = makeRunner({
+    clock: () => (clockTime += 1_000),
+    quote: async ({purpose, candidate, now}) => {
+      if (purpose === "EXIT") {
+        exitRequestTime = now;
+        clockTime = now + 1_000;
+        return quoteFixture(candidate, purpose, now + 1_000);
+      }
+      return quoteFixture(candidate, purpose, now);
+    }
+  });
+  const report = await runner.run();
+
+  const exit = calls.find(call => call.method === "observeExitQuote").input;
+  assert.equal(report.status, "FINISHED");
+  assert.equal(summary.openPositions.length, 0);
+  assert.ok(exit.quote.observedAt > exitRequestTime);
+  assert.ok(exit.quote.observedAt <= exit.now);
+});
+
+test("quotes genuinely ahead of their response clock are rejected for entry and exit", async () => {
+  const entryRun = makeRunner({
+    quote: async ({purpose, candidate, now}) =>
+      quoteFixture(candidate, purpose, purpose === "ENTRY" ? now + 10_000 : now)
+  });
+  const entryReport = await entryRun.runner.run();
+  assert.equal(entryReport.status, "FINISHED");
+  assert.equal(entryRun.calls.some(call => call.method === "executeEntry"), false);
+  assert.equal(entryReport.operationResults.find(item => item.method === "entryQuote")?.status, "BLOCKED");
+
+  const exitRun = makeRunner({
+    quote: async ({purpose, candidate, now}) =>
+      quoteFixture(candidate, purpose, purpose === "EXIT" ? now + 10_000 : now)
+  });
+  const exitReport = await exitRun.runner.run();
+  assert.equal(exitReport.status, "FINISHED");
+  assert.equal(exitRun.calls.some(call => call.method === "observeExitQuote"), false);
+  assert.equal(exitReport.summary.openPositions.length, 1);
 });
 
 test("offline demo durably reads back costs, stop exit, and terminal result", async () => {

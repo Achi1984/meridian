@@ -379,7 +379,9 @@ export function createPaperExecutionRunner({
       const observedAt = readTime();
       if (observedAt >= endAt) return {deadline: true, marks: []};
       const quote = await quoteFor({purpose: "EXIT", candidate, position, now: observedAt, tick});
-      if (!syntheticQuote(quote, candidate) || quote.observedAt > observedAt) continue;
+      const responseTime = readTime();
+      if (responseTime >= endAt) return {deadline: true, marks: []};
+      if (!syntheticQuote(quote, candidate) || quote.observedAt > responseTime) continue;
       const eventId = nextId("exit");
       const observedNow = readTime();
       if (observedNow >= endAt) return {deadline: true, marks: []};
@@ -506,9 +508,11 @@ export function createPaperExecutionRunner({
     const afterQuote = await checkStop(tick);
     if (afterQuote.deadline) return {deadline: true};
     if (afterQuote.shutdown) return {shutdown: true};
+    const responseTime = readTime();
+    if (responseTime >= endAt) return {deadline: true};
     const authorizedAt = Date.parse(authResult.authorizedAt);
     if (!syntheticQuote(quote, candidate) || quote.observedAt <= candidate.sampledAt ||
-        !integerTime(authorizedAt) || quote.observedAt <= authorizedAt || quote.observedAt > quoteTime) {
+        !integerTime(authorizedAt) || quote.observedAt <= authorizedAt || quote.observedAt > responseTime) {
       results.push({method: "entryQuote", status: "BLOCKED", reason: "later complete synthetic quote required"});
       return {blocked: true};
     }
