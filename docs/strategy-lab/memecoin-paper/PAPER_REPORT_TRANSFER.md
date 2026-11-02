@@ -258,12 +258,28 @@ or credential provisioning is made by this change.
 
 ```sh
 node --test test/memecoin-paper-report-transfer.test.js
+
+MERIDIAN_TEST_PAPER_REPORT_DATABASE_URL="$LOCAL_TEST_DATABASE_URL" \
+  node --test test/private-report-store-postgres.integration.test.js
 ```
 
 Tests use generated reports, temporary directories, injected transports, and
-injected database clients. In particular, the transaction/concurrency store
-tests use an in-memory SQL client stub; they do not establish PostgreSQL's actual
-unique-key locking/transaction behavior. These tests do not contact a host,
-provider, or real database. Validate those semantics against a separately
-provisioned test PostgreSQL instance before deployment; no database was
-provisioned or contacted for this change.
+injected database clients. The opt-in PostgreSQL test instead applies the
+repository migration to a random temporary schema and requires a database named
+`meridian_paper_report_test_*` reached over a local Unix socket; it checks this
+before making changes. Set `LOCAL_TEST_DATABASE_URL` only to an isolated,
+synthetic test database. It exercises concurrent identical inserts, immutable
+conflict handling, committed visibility, transaction rollback, caller timeout
+while a unique-key lock is held, cleanup, and reuse of the same pooled connection.
+It does not simulate a lost acknowledgement and is not evidence that a caller
+can distinguish a committed transaction after its acknowledgement is lost. No
+production database, credentials, provider, or runtime activation is used.
+
+Validation for this correction used PostgreSQL `16.15 (Ubuntu 16.15-1.pgdg24.04+2)`
+in a temporary local cluster over a Unix socket, with database
+`meridian_paper_report_test_local`. The command was
+`MERIDIAN_TEST_PAPER_REPORT_DATABASE_URL="$LOCAL_TEST_DATABASE_URL" node --test test/memecoin-paper-report-transfer.test.js test/private-report-store-postgres.integration.test.js`;
+result: 47 passed, 0 failed, 0 skipped. The PostgreSQL exercise validates the
+store against the real migration and engine, but does not model network loss
+after commit, validate a production deployment, or replace independent review
+and hosted CI.
