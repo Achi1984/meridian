@@ -238,14 +238,37 @@ test("non-string persisted request statuses fail validation without classifier c
   assert.equal(validateObservationAudit(malformed, {runId: RUN_ID, configHash: CONFIG_HASH}), false);
 });
 
+test("persisted request diagnostics are bounded, sanitized, and allowlisted", () => {
+  const fixture = createObservationFixture(1);
+  const audit = createAudit({maxRequests: 1, maxCandidates: 1});
+  audit.recordProviderEvents(fixture.providerEvents.slice(0, 1), 0);
+  const persisted = audit.snapshot();
+  for (const mutate of [
+    request => { request.reason = {toString: null}; },
+    request => { request.reason = "failed at https://private.example/request"; },
+    request => { request.status = "x".repeat(65); },
+    request => { request.extra = "unvalidated diagnostic"; }
+  ]) {
+    const malformed = structuredClone(persisted);
+    mutate(malformed.records.providerRequests[0]);
+    assert.equal(validateObservationAudit(malformed, {runId: RUN_ID, configHash: CONFIG_HASH}), false);
+  }
+});
+
 test("audit rejects stale run and configuration identity", () => {
   const audit = createAudit({maxRequests: 1, maxCandidates: 1});
   audit.setProviderAccounting({
     requests: 0, bytes: 0, providerEvents: 0, dexRequests: 0, rpcRequests: 0, candidates: 0
   });
   const result = audit.snapshot();
+  assert.equal(validateObservationAudit(result), false);
+  assert.equal(validateObservationAudit(result, {runId: RUN_ID}), false);
   assert.equal(validateObservationAudit(result, {runId: "another-run", configHash: CONFIG_HASH}), false);
   assert.equal(validateObservationAudit(result, {runId: RUN_ID, configHash: "b".repeat(64)}), false);
+  const unbound = structuredClone(result);
+  delete unbound.runId;
+  delete unbound.configHash;
+  assert.equal(validateObservationAudit(unbound), false);
 });
 
 test("terminal null failure remains distinct from an explicit UNKNOWN failure", () => {

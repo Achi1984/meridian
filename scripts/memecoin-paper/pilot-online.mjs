@@ -387,6 +387,24 @@ export async function readPilotReport(dataDirectory) {
   })) {
     return {status: "UNKNOWN", reason: "observation audit failed its schema or durable run identity contract"};
   }
+  const hasTerminalMarker = ["PERSISTED", "FAILED"].includes(status.observationAuditStatus);
+  if (audit && status.observationAuditStatus === "PERSISTED" &&
+      (audit.state !== "TERMINAL" ||
+       audit.terminal.runStatus !== status.status ||
+       audit.terminal.controllerStatus !==
+         (status.controllerStatus === "NOT_STARTED" ? null : status.controllerStatus ?? null) ||
+       audit.terminal.stopReason !== (status.stopReason ?? null))) {
+    return {status: "UNKNOWN", reason: "observation audit does not match the durable terminal run state"};
+  }
+  if (audit && !hasTerminalMarker) {
+    return {
+      status: "UNKNOWN",
+      runStatus: status.status,
+      observationAudit: audit,
+      reason: "durable terminal marker is unavailable; observation audit may be incomplete",
+      text: `## Operator report unavailable\nThe run has no durable terminal marker; the following run/config-bound snapshot is diagnostics only and may be incomplete.\n\n${renderObservationAudit(audit)}`
+    };
+  }
   if (status.observationAuditStatus === "PERSISTED" && !audit) {
     return {status: "UNKNOWN", reason: "terminal marker requires an observation audit that is unavailable"};
   }

@@ -78,11 +78,27 @@ function safeIdentity(value) {
 }
 
 function validAuditText(value, maxLength = MAX_TEXT_LENGTH) {
-  return value === null || (typeof value === "string" && value.length <= maxLength);
+  return value === null || (typeof value === "string" && value.length <= maxLength &&
+    safeText(value, maxLength) === value);
 }
 
 function validAuditCode(value) {
   return value === null || (typeof value === "string" && /^[A-Z0-9_:-]{1,64}$/.test(value));
+}
+
+function hasExactKeys(value, keys) {
+  return isRecord(value) && Object.keys(value).sort().join(",") === [...keys].sort().join(",");
+}
+
+function validAuditTime(value) {
+  return value === null || safeTime(value) === value;
+}
+
+function validAuditIdentity(value) {
+  return value === null || (hasExactKeys(value, ["chainId", "mint", "pool", "quote"]) &&
+    (value.chainId === null || value.chainId === "solana") &&
+    ["mint", "pool", "quote"].every(field =>
+      value[field] === null || (typeof value[field] === "string" && BASE58.test(value[field]))));
 }
 
 function requestClassification(status) {
@@ -90,6 +106,37 @@ function requestClassification(status) {
   if (status === "RECEIVED") return "SUCCESS";
   if (FAILURE_STATUSES.has(status) || /^HTTP_[1-5]\d\d$/.test(status)) return "FAILED";
   return "UNKNOWN";
+}
+
+function validAuditRequest(request) {
+  const requestIdValid = request?.requestId === null ||
+    (Number.isSafeInteger(request?.requestId) && request.requestId >= 0) ||
+    (typeof request?.requestId === "string" && SAFE_ID.test(request.requestId));
+  const slotValid = request?.slot === null ||
+    (Number.isSafeInteger(request?.slot) && request.slot >= 0);
+  const bytesValid = request?.bytes === null ||
+    (Number.isSafeInteger(request?.bytes) && request.bytes >= 0);
+  return hasExactKeys(request, [
+    "cycleIndex", "requestId", "provider", "endpointKind", "requested", "returned",
+    "slot", "status", "outcome", "reason", "requestedAt", "receivedAt",
+    "observedAtBasis", "bytes"
+  ]) &&
+    Number.isSafeInteger(request.cycleIndex) && request.cycleIndex >= 0 &&
+    requestIdValid &&
+    (request.provider === null || PROVIDERS.has(request.provider)) &&
+    validAuditText(request.endpointKind, 64) &&
+    validAuditIdentity(request.requested) &&
+    validAuditIdentity(request.returned) &&
+    slotValid &&
+    validAuditCode(request.status) &&
+    ["SUCCESS", "FAILED", "UNKNOWN"].includes(request.outcome) &&
+    request.outcome === requestClassification(request.status) &&
+    validAuditText(request.reason) &&
+    validAuditTime(request.requestedAt) &&
+    validAuditTime(request.receivedAt) &&
+    (request.observedAtBasis === null ||
+      request.observedAtBasis === "response-receipt-not-source-event-time") &&
+    bytesValid;
 }
 
 function statusClassification(status, allowed) {
@@ -424,7 +471,9 @@ export function createObservationAudit({
 }
 
 export function validateObservationAudit(audit, {runId, configHash} = {}) {
-  if (!isRecord(audit) || audit.schema !== OBSERVATION_AUDIT_SCHEMA ||
+  if (typeof runId !== "string" || !SAFE_ID.test(runId) ||
+      typeof configHash !== "string" || !/^[a-f0-9]{64}$/.test(configHash) ||
+      !isRecord(audit) || audit.schema !== OBSERVATION_AUDIT_SCHEMA ||
       audit.runId !== runId || audit.configHash !== configHash ||
       !["RUNNING", "TERMINAL"].includes(audit.state) ||
       !isRecord(audit.bounds) || !isRecord(audit.accounting) ||
@@ -461,12 +510,16 @@ export function validateObservationAudit(audit, {runId, configHash} = {}) {
        providerAccounting.dexRequests + providerAccounting.rpcRequests !== providerAccounting.requests)) {
     return false;
   }
-  if (audit.records.providerRequests.some(request =>
-    !isRecord(request) || !["SUCCESS", "FAILED", "UNKNOWN"].includes(request.outcome) ||
-    typeof request.status !== "string" ||
-    request.outcome !== requestClassification(request.status))) return false;
+  if (audit.records.providerRequests.some(request => !validAuditRequest(request))) return false;
   if (audit.records.candidates.some(candidate =>
-    !isRecord(candidate) || !isRecord(candidate.filter) || !isRecord(candidate.analysis) ||
+    !hasExactKeys(candidate, [
+      "cycleIndex", "identity", "sampledAt", "filterStatus", "analysisStatus", "filter", "analysis"
+    ]) ||
+    (candidate.cycleIndex !== null &&
+      (!Number.isSafeInteger(candidate.cycleIndex) || candidate.cycleIndex < 0)) ||
+    !validAuditIdentity(candidate.identity) || !validAuditTime(candidate.sampledAt) ||
+    !hasExactKeys(candidate.filter, ["status", "reason", "checks", "omittedChecks"]) ||
+    !hasExactKeys(candidate.analysis, ["status", "reason", "checks", "omittedChecks"]) ||
     !Array.isArray(candidate.filter.checks) || !Array.isArray(candidate.analysis.checks) ||
     candidate.filter.checks.length > MAX_CHECK_ROWS ||
     candidate.analysis.checks.length > MAX_CHECK_ROWS ||
@@ -474,10 +527,11 @@ export function validateObservationAudit(audit, {runId, configHash} = {}) {
     !Number.isSafeInteger(candidate.analysis.omittedChecks) || candidate.analysis.omittedChecks < 0 ||
     !validAuditText(candidate.filter.reason) || !validAuditText(candidate.analysis.reason) ||
     [...candidate.filter.checks, ...candidate.analysis.checks].some(check =>
-      !isRecord(check) || typeof check.name !== "string" || check.name.length > 64 ||
+      !hasExactKeys(check, ["name", "status", "reason", "source", "observedAt"]) ||
+      !validAuditText(check.name, 64) ||
       !["PASS", "REJECT", "UNKNOWN"].includes(check.status) ||
       !validAuditText(check.reason) || !validAuditText(check.source, 96) ||
-      (check.observedAt !== null && safeTime(check.observedAt) !== check.observedAt)) ||
+      !validAuditTime(check.observedAt)) ||
     candidate.filterStatus !== candidate.filter.status ||
     candidate.analysisStatus !== candidate.analysis.status ||
     !["PASS", "REJECT", "UNKNOWN"].includes(candidate.filterStatus) ||

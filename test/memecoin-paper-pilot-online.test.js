@@ -376,6 +376,19 @@ test("malformed persisted request status returns structured UNKNOWN", async t =>
   assert.match(report.reason, /schema or durable run identity contract/);
 });
 
+test("malformed persisted request diagnostics return structured UNKNOWN", async t => {
+  const harness = await createHarness(t);
+  assert.equal((await harness.runner.start()).status, "FINISHED");
+  const auditPath = path.join(harness.dataDirectory, "observation-audit.json");
+  const audit = JSON.parse(await readFile(auditPath, "utf8"));
+  audit.records.providerRequests[0].reason = {toString: null};
+  await writeFile(auditPath, canonicalJson(audit));
+
+  const report = await readPilotReport(harness.dataDirectory);
+  assert.equal(report.status, "UNKNOWN");
+  assert.match(report.reason, /schema or durable run identity contract/);
+});
+
 test("malformed terminal audit fields return structured UNKNOWN from report reads", async t => {
   const harness = await createHarness(t);
   assert.equal((await harness.runner.start()).status, "FINISHED");
@@ -390,6 +403,41 @@ test("malformed terminal audit fields return structured UNKNOWN from report read
     assert.equal(report.status, "UNKNOWN");
     assert.match(report.reason, /schema or durable run identity contract/);
   }
+});
+
+test("persisted terminal audits must match durable terminal state", async t => {
+  for (const mutateAudit of [
+    audit => {
+      audit.state = "RUNNING";
+      audit.terminal = null;
+    },
+    audit => {
+      audit.terminal.runStatus = "UNKNOWN";
+    }
+  ]) {
+    const harness = await createHarness(t);
+    assert.equal((await harness.runner.start()).status, "FINISHED");
+    const auditPath = path.join(harness.dataDirectory, "observation-audit.json");
+    const audit = JSON.parse(await readFile(auditPath, "utf8"));
+    mutateAudit(audit);
+    await writeFile(auditPath, canonicalJson(audit));
+
+    const report = await readPilotReport(harness.dataDirectory);
+    assert.equal(report.status, "UNKNOWN");
+    assert.match(report.reason, /does not match the durable terminal run state/);
+  }
+});
+
+test("missing durable terminal marker cannot present an audit as complete", async t => {
+  const harness = await createHarness(t);
+  assert.equal((await harness.runner.start()).status, "FINISHED");
+  unlinkSync(path.join(harness.dataDirectory, "terminal.json"));
+
+  const report = await readPilotReport(harness.dataDirectory);
+  assert.equal(report.status, "UNKNOWN");
+  assert.equal(report.observationAudit.state, "TERMINAL");
+  assert.match(report.reason, /terminal marker is unavailable/);
+  assert.match(report.text, /snapshot is diagnostics only and may be incomplete/);
 });
 
 test("unreadable operator report retains and warns about independently validated audit", async t => {
