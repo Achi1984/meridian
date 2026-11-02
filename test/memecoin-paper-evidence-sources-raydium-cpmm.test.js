@@ -441,6 +441,91 @@ test("context slot consistency, response digest, and bounded cancellation are ex
     assert.equal(result.reasonCode, "CANCELLED");
     assert.equal(built.requests.length, 0);
   });
+  await t.test("abort before queued transport dispatch does not count or issue a request", async () => {
+    const controller = new AbortController();
+    const built = buildTransport();
+    const pending = collectRaydiumCpmmPoolEvidence({
+      identity: IDENTITY,
+      enabled: true,
+      transport: built.transport,
+      clock: () => NOW,
+      signal: controller.signal
+    });
+    controller.abort();
+    const result = await pending;
+    assert.equal(result.status, "UNKNOWN");
+    assert.equal(result.reasonCode, "CANCELLED");
+    assert.equal(result.counters.requests, 0);
+    assert.equal(built.requests.length, 0);
+  });
+  await t.test("late response body is cancelled after timeout without retry", async () => {
+    let resolveTransport;
+    let calls = 0;
+    let cancelled = false;
+    const transportResponse = new Promise(resolve => { resolveTransport = resolve; });
+    const result = await collectRaydiumCpmmPoolEvidence({
+      identity: IDENTITY,
+      enabled: true,
+      clock: () => NOW,
+      limits: {requestTimeoutMs: 5},
+      transport: () => {
+        calls += 1;
+        return transportResponse;
+      }
+    });
+    assert.equal(result.status, "UNKNOWN");
+    assert.equal(result.reasonCode, "TIMEOUT");
+    assert.equal(result.counters.requests, 1);
+    assert.equal(calls, 1);
+    const body = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode("{}"));
+      },
+      cancel() { cancelled = true; }
+    });
+    resolveTransport(new Response(body, {
+      headers: {"content-type": "application/json"}
+    }));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(cancelled, true);
+    assert.equal(calls, 1);
+  });
+  await t.test("late response body is cancelled after caller abort without retry", async () => {
+    const controller = new AbortController();
+    let resolveTransport;
+    let calls = 0;
+    let cancelled = false;
+    const transportResponse = new Promise(resolve => { resolveTransport = resolve; });
+    const pending = collectRaydiumCpmmPoolEvidence({
+      identity: IDENTITY,
+      enabled: true,
+      clock: () => NOW,
+      signal: controller.signal,
+      transport: () => {
+        calls += 1;
+        return transportResponse;
+      }
+    });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(calls, 1);
+    controller.abort();
+    const result = await pending;
+    assert.equal(result.status, "UNKNOWN");
+    assert.equal(result.reasonCode, "CANCELLED");
+    assert.equal(result.counters.requests, 1);
+    const body = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode("{}"));
+      },
+      cancel() { cancelled = true; }
+    });
+    resolveTransport(new Response(body, {
+      headers: {"content-type": "application/json"}
+    }));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(cancelled, true);
+    assert.equal(calls, 1);
+  });
   await t.test("response digest matches the captured byte body", async () => {
     const {result, requests} = await collect();
     const hash = createHash("sha256")
@@ -460,6 +545,36 @@ test("context slot consistency, response digest, and bounded cancellation are ex
       .digest("hex");
     assert.equal(result.poolExclusionEvidence.responseSha256, hash);
     assert.equal(requests.length, 2);
+  });
+});
+
+test("the final decode boundary checks deadline and rejects backward source time", async t => {
+  await t.test("expiry during output construction returns UNKNOWN", async () => {
+    let clockReads = 0;
+    const {transport} = buildTransport();
+    const result = await collectRaydiumCpmmPoolEvidence({
+      identity: IDENTITY,
+      enabled: true,
+      transport,
+      clock: () => NOW + clockReads++ * 30,
+      limits: {maxElapsedMs: 500}
+    });
+    assert.equal(clockReads, 18);
+    assert.equal(result.status, "UNKNOWN");
+    assert.equal(result.reasonCode, "TIMEOUT");
+    assert.equal(result.executionAuthorized, false);
+  });
+  await t.test("response receipt time cannot precede request time", async () => {
+    let clockReads = 0;
+    const {transport} = buildTransport();
+    const result = await collectRaydiumCpmmPoolEvidence({
+      identity: IDENTITY,
+      enabled: true,
+      transport,
+      clock: () => clockReads++ === 3 ? NOW - 1 : NOW
+    });
+    assert.equal(result.status, "UNKNOWN");
+    assert.equal(result.reasonCode, "INVALID_CLOCK");
   });
 });
 

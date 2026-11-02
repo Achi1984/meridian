@@ -81,6 +81,12 @@ function fail(code) {
   throw new SourceFailure(code);
 }
 
+function abortFailure(signal) {
+  return signal?.reason instanceof SourceFailure
+    ? signal.reason
+    : new SourceFailure("CANCELLED");
+}
+
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
@@ -243,19 +249,43 @@ function rpcRequest(method, params, id) {
   });
 }
 
-function raceWithAbort(promise, signal) {
-  if (signal?.aborted) return Promise.reject(signal.reason ?? new SourceFailure("CANCELLED"));
+function cancelResponseBody(response) {
+  try { response?.body?.cancel?.().catch?.(() => {}); } catch { /* body may already be locked or closed */ }
+}
+
+function raceWithAbort(promise, signal, onLateValue) {
   if (!signal) return promise;
   return new Promise((resolve, reject) => {
+    let settled = false;
     const cleanup = () => signal.removeEventListener("abort", onAbort);
     const onAbort = () => {
+      if (settled) return;
+      settled = true;
       cleanup();
-      reject(signal.reason ?? new SourceFailure("CANCELLED"));
+      reject(abortFailure(signal));
     };
-    signal.addEventListener("abort", onAbort, {once: true});
+    if (signal.aborted) {
+      settled = true;
+      reject(abortFailure(signal));
+    } else {
+      signal.addEventListener("abort", onAbort, {once: true});
+    }
     promise.then(
-      value => { cleanup(); resolve(value); },
-      error => { cleanup(); reject(error); }
+      value => {
+        if (settled) {
+          try { onLateValue?.(value); } catch { /* late response cleanup must not escape */ }
+          return;
+        }
+        settled = true;
+        cleanup();
+        resolve(value);
+      },
+      error => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(error);
+      }
     );
   });
 }
@@ -300,6 +330,7 @@ async function readJson(response, {signal, limits, counters}) {
       if (value.byteLength === 0) {
         emptyReads += 1;
         if (emptyReads > 256) fail("EMPTY_STREAM_LIMIT");
+        if (reads % 64 === 0) await yieldToLoop();
         continue;
       }
       emptyReads = 0;
@@ -328,23 +359,32 @@ async function readJson(response, {signal, limits, counters}) {
   return {payload, responseSha256: digest.digest("hex"), responseBytes: size};
 }
 
-async function requestJson({request, transport, signal, limits, counters, timeoutMs}) {
+async function requestJson({
+  request, transport, signal, limits, counters, timeoutMs, beforeDispatch
+}) {
   let response = null;
   const controller = new AbortController();
-  const abortFromCaller = () => controller.abort(signal.reason ?? new SourceFailure("CANCELLED"));
+  const abortFromCaller = () => controller.abort(abortFailure(signal));
   if (signal?.aborted) abortFromCaller();
   else signal?.addEventListener("abort", abortFromCaller, {once: true});
   const timer = setTimeout(() => controller.abort(new SourceFailure("TIMEOUT")), timeoutMs);
   try {
     if (controller.signal.aborted) fail("CANCELLED");
-    counters.requests += 1;
-    response = await raceWithAbort(
-      Promise.resolve().then(() => transport(request, {
+    const transportPromise = Promise.resolve().then(() => {
+      if (controller.signal.aborted) {
+        fail(controller.signal.reason?.code ?? "CANCELLED");
+      }
+      beforeDispatch();
+      return transport(request, {
         credentials: "omit",
         redirect: "error",
         signal: controller.signal
-      })),
-      controller.signal
+      });
+    });
+    response = await raceWithAbort(
+      transportPromise,
+      controller.signal,
+      cancelResponseBody
     );
     validateResponseTarget(response);
     if (!Number.isInteger(response?.status) || response.status < 100 || response.status > 599) {
@@ -353,7 +393,7 @@ async function requestJson({request, transport, signal, limits, counters, timeou
     if (response.status < 200 || response.status >= 300) fail(`HTTP_${response.status}`);
     return await readJson(response, {signal: controller.signal, limits, counters});
   } catch (error) {
-    try { response?.body?.cancel?.().catch?.(() => {}); } catch { /* body may already be locked or closed */ }
+    cancelResponseBody(response);
     const code = error instanceof SourceFailure ? error.code
       : controller.signal.aborted
         ? controller.signal.reason?.code ?? "CANCELLED"
@@ -682,22 +722,34 @@ export async function collectRaydiumCpmmPoolEvidence({
     identity = validateIdentity(inputIdentity);
     startedAt = readClock(clock);
     startedMonotonicAt = performance.now();
-    const runRequest = async (method, params) => {
+    const checkBoundary = time => {
       if (signal?.aborted) fail("CANCELLED");
-      const now = readClock(clock);
+      const currentTime = time === undefined ? readClock(clock) : time;
+      if (signal?.aborted) fail("CANCELLED");
+      if (currentTime < startedAt) fail("INVALID_CLOCK");
+      if (currentTime - startedAt > limits.maxElapsedMs ||
+          performance.now() >= deadlineAt()) fail("TIMEOUT");
+      return currentTime;
+    };
+    const runRequest = async (method, params) => {
+      const now = checkBoundary();
       const remainingMs = limits.maxElapsedMs - (performance.now() - startedMonotonicAt);
-      if (now - startedAt > limits.maxElapsedMs || remainingMs <= 0 ||
-          counters.requests >= limits.maxRequests) fail("TIMEOUT");
+      if (remainingMs <= 0 || counters.requests >= limits.maxRequests) fail("TIMEOUT");
       const request = rpcRequest(method, params, counters.requests + 1);
       const requestedAt = now;
       const before = counters.bytes;
       const timeoutMs = Math.max(1, Math.min(limits.requestTimeoutMs, Math.ceil(remainingMs)));
       const result = await requestJson({
-        request, transport, signal, limits, counters, timeoutMs
+        request, transport, signal, limits, counters, timeoutMs,
+        beforeDispatch: () => {
+          checkBoundary();
+          if (counters.requests >= limits.maxRequests) fail("TIMEOUT");
+          counters.requests += 1;
+        }
       });
       const receivedAt = readClock(clock);
-      if (receivedAt - startedAt > limits.maxElapsedMs ||
-          performance.now() > deadlineAt()) fail("TIMEOUT");
+      if (receivedAt < requestedAt) fail("INVALID_CLOCK");
+      checkBoundary(receivedAt);
       const rpc = rpcResult(result.payload, request.id);
       const responseSlot = rpc.context.slot;
       events.push(requestEvent(request, "OK", requestedAt, receivedAt,
@@ -710,10 +762,13 @@ export async function collectRaydiumCpmmPoolEvidence({
       identity.pool,
       {commitment: "finalized", encoding: "base64"}
     ]);
+    checkBoundary();
     if (initial.rpc.value === null) fail("INVALID_POOL_ACCOUNT");
     const initialPool = parsePoolAccount(initial.rpc.value);
+    checkBoundary();
     const tokenPair = validatePoolIdentity(initialPool.fields, identity);
     validateCanonicalPdas(initialPool.fields, identity);
+    checkBoundary();
     const second = await runRequest("getMultipleAccounts", [
       [
         identity.pool,
@@ -731,13 +786,17 @@ export async function collectRaydiumCpmmPoolEvidence({
         second.responseSlot - initial.responseSlot > limits.maxSlotSkew) {
       fail("RPC_SLOT_INVALID");
     }
+    checkBoundary();
     if (!Array.isArray(second.rpc.value) || second.rpc.value.length !== 4 ||
         second.rpc.value.some(account => account === null)) fail("INVALID_RPC_ENVELOPE");
     const poolAgain = parsePoolAccount(second.rpc.value[0]);
+    checkBoundary();
     if (!poolAgain.bytes.equals(initialPool.bytes)) fail("POOL_STATE_CHANGED");
     const pool = poolAgain.fields;
     const canonicalAuthority = validateCanonicalPdas(pool, identity);
+    checkBoundary();
     const pair = validatePoolIdentity(pool, identity);
+    checkBoundary();
     const vault0 = decodeVault(second.rpc.value[1], {
       address: pool.token0Vault,
       mint: pool.token0Mint,
@@ -745,6 +804,7 @@ export async function collectRaydiumCpmmPoolEvidence({
       authority: canonicalAuthority,
       decimals: pool.token0Decimals
     });
+    checkBoundary();
     const vault1 = decodeVault(second.rpc.value[2], {
       address: pool.token1Vault,
       mint: pool.token1Mint,
@@ -752,7 +812,9 @@ export async function collectRaydiumCpmmPoolEvidence({
       authority: canonicalAuthority,
       decimals: pool.token1Decimals
     });
+    checkBoundary();
     const lpMint = decodeLpMint(second.rpc.value[3], pool, canonicalAuthority);
+    checkBoundary();
     const selectedVault = pair.selectedMint === pool.token0Mint ? vault0 : vault1;
     const quoteVault = pair.quoteMint === pool.token0Mint ? vault0 : vault1;
     slot = second.responseSlot;
@@ -792,7 +854,7 @@ export async function collectRaydiumCpmmPoolEvidence({
         quoteMintVault: quoteVault
       }
     };
-    return {
+    const result = {
       status: "DECODED_UNVERIFIED",
       reason: "pinned Raydium CPMM fields and vault accounts decoded from caller-injected RPC data; source is unauthenticated",
       sourceVersion: SOURCE_VERSION,
@@ -862,6 +924,8 @@ export async function collectRaydiumCpmmPoolEvidence({
       },
       executionAuthorized: false
     };
+    checkBoundary();
+    return result;
   } catch (error) {
     const code = error instanceof SourceFailure ? error.code
       : signal?.aborted ? "CANCELLED"

@@ -174,6 +174,79 @@ test("per-response byte limits stop a streamed profile response before parsing",
   assert.equal(result.events[0].status, "RESPONSE_TOO_LARGE");
 });
 
+test("stream work and empty-chunk limits stop endless provider bodies", async t => {
+  await t.test("endless empty chunks yield to scheduled macrotasks", async () => {
+    let pulls = 0;
+    let cancelled = false;
+    let macrotaskRan = false;
+    const body = new ReadableStream({
+      pull(controller) {
+        pulls += 1;
+        controller.enqueue(new Uint8Array(0));
+      },
+      cancel() { cancelled = true; }
+    });
+    const {options} = setup({
+      limits: {requestTimeoutMs: 50},
+      transport: async () => {
+        setTimeout(() => { macrotaskRan = true; }, 0);
+        return new Response(body, {headers: {"content-type": "application/json"}});
+      }
+    });
+    const result = await collectCandidateDiscovery(options);
+    assert.equal(result.status, "PARTIAL");
+    assert.equal(result.events[0].status, "EMPTY_STREAM_LIMIT");
+    assert.ok(pulls > 0);
+    assert.equal(macrotaskRan, true);
+    assert.equal(cancelled, true);
+  });
+  await t.test("endless one-byte chunks stop at the response byte cap", async () => {
+    let pulls = 0;
+    let cancelled = false;
+    const body = new ReadableStream({
+      pull(controller) {
+        pulls += 1;
+        controller.enqueue(new Uint8Array([0x20]));
+      },
+      cancel() { cancelled = true; }
+    });
+    const {options} = setup({
+      limits: {maxBytesPerResponse: 32, maxBytesPerRun: 4096},
+      transport: async () => new Response(body, {
+        headers: {"content-type": "application/json"}
+      })
+    });
+    const result = await collectCandidateDiscovery(options);
+    assert.equal(result.status, "PARTIAL");
+    assert.equal(result.events[0].status, "RESPONSE_TOO_LARGE");
+    assert.equal(result.counters.bytes, 32);
+    assert.ok(pulls >= 33);
+    assert.equal(cancelled, true);
+  });
+  await t.test("total stream-read work is capped before the response byte maximum", async () => {
+    let pulls = 0;
+    let cancelled = false;
+    const body = new ReadableStream({
+      pull(controller) {
+        pulls += 1;
+        controller.enqueue(new Uint8Array([0x20]));
+      },
+      cancel() { cancelled = true; }
+    });
+    const {options} = setup({
+      transport: async () => new Response(body, {
+        headers: {"content-type": "application/json"}
+      })
+    });
+    const result = await collectCandidateDiscovery(options);
+    assert.equal(result.status, "PARTIAL");
+    assert.equal(result.events[0].status, "STREAM_READ_LIMIT");
+    assert.equal(result.counters.bytes, 65_536);
+    assert.ok(pulls >= 65_536);
+    assert.equal(cancelled, true);
+  });
+});
+
 test("request budgets cap address batches and mark discovery partial", async () => {
   const profiles = Array.from({length: 61}, (_, index) => ({
     chainId: "solana",

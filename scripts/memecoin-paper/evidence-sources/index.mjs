@@ -1,4 +1,5 @@
 import {createHash} from "node:crypto";
+import {setImmediate as yieldToLoop} from "node:timers/promises";
 
 const DEX_ORIGIN = "https://api.dexscreener.com";
 const PROFILES_PATH = "/token-profiles/latest/v1";
@@ -36,9 +37,11 @@ const REQUEST_ERROR_CODES = new Set([
   "INVALID_RESPONSE_CHUNK",
   "INVALID_RESPONSE_URL",
   "INVALID_UTF8",
+  "EMPTY_STREAM_LIMIT",
   "MISSING_RESPONSE_STREAM",
   "REDIRECT_BLOCKED",
   "RESPONSE_TOO_LARGE",
+  "STREAM_READ_LIMIT",
   "TIMEOUT",
   "TRANSPORT_ERROR",
   "WORK_LIMIT"
@@ -168,13 +171,31 @@ async function readJson(response, {signal, limits, counters}) {
   const chunks = [];
   const digest = createHash("sha256");
   let size = 0;
+  let reads = 0;
+  let emptyReads = 0;
   try {
     while (true) {
+      if (signal.aborted) {
+        throw requestFailure("CANCELLED", "collection was cancelled");
+      }
+      reads += 1;
+      if (reads > 65_536) {
+        throw requestFailure("STREAM_READ_LIMIT", "provider response exceeded the stream-read work limit");
+      }
       const {done, value} = await raceWithAbort(reader.read(), signal);
       if (done) break;
       if (!(value instanceof Uint8Array)) {
         throw requestFailure("INVALID_RESPONSE_CHUNK", "provider response stream was malformed");
       }
+      if (value.byteLength === 0) {
+        emptyReads += 1;
+        if (emptyReads > 256) {
+          throw requestFailure("EMPTY_STREAM_LIMIT", "provider response exceeded the empty-chunk limit");
+        }
+        if (reads % 64 === 0) await yieldToLoop();
+        continue;
+      }
+      emptyReads = 0;
       if (value.byteLength > limits.maxBytesPerResponse - size ||
           value.byteLength > limits.maxBytesPerRun - counters.bytes) {
         throw requestFailure("RESPONSE_TOO_LARGE", "provider response exceeded a byte limit");
@@ -183,6 +204,7 @@ async function readJson(response, {signal, limits, counters}) {
       counters.bytes += value.byteLength;
       digest.update(value);
       chunks.push(value);
+      if (reads % 64 === 0) await yieldToLoop();
     }
   } catch (error) {
     try { reader.cancel?.().catch?.(() => {}); } catch { /* reader may already be closed */ }
@@ -335,7 +357,9 @@ function failureReason(status) {
             : status === "CANCELLED" ? "collection was cancelled"
               : status === "INVALID_RESPONSE_URL" || status === "REDIRECT_BLOCKED"
                 ? "redirects and non-allowlisted response URLs are rejected"
-                : "provider response could not be safely acquired";
+                : status === "EMPTY_STREAM_LIMIT" || status === "STREAM_READ_LIMIT"
+                  ? "provider response exceeded a bounded stream-read work limit"
+                  : "provider response could not be safely acquired";
 }
 
 export async function collectCandidateDiscovery({
