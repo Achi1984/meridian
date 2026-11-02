@@ -562,6 +562,57 @@ test('lock, navigation, pagehide and disposal clear private DOM; late uncancella
   assert.equal(h.root.children.length, 0);
 });
 
+test('rapid access changes share one pending cancellation and never repaint late private data', async () => {
+  let releaseCancellation;
+  let cancellationCount = 0;
+  let calls = 0;
+  const report = generatedReport();
+  const pendingBody = new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode('{"partial":'));
+    },
+    cancel() {
+      cancellationCount++;
+      return new Promise(resolve => { releaseCancellation = resolve; });
+    }
+  });
+  const h = harness({fetchImpl: async () => {
+    calls++;
+    return calls === 1
+      ? new Response(pendingBody, {status: 200, headers: {'content-type': 'application/json'}})
+      : paperResponse(report);
+  }});
+  h.controller.setActive(true);
+  const first = h.controller.refresh();
+  await until(() => calls === 1);
+  await until(() => pendingBody.locked);
+  h.access.lock();
+  await first;
+  await until(() => cancellationCount === 1);
+  try {
+    h.access.unlock('replacement-session-one');
+    await h.controller.refresh();
+    h.access.lock();
+    h.access.unlock('replacement-session-two');
+    await h.controller.refresh();
+    assert.equal(calls, 1, 'repeated unlock/lock/refresh cannot replace a cancelling source');
+    assert.equal(cancellationCount, 1, 'the source body is cancelled once despite repeated cleanup');
+    assert.doesNotMatch(h.root.textContent, /Observation-only|90071992547409931234/);
+
+    releaseCancellation();
+    await tick();
+    await tick();
+    assert.equal(calls, 1, 'settling cancellation does not trigger a retry or polling read');
+    assert.doesNotMatch(h.root.textContent, /Observation-only|90071992547409931234/);
+    await h.controller.refresh();
+    assert.equal(calls, 2, 'a later explicit refresh can start after cancellation settles');
+    assert.match(h.root.textContent, /Observation-only/);
+  } finally {
+    releaseCancellation?.();
+    h.controller.dispose();
+  }
+});
+
 test('connector keeps a disposed in-flight source visible as busy until its transport settles', async () => {
   let release;
   const connector = createPaperReportConnector({

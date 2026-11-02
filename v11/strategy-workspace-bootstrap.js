@@ -57,3 +57,8 @@ document.addEventListener('click',event=>{
   document.querySelector('#nav button[data-v="strategies"]')?.click();
   loadWorkspace();
 });
+
+if (document.querySelector('#nav button[data-v="strategies"][aria-current="page"]')) {
+  paperCockpit?.setActive(true);
+  loadWorkspace();
+}

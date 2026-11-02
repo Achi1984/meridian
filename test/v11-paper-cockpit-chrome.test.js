@@ -134,7 +134,7 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
             button:root.querySelector('button'),liveRegion:root.querySelector('[role="status"]')
           };
           details.open=true;
-          window.paperCockpitFreshnessRefs.button.focus();
+          window.paperCockpitFreshnessRefs.summary.focus();
         })()`);
           for(let attempt=0;attempt<400;attempt++){
             if(await evaluate(`document.querySelector('#paper-cockpit-root').dataset.state==='stale'`))break;
@@ -149,12 +149,12 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
               sameDetails:details===refs.details,sameSummary:summary===refs.summary,
               sameButton:root.querySelector('button')===refs.button,
               sameLiveRegion:root.querySelector('[role="status"]')===refs.liveRegion,
-              focused:document.activeElement===refs.button,
+              focusedSummary:document.activeElement===refs.summary,
               status:refs.liveRegion.textContent};
           })()`),{state:'stale',open:true,sameDetails:true,sameSummary:true,
-            sameButton:true,sameLiveRegion:true,focused:true,
+            sameButton:true,sameLiveRegion:true,focusedSummary:true,
             status:'The report is stale under the shared display-only freshness policy.'},
-          'the freshness deadline updates the mounted live region and preserves interactive focus without a read');
+          'the freshness deadline updates the mounted live region and preserves disclosure focus without a read');
           assert.equal(intercepted.count(),1,'freshness revalidation does not issue another request');
         }
         await evaluate(`document.querySelector('#nav').click()`);
@@ -216,6 +216,7 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
             demoReport,state:'ready',message:'Manual one-shot report read.',
             onRefresh:()=>{},loading:false
           });
+
           return true;
         })()`);
         const before=await evaluate(`(()=>{
@@ -344,4 +345,74 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
   }finally{
     await hosted.close();
   }
+});
+
+test('early Strategies navigation remains active when its module bootstrap initializes',{timeout:60000},async()=>{
+  assert.ok(chrome,'Chrome required; early navigation race cannot be skipped');
+  const hosted=await startV11StaticServer();
+  try{
+    let resolveEarlyBootstrap;
+    let rejectEarlyBootstrap;
+    const earlyBootstrapPaused=new Promise((resolve,reject)=>{
+      resolveEarlyBootstrap=resolve;
+      rejectEarlyBootstrap=reject;
+    });
+    await withMobileChrome(chrome,375,hosted.url,async call=>{
+      await earlyBootstrapPaused;
+      const report=projectOperatorReport(reportFixtures.readOnlyCheckpoint());
+      const intercepted=await interceptGeneratedPaperReport(call,report);
+      try{
+        const earlyClick=await call('Runtime.evaluate',{expression:'window.__paperCockpitEarlyNavigation===true',
+          returnByValue:true});
+        assert.equal(earlyClick.result?.value,true,'Strategies was selected before the module bootstrap loaded');
+        const beforeUnlock=await call('Runtime.evaluate',{expression:`(()=>{
+          const root=document.querySelector('#paper-cockpit-root');
+          return {selected:document.querySelector('#nav button[aria-current="page"]')?.dataset.v,
+            state:root?.dataset.state,button:!!root?.querySelector('button')};
+        })()`,returnByValue:true});
+        assert.deepEqual(beforeUnlock.result?.value,{selected:'strategies',state:'auth-required',button:true});
+        await unlockAppThroughGate(call);
+        const afterUnlock=await call('Runtime.evaluate',{expression:`(()=>{
+          const root=document.querySelector('#paper-cockpit-root');
+          return {selected:document.querySelector('#nav button[aria-current="page"]')?.dataset.v,
+            state:root?.dataset.state,button:!!root?.querySelector('button')};
+        })()`,returnByValue:true});
+        assert.deepEqual(afterUnlock.result?.value,{selected:'strategies',state:'ready',button:true});
+        assert.equal(intercepted.count(),0,'early selection and unlock never start a report read');
+      }finally{await intercepted.close();}
+    },844,async call=>{
+      let removeListener;
+      removeListener=call.onEvent('Fetch.requestPaused',event=>{
+        void(async()=>{
+          let failure;
+          try{
+            let selected=false;
+            for(let attempt=0;attempt<50&&!selected;attempt++){
+              const clicked=await call('Runtime.evaluate',{expression:`(()=>{
+                const button=document.querySelector('#nav button[data-v="strategies"]');
+                if(!button)return false;
+                button.click();
+                const active=button.getAttribute('aria-current')==='page';
+                if(active)window.__paperCockpitEarlyNavigation=true;
+                return active;
+              })()`,returnByValue:true});
+              selected=clicked.result?.value===true;
+              if(!selected)await new Promise(resolve=>setTimeout(resolve,10));
+            }
+            if(!selected)failure=Error('the core navigation handler did not activate Strategies before bootstrap');
+          }catch(error){failure=error;}
+          try{
+            await call('Fetch.continueRequest',{requestId:event.requestId});
+            await call('Fetch.disable');
+          }catch(error){failure??=error;}
+          removeListener();
+          if(failure)rejectEarlyBootstrap(failure);
+          else resolveEarlyBootstrap();
+        })().catch(rejectEarlyBootstrap);
+      });
+      await call('Fetch.enable',{patterns:[{
+        urlPattern:'*strategy-workspace-bootstrap.js*',requestStage:'Request'
+      }]});
+    });
+  }finally{await hosted.close();}
 });

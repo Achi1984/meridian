@@ -20,7 +20,7 @@ function stderrCategory(bytes){
  if(/SingletonLock[^\n]*File exists|Failed to create a ProcessSingleton/i.test(text))return 'PROFILE_LOCK';
  return 'UNKNOWN';
 }
-export async function withMobileChrome(chrome,width,url,probe,height=844){
+export async function withMobileChrome(chrome,width,url,probe,height=844,beforeNavigate){
  const dir=mkdtempSync(join(tmpdir(),'v11-cdp-'));
  let child,spawnFailure,collectingStartup=true,stderrReadFailed=false,startupStderr=Buffer.alloc(0);
  let ws;const pending=new Map();let seq=0;
@@ -86,6 +86,7 @@ export async function withMobileChrome(chrome,width,url,probe,height=844){
   await call('Emulation.setFocusEmulationEnabled',{enabled:true});
   await call('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:true,
    screenWidth:width,screenHeight:height});
+  if(typeof beforeNavigate==='function')await beforeNavigate(call);
   const navigation=await call('Page.navigate',{url});
   if(navigation.errorText)throw Error('Page navigation failed: '+navigation.errorText);
   let loaded=false;
