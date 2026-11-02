@@ -991,6 +991,30 @@ test("completion requires coherent candidate evidence and zero unresolved execut
   assert.equal(criterion(unknown, "terminal_completion").status, "UNKNOWN");
   assert.equal(unknown.observation.completionStatus, "UNKNOWN");
   assert.equal(unknown.observation.fullDeadlineCompleted, false);
+
+  for (const [label, change] of [
+    ["displayed count unavailable", coverage => {
+      coverage.displayed = null;
+    }],
+    ["display truncation unavailable", coverage => {
+      coverage.displayTruncated = null;
+    }],
+    ["source truncation unavailable", coverage => {
+      coverage.sourceTruncated = null;
+    }]
+  ]) {
+    const unavailableCoverage = reportRecord({
+      configHash: input.expectedConfigHash
+    });
+    change(unavailableCoverage.dto.unresolvedFillsCoverage);
+    const result = evaluateObservation({
+      ...input,
+      reportBytes: bytes(unavailableCoverage)
+    });
+    assert.equal(criterion(result, "unresolved_execution_attempts").status, "UNKNOWN", label);
+    assert.equal(criterion(result, "terminal_completion").status, "UNKNOWN", label);
+    assert.equal(result.observation.fullDeadlineCompleted, false, label);
+  }
 });
 
 test("unavailable candidate detail stays distinct from a rejection reason", () => {
@@ -1015,6 +1039,17 @@ test("unavailable candidate detail stays distinct from a rejection reason", () =
     status: "UNKNOWN",
     reason: "filter detail unavailable"
   }]);
+});
+
+test("malformed report end timestamps fail safely before interval parsing", () => {
+  const input = fixture();
+  for (const endAt of [{toString: null}, [], true, 123]) {
+    const report = JSON.parse(input.reportBytes.toString("utf8"));
+    report.dto.experiment.endAt = endAt;
+    const result = evaluateObservation({...input, reportBytes: bytes(report)});
+    assert.equal(criterion(result, "operator_report").status, "FAIL");
+    assert.doesNotThrow(() => renderEvaluationMarkdown(result));
+  }
 });
 
 test("Markdown rendering neutralizes untrusted image and link syntax", () => {
@@ -1256,6 +1291,44 @@ test("position rows, counters, and stop states gate observation-only completion"
   assert.match(criterion(closedPaperResult, "terminal_completion").reason, /CLOSED_PAPER/);
   assert.equal(closedPaperResult.observation.completionStatus, "FAIL");
   assert.equal(closedPaperResult.observation.fullDeadlineCompleted, false);
+});
+
+test("stop coverage cannot omit rows or claim more retained rows than observed", () => {
+  const cases = [
+    ["complete coverage omits observed stop", [], {
+      observedTotal: 1,
+      total: 1,
+      displayed: 0,
+      displayTruncated: false,
+      sourceTruncated: false,
+      unaccounted: 0
+    }],
+    ["retained stop exceeds observed count", [{
+      kind: "EXIT",
+      status: "OBSERVED",
+      reason: "stop observed",
+      observedAt: null,
+      source: "checkpoint audit"
+    }], {
+      observedTotal: 0,
+      total: 0,
+      displayed: 1,
+      displayTruncated: true,
+      sourceTruncated: false,
+      unaccounted: 0
+    }]
+  ];
+
+  for (const [label, rows, coverage] of cases) {
+    const input = fixture();
+    const report = JSON.parse(input.reportBytes.toString("utf8"));
+    report.dto.controls.stops = rows;
+    report.dto.controls.stopsCoverage = coverage;
+    const result = evaluateObservation({...input, reportBytes: bytes(report)});
+    assert.equal(criterion(result, "terminal_completion").status, "FAIL", label);
+    assert.equal(result.observation.completionStatus, "FAIL", label);
+    assert.equal(result.observation.fullDeadlineCompleted, false, label);
+  }
 });
 
 test("provider totals distinguish zero from missing, reject mismatches, and retain exact integers", () => {

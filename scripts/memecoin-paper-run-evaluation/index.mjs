@@ -341,7 +341,8 @@ function candidateCoverageStatus(report, config, terminal) {
       "Candidate outcome counts do not reconcile to the observed detail total.");
   }
   const finalization = terminal?.observation?.windowFinalization;
-  const observedEndAt = Date.parse(report?.dto?.experiment?.endAt);
+  const reportEndAt = report?.dto?.experiment?.endAt;
+  const observedEndAt = typeof reportEndAt === "string" ? Date.parse(reportEndAt) : NaN;
   const intervalIsBound = config && Number.isSafeInteger(finalization?.effectiveEndAt) &&
     finalization.effectiveEndAt === observedEndAt &&
     report?.dto?.experiment?.startAt === new Date(config.startAt).toISOString() &&
@@ -458,7 +459,11 @@ function paperExitEvidenceStatus(dto) {
   }
   if (Number.isSafeInteger(coverage.displayed) && coverage.displayed !== rows.length ||
       Number.isSafeInteger(coverage.observedTotal) &&
-        Number.isSafeInteger(coverage.total) && coverage.observedTotal > coverage.total ||
+        (coverage.observedTotal < rows.length ||
+          Number.isSafeInteger(coverage.total) && coverage.observedTotal > coverage.total) ||
+      coverage.displayTruncated === false && Number.isSafeInteger(coverage.displayed) &&
+        Number.isSafeInteger(coverage.observedTotal) &&
+        coverage.displayed !== coverage.observedTotal ||
       Number.isSafeInteger(coverage.unaccounted) &&
         Number.isSafeInteger(coverage.observedTotal) &&
         Number.isSafeInteger(coverage.total) &&
@@ -488,12 +493,12 @@ function unresolvedExecutionStatus(report) {
     .map(key => coverage[key]);
   if (counts.some(value => value !== null && value !== undefined &&
       (!Number.isSafeInteger(value) || value < 0)) ||
-      typeof coverage.displayTruncated !== "boolean" ||
-      typeof coverage.sourceTruncated !== "boolean") {
+      coverage.displayTruncated !== null && typeof coverage.displayTruncated !== "boolean" ||
+      coverage.sourceTruncated !== null && typeof coverage.sourceTruncated !== "boolean") {
     return makeCriterion("unresolved_execution_attempts", "FAIL",
       "Unresolved execution-attempt coverage counters are malformed.");
   }
-  if (coverage.displayed !== rows.length ||
+  if (Number.isSafeInteger(coverage.displayed) && coverage.displayed !== rows.length ||
       Number.isSafeInteger(coverage.observedTotal) && coverage.observedTotal < rows.length ||
       Number.isSafeInteger(coverage.total) &&
         Number.isSafeInteger(coverage.observedTotal) &&
