@@ -35,7 +35,14 @@ class Element {
   click() { for (const callback of this.events.get('click') || []) callback({target: this}); }
 }
 
-function harness({unlocked = true, token = TOKEN, fetchImpl, policy = {now: () => NOW, staleAfterMs: 60_000}} = {}) {
+function harness({
+  unlocked = true,
+  token = TOKEN,
+  fetchImpl,
+  policy = {now: () => NOW, staleAfterMs: 60_000},
+  schedule,
+  cancelSchedule
+} = {}) {
   const document = {createElement: tag => new Element(document, tag)};
   const root = new Element(document, 'section');
   const listeners = new Set();
@@ -78,7 +85,9 @@ function harness({unlocked = true, token = TOKEN, fetchImpl, policy = {now: () =
   const controller = mountPaperCockpit(root, document, window, {
     access,
     fetchImpl,
-    freshnessPolicy: policy
+    freshnessPolicy: policy,
+    schedule,
+    cancelSchedule
   });
   const findButton = () => {
     const visit = element => [element, ...element.children.flatMap(visit)];
@@ -87,6 +96,29 @@ function harness({unlocked = true, token = TOKEN, fetchImpl, policy = {now: () =
   return {
     root, document, window, access, controller, findButton, policy,
     revalidate() { for (const revalidate of readers.values()) revalidate(); }
+  };
+}
+
+function fakeScheduler(now) {
+  let nextId = 0;
+  const timers = new Map();
+  return {
+    timers,
+    schedule(callback, delay) {
+      const id = ++nextId;
+      timers.set(id, {callback, due: now() + delay, delay});
+      return id;
+    },
+    cancelSchedule(id) { timers.delete(id); },
+    runDue() {
+      const due = [...timers.entries()]
+        .filter(([, timer]) => timer.due <= now())
+        .sort((left, right) => left[1].due - right[1].due);
+      for (const [id, timer] of due) {
+        if (!timers.delete(id)) continue;
+        timer.callback();
+      }
+    }
   };
 }
 
@@ -218,6 +250,110 @@ test('revalidation reclassifies retained freshness without reading and preserves
   release(paperResponse(generatedReport()));
   await pending;
   h.controller.dispose();
+});
+
+test('freshness deadline is one-shot, strict at the boundary, and replaced with the report', async () => {
+  let now = NOW;
+  let calls = 0;
+  let release;
+  const clock = fakeScheduler(() => now);
+  const h = harness({
+    fetchImpl: async () => {
+      calls++;
+      if (calls === 1) return paperResponse(generatedReport());
+      return new Promise(resolve => { release = resolve; });
+    },
+    policy: {now: () => now, staleAfterMs: 60_000},
+    schedule: clock.schedule,
+    cancelSchedule: clock.cancelSchedule
+  });
+  h.controller.setActive(true);
+  await h.controller.refresh();
+  assert.equal(clock.timers.size, 1, 'a successful read arms one deadline timer');
+  const firstTimerId = clock.timers.keys().next().value;
+  assert.equal(clock.timers.get(firstTimerId).delay, 60_001);
+
+  now += 1_000;
+  const pending = h.controller.refresh();
+  await until(() => typeof release === 'function');
+  const inFlightTimerId = clock.timers.keys().next().value;
+  assert.notEqual(inFlightTimerId, firstTimerId, 'rendering does not retain an obsolete timer');
+  release(paperResponse(generatedReport({observedAt: now})));
+  await pending;
+  assert.equal(calls, 2);
+  assert.equal(clock.timers.size, 1, 'the replacement report owns one new deadline');
+  assert.equal(clock.timers.has(inFlightTimerId), false);
+
+  now += 60_000;
+  clock.runDue();
+  assert.notEqual(h.root.attrs['data-state'], 'stale', 'the threshold itself remains within policy');
+  assert.equal(clock.timers.size, 1, 'the timer waits until the strict stale boundary');
+  now++;
+  clock.runDue();
+  assert.equal(h.root.attrs['data-state'], 'stale');
+  assert.match(h.root.textContent, /stale under the shared display-only freshness policy/i);
+  assert.equal(calls, 2, 'deadline revalidation never issues another read');
+  assert.equal(clock.timers.size, 0, 'stale reports have no further deadline timer');
+  h.controller.dispose();
+});
+
+test('deadline during a refresh preserves loading and lifecycle clearing cancels timers', async () => {
+  let now = NOW;
+  let calls = 0;
+  let release;
+  const clock = fakeScheduler(() => now);
+  const h = harness({
+    fetchImpl: async () => {
+      calls++;
+      if (calls === 1) return paperResponse(generatedReport());
+      return new Promise(resolve => { release = resolve; });
+    },
+    policy: {now: () => now, staleAfterMs: 60_000},
+    schedule: clock.schedule,
+    cancelSchedule: clock.cancelSchedule
+  });
+  h.controller.setActive(true);
+  await h.controller.refresh();
+  const pending = h.controller.refresh();
+  await until(() => typeof release === 'function');
+  now += 60_001;
+  clock.runDue();
+  assert.equal(h.root.attrs['data-state'], 'loading');
+  assert.match(h.root.textContent, /one-shot report read is in progress/i);
+  assert.equal(calls, 2, 'deadline expiry during a read performs no additional request');
+  release(paperResponse(generatedReport({observedAt: now})));
+  await pending;
+  assert.notEqual(h.root.attrs['data-state'], 'stale', 'the replacement response is reclassified');
+  assert.equal(clock.timers.size, 1);
+  h.controller.dispose();
+  assert.equal(clock.timers.size, 0);
+
+  for (const lifecycle of ['lock', 'navigation', 'pagehide', 'dispose']) {
+    now = NOW;
+    const localClock = fakeScheduler(() => now);
+    let localCalls = 0;
+    const local = harness({
+      fetchImpl: async () => {
+        localCalls++;
+        return paperResponse(generatedReport());
+      },
+      policy: {now: () => now, staleAfterMs: 60_000},
+      schedule: localClock.schedule,
+      cancelSchedule: localClock.cancelSchedule
+    });
+    local.controller.setActive(true);
+    await local.controller.refresh();
+    assert.equal(localClock.timers.size, 1, `${lifecycle} setup arms one timer`);
+    if (lifecycle === 'lock') local.access.lock();
+    else if (lifecycle === 'navigation') local.controller.setActive(false);
+    else if (lifecycle === 'pagehide') local.window.fire('pagehide');
+    else local.controller.dispose();
+    assert.equal(localClock.timers.size, 0, `${lifecycle} cancels the deadline timer`);
+    now += 60_001;
+    localClock.runDue();
+    assert.equal(localCalls, 1, `${lifecycle} deadline cannot cause another read`);
+    if (lifecycle !== 'dispose') local.controller.dispose();
+  }
 });
 
 test('pageshow restores selected cockpit activity without restoring data or starting a read', () => {

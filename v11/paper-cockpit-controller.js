@@ -28,11 +28,14 @@ export function mountPaperCockpit(root, document, window, {
   fetchImpl = globalThis.fetch,
   enabled = true,
   freshnessPolicy = {now: Date.now, staleAfterMs: 5 * 60 * 1000},
-  createConnector = createPaperReportConnector
+  createConnector = createPaperReportConnector,
+  schedule = setTimeout,
+  cancelSchedule = clearTimeout
 } = {}) {
   if (!root || !document || !window || !access ||
       typeof access.getToken !== 'function' || typeof access.isUnlocked !== 'function' ||
       typeof access.registerReader !== 'function' || typeof access.subscribe !== 'function' ||
+      typeof schedule !== 'function' || typeof cancelSchedule !== 'function' ||
       typeof freshnessPolicy?.now !== 'function' ||
       !(freshnessPolicy.staleAfterMs === null ||
         (Number.isSafeInteger(freshnessPolicy.staleAfterMs) && freshnessPolicy.staleAfterMs >= 0))) {
@@ -49,9 +52,34 @@ export function mountPaperCockpit(root, document, window, {
   let active = false;
   let disposed = false;
   let reading = false;
+  let freshnessTimer = null;
   let restoreActiveOnPageShow = false;
   let generation = 0;
   let requestOwner = null;
+
+  function clearFreshnessTimer() {
+    if (freshnessTimer === null) return;
+    cancelSchedule(freshnessTimer);
+    freshnessTimer = null;
+  }
+
+  function scheduleFreshnessUpdate() {
+    clearFreshnessTimer();
+    if (disposed || !active || !report || policy.staleAfterMs === null) return;
+    const model = presentPaperCockpitReport(report, {
+      now: policy.now(),
+      staleAfterMs: policy.staleAfterMs
+    });
+    const freshness = model.evidence?.freshness;
+    if (freshness?.status !== 'WITHIN_DISPLAY_POLICY' ||
+        !Number.isSafeInteger(freshness.ageMs)) return;
+    const remaining = policy.staleAfterMs - freshness.ageMs + 1;
+    if (remaining <= 0) return;
+    freshnessTimer = schedule(() => {
+      freshnessTimer = null;
+      revalidate();
+    }, Math.min(remaining, 2_147_483_647));
+  }
 
   function render() {
     if (disposed) return;
@@ -62,6 +90,7 @@ export function mountPaperCockpit(root, document, window, {
       loading: reading,
       freshnessPolicy: policy
     });
+    scheduleFreshnessUpdate();
   }
 
   function disposeRead() {
