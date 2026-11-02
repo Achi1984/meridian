@@ -534,7 +534,7 @@ test("repeated 256 KiB strings are rejected by cumulative byte accounting", asyn
   assert.equal(calls.some(call => call.method === "authorizeEntry"), false);
 });
 
-test("real checkpoint daily-loss exit refreshes consumed marks and durably closes survivors", async t => {
+async function runRealDailyLossScenario(t, {futureRiskQuote = false} = {}) {
   const mints = [
     "So11111111111111111111111111111111111111112",
     `${"1".repeat(31)}2`,
@@ -550,6 +550,7 @@ test("real checkpoint daily-loss exit refreshes consumed marks and durably close
   let candidateIndex = 0;
   let clockTime = START;
   const quoteCounts = new Map();
+  const riskExitQuotes = [];
   const {runner, store} = await makeRealRunner(t, {
     runId: "runner-daily-loss-review",
     candidateSource: {
@@ -562,6 +563,12 @@ test("real checkpoint daily-loss exit refreshes consumed marks and durably close
       quoteCounts.set(candidate.mint, count + 1);
       const gap = purpose === "EXIT" && candidateIndex === candidates.length &&
         candidate.mint === mints[0] && count >= 2;
+      const riskExit = purpose === "RISK_EXIT";
+      if (riskExit) clockTime = now + 1_000;
+      const observedAt = riskExit
+        ? now + (futureRiskQuote && candidate.mint === mints[2] ? 3_000 : 1_000)
+        : now;
+      if (riskExit) riskExitQuotes.push({mint: candidate.mint, requestAt: now, observedAt});
       return {
         source: SYNTHETIC_SOURCE,
         fixtureOnly: true,
@@ -570,7 +577,7 @@ test("real checkpoint daily-loss exit refreshes consumed marks and durably close
         pool: candidate.pool,
         quote: candidate.quote,
         decimals: candidate.decimals,
-        observedAt: now,
+        observedAt,
         priceMicros: gap ? 1_000 : 10_000,
         mode: "HYPOTHETICAL",
         executable: true,
@@ -580,7 +587,11 @@ test("real checkpoint daily-loss exit refreshes consumed marks and durably close
     clock: () => (clockTime += 1_000)
   });
   const report = await runner.run();
+  return {report, store, mints, riskExitQuotes};
+}
 
+test("real checkpoint daily-loss exit validates fresh RISK_EXIT response time and durably closes survivors", async t => {
+  const {report, store, mints, riskExitQuotes} = await runRealDailyLossScenario(t);
   assert.equal(report.status, "FINISHED");
   assert.equal(report.reason, "DAILY_LOSS_LIMIT");
   assert.equal(report.summary.openPositions.length, 0);
@@ -599,6 +610,11 @@ test("real checkpoint daily-loss exit refreshes consumed marks and durably close
   assert.equal(checkpoint.records.at(-1).method, "finishRun");
   assert.equal(readback.sequence, report.terminalReceipt.sequence);
   assert.equal(readback.hash, report.terminalReceipt.hash);
+  assert.equal(riskExitQuotes.length, 2);
+  for (const quote of riskExitQuotes) {
+    assert.ok(quote.observedAt > quote.requestAt);
+    assert.ok(quote.observedAt <= quote.requestAt + 2_000);
+  }
   const lastObservations = new Map();
   for (const record of checkpoint.records.filter(item => item.method === "observeExitQuote")) {
     const quote = record.inputs.quote;
@@ -611,6 +627,28 @@ test("real checkpoint daily-loss exit refreshes consumed marks and durably close
     const mark = refreshedRisk.inputs.marks.find(item => item.mint === mint);
     assert.ok(mark.observedAt > lastObservations.get(mint));
   }
+});
+
+test("real checkpoint daily-loss exit rejects a RISK_EXIT quote future of its response clock", async t => {
+  const {report, store, mints, riskExitQuotes} = await runRealDailyLossScenario(t, {
+    futureRiskQuote: true
+  });
+  assert.equal(report.status, "FINISHED");
+  assert.equal(report.reason, "DAILY_LOSS_LIMIT");
+  assert.equal(report.summary.openPositions.length, 2);
+  const futureQuote = riskExitQuotes.find(quote => quote.mint === mints[2]);
+  assert.ok(futureQuote);
+  assert.ok(futureQuote.observedAt > futureQuote.requestAt + 2_000);
+
+  const readback = await store.readCheckpoint();
+  assert.equal(readback.status, "OK");
+  const checkpoint = JSON.parse(readback.bytes.toString("utf8"));
+  assert.equal(checkpoint.records.at(-1).method, "finishRun");
+  const validQuote = riskExitQuotes.find(quote => quote.mint === mints[1]);
+  const riskMarks = checkpoint.records.filter(item => item.method === "riskSnapshot")
+    .flatMap(item => item.inputs.marks);
+  assert.equal(riskMarks.some(mark =>
+    mark.mint === mints[1] && mark.observedAt === validQuote.observedAt), false);
 });
 
 test("tight-budget shutdown durably finishes without fabricated terminal valuation", async t => {

@@ -442,8 +442,10 @@ export function createPaperExecutionRunner({
           const observedAt = readTime();
           if (observedAt >= endAt) return {deadline: true, marks: []};
           const quote = await quoteFor({purpose: "RISK_EXIT", candidate, position, now: observedAt, tick});
+          const responseTime = readTime();
+          if (responseTime >= endAt) return {deadline: true, marks: []};
           const priorMark = priorMarks.get(position.mint);
-          if (!syntheticQuote(quote, candidate) || quote.observedAt > observedAt ||
+          if (!syntheticQuote(quote, candidate) || quote.observedAt > responseTime ||
               (priorMark && quote.observedAt <= priorMark.observedAt)) continue;
           refreshedMarks.push({...quote, eventId: nextId("risk-exit-mark")});
         }
