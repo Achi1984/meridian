@@ -21,6 +21,7 @@ const MAX_LIMITS = Object.freeze({
 });
 const HASH = /^[a-f0-9]{64}$/;
 const EXTERNAL_INPUT_KIND = "MEMECOIN_EXTERNAL_READ_ONLY_INPUT_V1";
+export const EXTERNAL_INPUT_SOURCE = "UNVERIFIED_EXTERNAL_READ_ONLY_INPUT";
 const externalReadOnlyInputs = new WeakMap();
 
 class InputBudgetError extends RangeError {}
@@ -167,6 +168,16 @@ function exactDataKeys(value, expected) {
     });
 }
 
+function unverifiedEvidenceGroup(group) {
+  if (!group || typeof group !== "object" || Array.isArray(group)) return {};
+  return Object.fromEntries(Object.entries(group).map(([key, evidence]) => [
+    key,
+    evidence && typeof evidence === "object" && !Array.isArray(evidence)
+      ? {...evidence, verified: false}
+      : evidence
+  ]));
+}
+
 export function createBoundedExternalReadOnlyInput(input) {
   const detached = detachInput(input, MAX_LIMITS.maxInputBytes);
   const value = detached.value;
@@ -198,6 +209,34 @@ export function createBoundedExternalReadOnlyInput(input) {
   return value;
 }
 
+export function normalizeBoundedExternalCandidates(externalReadOnlyInput, maxCandidates = MAX_LIMITS.maxCandidates) {
+  if (!externalReadOnlyInputs.has(externalReadOnlyInput) ||
+      !Number.isSafeInteger(maxCandidates) || maxCandidates < 0 ||
+      maxCandidates > MAX_LIMITS.maxCandidates) {
+    throw new TypeError("a bounded external input and candidate limit are required");
+  }
+  const payload = externalReadOnlyInput.payload;
+  const rows = Array.isArray(payload.candidates) ? payload.candidates
+    : payload.candidate && typeof payload.candidate === "object" && !Array.isArray(payload.candidate)
+      ? [payload.candidate] : [];
+  if (rows.length > maxCandidates) {
+    throw Object.assign(new RangeError("external candidate count exceeds its configured bound"), {
+      code: "CANDIDATE_BOUND"
+    });
+  }
+  return rows.map(row => {
+    if (!row || typeof row !== "object" || Array.isArray(row)) return row;
+    return {
+      ...row,
+      source: EXTERNAL_INPUT_SOURCE,
+      untrustedSourceClaim: row.source ?? null,
+      sampledAt: row.sampledAt ?? externalReadOnlyInput.timing.sourceTimestamp,
+      evidence: unverifiedEvidenceGroup(row.evidence ?? payload.evidence),
+      analystEvidence: unverifiedEvidenceGroup(row.analystEvidence ?? payload.analystEvidence)
+    };
+  });
+}
+
 function syntheticCandidateEvidence(candidate) {
   if (!candidate || candidate.source !== SYNTHETIC_SOURCE) return false;
   for (const group of [candidate.evidence, candidate.analystEvidence]) {
@@ -205,6 +244,18 @@ function syntheticCandidateEvidence(candidate) {
     if (!group || typeof group !== "object" || Array.isArray(group)) return false;
     for (const evidence of Object.values(group)) {
       if (evidence?.source !== SYNTHETIC_SOURCE) return false;
+    }
+  }
+  return true;
+}
+
+function externalCandidateEvidence(candidate) {
+  if (!candidate || candidate.source !== EXTERNAL_INPUT_SOURCE) return false;
+  for (const group of [candidate.evidence, candidate.analystEvidence]) {
+    if (group === undefined) continue;
+    if (!group || typeof group !== "object" || Array.isArray(group)) return false;
+    for (const evidence of Object.values(group)) {
+      if (evidence?.verified !== false) return false;
     }
   }
   return true;
@@ -240,59 +291,35 @@ export function createPaperExecutionRunner({
   smartWalletAllowlist,
   limits
 } = {}) {
+  let externalInput = null;
   if (externalReadOnlyInput !== undefined) {
-    const input = externalReadOnlyInputs.get(externalReadOnlyInput);
-    if (!input || !Number.isSafeInteger(externalInputByteLimit) ||
+    externalInput = externalReadOnlyInputs.get(externalReadOnlyInput);
+    if (!externalInput || !Number.isSafeInteger(externalInputByteLimit) ||
         externalInputByteLimit < 1 || externalInputByteLimit > MAX_LIMITS.maxInputBytes) {
       throw new TypeError("a bounded external read-only input and byte limit are required");
     }
-    if (input.bytes > externalInputByteLimit) {
+    if (externalInput.bytes > externalInputByteLimit) {
       throw new RangeError("external read-only input exceeds the configured byte budget");
     }
-    let externalRunPromise;
-    return Object.freeze({
-      run() {
-        if (!externalRunPromise) {
-          externalRunPromise = Promise.resolve({
-            status: "UNKNOWN",
-            code: "EXTERNAL_SOURCE_CONTRACTS_NOT_ACCEPTED",
-            reason: "external source contracts are not accepted for simulated entry",
-            executionMode: "READ_ONLY_EXTERNAL",
-            provenance: "UNVERIFIED_CALLER_INPUT",
-            realDataSourceCoverage: "NOT_ASSESSED",
-            externalInputDigest: input.digest,
-            producerRevision: externalReadOnlyInput.producerRevision,
-            sourceContracts: {...externalReadOnlyInput.sourceContracts},
-            timingClaims: {...externalReadOnlyInput.timing},
-            executionStarted: false,
-            terminalReceipt: null,
-            checkpoint: null,
-            unresolved: [
-              "candidate-intake contract is not accepted",
-              "market-evidence contract is not accepted",
-              "quote and complete-cost contract is not accepted",
-              "trusted source-time and receipt-time attestation is not accepted"
-            ]
-          });
-        }
-        return externalRunPromise;
-      }
-    });
   }
   const bounds = boundedLimits(limits);
   if (typeof runId !== "string" || !/^[A-Za-z0-9._:-]{1,120}$/.test(runId) ||
       !integerTime(startedAt) || !integerTime(endAt) || endAt <= startedAt ||
       endAt > startedAt + EIGHT_HOURS_MS ||
-      executionMode !== "SIMULATED_ONLY" || provenance !== SYNTHETIC_SOURCE ||
+      (externalInput
+        ? executionMode !== "READ_ONLY_EXTERNAL" || provenance !== "UNVERIFIED_CALLER_INPUT"
+        : executionMode !== "SIMULATED_ONLY" || provenance !== SYNTHETIC_SOURCE) ||
       !executionStep || !session || typeof session.snapshot !== "function" ||
       !["authorizeEntry", "executeEntry", "observeExitQuote", "riskSnapshot", "finishRun"]
         .every(method => typeof executionStep[method] === "function") ||
       !candidateSource || typeof candidateSource.poll !== "function" ||
       typeof quoteSource !== "function" || typeof clock !== "function" ||
       typeof stopSource !== "function" ||
-      smartWalletAllowlist?.status !== "VERIFIED" ||
-      smartWalletAllowlist?.provenance !== SYNTHETIC_SOURCE) {
-    throw new TypeError("explicit synthetic PAPER mode, bounded run, and injected sources are required");
+      (!externalInput && (smartWalletAllowlist?.status !== "VERIFIED" ||
+        smartWalletAllowlist?.provenance !== SYNTHETIC_SOURCE))) {
+    throw new TypeError(externalInput
+      ? "explicit bounded external PAPER mode, fresh checkpoint, and injected sources are required"
+      : "explicit synthetic PAPER mode, bounded run, and injected sources are required");
   }
   const metadata = session.metadata;
   if (metadata?.runId !== runId || metadata.startedAt !== startedAt ||
@@ -319,6 +346,18 @@ export function createPaperExecutionRunner({
   const pendingAuthorizationIds = new Set();
   let ledgerUnknownReason = null;
   let missingTerminalValuationMints = [];
+  let externalCandidateMismatch = false;
+  let externalCandidateDigests = new Set();
+  if (externalInput) {
+    try {
+      externalCandidateDigests = new Set(normalizeBoundedExternalCandidates(
+        externalReadOnlyInput,
+        bounds.maxCandidates
+      ).map(candidate => createHash("sha256").update(canonicalCheckpointBytes(candidate)).digest("hex")));
+    } catch {
+      externalCandidateDigests = new Set();
+    }
+  }
 
   function nextId(purpose) {
     logicalId += 1;
@@ -363,7 +402,23 @@ export function createPaperExecutionRunner({
       pendingAuthorizationIds: [...pendingAuthorizationIds],
       terminalResult,
       terminalReceipt: verifiedTerminalReceipt ? {...verifiedTerminalReceipt} : null,
-      summary
+      summary,
+      ...(externalInput ? {
+        externalInputDigest: externalInput.digest,
+        externalInputClaims: {
+          producerRevision: externalReadOnlyInput.producerRevision,
+          sourceContracts: {...externalReadOnlyInput.sourceContracts},
+          timing: {...externalReadOnlyInput.timing}
+        },
+        unresolved: [
+          "candidate-intake producer is not accepted",
+          "market-evidence producer is not accepted",
+          "owner census remains response-reconciled only and cannot satisfy its owner hard gate",
+          "source-bound quote and complete-cost producer is not accepted",
+          "source-time attestation and trusted UTC clock are unavailable",
+          ...(externalCandidateMismatch ? ["candidate source did not match the bound packet"] : [])
+        ]
+      } : {})
     };
   }
 
@@ -391,8 +446,25 @@ export function createPaperExecutionRunner({
     } else if (!(method === "authorizeEntry" && result?.status === "BLOCKED")) {
       return {unacknowledged: true, result};
     }
-    results.push({method, status: result?.status ?? "INVALID_RESULT",
-      receipt: result?.receipt ? {...result.receipt} : null});
+    const operationResult = {
+      method,
+      status: result?.status ?? "INVALID_RESULT",
+      receipt: result?.receipt ? {...result.receipt} : null
+    };
+    if (externalInput && method === "authorizeEntry") {
+      operationResult.candidateObservation = {
+        chainId: input.candidate?.chainId ?? null,
+        mint: input.candidate?.mint ?? null,
+        pool: input.candidate?.pool ?? null,
+        quote: input.candidate?.quote ?? null,
+        sampledAt: input.candidate?.sampledAt ?? null,
+        source: input.candidate?.source ?? null,
+        sourceClaim: input.candidate?.untrustedSourceClaim ?? null
+      };
+      operationResult.filterResult = result?.filterResult ?? null;
+      operationResult.scoreResult = result?.scoreResult ?? null;
+    }
+    results.push(operationResult);
     if (method === "authorizeEntry" && result?.status === "AUTHORIZED") {
       pendingAuthorizationIds.add(result.authorizationId);
     }
@@ -570,7 +642,22 @@ export function createPaperExecutionRunner({
   }
 
   async function processCandidate(candidate, tick, marks) {
-    if (!syntheticCandidateEvidence(candidate)) {
+    if (externalInput) {
+      const digest = createHash("sha256").update(canonicalCheckpointBytes(candidate)).digest("hex");
+      if (!externalCandidateDigests.has(digest)) {
+        externalCandidateMismatch = true;
+        results.push({
+          method: "candidate",
+          status: "BLOCKED",
+          reason: "external candidate is not bound to the immutable input packet"
+        });
+        return {blocked: true};
+      }
+    }
+    const acceptedCandidateBoundary = externalInput
+      ? externalCandidateEvidence(candidate)
+      : syntheticCandidateEvidence(candidate);
+    if (!acceptedCandidateBoundary) {
       results.push({method: "candidate", status: "BLOCKED", reason: "synthetic fixture provenance required"});
       return {blocked: true};
     }
@@ -592,6 +679,13 @@ export function createPaperExecutionRunner({
     if (authorization.ledgerUnknown) return {ledgerUnknown: true};
     if (authorization.budget || authorization.unacknowledged || authorization.stop) return {stop: true};
     const authResult = authorization.result;
+    if (externalInput) {
+      if (authResult?.status !== "BLOCKED") {
+        state = "UNKNOWN";
+        return {unknown: true};
+      }
+      return {blocked: true};
+    }
     if (authResult?.status !== "AUTHORIZED" ||
         authResult.executionMode !== "SIMULATED_ONLY" || authResult.executionRealistic !== false) {
       return {blocked: authResult?.status === "BLOCKED" || authResult?.status === "REJECT"};

@@ -1,17 +1,23 @@
-# Bounded Paper-pilot composition — offline proof only
+# Bounded Paper-pilot composition — offline and no-entry external proof
 
-**Status: runner-backed synthetic integration proof; real-source composition and
+**Status: the synthetic path is a runner-backed paper proof. The external path
+performs bounded candidate evaluation only and always fails closed to a durable
+no-entry result while source evidence remains unaccepted. Real-data entry and
 launch are BLOCKED.** The
 [`paper-pilot-composition.mjs`](../../../scripts/memecoin-paper/paper-pilot-composition.mjs)
 uses the accepted #1146 `execution-runner.mjs`, execution-step, checkpoint
-session, and fixed-point ledger. Its runnable trade path is
+session, and fixed-point ledger. Its trade path remains
 `SYNTHETIC_TEST_ONLY`; fixtures remain synthetic through evidence, quotes,
 provenance, report output, and durable checkpoint. The separate
-`EXTERNAL_READ_ONLY_INPUT` contract is deliberately bounded but returns
-`UNKNOWN` without starting execution while candidate intake, evidence, quote,
-cost, and trusted-time producers remain unaccepted. No provider, order, wallet,
-signer, deployment, or live-ready path is enabled. Import and no-argument CLI
-invocation are inert/disabled.
+`EXTERNAL_READ_ONLY_INPUT` contract accepts bounded normalized candidate rows,
+rewrites their source label to `UNVERIFIED_EXTERNAL_READ_ONLY_INPUT`, clears all
+evidence `verified` flags, and routes them through the existing scout, filter,
+analyst, risk, and terminal runner. It cannot request a quote or dispatch an
+entry. Missing or unauthenticated evidence therefore yields a durable
+`BLOCKED`/no-entry result with a terminal receipt, not a synthetic fill or
+readiness claim. No provider acquisition, order, wallet, signer, deployment, or
+live-ready path is enabled. Import and no-argument CLI invocation are inert/
+disabled.
 Configuration and fixture options reject accessor/hidden fields, and a
 pre-aborted run exits before opening a checkpoint.
 
@@ -48,8 +54,8 @@ except the nonnegative clock-uncertainty bound:
 }
 ```
 
-`startedAt` is integer UTC epoch milliseconds, no later than the proof's
-synthetic clock and at most eight hours before its fixed deadline. The supported
+`startedAt` is integer UTC epoch milliseconds, no later than the proof clock
+and at most eight hours before its fixed deadline. The supported
 ceilings are requests 960, bytes 8,388,608, global events 1,000 (the checkpoint
 step further caps ledger events at 256), candidates 100, cycles 256, duration
 eight hours, callback timeout 30 seconds, and clock uncertainty 60 seconds.
@@ -99,8 +105,14 @@ node scripts/memecoin-paper/paper-pilot-composition.mjs offline-proof \
 Without `offline-proof`, the command prints `DISABLED`. The CLI constructs only
 the repository's generated synthetic candidate and hypothetical quotes. It
 never starts acquisition from a provider. The state directory must be new for
-each run: an existing checkpoint, including a terminal one, returns
+each run: an existing checkpoint or pre-start binding returns
 `RESTART_NOT_ALLOWED`; there is no replay migration or restart path.
+
+Before sequence zero is published, each new run writes and fsyncs an immutable
+`start-binding.json` containing the canonical config digest, producer revision,
+run/window/policy identity, and (for external evaluation) the bounded input
+digest. It is not a ledger/checkpoint format change. A binding without a
+checkpoint is never treated as proof that a run completed.
 
 The synthetic factory accepts only module-generated adapters from
 `offlineFixtureAdapters({clock?, fault?})`. It does not accept caller-supplied
@@ -109,8 +121,8 @@ finite `fault` enum is offline-only and exercises disconnect, timeout, stop,
 clock-jump, lost-ack, no-candidate, evidence/cost rejection, and unavailable-mark
 paths. It cannot perform network access or relabel caller-supplied market data.
 
-The bounded external read-only input is a distinct, data-only packet. Its exact
-shape is:
+The external path is a distinct data-only, no-entry evaluation. Its bounded
+packet contract is:
 
 ```json
 {
@@ -129,13 +141,28 @@ shape is:
     "monotonicElapsedMs": 1000,
     "clockSource": "UNATTESTED"
   },
-  "payload": {"candidate": {}, "evidence": {}, "quotes": []}
+  "payload": {
+    "candidates": [{
+      "chainId": "solana",
+      "mint": "11111111111111111111111111111111",
+      "pool": "Vote111111111111111111111111111111111111111",
+      "quote": "Stake11111111111111111111111111111111111111",
+      "decimals": 6,
+      "sampledAt": 1793651880000,
+      "source": "caller-claimed-source",
+      "evidence": {},
+      "analystEvidence": {}
+    }]
+  }
 }
 ```
 
 `sourceContracts` values are either `null` or lowercase 40/64-character SHAs;
 the packet, including `payload`, is bounded to 8 MiB and detached from caller
-objects. These producer/time fields are claims, not attestations. The API is:
+objects. The candidate array is bounded by the configured candidate count; the
+legacy singular `payload.candidate` shape is also accepted. All producer, SHA,
+source-label, source-time, and clock fields remain caller claims. None is an
+attestation or an accepted dependency pin. The exact API is:
 
 ```js
 import {createPaperPilotComposition} from
@@ -146,40 +173,31 @@ import {createBoundedExternalReadOnlyInput} from
 const externalReadOnlyInput = createBoundedExternalReadOnlyInput(packet);
 const pilot = createPaperPilotComposition({
   config: {...config, mode: "EXTERNAL_READ_ONLY_INPUT"},
+  dataDirectory: "/absolute/path/to/new-empty-state",
   externalReadOnlyInput
 });
-const report = await pilot.start();
+const result = await pilot.start();
+const runExport = result.report;
 ```
 
-This path accepts no callbacks and performs no acquisition. Until the source
-contracts are accepted and wired, it returns `UNKNOWN`, zero entries, no
-checkpoint/terminal receipt, `executionStarted: false`, and explicit unresolved
-producer/time/cost blockers. Caller source labels cannot turn this packet into
-trusted evidence or synthetic fixtures.
+This path accepts no callbacks and performs no acquisition. It replaces each
+candidate source with the code-owned `UNVERIFIED_EXTERNAL_READ_ONLY_INPUT`
+label, preserves the original label only as `sourceClaim`, and forces every
+supplied evidence item's `verified` flag to `false`. Candidates go through the
+existing scout, filter, analyst, risk, and runner finish path; a valid bounded
+candidate therefore gets a durable no-entry terminal result even when its hard
+evidence is UNKNOWN. It never calls an entry/exit quote source or `executeEntry`.
+The report records the filter/analyst decision and caller claims, while its
+immutable start binding commits to the complete input digest. SHA claims alone
+cannot turn the data into trusted evidence.
 
-The following callback interface is the proposed contract for future accepted
-source adapters; it is **not wired or callable in this offline proof**:
-
-```text
-acquireCandidates({signal, now, deadlineAt, remaining, recordRequest})
-  -> Promise<Candidate[]>
-entryQuote({signal, now, deadlineAt, remaining, candidate, authorization, recordRequest})
-  -> Promise<Quote | null>
-exitQuote({signal, now, deadlineAt, remaining, candidate, purpose, previousQuote, recordRequest})
-  -> Promise<Quote | null>
-```
-
-For a future accepted adapter, each callback must be single-shot, sequential,
-signal-cancellable, and timed; no retries are permitted. Its
-`recordRequest({bytes, events})` boundary must charge the cumulative
-request/response-byte/provider-event budget before further work is admitted, and
-returned data must remain shape/byte bounded. `deadlineAt` is the earlier of the
-fixed eight-hour boundary and the composition budget deadline; `remaining.timeMs`
-reports the remaining wall/monotonic-bounded callback time. The implemented offline proof
-charges callback, candidate, decision, and actual ledger events to one cap, plus
-cycles and elapsed monotonic time. Its generated
-`SYNTHETIC_FIXTURE_CLOCK` tests wall/monotonic consistency and uncertainty
-bounds, not a trusted host clock.
+Input copying, candidate count, request count, result bytes, runner input, ledger
+events, ticks, and monotonic elapsed time remain bounded by the one config budget.
+The external path uses a local receipt clock only to detect invalid or jumping
+wall time; `trustedUtc` is false and packet clock claims are not substituted.
+Missing trusted source time, evidence, an accepted owner census, source-bound
+quotes, and complete source costs remain explicit blockers. The existing
+`SYNTHETIC_FIXTURE_CLOCK` still tests the synthetic wall/monotonic path only.
 
 Each checkpoint-bound candidate records exact chain/mint/pool/quote identity,
 token decimals/base-unit semantics, source sample time, composition receipt
@@ -197,66 +215,72 @@ the still-pending reservation instead of claiming it was released.
 
 ## Terminal contract and verification
 
-The synthetic path delegates terminal finalization to the accepted #1146
-execution runner and #1160 execution-step/checkpoint path. The receipt is the
-actual `finishRun` command receipt, bound to the checkpoint sequence, SHA-256
-head hash, result digest, and command ID. The report's checkpoint reference is
-the runner's session metadata; the terminal receipt is only included after the
-runner validates the acknowledgement. There is no separate report persistence
-API and no proposed `recordTerminal`/`recordUnknown` API.
-
-The export schema is `memecoin-paper-pilot-report/v1`:
+Both modes delegate terminal finalization to the accepted #1146 execution runner
+and #1160 execution-step/checkpoint path. The export is
+`memecoin-paper-run-export/v1`, a thin envelope over the **unmodified** runner
+report and actual canonical checkpoint. It does not project a second accounting
+or terminal API:
 
 ```json
 {
-  "schemaVersion": "memecoin-paper-pilot-report/v1",
-  "producerRevision": "paper-pilot-composition/2",
-  "configDigest": "<sha256 of canonical validated config>",
+  "schemaVersion": "memecoin-paper-run-export/v1",
+  "producerRevision": "paper-pilot-composition/3",
+  "config": {"version": 1, "...": "canonical validated config"},
+  "configSha256": "<sha256 of canonical config bytes>",
   "runId": "<checkpoint run id>",
-  "status": "FINISHED | STOPPED | UNKNOWN | BLOCKED",
-  "strategyOutcome": "CLOSED_PAPER | NO_CANDIDATES | BLOCKED | REJECT | ...",
-  "mode": "SYNTHETIC_TEST_ONLY | EXTERNAL_READ_ONLY_INPUT",
-  "executionMode": "SIMULATED_ONLY | READ_ONLY_EXTERNAL",
-  "realDataSourceCoverage": "NOT_ASSESSED",
-  "authority": {"executionAuthorized": false, "liveReady": false},
-  "persistence": {
-    "certainty": "ACKNOWLEDGED | UNKNOWN | NO_TERMINAL_RECEIPT | NOT_STARTED",
-    "checkpointRef": {"runId": "...", "sequence": 8, "hash": "..."},
-    "terminalReceiptRef": {
-      "runId": "...", "sequence": 8, "hash": "...",
-      "resultDigest": "...", "commandId": "..."
-    }
+  "startedAt": 1793651880000,
+  "deadlineAt": 1793680680000,
+  "policyVersion": "memecoin-paper-ledger-v2-monotonic-time",
+  "runnerReport": {"status": "FINISHED", "...": "actual runner fields"},
+  "checkpoint": {
+    "formatVersion": 1,
+    "runHeader": {"runId": "...", "startedAt": 1793651880000, "...": "..."},
+    "sequence": 8,
+    "records": ["full actual canonical checkpoint records"]
   },
-  "outcomes": {
-    "entries": [],
-    "exits": [],
-    "openUnvaluedPositions": [],
-    "unresolved": []
+  "checkpointSha256": "<sha256 of canonical checkpoint bytes>",
+  "persistence": "ACKNOWLEDGED | UNKNOWN | NOT_STARTED",
+  "exportBinding": "PRESTART_BOUND | EXPORT_ASSERTED",
+  "bindingReceipt": {
+    "schemaVersion": "memecoin-paper-start-binding/v1",
+    "producerRevision": "paper-pilot-composition/3",
+    "runId": "...",
+    "startedAt": 1793651880000,
+    "deadlineAt": 1793680680000,
+    "policyVersion": "memecoin-paper-ledger-v2-monotonic-time",
+    "configSha256": "<sha256>",
+    "externalInputSha256": null,
+    "receiptSha256": "<sha256 of preceding receipt fields>"
   }
 }
 ```
 
-`checkpointRef` and `terminalReceiptRef` are nullable when the checkpoint or
-terminal acknowledgement is not known; they are never synthesized. The
-`strategyOutcome` is separate from the lifecycle `status` and from persistence
-certainty.
+The receipt is exactly `{runId, sequence, hash, resultDigest}`. When present, it
+must match the runner report, the full checkpoint hash/head, and the final record.
+That record must have method `finishRun`; its `commandId` must match
+`runnerReport.terminalResult.commandId`, and its result digest must match both
+the terminal result receipt and final checkpoint record. `session.metadata` is
+not checkpoint content. The export cross-checks `runId`, `startedAt`,
+`deadlineAt`, and `policyVersion` against `checkpoint.runHeader`.
 
-Entry/exit rows contain the actual runner operation status, chain/mint/pool/quote
-identity, base-unit quantity, quote price, explicit cents, source label, source
-timestamp, local receipt timestamp, and checkpoint sequence. Synthetic rows
-declare `costBasis: "HYPOTHETICAL_FIXTURE_ONLY"`; no settled-source cost is
-claimed. Open unvalued rows preserve mint, base-unit quantity, unavailable mark
-status, and null equity. `status` and `persistence.certainty` are independent:
-for example, an explicit stop is `STOPPED` with `ACKNOWLEDGED` persistence when
-`finishRun` was acknowledged; an uncertain write has no invented receipt.
-`UNKNOWN` due to an unavailable source can still have an acknowledged terminal
-receipt, but the unresolved source outcome remains explicit.
+The immutable `start-binding.json` is written and fsynced before the initial
+checkpoint publication. Its receipt digest binds the canonical config and
+producer revision; in external mode it also binds the bounded input digest.
+`exportBinding` is `PRESTART_BOUND` only when that receipt verifies;
+`EXPORT_ASSERTED` makes no historical config/producer binding claim. Old
+checkpoints are never backfilled or migrated. The report is returned as
+`result.report`, not persisted as a second accounting artifact.
 
-The report export is derived from runner results and their real checkpoint
-references; it is not itself written as a second artifact. Evaluators should
-bind to `schemaVersion`, `producerRevision`, `configDigest`, `runId`, and the
-actual receipt references, and must not treat a successful synthetic report as
-simulated-trading or real-data acceptance.
+`runnerReport` preserves the runner's actual status/reason, execution mode,
+provenance, receipts, operation results, terminal result/receipt, and summary.
+No separate entries/exits/open-position projection is invented. Consumers use
+the actual checkpoint inputs and runner summary; preserve
+`missingTerminalValuationMints` and open positions exactly. Stop/deadline reason
+is a lifecycle outcome, independent of persistence: a `STOPPED` run may have an
+acknowledged terminal receipt, while lost ACK is `UNKNOWN` with no invented
+receipt. A valid terminal receipt can coexist with a runner `UNKNOWN` result.
+Persistence is exactly `ACKNOWLEDGED`, `UNKNOWN`, or `NOT_STARTED`; missing
+terminal receipt is represented by `UNKNOWN`, never a fourth enum.
 
 Lost checkpoint acknowledgement remains `UNKNOWN` and is not retried.
 Disconnect, timeout, cancellation, clock jump, late deadline, restart, missing
@@ -289,26 +313,45 @@ executable quotes, or validated exact costs
 matrix). Provider receipt time is not a source market timestamp. Synthetic
 fixtures cannot fill these gaps.
 
-Intake #1150 is open; quote #1157 and evidence #1158 are draft/open. Their
-branches and interfaces are not consumed as accepted dependencies. The external
-input packet above defines the bounded handoff envelope but does not authenticate
-its producer claims or process its payload. The current runner gate therefore
-returns `UNKNOWN` before checkpoint creation. Candidate intake, complete
-evidence, source-bound quote/cost semantics, and trusted clock/provenance remain
-operational blockers; no `READ_ONLY_EXTERNAL` packet can authorize a simulated
-entry in this revision.
+Intake #1150 remains open; quote #1157 and evidence #1158 remain draft/open.
+Their source SHAs and interfaces are caller claims, not accepted pins. The
+external candidate path therefore produces durable blocked/no-entry results and
+does not authorize simulated fills. Candidate intake provenance, complete hard
+and analyst evidence, source-bound quote/cost semantics, and trusted source-time
+attestation remain blockers.
 
-### Concrete integration proposal (not applied)
+The accepted #1152 owner-census interface is reconciled but is not treated as an
+eligible hard-gate source. `acquireOwnerCensus()` reports
+`RECONCILED_RPC_RESPONSE_ONLY`, leaves `filterEvidence.verified` and coverage
+false, emits no `top10OwnerPct`, and documents unauthenticated RPC completeness
+and unsupported pool exclusions. It therefore cannot satisfy the existing
+owner-concentration gate. Its injected transport/clock is not wired into this
+composition or allowed to bypass the shared budget/cancellation boundary.
+Holder evidence remains UNKNOWN until a separately reviewed source supplies
+authenticated completeness, pool/burn exclusions, and identity/time binding.
 
-After #1150/#1157/#1158 have merged at accepted SHAs and their exact source/time
-and cancellation contracts have been reviewed, the lead-owned integration is to
-replace the untrusted packet gate with a dedicated adapter that emits this
-versioned envelope from those exact exports. The adapter must independently
-validate producer SHA, identity/units, evidence completeness and source-versus-
-receipt times, and pass the existing global budget/signal/deadline controls.
-Until that integration change is reviewed, the only runnable composition is the
-synthetic fixture path. The present external input API must continue returning
-`UNKNOWN` and must not create checkpoint state.
+### Concrete integration patch proposal (not applied)
+
+After #1150/#1157/#1158 are accepted at exact SHAs and their source/time,
+identity/units, cancellation, and complete-cost semantics are reviewed, a
+lead-guarded patch can replace only the module-owned packet-to-candidate adapter:
+
+1. Construct the exact `MEMECOIN_EXTERNAL_READ_ONLY_INPUT_V1` envelope from the
+   accepted intake, evidence, and quote exports; caller SHA values alone remain
+   insufficient.
+2. Keep source labels, timestamps, evidence verification, and cost data bound to
+   their producer's actual source and receipt records. Do not copy fixture fields
+   or promote any owner census result that still reports UNKNOWN.
+3. Use the existing `createPaperPilotComposition()` signal, common request/
+   byte/event/candidate/time budgets, `scout`, `createPaperExecutionStep`, and
+   accepted execution runner. No second runner, checkpoint schema, ledger format,
+   terminal API, or replay migration is proposed.
+4. Preserve default-disabled behavior. The external mode stays no-entry until
+   every hard gate, quote/cost requirement, trusted-time condition, and immutable
+   pre-start binding validates. The terminal boundary remains the runner's
+   acknowledged `finishRun` receipt and actual checkpoint.
+
+The exact producer integration call shape is:
 
 ```js
 const packet = createBoundedExternalReadOnlyInput({
@@ -325,15 +368,16 @@ const packet = createBoundedExternalReadOnlyInput({
 });
 const composition = createPaperPilotComposition({
   config: {...reviewedConfig, mode: "EXTERNAL_READ_ONLY_INPUT"},
+  dataDirectory: "/absolute/path/to/new-empty-state",
   externalReadOnlyInput: packet
 });
-const report = await composition.start();
+const result = await composition.start();
 ```
 
-The snippet is a schema binding example, not executable real-source wiring: all
-three producer SHAs and their exports must be accepted before use, and caller-
-supplied SHA strings alone are not proof. No provider, wallet, signing, order, or
-deployment API is part of this proposal.
+This API is executable for bounded no-entry evaluation today; using unaccepted
+producer exports does not make it live-ready. Caller-supplied SHA strings alone
+are not proof. No provider, wallet, signing, order, or deployment API is part of
+this proposal.
 
 The required independent accounting, methodology, security review, hosted CI,
 and subsequent lead-guarded integration have not been performed by this offline

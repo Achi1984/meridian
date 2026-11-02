@@ -8,6 +8,7 @@ import {PaperCheckpointSession} from "../scripts/memecoin-paper/checkpoint-sessi
 import {createPaperExecutionStep} from "../scripts/memecoin-paper/execution-step.mjs";
 import {
   createBoundedExternalReadOnlyInput, createPaperExecutionRunner,
+  normalizeBoundedExternalCandidates,
   runOfflineDemo
 } from "../scripts/memecoin-paper/execution-runner.mjs";
 import {
@@ -964,7 +965,7 @@ test("runtime mode and fixture provenance are explicit fail-closed requirements"
     /explicit synthetic PAPER mode/);
 });
 
-test("bounded external read-only input stays UNKNOWN until source contracts are accepted", async () => {
+test("bounded external input evaluates only through unverified candidate gates", async () => {
   const externalInput = createBoundedExternalReadOnlyInput({
     kind: "MEMECOIN_EXTERNAL_READ_ONLY_INPUT_V1",
     schemaVersion: 1,
@@ -982,30 +983,66 @@ test("bounded external read-only input stays UNKNOWN until source contracts are 
       clockSource: "claimed-source-clock"
     },
     payload: {
-      candidate: {source: "SYNTHETIC_FIXTURE_ONLY", mint: "caller-claimed-mint"},
-      evidence: {complete: true},
+      candidate: {
+        chainId: "solana",
+        mint: "11111111111111111111111111111111",
+        pool: "Vote111111111111111111111111111111111111111",
+        quote: "Stake11111111111111111111111111111111111111",
+        decimals: 6,
+        sampledAt: START - 1_000,
+        source: "SYNTHETIC_FIXTURE_ONLY",
+        evidence: {},
+        analystEvidence: {}
+      },
       quote: {costs: {feeCents: 0}}
     }
   });
-  let invoked = false;
+  const system = harness();
+  const [candidate] = normalizeBoundedExternalCandidates(externalInput);
+  let candidatePolled = false;
+  let quoteRequested = false;
+  let sent = false;
   const runner = createPaperExecutionRunner({
     externalReadOnlyInput: externalInput,
     externalInputByteLimit: 4_096,
-    candidateSource: {poll: () => { invoked = true; }},
-    quoteSource: () => { invoked = true; }
+    ...system,
+    runId: RUN_ID,
+    startedAt: START,
+    endAt: END,
+    executionMode: "READ_ONLY_EXTERNAL",
+    provenance: "UNVERIFIED_CALLER_INPUT",
+    candidateSource: {
+      async poll() {
+        if (sent) return {done: true};
+        sent = true;
+        candidatePolled = true;
+        return {candidate};
+      }
+    },
+    quoteSource: () => { quoteRequested = true; },
+    clock: () => START + 1_000,
+    stopSource: () => false,
+    smartWalletAllowlist: {status: "UNVERIFIED", provenance: "UNVERIFIED_CALLER_INPUT"}
   });
 
   const report = await runner.run();
-  assert.equal(report.status, "UNKNOWN");
-  assert.equal(report.code, "EXTERNAL_SOURCE_CONTRACTS_NOT_ACCEPTED");
+  assert.equal(report.status, "FINISHED");
   assert.equal(report.executionMode, "READ_ONLY_EXTERNAL");
   assert.equal(report.provenance, "UNVERIFIED_CALLER_INPUT");
-  assert.equal(report.executionStarted, false);
-  assert.equal(report.terminalReceipt, null);
-  assert.equal(report.checkpoint, null);
-  assert.equal(report.unresolved.length, 4);
+  assert.equal(report.executionStarted, undefined);
+  assert.equal(report.terminalReceipt.sequence, 3);
+  assert.equal(report.unresolved.length, 5);
   assert.match(report.externalInputDigest, /^[a-f0-9]{64}$/);
-  assert.equal(invoked, false);
+  assert.equal(candidatePolled, true);
+  assert.equal(quoteRequested, false);
+  assert.deepEqual(system.calls.map(item => item.method), [
+    "riskSnapshot", "authorizeEntry", "riskSnapshot", "finishRun"
+  ]);
+  const decision = report.operationResults.find(item => item.method === "authorizeEntry");
+  assert.equal(decision.status, "BLOCKED");
+  assert.equal(decision.filterResult.accepted, false);
+  assert.equal(decision.candidateObservation.source, "UNVERIFIED_EXTERNAL_READ_ONLY_INPUT");
+  assert.equal(decision.candidateObservation.sourceClaim, "SYNTHETIC_FIXTURE_ONLY");
   assert.equal(await runner.run(), report);
   assert.throws(() => createPaperExecutionRunner({
     externalReadOnlyInput: externalInput,

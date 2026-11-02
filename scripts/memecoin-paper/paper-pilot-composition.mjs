@@ -1,11 +1,20 @@
 import {createHash} from "node:crypto";
 import {constants} from "node:fs";
-import {open} from "node:fs/promises";
+import {lstat, open} from "node:fs/promises";
 import path from "node:path";
 import {pathToFileURL} from "node:url";
 import {PaperCheckpointSession} from "./checkpoint-session.mjs";
-import {canonicalCheckpointBytes, CheckpointStore} from "./checkpoint-store.mjs";
-import {createBoundedExternalReadOnlyInput, createPaperExecutionRunner} from "./execution-runner.mjs";
+import {
+  canonicalCheckpointBytes,
+  CheckpointStore,
+  MAX_CHECKPOINT_BYTES
+} from "./checkpoint-store.mjs";
+import {
+  createBoundedExternalReadOnlyInput,
+  createPaperExecutionRunner,
+  EXTERNAL_INPUT_SOURCE,
+  normalizeBoundedExternalCandidates
+} from "./execution-runner.mjs";
 import {createPaperExecutionStep} from "./execution-step.mjs";
 import {PAPER_LEDGER_POLICY} from "./ledger.mjs";
 import {SYNTHETIC_SMART_WALLET_ALLOWLIST, syntheticCandidate} from "./synthetic-fixtures.mjs";
@@ -13,8 +22,10 @@ import {scout} from "./stages.mjs";
 
 const EIGHT_HOURS_MS = 8 * 60 * 60 * 1000;
 const SYNTHETIC_SOURCE = "SYNTHETIC_FIXTURE_ONLY";
-const REPORT_SCHEMA_VERSION = "memecoin-paper-pilot-report/v1";
-const REPORT_PRODUCER_REVISION = "paper-pilot-composition/2";
+const EXPORT_SCHEMA_VERSION = "memecoin-paper-run-export/v1";
+const PRODUCER_REVISION = "paper-pilot-composition/3";
+const CHECKPOINT_POLICY_VERSION = "memecoin-paper-ledger-v2-monotonic-time";
+const PERSISTENCE_STATES = new Set(["ACKNOWLEDGED", "UNKNOWN", "NOT_STARTED"]);
 const BUDGET_KEYS = [
   "requests", "bytes", "events", "candidates", "cycles", "durationMs",
   "callbackTimeoutMs", "maxWallClockUncertaintyMs"
@@ -27,7 +38,7 @@ const syntheticClocks = new WeakMap();
 const offlineFixtureAdaptersBySource = new WeakMap();
 const FIXTURE_FAULTS = new Set([
   "NONE", "DISCONNECT", "CALLBACK_TIMEOUT", "LATE_DEADLINE", "WAIT_FOR_STOP",
-  "CLOCK_JUMP", "LOST_ACK", "NO_CANDIDATES", "MISSING_EVIDENCE", "MISSING_COSTS",
+  "CLOCK_JUMP", "LOST_ACK", "LOST_INITIAL_ACK", "NO_CANDIDATES", "MISSING_EVIDENCE", "MISSING_COSTS",
   "NO_MARK", "REQUEST_BUDGET", "SPOOF_SOURCE", "QUOTE_AFTER_RECEIPT"
 ]);
 const SAFE_ID = /^[A-Za-z0-9._:-]{1,120}$/;
@@ -132,6 +143,149 @@ function clockAttestationFor(clock) {
   return syntheticClocks.get(clock);
 }
 
+function createExternalReceiptClock() {
+  const clock = Object.freeze({
+    wallClock: () => Date.now(),
+    monotonicClock: () => performance.now()
+  });
+  syntheticClocks.set(clock, {
+    source: "LOCAL_HOST_CLOCK_UNATTESTED",
+    uncertaintyMs: 2,
+    trustedUtc: false
+  });
+  return clock;
+}
+
+function sha256(bytes) {
+  return createHash("sha256").update(bytes).digest("hex");
+}
+
+function reportEnvelope(config, {
+  runnerReport = null,
+  checkpoint = null,
+  checkpointSha256 = null,
+  persistence = "NOT_STARTED",
+  exportBinding = "EXPORT_ASSERTED",
+  bindingReceipt = null
+} = {}) {
+  if (!PERSISTENCE_STATES.has(persistence)) {
+    throw new TypeError("run export persistence state is invalid");
+  }
+  const configBytes = canonicalCheckpointBytes(config);
+  return {
+    schemaVersion: EXPORT_SCHEMA_VERSION,
+    producerRevision: PRODUCER_REVISION,
+    config,
+    configSha256: sha256(configBytes),
+    runId: config.runId,
+    startedAt: config.startedAt,
+    deadlineAt: config.startedAt + EIGHT_HOURS_MS,
+    policyVersion: CHECKPOINT_POLICY_VERSION,
+    runnerReport,
+    checkpoint,
+    checkpointSha256,
+    persistence,
+    exportBinding,
+    bindingReceipt
+  };
+}
+
+async function syncDirectory(directory) {
+  const handle = await open(directory, "r");
+  try {
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
+}
+
+async function persistStartBinding(dataDirectory, config, externalInputDigest = null) {
+  const configSha256 = sha256(canonicalCheckpointBytes(config));
+  const unsigned = {
+    schemaVersion: "memecoin-paper-start-binding/v1",
+    producerRevision: PRODUCER_REVISION,
+    runId: config.runId,
+    startedAt: config.startedAt,
+    deadlineAt: config.startedAt + EIGHT_HOURS_MS,
+    policyVersion: CHECKPOINT_POLICY_VERSION,
+    configSha256,
+    externalInputSha256: externalInputDigest
+  };
+  const receiptBytes = canonicalCheckpointBytes(unsigned);
+  const receipt = {...unsigned, receiptSha256: sha256(receiptBytes)};
+  const handle = await open(path.join(dataDirectory, "start-binding.json"), "wx", 0o600);
+  try {
+    await handle.writeFile(canonicalCheckpointBytes(receipt));
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
+  await syncDirectory(dataDirectory);
+  return receipt;
+}
+
+function verifyTerminalReceipt(runnerReport, checkpoint, checkpointSha256) {
+  const receipt = runnerReport?.terminalReceipt;
+  const terminalResult = runnerReport?.terminalResult;
+  const record = checkpoint?.records?.at(-1);
+  const exactReceipt = value => isRecord(value) &&
+    Object.keys(value).sort().join(",") === ["hash", "resultDigest", "runId", "sequence"].sort().join(",");
+  return Boolean(exactReceipt(receipt) && exactReceipt(terminalResult?.receipt) && record &&
+    record.method === "finishRun" &&
+    record.sequence === checkpoint.sequence &&
+    record.runId === checkpoint.runHeader?.runId &&
+    record.commandId === terminalResult.commandId &&
+    record.resultDigest === receipt.resultDigest &&
+    receipt.runId === record.runId &&
+    receipt.sequence === record.sequence &&
+    receipt.hash === checkpointSha256 &&
+    terminalResult.receipt?.runId === receipt.runId &&
+    terminalResult.receipt?.sequence === receipt.sequence &&
+    terminalResult.receipt?.hash === receipt.hash &&
+    terminalResult.receipt?.resultDigest === receipt.resultDigest);
+}
+
+function verifyStartBinding(bindingReceipt, config, externalInputDigest, runnerReport = null) {
+  const {receiptSha256, ...unsignedBinding} = bindingReceipt ?? {};
+  return Boolean(bindingReceipt &&
+    bindingReceipt.schemaVersion === "memecoin-paper-start-binding/v1" &&
+    bindingReceipt.producerRevision === PRODUCER_REVISION &&
+    bindingReceipt.runId === config.runId &&
+    bindingReceipt.startedAt === config.startedAt &&
+    bindingReceipt.deadlineAt === config.startedAt + EIGHT_HOURS_MS &&
+    bindingReceipt.policyVersion === CHECKPOINT_POLICY_VERSION &&
+    bindingReceipt.configSha256 === sha256(canonicalCheckpointBytes(config)) &&
+    bindingReceipt.externalInputSha256 === externalInputDigest &&
+    receiptSha256 === sha256(canonicalCheckpointBytes(unsignedBinding)) &&
+    (!runnerReport || runnerReport.externalInputDigest === (externalInputDigest ?? undefined)));
+}
+
+function checkpointExportReadback(readback, config, bindingReceipt, externalInputDigest, runnerReport) {
+  if (readback?.status !== "OK" || !Buffer.isBuffer(readback.bytes) ||
+      readback.bytes.length > MAX_CHECKPOINT_BYTES) {
+    return {checkpoint: null, checkpointSha256: null, persistence: "UNKNOWN"};
+  }
+  let checkpoint;
+  try {
+    checkpoint = JSON.parse(readback.bytes.toString("utf8"));
+  } catch {
+    return {checkpoint: null, checkpointSha256: null, persistence: "UNKNOWN"};
+  }
+  const hash = sha256(readback.bytes);
+  if (!canonicalCheckpointBytes(checkpoint).equals(readback.bytes) ||
+      checkpoint.sequence !== readback.sequence ||
+      checkpoint.sequence !== checkpoint.records?.length - 1 ||
+      readback.hash !== hash ||
+      checkpoint.runHeader?.runId !== config.runId ||
+      checkpoint.runHeader?.startedAt !== config.startedAt ||
+      checkpoint.runHeader?.deadlineAt !== config.startedAt + EIGHT_HOURS_MS ||
+      checkpoint.runHeader?.policyVersion !== CHECKPOINT_POLICY_VERSION ||
+      !verifyStartBinding(bindingReceipt, config, externalInputDigest, runnerReport)) {
+    return {checkpoint: null, checkpointSha256: null, persistence: "UNKNOWN"};
+  }
+  return {checkpoint, checkpointSha256: hash, persistence: "UNKNOWN"};
+}
+
 export function offlineFixtureAdapters(options = {}) {
   if (!onlyDataKeys(options, ["clock", "fault"])) {
     throw new TypeError("only a clock and named offline fixture fault may be selected");
@@ -179,7 +333,7 @@ export function offlineFixtureAdapters(options = {}) {
       return result;
     }
   });
-  offlineFixtureAdaptersBySource.set(adapters, {clock, fault});
+  offlineFixtureAdaptersBySource.set(adapters, {clock, fault, sourceMode: "SYNTHETIC_TEST_ONLY"});
   return adapters;
 }
 
@@ -252,31 +406,6 @@ function publicError(error) {
   return {status: "UNKNOWN", code, reason: code};
 }
 
-function reportEnvelope(config, {
-  status,
-  strategyOutcome = "UNKNOWN",
-  persistence,
-  entries = [],
-  exits = [],
-  openUnvaluedPositions = [],
-  unresolved = []
-}) {
-  return {
-    schemaVersion: REPORT_SCHEMA_VERSION,
-    producerRevision: REPORT_PRODUCER_REVISION,
-    configDigest: createHash("sha256").update(canonicalCheckpointBytes(config)).digest("hex"),
-    runId: config.runId,
-    status,
-    strategyOutcome,
-    mode: config.mode,
-    executionMode: config.mode === "SYNTHETIC_TEST_ONLY" ? "SIMULATED_ONLY" : "READ_ONLY_EXTERNAL",
-    realDataSourceCoverage: "NOT_ASSESSED",
-    authority: {executionAuthorized: false, liveReady: false},
-    persistence,
-    outcomes: {entries, exits, openUnvaluedPositions, unresolved}
-  };
-}
-
 export function createPaperPilotComposition(options = {}) {
   if (!onlyDataKeys(options, [
         "config", "dataDirectory", "adapters", "clock", "signal", "externalReadOnlyInput"
@@ -297,82 +426,33 @@ export function createPaperPilotComposition(options = {}) {
   if (signal !== undefined && Object.getPrototypeOf(signal) !== AbortSignal.prototype) {
     throw new TypeError("signal must be a native AbortSignal");
   }
-  if (config.mode === "EXTERNAL_READ_ONLY_INPUT") {
-    if (externalReadOnlyInput === undefined || dataDirectory !== undefined ||
-        adapters !== undefined || clock !== undefined) {
-      throw new TypeError("external read-only input requires its typed packet and no execution sources");
+  const externalMode = config.mode === "EXTERNAL_READ_ONLY_INPUT";
+  let boundedExternalInput = null;
+  if (externalMode) {
+    if (externalReadOnlyInput === undefined || typeof dataDirectory !== "string" ||
+        !path.isAbsolute(dataDirectory) || adapters !== undefined || clock !== undefined) {
+      throw new TypeError("external read-only input requires its typed packet, absolute state, and no caller sources");
     }
-    const boundedInput = createBoundedExternalReadOnlyInput(externalReadOnlyInput);
-    const externalRunner = createPaperExecutionRunner({
-      externalReadOnlyInput: boundedInput,
-      externalInputByteLimit: config.budgets.bytes
-    });
-    let state = "CREATED";
-    let runPromise;
-    let stopRequested = false;
-    return Object.freeze({
-      start() {
-        if (!runPromise) {
-          state = "RUNNING";
-          runPromise = Promise.resolve().then(async () => {
-            if (signal?.aborted || stopRequested) {
-              state = "STOPPED";
-              return {
-                status: "STOPPED",
-                state,
-                code: "STOPPED",
-                executionStarted: false,
-                terminalReceipt: null,
-                report: reportEnvelope(config, {
-                  status: state,
-                  strategyOutcome: "STOPPED",
-                  persistence: {certainty: "NOT_STARTED", checkpointRef: null, terminalReceiptRef: null},
-                  unresolved: ["external input was not processed after cancellation"]
-                })
-              };
-            }
-            const result = await externalRunner.run();
-            state = result.status;
-            return {
-              ...result,
-              state,
-              mode: config.mode,
-              report: reportEnvelope(config, {
-                status: state,
-                strategyOutcome: result.code ?? "UNKNOWN",
-                persistence: {certainty: "NOT_STARTED", checkpointRef: null, terminalReceiptRef: null},
-                unresolved: result.unresolved
-              }),
-              authority: {providerExecution: false, signing: false, orders: false, wallet: false, liveReady: false}
-            };
-          }).catch(error => {
-            state = "UNKNOWN";
-            return {
-              ...publicError(error),
-              status: state,
-              state,
-              executionStarted: false,
-              terminalReceipt: null,
-              report: reportEnvelope(config, {
-                status: state,
-                strategyOutcome: "UNKNOWN",
-                persistence: {certainty: "NOT_STARTED", checkpointRef: null, terminalReceiptRef: null},
-                unresolved: ["external input failed bounded validation"]
-              })
-            };
-          });
-        }
-        return runPromise;
+    boundedExternalInput = createBoundedExternalReadOnlyInput(externalReadOnlyInput);
+    if (Buffer.byteLength(canonicalCheckpointBytes(boundedExternalInput)) > config.budgets.bytes) {
+      throw new RangeError("external read-only input exceeds the configured byte budget");
+    }
+    clock = createExternalReceiptClock();
+    adapters = Object.freeze({
+      async acquireCandidates() {
+        return normalizeBoundedExternalCandidates(boundedExternalInput, config.budgets.candidates);
       },
-      stop() {
-        if (state !== "RUNNING") return false;
-        stopRequested = true;
-        return true;
+      async entryQuote() {
+        return null;
       },
-      status: () => Object.freeze({state, terminalReceipt: null})
+      async exitQuote() {
+        return null;
+      }
     });
-  }
-  if (externalReadOnlyInput !== undefined) {
+    offlineFixtureAdaptersBySource.set(adapters, {
+      clock, fault: "NONE", sourceMode: "EXTERNAL_READ_ONLY_INPUT", externalInput: boundedExternalInput
+    });
+  } else if (externalReadOnlyInput !== undefined) {
     throw new TypeError("external read-only input requires EXTERNAL_READ_ONLY_INPUT mode");
   }
   if (!clock && adapters) clock = offlineFixtureAdaptersBySource.get(adapters)?.clock;
@@ -381,14 +461,18 @@ export function createPaperPilotComposition(options = {}) {
   if (typeof dataDirectory !== "string" || !path.isAbsolute(dataDirectory) ||
       !syntheticClocks.has(clock) ||
       clockAttestationFor(clock).uncertaintyMs > config.budgets.maxWallClockUncertaintyMs) {
-    throw new TypeError("absolute storage and a module-generated synthetic clock are required");
+    throw new TypeError("absolute storage and a bounded module clock are required");
   }
   if (!offlineFixtureAdaptersBySource.has(adapters) ||
       offlineFixtureAdaptersBySource.get(adapters).clock !== clock) {
-    throw new TypeError("only module-generated offline fixture adapters may run");
+    throw new TypeError(externalMode
+      ? "only the bounded external packet adapter may run"
+      : "only module-generated offline fixture adapters may run");
   }
   const {fault} = offlineFixtureAdaptersBySource.get(adapters);
   const clockAttestation = clockAttestationFor(clock);
+  const externalInputDigest = boundedExternalInput
+    ? sha256(canonicalCheckpointBytes(boundedExternalInput)) : null;
 
   const abort = new AbortController();
   const abortParent = () => abort.abort(signal?.reason);
@@ -406,6 +490,9 @@ export function createPaperPilotComposition(options = {}) {
   let step;
   let ledgerEventsCounted = 0;
   let terminalReceipt = null;
+  let runnerReport = null;
+  let bindingReceipt = null;
+  let initialPublicationAttempted = false;
   const provenance = {candidates: [], quotes: []};
 
   function readTime() {
@@ -527,9 +614,7 @@ export function createPaperPilotComposition(options = {}) {
         executionStarted: false,
         terminalReceipt: null,
         report: reportEnvelope(config, {
-          status: state,
-          strategyOutcome: "STOPPED",
-          persistence: {certainty: "NOT_STARTED", checkpointRef: null, terminalReceiptRef: null}
+          persistence: "NOT_STARTED"
         })
       };
     }
@@ -543,10 +628,7 @@ export function createPaperPilotComposition(options = {}) {
         executionStarted: false,
         terminalReceipt: null,
         report: reportEnvelope(config, {
-          status: state,
-          strategyOutcome: "RUN_WINDOW_NOT_STARTED",
-          persistence: {certainty: "NOT_STARTED", checkpointRef: null, terminalReceiptRef: null},
-          unresolved: ["run window has not started"]
+          persistence: "NOT_STARTED"
         })
       };
     }
@@ -559,18 +641,16 @@ export function createPaperPilotComposition(options = {}) {
         executionStarted: false,
         terminalReceipt: null,
         report: reportEnvelope(config, {
-          status: state,
-          strategyOutcome: "RUN_WINDOW_EXPIRED",
-          persistence: {certainty: "NOT_STARTED", checkpointRef: null, terminalReceiptRef: null},
-          unresolved: ["fixed eight-hour run window has expired"]
+          persistence: "NOT_STARTED"
         })
       };
     }
     compositionDeadlineAt = Math.min(deadlineAt, initial.wall + config.budgets.durationMs);
     state = "RUNNING";
-    const storeOptions = fault === "LOST_ACK" ? {
+    const storeOptions = ["LOST_ACK", "LOST_INITIAL_ACK"].includes(fault) ? {
       async onPhase(name, details) {
-        if (name === "after-rename" && details.sequence === 1) {
+        if (name === "after-rename" &&
+            details.sequence === (fault === "LOST_INITIAL_ACK" ? 0 : 1)) {
           throw new Error("offline fixture lost checkpoint acknowledgement");
         }
       }
@@ -584,14 +664,11 @@ export function createPaperPilotComposition(options = {}) {
         status: state,
         state,
         code: "STOPPED",
-        mode: "SYNTHETIC_TEST_ONLY",
+        mode: config.mode,
         executionStarted: false,
         terminalReceipt: null,
         report: reportEnvelope(config, {
-          status: state,
-          strategyOutcome: "STOPPED",
-          persistence: {certainty: "NOT_STARTED", checkpointRef: null, terminalReceiptRef: null},
-          unresolved: ["cancelled before checkpoint initialization"]
+          persistence: "NOT_STARTED"
         })
       };
     }
@@ -604,14 +681,11 @@ export function createPaperPilotComposition(options = {}) {
         status: state,
         state,
         code: "STOPPED",
-        mode: "SYNTHETIC_TEST_ONLY",
+        mode: config.mode,
         executionStarted: false,
         terminalReceipt: null,
         report: reportEnvelope(config, {
-          status: state,
-          strategyOutcome: "STOPPED",
-          persistence: {certainty: "NOT_STARTED", checkpointRef: null, terminalReceiptRef: null},
-          unresolved: ["cancelled before checkpoint initialization"]
+          persistence: "NOT_STARTED"
         })
       };
     }
@@ -626,13 +700,53 @@ export function createPaperPilotComposition(options = {}) {
         executionStarted: false,
         terminalReceipt: null,
         report: reportEnvelope(config, {
-          status: state,
-          strategyOutcome: "RESTART_NOT_ALLOWED",
-          persistence: {certainty: "NOT_STARTED", checkpointRef: null, terminalReceiptRef: null},
-          unresolved: ["implicit checkpoint replay and restart are prohibited"]
+          persistence: "NOT_STARTED"
         })
       };
     }
+    const bindingPath = path.join(dataDirectory, "start-binding.json");
+    try {
+      await lstat(bindingPath);
+      await store.close();
+      store = null;
+      state = "BLOCKED";
+      return {
+        status: state,
+        state,
+        code: "RESTART_NOT_ALLOWED",
+        executionStarted: false,
+        terminalReceipt: null,
+        report: reportEnvelope(config, {
+          persistence: "UNKNOWN"
+        })
+      };
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
+    bindingReceipt = await persistStartBinding(
+      dataDirectory,
+      config,
+      externalInputDigest
+    );
+    if (abort.signal.aborted) {
+      await store.close();
+      store = null;
+      state = "STOPPED";
+      return {
+        status: state,
+        state,
+        code: "STOPPED",
+        executionStarted: false,
+        terminalReceipt: null,
+        report: reportEnvelope(config, {
+          persistence: "NOT_STARTED",
+          exportBinding: "PRESTART_BOUND",
+          bindingReceipt,
+          unresolved: ["cancelled before initial checkpoint publication"]
+        })
+      };
+    }
+    initialPublicationAttempted = true;
     session = await PaperCheckpointSession.open({store, runId: config.runId, startedAt: config.startedAt});
     const executionStep = createPaperExecutionStep({
       session, store, runId: config.runId, startedAt: config.startedAt, endAt: deadlineAt,
@@ -676,7 +790,8 @@ export function createPaperPilotComposition(options = {}) {
           sourceReceiptAt = acquisition.receiptAt;
           for (const candidate of acquisition.result) {
             if (!integerTime(candidate?.sampledAt) ||
-                candidate.sampledAt > sourceReceiptAt + clockAttestation.uncertaintyMs) {
+                candidate.sampledAt > sourceReceiptAt +
+                  (externalMode ? 0 : clockAttestation.uncertaintyMs)) {
               adapterFailureCode = "SOURCE_AFTER_RECEIPT";
               strategyOverride = adapterFailureCode;
               return {done: true};
@@ -686,12 +801,12 @@ export function createPaperPilotComposition(options = {}) {
           candidates = scout(acquisition.result, {
             now: sourceReceiptAt,
             maxCandidates: config.budgets.candidates,
-            source: SYNTHETIC_SOURCE
+            source: externalMode ? EXTERNAL_INPUT_SOURCE : SYNTHETIC_SOURCE
           }).selected.slice(0, config.budgets.cycles);
         }
         if (candidateIndex >= candidates.length) return {done: true};
         const candidate = candidates[candidateIndex++];
-        if (candidate.source !== SYNTHETIC_SOURCE) {
+        if (candidate.source !== (externalMode ? EXTERNAL_INPUT_SOURCE : SYNTHETIC_SOURCE)) {
           adapterFailureCode = "SOURCE_PROVENANCE";
           strategyOverride = adapterFailureCode;
           return {done: true};
@@ -802,18 +917,24 @@ export function createPaperPilotComposition(options = {}) {
     }])));
 
     const runner = createPaperExecutionRunner({
+      ...(boundedExternalInput ? {
+        externalReadOnlyInput: boundedExternalInput,
+        externalInputByteLimit: config.budgets.bytes
+      } : {}),
       executionStep: boundedStep,
       session,
       runId: config.runId,
       startedAt: config.startedAt,
       endAt: compositionDeadlineAt,
-      executionMode: "SIMULATED_ONLY",
-      provenance: SYNTHETIC_SOURCE,
+      executionMode: externalMode ? "READ_ONLY_EXTERNAL" : "SIMULATED_ONLY",
+      provenance: externalMode ? "UNVERIFIED_CALLER_INPUT" : SYNTHETIC_SOURCE,
       candidateSource,
       quoteSource,
       clock: () => readTime().wall,
       stopSource: () => abort.signal.aborted,
-      smartWalletAllowlist: SYNTHETIC_SMART_WALLET_ALLOWLIST,
+      smartWalletAllowlist: externalMode
+        ? {status: "UNVERIFIED", provenance: "UNVERIFIED_CALLER_INPUT"}
+        : SYNTHETIC_SMART_WALLET_ALLOWLIST,
       limits: {
         maxTicks: Math.min(256, config.budgets.cycles),
         maxCandidates: Math.min(100, config.budgets.candidates),
@@ -823,6 +944,7 @@ export function createPaperPilotComposition(options = {}) {
       }
     });
     const runnerResult = await runner.run();
+    runnerReport = runnerResult;
     terminalReceipt = runnerResult.terminalReceipt;
     const summary = runnerResult.summary;
     const terminalResult = runnerResult.terminalResult;
@@ -879,18 +1001,25 @@ export function createPaperPilotComposition(options = {}) {
     if (adapterFailureCode && adapterFailureCode !== "STOPPED") lifecycleStatus = "UNKNOWN";
     else if (runnerResult.reason === "SHUTDOWN" || abort.signal.aborted) lifecycleStatus = "STOPPED";
     state = lifecycleStatus;
-    const persistenceCertainty = terminalReceipt
-      ? "ACKNOWLEDGED"
-      : checkpointMetadata
-        ? runnerResult.status === "UNKNOWN" ? "UNKNOWN" : "NO_TERMINAL_RECEIPT"
-        : "UNKNOWN";
-    const terminalReceiptRef = terminalReceipt ? {
-      runId: terminalReceipt.runId,
-      sequence: terminalReceipt.sequence,
-      hash: terminalReceipt.hash,
-      resultDigest: terminalReceipt.resultDigest,
-      commandId: terminalResult?.commandId ?? null
-    } : null;
+    let checkpointReadback = null;
+    try {
+      checkpointReadback = checkpointExportReadback(
+        await store.readCheckpoint(),
+        config,
+        bindingReceipt,
+        externalInputDigest,
+        runnerResult
+      );
+    } catch {
+      checkpointReadback = {checkpoint: null, checkpointSha256: null, persistence: "UNKNOWN"};
+    }
+    const terminalReceiptValid = verifyTerminalReceipt(
+      runnerResult,
+      checkpointReadback.checkpoint,
+      checkpointReadback.checkpointSha256
+    );
+    const persistence = terminalReceiptValid ? "ACKNOWLEDGED"
+      : initialPublicationAttempted || checkpointReadback.checkpoint ? "UNKNOWN" : "NOT_STARTED";
     const strategyOutcome = strategyOverride ??
       (runnerResult.reason && runnerResult.reason !== "SOURCES_EXHAUSTED" ? runnerResult.reason
         : counters.candidates === 0 || candidates.length === 0 ? "NO_CANDIDATES"
@@ -914,7 +1043,7 @@ export function createPaperPilotComposition(options = {}) {
         : runnerResult.reason && runnerResult.reason !== "SOURCES_EXHAUSTED"
           ? {code: runnerResult.reason}
           : {}),
-      mode: "SYNTHETIC_TEST_ONLY",
+      mode: config.mode,
       executionStarted: true,
       strategyOutcome,
       terminalState: {
@@ -939,6 +1068,7 @@ export function createPaperPilotComposition(options = {}) {
       timing: {
         clockSource: clockAttestation.source,
         clockUncertaintyMs: clockAttestation.uncertaintyMs,
+        trustedUtc: clockAttestation.trustedUtc === true,
         wallStartedAt: anchor.wall,
         monotonicElapsedMs: readTime().elapsedMs,
         endAt: deadlineAt,
@@ -947,19 +1077,14 @@ export function createPaperPilotComposition(options = {}) {
       provenance,
       authority: {providerExecution: false, signing: false, orders: false, wallet: false, liveReady: false},
       report: reportEnvelope(config, {
-        status: lifecycleStatus,
-        strategyOutcome,
-        persistence: {
-          certainty: persistenceCertainty,
-          checkpointRef: checkpointMetadata
-            ? {runId: checkpointMetadata.runId, sequence: checkpointMetadata.sequence, hash: checkpointMetadata.hash}
-            : null,
-          terminalReceiptRef
-        },
-        entries,
-        exits,
-        openUnvaluedPositions,
-        unresolved
+        runnerReport: runnerResult,
+        checkpoint: checkpointReadback.checkpoint,
+        checkpointSha256: checkpointReadback.checkpointSha256,
+        persistence,
+        exportBinding: verifyStartBinding(bindingReceipt, config, externalInputDigest, runnerResult)
+          ? "PRESTART_BOUND" : "EXPORT_ASSERTED",
+        bindingReceipt: verifyStartBinding(bindingReceipt, config, externalInputDigest, runnerResult)
+          ? bindingReceipt : null
       })
     };
   }
@@ -968,43 +1093,55 @@ export function createPaperPilotComposition(options = {}) {
     if (runPromise) return runPromise;
     if (state !== "CREATED") return Promise.resolve({status: state, terminalReceipt});
     state = "RUNNING";
-    runPromise = execute().catch(error => {
-      state = error?.code === "STOPPED" ? "STOPPED" : "UNKNOWN";
+    runPromise = execute().catch(async error => {
+      state = error?.code === "STOPPED" || abort.signal.aborted ? "STOPPED" : "UNKNOWN";
       let checkpointMetadata = null;
       try {
         checkpointMetadata = session ? {...session.metadata} : null;
       } catch {
         checkpointMetadata = null;
       }
-      const terminalReceiptRef = terminalReceipt ? {
-        runId: terminalReceipt.runId,
-        sequence: terminalReceipt.sequence,
-        hash: terminalReceipt.hash,
-        resultDigest: terminalReceipt.resultDigest,
-        commandId: null
-      } : null;
-      const persistenceCertainty = terminalReceipt
-        ? "ACKNOWLEDGED"
-        : !session ? "NOT_STARTED" : checkpointMetadata ? "NO_TERMINAL_RECEIPT" : "UNKNOWN";
+      let checkpointReadback = {checkpoint: null, checkpointSha256: null, persistence: "UNKNOWN"};
+      if (store) {
+        try {
+          checkpointReadback = checkpointExportReadback(
+            await store.readCheckpoint(),
+            config,
+            bindingReceipt,
+            externalInputDigest,
+            runnerReport
+          );
+        } catch {
+          checkpointReadback = {checkpoint: null, checkpointSha256: null, persistence: "UNKNOWN"};
+        }
+      }
+      const terminalReceiptValid = runnerReport
+        ? verifyTerminalReceipt(
+          runnerReport,
+          checkpointReadback.checkpoint,
+          checkpointReadback.checkpointSha256
+        )
+        : false;
+      const persistence = terminalReceiptValid ? "ACKNOWLEDGED"
+        : initialPublicationAttempted || checkpointMetadata || checkpointReadback.checkpoint
+          ? "UNKNOWN" : "NOT_STARTED";
       return {
         ...publicError(error),
         status: state,
         state,
-        mode: "SYNTHETIC_TEST_ONLY",
-        executionStarted: Boolean(session),
+        mode: config.mode,
+        executionStarted: Boolean(session || initialPublicationAttempted),
         terminalReceipt,
         checkpoint: checkpointMetadata,
         report: reportEnvelope(config, {
-          status: state,
-          strategyOutcome: error?.code ?? "COMPOSITION_FAILURE",
-          persistence: {
-            certainty: persistenceCertainty,
-            checkpointRef: checkpointMetadata
-              ? {runId: checkpointMetadata.runId, sequence: checkpointMetadata.sequence, hash: checkpointMetadata.hash}
-              : null,
-            terminalReceiptRef
-          },
-          unresolved: [error?.code ?? "COMPOSITION_FAILURE"]
+          runnerReport,
+          checkpoint: checkpointReadback.checkpoint,
+          checkpointSha256: checkpointReadback.checkpointSha256,
+          persistence,
+          exportBinding: verifyStartBinding(bindingReceipt, config, externalInputDigest, runnerReport)
+            ? "PRESTART_BOUND" : "EXPORT_ASSERTED",
+          bindingReceipt: verifyStartBinding(bindingReceipt, config, externalInputDigest, runnerReport)
+            ? bindingReceipt : null
         })
       };
     }).finally(async () => {

@@ -107,37 +107,70 @@ test("disabled by default and rejects non-synthetic activation configuration", a
   assert.equal(getterCalls, 0);
 });
 
-test("external read-only packet remains UNKNOWN until source contracts are accepted", async () => {
+test("bounded external candidate reaches existing filters and ends with a durable no-entry receipt", async t => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "paper-composition-external-"));
+  t.after(() => rm(directory, {recursive: true, force: true}));
+  const startedAt = Date.now() - 1_000;
+  const sampledAt = Date.now() - 100;
   const externalReadOnlyInput = createBoundedExternalReadOnlyInput({
     kind: "MEMECOIN_EXTERNAL_READ_ONLY_INPUT_V1",
     schemaVersion: 1,
     producerRevision: "candidate-intake-1",
     sourceContracts: {candidateIntakeSha: "a".repeat(40), evidenceSha: null, quotesSha: null},
     timing: {
-      sourceTimestamp: START,
-      receiptTimestamp: START + 1_000,
+      sourceTimestamp: sampledAt,
+      receiptTimestamp: sampledAt,
       uncertaintyMs: 1,
-      monotonicElapsedMs: 1_000,
+      monotonicElapsedMs: 0,
       clockSource: "claimed-source-clock"
     },
-    payload: {candidate: {source: "external-provider-claim", evidence: {complete: true}}}
+    payload: {
+      candidate: {
+        chainId: "solana",
+        mint: "11111111111111111111111111111111",
+        pool: "Vote111111111111111111111111111111111111111",
+        quote: "Stake11111111111111111111111111111111111111",
+        decimals: 6,
+        sampledAt,
+        source: "SYNTHETIC_FIXTURE_ONLY",
+        evidence: {},
+        analystEvidence: {}
+      }
+    }
   });
   const pilot = createPaperPilotComposition({
-    config: config({mode: "EXTERNAL_READ_ONLY_INPUT"}),
+    config: config({mode: "EXTERNAL_READ_ONLY_INPUT", runId: "external-composition-test", startedAt}),
+    dataDirectory: directory,
     externalReadOnlyInput
   });
   const result = await pilot.start();
-  assert.equal(result.status, "UNKNOWN");
-  assert.equal(result.report.strategyOutcome, "EXTERNAL_SOURCE_CONTRACTS_NOT_ACCEPTED");
-  assert.equal(result.executionMode, "READ_ONLY_EXTERNAL");
-  assert.equal(result.executionStarted, false);
-  assert.equal(result.terminalReceipt, null);
-  assert.equal(result.report.persistence.certainty, "NOT_STARTED");
-  assert.deepEqual(result.report.persistence.checkpointRef, null);
-  assert.deepEqual(result.report.persistence.terminalReceiptRef, null);
-  assert.equal(result.report.outcomes.entries.length, 0);
-  assert.equal(result.report.outcomes.exits.length, 0);
-  assert.equal(result.report.outcomes.unresolved.length, 4);
+  assert.equal(result.status, "FINISHED");
+  assert.equal(result.strategyOutcome, "BLOCKED");
+  assert.equal(result.mode, "EXTERNAL_READ_ONLY_INPUT");
+  assert.equal(result.executionStarted, true);
+  assert.deepEqual(result.terminalReceipt, result.report.runnerReport.terminalReceipt);
+  assert.equal(result.report.schemaVersion, "memecoin-paper-run-export/v1");
+  assert.equal(result.report.persistence, "ACKNOWLEDGED");
+  assert.equal(result.report.exportBinding, "PRESTART_BOUND");
+  assert.equal(result.report.runnerReport.executionMode, "READ_ONLY_EXTERNAL");
+  assert.equal(result.report.runnerReport.provenance, "UNVERIFIED_CALLER_INPUT");
+  assert.equal(result.report.runnerReport.counters.quotes, 0);
+  assert.equal(result.report.runnerReport.operationResults.some(item =>
+    item.method === "executeEntry"), false);
+  const decision = result.report.runnerReport.operationResults.find(item =>
+    item.method === "authorizeEntry");
+  assert.equal(decision.status, "BLOCKED");
+  assert.equal(decision.filterResult.accepted, false);
+  assert.equal(decision.candidateObservation.source, "UNVERIFIED_EXTERNAL_READ_ONLY_INPUT");
+  assert.equal(decision.candidateObservation.sourceClaim, "SYNTHETIC_FIXTURE_ONLY");
+  assert.deepEqual(result.report.checkpoint.records.map(record => record.method), [
+    "constructor", "riskSnapshot", "riskSnapshot", "finishRun"
+  ]);
+  assert.equal(result.report.checkpointSha256,
+    createHash("sha256").update(canonicalCheckpointBytes(result.report.checkpoint)).digest("hex"));
+  assert.equal(result.report.bindingReceipt.externalInputSha256, result.report.runnerReport.externalInputDigest);
+  const persistedBinding = JSON.parse(await readFile(path.join(directory, "start-binding.json"), "utf8"));
+  assert.deepEqual(persistedBinding, result.report.bindingReceipt);
   assert.equal(result.authority.liveReady, false);
   assert.throws(() => createPaperPilotComposition({
     config: config(),
@@ -185,35 +218,58 @@ test("complete offline path uses existing gates, ledger, independent ticks and d
   assert.equal(result.accounting.openPositions.length, 0);
   assert.equal(result.terminalReceipt.runId, "composition-test");
   assert.equal(result.terminalReceipt.sequence, result.checkpoint.sequence);
-  assert.equal(result.report.schemaVersion, "memecoin-paper-pilot-report/v1");
-  assert.equal(result.report.producerRevision, "paper-pilot-composition/2");
-  assert.equal(result.report.configDigest, createHash("sha256")
+  assert.equal(result.report.schemaVersion, "memecoin-paper-run-export/v1");
+  assert.equal(result.report.producerRevision, "paper-pilot-composition/3");
+  assert.deepEqual(result.report.config, config());
+  assert.equal(result.report.configSha256, createHash("sha256")
     .update(canonicalCheckpointBytes(config())).digest("hex"));
   assert.equal(result.report.runId, "composition-test");
-  assert.equal(result.report.strategyOutcome, "CLOSED_PAPER");
-  assert.equal(result.report.realDataSourceCoverage, "NOT_ASSESSED");
-  assert.deepEqual(result.report.authority, {executionAuthorized: false, liveReady: false});
-  assert.equal(result.report.persistence.certainty, "ACKNOWLEDGED");
-  assert.deepEqual(result.report.persistence.checkpointRef, {
-    runId: "composition-test",
-    sequence: result.checkpoint.sequence,
-    hash: result.checkpoint.hash
-  });
+  assert.equal(result.report.startedAt, START);
+  assert.equal(result.report.deadlineAt, START + 8 * 60 * 60 * 1000);
+  assert.equal(result.report.policyVersion, result.report.checkpoint.runHeader.policyVersion);
+  assert.equal(result.report.persistence, "ACKNOWLEDGED");
+  assert.equal(result.report.exportBinding, "PRESTART_BOUND");
+  assert.equal(result.report.bindingReceipt.configSha256, result.report.configSha256);
   const persisted = await checkpoint(directory);
-  assert.deepEqual(result.report.persistence.terminalReceiptRef, {
+  assert.deepEqual(result.report.checkpoint, persisted);
+  assert.equal(result.report.checkpointSha256,
+    createHash("sha256").update(canonicalCheckpointBytes(persisted)).digest("hex"));
+  assert.deepEqual(result.report.runnerReport, {
+    status: result.report.runnerReport.status,
+    reason: result.report.runnerReport.reason,
+    runId: result.report.runnerReport.runId,
+    executionMode: result.report.runnerReport.executionMode,
+    provenance: result.report.runnerReport.provenance,
+    realDataSourceCoverage: result.report.runnerReport.realDataSourceCoverage,
+    counters: result.report.runnerReport.counters,
+    inputBytes: result.report.runnerReport.inputBytes,
+    candidateBudgetReached: result.report.runnerReport.candidateBudgetReached,
+    receipts: result.report.runnerReport.receipts,
+    operationResults: result.report.runnerReport.operationResults,
+    missingTerminalValuationMints: result.report.runnerReport.missingTerminalValuationMints,
+    pendingAuthorizationIds: result.report.runnerReport.pendingAuthorizationIds,
+    terminalResult: result.report.runnerReport.terminalResult,
+    terminalReceipt: result.report.runnerReport.terminalReceipt,
+    summary: result.report.runnerReport.summary
+  });
+  assert.deepEqual(result.report.runnerReport.terminalReceipt, {
     runId: result.terminalReceipt.runId,
     sequence: result.terminalReceipt.sequence,
     hash: result.terminalReceipt.hash,
-    resultDigest: result.terminalReceipt.resultDigest,
-    commandId: persisted.records.at(-1).commandId
+    resultDigest: result.terminalReceipt.resultDigest
   });
-  assert.equal(result.report.outcomes.entries.length, 1);
-  assert.equal(result.report.outcomes.entries[0].status, "FILLED_PAPER");
-  assert.equal(result.report.outcomes.entries[0].source, "SYNTHETIC_FIXTURE_ONLY");
-  assert.equal(result.report.outcomes.entries[0].costBasis, "HYPOTHETICAL_FIXTURE_ONLY");
-  assert.equal(result.report.outcomes.exits.length, 1);
-  assert.equal(result.report.outcomes.exits[0].status, "CLOSED_PAPER");
-  assert.deepEqual(result.report.outcomes.openUnvaluedPositions, []);
+  assert.equal(persisted.records.at(-1).method, "finishRun");
+  assert.equal(persisted.records.at(-1).commandId, result.report.runnerReport.terminalResult.commandId);
+  assert.equal(persisted.records.at(-1).resultDigest, result.terminalReceipt.resultDigest);
+  assert.equal(result.terminalReceipt.hash, result.report.checkpointSha256);
+  const entryRecord = persisted.records.find(record => record.method === "executeEntry");
+  assert.equal(entryRecord.inputs.quote.source, "SYNTHETIC_FIXTURE_ONLY");
+  assert.equal(entryRecord.inputs.quote.costs.networkCents, 0);
+  assert.equal(result.report.runnerReport.operationResults.find(item =>
+    item.method === "executeEntry").status, "FILLED_PAPER");
+  assert.equal(result.report.runnerReport.operationResults.some(item =>
+    item.method === "observeExitQuote" && item.status === "CLOSED_PAPER"), true);
+  assert.deepEqual(result.report.runnerReport.terminalResult.openPositions, []);
   assert.equal(result.timing.clockSource, "SYNTHETIC_FIXTURE_CLOCK");
   assert.equal(result.provenance.candidates[0].sourceTimestamp < result.provenance.candidates[0].receiptTimestamp, true);
   assert.deepEqual(result.provenance.quotes.map(item => item.purpose), ["entry", "risk-mark", "risk-mark"]);
@@ -237,7 +293,7 @@ test("missing hard evidence and missing full cost components do not fill", async
   const rejected = await noEvidence.pilot.start();
   assert.equal(rejected.status, "FINISHED");
   assert.equal(rejected.strategyOutcome, "BLOCKED");
-  assert.equal(rejected.report.strategyOutcome, "BLOCKED");
+  assert.equal(rejected.strategyOutcome, "BLOCKED");
   assert.equal(rejected.accounting.cashCents, "100000");
   const evidenceRecords = (await checkpoint(noEvidence.directory)).records;
   assert.equal(evidenceRecords.some(record => record.method === "executeEntry"), false);
@@ -252,8 +308,8 @@ test("missing hard evidence and missing full cost components do not fill", async
   const costCheckpoint = await checkpoint(noCosts.directory);
   assert.equal(costCheckpoint.records.some(record => record.method === "executeEntry"), false);
   assert.equal(costCheckpoint.records.at(-1).method, "finishRun");
-  assert.equal(costResult.report.persistence.certainty, "ACKNOWLEDGED");
-  assert.equal(costResult.report.outcomes.unresolved.includes("authorized reservation remains pending without a fill"), true);
+  assert.equal(costResult.report.persistence, "ACKNOWLEDGED");
+  assert.equal(costResult.report.runnerReport.pendingAuthorizationIds.length, 1);
 });
 
 test("no candidates emits a terminal checkpoint without inventing a trade", async t => {
@@ -302,13 +358,26 @@ test("pre-aborted composition does not write or initialize a checkpoint", async 
   assert.deepEqual(await readdir(directory), []);
 });
 
+test("stop during checkpoint-store opening is STOPPED and NOT_STARTED", async t => {
+  const {directory, pilot} = await harness(t);
+  const pending = pilot.start();
+  assert.equal(pilot.stop(), true);
+  const result = await pending;
+  assert.equal(result.status, "STOPPED");
+  assert.equal(result.state, "STOPPED");
+  assert.equal(result.report.persistence, "NOT_STARTED");
+  assert.equal(result.report.bindingReceipt, null);
+  assert.equal(result.terminalReceipt, null);
+  assert.deepEqual(await readdir(directory), []);
+});
+
 test("disconnect, timeout and late callbacks stay UNKNOWN while terminal persistence is separately classified", async t => {
   const disconnectHarness = await harness(t, {fault: "DISCONNECT"});
   const disconnectedResult = await disconnectHarness.pilot.start();
   assert.equal(disconnectedResult.status, "UNKNOWN");
   assert.equal(disconnectedResult.code, "DISCONNECTED");
   assert.ok(disconnectedResult.terminalReceipt);
-  assert.equal(disconnectedResult.report.persistence.certainty, "ACKNOWLEDGED");
+  assert.equal(disconnectedResult.report.persistence, "ACKNOWLEDGED");
   const disconnectedRecords = (await checkpoint(disconnectHarness.directory)).records;
   assert.equal(disconnectedRecords.filter(record => record.method === "finishRun").length, 1);
   assert.equal(disconnectedRecords.some(record => record.method === "executeEntry"), false);
@@ -321,7 +390,7 @@ test("disconnect, timeout and late callbacks stay UNKNOWN while terminal persist
   assert.equal(timeoutResult.status, "UNKNOWN");
   assert.equal(timeoutResult.code, "CALLBACK_TIMEOUT");
   assert.ok(timeoutResult.terminalReceipt);
-  assert.equal(timeoutResult.report.persistence.certainty, "ACKNOWLEDGED");
+  assert.equal(timeoutResult.report.persistence, "ACKNOWLEDGED");
   await new Promise(resolve => setTimeout(resolve, 40));
   const timeoutRecords = (await checkpoint(timeoutHarness.directory)).records;
   assert.equal(timeoutRecords.filter(record => record.method === "finishRun").length, 1);
@@ -337,8 +406,9 @@ test("disconnect, timeout and late callbacks stay UNKNOWN while terminal persist
   assert.equal(deadlineResult.status, "FINISHED");
   assert.equal(deadlineResult.code, "DEADLINE");
   assert.ok(deadlineResult.terminalReceipt);
-  assert.equal(deadlineResult.report.persistence.certainty, "ACKNOWLEDGED");
-  assert.equal(deadlineResult.report.outcomes.entries.length, 0);
+  assert.equal(deadlineResult.report.persistence, "ACKNOWLEDGED");
+  assert.equal(deadlineResult.report.runnerReport.operationResults.some(item =>
+    item.method === "executeEntry"), false);
   assert.equal((await checkpoint(deadlineHarness.directory)).records.at(-1).method, "finishRun");
 });
 
@@ -351,7 +421,7 @@ test("stop has one STOPPED lifecycle with acknowledged persistence; clock jumps 
   assert.equal(stoppedResult.status, "STOPPED");
   assert.equal(stoppedResult.state, "STOPPED");
   assert.ok(stoppedResult.terminalReceipt);
-  assert.equal(stoppedResult.report.persistence.certainty, "ACKNOWLEDGED");
+  assert.equal(stoppedResult.report.persistence, "ACKNOWLEDGED");
   assert.equal((await checkpoint(stopped.directory)).records.at(-1).method, "finishRun");
 
   const jumped = await harness(t, {fault: "CLOCK_JUMP"});
@@ -359,7 +429,7 @@ test("stop has one STOPPED lifecycle with acknowledged persistence; clock jumps 
   assert.equal(jumpResult.status, "UNKNOWN");
   assert.equal(jumpResult.code, "CLOCK_JUMP");
   assert.equal(jumpResult.terminalReceipt, null);
-  assert.equal(jumpResult.report.persistence.certainty, "NO_TERMINAL_RECEIPT");
+  assert.equal(jumpResult.report.persistence, "UNKNOWN");
   assert.equal((await checkpoint(jumped.directory)).records.at(-1).method, "riskSnapshot");
 });
 
@@ -369,7 +439,7 @@ test("lost checkpoint ACK remains UNKNOWN and runner does not duplicate entry co
   assert.equal(uncertain.status, "UNKNOWN");
   assert.equal(uncertain.terminalReceipt, null);
   assert.equal((await checkpoint(lost.directory)).sequence, 1);
-  assert.equal(uncertain.report.persistence.certainty, "UNKNOWN");
+  assert.equal(uncertain.report.persistence, "UNKNOWN");
 
   const complete = await harness(t);
   const result = await complete.pilot.start();
@@ -387,7 +457,21 @@ test("lost checkpoint ACK remains UNKNOWN and runner does not duplicate entry co
   assert.equal(restartResult.status, "BLOCKED");
   assert.equal(restartResult.code, "RESTART_NOT_ALLOWED");
   assert.equal(restartResult.terminalReceipt, null);
-  assert.equal(restartResult.report.persistence.certainty, "NOT_STARTED");
+  assert.equal(restartResult.report.persistence, "NOT_STARTED");
+});
+
+test("lost sequence-zero acknowledgement is UNKNOWN, never NOT_STARTED", async t => {
+  const initial = await harness(t, {fault: "LOST_INITIAL_ACK"});
+  const result = await initial.pilot.start();
+  assert.equal(result.status, "UNKNOWN");
+  assert.equal(result.code, "CHECKPOINT_UNKNOWN");
+  assert.equal(result.report.persistence, "UNKNOWN");
+  assert.equal(result.executionStarted, true);
+  assert.equal(result.terminalReceipt, null);
+  assert.equal(result.report.runnerReport, null);
+  assert.equal(result.report.checkpoint, null);
+  assert.equal(result.report.exportBinding, "PRESTART_BOUND");
+  assert.equal((await checkpoint(initial.directory)).sequence, 0);
 });
 
 test("unavailable final mark remains open and unvalued instead of being liquidated", async t => {
@@ -431,7 +515,7 @@ test("request and byte budgets are global and source labels cannot masquerade as
   assert.equal(tooLarge.status, "UNKNOWN");
   assert.equal(tooLarge.code, "BYTE_BUDGET");
   assert.equal(tooLarge.terminalReceipt, null);
-  assert.equal(tooLarge.report.persistence.certainty, "NO_TERMINAL_RECEIPT");
+  assert.equal(tooLarge.report.persistence, "UNKNOWN");
   assert.equal((await checkpoint(byteBudget.directory)).records.at(-1).method, "constructor");
 
   const source = await harness(t, {fault: "SPOOF_SOURCE"});
