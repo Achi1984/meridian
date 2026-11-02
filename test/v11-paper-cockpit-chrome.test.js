@@ -102,13 +102,21 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         assert.ok(liveRead,'native browser module graph mounts the real controller');
         assert.equal(liveRead.height>=44,true,'manual report read target is at least 44px');
         assert.equal(intercepted.count(),0,'controller mount remains a no-read operation');
-        await evaluate(`document.querySelector('#paper-cockpit-root button').click()`);
+        assert.equal(await evaluate(`(()=>{
+          const button=document.querySelector('#paper-cockpit-root button');
+          button.focus();
+          button.click();
+          button.click();
+          return document.activeElement===document.querySelector('#paper-cockpit-root button');
+        })()`),true,'same-turn refresh activation preserves focus');
         for(let attempt=0;attempt<150;attempt++){
           if(await evaluate(`document.querySelector('#paper-cockpit-root').textContent.includes('Observation-only')`))break;
           await new Promise(resolve=>setTimeout(resolve,10));
         }
         intercepted.assertHealthy();
-        assert.equal(intercepted.count(),1,'one click produces exactly one generated-report GET');
+        assert.equal(intercepted.count(),1,'same-turn activations produce exactly one generated-report GET');
+        assert.equal(await evaluate(`document.activeElement===document.querySelector('#paper-cockpit-root button')`),true,
+          'refresh completion preserves keyboard focus');
         const delivered=await evaluate(`(()=>{
           const root=document.querySelector('#paper-cockpit-root');
           return {report:root.textContent.includes('Observation-only'),
@@ -117,11 +125,44 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
             noWorkerClaim:!root.textContent.includes('RUNNING')};
         })()`);
         assert.deepEqual(delivered,{report:true,exactCash:true,terminal:true,noWorkerClaim:true});
+        await evaluate(`document.querySelector('#nav').click()`);
+        assert.equal(await evaluate(`document.querySelector('#paper-cockpit-root').textContent.includes('Observation-only')`),true,
+          'clicking navigation whitespace does not deactivate the visible Strategies report');
         await evaluate(`document.querySelector('#nav button[data-v="command"]').click()`);
         assert.equal(await evaluate(`!document.querySelector('#paper-cockpit-root').textContent.includes('Observation-only')`),true,
           'navigation clears private report DOM');
         await evaluate(`document.querySelector('#nav button[data-v="strategies"]').click()`);
         assert.equal(intercepted.count(),1,'returning to the cockpit does not read automatically');
+        await evaluate(`document.querySelector('#paper-cockpit-root button').focus()`);
+        await key('Enter','Enter',13);
+        for(let attempt=0;attempt<150;attempt++){
+          if(await evaluate(`document.querySelector('#paper-cockpit-root').textContent.includes('Observation-only')`))break;
+          await new Promise(resolve=>setTimeout(resolve,10));
+        }
+        assert.equal(intercepted.count(),2,'keyboard activation performs one explicit refresh');
+        assert.equal(await evaluate(`document.activeElement===document.querySelector('#paper-cockpit-root button')`),true,
+          'keyboard activation retains focus after the result renders');
+        const restored=await evaluate(`(()=>{
+          window.dispatchEvent(new Event('pagehide'));
+          window.dispatchEvent(new Event('pageshow'));
+          const root=document.querySelector('#paper-cockpit-root');
+          return {state:root.dataset.state,button:!!root.querySelector('button'),
+            privateData:root.textContent.includes('Observation-only')||
+              root.textContent.includes('90071992547409931234')};
+        })()`);
+        assert.deepEqual(restored,{state:'auth-required',button:true,privateData:false},
+          'pageshow restores the selected cockpit affordance but not private data');
+        assert.equal(intercepted.count(),2,'navigation restoration never starts a read');
+        await unlockAppThroughGate(call);
+        assert.deepEqual(await evaluate(`(()=>{
+          const root=document.querySelector('#paper-cockpit-root');
+          return {appHidden:document.getElementById('app').hidden,state:root.dataset.state,
+            button:!!root.querySelector('button'),
+            privateData:root.textContent.includes('Observation-only')||
+              root.textContent.includes('90071992547409931234')};
+        })()`),{appHidden:false,state:'ready',button:true,privateData:false},
+        'unlock after restoration keeps Strategies active without restoring the cleared report');
+        assert.equal(intercepted.count(),2,'unlock after restoration does not start a report read');
         await intercepted.close();
         await evaluate(`(async()=>{
           const model=await import('./paper-cockpit-model.js?v=B16-M11-FIX12');

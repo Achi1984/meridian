@@ -153,6 +153,27 @@ test('one manual read uses the shared authenticated session and preserves genera
   h.controller.dispose();
 });
 
+test('same-turn refresh calls retain the active request and its successful result', async () => {
+  let calls = 0;
+  let release;
+  const h = harness({fetchImpl: async () => {
+    calls++;
+    return new Promise(resolve => { release = resolve; });
+  }});
+  h.controller.setActive(true);
+  const first = h.controller.refresh();
+  const second = h.controller.refresh();
+  await until(() => typeof release === 'function');
+  assert.equal(calls, 1, 'same-turn calls do not multiply transport work');
+  assert.equal(h.root.attrs['data-state'], 'loading');
+  await second;
+  release(paperResponse(generatedReport()));
+  await first;
+  assert.match(h.root.textContent, /Observation-only/);
+  assert.notEqual(h.root.attrs['data-state'], 'loading');
+  h.controller.dispose();
+});
+
 test('a shared display freshness policy classifies stale in both connector and cockpit', async () => {
   const h = harness({
     fetchImpl: async () => paperResponse(generatedReport({observedAt: NOW - 60_001})),

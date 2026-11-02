@@ -46,7 +46,7 @@ async function loadWorkspace() {
 
 document.getElementById('nav')?.addEventListener('click',event=>{
   const button=event.target.closest?.('button[data-v]');
-  paperCockpit?.setActive(button?.dataset.v==='strategies');
+  if(button) paperCockpit?.setActive(button.dataset.v==='strategies');
   if (button?.dataset.v==='strategies') loadWorkspace();
 });
 

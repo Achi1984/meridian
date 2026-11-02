@@ -172,6 +172,11 @@ export function mountPaperCockpit(root, document, window, {
       render();
       return;
     }
+    if (reading) {
+      state = 'loading';
+      render();
+      return;
+    }
     if (connector?.isDisposed?.()) {
       if (connector.isBusy?.()) {
         state = 'loading';
