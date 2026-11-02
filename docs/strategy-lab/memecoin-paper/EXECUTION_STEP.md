@@ -51,7 +51,9 @@ nonnegative integer `feeCents`, `spreadCents`, `slippageCents`,
 Synthetic and nonsynthetic sources cannot mix. Nonsynthetic source strings do
 not authenticate data or establish live-data simulated-trade provenance.
 
-Marks are always explicit arrays. `[]` does not invent a valuation: with open
+Marks are always explicit dense arrays with only own numeric indexes; named or
+symbol keys, holes, and accessors are rejected throughout nested input data
+before identity hashing or dispatch. `[]` does not invent a valuation: with open
 positions, risk is `EQUITY_UNKNOWN`, additional entries cannot fill, and finish
 reports unavailable equity. Malformed supplied marks/costs are rejected before
 dispatch. Exit observations and risk snapshots need no new candidate and run

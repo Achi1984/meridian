@@ -140,6 +140,52 @@ test("event collisions bind purpose and entire payload; duplicates detach return
   assert.equal(session.metadata.sequence, 1);
 });
 
+for (const [label, makeMarks] of [
+  ["named key replacing a hole", mark => {
+    const marks = [mark];
+    marks.length = 2;
+    marks.evidence = {source: "lost"};
+    return marks;
+  }],
+  ["named key replacing the only index", mark => {
+    const marks = [];
+    marks.length = 1;
+    marks.evidence = mark;
+    return marks;
+  }],
+  ["nested sparse array with a named key", mark => {
+    const evidence = ["present"];
+    evidence.length = 2;
+    evidence.provenance = "lost";
+    mark.evidence = evidence;
+    return [mark];
+  }],
+  ["array accessor", mark => {
+    const marks = [];
+    Object.defineProperty(marks, "0", {get: () => mark, enumerable: true});
+    return marks;
+  }]
+]) {
+  test(`lossy evidence arrays are rejected before identity or ledger dispatch: ${label}`, async t => {
+    const {step, session, store} = await filled(t);
+    const token = candidate();
+    const eventId = "array-evidence";
+    const malformed = makeMarks(quote(token, "mark", START + 3000));
+    const rejected = await step.riskSnapshot({eventId, now: START + 3000, marks: malformed});
+    assert.equal(rejected.status, "REJECT");
+    assert.equal(session.metadata.sequence, 2);
+
+    const validInput = {eventId, now: START + 3000, marks: [quote(token, "mark", START + 3000)]};
+    const accepted = await step.riskSnapshot(validInput);
+    assert.equal(accepted.status, "PASS");
+    assert.equal(accepted.receipt.sequence, 3);
+    assert.deepEqual(await step.riskSnapshot(validInput), accepted);
+    assert.equal(session.metadata.sequence, 3);
+    const checkpoint = JSON.parse((await store.readCheckpoint()).bytes);
+    assert.deepEqual(checkpoint.records.at(-1).inputs.marks, validInput.marks);
+  });
+}
+
 test("duplicate storms coalesce onto one bounded operation without additional checkpoint reads", async t => {
   let release;
   const gate = new Promise(resolve => { release = resolve; });

@@ -46,10 +46,13 @@ function copyData(value, maxBytes) {
     }
     seen.add(item);
     const names = Object.keys(item);
+    const array = Array.isArray(item);
     if (Object.getOwnPropertySymbols(item).length ||
-        Object.getOwnPropertyNames(item).length !== names.length + (Array.isArray(item) ? 1 : 0) ||
-        (Array.isArray(item) && names.length !== item.length)) {
-      throw new TypeError("hidden fields or sparse arrays are unsupported");
+        (array
+          ? Object.getOwnPropertyNames(item).length !== item.length + 1 ||
+            names.length !== item.length || names.some((name, index) => name !== String(index))
+          : Object.getOwnPropertyNames(item).length !== names.length)) {
+      throw new TypeError("hidden fields or non-dense arrays are unsupported");
     }
     const result = Array.isArray(item) ? [] : {};
     for (const name of names) {
