@@ -1353,8 +1353,10 @@ test("dedicated report pool requires verified TLS and rejects connection-string 
   for (const connectionString of [
     "postgres://localhost/report?sslmode=require",
     "postgres://localhost/report?sslmode=disable",
+    "postgres://localhost/report?ssl=no-verify",
     "postgres://localhost/report?sslrootcert=%2Ftmp%2Fca.pem",
     "host=localhost dbname=report sslmode='require'",
+    "host=localhost dbname=report ssl=no-verify",
     "host=localhost dbname=report sslcert=/tmp/client.pem"
   ]) {
     assert.throws(

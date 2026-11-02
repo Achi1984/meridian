@@ -6,7 +6,7 @@ export const PAPER_REPORT_POOL_OPTIONS = Object.freeze({
   idle_in_transaction_session_timeout: 4_500
 });
 
-const SSL_CONNECTION_PARAMETERS = new Set(["sslmode", "sslcert", "sslkey", "sslrootcert"]);
+const SSL_CONNECTION_PARAMETERS = new Set(["ssl", "sslmode", "sslcert", "sslkey", "sslrootcert"]);
 
 function assertNoConnectionStringTlsOverrides(connectionString) {
   const value = String(connectionString || "");
@@ -20,7 +20,7 @@ function assertNoConnectionStringTlsOverrides(connectionString) {
       throw new TypeError("invalid private report database URL");
     }
   } else {
-    hasTlsOverride = [...value.matchAll(/(?:^|\s)(sslmode|sslcert|sslkey|sslrootcert)\s*=/gi)]
+    hasTlsOverride = [...value.matchAll(/(?:^|\s)(ssl|sslmode|sslcert|sslkey|sslrootcert)\s*=/gi)]
       .length > 0;
   }
   if (hasTlsOverride) {
