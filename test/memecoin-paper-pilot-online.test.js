@@ -141,6 +141,20 @@ test("bounded online composition produces only a receipt-bound no-entry report",
   assert.equal(checkpoint.records.at(-1).method, "finishRun");
 });
 
+test("audit terminal preserves a controller failure code omitted from local failure state", async t => {
+  const harness = await createHarness(t, {
+    fakeAssemblyOptions: {summaryFailureCode: "MONOTONIC_CLOCK_INVALID"}
+  });
+
+  const terminal = await harness.runner.start();
+  const audit = JSON.parse(await readFile(
+    path.join(harness.dataDirectory, "observation-audit.json"), "utf8"
+  ));
+
+  assert.equal(terminal.observation.failureCode, "MONOTONIC_CLOCK_INVALID");
+  assert.equal(audit.terminal.failureCode, "MONOTONIC_CLOCK_INVALID");
+});
+
 test("generated 159-candidate observation persists every blocked reason without ledger entries", async t => {
   const fixture = createObservationFixture(159);
   const harness = await createHarness(t, {
@@ -334,6 +348,19 @@ test("failed terminal audit update exposes an earlier snapshot as incomplete, ne
   assert.equal(report.status, "UNKNOWN");
   assert.equal(report.observationAudit.state, "RUNNING");
   assert.match(report.text, /last successfully written snapshot and may be incomplete/);
+});
+
+test("malformed nested audit checks return structured UNKNOWN from report reads", async t => {
+  const harness = await createHarness(t);
+  assert.equal((await harness.runner.start()).status, "FINISHED");
+  const auditPath = path.join(harness.dataDirectory, "observation-audit.json");
+  const audit = JSON.parse(await readFile(auditPath, "utf8"));
+  audit.records.candidates[0].filter.checks = [null];
+  await writeFile(auditPath, canonicalJson(audit));
+
+  const report = await readPilotReport(harness.dataDirectory);
+  assert.equal(report.status, "UNKNOWN");
+  assert.match(report.reason, /schema or durable run identity contract/);
 });
 
 test("ambiguous checkpoint readback is terminal UNKNOWN and never retried", async t => {

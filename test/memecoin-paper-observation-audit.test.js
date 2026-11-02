@@ -73,6 +73,27 @@ test("request event allowlist preserves real status, reason, time and identity w
   assert.equal("headers" in record, false);
 });
 
+test("returned identity preserves each valid field when another field is missing or invalid", () => {
+  const fixture = createObservationFixture(1);
+  const audit = createAudit({maxRequests: 1, maxCandidates: 1});
+  audit.recordProviderEvents([{
+    ...fixture.providerEvents[0],
+    returned: {
+      chainId: "solana",
+      mint: fixture.candidates[0].mint,
+      pool: fixture.candidates[0].pool,
+      quote: null
+    }
+  }], 0);
+
+  assert.deepEqual(audit.snapshot().records.providerRequests[0].returned, {
+    chainId: "solana",
+    mint: fixture.candidates[0].mint,
+    pool: fixture.candidates[0].pool,
+    quote: null
+  });
+});
+
 test("known missing-source-time request failure is not downgraded to UNKNOWN", () => {
   const fixture = createObservationFixture(1);
   const audit = createAudit({maxRequests: 1, maxCandidates: 1});
@@ -119,7 +140,8 @@ test("missing request and candidate evidence is declared as UNKNOWN omission, no
   assert.equal(result.omissions.candidateOutcomes, 1);
   assert.equal(result.summary.requests.totalsReconciled, true);
   assert.equal(result.summary.candidates.totalsReconciled, true);
-  assert.equal(result.summary.candidates.filterOutcomes.UNKNOWN, 1);
+  assert.equal(result.summary.candidates.filterOutcomes.UNKNOWN, 2);
+  assert.equal(result.summary.candidates.analystOutcomes.UNKNOWN, 1);
 });
 
 test("row and byte bounds truncate deterministically and disclose omissions", () => {
@@ -138,7 +160,35 @@ test("row and byte bounds truncate deterministically and disclose omissions", ()
   assert.equal(result.truncation.byteLimit, true);
   assert.equal(result.summary.requests.totalsReconciled, true);
   assert.equal(result.summary.candidates.totalsReconciled, true);
+  assert.equal(result.summary.candidates.filterOutcomes.UNKNOWN, 3);
+  assert.equal(result.summary.candidates.analystOutcomes.UNKNOWN, 3);
   assert.equal(validateObservationAudit(result, {runId: RUN_ID, configHash: CONFIG_HASH}), true);
+});
+
+test("unexpected request rows and malformed nested checks are not reconciled", () => {
+  const audit = createAudit({maxRequests: 4, maxCandidates: 1});
+  const fixture = createObservationFixture(1);
+  audit.recordProviderEvents(fixture.providerEvents, 0);
+  audit.setProviderAccounting({
+    requests: 0, bytes: 0, providerEvents: 0, dexRequests: 0, rpcRequests: 0, candidates: 0
+  });
+  const extraRequest = audit.snapshot();
+  assert.equal(extraRequest.summary.requests.totalsReconciled, false);
+  assert.equal(extraRequest.summary.requests.unexpected, 4);
+
+  const candidateAudit = createAudit({maxRequests: 1, maxCandidates: 1});
+  const {filters, analysis} = createBlockedDecisions();
+  candidateAudit.recordCandidate(fixture.candidates[0], filters, analysis, 0);
+  candidateAudit.setProviderAccounting({
+    requests: 0, bytes: 0, providerEvents: 0, dexRequests: 0, rpcRequests: 0, candidates: 1
+  });
+  const malformed = candidateAudit.snapshot();
+  malformed.records.candidates[0].filter.checks = [null];
+  assert.equal(validateObservationAudit(malformed, {runId: RUN_ID, configHash: CONFIG_HASH}), false);
+  malformed.records.candidates[0].filter.checks = [{
+    name: "identity", status: "UNKNOWN", reason: 17, source: null, observedAt: null
+  }];
+  assert.equal(validateObservationAudit(malformed, {runId: RUN_ID, configHash: CONFIG_HASH}), false);
 });
 
 test("audit rejects stale run and configuration identity", () => {

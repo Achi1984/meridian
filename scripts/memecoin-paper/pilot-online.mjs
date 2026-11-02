@@ -1188,7 +1188,7 @@ export function createPilotOnline(options = {}) {
           runStatus: terminalStatus,
           controllerStatus: controllerSummary?.status ?? null,
           stopReason: controllerSummary?.reason ?? null,
-          failureCode
+          failureCode: failureCode ?? controllerSummary?.failureCode ?? null
         });
         await persistAudit();
         terminalStatus = failureCode || controllerSummary?.status !== "FINISHED"

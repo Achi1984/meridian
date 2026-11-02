@@ -69,13 +69,16 @@ function safeRequestId(value) {
 
 function safeIdentity(value) {
   if (!isRecord(value)) return null;
-  const identity = {
+  return {
     chainId: value.chainId === "solana" ? "solana" : null,
     mint: typeof value.mint === "string" && BASE58.test(value.mint) ? value.mint : null,
     pool: typeof value.pool === "string" && BASE58.test(value.pool) ? value.pool : null,
     quote: typeof value.quote === "string" && BASE58.test(value.quote) ? value.quote : null
   };
-  return Object.values(identity).every(item => item !== null) ? identity : null;
+}
+
+function validAuditText(value, maxLength = MAX_TEXT_LENGTH) {
+  return value === null || (typeof value === "string" && value.length <= maxLength);
 }
 
 function requestClassification(status) {
@@ -152,6 +155,12 @@ function summarize(requests, candidates, accounting) {
     ["PASS", "REJECT", "UNKNOWN"]);
   const analystOutcomes = countStatuses(candidates.slice(0, detailedCandidates), "analysisStatus",
     ["PASS", "REJECT", "UNKNOWN", "SCORE_UNAVAILABLE", "BLOCKED"]);
+  const omittedCandidates = expectedCandidates === null
+    ? null : Math.max(0, expectedCandidates - detailedCandidates);
+  if (omittedCandidates !== null) {
+    filterOutcomes.UNKNOWN += omittedCandidates;
+    analystOutcomes.UNKNOWN += omittedCandidates;
+  }
   return {
     requests: {
       expected: expectedRequests,
@@ -162,19 +171,20 @@ function summarize(requests, candidates, accounting) {
       failed: requestOutcomes.FAILED,
       unknown: requestOutcomes.UNKNOWN,
       totalsReconciled: expectedRequests !== null &&
+        Math.max(0, requests.length - detailedRequests) === 0 &&
         detailedRequests + (omittedRequests ?? 0) === expectedRequests
     },
     candidates: {
       expected: expectedCandidates,
       detailed: detailedCandidates,
       unexpected: Math.max(0, candidates.length - detailedCandidates),
-      omitted: expectedCandidates === null
-        ? null : Math.max(0, expectedCandidates - detailedCandidates),
+      omitted: omittedCandidates,
       filterOutcomes,
       analystOutcomes,
       majorBlockReasons: reasonSummary(candidates.slice(0, detailedCandidates)),
       totalsReconciled: expectedCandidates !== null &&
-        detailedCandidates + Math.max(0, expectedCandidates - detailedCandidates) === expectedCandidates
+        Math.max(0, candidates.length - detailedCandidates) === 0 &&
+        detailedCandidates + omittedCandidates === expectedCandidates
     }
   };
 }
@@ -425,6 +435,14 @@ export function validateObservationAudit(audit, {runId, configHash} = {}) {
   if (audit.records.candidates.some(candidate =>
     !isRecord(candidate) || !isRecord(candidate.filter) || !isRecord(candidate.analysis) ||
     !Array.isArray(candidate.filter.checks) || !Array.isArray(candidate.analysis.checks) ||
+    candidate.filter.checks.length > MAX_CHECK_ROWS ||
+    candidate.analysis.checks.length > MAX_CHECK_ROWS ||
+    !validAuditText(candidate.filter.reason) || !validAuditText(candidate.analysis.reason) ||
+    [...candidate.filter.checks, ...candidate.analysis.checks].some(check =>
+      !isRecord(check) || typeof check.name !== "string" || check.name.length > 64 ||
+      !["PASS", "REJECT", "UNKNOWN"].includes(check.status) ||
+      !validAuditText(check.reason) || !validAuditText(check.source, 96) ||
+      (check.observedAt !== null && safeTime(check.observedAt) !== check.observedAt)) ||
     candidate.filterStatus !== candidate.filter.status ||
     candidate.analysisStatus !== candidate.analysis.status ||
     !["PASS", "REJECT", "UNKNOWN"].includes(candidate.filterStatus) ||

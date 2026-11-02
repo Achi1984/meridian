@@ -95,6 +95,7 @@ export function createFakeAssembly({
   resultFactory,
   onStep,
   onReportInput,
+  summaryFailureCode,
   waitForStop = false,
   maxCycles = 1
 } = {}) {
@@ -235,7 +236,8 @@ export function createFakeAssembly({
             mode,
             reason,
             counts: {requests, events, cycles: calls.checkpoint, completedSteps: calls.steps},
-            checkpointAcknowledgement: acknowledgement
+            checkpointAcknowledgement: acknowledgement,
+            ...(summaryFailureCode ? {failureCode: summaryFailureCode} : {})
           };
           await callbacks.report({
             summary,
