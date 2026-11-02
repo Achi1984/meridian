@@ -23,7 +23,6 @@ function harness({
   const summary = {
     runId: RUN_ID,
     openPositions: [],
-    reservedPositions: 0,
     eventCount: 0,
     costs: {}
   };
@@ -144,6 +143,7 @@ test("offline lifecycle fills from a later synthetic quote and exits on a later 
   const report = await runner.run();
 
   assert.equal(report.status, "FINISHED");
+  assert.equal(report.reason, "SOURCES_EXHAUSTED");
   assert.equal(report.provenance, SYNTHETIC_SOURCE);
   assert.equal(report.realDataSourceCoverage, "NOT_ASSESSED");
   assert.equal(summary.openPositions.length, 0);

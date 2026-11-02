@@ -166,6 +166,7 @@ export function createPaperExecutionRunner({
   const receipts = [];
   const results = [];
   const candidatesByMint = new Map();
+  const pendingAuthorizationIds = new Set();
   let latestMarks = [];
   let ledgerUnknownReason = null;
 
@@ -240,6 +241,23 @@ export function createPaperExecutionRunner({
     }
     results.push({method, status: result?.status ?? "INVALID_RESULT",
       receipt: result?.receipt ? {...result.receipt} : null});
+    if (method === "authorizeEntry" && result?.status === "AUTHORIZED") {
+      pendingAuthorizationIds.add(result.authorizationId);
+    }
+    if (method === "executeEntry" && result?.status === "FILLED_PAPER") {
+      pendingAuthorizationIds.delete(input.authorizationId);
+    }
+    if (result.receipt) {
+      try {
+        for (const event of session.snapshot().auditEvents) {
+          if (event.type === "RISK_RESERVATION_RELEASED") {
+            pendingAuthorizationIds.delete(event.authorizationId);
+          }
+        }
+      } catch {
+        return {unknown: true};
+      }
+    }
     if (result?.status === "UNKNOWN") {
       return result.receipt ? {ledgerUnknown: true, result} : {unknown: true};
     }
@@ -548,7 +566,7 @@ export function createPaperExecutionRunner({
           return unknown("checkpoint/session readback became unavailable");
         }
         if ((sourceDone || candidateBudgetReached) && snapshot.openPositions.length === 0 &&
-            snapshot.reservedPositions === 0) {
+            pendingAuthorizationIds.size === 0) {
           return finish(sourceDone ? "SOURCES_EXHAUSTED" : "INPUT_BUDGET", readTime());
         }
       }
