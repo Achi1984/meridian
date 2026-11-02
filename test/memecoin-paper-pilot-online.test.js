@@ -363,6 +363,34 @@ test("malformed nested audit checks return structured UNKNOWN from report reads"
   assert.match(report.reason, /schema or durable run identity contract/);
 });
 
+test("malformed persisted request status returns structured UNKNOWN", async t => {
+  const harness = await createHarness(t);
+  assert.equal((await harness.runner.start()).status, "FINISHED");
+  const auditPath = path.join(harness.dataDirectory, "observation-audit.json");
+  const audit = JSON.parse(await readFile(auditPath, "utf8"));
+  audit.records.providerRequests[0].status = {toString: null};
+  await writeFile(auditPath, canonicalJson(audit));
+
+  const report = await readPilotReport(harness.dataDirectory);
+  assert.equal(report.status, "UNKNOWN");
+  assert.match(report.reason, /schema or durable run identity contract/);
+});
+
+test("unreadable operator report retains and warns about independently validated audit", async t => {
+  const harness = await createHarness(t);
+  assert.equal((await harness.runner.start()).status, "FINISHED");
+  const reportPath = path.join(harness.dataDirectory, "operator-report.json");
+  for (const content of ["{malformed", "{}", "null"]) {
+    await writeFile(reportPath, content);
+    const report = await readPilotReport(harness.dataDirectory);
+    assert.equal(report.status, "UNKNOWN");
+    assert.equal(report.observationAudit.runId, FIXTURE_RUN_ID);
+    assert.match(report.text, /Operator report unavailable/);
+    assert.match(report.text, /run\/config-bound audit is independently validated/);
+    assert.match(report.text, /Provider requests:/);
+  }
+});
+
 test("ambiguous checkpoint readback is terminal UNKNOWN and never retried", async t => {
   let readCount = 0;
   let commitCount = 0;

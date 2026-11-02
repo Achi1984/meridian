@@ -165,6 +165,44 @@ test("row and byte bounds truncate deterministically and disclose omissions", ()
   assert.equal(validateObservationAudit(result, {runId: RUN_ID, configHash: CONFIG_HASH}), true);
 });
 
+test("per-stage check bounds expose omitted checks in the artifact and rendered summary", () => {
+  const fixture = createObservationFixture(1);
+  const audit = createAudit({maxRequests: 1, maxCandidates: 1});
+  const checks = count => Object.fromEntries(Array.from({length: count}, (_, index) => [
+    `check-${index}`, {status: "UNKNOWN", reason: "evidence unavailable"}
+  ]));
+  audit.recordCandidate(fixture.candidates[0], {
+    status: "UNKNOWN",
+    reason: "filters unavailable",
+    checks: checks(22)
+  }, {
+    status: "BLOCKED",
+    reason: "analysis blocked",
+    components: checks(23)
+  }, 0);
+  audit.setProviderAccounting({
+    requests: 0, bytes: 0, providerEvents: 0, dexRequests: 0, rpcRequests: 0, candidates: 1
+  });
+  const result = audit.snapshot();
+
+  assert.equal(result.records.candidates[0].filter.checks.length, 20);
+  assert.equal(result.records.candidates[0].filter.omittedChecks, 2);
+  assert.equal(result.records.candidates[0].analysis.checks.length, 20);
+  assert.equal(result.records.candidates[0].analysis.omittedChecks, 3);
+  assert.equal(result.omissions.filterChecks, 2);
+  assert.equal(result.omissions.analysisChecks, 3);
+  assert.equal(result.summary.candidates.omittedChecks.filter, 2);
+  assert.equal(result.summary.candidates.omittedChecks.analysis, 3);
+  assert.equal(result.truncation.filterChecks, true);
+  assert.equal(result.truncation.analysisChecks, true);
+  assert.match(renderObservationAudit(result),
+    /Checks omitted: filter=2, analyst=3; check truncation filter=true, analyst=true/);
+  assert.equal(validateObservationAudit(result, {runId: RUN_ID, configHash: CONFIG_HASH}), true);
+  const undeclared = JSON.parse(JSON.stringify(result));
+  undeclared.truncation.filterChecks = false;
+  assert.equal(validateObservationAudit(undeclared, {runId: RUN_ID, configHash: CONFIG_HASH}), false);
+});
+
 test("unexpected request rows and malformed nested checks are not reconciled", () => {
   const audit = createAudit({maxRequests: 4, maxCandidates: 1});
   const fixture = createObservationFixture(1);
@@ -188,6 +226,15 @@ test("unexpected request rows and malformed nested checks are not reconciled", (
   malformed.records.candidates[0].filter.checks = [{
     name: "identity", status: "UNKNOWN", reason: 17, source: null, observedAt: null
   }];
+  assert.equal(validateObservationAudit(malformed, {runId: RUN_ID, configHash: CONFIG_HASH}), false);
+});
+
+test("non-string persisted request statuses fail validation without classifier coercion", () => {
+  const fixture = createObservationFixture(1);
+  const audit = createAudit({maxRequests: 1, maxCandidates: 1});
+  audit.recordProviderEvents(fixture.providerEvents.slice(0, 1), 0);
+  const malformed = audit.snapshot();
+  malformed.records.providerRequests[0].status = {toString: null};
   assert.equal(validateObservationAudit(malformed, {runId: RUN_ID, configHash: CONFIG_HASH}), false);
 });
 

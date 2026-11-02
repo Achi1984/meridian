@@ -82,6 +82,7 @@ function validAuditText(value, maxLength = MAX_TEXT_LENGTH) {
 }
 
 function requestClassification(status) {
+  if (typeof status !== "string") return "UNKNOWN";
   if (status === "RECEIVED") return "SUCCESS";
   if (FAILURE_STATUSES.has(status) || /^HTTP_[1-5]\d\d$/.test(status)) return "FAILED";
   return "UNKNOWN";
@@ -92,14 +93,18 @@ function statusClassification(status, allowed) {
 }
 
 function safeCheckEntries(value, allowedStatuses, text) {
-  if (!isRecord(value)) return [];
-  return Object.entries(value).slice(0, MAX_CHECK_ROWS).map(([name, check]) => ({
-    name: text(name, 64) ?? "UNKNOWN",
-    status: statusClassification(check?.status, allowedStatuses),
-    reason: text(check?.reason),
-    source: text(check?.source, 96),
-    observedAt: safeTime(check?.observedAt)
-  }));
+  if (!isRecord(value)) return {checks: [], omitted: 0};
+  const entries = Object.entries(value);
+  return {
+    checks: entries.slice(0, MAX_CHECK_ROWS).map(([name, check]) => ({
+      name: text(name, 64) ?? "UNKNOWN",
+      status: statusClassification(check?.status, allowedStatuses),
+      reason: text(check?.reason),
+      source: text(check?.source, 96),
+      observedAt: safeTime(check?.observedAt)
+    })),
+    omitted: Math.max(0, entries.length - MAX_CHECK_ROWS)
+  };
 }
 
 function countStatuses(records, field, statuses) {
@@ -157,6 +162,11 @@ function summarize(requests, candidates, accounting) {
     ["PASS", "REJECT", "UNKNOWN", "SCORE_UNAVAILABLE", "BLOCKED"]);
   const omittedCandidates = expectedCandidates === null
     ? null : Math.max(0, expectedCandidates - detailedCandidates);
+  const omittedChecks = candidates.slice(0, detailedCandidates).reduce((totals, candidate) => {
+    totals.filter += candidate.filter.omittedChecks;
+    totals.analysis += candidate.analysis.omittedChecks;
+    return totals;
+  }, {filter: 0, analysis: 0});
   if (omittedCandidates !== null) {
     filterOutcomes.UNKNOWN += omittedCandidates;
     analystOutcomes.UNKNOWN += omittedCandidates;
@@ -181,6 +191,7 @@ function summarize(requests, candidates, accounting) {
       omitted: omittedCandidates,
       filterOutcomes,
       analystOutcomes,
+      omittedChecks,
       majorBlockReasons: reasonSummary(candidates.slice(0, detailedCandidates)),
       totalsReconciled: expectedCandidates !== null &&
         Math.max(0, candidates.length - detailedCandidates) === 0 &&
@@ -211,6 +222,8 @@ function makeSnapshot(state, requestRecords, candidateRecords, byteTruncated) {
     truncation: {
       providerRows: state.requestRowsTruncated || requestRecords.length < state.requests.length,
       candidateRows: state.candidateRowsTruncated || candidateRecords.length < state.candidates.length,
+      filterChecks: state.filterChecksTruncated,
+      analysisChecks: state.analysisChecksTruncated,
       byteLimit: byteTruncated,
       textFields: state.textTruncated
     },
@@ -218,7 +231,9 @@ function makeSnapshot(state, requestRecords, candidateRecords, byteTruncated) {
       providerRequests: summary.requests.omitted,
       unexpectedProviderEvents: summary.requests.unexpected,
       candidateOutcomes: summary.candidates.omitted,
-      unexpectedCandidateOutcomes: summary.candidates.unexpected
+      unexpectedCandidateOutcomes: summary.candidates.unexpected,
+      filterChecks: summary.candidates.omittedChecks.filter,
+      analysisChecks: summary.candidates.omittedChecks.analysis
     },
     summary,
     records: {providerRequests: requestRecords, candidates: candidateRecords}
@@ -293,6 +308,8 @@ export function createObservationAudit({
     candidates: [],
     requestRowsTruncated: false,
     candidateRowsTruncated: false,
+    filterChecksTruncated: false,
+    analysisChecksTruncated: false,
     textTruncated: false,
     accounting: null,
     terminal: null
@@ -350,6 +367,12 @@ export function createObservationAudit({
         new Set(["PASS", "REJECT", "UNKNOWN", "SCORE_UNAVAILABLE", "BLOCKED"]));
       const text = (value, maxLength) =>
         safeText(value, maxLength, () => { state.textTruncated = true; });
+      const filterChecks = safeCheckEntries(filters?.checks,
+        new Set(["PASS", "REJECT", "UNKNOWN"]), text);
+      const analysisChecks = safeCheckEntries(analysis?.components,
+        new Set(["PASS", "REJECT", "UNKNOWN"]), text);
+      if (filterChecks.omitted > 0) state.filterChecksTruncated = true;
+      if (analysisChecks.omitted > 0) state.analysisChecksTruncated = true;
       state.candidates.push({
         cycleIndex: Number.isSafeInteger(cycleIndex) && cycleIndex >= 0 ? cycleIndex : null,
         identity: safeIdentity(candidate),
@@ -359,13 +382,14 @@ export function createObservationAudit({
         filter: {
           status: filterStatus,
           reason: text(filters?.reason),
-          checks: safeCheckEntries(filters?.checks, new Set(["PASS", "REJECT", "UNKNOWN"]), text)
+          checks: filterChecks.checks,
+          omittedChecks: filterChecks.omitted
         },
         analysis: {
           status: analysisStatus,
           reason: text(analysis?.reason),
-          checks: safeCheckEntries(analysis?.components,
-            new Set(["PASS", "REJECT", "UNKNOWN"]), text)
+          checks: analysisChecks.checks,
+          omittedChecks: analysisChecks.omitted
         }
       });
     },
@@ -413,6 +437,8 @@ export function validateObservationAudit(audit, {runId, configHash} = {}) {
       audit.bounds.maxCandidateRows < 1 || audit.bounds.maxCandidateRows > MAX_CANDIDATE_ROWS ||
       typeof audit.truncation.providerRows !== "boolean" ||
       typeof audit.truncation.candidateRows !== "boolean" ||
+      typeof audit.truncation.filterChecks !== "boolean" ||
+      typeof audit.truncation.analysisChecks !== "boolean" ||
       typeof audit.truncation.byteLimit !== "boolean" ||
       typeof audit.truncation.textFields !== "boolean" ||
       (audit.state === "RUNNING" && audit.terminal !== null) ||
@@ -431,12 +457,15 @@ export function validateObservationAudit(audit, {runId, configHash} = {}) {
   }
   if (audit.records.providerRequests.some(request =>
     !isRecord(request) || !["SUCCESS", "FAILED", "UNKNOWN"].includes(request.outcome) ||
+    typeof request.status !== "string" ||
     request.outcome !== requestClassification(request.status))) return false;
   if (audit.records.candidates.some(candidate =>
     !isRecord(candidate) || !isRecord(candidate.filter) || !isRecord(candidate.analysis) ||
     !Array.isArray(candidate.filter.checks) || !Array.isArray(candidate.analysis.checks) ||
     candidate.filter.checks.length > MAX_CHECK_ROWS ||
     candidate.analysis.checks.length > MAX_CHECK_ROWS ||
+    !Number.isSafeInteger(candidate.filter.omittedChecks) || candidate.filter.omittedChecks < 0 ||
+    !Number.isSafeInteger(candidate.analysis.omittedChecks) || candidate.analysis.omittedChecks < 0 ||
     !validAuditText(candidate.filter.reason) || !validAuditText(candidate.analysis.reason) ||
     [...candidate.filter.checks, ...candidate.analysis.checks].some(check =>
       !isRecord(check) || typeof check.name !== "string" || check.name.length > 64 ||
@@ -451,10 +480,14 @@ export function validateObservationAudit(audit, {runId, configHash} = {}) {
   }
   const recomputed = summarize(audit.records.providerRequests, audit.records.candidates, providerAccounting);
   return canonicalJson(recomputed) === canonicalJson(audit.summary) &&
+    (audit.truncation.filterChecks || recomputed.candidates.omittedChecks.filter === 0) &&
+    (audit.truncation.analysisChecks || recomputed.candidates.omittedChecks.analysis === 0) &&
     audit.omissions.providerRequests === recomputed.requests.omitted &&
     audit.omissions.unexpectedProviderEvents === recomputed.requests.unexpected &&
     audit.omissions.candidateOutcomes === recomputed.candidates.omitted &&
-    audit.omissions.unexpectedCandidateOutcomes === recomputed.candidates.unexpected;
+    audit.omissions.unexpectedCandidateOutcomes === recomputed.candidates.unexpected &&
+    audit.omissions.filterChecks === recomputed.candidates.omittedChecks.filter &&
+    audit.omissions.analysisChecks === recomputed.candidates.omittedChecks.analysis;
 }
 
 export function renderObservationAudit(audit) {
@@ -468,6 +501,7 @@ export function renderObservationAudit(audit) {
     `Candidate outcomes: detailed=${candidates.detailed}, omitted=${candidates.omitted ?? "UNKNOWN"}, unexpected=${candidates.unexpected}`,
     `Filter outcomes: PASS=${candidates.filterOutcomes.PASS}, REJECT=${candidates.filterOutcomes.REJECT}, UNKNOWN=${candidates.filterOutcomes.UNKNOWN}`,
     `Analyst outcomes: PASS=${candidates.analystOutcomes.PASS}, REJECT=${candidates.analystOutcomes.REJECT}, UNKNOWN=${candidates.analystOutcomes.UNKNOWN}, SCORE_UNAVAILABLE=${candidates.analystOutcomes.SCORE_UNAVAILABLE}, BLOCKED=${candidates.analystOutcomes.BLOCKED}`,
+    `Checks omitted: filter=${candidates.omittedChecks.filter}, analyst=${candidates.omittedChecks.analysis}; check truncation filter=${audit.truncation.filterChecks}, analyst=${audit.truncation.analysisChecks}`,
     `Totals reconcile: requests=${requests.totalsReconciled ? "YES" : "UNKNOWN"}, candidates=${candidates.totalsReconciled ? "YES" : "UNKNOWN"}`,
     `Truncated: provider rows=${audit.truncation.providerRows}, candidate rows=${audit.truncation.candidateRows}, byte limit=${audit.truncation.byteLimit}, text fields=${audit.truncation.textFields}`,
     "Major non-PASS reasons:"

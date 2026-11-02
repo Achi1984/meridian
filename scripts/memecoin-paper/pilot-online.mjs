@@ -279,11 +279,14 @@ function pathsFor(directory) {
   };
 }
 
-async function readOptionalJson(filePath, maxBytes = 16 * 1024) {
+async function readOptionalJson(filePath, maxBytes = 16 * 1024, includePresence = false) {
   try {
-    return (await readCanonicalJson(filePath, maxBytes, path.basename(filePath))).value;
+    const value = (await readCanonicalJson(filePath, maxBytes, path.basename(filePath))).value;
+    return includePresence ? {present: true, value} : value;
   } catch (error) {
-    if (error.code === "ENOENT") return null;
+    if (error.code === "ENOENT") {
+      return includePresence ? {present: false, value: null} : null;
+    }
     throw error;
   }
 }
@@ -363,13 +366,21 @@ export async function readPilotReport(dataDirectory) {
   let report;
   let audit;
   try {
-    [status, report, audit] = await Promise.all([
-      readPilotStatus(dataDirectory),
-      readOptionalJson(paths.reportJson, MAX_REPORT_BYTES),
-      readOptionalJson(paths.observationAudit, MAX_OBSERVATION_AUDIT_BYTES)
-    ]);
+    status = await readPilotStatus(dataDirectory);
   } catch {
-    return {status: "UNKNOWN", reason: "persisted operator report or observation audit is unreadable"};
+    return {status: "UNKNOWN", reason: "durable run status is unreadable"};
+  }
+  const [reportResult, auditResult] = await Promise.allSettled([
+    readOptionalJson(paths.reportJson, MAX_REPORT_BYTES, true),
+    readOptionalJson(paths.observationAudit, MAX_OBSERVATION_AUDIT_BYTES)
+  ]);
+  const reportUnreadable = reportResult.status === "rejected";
+  const reportMissing = !reportUnreadable && !reportResult.value.present;
+  const auditUnreadable = auditResult.status === "rejected";
+  if (!reportUnreadable) report = reportResult.value.value;
+  if (!auditUnreadable) audit = auditResult.value;
+  if (auditUnreadable) {
+    return {status: "UNKNOWN", reason: "persisted observation audit is unreadable"};
   }
   if (audit && !validateObservationAudit(audit, {
     runId: status.runId, configHash: status.configHash
@@ -379,7 +390,28 @@ export async function readPilotReport(dataDirectory) {
   if (status.observationAuditStatus === "PERSISTED" && !audit) {
     return {status: "UNKNOWN", reason: "terminal marker requires an observation audit that is unavailable"};
   }
-  if (!report) {
+  const reportFallback = reason => {
+    const auditText = audit
+      ? renderObservationAudit(audit)
+      : "No independently validated observation audit is available.";
+    const auditWarning = audit
+      ? "The following run/config-bound audit is independently validated and is diagnostics only; it does not replace the operator report."
+      : "No independently validated observation audit is available.";
+    const persistenceWarning = status.observationAuditStatus === "FAILED"
+      ? "\n\nFinal audit persistence failed; any retained artifact is the last successfully written snapshot and may be incomplete."
+      : "";
+    return {
+      status: "UNKNOWN",
+      runStatus: status.status,
+      observationAudit: audit,
+      reason,
+      text: `## Operator report unavailable\n${auditWarning}\n\n${auditText}${persistenceWarning}`
+    };
+  };
+  if (reportUnreadable) {
+    return reportFallback("The persisted operator report is unreadable");
+  }
+  if (reportMissing) {
     if (status.observationAuditStatus === "FAILED") {
       const lastSnapshot = audit
         ? renderObservationAudit(audit)
@@ -408,18 +440,24 @@ export async function readPilotReport(dataDirectory) {
         : "no durable operator report or observation audit exists"
     };
   }
-  const accounting = report.observation?.providerAccounting;
-  if (report.runId !== status.runId || report.configHash !== status.configHash ||
-      !isRecord(report.dto?.experiment) ||
-      report.dto.experiment.source !== "READ_ONLY_PAPER_CHECKPOINT" ||
-      report.dto.experiment.evidenceKind !== "READ_ONLY_PAPER_CHECKPOINT_RECEIPTS" ||
-      report.dto.experiment.sourceProvenance !== "CALLER_LABEL_ONLY_NOT_AUTHENTICATED" ||
-      !isRecord(accounting) || !isRecord(status.providerAccounting) ||
-      canonicalJson(accounting) !== canonicalJson(status.providerAccounting) ||
-      report.observation.entryAuthorizations !== 0 ||
-      report.observation.simulatedFills !== 0 ||
-      report.observation.executableQuoteAndCostEvidence !== "UNAVAILABLE") {
-    return {status: "UNKNOWN", reason: "report failed its provenance or durable identity contract"};
+  let reportValid = false;
+  try {
+    const accounting = report?.observation?.providerAccounting;
+    reportValid = report?.runId === status.runId && report.configHash === status.configHash &&
+      isRecord(report.dto?.experiment) &&
+      report.dto.experiment.source === "READ_ONLY_PAPER_CHECKPOINT" &&
+      report.dto.experiment.evidenceKind === "READ_ONLY_PAPER_CHECKPOINT_RECEIPTS" &&
+      report.dto.experiment.sourceProvenance === "CALLER_LABEL_ONLY_NOT_AUTHENTICATED" &&
+      isRecord(accounting) && isRecord(status.providerAccounting) &&
+      canonicalJson(accounting) === canonicalJson(status.providerAccounting) &&
+      report.observation.entryAuthorizations === 0 &&
+      report.observation.simulatedFills === 0 &&
+      report.observation.executableQuoteAndCostEvidence === "UNAVAILABLE";
+  } catch {
+    reportValid = false;
+  }
+  if (!reportValid) {
+    return reportFallback("The persisted operator report is malformed or fails its provenance and identity contract");
   }
   if (status.observationAuditStatus === "FAILED") {
     const auditText = audit
