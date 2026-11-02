@@ -54,7 +54,11 @@ export function parseMountInfo(mountInfo) {
 async function validatePath(fsOps) {
   for (const component of PATH_COMPONENTS) {
     const info = await fsOps.lstat(component);
-    if (!isSafeDirectory(info)) throw failure("VOLUME_PROTECTION_PATH_UNSAFE");
+    const unsafeAncestor = component !== TARGET &&
+      (info.uid !== 0 || (modeOf(info) & 0o022) !== 0);
+    if (!isSafeDirectory(info) || unsafeAncestor) {
+      throw failure("VOLUME_PROTECTION_PATH_UNSAFE");
+    }
   }
   if (await fsOps.realpath(TARGET) !== TARGET) {
     throw failure("VOLUME_PROTECTION_PATH_UNSAFE");

@@ -285,6 +285,30 @@ test("rejects unsafe owner, mode, symlink, mountpoint, and inode before mutation
   assertDropped(symlinkParent);
 });
 
+test("rejects wrong-owner and writable ancestors before opening target", async t => {
+  for (const [label, ancestorInfo] of [
+    ["wrong owner", directoryInfo({uid: RUNTIME_UID})],
+    ["group writable", directoryInfo({mode: 0o040775})],
+    ["world writable", directoryInfo({mode: 0o040757})]
+  ]) {
+    await t.test(label, async () => {
+      const harness = fixture({
+        lstatOverride: ({filename}) => filename === "/var/data" ? ancestorInfo : undefined
+      });
+      const result = await runOneShot({
+        mode: "REPAIR",
+        fsOps: harness.fsOps,
+        credentials: harness.credentials
+      });
+      assert.equal(result.status, "BLOCKED");
+      assert.equal(result.failureCode, "VOLUME_PROTECTION_PATH_UNSAFE");
+      assert.equal(harness.events.some(([operation]) => operation === "open"), false);
+      assert.equal(harness.chmodCalls, 0);
+      assertDropped(harness);
+    });
+  }
+});
+
 test("ambiguous mutation/readback remains UNKNOWN without retry or rollback", async t => {
   for (const [label, options] of [
     ["write error", {failChmod: true}],
