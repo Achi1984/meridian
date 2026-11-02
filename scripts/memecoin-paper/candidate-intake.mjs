@@ -1,5 +1,5 @@
 import {createHash} from "node:crypto";
-import {open, lstat, rm} from "node:fs/promises";
+import {open, lstat, link, mkdtemp, rm} from "node:fs/promises";
 import path from "node:path";
 import {pathToFileURL} from "node:url";
 import {parseDexScreenerPair} from "./adapters.mjs";
@@ -46,8 +46,8 @@ function reason(code, rowIndex, identity = {}) {
   return {
     code,
     rowIndex,
-    ...(BASE58.test(identity.mint ?? "") ? {mint: identity.mint} : {}),
-    ...(BASE58.test(identity.pool ?? "") ? {pool: identity.pool} : {})
+    ...(typeof identity.mint === "string" && BASE58.test(identity.mint) ? {mint: identity.mint} : {}),
+    ...(typeof identity.pool === "string" && BASE58.test(identity.pool) ? {pool: identity.pool} : {})
   };
 }
 
@@ -141,8 +141,9 @@ function inspectSnapshot(snapshot, rowIndex, {now, startAt, endAt}, rejections) 
     return null;
   }
   if (!isRecord(pair.baseToken) || !isRecord(pair.quoteToken) ||
-      !BASE58.test(pair.baseToken.address ?? "") || !BASE58.test(pair.pairAddress ?? "") ||
-      !BASE58.test(pair.quoteToken.address ?? "")) {
+      typeof pair.baseToken.address !== "string" || !BASE58.test(pair.baseToken.address) ||
+      typeof pair.pairAddress !== "string" || !BASE58.test(pair.pairAddress) ||
+      typeof pair.quoteToken.address !== "string" || !BASE58.test(pair.quoteToken.address)) {
     addRejection(rejections, reason("INVALID_IDENTITY", rowIndex, identity));
     return null;
   }
@@ -232,7 +233,8 @@ function selectionFrom(options) {
   const provided = fields.filter(field => options.selection?.[field] !== undefined);
   if (provided.length === 0) return null;
   if (provided.length !== fields.length ||
-      !fields.every(field => BASE58.test(options.selection[field] ?? ""))) {
+      !fields.every(field => typeof options.selection[field] === "string" &&
+        BASE58.test(options.selection[field]))) {
     throw new TypeError("explicit selection requires valid mint, pool, and quote identities");
   }
   return {chainId: "solana", ...options.selection};
@@ -354,34 +356,37 @@ async function syncDirectory(directory) {
 }
 
 export async function writeExclusiveConfig(output, bytes, {
-  write = (handle, data) => handle.writeFile(data)
+  write = (handle, data) => handle.writeFile(data),
+  sync = handle => handle.sync()
 } = {}) {
   if (typeof output !== "string" || !path.isAbsolute(output) || !Buffer.isBuffer(bytes) ||
-      typeof write !== "function") {
+      typeof write !== "function" || typeof sync !== "function") {
     throw new TypeError("an absolute output path and config bytes are required");
   }
   const resolved = path.resolve(output);
   const directory = path.dirname(resolved);
   await assertSafeOutputDirectory(directory);
   let handle;
-  let created = false;
+  let stagingDirectory;
   try {
-    handle = await open(resolved, "wx", 0o600);
-    created = true;
+    stagingDirectory = await mkdtemp(path.join(directory, ".candidate-intake-"));
+    const stagedOutput = path.join(stagingDirectory, "config");
+    handle = await open(stagedOutput, "wx", 0o600);
     await write(handle, bytes);
-    await handle.sync();
+    await sync(handle);
     await handle.close();
     handle = null;
+    await link(stagedOutput, resolved);
     await syncDirectory(directory);
   } catch (error) {
     if (handle) {
       try { await handle.close(); } catch {}
     }
-    if (created) {
-      try { await rm(resolved); } catch {}
-      try { await syncDirectory(directory); } catch {}
-    }
     throw error;
+  } finally {
+    if (stagingDirectory) {
+      try { await rm(stagingDirectory, {recursive: true, force: true}); } catch {}
+    }
   }
 }
 

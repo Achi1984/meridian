@@ -300,6 +300,32 @@ test("missing and future times, wrong chains, identity mismatch, FDV-only and in
     .some(item => item.code === "EXPLICIT_IDENTITY_NOT_ELIGIBLE"));
 });
 
+test("malformed address values are rejected without aborting eligible rows", async () => {
+  const valid = await pairFixture({
+    pairCreatedAt: NOW - FILTER_POLICY.minPairAgeMs
+  });
+  const wrongChain = await pairFixture({
+    chainId: "ethereum",
+    baseToken: {address: {toString: null}}
+  });
+  const malformedAddresses = [
+    await pairFixture({baseToken: {address: [IDENTITY.mint]}}),
+    await pairFixture({pairAddress: [IDENTITY.pool]}),
+    await pairFixture({quoteToken: {address: [IDENTITY.quote]}})
+  ];
+  const result = plan([
+    snapshot(wrongChain),
+    ...malformedAddresses.map(snapshot),
+    snapshot(valid)
+  ]);
+  assert.equal(result.status, "OBSERVATION_PLAN_READY");
+  assert.deepEqual(result.identity, IDENTITY);
+  const wrongChainRejection = result.rejections.items.find(item => item.code === "WRONG_CHAIN");
+  assert.ok(wrongChainRejection);
+  assert.equal(Object.hasOwn(wrongChainRejection, "mint"), false);
+  assert.equal(result.rejections.items.filter(item => item.code === "INVALID_IDENTITY").length, 3);
+});
+
 test("planning revalidates snapshot freshness and refuses stale timestamps", async () => {
   const pair = await pairFixture({pairCreatedAt: NOW - 60 * 60 * 1000});
   const freshBoundary = snapshot(pair, {
@@ -338,6 +364,17 @@ test("exclusive output preserves existing files, cleans partial failures, and re
     write: async () => { throw new Error("injected write failure"); }
   }), /injected write failure/);
   await assert.rejects(readFile(failed), {code: "ENOENT"});
+
+  const raced = path.join(directory, "raced.json");
+  const replacement = Buffer.from("replacement from another process");
+  await assert.rejects(writeExclusiveConfig(raced, Buffer.from("partial"), {
+    sync: async handle => {
+      await handle.sync();
+      await writeFile(raced, replacement, {flag: "wx"});
+      throw new Error("injected sync failure");
+    }
+  }), /injected sync failure/);
+  assert.deepEqual(await readFile(raced), replacement);
 
   const symlink = path.join(directory, "linked");
   await mkdir(path.join(directory, "real"));
