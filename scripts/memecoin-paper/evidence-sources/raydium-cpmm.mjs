@@ -716,17 +716,23 @@ export async function collectRaydiumCpmmPoolEvidence({
   let observedAt = null;
   let startedAt;
   let startedMonotonicAt;
+  let lastClockAt = null;
   const deadlineAt = () => startedMonotonicAt + limits.maxElapsedMs;
+  const acceptClock = time => {
+    if (lastClockAt !== null && time < lastClockAt) fail("INVALID_CLOCK");
+    lastClockAt = time;
+    return time;
+  };
+  const observeClock = () => acceptClock(readClock(clock));
   try {
     validateSignal(signal);
     identity = validateIdentity(inputIdentity);
-    startedAt = readClock(clock);
+    startedAt = observeClock();
     startedMonotonicAt = performance.now();
     const checkBoundary = time => {
       if (signal?.aborted) fail("CANCELLED");
-      const currentTime = time === undefined ? readClock(clock) : time;
+      const currentTime = time === undefined ? observeClock() : acceptClock(time);
       if (signal?.aborted) fail("CANCELLED");
-      if (currentTime < startedAt) fail("INVALID_CLOCK");
       if (currentTime - startedAt > limits.maxElapsedMs ||
           performance.now() >= deadlineAt()) fail("TIMEOUT");
       return currentTime;
@@ -747,8 +753,7 @@ export async function collectRaydiumCpmmPoolEvidence({
           counters.requests += 1;
         }
       });
-      const receivedAt = readClock(clock);
-      if (receivedAt < requestedAt) fail("INVALID_CLOCK");
+      const receivedAt = observeClock();
       checkBoundary(receivedAt);
       const rpc = rpcResult(result.payload, request.id);
       const responseSlot = rpc.context.slot;
@@ -938,7 +943,7 @@ export async function collectRaydiumCpmmPoolEvidence({
         status: code,
         reason: safeFailure(code),
         requestedAt: null,
-        receivedAt: (() => { try { return readClock(clock); } catch { return null; } })(),
+        receivedAt: (() => { try { return observeClock(); } catch { return null; } })(),
         responseBytes: 0,
         responseSha256: null,
         timeBasis: "injected local receipt clock; source clock is not authenticated",

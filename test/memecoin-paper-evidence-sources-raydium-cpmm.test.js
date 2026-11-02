@@ -564,17 +564,34 @@ test("the final decode boundary checks deadline and rejects backward source time
     assert.equal(result.reasonCode, "TIMEOUT");
     assert.equal(result.executionAuthorized, false);
   });
-  await t.test("response receipt time cannot precede request time", async () => {
+  await t.test("receipt time cannot regress after a later dispatch observation", async () => {
+    const clockTimes = [0, 10, 20, 15, 20].map(offset => NOW + offset);
+    let clockReads = 0;
+    const {transport, requests} = buildTransport();
+    const result = await collectRaydiumCpmmPoolEvidence({
+      identity: IDENTITY,
+      enabled: true,
+      transport,
+      clock: () => clockTimes[clockReads++] ?? clockTimes.at(-1)
+    });
+    assert.equal(result.status, "UNKNOWN");
+    assert.equal(result.reasonCode, "INVALID_CLOCK");
+    assert.equal(requests.length, 1);
+    assert.equal(result.counters.requests, 1);
+  });
+  await t.test("decode-time regression above start time remains UNKNOWN", async () => {
+    const offsets = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 125];
     let clockReads = 0;
     const {transport} = buildTransport();
     const result = await collectRaydiumCpmmPoolEvidence({
       identity: IDENTITY,
       enabled: true,
       transport,
-      clock: () => clockReads++ === 3 ? NOW - 1 : NOW
+      clock: () => NOW + (offsets[clockReads++] ?? offsets.at(-1))
     });
     assert.equal(result.status, "UNKNOWN");
     assert.equal(result.reasonCode, "INVALID_CLOCK");
+    assert.equal(result.executionAuthorized, false);
   });
 });
 
