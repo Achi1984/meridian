@@ -41,7 +41,8 @@ function harness({
   fetchImpl,
   policy = {now: () => NOW, staleAfterMs: 60_000},
   schedule,
-  cancelSchedule
+  cancelSchedule,
+  createConnector = createPaperReportConnector
 } = {}) {
   const document = {createElement: tag => new Element(document, tag)};
   const root = new Element(document, 'section');
@@ -87,7 +88,8 @@ function harness({
     fetchImpl,
     freshnessPolicy: policy,
     schedule,
-    cancelSchedule
+    cancelSchedule,
+    createConnector
   });
   const findButton = () => {
     const visit = element => [element, ...element.children.flatMap(visit)];
@@ -588,6 +590,45 @@ test('lock, navigation, pagehide and disposal clear private DOM; late uncancella
   assert.doesNotMatch(h.root.textContent, /Observation-only|90071992547409931234/);
   h.controller.dispose();
   assert.equal(h.root.children.length, 0);
+});
+
+test('navigation refresh during an uncancellable read never leaves an idle cockpit loading', async () => {
+  let release;
+  let calls = 0;
+  let connector;
+  const report = generatedReport();
+  const h = harness({fetchImpl: async () => {
+    calls++;
+    if (calls === 1) return new Promise(resolve => { release = () => resolve(paperResponse(report)); });
+    return paperResponse(report);
+  }, createConnector: options => {
+    connector = createPaperReportConnector(options);
+    return connector;
+  }});
+  h.controller.setActive(true);
+  const first = h.controller.refresh();
+  await until(() => typeof release === 'function');
+
+  h.controller.setActive(false);
+  h.controller.setActive(true);
+  await h.controller.refresh();
+  assert.equal(calls, 1, 're-entry does not replace an uncancellable stale source');
+  assert.equal(h.root.attrs['data-state'], 'ready',
+    'a refresh that cannot start does not claim a read is in progress');
+
+  release();
+  await first;
+  assert.equal(h.root.attrs['data-state'], 'ready',
+    'stale completion cannot leave the selected cockpit in loading');
+  assert.doesNotMatch(h.root.textContent, /Observation-only|90071992547409931234/);
+  assert.equal(calls, 1, 'stale completion does not trigger a retry or polling read');
+
+  await until(() => !connector.isBusy());
+  await tick();
+  await h.controller.refresh();
+  assert.equal(calls, 2, 'a later explicit refresh succeeds after the old source settles');
+  assert.match(h.root.textContent, /Observation-only/);
+  h.controller.dispose();
 });
 
 test('rapid access changes share one pending cancellation and never repaint late private data', async () => {

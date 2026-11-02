@@ -211,7 +211,7 @@ export function mountPaperCockpit(root, document, window, {
     }
     if (connector?.isDisposed?.()) {
       if (connector.isBusy?.()) {
-        state = 'loading';
+        state = initialState(access, enabled);
         render();
         return;
       }
