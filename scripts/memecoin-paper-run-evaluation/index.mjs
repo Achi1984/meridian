@@ -14,6 +14,7 @@ export const MAX_INPUT_BYTES = Object.freeze({
 
 const EIGHT_HOURS_MS = 8 * 60 * 60 * 1000;
 const MAX_DEADLINE_FINALIZATION_DELAY_MS = 60 * 1000;
+const MAX_AUDIT_ROWS = 1_000;
 const MAX_DATE_MS = 8_640_000_000_000_000;
 const SAFE_ID = /^[A-Za-z0-9._:-]{1,80}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -159,33 +160,69 @@ function validCoverageShape(value) {
 
 function coverageStatus(report) {
   const audit = report?.dto?.evidence?.coverage?.audit;
-  if (!isRecord(audit) || audit.present !== true) {
+  if (!isRecord(audit)) {
     return makeCriterion("checkpoint_audit_coverage", "UNKNOWN",
       "The report does not establish a complete checkpoint audit export.");
-  }
-  if (audit.truncated === true) {
-    return makeCriterion("checkpoint_audit_coverage", "UNKNOWN",
-      "The exported checkpoint audit is explicitly truncated.");
-  }
-  if (audit.replayLoggerTruncated === true || audit.ledgerAuditTruncated === true) {
-    return makeCriterion("checkpoint_audit_coverage", "UNKNOWN",
-      "A checkpoint audit component is explicitly truncated.");
   }
   const counts = [
     audit.observedRows, audit.totalRows, audit.ledgerEventsReported, audit.ledgerEventsAudited
   ];
-  if (audit.truncated !== false || counts.some(value => !Number.isSafeInteger(value) || value < 0)) {
+  if (counts.some(value => value !== null && value !== undefined &&
+      (!Number.isSafeInteger(value) || value < 0))) {
+    return makeCriterion("checkpoint_audit_coverage", "FAIL",
+      "Checkpoint audit counters are not non-negative safe integers.");
+  }
+  if (audit.present !== true) {
+    if (audit.present === false &&
+        [audit.observedRows, audit.totalRows, audit.ledgerEventsAudited]
+          .some(value => Number.isSafeInteger(value) && value > 0)) {
+      return makeCriterion("checkpoint_audit_coverage", "FAIL",
+        "Checkpoint audit counts claim retained rows although the audit is absent.");
+    }
+    return makeCriterion("checkpoint_audit_coverage", "UNKNOWN",
+      "The report does not establish a complete checkpoint audit export.");
+  }
+  if (Number.isSafeInteger(audit.observedRows) && audit.observedRows > MAX_AUDIT_ROWS) {
+    return makeCriterion("checkpoint_audit_coverage", "FAIL",
+      "Retained checkpoint audit rows exceed the producer's bounded row limit.");
+  }
+  if ((Number.isSafeInteger(audit.observedRows) && Number.isSafeInteger(audit.totalRows) &&
+       audit.observedRows > audit.totalRows) ||
+      (Number.isSafeInteger(audit.ledgerEventsAudited) &&
+       Number.isSafeInteger(audit.observedRows) &&
+       audit.ledgerEventsAudited > audit.observedRows) ||
+      (Number.isSafeInteger(audit.ledgerEventsAudited) &&
+       Number.isSafeInteger(audit.ledgerEventsReported) &&
+       audit.ledgerEventsAudited > audit.ledgerEventsReported) ||
+      (Number.isSafeInteger(audit.ledgerEventsReported) &&
+       Number.isSafeInteger(audit.totalRows) &&
+       audit.ledgerEventsReported > audit.totalRows)) {
+    return makeCriterion("checkpoint_audit_coverage", "FAIL",
+      "Checkpoint audit counts exceed their retained or source totals.");
+  }
+  if (audit.truncated === false &&
+      (audit.replayLoggerTruncated === true || audit.ledgerAuditTruncated === true)) {
+    return makeCriterion("checkpoint_audit_coverage", "FAIL",
+      "The complete-audit declaration conflicts with a truncated audit component.");
+  }
+  if (audit.truncated === true || audit.replayLoggerTruncated === true ||
+      audit.ledgerAuditTruncated === true) {
+    return makeCriterion("checkpoint_audit_coverage", "UNKNOWN",
+      "The exported checkpoint audit is explicitly truncated.");
+  }
+  if (audit.truncated !== false ||
+      counts.some(value => !Number.isSafeInteger(value) || value < 0)) {
     return makeCriterion("checkpoint_audit_coverage", "UNKNOWN",
       "Checkpoint audit completeness counters are missing or unavailable.");
   }
-  if (audit.observedRows > audit.totalRows || audit.ledgerEventsAudited > audit.ledgerEventsReported) {
+  if (audit.observedRows !== audit.totalRows ||
+      audit.ledgerEventsAudited > audit.ledgerEventsReported) {
     return makeCriterion("checkpoint_audit_coverage", "FAIL",
       "Checkpoint audit counters contradict the reported totals.");
   }
-  if (audit.observedRows !== audit.totalRows ||
-      audit.ledgerEventsReported !== audit.ledgerEventsAudited) {
-    return makeCriterion("checkpoint_audit_coverage", "UNKNOWN",
-      "Checkpoint audit coverage is partial.");
+  if (audit.ledgerEventsReported !== audit.ledgerEventsAudited) {
+    return makeCriterion("checkpoint_audit_coverage", "FAIL",
+      "Complete checkpoint ledger-event counts do not reconcile.");
   }
   return makeCriterion("checkpoint_audit_coverage", "PASS",
     "The report declares complete audit coverage and reconciled ledger-event counts.");
@@ -755,7 +792,7 @@ function identityStatus(expectedRunId, expectedConfigHash, artifacts, configHash
     {configHash});
 }
 
-function terminalStatus(terminal, report) {
+function terminalStatus(terminal, report, checkpointCoverage) {
   if (!terminal) {
     return makeCriterion("terminal_completion", "UNKNOWN",
       "No terminal marker is available.");
@@ -799,6 +836,34 @@ function terminalStatus(terminal, report) {
       terminalObservation[key] !== terminal[key])) {
     return makeCriterion("terminal_completion", "FAIL",
       "Controller status or stop reason conflicts across the terminal and report observations.");
+  }
+  const failureCodeLocations = [
+    [terminal, "failureCode"],
+    [terminalObservation, "failureCode"],
+    [reportObservation, "failureCode"]
+  ];
+  if (failureCodeLocations.some(([record, key]) => !Object.hasOwn(record, key))) {
+    return makeCriterion("terminal_completion", "UNKNOWN",
+      "Failure-code evidence is missing from the terminal or report.");
+  }
+  const failureCodes = failureCodeLocations.map(([record, key]) => record[key]);
+  if (failureCodes.some(value => value !== null &&
+      (typeof value !== "string" || !/^[A-Z0-9_:-]{1,128}$/.test(value)))) {
+    return makeCriterion("terminal_completion", "FAIL",
+      "Failure-code evidence is malformed.");
+  }
+  const recordedFailureCodes = failureCodes.filter(value => value !== null && value !== "UNKNOWN");
+  if (recordedFailureCodes.length > 0) {
+    if (new Set(recordedFailureCodes).size > 1) {
+      return makeCriterion("terminal_completion", "FAIL",
+        "Recorded failure codes conflict across the terminal and report.");
+    }
+    return makeCriterion("terminal_completion", "FAIL",
+      `A failure code is recorded (${recordedFailureCodes[0]}).`);
+  }
+  if (failureCodes.some(value => value === "UNKNOWN")) {
+    return makeCriterion("terminal_completion", "UNKNOWN",
+      "Failure-code evidence remains unknown.");
   }
   if ([terminal.controllerStatus, terminal.stopReason].some(value =>
     value === "UNKNOWN" || value === "NOT_STARTED")) {
@@ -874,13 +939,19 @@ function terminalStatus(terminal, report) {
   }
   if (terminal.controllerStatus !== "FINISHED" ||
       !["DEADLINE", "OPERATOR_STOP"].includes(terminal.stopReason) ||
-      terminal.failureCode !== null || terminal.reportStatus !== "PROJECTED" ||
+      terminal.reportStatus !== "PROJECTED" ||
       terminal.observationOnly !== true || terminal.executionStarted !== false ||
       terminalObservation.entryAuthorizations !== 0 ||
       terminalObservation.simulatedFills !== 0 ||
       terminalObservation.executableQuoteAndCostEvidence !== "UNAVAILABLE") {
     return makeCriterion("terminal_completion", "FAIL",
       "Terminal status, stop reason, report projection, or observation-only invariants conflict.");
+  }
+  if (checkpointCoverage.status !== "PASS") {
+    return makeCriterion("terminal_completion", checkpointCoverage.status,
+      checkpointCoverage.status === "FAIL"
+        ? `Checkpoint audit coverage is contradictory: ${checkpointCoverage.reason}`
+        : `Checkpoint audit coverage is incomplete: ${checkpointCoverage.reason}`);
   }
   return makeCriterion("terminal_completion", "PASS",
     terminal.stopReason === "DEADLINE"
@@ -911,14 +982,18 @@ function evaluateCriteria(expectedRunId, expectedConfigHash, artifacts) {
     : artifacts.report.status === "INVALID"
       ? makeCriterion("operator_report", "FAIL", artifacts.report.reason)
       : reportStatus(artifacts.report.value, expectedRunId, configHash);
-  const terminal = artifacts.terminal.status === "VALID" ? artifacts.terminal.value : null;
   const report = artifacts.report.status === "VALID" ? artifacts.report.value : null;
+  const checkpoint = artifacts.report.status === "VALID"
+    ? coverageStatus(report)
+    : makeCriterion("checkpoint_audit_coverage", "UNKNOWN",
+      "Checkpoint audit coverage cannot be assessed without a valid operator report.");
+  const terminal = artifacts.terminal.status === "VALID" ? artifacts.terminal.value : null;
   const config = artifacts.config.status === "VALID" ? artifacts.config.value : null;
   const terminalCheck = artifacts.terminal.status === "MISSING"
     ? makeCriterion("terminal_completion", "UNKNOWN", "No terminal marker was supplied.")
     : artifacts.terminal.status === "INVALID"
       ? makeCriterion("terminal_completion", "FAIL", artifacts.terminal.reason)
-      : terminalStatus(terminal, report);
+    : terminalStatus(terminal, report, checkpoint);
   const duration = config && validConfig(config, expectedRunId) && terminal && report
     ? evaluateDuration(config, terminal, report)
     : {
@@ -928,10 +1003,6 @@ function evaluateCriteria(expectedRunId, expectedConfigHash, artifacts) {
       scheduledMs: EIGHT_HOURS_MS,
       evidencedMs: null
     };
-  const checkpoint = artifacts.report.status === "VALID"
-    ? coverageStatus(report)
-    : makeCriterion("checkpoint_audit_coverage", "UNKNOWN",
-      "Checkpoint audit coverage cannot be assessed without a valid operator report.");
   const candidates = artifacts.report.status === "VALID"
     ? candidateCoverageStatus(report,
       config && validConfig(config, expectedRunId) ? config : null)

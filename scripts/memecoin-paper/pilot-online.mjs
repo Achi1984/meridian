@@ -958,7 +958,8 @@ export function createPilotOnline(options = {}) {
       }
       observations.controllerStatus = summaryCode(controllerSummary?.status);
       observations.stopReason = summaryCode(controllerSummary?.reason);
-      observations.failureCode = summaryCode(failureCode ?? controllerSummary?.failureCode);
+      const observedFailureCode = failureCode ?? controllerSummary?.failureCode;
+      observations.failureCode = observedFailureCode == null ? null : summaryCode(observedFailureCode);
       if (isRecord(controllerSummary?.positionEvidence)) {
         observations.controllerPositionEvidence = {
           status: summaryCode(controllerSummary.positionEvidence.status),
@@ -1034,7 +1035,8 @@ export function createPilotOnline(options = {}) {
       failureCode ??= typeof error?.code === "string" ? error.code : "PILOT_RUN_BLOCKED";
       observations.controllerStatus = summaryCode(controllerSummary?.status);
       observations.stopReason = summaryCode(controllerSummary?.reason);
-      observations.failureCode = summaryCode(failureCode ?? controllerSummary?.failureCode);
+      const observedFailureCode = failureCode ?? controllerSummary?.failureCode;
+      observations.failureCode = observedFailureCode == null ? null : summaryCode(observedFailureCode);
       if (!lockCreated) throw error;
       if (callbackWork.size > 0) {
         control?.stop();

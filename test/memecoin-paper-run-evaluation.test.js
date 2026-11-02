@@ -103,6 +103,7 @@ function reportRecord({
       },
       controllerStatus,
       stopReason,
+      failureCode: null,
       entryAuthorizations: 0,
       simulatedFills: 0,
       executableQuoteAndCostEvidence: "UNAVAILABLE",
@@ -173,6 +174,7 @@ function fixture({
       },
       controllerStatus: status === "FINISHED" ? "FINISHED" : status,
       stopReason,
+      failureCode: null,
       entryAuthorizations: 0,
       simulatedFills: 0,
       executableQuoteAndCostEvidence: "UNAVAILABLE"
@@ -565,7 +567,7 @@ test("missing and partial coverage stay UNKNOWN and uptime is never inferred", (
   assert.equal(result.coverage.uptimeAndGaps, "UNAVAILABLE");
 
   const componentTruncated = JSON.parse(valid.reportBytes.toString("utf8"));
-  componentTruncated.dto.evidence.coverage.audit.truncated = false;
+  componentTruncated.dto.evidence.coverage.audit.truncated = true;
   componentTruncated.dto.evidence.coverage.audit.replayLoggerTruncated = true;
   const componentResult = evaluateObservation({
     ...valid,
@@ -576,6 +578,93 @@ test("missing and partial coverage stay UNKNOWN and uptime is never inferred", (
   const missing = evaluateObservation({...valid, reportBytes: undefined});
   assert.equal(criterion(missing, "operator_report").status, "UNKNOWN");
   assert.notEqual(missing.overall, "PASS");
+});
+
+test("bounded audit counts fail closed and gate terminal completion", () => {
+  const auditCase = (change) => {
+    const input = fixture();
+    const report = JSON.parse(input.reportBytes.toString("utf8"));
+    Object.assign(report.dto.evidence.coverage.audit, {
+      present: true,
+      observedRows: 1,
+      totalRows: 1,
+      truncated: false,
+      replayLoggerTruncated: false,
+      ledgerAuditTruncated: false,
+      ledgerEventsReported: 0,
+      ledgerEventsAudited: 0
+    });
+    change(report.dto.evidence.coverage.audit);
+    input.reportBytes = bytes(report);
+    return evaluateObservation(input);
+  };
+
+  for (const [label, change] of [
+    ["source total conflicts with a complete retained audit", audit => {
+      audit.totalRows = 2;
+    }],
+    ["ledger events exceed retained audit rows", audit => {
+      audit.ledgerEventsReported = 2;
+      audit.ledgerEventsAudited = 2;
+    }],
+    ["retained audit exceeds the producer bound", audit => {
+      audit.observedRows = 1_001;
+      audit.totalRows = 1_001;
+    }],
+    ["complete declaration conflicts with component truncation", audit => {
+      audit.ledgerAuditTruncated = true;
+    }],
+    ["partial audit still cannot contain more events than the source reports", audit => {
+      audit.truncated = true;
+      audit.totalRows = null;
+      audit.ledgerAuditTruncated = true;
+      audit.ledgerEventsAudited = 1;
+    }]
+  ]) {
+    const result = auditCase(change);
+    assert.equal(criterion(result, "checkpoint_audit_coverage").status, "FAIL", label);
+    assert.equal(criterion(result, "terminal_completion").status, "FAIL", label);
+    assert.equal(result.observation.fullDeadlineCompleted, false, label);
+  }
+
+  const partial = auditCase(audit => {
+    audit.truncated = true;
+    audit.totalRows = null;
+    audit.ledgerAuditTruncated = true;
+    audit.ledgerEventsReported = 4;
+  });
+  assert.equal(criterion(partial, "checkpoint_audit_coverage").status, "UNKNOWN");
+  assert.equal(criterion(partial, "terminal_completion").status, "UNKNOWN");
+  assert.equal(partial.observation.fullDeadlineCompleted, false);
+});
+
+test("failure codes reconcile across terminal and report before completion", () => {
+  for (const [label, edit, expected] of [
+    ["report-only failure", (terminal, report) => {
+      report.observation.failureCode = "PROVIDER_REQUEST_FAILED";
+    }, "FAIL"],
+    ["conflicting failure codes", (terminal, report) => {
+      terminal.failureCode = "PROVIDER_REQUEST_FAILED";
+      terminal.observation.failureCode = "PROVIDER_REQUEST_FAILED";
+      report.observation.failureCode = "CONTROLLER_FAILED";
+    }, "FAIL"],
+    ["unknown failure evidence", (terminal, report) => {
+      report.observation.failureCode = "UNKNOWN";
+    }, "UNKNOWN"],
+    ["missing failure evidence", (terminal, report) => {
+      delete report.observation.failureCode;
+    }, "UNKNOWN"]
+  ]) {
+    const input = fixture();
+    const terminal = JSON.parse(input.terminalBytes.toString("utf8"));
+    const report = JSON.parse(input.reportBytes.toString("utf8"));
+    edit(terminal, report);
+    input.terminalBytes = bytes(terminal);
+    input.reportBytes = bytes(report);
+    const result = evaluateObservation(input);
+    assert.equal(criterion(result, "terminal_completion").status, expected, label);
+    assert.equal(result.observation.fullDeadlineCompleted, false, label);
+  }
 });
 
 test("candidate rejection reasons are preserved without manufacturing rejected counts", () => {
