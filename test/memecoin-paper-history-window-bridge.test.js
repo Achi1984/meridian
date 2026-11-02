@@ -155,7 +155,9 @@ test("collector-shaped receipt bridges to the Analyst readWindow contract withou
     maxResponseBytes: 1_048_576,
     maxBytes: 10_485_760,
     maxWorkUnits: 5_000,
+    maxSignatures: 2_000,
     maxTransactions: 1_000,
+    requestTimeoutMs: 5_000,
     maxElapsedMs: 15_000
   });
   assert.deepEqual(result.requested, {
@@ -182,8 +184,11 @@ test("collector-shaped receipt bridges to the Analyst readWindow contract withou
     cursorExhausted: true,
     timeBoundaryCoverage: "PROVEN_BY_RECEIPTED_BLOCKTIME_FENCES",
     timestampBasis: "SOLANA_RPC_ESTIMATED_BLOCK_TIME_SECONDS",
-    sourceHistoryCompleteness: "COMPLETE"
+    sourceHistoryCompleteness: "COMPLETE",
+    sourceAuthentication: "NOT_ESTABLISHED",
+    archivalRetention: "NOT_ESTABLISHED"
   });
+  assert.equal(result.sourceAuthentication, "NOT_ESTABLISHED");
 });
 
 test("the current accepted slot collector shape without time and receipt extensions stays unavailable", async () => {
@@ -237,6 +242,14 @@ test("truncated pagination and empty unproven responses do not imply complete co
       result.coverage.complete = false;
       result.coverage.signaturePagesComplete = false;
       result.coverage.terminationReason = "PAGE_LIMIT";
+      return result;
+    });
+    assert.equal((await source.readWindow(request())).status, "UNKNOWN");
+  });
+  await t.test("explicit truncation despite a completion flag", async () => {
+    const source = sourceFor(input => {
+      const result = collectorResult(input);
+      result.coverage.truncated = true;
       return result;
     });
     assert.equal((await source.readWindow(request())).status, "UNKNOWN");

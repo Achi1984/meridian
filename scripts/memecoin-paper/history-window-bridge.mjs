@@ -7,7 +7,9 @@ const LIMITS = Object.freeze({
   maxResponseBytes: 1_048_576,
   maxBytes: 10_485_760,
   maxWorkUnits: 5_000,
+  maxSignatures: 2_000,
   maxTransactions: 1_000,
+  requestTimeoutMs: 5_000,
   maxElapsedMs: 15_000
 });
 const HARD_LIMITS = Object.freeze({
@@ -15,7 +17,9 @@ const HARD_LIMITS = Object.freeze({
   maxResponseBytes: 1_048_576,
   maxBytes: 10_485_760,
   maxWorkUnits: 5_000,
+  maxSignatures: 20_000,
   maxTransactions: 1_000,
+  requestTimeoutMs: 30_000,
   maxElapsedMs: 30_000
 });
 
@@ -45,6 +49,22 @@ function validIdentity(identity) {
     ["mint", "pool", "quote"].every(key =>
       typeof identity[key] === "string" &&
       /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(identity[key]));
+}
+
+function identitySnapshot(identity) {
+  return validIdentity(identity) ? {
+    chainId: identity.chainId,
+    mint: identity.mint,
+    pool: identity.pool,
+    quote: identity.quote
+  } : null;
+}
+
+function validSignal(signal) {
+  return signal === undefined || (signal !== null &&
+    typeof signal.aborted === "boolean" &&
+    typeof signal.addEventListener === "function" &&
+    typeof signal.removeEventListener === "function");
 }
 
 function sameIdentity(left, right) {
@@ -128,6 +148,7 @@ function validCounters(result, limits) {
     Number.isSafeInteger(counters.workUnits) && counters.workUnits >= 0 &&
     counters.workUnits <= limits.maxWorkUnits &&
     Number.isSafeInteger(counters.signatures) && counters.signatures >= 0 &&
+    counters.signatures <= limits.maxSignatures &&
     Number.isSafeInteger(counters.successfulTransactions) &&
     counters.successfulTransactions >= 0 &&
     counters.successfulTransactions <= limits.maxTransactions;
@@ -137,6 +158,7 @@ function validCoverage(result, identity, receiptId, startExclusiveMs, endInclusi
   const coverage = result.coverage;
   const subjects = coverage?.subjects;
   return isRecord(coverage) && coverage.complete === true &&
+    coverage.truncated !== true && coverage.cursorExhausted !== false &&
     coverage.signaturePagesComplete === true &&
     coverage.successfulTransactionRetrievalComplete === true &&
     coverage.sourceHistoryCompleteness === "COMPLETE" &&
@@ -161,13 +183,33 @@ function validTransactions(result, slotInterval, timeBounds, startExclusiveMs, e
   let previousTime = -1;
   const seen = new Set();
   const withinWindow = [];
+  const timedSlots = [
+    timeBounds.startExclusive.before,
+    timeBounds.startExclusive.after,
+    ...result.transactions,
+    timeBounds.endInclusive.before,
+    timeBounds.endInclusive.after
+  ].map(row => isRecord(row)
+    ? {slot: row.slot, observedAt: blockTimeMs(row)}
+    : {slot: -1, observedAt: null})
+    .sort((left, right) => left.slot - right.slot);
+  let priorTimedSlot = -1;
+  let priorSlotTime = -1;
+  for (const point of timedSlots) {
+    if (point.observedAt === null || point.slot < priorTimedSlot ||
+        point.observedAt < priorSlotTime ||
+        (point.slot === priorTimedSlot && point.observedAt !== priorSlotTime)) return null;
+    priorTimedSlot = point.slot;
+    priorSlotTime = point.observedAt;
+  }
   for (const row of result.transactions) {
     const observedAt = blockTimeMs(row);
     if (!isRecord(row) || typeof row.signature !== "string" || !row.signature ||
         row.signature.length > 256 || seen.has(row.signature) ||
         !Number.isSafeInteger(row.slot) || row.slot < previousSlot ||
         row.slot < slotInterval.startInclusive || row.slot > slotInterval.endInclusive ||
-        !Array.isArray(row.subjectAddresses) || !row.subjectAddresses.includes(result.identity.pool) ||
+        !Array.isArray(row.subjectAddresses) || row.subjectAddresses.length !== 1 ||
+        row.subjectAddresses[0] !== result.identity.pool ||
         !isRecord(row.transaction) || !isRecord(row.meta) ||
         row.status !== "SUCCESS" || observedAt === null || observedAt < previousTime ||
         (row.observedAt !== undefined && row.observedAt !== observedAt)) return null;
@@ -184,15 +226,31 @@ function validTransactions(result, slotInterval, timeBounds, startExclusiveMs, e
 }
 
 function unavailable(identity, requested, reason, sourceResult = null) {
+  const receipts = Array.isArray(sourceResult?.events)
+    ? sourceResult.events.slice(0, LIMITS.maxRequests).map(event => isRecord(event) ? {
+      endpointKind: typeof event.endpointKind === "string" ? event.endpointKind.slice(0, 64) : null,
+      responseSha256: DIGEST.test(event.responseSha256 ?? "") ? event.responseSha256 : null,
+      bytes: Number.isSafeInteger(event.bytes) && event.bytes >= 0 ? event.bytes : null
+    } : null)
+    : [];
+  const receipt = validReceipt(sourceResult?.receipt, 0)
+    ? {
+      id: sourceResult.receipt.id,
+      payloadSha256: sourceResult.receipt.payloadSha256,
+      receivedAt: sourceResult.receipt.receivedAt
+    }
+    : null;
   return {
     status: "UNKNOWN",
     reason,
-    source: sourceResult?.source ?? RPC_SOURCE,
-    identity: validIdentity(identity) ? {...identity} : null,
+    source: typeof sourceResult?.source === "string" ? sourceResult.source.slice(0, 128) : RPC_SOURCE,
+    identity: identitySnapshot(identity),
     requested,
     transactions: [],
-    receipt: isRecord(sourceResult?.receipt) ? sourceResult.receipt : null,
-    sourceReceipts: Array.isArray(sourceResult?.events) ? sourceResult.events : [],
+    receipt,
+    sourceReceipts: receipts,
+    sourceReceiptsTruncated: Array.isArray(sourceResult?.events) &&
+      sourceResult.events.length > LIMITS.maxRequests,
     coverage: {complete: false, truncated: null, cursorExhausted: false}
   };
 }
@@ -236,10 +294,14 @@ export function createHistoryWindowSource({
   const limits = resolveLimits(suppliedLimits);
   return Object.freeze({
     async readWindow({identity, poolProof, startExclusiveMs, endInclusiveMs, signal} = {}) {
-      const requested = {startExclusiveMs, endInclusiveMs};
+      const requested = {
+        startExclusiveMs: validTime(startExclusiveMs) ? startExclusiveMs : null,
+        endInclusiveMs: validTime(endInclusiveMs) ? endInclusiveMs : null
+      };
       if (!enabled) return unavailable(identity, requested, "DISABLED");
       if (signal?.aborted) return unavailable(identity, requested, "CANCELLED");
       if (typeof slotHistoryCollector !== "function" ||
+          !validSignal(signal) ||
           !validIdentity(identity) || !validPoolProof(poolProof, identity) ||
           !validTime(startExclusiveMs) || !validTime(endInclusiveMs) ||
           startExclusiveMs >= endInclusiveMs) {
@@ -247,7 +309,7 @@ export function createHistoryWindowSource({
       }
 
       const outcome = await waitForCollection(slotHistoryCollector, {
-        identity: {...identity},
+        identity: identitySnapshot(identity),
         poolProof,
         startExclusiveMs,
         endInclusiveMs,
@@ -272,6 +334,8 @@ export function createHistoryWindowSource({
 
       const slotInterval = result.slotInterval;
       if (!isRecord(slotInterval) ||
+          !Array.isArray(result.declaredSubjects) || result.declaredSubjects.length !== 1 ||
+          result.declaredSubjects[0]?.address !== identity.pool ||
           !Number.isSafeInteger(slotInterval.startInclusive) ||
           !Number.isSafeInteger(slotInterval.endInclusive) ||
           slotInterval.startInclusive < 0 ||
@@ -302,8 +366,11 @@ export function createHistoryWindowSource({
           cursorExhausted: true,
           timeBoundaryCoverage: "PROVEN_BY_RECEIPTED_BLOCKTIME_FENCES",
           timestampBasis: "SOLANA_RPC_ESTIMATED_BLOCK_TIME_SECONDS",
-          sourceHistoryCompleteness: result.coverage.sourceHistoryCompleteness
-        }
+          sourceHistoryCompleteness: result.coverage.sourceHistoryCompleteness,
+          sourceAuthentication: "NOT_ESTABLISHED",
+          archivalRetention: "NOT_ESTABLISHED"
+        },
+        sourceAuthentication: "NOT_ESTABLISHED"
       };
     }
   });
