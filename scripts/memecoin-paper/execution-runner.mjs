@@ -345,6 +345,7 @@ export function createPaperExecutionRunner({
   const candidatesByMint = new Map();
   const pendingAuthorizationIds = new Set();
   let ledgerUnknownReason = null;
+  let sourceUnknownReason = null;
   let missingTerminalValuationMints = [];
   let externalCandidateMismatch = false;
   let externalCandidateDigests = new Set();
@@ -416,6 +417,7 @@ export function createPaperExecutionRunner({
           "owner census remains response-reconciled only and cannot satisfy its owner hard gate",
           "source-bound quote and complete-cost producer is not accepted",
           "source-time attestation and trusted UTC clock are unavailable",
+          ...(sourceUnknownReason ? [sourceUnknownReason] : []),
           ...(externalCandidateMismatch ? ["candidate source did not match the bound packet"] : [])
         ]
       } : {})
@@ -729,17 +731,20 @@ export function createPaperExecutionRunner({
 
   async function finish(reason, now = null) {
     if (state === "UNKNOWN") return report("UNKNOWN", reason);
+    const knownUnknownReason = ledgerUnknownReason ?? sourceUnknownReason;
+    const noFinishStatus = knownUnknownReason ? "UNKNOWN" : "STOPPED";
+    const reportWithoutFinish = message => report(noFinishStatus, knownUnknownReason ?? message);
     let finishAt;
     try {
       finishAt = readTime();
       if (now !== null && finishAt < now) {
-        return report("STOPPED", "terminal clock regressed; no finish command issued");
+        return reportWithoutFinish("terminal clock regressed; no finish command issued");
       }
     } catch {
-      return report("STOPPED", "clock unavailable; no finish command issued");
+      return reportWithoutFinish("clock unavailable; no finish command issued");
     }
     if (operationCount >= bounds.maxOperations) {
-      return report("STOPPED", "operation capacity reached; no finish command issued");
+      return reportWithoutFinish("operation capacity reached; no finish command issued");
     }
     state = "FINISHING";
     let openPositions;
@@ -760,7 +765,9 @@ export function createPaperExecutionRunner({
     const receipt = result?.receipt;
     if (result?.status === "REJECT" && !receipt) {
       results.push({method: "finishRun", status: result.status, receipt: null});
-      return report("STOPPED", "finish was rejected before dispatch", result);
+      const unknownReason = ledgerUnknownReason ?? sourceUnknownReason;
+      return report(unknownReason ? "UNKNOWN" : "STOPPED",
+        unknownReason ?? "finish was rejected before dispatch", result);
     }
     let checkpointHead;
     try {
@@ -783,8 +790,9 @@ export function createPaperExecutionRunner({
       receipt: {...receipt}});
     state = "FINISHED";
     if (result.status === "UNKNOWN") ledgerUnknownReason = "terminal ledger result is UNKNOWN with a verified receipt";
-    return report(ledgerUnknownReason ? "UNKNOWN" : result.status === "FINISHED" ? "FINISHED" : "STOPPED",
-      ledgerUnknownReason ?? reason, result);
+    const unknownReason = ledgerUnknownReason ?? sourceUnknownReason;
+    return report(unknownReason ? "UNKNOWN" : result.status === "FINISHED" ? "FINISHED" : "STOPPED",
+      unknownReason ?? reason, result);
   }
 
   async function runOnce() {
@@ -824,8 +832,14 @@ export function createPaperExecutionRunner({
           let response;
           try {
             response = await candidateSource.poll({now: pollNow, tick: tickCount - 1});
-          } catch {
-            return finish("CANDIDATE_SOURCE_UNAVAILABLE");
+          } catch (error) {
+            const reason = typeof error?.code === "string" && /^[A-Z0-9_]{1,48}$/.test(error.code)
+              ? error.code : "CANDIDATE_SOURCE_UNAVAILABLE";
+            if (reason === "STOPPED") return finish("SHUTDOWN", pollNow);
+            if (reason === "DEADLINE") return finish("DEADLINE", pollNow);
+            sourceUnknownReason = reason;
+            results.push({method: "candidateSource", status: "UNKNOWN", reason});
+            return finish(reason);
           }
           const afterPollStop = await checkStop(tickCount - 1);
           if (afterPollStop.deadline) return finish("DEADLINE", afterPollStop.now);
@@ -847,6 +861,12 @@ export function createPaperExecutionRunner({
           }
           if (item?.done === true) {
             sourceDone = true;
+            if (item.outcome === "UNKNOWN") {
+              const reason = typeof item.reason === "string" && /^[A-Z0-9_]{1,48}$/.test(item.reason)
+                ? item.reason : "CANDIDATE_SOURCE_UNKNOWN";
+              sourceUnknownReason = reason;
+              results.push({method: "candidateSource", status: "UNKNOWN", reason});
+            }
           } else if (item?.candidate !== undefined) {
             candidateCount += 1;
             const processed = await processCandidate(item.candidate, tickCount - 1, risk.marks);
@@ -877,8 +897,12 @@ export function createPaperExecutionRunner({
       }
       return finish("TICK_BUDGET");
     } catch {
-      return state === "UNKNOWN"
-        ? report("UNKNOWN", "checkpoint outcome uncertain; automatic retry/restart is prohibited")
+      if (state === "UNKNOWN") {
+        return report("UNKNOWN", "checkpoint outcome uncertain; automatic retry/restart is prohibited");
+      }
+      const knownUnknownReason = ledgerUnknownReason ?? sourceUnknownReason;
+      return knownUnknownReason
+        ? report("UNKNOWN", knownUnknownReason)
         : report("STOPPED", "clock or runner input became unavailable; no further work was dispatched");
     }
   }

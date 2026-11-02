@@ -59,8 +59,10 @@ and at most eight hours before its fixed deadline. The supported
 ceilings are requests 960, bytes 8,388,608, global events 1,000 (the checkpoint
 step further caps ledger events at 256), candidates 100, cycles 256, duration
 eight hours, callback timeout 30 seconds, and clock uncertainty 60 seconds.
-Bytes have a 1,024-byte minimum; a smaller-than-needed budget can
-stop the runner before a terminal receipt, which remains explicit in the report.
+Bytes have a 1,024-byte minimum. External mode reserves the packet bytes before
+assigning runner input capacity and therefore requires at least one byte to
+remain; a smaller-than-needed budget can stop the runner before a terminal
+receipt, which remains explicit in the report.
 Callback timeout cannot exceed duration; candidate count cannot exceed cycles.
 The config file is limited to 64 KiB and opened nonblocking without following
 symlinks; only regular files are accepted.
@@ -199,19 +201,20 @@ Missing trusted source time, evidence, an accepted owner census, source-bound
 quotes, and complete source costs remain explicit blockers. The existing
 `SYNTHETIC_FIXTURE_CLOCK` still tests the synthetic wall/monotonic path only.
 
-Each checkpoint-bound candidate records exact chain/mint/pool/quote identity,
-token decimals/base-unit semantics, source sample time, composition receipt
-time, and per-evidence SHA-256 digest, source, time, slot, identity binding, and
-coverage-complete state (the full evidence remains in the checkpoint). Quote
-provenance distinguishes quote-source observation from local receipt time;
-prices are integer `priceMicros`, costs are explicitly hypothetical integer
-cents, and token quantities are base units. These zero-cost synthetic fixtures
-are not source-verified settled-cost estimates. The existing runner and execution
-step reject a quote without all five costs, a future/stale/noncausal quote,
-identity mismatch, or source-mode mixing. An unavailable final mark stays
-`VALUATION_UNAVAILABLE`; an open position is never closed or valued by
-assumption. If quote/cost rejection follows risk authorization, the report keeps
-the still-pending reservation instead of claiming it was released.
+Checkpointed authorization/entry records preserve exact
+chain/mint/pool/quote identity, units, source sample time, and full evidence.
+External blocked candidates do not create synthetic ledger events; the pre-start
+receipt binds the packet digest and the runner report carries the filter/analyst
+decision. Synthetic quote provenance distinguishes source observation from
+local receipt time; prices are integer `priceMicros`, costs are explicitly
+hypothetical integer cents, and quantities are token base units. These
+zero-cost synthetic fixtures are not source-verified settled-cost estimates.
+The existing runner and execution step reject a quote without all five costs, a
+future/stale/noncausal quote, identity mismatch, or source-mode mixing. An
+unavailable final mark stays `VALUATION_UNAVAILABLE`; an open position is never
+closed or valued by assumption. If quote/cost rejection follows risk
+authorization, the runner report preserves the still-pending reservation rather
+than claiming it was released.
 
 ## Terminal contract and verification
 

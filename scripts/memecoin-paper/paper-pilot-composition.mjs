@@ -428,14 +428,16 @@ export function createPaperPilotComposition(options = {}) {
   }
   const externalMode = config.mode === "EXTERNAL_READ_ONLY_INPUT";
   let boundedExternalInput = null;
+  let externalInputBytes = 0;
   if (externalMode) {
     if (externalReadOnlyInput === undefined || typeof dataDirectory !== "string" ||
         !path.isAbsolute(dataDirectory) || adapters !== undefined || clock !== undefined) {
       throw new TypeError("external read-only input requires its typed packet, absolute state, and no caller sources");
     }
     boundedExternalInput = createBoundedExternalReadOnlyInput(externalReadOnlyInput);
-    if (Buffer.byteLength(canonicalCheckpointBytes(boundedExternalInput)) > config.budgets.bytes) {
-      throw new RangeError("external read-only input exceeds the configured byte budget");
+    externalInputBytes = Buffer.byteLength(canonicalCheckpointBytes(boundedExternalInput));
+    if (externalInputBytes >= config.budgets.bytes) {
+      throw new RangeError("external read-only input must leave bytes for runner input");
     }
     clock = createExternalReceiptClock();
     adapters = Object.freeze({
@@ -597,13 +599,13 @@ export function createPaperPilotComposition(options = {}) {
     if (abort.signal.aborted) throw Object.assign(new Error("late adapter result ignored after cancellation"), {code: "STOPPED"});
     const after = readTime();
     const bounded = boundedData(result, config.budgets.bytes - counters.bytes);
-    counters.bytes += bounded.bytes;
+    if (!(externalMode && name === "acquireCandidates")) counters.bytes += bounded.bytes;
     chargeEvent();
     return {result: bounded.value, receiptAt: after.wall, elapsedMs: after.elapsedMs};
   }
 
   async function execute() {
-    counters = {requests: 0, bytes: 0, events: 0, candidates: 0, cycles: 0};
+    counters = {requests: 0, bytes: externalInputBytes, events: 0, candidates: 0, cycles: 0};
     deadlineAt = config.startedAt + EIGHT_HOURS_MS;
     if (abort.signal.aborted) {
       state = "STOPPED";
@@ -766,25 +768,22 @@ export function createPaperPilotComposition(options = {}) {
     let candidateBatchLoaded = false;
     let sourceReceiptAt = null;
 
+    function candidateSourceFailure(code) {
+      adapterFailureCode = code;
+      strategyOverride = code;
+      return {done: true, outcome: "UNKNOWN", reason: code};
+    }
+
     const candidateSource = {
       async poll() {
         if (abort.signal.aborted) return {done: true};
         if (!candidateBatchLoaded) {
           candidateBatchLoaded = true;
-          let acquisition;
-          try {
-            acquisition = await invokeAdapter("acquireCandidates", {});
-          } catch (error) {
-            adapterFailureCode = error?.code ?? "CANDIDATE_SOURCE_UNAVAILABLE";
-            strategyOverride = adapterFailureCode;
-            return {done: true};
-          }
+          const acquisition = await invokeAdapter("acquireCandidates", {});
           if (!Array.isArray(acquisition.result) ||
               acquisition.result.length > config.budgets.candidates ||
               acquisition.result.length > config.budgets.cycles) {
-            adapterFailureCode = "CANDIDATE_BOUND";
-            strategyOverride = adapterFailureCode;
-            return {done: true};
+            return candidateSourceFailure("CANDIDATE_BOUND");
           }
           counters.candidates = acquisition.result.length;
           sourceReceiptAt = acquisition.receiptAt;
@@ -792,9 +791,7 @@ export function createPaperPilotComposition(options = {}) {
             if (!integerTime(candidate?.sampledAt) ||
                 candidate.sampledAt > sourceReceiptAt +
                   (externalMode ? 0 : clockAttestation.uncertaintyMs)) {
-              adapterFailureCode = "SOURCE_AFTER_RECEIPT";
-              strategyOverride = adapterFailureCode;
-              return {done: true};
+              return candidateSourceFailure("SOURCE_AFTER_RECEIPT");
             }
           }
           chargeEvent(acquisition.result.length);
@@ -807,9 +804,7 @@ export function createPaperPilotComposition(options = {}) {
         if (candidateIndex >= candidates.length) return {done: true};
         const candidate = candidates[candidateIndex++];
         if (candidate.source !== (externalMode ? EXTERNAL_INPUT_SOURCE : SYNTHETIC_SOURCE)) {
-          adapterFailureCode = "SOURCE_PROVENANCE";
-          strategyOverride = adapterFailureCode;
-          return {done: true};
+          return candidateSourceFailure("SOURCE_PROVENANCE");
         }
         counters.cycles += 1;
         provenance.candidates.push({
@@ -940,7 +935,7 @@ export function createPaperPilotComposition(options = {}) {
         maxCandidates: Math.min(100, config.budgets.candidates),
         maxQuotes: Math.min(1_024, config.budgets.requests),
         maxOperations: Math.min(10_000, Math.max(2, config.budgets.events)),
-        maxInputBytes: Math.min(8 * 1024 * 1024, config.budgets.bytes)
+        maxInputBytes: Math.min(8 * 1024 * 1024, config.budgets.bytes - counters.bytes)
       }
     });
     const runnerResult = await runner.run();
@@ -998,8 +993,10 @@ export function createPaperPilotComposition(options = {}) {
       equityCents: terminalResult?.equityCents ?? null
     }));
     let lifecycleStatus = runnerResult.status;
-    if (adapterFailureCode && adapterFailureCode !== "STOPPED") lifecycleStatus = "UNKNOWN";
-    else if (runnerResult.reason === "SHUTDOWN" || abort.signal.aborted) lifecycleStatus = "STOPPED";
+    if (runnerResult.status === "UNKNOWN" ||
+        (adapterFailureCode && adapterFailureCode !== "STOPPED")) lifecycleStatus = "UNKNOWN";
+    else if (runnerResult.reason === "SHUTDOWN" ||
+        (abort.signal.aborted && runnerResult.reason !== "DEADLINE")) lifecycleStatus = "STOPPED";
     state = lifecycleStatus;
     let checkpointReadback = null;
     try {
