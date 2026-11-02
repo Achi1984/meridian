@@ -90,6 +90,13 @@ pilot, invoke the ledger, make requests, authorize execution, or assert future
 runtime validity. A ready observation plan is not a candidate qualification or
 a trading claim.
 
+On Linux, staging, publication, and cleanup are anchored to opened directory
+handles. If publication succeeds but parent-directory durability cannot be
+confirmed, the CLI reports `OBSERVATION_PLAN_PUBLISHED_DURABILITY_UNCERTAIN`
+with the verified identity and config hash and exits nonzero. Inspect the
+published file before retrying with the same output path. Safe publication
+currently requires Linux `/proc/self/fd` directory handles.
+
 ## Evidence boundary and remaining real-data gaps
 
 Candidate intake parses snapshots with the existing parser and applies the

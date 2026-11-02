@@ -345,49 +345,127 @@ async function assertSafeOutputDirectory(directory) {
       throw new TypeError("output directory path must contain only real directories");
     }
     const parent = path.dirname(current);
-    if (parent === current) return;
+    if (parent === current) return await lstat(path.resolve(directory));
     current = parent;
   }
 }
 
-async function syncDirectory(directory) {
-  const handle = await open(directory, "r");
-  try { await handle.sync(); } finally { await handle.close(); }
+function sameDirectory(left, right) {
+  return left.isDirectory() && right.isDirectory() && left.dev === right.dev && left.ino === right.ino;
+}
+
+function descriptorPath(handle) {
+  if (process.platform !== "linux") {
+    throw new TypeError("safe config publication requires Linux directory handles");
+  }
+  return `/proc/self/fd/${handle.fd}`;
+}
+
+async function assertDirectoryBinding(directory, expected, handle) {
+  const [current, opened] = await Promise.all([assertSafeOutputDirectory(directory), handle.stat()]);
+  if (!sameDirectory(expected, current) || !sameDirectory(expected, opened)) {
+    throw new TypeError("output directory identity changed during config publication");
+  }
 }
 
 export async function writeExclusiveConfig(output, bytes, {
   write = (handle, data) => handle.writeFile(data),
-  sync = handle => handle.sync()
+  sync = handle => handle.sync(),
+  openDirectory = directory => open(directory, "r"),
+  syncDirectory = handle => handle.sync()
 } = {}) {
   if (typeof output !== "string" || !path.isAbsolute(output) || !Buffer.isBuffer(bytes) ||
-      typeof write !== "function" || typeof sync !== "function") {
+      typeof write !== "function" || typeof sync !== "function" ||
+      typeof openDirectory !== "function" || typeof syncDirectory !== "function") {
     throw new TypeError("an absolute output path and config bytes are required");
   }
   const resolved = path.resolve(output);
   const directory = path.dirname(resolved);
-  await assertSafeOutputDirectory(directory);
-  let handle;
+  const basename = path.basename(resolved);
+  const expectedDirectory = await assertSafeOutputDirectory(directory);
+  let directoryHandle;
   let stagingDirectory;
+  let stagingName;
+  let stagingHandle;
+  let stagingIdentity;
+  let handle;
+  let publicationStatus = "PUBLISHED_DURABLE";
   try {
-    stagingDirectory = await mkdtemp(path.join(directory, ".candidate-intake-"));
-    const stagedOutput = path.join(stagingDirectory, "config");
+    directoryHandle = await open(directory, "r");
+    const directoryPath = descriptorPath(directoryHandle);
+    await assertDirectoryBinding(directory, expectedDirectory, directoryHandle);
+    stagingDirectory = await mkdtemp(path.join(directoryPath, ".candidate-intake-"));
+    stagingName = path.basename(stagingDirectory);
+    stagingHandle = await open(stagingDirectory, "r");
+    const stagingPath = descriptorPath(stagingHandle);
+    const stagingInfo = await stagingHandle.stat();
+    if (!stagingInfo.isDirectory() || (stagingInfo.mode & 0o077) !== 0) {
+      throw new TypeError("private config staging directory was not created safely");
+    }
+    stagingIdentity = {dev: stagingInfo.dev, ino: stagingInfo.ino};
+    const stagedOutput = path.join(stagingPath, "config");
     handle = await open(stagedOutput, "wx", 0o600);
+    await handle.chmod(0o600);
     await write(handle, bytes);
     await sync(handle);
-    await handle.close();
-    handle = null;
-    await link(stagedOutput, resolved);
-    await syncDirectory(directory);
-  } catch (error) {
-    if (handle) {
-      try { await handle.close(); } catch {}
+    const stagedInfo = await handle.stat();
+    const stagedPathInfo = await lstat(stagedOutput);
+    if (!stagedInfo.isFile() || (stagedInfo.mode & 0o777) !== 0o600 ||
+        stagedInfo.dev !== stagedPathInfo.dev || stagedInfo.ino !== stagedPathInfo.ino) {
+      throw new TypeError("staged config identity or permissions changed before publication");
     }
-    throw error;
+    await assertDirectoryBinding(directory, expectedDirectory, directoryHandle);
+    await link(stagedOutput, path.join(directoryPath, basename));
+
+    const verifyPublished = async () => {
+      const publishedHandle = await open(path.join(directoryPath, basename), "r");
+      try {
+        const info = await publishedHandle.stat();
+        const staged = await handle.stat();
+        const publishedBytes = await publishedHandle.readFile();
+        return info.isFile() && (info.mode & 0o777) === 0o600 &&
+          info.dev === staged.dev && info.ino === staged.ino && publishedBytes.equals(bytes);
+      } finally {
+        await publishedHandle.close();
+      }
+    };
+
+    if (!await verifyPublished()) {
+      throw new TypeError("published config did not match its verified staged identity and bytes");
+    }
+    try {
+      await assertDirectoryBinding(directory, expectedDirectory, directoryHandle);
+      const syncHandle = await openDirectory(directoryPath);
+      try {
+        await syncDirectory(syncHandle);
+      } finally {
+        await syncHandle.close();
+      }
+      await assertDirectoryBinding(directory, expectedDirectory, directoryHandle);
+    } catch {
+      if (!await verifyPublished()) {
+        throw new TypeError("published config could not be verified after a durability failure");
+      }
+      publicationStatus = "PUBLISHED_DURABILITY_UNCERTAIN";
+    }
   } finally {
-    if (stagingDirectory) {
-      try { await rm(stagingDirectory, {recursive: true, force: true}); } catch {}
+    if (handle) try { await handle.close(); } catch {}
+    if (stagingHandle) {
+      try { await rm(path.join(descriptorPath(stagingHandle), "config"), {force: true}); } catch {}
+      try { await stagingHandle.close(); } catch {}
     }
+    if (stagingDirectory && stagingName && directoryHandle) {
+      try {
+        const stagingPath = path.join(descriptorPath(directoryHandle), stagingName);
+        const current = await lstat(stagingPath);
+        if (current.dev === stagingIdentity.dev && current.ino === stagingIdentity.ino) {
+          await rm(stagingPath, {recursive: true, force: true});
+        }
+      } catch {}
+    }
+    if (directoryHandle) try { await directoryHandle.close(); } catch {}
   }
+  return {status: publicationStatus};
 }
 
 export async function readSnapshotFile(inputPath) {
@@ -431,12 +509,16 @@ export async function readSnapshotFile(inputPath) {
   return parsed;
 }
 
-export async function runCandidateIntake(options) {
+export async function runCandidateIntake(options, publicationOptions) {
   const input = await readSnapshotFile(options.input);
   const plan = buildCandidateIntakePlan({...options, input});
   if (plan.status === "OBSERVATION_PLAN_READY") {
-    await writeExclusiveConfig(options.output, plan.configBytes);
+    const publication = await writeExclusiveConfig(options.output, plan.configBytes, publicationOptions);
     delete plan.configBytes;
+    plan.publicationStatus = publication.status;
+    if (publication.status === "PUBLISHED_DURABILITY_UNCERTAIN") {
+      plan.status = "OBSERVATION_PLAN_PUBLISHED_DURABILITY_UNCERTAIN";
+    }
   }
   return plan;
 }

@@ -1,6 +1,16 @@
 import assert from "node:assert/strict";
 import {spawnSync} from "node:child_process";
-import {readFile, mkdtemp, mkdir, writeFile, stat, rm} from "node:fs/promises";
+import {
+  readFile,
+  mkdtemp,
+  mkdir,
+  writeFile,
+  stat,
+  rm,
+  readdir,
+  rename,
+  symlink
+} from "node:fs/promises";
 import {createHash} from "node:crypto";
 import os from "node:os";
 import path from "node:path";
@@ -383,6 +393,80 @@ test("exclusive output preserves existing files, cleans partial failures, and re
     /real directories/);
 });
 
+test("directory swaps cannot redirect staged publication or cleanup", async t => {
+  const directory = await harness(t);
+  const outputDirectory = path.join(directory, "output");
+  const movedDirectory = path.join(directory, "moved-output");
+  const replacementDirectory = path.join(directory, "replacement");
+  await mkdir(outputDirectory);
+  await mkdir(replacementDirectory);
+  const replacementSentinel = path.join(replacementDirectory, "keep.txt");
+  await writeFile(replacementSentinel, "preserve replacement directory");
+  const output = path.join(outputDirectory, "run-config.json");
+  const intended = Buffer.from("intended config bytes");
+  const substitute = Buffer.from("substituted staging bytes");
+
+  await assert.rejects(writeExclusiveConfig(output, intended, {
+    write: async (handle, data) => {
+      const stagingName = (await readdir(outputDirectory))
+        .find(name => name.startsWith(".candidate-intake-"));
+      assert.ok(stagingName);
+      await rename(outputDirectory, movedDirectory);
+      await symlink(replacementDirectory, outputDirectory);
+      const replacementStaging = path.join(replacementDirectory, stagingName);
+      await mkdir(replacementStaging);
+      await writeFile(path.join(replacementStaging, "config"), substitute, {mode: 0o644});
+      await handle.writeFile(data);
+    }
+  }), /real directories/);
+
+  await assert.rejects(readFile(output), {code: "ENOENT"});
+  assert.deepEqual(await readFile(replacementSentinel), Buffer.from("preserve replacement directory"));
+  const replacementStageName = (await readdir(replacementDirectory))
+    .find(name => name.startsWith(".candidate-intake-"));
+  assert.ok(replacementStageName);
+  assert.deepEqual(await readFile(path.join(replacementDirectory, replacementStageName, "config")),
+    substitute);
+  assert.equal((await stat(path.join(replacementDirectory, replacementStageName, "config"))).mode & 0o777,
+    0o644);
+  assert.deepEqual(await readdir(movedDirectory), []);
+});
+
+test("post-publication directory open and sync failures report verified uncertain durability", async t => {
+  const directory = await harness(t);
+  const inputPath = path.join(directory, "snapshots.json");
+  const pair = await pairFixture({pairCreatedAt: NOW - 60 * 60 * 1000});
+  await writeFile(inputPath, JSON.stringify(input([snapshot(pair)])));
+
+  const failures = [
+    ["parent open", {openDirectory: async () => { throw new Error("injected parent open failure"); }}],
+    ["parent sync", {
+      syncDirectory: async handle => {
+        await handle.sync();
+        throw new Error("injected parent sync failure");
+      }
+    }]
+  ];
+  for (const [label, publicationOptions] of failures) {
+    const output = path.join(directory, `${label.replace(" ", "-")}.json`);
+    const result = await runCandidateIntake({
+      input: inputPath,
+      output,
+      runId: "uncertain-durability-test",
+      startAt: START_AT,
+      now: NOW
+    }, publicationOptions);
+
+    assert.equal(result.status, "OBSERVATION_PLAN_PUBLISHED_DURABILITY_UNCERTAIN");
+    assert.equal(result.publicationStatus, "PUBLISHED_DURABILITY_UNCERTAIN");
+    assert.deepEqual(result.identity, IDENTITY);
+    assert.equal(result.executionAuthorized, false);
+    const publishedBytes = await readFile(output);
+    assert.equal(createHash("sha256").update(publishedBytes).digest("hex"), result.configHash);
+    assert.equal((await stat(output)).mode & 0o777, 0o600);
+  }
+});
+
 test("no eligible candidate creates no config, and bounded rejection metadata stays caller-only", async t => {
   const directory = await harness(t);
   const output = path.join(directory, "never-created.json");
@@ -427,6 +511,7 @@ test("the documented executable CLI writes the config and returns bounded plan m
   assert.equal(result.status, 0, result.stderr);
   const report = JSON.parse(result.stdout);
   assert.equal(report.status, "OBSERVATION_PLAN_READY");
+  assert.equal(report.publicationStatus, "PUBLISHED_DURABLE");
   assert.equal(report.executionAuthorized, false);
   assert.equal(report.hardGateStatus, "UNKNOWN");
   assert.equal(report.configHash, createHash("sha256")
