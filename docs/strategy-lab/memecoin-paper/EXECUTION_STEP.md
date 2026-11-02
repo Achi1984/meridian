@@ -56,6 +56,11 @@ positions, risk is `EQUITY_UNKNOWN`, additional entries cannot fill, and finish
 reports unavailable equity. Malformed supplied marks/costs are rejected before
 dispatch. Exit observations and risk snapshots need no new candidate and run
 independently, including trailing/stop/gap and daily-loss exits.
+Marks without a valid bounded `eventId` receive a deterministic
+`paper-mark:<digest>:<index>` ID before dispatch. The digest binds the run,
+operation event, purpose, and complete caller payload; the bounded ID is stored
+in checkpoint inputs so ledger-generated daily-loss exits remain within the
+ledger's ID limit. Explicit entry/exit operation IDs are unchanged.
 
 Successful checkpoint commands return the ledger result plus `commandId` and
 `receipt: {runId, sequence, hash, resultDigest}`. A ledger rejection can also

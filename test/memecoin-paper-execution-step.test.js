@@ -10,18 +10,18 @@ import {canonicalCheckpointBytes, CheckpointStore} from "../scripts/memecoin-pap
 import {createPaperExecutionStep} from "../scripts/memecoin-paper/execution-step.mjs";
 import {START, END, RUN, candidate, authorization, quote, entry} from "./fixtures/memecoin-paper-execution-step/scenario.mjs";
 
-async function setup(t, {limits, wrapStore, wrapSession, storeOptions} = {}) {
+async function setup(t, {limits, wrapStore, wrapSession, storeOptions, runId = RUN} = {}) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "paper-execution-step-"));
   const realStore = await CheckpointStore.open(directory, storeOptions);
   const store = wrapStore ? wrapStore(realStore) : realStore;
-  const session = await PaperCheckpointSession.open({store, runId: RUN, startedAt: START});
+  const session = await PaperCheckpointSession.open({store, runId, startedAt: START});
   t.after(async () => {
     await session.close();
     await rm(directory, {recursive: true, force: true});
   });
   const step = createPaperExecutionStep({
     session: wrapSession ? wrapSession(session) : session, store,
-    runId: RUN, startedAt: START, endAt: END, limits
+    runId, startedAt: START, endAt: END, limits
   });
   return {step, session, store, directory};
 }
@@ -213,6 +213,7 @@ for (const [label, price, gap] of [["stop", 9400, false], ["gap", 9000, true]]) 
     const input = {eventId: "exit", quote: quote(candidate(), "exit", START + 3000, price), now: START + 3000};
     const result = await step.observeExitQuote(input);
     assert.equal(result.status, "CLOSED_PAPER");
+    assert.equal(result.eventId, input.eventId);
     assert.equal(result.fillPriceMicros, String(price));
     assert.equal(result.gapThroughStop, gap);
     assert.deepEqual(await step.observeExitQuote(input), result);
@@ -235,6 +236,7 @@ test("trailing marks and exit remain independent of entry candidates; incomplete
     eventId: "trailing", quote: quote(candidate(), "trailing", START + 5000, 11_000), now: START + 5000
   });
   assert.equal(exit.status, "CLOSED_PAPER");
+  assert.equal(exit.eventId, "trailing");
   assert.equal(exit.gapThroughStop, true);
 });
 
@@ -260,6 +262,39 @@ test("daily-loss risk gate revokes pending authorization and exits without new c
   assert.equal(risk.exitRequests[0].status, "CLOSED_PAPER");
   assert.equal((await step.executeEntry(entry(auth, next, "late-fill", day + 3000))).status, "REJECT");
   assert.equal(session.snapshot().summary.openPositions.length, 0);
+});
+
+test("ID-less daily-loss marks use bounded run-bound IDs and return an exact receipt", async t => {
+  const runId = "r".repeat(120);
+  const {step, session, store} = await filled(t, {runId});
+  const day = Date.parse("2026-01-01T23:00:00Z");
+  const token = candidate();
+  const openingMark = quote(token, "opening-mark", day);
+  delete openingMark.eventId;
+  assert.equal((await step.riskSnapshot({
+    eventId: "day", now: day, marks: [openingMark]
+  })).status, "PASS");
+
+  const lossMark = quote(token, "loss-mark", day + 2000, 6251);
+  delete lossMark.eventId;
+  const risk = await step.riskSnapshot({
+    eventId: "loss", now: day + 2000, marks: [lossMark]
+  });
+  assert.equal(risk.status, "DAILY_LOSS_LIMIT");
+  assert.equal(risk.exitRequests[0].status, "CLOSED_PAPER");
+  assert.equal(risk.exitRequests[0].eventId.length <= 120, true);
+  assert.match(risk.exitRequests[0].eventId, /^paper-mark:[a-f0-9]{64}:0$/);
+  assert.equal(session.snapshot().summary.openPositions.length, 0);
+
+  const read = await store.readCheckpoint();
+  const checkpoint = JSON.parse(read.bytes);
+  const record = checkpoint.records.at(-1);
+  assert.equal(record.inputs.marks[0].eventId, risk.exitRequests[0].eventId);
+  assert.equal(risk.receipt.runId, runId);
+  assert.equal(risk.receipt.sequence, read.sequence);
+  assert.equal(risk.receipt.hash, createHash("sha256").update(read.bytes).digest("hex"));
+  assert.equal(risk.receipt.resultDigest, record.resultDigest);
+  assert.equal(risk.commandId, record.commandId);
 });
 
 test("ACK loss latches UNKNOWN, including duplicates, with no second effect or finish", async t => {
@@ -337,6 +372,21 @@ test("deadline stops dispatch; explicit finish values marks without liquidation 
   assert.equal(session.snapshot().summary.openPositions.length, 1);
   assert.equal((await step.riskSnapshot({eventId: "after", now: END, marks: []})).status, "REJECT");
   assert.throws(() => createPaperExecutionStep({session, store, runId: RUN, startedAt: START, endAt: END}), /no resume/);
+});
+
+test("finish normalizes ID-less valuation marks without creating exits", async t => {
+  const {step, session, store} = await filled(t);
+  const mark = quote(candidate(), "finish-mark", END);
+  delete mark.eventId;
+  const finish = await step.finishRun({eventId: "finish", now: END, marks: [mark]});
+  assert.equal(finish.status, "FINISHED");
+  assert.equal(finish.openPositions.length, 1);
+  assert.equal(session.snapshot().summary.openPositions.length, 1);
+  assert.equal(session.snapshot().auditEvents.some(event => event.type === "PAPER_EXIT"), false);
+  const read = await store.readCheckpoint();
+  const record = JSON.parse(read.bytes).records.at(-1);
+  assert.match(record.inputs.marks[0].eventId, /^paper-mark:[a-f0-9]{64}:0$/);
+  assert.ok(record.inputs.marks[0].eventId.length <= 120);
 });
 
 test("event, command, byte and pending-authorization bounds fail before mutation but allow finish", async t => {

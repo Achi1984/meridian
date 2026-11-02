@@ -281,6 +281,13 @@ export function createPaperExecutionStep({session, store, runId, startedAt, endA
         return Promise.resolve(reject("exact explicit operation inputs required"));
       }
       identity = digest({runId, eventId: input.eventId, purpose: method, payload: input});
+      if (input.marks) {
+        input.marks = input.marks.map((mark, index) => ({
+          ...mark,
+          ...(!safeId(mark.eventId) ? {eventId: `paper-mark:${identity}:${index}`} : {})
+        }));
+        input = copyData(input, bounds.maxBytes);
+      }
       size = canonicalCheckpointBytes(input).length;
     } catch (error) {
       return Promise.resolve(reject(error.message));
