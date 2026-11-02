@@ -185,15 +185,13 @@ test("actual decoded fixture passes canonical adapter, hard filters and Analyst 
     assert.equal(item.coverage.slotProvenance, evidence.metrics[key].coverage.provenanceType, key);
   }
   const evaluation = await evaluateWithCanonicalMarketAdapter({
-    canonicalAdapter: input => adaptCanonicalMarketEvidence({
-      ...input,
-      holdUntil: fixture.decisionAt + 8 * 60 * 60 * 1000
-    }),
+    canonicalAdapter: adaptCanonicalMarketEvidence,
     providerCandidate: canonicalInput.providerCandidate,
     evidence: canonicalInput.evidence,
     packet: evidence,
     reviewEvidence,
-    now: fixture.decisionAt
+    now: fixture.decisionAt,
+    holdUntil: fixture.decisionAt + 8 * 60 * 60 * 1000
   });
   assert.equal(evaluation.status, "NORMALIZED");
   assert.equal(evaluation.filters.status, "PASS");
@@ -207,6 +205,49 @@ test("actual decoded fixture passes canonical adapter, hard filters and Analyst 
   }
   assert.equal(evidence.executionAuthorized, false);
   assert.equal(evidence.authorizationEligible, false);
+});
+
+test("canonical evaluation forwards the selected-pool LP lock horizon to the filter", async () => {
+  const fixture = makeFixture();
+  const canonicalInput = canonicalFixtureInput(fixture.candidateT);
+  fixture.candidate = canonicalInput.providerCandidate;
+  const evidence = await packet(fixture);
+  const reviewEvidence = Object.fromEntries(ANALYST_WINDOW_METRICS.map(key => [key, {
+    status: "REVIEWED",
+    reviewerId: `fixture-reviewer-${key}`,
+    reviewId: `fixture-review-${key}`,
+    reviewedAt: fixture.candidateT - 1
+  }]));
+  const holdUntil = fixture.decisionAt + 8 * 60 * 60 * 1000;
+  const evaluateLock = (lockedUntil, includeHoldUntil = true) => {
+    const input = canonicalFixtureInput(fixture.candidateT);
+    input.evidence.lpProtection.value = {
+      model: "lock",
+      pool: fixture.identity.pool,
+      lockedUntil
+    };
+    return evaluateWithCanonicalMarketAdapter({
+      canonicalAdapter: adaptCanonicalMarketEvidence,
+      providerCandidate: input.providerCandidate,
+      evidence: input.evidence,
+      packet: evidence,
+      reviewEvidence,
+      now: fixture.decisionAt,
+      ...(includeHoldUntil ? {holdUntil} : {})
+    });
+  };
+
+  const exactHorizon = await evaluateLock(holdUntil);
+  assert.equal(exactHorizon.filters.checks.lpProtection.status, "PASS");
+  assert.equal(exactHorizon.filters.accepted, true);
+
+  const earlierExpiry = await evaluateLock(holdUntil - 1);
+  assert.equal(earlierExpiry.filters.checks.lpProtection.status, "REJECT");
+  assert.equal(earlierExpiry.filters.accepted, false);
+
+  const missingHorizon = await evaluateLock(holdUntil, false);
+  assert.equal(missingHorizon.filters.checks.lpProtection.status, "UNKNOWN");
+  assert.equal(missingHorizon.filters.accepted, false);
 });
 
 test("canonical adapter keeps null slots confined to typed Analyst records", async () => {

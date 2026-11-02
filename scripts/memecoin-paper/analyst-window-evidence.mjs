@@ -992,7 +992,7 @@ export async function evaluateWithCanonicalMarketAdapter({
     holdUntil
   });
   const candidate = adapted?.candidate;
-  const filters = candidate ? filterCandidate(candidate, {now})
+  const filters = candidate ? filterCandidate(candidate, {now, holdUntil})
     : {status: "SCORE_UNAVAILABLE", results: []};
   const analysis = candidate ? analyzeCandidate(candidate, {
     now,
