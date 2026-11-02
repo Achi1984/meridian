@@ -225,6 +225,7 @@ export function createPaperExecutionRunner({
   const pendingAuthorizationIds = new Set();
   let latestMarks = [];
   let ledgerUnknownReason = null;
+  let missingTerminalValuationMints = [];
 
   function nextId(purpose) {
     logicalId += 1;
@@ -265,6 +266,7 @@ export function createPaperExecutionRunner({
       candidateBudgetReached,
       receipts: receipts.map(item => ({...item})),
       operationResults: results.map(item => ({...item})),
+      missingTerminalValuationMints: [...missingTerminalValuationMints],
       terminalResult,
       terminalReceipt: verifiedTerminalReceipt ? {...verifiedTerminalReceipt} : null,
       summary
@@ -546,7 +548,8 @@ export function createPaperExecutionRunner({
     state = "FINISHING";
     let result;
     try {
-      const openMints = new Set(session.snapshot().summary.openPositions.map(position => position.mint));
+      const openPositions = session.snapshot().summary.openPositions;
+      const openMints = new Set(openPositions.map(position => position.mint));
       const finishMarks = Array.isArray(marks)
         ? marks.filter(mark => integerTime(mark.observedAt) &&
           mark.observedAt <= finishAt && finishAt - mark.observedAt <= 300_000 &&
@@ -557,6 +560,16 @@ export function createPaperExecutionRunner({
         now: finishAt,
         marks: finishMarks
       });
+      if (finishMarks.length && result?.status === "REJECT" && !result.receipt &&
+          ["input byte capacity reached", "event/input capacity reached",
+            "checkpoint byte capacity reached before dispatch"].includes(result.reason)) {
+        missingTerminalValuationMints = openPositions.map(position => position.mint);
+        result = await executionStep.finishRun({
+          eventId: nextId("finish"),
+          now: finishAt,
+          marks: []
+        });
+      }
     } catch {
       state = "UNKNOWN";
       return report("UNKNOWN", "finish publication outcome is uncertain");

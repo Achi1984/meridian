@@ -3,7 +3,7 @@ import {mkdtemp, rm} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import {CheckpointStore} from "../scripts/memecoin-paper/checkpoint-store.mjs";
+import {canonicalCheckpointBytes, CheckpointStore} from "../scripts/memecoin-paper/checkpoint-store.mjs";
 import {PaperCheckpointSession} from "../scripts/memecoin-paper/checkpoint-session.mjs";
 import {createPaperExecutionStep} from "../scripts/memecoin-paper/execution-step.mjs";
 import {
@@ -152,6 +152,8 @@ async function makeRealRunner(t, {
   candidateSource = {poll: async () => ({done: true})},
   quoteSource = async () => null,
   clock = () => START + 1_000,
+  stopSource = () => false,
+  stepLimits,
   wrapRunnerSession = session => session
 } = {}) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "paper-runner-review-"));
@@ -162,7 +164,9 @@ async function makeRealRunner(t, {
     await rm(directory, {recursive: true, force: true});
   });
   const runner = createPaperExecutionRunner({
-    executionStep: createPaperExecutionStep({session, store, runId, startedAt: START, endAt: END}),
+    executionStep: createPaperExecutionStep({
+      session, store, runId, startedAt: START, endAt: END, limits: stepLimits
+    }),
     session: wrapRunnerSession(session),
     runId,
     startedAt: START,
@@ -172,7 +176,7 @@ async function makeRealRunner(t, {
     candidateSource,
     quoteSource,
     clock,
-    stopSource: () => false,
+    stopSource,
     smartWalletAllowlist: SYNTHETIC_SMART_WALLET_ALLOWLIST
   });
   return {directory, runner, session, store};
@@ -503,6 +507,74 @@ test("real checkpoint daily-loss exit refreshes consumed marks and durably close
     const mark = refreshedRisk.inputs.marks.find(item => item.mint === mint);
     assert.ok(mark.observedAt > lastObservations.get(mint));
   }
+});
+
+test("tight-budget shutdown durably finishes without fabricated terminal valuation", async t => {
+  const runId = "runner-tight-shutdown-review";
+  const candidate = syntheticCandidate(START);
+  let clockTime = START;
+  const quoteSource = async ({candidate: selected, now}) => ({
+    source: SYNTHETIC_SOURCE,
+    fixtureOnly: true,
+    chainId: selected.chainId,
+    mint: selected.mint,
+    pool: selected.pool,
+    quote: selected.quote,
+    decimals: selected.decimals,
+    observedAt: now,
+    priceMicros: 10_000,
+    mode: "HYPOTHETICAL",
+    executable: true,
+    costs: {feeCents: 2, spreadCents: 1, slippageCents: 1, priceImpactCents: 1, networkCents: 2}
+  });
+  const runOptions = () => {
+    let candidateSent = false;
+    clockTime = START;
+    return {
+      runId,
+      candidateSource: {
+        poll: async () => candidateSent ? {done: true} : (candidateSent = true, {candidate})
+      },
+      clock: () => (clockTime += 1_000),
+      stopSource: ({tick}) => tick >= 1,
+      quoteSource
+    };
+  };
+  const baseline = await makeRealRunner(t, runOptions());
+  const baselineReport = await baseline.runner.run();
+  assert.equal(baselineReport.status, "FINISHED");
+  assert.equal(baselineReport.reason, "SHUTDOWN");
+  const baselineReadback = await baseline.store.readCheckpoint();
+  const baselineCheckpoint = JSON.parse(baselineReadback.bytes.toString("utf8"));
+  const baselineFinish = baselineCheckpoint.records.at(-1);
+  assert.equal(baselineFinish.method, "finishRun");
+  assert.equal(baselineFinish.inputs.marks.length, 1);
+  const emptyFinishCheckpoint = {
+    ...baselineCheckpoint,
+    records: [
+      ...baselineCheckpoint.records.slice(0, -1),
+      {...baselineFinish, inputs: {...baselineFinish.inputs, marks: []}}
+    ]
+  };
+  const maxBytes = canonicalCheckpointBytes(emptyFinishCheckpoint).length + 64;
+  assert.ok(maxBytes < baselineReadback.bytes.length);
+
+  const constrained = await makeRealRunner(t, {...runOptions(), stepLimits: {maxBytes}});
+  const report = await constrained.runner.run();
+  assert.equal(report.status, "FINISHED");
+  assert.equal(report.reason, "SHUTDOWN");
+  assert.deepEqual(report.missingTerminalValuationMints, [candidate.mint]);
+  assert.equal(report.summary.openPositions.length, 1);
+
+  const readback = await constrained.store.readCheckpoint();
+  assert.equal(readback.status, "OK");
+  const checkpoint = JSON.parse(readback.bytes.toString("utf8"));
+  const finish = checkpoint.records.at(-1);
+  assert.equal(finish.method, "finishRun");
+  assert.deepEqual(finish.inputs.marks, []);
+  assert.equal(readback.sequence, report.terminalReceipt.sequence);
+  assert.equal(readback.hash, report.terminalReceipt.hash);
+  assert.equal(checkpoint.records.filter(record => record.method === "finishRun").length, 1);
 });
 
 test("real checkpoint UNKNOWN after an intermediate acknowledgement has no terminal receipt", async t => {
