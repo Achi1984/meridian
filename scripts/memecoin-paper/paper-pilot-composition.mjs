@@ -38,7 +38,8 @@ const syntheticClocks = new WeakMap();
 const offlineFixtureAdaptersBySource = new WeakMap();
 const FIXTURE_FAULTS = new Set([
   "NONE", "DISCONNECT", "CALLBACK_TIMEOUT", "LATE_DEADLINE", "WAIT_FOR_STOP",
-  "CLOCK_JUMP", "LOST_ACK", "LOST_INITIAL_ACK", "NO_CANDIDATES", "MISSING_EVIDENCE", "MISSING_COSTS",
+  "CLOCK_JUMP", "LOST_ACK", "LOST_INITIAL_ACK", "NO_CANDIDATES", "TWO_OPEN_POSITIONS",
+  "MISSING_EVIDENCE", "MISSING_COSTS",
   "NO_MARK", "REQUEST_BUDGET", "SPOOF_SOURCE", "QUOTE_AFTER_RECEIPT"
 ]);
 const SAFE_ID = /^[A-Za-z0-9._:-]{1,120}$/;
@@ -296,6 +297,7 @@ export function offlineFixtureAdapters(options = {}) {
     throw new TypeError("only bounded built-in offline fixture scenarios are supported");
   }
   let exitCount = 0;
+  let entryCount = 0;
   const adapters = Object.freeze({
     async acquireCandidates({now, signal, recordRequest}) {
       if (fault === "DISCONNECT") throw Object.assign(new Error("fixture disconnect"), {code: "DISCONNECTED"});
@@ -315,10 +317,31 @@ export function offlineFixtureAdapters(options = {}) {
       if (fault === "MISSING_EVIDENCE") delete row.evidence.top10OwnerPct;
       if (fault === "SPOOF_SOURCE") row.source = "DexScreener public API";
       clock.advance();
+      if (fault === "TWO_OPEN_POSITIONS") {
+        const second = syntheticCandidate(now - 1_000, {
+          mint: "Vote111111111111111111111111111111111111111",
+          pool: "Stake11111111111111111111111111111111111111"
+        });
+        for (const group of [second.evidence, second.analystEvidence]) {
+          for (const evidence of Object.values(group)) {
+            if (evidence?.binding) {
+              evidence.binding = {
+                chainId: second.chainId,
+                mint: second.mint,
+                pool: second.pool,
+                quote: second.quote
+              };
+            }
+          }
+        }
+        second.evidence.lpProtection.value.pool = second.pool;
+        return [row, second];
+      }
       return [row];
     },
     async entryQuote({candidate: token, now}) {
-      const result = fixtureQuote(token, "fixture-entry-1", now, 10_000);
+      entryCount += 1;
+      const result = fixtureQuote(token, `fixture-entry-${entryCount}`, now, 10_000);
       if (fault === "MISSING_COSTS") delete result.costs.networkCents;
       if (fault === "QUOTE_AFTER_RECEIPT") result.observedAt = now + 1_000;
       clock.advance();
@@ -327,7 +350,7 @@ export function offlineFixtureAdapters(options = {}) {
     async exitQuote({candidate: token, now, purpose}) {
       if (fault === "NO_MARK" && purpose === "risk-mark") return null;
       exitCount += 1;
-      const price = exitCount === 1 ? 10_000 : 9_000;
+      const price = fault === "TWO_OPEN_POSITIONS" || exitCount === 1 ? 10_000 : 9_000;
       const result = fixtureQuote(token, `fixture-exit-${exitCount}`, now, price);
       clock.advance();
       return result;

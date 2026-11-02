@@ -1,214 +1,146 @@
-# Simulated pilot receipt evaluator
+# Memecoin Paper run-export evaluator
 
-This package is a bounded, offline evaluator for one completed simulated
-Meme-Coin pilot. It is separate from the `READ_ONLY_PAPER` observation
-evaluator and does not change observation acceptance, the runner, ledger,
-composition, deployment, or activation state. It reads supplied artifact
-bytes only; it performs no network access and makes no live-execution,
-profitability, or readiness claim.
+This bounded, offline evaluator consumes the producer's actual
+`memecoin-paper-run-export/v1` envelope. It does not create an alternate
+manifest, terminal receipt, operator report, accounting projection, or checkpoint.
+It performs no network, provider, wallet, signing, order, deployment, or activation
+activity. A simulated `PASS` is limited to the reported offline lifecycle and
+its available receipt/export consistency; it is not operational readiness,
+profitability, real-source verification, or evidence that hypothetical costs
+equal settled costs.
 
 ## CLI
 
+The export file contains the envelope itself (the `report` object returned by
+`createPaperPilotComposition()`), not the surrounding CLI result object.
+Independent run/config/producer expectations must come from the caller's
+approved run record:
+
 ```sh
 node scripts/memecoin-paper-simulated-evaluation/index.mjs \
-  --manifest /absolute/export/manifest.json \
-  --config /absolute/export/config.json \
-  --checkpoint /absolute/export/checkpoint.json \
-  --terminal /absolute/export/terminal.json \
-  --report /absolute/export/operator-report.json \
+  --export /absolute/path/memecoin-paper-run-export.json \
   --run-id approved-run-id \
-  --build-id approved-build-id \
   --config-sha256 independently-recorded-config-sha256 \
+  --producer-revision paper-pilot-composition/3 \
   --format json
 ```
 
-`--format` accepts `json` or `markdown` and defaults to `json`. `--output
-/absolute/path/evaluation.json` is optional; the destination must not already
-exist. Without it, output is written to standard output. Inputs must be
-absolute paths to regular non-symlink files. The evaluator reads each file
-once, with these maximum byte limits:
+`--format` accepts `json` or `markdown` (default `json`).
+`--output /absolute/path/evaluation.json` is optional and must not already
+exist. Without it, output goes to stdout. The single export input must be an
+absolute path to a regular, non-symlink file and is opened nonblocking with a
+bounded read. The maximum envelope size is 16 MiB; the embedded canonical
+checkpoint is separately limited to 8 MiB.
 
-| Artifact | Maximum |
-| --- | ---: |
-| Manifest | 64 KiB |
-| Config | 64 KiB |
-| Checkpoint | 8 MiB |
-| Terminal | 2 MiB |
-| Operator report | 256 KiB |
+Exit codes are `0` for `PASS`, `1` for `FAIL`, and `2` for `UNKNOWN` or invalid
+CLI/file input. A missing pre-start binding is `UNKNOWN`, never a pass based on
+matching hashes computed after the run.
 
-Exit codes are `0` for overall `PASS`, `1` for `FAIL` (including malformed
-artifact bytes reported as `INVALID_EVIDENCE`), and `2` for `UNKNOWN` or
-unreadable/invalid command-line input. Output schema:
+## Input contract
+
+The evaluator accepts only the exact v1 envelope fields:
 
 ```json
 {
-  "schema": "MEMECOIN_SIMULATED_PILOT_EVALUATION_V1",
-  "overall": "PASS | FAIL | UNKNOWN",
-  "outcome": "SIMULATED_ENTRY_EXIT_COMPLETE | ZERO_ENTRY_COMPLETE | OPEN_UNVALUED_TERMINAL_POSITION | OPEN_POSITION_TERMINAL | SIMULATED_CYCLE_INCOMPLETE | INCOMPLETE_UNKNOWN | INVALID_EVIDENCE",
-  "identity": {
-    "runId": "…",
-    "buildId": "…",
-    "configSha256": "…",
-    "artifacts": {
-      "manifest": "sha256",
-      "config": "sha256",
-      "checkpoint": "sha256",
-      "terminal": "sha256",
-      "report": "sha256"
-    }
-  },
-  "checks": [{"id": "…", "status": "PASS | FAIL | UNKNOWN", "reason": "…"}],
-  "evidence": {
-    "entryFills": 0,
-    "exits": 0,
-    "openPositions": 0,
-    "terminalAt": "ISO timestamp or null",
-    "stopReason": "…",
-    "measuredCosts": "NOT_SUPPLIED"
-  },
-  "costProvenance": {
-    "declared": {"basis": "DECLARED_HYPOTHETICAL", "revision": "…", "source": "…"},
-    "measured": "NOT_SUPPLIED",
-    "comparability": "NOT_ASSESSED"
-  },
-  "claims": {"liveExecution": false, "profitability": false, "activation": false}
+  "schemaVersion": "memecoin-paper-run-export/v1",
+  "producerRevision": "paper-pilot-composition/3",
+  "config": {"version": 1, "mode": "SYNTHETIC_TEST_ONLY"},
+  "configSha256": "<sha256 of canonical config bytes>",
+  "runId": "<checkpoint run id>",
+  "startedAt": 1793651880000,
+  "deadlineAt": 1793680680000,
+  "policyVersion": "memecoin-paper-ledger-v2-monotonic-time",
+  "runnerReport": "<unmodified runner report or null>",
+  "checkpoint": "<full actual canonical checkpoint or null>",
+  "checkpointSha256": "<sha256 of canonical checkpoint bytes or null>",
+  "persistence": "ACKNOWLEDGED | UNKNOWN | NOT_STARTED",
+  "exportBinding": "PRESTART_BOUND | EXPORT_ASSERTED",
+  "bindingReceipt": "<immutable pre-start receipt or null>"
 }
 ```
 
-## Input contract: version 1
+The evaluator requires separate expected `runId`, `configSha256`, and
+`producerRevision` values. It checks the fixed eight-hour run window, checkpoint
+header/policy identity, canonical config digest, full checkpoint digest and
+predecessor chain, runner operation-receipt mapping, and final `finishRun`
+receipt. Terminal receipt shape is exactly
+`{runId, sequence, hash, resultDigest}`; `commandId` is reconciled from the raw
+`runnerReport.terminalResult` and final checkpoint record. The raw runner report
+is retained as supplied by the producer; evaluator code does not replace it
+with a derived report.
 
-The evaluator accepts only these exact, versioned artifacts. It does not infer
-or migrate older formats. Hashes bind the raw supplied bytes; do not
-reconstruct, reserialize, mix runs, or edit historical evidence. The expected
-run ID, build ID, and config SHA-256 must come independently from the approved
-launch record. A matching SHA-256 proves byte identity, not producer
-authenticity or trustworthy time.
+`PRESTART_BOUND` requires a valid `memecoin-paper-start-binding/v1` receipt
+whose canonical digest binds the expected producer, run, config, policy,
+window, and external-packet digest (if applicable). This checksum is not a
+signature. Without the receipt, the evaluator returns
+`historical_run_binding: UNKNOWN` and `exportBinding: EXPORT_ASSERTED` remains
+an assertion only. It never backfills historical runs.
 
-### Manifest
+Persistence certainty is distinct from lifecycle status:
 
-`MEMECOIN_SIMULATED_PILOT_EXPORT_V1` contains `runId`, `buildId`,
-`configSha256`, and `revisions`. Each of `config`, `checkpoint`, `terminal`,
-and `report` has an immutable safe `revision` identifier and the SHA-256 of
-the corresponding exact file bytes. All three expected identity values must
-match the CLI values and each artifact.
-
-### Config
-
-`MEMECOIN_SIMULATED_PILOT_CONFIG_V1` identifies the same `runId` and
-`buildId`, with `mode: "SIMULATED_PAPER"`,
-`executionMode: "SIMULATED_ONLY"`, and
-`policyVersion: "memecoin-paper-ledger-v2-monotonic-time"`. It carries integer
-millisecond `startedAt`, `entryCutoffAt`, and `deadlineAt` (an eight-hour
-window), plus `quoteMaxAgeMs` and a cost policy. These #996 limits are checked
-as fixed policy, not trusted as caller-adjustable values:
-
-| Limit | Required value |
-| --- | ---: |
-| Initial virtual capital | 100,000 cents |
-| Maximum all-in entry | 8,000 cents |
-| Maximum open positions | 3 |
-| Initial stop | 600 bps |
-| Trailing activation | 1,200 bps |
-| Trailing distance | 600 bps |
-| Daily loss gate | 3,000 cents |
-| Daily accounting timezone | `Europe/Vienna` |
-
-`costPolicy` must include `basis: "DECLARED_HYPOTHETICAL"`, safe bounded
-revision/source identifiers, and `measuredBasis: "NOT_MEASURED"`. A declared
-quote-cost assumption is not a settled or measured execution cost.
-
-### Checkpoint and terminal
-
-`checkpoint.json` must be the canonical `formatVersion: 1` checkpoint from
-`PaperCheckpointSession`: `runHeader`, contiguous `records`, and matching
-`sequence`. The evaluator reuses the repository's pure
-`canonicalCheckpointBytes` serializer, verifies every predecessor hash and
-command ID, and binds the final SHA-256 to the terminal checkpoint receipt.
-This is a digest chain, not a signature.
-
-The separate `MEMECOIN_SIMULATED_PILOT_TERMINAL_V1` receipt binds
-`runId`, `buildId`, `configSha256`, actual `terminalAt`, terminal `status`,
-`stopReason`, and the final `checkpointReceipt`. Its `operations` list must
-contain one result for every non-header checkpoint record, in sequence, with
-matching `commandId`, `method`, and `resultDigest`. Each result is checked by
-recomputing the canonical result digest. `stopEvidence` must establish the
-same actual terminal instant and stop reason. A deadline stop requires the
-actual stop instant to equal the configured deadline; an operator stop stays
-an early completion and is not described as an eight-hour run.
-
-`restartEvidence` passes only when it explicitly states `NOT_REQUIRED` with
-zero restarts and no receipts. Any restart, including a claimed `VERIFIED`
-restart, remains `UNKNOWN` until the producer freezes a receipt schema bound to
-the prior and resumed checkpoint identities. The current ledger explicitly
-fails closed on restart; no restart transition schema is available here.
-
-### Report
-
-The report must be the `MEMECOIN_PAPER_OPERATOR_REPORT_V1` DTO and identify
-the expected run through `experiment.id`. It is bound by its exact artifact
-revision and is reconciled against the terminal results for entry-fill count,
-cash, realized totals, fixed-point costs, and final open-position identities.
-The evaluator does not construct or repair the report.
-
-Risk snapshots are recomputed from replay-derived cash and exactly one fresh,
-event-identified mark per open position, including mark identity, price,
-decimals, and cost assumptions. Reported cash/equity/open value/exit costs and
-daily-loss fields must equal that recomputation. A local-day rollover resets
-the loss baseline only after a validated snapshot establishes the next day's
-opening equity. A terminal marked position likewise requires a fresh
-event-identified finish mark; unsupported marks cannot substantiate reported
-valuation.
-
-## Acceptance and interpretation
-
-`overall` is `FAIL` if any check fails, `UNKNOWN` if there is no failure but
-at least one required evidence item is unavailable, and `PASS` only when all
-checks pass. Criteria cover artifact identity/revisions, canonical checkpoint
-chain, terminal-receipt/result binding, operation/event uniqueness, causal
-fresh quotes and event-ID association (including fixed-point quantity/notional
-recomputation from quote price and decimals), entry cutoff, #996
-sizing/position/daily-loss limits, replay-derived risk snapshots and local-day
-rollover, fixed-point cash/P&L/terminal-mark reconciliation, declared cost
-provenance, terminal positions/reservations, and restart evidence.
-
-| Outcome | Acceptance meaning |
+| Persistence | Meaning |
 | --- | --- |
-| `SIMULATED_ENTRY_EXIT_COMPLETE` | The durable receipts record one or more simulated entries and matching exits, with no remaining positions. This is not proof of live execution capability or profitability. |
-| `ZERO_ENTRY_COMPLETE` | A coherent terminal completion has zero entry fills and no open positions. This is not a failed run and not profitability evidence. |
-| `OPEN_UNVALUED_TERMINAL_POSITION` | The finish receipt retains one or more open positions and the report honestly says terminal marks/unrealized values are unavailable. Overall evidence remains `UNKNOWN`; no liquidation is fabricated. |
-| `OPEN_POSITION_TERMINAL` | A terminal open position is reported with fresh, event-identified mark evidence. It is still not an entry/exit-complete run. |
-| `SIMULATED_CYCLE_INCOMPLETE` | Receipts show activity, but do not prove a complete entry/exit cycle. |
-| `INCOMPLETE_UNKNOWN` | A terminal, restart, quote, or accounting prerequisite is incomplete or explicitly `UNKNOWN`. |
-| `INVALID_EVIDENCE` | Identity, digest, checkpoint, event, accounting, or risk evidence is contradictory or invalid. |
+| `ACKNOWLEDGED` | The actual terminal receipt and full checkpoint were read back and match. This may coexist with a runner lifecycle `UNKNOWN` if the strategy/source outcome was unknown. |
+| `UNKNOWN` | A publication/readback may have happened, but durable certainty or terminal receipt is unavailable. The evaluator does not infer a receipt. |
+| `NOT_STARTED` | No checkpoint publication was attempted. |
 
-`executionRealistic: false`, hypothetical quotes, and declared costs remain
-simulation evidence. The evaluator reports measured/settled costs as
-`NOT_SUPPLIED`; it does not calculate or claim strategy profitability, value
-an unpriced position, synthesize a quote, or liquidate an open position.
+The runner's actual reason is preserved, including `SOURCES_EXHAUSTED`,
+`DEADLINE`, and `SHUTDOWN`. A terminal timestamp after the configured deadline
+is accepted only with reason `DEADLINE`; the timestamp must be the actual
+`finishRun` input and is never clamped or backdated. Nonterminal checkpoint
+records after the deadline are rejected. `STOPPED`/`UNKNOWN` lifecycle states
+do not become successful completion merely because persistence was acknowledged.
 
-## Integration boundary and unresolved dependencies
+Mark event IDs may appear in multiple operation inputs when a risk mark is
+reused. Identical event ID and identical canonical mark content are accepted;
+reusing an ID with different content fails. Terminal open positions marked
+`VALUATION_UNAVAILABLE` remain explicitly unvalued; no terminal mark or
+liquidation is invented.
 
-This is an isolated evaluator contract proposal, not a claim that the
-composition already emits these artifacts. At inspection, PR #1168 contained
-only its initial plan commit and had no report/terminal implementation schema.
-The accepted local checkpoint has canonical sequence/hash/result-digest
-records, but the checkpoint itself does not retain result objects; this
-contract therefore requires the terminal export to preserve each operation
-result for digest verification. The local operator-report DTO is
-`MEMECOIN_PAPER_OPERATOR_REPORT_V1`; the observation report is not accepted as
-a substitute for simulated-pilot receipts.
+## Interpretation and limitations
 
-Before integration, #1168/#1160 must freeze and produce this exact versioned
-config, terminal, and report contract, including stop evidence, a restart
-transition schema, and immutable artifact revision IDs. Until then, restarted
-runs cannot pass this evaluator. If their final schemas differ, integration
-requires an explicitly versioned adapter and new fixtures; this evaluator
-will not silently migrate historical artifacts. No import from an unmerged
-branch is used. The existing observer, ledger, runner, composition, and
-deployment files are unchanged.
+`overall` is `FAIL` when an export binding, checkpoint, receipt, time, mark
+reuse, inventory, or raw runner-summary consistency check contradicts the
+provided evidence. It is `UNKNOWN` when persistence, lifecycle, valuation,
+source trust, or another required outcome remains unresolved. `PASS` means only
+that the supplied simulated run export is internally consistent under the
+checks available in this envelope. It does not mean that real sources were
+verified; `realDataSourceCoverage` remains `NOT_ASSESSED`, and live execution,
+profitability, activation, and source-readiness claims are always false.
 
-Focused offline tests:
+The runner's checkpoint stores each operation's result digest rather than the
+full result object. Its unmodified `operationResults` expose method/status and
+receipt references. The evaluator can bind those receipt references to
+checkpoint records, but cannot independently reconstruct every nonterminal
+ledger result or re-run the strategy from absent data. It therefore uses only
+the raw runner's available operation summaries and terminal accounting; it does
+not claim a separate result replay or independent source/cost verification.
+Costs reported by this simulation remain hypothetical; measured/settled costs
+are `NOT_SUPPLIED`.
+
+| Outcome | Meaning |
+| --- | --- |
+| `SIMULATED_ENTRY_EXIT_COMPLETE` | Runner summaries report one or more simulated fills and matching quote exits, with no remaining positions. Not a profitability or live-execution claim. |
+| `ZERO_ENTRY_COMPLETE` | Durable terminal completion reports no simulated fill and no open position. It is not proof of strategy quality. |
+| `OPEN_UNVALUED_TERMINAL_POSITION` | The terminal receipt retains open positions without a supported mark. Overall evidence remains `UNKNOWN`. |
+| `SIMULATED_CYCLE_INCOMPLETE` | Activity exists but the supplied runner summary does not show a complete cycle. |
+| `INCOMPLETE_UNKNOWN` | Binding, persistence, lifecycle, quote, valuation, or other evidence is unresolved. |
+| `INVALID_EVIDENCE` | Conflicting identity, digest, checkpoint, receipt, time, event, or accounting evidence was found. |
+
+## End-to-end verification
+
+Tests create composition runs with the module-owned offline fixtures, then pass
+their actual export envelopes to the evaluator. They cover zero-entry,
+entry/exit, open-unvalued terminal positions, actual late-deadline finish,
+sequence-zero lost acknowledgement, missing/tampered pre-start binding,
+config/producer/checkpoint tampering, identical reused marks, and changed
+content under a reused mark ID. No hand-crafted checkpoint or alternate
+terminal artifact is used.
 
 ```sh
 node --test test/memecoin-paper-simulated-evaluation.test.js
 ```
+
+The two-position fixture is synthetic-only and exists to exercise repeated-mark
+identity behavior. It does not represent provider-sourced evidence or authorize
+runtime activation.
