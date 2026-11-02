@@ -201,6 +201,16 @@ function response(status, body) {
   return {status, body};
 }
 
+export function writeReportRouteResponse(req, res, result, origin, writeJson) {
+  if (!req.complete) {
+    res.shouldKeepAlive = false;
+    res.once("finish", () => {
+      if (!req.complete) req.destroy();
+    });
+  }
+  return writeJson(res, result.status, result.body, origin || "");
+}
+
 function storeFailure(error, {write = false} = {}) {
   if (error?.code === "STORE_BUSY") return response(503, {error: "paper_report_busy"});
   if (error?.code === "PAPER_REPORT_OUTCOME_UNKNOWN") {

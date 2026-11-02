@@ -11,6 +11,11 @@ export const PAPER_REPORT_STORE_LIMITS = Object.freeze({
   operationTimeoutMs: 6_000
 });
 
+export function attachPrivateReportPoolErrorHandler(pool, report = message => console.error(message)) {
+  pool.on("error", () => report("[GATEWAY] private Paper report pool error"));
+  return pool;
+}
+
 function storeError(code) {
   const error = new Error(code);
   error.code = code;

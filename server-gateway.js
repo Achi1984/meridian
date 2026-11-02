@@ -18,12 +18,14 @@ import { confirmReviewedLedger } from "./ledger-reviewed-authority.js";
 import { capturePortfolioHistoryOnce } from "./portfolio-history-runtime.js";
 import { buildPaperExecutionAuditExport } from "./paper-execution-audit-v2-export.js";
 import {
+  attachPrivateReportPoolErrorHandler,
   createPrivateReportStore,
   PAPER_REPORT_POOL_OPTIONS
 } from "./private-report-store.mjs";
 import {
   handleReportGatewayRequest,
-  reportTransferGatewayConfig
+  reportTransferGatewayConfig,
+  writeReportRouteResponse
 } from "./report-transfer-gateway.mjs";
 
 const { Pool } = pg;
@@ -135,11 +137,11 @@ function pool(){
 function paperReportPool(){
   if(!DATABASE_URL)return null;
   if(!privatePaperReportPool){
-    privatePaperReportPool=new Pool({
+    privatePaperReportPool=attachPrivateReportPoolErrorHandler(new Pool({
       connectionString:DATABASE_URL,
       ssl:{rejectUnauthorized:false},
       ...PAPER_REPORT_POOL_OPTIONS
-    });
+    }));
   }
   return privatePaperReportPool;
 }
@@ -336,12 +338,7 @@ const server=http.createServer(async(req,res)=>{
       res.removeListener("close",abortReportOnClose);
     }
     if(reportRoute){
-      const result=reportRoute;
-      if(result.status===408||result.status===413){
-        res.shouldKeepAlive=false;
-        res.once("finish",()=>{if(!req.complete)req.destroy();});
-      }
-      return writeJson(res,result.status,result.body,origin||"");
+      return writeReportRouteResponse(req,res,reportRoute,origin,writeJson);
     }
     if(req.method==="GET"&&u.pathname==="/gateway-health"){
       const [current,shareState,m15,h1,h4,d1]=await Promise.all([

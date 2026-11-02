@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {createHash} from "node:crypto";
+import {EventEmitter} from "node:events";
 import {mkdtemp, mkdir, rename, rm, symlink, writeFile} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -17,9 +18,13 @@ import {
   handleReportGatewayRequest,
   handlePaperReportUpload,
   PAPER_REPORT_MAX_BODY_BYTES,
-  readBoundedRequestBody
+  readBoundedRequestBody,
+  writeReportRouteResponse
 } from "../report-transfer-gateway.mjs";
-import {createPrivateReportStore} from "../private-report-store.mjs";
+import {
+  attachPrivateReportPoolErrorHandler,
+  createPrivateReportStore
+} from "../private-report-store.mjs";
 import {
   PAPER_REPORT_POOL_OPTIONS,
   PAPER_REPORT_STORE_LIMITS
@@ -864,6 +869,57 @@ test("gateway checks enablement and the dedicated upload credential before readi
   assert.equal(bodyReads, 0);
 });
 
+test("gateway closes incomplete bodies for early 401, 503, and 415 responses only", async () => {
+  const bytes = bodyBytes(transferEnvelope());
+  const cases = [
+    [request(bytes, {authorization: null}), {config: gatewayConfig}, 401],
+    [request(bytes), {config: {...gatewayConfig, enabled: false}}, 503],
+    [request(bytes, {contentType: "text/plain"}), {
+      config: gatewayConfig, store: new MemoryStore()
+    }, 415]
+  ];
+  for (const [req, options, expectedStatus] of cases) {
+    req.complete = false;
+    let destroyed = false;
+    req.destroy = () => { destroyed = true; };
+    const result = await handlePaperReportUpload(req, options);
+    assert.equal(result.status, expectedStatus);
+    const res = new EventEmitter();
+    res.shouldKeepAlive = true;
+    let writtenStatus;
+    writeReportRouteResponse(req, res, result, "", (_res, status) => {
+      writtenStatus = status;
+    });
+    assert.equal(writtenStatus, expectedStatus);
+    assert.equal(res.shouldKeepAlive, false);
+    res.emit("finish");
+    assert.equal(destroyed, true);
+  }
+
+  const completeRequest = request(bytes);
+  completeRequest.complete = true;
+  let destroyed = false;
+  completeRequest.destroy = () => { destroyed = true; };
+  const completeResponse = new EventEmitter();
+  completeResponse.shouldKeepAlive = true;
+  writeReportRouteResponse(completeRequest, completeResponse, {status: 200, body: {}}, "",
+    () => {});
+  completeResponse.emit("finish");
+  assert.equal(completeResponse.shouldKeepAlive, true);
+  assert.equal(destroyed, false);
+});
+
+test("dedicated report pool consumes asynchronous idle-client errors generically", async () => {
+  const pool = new EventEmitter();
+  const diagnostics = [];
+  assert.equal(attachPrivateReportPoolErrorHandler(pool, message => diagnostics.push(message)), pool);
+  await new Promise(resolve => setImmediate(() => {
+    pool.emit("error", new Error("database URL contains a secret"));
+    resolve();
+  }));
+  assert.deepEqual(diagnostics, ["[GATEWAY] private Paper report pool error"]);
+});
+
 test("gateway rejects run/config mismatch, future data, wrong media type, and query selectors", async () => {
   const store = new MemoryStore();
   const mismatch = await handlePaperReportUpload(request(bodyBytes(transferEnvelope(undefined, {
@@ -1383,6 +1439,8 @@ test("gateway route is fixed, upload precedes the read guard, and existing route
   const readGuard = source.indexOf("if(isProtected(u.pathname)&&!authorizedRead(req))");
   const reportRoutes = readFileSync(new URL("../report-transfer-gateway.mjs", import.meta.url), "utf8");
   assert.ok(dispatch > 0 && dispatch < readGuard);
+  assert.match(source, /attachPrivateReportPoolErrorHandler\(new Pool\(/);
+  assert.match(source, /writeReportRouteResponse\(req,res,reportRoute,origin,writeJson\)/);
   assert.match(reportRoutes, /pathname === "\/api\/private\/paper-report\/upload"/);
   assert.match(reportRoutes, /pathname === "\/api\/private\/paper-report"/);
   assert.match(reportRoutes, /authorizedRead\(req\)/);
