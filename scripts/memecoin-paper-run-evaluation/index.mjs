@@ -207,7 +207,7 @@ function candidateCoverageStatus(report) {
       "Candidate detail coverage counters or truncation flags are unavailable.");
   }
   if (coverage.displayed > coverage.observedTotal || coverage.observedTotal > coverage.total ||
-      coverage.unaccounted > coverage.observedTotal) {
+      coverage.unaccounted > coverage.total) {
     return makeCriterion("candidate_detail_coverage", "FAIL",
       "Candidate detail counters contradict their reported totals.");
   }
@@ -442,6 +442,29 @@ function evaluateDuration(config, terminal, report) {
     scheduledMs: endAt - startAt,
     evidencedMs: effectiveEndAt - startAt
   };
+}
+
+function hasNonZeroAmount(value) {
+  return value !== null && value !== undefined && BigInt(value) !== 0n;
+}
+
+function hasZeroFillContradictions(dto) {
+  const valuationAmounts = [
+    dto.valuation.realizedGrossPnlCents,
+    dto.valuation.realizedNetPnlCents,
+    dto.valuation.grossOpenValueCents,
+    dto.valuation.estimatedExitCostsCents,
+    dto.valuation.unrealizedGrossPnlCents,
+    dto.valuation.unrealizedNetPnlCents,
+    dto.costs.totalCents,
+    ...["entryByType", "exitByType", "totalByType"].flatMap(type =>
+      ["feeCents", "spreadCents", "slippageCents", "priceImpactCents", "networkCents"]
+        .map(key => dto.costs[type][key]))
+  ];
+  return valuationAmounts.some(hasNonZeroAmount) ||
+    dto.valuation.unresolvedPositions > 0 ||
+    dto.controls.openPositionCount > 0 ||
+    dto.controls.openPositions.length > 0;
 }
 
 function hasFields(value, fields) {
@@ -804,6 +827,10 @@ function terminalStatus(terminal, report) {
     return makeCriterion("terminal_completion", "UNKNOWN",
       "The report does not establish a known zero-fill observation.");
   }
+  if (hasZeroFillContradictions(report?.dto)) {
+    return makeCriterion("terminal_completion", "FAIL",
+      "Nonzero financial or open-position evidence conflicts with a zero-fill observation.");
+  }
   const finalizedAt = terminalObservation.windowFinalization.finalizedAt;
   const {effectiveEndAt, latenessMs} = terminalObservation.windowFinalization;
   if (![effectiveEndAt, finalizedAt, latenessMs].every(Number.isSafeInteger) ||
@@ -869,13 +896,13 @@ function evaluateCriteria(expectedRunId, expectedConfigHash, artifacts) {
     : artifacts.terminal.status === "INVALID"
       ? makeCriterion("terminal_completion", "FAIL", artifacts.terminal.reason)
       : terminalStatus(terminal, report);
-  const duration = config && terminal && report
+  const duration = config && validConfig(config, expectedRunId) && terminal && report
     ? evaluateDuration(config, terminal, report)
     : {
       criterion: makeCriterion("observation_duration", "UNKNOWN",
         "Config, terminal timing, or report timestamps are unavailable."),
       completionMode: "UNKNOWN",
-      scheduledMs: config ? config.endAt - config.startAt : EIGHT_HOURS_MS,
+      scheduledMs: EIGHT_HOURS_MS,
       evidencedMs: null
     };
   const checkpoint = artifacts.report.status === "VALID"

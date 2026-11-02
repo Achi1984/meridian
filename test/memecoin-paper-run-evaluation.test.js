@@ -369,6 +369,50 @@ test("completion headline requires a valid persisted operator report", () => {
   }
 });
 
+test("zero-fill completion rejects nonzero financial and open-position evidence", () => {
+  const contradictions = [
+    ["realized P&L", dto => {
+      dto.valuation.realizedGrossPnlCents = "1";
+    }],
+    ["unrealized P&L", dto => {
+      dto.valuation.unrealizedNetPnlCents = "-1";
+    }],
+    ["total costs", dto => {
+      for (const type of ["entryByType", "exitByType", "totalByType"]) {
+        for (const key of ["feeCents", "spreadCents", "slippageCents", "priceImpactCents", "networkCents"]) {
+          dto.costs[type][key] = "0";
+        }
+      }
+      dto.costs.totalCents = "1";
+    }],
+    ["open-position count", dto => {
+      dto.controls.openPositionCount = 1;
+    }],
+    ["open-position row", dto => {
+      dto.controls.openPositions.push({
+        mint: MINT,
+        tokenAtoms: "1",
+        decimals: 9,
+        entryCostCents: "1",
+        stopPriceMicros: null,
+        trailingActive: false,
+        markStatus: "UNAVAILABLE"
+      });
+    }]
+  ];
+  for (const [label, addContradiction] of contradictions) {
+    const input = fixture();
+    const report = JSON.parse(input.reportBytes.toString("utf8"));
+    addContradiction(report.dto);
+    input.reportBytes = bytes(report);
+
+    const result = evaluateObservation(input);
+    assert.equal(criterion(result, "operator_report").status, "PASS", label);
+    assert.equal(criterion(result, "terminal_completion").status, "FAIL", label);
+    assert.equal(result.observation.completionStatus, "FAIL", label);
+  }
+});
+
 test("controller status and stop reason reconcile across terminal and both report observations", () => {
   for (const [location, field, value] of [
     ["report", "stopReason", "OPERATOR_STOP"],
@@ -479,8 +523,11 @@ test("malformed and out-of-range config timestamps return structured pure and CL
   outOfRange.endAt = outOfRange.startAt + DURATION;
   outOfRange.manifest.startAt = outOfRange.startAt;
   outOfRange.manifest.endAt = outOfRange.endAt;
+  const nonPrimitiveTimestamp = JSON.parse(input.configBytes.toString("utf8"));
+  nonPrimitiveTimestamp.startAt = {toString: null};
+  nonPrimitiveTimestamp.manifest.startAt = nonPrimitiveTimestamp.startAt;
 
-  for (const config of [malformed, outOfRange]) {
+  for (const config of [malformed, outOfRange, nonPrimitiveTimestamp]) {
     const configBytes = bytes(config);
     const pureResult = evaluateObservation({...input, configBytes});
     assert.equal(criterion(pureResult, "run_config_identity").status, "FAIL");
@@ -574,6 +621,27 @@ test("candidate rejection reasons are preserved without manufacturing rejected c
   inconsistentSummary.dto.candidates.considered = 0;
   const inconsistentCounts = evaluateObservation({...input, reportBytes: bytes(inconsistentSummary)});
   assert.equal(criterion(inconsistentCounts, "candidate_detail_coverage").status, "FAIL");
+});
+
+test("partial candidate accounting with unaccounted rows remains UNKNOWN", () => {
+  const input = fixture();
+  const report = reportRecord({
+    configHash: input.expectedConfigHash,
+    candidateRejection: true
+  });
+  report.dto.candidates.considered = 10;
+  report.dto.candidates.detailsCoverage = {
+    observedTotal: 1,
+    total: 10,
+    displayed: 1,
+    displayTruncated: false,
+    sourceTruncated: false,
+    unaccounted: 9
+  };
+  input.reportBytes = bytes(report);
+
+  const result = evaluateObservation(input);
+  assert.equal(criterion(result, "candidate_detail_coverage").status, "UNKNOWN");
 });
 
 test("unavailable candidate detail stays distinct from a rejection reason", () => {
