@@ -25,6 +25,7 @@ import {
 import {
   handleReportGatewayRequest,
   reportTransferGatewayConfig,
+  writeReportRouteEarlyResponse,
   writeReportRouteResponse
 } from "./report-transfer-gateway.mjs";
 
@@ -315,6 +316,7 @@ const server=http.createServer(async(req,res)=>{
   try{
     const u=new URL(req.url,`http://${req.headers.host||"localhost"}`);
     const origin=allowOrigin(req);
+    if(writeReportRouteEarlyResponse(req,res,origin,{corsPreflight,writeJson}))return;
     if(req.method==="OPTIONS")return corsPreflight(req,res,origin);
     if(origin===null)return writeJson(res,403,{error:"origin_not_allowed"});
     const reportController=new AbortController();

@@ -212,14 +212,42 @@ function response(status, body) {
   return {status, body};
 }
 
-export function writeReportRouteResponse(req, res, result, origin, writeJson) {
+function finishIncompleteReportRequest(req, res, writeResponse) {
   if (!req.complete) {
     res.shouldKeepAlive = false;
     res.once("finish", () => {
       if (!req.complete) req.destroy();
     });
   }
-  return writeJson(res, result.status, result.body, origin || "");
+  return writeResponse();
+}
+
+export function writeReportRouteResponse(req, res, result, origin, writeJson) {
+  return finishIncompleteReportRequest(req, res, () =>
+    writeJson(res, result.status, result.body, origin || ""));
+}
+
+export function writeReportRouteEarlyResponse(req, res, origin, {
+  corsPreflight,
+  writeJson
+} = {}) {
+  let pathname;
+  try {
+    pathname = new URL(req.url, "http://gateway.invalid").pathname;
+  } catch {
+    return false;
+  }
+  if (pathname !== "/api/private/paper-report/upload" &&
+      pathname !== "/api/private/paper-report") return false;
+  if (req.method === "OPTIONS") {
+    finishIncompleteReportRequest(req, res, () => corsPreflight(req, res, origin));
+    return true;
+  }
+  if (origin === null) {
+    writeReportRouteResponse(req, res, response(403, {error: "origin_not_allowed"}), "", writeJson);
+    return true;
+  }
+  return false;
 }
 
 function storeFailure(error, {write = false} = {}) {

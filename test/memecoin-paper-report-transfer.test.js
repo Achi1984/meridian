@@ -22,6 +22,7 @@ import {
   PAPER_REPORT_MAX_BODY_BYTES,
   readBoundedRequestBody,
   reportTransferGatewayConfig,
+  writeReportRouteEarlyResponse,
   writeReportRouteResponse
 } from "../report-transfer-gateway.mjs";
 import {
@@ -90,6 +91,15 @@ function request(bytes, {
 
 function bodyBytes(value) {
   return Buffer.from(canonicalJson(value), "utf8");
+}
+
+function writeSocketJson(res, status, body) {
+  const raw = JSON.stringify(body);
+  res.writeHead(status, {
+    "content-type": "application/json",
+    "content-length": Buffer.byteLength(raw)
+  });
+  res.end(raw);
 }
 
 function observationAudit(runId, hash) {
@@ -1787,6 +1797,26 @@ test("real HTTP sockets close incomplete early-rejected uploads and preserve com
   }
 
   const server = http.createServer(async (req, res) => {
+    const origin = req.headers.origin === "https://achi1984.github.io"
+      ? req.headers.origin
+      : req.headers.origin ? null : "";
+    if (writeReportRouteEarlyResponse(req, res, origin, {
+      corsPreflight(request, response, allowedOrigin) {
+        if (allowedOrigin === null) {
+          writeSocketJson(response, 403, {error: "origin_not_allowed"});
+          return;
+        }
+        response.writeHead(204, {
+          ...(allowedOrigin ? {"access-control-allow-origin": allowedOrigin} : {}),
+          "access-control-allow-headers": "content-type, authorization, x-meridian-write-token",
+          "access-control-allow-methods": "GET,POST,OPTIONS",
+          "access-control-max-age": "600",
+          vary: "Origin"
+        });
+        response.end();
+      },
+      writeJson: writeSocketJson
+    })) return;
     if (req.url === "/health") {
       res.writeHead(204);
       res.end();
@@ -1836,6 +1866,86 @@ test("real HTTP sockets close incomplete early-rejected uploads and preserve com
   assert.equal(uploaded.socket, health.socket);
   agent.destroy();
   await new Promise(resolve => server.close(resolve));
+});
+
+test("production report early routing closes incomplete denied-origin and preflight requests", async () => {
+  const cases = [
+    {method: "POST", origin: "https://untrusted.invalid", status: 403},
+    {method: "OPTIONS", origin: "https://achi1984.github.io", status: 204}
+  ];
+  for (const {method, origin, status} of cases) {
+    let sawIncompleteRequest = false;
+    const server = http.createServer((req, res) => {
+      sawIncompleteRequest = !req.complete;
+      const requestOrigin = req.headers.origin === "https://achi1984.github.io"
+        ? req.headers.origin
+        : req.headers.origin ? null : "";
+      const handled = writeReportRouteEarlyResponse(req, res, requestOrigin, {
+        corsPreflight(request, response, allowedOrigin) {
+          if (allowedOrigin === null) {
+            writeSocketJson(response, 403, {error: "origin_not_allowed"});
+            return;
+          }
+          response.writeHead(204, {
+            ...(allowedOrigin ? {"access-control-allow-origin": allowedOrigin} : {}),
+            "access-control-allow-headers": "content-type, authorization, x-meridian-write-token",
+            "access-control-allow-methods": "GET,POST,OPTIONS",
+            "access-control-max-age": "600",
+            vary: "Origin"
+          });
+          response.end();
+        },
+        writeJson: writeSocketJson
+      });
+      if (!handled) {
+        res.writeHead(404);
+        res.end();
+      }
+    });
+    await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+    let clientSocket;
+    let socketClosedResolve;
+    const socketClosed = new Promise(resolve => { socketClosedResolve = resolve; });
+    const response = await new Promise((resolve, reject) => {
+      const client = http.request({
+        host: "127.0.0.1",
+        port: server.address().port,
+        path: "/api/private/paper-report/upload",
+        method,
+        headers: {
+          origin,
+          "content-length": "4096"
+        }
+      });
+      client.once("socket", socket => {
+        clientSocket = socket;
+        socket.once("close", socketClosedResolve);
+      });
+      client.once("response", res => {
+        res.resume();
+        res.once("end", () => resolve({
+          status: res.statusCode,
+          allowOrigin: res.headers["access-control-allow-origin"]
+        }));
+      });
+      client.once("error", reject);
+      client.flushHeaders();
+    });
+    const closedPromptly = await Promise.race([
+      socketClosed.then(() => true),
+      new Promise(resolve => setTimeout(() => resolve(false), 500))
+    ]);
+    const destroyedPromptly = clientSocket.destroyed;
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+    assert.equal(response.status, status);
+    assert.equal(sawIncompleteRequest, true);
+    assert.equal(closedPromptly, true);
+    assert.equal(destroyedPromptly, true);
+    if (method === "OPTIONS") {
+      assert.equal(response.allowOrigin, "https://achi1984.github.io");
+    }
+  }
 });
 
 test("test fixture module exports the existing report contract without mutating dependency files", () => {
