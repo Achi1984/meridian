@@ -139,6 +139,27 @@ test("bounded online composition produces only a receipt-bound no-entry report",
   assert.equal(checkpoint.records.at(-1).method, "finishRun");
 });
 
+test("late finalization failures are reflected in terminal and report observations", async t => {
+  const harness = await createHarness(t);
+  const createControl = harness.assembly.createPilotRunControl;
+  harness.assembly.createPilotRunControl = options => {
+    const control = createControl(options);
+    const start = control.start;
+    control.start = async () => ({...await start(), reason: "DEADLINE"});
+    return control;
+  };
+
+  const terminal = await harness.runner.start();
+  const failureCode = "DEADLINE_FINALIZATION_EVIDENCE_UNKNOWN";
+  assert.equal(terminal.status, "UNKNOWN");
+  assert.equal(terminal.failureCode, failureCode);
+  assert.equal(terminal.observation.failureCode, failureCode);
+
+  const report = await readPilotReport(harness.dataDirectory);
+  assert.equal(report.status, "AVAILABLE");
+  assert.equal(report.observation.failureCode, failureCode);
+});
+
 test("provider, request, event, and candidate budgets accumulate across cycles", async t => {
   const harness = await createHarness(t, {
     fakeAssemblyOptions: {maxCycles: 4},

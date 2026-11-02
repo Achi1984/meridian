@@ -665,6 +665,18 @@ test("failure codes reconcile across terminal and report before completion", () 
     assert.equal(criterion(result, "terminal_completion").status, expected, label);
     assert.equal(result.observation.fullDeadlineCompleted, false, label);
   }
+
+  const unknownTerminal = fixture({status: "UNKNOWN"});
+  const terminal = JSON.parse(unknownTerminal.terminalBytes.toString("utf8"));
+  const report = JSON.parse(unknownTerminal.reportBytes.toString("utf8"));
+  terminal.failureCode = "DEADLINE_FINALIZATION_TIME_UNKNOWN";
+  terminal.observation.failureCode = terminal.failureCode;
+  report.observation.failureCode = terminal.failureCode;
+  unknownTerminal.terminalBytes = bytes(terminal);
+  unknownTerminal.reportBytes = bytes(report);
+  const failure = evaluateObservation(unknownTerminal);
+  assert.equal(criterion(failure, "terminal_completion").status, "FAIL");
+  assert.match(criterion(failure, "terminal_completion").reason, /failure code is recorded/);
 });
 
 test("candidate rejection reasons are preserved without manufacturing rejected counts", () => {

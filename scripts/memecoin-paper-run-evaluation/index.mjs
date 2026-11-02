@@ -792,7 +792,45 @@ function identityStatus(expectedRunId, expectedConfigHash, artifacts, configHash
     {configHash});
 }
 
+function failureCodeStatus(terminal, report) {
+  const locations = [
+    [terminal, "failureCode"],
+    [terminal?.observation, "failureCode"],
+    [report?.observation, "failureCode"]
+  ];
+  const values = locations
+    .filter(([record, key]) => isRecord(record) && Object.hasOwn(record, key))
+    .map(([record, key]) => record[key]);
+  if (values.some(value => value !== null &&
+      (typeof value !== "string" || !/^[A-Z0-9_:-]{1,128}$/.test(value)))) {
+    return makeCriterion("terminal_completion", "FAIL",
+      "Failure-code evidence is malformed.");
+  }
+  const recordedFailureCodes = values.filter(value => value !== null && value !== "UNKNOWN");
+  if (recordedFailureCodes.length > 0) {
+    if (new Set(recordedFailureCodes).size > 1) {
+      return makeCriterion("terminal_completion", "FAIL",
+        "Recorded failure codes conflict across the terminal and report.");
+    }
+    return makeCriterion("terminal_completion", "FAIL",
+      `A failure code is recorded (${recordedFailureCodes[0]}).`);
+  }
+  if (locations.some(([record, key]) =>
+    !isRecord(record) || !Object.hasOwn(record, key)) ||
+      values.some(value => value === "UNKNOWN")) {
+    return makeCriterion("terminal_completion", "UNKNOWN",
+      locations.some(([record, key]) =>
+        !isRecord(record) || !Object.hasOwn(record, key))
+        ? "Failure-code evidence is missing from the terminal or report."
+        : "Failure-code evidence remains unknown.");
+  }
+  return makeCriterion("terminal_completion", "PASS",
+    "No failure code is recorded across the terminal and report.");
+}
+
 function terminalStatus(terminal, report, checkpointCoverage) {
+  const failureCodes = terminal ? failureCodeStatus(terminal, report) : null;
+  if (failureCodes?.status === "FAIL") return failureCodes;
   if (!terminal) {
     return makeCriterion("terminal_completion", "UNKNOWN",
       "No terminal marker is available.");
@@ -837,34 +875,7 @@ function terminalStatus(terminal, report, checkpointCoverage) {
     return makeCriterion("terminal_completion", "FAIL",
       "Controller status or stop reason conflicts across the terminal and report observations.");
   }
-  const failureCodeLocations = [
-    [terminal, "failureCode"],
-    [terminalObservation, "failureCode"],
-    [reportObservation, "failureCode"]
-  ];
-  if (failureCodeLocations.some(([record, key]) => !Object.hasOwn(record, key))) {
-    return makeCriterion("terminal_completion", "UNKNOWN",
-      "Failure-code evidence is missing from the terminal or report.");
-  }
-  const failureCodes = failureCodeLocations.map(([record, key]) => record[key]);
-  if (failureCodes.some(value => value !== null &&
-      (typeof value !== "string" || !/^[A-Z0-9_:-]{1,128}$/.test(value)))) {
-    return makeCriterion("terminal_completion", "FAIL",
-      "Failure-code evidence is malformed.");
-  }
-  const recordedFailureCodes = failureCodes.filter(value => value !== null && value !== "UNKNOWN");
-  if (recordedFailureCodes.length > 0) {
-    if (new Set(recordedFailureCodes).size > 1) {
-      return makeCriterion("terminal_completion", "FAIL",
-        "Recorded failure codes conflict across the terminal and report.");
-    }
-    return makeCriterion("terminal_completion", "FAIL",
-      `A failure code is recorded (${recordedFailureCodes[0]}).`);
-  }
-  if (failureCodes.some(value => value === "UNKNOWN")) {
-    return makeCriterion("terminal_completion", "UNKNOWN",
-      "Failure-code evidence remains unknown.");
-  }
+  if (failureCodes.status !== "PASS") return failureCodes;
   if ([terminal.controllerStatus, terminal.stopReason].some(value =>
     value === "UNKNOWN" || value === "NOT_STARTED")) {
     return makeCriterion("terminal_completion", "UNKNOWN",
