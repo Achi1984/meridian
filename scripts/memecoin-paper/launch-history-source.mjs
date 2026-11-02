@@ -1,3 +1,5 @@
+import {createHash} from "node:crypto";
+
 export const LAUNCH_HISTORY_SOURCE_VERSION = "solana-launch-history-source-v1";
 export const SOLANA_RPC_ORIGIN = "https://api.mainnet-beta.solana.com";
 export const DEFAULT_LAUNCH_HISTORY_LIMITS = Object.freeze({
@@ -183,7 +185,11 @@ async function readJsonBounded(response, state, limits, signal) {
     throw failure("INVALID_UTF8", "RPC response is not valid UTF-8");
   }
   try {
-    return {payload: JSON.parse(text), bytes: responseBytes};
+    return {
+      payload: JSON.parse(text),
+      bytes: responseBytes,
+      responseSha256: createHash("sha256").update(bytes).digest("hex")
+    };
   } catch {
     throw failure("INVALID_JSON", "RPC response is not valid JSON");
   }
@@ -297,7 +303,7 @@ async function requestRpc(state, limits, method, params) {
       cancelWithoutWaiting(response?.body, "RPC response status is not successful");
       return {ok: false, status: `HTTP_${response.status}`};
     }
-    const {payload, bytes: responseBytes} = await Promise.race([
+    const {payload, bytes: responseBytes, responseSha256} = await Promise.race([
       readJsonBounded(response, state, limits, controller.signal),
       timeoutPromise,
       abortedPromise
@@ -317,6 +323,7 @@ async function requestRpc(state, limits, method, params) {
       requestStartedAt: startedAt,
       responseReceivedAt: receivedAt,
       responseBytes,
+      responseSha256,
       status: "RESPONSE_RECEIVED"
     };
     state.events.push(event);
@@ -517,12 +524,14 @@ export async function acquireLaunchHistory(options) {
           record = {
             signature: entry.signature,
             slot: entry.slot,
+            blockTime: entry.blockTime ?? null,
             err: entry.err,
             subjectAddresses: [],
             errorStatus: signatureError(entry.err)
           };
           state.signatures.set(entry.signature, record);
         } else if (record.slot !== entry.slot ||
+            record.blockTime !== (entry.blockTime ?? null) ||
             JSON.stringify(record.err) !== JSON.stringify(entry.err)) {
           record.errorStatus = "CONFLICTING_SIGNATURE_RECORD";
           conflict = true;
@@ -608,6 +617,7 @@ export async function acquireLaunchHistory(options) {
       transactionRecord = {
         signature: signature.signature,
         slot: signature.slot,
+        blockTime: null,
         subjectAddresses: [...signature.subjectAddresses],
         status: outcome.status,
         error: outcome.error ?? null,
@@ -620,6 +630,7 @@ export async function acquireLaunchHistory(options) {
       transactionRecord = {
         signature: signature.signature,
         slot: signature.slot,
+        blockTime: null,
         subjectAddresses: [...signature.subjectAddresses],
         status: "MISSING_TRANSACTION",
         error: null,
@@ -645,6 +656,7 @@ export async function acquireLaunchHistory(options) {
       transactionRecord = {
         signature: signature.signature,
         slot: signature.slot,
+        blockTime: validTransaction ? outcome.result.blockTime ?? null : null,
         subjectAddresses: [...signature.subjectAddresses],
         status,
         error: null,
