@@ -66,6 +66,11 @@ function makeTimeEvidence({identity, requested, assembledAt, bounds = {}}) {
       sourceEvent("getBlockTime", {slot: 201, blockTime: afterEnd}, assembledAt)
     ]
   };
+  evidence.counters = {
+    requests: evidence.events.length,
+    bytes: evidence.events.reduce((sum, event) => sum + event.responseBytes, 0),
+    workUnits: evidence.events.length
+  };
   evidence.receipt = {
     status: "SOURCE_BOUND",
     id: evidence.timeBounds.receiptId,
@@ -508,6 +513,25 @@ test("wrong identity, subject, incomplete pagination, and non-settling callbacks
     assert.equal((await source.readWindow({...request, assembledAt: fixture.assembledAt})).status,
       "UNKNOWN");
   });
+  await t.test("pool proof must be slot-bound and not postdate the window", async () => {
+    const {source} = bridgeFor({
+      timeEvidenceFactory: () => evidence,
+      resultFactory: rows
+    });
+    const unbound = await source.readWindow({
+      ...request,
+      poolProof: {...request.poolProof, slot: null}
+    });
+    assert.equal(unbound.reason, "INVALID_OR_UNBOUND_REQUEST");
+    const future = await source.readWindow({
+      ...request,
+      poolProof: {
+        ...request.poolProof,
+        observedAt: request.endInclusiveMs + 1
+      }
+    });
+    assert.equal(future.reason, "INVALID_OR_UNBOUND_REQUEST");
+  });
   await t.test("wrong declared subject", async () => {
     const {source} = bridgeFor({
       timeEvidenceFactory: () => evidence,
@@ -593,6 +617,68 @@ test("collector budgets and payload digests are validated", async t => {
     });
     assert.equal((await source.readWindow({...request, assembledAt: fixture.assembledAt})).status,
       "UNKNOWN");
+  });
+  await t.test("boundary and collector calls share request limits", async () => {
+    let collectorLimits;
+    const bridge = createHistoryWindowSource({
+      enabled: true,
+      limits: {maxRequests: 7},
+      timeBoundarySource: {
+        readWindow: request => makeTimeEvidence({
+          identity: request.identity,
+          requested: request.requested,
+          assembledAt: fixture.assembledAt
+        })
+      },
+      slotHistoryCollector: request => {
+        collectorLimits = request.limits;
+        return collectorForFixture(fixture)(request);
+      }
+    });
+    const result = await bridge.readWindow({
+      ...request,
+      assembledAt: fixture.assembledAt
+    });
+    assert.equal(collectorLimits.maxRequests, 3);
+    assert.equal(result.status, "UNKNOWN");
+    assert.equal(result.reason, "SHARED_BUDGET_EXHAUSTED");
+  });
+  await t.test("boundary and collector calls share byte limits", async () => {
+    const collectorFixture = collectorForFixture(fixture)({
+      ...request,
+      assembledAt: fixture.assembledAt,
+      startSlot: 100,
+      endSlot: 201
+    });
+    const maxBytes = Math.max(evidence.counters.bytes, collectorFixture.counters.bytes);
+    const {source} = bridgeFor({
+      limits: {
+        maxBytes,
+        maxResponseBytes: Math.min(1_048_576, maxBytes)
+      },
+      timeEvidenceFactory: () => evidence,
+      resultFactory: collectorForFixture(fixture)
+    });
+    const result = await source.readWindow({...request, assembledAt: fixture.assembledAt});
+    assert.equal(result.status, "UNKNOWN");
+    assert.equal(result.reason, "SHARED_BUDGET_EXHAUSTED");
+  });
+  await t.test("boundary and collector calls share work limits", async () => {
+    const collectorFixture = collectorForFixture(fixture)({
+      ...request,
+      assembledAt: fixture.assembledAt,
+      startSlot: 100,
+      endSlot: 201
+    });
+    const maxWorkUnits = Math.max(evidence.counters.workUnits, collectorFixture.counters.workUnits);
+    const {source} = bridgeFor({
+      limits: {maxWorkUnits},
+      timeEvidenceFactory: () => evidence,
+      resultFactory: collectorForFixture(fixture)
+    });
+    const result = await source.readWindow({...request, assembledAt: fixture.assembledAt});
+    assert.equal(result.status, "UNKNOWN");
+    assert.equal(result.reason, "SHARED_BUDGET_EXHAUSTED");
   });
   await t.test("changed row changes digest even with same response hashes", async () => {
     const {source} = bridgeFor({

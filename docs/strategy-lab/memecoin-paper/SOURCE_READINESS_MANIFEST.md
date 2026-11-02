@@ -24,8 +24,8 @@ for 15-minute history, and missing score inputs still mean
 | Attributable prior-rug history | No checked-in complete project/creator history source. Generic address history does not identify all controlled addresses or establish intent/outcomes. | **External fact and policy missing.** Incomplete history is not `found: false`; no negative rug conclusion is supported. |
 | Bundled-launch supply | No checked-in transaction classifier or source. | **Implementation and policy missing.** Requires a versioned bundle definition, launch window, attributable addresses, complete transaction coverage, and a supply denominator. |
 | 15-minute momentum in USD | DexScreener provides a current pair snapshot, not the required exact historical USD endpoints. Pyth documents historical price APIs, but feed coverage, access entitlement, and suitability for these tokens are not selected or verified. | **Historical-price source missing.** Do not substitute current prices, one-hour price change, or a stablecoin/USD parity assumption. |
-| One-hour unique buyers | The proposed input needs successful pool swaps, actual buyer identities, and complete timestamp-window coverage. Public Solana `getSignaturesForAddress`, `getTransaction`, and `getBlockTime` expose history/time fields but do not by themselves prove complete archival coverage or decode pool swaps. | **Implementation gap.** The checked-out branch has no accepted #1178 launch-history collector or swap decoder. |
-| One-hour buy/sell USD-volume ratio | Requires the same complete decoded swaps as unique buyers, plus source-backed USD prices for each flow and positive buy and sell denominators. | **Implementation and historical-price gaps.** Transaction counts and total pair volume are not substitutes. |
+| One-hour unique buyers | `scripts/memecoin-paper/launch-history-source.mjs` captures bounded finalized signature/transaction responses, preserving supplied slots, block times, and raw-response digests. `scripts/memecoin-paper/cpmm-swap-observations.mjs` decodes supported CPMM swaps. `history-window-bridge.mjs` accepts an injected timestamp-boundary source. | **Partial implementation; source readiness unavailable.** The accepted collector reports `UNKNOWN_ARCHIVAL_OR_INDEX_TRUNCATION`; no concrete receipt-bound timestamp sidecar exists. The decoder and collector do not establish complete history. |
+| One-hour buy/sell USD-volume ratio | Uses the same bounded launch-history collector and CPMM decoder, plus historical prices for each swap flow and positive buy and sell denominators. | **Partial implementation; historical-price and source-completeness gaps.** The current collector remains unknown, and transaction counts or total pair volume are not substitutes. |
 | One-hour holder growth | Requires two complete, comparable, owner-resolved census snapshots at the window endpoints under one reviewed denominator/exclusion policy. | **Implementation and external-completeness gaps.** The present census path does not provide a complete time series. |
 | Liquidity / actual market-cap score component | Same-pair DexScreener snapshot fields can be parsed by the existing provider adapter. | **Implemented, partial snapshot only.** It does not establish historical endpoint coverage or executable liquidity. |
 | Qualified smart-wallet count and provenance | No checked-in allowlist, qualification history, or review receipt. `score-spec.md` contains proposed criteria only. | **External fact and owner-policy decision missing.** No wallet list is fabricated; addresses alone are not qualified evidence. |
@@ -34,50 +34,67 @@ for 15-minute history, and missing score inputs still mean
 
 `scripts/memecoin-paper/history-window-bridge.mjs` adds a default-disabled,
 injected `historySource.readWindow({identity, poolProof, startExclusiveMs,
-endInclusiveMs, signal})` boundary. It makes no transport calls. Its injected
-collector must return the accepted slot-history shape (`sourceVersion`,
-`source`, `rpcOrigin`, finalized commitment, declared subjects, slot interval,
-signature/transaction rows, events, counters, and coverage) **plus** an exact
-payload receipt, request identity/window echo, source block times on transaction
-rows, and receipt-bound lower/upper block-time fences. It preserves each
-collector response digest and the source `blockTime` seconds and `slot`; the
-millisecond `observedAt` is derived only from that supplied block timestamp, not
-from a slot estimate.
+endInclusiveMs, signal})` boundary. It makes no transport calls. The accepted
+`scripts/memecoin-paper/launch-history-source.mjs` response shape supplies
+`sourceVersion`, `source`, `rpcOrigin`, finalized commitment, declared subjects,
+slot interval, signature/transaction rows, response events, counters, and
+coverage. It now preserves each raw response digest and the RPC-supplied
+signature/transaction `blockTime` values; absent timestamps remain null. The
+collector has no time-fence witnesses or aggregate receipt, and its archival
+history completeness remains unknown.
+
+An injected `timeBoundarySource.readWindow` must separately return source-bound,
+receipt-digested `getBlockTime` witnesses immediately before and after each
+requested time fence, its identity/window binding, coverage scope, response
+events, and request/byte/work counters. It must use the same explicitly injected
+RPC transport, not a parallel transport. No concrete sidecar is included. The
+bridge derives milliseconds only from supplied block-time seconds and never
+interpolates timestamps from slots. It validates the actual collector shape,
+derives the `SOURCE_BOUND` aggregate receipt required by the Analyst consumer,
+and hashes the canonical identity, fences, coverage, rows, counters, and source
+response receipts. This payload binding is not provider authentication.
 
 The bridge returns `COMPLETE` only when the selected pool and mint are bound,
 the lower and upper timestamp fences straddle the requested
 `(startExclusiveMs, endInclusiveMs]` window, slot/time ordering is monotone,
-the collector says pagination and successful transaction retrieval are
-exhausted and untruncated, and all request/byte/work/row/deadline limits pass.
+the collector's declared pool scope and inclusive slot interval cover both
+complete time fences, pagination and successful transaction retrieval are
+exhausted and untruncated, and the shared request/byte/work/row/deadline budgets
+pass.
 Transactions exactly at the start are excluded; those exactly at the end are
 included. Empty rows alone never establish coverage. Missing block times,
 ambiguous ordering, truncation, mismatched identity, an invalid receipt,
 collector failure, cancellation, timeout, or exhausted budgets return `UNKNOWN`.
 `COMPLETE` describes the receipt-backed response contract only:
-`sourceAuthentication` and `archivalRetention` remain `NOT_ESTABLISHED`.
+`sourceAuthentication` and `archivalRetention` remain `NOT_ESTABLISHED`. The
+current accepted collector returns `UNKNOWN_ARCHIVAL_OR_INDEX_TRUNCATION`, so
+current production-shaped results remain `UNKNOWN`; positive bridge-to-Analyst
+tests use explicitly fixture-trusted completeness and are not operational
+readiness evidence.
 
-**Integration prerequisite:** the accepted #1178 launch-history collector is
-not present in this checkout. Its slot-bounded output does not retain transaction
-`blockTime`, time-window boundary witnesses, or the bridge's exact aggregate
-receipt/request echo; its archival/index completeness is also `UNKNOWN`. The
-bridge tests therefore inject generated collector-shaped fixtures with those
-additional fields and separately verify that the current slot-only shape remains
-unavailable. The fixture extension is not a claim that the collector emits
-those fields or that a provider returned complete history.
+**Integration prerequisite:** the accepted collector and swap decoder are now
+present, but no accepted timestamp-boundary sidecar or proof of archival
+completeness is available. The bridge tests use its actual response shape with
+explicitly fixture-trusted boundary evidence and verify that the unchanged
+collector output remains unavailable when its completeness is unknown. Those
+fixtures are not evidence that a provider returned complete history.
 
-Before integration, the owning source must provide timestamp fences and rows
-from the accepted collector's receipt-bound response (or an independently
-reviewed response-preserving sidecar) and prove the requested time window without
-slot-to-time interpolation. Do not import an unmerged branch module, duplicate
-the RPC transport, or bypass the existing Analyst adapter. Re-review the source
-and its completeness semantics when the accepted collector lands; until then,
-the bridge is a tested seam, not a usable real-history provider.
+Before integration, the owner must supply a narrowly reviewed sidecar using the
+accepted injected transport, preserving exact response bytes/digests and genuine
+`getBlockTime` values for both fences. It must report its scope and bounded
+counters, and must not relabel an `UNKNOWN` collector result. The accepted source
+must separately provide a defensible completeness guarantee; empty results,
+finite pagination, or a successful decoder do not prove archival coverage. Do
+not add a parallel RPC transport or bypass the existing Analyst adapter. Until
+both source gaps are resolved, the bridge remains a tested seam, not a usable
+real-history provider.
 
 ## Source proposals and unresolved choices
 
 The smallest public-history proposal is the existing fixed Solana JSON-RPC
-origin with `getSignaturesForAddress`, `getTransaction`, and `getBlockTime`,
-using source-provided finalized slots and estimated block timestamps. Solana
+origin and accepted injected transport, extending it narrowly for
+`getBlockTime`, using source-provided finalized slots and estimated block
+timestamps. Solana
 documents `getSignaturesForAddress` pagination parameters, transaction records,
 and `getBlockTime` as an estimated Unix time in seconds. Those methods do not
 guarantee archival retention, complete address history, monotone timestamps, or

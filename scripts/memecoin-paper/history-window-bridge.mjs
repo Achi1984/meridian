@@ -91,7 +91,8 @@ function validTime(value) {
 }
 
 function validReceipt(receipt, source, minimumReceivedAt = 0) {
-  return isRecord(receipt) && receipt.status === "SOURCE_BOUND" &&
+  return typeof source === "string" && source.trim().length > 0 && source.length <= 256 &&
+    isRecord(receipt) && receipt.status === "SOURCE_BOUND" &&
     receipt.source === source && typeof receipt.id === "string" &&
     receipt.id.trim().length > 0 && receipt.id.length <= 256 &&
     DIGEST.test(receipt.payloadSha256 ?? "") && validTime(receipt.receivedAt) &&
@@ -105,6 +106,7 @@ function receiptPayload(timeEvidence) {
     requested: timeEvidence.requested,
     timeBounds: timeEvidence.timeBounds,
     coverage: timeEvidence.coverage,
+    counters: timeEvidence.counters,
     events: timeEvidence.events
   };
 }
@@ -220,9 +222,16 @@ function validateTimeEvidence(value, identity, requested, limits) {
   const eventTotals = validEvents(value.events, limits, {
     methods: new Set(["getBlockTime"])
   });
+  const counters = value.counters;
   const bounds = value.timeBounds;
   const receipt = value.receipt;
-  if (!eventTotals || !validReceipt(receipt, value.source, requested.endInclusiveMs) ||
+  if (!eventTotals || !isRecord(counters) ||
+      counters.requests !== value.events.length ||
+      counters.bytes !== eventTotals.bytes ||
+      !Number.isSafeInteger(counters.workUnits) ||
+      counters.workUnits < counters.requests ||
+      counters.workUnits > limits.maxWorkUnits ||
+      !validReceipt(receipt, value.source, requested.endInclusiveMs) ||
       receipt.payloadSha256 !== timestampEvidenceDigest(value) ||
       receipt.receivedAt < eventTotals.latestReceivedAt ||
       !isRecord(value.coverage) || value.coverage.complete !== true ||
@@ -243,7 +252,10 @@ function validateTimeEvidence(value, identity, requested, limits) {
       endBefore.slot >= endAfter.slot ||
       endAfter.observedAt <= requested.endInclusiveMs ||
       endAfter.slot - startBefore.slot > limits.maxBoundarySlotSpan) return null;
-  return {startBefore, startAfter, endBefore, endAfter, receipt, events: value.events};
+  return {
+    startBefore, startAfter, endBefore, endAfter, receipt,
+    events: value.events, counters
+  };
 }
 
 function validCollector(collector, identity, slotInterval, limits) {
@@ -375,6 +387,25 @@ function aggregateReceiptPayload(collector, identity, requested, timeEvidence, e
   };
 }
 
+function launchHistoryLimits(limits, timeCounters, remainingMs) {
+  const maxRequests = limits.maxRequests - timeCounters.requests;
+  const maxBytesPerRun = limits.maxBytes - timeCounters.bytes;
+  const maxWorkUnits = limits.maxWorkUnits - timeCounters.workUnits;
+  if (maxRequests < 1 || maxBytesPerRun < 1 || maxWorkUnits < 1 || remainingMs < 1) {
+    return null;
+  }
+  return {
+    maxRequests,
+    maxBytesPerResponse: Math.min(limits.maxResponseBytes, maxBytesPerRun),
+    maxBytesPerRun,
+    maxWorkUnits,
+    maxSignatures: limits.maxSignatures,
+    maxTransactions: limits.maxTransactions,
+    maxDurationMs: remainingMs,
+    requestTimeoutMs: Math.min(5_000, remainingMs)
+  };
+}
+
 export function createHistoryWindowSource({
   slotHistoryCollector,
   timeBoundarySource,
@@ -398,6 +429,8 @@ export function createHistoryWindowSource({
           poolProof.pool !== identity.pool ||
           poolProof.quoteMint !== identity.quote ||
           !validTime(poolProof.observedAt) ||
+          poolProof.observedAt > endInclusiveMs ||
+          !Number.isSafeInteger(poolProof.slot) || poolProof.slot < 0 ||
           !validReceipt(poolProof.receipt, poolProof.source, poolProof.observedAt) ||
           !validTime(startExclusiveMs) || !validTime(endInclusiveMs) ||
           startExclusiveMs >= endInclusiveMs ||
@@ -439,10 +472,15 @@ export function createHistoryWindowSource({
       };
       const remainingMs = Math.floor(limits.maxElapsedMs - (performance.now() - startedAt));
       if (remainingMs <= 0) return unavailable(identity, requested, "TIME_LIMIT");
+      const collectorLimits = launchHistoryLimits(limits, validatedTime.counters, remainingMs);
+      if (!collectorLimits) {
+        return unavailable(identity, requested, "SHARED_BUDGET_EXHAUSTED", timeEvidence);
+      }
       const collectorOutcome = await waitForCallback(
         slotHistoryCollector,
         {
           ...requestBase,
+          limits: collectorLimits,
           subjects: [{
             address: identity.pool,
             source: poolProof.source,
@@ -469,6 +507,13 @@ export function createHistoryWindowSource({
             : "COLLECTOR_COVERAGE_OR_RECEIPT_UNKNOWN",
           collector
         );
+      }
+      if (collectorValidation.counters.requests + validatedTime.counters.requests >
+            limits.maxRequests ||
+          collectorValidation.counters.bytes + validatedTime.counters.bytes > limits.maxBytes ||
+          collectorValidation.counters.workUnits + validatedTime.counters.workUnits >
+            limits.maxWorkUnits) {
+        return unavailable(identity, requested, "SHARED_BUDGET_EXHAUSTED", collector);
       }
 
       const windowSpan = {
