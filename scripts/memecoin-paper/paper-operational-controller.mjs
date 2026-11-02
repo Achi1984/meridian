@@ -251,7 +251,10 @@ async function launch(manifestPath, runsDirectory, onPhase) {
     config,
     dataDirectory: runDirectory,
     externalReadOnlyInput,
-    signal: abort.signal
+    signal: abort.signal,
+    ...(onPhase ? {
+      onTestInitialized: details => onPhase("COMPOSITION_INITIALIZED", details)
+    } : {})
   });
   let lock;
   let onSignal;

@@ -200,7 +200,7 @@ test("explicit external-only run persists the exact report and read-only export 
   assert.equal(await readFile(exportPath, "utf8"), "{");
 });
 
-test("SIGTERM is held at pre-initialization and confirmed-start phase barriers", async t => {
+test("synthetic SIGTERM handler is tested at pre-initialization phase barriers", async t => {
   for (const [runId, targetPhase] of [
     ["signal-after-directory-created", "RUN_DIRECTORY_CREATED"],
     ["signal-before-initialization", "BEFORE_COMPOSITION_START"],
@@ -241,6 +241,84 @@ test("SIGTERM is held at pre-initialization and confirmed-start phase barriers",
     await assert.rejects(access(path.join(runDirectory, "checkpoint.json")), {code: "ENOENT"});
     await assert.rejects(access(path.join(runDirectory, "start-binding.json")), {code: "ENOENT"});
   }
+});
+
+test("in-process SIGTERM handler after durable initialization preserves terminal checkpoint", async t => {
+  const {runsDirectory, manifestPath, manifest} = await harness(t, "initialized-stop-run");
+  let releaseBarrier;
+  let reachedBarrier;
+  const barrier = new Promise(resolve => { releaseBarrier = resolve; });
+  const reached = new Promise(resolve => { reachedBarrier = resolve; });
+  const responsePromise = runOperationalController([
+    "start", "--enable", "--manifest", manifestPath, "--runs-dir", runsDirectory
+  ], {
+    async onPhase(phase, details) {
+      if (phase !== "COMPOSITION_INITIALIZED") return;
+      const runDirectory = path.join(runsDirectory, manifest.config.runId);
+      const bindingBytes = await readFile(path.join(runDirectory, "start-binding.json"));
+      const checkpointBytes = await readFile(path.join(runDirectory, "checkpoint.json"));
+      const binding = JSON.parse(bindingBytes);
+      const checkpoint = JSON.parse(checkpointBytes);
+      assert.deepEqual(bindingBytes, canonicalCheckpointBytes(binding));
+      assert.deepEqual(checkpointBytes, canonicalCheckpointBytes(checkpoint));
+      assert.equal(binding.schemaVersion, "memecoin-paper-start-binding/v1");
+      assert.equal(binding.runId, manifest.config.runId);
+      assert.equal(binding.receiptSha256, details.bindingReceipt.receiptSha256);
+      assert.equal(details.checkpointSequence, 0);
+      assert.equal(checkpoint.sequence, 0);
+      assert.equal(checkpoint.records.length, 1);
+      assert.equal(checkpoint.records[0].method, "constructor");
+      reachedBarrier({binding, checkpoint, checkpointBytes, runDirectory});
+      await barrier;
+    }
+  });
+
+  const initialized = await reached;
+  assert.equal(initialized.checkpoint.runHeader.runId, manifest.config.runId);
+  process.emit("SIGTERM");
+  releaseBarrier();
+  const response = await responsePromise;
+  const result = response.result;
+  const exportPath = path.join(initialized.runDirectory, "run-export.json");
+  const exportBytes = await readFile(exportPath);
+  const report = JSON.parse(exportBytes);
+  const persistedCheckpointBytes = await readFile(path.join(
+    initialized.runDirectory, "checkpoint.json"
+  ));
+  const persistedCheckpoint = JSON.parse(persistedCheckpointBytes);
+  const status = JSON.parse(await readFile(
+    path.join(initialized.runDirectory, "controller-status.json"), "utf8"
+  ));
+
+  assert.equal(response.exitCode, 2);
+  assert.equal(result.status, "STOPPED");
+  assert.equal(result.runStatus, undefined);
+  assert.equal(result.executionStarted, true);
+  assert.equal(result.exportStatus, "ACKNOWLEDGED");
+  assert.equal(result.evaluatorOverall, "UNKNOWN");
+  assert.equal(result.reconciliationRequired, undefined);
+  assert.equal(status.state, "STOPPED");
+  assert.equal(status.exportStatus, "ACKNOWLEDGED");
+  assert.deepEqual(exportBytes, canonicalCheckpointBytes(report));
+  assert.equal(report.persistence, "ACKNOWLEDGED");
+  assert.equal(report.exportBinding, "PRESTART_BOUND");
+  assert.ok(report.runnerReport.terminalReceipt);
+  assert.equal(report.runnerReport.terminalReceipt.runId, manifest.config.runId);
+  assert.equal(report.runnerReport.terminalReceipt.sequence, persistedCheckpoint.sequence);
+  assert.equal(report.runnerReport.terminalReceipt.hash, report.checkpointSha256);
+  assert.equal(persistedCheckpoint.records.at(-1).method, "finishRun");
+  assert.ok(persistedCheckpoint.sequence > initialized.checkpoint.sequence);
+  assert.equal(report.checkpointSha256,
+    createHash("sha256").update(persistedCheckpointBytes).digest("hex"));
+  const evaluation = evaluateMemecoinPaperRunExport(exportBytes, {
+    runId: manifest.config.runId,
+    configSha256: createHash("sha256")
+      .update(canonicalCheckpointBytes(manifest.config)).digest("hex"),
+    producerRevision: PRODUCER_REVISION
+  });
+  assert.equal(evaluation.checks.find(item => item.id === "historical_run_binding").status, "PASS");
+  assert.equal(evaluation.checks.find(item => item.id === "terminal_receipt").status, "PASS");
+  assert.equal(evaluation.checks.find(item => item.id === "persistence").status, "PASS");
 });
 
 test("post-directory I/O failure returns UNKNOWN identity and forbids retry", async t => {
