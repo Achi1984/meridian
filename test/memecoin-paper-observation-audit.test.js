@@ -321,6 +321,33 @@ test("terminal null failure remains distinct from an explicit UNKNOWN failure", 
   assert.match(renderObservationAudit(unknownFailure), /UNKNOWN\/UNKNOWN\/UNKNOWN/);
 });
 
+test("terminal failure codes preserve bounded controller names without accepting hostile text", () => {
+  for (const failureCode of ["Error", "TypeError", "a".repeat(48), "A".repeat(80)]) {
+    const audit = createAudit();
+    audit.setTerminal({
+      runStatus: "UNKNOWN", controllerStatus: "UNKNOWN", stopReason: null, failureCode
+    });
+    const result = audit.snapshot();
+    assert.equal(result.terminal.failureCode, failureCode);
+    assert.equal(validateObservationAudit(result, {runId: RUN_ID, configHash: CONFIG_HASH}), true);
+    assert.match(renderObservationAudit(result), new RegExp(failureCode));
+
+    for (const invalid of ["a".repeat(49), "A".repeat(81), "TypeError:detail",
+      "bad text", "Error\n", "<script>", "https://private.example", {}, undefined]) {
+      const malformed = structuredClone(result);
+      malformed.terminal.failureCode = invalid;
+      assert.equal(validateObservationAudit(malformed, {runId: RUN_ID, configHash: CONFIG_HASH}), false);
+      audit.setTerminal({
+        runStatus: "UNKNOWN", controllerStatus: "UNKNOWN", stopReason: null, failureCode: invalid
+      });
+      assert.equal(audit.snapshot().terminal.failureCode, "UNKNOWN");
+    }
+    const malformedStatus = structuredClone(result);
+    malformedStatus.terminal.controllerStatus = "TypeError";
+    assert.equal(validateObservationAudit(malformedStatus, {runId: RUN_ID, configHash: CONFIG_HASH}), false);
+  }
+});
+
 test("audit persistence is atomic, bounded, and reports write failures", async t => {
   const root = await mkdtemp(path.join(os.tmpdir(), "meridian-observation-audit-"));
   t.after(() => rm(root, {recursive: true, force: true}));
