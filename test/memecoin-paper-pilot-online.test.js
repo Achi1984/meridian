@@ -465,6 +465,65 @@ test("audit persistence failure is reported as UNKNOWN and does not claim succes
   assert.equal((await readPilotReport(harness.dataDirectory)).status, "UNKNOWN");
 });
 
+test("caught filesystem persistence code replaces UNKNOWN failure evidence consistently", async t => {
+  let reportPath;
+  const harness = await createHarness(t, {
+    fakeAssemblyOptions: {
+      summaryFailureCode: "UNKNOWN",
+      onReportInput() {
+        mkdirSync(reportPath);
+      }
+    }
+  });
+  reportPath = path.join(harness.dataDirectory, "operator-report.json");
+
+  const terminal = await harness.runner.start();
+  const persisted = JSON.parse(await readFile(path.join(harness.dataDirectory, "terminal.json"), "utf8"));
+  const audit = JSON.parse(await readFile(path.join(harness.dataDirectory, "observation-audit.json"), "utf8"));
+  assert.equal(terminal.failureCode, "EISDIR");
+  assert.equal(persisted.failureCode, "EISDIR");
+  assert.equal(persisted.observation.failureCode, "EISDIR");
+  assert.equal(audit.terminal.failureCode, "EISDIR");
+});
+
+test("caught persistence code preserves an earlier concrete failure code", async t => {
+  const harness = await createHarness(t, {
+    fakeAssemblyOptions: {
+      summaryFailureCode: "EARLIER_CONTROLLER_FAILURE",
+      onReportInput() {
+        throw Object.assign(new Error("report persistence failed"), {code: "EIO"});
+      }
+    }
+  });
+
+  const terminal = await harness.runner.start();
+  const persisted = JSON.parse(await readFile(path.join(harness.dataDirectory, "terminal.json"), "utf8"));
+  const audit = JSON.parse(await readFile(path.join(harness.dataDirectory, "observation-audit.json"), "utf8"));
+  assert.equal(terminal.failureCode, "EARLIER_CONTROLLER_FAILURE");
+  assert.equal(persisted.failureCode, "EARLIER_CONTROLLER_FAILURE");
+  assert.equal(persisted.observation.failureCode, "EARLIER_CONTROLLER_FAILURE");
+  assert.equal(audit.terminal.failureCode, "EARLIER_CONTROLLER_FAILURE");
+});
+
+test("invalid caught persistence code cannot replace UNKNOWN failure evidence", async t => {
+  const harness = await createHarness(t, {
+    fakeAssemblyOptions: {
+      summaryFailureCode: "UNKNOWN",
+      onReportInput() {
+        throw Object.assign(new Error("report persistence failed"), {code: "EIO https://hostile.example"});
+      }
+    }
+  });
+
+  const terminal = await harness.runner.start();
+  const persisted = JSON.parse(await readFile(path.join(harness.dataDirectory, "terminal.json"), "utf8"));
+  const audit = JSON.parse(await readFile(path.join(harness.dataDirectory, "observation-audit.json"), "utf8"));
+  assert.equal(terminal.failureCode, "UNKNOWN");
+  assert.equal(persisted.failureCode, "UNKNOWN");
+  assert.equal(persisted.observation.failureCode, "UNKNOWN");
+  assert.equal(audit.terminal.failureCode, "UNKNOWN");
+});
+
 test("failed terminal audit update exposes an earlier snapshot as incomplete, never audit-only success", async t => {
   const harness = await createHarness(t);
   assert.equal((await harness.runner.start()).status, "FINISHED");

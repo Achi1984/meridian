@@ -672,6 +672,21 @@ function failureCodeEvidence(failureCode, controllerSummary) {
   return controllerSummary?.status === "FINISHED" ? null : "UNKNOWN";
 }
 
+function caughtFailureCode(failureCode, error) {
+  let caughtCode = null;
+  try {
+    const code = error?.code;
+    if (validFailureCode(code) && code !== "UNKNOWN") caughtCode = code;
+  } catch {
+    // Ignore unavailable error diagnostics and retain bounded evidence.
+  }
+  if (failureCode !== null && failureCode !== undefined &&
+      failureCode !== "UNKNOWN" && validFailureCode(failureCode)) {
+    return failureCode;
+  }
+  return caughtCode ?? (failureCode === "UNKNOWN" ? "UNKNOWN" : "PILOT_RUN_BLOCKED");
+}
+
 async function persistReport(assembly, paths, input, identity, observation) {
   const dto = assembly.projectOperatorReport(input);
   if (!isRecord(dto?.experiment) || dto.experiment.source !== "READ_ONLY_PAPER_CHECKPOINT" ||
@@ -1235,7 +1250,7 @@ export function createPilotOnline(options = {}) {
       reportStatus = "PROJECTED";
       reportTradingStatus = projected.dto?.trading?.status ?? "UNKNOWN";
     } catch (error) {
-      failureCode ??= typeof error?.code === "string" ? error.code : "PILOT_RUN_BLOCKED";
+      failureCode = caughtFailureCode(failureCode, error);
       failureCode = failureCodeEvidence(failureCode, controllerSummary);
       observations.controllerStatus = summaryCode(controllerSummary?.status);
       observations.stopReason = summaryCode(controllerSummary?.reason);
