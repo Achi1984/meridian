@@ -25,7 +25,8 @@ function harness({
   authorizeUnknown = false,
   riskUnacknowledged = false,
   riskLedgerUnknown = false,
-  closeOnRiskSnapshot = false
+  closeOnRiskSnapshot = false,
+  finishReject = false
 } = {}) {
   const calls = [];
   let sequence = 0;
@@ -93,6 +94,7 @@ function harness({
     },
     async finishRun(input) {
       calls.push({method: "finishRun", input});
+      if (finishReject) return {status: "REJECT", reason: "pre-dispatch capacity rejection"};
       return {status: "FINISHED", receipt: receipt()};
     }
   };
@@ -154,7 +156,9 @@ async function makeRealRunner(t, {
   clock = () => START + 1_000,
   stopSource = () => false,
   stepLimits,
-  wrapRunnerSession = session => session
+  runnerLimits,
+  wrapRunnerSession = session => session,
+  wrapExecutionStep = executionStep => executionStep
 } = {}) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "paper-runner-review-"));
   const store = await CheckpointStore.open(directory);
@@ -163,10 +167,11 @@ async function makeRealRunner(t, {
     await session.close();
     await rm(directory, {recursive: true, force: true});
   });
-  const runner = createPaperExecutionRunner({
-    executionStep: createPaperExecutionStep({
+  const executionStep = createPaperExecutionStep({
       session, store, runId, startedAt: START, endAt: END, limits: stepLimits
-    }),
+    });
+  const runner = createPaperExecutionRunner({
+    executionStep: wrapExecutionStep(executionStep),
     session: wrapRunnerSession(session),
     runId,
     startedAt: START,
@@ -177,7 +182,8 @@ async function makeRealRunner(t, {
     quoteSource,
     clock,
     stopSource,
-    smartWalletAllowlist: SYNTHETIC_SMART_WALLET_ALLOWLIST
+    smartWalletAllowlist: SYNTHETIC_SMART_WALLET_ALLOWLIST,
+    limits: runnerLimits
   });
   return {directory, runner, session, store};
 }
@@ -303,6 +309,20 @@ test("risk work without a durable acknowledgement blocks candidate authorization
   assert.deepEqual(calls.map(call => call.method), ["riskSnapshot", "finishRun"]);
 });
 
+test("only explicit pre-dispatch finish rejection stops without a terminal receipt", async () => {
+  const {calls, runner} = makeRunner({
+    stopSource: () => true,
+    limits: {maxOperations: 2},
+    harnessOptions: {finishReject: true}
+  });
+  const report = await runner.run();
+
+  assert.equal(report.status, "STOPPED");
+  assert.equal(report.terminalReceipt, null);
+  assert.equal(report.counters.operations, 2);
+  assert.deepEqual(calls.map(call => call.method), ["riskSnapshot", "finishRun"]);
+});
+
 test("committed ledger UNKNOWN propagates with its receipt and does not retry", async () => {
   const {calls, runner} = makeRunner({harnessOptions: {riskLedgerUnknown: true}});
   const report = await runner.run();
@@ -331,7 +351,7 @@ test("shutdown evaluates current risk and then finishes explicitly", async () =>
   assert.deepEqual(calls.map(call => call.method), ["riskSnapshot", "finishRun"]);
 });
 
-test("shutdown finish carries a still-fresh risk mark", async () => {
+test("shutdown finish omits terminal marks and reports open positions unvalued", async () => {
   let time = START;
   const {calls, runner} = makeRunner({
     quote: async ({candidate, now}) => ({
@@ -355,8 +375,9 @@ test("shutdown finish carries a still-fresh risk mark", async () => {
 
   assert.equal(report.status, "FINISHED");
   const finish = calls.find(call => call.method === "finishRun");
-  assert.equal(finish.input.marks.length, 1);
-  assert.ok(finish.input.marks[0].observedAt <= finish.input.now);
+  assert.deepEqual(finish.input.marks, []);
+  assert.deepEqual(report.missingTerminalValuationMints, [syntheticCandidate(START).mint]);
+  assert.equal(report.summary.openPositions.length, 1);
 });
 
 test("finish drops marks for positions closed by the independent risk snapshot", async () => {
@@ -546,25 +567,43 @@ test("tight-budget shutdown durably finishes without fabricated terminal valuati
   assert.equal(baselineReport.reason, "SHUTDOWN");
   const baselineReadback = await baseline.store.readCheckpoint();
   const baselineCheckpoint = JSON.parse(baselineReadback.bytes.toString("utf8"));
-  const baselineFinish = baselineCheckpoint.records.at(-1);
-  assert.equal(baselineFinish.method, "finishRun");
-  assert.equal(baselineFinish.inputs.marks.length, 1);
-  const emptyFinishCheckpoint = {
+  const finalRecord = baselineCheckpoint.records.at(-1);
+  assert.equal(finalRecord.method, "finishRun");
+  assert.deepEqual(finalRecord.inputs.marks, []);
+  const riskMarks = baselineCheckpoint.records.findLast(record =>
+    record.method === "riskSnapshot" && record.inputs.marks.length)?.inputs.marks;
+  assert.ok(riskMarks?.length);
+  const markedFinishCheckpoint = {
     ...baselineCheckpoint,
     records: [
       ...baselineCheckpoint.records.slice(0, -1),
-      {...baselineFinish, inputs: {...baselineFinish.inputs, marks: []}}
+      {...finalRecord, inputs: {...finalRecord.inputs, marks: riskMarks}}
     ]
   };
-  const maxBytes = canonicalCheckpointBytes(emptyFinishCheckpoint).length + 64;
-  assert.ok(maxBytes < baselineReadback.bytes.length);
+  const maxBytes = canonicalCheckpointBytes(baselineCheckpoint).length + 64;
+  assert.ok(maxBytes < canonicalCheckpointBytes(markedFinishCheckpoint).length);
 
-  const constrained = await makeRealRunner(t, {...runOptions(), stepLimits: {maxBytes}});
+  const finishAttempts = [];
+  const constrained = await makeRealRunner(t, {
+    ...runOptions(),
+    stepLimits: {maxBytes, maxEvents: 5},
+    runnerLimits: {maxOperations: 6},
+    wrapExecutionStep: executionStep => ({
+      ...executionStep,
+      finishRun(input) {
+        finishAttempts.push(structuredClone(input));
+        return executionStep.finishRun(input);
+      }
+    })
+  });
   const report = await constrained.runner.run();
   assert.equal(report.status, "FINISHED");
   assert.equal(report.reason, "SHUTDOWN");
   assert.deepEqual(report.missingTerminalValuationMints, [candidate.mint]);
   assert.equal(report.summary.openPositions.length, 1);
+  assert.equal(report.counters.operations, 6);
+  assert.equal(finishAttempts.length, 1);
+  assert.deepEqual(finishAttempts[0].marks, []);
 
   const readback = await constrained.store.readCheckpoint();
   assert.equal(readback.status, "OK");
@@ -575,6 +614,31 @@ test("tight-budget shutdown durably finishes without fabricated terminal valuati
   assert.equal(readback.sequence, report.terminalReceipt.sequence);
   assert.equal(readback.hash, report.terminalReceipt.hash);
   assert.equal(checkpoint.records.filter(record => record.method === "finishRun").length, 1);
+});
+
+test("a corrupt post-commit terminal receipt latches UNKNOWN without retry", async t => {
+  const finishAttempts = [];
+  const {runner, store} = await makeRealRunner(t, {
+    runId: "runner-corrupt-finish-review",
+    wrapExecutionStep: executionStep => ({
+      ...executionStep,
+      async finishRun(input) {
+        finishAttempts.push(structuredClone(input));
+        const result = await executionStep.finishRun(input);
+        return {...result, receipt: {...result.receipt, hash: "f".repeat(64)}};
+      }
+    })
+  });
+  const report = await runner.run();
+
+  assert.equal(report.status, "UNKNOWN");
+  assert.equal(report.terminalReceipt, null);
+  assert.equal(finishAttempts.length, 1);
+  assert.equal(report.counters.operations, 2);
+  assert.deepEqual(report.receipts.map(receipt => receipt.sequence), [1]);
+  const readback = await store.readCheckpoint();
+  assert.equal(readback.status, "OK");
+  assert.equal(JSON.parse(readback.bytes.toString("utf8")).records.at(-1).method, "finishRun");
 });
 
 test("real checkpoint UNKNOWN after an intermediate acknowledgement has no terminal receipt", async t => {

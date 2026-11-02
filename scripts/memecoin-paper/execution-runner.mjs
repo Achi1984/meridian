@@ -223,7 +223,6 @@ export function createPaperExecutionRunner({
   let verifiedTerminalReceipt = null;
   const candidatesByMint = new Map();
   const pendingAuthorizationIds = new Set();
-  let latestMarks = [];
   let ledgerUnknownReason = null;
   let missingTerminalValuationMints = [];
 
@@ -278,13 +277,13 @@ export function createPaperExecutionRunner({
     if (method !== "finishRun" && operationCount + 1 >= bounds.maxOperations) {
       return {budget: true};
     }
+    operationCount += 1;
     let result;
     try {
       result = await executionStep[method](input);
     } catch {
       return {unknown: true};
     }
-    operationCount += 1;
     if (result?.status === "UNKNOWN" && result.receipt === undefined) return {unknown: true};
     if (result?.receipt !== undefined) {
       const receipt = result.receipt;
@@ -533,7 +532,7 @@ export function createPaperExecutionRunner({
     return {result: execution.result};
   }
 
-  async function finish(reason, now = null, marks = latestMarks) {
+  async function finish(reason, now = null) {
     if (state === "UNKNOWN") return report("UNKNOWN", reason);
     let finishAt = now;
     try {
@@ -545,50 +544,49 @@ export function createPaperExecutionRunner({
     } catch {
       return report("STOPPED", "clock unavailable; no finish command issued");
     }
+    if (operationCount >= bounds.maxOperations) {
+      return report("STOPPED", "operation capacity reached; no finish command issued");
+    }
     state = "FINISHING";
+    let openPositions;
     let result;
     try {
-      const openPositions = session.snapshot().summary.openPositions;
-      const openMints = new Set(openPositions.map(position => position.mint));
-      const finishMarks = Array.isArray(marks)
-        ? marks.filter(mark => integerTime(mark.observedAt) &&
-          mark.observedAt <= finishAt && finishAt - mark.observedAt <= 300_000 &&
-          openMints.has(mark.mint))
-        : [];
+      openPositions = session.snapshot().summary.openPositions;
+      missingTerminalValuationMints = openPositions.map(position => position.mint);
+      operationCount += 1;
       result = await executionStep.finishRun({
         eventId: nextId("finish"),
         now: finishAt,
-        marks: finishMarks
+        marks: []
       });
-      if (finishMarks.length && result?.status === "REJECT" && !result.receipt &&
-          ["input byte capacity reached", "event/input capacity reached",
-            "checkpoint byte capacity reached before dispatch"].includes(result.reason)) {
-        missingTerminalValuationMints = openPositions.map(position => position.mint);
-        result = await executionStep.finishRun({
-          eventId: nextId("finish"),
-          now: finishAt,
-          marks: []
-        });
-      }
     } catch {
       state = "UNKNOWN";
       return report("UNKNOWN", "finish publication outcome is uncertain");
     }
-    operationCount += 1;
     const receipt = result?.receipt;
-    if (result?.status === "UNKNOWN" && !receipt) {
+    if (result?.status === "REJECT" && !receipt) {
+      results.push({method: "finishRun", status: result.status, receipt: null});
+      return report("STOPPED", "finish was rejected before dispatch", result);
+    }
+    let checkpointHead;
+    try {
+      checkpointHead = session.metadata;
+    } catch {
       state = "UNKNOWN";
-      return report("UNKNOWN", "finish publication outcome is uncertain");
+      return report("UNKNOWN", "finish acknowledgement could not be matched to durable checkpoint");
     }
     if (!receipt || receipt.runId !== runId || receipt.sequence !== sequence + 1 ||
-        !HASH.test(receipt.hash ?? "") || !HASH.test(receipt.resultDigest ?? "")) {
-      state = "STOPPED";
-      return report("STOPPED", "finish has no verified durable receipt", result);
+        !HASH.test(receipt.hash ?? "") || !HASH.test(receipt.resultDigest ?? "") ||
+        (Object.hasOwn(checkpointHead ?? {}, "hash") &&
+          (checkpointHead.sequence !== receipt.sequence || checkpointHead.hash !== receipt.hash))) {
+      state = "UNKNOWN";
+      return report("UNKNOWN", "finish acknowledgement is unverifiable; publication outcome is uncertain");
     }
     sequence = receipt.sequence;
     receipts.push({...receipt});
     verifiedTerminalReceipt = {...receipt};
-    results.push({method: "finishRun", status: result.status, receipt: {...receipt}});
+    results.push({method: "finishRun", status: result?.status ?? "INVALID_RESULT",
+      receipt: {...receipt}});
     state = "FINISHED";
     if (result.status === "UNKNOWN") ledgerUnknownReason = "terminal ledger result is UNKNOWN with a verified receipt";
     return report(ledgerUnknownReason ? "UNKNOWN" : result.status === "FINISHED" ? "FINISHED" : "STOPPED",
@@ -612,9 +610,8 @@ export function createPaperExecutionRunner({
         if (risk.unknown) return unknown("checkpoint or session state is uncertain");
         if (risk.ledgerUnknown) {
           ledgerUnknownReason = "ledger risk/exit result is UNKNOWN with a verified receipt";
-          return finish("LEDGER_UNKNOWN", null, risk.marks);
+          return finish("LEDGER_UNKNOWN");
         }
-        latestMarks = risk.marks;
         if (risk.stop) return finish(risk.reason ?? "RISK_OPERATION_UNAVAILABLE");
         if (risk.deadline) return finish("DEADLINE");
         const afterRiskStop = await checkStop(tickCount - 1);
@@ -662,7 +659,7 @@ export function createPaperExecutionRunner({
             if (processed.unknown) return unknown("checkpoint outcome uncertain; automatic retry/restart is prohibited");
             if (processed.ledgerUnknown) {
               ledgerUnknownReason = "ledger entry result is UNKNOWN with a verified receipt";
-              return finish("LEDGER_UNKNOWN", null, risk.marks);
+              return finish("LEDGER_UNKNOWN");
             }
             if (processed.stop) return finish("EXECUTION_OPERATION_UNAVAILABLE");
             if (processed.shutdown) return finish("SHUTDOWN");
