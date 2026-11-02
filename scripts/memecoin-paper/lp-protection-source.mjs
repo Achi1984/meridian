@@ -299,7 +299,7 @@ function decodeBurnTransactions(
   const reserveKnown = poolCounter >= INITIAL_LP_RESERVE_ATOMS;
   if (!reserveKnown) throw failure("POOL_COUNTER_BELOW_INITIAL_RESERVE");
   const protectionDenominator = poolCounter - INITIAL_LP_RESERVE_ATOMS;
-  const signatures = new Set();
+  const transactionIdentities = new Set();
   const transactionsSeen = [];
   const instructionsSeen = [];
   let totalBurnAtoms = 0n;
@@ -312,15 +312,12 @@ function decodeBurnTransactions(
         !DECIMAL_INTEGER.test(evidence.claimedBurnAtoms) ||
         evidence.denominatorAtoms !== protectionDenominator.toString() ||
         decodeBase58Bytes(evidence.signature)?.length !== 64 ||
-        signatures.has(evidence.signature) || !Number.isSafeInteger(evidence.slot) ||
+        !Number.isSafeInteger(evidence.slot) ||
         evidence.slot < 0 || evidence.slot > slot ||
         typeof evidence.responseJson !== "string" ||
         !/^[a-f0-9]{64}$/.test(evidence.responseSha256 ?? "")) {
-      throw failure(signatures.has(evidence?.signature)
-        ? "DUPLICATE_BURN_EVIDENCE"
-        : "BURN_EVIDENCE_INVALID");
+      throw failure("BURN_EVIDENCE_INVALID");
     }
-    signatures.add(evidence.signature);
     const responseBytes = Buffer.from(evidence.responseJson, "utf8");
     totalResponseBytes += responseBytes.length;
     if (responseBytes.length > MAX_RESPONSE_BYTES || totalResponseBytes > MAX_RUN_BYTES) {
@@ -337,11 +334,21 @@ function decodeBurnTransactions(
     if (response?.jsonrpc !== "2.0" || !isRecord(tx) || tx.slot !== evidence.slot ||
         !isRecord(tx.meta) || tx.meta.err !== null ||
         !Array.isArray(tx.transaction?.signatures) ||
-        !tx.transaction.signatures.includes(evidence.signature) ||
+        tx.transaction.signatures.length === 0 ||
+        tx.transaction.signatures.some(signature => decodeBase58Bytes(signature)?.length !== 64) ||
         !Array.isArray(tx.transaction.message?.instructions) ||
         !Array.isArray(tx.meta.innerInstructions)) {
       throw failure("BURN_TRANSACTION_NOT_FINALIZED_OR_INCOMPLETE");
     }
+    const canonicalSignature = tx.transaction.signatures[0];
+    if (canonicalSignature !== evidence.signature ||
+        decodeBase58Bytes(canonicalSignature)?.length !== 64) {
+      throw failure("BURN_TRANSACTION_SIGNATURE_NOT_CANONICAL");
+    }
+    if (transactionIdentities.has(canonicalSignature)) {
+      throw failure("DUPLICATE_BURN_EVIDENCE");
+    }
+    transactionIdentities.add(canonicalSignature);
     const allInstructions = [...tx.transaction.message.instructions];
     for (const group of tx.meta.innerInstructions) {
       if (!isRecord(group) || !Array.isArray(group.instructions)) {
@@ -410,7 +417,7 @@ function decodeBurnTransactions(
     transactionsSeen.push({
       source: evidence.source,
       commitment: evidence.commitment,
-      signature: evidence.signature,
+      signature: canonicalSignature,
       slot: evidence.slot,
       responseSha256: evidence.responseSha256,
       pool: identity.pool,
@@ -418,7 +425,9 @@ function decodeBurnTransactions(
       claimedBurnAtoms: transactionBurnAtoms.toString(),
       denominatorAtoms: protectionDenominator.toString(),
       holdUntil,
-      status: "DECODED_UNVERIFIED_FINALIZED_SPL_BURN"
+      status: "DECODED_UNVERIFIED_FINALIZED_SPL_BURN",
+      transactionEvidence: tx,
+      decodedInstructions: allInstructions
     });
     totalBurnAtoms += transactionBurnAtoms;
     if (totalBurnAtoms > U64_MAX) throw failure("BURN_INSTRUCTION_AMOUNT_INVALID");
@@ -823,6 +832,8 @@ export async function collectLpProtectionSource({
       trustPolicy: burnAssessment.trustPolicy,
       status: burnAssessment.fixtureStatus,
       reason: burnAssessment.fixtureReason,
+      decodedTransactions: burnAssessment.transactions,
+      decodedInstructions: burnAssessment.instructions,
       protectedAtoms,
       denominatorAtoms: protectionDenominatorAtoms,
       currentMintSupplyAtoms: supply.toString(),
@@ -866,7 +877,6 @@ export async function collectLpProtectionSource({
         frozenAccountAtoms: frozenAtoms.toString(),
         noncirculatingPoolCounterAtoms: gap.toString()
       },
-      burnAssessment: fixtureEvaluation,
       reason: "operational protection remains unverified because source-shaped transaction evidence and deployed-program policy are not authenticated"
     };
     return {
@@ -883,11 +893,7 @@ export async function collectLpProtectionSource({
       events,
       counters,
       accounts,
-      claims: {
-        ...claims,
-        decodedBurnTransactions: burnAssessment?.transactions ?? [],
-        decodedBurnInstructions: burnAssessment?.instructions ?? []
-      },
+      claims,
       measurement: {
         denominatorAtoms: denominator.toString(),
         currentMintSupplyAtoms: supply.toString(),

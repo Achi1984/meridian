@@ -10,6 +10,7 @@ import {
   RAYDIUM_CPMM_PROGRAM_ID
 } from "../scripts/memecoin-paper/lp-protection-source.mjs";
 import {
+  encodeBase58,
   IDENTITY,
   LP_MINT,
   NOW,
@@ -266,9 +267,22 @@ test("finalized SPL burns support exact fixture-only protection without operatio
     assert.equal(result.measurement.burnAssessment.holdUntil, HOLD_UNTIL);
     assert.match(result.measurement.burnAssessment.releasePath, /NONE/);
     assert.match(result.measurement.burnAssessment.administrativePath, /mint authority/);
-    assert.equal(result.claims.decodedBurnTransactions[0].claimedBurnAtoms, "1000");
-    assert.match(result.claims.decodedBurnTransactions[0].responseSha256, /^[a-f0-9]{64}$/);
-    assert.equal(result.claims.decodedBurnInstructions[0].amountAtoms, "1000");
+    assert.equal(result.measurement.burnAssessment.decodedTransactions[0].claimedBurnAtoms, "1000");
+    assert.match(
+      result.measurement.burnAssessment.decodedTransactions[0].responseSha256,
+      /^[a-f0-9]{64}$/
+    );
+    assert.equal(
+      result.measurement.burnAssessment.decodedTransactions[0]
+        .transactionEvidence.transaction.signatures[0],
+      evidence.signature
+    );
+    assert.equal(
+      result.measurement.burnAssessment.decodedTransactions[0]
+        .decodedInstructions[0].parsed.type,
+      "burnChecked"
+    );
+    assert.equal(result.measurement.burnAssessment.decodedInstructions[0].amountAtoms, "1000");
     assert.equal(result.lpProtection.status, "UNKNOWN");
     assert.equal(result.lpProtection.verified, false);
     assert.equal(result.adapterEvidence.verified, false);
@@ -440,6 +454,25 @@ test("finalized SPL burns support exact fixture-only protection without operatio
         holdUntil: HOLD_UNTIL
       });
       assert.equal(result.reasonCode, "DUPLICATE_BURN_EVIDENCE");
+    });
+    await t.test("multisigner alias cannot count one canonical transaction twice", async () => {
+      const canonicalSignature = encodeBase58(Buffer.alloc(64, 2));
+      const aliasSignature = encodeBase58(Buffer.alloc(64, 3));
+      const canonical = finalizedBurnEvidence({
+        holdUntil: HOLD_UNTIL,
+        signature: canonicalSignature,
+        transactionSignatures: [canonicalSignature, aliasSignature]
+      });
+      const alias = {...canonical, signature: aliasSignature};
+      const {result} = await collect({
+        proof,
+        accounts: [],
+        burnTransactions: [canonical, alias],
+        fixtureTrustPolicy: LP_BURN_FIXTURE_TRUST_POLICY,
+        holdUntil: HOLD_UNTIL
+      });
+      assert.equal(result.reasonCode, "BURN_TRANSACTION_SIGNATURE_NOT_CANONICAL");
+      assert.equal(result.lpProtection.status, "UNKNOWN");
     });
     await t.test("failed transaction", async () => {
       const failed = finalizedBurnEvidence({

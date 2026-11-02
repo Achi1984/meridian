@@ -246,6 +246,7 @@ export function finalizedBurnEvidence({
   pool = IDENTITY.pool,
   slot = 1_000,
   signature = encodeBase58(Buffer.alloc(64, 2)),
+  transactionSignatures = [signature],
   holdUntil = NOW + 60_000,
   includesCpmmInstruction = false,
   transactionError = null,
@@ -274,7 +275,7 @@ export function finalizedBurnEvidence({
     result: {
       slot,
       transaction: {
-        signatures: [signature],
+        signatures: transactionSignatures,
         message: {accountKeys: [], instructions}
       },
       meta: {
