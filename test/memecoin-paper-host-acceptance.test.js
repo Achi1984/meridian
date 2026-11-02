@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {mkdir, mkdtemp, readFile, rm, writeFile} from "node:fs/promises";
+import {chmod, lstat, mkdir, mkdtemp, readFile, rm, symlink, writeFile} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import {runHostAcceptance} from "../scripts/memecoin-paper/host-acceptance.mjs";
+import {runHostAcceptance, verifyOwnedDataRoot} from "../scripts/memecoin-paper/host-acceptance.mjs";
 
 const IDENTITY = Object.freeze({
   chainId: "solana",
@@ -17,7 +17,7 @@ async function fixture(t) {
   t.after(() => rm(root, {recursive: true, force: true}));
   const volume = path.join(root, "volume");
   await mkdir(volume);
-  return {root, volume};
+  return {root, volume, dataRoot: path.join(volume, "application-data")};
 }
 
 function successfulAssembly(onAcquire = () => {}) {
@@ -91,6 +91,8 @@ test("bounded volume probe persists evidence and the same-ID restart never repea
   const first = await runHostAcceptance(input);
   assert.equal(first.status, "PASS");
   assert.equal(first.scope, "HOST_ACCEPTANCE_ONLY");
+  assert.equal(first.dataRoot, harness.dataRoot);
+  assert.equal(first.dataRootSameDeviceAsMountRoot, true);
   assert.equal(first.hostDurability, "NOT_VERIFIED");
   assert.equal(first.clockProvenance, "UNVERIFIED");
   assert.equal(first.pilotStarted, false);
@@ -106,7 +108,7 @@ test("bounded volume probe persists evidence and the same-ID restart never repea
   assert.equal(first.evidencePreserved, true);
   assert.equal(acquisitions, 1);
 
-  const evidenceDirectory = path.join(harness.volume, "host-acceptance", input.evidenceId);
+  const evidenceDirectory = path.join(harness.dataRoot, "host-acceptance", input.evidenceId);
   const probe = await readFile(path.join(evidenceDirectory, "probe.json"));
   const stored = JSON.parse(await readFile(path.join(evidenceDirectory, "result.json"), "utf8"));
   assert.equal(stored.evidenceHash, first.evidenceHash);
@@ -142,12 +144,117 @@ test("a runtime-UID ownership mismatch blocks writes and provider requests", asy
   assert.equal(acquisitions, 0);
 });
 
+test("root-owned physical mount metadata is distinct from the runtime-owned data root", async t => {
+  const harness = await fixture(t);
+  await mkdir(harness.dataRoot, {mode: 0o700});
+  const runtimeUid = process.getuid();
+  const metadataLstat = async filename => {
+    const info = await lstat(filename);
+    if (filename !== harness.volume) return info;
+    return {
+      ...info,
+      uid: 0,
+      gid: 1000,
+      isDirectory: () => info.isDirectory(),
+      isSymbolicLink: () => info.isSymbolicLink()
+    };
+  };
+  const verified = await verifyOwnedDataRoot({
+    mountRoot: harness.volume,
+    dataRoot: harness.dataRoot,
+    runtimeUid,
+    lstatPath: metadataLstat
+  });
+  assert.equal(verified.mountInfo.uid, 0);
+  assert.equal(verified.mountInfo.gid, 1000);
+  assert.equal(verified.info.uid, runtimeUid);
+  assert.equal(verified.sameDeviceAsMountRoot, true);
+});
+
+test("private data root rejects a non-runtime owner and a different device", async t => {
+  const harness = await fixture(t);
+  await mkdir(harness.dataRoot, {mode: 0o700});
+  const runtimeUid = process.getuid();
+  const mismatchLstat = async filename => {
+    const info = await lstat(filename);
+    if (filename !== harness.dataRoot) return info;
+    return {
+      ...info,
+      uid: runtimeUid + 1,
+      isDirectory: () => info.isDirectory(),
+      isSymbolicLink: () => info.isSymbolicLink()
+    };
+  };
+  await assert.rejects(verifyOwnedDataRoot({
+    mountRoot: harness.volume,
+    dataRoot: harness.dataRoot,
+    runtimeUid,
+    lstatPath: mismatchLstat
+  }), /owned by the runtime UID/);
+
+  const differentDeviceLstat = async filename => {
+    const info = await lstat(filename);
+    if (filename !== harness.dataRoot) return info;
+    return {
+      ...info,
+      dev: info.dev + 1,
+      isDirectory: () => info.isDirectory(),
+      isSymbolicLink: () => info.isSymbolicLink()
+    };
+  };
+  await assert.rejects(verifyOwnedDataRoot({
+    mountRoot: harness.volume,
+    dataRoot: harness.dataRoot,
+    runtimeUid,
+    lstatPath: differentDeviceLstat
+  }), /physical mount root device/);
+});
+
+test("private data root rejects symlinks, escapes, and group-writable permissions", async t => {
+  const harness = await fixture(t);
+  const runtimeUid = process.getuid();
+  const outside = path.join(harness.root, "outside");
+  await mkdir(outside);
+  const linkedRoot = path.join(harness.volume, "linked-data");
+  await symlink(outside, linkedRoot);
+  await assert.rejects(verifyOwnedDataRoot({
+    mountRoot: harness.volume,
+    dataRoot: linkedRoot,
+    runtimeUid
+  }), /runtime UID|non-symlink/);
+
+  await assert.rejects(verifyOwnedDataRoot({
+    mountRoot: harness.volume,
+    dataRoot: outside,
+    runtimeUid
+  }), /one safe direct child/);
+  const escapedRoot = path.join(harness.root, "must-not-be-created");
+  await assert.rejects(runHostAcceptance({
+    mode: "HOST_ACCEPTANCE_ONLY",
+    evidenceId: "escaped-data-root",
+    candidate: IDENTITY,
+    providerPreflight: true,
+    mountRoot: harness.volume,
+    dataRoot: escapedRoot
+  }), /one safe direct child/);
+  await assert.rejects(lstat(escapedRoot), {code: "ENOENT"});
+
+  await mkdir(harness.dataRoot, {mode: 0o700});
+  await chmod(harness.dataRoot, 0o770);
+  await assert.rejects(verifyOwnedDataRoot({
+    mountRoot: harness.volume,
+    dataRoot: harness.dataRoot,
+    runtimeUid
+  }), /owned by the runtime UID/);
+});
+
 test("incomplete existing evidence remains UNKNOWN and is not repaired or replayed", async t => {
   const harness = await fixture(t);
   const evidenceId = "interrupted-001";
-  const evidenceParent = path.join(harness.volume, "host-acceptance");
+  await mkdir(harness.dataRoot, {mode: 0o700});
+  const evidenceParent = path.join(harness.dataRoot, "host-acceptance");
   await mkdir(evidenceParent, {mode: 0o700});
-  const evidenceDirectory = path.join(harness.volume, "host-acceptance", evidenceId);
+  const evidenceDirectory = path.join(evidenceParent, evidenceId);
   await mkdir(evidenceDirectory, {mode: 0o700});
   const probePath = path.join(evidenceDirectory, "probe.json");
   await writeFile(probePath, "partial evidence");
@@ -167,6 +274,32 @@ test("incomplete existing evidence remains UNKNOWN and is not repaired or replay
   assert.equal(result.providerRequestsThisInvocation, 0);
   assert.equal(acquisitions, 0);
   assert.equal(await readFile(probePath, "utf8"), "partial evidence");
+});
+
+test("legacy evidence at the physical mount root fails closed without mutation", async t => {
+  const harness = await fixture(t);
+  const legacyParent = path.join(harness.volume, "host-acceptance");
+  await mkdir(legacyParent);
+  const legacyEvidence = path.join(legacyParent, "preserve-me");
+  await mkdir(legacyEvidence);
+  const marker = path.join(legacyEvidence, "existing.txt");
+  await writeFile(marker, "do not migrate or overwrite");
+  let acquisitions = 0;
+  const result = await runHostAcceptance({
+    mode: "HOST_ACCEPTANCE_ONLY",
+    evidenceId: "legacy-layout",
+    candidate: IDENTITY,
+    providerPreflight: true,
+    mountRoot: harness.volume,
+    assemblyLoader: async () => {
+      acquisitions += 1;
+      return successfulAssembly();
+    }
+  });
+  assert.equal(result.status, "BLOCKED");
+  assert.equal(result.providerRequests, 0);
+  assert.equal(acquisitions, 0);
+  assert.equal(await readFile(marker, "utf8"), "do not migrate or overwrite");
 });
 
 test("unsafe evidence IDs are rejected before creating host evidence", async t => {

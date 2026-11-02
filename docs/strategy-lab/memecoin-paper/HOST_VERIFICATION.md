@@ -108,21 +108,36 @@ this task did not make those calls.
 
 On its first invocation the utility:
 
-1. Records the actual process UID/GID and volume-root UID/GID/mode/device. It
-   blocks before writes or provider calls unless the mounted root is a real
-   non-symlink directory owned by the actual runtime UID.
-2. Creates a new, private evidence directory under
-   `/var/data/meridian-paper/host-acceptance/<UNIQUE_ID>/`, then writes a
-   generated marker, calls file `fsync`, renames within that directory, syncs
-   the directory, and verifies byte-for-byte readback.
-3. Reports wall-clock samples against monotonic elapsed time. Clock provenance
+1. Treats `/var/data/meridian-paper` as the physical mount root. It must be an
+   absolute, normalized, real non-symlink directory; its owner may be the
+   platform (including UID 0), and its mount identity remains `UNVERIFIED`.
+2. Uses `/var/data/meridian-paper/application-data` as the private application
+   data root by default. `--data-root` may select another single safe direct
+   child only; it cannot escape the physical mount root. The private root,
+   `host-acceptance`, and each evidence directory must be real non-symlink
+   directories, owned by the actual runtime UID, not group/world writable, and
+   on the same device as the physical mount root. Group ownership never
+   substitutes for runtime-UID ownership. If the private root cannot be created
+   safely, the utility blocks before provider calls; no ownership repair is
+   attempted.
+3. Writes a generated marker under
+   `/var/data/meridian-paper/application-data/host-acceptance/<UNIQUE_ID>/`,
+   calls file `fsync`, renames within that directory, syncs the directory, and
+   verifies byte-for-byte readback.
+4. Reports wall-clock samples against monotonic elapsed time. Clock provenance
    always remains `UNVERIFIED`; neither `Date.now()` nor this brief comparison
    establishes trusted clock authority.
-4. Calls the integrated fixed-endpoint provider assembly only after the volume
+5. Calls the integrated fixed-endpoint provider assembly only after the private
    write/readback succeeds. It stores a bounded, hashed `result.json` and emits
    one JSON result to platform logs. A pass means only these specific checks
    passed; `hostDurability` remains `NOT_VERIFIED`,
    `runtimeAuthorization` remains false, and `pilotStarted` remains false.
+
+Evidence in the prior layout directly under
+`/var/data/meridian-paper/host-acceptance` is never migrated, deleted, or
+reused. If that legacy location exists, the utility fails closed before making
+new evidence or provider requests. Inspect and preserve such data separately;
+do not `chown` existing run artifacts.
 
 The durable files are `probe.json` and `result.json`. Do not delete, overwrite,
 or reuse the evidence directory. If the service restarts with the same CMD and
@@ -182,9 +197,10 @@ do not use it to inspect or interrupt the active one-shot run.
    packaging or a separate host preflight is outside this handoff and requires
    a new review. The utility never starts or authorizes the Paper pilot.
 
-The host check's UID match, `fsync`/rename/readback, and same-ID restart readback
-are bounded observations. `sameDeviceAsParent` is informational, not volume
-authentication. They do not prove a provider-specific durability guarantee,
-trusted clock, source-page correctness, hard-gate completeness, executed
-trades, PnL, or suitability for an eight-hour run. The report hash is an
-integrity identifier, not authentication.
+The host check's runtime-UID match, `fsync`/rename/readback, and same-ID restart
+readback are bounded observations. `dataRootSameDeviceAsMountRoot` is a required
+layout check; `sameDeviceAsParent` remains informational and neither proves
+mount identity. They do not prove a provider-specific durability guarantee,
+trusted clock, source-page correctness, hard-gate completeness, executed trades,
+PnL, or suitability for an eight-hour run. The report hash is an integrity
+identifier, not authentication.
