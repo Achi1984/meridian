@@ -1,0 +1,73 @@
+{
+  "schemaVersion": "1.0.0",
+  "pairs": [
+    {
+      "chainId": "solana",
+      "dexId": "fixture",
+      "pairAddress": "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC",
+      "baseToken": {
+        "address": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+        "name": "Fixture Token",
+        "symbol": "FIX"
+      },
+      "quoteToken": {
+        "address": "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+        "name": "Fixture Quote",
+        "symbol": "USDQ"
+      },
+      "pairCreatedAt": 1793552400000,
+      "priceUsd": "0.001"
+    },
+    {
+      "chainId": "solana",
+      "dexId": "fixture",
+      "pairAddress": "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC",
+      "baseToken": {
+        "address": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+        "name": "Fixture Token",
+        "symbol": "FIX"
+      },
+      "quoteToken": {
+        "address": "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+        "name": "Fixture Quote",
+        "symbol": "USDQ"
+      },
+      "pairCreatedAt": 1793552400000,
+      "priceUsd": "0.001"
+    },
+    {
+      "chainId": "solana",
+      "dexId": "fixture",
+      "pairAddress": "HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "baseToken": {
+        "address": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+        "name": "Fixture Token",
+        "symbol": "FIX"
+      },
+      "quoteToken": {
+        "address": "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+        "name": "Fixture Quote",
+        "symbol": "USDQ"
+      },
+      "pairCreatedAt": 1793552400000,
+      "priceUsd": "0.001"
+    },
+    {
+      "chainId": "solana",
+      "dexId": "fixture",
+      "pairAddress": "KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK",
+      "baseToken": {
+        "address": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+        "name": "Fixture Token Two",
+        "symbol": "FIX2"
+      },
+      "quoteToken": {
+        "address": "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+        "name": "Fixture Quote",
+        "symbol": "USDQ"
+      },
+      "pairCreatedAt": 1793552400000,
+      "priceUsd": "0.002"
+    }
+  ]
+}
