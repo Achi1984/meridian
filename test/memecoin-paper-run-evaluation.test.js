@@ -901,6 +901,19 @@ test("provider totals distinguish zero from missing, reject mismatches, and reta
   assert.match(unavailableAmountMarkdown, /- Cash cents: UNKNOWN/);
   assert.match(unavailableAmountMarkdown, /- Total costs cents: UNKNOWN/);
 
+  const zeroAmountReport = JSON.parse(exactAmount.reportBytes.toString("utf8"));
+  zeroAmountReport.dto.valuation.cashCents = "0";
+  zeroAmountReport.dto.valuation.realizedNetPnlCents = "0";
+  zeroAmountReport.dto.costs.totalCents = "0";
+  const zeroAmountResult = evaluateObservation({
+    ...exactAmount,
+    reportBytes: bytes(zeroAmountReport)
+  });
+  assert.equal(zeroAmountResult.accounting.cashCents, "0");
+  assert.equal(zeroAmountResult.accounting.realizedNetPnlCents, "0");
+  assert.equal(zeroAmountResult.accounting.totalCostsCents, "0");
+  assert.match(renderEvaluationMarkdown(zeroAmountResult), /- Total costs cents: 0/);
+
   const overBudget = evaluate({
     providerAccounting: {
       requests: 961,
@@ -924,6 +937,76 @@ test("provider totals distinguish zero from missing, reject mismatches, and reta
     }
   });
   assert.equal(criterion(candidateOverBudget, "provider_accounting").status, "FAIL");
+});
+
+test("malformed financial and terminal diagnostics stay safe in JSON-to-Markdown output", () => {
+  const input = fixture();
+  const invalidAmounts = [
+    {name: "paperEntryFills", label: "Paper entry fills",
+      path: ["trading", "paperEntryFills"], invalid: [
+      {toString: null}, [], true, "0", -1
+    ]},
+    {name: "cashCents", label: "Cash cents", path: ["valuation", "cashCents"], invalid: [
+      {toString: null}, [], true, 1, "01", "-0", "1.0", "1e2"
+    ]},
+    {name: "realizedGrossPnlCents", label: "Realized gross P&L cents",
+      path: ["valuation", "realizedGrossPnlCents"], invalid: [
+      {toString: null}, [], true, 1, "01", "-0", "1.0", "1e2"
+    ]},
+    {name: "realizedNetPnlCents", label: "Realized net P&L cents",
+      path: ["valuation", "realizedNetPnlCents"], invalid: [
+      {toString: null}, [], true, 1, "01", "-0", "1.0", "1e2"
+    ]},
+    {name: "unrealizedGrossPnlCents", label: "Unrealized gross P&L cents",
+      path: ["valuation", "unrealizedGrossPnlCents"], invalid: [
+      {toString: null}, [], true, 1, "01", "-0", "1.0", "1e2"
+    ]},
+    {name: "unrealizedNetPnlCents", label: "Unrealized net P&L cents",
+      path: ["valuation", "unrealizedNetPnlCents"], invalid: [
+      {toString: null}, [], true, 1, "01", "-0", "1.0", "1e2"
+    ]},
+    {name: "totalCostsCents", label: "Total costs cents",
+      path: ["costs", "totalCents"], invalid: [
+      {toString: null}, [], true, 1, "01", "-0", "1.0", "1e2"
+    ]}
+  ];
+  for (const field of invalidAmounts) {
+    for (const value of field.invalid) {
+      const report = JSON.parse(input.reportBytes.toString("utf8"));
+      report.dto[field.path[0]][field.path[1]] = value;
+      const result = evaluateObservation({...input, reportBytes: bytes(report)});
+      assert.equal(criterion(result, "operator_report").status, "FAIL",
+        `${field.name} should invalidate the operator report`);
+      assert.equal(result.accounting[field.name], null,
+        `${field.name} should be unavailable in the evaluation`);
+      const markdown = renderEvaluationMarkdown(result);
+      assert.ok(markdown.includes(`- ${field.label}: UNKNOWN`));
+      assert.ok(markdown.includes("| operator\\_report | FAIL |"));
+    }
+  }
+
+  const malformedTerminalFields = [
+    ["stopReason", "stopReason", null],
+    ["failureCode", "failureCode", null],
+    ["controllerStatus", "controllerStatus", "UNKNOWN"],
+    ["reportStatus", "reportStatus", "UNKNOWN"]
+  ];
+  for (const [field, outputField, fallback] of malformedTerminalFields) {
+    const terminal = JSON.parse(input.terminalBytes.toString("utf8"));
+    terminal[field] = {toString: null};
+    const result = evaluateObservation({...input, terminalBytes: bytes(terminal)});
+    assert.equal(result.observation[outputField], fallback);
+    assert.doesNotThrow(() => renderEvaluationMarkdown(result));
+  }
+
+  const malformedReportDiagnostic = JSON.parse(input.reportBytes.toString("utf8"));
+  malformedReportDiagnostic.observation.executableQuoteAndCostEvidence = {toString: null};
+  const diagnosticResult = evaluateObservation({
+    ...input,
+    reportBytes: bytes(malformedReportDiagnostic)
+  });
+  assert.equal(diagnosticResult.hardGates.executableQuoteAndCostEvidence, "UNKNOWN");
+  assert.doesNotThrow(() => renderEvaluationMarkdown(diagnosticResult));
 });
 
 test("CLI reads one bounded export set and writes only to an explicit output path", async t => {
@@ -955,6 +1038,46 @@ test("CLI reads one bounded export set and writes only to an explicit output pat
   assert.equal(saved.schema, EVALUATION_SCHEMA);
   assert.deepEqual((await readdir(directory)).sort(),
     ["config.json", "evaluation.json", "lock.json", "report.json", "terminal.json"]);
+});
+
+test("CLI Markdown preserves failure, unavailable values, and exact large amounts", async t => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "paper-run-evaluation-markdown-"));
+  t.after(() => rm(directory, {recursive: true, force: true}));
+  const input = fixture();
+  const report = JSON.parse(input.reportBytes.toString("utf8"));
+  report.dto.valuation.cashCents = {toString: null};
+  report.dto.valuation.realizedNetPnlCents = "-900719925474099312345";
+  report.dto.costs.totalCents = null;
+  const artifacts = {
+    config: input.configBytes,
+    lock: input.lockBytes,
+    terminal: input.terminalBytes,
+    report: bytes(report)
+  };
+  const files = {};
+  for (const [name, content] of Object.entries(artifacts)) {
+    files[name] = path.join(directory, `${name}.json`);
+    await writeFile(files[name], content);
+  }
+  const output = path.join(directory, "evaluation.md");
+  const result = spawnSync(process.execPath, [
+    CLI,
+    "--run-id", RUN_ID,
+    "--config-sha256", input.expectedConfigHash,
+    "--config", files.config,
+    "--lock", files.lock,
+    "--terminal", files.terminal,
+    "--report", files.report,
+    "--format", "markdown",
+    "--output", output
+  ], {encoding: "utf8"});
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, "");
+  const markdown = await readFile(output, "utf8");
+  assert.ok(markdown.includes("| operator\\_report | FAIL |"));
+  assert.match(markdown, /- Cash cents: UNKNOWN/);
+  assert.match(markdown, /- Total costs cents: UNKNOWN/);
+  assert.match(markdown, /- Realized net P&L cents: -900719925474099312345/);
 });
 
 test("CLI rejects symlink and FIFO inputs without blocking", async t => {

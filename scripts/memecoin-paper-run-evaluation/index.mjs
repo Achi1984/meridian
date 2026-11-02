@@ -142,6 +142,10 @@ function validText(value, maxBytes, nullable = true) {
       (nullable || value.length > 0));
 }
 
+function diagnosticText(value, maxBytes, fallback = null) {
+  return validText(value, maxBytes, false) ? value : fallback;
+}
+
 function validCoverageShape(value) {
   if (!isRecord(value)) return false;
   const counts = ["observedTotal", "total", "displayed", "unaccounted"];
@@ -455,7 +459,8 @@ function evaluateDuration(config, terminal, report) {
 }
 
 function hasNonZeroAmount(value) {
-  return value !== null && value !== undefined && BigInt(value) !== 0n;
+  return value !== null && value !== undefined &&
+    (!nullableAmount(value, true) || BigInt(value) !== 0n);
 }
 
 function hasZeroFillContradictions(dto) {
@@ -497,6 +502,10 @@ function nullableAmount(value, signed = false) {
   return value === null || typeof value === "string" &&
     (signed ? /^-?(?:0|[1-9]\d{0,128})$/ : /^(?:0|[1-9]\d{0,128})$/).test(value) &&
     value !== "-0";
+}
+
+function reportAmount(value, signed = false) {
+  return nullableAmount(value, signed) ? value : null;
 }
 
 function completeCoverage(value) {
@@ -1008,10 +1017,10 @@ export function evaluateObservation({
     observation: {
       completionStatus,
       completionMode,
-      stopReason: typeof terminal?.stopReason === "string" ? terminal.stopReason : null,
-      failureCode: terminal?.failureCode ?? null,
-      controllerStatus: terminal?.controllerStatus ?? "UNKNOWN",
-      reportStatus: terminal?.reportStatus ?? "UNKNOWN",
+      stopReason: diagnosticText(terminal?.stopReason, 32),
+      failureCode: diagnosticText(terminal?.failureCode, 128),
+      controllerStatus: diagnosticText(terminal?.controllerStatus, 32, "UNKNOWN"),
+      reportStatus: diagnosticText(terminal?.reportStatus, 32, "UNKNOWN"),
       scheduledDurationMs: duration.scheduledMs,
       evidencedDurationMs: duration.evidencedMs,
       fullDeadlineCompleted: completionMode === "FULL_DEADLINE" &&
@@ -1022,14 +1031,14 @@ export function evaluateObservation({
     criteria: evaluation.criteria,
     accounting: {
       provider: totals,
-      paperEntryFills: Number.isSafeInteger(reportDto?.trading?.paperEntryFills)
+      paperEntryFills: nullableCount(reportDto?.trading?.paperEntryFills)
         ? reportDto.trading.paperEntryFills : null,
-      cashCents: reportDto?.valuation?.cashCents ?? null,
-      realizedGrossPnlCents: reportDto?.valuation?.realizedGrossPnlCents ?? null,
-      realizedNetPnlCents: reportDto?.valuation?.realizedNetPnlCents ?? null,
-      unrealizedGrossPnlCents: reportDto?.valuation?.unrealizedGrossPnlCents ?? null,
-      unrealizedNetPnlCents: reportDto?.valuation?.unrealizedNetPnlCents ?? null,
-      totalCostsCents: reportDto?.costs?.totalCents ?? null,
+      cashCents: reportAmount(reportDto?.valuation?.cashCents),
+      realizedGrossPnlCents: reportAmount(reportDto?.valuation?.realizedGrossPnlCents, true),
+      realizedNetPnlCents: reportAmount(reportDto?.valuation?.realizedNetPnlCents, true),
+      unrealizedGrossPnlCents: reportAmount(reportDto?.valuation?.unrealizedGrossPnlCents, true),
+      unrealizedNetPnlCents: reportAmount(reportDto?.valuation?.unrealizedNetPnlCents, true),
+      totalCostsCents: reportAmount(reportDto?.costs?.totalCents),
       note: reportDto?.trading?.paperEntryFills === 0
         ? "Zero observed fills are not profitability evidence."
         : "Financial totals are copied from the supplied operator report; no profitability metric is calculated."
@@ -1053,7 +1062,9 @@ export function evaluateObservation({
       externallyVerifiedProvenance: false
     },
     hardGates: {
-      executableQuoteAndCostEvidence: report?.observation?.executableQuoteAndCostEvidence ?? "UNKNOWN",
+      executableQuoteAndCostEvidence: diagnosticText(
+        report?.observation?.executableQuoteAndCostEvidence, 64, "UNKNOWN"
+      ),
       simulatedTradeTestEligibility: false,
       runtimeAuthorization: false,
       remainingPrerequisites: [
@@ -1067,7 +1078,10 @@ export function evaluateObservation({
 }
 
 function markdownEscape(value) {
-  return String(value).replaceAll("\\", "\\\\").replaceAll("`", "\\`")
+  const text = typeof value === "string" ? value
+    : typeof value === "number" && Number.isFinite(value) || typeof value === "boolean"
+      ? String(value) : "UNKNOWN";
+  return text.replaceAll("\\", "\\\\").replaceAll("`", "\\`")
     .replaceAll("!", "\\!").replaceAll("[", "\\[").replaceAll("]", "\\]")
     .replaceAll("(", "\\(").replaceAll(")", "\\)")
     .replaceAll("*", "\\*").replaceAll("_", "\\_").replaceAll("~", "\\~")
@@ -1081,10 +1095,11 @@ export function renderEvaluationMarkdown(evaluation) {
     throw new TypeError("a memecoin paper run evaluation is required");
   }
   const criteria = evaluation.criteria.map(item =>
-    `| ${markdownEscape(item.id)} | ${item.status} | ${markdownEscape(item.reason)} |`);
+    `| ${markdownEscape(item.id)} | ${markdownEscape(item.status)} | ${markdownEscape(item.reason)} |`);
   const provider = evaluation.accounting.provider;
   const providerRows = provider
-    ? Object.entries(provider).map(([key, value]) => `- ${key}: ${value}`)
+    ? Object.entries(provider).map(([key, value]) =>
+      `- ${markdownEscape(key)}: ${markdownEscape(value)}`)
     : ["- UNKNOWN (missing or mismatched counters)"];
   const candidates = evaluation.checkpointEvidence.candidates.length
     ? evaluation.checkpointEvidence.candidates.flatMap(candidate => [
@@ -1098,12 +1113,12 @@ export function renderEvaluationMarkdown(evaluation) {
     "",
     `- Expected run: ${markdownEscape(evaluation.expectedRunId ?? "UNKNOWN")}`,
     `- Expected config SHA-256: ${markdownEscape(evaluation.expectedConfigHash ?? "UNKNOWN")}`,
-    `- Overall evidence result: **${evaluation.overall}**`,
-    `- Completion: ${evaluation.observation.completionStatus} (${evaluation.observation.completionMode})`,
+    `- Overall evidence result: **${markdownEscape(evaluation.overall)}**`,
+    `- Completion: ${markdownEscape(evaluation.observation.completionStatus)} (${markdownEscape(evaluation.observation.completionMode)})`,
     `- Stop reason: ${markdownEscape(evaluation.observation.stopReason ?? "UNKNOWN")}`,
-    `- Scheduled duration: ${evaluation.observation.scheduledDurationMs} ms`,
-    `- Evidenced duration: ${evaluation.observation.evidencedDurationMs ?? "UNKNOWN"} ms`,
-    `- Full deadline completed: ${evaluation.observation.fullDeadlineCompleted}`,
+    `- Scheduled duration: ${markdownEscape(evaluation.observation.scheduledDurationMs)} ms`,
+    `- Evidenced duration: ${markdownEscape(evaluation.observation.evidencedDurationMs ?? "UNKNOWN")} ms`,
+    `- Full deadline completed: ${markdownEscape(evaluation.observation.fullDeadlineCompleted)}`,
     "",
     "## Source SHA-256 digests",
     "",
@@ -1122,7 +1137,7 @@ export function renderEvaluationMarkdown(evaluation) {
     "",
     "## Paper accounting",
     "",
-    `- Paper entry fills: ${evaluation.accounting.paperEntryFills ?? "UNKNOWN"}`,
+    `- Paper entry fills: ${markdownEscape(evaluation.accounting.paperEntryFills ?? "UNKNOWN")}`,
     `- Cash cents: ${markdownEscape(evaluation.accounting.cashCents ?? "UNKNOWN")}`,
     `- Realized gross P&L cents: ${markdownEscape(evaluation.accounting.realizedGrossPnlCents ?? "UNKNOWN")}`,
     `- Realized net P&L cents: ${markdownEscape(evaluation.accounting.realizedNetPnlCents ?? "UNKNOWN")}`,
