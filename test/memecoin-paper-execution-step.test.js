@@ -376,6 +376,38 @@ test("actual after-rename persistence fault is terminal, even when candidate byt
   assert.equal((await step.riskSnapshot({eventId: "risk", now: START + 3000, marks: []})).status, "UNKNOWN");
 });
 
+test("delayed finish ACK loss is UNKNOWN and never retries or resumes", async t => {
+  let loseAck = false;
+  let commits = 0;
+  const {step, session, store, directory} = await setup(t, {
+    wrapStore: real => proxy(real, {
+      commitCheckpoint: async input => {
+        commits += 1;
+        const result = await real.commitCheckpoint(input);
+        return loseAck ? {status: "UNKNOWN"} : result;
+      }
+    })
+  });
+  await step.riskSnapshot({eventId: "stop-at-deadline", now: END, marks: []});
+  const before = session.metadata.sequence;
+  loseAck = true;
+  const input = {eventId: "late-finish-unknown", now: END + 60_000, marks: []};
+  assert.equal((await step.finishRun(input)).status, "UNKNOWN");
+  assert.equal(JSON.parse((await store.readCheckpoint()).bytes).sequence, before + 1);
+  const afterFinishCommits = commits;
+  assert.equal((await step.finishRun(input)).status, "UNKNOWN");
+  assert.equal(commits, afterFinishCommits);
+
+  await session.close();
+  const reopenedStore = await CheckpointStore.open(directory);
+  const reopenedSession = await PaperCheckpointSession.open({store: reopenedStore});
+  assert.throws(() => createPaperExecutionStep({
+    session: reopenedSession, store: reopenedStore,
+    runId: RUN, startedAt: START, endAt: END
+  }), /no resume/);
+  await reopenedSession.close();
+});
+
 for (const field of ["hash", "sequence", "run", "receipt", "inputs"]) {
   test(`post-effect ${field} readback mismatch latches UNKNOWN`, async t => {
     let reads = 0;
@@ -420,6 +452,65 @@ test("deadline stops dispatch; explicit finish values marks without liquidation 
   assert.equal(session.snapshot().summary.openPositions.length, 1);
   assert.equal((await step.riskSnapshot({eventId: "after", now: END, marks: []})).status, "REJECT");
   assert.throws(() => createPaperExecutionStep({session, store, runId: RUN, startedAt: START, endAt: END}), /no resume/);
+});
+
+test("delayed stop callback finishes at observed time with an exact durable receipt", async t => {
+  const {step, session, store} = await filled(t);
+  const sequence = session.metadata.sequence;
+  assert.match((await step.riskSnapshot({
+    eventId: "stop-at-deadline", now: END, marks: []
+  })).reason, /deadline/);
+  assert.equal(session.metadata.sequence, sequence);
+  assert.equal((await step.authorizeEntry(authorization("late-entry", {
+    candidate: candidate(END + 1),
+    now: END + 1
+  }))).status, "REJECT");
+
+  const finishedAt = END + 120_000;
+  const finishInput = {eventId: "delayed-finish", now: finishedAt, marks: []};
+  const finish = await step.finishRun(finishInput);
+  assert.equal(finish.status, "FINISHED");
+  assert.equal(finish.elapsedMs, 8 * 60 * 60 * 1000 + 120_000);
+  assert.equal(finish.equityCents, null);
+  assert.deepEqual(finish.openPositions, [{
+    mint: candidate().mint,
+    markStatus: "VALUATION_UNAVAILABLE"
+  }]);
+  assert.equal(session.snapshot().summary.cashCents, "92000");
+  assert.equal(session.snapshot().summary.openPositions.length, 1);
+  assert.equal(session.snapshot().auditEvents.some(event => event.type === "PAPER_EXIT"), false);
+
+  const read = await store.readCheckpoint();
+  assert.equal(read.status, "OK");
+  const checkpoint = JSON.parse(read.bytes);
+  const record = checkpoint.records.at(-1);
+  assert.equal(record.method, "finishRun");
+  assert.equal(record.inputs.now, finishedAt);
+  assert.equal(record.inputs.startedAt, START);
+  assert.equal(finish.receipt.sequence, read.sequence);
+  assert.equal(finish.receipt.hash, createHash("sha256").update(read.bytes).digest("hex"));
+  assert.equal(finish.receipt.resultDigest, record.resultDigest);
+  assert.equal(finish.commandId, record.commandId);
+
+  assert.deepEqual(await step.finishRun(finishInput), finish);
+  assert.equal(session.metadata.sequence, read.sequence);
+  assert.equal((await step.finishRun({eventId: "second-finish", now: finishedAt, marks: []})).status, "REJECT");
+  assert.equal(session.metadata.sequence, read.sequence);
+  assert.throws(() => createPaperExecutionStep({
+    session, store, runId: RUN, startedAt: START, endAt: END
+  }), /no resume/);
+});
+
+test("late entry quote is rejected before ledger dispatch while terminal finish remains allowed", async t => {
+  const {step, session} = await setup(t);
+  const auth = await step.authorizeEntry(authorization());
+  const late = await step.executeEntry(entry(auth, candidate(), "late-entry", END + 1));
+  assert.equal(late.status, "REJECT");
+  assert.match(late.reason, /deadline/);
+  assert.equal(session.metadata.sequence, 1);
+  assert.equal(session.snapshot().summary.cashCents, "100000");
+  assert.equal(session.snapshot().summary.openPositions.length, 0);
+  assert.equal((await step.finishRun({eventId: "late-finish", now: END + 1, marks: []})).status, "FINISHED");
 });
 
 test("finish normalizes ID-less valuation marks without creating exits", async t => {
@@ -610,7 +701,7 @@ test("marks must match decimals, source, time and complete costs before effect",
   })).status, "PASS");
 });
 
-test("shorter run deadline and late fixed-window finish never dispatch or fabricate time", async t => {
+test("shorter run deadline stops work and late fixed-window finish uses actual time", async t => {
   const {session, store} = await setup(t);
   const step = createPaperExecutionStep({session, store, runId: RUN, startedAt: START, endAt: START + 5000});
   assert.match((await step.authorizeEntry(authorization("deadline", {now: START + 5000}))).reason, /deadline/);
@@ -619,8 +710,10 @@ test("shorter run deadline and late fixed-window finish never dispatch or fabric
   assert.equal(finish.status, "FINISHED");
   assert.equal(finish.elapsedMs, 5000);
   const late = await setup(t);
-  assert.match((await late.step.finishRun({eventId: "late", now: END + 1, marks: []})).reason, /deadline/);
-  assert.equal(late.session.metadata.sequence, 0);
+  const delayed = await late.step.finishRun({eventId: "late", now: END + 1, marks: []});
+  assert.equal(delayed.status, "FINISHED");
+  assert.equal(delayed.elapsedMs, 8 * 60 * 60 * 1000 + 1);
+  assert.equal(late.session.metadata.sequence, 1);
 });
 
 test("backward time, invalid run bounds and attempts to loosen capacity are rejected", async t => {

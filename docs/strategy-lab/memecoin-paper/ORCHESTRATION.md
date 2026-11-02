@@ -21,7 +21,7 @@ neither market evidence nor execution-realistic performance.
 | `stale-evidence` | A generated entry quote predates the authorization; actual ledger reports `UNFILLED`, preserving cash and positions. |
 | `mismatched-evidence` | A generated quote has a different pool binding; actual ledger reports `UNFILLED`, preserving cash and positions. |
 | `vienna-daily-gate` | Requires fixture start `2026-01-01T19:00:00Z`; crosses Vienna midnight at 23:00 UTC. Unknown marks block risk, 2999 cents permits entries, 3000 cents trips the daily gate and revokes a pending second reservation. A later attempted fill remains rejected. |
-| `manual-late` | A risk command at exactly eight hours plus one millisecond is routed through the session deadline guard and reports `INVALID_RUN_WINDOW`. No timer is installed. |
+| `manual-late` | A risk command at exactly eight hours plus one millisecond is routed through the session deadline guard, which records only terminal `finishRun` bookkeeping at that observed time. It does not run risk logic or admit entries. No timer is installed. |
 
 All state transitions use the existing `PaperCheckpointSession` and its real
 ledger. The driver adds no reducer, ledger, provider adapter or trading rules.
