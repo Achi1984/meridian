@@ -551,7 +551,13 @@ test("FIFO and oversized replacements after publication remain bounded and uncer
       input, output, runId: "replacement-durability-test",
       startAt: Number(startAt), now: ${NOW}
     }, {
+      afterPublication: mode === "first-fifo" ? async () => {
+        await unlink(output);
+        const created = spawnSync("mkfifo", [output]);
+        if (created.status !== 0) throw new Error("could not create first-verification FIFO");
+      } : async () => {},
       openDirectory: async directory => {
+        if (mode === "first-fifo") throw new Error("first verification should fail before directory open");
         await unlink(output);
         if (mode === "fifo") {
           const created = spawnSync("mkfifo", [output]);
@@ -565,7 +571,7 @@ test("FIFO and oversized replacements after publication remain bounded and uncer
     console.log(JSON.stringify(result));
   `;
 
-  for (const mode of ["fifo", "large"]) {
+  for (const mode of ["fifo", "large", "first-fifo"]) {
     const output = path.join(directory, `${mode}-replacement.json`);
     const child = spawnSync(process.execPath, [
       "--input-type=module", "-e", program, inputPath, output, String(START_AT), mode
@@ -581,7 +587,7 @@ test("FIFO and oversized replacements after publication remain bounded and uncer
     assert.match(result.configHash, /^[a-f0-9]{64}$/);
 
     const replacement = await stat(output);
-    if (mode === "fifo") {
+    if (mode === "fifo" || mode === "first-fifo") {
       assert.ok(replacement.isFIFO());
     } else {
       assert.equal(replacement.size, 16 * 1024 * 1024);

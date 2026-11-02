@@ -378,12 +378,14 @@ export async function writeExclusiveConfig(output, bytes, {
   sync = handle => handle.sync(),
   openDirectory = directory => open(directory, "r"),
   syncDirectory = handle => handle.sync(),
+  afterPublication = async () => {},
   beforeOpenStagingDirectory = async () => {},
   beforeOpenStagedConfig = async () => {}
 } = {}) {
   if (typeof output !== "string" || !path.isAbsolute(output) || !Buffer.isBuffer(bytes) ||
       typeof write !== "function" || typeof sync !== "function" ||
       typeof openDirectory !== "function" || typeof syncDirectory !== "function" ||
+      typeof afterPublication !== "function" ||
       typeof beforeOpenStagingDirectory !== "function" ||
       typeof beforeOpenStagedConfig !== "function") {
     throw new TypeError("an absolute output path and config bytes are required");
@@ -436,6 +438,7 @@ export async function writeExclusiveConfig(output, bytes, {
     }
     await assertDirectoryBinding(directory, expectedDirectory, directoryHandle);
     await link(stagedOutput, path.join(directoryPath, basename));
+    publicationStatus = "PUBLISHED_DURABILITY_UNCERTAIN";
 
     const verifyPublished = async () => {
       const publishedHandle = await open(
@@ -464,10 +467,11 @@ export async function writeExclusiveConfig(output, bytes, {
       }
     };
 
-    if (!await verifyPublished()) {
-      throw new TypeError("published config did not match its verified staged identity and bytes");
-    }
     try {
+      await afterPublication(path.join(directoryPath, basename));
+      if (!await verifyPublished()) {
+        throw new TypeError("published config did not match its verified staged identity and bytes");
+      }
       await assertDirectoryBinding(directory, expectedDirectory, directoryHandle);
       const syncHandle = await openDirectory(directoryPath);
       try {
@@ -476,8 +480,8 @@ export async function writeExclusiveConfig(output, bytes, {
         await syncHandle.close();
       }
       await assertDirectoryBinding(directory, expectedDirectory, directoryHandle);
+      publicationStatus = "PUBLISHED_DURABLE";
     } catch {
-      try { await verifyPublished(); } catch {}
       publicationStatus = "PUBLISHED_DURABILITY_UNCERTAIN";
     }
   } finally {
