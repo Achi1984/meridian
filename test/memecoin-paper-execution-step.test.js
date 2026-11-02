@@ -6,7 +6,9 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import {PaperCheckpointSession} from "../scripts/memecoin-paper/checkpoint-session.mjs";
-import {canonicalCheckpointBytes, CheckpointStore} from "../scripts/memecoin-paper/checkpoint-store.mjs";
+import {
+  canonicalCheckpointBytes, CheckpointStore, MAX_CHECKPOINT_BYTES
+} from "../scripts/memecoin-paper/checkpoint-store.mjs";
 import {createPaperExecutionStep} from "../scripts/memecoin-paper/execution-step.mjs";
 import {START, END, RUN, candidate, authorization, quote, entry} from "./fixtures/memecoin-paper-execution-step/scenario.mjs";
 
@@ -469,6 +471,58 @@ test("event, command, byte and pending-authorization bounds fail before mutation
     eventId: "finish", now: END, marks: []
   })).status, "FINISHED");
   assert.equal(checkpoint.session.snapshot().summary.cashCents, "100000");
+});
+
+test("configured 1,024-byte capacity rejects operations without latching checkpoint uncertainty", async t => {
+  for (const method of ["riskSnapshot", "finishRun"]) {
+    let dispatches = 0;
+    const {step, session} = await setup(t, {
+      limits: {maxBytes: 1024},
+      wrapSession: real => proxy(real, Object.fromEntries(
+        ["authorizeEntry", "executeEntry", "observeExitQuote", "riskSnapshot", "finishRun"]
+          .map(name => [name, async (...args) => {
+            dispatches += 1;
+            return real[name](...args);
+          }])
+      ))
+    });
+    const input = method === "riskSnapshot"
+      ? {eventId: method, now: START, marks: []}
+      : {eventId: "finish", now: END, marks: []};
+    const result = await step[method](input);
+    assert.equal(result.status, "REJECT");
+    assert.match(result.reason, /checkpoint byte capacity/);
+    assert.equal(session.metadata.sequence, 0);
+    assert.equal(dispatches, 0);
+    assert.deepEqual(await step[method](input), result);
+    assert.equal(dispatches, 0);
+  }
+});
+
+test("corrupt or oversized checkpoint readback still latches UNKNOWN", async t => {
+  for (const kind of ["corrupt", "oversized"]) {
+    let dispatches = 0;
+    const {step} = await setup(t, {
+      wrapStore: real => proxy(real, {
+        readCheckpoint: async () => {
+          const read = await real.readCheckpoint();
+          return kind === "corrupt"
+            ? {...read, bytes: Buffer.from("{}")}
+            : {...read, bytes: Buffer.alloc(MAX_CHECKPOINT_BYTES + 1)};
+        }
+      }),
+      wrapSession: real => proxy(real, Object.fromEntries(
+        ["authorizeEntry", "executeEntry", "observeExitQuote", "riskSnapshot", "finishRun"]
+          .map(name => [name, async (...args) => {
+            dispatches += 1;
+            return real[name](...args);
+          }])
+      ))
+    });
+    assert.equal((await step.riskSnapshot({eventId: kind, now: START, marks: []})).status, "UNKNOWN");
+    assert.equal((await step.riskSnapshot({eventId: `${kind}-again`, now: START, marks: []})).status, "UNKNOWN");
+    assert.equal(dispatches, 0);
+  }
 });
 
 test("malformed plain-data inputs reject without poisoning the adapter", async t => {

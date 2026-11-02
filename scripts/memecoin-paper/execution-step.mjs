@@ -140,7 +140,7 @@ export function createPaperExecutionStep({session, store, runId, startedAt, endA
     const readback = await store.readCheckpoint();
     const metadata = session.metadata;
     if (readback.status !== "OK" || !Buffer.isBuffer(readback.bytes) ||
-        readback.bytes.length > bounds.maxBytes) throw new Error("unavailable checkpoint");
+        readback.bytes.length > MAX_CHECKPOINT_BYTES) throw new Error("unavailable checkpoint");
     const checkpoint = JSON.parse(readback.bytes.toString("utf8"));
     if (!canonicalCheckpointBytes(checkpoint).equals(readback.bytes) ||
         createHash("sha256").update(readback.bytes).digest("hex") !== head.hash ||
