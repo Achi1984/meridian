@@ -67,6 +67,16 @@ function adapterFor(body, options = {}) {
   return {adapter, calls};
 }
 
+function settleWithin(promise, timeoutMs = 500) {
+  let timeoutHandle;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      timeoutHandle = setTimeout(() => reject(new Error("quote did not settle within the test bound")), timeoutMs);
+    })
+  ]).finally(() => clearTimeout(timeoutHandle));
+}
+
 function reviewScenario(caseName = "BASELINE", overrides = {}) {
   const assumptions = caseName === "STRESS"
     ? {scenarioId: "MEMECOIN_PAPER_QUOTE_ADVERSE_V1_STRESS",
@@ -723,6 +733,169 @@ test("caller cancellation aborts the response stream without retry", async () =>
   assert.equal(result.status, "UNAVAILABLE");
   assert.ok(result.reasons.includes("REQUEST_CANCELLED"));
   assert.equal(cancelled, true);
+  assert.equal(calls, 1);
+});
+
+test("timeout cleanup does not wait for a reader whose cancellation never settles", async () => {
+  let calls = 0;
+  let cancelCalls = 0;
+  const adapter = createMarketQuoteAdapter({
+    enabled: true,
+    timeoutMs: 40,
+    clock: () => NOW,
+    transport: async () => {
+      calls += 1;
+      return {
+        status: 200,
+        redirected: false,
+        url: "",
+        headers: new Headers({"content-type": "application/json"}),
+        body: {
+          getReader() {
+            return {
+              read: () => new Promise(() => {}),
+              cancel() {
+                cancelCalls += 1;
+                return new Promise(() => {});
+              },
+              releaseLock() {}
+            };
+          }
+        }
+      };
+    }
+  });
+
+  const result = await settleWithin(adapter.getPaperQuote(request()));
+  assert.ok(result.reasons.includes("REQUEST_TIMEOUT"));
+  assert.ok(cancelCalls > 0);
+  assert.equal(calls, 1);
+});
+
+test("endless immediate empty chunks are bounded and yield to the event loop", async () => {
+  let calls = 0;
+  let pulls = 0;
+  let timerRan = false;
+  const timer = setTimeout(() => { timerRan = true; }, 0);
+  const adapter = createMarketQuoteAdapter({
+    enabled: true,
+    timeoutMs: 1_000,
+    clock: () => NOW,
+    transport: async () => {
+      calls += 1;
+      return {
+        status: 200,
+        redirected: false,
+        url: "",
+        headers: new Headers({"content-type": "application/json"}),
+        body: new ReadableStream({
+          pull(controller) {
+            pulls += 1;
+            controller.enqueue(new Uint8Array(0));
+          }
+        })
+      };
+    }
+  });
+
+  try {
+    const result = await settleWithin(adapter.getPaperQuote(request()));
+    assert.ok(result.reasons.includes("RESPONSE_EMPTY_READ_LIMIT"));
+    assert.equal(timerRan, true);
+    assert.ok(pulls <= 300);
+    assert.equal(calls, 1);
+  } finally {
+    clearTimeout(timer);
+  }
+});
+
+test("late response cancellation rejection is observed after timeout without retry", async () => {
+  const unhandled = [];
+  const onUnhandled = error => unhandled.push(error);
+  process.on("unhandledRejection", onUnhandled);
+  let calls = 0;
+  let cancelCalls = 0;
+  const adapter = createMarketQuoteAdapter({
+    enabled: true,
+    timeoutMs: 40,
+    clock: () => NOW,
+    transport: async (_url, {signal}) => {
+      calls += 1;
+      return new Promise(resolve => {
+        const lateResponse = () => resolve({
+          status: 200,
+          redirected: false,
+          url: "",
+          headers: new Headers({"content-type": "application/json"}),
+          body: {
+            getReader() {
+              return {
+                read: () => new Promise(() => {}),
+                cancel() {
+                  cancelCalls += 1;
+                  return Promise.reject(new Error("late body cancellation rejected"));
+                },
+                releaseLock() {}
+              };
+            }
+          }
+        });
+        if (signal.aborted) lateResponse();
+        else signal.addEventListener("abort", lateResponse, {once: true});
+      });
+    }
+  });
+
+  try {
+    const result = await settleWithin(adapter.getPaperQuote(request()));
+    await new Promise(resolve => setImmediate(resolve));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.ok(result.reasons.includes("REQUEST_TIMEOUT"));
+    assert.ok(cancelCalls > 0);
+    assert.deepEqual(unhandled, []);
+    assert.equal(calls, 1);
+  } finally {
+    process.off("unhandledRejection", onUnhandled);
+  }
+});
+
+test("caller abort race settles despite a never-settling cancellation and never retries", async () => {
+  const cancellation = new AbortController();
+  let calls = 0;
+  let cancelCalls = 0;
+  const adapter = createMarketQuoteAdapter({
+    enabled: true,
+    timeoutMs: 80,
+    clock: () => NOW,
+    transport: async () => {
+      calls += 1;
+      return {
+        status: 200,
+        redirected: false,
+        url: "",
+        headers: new Headers({"content-type": "application/json"}),
+        body: {
+          getReader() {
+            return {
+              read: () => new Promise(() => {}),
+              cancel() {
+                cancelCalls += 1;
+                return new Promise(() => {});
+              },
+              releaseLock() {}
+            };
+          }
+        }
+      };
+    }
+  });
+
+  const pending = adapter.getPaperQuote(request(), {signal: cancellation.signal});
+  await new Promise(resolve => setImmediate(resolve));
+  cancellation.abort();
+  const result = await settleWithin(pending);
+  assert.ok(result.reasons.includes("REQUEST_CANCELLED"));
+  assert.ok(cancelCalls > 0);
   assert.equal(calls, 1);
 });
 
