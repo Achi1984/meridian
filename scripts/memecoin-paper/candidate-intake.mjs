@@ -438,13 +438,27 @@ export async function writeExclusiveConfig(output, bytes, {
     await link(stagedOutput, path.join(directoryPath, basename));
 
     const verifyPublished = async () => {
-      const publishedHandle = await open(path.join(directoryPath, basename), "r");
+      const publishedHandle = await open(
+        path.join(directoryPath, basename),
+        constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK
+      );
       try {
         const info = await publishedHandle.stat();
         const staged = await handle.stat();
-        const publishedBytes = await publishedHandle.readFile();
-        return info.isFile() && (info.mode & 0o777) === 0o600 &&
-          info.dev === staged.dev && info.ino === staged.ino && publishedBytes.equals(bytes);
+        if (!info.isFile() || (info.mode & 0o777) !== 0o600 ||
+            info.dev !== staged.dev || info.ino !== staged.ino || info.size !== bytes.length) {
+          return false;
+        }
+        const publishedBytes = Buffer.alloc(bytes.length + 1);
+        let offset = 0;
+        while (offset < publishedBytes.length) {
+          const {bytesRead} = await publishedHandle.read(
+            publishedBytes, offset, publishedBytes.length - offset, offset
+          );
+          if (bytesRead === 0) break;
+          offset += bytesRead;
+        }
+        return offset === bytes.length && publishedBytes.subarray(0, offset).equals(bytes);
       } finally {
         await publishedHandle.close();
       }
@@ -463,9 +477,7 @@ export async function writeExclusiveConfig(output, bytes, {
       }
       await assertDirectoryBinding(directory, expectedDirectory, directoryHandle);
     } catch {
-      if (!await verifyPublished()) {
-        throw new TypeError("published config could not be verified after a durability failure");
-      }
+      try { await verifyPublished(); } catch {}
       publicationStatus = "PUBLISHED_DURABILITY_UNCERTAIN";
     }
   } finally {

@@ -535,6 +535,60 @@ test("post-publication directory open and sync failures report verified uncertai
   }
 });
 
+test("FIFO and oversized replacements after publication remain bounded and uncertain", async t => {
+  if (process.platform !== "linux") return t.skip("publication regression uses Linux file descriptors");
+  const directory = await harness(t);
+  const inputPath = path.join(directory, "snapshots.json");
+  const pair = await pairFixture({pairCreatedAt: NOW - 60 * 60 * 1000});
+  await writeFile(inputPath, JSON.stringify(input([snapshot(pair)])));
+  const moduleUrl = new URL("../scripts/memecoin-paper/candidate-intake.mjs", import.meta.url).href;
+  const program = `
+    import {unlink, writeFile} from "node:fs/promises";
+    import {spawnSync} from "node:child_process";
+    import {runCandidateIntake} from ${JSON.stringify(moduleUrl)};
+    const [input, output, startAt, mode] = process.argv.slice(1);
+    const result = await runCandidateIntake({
+      input, output, runId: "replacement-durability-test",
+      startAt: Number(startAt), now: ${NOW}
+    }, {
+      openDirectory: async directory => {
+        await unlink(output);
+        if (mode === "fifo") {
+          const created = spawnSync("mkfifo", [output]);
+          if (created.status !== 0) throw new Error("could not create replacement FIFO");
+        } else {
+          await writeFile(output, Buffer.alloc(16 * 1024 * 1024, 0x78), {mode: 0o600});
+        }
+        throw new Error("injected post-publication directory-open failure");
+      }
+    });
+    console.log(JSON.stringify(result));
+  `;
+
+  for (const mode of ["fifo", "large"]) {
+    const output = path.join(directory, `${mode}-replacement.json`);
+    const child = spawnSync(process.execPath, [
+      "--input-type=module", "-e", program, inputPath, output, String(START_AT), mode
+    ], {encoding: "utf8", timeout: 3_000});
+    assert.equal(child.error, undefined, child.error?.message);
+    assert.equal(child.status, 0, child.stderr);
+    const result = JSON.parse(child.stdout);
+    assert.equal(result.status, "OBSERVATION_PLAN_PUBLISHED_DURABILITY_UNCERTAIN");
+    assert.equal(result.publicationStatus, "PUBLISHED_DURABILITY_UNCERTAIN");
+    assert.deepEqual(result.identity, IDENTITY);
+    assert.equal(result.hardGateStatus, "UNKNOWN");
+    assert.equal(result.executionAuthorized, false);
+    assert.match(result.configHash, /^[a-f0-9]{64}$/);
+
+    const replacement = await stat(output);
+    if (mode === "fifo") {
+      assert.ok(replacement.isFIFO());
+    } else {
+      assert.equal(replacement.size, 16 * 1024 * 1024);
+    }
+  }
+});
+
 test("no eligible candidate creates no config, and bounded rejection metadata stays caller-only", async t => {
   const directory = await harness(t);
   const output = path.join(directory, "never-created.json");
