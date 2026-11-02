@@ -227,6 +227,34 @@ test('a shared display freshness policy classifies stale in both connector and c
   h.controller.dispose();
 });
 
+test('freshness crossing during presentation uses one consistent evaluation instant', async () => {
+  let samples = 0;
+  let calls = 0;
+  const clock = fakeScheduler(() => NOW + 60_001);
+  const h = harness({
+    fetchImpl: async () => {
+      calls++;
+      return paperResponse(generatedReport());
+    },
+    policy: {
+      now: () => ++samples <= 5 ? NOW : NOW + 60_001,
+      staleAfterMs: 60_000
+    },
+    schedule: clock.schedule,
+    cancelSchedule: clock.cancelSchedule
+  });
+  h.controller.setActive(true);
+  await h.controller.refresh();
+
+  assert.equal(samples, 6, 'the report presentation samples freshness once after connector validation');
+  assert.equal(calls, 1, 'freshness reconciliation does not request another report');
+  assert.equal(h.root.attrs['data-state'], 'stale');
+  assert.match(h.root.textContent, /stale under the shared display-only freshness policy/i);
+  assert.match(h.root.textContent, /AktualitätSTALE/);
+  assert.equal(clock.timers.size, 0, 'an already stale report does not arm a freshness timer');
+  h.controller.dispose();
+});
+
 test('revalidation reclassifies retained freshness without reading and preserves loading', async () => {
   let now = NOW;
   let calls = 0;

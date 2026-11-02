@@ -63,11 +63,11 @@ export function mountPaperCockpit(root, document, window, {
     freshnessTimer = null;
   }
 
-  function scheduleFreshnessUpdate() {
+  function scheduleFreshnessUpdate(now) {
     clearFreshnessTimer();
     if (disposed || !active || !report || policy.staleAfterMs === null) return;
     const model = presentPaperCockpitReport(report, {
-      now: policy.now(),
+      now,
       staleAfterMs: policy.staleAfterMs
     });
     const freshness = model.evidence?.freshness;
@@ -83,15 +83,18 @@ export function mountPaperCockpit(root, document, window, {
 
   function render({preserveDemoState = false} = {}) {
     if (disposed) return;
+    const now = policy.now();
+    if (report && !reading) state = classifyReport(report, now);
     renderPaperCockpit(root, report, document, {
       state,
       message: STATE_MESSAGES[state] || STATE_MESSAGES.unknown,
       onRefresh: enabled && active ? read : null,
       loading: reading,
       freshnessPolicy: policy,
+      now,
       preserveDemoState
     });
-    scheduleFreshnessUpdate();
+    scheduleFreshnessUpdate(now);
   }
 
   function disposeRead() {
@@ -114,14 +117,13 @@ export function mountPaperCockpit(root, document, window, {
       return;
     }
     if (report) {
-      if (!reading) state = classifyReport(report);
       render({preserveDemoState: true});
     }
   }
 
-  function classifyReport(report) {
+  function classifyReport(report, now) {
     const model = presentPaperCockpitReport(report, {
-      now: policy.now(),
+      now,
       staleAfterMs: policy.staleAfterMs
     });
     if (model.evidence.freshness.status === 'STALE') return 'stale';
@@ -176,7 +178,7 @@ export function mountPaperCockpit(root, document, window, {
       state = 'stale';
     } else if (result.status === 'AVAILABLE' && result.report) {
       report = result.report;
-      state = classifyReport(report);
+      state = 'unknown';
     } else if (result.status === 'BUSY') {
       state = 'loading';
     } else {

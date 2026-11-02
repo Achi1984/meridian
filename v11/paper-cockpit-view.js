@@ -200,7 +200,7 @@ export function renderPaperCockpit(root, report = null, document = root?.ownerDo
   view.status.textContent = options.message || 'Reportstatus unbekannt.';
   const freshnessPolicy = options.freshnessPolicy;
   const reportOptions = freshnessPolicy
-    ? {now: freshnessPolicy.now(), staleAfterMs: freshnessPolicy.staleAfterMs}
+    ? {now: options.now ?? freshnessPolicy.now(), staleAfterMs: freshnessPolicy.staleAfterMs}
     : options;
   if (options.preserveDemoState !== true) view.demo.open = false;
   view.report.replaceChildren();

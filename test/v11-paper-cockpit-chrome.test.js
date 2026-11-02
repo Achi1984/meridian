@@ -28,6 +28,18 @@ function runFlaggedBrowserTest(name,timeout){
     {env,encoding:'utf8',timeout});
 }
 
+function assertNamedTestPassed(output,name){
+  const result=output.split(/\r?\n/).map(line=>{
+    const match=/^ok (\d+) - (.+?)(?:\s+# (.*))?$/.exec(line);
+    if(!match||match[2]!==name)return null;
+    return {ordinal:Number(match[1]),directive:match[3]};
+  }).find(Boolean);
+  assert.ok(result&&Number.isSafeInteger(result.ordinal)&&result.ordinal>0,
+    `flagged child must report the named browser regression as a TAP success:\n${output}`);
+  assert.doesNotMatch(result.directive||'',/^SKIP(?:\s|$)/,
+    'the named browser regression must execute rather than skip');
+}
+
 async function interceptGeneratedPaperReport(call,report){
   const body=Buffer.from(JSON.stringify({
     schema:PAPER_REPORT_ENVELOPE_SCHEMA,runId:report.experiment.id,report
@@ -68,6 +80,8 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
     const child=runFlaggedBrowserTest(
       'M11 Paper cockpit demo is responsive and keyboard accessible at five widths',235000);
     assert.equal(child.status,0,String(child.stdout).slice(-2500)+String(child.stderr).slice(-1000));
+    assertNamedTestPassed(child.stdout,
+      'M11 Paper cockpit demo is responsive and keyboard accessible at five widths');
     const rows=child.stdout.split('\n').filter(line=>/^(?:# )?V11_PAPER_COCKPIT_SIZE /.test(line));
     assert.equal(rows.length,sizes.length);rows.forEach(row=>console.log(row));return;
   }
@@ -358,8 +372,7 @@ test('early Strategies navigation remains active when its module bootstrap initi
     const name='early Strategies navigation remains active when its module bootstrap initializes';
     const child=runFlaggedBrowserTest(name,55000);
     assert.equal(child.status,0,String(child.stdout).slice(-2500)+String(child.stderr).slice(-1000));
-    assert.match(child.stdout,new RegExp(`ok 1 - ${name}`),
-      'the flagged child must execute this browser regression, not silently skip it');
+    assertNamedTestPassed(child.stdout,name);
     return;
   }
   assert.ok(chrome,'Chrome required; early navigation race cannot be skipped');
