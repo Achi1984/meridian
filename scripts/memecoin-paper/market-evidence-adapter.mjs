@@ -132,6 +132,15 @@ function providerEvidence(candidate, key, now, identity) {
             .every(name => typeof value[name] === "boolean")
           : isFiniteNumber(value) && value >= (key === "priceChange1hPct" ? -100 : 0);
   if (!validValue) return unknownEvidence("normalized provider field has an invalid value", identity, item);
+  if (key === "tokenDecimals") {
+    const candidateSupply = decimalAtoms(candidate.tokenSupplyAtoms);
+    const normalizedSupply = decimalAtoms(item.coverage.amountAtoms);
+    if (item.verified !== true || candidateSupply === null || normalizedSupply === null ||
+        candidateSupply !== normalizedSupply || item.coverage.mintAccountMatch !== true ||
+        item.coverage.accountSlot !== item.slot) {
+      return unknownEvidence("authoritative mint supply is missing, unbound, or inconsistent", identity, item);
+    }
+  }
   const record = {
     value,
     source: item.source,
@@ -147,7 +156,10 @@ function providerEvidence(candidate, key, now, identity) {
         ? {sourceBinding: item.coverage.sourceBinding} : {}),
       ...(typeof item.coverage.amountAtoms === "string" &&
         item.coverage.amountAtoms.length <= 39 && DECIMAL_INTEGER.test(item.coverage.amountAtoms)
-        ? {amountAtoms: item.coverage.amountAtoms} : {})
+        ? {amountAtoms: item.coverage.amountAtoms} : {}),
+      ...(item.coverage.mintAccountMatch === true ? {mintAccountMatch: true} : {}),
+      ...(Number.isSafeInteger(item.coverage.accountSlot) && item.coverage.accountSlot >= 0
+        ? {accountSlot: item.coverage.accountSlot} : {})
     },
     binding: identity
   };
@@ -212,10 +224,12 @@ function percentageCeiling(numerator, denominator) {
   return Number(scaled) / 1_000_000;
 }
 
-function ownerCensus(item, candidate, now, identity) {
+function ownerCensus(item, candidate, now, identity, tokenSupplyEvidence) {
   const checked = reviewable(item, candidate, now, identity);
   if (!checked.metadata) return {record: unknownEvidence(checked.reason, identity, item), owners: null};
   const value = item.value;
+  const context = value?.context;
+  const policy = item.coverage.supplyContextPolicy;
   if (!isRecord(value) || !Array.isArray(value.accounts) ||
       value.accounts.length === 0 || value.accounts.length > MAX_OWNER_ACCOUNTS ||
       !Array.isArray(item.coverage.exclusions) ||
@@ -225,6 +239,17 @@ function ownerCensus(item, candidate, now, identity) {
       item.coverage.ownerResolutionComplete !== true ||
       item.coverage.accountCoverageComplete !== true ||
       value.pool !== candidate.pool ||
+      !sameIdentity(context, identity) ||
+      context.slot !== item.slot || context.observedAt !== item.observedAt ||
+      context.commitment !== "finalized" ||
+      !["same-finalized-slot", "distinct-finalized-slots-equal-supply"].includes(policy) ||
+      !tokenSupplyEvidence || tokenSupplyEvidence.verified !== true ||
+      tokenSupplyEvidence.source !== (candidate.source === SYNTHETIC_SOURCE
+        ? SYNTHETIC_SOURCE : "Solana JSON-RPC getTokenSupply") ||
+      !Number.isSafeInteger(tokenSupplyEvidence.slot) ||
+      !Number.isSafeInteger(tokenSupplyEvidence.coverage?.accountSlot) ||
+      tokenSupplyEvidence.coverage.mintAccountMatch !== true ||
+      tokenSupplyEvidence.coverage.accountSlot !== tokenSupplyEvidence.slot ||
       !Array.isArray(value.selectedPoolTokenAccounts) ||
       value.selectedPoolTokenAccounts.length < 1 ||
       value.selectedPoolTokenAccounts.length > MAX_OWNER_ACCOUNTS ||
@@ -245,8 +270,19 @@ function ownerCensus(item, candidate, now, identity) {
     return {record: unknownWithReason(identity, "burned-supply exclusion amount is not established", item), owners: null};
   }
   const supply = decimalAtoms(value.supplyAtoms);
-  if (supply === null || supply === 0n) {
-    return {record: unknownWithReason(identity, "owner census supply is missing or invalid", item), owners: null};
+  const authoritativeSupply = decimalAtoms(candidate.tokenSupplyAtoms);
+  const normalizedSupply = decimalAtoms(tokenSupplyEvidence.coverage.amountAtoms);
+  if (supply === null || supply === 0n || authoritativeSupply === null ||
+      normalizedSupply === null || authoritativeSupply !== normalizedSupply ||
+      supply !== authoritativeSupply) {
+    return {record: unknownWithReason(identity,
+      "owner census supply does not match the source-bound mint supply", item), owners: null};
+  }
+  const sameSlot = context.slot === tokenSupplyEvidence.slot;
+  if ((policy === "same-finalized-slot" && !sameSlot) ||
+      (policy === "distinct-finalized-slots-equal-supply" && sameSlot)) {
+    return {record: unknownWithReason(identity,
+      "owner census and mint-supply slots contradict the declared snapshot policy", item), owners: null};
   }
   const seenAccounts = new Set();
   const owners = new Map();
@@ -496,7 +532,8 @@ export function adaptMarketEvidence({
     : unknownWithReason(identity, "selected-pool LP burn/lock evidence is missing, mismatched, or does not cover the hold",
       lp);
 
-  const census = ownerCensus(evidence.ownerCensus, candidate, now, identity);
+  const census = ownerCensus(
+    evidence.ownerCensus, candidate, now, identity, normalizedEvidence.tokenDecimals);
   normalizedEvidence.top10OwnerPct = census.record;
   normalizedEvidence.devAssociatedPct = developerHoldings(
     evidence.developerAttribution, census, candidate, now, identity);

@@ -15,7 +15,10 @@ does not parse HTTP or RPC responses. Supplemental records must carry the
 candidate identity (`chainId`, `mint`, selected `pool`, and `quote`), millisecond
 `observedAt`, nonnegative numeric `slot`, `source`, `sourceVersion`, complete
 `coverage`, `review` metadata (`status: "REVIEWED"`, reviewer ID, review ID,
-review time), and a typed `value`. The adapter discards caller `status` and
+review time), and a typed `value`. Owner-census `value.context` also binds
+`chainId`, `mint`, selected `pool`, `quote`, `slot`, `observedAt`, and
+`commitment: "finalized"`; the context slot/time must equal the outer record.
+The adapter discards caller `status` and
 `verified` flags and derives its filter-facing values only after validating
 those fields and the individual data contract.
 
@@ -53,6 +56,32 @@ or an over-limit census leave concentration `UNKNOWN`. The upstream
 owner-census source must document how it proves completeness and ties the
 selected pool and burned-account exclusions to on-chain evidence; a list of the
 largest accounts alone cannot satisfy this contract.
+
+The census supply must also exactly equal both
+`providerCandidate.tokenSupplyAtoms` and the amount in the provider-normalized
+`evidence.tokenDecimals.coverage.amountAtoms`. That decimals record must be
+source-bound to `Solana JSON-RPC getTokenSupply`, have a valid mint-account
+match, and retain its supply slot. The census record declares one of two
+`coverage.supplyContextPolicy` values:
+
+- `same-finalized-slot`: census context slot must equal the normalized
+  `getTokenSupply` slot.
+- `distinct-finalized-slots-equal-supply`: slots must differ, while both
+  records remain separately bound to finalized contexts, are fresh under the
+  existing evidence-age limit, and supply amounts match exactly. This is an
+  explicit cross-slot policy, not an assertion that the balance distribution
+  is atomic across those observations. The census rows must reconcile to its
+  own context supply. Missing/mismatched mint, amount, context time, slot, or
+  unsupported policy remains `UNKNOWN`; slots are never silently treated as
+  interchangeable.
+
+`burned_supply` means a reviewed, currently evidenced irrecoverable token
+account balance that is still included in the observed mint supply and in the
+census rows. It does **not** mean historical SPL burn transactions: those
+already reduce mint supply and must not be subtracted a second time. The census
+source must prove each excluded account's irrecoverability and amount; if that
+proof is unavailable, the owner distribution is incomplete and remains
+`UNKNOWN`.
 
 `evidence.developerAttribution` is a separate reviewed record with
 `value.method: "documented"`, explicit `developerOwners`, and nonempty
@@ -103,7 +132,7 @@ source provenance.
 |---|---|---|
 | Solana mint, selected pool, quote, sample identity | DexScreener pair response is checked against the requested chain, mint, pool, and quote by `acquireProviderEvidence`. | Preserved from the normalized candidate; mismatch remains unknown. Discovery is not exhaustive. |
 | Pair age, actual USD market cap | DexScreener `pairCreatedAt` and optional `marketCap`. | Reuses the normalizer. Missing `marketCap` stays unknown; FDV is not substituted. Pair age is not token creation age. |
-| Token decimals, mint/freeze authority | `getTokenSupply`, `getAccountInfo`, and the existing mint-safety evidence bridge. | Existing bridge binds account/supply identity, time, and slot. The adapter does not broaden its decoder support. |
+| Token decimals, mint/freeze authority | `getTokenSupply`, `getAccountInfo`, and the existing mint-safety evidence bridge. | Existing bridge binds account/supply identity, time, and slot. For census use, the adapter additionally requires decimals evidence to bind `amountAtoms`, `mintAccountMatch`, and `accountSlot` to `candidate.tokenSupplyAtoms`; it does not broaden decoder support. |
 | Token-2022 transfer restrictions | The current decoder reports transfer fee, transfer hook, default-frozen accounts, and permanent delegate. | Other/unrecognized extensions remain unknown. Revoked mint/freeze authority alone is not universal transfer-safety proof. |
 | Pool-specific LP burn or lock | No current provider parser or source-bound record. | Requires an independently reviewed, pool-specific lock/burn decoder and proof; unknown pool models block. |
 | Liquidity, trailing 1-hour volume, 1-hour price change | DexScreener `liquidity.usd`, `volume.h1`, and `priceChange.h1`. | Snapshot fields feed existing thresholds only. They are not executable depth, complete history, or event-time guarantees. |

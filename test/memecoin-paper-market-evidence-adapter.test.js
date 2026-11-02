@@ -56,6 +56,13 @@ function reviewed(source, value, {
 
 function fixtureInput() {
   const providerCandidate = syntheticCandidate(NOW);
+  providerCandidate.tokenSupplyAtoms = "1000";
+  providerCandidate.evidence.tokenDecimals.coverage = {
+    complete: true,
+    amountAtoms: "1000",
+    mintAccountMatch: true,
+    accountSlot: 1
+  };
   const ownerAccounts = Array.from({length: 40}, (_, index) => ({
     account: address("B", index),
     owner: address("A", index),
@@ -73,6 +80,7 @@ function fixtureInput() {
     ownerCensus: reviewed(SYNTHETIC_SOURCE, {
       pool: IDENTITY.pool,
       supplyAtoms: "1000",
+      context: {...IDENTITY, slot: 1, observedAt: NOW, commitment: "finalized"},
       selectedPoolTokenAccounts: [address("P", 1)],
       burnedTokenAccounts: [address("Q", 2)],
       accounts: ownerAccounts
@@ -82,6 +90,7 @@ function fixtureInput() {
         ownerResolutionComplete: true,
         accountCoverageComplete: true,
         burnedSupplyAtoms: "100",
+        supplyContextPolicy: "same-finalized-slot",
         exclusions: ["selected_pool", "burned_supply"]
       }
     }),
@@ -282,11 +291,48 @@ test("owner census aggregates by owner, excludes pool and burned balances, and i
   assert.equal(adapt(oversized).candidate.evidence.top10OwnerPct.verified, false);
 });
 
+test("owner census must reconcile source-bound supply, mint, and declared slot policy", () => {
+  const mismatch = fixtureInput();
+  mismatch.providerCandidate.tokenSupplyAtoms = "2000";
+  mismatch.providerCandidate.evidence.tokenDecimals.coverage.amountAtoms = "2000";
+  const mismatchResult = adapt(mismatch);
+  const mismatchFilters = filterCandidate(mismatchResult.candidate, {now: NOW, holdUntil: HOLD_UNTIL});
+  assert.equal(mismatchFilters.checks.top10Owners.status, "UNKNOWN");
+
+  const missingSupply = fixtureInput();
+  delete missingSupply.providerCandidate.tokenSupplyAtoms;
+  delete missingSupply.providerCandidate.evidence.tokenDecimals.coverage.amountAtoms;
+  const missingResult = adapt(missingSupply);
+  const missingFilters = filterCandidate(missingResult.candidate, {now: NOW, holdUntil: HOLD_UNTIL});
+  assert.equal(missingFilters.checks.tokenDecimals.status, "UNKNOWN");
+  assert.equal(missingFilters.checks.top10Owners.status, "UNKNOWN");
+
+  const wrongMint = fixtureInput();
+  wrongMint.evidence.ownerCensus.value.context.mint = address("Z", 5);
+  assert.equal(adapt(wrongMint).candidate.evidence.top10OwnerPct.verified, false);
+
+  const contradictorySameSlot = fixtureInput();
+  contradictorySameSlot.evidence.ownerCensus.value.context.slot = 2;
+  contradictorySameSlot.evidence.ownerCensus.slot = 2;
+  assert.equal(adapt(contradictorySameSlot).candidate.evidence.top10OwnerPct.verified, false);
+
+  const supportedCrossSlot = fixtureInput();
+  supportedCrossSlot.evidence.ownerCensus.value.context.slot = 2;
+  supportedCrossSlot.evidence.ownerCensus.slot = 2;
+  supportedCrossSlot.evidence.ownerCensus.coverage.supplyContextPolicy =
+    "distinct-finalized-slots-equal-supply";
+  const crossSlotResult = adapt(supportedCrossSlot);
+  const crossSlotFilters = filterCandidate(crossSlotResult.candidate, {now: NOW, holdUntil: HOLD_UNTIL});
+  assert.equal(crossSlotFilters.checks.top10Owners.status, "PASS");
+});
+
 test("hard-gate percentages round conservatively at sub-micropercentage boundaries", () => {
   const concentration = fixtureInput();
   const census = concentration.evidence.ownerCensus;
   census.value.supplyAtoms = "10000000000";
   census.coverage.burnedSupplyAtoms = "0";
+  concentration.providerCandidate.tokenSupplyAtoms = "10000000000";
+  concentration.providerCandidate.evidence.tokenDecimals.coverage.amountAtoms = "10000000000";
   for (const [index, account] of census.value.accounts.entries()) {
     account.amountAtoms = index < 10 ? "250000001"
       : index < 39 ? "250000000" : index === 39 ? "249999990" : "0";
@@ -300,6 +346,8 @@ test("hard-gate percentages round conservatively at sub-micropercentage boundari
   const otherCensus = otherGates.evidence.ownerCensus;
   otherCensus.value.supplyAtoms = "10000000000";
   otherCensus.coverage.burnedSupplyAtoms = "0";
+  otherGates.providerCandidate.tokenSupplyAtoms = "10000000000";
+  otherGates.providerCandidate.evidence.tokenDecimals.coverage.amountAtoms = "10000000000";
   otherCensus.value.accounts.splice(40, 0, ...Array.from({length: 10}, (_, index) => ({
     account: address("B", index + 40),
     owner: address("A", index + 40),
