@@ -218,7 +218,7 @@ test("stale authorization or candidate chronology is disclosed and remains ineli
   assert.equal(result.authorizationEligible, false);
 });
 
-test("exact price ratio retains large raw-unit precision without floating-point arithmetic", async () => {
+test("fixture successfully normalizes the exact quote/base ratio but cannot normalize USD costs", async () => {
   const amount = "123456789012345678901";
   const output = "9876543210987654321";
   const fixture = entryResponse({
@@ -236,9 +236,16 @@ test("exact price ratio retains large raw-unit precision without floating-point 
   const numerator = BigInt(ratio.numerator);
   const denominator = BigInt(ratio.denominator);
   assert.equal(numerator * BigInt(output), denominator * BigInt(amount));
+  assert.equal(ratio.unit, "quote-token per base-token");
   assert.equal(result.quoteCandidate.routeAmounts.inputAtoms, amount);
   assert.equal(result.quoteCandidate.routeAmounts.outputAtoms, output);
   assert.equal(result.quoteCandidate.priceMicros, null);
+  assert.equal(result.costEvidence.status, "UNKNOWN");
+  assert.deepEqual(Object.keys(result.costEvidence.components).sort(),
+    ["fee", "network", "priceImpact", "slippage", "spread"]);
+  assert.ok(Object.values(result.costEvidence.components)
+    .every(component => component.status === "UNKNOWN" && component.amount === null));
+  assert.equal(result.authorizationEligible, false);
 });
 
 test("provider expiry, malformed/truncated responses, and over-cap streams fail closed", async () => {
