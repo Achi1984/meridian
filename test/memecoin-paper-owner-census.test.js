@@ -534,26 +534,138 @@ test("intermittent progress still hits the total-read cap", {timeout: 15_000}, a
   assert.equal(cancelled, 1);
 });
 
-test("immediately ready empty and nonempty reads yield to the real deadline", {timeout: 2000}, async t => {
+test("deadline expiry before dispatch records no request, read, or body cancellation", {timeout: 2000}, async () => {
+  let transportAttempts = 0;
+  let reads = 0;
+  let cancelled = 0;
+  const pending = acquire({
+    bounds: {...BOUNDS, maxElapsedMs: 1},
+    transport: async () => {
+      transportAttempts += 1;
+      return {
+        status: 200,
+        body: {
+          getReader() {
+            return {
+              read() {
+                reads += 1;
+                return Promise.resolve({done: true});
+              },
+              cancel() { cancelled += 1; },
+              releaseLock() {}
+            };
+          }
+        }
+      };
+    }
+  });
+  const spinStartedAt = performance.now();
+  while (performance.now() - spinStartedAt < 5) {}
+
+  const result = await pending;
+  assert.equal(result.reason, "TIMEOUT");
+  assert.equal(result.status, "UNKNOWN");
+  assert.equal(result.rawCensus, null);
+  assert.equal(result.provenance.requestCount, 0);
+  assert.equal(transportAttempts, 0);
+  assert.equal(reads, 0);
+  assert.equal(cancelled, 0);
+});
+
+test("stream deadline after dispatch and first read cancels the existing body", {timeout: 2000}, async () => {
+  let transportAttempts = 0;
+  let reads = 0;
+  let cancelled = 0;
+  const result = await acquire({
+    bounds: {...BOUNDS, maxElapsedMs: 100},
+    transport: async () => {
+      transportAttempts += 1;
+      return {
+        status: 200,
+        body: {
+          getReader() {
+            return {
+              read() {
+                reads += 1;
+                if (reads === 1) {
+                  return Promise.resolve({done: false, value: new Uint8Array([123])});
+                }
+                return new Promise(() => {});
+              },
+              cancel() {
+                cancelled += 1;
+                return Promise.resolve();
+              },
+              releaseLock() {}
+            };
+          }
+        }
+      };
+    }
+  });
+
+  assert.equal(result.reason, "TIMEOUT");
+  assert.equal(result.status, "UNKNOWN");
+  assert.equal(result.rawCensus, null);
+  assert.equal(result.provenance.requestCount, 1);
+  assert.equal(transportAttempts, 1);
+  assert.equal(reads, 2);
+  assert.equal(result.provenance.responseBytes, 1);
+  assert.equal(cancelled, 1);
+});
+
+test("immediately fulfilled unbounded streams yield macrotask progress before bounded termination", {
+  timeout: 15_000
+}, async t => {
   for (const empty of [true, false]) {
-    await t.test(empty ? "empty chunks" : "one-byte chunks", async () => {
+    await t.test(empty ? "empty chunks" : "one-byte chunks", {timeout: 10_000}, async () => {
+      let transportAttempts = 0;
       let reads = 0;
+      let pulls = 0;
+      let readsAtMacrotask = null;
       let cancelled = 0;
       const body = new ReadableStream({
         pull(controller) {
-          reads += 1;
+          pulls += 1;
+          if (pulls === 1) {
+            setImmediate(() => { readsAtMacrotask = reads; });
+          }
           controller.enqueue(empty ? new Uint8Array(0) : new Uint8Array([32]));
         },
         cancel() { cancelled += 1; }
       }, {highWaterMark: 0});
+      const nativeGetReader = body.getReader.bind(body);
+      const instrumentedBody = {
+        getReader() {
+          const reader = nativeGetReader();
+          return {
+            read() {
+              reads += 1;
+              return reader.read();
+            },
+            cancel(reason) { return reader.cancel(reason); },
+            releaseLock() { return reader.releaseLock(); }
+          };
+        }
+      };
+
       const result = await acquire({
-        bounds: {...BOUNDS, maxElapsedMs: 1},
-        transport: async () => ({status: 200, body})
+        transport: async () => {
+          transportAttempts += 1;
+          return {status: 200, body: instrumentedBody};
+        }
       });
-      assert.equal(result.reason, "TIMEOUT");
+
+      assert.equal(result.reason, empty ? "RESPONSE_NO_PROGRESS" : "RESPONSE_READ_LIMIT");
       assert.equal(result.status, "UNKNOWN");
       assert.equal(result.rawCensus, null);
-      assert.ok(reads <= 64);
+      assert.equal(result.provenance.requestCount, 1);
+      assert.equal(transportAttempts, 1);
+      assert.equal(reads, empty ? 256 : 65_536);
+      assert.equal(pulls, reads);
+      assert.notEqual(readsAtMacrotask, null);
+      assert.ok(readsAtMacrotask > 0);
+      assert.ok(readsAtMacrotask < reads);
       assert.equal(cancelled, 1);
     });
   }
