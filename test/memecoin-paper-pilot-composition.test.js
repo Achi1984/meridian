@@ -354,23 +354,31 @@ test("blocked start and expired windows leave a truthful blocked lifecycle state
   const future = await harness(t, {
     runConfig: config({startedAt: START + 10_000})
   });
-  assert.equal((await future.pilot.start()).code, "RUN_WINDOW_NOT_STARTED");
+  const futureResult = await future.pilot.start();
+  assert.equal(futureResult.code, "RUN_WINDOW_NOT_STARTED");
+  assert.equal(futureResult.executionStarted, false);
+  assert.equal(futureResult.terminalReceipt, null);
+  assert.equal(futureResult.report.runnerReport, null);
   assert.equal(future.pilot.status().state, "BLOCKED");
   assert.equal(future.pilot.stop(), false);
 
   const expired = await harness(t, {
     runConfig: config({startedAt: START - 8 * 60 * 60 * 1000})
   });
-  assert.equal((await expired.pilot.start()).code, "RUN_WINDOW_EXPIRED");
+  const expiredResult = await expired.pilot.start();
+  assert.equal(expiredResult.code, "RUN_WINDOW_EXPIRED");
+  assert.equal(expiredResult.executionStarted, false);
+  assert.equal(expiredResult.terminalReceipt, null);
+  assert.equal(expiredResult.report.runnerReport, null);
   assert.equal(expired.pilot.status().state, "BLOCKED");
   assert.equal(expired.pilot.stop(), false);
 });
 
-test("pre-aborted composition does not write or initialize a checkpoint", async t => {
+test("pre-aborted timeout does not write or invent a terminal result", async t => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "paper-composition-aborted-"));
   t.after(() => rm(directory, {recursive: true, force: true}));
   const controller = new AbortController();
-  controller.abort();
+  controller.abort(new DOMException("fixture timeout", "TimeoutError"));
   const clock = clockHarness();
   const pilot = createPaperPilotComposition({
     config: config(),
@@ -382,6 +390,10 @@ test("pre-aborted composition does not write or initialize a checkpoint", async 
   const result = await pilot.start();
   assert.equal(result.status, "STOPPED");
   assert.equal(pilot.status().state, "STOPPED");
+  assert.equal(result.executionStarted, false);
+  assert.equal(result.terminalReceipt, null);
+  assert.equal(result.report.persistence, "NOT_STARTED");
+  assert.equal(result.report.runnerReport, null);
   assert.deepEqual(await readdir(directory), []);
 });
 
@@ -395,6 +407,7 @@ test("stop during checkpoint-store opening is STOPPED and NOT_STARTED", async t 
   assert.equal(result.report.persistence, "NOT_STARTED");
   assert.equal(result.report.bindingReceipt, null);
   assert.equal(result.terminalReceipt, null);
+  assert.equal(result.report.runnerReport, null);
   assert.deepEqual(await readdir(directory), []);
 });
 
