@@ -400,7 +400,7 @@ test("import is inert", () => {
   assert.equal(output, "");
 });
 
-test("isolated helper image drops root to UID/GID 1000 with networking disabled", async t => {
+test("isolated helper image uses UID 0/GID 1000 by default and drops to 1000:1000", async t => {
   const dockerInfo = spawnSync("docker", ["info"], {encoding: "utf8"});
   if (dockerInfo.error || dockerInfo.status !== 0) {
     t.skip("Docker daemon unavailable; isolated container privilege-drop check not run");
@@ -414,8 +414,14 @@ test("isolated helper image drops root to UID/GID 1000 with networking disabled"
   spawn("docker", ["build", "--tag", image, "--file", DOCKERFILE,
     fileURLToPath(new URL("..", import.meta.url))]);
 
+  const initialCredentials = JSON.parse(spawn("docker", [
+    "run", "--rm", "--network=none", "--read-only", "--entrypoint", "node", image,
+    "-e", "process.stdout.write(JSON.stringify({uid: process.getuid(), gid: process.getgid()}))"
+  ]));
+  assert.deepEqual(initialCredentials, {uid: 0, gid: REQUIRED_GID});
+
   const output = JSON.parse(spawn("docker", [
-    "run", "--rm", "--network=none", "--read-only", "--user", "0:0", image
+    "run", "--rm", "--network=none", "--read-only", image
   ]));
   assert.equal(output.status, "DISABLED");
   assert.deepEqual(output.credentials, {

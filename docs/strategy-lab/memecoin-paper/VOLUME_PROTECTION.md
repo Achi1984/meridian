@@ -1,10 +1,11 @@
 # Paper volume protection helper
 
-This source-only helper is a narrowly scoped mount-root permission repair for
-`/var/data/meridian-paper`. It is not part of the normal Paper image, does not
-import the application, and is disabled unless `--repair` is supplied. Even in
-disabled mode the process drops supplementary groups and changes its real and
-effective GID/UID to `1000:1000` before it reports its result.
+This helper is a narrowly scoped mount-root permission repair for
+`/var/data/meridian-paper`. Its source is copied into the normal Paper image,
+but that image's entrypoint does not invoke it. It does not import the
+application and is disabled unless `--repair` is supplied. Even in disabled
+mode the process drops supplementary groups and changes its real and effective
+GID/UID to `1000:1000` before it reports its result.
 
 The helper accepts only a mount owned by UID `0`, GID `1000`, with exact mode
 `02775`. It opens the fixed directory without following a symlink, verifies the
@@ -30,11 +31,13 @@ docker build --file Dockerfile.paper-volume-protection \
   --tag meridian-paper-volume-protection:reviewed .
 ```
 
-The image contains Node 20 and the helper only. Its default invocation is
-disabled; it still drops to UID/GID `1000:1000`, verifies the empty
-supplementary-group set (Node may also report the primary GID in its group
-list), emits a bounded `DISABLED` result, and exits. The image does not include
-or start the Paper application.
+The image contains Node 20 and the helper only, with `USER 0:1000`. Its default
+invocation is disabled; it still drops to UID/GID `1000:1000`, verifies the
+empty supplementary-group set (Node may also report the primary GID in its
+group list), emits a bounded `DISABLED` result, and exits. The image does not
+include or start the Paper application. Do not override its user to `0:0`;
+the build-time GID `1000` preserves the volume's expected group, as required by
+[Northflank's volume group ownership contract](https://northflank.com/docs/v1/application/databases-and-persistence/add-a-volume).
 
 ## Approved activation
 
@@ -45,14 +48,31 @@ must ensure the mount is stable and exclusively administered for the full
 operation. Descriptor-bound mutation does not protect against a concurrent
 platform administrator replacing or changing the mount.
 
-Only after that approval, bind the independently verified platform volume at
-the fixed target and run the explicit repair command with no network:
+Without that approval, keep the existing normal Paper image and its UID 1000
+read-only metadata-hold configuration; do not deploy the root helper image with
+that old command. Only after owner-specific approval, bind the independently
+verified platform volume at the fixed target and run the explicit repair
+command with no network:
 
 ```sh
-docker run --rm --network=none --user 0:0 \
+docker run --rm --network=none \
   --mount type=volume,source=<operator-bound-volume>,target=/var/data/meridian-paper \
   meridian-paper-volume-protection:reviewed --repair
 ```
+
+For a Northflank service override, select **custom entrypoint plus custom
+command**:
+
+```text
+Custom entrypoint: node
+Custom command: /helper/volume-protection.mjs --repair --keepalive
+```
+
+This guarded command is only for the separately approved helper-image
+activation. It uses the helper at `/helper/volume-protection.mjs`; after repair
+and bounded result output, the helper drops to UID/GID `1000:1000` before its
+inert keepalive. Do not use the normal observer's previous CMD as the helper
+command.
 
 The platform volume name is a placeholder that must be resolved and verified
 by the operator; it is not derived from mountinfo or accepted as helper input.
@@ -69,7 +89,7 @@ After an applied result, use the same fixed mount and a separately approved
 one-shot invocation to verify it again without permitting mutation:
 
 ```sh
-docker run --rm --network=none --user 0:0 \
+docker run --rm --network=none \
   --mount type=volume,source=<operator-bound-volume>,target=/var/data/meridian-paper \
   meridian-paper-volume-protection:reviewed --verify
 ```
@@ -81,7 +101,7 @@ and investigate without re-running the mutation.
 
 Once review and operational checks are complete, stop using the temporary
 helper image and return deployment to the normal `Dockerfile.paper` image and
-its existing entrypoint. Do not use the helper image as an application
-replacement. The sticky bit remains on the directory; do not clear it as an
-automatic rollback. Any later permission change requires a separate reviewed,
-explicitly approved operation.
+its existing non-root UID 1000 read-only metadata-hold configuration. Do not
+use the helper image as an application replacement. The sticky bit remains on
+the directory; do not clear it as an automatic rollback. Any later permission
+change requires a separate reviewed, explicitly approved operation.

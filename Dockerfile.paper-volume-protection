@@ -6,4 +6,6 @@ COPY scripts/memecoin-paper/volume-protection.mjs /helper/volume-protection.mjs
 
 ENV NODE_ENV=production
 
+USER 0:1000
+
 ENTRYPOINT ["node", "/helper/volume-protection.mjs"]
