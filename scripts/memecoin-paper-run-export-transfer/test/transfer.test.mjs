@@ -9,7 +9,8 @@ import {
 } from "../../memecoin-paper/paper-pilot-composition.mjs";
 import {canonicalCheckpointBytes} from "../../memecoin-paper/checkpoint-store.mjs";
 import {
-  createExportTransfer, createFileReceiver, createInProcessTransport, MAX_TRANSFER_BYTES
+  createExportTransfer, createFileReceiver, createInProcessTransport, MAX_STREAM_READS,
+  MAX_TRANSFER_BYTES
 } from "../index.mjs";
 
 const PRIVATE_ORIGIN = "https://paper-private.example";
@@ -147,6 +148,7 @@ test("actual canonical run-export roundtrips and the independent evaluator reads
   assert.equal(readback.status, "READ_BACK");
   assert.equal(readback.exportSha256, hash(bytes));
   assert.equal(readback.byteLength, bytes.byteLength);
+  assert.deepEqual(readback.bytes, bytes);
   assert.deepEqual(Buffer.from(JSON.stringify(readback.exportValue)), bytes);
   assert.equal(readback.evaluation.overall, "PASS");
   assert.equal(readback.evaluation.identity.runId, expected.runId);
@@ -203,6 +205,19 @@ test("receiver requires separate scoped authorizers and binds identity, length, 
     exportBytes: bytes, expected: identity, writeAuthorization: WRITE_AUTH, explicitlyAuthorized: true
   });
   assert.equal(sent.status, "TRANSFER_ACKNOWLEDGED");
+  for (const mismatchedIdentity of [
+    {...identity, configSha256: "0".repeat(64)},
+    {...identity, producerRevision: "paper-pilot-composition/999"}
+  ]) {
+    const mismatchedRead = await receiver.get({
+      schema: "memecoin-paper-run-export-transfer/v1",
+      origin: PRIVATE_ORIGIN,
+      identity: mismatchedIdentity,
+      authorization: READ_AUTH
+    });
+    assert.equal(mismatchedRead.status, "UNKNOWN");
+    assert.equal("bytes" in mismatchedRead, false);
+  }
   assert.deepEqual(await client.readback({expected: identity, readAuthorization: WRITE_AUTH}), {
     status: "REJECTED", code: "INVALID_READ_REQUEST"
   });
@@ -269,7 +284,7 @@ test("oversize input is rejected before dispatch and missing readback stays UNKN
   assert.equal(calls, 0);
   assert.deepEqual(await client.readback({
     expected: expectedFor(run), readAuthorization: READ_AUTH
-  }), {status: "UNKNOWN", code: "EXPORT_NOT_FOUND"});
+  }), {status: "REJECTED", code: "INVALID_READ_REQUEST"});
 });
 
 test("deadline, cancellation, redirects, partial writes and lost ACKs are UNKNOWN with no retry", async t => {
@@ -303,11 +318,20 @@ test("deadline, cancellation, redirects, partial writes and lost ACKs are UNKNOW
   });
   const controller = new AbortController();
   controller.abort();
+  let preAbortedReads = 0;
+  const preAbortedStream = {
+    [Symbol.asyncIterator]() { return this; },
+    next() {
+      preAbortedReads++;
+      return Promise.resolve({done: true});
+    }
+  };
   assert.deepEqual(await cancelClient.transfer({
-    exportBytes: bytes, expected, writeAuthorization: WRITE_AUTH,
+    exportBytes: preAbortedStream, expected, writeAuthorization: WRITE_AUTH,
     explicitlyAuthorized: true, signal: controller.signal
   }), {status: "UNKNOWN", code: "CANCELLED"});
   assert.equal(cancelCalls, 0);
+  assert.equal(preAbortedReads, 0);
 
   let redirectCalls = 0;
   const redirectClient = createExportTransfer({
@@ -365,6 +389,61 @@ test("deadline, cancellation, redirects, partial writes and lost ACKs are UNKNOW
   assert.equal(readback.exportSha256, hash(bytes));
 });
 
+test("stream read/work limits bound empty and one-byte chunks; hanging iterators cancel nonblocking", async () => {
+  const run = exportsByFault.NONE;
+  let dispatches = 0;
+  const makeClientForStreams = timeoutMs => createExportTransfer({
+    enabled: true,
+    privateOrigin: PRIVATE_ORIGIN,
+    timeoutMs,
+    transport: {
+      put: async () => { dispatches++; return {}; },
+      get: async () => ({status: "NOT_FOUND", redirected: false})
+    }
+  });
+
+  for (const chunk of [Buffer.alloc(0), Buffer.from("x")]) {
+    let reads = 0;
+    let returnCalls = 0;
+    const stream = {
+      [Symbol.asyncIterator]() { return this; },
+      next() {
+        reads++;
+        return Promise.resolve({done: false, value: chunk});
+      },
+      return() {
+        returnCalls++;
+        return new Promise(() => {});
+      }
+    };
+    const result = await makeClientForStreams(2_000).transfer({
+      exportBytes: stream, expected: expectedFor(run), writeAuthorization: WRITE_AUTH,
+      explicitlyAuthorized: true
+    });
+    assert.deepEqual(result, {status: "REJECTED", code: "INVALID_EXPORT"});
+    assert.equal(reads, MAX_STREAM_READS);
+    assert.equal(returnCalls, 1);
+  }
+  assert.equal(dispatches, 0);
+
+  let hangingReturnCalls = 0;
+  const hangingStream = {
+    [Symbol.asyncIterator]() { return this; },
+    next() { return new Promise(() => {}); },
+    return() {
+      hangingReturnCalls++;
+      return new Promise(() => {});
+    }
+  };
+  assert.deepEqual(await makeClientForStreams(10).transfer({
+    exportBytes: hangingStream, expected: expectedFor(run), writeAuthorization: WRITE_AUTH,
+    explicitlyAuthorized: true
+  }), {status: "UNKNOWN", code: "DEADLINE_EXCEEDED"});
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(hangingReturnCalls, 1);
+  assert.equal(dispatches, 0);
+});
+
 test("readback rejects altered bytes and identity instead of evaluating them", async () => {
   const run = exportsByFault.NONE;
   const bytes = bytesOf(run);
@@ -377,11 +456,14 @@ test("readback rejects altered bytes and identity instead of evaluating them", a
         status: "STORED", redirected: false, identity: request.identity,
         exportSha256: request.exportSha256, byteLength: request.byteLength
       }),
-      get: async request => ({
-        status: "FOUND", redirected: false, identity: request.identity,
-        exportSha256: hash(bytes), byteLength: bytes.byteLength,
-        bytes: Buffer.from(bytes).fill(0x20, 0, 1)
-      })
+      get: async request => {
+        const alteredBytes = Buffer.concat([bytes, Buffer.from("\n")]);
+        return {
+          status: "FOUND", redirected: false, identity: request.identity,
+          exportSha256: hash(alteredBytes), byteLength: alteredBytes.byteLength,
+          bytes: alteredBytes
+        };
+      }
     }
   });
   assert.equal((await client.transfer({

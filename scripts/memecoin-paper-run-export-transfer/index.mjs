@@ -2,11 +2,13 @@ import {createHash, randomBytes} from "node:crypto";
 import {constants} from "node:fs";
 import {chmod, link, lstat, mkdir, open, rm} from "node:fs/promises";
 import path from "node:path";
+import {performance} from "node:perf_hooks";
 import {evaluateMemecoinPaperRunExport} from "../memecoin-paper-simulated-evaluation/index.mjs";
 
 export const TRANSFER_SCHEMA = "memecoin-paper-run-export-transfer/v1";
 export const MAX_TRANSFER_BYTES = 16 * 1024 * 1024;
 export const MAX_OPERATION_MS = 30_000;
+export const MAX_STREAM_READS = 4096;
 
 const HASH = /^[a-f0-9]{64}$/;
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/;
@@ -61,6 +63,12 @@ function identityMatches(left, right) {
   return IDENTITY_FIELDS.every(key => left?.[key] === right?.[key]);
 }
 
+function deadlineError() {
+  const error = new Error("operation deadline exceeded");
+  error.code = "DEADLINE_EXCEEDED";
+  return error;
+}
+
 function parseExport(bytes, expected) {
   if (!(bytes instanceof Uint8Array) || bytes.byteLength === 0 ||
       bytes.byteLength > MAX_TRANSFER_BYTES) {
@@ -80,8 +88,48 @@ function parseExport(bytes, expected) {
   return value;
 }
 
-async function collectBounded(source, signal) {
+function checkOperation(signal, deadline) {
   if (signal.aborted) throw signal.reason ?? new Error("operation aborted");
+  if (performance.now() >= deadline) throw deadlineError();
+}
+
+function yieldToEventLoop() {
+  return new Promise(resolve => setImmediate(resolve));
+}
+
+async function nextWithAbort(iterator, signal, deadline) {
+  checkOperation(signal, deadline);
+  let abortListener;
+  let deadlineTimer;
+  const aborted = new Promise((resolve, reject) => {
+    abortListener = () => reject(signal.reason ?? new Error("operation aborted"));
+    signal.addEventListener("abort", abortListener, {once: true});
+    if (signal.aborted) abortListener();
+  });
+  const deadlineExceeded = new Promise((resolve, reject) => {
+    const remaining = deadline - performance.now();
+    if (remaining <= 0) {
+      reject(deadlineError());
+      return;
+    }
+    deadlineTimer = setTimeout(() => reject(deadlineError()), remaining);
+  });
+  try {
+    const result = await Promise.race([
+      Promise.resolve().then(() => iterator.next()),
+      aborted,
+      deadlineExceeded
+    ]);
+    checkOperation(signal, deadline);
+    return result;
+  } finally {
+    signal.removeEventListener("abort", abortListener);
+    clearTimeout(deadlineTimer);
+  }
+}
+
+async function collectBounded(source, signal, deadline) {
+  checkOperation(signal, deadline);
   if (source instanceof Uint8Array) {
     if (source.byteLength === 0 || source.byteLength > MAX_TRANSFER_BYTES) {
       throw new RangeError("export is empty or exceeds the 16 MiB transfer limit");
@@ -94,18 +142,30 @@ async function collectBounded(source, signal) {
   const chunks = [];
   let length = 0;
   const iterator = source[Symbol.asyncIterator]();
+  let reads = 0;
   try {
     while (true) {
-      if (signal.aborted) throw signal.reason ?? new Error("operation aborted");
-      const {done, value} = await iterator.next();
+      checkOperation(signal, deadline);
+      if (++reads > MAX_STREAM_READS) throw new RangeError("export stream exceeds the read limit");
+      const {done, value} = await nextWithAbort(iterator, signal, deadline);
       if (done) break;
       if (!(value instanceof Uint8Array)) throw new TypeError("export stream yielded a non-byte chunk");
       length += value.byteLength;
       if (length > MAX_TRANSFER_BYTES) throw new RangeError("export exceeds the 16 MiB transfer limit");
       chunks.push(Buffer.from(value));
+      if (reads % 64 === 0) {
+        await yieldToEventLoop();
+        checkOperation(signal, deadline);
+      }
     }
   } catch (error) {
-    if (typeof iterator.return === "function") Promise.resolve(iterator.return()).catch(() => {});
+    if (typeof iterator.return === "function") {
+      try {
+        Promise.resolve(iterator.return()).catch(() => {});
+      } catch {
+        // Iterator cancellation is best-effort and must not extend operation time.
+      }
+    }
     throw error;
   }
   if (length === 0) throw new RangeError("export is empty");
@@ -115,6 +175,7 @@ async function collectBounded(source, signal) {
 function boundedOperation(work, {timeoutMs, signal}) {
   if (signal?.aborted) return Promise.resolve({stopped: true});
   const controller = new AbortController();
+  const deadline = performance.now() + timeoutMs;
   let timer;
   let abortListener;
   const stopped = new Promise(resolve => {
@@ -132,8 +193,12 @@ function boundedOperation(work, {timeoutMs, signal}) {
     }
     timer = setTimeout(() => stop(new Error("operation deadline exceeded")), timeoutMs);
   });
-  const operation = Promise.resolve().then(() => work(controller.signal))
-    .then(value => ({value}), error => ({error}));
+  const operation = Promise.resolve().then(() => work(controller.signal, deadline))
+    .then(value => ({value}), error => ({
+      stopped: controller.signal.aborted || performance.now() >= deadline ||
+        error?.code === "DEADLINE_EXCEEDED",
+      error
+    }));
   return Promise.race([operation, stopped]).finally(() => {
     clearTimeout(timer);
     if (signal && abortListener) signal.removeEventListener("abort", abortListener);
@@ -172,6 +237,8 @@ export function createExportTransfer({
   }
   let attempted = false;
   let targetIdentity = null;
+  let targetExportSha256 = null;
+  let targetByteLength = null;
   let writeAuthorizationDigest = null;
 
   return Object.freeze({
@@ -190,16 +257,19 @@ export function createExportTransfer({
         return {status: "REJECTED", code: "INVALID_TRANSFER_REQUEST"};
       }
 
-      const outcome = await boundedOperation(async operationSignal => {
+      const outcome = await boundedOperation(async (operationSignal, deadline) => {
         let bytes;
         try {
-          bytes = await collectBounded(exportBytes, operationSignal);
+          bytes = await collectBounded(exportBytes, operationSignal, deadline);
           parseExport(bytes, identity);
         } catch (error) {
-          if (operationSignal.aborted) throw error;
+          if (operationSignal.aborted || performance.now() >= deadline ||
+              error?.code === "DEADLINE_EXCEEDED") throw error;
           return {invalid: true};
         }
         const exportSha256 = sha256(bytes);
+        targetExportSha256 = exportSha256;
+        targetByteLength = bytes.byteLength;
         try {
           const response = await transport.put({
             schema: TRANSFER_SCHEMA,
@@ -241,6 +311,7 @@ export function createExportTransfer({
       try {
         identity = normalizeIdentity(expected);
         if (!attempted || !targetIdentity || !identityMatches(identity, targetIdentity) ||
+            !targetExportSha256 || !Number.isSafeInteger(targetByteLength) ||
             !validAuthorization(readAuthorization) ||
             sha256(Buffer.from(readAuthorization)) === writeAuthorizationDigest) {
           throw new TypeError("separate read authorization and matching transfer identity required");
@@ -248,7 +319,7 @@ export function createExportTransfer({
       } catch {
         return {status: "REJECTED", code: "INVALID_READ_REQUEST"};
       }
-      const outcome = await boundedOperation(async operationSignal => {
+      const outcome = await boundedOperation(async (operationSignal, deadline) => {
         let response;
         try {
           response = await transport.get({
@@ -263,16 +334,20 @@ export function createExportTransfer({
         }
         if (response?.status !== "FOUND") return {response};
         try {
-          const bytes = await collectBounded(response.bytes, operationSignal);
+          const bytes = await collectBounded(response.bytes, operationSignal, deadline);
+          const downloadedSha256 = sha256(bytes);
           if (!identityMatches(response.identity, identity) || response.byteLength !== bytes.byteLength ||
-              !HASH.test(response.exportSha256) || sha256(bytes) !== response.exportSha256) {
+              !HASH.test(response.exportSha256) || response.exportSha256 !== targetExportSha256 ||
+              response.byteLength !== targetByteLength || downloadedSha256 !== response.exportSha256 ||
+              downloadedSha256 !== targetExportSha256 || bytes.byteLength !== targetByteLength) {
             return {response, invalid: true};
           }
           const exportValue = parseExport(bytes, identity);
           const evaluation = evaluateMemecoinPaperRunExport(bytes, identity);
           return {response, bytes, exportValue, evaluation};
         } catch (error) {
-          if (operationSignal.aborted) throw error;
+          if (operationSignal.aborted || performance.now() >= deadline ||
+              error?.code === "DEADLINE_EXCEEDED") throw error;
           return {response, invalid: true};
         }
       }, {timeoutMs, signal});
@@ -292,6 +367,7 @@ export function createExportTransfer({
         identity,
         exportSha256: response.exportSha256,
         byteLength: outcome.value.bytes.byteLength,
+        bytes: Buffer.from(outcome.value.bytes),
         exportValue: outcome.value.exportValue,
         evaluation: outcome.value.evaluation
       };
@@ -420,7 +496,11 @@ export function createFileReceiver({
         if (await authorizeWrite(request.authorization, identity) !== true) {
           return {status: "REJECTED", redirected: false};
         }
-        const bytes = await collectBounded(request.bytes, request.signal ?? new AbortController().signal);
+        const bytes = await collectBounded(
+          request.bytes,
+          request.signal ?? new AbortController().signal,
+          performance.now() + MAX_OPERATION_MS
+        );
         const exportValue = parseExport(bytes, identity);
         const exportSha256 = sha256(bytes);
         if (!identityMatches({
@@ -507,6 +587,9 @@ export function createFileReceiver({
         const stored = await readStored(root, identity);
         if (stored.status === "NOT_FOUND") return {status: "NOT_FOUND", redirected: false};
         if (stored.status !== "FOUND") return {status: "UNKNOWN", redirected: false};
+        if (!identityMatches(stored.metadata.identity, identity)) {
+          return {status: "UNKNOWN", redirected: false};
+        }
         return {
           status: "FOUND",
           identity: stored.metadata.identity,

@@ -23,7 +23,10 @@ fixed HTTPS origin and an injected transport with `put(request)` and
 provided read authorization. Write and read authorization values must differ.
 The adapter contract requires redirect rejection; a redirect, timeout,
 cancellation, partial/ambiguous response, or lost acknowledgement is reported
-as `UNKNOWN`, never retried. The deadline is at most 30 seconds.
+as `UNKNOWN`, never retried. The deadline is at most 30 seconds. Async sources
+are limited to 4096 iterator reads (including empty chunks), check cancellation
+and a monotonic deadline while consuming, and yield every 64 reads. Iterator
+cancellation is best-effort and is never awaited.
 
 `createFileReceiver({directory, privateOrigin, authorizeWrite, authorizeRead})`
 provides the concrete receiver/storage implementation. Its `put` and `get`
@@ -40,12 +43,15 @@ endpoint, credentials provider, route, or remote server implementation.
 
 Readback requires independently supplied expected run/config/producer identity,
 uses the distinct read authorization, downloads the stored bytes, checks their
-actual digest/length/identity, then invokes
+actual digest/length against the original pre-dispatch upload digest/length and
+the bound identity, then invokes
 `evaluateMemecoinPaperRunExport()` on those bytes. The original envelope is
 passed through unchanged, including full checkpoint/start binding, open
 positions, null/unvalued fields, and any evaluator `UNKNOWN`. Readback `UNKNOWN`
 means retrieval or certainty remains unresolved; evaluator `UNKNOWN` remains
-the evaluator's honest result and is never upgraded.
+the evaluator's honest result and is never upgraded. A successful readback
+returns the verified original byte buffer as `bytes`; callers must use it rather
+than serializing the parsed `exportValue` when exact-byte identity matters.
 
 ## Focused offline acceptance
 
@@ -75,13 +81,15 @@ the single configured origin before any deployment wiring:
   revision, export SHA-256, and byte length; return `STORED`, `DUPLICATE`,
   `CONFLICT`, `REJECTED`, or `UNKNOWN` with the bound identity/digest/length.
 - `GET /private/run-exports/v1/{runId}`: return the original bytes and bound
-  identity/digest/length, or an honest `NOT_FOUND`/`UNKNOWN`.
+  identity/digest/length only when the stored run/config/producer identity
+  exactly matches the request, or an honest `NOT_FOUND`/`UNKNOWN`. A mismatch
+  must not disclose whether the run ID exists or return bytes.
 
 The route adapter must map those requests to `createFileReceiver().put/get`,
 authenticate writes and reads with separate scopes, reject redirects, avoid
 filesystem path selectors, cap request/response streams at 16 MiB, and enforce
-the same operation deadline. It must not log authorization values or export
-bytes. These paths are a proposed registration contract only; this repository
+the same operation deadline and stream work limit. It must not log authorization
+values or export bytes. These paths are a proposed registration contract only; this repository
 contains no HTTP route or ready remote endpoint. Registration, TLS/network
 privacy review, durable storage provisioning, and owner review are separate
 handoffs and are not authorized by this source-only package.
