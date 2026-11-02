@@ -6,9 +6,10 @@ import test from "node:test";
 import {createPaperExecutionStep} from "../scripts/memecoin-paper/execution-step.mjs";
 import {CheckpointStore} from "../scripts/memecoin-paper/checkpoint-store.mjs";
 import {PaperCheckpointSession} from "../scripts/memecoin-paper/checkpoint-session.mjs";
+import {normalizeExactCosts} from "../scripts/memecoin-paper-execution-evidence/normalize.mjs";
 import {createMarketQuoteAdapter} from "../scripts/memecoin-paper/market-quote-adapter.mjs";
 import {
-  SYNTHETIC_MINT, SYNTHETIC_POOL, SYNTHETIC_QUOTE
+  SYNTHETIC_MINT, SYNTHETIC_POOL, SYNTHETIC_QUOTE, SYNTHETIC_SOURCE
 } from "../scripts/memecoin-paper/synthetic-fixtures.mjs";
 import {END, RUN, START, authorization} from "./fixtures/memecoin-paper-execution-step/scenario.mjs";
 import {syntheticOrderResponse} from "./fixtures/memecoin-paper-route-quotes/jupiter-v2-order.mjs";
@@ -246,6 +247,43 @@ test("fixture successfully normalizes the exact quote/base ratio but cannot norm
   assert.ok(Object.values(result.costEvidence.components)
     .every(component => component.status === "UNKNOWN" && component.amount === null));
   assert.equal(result.authorizationEligible, false);
+});
+
+test("the existing cost normalizer maps a complete explicit synthetic scenario without granting authority", () => {
+  const fixture = {
+    label: "SYNTHETIC_DECLARED_COST_SCENARIO_ONLY",
+    evidence: {
+      source: SYNTHETIC_SOURCE,
+      binding: IDENTITY,
+      observedAt: NOW,
+      microUsd: {
+        fee: "12345",
+        spread: "1",
+        slippage: "10000",
+        priceImpact: "10001",
+        network: "9999"
+      }
+    }
+  };
+  const normalized = normalizeExactCosts(fixture.evidence, {
+    identity: IDENTITY,
+    quoteSource: SYNTHETIC_SOURCE,
+    quoteObservedAt: NOW,
+    now: NOW
+  });
+
+  assert.equal(fixture.label, "SYNTHETIC_DECLARED_COST_SCENARIO_ONLY");
+  assert.equal(normalized.status, "NORMALIZED_UNVERIFIED");
+  assert.deepEqual(normalized.costsCents, {
+    feeCents: "2",
+    spreadCents: "1",
+    slippageCents: "1",
+    priceImpactCents: "2",
+    networkCents: "1"
+  });
+  assert.equal(normalized.totalCents, "7");
+  assert.equal(normalized.provenance, "CALLER_ASSERTED_NOT_SOURCE_VERIFIED");
+  assert.equal(normalized.authorizationEligible, false);
 });
 
 test("provider expiry, malformed/truncated responses, and over-cap streams fail closed", async () => {

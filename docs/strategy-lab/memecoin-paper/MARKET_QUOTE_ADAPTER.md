@@ -72,53 +72,66 @@ contract:
 | Price impact | V2 `/order` reports `priceImpact` in percentage points. | The size-specific route amount already represents the quote at that size; adding an impact estimate as a separate deduction without an unimpacted benchmark risks charging for the same price movement twice. The API does not define an independent USD cost amount. | Yes, `costs.priceImpactCents` is mandatory and separately summed. | UNKNOWN. Requires an independently defined pre-impact benchmark and exact conversion; percentage points alone are not cents. |
 | Network / rent | V2 `/order` may report `signatureFeeLamports`, `prioritizationFeeLamports`, `rentFeeLamports` and payer fields. The Gasless documentation describes distinct taker, Jupiter sponsor, market-maker, and integrator-payer cases. | Some gasless cost recoup may already contribute to total `feeBps`; the remaining network amounts are denominated in lamports and payer-dependent. Quote-only uses no taker and returns no transaction to establish a payer or settlement. | Yes, `costs.networkCents` is mandatory and separately summed. | UNKNOWN. Requires a transaction/payer-specific cost basis and source-verified SOL-to-USD conversion; this read-only quote does not establish either. |
 
-These are not merely missing values in a JSON mapping. The existing consumer
-requires all five nonnegative integer-cent fields (`feeCents`, `spreadCents`,
-`slippageCents`, `priceImpactCents`, `networkCents`) and adds them separately to
-the route-derived notional/proceeds. Its shared `normalizeExactCosts` helper
-accepts all five source-bound integer micro-USD values but labels them
-`NORMALIZED_UNVERIFIED` and leaves eligibility false. Its quote normalizer also
-keeps source and quote semantics unverified. Supplying five zeros, mapping
-`feeBps` to cents, or treating slippage tolerance / price impact / lamports as
-USD costs would manufacture evidence or risk double counting.
+The existing consumer requires all five nonnegative integer-cent fields
+(`feeCents`, `spreadCents`, `slippageCents`, `priceImpactCents`,
+`networkCents`) and adds them separately to route-derived notional/proceeds.
+Its shared `normalizeExactCosts` contract takes identity/source/time-bound
+nonnegative integer `microUsd` values for all five fields, rounds each upward
+independently to cents, and returns `NORMALIZED_UNVERIFIED` with
+`authorizationEligible: false`. That helper is the supported conversion to the
+consumer's exact cost shape; this adapter does not duplicate or loosen it.
 
-The fixture-backed successful normalization this contract can support is the
-exact route ratio: raw `inAmount`/`outAmount` plus explicit token decimals
-normalize to a reduced integer `priceQuotePerBase` ratio without floating-point
-rounding. It is a quote-token-per-base-token ratio only, **not** a USD
-`priceMicros`, complete cost normalization, or eligible Paper quote. A
-successful eligible quote cannot be demonstrated from this reviewed source
-contract. It would require the missing source evidence listed below; until then
-the correct end-to-end existing-consumer result is rejection, as the focused
-contract test verifies.
+The test fixture exercises that helper successfully with five explicitly
+supplied, nonzero synthetic scenario inputs. The result is useful to demonstrate
+rounding and consumer-field mapping, but its label is
+`SYNTHETIC_DECLARED_COST_SCENARIO_ONLY`, its provenance remains
+`CALLER_ASSERTED_NOT_SOURCE_VERIFIED`, and it is not evidence that these values
+describe Jupiter fees or a real market. No values are selected as operating
+assumptions by this adapter.
 
-The candidate is deliberately not a ledger quote, and this adapter is not
-connected to the runner.
+## Minimum additional inputs and decision
 
-### Remaining evidence before an eligible quote can exist
+For a *declared simulation scenario* to populate the existing normalizer, its
+caller must provide, without defaults:
 
-The chosen API provides route and amount information but cannot establish all
-the following inputs. No caller assertion or boolean can substitute for them:
+1. The source quote plus quote identity and quote-observation timestamp.
+2. Explicit fixed-point integer micro-USD values for each of the five consumer
+   components, bound to the same identity and observation time. For a cost
+   asserted as actual rather than an assumption, each value also needs a
+   source contract establishing its non-overlapping gross/net basis.
+3. If deriving a fee estimate rather than declaring it as a scenario, Jupiter's
+   `platformFee.amount`, `feeMint`, and `platformFee.feeBps` plus an exact,
+   time-bound USD conversion for that mint. This establishes only the quoted
+   platform-fee component: top-level `feeBps` may include gasless cost recoup,
+   and does not provide an exact total fee amount. `/execute` documents actual
+   route-versus-wallet input/output amounts and would be needed to confirm
+   settled fee deltas; calling it, signing, or submitting is outside this
+   read-only packet.
+4. An explicit same-time USD conversion for the quote mint and SOL-denominated
+   network costs, using exact rational/fixed-point values and provenance. The
+   Jupiter `/order` USD estimates are numeric display fields, not this exact
+   conversion contract.
 
-1. A source-backed exact USD conversion for the quote mint, fee mint, and SOL,
-   with observation time and rational/fixed-point semantics. The API's numeric
-   USD estimates do not establish this conversion contract.
-2. A reviewed gross/net quote convention and five-component non-overlapping
-   USD cost mapping that does not re-add amounts already reflected in the
-   quote. The `/order` docs state the platform fee is deducted from the quote,
-   while `/execute` separately exposes route and final wallet amounts; a
-   quote-only response does not resolve that accounting basis for the ledger.
-3. An independent spread reference and measured spread, plus realized slippage
-   evidence; neither is reported as a separately valued cost by `/order`.
-4. A documented source quote timestamp and independently authenticated source
-   and clock provenance, plus source semantics supporting the selected pool,
-   quote lifetime, amount, and hypothetical execution claim.
-5. Independent coverage for the route's actual liquidity and executable
-   capacity at the requested amount; a routed quote alone is not a fill.
+**Decision for this packet: keep real-data Paper cost eligibility blocked; do
+not add adapter-side fee/cost normalization or populate missing cost fields.**
+Jupiter's quote-only contract says the platform fee is included/deducted in the
+quote, while `/execute` distinguishes route amounts from final wallet amounts.
+Adding the reported fee again to a price derived from the quote can therefore
+double count, but treating it as zero also hides a required consumer field.
+Spread has no independent reference in `/order`; slippage tolerance is not
+realized slippage; price impact has no independent pre-impact USD benchmark; and
+network amounts do not establish payer settlement in a quote-only request.
+Those source gaps cannot be solved by normalization.
 
-Until that evidence is supplied by a separately reviewed contract, missing
-coverage remains `UNKNOWN`, not eligibility. This packet does not enable real
-market scans or change synthetic-only restrictions.
+If Paper is later to accept conservative declared assumptions, the owner must
+choose and approve the scenario inputs and the gross/net treatment first. The
+five values must remain explicitly labeled assumptions, not actual costs, and
+must not be silently substituted for measured evidence. Otherwise, source
+contracts for independent spread/price-impact benchmarks, realized execution
+costs, exact USD conversions, and transaction payer settlement are required.
+Until one of those decisions/contracts exists, missing coverage remains
+`UNKNOWN` and the existing consumer rejects the adapter candidate. No live
+market scan, credentials, signing, submission, or runner connection is added.
 
 ## Offline validation
 
