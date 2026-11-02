@@ -246,6 +246,37 @@ test("conflicting terminal and observation failure codes are unavailable", async
   assert.equal(report.status, "UNKNOWN");
 });
 
+test("literal UNKNOWN report and audit cannot conceal invalid raw terminal failure evidence", async t => {
+  const harness = await createHarness(t, {
+    fakeAssemblyOptions: {summaryFailureCode: "UNKNOWN"}
+  });
+  assert.equal((await harness.runner.start()).status, "UNKNOWN");
+  assert.equal((await readPilotReport(harness.dataDirectory)).status, "AVAILABLE");
+  const terminalPath = path.join(harness.dataDirectory, "terminal.json");
+  const persisted = JSON.parse(await readFile(terminalPath, "utf8"));
+  for (const field of ["top", "observation"]) {
+    for (const value of [undefined, null, "MONOTONIC_CLOCK_INVALID", "bad text", {}, "x".repeat(49)]) {
+      const terminal = structuredClone(persisted);
+      const record = field === "top" ? terminal : terminal.observation;
+      if (value === undefined) delete record.failureCode;
+      else record.failureCode = value;
+      await writeFile(terminalPath, canonicalJson(terminal));
+
+      const status = await readPilotStatus(harness.dataDirectory);
+      assert.equal(status.status, "UNKNOWN");
+      assert.equal(status.failureCode, "UNKNOWN");
+      assert.match(status.reason, /terminal failure evidence/);
+      assert.equal((await readPilotReport(harness.dataDirectory)).status, "UNKNOWN");
+    }
+  }
+  const terminal = structuredClone(persisted);
+  delete terminal.failureCode;
+  delete terminal.observation.failureCode;
+  await writeFile(terminalPath, canonicalJson(terminal));
+  assert.match((await readPilotStatus(harness.dataDirectory)).reason, /terminal failure evidence/);
+  assert.equal((await readPilotReport(harness.dataDirectory)).status, "UNKNOWN");
+});
+
 test("operator report failure code must match persisted terminal evidence", async t => {
   const harness = await createHarness(t, {
     fakeAssemblyOptions: {summaryFailureCode: "MONOTONIC_CLOCK_INVALID"}
@@ -445,6 +476,7 @@ test("failed terminal audit update exposes an earlier snapshot as incomplete, ne
   audit.terminal = null;
   terminal.status = "UNKNOWN";
   terminal.failureCode = "OBSERVATION_AUDIT_WRITE_FAILED";
+  terminal.observation.failureCode = "OBSERVATION_AUDIT_WRITE_FAILED";
   terminal.observationAuditStatus = "FAILED";
   terminal.observationAuditFailureCode = "OBSERVATION_AUDIT_WRITE_FAILED";
   await writeFile(auditPath, canonicalJson(audit));

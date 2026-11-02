@@ -313,6 +313,10 @@ export async function readPilotStatus(dataDirectory) {
         terminal.runId !== lock.runId || terminal.configHash !== lock.configHash) {
       return {status: "UNKNOWN", reason: "terminal marker does not bind the durable run lock"};
     }
+    if (!validTerminalFailureEvidence(terminal)) {
+      return {status: "UNKNOWN", failureCode: "UNKNOWN",
+        reason: "terminal failure evidence is missing, invalid, or inconsistent"};
+    }
     const failureCode = terminalFailureEvidence(terminal);
     return {
       ...terminal,
@@ -643,24 +647,27 @@ function summaryCode(value) {
   return typeof value === "string" && /^[A-Z0-9_:-]{1,80}$/.test(value) ? value : "UNKNOWN";
 }
 
+function validFailureCode(value) {
+  return typeof value === "string" &&
+    (/^[A-Z0-9_:-]{1,80}$/.test(value) || /^[A-Za-z0-9_]{1,48}$/.test(value));
+}
+
+function validTerminalFailureEvidence(terminal) {
+  return terminal?.observation?.failureCode === terminal?.failureCode &&
+    (validFailureCode(terminal?.failureCode) ||
+      (terminal?.status === "FINISHED" && terminal?.failureCode === null));
+}
+
 function terminalFailureEvidence(terminal) {
-  if (typeof terminal?.failureCode === "string" &&
-      /^[A-Z0-9_:-]{1,80}$/.test(terminal.failureCode)) {
-    return terminal.observation?.failureCode === terminal.failureCode
-      ? terminal.failureCode
-      : "UNKNOWN";
-  }
-  if (terminal?.status === "FINISHED" && terminal?.failureCode === null &&
-      terminal?.observation?.failureCode === null) {
-    return null;
-  }
-  return "UNKNOWN";
+  return validTerminalFailureEvidence(terminal) ? terminal.failureCode : "UNKNOWN";
 }
 
 function failureCodeEvidence(failureCode, controllerSummary) {
-  if (failureCode !== null && failureCode !== undefined) return summaryCode(failureCode);
+  if (failureCode !== null && failureCode !== undefined) {
+    return validFailureCode(failureCode) ? failureCode : "UNKNOWN";
+  }
   if (controllerSummary?.failureCode !== null && controllerSummary?.failureCode !== undefined) {
-    return summaryCode(controllerSummary.failureCode);
+    return validFailureCode(controllerSummary.failureCode) ? controllerSummary.failureCode : "UNKNOWN";
   }
   return controllerSummary?.status === "FINISHED" ? null : "UNKNOWN";
 }
@@ -1153,7 +1160,7 @@ export function createPilotOnline(options = {}) {
       }
       observations.controllerStatus = summaryCode(controllerSummary?.status);
       observations.stopReason = summaryCode(controllerSummary?.reason);
-      observations.failureCode = summaryCode(failureCode ?? controllerSummary?.failureCode);
+      observations.failureCode = failureCodeEvidence(failureCode, controllerSummary);
       if (isRecord(controllerSummary?.positionEvidence)) {
         observations.controllerPositionEvidence = {
           status: summaryCode(controllerSummary.positionEvidence.status),
@@ -1244,6 +1251,7 @@ export function createPilotOnline(options = {}) {
         return {
           status: "UNKNOWN",
           runId: config.runId,
+          failureCode,
           reason: "underlying callback work did not settle within the configured bound; session remains open and restart is forbidden"
         };
       }
