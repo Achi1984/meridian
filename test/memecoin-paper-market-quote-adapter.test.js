@@ -899,6 +899,73 @@ test("caller abort race settles despite a never-settling cancellation and never 
   assert.equal(calls, 1);
 });
 
+test("caller abort and timeout contain synchronous source cancellation throws", async () => {
+  const uncaught = [];
+  const unhandled = [];
+  const onUncaught = error => uncaught.push(error);
+  const onUnhandled = error => unhandled.push(error);
+  process.on("uncaughtException", onUncaught);
+  process.on("unhandledRejection", onUnhandled);
+
+  try {
+    for (const mode of ["CALLER_ABORT", "INTERNAL_TIMEOUT"]) {
+      const cancellation = new AbortController();
+      let calls = 0;
+      let cancelCalls = 0;
+      const adapter = createMarketQuoteAdapter({
+        enabled: true,
+        timeoutMs: mode === "INTERNAL_TIMEOUT" ? 30 : 80,
+        clock: () => NOW,
+        transport: async () => {
+          calls += 1;
+          return {
+            status: 200,
+            redirected: false,
+            url: "",
+            headers: new Headers({"content-type": "application/json"}),
+            body: {
+              getReader() {
+                return {
+                  read: () => new Promise(() => {}),
+                  cancel() {
+                    cancelCalls += 1;
+                    throw new Error("synchronous source cancellation failure");
+                  },
+                  releaseLock() {}
+                };
+              }
+            }
+          };
+        }
+      });
+
+      const pending = adapter.getPaperQuote(request(), {
+        signal: mode === "CALLER_ABORT" ? cancellation.signal : undefined
+      });
+      if (mode === "CALLER_ABORT") {
+        await new Promise(resolve => setImmediate(resolve));
+        cancellation.abort();
+      }
+      const result = await settleWithin(pending);
+      await new Promise(resolve => setImmediate(resolve));
+
+      assert.equal(result.status, "UNAVAILABLE");
+      assert.ok(result.reasons.includes(
+        mode === "CALLER_ABORT" ? "REQUEST_CANCELLED" : "REQUEST_TIMEOUT"
+      ));
+      assert.ok(cancelCalls > 0);
+      assert.equal(calls, 1);
+    }
+
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(uncaught, []);
+    assert.deepEqual(unhandled, []);
+  } finally {
+    process.off("uncaughtException", onUncaught);
+    process.off("unhandledRejection", onUnhandled);
+  }
+});
+
 test("the configured request budget caps transport attempts", async () => {
   let calls = 0;
   const adapter = createMarketQuoteAdapter({

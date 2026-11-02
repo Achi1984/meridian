@@ -608,7 +608,12 @@ function abortableTransport(transport, getExternalSignal) {
         for (const signal of signals) signal.removeEventListener("abort", cancel);
       };
       const cancel = () => {
-        if (!done) void reader.cancel().catch(() => {});
+        if (done) return;
+        try {
+          void Promise.resolve(reader.cancel()).catch(() => {});
+        } catch {
+          return;
+        }
       };
       for (const signal of signals) signal.addEventListener("abort", cancel, {once: true});
       const body = new ReadableStream({
