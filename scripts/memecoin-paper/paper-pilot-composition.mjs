@@ -20,7 +20,7 @@ const BUDGET_KEYS = [
   "callbackTimeoutMs", "maxWallClockUncertaintyMs"
 ];
 const MAXIMA = {
-  requests: 960, bytes: 10_485_760, events: 1_000, candidates: 300, cycles: 300,
+  requests: 960, bytes: 8 * 1024 * 1024, events: 1_000, candidates: 100, cycles: 256,
   durationMs: EIGHT_HOURS_MS, callbackTimeoutMs: 30_000, maxWallClockUncertaintyMs: 60_000
 };
 const syntheticClocks = new WeakMap();
@@ -254,6 +254,7 @@ function publicError(error) {
 
 function reportEnvelope(config, {
   status,
+  strategyOutcome = "UNKNOWN",
   persistence,
   entries = [],
   exits = [],
@@ -266,8 +267,11 @@ function reportEnvelope(config, {
     configDigest: createHash("sha256").update(canonicalCheckpointBytes(config)).digest("hex"),
     runId: config.runId,
     status,
+    strategyOutcome,
     mode: config.mode,
     executionMode: config.mode === "SYNTHETIC_TEST_ONLY" ? "SIMULATED_ONLY" : "READ_ONLY_EXTERNAL",
+    realDataSourceCoverage: "NOT_ASSESSED",
+    authority: {executionAuthorized: false, liveReady: false},
     persistence,
     outcomes: {entries, exits, openUnvaluedPositions, unresolved}
   };
@@ -321,6 +325,7 @@ export function createPaperPilotComposition(options = {}) {
                 terminalReceipt: null,
                 report: reportEnvelope(config, {
                   status: state,
+                  strategyOutcome: "STOPPED",
                   persistence: {certainty: "NOT_STARTED", checkpointRef: null, terminalReceiptRef: null},
                   unresolved: ["external input was not processed after cancellation"]
                 })
@@ -334,6 +339,7 @@ export function createPaperPilotComposition(options = {}) {
               mode: config.mode,
               report: reportEnvelope(config, {
                 status: state,
+                strategyOutcome: result.code ?? "UNKNOWN",
                 persistence: {certainty: "NOT_STARTED", checkpointRef: null, terminalReceiptRef: null},
                 unresolved: result.unresolved
               }),
@@ -349,6 +355,7 @@ export function createPaperPilotComposition(options = {}) {
               terminalReceipt: null,
               report: reportEnvelope(config, {
                 status: state,
+                strategyOutcome: "UNKNOWN",
                 persistence: {certainty: "NOT_STARTED", checkpointRef: null, terminalReceiptRef: null},
                 unresolved: ["external input failed bounded validation"]
               })
@@ -392,6 +399,7 @@ export function createPaperPilotComposition(options = {}) {
   let anchor;
   let previousMono = null;
   let deadlineAt;
+  let compositionDeadlineAt;
   let counters;
   let store;
   let session;
@@ -446,7 +454,10 @@ export function createPaperPilotComposition(options = {}) {
   async function invokeAdapter(name, input) {
     if (abort.signal.aborted) throw Object.assign(new Error("composition stopped"), {code: "STOPPED"});
     const before = readTime();
-    const remainingMs = Math.min(config.budgets.durationMs - before.elapsedMs, deadlineAt - before.wall);
+    const remainingMs = Math.min(
+      config.budgets.durationMs - before.elapsedMs,
+      compositionDeadlineAt - before.wall
+    );
     if (remainingMs <= 0) throw Object.assign(new Error("composition deadline reached"), {code: "DEADLINE"});
     accountRequest({bytes: 0, events: 0});
     let timer;
@@ -457,13 +468,14 @@ export function createPaperPilotComposition(options = {}) {
       ...input,
       signal: callbackSignal,
       now: before.wall,
-      deadlineAt,
+      deadlineAt: compositionDeadlineAt,
       remaining: Object.freeze({
         requests: config.budgets.requests - counters.requests,
         bytes: config.budgets.bytes - counters.bytes,
         events: config.budgets.events - counters.events,
         candidates: config.budgets.candidates - counters.candidates,
-        cycles: config.budgets.cycles - counters.cycles
+        cycles: config.budgets.cycles - counters.cycles,
+        timeMs: remainingMs
       }),
       recordRequest: accountRequest
     }));
@@ -516,6 +528,7 @@ export function createPaperPilotComposition(options = {}) {
         terminalReceipt: null,
         report: reportEnvelope(config, {
           status: state,
+          strategyOutcome: "STOPPED",
           persistence: {certainty: "NOT_STARTED", checkpointRef: null, terminalReceiptRef: null}
         })
       };
@@ -531,6 +544,7 @@ export function createPaperPilotComposition(options = {}) {
         terminalReceipt: null,
         report: reportEnvelope(config, {
           status: state,
+          strategyOutcome: "RUN_WINDOW_NOT_STARTED",
           persistence: {certainty: "NOT_STARTED", checkpointRef: null, terminalReceiptRef: null},
           unresolved: ["run window has not started"]
         })
@@ -546,11 +560,13 @@ export function createPaperPilotComposition(options = {}) {
         terminalReceipt: null,
         report: reportEnvelope(config, {
           status: state,
+          strategyOutcome: "RUN_WINDOW_EXPIRED",
           persistence: {certainty: "NOT_STARTED", checkpointRef: null, terminalReceiptRef: null},
           unresolved: ["fixed eight-hour run window has expired"]
         })
       };
     }
+    compositionDeadlineAt = Math.min(deadlineAt, initial.wall + config.budgets.durationMs);
     state = "RUNNING";
     const storeOptions = fault === "LOST_ACK" ? {
       async onPhase(name, details) {
@@ -564,14 +580,40 @@ export function createPaperPilotComposition(options = {}) {
       await store.close();
       store = null;
       state = "STOPPED";
-      return {status: "STOPPED", code: "STOPPED", terminalReceipt: null};
+      return {
+        status: state,
+        state,
+        code: "STOPPED",
+        mode: "SYNTHETIC_TEST_ONLY",
+        executionStarted: false,
+        terminalReceipt: null,
+        report: reportEnvelope(config, {
+          status: state,
+          strategyOutcome: "STOPPED",
+          persistence: {certainty: "NOT_STARTED", checkpointRef: null, terminalReceiptRef: null},
+          unresolved: ["cancelled before checkpoint initialization"]
+        })
+      };
     }
     const prior = await store.readCheckpoint();
     if (abort.signal.aborted) {
       await store.close();
       store = null;
       state = "STOPPED";
-      return {status: "STOPPED", code: "STOPPED", terminalReceipt: null};
+      return {
+        status: state,
+        state,
+        code: "STOPPED",
+        mode: "SYNTHETIC_TEST_ONLY",
+        executionStarted: false,
+        terminalReceipt: null,
+        report: reportEnvelope(config, {
+          status: state,
+          strategyOutcome: "STOPPED",
+          persistence: {certainty: "NOT_STARTED", checkpointRef: null, terminalReceiptRef: null},
+          unresolved: ["cancelled before checkpoint initialization"]
+        })
+      };
     }
     if (prior.status !== "ABSENT") {
       await store.close();
@@ -585,6 +627,7 @@ export function createPaperPilotComposition(options = {}) {
         terminalReceipt: null,
         report: reportEnvelope(config, {
           status: state,
+          strategyOutcome: "RESTART_NOT_ALLOWED",
           persistence: {certainty: "NOT_STARTED", checkpointRef: null, terminalReceiptRef: null},
           unresolved: ["implicit checkpoint replay and restart are prohibited"]
         })
@@ -758,13 +801,12 @@ export function createPaperPilotComposition(options = {}) {
       return result;
     }])));
 
-    const runEndAt = Math.min(deadlineAt, initial.wall + config.budgets.durationMs);
     const runner = createPaperExecutionRunner({
       executionStep: boundedStep,
       session,
       runId: config.runId,
       startedAt: config.startedAt,
-      endAt: runEndAt,
+      endAt: compositionDeadlineAt,
       executionMode: "SIMULATED_ONLY",
       provenance: SYNTHETIC_SOURCE,
       candidateSource,
@@ -815,7 +857,7 @@ export function createPaperPilotComposition(options = {}) {
         status: item.status,
         identity: {chainId: quote.chainId, mint: quote.mint, pool: quote.pool, quote: quote.quote},
         quantityBaseUnits: entryQuantities.get(quote.mint) ?? null,
-        priceMicros: item.result?.fillPriceMicros ?? quote.priceMicros,
+        priceMicros: quote.priceMicros,
         costsCents: quote.costs,
         costBasis: "HYPOTHETICAL_FIXTURE_ONLY",
         source: quote.source,
@@ -849,18 +891,21 @@ export function createPaperPilotComposition(options = {}) {
       resultDigest: terminalReceipt.resultDigest,
       commandId: terminalResult?.commandId ?? null
     } : null;
-    const unresolved = [];
-    if (adapterFailureCode && adapterFailureCode !== "STOPPED") unresolved.push(adapterFailureCode);
-    if (runnerResult.reason && runnerResult.reason !== "SOURCES_EXHAUSTED") unresolved.push(runnerResult.reason);
-    if (runnerResult.pendingAuthorizationIds?.length) {
-      unresolved.push("authorized reservation remains pending without a fill");
-    }
-    if (openUnvaluedPositions.length) unresolved.push("open positions remain unvalued at terminal finalization");
     const strategyOutcome = strategyOverride ??
       (runnerResult.reason && runnerResult.reason !== "SOURCES_EXHAUSTED" ? runnerResult.reason
         : counters.candidates === 0 || candidates.length === 0 ? "NO_CANDIDATES"
           : exits.length && openPositions.length === 0 ? "CLOSED_PAPER"
             : operationInputs.find(item => item.method === "authorizeEntry")?.status ?? runnerResult.reason);
+    const unresolved = [];
+    if (adapterFailureCode && adapterFailureCode !== "STOPPED") unresolved.push(adapterFailureCode);
+    if (runnerResult.reason && runnerResult.reason !== "SOURCES_EXHAUSTED") unresolved.push(runnerResult.reason);
+    if (!["CLOSED_PAPER", "NO_CANDIDATES"].includes(strategyOutcome)) {
+      unresolved.push(`strategy outcome: ${strategyOutcome}`);
+    }
+    if (runnerResult.pendingAuthorizationIds?.length) {
+      unresolved.push("authorized reservation remains pending without a fill");
+    }
+    if (openUnvaluedPositions.length) unresolved.push("open positions remain unvalued at terminal finalization");
     return {
       status: lifecycleStatus,
       state: lifecycleStatus,
@@ -896,12 +941,14 @@ export function createPaperPilotComposition(options = {}) {
         clockUncertaintyMs: clockAttestation.uncertaintyMs,
         wallStartedAt: anchor.wall,
         monotonicElapsedMs: readTime().elapsedMs,
-        endAt: deadlineAt
+        endAt: deadlineAt,
+        compositionDeadlineAt
       },
       provenance,
       authority: {providerExecution: false, signing: false, orders: false, wallet: false, liveReady: false},
       report: reportEnvelope(config, {
         status: lifecycleStatus,
+        strategyOutcome,
         persistence: {
           certainty: persistenceCertainty,
           checkpointRef: checkpointMetadata
@@ -941,6 +988,7 @@ export function createPaperPilotComposition(options = {}) {
         : !session ? "NOT_STARTED" : checkpointMetadata ? "NO_TERMINAL_RECEIPT" : "UNKNOWN";
       return {
         ...publicError(error),
+        status: state,
         state,
         mode: "SYNTHETIC_TEST_ONLY",
         executionStarted: Boolean(session),
@@ -948,6 +996,7 @@ export function createPaperPilotComposition(options = {}) {
         checkpoint: checkpointMetadata,
         report: reportEnvelope(config, {
           status: state,
+          strategyOutcome: error?.code ?? "COMPOSITION_FAILURE",
           persistence: {
             certainty: persistenceCertainty,
             checkpointRef: checkpointMetadata

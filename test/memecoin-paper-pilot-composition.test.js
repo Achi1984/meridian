@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import {createHash} from "node:crypto";
 import {execFileSync, spawnSync} from "node:child_process";
 import {mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile} from "node:fs/promises";
 import os from "node:os";
@@ -8,6 +9,7 @@ import {fileURLToPath} from "node:url";
 import {
   createPaperPilotComposition, createSyntheticClock, offlineFixtureAdapters
 } from "../scripts/memecoin-paper/paper-pilot-composition.mjs";
+import {canonicalCheckpointBytes} from "../scripts/memecoin-paper/checkpoint-store.mjs";
 import {createBoundedExternalReadOnlyInput} from "../scripts/memecoin-paper/execution-runner.mjs";
 
 const START = Date.parse("2026-01-01T19:00:00Z");
@@ -126,6 +128,7 @@ test("external read-only packet remains UNKNOWN until source contracts are accep
   });
   const result = await pilot.start();
   assert.equal(result.status, "UNKNOWN");
+  assert.equal(result.report.strategyOutcome, "EXTERNAL_SOURCE_CONTRACTS_NOT_ACCEPTED");
   assert.equal(result.executionMode, "READ_ONLY_EXTERNAL");
   assert.equal(result.executionStarted, false);
   assert.equal(result.terminalReceipt, null);
@@ -184,8 +187,12 @@ test("complete offline path uses existing gates, ledger, independent ticks and d
   assert.equal(result.terminalReceipt.sequence, result.checkpoint.sequence);
   assert.equal(result.report.schemaVersion, "memecoin-paper-pilot-report/v1");
   assert.equal(result.report.producerRevision, "paper-pilot-composition/2");
-  assert.match(result.report.configDigest, /^[a-f0-9]{64}$/);
+  assert.equal(result.report.configDigest, createHash("sha256")
+    .update(canonicalCheckpointBytes(config())).digest("hex"));
   assert.equal(result.report.runId, "composition-test");
+  assert.equal(result.report.strategyOutcome, "CLOSED_PAPER");
+  assert.equal(result.report.realDataSourceCoverage, "NOT_ASSESSED");
+  assert.deepEqual(result.report.authority, {executionAuthorized: false, liveReady: false});
   assert.equal(result.report.persistence.certainty, "ACKNOWLEDGED");
   assert.deepEqual(result.report.persistence.checkpointRef, {
     runId: "composition-test",
@@ -230,6 +237,7 @@ test("missing hard evidence and missing full cost components do not fill", async
   const rejected = await noEvidence.pilot.start();
   assert.equal(rejected.status, "FINISHED");
   assert.equal(rejected.strategyOutcome, "BLOCKED");
+  assert.equal(rejected.report.strategyOutcome, "BLOCKED");
   assert.equal(rejected.accounting.cashCents, "100000");
   const evidenceRecords = (await checkpoint(noEvidence.directory)).records;
   assert.equal(evidenceRecords.some(record => record.method === "executeEntry"), false);

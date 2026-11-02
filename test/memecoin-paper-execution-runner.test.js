@@ -997,6 +997,7 @@ test("bounded external read-only input stays UNKNOWN until source contracts are 
 
   const report = await runner.run();
   assert.equal(report.status, "UNKNOWN");
+  assert.equal(report.code, "EXTERNAL_SOURCE_CONTRACTS_NOT_ACCEPTED");
   assert.equal(report.executionMode, "READ_ONLY_EXTERNAL");
   assert.equal(report.provenance, "UNVERIFIED_CALLER_INPUT");
   assert.equal(report.executionStarted, false);

@@ -255,6 +255,7 @@ export function createPaperExecutionRunner({
         if (!externalRunPromise) {
           externalRunPromise = Promise.resolve({
             status: "UNKNOWN",
+            code: "EXTERNAL_SOURCE_CONTRACTS_NOT_ACCEPTED",
             reason: "external source contracts are not accepted for simulated entry",
             executionMode: "READ_ONLY_EXTERNAL",
             provenance: "UNVERIFIED_CALLER_INPUT",
