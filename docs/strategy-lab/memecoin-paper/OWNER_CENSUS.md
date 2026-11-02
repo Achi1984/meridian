@@ -42,6 +42,13 @@ exceeds the configured byte bound. Non-2xx responses, including 429, malformed
 data, timeout, abort, and budget exhaustion return `UNKNOWN`; there is no retry or
 claim of pagination.
 
+Stream consumption also caps total reads at 65,536 and consecutive empty reads
+at 256. Empty chunks are not retained, and every 64 reads yields to the timer
+queue so immediately ready chunks cannot starve the deadline. Cancellation is
+checked before and after each read race. Oversized declared content lengths are
+rejected before reading. Rejected bodies are cancelled on a best-effort basis;
+cancellation errors are consumed and cancellation promises are never awaited.
+
 ## Supported account layouts and aggregation
 
 Only the legacy SPL Token program and Token-2022 are recognized. An account must

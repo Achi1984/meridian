@@ -7,6 +7,9 @@ const TOKEN_PROGRAMS = new Set([LEGACY_TOKEN_PROGRAM, TOKEN_2022_PROGRAM]);
 const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 const BASE58_VALUES = new Map([...BASE58_ALPHABET].map((character, index) => [character, index]));
 const TOKEN_ACCOUNT_BYTES = 165;
+const MAX_READ_ITERATIONS = 65_536;
+const MAX_EMPTY_READS = 256;
+const READ_YIELD_INTERVAL = 64;
 const U64_MAX = (1n << 64n) - 1n;
 const MAX_BOUNDS = Object.freeze({
   maxRequests: 1,
@@ -186,9 +189,20 @@ function createDeadline(parentSignal, timeoutMs) {
   if (parentSignal?.aborted) abort("CANCELLED");
   else parentSignal?.addEventListener("abort", onParentAbort, {once: true});
   const timer = setTimeout(() => abort("TIMEOUT"), timeoutMs);
+  const check = () => {
+    if (controller.signal.aborted) throw controller.signal.reason;
+  };
   return {
     signal: controller.signal,
-    wait: value => Promise.race([Promise.resolve(value), aborted]),
+    check,
+    async wait(value) {
+      const pending = Promise.resolve(value);
+      void pending.catch(() => {});
+      check();
+      const result = await Promise.race([pending, aborted]);
+      check();
+      return result;
+    },
     reasonCode: () => reasonCode,
     close() {
       clearTimeout(timer);
@@ -211,22 +225,38 @@ function validateResponseTarget(response) {
   }
 }
 
+function cancelBody(body) {
+  try { void Promise.resolve(body?.cancel()).catch(() => {}); } catch {}
+}
+
 async function readBoundedBody(response, maxBytes, deadline, onByteCount) {
-  if (!response?.body || typeof response.body.getReader !== "function") fail("INVALID_RESPONSE_BODY");
-  const reader = response.body.getReader();
+  let reader;
   const chunks = [];
   let byteCount = 0;
-  const cancel = () => {
-    try { void Promise.resolve(reader.cancel()).catch(() => {}); } catch {}
-  };
+  let reads = 0;
+  let emptyReads = 0;
   try {
+    if (!response?.body || typeof response.body.getReader !== "function") fail("INVALID_RESPONSE_BODY");
+    reader = response.body.getReader();
     while (true) {
+      deadline.check();
+      if (reads >= MAX_READ_ITERATIONS) fail("RESPONSE_READ_LIMIT");
+      if (reads > 0 && reads % READ_YIELD_INTERVAL === 0) {
+        await deadline.wait(new Promise(resolve => setTimeout(resolve, 0)));
+      }
+      deadline.check();
+      reads += 1;
       const {done, value} = await deadline.wait(reader.read());
       if (done) break;
       if (!(value instanceof Uint8Array)) fail("INVALID_RESPONSE_BODY");
+      if (value.byteLength === 0) {
+        emptyReads += 1;
+        if (emptyReads >= MAX_EMPTY_READS) fail("RESPONSE_NO_PROGRESS");
+        continue;
+      }
+      emptyReads = 0;
       if (value.byteLength > maxBytes - byteCount) {
         onByteCount(byteCount + value.byteLength);
-        cancel();
         fail("RESPONSE_BYTE_LIMIT", {responseBytes: byteCount + value.byteLength});
       }
       byteCount += value.byteLength;
@@ -234,10 +264,10 @@ async function readBoundedBody(response, maxBytes, deadline, onByteCount) {
       chunks.push(value);
     }
   } catch (error) {
-    cancel();
+    cancelBody(reader ?? response?.body);
     throw error;
   } finally {
-    try { reader.releaseLock(); } catch {}
+    try { reader?.releaseLock(); } catch {}
   }
   const bytes = new Uint8Array(byteCount);
   let offset = 0;
@@ -423,6 +453,8 @@ export async function acquireOwnerCensus({
   let requests = 0;
   let responseBytes = 0;
   let deadline;
+  let response;
+  let bodyReadStarted = false;
   let observedAt = null;
   let slot = null;
   const poolExclusionEvidenceSupplied = poolExclusionEvidence !== undefined &&
@@ -443,17 +475,29 @@ export async function acquireOwnerCensus({
     deadline = createDeadline(signal, bounds.maxElapsedMs);
     if (deadline.signal.aborted) fail("CANCELLED");
     requests += 1;
-    const response = await deadline.wait(Promise.resolve().then(() => transport(request, {
+    await deadline.wait(Promise.resolve().then(() => transport(request, {
       credentials: "omit",
       redirect: "error",
       signal: deadline.signal
-    })));
+    })).then(received => {
+      if (deadline.signal.aborted) cancelBody(received?.body);
+      else response = received;
+      return received;
+    }));
     observedAt = parseTime(clock());
     if (observedAt === null) fail("INVALID_CLOCK");
     validateResponseTarget(response);
     if (!Number.isInteger(response.status) || response.status < 200 || response.status >= 300) {
       fail(response.status === 429 ? "RATE_LIMITED" : "HTTP_ERROR");
     }
+    const contentLength = response.headers?.get("content-length");
+    if (contentLength !== undefined && contentLength !== null) {
+      if (!/^\d{1,16}$/.test(contentLength) || !Number.isSafeInteger(Number(contentLength))) {
+        fail("INVALID_RESPONSE_HEADERS");
+      }
+      if (Number(contentLength) > bounds.maxResponseBytes) fail("RESPONSE_BYTE_LIMIT");
+    }
+    bodyReadStarted = true;
     const streamed = await readBoundedBody(response, bounds.maxResponseBytes, deadline,
       count => { responseBytes = count; });
     const rpc = parseRpcResponse(streamed.bytes);
@@ -573,6 +617,7 @@ export async function acquireOwnerCensus({
       ...(error instanceof CensusFailure ? error.details : {})
     });
   } finally {
+    if (!bodyReadStarted) cancelBody(response?.body);
     deadline?.close();
   }
 }

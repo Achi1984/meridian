@@ -400,3 +400,239 @@ test("malformed program ownership and non-success responses do not retry", async
   assert.equal(calls, 1);
   assert.equal(limited.provenance.requestCount, 1);
 });
+
+test("immediate empty chunks hit the no-progress cap without retaining bytes", {timeout: 2000}, async () => {
+  let reads = 0;
+  let cancelled = 0;
+  const body = new ReadableStream({
+    pull(controller) {
+      reads += 1;
+      controller.enqueue(new Uint8Array(0));
+    },
+    cancel() { cancelled += 1; }
+  }, {highWaterMark: 0});
+  const result = await acquire({transport: async () => ({status: 200, body})});
+  assert.equal(result.reason, "RESPONSE_NO_PROGRESS");
+  assert.equal(result.status, "UNKNOWN");
+  assert.equal(result.rawCensus, null);
+  assert.equal(result.provenance.responseBytes, 0);
+  assert.equal(reads, 256);
+  assert.equal(cancelled, 1);
+});
+
+test("intermittent progress still hits the total-read cap", {timeout: 15_000}, async () => {
+  let reads = 0;
+  let cancelled = 0;
+  const body = new ReadableStream({
+    pull(controller) {
+      reads += 1;
+      controller.enqueue(reads % 2 ? new Uint8Array(0) : new Uint8Array([32]));
+    },
+    cancel() { cancelled += 1; }
+  }, {highWaterMark: 0});
+  const result = await acquire({transport: async () => ({status: 200, body})});
+  assert.equal(result.reason, "RESPONSE_READ_LIMIT");
+  assert.equal(result.rawCensus, null);
+  assert.equal(reads, 65_536);
+  assert.equal(result.provenance.responseBytes, 32_768);
+  assert.equal(cancelled, 1);
+});
+
+test("immediately ready empty and nonempty reads yield to the real deadline", {timeout: 2000}, async t => {
+  for (const empty of [true, false]) {
+    await t.test(empty ? "empty chunks" : "one-byte chunks", async () => {
+      let reads = 0;
+      let cancelled = 0;
+      const body = new ReadableStream({
+        pull(controller) {
+          reads += 1;
+          controller.enqueue(empty ? new Uint8Array(0) : new Uint8Array([32]));
+        },
+        cancel() { cancelled += 1; }
+      }, {highWaterMark: 0});
+      const result = await acquire({
+        bounds: {...BOUNDS, maxElapsedMs: 1},
+        transport: async () => ({status: 200, body})
+      });
+      assert.equal(result.reason, "TIMEOUT");
+      assert.equal(result.status, "UNKNOWN");
+      assert.equal(result.rawCensus, null);
+      assert.ok(reads <= 64);
+      assert.equal(cancelled, 1);
+    });
+  }
+});
+
+test("small finite empty chunks do not change a reconciled census", async () => {
+  const bytes = new TextEncoder().encode(JSON.stringify(rpcPayload([
+    tokenAccount({amount: 100n})
+  ])));
+  const body = new ReadableStream({
+    start(controller) {
+      controller.enqueue(new Uint8Array(0));
+      controller.enqueue(bytes);
+      controller.enqueue(new Uint8Array(0));
+      controller.close();
+    }
+  });
+  const result = await acquire({transport: async () => ({status: 200, body})});
+  assert.equal(result.accountCoverage, "RECONCILED_RPC_RESPONSE_ONLY");
+  assert.equal(result.provenance.responseBytes, bytes.byteLength);
+  assert.equal(result.status, "UNKNOWN");
+  assert.equal(result.executionAuthorized, false);
+});
+
+test("buffered chunks and an already-fulfilled final read cannot bypass abort", async t => {
+  for (const abortOnRead of [1, 2, 3]) {
+    await t.test(`abort on read ${abortOnRead}`, async () => {
+      const controller = new AbortController();
+      const bytes = new TextEncoder().encode(JSON.stringify(rpcPayload([
+        tokenAccount({amount: 100n})
+      ])));
+      const chunks = [bytes.subarray(0, 10), bytes.subarray(10)];
+      let reads = 0;
+      let cancelled = 0;
+      const reader = {
+        read() {
+          reads += 1;
+          const value = chunks.shift();
+          const pending = Promise.resolve({done: value === undefined, value});
+          if (reads === abortOnRead) queueMicrotask(() => controller.abort());
+          return pending;
+        },
+        cancel() { cancelled += 1; return Promise.resolve(); },
+        releaseLock() {}
+      };
+      const result = await acquire({
+        signal: controller.signal,
+        transport: async () => ({status: 200, body: {getReader: () => reader}})
+      });
+      assert.equal(result.reason, "CANCELLED");
+      assert.equal(result.rawCensus, null);
+      assert.equal(result.status, "UNKNOWN");
+      assert.equal(reads, abortOnRead);
+      assert.equal(cancelled, 1);
+      assert.equal(result.provenance.requestCount, 1);
+    });
+  }
+});
+
+test("queued native stream chunks cannot bypass synchronous caller abort", async () => {
+  const controller = new AbortController();
+  let cancelled = 0;
+  const bytes = new TextEncoder().encode(JSON.stringify(rpcPayload([tokenAccount({amount: 100n})])));
+  const body = new ReadableStream({
+    pull(stream) {
+      stream.enqueue(bytes.subarray(0, 10));
+      stream.enqueue(bytes.subarray(10));
+      controller.abort();
+      stream.close();
+    },
+    cancel() { cancelled += 1; }
+  }, {highWaterMark: 0});
+  const result = await acquire({
+    signal: controller.signal,
+    transport: async () => ({status: 200, body})
+  });
+  assert.equal(result.reason, "CANCELLED");
+  assert.equal(result.rawCensus, null);
+  assert.equal(result.provenance.responseBytes, 0);
+  assert.equal(cancelled, 1);
+});
+
+test("early response failures cancel bodies without awaiting or leaking cancellation errors",
+  {timeout: 2000}, async t => {
+    const cases = [
+      [{status: 429}, "RATE_LIMITED"],
+      [{status: 503}, "HTTP_ERROR"],
+      [{status: NaN}, "HTTP_ERROR"],
+      [{headers: new Headers({"content-length": String(BOUNDS.maxResponseBytes + 1)})},
+        "RESPONSE_BYTE_LIMIT"],
+      [{headers: new Headers({"content-length": "invalid"})}, "INVALID_RESPONSE_HEADERS"],
+      [{url: "https://example.invalid"}, "INVALID_RESPONSE_URL"],
+      [{redirected: true}, "REDIRECT_BLOCKED"]
+    ];
+    for (const mode of ["resolve", "reject", "throw", "hang"]) {
+      for (const [properties, reason] of cases) {
+        await t.test(`${reason}: cancel ${mode}`, async () => {
+          let cancelled = 0;
+          let reads = 0;
+          let calls = 0;
+          const body = new ReadableStream({
+            pull() { reads += 1; },
+            cancel() {
+              cancelled += 1;
+              if (mode === "throw") throw new Error("cancel threw");
+              if (mode === "reject") return Promise.reject(new Error("cancel rejected"));
+              if (mode === "hang") return new Promise(() => {});
+            }
+          }, {highWaterMark: 0});
+          const result = await acquire({
+            transport: async () => {
+              calls += 1;
+              return {status: 200, body, ...properties};
+            }
+          });
+          assert.equal(result.reason, reason);
+          assert.equal(result.status, "UNKNOWN");
+          assert.equal(result.rawCensus, null);
+          assert.equal(result.provenance.responseBytes, 0);
+          assert.equal(result.provenance.requestCount, 1);
+          assert.equal(result.requestPlan.retry, false);
+          assert.equal(cancelled, 1);
+          assert.equal(reads, 0);
+          assert.equal(calls, 1);
+          await new Promise(resolve => setImmediate(resolve));
+        });
+      }
+    }
+  });
+
+test("read failures remain bounded when reader cancellation rejects, throws, or hangs",
+  {timeout: 2000}, async t => {
+    for (const mode of ["reject", "throw", "hang"]) {
+      await t.test(mode, async () => {
+        let cancelled = 0;
+        let released = 0;
+        const reader = {
+          read: () => Promise.resolve({done: false, value: new Uint8Array(129)}),
+          cancel() {
+            cancelled += 1;
+            if (mode === "throw") throw new Error("cancel threw");
+            if (mode === "reject") return Promise.reject(new Error("cancel rejected"));
+            return new Promise(() => {});
+          },
+          releaseLock() { released += 1; }
+        };
+        const result = await acquire({
+          bounds: {...BOUNDS, maxResponseBytes: 128},
+          transport: async () => ({status: 200, body: {getReader: () => reader}})
+        });
+        assert.equal(result.reason, "RESPONSE_BYTE_LIMIT");
+        assert.equal(result.rawCensus, null);
+        assert.equal(cancelled, 1);
+        assert.equal(released, 1);
+        await new Promise(resolve => setImmediate(resolve));
+      });
+    }
+  });
+
+test("a response arriving after cancellation is still cancelled without rejection leaks", async () => {
+  const controller = new AbortController();
+  let resolveResponse;
+  let cancelled = 0;
+  const pending = acquire({
+    signal: controller.signal,
+    transport: () => new Promise(resolve => { resolveResponse = resolve; })
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  controller.abort();
+  const result = await pending;
+  assert.equal(result.reason, "CANCELLED");
+  resolveResponse({
+    status: 200,
+    body: {cancel() { cancelled += 1; return Promise.reject(new Error("late cancel")); }}
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(cancelled, 1);
+});
