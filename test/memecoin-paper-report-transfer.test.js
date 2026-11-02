@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {createHash} from "node:crypto";
 import {EventEmitter} from "node:events";
+import http from "node:http";
 import {mkdtemp, mkdir, rename, rm, symlink, writeFile} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -19,6 +20,7 @@ import {
   handlePaperReportUpload,
   PAPER_REPORT_MAX_BODY_BYTES,
   readBoundedRequestBody,
+  reportTransferGatewayConfig,
   writeReportRouteResponse
 } from "../report-transfer-gateway.mjs";
 import {
@@ -1058,7 +1060,7 @@ test("gateway GET reports absent, disabled, and unavailable states without expos
   }, {config: gatewayConfig, store: new MemoryStore()})).status, 400);
 });
 
-test("gateway dispatcher applies the existing read authorizer only to GET and keeps upload credentials separate", async () => {
+test("gateway dispatcher protects GET reads and rejects read credentials on upload", async () => {
   const getRequest = {
     method: "GET",
     url: "/api/private/paper-report",
@@ -1460,7 +1462,6 @@ test("gateway config requires only a hash and a dedicated bearer cannot be confu
     MERIDIAN_PAPER_REPORT_UPLOAD_TOKEN_SHA256: uploadTokenHash,
     MERIDIAN_READ_TOKEN_SHA256: createHash("sha256").update("read-only-token").digest("hex")
   };
-  const {reportTransferGatewayConfig} = await import("../report-transfer-gateway.mjs");
   const config = reportTransferGatewayConfig(env);
   assert.equal(Object.hasOwn(config, "uploadToken"), false);
   const bytes = bodyBytes(transferEnvelope());
@@ -1468,6 +1469,188 @@ test("gateway config requires only a hash and a dedicated bearer cannot be confu
     authorization: ["Bearer", "read-only-token"].join(" ")
   }), {config, store: new MemoryStore()});
   assert.equal(result.status, 401);
+});
+
+test("gateway rejects upload credentials matching read hashes from current, plaintext, or rotation sources", async () => {
+  const env = {
+    MERIDIAN_PAPER_REPORT_UPLOAD_ENABLED: "true",
+    MERIDIAN_PAPER_REPORT_EXPECTED_RUN_ID: RUN_ID,
+    MERIDIAN_PAPER_REPORT_EXPECTED_CONFIG_SHA256: gatewayConfig.expectedConfigHash,
+    MERIDIAN_PAPER_REPORT_UPLOAD_TOKEN_SHA256: uploadTokenHash
+  };
+  const bytes = bodyBytes(transferEnvelope());
+  for (const readConfig of [
+    {MERIDIAN_READ_TOKEN_SHA256: uploadTokenHash},
+    {MERIDIAN_READ_TOKEN: UPLOAD_TOKEN}
+  ]) {
+    const config = reportTransferGatewayConfig({...env, ...readConfig});
+    const result = await handlePaperReportUpload(request(bytes), {
+      config, store: new MemoryStore()
+    });
+    assert.equal(result.status, 503);
+  }
+
+  const rotated = {
+    ...reportTransferGatewayConfig({
+      ...env,
+      MERIDIAN_READ_TOKEN_SHA256: createHash("sha256").update("current-read-token").digest("hex")
+    }),
+    readTokenHashes: [
+      createHash("sha256").update("current-read-token").digest("hex"),
+      uploadTokenHash
+    ]
+  };
+  assert.equal((await handlePaperReportUpload(request(bytes), {
+    config: rotated, store: new MemoryStore()
+  })).status, 503);
+
+  const distinct = reportTransferGatewayConfig({
+    ...env,
+    MERIDIAN_READ_TOKEN_SHA256: createHash("sha256").update("distinct-read-token").digest("hex")
+  });
+  assert.equal((await handlePaperReportUpload(request(bytes), {
+    config: distinct, store: new MemoryStore()
+  })).status, 201);
+});
+
+test("gateway refuses read credentials at upload authorization, including rotated read tokens", async () => {
+  const bytes = bodyBytes(transferEnvelope());
+  const readHashes = [
+    createHash("sha256").update("current-read-token").digest("hex"),
+    createHash("sha256").update("rotated-read-token").digest("hex")
+  ];
+  for (const token of ["current-read-token", "rotated-read-token"]) {
+    const result = await handleReportGatewayRequest(request(bytes, {
+      authorization: ["Bearer", token].join(" ")
+    }), {
+      config: gatewayConfig,
+      authorizedRead: req => readHashes.includes(
+        createHash("sha256").update(req.headers.authorization.slice(7)).digest("hex")
+      ),
+      getStore: () => new MemoryStore()
+    });
+    assert.equal(result.status, 401);
+  }
+  const uploadResult = await handleReportGatewayRequest(request(bytes), {
+    config: gatewayConfig,
+    authorizedRead: () => false,
+    getStore: () => new MemoryStore()
+  });
+  assert.equal(uploadResult.status, 201);
+});
+
+test("real HTTP sockets close incomplete early-rejected uploads and preserve completed keep-alive uploads", async () => {
+  const cases = [
+    [{config: gatewayConfig}, 401, "application/json"],
+    [{config: {...gatewayConfig, enabled: false}}, 503, "application/json"],
+    [{config: gatewayConfig, store: new MemoryStore()}, 415, "text/plain"]
+  ];
+  for (const [options, expectedStatus, contentType] of cases) {
+    let sawIncompleteRequest = false;
+    const server = http.createServer(async (req, res) => {
+      sawIncompleteRequest = !req.complete;
+      const result = await handlePaperReportUpload(req, options);
+      writeReportRouteResponse(req, res, result, "", (_res, status, body) => {
+        const raw = JSON.stringify(body);
+        res.writeHead(status, {
+          "content-type": "application/json",
+          "content-length": Buffer.byteLength(raw)
+        });
+        res.end(raw);
+      });
+    });
+    await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+    const port = server.address().port;
+    let clientSocket;
+    let socketClosedResolve;
+    const socketClosed = new Promise(resolve => { socketClosedResolve = resolve; });
+    const response = await new Promise((resolve, reject) => {
+      const client = http.request({
+        host: "127.0.0.1",
+        port,
+        path: "/api/private/paper-report/upload",
+        method: "POST",
+        headers: {
+          "content-length": "4096",
+          "content-type": contentType,
+          ...(expectedStatus === 401 ? {} : {authorization: ["Bearer", UPLOAD_TOKEN].join(" ")})
+        }
+      });
+      client.on("socket", socket => {
+        clientSocket = socket;
+        socket.once("close", socketClosedResolve);
+      });
+      client.once("response", res => {
+        const chunks = [];
+        res.on("data", chunk => chunks.push(chunk));
+        res.once("end", () => resolve({status: res.statusCode, body: Buffer.concat(chunks)}));
+      });
+      client.once("error", reject);
+      client.flushHeaders();
+    });
+    const closedPromptly = await Promise.race([
+      socketClosed.then(() => true),
+      new Promise(resolve => setTimeout(() => resolve(false), 500))
+    ]);
+    const destroyedPromptly = clientSocket.destroyed;
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+    assert.equal(response.status, expectedStatus);
+    assert.equal(sawIncompleteRequest, true);
+    assert.equal(closedPromptly, true);
+    assert.equal(destroyedPromptly, true);
+  }
+
+  const server = http.createServer(async (req, res) => {
+    if (req.url === "/health") {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+    const result = await handlePaperReportUpload(req, {
+      config: gatewayConfig,
+      store: new MemoryStore()
+    });
+    writeReportRouteResponse(req, res, result, "", (_res, status, body) => {
+      const raw = JSON.stringify(body);
+      res.writeHead(status, {
+        "content-type": "application/json",
+        "content-length": Buffer.byteLength(raw)
+      });
+      res.end(raw);
+    });
+  });
+  await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+  const agent = new http.Agent({keepAlive: true, maxSockets: 1});
+  const send = (method, path, body) => new Promise((resolve, reject) => {
+    const req = http.request({
+      host: "127.0.0.1",
+      port: server.address().port,
+      path,
+      method,
+      agent,
+      ...(body ? {headers: {
+        authorization: ["Bearer", UPLOAD_TOKEN].join(" "),
+        "content-type": "application/json",
+        "content-length": body.length
+      }} : {})
+    }, res => {
+      res.resume();
+      res.once("end", () => resolve({status: res.statusCode, socket}));
+    });
+    let socket;
+    req.once("socket", value => { socket = value; });
+    req.once("error", reject);
+    req.end(body);
+  });
+  const payload = bodyBytes(transferEnvelope());
+  const uploaded = await send("POST", "/api/private/paper-report/upload", payload);
+  const health = await send("GET", "/health");
+  assert.equal(uploaded.status, 201);
+  assert.equal(health.status, 204);
+  assert.equal(uploaded.socket, health.socket);
+  agent.destroy();
+  await new Promise(resolve => server.close(resolve));
 });
 
 test("test fixture module exports the existing report contract without mutating dependency files", () => {

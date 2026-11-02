@@ -15,19 +15,28 @@ const MAX_ACTIVE_REPORT_REQUESTS = 4;
 let activeReportRequests = 0;
 
 export function reportTransferGatewayConfig(env = process.env) {
+  const readTokenHashes = [];
+  const readTokenHash = String(env.MERIDIAN_READ_TOKEN_SHA256 ?? "").trim().toLowerCase();
+  if (readTokenHash) readTokenHashes.push(readTokenHash);
+  const readToken = String(env.MERIDIAN_READ_TOKEN ?? "").trim();
+  if (readToken) readTokenHashes.push(digest(Buffer.from(readToken, "utf8")));
   return Object.freeze({
     enabled: env.MERIDIAN_PAPER_REPORT_UPLOAD_ENABLED === "true",
     expectedRunId: String(env.MERIDIAN_PAPER_REPORT_EXPECTED_RUN_ID ?? ""),
     expectedConfigHash: String(env.MERIDIAN_PAPER_REPORT_EXPECTED_CONFIG_SHA256 ?? "").toLowerCase(),
-    uploadTokenHash: String(env.MERIDIAN_PAPER_REPORT_UPLOAD_TOKEN_SHA256 ?? "").toLowerCase()
+    uploadTokenHash: String(env.MERIDIAN_PAPER_REPORT_UPLOAD_TOKEN_SHA256 ?? "").toLowerCase(),
+    readTokenHashes: Object.freeze([...new Set(readTokenHashes)])
   });
 }
 
 function isConfigured(config) {
+  const readTokenHashes = config?.readTokenHashes ?? [];
   return config?.enabled === true &&
     typeof config.expectedRunId === "string" && SAFE_RUN_ID.test(config.expectedRunId) &&
     typeof config.expectedConfigHash === "string" && HASH.test(config.expectedConfigHash) &&
-    typeof config.uploadTokenHash === "string" && HASH.test(config.uploadTokenHash);
+    typeof config.uploadTokenHash === "string" && HASH.test(config.uploadTokenHash) &&
+    Array.isArray(readTokenHashes) &&
+    readTokenHashes.every(hash => HASH.test(hash) && hash !== config.uploadTokenHash);
 }
 
 function tokenFromHeader(req) {
@@ -37,11 +46,13 @@ function tokenFromHeader(req) {
   return token && !/\s/.test(token) ? token : "";
 }
 
-function authorizedUpload(req, hash) {
+function authorizedUpload(req, config) {
   const token = tokenFromHeader(req);
-  if (!token || !HASH.test(hash)) return false;
+  if (!token || !HASH.test(config?.uploadTokenHash)) return false;
   const actual = createHash("sha256").update(token).digest();
-  const expected = Buffer.from(hash, "hex");
+  if ((config.readTokenHashes ?? []).some(hash =>
+    HASH.test(hash) && timingSafeEqual(actual, Buffer.from(hash, "hex")))) return false;
+  const expected = Buffer.from(config.uploadTokenHash, "hex");
   return timingSafeEqual(actual, expected);
 }
 
@@ -233,7 +244,7 @@ export async function handlePaperReportUpload(req, {
   if (!isConfigured(config)) return response(503, {error: "paper_report_upload_disabled"});
   if (req.method !== "POST") return response(405, {error: "method_not_allowed"});
   if (queryPresent(req)) return response(400, {error: "paper_report_query_not_supported"});
-  if (!authorizedUpload(req, config.uploadTokenHash)) {
+  if (!authorizedUpload(req, config)) {
     return response(401, {error: "paper_report_upload_auth_required"});
   }
   const releaseAdmission = enterReportRequest();
@@ -380,6 +391,9 @@ export async function handleReportGatewayRequest(req, {
     return null;
   }
   if (pathname === "/api/private/paper-report/upload") {
+    if (typeof authorizedRead === "function" && authorizedRead(req)) {
+      return response(401, {error: "paper_report_upload_auth_required"});
+    }
     return handlePaperReportUpload(req, {config, getStore, readBody, now, signal});
   }
   if (pathname === "/api/private/paper-report") {
