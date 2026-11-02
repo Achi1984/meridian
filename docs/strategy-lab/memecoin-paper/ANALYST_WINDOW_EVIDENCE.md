@@ -59,10 +59,31 @@ endInclusiveMs})` must return the already-paginated window with:
 - a source receipt `{status: "SOURCE_BOUND", id, source, payloadSha256,
   receivedAt}`.
 
-The builder validates receipt shape, binding, coverage, and time bounds. It does
-not authenticate a provider or recompute the receipt digest; the injected
-collector owns binding the receipt to the exact raw payload and proving
-pagination exhaustion. An asserted receipt is not independent source review.
+The builder validates receipt shape, binding, coverage, and time bounds. Each
+injected callback receives an `AbortSignal` and is deadline-bounded; the default
+total source-read budget is 15 seconds (tests may select a smaller bound). A
+callback that ignores cancellation still cannot hold the builder open past its
+deadline. Oversized responses fail closed: history is limited to 5,000 rows,
+aggregate decode work to 25,000,000 units, quote/momentum lookups to 2,048,
+census rows to 25,000 per endpoint / 50,000 total, and allowlist entries to
+10,000. The transaction decoder separately caps account keys, instruction
+counts/references, token balances, signatures, and program logs.
+
+The adapter does not authenticate a provider or recompute the receipt digest;
+the injected collector owns binding the receipt to the exact raw payload and
+proving pagination exhaustion. An asserted receipt is not independent source
+review.
+
+`candidateT` is the candidate's immutable window cutoff. `assembledAt` records
+when the packet was actually assembled and may be later than `candidateT`;
+`decisionAt` records the later filter/scoring time. Endpoint observations must
+be no later than their receipt; end-of-window history receipts must be received
+at or after `candidateT`. All receipts precede packet assembly, and
+`assembledAt <= decisionAt`; `decisionAt - candidateT` cannot exceed the
+existing five-minute evidence freshness limit. Derived metrics use
+`observedAt: candidateT` as their window-as-of time, while their receipt and
+packet assembly/decision times remain separately recorded. No acquisition or
+receipt time is backdated.
 
 `poolProof` must be a `SOURCE_BOUND`, verified proof for the candidate's exact
 pool and both mints, including the two vault addresses, decimals, a genuine
@@ -92,8 +113,10 @@ accepted pair, and exactly match the candidate's existing verified, complete
 hard-filter evidence. No FDV substitution is used. A wallet allowlist must be
 externally reviewed, versioned, effective at candidate time, and contain
 individually reviewed qualification records that exclude the candidate mint.
-The adapter intersects only those explicit records with decoded unique buyers;
-it never qualifies or infers wallets.
+Real wallet qualification additionally requires an explicit owner-approved
+membership-timing decision with mode `AS_OF_CANDIDATE_CUTOFF`; `REVIEWED` alone
+does not authorize intersecting a current list with the preceding hour. The
+fixture-only timing mode is accepted only for synthetic candidates.
 
 Receipts and derived packet objects are frozen. `payloadSha256` syntax and
 receipt claims are preserved for review, not treated as cryptographic
@@ -101,7 +124,10 @@ authentication by this adapter.
 
 ## Proposed windows and score components
 
-`PROPOSED_ANALYST_WINDOW_POLICY` makes the current proposal inspectable:
+`PROPOSED_ANALYST_WINDOW_POLICY` makes the current proposal inspectable. The
+current score version is pinned to 900,000 ms momentum and 3,600,000 ms swap
+and holder windows; other durations are rejected for this score version and
+require a separately approved/versioned strategy:
 
 | Metric | Proposed evidence window | Derivation |
 | --- | --- | --- |
@@ -112,34 +138,45 @@ authentication by this adapter.
 | `liquidityMarketCapPct` | One accepted pair sample | `liquidityUsd / actualMarketCapUsd × 100` from the exact pair already bound to the hard-filter evidence. |
 | `qualifiedSmartWallets` | `(T − 60m, T]` | Distinct decoded buyers intersected with the versioned, effective, externally reviewed allowlist. |
 
-Window sizes, boundary convention, denomination, price-source trust, census
-aggregation/exclusions, and wallet-qualification version are explicit policy
-inputs; the proposal is not a frozen strategy decision. `T` must equal the
-candidate sample time. Source timestamps and endpoint observations are not
-manufactured. A missing input omits that metric and records an unavailable
-reason; the existing `analyzeCandidate` then returns `SCORE_UNAVAILABLE`.
+The pinned durations do not decide whether the proposed boundaries,
+denomination, price-source trust, census aggregation/exclusions, or
+wallet-qualification semantics are approved. Those remain explicit policy
+inputs. `T` must equal the candidate sample time. Source timestamps and
+endpoint observations are not manufactured. A missing input omits that metric
+and records an unavailable reason; the existing `analyzeCandidate` then returns
+`SCORE_UNAVAILABLE`.
 No missing metric causes weight redistribution. The current score weights
 (25/20/15/15/15/10) and threshold 70 are unchanged.
 
-The score-stage evidence format has a legacy `slot` field. The new evidence uses
-`slot: null` for off-chain observations and derived multi-slot windows, with
-typed `coverage.provenanceType` and per-census-endpoint slot provenance. It
-never copies a nearby RPC slot onto an off-chain timestamp. The current
-`boundEvidence` path does not require a numeric slot. If a separate adapter
-requires one, the minimal follow-up should version its envelope to carry
-`slot: number | null` plus a required typed `slotProvenance` discriminator; it
-must keep genuine RPC context slots for on-chain facts and explicitly mark
-timestamp-only sources as having no Solana slot. This adapter change is outside
-the exclusive file scope of this issue.
+The packet emits `slot: null` for off-chain observations and derived
+multi-observation windows. `bridgeAnalystWindowPacket` prepares typed records
+for the canonical market adapter; it does not stamp candidate evidence itself.
+That canonical adapter is on the separate #1158/#1157 change and currently
+rejects null slots for supplemental Analyst records. Do not bypass it or borrow
+an unrelated RPC slot. Its single-writer handoff is narrowly scoped: permit
+`slot: null` for Analyst records only when `coverage.slotProvenance` is one of
+`OFFCHAIN_TIMESTAMP_NO_SOLANA_SLOT`,
+`DERIVED_ONCHAIN_WINDOW_NO_SINGLE_SLOT`,
+`DERIVED_ONCHAIN_WINDOW_WITH_EXACT_HISTORICAL_USD_PRICES_NO_SINGLE_SLOT`,
+`CENSUS_ENDPOINTS_TYPED_PROVENANCE_NO_SINGLE_SLOT`, or
+`DERIVED_ONCHAIN_WINDOW_WITH_EXTERNALLY_REVIEWED_ALLOWLIST_NO_SINGLE_SLOT`.
+Retain required numeric slots and `ONCHAIN_SLOT` provenance for on-chain
+records, and keep every existing identity, review, coverage, freshness, and
+hard-evidence check. Until that change lands, this packet cannot claim the full
+canonical-adapter → filter → scorer acceptance path;
+`evaluateWithCanonicalMarketAdapter` only runs that path when the canonical
+adapter is supplied.
 
 ## Decisions required before real-source use
 
-1. **Smart-wallet qualification and allowlist:** the score specification's
+1. **Smart-wallet qualification, membership timing, and allowlist:** the score specification's
    round-trip, unrelated-mint, realized-cost, attribution, review, and
    candidate-mint exclusions are proposals, not owner approval. The owner must
    freeze the qualification definition and provide its independently reviewed,
-   effective, versioned list. Until then, real `qualifiedSmartWallets` remains
-   unavailable.
+   effective, versioned list. The owner must also choose when membership is
+   evaluated; the current code only accepts an explicit owner approval of
+   `AS_OF_CANDIDATE_CUTOFF`. Until qualification, list, and timing are approved,
+   real `qualifiedSmartWallets` remains unavailable.
 2. **Momentum denomination and historical USD trust:** the owner must identify
    the trusted historical source/methodology and confirm whether momentum is
    USD-denominated. Cross-currency quote pricing also needs an approved source
@@ -150,13 +187,15 @@ the exclusive file scope of this issue.
    window, exact `T−15m`/`T` momentum endpoints, `T−60m`/`T` census endpoints,
    and census denominator/exclusion policy before freezing a strategy version.
 
-The referenced 1167 pool/discovery, 1176 history, and 1152 census work products
-are not available as imports in this checkout. Their caller must adapt their
-receipted output to the narrow injected interfaces above; this packet does not
-duplicate their transport, pagination, or acquisition and does not import an
-unmerged branch. No live schedule, network request, paid provider, spending, or
-secret is involved. The fixtures are synthetic plumbing only, not market or
-wallet evidence.
+Merged #1152 returns `status: "UNKNOWN"`, `coverage.complete: false`, and
+`accountCoverage: "RECONCILED_RPC_RESPONSE_ONLY"`; its current RPC census has
+no authenticated complete two-endpoint receipt. `adaptAcceptedOwnerCensusResult`
+preserves its actual slot and bounded owner rows while retaining `UNKNOWN`, so
+it cannot produce `holderGrowthPct1h`. The 1167 pool/discovery and 1176 history
+products remain caller-injected; this packet duplicates no transport,
+pagination, or acquisition and imports no unmerged branch. No live schedule,
+network request, paid provider, spending, or secret is involved. The fixtures
+are synthetic plumbing only, not market or wallet evidence.
 
 Focused offline validation:
 

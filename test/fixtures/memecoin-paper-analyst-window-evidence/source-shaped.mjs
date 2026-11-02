@@ -9,7 +9,8 @@ const AUTHORITY = key(80_004);
 const AMM_CONFIG = key(80_005);
 const OBSERVATION = key(80_006);
 const CANDIDATE_T = Date.parse("2026-10-30T12:00:00.000Z");
-const ASSEMBLED_AT = CANDIDATE_T;
+const ASSEMBLED_AT = CANDIDATE_T + 1;
+const DECISION_AT = CANDIDATE_T + 2;
 
 function key(number) {
   const bytes = Buffer.alloc(32);
@@ -196,6 +197,7 @@ export function makeFixture({
 } = {}) {
   const candidateT = CANDIDATE_T;
   const assembledAt = ASSEMBLED_AT;
+  const decisionAt = DECISION_AT;
   const start = candidateT - 3_600_000;
   const candidate = syntheticCandidate(candidateT);
   const identity = {
@@ -321,7 +323,7 @@ export function makeFixture({
     status: "SOURCE_BOUND",
     source: SYNTHETIC_SOURCE,
     identity,
-    observedAt: assembledAt,
+    observedAt: candidateT,
     marketCapUsd: 1_000_000,
     liquidityUsd: 50_000,
     receipt: receipt("market-pair", assembledAt, "1")
@@ -329,7 +331,8 @@ export function makeFixture({
   const walletQualification = {
     status: "REVIEWED",
     version: "fixture-wallet-policy-v1",
-    reviewReceiptId: "synthetic-fixture-wallet-policy"
+    reviewReceiptId: "synthetic-fixture-wallet-policy",
+    membershipTiming: "SYNTHETIC_FIXTURE_ONLY"
   };
   const smartWalletAllowlist = allowlistOverride ?? {
     status: "VERIFIED",
@@ -356,6 +359,7 @@ export function makeFixture({
   };
   const policy = {
     version: "fixture-analyst-policy-v1",
+    scoreVersion: "memecoin-candidate-score-v1",
     boundary: "(startExclusive,endInclusive]",
     windowsMs: {swaps1h: 3_600_000, momentum15m: 900_000, holders1h: 3_600_000},
     momentumDenomination: "USD",
@@ -365,7 +369,7 @@ export function makeFixture({
     ...policyOverride
   };
   return {
-    candidate, identity, candidateT, assembledAt, policy, poolProof: poolProofOverride ?? poolProof,
+    candidate, identity, candidateT, assembledAt, decisionAt, policy, poolProof: poolProofOverride ?? poolProof,
     historySource, censusSource, priceSource, marketPairEvidence, smartWalletAllowlist,
     transactions, receipt
   };

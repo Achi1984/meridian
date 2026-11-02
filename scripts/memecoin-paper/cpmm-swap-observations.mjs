@@ -18,6 +18,14 @@ const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvw
 const BASE58_INDEX = new Map([...BASE58_ALPHABET].map((character, index) => [character, index]));
 const COMPUTE_BUDGET_PROGRAM = "ComputeBudget111111111111111111111111111111";
 const TOKEN_AMOUNT = /^(0|[1-9]\d{0,39})$/;
+const MAX_ACCOUNT_KEYS = 256;
+const MAX_OUTER_INSTRUCTIONS = 128;
+const MAX_INNER_GROUPS = 128;
+const MAX_TOTAL_INSTRUCTIONS = 512;
+const MAX_INSTRUCTION_ACCOUNT_REFS = 4096;
+const MAX_TOKEN_BALANCE_ROWS = 1024;
+const MAX_LOG_MESSAGES = 2048;
+const MAX_LOG_BYTES = 262_144;
 
 function excluded(reason, details = {}) {
   return Object.freeze({status: "EXCLUDED", reason, ...details});
@@ -87,13 +95,14 @@ function accountKey(value) {
 function accountKeysFor(transaction) {
   const message = transaction?.message;
   const staticKeys = message?.staticAccountKeys ?? message?.accountKeys;
-  if (!Array.isArray(staticKeys)) return null;
+  if (!Array.isArray(staticKeys) || staticKeys.length > MAX_ACCOUNT_KEYS) return null;
   const keys = staticKeys.map(accountKey);
   const loaded = transaction?.meta?.loadedAddresses;
   if (loaded !== undefined) {
     if (!isRecord(loaded) || !Array.isArray(loaded.writable) || !Array.isArray(loaded.readonly)) {
       return null;
     }
+    if (loaded.writable.length + loaded.readonly.length + keys.length > MAX_ACCOUNT_KEYS) return null;
     keys.push(...loaded.writable.map(accountKey), ...loaded.readonly.map(accountKey));
   }
   return keys.every(isSolanaPublicKey) ? keys : null;
@@ -111,16 +120,27 @@ function resolveIndex(value, keys) {
 function instructionRows(transaction) {
   const message = transaction?.message;
   const outer = message?.compiledInstructions ?? message?.instructions;
-  if (!Array.isArray(outer)) return null;
+  if (!Array.isArray(outer) || outer.length > MAX_OUTER_INSTRUCTIONS) return null;
   const rows = outer.map((instruction, index) => ({instruction, index, inner: false}));
   const innerGroups = transaction?.meta?.innerInstructions ?? [];
-  if (!Array.isArray(innerGroups)) return null;
+  if (!Array.isArray(innerGroups) || innerGroups.length > MAX_INNER_GROUPS) return null;
+  let accountRefs = 0;
   for (const group of innerGroups) {
     if (!isRecord(group) || !Number.isSafeInteger(group.index) ||
+        group.index < 0 || group.index >= outer.length ||
         !Array.isArray(group.instructions)) return null;
     for (const instruction of group.instructions) {
       rows.push({instruction, index: group.index, inner: true});
+      if (rows.length > MAX_TOTAL_INSTRUCTIONS) return null;
+      if (!Array.isArray(instruction?.accounts) || instruction.accounts.length > 128) return null;
+      accountRefs += instruction.accounts.length;
+      if (accountRefs > MAX_INSTRUCTION_ACCOUNT_REFS) return null;
     }
+  }
+  for (const instruction of outer) {
+    if (!Array.isArray(instruction?.accounts) || instruction.accounts.length > 128) return null;
+    accountRefs += instruction.accounts.length;
+    if (accountRefs > MAX_INSTRUCTION_ACCOUNT_REFS) return null;
   }
   return rows;
 }
@@ -143,12 +163,15 @@ function instructionAccounts(instruction, keys) {
 }
 
 function readSwapEvent(logMessages) {
-  if (!Array.isArray(logMessages) || logMessages.length > 100_000) return null;
+  if (!Array.isArray(logMessages) || logMessages.length > MAX_LOG_MESSAGES) return null;
   const stack = [];
   const events = [];
   let lpChangeFound = false;
+  let logBytes = 0;
   for (const line of logMessages) {
     if (typeof line !== "string" || line.length > 16_384) return null;
+    logBytes += line.length;
+    if (logBytes > MAX_LOG_BYTES) return null;
     const invoke = /^Program ([1-9A-HJ-NP-Za-km-z]{32,44}) invoke \[\d+\]$/.exec(line);
     if (invoke) {
       stack.push(invoke[1]);
@@ -191,7 +214,7 @@ function readSwapEvent(logMessages) {
 }
 
 function tokenBalanceMap(rows, keys) {
-  if (!Array.isArray(rows) || rows.length > 100_000) return null;
+  if (!Array.isArray(rows) || rows.length > MAX_TOKEN_BALANCE_ROWS) return null;
   const result = new Map();
   for (const row of rows) {
     if (!isRecord(row) || !Number.isSafeInteger(row.accountIndex) ||
@@ -265,6 +288,58 @@ function nonnegativeBalance(account, index) {
   return account?.get(index) ?? null;
 }
 
+export function estimateCpmmDecodeWork(row) {
+  const transaction = row?.transaction;
+  const meta = row?.meta;
+  if (!isRecord(transaction) || !isRecord(meta)) return 1;
+  const message = transaction.message;
+  const keys = message?.staticAccountKeys ?? message?.accountKeys;
+  const outer = message?.compiledInstructions ?? message?.instructions;
+  const innerGroups = meta.innerInstructions ?? [];
+  const loaded = meta.loadedAddresses;
+  const pre = meta.preTokenBalances;
+  const post = meta.postTokenBalances;
+  const logs = meta.logMessages;
+  if (!Array.isArray(keys) || keys.length > MAX_ACCOUNT_KEYS ||
+      !Array.isArray(outer) || outer.length > MAX_OUTER_INSTRUCTIONS ||
+      !Array.isArray(innerGroups) || innerGroups.length > MAX_INNER_GROUPS ||
+      !Array.isArray(pre) || pre.length > MAX_TOKEN_BALANCE_ROWS ||
+      !Array.isArray(post) || post.length > MAX_TOKEN_BALANCE_ROWS ||
+      !Array.isArray(logs) || logs.length > MAX_LOG_MESSAGES ||
+      loaded !== undefined && (!isRecord(loaded) ||
+        !Array.isArray(loaded.writable) || !Array.isArray(loaded.readonly) ||
+        loaded.writable.length + loaded.readonly.length + keys.length > MAX_ACCOUNT_KEYS)) {
+    return null;
+  }
+  let instructions = outer.length;
+  let accountRefs = 0;
+  let textBytes = 0;
+  for (const instruction of outer) {
+    if (!Array.isArray(instruction?.accounts) || instruction.accounts.length > 128 ||
+        typeof instruction.data !== "string" || instruction.data.length > 4096) return null;
+    accountRefs += instruction.accounts.length;
+    textBytes += instruction.data.length;
+  }
+  for (const group of innerGroups) {
+    if (!isRecord(group) || !Array.isArray(group.instructions)) return null;
+    instructions += group.instructions.length;
+    for (const instruction of group.instructions) {
+      if (!Array.isArray(instruction?.accounts) || instruction.accounts.length > 128 ||
+          typeof instruction.data !== "string" || instruction.data.length > 4096) return null;
+      accountRefs += instruction.accounts.length;
+      textBytes += instruction.data.length;
+    }
+  }
+  if (instructions > MAX_TOTAL_INSTRUCTIONS || accountRefs > MAX_INSTRUCTION_ACCOUNT_REFS) return null;
+  for (const line of logs) {
+    if (typeof line !== "string" || line.length > 16_384) return null;
+    textBytes += line.length;
+  }
+  if (textBytes > MAX_LOG_BYTES) return null;
+  return keys.length + instructions + accountRefs + pre.length + post.length +
+    logs.length + textBytes;
+}
+
 export function decodeCpmmSuccessfulSwap(row, {identity, poolProof} = {}) {
   if (!identity || identity.chainId !== "solana" || !isSolanaPublicKey(identity.mint) ||
       !isSolanaPublicKey(identity.pool) || !isSolanaPublicKey(identity.quote)) {
@@ -282,6 +357,7 @@ export function decodeCpmmSuccessfulSwap(row, {identity, poolProof} = {}) {
     return excluded("TRANSACTION_RECEIPT_INVALID");
   }
   if (!Array.isArray(transaction.signatures) || transaction.signatures.length < 1 ||
+      transaction.signatures.length > 64 ||
       transaction.signatures[0] !== row.signature ||
       !transaction.signatures.every(validSignature)) {
     return excluded("TRANSACTION_SIGNATURE_MISMATCH");

@@ -1,12 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  adaptMarketEvidence,
   ANALYST_WINDOW_METRICS,
+  adaptAcceptedOwnerCensusResult,
+  bridgeAnalystWindowPacket,
   buildAnalystWindowEvidence,
+  evaluateWithCanonicalMarketAdapter,
   PROPOSED_ANALYST_WINDOW_POLICY
 } from "../scripts/memecoin-paper/analyst-window-evidence.mjs";
 import {
+  estimateCpmmDecodeWork,
   decodeCpmmSuccessfulSwap,
   RAYDIUM_CPMM_LAYOUT
 } from "../scripts/memecoin-paper/cpmm-swap-observations.mjs";
@@ -36,6 +39,7 @@ function packet(fixture) {
     candidate: fixture.candidate,
     candidateT: fixture.candidateT,
     assembledAt: fixture.assembledAt,
+    decisionAt: fixture.decisionAt,
     policy: fixture.policy,
     poolProof: fixture.poolProof,
     historySource: fixture.historySource,
@@ -124,9 +128,16 @@ test("failed swaps, transfers, LP changes, routed calls and stale pool identity 
     identity: fixture.identity,
     poolProof: {...fixture.poolProof, pool: "11111111111111111111111111111112"}
   }).reason, "POOL_PROOF_UNBOUND_OR_INCOMPLETE");
+
+  const oversized = makeSwap(782, fixture.candidateT - 10_000);
+  oversized.transaction.message.instructions = Array.from({length: 129},
+    () => oversized.transaction.message.instructions[0]);
+  assert.equal(estimateCpmmDecodeWork(oversized), null);
+  assert.equal(decodeCpmmSuccessfulSwap(oversized, fixture).reason,
+    "TRANSACTION_LAYOUT_UNAVAILABLE");
 });
 
-test("actual decoded source fixture adapts through hard filters and Analyst without authorization", async () => {
+test("actual decoded fixture produces a typed canonical-adapter bridge without inventing slots", async () => {
   const fixture = makeFixture({duplicateFirstRow: true});
   const evidence = await packet(fixture);
   assert.equal(evidence.status, "COMPLETE");
@@ -144,32 +155,48 @@ test("actual decoded source fixture adapts through hard filters and Analyst with
   assert.equal(evidence.metrics.momentum15m.slot, null);
   assert.equal(evidence.metrics.momentum15m.coverage.provenanceType,
     "OFFCHAIN_TIMESTAMP_NO_SOLANA_SLOT");
+  assert.equal(evidence.candidateT, fixture.candidateT);
+  assert.equal(evidence.assembledAt, fixture.candidateT + 1);
+  assert.equal(evidence.decisionAt, fixture.candidateT + 2);
+  assert.equal(evidence.metrics.uniqueBuyers1h.observedAt, fixture.candidateT);
   assert.equal(Object.isFrozen(evidence), true);
   assert.equal(Object.isFrozen(evidence.receipts.history), true);
 
-  const adapted = adaptMarketEvidence(fixture.candidate, evidence);
-  const filters = filterCandidate(adapted, {now: fixture.candidateT});
-  assert.equal(filters.status, "PASS");
-  const analysis = analyzeCandidate(adapted, {
-    now: fixture.candidateT,
-    filterResult: filters,
-    smartWalletAllowlist: fixture.smartWalletAllowlist
+  const reviewEvidence = Object.fromEntries(ANALYST_WINDOW_METRICS.map(key => [key, {
+    status: "REVIEWED",
+    reviewerId: `fixture-reviewer-${key}`,
+    reviewId: `fixture-review-${key}`,
+    reviewedAt: fixture.candidateT - 1
+  }]));
+  const bridge = bridgeAnalystWindowPacket(evidence, {
+    identity: fixture.identity,
+    reviewEvidence
   });
-  assert.equal(analysis.status, "PASS");
-  assert.ok(Number.isInteger(analysis.score));
-  assert.equal(adapted.executionAuthorized, false);
+  assert.equal(bridge.status, "BRIDGED");
+  assert.deepEqual(Object.keys(bridge.analystEvidence).sort(), [...ANALYST_WINDOW_METRICS].sort());
+  for (const [key, item] of Object.entries(bridge.analystEvidence)) {
+    assert.equal(item.slot, null, key);
+    assert.equal(item.coverage.slotProvenance, evidence.metrics[key].coverage.provenanceType, key);
+  }
+  const unavailable = await evaluateWithCanonicalMarketAdapter({
+    providerCandidate: fixture.candidate,
+    evidence: {},
+    packet: evidence,
+    reviewEvidence,
+    now: fixture.decisionAt
+  });
+  assert.equal(unavailable.analysis.status, "SCORE_UNAVAILABLE");
+  assert.equal(unavailable.executionAuthorized, false);
   assert.equal(evidence.executionAuthorized, false);
   assert.equal(evidence.authorizationEligible, false);
 });
 
 test("each missing Analyst component yields SCORE_UNAVAILABLE with no weight redistribution", async () => {
   const fixture = makeFixture();
-  const evidence = await packet(fixture);
-  const adapted = adaptMarketEvidence(fixture.candidate, evidence);
-  const filters = filterCandidate(adapted, {now: fixture.candidateT});
+  const filters = filterCandidate(fixture.candidate, {now: fixture.candidateT});
   assert.equal(filters.status, "PASS");
   for (const key of ANALYST_WINDOW_METRICS) {
-    const incomplete = {...adapted, analystEvidence: {...adapted.analystEvidence}};
+    const incomplete = {...fixture.candidate, analystEvidence: {...fixture.candidate.analystEvidence}};
     delete incomplete.analystEvidence[key];
     const result = analyzeCandidate(incomplete, {
       now: fixture.candidateT,
@@ -321,6 +348,7 @@ test("incomplete or stale source identity cannot be upgraded by the adapter", as
     candidate: fixture.candidate,
     candidateT: fixture.candidateT,
     assembledAt: fixture.assembledAt,
+    decisionAt: fixture.decisionAt,
     policy: fixture.policy,
     poolProof: staleProof,
     historySource: fixture.historySource,
@@ -331,13 +359,45 @@ test("incomplete or stale source identity cannot be upgraded by the adapter", as
   });
   assert.equal(evidence.metrics.uniqueBuyers1h, undefined);
   const forgedPacket = {...evidence, executionAuthorized: true};
-  const adapted = adaptMarketEvidence(fixture.candidate, forgedPacket);
-  assert.deepEqual(adapted.analystEvidence, {});
-  assert.equal(adapted.analystWindowPacket, null);
-  assert.equal(adapted.executionAuthorized, false);
+  const bridge = bridgeAnalystWindowPacket(forgedPacket, {
+    identity: fixture.identity,
+    reviewEvidence: {}
+  });
+  assert.equal(bridge.status, "UNAVAILABLE");
+  assert.deepEqual(bridge.analystEvidence, {});
 });
 
-test("proposed timing remains explicit and cannot silently turn absent trust policy into price evidence", async () => {
+test("owner census adapter preserves merged 1152 uncertainty and never upgrades owner totals", () => {
+  const fixture = makeFixture();
+  const sourceResult = {
+    status: "UNKNOWN",
+    reason: "RPC_CENSUS_RECONCILED_BUT_SOURCE_COMPLETENESS_IS_UNAUTHENTICATED",
+    source: "Solana JSON-RPC getProgramAccounts",
+    boundIdentity: fixture.identity,
+    slot: 900_001,
+    observedAt: fixture.candidateT,
+    accountCoverage: "RECONCILED_RPC_RESPONSE_ONLY",
+    rawCensus: {
+      accountCount: 1,
+      ownerCount: 1,
+      owners: [{owner: fixture.transactions[0].meta.preTokenBalances[0].owner, amountAtoms: "7"}]
+    },
+    coverage: {
+      complete: false,
+      supplyReconciled: true,
+      sourceCompletenessAuthenticated: false
+    }
+  };
+  const adapted = adaptAcceptedOwnerCensusResult(sourceResult, {identity: fixture.identity});
+  assert.equal(adapted.status, "UNKNOWN");
+  assert.equal(adapted.slot, sourceResult.slot);
+  assert.equal(adapted.slotProvenance, "ONCHAIN_SLOT");
+  assert.deepEqual(adapted.rawCensus.owners[0], sourceResult.rawCensus.owners[0]);
+  assert.equal(adapted.coverage.complete, false);
+  assert.equal(adapted.receipt, null);
+});
+
+test("window durations are pinned to this score version and timing approval is explicit", async () => {
   assert.deepEqual(PROPOSED_ANALYST_WINDOW_POLICY.windowsMs, {
     swaps1h: 3_600_000,
     momentum15m: 900_000,
@@ -348,4 +408,64 @@ test("proposed timing remains explicit and cannot silently turn absent trust pol
   const evidence = await packet(fixture);
   assert.equal(evidence.metrics.momentum15m, undefined);
   assert.equal(evidence.metrics.buySellUsdRatio1h, undefined);
+
+  const shortWindow = makeFixture({policyOverride: {
+    windowsMs: {swaps1h: 3_600_000, momentum15m: 1, holders1h: 3_600_000}
+  }});
+  const invalidWindowPacket = await packet(shortWindow);
+  assert.equal(invalidWindowPacket.status, "INCOMPLETE");
+  assert.equal(invalidWindowPacket.unavailableMetrics.momentum15m.reason, "WINDOW_POLICY_INVALID");
+
+  const noMembershipDecision = makeFixture({policyOverride: {
+    walletQualification: {
+      status: "REVIEWED",
+      version: "fixture-wallet-policy-v1",
+      reviewReceiptId: "reviewed-is-not-owner-approved"
+    }
+  }});
+  assert.equal((await packet(noMembershipDecision)).metrics.qualifiedSmartWallets, undefined);
+});
+
+test("source callbacks are deadline-bounded and oversized history is rejected", async () => {
+  const hanging = makeFixture();
+  let aborted = false;
+  hanging.historySource.readWindow = ({signal}) => {
+    signal.addEventListener("abort", () => { aborted = true; }, {once: true});
+    return new Promise(() => {});
+  };
+  const timedOut = await buildAnalystWindowEvidence({
+    candidate: hanging.candidate,
+    candidateT: hanging.candidateT,
+    assembledAt: hanging.assembledAt,
+    decisionAt: hanging.decisionAt,
+    policy: hanging.policy,
+    poolProof: hanging.poolProof,
+    historySource: hanging.historySource,
+    censusSource: hanging.censusSource,
+    priceSource: hanging.priceSource,
+    marketPairEvidence: hanging.marketPairEvidence,
+    smartWalletAllowlist: hanging.smartWalletAllowlist,
+    maxSourceReadMs: 5
+  });
+  assert.equal(timedOut.metrics.uniqueBuyers1h, undefined);
+  assert.equal(aborted, true);
+
+  const oversized = makeFixture();
+  const history = await oversized.historySource.readWindow({
+    identity: oversized.identity,
+    startExclusiveMs: oversized.candidateT - 3_600_000,
+    endInclusiveMs: oversized.candidateT
+  });
+  oversized.historySource.readWindow = async () => ({
+    ...history,
+    transactions: Array.from({length: 5_001}, () => history.transactions[0])
+  });
+  assert.equal((await packet(oversized)).metrics.uniqueBuyers1h, undefined);
+
+  const manyPrices = makeFixture({buyCount: 0, sellCount: 0, includeBoundaryRows: false});
+  manyPrices.transactions.push(...Array.from({length: 2_050}, (_, index) =>
+    makeSwap(30_000 + index, manyPrices.candidateT - 3_590_000 + index * 1_000)));
+  const limitedPrices = await packet(manyPrices);
+  assert.ok(limitedPrices.limits.priceLookups <= 2_048);
+  assert.equal(limitedPrices.metrics.buySellUsdRatio1h, undefined);
 });

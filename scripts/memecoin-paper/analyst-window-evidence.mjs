@@ -1,7 +1,9 @@
 import {
   decodeCpmmSuccessfulSwap,
+  estimateCpmmDecodeWork,
   isSolanaPublicKey
 } from "./cpmm-swap-observations.mjs";
+import {FILTER_POLICY, SCORE_SPEC, analyzeCandidate, filterCandidate} from "./stages.mjs";
 
 export const ANALYST_WINDOW_METRICS = Object.freeze([
   "momentum15m",
@@ -14,6 +16,7 @@ export const ANALYST_WINDOW_METRICS = Object.freeze([
 
 export const PROPOSED_ANALYST_WINDOW_POLICY = Object.freeze({
   version: "analyst-window-proposal-v1",
+  scoreVersion: SCORE_SPEC.version,
   boundary: "(startExclusive,endInclusive]",
   windowsMs: Object.freeze({swaps1h: 3_600_000, momentum15m: 900_000, holders1h: 3_600_000}),
   momentumDenomination: "USD",
@@ -23,9 +26,20 @@ export const PROPOSED_ANALYST_WINDOW_POLICY = Object.freeze({
 });
 
 const PACKET_BRAND = Symbol("source-built Analyst window packet");
-const MAX_HISTORY_ROWS = 50_000;
-const MAX_CENSUS_ROWS = 250_000;
-const MAX_ALLOWLIST_ROWS = 100_000;
+const MAX_HISTORY_ROWS = 5_000;
+const MAX_CENSUS_ROWS = 25_000;
+const MAX_ALLOWLIST_ROWS = 10_000;
+const MAX_TOTAL_CENSUS_ROWS = 50_000;
+const MAX_PRICE_LOOKUPS = 2_048;
+const MAX_DECODE_WORK = 25_000_000;
+const MAX_SOURCE_READ_MS = 15_000;
+const NULL_SLOT_PROVENANCE = new Set([
+  "OFFCHAIN_TIMESTAMP_NO_SOLANA_SLOT",
+  "DERIVED_ONCHAIN_WINDOW_NO_SINGLE_SLOT",
+  "DERIVED_ONCHAIN_WINDOW_WITH_EXACT_HISTORICAL_USD_PRICES_NO_SINGLE_SLOT",
+  "CENSUS_ENDPOINTS_TYPED_PROVENANCE_NO_SINGLE_SLOT",
+  "DERIVED_ONCHAIN_WINDOW_WITH_EXTERNALLY_REVIEWED_ALLOWLIST_NO_SINGLE_SLOT"
+]);
 const HASH = /^[a-f0-9]{64}$/i;
 const DECIMAL_INTEGER = /^(0|[1-9]\d{0,39})$/;
 const UNCERTAIN_SWAP_REASONS = new Set([
@@ -120,13 +134,14 @@ function validReceipt(source, receipt, assembledAt) {
 }
 
 function validPolicy(policy) {
-  return isRecord(policy) && typeof policy.version === "string" &&
+  return isRecord(policy) && policy.scoreVersion === SCORE_SPEC.version &&
+    typeof policy.version === "string" &&
     policy.version.trim().length > 0 &&
     policy.boundary === "(startExclusive,endInclusive]" &&
     isRecord(policy.windowsMs) &&
-    Number.isSafeInteger(policy.windowsMs.swaps1h) && policy.windowsMs.swaps1h > 0 &&
-    Number.isSafeInteger(policy.windowsMs.momentum15m) && policy.windowsMs.momentum15m > 0 &&
-    Number.isSafeInteger(policy.windowsMs.holders1h) && policy.windowsMs.holders1h > 0;
+    policy.windowsMs.swaps1h === 3_600_000 &&
+    policy.windowsMs.momentum15m === 900_000 &&
+    policy.windowsMs.holders1h === 3_600_000;
 }
 
 function bindingOf(candidate) {
@@ -159,6 +174,41 @@ function metricEvidence({
 
 function noMetric(reason) {
   return {status: "UNAVAILABLE", reason};
+}
+
+export function adaptAcceptedOwnerCensusResult(result, {identity} = {}) {
+  const boundIdentity = result?.boundIdentity;
+  const rows = result?.rawCensus?.owners;
+  const boundedRows = Array.isArray(rows) && rows.length <= MAX_CENSUS_ROWS
+    ? rows.map(entry => isRecord(entry) && isSolanaPublicKey(entry.owner) &&
+      typeof entry.amountAtoms === "string" && DECIMAL_INTEGER.test(entry.amountAtoms)
+      ? {owner: entry.owner, amountAtoms: entry.amountAtoms} : null)
+    : null;
+  return deepFreeze({
+    schema: "MERGED_OWNER_CENSUS_SOURCE_RESULT_V1",
+    status: "UNKNOWN",
+    reason: result?.reason ?? "SOURCE_COMPLETENESS_UNAUTHENTICATED",
+    source: typeof result?.source === "string" ? result.source : null,
+    identity: isRecord(identity) && sameIdentity(boundIdentity, identity) ? boundIdentity : null,
+    observedAt: timestampValue(result?.observedAt),
+    slot: Number.isSafeInteger(result?.slot) && result.slot >= 0 ? result.slot : null,
+    slotProvenance: Number.isSafeInteger(result?.slot) && result.slot >= 0
+      ? "ONCHAIN_SLOT" : null,
+    accountCoverage: result?.accountCoverage ?? "UNKNOWN",
+    rawCensus: {
+      accountCount: Number.isSafeInteger(result?.rawCensus?.accountCount)
+        ? result.rawCensus.accountCount : null,
+      ownerCount: Number.isSafeInteger(result?.rawCensus?.ownerCount)
+        ? result.rawCensus.ownerCount : null,
+      owners: boundedRows
+    },
+    coverage: {
+      complete: false,
+      sourceCompletenessAuthenticated: result?.coverage?.sourceCompletenessAuthenticated === true,
+      supplyReconciled: result?.coverage?.supplyReconciled === true
+    },
+    receipt: null
+  });
 }
 
 function exactSourceObservation(value, source, requestedAt, assembledAt, trust) {
@@ -208,6 +258,7 @@ function historyWindowReady(result, identity, startExclusive, endInclusive, asse
     result.requested?.startExclusiveMs === startExclusive &&
     result.requested?.endInclusiveMs === endInclusive &&
     sameIdentity(result.identity, identity) &&
+    result.receipt?.receivedAt >= endInclusive &&
     validReceipt(result.source, result.receipt, assembledAt);
 }
 
@@ -226,7 +277,7 @@ function censusPolicyReady(policy) {
     typeof policy.reviewReceiptId === "string" && policy.reviewReceiptId.trim().length > 0;
 }
 
-function ownerCount(snapshot, policy, endpoint, assembledAt, identity) {
+function ownerCount(snapshot, policy, endpoint, assembledAt, identity, chargeWork) {
   if (!isRecord(snapshot) || snapshot.status !== "COMPLETE" ||
       !sameIdentity(snapshot.identity, identity) ||
       snapshot.observedAt !== endpoint || snapshot.coverage?.complete !== true ||
@@ -239,7 +290,8 @@ function ownerCount(snapshot, policy, endpoint, assembledAt, identity) {
       !DECIMAL_INTEGER.test(snapshot.denominatorAtoms ?? "") ||
       BigInt(snapshot.denominatorAtoms) <= 0n ||
       !Array.isArray(snapshot.owners) || snapshot.owners.length > MAX_CENSUS_ROWS ||
-      !validTime(snapshot.receivedAt) || snapshot.receivedAt > assembledAt ||
+      !validTime(snapshot.receivedAt) || snapshot.receivedAt < snapshot.observedAt ||
+      snapshot.receivedAt > assembledAt ||
       snapshot.receivedAt !== snapshot.receipt?.receivedAt ||
       !validReceipt(snapshot.source, snapshot.receipt, assembledAt) ||
       (snapshot.slot === null
@@ -248,6 +300,7 @@ function ownerCount(snapshot, policy, endpoint, assembledAt, identity) {
           snapshot.provenanceType !== "ONCHAIN_SLOT")) return null;
   const owners = new Set();
   for (const entry of snapshot.owners) {
+    if (!chargeWork(1)) return null;
     if (!isRecord(entry) || !isSolanaPublicKey(entry.owner) ||
         typeof entry.balanceAtoms !== "string" ||
         !DECIMAL_INTEGER.test(entry.balanceAtoms ?? "")) return null;
@@ -256,12 +309,13 @@ function ownerCount(snapshot, policy, endpoint, assembledAt, identity) {
   return owners.size;
 }
 
-function validPair(pair, identity, assembledAt) {
+function validPair(pair, identity, candidateT, assembledAt) {
   return isRecord(pair) && pair.status === "SOURCE_BOUND" &&
     sameIdentity(pair.identity, identity) &&
     finitePositive(pair.marketCapUsd) && finitePositive(pair.liquidityUsd) &&
     validTime(pair.observedAt) &&
-    pair.observedAt <= assembledAt &&
+    pair.observedAt <= candidateT && pair.observedAt <= assembledAt &&
+    pair.receipt?.receivedAt >= pair.observedAt &&
     validReceipt(pair.source, pair.receipt, assembledAt);
 }
 
@@ -278,26 +332,34 @@ function candidatePairMatches(candidate, pair, identity) {
     matchingEvidence(liquidity, pair.liquidityUsd);
 }
 
-function walletAllowlistReady(allowlist, policy, candidateT, assembledAt) {
+function walletAllowlistReady(allowlist, policy, candidateT, assembledAt, syntheticFixtureOnly) {
   return isRecord(allowlist) && allowlist.status === "VERIFIED" &&
     typeof allowlist.source === "string" && allowlist.source.trim().length > 0 &&
     typeof allowlist.version === "string" && allowlist.version.trim().length > 0 &&
     allowlist.qualificationPolicyVersion === policy.version &&
+    (syntheticFixtureOnly
+      ? policy.membershipTiming === "SYNTHETIC_FIXTURE_ONLY"
+      : policy.membershipTimingApproval?.status === "OWNER_APPROVED" &&
+        policy.membershipTimingApproval.mode === "AS_OF_CANDIDATE_CUTOFF" &&
+        typeof policy.membershipTimingApproval.decisionId === "string" &&
+        policy.membershipTimingApproval.decisionId.trim().length > 0) &&
     typeof allowlist.provenance === "string" && allowlist.provenance.trim().length > 0 &&
     validTime(allowlist.effectiveFromMs) && validTime(allowlist.effectiveUntilMs) &&
     allowlist.effectiveFromMs <= candidateT && candidateT <= allowlist.effectiveUntilMs &&
     allowlist.review?.status === "EXTERNALLY_REVIEWED" &&
     validTime(allowlist.review.reviewedAt) && allowlist.review.reviewedAt <= candidateT &&
+    allowlist.receipt?.receivedAt >= allowlist.review.reviewedAt &&
     typeof allowlist.review.receiptId === "string" &&
     allowlist.review.receiptId.trim().length > 0 &&
     Array.isArray(allowlist.entries) && allowlist.entries.length <= MAX_ALLOWLIST_ROWS &&
     validReceipt(allowlist.source, allowlist.receipt, assembledAt);
 }
 
-function qualifiedWallets(allowlist, policy, candidateT, assembledAt) {
-  if (!walletAllowlistReady(allowlist, policy, candidateT, assembledAt)) return null;
+function qualifiedWallets(allowlist, policy, candidateT, assembledAt, syntheticFixtureOnly, chargeWork) {
+  if (!walletAllowlistReady(allowlist, policy, candidateT, assembledAt, syntheticFixtureOnly)) return null;
   const result = new Set();
   for (const entry of allowlist.entries) {
+    if (!chargeWork(1)) return null;
     if (!isRecord(entry) || !isSolanaPublicKey(entry.address) ||
         entry.qualified !== true || entry.reviewed !== true ||
         entry.candidateMintExcluded !== true ||
@@ -322,26 +384,74 @@ function possibleUnobservedSwap(decoded) {
   return decoded.status === "EXCLUDED" && UNCERTAIN_SWAP_REASONS.has(decoded.reason);
 }
 
-async function safeRead(operation, ...args) {
-  if (typeof operation !== "function") return null;
-  try {
-    return await operation(...args);
-  } catch {
-    return null;
-  }
+function createSourceBudget(maxReadMs = MAX_SOURCE_READ_MS) {
+  const startedAt = performance.now();
+  let decodeWork = 0;
+  let censusRows = 0;
+  let priceLookups = 0;
+  const withinTime = () => performance.now() - startedAt < maxReadMs;
+  return {
+    withinTime,
+    chargeDecode(units) {
+      if (!Number.isSafeInteger(units) || units < 0 ||
+          decodeWork + units > MAX_DECODE_WORK) return false;
+      decodeWork += units;
+      return true;
+    },
+    chargeCensus(units) {
+      if (!Number.isSafeInteger(units) || units < 0 ||
+          !withinTime() || censusRows + units > MAX_TOTAL_CENSUS_ROWS) return false;
+      censusRows += units;
+      return true;
+    },
+    canLookupPrice() {
+      return withinTime() && priceLookups < MAX_PRICE_LOOKUPS;
+    },
+    chargePrice() {
+      if (!this.canLookupPrice()) return false;
+      priceLookups += 1;
+      return true;
+    },
+    async read(operation, args) {
+      if (typeof operation !== "function" || !withinTime()) return null;
+      const controller = new AbortController();
+      const remaining = Math.max(1, maxReadMs - (performance.now() - startedAt));
+      let timer;
+      const timeout = new Promise((_, reject) => {
+        timer = setTimeout(() => {
+          controller.abort();
+          reject(new Error("SOURCE_READ_DEADLINE_EXCEEDED"));
+        }, remaining);
+      });
+      try {
+        const pending = Promise.resolve().then(() =>
+          operation({...args, signal: controller.signal}));
+        return await Promise.race([pending, timeout]);
+      } catch {
+        return null;
+      } finally {
+        clearTimeout(timer);
+      }
+    },
+    totals() {
+      return {decodeWork, censusRows, priceLookups, elapsedMs: Math.floor(performance.now() - startedAt)};
+    }
+  };
 }
 
 export async function buildAnalystWindowEvidence({
   candidate,
   candidateT,
   assembledAt,
+  decisionAt = assembledAt,
   policy,
   poolProof,
   historySource,
   censusSource,
   priceSource,
   marketPairEvidence,
-  smartWalletAllowlist
+  smartWalletAllowlist,
+  maxSourceReadMs = MAX_SOURCE_READ_MS
 } = {}) {
   const identity = candidateIdentity(candidate);
   const metrics = {};
@@ -349,9 +459,14 @@ export async function buildAnalystWindowEvidence({
     [key, noMetric("REQUIRED_SOURCE_OR_REVIEWED_POLICY_UNAVAILABLE")]));
   const receipts = {pool: null, history: null, census: [], prices: [], marketPair: null, allowlist: null};
   const windows = {};
+  const sourceBudgetValid = Number.isSafeInteger(maxSourceReadMs) &&
+    maxSourceReadMs > 0 && maxSourceReadMs <= MAX_SOURCE_READ_MS;
+  const budget = createSourceBudget(sourceBudgetValid ? maxSourceReadMs : MAX_SOURCE_READ_MS);
   const policyValid = validPolicy(policy);
   const timeValid = validTime(candidateT) && validTime(assembledAt) &&
-    assembledAt <= candidateT && timestampValue(candidate?.sampledAt) === candidateT &&
+    sourceBudgetValid && validTime(decisionAt) && candidateT <= assembledAt && assembledAt <= decisionAt &&
+    decisionAt - candidateT <= FILTER_POLICY.maxEvidenceAgeMs &&
+    timestampValue(candidate?.sampledAt) === candidateT &&
     policyValid && policy.windowsMs.swaps1h <= candidateT &&
     policy.windowsMs.momentum15m <= candidateT &&
     policy.windowsMs.holders1h <= candidateT;
@@ -366,12 +481,13 @@ export async function buildAnalystWindowEvidence({
       binding: identity,
       candidateT: validTime(candidateT) ? candidateT : null,
       assembledAt: validTime(assembledAt) ? assembledAt : null,
+      decisionAt: validTime(decisionAt) ? decisionAt : null,
       policy: policyValid ? policy : null,
       windows,
       metrics,
       unavailableMetrics: Object.fromEntries(ANALYST_WINDOW_METRICS.map(key => [
         key, noMetric(!identityValid ? "CANDIDATE_IDENTITY_INVALID"
-          : !timeValid ? "CANDIDATE_TIME_INVALID" : "WINDOW_POLICY_INVALID")
+          : !policyValid ? "WINDOW_POLICY_INVALID" : "CANDIDATE_TIME_INVALID")
       ])),
       receipts,
       executionAuthorized: false,
@@ -399,7 +515,7 @@ export async function buildAnalystWindowEvidence({
   else unavailableMetrics.uniqueBuyers1h = noMetric("POOL_PROOF_STALE_OR_UNBOUND");
 
   const historyResult = poolReady && typeof historySource?.readWindow === "function"
-    ? await safeRead(historySource.readWindow.bind(historySource), {
+    ? await budget.read(historySource.readWindow.bind(historySource), {
       identity, poolProof,
       startExclusiveMs: start1h, endInclusiveMs: candidateT
     })
@@ -423,6 +539,15 @@ export async function buildAnalystWindowEvidence({
     };
     const seen = new Map();
     for (const row of historyResult.transactions) {
+      if (!budget.withinTime()) {
+        decodeComplete = false;
+        break;
+      }
+      const workUnits = estimateCpmmDecodeWork(row);
+      if (workUnits === null || !budget.chargeDecode(workUnits)) {
+        decodeComplete = false;
+        break;
+      }
       const decoded = sourceRowMaybeSwap(row, identity, poolProof);
       if (possibleUnobservedSwap(decoded)) decodeComplete = false;
       if (row?.signature && seen.has(row.signature)) {
@@ -439,7 +564,7 @@ export async function buildAnalystWindowEvidence({
       const buyers = new Set(decodedSwaps.filter(row => row.direction === "BUY").map(row => row.buyer));
       metrics.uniqueBuyers1h = metricEvidence({
         candidate, value: buyers.size, source: historyResult.source,
-        observedAt: assembledAt, slot: null,
+        observedAt: candidateT, slot: null,
         coverage: {
           window: windows.swaps1h,
           historyReceiptId: historyResult.receipt.id,
@@ -479,7 +604,8 @@ export async function buildAnalystWindowEvidence({
     if (!sourceTrustReady(trust) || typeof priceSource?.readObservation !== "function") return null;
     const key = `${mint}:${atMs}`;
     if (!priceCache.has(key)) {
-      priceCache.set(key, await safeRead(priceSource.readObservation.bind(priceSource), {
+      if (priceCache.size >= MAX_PRICE_LOOKUPS || !budget.chargePrice()) return null;
+      priceCache.set(key, await budget.read(priceSource.readObservation.bind(priceSource), {
         mint, atMs, denomination: policy.momentumDenomination, purpose
       }));
     }
@@ -512,7 +638,7 @@ export async function buildAnalystWindowEvidence({
       const value = (to.valueUsd / from.valueUsd - 1) * 100;
       if (Number.isFinite(value)) {
         metrics.momentum15m = metricEvidence({
-          candidate, value, source: from.source, observedAt: assembledAt,
+          candidate, value, source: from.source, observedAt: candidateT,
           coverage: {
             window: windows.momentum15m,
             denomination: "USD",
@@ -560,7 +686,7 @@ export async function buildAnalystWindowEvidence({
     metrics.buySellUsdRatio1h = metricEvidence({
       candidate, value: null,
       source: sourceLabel(historyResult.source, policy.historicalPriceTrust.source),
-      observedAt: assembledAt,
+      observedAt: candidateT,
       coverage: {
         window: windows.swaps1h,
         denomination: "USD",
@@ -581,15 +707,18 @@ export async function buildAnalystWindowEvidence({
 
   const censusPolicy = policy.censusPolicy;
   if (censusPolicyReady(censusPolicy) && typeof censusSource?.readSnapshots === "function") {
-    const census = await safeRead(censusSource.readSnapshots.bind(censusSource), {
+    const census = await budget.read(censusSource.readSnapshots.bind(censusSource), {
       identity, startAtMs: startHolders, endAtMs: candidateT, policy: censusPolicy
     });
     const pair = census?.snapshots;
     if (census?.status === "COMPLETE" && census?.coverage?.complete === true &&
         census?.coverage?.truncated === false && Array.isArray(pair) && pair.length === 2 &&
-        sameIdentity(census.identity, identity)) {
-      const startCount = ownerCount(pair[0], censusPolicy, startHolders, assembledAt, identity);
-      const endCount = ownerCount(pair[1], censusPolicy, candidateT, assembledAt, identity);
+        sameIdentity(census.identity, identity) &&
+        Array.isArray(pair[0]?.owners) && Array.isArray(pair[1]?.owners) &&
+        pair[0].owners.length + pair[1].owners.length <= MAX_TOTAL_CENSUS_ROWS) {
+      const chargeCensus = units => budget.chargeCensus(units);
+      const startCount = ownerCount(pair[0], censusPolicy, startHolders, assembledAt, identity, chargeCensus);
+      const endCount = ownerCount(pair[1], censusPolicy, candidateT, assembledAt, identity, chargeCensus);
       if (pair[0]?.source !== pair[1]?.source) {
         unavailableMetrics.holderGrowthPct1h = noMetric("CENSUS_SOURCE_CHANGED_BETWEEN_ENDPOINTS");
       }
@@ -608,7 +737,7 @@ export async function buildAnalystWindowEvidence({
         const value = ((endCount - startCount) / startCount) * 100;
         if (Number.isFinite(value)) {
           metrics.holderGrowthPct1h = metricEvidence({
-            candidate, value, source: pair[0].source, observedAt: assembledAt,
+            candidate, value, source: pair[0].source, observedAt: candidateT,
             coverage: {
               window: windows.holders1h,
               aggregation: censusPolicy.aggregation,
@@ -635,7 +764,7 @@ export async function buildAnalystWindowEvidence({
     "MATCHED_COMPLETE_CENSUS_ENDPOINTS_UNAVAILABLE"
   );
 
-  if (validPair(marketPairEvidence, identity, assembledAt) &&
+  if (validPair(marketPairEvidence, identity, candidateT, assembledAt) &&
       candidatePairMatches(candidate, marketPairEvidence, identity)) {
     receipts.marketPair = {
       source: marketPairEvidence.source,
@@ -647,7 +776,7 @@ export async function buildAnalystWindowEvidence({
     const value = marketPairEvidence.liquidityUsd / marketPairEvidence.marketCapUsd * 100;
     if (Number.isFinite(value) && value > 0) {
       metrics.liquidityMarketCapPct = metricEvidence({
-        candidate, value, source: marketPairEvidence.source, observedAt: assembledAt,
+        candidate, value, source: marketPairEvidence.source, observedAt: marketPairEvidence.observedAt,
         coverage: {
           pairReceiptId: marketPairEvidence.receipt.id,
           liquidityUsd: marketPairEvidence.liquidityUsd,
@@ -664,13 +793,15 @@ export async function buildAnalystWindowEvidence({
   );
 
   const qualificationPolicy = policy.walletQualification;
+  const syntheticFixtureOnly = candidate?.source === "SYNTHETIC_FIXTURE_ONLY";
   if (isRecord(qualificationPolicy) && qualificationPolicy.status === "REVIEWED" &&
       typeof qualificationPolicy.version === "string" &&
       typeof qualificationPolicy.reviewReceiptId === "string" &&
       qualificationPolicy.reviewReceiptId.trim() &&
       historyReady && decodeComplete) {
     const eligible = qualifiedWallets(
-      smartWalletAllowlist, qualificationPolicy, candidateT, assembledAt
+      smartWalletAllowlist, qualificationPolicy, candidateT, assembledAt,
+      syntheticFixtureOnly, units => budget.chargeCensus(units)
     );
     if (eligible) {
       const buyers = new Set(decodedSwaps.filter(row => row.direction === "BUY").map(row => row.buyer));
@@ -687,7 +818,7 @@ export async function buildAnalystWindowEvidence({
       metrics.qualifiedSmartWallets = metricEvidence({
         candidate, value: count,
         source: sourceLabel(historyResult.source, smartWalletAllowlist.source),
-        observedAt: assembledAt,
+        observedAt: candidateT,
         coverage: {
           window: windows.swaps1h,
           distinctBuyers: buyers.size,
@@ -713,6 +844,7 @@ export async function buildAnalystWindowEvidence({
     binding: identity,
     candidateT,
     assembledAt,
+    decisionAt,
     policy: {
       version: policy.version,
       boundary: policy.boundary,
@@ -727,7 +859,18 @@ export async function buildAnalystWindowEvidence({
         ? [...policy.censusPolicy.exclusions] : null,
       censusDenominatorPolicy: policy.censusPolicy?.denominatorPolicy ?? null,
       walletQualificationVersion: policy.walletQualification?.version ?? null,
-      walletQualificationReviewReceiptId: policy.walletQualification?.reviewReceiptId ?? null
+      walletQualificationReviewReceiptId: policy.walletQualification?.reviewReceiptId ?? null,
+      membershipTiming: policy.walletQualification?.membershipTiming ?? null,
+      membershipTimingApproval: policy.walletQualification?.membershipTimingApproval ?? null
+    },
+    limits: {
+      maxSourceReadMs,
+      maxHistoryRows: MAX_HISTORY_ROWS,
+      maxDecodeWork: MAX_DECODE_WORK,
+      maxPriceLookups: MAX_PRICE_LOOKUPS,
+      maxCensusOwners: MAX_TOTAL_CENSUS_ROWS,
+      maxAllowlistRows: MAX_ALLOWLIST_ROWS,
+      ...budget.totals()
     },
     windows,
     metrics,
@@ -740,17 +883,127 @@ export async function buildAnalystWindowEvidence({
   return deepFreeze(packet);
 }
 
-export function adaptMarketEvidence(candidate, packet) {
-  const identity = candidateIdentity(candidate);
-  const validPacket = packet?.[PACKET_BRAND] === true &&
-    sameIdentity(packet.binding, identity) &&
-    packet.candidateT === timestampValue(candidate?.sampledAt) &&
-    packet.executionAuthorized === false &&
-    packet.authorizationEligible === false;
+function canonicalAnalystValue(key, evidence, packet) {
+  switch (key) {
+    case "momentum15m":
+      return {percent: evidence.value};
+    case "uniqueBuyers1h":
+      return {count: evidence.value};
+    case "buySellUsdRatio1h":
+      return {
+        buyVolumeUsd: evidence.coverage.buyVolumeUsd,
+        sellVolumeUsd: evidence.coverage.sellVolumeUsd
+      };
+    case "holderGrowthPct1h":
+      return {
+        startHolders: evidence.coverage.startOwnerCount,
+        endHolders: evidence.coverage.endOwnerCount
+      };
+    case "liquidityMarketCapPct":
+      return {
+        liquidityUsd: evidence.coverage.liquidityUsd,
+        marketCapUsd: evidence.coverage.actualMarketCapUsd
+      };
+    case "qualifiedSmartWallets":
+      return {
+        count: evidence.value,
+        allowlistId: packet.receipts.allowlist?.id,
+        evidenceIds: [packet.receipts.history?.id, packet.receipts.allowlist?.id]
+      };
+    default:
+      return null;
+  }
+}
+
+export function bridgeAnalystWindowPacket(packet, {identity, reviewEvidence = {}} = {}) {
+  if (packet?.[PACKET_BRAND] !== true || !sameIdentity(packet.binding, identity) ||
+      packet.executionAuthorized !== false || packet.authorizationEligible !== false) {
+    return Object.freeze({status: "UNAVAILABLE", analystEvidence: Object.freeze({})});
+  }
+  const analystEvidence = {};
+  for (const key of ANALYST_WINDOW_METRICS) {
+    const evidence = packet.metrics[key];
+    const review = reviewEvidence[key];
+    if (!isRecord(evidence) || !isRecord(review) || review.status !== "REVIEWED" ||
+        typeof review.reviewerId !== "string" || !review.reviewerId.trim() ||
+        typeof review.reviewId !== "string" || !review.reviewId.trim() ||
+        !validTime(review.reviewedAt) || review.reviewedAt > packet.decisionAt) continue;
+    const sourceVersion = evidence.coverage.methodologyVersion ??
+      packet.policy.version;
+    const value = canonicalAnalystValue(key, evidence, packet);
+    if (!isRecord(value) || !Number.isSafeInteger(packet.windows[key === "momentum15m"
+      ? "momentum15m" : key === "holderGrowthPct1h" ? "holders1h" : "swaps1h"]?.endInclusive)) {
+      continue;
+    }
+    const windowMs = key === "momentum15m" ? 900_000
+      : key === "liquidityMarketCapPct" ? undefined : 3_600_000;
+    const slotProvenance = evidence.coverage.provenanceType;
+    if (!NULL_SLOT_PROVENANCE.has(slotProvenance)) continue;
+    analystEvidence[key] = {
+      source: evidence.source,
+      sourceVersion,
+      identity: packet.binding,
+      observedAt: evidence.observedAt,
+      slot: evidence.slot,
+      value,
+      coverage: {
+        ...evidence.coverage,
+        complete: true,
+        ...(windowMs ? {windowMs} : {}),
+        ...(key === "uniqueBuyers1h" ? {uniqueAddressesDeduplicated: true} : {}),
+        slotProvenance
+      },
+      review
+    };
+  }
+  return deepFreeze({status: "BRIDGED", analystEvidence});
+}
+
+export async function evaluateWithCanonicalMarketAdapter({
+  canonicalAdapter,
+  providerCandidate,
+  evidence,
+  packet,
+  reviewEvidence,
+  now,
+  holdUntil = null
+} = {}) {
+  const bridge = bridgeAnalystWindowPacket(packet, {
+    identity: candidateIdentity(providerCandidate),
+    reviewEvidence
+  });
+  if (bridge.status !== "BRIDGED" || typeof canonicalAdapter !== "function" ||
+      !validTime(now)) {
+    return {
+      status: "CANONICAL_ADAPTER_OR_PACKET_UNAVAILABLE",
+      bridge,
+      adapted: null,
+      filters: null,
+      analysis: {status: "SCORE_UNAVAILABLE", score: null},
+      executionAuthorized: false
+    };
+  }
+  const adapted = await canonicalAdapter({
+    providerCandidate,
+    evidence,
+    analystEvidence: bridge.analystEvidence,
+    now,
+    holdUntil
+  });
+  const candidate = adapted?.candidate;
+  const filters = candidate ? filterCandidate(candidate, {now})
+    : {status: "SCORE_UNAVAILABLE", results: []};
+  const analysis = candidate ? analyzeCandidate(candidate, {
+    now,
+    filterResult: filters,
+    smartWalletAllowlist: adapted?.smartWalletAllowlist
+  }) : {status: "SCORE_UNAVAILABLE", score: null};
   return {
-    ...candidate,
-    analystEvidence: validPacket ? packet.metrics : {},
-    analystWindowPacket: validPacket ? packet : null,
+    status: adapted?.status ?? "ADAPTER_RESULT_UNAVAILABLE",
+    bridge,
+    adapted,
+    filters,
+    analysis,
     executionAuthorized: false
   };
 }
