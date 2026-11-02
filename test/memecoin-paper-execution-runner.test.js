@@ -425,6 +425,46 @@ test("deadline stops candidate and risk work and records only explicit finish", 
   assert.equal(calls[0].input.now, END);
 });
 
+test("delayed stop callback finishes once at the actual post-deadline time", async t => {
+  let clockTime = START;
+  let candidatePolls = 0;
+  const {runner, session, store} = await makeRealRunner(t, {
+    runId: "runner-delayed-finish-review",
+    candidateSource: {poll: async () => {
+      candidatePolls += 1;
+      return {candidate: syntheticCandidate(START)};
+    }},
+    clock: () => (clockTime += 1000),
+    stopSource: async () => {
+      await Promise.resolve();
+      clockTime = END + 5000;
+      return false;
+    }
+  });
+  const report = await runner.run();
+
+  assert.equal(report.status, "FINISHED");
+  assert.equal(report.reason, "DEADLINE");
+  assert.equal(candidatePolls, 0);
+  assert.equal(report.counters.operations, 1);
+  assert.equal(report.summary.openPositions.length, 0);
+  assert.ok(report.terminalReceipt);
+
+  const readback = await store.readCheckpoint();
+  assert.equal(readback.status, "OK");
+  const checkpoint = JSON.parse(readback.bytes.toString("utf8"));
+  assert.equal(checkpoint.records.filter(record => record.method === "finishRun").length, 1);
+  assert.equal(checkpoint.records.length, 2);
+  const finish = checkpoint.records.at(-1);
+  assert.equal(finish.method, "finishRun");
+  assert.equal(finish.inputs.now, END + 7000);
+  assert.equal(finish.inputs.startedAt, START);
+  assert.equal(readback.sequence, report.terminalReceipt.sequence);
+  assert.equal(readback.hash, report.terminalReceipt.hash);
+  assert.equal(session.metadata.sequence, readback.sequence);
+  assert.equal(report.terminalResult.elapsedMs, 8 * 60 * 60 * 1000 + 7000);
+});
+
 test("shutdown evaluates current risk and then finishes explicitly", async () => {
   const {calls, runner} = makeRunner({stopSource: () => true});
   const report = await runner.run();
@@ -701,7 +741,7 @@ test("tight-budget shutdown durably finishes without fabricated terminal valuati
       {...finalRecord, inputs: {...finalRecord.inputs, marks: riskMarks}}
     ]
   };
-  const maxBytes = canonicalCheckpointBytes(baselineCheckpoint).length + 64;
+  const maxBytes = canonicalCheckpointBytes(baselineCheckpoint).length + 128;
   assert.ok(maxBytes < canonicalCheckpointBytes(markedFinishCheckpoint).length);
 
   const finishAttempts = [];

@@ -540,13 +540,12 @@ export function createPaperExecutionRunner({
 
   async function finish(reason, now = null) {
     if (state === "UNKNOWN") return report("UNKNOWN", reason);
-    let finishAt = now;
+    let finishAt;
     try {
-      if (finishAt === null) finishAt = readTime();
-      if (finishAt > metadata.deadlineAt || finishAt < latestTime) {
-        return report("STOPPED", "no valid on-time terminal timestamp; no finish command issued");
+      finishAt = readTime();
+      if (now !== null && finishAt < now) {
+        return report("STOPPED", "terminal clock regressed; no finish command issued");
       }
-      if (finishAt > latestTime) latestTime = finishAt;
     } catch {
       return report("STOPPED", "clock unavailable; no finish command issued");
     }
