@@ -465,6 +465,37 @@ test("audit persistence failure is reported as UNKNOWN and does not claim succes
   assert.equal((await readPilotReport(harness.dataDirectory)).status, "UNKNOWN");
 });
 
+test("late audit persistence failure replaces UNKNOWN evidence and invalidates report availability", async t => {
+  let auditPath;
+  const harness = await createHarness(t, {
+    fakeAssemblyOptions: {
+      summaryFailureCode: "UNKNOWN",
+      onReportInput() {
+        unlinkSync(auditPath);
+        mkdirSync(auditPath);
+      }
+    }
+  });
+  auditPath = path.join(harness.dataDirectory, "observation-audit.json");
+
+  const result = await harness.runner.start();
+  const persisted = JSON.parse(await readFile(path.join(harness.dataDirectory, "terminal.json"), "utf8"));
+  const reportRecord = JSON.parse(await readFile(
+    path.join(harness.dataDirectory, "operator-report.json"), "utf8"
+  ));
+  const report = await readPilotReport(harness.dataDirectory);
+
+  assert.equal(result.status, "UNKNOWN");
+  assert.equal(result.failureCode, "OBSERVATION_AUDIT_WRITE_FAILED");
+  assert.equal(persisted.failureCode, "OBSERVATION_AUDIT_WRITE_FAILED");
+  assert.equal(persisted.observation.failureCode, "OBSERVATION_AUDIT_WRITE_FAILED");
+  assert.equal(persisted.observationAuditStatus, "FAILED");
+  assert.equal(persisted.observationAuditFailureCode, "OBSERVATION_AUDIT_WRITE_FAILED");
+  assert.equal(persisted.reportStatus, "UNKNOWN");
+  assert.equal(reportRecord.observation.failureCode, "UNKNOWN");
+  assert.equal(report.status, "UNKNOWN");
+});
+
 test("caught filesystem persistence code replaces UNKNOWN failure evidence consistently", async t => {
   let reportPath;
   const harness = await createHarness(t, {

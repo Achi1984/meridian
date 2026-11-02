@@ -844,7 +844,9 @@ export function createPilotOnline(options = {}) {
       } catch {
         auditPersistenceStatus = "FAILED";
         auditFailureCode = "OBSERVATION_AUDIT_WRITE_FAILED";
-        failureCode ??= auditFailureCode;
+        if (failureCode === null || failureCode === undefined || failureCode === "UNKNOWN") {
+          failureCode = auditFailureCode;
+        }
         observations.failureCode = failureCode;
         reportStatus = "UNKNOWN";
         return false;
