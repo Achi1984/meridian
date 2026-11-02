@@ -108,7 +108,7 @@ function requestClassification(status) {
   return "UNKNOWN";
 }
 
-function validAuditRequest(request) {
+function validAuditRequest(request, maxTextLength) {
   const requestIdValid = request?.requestId === null ||
     (Number.isSafeInteger(request?.requestId) && request.requestId >= 0) ||
     (typeof request?.requestId === "string" && SAFE_ID.test(request.requestId));
@@ -124,14 +124,14 @@ function validAuditRequest(request) {
     Number.isSafeInteger(request.cycleIndex) && request.cycleIndex >= 0 &&
     requestIdValid &&
     (request.provider === null || PROVIDERS.has(request.provider)) &&
-    validAuditText(request.endpointKind, 64) &&
+    validAuditText(request.endpointKind, Math.min(64, maxTextLength)) &&
     validAuditIdentity(request.requested) &&
     validAuditIdentity(request.returned) &&
     slotValid &&
     validAuditCode(request.status) &&
     ["SUCCESS", "FAILED", "UNKNOWN"].includes(request.outcome) &&
     request.outcome === requestClassification(request.status) &&
-    validAuditText(request.reason) &&
+    validAuditText(request.reason, maxTextLength) &&
     validAuditTime(request.requestedAt) &&
     validAuditTime(request.receivedAt) &&
     (request.observedAtBasis === null ||
@@ -473,12 +473,25 @@ export function createObservationAudit({
 export function validateObservationAudit(audit, {runId, configHash} = {}) {
   if (typeof runId !== "string" || !SAFE_ID.test(runId) ||
       typeof configHash !== "string" || !/^[a-f0-9]{64}$/.test(configHash) ||
-      !isRecord(audit) || audit.schema !== OBSERVATION_AUDIT_SCHEMA ||
+      !hasExactKeys(audit, [
+        "schema", "runId", "configHash", "state", "bounds", "accounting", "terminal",
+        "truncation", "omissions", "summary", "records"
+      ]) || audit.schema !== OBSERVATION_AUDIT_SCHEMA ||
       audit.runId !== runId || audit.configHash !== configHash ||
       !["RUNNING", "TERMINAL"].includes(audit.state) ||
-      !isRecord(audit.bounds) || !isRecord(audit.accounting) ||
-      !isRecord(audit.truncation) || !isRecord(audit.omissions) ||
-      !isRecord(audit.summary) || !isRecord(audit.records) ||
+      !hasExactKeys(audit.bounds, [
+        "maxBytes", "maxProviderRequestRows", "maxCandidateRows",
+        "maxChecksPerCandidate", "maxTextLength"
+      ]) ||
+      !hasExactKeys(audit.accounting, ["status", "providerAccounting"]) ||
+      !hasExactKeys(audit.truncation, [
+        "providerRows", "candidateRows", "filterChecks", "analysisChecks", "byteLimit", "textFields"
+      ]) ||
+      !hasExactKeys(audit.omissions, [
+        "providerRequests", "unexpectedProviderEvents", "candidateOutcomes",
+        "unexpectedCandidateOutcomes", "filterChecks", "analysisChecks"
+      ]) ||
+      !hasExactKeys(audit.records, ["providerRequests", "candidates"]) ||
       !Array.isArray(audit.records.providerRequests) || !Array.isArray(audit.records.candidates) ||
       audit.records.providerRequests.length > MAX_REQUEST_ROWS ||
       audit.records.candidates.length > MAX_CANDIDATE_ROWS ||
@@ -488,29 +501,52 @@ export function validateObservationAudit(audit, {runId, configHash} = {}) {
       audit.bounds.maxProviderRequestRows < 1 || audit.bounds.maxProviderRequestRows > MAX_REQUEST_ROWS ||
       !Number.isSafeInteger(audit.bounds.maxCandidateRows) ||
       audit.bounds.maxCandidateRows < 1 || audit.bounds.maxCandidateRows > MAX_CANDIDATE_ROWS ||
+      !Number.isSafeInteger(audit.bounds.maxChecksPerCandidate) ||
+      audit.bounds.maxChecksPerCandidate < 1 || audit.bounds.maxChecksPerCandidate > MAX_CHECK_ROWS ||
+      !Number.isSafeInteger(audit.bounds.maxTextLength) ||
+      audit.bounds.maxTextLength < 1 || audit.bounds.maxTextLength > MAX_TEXT_LENGTH ||
+      audit.records.providerRequests.length > audit.bounds.maxProviderRequestRows ||
+      audit.records.candidates.length > audit.bounds.maxCandidateRows ||
       typeof audit.truncation.providerRows !== "boolean" ||
       typeof audit.truncation.candidateRows !== "boolean" ||
       typeof audit.truncation.filterChecks !== "boolean" ||
       typeof audit.truncation.analysisChecks !== "boolean" ||
       typeof audit.truncation.byteLimit !== "boolean" ||
       typeof audit.truncation.textFields !== "boolean" ||
+      !Number.isSafeInteger(audit.omissions.unexpectedProviderEvents) ||
+      audit.omissions.unexpectedProviderEvents < 0 ||
+      !Number.isSafeInteger(audit.omissions.unexpectedCandidateOutcomes) ||
+      audit.omissions.unexpectedCandidateOutcomes < 0 ||
+      !Number.isSafeInteger(audit.omissions.filterChecks) || audit.omissions.filterChecks < 0 ||
+      !Number.isSafeInteger(audit.omissions.analysisChecks) || audit.omissions.analysisChecks < 0 ||
+      (audit.omissions.providerRequests !== null &&
+        (!Number.isSafeInteger(audit.omissions.providerRequests) || audit.omissions.providerRequests < 0)) ||
+      (audit.omissions.candidateOutcomes !== null &&
+        (!Number.isSafeInteger(audit.omissions.candidateOutcomes) || audit.omissions.candidateOutcomes < 0)) ||
       (audit.state === "RUNNING" && audit.terminal !== null) ||
-      (audit.state === "TERMINAL" && (!isRecord(audit.terminal) ||
-       !["runStatus", "controllerStatus", "stopReason", "failureCode"]
-         .every(field => validAuditCode(audit.terminal[field])))) ||
+      (audit.state === "TERMINAL" &&
+       (!hasExactKeys(audit.terminal, ["runStatus", "controllerStatus", "stopReason", "failureCode"]) ||
+        !["runStatus", "controllerStatus", "stopReason", "failureCode"]
+          .every(field => validAuditCode(audit.terminal[field])))) ||
+      !isRecord(audit.summary) ||
       !isRecord(audit.summary.requests) || !isRecord(audit.summary.candidates)) return false;
   const providerAccounting = audit.accounting.status === "KNOWN"
     ? audit.accounting.providerAccounting : null;
-  if (audit.accounting.status !== "UNKNOWN" && audit.accounting.status !== "KNOWN") return false;
+  if ((audit.accounting.status !== "UNKNOWN" && audit.accounting.status !== "KNOWN") ||
+      (audit.accounting.status === "UNKNOWN" && audit.accounting.providerAccounting !== null)) return false;
   if (audit.accounting.status === "KNOWN" &&
       (!isRecord(providerAccounting) ||
+       !hasExactKeys(providerAccounting, [
+         "requests", "bytes", "providerEvents", "dexRequests", "rpcRequests", "candidates"
+       ]) ||
        !["requests", "bytes", "providerEvents", "dexRequests", "rpcRequests", "candidates"]
          .every(key => Number.isSafeInteger(providerAccounting[key]) && providerAccounting[key] >= 0) ||
        providerAccounting.requests !== providerAccounting.providerEvents ||
        providerAccounting.dexRequests + providerAccounting.rpcRequests !== providerAccounting.requests)) {
     return false;
   }
-  if (audit.records.providerRequests.some(request => !validAuditRequest(request))) return false;
+  if (audit.records.providerRequests.some(request =>
+    !validAuditRequest(request, audit.bounds.maxTextLength))) return false;
   if (audit.records.candidates.some(candidate =>
     !hasExactKeys(candidate, [
       "cycleIndex", "identity", "sampledAt", "filterStatus", "analysisStatus", "filter", "analysis"
@@ -521,16 +557,19 @@ export function validateObservationAudit(audit, {runId, configHash} = {}) {
     !hasExactKeys(candidate.filter, ["status", "reason", "checks", "omittedChecks"]) ||
     !hasExactKeys(candidate.analysis, ["status", "reason", "checks", "omittedChecks"]) ||
     !Array.isArray(candidate.filter.checks) || !Array.isArray(candidate.analysis.checks) ||
-    candidate.filter.checks.length > MAX_CHECK_ROWS ||
-    candidate.analysis.checks.length > MAX_CHECK_ROWS ||
+    candidate.filter.checks.length > audit.bounds.maxChecksPerCandidate ||
+    candidate.analysis.checks.length > audit.bounds.maxChecksPerCandidate ||
     !Number.isSafeInteger(candidate.filter.omittedChecks) || candidate.filter.omittedChecks < 0 ||
     !Number.isSafeInteger(candidate.analysis.omittedChecks) || candidate.analysis.omittedChecks < 0 ||
-    !validAuditText(candidate.filter.reason) || !validAuditText(candidate.analysis.reason) ||
+    !validAuditText(candidate.filter.reason, audit.bounds.maxTextLength) ||
+    !validAuditText(candidate.analysis.reason, audit.bounds.maxTextLength) ||
     [...candidate.filter.checks, ...candidate.analysis.checks].some(check =>
       !hasExactKeys(check, ["name", "status", "reason", "source", "observedAt"]) ||
-      !validAuditText(check.name, 64) ||
+      typeof check.name !== "string" || check.name.length === 0 ||
+      !validAuditText(check.name, Math.min(64, audit.bounds.maxTextLength)) ||
       !["PASS", "REJECT", "UNKNOWN"].includes(check.status) ||
-      !validAuditText(check.reason) || !validAuditText(check.source, 96) ||
+      !validAuditText(check.reason, audit.bounds.maxTextLength) ||
+      !validAuditText(check.source, Math.min(96, audit.bounds.maxTextLength)) ||
       !validAuditTime(check.observedAt)) ||
     candidate.filterStatus !== candidate.filter.status ||
     candidate.analysisStatus !== candidate.analysis.status ||
@@ -539,7 +578,9 @@ export function validateObservationAudit(audit, {runId, configHash} = {}) {
     return false;
   }
   const recomputed = summarize(audit.records.providerRequests, audit.records.candidates, providerAccounting);
-  return canonicalJson(recomputed) === canonicalJson(audit.summary) &&
+  return Buffer.byteLength(canonicalJson(audit), "utf8") <= audit.bounds.maxBytes &&
+    Buffer.byteLength(canonicalJson(audit), "utf8") <= MAX_OBSERVATION_AUDIT_BYTES &&
+    canonicalJson(recomputed) === canonicalJson(audit.summary) &&
     (audit.truncation.filterChecks || recomputed.candidates.omittedChecks.filter === 0) &&
     (audit.truncation.analysisChecks || recomputed.candidates.omittedChecks.analysis === 0) &&
     audit.omissions.providerRequests === recomputed.requests.omitted &&

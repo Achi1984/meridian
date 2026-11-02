@@ -354,17 +354,25 @@ test("failed terminal audit update exposes an earlier snapshot as incomplete, ne
   assert.match(report.text, /last successfully written snapshot and may be incomplete/);
 });
 
-test("malformed nested audit checks return structured UNKNOWN from report reads", async t => {
+test("malformed check names and declared audit limits return structured UNKNOWN", async t => {
   const harness = await createHarness(t);
   assert.equal((await harness.runner.start()).status, "FINISHED");
   const auditPath = path.join(harness.dataDirectory, "observation-audit.json");
-  const audit = JSON.parse(await readFile(auditPath, "utf8"));
-  audit.records.candidates[0].filter.checks = [null];
-  await writeFile(auditPath, canonicalJson(audit));
-
-  const report = await readPilotReport(harness.dataDirectory);
-  assert.equal(report.status, "UNKNOWN");
-  assert.match(report.reason, /schema or durable run identity contract/);
+  const persisted = JSON.parse(await readFile(auditPath, "utf8"));
+  for (const mutate of [
+    audit => { audit.records.candidates[0].filter.checks[0].name = null; },
+    audit => { audit.bounds.maxProviderRequestRows = 1; },
+    audit => { audit.bounds.maxChecksPerCandidate = 1; },
+    audit => { audit.summary = null; },
+    audit => { audit.summary.requests.successful = {toString: null}; }
+  ]) {
+    const malformed = structuredClone(persisted);
+    mutate(malformed);
+    await writeFile(auditPath, canonicalJson(malformed));
+    const report = await readPilotReport(harness.dataDirectory);
+    assert.equal(report.status, "UNKNOWN");
+    assert.match(report.reason, /schema or durable run identity contract/);
+  }
 });
 
 test("malformed persisted request status returns structured UNKNOWN", async t => {

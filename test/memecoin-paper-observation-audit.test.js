@@ -229,6 +229,39 @@ test("unexpected request rows and malformed nested checks are not reconciled", (
   assert.equal(validateObservationAudit(malformed, {runId: RUN_ID, configHash: CONFIG_HASH}), false);
 });
 
+test("persisted audits reject declared-bound violations and missing check names", () => {
+  const fixture = createObservationFixture(2);
+  const audit = createAudit({maxRequests: 8, maxCandidates: 2});
+  audit.recordProviderEvents(fixture.providerEvents, 0);
+  const {filters, analysis} = createBlockedDecisions();
+  const filtersWithChecks = {
+    ...filters,
+    checks: Object.fromEntries(Array.from({length: 21}, (_, index) => [
+      `check-${index}`, {status: "UNKNOWN", reason: "evidence unavailable"}
+    ]))
+  };
+  for (const candidate of fixture.candidates) {
+    audit.recordCandidate(candidate, filtersWithChecks, analysis, 0);
+  }
+  audit.setProviderAccounting(fixture.accounting);
+  const snapshot = audit.snapshot();
+
+  for (const mutate of [
+    result => { result.bounds.maxProviderRequestRows = 7; },
+    result => { result.bounds.maxCandidateRows = 1; },
+    result => { result.bounds.maxChecksPerCandidate = 19; },
+    result => { result.bounds.maxTextLength = 20; },
+    result => { result.bounds.maxBytes = 1_024; },
+    result => { result.summary = null; },
+    result => { result.summary.requests.successful = {toString: null}; },
+    result => { result.records.candidates[0].filter.checks[0].name = null; }
+  ]) {
+    const malformed = structuredClone(snapshot);
+    mutate(malformed);
+    assert.equal(validateObservationAudit(malformed, {runId: RUN_ID, configHash: CONFIG_HASH}), false);
+  }
+});
+
 test("non-string persisted request statuses fail validation without classifier coercion", () => {
   const fixture = createObservationFixture(1);
   const audit = createAudit({maxRequests: 1, maxCandidates: 1});
