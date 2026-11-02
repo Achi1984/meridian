@@ -1,13 +1,17 @@
 import assert from "node:assert/strict";
-import {mkdtemp, readFile, readdir, rm} from "node:fs/promises";
+import {execFileSync, spawnSync} from "node:child_process";
+import {mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import {fileURLToPath} from "node:url";
 import {
   createPaperPilotComposition, createSyntheticClock, offlineFixtureAdapters
 } from "../scripts/memecoin-paper/paper-pilot-composition.mjs";
+import {createBoundedExternalReadOnlyInput} from "../scripts/memecoin-paper/execution-runner.mjs";
 
 const START = Date.parse("2026-01-01T19:00:00Z");
+const CLI = fileURLToPath(new URL("../scripts/memecoin-paper/paper-pilot-composition.mjs", import.meta.url));
 const BUDGETS = {
   requests: 12,
   bytes: 1_000_000,
@@ -101,6 +105,72 @@ test("disabled by default and rejects non-synthetic activation configuration", a
   assert.equal(getterCalls, 0);
 });
 
+test("external read-only packet remains UNKNOWN until source contracts are accepted", async () => {
+  const externalReadOnlyInput = createBoundedExternalReadOnlyInput({
+    kind: "MEMECOIN_EXTERNAL_READ_ONLY_INPUT_V1",
+    schemaVersion: 1,
+    producerRevision: "candidate-intake-1",
+    sourceContracts: {candidateIntakeSha: "a".repeat(40), evidenceSha: null, quotesSha: null},
+    timing: {
+      sourceTimestamp: START,
+      receiptTimestamp: START + 1_000,
+      uncertaintyMs: 1,
+      monotonicElapsedMs: 1_000,
+      clockSource: "claimed-source-clock"
+    },
+    payload: {candidate: {source: "external-provider-claim", evidence: {complete: true}}}
+  });
+  const pilot = createPaperPilotComposition({
+    config: config({mode: "EXTERNAL_READ_ONLY_INPUT"}),
+    externalReadOnlyInput
+  });
+  const result = await pilot.start();
+  assert.equal(result.status, "UNKNOWN");
+  assert.equal(result.executionMode, "READ_ONLY_EXTERNAL");
+  assert.equal(result.executionStarted, false);
+  assert.equal(result.terminalReceipt, null);
+  assert.equal(result.report.persistence.certainty, "NOT_STARTED");
+  assert.deepEqual(result.report.persistence.checkpointRef, null);
+  assert.deepEqual(result.report.persistence.terminalReceiptRef, null);
+  assert.equal(result.report.outcomes.entries.length, 0);
+  assert.equal(result.report.outcomes.exits.length, 0);
+  assert.equal(result.report.outcomes.unresolved.length, 4);
+  assert.equal(result.authority.liveReady, false);
+  assert.throws(() => createPaperPilotComposition({
+    config: config(),
+    externalReadOnlyInput
+  }), /requires EXTERNAL_READ_ONLY_INPUT mode/);
+});
+
+test("CLI rejects FIFOs and symlinked config files without waiting or creating checkpoints", async t => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "paper-composition-cli-files-"));
+  const stateDirectory = path.join(root, "state");
+  await mkdir(stateDirectory);
+  t.after(() => rm(root, {recursive: true, force: true}));
+
+  const fifo = path.join(root, "config.fifo");
+  execFileSync("mkfifo", [fifo]);
+  const fifoResult = spawnSync(process.execPath, [
+    CLI, "offline-proof", "--config", fifo, "--data-dir", stateDirectory
+  ], {encoding: "utf8", timeout: 1_000});
+  assert.equal(fifoResult.error, undefined);
+  assert.equal(fifoResult.status, 1);
+  assert.deepEqual(JSON.parse(fifoResult.stdout), {status: "BLOCKED", code: "INVALID_CONFIGURATION"});
+  assert.deepEqual(await readdir(stateDirectory), []);
+
+  const regularConfig = path.join(root, "regular.json");
+  const linkedConfig = path.join(root, "linked.json");
+  await writeFile(regularConfig, JSON.stringify(config()));
+  await symlink(regularConfig, linkedConfig);
+  const symlinkResult = spawnSync(process.execPath, [
+    CLI, "offline-proof", "--config", linkedConfig, "--data-dir", stateDirectory
+  ], {encoding: "utf8", timeout: 1_000});
+  assert.equal(symlinkResult.error, undefined);
+  assert.equal(symlinkResult.status, 1);
+  assert.deepEqual(JSON.parse(symlinkResult.stdout), {status: "BLOCKED", code: "INVALID_CONFIGURATION"});
+  assert.deepEqual(await readdir(stateDirectory), []);
+});
+
 test("complete offline path uses existing gates, ledger, independent ticks and durable terminal receipt", async t => {
   const {directory, pilot} = await harness(t);
   const result = await pilot.start();
@@ -112,22 +182,47 @@ test("complete offline path uses existing gates, ledger, independent ticks and d
   assert.equal(result.accounting.openPositions.length, 0);
   assert.equal(result.terminalReceipt.runId, "composition-test");
   assert.equal(result.terminalReceipt.sequence, result.checkpoint.sequence);
+  assert.equal(result.report.schemaVersion, "memecoin-paper-pilot-report/v1");
+  assert.equal(result.report.producerRevision, "paper-pilot-composition/2");
+  assert.match(result.report.configDigest, /^[a-f0-9]{64}$/);
+  assert.equal(result.report.runId, "composition-test");
+  assert.equal(result.report.persistence.certainty, "ACKNOWLEDGED");
+  assert.deepEqual(result.report.persistence.checkpointRef, {
+    runId: "composition-test",
+    sequence: result.checkpoint.sequence,
+    hash: result.checkpoint.hash
+  });
+  const persisted = await checkpoint(directory);
+  assert.deepEqual(result.report.persistence.terminalReceiptRef, {
+    runId: result.terminalReceipt.runId,
+    sequence: result.terminalReceipt.sequence,
+    hash: result.terminalReceipt.hash,
+    resultDigest: result.terminalReceipt.resultDigest,
+    commandId: persisted.records.at(-1).commandId
+  });
+  assert.equal(result.report.outcomes.entries.length, 1);
+  assert.equal(result.report.outcomes.entries[0].status, "FILLED_PAPER");
+  assert.equal(result.report.outcomes.entries[0].source, "SYNTHETIC_FIXTURE_ONLY");
+  assert.equal(result.report.outcomes.entries[0].costBasis, "HYPOTHETICAL_FIXTURE_ONLY");
+  assert.equal(result.report.outcomes.exits.length, 1);
+  assert.equal(result.report.outcomes.exits[0].status, "CLOSED_PAPER");
+  assert.deepEqual(result.report.outcomes.openUnvaluedPositions, []);
   assert.equal(result.timing.clockSource, "SYNTHETIC_FIXTURE_CLOCK");
   assert.equal(result.provenance.candidates[0].sourceTimestamp < result.provenance.candidates[0].receiptTimestamp, true);
-  assert.deepEqual(result.provenance.quotes.map(item => item.purpose), ["entry", "risk-mark", "exit"]);
+  assert.deepEqual(result.provenance.quotes.map(item => item.purpose), ["entry", "risk-mark", "risk-mark"]);
 
-  const durable = await checkpoint(directory);
+  const durable = persisted;
   const methods = durable.records.map(record => record.method);
   assert.deepEqual(methods, [
-    "constructor", "authorizeEntry", "executeEntry", "riskSnapshot",
-    "observeExitQuote", "riskSnapshot", "finishRun"
+    "constructor", "riskSnapshot", "authorizeEntry", "executeEntry", "observeExitQuote",
+    "riskSnapshot", "observeExitQuote", "riskSnapshot", "finishRun"
   ]);
   assert.equal(methods.filter(method => method === "executeEntry").length, 1);
   assert.equal(durable.records.at(-1).method, "finishRun");
   assert.equal(durable.sequence, result.terminalReceipt.sequence);
-  assert.equal(durable.records[3].inputs.now <= durable.records[4].inputs.now, true);
   assert.equal(durable.records[4].inputs.now <= durable.records[5].inputs.now, true);
-  assert.notEqual(durable.records[3].commandId, durable.records[5].commandId);
+  assert.equal(durable.records[5].inputs.now <= durable.records[6].inputs.now, true);
+  assert.notEqual(durable.records[1].commandId, durable.records[5].commandId);
 });
 
 test("missing hard evidence and missing full cost components do not fill", async t => {
@@ -136,8 +231,9 @@ test("missing hard evidence and missing full cost components do not fill", async
   assert.equal(rejected.status, "FINISHED");
   assert.equal(rejected.strategyOutcome, "BLOCKED");
   assert.equal(rejected.accounting.cashCents, "100000");
-  assert.deepEqual((await checkpoint(noEvidence.directory)).records.map(record => record.method),
-    ["constructor", "finishRun"]);
+  const evidenceRecords = (await checkpoint(noEvidence.directory)).records;
+  assert.equal(evidenceRecords.some(record => record.method === "executeEntry"), false);
+  assert.equal(evidenceRecords.at(-1).method, "finishRun");
 
   const noCosts = await harness(t, {fault: "MISSING_COSTS"});
   const costResult = await noCosts.pilot.start();
@@ -148,6 +244,8 @@ test("missing hard evidence and missing full cost components do not fill", async
   const costCheckpoint = await checkpoint(noCosts.directory);
   assert.equal(costCheckpoint.records.some(record => record.method === "executeEntry"), false);
   assert.equal(costCheckpoint.records.at(-1).method, "finishRun");
+  assert.equal(costResult.report.persistence.certainty, "ACKNOWLEDGED");
+  assert.equal(costResult.report.outcomes.unresolved.includes("authorized reservation remains pending without a fill"), true);
 });
 
 test("no candidates emits a terminal checkpoint without inventing a trade", async t => {
@@ -157,8 +255,8 @@ test("no candidates emits a terminal checkpoint without inventing a trade", asyn
   assert.equal(result.strategyOutcome, "NO_CANDIDATES");
   assert.equal(result.accounting.cashCents, "100000");
   assert.equal(result.accounting.openPositions.length, 0);
-  assert.deepEqual((await checkpoint(directory)).records.map(record => record.method),
-    ["constructor", "finishRun"]);
+  const records = (await checkpoint(directory)).records;
+  assert.deepEqual(records.map(record => record.method), ["constructor", "riskSnapshot", "finishRun"]);
 });
 
 test("blocked start and expired windows leave a truthful blocked lifecycle state", async t => {
@@ -196,13 +294,16 @@ test("pre-aborted composition does not write or initialize a checkpoint", async 
   assert.deepEqual(await readdir(directory), []);
 });
 
-test("disconnect, timeout and late callback results remain nonterminal and are not retried", async t => {
+test("disconnect, timeout and late callbacks stay UNKNOWN while terminal persistence is separately classified", async t => {
   const disconnectHarness = await harness(t, {fault: "DISCONNECT"});
   const disconnectedResult = await disconnectHarness.pilot.start();
   assert.equal(disconnectedResult.status, "UNKNOWN");
   assert.equal(disconnectedResult.code, "DISCONNECTED");
-  assert.equal(disconnectedResult.terminalReceipt, null);
-  assert.equal((await checkpoint(disconnectHarness.directory)).sequence, 0);
+  assert.ok(disconnectedResult.terminalReceipt);
+  assert.equal(disconnectedResult.report.persistence.certainty, "ACKNOWLEDGED");
+  const disconnectedRecords = (await checkpoint(disconnectHarness.directory)).records;
+  assert.equal(disconnectedRecords.filter(record => record.method === "finishRun").length, 1);
+  assert.equal(disconnectedRecords.some(record => record.method === "executeEntry"), false);
 
   const timeoutHarness = await harness(t, {
     fault: "CALLBACK_TIMEOUT",
@@ -211,8 +312,12 @@ test("disconnect, timeout and late callback results remain nonterminal and are n
   const timeoutResult = await timeoutHarness.pilot.start();
   assert.equal(timeoutResult.status, "UNKNOWN");
   assert.equal(timeoutResult.code, "CALLBACK_TIMEOUT");
+  assert.ok(timeoutResult.terminalReceipt);
+  assert.equal(timeoutResult.report.persistence.certainty, "ACKNOWLEDGED");
   await new Promise(resolve => setTimeout(resolve, 40));
-  assert.equal((await checkpoint(timeoutHarness.directory)).sequence, 0);
+  const timeoutRecords = (await checkpoint(timeoutHarness.directory)).records;
+  assert.equal(timeoutRecords.filter(record => record.method === "finishRun").length, 1);
+  assert.equal(timeoutRecords.some(record => record.method === "executeEntry"), false);
 
   const deadlineHarness = await harness(t, {
     fault: "LATE_DEADLINE",
@@ -221,34 +326,42 @@ test("disconnect, timeout and late callback results remain nonterminal and are n
     })
   });
   const deadlineResult = await deadlineHarness.pilot.start();
-  assert.equal(deadlineResult.status, "UNKNOWN");
+  assert.equal(deadlineResult.status, "FINISHED");
   assert.equal(deadlineResult.code, "DEADLINE");
-  assert.equal((await checkpoint(deadlineHarness.directory)).sequence, 0);
+  assert.ok(deadlineResult.terminalReceipt);
+  assert.equal(deadlineResult.report.persistence.certainty, "ACKNOWLEDGED");
+  assert.equal(deadlineResult.report.outcomes.entries.length, 0);
+  assert.equal((await checkpoint(deadlineHarness.directory)).records.at(-1).method, "finishRun");
 });
 
-test("stop cancels an outstanding adapter; clock jumps fail closed", async t => {
+test("stop has one STOPPED lifecycle with acknowledged persistence; clock jumps remain UNKNOWN", async t => {
   const stopped = await harness(t, {fault: "WAIT_FOR_STOP"});
   const pending = stopped.pilot.start();
   await new Promise(resolve => setTimeout(resolve, 5));
   assert.equal(stopped.pilot.stop(), true);
   const stoppedResult = await pending;
+  assert.equal(stoppedResult.status, "STOPPED");
   assert.equal(stoppedResult.state, "STOPPED");
-  assert.equal(stoppedResult.terminalReceipt, null);
-  assert.equal((await checkpoint(stopped.directory)).sequence, 0);
+  assert.ok(stoppedResult.terminalReceipt);
+  assert.equal(stoppedResult.report.persistence.certainty, "ACKNOWLEDGED");
+  assert.equal((await checkpoint(stopped.directory)).records.at(-1).method, "finishRun");
 
   const jumped = await harness(t, {fault: "CLOCK_JUMP"});
   const jumpResult = await jumped.pilot.start();
   assert.equal(jumpResult.status, "UNKNOWN");
   assert.equal(jumpResult.code, "CLOCK_JUMP");
-  assert.equal((await checkpoint(jumped.directory)).sequence, 0);
+  assert.equal(jumpResult.terminalReceipt, null);
+  assert.equal(jumpResult.report.persistence.certainty, "NO_TERMINAL_RECEIPT");
+  assert.equal((await checkpoint(jumped.directory)).records.at(-1).method, "riskSnapshot");
 });
 
-test("lost checkpoint ACK is UNKNOWN and duplicate events do not append another command", async t => {
+test("lost checkpoint ACK remains UNKNOWN and runner does not duplicate entry commands", async t => {
   const lost = await harness(t, {fault: "LOST_ACK"});
   const uncertain = await lost.pilot.start();
   assert.equal(uncertain.status, "UNKNOWN");
   assert.equal(uncertain.terminalReceipt, null);
   assert.equal((await checkpoint(lost.directory)).sequence, 1);
+  assert.equal(uncertain.report.persistence.certainty, "UNKNOWN");
 
   const complete = await harness(t);
   const result = await complete.pilot.start();
@@ -262,9 +375,11 @@ test("lost checkpoint ACK is UNKNOWN and duplicate events do not append another 
     adapters: offlineFixtureAdapters({clock: restartClock}),
     clock: restartClock
   });
-  assert.deepEqual(await restarted.start(), {
-    status: "BLOCKED", code: "RESTART_NOT_ALLOWED", terminalReceipt: null
-  });
+  const restartResult = await restarted.start();
+  assert.equal(restartResult.status, "BLOCKED");
+  assert.equal(restartResult.code, "RESTART_NOT_ALLOWED");
+  assert.equal(restartResult.terminalReceipt, null);
+  assert.equal(restartResult.report.persistence.certainty, "NOT_STARTED");
 });
 
 test("unavailable final mark remains open and unvalued instead of being liquidated", async t => {
@@ -288,7 +403,7 @@ test("source quote time later than local receipt is rejected before entry dispat
   assert.equal(result.code, "QUOTE_AFTER_RECEIPT");
   const durable = await checkpoint(directory);
   assert.equal(durable.records.some(record => record.method === "executeEntry"), false);
-  assert.equal(durable.records.at(-1).method, "authorizeEntry");
+  assert.equal(durable.records.at(-1).method, "finishRun");
 });
 
 test("request and byte budgets are global and source labels cannot masquerade as real evidence", async t => {
@@ -299,7 +414,7 @@ test("request and byte budgets are global and source labels cannot masquerade as
   const exhausted = await budget.pilot.start();
   assert.equal(exhausted.status, "UNKNOWN");
   assert.equal(exhausted.code, "GLOBAL_BUDGET");
-  assert.equal((await checkpoint(budget.directory)).sequence, 0);
+  assert.equal((await checkpoint(budget.directory)).records.at(-1).method, "finishRun");
 
   const byteBudget = await harness(t, {
     runConfig: config({budgets: {...BUDGETS, bytes: 1024}})
@@ -307,7 +422,9 @@ test("request and byte budgets are global and source labels cannot masquerade as
   const tooLarge = await byteBudget.pilot.start();
   assert.equal(tooLarge.status, "UNKNOWN");
   assert.equal(tooLarge.code, "BYTE_BUDGET");
-  assert.equal((await checkpoint(byteBudget.directory)).sequence, 0);
+  assert.equal(tooLarge.terminalReceipt, null);
+  assert.equal(tooLarge.report.persistence.certainty, "NO_TERMINAL_RECEIPT");
+  assert.equal((await checkpoint(byteBudget.directory)).records.at(-1).method, "constructor");
 
   const source = await harness(t, {fault: "SPOOF_SOURCE"});
   const refused = await source.pilot.start();

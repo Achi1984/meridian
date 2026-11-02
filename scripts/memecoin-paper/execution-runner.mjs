@@ -20,6 +20,8 @@ const MAX_LIMITS = Object.freeze({
   maxInputBytes: 8 * 1024 * 1024
 });
 const HASH = /^[a-f0-9]{64}$/;
+const EXTERNAL_INPUT_KIND = "MEMECOIN_EXTERNAL_READ_ONLY_INPUT_V1";
+const externalReadOnlyInputs = new WeakMap();
 
 class InputBudgetError extends RangeError {}
 
@@ -145,6 +147,57 @@ function detachInput(value, remainingBytes) {
   return {value: detached, bytes: canonicalBytes.length};
 }
 
+function freezeData(value) {
+  if (value && typeof value === "object") {
+    for (const item of Object.values(value)) freezeData(item);
+    Object.freeze(value);
+  }
+  return value;
+}
+
+function exactDataKeys(value, expected) {
+  if (!value || typeof value !== "object" || Array.isArray(value) ||
+      Object.getPrototypeOf(value) !== Object.prototype ||
+      Object.getOwnPropertySymbols(value).length !== 0) return false;
+  const keys = Object.getOwnPropertyNames(value);
+  return keys.sort().join(",") === [...expected].sort().join(",") &&
+    keys.every(key => {
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      return descriptor && "value" in descriptor;
+    });
+}
+
+export function createBoundedExternalReadOnlyInput(input) {
+  const detached = detachInput(input, MAX_LIMITS.maxInputBytes);
+  const value = detached.value;
+  if (!exactDataKeys(value, [
+        "kind", "schemaVersion", "producerRevision", "sourceContracts", "timing", "payload"
+      ]) ||
+      value.kind !== EXTERNAL_INPUT_KIND || value.schemaVersion !== 1 ||
+      typeof value.producerRevision !== "string" ||
+      !/^[A-Za-z0-9._:-]{1,160}$/.test(value.producerRevision) ||
+      !exactDataKeys(value.sourceContracts, ["candidateIntakeSha", "evidenceSha", "quotesSha"]) ||
+      !["candidateIntakeSha", "evidenceSha", "quotesSha"].every(key =>
+        value.sourceContracts[key] === null ||
+        (typeof value.sourceContracts[key] === "string" &&
+         /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/.test(value.sourceContracts[key]))) ||
+      !exactDataKeys(value.timing, [
+        "sourceTimestamp", "receiptTimestamp", "uncertaintyMs", "monotonicElapsedMs", "clockSource"
+      ]) ||
+      !integerTime(value.timing.sourceTimestamp) || !integerTime(value.timing.receiptTimestamp) ||
+      value.timing.sourceTimestamp > value.timing.receiptTimestamp ||
+      !Number.isSafeInteger(value.timing.uncertaintyMs) || value.timing.uncertaintyMs < 0 ||
+      !Number.isFinite(value.timing.monotonicElapsedMs) || value.timing.monotonicElapsedMs < 0 ||
+      typeof value.timing.clockSource !== "string" || value.timing.clockSource.length > 120 ||
+      !value.payload || typeof value.payload !== "object" || Array.isArray(value.payload)) {
+    throw new TypeError("external read-only input does not match the bounded v1 contract");
+  }
+  freezeData(value);
+  const digest = createHash("sha256").update(canonicalCheckpointBytes(value)).digest("hex");
+  externalReadOnlyInputs.set(value, {digest, bytes: detached.bytes});
+  return value;
+}
+
 function syntheticCandidateEvidence(candidate) {
   if (!candidate || candidate.source !== SYNTHETIC_SOURCE) return false;
   for (const group of [candidate.evidence, candidate.analystEvidence]) {
@@ -171,6 +224,8 @@ function syntheticQuote(quote, identity) {
 }
 
 export function createPaperExecutionRunner({
+  externalReadOnlyInput,
+  externalInputByteLimit = MAX_LIMITS.maxInputBytes,
   executionStep,
   session,
   runId,
@@ -185,6 +240,44 @@ export function createPaperExecutionRunner({
   smartWalletAllowlist,
   limits
 } = {}) {
+  if (externalReadOnlyInput !== undefined) {
+    const input = externalReadOnlyInputs.get(externalReadOnlyInput);
+    if (!input || !Number.isSafeInteger(externalInputByteLimit) ||
+        externalInputByteLimit < 1 || externalInputByteLimit > MAX_LIMITS.maxInputBytes) {
+      throw new TypeError("a bounded external read-only input and byte limit are required");
+    }
+    if (input.bytes > externalInputByteLimit) {
+      throw new RangeError("external read-only input exceeds the configured byte budget");
+    }
+    let externalRunPromise;
+    return Object.freeze({
+      run() {
+        if (!externalRunPromise) {
+          externalRunPromise = Promise.resolve({
+            status: "UNKNOWN",
+            reason: "external source contracts are not accepted for simulated entry",
+            executionMode: "READ_ONLY_EXTERNAL",
+            provenance: "UNVERIFIED_CALLER_INPUT",
+            realDataSourceCoverage: "NOT_ASSESSED",
+            externalInputDigest: input.digest,
+            producerRevision: externalReadOnlyInput.producerRevision,
+            sourceContracts: {...externalReadOnlyInput.sourceContracts},
+            timingClaims: {...externalReadOnlyInput.timing},
+            executionStarted: false,
+            terminalReceipt: null,
+            checkpoint: null,
+            unresolved: [
+              "candidate-intake contract is not accepted",
+              "market-evidence contract is not accepted",
+              "quote and complete-cost contract is not accepted",
+              "trusted source-time and receipt-time attestation is not accepted"
+            ]
+          });
+        }
+        return externalRunPromise;
+      }
+    });
+  }
   const bounds = boundedLimits(limits);
   if (typeof runId !== "string" || !/^[A-Za-z0-9._:-]{1,120}$/.test(runId) ||
       !integerTime(startedAt) || !integerTime(endAt) || endAt <= startedAt ||
@@ -266,6 +359,7 @@ export function createPaperExecutionRunner({
       receipts: receipts.map(item => ({...item})),
       operationResults: results.map(item => ({...item})),
       missingTerminalValuationMints: [...missingTerminalValuationMints],
+      pendingAuthorizationIds: [...pendingAuthorizationIds],
       terminalResult,
       terminalReceipt: verifiedTerminalReceipt ? {...verifiedTerminalReceipt} : null,
       summary

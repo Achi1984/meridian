@@ -1,9 +1,11 @@
 import {createHash} from "node:crypto";
+import {constants} from "node:fs";
 import {open} from "node:fs/promises";
 import path from "node:path";
 import {pathToFileURL} from "node:url";
 import {PaperCheckpointSession} from "./checkpoint-session.mjs";
 import {canonicalCheckpointBytes, CheckpointStore} from "./checkpoint-store.mjs";
+import {createBoundedExternalReadOnlyInput, createPaperExecutionRunner} from "./execution-runner.mjs";
 import {createPaperExecutionStep} from "./execution-step.mjs";
 import {PAPER_LEDGER_POLICY} from "./ledger.mjs";
 import {SYNTHETIC_SMART_WALLET_ALLOWLIST, syntheticCandidate} from "./synthetic-fixtures.mjs";
@@ -11,6 +13,8 @@ import {scout} from "./stages.mjs";
 
 const EIGHT_HOURS_MS = 8 * 60 * 60 * 1000;
 const SYNTHETIC_SOURCE = "SYNTHETIC_FIXTURE_ONLY";
+const REPORT_SCHEMA_VERSION = "memecoin-paper-pilot-report/v1";
+const REPORT_PRODUCER_REVISION = "paper-pilot-composition/2";
 const BUDGET_KEYS = [
   "requests", "bytes", "events", "candidates", "cycles", "durationMs",
   "callbackTimeoutMs", "maxWallClockUncertaintyMs"
@@ -66,7 +70,8 @@ function onlyDataKeys(value, allowed) {
 
 function validateConfig(config) {
   if (!exactKeys(config, ["version", "mode", "enabled", "runId", "startedAt", "budgets"]) ||
-      config.version !== 1 || config.mode !== "SYNTHETIC_TEST_ONLY" ||
+      config.version !== 1 ||
+      !["SYNTHETIC_TEST_ONLY", "EXTERNAL_READ_ONLY_INPUT"].includes(config.mode) ||
       config.enabled !== true || typeof config.runId !== "string" || !SAFE_ID.test(config.runId) ||
       !integerTime(config.startedAt) || !exactKeys(config.budgets, BUDGET_KEYS)) {
     throw new TypeError("invalid bounded composition configuration");
@@ -78,7 +83,8 @@ function validateConfig(config) {
       throw new RangeError(`budget ${key} is outside its supported bound`);
     }
   }
-  if (config.budgets.callbackTimeoutMs > config.budgets.durationMs ||
+  if (config.budgets.candidates > 100 || config.budgets.cycles > 256 ||
+      config.budgets.callbackTimeoutMs > config.budgets.durationMs ||
       config.budgets.candidates > config.budgets.cycles) {
     throw new RangeError("callback, candidate, and cycle budgets are inconsistent");
   }
@@ -246,11 +252,34 @@ function publicError(error) {
   return {status: "UNKNOWN", code, reason: code};
 }
 
+function reportEnvelope(config, {
+  status,
+  persistence,
+  entries = [],
+  exits = [],
+  openUnvaluedPositions = [],
+  unresolved = []
+}) {
+  return {
+    schemaVersion: REPORT_SCHEMA_VERSION,
+    producerRevision: REPORT_PRODUCER_REVISION,
+    configDigest: createHash("sha256").update(canonicalCheckpointBytes(config)).digest("hex"),
+    runId: config.runId,
+    status,
+    mode: config.mode,
+    executionMode: config.mode === "SYNTHETIC_TEST_ONLY" ? "SIMULATED_ONLY" : "READ_ONLY_EXTERNAL",
+    persistence,
+    outcomes: {entries, exits, openUnvaluedPositions, unresolved}
+  };
+}
+
 export function createPaperPilotComposition(options = {}) {
-  if (!onlyDataKeys(options, ["config", "dataDirectory", "adapters", "clock", "signal"])) {
+  if (!onlyDataKeys(options, [
+        "config", "dataDirectory", "adapters", "clock", "signal", "externalReadOnlyInput"
+      ])) {
     throw new TypeError("composition factory options must be bounded data");
   }
-  let {config, dataDirectory, adapters, clock, signal} = options;
+  let {config, dataDirectory, adapters, clock, signal, externalReadOnlyInput} = options;
   if (config === undefined || config === null) {
     return Object.freeze({start: async () => DISABLED, stop: () => false, status: () => DISABLED});
   }
@@ -261,6 +290,84 @@ export function createPaperPilotComposition(options = {}) {
     start: async () => DISABLED, stop: () => false, status: () => DISABLED
   });
   config = validateConfig(config);
+  if (signal !== undefined && Object.getPrototypeOf(signal) !== AbortSignal.prototype) {
+    throw new TypeError("signal must be a native AbortSignal");
+  }
+  if (config.mode === "EXTERNAL_READ_ONLY_INPUT") {
+    if (externalReadOnlyInput === undefined || dataDirectory !== undefined ||
+        adapters !== undefined || clock !== undefined) {
+      throw new TypeError("external read-only input requires its typed packet and no execution sources");
+    }
+    const boundedInput = createBoundedExternalReadOnlyInput(externalReadOnlyInput);
+    const externalRunner = createPaperExecutionRunner({
+      externalReadOnlyInput: boundedInput,
+      externalInputByteLimit: config.budgets.bytes
+    });
+    let state = "CREATED";
+    let runPromise;
+    let stopRequested = false;
+    return Object.freeze({
+      start() {
+        if (!runPromise) {
+          state = "RUNNING";
+          runPromise = Promise.resolve().then(async () => {
+            if (signal?.aborted || stopRequested) {
+              state = "STOPPED";
+              return {
+                status: "STOPPED",
+                state,
+                code: "STOPPED",
+                executionStarted: false,
+                terminalReceipt: null,
+                report: reportEnvelope(config, {
+                  status: state,
+                  persistence: {certainty: "NOT_STARTED", checkpointRef: null, terminalReceiptRef: null},
+                  unresolved: ["external input was not processed after cancellation"]
+                })
+              };
+            }
+            const result = await externalRunner.run();
+            state = result.status;
+            return {
+              ...result,
+              state,
+              mode: config.mode,
+              report: reportEnvelope(config, {
+                status: state,
+                persistence: {certainty: "NOT_STARTED", checkpointRef: null, terminalReceiptRef: null},
+                unresolved: result.unresolved
+              }),
+              authority: {providerExecution: false, signing: false, orders: false, wallet: false, liveReady: false}
+            };
+          }).catch(error => {
+            state = "UNKNOWN";
+            return {
+              ...publicError(error),
+              status: state,
+              state,
+              executionStarted: false,
+              terminalReceipt: null,
+              report: reportEnvelope(config, {
+                status: state,
+                persistence: {certainty: "NOT_STARTED", checkpointRef: null, terminalReceiptRef: null},
+                unresolved: ["external input failed bounded validation"]
+              })
+            };
+          });
+        }
+        return runPromise;
+      },
+      stop() {
+        if (state !== "RUNNING") return false;
+        stopRequested = true;
+        return true;
+      },
+      status: () => Object.freeze({state, terminalReceipt: null})
+    });
+  }
+  if (externalReadOnlyInput !== undefined) {
+    throw new TypeError("external read-only input requires EXTERNAL_READ_ONLY_INPUT mode");
+  }
   if (!clock && adapters) clock = offlineFixtureAdaptersBySource.get(adapters)?.clock;
   if (!clock) clock = createSyntheticClock();
   if (!adapters) adapters = offlineFixtureAdapters({clock});
@@ -274,9 +381,6 @@ export function createPaperPilotComposition(options = {}) {
     throw new TypeError("only module-generated offline fixture adapters may run");
   }
   const {fault} = offlineFixtureAdaptersBySource.get(adapters);
-  if (signal !== undefined && Object.getPrototypeOf(signal) !== AbortSignal.prototype) {
-    throw new TypeError("signal must be a native AbortSignal");
-  }
   const clockAttestation = clockAttestationFor(clock);
 
   const abort = new AbortController();
@@ -312,9 +416,6 @@ export function createPaperPilotComposition(options = {}) {
           config.budgets.maxWallClockUncertaintyMs - clockAttestation.uncertaintyMs) {
         throw Object.assign(new Error("wall clock diverged from monotonic elapsed time"), {code: "CLOCK_JUMP"});
       }
-      if (mono - anchor.mono > config.budgets.durationMs || wall > deadlineAt) {
-        throw Object.assign(new Error("composition time budget or eight-hour window ended"), {code: "DEADLINE"});
-      }
     }
     return {wall, mono, elapsedMs: anchor ? mono - anchor.mono : 0};
   }
@@ -347,6 +448,7 @@ export function createPaperPilotComposition(options = {}) {
     const before = readTime();
     const remainingMs = Math.min(config.budgets.durationMs - before.elapsedMs, deadlineAt - before.wall);
     if (remainingMs <= 0) throw Object.assign(new Error("composition deadline reached"), {code: "DEADLINE"});
+    accountRequest({bytes: 0, events: 0});
     let timer;
     let timedOut = false;
     let timeoutCode = "CALLBACK_TIMEOUT";
@@ -395,43 +497,10 @@ export function createPaperPilotComposition(options = {}) {
     }
     if (abort.signal.aborted) throw Object.assign(new Error("late adapter result ignored after cancellation"), {code: "STOPPED"});
     const after = readTime();
-    const bounded = boundedData(result, config.budgets.bytes);
-    if (counters.bytes + bounded.bytes > config.budgets.bytes) {
-      throw Object.assign(new Error("global byte budget exhausted"), {code: "BYTE_BUDGET"});
-    }
+    const bounded = boundedData(result, config.budgets.bytes - counters.bytes);
     counters.bytes += bounded.bytes;
     chargeEvent();
     return {result: bounded.value, receiptAt: after.wall, elapsedMs: after.elapsedMs};
-  }
-
-  async function runStep(method, input) {
-    const ledgerReserve = 2 * PAPER_LEDGER_POLICY.maxOpenPositions + 3;
-    const methodReserve = method === "finishRun" ? 1
-      : method === "observeExitQuote" ? 3 : ledgerReserve;
-    if (counters.events + 1 + methodReserve > config.budgets.events) {
-      throw Object.assign(new Error("global event budget cannot admit another ledger step"), {code: "EVENT_BUDGET"});
-    }
-    chargeEvent();
-    if (!Object.hasOwn(input, "now")) input.now = readTime().wall;
-    const result = await step[method](input);
-    const ledgerEvents = session.snapshot().summary.eventCount;
-    const delta = ledgerEvents - ledgerEventsCounted;
-    if (delta < 0 || counters.events + delta > config.budgets.events) {
-      throw Object.assign(new Error("global event budget exhausted by ledger events"), {code: "EVENT_BUDGET"});
-    }
-    counters.events += delta;
-    ledgerEventsCounted = ledgerEvents;
-    return result;
-  }
-
-  async function finish() {
-    if (!step || terminalReceipt || abort.signal.aborted) return null;
-    const result = await runStep("finishRun", {
-      eventId: `${config.runId}:finish`,
-      marks: []
-    });
-    if (result?.receipt) terminalReceipt = result.receipt;
-    return {result, receipt: terminalReceipt};
   }
 
   async function execute() {
@@ -439,16 +508,48 @@ export function createPaperPilotComposition(options = {}) {
     deadlineAt = config.startedAt + EIGHT_HOURS_MS;
     if (abort.signal.aborted) {
       state = "STOPPED";
-      return {status: "STOPPED", code: "STOPPED", terminalReceipt: null};
+      return {
+        status: state,
+        state,
+        code: "STOPPED",
+        executionStarted: false,
+        terminalReceipt: null,
+        report: reportEnvelope(config, {
+          status: state,
+          persistence: {certainty: "NOT_STARTED", checkpointRef: null, terminalReceiptRef: null}
+        })
+      };
     }
     const initial = readTime();
     if (initial.wall < config.startedAt) {
       state = "BLOCKED";
-      return {status: "BLOCKED", code: "RUN_WINDOW_NOT_STARTED", terminalReceipt: null};
+      return {
+        status: state,
+        state,
+        code: "RUN_WINDOW_NOT_STARTED",
+        executionStarted: false,
+        terminalReceipt: null,
+        report: reportEnvelope(config, {
+          status: state,
+          persistence: {certainty: "NOT_STARTED", checkpointRef: null, terminalReceiptRef: null},
+          unresolved: ["run window has not started"]
+        })
+      };
     }
     if (initial.wall > deadlineAt) {
       state = "BLOCKED";
-      return {status: "BLOCKED", code: "RUN_WINDOW_EXPIRED", terminalReceipt: null};
+      return {
+        status: state,
+        state,
+        code: "RUN_WINDOW_EXPIRED",
+        executionStarted: false,
+        terminalReceipt: null,
+        report: reportEnvelope(config, {
+          status: state,
+          persistence: {certainty: "NOT_STARTED", checkpointRef: null, terminalReceiptRef: null},
+          unresolved: ["fixed eight-hour run window has expired"]
+        })
+      };
     }
     state = "RUNNING";
     const storeOptions = fault === "LOST_ACK" ? {
@@ -476,10 +577,21 @@ export function createPaperPilotComposition(options = {}) {
       await store.close();
       store = null;
       state = "BLOCKED";
-      return {status: "BLOCKED", code: "RESTART_NOT_ALLOWED", terminalReceipt: null};
+      return {
+        status: state,
+        state,
+        code: "RESTART_NOT_ALLOWED",
+        executionStarted: false,
+        terminalReceipt: null,
+        report: reportEnvelope(config, {
+          status: state,
+          persistence: {certainty: "NOT_STARTED", checkpointRef: null, terminalReceiptRef: null},
+          unresolved: ["implicit checkpoint replay and restart are prohibited"]
+        })
+      };
     }
     session = await PaperCheckpointSession.open({store, runId: config.runId, startedAt: config.startedAt});
-    step = createPaperExecutionStep({
+    const executionStep = createPaperExecutionStep({
       session, store, runId: config.runId, startedAt: config.startedAt, endAt: deadlineAt,
       limits: {
         maxEvents: Math.min(256, config.budgets.events),
@@ -488,198 +600,297 @@ export function createPaperPilotComposition(options = {}) {
       }
     });
     counters.events = 1;
-    let pendingAuthorization = false;
-    const acquisition = await invokeAdapter("acquireCandidates", {});
-    if (!Array.isArray(acquisition.result) ||
-        acquisition.result.length > config.budgets.candidates ||
-        acquisition.result.length > config.budgets.cycles) {
-      throw Object.assign(new Error("candidate stream is invalid or exceeds its bound"), {code: "CANDIDATE_BOUND"});
-    }
-    counters.candidates = acquisition.result.length;
-    chargeEvent(acquisition.result.length);
-    for (const candidate of acquisition.result) {
-      if (!integerTime(candidate?.sampledAt) ||
-          candidate.sampledAt > acquisition.receiptAt + clockAttestation.uncertaintyMs) {
-        throw Object.assign(new Error("candidate source time is later than its receipt"), {
-          code: "SOURCE_AFTER_RECEIPT"
-        });
-      }
-    }
-    const selected = scout(acquisition.result, {
-      now: acquisition.receiptAt,
-      maxCandidates: config.budgets.candidates,
-      source: SYNTHETIC_SOURCE
-    }).selected;
-    let lastStatus = "NO_CANDIDATES";
+    const operationInputs = [];
+    const quoteReceipts = new Map();
+    let adapterFailureCode = null;
+    let strategyOverride = null;
+    let candidates = [];
+    let candidateIndex = 0;
+    let candidateBatchLoaded = false;
+    let sourceReceiptAt = null;
 
-    for (const candidate of selected.slice(0, config.budgets.cycles)) {
-      counters.cycles += 1;
-      if (abort.signal.aborted) throw Object.assign(new Error("composition stopped"), {code: "STOPPED"});
-      if (candidate.source !== SYNTHETIC_SOURCE) {
-        throw Object.assign(new Error("real or caller-labeled evidence is not admitted by offline composition"), {
-          code: "SOURCE_PROVENANCE"
+    const candidateSource = {
+      async poll() {
+        if (abort.signal.aborted) return {done: true};
+        if (!candidateBatchLoaded) {
+          candidateBatchLoaded = true;
+          let acquisition;
+          try {
+            acquisition = await invokeAdapter("acquireCandidates", {});
+          } catch (error) {
+            adapterFailureCode = error?.code ?? "CANDIDATE_SOURCE_UNAVAILABLE";
+            strategyOverride = adapterFailureCode;
+            return {done: true};
+          }
+          if (!Array.isArray(acquisition.result) ||
+              acquisition.result.length > config.budgets.candidates ||
+              acquisition.result.length > config.budgets.cycles) {
+            adapterFailureCode = "CANDIDATE_BOUND";
+            strategyOverride = adapterFailureCode;
+            return {done: true};
+          }
+          counters.candidates = acquisition.result.length;
+          sourceReceiptAt = acquisition.receiptAt;
+          for (const candidate of acquisition.result) {
+            if (!integerTime(candidate?.sampledAt) ||
+                candidate.sampledAt > sourceReceiptAt + clockAttestation.uncertaintyMs) {
+              adapterFailureCode = "SOURCE_AFTER_RECEIPT";
+              strategyOverride = adapterFailureCode;
+              return {done: true};
+            }
+          }
+          chargeEvent(acquisition.result.length);
+          candidates = scout(acquisition.result, {
+            now: sourceReceiptAt,
+            maxCandidates: config.budgets.candidates,
+            source: SYNTHETIC_SOURCE
+          }).selected.slice(0, config.budgets.cycles);
+        }
+        if (candidateIndex >= candidates.length) return {done: true};
+        const candidate = candidates[candidateIndex++];
+        if (candidate.source !== SYNTHETIC_SOURCE) {
+          adapterFailureCode = "SOURCE_PROVENANCE";
+          strategyOverride = adapterFailureCode;
+          return {done: true};
+        }
+        counters.cycles += 1;
+        provenance.candidates.push({
+          source: candidate.source,
+          sourceTimestamp: candidate.sampledAt,
+          receiptTimestamp: sourceReceiptAt,
+          identity: {chainId: candidate.chainId, mint: candidate.mint, pool: candidate.pool, quote: candidate.quote},
+          units: {tokenQuantity: "base units", decimals: candidate.decimals, marketValues: "USD"},
+          evidence: Object.entries({...candidate.evidence, ...candidate.analystEvidence}).map(([name, item]) => ({
+            name,
+            digest: createHash("sha256").update(canonicalCheckpointBytes(item)).digest("hex"),
+            source: item?.source ?? null,
+            sourceTimestamp: item?.observedAt ?? null,
+            slot: item?.slot ?? null,
+            binding: item?.binding ?? null,
+            coverageComplete: item?.coverage?.complete === true
+          }))
         });
+        return {candidate};
       }
-      provenance.candidates.push({
-        source: candidate.source,
-        sourceTimestamp: candidate.sampledAt,
-        receiptTimestamp: acquisition.receiptAt,
-        identity: {chainId: candidate.chainId, mint: candidate.mint, pool: candidate.pool, quote: candidate.quote},
-        units: {tokenQuantity: "base units", decimals: candidate.decimals, marketValues: "USD"},
-        evidence: Object.entries({...candidate.evidence, ...candidate.analystEvidence}).map(([name, item]) => ({
-          name,
-          digest: createHash("sha256").update(canonicalCheckpointBytes(item)).digest("hex"),
-          source: item?.source ?? null,
-          sourceTimestamp: item?.observedAt ?? null,
-          slot: item?.slot ?? null,
-          binding: item?.binding ?? null,
-          coverageComplete: item?.coverage?.complete === true
-        }))
-      });
-      const authorization = await runStep("authorizeEntry", {
-        eventId: `${config.runId}:authorize:${counters.cycles}`,
-        tickId: `${config.runId}:tick:${counters.cycles}`,
-        candidate,
-        smartWalletAllowlist: SYNTHETIC_SMART_WALLET_ALLOWLIST,
-        marks: []
-      });
-      lastStatus = authorization.status;
-      if (authorization.status !== "AUTHORIZED") continue;
-      pendingAuthorization = true;
+    };
 
-      const entry = await invokeAdapter("entryQuote", {candidate, authorization});
-      const quote = entry.result;
+    const quoteSource = async request => {
+      const {purpose, candidate} = request;
+      const adapterPurpose = purpose === "ENTRY" ? "entry"
+        : purpose === "RISK_EXIT" ? "risk-exit" : "risk-mark";
+      let envelope;
+      try {
+        envelope = await invokeAdapter(
+          purpose === "ENTRY" ? "entryQuote" : "exitQuote",
+          {candidate, purpose: adapterPurpose, previousQuote: request.previousQuote}
+        );
+      } catch (error) {
+        adapterFailureCode = error?.code ?? "QUOTE_SOURCE_UNAVAILABLE";
+        strategyOverride = adapterFailureCode;
+        return null;
+      }
+      const quote = envelope.result;
       if (quote === null) {
-        lastStatus = "QUOTE_UNAVAILABLE";
-        break;
+        if (purpose !== "ENTRY") strategyOverride = "VALUATION_UNAVAILABLE";
+        else strategyOverride = "QUOTE_UNAVAILABLE";
+        return null;
       }
       if (!quote || quote.source !== SYNTHETIC_SOURCE) {
-        throw Object.assign(new Error("quote source provenance is not the synthetic fixture source"), {
-          code: "QUOTE_PROVENANCE"
-        });
+        adapterFailureCode = "QUOTE_PROVENANCE";
+        strategyOverride = adapterFailureCode;
+        return quote;
       }
       if (!integerTime(quote.observedAt) ||
-          quote.observedAt > entry.receiptAt + clockAttestation.uncertaintyMs) {
-        throw Object.assign(new Error("entry quote observation is later than its receipt"), {
-          code: "QUOTE_AFTER_RECEIPT"
-        });
+          quote.observedAt > envelope.receiptAt + clockAttestation.uncertaintyMs) {
+        adapterFailureCode = "QUOTE_AFTER_RECEIPT";
+        strategyOverride = adapterFailureCode;
+        return quote;
       }
+      const purposeLabel = purpose === "ENTRY" ? "entry" : adapterPurpose;
+      quoteReceipts.set(`${purpose}:${quote.mint}:${quote.observedAt}`, envelope.receiptAt);
       provenance.quotes.push({
-        purpose: "entry",
+        purpose: purposeLabel,
         source: quote.source,
         sourceTimestamp: quote.observedAt,
-        receiptTimestamp: entry.receiptAt,
+        receiptTimestamp: envelope.receiptAt,
         identity: {chainId: quote.chainId, mint: quote.mint, pool: quote.pool, quote: quote.quote},
         units: {price: "priceMicros", costs: "integer cents", quantity: "token base units"}
       });
-      const entryInput = {
-        eventId: quote.eventId,
-        authorizationId: authorization.authorizationId,
-        quote,
-        marks: []
-      };
-      const fill = await runStep("executeEntry", entryInput);
-      lastStatus = fill.status;
-      if (fill.status !== "FILLED_PAPER") break;
-      pendingAuthorization = false;
+      if (purpose === "ENTRY" &&
+          !["feeCents", "spreadCents", "slippageCents", "priceImpactCents", "networkCents"]
+            .every(key => Object.hasOwn(quote.costs ?? {}, key))) {
+        strategyOverride = "REJECT";
+      }
+      return quote;
+    };
+
+    const stepMethods = ["authorizeEntry", "executeEntry", "observeExitQuote", "riskSnapshot", "finishRun"];
+    const boundedStep = Object.freeze(Object.fromEntries(stepMethods.map(method => [method, async input => {
+      const ledgerReserve = 2 * PAPER_LEDGER_POLICY.maxOpenPositions + 3;
+      const methodReserve = method === "finishRun" ? 1
+        : method === "observeExitQuote" ? 3 : ledgerReserve;
+      if (counters.events + 1 + methodReserve > config.budgets.events) {
+        throw Object.assign(new Error("global event budget cannot admit another ledger step"), {
+          code: "EVENT_BUDGET"
+        });
+      }
       chargeEvent();
-      const replay = await step.executeEntry(entryInput);
-      if (replay.status !== fill.status || replay.receipt?.hash !== fill.receipt?.hash) {
-        throw Object.assign(new Error("duplicate command did not return its original receipt"), {
-          code: "DUPLICATE_EVENT_MISMATCH"
-        });
+      const stepInput = Object.hasOwn(input, "now") ? input : {...input, now: readTime().wall};
+      const result = await executionStep[method](stepInput);
+      if (result?.status === "REJECT" && /byte|input capacity/i.test(result.reason ?? "")) {
+        adapterFailureCode ??= "BYTE_BUDGET";
+        strategyOverride ??= "BYTE_BUDGET";
       }
+      const ledgerEvents = session.snapshot().summary.eventCount;
+      const delta = ledgerEvents - ledgerEventsCounted;
+      if (delta < 0 || counters.events + delta > config.budgets.events) {
+        throw Object.assign(new Error("global event budget exhausted by ledger events"), {code: "EVENT_BUDGET"});
+      }
+      counters.events += delta;
+      ledgerEventsCounted = ledgerEvents;
+      operationInputs.push({
+        method,
+        status: result?.status ?? "INVALID_RESULT",
+        input: structuredClone(stepInput),
+        result: structuredClone(result),
+        receipt: result?.receipt ? {...result.receipt} : null
+      });
+      return result;
+    }])));
 
-      const markEnvelope = await invokeAdapter("exitQuote", {
-        candidate, purpose: "risk-mark", previousQuote: quote
-      });
-      const mark = markEnvelope.result;
-      if (mark === null) {
-        lastStatus = "VALUATION_UNAVAILABLE";
-        break;
+    const runEndAt = Math.min(deadlineAt, initial.wall + config.budgets.durationMs);
+    const runner = createPaperExecutionRunner({
+      executionStep: boundedStep,
+      session,
+      runId: config.runId,
+      startedAt: config.startedAt,
+      endAt: runEndAt,
+      executionMode: "SIMULATED_ONLY",
+      provenance: SYNTHETIC_SOURCE,
+      candidateSource,
+      quoteSource,
+      clock: () => readTime().wall,
+      stopSource: () => abort.signal.aborted,
+      smartWalletAllowlist: SYNTHETIC_SMART_WALLET_ALLOWLIST,
+      limits: {
+        maxTicks: Math.min(256, config.budgets.cycles),
+        maxCandidates: Math.min(100, config.budgets.candidates),
+        maxQuotes: Math.min(1_024, config.budgets.requests),
+        maxOperations: Math.min(10_000, Math.max(2, config.budgets.events)),
+        maxInputBytes: Math.min(8 * 1024 * 1024, config.budgets.bytes)
       }
-      if (!mark || mark.source !== SYNTHETIC_SOURCE) {
-        throw Object.assign(new Error("risk mark source provenance is not synthetic"), {code: "QUOTE_PROVENANCE"});
-      }
-      if (!integerTime(mark.observedAt) ||
-          mark.observedAt > markEnvelope.receiptAt + clockAttestation.uncertaintyMs) {
-        throw Object.assign(new Error("risk-mark observation is later than its receipt"), {
-          code: "QUOTE_AFTER_RECEIPT"
-        });
-      }
-      provenance.quotes.push({
-        purpose: "risk-mark", source: mark.source, sourceTimestamp: mark.observedAt,
-        receiptTimestamp: markEnvelope.receiptAt,
-        identity: {chainId: mark.chainId, mint: mark.mint, pool: mark.pool, quote: mark.quote},
-        units: {price: "priceMicros", costs: "integer cents"}
-      });
-      const risk = await runStep("riskSnapshot", {
-        eventId: `${config.runId}:risk:mark`,
-        marks: [mark]
-      });
-      lastStatus = risk.status;
-
-      const exitEnvelope = await invokeAdapter("exitQuote", {
-        candidate, purpose: "exit", previousQuote: mark
-      });
-      const exitQuote = exitEnvelope.result;
-      if (exitQuote === null) {
-        lastStatus = "VALUATION_UNAVAILABLE";
-        break;
-      }
-      if (!exitQuote || exitQuote.source !== SYNTHETIC_SOURCE) {
-        throw Object.assign(new Error("exit quote source provenance is not synthetic"), {code: "QUOTE_PROVENANCE"});
-      }
-      if (!integerTime(exitQuote.observedAt) ||
-          exitQuote.observedAt > exitEnvelope.receiptAt + clockAttestation.uncertaintyMs) {
-        throw Object.assign(new Error("exit quote observation is later than its receipt"), {
-          code: "QUOTE_AFTER_RECEIPT"
-        });
-      }
-      provenance.quotes.push({
-        purpose: "exit", source: exitQuote.source, sourceTimestamp: exitQuote.observedAt,
-        receiptTimestamp: exitEnvelope.receiptAt,
-        identity: {chainId: exitQuote.chainId, mint: exitQuote.mint, pool: exitQuote.pool, quote: exitQuote.quote},
-        units: {price: "priceMicros", costs: "integer cents"}
-      });
-      const exit = await runStep("observeExitQuote", {
-        eventId: exitQuote.eventId, quote: exitQuote
-      });
-      lastStatus = exit.status;
-      await runStep("riskSnapshot", {
-        eventId: `${config.runId}:risk:post-exit`,
-        marks: []
-      });
-      break;
+    });
+    const runnerResult = await runner.run();
+    terminalReceipt = runnerResult.terminalReceipt;
+    const summary = runnerResult.summary;
+    const terminalResult = runnerResult.terminalResult;
+    let checkpointMetadata = null;
+    try {
+      checkpointMetadata = {...session.metadata};
+    } catch {
+      checkpointMetadata = null;
     }
 
-    const terminal = await finish();
-    const snapshot = session.snapshot();
-    state = terminal?.receipt ? "FINISHED" : "UNKNOWN";
+    const entries = operationInputs.filter(item =>
+      item.method === "executeEntry" && item.status === "FILLED_PAPER").map(item => {
+      const quote = item.input.quote;
+      return {
+        status: item.status,
+        identity: {chainId: quote.chainId, mint: quote.mint, pool: quote.pool, quote: quote.quote},
+        quantityBaseUnits: item.result?.tokenAtoms ?? null,
+        priceMicros: quote.priceMicros,
+        costsCents: quote.costs,
+        costBasis: "HYPOTHETICAL_FIXTURE_ONLY",
+        source: quote.source,
+        sourceTimestamp: quote.observedAt,
+        receiptTimestamp: quoteReceipts.get(`ENTRY:${quote.mint}:${quote.observedAt}`) ?? null,
+        checkpointSequence: item.receipt?.sequence ?? null
+      };
+    });
+    const entryQuantities = new Map(entries.map(item => [item.identity.mint, item.quantityBaseUnits]));
+    const exits = operationInputs.filter(item =>
+      item.method === "observeExitQuote" && item.status === "CLOSED_PAPER").map(item => {
+      const quote = item.input.quote;
+      return {
+        status: item.status,
+        identity: {chainId: quote.chainId, mint: quote.mint, pool: quote.pool, quote: quote.quote},
+        quantityBaseUnits: entryQuantities.get(quote.mint) ?? null,
+        priceMicros: item.result?.fillPriceMicros ?? quote.priceMicros,
+        costsCents: quote.costs,
+        costBasis: "HYPOTHETICAL_FIXTURE_ONLY",
+        source: quote.source,
+        sourceTimestamp: quote.observedAt,
+        receiptTimestamp: quoteReceipts.get(`EXIT:${quote.mint}:${quote.observedAt}`) ??
+          quoteReceipts.get(`RISK_EXIT:${quote.mint}:${quote.observedAt}`) ?? null,
+        checkpointSequence: item.receipt?.sequence ?? null
+      };
+    });
+    const openPositions = terminalResult?.openPositions ?? summary?.openPositions ?? [];
+    const openUnvaluedPositions = openPositions.filter(position =>
+      position.markStatus === "VALUATION_UNAVAILABLE" || position.markStatus === undefined).map(position => ({
+      mint: position.mint,
+      quantityBaseUnits: position.tokenAtoms ?? null,
+      markStatus: position.markStatus ?? "VALUATION_UNAVAILABLE",
+      equityCents: terminalResult?.equityCents ?? null
+    }));
+    let lifecycleStatus = runnerResult.status;
+    if (adapterFailureCode && adapterFailureCode !== "STOPPED") lifecycleStatus = "UNKNOWN";
+    else if (runnerResult.reason === "SHUTDOWN" || abort.signal.aborted) lifecycleStatus = "STOPPED";
+    state = lifecycleStatus;
+    const persistenceCertainty = terminalReceipt
+      ? "ACKNOWLEDGED"
+      : checkpointMetadata
+        ? runnerResult.status === "UNKNOWN" ? "UNKNOWN" : "NO_TERMINAL_RECEIPT"
+        : "UNKNOWN";
+    const terminalReceiptRef = terminalReceipt ? {
+      runId: terminalReceipt.runId,
+      sequence: terminalReceipt.sequence,
+      hash: terminalReceipt.hash,
+      resultDigest: terminalReceipt.resultDigest,
+      commandId: terminalResult?.commandId ?? null
+    } : null;
+    const unresolved = [];
+    if (adapterFailureCode && adapterFailureCode !== "STOPPED") unresolved.push(adapterFailureCode);
+    if (runnerResult.reason && runnerResult.reason !== "SOURCES_EXHAUSTED") unresolved.push(runnerResult.reason);
+    if (runnerResult.pendingAuthorizationIds?.length) {
+      unresolved.push("authorized reservation remains pending without a fill");
+    }
+    if (openUnvaluedPositions.length) unresolved.push("open positions remain unvalued at terminal finalization");
+    const strategyOutcome = strategyOverride ??
+      (runnerResult.reason && runnerResult.reason !== "SOURCES_EXHAUSTED" ? runnerResult.reason
+        : counters.candidates === 0 || candidates.length === 0 ? "NO_CANDIDATES"
+          : exits.length && openPositions.length === 0 ? "CLOSED_PAPER"
+            : operationInputs.find(item => item.method === "authorizeEntry")?.status ?? runnerResult.reason);
     return {
-      status: state,
+      status: lifecycleStatus,
+      state: lifecycleStatus,
+      ...(adapterFailureCode
+        ? {code: adapterFailureCode}
+        : runnerResult.reason && runnerResult.reason !== "SOURCES_EXHAUSTED"
+          ? {code: runnerResult.reason}
+          : {}),
       mode: "SYNTHETIC_TEST_ONLY",
       executionStarted: true,
-      strategyOutcome: lastStatus,
+      strategyOutcome,
       terminalState: {
-        status: terminal?.result?.status ?? "OPEN",
-        openPositions: terminal?.result?.openPositions ?? [],
-        equityCents: terminal?.result?.equityCents ?? null,
-        reservedPositions: pendingAuthorization ? 1 : 0,
-        note: terminal?.result?.note ?? "No terminal liquidation or valuation is inferred."
+        status: terminalResult?.status ?? "OPEN",
+        openPositions,
+        equityCents: terminalResult?.equityCents ?? null,
+        reservedPositions: runnerResult.pendingAuthorizationIds?.length ?? summary?.reservedPositions ?? 0,
+        note: terminalResult?.note ?? "No terminal liquidation or valuation is inferred."
       },
       terminalReceipt,
-      checkpoint: {...session.metadata},
-      accounting: {
-        cashCents: snapshot.summary.cashCents,
-        openPositions: snapshot.summary.openPositions,
-        realizedGrossCents: snapshot.summary.pnl.realizedGrossCents,
-        realizedNetCents: snapshot.summary.pnl.realizedNetCents,
-        unrealizedGrossCents: snapshot.summary.pnl.unrealizedGrossCents,
-        unrealizedNetCents: snapshot.summary.pnl.unrealizedNetCents,
+      checkpoint: checkpointMetadata,
+      accounting: summary ? {
+        cashCents: summary.cashCents,
+        openPositions: summary.openPositions,
+        realizedGrossCents: summary.pnl.realizedGrossCents,
+        realizedNetCents: summary.pnl.realizedNetCents,
+        unrealizedGrossCents: summary.pnl.unrealizedGrossCents,
+        unrealizedNetCents: summary.pnl.unrealizedNetCents,
         executionRealistic: false
-      },
-      budgets: counters,
+      } : null,
+      budgets: {...counters, operations: runnerResult.counters?.operations ?? 0},
       timing: {
         clockSource: clockAttestation.source,
         clockUncertaintyMs: clockAttestation.uncertaintyMs,
@@ -688,7 +899,21 @@ export function createPaperPilotComposition(options = {}) {
         endAt: deadlineAt
       },
       provenance,
-      authority: {providerExecution: false, signing: false, orders: false, wallet: false, liveReady: false}
+      authority: {providerExecution: false, signing: false, orders: false, wallet: false, liveReady: false},
+      report: reportEnvelope(config, {
+        status: lifecycleStatus,
+        persistence: {
+          certainty: persistenceCertainty,
+          checkpointRef: checkpointMetadata
+            ? {runId: checkpointMetadata.runId, sequence: checkpointMetadata.sequence, hash: checkpointMetadata.hash}
+            : null,
+          terminalReceiptRef
+        },
+        entries,
+        exits,
+        openUnvaluedPositions,
+        unresolved
+      })
     };
   }
 
@@ -698,7 +923,41 @@ export function createPaperPilotComposition(options = {}) {
     state = "RUNNING";
     runPromise = execute().catch(error => {
       state = error?.code === "STOPPED" ? "STOPPED" : "UNKNOWN";
-      return {...publicError(error), state, executionStarted: Boolean(session), terminalReceipt};
+      let checkpointMetadata = null;
+      try {
+        checkpointMetadata = session ? {...session.metadata} : null;
+      } catch {
+        checkpointMetadata = null;
+      }
+      const terminalReceiptRef = terminalReceipt ? {
+        runId: terminalReceipt.runId,
+        sequence: terminalReceipt.sequence,
+        hash: terminalReceipt.hash,
+        resultDigest: terminalReceipt.resultDigest,
+        commandId: null
+      } : null;
+      const persistenceCertainty = terminalReceipt
+        ? "ACKNOWLEDGED"
+        : !session ? "NOT_STARTED" : checkpointMetadata ? "NO_TERMINAL_RECEIPT" : "UNKNOWN";
+      return {
+        ...publicError(error),
+        state,
+        mode: "SYNTHETIC_TEST_ONLY",
+        executionStarted: Boolean(session),
+        terminalReceipt,
+        checkpoint: checkpointMetadata,
+        report: reportEnvelope(config, {
+          status: state,
+          persistence: {
+            certainty: persistenceCertainty,
+            checkpointRef: checkpointMetadata
+              ? {runId: checkpointMetadata.runId, sequence: checkpointMetadata.sequence, hash: checkpointMetadata.hash}
+              : null,
+            terminalReceiptRef
+          },
+          unresolved: [error?.code ?? "COMPOSITION_FAILURE"]
+        })
+      };
     }).finally(async () => {
       if (session) await session.close().catch(() => {});
       else if (store) await store.close().catch(() => {});
@@ -721,6 +980,7 @@ export function createPaperPilotComposition(options = {}) {
 function fixtureQuote(candidate, eventId, observedAt, priceMicros) {
   return {
     eventId,
+    fixtureOnly: true,
     mint: candidate.mint,
     chainId: candidate.chainId,
     pool: candidate.pool,
@@ -747,21 +1007,32 @@ async function cli(argv) {
   };
   const configPath = value("--config");
   const dataDirectory = value("--data-dir");
-  if (!configPath || !dataDirectory || args.length !== 4 ||
+  if (!configPath || !dataDirectory || !path.isAbsolute(configPath) || !path.isAbsolute(dataDirectory) ||
+      args.length !== 4 ||
       args[0] !== "--config" || args[2] !== "--data-dir") {
     process.stdout.write(`${JSON.stringify({status: "BLOCKED", code: "INVALID_ARGUMENTS"})}\n`);
     return 1;
   }
   try {
-    const handle = await open(configPath, "r");
+    if (!Number.isInteger(constants.O_NOFOLLOW) || !Number.isInteger(constants.O_NONBLOCK)) {
+      throw new Error("safe configuration open flags are unavailable");
+    }
+    const handle = await open(configPath, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
     let bytes;
     try {
       const buffer = Buffer.alloc(65_537);
-      const {size} = await handle.stat();
-      if (size > 65_536) throw new RangeError("configuration exceeds its byte limit");
-      const {bytesRead} = await handle.read(buffer, 0, buffer.length, 0);
-      if (bytesRead > 65_536) throw new RangeError("configuration exceeds its byte limit");
-      bytes = buffer.subarray(0, bytesRead);
+      const metadata = await handle.stat();
+      if (!metadata.isFile() || metadata.size > 65_536) {
+        throw new RangeError("configuration must be a regular file within its byte limit");
+      }
+      let total = 0;
+      while (total < buffer.length) {
+        const {bytesRead} = await handle.read(buffer, total, buffer.length - total, null);
+        if (bytesRead === 0) break;
+        total += bytesRead;
+      }
+      if (total > 65_536) throw new RangeError("configuration exceeds its byte limit");
+      bytes = buffer.subarray(0, total);
     } finally {
       await handle.close();
     }

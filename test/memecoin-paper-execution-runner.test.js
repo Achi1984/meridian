@@ -7,7 +7,7 @@ import {canonicalCheckpointBytes, CheckpointStore} from "../scripts/memecoin-pap
 import {PaperCheckpointSession} from "../scripts/memecoin-paper/checkpoint-session.mjs";
 import {createPaperExecutionStep} from "../scripts/memecoin-paper/execution-step.mjs";
 import {
-  createPaperExecutionRunner,
+  createBoundedExternalReadOnlyInput, createPaperExecutionRunner,
   runOfflineDemo
 } from "../scripts/memecoin-paper/execution-runner.mjs";
 import {
@@ -962,4 +962,81 @@ test("runtime mode and fixture provenance are explicit fail-closed requirements"
     /explicit synthetic PAPER mode/);
   assert.throws(() => createPaperExecutionRunner({...config, provenance: "UNVERIFIED"}),
     /explicit synthetic PAPER mode/);
+});
+
+test("bounded external read-only input stays UNKNOWN until source contracts are accepted", async () => {
+  const externalInput = createBoundedExternalReadOnlyInput({
+    kind: "MEMECOIN_EXTERNAL_READ_ONLY_INPUT_V1",
+    schemaVersion: 1,
+    producerRevision: "candidate-intake-1",
+    sourceContracts: {
+      candidateIntakeSha: "a".repeat(40),
+      evidenceSha: null,
+      quotesSha: null
+    },
+    timing: {
+      sourceTimestamp: START,
+      receiptTimestamp: START + 1_000,
+      uncertaintyMs: 1,
+      monotonicElapsedMs: 1_000,
+      clockSource: "claimed-source-clock"
+    },
+    payload: {
+      candidate: {source: "SYNTHETIC_FIXTURE_ONLY", mint: "caller-claimed-mint"},
+      evidence: {complete: true},
+      quote: {costs: {feeCents: 0}}
+    }
+  });
+  let invoked = false;
+  const runner = createPaperExecutionRunner({
+    externalReadOnlyInput: externalInput,
+    externalInputByteLimit: 4_096,
+    candidateSource: {poll: () => { invoked = true; }},
+    quoteSource: () => { invoked = true; }
+  });
+
+  const report = await runner.run();
+  assert.equal(report.status, "UNKNOWN");
+  assert.equal(report.executionMode, "READ_ONLY_EXTERNAL");
+  assert.equal(report.provenance, "UNVERIFIED_CALLER_INPUT");
+  assert.equal(report.executionStarted, false);
+  assert.equal(report.terminalReceipt, null);
+  assert.equal(report.checkpoint, null);
+  assert.equal(report.unresolved.length, 4);
+  assert.match(report.externalInputDigest, /^[a-f0-9]{64}$/);
+  assert.equal(invoked, false);
+  assert.equal(await runner.run(), report);
+  assert.throws(() => createPaperExecutionRunner({
+    externalReadOnlyInput: externalInput,
+    externalInputByteLimit: 1
+  }), /exceeds the configured byte budget/);
+});
+
+test("external read-only input contract rejects malformed provenance and accessors", () => {
+  const value = {
+    kind: "MEMECOIN_EXTERNAL_READ_ONLY_INPUT_V1",
+    schemaVersion: 1,
+    producerRevision: "candidate-intake-1",
+    sourceContracts: {candidateIntakeSha: null, evidenceSha: null, quotesSha: null},
+    timing: {
+      sourceTimestamp: START + 1,
+      receiptTimestamp: START,
+      uncertaintyMs: 0,
+      monotonicElapsedMs: 0,
+      clockSource: "untrusted"
+    },
+    payload: {}
+  };
+  assert.throws(() => createBoundedExternalReadOnlyInput(value), /bounded v1 contract/);
+  let invoked = false;
+  const accessor = {...value};
+  Object.defineProperty(accessor.payload, "candidate", {
+    enumerable: true,
+    get() {
+      invoked = true;
+      return {};
+    }
+  });
+  assert.throws(() => createBoundedExternalReadOnlyInput(accessor), /accessor/);
+  assert.equal(invoked, false);
 });
