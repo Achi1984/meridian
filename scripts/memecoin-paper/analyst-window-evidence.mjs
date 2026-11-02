@@ -1,4 +1,7 @@
-import {decodeCpmmSuccessfulSwap} from "./cpmm-swap-observations.mjs";
+import {
+  decodeCpmmSuccessfulSwap,
+  isSolanaPublicKey
+} from "./cpmm-swap-observations.mjs";
 
 export const ANALYST_WINDOW_METRICS = Object.freeze([
   "momentum15m",
@@ -25,7 +28,6 @@ const MAX_CENSUS_ROWS = 250_000;
 const MAX_ALLOWLIST_ROWS = 100_000;
 const HASH = /^[a-f0-9]{64}$/i;
 const DECIMAL_INTEGER = /^(0|[1-9]\d{0,39})$/;
-const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 const UNCERTAIN_SWAP_REASONS = new Set([
   "CPMM_INSTRUCTION_UNDECODABLE",
   "ROUTED_INSTRUCTION_AMBIGUOUS",
@@ -42,7 +44,10 @@ const UNCERTAIN_SWAP_REASONS = new Set([
   "TOKEN_BALANCE_LAYOUT_INCOMPLETE",
   "USER_OR_VAULT_BALANCE_DELTA_MISMATCH",
   "USER_TOKEN_DECIMALS_MISMATCH",
+  "LP_SWAP_TRANSACTION_AMBIGUOUS",
   "TRANSACTION_RECEIPT_INVALID",
+  "TRANSACTION_SIGNATURE_MISMATCH",
+  "TRANSACTION_UNAVAILABLE",
   "TRANSACTION_LAYOUT_UNAVAILABLE",
   "POOL_PROOF_UNBOUND_OR_INCOMPLETE"
 ]);
@@ -56,6 +61,11 @@ function validTime(value) {
     Number.isFinite(new Date(value).getTime());
 }
 
+function timestampValue(value) {
+  const parsed = typeof value === "number" ? value : Date.parse(value);
+  return validTime(parsed) ? parsed : null;
+}
+
 function finitePositive(value) {
   return typeof value === "number" && Number.isFinite(value) && value > 0;
 }
@@ -67,7 +77,8 @@ function sourceLabel(...sources) {
 }
 
 function tokenUnits(rawAmount, decimals) {
-  if (!DECIMAL_INTEGER.test(rawAmount) || !Number.isInteger(decimals) ||
+  if (typeof rawAmount !== "string" || !DECIMAL_INTEGER.test(rawAmount) ||
+      !Number.isInteger(decimals) ||
       decimals < 0 || decimals > 18) return null;
   const scale = 10n ** BigInt(decimals);
   const amount = BigInt(rawAmount);
@@ -224,10 +235,12 @@ function ownerCount(snapshot, policy, endpoint, assembledAt, identity) {
       snapshot.aggregation !== policy.aggregation ||
       snapshot.denominatorPolicy !== policy.denominatorPolicy ||
       !equalStringArray(snapshot.exclusions, policy.exclusions) ||
+      typeof snapshot.denominatorAtoms !== "string" ||
       !DECIMAL_INTEGER.test(snapshot.denominatorAtoms ?? "") ||
       BigInt(snapshot.denominatorAtoms) <= 0n ||
       !Array.isArray(snapshot.owners) || snapshot.owners.length > MAX_CENSUS_ROWS ||
       !validTime(snapshot.receivedAt) || snapshot.receivedAt > assembledAt ||
+      snapshot.receivedAt !== snapshot.receipt?.receivedAt ||
       !validReceipt(snapshot.source, snapshot.receipt, assembledAt) ||
       (snapshot.slot === null
         ? snapshot.provenanceType !== "OFFCHAIN_TIMESTAMP_NO_SOLANA_SLOT"
@@ -235,7 +248,8 @@ function ownerCount(snapshot, policy, endpoint, assembledAt, identity) {
           snapshot.provenanceType !== "ONCHAIN_SLOT")) return null;
   const owners = new Set();
   for (const entry of snapshot.owners) {
-    if (!isRecord(entry) || !BASE58.test(entry.owner ?? "") ||
+    if (!isRecord(entry) || !isSolanaPublicKey(entry.owner) ||
+        typeof entry.balanceAtoms !== "string" ||
         !DECIMAL_INTEGER.test(entry.balanceAtoms ?? "")) return null;
     if (BigInt(entry.balanceAtoms) > 0n) owners.add(entry.owner);
   }
@@ -257,7 +271,8 @@ function candidatePairMatches(candidate, pair, identity) {
   const matchingEvidence = (item, value) => isRecord(item) &&
     item.verified === true && item.coverage?.complete === true &&
     item.value === value && item.source === pair.source &&
-    sameIdentity(item.binding, identity) && item.observedAt === pair.observedAt;
+    sameIdentity(item.binding, identity) &&
+    timestampValue(item.observedAt) === pair.observedAt;
   return candidate?.marketCapUsd === pair.marketCapUsd &&
     matchingEvidence(marketCap, pair.marketCapUsd) &&
     matchingEvidence(liquidity, pair.liquidityUsd);
@@ -268,6 +283,7 @@ function walletAllowlistReady(allowlist, policy, candidateT, assembledAt) {
     typeof allowlist.source === "string" && allowlist.source.trim().length > 0 &&
     typeof allowlist.version === "string" && allowlist.version.trim().length > 0 &&
     allowlist.qualificationPolicyVersion === policy.version &&
+    typeof allowlist.provenance === "string" && allowlist.provenance.trim().length > 0 &&
     validTime(allowlist.effectiveFromMs) && validTime(allowlist.effectiveUntilMs) &&
     allowlist.effectiveFromMs <= candidateT && candidateT <= allowlist.effectiveUntilMs &&
     allowlist.review?.status === "EXTERNALLY_REVIEWED" &&
@@ -282,7 +298,7 @@ function qualifiedWallets(allowlist, policy, candidateT, assembledAt) {
   if (!walletAllowlistReady(allowlist, policy, candidateT, assembledAt)) return null;
   const result = new Set();
   for (const entry of allowlist.entries) {
-    if (!isRecord(entry) || !BASE58.test(entry.address ?? "") ||
+    if (!isRecord(entry) || !isSolanaPublicKey(entry.address) ||
         entry.qualified !== true || entry.reviewed !== true ||
         entry.candidateMintExcluded !== true ||
         entry.qualificationPolicyVersion !== policy.version ||
@@ -335,13 +351,13 @@ export async function buildAnalystWindowEvidence({
   const windows = {};
   const policyValid = validPolicy(policy);
   const timeValid = validTime(candidateT) && validTime(assembledAt) &&
-    assembledAt <= candidateT && candidate?.sampledAt === candidateT &&
+    assembledAt <= candidateT && timestampValue(candidate?.sampledAt) === candidateT &&
     policyValid && policy.windowsMs.swaps1h <= candidateT &&
     policy.windowsMs.momentum15m <= candidateT &&
     policy.windowsMs.holders1h <= candidateT;
   const identityValid = identity.chainId === "solana" &&
-    BASE58.test(identity.mint ?? "") && BASE58.test(identity.pool ?? "") &&
-    BASE58.test(identity.quote ?? "") && identity.mint !== identity.quote &&
+    isSolanaPublicKey(identity.mint) && isSolanaPublicKey(identity.pool) &&
+    isSolanaPublicKey(identity.quote) && identity.mint !== identity.quote &&
     typeof candidate?.source === "string" && candidate.source.trim().length > 0;
   if (!policyValid || !timeValid || !identityValid) {
     const packet = {
@@ -728,7 +744,7 @@ export function adaptMarketEvidence(candidate, packet) {
   const identity = candidateIdentity(candidate);
   const validPacket = packet?.[PACKET_BRAND] === true &&
     sameIdentity(packet.binding, identity) &&
-    packet.candidateT === candidate?.sampledAt &&
+    packet.candidateT === timestampValue(candidate?.sampledAt) &&
     packet.executionAuthorized === false &&
     packet.authorizationEligible === false;
   return {

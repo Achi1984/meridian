@@ -61,7 +61,7 @@ function encodeBase58(bytes) {
   return "1".repeat(zeroes) + encoded;
 }
 
-function validPublicKey(value) {
+export function isSolanaPublicKey(value) {
   return decodeBase58(value)?.length === 32;
 }
 
@@ -96,7 +96,7 @@ function accountKeysFor(transaction) {
     }
     keys.push(...loaded.writable.map(accountKey), ...loaded.readonly.map(accountKey));
   }
-  return keys.every(validPublicKey) ? keys : null;
+  return keys.every(isSolanaPublicKey) ? keys : null;
 }
 
 function resolveIndex(value, keys) {
@@ -196,7 +196,8 @@ function tokenBalanceMap(rows, keys) {
   for (const row of rows) {
     if (!isRecord(row) || !Number.isSafeInteger(row.accountIndex) ||
         row.accountIndex < 0 || row.accountIndex >= keys.length ||
-        !validPublicKey(row.mint) || !validPublicKey(row.owner) ||
+        !isSolanaPublicKey(row.mint) || !isSolanaPublicKey(row.owner) ||
+        typeof row.uiTokenAmount?.amount !== "string" ||
         !TOKEN_AMOUNT.test(row.uiTokenAmount?.amount ?? "") ||
         !Number.isInteger(row.uiTokenAmount?.decimals) ||
         row.uiTokenAmount.decimals < 0 || row.uiTokenAmount.decimals > 18 ||
@@ -233,14 +234,19 @@ function validProof(poolProof, identity) {
   return isRecord(poolProof) && poolProof.status === "SOURCE_BOUND" &&
     poolProof.verified === true && poolProof.chainId === "solana" &&
     poolProof.pool === identity.pool && poolProof.baseMint === identity.mint &&
-    poolProof.quoteMint === identity.quote && validPublicKey(poolProof.baseVault) &&
-    validPublicKey(poolProof.quoteVault) && poolProof.baseVault !== poolProof.quoteVault &&
+    poolProof.quoteMint === identity.quote && isSolanaPublicKey(poolProof.baseVault) &&
+    isSolanaPublicKey(poolProof.quoteVault) && poolProof.baseVault !== poolProof.quoteVault &&
     Number.isInteger(poolProof.baseDecimals) && poolProof.baseDecimals >= 0 &&
     poolProof.baseDecimals <= 18 && Number.isInteger(poolProof.quoteDecimals) &&
     poolProof.quoteDecimals >= 0 && poolProof.quoteDecimals <= 18 &&
     Number.isSafeInteger(poolProof.slot) && poolProof.slot >= 0 &&
-    typeof poolProof.source === "string" && poolProof.source.length > 0 &&
-    typeof poolProof.receipt?.id === "string" && poolProof.receipt.id.length > 0 &&
+    typeof poolProof.source === "string" && poolProof.source.trim().length > 0 &&
+    poolProof.receipt?.status === "SOURCE_BOUND" &&
+    typeof poolProof.receipt.id === "string" && poolProof.receipt.id.trim().length > 0 &&
+    poolProof.receipt.source === poolProof.source &&
+    Number.isSafeInteger(poolProof.observedAt) && poolProof.observedAt >= 0 &&
+    Number.isSafeInteger(poolProof.receipt.receivedAt) &&
+    poolProof.observedAt <= poolProof.receipt.receivedAt &&
     /^[a-f0-9]{64}$/i.test(poolProof.receipt.payloadSha256 ?? "");
 }
 
@@ -260,20 +266,25 @@ function nonnegativeBalance(account, index) {
 }
 
 export function decodeCpmmSuccessfulSwap(row, {identity, poolProof} = {}) {
-  if (!identity || identity.chainId !== "solana" || !validPublicKey(identity.mint) ||
-      !validPublicKey(identity.pool) || !validPublicKey(identity.quote)) {
+  if (!identity || identity.chainId !== "solana" || !isSolanaPublicKey(identity.mint) ||
+      !isSolanaPublicKey(identity.pool) || !isSolanaPublicKey(identity.quote)) {
     return excluded("CANDIDATE_IDENTITY_INVALID");
   }
   if (!validProof(poolProof, identity)) return excluded("POOL_PROOF_UNBOUND_OR_INCOMPLETE");
   const transaction = row?.transaction;
   const meta = row?.meta;
-  if (!isRecord(transaction) || !isRecord(meta) || meta.err !== null) {
-    return excluded(!isRecord(meta) ? "TRANSACTION_UNAVAILABLE"
-      : meta.err === null ? "TRANSACTION_UNAVAILABLE" : "TRANSACTION_FAILED");
+  if (!isRecord(transaction) || !isRecord(meta) || !Object.hasOwn(meta, "err")) {
+    return excluded("TRANSACTION_UNAVAILABLE");
   }
+  if (meta.err !== null) return excluded("TRANSACTION_FAILED");
   if (!validSignature(row.signature) || !Number.isSafeInteger(row.slot) || row.slot < 0 ||
       row.slot > Number.MAX_SAFE_INTEGER || transactionTimestamp(row) === null) {
     return excluded("TRANSACTION_RECEIPT_INVALID");
+  }
+  if (!Array.isArray(transaction.signatures) || transaction.signatures.length < 1 ||
+      transaction.signatures[0] !== row.signature ||
+      !transaction.signatures.every(validSignature)) {
+    return excluded("TRANSACTION_SIGNATURE_MISMATCH");
   }
   const keys = accountKeysFor({...transaction, meta});
   const rows = instructionRows({...transaction, meta});
@@ -305,6 +316,7 @@ export function decodeCpmmSuccessfulSwap(row, {identity, poolProof} = {}) {
     if (lpOperation) return excluded("LP_OPERATION");
     return excluded("TRANSFER_OR_NON_SWAP");
   }
+  if (lpOperation) return excluded("LP_SWAP_TRANSACTION_AMBIGUOUS");
   const selected = cpmmInstructions[0];
   if (rows.some(entry => !entry.inner && entry.instruction !== selected.instruction &&
       instructionProgram(entry.instruction, keys) !== COMPUTE_BUDGET_PROGRAM)) {
@@ -335,6 +347,7 @@ export function decodeCpmmSuccessfulSwap(row, {identity, poolProof} = {}) {
   }
   const eventResult = readSwapEvent(meta.logMessages);
   if (!eventResult?.balancedLog) return excluded("SWAP_EVENT_LOG_INVALID");
+  if (eventResult.lpChangeFound) return excluded("LP_SWAP_TRANSACTION_AMBIGUOUS");
   if (eventResult.events.length !== 1) {
     return excluded(eventResult.lpChangeFound ? "LP_OPERATION" : "SWAP_EVENT_MISSING_OR_AMBIGUOUS");
   }

@@ -73,6 +73,14 @@ test("successful raw CPMM instruction binds event, vault deltas, transaction and
   assert.equal(decoded.signature, row.signature);
   assert.equal(decoded.slot, row.slot);
   assert.equal(decoded.instructionIndex, 0);
+
+  const mismatchedSignature = makeSwap(998, fixture.candidateT - 10_000).signature;
+  const mismatchedTransaction = {
+    ...row,
+    transaction: {...row.transaction, signatures: [mismatchedSignature]}
+  };
+  assert.equal(decodeCpmmSuccessfulSwap(mismatchedTransaction, fixture).reason,
+    "TRANSACTION_SIGNATURE_MISMATCH");
 });
 
 test("failed swaps, transfers, LP changes, routed calls and stale pool identity are excluded", () => {
@@ -90,6 +98,17 @@ test("failed swaps, transfers, LP changes, routed calls and stale pool identity 
   ]);
   lp.transaction.message.instructions[0].data = base58(lpBytes);
   assert.equal(decodeCpmmSuccessfulSwap(lp, fixture).reason, "LP_OPERATION");
+
+  const mixedLpAndSwap = makeSwap(781, fixture.candidateT - 10_000);
+  mixedLpAndSwap.transaction.message.instructions.push({
+    programIdIndex: 13,
+    accounts: Array.from({length: 13}, (_, index) => index),
+    data: base58(Buffer.concat([
+      Buffer.from(RAYDIUM_CPMM_LAYOUT.instructions.deposit), Buffer.alloc(16)
+    ]))
+  });
+  assert.equal(decodeCpmmSuccessfulSwap(mixedLpAndSwap, fixture).reason,
+    "LP_SWAP_TRANSACTION_AMBIGUOUS");
 
   const routed = makeSwap(780, fixture.candidateT - 10_000);
   const swap = routed.transaction.message.instructions[0];
@@ -194,6 +213,12 @@ test("truncated history, ambiguous routes, unpriced flow and a zero sell side do
   assert.equal(truncatedPacket.metrics.uniqueBuyers1h, undefined);
   assert.equal(truncatedPacket.metrics.qualifiedSmartWallets, undefined);
 
+  const missingTransaction = makeFixture();
+  missingTransaction.transactions.push({
+    ...missingTransaction.transactions[0], transaction: null, meta: null
+  });
+  assert.equal((await packet(missingTransaction)).metrics.uniqueBuyers1h, undefined);
+
   const ambiguous = makeFixture();
   const routedRow = ambiguous.transactions[0];
   const cpmmInstruction = routedRow.transaction.message.instructions[0];
@@ -202,6 +227,11 @@ test("truncated history, ambiguous routes, unpriced flow and a zero sell side do
   }];
   routedRow.meta.innerInstructions = [{index: 0, instructions: [cpmmInstruction]}];
   assert.equal((await packet(ambiguous)).metrics.uniqueBuyers1h, undefined);
+
+  const conflictingDuplicate = makeFixture({duplicateFirstRow: true});
+  const duplicate = conflictingDuplicate.transactions.at(-1);
+  duplicate.slot += 1;
+  assert.equal((await packet(conflictingDuplicate)).metrics.uniqueBuyers1h, undefined);
 
   const missingFx = makeFixture({
     priceOverride: ({mint, atMs}) => mint === "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"

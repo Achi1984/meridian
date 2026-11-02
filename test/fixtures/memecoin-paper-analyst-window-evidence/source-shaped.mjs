@@ -117,6 +117,7 @@ export function makeSwap(number, atMs, {direction = "BUY", failed = false} = {})
   const outputBefore = 0;
   const inputVaultBefore = 2_000_000_000;
   const outputVaultBefore = 9_000_000_000;
+  const transactionSignature = signature(300_000 + number);
   const keys = [
     FEE_PAYER,
     AUTHORITY,
@@ -137,6 +138,7 @@ export function makeSwap(number, atMs, {direction = "BUY", failed = false} = {})
     inputMint, outputMint, inputAmount, outputAmount
   });
   const transaction = {
+    signatures: [transactionSignature],
     message: {
       accountKeys: keys,
       instructions: [{
@@ -171,7 +173,7 @@ export function makeSwap(number, atMs, {direction = "BUY", failed = false} = {})
     }
   };
   return {
-    signature: signature(300_000 + number),
+    signature: transactionSignature,
     slot: 500_000 + number,
     blockTime: Math.floor(atMs / 1000),
     transaction,
@@ -231,7 +233,9 @@ export function makeFixture({
     transactions.push(makeSwap(20_000, start, {direction: "BUY"}));
     transactions.push(makeSwap(20_001, candidateT, {direction: "BUY"}));
   }
-  if (duplicateFirstRow && transactions.length) transactions.push(transactions[0]);
+  if (duplicateFirstRow && transactions.length) {
+    transactions.push(structuredClone(transactions[0]));
+  }
   const historySource = {
     async readWindow({identity: requestIdentity, startExclusiveMs, endInclusiveMs}) {
       if (historyOverride) return historyOverride;
