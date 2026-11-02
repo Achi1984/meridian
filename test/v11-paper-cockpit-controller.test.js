@@ -8,6 +8,7 @@ import {
   PAPER_REPORT_ENDPOINT
 } from '../v11/paper-cockpit-controller.js';
 import {createPaperReportConnector} from '../v11/paper-report-connector.js';
+import {createAppAccess} from '../v11/app-access.js';
 
 const NOW = Date.parse('2026-11-01T20:00:00.000Z');
 const TOKEN = 'existing-session-token';
@@ -42,6 +43,7 @@ function harness({
   policy = {now: () => NOW, staleAfterMs: 60_000},
   schedule,
   cancelSchedule,
+  access: suppliedAccess,
   createConnector = createPaperReportConnector
 } = {}) {
   const document = {createElement: tag => new Element(document, tag)};
@@ -51,7 +53,7 @@ function harness({
   const windowListeners = new Map();
   let credential = token;
   let open = unlocked;
-  const access = {
+  const access = suppliedAccess || {
     getToken: () => credential,
     isUnlocked: () => open,
     lock() {
@@ -698,4 +700,102 @@ test('connector keeps a disposed in-flight source visible as busy until its tran
   release(new Response(null, {status: 503}));
   await tick();
   assert.equal(connector.isBusy(), false);
+});
+
+test('timed-out bridge retries stay idle through late transport settlement and can refresh explicitly', async () => {
+  let now = NOW;
+  const accessClock = fakeScheduler(() => now);
+  const access = createAppAccess({
+    fetchImpl: async () => new Response('{}', {
+      headers: {'content-type': 'application/json; charset=utf-8'}
+    }),
+    now: () => now,
+    schedule: accessClock.schedule,
+    cancelSchedule: accessClock.cancelSchedule
+  });
+  assert.equal(await access.verify('integration-session-token'), 'unlocked');
+
+  let releaseLateResponse;
+  let connector;
+  let calls = 0;
+  let lateBodyCancelled = false;
+  const report = generatedReport();
+  const lateBody = new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode(JSON.stringify({
+        schema: PAPER_REPORT_ENVELOPE_SCHEMA,
+        runId: report.experiment.id,
+        report
+      })));
+    },
+    cancel() { lateBodyCancelled = true; }
+  });
+  const h = harness({
+    fetchImpl: async () => {
+      calls++;
+      if (calls === 1) {
+        return new Promise(resolve => {
+          releaseLateResponse = () => resolve(new Response(lateBody, {
+            status: 200,
+            headers: {'content-type': 'application/json; charset=utf-8'}
+          }));
+        });
+      }
+      return paperResponse(report);
+    },
+    createConnector: options => {
+      connector = createPaperReportConnector({...options, timeoutMs: 20});
+      return connector;
+    },
+    access
+  });
+  h.controller.setActive(true);
+
+  const first = h.controller.refresh();
+  await until(() => typeof releaseLateResponse === 'function');
+  await first;
+  assert.equal(h.root.attrs['data-state'], 'unavailable');
+  assert.equal(calls, 1);
+
+  await h.controller.refresh();
+  assert.equal(calls, 1, 'a retry cannot replace the timed-out source before settlement');
+  assert.equal(h.root.attrs['data-state'], 'ready',
+    'a blocked retry must not leave the cockpit claiming a read is in progress');
+
+  access.lock();
+  assert.equal(h.root.attrs['data-state'], 'auth-required');
+  assert.doesNotMatch(h.root.textContent, /Observation-only|90071992547409931234/);
+  assert.equal(await access.verify('replacement-session-one'), 'unlocked');
+  await h.controller.refresh();
+  assert.equal(calls, 1, 'unlock during late settlement does not multiply transport work');
+  assert.equal(h.root.attrs['data-state'], 'ready');
+
+  h.controller.setActive(false);
+  assert.equal(h.root.attrs['data-state'], 'unavailable');
+  assert.doesNotMatch(h.root.textContent, /Observation-only|90071992547409931234/);
+  h.controller.setActive(true);
+  await h.controller.refresh();
+  assert.equal(calls, 1, 'navigation does not replace the timed-out source');
+
+  now += 15 * 60 * 1000;
+  accessClock.runDue();
+  assert.equal(h.root.attrs['data-state'], 'auth-required',
+    'the real access expiry timer clears the cockpit state');
+  assert.doesNotMatch(h.root.textContent, /Observation-only|90071992547409931234/);
+  assert.equal(await access.verify('replacement-session-two'), 'unlocked');
+  await h.controller.refresh();
+  assert.equal(calls, 1, 're-unlock stays blocked until late transport settlement');
+
+  releaseLateResponse();
+  await until(() => lateBodyCancelled && !connector.isBusy());
+  assert.equal(calls, 1, 'late completion does not trigger a retry or polling read');
+  assert.equal(h.root.attrs['data-state'], 'ready');
+  assert.doesNotMatch(h.root.textContent, /Observation-only|90071992547409931234/,
+    'late private data cannot repaint after the lock');
+
+  await h.controller.refresh();
+  assert.equal(calls, 2, 'a later explicit refresh starts after the stale source settles');
+  assert.match(h.root.textContent, /Observation-only/);
+  h.controller.dispose();
+  access.dispose();
 });
