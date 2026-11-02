@@ -140,93 +140,108 @@ export async function transferPostRunReport({
 
   const owner = {};
   activeTransfer = owner;
-  const operation = (async () => {
-  let runPath;
-  try {
-    runPath = await assertSafeRunDirectory(root, runId);
-  } catch {
-    return failure("run_directory_unsafe_or_missing");
-  }
-
-  let status;
-  let config;
-  try {
-    [status, config] = await Promise.all([
-      readStatus(runPath),
-      readConfig(runPath)
-    ]);
-  } catch {
-    return failure("run_state_unavailable");
-  }
-  if (status?.status !== "FINISHED" || status.runId !== runId ||
-      status.configHash !== expectedConfigHash ||
-      config.hash !== expectedConfigHash || config.config?.runId !== runId ||
-      config.config?.mode !== "READ_ONLY_PAPER") {
-    return failure("terminal_or_config_mismatch");
-  }
-
-  const terminal = await readFile(path.join(runPath, "terminal.json")).then(bytes => {
-    if (bytes.length > 16 * 1024) throw new RangeError();
-    return JSON.parse(new TextDecoder("utf-8", {fatal: true}).decode(bytes));
-  }).catch(() => null);
-  const lock = await readFile(path.join(runPath, "run.lock")).then(bytes => {
-    if (bytes.length > 16 * 1024) throw new RangeError();
-    return JSON.parse(new TextDecoder("utf-8", {fatal: true}).decode(bytes));
-  }).catch(() => null);
-  if (terminal?.version !== 1 || terminal.status !== "FINISHED" ||
-      terminal.runId !== runId || terminal.configHash !== expectedConfigHash ||
-      lock?.version !== 1 || lock.runId !== runId ||
-      lock.configHash !== expectedConfigHash) {
-    return failure("terminal_or_config_mismatch");
-  }
-
-  let source;
-  try {
-    source = await readReport(runPath);
-  } catch {
-    return failure("report_unavailable");
-  }
-  if (source?.status !== "AVAILABLE" || source.runStatus !== "FINISHED" ||
-      source.report?.schema !== PAPER_REPORT_SCHEMA ||
-      source.report?.experiment?.id !== runId ||
-      source.report?.experiment?.reportStatus !== "FINISHED") {
-    return failure("report_not_finished");
-  }
-
-  const envelope = canonicalTransferEnvelope(runId, expectedConfigHash, source.report);
-  let body;
-  try {
-    body = Buffer.from(canonicalJson(envelope), "utf8");
-  } catch {
-    return failure("report_invalid");
-  }
-  if (body.length > PAPER_REPORT_MAX_BYTES) return failure("report_too_large");
-  const expectedDigest = sha256(body);
-
   const controller = new AbortController();
-  let timer;
   let timeoutResolve;
   let timedOut = false;
-  let trackedWork;
+  let timer;
+  const deadline = new Promise(resolve => { timeoutResolve = resolve; });
   try {
-    const deadline = new Promise(resolve => { timeoutResolve = resolve; });
     timer = schedule(() => {
       timedOut = true;
       controller.abort();
       timeoutResolve(unknown("transfer_outcome_unknown"));
     }, timeoutMs);
-    if (timer === undefined || timer === null) return failure("deadline_unavailable");
-    const work = Promise.resolve().then(() => fetchImpl(`${origin}${PAPER_REPORT_UPLOAD_PATH}`, {
-      method: "POST",
-      headers: {
-        authorization: "Bearer " + uploadToken,
-        "content-type": "application/json",
-        "content-length": String(body.length)
-      },
-      body,
-      redirect: "error",
-      signal: controller.signal
-    })).then(async response => {
+  } catch {
+    if (activeTransfer === owner) activeTransfer = null;
+    return failure("deadline_unavailable");
+  }
+  if (timer === undefined || timer === null) {
+    if (activeTransfer === owner) activeTransfer = null;
+    return failure("deadline_unavailable");
+  }
+
+  const operation = (async () => {
+    if (timedOut) return unknown("transfer_outcome_unknown");
+    let runPath;
+    try {
+      runPath = await assertSafeRunDirectory(root, runId);
+    } catch {
+      return timedOut ? unknown("transfer_outcome_unknown") :
+        failure("run_directory_unsafe_or_missing");
+    }
+    if (timedOut) return unknown("transfer_outcome_unknown");
+
+    const [statusResult, configResult] = await Promise.allSettled([
+      readStatus(runPath),
+      readConfig(runPath)
+    ]);
+    if (timedOut) return unknown("transfer_outcome_unknown");
+    if (statusResult.status !== "fulfilled" || configResult.status !== "fulfilled") {
+      return failure("run_state_unavailable");
+    }
+    const status = statusResult.value;
+    const config = configResult.value;
+    if (status?.status !== "FINISHED" || status.runId !== runId ||
+        status.configHash !== expectedConfigHash ||
+        config.hash !== expectedConfigHash || config.config?.runId !== runId ||
+        config.config?.mode !== "READ_ONLY_PAPER") {
+      return failure("terminal_or_config_mismatch");
+    }
+
+    const terminal = await readFile(path.join(runPath, "terminal.json")).then(bytes => {
+      if (bytes.length > 16 * 1024) throw new RangeError();
+      return JSON.parse(new TextDecoder("utf-8", {fatal: true}).decode(bytes));
+    }).catch(() => null);
+    if (timedOut) return unknown("transfer_outcome_unknown");
+    const lock = await readFile(path.join(runPath, "run.lock")).then(bytes => {
+      if (bytes.length > 16 * 1024) throw new RangeError();
+      return JSON.parse(new TextDecoder("utf-8", {fatal: true}).decode(bytes));
+    }).catch(() => null);
+    if (timedOut) return unknown("transfer_outcome_unknown");
+    if (terminal?.version !== 1 || terminal.status !== "FINISHED" ||
+        terminal.runId !== runId || terminal.configHash !== expectedConfigHash ||
+        lock?.version !== 1 || lock.runId !== runId ||
+        lock.configHash !== expectedConfigHash) {
+      return failure("terminal_or_config_mismatch");
+    }
+
+    let source;
+    try {
+      source = await readReport(runPath);
+    } catch {
+      return timedOut ? unknown("transfer_outcome_unknown") : failure("report_unavailable");
+    }
+    if (timedOut) return unknown("transfer_outcome_unknown");
+    if (source?.status !== "AVAILABLE" || source.runStatus !== "FINISHED" ||
+        source.report?.schema !== PAPER_REPORT_SCHEMA ||
+        source.report?.experiment?.id !== runId ||
+        source.report?.experiment?.reportStatus !== "FINISHED") {
+      return failure("report_not_finished");
+    }
+
+    const envelope = canonicalTransferEnvelope(runId, expectedConfigHash, source.report);
+    let body;
+    try {
+      body = Buffer.from(canonicalJson(envelope), "utf8");
+    } catch {
+      return failure("report_invalid");
+    }
+    if (body.length > PAPER_REPORT_MAX_BYTES) return failure("report_too_large");
+    const expectedDigest = sha256(body);
+
+    if (timedOut) return unknown("transfer_outcome_unknown");
+    try {
+      const response = await fetchImpl(`${origin}${PAPER_REPORT_UPLOAD_PATH}`, {
+        method: "POST",
+        headers: {
+          authorization: "Bearer " + uploadToken,
+          "content-type": "application/json",
+          "content-length": String(body.length)
+        },
+        body,
+        redirect: "error",
+        signal: controller.signal
+      });
       if (timedOut || controller.signal.aborted) {
         await cancelResponseBody(response);
         return unknown("transfer_outcome_unknown");
@@ -260,29 +275,18 @@ export async function transferPostRunReport({
         return unknown("upload_receipt_unverified");
       }
       return {status: "TRANSFERRED", httpStatus: response.status, digest: expectedDigest};
-    }).catch(() => unknown(timedOut ? "transfer_outcome_unknown" : "transfer_unavailable"));
-    trackedWork = work.finally(() => { owner.settlementDone = true; });
-    owner.settlement = trackedWork;
-    return await Promise.race([trackedWork, deadline]);
-  } catch {
-    return timedOut ? unknown("transfer_outcome_unknown") : failure("transfer_unavailable");
-  } finally {
-    if (timer !== undefined && timer !== null) {
-      try { cancelSchedule(timer); } catch { }
+    } catch {
+      return unknown(timedOut ? "transfer_outcome_unknown" : "transfer_unavailable");
     }
-  }
-  })();
+  })().catch(() => unknown(timedOut ? "transfer_outcome_unknown" : "transfer_unavailable"));
+
+  owner.settlement = operation.finally(() => {
+    if (activeTransfer === owner) activeTransfer = null;
+  });
   try {
-    return await operation;
+    return await Promise.race([owner.settlement, deadline]);
   } finally {
-    const release = () => {
-      if (activeTransfer === owner) activeTransfer = null;
-    };
-    if (owner.settlement && !owner.settlementDone) {
-      owner.settlement.then(release, release);
-    } else {
-      release();
-    }
+    try { cancelSchedule(timer); } catch { }
   }
 }
 
@@ -321,14 +325,14 @@ async function readBoundedReceipt(response, {signal, runId, configHash, digest})
 
   let reader;
   let abort;
-  let cancelled = Promise.resolve();
+  let cancelled;
   const chunks = [];
   let size = 0;
   let complete = false;
   try {
     reader = body.getReader();
     abort = () => {
-      try { cancelled = Promise.resolve(reader.cancel()).catch(() => {}); } catch { }
+      cancelReader();
     };
     signal.addEventListener("abort", abort, {once: true});
     if (signal.aborted) abort();
@@ -341,8 +345,9 @@ async function readBoundedReceipt(response, {signal, runId, configHash, digest})
         break;
       }
       if (!(next.value instanceof Uint8Array)) return null;
+      if (next.value.byteLength === 0) continue;
       size += next.value.byteLength;
-      if (size > PAPER_REPORT_RECEIPT_MAX_BYTES || chunks.length >= 16) return null;
+      if (size > PAPER_REPORT_RECEIPT_MAX_BYTES) return null;
       chunks.push(next.value);
     }
     if (contentLength !== null && contentLength !== undefined &&
@@ -367,11 +372,19 @@ async function readBoundedReceipt(response, {signal, runId, configHash, digest})
     return receipt;
   } finally {
     if (abort) signal.removeEventListener("abort", abort);
-    if (!complete) {
-      try { cancelled = Promise.resolve(reader?.cancel()).catch(() => {}); } catch { }
-    }
-    await cancelled;
+    if (!complete) cancelReader();
+    if (cancelled) await cancelled;
     try { reader?.releaseLock(); } catch { }
+  }
+
+  function cancelReader() {
+    if (cancelled) return cancelled;
+    try {
+      cancelled = Promise.resolve(reader?.cancel()).catch(() => {});
+    } catch {
+      cancelled = Promise.resolve();
+    }
+    return cancelled;
   }
 }
 

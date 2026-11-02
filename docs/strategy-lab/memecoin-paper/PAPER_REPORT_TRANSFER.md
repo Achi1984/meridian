@@ -151,13 +151,30 @@ ID and config SHA-256 in persisted config, status, lock, terminal marker, and
 existing report identity/accounting. `AVAILABLE` alone, a lock, or elapsed time
 is not proof. Do not modify or restart the observation to obtain evidence.
 
-Only after those checks and prerequisites, invoke from the configured worker
-runtime with the required settings already present in its environment (the
-secret value is never placed in the command):
+The reviewed `Dockerfile.paper` image includes both
+`scripts/memecoin-paper-report-transfer/` and its
+`scripts/memecoin-paper-report-bridge/` contract dependency. Build it from the
+repository root only after reviewing the source and build context:
 
 ```sh
-MERIDIAN_PAPER_REPORT_TRANSFER_ENABLED=true \
-  node scripts/memecoin-paper-report-transfer/transfer.mjs \
+docker build -f Dockerfile.paper -t meridian-paper:report-transfer .
+```
+
+The image retains its normal pilot entrypoint. Only after the terminal checks
+above and migration/gateway prerequisites are satisfied, override that entrypoint
+with `node` for the one-shot exporter. The worker environment file supplies the
+required settings without placing secret values in the command. Set
+`WORKER_PAPER_DATA_ROOT` to the host-side preserved run-data directory and
+`MERIDIAN_PAPER_REPORT_EXPECTED_RUN_ID` to the independently verified run ID;
+mount the preserved run data read-only:
+
+```sh
+docker run --rm --entrypoint node \
+  --env-file "$WORKER_ENV_FILE" \
+  --mount "type=bind,src=$WORKER_PAPER_DATA_ROOT,dst=/var/data/meridian-paper,readonly" \
+  --env MERIDIAN_PAPER_REPORT_DATA_ROOT=/var/data/meridian-paper \
+  meridian-paper:report-transfer \
+  scripts/memecoin-paper-report-transfer/transfer.mjs \
   --run-id "$MERIDIAN_PAPER_REPORT_EXPECTED_RUN_ID"
 ```
 

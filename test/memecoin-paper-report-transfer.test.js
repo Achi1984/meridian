@@ -213,6 +213,13 @@ test("exporter is disabled by default without reading or sending data", async t 
   assert.equal(reads, 0);
 });
 
+test("Paper worker image includes the exporter and bridge contract", () => {
+  const dockerfile = readFileSync(new URL("../Dockerfile.paper", import.meta.url), "utf8");
+  assert.match(dockerfile, /COPY --chown=node:node scripts\/memecoin-paper-report-transfer\//);
+  assert.match(dockerfile, /COPY --chown=node:node scripts\/memecoin-paper-report-bridge\//);
+  assert.match(dockerfile, /ENTRYPOINT \["node", "scripts\/memecoin-paper\/pilot-online\.mjs"\]/);
+});
+
 test("one-shot transfer validates terminal/config and sends only the fixed bounded envelope", async t => {
   const fixture = await workerFixture(t);
   const observed = [];
@@ -311,10 +318,12 @@ test("deferred preflight ownership remains held through timeout and late respons
   const fetchStarted = deferred();
   let resolveFetch;
   let finishCancel;
+  let triggerTimeout;
   let cancelStarted = false;
   const options = makeWorkerOptions(fixture, {
     timeoutMs: 5,
-    schedule(callback) { return setTimeout(callback, 0); },
+    schedule(callback) { triggerTimeout = callback; return 1; },
+    cancelSchedule() {},
     readStatus: () => {
       statusStarted.resolve();
       return statusGate.promise;
@@ -330,6 +339,7 @@ test("deferred preflight ownership remains held through timeout and late respons
 
   statusGate.resolve({status: "FINISHED", runId: RUN_ID, configHash: fixture.hash});
   await fetchStarted.promise;
+  triggerTimeout();
   assert.deepEqual(await first, {status: "UNKNOWN", reason: "transfer_outcome_unknown"});
   resolveFetch({
     status: 201,
@@ -348,6 +358,52 @@ test("deferred preflight ownership remains held through timeout and late respons
     readStatus: makeWorkerOptions(fixture).readStatus,
     fetchImpl: async (_url, requestOptions) => receiptResponse(201, requestOptions.body)
   })).status, "TRANSFERRED");
+});
+
+test("preflight deadline returns UNKNOWN, retains ownership, and blocks late dispatch", async t => {
+  const fixture = await workerFixture(t);
+  const statusGate = deferred();
+  const statusStarted = deferred();
+  const timers = [];
+  let statusReads = 0;
+  let sends = 0;
+  const options = makeWorkerOptions(fixture, {
+    timeoutMs: 1_000,
+    schedule(callback) { timers.push(callback); return timers.length; },
+    cancelSchedule() {},
+    readStatus: () => {
+      statusReads++;
+      statusStarted.resolve();
+      return statusReads === 1 ? statusGate.promise : Promise.resolve({
+        status: "FINISHED",
+        runId: RUN_ID,
+        configHash: fixture.hash
+      });
+    },
+    fetchImpl: async (_url, requestOptions) => {
+      sends++;
+      return receiptResponse(201, requestOptions.body);
+    }
+  });
+
+  const first = transferPostRunReport(options);
+  await statusStarted.promise;
+  timers[0]();
+  assert.deepEqual(await first, {status: "UNKNOWN", reason: "transfer_outcome_unknown"});
+  assert.deepEqual(await transferPostRunReport(options), {status: "REJECTED", reason: "transfer_busy"});
+  assert.equal(statusReads, 1);
+  assert.equal(sends, 0);
+
+  statusGate.resolve({status: "FINISHED", runId: RUN_ID, configHash: fixture.hash});
+  let next;
+  for (let attempt = 0; attempt < 20; attempt++) {
+    next = await transferPostRunReport(options);
+    if (next.reason !== "transfer_busy") break;
+    await new Promise(resolve => setImmediate(resolve));
+  }
+  assert.equal(next.status, "TRANSFERRED");
+  assert.equal(statusReads, 2);
+  assert.equal(sends, 1);
 });
 
 test("partial and UNKNOWN terminal states and expected run/config mismatches never send", async t => {
@@ -411,36 +467,47 @@ test("invalid origins and redirects fail without retries or credential leakage",
 
 test("exporter deadline aborts transport and bounds transfer duration", async t => {
   const fixture = await workerFixture(t);
-  const result = await transferPostRunReport(makeWorkerOptions(fixture, {
+  const fetchStarted = deferred();
+  let triggerTimeout;
+  const pending = transferPostRunReport(makeWorkerOptions(fixture, {
     timeoutMs: 50,
-    schedule(callback) {
-      const timer = setTimeout(callback, 0);
-      return timer;
-    },
+    schedule(callback) { triggerTimeout = callback; return 1; },
+    cancelSchedule() {},
     fetchImpl: async (_url, options) => {
       assert.equal(options.signal instanceof AbortSignal, true);
+      fetchStarted.resolve();
       await new Promise((resolve, reject) => {
         options.signal.addEventListener("abort", () => reject(new Error("aborted")), {once: true});
       });
       return {status: 201};
     }
   }));
+  await fetchStarted.promise;
+  triggerTimeout();
+  const result = await pending;
   assert.equal(result.reason, "transfer_outcome_unknown");
 });
 
 test("never-settling fetch returns UNKNOWN once and retains a single in-flight transfer", async t => {
   const fixture = await workerFixture(t);
+  const fetchStarted = deferred();
   let releaseFetch;
+  let triggerTimeout;
   let requestBody;
   const options = makeWorkerOptions(fixture, {
     timeoutMs: 5,
-    schedule(callback) { return setTimeout(callback, 0); },
+    schedule(callback) { triggerTimeout = callback; return 1; },
+    cancelSchedule() {},
     fetchImpl: (_url, options) => {
       requestBody = options.body;
+      fetchStarted.resolve();
       return new Promise(resolve => { releaseFetch = resolve; });
     }
   });
-  const first = await transferPostRunReport(options);
+  const firstPending = transferPostRunReport(options);
+  await fetchStarted.promise;
+  triggerTimeout();
+  const first = await firstPending;
   assert.equal(first.status, "UNKNOWN");
   assert.equal(first.reason, "transfer_outcome_unknown");
   assert.equal((await transferPostRunReport(options)).reason, "transfer_busy");
@@ -454,15 +521,24 @@ test("never-settling fetch returns UNKNOWN once and retains a single in-flight t
 
 test("late HTTP response body is cancelled before releasing the transfer slot", async t => {
   const fixture = await workerFixture(t);
+  const fetchStarted = deferred();
   let resolveFetch;
+  let triggerTimeout;
   let finishCancel;
   let cancelStarted = false;
   const options = makeWorkerOptions(fixture, {
     timeoutMs: 5,
-    schedule(callback) { return setTimeout(callback, 0); },
-    fetchImpl: () => new Promise(resolve => { resolveFetch = resolve; })
+    schedule(callback) { triggerTimeout = callback; return 1; },
+    cancelSchedule() {},
+    fetchImpl: () => {
+      fetchStarted.resolve();
+      return new Promise(resolve => { resolveFetch = resolve; });
+    }
   });
-  assert.equal((await transferPostRunReport(options)).reason, "transfer_outcome_unknown");
+  const firstPending = transferPostRunReport(options);
+  await fetchStarted.promise;
+  triggerTimeout();
+  assert.equal((await firstPending).reason, "transfer_outcome_unknown");
   resolveFetch({
     status: 201,
     body: {cancel: () => {
@@ -540,12 +616,17 @@ test("exporter requires a bounded, fully bound upload acknowledgement before suc
 
 test("receipt body timeout cancels and releases the reader but keeps caller outcome UNKNOWN", async t => {
   const fixture = await workerFixture(t);
+  const responseStarted = deferred();
+  let triggerTimeout;
   let cancelled = false;
   let stream;
-  const result = await transferPostRunReport(makeWorkerOptions(fixture, {
-    timeoutMs: 20,
+  const pending = transferPostRunReport(makeWorkerOptions(fixture, {
+    timeoutMs: 1_000,
+    schedule(callback) { triggerTimeout = callback; return 1; },
+    cancelSchedule() {},
     fetchImpl: async () => {
       stream = new ReadableStream({cancel() { cancelled = true; }});
+      responseStarted.resolve();
       return {
         status: 201,
         headers: {get: name => name === "content-type" ? "application/json" : null},
@@ -553,10 +634,104 @@ test("receipt body timeout cancels and releases the reader but keeps caller outc
       };
     }
   }));
+  await responseStarted.promise;
+  triggerTimeout();
+  const result = await pending;
   assert.deepEqual(result, {status: "UNKNOWN", reason: "transfer_outcome_unknown"});
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(cancelled, true);
   assert.equal(stream.locked, false);
+});
+
+test("receipt timeout preserves pending cancellation cleanup and transfer ownership", async t => {
+  const fixture = await workerFixture(t);
+  const readGate = deferred();
+  const cancelGate = deferred();
+  const cancelStarted = deferred();
+  const readerStarted = deferred();
+  let triggerTimeout;
+  let cancelCalls = 0;
+  let released = false;
+  const options = makeWorkerOptions(fixture, {
+    timeoutMs: 1_000,
+    schedule(callback) { triggerTimeout = callback; return 1; },
+    cancelSchedule() {},
+    fetchImpl: async () => ({
+      status: 201,
+      headers: {get: name => name === "content-type" ? "application/json" : null},
+      body: {
+        getReader() {
+          readerStarted.resolve();
+          return {
+            read: () => readGate.promise,
+            cancel() {
+              cancelCalls++;
+              readGate.resolve({done: true});
+              cancelStarted.resolve();
+              return cancelGate.promise;
+            },
+            releaseLock() { released = true; }
+          };
+        }
+      }
+    })
+  });
+
+  const first = transferPostRunReport(options);
+  await readerStarted.promise;
+  triggerTimeout();
+  assert.deepEqual(await first, {
+    status: "UNKNOWN",
+    reason: "transfer_outcome_unknown"
+  });
+  await cancelStarted.promise;
+  assert.equal(cancelCalls, 1);
+  assert.equal(released, false);
+  assert.deepEqual(await transferPostRunReport(options), {status: "REJECTED", reason: "transfer_busy"});
+
+  cancelGate.resolve();
+  for (let attempt = 0; !released && attempt < 20; attempt++) {
+    await new Promise(resolve => setImmediate(resolve));
+  }
+  assert.equal(released, true);
+  const retry = await transferPostRunReport({
+    ...options,
+    timeoutMs: 1_000,
+    fetchImpl: async (_url, requestOptions) => receiptResponse(201, requestOptions.body)
+  });
+  assert.equal(retry.status, "TRANSFERRED");
+});
+
+test("receipt parsing accepts more than sixteen chunks and ignores empty chunks", async t => {
+  const fixture = await workerFixture(t);
+  const result = await transferPostRunReport(makeWorkerOptions(fixture, {
+    fetchImpl: async (_url, options) => {
+      const envelope = JSON.parse(options.body.toString("utf8"));
+      const bytes = Buffer.from(JSON.stringify({
+        ok: true,
+        runId: envelope.runId,
+        configHash: envelope.configHash,
+        digest: configHash(options.body),
+        idempotent: false
+      }));
+      const chunks = new ReadableStream({
+        start(controller) {
+          controller.enqueue(new Uint8Array());
+          for (const byte of bytes) controller.enqueue(Uint8Array.of(byte));
+          controller.close();
+        }
+      });
+      return {
+        status: 201,
+        headers: {get: name => ({
+          "content-type": "application/json",
+          "content-length": String(bytes.length)
+        })[name.toLowerCase()] ?? null},
+        body: chunks
+      };
+    }
+  }));
+  assert.equal(result.status, "TRANSFERRED");
 });
 
 test("gateway checks enablement and the dedicated upload credential before reading the body", async () => {
