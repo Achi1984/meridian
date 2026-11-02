@@ -238,7 +238,7 @@ test("journaled riskSnapshot restores the fixed 2999/3000-cent gate and rejected
   await resumed.close();
 });
 
-test("fixed start and eight-hour deadline are replayed and enforced on invocation", async t => {
+test("fixed deadline allows one terminal finish and replays its terminal latch", async t => {
   const directory = await tempDirectory(t);
   const {session} = await openSession(directory);
   const finished = await session.finishRun("finish-at-deadline", {
@@ -250,7 +250,9 @@ test("fixed start and eight-hour deadline are replayed and enforced on invocatio
     now: START + EIGHT_HOURS + 1,
     marks: []
   });
-  assert.equal(late.status, "INVALID_RUN_WINDOW");
+  assert.equal(late.status, "REJECT");
+  assert.equal(late.reason, "run already finished");
+  assert.equal(session.snapshot().auditEvents.filter(event => event.type === "RUN_FINISHED").length, 1);
   await session.close();
 
   const resumed = await openSession(directory);
@@ -258,7 +260,9 @@ test("fixed start and eight-hour deadline are replayed and enforced on invocatio
     now: START + EIGHT_HOURS + 2,
     marks: []
   });
-  assert.equal(lateSnapshot.status, "INVALID_RUN_WINDOW");
+  assert.equal(lateSnapshot.status, "REJECT");
+  assert.equal(lateSnapshot.reason, "run already finished");
+  assert.equal(resumed.session.snapshot().auditEvents.filter(event => event.type === "RUN_FINISHED").length, 1);
   await resumed.session.close();
 
   const mismatchedStore = await CheckpointStore.open(directory);
@@ -267,6 +271,40 @@ test("fixed start and eight-hour deadline are replayed and enforced on invocatio
     runId: "checkpoint-test",
     startedAt: START + 1
   }), {code: "CHECKPOINT_INCOMPATIBLE"});
+});
+
+test("delayed finish persists actual time and replay cannot account for it twice", async t => {
+  const directory = await tempDirectory(t);
+  const {session, store} = await openSession(directory);
+  const finishedAt = START + EIGHT_HOURS + 60_000;
+  const input = {now: finishedAt, marks: []};
+  const result = await session.finishRun("delayed-finish", input);
+  assert.equal(result.status, "FINISHED");
+  assert.equal(result.elapsedMs, EIGHT_HOURS + 60_000);
+  assert.equal(session.snapshot().auditEvents.filter(event => event.type === "RUN_FINISHED").length, 1);
+
+  const readback = await store.readCheckpoint();
+  assert.equal(readback.status, "OK");
+  assert.equal(createHash("sha256").update(readback.bytes).digest("hex"), session.metadata.hash);
+  const checkpoint = JSON.parse(readback.bytes);
+  const record = checkpoint.records.at(-1);
+  assert.equal(record.method, "finishRun");
+  assert.equal(record.inputs.now, finishedAt);
+  assert.equal(record.runStart, START);
+  await session.close();
+
+  const reopened = await openSession(directory);
+  const sequence = reopened.session.metadata.sequence;
+  assert.deepEqual(await reopened.session.finishRun("delayed-finish", input), result);
+  assert.equal(reopened.session.metadata.sequence, sequence);
+  const repeated = await reopened.session.finishRun("second-finish", {
+    now: finishedAt + 1000,
+    marks: []
+  });
+  assert.equal(repeated.status, "REJECT");
+  assert.equal(repeated.reason, "run already finished");
+  assert.equal(reopened.session.snapshot().auditEvents.filter(event => event.type === "RUN_FINISHED").length, 1);
+  await reopened.session.close();
 });
 
 test("pre-publication failure keeps the old checkpoint and requires explicit reopen", async t => {
