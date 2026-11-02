@@ -5,6 +5,10 @@ import path from "node:path";
 import {pathToFileURL} from "node:url";
 import {canonicalJson} from "../memecoin-paper/pilot-online.mjs";
 import {
+  MAX_OBSERVATION_AUDIT_BYTES,
+  validateObservationAudit
+} from "../memecoin-paper/observation-audit.mjs";
+import {
   PAPER_REPORT_SCHEMA
 } from "../memecoin-paper-report-bridge/contract.mjs";
 
@@ -139,6 +143,18 @@ async function captureRunFiles(runDirectory) {
   }
 }
 
+async function captureOptionalAudit(runDirectory, files) {
+  try {
+    const file = await readFileSnapshot(runDirectory, "observation-audit.json",
+      MAX_OBSERVATION_AUDIT_BYTES);
+    files.push(file);
+    return file;
+  } catch (error) {
+    if (error?.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
 async function verifyRunSnapshot(rootPath, root, runId, runDirectory, files) {
   const namedRoot = await openDirectoryPath(rootPath);
   let openedRootStat;
@@ -164,6 +180,14 @@ async function verifyRunSnapshot(rootPath, root, runId, runDirectory, files) {
     const current = await lstat(descriptorPath(runDirectory, file.name));
     if (!compareStat(file.stat, opened) || !compareStat(opened, current)) {
       throw new TypeError("run_file_changed");
+    }
+  }
+  if (!files.some(file => file.name === "observation-audit.json")) {
+    try {
+      await lstat(descriptorPath(runDirectory, "observation-audit.json"));
+      throw new TypeError("observation_audit_appeared");
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
     }
   }
 }
@@ -320,6 +344,13 @@ export async function transferPostRunReport({
         return failure("terminal_or_config_mismatch");
       }
 
+      let auditFile;
+      try {
+        auditFile = await captureOptionalAudit(runDirectory, files);
+      } catch {
+        return failure("observation_audit_unavailable");
+      }
+
       const runPath = path.resolve(root, runId);
       let status = terminal;
       if (typeof readStatus === "function") {
@@ -334,6 +365,33 @@ export async function transferPostRunReport({
       if (status?.status !== "FINISHED" || status.runId !== runId ||
           status.configHash !== expectedConfigHash) {
         return failure("terminal_or_config_mismatch");
+      }
+
+      const auditStatus = terminal.observationAuditStatus;
+      if (status.observationAuditStatus !== undefined &&
+          status.observationAuditStatus !== auditStatus) {
+        return failure("observation_audit_mismatch");
+      }
+      let audit;
+      if (auditFile) {
+        try {
+          audit = parseCanonicalSnapshot(auditFile);
+        } catch {
+          return failure("observation_audit_unavailable");
+        }
+        if (!validateObservationAudit(audit, {runId, configHash: expectedConfigHash})) {
+          return failure("observation_audit_invalid");
+        }
+      }
+      if (auditStatus === "FAILED" ||
+          (auditStatus === "PERSISTED" && (!audit || audit.state !== "TERMINAL")) ||
+          (audit?.state === "TERMINAL" && auditStatus !== "PERSISTED") ||
+          (auditStatus === "PERSISTED" &&
+            (audit.terminal.runStatus !== terminal.status ||
+             audit.terminal.controllerStatus !==
+               (terminal.controllerStatus === "NOT_STARTED" ? null : terminal.controllerStatus ?? null) ||
+             audit.terminal.stopReason !== (terminal.stopReason ?? null)))) {
+        return failure("observation_audit_mismatch");
       }
 
       let source;

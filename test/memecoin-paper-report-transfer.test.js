@@ -7,6 +7,7 @@ import os from "node:os";
 import path from "node:path";
 import {readFileSync} from "node:fs";
 import test from "node:test";
+import {createObservationAudit} from "../scripts/memecoin-paper/observation-audit.mjs";
 import {projectOperatorReport} from "../scripts/memecoin-paper/operator-report.mjs";
 import {canonicalJson} from "../scripts/memecoin-paper/pilot-online.mjs";
 import {
@@ -88,6 +89,30 @@ function request(bytes, {
 
 function bodyBytes(value) {
   return Buffer.from(canonicalJson(value), "utf8");
+}
+
+function observationAudit(runId, hash) {
+  const audit = createObservationAudit({
+    runId,
+    configHash: hash,
+    maxRequests: 1,
+    maxCandidates: 1
+  });
+  audit.setProviderAccounting({
+    requests: 0,
+    bytes: 0,
+    providerEvents: 0,
+    dexRequests: 0,
+    rpcRequests: 0,
+    candidates: 0
+  });
+  audit.setTerminal({
+    runStatus: "FINISHED",
+    controllerStatus: null,
+    stopReason: null,
+    failureCode: null
+  });
+  return audit.snapshot();
 }
 
 function receiptResponse(status, requestBody, {
@@ -179,8 +204,13 @@ async function workerFixture(t, {
     status: "FINISHED",
     runId,
     configHash: hash,
-    providerAccounting: {}
+    providerAccounting: {},
+    observationAuditStatus: "PERSISTED",
+    controllerStatus: null,
+    stopReason: null
   }));
+  await writeFile(path.join(runDirectory, "observation-audit.json"),
+    canonicalJson(observationAudit(runId, hash)));
   const storedReport = canonicalJson({
     runId,
     configHash: hash,
@@ -253,7 +283,10 @@ test("exporter handles the deployed flat-volume bind mount layout and rejects a 
   t.after(() => rm(containerRoot, {recursive: true, force: true}));
   const mountTarget = path.join(containerRoot, RUN_ID);
   await mkdir(mountTarget);
-  for (const name of ["run.lock", "terminal.json", "run-config.json", "operator-report.json"]) {
+  for (const name of [
+    "run.lock", "terminal.json", "run-config.json", "operator-report.json",
+    "observation-audit.json"
+  ]) {
     await rename(path.join(hostFixture.root, name), path.join(mountTarget, name));
   }
   const deployedFixture = {...hostFixture, root: containerRoot};
@@ -319,6 +352,51 @@ test("default exporter reads status and report from the captured run snapshot", 
   }));
   assert.equal(result.status, "TRANSFERRED");
   assert.deepEqual(uploaded, transferEnvelope(fixture.report, {hash: fixture.hash}));
+});
+
+test("default exporter rejects missing, corrupt, mismatched, and failed-required audits", async t => {
+  const cases = [
+    ["missing required audit", async fixture => {
+      await rm(path.join(fixture.root, RUN_ID, "observation-audit.json"));
+    }],
+    ["corrupt required audit", async fixture => {
+      await writeFile(path.join(fixture.root, RUN_ID, "observation-audit.json"), "{broken");
+    }],
+    ["mismatched required audit", async fixture => {
+      const auditPath = path.join(fixture.root, RUN_ID, "observation-audit.json");
+      const audit = JSON.parse(readFileSync(auditPath, "utf8"));
+      audit.runId = "different-run";
+      await writeFile(auditPath, canonicalJson(audit));
+    }],
+    ["terminal-mismatched audit", async fixture => {
+      const auditPath = path.join(fixture.root, RUN_ID, "observation-audit.json");
+      const audit = JSON.parse(readFileSync(auditPath, "utf8"));
+      audit.terminal.runStatus = "UNKNOWN";
+      await writeFile(auditPath, canonicalJson(audit));
+    }],
+    ["failed required audit", async fixture => {
+      const terminalPath = path.join(fixture.root, RUN_ID, "terminal.json");
+      const terminal = JSON.parse(readFileSync(terminalPath, "utf8"));
+      terminal.observationAuditStatus = "FAILED";
+      await writeFile(terminalPath, canonicalJson(terminal));
+    }]
+  ];
+
+  for (const [name, alterFixture] of cases) {
+    await t.test(name, async t => {
+      const fixture = await workerFixture(t);
+      await alterFixture(fixture);
+      let sends = 0;
+      const result = await transferPostRunReport({
+        ...makeWorkerOptions(fixture),
+        readStatus: undefined,
+        readReport: undefined,
+        fetchImpl: async () => { sends++; }
+      });
+      assert.equal(result.status, "REJECTED");
+      assert.equal(sends, 0);
+    });
+  }
 });
 
 test("synchronous admission allows one deferred preflight owner and releases it after success", async t => {
@@ -547,6 +625,38 @@ test("report path replacement during deferred status read cannot redirect or upl
 
   await rename(reportPath, originalPath);
   await symlink(outsidePath, reportPath);
+  statusGate.resolve({
+    status: "FINISHED",
+    runId: RUN_ID,
+    configHash: fixture.hash,
+    providerAccounting: {}
+  });
+
+  assert.deepEqual(await pending, {status: "REJECTED", reason: "run_snapshot_changed"});
+  assert.equal(sends, 0);
+});
+
+test("observation audit replacement during deferred status read cannot redirect or upload", async t => {
+  const fixture = await workerFixture(t);
+  const statusGate = deferred();
+  const statusStarted = deferred();
+  const auditPath = path.join(fixture.root, RUN_ID, "observation-audit.json");
+  const originalPath = path.join(fixture.root, RUN_ID, "captured-observation-audit.json");
+  const outsidePath = path.join(fixture.root, "outside-observation-audit.json");
+  await writeFile(outsidePath, readFileSync(auditPath, "utf8"));
+  let sends = 0;
+  const pending = transferPostRunReport(makeWorkerOptions(fixture, {
+    readStatus: () => {
+      statusStarted.resolve();
+      return statusGate.promise;
+    },
+    readReport: undefined,
+    fetchImpl: async () => { sends++; }
+  }));
+  await statusStarted.promise;
+
+  await rename(auditPath, originalPath);
+  await symlink(outsidePath, auditPath);
   statusGate.resolve({
     status: "FINISHED",
     runId: RUN_ID,
