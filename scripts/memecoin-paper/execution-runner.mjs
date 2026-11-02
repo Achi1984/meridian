@@ -20,6 +20,9 @@ const MAX_LIMITS = Object.freeze({
   maxInputBytes: 8 * 1024 * 1024
 });
 const HASH = /^[a-f0-9]{64}$/;
+const EXTERNAL_INPUT_KIND = "MEMECOIN_EXTERNAL_READ_ONLY_INPUT_V1";
+export const EXTERNAL_INPUT_SOURCE = "UNVERIFIED_EXTERNAL_READ_ONLY_INPUT";
+const externalReadOnlyInputs = new WeakMap();
 
 class InputBudgetError extends RangeError {}
 
@@ -145,6 +148,95 @@ function detachInput(value, remainingBytes) {
   return {value: detached, bytes: canonicalBytes.length};
 }
 
+function freezeData(value) {
+  if (value && typeof value === "object") {
+    for (const item of Object.values(value)) freezeData(item);
+    Object.freeze(value);
+  }
+  return value;
+}
+
+function exactDataKeys(value, expected) {
+  if (!value || typeof value !== "object" || Array.isArray(value) ||
+      Object.getPrototypeOf(value) !== Object.prototype ||
+      Object.getOwnPropertySymbols(value).length !== 0) return false;
+  const keys = Object.getOwnPropertyNames(value);
+  return keys.sort().join(",") === [...expected].sort().join(",") &&
+    keys.every(key => {
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      return descriptor && "value" in descriptor;
+    });
+}
+
+function unverifiedEvidenceGroup(group) {
+  if (!group || typeof group !== "object" || Array.isArray(group)) return {};
+  return Object.fromEntries(Object.entries(group).map(([key, evidence]) => [
+    key,
+    evidence && typeof evidence === "object" && !Array.isArray(evidence)
+      ? {...evidence, verified: false}
+      : evidence
+  ]));
+}
+
+export function createBoundedExternalReadOnlyInput(input) {
+  const detached = detachInput(input, MAX_LIMITS.maxInputBytes);
+  const value = detached.value;
+  if (!exactDataKeys(value, [
+        "kind", "schemaVersion", "producerRevision", "sourceContracts", "timing", "payload"
+      ]) ||
+      value.kind !== EXTERNAL_INPUT_KIND || value.schemaVersion !== 1 ||
+      typeof value.producerRevision !== "string" ||
+      !/^[A-Za-z0-9._:-]{1,160}$/.test(value.producerRevision) ||
+      !exactDataKeys(value.sourceContracts, ["candidateIntakeSha", "evidenceSha", "quotesSha"]) ||
+      !["candidateIntakeSha", "evidenceSha", "quotesSha"].every(key =>
+        value.sourceContracts[key] === null ||
+        (typeof value.sourceContracts[key] === "string" &&
+         /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/.test(value.sourceContracts[key]))) ||
+      !exactDataKeys(value.timing, [
+        "sourceTimestamp", "receiptTimestamp", "uncertaintyMs", "monotonicElapsedMs", "clockSource"
+      ]) ||
+      !integerTime(value.timing.sourceTimestamp) || !integerTime(value.timing.receiptTimestamp) ||
+      value.timing.sourceTimestamp > value.timing.receiptTimestamp ||
+      !Number.isSafeInteger(value.timing.uncertaintyMs) || value.timing.uncertaintyMs < 0 ||
+      !Number.isFinite(value.timing.monotonicElapsedMs) || value.timing.monotonicElapsedMs < 0 ||
+      typeof value.timing.clockSource !== "string" || value.timing.clockSource.length > 120 ||
+      !value.payload || typeof value.payload !== "object" || Array.isArray(value.payload)) {
+    throw new TypeError("external read-only input does not match the bounded v1 contract");
+  }
+  freezeData(value);
+  const digest = createHash("sha256").update(canonicalCheckpointBytes(value)).digest("hex");
+  externalReadOnlyInputs.set(value, {digest, bytes: detached.bytes});
+  return value;
+}
+
+export function normalizeBoundedExternalCandidates(externalReadOnlyInput, maxCandidates = MAX_LIMITS.maxCandidates) {
+  if (!externalReadOnlyInputs.has(externalReadOnlyInput) ||
+      !Number.isSafeInteger(maxCandidates) || maxCandidates < 0 ||
+      maxCandidates > MAX_LIMITS.maxCandidates) {
+    throw new TypeError("a bounded external input and candidate limit are required");
+  }
+  const payload = externalReadOnlyInput.payload;
+  const rows = Array.isArray(payload.candidates) ? payload.candidates
+    : payload.candidate && typeof payload.candidate === "object" && !Array.isArray(payload.candidate)
+      ? [payload.candidate] : [];
+  if (rows.length > maxCandidates) {
+    throw Object.assign(new RangeError("external candidate count exceeds its configured bound"), {
+      code: "CANDIDATE_BOUND"
+    });
+  }
+  return rows.map(row => {
+    if (!row || typeof row !== "object" || Array.isArray(row)) return row;
+    return {
+      ...row,
+      source: EXTERNAL_INPUT_SOURCE,
+      untrustedSourceClaim: row.source ?? null,
+      sampledAt: row.sampledAt ?? externalReadOnlyInput.timing.sourceTimestamp,
+      evidence: unverifiedEvidenceGroup(row.evidence ?? payload.evidence),
+      analystEvidence: unverifiedEvidenceGroup(row.analystEvidence ?? payload.analystEvidence)
+    };
+  });
+}
+
 function syntheticCandidateEvidence(candidate) {
   if (!candidate || candidate.source !== SYNTHETIC_SOURCE) return false;
   for (const group of [candidate.evidence, candidate.analystEvidence]) {
@@ -152,6 +244,18 @@ function syntheticCandidateEvidence(candidate) {
     if (!group || typeof group !== "object" || Array.isArray(group)) return false;
     for (const evidence of Object.values(group)) {
       if (evidence?.source !== SYNTHETIC_SOURCE) return false;
+    }
+  }
+  return true;
+}
+
+function externalCandidateEvidence(candidate) {
+  if (!candidate || candidate.source !== EXTERNAL_INPUT_SOURCE) return false;
+  for (const group of [candidate.evidence, candidate.analystEvidence]) {
+    if (group === undefined) continue;
+    if (!group || typeof group !== "object" || Array.isArray(group)) return false;
+    for (const evidence of Object.values(group)) {
+      if (evidence?.verified !== false) return false;
     }
   }
   return true;
@@ -171,6 +275,8 @@ function syntheticQuote(quote, identity) {
 }
 
 export function createPaperExecutionRunner({
+  externalReadOnlyInput,
+  externalInputByteLimit = MAX_LIMITS.maxInputBytes,
   executionStep,
   session,
   runId,
@@ -185,20 +291,35 @@ export function createPaperExecutionRunner({
   smartWalletAllowlist,
   limits
 } = {}) {
+  let externalInput = null;
+  if (externalReadOnlyInput !== undefined) {
+    externalInput = externalReadOnlyInputs.get(externalReadOnlyInput);
+    if (!externalInput || !Number.isSafeInteger(externalInputByteLimit) ||
+        externalInputByteLimit < 1 || externalInputByteLimit > MAX_LIMITS.maxInputBytes) {
+      throw new TypeError("a bounded external read-only input and byte limit are required");
+    }
+    if (externalInput.bytes > externalInputByteLimit) {
+      throw new RangeError("external read-only input exceeds the configured byte budget");
+    }
+  }
   const bounds = boundedLimits(limits);
   if (typeof runId !== "string" || !/^[A-Za-z0-9._:-]{1,120}$/.test(runId) ||
       !integerTime(startedAt) || !integerTime(endAt) || endAt <= startedAt ||
       endAt > startedAt + EIGHT_HOURS_MS ||
-      executionMode !== "SIMULATED_ONLY" || provenance !== SYNTHETIC_SOURCE ||
+      (externalInput
+        ? executionMode !== "READ_ONLY_EXTERNAL" || provenance !== "UNVERIFIED_CALLER_INPUT"
+        : executionMode !== "SIMULATED_ONLY" || provenance !== SYNTHETIC_SOURCE) ||
       !executionStep || !session || typeof session.snapshot !== "function" ||
       !["authorizeEntry", "executeEntry", "observeExitQuote", "riskSnapshot", "finishRun"]
         .every(method => typeof executionStep[method] === "function") ||
       !candidateSource || typeof candidateSource.poll !== "function" ||
       typeof quoteSource !== "function" || typeof clock !== "function" ||
       typeof stopSource !== "function" ||
-      smartWalletAllowlist?.status !== "VERIFIED" ||
-      smartWalletAllowlist?.provenance !== SYNTHETIC_SOURCE) {
-    throw new TypeError("explicit synthetic PAPER mode, bounded run, and injected sources are required");
+      (!externalInput && (smartWalletAllowlist?.status !== "VERIFIED" ||
+        smartWalletAllowlist?.provenance !== SYNTHETIC_SOURCE))) {
+    throw new TypeError(externalInput
+      ? "explicit bounded external PAPER mode, fresh checkpoint, and injected sources are required"
+      : "explicit synthetic PAPER mode, bounded run, and injected sources are required");
   }
   const metadata = session.metadata;
   if (metadata?.runId !== runId || metadata.startedAt !== startedAt ||
@@ -224,7 +345,20 @@ export function createPaperExecutionRunner({
   const candidatesByMint = new Map();
   const pendingAuthorizationIds = new Set();
   let ledgerUnknownReason = null;
+  let sourceUnknownReason = null;
   let missingTerminalValuationMints = [];
+  let externalCandidateMismatch = false;
+  let externalCandidateDigests = new Set();
+  if (externalInput) {
+    try {
+      externalCandidateDigests = new Set(normalizeBoundedExternalCandidates(
+        externalReadOnlyInput,
+        bounds.maxCandidates
+      ).map(candidate => createHash("sha256").update(canonicalCheckpointBytes(candidate)).digest("hex")));
+    } catch {
+      externalCandidateDigests = new Set();
+    }
+  }
 
   function nextId(purpose) {
     logicalId += 1;
@@ -266,9 +400,27 @@ export function createPaperExecutionRunner({
       receipts: receipts.map(item => ({...item})),
       operationResults: results.map(item => ({...item})),
       missingTerminalValuationMints: [...missingTerminalValuationMints],
+      pendingAuthorizationIds: [...pendingAuthorizationIds],
       terminalResult,
       terminalReceipt: verifiedTerminalReceipt ? {...verifiedTerminalReceipt} : null,
-      summary
+      summary,
+      ...(externalInput ? {
+        externalInputDigest: externalInput.digest,
+        externalInputClaims: {
+          producerRevision: externalReadOnlyInput.producerRevision,
+          sourceContracts: {...externalReadOnlyInput.sourceContracts},
+          timing: {...externalReadOnlyInput.timing}
+        },
+        unresolved: [
+          "candidate-intake producer is not accepted",
+          "market-evidence producer is not accepted",
+          "owner census remains response-reconciled only and cannot satisfy its owner hard gate",
+          "source-bound quote and complete-cost producer is not accepted",
+          "source-time attestation and trusted UTC clock are unavailable",
+          ...(sourceUnknownReason ? [sourceUnknownReason] : []),
+          ...(externalCandidateMismatch ? ["candidate source did not match the bound packet"] : [])
+        ]
+      } : {})
     };
   }
 
@@ -296,8 +448,25 @@ export function createPaperExecutionRunner({
     } else if (!(method === "authorizeEntry" && result?.status === "BLOCKED")) {
       return {unacknowledged: true, result};
     }
-    results.push({method, status: result?.status ?? "INVALID_RESULT",
-      receipt: result?.receipt ? {...result.receipt} : null});
+    const operationResult = {
+      method,
+      status: result?.status ?? "INVALID_RESULT",
+      receipt: result?.receipt ? {...result.receipt} : null
+    };
+    if (externalInput && method === "authorizeEntry") {
+      operationResult.candidateObservation = {
+        chainId: input.candidate?.chainId ?? null,
+        mint: input.candidate?.mint ?? null,
+        pool: input.candidate?.pool ?? null,
+        quote: input.candidate?.quote ?? null,
+        sampledAt: input.candidate?.sampledAt ?? null,
+        source: input.candidate?.source ?? null,
+        sourceClaim: input.candidate?.untrustedSourceClaim ?? null
+      };
+      operationResult.filterResult = result?.filterResult ?? null;
+      operationResult.scoreResult = result?.scoreResult ?? null;
+    }
+    results.push(operationResult);
     if (method === "authorizeEntry" && result?.status === "AUTHORIZED") {
       pendingAuthorizationIds.add(result.authorizationId);
     }
@@ -475,7 +644,22 @@ export function createPaperExecutionRunner({
   }
 
   async function processCandidate(candidate, tick, marks) {
-    if (!syntheticCandidateEvidence(candidate)) {
+    if (externalInput) {
+      const digest = createHash("sha256").update(canonicalCheckpointBytes(candidate)).digest("hex");
+      if (!externalCandidateDigests.has(digest)) {
+        externalCandidateMismatch = true;
+        results.push({
+          method: "candidate",
+          status: "BLOCKED",
+          reason: "external candidate is not bound to the immutable input packet"
+        });
+        return {blocked: true};
+      }
+    }
+    const acceptedCandidateBoundary = externalInput
+      ? externalCandidateEvidence(candidate)
+      : syntheticCandidateEvidence(candidate);
+    if (!acceptedCandidateBoundary) {
       results.push({method: "candidate", status: "BLOCKED", reason: "synthetic fixture provenance required"});
       return {blocked: true};
     }
@@ -497,6 +681,13 @@ export function createPaperExecutionRunner({
     if (authorization.ledgerUnknown) return {ledgerUnknown: true};
     if (authorization.budget || authorization.unacknowledged || authorization.stop) return {stop: true};
     const authResult = authorization.result;
+    if (externalInput) {
+      if (authResult?.status !== "BLOCKED") {
+        state = "UNKNOWN";
+        return {unknown: true};
+      }
+      return {blocked: true};
+    }
     if (authResult?.status !== "AUTHORIZED" ||
         authResult.executionMode !== "SIMULATED_ONLY" || authResult.executionRealistic !== false) {
       return {blocked: authResult?.status === "BLOCKED" || authResult?.status === "REJECT"};
@@ -540,17 +731,20 @@ export function createPaperExecutionRunner({
 
   async function finish(reason, now = null) {
     if (state === "UNKNOWN") return report("UNKNOWN", reason);
+    const knownUnknownReason = ledgerUnknownReason ?? sourceUnknownReason;
+    const noFinishStatus = knownUnknownReason ? "UNKNOWN" : "STOPPED";
+    const reportWithoutFinish = message => report(noFinishStatus, knownUnknownReason ?? message);
     let finishAt;
     try {
       finishAt = readTime();
       if (now !== null && finishAt < now) {
-        return report("STOPPED", "terminal clock regressed; no finish command issued");
+        return reportWithoutFinish("terminal clock regressed; no finish command issued");
       }
     } catch {
-      return report("STOPPED", "clock unavailable; no finish command issued");
+      return reportWithoutFinish("clock unavailable; no finish command issued");
     }
     if (operationCount >= bounds.maxOperations) {
-      return report("STOPPED", "operation capacity reached; no finish command issued");
+      return reportWithoutFinish("operation capacity reached; no finish command issued");
     }
     state = "FINISHING";
     let openPositions;
@@ -571,7 +765,9 @@ export function createPaperExecutionRunner({
     const receipt = result?.receipt;
     if (result?.status === "REJECT" && !receipt) {
       results.push({method: "finishRun", status: result.status, receipt: null});
-      return report("STOPPED", "finish was rejected before dispatch", result);
+      const unknownReason = ledgerUnknownReason ?? sourceUnknownReason;
+      return report(unknownReason ? "UNKNOWN" : "STOPPED",
+        unknownReason ?? "finish was rejected before dispatch", result);
     }
     let checkpointHead;
     try {
@@ -594,8 +790,9 @@ export function createPaperExecutionRunner({
       receipt: {...receipt}});
     state = "FINISHED";
     if (result.status === "UNKNOWN") ledgerUnknownReason = "terminal ledger result is UNKNOWN with a verified receipt";
-    return report(ledgerUnknownReason ? "UNKNOWN" : result.status === "FINISHED" ? "FINISHED" : "STOPPED",
-      ledgerUnknownReason ?? reason, result);
+    const unknownReason = ledgerUnknownReason ?? sourceUnknownReason;
+    return report(unknownReason ? "UNKNOWN" : result.status === "FINISHED" ? "FINISHED" : "STOPPED",
+      unknownReason ?? reason, result);
   }
 
   async function runOnce() {
@@ -635,8 +832,14 @@ export function createPaperExecutionRunner({
           let response;
           try {
             response = await candidateSource.poll({now: pollNow, tick: tickCount - 1});
-          } catch {
-            return finish("CANDIDATE_SOURCE_UNAVAILABLE");
+          } catch (error) {
+            const reason = typeof error?.code === "string" && /^[A-Z0-9_]{1,48}$/.test(error.code)
+              ? error.code : "CANDIDATE_SOURCE_UNAVAILABLE";
+            if (reason === "STOPPED") return finish("SHUTDOWN", pollNow);
+            if (reason === "DEADLINE") return finish("DEADLINE", pollNow);
+            sourceUnknownReason = reason;
+            results.push({method: "candidateSource", status: "UNKNOWN", reason});
+            return finish(reason);
           }
           const afterPollStop = await checkStop(tickCount - 1);
           if (afterPollStop.deadline) return finish("DEADLINE", afterPollStop.now);
@@ -658,6 +861,12 @@ export function createPaperExecutionRunner({
           }
           if (item?.done === true) {
             sourceDone = true;
+            if (item.outcome === "UNKNOWN") {
+              const reason = typeof item.reason === "string" && /^[A-Z0-9_]{1,48}$/.test(item.reason)
+                ? item.reason : "CANDIDATE_SOURCE_UNKNOWN";
+              sourceUnknownReason = reason;
+              results.push({method: "candidateSource", status: "UNKNOWN", reason});
+            }
           } else if (item?.candidate !== undefined) {
             candidateCount += 1;
             const processed = await processCandidate(item.candidate, tickCount - 1, risk.marks);
@@ -688,8 +897,12 @@ export function createPaperExecutionRunner({
       }
       return finish("TICK_BUDGET");
     } catch {
-      return state === "UNKNOWN"
-        ? report("UNKNOWN", "checkpoint outcome uncertain; automatic retry/restart is prohibited")
+      if (state === "UNKNOWN") {
+        return report("UNKNOWN", "checkpoint outcome uncertain; automatic retry/restart is prohibited");
+      }
+      const knownUnknownReason = ledgerUnknownReason ?? sourceUnknownReason;
+      return knownUnknownReason
+        ? report("UNKNOWN", knownUnknownReason)
         : report("STOPPED", "clock or runner input became unavailable; no further work was dispatched");
     }
   }
