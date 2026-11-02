@@ -101,6 +101,30 @@ function resultDigest(value) {
   return sha256(canonicalCheckpointBytes(value));
 }
 
+function invalidEvaluation(expected, unresolved, checks) {
+  return {
+    schema: EVALUATION_SCHEMA,
+    overall: "FAIL",
+    outcome: "INVALID_EVIDENCE",
+    lifecycleStatus: "UNKNOWN",
+    persistence: "UNKNOWN",
+    exportBinding: "EXPORT_ASSERTED",
+    identity: {
+      runId: expected?.runId ?? null,
+      producerRevision: expected?.producerRevision ?? null,
+      configSha256: expected?.configSha256 ?? null,
+      checkpointSha256: null
+    },
+    evidence: {
+      entryFills: null, exits: null, openPositions: null, terminalAt: null,
+      reason: null, realDataSourceCoverage: "NOT_ASSESSED", measuredCosts: "NOT_SUPPLIED"
+    },
+    unresolved: [unresolved],
+    checks,
+    claims: {liveExecution: false, profitability: false, activation: false, sourceReadiness: false}
+  };
+}
+
 function recordHashes(checkpoint) {
   const {runHeader, records} = checkpoint;
   const prefixHash = createHash("sha256").update('{"formatVersion":1,"records":[');
@@ -148,7 +172,7 @@ function checkExport(exportValue, expected, checks) {
 
   if (!exactKeys(exportValue, EXPORT_FIELDS)) {
     fail("export_contract", "export envelope does not use the exact v1 field set");
-    return {exportValue, expectedValid, checks};
+    return invalidEvaluation(expected, "export envelope does not use the exact v1 field set", checks);
   }
   const validSchema = exportValue.schemaVersion === EXPORT_SCHEMA;
   if (validSchema) pass("export_contract", "export uses the agreed memecoin-paper-run-export/v1 envelope");
@@ -565,27 +589,9 @@ export function evaluateMemecoinPaperRunExport(exportBytes, expected) {
     const exportValue = parseBoundedJson(exportBytes);
     return checkExport(exportValue, expected, []);
   } catch (error) {
-    return {
-      schema: EVALUATION_SCHEMA,
-      overall: "FAIL",
-      outcome: "INVALID_EVIDENCE",
-      lifecycleStatus: "UNKNOWN",
-      persistence: "UNKNOWN",
-      exportBinding: "EXPORT_ASSERTED",
-      identity: {
-        runId: expected?.runId ?? null,
-        producerRevision: expected?.producerRevision ?? null,
-        configSha256: expected?.configSha256 ?? null,
-        checkpointSha256: null
-      },
-      evidence: {
-        entryFills: null, exits: null, openPositions: null, terminalAt: null,
-        reason: null, realDataSourceCoverage: "NOT_ASSESSED", measuredCosts: "NOT_SUPPLIED"
-      },
-      unresolved: ["export could not be parsed within its bounded input contract"],
-      checks: [{id: "export_parsing", status: "FAIL", reason: error.message}],
-      claims: {liveExecution: false, profitability: false, activation: false, sourceReadiness: false}
-    };
+    return invalidEvaluation(expected,
+      "export could not be parsed within its bounded input contract",
+      [{id: "export_parsing", status: "FAIL", reason: error.message}]);
   }
 }
 

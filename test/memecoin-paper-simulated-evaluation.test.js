@@ -83,6 +83,21 @@ function check(result, id) {
   return result.checks.find(item => item.id === id);
 }
 
+function assertInvalidDto(result, expected) {
+  assert.deepEqual(Object.keys(result).sort(), [
+    "schema", "overall", "outcome", "lifecycleStatus", "persistence", "exportBinding",
+    "identity", "evidence", "unresolved", "checks", "claims"
+  ].sort());
+  assert.equal(result.overall, "FAIL");
+  assert.equal(result.outcome, "INVALID_EVIDENCE");
+  assert.equal(result.lifecycleStatus, "UNKNOWN");
+  assert.equal(result.persistence, "UNKNOWN");
+  assert.equal(result.identity.runId, expected.runId);
+  assert.equal(result.identity.configSha256, expected.configSha256);
+  assert.equal(result.identity.producerRevision, expected.producerRevision);
+  assert.equal(result.checks.some(item => item.status === "FAIL"), true);
+}
+
 test("actual zero-entry composition export verifies as a distinct complete run", async t => {
   const {result: run, export: runExport} = await produce(t, {fault: "NO_CANDIDATES"});
   const evaluation = evaluate(runExport);
@@ -271,27 +286,55 @@ test("two actual open positions may reuse identical marks across risk and entry 
   assert.equal(check(alteredEvaluation, "mark_reuse_consistency").status, "FAIL");
 });
 
-test("CLI consumes one bounded export file and rejects FIFO input without blocking", async t => {
+test("malformed actual exports return complete invalid DTOs through API and JSON/Markdown CLI", async t => {
   const {export: runExport, expected, directory} = await produce(t, {
     fault: "NO_CANDIDATES",
     runId: "actual-cli-export"
   });
   const exportPath = path.join(directory, "run-export.json");
   await writeFile(exportPath, JSON.stringify(runExport), {flag: "wx"});
-  const args = [
-    CLI, "--export", exportPath,
+  const cliArgs = (filename, format) => [
+    CLI, "--export", filename,
     "--run-id", expected.runId,
     "--config-sha256", expected.configSha256,
     "--producer-revision", expected.producerRevision,
-    "--format", "json"
+    "--format", format
   ];
-  const accepted = spawnSync(process.execPath, args, {encoding: "utf8", timeout: 5_000});
+  const accepted = spawnSync(process.execPath, cliArgs(exportPath, "json"), {
+    encoding: "utf8", timeout: 5_000
+  });
   assert.equal(accepted.status, 0, accepted.stderr);
   assert.equal(JSON.parse(accepted.stdout).outcome, "ZERO_ENTRY_COMPLETE");
 
+  const missingField = structuredClone(runExport);
+  delete missingField.checkpointSha256;
+  assertInvalidDto(evaluate(missingField), expected);
+
+  const missingPath = path.join(directory, "missing-field.json");
+  await writeFile(missingPath, JSON.stringify(missingField), {flag: "wx"});
+  const missingJson = spawnSync(process.execPath, cliArgs(missingPath, "json"), {
+    encoding: "utf8", timeout: 5_000
+  });
+  assert.equal(missingJson.status, 1, missingJson.stderr);
+  assertInvalidDto(JSON.parse(missingJson.stdout), expected);
+
+  const addedField = {...structuredClone(runExport), unexpectedField: true};
+  assertInvalidDto(evaluate(addedField), expected);
+
+  const addedPath = path.join(directory, "added-field.json");
+  await writeFile(addedPath, JSON.stringify(addedField), {flag: "wx"});
+  const addedMarkdown = spawnSync(process.execPath, cliArgs(addedPath, "markdown"), {
+    encoding: "utf8", timeout: 5_000
+  });
+  assert.equal(addedMarkdown.status, 1, addedMarkdown.stderr);
+  assert.match(addedMarkdown.stdout, /Overall evidence status: \*\*FAIL\*\*/);
+  assert.match(addedMarkdown.stdout, /Outcome: \*\*INVALID_EVIDENCE\*\*/);
+  assert.match(addedMarkdown.stdout, /actual-cli-export/);
+  assert.equal(addedMarkdown.stderr, "");
+
   const fifo = path.join(directory, "export.fifo");
   execFileSync("mkfifo", [fifo]);
-  const rejected = spawnSync(process.execPath, [...args.slice(0, 2), fifo, ...args.slice(3)], {
+  const rejected = spawnSync(process.execPath, cliArgs(fifo, "json"), {
     encoding: "utf8",
     timeout: 5_000
   });
