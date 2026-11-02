@@ -534,29 +534,84 @@ test("intermittent progress still hits the total-read cap", {timeout: 15_000}, a
   assert.equal(cancelled, 1);
 });
 
-test("immediately ready empty and nonempty reads yield to the real deadline", {timeout: 2000}, async t => {
-  for (const empty of [true, false]) {
-    await t.test(empty ? "empty chunks" : "one-byte chunks", async () => {
-      let reads = 0;
-      let cancelled = 0;
-      const body = new ReadableStream({
-        pull(controller) {
-          reads += 1;
-          controller.enqueue(empty ? new Uint8Array(0) : new Uint8Array([32]));
-        },
-        cancel() { cancelled += 1; }
-      }, {highWaterMark: 0});
-      const result = await acquire({
-        bounds: {...BOUNDS, maxElapsedMs: 1},
-        transport: async () => ({status: 200, body})
-      });
-      assert.equal(result.reason, "TIMEOUT");
-      assert.equal(result.status, "UNKNOWN");
-      assert.equal(result.rawCensus, null);
-      assert.ok(reads <= 64);
-      assert.equal(cancelled, 1);
-    });
-  }
+test("deadline expiry before dispatch records no request, read, or body cancellation", {timeout: 2000}, async () => {
+  let transportAttempts = 0;
+  let reads = 0;
+  let cancelled = 0;
+  const pending = acquire({
+    bounds: {...BOUNDS, maxElapsedMs: 1},
+    transport: async () => {
+      transportAttempts += 1;
+      return {
+        status: 200,
+        body: {
+          getReader() {
+            return {
+              read() {
+                reads += 1;
+                return Promise.resolve({done: true});
+              },
+              cancel() { cancelled += 1; },
+              releaseLock() {}
+            };
+          }
+        }
+      };
+    }
+  });
+  const spinStartedAt = performance.now();
+  while (performance.now() - spinStartedAt < 5) {}
+
+  const result = await pending;
+  assert.equal(result.reason, "TIMEOUT");
+  assert.equal(result.status, "UNKNOWN");
+  assert.equal(result.rawCensus, null);
+  assert.equal(result.provenance.requestCount, 0);
+  assert.equal(transportAttempts, 0);
+  assert.equal(reads, 0);
+  assert.equal(cancelled, 0);
+});
+
+test("stream deadline after dispatch and first read cancels the existing body", {timeout: 2000}, async () => {
+  let transportAttempts = 0;
+  let reads = 0;
+  let cancelled = 0;
+  const result = await acquire({
+    bounds: {...BOUNDS, maxElapsedMs: 100},
+    transport: async () => {
+      transportAttempts += 1;
+      return {
+        status: 200,
+        body: {
+          getReader() {
+            return {
+              read() {
+                reads += 1;
+                if (reads === 1) {
+                  return Promise.resolve({done: false, value: new Uint8Array([123])});
+                }
+                return new Promise(() => {});
+              },
+              cancel() {
+                cancelled += 1;
+                return Promise.resolve();
+              },
+              releaseLock() {}
+            };
+          }
+        }
+      };
+    }
+  });
+
+  assert.equal(result.reason, "TIMEOUT");
+  assert.equal(result.status, "UNKNOWN");
+  assert.equal(result.rawCensus, null);
+  assert.equal(result.provenance.requestCount, 1);
+  assert.equal(transportAttempts, 1);
+  assert.equal(reads, 2);
+  assert.equal(result.provenance.responseBytes, 1);
+  assert.equal(cancelled, 1);
 });
 
 test("small finite empty chunks do not change a reconciled census", async () => {
