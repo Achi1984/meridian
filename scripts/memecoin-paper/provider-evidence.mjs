@@ -3,6 +3,7 @@ import {
   parseDexScreenerPair,
   parseSolanaLargestAccounts
 } from "./adapters.mjs";
+import {bridgeMintSafetyEvidence} from "../memecoin-paper-token-safety/evidence-bridge.mjs";
 
 const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 const DECIMAL_INTEGER = /^(?:0|[1-9]\d{0,39})$/;
@@ -456,7 +457,7 @@ function unknownRecord(reason, request, observedAt, slot = null) {
   return supportedRecord(null, request, observedAt, slot, {complete: false, reason});
 }
 
-function normalizeCandidate(identity, responses, sampledAt, identityMismatch) {
+function normalizeCandidate(identity, responses, sampledAt, identityMismatch, freshness) {
   const pair = responses.get("pair");
   const supply = responses.get("getTokenSupply");
   const largest = responses.get("getTokenLargestAccounts");
@@ -513,8 +514,52 @@ function normalizeCandidate(identity, responses, sampledAt, identityMismatch) {
   if (!identityMismatch && accountInfo) {
     for (const key of ["mintAuthorityRevoked", "freezeAuthorityRevoked", "tokenExtensions"]) {
       evidence[key] = unknownRecord(
-        "getAccountInfo bytes were not decoded as verified mint authorities or Token-2022 extensions",
+        "getAccountInfo bytes were not bound to token-supply evidence by the mint safety decoder",
         accountInfo.request, accountInfo.receivedAt, accountInfo.slot);
+    }
+  }
+  const mintSafetyEvidence = identityMismatch ? null : bridgeMintSafetyEvidence({
+    identity,
+    accountInfo,
+    supply,
+    sampledAt,
+    maxAcquisitionDurationMs: freshness.maxAcquisitionDurationMs
+  });
+  if (mintSafetyEvidence?.status === "SOURCE_BOUND") {
+    for (const key of ["mintAuthorityRevoked", "freezeAuthorityRevoked", "tokenExtensions"]) {
+      const fact = mintSafetyEvidence.facts[key];
+      evidence[key] = supportedRecord(fact.value,
+        accountInfo.request, accountInfo.receivedAt, accountInfo.slot, {
+          complete: true,
+          decoderStatus: mintSafetyEvidence.decoded.status,
+          sourceBinding: "fixed-request-account-and-supply-match"
+        });
+    }
+    const fact = mintSafetyEvidence.facts.tokenDecimals;
+    evidence.tokenDecimals = supportedRecord(fact.value, supply.request,
+      supply.receivedAt, supply.slot, {
+        complete: true,
+        amountAtoms: mintSafetyEvidence.sourceBinding.supplyAmountAtoms,
+        mintAccountMatch: true,
+        accountSlot: mintSafetyEvidence.sourceBinding.slot
+      });
+  } else if (mintSafetyEvidence?.reasonCodes.some(reason =>
+    reason === "TOKEN_SUPPLY_AMOUNT_MISMATCH" || reason === "TOKEN_SUPPLY_DECIMALS_MISMATCH")) {
+    evidence.tokenDecimals = unknownRecord(
+      mintSafetyEvidence.reasonCodes.filter(reason =>
+        reason === "TOKEN_SUPPLY_AMOUNT_MISMATCH" || reason === "TOKEN_SUPPLY_DECIMALS_MISMATCH")
+        .join("; "),
+      supply?.request ?? accountInfo?.request ?? {provider: "boundary", kind: "getTokenSupply", requested: identity},
+      supply?.receivedAt ?? accountInfo?.receivedAt ?? sampledAt,
+      supply?.slot ?? null);
+  } else if (mintSafetyEvidence) {
+    for (const key of ["mintAuthorityRevoked", "freezeAuthorityRevoked", "tokenExtensions"]) {
+      const fact = mintSafetyEvidence.facts[key];
+      evidence[key] = unknownRecord(fact.reason,
+        accountInfo?.request ?? supply?.request ??
+          {provider: "boundary", kind: "getAccountInfo", requested: identity},
+        accountInfo?.receivedAt ?? supply?.receivedAt ?? sampledAt,
+        accountInfo?.slot ?? supply?.slot ?? null);
     }
   }
   const transactions = identityMismatch ? null : pairData?.transactions1h ?? null;
@@ -533,6 +578,7 @@ function normalizeCandidate(identity, responses, sampledAt, identityMismatch) {
       transactionCounts1h: transactions,
       largestTokenAccounts: identityMismatch ? null : largest?.value?.result?.value ?? null,
       mintAccountInfo: identityMismatch ? null : accountInfo?.value?.result?.value ?? null,
+      mintSafetyEvidence,
       evidence
     },
     identityStatus: identityMismatch ? "UNKNOWN" : "BOUND_TO_REQUEST",
@@ -744,7 +790,7 @@ export async function acquireProviderEvidence(options) {
     const candidateEvents = [...results[index].values()];
     const identityMismatch = candidateEvents.some(item => item.identityMismatch);
     const responseMap = new Map(candidateEvents.map(item => [item.request.kind, item]));
-    return normalizeCandidate(identity, responseMap, sampledAt, identityMismatch);
+    return normalizeCandidate(identity, responseMap, sampledAt, identityMismatch, freshness);
   });
   return {
     status: stoppedReason ? "PARTIAL" : "ACQUISITION_FINISHED",
