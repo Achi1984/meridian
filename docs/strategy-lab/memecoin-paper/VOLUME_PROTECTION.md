@@ -38,6 +38,9 @@ group list), emits a bounded `DISABLED` result, and exits. The image does not
 include or start the Paper application. Do not override its user to `0:0`;
 the build-time GID `1000` preserves the volume's expected group, as required by
 [Northflank's volume group ownership contract](https://northflank.com/docs/v1/application/databases-and-persistence/add-a-volume).
+The Docker-backed regression test checks the image's default UID/GID and that
+the disabled invocation drops to `1000:1000`; it does not mount a volume or
+exercise the repair path.
 
 ## Approved activation
 
@@ -70,9 +73,11 @@ Custom command: /helper/volume-protection.mjs --repair --keepalive
 
 This guarded command is only for the separately approved helper-image
 activation. It uses the helper at `/helper/volume-protection.mjs`; after repair
-and bounded result output, the helper drops to UID/GID `1000:1000` before its
-inert keepalive. Do not use the normal observer's previous CMD as the helper
-command.
+and readback, the helper closes the privileged descriptor, clears supplementary
+groups, drops to and verifies UID/GID `1000:1000`, and only then emits its
+bounded result and enters inert keepalive. A descriptor-close or privilege-drop
+failure exits without output or keepalive. Do not use the normal observer's
+previous CMD as the helper command.
 
 The platform volume name is a placeholder that must be resolved and verified
 by the operator; it is not derived from mountinfo or accepted as helper input.
