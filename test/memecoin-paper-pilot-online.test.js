@@ -229,6 +229,23 @@ test("missing terminal failure evidence is unavailable rather than null", async 
   assert.equal(report.status, "UNKNOWN");
 });
 
+test("conflicting terminal and observation failure codes are unavailable", async t => {
+  const harness = await createHarness(t, {
+    fakeAssemblyOptions: {summaryFailureCode: "MONOTONIC_CLOCK_INVALID"}
+  });
+  assert.equal((await harness.runner.start()).status, "UNKNOWN");
+  const terminalPath = path.join(harness.dataDirectory, "terminal.json");
+  const terminal = JSON.parse(await readFile(terminalPath, "utf8"));
+  terminal.observation.failureCode = "CONTROLLER_REPORT_CALLBACK_MISSING";
+  await writeFile(terminalPath, canonicalJson(terminal));
+
+  const status = await readPilotStatus(harness.dataDirectory);
+  const report = await readPilotReport(harness.dataDirectory);
+  assert.equal(status.status, "UNKNOWN");
+  assert.equal(status.failureCode, "UNKNOWN");
+  assert.equal(report.status, "UNKNOWN");
+});
+
 test("operator report failure code must match persisted terminal evidence", async t => {
   const harness = await createHarness(t, {
     fakeAssemblyOptions: {summaryFailureCode: "MONOTONIC_CLOCK_INVALID"}

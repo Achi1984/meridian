@@ -646,7 +646,9 @@ function summaryCode(value) {
 function terminalFailureEvidence(terminal) {
   if (typeof terminal?.failureCode === "string" &&
       /^[A-Z0-9_:-]{1,80}$/.test(terminal.failureCode)) {
-    return terminal.failureCode;
+    return terminal.observation?.failureCode === terminal.failureCode
+      ? terminal.failureCode
+      : "UNKNOWN";
   }
   if (terminal?.status === "FINISHED" && terminal?.failureCode === null &&
       terminal?.observation?.failureCode === null) {
