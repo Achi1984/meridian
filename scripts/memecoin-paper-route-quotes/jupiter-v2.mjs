@@ -5,6 +5,9 @@ const SCHEMA_VERSION = "2.0.0";
 const MAX_TIMEOUT_MS = 5_000;
 const DEFAULT_TIMEOUT_MS = 1_500;
 const MAX_RESPONSE_BYTES = 256 * 1024;
+const MAX_RESPONSE_READS = 4_096;
+const MAX_EMPTY_RESPONSE_READS = 256;
+const RESPONSE_READ_YIELD_INTERVAL = 32;
 const MAX_REQUEST_BYTES = 2_048;
 const MAX_AMOUNT_DIGITS = 40;
 const MAX_ROUTE_STEPS = 32;
@@ -121,17 +124,34 @@ function parseResponseJson(bytes) {
   }
 }
 
-async function discardResponseBody(response) {
+function observeCancellation(value) {
+  try {
+    void Promise.resolve(value).catch(() => {});
+  } catch {
+    return;
+  }
+}
+
+function cancelReader(reader) {
+  try {
+    observeCancellation(reader.cancel());
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function discardResponseBody(response) {
   const body = response?.body;
   if (!body) return;
   if (typeof body.getReader === "function") {
     let reader;
     try {
       reader = body.getReader();
-      await reader.cancel();
+      if (!cancelReader(reader)) observeCancellation(body.cancel?.());
     } catch {
       try {
-        await body.cancel?.();
+        observeCancellation(body.cancel?.());
       } catch {
         return;
       }
@@ -145,24 +165,24 @@ async function discardResponseBody(response) {
     return;
   }
   try {
-    await body.cancel?.();
+    observeCancellation(body.cancel?.());
   } catch {
     return;
   }
 }
 
-async function readBoundedBody(response, onReader) {
+function checkReadDeadline(deadlineAt) {
+  if (performance.now() >= deadlineAt) throw invalid("REQUEST_TIMEOUT");
+}
+
+async function readBoundedBody(response, onReader, deadlineAt) {
   if (!response.body?.getReader) throw invalid("RESPONSE_BODY_MISSING");
   const reader = response.body.getReader();
-  onReader(async () => {
-    try {
-      await reader.cancel();
-    } catch {
-      return;
-    }
-  });
+  onReader(() => cancelReader(reader));
   const chunks = [];
   let length = 0;
+  let reads = 0;
+  let emptyReads = 0;
   try {
     const contentLength = response.headers?.get?.("content-length");
     if (contentLength !== null && contentLength !== undefined) {
@@ -174,19 +194,30 @@ async function readBoundedBody(response, onReader) {
       throw invalid("CONTENT_TYPE_INVALID");
     }
     while (true) {
+      checkReadDeadline(deadlineAt);
+      reads += 1;
+      if (reads > MAX_RESPONSE_READS) throw invalid("RESPONSE_READ_LIMIT");
       const {done, value} = await reader.read();
+      checkReadDeadline(deadlineAt);
       if (done) break;
       if (!(value instanceof Uint8Array)) throw invalid("RESPONSE_BODY_INVALID");
       length += value.byteLength;
       if (length > MAX_RESPONSE_BYTES) throw invalid("RESPONSE_TOO_LARGE");
-      chunks.push(value);
+      if (value.byteLength === 0) {
+        emptyReads += 1;
+        if (emptyReads > MAX_EMPTY_RESPONSE_READS) {
+          throw invalid("RESPONSE_EMPTY_READ_LIMIT");
+        }
+      } else {
+        chunks.push(value);
+      }
+      if (reads % RESPONSE_READ_YIELD_INTERVAL === 0) {
+        await new Promise(resolve => setImmediate(resolve));
+        checkReadDeadline(deadlineAt);
+      }
     }
   } catch (error) {
-    try {
-      await reader.cancel();
-    } catch {
-      // The response stream may already be closed or aborted.
-    }
+    cancelReader(reader);
     throw error;
   } finally {
     try {
@@ -583,6 +614,7 @@ export function createJupiterV2QuoteAdapter({
       let timeoutHandle;
       let response;
       let cancelActiveReader = null;
+      const deadlineAt = performance.now() + timeoutMs;
       const timeout = new Promise((_, reject) => {
         timeoutHandle = setTimeout(() => {
           timeoutExpired = true;
@@ -605,29 +637,29 @@ export function createJupiterV2QuoteAdapter({
           throw invalid("TRANSPORT_ERROR");
         }
         if (controller.signal.aborted) {
-          await discardResponseBody(response);
+          discardResponseBody(response);
           throw invalid(timeoutExpired ? "REQUEST_TIMEOUT" : "TRANSPORT_ABORTED");
         }
         if (!response || !Number.isInteger(response.status)) throw invalid("TRANSPORT_RESPONSE_INVALID");
         if (isRedirected(response, requestUrl) || (response.status >= 300 && response.status < 400)) {
-          await discardResponseBody(response);
+          discardResponseBody(response);
           throw invalid("REDIRECT_REJECTED");
         }
         if (response.status === 401 || response.status === 403) {
-          await discardResponseBody(response);
+          discardResponseBody(response);
           throw invalid("AUTH_DENIED");
         }
         if (response.status === 429) {
-          await discardResponseBody(response);
+          discardResponseBody(response);
           throw invalid("RATE_LIMITED");
         }
         if (response.status !== 200) {
-          await discardResponseBody(response);
+          discardResponseBody(response);
           throw invalid("HTTP_ERROR");
         }
         const body = await readBoundedBody(response, cancelReader => {
           cancelActiveReader = cancelReader;
-        });
+        }, deadlineAt);
         const route = validateResponse(body, snapshot);
         const observedAt = clock();
         if (!validTime(observedAt) || observedAt < beforeRequest) throw invalid("CLOCK_INVALID");
@@ -672,8 +704,8 @@ export function createJupiterV2QuoteAdapter({
         return result;
       } catch (error) {
         controller.abort();
-        if (cancelActiveReader) await cancelActiveReader();
-        else if (response) await discardResponseBody(response);
+        if (cancelActiveReader) cancelActiveReader();
+        else if (response) discardResponseBody(response);
         const code = timeoutExpired ? "REQUEST_TIMEOUT" : error?.code ?? "TRANSPORT_ERROR";
         const failed = resultBase([code], snapshot, beforeRequest);
         failed.normalization = normalizeUnavailable(

@@ -1,0 +1,24 @@
+[
+  {
+    "chainId": "solana",
+    "tokenAddress": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+    "url": "https://untrusted.example/profile"
+  },
+  {
+    "chainId": "solana",
+    "tokenAddress": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+    "description": "duplicate profile"
+  },
+  {
+    "chainId": "ethereum",
+    "tokenAddress": "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE"
+  },
+  {
+    "chainId": "solana",
+    "tokenAddress": "not-a-solana-address"
+  },
+  {
+    "chainId": "solana",
+    "tokenAddress": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
+  }
+]
