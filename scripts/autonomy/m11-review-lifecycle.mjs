@@ -383,7 +383,11 @@ export async function observeReviewLifecycle({
   const budgetExpired = () => performance.now() - started > maxRuntimeMs || now() >= expiresAt;
   const remainingMs = () => Math.min(maxRuntimeMs - (performance.now() - started), expiresAt - now());
   try {
-    const durableCall = await callWithinBudget(store.reconcile.bind(store), executionKey, remainingMs());
+    const durableCall = await callWithinBudget(
+      ({signal}) => store.reconcile(executionKey, {signal}),
+      {},
+      remainingMs()
+    );
     if (durableCall.timedOut || durableCall.error || durableCall.value?.status !== 'READY') {
       return unknown('DURABLE_CLAIM_EVIDENCE_MISSING_OR_CONFLICTING', false);
     }
