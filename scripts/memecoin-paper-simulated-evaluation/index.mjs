@@ -462,7 +462,7 @@ function checkExport(exportValue, expected, checks) {
   if (runtimeAudit !== undefined) {
     let runtimeAuditValid = config?.mode === "SYNTHETIC_TEST_ONLY" &&
       exactKeys(runtimeAudit, ["schemaVersion", "source", "truncated", "candidates"]) &&
-      runtimeAudit.schemaVersion === "memecoin-paper-source-quote-audit/v1" &&
+      runtimeAudit.schemaVersion === "memecoin-paper-source-quote-audit/v2" &&
       runtimeAudit.source === SYNTHETIC_SOURCE &&
       runtimeAudit.truncated === false &&
       Array.isArray(runtimeAudit.candidates) && runtimeAudit.candidates.length > 0 &&
@@ -495,14 +495,16 @@ function checkExport(exportValue, expected, checks) {
             candidate.assembledAt > candidate.decisionAt ||
             !exactKeys(pipeline, [
               "status", "filtersStatus", "filtersAccepted", "analystStatus",
+              "analystEvidenceSha256",
               "sourceIdentityValid", "marketPairChronologyValid",
               "syntheticAnalystEvidence", "acquisitionReceiptIds"
             ]) ||
-            !["COMPLETE", "PARTIAL"].includes(pipeline.status) ||
+            !["COMPLETE", "PARTIAL", "NORMALIZED"].includes(pipeline.status) ||
             !["PASS", "UNKNOWN", "FAIL"].includes(pipeline.filtersStatus) ||
             typeof pipeline.filtersAccepted !== "boolean" ||
             (pipeline.filtersAccepted && pipeline.filtersStatus !== "PASS") ||
             typeof pipeline.analystStatus !== "string" ||
+            !HASH.test(pipeline.analystEvidenceSha256 ?? "") ||
             typeof pipeline.sourceIdentityValid !== "boolean" ||
             typeof pipeline.marketPairChronologyValid !== "boolean" ||
             pipeline.syntheticAnalystEvidence !== SYNTHETIC_SOURCE ||
@@ -527,30 +529,46 @@ function checkExport(exportValue, expected, checks) {
         for (const quote of candidate.quotes) {
           const costsComplete = exactKeys(quote?.costs, COST_KEYS) &&
             COST_KEYS.every(key => Number.isSafeInteger(quote.costs[key]) && quote.costs[key] >= 0);
-          const matchesCheckpointQuote = quote?.paperFillEligible === true && checkpointShape &&
-            checkpointQuotes.some(checkpointQuote =>
-              ["chainId", "mint", "pool", "quote", "decimals"].every(key =>
-                checkpointQuote[key] === identity[key]) &&
-              checkpointQuote.source === SYNTHETIC_SOURCE &&
-              checkpointQuote.observedAt === quote.observedAt &&
-              checkpointQuote.priceMicros === quote.paperPriceMicros &&
-              checkpointQuote.costBasis === "SYNTHETIC_FIXED_CENT_SCHEDULE_V1" &&
-              exactKeys(checkpointQuote.costs, COST_KEYS) &&
-              COST_KEYS.every(key => checkpointQuote.costs[key] === quote.costs[key]));
-          const matchesEntry = quote?.purpose !== "entry" || (checkpointShape &&
+          const matchesCheckpointInput = input => input?.source === SYNTHETIC_SOURCE &&
+            ["chainId", "mint", "pool", "quote", "decimals"].every(key =>
+              input[key] === identity[key]) &&
+            input.observedAt === quote?.observedAt &&
+            input.priceMicros === quote?.paperPriceMicros &&
+            input.costBasis === quote?.costBasis &&
+            exactKeys(input.costs, COST_KEYS) &&
+            COST_KEYS.every(key => input.costs[key] === quote?.costs?.[key]);
+          const consumedEntry = quote?.purpose === "entry" && checkpointShape &&
             records.some(record => record.method === "executeEntry" &&
-              record.inputs?.quote?.source === SYNTHETIC_SOURCE &&
-              record.inputs.quote.observedAt === quote.observedAt &&
-              record.inputs.quote.mint === identity.mint &&
-              record.inputs.quote.priceMicros === quote.paperPriceMicros &&
-              exactKeys(record.inputs.quote.costs, COST_KEYS) &&
-              COST_KEYS.every(key => record.inputs.quote.costs[key] === quote.costs?.[key])));
+              matchesCheckpointInput(record.inputs?.quote));
+          const consumedMark = quote?.purpose === "risk-mark" && checkpointShape &&
+            records.some(record => record.method === "observeExitQuote" &&
+              matchesCheckpointInput(record.inputs?.quote));
+          const consumedRiskExit = quote?.purpose === "risk-exit" && checkpointShape &&
+            records.some(record => record.method === "riskSnapshot" &&
+              record.inputs?.marks?.some(matchesCheckpointInput));
+          const consumed = consumedEntry || consumedMark || consumedRiskExit;
+          const unusedDispositionValid = quote?.disposition === "NOT_CONSUMED_DEADLINE"
+            ? runnerReport?.reason === "DEADLINE"
+            : quote?.disposition === "NOT_CONSUMED_STOPPED"
+              ? runnerReport?.reason === "SHUTDOWN" &&
+                ["STOPPED", "FINISHED"].includes(runnerReport?.status)
+              : quote?.disposition === "NOT_CONSUMED_POLICY"
+                ? runnerReport?.status !== "UNKNOWN"
+                : quote?.disposition === "CONSUMPTION_UNKNOWN" &&
+                  runnerReport?.status === "UNKNOWN";
+          const consumptionDispositionValid = quote?.disposition === "CHECKPOINT_CONSUMED_ENTRY"
+            ? consumedEntry
+            : quote?.disposition === "CHECKPOINT_CONSUMED_MARK"
+              ? consumedMark
+              : quote?.disposition === "CHECKPOINT_CONSUMED_RISK_EXIT"
+                ? consumedRiskExit
+                : false;
           if (!exactKeys(quote, [
             "purpose", "adapterStatus", "adapterReasons", "adapterSourceProvenance",
             "adapterAuthorizationEligible", "adapterCostStatus", "adapterEventId",
             "observedAt", "receiptAt", "routeIdentityValid", "causalAt",
             "chronologyValid", "identity", "selectedPool",
-            "paperFillEligible", "paperPriceMicros", "costBasis", "costs"
+            "paperFillEligible", "paperPriceMicros", "costBasis", "costs", "disposition"
           ]) || !["entry", "risk-mark", "risk-exit"].includes(quote.purpose) ||
               quote.adapterStatus !== "UNAVAILABLE" ||
               !Array.isArray(quote.adapterReasons) || quote.adapterReasons.length > 16 ||
@@ -578,11 +596,22 @@ function checkExport(exportValue, expected, checks) {
                 (!Number.isSafeInteger(quote.paperPriceMicros) || quote.paperPriceMicros <= 0)) ||
               (quote.costBasis !== null &&
                 quote.costBasis !== "SYNTHETIC_FIXED_CENT_SCHEDULE_V1") ||
+              (quote.disposition === "NOT_FILL_ELIGIBLE" && quote.paperFillEligible) ||
+              (quote.disposition === "PENDING") ||
               (quote.paperFillEligible &&
                 (!costsComplete || quote.costBasis !== "SYNTHETIC_FIXED_CENT_SCHEDULE_V1" ||
                  quote.paperPriceMicros === null || quote.selectedPool !== identity.pool ||
                  quote.adapterEventId === null || quote.routeIdentityValid !== true ||
-                 quote.chronologyValid !== true || !matchesCheckpointQuote || !matchesEntry))) {
+                 quote.chronologyValid !== true || pipeline.analystStatus !== "PASS" ||
+                 !pipeline.filtersAccepted ||
+                 (consumed ? !consumptionDispositionValid : !unusedDispositionValid))) ||
+              (!quote.paperFillEligible && quote.disposition !== "NOT_FILL_ELIGIBLE") ||
+              (["CHECKPOINT_CONSUMED_ENTRY", "CHECKPOINT_CONSUMED_MARK",
+                "CHECKPOINT_CONSUMED_RISK_EXIT"].includes(quote.disposition) &&
+               !consumptionDispositionValid) ||
+              (["NOT_CONSUMED_DEADLINE", "NOT_CONSUMED_STOPPED",
+                "NOT_CONSUMED_POLICY", "CONSUMPTION_UNKNOWN"].includes(quote.disposition) &&
+               !unusedDispositionValid)) {
             runtimeAuditValid = false;
             break;
           }
@@ -592,23 +621,63 @@ function checkExport(exportValue, expected, checks) {
     }
     if (runtimeAuditValid && checkpointShape) {
       for (const record of records.slice(1)) {
-        const quote = record.inputs?.quote;
-        if (!quote || quote.source !== SYNTHETIC_SOURCE ||
-            !runtimeAudit.candidates.some(candidate =>
-              ["chainId", "mint", "pool", "quote", "decimals"].every(key =>
-                candidate.identity[key] === quote[key]))) continue;
-        const purpose = record.method === "executeEntry" ? "entry"
-          : record.method === "observeExitQuote" ? "risk-mark" : null;
-        if (!purpose || !runtimeAudit.candidates.some(candidate =>
-          candidate.quotes.some(auditQuote =>
-            auditQuote.purpose === purpose && auditQuote.paperFillEligible &&
-            auditQuote.observedAt === quote.observedAt &&
-            auditQuote.paperPriceMicros === quote.priceMicros &&
-            auditQuote.costBasis === quote.costBasis &&
-            exactKeys(auditQuote.costs, COST_KEYS) &&
-            COST_KEYS.every(key => auditQuote.costs[key] === quote.costs[key]) &&
+        const quoteRequirements = [];
+        if (record.method === "executeEntry" && record.inputs?.quote?.source === SYNTHETIC_SOURCE) {
+          quoteRequirements.push({
+            quote: record.inputs.quote,
+            purpose: "entry",
+            disposition: "CHECKPOINT_CONSUMED_ENTRY"
+          });
+        } else if (record.method === "observeExitQuote" &&
+            record.inputs?.quote?.source === SYNTHETIC_SOURCE) {
+          quoteRequirements.push({
+            quote: record.inputs.quote,
+            purpose: "risk-mark",
+            disposition: "CHECKPOINT_CONSUMED_MARK"
+          });
+        }
+        if (record.method === "riskSnapshot" && Array.isArray(record.inputs?.marks)) {
+          for (const quote of record.inputs.marks.filter(item => item?.source === SYNTHETIC_SOURCE)) {
+            quoteRequirements.push({
+              quote,
+              purpose: null,
+              disposition: null
+            });
+          }
+        }
+        for (const requirement of quoteRequirements) {
+          const quote = requirement.quote;
+          const bound = runtimeAudit.candidates.some(candidate =>
             ["chainId", "mint", "pool", "quote", "decimals"].every(key =>
-              candidate.identity[key] === quote[key])))) {
+              candidate.identity[key] === quote[key]) &&
+            candidate.quotes.some(auditQuote =>
+              auditQuote.paperFillEligible &&
+              (requirement.purpose === null
+                ? (auditQuote.purpose === "risk-mark" &&
+                    auditQuote.disposition === "CHECKPOINT_CONSUMED_MARK" ||
+                   auditQuote.purpose === "risk-exit" &&
+                    auditQuote.disposition === "CHECKPOINT_CONSUMED_RISK_EXIT")
+                : auditQuote.purpose === requirement.purpose &&
+                  auditQuote.disposition === requirement.disposition) &&
+              auditQuote.observedAt === quote.observedAt &&
+              auditQuote.paperPriceMicros === quote.priceMicros &&
+              auditQuote.costBasis === quote.costBasis &&
+              exactKeys(auditQuote.costs, COST_KEYS) &&
+              COST_KEYS.every(key => auditQuote.costs[key] === quote.costs[key])));
+          if (!bound) {
+            runtimeAuditValid = false;
+            break;
+          }
+        }
+        if (!runtimeAuditValid) break;
+      }
+      for (const operation of operationResults ?? []) {
+        if (operation?.method !== "authorizeEntry" ||
+            typeof operation.candidateMint !== "string") continue;
+        const candidate = runtimeAudit.candidates.find(item =>
+          item.identity.mint === operation.candidateMint);
+        if (candidate &&
+            operation.candidateAnalystEvidenceSha256 !== candidate.pipeline.analystEvidenceSha256) {
           runtimeAuditValid = false;
           break;
         }

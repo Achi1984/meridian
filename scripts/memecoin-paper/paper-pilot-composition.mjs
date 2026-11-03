@@ -45,6 +45,7 @@ const offlineFixtureAdaptersBySource = new WeakMap();
 const FIXTURE_FAULTS = new Set([
   "NONE", "PIPELINE_QUOTE", "PIPELINE_QUOTE_DUPLICATE", "PIPELINE_QUOTE_WAIT",
   "PIPELINE_QUOTE_DEADLINE",
+  "PIPELINE_QUOTE_DEADLINE_AFTER_ENTRY", "PIPELINE_QUOTE_STOP_AFTER_ENTRY",
   "PIPELINE_QUOTE_MISSING_QUOTE", "PIPELINE_QUOTE_MISSING_COSTS",
   "PIPELINE_QUOTE_WRONG_IDENTITY", "PIPELINE_QUOTE_ROUTE_IDENTITY",
   "PIPELINE_QUOTE_FUTURE_EVIDENCE",
@@ -918,6 +919,25 @@ export function createPaperPilotComposition(options = {}) {
     }));
     const operationInputs = [];
     const quoteReceipts = new Map();
+    const fixtureRuntimeState = offlineFixtureAdaptersBySource.get(adapters);
+    function recordRuntimeQuoteDisposition(quote, purpose, disposition) {
+      if (!fixtureRuntimeState || !quote) return;
+      for (const candidate of fixtureRuntimeState.runtimeAudits) {
+        const identity = candidate.identity;
+        if (!["chainId", "mint", "pool", "quote", "decimals"].every(key =>
+          identity[key] === quote[key])) continue;
+        const auditQuote = candidate.quotes.find(item =>
+          item.purpose === purpose && item.disposition === "PENDING" &&
+          item.observedAt === quote.observedAt &&
+          item.paperPriceMicros === quote.priceMicros &&
+          Object.keys(item.costs ?? {}).length === Object.keys(quote.costs ?? {}).length &&
+          Object.entries(item.costs ?? {}).every(([key, value]) => quote.costs?.[key] === value));
+        if (auditQuote) {
+          auditQuote.disposition = disposition;
+          return;
+        }
+      }
+    }
     if (fault === "DEADLINE_BEFORE_FIRST_RISK_SNAPSHOT") {
       const remainingMs = deadlineAt - clock.wallClock();
       if (remainingMs > 0) clock.advance(remainingMs + 1);
@@ -1110,6 +1130,11 @@ export function createPaperPilotComposition(options = {}) {
         identity: {chainId: quote.chainId, mint: quote.mint, pool: quote.pool, quote: quote.quote},
         units: {price: "priceMicros", costs: "integer cents", quantity: "token base units"}
       });
+      if (fault === "PIPELINE_QUOTE_DEADLINE_AFTER_ENTRY" && purpose === "ENTRY") {
+        clock.advance(Math.max(1, compositionDeadlineAt - clock.wallClock() + 1));
+      } else if (fault === "PIPELINE_QUOTE_STOP_AFTER_ENTRY" && purpose === "ENTRY") {
+        abort.abort();
+      }
       if (purpose === "ENTRY" &&
           !["feeCents", "spreadCents", "slippageCents", "priceImpactCents", "networkCents"]
             .every(key => Object.hasOwn(quote.costs ?? {}, key))) {
@@ -1131,6 +1156,17 @@ export function createPaperPilotComposition(options = {}) {
       chargeEvent();
       const stepInput = Object.hasOwn(input, "now") ? input : {...input, now: readTime().wall};
       const result = await executionStep[method](stepInput);
+      if (result?.receipt) {
+        if (method === "executeEntry") {
+          recordRuntimeQuoteDisposition(stepInput.quote, "entry", "CHECKPOINT_CONSUMED_ENTRY");
+        } else if (method === "observeExitQuote") {
+          recordRuntimeQuoteDisposition(stepInput.quote, "risk-mark", "CHECKPOINT_CONSUMED_MARK");
+        } else if (method === "riskSnapshot") {
+          for (const mark of stepInput.marks ?? []) {
+            recordRuntimeQuoteDisposition(mark, "risk-exit", "CHECKPOINT_CONSUMED_RISK_EXIT");
+          }
+        }
+      }
       if (result?.status === "REJECT" && /byte|input capacity/i.test(result.reason ?? "")) {
         adapterFailureCode ??= "BYTE_BUDGET";
         strategyOverride ??= "BYTE_BUDGET";
@@ -1183,7 +1219,17 @@ export function createPaperPilotComposition(options = {}) {
       }
     });
     const runnerResult = await runner.run();
-    const fixtureRuntimeState = offlineFixtureAdaptersBySource.get(adapters);
+    if (fixtureRuntimeState?.sourceMode === "SYNTHETIC_TEST_ONLY") {
+      for (const candidate of fixtureRuntimeState.runtimeAudits) {
+        for (const quote of candidate.quotes) {
+          if (quote.disposition !== "PENDING") continue;
+          quote.disposition = runnerResult.reason === "DEADLINE" ? "NOT_CONSUMED_DEADLINE"
+            : runnerResult.reason === "SHUTDOWN" ? "NOT_CONSUMED_STOPPED"
+              : runnerResult.status === "UNKNOWN" ? "CONSUMPTION_UNKNOWN"
+                : "NOT_CONSUMED_POLICY";
+        }
+      }
+    }
     runnerReport = sourceMode
       ? {...runnerResult, sourcePolicy: sourcePolicyAssessment ?? {
           policySha256: config.sourcePolicySha256,
@@ -1198,7 +1244,7 @@ export function createPaperPilotComposition(options = {}) {
         ? {
             ...runnerResult,
             runtimeAudit: {
-              schemaVersion: "memecoin-paper-source-quote-audit/v1",
+              schemaVersion: "memecoin-paper-source-quote-audit/v2",
               source: SYNTHETIC_SOURCE,
               truncated: fixtureRuntimeState.runtimeAudits.length > 100,
               candidates: fixtureRuntimeState.runtimeAudits.slice(0, 100)

@@ -225,8 +225,15 @@ export async function acquireSyntheticRuntimeFixture(clock, {
     import("../../test/fixtures/memecoin-paper-route-quotes/jupiter-v2-order.mjs")
   ]);
   const candidateT = clock.wallClock() - 1_000;
-  const fixture = makeFixture({candidateT});
+  const fixture = makeFixture({candidateT, buyCount: 5, sellCount: 2, includeBoundaryRows: false});
   const completeFixture = reviewedFixtureEvidence(fixture, candidateT);
+  const orderedTransactions = [...fixture.transactions]
+    .sort((left, right) => left.blockTime - right.blockTime ||
+      left.signature.localeCompare(right.signature));
+  const firstTransactionSlot = 490_002;
+  const lastTransactionSlot = firstTransactionSlot + orderedTransactions.length - 1;
+  const endBoundarySlot = lastTransactionSlot + 1;
+  const afterBoundarySlot = endBoundarySlot + 1;
   const marketPairEvidence = variant === "WRONG_IDENTITY"
     ? {
         ...fixture.marketPairEvidence,
@@ -238,10 +245,29 @@ export async function acquireSyntheticRuntimeFixture(clock, {
   const slotTimes = new Map([
     [490_000, Math.floor((candidateT - 3_601_000) / 1_000)],
     [490_001, Math.floor((candidateT - 3_600_000) / 1_000)],
-    [490_003, Math.floor((candidateT - 3_599_000) / 1_000)],
-    [490_004, Math.floor(candidateT / 1_000)],
-    [490_006, Math.floor((candidateT + 1_000) / 1_000)]
+    ...orderedTransactions.map((row, index) =>
+      [firstTransactionSlot + index, row.blockTime]),
+    [endBoundarySlot, Math.floor(candidateT / 1_000)],
+    [afterBoundarySlot, Math.floor((candidateT + 1_000) / 1_000)]
   ]);
+  const collectorRows = orderedTransactions.map((row, index) => {
+    const slot = firstTransactionSlot + index;
+    return {
+      ...row,
+      slot,
+      subjectAddresses: [fixture.identity.pool],
+      status: "SUCCESS",
+      version: "legacy"
+    };
+  });
+  const collectorSignatures = collectorRows.map(row => ({
+    signature: row.signature,
+    slot: row.slot,
+    blockTime: row.blockTime,
+    err: null,
+    errorStatus: null,
+    subjectAddresses: [fixture.identity.pool]
+  }));
   const rpcMethods = [];
   const transport = async request => {
     if (expireDuringRequest) clock.advance(remaining.timeMs + 1);
@@ -259,7 +285,7 @@ export async function acquireSyntheticRuntimeFixture(clock, {
     const body = JSON.parse(request.body);
     rpcMethods.push(body.method);
     const result = body.method === "getSlot" ? 490_016
-      : body.method === "getBlocks" ? [490_000, 490_001, 490_003, 490_004, 490_006]
+      : body.method === "getBlocks" ? [...slotTimes.keys()]
         : body.method === "getBlockTime" ? slotTimes.get(body.params[0]) ?? null
           : null;
     const response = JSON.stringify({jsonrpc: "2.0", id: body.id, result});
@@ -271,7 +297,15 @@ export async function acquireSyntheticRuntimeFixture(clock, {
   };
   const historySlotCollector = request => {
     if (signal?.aborted) throw Object.assign(new Error("fixture acquisition cancelled"), {code: "STOPPED"});
-    const payload = JSON.stringify({fixture: "SYNTHETIC_FIXTURE_ONLY"});
+    const transactions = collectorRows.filter(row =>
+      row.slot >= request.startSlot && row.slot <= request.endSlot);
+    const signatures = collectorSignatures.filter(row =>
+      row.slot >= request.startSlot && row.slot <= request.endSlot);
+    const payload = JSON.stringify({
+      fixture: "SYNTHETIC_FIXTURE_ONLY",
+      signatures: signatures.length,
+      transactions: transactions.length
+    });
     chargeRequest(Buffer.byteLength(payload));
     return {
       sourceVersion: "solana-launch-history-source-v1",
@@ -280,8 +314,8 @@ export async function acquireSyntheticRuntimeFixture(clock, {
       commitment: "finalized",
       declaredSubjects: request.subjects,
       slotInterval: {startInclusive: request.startSlot, endInclusive: request.endSlot},
-      signatures: [],
-      transactions: [],
+      signatures,
+      transactions,
       events: [{
         origin: "https://api.mainnet-beta.solana.com",
         method: "getSlot",
@@ -294,9 +328,9 @@ export async function acquireSyntheticRuntimeFixture(clock, {
       counters: {
         requests: 1,
         bytes: Buffer.byteLength(payload),
-        workUnits: 1,
-        signatures: 0,
-        successfulTransactions: 0
+        workUnits: 1 + transactions.length,
+        signatures: signatures.length,
+        successfulTransactions: transactions.length
       },
       coverage: {
         scope: "declared-subjects-and-inclusive-slot-interval-only",
@@ -317,7 +351,7 @@ export async function acquireSyntheticRuntimeFixture(clock, {
   const pipeline = createPaperSourcePipeline({
     enabled: true,
     mode: "SYNTHETIC_TEST_ONLY",
-    slotRange: {startInclusive: 490_000, endInclusive: 490_006},
+    slotRange: {startInclusive: 490_000, endInclusive: afterBoundarySlot},
     transport,
     clock: () => clock.wallClock(),
     limits: {
@@ -374,15 +408,7 @@ export async function acquireSyntheticRuntimeFixture(clock, {
       quote: null
     };
   }
-  const liquidityCoverage = evaluation.candidate.analystEvidence?.liquidityMarketCapPct?.coverage;
-  if (liquidityCoverage && Object.hasOwn(liquidityCoverage, "windowMs") &&
-      liquidityCoverage.windowMs === undefined) {
-    delete liquidityCoverage.windowMs;
-  }
-  const runtimeCandidate = {
-    ...evaluation.candidate,
-    analystEvidence: completeFixture.candidate.analystEvidence
-  };
+  const runtimeCandidate = evaluation.candidate;
   const runtimeAudit = {
     source: "SYNTHETIC_FIXTURE_ONLY",
     candidateT: evaluation.candidateT,
@@ -400,6 +426,8 @@ export async function acquireSyntheticRuntimeFixture(clock, {
       filtersStatus: evaluation.filters?.status ?? "UNKNOWN",
       filtersAccepted: evaluation.filters?.accepted === true,
       analystStatus: evaluation.analysis?.status ?? "UNKNOWN",
+      analystEvidenceSha256: createHash("sha256")
+        .update(canonicalCheckpointBytes(runtimeCandidate.analystEvidence)).digest("hex"),
       sourceIdentityValid: ["chainId", "mint", "pool", "quote"].every(key =>
         marketPairEvidence?.identity?.[key] === runtimeCandidate[key]),
       marketPairChronologyValid: Number.isSafeInteger(marketPairEvidence?.observedAt) &&
@@ -557,7 +585,7 @@ export async function acquireSyntheticRuntimeFixture(clock, {
         if (variant === "MISSING_COSTS") delete paperQuote.costs.networkCents;
       }
     }
-    runtimeAudit.quotes.push({
+    const auditQuote = {
       purpose: side === "ENTRY" ? "entry"
         : String(purpose).includes("risk-exit") || purpose === "RISK_EXIT" ? "risk-exit" : "risk-mark",
       adapterStatus: adapterResult.status,
@@ -578,8 +606,12 @@ export async function acquireSyntheticRuntimeFixture(clock, {
         Object.keys(FIXTURE_COST_CONTRACT.costs).every(key => Object.hasOwn(paperQuote.costs, key))),
       paperPriceMicros: paperQuote?.priceMicros ?? null,
       costBasis: paperQuote?.costBasis ?? null,
-      costs: paperQuote?.costs ?? null
-    });
+      costs: paperQuote?.costs ?? null,
+      disposition: paperQuote &&
+        Object.keys(FIXTURE_COST_CONTRACT.costs).every(key => Object.hasOwn(paperQuote.costs, key))
+        ? "PENDING" : "NOT_FILL_ELIGIBLE"
+    };
+    runtimeAudit.quotes.push(auditQuote);
     return paperQuote;
   };
   attachRuntime();

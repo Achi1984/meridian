@@ -366,7 +366,8 @@ export function createPaperSourcePipeline({
             priceSource: cachedPriceSource,
             marketPairEvidence,
             smartWalletAllowlist,
-            sourcePrefetchOnly: true
+            sourcePrefetchOnly: true,
+            syntheticHistorySourceOverride: mode === "SYNTHETIC_TEST_ONLY"
           });
         } catch {
           return unavailable("ANALYST_SOURCE_PREFETCH_UNKNOWN", {
@@ -414,7 +415,8 @@ export function createPaperSourcePipeline({
             censusSource: cachedCensusSource,
             priceSource: cachedPriceSource,
             marketPairEvidence,
-            smartWalletAllowlist
+            smartWalletAllowlist,
+            syntheticHistorySourceOverride: mode === "SYNTHETIC_TEST_ONLY"
           });
         } catch {
           return unavailable("ANALYST_EVIDENCE_BUILD_UNKNOWN", {

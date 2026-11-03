@@ -334,6 +334,7 @@ test("synthetic runtime fixture carries adapter quotes through entry, risk, exit
   const candidate = runtime.candidates[0];
   assert.equal(candidate.pipeline.filtersStatus, "PASS");
   assert.equal(candidate.pipeline.filtersAccepted, true);
+  assert.equal(candidate.pipeline.analystStatus, "PASS");
   assert.equal(candidate.pipeline.syntheticAnalystEvidence, "SYNTHETIC_FIXTURE_ONLY");
   assert.ok(candidate.pipeline.acquisitionReceiptIds.length > 0);
   assert.ok(candidate.assembledAt >= candidate.candidateT);
@@ -354,6 +355,11 @@ test("synthetic runtime fixture carries adapter quotes through entry, risk, exit
     item.method === "executeEntry" && item.status === "FILLED_PAPER"), true);
   assert.equal(report.runnerReport.operationResults.some(item =>
     item.method === "observeExitQuote" && item.status === "CLOSED_PAPER"), true);
+  const authorization = report.runnerReport.operationResults.find(item =>
+    item.method === "authorizeEntry");
+  assert.equal(authorization.candidateMint, candidate.identity.mint);
+  assert.equal(authorization.candidateAnalystEvidenceSha256,
+    candidate.pipeline.analystEvidenceSha256);
   assert.deepEqual(report.runnerReport.terminalResult.openPositions, []);
   assert.equal(report.persistence, "ACKNOWLEDGED");
   assert.equal(report.exportBinding, "PRESTART_BOUND");
@@ -376,6 +382,43 @@ test("synthetic runtime fixture carries adapter quotes through entry, risk, exit
   assert.equal(evaluation.claims.liveExecution, false);
 });
 
+test("valid entry quote stopped or expired before execution is explicitly unconsumed", async t => {
+  for (const [runId, fault, status, reason, disposition] of [
+    ["quote-before-stop", "PIPELINE_QUOTE_STOP_AFTER_ENTRY", "STOPPED", "SHUTDOWN", "NOT_CONSUMED_STOPPED"],
+    ["quote-before-deadline", "PIPELINE_QUOTE_DEADLINE_AFTER_ENTRY", "FINISHED", "DEADLINE", "NOT_CONSUMED_DEADLINE"]
+  ]) {
+    const {pilot} = await harness(t, {
+      fault,
+      runConfig: config({
+        runId,
+        budgets: {...BUDGETS, requests: 40, cycles: 8}
+      })
+    });
+    const result = await pilot.start();
+    const report = result.report;
+    const auditQuote = report.runnerReport.runtimeAudit.candidates[0].quotes[0];
+    assert.equal(result.status, status);
+    assert.equal(report.runnerReport.reason, reason);
+    assert.equal(auditQuote.purpose, "entry");
+    assert.equal(auditQuote.paperFillEligible, true);
+    assert.equal(auditQuote.disposition, disposition);
+    assert.equal(report.runnerReport.operationResults.some(item =>
+      item.method === "executeEntry"), false);
+    assert.deepEqual(report.runnerReport.terminalResult.openPositions, []);
+    const bytes = canonicalCheckpointBytes(report);
+    const parsed = JSON.parse(bytes.toString("utf8"));
+    assert.deepEqual(parsed.runnerReport.runtimeAudit, report.runnerReport.runtimeAudit);
+    const evaluation = evaluateMemecoinPaperRunExport(bytes, {
+      runId: report.runId,
+      configSha256: createHash("sha256")
+        .update(canonicalCheckpointBytes(report.config)).digest("hex"),
+      producerRevision: report.producerRevision
+    });
+    assert.equal(evaluation.checks.find(item => item.id === "runtime_source_quote_audit").status, "PASS");
+    assert.equal(evaluation.evidence.entryFills, 0);
+  }
+});
+
 test("pipeline and adapter identity, chronology, quote, and cost failures remain no-entry", async t => {
   for (const [runId, fault, sourceIdentityValid, marketPairChronologyValid, expectedAdapterCalls] of [
     ["pipeline-wrong-identity", "PIPELINE_QUOTE_WRONG_IDENTITY", false, true, 0],
@@ -385,7 +428,7 @@ test("pipeline and adapter identity, chronology, quote, and cost failures remain
     ["pipeline-route-identity", "PIPELINE_QUOTE_ROUTE_IDENTITY", true, true, 1]
   ]) {
     const {pilot} = await harness(t, {
-      runConfig: config({runId}),
+      runConfig: config({runId, budgets: {...BUDGETS, requests: 40, cycles: 8}}),
       fault
     });
     const result = await pilot.start();

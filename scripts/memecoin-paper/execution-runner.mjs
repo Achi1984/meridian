@@ -484,6 +484,12 @@ export function createPaperExecutionRunner({
       status: result?.status ?? "INVALID_RESULT",
       receipt: result?.receipt ? {...result.receipt} : null
     };
+    if (!externalInput && !sourceOnly && method === "authorizeEntry" &&
+        typeof input.candidate?.mint === "string") {
+      operationResult.candidateMint = input.candidate.mint;
+      operationResult.candidateAnalystEvidenceSha256 = createHash("sha256")
+        .update(canonicalCheckpointBytes(input.candidate.analystEvidence ?? {})).digest("hex");
+    }
     if (externalInput && method === "authorizeEntry") {
       operationResult.candidateObservation = {
         chainId: input.candidate?.chainId ?? null,
