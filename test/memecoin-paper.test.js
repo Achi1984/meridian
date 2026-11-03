@@ -741,13 +741,18 @@ test("cost assumptions are explicit, integer cents, and charged once", () => {
   assert.equal(result.allInCents, "8000");
   assert.equal(ledger.summary().cashCents, "92000");
 
-  const ledger2 = new PaperLedger({now});
-  const auth2 = authorize(ledger2, candidate, now);
-  const missingCosts = ledger2.executeEntry(auth2, fillQuote(candidate, now, {
-    costs: {...ZERO_COSTS, feeCents: undefined}
-  }), {now: now + 2000});
-  assert.equal(missingCosts.status, "UNFILLED");
-  assert.equal(ledger2.summary().cashCents, "100000");
+  for (const component of [
+    "feeCents", "spreadCents", "slippageCents", "priceImpactCents", "networkCents"
+  ]) {
+    const incompleteLedger = new PaperLedger({now});
+    const incompleteAuthorization = authorize(incompleteLedger, candidate, now);
+    const missingCosts = incompleteLedger.executeEntry(incompleteAuthorization, fillQuote(candidate, now, {
+      costs: {...ZERO_COSTS, [component]: undefined}
+    }), {now: now + 2000});
+    assert.equal(missingCosts.status, "UNFILLED", `${component} is required`);
+    assert.equal(incompleteLedger.summary().cashCents, "100000");
+    assert.equal(incompleteLedger.summary().openPositions.length, 0);
+  }
 
   const mark = exitQuote(candidate, now + 3000, 10_000, {
     costs: {feeCents: 100, spreadCents: 50, slippageCents: 25, priceImpactCents: 25, networkCents: 10}

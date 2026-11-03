@@ -630,6 +630,9 @@ test("actual collector archival UNKNOWN stays UNKNOWN and external mode rejects 
   assert.equal(result.analystEvidence.candidateT, fixture.candidateT);
   assert.equal(result.executionAuthorized, false);
   assert.equal(result.realDataEntryEligible, false);
+  assert.ok(Object.values(result.adapted.candidate.analystEvidence)
+    .every(item => item.verified === false));
+  assert.equal(result.analysis.score, null);
   assert.equal(result.candidate.source, "DexScreener public API");
   assert.throws(() => createPaperSourcePipeline({
     enabled: true,

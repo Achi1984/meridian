@@ -89,9 +89,12 @@ The existing `EXTERNAL_READ_ONLY_INPUT` composition is unchanged: it continues
 to normalize caller candidates as unverified, rejects caller adapters and clocks,
 and supplies `null` entry and exit quotes. This work is not wired into that
 composition. Before a future owner-approved integration, the module-owned
-default-disabled path needs an exact reviewed manifest/source-policy binding,
-an accepted internal clock policy, and the actual accepted quote and complete
-cost interfaces. The source pipeline itself is not that authorization.
+default-disabled path already binds the exact module-owned policy digest in its
+manifest and start receipt. That binding is not approval: the providers remain
+unapproved, the runtime host clock remains unattested, and the source pipeline
+does not authorize an entry. Integration still requires an owner-approved source
+policy, a reviewed time contract, accepted evidence sources, and the actual
+source-bound quote and complete cost interfaces.
 
 ## Accepted interface dependency
 
@@ -126,6 +129,56 @@ separately defensible global completeness policy.
 - No accepted source-bound quote and complete five-component cost estimate is
   supplied by this pipeline. Missing quote or cost must continue to produce no
   entry.
+
+## Current #996 integration and evidence matrix
+
+This matrix describes the unchanged #996 hard filters and all six Analyst inputs.
+Existing parsers and evaluators are code support, not evidence that a provider
+returned authentic, complete, or entitled data. `EXTERNAL_READ_ONLY_INPUT`
+review evidence is deliberately ignored: caller-supplied `REVIEWED` labels cannot
+bridge Analyst inputs. The valid source-shaped path is
+`SYNTHETIC_TEST_ONLY`; it proves wiring only and sets neither runtime authority
+flag. No real-data policy is enabled by this document.
+
+For evidence rows, the common receipt policy is exact
+`{chainId, mint, pool, quote}` binding, source/version and digest-bound response
+receipts, a source observation no later than candidate T, receipt no earlier than
+the observation, and no future/stale evidence. Hard-filter evidence must be
+complete, verified at the module-owned composition boundary, and at most five
+minutes old at decision time; on-chain items also bind finalized slot/account
+context. Analyst rows must additionally bind their exact 15-minute or
+`(T-1h, T]` window and comparable endpoints. No caller assertion or pagination
+exhaustion can satisfy these requirements.
+
+| #996 gate or metric | Existing implementation | Required source and guarantee | Receipt identity/time policy | Missing external data vs. missing code | Minimum concrete decision |
+|---|---|---|---|---|---|
+| Candidate identity / selected pool and quote | `stages.mjs` identity filter; Scout deterministically selects one pool/quote per mint. Discovery is explicitly non-exhaustive. | Reviewed candidate intake bound to the exact Solana mint, selected pool, and quote; snapshot is not a new-pair feed. | Bind all four identity fields and candidate T; reject any source or evidence identity mismatch. | Intake contract and trusted source provenance are not approved; identity validation code exists. | Approve a bounded intake contract and mint/pool allowlist; do not infer exhaustive discovery. |
+| Pair age, 30 minutes–72 hours | `provider-sources` parses DexScreener pair snapshots; `market-evidence-adapter` and `stages.mjs` enforce the pair-created-time range. | Selected-pair creation time from a fixed, reviewed provider response; must be pair age, not token age. | Same-pair receipt, source time no later than T, fresh at decision, and exact candidate identity. | Parser/filter exist; authenticated source-time semantics and live receipt are unavailable. | Approve the pair timestamp semantics, source, and freshness policy. |
+| Actual USD market cap, $300,000–$20,000,000 | DexScreener adapter parses `marketCap`; filter rejects missing value and does not substitute FDV. | Actual market cap for the selected pair/mint in USD; no FDV fallback or assumed quote parity. | Bind mint/pool/quote, denomination USD, source timestamp and response digest; observation no later than T. | Parsing and range gate exist; accepted source authenticity and USD valuation guarantee are unavailable. | Select and approve the market-cap field and USD methodology. |
+| Liquidity, at least $40,000 | DexScreener snapshot field and canonical filter exist. | Selected-pool USD liquidity; a snapshot is not proof of executable depth. | Same pair and USD basis as market cap, identity-bound and fresh at T. | Snapshot parser/filter exist; trusted USD conversion and executable depth are not provided. | Approve liquidity semantics and the quote-asset USD conversion source. |
+| Trailing one-hour USD volume, at least $50,000 | DexScreener pair snapshot parser and hard filter exist. | Exact selected-pair trailing-hour USD volume, not a count or an unrelated pool aggregate. | Same pair, source time no later than T and within freshness; response digest bound to identity. | Snapshot support exists; authenticated interval/data semantics are not accepted. | Approve the source's interval and aggregation semantics. |
+| One-hour price change, strictly below +80% | DexScreener snapshot parser and filter exist. | Same-pair one-hour change with defined price and source-time semantics. | Pair identity, source timestamp ≤ T, five-minute decision freshness. | Parser/filter exist; provider trust/time contract is missing. | Approve the precise provider field and its source-time policy. |
+| Mint authority revoked | Token-safety bridge and existing `getAccountInfo`/mint evidence path normalize supported layouts. | Finalized mint account bytes/layout sufficient to prove the authority is null. | Mint account, mint identity, finalized slot, response digest, and source/receipt times. | Decoder support is partial; no authenticated source receipt or live account data is accepted. | Approve supported layouts/commitment and reject unknown layouts. |
+| Freeze authority revoked | Same token-safety/account-info path and hard filter. | Finalized mint account bytes proving freeze authority is null. | Same mint/slot/digest/time requirements as mint authority; no account substitution. | Parser/filter exist for recognized layouts; trusted current account evidence is missing. | Approve account decoding and finalized observation semantics. |
+| Supported token extensions | Token-safety bridge recognizes transfer fee, transfer hook, default-frozen, and permanent delegate flags. | Complete mint extension enumeration proving all four disallowed conditions absent. | Mint/account identity, finalized slot and raw-response digest; unsupported extension layouts remain unknown. | Known-layout decoder exists; exhaustive extension coverage/source guarantee is absent. | Approve supported token program/layout versions and explicit fail-closed handling for all others. |
+| Pool LP burn or lock through hold | Raydium CPMM decoder checks supported pool state; `lp-protection-source.mjs` does not prove a reviewed burn/lock. | Pool-specific LP supply/ownership and irrecoverability, or lock authority, duration and expiry past hold. | Exact pool and LP mint, receipt digest, finalized slot and source time; lock expiry must exceed proposed hold. | Pool decoding exists; accepted burn/lock proof source and semantics are missing. | Select supported pool programs and define acceptable burn/lock evidence and hold policy. |
+| Top-ten owner concentration, at most 25% | `owner-census.mjs` and canonical adapter calculate concentration only from complete owner-resolved census evidence. Top-20 token accounts are explicitly insufficient. | Complete account enumeration, owner resolution, nonzero supply denominator, and reviewed selected-pool/burn exclusions. | Same identity/policy and comparable finalized observation; bind account set, supply denominator, exclusions and response receipts. | Calculation code exists; complete authenticated owner census and exclusions are unavailable. | Select a completeness-capable census source and approve denominator/exclusion policy. |
+| Developer-associated holdings, at most 3% | Canonical adapter validates a reviewed attribution and joins it to the owner census; no attribution source is checked in. | Documented attributable developer identities plus complete balances and defined scope. | Bind attribution receipt, census receipt, identity and common observation/supply context; no unresolved attribution may count as zero. | Join/check code exists; attribution facts and policy are missing. | Define attribution evidence, scope, and how uncertain ownership blocks. |
+| Attributable prior-rug history | Canonical adapter requires reviewed attributable history coverage; generic address history is not sufficient. | Complete attributable project/creator history for a reviewed lookback and definition of rug outcomes. | Bind identities, history scope/lookback, source receipts and time; “not found” requires demonstrated complete scope. | Validation path exists; attributable identities, complete history and policy are missing. | Define attribution, lookback, qualifying outcomes and completeness guarantee. |
+| Bundled-launch supply, at most 10% | Canonical adapter consumes reviewed bundle amount and reconciles it to census supply; no launch classifier/source is checked in. | Versioned bundle definition, launch window, attributable addresses, complete transaction coverage and supply denominator. | Bind mint/pool, transaction-window receipts, source timestamps, denominator and classifier version. | Consumption/reconciliation exists; classifier, complete history, attribution and policy are missing. | Approve bundle definition/window and a source that guarantees complete transaction coverage. |
+| Analyst momentum, 15 minutes | `analyst-window-evidence.mjs` computes from historical price observations; weights/normalization remain #996. | Exact historical USD endpoints or a reviewed equivalent time series for the candidate and quote asset; never assume USD parity. | Identity, USD denomination, method/version, source/receipt digests, no future observations, exact 15-minute window and owner-approved staleness. | Computation and receipt checks exist; historical price/feed and quote-USD conversion are unselected/unverified. | Select feed coverage, access entitlement, endpoint semantics, staleness and conversion policy. |
+| Analyst unique buyers, trailing 1 hour | Launch-history bridge, swap decoder and Analyst calculator deduplicate buyer addresses. | Complete finalized pool swap history, correct buyer extraction, and defensible archive completeness; pagination exhaustion alone is not completeness. | Identity and `(T-1h, T]` window, source receipts and timestamp fence witnesses; all rows finalized and within the window. | Collector/decoder/calculation exist; accepted archive completeness and authenticated timestamps are missing. | Approve an archival provider/completeness guarantee and buyer-classification rule. |
+| Analyst buy/sell USD-volume ratio, trailing 1 hour | Swap decoder and Analyst calculator require positive buy and sell USD denominators. | Complete direction-classified swap flows and historical USD prices for each quote/base amount. | Same history-window binding plus receipt-bound historical prices and an explicitly nonzero denominator for each side. | Calculation exists; complete history, historical USD prices and quote conversion are missing. | Approve the history and price sources/methods; never substitute transaction count or pair aggregate volume. |
+| Analyst holder growth, trailing 1 hour | Owner census and Analyst calculator compare endpoint owner counts. | Two complete, owner-resolved and comparable censuses under one denominator/exclusion policy. | Same identity and census-policy version; endpoints exactly bound to T−1h and T, finalized/source-timed, with receipts. | Comparison code exists; complete time-series census and source guarantees are missing. | Select census provider and approve comparability, endpoint and exclusion semantics. |
+| Analyst liquidity / market-cap percentage | Canonical market adapter derives from selected-pair liquidity and actual market cap; #996 normalization unchanged. | Same-pair fields in a common accepted USD basis; market cap cannot fall back to FDV. | Reuse both identity-bound fresh receipts; same decision snapshot/methodology and USD conversion. | Derivation exists; accepted USD market-data trust and conversion are missing. | Approve the pair data and USD methodology; preserve existing threshold/weight. |
+| Analyst qualified smart wallets | Analyst builder supports an allowlist input; no qualified-wallet allowlist or provenance source is configured. | Owner-reviewed qualifying wallet records with the existing #996 round-trip/activity/cost criteria and attributable evidence. | Bind allowlist version, review receipt, candidate identity and `(T-1h, T]` transaction evidence; deduplicate addresses. | Scoring support exists; source/list, qualification history, cost evidence and review are absent. | Approve the qualification source and allowlist process. **HEDGE remains NOT QUALIFIED.** |
+| Causal entry/exit quote and five nonoverlapping costs (execution prerequisite) | `market-quote-adapter.mjs` binds Jupiter route identity/time; current authorization remains false. Offline quote scenarios are review-only. | Same-mint/pool/quote causal quote plus separately supported fee, spread, slippage, price-impact and network costs; no estimate or parity assumption. | Exact identity/side/amount, route/selected pool, receipt time later than decision and candidate T, bounded response digest; each cost has its own source/basis. | Quote parsing and scenario projections exist; accepted source-bound USD quote and all five real cost components do not. | Approve quote and cost source/methodologies; until all five are present, keep no-entry. |
+
+No provider request is authorized for this packet (19/20 requests have been
+used). HEDGE remains **NOT QUALIFIED**; no eligibility, allowlist, or source trust
+is implied. Product decisions and external source guarantees above cannot be
+replaced by code-only assertions. The run manifest, thresholds, weights, six
+metrics, and policy approval state remain unchanged.
 
 Focused offline verification:
 

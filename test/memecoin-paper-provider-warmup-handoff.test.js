@@ -9,6 +9,7 @@ import {
   createWarmupPriceSource
 } from "../scripts/memecoin-paper/evidence-warmup/index.mjs";
 import {
+  createPaperRuntimeSourceAdapter,
   PAPER_RUNTIME_SOURCE_POLICY_SHA256
 } from "../scripts/memecoin-paper/paper-runtime-source.mjs";
 import {
@@ -76,6 +77,12 @@ test("disabled handoff and production preflight perform no acquisition or storag
   assert.equal(preflight.acquisitionAttempted, false);
   assert.equal(preflight.storageMutated, false);
   assert.equal(preflight.networkAccessed, false);
+  assert.throws(() => createPaperRuntimeSourceAdapter({
+    sourcePolicySha256: PAPER_RUNTIME_SOURCE_POLICY_SHA256,
+    policy: {enabled: true, approved: true},
+    clock: () => Date.now(),
+    transport: () => { throw new Error("must not be called"); }
+  }), /runtime source adapter options must be exact bounded data/);
   assert.deepEqual({publishes, reads}, {publishes: 0, reads: 0});
 });
 
