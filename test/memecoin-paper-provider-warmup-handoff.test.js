@@ -73,6 +73,7 @@ test("disabled handoff and production preflight perform no acquisition or storag
 
   const preflight = await preflightPaperProduction();
   assert.equal(preflight.reason, "SOURCE_POLICY_UNAPPROVED");
+  assert.equal(preflight.implementationStatus, "BLOCKED_NOT_IMPLEMENTED");
   assert.equal(preflight.sourcePolicySha256, PAPER_RUNTIME_SOURCE_POLICY_SHA256);
   assert.equal(preflight.acquisitionAttempted, false);
   assert.equal(preflight.storageMutated, false);

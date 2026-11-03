@@ -2,8 +2,8 @@
 
 This is a disabled, read-only acquisition and canonical-evaluation seam. It does
 not activate the one-shot manifest, call a provider without injected transport,
-hold credentials, create quotes, estimate costs, authorize execution, or modify
-the external composition. `createTimeBoundarySource()` and
+hold credentials, create production quotes, estimate costs, authorize execution,
+or modify the external composition. `createTimeBoundarySource()` and
 `createPaperSourcePipeline()` default to disabled.
 
 ## Time-boundary acquisition
@@ -96,6 +96,25 @@ does not authorize an entry. Integration still requires an owner-approved source
 policy, a reviewed time contract, accepted evidence sources, and the actual
 source-bound quote and complete cost interfaces.
 
+**Production runtime source integration: `BLOCKED_NOT_IMPLEMENTED`.** The
+`createPaperRuntimeSourceAdapter()` production path still returns no candidates
+with `SOURCE_POLICY_UNAPPROVED`, keeps the pipeline and quote adapter disabled,
+and does not access the network. The existing provider adapters do not define an
+approved candidate-intake/mint-pool allowlist or source-authentication/time
+contract; the warmup handoff only stores UNKNOWN-trust evidence. The existing
+quote adapter cannot supply an approved causal quote with all five source-bound,
+nonoverlapping USD costs. These missing interfaces and owner decisions cannot be
+implemented by adding caller-injected REVIEWED/approved booleans. The exact
+requirements and decisions are itemized below.
+
+The adapter also has an explicitly selected `SYNTHETIC_TEST_ONLY` composition
+used by the offline runner tests. That path uses only the checked-in synthetic
+transport/data, evaluates through the existing pipeline, and passes its
+fixture-labelled candidate and quote through the existing simulated ledger. It
+proves plumbing only; its output remains `SYNTHETIC_FIXTURE_ONLY`, does not
+change the production constructor or policy, and grants no production trust or
+entry authority.
+
 ## Accepted interface dependency
 
 The accepted history-window bridge from PR #1182 is present at the merged
@@ -136,9 +155,10 @@ This matrix describes the unchanged #996 hard filters and all six Analyst inputs
 Existing parsers and evaluators are code support, not evidence that a provider
 returned authentic, complete, or entitled data. `EXTERNAL_READ_ONLY_INPUT`
 review evidence is deliberately ignored: caller-supplied `REVIEWED` labels cannot
-bridge Analyst inputs. The valid source-shaped path is
-`SYNTHETIC_TEST_ONLY`; it proves wiring only and sets neither runtime authority
-flag. No real-data policy is enabled by this document.
+bridge Analyst inputs. The source-shaped and acquired-evidence path is exercised
+only in `SYNTHETIC_TEST_ONLY`; it proves wiring only and sets neither runtime
+authority flag. Production integration remains `BLOCKED_NOT_IMPLEMENTED`; no
+real-data policy is enabled by this document.
 
 For evidence rows, the common receipt policy is exact
 `{chainId, mint, pool, quote}` binding, source/version and digest-bound response
