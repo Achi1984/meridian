@@ -1,4 +1,4 @@
-# Bounded Paper-pilot composition — offline and no-entry external proof
+# Bounded Paper-pilot composition — offline Paper proof and no-entry external evaluation
 
 **Status: the synthetic path is a runner-backed paper proof. The external path
 performs bounded candidate evaluation only and always fails closed to a durable
@@ -35,19 +35,24 @@ The offline fixture-only `PIPELINE_QUOTE` scenario is a separate test seam. It
 constructs the accepted paper source pipeline in `SYNTHETIC_TEST_ONLY`, evaluates
 the source-shaped fixture through the canonical market evidence adapter, and
 calls the accepted market quote/cost adapter with a local quote-shaped fixture.
-Its pipeline receipt IDs, candidate/assembly/decision times, and quote adapter
-receipt metadata are carried in synthetic provenance through the same runner,
-checkpoint, export, and evaluator. The current fixture intentionally remains
-`PARTIAL`/UNKNOWN for hard evidence and the quote adapter reports UNKNOWN costs;
-the runner therefore records a truthful no-entry terminal and never converts
-that observation into a fill. This proves orchestration only, not entry, mark, exit, source trust, or readiness.
+The fixture's bounded swap, census, price, and wallet observations flow through
+the pipeline itself; its actual hard-filter and Analyst results are passed to
+runner authorization without replacement. An explicit synthetic-only cost
+schedule supports a hypothetical Paper entry, risk mark, and exit. Pipeline
+receipt IDs, candidate/assembly/decision times, and quote adapter receipt
+metadata are persisted in the canonical v2 runtime audit and reconciled against
+checkpoint inputs by the evaluator. This proves orchestration only, not source
+trust or live readiness.
 The fixture seam can repeat bounded acquisition cycles, accounts for its RPC,
 history, evidence, and quote work against the composition's shared budgets, and
 deduplicates repeated mint identities. Its request and byte allowances are
 passed down as remaining capacity rather than replenished for each cycle; work
 shares the existing `events` ceiling. Stop/deadline and late-callback fixtures
 exercise cancellation without retry. These remain local synthetic test cases;
-the real `SOURCE_BACKED_PAPER` mode never calls this seam.
+the real `SOURCE_BACKED_PAPER` mode never calls this seam. Runtime-audit exports
+use `memecoin-paper-source-quote-audit/v2`; the evaluator rejects prior v1 audit
+records rather than treating them as proof of quote consumption or pipeline
+Analyst evidence.
 Configuration and fixture options reject accessor/hidden fields, and a
 pre-aborted run exits before opening a checkpoint.
 
