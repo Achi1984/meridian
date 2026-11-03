@@ -376,6 +376,19 @@ async function syncDirectory(directory, {budget, fsOps}) {
   }
 }
 
+async function removeOwnedPendingMarker(filename, directory, ownership, {budget, fsOps}) {
+  budget.check();
+  const marker = await budget.wait(fsOps.lstat(filename));
+  if (marker.dev !== ownership.dev || marker.ino !== ownership.ino) {
+    throw new Error("warmup publication marker ownership changed");
+  }
+  budget.check();
+  await budget.wait(fsOps.unlink(filename));
+  budget.check();
+  await syncDirectory(directory, {budget, fsOps});
+  budget.check();
+}
+
 async function publicationPending(filename, budget, fsOps) {
   budget.check();
   try {
@@ -429,6 +442,7 @@ export class EvidenceWarmupStore {
     this.#busy = true;
     let temporary = null;
     let linkAttempted = false;
+    let markerOwnership = null;
     try {
       budget.check();
       const document = {
@@ -498,6 +512,8 @@ export class EvidenceWarmupStore {
           }
         });
         temporary = pendingPath;
+        const markerStat = await budget.wait(handle.stat());
+        markerOwnership = {dev: markerStat.dev, ino: markerStat.ino};
         budget.check();
         await budget.wait(handle.writeFile(bytes));
         budget.check();
@@ -518,12 +534,16 @@ export class EvidenceWarmupStore {
           });
           budget.check();
           if (current.status === "OK" && current.digest === digest) {
-            bestEffort(() => this.#fsOps.unlink(temporary));
+            await removeOwnedPendingMarker(temporary, root, markerOwnership, {
+              budget, fsOps: this.#fsOps
+            });
             temporary = null;
             return {status: "DUPLICATE", datasetId, digest, byteLength: current.byteLength};
           }
           if (current.status === "OK") {
-            bestEffort(() => this.#fsOps.unlink(temporary));
+            await removeOwnedPendingMarker(temporary, root, markerOwnership, {
+              budget, fsOps: this.#fsOps
+            });
             temporary = null;
             return {status: "CONFLICT", reason: "IMMUTABLE_DATASET_CONFLICT"};
           }
@@ -534,7 +554,9 @@ export class EvidenceWarmupStore {
       budget.check();
       await syncDirectory(root, {budget, fsOps: this.#fsOps});
       budget.check();
-      bestEffort(() => this.#fsOps.unlink(temporary));
+      await removeOwnedPendingMarker(temporary, root, markerOwnership, {
+        budget, fsOps: this.#fsOps
+      });
       temporary = null;
       return {status: "PUBLISHED", datasetId, digest, byteLength: bytes.length};
     } catch (error) {

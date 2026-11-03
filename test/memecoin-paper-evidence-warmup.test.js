@@ -73,6 +73,7 @@ test("warmup is disabled by default and publishes immutable digest-verified reco
   assert.equal(read.digest, published.digest);
   assert.equal(read.byteLength, published.byteLength);
   assert.equal(Object.isFrozen(read.document.records[0].payload), true);
+  await assert.rejects(lstat(path.join(root, ".evidence-warmup-pending")), {code: "ENOENT"});
 
   const changed = {...record, payload: {...record.payload, valueUsd: 2}};
   assert.equal((await store.publish({...input, records: [changed]})).status, "CONFLICT");
@@ -598,6 +599,149 @@ test("cancelled or expired link and directory-sync waits stay UNKNOWN and block 
     {signal: cancelController.signal})).reason, "CANCELLED");
   assert.equal(cancelLinkCalls, 1);
   assert.equal((await cancelLink.publish({...bundle, datasetId: "cancel-link"})).status, "UNKNOWN");
+});
+
+test("publication requires owned marker removal and post-removal directory sync", async t => {
+  const {root} = await temporaryStore(t);
+  const identity = {chainId: "solana", mint: "mint", pool: "pool", quote: "quote"};
+  const bundle = {datasetId: "finalize", identity, capturedAt: 20_000,
+    records: [priceRecord(identity, 10_000)]};
+  const actualUnlink = (await import("node:fs/promises")).unlink;
+
+  const unlinkFailureRoot = path.join(root, "unlink-failure");
+  const unlinkFailure = new EvidenceWarmupStore(unlinkFailureRoot, {
+    enabled: true,
+    fsOps: {
+      unlink: async () => { throw new Error("injected marker unlink failure"); }
+    }
+  });
+  assert.equal((await unlinkFailure.publish({...bundle, datasetId: "unlink-failure"})).status,
+    "UNKNOWN");
+  assert.ok((await lstat(path.join(unlinkFailureRoot, "evidence-warmup.json"))).isFile());
+  assert.ok((await lstat(path.join(unlinkFailureRoot, ".evidence-warmup-pending"))).isFile());
+  assert.equal((await new EvidenceWarmupStore(unlinkFailureRoot).read("unlink-failure")).status,
+    "UNKNOWN");
+
+  const delayedRoot = path.join(root, "delayed-unlink");
+  let releaseUnlink;
+  let signalUnlink;
+  let completeUnlink;
+  const unlinkGate = new Promise(resolve => { releaseUnlink = resolve; });
+  const unlinkStarted = new Promise(resolve => { signalUnlink = resolve; });
+  const unlinkFinished = new Promise(resolve => { completeUnlink = resolve; });
+  const controller = new AbortController();
+  const delayed = new EvidenceWarmupStore(delayedRoot, {
+    enabled: true,
+    limits: {maxElapsedMs: 1_000},
+    fsOps: {
+      unlink: async (...args) => {
+        signalUnlink();
+        await unlinkGate;
+        try {
+          return await actualUnlink(...args);
+        } finally {
+          completeUnlink();
+        }
+      }
+    }
+  });
+  const delayedPublish = delayed.publish({...bundle, datasetId: "delayed-unlink"},
+    {signal: controller.signal});
+  await unlinkStarted;
+  controller.abort();
+  assert.equal((await delayedPublish).status, "UNKNOWN");
+  assert.ok((await lstat(path.join(delayedRoot, "evidence-warmup.json"))).isFile());
+  releaseUnlink();
+  await unlinkFinished;
+  assert.equal((await new EvidenceWarmupStore(delayedRoot).read("delayed-unlink")).status,
+    "AVAILABLE");
+  assert.equal((await delayed.publish({...bundle, datasetId: "delayed-unlink"})).status,
+    "DUPLICATE");
+
+  const syncRoot = path.join(root, "post-unlink-sync-failure");
+  let directorySyncCalls = 0;
+  const syncFailure = new EvidenceWarmupStore(syncRoot, {
+    enabled: true,
+    fsOps: {
+      open: async (filename, ...args) => {
+        const handle = await open(filename, ...args);
+        if (filename !== syncRoot) return handle;
+        return new Proxy(handle, {
+          get(target, key) {
+            const value = Reflect.get(target, key, target);
+            if (key === "sync") {
+              return async (...methodArgs) => {
+                directorySyncCalls += 1;
+                if (directorySyncCalls === 2) throw new Error("injected post-unlink sync failure");
+                return value.apply(target, methodArgs);
+              };
+            }
+            return typeof value === "function" ? value.bind(target) : value;
+          }
+        });
+      }
+    }
+  });
+  const syncResult = await syncFailure.publish({...bundle, datasetId: "sync-failure"});
+  assert.equal(syncResult.status, "UNKNOWN");
+  assert.equal(directorySyncCalls, 2);
+  assert.ok((await lstat(path.join(syncRoot, "evidence-warmup.json"))).isFile());
+  assert.equal((await new EvidenceWarmupStore(syncRoot).read("sync-failure")).status, "AVAILABLE");
+  assert.equal((await syncFailure.publish({...bundle, datasetId: "sync-failure"})).status,
+    "DUPLICATE");
+
+  const actualLink = (await import("node:fs/promises")).link;
+  const duplicateRoot = path.join(root, "race-duplicate");
+  const raceDuplicate = new EvidenceWarmupStore(duplicateRoot, {
+    enabled: true,
+    fsOps: {
+      link: async (temporary, finalPath) => {
+        await actualLink(temporary, finalPath);
+        throw Object.assign(new Error("injected competing publisher"), {code: "EEXIST"});
+      }
+    }
+  });
+  assert.equal((await raceDuplicate.publish({...bundle, datasetId: "race-duplicate"})).status,
+    "DUPLICATE");
+  await assert.rejects(lstat(path.join(duplicateRoot, ".evidence-warmup-pending")),
+    {code: "ENOENT"});
+  assert.equal((await new EvidenceWarmupStore(duplicateRoot).read("race-duplicate")).status,
+    "AVAILABLE");
+
+  const conflictRoot = path.join(root, "race-conflict");
+  const conflictPayload = Buffer.from(JSON.stringify({
+    datasetId: "other-dataset", padding: "x".repeat(100)
+  }));
+  const conflictBytes = Buffer.concat([
+    Buffer.from(`${hash(conflictPayload)}\n`, "ascii"), conflictPayload
+  ]);
+  const conflictSeed = path.join(root, "conflict-seed");
+  const conflictSeedHandle = await open(conflictSeed, "wx", 0o600);
+  try {
+    await conflictSeedHandle.writeFile(conflictBytes);
+    await conflictSeedHandle.sync();
+  } finally {
+    await conflictSeedHandle.close();
+  }
+  const raceConflict = new EvidenceWarmupStore(conflictRoot, {
+    enabled: true,
+    fsOps: {
+      link: async (_temporary, finalPath) => {
+        await actualLink(conflictSeed, finalPath);
+        throw Object.assign(new Error("injected competing publisher"), {code: "EEXIST"});
+      }
+    }
+  });
+  assert.equal((await raceConflict.publish({...bundle, datasetId: "race-conflict"})).status,
+    "CONFLICT");
+  await assert.rejects(lstat(path.join(conflictRoot, ".evidence-warmup-pending")),
+    {code: "ENOENT"});
+  const conflictFile = await open(path.join(conflictRoot, "evidence-warmup.json"), "r");
+  try {
+    assert.deepEqual(await conflictFile.readFile(), conflictBytes);
+  } finally {
+    await conflictFile.close();
+  }
 });
 
 test("symlinked ancestry is rejected before creating any target directories", async t => {

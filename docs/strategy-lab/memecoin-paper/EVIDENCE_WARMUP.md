@@ -15,10 +15,10 @@ node --check scripts/memecoin-paper/evidence-warmup/index.mjs
 node --check scripts/memecoin-paper/evidence-warmup/cli.mjs
 ```
 
-Result: 11 focused warmup tests passed; both module syntax checks passed. The
-final correction set also exercised delayed filesystem reads/writes/syncs,
-cancellation/deadline fencing, symlink ancestry rejection, duplicate logical
-keys, and payload-binding mismatches.
+Result: 12 focused warmup tests passed; both module syntax checks passed. The
+correction tests exercise delayed filesystem reads/writes/syncs/unlinks,
+cancellation/deadline fencing, post-unlink directory sync failures, symlink
+ancestry rejection, duplicate logical keys, and payload-binding mismatches.
 
 ## Capture, store, read
 
@@ -54,7 +54,9 @@ direct file read (no directory scan), verifies the digest of the complete file
 payload on every read/restart, and uses an exclusive immutable publication.
 Same bytes under the same dataset ID return `DUPLICATE`; different bytes return
 `CONFLICT`. Ambiguous publication/read states return `UNKNOWN`; they are not
-overwritten or retried.
+overwritten or retried. A successful publication requires syncing the linked
+dataset, removing only its owned pending marker, and syncing the directory again;
+ambiguous marker finalization returns `UNKNOWN`.
 
 ```sh
 node scripts/memecoin-paper/evidence-warmup/cli.mjs capture \
