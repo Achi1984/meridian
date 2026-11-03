@@ -11,6 +11,9 @@ follow redirects or retry. Upload/readback operations preserve the transfer
 contract's 16 MiB limit, 4096 stream-read bound, and one 30-second maximum
 deadline. Header parsing is capped; upload and download streams apply
 backpressure and cancellation destroys their request/response streams.
+Independent readback uses one monotonic deadline from before request dispatch
+through body consumption, digest/identity verification, JSON decoding, and
+evaluation; a late synchronous evaluator result remains `UNKNOWN`.
 
 `createPrivateReceiverHandler()` adapts exactly `PUT` and `GET` requests to
 `createFileReceiver()`. It rejects non-TLS sockets, paths outside the fixed
@@ -64,6 +67,9 @@ node scripts/memecoin-paper-run-export-https/cli.mjs readback \
 `readback` needs only the independent read authorization; it is available in a
 new process and does not consult or claim an upload gate. It writes the verified
 original bytes to a new mode-`0600` file and never overwrites an existing path.
+If publication has linked the destination but directory synchronization fails,
+the CLI reports `UNKNOWN` with the output path and export binding; it does not
+retry or overwrite the possibly published file.
 Exit codes are `0` for acknowledged upload or evaluator `PASS`, `1` for rejected
 input/transfer or evaluator `FAIL`, and `2` for `UNKNOWN` or evaluator
 `UNKNOWN`. `TRANSFER_ACKNOWLEDGED` is not checkpoint acknowledgement; neither
@@ -137,6 +143,8 @@ and hanging streams, lost acknowledgement, and the durable restart gate. They do
 not disable certificate verification, use external network access, or contain
 actual private data.
 
-Frozen dependency head: `7c043ecabaa4516aff3ca8488bd22e22fcc57d43`. Its final
-safety review remains pending. The lead owns combined CI, final review, and
-integration; this package makes no host-side availability or deployment claim.
+Frozen dependency head: `7c043ecabaa4516aff3ca8488bd22e22fcc57d43`, preserved
+unchanged through the accepted `main` merge at
+`24323eb88dde220bb410b578bc4c30108c6be9b4`. The lead owns integrated CI and
+final integration review; this package makes no host-side availability or
+deployment claim.

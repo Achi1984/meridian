@@ -1,5 +1,6 @@
 import {createHash} from "node:crypto";
 import https from "node:https";
+import {performance} from "node:perf_hooks";
 import {evaluateMemecoinPaperRunExport} from "../memecoin-paper-simulated-evaluation/index.mjs";
 import {
   MAX_OPERATION_MS,
@@ -644,7 +645,13 @@ export function createPrivateReceiverHandler({receiver, privateOrigin, timeoutMs
   };
 }
 
-async function awaitWithDeadline(promise, signal, deadline) {
+function deadlineError() {
+  const error = new Error("operation deadline exceeded");
+  error.code = "DEADLINE_EXCEEDED";
+  return error;
+}
+
+async function awaitWithDeadline(promise, signal, deadline, monotonicNow) {
   if (signal.aborted) throw abortError(signal);
   let timer;
   let abortListener;
@@ -654,16 +661,17 @@ async function awaitWithDeadline(promise, signal, deadline) {
     if (signal.aborted) abortListener();
   });
   const timedOut = new Promise((resolve, reject) => {
-    const remaining = deadline - Date.now();
+    const remaining = deadline - monotonicNow();
     if (remaining <= 0) {
-      reject(new Error("operation deadline exceeded"));
+      reject(deadlineError());
       return;
     }
-    timer = setTimeout(() => reject(new Error("operation deadline exceeded")), remaining);
+    timer = setTimeout(() => reject(deadlineError()), remaining);
   });
   try {
     const value = await Promise.race([Promise.resolve(promise), cancelled, timedOut]);
-    if (signal.aborted || Date.now() >= deadline) throw abortError(signal);
+    if (signal.aborted) throw abortError(signal);
+    if (monotonicNow() >= deadline) throw deadlineError();
     return value;
   } finally {
     clearTimeout(timer);
@@ -671,7 +679,7 @@ async function awaitWithDeadline(promise, signal, deadline) {
   }
 }
 
-async function collectBounded(source, signal, deadline) {
+async function collectBounded(source, signal, deadline, monotonicNow) {
   const chunks = [];
   let length = 0;
   let reads = 0;
@@ -679,8 +687,11 @@ async function collectBounded(source, signal, deadline) {
   if (!iterator) throw new TypeError("HTTP response body is not a byte stream");
   try {
     while (true) {
-      if (signal.aborted || Date.now() >= deadline) throw abortError(signal);
-      const next = await awaitWithDeadline(iterator.next(), signal, deadline);
+      if (signal.aborted) throw abortError(signal);
+      if (monotonicNow() >= deadline) throw deadlineError();
+      const next = await awaitWithDeadline(iterator.next(), signal, deadline, monotonicNow);
+      if (signal.aborted) throw abortError(signal);
+      if (monotonicNow() >= deadline) throw deadlineError();
       if (next.done) break;
       if (++reads > MAX_STREAM_READS || !(next.value instanceof Uint8Array)) {
         throw new RangeError("HTTP response stream exceeds its bounds");
@@ -705,7 +716,9 @@ export async function readExportOverHttps({
   expectedByteLength,
   readAuthorization,
   timeoutMs = 15_000,
-  signal
+  signal,
+  monotonicNow = () => performance.now(),
+  evaluate = evaluateMemecoinPaperRunExport
 } = {}) {
   let identity;
   try {
@@ -715,7 +728,8 @@ export async function readExportOverHttps({
         !HASH.test(expectedExportSha256 ?? "") ||
         !Number.isSafeInteger(expectedByteLength) || expectedByteLength < 1 ||
         expectedByteLength > MAX_TRANSFER_BYTES || !validAuthorization(readAuthorization) ||
-        !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > MAX_OPERATION_MS) {
+        !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > MAX_OPERATION_MS ||
+        typeof monotonicNow !== "function" || typeof evaluate !== "function") {
       throw new TypeError("invalid independent readback request");
     }
   } catch {
@@ -724,7 +738,24 @@ export async function readExportOverHttps({
 
   const controller = new AbortController();
   let timedOut = false;
-  const deadline = Date.now() + timeoutMs;
+  let deadlineExpired = false;
+  let lastMonotonic = monotonicNow();
+  if (!Number.isFinite(lastMonotonic)) {
+    return {status: "REJECTED", code: "INVALID_READ_REQUEST"};
+  }
+  const readMonotonic = () => {
+    const current = monotonicNow();
+    if (!Number.isFinite(current)) throw new TypeError("monotonic clock returned an invalid value");
+    lastMonotonic = Math.max(lastMonotonic, current);
+    return lastMonotonic;
+  };
+  const deadline = lastMonotonic + timeoutMs;
+  const checkDeadline = () => {
+    if (readMonotonic() >= deadline) {
+      deadlineExpired = true;
+      throw deadlineError();
+    }
+  };
   const onAbort = () => controller.abort(signal.reason ?? new Error("readback cancelled"));
   signal?.addEventListener("abort", onAbort, {once: true});
   const timer = setTimeout(() => {
@@ -732,8 +763,9 @@ export async function readExportOverHttps({
     controller.abort(new Error("readback deadline exceeded"));
   }, timeoutMs);
   try {
-    if (signal?.aborted) controller.abort(signal.reason ?? new Error("readback cancelled"));
-    const response = await awaitWithDeadline(transport.get({
+    if (signal?.aborted) return {status: "UNKNOWN", code: "CANCELLED"};
+    checkDeadline();
+    const responsePromise = transport.get({
       schema: TRANSFER_SCHEMA,
       origin: normalizeOrigin(privateOrigin),
       identity,
@@ -741,18 +773,20 @@ export async function readExportOverHttps({
       expectedByteLength,
       authorization: readAuthorization,
       signal: controller.signal
-    }), controller.signal, deadline);
-    if (controller.signal.aborted || Date.now() >= deadline) {
-      return {status: "UNKNOWN", code: timedOut ? "DEADLINE_EXCEEDED" : "CANCELLED"};
-    }
+    });
+    const response = await awaitWithDeadline(responsePromise, controller.signal, deadline, readMonotonic);
+    checkDeadline();
+    if (controller.signal.aborted) return {status: "UNKNOWN", code: "CANCELLED"};
     if (response?.redirected === true) return {status: "UNKNOWN", code: "REDIRECT_REJECTED"};
     if (response?.status === "REJECTED") return {status: "REJECTED", code: "READ_REJECTED"};
     if (response?.status !== "FOUND" || response.redirected !== false) {
       return {status: "UNKNOWN", code: response?.status === "NOT_FOUND"
         ? "EXPORT_NOT_FOUND" : "READBACK_UNKNOWN"};
     }
-    const bytes = await collectBounded(response.bytes, controller.signal, deadline);
+    const bytes = await collectBounded(response.bytes, controller.signal, deadline, readMonotonic);
+    checkDeadline();
     const digest = createHash("sha256").update(bytes).digest("hex");
+    checkDeadline();
     if (!identityMatches(response.identity, identity) ||
         response.exportSha256 !== expectedExportSha256 ||
         response.byteLength !== expectedByteLength ||
@@ -765,6 +799,7 @@ export async function readExportOverHttps({
     } catch {
       return {status: "REJECTED", code: "INVALID_EXPORT"};
     }
+    checkDeadline();
     if (!isRecord(exportValue) || exportValue.schemaVersion !== "memecoin-paper-run-export/v1" ||
         !identityMatches({
           runId: exportValue.runId,
@@ -773,6 +808,10 @@ export async function readExportOverHttps({
         }, identity)) {
       return {status: "REJECTED", code: "READBACK_DIGEST_OR_IDENTITY_MISMATCH"};
     }
+    checkDeadline();
+    const evaluation = evaluate(bytes, identity);
+    checkDeadline();
+    if (controller.signal.aborted) return {status: "UNKNOWN", code: "CANCELLED"};
     return {
       status: "READ_BACK",
       identity,
@@ -780,12 +819,13 @@ export async function readExportOverHttps({
       byteLength: bytes.byteLength,
       bytes,
       exportValue,
-      evaluation: evaluateMemecoinPaperRunExport(bytes, identity)
+      evaluation
     };
-  } catch {
+  } catch (error) {
+    const deadlineReached = deadlineExpired || error?.code === "DEADLINE_EXCEEDED" || timedOut;
     return {
       status: "UNKNOWN",
-      code: timedOut ? "DEADLINE_EXCEEDED" : signal?.aborted ? "CANCELLED" : "READ_OUTCOME_UNKNOWN"
+      code: deadlineReached ? "DEADLINE_EXCEEDED" : signal?.aborted ? "CANCELLED" : "READ_OUTCOME_UNKNOWN"
     };
   } finally {
     clearTimeout(timer);

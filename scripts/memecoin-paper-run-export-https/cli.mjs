@@ -229,11 +229,16 @@ async function runUpload(values) {
   return outcome.status === "TRANSFER_ACKNOWLEDGED" ? 0 : outcome.status === "UNKNOWN" ? 2 : 1;
 }
 
-async function writeExactBytes(filename, bytes) {
+export async function writeExactBytes(filename, bytes, {
+  linkFile = link,
+  unlinkFile = unlink,
+  syncDirectory: syncDirectoryOperation = syncDirectory
+} = {}) {
   if (!path.isAbsolute(filename)) throw new TypeError("readback output path must be absolute");
   const directory = path.dirname(filename);
   const temporary = path.join(directory, `.${path.basename(filename)}.${randomBytes(12).toString("hex")}.stage`);
   let handle;
+  let published = false;
   try {
     handle = await open(temporary, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL, 0o600);
     let offset = 0;
@@ -245,17 +250,38 @@ async function writeExactBytes(filename, bytes) {
     await handle.sync();
     await handle.close();
     handle = null;
-    await link(temporary, filename);
-    await unlink(temporary);
-    await syncDirectory(directory);
+    await linkFile(temporary, filename);
+    published = true;
+    await unlinkFile(temporary);
+    await syncDirectoryOperation(directory);
+    return {status: "WRITTEN"};
   } catch (error) {
     await handle?.close().catch(() => {});
     await rm(temporary, {force: true}).catch(() => {});
+    if (published) return {status: "UNKNOWN", code: "OUTPUT_OUTCOME_UNKNOWN"};
     throw error;
   }
 }
 
-async function runReadback(values) {
+export async function publishReadbackOutput({
+  output, bytes, identity, exportSha256, byteLength, evaluation
+}, writeOutput = writeExactBytes) {
+  const published = await writeOutput(output, bytes);
+  const result = {
+    status: published.status === "WRITTEN" ? "READ_BACK" : "UNKNOWN",
+    ...(published.status === "WRITTEN" ? {} : {code: "OUTPUT_OUTCOME_UNKNOWN"}),
+    identity,
+    exportSha256,
+    byteLength,
+    evaluation: {overall: evaluation.overall},
+    output
+  };
+  const exitCode = result.status === "UNKNOWN" ? 2 :
+    evaluation.overall === "FAIL" ? 1 : evaluation.overall === "UNKNOWN" ? 2 : 0;
+  return {result, exitCode};
+}
+
+async function runReadback(values, writeOutput = writeExactBytes) {
   const config = runtimeConfig();
   const identity = validateIdentity({
     runId: required(values, "run-id", SAFE_ID),
@@ -280,19 +306,19 @@ async function runReadback(values) {
     emit({status: result.status, code: result.code, identity, exportSha256: digest, byteLength});
     return result.status === "UNKNOWN" ? 2 : 1;
   }
-  await writeExactBytes(output, result.bytes);
-  emit({
-    status: "READ_BACK",
+  const published = await publishReadbackOutput({
+    output,
+    bytes: result.bytes,
     identity,
     exportSha256: result.exportSha256,
     byteLength: result.byteLength,
-    evaluation: {overall: result.evaluation.overall},
-    output
-  });
-  return result.evaluation.overall === "FAIL" ? 1 : result.evaluation.overall === "UNKNOWN" ? 2 : 0;
+    evaluation: result.evaluation
+  }, writeOutput);
+  emit(published.result);
+  return published.exitCode;
 }
 
-export async function main(args = process.argv.slice(2)) {
+export async function main(args = process.argv.slice(2), {writeOutput = writeExactBytes} = {}) {
   try {
     const [command, ...rest] = args;
     const values = parseArgs(rest);
@@ -305,7 +331,7 @@ export async function main(args = process.argv.slice(2)) {
         allowed.some(key => typeof values[key] !== "string")) {
       throw new TypeError("invalid HTTPS export command");
     }
-    return command === "upload" ? await runUpload(values) : await runReadback(values);
+    return command === "upload" ? await runUpload(values) : await runReadback(values, writeOutput);
   } catch {
     emit({status: "REJECTED", code: "INVALID_COMMAND_OR_RUNTIME_CONFIGURATION"});
     return 1;

@@ -14,7 +14,9 @@ import {
 import {
   createExportTransfer, createFileReceiver, TRANSFER_SCHEMA
 } from "../../memecoin-paper-run-export-transfer/index.mjs";
-import {claimDurableAttempt, recordDurableOutcome} from "../cli.mjs";
+import {
+  claimDurableAttempt, publishReadbackOutput, recordDurableOutcome, writeExactBytes
+} from "../cli.mjs";
 import {createHttpsExportTransport, createPrivateReceiverHandler, readExportOverHttps} from "../https.mjs";
 
 const WRITE_AUTH = "test-write-scope";
@@ -245,6 +247,80 @@ test("independent readback rejects bytes altered after HTTPS metadata binding", 
   assert.equal(result.code, "READBACK_DIGEST_OR_IDENTITY_MISMATCH");
 });
 
+test("independent readback shares a monotonic deadline through synchronous evaluation", async () => {
+  let now = 100;
+  let calls = 0;
+  const transport = {
+    get: async () => {
+      calls++;
+      return {
+        status: "FOUND",
+        redirected: false,
+        identity,
+        exportSha256: hash(exportBytes),
+        byteLength: exportBytes.byteLength,
+        bytes: (async function* () { yield exportBytes; })()
+      };
+    }
+  };
+  const result = await readExportOverHttps({
+    transport,
+    privateOrigin: "https://paper-private.example",
+    expected: identity,
+    expectedExportSha256: hash(exportBytes),
+    expectedByteLength: exportBytes.byteLength,
+    readAuthorization: READ_AUTH,
+    timeoutMs: 100,
+    monotonicNow: () => now,
+    evaluate: () => {
+      now = 200;
+      return {overall: "PASS"};
+    }
+  });
+  assert.equal(calls, 1);
+  assert.deepEqual(result, {status: "UNKNOWN", code: "DEADLINE_EXCEEDED"});
+});
+
+test("independent readback does not dispatch when already cancelled or after clock rollback", async () => {
+  let calls = 0;
+  const response = {
+    status: "FOUND",
+    redirected: false,
+    identity,
+    exportSha256: hash(exportBytes),
+    byteLength: exportBytes.byteLength,
+    bytes: (async function* () { yield exportBytes; })()
+  };
+  const transport = {get: async () => { calls++; return response; }};
+  const controller = new AbortController();
+  controller.abort();
+  const cancelled = await readExportOverHttps({
+    transport,
+    privateOrigin: "https://paper-private.example",
+    expected: identity,
+    expectedExportSha256: hash(exportBytes),
+    expectedByteLength: exportBytes.byteLength,
+    readAuthorization: READ_AUTH,
+    signal: controller.signal
+  });
+  assert.deepEqual(cancelled, {status: "UNKNOWN", code: "CANCELLED"});
+  assert.equal(calls, 0);
+
+  const time = [100, 150, 120, 110, 140, 130, 125, 115, 160, 150, 145, 140, 135, 130, 125, 200];
+  const rolledBack = await readExportOverHttps({
+    transport,
+    privateOrigin: "https://paper-private.example",
+    expected: identity,
+    expectedExportSha256: hash(exportBytes),
+    expectedByteLength: exportBytes.byteLength,
+    readAuthorization: READ_AUTH,
+    timeoutMs: 100,
+    monotonicNow: () => time.length ? time.shift() : 200
+  });
+  assert.equal(rolledBack.status, "UNKNOWN");
+  assert.equal(rolledBack.code, "DEADLINE_EXCEEDED");
+});
+
 test("redirects are not followed and cancellation closes the HTTPS request", async t => {
   let redirects = 0;
   const redirectServer = https.createServer({key: privateKey, cert: certificate}, (_request, response) => {
@@ -352,7 +428,7 @@ test("receiver rejects unknown-length, partial, and chunk-flood requests", async
     authorizeWrite: authorization => authorization === WRITE_AUTH,
     authorizeRead: authorization => authorization === READ_AUTH
   });
-  const handler = createPrivateReceiverHandler({receiver, privateOrigin, timeoutMs: 100});
+  const handler = createPrivateReceiverHandler({receiver, privateOrigin, timeoutMs: 2_000});
   const baseHeaders = [
     "host", "receiver.example",
     "x-paper-transfer-schema", TRANSFER_SCHEMA,
@@ -479,6 +555,36 @@ test("operator CLI uses a durable one-shot gate and independent read-only author
   assert.equal(readback.status, 0, readback.stderr);
   assert.equal(JSON.parse(readback.stdout).evaluation.overall, "PASS");
   assert.deepEqual(await readFile(outputPath), exportBytes);
+});
+
+test("post-link directory sync failure is bound UNKNOWN and never overwrites output", async () => {
+  const output = path.join(temporaryRoot, "published-before-sync-failure.json");
+  const identityBinding = {...identity};
+  const outcome = await publishReadbackOutput({
+    output,
+    bytes: exportBytes,
+    identity: identityBinding,
+    exportSha256: hash(exportBytes),
+    byteLength: exportBytes.byteLength,
+    evaluation: {overall: "PASS"}
+  }, (filename, bytes) => writeExactBytes(filename, bytes, {
+    syncDirectory: async () => { throw new Error("injected directory sync fault"); }
+  }));
+  assert.deepEqual(outcome, {
+    result: {
+    status: "UNKNOWN",
+    code: "OUTPUT_OUTCOME_UNKNOWN",
+    identity: identityBinding,
+    exportSha256: hash(exportBytes),
+    byteLength: exportBytes.byteLength,
+    evaluation: {overall: "PASS"},
+    output
+    },
+    exitCode: 2
+  });
+  assert.deepEqual(await readFile(output), exportBytes);
+  await assert.rejects(() => writeExactBytes(output, Buffer.from("replacement")), {code: "EEXIST"});
+  assert.deepEqual(await readFile(output), exportBytes);
 });
 
 test("stored upload with lost ACK is UNKNOWN and durable gate survives restart", async t => {
