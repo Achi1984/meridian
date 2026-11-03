@@ -33,6 +33,7 @@ const MAX_TOTAL_CENSUS_ROWS = 50_000;
 const MAX_PRICE_LOOKUPS = 2_048;
 const MAX_DECODE_WORK = 25_000_000;
 const MAX_SOURCE_READ_MS = 15_000;
+const PREFETCH_RECEIPT_CUTOFF = Date.parse("9999-12-31T23:59:59.999Z");
 const NULL_SLOT_PROVENANCE = new Set([
   "OFFCHAIN_TIMESTAMP_NO_SOLANA_SLOT",
   "DERIVED_ONCHAIN_WINDOW_NO_SINGLE_SLOT",
@@ -451,7 +452,8 @@ export async function buildAnalystWindowEvidence({
   priceSource,
   marketPairEvidence,
   smartWalletAllowlist,
-  maxSourceReadMs = MAX_SOURCE_READ_MS
+  maxSourceReadMs = MAX_SOURCE_READ_MS,
+  sourcePrefetchOnly = false
 } = {}) {
   const identity = candidateIdentity(candidate);
   const metrics = {};
@@ -461,6 +463,7 @@ export async function buildAnalystWindowEvidence({
   const windows = {};
   const sourceBudgetValid = Number.isSafeInteger(maxSourceReadMs) &&
     maxSourceReadMs > 0 && maxSourceReadMs <= MAX_SOURCE_READ_MS;
+  const sourceReceiptCutoff = sourcePrefetchOnly ? PREFETCH_RECEIPT_CUTOFF : assembledAt;
   const budget = createSourceBudget(sourceBudgetValid ? maxSourceReadMs : MAX_SOURCE_READ_MS);
   const policyValid = validPolicy(policy);
   const timeValid = validTime(candidateT) && validTime(assembledAt) &&
@@ -610,7 +613,7 @@ export async function buildAnalystWindowEvidence({
       }));
     }
     const response = priceCache.get(key);
-    if (!exactSourceObservation(response, response?.source, {mint, atMs}, assembledAt, trust) ||
+    if (!exactSourceObservation(response, response?.source, {mint, atMs}, sourceReceiptCutoff, trust) ||
         response.source !== trust.source || response.denomination !== policy.momentumDenomination) {
       return null;
     }
@@ -717,13 +720,17 @@ export async function buildAnalystWindowEvidence({
         Array.isArray(pair[0]?.owners) && Array.isArray(pair[1]?.owners) &&
         pair[0].owners.length + pair[1].owners.length <= MAX_TOTAL_CENSUS_ROWS) {
       const chargeCensus = units => budget.chargeCensus(units);
-      const startCount = ownerCount(pair[0], censusPolicy, startHolders, assembledAt, identity, chargeCensus);
-      const endCount = ownerCount(pair[1], censusPolicy, candidateT, assembledAt, identity, chargeCensus);
+      const startCount = ownerCount(
+        pair[0], censusPolicy, startHolders, sourceReceiptCutoff, identity, chargeCensus
+      );
+      const endCount = ownerCount(
+        pair[1], censusPolicy, candidateT, sourceReceiptCutoff, identity, chargeCensus
+      );
       if (pair[0]?.source !== pair[1]?.source) {
         unavailableMetrics.holderGrowthPct1h = noMetric("CENSUS_SOURCE_CHANGED_BETWEEN_ENDPOINTS");
       }
       receipts.census = pair.filter(snapshot => isRecord(snapshot) &&
-        validReceipt(snapshot.source, snapshot.receipt, assembledAt)).map(snapshot => ({
+        validReceipt(snapshot.source, snapshot.receipt, sourceReceiptCutoff)).map(snapshot => ({
         source: snapshot.source,
         id: snapshot.receipt.id,
         payloadSha256: snapshot.receipt.payloadSha256,
@@ -838,6 +845,7 @@ export async function buildAnalystWindowEvidence({
 
   const status = ANALYST_WINDOW_METRICS.every(key => metrics[key])
     ? "COMPLETE" : "INCOMPLETE";
+  if (sourcePrefetchOnly) return Object.freeze({status: "SOURCE_PREFETCHED"});
   const packet = {
     schema: "MEMECOIN_ANALYST_WINDOW_EVIDENCE_V1",
     status,

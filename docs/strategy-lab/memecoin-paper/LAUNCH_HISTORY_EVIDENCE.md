@@ -29,6 +29,10 @@ repeated within a subject stop pagination as `REPEATED_CURSOR`; signatures
 repeated across different declared subjects are deduplicated and retain all
 subject addresses. The result reports coverage only for those addresses and
 that inclusive interval.
+The per-request event also records the fixed origin, consumed response bytes,
+and SHA-256 of the exact response bytes. Supplied signature and transaction
+`blockTime` values are preserved as seconds; absent or invalid values remain
+null, and no timestamp is inferred from a slot.
 
 The request first captures a `getSlot({commitment:"finalized"})` anchor. If that
 anchor is unavailable or below `endSlot`, history paging does not start and
@@ -51,6 +55,17 @@ Consumed response bytes are counted as chunks arrive, including bytes consumed
 before a timeout or size failure; an aborted reader is sealed against later
 counter changes. There are no retries. An injected transport is not
 authenticated merely because its request object contains the fixed URL.
+
+The separate `createBoundedHistoryRpcReader()` seam in
+`launch-history-source.mjs` reuses this bounded request path for only
+`getSlot`, `getBlocks`, and `getBlockTime`. The latter two methods are limited
+to the explicit slot-time-boundary source; they do not expand
+`acquireLaunchHistory()`'s signature/transaction scan or change the disabled
+run manifest. That source enumerates produced slots in a configured range and
+queries `getBlockTime` for each one. Gaps are listed as skipped slots; any
+produced slot with a missing time, a regression, or an endpoint outside the
+range leaves the boundary `UNKNOWN`. Provider authenticity and archival
+completeness remain unestablished.
 
 `coverage.complete` is true only when every declared subject reaches the lower
 slot boundary or the RPC history is exhausted, and every successful in-range
