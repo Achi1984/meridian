@@ -3476,6 +3476,33 @@
       "executionAuthorized": false,
       "autoPromotion": false,
       "provenanceVerified": false
+    },
+    "paperSource1208Checkpoint20261103": {
+      "opId": "meridian-1208-checkpoint-20261103-r1",
+      "recordedDate": "2026-11-03",
+      "scope": "CHECKPOINT_METADATA_ONLY_NO_SOURCE_IMPLEMENTATION_OR_AUTHORITY_CHANGE",
+      "observedMainSha": "c909d06f897fcb75152b4b56502d20e2a2785734",
+      "priorReviewedSourceHead": "1a2d61656534910d0694803284bdcc36d9b7c4da",
+      "baseSha": "c909d06f897fcb75152b4b56502d20e2a2785734",
+      "ci": {
+        "workflowRunId": 41707915818,
+        "attempt": 2,
+        "jobId": 126172216672,
+        "state": "SUCCESS",
+        "tests": "4254_PASS_0_FAIL_0_CANCELLED"
+      },
+      "independentReview": {
+        "commentId": 6614914664,
+        "state": "GREEN_LIGHT_EXACT_HEAD"
+      },
+      "ownerReviewerException": "942/6614785625",
+      "productionIntegration": "BLOCKED_NOT_IMPLEMENTED",
+      "issue1207": "OPEN",
+      "plannedIntegration": "PENDING_NOT_MERGED_NOT_POSTCHECKED",
+      "keys": "DEFERRED_NO_KEY_USE",
+      "providerOrHostActivation": false,
+      "mergeAuthorizedOrPerformed": false,
+      "finalSourceFrozenPendingHostedCiAndNarrowDeltaReview": true
     }
   }
 }
