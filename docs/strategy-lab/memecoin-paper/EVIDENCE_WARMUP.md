@@ -15,12 +15,10 @@ node --check scripts/memecoin-paper/evidence-warmup/index.mjs
 node --check scripts/memecoin-paper/evidence-warmup/cli.mjs
 ```
 
-Result: 7 focused warmup tests passed; both module syntax checks passed. Test coverage
-includes disabled-by-default behavior, immutable duplicate/conflict handling,
-restart digest verification and tampering, exact price/census endpoints,
-identity/policy/source changes, unknown trust and completeness through the
-actual Analyst builder, synthetic handoff, quotas, cancellation, and local
-census timestamps remaining nonhistorical.
+Result: 11 focused warmup tests passed; both module syntax checks passed. The
+final correction set also exercised delayed filesystem reads/writes/syncs,
+cancellation/deadline fencing, symlink ancestry rejection, duplicate logical
+keys, and payload-binding mismatches.
 
 ## Capture, store, read
 

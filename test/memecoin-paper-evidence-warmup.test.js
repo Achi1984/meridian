@@ -123,6 +123,15 @@ test("duplicate exact keys and mismatched payload bindings stay unavailable in r
   mismatched.payload.mint = "other-mint";
   assert.equal((await store.publish({datasetId: "mismatched-price", identity,
     capturedAt: 1_000_000, records: [mismatched]})).status, "UNKNOWN");
+  const mismatchedDataset = {datasetId: "mismatched-memory", identity, capturedAt: 1_000_000,
+    records: [mismatched]};
+  assert.equal(await createWarmupPriceSource(mismatchedDataset).readObservation({
+    mint: identity.mint, atMs: mismatched.sourceAtMs, denomination: "USD"
+  }), null);
+  assert.equal(warmupCoverage(mismatchedDataset, {
+    identity,
+    priceEndpoints: [{mint: identity.mint, atMs: mismatched.sourceAtMs, denomination: "USD"}]
+  }).exactMissing.prices.length, 1);
 
   const censusFixture = makeFixture({buyCount: 1, sellCount: 1});
   const census = await censusFixture.censusSource.readSnapshots({
@@ -219,6 +228,23 @@ test("census reader requires both exact same-identity policy endpoints", async t
   assert.equal((await createWarmupCensusSource(mismatchedDataset).readSnapshots({
     identity: fixture.identity, startAtMs: start.observedAt, endAtMs: end.observedAt, policy
   })).status, "WARMUP");
+  assert.equal(warmupCoverage(mismatchedDataset, {
+    identity: fixture.identity,
+    censusEndpoints: [
+      {atMs: start.observedAt, policyVersion: policy.version},
+      {atMs: end.observedAt, policyVersion: policy.version}
+    ]
+  }).exactMissing.census.length, 1);
+  assert.equal(warmupCoverage({...dataset, records: dataset.records.map((record, index) =>
+    index === 1 ? {...record, source: "changed-source", trust: "REVIEWED",
+      payload: {...record.payload, source: "changed-source",
+        receipt: {...record.payload.receipt, source: "changed-source"}}} : record)}, {
+    identity: fixture.identity,
+    censusEndpoints: [
+      {atMs: start.observedAt, policyVersion: policy.version},
+      {atMs: end.observedAt, policyVersion: policy.version}
+    ]
+  }).exactMissing.census.length, 2);
   assert.equal((await source.readSnapshots({
     identity: fixture.identity,
     startAtMs: start.observedAt,
@@ -451,6 +477,10 @@ test("read and publish filesystem waits obey one deadline and late work cannot a
     }
   });
   assert.equal((await delayedRead.read("delay-read")).reason, "DEADLINE");
+  const readController = new AbortController();
+  setTimeout(() => readController.abort(), 5);
+  assert.equal((await delayedRead.read("delay-read", {signal: readController.signal})).reason,
+    "CANCELLED");
   await new Promise(resolve => setTimeout(resolve, 70));
   assert.equal((await base.read("delay-read")).status, "AVAILABLE");
 
@@ -548,6 +578,26 @@ test("cancelled or expired link and directory-sync waits stay UNKNOWN and block 
     {signal: controller.signal})).reason, "CANCELLED");
   assert.equal(syncCalls, 1);
   assert.equal((await lateSync.publish({...bundle, datasetId: "late-sync"})).status, "UNKNOWN");
+
+  const cancelRoot = path.join(root, "cancel-link");
+  const cancelController = new AbortController();
+  let cancelLinkCalls = 0;
+  const cancelLink = new EvidenceWarmupStore(cancelRoot, {
+    enabled: true,
+    limits: {maxElapsedMs: 1_000},
+    fsOps: {
+      link: async (...args) => {
+        cancelLinkCalls += 1;
+        await actualLink(...args);
+        await new Promise(resolve => setTimeout(resolve, 60));
+      }
+    }
+  });
+  setTimeout(() => cancelController.abort(), 20);
+  assert.equal((await cancelLink.publish({...bundle, datasetId: "cancel-link"},
+    {signal: cancelController.signal})).reason, "CANCELLED");
+  assert.equal(cancelLinkCalls, 1);
+  assert.equal((await cancelLink.publish({...bundle, datasetId: "cancel-link"})).status, "UNKNOWN");
 });
 
 test("symlinked ancestry is rejected before creating any target directories", async t => {

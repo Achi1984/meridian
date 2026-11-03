@@ -83,7 +83,14 @@ class OperationBudget {
     });
     void pending.catch(() => {});
     const result = await Promise.race([pending, this.#stopped]);
-    this.check();
+    try {
+      this.check();
+    } catch (error) {
+      if (onLate) {
+        try { void Promise.resolve(onLate(result)).catch(() => {}); } catch {}
+      }
+      throw error;
+    }
     return result;
   }
 
@@ -101,6 +108,10 @@ function isRecord(value) {
 function validTime(value) {
   return Number.isSafeInteger(value) && value >= 0 &&
     Number.isFinite(new Date(value).getTime());
+}
+
+function bestEffort(operation) {
+  try { void Promise.resolve(operation()).catch(() => {}); } catch {}
 }
 
 function validIdentity(identity) {
@@ -266,6 +277,7 @@ function validateDirectoryStat(stat, isTarget) {
 async function assertPrivateDirectory(directory, {create = false, budget, fsOps} = {}) {
   const resolved = path.resolve(directory);
   const parts = resolved.split(path.sep).filter(Boolean);
+  if (parts.length === 0) throw new Error("warmup root cannot be a filesystem root");
   let current = path.parse(resolved).root;
   budget.check();
   validateDirectoryStat(await budget.wait(fsOps.lstat(current)), false);
@@ -282,7 +294,7 @@ async function assertPrivateDirectory(directory, {create = false, budget, fsOps}
       try {
         budget.check();
         await budget.wait(fsOps.mkdir(current, {mode: 0o700}), {
-          onLate: () => fsOps.rmdir(current).catch(() => {})
+          onLate: () => bestEffort(() => fsOps.rmdir(current))
         });
       } catch (mkdirError) {
         if (mkdirError.code !== "EEXIST") throw mkdirError;
@@ -348,7 +360,7 @@ async function boundedRead(filename, maxBytes, {budget, fsOps}) {
     if (error instanceof OperationStopped) throw error;
     return {status: "UNKNOWN", reason: "WARMUP_FILE_READ_FAILED"};
   } finally {
-    void handle.close().catch(() => {});
+    bestEffort(() => handle.close());
   }
 }
 
@@ -360,7 +372,18 @@ async function syncDirectory(directory, {budget, fsOps}) {
   try {
     await budget.wait(handle.sync());
   } finally {
-    void handle.close().catch(() => {});
+    bestEffort(() => handle.close());
+  }
+}
+
+async function publicationPending(filename, budget, fsOps) {
+  budget.check();
+  try {
+    await budget.wait(fsOps.lstat(filename));
+    return true;
+  } catch (error) {
+    if (error instanceof OperationStopped || error.code !== "ENOENT") throw error;
+    return false;
   }
 }
 
@@ -452,13 +475,8 @@ export class EvidenceWarmupStore {
       budget.check();
       const finalPath = path.join(root, sourceKey(datasetId));
       const pendingPath = path.join(root, ".evidence-warmup-pending");
-      try {
-        budget.check();
-        await budget.wait(this.#fsOps.lstat(pendingPath));
+      if (await publicationPending(pendingPath, budget, this.#fsOps)) {
         return {status: "UNKNOWN", reason: "PUBLICATION_STATE_UNKNOWN"};
-      } catch (error) {
-        if (error instanceof OperationStopped) throw error;
-        if (error.code !== "ENOENT") throw error;
       }
       const existing = await boundedRead(finalPath, this.#limits.maxBytes, {
         budget, fsOps: this.#fsOps
@@ -475,8 +493,8 @@ export class EvidenceWarmupStore {
         budget.check();
         handle = await budget.wait(this.#fsOps.open(pendingPath, "wx", 0o600), {
           onLate: opened => {
-            void opened.close().catch(() => {});
-            void this.#fsOps.unlink(pendingPath).catch(() => {});
+            bestEffort(() => opened.close());
+            bestEffort(() => this.#fsOps.unlink(pendingPath));
           }
         });
         temporary = pendingPath;
@@ -485,7 +503,7 @@ export class EvidenceWarmupStore {
         budget.check();
         await budget.wait(handle.sync());
       } finally {
-        if (handle) void handle.close().catch(() => {});
+        if (handle) bestEffort(() => handle.close());
       }
       budget.check();
       try {
@@ -500,12 +518,12 @@ export class EvidenceWarmupStore {
           });
           budget.check();
           if (current.status === "OK" && current.digest === digest) {
-            void this.#fsOps.unlink(temporary).catch(() => {});
+            bestEffort(() => this.#fsOps.unlink(temporary));
             temporary = null;
             return {status: "DUPLICATE", datasetId, digest, byteLength: current.byteLength};
           }
           if (current.status === "OK") {
-            void this.#fsOps.unlink(temporary).catch(() => {});
+            bestEffort(() => this.#fsOps.unlink(temporary));
             temporary = null;
             return {status: "CONFLICT", reason: "IMMUTABLE_DATASET_CONFLICT"};
           }
@@ -516,7 +534,7 @@ export class EvidenceWarmupStore {
       budget.check();
       await syncDirectory(root, {budget, fsOps: this.#fsOps});
       budget.check();
-      void this.#fsOps.unlink(temporary).catch(() => {});
+      bestEffort(() => this.#fsOps.unlink(temporary));
       temporary = null;
       return {status: "PUBLISHED", datasetId, digest, byteLength: bytes.length};
     } catch (error) {
@@ -525,7 +543,7 @@ export class EvidenceWarmupStore {
       }
       return {status: "UNKNOWN", reason: "WARMUP_PUBLICATION_FAILED"};
     } finally {
-      if (temporary && !linkAttempted) void this.#fsOps.unlink(temporary).catch(() => {});
+      if (temporary && !linkAttempted) bestEffort(() => this.#fsOps.unlink(temporary));
       budget.close();
       this.#busy = false;
     }
@@ -541,17 +559,15 @@ export class EvidenceWarmupStore {
     try {
       const root = await assertPrivateDirectory(this.#root, {budget, fsOps: this.#fsOps});
       const pendingPath = path.join(root, ".evidence-warmup-pending");
-      try {
-        budget.check();
-        await budget.wait(this.#fsOps.lstat(pendingPath));
+      if (await publicationPending(pendingPath, budget, this.#fsOps)) {
         return {status: "UNKNOWN", reason: "PUBLICATION_STATE_UNKNOWN"};
-      } catch (error) {
-        if (error instanceof OperationStopped) throw error;
-        if (error.code !== "ENOENT") throw error;
       }
       const result = await boundedRead(path.join(root, sourceKey(datasetId)), this.#limits.maxBytes,
         {budget, fsOps: this.#fsOps});
       budget.check();
+      if (await publicationPending(pendingPath, budget, this.#fsOps)) {
+        return {status: "UNKNOWN", reason: "PUBLICATION_STATE_UNKNOWN"};
+      }
       if (result.status !== "OK") return result;
       const document = result.document;
       const workState = {nodes: 0, seen: new WeakSet()};
@@ -577,6 +593,9 @@ export class EvidenceWarmupStore {
         return {status: "UNKNOWN", reason: "WORK_LIMIT_OR_BUDGET_MISMATCH"};
       }
       budget.check();
+      if (await publicationPending(pendingPath, budget, this.#fsOps)) {
+        return {status: "UNKNOWN", reason: "PUBLICATION_STATE_UNKNOWN"};
+      }
       return {status: "AVAILABLE", document: deepFreeze(document), digest: result.digest,
         byteLength: result.byteLength};
     } catch (error) {
@@ -662,14 +681,18 @@ function exactMatches(records, predicate) {
 }
 
 export function createWarmupPriceSource(dataset) {
-  const records = dataset?.records ?? [];
+  const records = Array.isArray(dataset?.records) &&
+    dataset.records.length <= DEFAULT_WARMUP_LIMITS.maxRecords ? dataset.records : [];
   const capturedAt = dataset?.capturedAt;
   return Object.freeze({
     async readObservation({mint, atMs, denomination, purpose} = {}) {
       const request = {identity: dataset?.identity, mint, atMs, denomination};
-      const matches = exactMatches(records, record =>
-        PRICE_KINDS.has(record.kind) && record.mint === mint &&
-        record.sourceAtMs === atMs && record.denomination === denomination);
+      const datasetIdentityMatches = validIdentity(dataset?.identity) &&
+        validIdentity(request.identity);
+      const matches = datasetIdentityMatches ? exactMatches(records, record =>
+        PRICE_KINDS.has(record.kind) && exactIdentity(record, request.identity) &&
+        record.mint === mint && record.sourceAtMs === atMs &&
+        record.denomination === denomination) : [];
       if (matches.length !== 1) return null;
       const record = matches[0];
       if (!validTime(capturedAt) || !usablePriceRecord(record, request, capturedAt)) return null;
@@ -679,14 +702,21 @@ export function createWarmupPriceSource(dataset) {
 }
 
 export function createWarmupCensusSource(dataset) {
-  const records = dataset?.records ?? [];
+  const records = Array.isArray(dataset?.records) &&
+    dataset.records.length <= DEFAULT_WARMUP_LIMITS.maxRecords ? dataset.records : [];
   const capturedAt = dataset?.capturedAt;
   return Object.freeze({
     async readSnapshots({identity, startAtMs, endAtMs, policy} = {}) {
       const requested = [startAtMs, endAtMs];
-      const snapshots = requested.map(endpoint => exactMatches(records, record =>
-        CENSUS_KINDS.has(record.kind) && exactIdentity(record, identity) &&
-        record.observedAt === endpoint && record.policyVersion === policy?.version));
+      const validRequest = validIdentity(identity) && validIdentity(dataset?.identity) &&
+        exactIdentity({identity: dataset.identity}, identity) &&
+        requested.every(validTime);
+      const snapshots = requested.map(endpoint => {
+        if (!validRequest) return [];
+        return exactMatches(records, record =>
+          CENSUS_KINDS.has(record.kind) && exactIdentity(record, identity) &&
+          record.observedAt === endpoint && record.policyVersion === policy?.version);
+      });
       const available = snapshots.map((matches, index) =>
         matches.length === 1 && validTime(capturedAt) &&
         usableCensusRecord(matches[0], {
@@ -717,24 +747,43 @@ export function createWarmupCensusSource(dataset) {
 }
 
 export function warmupCoverage(dataset, {identity, priceEndpoints = [], censusEndpoints = []} = {}) {
-  const records = Array.isArray(dataset?.records) ? dataset.records : [];
+  const records = Array.isArray(dataset?.records) &&
+    dataset.records.length <= DEFAULT_WARMUP_LIMITS.maxRecords ? dataset.records : [];
   const capturedAt = dataset?.capturedAt;
+  const datasetIdentityMatches = validIdentity(identity) && validIdentity(dataset?.identity) &&
+    exactIdentity({identity: dataset.identity}, identity);
   const availablePriceEndpoints = priceEndpoints.filter(endpoint => {
+    if (!datasetIdentityMatches) return false;
     const matches = exactMatches(records, record => record.kind === "price" &&
       exactIdentity(record, identity) && record.mint === endpoint.mint &&
       record.denomination === endpoint.denomination && record.sourceAtMs === endpoint.atMs);
     return matches.length === 1 && validTime(capturedAt) &&
       usablePriceRecord(matches[0], {...endpoint, identity, atMs: endpoint.atMs}, capturedAt);
   });
-  const availableCensusEndpoints = censusEndpoints.filter(endpoint => {
-    const matches = exactMatches(records, record => record.kind === "census" &&
+  const censusRecordsByEndpoint = censusEndpoints.map(endpoint => {
+    if (!datasetIdentityMatches) return [];
+    return exactMatches(records, record => record.kind === "census" &&
       exactIdentity(record, identity) && record.observedAt === endpoint.atMs &&
       record.policyVersion === endpoint.policyVersion);
+  });
+  const censusAvailable = censusEndpoints.map((endpoint, index) => {
+    const matches = censusRecordsByEndpoint[index];
     return matches.length === 1 && validTime(capturedAt) &&
       usableCensusRecord(matches[0], {
         identity, atMs: endpoint.atMs, policyVersion: endpoint.policyVersion
       }, capturedAt);
   });
+  if (censusEndpoints.length === 2 &&
+      censusEndpoints[0].policyVersion === censusEndpoints[1].policyVersion &&
+      censusAvailable.every(Boolean)) {
+    const [start, end] = censusRecordsByEndpoint.map(matches => matches[0]);
+    const samePolicy = start.source === end.source &&
+      start.payload.aggregation === end.payload.aggregation &&
+      start.payload.denominatorPolicy === end.payload.denominatorPolicy &&
+      JSON.stringify(start.payload.exclusions) === JSON.stringify(end.payload.exclusions);
+    if (!samePolicy) censusAvailable.fill(false);
+  }
+  const availableCensusEndpoints = censusEndpoints.filter((_, index) => censusAvailable[index]);
   return deepFreeze({
     status: "WARMUP",
     datasetId: dataset?.datasetId ?? null,
