@@ -15,7 +15,7 @@ node --check scripts/memecoin-paper/evidence-warmup/index.mjs
 node --check scripts/memecoin-paper/evidence-warmup/cli.mjs
 ```
 
-Result: 6 focused tests passed; both module syntax checks passed. Test coverage
+Result: 7 focused warmup tests passed; both module syntax checks passed. Test coverage
 includes disabled-by-default behavior, immutable duplicate/conflict handling,
 restart digest verification and tampering, exact price/census endpoints,
 identity/policy/source changes, unknown trust and completeness through the
@@ -49,8 +49,9 @@ particular, local `trust` labels are not a review mechanism. Explicit
 records must remain visibly `SYNTHETIC_FIXTURE_ONLY`.
 
 Each store root holds exactly one immutable dataset; create a separate private
-root for another run. The root and its parent ancestry must be owned/private local directories, with
-the normal sticky `/tmp` ancestor permitted for tests. The store uses a bounded
+root for another run. The root and its parent ancestry must be owned/private
+local directories, with the normal sticky `/tmp` ancestor permitted for tests.
+The store uses a bounded
 direct file read (no directory scan), verifies the digest of the complete file
 payload on every read/restart, and uses an exclusive immutable publication.
 Same bytes under the same dataset ID return `DUPLICATE`; different bytes return

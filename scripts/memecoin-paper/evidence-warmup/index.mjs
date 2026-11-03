@@ -29,6 +29,12 @@ function validTime(value) {
     Number.isFinite(new Date(value).getTime());
 }
 
+function validIdentity(identity) {
+  return isRecord(identity) && identity.chainId === "solana" &&
+    ["mint", "pool", "quote"].every(key =>
+      typeof identity[key] === "string" && identity[key].length <= 64);
+}
+
 function identityKey(identity) {
   return JSON.stringify([
     identity?.chainId, identity?.mint, identity?.pool, identity?.quote
@@ -110,6 +116,10 @@ function validateRecord(record) {
   if (record.kind === "census" &&
       (!validTime(record.observedAt) || record.payload.observedAt !== record.observedAt ||
        typeof record.policyVersion !== "string" || !record.policyVersion ||
+       record.source !== record.payload.source ||
+       record.payload.censusPolicyVersion !== record.policyVersion ||
+       record.payload.receivedAt !== record.receivedAt ||
+       record.payload.receipt?.receivedAt !== record.receivedAt ||
        (record.completeness === "COMPLETE" &&
          (record.payload.status !== "COMPLETE" || record.payload.coverage?.complete !== true)))) {
     throw new TypeError("warmup census record is invalid");
@@ -206,6 +216,15 @@ async function boundedRead(filename, maxBytes) {
   }
 }
 
+async function syncDirectory(directory) {
+  const handle = await open(directory, "r");
+  try {
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
+}
+
 function sourceKey() {
   return "evidence-warmup.json";
 }
@@ -234,8 +253,8 @@ export class EvidenceWarmupStore {
     if (!this.#enabled) return {status: "DISABLED"};
     if (this.#busy) return {status: "UNKNOWN", reason: "PUBLICATION_IN_PROGRESS"};
     if (signal?.aborted) return {status: "UNKNOWN", reason: "CANCELLED"};
-    if (!DATASET_ID.test(datasetId ?? "") || !isRecord(identity) ||
-        identity.chainId !== "solana" || !validTime(capturedAt) ||
+    if (!DATASET_ID.test(datasetId ?? "") || !validIdentity(identity) ||
+        !validTime(capturedAt) ||
         !Array.isArray(records) || records.length > this.#limits.maxRecords) {
       return {status: "UNKNOWN", reason: "INVALID_WARMUP_PUBLICATION"};
     }
@@ -312,6 +331,11 @@ export class EvidenceWarmupStore {
         }
         return {status: "UNKNOWN", reason: "PUBLICATION_STATE_UNKNOWN"};
       }
+      try {
+        await syncDirectory(root);
+      } catch {
+        return {status: "UNKNOWN", reason: "PUBLICATION_STATE_UNKNOWN"};
+      }
       return {status: "PUBLISHED", datasetId, digest, byteLength: bytes.length};
     } catch {
       return {status: "UNKNOWN", reason: "WARMUP_PUBLICATION_FAILED"};
@@ -331,6 +355,7 @@ export class EvidenceWarmupStore {
       const workState = {nodes: 0, seen: new WeakSet()};
       validateJsonValue(document, workState);
       if (document?.schema !== EVIDENCE_WARMUP_SCHEMA || document.datasetId !== datasetId ||
+          !validIdentity(document.identity) ||
           !Array.isArray(document.records) || document.records.length > this.#limits.maxRecords) {
         return {status: "UNKNOWN", reason: "WARMUP_DOCUMENT_INVALID"};
       }
@@ -393,7 +418,10 @@ export function createWarmupCensusSource(dataset) {
         record.observedAt === endpoint && record.policyVersion === policy?.version));
       const available = snapshots.map(matches => matches.length === 1 &&
         reviewedOrSynthetic(matches[0], matches[0].payload) &&
-        matches[0].completeness === "COMPLETE");
+        matches[0].completeness === "COMPLETE" &&
+        matches[0].source === matches[0].payload.source &&
+        matches[0].payload.censusPolicyVersion === policy?.version &&
+        matches[0].payload.receivedAt === matches[0].receivedAt);
       const exactEndpoints = {available: [], missing: []};
       requested.forEach((endpoint, index) =>
         exactEndpoints[available[index] ? "available" : "missing"].push(endpoint));
