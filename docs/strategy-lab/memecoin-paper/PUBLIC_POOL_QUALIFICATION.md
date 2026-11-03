@@ -81,13 +81,17 @@ decoded LP state does not establish LP protection.
 ### Original pair creation history attempt
 
 The public RPC read-only method `getSignaturesForAddress(pool,
-{commitment:"finalized", limit:1000})` returned 1,000 signatures. Ten subsequent
-cursor pages used the returned oldest signature as `before`, each with the same
-1,000-row cap. Every successful page was full; the oldest returned block time
-was still later than the provider `openTime`. The next page returned HTTP 429,
-so pagination stopped immediately: no retry, no transaction read, and no
-response body/hash for the 429. These results do not identify the creation
-transaction or prove complete history.
+{commitment:"finalized", limit:1000})` was POSTed to
+`https://api.mainnet-beta.solana.com/` with credentials omitted, redirects
+disabled, an 8-second connect timeout, 25-second total timeout, and a 1 MiB
+response cap. Ten subsequent cursor pages used the returned oldest signature as
+`before`, each with the same 1,000-row cap, credentials omitted, redirects
+disabled, a 10-second per-request timeout, and a 1 MiB streamed response cap.
+Every successful page was full; the oldest returned block time was still later
+than the provider `openTime`. The next page returned HTTP 429, so pagination
+stopped immediately: no retry, no transaction read, and no response body/hash
+for the 429. These results do not identify the creation transaction or prove
+complete history.
 
 | Read | Start UTC | HTTP / rows | Oldest returned block time UTC | Response SHA-256 |
 |---|---|---|---|---|
