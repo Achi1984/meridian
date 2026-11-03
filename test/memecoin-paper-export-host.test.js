@@ -233,6 +233,7 @@ test("host import and disabled or incomplete configuration never start a listene
     code: "HOST_CONFIGURATION_INVALID",
     listenerStarted: false
   });
+
   assert.throws(() => hostModule.paperExportHostConfigFromEnvironment({
     PAPER_EXPORT_HOST_ENABLED: "true",
     PAPER_EXPORT_HOST_ORIGIN: "https://example.invalid:4443",
@@ -240,6 +241,57 @@ test("host import and disabled or incomplete configuration never start a listene
     PAPER_EXPORT_HOST_PORT: "4443",
     PAPER_EXPORT_HOST_MOUNT_ROOT: "/var/data/other"
   }), /mount root/);
+});
+
+test("host bootstrap compares effective HTTPS ports and only normalizes standard 443", async t => {
+  const {paperExportHostConfigFromEnvironment, createPaperExportServer, closePaperExportServer} =
+    await import("../scripts/memecoin-paper-export-host.mjs");
+  const env = {
+    PAPER_EXPORT_HOST_ENABLED: "true",
+    PAPER_EXPORT_HOST_LISTEN_HOST: "127.0.0.1",
+    PAPER_EXPORT_HOST_MOUNT_ROOT: "/var/data/meridian-paper",
+    PAPER_EXPORT_HOST_STORAGE_ROOT: "/var/data/meridian-paper/receiver",
+    PAPER_EXPORT_HOST_TLS_CERT_FILE: "/private/cert",
+    PAPER_EXPORT_HOST_TLS_KEY_FILE: "/private/key",
+    PAPER_EXPORT_HOST_WRITE_AUTH_FILE: "/private/write",
+    PAPER_EXPORT_HOST_READ_AUTH_FILE: "/private/read"
+  };
+  const hostFixture = await fixture(t);
+  for (const [origin, port, normalized] of [
+    ["https://localhost", "443", "https://localhost"],
+    ["https://localhost:443", "443", "https://localhost"],
+    ["https://localhost:4443", "4443", "https://localhost:4443"]
+  ]) {
+    const config = paperExportHostConfigFromEnvironment({
+      ...env, PAPER_EXPORT_HOST_ORIGIN: origin, PAPER_EXPORT_HOST_PORT: port
+    });
+    assert.equal(config.privateOrigin, normalized);
+    assert.equal(config.port, Number(port));
+    const server = await createPaperExportServer({
+      ...hostFixture.config, privateOrigin: origin, port: Number(port)
+    }, {lstatPath: hostFixture.lstatPath});
+    assert.equal(server.listening, false);
+    await closePaperExportServer(server);
+  }
+  for (const [origin, port] of [
+    ["https://localhost", "4443"],
+    ["https://localhost:443", "4443"],
+    ["https://localhost:4443", "443"],
+    ["https://localhost:4443", "4444"]
+  ]) {
+    assert.throws(() => paperExportHostConfigFromEnvironment({
+      ...env, PAPER_EXPORT_HOST_ORIGIN: origin, PAPER_EXPORT_HOST_PORT: port
+    }), /port/);
+    await assert.rejects(createPaperExportServer({
+      ...hostFixture.config, privateOrigin: origin, port: Number(port)
+    }, {lstatPath: hostFixture.lstatPath}), /configuration/);
+  }
+  for (const origin of ["https://localhost/", "https://LOCALHOST", "https://localhost:0443",
+    "https://localhost:4443:443", "http://localhost:443", "https://user@localhost:443"]) {
+    assert.throws(() => paperExportHostConfigFromEnvironment({
+      ...env, PAPER_EXPORT_HOST_ORIGIN: origin, PAPER_EXPORT_HOST_PORT: "443"
+    }), /origin/);
+  }
 });
 
 test("generated-CA TLS bootstrap accepts only exact host and separate scopes, evaluates exact readback, and shuts down on signal", async t => {
@@ -327,6 +379,23 @@ test("generated-CA TLS bootstrap accepts only exact host and separate scopes, ev
   assert.equal(readback.status, "READ_BACK");
   assert.deepEqual(readback.bytes, bytes);
   assert.equal(readback.evaluation.overall, "PASS");
+
+  const {runSyntheticHostAcceptance} =
+    await import("../scripts/memecoin-paper/synthetic-host-acceptance.mjs");
+  const acceptanceRoot = path.join(hostFixture.root, "acceptance");
+  await mkdir(acceptanceRoot, {mode: 0o700});
+  for (const proof of ["PIPELINE_QUOTE", "ACTIVE_STOP"]) {
+    const {summary} = await runSyntheticHostAcceptance({
+      enabled: true, dataRoot: acceptanceRoot, proof,
+      httpsOptions: {
+        privateOrigin: hostFixture.privateOrigin, transport,
+        writeAuthorization: WRITE_AUTH, readAuthorization: READ_AUTH
+      }
+    });
+    assert.equal(summary.https.status, "READ_BACK");
+    assert.equal(summary.https.overall, proof === "ACTIVE_STOP" ? "UNKNOWN" : "PASS");
+    assert.equal(summary.status, proof === "ACTIVE_STOP" ? "UNKNOWN" : "PASS");
+  }
 
   signalSource.emit("SIGTERM");
   assert.equal(await runPromise, 0);
