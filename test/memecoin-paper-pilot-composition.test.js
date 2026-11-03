@@ -320,65 +320,96 @@ test("complete offline path uses existing gates, ledger, independent ticks and d
   assert.notEqual(durable.records[1].commandId, durable.records[5].commandId);
 });
 
-test("synthetic runtime fixture traverses source pipeline and quote adapter into a truthful terminal export", async t => {
-  const {directory, pilot} = await harness(t, {fault: "PIPELINE_QUOTE"});
+test("synthetic runtime fixture carries adapter quotes through entry, risk, exit, and exported audit", async t => {
+  const {directory, pilot} = await harness(t, {
+    fault: "PIPELINE_QUOTE",
+    runConfig: config({budgets: {...BUDGETS, requests: 40, cycles: 8}})
+  });
   const result = await pilot.start();
   const report = result.report;
-  const runtime = result.provenance.candidates[0].syntheticFixtureRuntime;
+  const runtime = report.runnerReport.runtimeAudit;
   assert.ok(runtime);
-  assert.equal(runtime.label, "SYNTHETIC_FIXTURE_ONLY");
-  assert.equal(runtime.pipeline.status, "PARTIAL");
-  assert.equal(runtime.pipeline.filtersStatus, "UNKNOWN");
-  assert.equal(runtime.pipeline.filtersAccepted, false);
-  assert.ok(runtime.pipeline.acquisitionReceiptIds.length > 0);
-  assert.ok(runtime.pipeline.assembledAt >= runtime.pipeline.candidateT);
-  assert.ok(runtime.pipeline.decisionAt >= runtime.pipeline.assembledAt);
-  assert.equal(runtime.quote.status, "UNAVAILABLE");
-  assert.equal(runtime.quote.sourceProvenance, "INJECTED_TRANSPORT_NOT_AUTHENTICATED");
-  assert.equal(runtime.quote.eventId, "synthetic-order-1");
-  assert.ok(runtime.quote.observedAt > runtime.pipeline.decisionAt);
-  assert.equal(runtime.quote.costStatus, "UNKNOWN");
-  assert.equal(runtime.quote.paperFillEligible, false);
-  assert.equal(report.runnerReport.counters.quotes, 0);
+  assert.equal(runtime.source, "SYNTHETIC_FIXTURE_ONLY");
+  assert.equal(runtime.candidates.length, 1);
+  const candidate = runtime.candidates[0];
+  assert.equal(candidate.pipeline.filtersStatus, "PASS");
+  assert.equal(candidate.pipeline.filtersAccepted, true);
+  assert.equal(candidate.pipeline.syntheticAnalystEvidence, "SYNTHETIC_FIXTURE_ONLY");
+  assert.ok(candidate.pipeline.acquisitionReceiptIds.length > 0);
+  assert.ok(candidate.assembledAt >= candidate.candidateT);
+  assert.ok(candidate.decisionAt >= candidate.assembledAt);
+  assert.deepEqual(candidate.quotes.map(item => item.purpose), ["entry", "risk-mark"]);
+  assert.deepEqual(candidate.quotes.map(item => item.paperPriceMicros), [5_000_000, 4_500_000]);
+  assert.ok(candidate.quotes.every(item =>
+    item.adapterStatus === "UNAVAILABLE" &&
+    item.adapterAuthorizationEligible === false &&
+    item.adapterCostStatus === "UNKNOWN" &&
+    item.adapterSourceProvenance === "INJECTED_TRANSPORT_NOT_AUTHENTICATED"));
+  assert.ok(candidate.quotes.every(item =>
+    item.paperFillEligible &&
+    item.costBasis === "SYNTHETIC_FIXED_CENT_SCHEDULE_V1" &&
+    Object.keys(item.costs).length === 5), JSON.stringify(candidate.quotes, null, 2));
+  assert.ok(report.runnerReport.counters.quotes >= 2);
   assert.equal(report.runnerReport.operationResults.some(item =>
-    item.method === "executeEntry" && item.status === "FILLED_PAPER"), false);
+    item.method === "executeEntry" && item.status === "FILLED_PAPER"), true);
+  assert.equal(report.runnerReport.operationResults.some(item =>
+    item.method === "observeExitQuote" && item.status === "CLOSED_PAPER"), true);
   assert.deepEqual(report.runnerReport.terminalResult.openPositions, []);
   assert.equal(report.persistence, "ACKNOWLEDGED");
   assert.equal(report.exportBinding, "PRESTART_BOUND");
   assert.ok(await readFile(path.join(directory, "checkpoint.json")));
 
+  const exportBytes = canonicalCheckpointBytes(report);
+  const parsedReport = JSON.parse(exportBytes.toString("utf8"));
+  assert.deepEqual(parsedReport.runnerReport.runtimeAudit, runtime);
   const configSha256 = createHash("sha256")
     .update(canonicalCheckpointBytes(report.config)).digest("hex");
-  const evaluation = evaluateMemecoinPaperRunExport(canonicalCheckpointBytes(report), {
+  const evaluation = evaluateMemecoinPaperRunExport(exportBytes, {
     runId: report.runId,
     configSha256,
     producerRevision: report.producerRevision
   });
-  assert.equal(evaluation.evidence.entryFills, 0);
+  assert.equal(evaluation.checks.find(item => item.id === "runtime_source_quote_audit").status, "PASS");
+  assert.equal(evaluation.evidence.entryFills, 1);
+  assert.equal(evaluation.evidence.exits, 1);
+  assert.equal(evaluation.outcome, "SIMULATED_ENTRY_EXIT_COMPLETE");
   assert.equal(evaluation.claims.liveExecution, false);
 });
 
-test("wrong identity, future evidence, and missing quote remain integrated no-entry outcomes", async t => {
-  for (const [runId, fault, expectedEvent] of [
-    ["pipeline-wrong-identity", "PIPELINE_QUOTE_WRONG_IDENTITY", "synthetic-order-1"],
-    ["pipeline-future-evidence", "PIPELINE_QUOTE_FUTURE_EVIDENCE", "synthetic-order-1"],
-    ["pipeline-missing-quote", "PIPELINE_QUOTE_MISSING_QUOTE", null]
+test("pipeline and adapter identity, chronology, quote, and cost failures remain no-entry", async t => {
+  for (const [runId, fault, sourceIdentityValid, marketPairChronologyValid, expectedAdapterCalls] of [
+    ["pipeline-wrong-identity", "PIPELINE_QUOTE_WRONG_IDENTITY", false, true, 0],
+    ["pipeline-future-evidence", "PIPELINE_QUOTE_FUTURE_EVIDENCE", true, false, 0],
+    ["pipeline-missing-quote", "PIPELINE_QUOTE_MISSING_QUOTE", true, true, 1],
+    ["pipeline-missing-costs", "PIPELINE_QUOTE_MISSING_COSTS", true, true, 1],
+    ["pipeline-route-identity", "PIPELINE_QUOTE_ROUTE_IDENTITY", true, true, 1]
   ]) {
     const {pilot} = await harness(t, {
       runConfig: config({runId}),
       fault
     });
     const result = await pilot.start();
-    const runtime = result.provenance.candidates[0]?.syntheticFixtureRuntime;
-    assert.ok(runtime);
-    assert.equal(runtime.pipeline.filtersAccepted, false);
-    assert.equal(runtime.pipeline.filtersStatus, "UNKNOWN");
-    assert.equal(runtime.quote.eventId, expectedEvent);
-    assert.equal(runtime.quote.paperFillEligible, false);
-    assert.equal(result.report.runnerReport.counters.quotes, 0);
+    const audit = result.report.runnerReport.runtimeAudit;
+    assert.ok(audit);
+    assert.equal(audit.candidates[0].pipeline.sourceIdentityValid, sourceIdentityValid);
+    assert.equal(audit.candidates[0].pipeline.marketPairChronologyValid, marketPairChronologyValid);
+    assert.equal(result.report.runnerReport.counters.quotes, expectedAdapterCalls);
+    assert.ok(audit.candidates[0].quotes.every(item => !item.paperFillEligible),
+      JSON.stringify(audit.candidates[0], null, 2));
     assert.equal(result.report.runnerReport.operationResults.some(item =>
       item.method === "executeEntry" && item.status === "FILLED_PAPER"), false);
     assert.deepEqual(result.report.runnerReport.terminalResult.openPositions, []);
+    const reportBytes = canonicalCheckpointBytes(result.report);
+    const parsedReport = JSON.parse(reportBytes.toString("utf8"));
+    assert.deepEqual(parsedReport.runnerReport.runtimeAudit, audit);
+    const evaluation = evaluateMemecoinPaperRunExport(reportBytes, {
+      runId: result.report.runId,
+      configSha256: createHash("sha256")
+        .update(canonicalCheckpointBytes(result.report.config)).digest("hex"),
+      producerRevision: result.report.producerRevision
+    });
+    assert.equal(evaluation.checks.find(item =>
+      item.id === "runtime_source_quote_audit").status, "PASS");
   }
 });
 
@@ -435,10 +466,8 @@ test("stop during the integrated fixture callback isolates its late completion",
 test("deadline during fixture acquisition prevents its subsequent quote request", async t => {
   const {pilot} = await harness(t, {fault: "PIPELINE_QUOTE_DEADLINE"});
   const result = await pilot.start();
-  const runtime = result.provenance.candidates[0]?.syntheticFixtureRuntime;
-  assert.ok(runtime);
-  assert.equal(runtime.quote.sourceProvenance, "NOT_REQUESTED");
-  assert.equal(runtime.quote.eventId, null);
+  assert.equal(result.provenance.candidates.length, 1);
+  assert.equal(result.report.runnerReport.counters.candidates, 0);
   assert.equal(result.report.runnerReport.counters.quotes, 0);
   assert.ok(["FINISHED", "STOPPED", "UNKNOWN"].includes(result.status));
 });

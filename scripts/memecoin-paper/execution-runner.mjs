@@ -353,6 +353,7 @@ export function createPaperExecutionRunner({
   const results = [];
   let verifiedTerminalReceipt = null;
   const candidatesByMint = new Map();
+  const positionsOpenedAtByMint = new Map();
   const pendingAuthorizationIds = new Set();
   let ledgerUnknownReason = null;
   let sourceUnknownReason = null;
@@ -577,7 +578,11 @@ export function createPaperExecutionRunner({
       if (!candidate) continue;
       const observedAt = readTime();
       if (observedAt >= endAt) return {deadline: true, marks: []};
-      const quote = await quoteFor({purpose: "EXIT", candidate, position, now: observedAt, tick});
+      const quote = await quoteFor({
+        purpose: "EXIT", candidate, position,
+        positionOpenedAt: positionsOpenedAtByMint.get(position.mint),
+        now: observedAt, tick
+      });
       const responseTime = readTime();
       if (responseTime >= endAt) return {deadline: true, marks: []};
       if (!syntheticQuote(quote, candidate) || quote.observedAt > responseTime) continue;
@@ -640,7 +645,11 @@ export function createPaperExecutionRunner({
           if (!candidate) continue;
           const observedAt = readTime();
           if (observedAt >= endAt) return {deadline: true, marks: []};
-          const quote = await quoteFor({purpose: "RISK_EXIT", candidate, position, now: observedAt, tick});
+          const quote = await quoteFor({
+            purpose: "RISK_EXIT", candidate, position,
+            positionOpenedAt: positionsOpenedAtByMint.get(position.mint),
+            now: observedAt, tick
+          });
           const responseTime = readTime();
           if (responseTime >= endAt) return {deadline: true, marks: []};
           const priorMark = priorMarks.get(position.mint);
@@ -763,7 +772,10 @@ export function createPaperExecutionRunner({
     if (execution.unknown) return {unknown: true};
     if (execution.ledgerUnknown) return {ledgerUnknown: true};
     if (execution.budget || execution.unacknowledged || execution.stop) return {stop: true};
-    if (execution.result?.status === "FILLED_PAPER") candidatesByMint.set(candidate.mint, candidate);
+    if (execution.result?.status === "FILLED_PAPER") {
+      candidatesByMint.set(candidate.mint, candidate);
+      positionsOpenedAtByMint.set(candidate.mint, executeNow);
+    }
     return {result: execution.result};
   }
 

@@ -458,6 +458,171 @@ function checkExport(exportValue, expected, checks) {
     unknown("mark_reuse_consistency", "mark records are unavailable");
   } else fail("mark_reuse_consistency", "a mark event was malformed, reused with changed content, or a quote identity/time failed");
 
+  const runtimeAudit = runnerReport?.runtimeAudit;
+  if (runtimeAudit !== undefined) {
+    let runtimeAuditValid = config?.mode === "SYNTHETIC_TEST_ONLY" &&
+      exactKeys(runtimeAudit, ["schemaVersion", "source", "truncated", "candidates"]) &&
+      runtimeAudit.schemaVersion === "memecoin-paper-source-quote-audit/v1" &&
+      runtimeAudit.source === SYNTHETIC_SOURCE &&
+      runtimeAudit.truncated === false &&
+      Array.isArray(runtimeAudit.candidates) && runtimeAudit.candidates.length > 0 &&
+      runtimeAudit.candidates.length <= Math.min(100, config?.budgets?.cycles ?? 0);
+    const checkpointQuotes = [];
+    let runtimeQuoteCount = 0;
+    if (checkpointShape) {
+      for (const record of records.slice(1)) {
+        const input = record.inputs ?? {};
+        if (input.quote) checkpointQuotes.push(input.quote);
+        if (Array.isArray(input.marks)) checkpointQuotes.push(...input.marks);
+      }
+    }
+    if (runtimeAuditValid) {
+      for (const candidate of runtimeAudit.candidates) {
+        const identity = candidate?.identity;
+        const pipeline = candidate?.pipeline;
+        if (!exactKeys(candidate, [
+          "source", "candidateT", "assembledAt", "decisionAt", "identity", "pipeline", "quotes"
+        ]) || candidate.source !== SYNTHETIC_SOURCE ||
+            !exactKeys(identity, ["chainId", "mint", "pool", "quote", "decimals"]) ||
+            identity.chainId !== "solana" ||
+            ![identity.mint, identity.pool, identity.quote].every(value =>
+              typeof value === "string" && value.length >= 32 && value.length <= 44) ||
+            !Number.isInteger(identity.decimals) || identity.decimals < 0 || identity.decimals > 18 ||
+            !Number.isSafeInteger(candidate.candidateT) ||
+            !Number.isSafeInteger(candidate.assembledAt) ||
+            !Number.isSafeInteger(candidate.decisionAt) ||
+            candidate.candidateT > candidate.assembledAt ||
+            candidate.assembledAt > candidate.decisionAt ||
+            !exactKeys(pipeline, [
+              "status", "filtersStatus", "filtersAccepted", "analystStatus",
+              "sourceIdentityValid", "marketPairChronologyValid",
+              "syntheticAnalystEvidence", "acquisitionReceiptIds"
+            ]) ||
+            !["COMPLETE", "PARTIAL"].includes(pipeline.status) ||
+            !["PASS", "UNKNOWN", "FAIL"].includes(pipeline.filtersStatus) ||
+            typeof pipeline.filtersAccepted !== "boolean" ||
+            (pipeline.filtersAccepted && pipeline.filtersStatus !== "PASS") ||
+            typeof pipeline.analystStatus !== "string" ||
+            typeof pipeline.sourceIdentityValid !== "boolean" ||
+            typeof pipeline.marketPairChronologyValid !== "boolean" ||
+            pipeline.syntheticAnalystEvidence !== SYNTHETIC_SOURCE ||
+            !Array.isArray(pipeline.acquisitionReceiptIds) ||
+            pipeline.acquisitionReceiptIds.length > 64 ||
+            !pipeline.acquisitionReceiptIds.every(value => SAFE_ID.test(value))) {
+          runtimeAuditValid = false;
+          break;
+        }
+        if (!Array.isArray(candidate.quotes) || candidate.quotes.length > 1_024 ||
+            ((!pipeline.sourceIdentityValid || !pipeline.marketPairChronologyValid) &&
+             candidate.quotes.length !== 0)) {
+          runtimeAuditValid = false;
+          break;
+        }
+        runtimeQuoteCount += candidate.quotes.length;
+        if (runtimeQuoteCount > Math.min(config?.budgets?.requests ?? 0,
+          runnerReport?.counters?.quotes ?? 0)) {
+          runtimeAuditValid = false;
+          break;
+        }
+        for (const quote of candidate.quotes) {
+          const costsComplete = exactKeys(quote?.costs, COST_KEYS) &&
+            COST_KEYS.every(key => Number.isSafeInteger(quote.costs[key]) && quote.costs[key] >= 0);
+          const matchesCheckpointQuote = quote?.paperFillEligible === true && checkpointShape &&
+            checkpointQuotes.some(checkpointQuote =>
+              ["chainId", "mint", "pool", "quote", "decimals"].every(key =>
+                checkpointQuote[key] === identity[key]) &&
+              checkpointQuote.source === SYNTHETIC_SOURCE &&
+              checkpointQuote.observedAt === quote.observedAt &&
+              checkpointQuote.priceMicros === quote.paperPriceMicros &&
+              checkpointQuote.costBasis === "SYNTHETIC_FIXED_CENT_SCHEDULE_V1" &&
+              exactKeys(checkpointQuote.costs, COST_KEYS) &&
+              COST_KEYS.every(key => checkpointQuote.costs[key] === quote.costs[key]));
+          const matchesEntry = quote?.purpose !== "entry" || (checkpointShape &&
+            records.some(record => record.method === "executeEntry" &&
+              record.inputs?.quote?.source === SYNTHETIC_SOURCE &&
+              record.inputs.quote.observedAt === quote.observedAt &&
+              record.inputs.quote.mint === identity.mint &&
+              record.inputs.quote.priceMicros === quote.paperPriceMicros &&
+              exactKeys(record.inputs.quote.costs, COST_KEYS) &&
+              COST_KEYS.every(key => record.inputs.quote.costs[key] === quote.costs?.[key])));
+          if (!exactKeys(quote, [
+            "purpose", "adapterStatus", "adapterReasons", "adapterSourceProvenance",
+            "adapterAuthorizationEligible", "adapterCostStatus", "adapterEventId",
+            "observedAt", "receiptAt", "routeIdentityValid", "causalAt",
+            "chronologyValid", "identity", "selectedPool",
+            "paperFillEligible", "paperPriceMicros", "costBasis", "costs"
+          ]) || !["entry", "risk-mark", "risk-exit"].includes(quote.purpose) ||
+              quote.adapterStatus !== "UNAVAILABLE" ||
+              !Array.isArray(quote.adapterReasons) || quote.adapterReasons.length > 16 ||
+              !quote.adapterReasons.every(value => typeof value === "string" && value.length <= 128) ||
+              ![null, "INJECTED_TRANSPORT_NOT_AUTHENTICATED"]
+                .includes(quote.adapterSourceProvenance) ||
+              quote.adapterAuthorizationEligible !== false ||
+              quote.adapterCostStatus !== "UNKNOWN" ||
+              (quote.adapterEventId !== null && !SAFE_ID.test(quote.adapterEventId)) ||
+              (quote.observedAt !== null && !Number.isSafeInteger(quote.observedAt)) ||
+              !Number.isSafeInteger(quote.receiptAt) ||
+              typeof quote.routeIdentityValid !== "boolean" ||
+              (quote.causalAt !== null && !Number.isSafeInteger(quote.causalAt)) ||
+              typeof quote.chronologyValid !== "boolean" ||
+              (quote.observedAt !== null &&
+                (quote.observedAt > quote.receiptAt || quote.observedAt <= candidate.decisionAt)) ||
+              (quote.paperFillEligible &&
+                (!Number.isSafeInteger(quote.causalAt) || quote.observedAt <= quote.causalAt)) ||
+              !exactKeys(quote.identity, ["chainId", "mint", "pool", "quote", "decimals"]) ||
+              !["chainId", "mint", "pool", "quote", "decimals"]
+                .every(key => quote.identity[key] === identity[key]) ||
+              (quote.paperFillEligible && quote.selectedPool !== identity.pool) ||
+              typeof quote.paperFillEligible !== "boolean" ||
+              (quote.paperPriceMicros !== null &&
+                (!Number.isSafeInteger(quote.paperPriceMicros) || quote.paperPriceMicros <= 0)) ||
+              (quote.costBasis !== null &&
+                quote.costBasis !== "SYNTHETIC_FIXED_CENT_SCHEDULE_V1") ||
+              (quote.paperFillEligible &&
+                (!costsComplete || quote.costBasis !== "SYNTHETIC_FIXED_CENT_SCHEDULE_V1" ||
+                 quote.paperPriceMicros === null || quote.selectedPool !== identity.pool ||
+                 quote.adapterEventId === null || quote.routeIdentityValid !== true ||
+                 quote.chronologyValid !== true || !matchesCheckpointQuote || !matchesEntry))) {
+            runtimeAuditValid = false;
+            break;
+          }
+        }
+        if (!runtimeAuditValid) break;
+      }
+    }
+    if (runtimeAuditValid && checkpointShape) {
+      for (const record of records.slice(1)) {
+        const quote = record.inputs?.quote;
+        if (!quote || quote.source !== SYNTHETIC_SOURCE ||
+            !runtimeAudit.candidates.some(candidate =>
+              ["chainId", "mint", "pool", "quote", "decimals"].every(key =>
+                candidate.identity[key] === quote[key]))) continue;
+        const purpose = record.method === "executeEntry" ? "entry"
+          : record.method === "observeExitQuote" ? "risk-mark" : null;
+        if (!purpose || !runtimeAudit.candidates.some(candidate =>
+          candidate.quotes.some(auditQuote =>
+            auditQuote.purpose === purpose && auditQuote.paperFillEligible &&
+            auditQuote.observedAt === quote.observedAt &&
+            auditQuote.paperPriceMicros === quote.priceMicros &&
+            auditQuote.costBasis === quote.costBasis &&
+            exactKeys(auditQuote.costs, COST_KEYS) &&
+            COST_KEYS.every(key => auditQuote.costs[key] === quote.costs[key]) &&
+            ["chainId", "mint", "pool", "quote", "decimals"].every(key =>
+              candidate.identity[key] === quote[key])))) {
+          runtimeAuditValid = false;
+          break;
+        }
+      }
+    }
+    if (runtimeAuditValid) {
+      pass("runtime_source_quote_audit",
+        "bounded synthetic pipeline and quote receipts reconcile to the persisted Paper quotes");
+    } else {
+      fail("runtime_source_quote_audit",
+        "synthetic pipeline/quote audit is malformed or does not bind to checkpoint identity, chronology, and costs");
+    }
+  }
+
   const entries = Array.isArray(operationResults)
     ? operationResults.filter(item => item?.method === "executeEntry" && item.status === "FILLED_PAPER").length
     : null;

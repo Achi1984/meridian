@@ -45,7 +45,8 @@ const offlineFixtureAdaptersBySource = new WeakMap();
 const FIXTURE_FAULTS = new Set([
   "NONE", "PIPELINE_QUOTE", "PIPELINE_QUOTE_DUPLICATE", "PIPELINE_QUOTE_WAIT",
   "PIPELINE_QUOTE_DEADLINE",
-  "PIPELINE_QUOTE_MISSING_QUOTE", "PIPELINE_QUOTE_WRONG_IDENTITY",
+  "PIPELINE_QUOTE_MISSING_QUOTE", "PIPELINE_QUOTE_MISSING_COSTS",
+  "PIPELINE_QUOTE_WRONG_IDENTITY", "PIPELINE_QUOTE_ROUTE_IDENTITY",
   "PIPELINE_QUOTE_FUTURE_EVIDENCE",
   "DISCONNECT", "CALLBACK_TIMEOUT", "LATE_DEADLINE", "WAIT_FOR_STOP",
   "DEADLINE_BEFORE_FIRST_RISK_SNAPSHOT",
@@ -332,6 +333,15 @@ export function offlineFixtureAdapters(options = {}) {
   let exitCount = 0;
   let entryCount = 0;
   let pipelineFixtureCalls = 0;
+  const runtimeFixturesByMint = new Map();
+  const runtimeAudits = [];
+  const fixtureState = {
+    clock,
+    fault,
+    sourceMode: "SYNTHETIC_TEST_ONLY",
+    runtimeFixturesByMint,
+    runtimeAudits
+  };
   const adapters = Object.freeze({
     async acquireCandidates({now, signal, deadlineAt, remaining, recordRequest, recordWork}) {
       if (fault === "DISCONNECT") throw Object.assign(new Error("fixture disconnect"), {code: "DISCONNECTED"});
@@ -357,7 +367,9 @@ export function offlineFixtureAdapters(options = {}) {
             expireDuringRequest: fault === "PIPELINE_QUOTE_DEADLINE",
             deadlineAt,
             variant: fault === "PIPELINE_QUOTE_MISSING_QUOTE" ? "MISSING_QUOTE"
-              : fault === "PIPELINE_QUOTE_WRONG_IDENTITY" ? "WRONG_IDENTITY"
+              : fault === "PIPELINE_QUOTE_MISSING_COSTS" ? "MISSING_COSTS"
+                : fault === "PIPELINE_QUOTE_ROUTE_IDENTITY" ? "WRONG_QUOTE_IDENTITY"
+                  : fault === "PIPELINE_QUOTE_WRONG_IDENTITY" ? "WRONG_IDENTITY"
                 : fault === "PIPELINE_QUOTE_FUTURE_EVIDENCE" ? "FUTURE_EVIDENCE" : "BASE"
           });
         } catch (error) {
@@ -367,6 +379,10 @@ export function offlineFixtureAdapters(options = {}) {
           });
         }
         clock.advance();
+        if (acquired.runtimeAudit) runtimeAudits.push(acquired.runtimeAudit);
+        if (acquired.candidate && !runtimeFixturesByMint.has(acquired.candidate.mint)) {
+          runtimeFixturesByMint.set(acquired.candidate.mint, acquired.quote);
+        }
         return acquired.candidate ? [acquired.candidate] : [];
       }
       if (fault === "CLOCK_JUMP") clock.jumpWall(100);
@@ -397,16 +413,36 @@ export function offlineFixtureAdapters(options = {}) {
       }
       return [row];
     },
-    async entryQuote({candidate: token, now}) {
+    async entryQuote({candidate: token, now, signal}) {
       entryCount += 1;
+      const runtimeQuote = runtimeFixturesByMint.get(token.mint);
+      if (runtimeQuote) {
+        return runtimeQuote({
+          candidate: token,
+          purpose: "ENTRY",
+          now,
+          signal
+        });
+      }
       const result = fixtureQuote(token, `fixture-entry-${entryCount}`, now, 10_000);
       if (fault === "MISSING_COSTS") delete result.costs.networkCents;
       if (fault === "QUOTE_AFTER_RECEIPT") result.observedAt = now + 1_000;
       clock.advance();
       return result;
     },
-    async exitQuote({candidate: token, now, purpose}) {
+    async exitQuote({candidate: token, now, purpose, position, positionOpenedAt, signal}) {
       if (fault === "NO_MARK" && purpose === "risk-mark") return null;
+      const runtimeQuote = runtimeFixturesByMint.get(token.mint);
+      if (runtimeQuote) {
+        return runtimeQuote({
+          candidate: token,
+          purpose,
+          position,
+          positionOpenedAt,
+          now,
+          signal
+        });
+      }
       exitCount += 1;
       const price = fault === "TWO_OPEN_POSITIONS" || exitCount === 1 ? 10_000 : 9_000;
       const result = fixtureQuote(token, `fixture-exit-${exitCount}`, now, price);
@@ -414,7 +450,7 @@ export function offlineFixtureAdapters(options = {}) {
       return result;
     }
   });
-  offlineFixtureAdaptersBySource.set(adapters, {clock, fault, sourceMode: "SYNTHETIC_TEST_ONLY"});
+  offlineFixtureAdaptersBySource.set(adapters, fixtureState);
   return adapters;
 }
 
@@ -1033,7 +1069,14 @@ export function createPaperPilotComposition(options = {}) {
       try {
         envelope = await invokeAdapter(
           purpose === "ENTRY" ? "entryQuote" : "exitQuote",
-          {candidate, purpose: adapterPurpose, previousQuote: request.previousQuote}
+          {
+            candidate,
+            purpose: adapterPurpose,
+            position: request.position,
+            positionOpenedAt: request.positionOpenedAt ?? null,
+            now: request.now,
+            previousQuote: request.previousQuote
+          }
         );
       } catch (error) {
         adapterFailureCode = error?.code ?? "QUOTE_SOURCE_UNAVAILABLE";
@@ -1140,6 +1183,7 @@ export function createPaperPilotComposition(options = {}) {
       }
     });
     const runnerResult = await runner.run();
+    const fixtureRuntimeState = offlineFixtureAdaptersBySource.get(adapters);
     runnerReport = sourceMode
       ? {...runnerResult, sourcePolicy: sourcePolicyAssessment ?? {
           policySha256: config.sourcePolicySha256,
@@ -1150,7 +1194,17 @@ export function createPaperPilotComposition(options = {}) {
           trustedUtc: clockAttestation.trustedUtc === true,
           unresolved: [...PAPER_RUNTIME_SOURCE_POLICY.missingRequirements]
         }}
-      : runnerResult;
+      : fixtureRuntimeState?.runtimeAudits?.length
+        ? {
+            ...runnerResult,
+            runtimeAudit: {
+              schemaVersion: "memecoin-paper-source-quote-audit/v1",
+              source: SYNTHETIC_SOURCE,
+              truncated: fixtureRuntimeState.runtimeAudits.length > 100,
+              candidates: fixtureRuntimeState.runtimeAudits.slice(0, 100)
+            }
+          }
+        : runnerResult;
     terminalReceipt = runnerResult.terminalReceipt;
     const summary = runnerResult.summary;
     const terminalResult = runnerResult.terminalResult;

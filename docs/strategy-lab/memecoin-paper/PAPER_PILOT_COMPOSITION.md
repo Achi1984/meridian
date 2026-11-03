@@ -348,12 +348,15 @@ executable quotes, or validated exact costs
 matrix). Provider receipt time is not a source market timestamp. Synthetic
 fixtures cannot fill these gaps.
 
-Intake #1150 remains open; quote #1157 and evidence #1158 remain draft/open.
-Their source SHAs and interfaces are caller claims, not accepted pins. The
-external candidate path therefore produces durable blocked/no-entry results and
-does not authorize simulated fills. Candidate intake provenance, complete hard
-and analyst evidence, source-bound quote/cost semantics, and trusted source-time
-attestation remain blockers.
+Intake #1150 remains open; quote #1157 and evidence #1158 are closed. Their
+closure does not establish provider authenticity, complete evidence, trusted
+source time, or complete quote costs. The external candidate path therefore
+produces durable blocked/no-entry results and does not authorize simulated fills.
+Candidate intake provenance, complete hard and analyst evidence, source-bound
+quote/cost semantics, and trusted source-time attestation remain blockers. The
+isolated `SYNTHETIC_TEST_ONLY` runtime fixture exercises the accepted pipeline
+and quote adapter through the Paper checkpoint/export/evaluator path, but it does
+not satisfy any real-source prerequisite.
 
 The accepted #1152 owner-census interface is reconciled but is not treated as an
 eligible hard-gate source. `acquireOwnerCensus()` reports
@@ -365,10 +368,10 @@ composition or allowed to bypass the shared budget/cancellation boundary.
 Holder evidence remains UNKNOWN until a separately reviewed source supplies
 authenticated completeness, pool/burn exclusions, and identity/time binding.
 
-### Concrete integration patch proposal (not applied)
+### Future real-source integration (not applied)
 
-After #1150/#1157/#1158 are accepted at exact SHAs and their source/time,
-identity/units, cancellation, and complete-cost semantics are reviewed, a
+After intake is complete and provider contracts are pinned and reviewed for
+source/time, identity/units, cancellation, and complete-cost semantics, a
 lead-guarded patch can replace only the module-owned packet-to-candidate adapter:
 
 1. Construct the exact `MEMECOIN_EXTERNAL_READ_ONLY_INPUT_V1` envelope from the
