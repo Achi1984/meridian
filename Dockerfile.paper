@@ -4,10 +4,14 @@ WORKDIR /app
 
 COPY --chown=node:node scripts/memecoin-paper/ ./scripts/memecoin-paper/
 COPY --chown=node:node scripts/memecoin-paper-token-safety/ ./scripts/memecoin-paper-token-safety/
+COPY --chown=node:node scripts/memecoin-paper-execution-evidence/normalize.mjs ./scripts/memecoin-paper-execution-evidence/normalize.mjs
+COPY --chown=node:node scripts/memecoin-paper-route-quotes/jupiter-v2.mjs ./scripts/memecoin-paper-route-quotes/jupiter-v2.mjs
 COPY --chown=node:node scripts/memecoin-paper-simulated-evaluation/index.mjs ./scripts/memecoin-paper-simulated-evaluation/index.mjs
 COPY --chown=node:node scripts/memecoin-paper-run-export-transfer/index.mjs ./scripts/memecoin-paper-run-export-transfer/index.mjs
 COPY --chown=node:node scripts/memecoin-paper-run-export-https/https.mjs ./scripts/memecoin-paper-run-export-https/https.mjs
 COPY --chown=node:node scripts/memecoin-paper-export-host.mjs ./scripts/memecoin-paper-export-host.mjs
+COPY --chown=node:node test/fixtures/memecoin-paper-analyst-window-evidence/source-shaped.mjs ./test/fixtures/memecoin-paper-analyst-window-evidence/source-shaped.mjs
+COPY --chown=node:node test/fixtures/memecoin-paper-route-quotes/jupiter-v2-order.mjs ./test/fixtures/memecoin-paper-route-quotes/jupiter-v2-order.mjs
 RUN mkdir -p /var/data/meridian-paper && chown node:node /var/data/meridian-paper
 
 ENV NODE_ENV=production
