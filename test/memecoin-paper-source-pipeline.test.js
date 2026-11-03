@@ -2,10 +2,12 @@ import assert from "node:assert/strict";
 import {createHash} from "node:crypto";
 import test from "node:test";
 import {
-  createHistoryWindowSource,
-  createTimeBoundarySource,
-  timeEvidenceDigest
+  createTimeBoundarySource
 } from "../scripts/memecoin-paper/history-time-boundary-source.mjs";
+import {
+  createHistoryWindowSource,
+  timestampEvidenceDigest
+} from "../scripts/memecoin-paper/history-window-bridge.mjs";
 import {
   createBoundedHistoryRpcReader,
   SOLANA_RPC_ORIGIN
@@ -44,7 +46,12 @@ function slotTimes(candidateT) {
   ]);
 }
 
-function rpcHarness(fixture, {hang = false, range = [490_000, 490_006]} = {}) {
+function rpcHarness(fixture, {
+  hang = false,
+  range = [490_000, 490_006],
+  latency = 0,
+  beforeResponse
+} = {}) {
   const times = slotTimes(fixture.candidateT);
   const calls = [];
   const rawResponses = [];
@@ -55,6 +62,8 @@ function rpcHarness(fixture, {hang = false, range = [490_000, 490_006]} = {}) {
     assert.equal(request.redirect, "error");
     assert.equal(request.credentials, "omit");
     if (hang) return new Promise(() => {});
+    await beforeResponse?.(request);
+    if (latency > 0) await new Promise(resolve => setTimeout(resolve, latency));
     if (body.method === "getSlot") return rpcResponse(request, range[1] + 10, rawResponses);
     if (body.method === "getBlocks") {
       return rpcResponse(request, [490_000, 490_001, 490_003, 490_004, 490_006]
@@ -165,14 +174,20 @@ function poolProofFor(fixture) {
   return fixture.poolProof;
 }
 
-function sourcePipeline(fixture, {mode = "SYNTHETIC_TEST_ONLY", collector} = {}) {
-  const harness = rpcHarness(fixture);
+function sourcePipeline(fixture, {
+  mode = "SYNTHETIC_TEST_ONLY",
+  collector,
+  clock = () => fixture.assembledAt,
+  latency = 0,
+  beforeResponse
+} = {}) {
+  const harness = rpcHarness(fixture, {latency, beforeResponse});
   return createPaperSourcePipeline({
     enabled: true,
     mode,
     slotRange: {startInclusive: 490_000, endInclusive: 490_006},
     transport: harness.transport,
-    clock: () => fixture.assembledAt,
+    clock,
     ...(collector ? {
       historySlotCollector: request => collector(request, fixture.assembledAt)
     } : {})
@@ -217,10 +232,10 @@ test("enumerates produced slots, accounts for skipped slots, and hashes actual b
     poolProof: fixture.poolProof
   });
   assert.equal(result.status, "SOURCE_BOUND", result.reason);
-  assert.deepEqual(result.slotEnumeration.producedSlots, [
+  assert.deepEqual(result.coverage.slotEnumeration.producedSlots, [
     490_000, 490_001, 490_003, 490_004, 490_006
   ]);
-  assert.deepEqual(result.slotEnumeration.skippedRanges, [
+  assert.deepEqual(result.coverage.slotEnumeration.skippedRanges, [
     {startInclusive: 490_002, endInclusive: 490_002},
     {startInclusive: 490_005, endInclusive: 490_005}
   ]);
@@ -230,13 +245,16 @@ test("enumerates produced slots, accounts for skipped slots, and hashes actual b
   });
   assert.equal(result.timeBounds.endInclusive.before.slot, 490_004);
   assert.equal(result.timeBounds.endInclusive.after.slot, 490_006);
-  assert.equal(result.events.length, 7);
-  assert.equal(result.counters.requests, 7);
+  assert.equal(result.events.length, 5);
+  assert.equal(result.counters.requests, 5);
   assert.equal(result.counters.workUnits, 14);
   assert.ok(result.events.every(event => /^[a-f0-9]{64}$/.test(event.responseSha256)));
-  assert.deepEqual(result.events.map(event => event.responseSha256), rawResponses.map(hash));
+  assert.deepEqual(result.events.map(event => event.responseSha256), rawResponses.slice(2).map(hash));
   assert.equal(result.counters.bytes, rawResponses.reduce((sum, body) =>
-    sum + Buffer.byteLength(body), 0));
+    sum + Buffer.byteLength(body), 0) -
+    rawResponses.slice(0, 2).reduce((sum, body) => sum + Buffer.byteLength(body), 0));
+  assert.equal(result.coverage.auxiliaryEvents.length, 2);
+  assert.equal(result.coverage.auxiliaryCounters.requests, 2);
   assert.ok(result.events.every(event => event.responseReceivedAt === fixture.assembledAt));
   assert.equal(result.receipt.receivedAt, fixture.assembledAt);
   assert.deepEqual(calls.map(call => call.method), [
@@ -247,7 +265,7 @@ test("enumerates produced slots, accounts for skipped slots, and hashes actual b
     490_000, 490_006, {commitment: "finalized"}
   ]);
   assert.equal(result.receipt.status, "SOURCE_BOUND");
-  assert.equal(result.receipt.payloadSha256, timeEvidenceDigest(result));
+  assert.equal(result.receipt.payloadSha256, timestampEvidenceDigest(result));
   assert.equal(result.coverage.sourceAuthentication, "NOT_ESTABLISHED");
 });
 
@@ -321,7 +339,6 @@ test("boundary digest and identity mismatches fail closed before collector invoc
   let collectorCalls = 0;
   const source = createHistoryWindowSource({
     enabled: true,
-    clock: () => fixture.assembledAt,
     timeBoundarySource: {
       async readWindow() {
         const changed = structuredClone(evidence);
@@ -365,8 +382,7 @@ test("receipt-bound collector handoff uses start-exclusive and end-inclusive tim
     enabled: true,
     timeBoundarySource: time.source,
     slotHistoryCollector: request =>
-      boundaryRowsCollector(request, fixture.assembledAt, fixture),
-    clock: () => fixture.assembledAt
+      boundaryRowsCollector(request, fixture.assembledAt, fixture)
   });
   const result = await source.readWindow({
     identity: fixture.identity,
@@ -455,7 +471,7 @@ test("request, byte, work, and shared collector budgets are cumulative", async t
       poolProof: fixture.poolProof
     });
     assert.equal(result.status, "UNKNOWN");
-    assert.equal(result.reason, "WORK_LIMIT");
+    assert.equal(result.reason, "SHARED_BUDGET_EXHAUSTED");
   });
 
   await t.test("boundary and collector share the request budget", async () => {
@@ -474,8 +490,7 @@ test("request, byte, work, and shared collector budgets are cumulative", async t
         collectorCalls += 1;
         return fixtureCollector;
       },
-      clock: () => fixture.assembledAt,
-      limits: {maxRequests: 7}
+      limits: {maxRequests: 5}
     });
     const result = await source.readWindow({
       identity: fixture.identity,
@@ -483,7 +498,7 @@ test("request, byte, work, and shared collector budgets are cumulative", async t
       ...requested(fixture)
     });
     assert.equal(result.status, "UNKNOWN");
-    assert.equal(result.reason, "SHARED_BUDGET_EXHAUSTED");
+    assert.equal(result.reason, "TIME_BOUNDARY_RECEIPT_UNKNOWN");
     assert.equal(collectorCalls, 0);
   });
 });
@@ -549,6 +564,7 @@ test("fixture-trusted window reaches the canonical Analyst adapter only in synth
   assert.equal(result.realDataEntryEligible, false);
   assert.equal(result.auditReceipts.history?.id, result.auditReceipts.acquisition[0]?.receipt?.id);
   assert.equal(result.auditReceipts.acquisition[0]?.receipt?.status, "SOURCE_BOUND");
+  assert.equal(result.auditReceipts.acquisition[0]?.coverage.sourceHistoryCompleteness, "COMPLETE");
   assert.equal(result.candidateT, fixture.candidateT);
   assert.equal(result.assembledAt, fixture.assembledAt);
   assert.equal(result.decisionAt, fixture.assembledAt);
@@ -556,7 +572,11 @@ test("fixture-trusted window reaches the canonical Analyst adapter only in synth
 
 test("actual collector archival UNKNOWN stays UNKNOWN and external mode rejects fixture trust", async () => {
   const fixture = makeFixture({buyCount: 0, sellCount: 0});
-  const harness = rpcHarness(fixture);
+  let now = fixture.assembledAt;
+  const clock = () => {
+    now += 1;
+    return now;
+  };
   const externalCandidate = Object.fromEntries([
     "chainId", "mint", "pool", "quote", "sampledAt", "pairCreatedAt",
     "marketCapUsd", "decimals", "tokenSupplyAtoms"
@@ -574,12 +594,10 @@ test("actual collector archival UNKNOWN stays UNKNOWN and external mode rejects 
     censusPolicy: null,
     walletQualification: null
   };
-  const pipeline = createPaperSourcePipeline({
-    enabled: true,
+  const pipeline = sourcePipeline(fixture, {
     mode: "EXTERNAL_READ_ONLY_INPUT",
-    slotRange: {startInclusive: 490_000, endInclusive: 490_006},
-    transport: harness.transport,
-    clock: () => fixture.assembledAt
+    clock,
+    latency: 2
   });
   const result = await pipeline.evaluate({
     providerCandidate: externalCandidate,
@@ -594,11 +612,20 @@ test("actual collector archival UNKNOWN stays UNKNOWN and external mode rejects 
   assert.equal(result.auditReceipts.history, null);
   assert.equal(result.auditReceipts.acquisition[0]?.reason,
     "COLLECTOR_HISTORY_COMPLETENESS_UNKNOWN");
-  assert.equal(result.auditReceipts.acquisition[0]?.coverage.sourceHistoryCompleteness,
+  assert.equal(result.auditReceipts.acquisition[0]?.collectorCoverage.sourceHistoryCompleteness,
     "UNKNOWN_ARCHIVAL_OR_INDEX_TRUNCATION");
-  assert.equal(result.auditReceipts.acquisition[0]?.sourceReceipts.timeBoundaries.length, 7);
+  assert.equal(result.auditReceipts.acquisition[0]?.sourceReceipts.timeBoundaries.length, 5);
+  assert.equal(result.auditReceipts.acquisition[0]?.timeBoundaryCoverage.auxiliaryEvents.length, 2);
   assert.ok(result.auditReceipts.acquisition[0]?.sourceReceipts.collector.length > 0);
   assert.equal(result.auditReceipts.acquisition[0]?.counters.requests, 9);
+  const sourceEvents = [
+    ...result.auditReceipts.acquisition[0].sourceReceipts.timeBoundaries,
+    ...result.auditReceipts.acquisition[0].sourceReceipts.collector
+  ];
+  assert.ok(sourceEvents.every(event => event.responseReceivedAt < result.assembledAt));
+  assert.ok(result.assembledAt > fixture.assembledAt);
+  assert.equal(result.analystEvidence.assembledAt, result.assembledAt);
+  assert.equal(result.analystEvidence.candidateT, fixture.candidateT);
   assert.equal(result.executionAuthorized, false);
   assert.equal(result.realDataEntryEligible, false);
   assert.equal(result.candidate.source, "DexScreener public API");
@@ -606,8 +633,48 @@ test("actual collector archival UNKNOWN stays UNKNOWN and external mode rejects 
     enabled: true,
     mode: "EXTERNAL_READ_ONLY_INPUT",
     slotRange: {startInclusive: 490_000, endInclusive: 490_006},
-    transport: harness.transport,
-    clock: () => fixture.assembledAt,
+    transport: () => {},
+    clock,
     historySlotCollector: () => fixtureCollector
   }), /custom history collectors are limited to synthetic test mode/);
+});
+
+test("overlapping pipeline evaluations are explicitly rejected", async () => {
+  const fixture = makeFixture({buyCount: 0, sellCount: 0});
+  let release;
+  let announceStarted;
+  const gate = new Promise(resolve => { release = resolve; });
+  const started = new Promise(resolve => { announceStarted = resolve; });
+  let blocked = false;
+  const pipeline = sourcePipeline(fixture, {
+    collector: fixtureCollector,
+    beforeResponse: async () => {
+      if (blocked) return;
+      blocked = true;
+      announceStarted();
+      await gate;
+    }
+  });
+  const request = {
+    providerCandidate: fixture.candidate,
+    evidence: {},
+    candidateT: fixture.candidateT,
+    policy: fixture.policy,
+    poolProof: fixture.poolProof,
+    censusSource: fixture.censusSource,
+    priceSource: fixture.priceSource,
+    marketPairEvidence: fixture.marketPairEvidence,
+    smartWalletAllowlist: fixture.smartWalletAllowlist,
+    reviewEvidence: reviews(fixture.candidateT),
+    holdUntil: fixture.decisionAt + 8 * 60 * 60 * 1_000
+  };
+  const first = pipeline.evaluate(request);
+  await started;
+  const overlapping = await pipeline.evaluate(request);
+  assert.equal(overlapping.status, "UNKNOWN");
+  assert.equal(overlapping.reason, "EVALUATION_IN_PROGRESS");
+  release();
+  const result = await first;
+  assert.equal(result.mode, "SYNTHETIC_TEST_ONLY");
+  assert.equal(result.auditReceipts.acquisition.length, 1);
 });

@@ -3,10 +3,12 @@ import {
   buildAnalystWindowEvidence,
   evaluateWithCanonicalMarketAdapter
 } from "./analyst-window-evidence.mjs";
+import {
+  createHistoryWindowSource
+} from "./history-window-bridge.mjs";
 import {acquireLaunchHistory} from "./launch-history-source.mjs";
 import {
   DEFAULT_TIME_BOUNDARY_LIMITS,
-  createHistoryWindowSource,
   createTimeBoundarySource
 } from "./history-time-boundary-source.mjs";
 
@@ -70,6 +72,58 @@ function unavailable(reason, request = {}) {
   };
 }
 
+function bridgeLimitsFor(limits) {
+  const reservedRequests = 2;
+  const bridgeBytes = Math.max(
+    1, limits.maxBytesPerRun - reservedRequests * limits.maxBytesPerResponse
+  );
+  return {
+    maxRequests: Math.max(1, limits.maxRequests - reservedRequests),
+    maxResponseBytes: Math.min(limits.maxBytesPerResponse, bridgeBytes),
+    maxBytes: bridgeBytes,
+    maxWorkUnits: limits.maxWorkUnits,
+    maxSignatures: limits.maxSignatures,
+    maxTransactions: limits.maxTransactions,
+    maxBoundarySlotSpan: limits.maxBoundarySlotSpan,
+    maxElapsedMs: limits.maxElapsedMs
+  };
+}
+
+function receiptSummary(result, timeEvidence, collector) {
+  const boundaryCounters = timeEvidence?.counters;
+  const auxiliaryCounters = timeEvidence?.status === "SOURCE_BOUND"
+    ? timeEvidence.coverage?.auxiliaryCounters : null;
+  const collectorCounters = collector?.counters;
+  const counters = isRecord(boundaryCounters) && isRecord(collectorCounters)
+    ? {
+        requests: boundaryCounters.requests + (auxiliaryCounters?.requests ?? 0) +
+          collectorCounters.requests,
+        bytes: boundaryCounters.bytes + (auxiliaryCounters?.bytes ?? 0) +
+          collectorCounters.bytes,
+        workUnits: boundaryCounters.workUnits + collectorCounters.workUnits
+      }
+    : isRecord(boundaryCounters) ? {
+        requests: boundaryCounters.requests + (auxiliaryCounters?.requests ?? 0),
+        bytes: boundaryCounters.bytes + (auxiliaryCounters?.bytes ?? 0),
+        workUnits: boundaryCounters.workUnits
+      } : result?.counters ?? null;
+  return {
+    status: result?.status ?? "UNKNOWN",
+    reason: result?.reason ?? (result ? null : "HISTORY_SOURCE_RETURNED_NO_RESULT"),
+    source: result?.source ?? null,
+    receipt: result?.receipt ?? null,
+    coverage: result?.coverage ?? null,
+    counters,
+    sourceReceipts: {
+      timeBoundaries: timeEvidence?.events ?? timeEvidence?.timeBoundaryEvents ??
+        result?.sourceReceipts?.timeBoundaries ?? [],
+      collector: collector?.events ?? result?.sourceReceipts?.collector ?? result?.events ?? []
+    },
+    timeBoundaryCoverage: timeEvidence?.coverage ?? result?.timeBoundaryCoverage ?? null,
+    collectorCoverage: collector?.coverage ?? result?.collectorCoverage ?? result?.coverage ?? null
+  };
+}
+
 export function createPaperSourcePipeline({
   enabled = false,
   mode = "EXTERNAL_READ_ONLY_INPUT",
@@ -100,42 +154,27 @@ export function createPaperSourcePipeline({
     signal: request.signal,
     limits: request.limits
   }));
-  const historySource = createHistoryWindowSource({
-    enabled,
-    timeBoundarySource,
-    slotHistoryCollector: collector,
-    clock,
-    limits
-  });
   const reportedLimits = Object.freeze({...DEFAULT_TIME_BOUNDARY_LIMITS, ...limits});
-  const acquisitionReceipts = [];
-  const observedHistorySource = Object.freeze({
+  let activeAcquisition = null;
+  const observedTimeBoundarySource = Object.freeze({
     async readWindow(request) {
-      const result = await historySource.readWindow(request);
-      acquisitionReceipts.push(result ? {
-        status: result.status ?? "UNKNOWN",
-        reason: result.reason ?? null,
-        source: result.source ?? null,
-        receipt: result.receipt ?? null,
-        coverage: result.coverage ?? null,
-        counters: result.counters ?? null,
-        sourceReceipts: result.sourceReceipts ?? [],
-        timeBoundaryCoverage: result.timeBoundaryCoverage ?? null,
-        collectorCoverage: result.collectorCoverage ?? null
-      } : {
-        status: "UNKNOWN",
-        reason: "HISTORY_SOURCE_RETURNED_NO_RESULT",
-        source: null,
-        receipt: null,
-        coverage: null,
-        counters: null,
-        sourceReceipts: [],
-        timeBoundaryCoverage: null,
-        collectorCoverage: null
-      });
+      const result = await timeBoundarySource.readWindow(request);
+      if (activeAcquisition) activeAcquisition.timeEvidence = result;
       return result;
     }
   });
+  const observedCollector = async request => {
+    const result = await collector(request);
+    if (activeAcquisition) activeAcquisition.collector = result;
+    return result;
+  };
+  const historySource = createHistoryWindowSource({
+    enabled,
+    timeBoundarySource: observedTimeBoundarySource,
+    slotHistoryCollector: observedCollector,
+    limits: bridgeLimitsFor(reportedLimits)
+  });
+  let evaluationActive = false;
 
   return Object.freeze({
     enabled,
@@ -156,135 +195,177 @@ export function createPaperSourcePipeline({
       holdUntil = null
     } = {}) {
       if (!enabled) return unavailable("DISABLED");
-      if (typeof clock !== "function" || !isRecord(providerCandidate) ||
-          !validTime(candidateT) || providerCandidate.sampledAt !== candidateT ||
-          !isRecord(evidence) || !isRecord(reviewEvidence)) {
-        return unavailable("INVALID_PIPELINE_REQUEST", {candidateT, assembledAt, decisionAt, holdUntil});
-      }
-      if (mode === "EXTERNAL_READ_ONLY_INPUT" &&
-          providerCandidate.source === "SYNTHETIC_FIXTURE_ONLY") {
-        return unavailable("SYNTHETIC_FIXTURE_NOT_ALLOWED_IN_EXTERNAL_MODE", {
-          candidateT, assembledAt, decisionAt, holdUntil
+      if (evaluationActive) return unavailable("EVALUATION_IN_PROGRESS", {
+        candidateT, assembledAt, decisionAt, holdUntil
+      });
+      evaluationActive = true;
+      try {
+        if (typeof clock !== "function" || !isRecord(providerCandidate) ||
+            !validTime(candidateT) || providerCandidate.sampledAt !== candidateT ||
+            !isRecord(evidence) || !isRecord(reviewEvidence)) {
+          return unavailable("INVALID_PIPELINE_REQUEST", {
+            candidateT, assembledAt, decisionAt, holdUntil
+          });
+        }
+        if (mode === "EXTERNAL_READ_ONLY_INPUT" &&
+            providerCandidate.source === "SYNTHETIC_FIXTURE_ONLY") {
+          return unavailable("SYNTHETIC_FIXTURE_NOT_ALLOWED_IN_EXTERNAL_MODE", {
+            candidateT, assembledAt, decisionAt, holdUntil
+          });
+        }
+        if (mode === "EXTERNAL_READ_ONLY_INPUT" &&
+            containsFixtureTrust({
+              providerCandidate,
+              evidence,
+              policy,
+              poolProof,
+              marketPairEvidence,
+              smartWalletAllowlist
+            })) {
+          return unavailable("SYNTHETIC_FIXTURE_NOT_ALLOWED_IN_EXTERNAL_MODE", {
+            candidateT, assembledAt, decisionAt, holdUntil
+          });
+        }
+
+        const identity = {
+          chainId: providerCandidate.chainId,
+          mint: providerCandidate.mint,
+          pool: providerCandidate.pool,
+          quote: providerCandidate.quote
+        };
+        const acquisitionReceipts = [];
+        const acquisition = {timeEvidence: null, collector: null};
+        activeAcquisition = acquisition;
+        let prefetchedHistory = null;
+        if (isRecord(policy) && policy.windowsMs?.swaps1h === 3_600_000 &&
+            isRecord(poolProof)) {
+          try {
+            prefetchedHistory = await historySource.readWindow({
+              identity,
+              poolProof,
+              startExclusiveMs: candidateT - policy.windowsMs.swaps1h,
+              endInclusiveMs: candidateT
+            });
+          } catch {
+            prefetchedHistory = null;
+          }
+          acquisitionReceipts.push(receiptSummary(
+            prefetchedHistory, acquisition.timeEvidence, acquisition.collector
+          ));
+        }
+
+        let actualAssembledAt;
+        try {
+          actualAssembledAt = clock();
+        } catch {
+          return unavailable("INVALID_ASSEMBLY_CLOCK", {candidateT, holdUntil});
+        }
+        if (!validTime(actualAssembledAt) || actualAssembledAt < candidateT ||
+            (assembledAt !== undefined && assembledAt !== actualAssembledAt)) {
+          return unavailable("ASSEMBLY_TIME_NOT_CURRENT", {
+            candidateT, assembledAt: actualAssembledAt, decisionAt, holdUntil
+          });
+        }
+        let analystCutoff;
+        try {
+          analystCutoff = clock();
+        } catch {
+          return unavailable("INVALID_DECISION_CLOCK", {
+            candidateT, assembledAt: actualAssembledAt, holdUntil
+          });
+        }
+        if (!validTime(analystCutoff) || analystCutoff < actualAssembledAt ||
+            (decisionAt !== undefined && decisionAt !== analystCutoff) ||
+            (holdUntil !== null && (!validTime(holdUntil) || holdUntil <= analystCutoff))) {
+          return unavailable("DECISION_TIME_OR_HOLD_INVALID", {
+            candidateT, assembledAt: actualAssembledAt, decisionAt: analystCutoff, holdUntil
+          });
+        }
+        const assembledHistorySource = prefetchedHistory === null ? null : Object.freeze({
+          async readWindow(request) {
+            if (request?.identity?.chainId !== identity.chainId ||
+                request?.identity?.mint !== identity.mint ||
+                request?.identity?.pool !== identity.pool ||
+                request?.identity?.quote !== identity.quote ||
+                request?.startExclusiveMs !== candidateT - 3_600_000 ||
+                request?.endInclusiveMs !== candidateT) return null;
+            return prefetchedHistory;
+          }
         });
-      }
-      if (mode === "EXTERNAL_READ_ONLY_INPUT" &&
-          containsFixtureTrust({
-            providerCandidate,
-            evidence,
+        let packet;
+        try {
+          packet = await buildAnalystWindowEvidence({
+            candidate: providerCandidate,
+            candidateT,
+            assembledAt: actualAssembledAt,
+            decisionAt: analystCutoff,
             policy,
             poolProof,
+            historySource: assembledHistorySource,
+            censusSource: mode === "EXTERNAL_READ_ONLY_INPUT"
+              ? withoutFixtureResults(censusSource, "readSnapshots") : censusSource,
+            priceSource: mode === "EXTERNAL_READ_ONLY_INPUT"
+              ? withoutFixtureResults(priceSource, "readObservation") : priceSource,
             marketPairEvidence,
             smartWalletAllowlist
-          })) {
-        return unavailable("SYNTHETIC_FIXTURE_NOT_ALLOWED_IN_EXTERNAL_MODE", {
-          candidateT, assembledAt, decisionAt, holdUntil
-        });
-      }
-
-      let actualAssembledAt;
-      try {
-        actualAssembledAt = clock();
-      } catch {
-        return unavailable("INVALID_ASSEMBLY_CLOCK", {candidateT, holdUntil});
-      }
-      if (!validTime(actualAssembledAt) || actualAssembledAt < candidateT ||
-          (assembledAt !== undefined && assembledAt !== actualAssembledAt)) {
-        return unavailable("ASSEMBLY_TIME_NOT_CURRENT", {
-          candidateT, assembledAt: actualAssembledAt, decisionAt, holdUntil
-        });
-      }
-      let analystCutoff;
-      try {
-        analystCutoff = clock();
-      } catch {
-        return unavailable("INVALID_DECISION_CLOCK", {
-          candidateT, assembledAt: actualAssembledAt, holdUntil
-        });
-      }
-      if (!validTime(analystCutoff) || analystCutoff < actualAssembledAt ||
-          (decisionAt !== undefined && decisionAt !== analystCutoff) ||
-          (holdUntil !== null && (!validTime(holdUntil) || holdUntil <= analystCutoff))) {
-        return unavailable("DECISION_TIME_OR_HOLD_INVALID", {
-          candidateT, assembledAt: actualAssembledAt, decisionAt: analystCutoff, holdUntil
-        });
-      }
-      const identity = {
-        chainId: providerCandidate.chainId,
-        mint: providerCandidate.mint,
-        pool: providerCandidate.pool,
-        quote: providerCandidate.quote
-      };
-      acquisitionReceipts.length = 0;
-      let packet;
-      try {
-        packet = await buildAnalystWindowEvidence({
-          candidate: providerCandidate,
+          });
+        } catch {
+          return unavailable("ANALYST_EVIDENCE_BUILD_UNKNOWN", {
+            candidateT, assembledAt: actualAssembledAt, decisionAt: analystCutoff, holdUntil
+          });
+        }
+        let actualDecisionAt;
+        try {
+          actualDecisionAt = clock();
+        } catch {
+          actualDecisionAt = null;
+        }
+        if (!validTime(actualDecisionAt) || actualDecisionAt < analystCutoff) {
+          return unavailable("INVALID_FINAL_DECISION_CLOCK", {
+            candidateT, assembledAt: actualAssembledAt, decisionAt: actualDecisionAt, holdUntil
+          });
+        }
+        let evaluation;
+        try {
+          evaluation = await evaluateWithCanonicalMarketAdapter({
+            canonicalAdapter: adaptMarketEvidence,
+            providerCandidate,
+            evidence,
+            packet,
+            reviewEvidence,
+            now: actualDecisionAt,
+            holdUntil
+          });
+        } catch {
+          return unavailable("CANONICAL_EVALUATION_UNKNOWN", {
+            candidateT, assembledAt: actualAssembledAt, decisionAt: actualDecisionAt, holdUntil
+          });
+        }
+        return {
+          status: evaluation.status,
+          mode,
           candidateT,
           assembledAt: actualAssembledAt,
-          decisionAt: analystCutoff,
-          policy,
-          poolProof,
-          historySource: observedHistorySource,
-          censusSource: mode === "EXTERNAL_READ_ONLY_INPUT"
-            ? withoutFixtureResults(censusSource, "readSnapshots") : censusSource,
-          priceSource: mode === "EXTERNAL_READ_ONLY_INPUT"
-            ? withoutFixtureResults(priceSource, "readObservation") : priceSource,
-          marketPairEvidence,
-          smartWalletAllowlist
-        });
-      } catch {
-        return unavailable("ANALYST_EVIDENCE_BUILD_UNKNOWN", {
-          candidateT, assembledAt: actualAssembledAt, decisionAt: analystCutoff, holdUntil
-        });
+          decisionAt: actualDecisionAt,
+          analystCutoff,
+          holdUntil,
+          candidate: evaluation.adapted?.candidate ?? null,
+          adapted: evaluation.adapted,
+          filters: evaluation.filters,
+          analysis: evaluation.analysis,
+          analystEvidence: packet,
+          auditReceipts: {
+            ...packet.receipts,
+            acquisition: acquisitionReceipts.map(item => ({...item}))
+          },
+          sourceLimits: {...reportedLimits},
+          executionAuthorized: false,
+          realDataEntryEligible: false
+        };
+      } finally {
+        activeAcquisition = null;
+        evaluationActive = false;
       }
-      let actualDecisionAt;
-      try {
-        actualDecisionAt = clock();
-      } catch {
-        actualDecisionAt = null;
-      }
-      if (!validTime(actualDecisionAt) || actualDecisionAt < analystCutoff) {
-        return unavailable("INVALID_FINAL_DECISION_CLOCK", {
-          candidateT, assembledAt: actualAssembledAt, decisionAt: actualDecisionAt, holdUntil
-        });
-      }
-      let evaluation;
-      try {
-        evaluation = await evaluateWithCanonicalMarketAdapter({
-          canonicalAdapter: adaptMarketEvidence,
-          providerCandidate,
-          evidence,
-          packet,
-          reviewEvidence,
-          now: actualDecisionAt,
-          holdUntil
-        });
-      } catch {
-        return unavailable("CANONICAL_EVALUATION_UNKNOWN", {
-          candidateT, assembledAt: actualAssembledAt, decisionAt: actualDecisionAt, holdUntil
-        });
-      }
-      return {
-        status: evaluation.status,
-        mode,
-        candidateT,
-        assembledAt: actualAssembledAt,
-        decisionAt: actualDecisionAt,
-        analystCutoff,
-        holdUntil,
-        candidate: evaluation.adapted?.candidate ?? null,
-        adapted: evaluation.adapted,
-        filters: evaluation.filters,
-        analysis: evaluation.analysis,
-        analystEvidence: packet,
-        auditReceipts: {
-          ...packet.receipts,
-          acquisition: acquisitionReceipts.map(item => ({...item}))
-        },
-        sourceLimits: {...reportedLimits},
-        executionAuthorized: false,
-        realDataEntryEligible: false
-      };
     }
   });
 }

@@ -31,20 +31,25 @@ are not treated as global coverage or monotonicity evidence.
 
 Each successful RPC event records its fixed origin, method and parameters,
 request/receipt times from the injected clock, consumed response bytes, and the
-SHA-256 of the exact response bytes. The time-boundary receipt digest binds
-those events, all produced-slot timestamps, skipped ranges, requested fences,
-identity, coverage and cumulative counters. The history-window handoff subtracts
-those request/byte/work counts and elapsed time before invoking the existing
-launch-history collector. Time and slot response timestamps remain provider
-claims: `sourceAuthentication` and archival completeness are
-`NOT_ESTABLISHED`.
+SHA-256 of the exact response bytes. The canonical `timestampEvidenceDigest()`
+binds the time-boundary fields accepted by the history-window bridge. Its event
+array contains the `getBlockTime` responses; the `getSlot` and `getBlocks`
+responses, full produced-slot enumeration, skipped ranges, and auxiliary request
+and byte counts are included in the digest-bound coverage object. Work units
+include the full slot-range scan. Before bridge construction, the pipeline
+reserves two bounded auxiliary requests and their maximum response bytes from
+the configured request/byte budgets, so the accepted bridge's existing
+timestamp-event counters plus collector limits remain within the original run
+budget. Time and slot response timestamps remain provider claims:
+`sourceAuthentication` and archival completeness are `NOT_ESTABLISHED`.
 
-The default per-window caps are 960 requests, 8 MiB cumulative response bytes,
-1 MiB per response, 5,000 work units, 15 seconds elapsed, and a 5-second
-request timeout. A source may narrow these limits; raising them is bounded by
-the current launch-history hard ceilings. The caller must pass the run's
-remaining global budget when the module is integrated into a multi-candidate
-run; no composition budget or cross-candidate state is changed here.
+The default per-window caps are 2,100 requests, 10 MiB cumulative response
+bytes, 1 MiB per response, 5,000 work units, 15 seconds elapsed, and a 5-second
+request timeout; the produced-slot range is capped at 2,500 slots. A source may
+narrow these limits; raising them is bounded by the current launch-history hard
+ceilings. The caller must pass the run's remaining global budget when the module
+is integrated into a multi-candidate run; no composition budget or
+cross-candidate state is changed here.
 
 The collector's read-method addition is intentionally narrow: the bounded
 reader admits `getBlocks` and `getBlockTime` for the new boundary source; `getSlot`
@@ -58,9 +63,13 @@ provider, run-manifest entry, credential, or provider activation is added.
 `buildAnalystWindowEvidence()` → `evaluateWithCanonicalMarketAdapter()` path,
 using the repository's `adaptMarketEvidence()`. It retains the provider
 candidate's `sampledAt` as candidate T, captures actual injected-clock assembly
-and decision times separately, passes `holdUntil`, and returns the canonical
-candidate with Analyst and source audit receipts. It adds no candidate
-normalizer, ledger, quote, or execution schema.
+and decision times separately after bounded history acquisition, passes
+`holdUntil`, and returns the canonical candidate with Analyst and source audit
+receipts. The acquired history result is handed to Analyst through a one-read
+cached source bound to the exact candidate window. Concurrent evaluations on
+one pipeline instance are rejected to keep their acquisition budgets and audit
+receipts isolated. It adds no candidate normalizer, ledger, quote, or execution
+schema.
 
 Only the synthetic test mode can inject a collector fixture. The external mode
 rejects fixture-labelled candidate/evidence and cannot inject a collector
@@ -72,22 +81,22 @@ handoff contract, not production readiness. An unavailable quote or any missing
 cost remains no-entry.
 
 The existing `EXTERNAL_READ_ONLY_INPUT` composition is unchanged: it continues
-to strip caller verification and supply no quotes. This work is not wired into
-that composition. Before a future owner-approved integration, the module-owned
-path needs an exact reviewed manifest/source-policy binding, an accepted internal
-clock policy, and the actual accepted quote and complete cost interfaces. The
-source pipeline itself is not that authorization.
+to normalize caller candidates as unverified, rejects caller adapters and clocks,
+and supplies `null` entry and exit quotes. This work is not wired into that
+composition. Before a future owner-approved integration, the module-owned
+default-disabled path needs an exact reviewed manifest/source-policy binding,
+an accepted internal clock policy, and the actual accepted quote and complete
+cost interfaces. The source pipeline itself is not that authorization.
 
 ## Accepted interface dependency
 
-The concrete history-window bridge interface was reviewed from PR #1182 at
-`91072e375259c231a3edac9507a5553408d5dc29`. At this change's frozen head it is
-still an open draft and is not on the checked-out `main` baseline. The new
-modules use injected collector-shaped contract fixtures and do not import files
-from that unmerged branch. The current collector's archival result remains
-`UNKNOWN`; integration depends on an accepted bridge/collector revision with
-matching raw-response digests and timestamp fields, plus a separately
-defensible completeness policy.
+The accepted history-window bridge from PR #1182 is present at the merged
+`main` baseline (`dc04ab0aa800839e0b33120054d424c8bb4211f6`). The pipeline imports
+that canonical `createHistoryWindowSource()` and its
+`timestampEvidenceDigest()` contract; the timestamp module contains no second
+bridge implementation. The current collector's archival result remains
+`UNKNOWN`; successful integration through the bridge does not establish a
+separately defensible global completeness policy.
 
 ## Remaining source and provider policy facts
 
