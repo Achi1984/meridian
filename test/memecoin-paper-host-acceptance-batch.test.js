@@ -1,9 +1,15 @@
 import assert from "node:assert/strict";
+import {createHash} from "node:crypto";
 import {EventEmitter} from "node:events";
+import {mkdirSync, writeFileSync} from "node:fs";
 import {PassThrough} from "node:stream";
-import {lstat, mkdir, mkdtemp, open, readFile, rm} from "node:fs/promises";
+import {
+  lstat, mkdir, mkdtemp, open, readFile, rm, writeFile
+} from "node:fs/promises";
+import {spawn} from "node:child_process";
 import os from "node:os";
 import path from "node:path";
+import {fileURLToPath} from "node:url";
 import test from "node:test";
 import {
   runHostAcceptanceBatch
@@ -17,6 +23,43 @@ const IDENTITY = Object.freeze({
   imageDigest: `sha256:${"b".repeat(64)}`,
   runId: "batch-test-001"
 });
+const CLI = fileURLToPath(new URL(
+  "../scripts/memecoin-paper/host-acceptance-batch.mjs", import.meta.url
+));
+const HOLD_CHILD = `
+import {mkdir} from "node:fs/promises";
+import {spawn} from "node:child_process";
+import {main} from ${JSON.stringify(new URL(
+  "../scripts/memecoin-paper/host-acceptance-batch.mjs", import.meta.url
+).href)};
+const mode = process.env.TEST_HOLD_MODE;
+const actualUid = process.getuid();
+const actualGid = process.getgid();
+let uidCalls = 0;
+let gidCalls = 0;
+process.getuid = () => ++uidCalls === 1 ? 1000 : actualUid;
+process.getgid = () => ++gidCalls === 1 ? 1000 : actualGid;
+let dispatches = 0;
+const options = {
+  env: process.env,
+  mountRoot: process.env.TEST_MOUNT_ROOT,
+  storageRoot: process.env.TEST_STORAGE_ROOT,
+  validateMount: async () => {},
+  validateStorageRoot: async (_mount, storage, {mkdirPath}) => {
+    try { await mkdirPath(storage, {mode: 0o700}); }
+    catch (error) { if (error.code !== "EEXIST") throw error; }
+  },
+  spawnImpl: (...args) => { dispatches += 1; return spawn(...args); }
+};
+if (mode === "deadline") {
+  options.timeoutMs = 1;
+  let calls = 0;
+  options.monotonicNow = () => calls++ === 0 ? 0 : 2;
+}
+const code = await main(options);
+process.exitCode = code;
+process.stdout.write(JSON.stringify({done: true, code, dispatches}) + "\\n");
+`;
 
 async function fixture(t) {
   const root = await mkdtemp(path.join(os.tmpdir(), "paper-acceptance-batch-"));
@@ -101,8 +144,81 @@ function mountInfoFileSystem(mountInfo) {
   };
 }
 
+function validPipelineChild(dataRoot) {
+  const runId = "synthetic-batch-read-cancel";
+  const directory = path.join(dataRoot, runId);
+  mkdirSync(directory, {mode: 0o700});
+  const configBytes = Buffer.from("{}");
+  const exportBytes = Buffer.from("{}");
+  writeFileSync(path.join(directory, "config.json"), configBytes, {mode: 0o600});
+  writeFileSync(path.join(directory, "result.report.json"), exportBytes, {mode: 0o600});
+  const hash = bytes => createHash("sha256").update(bytes).digest("hex");
+  return {
+    status: "PASS",
+    contractChecks: "PASS",
+    proof: "SYNTHETIC_PIPELINE_QUOTE",
+    producerRevision: "paper-pilot-composition/3",
+    hostAcceptance: "NOT_ASSESSED",
+    providerTrust: "NOT_ASSESSED",
+    liveExecution: false,
+    restartDenied: true,
+    immutableReadback: true,
+    https: {status: "DISABLED"},
+    evaluation: "PASS",
+    outcome: "SIMULATED_ENTRY_EXIT_COMPLETE",
+    entryFills: 1,
+    exits: 1,
+    runId,
+    configSha256: hash(configBytes),
+    exportSha256: hash(exportBytes),
+    byteLength: exportBytes.byteLength
+  };
+}
+
 async function execute(harness, extra = {}) {
   return runHostAcceptanceBatch(options(harness, extra));
+}
+
+function startProcess(t, command, args, env) {
+  const child = spawn(command, args, {env, stdio: ["ignore", "pipe", "pipe"]});
+  t.after(() => {
+    if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+  });
+  let output = "";
+  let stderr = "";
+  child.stdout.setEncoding("utf8");
+  child.stderr.setEncoding("utf8");
+  child.stdout.on("data", chunk => { output += chunk; });
+  child.stderr.on("data", chunk => { stderr += chunk; });
+  const line = new Promise((resolve, reject) => {
+    child.stdout.on("data", () => {
+      const newline = output.indexOf("\n");
+      if (newline >= 0) resolve(output.slice(0, newline));
+    });
+    child.once("error", reject);
+    child.once("exit", code => {
+      if (!output.includes("\n")) reject(new Error(`child exited ${code}: ${stderr}`));
+    });
+  });
+  return {child, line, getOutput: () => output, getStderr: () => stderr};
+}
+
+async function assertHeldUntilTerminated(t, childProcess, resultStatus, exitCode, expectedDispatches) {
+  const firstLine = await childProcess.line;
+  assert.equal(JSON.parse(firstLine).status, resultStatus);
+  await new Promise(resolve => setTimeout(resolve, 80));
+  assert.equal(childProcess.child.exitCode, null, "child should remain alive after writing its result");
+  childProcess.child.kill("SIGTERM");
+  const closed = new Promise(resolve => childProcess.child.once(
+    "close", (code, signal) => resolve([code, signal])
+  ));
+  const [code, signal] = await closed;
+  assert.equal(signal, null);
+  assert.equal(code, exitCode);
+  const lines = childProcess.getOutput().trim().split("\n");
+  const completion = JSON.parse(lines.at(-1));
+  assert.equal(completion.done, true);
+  assert.equal(completion.dispatches, expectedDispatches);
 }
 
 test("disabled by default without mount access or proof dispatch", async t => {
@@ -165,6 +281,76 @@ test("hold mode remains inert after a failure until termination", async t => {
   const result = await pending;
   assert.equal(result.status, "UNKNOWN");
   assert.equal(settled, true);
+});
+
+test("the executable CLI holds while disabled and exits on SIGTERM", async t => {
+  const childProcess = startProcess(t, process.execPath, [CLI], {
+    ...process.env,
+    PAPER_HOST_ACCEPTANCE_BATCH_ENABLED: "false",
+    PAPER_HOST_ACCEPTANCE_BATCH_HOLD: "true"
+  });
+  assert.deepEqual(JSON.parse(await childProcess.line), {
+    status: "DISABLED", executionStarted: false
+  });
+  await new Promise(resolve => setTimeout(resolve, 80));
+  assert.equal(childProcess.child.exitCode, null);
+  childProcess.child.kill("SIGTERM");
+  const [code, signal] = await new Promise(resolve => childProcess.child.once(
+    "close", (exitCode, exitSignal) => resolve([exitCode, exitSignal])
+  ));
+  assert.equal(signal, null);
+  assert.equal(code, 0);
+  assert.equal(childProcess.getOutput().trim().split("\n").length, 1);
+});
+
+test("subprocess CLI reports batch success before holding, then exits on SIGTERM", async t => {
+  const harness = await fixture(t);
+  const childProcess = startProcess(t, process.execPath, ["--input-type=module", "-e", HOLD_CHILD], {
+    ...process.env,
+    TEST_HOLD_MODE: "success",
+    TEST_MOUNT_ROOT: harness.mountRoot,
+    TEST_STORAGE_ROOT: harness.storageRoot,
+    PAPER_HOST_ACCEPTANCE_BATCH_ENABLED: "true",
+    PAPER_HOST_ACCEPTANCE_BATCH_HOLD: "true",
+    PAPER_HOST_ACCEPTANCE_BATCH_SOURCE_REVISION: IDENTITY.sourceRevision,
+    PAPER_HOST_ACCEPTANCE_BATCH_IMAGE_DIGEST: IDENTITY.imageDigest,
+    PAPER_HOST_ACCEPTANCE_BATCH_RUN_ID: IDENTITY.runId
+  });
+  await assertHeldUntilTerminated(t, childProcess, "BATCH_COMPLETE", 0, 3);
+});
+
+test("subprocess CLI holds an existing claim and never dispatches a proof", async t => {
+  const harness = await fixture(t);
+  await mkdir(harness.storageRoot, {mode: 0o700});
+  await writeFile(path.join(harness.storageRoot, "batch-claim.json"), "permanent");
+  const childProcess = startProcess(t, process.execPath, ["--input-type=module", "-e", HOLD_CHILD], {
+    ...process.env,
+    TEST_HOLD_MODE: "existing-claim",
+    TEST_MOUNT_ROOT: harness.mountRoot,
+    TEST_STORAGE_ROOT: harness.storageRoot,
+    PAPER_HOST_ACCEPTANCE_BATCH_ENABLED: "true",
+    PAPER_HOST_ACCEPTANCE_BATCH_HOLD: "true",
+    PAPER_HOST_ACCEPTANCE_BATCH_SOURCE_REVISION: IDENTITY.sourceRevision,
+    PAPER_HOST_ACCEPTANCE_BATCH_IMAGE_DIGEST: IDENTITY.imageDigest,
+    PAPER_HOST_ACCEPTANCE_BATCH_RUN_ID: IDENTITY.runId
+  });
+  await assertHeldUntilTerminated(t, childProcess, "ALREADY_CLAIMED", 2, 0);
+});
+
+test("subprocess CLI holds after internal deadline and exits cleanly on SIGTERM", async t => {
+  const harness = await fixture(t);
+  const childProcess = startProcess(t, process.execPath, ["--input-type=module", "-e", HOLD_CHILD], {
+    ...process.env,
+    TEST_HOLD_MODE: "deadline",
+    TEST_MOUNT_ROOT: harness.mountRoot,
+    TEST_STORAGE_ROOT: harness.storageRoot,
+    PAPER_HOST_ACCEPTANCE_BATCH_ENABLED: "true",
+    PAPER_HOST_ACCEPTANCE_BATCH_HOLD: "true",
+    PAPER_HOST_ACCEPTANCE_BATCH_SOURCE_REVISION: IDENTITY.sourceRevision,
+    PAPER_HOST_ACCEPTANCE_BATCH_IMAGE_DIGEST: IDENTITY.imageDigest,
+    PAPER_HOST_ACCEPTANCE_BATCH_RUN_ID: IDENTITY.runId
+  });
+  await assertHeldUntilTerminated(t, childProcess, "UNKNOWN", 2, 0);
 });
 
 test("one generated-data batch composes all existing proofs and restart never dispatches", async t => {
@@ -336,6 +522,61 @@ test("late filesystem completion cannot dispatch a proof or clear the claim", as
   assert.equal(restart.status, "ALREADY_CLAIMED");
   assert.equal(spawnCount, 0);
 });
+
+for (const delayedOperation of ["stat", "read"]) {
+  test(`cancellation during delayed ${delayedOperation} closes the opened evidence handle`, async t => {
+    const harness = await fixture(t);
+    let closeAttempts = 0;
+    let delayed = false;
+    const delayedFs = {
+      open: async (filename, ...args) => {
+        const handle = await open(filename, ...args);
+        if (path.basename(filename) !== "config.json") return handle;
+        const delay = async () => {
+          if (delayed) return;
+          delayed = true;
+          await new Promise(resolve => setTimeout(resolve, 500));
+        };
+        return {
+          stat: async () => {
+            if (delayedOperation === "stat") await delay();
+            return handle.stat();
+          },
+          read: async (...values) => {
+            if (delayedOperation === "read") await delay();
+            return handle.read(...values);
+          },
+          close: async () => {
+            closeAttempts += 1;
+            return handle.close();
+          }
+        };
+      }
+    };
+    const result = await execute(harness, {
+      timeoutMs: 150,
+      fileSystem: delayedFs,
+      spawnImpl: (_command, _args, childOptions) => fakeSpawn({
+        stdout: JSON.stringify(validPipelineChild(
+          childOptions.env.PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT
+        )),
+        code: 0
+      })()
+    });
+    assert.equal(result.status, "UNKNOWN");
+    assert.equal(result.code, "BATCH_DEADLINE_EXCEEDED");
+    await new Promise(resolve => setTimeout(resolve, 550));
+    assert.ok(closeAttempts > 0, "the descriptor close should be attempted after abort");
+    const proofDirectory = path.join(
+      harness.storageRoot, IDENTITY.runId, "pipeline_quote"
+    );
+    await assert.rejects(lstat(path.join(proofDirectory, "PIPELINE_QUOTE.readback.json")), {
+      code: "ENOENT"
+    });
+    const restart = await execute(harness);
+    assert.equal(restart.status, "ALREADY_CLAIMED");
+  });
+}
 
 test("timeout and termination during a child are fenced and preserve partial output", async t => {
   const harness = await fixture(t);

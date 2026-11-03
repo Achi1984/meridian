@@ -4,6 +4,7 @@ import {spawn} from "node:child_process";
 import path from "node:path";
 import {performance} from "node:perf_hooks";
 import {fileURLToPath, pathToFileURL} from "node:url";
+import {MessageChannel} from "node:worker_threads";
 import {evaluateMemecoinPaperRunExport} from "../memecoin-paper-simulated-evaluation/index.mjs";
 import {
   PAPER_EXPORT_MOUNT_ROOT,
@@ -83,7 +84,6 @@ function createDeadline({
   let previous = started;
   let activeChild = null;
   let shutdownSignal = null;
-  let holdResolver = null;
   let timer;
   let forceKillTimer;
   const abortController = new AbortController();
@@ -102,7 +102,6 @@ function createDeadline({
   };
   const onSignal = signal => {
     shutdownSignal ??= signal;
-    if (holdResolver) holdResolver();
     if (activeChild) {
       try { activeChild.kill(signal); } catch {}
     } else {
@@ -156,13 +155,6 @@ function createDeadline({
     get childStarted() { return childStarted; },
     get shutdownSignal() { return shutdownSignal; },
     stopDeadline() { clearTimeout(timer); },
-    async hold() {
-      if (shutdownSignal || abortController.signal.aborted) return;
-      await new Promise(resolve => {
-        holdResolver = resolve;
-        if (shutdownSignal || abortController.signal.aborted) resolve();
-      });
-    },
     dispose() {
       clearTimeout(timer);
       signalSource.removeListener("SIGINT", onInterrupt);
@@ -174,6 +166,25 @@ function createDeadline({
 
 function closeLate(handle) {
   try { Promise.resolve(handle.close()).catch(() => {}); } catch {}
+}
+
+function waitInert(signalSource, isStopping = () => false) {
+  if (isStopping()) return Promise.resolve();
+  const {port1, port2} = new MessageChannel();
+  port1.ref();
+  port2.ref();
+  return new Promise(resolve => {
+    const finish = () => {
+      signalSource.removeListener("SIGINT", finish);
+      signalSource.removeListener("SIGTERM", finish);
+      port1.close();
+      port2.close();
+      resolve();
+    };
+    signalSource.once("SIGINT", finish);
+    signalSource.once("SIGTERM", finish);
+    if (isStopping()) finish();
+  });
 }
 
 async function openWithin(operation, fs, ...args) {
@@ -229,7 +240,7 @@ async function boundedRead(filename, maximum, operation, fs, runtimeUid) {
       return {
         stat: () => operation.wait(() => handle.stat()),
         read: (...values) => operation.wait(() => handle.read(...values)),
-        close: () => operation.wait(() => handle.close())
+        close: () => closeWithin(operation, handle)
       };
     }
   }));
@@ -580,18 +591,6 @@ async function runBatchWork({
   }
 }
 
-async function waitInert(signalSource) {
-  await new Promise(resolve => {
-    const finish = () => {
-      signalSource.removeListener("SIGINT", finish);
-      signalSource.removeListener("SIGTERM", finish);
-      resolve();
-    };
-    signalSource.once("SIGINT", finish);
-    signalSource.once("SIGTERM", finish);
-  });
-}
-
 export async function runHostAcceptanceBatch({
   enabled = false,
   sourceRevision,
@@ -646,7 +645,7 @@ export async function runHostAcceptanceBatch({
   operation.stopDeadline();
   try {
     onResult?.(result);
-    if (hold && !operation.signal.aborted) await operation.hold();
+    if (hold) await waitInert(signalSource, () => operation.shutdownSignal !== null);
     return result;
   } finally {
     operation.dispose();
@@ -683,6 +682,8 @@ export async function main({
 } = {}) {
   let result;
   let emitted = false;
+  let batchOwnsHold = false;
+  const hold = env.PAPER_HOST_ACCEPTANCE_BATCH_HOLD === "true";
   const emitResult = value => {
     stdout.write(`${JSON.stringify(value)}\n`);
     emitted = true;
@@ -694,6 +695,7 @@ export async function main({
         typeof process.getgid === "function" && process.getgid() === 1000,
       "BATCH_RUNTIME_IDENTITY_INVALID");
     }
+    batchOwnsHold = true;
     result = await runHostAcceptanceBatch({
       ...options, ...config, signalSource, onResult: emitResult
     });
@@ -706,7 +708,9 @@ export async function main({
       executionStarted: false
     };
   }
+  if (!emitted) batchOwnsHold = false;
   if (!emitted) emitResult(result);
+  if (hold && !batchOwnsHold) await waitInert(signalSource);
   return result.status === "DISABLED" || result.status === "BATCH_COMPLETE" ? 0 : 2;
 }
 
