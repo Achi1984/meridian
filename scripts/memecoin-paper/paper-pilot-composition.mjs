@@ -18,7 +18,6 @@ import {
 import {createPaperExecutionStep} from "./execution-step.mjs";
 import {PAPER_LEDGER_POLICY} from "./ledger.mjs";
 import {
-  acquireSyntheticRuntimeFixture,
   createPaperRuntimeSourceAdapter,
   PAPER_RUNTIME_SOURCE_POLICY,
   PAPER_RUNTIME_SOURCE_POLICY_SHA256
@@ -362,17 +361,23 @@ export function offlineFixtureAdapters(options = {}) {
         if (pipelineFixtureCalls > (fault === "PIPELINE_QUOTE_DUPLICATE" ? 2 : 1)) return [];
         let acquired;
         try {
-          acquired = await acquireSyntheticRuntimeFixture(clock, {
-            signal, remaining, recordRequest, recordWork,
-            waitForStop: fault === "PIPELINE_QUOTE_WAIT",
-            expireDuringRequest: fault === "PIPELINE_QUOTE_DEADLINE",
-            deadlineAt,
-            variant: fault === "PIPELINE_QUOTE_MISSING_QUOTE" ? "MISSING_QUOTE"
-              : fault === "PIPELINE_QUOTE_MISSING_COSTS" ? "MISSING_COSTS"
-                : fault === "PIPELINE_QUOTE_ROUTE_IDENTITY" ? "WRONG_QUOTE_IDENTITY"
-                  : fault === "PIPELINE_QUOTE_WRONG_IDENTITY" ? "WRONG_IDENTITY"
-                : fault === "PIPELINE_QUOTE_FUTURE_EVIDENCE" ? "FUTURE_EVIDENCE" : "BASE"
+          const variant = fault === "PIPELINE_QUOTE_MISSING_QUOTE" ? "MISSING_QUOTE"
+            : fault === "PIPELINE_QUOTE_MISSING_COSTS" ? "MISSING_COSTS"
+              : fault === "PIPELINE_QUOTE_ROUTE_IDENTITY" ? "WRONG_QUOTE_IDENTITY"
+                : fault === "PIPELINE_QUOTE_WRONG_IDENTITY" ? "WRONG_IDENTITY"
+                  : fault === "PIPELINE_QUOTE_FUTURE_EVIDENCE" ? "FUTURE_EVIDENCE" : "BASE";
+          const sourceAdapter = createPaperRuntimeSourceAdapter({
+            sourcePolicySha256: PAPER_RUNTIME_SOURCE_POLICY_SHA256,
+            fixtureMode: "SYNTHETIC_TEST_ONLY",
+            clock,
+            variant,
+            fixtureBehavior: fault === "PIPELINE_QUOTE_WAIT" ? "WAIT_FOR_STOP"
+              : fault === "PIPELINE_QUOTE_DEADLINE" ? "EXPIRE_DURING_REQUEST" : "NONE"
           });
+          acquired = await sourceAdapter.acquireCandidates({
+            signal, remaining, recordRequest, recordWork, deadlineAt
+          });
+          acquired.quoteAdapter = sourceAdapter;
         } catch (error) {
           throw Object.assign(new Error("synthetic pipeline fixture failed closed"), {
             code: typeof error?.code === "string" && /^[A-Z0-9_]{1,48}$/.test(error.code)
@@ -382,7 +387,8 @@ export function offlineFixtureAdapters(options = {}) {
         clock.advance();
         if (acquired.runtimeAudit) runtimeAudits.push(acquired.runtimeAudit);
         if (acquired.candidate && !runtimeFixturesByMint.has(acquired.candidate.mint)) {
-          runtimeFixturesByMint.set(acquired.candidate.mint, acquired.quote);
+          runtimeFixturesByMint.set(acquired.candidate.mint, request =>
+            acquired.quoteAdapter.quote(request));
         }
         return acquired.candidate ? [acquired.candidate] : [];
       }

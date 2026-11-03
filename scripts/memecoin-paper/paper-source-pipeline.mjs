@@ -275,6 +275,7 @@ export function createPaperSourcePipeline({
           pool: providerCandidate.pool,
           quote: providerCandidate.quote
         };
+        const acceptedReviewEvidence = mode === "SYNTHETIC_TEST_ONLY" ? reviewEvidence : {};
         const acquisitionReceipts = [];
         const acquisition = {timeEvidence: null, collector: null};
         const historySource = createHistorySource({
@@ -441,7 +442,7 @@ export function createPaperSourcePipeline({
             providerCandidate,
             evidence,
             packet,
-            reviewEvidence,
+            reviewEvidence: acceptedReviewEvidence,
             now: actualDecisionAt,
             holdUntil
           });

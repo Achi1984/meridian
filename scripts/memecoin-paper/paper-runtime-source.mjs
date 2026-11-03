@@ -626,18 +626,73 @@ export async function acquireSyntheticRuntimeFixture(clock, {
 }
 
 export function createPaperRuntimeSourceAdapter(options = {}) {
+  const allowedOptions = [
+    "sourcePolicySha256", "fixtureMode", "clock", "variant", "fixtureBehavior"
+  ];
   if (!options || typeof options !== "object" || Array.isArray(options) ||
       ![Object.prototype, null].includes(Object.getPrototypeOf(options)) ||
       Object.getOwnPropertySymbols(options).length !== 0 ||
-      Object.getOwnPropertyNames(options).join(",") !== "sourcePolicySha256" ||
-      !Object.hasOwn(Object.getOwnPropertyDescriptor(options, "sourcePolicySha256") ?? {}, "value")) {
+      Object.getOwnPropertyNames(options).some(key => !allowedOptions.includes(key)) ||
+      Object.getOwnPropertyNames(options).some(key =>
+        !Object.hasOwn(Object.getOwnPropertyDescriptor(options, key) ?? {}, "value"))) {
     throw new TypeError("runtime source adapter options must be exact bounded data");
   }
-  const {sourcePolicySha256} = options;
+  const {
+    sourcePolicySha256,
+    fixtureMode,
+    clock,
+    variant = "BASE",
+    fixtureBehavior = "NONE"
+  } = options;
   if (sourcePolicySha256 !== PAPER_RUNTIME_SOURCE_POLICY_SHA256) {
     throw new TypeError("source policy digest does not match the module-owned policy");
   }
 
+  if (fixtureMode !== undefined) {
+    if (fixtureMode !== "SYNTHETIC_TEST_ONLY" ||
+        Object.keys(options).sort().join(",") !==
+          ["clock", "fixtureBehavior", "fixtureMode", "sourcePolicySha256", "variant"]
+            .sort().join(",") ||
+        !clock || typeof clock.wallClock !== "function" ||
+        typeof clock.advance !== "function" ||
+        !["BASE", "MISSING_QUOTE", "MISSING_COSTS", "WRONG_IDENTITY",
+          "FUTURE_EVIDENCE", "WRONG_QUOTE_IDENTITY"].includes(variant) ||
+        !["NONE", "WAIT_FOR_STOP", "EXPIRE_DURING_REQUEST"].includes(fixtureBehavior)) {
+      throw new TypeError("fixture runtime source requires exact synthetic-only dependencies");
+    }
+    const fixtures = new Map();
+    return Object.freeze({
+      async acquireCandidates({signal, remaining, recordRequest, recordWork, deadlineAt} = {}) {
+        const acquired = await acquireSyntheticRuntimeFixture(clock, {
+          signal, remaining, recordRequest, recordWork, deadlineAt, variant,
+          waitForStop: fixtureBehavior === "WAIT_FOR_STOP",
+          expireDuringRequest: fixtureBehavior === "EXPIRE_DURING_REQUEST"
+        });
+        if (signal?.aborted) {
+          return {status: "UNKNOWN", reason: "STOPPED", candidates: [], fixtureOnly: true};
+        }
+        if (acquired.candidate) fixtures.set(acquired.candidate.mint, acquired);
+        return {
+          ...acquired,
+          status: acquired.candidate ? "SYNTHETIC_FIXTURE_ONLY" : acquired.status,
+          candidates: acquired.candidate ? [acquired.candidate] : [],
+          fixtureOnly: true
+        };
+      },
+      async quote(request, quoteOptions) {
+        const candidate = request?.candidate;
+        const fixture = fixtures.get(candidate?.mint);
+        if (!fixture || !candidate ||
+            ["chainId", "mint", "pool", "quote", "decimals"].some(key =>
+              candidate[key] !== fixture.candidate[key])) return null;
+        return fixture.quote(request, quoteOptions);
+      }
+    });
+  }
+
+  if (Object.keys(options).sort().join(",") !== "sourcePolicySha256") {
+    throw new TypeError("production runtime source options are not injectable");
+  }
   const pipeline = createPaperSourcePipeline({
     enabled: false,
     mode: "EXTERNAL_READ_ONLY_INPUT"
@@ -668,6 +723,7 @@ export function createPaperRuntimeSourceAdapter(options = {}) {
         pipelineVersion: PAPER_SOURCE_PIPELINE_VERSION,
         pipelineEnabled: pipeline.enabled,
         quoteAdapterStatus: "DISABLED",
+        implementationStatus: "BLOCKED_NOT_IMPLEMENTED",
         networkAccessed: false
       };
     },
