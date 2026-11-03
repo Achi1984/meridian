@@ -6,13 +6,30 @@ signers, orders, deployments, schedules, or trading. Importing the module, runni
 it with no arguments, or requesting status does not start a run. Every run
 requires the explicit `start --enable` command and a bounded manifest.
 
-The wrapper accepts only `EXTERNAL_READ_ONLY_INPUT`. The input is passed through
+The v1 manifest path accepts `EXTERNAL_READ_ONLY_INPUT`. The input is passed through
 the existing `createBoundedExternalReadOnlyInput()` interface and composition:
 source labels are rewritten as unverified, evidence `verified` flags remain
 false, and unsupported or missing source gates remain no-entry/UNKNOWN. This
 wrapper does not use observation-pilot commands as trading control, remove
 verification stripping, synthesize accepted source evidence, or introduce a
 second runner, ledger, checkpoint, or export schema.
+
+The separate `SOURCE_BACKED_PAPER` mode uses an exact v2 manifest containing the
+module-owned source policy both at the manifest root and in `config.sourcePolicy`,
+plus `config.sourcePolicySha256`. The current policy is intentionally disabled
+and every listed provider is unapproved. Its digest is included in the canonical
+config hash and immutable prestart receipt. A policy mismatch or caller attempt
+to mark a provider approved is rejected before run state is created.
+
+With the checked-in disabled policy, an explicit source-mode start still follows
+the runner/checkpoint/export/evaluator lifecycle, but acquisition returns
+`SOURCE_POLICY_UNAPPROVED`; it does not make network calls, falls back to
+synthetic data, request quotes, or authorize entries. The fixed pipeline and
+quote adapter are constructed disabled, and the local host clock remains
+`trustedUtc: false`. The terminal `UNKNOWN` outcome records the exact outstanding
+provider authenticity/time, archive/census, LP/developer/rug/bundle/wallet,
+source-bound price/cost, and independent policy approval requirements. This is
+an operational no-entry path, not an acquired-data or live-readiness claim.
 
 ## Reviewed manifest and start
 

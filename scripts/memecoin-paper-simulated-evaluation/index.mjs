@@ -4,6 +4,10 @@ import {open} from "node:fs/promises";
 import path from "node:path";
 import {pathToFileURL} from "node:url";
 import {canonicalCheckpointBytes, MAX_CHECKPOINT_BYTES} from "../memecoin-paper/checkpoint-store.mjs";
+import {
+  PAPER_RUNTIME_SOURCE_POLICY,
+  PAPER_RUNTIME_SOURCE_POLICY_SHA256
+} from "../memecoin-paper/paper-runtime-source.mjs";
 
 export const EVALUATION_SCHEMA = "MEMECOIN_SIMULATED_PILOT_EVALUATION_V1";
 export const EXPORT_SCHEMA = "memecoin-paper-run-export/v1";
@@ -192,9 +196,16 @@ function checkExport(exportValue, expected, checks) {
   } catch {
     configBytes = null;
   }
-  const configShape = exactKeys(config, ["version", "mode", "enabled", "runId", "startedAt", "budgets"]) &&
+  const sourceMode = config?.mode === "SOURCE_BACKED_PAPER";
+  const configShape = exactKeys(config, sourceMode
+    ? ["version", "mode", "enabled", "runId", "startedAt", "budgets",
+      "sourcePolicy", "sourcePolicySha256"]
+    : ["version", "mode", "enabled", "runId", "startedAt", "budgets"]) &&
     config.version === 1 && config.enabled === true &&
-    ["SYNTHETIC_TEST_ONLY", "EXTERNAL_READ_ONLY_INPUT"].includes(config.mode) &&
+    ["SYNTHETIC_TEST_ONLY", "EXTERNAL_READ_ONLY_INPUT", "SOURCE_BACKED_PAPER"].includes(config.mode) &&
+    (!sourceMode || (config.sourcePolicySha256 === PAPER_RUNTIME_SOURCE_POLICY_SHA256 &&
+      canonicalCheckpointBytes(config.sourcePolicy).equals(
+        canonicalCheckpointBytes(PAPER_RUNTIME_SOURCE_POLICY)))) &&
     SAFE_ID.test(config.runId ?? "") && integerTime(config.startedAt) &&
     exactKeys(config.budgets, BUDGET_KEYS) &&
     BUDGET_KEYS.every(key => {

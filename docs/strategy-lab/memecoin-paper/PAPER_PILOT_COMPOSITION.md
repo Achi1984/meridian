@@ -18,6 +18,18 @@ entry. Missing or unauthenticated evidence therefore yields a durable
 readiness claim. No provider acquisition, order, wallet, signer, deployment, or
 live-ready path is enabled. Import and no-argument CLI invocation are inert/
 disabled.
+
+The separate controller-only `SOURCE_BACKED_PAPER` mode is wired to the same
+runner, checkpoint, export, and evaluator lifecycle. Its v2 manifest and
+prestart-bound config pin the exact `PAPER_RUNTIME_SOURCE_POLICY`; that code-owned
+policy currently marks all fixed providers unapproved. The runtime adapter
+constructs the accepted paper source pipeline and market quote adapter disabled,
+uses no transport or caller clock, and reports the exact unresolved policy
+requirements. It therefore terminates `UNKNOWN` with a durable no-entry receipt
+without calling providers, synthesizing a candidate, requesting a quote, or
+setting trusted UTC. This mode is an executable no-entry integration boundary,
+not an acquired-source or live-ready run. The existing run manifest remains
+disabled with its stop switch engaged.
 Configuration and fixture options reject accessor/hidden fields, and a
 pre-aborted run exits before opening a checkpoint.
 

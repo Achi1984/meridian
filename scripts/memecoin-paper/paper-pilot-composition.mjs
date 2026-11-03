@@ -17,6 +17,11 @@ import {
 } from "./execution-runner.mjs";
 import {createPaperExecutionStep} from "./execution-step.mjs";
 import {PAPER_LEDGER_POLICY} from "./ledger.mjs";
+import {
+  createPaperRuntimeSourceAdapter,
+  PAPER_RUNTIME_SOURCE_POLICY,
+  PAPER_RUNTIME_SOURCE_POLICY_SHA256
+} from "./paper-runtime-source.mjs";
 import {SYNTHETIC_SMART_WALLET_ALLOWLIST, syntheticCandidate} from "./synthetic-fixtures.mjs";
 import {scout} from "./stages.mjs";
 
@@ -82,12 +87,30 @@ function onlyDataKeys(value, allowed) {
 }
 
 function validateConfig(config) {
-  if (!exactKeys(config, ["version", "mode", "enabled", "runId", "startedAt", "budgets"]) ||
+  const sourceMode = config?.mode === "SOURCE_BACKED_PAPER";
+  const expectedKeys = sourceMode
+    ? ["version", "mode", "enabled", "runId", "startedAt", "budgets",
+      "sourcePolicy", "sourcePolicySha256"]
+    : ["version", "mode", "enabled", "runId", "startedAt", "budgets"];
+  if (!exactKeys(config, expectedKeys) ||
       config.version !== 1 ||
-      !["SYNTHETIC_TEST_ONLY", "EXTERNAL_READ_ONLY_INPUT"].includes(config.mode) ||
+      !["SYNTHETIC_TEST_ONLY", "EXTERNAL_READ_ONLY_INPUT", "SOURCE_BACKED_PAPER"].includes(config.mode) ||
       config.enabled !== true || typeof config.runId !== "string" || !SAFE_ID.test(config.runId) ||
       !integerTime(config.startedAt) || !exactKeys(config.budgets, BUDGET_KEYS)) {
     throw new TypeError("invalid bounded composition configuration");
+  }
+  if (sourceMode) {
+    let sourcePolicy;
+    try {
+      sourcePolicy = boundedData(config.sourcePolicy, 16_384).value;
+    } catch {
+      throw new TypeError("source policy is not bounded module-owned data");
+    }
+    if (config.sourcePolicySha256 !== PAPER_RUNTIME_SOURCE_POLICY_SHA256 ||
+        !canonicalCheckpointBytes(sourcePolicy).equals(
+          canonicalCheckpointBytes(PAPER_RUNTIME_SOURCE_POLICY))) {
+      throw new TypeError("source policy is not the exact module-owned disabled policy");
+    }
   }
   for (const key of BUDGET_KEYS) {
     const minimum = key === "maxWallClockUncertaintyMs" ? 0 : key === "bytes" ? 1024 : 1;
@@ -101,7 +124,11 @@ function validateConfig(config) {
       config.budgets.candidates > config.budgets.cycles) {
     throw new RangeError("callback, candidate, and cycle budgets are inconsistent");
   }
-  return Object.freeze({...config, budgets: Object.freeze({...config.budgets})});
+  return Object.freeze({
+    ...config,
+    ...(sourceMode ? {sourcePolicy: PAPER_RUNTIME_SOURCE_POLICY} : {}),
+    budgets: Object.freeze({...config.budgets})
+  });
 }
 
 export function createSyntheticClock(options = {}) {
@@ -458,6 +485,7 @@ export function createPaperPilotComposition(options = {}) {
     throw new TypeError("signal must be a native AbortSignal");
   }
   const externalMode = config.mode === "EXTERNAL_READ_ONLY_INPUT";
+  const sourceMode = config.mode === "SOURCE_BACKED_PAPER";
   let boundedExternalInput = null;
   let externalInputBytes = 0;
   if (externalMode) {
@@ -485,6 +513,20 @@ export function createPaperPilotComposition(options = {}) {
     offlineFixtureAdaptersBySource.set(adapters, {
       clock, fault: "NONE", sourceMode: "EXTERNAL_READ_ONLY_INPUT", externalInput: boundedExternalInput
     });
+  } else if (sourceMode) {
+    if (externalReadOnlyInput !== undefined || adapters !== undefined || clock !== undefined ||
+        typeof dataDirectory !== "string" || !path.isAbsolute(dataDirectory)) {
+      throw new TypeError("source-backed PAPER mode requires module-owned sources and absolute state");
+    }
+    clock = createExternalReceiptClock();
+    const sourceAdapter = createPaperRuntimeSourceAdapter({
+      sourcePolicySha256: config.sourcePolicySha256
+    });
+    adapters = Object.freeze({
+      acquireCandidates: sourceAdapter.acquireCandidates,
+      entryQuote: sourceAdapter.quote,
+      exitQuote: sourceAdapter.quote
+    });
   } else if (externalReadOnlyInput !== undefined) {
     throw new TypeError("external read-only input requires EXTERNAL_READ_ONLY_INPUT mode");
   }
@@ -496,13 +538,17 @@ export function createPaperPilotComposition(options = {}) {
       clockAttestationFor(clock).uncertaintyMs > config.budgets.maxWallClockUncertaintyMs) {
     throw new TypeError("absolute storage and a bounded module clock are required");
   }
-  if (!offlineFixtureAdaptersBySource.has(adapters) ||
+  if (sourceMode) {
+    if (!clockAttestationFor(clock) || clockAttestationFor(clock).trustedUtc !== false) {
+      throw new TypeError("source-backed PAPER mode requires an explicitly untrusted host receipt clock");
+    }
+  } else if (!offlineFixtureAdaptersBySource.has(adapters) ||
       offlineFixtureAdaptersBySource.get(adapters).clock !== clock) {
     throw new TypeError(externalMode
       ? "only the bounded external packet adapter may run"
       : "only module-generated offline fixture adapters may run");
   }
-  const {fault} = offlineFixtureAdaptersBySource.get(adapters);
+  const fault = sourceMode ? "NONE" : offlineFixtureAdaptersBySource.get(adapters).fault;
   const clockAttestation = clockAttestationFor(clock);
   const externalInputDigest = boundedExternalInput
     ? sha256(canonicalCheckpointBytes(boundedExternalInput)) : null;
@@ -804,6 +850,8 @@ export function createPaperPilotComposition(options = {}) {
     }
     let adapterFailureCode = null;
     let strategyOverride = null;
+    let sourcePolicyAssessment = null;
+    let sourceUnknownReason = null;
     let candidates = [];
     let candidateIndex = 0;
     let candidateBatchLoaded = false;
@@ -820,7 +868,49 @@ export function createPaperPilotComposition(options = {}) {
         if (abort.signal.aborted) return {done: true};
         if (!candidateBatchLoaded) {
           candidateBatchLoaded = true;
-          const acquisition = await invokeAdapter("acquireCandidates", {});
+          let acquisition;
+          try {
+            acquisition = await invokeAdapter("acquireCandidates", {});
+          } catch (error) {
+            if (sourceMode) {
+              const reason = typeof error?.code === "string" &&
+                /^[A-Z0-9_]{1,48}$/.test(error.code)
+                ? error.code : "SOURCE_ACQUISITION_UNKNOWN";
+              sourceUnknownReason = reason;
+              sourcePolicyAssessment = {
+                policySha256: config.sourcePolicySha256,
+                status: "UNAPPROVED",
+                networkAccessed: false,
+                clockSource: clockAttestation.source,
+                clockUncertaintyMs: clockAttestation.uncertaintyMs,
+                trustedUtc: clockAttestation.trustedUtc === true,
+                unresolved: [...PAPER_RUNTIME_SOURCE_POLICY.missingRequirements, reason]
+              };
+              return {done: true, outcome: "UNKNOWN", reason};
+            }
+            throw error;
+          }
+          if (sourceMode && isRecord(acquisition.result) &&
+              acquisition.result.status === "UNKNOWN" &&
+              acquisition.result.reason === "SOURCE_POLICY_UNAPPROVED" &&
+              Array.isArray(acquisition.result.candidates) &&
+              acquisition.result.candidates.length === 0) {
+            sourcePolicyAssessment = {
+              policySha256: config.sourcePolicySha256,
+              status: "UNAPPROVED",
+              networkAccessed: acquisition.result.networkAccessed === true,
+              clockSource: clockAttestation.source,
+              clockUncertaintyMs: clockAttestation.uncertaintyMs,
+              trustedUtc: clockAttestation.trustedUtc === true,
+              pipelineVersion: acquisition.result.pipelineVersion ?? null,
+              pipelineEnabled: acquisition.result.pipelineEnabled === true,
+              quoteAdapterStatus: acquisition.result.quoteAdapterStatus ?? "UNKNOWN",
+              unresolved: Array.isArray(acquisition.result.unresolved)
+                ? acquisition.result.unresolved.slice() : []
+            };
+            sourceUnknownReason = acquisition.result.reason;
+            return {done: true, outcome: "UNKNOWN", reason: acquisition.result.reason};
+          }
           if (!Array.isArray(acquisition.result) ||
               acquisition.result.length > config.budgets.candidates ||
               acquisition.result.length > config.budgets.cycles) {
@@ -962,13 +1052,16 @@ export function createPaperPilotComposition(options = {}) {
       runId: config.runId,
       startedAt: config.startedAt,
       endAt: compositionDeadlineAt,
-      executionMode: externalMode ? "READ_ONLY_EXTERNAL" : "SIMULATED_ONLY",
-      provenance: externalMode ? "UNVERIFIED_CALLER_INPUT" : SYNTHETIC_SOURCE,
+      executionMode: sourceMode ? "SOURCE_BACKED_PAPER"
+        : externalMode ? "READ_ONLY_EXTERNAL" : "SIMULATED_ONLY",
+      provenance: sourceMode ? "UNVERIFIED_ACQUIRED_SOURCE"
+        : externalMode ? "UNVERIFIED_CALLER_INPUT" : SYNTHETIC_SOURCE,
+      ...(sourceMode ? {sourcePolicySha256: config.sourcePolicySha256} : {}),
       candidateSource,
       quoteSource,
       clock: () => readTime().wall,
       stopSource: () => abort.signal.aborted,
-      smartWalletAllowlist: externalMode
+      smartWalletAllowlist: externalMode || sourceMode
         ? {status: "UNVERIFIED", provenance: "UNVERIFIED_CALLER_INPUT"}
         : SYNTHETIC_SMART_WALLET_ALLOWLIST,
       limits: {
@@ -980,7 +1073,17 @@ export function createPaperPilotComposition(options = {}) {
       }
     });
     const runnerResult = await runner.run();
-    runnerReport = runnerResult;
+    runnerReport = sourceMode
+      ? {...runnerResult, sourcePolicy: sourcePolicyAssessment ?? {
+          policySha256: config.sourcePolicySha256,
+          status: "UNAPPROVED",
+          networkAccessed: false,
+          clockSource: clockAttestation.source,
+          clockUncertaintyMs: clockAttestation.uncertaintyMs,
+          trustedUtc: clockAttestation.trustedUtc === true,
+          unresolved: [...PAPER_RUNTIME_SOURCE_POLICY.missingRequirements]
+        }}
+      : runnerResult;
     terminalReceipt = runnerResult.terminalReceipt;
     const summary = runnerResult.summary;
     const terminalResult = runnerResult.terminalResult;
@@ -1046,7 +1149,7 @@ export function createPaperPilotComposition(options = {}) {
         config,
         bindingReceipt,
         externalInputDigest,
-        runnerResult
+        runnerReport
       );
     } catch {
       checkpointReadback = {checkpoint: null, checkpointSha256: null, persistence: "UNKNOWN"};
@@ -1115,7 +1218,7 @@ export function createPaperPilotComposition(options = {}) {
       provenance,
       authority: {providerExecution: false, signing: false, orders: false, wallet: false, liveReady: false},
       report: reportEnvelope(config, {
-        runnerReport: runnerResult,
+        runnerReport,
         checkpoint: checkpointReadback.checkpoint,
         checkpointSha256: checkpointReadback.checkpointSha256,
         persistence,

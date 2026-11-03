@@ -10,6 +10,7 @@ import {
   SYNTHETIC_SOURCE,
   syntheticCandidate
 } from "./synthetic-fixtures.mjs";
+import {PAPER_RUNTIME_SOURCE_POLICY_SHA256} from "./paper-runtime-source.mjs";
 
 const EIGHT_HOURS_MS = 8 * 60 * 60 * 1000;
 const MAX_LIMITS = Object.freeze({
@@ -284,6 +285,7 @@ export function createPaperExecutionRunner({
   endAt,
   executionMode,
   provenance,
+  sourcePolicySha256,
   candidateSource,
   quoteSource,
   clock,
@@ -303,23 +305,31 @@ export function createPaperExecutionRunner({
     }
   }
   const bounds = boundedLimits(limits);
+  const sourceOnly = sourcePolicySha256 !== undefined;
+  if (sourceOnly && sourcePolicySha256 !== PAPER_RUNTIME_SOURCE_POLICY_SHA256) {
+    throw new TypeError("source-only runner requires the exact module-owned policy digest");
+  }
   if (typeof runId !== "string" || !/^[A-Za-z0-9._:-]{1,120}$/.test(runId) ||
       !integerTime(startedAt) || !integerTime(endAt) || endAt <= startedAt ||
       endAt > startedAt + EIGHT_HOURS_MS ||
       (externalInput
         ? executionMode !== "READ_ONLY_EXTERNAL" || provenance !== "UNVERIFIED_CALLER_INPUT"
-        : executionMode !== "SIMULATED_ONLY" || provenance !== SYNTHETIC_SOURCE) ||
+        : sourceOnly
+          ? executionMode !== "SOURCE_BACKED_PAPER" || provenance !== "UNVERIFIED_ACQUIRED_SOURCE"
+          : executionMode !== "SIMULATED_ONLY" || provenance !== SYNTHETIC_SOURCE) ||
       !executionStep || !session || typeof session.snapshot !== "function" ||
       !["authorizeEntry", "executeEntry", "observeExitQuote", "riskSnapshot", "finishRun"]
         .every(method => typeof executionStep[method] === "function") ||
       !candidateSource || typeof candidateSource.poll !== "function" ||
       typeof quoteSource !== "function" || typeof clock !== "function" ||
       typeof stopSource !== "function" ||
-      (!externalInput && (smartWalletAllowlist?.status !== "VERIFIED" ||
+      (!externalInput && !sourceOnly && (smartWalletAllowlist?.status !== "VERIFIED" ||
         smartWalletAllowlist?.provenance !== SYNTHETIC_SOURCE))) {
     throw new TypeError(externalInput
       ? "explicit bounded external PAPER mode, fresh checkpoint, and injected sources are required"
-      : "explicit synthetic PAPER mode, bounded run, and injected sources are required");
+      : sourceOnly
+        ? "explicit module-bound source-only PAPER mode, fresh checkpoint, and no-entry policy are required"
+        : "explicit synthetic PAPER mode, bounded run, and injected sources are required");
   }
   const metadata = session.metadata;
   if (metadata?.runId !== runId || metadata.startedAt !== startedAt ||
@@ -433,6 +443,13 @@ export function createPaperExecutionRunner({
           ...(sourceUnknownReason ? [sourceUnknownReason] : []),
           ...(externalCandidateMismatch ? ["candidate source did not match the bound packet"] : [])
         ]
+      } : {}),
+      ...(sourceOnly ? {
+        sourcePolicySha256,
+        unresolved: sourceUnknownReason ? [
+          sourceUnknownReason,
+          "unapproved providers cannot establish source authenticity, complete evidence, trusted UTC, or complete quote costs"
+        ] : ["source policy is unapproved"]
       } : {})
     };
   }
@@ -657,6 +674,14 @@ export function createPaperExecutionRunner({
   }
 
   async function processCandidate(candidate, tick, marks) {
+    if (sourceOnly) {
+      results.push({
+        method: "candidate",
+        status: "BLOCKED",
+        reason: "source policy is unapproved; source candidate cannot enter"
+      });
+      return {blocked: true};
+    }
     if (externalInput) {
       const digest = createHash("sha256").update(canonicalCheckpointBytes(candidate)).digest("hex");
       if (!externalCandidateDigests.has(digest)) {

@@ -11,8 +11,13 @@ import {
   MAX_EXPORT_BYTES
 } from "../memecoin-paper-simulated-evaluation/index.mjs";
 import {createBoundedExternalReadOnlyInput} from "./execution-runner.mjs";
+import {
+  PAPER_RUNTIME_SOURCE_POLICY,
+  PAPER_RUNTIME_SOURCE_POLICY_SHA256
+} from "./paper-runtime-source.mjs";
 
 const MANIFEST_SCHEMA = "memecoin-paper-operational-manifest/v1";
+const SOURCE_MANIFEST_SCHEMA = "memecoin-paper-operational-manifest/v2";
 const CONTROL_SCHEMA = "memecoin-paper-operational-control/v1";
 const PRODUCER_REVISION = "paper-pilot-composition/3";
 const MAX_MANIFEST_BYTES = MAX_CHECKPOINT_BYTES;
@@ -125,6 +130,19 @@ async function writeAtomic(directory, filename, bytes, replace) {
 }
 
 function parseManifest(value) {
+  if (isRecord(value) && value.config?.mode === "SOURCE_BACKED_PAPER") {
+    if (!exactKeys(value, ["schemaVersion", "config", "sourcePolicy"]) ||
+        value.schemaVersion !== SOURCE_MANIFEST_SCHEMA ||
+        !isRecord(value.config) ||
+        value.config.sourcePolicySha256 !== PAPER_RUNTIME_SOURCE_POLICY_SHA256 ||
+        !canonicalCheckpointBytes(value.sourcePolicy).equals(
+          canonicalCheckpointBytes(PAPER_RUNTIME_SOURCE_POLICY)) ||
+        !canonicalCheckpointBytes(value.config.sourcePolicy).equals(
+          canonicalCheckpointBytes(PAPER_RUNTIME_SOURCE_POLICY))) {
+      throw new TypeError("source-backed manifest must bind the exact module-owned disabled policy");
+    }
+    return {config: value.config, externalReadOnlyInput: undefined};
+  }
   if (!exactKeys(value, ["schemaVersion", "config", "externalReadOnlyInput"]) ||
       value.schemaVersion !== MANIFEST_SCHEMA ||
       !isRecord(value.config) ||
