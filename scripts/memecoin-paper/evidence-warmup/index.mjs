@@ -1,4 +1,4 @@
-import {createHash, randomBytes} from "node:crypto";
+import {createHash} from "node:crypto";
 import {constants} from "node:fs";
 import {lstat, mkdir, open, link, unlink} from "node:fs/promises";
 import path from "node:path";
@@ -32,16 +32,6 @@ function validTime(value) {
 function identityKey(identity) {
   return JSON.stringify([
     identity?.chainId, identity?.mint, identity?.pool, identity?.quote
-  ]);
-}
-
-function recordKey(record) {
-  return JSON.stringify([
-    record.kind,
-    identityKey(record.identity),
-    record.kind === "price" ? record.sourceAtMs : record.observedAt,
-    record.kind === "price" ? record.mint : record.policyVersion,
-    record.kind === "price" ? record.denomination : null
   ]);
 }
 
@@ -96,17 +86,32 @@ function validateRecord(record) {
       !isRecord(record.payload)) {
     throw new TypeError("warmup record is invalid");
   }
+  const synthetic = record.payload.source === "SYNTHETIC_FIXTURE_ONLY";
+  if ((synthetic && record.trust !== "SYNTHETIC_FIXTURE_ONLY") ||
+      (!synthetic && record.trust === "SYNTHETIC_FIXTURE_ONLY") ||
+      (record.trust === "REVIEWED" && record.payload.trust === "UNKNOWN") ||
+      (record.completeness === "COMPLETE" &&
+        (record.payload.status === "UNKNOWN" ||
+         ["UNKNOWN", "INCOMPLETE"].includes(record.payload.trust) ||
+         ["UNKNOWN", "INCOMPLETE"].includes(record.payload.completeness) ||
+         record.payload.coverage?.complete === false))) {
+    throw new TypeError("warmup record cannot promote synthetic, unknown, or incomplete evidence");
+  }
   if (record.kind === "price" &&
       (!validTime(record.sourceAtMs) || typeof record.mint !== "string" ||
-       record.mint !== record.identity.mint || record.denomination !== "USD" ||
+       ![record.identity.mint, record.identity.quote].includes(record.mint) ||
+       record.denomination !== "USD" ||
        typeof record.methodologyVersion !== "string" || !record.methodologyVersion ||
+       (record.completeness === "COMPLETE" && record.payload.status !== "SOURCE_BOUND") ||
        record.payload.sourceAtMs !== record.sourceAtMs ||
        record.payload.receivedAt !== record.receivedAt)) {
     throw new TypeError("warmup price record is invalid");
   }
   if (record.kind === "census" &&
       (!validTime(record.observedAt) || record.payload.observedAt !== record.observedAt ||
-       typeof record.policyVersion !== "string" || !record.policyVersion)) {
+       typeof record.policyVersion !== "string" || !record.policyVersion ||
+       (record.completeness === "COMPLETE" &&
+         (record.payload.status !== "COMPLETE" || record.payload.coverage?.complete !== true)))) {
     throw new TypeError("warmup census record is invalid");
   }
   if (record.kind === "local-census-acquisition" &&
@@ -114,7 +119,6 @@ function validateRecord(record) {
        !validTime(record.observedAt) || record.payload.observedAt !== record.observedAt)) {
     throw new TypeError("local census acquisition time must remain explicitly nonhistorical");
   }
-  validateJsonValue(record);
 }
 
 function validateLimits(limits = {}) {
@@ -125,6 +129,7 @@ function validateLimits(limits = {}) {
       throw new RangeError(`invalid warmup limit: ${key}`);
     }
   }
+  if (result.maxFiles !== 1) throw new RangeError("warmup store permits one immutable dataset file");
   return result;
 }
 
@@ -201,8 +206,8 @@ async function boundedRead(filename, maxBytes) {
   }
 }
 
-function sourceKey(datasetId) {
-  return `${datasetId}.json`;
+function sourceKey() {
+  return "evidence-warmup.json";
 }
 
 export class EvidenceWarmupStore {
@@ -238,27 +243,27 @@ export class EvidenceWarmupStore {
     this.#busy = true;
     let temporary = null;
     try {
-      let work = 0;
-      for (const record of records) {
-        work += 1;
-        if (work > this.#limits.maxWorkUnits) {
-          return {status: "UNKNOWN", reason: "WORK_LIMIT"};
-        }
-        validateRecord(record);
-        if (identityKey(record.identity) !== identityKey(identity)) {
-          return {status: "UNKNOWN", reason: "RECORD_IDENTITY_MISMATCH"};
-        }
-      }
       const document = {
         schema: EVIDENCE_WARMUP_SCHEMA,
         datasetId,
         identity,
         capturedAt,
         versions,
-        budgets: {...budgets, records: records.length, workUnits: work},
+        budgets: {...budgets, records: records.length, workUnits: 0},
         records
       };
-      validateJsonValue(document);
+      const workState = {nodes: 0, seen: new WeakSet()};
+      validateJsonValue(document, workState);
+      if (workState.nodes > this.#limits.maxWorkUnits) {
+        return {status: "UNKNOWN", reason: "WORK_LIMIT"};
+      }
+      document.budgets.workUnits = workState.nodes;
+      for (const record of records) {
+        validateRecord(record);
+        if (identityKey(record.identity) !== identityKey(identity)) {
+          return {status: "UNKNOWN", reason: "RECORD_IDENTITY_MISMATCH"};
+        }
+      }
       const payload = Buffer.from(JSON.stringify(document), "utf8");
       const digest = createHash("sha256").update(payload).digest("hex");
       const bytes = Buffer.concat([Buffer.from(`${digest}\n`, "ascii"), payload]);
@@ -280,10 +285,11 @@ export class EvidenceWarmupStore {
           : {status: "CONFLICT", reason: "IMMUTABLE_DATASET_CONFLICT"};
       }
       if (existing.status !== "ABSENT") return existing;
-      temporary = path.join(root, `.pending-${randomBytes(16).toString("hex")}`);
+      const pendingPath = path.join(root, ".evidence-warmup-pending");
       let handle;
       try {
-        handle = await open(temporary, "wx", 0o600);
+        handle = await open(pendingPath, "wx", 0o600);
+        temporary = pendingPath;
         await handle.writeFile(bytes);
         await handle.sync();
       } finally {
@@ -322,20 +328,21 @@ export class EvidenceWarmupStore {
       const result = await boundedRead(path.join(root, sourceKey(datasetId)), this.#limits.maxBytes);
       if (result.status !== "OK") return result;
       const document = result.document;
+      const workState = {nodes: 0, seen: new WeakSet()};
+      validateJsonValue(document, workState);
       if (document?.schema !== EVIDENCE_WARMUP_SCHEMA || document.datasetId !== datasetId ||
           !Array.isArray(document.records) || document.records.length > this.#limits.maxRecords) {
         return {status: "UNKNOWN", reason: "WARMUP_DOCUMENT_INVALID"};
       }
-      let work = 0;
       for (const record of document.records) {
-        work += 1;
-        if (work > this.#limits.maxWorkUnits) {
-          return {status: "UNKNOWN", reason: "WORK_LIMIT"};
-        }
         validateRecord(record);
         if (identityKey(record.identity) !== identityKey(document.identity)) {
           return {status: "UNKNOWN", reason: "RECORD_IDENTITY_MISMATCH"};
         }
+      }
+      if (workState.nodes > this.#limits.maxWorkUnits ||
+          document.budgets?.workUnits !== workState.nodes) {
+        return {status: "UNKNOWN", reason: "WORK_LIMIT_OR_BUDGET_MISMATCH"};
       }
       return {status: "AVAILABLE", document: deepFreeze(document), digest: result.digest,
         byteLength: result.byteLength};

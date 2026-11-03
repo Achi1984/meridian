@@ -26,7 +26,7 @@ async function readInput(filename) {
       length += bytesRead;
     }
     if (length !== stat.size) throw new Error("capture input size changed while reading");
-    return JSON.parse(bytes.toString("utf8"));
+    return JSON.parse(bytes.subarray(0, length).toString("utf8"));
   } finally {
     await handle.close();
   }
@@ -68,7 +68,9 @@ export async function main(argv = process.argv.slice(2)) {
   if (command === "capture") {
     if (typeof options.input !== "string") throw new TypeError("capture requires --input");
     const input = await readInput(options.input);
-    result = await store.publish(input);
+    result = input?.datasetId === options.id
+      ? await store.publish(input)
+      : {status: "UNKNOWN", reason: "DATASET_ID_MISMATCH"};
   } else {
     const reader = new EvidenceWarmupStore(options.store);
     const read = await reader.read(options.id);
@@ -77,13 +79,15 @@ export async function main(argv = process.argv.slice(2)) {
       result = {status: read.status, datasetId: options.id, digest: read.digest,
         byteLength: read.byteLength, document: read.document};
     } else {
-      if (typeof options.query !== "string") throw new TypeError("status requires --query");
+      if (typeof options.query !== "string" || options.query.length > 4096) {
+        throw new TypeError("status requires a bounded --query");
+      }
       result = warmupCoverage(read.document, JSON.parse(options.query));
     }
   }
   process.stdout.write(`${JSON.stringify(result)}\n`);
   return result.status === "PUBLISHED" || result.status === "DUPLICATE" ||
-    result.status === "AVAILABLE" ? 0 : 1;
+    result.status === "AVAILABLE" || (command === "status" && result.status === "WARMUP") ? 0 : 1;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
