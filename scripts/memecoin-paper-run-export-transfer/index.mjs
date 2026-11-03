@@ -88,17 +88,17 @@ function parseExport(bytes, expected) {
   return value;
 }
 
-function checkOperation(signal, deadline) {
+function checkOperation(signal, deadline, monotonicNow) {
   if (signal.aborted) throw signal.reason ?? new Error("operation aborted");
-  if (performance.now() >= deadline) throw deadlineError();
+  if (monotonicNow() >= deadline) throw deadlineError();
 }
 
 function yieldToEventLoop() {
   return new Promise(resolve => setImmediate(resolve));
 }
 
-async function nextWithAbort(iterator, signal, deadline) {
-  checkOperation(signal, deadline);
+async function nextWithAbort(iterator, signal, deadline, monotonicNow) {
+  checkOperation(signal, deadline, monotonicNow);
   let abortListener;
   let deadlineTimer;
   const aborted = new Promise((resolve, reject) => {
@@ -107,7 +107,7 @@ async function nextWithAbort(iterator, signal, deadline) {
     if (signal.aborted) abortListener();
   });
   const deadlineExceeded = new Promise((resolve, reject) => {
-    const remaining = deadline - performance.now();
+    const remaining = deadline - monotonicNow();
     if (remaining <= 0) {
       reject(deadlineError());
       return;
@@ -120,7 +120,7 @@ async function nextWithAbort(iterator, signal, deadline) {
       aborted,
       deadlineExceeded
     ]);
-    checkOperation(signal, deadline);
+    checkOperation(signal, deadline, monotonicNow);
     return result;
   } finally {
     signal.removeEventListener("abort", abortListener);
@@ -128,8 +128,8 @@ async function nextWithAbort(iterator, signal, deadline) {
   }
 }
 
-async function collectBounded(source, signal, deadline) {
-  checkOperation(signal, deadline);
+async function collectBounded(source, signal, deadline, monotonicNow) {
+  checkOperation(signal, deadline, monotonicNow);
   if (source instanceof Uint8Array) {
     if (source.byteLength === 0 || source.byteLength > MAX_TRANSFER_BYTES) {
       throw new RangeError("export is empty or exceeds the 16 MiB transfer limit");
@@ -145,9 +145,9 @@ async function collectBounded(source, signal, deadline) {
   let reads = 0;
   try {
     while (true) {
-      checkOperation(signal, deadline);
+      checkOperation(signal, deadline, monotonicNow);
       if (++reads > MAX_STREAM_READS) throw new RangeError("export stream exceeds the read limit");
-      const {done, value} = await nextWithAbort(iterator, signal, deadline);
+      const {done, value} = await nextWithAbort(iterator, signal, deadline, monotonicNow);
       if (done) break;
       if (!(value instanceof Uint8Array)) throw new TypeError("export stream yielded a non-byte chunk");
       length += value.byteLength;
@@ -155,7 +155,7 @@ async function collectBounded(source, signal, deadline) {
       chunks.push(Buffer.from(value));
       if (reads % 64 === 0) {
         await yieldToEventLoop();
-        checkOperation(signal, deadline);
+        checkOperation(signal, deadline, monotonicNow);
       }
     }
   } catch (error) {
@@ -172,10 +172,10 @@ async function collectBounded(source, signal, deadline) {
   return Buffer.concat(chunks, length);
 }
 
-function boundedOperation(work, {timeoutMs, signal}) {
+function boundedOperation(work, {timeoutMs, signal, monotonicNow}) {
   if (signal?.aborted) return Promise.resolve({stopped: true});
   const controller = new AbortController();
-  const deadline = performance.now() + timeoutMs;
+  const deadline = monotonicNow() + timeoutMs;
   let timer;
   let abortListener;
   const stopped = new Promise(resolve => {
@@ -195,7 +195,7 @@ function boundedOperation(work, {timeoutMs, signal}) {
   });
   const operation = Promise.resolve().then(() => work(controller.signal, deadline))
     .then(value => ({value}), error => ({
-      stopped: controller.signal.aborted || performance.now() >= deadline ||
+      stopped: controller.signal.aborted || monotonicNow() >= deadline ||
         error?.code === "DEADLINE_EXCEEDED",
       error
     }));
@@ -224,12 +224,14 @@ export function createExportTransfer({
   enabled = false,
   privateOrigin,
   transport,
-  timeoutMs = 15_000
+  timeoutMs = 15_000,
+  monotonicNow = () => performance.now()
 } = {}) {
   if (typeof enabled !== "boolean") throw new TypeError("enabled must be boolean");
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > MAX_OPERATION_MS) {
     throw new RangeError("operation deadline must be between 1 and 30000 ms");
   }
+  if (typeof monotonicNow !== "function") throw new TypeError("monotonicNow must be a function");
   const origin = enabled ? normalizeOrigin(privateOrigin) : null;
   if (enabled && (!transport || typeof transport.put !== "function" ||
       typeof transport.get !== "function")) {
@@ -260,10 +262,10 @@ export function createExportTransfer({
       const outcome = await boundedOperation(async (operationSignal, deadline) => {
         let bytes;
         try {
-          bytes = await collectBounded(exportBytes, operationSignal, deadline);
+          bytes = await collectBounded(exportBytes, operationSignal, deadline, monotonicNow);
           parseExport(bytes, identity);
         } catch (error) {
-          if (operationSignal.aborted || performance.now() >= deadline ||
+          if (operationSignal.aborted || monotonicNow() >= deadline ||
               error?.code === "DEADLINE_EXCEEDED") throw error;
           return {invalid: true};
         }
@@ -271,7 +273,7 @@ export function createExportTransfer({
         targetExportSha256 = exportSha256;
         targetByteLength = bytes.byteLength;
         try {
-          const response = await transport.put({
+          const request = {
             schema: TRANSFER_SCHEMA,
             origin,
             identity,
@@ -280,12 +282,16 @@ export function createExportTransfer({
             bytes,
             authorization: writeAuthorization,
             signal: operationSignal
-          });
+          };
+          const put = transport.put;
+          checkOperation(operationSignal, deadline, monotonicNow);
+          const response = await put.call(transport, request);
           return {response, exportSha256, byteLength: bytes.byteLength};
-        } catch {
+        } catch (error) {
+          if (operationSignal.aborted || error?.code === "DEADLINE_EXCEEDED") throw error;
           return {transportError: true};
         }
-      }, {timeoutMs, signal});
+      }, {timeoutMs, signal, monotonicNow});
       if (outcome.stopped) return unknown(signal?.aborted ? "CANCELLED" : "DEADLINE_EXCEEDED");
       if (outcome.error) return unknown("WRITE_OUTCOME_UNKNOWN");
       if (outcome.value.invalid) return {status: "REJECTED", code: "INVALID_EXPORT"};
@@ -322,19 +328,23 @@ export function createExportTransfer({
       const outcome = await boundedOperation(async (operationSignal, deadline) => {
         let response;
         try {
-          response = await transport.get({
+          const request = {
             schema: TRANSFER_SCHEMA,
             origin,
             identity,
             authorization: readAuthorization,
             signal: operationSignal
-          });
-        } catch {
+          };
+          const get = transport.get;
+          checkOperation(operationSignal, deadline, monotonicNow);
+          response = await get.call(transport, request);
+        } catch (error) {
+          if (operationSignal.aborted || error?.code === "DEADLINE_EXCEEDED") throw error;
           return {transportError: true};
         }
         if (response?.status !== "FOUND") return {response};
         try {
-          const bytes = await collectBounded(response.bytes, operationSignal, deadline);
+          const bytes = await collectBounded(response.bytes, operationSignal, deadline, monotonicNow);
           const downloadedSha256 = sha256(bytes);
           if (!identityMatches(response.identity, identity) || response.byteLength !== bytes.byteLength ||
               !HASH.test(response.exportSha256) || response.exportSha256 !== targetExportSha256 ||
@@ -346,11 +356,11 @@ export function createExportTransfer({
           const evaluation = evaluateMemecoinPaperRunExport(bytes, identity);
           return {response, bytes, exportValue, evaluation};
         } catch (error) {
-          if (operationSignal.aborted || performance.now() >= deadline ||
+          if (operationSignal.aborted || monotonicNow() >= deadline ||
               error?.code === "DEADLINE_EXCEEDED") throw error;
           return {response, invalid: true};
         }
-      }, {timeoutMs, signal});
+      }, {timeoutMs, signal, monotonicNow});
       if (outcome.stopped) return unknown(signal?.aborted ? "CANCELLED" : "DEADLINE_EXCEEDED");
       if (outcome.error) return unknown("READ_OUTCOME_UNKNOWN");
       if (outcome.value.transportError) return unknown("READ_OUTCOME_UNKNOWN");
@@ -499,7 +509,8 @@ export function createFileReceiver({
         const bytes = await collectBounded(
           request.bytes,
           request.signal ?? new AbortController().signal,
-          performance.now() + MAX_OPERATION_MS
+          performance.now() + MAX_OPERATION_MS,
+          () => performance.now()
         );
         const exportValue = parseExport(bytes, identity);
         const exportSha256 = sha256(bytes);

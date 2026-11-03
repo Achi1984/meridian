@@ -389,6 +389,91 @@ test("deadline, cancellation, redirects, partial writes and lost ACKs are UNKNOW
   assert.equal(readback.exportSha256, hash(bytes));
 });
 
+test("expired monotonic budget during preparation prevents PUT/GET dispatch; pre-aborted read does not dispatch", async () => {
+  const run = exportsByFault.NONE;
+  const bytes = bytesOf(run);
+  const expected = expectedFor(run);
+  const expiredPutTimes = [0, 0, 10];
+  let putCalls = 0;
+  const putClient = createExportTransfer({
+    enabled: true,
+    privateOrigin: PRIVATE_ORIGIN,
+    timeoutMs: 10,
+    monotonicNow: () => expiredPutTimes.shift() ?? 10,
+    transport: {
+      put: async () => { putCalls++; return {}; },
+      get: async () => ({status: "NOT_FOUND", redirected: false})
+    }
+  });
+  assert.deepEqual(await putClient.transfer({
+    exportBytes: bytes,
+    expected,
+    writeAuthorization: WRITE_AUTH,
+    explicitlyAuthorized: true
+  }), {status: "UNKNOWN", code: "DEADLINE_EXCEEDED"});
+  assert.equal(putCalls, 0);
+
+  let getCalls = 0;
+  const readTimes = [0, 0, 0, 0, 10];
+  const readClient = createExportTransfer({
+    enabled: true,
+    privateOrigin: PRIVATE_ORIGIN,
+    timeoutMs: 10,
+    monotonicNow: () => readTimes.shift() ?? 10,
+    transport: {
+      put: async request => ({
+        status: "STORED",
+        redirected: false,
+        identity: request.identity,
+        exportSha256: request.exportSha256,
+        byteLength: request.byteLength
+      }),
+      get: async () => { getCalls++; return {status: "NOT_FOUND", redirected: false}; }
+    }
+  });
+  assert.equal((await readClient.transfer({
+    exportBytes: bytes,
+    expected,
+    writeAuthorization: WRITE_AUTH,
+    explicitlyAuthorized: true
+  })).status, "TRANSFER_ACKNOWLEDGED");
+  assert.deepEqual(await readClient.readback({
+    expected,
+    readAuthorization: READ_AUTH
+  }), {status: "UNKNOWN", code: "DEADLINE_EXCEEDED"});
+  assert.equal(getCalls, 0);
+
+  let preAbortedGetCalls = 0;
+  const preAbortedClient = createExportTransfer({
+    enabled: true,
+    privateOrigin: PRIVATE_ORIGIN,
+    transport: {
+      put: async request => ({
+        status: "STORED",
+        redirected: false,
+        identity: request.identity,
+        exportSha256: request.exportSha256,
+        byteLength: request.byteLength
+      }),
+      get: async () => { preAbortedGetCalls++; return {status: "NOT_FOUND", redirected: false}; }
+    }
+  });
+  assert.equal((await preAbortedClient.transfer({
+    exportBytes: bytes,
+    expected,
+    writeAuthorization: WRITE_AUTH,
+    explicitlyAuthorized: true
+  })).status, "TRANSFER_ACKNOWLEDGED");
+  const controller = new AbortController();
+  controller.abort();
+  assert.deepEqual(await preAbortedClient.readback({
+    expected,
+    readAuthorization: READ_AUTH,
+    signal: controller.signal
+  }), {status: "UNKNOWN", code: "CANCELLED"});
+  assert.equal(preAbortedGetCalls, 0);
+});
+
 test("stream read/work limits bound empty and one-byte chunks; hanging iterators cancel nonblocking", async () => {
   const run = exportsByFault.NONE;
   let dispatches = 0;
