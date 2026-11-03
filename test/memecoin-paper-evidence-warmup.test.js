@@ -53,6 +53,26 @@ function priceRecord(identity, atMs, {
     completeness, payload};
 }
 
+function barrier() {
+  let release;
+  const promise = new Promise(resolve => { release = resolve; });
+  return {promise, release};
+}
+
+async function bounded(promise, message) {
+  let timer;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(message)), 5_000);
+      })
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 test("warmup is disabled by default and publishes immutable digest-verified records", async t => {
   const {root} = await temporaryStore(t);
   const disabled = new EvidenceWarmupStore(root);
@@ -530,19 +550,33 @@ test("cancelled or expired link and directory-sync waits stay UNKNOWN and block 
     records: [priceRecord(identity, 10_000)]};
   const actualLink = (await import("node:fs/promises")).link;
   let linkCalls = 0;
+  const linkEntered = barrier();
+  const linkSettled = barrier();
+  const releaseLateLink = barrier();
   const lateLink = new EvidenceWarmupStore(root, {
     enabled: true,
-    limits: {maxElapsedMs: 15},
+    limits: {maxElapsedMs: 1_000},
     fsOps: {
       link: async (...args) => {
         linkCalls += 1;
-        await actualLink(...args);
-        await new Promise(resolve => setTimeout(resolve, 60));
+        try {
+          await actualLink(...args);
+          linkEntered.release();
+          await releaseLateLink.promise;
+        } finally {
+          linkSettled.release();
+        }
       }
     }
   });
-  assert.equal((await lateLink.publish(bundle)).reason, "DEADLINE");
-  await new Promise(resolve => setTimeout(resolve, 80));
+  const lateLinkPublish = lateLink.publish(bundle);
+  try {
+    await bounded(linkEntered.promise, "late link was not entered");
+    assert.equal((await bounded(lateLinkPublish, "deadline did not settle")).reason, "DEADLINE");
+  } finally {
+    releaseLateLink.release();
+  }
+  await bounded(linkSettled.promise, "late link did not settle after release");
   assert.equal((await lateLink.publish(bundle)).status, "UNKNOWN");
   assert.equal((await lateLink.read(bundle.datasetId)).status, "UNKNOWN");
   assert.equal(linkCalls, 1);
@@ -550,10 +584,13 @@ test("cancelled or expired link and directory-sync waits stay UNKNOWN and block 
   const syncRoot = path.join(root, "late-sync");
   const controller = new AbortController();
   let syncCalls = 0;
+  const syncEntered = barrier();
+  const syncSettled = barrier();
+  const releaseLateSync = barrier();
   const actualOpen = open;
   const lateSync = new EvidenceWarmupStore(syncRoot, {
     enabled: true,
-    limits: {maxElapsedMs: 1_000},
+    limits: {maxElapsedMs: 5_000},
     fsOps: {
       open: async (filename, ...args) => {
         const handle = await actualOpen(filename, ...args);
@@ -564,8 +601,13 @@ test("cancelled or expired link and directory-sync waits stay UNKNOWN and block 
             if (key === "sync") {
               return async (...methodArgs) => {
                 syncCalls += 1;
-                await value.apply(target, methodArgs);
-                await new Promise(resolve => setTimeout(resolve, 60));
+                try {
+                  await value.apply(target, methodArgs);
+                  syncEntered.release();
+                  await releaseLateSync.promise;
+                } finally {
+                  syncSettled.release();
+                }
               };
             }
             return typeof value === "function" ? value.bind(target) : value;
@@ -574,29 +616,51 @@ test("cancelled or expired link and directory-sync waits stay UNKNOWN and block 
       }
     }
   });
-  setTimeout(() => controller.abort(), 20);
-  assert.equal((await lateSync.publish({...bundle, datasetId: "late-sync"},
-    {signal: controller.signal})).reason, "CANCELLED");
+  const lateSyncPublish = lateSync.publish({...bundle, datasetId: "late-sync"},
+    {signal: controller.signal});
+  try {
+    await bounded(syncEntered.promise, "directory sync was not entered");
+    controller.abort();
+    assert.equal((await bounded(lateSyncPublish, "cancelled sync did not settle")).reason, "CANCELLED");
+  } finally {
+    releaseLateSync.release();
+  }
+  await bounded(syncSettled.promise, "directory sync did not settle after release");
   assert.equal(syncCalls, 1);
   assert.equal((await lateSync.publish({...bundle, datasetId: "late-sync"})).status, "UNKNOWN");
 
   const cancelRoot = path.join(root, "cancel-link");
   const cancelController = new AbortController();
   let cancelLinkCalls = 0;
+  const cancelLinkEntered = barrier();
+  const cancelLinkSettled = barrier();
+  const releaseCancelLink = barrier();
   const cancelLink = new EvidenceWarmupStore(cancelRoot, {
     enabled: true,
-    limits: {maxElapsedMs: 1_000},
+    limits: {maxElapsedMs: 5_000},
     fsOps: {
       link: async (...args) => {
         cancelLinkCalls += 1;
-        await actualLink(...args);
-        await new Promise(resolve => setTimeout(resolve, 60));
+        try {
+          await actualLink(...args);
+          cancelLinkEntered.release();
+          await releaseCancelLink.promise;
+        } finally {
+          cancelLinkSettled.release();
+        }
       }
     }
   });
-  setTimeout(() => cancelController.abort(), 20);
-  assert.equal((await cancelLink.publish({...bundle, datasetId: "cancel-link"},
-    {signal: cancelController.signal})).reason, "CANCELLED");
+  const cancelLinkPublish = cancelLink.publish({...bundle, datasetId: "cancel-link"},
+    {signal: cancelController.signal});
+  try {
+    await bounded(cancelLinkEntered.promise, "cancel link was not entered");
+    cancelController.abort();
+    assert.equal((await bounded(cancelLinkPublish, "cancelled link did not settle")).reason, "CANCELLED");
+  } finally {
+    releaseCancelLink.release();
+  }
+  await bounded(cancelLinkSettled.promise, "cancel link did not settle after release");
   assert.equal(cancelLinkCalls, 1);
   assert.equal((await cancelLink.publish({...bundle, datasetId: "cancel-link"})).status, "UNKNOWN");
 });
