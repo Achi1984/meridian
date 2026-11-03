@@ -47,6 +47,180 @@ export const PAPER_RUNTIME_SOURCE_POLICY_SHA256 = createHash("sha256")
   .update(canonicalCheckpointBytes(PAPER_SOURCE_POLICY))
   .digest("hex");
 
+export async function acquireSyntheticRuntimeFixture(clock) {
+  if (!clock || typeof clock.wallClock !== "function" ||
+      typeof clock.advance !== "function") {
+    throw new TypeError("synthetic runtime fixture requires the module synthetic clock");
+  }
+  const [{makeFixture}, {createPaperSourcePipeline}, {ANALYST_WINDOW_METRICS},
+    {createMarketQuoteAdapter}, {syntheticOrderResponse}] = await Promise.all([
+    import("../../test/fixtures/memecoin-paper-analyst-window-evidence/source-shaped.mjs"),
+    import("./paper-source-pipeline.mjs"),
+    import("./analyst-window-evidence.mjs"),
+    import("./market-quote-adapter.mjs"),
+    import("../../test/fixtures/memecoin-paper-route-quotes/jupiter-v2-order.mjs")
+  ]);
+  const candidateT = clock.wallClock() - 1_000;
+  const fixture = makeFixture({candidateT});
+  const slotTimes = new Map([
+    [490_000, Math.floor((candidateT - 3_601_000) / 1_000)],
+    [490_001, Math.floor((candidateT - 3_600_000) / 1_000)],
+    [490_003, Math.floor((candidateT - 3_599_000) / 1_000)],
+    [490_004, Math.floor(candidateT / 1_000)],
+    [490_006, Math.floor((candidateT + 1_000) / 1_000)]
+  ]);
+  const transport = async request => {
+    const body = JSON.parse(request.body);
+    const result = body.method === "getSlot" ? 490_016
+      : body.method === "getBlocks" ? [490_000, 490_001, 490_003, 490_004, 490_006]
+        : body.method === "getBlockTime" ? slotTimes.get(body.params[0]) ?? null
+          : null;
+    return new Response(JSON.stringify({jsonrpc: "2.0", id: body.id, result}), {
+      status: 200,
+      headers: {"content-type": "application/json"}
+    });
+  };
+  const historySlotCollector = request => {
+    const payload = JSON.stringify({fixture: "SYNTHETIC_FIXTURE_ONLY"});
+    return {
+      sourceVersion: "solana-launch-history-source-v1",
+      source: "Solana JSON-RPC",
+      rpcOrigin: "https://api.mainnet-beta.solana.com",
+      commitment: "finalized",
+      declaredSubjects: request.subjects,
+      slotInterval: {startInclusive: request.startSlot, endInclusive: request.endSlot},
+      signatures: [],
+      transactions: [],
+      events: [{
+        origin: "https://api.mainnet-beta.solana.com",
+        method: "getSlot",
+        requestStartedAt: clock.wallClock(),
+        responseReceivedAt: clock.wallClock(),
+        responseBytes: Buffer.byteLength(payload),
+        responseSha256: createHash("sha256").update(payload).digest("hex"),
+        status: "RESPONSE_RECEIVED"
+      }],
+      counters: {
+        requests: 1,
+        bytes: Buffer.byteLength(payload),
+        workUnits: 1,
+        signatures: 0,
+        successfulTransactions: 0
+      },
+      coverage: {
+        scope: "declared-subjects-and-inclusive-slot-interval-only",
+        finalizedAnchor: {status: "CAPTURED", slot: request.endSlot + 10},
+        sourceHistoryCompleteness: "COMPLETE",
+        complete: true,
+        signaturePagesComplete: true,
+        successfulTransactionRetrievalComplete: true,
+        terminationReason: "DECLARED_INTERVAL_COVERED",
+        subjects: [{
+          address: request.identity.pool,
+          signatureCoverageComplete: true,
+          terminationReason: "SOURCE_EXHAUSTED"
+        }]
+      }
+    };
+  };
+  const pipeline = createPaperSourcePipeline({
+    enabled: true,
+    mode: "SYNTHETIC_TEST_ONLY",
+    slotRange: {startInclusive: 490_000, endInclusive: 490_006},
+    transport,
+    clock: () => clock.wallClock(),
+    historySlotCollector
+  });
+  const reviewEvidence = Object.fromEntries(ANALYST_WINDOW_METRICS.map(key => [key, {
+    status: "REVIEWED",
+    reviewerId: "offline-fixture-reviewer",
+    reviewId: `offline-${key}`,
+    reviewedAt: candidateT - 1
+  }]));
+  const evaluation = await pipeline.evaluate({
+    providerCandidate: fixture.candidate,
+    evidence: fixture.candidate.evidence,
+    candidateT,
+    policy: fixture.policy,
+    poolProof: fixture.poolProof,
+    censusSource: fixture.censusSource,
+    priceSource: fixture.priceSource,
+    marketPairEvidence: fixture.marketPairEvidence,
+    smartWalletAllowlist: fixture.smartWalletAllowlist,
+    reviewEvidence,
+    holdUntil: candidateT + 8 * 60 * 60 * 1_000
+  });
+  if (!evaluation.candidate) {
+    return {
+      status: "UNKNOWN",
+      reason: evaluation.reason ?? "PIPELINE_CANDIDATE_UNAVAILABLE",
+      candidate: null,
+      pipeline: evaluation,
+      quote: null
+    };
+  }
+
+  const quoteBody = syntheticOrderResponse({
+    inputMint: fixture.candidate.quote,
+    outputMint: fixture.candidate.mint
+  });
+  const quoteAdapter = createMarketQuoteAdapter({
+    enabled: true,
+    clock: () => {
+      clock.advance(1);
+      return clock.wallClock();
+    },
+    transport: async () => new Response(JSON.stringify(quoteBody.body), {
+      status: 200,
+      headers: {"content-type": "application/json"}
+    }),
+    timeoutMs: 1_000,
+    maxRequests: 1
+  });
+  const quote = await quoteAdapter.getPaperQuote({
+    identity: {
+      chainId: fixture.candidate.chainId,
+      mint: fixture.candidate.mint,
+      pool: fixture.candidate.pool,
+      quote: fixture.candidate.quote,
+      decimals: fixture.candidate.decimals
+    },
+    side: "ENTRY",
+    amountAtoms: "100000000",
+    quoteDecimals: 6,
+    candidateSampledAt: candidateT,
+    authorizedAt: evaluation.decisionAt,
+    slippageBps: 50
+  }, {signal: new AbortController().signal});
+
+  evaluation.candidate.syntheticRuntime = {
+    label: "SYNTHETIC_FIXTURE_ONLY",
+    pipeline: {
+      status: evaluation.status,
+      candidateT: evaluation.candidateT,
+      assembledAt: evaluation.assembledAt,
+      decisionAt: evaluation.decisionAt,
+      acquisitionReceiptIds: evaluation.auditReceipts.acquisition
+        .map(item => item.receipt?.id).filter(Boolean)
+    },
+    quote: {
+      status: quote.status,
+      sourceProvenance: quote.sourceProvenance,
+      eventId: quote.quoteCandidate?.eventId ?? null,
+      observedAt: quote.quoteCandidate?.receiptTime?.observedAt ?? null,
+      scenarioStatus: quote.scenarioProjection?.status ?? null,
+      paperFillEligible: false
+    }
+  };
+  return {
+    status: evaluation.status,
+    reason: evaluation.filters?.status === "PASS" ? null : "FIXTURE_EVIDENCE_NOT_ENTRY_AUTHORITY",
+    candidate: evaluation.candidate,
+    pipeline: evaluation,
+    quote
+  };
+}
+
 export function createPaperRuntimeSourceAdapter(options = {}) {
   if (!options || typeof options !== "object" || Array.isArray(options) ||
       ![Object.prototype, null].includes(Object.getPrototypeOf(options)) ||

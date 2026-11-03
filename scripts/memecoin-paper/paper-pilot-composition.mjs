@@ -18,6 +18,7 @@ import {
 import {createPaperExecutionStep} from "./execution-step.mjs";
 import {PAPER_LEDGER_POLICY} from "./ledger.mjs";
 import {
+  acquireSyntheticRuntimeFixture,
   createPaperRuntimeSourceAdapter,
   PAPER_RUNTIME_SOURCE_POLICY,
   PAPER_RUNTIME_SOURCE_POLICY_SHA256
@@ -42,7 +43,7 @@ const MAXIMA = {
 const syntheticClocks = new WeakMap();
 const offlineFixtureAdaptersBySource = new WeakMap();
 const FIXTURE_FAULTS = new Set([
-  "NONE", "DISCONNECT", "CALLBACK_TIMEOUT", "LATE_DEADLINE", "WAIT_FOR_STOP",
+  "NONE", "PIPELINE_QUOTE", "DISCONNECT", "CALLBACK_TIMEOUT", "LATE_DEADLINE", "WAIT_FOR_STOP",
   "DEADLINE_BEFORE_FIRST_RISK_SNAPSHOT",
   "CLOCK_JUMP", "LOST_ACK", "LOST_INITIAL_ACK", "NO_CANDIDATES", "TWO_OPEN_POSITIONS",
   "MISSING_EVIDENCE", "MISSING_COSTS",
@@ -339,6 +340,11 @@ export function offlineFixtureAdapters(options = {}) {
       if (fault === "REQUEST_BUDGET") {
         recordRequest({bytes: 4, events: 1});
         recordRequest({bytes: 4, events: 1});
+      }
+      if (fault === "PIPELINE_QUOTE") {
+        const acquired = await acquireSyntheticRuntimeFixture(clock);
+        clock.advance();
+        return acquired.candidate ? [acquired.candidate] : [];
       }
       if (fault === "CLOCK_JUMP") clock.jumpWall(100);
       if (fault === "NO_CANDIDATES") return [];
@@ -944,6 +950,9 @@ export function createPaperPilotComposition(options = {}) {
           receiptTimestamp: sourceReceiptAt,
           identity: {chainId: candidate.chainId, mint: candidate.mint, pool: candidate.pool, quote: candidate.quote},
           units: {tokenQuantity: "base units", decimals: candidate.decimals, marketValues: "USD"},
+          ...(candidate.syntheticRuntime ? {
+            syntheticFixtureRuntime: candidate.syntheticRuntime
+          } : {}),
           evidence: Object.entries({...candidate.evidence, ...candidate.analystEvidence}).map(([name, item]) => ({
             name,
             digest: createHash("sha256").update(canonicalCheckpointBytes(item)).digest("hex"),

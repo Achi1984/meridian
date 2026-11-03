@@ -11,6 +11,9 @@ import {
 } from "../scripts/memecoin-paper/paper-pilot-composition.mjs";
 import {canonicalCheckpointBytes} from "../scripts/memecoin-paper/checkpoint-store.mjs";
 import {createBoundedExternalReadOnlyInput} from "../scripts/memecoin-paper/execution-runner.mjs";
+import {
+  evaluateMemecoinPaperRunExport
+} from "../scripts/memecoin-paper-simulated-evaluation/index.mjs";
 
 const START = Date.parse("2026-01-01T19:00:00Z");
 const CLI = fileURLToPath(new URL("../scripts/memecoin-paper/paper-pilot-composition.mjs", import.meta.url));
@@ -313,6 +316,41 @@ test("complete offline path uses existing gates, ledger, independent ticks and d
   assert.equal(durable.records[4].inputs.now <= durable.records[5].inputs.now, true);
   assert.equal(durable.records[5].inputs.now <= durable.records[6].inputs.now, true);
   assert.notEqual(durable.records[1].commandId, durable.records[5].commandId);
+});
+
+test("synthetic runtime fixture traverses source pipeline and quote adapter into a truthful terminal export", async t => {
+  const {directory, pilot} = await harness(t, {fault: "PIPELINE_QUOTE"});
+  const result = await pilot.start();
+  const report = result.report;
+  const runtime = result.provenance.candidates[0].syntheticFixtureRuntime;
+  assert.ok(runtime);
+  assert.equal(runtime.label, "SYNTHETIC_FIXTURE_ONLY");
+  assert.equal(runtime.pipeline.status, "PARTIAL");
+  assert.ok(runtime.pipeline.acquisitionReceiptIds.length > 0);
+  assert.ok(runtime.pipeline.assembledAt >= runtime.pipeline.candidateT);
+  assert.ok(runtime.pipeline.decisionAt >= runtime.pipeline.assembledAt);
+  assert.equal(runtime.quote.status, "UNAVAILABLE");
+  assert.equal(runtime.quote.sourceProvenance, "INJECTED_TRANSPORT_NOT_AUTHENTICATED");
+  assert.equal(runtime.quote.eventId, "synthetic-order-1");
+  assert.ok(runtime.quote.observedAt > runtime.pipeline.decisionAt);
+  assert.equal(runtime.quote.paperFillEligible, false);
+  assert.equal(report.runnerReport.counters.quotes, 0);
+  assert.equal(report.runnerReport.operationResults.some(item =>
+    item.method === "executeEntry" && item.status === "FILLED_PAPER"), false);
+  assert.deepEqual(report.runnerReport.terminalResult.openPositions, []);
+  assert.equal(report.persistence, "ACKNOWLEDGED");
+  assert.equal(report.exportBinding, "PRESTART_BOUND");
+  assert.ok(await readFile(path.join(directory, "checkpoint.json")));
+
+  const configSha256 = createHash("sha256")
+    .update(canonicalCheckpointBytes(report.config)).digest("hex");
+  const evaluation = evaluateMemecoinPaperRunExport(canonicalCheckpointBytes(report), {
+    runId: report.runId,
+    configSha256,
+    producerRevision: report.producerRevision
+  });
+  assert.equal(evaluation.evidence.entryFills, 0);
+  assert.equal(evaluation.claims.liveExecution, false);
 });
 
 test("missing hard evidence and missing full cost components do not fill", async t => {

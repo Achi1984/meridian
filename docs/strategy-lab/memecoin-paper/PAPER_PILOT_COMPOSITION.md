@@ -30,6 +30,19 @@ without calling providers, synthesizing a candidate, requesting a quote, or
 setting trusted UTC. This mode is an executable no-entry integration boundary,
 not an acquired-source or live-ready run. The existing run manifest remains
 disabled with its stop switch engaged.
+
+The offline fixture-only `PIPELINE_QUOTE` scenario is a separate test seam. It
+constructs the accepted paper source pipeline in `SYNTHETIC_TEST_ONLY`, evaluates
+the source-shaped fixture through the canonical market evidence adapter, and
+calls the accepted market quote/cost adapter with a local quote-shaped fixture.
+Its pipeline receipt IDs, candidate/assembly/decision times, and quote adapter
+receipt metadata are carried in synthetic provenance through the same runner,
+checkpoint, export, and evaluator. The current fixture intentionally remains
+`PARTIAL`/UNKNOWN for hard evidence and the quote adapter reports UNKNOWN costs;
+the runner therefore records a truthful no-entry terminal and never converts
+that observation into a fill. This proves orchestration only, not entry, mark,
+exit, source trust, or readiness. The real `SOURCE_BACKED_PAPER` mode never calls
+this seam.
 Configuration and fixture options reject accessor/hidden fields, and a
 pre-aborted run exits before opening a checkpoint.
 
@@ -133,7 +146,9 @@ The synthetic factory accepts only module-generated adapters from
 callbacks, fixture candidates, quotes, clock functions, or storage hooks. The
 finite `fault` enum is offline-only and exercises disconnect, timeout, stop,
 clock-jump, lost-ack, no-candidate, evidence/cost rejection, and unavailable-mark
-paths. It cannot perform network access or relabel caller-supplied market data.
+paths. `PIPELINE_QUOTE` specifically runs the fixed source-shaped fixture
+through the source pipeline and quote/cost adapter before the normal lifecycle.
+It cannot perform network access or relabel caller-supplied market data.
 
 The external path is a distinct data-only, no-entry evaluation. Its bounded
 packet contract is:
