@@ -17,6 +17,12 @@ import {
 } from "./execution-runner.mjs";
 import {createPaperExecutionStep} from "./execution-step.mjs";
 import {PAPER_LEDGER_POLICY} from "./ledger.mjs";
+import {
+  acquireSyntheticRuntimeFixture,
+  createPaperRuntimeSourceAdapter,
+  PAPER_RUNTIME_SOURCE_POLICY,
+  PAPER_RUNTIME_SOURCE_POLICY_SHA256
+} from "./paper-runtime-source.mjs";
 import {SYNTHETIC_SMART_WALLET_ALLOWLIST, syntheticCandidate} from "./synthetic-fixtures.mjs";
 import {scout} from "./stages.mjs";
 
@@ -37,7 +43,13 @@ const MAXIMA = {
 const syntheticClocks = new WeakMap();
 const offlineFixtureAdaptersBySource = new WeakMap();
 const FIXTURE_FAULTS = new Set([
-  "NONE", "DISCONNECT", "CALLBACK_TIMEOUT", "LATE_DEADLINE", "WAIT_FOR_STOP",
+  "NONE", "PIPELINE_QUOTE", "PIPELINE_QUOTE_DUPLICATE", "PIPELINE_QUOTE_WAIT",
+  "PIPELINE_QUOTE_DEADLINE",
+  "PIPELINE_QUOTE_DEADLINE_AFTER_ENTRY", "PIPELINE_QUOTE_STOP_AFTER_ENTRY",
+  "PIPELINE_QUOTE_MISSING_QUOTE", "PIPELINE_QUOTE_MISSING_COSTS",
+  "PIPELINE_QUOTE_WRONG_IDENTITY", "PIPELINE_QUOTE_ROUTE_IDENTITY",
+  "PIPELINE_QUOTE_FUTURE_EVIDENCE",
+  "DISCONNECT", "CALLBACK_TIMEOUT", "LATE_DEADLINE", "WAIT_FOR_STOP",
   "DEADLINE_BEFORE_FIRST_RISK_SNAPSHOT",
   "CLOCK_JUMP", "LOST_ACK", "LOST_INITIAL_ACK", "NO_CANDIDATES", "TWO_OPEN_POSITIONS",
   "MISSING_EVIDENCE", "MISSING_COSTS",
@@ -82,12 +94,30 @@ function onlyDataKeys(value, allowed) {
 }
 
 function validateConfig(config) {
-  if (!exactKeys(config, ["version", "mode", "enabled", "runId", "startedAt", "budgets"]) ||
+  const sourceMode = config?.mode === "SOURCE_BACKED_PAPER";
+  const expectedKeys = sourceMode
+    ? ["version", "mode", "enabled", "runId", "startedAt", "budgets",
+      "sourcePolicy", "sourcePolicySha256"]
+    : ["version", "mode", "enabled", "runId", "startedAt", "budgets"];
+  if (!exactKeys(config, expectedKeys) ||
       config.version !== 1 ||
-      !["SYNTHETIC_TEST_ONLY", "EXTERNAL_READ_ONLY_INPUT"].includes(config.mode) ||
+      !["SYNTHETIC_TEST_ONLY", "EXTERNAL_READ_ONLY_INPUT", "SOURCE_BACKED_PAPER"].includes(config.mode) ||
       config.enabled !== true || typeof config.runId !== "string" || !SAFE_ID.test(config.runId) ||
       !integerTime(config.startedAt) || !exactKeys(config.budgets, BUDGET_KEYS)) {
     throw new TypeError("invalid bounded composition configuration");
+  }
+  if (sourceMode) {
+    let sourcePolicy;
+    try {
+      sourcePolicy = boundedData(config.sourcePolicy, 16_384).value;
+    } catch {
+      throw new TypeError("source policy is not bounded module-owned data");
+    }
+    if (config.sourcePolicySha256 !== PAPER_RUNTIME_SOURCE_POLICY_SHA256 ||
+        !canonicalCheckpointBytes(sourcePolicy).equals(
+          canonicalCheckpointBytes(PAPER_RUNTIME_SOURCE_POLICY))) {
+      throw new TypeError("source policy is not the exact module-owned disabled policy");
+    }
   }
   for (const key of BUDGET_KEYS) {
     const minimum = key === "maxWallClockUncertaintyMs" ? 0 : key === "bytes" ? 1024 : 1;
@@ -101,7 +131,11 @@ function validateConfig(config) {
       config.budgets.candidates > config.budgets.cycles) {
     throw new RangeError("callback, candidate, and cycle budgets are inconsistent");
   }
-  return Object.freeze({...config, budgets: Object.freeze({...config.budgets})});
+  return Object.freeze({
+    ...config,
+    ...(sourceMode ? {sourcePolicy: PAPER_RUNTIME_SOURCE_POLICY} : {}),
+    budgets: Object.freeze({...config.budgets})
+  });
 }
 
 export function createSyntheticClock(options = {}) {
@@ -299,8 +333,18 @@ export function offlineFixtureAdapters(options = {}) {
   }
   let exitCount = 0;
   let entryCount = 0;
+  let pipelineFixtureCalls = 0;
+  const runtimeFixturesByMint = new Map();
+  const runtimeAudits = [];
+  const fixtureState = {
+    clock,
+    fault,
+    sourceMode: "SYNTHETIC_TEST_ONLY",
+    runtimeFixturesByMint,
+    runtimeAudits
+  };
   const adapters = Object.freeze({
-    async acquireCandidates({now, signal, recordRequest}) {
+    async acquireCandidates({now, signal, deadlineAt, remaining, recordRequest, recordWork}) {
       if (fault === "DISCONNECT") throw Object.assign(new Error("fixture disconnect"), {code: "DISCONNECTED"});
       if (fault === "CALLBACK_TIMEOUT") {
         await new Promise(resolve => setTimeout(resolve, 30));
@@ -312,6 +356,35 @@ export function offlineFixtureAdapters(options = {}) {
       if (fault === "REQUEST_BUDGET") {
         recordRequest({bytes: 4, events: 1});
         recordRequest({bytes: 4, events: 1});
+      }
+      if (fault.startsWith("PIPELINE_QUOTE")) {
+        pipelineFixtureCalls += 1;
+        if (pipelineFixtureCalls > (fault === "PIPELINE_QUOTE_DUPLICATE" ? 2 : 1)) return [];
+        let acquired;
+        try {
+          acquired = await acquireSyntheticRuntimeFixture(clock, {
+            signal, remaining, recordRequest, recordWork,
+            waitForStop: fault === "PIPELINE_QUOTE_WAIT",
+            expireDuringRequest: fault === "PIPELINE_QUOTE_DEADLINE",
+            deadlineAt,
+            variant: fault === "PIPELINE_QUOTE_MISSING_QUOTE" ? "MISSING_QUOTE"
+              : fault === "PIPELINE_QUOTE_MISSING_COSTS" ? "MISSING_COSTS"
+                : fault === "PIPELINE_QUOTE_ROUTE_IDENTITY" ? "WRONG_QUOTE_IDENTITY"
+                  : fault === "PIPELINE_QUOTE_WRONG_IDENTITY" ? "WRONG_IDENTITY"
+                : fault === "PIPELINE_QUOTE_FUTURE_EVIDENCE" ? "FUTURE_EVIDENCE" : "BASE"
+          });
+        } catch (error) {
+          throw Object.assign(new Error("synthetic pipeline fixture failed closed"), {
+            code: typeof error?.code === "string" && /^[A-Z0-9_]{1,48}$/.test(error.code)
+              ? error.code : "PIPELINE_FIXTURE_FAILURE"
+          });
+        }
+        clock.advance();
+        if (acquired.runtimeAudit) runtimeAudits.push(acquired.runtimeAudit);
+        if (acquired.candidate && !runtimeFixturesByMint.has(acquired.candidate.mint)) {
+          runtimeFixturesByMint.set(acquired.candidate.mint, acquired.quote);
+        }
+        return acquired.candidate ? [acquired.candidate] : [];
       }
       if (fault === "CLOCK_JUMP") clock.jumpWall(100);
       if (fault === "NO_CANDIDATES") return [];
@@ -341,16 +414,36 @@ export function offlineFixtureAdapters(options = {}) {
       }
       return [row];
     },
-    async entryQuote({candidate: token, now}) {
+    async entryQuote({candidate: token, now, signal}) {
       entryCount += 1;
+      const runtimeQuote = runtimeFixturesByMint.get(token.mint);
+      if (runtimeQuote) {
+        return runtimeQuote({
+          candidate: token,
+          purpose: "ENTRY",
+          now,
+          signal
+        });
+      }
       const result = fixtureQuote(token, `fixture-entry-${entryCount}`, now, 10_000);
       if (fault === "MISSING_COSTS") delete result.costs.networkCents;
       if (fault === "QUOTE_AFTER_RECEIPT") result.observedAt = now + 1_000;
       clock.advance();
       return result;
     },
-    async exitQuote({candidate: token, now, purpose}) {
+    async exitQuote({candidate: token, now, purpose, position, positionOpenedAt, signal}) {
       if (fault === "NO_MARK" && purpose === "risk-mark") return null;
+      const runtimeQuote = runtimeFixturesByMint.get(token.mint);
+      if (runtimeQuote) {
+        return runtimeQuote({
+          candidate: token,
+          purpose,
+          position,
+          positionOpenedAt,
+          now,
+          signal
+        });
+      }
       exitCount += 1;
       const price = fault === "TWO_OPEN_POSITIONS" || exitCount === 1 ? 10_000 : 9_000;
       const result = fixtureQuote(token, `fixture-exit-${exitCount}`, now, price);
@@ -358,7 +451,7 @@ export function offlineFixtureAdapters(options = {}) {
       return result;
     }
   });
-  offlineFixtureAdaptersBySource.set(adapters, {clock, fault, sourceMode: "SYNTHETIC_TEST_ONLY"});
+  offlineFixtureAdaptersBySource.set(adapters, fixtureState);
   return adapters;
 }
 
@@ -458,6 +551,7 @@ export function createPaperPilotComposition(options = {}) {
     throw new TypeError("signal must be a native AbortSignal");
   }
   const externalMode = config.mode === "EXTERNAL_READ_ONLY_INPUT";
+  const sourceMode = config.mode === "SOURCE_BACKED_PAPER";
   let boundedExternalInput = null;
   let externalInputBytes = 0;
   if (externalMode) {
@@ -485,6 +579,20 @@ export function createPaperPilotComposition(options = {}) {
     offlineFixtureAdaptersBySource.set(adapters, {
       clock, fault: "NONE", sourceMode: "EXTERNAL_READ_ONLY_INPUT", externalInput: boundedExternalInput
     });
+  } else if (sourceMode) {
+    if (externalReadOnlyInput !== undefined || adapters !== undefined || clock !== undefined ||
+        typeof dataDirectory !== "string" || !path.isAbsolute(dataDirectory)) {
+      throw new TypeError("source-backed PAPER mode requires module-owned sources and absolute state");
+    }
+    clock = createExternalReceiptClock();
+    const sourceAdapter = createPaperRuntimeSourceAdapter({
+      sourcePolicySha256: config.sourcePolicySha256
+    });
+    adapters = Object.freeze({
+      acquireCandidates: sourceAdapter.acquireCandidates,
+      entryQuote: sourceAdapter.quote,
+      exitQuote: sourceAdapter.quote
+    });
   } else if (externalReadOnlyInput !== undefined) {
     throw new TypeError("external read-only input requires EXTERNAL_READ_ONLY_INPUT mode");
   }
@@ -496,13 +604,17 @@ export function createPaperPilotComposition(options = {}) {
       clockAttestationFor(clock).uncertaintyMs > config.budgets.maxWallClockUncertaintyMs) {
     throw new TypeError("absolute storage and a bounded module clock are required");
   }
-  if (!offlineFixtureAdaptersBySource.has(adapters) ||
+  if (sourceMode) {
+    if (!clockAttestationFor(clock) || clockAttestationFor(clock).trustedUtc !== false) {
+      throw new TypeError("source-backed PAPER mode requires an explicitly untrusted host receipt clock");
+    }
+  } else if (!offlineFixtureAdaptersBySource.has(adapters) ||
       offlineFixtureAdaptersBySource.get(adapters).clock !== clock) {
     throw new TypeError(externalMode
       ? "only the bounded external packet adapter may run"
       : "only module-generated offline fixture adapters may run");
   }
-  const {fault} = offlineFixtureAdaptersBySource.get(adapters);
+  const fault = sourceMode ? "NONE" : offlineFixtureAdaptersBySource.get(adapters).fault;
   const clockAttestation = clockAttestationFor(clock);
   const externalInputDigest = boundedExternalInput
     ? sha256(canonicalCheckpointBytes(boundedExternalInput)) : null;
@@ -548,12 +660,16 @@ export function createPaperPilotComposition(options = {}) {
     return {wall, mono, elapsedMs: anchor ? mono - anchor.mono : 0};
   }
 
-  function chargeEvent(count = 1) {
+  function chargeWork(count = 1) {
     if (!Number.isSafeInteger(count) || count < 0 ||
         counters.events + count > config.budgets.events) {
-      throw Object.assign(new Error("global event budget exhausted"), {code: "EVENT_BUDGET"});
+      throw Object.assign(new Error("global work/event budget exhausted"), {code: "EVENT_BUDGET"});
     }
     counters.events += count;
+  }
+
+  function chargeEvent(count = 1) {
+    chargeWork(count);
   }
 
   function accountRequest({bytes = 0, events = 1} = {}) {
@@ -568,7 +684,7 @@ export function createPaperPilotComposition(options = {}) {
     }
     counters.requests += 1;
     counters.bytes += bytes;
-    counters.events += events;
+    chargeWork(events);
   }
 
   async function invokeAdapter(name, input) {
@@ -594,10 +710,12 @@ export function createPaperPilotComposition(options = {}) {
         bytes: config.budgets.bytes - counters.bytes,
         events: config.budgets.events - counters.events,
         candidates: config.budgets.candidates - counters.candidates,
-        cycles: config.budgets.cycles - counters.cycles,
-        timeMs: remainingMs
+        cycles: config.budgets.cycles - counters.cycles - counters.acquisitionCycles,
+        work: config.budgets.events - counters.events,
+        timeMs: Math.max(0, Math.floor(remainingMs))
       }),
-      recordRequest: accountRequest
+      recordRequest: accountRequest,
+      recordWork: chargeWork
     }));
     const timeoutMs = Math.min(config.budgets.callbackTimeoutMs, remainingMs);
     if (remainingMs <= config.budgets.callbackTimeoutMs) timeoutCode = "DEADLINE";
@@ -636,7 +754,10 @@ export function createPaperPilotComposition(options = {}) {
   }
 
   async function execute() {
-    counters = {requests: 0, bytes: externalInputBytes, events: 0, candidates: 0, cycles: 0};
+    counters = {
+      requests: 0, bytes: externalInputBytes, events: 0, candidates: 0, cycles: 0,
+      acquisitionCycles: 0
+    };
     deadlineAt = config.startedAt + EIGHT_HOURS_MS;
     if (abort.signal.aborted) {
       state = "STOPPED";
@@ -798,15 +919,39 @@ export function createPaperPilotComposition(options = {}) {
     }));
     const operationInputs = [];
     const quoteReceipts = new Map();
+    const fixtureRuntimeState = offlineFixtureAdaptersBySource.get(adapters);
+    function recordRuntimeQuoteDisposition(quote, purpose, disposition) {
+      if (!fixtureRuntimeState || !quote) return;
+      for (const candidate of fixtureRuntimeState.runtimeAudits) {
+        const identity = candidate.identity;
+        if (!["chainId", "mint", "pool", "quote", "decimals"].every(key =>
+          identity[key] === quote[key])) continue;
+        const auditQuote = candidate.quotes.find(item =>
+          item.purpose === purpose && item.disposition === "PENDING" &&
+          item.observedAt === quote.observedAt &&
+          item.paperPriceMicros === quote.priceMicros &&
+          Object.keys(item.costs ?? {}).length === Object.keys(quote.costs ?? {}).length &&
+          Object.entries(item.costs ?? {}).every(([key, value]) => quote.costs?.[key] === value));
+        if (auditQuote) {
+          auditQuote.disposition = disposition;
+          return;
+        }
+      }
+    }
     if (fault === "DEADLINE_BEFORE_FIRST_RISK_SNAPSHOT") {
       const remainingMs = deadlineAt - clock.wallClock();
       if (remainingMs > 0) clock.advance(remainingMs + 1);
     }
     let adapterFailureCode = null;
     let strategyOverride = null;
+    let sourcePolicyAssessment = null;
+    let sourceUnknownReason = null;
     let candidates = [];
     let candidateIndex = 0;
     let candidateBatchLoaded = false;
+    const seenCandidateMints = new Set();
+    const repeatedAcquisition = sourceMode ||
+      fault.startsWith("PIPELINE_QUOTE");
     let sourceReceiptAt = null;
 
     function candidateSourceFailure(code) {
@@ -818,15 +963,67 @@ export function createPaperPilotComposition(options = {}) {
     const candidateSource = {
       async poll() {
         if (abort.signal.aborted) return {done: true};
-        if (!candidateBatchLoaded) {
+        const batchExhausted = candidateIndex >= candidates.length;
+        if (!candidateBatchLoaded || (repeatedAcquisition && batchExhausted)) {
+          if (repeatedAcquisition &&
+              counters.cycles + counters.acquisitionCycles >= config.budgets.cycles) {
+            const reason = "CYCLE_BUDGET";
+            sourceUnknownReason = reason;
+            return {done: true, outcome: "UNKNOWN", reason};
+          }
           candidateBatchLoaded = true;
-          const acquisition = await invokeAdapter("acquireCandidates", {});
-          if (!Array.isArray(acquisition.result) ||
-              acquisition.result.length > config.budgets.candidates ||
-              acquisition.result.length > config.budgets.cycles) {
+          candidates = [];
+          candidateIndex = 0;
+          if (repeatedAcquisition) counters.acquisitionCycles += 1;
+          let acquisition;
+          try {
+            acquisition = await invokeAdapter("acquireCandidates", {});
+          } catch (error) {
+            if (sourceMode) {
+              const reason = typeof error?.code === "string" &&
+                /^[A-Z0-9_]{1,48}$/.test(error.code)
+                ? error.code : "SOURCE_ACQUISITION_UNKNOWN";
+              sourceUnknownReason = reason;
+              sourcePolicyAssessment = {
+                policySha256: config.sourcePolicySha256,
+                status: "UNAPPROVED",
+                networkAccessed: false,
+                clockSource: clockAttestation.source,
+                clockUncertaintyMs: clockAttestation.uncertaintyMs,
+                trustedUtc: clockAttestation.trustedUtc === true,
+                unresolved: [...PAPER_RUNTIME_SOURCE_POLICY.missingRequirements, reason]
+              };
+              return {done: true, outcome: "UNKNOWN", reason};
+            }
+            throw error;
+          }
+          if (sourceMode && isRecord(acquisition.result) &&
+              acquisition.result.status === "UNKNOWN" &&
+              acquisition.result.reason === "SOURCE_POLICY_UNAPPROVED" &&
+              Array.isArray(acquisition.result.candidates) &&
+              acquisition.result.candidates.length === 0) {
+            sourcePolicyAssessment = {
+              policySha256: config.sourcePolicySha256,
+              status: "UNAPPROVED",
+              networkAccessed: acquisition.result.networkAccessed === true,
+              clockSource: clockAttestation.source,
+              clockUncertaintyMs: clockAttestation.uncertaintyMs,
+              trustedUtc: clockAttestation.trustedUtc === true,
+              pipelineVersion: acquisition.result.pipelineVersion ?? null,
+              pipelineEnabled: acquisition.result.pipelineEnabled === true,
+              quoteAdapterStatus: acquisition.result.quoteAdapterStatus ?? "UNKNOWN",
+              unresolved: Array.isArray(acquisition.result.unresolved)
+                ? acquisition.result.unresolved.slice() : []
+            };
+            sourceUnknownReason = acquisition.result.reason;
+            return {done: true, outcome: "UNKNOWN", reason: acquisition.result.reason};
+          }
+          if (!Array.isArray(acquisition.result)) {
             return candidateSourceFailure("CANDIDATE_BOUND");
           }
-          counters.candidates = acquisition.result.length;
+          if (!acquisition.result.length) {
+            return {done: true};
+          }
           sourceReceiptAt = acquisition.receiptAt;
           for (const candidate of acquisition.result) {
             if (!integerTime(candidate?.sampledAt) ||
@@ -835,12 +1032,25 @@ export function createPaperPilotComposition(options = {}) {
               return candidateSourceFailure("SOURCE_AFTER_RECEIPT");
             }
           }
-          chargeEvent(acquisition.result.length);
-          candidates = scout(acquisition.result, {
+          const uniqueCandidates = acquisition.result.filter(candidate => {
+            if (typeof candidate?.mint !== "string" || seenCandidateMints.has(candidate.mint)) {
+              return false;
+            }
+            seenCandidateMints.add(candidate.mint);
+            return true;
+          });
+          if (counters.candidates + uniqueCandidates.length > config.budgets.candidates ||
+              counters.candidates + uniqueCandidates.length > config.budgets.cycles) {
+            return candidateSourceFailure("CANDIDATE_BOUND");
+          }
+          counters.candidates += uniqueCandidates.length;
+          chargeEvent(uniqueCandidates.length);
+          candidates = scout(uniqueCandidates, {
             now: sourceReceiptAt,
             maxCandidates: config.budgets.candidates,
             source: externalMode ? EXTERNAL_INPUT_SOURCE : SYNTHETIC_SOURCE
           }).selected.slice(0, config.budgets.cycles);
+          if (!candidates.length && repeatedAcquisition) return null;
         }
         if (candidateIndex >= candidates.length) return {done: true};
         const candidate = candidates[candidateIndex++];
@@ -854,6 +1064,9 @@ export function createPaperPilotComposition(options = {}) {
           receiptTimestamp: sourceReceiptAt,
           identity: {chainId: candidate.chainId, mint: candidate.mint, pool: candidate.pool, quote: candidate.quote},
           units: {tokenQuantity: "base units", decimals: candidate.decimals, marketValues: "USD"},
+          ...(candidate.syntheticRuntime ? {
+            syntheticFixtureRuntime: candidate.syntheticRuntime
+          } : {}),
           evidence: Object.entries({...candidate.evidence, ...candidate.analystEvidence}).map(([name, item]) => ({
             name,
             digest: createHash("sha256").update(canonicalCheckpointBytes(item)).digest("hex"),
@@ -876,7 +1089,14 @@ export function createPaperPilotComposition(options = {}) {
       try {
         envelope = await invokeAdapter(
           purpose === "ENTRY" ? "entryQuote" : "exitQuote",
-          {candidate, purpose: adapterPurpose, previousQuote: request.previousQuote}
+          {
+            candidate,
+            purpose: adapterPurpose,
+            position: request.position,
+            positionOpenedAt: request.positionOpenedAt ?? null,
+            now: request.now,
+            previousQuote: request.previousQuote
+          }
         );
       } catch (error) {
         adapterFailureCode = error?.code ?? "QUOTE_SOURCE_UNAVAILABLE";
@@ -910,6 +1130,11 @@ export function createPaperPilotComposition(options = {}) {
         identity: {chainId: quote.chainId, mint: quote.mint, pool: quote.pool, quote: quote.quote},
         units: {price: "priceMicros", costs: "integer cents", quantity: "token base units"}
       });
+      if (fault === "PIPELINE_QUOTE_DEADLINE_AFTER_ENTRY" && purpose === "ENTRY") {
+        clock.advance(Math.max(1, compositionDeadlineAt - clock.wallClock() + 1));
+      } else if (fault === "PIPELINE_QUOTE_STOP_AFTER_ENTRY" && purpose === "ENTRY") {
+        abort.abort();
+      }
       if (purpose === "ENTRY" &&
           !["feeCents", "spreadCents", "slippageCents", "priceImpactCents", "networkCents"]
             .every(key => Object.hasOwn(quote.costs ?? {}, key))) {
@@ -931,6 +1156,17 @@ export function createPaperPilotComposition(options = {}) {
       chargeEvent();
       const stepInput = Object.hasOwn(input, "now") ? input : {...input, now: readTime().wall};
       const result = await executionStep[method](stepInput);
+      if (result?.receipt) {
+        if (method === "executeEntry") {
+          recordRuntimeQuoteDisposition(stepInput.quote, "entry", "CHECKPOINT_CONSUMED_ENTRY");
+        } else if (method === "observeExitQuote") {
+          recordRuntimeQuoteDisposition(stepInput.quote, "risk-mark", "CHECKPOINT_CONSUMED_MARK");
+        } else if (method === "riskSnapshot") {
+          for (const mark of stepInput.marks ?? []) {
+            recordRuntimeQuoteDisposition(mark, "risk-exit", "CHECKPOINT_CONSUMED_RISK_EXIT");
+          }
+        }
+      }
       if (result?.status === "REJECT" && /byte|input capacity/i.test(result.reason ?? "")) {
         adapterFailureCode ??= "BYTE_BUDGET";
         strategyOverride ??= "BYTE_BUDGET";
@@ -962,13 +1198,16 @@ export function createPaperPilotComposition(options = {}) {
       runId: config.runId,
       startedAt: config.startedAt,
       endAt: compositionDeadlineAt,
-      executionMode: externalMode ? "READ_ONLY_EXTERNAL" : "SIMULATED_ONLY",
-      provenance: externalMode ? "UNVERIFIED_CALLER_INPUT" : SYNTHETIC_SOURCE,
+      executionMode: sourceMode ? "SOURCE_BACKED_PAPER"
+        : externalMode ? "READ_ONLY_EXTERNAL" : "SIMULATED_ONLY",
+      provenance: sourceMode ? "UNVERIFIED_ACQUIRED_SOURCE"
+        : externalMode ? "UNVERIFIED_CALLER_INPUT" : SYNTHETIC_SOURCE,
+      ...(sourceMode ? {sourcePolicySha256: config.sourcePolicySha256} : {}),
       candidateSource,
       quoteSource,
       clock: () => readTime().wall,
       stopSource: () => abort.signal.aborted,
-      smartWalletAllowlist: externalMode
+      smartWalletAllowlist: externalMode || sourceMode
         ? {status: "UNVERIFIED", provenance: "UNVERIFIED_CALLER_INPUT"}
         : SYNTHETIC_SMART_WALLET_ALLOWLIST,
       limits: {
@@ -980,7 +1219,38 @@ export function createPaperPilotComposition(options = {}) {
       }
     });
     const runnerResult = await runner.run();
-    runnerReport = runnerResult;
+    if (fixtureRuntimeState?.sourceMode === "SYNTHETIC_TEST_ONLY") {
+      for (const candidate of fixtureRuntimeState.runtimeAudits) {
+        for (const quote of candidate.quotes) {
+          if (quote.disposition !== "PENDING") continue;
+          quote.disposition = runnerResult.reason === "DEADLINE" ? "NOT_CONSUMED_DEADLINE"
+            : runnerResult.reason === "SHUTDOWN" ? "NOT_CONSUMED_STOPPED"
+              : runnerResult.status === "UNKNOWN" ? "CONSUMPTION_UNKNOWN"
+                : "NOT_CONSUMED_POLICY";
+        }
+      }
+    }
+    runnerReport = sourceMode
+      ? {...runnerResult, sourcePolicy: sourcePolicyAssessment ?? {
+          policySha256: config.sourcePolicySha256,
+          status: "UNAPPROVED",
+          networkAccessed: false,
+          clockSource: clockAttestation.source,
+          clockUncertaintyMs: clockAttestation.uncertaintyMs,
+          trustedUtc: clockAttestation.trustedUtc === true,
+          unresolved: [...PAPER_RUNTIME_SOURCE_POLICY.missingRequirements]
+        }}
+      : fixtureRuntimeState?.runtimeAudits?.length
+        ? {
+            ...runnerResult,
+            runtimeAudit: {
+              schemaVersion: "memecoin-paper-source-quote-audit/v2",
+              source: SYNTHETIC_SOURCE,
+              truncated: fixtureRuntimeState.runtimeAudits.length > 100,
+              candidates: fixtureRuntimeState.runtimeAudits.slice(0, 100)
+            }
+          }
+        : runnerResult;
     terminalReceipt = runnerResult.terminalReceipt;
     const summary = runnerResult.summary;
     const terminalResult = runnerResult.terminalResult;
@@ -1046,7 +1316,7 @@ export function createPaperPilotComposition(options = {}) {
         config,
         bindingReceipt,
         externalInputDigest,
-        runnerResult
+        runnerReport
       );
     } catch {
       checkpointReadback = {checkpoint: null, checkpointSha256: null, persistence: "UNKNOWN"};
@@ -1115,7 +1385,7 @@ export function createPaperPilotComposition(options = {}) {
       provenance,
       authority: {providerExecution: false, signing: false, orders: false, wallet: false, liveReady: false},
       report: reportEnvelope(config, {
-        runnerReport: runnerResult,
+        runnerReport,
         checkpoint: checkpointReadback.checkpoint,
         checkpointSha256: checkpointReadback.checkpointSha256,
         persistence,

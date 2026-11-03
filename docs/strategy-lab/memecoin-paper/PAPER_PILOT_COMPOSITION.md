@@ -1,4 +1,4 @@
-# Bounded Paper-pilot composition — offline and no-entry external proof
+# Bounded Paper-pilot composition — offline Paper proof and no-entry external evaluation
 
 **Status: the synthetic path is a runner-backed paper proof. The external path
 performs bounded candidate evaluation only and always fails closed to a durable
@@ -18,6 +18,41 @@ entry. Missing or unauthenticated evidence therefore yields a durable
 readiness claim. No provider acquisition, order, wallet, signer, deployment, or
 live-ready path is enabled. Import and no-argument CLI invocation are inert/
 disabled.
+
+The separate controller-only `SOURCE_BACKED_PAPER` mode is wired to the same
+runner, checkpoint, export, and evaluator lifecycle. Its v2 manifest and
+prestart-bound config pin the exact `PAPER_RUNTIME_SOURCE_POLICY`; that code-owned
+policy currently marks all fixed providers unapproved. The runtime adapter
+constructs the accepted paper source pipeline and market quote adapter disabled,
+uses no transport or caller clock, and reports the exact unresolved policy
+requirements. It therefore terminates `UNKNOWN` with a durable no-entry receipt
+without calling providers, synthesizing a candidate, requesting a quote, or
+setting trusted UTC. This mode is an executable no-entry integration boundary,
+not an acquired-source or live-ready run. The existing run manifest remains
+disabled with its stop switch engaged.
+
+The offline fixture-only `PIPELINE_QUOTE` scenario is a separate test seam. It
+constructs the accepted paper source pipeline in `SYNTHETIC_TEST_ONLY`, evaluates
+the source-shaped fixture through the canonical market evidence adapter, and
+calls the accepted market quote/cost adapter with a local quote-shaped fixture.
+The fixture's bounded swap, census, price, and wallet observations flow through
+the pipeline itself; its actual hard-filter and Analyst results are passed to
+runner authorization without replacement. An explicit synthetic-only cost
+schedule supports a hypothetical Paper entry, risk mark, and exit. Pipeline
+receipt IDs, candidate/assembly/decision times, and quote adapter receipt
+metadata are persisted in the canonical v2 runtime audit and reconciled against
+checkpoint inputs by the evaluator. This proves orchestration only, not source
+trust or live readiness.
+The fixture seam can repeat bounded acquisition cycles, accounts for its RPC,
+history, evidence, and quote work against the composition's shared budgets, and
+deduplicates repeated mint identities. Its request and byte allowances are
+passed down as remaining capacity rather than replenished for each cycle; work
+shares the existing `events` ceiling. Stop/deadline and late-callback fixtures
+exercise cancellation without retry. These remain local synthetic test cases;
+the real `SOURCE_BACKED_PAPER` mode never calls this seam. Runtime-audit exports
+use `memecoin-paper-source-quote-audit/v2`; the evaluator rejects prior v1 audit
+records rather than treating them as proof of quote consumption or pipeline
+Analyst evidence.
 Configuration and fixture options reject accessor/hidden fields, and a
 pre-aborted run exits before opening a checkpoint.
 
@@ -121,7 +156,9 @@ The synthetic factory accepts only module-generated adapters from
 callbacks, fixture candidates, quotes, clock functions, or storage hooks. The
 finite `fault` enum is offline-only and exercises disconnect, timeout, stop,
 clock-jump, lost-ack, no-candidate, evidence/cost rejection, and unavailable-mark
-paths. It cannot perform network access or relabel caller-supplied market data.
+paths. `PIPELINE_QUOTE` specifically runs the fixed source-shaped fixture
+through the source pipeline and quote/cost adapter before the normal lifecycle.
+It cannot perform network access or relabel caller-supplied market data.
 
 The external path is a distinct data-only, no-entry evaluation. Its bounded
 packet contract is:
@@ -316,12 +353,15 @@ executable quotes, or validated exact costs
 matrix). Provider receipt time is not a source market timestamp. Synthetic
 fixtures cannot fill these gaps.
 
-Intake #1150 remains open; quote #1157 and evidence #1158 remain draft/open.
-Their source SHAs and interfaces are caller claims, not accepted pins. The
-external candidate path therefore produces durable blocked/no-entry results and
-does not authorize simulated fills. Candidate intake provenance, complete hard
-and analyst evidence, source-bound quote/cost semantics, and trusted source-time
-attestation remain blockers.
+Intake #1150 remains open; quote #1157 and evidence #1158 are closed. Their
+closure does not establish provider authenticity, complete evidence, trusted
+source time, or complete quote costs. The external candidate path therefore
+produces durable blocked/no-entry results and does not authorize simulated fills.
+Candidate intake provenance, complete hard and analyst evidence, source-bound
+quote/cost semantics, and trusted source-time attestation remain blockers. The
+isolated `SYNTHETIC_TEST_ONLY` runtime fixture exercises the accepted pipeline
+and quote adapter through the Paper checkpoint/export/evaluator path, but it does
+not satisfy any real-source prerequisite.
 
 The accepted #1152 owner-census interface is reconciled but is not treated as an
 eligible hard-gate source. `acquireOwnerCensus()` reports
@@ -333,10 +373,10 @@ composition or allowed to bypass the shared budget/cancellation boundary.
 Holder evidence remains UNKNOWN until a separately reviewed source supplies
 authenticated completeness, pool/burn exclusions, and identity/time binding.
 
-### Concrete integration patch proposal (not applied)
+### Future real-source integration (not applied)
 
-After #1150/#1157/#1158 are accepted at exact SHAs and their source/time,
-identity/units, cancellation, and complete-cost semantics are reviewed, a
+After intake is complete and provider contracts are pinned and reviewed for
+source/time, identity/units, cancellation, and complete-cost semantics, a
 lead-guarded patch can replace only the module-owned packet-to-candidate adapter:
 
 1. Construct the exact `MEMECOIN_EXTERNAL_READ_ONLY_INPUT_V1` envelope from the

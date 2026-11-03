@@ -13,6 +13,10 @@ import {
   evaluateMemecoinPaperRunExport
 } from "../scripts/memecoin-paper-simulated-evaluation/index.mjs";
 import {runOperationalController} from "../scripts/memecoin-paper/paper-operational-controller.mjs";
+import {
+  PAPER_RUNTIME_SOURCE_POLICY,
+  PAPER_RUNTIME_SOURCE_POLICY_SHA256
+} from "../scripts/memecoin-paper/paper-runtime-source.mjs";
 
 const CLI = fileURLToPath(new URL(
   "../scripts/memecoin-paper/paper-operational-controller.mjs", import.meta.url
@@ -76,6 +80,24 @@ function externalManifest(runId) {
         }
       }
     }
+  };
+}
+
+function sourceManifest(runId) {
+  const startedAt = Date.now() - 5_000;
+  return {
+    schemaVersion: "memecoin-paper-operational-manifest/v2",
+    config: {
+      version: 1,
+      mode: "SOURCE_BACKED_PAPER",
+      enabled: true,
+      runId,
+      startedAt,
+      budgets: {...BUDGETS},
+      sourcePolicy: structuredClone(PAPER_RUNTIME_SOURCE_POLICY),
+      sourcePolicySha256: PAPER_RUNTIME_SOURCE_POLICY_SHA256
+    },
+    sourcePolicy: structuredClone(PAPER_RUNTIME_SOURCE_POLICY)
   };
 }
 
@@ -146,6 +168,7 @@ test("explicit external-only run persists the exact report and read-only export 
     configSha256,
     producerRevision: PRODUCER_REVISION
   });
+
   assert.equal(evaluation.overall, "UNKNOWN");
   assert.equal(evaluation.evidence.entryFills, 0);
   assert.deepEqual(evaluation.claims, {
@@ -198,6 +221,77 @@ test("explicit external-only run persists the exact report and read-only export 
   assert.equal(rejectedDownload.status, 2);
   assert.equal(parseOutput(rejectedDownload).status, "BLOCKED");
   assert.equal(await readFile(exportPath, "utf8"), "{");
+});
+
+test("module-bound source mode executes the bounded no-entry lifecycle under unapproved policy", async t => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "paper-operational-source-"));
+  const runsDirectory = path.join(root, "runs");
+  await mkdir(runsDirectory);
+  const manifestPath = path.join(root, "manifest.json");
+  const manifest = sourceManifest("source-no-entry-test");
+  await writeFile(manifestPath, JSON.stringify(manifest), {mode: 0o600});
+  t.after(() => rm(root, {recursive: true, force: true}));
+
+  const started = command([
+    "start", "--enable", "--manifest", manifestPath, "--runs-dir", runsDirectory
+  ]);
+  assert.equal(started.status, 2, `${started.stderr}\n${started.stdout}`);
+  const result = parseOutput(started);
+  assert.equal(result.status, "UNKNOWN");
+  assert.equal(result.exportStatus, "ACKNOWLEDGED");
+  assert.equal(result.evaluatorOverall, "UNKNOWN");
+
+  const runDirectory = path.join(runsDirectory, manifest.config.runId);
+  const exportPath = path.join(runDirectory, "run-export.json");
+  const report = JSON.parse(await readFile(exportPath, "utf8"));
+  assert.equal(report.config.mode, "SOURCE_BACKED_PAPER");
+  assert.equal(report.config.sourcePolicySha256, PAPER_RUNTIME_SOURCE_POLICY_SHA256);
+  assert.deepEqual(report.config.sourcePolicy, PAPER_RUNTIME_SOURCE_POLICY);
+  assert.equal(report.configSha256,
+    createHash("sha256").update(canonicalCheckpointBytes(report.config)).digest("hex"));
+  assert.equal(report.bindingReceipt.configSha256, report.configSha256);
+  assert.equal(report.runnerReport.executionMode, "SOURCE_BACKED_PAPER");
+  assert.equal(report.runnerReport.provenance, "UNVERIFIED_ACQUIRED_SOURCE");
+  assert.equal(report.runnerReport.reason, "SOURCE_POLICY_UNAPPROVED");
+  assert.equal(report.runnerReport.sourcePolicy.networkAccessed, false);
+  assert.equal(report.runnerReport.sourcePolicy.pipelineEnabled, false);
+  assert.equal(report.runnerReport.sourcePolicy.quoteAdapterStatus, "DISABLED");
+  assert.deepEqual(report.runnerReport.sourcePolicy.unresolved,
+    PAPER_RUNTIME_SOURCE_POLICY.missingRequirements);
+  assert.equal(report.runnerReport.counters.quotes, 0);
+  assert.equal(report.runnerReport.sourcePolicy.trustedUtc, false);
+  assert.equal(report.runnerReport.sourcePolicy.clockSource, "LOCAL_HOST_CLOCK_UNATTESTED");
+  assert.equal(report.runnerReport.operationResults.some(item =>
+    ["authorizeEntry", "executeEntry"].includes(item.method)), false);
+  assert.ok(report.runnerReport.terminalReceipt);
+  assert.equal(report.checkpoint.records.at(-1).method, "finishRun");
+
+  const evaluation = evaluateMemecoinPaperRunExport(await readFile(exportPath), {
+    runId: manifest.config.runId,
+    configSha256: report.configSha256,
+    producerRevision: PRODUCER_REVISION
+  });
+  assert.equal(evaluation.overall, "UNKNOWN");
+  assert.equal(evaluation.evidence.entryFills, 0);
+  assert.equal(evaluation.claims.sourceReadiness, false);
+});
+
+test("source controller refuses altered or caller-approved policy before creating run state", async t => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "paper-operational-source-policy-"));
+  const runsDirectory = path.join(root, "runs");
+  await mkdir(runsDirectory);
+  const manifestPath = path.join(root, "manifest.json");
+  const manifest = sourceManifest("source-policy-tamper-test");
+  manifest.sourcePolicy.enabled = true;
+  await writeFile(manifestPath, JSON.stringify(manifest), {mode: 0o600});
+  t.after(() => rm(root, {recursive: true, force: true}));
+
+  const rejected = command([
+    "start", "--enable", "--manifest", manifestPath, "--runs-dir", runsDirectory
+  ]);
+  assert.equal(rejected.status, 2);
+  assert.equal(parseOutput(rejected).executionStarted, false);
+  assert.deepEqual(await readdir(runsDirectory), []);
 });
 
 test("synthetic SIGTERM handler is tested at pre-initialization phase barriers", async t => {
