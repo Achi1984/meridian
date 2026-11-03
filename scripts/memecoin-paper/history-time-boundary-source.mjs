@@ -247,6 +247,7 @@ export function createTimeBoundarySource({
         Object.keys(DEFAULT_LAUNCH_HISTORY_LIMITS)
           .map(key => [key, limits[key]])
       );
+      readerLimits.maxWorkUnits = limits.maxWorkUnits - span;
       const startedMonotonic = performance.now();
       const reader = createBoundedHistoryRpcReader({
         transport,

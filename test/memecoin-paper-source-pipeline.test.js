@@ -471,7 +471,7 @@ test("request, byte, work, and shared collector budgets are cumulative", async t
       poolProof: fixture.poolProof
     });
     assert.equal(result.status, "UNKNOWN");
-    assert.equal(result.reason, "SHARED_BUDGET_EXHAUSTED");
+    assert.equal(result.reason, "WORK_LIMIT");
   });
 
   await t.test("boundary and collector share the request budget", async () => {
