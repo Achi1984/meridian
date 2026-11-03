@@ -9,9 +9,9 @@ or make the Paper runtime live-ready. All positive fixtures in
 
 | Provider / method | Provider identity and documented scope | Observed completeness | Exact timestamp fidelity | Policy approval |
 |---|---|---|---|---|
-| Helius `getTransactionsForAddress` | Helius RPC identity is retained. The request captures the address, finalized commitment, page limit, and cursor; each row retains its original slot and `blockTime`, and each raw response has a SHA-256 receipt. Requested local bounds are retained as scope, not asserted as provider-enforced filters. | **UNKNOWN.** Finalized status, time/slot bounds, a short page, or exhausted pagination do not prove complete address attribution or archival history. Repeated cursors, contradictory rows, null metadata, unsupported transaction versions, and quota failures remain unavailable. | Not a timestamp-observation adapter; provider `blockTime` is preserved, including null values. | **NOT APPROVED.** |
-| Helius `getProgramAccountsV2` | Helius identity, each response context slot, cursor, raw response hash, and decoded token-account owner aggregation are retained. `minContextSlot` is a lower bound, not a frozen multi-page snapshot. | **UNKNOWN.** Only `paginationKey: null` terminates pagination; short pages do not. Cursor cycles, contradictory accounts, context-slot drift, and quota failures remain unavailable. Matching aggregate supply is not a completeness proof. | Not applicable. | **NOT APPROVED.** |
-| Birdeye `historical_price_unix` | Birdeye endpoint identity, mint, USD denomination, purpose, raw receipt hash, and returned `data.updateUnixTime` are retained. The adapter exposes an observation only when the returned second timestamp exactly equals the requested millisecond timestamp. | **UNKNOWN.** A response is one observation, not proof of series coverage or token support. Missing, near, future, malformed, and non-second-aligned times are unavailable. No parity fallback or client token scaling is applied. | Exact request/response timestamp equality is enforced for accepted observations. The requested timestamp is never substituted for the provider timestamp. | **NOT APPROVED.** |
+| Helius `getTransactionsForAddress` | Helius RPC identity is retained. The request explicitly asks for full JSON transaction details, supports versions through 0, and sends provided slot/block-time bounds as provider filters. Each result extracts its signature from `transaction.signatures[0]`, retains its original slot and `blockTime`, and binds a raw response SHA-256 receipt. | **UNKNOWN.** Provider filters, result-page length, finalized data, or an explicit null `paginationToken` do not prove complete address attribution or archival history. Repeated cursors, contradictory rows, null metadata, unsupported versions, and quota failures remain unavailable. | Not a timestamp-observation adapter; the provider's `blockTime`, including null, is preserved without substitution. | **NOT APPROVED.** |
+| Helius `getProgramAccountsV2` | The request specifies finalized `jsonParsed` data with `withContext: true`; response context slots, `value.accounts`, cursors, and raw response hashes are retained. Parsed token-account owners and raw amounts are grouped by owner. `minContextSlot` is a lower bound, not a frozen multi-page snapshot. | **UNKNOWN.** Only `value.paginationKey: null` terminates pagination; short pages do not. Cursor cycles, contradictory accounts, context-slot drift, and quota failures remain unavailable. The owner aggregation sums its decoded rows; it is not a mint-supply reconciliation. | Not applicable. | **NOT APPROVED.** |
+| Birdeye `historical_price_unix` | Birdeye endpoint identity, mint, USD denomination, purpose, raw receipt hash, returned `data.updateUnixTime`, and `isScaledUiToken` are retained. A value is exposed only for `success: true`, `isScaledUiToken: false`, and exact equality between returned seconds and requested milliseconds. | **UNKNOWN.** One response is not proof of series coverage or token support. Failed responses, unsupported/missing scaling semantics, missing/near/future timestamps, and non-second-aligned requests are unavailable. No parity fallback or client token scaling is applied. | Exact request/response timestamp equality is enforced for accepted observations. The requested timestamp is never substituted for the provider timestamp. | **NOT APPROVED.** |
 
 `CAPTURED` means only that the bounded Helius acquisition reached its endpoint
 termination condition. It is not a completeness state. Birdeye's exact
@@ -33,13 +33,12 @@ The implementation targets the issue's supplied official references:
 - Helius [RPC HTTP `llms.txt`](https://www.helius.dev/docs/api-reference/rpc/http/llms.txt)
 - Birdeye [`historical_price_unix`](https://data.birdeye.so/docs/data-api/price-ohlcv/get-defi-historical-price-unix)
 
-The sandbox could not resolve/fetch these documentation hosts during this task.
-The behavior above follows the issue's stated pagination and timestamp
-requirements; it is not a claim that the current provider docs, account
-entitlement, response contract, or service availability were independently
-verified. Birdeye's referenced documentation is described by the issue as
-returning a resolved time **near** the request, so this adapter deliberately
-rejects a near-but-not-exact observation.
+Direct fetches of these documentation hosts were blocked by sandbox DNS. Search
+results for the official provider references surfaced the request and response
+fields implemented above, but this is not a claim of live contract conformance,
+account entitlement, completeness, or service availability. Birdeye's
+referenced documentation describes a resolved time **near** the request, so
+this adapter deliberately rejects a near-but-not-exact observation.
 
 ## Decisions still open
 
