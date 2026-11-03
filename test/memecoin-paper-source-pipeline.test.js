@@ -572,6 +572,85 @@ test("fixture-trusted window reaches the canonical Analyst adapter only in synth
   assert.equal(result.decisionAt, fixture.assembledAt);
 });
 
+test("external caller reviews cannot promote an otherwise available Analyst metric", async () => {
+  const fixture = makeFixture({buyCount: 0, sellCount: 0});
+  const pairSource = "DexScreener public API";
+  const marketPairEvidence = {
+    ...fixture.marketPairEvidence,
+    source: pairSource,
+    receipt: {...fixture.marketPairEvidence.receipt, source: pairSource}
+  };
+  const providerCandidate = {
+    ...fixture.candidate,
+    source: pairSource,
+    analystEvidence: {},
+    evidence: Object.fromEntries(["marketCapUsd", "liquidityUsd"].map(key => [key, {
+      value: marketPairEvidence[key],
+      source: pairSource,
+      observedAt: fixture.candidateT,
+      verified: true,
+      coverage: {complete: true},
+      binding: fixture.identity
+    }]))
+  };
+  const externalPoolProof = {
+    ...fixture.poolProof,
+    source: "Solana JSON-RPC",
+    receipt: {...fixture.poolProof.receipt, source: "Solana JSON-RPC"}
+  };
+  const externalPolicy = {
+    ...fixture.policy,
+    historicalPriceTrust: null,
+    censusPolicy: null,
+    walletQualification: null
+  };
+  const external = await sourcePipeline(fixture, {
+    mode: "EXTERNAL_READ_ONLY_INPUT",
+    clock: () => fixture.assembledAt + 1
+  }).evaluate({
+    providerCandidate,
+    evidence: {},
+    policy: externalPolicy,
+    poolProof: externalPoolProof,
+    marketPairEvidence,
+    reviewEvidence: reviews(fixture.candidateT)
+  });
+
+  assert.ok(external.analystEvidence, JSON.stringify({
+    reason: external.reason,
+    acquisition: external.auditReceipts.acquisition
+  }));
+  const metric = external.analystEvidence.metrics.liquidityMarketCapPct;
+  assert.equal(metric.value, 5);
+  assert.equal(metric.verified, true);
+  assert.equal(metric.coverage.complete, true);
+  assert.equal(metric.source, pairSource);
+  const untrustedMetric = external.adapted.candidate.analystEvidence.liquidityMarketCapPct;
+  assert.equal(untrustedMetric.verified, false);
+  assert.equal(external.analysis.score, null);
+  assert.equal(external.executionAuthorized, false);
+  assert.equal(external.realDataEntryEligible, false);
+
+  const synthetic = await sourcePipeline(fixture, {collector: fixtureCollector}).evaluate({
+    providerCandidate: fixture.candidate,
+    evidence: {},
+    policy: fixture.policy,
+    poolProof: fixture.poolProof,
+    censusSource: fixture.censusSource,
+    priceSource: fixture.priceSource,
+    marketPairEvidence: fixture.marketPairEvidence,
+    smartWalletAllowlist: fixture.smartWalletAllowlist,
+    reviewEvidence: reviews(fixture.candidateT),
+    holdUntil: fixture.decisionAt + 8 * 60 * 60 * 1_000
+  });
+  const syntheticMetric = synthetic.adapted.candidate.analystEvidence.liquidityMarketCapPct;
+  assert.equal(synthetic.analystEvidence.metrics.liquidityMarketCapPct.value, 5);
+  assert.equal(syntheticMetric.verified, true);
+  assert.equal(syntheticMetric.source, "SYNTHETIC_FIXTURE_ONLY");
+  assert.equal(synthetic.executionAuthorized, false);
+  assert.equal(synthetic.realDataEntryEligible, false);
+});
+
 test("actual collector archival UNKNOWN stays UNKNOWN and external mode rejects fixture trust", async () => {
   const fixture = makeFixture({buyCount: 0, sellCount: 0});
   let now = fixture.assembledAt;
@@ -630,6 +709,9 @@ test("actual collector archival UNKNOWN stays UNKNOWN and external mode rejects 
   assert.equal(result.analystEvidence.candidateT, fixture.candidateT);
   assert.equal(result.executionAuthorized, false);
   assert.equal(result.realDataEntryEligible, false);
+  assert.ok(Object.values(result.adapted.candidate.analystEvidence)
+    .every(item => item.verified === false));
+  assert.equal(result.analysis.score, null);
   assert.equal(result.candidate.source, "DexScreener public API");
   assert.throws(() => createPaperSourcePipeline({
     enabled: true,
