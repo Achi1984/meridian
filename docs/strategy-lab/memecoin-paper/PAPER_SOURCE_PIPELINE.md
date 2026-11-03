@@ -115,6 +115,49 @@ proves plumbing only; its output remains `SYNTHETIC_FIXTURE_ONLY`, does not
 change the production constructor or policy, and grants no production trust or
 entry authority.
 
+## Source-orchestration partial checkpoint
+
+For `meridian-source-orchestration-20261103-r1`, the verified starting
+revision was `c24c339b763f48f64c2b018f2e12bb38d24efcf8`, with a clean
+worktree. PR #1208 was merged at that revision. PR #1210 was open and owned the
+host batch, its recovery tests, and the shared live checkpoint; none of those
+files is changed here. The separately diagnosed baseline Safety failure remains
+a historical failure, not a passed check or a repair by this packet.
+
+The intended transition is **PENDING** exact-head hosted CI and independent
+final review, not production admission. This bounded checkpoint does not change
+routing, authority, last-seen state, or the shared live checkpoint. Issue #1207
+remains open; no merge or production activation is implied.
+
+This packet is **partial**, not the requested production orchestration. The
+offline integration test joins the existing generated Birdeye response,
+immutable UNKNOWN-trust warmup publication/readback and readers, canonical
+synthetic-mode pipeline, generated candidate-bound Jupiter response, and
+existing ledger. The ledger rejects the resulting blocked evaluation; the
+actual quote adapter exposes neither an executable USD price nor known costs.
+The history collector in that test is explicitly synthetic, not evidence of an
+archive guarantee. The existing separate positive synthetic control and its
+fixture-only one-cent cost schedule grant no real-data authority.
+
+The pipeline now checks cancellation after history, source prefetch, Analyst
+assembly, and canonical evaluation before returning a result. An uncooperative
+price or census callback can still delay settlement until that callback returns;
+this is not an end-to-end deadline implementation.
+
+Remaining implementation blockers include a single enforceable cumulative
+request/response-byte/work/deadline budget spanning provider acquisition,
+warmup storage/readback, history and census/price readers, and entry/exit
+quotes, including cancellation and late-result fencing across candidate runs.
+The existing components have separate budgets and no approved common accounting
+interface. A production composition also needs a module-owned authenticated
+candidate/transport/time/policy boundary, complete archive and comparable
+census guarantees, wallet/developer/rug/bundle/LP sources, and immutable
+quote-response provenance. Quote-token/base-token ratios are not USD prices;
+all five USD cost components remain UNKNOWN without source-bound conversions,
+payer/settlement evidence, and a proven nonoverlapping gross/net basis.
+Caller `REVIEWED`, approval flags, and finite pagination cannot supply these
+guarantees. The runtime adapter remains disabled with `trustedUtc` unchanged.
+
 ## Accepted interface dependency
 
 The accepted history-window bridge from PR #1182 is present at the merged

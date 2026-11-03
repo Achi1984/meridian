@@ -763,6 +763,43 @@ test("overlapping pipeline evaluations are explicitly rejected", async () => {
   assert.equal(result.auditReceipts.acquisition.length, 1);
 });
 
+test("cancellation during a late source read cannot return a canonical evaluation", async () => {
+  const fixture = makeFixture({buyCount: 0, sellCount: 0});
+  const controller = new AbortController();
+  let release;
+  let announce;
+  const started = new Promise(resolve => { announce = resolve; });
+  const gate = new Promise(resolve => { release = resolve; });
+  const priceSource = {
+    async readObservation(request) {
+      announce();
+      await gate;
+      return fixture.priceSource.readObservation(request);
+    }
+  };
+  const pipeline = sourcePipeline(fixture, {collector: fixtureCollector});
+  const pending = pipeline.evaluate({
+    providerCandidate: fixture.candidate,
+    policy: fixture.policy,
+    poolProof: fixture.poolProof,
+    priceSource,
+    censusSource: fixture.censusSource,
+    marketPairEvidence: fixture.marketPairEvidence,
+    smartWalletAllowlist: fixture.smartWalletAllowlist,
+    reviewEvidence: reviews(fixture.candidateT),
+    signal: controller.signal
+  });
+  await started;
+  controller.abort();
+  release();
+  const result = await pending;
+  assert.equal(result.status, "UNKNOWN");
+  assert.equal(result.reason, "CANCELLED");
+  assert.equal(result.candidate, null);
+  assert.equal(result.executionAuthorized, false);
+  assert.equal(result.realDataEntryEligible, false);
+});
+
 test("price and census source receipts completed after prefetch start are accepted only after assembly", async () => {
   const fixture = makeFixture({buyCount: 0, sellCount: 0});
   let now = fixture.assembledAt;

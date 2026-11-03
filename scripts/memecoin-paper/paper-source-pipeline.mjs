@@ -299,6 +299,9 @@ export function createPaperSourcePipeline({
           } catch {
             prefetchedHistory = null;
           }
+          if (signal?.aborted) {
+            return unavailable("CANCELLED", {candidateT, holdUntil});
+          }
           acquisitionReceipts.push(receiptSummary(
             prefetchedHistory, acquisition.timeEvidence, acquisition.collector
           ));
@@ -375,6 +378,9 @@ export function createPaperSourcePipeline({
             candidateT, assembledAt: sourceAssembly, holdUntil
           });
         }
+        if (signal?.aborted) {
+          return unavailable("CANCELLED", {candidateT, assembledAt: sourceAssembly, holdUntil});
+        }
 
         let actualAssembledAt;
         try {
@@ -424,6 +430,11 @@ export function createPaperSourcePipeline({
             candidateT, assembledAt: actualAssembledAt, decisionAt: analystCutoff, holdUntil
           });
         }
+        if (signal?.aborted) {
+          return unavailable("CANCELLED", {
+            candidateT, assembledAt: actualAssembledAt, decisionAt: analystCutoff, holdUntil
+          });
+        }
         let actualDecisionAt;
         try {
           actualDecisionAt = clock();
@@ -448,6 +459,11 @@ export function createPaperSourcePipeline({
           });
         } catch {
           return unavailable("CANONICAL_EVALUATION_UNKNOWN", {
+            candidateT, assembledAt: actualAssembledAt, decisionAt: actualDecisionAt, holdUntil
+          });
+        }
+        if (signal?.aborted) {
+          return unavailable("CANCELLED", {
             candidateT, assembledAt: actualAssembledAt, decisionAt: actualDecisionAt, holdUntil
           });
         }
