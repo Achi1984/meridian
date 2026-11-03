@@ -56,6 +56,8 @@ function redactSecret(value, secret, seen = new WeakMap()) {
   const output = Array.isArray(value) ? [] : {};
   seen.set(value, output);
   for (const [key, child] of Object.entries(value)) {
+    if (/secret|api[-_]?key|authorization|access[-_]?token|bearer/i.test(key) ||
+        (secret && key.toLowerCase().includes(secret.toLowerCase()))) continue;
     output[key] = redactSecret(child, secret, seen);
   }
   return output;
@@ -210,9 +212,15 @@ async function readJson(response, state, limits, signal) {
   signal?.addEventListener("abort", seal, {once: true});
   try {
     for (;;) {
+      const currentFailure = finalAcquisitionFailure(state, signal);
+      if (currentFailure) throw new Error(currentFailure);
       const {done, value} = await reader.read();
       if (sealed || signal?.aborted) throw new Error("CANCELLED");
       if (done) break;
+      if (state.workUnits >= limits.maxWorkUnits) {
+        throw new Error("WORK_QUOTA_EXHAUSTED");
+      }
+      state.workUnits += 1;
       if (!(value instanceof Uint8Array)) throw new Error("INVALID_RESPONSE_BODY");
       bytes += value.byteLength;
       state.bytes += value.byteLength;
@@ -240,6 +248,8 @@ async function readJson(response, state, limits, signal) {
   } catch {
     throw new Error("INVALID_JSON");
   }
+  const finalFailure = finalAcquisitionFailure(state, signal);
+  if (finalFailure) throw new Error(finalFailure);
   return {
     parsed,
     bytes,
@@ -276,6 +286,20 @@ function makeRequest(provider, method, params, id) {
   });
 }
 
+function completedEnvelope(provider, method, scope, state, data, coverage, signal) {
+  const result = providerEnvelope(provider, method, scope, state, {
+    status: "CAPTURED",
+    data,
+    coverage
+  });
+  const reason = finalAcquisitionFailure(state, signal);
+  if (reason) {
+    result.status = "UNAVAILABLE";
+    result.reason = reason;
+  }
+  return result;
+}
+
 function createState(clock, limits, transport, secret, signal) {
   let startedAt;
   try { startedAt = clock(); } catch { startedAt = null; }
@@ -303,6 +327,17 @@ function acquisitionFailure(state) {
   }
   if (state.requests >= state.limits.maxRequests) return "REQUEST_QUOTA_EXHAUSTED";
   if (state.workUnits >= state.limits.maxWorkUnits) return "WORK_QUOTA_EXHAUSTED";
+  return null;
+}
+
+function finalAcquisitionFailure(state, signal = state.signal) {
+  if (signal?.aborted) return "CANCELLED";
+  if (!validTime(state.startedAt)) return "INVALID_CLOCK";
+  if (performance.now() - state.startedMonotonic >= state.limits.maxDurationMs) {
+    return "DEADLINE_EXCEEDED";
+  }
+  if (state.bytes > state.limits.maxBytesPerRun) return "RUN_BYTE_LIMIT";
+  if (state.workUnits > state.limits.maxWorkUnits) return "WORK_QUOTA_EXHAUSTED";
   return null;
 }
 
@@ -376,7 +411,8 @@ async function requestJson(state, provider, method, params, signal = state.signa
       timeout,
       aborted
     ]);
-    const receivedAt = state.clock();
+    let receivedAt;
+    try { receivedAt = state.clock(); } catch { return {ok: false, reason: "INVALID_CLOCK"}; }
     if (!validTime(receivedAt) || receivedAt < startedAt ||
         performance.now() - state.startedMonotonic > state.limits.maxDurationMs) {
       return {ok: false, reason: "DEADLINE_EXCEEDED"};
@@ -413,13 +449,16 @@ async function requestJson(state, provider, method, params, signal = state.signa
     } else {
       result = decoded.parsed;
     }
+    const completionFailure = finalAcquisitionFailure(state, signal);
+    if (completionFailure) return {ok: false, reason: completionFailure};
     return {ok: true, result, receipt};
   } catch (error) {
     controller.abort();
     cancelledBody(response?.body, "request closed");
     const safeReasons = new Set([
       "CANCELLED", "DEADLINE_EXCEEDED", "REQUEST_TIMEOUT",
-      "RESPONSE_BYTE_LIMIT", "INVALID_RESPONSE_BODY", "INVALID_JSON"
+      "RESPONSE_BYTE_LIMIT", "INVALID_RESPONSE_BODY", "INVALID_JSON",
+      "WORK_QUOTA_EXHAUSTED", "RUN_BYTE_LIMIT"
     ]);
     const reason = safeReasons.has(error?.message) ? error.message : "TRANSPORT_UNAVAILABLE";
     return {ok: false, reason};
@@ -491,14 +530,23 @@ export function createHeliusSource({
       endBlockTime = null,
       signal
     } = {}) {
+      const filters = {};
+      if (startSlot !== null || endSlot !== null) {
+        filters.slot = {
+          ...(startSlot !== null ? {gte: startSlot} : {}),
+          ...(endSlot !== null ? {lte: endSlot} : {})
+        };
+      }
+      if (startBlockTime !== null || endBlockTime !== null) {
+        filters.blockTime = {
+          ...(startBlockTime !== null ? {gte: startBlockTime} : {}),
+          ...(endBlockTime !== null ? {lte: endBlockTime} : {})
+        };
+      }
       const scope = {
         address: address(queriedAddress) ? queriedAddress : null,
-        commitment: "finalized",
         limit,
-        startSlot,
-        endSlot,
-        startBlockTime,
-        endBlockTime
+        filters
       };
       if (!config.enabled) {
         return failureEnvelope(HELIUS_SOURCE, "getTransactionsForAddress", scope,
@@ -521,14 +569,16 @@ export function createHeliusSource({
       const transactions = [];
       const seen = new Map();
       const seenCursors = new Set();
-      let before;
-      let cursorParameter = "before";
+      let paginationToken;
       let reason = null;
       for (let page = 0; page < config.limits.maxPages; page += 1) {
         const params = [queriedAddress, {
-          commitment: "finalized",
+          transactionDetails: "full",
+          encoding: "json",
+          maxSupportedTransactionVersion: 0,
           limit,
-          ...(before ? {[cursorParameter]: before} : {})
+          filters,
+          ...(typeof paginationToken === "string" ? {paginationToken} : {})
         }];
         const outcome = await requestJson(state, HELIUS_SOURCE,
           "getTransactionsForAddress", params, signal);
@@ -536,28 +586,27 @@ export function createHeliusSource({
           reason = outcome.reason;
           break;
         }
-        const pageRows = Array.isArray(outcome.result) ? outcome.result
-          : Array.isArray(outcome.result?.data) ? outcome.result.data
-            : Array.isArray(outcome.result?.transactions) ? outcome.result.transactions
-              : null;
-        if (!pageRows) {
+        if (!isRecord(outcome.result) || !Array.isArray(outcome.result.data) ||
+            !Object.hasOwn(outcome.result, "paginationToken") ||
+            (outcome.result.paginationToken !== null &&
+              (typeof outcome.result.paginationToken !== "string" ||
+               !outcome.result.paginationToken))) {
           reason = "INVALID_TRANSACTION_PAGE";
           break;
         }
-        const explicitCursor = isRecord(outcome.result) &&
-          (Object.hasOwn(outcome.result, "paginationToken") ||
-           Object.hasOwn(outcome.result, "nextCursor"));
-        const nextCursor = explicitCursor
-          ? (outcome.result.paginationToken ?? outcome.result.nextCursor)
-          : null;
-        const nextCursorParameter = isRecord(outcome.result) &&
-          Object.hasOwn(outcome.result, "paginationToken")
-          ? "paginationToken" : "before";
-        let lastSignature = null;
+        const pageRows = outcome.result.data;
+        const nextCursor = outcome.result.paginationToken;
         for (const row of pageRows) {
-          if (!isRecord(row) || typeof row.signature !== "string" ||
-              !row.signature || row.signature.length > 128 ||
-              !Number.isSafeInteger(row.slot) || row.slot < 0) {
+          const rowFailure = finalAcquisitionFailure(state, signal);
+          if (rowFailure) {
+            reason = rowFailure;
+            break;
+          }
+          const signature = row?.transaction?.signatures?.[0];
+          if (!isRecord(row) || !isRecord(row.transaction) ||
+              !Array.isArray(row.transaction.signatures) ||
+              typeof signature !== "string" || !signature ||
+              signature.length > 128 || !Number.isSafeInteger(row.slot) || row.slot < 0) {
             reason = "INVALID_TRANSACTION_ROW";
             break;
           }
@@ -580,67 +629,57 @@ export function createHeliusSource({
             break;
           }
           const serialized = JSON.stringify(row);
-          const prior = seen.get(row.signature);
+          const prior = seen.get(signature);
           if (prior !== undefined) {
             if (prior !== serialized) reason = "CONTRADICTORY_DUPLICATE_TRANSACTION";
             else reason = "DUPLICATE_TRANSACTION";
             break;
           }
-          seen.set(row.signature, serialized);
+          seen.set(signature, serialized);
           transactions.push({
             ...row,
+            signature,
             providerIdentity: HELIUS_SOURCE,
             originalSlot: row.slot,
             originalBlockTime: row.blockTime,
             queryScope: safeScope(scope),
             receiptSha256: outcome.receipt.responseSha256
           });
-          lastSignature = row.signature;
           if (transactions.length > config.limits.maxRows) {
             reason = "ROW_QUOTA_EXHAUSTED";
             break;
           }
         }
         if (reason) break;
-        if (explicitCursor && nextCursor === null) {
+        if (nextCursor === null) {
           reason = "PROVIDER_PAGE_EXHAUSTED";
           break;
         }
-        if (!explicitCursor && (pageRows.length === 0 || pageRows.length < limit)) {
-          reason = "PROVIDER_PAGE_EXHAUSTED";
-          break;
-        }
-        const next = explicitCursor ? nextCursor : lastSignature;
-        if (typeof next !== "string" || !next ||
-            seenCursors.has(next) || next === before) {
+        if (seenCursors.has(nextCursor) || nextCursor === paginationToken) {
           reason = "REPEATED_CURSOR";
           break;
         }
-        seenCursors.add(next);
-        before = next;
-        cursorParameter = explicitCursor ? nextCursorParameter : "before";
+        seenCursors.add(nextCursor);
+        paginationToken = nextCursor;
       }
       if (!reason) reason = "PAGE_QUOTA_EXHAUSTED";
       const data = {
         transactions,
-        cursorTermination: reason === "PROVIDER_PAGE_EXHAUSTED" ? "SHORT_OR_EMPTY_PAGE" : null
+        cursorTermination: reason === "PROVIDER_PAGE_EXHAUSTED" ? "NULL_PAGINATION_TOKEN" : null
       };
+      const completionFailure = finalAcquisitionFailure(state, signal);
+      if (!reason && completionFailure) reason = completionFailure;
       if (reason !== "PROVIDER_PAGE_EXHAUSTED") {
         return failureEnvelope(HELIUS_SOURCE, "getTransactionsForAddress",
           safeScope(scope), state, reason, data);
       }
-      return providerEnvelope(HELIUS_SOURCE, "getTransactionsForAddress",
-        safeScope(scope), state, {
-          status: "CAPTURED",
-          reason: null,
-          data,
-          coverage: {
-            cursorExhausted: true,
-            observedCompleteness: "UNKNOWN",
-            policyApproval: "NOT_APPROVED",
-            finalizedIsNotCompletenessProof: true
-          }
-        });
+      return completedEnvelope(HELIUS_SOURCE, "getTransactionsForAddress",
+        safeScope(scope), state, data, {
+          cursorExhausted: true,
+          observedCompleteness: "UNKNOWN",
+          policyApproval: "NOT_APPROVED",
+          finalizedIsNotCompletenessProof: true
+        }, signal);
     },
 
     async getProgramAccountsV2({
@@ -683,10 +722,13 @@ export function createHeliusSource({
       const seenKeys = new Set();
       for (let page = 0; page < config.limits.maxPages; page += 1) {
         const params = [programId, {
+          commitment: "finalized",
+          encoding: "jsonParsed",
+          withContext: true,
           filters: safeFilters,
           limit: pageSize,
-          minContextSlot: minContextSlot ?? undefined,
-          paginationKey
+          ...(minContextSlot !== null ? {minContextSlot} : {}),
+          ...(typeof paginationKey === "string" ? {paginationKey} : {})
         }];
         const outcome = await requestJson(state, HELIUS_SOURCE,
           "getProgramAccountsV2", params, signal);
@@ -695,11 +737,13 @@ export function createHeliusSource({
           break;
         }
         const result = outcome.result;
-        if (!isRecord(result) || !Array.isArray(result.accounts) ||
-            !isRecord(result.context) || !Number.isSafeInteger(result.context.slot) ||
-            result.context.slot < 0 || !Object.hasOwn(result, "paginationKey") ||
-            (result.paginationKey !== null &&
-              (typeof result.paginationKey !== "string" || !result.paginationKey))) {
+        const pageValue = result?.value;
+        if (!isRecord(result) || !isRecord(result.context) ||
+            !Number.isSafeInteger(result.context.slot) || result.context.slot < 0 ||
+            !isRecord(pageValue) || !Array.isArray(pageValue.accounts) ||
+            !Object.hasOwn(pageValue, "paginationKey") ||
+            (pageValue.paginationKey !== null &&
+              (typeof pageValue.paginationKey !== "string" || !pageValue.paginationKey))) {
           reason = "INVALID_ACCOUNT_PAGE";
           break;
         }
@@ -712,17 +756,22 @@ export function createHeliusSource({
         pages.push({
           context: {slot: pageContextSlot},
           requestedPaginationKey: paginationKey,
-          paginationKey: result.paginationKey,
+          paginationKey: pageValue.paginationKey,
           responseSha256: outcome.receipt.responseSha256,
-          accountCount: result.accounts.length
+          accountCount: pageValue.accounts.length
         });
-        for (const row of result.accounts) {
+        for (const row of pageValue.accounts) {
+          const rowFailure = finalAcquisitionFailure(state, signal);
+          if (rowFailure) {
+            reason = rowFailure;
+            break;
+          }
           if (!isRecord(row) ||
-              (typeof row.address !== "string" && typeof row.pubkey !== "string")) {
+              typeof row.pubkey !== "string" || !isRecord(row.account)) {
             reason = "INVALID_ACCOUNT_ROW";
             break;
           }
-          const accountAddress = row.address ?? row.pubkey;
+          const accountAddress = row.pubkey;
           if (!address(accountAddress)) {
             reason = "INVALID_ACCOUNT_ROW";
             break;
@@ -743,10 +792,9 @@ export function createHeliusSource({
             reason = "ROW_QUOTA_EXHAUSTED";
             break;
           }
-          const decodedOwner = row.decoded?.owner ??
-            row.account?.data?.parsed?.info?.owner ?? null;
-          const rawAmount = row.decoded?.amount ??
-            row.account?.data?.parsed?.info?.tokenAmount?.amount ?? null;
+          const info = row.account?.data?.parsed?.info;
+          const decodedOwner = info?.owner ?? null;
+          const rawAmount = info?.tokenAmount?.amount ?? null;
           if (typeof decodedOwner !== "string" || !BASE58.test(decodedOwner) ||
               typeof rawAmount !== "string" || !/^(?:0|[1-9]\d{0,79})$/.test(rawAmount)) {
             allDecoded = false;
@@ -760,16 +808,17 @@ export function createHeliusSource({
           owners.set(decodedOwner, aggregate);
         }
         if (reason) break;
-        if (result.paginationKey === null) {
+        if (pageValue.paginationKey === null) {
           terminated = true;
           break;
         }
-        if (seenKeys.has(result.paginationKey) || result.paginationKey === paginationKey) {
+        if (seenKeys.has(pageValue.paginationKey) ||
+            pageValue.paginationKey === paginationKey) {
           reason = "REPEATED_CURSOR";
           break;
         }
-        seenKeys.add(result.paginationKey);
-        paginationKey = result.paginationKey;
+        seenKeys.add(pageValue.paginationKey);
+        paginationKey = pageValue.paginationKey;
       }
       if (!reason && !terminated) reason = "PAGE_QUOTA_EXHAUSTED";
       const ownerRows = [...owners.values()].map(item => ({
@@ -782,17 +831,20 @@ export function createHeliusSource({
         pages,
         accounts: accounts.size,
         owners: ownerRows,
-        reconciliation: {
+        ownerAggregation: {
           decodedAccounts: allDecoded ? accounts.size : null,
-          rawAmountTotal: allDecoded ? rawAmountTotal.toString() : null,
-          ownerRawAmountTotal: allDecoded ? ownerTotal.toString() : null,
-          matches: allDecoded ? rawAmountTotal === ownerTotal : null
+          decodedAccountRawAmountTotal: allDecoded ? rawAmountTotal.toString() : null,
+          aggregatedOwnerRawAmountTotal: allDecoded ? ownerTotal.toString() : null,
+          sumsToDecodedAccountTotal: allDecoded ? rawAmountTotal === ownerTotal : null,
+          isMintSupplyReconciliation: false
         },
         contextSlots,
         contextSlotDrift: new Set(contextSlots).size > 1,
         minContextSlotIsLowerBound: true,
         paginationTerminatedByNull: terminated
       };
+      const completionFailure = finalAcquisitionFailure(state, signal);
+      if (!reason && completionFailure) reason = completionFailure;
       if (reason) {
         return failureEnvelope(HELIUS_SOURCE, "getProgramAccountsV2",
           safeScope(scope), state, reason, data);
@@ -801,17 +853,13 @@ export function createHeliusSource({
         return failureEnvelope(HELIUS_SOURCE, "getProgramAccountsV2",
           safeScope(scope), state, "CONTEXT_SLOT_DRIFT", data);
       }
-      return providerEnvelope(HELIUS_SOURCE, "getProgramAccountsV2",
-        safeScope(scope), state, {
-          status: "CAPTURED",
-          data,
-          coverage: {
-            paginationTerminatedByNull: true,
-            observedCompleteness: "UNKNOWN",
-            policyApproval: "NOT_APPROVED",
-            frozenSnapshot: false
-          }
-        });
+      return completedEnvelope(HELIUS_SOURCE, "getProgramAccountsV2",
+        safeScope(scope), state, data, {
+          paginationTerminatedByNull: true,
+          observedCompleteness: "UNKNOWN",
+          policyApproval: "NOT_APPROVED",
+          frozenSnapshot: false
+        }, signal);
     }
   });
 }
@@ -875,6 +923,10 @@ export function createBirdeyeSource({
         return failureEnvelope(BIRDEYE_SOURCE, "historical_price_unix",
           safeScope(scope), state, outcome.reason);
       }
+      if (!isRecord(outcome.result) || outcome.result.success !== true) {
+        return failureEnvelope(BIRDEYE_SOURCE, "historical_price_unix",
+          safeScope(scope), state, "PROVIDER_RESPONSE_UNSUCCESSFUL");
+      }
       const data = outcome.result?.data;
       if (!isRecord(data)) {
         return failureEnvelope(BIRDEYE_SOURCE, "historical_price_unix",
@@ -882,8 +934,16 @@ export function createBirdeyeSource({
       }
       const preservedData = {
         updateUnixTime: data.updateUnixTime ?? null,
-        value: data.value ?? null
+        value: data.value ?? null,
+        isScaledUiToken: data.isScaledUiToken ?? null
       };
+      if (data.isScaledUiToken !== false) {
+        return failureEnvelope(BIRDEYE_SOURCE, "historical_price_unix",
+          safeScope(scope), state,
+          data.isScaledUiToken === true
+            ? "UNSUPPORTED_TOKEN_SCALING" : "MISSING_SCALING_SEMANTICS",
+          preservedData);
+      }
       if (typeof data.updateUnixTime !== "number" ||
           !Number.isSafeInteger(data.updateUnixTime)) {
         return failureEnvelope(BIRDEYE_SOURCE, "historical_price_unix",
@@ -902,7 +962,7 @@ export function createBirdeyeSource({
           safeScope(scope), state, "INVALID_PRICE_VALUE", {...preservedData, sourceAtMs});
       }
       const receipt = outcome.receipt;
-      return redactSecret({
+      const observation = redactSecret({
         status: "SOURCE_BOUND",
         source: BIRDEYE_SOURCE,
         provider: {name: BIRDEYE_SOURCE, method: "historical_price_unix"},
@@ -911,6 +971,8 @@ export function createBirdeyeSource({
         denomination: "USD",
         purpose: input.purpose,
         value: data.value,
+        valueUsd: data.value,
+        methodologyVersion: "birdeye-historical-price-unix-v1",
         data: preservedData,
         sourceAtMs,
         observedAt: sourceAtMs,
@@ -942,6 +1004,12 @@ export function createBirdeyeSource({
           scaling: "PROVIDER_PRICE_PER_TOKEN_UNSCALED"
         }
       }, config.secret);
+      const completionFailure = finalAcquisitionFailure(state, input.signal);
+      if (completionFailure) {
+        return failureEnvelope(BIRDEYE_SOURCE, "historical_price_unix",
+          safeScope(scope), state, completionFailure, preservedData);
+      }
+      return observation;
     }
   });
 }

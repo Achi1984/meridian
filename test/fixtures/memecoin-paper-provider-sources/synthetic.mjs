@@ -17,22 +17,54 @@ export function syntheticTransaction({
   version = 0,
   meta = {err: null}
 } = {}) {
-  return {signature, slot, blockTime, version, meta, transaction: {signatures: [signature]}};
+  return {
+    slot,
+    blockTime,
+    version,
+    meta,
+    transaction: {
+      signatures: [signature],
+      message: {accountKeys: []}
+    }
+  };
 }
 
 export function syntheticAccount({
-  address = SYNTHETIC_POOL,
+  pubkey = SYNTHETIC_POOL,
   owner = SYNTHETIC_OWNER_A,
-  amount = "17"
+  amount = "17",
+  mint = SYNTHETIC_PROGRAM
 } = {}) {
-  return {address, decoded: {owner, amount}};
+  return {
+    pubkey,
+    account: {
+      data: {
+        program: "spl-token",
+        parsed: {
+          type: "account",
+          info: {
+            mint,
+            owner,
+            tokenAmount: {amount, decimals: 6, uiAmount: null, uiAmountString: "0"}
+          }
+        }
+      },
+      executable: false,
+      lamports: 2_039_280,
+      owner: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      rentEpoch: 0,
+      space: 165
+    }
+  };
 }
 
 export function syntheticPriceResponse({
   value = 0.00042,
-  updateUnixTime = Math.floor(SYNTHETIC_PROVIDER_TIME / 1_000)
+  updateUnixTime = Math.floor(SYNTHETIC_PROVIDER_TIME / 1_000),
+  success = true,
+  isScaledUiToken = false
 } = {}) {
-  return {data: {value, updateUnixTime}};
+  return {success, data: {value, updateUnixTime, isScaledUiToken}};
 }
 
 export function jsonResponse(value, {

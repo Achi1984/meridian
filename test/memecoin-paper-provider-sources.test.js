@@ -11,7 +11,9 @@ import {
 } from "../scripts/memecoin-paper/provider-sources/index.mjs";
 import {
   ANALYST_WINDOW_METRICS,
-  PROPOSED_ANALYST_WINDOW_POLICY
+  PROPOSED_ANALYST_WINDOW_POLICY,
+  bridgeAnalystWindowPacket,
+  buildAnalystWindowEvidence
 } from "../scripts/memecoin-paper/analyst-window-evidence.mjs";
 import {analyzeCandidate, filterCandidate} from "../scripts/memecoin-paper/stages.mjs";
 import {makeFixture} from "./fixtures/memecoin-paper-analyst-window-evidence/source-shaped.mjs";
@@ -96,9 +98,14 @@ test("disabled provider sources make zero requests and cannot provide readiness"
 });
 
 test("synthetic Helius history preserves provider, query, raw hash, slot and block time", async () => {
-  const source = helius(rpcTransport(async (_method, params) => [
-    syntheticTransaction({signature: "sig-1", slot: 44, blockTime: 123})
-  ]));
+  let requestOptions;
+  const source = helius(rpcTransport(async (_method, params) => {
+    requestOptions = params[1];
+    return {
+      data: [syntheticTransaction({signature: "sig-1", slot: 44, blockTime: 123})],
+      paginationToken: null
+    };
+  }));
   const result = await source.getTransactionsForAddress({
     address,
     limit: 2,
@@ -112,13 +119,24 @@ test("synthetic Helius history preserves provider, query, raw hash, slot and blo
   assert.equal(result.provider.method, "getTransactionsForAddress");
   assert.deepEqual(result.queryScope, {
     address,
-    commitment: "finalized",
     limit: 2,
-    startSlot: 40,
-    endSlot: 50,
-    startBlockTime: 100,
-    endBlockTime: 150
+    filters: {
+      slot: {gte: 40, lte: 50},
+      blockTime: {gte: 100, lte: 150}
+    }
   });
+  assert.deepEqual(requestOptions, {
+    transactionDetails: "full",
+    encoding: "json",
+    maxSupportedTransactionVersion: 0,
+    limit: 2,
+    filters: {
+      slot: {gte: 40, lte: 50},
+      blockTime: {gte: 100, lte: 150}
+    }
+  });
+  assert.deepEqual(result.data.transactions[0].transaction.signatures, ["sig-1"]);
+  assert.equal(result.data.transactions[0].signature, "sig-1");
   assert.equal(result.data.transactions[0].providerIdentity, HELIUS_SOURCE);
   assert.equal(result.data.transactions[0].originalSlot, 44);
   assert.equal(result.data.transactions[0].originalBlockTime, 123);
@@ -128,11 +146,14 @@ test("synthetic Helius history preserves provider, query, raw hash, slot and blo
   assert.equal(result.coverage.policyApproval, "NOT_APPROVED");
 });
 
-test("synthetic Helius short transaction pages terminate cursor walking without claiming completeness", async () => {
+test("synthetic Helius null pagination token terminates history without claiming completeness", async () => {
   const calls = [];
   const source = helius(rpcTransport(async (method, params) => {
     calls.push({method, params});
-    return [syntheticTransaction({signature: "last", slot: 20})];
+    return {
+      data: [syntheticTransaction({signature: "last", slot: 20})],
+      paginationToken: null
+    };
   }));
   const result = await source.getTransactionsForAddress({address, limit: 2});
   assert.equal(result.status, "CAPTURED");
@@ -168,18 +189,36 @@ test("Helius transaction cursor cycles, contradictory duplicates, null metadata 
     assert.equal(result.reason, "CONTRADICTORY_DUPLICATE_TRANSACTION");
   });
   await t.test("null metadata", async () => {
-    const source = helius(rpcTransport(async () => [
-      syntheticTransaction({meta: null})
-    ]));
+    const source = helius(rpcTransport(async () => ({
+      data: [syntheticTransaction({meta: null})],
+      paginationToken: null
+    })));
     const result = await source.getTransactionsForAddress({address});
     assert.equal(result.reason, "NULL_TRANSACTION_METADATA");
   });
   await t.test("unsupported version", async () => {
-    const source = helius(rpcTransport(async () => [
-      syntheticTransaction({version: 1})
-    ]));
+    const source = helius(rpcTransport(async () => ({
+      data: [syntheticTransaction({version: 1})],
+      paginationToken: null
+    })));
     const result = await source.getTransactionsForAddress({address});
     assert.equal(result.reason, "UNSUPPORTED_TRANSACTION_VERSION");
+  });
+  await t.test("invented top-level signature rejected", async () => {
+    const row = syntheticTransaction();
+    delete row.transaction;
+    row.signature = "fake-top-level-signature";
+    const source = helius(rpcTransport(async () => ({
+      data: [row],
+      paginationToken: null
+    })));
+    const result = await source.getTransactionsForAddress({address});
+    assert.equal(result.reason, "INVALID_TRANSACTION_ROW");
+  });
+  await t.test("missing pagination token rejected", async () => {
+    const source = helius(rpcTransport(async () => ({data: []})));
+    const result = await source.getTransactionsForAddress({address});
+    assert.equal(result.reason, "INVALID_TRANSACTION_PAGE");
   });
 });
 
@@ -190,16 +229,20 @@ test("synthetic Helius account pages continue after short pages and stop only at
     if (requests.length === 1) {
       return {
         context: {slot: 90},
-        accounts: [syntheticAccount({address: SYNTHETIC_PROGRAM})],
-        paginationKey: "continue"
+        value: {
+          accounts: [syntheticAccount({pubkey: SYNTHETIC_PROGRAM})],
+          paginationKey: "continue"
+        }
       };
     }
     return {
       context: {slot: 90},
-      accounts: [syntheticAccount({
-        address: SYNTHETIC_OWNER_B, owner: SYNTHETIC_OWNER_B, amount: "23"
-      })],
-      paginationKey: null
+      value: {
+        accounts: [syntheticAccount({
+          pubkey: SYNTHETIC_OWNER_B, owner: SYNTHETIC_OWNER_B, amount: "23"
+        })],
+        paginationKey: null
+      }
     };
   }));
   const result = await source.getProgramAccountsV2({
@@ -209,13 +252,17 @@ test("synthetic Helius account pages continue after short pages and stop only at
   });
   assert.equal(result.status, "CAPTURED");
   assert.equal(requests.length, 2);
-  assert.equal(requests[0].paginationKey, null);
+  assert.equal(Object.hasOwn(requests[0], "paginationKey"), false);
   assert.equal(requests[1].paginationKey, "continue");
+  assert.equal(requests[0].withContext, true);
+  assert.equal(requests[0].encoding, "jsonParsed");
+  assert.equal(requests[0].commitment, "finalized");
   assert.deepEqual(result.data.contextSlots, [90, 90]);
   assert.equal(result.data.paginationTerminatedByNull, true);
   assert.equal(result.data.accounts, 2);
   assert.deepEqual(result.data.owners.map(row => row.rawAmount).sort(), ["17", "23"]);
-  assert.equal(result.data.reconciliation.matches, true);
+  assert.equal(result.data.ownerAggregation.sumsToDecodedAccountTotal, true);
+  assert.equal(result.data.ownerAggregation.isMintSupplyReconciliation, false);
   assert.equal(result.coverage.frozenSnapshot, false);
   assert.equal(result.coverage.observedCompleteness, "UNKNOWN");
 });
@@ -227,8 +274,7 @@ test("Helius account cursor cycles, contradictions, context drift and quotas rem
       calls += 1;
       return {
         context: {slot: 90},
-        accounts: [],
-        paginationKey: "repeat"
+        value: {accounts: [], paginationKey: "repeat"}
       };
     }));
     const result = await source.getProgramAccountsV2({programId: SYNTHETIC_PROGRAM});
@@ -241,8 +287,10 @@ test("Helius account cursor cycles, contradictions, context drift and quotas rem
       calls += 1;
       return {
         context: {slot: 90},
-        accounts: [syntheticAccount({address: SYNTHETIC_PROGRAM, amount: String(calls)})],
-        paginationKey: calls === 1 ? "next" : null
+        value: {
+          accounts: [syntheticAccount({pubkey: SYNTHETIC_PROGRAM, amount: String(calls)})],
+          paginationKey: calls === 1 ? "next" : null
+        }
       };
     }));
     const result = await source.getProgramAccountsV2({programId: SYNTHETIC_PROGRAM});
@@ -254,8 +302,7 @@ test("Helius account cursor cycles, contradictions, context drift and quotas rem
       calls += 1;
       return {
         context: {slot: 90 + calls},
-        accounts: [],
-        paginationKey: calls === 1 ? "next" : null
+        value: {accounts: [], paginationKey: calls === 1 ? "next" : null}
       };
     }));
     const result = await source.getProgramAccountsV2({
@@ -270,7 +317,7 @@ test("Helius account cursor cycles, contradictions, context drift and quotas rem
     let calls = 0;
     const source = helius(rpcTransport(async () => {
       calls += 1;
-      return {context: {slot: 90}, accounts: [], paginationKey: "next"};
+      return {context: {slot: 90}, value: {accounts: [], paginationKey: "next"}};
     }), {limits: {maxRequests: 1}});
     const result = await source.getProgramAccountsV2({programId: SYNTHETIC_PROGRAM});
     assert.equal(result.reason, "REQUEST_QUOTA_EXHAUSTED");
@@ -280,7 +327,7 @@ test("Helius account cursor cycles, contradictions, context drift and quotas rem
     let calls = 0;
     const source = helius(rpcTransport(async () => {
       calls += 1;
-      return {context: {slot: 90}, accounts: [], paginationKey: null};
+      return {context: {slot: 90}, value: {accounts: [], paginationKey: null}};
     }));
     const result = await source.getProgramAccountsV2({
       programId: SYNTHETIC_PROGRAM,
@@ -336,6 +383,19 @@ test("provider URLs, redirects, and secrets are constrained and redacted", async
     assert.equal(result.status, "SOURCE_BOUND");
     assert.equal(JSON.stringify(result).includes(SYNTHETIC_PROVIDER_SECRET), false);
     assert.equal(result.purpose, "[REDACTED]");
+  });
+  await t.test("secret-bearing response keys and values are removed", async () => {
+    const row = syntheticTransaction();
+    row[SYNTHETIC_PROVIDER_SECRET] = `echo:${SYNTHETIC_PROVIDER_SECRET}`;
+    const source = helius(rpcTransport(async () => ({
+      data: [row],
+      paginationToken: null
+    })));
+    const result = await source.getTransactionsForAddress({address});
+    const serialized = JSON.stringify(result);
+    assert.equal(result.status, "CAPTURED");
+    assert.equal(serialized.includes(SYNTHETIC_PROVIDER_SECRET), false);
+    assert.equal(Object.hasOwn(result.data.transactions[0], SYNTHETIC_PROVIDER_SECRET), false);
   });
 });
 
@@ -395,9 +455,10 @@ test("request deadline, stalled body, cancellation and late transport continuati
     assert.equal(result.receipts.length, 0);
   });
   await t.test("cumulative work limit", async () => {
-    const source = helius(rpcTransport(async () => [
-      syntheticTransaction(), syntheticTransaction({signature: "sig-2"})
-    ]), {limits: {maxWorkUnits: 1}});
+    const source = helius(rpcTransport(async () => ({
+      data: [syntheticTransaction(), syntheticTransaction({signature: "sig-2"})],
+      paginationToken: null
+    })), {limits: {maxWorkUnits: 3}});
     const result = await source.getTransactionsForAddress({address, limit: 2});
     assert.equal(result.reason, "WORK_QUOTA_EXHAUSTED");
   });
@@ -409,11 +470,67 @@ test("request deadline, stalled body, cancellation and late transport continuati
     assert.equal(result.reason, "DEADLINE_EXCEEDED");
   });
   await t.test("per-response byte quota", async () => {
-    const source = helius(rpcTransport(async () => [
-      syntheticTransaction()
-    ]), {limits: {maxBytesPerResponse: 32, maxBytesPerRun: 32}});
+    const source = helius(rpcTransport(async () => ({
+      data: [syntheticTransaction()],
+      paginationToken: null
+    })), {limits: {maxBytesPerResponse: 32, maxBytesPerRun: 32}});
     const result = await source.getTransactionsForAddress({address});
     assert.equal(result.reason, "RESPONSE_BYTE_LIMIT");
+  });
+  await t.test("endless zero-byte chunks exhaust work", async () => {
+    let pulls = 0;
+    const source = helius(() => ({
+      status: 200,
+      headers: new Headers(),
+      url: "",
+      body: new ReadableStream({
+        pull(controller) {
+          pulls += 1;
+          controller.enqueue(new Uint8Array(0));
+        }
+      }, {highWaterMark: 1, size: () => 1})
+    }), {limits: {maxWorkUnits: 20}});
+    const result = await source.getTransactionsForAddress({address});
+    assert.equal(result.reason, "WORK_QUOTA_EXHAUSTED");
+    assert.equal(result.counters.workUnits, 20);
+    assert.ok(pulls <= 21);
+  });
+  await t.test("deadline reached during final response validation cannot capture", async () => {
+    let calls = 0;
+    const delayedClock = () => {
+      calls += 1;
+      if (calls === 3) {
+        const until = performance.now() + 25;
+        while (performance.now() < until) {}
+      }
+      return clock();
+    };
+    const source = helius(rpcTransport(async () => ({
+      data: [],
+      paginationToken: null
+    })), {clock: delayedClock, limits: {requestTimeoutMs: 20, maxDurationMs: 20}});
+    const result = await source.getTransactionsForAddress({address});
+    assert.equal(result.status, "UNAVAILABLE");
+    assert.equal(result.reason, "DEADLINE_EXCEEDED");
+  });
+  await t.test("cancellation during final response validation cannot capture", async () => {
+    const controller = new AbortController();
+    let calls = 0;
+    const cancellingClock = () => {
+      calls += 1;
+      if (calls === 3) controller.abort();
+      return clock();
+    };
+    const source = helius(rpcTransport(async () => ({
+      data: [],
+      paginationToken: null
+    })), {clock: cancellingClock});
+    const result = await source.getTransactionsForAddress({
+      address,
+      signal: controller.signal
+    });
+    assert.equal(result.status, "UNAVAILABLE");
+    assert.equal(result.reason, "CANCELLED");
   });
   await t.test("cumulative run byte quota", async () => {
     let calls = 0;
@@ -421,8 +538,7 @@ test("request deadline, stalled body, cancellation and late transport continuati
       calls += 1;
       return {
         context: {slot: 90},
-        accounts: [],
-        paginationKey: calls === 1 ? "next" : null,
+        value: {accounts: [], paginationKey: calls === 1 ? "next" : null},
         ...(calls === 1 ? {padding: "x".repeat(200)} : {})
       };
     }), {limits: {maxBytesPerResponse: 350, maxBytesPerRun: 350}});
@@ -474,7 +590,10 @@ test("Birdeye rejects near, missing, future, nonaligned, and unsupported scaled 
     assert.equal(result.data.updateUnixTime, atMs / 1_000 - 1);
   });
   await t.test("missing update time", async () => {
-    const source = birdeye(priceTransport({data: {value: 1}}));
+    const source = birdeye(priceTransport({
+      success: true,
+      data: {value: 1, isScaledUiToken: false}
+    }));
     const result = await source.readObservation({
       mint: address, atMs, denomination: "USD", purpose: "TEST"
     });
@@ -518,37 +637,126 @@ test("Birdeye rejects near, missing, future, nonaligned, and unsupported scaled 
     assert.equal(result.reason, "UNSUPPORTED_TOKEN_SCALING");
     assert.equal(result.counters.requests, 0);
   });
+  await t.test("failed provider response rejected", async () => {
+    const source = birdeye(priceTransport(syntheticPriceResponse({success: false})));
+    const result = await source.readObservation({
+      mint: address, atMs, denomination: "USD", purpose: "TEST"
+    });
+    assert.equal(result.reason, "PROVIDER_RESPONSE_UNSUCCESSFUL");
+  });
+  await t.test("scaled UI token rejected", async () => {
+    const source = birdeye(priceTransport(syntheticPriceResponse({isScaledUiToken: true})));
+    const result = await source.readObservation({
+      mint: address, atMs, denomination: "USD", purpose: "TEST"
+    });
+    assert.equal(result.reason, "UNSUPPORTED_TOKEN_SCALING");
+    assert.equal(result.data.isScaledUiToken, true);
+  });
+  await t.test("missing scaling flag rejected", async () => {
+    const source = birdeye(priceTransport({
+      success: true,
+      data: {value: 1, updateUnixTime: atMs / 1_000}
+    }));
+    const result = await source.readObservation({
+      mint: address, atMs, denomination: "USD", purpose: "TEST"
+    });
+    assert.equal(result.reason, "MISSING_SCALING_SEMANTICS");
+  });
 });
 
-test("real Analyst remains unavailable when provider evidence is unknown or unapproved", async () => {
-  const disabledHistory = await createHeliusSource().getTransactionsForAddress({address});
-  const disabledPrice = await createBirdeyeSource().readObservation({
-    mint: address,
-    atMs: SYNTHETIC_PROVIDER_TIME,
+test("actual Analyst pipeline keeps captured but unapproved provider outputs unavailable", async () => {
+  const fixture = makeFixture();
+  let historyRequests = 0;
+  const historySource = helius(rpcTransport(async () => {
+    historyRequests += 1;
+    return {data: [], paginationToken: null};
+  }));
+  const capturedHistory = await historySource.getTransactionsForAddress({
+    address: fixture.candidate.mint,
+    limit: 1
+  });
+  let priceReads = 0;
+  const exactPriceSource = birdeye(priceTransport(syntheticPriceResponse({
+    updateUnixTime: (fixture.candidateT - 15 * 60 * 1_000) / 1_000
+  })));
+  const exactPrice = await exactPriceSource.readObservation({
+    mint: fixture.candidate.mint,
+    atMs: fixture.candidateT - 15 * 60 * 1_000,
     denomination: "USD",
     purpose: "MOMENTUM_START"
   });
-  const fixture = makeFixture();
-  const filters = filterCandidate(fixture.candidate, {
-    now: fixture.candidateT,
-    holdUntil: fixture.candidateT + 8 * 60 * 60 * 1_000
+  const nearPriceSource = birdeye(priceTransport(syntheticPriceResponse({
+    updateUnixTime: (fixture.candidateT - 15 * 60 * 1_000) / 1_000 - 1
+  })));
+  const nearPrice = await nearPriceSource.readObservation({
+    mint: fixture.candidate.mint,
+    atMs: fixture.candidateT - 15 * 60 * 1_000,
+    denomination: "USD",
+    purpose: "MOMENTUM_START"
   });
-  assert.equal(filters.status, "PASS");
-  const candidate = {
-    ...fixture.candidate,
-    analystEvidence: {...fixture.candidate.analystEvidence}
-  };
-  for (const key of ANALYST_WINDOW_METRICS) delete candidate.analystEvidence[key];
-  const analysis = analyzeCandidate(candidate, {
-    now: fixture.candidateT,
-    filterResult: filters,
-    smartWalletAllowlist: fixture.smartWalletAllowlist
+  const missingPriceSource = birdeye(priceTransport({
+    success: true,
+    data: {value: 1, isScaledUiToken: false}
+  }));
+  const missingPrice = await missingPriceSource.readObservation({
+    mint: fixture.candidate.mint,
+    atMs: fixture.candidateT - 15 * 60 * 1_000,
+    denomination: "USD",
+    purpose: "MOMENTUM_START"
   });
-  assert.equal(disabledHistory.coverage.observedCompleteness, "UNKNOWN");
-  assert.equal(disabledPrice.status, "UNAVAILABLE");
-  assert.equal(analysis.status, "SCORE_UNAVAILABLE");
-  assert.equal(analysis.score, null);
-  assert.notEqual(analysis.executionAuthorized, true);
+  const reviewEvidence = Object.fromEntries(ANALYST_WINDOW_METRICS.map(key => [key, {
+    status: "REVIEWED",
+    reviewerId: `synthetic-reviewer-${key}`,
+    reviewId: `synthetic-review-${key}`,
+    reviewedAt: fixture.candidateT
+  }]));
+  for (const providerPrice of [exactPrice, nearPrice, missingPrice]) {
+    const analystPacket = await buildAnalystWindowEvidence({
+      candidate: fixture.candidate,
+      candidateT: fixture.candidateT,
+      assembledAt: fixture.assembledAt,
+      decisionAt: fixture.decisionAt,
+      policy: {...fixture.policy, historicalPriceTrust: null},
+      poolProof: fixture.poolProof,
+      historySource: {readWindow: async () => capturedHistory},
+      censusSource: fixture.censusSource,
+      priceSource: {readObservation: async () => {
+        priceReads += 1;
+        return providerPrice;
+      }},
+      marketPairEvidence: fixture.marketPairEvidence,
+      smartWalletAllowlist: fixture.smartWalletAllowlist
+    });
+    const bridge = bridgeAnalystWindowPacket(analystPacket, {
+      identity: fixture.identity,
+      reviewEvidence
+    });
+    assert.equal(bridge.status, "BRIDGED");
+    const candidate = {
+      ...fixture.candidate,
+      analystEvidence: bridge.analystEvidence
+    };
+    const filters = filterCandidate(candidate, {
+      now: fixture.candidateT,
+      holdUntil: fixture.candidateT + 8 * 60 * 60 * 1_000
+    });
+    const analysis = analyzeCandidate(candidate, {
+      now: fixture.candidateT,
+      filterResult: filters,
+      smartWalletAllowlist: fixture.smartWalletAllowlist
+    });
+    assert.equal(analysis.status, "SCORE_UNAVAILABLE");
+    assert.equal(analysis.score, null);
+    assert.notEqual(analysis.executionAuthorized, true);
+  }
+  assert.equal(capturedHistory.status, "CAPTURED");
+  assert.equal(capturedHistory.coverage.policyApproval, "NOT_APPROVED");
+  assert.equal(exactPrice.status, "SOURCE_BOUND");
+  assert.equal(exactPrice.qualification.policyApproval, "NOT_APPROVED");
+  assert.equal(nearPrice.reason, "NONEXACT_OBSERVATION_TIME");
+  assert.equal(missingPrice.reason, "MISSING_OBSERVATION_TIME");
+  assert.equal(historyRequests, 1);
+  assert.equal(priceReads, 0);
   assert.equal(PROPOSED_ANALYST_WINDOW_POLICY.historicalPriceTrust, null);
 });
 
@@ -557,5 +765,5 @@ test("provider defaults remain small bounded and synthetic fixtures are clearly 
   assert.equal(DEFAULT_PROVIDER_LIMITS.maxBytesPerResponse, 1_048_576);
   assert.equal(DEFAULT_PROVIDER_LIMITS.maxDurationMs, 15_000);
   assert.ok(SYNTHETIC_PROGRAM.length >= 32);
-  assert.equal(syntheticAccount().decoded.owner, SYNTHETIC_OWNER_A);
+  assert.equal(syntheticAccount().account.data.parsed.info.owner, SYNTHETIC_OWNER_A);
 });
