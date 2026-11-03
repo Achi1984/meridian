@@ -281,6 +281,29 @@ test("independent readback shares a monotonic deadline through synchronous evalu
   assert.deepEqual(result, {status: "UNKNOWN", code: "DEADLINE_EXCEEDED"});
 });
 
+test("monotonic deadline expiry aborts a pending transport before returning UNKNOWN", async () => {
+  let now = 100;
+  let requestSignal;
+  const result = await readExportOverHttps({
+    transport: {
+      get: request => {
+        requestSignal = request.signal;
+        now = 201;
+        return new Promise(() => {});
+      }
+    },
+    privateOrigin: "https://paper-private.example",
+    expected: identity,
+    expectedExportSha256: hash(exportBytes),
+    expectedByteLength: exportBytes.byteLength,
+    readAuthorization: READ_AUTH,
+    timeoutMs: 100,
+    monotonicNow: () => now
+  });
+  assert.deepEqual(result, {status: "UNKNOWN", code: "DEADLINE_EXCEEDED"});
+  assert.equal(requestSignal.aborted, true);
+});
+
 test("independent readback does not dispatch when already cancelled or after clock rollback", async () => {
   let calls = 0;
   const response = {

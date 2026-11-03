@@ -823,6 +823,9 @@ export async function readExportOverHttps({
     };
   } catch (error) {
     const deadlineReached = deadlineExpired || error?.code === "DEADLINE_EXCEEDED" || timedOut;
+    if (deadlineReached && !controller.signal.aborted) {
+      controller.abort(error?.code === "DEADLINE_EXCEEDED" ? error : deadlineError());
+    }
     return {
       status: "UNKNOWN",
       code: deadlineReached ? "DEADLINE_EXCEEDED" : signal?.aborted ? "CANCELLED" : "READ_OUTCOME_UNKNOWN"
