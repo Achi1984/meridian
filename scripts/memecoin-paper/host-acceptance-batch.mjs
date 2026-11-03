@@ -1,5 +1,4 @@
 import {createHash} from "node:crypto";
-import {constants} from "node:fs";
 import {lstat, mkdir, open, realpath} from "node:fs/promises";
 import {spawn} from "node:child_process";
 import path from "node:path";
@@ -16,6 +15,7 @@ import {
   PAPER_RUNTIME_SOURCE_POLICY,
   PAPER_RUNTIME_SOURCE_POLICY_SHA256
 } from "./paper-runtime-source.mjs";
+import {parseMountInfo} from "./volume-protection.mjs";
 
 const SCRIPT_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const APPLICATION_ROOT = path.resolve(SCRIPT_DIRECTORY, "../..");
@@ -23,11 +23,17 @@ const STORAGE_ROOT = path.join(PAPER_EXPORT_MOUNT_ROOT, "host-acceptance-batch")
 const CLAIM_NAME = "batch-claim.json";
 const MAX_BATCH_MS = 60_000;
 const MAX_OUTPUT_BYTES = 64 * 1024;
+const MAX_MOUNT_INFO_BYTES = 256 * 1024;
 const MAX_EVIDENCE_BYTES = 16 * 1024 * 1024;
 const PRODUCER_REVISION = "paper-pilot-composition/3";
 const SAFE_RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/;
 const SOURCE_REVISION = /^[a-f0-9]{40}$/;
 const IMAGE_DIGEST = /^sha256:[a-f0-9]{64}$/;
+const PREVIOUS_REHEARSAL_SOURCE = "fc5b3d97f62b8a9098e53a99eaa9a03b7955e5aa";
+const PREVIOUS_LOCAL_IMAGE_IDS = new Set([
+  "sha256:ec191ba1fbd70d858940bd5e934c79fd000bf1e1a61fdbd442766cd01f2e63b5",
+  "sha256:482b1847819a7071d64e823e38850b4556d8dd0245b6e0320f7af4ea3db01a72"
+]);
 const REQUIRED_PROOFS = Object.freeze([
   "PIPELINE_QUOTE", "ACTIVE_STOP", "CONTROLLER_SOURCE_POLICY_NO_ENTRY"
 ]);
@@ -57,7 +63,9 @@ function sha256(bytes) {
 
 function validateIdentity({sourceRevision, imageDigest, runId}) {
   requireBatch(SOURCE_REVISION.test(sourceRevision ?? ""), "BATCH_IDENTITY_INVALID");
+  requireBatch(sourceRevision !== PREVIOUS_REHEARSAL_SOURCE, "BATCH_SOURCE_PIN_STALE");
   requireBatch(IMAGE_DIGEST.test(imageDigest ?? ""), "BATCH_IDENTITY_INVALID");
+  requireBatch(!PREVIOUS_LOCAL_IMAGE_IDS.has(imageDigest), "BATCH_IMAGE_DIGEST_NOT_PUBLISHED");
   requireBatch(SAFE_RUN_ID.test(runId ?? "") && !runId.includes(".."), "BATCH_IDENTITY_INVALID");
   return {sourceRevision, imageDigest, runId};
 }
@@ -83,7 +91,7 @@ function createDeadline({
   const timeoutFailure = failure("BATCH_DEADLINE_EXCEEDED");
   const cancel = error => {
     if (!abortController.signal.aborted) abortController.abort(error);
-    if (activeChild) terminate(activeChild, "SIGTERM");
+    if (activeChild) terminate(activeChild);
   };
   const check = () => {
     const now = monotonicNow();
@@ -96,7 +104,7 @@ function createDeadline({
     shutdownSignal ??= signal;
     if (holdResolver) holdResolver();
     if (activeChild) {
-      terminate(activeChild, signal);
+      try { activeChild.kill(signal); } catch {}
     } else {
       cancel(failure("BATCH_CANCELLED"));
     }
@@ -107,8 +115,8 @@ function createDeadline({
   signalSource.on("SIGTERM", onTerminate);
   timer = setTimeout(() => cancel(timeoutFailure), timeoutMs);
 
-  function terminate(child, signal) {
-    try { child.kill(signal); } catch {}
+  function terminate(child) {
+    try { child.kill("SIGTERM"); } catch {}
     if (forceKillTimer) clearTimeout(forceKillTimer);
     forceKillTimer = setTimeout(() => {
       try { child.kill("SIGKILL"); } catch {}
@@ -159,7 +167,7 @@ function createDeadline({
       clearTimeout(timer);
       signalSource.removeListener("SIGINT", onInterrupt);
       signalSource.removeListener("SIGTERM", onTerminate);
-      if (forceKillTimer) clearTimeout(forceKillTimer);
+      if (forceKillTimer && !abortController.signal.aborted) clearTimeout(forceKillTimer);
     }
   };
 }
@@ -191,16 +199,11 @@ async function syncDirectory(directory, operation, fs) {
   }
 }
 
-async function boundedRead(filename, maximum, operation, fs, runtimeUid) {
-  requireBatch(Number.isSafeInteger(maximum) && maximum > 0, "BATCH_FILE_LIMIT_INVALID");
-  const handle = await openWithin(operation, fs,
-    filename, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+async function validateActualMount(operation, fs) {
+  const handle = await openWithin(operation, fs, "/proc/self/mountinfo", "r");
+  let bytes;
   try {
-    const before = await operation.wait(() => handle.stat());
-    requireBatch(before.isFile() && before.uid === runtimeUid &&
-      (before.mode & 0o077) === 0 && before.size > 0 && before.size <= maximum,
-    "BATCH_EVIDENCE_UNSAFE");
-    const buffer = Buffer.alloc(maximum + 1);
+    const buffer = Buffer.alloc(MAX_MOUNT_INFO_BYTES + 1);
     let length = 0;
     while (length < buffer.byteLength) {
       const {bytesRead} = await operation.wait(() =>
@@ -208,35 +211,55 @@ async function boundedRead(filename, maximum, operation, fs, runtimeUid) {
       if (bytesRead === 0) break;
       length += bytesRead;
     }
-    const after = await operation.wait(() => handle.stat());
-    requireBatch(length > 0 && length <= maximum && after.size === length &&
-      after.uid === runtimeUid && (after.mode & 0o077) === 0 && after.isFile(),
-    "BATCH_EVIDENCE_CHANGED");
-    return buffer.subarray(0, length);
+    requireBatch(length > 0 && length <= MAX_MOUNT_INFO_BYTES, "BATCH_MOUNT_INFO_INVALID");
+    bytes = buffer.subarray(0, length);
   } finally {
     await closeWithin(operation, handle);
   }
+  const mountInfo = new TextDecoder("utf-8", {fatal: true}).decode(bytes);
+  requireBatch(parseMountInfo(mountInfo), "BATCH_MOUNT_IDENTITY_INVALID");
+}
+
+async function boundedRead(filename, maximum, operation, fs, runtimeUid) {
+  requireBatch(Number.isSafeInteger(maximum) && maximum > 0, "BATCH_FILE_LIMIT_INVALID");
+  return operation.wait(() => readBoundedPrivateFile(filename, maximum, {
+    runtimeUid,
+    openFile: async (...args) => {
+      const handle = await openWithin(operation, fs, ...args);
+      return {
+        stat: () => operation.wait(() => handle.stat()),
+        read: (...values) => operation.wait(() => handle.read(...values)),
+        close: () => operation.wait(() => handle.close())
+      };
+    }
+  }));
 }
 
 async function writeExclusive(directory, filename, bytes, operation, fs, runtimeUid) {
   requireBatch(bytes.byteLength > 0 && bytes.byteLength <= MAX_EVIDENCE_BYTES,
     "BATCH_EVIDENCE_LIMIT_EXCEEDED");
-  const target = path.join(directory, filename);
-  const handle = await openWithin(operation, fs, target, "wx", 0o600);
   try {
-    await operation.wait(() => handle.writeFile(bytes));
-    await operation.wait(() => handle.sync());
-  } finally {
-    await closeWithin(operation, handle);
+    const target = path.join(directory, filename);
+    const handle = await openWithin(operation, fs, target, "wx", 0o600);
+    try {
+      await operation.wait(() => handle.writeFile(bytes));
+      await operation.wait(() => handle.sync());
+    } finally {
+      await closeWithin(operation, handle);
+    }
+    await syncDirectory(directory, operation, fs);
+    const readback = await boundedRead(target, MAX_EVIDENCE_BYTES, operation, fs, runtimeUid);
+    requireBatch(readback.equals(bytes), "BATCH_EVIDENCE_READBACK_FAILED");
+    return sha256(readback);
+  } catch (error) {
+    if (filename === CLAIM_NAME) error.claimAcquired = true;
+    throw error;
   }
-  await syncDirectory(directory, operation, fs);
-  const readback = await boundedRead(target, MAX_EVIDENCE_BYTES, operation, fs, runtimeUid);
-  requireBatch(readback.equals(bytes), "BATCH_EVIDENCE_READBACK_FAILED");
-  return sha256(readback);
 }
 
 async function makePrivateDirectory(directory, operation, fs, runtimeUid) {
   await operation.wait(() => fs.mkdir(directory, {mode: 0o700}));
+  await syncDirectory(path.dirname(directory), operation, fs);
   const info = await operation.wait(() => fs.lstat(directory));
   requireBatch(info.isDirectory() && !info.isSymbolicLink() && info.uid === runtimeUid &&
     [0o700, 0o2700].includes(info.mode & 0o7777), "BATCH_PRIVATE_DIRECTORY_UNSAFE");
@@ -256,6 +279,7 @@ function boundedOutput(stream, onOverflow) {
     }
     if (bytes.byteLength > remaining) onOverflow();
   });
+  stream?.on("error", onOverflow);
   return () => Buffer.concat(chunks, length);
 }
 
@@ -272,12 +296,10 @@ async function runChild(args, env, operation, spawnImpl) {
   let outputExceeded = false;
   const stdout = boundedOutput(child.stdout, () => {
     outputExceeded = true;
-    operation.setActiveChild(null);
     try { child.kill("SIGTERM"); } catch {}
   });
   const stderr = boundedOutput(child.stderr, () => {
     outputExceeded = true;
-    operation.setActiveChild(null);
     try { child.kill("SIGTERM"); } catch {}
   });
   const finished = new Promise(resolve => {
@@ -496,6 +518,7 @@ async function validateStorage(mountRoot, storageRoot, operation, fs, runtimeUid
     mkdirPath: (directory, options) => operation.wait(() => fs.mkdir(directory, options)),
     runtimeUid
   }));
+  await syncDirectory(mountRoot, operation, fs);
   const info = await operation.wait(() => fs.lstat(storageRoot));
   requireBatch(info.isDirectory() && !info.isSymbolicLink() && info.uid === runtimeUid &&
     [0o700, 0o2700].includes(info.mode & 0o7777) &&
@@ -504,11 +527,18 @@ async function validateStorage(mountRoot, storageRoot, operation, fs, runtimeUid
 }
 
 async function runBatchWork({
-  identity, mountRoot, storageRoot, operation, fs, validator, spawnImpl, runtimeUid
+  identity, mountRoot, storageRoot, operation, fs, validator, mountValidator, spawnImpl, runtimeUid
 }) {
+  await operation.wait(() => mountValidator(operation, fs));
   await validateStorage(mountRoot, storageRoot, operation, fs, runtimeUid, validator);
   const claim = await createClaim(identity, storageRoot, operation, fs, runtimeUid);
-  if (!claim.claimed) return {status: "ALREADY_CLAIMED", executionStarted: false};
+  if (!claim.claimed) {
+    return {
+      status: "ALREADY_CLAIMED",
+      requestedIdentity: identity,
+      executionStarted: false
+    };
+  }
   const proofs = [];
   try {
     const batchDirectory = await makePrivateDirectory(
@@ -533,10 +563,12 @@ async function runBatchWork({
     }
     operation.check();
     return {
+      ...identity,
       status: "BATCH_COMPLETE",
       executionStarted: true,
       proofs,
       hostAcceptance: "NOT_ASSESSED",
+      networkAccessed: false,
       liveExecution: false,
       claimSha256: claim.claimSha256
     };
@@ -577,10 +609,13 @@ export async function runHostAcceptanceBatch({
   signalSource = process,
   fileSystem = {lstat, mkdir, open},
   validateStorageRoot = validatePaperExportStorageRoot,
-  spawnImpl = spawn
+  validateMount = validateActualMount,
+  spawnImpl = spawn,
+  onResult
 } = {}) {
   if (enabled !== true) {
     const result = {status: "DISABLED", executionStarted: false};
+    onResult?.(result);
     if (hold) await waitInert(signalSource);
     return result;
   }
@@ -593,10 +628,12 @@ export async function runHostAcceptanceBatch({
   try {
     result = await runBatchWork({
       identity, mountRoot, storageRoot, operation, fs,
-      validator: validateStorageRoot, spawnImpl, runtimeUid
+      validator: validateStorageRoot, mountValidator: validateMount, spawnImpl, runtimeUid
     });
+    operation.check();
   } catch (error) {
     result = {
+      ...identity,
       status: error.code === "BATCH_DEADLINE_EXCEEDED" ||
         error.code === "BATCH_CANCELLED" || error.claimAcquired ? "UNKNOWN" : "BLOCKED",
       code: typeof error.code === "string" && error.code.startsWith("BATCH_")
@@ -607,9 +644,13 @@ export async function runHostAcceptanceBatch({
     };
   }
   operation.stopDeadline();
-  if (hold && !operation.signal.aborted) await operation.hold();
-  operation.dispose();
-  return result;
+  try {
+    onResult?.(result);
+    if (hold && !operation.signal.aborted) await operation.hold();
+    return result;
+  } finally {
+    operation.dispose();
+  }
 }
 
 function environmentConfig(env) {
@@ -641,6 +682,11 @@ export async function main({
   ...options
 } = {}) {
   let result;
+  let emitted = false;
+  const emitResult = value => {
+    stdout.write(`${JSON.stringify(value)}\n`);
+    emitted = true;
+  };
   try {
     const config = environmentConfig(env);
     if (config.enabled) {
@@ -648,7 +694,9 @@ export async function main({
         typeof process.getgid === "function" && process.getgid() === 1000,
       "BATCH_RUNTIME_IDENTITY_INVALID");
     }
-    result = await runHostAcceptanceBatch({...options, ...config, signalSource});
+    result = await runHostAcceptanceBatch({
+      ...options, ...config, signalSource, onResult: emitResult
+    });
   } catch (error) {
     result = {
       status: "BLOCKED",
@@ -658,7 +706,7 @@ export async function main({
       executionStarted: false
     };
   }
-  stdout.write(`${JSON.stringify(result)}\n`);
+  if (!emitted) emitResult(result);
   return result.status === "DISABLED" || result.status === "BATCH_COMPLETE" ? 0 : 2;
 }
 
