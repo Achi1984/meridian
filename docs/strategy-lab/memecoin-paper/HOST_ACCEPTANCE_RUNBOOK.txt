@@ -120,12 +120,30 @@ Use the printed runId to locate these artifacts; do not merge two runs' evidence
 An interrupted run/missing summary is UNKNOWN. Preserve it; never reuse its
 directory, resume it, remove locks, or retry its transfer.
 
-The harness also handles actual SIGINT/SIGTERM while running by calling stop().
+One 60-second monotonic acceptance-operation budget spans preparation (including
+CLI TLS/auth-file reads), the pilot, restart verification, immutable readback,
+optional HTTPS transfer, and final evidence. It is not reset between stages;
+the pilot retains its separate 20-second work limit. Filesystem awaits are
+bounded by the remaining acceptance budget, including open/write/fsync/close,
+directory sync, and bounded checkpoint/report readback. Expiry aborts supported
+operations and fences subsequent harness writes and HTTPS dispatch. Already
+submitted OS filesystem operations cannot be recalled and may settle later;
+their late results cannot advance the harness or return PASS. Preserve partial
+evidence even if a pending write subsequently appears on disk. A summary file
+alone is not an acknowledged successful command when completion returned
+UNKNOWN or was interrupted. Cleanup is best effort and never extends the bound.
+
+The harness handles actual SIGINT/SIGTERM during the active pilot by calling
+stop(), allowing its existing terminal checkpoint semantics within the remaining
+budget. During preparation or finalization those signals cancel the acceptance
+operation immediately, return sanitized UNKNOWN (exit 2), and prevent further
+publication/upload. Handlers remain installed until finalization ends.
 The deterministic ACTIVE_STOP proof is an API-stop proof, not an OS-signal timing
 claim. Focused tests separately deliver SIGTERM to an active filled composition.
-Allow at least 60 seconds of process termination grace: 20-second bounded runner
-work plus bounded export/readback, and do not SIGKILL during checkpoint/export
-publication. Slow durable storage may require operator reconciliation, not retry.
+Allow at least 65 seconds of process termination grace for the 60-second total
+budget plus scheduling margin; do not SIGKILL during checkpoint/export
+publication. Slow durable storage remains UNKNOWN and requires reconciliation,
+never a retry or a new operation budget for the same run.
 
 Proof B — CONTROLLER SOURCE-POLICY NO-ENTRY lifecycle, NOT synthetic quote proof
 -----------------------------------------------------------------------------

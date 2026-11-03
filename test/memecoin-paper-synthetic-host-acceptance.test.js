@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import {createHash} from "node:crypto";
 import {EventEmitter} from "node:events";
-import {chmod, lstat, mkdtemp, readFile, readdir, rm, symlink, writeFile} from "node:fs/promises";
+import {
+  chmod, lstat, mkdir, mkdtemp, open, readFile, readdir, realpath, rm, symlink, writeFile
+} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import {spawnSync} from "node:child_process";
@@ -16,6 +18,48 @@ import {canonicalCheckpointBytes} from "../scripts/memecoin-paper/checkpoint-sto
 import {evaluateMemecoinPaperRunExport} from "../scripts/memecoin-paper-simulated-evaluation/index.mjs";
 
 const hash = bytes => createHash("sha256").update(bytes).digest("hex");
+
+function deferred() {
+  let resolve;
+  const promise = new Promise(value => { resolve = value; });
+  return {promise, resolve};
+}
+
+function filesystemProbe(intercept) {
+  const calls = [];
+  const handles = new Set();
+  const invoke = async (method, filename, action) => {
+    calls.push({method, filename});
+    return intercept({method, filename, action});
+  };
+  return {
+    calls, handles,
+    fileSystem: {
+      lstat: filename => invoke("lstat", filename, () => lstat(filename)),
+      realpath: filename => invoke("realpath", filename, () => realpath(filename)),
+      mkdir: (filename, options) => invoke("mkdir", filename, () => mkdir(filename, options)),
+      open: async (filename, ...args) => {
+        const handle = await invoke("open", filename, () => open(filename, ...args));
+        handles.add(handle);
+        return Object.fromEntries(["writeFile", "sync", "stat", "read", "close"].map(method => [
+          method, (...values) => invoke(method, filename, async () => {
+            const value = await handle[method](...values);
+            if (method === "close") handles.delete(handle);
+            return value;
+          })
+        ]));
+      }
+    }
+  };
+}
+
+async function drainProbe(probe) {
+  const deadline = performance.now() + 2_000;
+  while (probe.handles.size > 0 && performance.now() < deadline) {
+    await new Promise(resolve => setTimeout(resolve, 5));
+  }
+  assert.equal(probe.handles.size, 0);
+}
 
 async function root(t) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "synthetic-acceptance-"));
@@ -200,4 +244,282 @@ test("HTTPS file-backed auth rejects newline and equal scopes before starting; o
     assert.equal(output.includes(dataRoot), false);
   }
   assert.deepEqual((await readdir(dataRoot)).sort(), ["ca.pem", "read-auth", "write-auth"]);
+});
+
+test("one deadline bounds a stalled preparation write and cleanup without late continuation", async t => {
+  const dataRoot = await root(t);
+  const gate = deferred();
+  const closing = deferred();
+  const probe = filesystemProbe(async ({method, filename, action}) => {
+    if (path.basename(filename) === "config.json" && method === "writeFile") {
+      await gate.promise;
+      return;
+    }
+    if (path.basename(filename) === "config.json" && method === "close") {
+      await closing.promise;
+    }
+    return action();
+  });
+  const started = performance.now();
+  const result = await runSyntheticHostAcceptance({
+    enabled: true, dataRoot, timeoutMs: 500, fileSystem: probe.fileSystem
+  });
+  assert.ok(performance.now() - started < 2_000, "write/cleanup extended the deadline");
+  assert.deepEqual(result, {summary: {status: "UNKNOWN", code: "SYNTHETIC_ACCEPTANCE_FAILED"}});
+  const callsBeforeRelease = probe.calls.filter(item => item.method !== "close");
+  gate.resolve();
+  closing.resolve();
+  await new Promise(resolve => setImmediate(resolve));
+  await drainProbe(probe);
+  assert.deepEqual(probe.calls.filter(item => item.method !== "close"), callsBeforeRelease);
+  assert.equal(probe.calls.some(item => item.method === "sync" &&
+    path.basename(item.filename) === "config.json"), false);
+  const [runId] = await readdir(dataRoot);
+  assert.deepEqual(await readdir(path.join(dataRoot, runId)), ["config.json"]);
+});
+
+for (const [filename, method] of [
+  ["result.report.json", "writeFile"],
+  ["result.report.json", "sync"],
+  ["result.report.json", "read"],
+  ["checkpoint.json", "read"],
+  ["summary.json", "sync"]
+]) {
+  for (const interruption of ["expiry", "SIGTERM", "SIGINT"]) {
+    test(`${interruption} during ${filename} ${method} fences finalization and late success`, async t => {
+      const dataRoot = await root(t);
+      const signals = new EventEmitter();
+      const entered = deferred();
+      const release = deferred();
+      let now = 0;
+      let blocked = false;
+      let puts = 0;
+      let gets = 0;
+      const probe = filesystemProbe(async call => {
+        if (!blocked && path.basename(call.filename) === filename && call.method === method) {
+          blocked = true;
+          entered.resolve();
+          await release.promise;
+          if (interruption === "expiry") now = 60_000;
+        }
+        return call.action();
+      });
+      const pending = runSyntheticHostAcceptance({
+        enabled: true, dataRoot, signalSource: signals, fileSystem: probe.fileSystem,
+        monotonicNow: () => now,
+        httpsOptions: filename === "summary.json" ? undefined : {
+          privateOrigin: "https://synthetic.invalid",
+          writeAuthorization: "private-write-value", readAuthorization: "private-read-value",
+          transport: {
+            async put() { puts += 1; throw new Error("late upload"); },
+            async get() { gets += 1; throw new Error("late readback"); }
+          }
+        }
+      });
+      await entered.promise;
+      assert.equal(signals.listenerCount("SIGINT"), 1);
+      assert.equal(signals.listenerCount("SIGTERM"), 1);
+      if (interruption !== "expiry") signals.emit(interruption);
+      else release.resolve();
+      const result = await pending;
+      assert.deepEqual(result, {summary: {status: "UNKNOWN", code: "SYNTHETIC_ACCEPTANCE_FAILED"}});
+      assert.equal(puts, 0);
+      assert.equal(gets, 0);
+      const fencedCalls = probe.calls.filter(item => item.method !== "close");
+      release.resolve();
+      await new Promise(resolve => setImmediate(resolve));
+      await drainProbe(probe);
+      assert.deepEqual(probe.calls.filter(item => item.method !== "close"), fencedCalls);
+      assert.equal(signals.eventNames().length, 0);
+      const [runId] = await readdir(dataRoot);
+      const files = await readdir(path.join(dataRoot, runId));
+      assert.ok(files.includes("config.json"), "partial evidence must be preserved");
+      assert.equal(files.includes("https-attempt.json"), false);
+      if (filename !== "summary.json") assert.equal(files.includes("summary.json"), false);
+    });
+  }
+}
+
+test("a real deadline releases a stalled finalization read before it settles", async t => {
+  const dataRoot = await root(t);
+  const gate = deferred();
+  const entered = deferred();
+  const probe = filesystemProbe(async call => {
+    if (path.basename(call.filename) === "result.report.json" && call.method === "read") {
+      entered.resolve();
+      await gate.promise;
+    }
+    return call.action();
+  });
+  const started = performance.now();
+  const pending = runSyntheticHostAcceptance({
+    enabled: true, dataRoot, timeoutMs: 5_000, fileSystem: probe.fileSystem
+  });
+  await entered.promise;
+  const result = await pending;
+  assert.equal(result.summary.status, "UNKNOWN");
+  assert.ok(performance.now() - started < 8_000, "read extended the deadline");
+  const calls = probe.calls.filter(item => item.method !== "close");
+  gate.resolve();
+  await new Promise(resolve => setImmediate(resolve));
+  await drainProbe(probe);
+  assert.deepEqual(probe.calls.filter(item => item.method !== "close"), calls);
+});
+
+test("late open completion is closed without starting a write", async t => {
+  const dataRoot = await root(t);
+  const gate = deferred();
+  const entered = deferred();
+  const signals = new EventEmitter();
+  const probe = filesystemProbe(async call => {
+    const value = await call.action();
+    if (call.method === "open" && path.basename(call.filename) === "config.json") {
+      entered.resolve();
+      await gate.promise;
+    }
+    return value;
+  });
+  const pending = runSyntheticHostAcceptance({
+    enabled: true, dataRoot, signalSource: signals, fileSystem: probe.fileSystem
+  });
+  await entered.promise;
+  signals.emit("SIGTERM");
+  assert.equal((await pending).summary.status, "UNKNOWN");
+  gate.resolve();
+  await new Promise(resolve => setImmediate(resolve));
+  await drainProbe(probe);
+  assert.equal(probe.calls.some(call => call.method === "writeFile"), false);
+});
+
+test("CLI secret preparation shares the deadline and returns sanitized UNKNOWN on cancellation", async t => {
+  const dataRoot = await root(t);
+  const caFile = path.join(dataRoot, "ca.pem");
+  await writeFile(caFile, "private-ca-value", {mode: 0o600});
+  const entered = deferred();
+  const release = deferred();
+  const signals = new EventEmitter();
+  const probe = filesystemProbe(async call => {
+    if (call.method === "read") {
+      entered.resolve();
+      await release.promise;
+    }
+    return call.action();
+  });
+  let output = "";
+  const pending = main({
+    env: {
+      PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT: dataRoot,
+      PAPER_SYNTHETIC_ACCEPTANCE_HTTPS_ENABLED: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_ORIGIN: "https://synthetic.invalid",
+      PAPER_SYNTHETIC_ACCEPTANCE_CA_FILE: caFile
+    },
+    signalSource: signals, fileSystem: probe.fileSystem,
+    stdout: {write: value => { output += value; }}
+  });
+  await entered.promise;
+  signals.emit("SIGINT");
+  assert.equal(await pending, 2);
+  assert.deepEqual(JSON.parse(output), {status: "UNKNOWN", code: "SYNTHETIC_ACCEPTANCE_FAILED"});
+  release.resolve();
+  await new Promise(resolve => setImmediate(resolve));
+  await drainProbe(probe);
+  assert.deepEqual(await readdir(dataRoot), ["ca.pem"]);
+  assert.equal(signals.eventNames().length, 0);
+});
+
+test("the budget is shared across preparation and evidence, not restarted per stage", async t => {
+  const dataRoot = await root(t);
+  let now = 0;
+  const probe = filesystemProbe(async call => {
+    if (path.basename(call.filename) === "config.json" && call.method === "writeFile") {
+      now = 30_000;
+    }
+    if (path.basename(call.filename) === "result.report.json" && call.method === "writeFile") {
+      now += 30_000;
+    }
+    return call.action();
+  });
+  const result = await runSyntheticHostAcceptance({
+    enabled: true, dataRoot, monotonicNow: () => now, fileSystem: probe.fileSystem
+  });
+  assert.equal(result.summary.status, "UNKNOWN");
+  await drainProbe(probe);
+  assert.equal(probe.calls.some(call =>
+    call.method === "sync" && path.basename(call.filename) === "result.report.json"), false);
+  assert.equal(probe.calls.some(call => path.basename(call.filename) === "summary.json"), false);
+});
+
+test("expiry while syncing the HTTPS marker fences dispatch and retains the one-shot claim", async t => {
+  const {exportBytes, summary} = await runSyntheticHostAcceptance({enabled: true, dataRoot: await root(t)});
+  const attemptDirectory = await root(t);
+  const expected = {
+    runId: summary.runId, configSha256: summary.configSha256, producerRevision: summary.producerRevision
+  };
+  let now = 0;
+  let puts = 0;
+  const probe = filesystemProbe(async call => {
+    const result = await call.action();
+    if (path.basename(call.filename) === "https-attempt.json" && call.method === "sync") {
+      now = 60_000;
+    }
+    return result;
+  });
+  const options = {
+    exportBytes, expected, attemptDirectory,
+    privateOrigin: "https://synthetic.invalid",
+    writeAuthorization: "private-write-value", readAuthorization: "private-read-value",
+    transport: {
+      async put() { puts += 1; throw new Error("late upload"); },
+      async get() { throw new Error("late readback"); }
+    }
+  };
+  assert.deepEqual(await transferSyntheticAcceptance({
+    ...options, monotonicNow: () => now, fileSystem: probe.fileSystem
+  }), {status: "UNKNOWN"});
+  await drainProbe(probe);
+  assert.deepEqual(await readdir(attemptDirectory), ["https-attempt.json"]);
+  assert.deepEqual(await transferSyntheticAcceptance(options), {status: "UNKNOWN"});
+  assert.equal(puts, 0);
+});
+
+test("cancellation during upload aborts transport, never reads or retries after late ACK", async t => {
+  const {exportBytes, summary} = await runSyntheticHostAcceptance({enabled: true, dataRoot: await root(t)});
+  const signals = new EventEmitter();
+  const gate = deferred();
+  const entered = deferred();
+  let signal;
+  let puts = 0;
+  let gets = 0;
+  const options = {
+    exportBytes,
+    expected: {runId: summary.runId, configSha256: summary.configSha256,
+      producerRevision: summary.producerRevision},
+    attemptDirectory: await root(t), signalSource: signals,
+    privateOrigin: "https://synthetic.invalid",
+    writeAuthorization: "private-write-value", readAuthorization: "private-read-value",
+    transport: {
+      async put(request) {
+        puts += 1;
+        signal = request.signal;
+        entered.resolve();
+        await gate.promise;
+        return {status: "STORED", identity: request.identity,
+          exportSha256: request.exportSha256, byteLength: request.byteLength, redirected: false};
+      },
+      async get() { gets += 1; throw new Error("late readback"); }
+    }
+  };
+  const pending = transferSyntheticAcceptance(options);
+  await entered.promise;
+  signals.emit("SIGTERM");
+  assert.deepEqual(await pending, {status: "UNKNOWN"});
+  assert.equal(signal.aborted, true);
+  gate.resolve();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(puts, 1);
+  assert.equal(gets, 0);
+  assert.deepEqual(await transferSyntheticAcceptance(options), {status: "UNKNOWN"});
+  assert.equal(puts, 1);
+  assert.equal(signals.eventNames().length, 0);
 });
