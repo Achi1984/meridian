@@ -186,7 +186,12 @@ async function readJsonBounded(response, state, limits, signal) {
     throw failure("INVALID_UTF8", "RPC response is not valid UTF-8");
   }
   try {
-    return {payload: JSON.parse(text), bytes: responseBytes, rawBytes: bytes};
+    return {
+      payload: JSON.parse(text),
+      bytes: responseBytes,
+      rawBytes: bytes,
+      responseSha256: createHash("sha256").update(bytes).digest("hex")
+    };
   } catch {
     throw failure("INVALID_JSON", "RPC response is not valid JSON");
   }
@@ -322,7 +327,7 @@ async function requestRpc(state, limits, method, params) {
       cancelWithoutWaiting(response?.body, "RPC response status is not successful");
       return {ok: false, status: `HTTP_${response.status}`};
     }
-    const {payload, bytes: responseBytes, rawBytes} = await Promise.race([
+    const {payload, bytes: responseBytes, responseSha256} = await Promise.race([
       readJsonBounded(response, state, limits, controller.signal),
       timeoutPromise,
       abortedPromise
@@ -343,7 +348,7 @@ async function requestRpc(state, limits, method, params) {
       requestStartedAt: startedAt,
       responseReceivedAt: receivedAt,
       responseBytes,
-      responseSha256: createHash("sha256").update(rawBytes).digest("hex"),
+      responseSha256,
       ...(TIME_BOUNDARY_RPC_METHODS.has(method) ? {params} : {}),
       status: "RESPONSE_RECEIVED"
     };

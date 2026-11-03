@@ -433,11 +433,17 @@ function publicError(error) {
 
 export function createPaperPilotComposition(options = {}) {
   if (!onlyDataKeys(options, [
-        "config", "dataDirectory", "adapters", "clock", "signal", "externalReadOnlyInput"
+        "config", "dataDirectory", "adapters", "clock", "signal", "externalReadOnlyInput",
+        "onTestInitialized"
       ])) {
     throw new TypeError("composition factory options must be bounded data");
   }
-  let {config, dataDirectory, adapters, clock, signal, externalReadOnlyInput} = options;
+  let {
+    config, dataDirectory, adapters, clock, signal, externalReadOnlyInput, onTestInitialized
+  } = options;
+  if (onTestInitialized !== undefined && typeof onTestInitialized !== "function") {
+    throw new TypeError("test initialization observer must be a function");
+  }
   if (config === undefined || config === null) {
     return Object.freeze({start: async () => DISABLED, stop: () => false, status: () => DISABLED});
   }
@@ -784,6 +790,12 @@ export function createPaperPilotComposition(options = {}) {
       }
     });
     counters.events = 1;
+    await onTestInitialized?.(Object.freeze({
+      runId: config.runId,
+      checkpointSequence: session.metadata.sequence,
+      checkpointHash: session.metadata.hash,
+      bindingReceipt
+    }));
     const operationInputs = [];
     const quoteReceipts = new Map();
     if (fault === "DEADLINE_BEFORE_FIRST_RISK_SNAPSHOT") {
