@@ -108,6 +108,20 @@ complete history.
 | Cursor 10 | 18:19:58.800 | 200 / 1,000 | 2026-11-02 23:23:49 | `909747e342bdcc328cd0a886eed9aa8921ff5ed4e0b8b467d3983b952fd2e2a2` |
 | Cursor 11 | 18:19:59.400 | **429** | — | No body/hash retained |
 
+The last successful page's terminal signature was present in the recorded
+session output and was supplied as the `before` cursor for the rate-limited
+request:
+
+- **Resume cursor:** `pUSLQhD6NCFF76WvLn1PSN6EQfyMshNLvaa9XRSNwTxbiXZ8xNNjC6nuKRPaoSZmFXE4a6u3GnkoS1kjx6xUakb`
+- **Source page:** cursor 10, requested 2026-11-03 18:19:58.800 UTC.
+- **Page response SHA-256:** `909747e342bdcc328cd0a886eed9aa8921ff5ed4e0b8b467d3983b952fd2e2a2`.
+- **Cursor row context:** finalized slot `464678719`, block time
+  `1793661829` = 2026-11-02 23:23:49 UTC.
+
+This records a possible pagination continuation point, not permission to retry.
+No request was made with this cursor after the HTTP 429; the remaining four
+reads in the original twenty-request ceiling are not used in this follow-up.
+
 The total bounded public-read count is 16 including the first-session DNS-failed
 attempt: one Raydium list request, two decoder RPC requests, and twelve
 signature-history requests in this session. No reads were made after the 429.
