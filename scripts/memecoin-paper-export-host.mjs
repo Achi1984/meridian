@@ -36,7 +36,8 @@ function normalizeOrigin(value) {
     throw new TypeError("private origin must be a fixed HTTPS origin");
   }
   if (url.protocol !== "https:" || url.username || url.password || url.pathname !== "/" ||
-      url.search || url.hash || url.origin !== value) {
+      url.search || url.hash ||
+      (url.origin !== value && value !== `${url.origin}:443`)) {
     throw new TypeError("private origin must be a canonical fixed HTTPS origin");
   }
   return url;
@@ -70,7 +71,7 @@ export function paperExportHostConfigFromEnvironment(env = process.env) {
   const listenHost = requiredString(env, "PAPER_EXPORT_HOST_LISTEN_HOST");
   if (net.isIP(listenHost) === 0) throw new TypeError("listener host must be an IP address");
   const port = parsePort(requiredString(env, "PAPER_EXPORT_HOST_PORT"));
-  if (Number(privateOrigin.port) !== port) {
+  if (Number(privateOrigin.port || 443) !== port) {
     throw new TypeError("origin port must match the listener port");
   }
 
@@ -232,7 +233,7 @@ export async function createPaperExportServer(config, {lstatPath = lstat} = {}) 
   const originUrl = normalizeOrigin(config.privateOrigin);
   if (typeof config.listenHost !== "string" || net.isIP(config.listenHost) === 0 ||
       !Number.isSafeInteger(config.port) || config.port < 1 || config.port > 65_535 ||
-      Number(originUrl.port) !== config.port ||
+      Number(originUrl.port || 443) !== config.port ||
       absolutePath(config.mountRoot, "mount root") !== config.mountRoot ||
       absolutePath(config.storageRoot, "storage root") !== config.storageRoot ||
       absolutePath(config.certificateFile, "certificate file") !== config.certificateFile ||

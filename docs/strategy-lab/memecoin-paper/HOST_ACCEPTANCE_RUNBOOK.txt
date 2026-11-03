@@ -1,0 +1,297 @@
+Paper host acceptance rehearsal: two SEPARATE labeled proofs
+===========================================================
+
+This is source-only, default-disabled tooling. No deployment, service selection,
+provider activation, subscription, signing, wallet access, or real trades are
+authorized. Tests are NOT actual host acceptance. Keep the PR draft until an
+independent reviewer accepts the source and an operator separately records any
+real image/volume/TLS observations. Never label the controller proof as a
+synthetic quote proof, and never label either proof as provider readiness.
+
+Commands below assume a Linux operator shell with Node 20+, and this checkout:
+  export REPO=/home/runner/work/meridian/meridian
+  cd "$REPO"
+  umask 077
+
+Image and host prerequisites (record independently, do not infer from tests)
+-------------------------------------------------------------------------
+
+Record source SHA with `git -C "$REPO" rev-parse HEAD`, clean-tree status, built
+image digest/ID, actual deployed image digest, runtime UID/GID and Node version.
+The image must be built from the reviewed final SHA, not merely the a1962c8
+baseline. A local example, only when an operator explicitly authorizes building:
+
+  SOURCE_SHA=$(git -C "$REPO" rev-parse HEAD)
+  test -z "$(git -C "$REPO" status --porcelain)"
+  docker build -f "$REPO/Dockerfile.paper" \
+    --label "org.opencontainers.image.revision=$SOURCE_SHA" \
+    -t "meridian-paper-acceptance:$SOURCE_SHA" "$REPO"
+  docker image inspect "meridian-paper-acceptance:$SOURCE_SHA" \
+    --format '{{.Id}} {{json .RepoDigests}} {{.Config.User}} {{json .Config.Labels}}'
+
+Dockerfile.paper copies the new harness under /app/scripts/memecoin-paper and
+its dependencies, but intentionally leaves its pilot-online entrypoint intact.
+Override the entrypoint explicitly with node for each authorized rehearsal.
+Do not assume the stock entrypoint starts the controller, harness or TLS host.
+Use /app as REPO inside that image; copy no credentials into an image layer.
+Verify UID 1000 (node), not root, in the actual runtime. A root operator must
+prepare the mounted volume boundary, not run the application as root:
+
+  # On the actual mounted host volume, only after explicit operator approval:
+  chown 0:1000 /var/data/meridian-paper
+  chmod 03775 /var/data/meridian-paper
+  # Runtime UID1000 then creates fresh direct private children:
+  umask 077
+  mkdir /var/data/meridian-paper/synthetic-acceptance
+  mkdir /var/data/meridian-paper/controller-acceptance
+  stat -c '%u:%g %a %n' /var/data/meridian-paper \
+    /var/data/meridian-paper/synthetic-acceptance \
+    /var/data/meridian-paper/controller-acceptance
+
+The mount must be root:1000 exact 03775 (setgid + sticky), with trusted real
+ancestry. Each direct private child must be runtime-owned exact 0700 or inherited
+02700, never a symlink, group-readable, group-writable or world-accessible.
+Do not chmod/chown the physical mount to UID1000 or remove its sticky bit.
+The harness refuses unsafe/private-root metadata and uses exclusive UUID run
+directories; it does not certify mount identity. Independently validate the
+protected mount and each direct child using the existing bootstrap validator:
+
+  node --input-type=module <<'JS'
+  import {validatePaperExportStorageRoot} from './scripts/memecoin-paper-export-host.mjs';
+  if (process.getuid() !== 1000) throw new Error('runtime must be UID1000');
+  for (const child of ['synthetic-acceptance', 'controller-acceptance']) {
+    await validatePaperExportStorageRoot('/var/data/meridian-paper',
+      `/var/data/meridian-paper/${child}`);
+  }
+  JS
+
+For a LOCAL-ONLY source rehearsal instead, use fresh private temporary roots:
+
+  export SYNTHETIC_ROOT=$(mktemp -d /tmp/meridian-synthetic-acceptance.XXXXXXXX)
+  export CONTROLLER_ROOT=$(mktemp -d /tmp/meridian-controller-acceptance.XXXXXXXX)
+
+For an authorized actual-volume rehearsal use these instead:
+
+  export SYNTHETIC_ROOT=/var/data/meridian-paper/synthetic-acceptance
+  export CONTROLLER_ROOT=/var/data/meridian-paper/controller-acceptance
+
+Proof A — SYNTHETIC pipeline/quote/risk/ledger/export, NOT controller admission
+---------------------------------------------------------------------------
+
+Run the dedicated default-disabled module. There is deliberately no synthetic
+controller manifest, no change to controller accepted modes, and no new provider
+trust. Both invocations generate fresh run IDs and preserve all durable output:
+
+  PAPER_SYNTHETIC_ACCEPTANCE_ENABLED=true \
+  PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT="$SYNTHETIC_ROOT" \
+  PAPER_SYNTHETIC_ACCEPTANCE_PROOF=PIPELINE_QUOTE \
+    node "$REPO/scripts/memecoin-paper/synthetic-host-acceptance.mjs"
+
+Expected: exit 0, proof SYNTHETIC_PIPELINE_QUOTE, status/evaluation PASS,
+one entry and one observed risk exit. Existing synthetic acquisition flows
+through the actual pipeline, quote adapter, risk/execution runner and ledger.
+Adapter authentication remains unavailable; the synthetic fixed-cent cost
+schedule is NOT a measured provider price/cost or authenticated source.
+
+  stop_rc=0
+  PAPER_SYNTHETIC_ACCEPTANCE_ENABLED=true \
+  PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT="$SYNTHETIC_ROOT" \
+  PAPER_SYNTHETIC_ACCEPTANCE_PROOF=ACTIVE_STOP \
+    node "$REPO/scripts/memecoin-paper/synthetic-host-acceptance.mjs" || stop_rc=$?
+  test "$stop_rc" -eq 2
+
+Expected: proof SYNTHETIC_ACTIVE_STOP, contractChecks PASS, stopAccepted true,
+status/evaluation UNKNOWN, outcome OPEN_UNVALUED_TERMINAL_POSITION, one entry
+and no exit. The new synthetic-only onTestEntry observer runs after an actual
+acknowledged FILLED_PAPER, then calls the EXISTING composition.stop(). It does
+not add stop/trading logic. The pre-existing PIPELINE_QUOTE_STOP_AFTER_ENTRY
+fixture actually stops after quote acquisition BEFORE execution and therefore
+cannot prove this boundary. No terminal liquidation/valuation is invented.
+
+Both proofs require ACKNOWLEDGED checkpoint persistence, terminal restart
+RESTART_NOT_ALLOWED without checkpoint mutation, exact canonical result.report
+publication and byte-exact immutable receiver readback. The evaluator receives
+the independently computed config digest and pinned paper-pilot-composition/3
+producer, not identities extracted from a received report. Summary includes
+runId, configSha256, producerRevision, exportSha256 and byteLength; original
+config.json, result.report.json, summary.json, checkpoint and immutable receiver
+records remain under SYNTHETIC_ROOT/<runId>. No raw report or secret is logged.
+Use the printed runId to locate these artifacts; do not merge two runs' evidence.
+An interrupted run/missing summary is UNKNOWN. Preserve it; never reuse its
+directory, resume it, remove locks, or retry its transfer.
+
+One 60-second monotonic acceptance-operation budget spans preparation (including
+CLI TLS/auth-file reads), the pilot, restart verification, immutable readback,
+optional HTTPS transfer, and final evidence. It is not reset between stages;
+the pilot retains its separate 20-second work limit. Filesystem awaits are
+bounded by the remaining acceptance budget, including open/write/fsync/close,
+directory sync, and bounded checkpoint/report readback. Expiry aborts supported
+operations and fences subsequent harness writes and HTTPS dispatch. Already
+submitted OS filesystem operations cannot be recalled and may settle later;
+their late results cannot advance the harness or return PASS. Preserve partial
+evidence even if a pending write subsequently appears on disk. A summary file
+alone is not an acknowledged successful command when completion returned
+UNKNOWN or was interrupted. Cleanup is best effort and never extends the bound.
+
+The harness handles actual SIGINT/SIGTERM during the active pilot by calling
+stop(), allowing its existing terminal checkpoint semantics within the remaining
+budget. During preparation or finalization those signals cancel the acceptance
+operation immediately, return sanitized UNKNOWN (exit 2), and prevent further
+publication/upload. Handlers remain installed until finalization ends.
+The deterministic ACTIVE_STOP proof is an API-stop proof, not an OS-signal timing
+claim. Focused tests separately deliver SIGTERM to an active filled composition.
+Allow at least 65 seconds of process termination grace for the 60-second total
+budget plus scheduling margin; do not SIGKILL during checkpoint/export
+publication. Slow durable storage remains UNKNOWN and requires reconciliation,
+never a retry or a new operation budget for the same run.
+
+Proof B — CONTROLLER SOURCE-POLICY NO-ENTRY lifecycle, NOT synthetic quote proof
+-----------------------------------------------------------------------------
+
+Generate a fresh disabled-policy v2 manifest with the module-owned policy. This
+is a no-network no-entry rehearsal, not provider evidence, a warmup, or a quote.
+The following writes a new private invocation directory and independent identity:
+
+  export CONTROLLER_INVOCATION=$(mktemp -d "$CONTROLLER_ROOT/proof.XXXXXXXX")
+  node --input-type=module <<'JS'
+  import {randomUUID, createHash} from 'node:crypto';
+  import {mkdir, writeFile} from 'node:fs/promises';
+  import {canonicalCheckpointBytes} from './scripts/memecoin-paper/checkpoint-store.mjs';
+  import {PAPER_RUNTIME_SOURCE_POLICY as policy, PAPER_RUNTIME_SOURCE_POLICY_SHA256 as policySha}
+    from './scripts/memecoin-paper/paper-runtime-source.mjs';
+  const directory = process.env.CONTROLLER_INVOCATION;
+  const config = {
+    version: 1, mode: 'SOURCE_BACKED_PAPER', enabled: true,
+    runId: `controller-no-entry-${randomUUID()}`, startedAt: Date.now() - 1000,
+    budgets: {requests: 40, bytes: 1000000, events: 128, candidates: 4, cycles: 8,
+      durationMs: 20000, callbackTimeoutMs: 1000, maxWallClockUncertaintyMs: 10},
+    sourcePolicy: policy, sourcePolicySha256: policySha
+  };
+  await mkdir(`${directory}/runs`, {mode: 0o700});
+  await writeFile(`${directory}/manifest.json`, JSON.stringify({
+    schemaVersion: 'memecoin-paper-operational-manifest/v2', config, sourcePolicy: policy
+  }), {flag: 'wx', mode: 0o600});
+  await writeFile(`${directory}/expected.json`, JSON.stringify({
+    runId: config.runId,
+    configSha256: createHash('sha256').update(canonicalCheckpointBytes(config)).digest('hex'),
+    producerRevision: 'paper-pilot-composition/3'
+  }), {flag: 'wx', mode: 0o600});
+  JS
+  controller_rc=0
+  node "$REPO/scripts/memecoin-paper/paper-operational-controller.mjs" start --enable \
+    --manifest "$CONTROLLER_INVOCATION/manifest.json" \
+    --runs-dir "$CONTROLLER_INVOCATION/runs" || controller_rc=$?
+  test "$controller_rc" -eq 2
+
+Expected UNKNOWN with exportStatus ACKNOWLEDGED and evaluatorOverall UNKNOWN.
+Verify the exact export against the independently saved expectation:
+
+  node --input-type=module <<'JS'
+  import assert from 'node:assert/strict';
+  import {readFile} from 'node:fs/promises';
+  import {evaluateMemecoinPaperRunExport} from './scripts/memecoin-paper-simulated-evaluation/index.mjs';
+  const root = process.env.CONTROLLER_INVOCATION;
+  const expected = JSON.parse(await readFile(`${root}/expected.json`));
+  const bytes = await readFile(`${root}/runs/${expected.runId}/run-export.json`);
+  const report = JSON.parse(bytes);
+  const evaluation = evaluateMemecoinPaperRunExport(bytes, expected);
+  assert.equal(report.runnerReport.reason, 'SOURCE_POLICY_UNAPPROVED');
+  assert.equal(report.runnerReport.sourcePolicy.networkAccessed, false);
+  assert.equal(report.runnerReport.counters.quotes, 0);
+  assert.equal(evaluation.evidence.entryFills, 0);
+  assert.equal(evaluation.overall, 'UNKNOWN');
+  console.log(JSON.stringify({proof: 'CONTROLLER_SOURCE_POLICY_NO_ENTRY',
+    evaluation: evaluation.overall, quotes: 0, entryFills: 0, hostAcceptance: 'NOT_ASSESSED'}));
+  JS
+
+HTTPS (optional additional transport evidence for Proof A, NOT activation)
+------------------------------------------------------------------------
+
+Only an explicitly authorized operator may start this separate TLS process.
+Beforehand, provision runtime UID1000-owned regular private files (0600, no
+symlinks, no group/world access) in trusted private ancestry:
+  /run/paper-private/server.pem, server.key, ca.pem, write-auth, read-auth
+The PEM certificate and key must match; SAN must cover the actual origin host.
+Each file is bounded (TLS/CA 16 KiB, auth 4096 bytes). Auth files contain distinct,
+nonempty full authorization values with NO trailing newline or control bytes.
+Do not echo them, put them in argv, shell tracing, logs, images, or this runbook.
+Provision them through the approved host secret-file facility, not guessed IDs.
+
+Set ORIGIN and LISTEN_IP to the independently verified private TLS endpoint and
+local listener IP. The examples below intentionally require operator input:
+
+  : "${ORIGIN:?Set the exact canonical reachable private https origin}"
+  : "${LISTEN_IP:?Set the actual local listener IP}"
+  : "${LISTEN_PORT:?Set explicit listener port}"
+  PAPER_EXPORT_HOST_ENABLED=true \
+  PAPER_EXPORT_HOST_ORIGIN="$ORIGIN" \
+  PAPER_EXPORT_HOST_LISTEN_HOST="$LISTEN_IP" \
+  PAPER_EXPORT_HOST_PORT="$LISTEN_PORT" \
+  PAPER_EXPORT_HOST_MOUNT_ROOT=/var/data/meridian-paper \
+  PAPER_EXPORT_HOST_STORAGE_ROOT=/var/data/meridian-paper/acceptance-receiver \
+  PAPER_EXPORT_HOST_TLS_CERT_FILE=/run/paper-private/server.pem \
+  PAPER_EXPORT_HOST_TLS_KEY_FILE=/run/paper-private/server.key \
+  PAPER_EXPORT_HOST_WRITE_AUTH_FILE=/run/paper-private/write-auth \
+  PAPER_EXPORT_HOST_READ_AUTH_FILE=/run/paper-private/read-auth \
+    node "$REPO/scripts/memecoin-paper-export-host.mjs"
+
+Run that in a separately supervised process with >=10-second shutdown grace
+(host close bound is 5 seconds). Verify LISTENING and actual TLS reachability
+from the client; DNS, firewall and any ingress must reach an ENCRYPTED Node
+socket with the exact configured Host. Plaintext TLS termination plus forwarded
+headers cannot work. Do not disable certificate validation to make it work.
+No Northflank service ID/topology, subscription, ingress or DNS is assumed.
+Implicit https port and explicit :443 normalize to effective 443; nondefault
+ports must match the listener. The canonical Host at 443 excludes ":443".
+UID1000 may lack permission to bind port443; an authorized host must provide
+nonroot low-port capability/namespace configuration or use a matching nondefault
+port. Port normalization does not grant privileges or validate routing.
+
+In the authorized client process, run Proof A with these extra settings:
+
+  PAPER_SYNTHETIC_ACCEPTANCE_ENABLED=true \
+  PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT="$SYNTHETIC_ROOT" \
+  PAPER_SYNTHETIC_ACCEPTANCE_PROOF=PIPELINE_QUOTE \
+  PAPER_SYNTHETIC_ACCEPTANCE_HTTPS_ENABLED=true \
+  PAPER_SYNTHETIC_ACCEPTANCE_ORIGIN="$ORIGIN" \
+  PAPER_SYNTHETIC_ACCEPTANCE_CA_FILE=/run/paper-private/ca.pem \
+  PAPER_SYNTHETIC_ACCEPTANCE_WRITE_AUTH_FILE=/run/paper-private/write-auth \
+  PAPER_SYNTHETIC_ACCEPTANCE_READ_AUTH_FILE=/run/paper-private/read-auth \
+    node "$REPO/scripts/memecoin-paper/synthetic-host-acceptance.mjs"
+
+Expected https.status READ_BACK and https.overall PASS with exact report digest
+and length. ACTIVE_STOP may also be selected, but readback evaluation remains
+UNKNOWN and exit 2, never a promoted PASS. The existing bounded HTTPS transport
+performs one upload then one separately authorized read. It never follows
+redirects, changes origin, retries UNKNOWN, or logs authorization.
+A durable exclusive https-attempt.json is synced BEFORE upload. A second call
+using that attempt directory is UNKNOWN without dispatch, including after lost
+ACK. Preserve the marker even for rejection; no retry is authorized. Reconcile
+using receiver artifacts and independently pinned identity/digest; do not launch
+another synthetic run as a substitute for missing evidence of this run.
+
+Final source checks (run once on the final candidate)
+---------------------------------------------------
+
+From REPO:
+  node --check scripts/memecoin-paper/synthetic-host-acceptance.mjs
+  node --check scripts/memecoin-paper/paper-pilot-composition.mjs
+  node --check scripts/memecoin-paper-export-host.mjs
+  node --test test/memecoin-paper-synthetic-host-acceptance.test.js \
+    test/memecoin-paper-export-host.test.js \
+    test/memecoin-paper-pilot-composition.test.js \
+    test/memecoin-paper-operational-controller.test.js \
+    test/memecoin-paper-simulated-evaluation.test.js \
+    test/memecoin-paper-image.test.js
+  node --test scripts/memecoin-paper-run-export-transfer/test/*.test.mjs \
+    scripts/memecoin-paper-run-export-https/test/*.test.mjs
+  npm run release:check
+  node scripts/frozen-research-guard.mjs
+  node scripts/privacy-check.mjs
+  node scripts/secret-check.mjs
+
+Record command exit codes, test/pass/fail/skip counts, final SHA, and explicit
+skips (e.g. Docker unavailable, actual mount/TLS host not exercised). Hosted
+release-safety CI remains responsible for complete candidate regression and
+workflow-specific guards. Synthetic/local generated-CA tests cannot establish
+an actual host image, persistent volume, DNS/TLS ingress or signal grace.

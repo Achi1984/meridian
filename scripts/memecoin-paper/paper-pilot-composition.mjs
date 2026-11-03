@@ -527,12 +527,13 @@ function publicError(error) {
 export function createPaperPilotComposition(options = {}) {
   if (!onlyDataKeys(options, [
         "config", "dataDirectory", "adapters", "clock", "signal", "externalReadOnlyInput",
-        "onTestInitialized"
+        "onTestInitialized", "onTestEntry"
       ])) {
     throw new TypeError("composition factory options must be bounded data");
   }
   let {
-    config, dataDirectory, adapters, clock, signal, externalReadOnlyInput, onTestInitialized
+    config, dataDirectory, adapters, clock, signal, externalReadOnlyInput, onTestInitialized,
+    onTestEntry
   } = options;
   if (onTestInitialized !== undefined && typeof onTestInitialized !== "function") {
     throw new TypeError("test initialization observer must be a function");
@@ -547,6 +548,10 @@ export function createPaperPilotComposition(options = {}) {
     start: async () => DISABLED, stop: () => false, status: () => DISABLED
   });
   config = validateConfig(config);
+  if (onTestEntry !== undefined &&
+      (typeof onTestEntry !== "function" || config.mode !== "SYNTHETIC_TEST_ONLY")) {
+    throw new TypeError("test entry observer requires synthetic-only mode and a function");
+  }
   if (signal !== undefined && Object.getPrototypeOf(signal) !== AbortSignal.prototype) {
     throw new TypeError("signal must be a native AbortSignal");
   }
@@ -1185,6 +1190,9 @@ export function createPaperPilotComposition(options = {}) {
         result: structuredClone(result),
         receipt: result?.receipt ? {...result.receipt} : null
       });
+      if (method === "executeEntry" && result?.status === "FILLED_PAPER" && result.receipt) {
+        onTestEntry?.();
+      }
       return result;
     }])));
 
