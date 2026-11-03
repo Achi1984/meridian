@@ -5,10 +5,16 @@ import https from "node:https";
 import net from "node:net";
 import path from "node:path";
 import {pathToFileURL} from "node:url";
+import {
+  PROTECTED_MODE,
+  REQUIRED_GID as PAPER_MOUNT_GID,
+  REQUIRED_UID as PAPER_MOUNT_UID,
+  TARGET as PAPER_MOUNT_ROOT
+} from "./memecoin-paper/volume-protection.mjs";
 import {createPrivateReceiverHandler} from "./memecoin-paper-run-export-https/https.mjs";
 import {createFileReceiver} from "./memecoin-paper-run-export-transfer/index.mjs";
 
-export const PAPER_EXPORT_MOUNT_ROOT = "/var/data/meridian-paper";
+export const PAPER_EXPORT_MOUNT_ROOT = PAPER_MOUNT_ROOT;
 const MAX_SECRET_FILE_BYTES = 16 * 1024;
 const MAX_SHUTDOWN_MS = 5_000;
 
@@ -99,19 +105,46 @@ export function paperExportHostConfigFromEnvironment(env = process.env) {
   };
 }
 
-async function readPrivateFile(filename, label, maximum) {
-  const handle = await open(filename, constants.O_RDONLY | constants.O_NOFOLLOW);
+export async function readBoundedPrivateFile(
+  filename,
+  maximum,
+  {openFile = open, runtimeUid = process.getuid()} = {}
+) {
+  if (!Number.isSafeInteger(maximum) || maximum < 1 ||
+      !Number.isInteger(constants.O_NOFOLLOW) || !Number.isInteger(constants.O_NONBLOCK)) {
+    throw new TypeError("bounded private file read is not safely supported");
+  }
+  const handle = await openFile(filename, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   try {
     const stat = await handle.stat();
-    if (!stat.isFile() || stat.uid !== process.getuid() || (stat.mode & 0o077) !== 0 ||
+    if (!stat.isFile() || stat.uid !== runtimeUid || (stat.mode & 0o077) !== 0 ||
         stat.size < 1 || stat.size > maximum) {
-      throw new TypeError(`${label} file has unsafe ownership, permissions, or size`);
+      throw new TypeError("private file has unsafe ownership, permissions, or size");
     }
-    const bytes = await handle.readFile();
-    if (bytes.byteLength > maximum) throw new RangeError(`${label} file exceeds its byte limit`);
-    return bytes;
+    const bytes = Buffer.allocUnsafe(maximum + 1);
+    let length = 0;
+    while (length < bytes.byteLength) {
+      const {bytesRead} = await handle.read(bytes, length, bytes.byteLength - length, null);
+      if (bytesRead === 0) break;
+      length += bytesRead;
+    }
+    const finalStat = await handle.stat();
+    if (length === 0 || length > maximum || finalStat.size !== length ||
+        finalStat.uid !== runtimeUid || (finalStat.mode & 0o077) !== 0 ||
+        !finalStat.isFile()) {
+      throw new RangeError("private file is empty or exceeds its byte limit");
+    }
+    return bytes.subarray(0, length);
   } finally {
     await handle.close();
+  }
+}
+
+async function readPrivateFile(filename, label, maximum) {
+  try {
+    return await readBoundedPrivateFile(filename, maximum);
+  } catch {
+    throw new TypeError(`${label} file is unsafe, unavailable, or exceeds its byte limit`);
   }
 }
 
@@ -130,39 +163,46 @@ function tokenMatches(expected, value) {
   return actual.byteLength === expected.byteLength && timingSafeEqual(actual, expected);
 }
 
-async function validateStorageRoot(mountRoot, storageRoot) {
-  const uid = process.getuid();
+export async function validatePaperExportStorageRoot(
+  mountRoot,
+  storageRoot,
+  {lstatPath = lstat, mkdirPath = mkdir, runtimeUid = process.getuid()} = {}
+) {
+  if (path.dirname(storageRoot) !== mountRoot) {
+    throw new TypeError("storage root must be a direct child of the protected mount");
+  }
   const root = path.parse(mountRoot).root;
   const components = mountRoot.slice(root.length).split(path.sep).filter(Boolean);
   let current = root;
   for (let index = 0; index <= components.length; index += 1) {
     if (index > 0) current = path.join(current, components[index - 1]);
-    const stat = await lstat(current);
+    const stat = await lstatPath(current);
+    const isMountRoot = current === mountRoot;
     if (!stat.isDirectory() || stat.isSymbolicLink() ||
-        (stat.uid !== 0 && stat.uid !== uid)) {
+        (isMountRoot
+          ? stat.uid !== PAPER_MOUNT_UID || stat.gid !== PAPER_MOUNT_GID ||
+            (stat.mode & 0o7777) !== PROTECTED_MODE
+          : stat.uid !== 0 && stat.uid !== runtimeUid)) {
       throw new TypeError("mount ancestry must be trusted directories owned by root or the runtime UID");
     }
     const writableByOthers = (stat.mode & 0o022) !== 0;
-    const isMountRoot = current === mountRoot;
-    const safeStickyAncestor = !isMountRoot && stat.uid === 0 &&
-      (stat.mode & 0o1000) !== 0;
-    if (writableByOthers && !safeStickyAncestor) {
+    const safeProtectedMount = isMountRoot && stat.uid === PAPER_MOUNT_UID &&
+      stat.gid === PAPER_MOUNT_GID && (stat.mode & 0o7777) === PROTECTED_MODE;
+    const safeStickyAncestor = current === "/tmp" && stat.uid === 0 &&
+      (stat.mode & 0o7777) === 0o1777;
+    if (writableByOthers && !safeProtectedMount && !safeStickyAncestor) {
       throw new TypeError("mount ancestry is group- or world-writable");
     }
   }
 
-  const mountStat = await lstat(mountRoot);
-  if ((mountStat.mode & 0o022) !== 0) {
-    throw new TypeError("mount root is group- or world-writable");
-  }
   try {
-    await mkdir(storageRoot, {mode: 0o700});
+    await mkdirPath(storageRoot, {mode: 0o700});
   } catch (error) {
     if (error.code !== "EEXIST") throw error;
   }
-  const storageStat = await lstat(storageRoot);
+  const storageStat = await lstatPath(storageRoot);
   if (!storageStat.isDirectory() || storageStat.isSymbolicLink() ||
-      storageStat.uid !== uid || (storageStat.mode & 0o077) !== 0) {
+      storageStat.uid !== runtimeUid || (storageStat.mode & 0o7777) !== 0o700) {
     throw new TypeError("storage root must be a runtime-owned private directory");
   }
 }
@@ -183,7 +223,7 @@ function listen(server, host, port) {
   });
 }
 
-export async function createPaperExportServer(config) {
+export async function createPaperExportServer(config, {lstatPath = lstat} = {}) {
   if (!config || config.enabled !== true) throw new TypeError("explicit host enable is required");
   if (typeof process.getuid !== "function" || process.getuid() === 0) {
     throw new TypeError("Paper export host requires a nonroot runtime");
@@ -203,7 +243,7 @@ export async function createPaperExportServer(config) {
       path.dirname(config.storageRoot) !== config.mountRoot) {
     throw new TypeError("invalid private Paper host configuration");
   }
-  await validateStorageRoot(config.mountRoot, config.storageRoot);
+  await validatePaperExportStorageRoot(config.mountRoot, config.storageRoot, {lstatPath});
 
   const [certificate, privateKey, writeToken, readToken] = await Promise.all([
     readPrivateFile(config.certificateFile, "TLS certificate", MAX_SECRET_FILE_BYTES),
@@ -265,11 +305,12 @@ function writeResult(stdout, value) {
 
 export async function runPaperExportHost(config, {
   stdout = process.stdout,
-  signalSource = process
+  signalSource = process,
+  lstatPath = lstat
 } = {}) {
   let server;
   try {
-    server = await createPaperExportServer(config);
+    server = await createPaperExportServer(config, {lstatPath});
     await listen(server, config.listenHost, config.port);
   } catch {
     if (server) await closePaperExportServer(server);

@@ -5,13 +5,18 @@ import {EventEmitter} from "node:events";
 import http from "node:http";
 import https from "node:https";
 import net from "node:net";
-import {chmod, mkdtemp, mkdir, readFile, rm, writeFile} from "node:fs/promises";
+import {
+  chmod, lstat, mkdtemp, mkdir, open, readFile, rm, writeFile
+} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import {
   createPaperPilotComposition, createSyntheticClock, offlineFixtureAdapters
 } from "../scripts/memecoin-paper/paper-pilot-composition.mjs";
+import {
+  PROTECTED_MODE, REQUIRED_GID, REQUIRED_UID
+} from "../scripts/memecoin-paper/volume-protection.mjs";
 import {createExportTransfer} from "../scripts/memecoin-paper-run-export-transfer/index.mjs";
 import {
   createHttpsExportTransport, readExportOverHttps
@@ -82,7 +87,27 @@ async function fixture(t) {
     writeAuthorizationFile,
     readAuthorizationFile
   };
-  return {...config, config, ca: tls.ca, root};
+  const lstatPath = async filename => filename === mountRoot
+    ? directoryInfo({uid: REQUIRED_UID, gid: REQUIRED_GID, mode: 0o040000 | PROTECTED_MODE})
+    : lstat(filename);
+  return {...config, config, ca: tls.ca, root, lstatPath};
+}
+
+function directoryInfo(overrides = {}) {
+  return {
+    uid: process.getuid(),
+    gid: process.getgid(),
+    mode: 0o040700,
+    isDirectory: () => true,
+    isSymbolicLink: () => false,
+    ...overrides
+  };
+}
+
+function fakeMountLstat(mountRoot, {uid = REQUIRED_UID, gid = REQUIRED_GID, mode = PROTECTED_MODE} = {}) {
+  return async filename => filename === mountRoot
+    ? directoryInfo({uid, gid, mode: 0o040000 | mode})
+    : lstat(filename);
 }
 
 function reservePort() {
@@ -166,6 +191,22 @@ function plainHttpAttempt(port) {
   });
 }
 
+function portAcceptsConnections(port) {
+  return new Promise(resolve => {
+    const socket = net.createConnection({host: "127.0.0.1", port});
+    socket.setTimeout(1_000);
+    socket.once("connect", () => {
+      socket.destroy();
+      resolve(true);
+    });
+    socket.once("error", () => resolve(false));
+    socket.once("timeout", () => {
+      socket.destroy();
+      resolve(false);
+    });
+  });
+}
+
 test("host import and disabled or incomplete configuration never start a listener", async () => {
   const signalsBeforeImport = {
     int: process.listenerCount("SIGINT"),
@@ -210,6 +251,7 @@ test("generated-CA TLS bootstrap accepts only exact host and separate scopes, ev
   const listening = new Promise(resolve => { resolveListening = resolve; });
   const runPromise = runPaperExportHost(hostFixture.config, {
     signalSource,
+    lstatPath: hostFixture.lstatPath,
     stdout: {write: value => {
       hostOutput += value;
       if (value.includes('"status":"LISTENING"')) resolveListening();
@@ -290,10 +332,132 @@ test("generated-CA TLS bootstrap accepts only exact host and separate scopes, ev
   assert.equal(await runPromise, 0);
 });
 
+test("protected storage accepts only the root:1000 sticky 03775 mount and a private direct child", async t => {
+  const hostFixture = await fixture(t);
+  const {validatePaperExportStorageRoot} = await import("../scripts/memecoin-paper-export-host.mjs");
+
+  await validatePaperExportStorageRoot(
+    hostFixture.mountRoot,
+    hostFixture.storageRoot,
+    {lstatPath: fakeMountLstat(hostFixture.mountRoot)}
+  );
+  const storage = await lstat(hostFixture.storageRoot);
+  assert.equal(storage.uid, process.getuid());
+  assert.equal(storage.isDirectory(), true);
+  assert.equal(storage.mode & 0o7777, 0o700);
+
+  for (const [label, metadata] of [
+    ["missing sticky bit", {mode: 0o2775}],
+    ["wrong owner", {uid: REQUIRED_UID + 1}],
+    ["wrong group", {gid: REQUIRED_GID + 1}],
+    ["symlinked mount", {symlink: true}]
+  ]) {
+    await t.test(label, async () => {
+      const mountLstat = fakeMountLstat(hostFixture.mountRoot, metadata);
+      const lstatPath = metadata.symlink
+        ? async filename => filename === hostFixture.mountRoot
+          ? directoryInfo({
+            uid: REQUIRED_UID,
+            gid: REQUIRED_GID,
+            mode: 0o040000 | PROTECTED_MODE,
+            isSymbolicLink: () => true
+          })
+          : lstat(filename)
+        : mountLstat;
+      const rejectedStorage = path.join(hostFixture.mountRoot, `rejected-${label.replaceAll(" ", "-")}`);
+      await assert.rejects(
+        validatePaperExportStorageRoot(hostFixture.mountRoot, rejectedStorage, {lstatPath}),
+        /trusted directories/
+      );
+      await assert.rejects(lstat(rejectedStorage), {code: "ENOENT"});
+    });
+  }
+
+  for (const [label, metadata] of [
+    ["wrong runtime owner", {uid: process.getuid() + 1}],
+    ["group writable", {mode: 0o040770}],
+    ["symlinked child", {symlink: true}]
+  ]) {
+    await t.test(label, async () => {
+      const storageRoot = path.join(hostFixture.mountRoot, `unsafe-${label.replaceAll(" ", "-")}`);
+      const lstatPath = async filename => {
+        if (filename === hostFixture.mountRoot) {
+          return directoryInfo({
+            uid: REQUIRED_UID, gid: REQUIRED_GID, mode: 0o040000 | PROTECTED_MODE
+          });
+        }
+        if (filename === storageRoot) {
+          return directoryInfo({
+            ...metadata,
+            mode: metadata.mode ?? 0o040700,
+            isSymbolicLink: () => metadata.symlink === true
+          });
+        }
+        return lstat(filename);
+      };
+      await assert.rejects(
+        validatePaperExportStorageRoot(hostFixture.mountRoot, storageRoot, {lstatPath}),
+        /runtime-owned private directory/
+      );
+    });
+  }
+});
+
+test("private file reads reject FIFOs without blocking and cap files that grow after fstat", async t => {
+  const hostFixture = await fixture(t);
+  const {readBoundedPrivateFile, runPaperExportHost} =
+    await import("../scripts/memecoin-paper-export-host.mjs");
+  const fifo = path.join(hostFixture.root, "authorization.fifo");
+  execFileSync("mkfifo", ["-m", "600", fifo]);
+
+  const startedAt = process.hrtime.bigint();
+  await assert.rejects(readBoundedPrivateFile(fifo, 4096), /private file/);
+  const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
+  assert.ok(elapsedMs < 1_000, `FIFO rejection took ${elapsedMs} ms`);
+
+  const growingFile = path.join(hostFixture.root, "growing-secret");
+  await writeFile(growingFile, "x", {mode: 0o600});
+  let grew = false;
+  const openFile = async (filename, flags) => {
+    const handle = await open(filename, flags);
+    const originalStat = await handle.stat();
+    return {
+      stat: async () => originalStat,
+      read: async (...args) => {
+        if (!grew) {
+          grew = true;
+          await writeFile(growingFile, Buffer.alloc(4097, 0x41), {mode: 0o600});
+        }
+        return handle.read(...args);
+      },
+      close: () => handle.close()
+    };
+  };
+  await assert.rejects(readBoundedPrivateFile(growingFile, 4096, {openFile}), /byte limit/);
+
+  let output = "";
+  const exitCode = await runPaperExportHost({
+    ...hostFixture.config,
+    writeAuthorizationFile: fifo
+  }, {
+    lstatPath: hostFixture.lstatPath,
+    stdout: {write: value => { output += value; }}
+  });
+  assert.equal(exitCode, 2);
+  assert.deepEqual(JSON.parse(output), {
+    status: "BLOCKED",
+    code: "HOST_NOT_STARTED",
+    listenerStarted: false
+  });
+  assert.equal(await portAcceptsConnections(hostFixture.port), false);
+});
+
 test("bootstrap refuses identical authorization scopes before exposing a server", async t => {
   const hostFixture = await fixture(t);
   const {createPaperExportServer} = await import("../scripts/memecoin-paper-export-host.mjs");
   await writeFile(hostFixture.readAuthorizationFile, WRITE_AUTH, {mode: 0o600});
   await chmod(hostFixture.readAuthorizationFile, 0o600);
-  await assert.rejects(createPaperExportServer(hostFixture.config), /scopes must differ/);
+  await assert.rejects(createPaperExportServer(hostFixture.config, {
+    lstatPath: hostFixture.lstatPath
+  }), /scopes must differ/);
 });
