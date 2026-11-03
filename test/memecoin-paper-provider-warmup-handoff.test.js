@@ -362,6 +362,167 @@ test("overall deadline is passed to the actual warmup readers and evaluation", a
   assert.equal(evaluationSignal.aborted, true);
 });
 
+test("noncooperating publication, readback, and evaluation are all deadline-raced", async () => {
+  const fixture = makeHandoffFixture();
+  const {observation, request} = await makeBirdeyeObservation(fixture);
+  const baseStore = () => {
+    let published;
+    return {
+      async publish(input) {
+        published = input;
+        return {
+          status: "PUBLISHED",
+          datasetId: input.datasetId,
+          digest: "c".repeat(64)
+        };
+      },
+      async read(datasetId) {
+        return {
+          status: "AVAILABLE",
+          digest: "c".repeat(64),
+          document: {
+            datasetId,
+            identity: published.identity,
+            capturedAt: published.capturedAt,
+            records: published.records
+          }
+        };
+      }
+    };
+  };
+  const never = () => new Promise(() => {});
+  const noncooperatingPipeline = {
+    enabled: true,
+    mode: "SYNTHETIC_TEST_ONLY",
+    evaluate: never
+  };
+  let publicationReads = 0;
+  let publicationEvaluations = 0;
+  const publication = await handoff({
+    async publish() { return never(); },
+    async read() { publicationReads += 1; }
+  }, fixture, {limits: {maxElapsedMs: 25}}).runOffline(runRequest(
+    fixture, observation, request, {
+      ...noncooperatingPipeline,
+      async evaluate() { publicationEvaluations += 1; }
+    }
+  ));
+  assert.equal(publication.reason, "DEADLINE");
+  assert.deepEqual({publicationReads, publicationEvaluations},
+    {publicationReads: 0, publicationEvaluations: 0});
+
+  const readStore = baseStore();
+  let readEvaluations = 0;
+  const readback = await handoff({
+    ...readStore,
+    async read() { return never(); }
+  }, fixture, {limits: {maxElapsedMs: 25}}).runOffline(runRequest(
+    fixture, observation, request, {
+      ...noncooperatingPipeline,
+      async evaluate() { readEvaluations += 1; }
+    }
+  ));
+  assert.equal(readback.reason, "DEADLINE");
+  assert.equal(readEvaluations, 0);
+
+  const evaluation = await handoff(baseStore(), fixture, {
+    limits: {maxElapsedMs: 25}
+  }).runOffline(runRequest(fixture, observation, request, noncooperatingPipeline));
+  assert.equal(evaluation.reason, "DEADLINE");
+});
+
+test("publication resolving after deadline cannot start readback or evaluation", async () => {
+  const fixture = makeHandoffFixture();
+  const {observation, request} = await makeBirdeyeObservation(fixture);
+  let reads = 0;
+  let evaluations = 0;
+  const result = await handoff({
+    async publish() {
+      await new Promise(resolve => setTimeout(resolve, 50));
+      return {
+        status: "PUBLISHED",
+        datasetId: "provider-handoff-test",
+        digest: "d".repeat(64)
+      };
+    },
+    async read() { reads += 1; }
+  }, fixture, {limits: {maxElapsedMs: 20}}).runOffline(runRequest(
+    fixture, observation, request, {
+      enabled: true,
+      mode: "SYNTHETIC_TEST_ONLY",
+      async evaluate() { evaluations += 1; }
+    }
+  ));
+  assert.equal(result.reason, "DEADLINE");
+  await new Promise(resolve => setTimeout(resolve, 60));
+  assert.deepEqual({reads, evaluations}, {reads: 0, evaluations: 0});
+});
+
+test("cancellation during each noncooperating asynchronous stage returns promptly", async () => {
+  const fixture = makeHandoffFixture();
+  const {observation, request} = await makeBirdeyeObservation(fixture);
+  const never = () => new Promise(() => {});
+  const makeStore = () => {
+    let published;
+    return {
+      async publish(input) {
+        published = input;
+        return {
+          status: "PUBLISHED",
+          datasetId: input.datasetId,
+          digest: "e".repeat(64)
+        };
+      },
+      async read(datasetId) {
+        return {
+          status: "AVAILABLE",
+          digest: "e".repeat(64),
+          document: {
+            datasetId,
+            identity: published.identity,
+            capturedAt: published.capturedAt,
+            records: published.records
+          }
+        };
+      }
+    };
+  };
+  const cases = [
+    ["publish", {
+      async publish() { return never(); },
+      async read() { assert.fail("read must not follow cancelled publication"); }
+    }],
+    ["read", {
+      async publish(input) {
+        return {status: "PUBLISHED", datasetId: input.datasetId, digest: "e".repeat(64)};
+      },
+      async read() { return never(); }
+    }]
+  ];
+  for (const [stage, store] of cases) {
+    const controller = new AbortController();
+    const promise = handoff(store, fixture).runOffline({
+      ...runRequest(fixture, observation, request),
+      signal: controller.signal
+    });
+    setTimeout(() => controller.abort(), 10);
+    const result = await promise;
+    assert.equal(result.reason, "CANCELLED", stage);
+  }
+
+  const controller = new AbortController();
+  const promise = handoff(makeStore(), fixture).runOffline({
+    ...runRequest(fixture, observation, request, {
+      enabled: true,
+      mode: "SYNTHETIC_TEST_ONLY",
+      evaluate: never
+    }),
+    signal: controller.signal
+  });
+  setTimeout(() => controller.abort(), 10);
+  assert.equal((await promise).reason, "CANCELLED");
+});
+
 test("Helius history and GPA remain bounded diagnostics, never historical or census records", async () => {
   const fixture = makeHandoffFixture();
   for (const kind of ["history", "gpa"]) {

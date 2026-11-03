@@ -122,10 +122,16 @@ function operationDeadline(timeoutMs, signal) {
   const controller = new AbortController();
   let reason = null;
   let timer;
+  let rejectStopped;
+  const stopped = new Promise((_, reject) => {
+    rejectStopped = reject;
+  });
+  void stopped.catch(() => {});
   const stop = value => {
     if (reason) return;
     reason = value;
     controller.abort(value);
+    rejectStopped(new Error(value));
   };
   const onAbort = () => stop("CANCELLED");
   if (signal?.aborted) stop("CANCELLED");
@@ -141,6 +147,20 @@ function operationDeadline(timeoutMs, signal) {
     remaining() {
       this.reason();
       return Math.max(0, Math.floor(timeoutMs - (performance.now() - startedAt)));
+    },
+    async run(operation) {
+      this.reason();
+      if (reason) throw new Error(reason);
+      const pending = Promise.resolve().then(() => {
+        this.reason();
+        if (reason) throw new Error(reason);
+        return operation();
+      });
+      void pending.catch(() => {});
+      const result = await Promise.race([pending, stopped]);
+      this.reason();
+      if (reason) throw new Error(reason);
+      return result;
     },
     close() {
       clearTimeout(timer);
@@ -466,7 +486,7 @@ export function createPaperProviderWarmupHandoff({
           completeness: "UNKNOWN",
           payload: normalized.observation
         };
-        const publication = await store.publish({
+        const publication = await deadline.run(() => store.publish({
           datasetId,
           identity: boundIdentity,
           capturedAt,
@@ -481,7 +501,7 @@ export function createPaperProviderWarmupHandoff({
             runId
           },
           records: [record]
-        }, {signal: deadline.signal});
+        }, {signal: deadline.signal}));
         if (deadline.reason()) return unavailable(deadline.reason(), context);
         if (!["PUBLISHED", "DUPLICATE"].includes(publication?.status) ||
             publication.datasetId !== datasetId || !HASH.test(publication.digest ?? "")) {
@@ -493,10 +513,10 @@ export function createPaperProviderWarmupHandoff({
         }
         const remaining = deadline.remaining();
         if (remaining < 1) return unavailable(deadline.reason() ?? "DEADLINE", context);
-        const readback = await store.read(datasetId, {
+        const readback = await deadline.run(() => store.read(datasetId, {
           signal: deadline.signal,
           timeoutMs: Math.max(1, Math.min(remaining, DEFAULT_WARMUP_LIMITS.maxElapsedMs))
-        });
+        }));
         if (deadline.reason()) return unavailable(deadline.reason(), context);
         const dataset = readback?.document;
         const persistedRecord = dataset?.records?.length === 1 ? dataset.records[0] : null;
@@ -521,20 +541,20 @@ export function createPaperProviderWarmupHandoff({
           priceEndpoints: boundedEndpoints.priceEndpoints,
           censusEndpoints: boundedEndpoints.censusEndpoints
         });
-        const unavailablePrice = await priceSource.readObservation({
+        const unavailablePrice = await deadline.run(() => priceSource.readObservation({
           mint: exact.mint,
           atMs: exact.atMs,
           denomination: exact.denomination,
           purpose: exact.purpose
-        });
+        }));
         if (unavailablePrice !== null) return unavailable("UNKNOWN_PRICE_BECAME_USABLE", context);
         if (deadline.reason()) return unavailable(deadline.reason(), context);
-        const evaluation = await pipeline.evaluate({
+        const evaluation = await deadline.run(() => pipeline.evaluate({
           ...normalizedEvaluation,
           priceSource,
           censusSource,
           signal: deadline.signal
-        });
+        }));
         if (deadline.reason()) return unavailable(deadline.reason(), context);
         return {
           status: "OFFLINE_EVALUATED",
