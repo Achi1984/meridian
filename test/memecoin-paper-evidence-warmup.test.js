@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import {createHash} from "node:crypto";
-import {mkdir, mkdtemp, open, rm} from "node:fs/promises";
+import {lstat, mkdir, mkdtemp, open, rm, symlink} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -111,6 +111,56 @@ test("price source serves only exact, complete reviewed records; UNKNOWN never u
   }), null);
 });
 
+test("duplicate exact keys and mismatched payload bindings stay unavailable in readers and status", async t => {
+  const {root} = await temporaryStore(t);
+  const identity = {chainId: "solana", mint: "mint", pool: "pool", quote: "quote"};
+  const duplicate = priceRecord(identity, 900_000);
+  const store = new EvidenceWarmupStore(root, {enabled: true});
+  assert.equal((await store.publish({datasetId: "duplicate-price", identity,
+    capturedAt: 1_000_000, records: [duplicate, structuredClone(duplicate)]})).reason,
+  "DUPLICATE_LOGICAL_RECORD");
+  const mismatched = priceRecord(identity, 910_000);
+  mismatched.payload.mint = "other-mint";
+  assert.equal((await store.publish({datasetId: "mismatched-price", identity,
+    capturedAt: 1_000_000, records: [mismatched]})).status, "UNKNOWN");
+
+  const censusFixture = makeFixture({buyCount: 1, sellCount: 1});
+  const census = await censusFixture.censusSource.readSnapshots({
+    identity: censusFixture.identity,
+    startAtMs: censusFixture.candidateT - 3_600_000,
+    endAtMs: censusFixture.candidateT,
+    policy: censusFixture.policy.censusPolicy
+  });
+  const [snapshot] = census.snapshots;
+  const censusRecord = {
+    kind: "census", identity: censusFixture.identity, observedAt: snapshot.observedAt,
+    policyVersion: censusFixture.policy.censusPolicy.version,
+    receivedAt: snapshot.receivedAt, source: snapshot.source,
+    trust: "SYNTHETIC_FIXTURE_ONLY", completeness: "COMPLETE", payload: snapshot
+  };
+  assert.equal((await store.publish({
+    datasetId: "duplicate-census",
+    identity: censusFixture.identity,
+    capturedAt: censusFixture.assembledAt,
+    records: [censusRecord, structuredClone(censusRecord)]
+  })).reason, "DUPLICATE_LOGICAL_RECORD");
+
+  const duplicatedDataset = {
+    datasetId: "untrusted-memory",
+    identity,
+    capturedAt: 1_000_000,
+    records: [duplicate, structuredClone(duplicate)]
+  };
+  const priceSource = createWarmupPriceSource(duplicatedDataset);
+  assert.equal(await priceSource.readObservation({
+    mint: identity.mint, atMs: duplicate.sourceAtMs, denomination: "USD"
+  }), null);
+  assert.deepEqual(warmupCoverage(duplicatedDataset, {
+    identity,
+    priceEndpoints: [{mint: identity.mint, atMs: duplicate.sourceAtMs, denomination: "USD"}]
+  }).exactMissing.prices.length, 1);
+});
+
 test("census reader requires both exact same-identity policy endpoints", async t => {
   const {root} = await temporaryStore(t);
   const fixture = makeFixture({buyCount: 1, sellCount: 1});
@@ -162,6 +212,13 @@ test("census reader requires both exact same-identity policy endpoints", async t
     policy
   });
   assert.equal(wrongIdentity.status, "WARMUP");
+  const mismatchedDataset = {...dataset, records: dataset.records.map((record, index) =>
+    index === 0 ? {...record, payload: {...record.payload, identity: {
+      ...record.payload.identity, pool: "wrong-pool"
+    }}} : record)};
+  assert.equal((await createWarmupCensusSource(mismatchedDataset).readSnapshots({
+    identity: fixture.identity, startAtMs: start.observedAt, endAtMs: end.observedAt, policy
+  })).status, "WARMUP");
   assert.equal((await source.readSnapshots({
     identity: fixture.identity,
     startAtMs: start.observedAt,
@@ -371,4 +428,142 @@ test("incomplete pending publication is UNKNOWN and is never overwritten or retr
   };
   assert.equal((await store.publish(input)).status, "UNKNOWN");
   assert.equal((await store.publish(input)).status, "UNKNOWN");
+});
+
+test("read and publish filesystem waits obey one deadline and late work cannot advance", async t => {
+  const {root} = await temporaryStore(t);
+  const identity = {chainId: "solana", mint: "mint", pool: "pool", quote: "quote"};
+  const record = priceRecord(identity, 10_000);
+  const base = new EvidenceWarmupStore(root, {enabled: true});
+  const bundle = {datasetId: "delay-read", identity, capturedAt: 20_000, records: [record]};
+  assert.equal((await base.publish(bundle)).status, "PUBLISHED");
+
+  const defaultOpen = open;
+  const delayedRead = new EvidenceWarmupStore(root, {
+    limits: {maxElapsedMs: 15},
+    fsOps: {
+      open: async (filename, ...args) => {
+        if (filename.endsWith("evidence-warmup.json")) {
+          await new Promise(resolve => setTimeout(resolve, 60));
+        }
+        return defaultOpen(filename, ...args);
+      }
+    }
+  });
+  assert.equal((await delayedRead.read("delay-read")).reason, "DEADLINE");
+  await new Promise(resolve => setTimeout(resolve, 70));
+  assert.equal((await base.read("delay-read")).status, "AVAILABLE");
+
+  for (const delayedMethod of ["writeFile", "sync"]) {
+    const delayRoot = path.join(root, `delayed-${delayedMethod}`);
+    const linkCalls = [];
+    const delayed = new EvidenceWarmupStore(delayRoot, {
+      enabled: true,
+      limits: {maxElapsedMs: 15},
+      fsOps: {
+        open: async (filename, ...args) => {
+          const handle = await defaultOpen(filename, ...args);
+          if (!filename.endsWith(".evidence-warmup-pending")) return handle;
+          return new Proxy(handle, {
+            get(target, key) {
+              const value = Reflect.get(target, key, target);
+              if (key === delayedMethod) {
+                return async (...methodArgs) => {
+                  await new Promise(resolve => setTimeout(resolve, 60));
+                  return value.apply(target, methodArgs);
+                };
+              }
+              return typeof value === "function" ? value.bind(target) : value;
+            }
+          });
+        },
+        link: async (...args) => {
+          linkCalls.push(args);
+          const {link: actualLink} = await import("node:fs/promises");
+          return actualLink(...args);
+        }
+      }
+    });
+    const result = await delayed.publish({...bundle, datasetId: delayedMethod});
+    assert.equal(result.reason, "DEADLINE");
+    await new Promise(resolve => setTimeout(resolve, 80));
+    assert.equal(linkCalls.length, 0);
+    await assert.rejects(lstat(path.join(delayRoot, "evidence-warmup.json")), {code: "ENOENT"});
+  }
+});
+
+test("cancelled or expired link and directory-sync waits stay UNKNOWN and block republish", async t => {
+  const {root} = await temporaryStore(t);
+  const identity = {chainId: "solana", mint: "mint", pool: "pool", quote: "quote"};
+  const bundle = {datasetId: "late-link", identity, capturedAt: 20_000,
+    records: [priceRecord(identity, 10_000)]};
+  const actualLink = (await import("node:fs/promises")).link;
+  let linkCalls = 0;
+  const lateLink = new EvidenceWarmupStore(root, {
+    enabled: true,
+    limits: {maxElapsedMs: 15},
+    fsOps: {
+      link: async (...args) => {
+        linkCalls += 1;
+        await actualLink(...args);
+        await new Promise(resolve => setTimeout(resolve, 60));
+      }
+    }
+  });
+  assert.equal((await lateLink.publish(bundle)).reason, "DEADLINE");
+  await new Promise(resolve => setTimeout(resolve, 80));
+  assert.equal((await lateLink.publish(bundle)).status, "UNKNOWN");
+  assert.equal((await lateLink.read(bundle.datasetId)).status, "UNKNOWN");
+  assert.equal(linkCalls, 1);
+
+  const syncRoot = path.join(root, "late-sync");
+  const controller = new AbortController();
+  let syncCalls = 0;
+  const actualOpen = open;
+  const lateSync = new EvidenceWarmupStore(syncRoot, {
+    enabled: true,
+    limits: {maxElapsedMs: 1_000},
+    fsOps: {
+      open: async (filename, ...args) => {
+        const handle = await actualOpen(filename, ...args);
+        if (filename !== syncRoot) return handle;
+        return new Proxy(handle, {
+          get(target, key) {
+            const value = Reflect.get(target, key, target);
+            if (key === "sync") {
+              return async (...methodArgs) => {
+                syncCalls += 1;
+                await value.apply(target, methodArgs);
+                await new Promise(resolve => setTimeout(resolve, 60));
+              };
+            }
+            return typeof value === "function" ? value.bind(target) : value;
+          }
+        });
+      }
+    }
+  });
+  setTimeout(() => controller.abort(), 20);
+  assert.equal((await lateSync.publish({...bundle, datasetId: "late-sync"},
+    {signal: controller.signal})).reason, "CANCELLED");
+  assert.equal(syncCalls, 1);
+  assert.equal((await lateSync.publish({...bundle, datasetId: "late-sync"})).status, "UNKNOWN");
+});
+
+test("symlinked ancestry is rejected before creating any target directories", async t => {
+  const {parent} = await temporaryStore(t);
+  const outside = path.join(parent, "outside");
+  const symlinked = path.join(parent, "symlinked");
+  await mkdir(outside, {mode: 0o700});
+  await symlink(outside, symlinked);
+  const target = path.join(symlinked, "new", "nested", "store");
+  const store = new EvidenceWarmupStore(target, {enabled: true});
+  const result = await store.publish({
+    datasetId: "symlink-escape",
+    identity: {chainId: "solana", mint: "mint", pool: "pool", quote: "quote"},
+    capturedAt: 20_000,
+    records: []
+  });
+  assert.equal(result.status, "UNKNOWN");
+  await assert.rejects(lstat(path.join(outside, "new")), {code: "ENOENT"});
 });
