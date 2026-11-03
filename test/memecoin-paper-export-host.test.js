@@ -403,6 +403,26 @@ test("protected storage accepts only the root:1000 sticky 03775 mount and a priv
   }
 });
 
+test("setgid protected mount creates and accepts its inherited private 02700 child", async t => {
+  const hostFixture = await fixture(t);
+  const {validatePaperExportStorageRoot} = await import("../scripts/memecoin-paper-export-host.mjs");
+  await chmod(hostFixture.mountRoot, 0o3775);
+
+  const parent = await lstat(hostFixture.mountRoot);
+  assert.equal(parent.mode & 0o7777, PROTECTED_MODE);
+  const lstatPath = fakeMountLstat(hostFixture.mountRoot);
+  await validatePaperExportStorageRoot(
+    hostFixture.mountRoot,
+    hostFixture.storageRoot,
+    {lstatPath}
+  );
+
+  const child = await lstat(hostFixture.storageRoot);
+  assert.equal(child.uid, process.getuid());
+  assert.equal(child.gid, parent.gid);
+  assert.equal(child.mode & 0o7777, 0o2700);
+});
+
 test("private file reads reject FIFOs without blocking and cap files that grow after fstat", async t => {
   const hostFixture = await fixture(t);
   const {readBoundedPrivateFile, runPaperExportHost} =

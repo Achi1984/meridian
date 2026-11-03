@@ -23,9 +23,11 @@ setting validates. The required settings are:
   nonempty, independent authorization scopes;
 - `PAPER_EXPORT_HOST_MOUNT_ROOT=/var/data/meridian-paper` and
   `PAPER_EXPORT_HOST_STORAGE_ROOT`: a direct child storage directory. Mount
-  ancestry must be real, trusted directories; the storage directory must be
-  runtime-owned with mode `0700`. TLS and authorization files must be regular,
-  runtime-owned files with no group/world permissions.
+  ancestry must be real, trusted directories. The storage child must be
+  runtime-owned and private with exact mode `0700` or `02700`; Linux inherits
+  the protected mount's setgid bit and group when creating a child, yielding
+  `02700` while retaining no group/world access. TLS and authorization files
+  must be regular, runtime-owned files with no group/world permissions.
 
 The authorizers compare each request against its corresponding file-backed
 authorization value. File contents, PEM data, authorization values, and export

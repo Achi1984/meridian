@@ -201,8 +201,9 @@ export async function validatePaperExportStorageRoot(
     if (error.code !== "EEXIST") throw error;
   }
   const storageStat = await lstatPath(storageRoot);
+  const storageMode = storageStat.mode & 0o7777;
   if (!storageStat.isDirectory() || storageStat.isSymbolicLink() ||
-      storageStat.uid !== runtimeUid || (storageStat.mode & 0o7777) !== 0o700) {
+      storageStat.uid !== runtimeUid || ![0o700, 0o2700].includes(storageMode)) {
     throw new TypeError("storage root must be a runtime-owned private directory");
   }
 }
