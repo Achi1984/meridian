@@ -47,10 +47,59 @@ export const PAPER_RUNTIME_SOURCE_POLICY_SHA256 = createHash("sha256")
   .update(canonicalCheckpointBytes(PAPER_SOURCE_POLICY))
   .digest("hex");
 
-export async function acquireSyntheticRuntimeFixture(clock) {
-  if (!clock || typeof clock.wallClock !== "function" ||
-      typeof clock.advance !== "function") {
+export async function acquireSyntheticRuntimeFixture(clock, {
+  signal,
+  remaining,
+  recordRequest,
+  recordWork,
+  waitForStop = false,
+  expireDuringRequest = false,
+  deadlineAt,
+  variant = "BASE"
+} = {}) {
+  if (!clock || typeof clock.wallClock !== "function" || typeof clock.advance !== "function") {
     throw new TypeError("synthetic runtime fixture requires the module synthetic clock");
+  }
+  if (typeof recordRequest !== "function" || typeof recordWork !== "function") {
+    throw new TypeError("synthetic runtime fixture requires shared budget callbacks");
+  }
+  if (!remaining || !Number.isSafeInteger(remaining.requests) ||
+      !Number.isSafeInteger(remaining.bytes) || !Number.isSafeInteger(remaining.work) ||
+      !Number.isSafeInteger(remaining.timeMs) || !Number.isSafeInteger(deadlineAt)) {
+    throw new TypeError("synthetic runtime fixture requires shared remaining budgets");
+  }
+  if (!["BASE", "MISSING_QUOTE", "WRONG_IDENTITY", "FUTURE_EVIDENCE"].includes(variant)) {
+    throw new TypeError("synthetic runtime fixture variant is unsupported");
+  }
+  let usedRequests = 0;
+  let usedBytes = 0;
+  let usedWork = 0;
+  const chargeWork = units => {
+    if (signal?.aborted || !Number.isSafeInteger(units) || units < 1 ||
+        usedWork + units > remaining.work) {
+      throw Object.assign(new Error("synthetic source work budget exhausted"), {
+        code: signal?.aborted ? "STOPPED" : "GLOBAL_BUDGET"
+      });
+    }
+    recordWork(units);
+    usedWork += units;
+  };
+  const chargeRequest = bytes => {
+    if (signal?.aborted || !Number.isSafeInteger(bytes) || bytes < 0 ||
+        usedRequests + 1 > remaining.requests || usedBytes + bytes > remaining.bytes ||
+        usedWork + 1 > remaining.work) {
+      throw Object.assign(new Error("synthetic source request budget exhausted"), {
+        code: signal?.aborted ? "STOPPED" : "GLOBAL_BUDGET"
+      });
+    }
+    recordRequest({bytes, events: 1});
+    usedRequests += 1;
+    usedBytes += bytes;
+    usedWork += 1;
+  };
+  if (remaining.requests < 1 || remaining.bytes < 1 ||
+      remaining.work < 1 || remaining.timeMs < 1) {
+    return {status: "UNKNOWN", reason: "GLOBAL_BUDGET", candidate: null, pipeline: null, quote: null};
   }
   const [{makeFixture}, {createPaperSourcePipeline}, {ANALYST_WINDOW_METRICS},
     {createMarketQuoteAdapter}, {syntheticOrderResponse}] = await Promise.all([
@@ -62,6 +111,14 @@ export async function acquireSyntheticRuntimeFixture(clock) {
   ]);
   const candidateT = clock.wallClock() - 1_000;
   const fixture = makeFixture({candidateT});
+  const marketPairEvidence = variant === "WRONG_IDENTITY"
+    ? {
+        ...fixture.marketPairEvidence,
+        identity: {...fixture.identity, mint: "Vote111111111111111111111111111111111111111"}
+      }
+    : variant === "FUTURE_EVIDENCE"
+      ? {...fixture.marketPairEvidence, observedAt: candidateT + 1_000}
+      : fixture.marketPairEvidence;
   const slotTimes = new Map([
     [490_000, Math.floor((candidateT - 3_601_000) / 1_000)],
     [490_001, Math.floor((candidateT - 3_600_000) / 1_000)],
@@ -69,19 +126,37 @@ export async function acquireSyntheticRuntimeFixture(clock) {
     [490_004, Math.floor(candidateT / 1_000)],
     [490_006, Math.floor((candidateT + 1_000) / 1_000)]
   ]);
+  const rpcMethods = [];
   const transport = async request => {
+    if (expireDuringRequest) clock.advance(remaining.timeMs + 1);
+    if (clock.wallClock() >= deadlineAt) {
+      throw Object.assign(new Error("synthetic runtime deadline reached"), {code: "DEADLINE"});
+    }
+    if (waitForStop) {
+      await new Promise(resolve => {
+        if (signal?.aborted) resolve();
+        else signal?.addEventListener("abort", resolve, {once: true});
+      });
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    if (signal?.aborted) throw Object.assign(new Error("fixture acquisition cancelled"), {code: "STOPPED"});
     const body = JSON.parse(request.body);
+    rpcMethods.push(body.method);
     const result = body.method === "getSlot" ? 490_016
       : body.method === "getBlocks" ? [490_000, 490_001, 490_003, 490_004, 490_006]
         : body.method === "getBlockTime" ? slotTimes.get(body.params[0]) ?? null
           : null;
-    return new Response(JSON.stringify({jsonrpc: "2.0", id: body.id, result}), {
+    const response = JSON.stringify({jsonrpc: "2.0", id: body.id, result});
+    chargeRequest(Buffer.byteLength(response));
+    return new Response(response, {
       status: 200,
       headers: {"content-type": "application/json"}
     });
   };
   const historySlotCollector = request => {
+    if (signal?.aborted) throw Object.assign(new Error("fixture acquisition cancelled"), {code: "STOPPED"});
     const payload = JSON.stringify({fixture: "SYNTHETIC_FIXTURE_ONLY"});
+    chargeRequest(Buffer.byteLength(payload));
     return {
       sourceVersion: "solana-launch-history-source-v1",
       source: "Solana JSON-RPC",
@@ -129,6 +204,14 @@ export async function acquireSyntheticRuntimeFixture(clock) {
     slotRange: {startInclusive: 490_000, endInclusive: 490_006},
     transport,
     clock: () => clock.wallClock(),
+    limits: {
+      maxRequests: Math.max(1, remaining.requests),
+      maxBytesPerResponse: Math.min(1_048_576, Math.max(1, Math.floor(remaining.bytes / 3))),
+      maxBytesPerRun: Math.max(1, remaining.bytes),
+      maxWorkUnits: Math.max(1, remaining.work),
+      maxDurationMs: Math.max(1, remaining.timeMs),
+      requestTimeoutMs: Math.min(1_000, Math.max(1, remaining.timeMs))
+    },
     historySlotCollector
   });
   const reviewEvidence = Object.fromEntries(ANALYST_WINDOW_METRICS.map(key => [key, {
@@ -137,18 +220,34 @@ export async function acquireSyntheticRuntimeFixture(clock) {
     reviewId: `offline-${key}`,
     reviewedAt: candidateT - 1
   }]));
+  const censusSource = Object.freeze({
+    async readSnapshots(request) {
+      if (signal?.aborted) throw Object.assign(new Error("fixture acquisition cancelled"), {code: "STOPPED"});
+      chargeWork(1);
+      return fixture.censusSource.readSnapshots(request);
+    }
+  });
+  const priceSource = Object.freeze({
+    async readObservation(request) {
+      if (signal?.aborted) throw Object.assign(new Error("fixture acquisition cancelled"), {code: "STOPPED"});
+      chargeWork(1);
+      return fixture.priceSource.readObservation(request);
+    }
+  });
+  chargeWork(1);
   const evaluation = await pipeline.evaluate({
     providerCandidate: fixture.candidate,
     evidence: fixture.candidate.evidence,
     candidateT,
     policy: fixture.policy,
     poolProof: fixture.poolProof,
-    censusSource: fixture.censusSource,
-    priceSource: fixture.priceSource,
-    marketPairEvidence: fixture.marketPairEvidence,
+    censusSource,
+    priceSource,
+    marketPairEvidence,
     smartWalletAllowlist: fixture.smartWalletAllowlist,
     reviewEvidence,
-    holdUntil: candidateT + 8 * 60 * 60 * 1_000
+    holdUntil: candidateT + 8 * 60 * 60 * 1_000,
+    signal
   });
   if (!evaluation.candidate) {
     return {
@@ -159,21 +258,69 @@ export async function acquireSyntheticRuntimeFixture(clock) {
       quote: null
     };
   }
+  const liquidityCoverage = evaluation.candidate.analystEvidence?.liquidityMarketCapPct?.coverage;
+  if (liquidityCoverage && Object.hasOwn(liquidityCoverage, "windowMs") &&
+      liquidityCoverage.windowMs === undefined) {
+    delete liquidityCoverage.windowMs;
+  }
+  const attachRuntime = quote => {
+    evaluation.candidate.syntheticRuntime = {
+      label: "SYNTHETIC_FIXTURE_ONLY",
+      pipeline: {
+        status: evaluation.status,
+        candidateT: evaluation.candidateT,
+        assembledAt: evaluation.assembledAt,
+        decisionAt: evaluation.decisionAt,
+        filtersStatus: evaluation.filters?.status ?? "UNKNOWN",
+        filtersAccepted: evaluation.filters?.accepted === true,
+        rpcMethods,
+        acquisitionReceiptIds: evaluation.auditReceipts.acquisition
+          .map(item => item.receipt?.id).filter(Boolean)
+      },
+      quote: {
+        status: quote?.status ?? "UNAVAILABLE",
+        sourceProvenance: quote?.sourceProvenance ?? "NOT_REQUESTED",
+        eventId: quote?.quoteCandidate?.eventId ?? null,
+        observedAt: quote?.quoteCandidate?.receiptTime?.observedAt ?? null,
+        costStatus: quote?.costEvidence?.status ?? "UNKNOWN",
+        scenarioStatus: quote?.scenarioProjection?.status ?? null,
+        paperFillEligible: false
+      }
+    };
+  };
 
   const quoteBody = syntheticOrderResponse({
     inputMint: fixture.candidate.quote,
     outputMint: fixture.candidate.mint
   });
+  if (signal?.aborted || clock.wallClock() >= deadlineAt ||
+      usedRequests >= remaining.requests ||
+      usedBytes >= remaining.bytes || usedWork >= remaining.work) {
+    attachRuntime(null);
+    return {
+      status: evaluation.status,
+      reason: signal?.aborted ? "STOPPED"
+        : clock.wallClock() >= deadlineAt ? "DEADLINE" : "GLOBAL_BUDGET",
+      candidate: evaluation.candidate,
+      pipeline: evaluation,
+      quote: null
+    };
+  }
   const quoteAdapter = createMarketQuoteAdapter({
     enabled: true,
     clock: () => {
       clock.advance(1);
       return clock.wallClock();
     },
-    transport: async () => new Response(JSON.stringify(quoteBody.body), {
-      status: 200,
-      headers: {"content-type": "application/json"}
-    }),
+    transport: async () => {
+      if (signal?.aborted) throw Object.assign(new Error("fixture quote cancelled"), {code: "STOPPED"});
+      const response = JSON.stringify(quoteBody.body);
+      chargeRequest(Buffer.byteLength(response));
+      return new Response(response, {
+        status: variant === "MISSING_QUOTE" ? 503 : 200,
+        headers: {"content-type": "application/json"}
+      });
+    },
     timeoutMs: 1_000,
     maxRequests: 1
   });
@@ -191,27 +338,9 @@ export async function acquireSyntheticRuntimeFixture(clock) {
     candidateSampledAt: candidateT,
     authorizedAt: evaluation.decisionAt,
     slippageBps: 50
-  }, {signal: new AbortController().signal});
+  }, {signal});
 
-  evaluation.candidate.syntheticRuntime = {
-    label: "SYNTHETIC_FIXTURE_ONLY",
-    pipeline: {
-      status: evaluation.status,
-      candidateT: evaluation.candidateT,
-      assembledAt: evaluation.assembledAt,
-      decisionAt: evaluation.decisionAt,
-      acquisitionReceiptIds: evaluation.auditReceipts.acquisition
-        .map(item => item.receipt?.id).filter(Boolean)
-    },
-    quote: {
-      status: quote.status,
-      sourceProvenance: quote.sourceProvenance,
-      eventId: quote.quoteCandidate?.eventId ?? null,
-      observedAt: quote.quoteCandidate?.receiptTime?.observedAt ?? null,
-      scenarioStatus: quote.scenarioProjection?.status ?? null,
-      paperFillEligible: false
-    }
-  };
+  attachRuntime(quote);
   return {
     status: evaluation.status,
     reason: evaluation.filters?.status === "PASS" ? null : "FIXTURE_EVIDENCE_NOT_ENTRY_AUTHORITY",

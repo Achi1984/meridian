@@ -48,7 +48,8 @@ async function harness(t, {
   runConfig = config(),
   clock = clockHarness(),
   adapters,
-  fault = "NONE"
+  fault = "NONE",
+  onTestInitialized
 } = {}) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "paper-composition-"));
   t.after(() => rm(directory, {recursive: true, force: true}));
@@ -56,7 +57,8 @@ async function harness(t, {
     config: runConfig,
     dataDirectory: directory,
     adapters: adapters ?? offlineFixtureAdapters({clock, fault}),
-    clock
+    clock,
+    onTestInitialized
   });
   return {directory, pilot, clock};
 }
@@ -326,6 +328,8 @@ test("synthetic runtime fixture traverses source pipeline and quote adapter into
   assert.ok(runtime);
   assert.equal(runtime.label, "SYNTHETIC_FIXTURE_ONLY");
   assert.equal(runtime.pipeline.status, "PARTIAL");
+  assert.equal(runtime.pipeline.filtersStatus, "UNKNOWN");
+  assert.equal(runtime.pipeline.filtersAccepted, false);
   assert.ok(runtime.pipeline.acquisitionReceiptIds.length > 0);
   assert.ok(runtime.pipeline.assembledAt >= runtime.pipeline.candidateT);
   assert.ok(runtime.pipeline.decisionAt >= runtime.pipeline.assembledAt);
@@ -333,6 +337,7 @@ test("synthetic runtime fixture traverses source pipeline and quote adapter into
   assert.equal(runtime.quote.sourceProvenance, "INJECTED_TRANSPORT_NOT_AUTHENTICATED");
   assert.equal(runtime.quote.eventId, "synthetic-order-1");
   assert.ok(runtime.quote.observedAt > runtime.pipeline.decisionAt);
+  assert.equal(runtime.quote.costStatus, "UNKNOWN");
   assert.equal(runtime.quote.paperFillEligible, false);
   assert.equal(report.runnerReport.counters.quotes, 0);
   assert.equal(report.runnerReport.operationResults.some(item =>
@@ -351,6 +356,91 @@ test("synthetic runtime fixture traverses source pipeline and quote adapter into
   });
   assert.equal(evaluation.evidence.entryFills, 0);
   assert.equal(evaluation.claims.liveExecution, false);
+});
+
+test("wrong identity, future evidence, and missing quote remain integrated no-entry outcomes", async t => {
+  for (const [runId, fault, expectedEvent] of [
+    ["pipeline-wrong-identity", "PIPELINE_QUOTE_WRONG_IDENTITY", "synthetic-order-1"],
+    ["pipeline-future-evidence", "PIPELINE_QUOTE_FUTURE_EVIDENCE", "synthetic-order-1"],
+    ["pipeline-missing-quote", "PIPELINE_QUOTE_MISSING_QUOTE", null]
+  ]) {
+    const {pilot} = await harness(t, {
+      runConfig: config({runId}),
+      fault
+    });
+    const result = await pilot.start();
+    const runtime = result.provenance.candidates[0]?.syntheticFixtureRuntime;
+    assert.ok(runtime);
+    assert.equal(runtime.pipeline.filtersAccepted, false);
+    assert.equal(runtime.pipeline.filtersStatus, "UNKNOWN");
+    assert.equal(runtime.quote.eventId, expectedEvent);
+    assert.equal(runtime.quote.paperFillEligible, false);
+    assert.equal(result.report.runnerReport.counters.quotes, 0);
+    assert.equal(result.report.runnerReport.operationResults.some(item =>
+      item.method === "executeEntry" && item.status === "FILLED_PAPER"), false);
+    assert.deepEqual(result.report.runnerReport.terminalResult.openPositions, []);
+  }
+});
+
+test("repeated fixture acquisition shares request and work budgets and deduplicates candidate identity", async t => {
+  const duplicate = await harness(t, {
+    runConfig: config({
+      runId: "pipeline-duplicate",
+      budgets: {...BUDGETS, requests: 40, cycles: 8}
+    }),
+    fault: "PIPELINE_QUOTE_DUPLICATE"
+  });
+  const result = await duplicate.pilot.start();
+  assert.equal(result.status, "FINISHED");
+  assert.equal(result.provenance.candidates.length, 1);
+  assert.equal(result.budgets.acquisitionCycles, 3);
+  assert.ok(result.budgets.requests <= 40);
+  assert.ok(result.budgets.events <= BUDGETS.events);
+  assert.deepEqual(result.report.runnerReport.terminalResult.openPositions, []);
+
+  const exhausted = await harness(t, {
+    runConfig: config({
+      runId: "pipeline-budget-exhausted",
+      budgets: {...BUDGETS, requests: 10, cycles: 8}
+    }),
+    fault: "PIPELINE_QUOTE_DUPLICATE"
+  });
+  const bounded = await exhausted.pilot.start();
+  assert.equal(bounded.status, "UNKNOWN");
+  assert.equal(bounded.report.runnerReport.reason, "GLOBAL_BUDGET");
+  assert.equal(bounded.budgets.requests, 10);
+  assert.ok(bounded.budgets.events <= BUDGETS.events);
+  assert.equal(bounded.report.runnerReport.operationResults.some(item =>
+    item.method === "executeEntry" && item.status === "FILLED_PAPER"), false);
+});
+
+test("stop during the integrated fixture callback isolates its late completion", async t => {
+  let initialized;
+  const ready = new Promise(resolve => { initialized = resolve; });
+  const {pilot} = await harness(t, {
+    fault: "PIPELINE_QUOTE_WAIT",
+    onTestInitialized: initialized
+  });
+  const pending = pilot.start();
+  await ready;
+  await new Promise(resolve => setTimeout(resolve, 25));
+  assert.equal(pilot.stop(), true);
+  const result = await pending;
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.ok(["STOPPED", "UNKNOWN"].includes(result.status));
+  assert.ok(result.report.runnerReport.counters.quotes === 0);
+  assert.equal(result.provenance.candidates.length, 0);
+});
+
+test("deadline during fixture acquisition prevents its subsequent quote request", async t => {
+  const {pilot} = await harness(t, {fault: "PIPELINE_QUOTE_DEADLINE"});
+  const result = await pilot.start();
+  const runtime = result.provenance.candidates[0]?.syntheticFixtureRuntime;
+  assert.ok(runtime);
+  assert.equal(runtime.quote.sourceProvenance, "NOT_REQUESTED");
+  assert.equal(runtime.quote.eventId, null);
+  assert.equal(result.report.runnerReport.counters.quotes, 0);
+  assert.ok(["FINISHED", "STOPPED", "UNKNOWN"].includes(result.status));
 });
 
 test("missing hard evidence and missing full cost components do not fill", async t => {

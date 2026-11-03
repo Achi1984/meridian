@@ -40,9 +40,14 @@ receipt metadata are carried in synthetic provenance through the same runner,
 checkpoint, export, and evaluator. The current fixture intentionally remains
 `PARTIAL`/UNKNOWN for hard evidence and the quote adapter reports UNKNOWN costs;
 the runner therefore records a truthful no-entry terminal and never converts
-that observation into a fill. This proves orchestration only, not entry, mark,
-exit, source trust, or readiness. The real `SOURCE_BACKED_PAPER` mode never calls
-this seam.
+that observation into a fill. This proves orchestration only, not entry, mark, exit, source trust, or readiness.
+The fixture seam can repeat bounded acquisition cycles, accounts for its RPC,
+history, evidence, and quote work against the composition's shared budgets, and
+deduplicates repeated mint identities. Its request and byte allowances are
+passed down as remaining capacity rather than replenished for each cycle; work
+shares the existing `events` ceiling. Stop/deadline and late-callback fixtures
+exercise cancellation without retry. These remain local synthetic test cases;
+the real `SOURCE_BACKED_PAPER` mode never calls this seam.
 Configuration and fixture options reject accessor/hidden fields, and a
 pre-aborted run exits before opening a checkpoint.
 

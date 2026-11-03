@@ -124,7 +124,7 @@ function receiptSummary(result, timeEvidence, collector) {
   };
 }
 
-function cachedSource(source, method, keyOf) {
+function cachedSource(source, method, keyOf, signal) {
   const cache = new Map();
   const descriptor = source && Object.getOwnPropertyDescriptor(source, method);
   const read = descriptor && Object.hasOwn(descriptor, "value") ? descriptor.value : null;
@@ -138,7 +138,7 @@ function cachedSource(source, method, keyOf) {
         return null;
       }
       if (!cache.has(key)) {
-        cache.set(key, Promise.resolve().then(() => read.call(source, request)));
+        cache.set(key, Promise.resolve().then(() => read.call(source, {...request, signal})));
       }
       try {
         return await cache.get(key);
@@ -225,9 +225,18 @@ export function createPaperSourcePipeline({
       marketPairEvidence,
       smartWalletAllowlist,
       reviewEvidence = {},
-      holdUntil = null
+      holdUntil = null,
+      signal
     } = {}) {
       if (!enabled) return unavailable("DISABLED");
+      if (signal !== undefined && (!signal || typeof signal.aborted !== "boolean" ||
+          typeof signal.addEventListener !== "function" ||
+          typeof signal.removeEventListener !== "function")) {
+        return unavailable("INVALID_ABORT_SIGNAL", {candidateT, assembledAt, decisionAt, holdUntil});
+      }
+      if (signal?.aborted) {
+        return unavailable("CANCELLED", {candidateT, assembledAt, decisionAt, holdUntil});
+      }
       if (evaluationActive) return unavailable("EVALUATION_IN_PROGRESS", {
         candidateT, assembledAt, decisionAt, holdUntil
       });
@@ -283,7 +292,8 @@ export function createPaperSourcePipeline({
               identity,
               poolProof,
               startExclusiveMs: candidateT - policy.windowsMs.swaps1h,
-              endInclusiveMs: candidateT
+              endInclusiveMs: candidateT,
+              signal
             });
           } catch {
             prefetchedHistory = null;
@@ -314,7 +324,8 @@ export function createPaperSourcePipeline({
             request?.mint,
             request?.atMs,
             request?.denomination
-          ])
+          ]),
+          signal
         );
         const cachedCensusSource = cachedSource(
           prefetchCensusSource,
@@ -327,10 +338,12 @@ export function createPaperSourcePipeline({
             request?.startAtMs,
             request?.endAtMs,
             request?.policy
-          ])
+          ]),
+          signal
         );
         const cachedHistorySource = prefetchedHistory === null ? null : Object.freeze({
           async readWindow(request) {
+            if (signal?.aborted) return null;
             if (request?.identity?.chainId !== identity.chainId ||
                 request?.identity?.mint !== identity.mint ||
                 request?.identity?.pool !== identity.pool ||

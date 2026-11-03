@@ -43,7 +43,11 @@ const MAXIMA = {
 const syntheticClocks = new WeakMap();
 const offlineFixtureAdaptersBySource = new WeakMap();
 const FIXTURE_FAULTS = new Set([
-  "NONE", "PIPELINE_QUOTE", "DISCONNECT", "CALLBACK_TIMEOUT", "LATE_DEADLINE", "WAIT_FOR_STOP",
+  "NONE", "PIPELINE_QUOTE", "PIPELINE_QUOTE_DUPLICATE", "PIPELINE_QUOTE_WAIT",
+  "PIPELINE_QUOTE_DEADLINE",
+  "PIPELINE_QUOTE_MISSING_QUOTE", "PIPELINE_QUOTE_WRONG_IDENTITY",
+  "PIPELINE_QUOTE_FUTURE_EVIDENCE",
+  "DISCONNECT", "CALLBACK_TIMEOUT", "LATE_DEADLINE", "WAIT_FOR_STOP",
   "DEADLINE_BEFORE_FIRST_RISK_SNAPSHOT",
   "CLOCK_JUMP", "LOST_ACK", "LOST_INITIAL_ACK", "NO_CANDIDATES", "TWO_OPEN_POSITIONS",
   "MISSING_EVIDENCE", "MISSING_COSTS",
@@ -327,8 +331,9 @@ export function offlineFixtureAdapters(options = {}) {
   }
   let exitCount = 0;
   let entryCount = 0;
+  let pipelineFixtureCalls = 0;
   const adapters = Object.freeze({
-    async acquireCandidates({now, signal, recordRequest}) {
+    async acquireCandidates({now, signal, deadlineAt, remaining, recordRequest, recordWork}) {
       if (fault === "DISCONNECT") throw Object.assign(new Error("fixture disconnect"), {code: "DISCONNECTED"});
       if (fault === "CALLBACK_TIMEOUT") {
         await new Promise(resolve => setTimeout(resolve, 30));
@@ -341,8 +346,26 @@ export function offlineFixtureAdapters(options = {}) {
         recordRequest({bytes: 4, events: 1});
         recordRequest({bytes: 4, events: 1});
       }
-      if (fault === "PIPELINE_QUOTE") {
-        const acquired = await acquireSyntheticRuntimeFixture(clock);
+      if (fault.startsWith("PIPELINE_QUOTE")) {
+        pipelineFixtureCalls += 1;
+        if (pipelineFixtureCalls > (fault === "PIPELINE_QUOTE_DUPLICATE" ? 2 : 1)) return [];
+        let acquired;
+        try {
+          acquired = await acquireSyntheticRuntimeFixture(clock, {
+            signal, remaining, recordRequest, recordWork,
+            waitForStop: fault === "PIPELINE_QUOTE_WAIT",
+            expireDuringRequest: fault === "PIPELINE_QUOTE_DEADLINE",
+            deadlineAt,
+            variant: fault === "PIPELINE_QUOTE_MISSING_QUOTE" ? "MISSING_QUOTE"
+              : fault === "PIPELINE_QUOTE_WRONG_IDENTITY" ? "WRONG_IDENTITY"
+                : fault === "PIPELINE_QUOTE_FUTURE_EVIDENCE" ? "FUTURE_EVIDENCE" : "BASE"
+          });
+        } catch (error) {
+          throw Object.assign(new Error("synthetic pipeline fixture failed closed"), {
+            code: typeof error?.code === "string" && /^[A-Z0-9_]{1,48}$/.test(error.code)
+              ? error.code : "PIPELINE_FIXTURE_FAILURE"
+          });
+        }
         clock.advance();
         return acquired.candidate ? [acquired.candidate] : [];
       }
@@ -600,12 +623,16 @@ export function createPaperPilotComposition(options = {}) {
     return {wall, mono, elapsedMs: anchor ? mono - anchor.mono : 0};
   }
 
-  function chargeEvent(count = 1) {
+  function chargeWork(count = 1) {
     if (!Number.isSafeInteger(count) || count < 0 ||
         counters.events + count > config.budgets.events) {
-      throw Object.assign(new Error("global event budget exhausted"), {code: "EVENT_BUDGET"});
+      throw Object.assign(new Error("global work/event budget exhausted"), {code: "EVENT_BUDGET"});
     }
     counters.events += count;
+  }
+
+  function chargeEvent(count = 1) {
+    chargeWork(count);
   }
 
   function accountRequest({bytes = 0, events = 1} = {}) {
@@ -620,7 +647,7 @@ export function createPaperPilotComposition(options = {}) {
     }
     counters.requests += 1;
     counters.bytes += bytes;
-    counters.events += events;
+    chargeWork(events);
   }
 
   async function invokeAdapter(name, input) {
@@ -646,10 +673,12 @@ export function createPaperPilotComposition(options = {}) {
         bytes: config.budgets.bytes - counters.bytes,
         events: config.budgets.events - counters.events,
         candidates: config.budgets.candidates - counters.candidates,
-        cycles: config.budgets.cycles - counters.cycles,
-        timeMs: remainingMs
+        cycles: config.budgets.cycles - counters.cycles - counters.acquisitionCycles,
+        work: config.budgets.events - counters.events,
+        timeMs: Math.max(0, Math.floor(remainingMs))
       }),
-      recordRequest: accountRequest
+      recordRequest: accountRequest,
+      recordWork: chargeWork
     }));
     const timeoutMs = Math.min(config.budgets.callbackTimeoutMs, remainingMs);
     if (remainingMs <= config.budgets.callbackTimeoutMs) timeoutCode = "DEADLINE";
@@ -688,7 +717,10 @@ export function createPaperPilotComposition(options = {}) {
   }
 
   async function execute() {
-    counters = {requests: 0, bytes: externalInputBytes, events: 0, candidates: 0, cycles: 0};
+    counters = {
+      requests: 0, bytes: externalInputBytes, events: 0, candidates: 0, cycles: 0,
+      acquisitionCycles: 0
+    };
     deadlineAt = config.startedAt + EIGHT_HOURS_MS;
     if (abort.signal.aborted) {
       state = "STOPPED";
@@ -861,6 +893,9 @@ export function createPaperPilotComposition(options = {}) {
     let candidates = [];
     let candidateIndex = 0;
     let candidateBatchLoaded = false;
+    const seenCandidateMints = new Set();
+    const repeatedAcquisition = sourceMode ||
+      fault.startsWith("PIPELINE_QUOTE");
     let sourceReceiptAt = null;
 
     function candidateSourceFailure(code) {
@@ -872,8 +907,18 @@ export function createPaperPilotComposition(options = {}) {
     const candidateSource = {
       async poll() {
         if (abort.signal.aborted) return {done: true};
-        if (!candidateBatchLoaded) {
+        const batchExhausted = candidateIndex >= candidates.length;
+        if (!candidateBatchLoaded || (repeatedAcquisition && batchExhausted)) {
+          if (repeatedAcquisition &&
+              counters.cycles + counters.acquisitionCycles >= config.budgets.cycles) {
+            const reason = "CYCLE_BUDGET";
+            sourceUnknownReason = reason;
+            return {done: true, outcome: "UNKNOWN", reason};
+          }
           candidateBatchLoaded = true;
+          candidates = [];
+          candidateIndex = 0;
+          if (repeatedAcquisition) counters.acquisitionCycles += 1;
           let acquisition;
           try {
             acquisition = await invokeAdapter("acquireCandidates", {});
@@ -917,12 +962,12 @@ export function createPaperPilotComposition(options = {}) {
             sourceUnknownReason = acquisition.result.reason;
             return {done: true, outcome: "UNKNOWN", reason: acquisition.result.reason};
           }
-          if (!Array.isArray(acquisition.result) ||
-              acquisition.result.length > config.budgets.candidates ||
-              acquisition.result.length > config.budgets.cycles) {
+          if (!Array.isArray(acquisition.result)) {
             return candidateSourceFailure("CANDIDATE_BOUND");
           }
-          counters.candidates = acquisition.result.length;
+          if (!acquisition.result.length) {
+            return {done: true};
+          }
           sourceReceiptAt = acquisition.receiptAt;
           for (const candidate of acquisition.result) {
             if (!integerTime(candidate?.sampledAt) ||
@@ -931,12 +976,25 @@ export function createPaperPilotComposition(options = {}) {
               return candidateSourceFailure("SOURCE_AFTER_RECEIPT");
             }
           }
-          chargeEvent(acquisition.result.length);
-          candidates = scout(acquisition.result, {
+          const uniqueCandidates = acquisition.result.filter(candidate => {
+            if (typeof candidate?.mint !== "string" || seenCandidateMints.has(candidate.mint)) {
+              return false;
+            }
+            seenCandidateMints.add(candidate.mint);
+            return true;
+          });
+          if (counters.candidates + uniqueCandidates.length > config.budgets.candidates ||
+              counters.candidates + uniqueCandidates.length > config.budgets.cycles) {
+            return candidateSourceFailure("CANDIDATE_BOUND");
+          }
+          counters.candidates += uniqueCandidates.length;
+          chargeEvent(uniqueCandidates.length);
+          candidates = scout(uniqueCandidates, {
             now: sourceReceiptAt,
             maxCandidates: config.budgets.candidates,
             source: externalMode ? EXTERNAL_INPUT_SOURCE : SYNTHETIC_SOURCE
           }).selected.slice(0, config.budgets.cycles);
+          if (!candidates.length && repeatedAcquisition) return null;
         }
         if (candidateIndex >= candidates.length) return {done: true};
         const candidate = candidates[candidateIndex++];

@@ -197,8 +197,8 @@ export function makeFixture({
   policyOverride = {}
 } = {}) {
   const candidateT = candidateTime;
-  const assembledAt = ASSEMBLED_AT;
-  const decisionAt = DECISION_AT;
+  const assembledAt = candidateT + 1;
+  const decisionAt = candidateT + 2;
   const start = candidateT - 3_600_000;
   const candidate = syntheticCandidate(candidateT);
   const identity = {
