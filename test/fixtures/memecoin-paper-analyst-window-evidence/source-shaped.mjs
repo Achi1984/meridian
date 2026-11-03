@@ -185,6 +185,7 @@ export function makeSwap(number, atMs, {direction = "BUY", failed = false} = {})
 export function makeFixture({
   buyCount = 100,
   sellCount = 5,
+  candidateT: candidateTime = CANDIDATE_T,
   includeBoundaryRows = true,
   duplicateFirstRow = false,
   historyOverride = null,
@@ -195,9 +196,9 @@ export function makeFixture({
   allowlistOverride = null,
   policyOverride = {}
 } = {}) {
-  const candidateT = CANDIDATE_T;
-  const assembledAt = ASSEMBLED_AT;
-  const decisionAt = DECISION_AT;
+  const candidateT = candidateTime;
+  const assembledAt = candidateT + 1;
+  const decisionAt = candidateT + 2;
   const start = candidateT - 3_600_000;
   const candidate = syntheticCandidate(candidateT);
   const identity = {

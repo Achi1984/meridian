@@ -453,9 +453,12 @@ export async function buildAnalystWindowEvidence({
   marketPairEvidence,
   smartWalletAllowlist,
   maxSourceReadMs = MAX_SOURCE_READ_MS,
-  sourcePrefetchOnly = false
+  sourcePrefetchOnly = false,
+  syntheticHistorySourceOverride = false
 } = {}) {
   const identity = candidateIdentity(candidate);
+  const syntheticHistorySource = syntheticHistorySourceOverride &&
+    candidate?.source === "SYNTHETIC_FIXTURE_ONLY";
   const metrics = {};
   const unavailableMetrics = Object.fromEntries(ANALYST_WINDOW_METRICS.map(key =>
     [key, noMetric("REQUIRED_SOURCE_OR_REVIEWED_POLICY_UNAVAILABLE")]));
@@ -566,7 +569,8 @@ export async function buildAnalystWindowEvidence({
     if (decodeComplete) {
       const buyers = new Set(decodedSwaps.filter(row => row.direction === "BUY").map(row => row.buyer));
       metrics.uniqueBuyers1h = metricEvidence({
-        candidate, value: buyers.size, source: historyResult.source,
+        candidate, value: buyers.size,
+        source: syntheticHistorySource ? "SYNTHETIC_FIXTURE_ONLY" : historyResult.source,
         observedAt: candidateT, slot: null,
         coverage: {
           window: windows.swaps1h,
@@ -688,7 +692,8 @@ export async function buildAnalystWindowEvidence({
       Number.isFinite(buyVolumeUsd) && Number.isFinite(sellVolumeUsd)) {
     metrics.buySellUsdRatio1h = metricEvidence({
       candidate, value: null,
-      source: sourceLabel(historyResult.source, policy.historicalPriceTrust.source),
+      source: syntheticHistorySource ? "SYNTHETIC_FIXTURE_ONLY"
+        : sourceLabel(historyResult.source, policy.historicalPriceTrust.source),
       observedAt: candidateT,
       coverage: {
         window: windows.swaps1h,
@@ -824,7 +829,8 @@ export async function buildAnalystWindowEvidence({
       };
       metrics.qualifiedSmartWallets = metricEvidence({
         candidate, value: count,
-        source: sourceLabel(historyResult.source, smartWalletAllowlist.source),
+        source: syntheticHistorySource ? "SYNTHETIC_FIXTURE_ONLY"
+          : sourceLabel(historyResult.source, smartWalletAllowlist.source),
         observedAt: candidateT,
         coverage: {
           window: windows.swaps1h,

@@ -430,7 +430,8 @@ function analystRecord(key, item, candidate, now, identity, providerEvidence) {
     return unknownWithReason(identity, checked.reason ?? "analyst evidence is missing", item);
   }
   let normalized;
-  const coverage = {windowMs: item.coverage.windowMs};
+  const coverage = item.coverage.windowMs === undefined
+    ? {} : {windowMs: item.coverage.windowMs};
   if (item.slot === null) coverage.slotProvenance = item.coverage.slotProvenance;
   switch (key) {
     case "momentum15m":

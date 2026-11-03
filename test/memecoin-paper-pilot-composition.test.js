@@ -11,6 +11,9 @@ import {
 } from "../scripts/memecoin-paper/paper-pilot-composition.mjs";
 import {canonicalCheckpointBytes} from "../scripts/memecoin-paper/checkpoint-store.mjs";
 import {createBoundedExternalReadOnlyInput} from "../scripts/memecoin-paper/execution-runner.mjs";
+import {
+  evaluateMemecoinPaperRunExport
+} from "../scripts/memecoin-paper-simulated-evaluation/index.mjs";
 
 const START = Date.parse("2026-01-01T19:00:00Z");
 const CLI = fileURLToPath(new URL("../scripts/memecoin-paper/paper-pilot-composition.mjs", import.meta.url));
@@ -45,7 +48,8 @@ async function harness(t, {
   runConfig = config(),
   clock = clockHarness(),
   adapters,
-  fault = "NONE"
+  fault = "NONE",
+  onTestInitialized
 } = {}) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "paper-composition-"));
   t.after(() => rm(directory, {recursive: true, force: true}));
@@ -53,7 +57,8 @@ async function harness(t, {
     config: runConfig,
     dataDirectory: directory,
     adapters: adapters ?? offlineFixtureAdapters({clock, fault}),
-    clock
+    clock,
+    onTestInitialized
   });
   return {directory, pilot, clock};
 }
@@ -313,6 +318,201 @@ test("complete offline path uses existing gates, ledger, independent ticks and d
   assert.equal(durable.records[4].inputs.now <= durable.records[5].inputs.now, true);
   assert.equal(durable.records[5].inputs.now <= durable.records[6].inputs.now, true);
   assert.notEqual(durable.records[1].commandId, durable.records[5].commandId);
+});
+
+test("synthetic runtime fixture carries adapter quotes through entry, risk, exit, and exported audit", async t => {
+  const {directory, pilot} = await harness(t, {
+    fault: "PIPELINE_QUOTE",
+    runConfig: config({budgets: {...BUDGETS, requests: 40, cycles: 8}})
+  });
+  const result = await pilot.start();
+  const report = result.report;
+  const runtime = report.runnerReport.runtimeAudit;
+  assert.ok(runtime);
+  assert.equal(runtime.source, "SYNTHETIC_FIXTURE_ONLY");
+  assert.equal(runtime.candidates.length, 1);
+  const candidate = runtime.candidates[0];
+  assert.equal(candidate.pipeline.filtersStatus, "PASS");
+  assert.equal(candidate.pipeline.filtersAccepted, true);
+  assert.equal(candidate.pipeline.analystStatus, "PASS");
+  assert.equal(candidate.pipeline.syntheticAnalystEvidence, "SYNTHETIC_FIXTURE_ONLY");
+  assert.ok(candidate.pipeline.acquisitionReceiptIds.length > 0);
+  assert.ok(candidate.assembledAt >= candidate.candidateT);
+  assert.ok(candidate.decisionAt >= candidate.assembledAt);
+  assert.deepEqual(candidate.quotes.map(item => item.purpose), ["entry", "risk-mark"]);
+  assert.deepEqual(candidate.quotes.map(item => item.paperPriceMicros), [5_000_000, 4_500_000]);
+  assert.ok(candidate.quotes.every(item =>
+    item.adapterStatus === "UNAVAILABLE" &&
+    item.adapterAuthorizationEligible === false &&
+    item.adapterCostStatus === "UNKNOWN" &&
+    item.adapterSourceProvenance === "INJECTED_TRANSPORT_NOT_AUTHENTICATED"));
+  assert.ok(candidate.quotes.every(item =>
+    item.paperFillEligible &&
+    item.costBasis === "SYNTHETIC_FIXED_CENT_SCHEDULE_V1" &&
+    Object.keys(item.costs).length === 5), JSON.stringify(candidate.quotes, null, 2));
+  assert.ok(report.runnerReport.counters.quotes >= 2);
+  assert.equal(report.runnerReport.operationResults.some(item =>
+    item.method === "executeEntry" && item.status === "FILLED_PAPER"), true);
+  assert.equal(report.runnerReport.operationResults.some(item =>
+    item.method === "observeExitQuote" && item.status === "CLOSED_PAPER"), true);
+  const authorization = report.runnerReport.operationResults.find(item =>
+    item.method === "authorizeEntry");
+  assert.equal(authorization.candidateMint, candidate.identity.mint);
+  assert.equal(authorization.candidateAnalystEvidenceSha256,
+    candidate.pipeline.analystEvidenceSha256);
+  assert.deepEqual(report.runnerReport.terminalResult.openPositions, []);
+  assert.equal(report.persistence, "ACKNOWLEDGED");
+  assert.equal(report.exportBinding, "PRESTART_BOUND");
+  assert.ok(await readFile(path.join(directory, "checkpoint.json")));
+
+  const exportBytes = canonicalCheckpointBytes(report);
+  const parsedReport = JSON.parse(exportBytes.toString("utf8"));
+  assert.deepEqual(parsedReport.runnerReport.runtimeAudit, runtime);
+  const configSha256 = createHash("sha256")
+    .update(canonicalCheckpointBytes(report.config)).digest("hex");
+  const evaluation = evaluateMemecoinPaperRunExport(exportBytes, {
+    runId: report.runId,
+    configSha256,
+    producerRevision: report.producerRevision
+  });
+  assert.equal(evaluation.checks.find(item => item.id === "runtime_source_quote_audit").status, "PASS");
+  assert.equal(evaluation.evidence.entryFills, 1);
+  assert.equal(evaluation.evidence.exits, 1);
+  assert.equal(evaluation.outcome, "SIMULATED_ENTRY_EXIT_COMPLETE");
+  assert.equal(evaluation.claims.liveExecution, false);
+});
+
+test("valid entry quote stopped or expired before execution is explicitly unconsumed", async t => {
+  for (const [runId, fault, status, reason, disposition] of [
+    ["quote-before-stop", "PIPELINE_QUOTE_STOP_AFTER_ENTRY", "STOPPED", "SHUTDOWN", "NOT_CONSUMED_STOPPED"],
+    ["quote-before-deadline", "PIPELINE_QUOTE_DEADLINE_AFTER_ENTRY", "FINISHED", "DEADLINE", "NOT_CONSUMED_DEADLINE"]
+  ]) {
+    const {pilot} = await harness(t, {
+      fault,
+      runConfig: config({
+        runId,
+        budgets: {...BUDGETS, requests: 40, cycles: 8}
+      })
+    });
+    const result = await pilot.start();
+    const report = result.report;
+    const auditQuote = report.runnerReport.runtimeAudit.candidates[0].quotes[0];
+    assert.equal(result.status, status);
+    assert.equal(report.runnerReport.reason, reason);
+    assert.equal(auditQuote.purpose, "entry");
+    assert.equal(auditQuote.paperFillEligible, true);
+    assert.equal(auditQuote.disposition, disposition);
+    assert.equal(report.runnerReport.operationResults.some(item =>
+      item.method === "executeEntry"), false);
+    assert.deepEqual(report.runnerReport.terminalResult.openPositions, []);
+    const bytes = canonicalCheckpointBytes(report);
+    const parsed = JSON.parse(bytes.toString("utf8"));
+    assert.deepEqual(parsed.runnerReport.runtimeAudit, report.runnerReport.runtimeAudit);
+    const evaluation = evaluateMemecoinPaperRunExport(bytes, {
+      runId: report.runId,
+      configSha256: createHash("sha256")
+        .update(canonicalCheckpointBytes(report.config)).digest("hex"),
+      producerRevision: report.producerRevision
+    });
+    assert.equal(evaluation.checks.find(item => item.id === "runtime_source_quote_audit").status, "PASS");
+    assert.equal(evaluation.evidence.entryFills, 0);
+  }
+});
+
+test("pipeline and adapter identity, chronology, quote, and cost failures remain no-entry", async t => {
+  for (const [runId, fault, sourceIdentityValid, marketPairChronologyValid, expectedAdapterCalls] of [
+    ["pipeline-wrong-identity", "PIPELINE_QUOTE_WRONG_IDENTITY", false, true, 0],
+    ["pipeline-future-evidence", "PIPELINE_QUOTE_FUTURE_EVIDENCE", true, false, 0],
+    ["pipeline-missing-quote", "PIPELINE_QUOTE_MISSING_QUOTE", true, true, 1],
+    ["pipeline-missing-costs", "PIPELINE_QUOTE_MISSING_COSTS", true, true, 1],
+    ["pipeline-route-identity", "PIPELINE_QUOTE_ROUTE_IDENTITY", true, true, 1]
+  ]) {
+    const {pilot} = await harness(t, {
+      runConfig: config({runId, budgets: {...BUDGETS, requests: 40, cycles: 8}}),
+      fault
+    });
+    const result = await pilot.start();
+    const audit = result.report.runnerReport.runtimeAudit;
+    assert.ok(audit);
+    assert.equal(audit.candidates[0].pipeline.sourceIdentityValid, sourceIdentityValid);
+    assert.equal(audit.candidates[0].pipeline.marketPairChronologyValid, marketPairChronologyValid);
+    assert.equal(result.report.runnerReport.counters.quotes, expectedAdapterCalls);
+    assert.ok(audit.candidates[0].quotes.every(item => !item.paperFillEligible),
+      JSON.stringify(audit.candidates[0], null, 2));
+    assert.equal(result.report.runnerReport.operationResults.some(item =>
+      item.method === "executeEntry" && item.status === "FILLED_PAPER"), false);
+    assert.deepEqual(result.report.runnerReport.terminalResult.openPositions, []);
+    const reportBytes = canonicalCheckpointBytes(result.report);
+    const parsedReport = JSON.parse(reportBytes.toString("utf8"));
+    assert.deepEqual(parsedReport.runnerReport.runtimeAudit, audit);
+    const evaluation = evaluateMemecoinPaperRunExport(reportBytes, {
+      runId: result.report.runId,
+      configSha256: createHash("sha256")
+        .update(canonicalCheckpointBytes(result.report.config)).digest("hex"),
+      producerRevision: result.report.producerRevision
+    });
+    assert.equal(evaluation.checks.find(item =>
+      item.id === "runtime_source_quote_audit").status, "PASS");
+  }
+});
+
+test("repeated fixture acquisition shares request and work budgets and deduplicates candidate identity", async t => {
+  const duplicate = await harness(t, {
+    runConfig: config({
+      runId: "pipeline-duplicate",
+      budgets: {...BUDGETS, requests: 40, cycles: 8}
+    }),
+    fault: "PIPELINE_QUOTE_DUPLICATE"
+  });
+  const result = await duplicate.pilot.start();
+  assert.equal(result.status, "FINISHED");
+  assert.equal(result.provenance.candidates.length, 1);
+  assert.equal(result.budgets.acquisitionCycles, 3);
+  assert.ok(result.budgets.requests <= 40);
+  assert.ok(result.budgets.events <= BUDGETS.events);
+  assert.deepEqual(result.report.runnerReport.terminalResult.openPositions, []);
+
+  const exhausted = await harness(t, {
+    runConfig: config({
+      runId: "pipeline-budget-exhausted",
+      budgets: {...BUDGETS, requests: 10, cycles: 8}
+    }),
+    fault: "PIPELINE_QUOTE_DUPLICATE"
+  });
+  const bounded = await exhausted.pilot.start();
+  assert.equal(bounded.status, "UNKNOWN");
+  assert.equal(bounded.report.runnerReport.reason, "GLOBAL_BUDGET");
+  assert.equal(bounded.budgets.requests, 10);
+  assert.ok(bounded.budgets.events <= BUDGETS.events);
+  assert.equal(bounded.report.runnerReport.operationResults.some(item =>
+    item.method === "executeEntry" && item.status === "FILLED_PAPER"), false);
+});
+
+test("stop during the integrated fixture callback isolates its late completion", async t => {
+  let initialized;
+  const ready = new Promise(resolve => { initialized = resolve; });
+  const {pilot} = await harness(t, {
+    fault: "PIPELINE_QUOTE_WAIT",
+    onTestInitialized: initialized
+  });
+  const pending = pilot.start();
+  await ready;
+  await new Promise(resolve => setTimeout(resolve, 25));
+  assert.equal(pilot.stop(), true);
+  const result = await pending;
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.ok(["STOPPED", "UNKNOWN"].includes(result.status));
+  assert.ok(result.report.runnerReport.counters.quotes === 0);
+  assert.equal(result.provenance.candidates.length, 0);
+});
+
+test("deadline during fixture acquisition prevents its subsequent quote request", async t => {
+  const {pilot} = await harness(t, {fault: "PIPELINE_QUOTE_DEADLINE"});
+  const result = await pilot.start();
+  assert.equal(result.provenance.candidates.length, 1);
+  assert.equal(result.report.runnerReport.counters.candidates, 0);
+  assert.equal(result.report.runnerReport.counters.quotes, 0);
+  assert.ok(["FINISHED", "STOPPED", "UNKNOWN"].includes(result.status));
 });
 
 test("missing hard evidence and missing full cost components do not fill", async t => {

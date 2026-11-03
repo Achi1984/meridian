@@ -12,6 +12,12 @@ import assert from "node:assert/strict";
 import {stat} from "node:fs/promises";
 import {createPinnedAssembly} from "./scripts/memecoin-paper/pilot-online-assembly.mjs";
 import {runOperationalController} from "./scripts/memecoin-paper/paper-operational-controller.mjs";
+const [{makeFixture}, {syntheticOrderResponse}] = await Promise.all([
+  import("./test/fixtures/memecoin-paper-analyst-window-evidence/source-shaped.mjs"),
+  import("./test/fixtures/memecoin-paper-route-quotes/jupiter-v2-order.mjs")
+]);
+assert.equal(typeof makeFixture, "function");
+assert.equal(typeof syntheticOrderResponse, "function");
 let fetchCalls = 0;
 const assembly = await createPinnedAssembly({
   fetchImpl: () => { fetchCalls += 1; throw new Error("unexpected network request"); }
