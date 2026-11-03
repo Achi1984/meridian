@@ -11,6 +11,7 @@ const assemblyCheck = `
 import assert from "node:assert/strict";
 import {stat} from "node:fs/promises";
 import {createPinnedAssembly} from "./scripts/memecoin-paper/pilot-online-assembly.mjs";
+import {runOperationalController} from "./scripts/memecoin-paper/paper-operational-controller.mjs";
 let fetchCalls = 0;
 const assembly = await createPinnedAssembly({
   fetchImpl: () => { fetchCalls += 1; throw new Error("unexpected network request"); }
@@ -20,9 +21,18 @@ assert.equal(typeof assembly.createPilotRunControl, "function");
 assert.equal(typeof assembly.projectOperatorReport, "function");
 assert.equal(typeof assembly.renderOperatorReport, "function");
 assert.equal(fetchCalls, 0);
+const controller = await runOperationalController([]);
+assert.equal(controller.result.status, "DISABLED");
+assert.equal(controller.result.executionStarted, false);
+const host = await import("./scripts/memecoin-paper-export-host.mjs");
+let hostOutput = "";
+const hostExitCode = await host.main({env: {}, stdout: {write: value => { hostOutput += value; }}});
+assert.equal(hostExitCode, 0);
+assert.match(hostOutput, /"status":"DISABLED"/);
 for (const file of [
   "./scripts/memecoin-paper/provider-evidence.mjs",
-  "./scripts/memecoin-paper-token-safety/evidence-bridge.mjs"
+  "./scripts/memecoin-paper-token-safety/evidence-bridge.mjs",
+  "./scripts/memecoin-paper-simulated-evaluation/index.mjs"
 ]) {
   assert.equal((await stat(file)).uid, process.getuid());
 }
