@@ -177,6 +177,7 @@ function poolProofFor(fixture) {
 function sourcePipeline(fixture, {
   mode = "SYNTHETIC_TEST_ONLY",
   collector,
+  limits = {},
   clock = () => fixture.assembledAt,
   latency = 0,
   beforeResponse
@@ -188,6 +189,7 @@ function sourcePipeline(fixture, {
     slotRange: {startInclusive: 490_000, endInclusive: 490_006},
     transport: harness.transport,
     clock,
+    limits,
     ...(collector ? {
       historySlotCollector: request => collector(request, fixture.assembledAt)
     } : {})
@@ -677,4 +679,121 @@ test("overlapping pipeline evaluations are explicitly rejected", async () => {
   const result = await first;
   assert.equal(result.mode, "SYNTHETIC_TEST_ONLY");
   assert.equal(result.auditReceipts.acquisition.length, 1);
+});
+
+test("price and census source receipts completed after prefetch start are accepted only after assembly", async () => {
+  const fixture = makeFixture({buyCount: 0, sellCount: 0});
+  let now = fixture.assembledAt;
+  const priceReceivedAt = [];
+  const censusReceivedAt = [];
+  const priceSource = {
+    async readObservation(request) {
+      now += 10;
+      const result = structuredClone(await fixture.priceSource.readObservation(request));
+      result.receivedAt = now;
+      result.receipt.receivedAt = now;
+      priceReceivedAt.push(now);
+      return result;
+    }
+  };
+  const censusSource = {
+    async readSnapshots(request) {
+      now += 10;
+      const result = structuredClone(await fixture.censusSource.readSnapshots(request));
+      for (const snapshot of result.snapshots) {
+        snapshot.receivedAt = now;
+        snapshot.receipt.receivedAt = now;
+      }
+      censusReceivedAt.push(now);
+      return result;
+    }
+  };
+  const pipeline = sourcePipeline(fixture, {
+    collector: fixtureCollector,
+    clock: () => now
+  });
+  const result = await pipeline.evaluate({
+    providerCandidate: fixture.candidate,
+    evidence: {},
+    candidateT: fixture.candidateT,
+    policy: fixture.policy,
+    poolProof: fixture.poolProof,
+    censusSource,
+    priceSource,
+    marketPairEvidence: fixture.marketPairEvidence,
+    smartWalletAllowlist: fixture.smartWalletAllowlist,
+    reviewEvidence: reviews(fixture.candidateT),
+    holdUntil: fixture.decisionAt + 8 * 60 * 60 * 1_000
+  });
+  assert.ok(priceReceivedAt.length >= 2);
+  assert.equal(censusReceivedAt.length, 1);
+  assert.ok(priceReceivedAt.every(receivedAt => receivedAt > fixture.assembledAt));
+  assert.ok(censusReceivedAt.every(receivedAt => receivedAt > fixture.assembledAt));
+  assert.ok([...priceReceivedAt, ...censusReceivedAt]
+    .every(receivedAt => receivedAt <= result.assembledAt));
+  assert.ok(result.assembledAt > fixture.assembledAt);
+  assert.equal(result.analystEvidence.metrics.momentum15m?.coverage.exactEndpoints, true);
+  assert.equal(result.analystEvidence.metrics.holderGrowthPct1h?.coverage.exactEndpoints, true);
+  assert.ok(result.analystEvidence.receipts.prices.length >= 2);
+  assert.equal(result.analystEvidence.receipts.census.length, 2);
+  assert.equal(result.candidate.chainId, fixture.candidate.chainId);
+  assert.equal(result.executionAuthorized, false);
+});
+
+test("late collector completion after timeout cannot overwrite the next evaluation audit", async () => {
+  const fixture = makeFixture({buyCount: 0, sellCount: 0});
+  let releaseFirst;
+  let releaseSecond;
+  let announceFirst;
+  let announceSecond;
+  const firstStarted = new Promise(resolve => { announceFirst = resolve; });
+  const secondStarted = new Promise(resolve => { announceSecond = resolve; });
+  const firstPending = new Promise(resolve => { releaseFirst = resolve; });
+  const secondPending = new Promise(resolve => { releaseSecond = resolve; });
+  let collectorCall = 0;
+  const collector = request => {
+    collectorCall += 1;
+    if (collectorCall === 1) {
+      announceFirst();
+      return firstPending.then(() => ({
+        ...fixtureCollector(request, fixture.assembledAt),
+        coverage: {...fixtureCollector(request, fixture.assembledAt).coverage, auditMarker: "A"}
+      }));
+    }
+    announceSecond();
+    return secondPending.then(() => ({
+      ...fixtureCollector(request, fixture.assembledAt),
+      coverage: {...fixtureCollector(request, fixture.assembledAt).coverage, auditMarker: "B"}
+    }));
+  };
+  const pipeline = sourcePipeline(fixture, {
+    collector,
+    limits: {maxElapsedMs: 100, maxDurationMs: 100, requestTimeoutMs: 20}
+  });
+  const request = {
+    providerCandidate: fixture.candidate,
+    evidence: {},
+    candidateT: fixture.candidateT,
+    policy: fixture.policy,
+    poolProof: fixture.poolProof,
+    reviewEvidence: reviews(fixture.candidateT)
+  };
+
+  const firstEvaluation = pipeline.evaluate(request);
+  await firstStarted;
+  const first = await firstEvaluation;
+  assert.equal(first.auditReceipts.acquisition[0]?.collectorCoverage.auditMarker, undefined);
+  assert.equal(first.auditReceipts.acquisition[0]?.sourceReceipts.collector.length, 0);
+
+  const secondEvaluation = pipeline.evaluate(request);
+  await secondStarted;
+  releaseFirst();
+  await new Promise(resolve => setImmediate(resolve));
+  const second = await secondEvaluation;
+  assert.notEqual(second.analystEvidence.status, "COMPLETE");
+  assert.equal(second.auditReceipts.acquisition[0]?.collectorCoverage.auditMarker, undefined);
+  assert.equal(second.auditReceipts.acquisition[0]?.sourceReceipts.collector.length, 0);
+  assert.equal(second.auditReceipts.acquisition[0]?.counters.requests, 7);
+  assert.equal(second.auditReceipts.acquisition[0]?.reason, "TIME_LIMIT");
+  releaseSecond();
 });

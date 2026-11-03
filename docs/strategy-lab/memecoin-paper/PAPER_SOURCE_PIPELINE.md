@@ -65,11 +65,16 @@ using the repository's `adaptMarketEvidence()`. It retains the provider
 candidate's `sampledAt` as candidate T, captures actual injected-clock assembly
 and decision times separately after bounded history acquisition, passes
 `holdUntil`, and returns the canonical candidate with Analyst and source audit
-receipts. The acquired history result is handed to Analyst through a one-read
-cached source bound to the exact candidate window. Concurrent evaluations on
-one pipeline instance are rejected to keep their acquisition budgets and audit
-receipts isolated. It adds no candidate normalizer, ledger, quote, or execution
-schema.
+receipts. Before assembly, a non-authoritative Analyst source-prefetch pass
+invokes the actual price and census sources after obtaining history; their
+results are cached by exact identity and request window. That pass returns no
+Analyst packet and its temporary cutoff is never used for evaluation. The normal
+builder then validates the same cached responses against the actual assembly
+time, without repeating source reads or changing the candidate cutoff or
+causality rules. History, price, census, and audit caches are evaluation-local,
+so a callback that completes after its bounded wait cannot write into a later
+evaluation. Concurrent evaluations on one pipeline instance are rejected. It
+adds no candidate normalizer, ledger, quote, or execution schema.
 
 Only the synthetic test mode can inject a collector fixture. The external mode
 rejects fixture-labelled candidate/evidence and cannot inject a collector

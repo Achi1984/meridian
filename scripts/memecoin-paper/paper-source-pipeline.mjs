@@ -124,6 +124,58 @@ function receiptSummary(result, timeEvidence, collector) {
   };
 }
 
+function cachedSource(source, method, keyOf) {
+  const cache = new Map();
+  const descriptor = source && Object.getOwnPropertyDescriptor(source, method);
+  const read = descriptor && Object.hasOwn(descriptor, "value") ? descriptor.value : null;
+  if (typeof read !== "function") return null;
+  return Object.freeze({
+    async [method](request) {
+      let key;
+      try {
+        key = keyOf(request);
+      } catch {
+        return null;
+      }
+      if (!cache.has(key)) {
+        cache.set(key, Promise.resolve().then(() => read.call(source, request)));
+      }
+      try {
+        return await cache.get(key);
+      } catch {
+        return null;
+      }
+    }
+  });
+}
+
+function createHistorySource({
+  enabled,
+  timeBoundarySource,
+  collector,
+  limits,
+  acquisition
+}) {
+  const observedTimeBoundarySource = Object.freeze({
+    async readWindow(request) {
+      const result = await timeBoundarySource.readWindow(request);
+      acquisition.timeEvidence = result;
+      return result;
+    }
+  });
+  const observedCollector = async request => {
+    const result = await collector(request);
+    acquisition.collector = result;
+    return result;
+  };
+  return createHistoryWindowSource({
+    enabled,
+    timeBoundarySource: observedTimeBoundarySource,
+    slotHistoryCollector: observedCollector,
+    limits
+  });
+}
+
 export function createPaperSourcePipeline({
   enabled = false,
   mode = "EXTERNAL_READ_ONLY_INPUT",
@@ -155,25 +207,6 @@ export function createPaperSourcePipeline({
     limits: request.limits
   }));
   const reportedLimits = Object.freeze({...DEFAULT_TIME_BOUNDARY_LIMITS, ...limits});
-  let activeAcquisition = null;
-  const observedTimeBoundarySource = Object.freeze({
-    async readWindow(request) {
-      const result = await timeBoundarySource.readWindow(request);
-      if (activeAcquisition) activeAcquisition.timeEvidence = result;
-      return result;
-    }
-  });
-  const observedCollector = async request => {
-    const result = await collector(request);
-    if (activeAcquisition) activeAcquisition.collector = result;
-    return result;
-  };
-  const historySource = createHistoryWindowSource({
-    enabled,
-    timeBoundarySource: observedTimeBoundarySource,
-    slotHistoryCollector: observedCollector,
-    limits: bridgeLimitsFor(reportedLimits)
-  });
   let evaluationActive = false;
 
   return Object.freeze({
@@ -235,7 +268,13 @@ export function createPaperSourcePipeline({
         };
         const acquisitionReceipts = [];
         const acquisition = {timeEvidence: null, collector: null};
-        activeAcquisition = acquisition;
+        const historySource = createHistorySource({
+          enabled,
+          timeBoundarySource,
+          collector,
+          limits: bridgeLimitsFor(reportedLimits),
+          acquisition
+        });
         let prefetchedHistory = null;
         if (isRecord(policy) && policy.windowsMs?.swaps1h === 3_600_000 &&
             isRecord(poolProof)) {
@@ -252,6 +291,74 @@ export function createPaperSourcePipeline({
           acquisitionReceipts.push(receiptSummary(
             prefetchedHistory, acquisition.timeEvidence, acquisition.collector
           ));
+        }
+
+        const sourceAssembly = clock();
+        if (!validTime(sourceAssembly) || sourceAssembly < candidateT) {
+          return unavailable("INVALID_SOURCE_PREFETCH_CLOCK", {
+            candidateT, assembledAt: sourceAssembly, holdUntil
+          });
+        }
+        const prefetchPriceSource = mode === "EXTERNAL_READ_ONLY_INPUT"
+          ? withoutFixtureResults(priceSource, "readObservation") : priceSource;
+        const prefetchCensusSource = mode === "EXTERNAL_READ_ONLY_INPUT"
+          ? withoutFixtureResults(censusSource, "readSnapshots") : censusSource;
+        const cachedPriceSource = cachedSource(
+          prefetchPriceSource,
+          "readObservation",
+          request => JSON.stringify([
+            identity.chainId,
+            identity.mint,
+            identity.pool,
+            identity.quote,
+            request?.mint,
+            request?.atMs,
+            request?.denomination
+          ])
+        );
+        const cachedCensusSource = cachedSource(
+          prefetchCensusSource,
+          "readSnapshots",
+          request => JSON.stringify([
+            request?.identity?.chainId,
+            request?.identity?.mint,
+            request?.identity?.pool,
+            request?.identity?.quote,
+            request?.startAtMs,
+            request?.endAtMs,
+            request?.policy
+          ])
+        );
+        const cachedHistorySource = prefetchedHistory === null ? null : Object.freeze({
+          async readWindow(request) {
+            if (request?.identity?.chainId !== identity.chainId ||
+                request?.identity?.mint !== identity.mint ||
+                request?.identity?.pool !== identity.pool ||
+                request?.identity?.quote !== identity.quote ||
+                request?.startExclusiveMs !== candidateT - 3_600_000 ||
+                request?.endInclusiveMs !== candidateT) return null;
+            return prefetchedHistory;
+          }
+        });
+        try {
+          await buildAnalystWindowEvidence({
+            candidate: providerCandidate,
+            candidateT,
+            assembledAt: sourceAssembly,
+            decisionAt: sourceAssembly,
+            policy,
+            poolProof,
+            historySource: cachedHistorySource,
+            censusSource: cachedCensusSource,
+            priceSource: cachedPriceSource,
+            marketPairEvidence,
+            smartWalletAllowlist,
+            sourcePrefetchOnly: true
+          });
+        } catch {
+          return unavailable("ANALYST_SOURCE_PREFETCH_UNKNOWN", {
+            candidateT, assembledAt: sourceAssembly, holdUntil
+          });
         }
 
         let actualAssembledAt;
@@ -281,17 +388,6 @@ export function createPaperSourcePipeline({
             candidateT, assembledAt: actualAssembledAt, decisionAt: analystCutoff, holdUntil
           });
         }
-        const assembledHistorySource = prefetchedHistory === null ? null : Object.freeze({
-          async readWindow(request) {
-            if (request?.identity?.chainId !== identity.chainId ||
-                request?.identity?.mint !== identity.mint ||
-                request?.identity?.pool !== identity.pool ||
-                request?.identity?.quote !== identity.quote ||
-                request?.startExclusiveMs !== candidateT - 3_600_000 ||
-                request?.endInclusiveMs !== candidateT) return null;
-            return prefetchedHistory;
-          }
-        });
         let packet;
         try {
           packet = await buildAnalystWindowEvidence({
@@ -301,11 +397,9 @@ export function createPaperSourcePipeline({
             decisionAt: analystCutoff,
             policy,
             poolProof,
-            historySource: assembledHistorySource,
-            censusSource: mode === "EXTERNAL_READ_ONLY_INPUT"
-              ? withoutFixtureResults(censusSource, "readSnapshots") : censusSource,
-            priceSource: mode === "EXTERNAL_READ_ONLY_INPUT"
-              ? withoutFixtureResults(priceSource, "readObservation") : priceSource,
+            historySource: cachedHistorySource,
+            censusSource: cachedCensusSource,
+            priceSource: cachedPriceSource,
             marketPairEvidence,
             smartWalletAllowlist
           });
@@ -363,7 +457,6 @@ export function createPaperSourcePipeline({
           realDataEntryEligible: false
         };
       } finally {
-        activeAcquisition = null;
         evaluationActive = false;
       }
     }
