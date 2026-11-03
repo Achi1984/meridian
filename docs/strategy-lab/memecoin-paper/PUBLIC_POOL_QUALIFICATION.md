@@ -119,19 +119,54 @@ request:
   `1793661829` = 2026-11-02 23:23:49 UTC.
 
 This records a possible pagination continuation point, not permission to retry.
-No request was made with this cursor after the HTTP 429; the remaining four
-reads in the original twenty-request ceiling are not used in this follow-up.
+At the time this cursor was recorded, no request had been made with it after
+the HTTP 429; four reads remained in the original twenty-request ceiling.
+Attempt 3 below records the separately authorized continuation.
 
 The total bounded public-read count is 16 including the first-session DNS-failed
 attempt: one Raydium list request, two decoder RPC requests, and twelve
 signature-history requests in this session. No reads were made after the 429.
+
+## Attempt 3 — paced history continuation
+
+Used only the approved public JSON-RPC endpoint
+`https://api.mainnet-beta.solana.com/` and the recovered cursor above. Each
+unauthenticated `POST` called read-only
+`getSignaturesForAddress(pool, {commitment:"finalized", limit:1000, before})`;
+credentials were omitted, redirects were disabled, each request had a 10-second
+timeout and 1 MiB streamed response cap, and there were no retries. Requests
+were sequential with more than three seconds between their start times.
+
+| Page | Start → finish UTC | HTTP / rows | Oldest returned block time UTC | Response bytes | Response SHA-256 |
+|---|---|---|---|---:|---|
+| 1 | 18:52:32.083 → 18:52:35.182 | 200 / 1,000 | 2026-11-02 23:04:55 | 230,701 | `e1761b208dde0a54e682a59c4c560c68a67bd8d25b18bbae5279cabe3849e0f4` |
+| 2 | 18:52:38.263 → 18:52:41.104 | 200 / 1,000 | 2026-11-02 23:02:59 | 228,172 | `5d8df451277bf21643e485ca75a58a7caa11a6915415b8467ed158d8233cf2fe` |
+| 3 | 18:52:44.129 → 18:52:46.996 | 200 / 1,000 | 2026-11-02 23:02:13 | 242,675 | `a408a1b90e99e639c9bd140b6e63cca2f2f40700c3c275b3829a6af54685c92c` |
+
+The cursor chain used the recovered page-10 terminal signature for page 1, then
+each successful page's oldest signature as the next `before` value. The final
+successful page's terminal cursor is
+`5uYfqyAeMqdrPSLde12dijrj8hf2tzbS9CKEJ2E4Wh2a3Hu7xdwV9U7aX2Vc9ePGatsQSzV4Qk3JNQ8bX6ec2nTW`
+(slot `464672680`, block time `1793660533`, 2026-11-02 23:02:13 UTC).
+All three pages were full. Their oldest times remain later than the list
+`openTime` (2026-11-02 20:23:59 UTC); the continuation therefore did not reach
+the creation boundary. A full page is not proof of complete history, and a
+short/empty page alone would not prove completeness either.
+
+The retained page summaries do not support a candidate initializer signature,
+so the reserved `getTransaction` read was not made. There was no retry or
+further history request after page 3. This continuation used three reads;
+cumulative total is **19 of 20**, with one remaining request in the original
+ceiling. Any future use of that final request would first require separately
+retained evidence supporting an initializer signature; no request is authorized
+or implied by this receipt.
 
 ## Qualification findings
 
 | Requirement | Result |
 |---|---|
 | Pool address, base/quote mints, decimals, and CPMM account binding | **OBSERVED, DECODED_UNVERIFIED** for the pool and identity above; not owner approval |
-| Original pair creation evidence; pair age 30 minutes–72 hours | **UNKNOWN** — provider `openTime` is only a proxy; capped history did not reach creation and hit HTTP 429 |
+| Original pair creation evidence; pair age 30 minutes–72 hours | **UNKNOWN** — provider `openTime` is only a proxy; initial capped history stopped at HTTP 429, and the later three-page continuation still did not reach creation |
 | Actual market cap USD 300,000–20,000,000 (not FDV) | **UNKNOWN** — the list row supplied neither market cap nor FDV |
 | Liquidity at least USD 40,000 | **UNKNOWN** — provider `tvl: 62558.28` is not independently established as the required liquidity measure |
 | Trailing 1-hour volume at least USD 50,000 | **UNKNOWN** — only a `day.volume` value was returned |
