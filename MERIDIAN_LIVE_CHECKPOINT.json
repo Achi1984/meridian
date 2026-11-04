@@ -3574,14 +3574,14 @@
         "test/memecoin-paper-provider-warmup-handoff.test.js": "13_PASS_0_FAIL"
       },
       "verification": "FOCUSED_SUITES_ONLY_NO_FULL_SUITE",
-      "codeql": "PENDING_AFTER_COMMIT",
+      "codeql": "SKIPPED_DATABASE_TOO_LARGE",
       "productionIntegration": "BLOCKED_AUTHENTICATED_TRUST_ARCHIVE_CENSUS_METRICS_QUOTE_PROVENANCE_USD_PRICE_AND_COST_CONTRACTS",
       "providerCallsOrKeys": false,
       "hostRegistryWorkflowSpendOrActivation": false,
       "issue1207": "OPEN",
       "hostedExactHeadCi": "NOT_DISPATCHED_PER_REQUEST",
       "independentFinalReview": "PENDING",
-      "nextGate": "COMMIT_AND_SECRET_SCAN_THEN_CODEQL_AND_REPORT_EXACT_HEAD; FREEZE_FOR_HOSTED_CI"
+      "nextGate": "REPORT_EXACT_HEAD_AND_FREEZE_FOR_HOSTED_CI; NO_HOSTED_CI_DISPATCH"
     }
   }
 }
