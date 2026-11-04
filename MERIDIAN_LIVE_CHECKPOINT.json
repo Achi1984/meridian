@@ -3566,7 +3566,10 @@
         "complete archival coverage",
         "source-bound USD cost policy"
       ],
-      "realPathAcquisition": "BLOCKED_BY_UNAPPROVED_POLICY_AND_SYNTHETIC_ONLY_HANDOFF_PIPELINE_MODE",
+      "realPathAcquisition": "EXTERNAL_READ_ONLY_INPUT_DIAGNOSTIC_ONLY_UNKNOWN_TRUST_ZERO_ELIGIBLE_NO_NETWORK; APPROVED_TRANSPORT_AND_REVIEWER_AUTHENTICITY_UNRESOLVED",
+      "mainReconciled": "041f45e4fd93d7a0c40e4e912e3f4b535e09d0a4",
+      "reviewCorrection": "PR1219 comment 6639237977 incorporated",
+      "costModule": "NOT_EDITED_OWNED_BY_1220",
       "productionRuntime": "DEFAULT_DISABLED_NO_NETWORK_NO_ELIGIBLE_CANDIDATES",
       "providerCallsOrKeys": false,
       "hostRegistryWorkflowSpendOrActivation": false,
