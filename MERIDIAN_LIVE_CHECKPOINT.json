@@ -3707,7 +3707,8 @@
         "repair": "TEST_ONLY_DETERMINISTIC_MONOTONICNOW_AND_SCOPED_INITIAL_TIMER_CAPTURE_FIRE_AFTER_SPAWN_LATE_PASS_AFTER_ABORT_NO_PRODUCTION_EDIT",
         "repairFocusedTest": "node --test test/memecoin-paper-host-acceptance-batch.test.js",
         "repairFocusedResult": "17_PASS_0_FAIL_EXIT_0",
-        "hostedCiAfterRepair": "PENDING_NOT_CLAIMED"
+        "hostedCiAfterRepair": "PENDING_NOT_CLAIMED",
+        "reviewFollowUp": "RECOVERY_REVIEW_a7141fd_HANG_RISK_FIXED_TEST_ONLY: REAL_5S_WATCHDOG_ON_SPAWN_AND_RESULT_WAITS; CAPTURED_DEADLINE_FIRED_IDEMPOTENTLY_IN_CLEANUP; REPAIR_FOCUSED_RESULT_RERUN_17_PASS_0_FAIL_EXIT_0_AT_RECOVERY_TEST_COMMIT"
       },
       "focusedTest": "node --test test/memecoin-paper-provider-warmup-handoff.test.js test/memecoin-paper-evidence-warmup.test.js",
       "focusedResult": "33_PASS_0_FAIL",
@@ -3748,6 +3749,28 @@
       "disjointFrom": ["1212costs", "1213provider-handoff"],
       "providersKeysHostWorkflowsSpendActivation": false,
       "nextGate": "EXACT_HEAD_REVIEW_AND_EXPLICIT_OWNER_DECISION; POLICY_REVIEWER_ACCOUNTING_DECISIONS_SEPARATE"
+    },
+    "paperReceiptIntegrityIntegration1215_20261104": {
+      "opId": "meridian-receipt-integrity-20261104-r1",
+      "recordedDate": "2026-11-04",
+      "pullRequest": 1215,
+      "baseSha": "e52cb697008111866d759f6d74b9c2242816c201",
+      "absorbed": {
+        "pr1216": {"issue": 1214, "head": "6d8a114b7f2f7930ca5a1cf2e0ebfb19591a7030", "hostedSafetyRun": 41887631133, "focusedResult": "29_PASS_0_FAIL"},
+        "pr1217": {"issue": 1212, "head": "df6d554919cdc166e8f326efba01ca665d444b76", "hostedSafetyRun": 41887662816, "focusedResult": "63_PASS_0_FAIL"}
+      },
+      "ownIntegrityHead": "1c0072b0a1720e0badf541b305f79857798a4f99",
+      "ownFocusedResult": "33_PASS_0_FAIL",
+      "preservedFailedCi": {"runId": 41886644520, "jobId": 126773005409, "recordedIn": "paperWarmupResponseIntegrity1213Checkpoint20261104.failedCi"},
+      "mergeMethod": "REGULAR_NO_FF_NO_FORCE",
+      "reviewedBlobsUnchanged": "ABSORBED_PACKET_SOURCE_TEST_DOC_BLOBS_EQUAL_SOURCE_HEADS",
+      "state": "INTEGRATED_PENDING_COMBINED_HOSTED_CI_AND_FINAL_REVIEW",
+      "approved": false,
+      "merged": false,
+      "live": false,
+      "issue1207": "OPEN",
+      "providersKeysHostWorkflowsSpendActivation": false,
+      "nextGate": "COMBINED_HEAD_HOSTED_CI_THEN_FINAL_INDEPENDENT_REVIEW; LEAD_VERIFIES_MERGE_BEFORE_CLOSING_1212_1214_1216_1217"
     }
   }
 }
