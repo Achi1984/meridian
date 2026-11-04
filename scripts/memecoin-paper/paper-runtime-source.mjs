@@ -844,7 +844,7 @@ const DIAGNOSTIC_KEYS = ["evaluationRequest", "observation", "request", "slotRan
 
 // Detached copy built from own data descriptors only: accessors are rejected without being
 // invoked, and later caller mutation cannot reach the copy.
-function detachDiagnosticData(value, state = {nodes: 0}, depth = 0) {
+export function detachDiagnosticData(value, state = {nodes: 0}, depth = 0) {
   if (depth > 24 || ++state.nodes > 20_000) throw new TypeError("diagnostic input exceeds bounds");
   if (value === null || ["string", "boolean"].includes(typeof value)) return value;
   if (typeof value === "number") {
@@ -869,7 +869,10 @@ function detachDiagnosticData(value, state = {nodes: 0}, depth = 0) {
       throw new TypeError("diagnostic accessors are unsupported");
     }
     if (array && !/^(0|[1-9][0-9]*)$/.test(key)) throw new TypeError("diagnostic array shape is invalid");
-    copy[key] = detachDiagnosticData(descriptor.value, state, depth + 1);
+    Object.defineProperty(copy, key, {
+      value: detachDiagnosticData(descriptor.value, state, depth + 1),
+      enumerable: true, writable: true, configurable: true
+    });
   }
   if (array && Object.keys(copy).length !== value.length) {
     throw new TypeError("diagnostic arrays must be dense");

@@ -7,6 +7,7 @@ import {EvidenceWarmupStore} from "../scripts/memecoin-paper/evidence-warmup/ind
 import {createPaperPilotComposition} from "../scripts/memecoin-paper/paper-pilot-composition.mjs";
 import {
   PAPER_RUNTIME_SOURCE_POLICY,
+  detachDiagnosticData,
   isIssuedRuntimeCandidate
 } from "../scripts/memecoin-paper/paper-runtime-source.mjs";
 import {
@@ -220,7 +221,7 @@ test("diagnostic honors exhausted budget, cancellation, and deadline", async t =
   assert.equal(expired.diagnostic.eligibleCandidates, 0);
 });
 
-test("a held publication cannot evaluate after the shared deadline", async t => {
+test("a held publication cannot evaluate after a deadline fired once publication was entered", async t => {
   const setup = await diagnosticSetup(t);
   let evaluated = false;
   let release;
@@ -231,16 +232,35 @@ test("a held publication cannot evaluate after the shared deadline", async t => 
     async publish() { markEntered(); await held; return {status: "PUBLISHED"}; },
     async read() { evaluated = true; return {status: "UNAVAILABLE"}; }
   };
-  const pending = diagnosticAdapter({input: setup.input, warmupStore: store}).acquireCandidates(
-    sharedInput({remaining: {requests: 40, bytes: 1_000_000, candidates: 4, work: 1_000, timeMs: 60}}).input
-  );
-  await entered;
-  const result = await pending;
-  release();
-  await new Promise(resolve => setTimeout(resolve, 20));
-  assert.notEqual(result.diagnostic.status, "OFFLINE_EVALUATED");
-  assert.equal(evaluated, false);
-  assert.deepEqual(result.candidates, []);
+  const budgetMs = 10_000;
+  t.mock.timers.enable({apis: ["Date", "setTimeout"], now: Date.now()});
+  try {
+    const pending = diagnosticAdapter({input: setup.input, warmupStore: store}).acquireCandidates(
+      sharedInput({
+        remaining: {requests: 40, bytes: 1_000_000, candidates: 4, work: 1_000, timeMs: budgetMs},
+        deadlineAt: Date.now() + budgetMs
+      }).input
+    );
+    // AbortSignal.timeout is a real timer and is not affected by the mocked clock.
+    const watchdog = AbortSignal.timeout(5_000);
+    await Promise.race([
+      entered,
+      new Promise((_, reject) => watchdog.addEventListener("abort",
+        () => reject(new Error("publication was never entered")), {once: true}))
+    ]);
+    t.mock.timers.tick(budgetMs);
+    const result = await pending;
+    release();
+    t.mock.timers.reset();
+    await new Promise(resolve => setImmediate(resolve));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.notEqual(result.diagnostic.status, "OFFLINE_EVALUATED");
+    assert.equal(evaluated, false);
+    assert.deepEqual(result.candidates, []);
+  } finally {
+    release();
+    t.mock.timers.reset();
+  }
 });
 
 test("held publication is cancelled by the caller only after publication was entered", async t => {
@@ -294,6 +314,17 @@ test("nested accessors are rejected without invocation and later mutation is iso
   const result = await adapter.acquireCandidates(sharedInput().input);
   assert.equal(result.diagnostic.status, "OFFLINE_EVALUATED");
   assert.deepEqual(result.candidates, []);
+});
+
+test("detached diagnostic data preserves an own __proto__ key without changing the prototype", () => {
+  const source = JSON.parse('{"__proto__": {"polluted": true}, "nested": [{"__proto__": 1}]}');
+  const copy = detachDiagnosticData(source);
+  assert.equal(Object.getPrototypeOf(copy), Object.prototype);
+  assert.equal(Object.hasOwn(copy, "__proto__"), true);
+  assert.deepEqual(Object.getOwnPropertyDescriptor(copy, "__proto__").value, {polluted: true});
+  assert.equal(copy.polluted, undefined);
+  assert.equal(Object.hasOwn(copy.nested[0], "__proto__"), true);
+  assert.notEqual(copy.nested, source.nested);
 });
 
 test("only module-issued candidates are recognized", () => {

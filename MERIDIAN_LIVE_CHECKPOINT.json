@@ -3568,7 +3568,7 @@
       ],
       "realPathAcquisition": "EXTERNAL_READ_ONLY_INPUT_DIAGNOSTIC_ONLY_UNKNOWN_TRUST_ZERO_ELIGIBLE_NO_NETWORK; APPROVED_TRANSPORT_AND_REVIEWER_AUTHENTICITY_UNRESOLVED",
       "mainReconciled": "041f45e4fd93d7a0c40e4e912e3f4b535e09d0a4",
-      "reviewCorrection": "PR1219 comment 6639237977 incorporated; P2 descriptor-safe detached diagnostic copy and gated held-publication tests applied",
+      "reviewCorrection": "PR1219 comment 6639237977 incorporated; P2 descriptor-safe detached diagnostic copy (own __proto__ preserved) and deterministic post-entry deadline held-publication tests applied",
       "costModule": "NOT_EDITED_OWNED_BY_1220",
       "productionRuntime": "DEFAULT_DISABLED_NO_NETWORK_NO_ELIGIBLE_CANDIDATES",
       "providerCallsOrKeys": false,
