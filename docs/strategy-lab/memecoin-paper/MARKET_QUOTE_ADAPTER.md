@@ -326,7 +326,12 @@ separate independent review and run-policy binding.
   paperQuotedNetModelDigest(binding)` (SHA-256 of sorted-key canonical JSON),
   `provenance: "MODELED"`, `actualCostCoverage: "UNKNOWN"`,
   `executionRealistic: false`, no authority. `verifyPaperQuotedNetProjection`
-  recomputes the digest and rejects mutation or overstated authority. It does
+  recomputes the full binding and every exposed duplicate field (all five
+  `costsCents`/`costDisposition` categories, `amountProjection` caps,
+  `quoteValue`, price, scenario) from the binding's quote inputs, rejects
+  missing, extra, or inconsistent fields, and never trusts a caller-supplied
+  digest. Source-quote identity fields (response hash, request id, expiry) are
+  caller-asserted inputs; pass `{expectedDigest}` to pin them. It does
   not authenticate the provider or reviewer.
 
 ## Offline validation

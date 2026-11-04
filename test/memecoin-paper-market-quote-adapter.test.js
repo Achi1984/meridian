@@ -1190,6 +1190,98 @@ test("QUOTED_NET_V1 digest detects every mutated binding component", async () =>
   assert.notEqual(different.model.digest, projection.model.digest);
 });
 
+test("QUOTED_NET_V1 verifier rejects every mutated, missing, or extra exposed duplicate field", async () => {
+  const {exitRequest, body} = exitFixture("3000000", "3703702");
+  const exit = (await adapterFor(body).adapter.getPaperQuote(exitRequest, {
+    reviewScenario: reviewScenario(QN)})).scenarioProjection;
+  const entry = await quotedNet();
+  const costKeys = ["feeCents", "spreadCents", "slippageCents", "priceImpactCents", "networkCents"];
+  const mutations = [];
+  for (const key of costKeys) {
+    mutations.push(p => { p.costsCents[key] = "999999"; });
+    mutations.push(p => { delete p.costsCents[key]; });
+    mutations.push(p => { p.costDisposition[key] = "VERIFIED_INCLUDED"; });
+    mutations.push(p => { delete p.costDisposition[key]; });
+  }
+  mutations.push(p => { p.costsCents.extraCents = "0"; });
+  mutations.push(p => { p.costDisposition.extra = "X"; });
+  for (const key of ["sourceQuotedInputAtoms", "maximumModeledInputAtoms", "sourceQuotedBaseAtoms",
+    "maximumModeledBaseAtoms", "entryAllInLimitCents", "dynamicRiskCaps", "modeledAllInCents", "basis"]) {
+    mutations.push(p => { p.amountProjection[key] = "999999999999"; });
+    mutations.push(p => { delete p.amountProjection[key]; });
+  }
+  mutations.push(p => { p.amountProjection.extra = "1"; });
+  for (const key of ["grossBeforeExtraScenarioCostsCents", "direction",
+    "totalExtraScenarioCostsCents", "afterExtraScenarioCostsCents", "label"]) {
+    mutations.push(p => { p.quoteValue[key] = "1"; });
+    mutations.push(p => { delete p.quoteValue[key]; });
+  }
+  for (const key of ["priceMicros", "priceRounding", "rawExactQuotePerBase", "receiptTime", "source",
+    "costBasis", "pnl", "identity", "side", "scenario", "providerFieldsRetainedSeparately",
+    "sourceProvenance", "integrationBoundary", "scenarioCostCoverage"]) {
+    mutations.push(p => { p[key] = key === "priceMicros" ? 1 : "mutated"; });
+    mutations.push(p => { delete p[key]; });
+  }
+  mutations.push(p => { p.unexpectedTopLevel = true; });
+  mutations.push(p => { p.scenario.adverseAdjustmentBps = 1; });
+  mutations.push(p => { p.scenario.configurationSha256 = "c".repeat(64); });
+  mutations.push(p => { p.scenario.extra = 1; });
+  mutations.push(p => { delete p.scenario.zeroChargeDisposition; });
+  mutations.push(p => { p.model.assumptions.pop(); });
+  mutations.push(p => { p.model.resultContract.authority = "GRANTED"; });
+  mutations.push(p => { p.model.extra = 1; });
+  for (const key of ["authorizationEligible", "integrationEligible", "executionRealistic"]) {
+    mutations.push(p => { p[key] = true; });
+  }
+  for (const base of [entry, exit]) {
+    assert.equal(verifyPaperQuotedNetProjection(base).valid, true);
+    for (const [index, mutate] of mutations.entries()) {
+      const copy = structuredClone(base);
+      mutate(copy);
+      assert.equal(verifyPaperQuotedNetProjection(copy).valid, false, `mutation ${index} accepted`);
+    }
+  }
+});
+
+test("QUOTED_NET_V1 verifier does not trust a caller-recomputed digest over altered binding", async () => {
+  const projection = await quotedNet();
+  const bindingMutations = [
+    b => { b.parameters.feeCents.value = "999999"; },
+    b => { b.parameters.adverseAdjustmentBps.value = 1; },
+    b => { delete b.dispositions.spreadCents; },
+    b => { b.dispositions.priceImpactCents = "VERIFIED_INCLUDED"; },
+    b => { b.quantity.modeledBaseAtoms = (BigInt(b.quantity.modeledBaseAtoms) + 1n).toString(); },
+    b => { b.quantity.sizeDisposition = "QUOTED_AMOUNT"; },
+    b => { b.result.grossCents = "1"; },
+    b => { b.result.slippageCents = "1"; },
+    b => { b.sourceQuote.outAmount = "1"; },
+    Object.assign(b => { b.sourceQuote.responseSha256 = "d".repeat(64); }, {pinnedOnly: true}),
+    b => { b.candidateIdentity.mint = SYNTHETIC_POOL; },
+    b => { b.currency.assumption = "OBSERVED_FX"; },
+    b => { b.extra = true; },
+    b => { b.status = "APPROVED"; }
+  ];
+  for (const mutate of bindingMutations) {
+    const copy = structuredClone(projection);
+    mutate(copy.model.binding);
+    copy.model.digest = paperQuotedNetModelDigest(copy.model.binding);
+    const pinned = {expectedDigest: projection.model.digest};
+    assert.equal(verifyPaperQuotedNetProjection(copy, pinned).valid, false);
+    // Quote-identity fields (response hash/request id/expiry) are caller-asserted inputs;
+    // only a pinned digest can detect their substitution.
+    if (!mutate.pinnedOnly) {
+      assert.equal(verifyPaperQuotedNetProjection(copy).valid, false);
+    }
+  }
+  const pinnedOk = verifyPaperQuotedNetProjection(projection, {expectedDigest: projection.model.digest});
+  assert.equal(pinnedOk.valid, true);
+  assert.equal(verifyPaperQuotedNetProjection(projection, {expectedDigest: "e".repeat(64)}).valid, false);
+  const enlarged = structuredClone(projection);
+  enlarged.amountProjection.maximumModeledBaseAtoms =
+    (BigInt(enlarged.amountProjection.maximumModeledBaseAtoms) + 1n).toString();
+  assert.equal(verifyPaperQuotedNetProjection(enlarged).valid, false);
+});
+
 test("QUOTED_NET_V1 never charges provider fee, impact, threshold, slippage, or lamports again", async () => {
   const plain = await quotedNet();
   assert.equal(plain.costsCents.feeCents, "0");

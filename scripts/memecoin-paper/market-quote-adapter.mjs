@@ -56,9 +56,19 @@ const QUOTED_NET_MODEL = Object.freeze({
     networkCents: "MODELED_FIXED_USD_RESERVE_PER_SIDE"
   })
 });
-const MODEL_DISPOSITION_KEYS = Object.freeze([
-  "feeCents", "spreadCents", "slippageCents", "priceImpactCents", "networkCents"
+const QUOTED_NET_ASSUMPTIONS = Object.freeze([
+  "Numeric parameters are proposed, uncalibrated, and not guaranteed worst-case real costs.",
+  "Fee, spread, and price impact add 0 under the explicit QUOTED_NET basis; actual zero or independently verified inclusion is not asserted.",
+  "1 USDC = 1 MODELED_USD is an unsupported-by-market accounting assumption, not observed FX or depeg protection.",
+  "Provider fee, platform fee, price impact, minimum output, slippage tolerance, and lamports are retained separately and never charged again.",
+  "Smaller-size projections are modeled, not fresh executable quotes."
 ]);
+const QUOTED_NET_RESULT_CONTRACT = Object.freeze({
+  provenance: "MODELED",
+  actualCostCoverage: "UNKNOWN",
+  executionRealistic: false,
+  authority: "NONE_POLICY_BOUND_ACCEPTANCE_REQUIRES_INDEPENDENT_RUN_POLICY_BINDING"
+});
 const PAPER_ENTRY_LIMIT_CENTS = BigInt(PAPER_LEDGER_POLICY.maxEntryCents);
 const MICRO_USD_PER_CENT = 10_000n;
 const BPS = 10_000n;
@@ -422,19 +432,8 @@ function projectReviewScenario(request, observation, candidateReasons, parsedSce
     model = {
       binding,
       digest: paperQuotedNetModelDigest(binding),
-      assumptions: [
-        "Numeric parameters are proposed, uncalibrated, and not guaranteed worst-case real costs.",
-        "Fee, spread, and price impact add 0 under the explicit QUOTED_NET basis; actual zero or independently verified inclusion is not asserted.",
-        "1 USDC = 1 MODELED_USD is an unsupported-by-market accounting assumption, not observed FX or depeg protection.",
-        "Provider fee, platform fee, price impact, minimum output, slippage tolerance, and lamports are retained separately and never charged again.",
-        "Smaller-size projections are modeled, not fresh executable quotes."
-      ],
-      resultContract: {
-        provenance: "MODELED",
-        actualCostCoverage: "UNKNOWN",
-        executionRealistic: false,
-        authority: "NONE_POLICY_BOUND_ACCEPTANCE_REQUIRES_INDEPENDENT_RUN_POLICY_BINDING"
-      }
+      assumptions: [...QUOTED_NET_ASSUMPTIONS],
+      resultContract: {...QUOTED_NET_RESULT_CONTRACT}
     };
   }
 
@@ -1136,7 +1135,208 @@ export function createMarketQuoteAdapter({
   });
 }
 
-export function verifyPaperQuotedNetProjection(projection) {
+function exactKeys(value, keys) {
+  return isRecord(value) && Object.keys(value).sort().join(",") === [...keys].sort().join(",");
+}
+
+function recomputeQuotedNetBinding(b) {
+  try {
+    if (!isRecord(b) || !isRecord(b.candidateIdentity) || !isRecord(b.sourceQuote)) return null;
+    const id = b.candidateIdentity;
+    const sq = b.sourceQuote;
+    const identity = {
+      chainId: id.chainId, mint: id.mint, pool: id.pool, quote: id.quote, decimals: id.decimals
+    };
+    const side = b.side;
+    if (!exactKeys(id, Object.keys(identity)) || identity.chainId !== "solana" ||
+        typeof identity.mint !== "string" || !BASE58.test(identity.mint) ||
+        typeof identity.pool !== "string" || !BASE58.test(identity.pool) ||
+        identity.quote !== SOLANA_USDC_MINT ||
+        !Number.isInteger(identity.decimals) || identity.decimals < 0 || identity.decimals > 18 ||
+        !["ENTRY", "EXIT"].includes(side) ||
+        !exactKeys(sq, ["source", "requestId", "observedAt", "expiresAt", "inAmount", "outAmount",
+          "responseSha256", "responseByteLength"]) ||
+        sq.source !== SOURCE ||
+        !(sq.requestId === null || (typeof sq.requestId === "string" && sq.requestId.length <= 200)) ||
+        !validTime(sq.observedAt) || !validTime(sq.expiresAt) ||
+        typeof sq.inAmount !== "string" || !INTEGER.test(sq.inAmount) ||
+        typeof sq.outAmount !== "string" || !INTEGER.test(sq.outAmount) ||
+        typeof sq.responseSha256 !== "string" || !SHA256.test(sq.responseSha256) ||
+        !Number.isSafeInteger(sq.responseByteLength) || sq.responseByteLength <= 0) {
+      return null;
+    }
+    const config = scenarioConfig({
+      optIn: true,
+      scenarioId: SCENARIO_CASES[QUOTED_NET_CASE].scenarioId,
+      scenarioVersion: SCENARIO_VERSION,
+      scenario: QUOTED_NET_CASE,
+      identity,
+      usdcMint: SOLANA_USDC_MINT,
+      usdcDecimals: 6,
+      usdcUsdMicrosPerToken: "1000000",
+      quoteBasis: QUOTED_NET_BASIS,
+      adverseAdjustmentBps: 300,
+      networkReserveCents: "50",
+      feeCents: "0",
+      spreadCents: "0",
+      priceImpactCents: "0",
+      zeroChargeDisposition: NO_INCREMENTAL_CHARGE
+    });
+    const entry = side === "ENTRY";
+    const baseAtoms = BigInt(entry ? sq.outAmount : sq.inAmount);
+    const quoteAtoms = BigInt(entry ? sq.inAmount : sq.outAmount);
+    if (baseAtoms <= 0n) return null;
+    const baseScale = 10n ** BigInt(identity.decimals);
+    const priceNumerator = quoteAtoms * 1_000_000n * baseScale;
+    const priceDenominator = baseAtoms * 1_000_000n;
+    const priceMicros = entry
+      ? ceilDiv(priceNumerator, priceDenominator) : priceNumerator / priceDenominator;
+    if (priceMicros <= 0n || priceMicros > BigInt(Number.MAX_SAFE_INTEGER)) return null;
+    const reserve = 50n;
+    let modeledBase;
+    let modeledQuote;
+    if (entry) {
+      modeledBase = maximumEntryBaseAtoms(baseAtoms, priceMicros, baseScale, 300n, reserve);
+      if (modeledBase <= 0n) return null;
+      modeledQuote = ceilDiv(quoteAtoms * modeledBase, baseAtoms);
+      if (modeledQuote > quoteAtoms) return null;
+    } else {
+      modeledBase = baseAtoms;
+      modeledQuote = baseAtoms;
+    }
+    const gross = grossCentsAtPrice(modeledBase, priceMicros, baseScale, side);
+    const slippage = slippageCentsAtGross(gross, 300n);
+    const total = slippage + reserve;
+    if (!entry && total > gross) return null;
+    const after = entry ? gross + total : gross - total;
+    const binding = {
+      modelId: QUOTED_NET_MODEL.id,
+      modelVersion: QUOTED_NET_MODEL.version,
+      status: QUOTED_NET_MODEL.status,
+      provenance: QUOTED_NET_MODEL.provenance,
+      parameterStatus: QUOTED_NET_MODEL.parameterStatus,
+      formula: QUOTED_NET_MODEL.formula,
+      scenarioConfigSha256: config.sha256,
+      parameters: {
+        adverseAdjustmentBps: {value: 300, unit: "basis_points_of_ledger_gross_cents_ceil"},
+        networkReserveCents: {value: "50", unit: "us_cents_per_side"},
+        feeCents: {value: "0", unit: "additional_us_cents"},
+        spreadCents: {value: "0", unit: "additional_us_cents"},
+        priceImpactCents: {value: "0", unit: "additional_us_cents"}
+      },
+      currency: {
+        mint: SOLANA_USDC_MINT,
+        decimals: 6,
+        microUsdPerToken: "1000000",
+        assumption: QUOTED_NET_MODEL.currencyAssumption
+      },
+      quoteBasis: QUOTED_NET_BASIS,
+      dispositions: {...QUOTED_NET_MODEL.dispositions},
+      candidateIdentity: identity,
+      side,
+      quantity: {
+        modeledBaseAtoms: modeledBase.toString(),
+        modeledInputAtoms: (entry ? modeledQuote : modeledBase).toString(),
+        sourceQuotedBaseAtoms: baseAtoms.toString(),
+        sourceQuotedInputAtoms: sq.inAmount,
+        sizeDisposition: modeledBase === baseAtoms
+          ? "QUOTED_AMOUNT" : "SMALLER_SIZE_MODELED_NOT_A_FRESH_EXECUTABLE_QUOTE"
+      },
+      sourceQuote: {...sq},
+      result: {
+        priceMicros: priceMicros.toString(),
+        grossCents: gross.toString(),
+        slippageCents: slippage.toString(),
+        networkCents: "50",
+        totalExtraCents: total.toString(),
+        afterCents: after.toString()
+      }
+    };
+    const exposure = {
+      status: "REVIEW_PROJECTION_ONLY",
+      scenarioCostCoverage: "COMPLETE",
+      actualCostCoverage: "UNKNOWN",
+      identity,
+      source: SOURCE,
+      sourceProvenance: "INJECTED_TRANSPORT_NOT_AUTHENTICATED",
+      side,
+      receiptTime: sq.observedAt,
+      receiptTimeProvenance: "INJECTED_LOCAL_CLOCK_AFTER_RESPONSE_BODY; NOT_AUTHENTICATED",
+      priceMicros: Number(priceMicros),
+      rawExactQuotePerBase: exactPriceRatio(
+        {side, identity, quoteDecimals: 6}, {inAmount: sq.inAmount, outAmount: sq.outAmount}
+      ),
+      priceRounding: entry
+        ? "ceil_exact_USD_per_token_microUSD" : "floor_exact_USD_per_token_microUSD",
+      amountProjection: {
+        basis: "ROUTE_CAP_WITH_MODELED_VALUE_AND_COSTS_FROM_PUBLISHED_ROUNDED_PRICE; NOT_AN_EXECUTABLE_EXACT_SIZE_ROUTE",
+        sourceQuotedInputAtoms: sq.inAmount,
+        maximumModeledInputAtoms: (entry ? modeledQuote : modeledBase).toString(),
+        sourceQuotedBaseAtoms: baseAtoms.toString(),
+        maximumModeledBaseAtoms: modeledBase.toString(),
+        entryAllInLimitCents: entry ? PAPER_ENTRY_LIMIT_CENTS.toString() : null,
+        dynamicRiskCaps: "NOT_EVALUATED; existing authorization, equity, cash, and hard evidence gates remain unchanged",
+        modeledAllInCents: entry ? after.toString() : null
+      },
+      costBasis: QUOTED_NET_BASIS,
+      costsCents: {
+        feeCents: "0",
+        spreadCents: "0",
+        slippageCents: slippage.toString(),
+        priceImpactCents: "0",
+        networkCents: "50"
+      },
+      costDisposition: {
+        feeCents: NO_INCREMENTAL_CHARGE,
+        spreadCents: NO_INCREMENTAL_CHARGE,
+        slippageCents: "EXPERIMENTAL_ADVERSE_SCENARIO_ADJUSTMENT_ROUNDED_UP",
+        priceImpactCents: NO_INCREMENTAL_CHARGE,
+        networkCents: "EXPERIMENTAL_FIXED_USD_RESERVE_PER_SIDE"
+      },
+      quoteValue: {
+        grossBeforeExtraScenarioCostsCents: gross.toString(),
+        direction: entry ? "DEBIT_ROUNDED_UP" : "CREDIT_ROUNDED_DOWN",
+        totalExtraScenarioCostsCents: total.toString(),
+        afterExtraScenarioCostsCents: after.toString(),
+        label: "MODELED_SINGLE_SIDE_QUOTE_VALUE_NOT_PNL"
+      },
+      pnl: {
+        status: "NOT_COMPUTED_SINGLE_SIDE_PROJECTION",
+        beforeExtraScenarioCostsCents: null,
+        afterExtraScenarioCostsCents: null,
+        reason: "A paired entry, exit, identity-bound marks, and scenario configuration are required."
+      },
+      provenance: "MODELED",
+      authorizationEligible: false,
+      executionRealistic: false,
+      integrationEligible: false,
+      integrationBoundary: "Independent review evidence verification, size-cap enforcement, and unchanged Paper hard/risk gates are required."
+    };
+    const scenario = {
+      id: SCENARIO_CASES[QUOTED_NET_CASE].scenarioId,
+      version: SCENARIO_VERSION,
+      case: QUOTED_NET_CASE,
+      configurationSha256: config.sha256,
+      approvalPurpose: "OFFLINE_SCENARIO_REVIEW_ONLY",
+      approvalEvidenceProvenance: "CALLER_ASSERTED_NOT_AUTHENTICATED",
+      quoteBasis: QUOTED_NET_BASIS,
+      quoteUsdAssumption: {
+        mint: SOLANA_USDC_MINT,
+        decimals: 6,
+        microUsdPerToken: "1000000",
+        assumption: "USDC_EQUALS_USD1_EXPERIMENTAL_NOT_MEASURED"
+      },
+      adverseAdjustmentBps: 300,
+      networkReserveCents: "50",
+      zeroChargeDisposition: NO_INCREMENTAL_CHARGE
+    };
+    return {binding, exposure, scenario};
+  } catch {
+    return null;
+  }
+}
+
+export function verifyPaperQuotedNetProjection(projection, {expectedDigest} = {}) {
   const reasons = [];
   const model = projection?.model;
   const binding = model?.binding;
@@ -1151,41 +1351,35 @@ export function verifyPaperQuotedNetProjection(projection) {
     digestOk = false;
   }
   check(digestOk, "MODEL_DIGEST_MISMATCH");
+  check(expectedDigest === undefined || model.digest === expectedDigest, "MODEL_DIGEST_NOT_THE_PINNED_DIGEST");
   check(binding.modelId === QUOTED_NET_MODEL.id && binding.modelVersion === QUOTED_NET_MODEL.version &&
     binding.status === QUOTED_NET_MODEL.status && binding.provenance === "MODELED",
   "MODEL_IDENTITY_MISMATCH");
-  const dispositions = binding.dispositions;
-  check(isRecord(dispositions) &&
-    Object.keys(dispositions).length === MODEL_DISPOSITION_KEYS.length &&
-    MODEL_DISPOSITION_KEYS.every(key => dispositions[key] === QUOTED_NET_MODEL.dispositions[key]),
-  "MODEL_DISPOSITION_MISSING_OR_ALTERED");
-  const p = binding.parameters;
-  check(p?.adverseAdjustmentBps?.value === 300 && p.networkReserveCents?.value === "50" &&
-    p.feeCents?.value === "0" && p.spreadCents?.value === "0" && p.priceImpactCents?.value === "0",
-  "MODEL_PARAMETERS_MISMATCH");
-  check(binding.currency?.mint === SOLANA_USDC_MINT && binding.currency.decimals === 6 &&
-    binding.currency.microUsdPerToken === "1000000" &&
-    binding.currency.assumption === QUOTED_NET_MODEL.currencyAssumption,
-  "MODEL_CURRENCY_ASSUMPTION_MISMATCH");
-  const r = binding.result;
-  const costs = projection.costsCents;
-  check(isRecord(r) && isRecord(costs) && r.slippageCents === costs.slippageCents &&
-    r.networkCents === costs.networkCents &&
-    r.grossCents === projection.quoteValue?.grossBeforeExtraScenarioCostsCents &&
-    r.totalExtraCents === projection.quoteValue?.totalExtraScenarioCostsCents &&
-    r.afterCents === projection.quoteValue?.afterExtraScenarioCostsCents &&
-    r.priceMicros === String(projection.priceMicros),
-  "MODEL_RESULT_PROJECTION_MISMATCH");
-  check(sameIdentity(binding.candidateIdentity, projection.identity) &&
-    binding.side === projection.side &&
-    binding.scenarioConfigSha256 === projection.scenario?.configurationSha256,
-  "MODEL_BINDING_PROJECTION_MISMATCH");
-  check(typeof binding.sourceQuote?.responseSha256 === "string" &&
-    SHA256.test(binding.sourceQuote.responseSha256),
-  "MODEL_SOURCE_QUOTE_UNBOUND");
-  check(projection.actualCostCoverage === "UNKNOWN" && projection.provenance === "MODELED" &&
-    projection.executionRealistic === false && projection.authorizationEligible === false &&
-    projection.integrationEligible === false,
-  "MODEL_AUTHORITY_OR_COVERAGE_OVERSTATED");
+  const expected = recomputeQuotedNetBinding(binding);
+  check(expected !== null && canonicalJson(expected.binding) === canonicalJson(binding),
+    "MODEL_BINDING_NOT_RECOMPUTED_FROM_QUOTE");
+  check(exactKeys(model, ["binding", "digest", "assumptions", "resultContract"]) &&
+    canonicalJson(model.assumptions) === canonicalJson(QUOTED_NET_ASSUMPTIONS) &&
+    canonicalJson(model.resultContract) === canonicalJson(QUOTED_NET_RESULT_CONTRACT),
+  "MODEL_ASSUMPTIONS_OR_RESULT_CONTRACT_ALTERED");
+  if (expected) {
+    for (const [key, value] of Object.entries(expected.exposure)) {
+      check(canonicalJson(projection[key]) === canonicalJson(value), `MODEL_EXPOSED_FIELD_MISMATCH:${key}`);
+    }
+    const scenario = projection.scenario;
+    const approval = scenario?.approvalEvidence;
+    check(exactKeys(scenario, [...Object.keys(expected.scenario), "approvalEvidence"]) &&
+      Object.entries(expected.scenario).every(([key, value]) =>
+        canonicalJson(scenario[key]) === canonicalJson(value)) &&
+      isRecord(approval) && approval.status === "ASSERTED_UNVERIFIED" &&
+      Object.keys(approval).length === 3,
+    "MODEL_EXPOSED_FIELD_MISMATCH:scenario");
+    check(exactKeys(projection, [...Object.keys(expected.exposure), "scenario",
+      "providerFieldsRetainedSeparately", "model"]),
+    "MODEL_PROJECTION_FIELD_SET_MISMATCH");
+    check(exactKeys(projection.providerFieldsRetainedSeparately, ["feeBps", "feeMint",
+      "platformFee", "networkFeesLamports", "priceImpact", "slippageToleranceBps"]),
+    "MODEL_PROVIDER_FIELDS_MISMATCH");
+  }
   return {valid: reasons.length === 0, reasons};
 }
