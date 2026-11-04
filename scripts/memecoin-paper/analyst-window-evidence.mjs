@@ -1022,3 +1022,132 @@ export async function evaluateWithCanonicalMarketAdapter({
     executionAuthorized: false
   };
 }
+
+export const WALLET_QUALIFICATION_DIAGNOSTIC_VERSION = "wallet-qualification-diagnostic-v1";
+const MAX_QUALIFICATION_ROUNDTRIPS = 5_000;
+const MAX_QUALIFICATION_REFS = 8;
+const MAX_QUALIFICATION_ID = 128;
+const DAY_MS = 86_400_000;
+const COST_FIELDS = Object.freeze(["feesUnits", "slippageUnits", "tipsUnits", "otherCostsUnits"]);
+const QUALIFICATION_POLICY_KEYS = Object.freeze([
+  "version", "proposed", "accountingUnit", "minRoundtrips", "windowDays",
+  "minUnrelatedMints", "requirePositiveNet"
+]);
+
+function boundedId(value) {
+  return typeof value === "string" && value.length > 0 &&
+    value.length <= MAX_QUALIFICATION_ID && value === value.trim();
+}
+
+function safeUnits(value) {
+  return Number.isSafeInteger(value) && value >= 0 ? BigInt(value) : null;
+}
+
+function qualificationPolicy(policy) {
+  if (!isRecord(policy) || Object.keys(policy).sort().join() !== [...QUALIFICATION_POLICY_KEYS].sort().join() ||
+      !boundedId(policy.version) || policy.proposed !== true || !boundedId(policy.accountingUnit) ||
+      !Number.isSafeInteger(policy.minRoundtrips) || policy.minRoundtrips < 1 || policy.minRoundtrips > 1_000 ||
+      !Number.isSafeInteger(policy.windowDays) || policy.windowDays < 1 || policy.windowDays > 3_650 ||
+      !Number.isSafeInteger(policy.minUnrelatedMints) || policy.minUnrelatedMints < 1 ||
+      policy.minUnrelatedMints > 1_000 || policy.requirePositiveNet !== true) return null;
+  return policy;
+}
+
+function qualificationResult(status, reasons, fields = {}) {
+  return deepFreeze({
+    diagnosticVersion: WALLET_QUALIFICATION_DIAGNOSTIC_VERSION,
+    status,
+    reasons: [...new Set(reasons)].sort(),
+    eligibleRoundtripCount: null,
+    unrelatedMintCount: null,
+    netResultUnits: null,
+    accountingUnit: null,
+    thresholdsMet: null,
+    ...fields,
+    verificationStatus: "UNVERIFIED",
+    reviewed: false,
+    allowlistAdmitted: false,
+    admissionGranted: false
+  });
+}
+
+// Pure, offline diagnostic. A calculation never grants trust or allowlist admission.
+export function evaluateWalletQualificationDiagnostics({
+  wallet, candidateMint, asOf, roundtrips, policy
+} = {}) {
+  const rules = qualificationPolicy(policy);
+  if (!rules) return qualificationResult("UNAVAILABLE", ["POLICY_INVALID_OR_UNVERSIONED"]);
+  const cutoff = timestampValue(asOf);
+  if (!isSolanaPublicKey(wallet) || !isSolanaPublicKey(candidateMint) || cutoff === null) {
+    return qualificationResult("UNAVAILABLE", ["SUBJECT_OR_CUTOFF_INVALID"]);
+  }
+  if (!Array.isArray(roundtrips) || roundtrips.length === 0) {
+    return qualificationResult("UNAVAILABLE", ["ROUNDTRIPS_MISSING"]);
+  }
+  if (roundtrips.length > MAX_QUALIFICATION_ROUNDTRIPS) {
+    return qualificationResult("UNAVAILABLE", ["ROUNDTRIPS_OVERSIZED"]);
+  }
+  const startExclusive = cutoff - rules.windowDays * DAY_MS;
+  const review = new Set();
+  const seen = new Map();
+  const eligible = [];
+  for (const row of roundtrips) {
+    if (!isRecord(row) || !boundedId(row.id)) { review.add("ROUNDTRIP_MALFORMED"); continue; }
+    const canonical = JSON.stringify(row);
+    if (seen.has(row.id)) {
+      if (seen.get(row.id) !== canonical) review.add("DUPLICATE_ID_CONFLICT");
+      continue;
+    }
+    seen.set(row.id, canonical);
+    if (row.wallet !== wallet) { review.add("WALLET_MISMATCH"); continue; }
+    if (!isSolanaPublicKey(row.mint)) { review.add("MINT_INVALID"); continue; }
+    const opened = timestampValue(row.openedAt);
+    const closed = timestampValue(row.closedAt);
+    if (opened === null || closed === null || opened > closed) { review.add("TIMES_INVALID"); continue; }
+    if (closed > cutoff) { review.add("FUTURE_ROUNDTRIP"); continue; }
+    if (!Array.isArray(row.executionRefs) || row.executionRefs.length < 2 ||
+        row.executionRefs.length > MAX_QUALIFICATION_REFS || !row.executionRefs.every(boundedId) ||
+        new Set(row.executionRefs).size !== row.executionRefs.length) {
+      review.add("EXECUTION_REFS_INCOMPLETE"); continue;
+    }
+    if (row.complete !== true) { review.add("ROUNDTRIP_INCOMPLETE"); continue; }
+    if (closed <= startExclusive) continue;
+    if (!boundedId(row.evidenceRef)) { review.add("EVIDENCE_REF_MISSING"); continue; }
+    if (row.unit !== rules.accountingUnit) { review.add("UNIT_MISMATCH_OR_MISSING"); continue; }
+    const proceeds = safeUnits(row.realizedProceedsUnits);
+    const basis = safeUnits(row.basisUnits);
+    if (proceeds === null || basis === null) { review.add("AMOUNT_MISSING_OR_UNSAFE"); continue; }
+    let costs = 0n;
+    let costsOk = isRecord(row.costs);
+    for (const field of COST_FIELDS) {
+      const value = costsOk ? safeUnits(row.costs[field]) : null;
+      if (value === null) { costsOk = false; break; }
+      costs += value;
+    }
+    if (!costsOk) { review.add("COSTS_MISSING_OR_UNSAFE"); continue; }
+    if (typeof row.selfTransfer !== "boolean" || typeof row.sameMintBundle !== "boolean") {
+      review.add("EXCLUSION_FACT_AMBIGUOUS"); continue;
+    }
+    if (!boundedId(row.mintRelationGroup)) { review.add("MINT_RELATIONSHIP_UNKNOWN"); continue; }
+    if (row.mint === candidateMint || row.selfTransfer || row.sameMintBundle) continue;
+    eligible.push({group: row.mintRelationGroup, net: proceeds - basis - costs});
+  }
+  if (review.size > 0) return qualificationResult("REVIEW_REQUIRED", [...review]);
+  const net = eligible.reduce((sum, row) => sum + row.net, 0n);
+  const groups = new Set(eligible.map(row => row.group));
+  const netString = net.toString();
+  const met = {
+    roundtrips: eligible.length >= rules.minRoundtrips,
+    unrelatedMints: groups.size >= rules.minUnrelatedMints,
+    positiveNet: net > 0n
+  };
+  const reasons = Object.entries(met).filter(([, ok]) => !ok).map(([key]) => `THRESHOLD_NOT_MET_${key}`);
+  return qualificationResult(reasons.length ? "THRESHOLDS_NOT_MET" : "THRESHOLDS_MET_UNVERIFIED", reasons, {
+    eligibleRoundtripCount: eligible.length,
+    unrelatedMintCount: groups.size,
+    netResultUnits: netString,
+    accountingUnit: rules.accountingUnit,
+    thresholdsMet: met,
+    policyVersion: rules.version
+  });
+}

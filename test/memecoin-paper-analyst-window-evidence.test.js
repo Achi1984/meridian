@@ -5,6 +5,7 @@ import {
   adaptAcceptedOwnerCensusResult,
   bridgeAnalystWindowPacket,
   buildAnalystWindowEvidence,
+  evaluateWalletQualificationDiagnostics,
   evaluateWithCanonicalMarketAdapter,
   PROPOSED_ANALYST_WINDOW_POLICY
 } from "../scripts/memecoin-paper/analyst-window-evidence.mjs";
@@ -572,4 +573,118 @@ test("source callbacks are deadline-bounded and oversized history is rejected", 
   const limitedPrices = await packet(manyPrices);
   assert.ok(limitedPrices.limits.priceLookups <= 2_048);
   assert.equal(limitedPrices.metrics.buySellUsdRatio1h, undefined);
+});
+
+const QW = base58(Buffer.alloc(32, 7));
+const QCAND = base58(Buffer.alloc(32, 8));
+const QMINTS = [1, 2, 3, 4, 5].map(i => base58(Buffer.alloc(32, 20 + i)));
+const QNOW = Date.parse("2026-11-01T00:00:00.000Z");
+const QPOLICY = Object.freeze({
+  version: "test-proposed-v1", proposed: true, accountingUnit: "lamports",
+  minRoundtrips: 10, windowDays: 90, minUnrelatedMints: 5, requirePositiveNet: true
+});
+
+function qrt(i, over = {}) {
+  return {
+    id: `rt${i}`, wallet: QW, mint: QMINTS[i % 5], mintRelationGroup: `g${i % 5}`,
+    executionRefs: [`a${i}`, `b${i}`], evidenceRef: `e${i}`, complete: true,
+    openedAt: QNOW - 5 * 86_400_000, closedAt: QNOW - 4 * 86_400_000, unit: "lamports",
+    realizedProceedsUnits: 1_100, basisUnits: 1_000,
+    costs: {feesUnits: 10, slippageUnits: 10, tipsUnits: 0, otherCostsUnits: 0},
+    selfTransfer: false, sameMintBundle: false, ...over
+  };
+}
+
+function qrun(rows, policy = QPOLICY, extra = {}) {
+  return evaluateWalletQualificationDiagnostics({
+    wallet: QW, candidateMint: QCAND, asOf: QNOW, roundtrips: rows, policy, ...extra
+  });
+}
+
+const qten = () => Array.from({length: 10}, (_, i) => qrt(i));
+
+test("wallet qualification diagnostics compute exact result but never grant trust", () => {
+  const out = qrun(qten());
+  assert.equal(out.status, "THRESHOLDS_MET_UNVERIFIED");
+  assert.equal(out.eligibleRoundtripCount, 10);
+  assert.equal(out.unrelatedMintCount, 5);
+  assert.equal(out.netResultUnits, "800");
+  assert.equal(out.verificationStatus, "UNVERIFIED");
+  assert.equal(out.allowlistAdmitted, false);
+  assert.equal(out.admissionGranted, false);
+  assert.equal(out.reviewed, false);
+  assert.doesNotMatch(JSON.stringify(out), /"(VERIFIED|EXTERNALLY_REVIEWED)"/);
+});
+
+test("wallet qualification requires an explicit versioned proposed policy", () => {
+  for (const policy of [null, {...QPOLICY, proposed: false}, {...QPOLICY, version: ""},
+    {...QPOLICY, extra: 1}, {...QPOLICY, requirePositiveNet: false}, {...QPOLICY, minRoundtrips: 0}]) {
+    assert.equal(qrun(qten(), policy).status, "UNAVAILABLE");
+  }
+  assert.equal(evaluateWalletQualificationDiagnostics({
+    wallet: QW, candidateMint: QCAND, asOf: QNOW, roundtrips: qten()
+  }).status, "UNAVAILABLE");
+});
+
+test("wallet qualification dedupes identical records and flags conflicting duplicates", () => {
+  const rows = qten();
+  assert.equal(qrun([...rows, {...rows[0]}]).eligibleRoundtripCount, 10);
+  const conflict = qrun([...rows, qrt(0, {basisUnits: 5})]);
+  assert.equal(conflict.status, "REVIEW_REQUIRED");
+  assert.ok(conflict.reasons.includes("DUPLICATE_ID_CONFLICT"));
+});
+
+test("wallet qualification excludes candidate mint, self-transfer and bundles", () => {
+  const rows = [...qten(), qrt(10, {mint: QCAND}), qrt(11, {selfTransfer: true}), qrt(12, {sameMintBundle: true})];
+  const out = qrun(rows);
+  assert.equal(out.eligibleRoundtripCount, 10);
+  assert.equal(out.netResultUnits, "800");
+});
+
+test("wallet qualification fails closed on ambiguous or incomplete evidence", () => {
+  const cases = {
+    EXCLUSION_FACT_AMBIGUOUS: {selfTransfer: undefined},
+    MINT_RELATIONSHIP_UNKNOWN: {mintRelationGroup: null},
+    COSTS_MISSING_OR_UNSAFE: {costs: undefined},
+    UNIT_MISMATCH_OR_MISSING: {unit: "usd"},
+    AMOUNT_MISSING_OR_UNSAFE: {basisUnits: Number.MAX_SAFE_INTEGER + 1},
+    FUTURE_ROUNDTRIP: {closedAt: QNOW + 1},
+    ROUNDTRIP_INCOMPLETE: {complete: false},
+    EXECUTION_REFS_INCOMPLETE: {executionRefs: ["only"]},
+    EVIDENCE_REF_MISSING: {evidenceRef: ""},
+    WALLET_MISMATCH: {wallet: QCAND}
+  };
+  for (const [reason, over] of Object.entries(cases)) {
+    const out = qrun([...qten(), qrt(99, over)]);
+    assert.equal(out.status, "REVIEW_REQUIRED", reason);
+    assert.ok(out.reasons.includes(reason), reason);
+    assert.equal(out.netResultUnits, null);
+  }
+  const partial = qrun([...qten(), qrt(98, {costs: {feesUnits: 1}})]);
+  assert.ok(partial.reasons.includes("COSTS_MISSING_OR_UNSAFE"));
+});
+
+test("wallet qualification window boundary is exclusive at start and inclusive at cutoff", () => {
+  const start = QNOW - 90 * 86_400_000;
+  const rows = qten();
+  assert.equal(qrun([...rows, qrt(50, {openedAt: start - 1, closedAt: start})]).eligibleRoundtripCount, 10);
+  assert.equal(qrun([...rows, qrt(51, {openedAt: start, closedAt: start + 1})]).eligibleRoundtripCount, 11);
+  assert.equal(qrun([...rows, qrt(52, {closedAt: QNOW})]).eligibleRoundtripCount, 11);
+});
+
+test("wallet qualification reports unmet thresholds and nonpositive net", () => {
+  assert.deepEqual(qrun(qten().slice(0, 9)).reasons, ["THRESHOLD_NOT_MET_roundtrips"]);
+  const lowMints = qrun(qten().map(r => ({...r, mintRelationGroup: "same"})));
+  assert.deepEqual(lowMints.reasons, ["THRESHOLD_NOT_MET_unrelatedMints"]);
+  const losing = qrun(qten().map(r => ({...r, realizedProceedsUnits: 1_000})));
+  assert.equal(losing.status, "THRESHOLDS_NOT_MET");
+  assert.equal(losing.netResultUnits, "-200");
+  assert.deepEqual(losing.reasons, ["THRESHOLD_NOT_MET_positiveNet"]);
+});
+
+test("wallet qualification bounds inputs and rejects bad subjects", () => {
+  assert.equal(qrun(Array.from({length: 5_001}, (_, i) => qrt(i))).reasons[0], "ROUNDTRIPS_OVERSIZED");
+  assert.equal(qrun([]).status, "UNAVAILABLE");
+  assert.equal(qrun(qten(), QPOLICY, {asOf: "nope"}).status, "UNAVAILABLE");
+  assert.equal(qrun(qten(), QPOLICY, {wallet: "x"}).status, "UNAVAILABLE");
 });

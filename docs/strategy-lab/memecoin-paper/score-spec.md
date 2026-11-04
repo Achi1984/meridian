@@ -40,3 +40,19 @@ selected chain/pool/quote. The candidate must already pass every hard gate.
 The checked-in all-high synthetic score is fixture plumbing, not performance
 evidence. Changing windows, weights, bounds, or qualification requires a new
 score-spec version and review before any experiment.
+
+## Offline wallet qualification diagnostics
+
+`evaluateWalletQualificationDiagnostics` in
+`scripts/memecoin-paper/analyst-window-evidence.mjs` is a pure, bounded,
+offline calculation over explicitly supplied completed round trips and an
+explicitly supplied, versioned `proposed: true` policy. The parameters above
+are not adopted as defaults; no policy means `UNAVAILABLE`. Costs, proceeds
+and basis are exact safe integers in one accounting unit. Missing/partial
+costs, mixed units, unsafe numbers, ambiguous self-transfer/bundle/mint
+relationship facts, future or incomplete round trips, conflicting duplicates
+or oversized input yield `UNAVAILABLE` or `REVIEW_REQUIRED`. Evidence
+references are presence-checked only, not authenticated. Output is always
+`UNVERIFIED` with `allowlistAdmitted: false`; it never emits `VERIFIED` or
+`EXTERNALLY_REVIEWED` and does not replace as-of membership approval or the
+dated independent review.
