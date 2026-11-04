@@ -104,6 +104,7 @@ export function createPaperExecutionStep({session, store, runId, startedAt, endA
     throw new TypeError("explicit bounded run, session, and store required");
   }
   let modeledAdapter = null;
+  let modeledPolicy = null;
   if (modeledQuoteAuthority !== undefined) {
     const policy = copyModeledPolicy(modeledQuoteAuthority?.policy);
     if (Object.keys(modeledQuoteAuthority).sort().join(",") !== "adapter,policy" ||
@@ -112,11 +113,21 @@ export function createPaperExecutionStep({session, store, runId, startedAt, endA
       throw new TypeError("modeled quote authority requires a fixture adapter and an exact run-bound policy");
     }
     modeledAdapter = modeledQuoteAuthority.adapter;
+    modeledPolicy = policy;
   }
+  const policyMatches = facts => facts.runId === modeledPolicy.runId &&
+    facts.runStartedAt === modeledPolicy.runStartedAt && facts.runEndAt === modeledPolicy.runEndAt &&
+    facts.sourcePolicySha256 === modeledPolicy.sourcePolicySha256 &&
+    facts.modelVersion === modeledPolicy.modelVersion &&
+    facts.scenarioConfigSha256 === modeledPolicy.scenarioConfigSha256 &&
+    facts.usdAssumption === modeledPolicy.usdAssumption;
   const modeledOk = (quote, position) => {
     if (!modeledAdapter) return quote?.modeled === undefined;
-    return quote?.modeled !== undefined && modeledAdapter.confirmModeledQuote(quote) === true &&
-      (position === undefined || quote.modeled.baseAtoms === position.modeledTokenAtoms);
+    return quote?.modeled !== undefined && policyMatches(quote.modeled) &&
+      modeledAdapter.confirmModeledQuote(quote) === true &&
+      (position === undefined || (quote.modeled.baseAtoms === position.modeledTokenAtoms &&
+        quote.modeled.scenarioConfigSha256 === position.modeledScenarioConfigSha256 &&
+        quote.modeled.sourcePolicySha256 === position.modeledSourcePolicySha256));
   };
   const bounds = {
     maxEvents: MAX_RECORDS - 2,
@@ -277,7 +288,11 @@ export function createPaperExecutionStep({session, store, runId, startedAt, endA
     if (method === "executeEntry" && result.status === "FILLED_PAPER") {
       positions.set(input.quote.mint, {
         ...authorizations.get(input.authorizationId).candidate,
-        ...(modeledAdapter ? {modeledTokenAtoms: result.tokenAtoms} : {})
+        ...(modeledAdapter ? {
+          modeledTokenAtoms: result.tokenAtoms,
+          modeledScenarioConfigSha256: input.quote.modeled.scenarioConfigSha256,
+          modeledSourcePolicySha256: input.quote.modeled.sourcePolicySha256
+        } : {})
       });
       authorizations.delete(input.authorizationId);
     }

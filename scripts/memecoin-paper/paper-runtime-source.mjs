@@ -872,6 +872,11 @@ export async function acquireSyntheticRuntimeFixture(clock, {
         policy: modeledHost.policy
       });
       paperQuote = issued.ok ? {...issued.quote, eventId: paperQuote.eventId} : null;
+      // The fixture issuer clock advances during issuance; no audit or return after cancel/deadline.
+      if (quoteController.signal.aborted || signal?.aborted || quoteSignal?.aborted ||
+          clock.wallClock() >= deadlineAt) {
+        return null;
+      }
     }
     const auditQuote = {
       purpose: side === "ENTRY" ? "entry"

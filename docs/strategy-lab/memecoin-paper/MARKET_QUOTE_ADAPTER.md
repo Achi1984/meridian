@@ -368,5 +368,14 @@ from issuer confirmation only because the ledger binds event identity and the
 full payload separately. Real and external modes gain no authority.
 
 Unresolved policy: approved network transport, reviewer authenticity,
-archival coverage, and numeric model calibration. Composition end-to-end and
-checkpoint restart acceptance tests are still pending.
+archival coverage, and numeric model calibration.
+
+The step retains an immutable configured policy and refuses (before any state
+mutation) any issuer quote whose run, window, source policy, model, scenario
+config or USD assumption differs, and any exit whose bindings differ from the
+entry position. The fixture runtime rechecks deadline and cancellation after
+the issuer clock advances, before audit append or return. Integration tests
+cover issuer → composition → step → checkpoint → ledger entry/mark/exit,
+checkpoint restart replay (PAPER_FILL/PAPER_EXIT provenance and digests) and
+changed-event/changed-quote replay rejection. Still pending: a deterministic
+direct regression for a deadline falling inside the issuer clock advance.
