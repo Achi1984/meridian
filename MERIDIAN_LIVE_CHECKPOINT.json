@@ -3503,6 +3503,24 @@
       "providerOrHostActivation": false,
       "mergeAuthorizedOrPerformed": false,
       "finalSourceFrozenPendingHostedCiAndNarrowDeltaReview": true
+    },
+    "paperSourceOrchestration1211Revision20261104": {
+      "opId": "meridian-1211-orchestration-r2",
+      "recordedDate": "2026-11-04",
+      "issue": 1207,
+      "pullRequest": 1211,
+      "branch": "copilot/issue1207-source-orchestration",
+      "startingHead": "037d6aa51ed569c2507c1e59a4c5e122122c33e7",
+      "baseSha": "c24c339b763f48f64c2b018f2e12bb38d24efcf8",
+      "scope": "SYNTHETIC_SOURCE_ORCHESTRATION_AND_CANCELLATION_HARDENING_NO_PRODUCTION_AUTHORITY",
+      "state": "IMPLEMENTED_FOCUSED_TESTS_PENDING_FINAL_HEAD_HOSTED_CI_AND_REVIEW",
+      "baselineReleaseSafetyFailure": "PRESERVED_HISTORICAL_NOT_REPAIRED_OR_RELABELED",
+      "providerCallsOrKeys": false,
+      "hostRegistryWorkflowSpendOrActivation": false,
+      "issue1207": "OPEN",
+      "hostedExactHeadCi": "PENDING",
+      "independentFinalReview": "PENDING",
+      "nextGate": "FOCUSED_VALIDATION_AND_EXACT_HEAD_DELTA_REPORT_THEN_HOSTED_CI; NO_AUTO_CLOSE_OR_PRODUCTION_ADMISSION"
     }
   }
 }

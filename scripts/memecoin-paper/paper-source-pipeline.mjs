@@ -72,6 +72,47 @@ function unavailable(reason, request = {}) {
   };
 }
 
+function awaitBounded(operation, signal, deadlineAt) {
+  if (signal?.aborted) {
+    return Promise.reject(Object.assign(new Error("source evaluation cancelled"), {
+      code: "CANCELLED"
+    }));
+  }
+  const remainingMs = deadlineAt - performance.now();
+  if (remainingMs <= 0) {
+    return Promise.reject(Object.assign(new Error("source evaluation deadline reached"), {
+      code: "DEADLINE"
+    }));
+  }
+  let timer;
+  let abortListener;
+  const pending = Promise.resolve().then(() => {
+    if (signal?.aborted) {
+      throw Object.assign(new Error("source evaluation cancelled"), {code: "CANCELLED"});
+    }
+    return operation();
+  });
+  void pending.catch(() => {});
+  const stopped = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      reject(Object.assign(new Error("source evaluation deadline reached"), {
+        code: "DEADLINE"
+      }));
+    }, remainingMs);
+    if (signal) {
+      abortListener = () => reject(Object.assign(new Error("source evaluation cancelled"), {
+        code: "CANCELLED"
+      }));
+      signal.addEventListener("abort", abortListener, {once: true});
+      if (signal.aborted) abortListener();
+    }
+  });
+  return Promise.race([pending, stopped]).finally(() => {
+    clearTimeout(timer);
+    if (abortListener) signal.removeEventListener("abort", abortListener);
+  });
+}
+
 function bridgeLimitsFor(limits) {
   const reservedRequests = 2;
   const bridgeBytes = Math.max(
@@ -131,6 +172,7 @@ function cachedSource(source, method, keyOf, signal) {
   if (typeof read !== "function") return null;
   return Object.freeze({
     async [method](request) {
+      if (signal?.aborted) return null;
       let key;
       try {
         key = keyOf(request);
@@ -138,10 +180,12 @@ function cachedSource(source, method, keyOf, signal) {
         return null;
       }
       if (!cache.has(key)) {
-        cache.set(key, Promise.resolve().then(() => read.call(source, {...request, signal})));
+        cache.set(key, Promise.resolve().then(() => signal?.aborted
+          ? null : read.call(source, {...request, signal})));
       }
       try {
-        return await cache.get(key);
+        const result = await cache.get(key);
+        return signal?.aborted ? null : result;
       } catch {
         return null;
       }
@@ -242,6 +286,7 @@ export function createPaperSourcePipeline({
       });
       evaluationActive = true;
       try {
+        const deadlineAt = performance.now() + reportedLimits.maxElapsedMs;
         if (typeof clock !== "function" || !isRecord(providerCandidate) ||
             !validTime(candidateT) || providerCandidate.sampledAt !== candidateT ||
             !isRecord(evidence) || !isRecord(reviewEvidence)) {
@@ -289,14 +334,17 @@ export function createPaperSourcePipeline({
         if (isRecord(policy) && policy.windowsMs?.swaps1h === 3_600_000 &&
             isRecord(poolProof)) {
           try {
-            prefetchedHistory = await historySource.readWindow({
+            prefetchedHistory = await awaitBounded(() => historySource.readWindow({
               identity,
               poolProof,
               startExclusiveMs: candidateT - policy.windowsMs.swaps1h,
               endInclusiveMs: candidateT,
               signal
-            });
-          } catch {
+            }), signal, deadlineAt);
+          } catch (error) {
+            if (error?.code === "CANCELLED" || error?.code === "DEADLINE") {
+              return unavailable(error.code, {candidateT, holdUntil});
+            }
             prefetchedHistory = null;
           }
           if (signal?.aborted) {
@@ -358,7 +406,7 @@ export function createPaperSourcePipeline({
           }
         });
         try {
-          await buildAnalystWindowEvidence({
+          await awaitBounded(() => buildAnalystWindowEvidence({
             candidate: providerCandidate,
             candidateT,
             assembledAt: sourceAssembly,
@@ -372,8 +420,11 @@ export function createPaperSourcePipeline({
             smartWalletAllowlist,
             sourcePrefetchOnly: true,
             syntheticHistorySourceOverride: mode === "SYNTHETIC_TEST_ONLY"
-          });
-        } catch {
+          }), signal, deadlineAt);
+        } catch (error) {
+          if (error?.code === "CANCELLED" || error?.code === "DEADLINE") {
+            return unavailable(error.code, {candidateT, assembledAt: sourceAssembly, holdUntil});
+          }
           return unavailable("ANALYST_SOURCE_PREFETCH_UNKNOWN", {
             candidateT, assembledAt: sourceAssembly, holdUntil
           });
@@ -411,7 +462,7 @@ export function createPaperSourcePipeline({
         }
         let packet;
         try {
-          packet = await buildAnalystWindowEvidence({
+          packet = await awaitBounded(() => buildAnalystWindowEvidence({
             candidate: providerCandidate,
             candidateT,
             assembledAt: actualAssembledAt,
@@ -424,8 +475,13 @@ export function createPaperSourcePipeline({
             marketPairEvidence,
             smartWalletAllowlist,
             syntheticHistorySourceOverride: mode === "SYNTHETIC_TEST_ONLY"
-          });
-        } catch {
+          }), signal, deadlineAt);
+        } catch (error) {
+          if (error?.code === "CANCELLED" || error?.code === "DEADLINE") {
+            return unavailable(error.code, {
+              candidateT, assembledAt: actualAssembledAt, decisionAt: analystCutoff, holdUntil
+            });
+          }
           return unavailable("ANALYST_EVIDENCE_BUILD_UNKNOWN", {
             candidateT, assembledAt: actualAssembledAt, decisionAt: analystCutoff, holdUntil
           });
@@ -448,7 +504,7 @@ export function createPaperSourcePipeline({
         }
         let evaluation;
         try {
-          evaluation = await evaluateWithCanonicalMarketAdapter({
+          evaluation = await awaitBounded(() => evaluateWithCanonicalMarketAdapter({
             canonicalAdapter: adaptMarketEvidence,
             providerCandidate,
             evidence,
@@ -456,8 +512,13 @@ export function createPaperSourcePipeline({
             reviewEvidence: acceptedReviewEvidence,
             now: actualDecisionAt,
             holdUntil
-          });
-        } catch {
+          }), signal, deadlineAt);
+        } catch (error) {
+          if (error?.code === "CANCELLED" || error?.code === "DEADLINE") {
+            return unavailable(error.code, {
+              candidateT, assembledAt: actualAssembledAt, decisionAt: actualDecisionAt, holdUntil
+            });
+          }
           return unavailable("CANONICAL_EVALUATION_UNKNOWN", {
             candidateT, assembledAt: actualAssembledAt, decisionAt: actualDecisionAt, holdUntil
           });

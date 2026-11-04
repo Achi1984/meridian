@@ -466,6 +466,48 @@ test("publication resolving after deadline cannot start readback or evaluation",
   assert.deepEqual({reads, evaluations}, {reads: 0, evaluations: 0});
 });
 
+test("publication resolving after cancellation cannot start readback or evaluation", async () => {
+  const fixture = makeHandoffFixture();
+  const {observation, request} = await makeBirdeyeObservation(fixture);
+  let release;
+  let announce;
+  let reads = 0;
+  let evaluations = 0;
+  const started = new Promise(resolve => { announce = resolve; });
+  const gate = new Promise(resolve => { release = resolve; });
+  const controller = new AbortController();
+  const pending = handoff({
+    async publish(input) {
+      announce();
+      await gate;
+      return {
+        status: "PUBLISHED",
+        datasetId: input.datasetId,
+        digest: "f".repeat(64)
+      };
+    },
+    async read() { reads += 1; }
+  }, fixture).runOffline({
+    ...runRequest(fixture, observation, request, {
+      enabled: true,
+      mode: "SYNTHETIC_TEST_ONLY",
+      async evaluate() { evaluations += 1; }
+    }),
+    signal: controller.signal
+  });
+  await started;
+  controller.abort();
+  const result = await Promise.race([
+    pending,
+    new Promise(resolve => setTimeout(() => resolve(null), 100))
+  ]);
+  assert.ok(result, "cancelled publication must stop before its callback settles");
+  assert.equal(result.reason, "CANCELLED");
+  release();
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.deepEqual({reads, evaluations}, {reads: 0, evaluations: 0});
+});
+
 test("cancellation during each noncooperating asynchronous stage returns promptly", async () => {
   const fixture = makeHandoffFixture();
   const {observation, request} = await makeBirdeyeObservation(fixture);

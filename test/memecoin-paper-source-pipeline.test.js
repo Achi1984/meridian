@@ -778,7 +778,7 @@ test("cancellation during a late source read cannot return a canonical evaluatio
     }
   };
   const pipeline = sourcePipeline(fixture, {collector: fixtureCollector});
-  const pending = pipeline.evaluate({
+  const request = {
     providerCandidate: fixture.candidate,
     policy: fixture.policy,
     poolProof: fixture.poolProof,
@@ -788,16 +788,27 @@ test("cancellation during a late source read cannot return a canonical evaluatio
     smartWalletAllowlist: fixture.smartWalletAllowlist,
     reviewEvidence: reviews(fixture.candidateT),
     signal: controller.signal
-  });
+  };
+  const pending = pipeline.evaluate(request);
   await started;
   controller.abort();
-  release();
-  const result = await pending;
+  const result = await Promise.race([
+    pending,
+    new Promise(resolve => setTimeout(() => resolve(null), 100))
+  ]);
+  assert.ok(result, "cancelled evaluation must settle before its source callback");
   assert.equal(result.status, "UNKNOWN");
   assert.equal(result.reason, "CANCELLED");
   assert.equal(result.candidate, null);
   assert.equal(result.executionAuthorized, false);
   assert.equal(result.realDataEntryEligible, false);
+  release();
+  const retry = await pipeline.evaluate({
+    ...request,
+    signal: undefined,
+    priceSource: fixture.priceSource
+  });
+  assert.notEqual(retry.reason, "EVALUATION_IN_PROGRESS");
 });
 
 test("price and census source receipts completed after prefetch start are accepted only after assembly", async () => {
@@ -859,7 +870,7 @@ test("price and census source receipts completed after prefetch start are accept
   assert.equal(result.executionAuthorized, false);
 });
 
-test("late collector completion after timeout cannot overwrite the next evaluation audit", async () => {
+test("late collector completion after cancellation cannot overwrite the next evaluation audit", async () => {
   const fixture = makeFixture({buyCount: 0, sellCount: 0});
   let releaseFirst;
   let releaseSecond;
@@ -869,6 +880,7 @@ test("late collector completion after timeout cannot overwrite the next evaluati
   const secondStarted = new Promise(resolve => { announceSecond = resolve; });
   const firstPending = new Promise(resolve => { releaseFirst = resolve; });
   const secondPending = new Promise(resolve => { releaseSecond = resolve; });
+  const controller = new AbortController();
   let collectorCall = 0;
   const collector = request => {
     collectorCall += 1;
@@ -880,10 +892,10 @@ test("late collector completion after timeout cannot overwrite the next evaluati
       }));
     }
     announceSecond();
-    return secondPending.then(() => ({
-      ...fixtureCollector(request, fixture.assembledAt),
-      coverage: {...fixtureCollector(request, fixture.assembledAt).coverage, auditMarker: "B"}
-    }));
+    return secondPending.then(() => {
+      const result = fixtureCollector(request, fixture.assembledAt);
+      return {...result, coverage: {...result.coverage, auditMarker: "B"}};
+    });
   };
   const pipeline = sourcePipeline(fixture, {
     collector,
@@ -895,24 +907,22 @@ test("late collector completion after timeout cannot overwrite the next evaluati
     candidateT: fixture.candidateT,
     policy: fixture.policy,
     poolProof: fixture.poolProof,
-    reviewEvidence: reviews(fixture.candidateT)
+    reviewEvidence: reviews(fixture.candidateT),
+    signal: controller.signal
   };
 
   const firstEvaluation = pipeline.evaluate(request);
   await firstStarted;
+  controller.abort();
   const first = await firstEvaluation;
-  assert.equal(first.auditReceipts.acquisition[0]?.collectorCoverage.auditMarker, undefined);
-  assert.equal(first.auditReceipts.acquisition[0]?.sourceReceipts.collector.length, 0);
+  assert.equal(first.reason, "CANCELLED");
+  assert.equal(first.auditReceipts.acquisition.length, 0);
 
-  const secondEvaluation = pipeline.evaluate(request);
+  const secondEvaluation = pipeline.evaluate({...request, signal: undefined});
   await secondStarted;
   releaseFirst();
   await new Promise(resolve => setImmediate(resolve));
-  const second = await secondEvaluation;
-  assert.notEqual(second.analystEvidence.status, "COMPLETE");
-  assert.equal(second.auditReceipts.acquisition[0]?.collectorCoverage.auditMarker, undefined);
-  assert.equal(second.auditReceipts.acquisition[0]?.sourceReceipts.collector.length, 0);
-  assert.equal(second.auditReceipts.acquisition[0]?.counters.requests, 7);
-  assert.equal(second.auditReceipts.acquisition[0]?.reason, "TIME_LIMIT");
   releaseSecond();
+  const second = await secondEvaluation;
+  assert.equal(second.auditReceipts.acquisition[0]?.collectorCoverage.auditMarker, "B");
 });

@@ -509,7 +509,7 @@ test("stop during the integrated fixture callback isolates its late completion",
 test("deadline during fixture acquisition prevents its subsequent quote request", async t => {
   const {pilot} = await harness(t, {fault: "PIPELINE_QUOTE_DEADLINE"});
   const result = await pilot.start();
-  assert.equal(result.provenance.candidates.length, 1);
+  assert.equal(result.provenance.candidates.length, 0);
   assert.equal(result.report.runnerReport.counters.candidates, 0);
   assert.equal(result.report.runnerReport.counters.quotes, 0);
   assert.ok(["FINISHED", "STOPPED", "UNKNOWN"].includes(result.status));

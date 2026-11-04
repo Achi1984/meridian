@@ -6,6 +6,16 @@ import test from "node:test";
 import {EvidenceWarmupStore} from "../scripts/memecoin-paper/evidence-warmup/index.mjs";
 import {PaperLedger} from "../scripts/memecoin-paper/ledger.mjs";
 import {createMarketQuoteAdapter} from "../scripts/memecoin-paper/market-quote-adapter.mjs";
+import {
+  createPaperPilotComposition,
+  createSyntheticClock,
+  offlineFixtureAdapters
+} from "../scripts/memecoin-paper/paper-pilot-composition.mjs";
+import {
+  PAPER_RUNTIME_SOURCE_POLICY,
+  PAPER_RUNTIME_SOURCE_POLICY_SHA256,
+  createPaperRuntimeSourceAdapter
+} from "../scripts/memecoin-paper/paper-runtime-source.mjs";
 import {createPaperProviderWarmupHandoff} from "../scripts/memecoin-paper/provider-warmup-handoff/index.mjs";
 import {
   evaluationRequest,
@@ -15,7 +25,7 @@ import {
 } from "./fixtures/memecoin-paper-provider-warmup-handoff/synthetic.mjs";
 import {syntheticOrderResponse} from "./fixtures/memecoin-paper-route-quotes/jupiter-v2-order.mjs";
 
-test("generated provider data through warmup, evaluation, quote and ledger remains no-entry", async t => {
+test("generated provider warmup remains UNKNOWN and quote/ledger adapters reject independently", async t => {
   const fixture = makeHandoffFixture();
   const parent = await mkdtemp(path.join(os.tmpdir(), "paper-source-orchestration-"));
   t.after(() => rm(parent, {recursive: true, force: true}));
@@ -107,6 +117,176 @@ test("generated provider data through warmup, evaluation, quote and ledger remai
   });
   assert.equal(authorization.status, "REJECT");
   assert.equal(ledger.summary().openPositions.length, 0);
+});
+
+test("composition blocks unapproved source candidates before quotes and preserves synthetic control", async t => {
+  const parent = await mkdtemp(path.join(os.tmpdir(), "paper-source-composition-"));
+  t.after(() => rm(parent, {recursive: true, force: true}));
+  const sourceConfig = {
+    version: 1,
+    mode: "SOURCE_BACKED_PAPER",
+    enabled: true,
+    runId: "source-composition-blocked",
+    startedAt: Date.now() - 1_000,
+    budgets: {
+      requests: 40,
+      bytes: 1_000_000,
+      events: 128,
+      candidates: 4,
+      cycles: 8,
+      durationMs: 20_000,
+      callbackTimeoutMs: 1_000,
+      maxWallClockUncertaintyMs: 10
+    },
+    sourcePolicy: PAPER_RUNTIME_SOURCE_POLICY,
+    sourcePolicySha256: PAPER_RUNTIME_SOURCE_POLICY_SHA256
+  };
+  const blocked = await createPaperPilotComposition({
+    config: sourceConfig,
+    dataDirectory: path.join(parent, "source")
+  }).start();
+  assert.equal(blocked.status, "UNKNOWN");
+  assert.equal(blocked.report.runnerReport.sourcePolicy.status, "UNAPPROVED");
+  assert.equal(blocked.report.runnerReport.sourcePolicy.networkAccessed, false);
+  assert.equal(blocked.report.runnerReport.sourcePolicy.quoteAdapterStatus, "DISABLED");
+  assert.equal(blocked.report.runnerReport.counters.quotes, 0);
+  assert.equal(blocked.report.runnerReport.operationResults.some(item =>
+    item.method === "authorizeEntry" || item.method === "executeEntry"), false);
+  assert.deepEqual(blocked.report.checkpoint.records.map(record => record.method), [
+    "constructor", "riskSnapshot", "finishRun"
+  ]);
+  assert.equal(blocked.report.persistence, "ACKNOWLEDGED");
+
+  const startedAt = Date.parse("2026-01-01T19:00:00Z");
+  const clock = createSyntheticClock({wallStart: startedAt + 5_000, monotonicStart: 100});
+  const control = await createPaperPilotComposition({
+    config: {
+      version: 1,
+      mode: "SYNTHETIC_TEST_ONLY",
+      enabled: true,
+      runId: "synthetic-composition-control",
+      startedAt,
+      budgets: {...sourceConfig.budgets}
+    },
+    dataDirectory: path.join(parent, "synthetic"),
+    adapters: offlineFixtureAdapters({clock, fault: "PIPELINE_QUOTE"}),
+    clock
+  }).start();
+  assert.ok(control.report.runnerReport.counters.quotes >= 2);
+  assert.equal(control.report.runnerReport.operationResults.some(item =>
+    item.method === "executeEntry" && item.status === "FILLED_PAPER"), true);
+  assert.deepEqual(control.report.runnerReport.terminalResult.openPositions, []);
+  assert.equal(control.report.persistence, "ACKNOWLEDGED");
+});
+
+test("runtime adapter orchestrates generated acquisition, UNKNOWN warmup persistence, and evaluation under one budget", async t => {
+  const parent = await mkdtemp(path.join(os.tmpdir(), "paper-runtime-source-warmup-"));
+  t.after(() => rm(parent, {recursive: true, force: true}));
+  const store = new EvidenceWarmupStore(path.join(parent, "warmup"), {enabled: true});
+  const clock = createSyntheticClock({wallStart: Date.now(), monotonicStart: 100});
+  const adapter = createPaperRuntimeSourceAdapter({
+    sourcePolicySha256: PAPER_RUNTIME_SOURCE_POLICY_SHA256,
+    fixtureMode: "SYNTHETIC_TEST_ONLY",
+    clock,
+    variant: "BASE",
+    fixtureBehavior: "NONE",
+    warmupStore: store
+  });
+  const used = {requests: 0, bytes: 0, work: 0};
+  const result = await adapter.acquireCandidates({
+    signal: new AbortController().signal,
+    remaining: {requests: 20, bytes: 1_000_000, work: 100, timeMs: 10_000},
+    deadlineAt: clock.wallClock() + 10_000,
+    recordRequest({bytes, events}) {
+      used.requests += 1;
+      used.bytes += bytes;
+      used.work += events;
+      assert.ok(used.requests <= 20);
+      assert.ok(used.bytes <= 1_000_000);
+      assert.ok(used.work <= 100);
+    },
+    recordWork(units) {
+      used.work += units;
+      assert.ok(used.work <= 100);
+    }
+  });
+  assert.equal(result.status, "SYNTHETIC_FIXTURE_ONLY");
+  assert.equal(result.warmup.status, "OFFLINE_EVALUATED");
+  assert.equal(result.warmup.trust, "UNKNOWN");
+  assert.equal(result.warmup.completeness, "UNKNOWN");
+  assert.equal(result.pipeline.analysis.status, "BLOCKED");
+  assert.equal(result.pipeline.executionAuthorized, false);
+  assert.ok(used.requests >= 3);
+  assert.ok(used.bytes > 0);
+  assert.ok(used.work > 0);
+  const readback = await store.read("runtime-source-fixture");
+  assert.equal(readback.status, "AVAILABLE");
+  assert.equal(readback.document.records[0].trust, "UNKNOWN");
+  assert.equal(readback.document.records[0].completeness, "UNKNOWN");
+  assert.equal(await adapter.quote({
+    candidate: result.candidate,
+    purpose: "ENTRY",
+    now: clock.wallClock()
+  }), null);
+
+  let publishes = 0;
+  const exhaustedAdapter = createPaperRuntimeSourceAdapter({
+    sourcePolicySha256: PAPER_RUNTIME_SOURCE_POLICY_SHA256,
+    fixtureMode: "SYNTHETIC_TEST_ONLY",
+    clock,
+    variant: "BASE",
+    fixtureBehavior: "NONE",
+    warmupStore: {
+      async publish() { publishes += 1; },
+      async read() { assert.fail("budget exhaustion must prevent readback"); }
+    }
+  });
+  const exhausted = await exhaustedAdapter.acquireCandidates({
+    signal: new AbortController().signal,
+    remaining: {requests: 10, bytes: 1, work: 10, timeMs: 10_000},
+    deadlineAt: clock.wallClock() + 10_000,
+    recordRequest() {
+      throw Object.assign(new Error("global byte budget exhausted"), {code: "GLOBAL_BUDGET"});
+    },
+    recordWork() {}
+  });
+  assert.equal(exhausted.reason, "GLOBAL_BUDGET");
+  assert.equal(publishes, 0);
+});
+
+test("runtime quote result released after abort cannot enter the audit", async () => {
+  const clock = createSyntheticClock({wallStart: Date.now(), monotonicStart: 100});
+  const adapter = createPaperRuntimeSourceAdapter({
+    sourcePolicySha256: PAPER_RUNTIME_SOURCE_POLICY_SHA256,
+    fixtureMode: "SYNTHETIC_TEST_ONLY",
+    clock,
+    variant: "BASE",
+    fixtureBehavior: "WAIT_FOR_QUOTE_SETTLE"
+  });
+  const acquired = await adapter.acquireCandidates({
+    signal: new AbortController().signal,
+    remaining: {requests: 40, bytes: 1_000_000, work: 1_000, timeMs: 10_000},
+    deadlineAt: clock.wallClock() + 10_000,
+    recordRequest() {},
+    recordWork() {}
+  });
+  const controller = new AbortController();
+  const pending = adapter.quote({
+    candidate: acquired.candidate,
+    purpose: "ENTRY",
+    now: clock.wallClock(),
+    signal: controller.signal
+  });
+  await new Promise(resolve => setTimeout(resolve, 5));
+  controller.abort();
+  const quote = await Promise.race([
+    pending,
+    new Promise(resolve => setTimeout(() => resolve("TIMEOUT"), 100))
+  ]);
+  assert.equal(quote, null);
+  assert.equal(acquired.runtimeAudit.quotes.length, 0);
+  await new Promise(resolve => setTimeout(resolve, 30));
+  assert.equal(acquired.runtimeAudit.quotes.length, 0);
 });
 
 test("forged provider receipt cannot publish or reach the evaluation", async () => {
