@@ -896,3 +896,59 @@ test("cancellation and deadline around integrity-bound publication stop evaluati
   });
   assert.equal(deadline.reason, "DEADLINE");
 });
+
+test("responseBytes cannot spoof size or run code via own properties, subclasses, or accessors", async t => {
+  const hostile = [];
+  const oversized = new Uint8Array(65_537);
+  Object.defineProperty(oversized, "byteLength", {value: 1});
+  hostile.push([oversized, "INTEGRITY_BYTES_LIMIT"]);
+  const oversizedLength = new Uint8Array(65_537);
+  Object.defineProperty(oversizedLength, "length", {value: 1});
+  hostile.push([oversizedLength, "INTEGRITY_BYTES_LIMIT"]);
+  let executed = false;
+  class Sub extends Uint8Array {
+    get byteLength() { executed = true; return 1; }
+  }
+  hostile.push([new Sub(65_537), "INTEGRITY_INPUT_INVALID"]);
+  const forgedBuffer = Buffer.alloc(65_537);
+  Object.defineProperty(forgedBuffer, "byteLength", {value: 1});
+  hostile.push([forgedBuffer, "INTEGRITY_BYTES_LIMIT"]);
+  const forgedBufferLength = Buffer.alloc(65_537);
+  Object.defineProperty(forgedBufferLength, "length", {value: 1});
+  hostile.push([forgedBufferLength, "INTEGRITY_BYTES_LIMIT"]);
+  class SubBuffer extends Buffer {}
+  hostile.push([Object.setPrototypeOf(Buffer.alloc(4), SubBuffer.prototype),
+    "INTEGRITY_INPUT_INVALID"]);
+  const accessor = new Uint8Array(4);
+  Object.defineProperty(accessor, "byteLength", {get() { executed = true; return 1; }});
+  hostile.push([accessor, "INTEGRITY_INPUT_INVALID"]);
+  const buffered = new Uint8Array(4);
+  Object.defineProperty(buffered, "buffer", {value: new ArrayBuffer(70_000)});
+  hostile.push([buffered, "INTEGRITY_INPUT_INVALID"]);
+  const proto = new Uint8Array(4);
+  Object.setPrototypeOf(proto, {__proto__: Uint8Array.prototype,
+    get byteLength() { executed = true; return 1; }});
+  hostile.push([proto, "INTEGRITY_INPUT_INVALID"]);
+  for (const [responseBytes, reason] of hostile) {
+    const c = await integrityCase(t);
+    const counted = countingStore(c.store);
+    const result = await handoff(counted.store, c.fixture).runOffline({
+      ...runRequest(c.fixture, c.observation, c.request),
+      integrity: {...c.input, responseBytes}
+    });
+    assert.equal(result.status, "UNKNOWN");
+    assert.equal(result.reason, reason);
+    assert.deepEqual(counted.counts, {publishes: 0, reads: 0});
+  }
+  assert.equal(executed, false);
+
+  const c = await integrityCase(t);
+  const padded = new Uint8Array(c.raw.length + 10);
+  padded.set(c.raw, 5);
+  const window = new Uint8Array(padded.buffer, 5, c.raw.length);
+  const ok = await handoff(c.store, c.fixture).runOffline({
+    ...runRequest(c.fixture, c.observation, c.request),
+    integrity: {...c.input, responseBytes: window}
+  });
+  assert.equal(ok.integrity.status, "INTEGRITY_MATCH");
+});

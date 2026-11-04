@@ -429,6 +429,29 @@ function integrityReceipt(identity, request, observation, responseSha256, respon
   };
 }
 
+const TYPED_ARRAY_PROTOTYPE = Object.getPrototypeOf(Uint8Array.prototype);
+const typedGetter = name => Object.getOwnPropertyDescriptor(TYPED_ARRAY_PROTOTYPE, name).get;
+const nativeBuffer = typedGetter("buffer");
+const nativeOffset = typedGetter("byteOffset");
+const nativeLength = typedGetter("byteLength");
+
+// Reads only intrinsic slots, so overridden properties or subclasses cannot spoof size
+// or run caller code. Returns a fresh native view, or null for anything but a canonical Uint8Array or Buffer.
+function nativeBytes(value) {
+  try {
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Uint8Array.prototype && prototype !== Buffer.prototype) return null;
+    const length = nativeLength.call(value);
+    const buffer = nativeBuffer.call(value);
+    const offset = nativeOffset.call(value);
+    if (length > MAX_INTEGRITY_RESPONSE_BYTES) return new Uint8Array(0);
+    if (Reflect.ownKeys(value).length !== length) return null;
+    return new Uint8Array(buffer, offset, length);
+  } catch {
+    return null;
+  }
+}
+
 function verifyResponseIntegrity(input, request, identity, observation, limits) {
   const supplied = projectRecord(input,
     ["version", "responseBytes", "observationSha256", "bindingSha256"]);
@@ -436,13 +459,13 @@ function verifyResponseIntegrity(input, request, identity, observation, limits) 
       !HASH.test(supplied.observationSha256 ?? "") || !HASH.test(supplied.bindingSha256 ?? "")) {
     return {reason: "INTEGRITY_INPUT_INVALID"};
   }
-  const raw = supplied.responseBytes;
-  if (!(raw instanceof Uint8Array)) return {reason: "INTEGRITY_INPUT_INVALID"};
-  if (raw.byteLength < 1 ||
-      raw.byteLength > Math.min(MAX_INTEGRITY_RESPONSE_BYTES, limits.maxEnvelopeBytes)) {
+  const view = nativeBytes(supplied.responseBytes);
+  if (!view) return {reason: "INTEGRITY_INPUT_INVALID"};
+  if (view.length < 1 ||
+      view.length > Math.min(MAX_INTEGRITY_RESPONSE_BYTES, limits.maxEnvelopeBytes)) {
     return {reason: "INTEGRITY_BYTES_LIMIT"};
   }
-  const bytes = Buffer.from(raw);
+  const bytes = Buffer.from(view);
   const responseSha256 = sha256(bytes);
   if (responseSha256 !== observation.receipts[0].responseSha256 ||
       responseSha256 !== observation.receipt.payloadSha256 ||
