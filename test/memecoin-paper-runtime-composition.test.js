@@ -224,18 +224,75 @@ test("a held publication cannot evaluate after the shared deadline", async t => 
   const setup = await diagnosticSetup(t);
   let evaluated = false;
   let release;
+  let markEntered;
   const held = new Promise(resolve => { release = resolve; });
+  const entered = new Promise(resolve => { markEntered = resolve; });
   const store = {
-    async publish() { await held; return {status: "PUBLISHED"}; },
+    async publish() { markEntered(); await held; return {status: "PUBLISHED"}; },
     async read() { evaluated = true; return {status: "UNAVAILABLE"}; }
   };
-  const result = await diagnosticAdapter({input: setup.input, warmupStore: store}).acquireCandidates(
-    sharedInput({remaining: {requests: 40, bytes: 1_000_000, candidates: 4, work: 1_000, timeMs: 30}}).input
+  const pending = diagnosticAdapter({input: setup.input, warmupStore: store}).acquireCandidates(
+    sharedInput({remaining: {requests: 40, bytes: 1_000_000, candidates: 4, work: 1_000, timeMs: 60}}).input
   );
+  await entered;
+  const result = await pending;
   release();
   await new Promise(resolve => setTimeout(resolve, 20));
   assert.notEqual(result.diagnostic.status, "OFFLINE_EVALUATED");
   assert.equal(evaluated, false);
+  assert.deepEqual(result.candidates, []);
+});
+
+test("held publication is cancelled by the caller only after publication was entered", async t => {
+  const setup = await diagnosticSetup(t);
+  let evaluated = false;
+  let release;
+  let markEntered;
+  const held = new Promise(resolve => { release = resolve; });
+  const entered = new Promise(resolve => { markEntered = resolve; });
+  const store = {
+    async publish() { markEntered(); await held; return {status: "PUBLISHED"}; },
+    async read() { evaluated = true; return {status: "UNAVAILABLE"}; }
+  };
+  const controller = new AbortController();
+  const pending = diagnosticAdapter({input: setup.input, warmupStore: store}).acquireCandidates(
+    sharedInput({signal: controller.signal}).input
+  );
+  await entered;
+  controller.abort();
+  const result = await pending;
+  release();
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.equal(result.reason, "STOPPED");
+  assert.deepEqual(result.candidates, []);
+  assert.equal(evaluated, false);
+});
+
+test("nested accessors are rejected without invocation and later mutation is isolated", async t => {
+  const setup = await diagnosticSetup(t);
+  let getterCalls = 0;
+  const hostile = {...setup.input, evaluationRequest: {...setup.input.evaluationRequest}};
+  Object.defineProperty(hostile.evaluationRequest, "providerCandidate", {
+    enumerable: true,
+    get() { getterCalls += 1; return setup.input.evaluationRequest.providerCandidate; }
+  });
+  assert.throws(() => diagnosticAdapter({input: hostile, warmupStore: setup.warmupStore}), TypeError);
+  const slot = {...setup.input, slotRange: {}};
+  Object.defineProperty(slot.slotRange, "startInclusive", {
+    enumerable: true, get() { getterCalls += 1; return 1; }
+  });
+  assert.throws(() => diagnosticAdapter({input: slot, warmupStore: setup.warmupStore}), TypeError);
+  const request = {...setup.input, request: {...setup.input.request}};
+  Object.defineProperty(request.request, "atMs", {enumerable: true, get() { getterCalls += 1; return 1; }});
+  assert.throws(() => diagnosticAdapter({input: request, warmupStore: setup.warmupStore}), TypeError);
+  assert.equal(getterCalls, 0);
+
+  const adapter = diagnosticAdapter(setup);
+  setup.input.evaluationRequest.providerCandidate.mint = "Vote111111111111111111111111111111111111111";
+  setup.input.request.atMs = 1;
+  setup.input.slotRange.endInclusive = 1;
+  const result = await adapter.acquireCandidates(sharedInput().input);
+  assert.equal(result.diagnostic.status, "OFFLINE_EVALUATED");
   assert.deepEqual(result.candidates, []);
 });
 

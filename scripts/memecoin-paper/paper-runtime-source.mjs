@@ -842,6 +842,41 @@ export async function acquireSyntheticRuntimeFixture(clock, {
 
 const DIAGNOSTIC_KEYS = ["evaluationRequest", "observation", "request", "slotRange"];
 
+// Detached copy built from own data descriptors only: accessors are rejected without being
+// invoked, and later caller mutation cannot reach the copy.
+function detachDiagnosticData(value, state = {nodes: 0}, depth = 0) {
+  if (depth > 24 || ++state.nodes > 20_000) throw new TypeError("diagnostic input exceeds bounds");
+  if (value === null || ["string", "boolean"].includes(typeof value)) return value;
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) throw new TypeError("diagnostic number is not finite");
+    return value;
+  }
+  if (typeof value !== "object") throw new TypeError("diagnostic value type is unsupported");
+  const array = Array.isArray(value);
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== (array ? Array.prototype : Object.prototype) &&
+      !(prototype === null && !array)) {
+    throw new TypeError("diagnostic value must be plain data");
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const keys = Reflect.ownKeys(descriptors);
+  if (keys.some(key => typeof key !== "string")) throw new TypeError("diagnostic symbols are unsupported");
+  const copy = array ? [] : {};
+  for (const key of keys) {
+    if (array && key === "length") continue;
+    const descriptor = descriptors[key];
+    if (!Object.hasOwn(descriptor, "value") || !descriptor.enumerable) {
+      throw new TypeError("diagnostic accessors are unsupported");
+    }
+    if (array && !/^(0|[1-9][0-9]*)$/.test(key)) throw new TypeError("diagnostic array shape is invalid");
+    copy[key] = detachDiagnosticData(descriptor.value, state, depth + 1);
+  }
+  if (array && Object.keys(copy).length !== value.length) {
+    throw new TypeError("diagnostic arrays must be dense");
+  }
+  return copy;
+}
+
 function validateDiagnosticInput(input, warmupStore) {
   const valid = input !== null && typeof input === "object" && !Array.isArray(input) &&
     Object.getPrototypeOf(input) === Object.prototype &&
@@ -851,7 +886,7 @@ function validateDiagnosticInput(input, warmupStore) {
       Object.hasOwn(Object.getOwnPropertyDescriptor(input, key), "value")) &&
     hasDataMethod(warmupStore, "publish") && hasDataMethod(warmupStore, "read");
   if (!valid) throw new TypeError("diagnostic input must be exact bounded data with a warmup store");
-  return input;
+  return Object.freeze(detachDiagnosticData(input));
 }
 
 // Supplied observations are normalized and evaluated in EXTERNAL_READ_ONLY_INPUT mode with a
