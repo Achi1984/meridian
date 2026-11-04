@@ -3622,6 +3622,37 @@
       "issue1207": "OPEN",
       "keys": "DEFERRED_NO_KEY_USE",
       "providerOrHostActivation": false
+    },
+    "paperSourceOrchestration1211CiBudgetRepair20261104": {
+      "opId": "meridian-1211-ci-budget-20261104-r1",
+      "recordedDate": "2026-11-04",
+      "issue": 1207,
+      "pullRequest": 1211,
+      "startingHead": "c0df799e1183e47dcf0a098d97190ef21849ee4e",
+      "failedCi": {
+        "runId": 41852567141,
+        "attempt": 2,
+        "jobId": 126698450011,
+        "result": "FAILED",
+        "tests": "4282_PASS_1_FAIL_0_CANCELLED_0_SKIPPED",
+        "failure": "test/memecoin-paper-pilot-composition.test.js:459 repeated fixture acquisition request allowance 40 exhausted; expected FINISHED, got UNKNOWN"
+      },
+      "diagnosis": {
+        "localReproduction": "UNKNOWN_GLOBAL_BUDGET_AT_40_REQUESTS_IN_249MS_BELOW_1000MS_CALLBACK_TIMEOUT",
+        "minimumSuccessfulRequestLimit": 55,
+        "measuredSuccessfulRequests": 55,
+        "derivation": "2_ACQUISITIONS_X_25_REQUESTS_PLUS_3_SOURCE_POLLS_PLUS_2_QUOTES",
+        "repair": "HAPPY_PATH_TEST_LIMIT_64_NINE_REQUESTS_HEADROOM",
+        "explicitExhaustionControl": "UNCHANGED_10_REQUESTS_REMAINS_UNKNOWN_GLOBAL_BUDGET"
+      },
+      "focusedTest": "node --test test/memecoin-paper-pilot-composition.test.js",
+      "focusedResult": "22_PASS_0_FAIL",
+      "hostedCi": "NOT_RERUN_PER_REQUEST",
+      "issue1207": "OPEN",
+      "productionRuntime": "DEFAULT_DISABLED",
+      "providerCallsOrKeys": false,
+      "hostRegistryWorkflowSpendOrActivation": false,
+      "nextGate": "COMMIT_NARROW_TEST_ALLOWANCE_AND_CHECKPOINT; REPORT_FINAL_HEAD; NO_BLIND_CI_RERUN"
     }
   }
 }
