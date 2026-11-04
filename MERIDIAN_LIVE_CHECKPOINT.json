@@ -3832,6 +3832,24 @@
       "issue1207": "OPEN",
       "providersKeysHostWorkflowsSpendActivation": false,
       "nextGate": "COMBINED_HEAD_HOSTED_CI_THEN_FINAL_INDEPENDENT_REVIEW; LEAD_VERIFIES_MERGE_BEFORE_CLOSING_1212_1214_1216_1217"
+    },
+    "paperModeledExecution1222_20261105": {
+      "opId": "meridian-modeled-execution-1222-r1",
+      "issue": 1222,
+      "parentIssue": 1207,
+      "baseSha": "4b197126465863ee231e0cb0a78f25bc4a76510d",
+      "branch": "copilot/issue-1222-modeled-execution",
+      "scope": "FIXTURE_ONLY; run-bound QUOTED_NET_V1 modeled quote through issuer, composition, step, ledger; exact modeled quantity; full-position source cap; MODELED/UNKNOWN/executionRealistic=false",
+      "state": "WIP_DRAFT_NOT_READY",
+      "passing": "adapter issuance, ledger entry/mark/exit cap/replay, and 134 legacy composition/step/runner/session/runtime tests",
+      "missing": "composition end-to-end and checkpoint-session restart acceptance tests; MARKET_QUOTE_ADAPTER.md update",
+      "unresolvedPolicy": "approved network transport; reviewer authenticity; archival coverage; numeric model uncalibrated",
+      "parentPullRequest1219": "FROZEN_UNCHANGED",
+      "approved": false,
+      "merged": false,
+      "live": false,
+      "issue1207": "OPEN",
+      "providersKeysHostWorkflowsSpendActivation": false
     }
   }
 }

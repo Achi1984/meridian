@@ -1,6 +1,9 @@
 import {createHash} from "node:crypto";
 import {canonicalCheckpointBytes, MAX_CHECKPOINT_BYTES} from "./checkpoint-store.mjs";
 import {PAPER_LEDGER_POLICY} from "./ledger.mjs";
+import {
+  copyModeledPolicy, isFixtureMarketQuoteAdapter
+} from "./market-quote-adapter.mjs";
 import {analyzeCandidate, filterCandidate} from "./stages.mjs";
 
 const SAFE_ID = /^[A-Za-z0-9._:-]{1,120}$/;
@@ -91,7 +94,8 @@ function completeQuote(quote, identity, now, source) {
     COSTS.every(key => amount(quote.costs?.[key]));
 }
 
-export function createPaperExecutionStep({session, store, runId, startedAt, endAt, limits = {}} = {}) {
+export function createPaperExecutionStep({session, store, runId, startedAt, endAt, limits = {},
+  modeledQuoteAuthority} = {}) {
   if (!safeId(runId) || !integerTime(startedAt) || !integerTime(endAt) ||
       endAt <= startedAt || endAt > startedAt + WINDOW_MS ||
       !store || typeof store.readCheckpoint !== "function" ||
@@ -99,6 +103,21 @@ export function createPaperExecutionStep({session, store, runId, startedAt, endA
       Object.keys(SCHEMAS).some(method => typeof session[method] !== "function")) {
     throw new TypeError("explicit bounded run, session, and store required");
   }
+  let modeledAdapter = null;
+  if (modeledQuoteAuthority !== undefined) {
+    const policy = copyModeledPolicy(modeledQuoteAuthority?.policy);
+    if (Object.keys(modeledQuoteAuthority).sort().join(",") !== "adapter,policy" ||
+        !isFixtureMarketQuoteAdapter(modeledQuoteAuthority.adapter) ||
+        policy.runId !== runId || policy.runStartedAt !== startedAt || policy.runEndAt !== endAt) {
+      throw new TypeError("modeled quote authority requires a fixture adapter and an exact run-bound policy");
+    }
+    modeledAdapter = modeledQuoteAuthority.adapter;
+  }
+  const modeledOk = (quote, position) => {
+    if (!modeledAdapter) return quote?.modeled === undefined;
+    return quote?.modeled !== undefined && modeledAdapter.confirmModeledQuote(quote) === true &&
+      (position === undefined || quote.modeled.baseAtoms === position.modeledTokenAtoms);
+  };
   const bounds = {
     maxEvents: MAX_RECORDS - 2,
     maxCommands: MAX_RECORDS - 1,
@@ -203,6 +222,7 @@ export function createPaperExecutionStep({session, store, runId, startedAt, endA
       const auth = authorizations.get(input.authorizationId);
       if (!auth || input.quote.eventId !== input.eventId ||
           !completeQuote(input.quote, auth.candidate, input.now, auth.candidate.source) ||
+          !modeledOk(input.quote) ||
           input.quote.observedAt <= auth.now || input.quote.observedAt <= auth.candidate.sampledAt) {
         return reject("live authorization and strictly later fully bound quote/costs required");
       }
@@ -210,7 +230,8 @@ export function createPaperExecutionStep({session, store, runId, startedAt, endA
     } else if (method === "observeExitQuote") {
       const position = positions.get(input.quote.mint);
       if (input.quote.eventId !== input.eventId ||
-          !completeQuote(input.quote, position, input.now, position?.source)) {
+          !completeQuote(input.quote, position, input.now, position?.source) ||
+          !modeledOk(input.quote, position)) {
         return reject("fully bound exit quote and costs required");
       }
       inputs = {quote: input.quote, eventId: input.eventId, now: input.now};
@@ -218,7 +239,9 @@ export function createPaperExecutionStep({session, store, runId, startedAt, endA
       inputs = {now: input.now, marks: input.marks};
     }
     if (inputs.marks?.some(mark => !completeQuote(mark, positions.get(mark.mint), input.now,
-      positions.get(mark.mint)?.source))) return reject("supplied marks must be fully bound with complete costs");
+      positions.get(mark.mint)?.source) || !modeledOk(mark, positions.get(mark.mint)))) {
+      return reject("supplied marks must be fully bound with complete costs");
+    }
     try {
       copyData(inputs, bounds.maxBytes);
     } catch (error) {
@@ -252,7 +275,10 @@ export function createPaperExecutionStep({session, store, runId, startedAt, endA
       authorizations.set(result.authorizationId, {candidate: input.candidate, now: input.now});
     }
     if (method === "executeEntry" && result.status === "FILLED_PAPER") {
-      positions.set(input.quote.mint, {...authorizations.get(input.authorizationId).candidate});
+      positions.set(input.quote.mint, {
+        ...authorizations.get(input.authorizationId).candidate,
+        ...(modeledAdapter ? {modeledTokenAtoms: result.tokenAtoms} : {})
+      });
       authorizations.delete(input.authorizationId);
     }
     const after = session.snapshot();

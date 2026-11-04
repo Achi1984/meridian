@@ -84,7 +84,7 @@ test("disabled by default and rejects non-synthetic activation configuration", a
     clock: clockHarness()
   }), /only module-generated offline fixture adapters may run/);
   assert.throws(() => offlineFixtureAdapters({candidate: {source: "SYNTHETIC_FIXTURE_ONLY"}}),
-    /only a clock and named offline fixture fault/);
+    /only a clock, named offline fixture fault, and modeled fixture policy/);
   let getterCalls = 0;
   const accessorConfig = {};
   Object.defineProperty(accessorConfig, "enabled", {
@@ -108,7 +108,7 @@ test("disabled by default and rejects non-synthetic activation configuration", a
     get() { getterCalls += 1; return "NONE"; }
   });
   assert.throws(() => offlineFixtureAdapters(fixtureOptions),
-    /only a clock and named offline fixture fault/);
+    /only a clock, named offline fixture fault, and modeled fixture policy/);
   assert.equal(getterCalls, 0);
 });
 

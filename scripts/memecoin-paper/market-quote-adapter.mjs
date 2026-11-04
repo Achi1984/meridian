@@ -1,5 +1,5 @@
 import {createHash} from "node:crypto";
-import {PAPER_LEDGER_POLICY} from "./ledger.mjs";
+import {PAPER_LEDGER_POLICY, paperModeledQuoteDigest} from "./ledger.mjs";
 import {normalizeExactCosts} from "../memecoin-paper-execution-evidence/normalize.mjs";
 import {createJupiterV2QuoteAdapter} from "../memecoin-paper-route-quotes/jupiter-v2.mjs";
 
@@ -967,7 +967,61 @@ function abortableTransport(transport, getExternalSignal, acquireDigest) {
   };
 }
 
-export function createMarketQuoteAdapter({
+const genuineAdapters = new WeakSet();
+const fixtureAdapters = new WeakSet();
+
+export function isMarketQuoteAdapter(value) {
+  return value !== null && typeof value === "object" && genuineAdapters.has(value);
+}
+
+export function isFixtureMarketQuoteAdapter(value) {
+  return value !== null && typeof value === "object" && fixtureAdapters.has(value);
+}
+
+const MODELED_FIXTURE_SOURCE = "SYNTHETIC_FIXTURE_ONLY";
+const POLICY_KEYS = Object.freeze([
+  "runId", "runStartedAt", "runEndAt", "sourcePolicySha256", "modelVersion",
+  "scenarioConfigSha256", "usdAssumption"
+]);
+
+function deepFreeze(value) {
+  if (value !== null && typeof value === "object" && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const key of Object.keys(value)) deepFreeze(value[key]);
+  }
+  return value;
+}
+
+export function copyModeledPolicy(value) {
+  const policy = copyPlainRecord(value, POLICY_KEYS, "modeled policy");
+  if (POLICY_KEYS.some(key => !Object.hasOwn(policy, key)) ||
+      typeof policy.runId !== "string" || !SAFE_ID.test(policy.runId) ||
+      !validTime(policy.runStartedAt) || !validTime(policy.runEndAt) ||
+      policy.runEndAt <= policy.runStartedAt ||
+      typeof policy.sourcePolicySha256 !== "string" || !SHA256.test(policy.sourcePolicySha256) ||
+      policy.modelVersion !== QUOTED_NET_MODEL.version ||
+      typeof policy.scenarioConfigSha256 !== "string" || !SHA256.test(policy.scenarioConfigSha256) ||
+      policy.usdAssumption !== QUOTED_NET_MODEL.currencyAssumption) {
+    throw new TypeError("modeled policy is incomplete, mismatched, or outside the supported model");
+  }
+  return Object.freeze({...policy});
+}
+
+export function createMarketQuoteAdapter(options = {}) {
+  const adapter = buildMarketQuoteAdapter(options);
+  genuineAdapters.add(adapter);
+  return adapter;
+}
+
+// Module-owned fixture authority: only this factory marks an adapter as fixture-capable.
+export function createFixtureMarketQuoteAdapter(options = {}) {
+  const adapter = buildMarketQuoteAdapter({...options, enabled: true});
+  genuineAdapters.add(adapter);
+  fixtureAdapters.add(adapter);
+  return adapter;
+}
+
+function buildMarketQuoteAdapter({
   enabled = false,
   transport,
   clock = Date.now,
@@ -981,6 +1035,12 @@ export function createMarketQuoteAdapter({
       },
       validateCostReceipt() {
         return costRejection(["ADAPTER_DISABLED"]);
+      },
+      issueModeledQuote() {
+        return Object.freeze({ok: false, reason: "ADAPTER_DISABLED"});
+      },
+      confirmModeledQuote() {
+        return false;
       }
     });
   }
@@ -995,6 +1055,7 @@ export function createMarketQuoteAdapter({
   let requestsStarted = 0;
   let digest = null;
   const issued = new WeakMap();
+  const handoffs = new Map();
   const source = createJupiterV2QuoteAdapter({
     enabled: true,
     clock,
@@ -1003,7 +1064,21 @@ export function createMarketQuoteAdapter({
       () => digest ?? {fenced: true})
   });
 
-  return Object.freeze({
+  const adapter = Object.freeze({
+    issueModeledQuote(original, expected) {
+      return issueModeled({
+        adapter, issued, handoffs, clock, original, expected, maxRequests
+      });
+    },
+    confirmModeledQuote(quote) {
+      try {
+        const stored = handoffs.get(quote?.modeled?.digest);
+        const {eventId: _eventId, ...bare} = quote;
+        return stored !== undefined && stored === canonicalJson(bare);
+      } catch {
+        return false;
+      }
+    },
     validateCostReceipt(quoteResult, receipt) {
       const snapshot = isRecord(quoteResult) ? issued.get(quoteResult) : undefined;
       if (!snapshot) return costRejection(["COST_QUOTE_RESULT_NOT_ISSUED_BY_THIS_ADAPTER"]);
@@ -1109,6 +1184,8 @@ export function createMarketQuoteAdapter({
         };
         issued.set(result, {
           request,
+          projection: scenarioProjection?.model ? deepFreeze(structuredClone(scenarioProjection)) : null,
+          projectionCanonical: scenarioProjection?.model ? canonicalJson(scenarioProjection) : null,
           route: {requestId: observed.route.requestId ?? null, expiresAt: observed.route.expiresAt},
           observedAt: observed.route.observedAt,
           response: {
@@ -1133,6 +1210,94 @@ export function createMarketQuoteAdapter({
       }
     }
   });
+  return adapter;
+}
+
+function issueModeled({adapter, issued, handoffs, clock, original, expected, maxRequests}) {
+  const refuse = reason => Object.freeze({ok: false, reason});
+  try {
+    if (!fixtureAdapters.has(adapter)) return refuse("ADAPTER_HAS_NO_FIXTURE_AUTHORITY");
+    const snapshot = isRecord(original) ? issued.get(original) : undefined;
+    if (!snapshot?.projection) return refuse("RESULT_NOT_ISSUED_BY_THIS_ADAPTER");
+    if (canonicalJson(original.scenarioProjection) !== snapshot.projectionCanonical) {
+      return refuse("RESULT_MUTATED_AFTER_ISSUANCE");
+    }
+    const policy = copyModeledPolicy(expected?.policy);
+    const projection = snapshot.projection;
+    const verified = verifyPaperQuotedNetProjection(projection);
+    if (!verified.valid) return refuse("MODEL_PROJECTION_INVALID");
+    const binding = projection.model.binding;
+    const request = snapshot.request;
+    const side = expected?.side;
+    if ((side !== "ENTRY" && side !== "EXIT") || request.side !== side ||
+        typeof expected.amountAtoms !== "string" || request.amountAtoms !== expected.amountAtoms ||
+        !sameIdentity(request.identity, expected.identity) ||
+        !sameIdentity(projection.identity, expected.identity) ||
+        binding.scenarioConfigSha256 !== policy.scenarioConfigSha256 ||
+        binding.modelVersion !== policy.modelVersion ||
+        binding.currency.assumption !== policy.usdAssumption) {
+      return refuse("RESULT_DOES_NOT_MATCH_EXPECTED_IDENTITY_SIDE_AMOUNT_OR_POLICY");
+    }
+    const observedAt = binding.sourceQuote.observedAt;
+    const expiresAt = binding.sourceQuote.expiresAt;
+    const now = clock();
+    if (!validTime(now) || !validTime(observedAt) || !validTime(expiresAt) ||
+        observedAt < policy.runStartedAt || observedAt > policy.runEndAt ||
+        now < observedAt || now > expiresAt || now > policy.runEndAt) {
+      return refuse("QUOTE_OUTSIDE_RUN_WINDOW_OR_EXPIRED");
+    }
+    if (handoffs.size >= maxRequests) return refuse("HANDOFF_BUDGET_EXHAUSTED");
+    const costs = projection.costsCents;
+    const facts = {
+      schema: "PAPER_MODELED_QUOTE_V1",
+      provenance: "MODELED",
+      actualCostCoverage: "UNKNOWN",
+      executionRealistic: false,
+      runId: policy.runId,
+      runStartedAt: policy.runStartedAt,
+      runEndAt: policy.runEndAt,
+      sourcePolicySha256: policy.sourcePolicySha256,
+      modelId: binding.modelId,
+      modelVersion: binding.modelVersion,
+      modelDigest: projection.model.digest,
+      scenarioConfigSha256: binding.scenarioConfigSha256,
+      usdAssumption: binding.currency.assumption,
+      side,
+      baseAtoms: binding.quantity.modeledBaseAtoms,
+      sourceCapBaseAtoms: binding.quantity.sourceQuotedBaseAtoms,
+      adverseAdjustmentBps: projection.scenario.adverseAdjustmentBps,
+      networkReserveCents: projection.scenario.networkReserveCents,
+      responseSha256: binding.sourceQuote.responseSha256,
+      expiresAt,
+      sourceObservedAt: observedAt,
+      digest: ""
+    };
+    const quote = {
+      fixtureOnly: true,
+      source: MODELED_FIXTURE_SOURCE,
+      chainId: expected.identity.chainId,
+      mint: expected.identity.mint,
+      pool: expected.identity.pool,
+      quote: expected.identity.quote,
+      decimals: expected.identity.decimals,
+      observedAt,
+      priceMicros: projection.priceMicros,
+      mode: "HYPOTHETICAL",
+      executable: true,
+      costs: {
+        feeCents: costs.feeCents, spreadCents: costs.spreadCents,
+        slippageCents: costs.slippageCents, priceImpactCents: costs.priceImpactCents,
+        networkCents: costs.networkCents
+      },
+      modeled: facts
+    };
+    facts.digest = paperModeledQuoteDigest(facts, quote, expected.identity.decimals);
+    deepFreeze(quote);
+    handoffs.set(facts.digest, canonicalJson(quote));
+    return Object.freeze({ok: true, quote});
+  } catch {
+    return refuse("MODELED_ISSUANCE_FAILED");
+  }
 }
 
 function exactKeys(value, keys) {
