@@ -3,6 +3,11 @@ import {
   createBirdeyeSource,
   createHeliusSource
 } from "../../../scripts/memecoin-paper/provider-sources/index.mjs";
+import {canonicalCheckpointBytes} from "../../../scripts/memecoin-paper/checkpoint-store.mjs";
+import {
+  WARMUP_RESPONSE_INTEGRITY_VERSION,
+  computeWarmupResponseBinding
+} from "../../../scripts/memecoin-paper/provider-warmup-handoff/index.mjs";
 import {
   createPaperSourcePipeline
 } from "../../../scripts/memecoin-paper/paper-source-pipeline.mjs";
@@ -36,6 +41,7 @@ export async function makeBirdeyeObservation(fixture, overrides = {}, {
   budget
 } = {}) {
   const calls = [];
+  const rawBodies = [];
   const request = {
     mint: fixture.candidate.mint,
     atMs: fixture.candidateT,
@@ -62,6 +68,7 @@ export async function makeBirdeyeObservation(fixture, overrides = {}, {
         success
       });
       if (omitUpdateUnixTime) delete response.data.updateUnixTime;
+      rawBodies.push(Buffer.from(JSON.stringify(response), "utf8"));
       const result = jsonResponse(response, {url: wireRequest.url});
       if (chargeBytes) {
         const reader = result.body.getReader();
@@ -90,7 +97,25 @@ export async function makeBirdeyeObservation(fixture, overrides = {}, {
   return {
     request,
     observation: await source.readObservation(request),
-    calls
+    calls,
+    rawBodies
+  };
+}
+
+export function makeIntegrityInput(fixture, observation, request, rawBytes) {
+  const wire = observation.receipts[0];
+  return {
+    version: WARMUP_RESPONSE_INTEGRITY_VERSION,
+    responseBytes: rawBytes,
+    observationSha256: createHash("sha256").update(
+      canonicalCheckpointBytes(observation)).digest("hex"),
+    bindingSha256: computeWarmupResponseBinding({
+      identity: fixture.identity,
+      request,
+      observation,
+      responseSha256: wire.responseSha256,
+      responseBytes: wire.responseBytes
+    })
   };
 }
 

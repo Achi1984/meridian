@@ -1,3 +1,5 @@
+import {createHash} from "node:crypto";
+import {canonicalCheckpointBytes} from "../checkpoint-store.mjs";
 import {
   BIRDEYE_SOURCE,
   HELIUS_SOURCE
@@ -14,6 +16,9 @@ import {
 } from "../paper-runtime-source.mjs";
 
 export const PAPER_PROVIDER_WARMUP_HANDOFF_VERSION = "paper-provider-warmup-handoff-v1";
+export const WARMUP_RESPONSE_INTEGRITY_VERSION = "paper-warmup-response-integrity-v1";
+export const MAX_INTEGRITY_RESPONSE_BYTES = 65_536;
+const BINDING_DOMAIN = "meridian:paper-warmup-response-binding:v1\n";
 export const DEFAULT_HANDOFF_LIMITS = Object.freeze({
   maxElapsedMs: 10_000,
   maxEnvelopeBytes: 1_048_576,
@@ -368,6 +373,125 @@ function validateBirdeyeObservation(input, request, identity, capturedAt, maxByt
   return {observation, byteLength: bytes};
 }
 
+function sha256(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+// Bounded clones are null-prototype; the canonical encoder requires plain JSON objects.
+function plainJson(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function canonicalSha256(value) {
+  return sha256(canonicalCheckpointBytes(plainJson(value)));
+}
+
+// Domain-separated digest over the normalized identity, request, source/method/version,
+// module-owned policy hash, and normalized observation. Integrity only: no authentication.
+export function computeWarmupResponseBinding({
+  identity, request, observation, responseSha256, responseBytes
+}) {
+  const body = canonicalCheckpointBytes({
+    version: WARMUP_RESPONSE_INTEGRITY_VERSION,
+    identity: {
+      chainId: identity.chainId, mint: identity.mint, pool: identity.pool, quote: identity.quote
+    },
+    request: {
+      mint: request.mint, atMs: request.atMs,
+      denomination: request.denomination, purpose: request.purpose
+    },
+    source: BIRDEYE_SOURCE,
+    method: "historical_price_unix",
+    methodologyVersion: observation.methodologyVersion,
+    policySha256: PAPER_RUNTIME_SOURCE_POLICY_SHA256,
+    observationSha256: canonicalSha256(observation),
+    responseSha256,
+    responseBytes
+  });
+  return sha256(Buffer.concat([Buffer.from(BINDING_DOMAIN, "utf8"), body]));
+}
+
+function integrityReceipt(identity, request, observation, responseSha256, responseBytes) {
+  return {
+    version: WARMUP_RESPONSE_INTEGRITY_VERSION,
+    status: "INTEGRITY_MATCH",
+    responseSha256,
+    responseBytes,
+    observationSha256: canonicalSha256(observation),
+    bindingSha256: computeWarmupResponseBinding({
+      identity, request, observation, responseSha256, responseBytes
+    }),
+    policySha256: PAPER_RUNTIME_SOURCE_POLICY_SHA256,
+    sourceAuthentication: "NOT_ESTABLISHED",
+    trust: "UNKNOWN",
+    completeness: "UNKNOWN",
+    authorization: false
+  };
+}
+
+function verifyResponseIntegrity(input, request, identity, observation, limits) {
+  const supplied = projectRecord(input,
+    ["version", "responseBytes", "observationSha256", "bindingSha256"]);
+  if (!supplied || supplied.version !== WARMUP_RESPONSE_INTEGRITY_VERSION ||
+      !HASH.test(supplied.observationSha256 ?? "") || !HASH.test(supplied.bindingSha256 ?? "")) {
+    return {reason: "INTEGRITY_INPUT_INVALID"};
+  }
+  const raw = supplied.responseBytes;
+  if (!(raw instanceof Uint8Array)) return {reason: "INTEGRITY_INPUT_INVALID"};
+  if (raw.byteLength < 1 ||
+      raw.byteLength > Math.min(MAX_INTEGRITY_RESPONSE_BYTES, limits.maxEnvelopeBytes)) {
+    return {reason: "INTEGRITY_BYTES_LIMIT"};
+  }
+  const bytes = Buffer.from(raw);
+  const responseSha256 = sha256(bytes);
+  if (responseSha256 !== observation.receipts[0].responseSha256 ||
+      responseSha256 !== observation.receipt.payloadSha256 ||
+      bytes.byteLength !== observation.receipts[0].responseBytes) {
+    return {reason: "INTEGRITY_WIRE_DIGEST_MISMATCH"};
+  }
+  let observationSha256;
+  try {
+    observationSha256 = canonicalSha256(observation);
+  } catch {
+    return {reason: "INTEGRITY_INPUT_INVALID"};
+  }
+  if (observationSha256 !== supplied.observationSha256) {
+    return {reason: "INTEGRITY_OBSERVATION_DIGEST_MISMATCH"};
+  }
+  let parsed;
+  try {
+    parsed = cloneBounded(
+      JSON.parse(new TextDecoder("utf-8", {fatal: true}).decode(bytes)),
+      {nodes: 0, seen: new WeakSet()}, 0, limits.maxNodes
+    );
+  } catch {
+    return {reason: "INTEGRITY_RESPONSE_INVALID"};
+  }
+  if (!isRecord(parsed) || parsed.success !== true || !isRecord(parsed.data) ||
+      !Number.isFinite(parsed.data.value) || parsed.data.value <= 0 ||
+      parsed.data.isScaledUiToken !== false ||
+      parsed.data.value !== observation.valueUsd ||
+      !Number.isSafeInteger(parsed.data.updateUnixTime) ||
+      parsed.data.updateUnixTime * 1_000 !== request.atMs ||
+      parsed.data.updateUnixTime * 1_000 !== observation.sourceAtMs) {
+    return {reason: "INTEGRITY_VALUE_MISMATCH"};
+  }
+  try {
+    if (canonicalSha256(parsed.data) !== canonicalSha256(observation.data)) {
+      return {reason: "INTEGRITY_VALUE_MISMATCH"};
+    }
+  } catch {
+    return {reason: "INTEGRITY_VALUE_MISMATCH"};
+  }
+  const expected = computeWarmupResponseBinding({
+    identity, request, observation, responseSha256, responseBytes: bytes.byteLength
+  });
+  if (expected !== supplied.bindingSha256) return {reason: "INTEGRITY_BINDING_MISMATCH"};
+  return {
+    receipt: integrityReceipt(identity, request, observation, responseSha256, bytes.byteLength)
+  };
+}
+
 function unavailable(reason, context = {}) {
   return {
     status: "UNKNOWN",
@@ -495,6 +619,7 @@ export function createPaperProviderWarmupHandoff({
       request,
       pipeline,
       evaluationRequest,
+      integrity,
       priceEndpoints = [],
       censusEndpoints = [],
       signal,
@@ -551,6 +676,13 @@ export function createPaperProviderWarmupHandoff({
           boundedLimits.maxNodes
         );
         if (!normalized.observation) return unavailable(normalized.reason, context);
+        let integrityResult = null;
+        if (integrity !== undefined) {
+          integrityResult = verifyResponseIntegrity(
+            integrity, exact, boundIdentity, normalized.observation, boundedLimits
+          );
+          if (!integrityResult.receipt) return unavailable(integrityResult.reason, context);
+        }
         const normalizedEvaluation = boundedEvaluationRequest(
           evaluationRequest, boundedLimits.maxEnvelopeBytes, boundedLimits.maxNodes
         );
@@ -585,7 +717,8 @@ export function createPaperProviderWarmupHandoff({
           source: BIRDEYE_SOURCE,
           trust: "UNKNOWN",
           completeness: "UNKNOWN",
-          payload: normalized.observation
+          payload: normalized.observation,
+          ...(integrityResult ? {integrity: integrityResult.receipt} : {})
         };
         const publicationInput = {
           datasetId,
@@ -648,6 +781,22 @@ export function createPaperProviderWarmupHandoff({
             JSON.stringify(persistedRecord.payload) !== JSON.stringify(normalized.observation)) {
           return unavailable("WARMUP_READBACK_MISMATCH", context);
         }
+        if (integrityResult) {
+          let revalidated = false;
+          try {
+            const stored = persistedRecord.integrity;
+            revalidated = isRecord(stored) && canonicalSha256(stored) ===
+              canonicalSha256(integrityReceipt(
+                boundIdentity, exact, persistedRecord.payload,
+                stored.responseSha256, stored.responseBytes
+              )) && canonicalSha256(stored) === canonicalSha256(integrityResult.receipt);
+          } catch {
+            revalidated = false;
+          }
+          if (!revalidated) return unavailable("INTEGRITY_READBACK_MISMATCH", context);
+        } else if (persistedRecord.integrity !== undefined) {
+          return unavailable("INTEGRITY_READBACK_MISMATCH", context);
+        }
         const priceSource = createWarmupPriceSource(dataset);
         const censusSource = createWarmupCensusSource(dataset);
         const coverage = warmupCoverage(dataset, {
@@ -682,6 +831,21 @@ export function createPaperProviderWarmupHandoff({
           warmupReadback: readback.status,
           trust: persistedRecord.trust,
           completeness: persistedRecord.completeness,
+          integrity: integrityResult ? {
+            status: "INTEGRITY_MATCH",
+            bindingSha256: integrityResult.receipt.bindingSha256,
+            responseSha256: integrityResult.receipt.responseSha256,
+            sourceAuthentication: "NOT_ESTABLISHED",
+            trust: "UNKNOWN",
+            completeness: "UNKNOWN",
+            authorization: false
+          } : {
+            status: "NOT_CHECKED",
+            sourceAuthentication: "NOT_ESTABLISHED",
+            trust: "UNKNOWN",
+            completeness: "UNKNOWN",
+            authorization: false
+          },
           coverage,
           evaluation
         };
