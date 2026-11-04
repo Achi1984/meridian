@@ -1022,3 +1022,220 @@ export async function evaluateWithCanonicalMarketAdapter({
     executionAuthorized: false
   };
 }
+
+export const WALLET_QUALIFICATION_DIAGNOSTIC_VERSION = "wallet-qualification-diagnostic-v1";
+const MAX_QUALIFICATION_ROUNDTRIPS = 5_000;
+const MAX_QUALIFICATION_REFS = 8;
+const MAX_QUALIFICATION_ID = 128;
+const DAY_MS = 86_400_000;
+const COST_FIELDS = Object.freeze(["feesUnits", "slippageUnits", "tipsUnits", "otherCostsUnits"]);
+const QUALIFICATION_POLICY_KEYS = Object.freeze([
+  "version", "proposed", "accountingUnit", "minRoundtrips", "windowDays",
+  "minUnrelatedMints", "requirePositiveNet"
+]);
+
+function boundedId(value) {
+  return typeof value === "string" && value.length > 0 &&
+    value.length <= MAX_QUALIFICATION_ID && value === value.trim();
+}
+
+function safeUnits(value) {
+  return Number.isSafeInteger(value) && value >= 0 ? BigInt(value) : null;
+}
+
+function qualificationPolicy(policy) {
+  if (!isRecord(policy) || Object.keys(policy).sort().join() !== [...QUALIFICATION_POLICY_KEYS].sort().join() ||
+      !boundedId(policy.version) || policy.proposed !== true || !boundedId(policy.accountingUnit) ||
+      !Number.isSafeInteger(policy.minRoundtrips) || policy.minRoundtrips < 1 || policy.minRoundtrips > 1_000 ||
+      !Number.isSafeInteger(policy.windowDays) || policy.windowDays < 1 || policy.windowDays > 3_650 ||
+      !Number.isSafeInteger(policy.minUnrelatedMints) || policy.minUnrelatedMints < 1 ||
+      policy.minUnrelatedMints > 1_000 || policy.requirePositiveNet !== true) return null;
+  return policy;
+}
+
+const ROUNDTRIP_KEYS = Object.freeze([
+  "id", "wallet", "mint", "mintRelationGroup", "executionRefs", "evidenceRef", "complete",
+  "openedAt", "closedAt", "unit", "realizedProceedsUnits", "basisUnits", "costs",
+  "selfTransfer", "sameMintBundle"
+]);
+
+function plainData(value, keys) {
+  if (!isRecord(value)) return false;
+  const proto = Object.getPrototypeOf(value);
+  if (proto !== Object.prototype && proto !== null) return false;
+  const own = Reflect.ownKeys(value);
+  return own.length <= keys.length && own.every(key => {
+    if (typeof key !== "string" || !keys.includes(key)) return false;
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    return "value" in descriptor && descriptor.enumerable === true;
+  });
+}
+
+// Dense array of own enumerable data elements; checked without invoking accessors.
+function plainArray(value, maxLength) {
+  if (!Array.isArray(value) || value.length > maxLength) return false;
+  const own = Reflect.ownKeys(value);
+  if (own.length !== value.length + 1) return false;
+  for (let i = 0; i < value.length; i += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, String(i));
+    if (!descriptor || !("value" in descriptor) || descriptor.enumerable !== true) return false;
+  }
+  return true;
+}
+
+function scalarData(value) {
+  return value === undefined || value === null || typeof value === "boolean" ||
+    typeof value === "number" || (typeof value === "string" && value.length <= MAX_QUALIFICATION_ID);
+}
+
+// Structural check only: no getters, extra keys, bigint, nesting beyond refs/costs.
+function roundtripShapeValid(row) {
+  if (!plainData(row, ROUNDTRIP_KEYS)) return false;
+  for (const key of Object.keys(row)) {
+    const value = row[key];
+    if (key === "executionRefs") {
+      if (value === undefined) continue;
+      if (!plainArray(value, MAX_QUALIFICATION_REFS) || !value.every(scalarData)) return false;
+    } else if (key === "costs") {
+      if (value === undefined) continue;
+      if (!plainData(value, COST_FIELDS) || !Object.keys(value).every(field => scalarData(value[field]))) {
+        return false;
+      }
+    } else if (!scalarData(value)) return false;
+  }
+  return true;
+}
+
+function canonicalRoundtrip(row, includeId) {
+  return JSON.stringify([
+    includeId ? row.id : null, row.wallet, row.mint, row.mintRelationGroup,
+    Array.isArray(row.executionRefs) ? [...row.executionRefs].sort() : null,
+    row.evidenceRef, row.complete, row.openedAt, row.closedAt, row.unit,
+    row.realizedProceedsUnits, row.basisUnits,
+    isRecord(row.costs) ? COST_FIELDS.map(field => row.costs[field]) : null,
+    row.selfTransfer, row.sameMintBundle
+  ]);
+}
+
+function qualificationResult(status, reasons, fields = {}) {
+  return deepFreeze({
+    diagnosticVersion: WALLET_QUALIFICATION_DIAGNOSTIC_VERSION,
+    status,
+    reasons: [...new Set(reasons)].sort(),
+    eligibleRoundtripCount: null,
+    unrelatedMintCount: null,
+    netResultUnits: null,
+    accountingUnit: null,
+    thresholdsMet: null,
+    ...fields,
+    verificationStatus: "UNVERIFIED",
+    reviewed: false,
+    allowlistAdmitted: false,
+    admissionGranted: false
+  });
+}
+
+// Pure, offline diagnostic. A calculation never grants trust or allowlist admission.
+export function evaluateWalletQualificationDiagnostics({
+  wallet, candidateMint, asOf, roundtrips, policy
+} = {}) {
+  const rules = qualificationPolicy(policy);
+  if (!rules) return qualificationResult("UNAVAILABLE", ["POLICY_INVALID_OR_UNVERSIONED"]);
+  const cutoff = timestampValue(asOf);
+  if (!isSolanaPublicKey(wallet) || !isSolanaPublicKey(candidateMint) || cutoff === null) {
+    return qualificationResult("UNAVAILABLE", ["SUBJECT_OR_CUTOFF_INVALID"]);
+  }
+  if (!Array.isArray(roundtrips) || roundtrips.length === 0) {
+    return qualificationResult("UNAVAILABLE", ["ROUNDTRIPS_MISSING"]);
+  }
+  if (roundtrips.length > MAX_QUALIFICATION_ROUNDTRIPS) {
+    return qualificationResult("UNAVAILABLE", ["ROUNDTRIPS_OVERSIZED"]);
+  }
+  const startExclusive = cutoff - rules.windowDays * DAY_MS;
+  if (!plainArray(roundtrips, MAX_QUALIFICATION_ROUNDTRIPS) || !roundtrips.every(roundtripShapeValid)) {
+    return qualificationResult("UNAVAILABLE", ["ROUNDTRIP_SCHEMA_INVALID"]);
+  }
+  const review = new Set();
+  const seenIds = new Map();
+  const seenContent = new Set();
+  const refOwner = new Map();
+  const mintGroup = new Map();
+  const eligible = [];
+  for (const row of roundtrips) {
+    if (!boundedId(row.id)) { review.add("ROUNDTRIP_MALFORMED"); continue; }
+    const withId = canonicalRoundtrip(row, true);
+    if (seenIds.has(row.id)) {
+      if (seenIds.get(row.id) !== withId) review.add("DUPLICATE_ID_CONFLICT");
+      continue;
+    }
+    seenIds.set(row.id, withId);
+    const content = canonicalRoundtrip(row, false);
+    let refConflict = false;
+    if (Array.isArray(row.executionRefs)) {
+      for (const ref of row.executionRefs) {
+        if (typeof ref !== "string") continue;
+        const key = `${row.wallet}|${ref}`;
+        if (refOwner.has(key) && refOwner.get(key) !== content) refConflict = true;
+        refOwner.set(key, content);
+      }
+    }
+    if (refConflict) review.add("DUPLICATE_EXECUTION_CONFLICT");
+    if (seenContent.has(content)) continue;
+    seenContent.add(content);
+    if (row.wallet !== wallet) { review.add("WALLET_MISMATCH"); continue; }
+    if (!isSolanaPublicKey(row.mint)) { review.add("MINT_INVALID"); continue; }
+    const opened = timestampValue(row.openedAt);
+    const closed = timestampValue(row.closedAt);
+    if (opened === null || closed === null || opened > closed) { review.add("TIMES_INVALID"); continue; }
+    if (closed > cutoff) { review.add("FUTURE_ROUNDTRIP"); continue; }
+    if (!Array.isArray(row.executionRefs) || row.executionRefs.length < 2 ||
+        row.executionRefs.length > MAX_QUALIFICATION_REFS || !row.executionRefs.every(boundedId) ||
+        new Set(row.executionRefs).size !== row.executionRefs.length) {
+      review.add("EXECUTION_REFS_INCOMPLETE"); continue;
+    }
+    if (row.complete !== true) { review.add("ROUNDTRIP_INCOMPLETE"); continue; }
+    if (closed <= startExclusive) continue;
+    if (!boundedId(row.evidenceRef)) { review.add("EVIDENCE_REF_MISSING"); continue; }
+    if (row.unit !== rules.accountingUnit) { review.add("UNIT_MISMATCH_OR_MISSING"); continue; }
+    const proceeds = safeUnits(row.realizedProceedsUnits);
+    const basis = safeUnits(row.basisUnits);
+    if (proceeds === null || basis === null) { review.add("AMOUNT_MISSING_OR_UNSAFE"); continue; }
+    let costs = 0n;
+    let costsOk = isRecord(row.costs);
+    for (const field of COST_FIELDS) {
+      const value = costsOk ? safeUnits(row.costs[field]) : null;
+      if (value === null) { costsOk = false; break; }
+      costs += value;
+    }
+    if (!costsOk) { review.add("COSTS_MISSING_OR_UNSAFE"); continue; }
+    if (typeof row.selfTransfer !== "boolean" || typeof row.sameMintBundle !== "boolean") {
+      review.add("EXCLUSION_FACT_AMBIGUOUS"); continue;
+    }
+    if (!boundedId(row.mintRelationGroup)) { review.add("MINT_RELATIONSHIP_UNKNOWN"); continue; }
+    if (mintGroup.has(row.mint) && mintGroup.get(row.mint) !== row.mintRelationGroup) {
+      review.add("MINT_GROUP_CONFLICT"); continue;
+    }
+    mintGroup.set(row.mint, row.mintRelationGroup);
+    if (row.mint === candidateMint || row.selfTransfer || row.sameMintBundle) continue;
+    eligible.push({mint: row.mint, group: row.mintRelationGroup, net: proceeds - basis - costs});
+  }
+  if (review.size > 0) return qualificationResult("REVIEW_REQUIRED", [...review]);
+  const net = eligible.reduce((sum, row) => sum + row.net, 0n);
+  const groups = new Set(eligible.map(row => row.group));
+  const mints = new Set(eligible.map(row => row.mint));
+  const netString = net.toString();
+  const met = {
+    roundtrips: eligible.length >= rules.minRoundtrips,
+    unrelatedMints: Math.min(groups.size, mints.size) >= rules.minUnrelatedMints,
+    positiveNet: net > 0n
+  };
+  const reasons = Object.entries(met).filter(([, ok]) => !ok).map(([key]) => `THRESHOLD_NOT_MET_${key}`);
+  return qualificationResult(reasons.length ? "THRESHOLDS_NOT_MET" : "THRESHOLDS_MET_UNVERIFIED", reasons, {
+    eligibleRoundtripCount: eligible.length,
+    unrelatedMintCount: Math.min(groups.size, mints.size),
+    netResultUnits: netString,
+    accountingUnit: rules.accountingUnit,
+    thresholdsMet: met,
+    policyVersion: rules.version
+  });
+}

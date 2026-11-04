@@ -3693,6 +3693,37 @@
       "providerCallsOrKeys": false,
       "hostRegistryWorkflowSpendOrActivation": false,
       "nextGate": "EXACT_HEAD_HOSTED_CI_THEN_INDEPENDENT_REVIEW; AUTHENTICATION_AND_ATTESTATION_UNRESOLVED"
+    },
+    "walletQualificationDiagnostics1214": {
+      "opId": "meridian-wallet-diagnostics-20261104-r1",
+      "recordedDate": "2026-11-04",
+      "issue": 1214,
+      "parentIssue": 1207,
+      "parentIssueState": "OPEN",
+      "pullRequest": 1216,
+      "pullRequestState": "DRAFT",
+      "branch": "issue-1214-wallet-qualification-diagnostics",
+      "baseSha": "e52cb697008111866d759f6d74b9c2242816c201",
+      "implementationHead": "43422b6be92ed14c867512a42deff5a6bb3ea9f0",
+      "reviewBlockerFixes": "SOURCE_REVIEW_OF_43422b6_3_BLOCKERS_ADDRESSED_PENDING_RE_REVIEW: EXECUTION_IDENTITY_DEDUP; MINT_GROUP_CONSISTENCY; BOUNDED_PLAIN_SCHEMA_BEFORE_CANONICALIZATION; DELTA_REVIEW_5aeaa55_NONENUMERABLE_AND_ACCESSOR_ARRAY_SCHEMA_GAPS_ADDRESSED_PENDING_RE_REVIEW; REVIEW_6638553204_WALLET_REF_EXECUTION_IDENTITY_AND_TOP_LEVEL_ARRAY_DESCRIPTORS_ADDRESSED_PENDING_RE_REVIEW",
+      "scope": "PURE_OFFLINE_BOUNDED_WALLET_QUALIFICATION_DIAGNOSTICS_EXPLICIT_PROPOSED_POLICY_ONLY",
+      "files": [
+        "scripts/memecoin-paper/analyst-window-evidence.mjs",
+        "test/memecoin-paper-analyst-window-evidence.test.js",
+        "docs/strategy-lab/memecoin-paper/score-spec.md"
+      ],
+      "status": "IMPLEMENTED_FOCUSED_TESTED_NOT_REVIEWED_NOT_MERGED_NOT_LIVE",
+      "focusedTest": "node --test test/memecoin-paper-analyst-window-evidence.test.js",
+      "focusedTestResult": "29_PASS_0_FAIL",
+      "reviewed": false,
+      "merged": false,
+      "live": false,
+      "verifiedAdmissionGranted": false,
+      "allowlistAdmitted": false,
+      "liveDefaultsAdopted": false,
+      "disjointFrom": ["1212costs", "1213provider-handoff"],
+      "providersKeysHostWorkflowsSpendActivation": false,
+      "nextGate": "EXACT_HEAD_REVIEW_AND_EXPLICIT_OWNER_DECISION; POLICY_REVIEWER_ACCOUNTING_DECISIONS_SEPARATE"
     }
   }
 }
