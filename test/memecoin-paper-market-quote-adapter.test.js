@@ -8,7 +8,8 @@ import {CheckpointStore} from "../scripts/memecoin-paper/checkpoint-store.mjs";
 import {PaperCheckpointSession} from "../scripts/memecoin-paper/checkpoint-session.mjs";
 import {normalizeExactCosts} from "../scripts/memecoin-paper-execution-evidence/normalize.mjs";
 import {
-  createMarketQuoteAdapter, reviewScenarioConfigSha256
+  createMarketQuoteAdapter, paperQuotedNetModelDigest, reviewScenarioConfigSha256,
+  verifyPaperQuotedNetProjection
 } from "../scripts/memecoin-paper/market-quote-adapter.mjs";
 import {
   SYNTHETIC_MINT, SYNTHETIC_POOL, SYNTHETIC_QUOTE, SYNTHETIC_SOURCE
@@ -78,7 +79,10 @@ function settleWithin(promise, timeoutMs = 500) {
 }
 
 function reviewScenario(caseName = "BASELINE", overrides = {}) {
-  const assumptions = caseName === "STRESS"
+  const assumptions = caseName === "QUOTED_NET_V1"
+    ? {scenarioId: "MERIDIAN_PAPER_QUOTED_NET_V1",
+      adverseAdjustmentBps: 300, networkReserveCents: "50"}
+    : caseName === "STRESS"
     ? {scenarioId: "MEMECOIN_PAPER_QUOTE_ADVERSE_V1_STRESS",
       adverseAdjustmentBps: 300, networkReserveCents: "50"}
     : {scenarioId: "MEMECOIN_PAPER_QUOTE_ADVERSE_V1_BASELINE",
@@ -1029,4 +1033,279 @@ test("the existing Paper consumer cannot fill from an incomplete market quote ca
   assert.equal(rejected.status, "REJECT");
   assert.equal(session.metadata.sequence, 1);
   assert.equal(session.snapshot().summary.openPositions.length, 0);
+});
+
+const QN = "QUOTED_NET_V1";
+
+function exitFixture(inAmount, outAmount) {
+  const exitRequest = request({side: "EXIT", amountAtoms: inAmount, positionOpenedAt: NOW - 1_000});
+  delete exitRequest.authorizedAt;
+  const body = syntheticOrderResponse({
+    inputMint: SYNTHETIC_MINT, outputMint: SYNTHETIC_QUOTE,
+    inAmount, outAmount, otherAmountThreshold: "1"
+  }).body;
+  return {exitRequest, body};
+}
+
+async function quotedNet(overrides = {}, scenarioOverrides = {}, req = request()) {
+  const result = await adapterFor(entryResponse(overrides).body).adapter.getPaperQuote(
+    req, {reviewScenario: reviewScenario(QN, scenarioOverrides)});
+  return result.scenarioProjection;
+}
+
+test("QUOTED_NET_V1 reuses shared STRESS arithmetic, binds a digest, and stays MODELED/UNKNOWN", async () => {
+  const stress = (await adapterFor(entryResponse().body).adapter.getPaperQuote(
+    request(), {reviewScenario: reviewScenario("STRESS")})).scenarioProjection;
+  const result = await adapterFor(entryResponse().body).adapter.getPaperQuote(
+    request(), {reviewScenario: reviewScenario(QN)});
+  const projection = result.scenarioProjection;
+  assert.equal(projection.status, "REVIEW_PROJECTION_ONLY");
+  assert.equal(projection.provenance, "MODELED");
+  assert.equal(projection.actualCostCoverage, "UNKNOWN");
+  assert.equal(projection.executionRealistic, false);
+  assert.equal(projection.authorizationEligible, false);
+  assert.equal(projection.integrationEligible, false);
+  assert.equal(result.costEvidence.status, "UNKNOWN");
+  assert.equal(result.quoteCandidate.priceMicros, null);
+  assert.equal(projection.scenario.id, "MERIDIAN_PAPER_QUOTED_NET_V1");
+  assert.equal(projection.model.binding.status, "PROPOSED_FOR_INDEPENDENT_REVIEW");
+  assert.match(projection.model.digest, /^[a-f0-9]{64}$/);
+  assert.equal(projection.model.digest, paperQuotedNetModelDigest(projection.model.binding));
+  assert.deepEqual(verifyPaperQuotedNetProjection(projection), {valid: true, reasons: []});
+  for (const key of ["costsCents", "quoteValue", "amountProjection", "priceMicros"]) {
+    assert.deepEqual(projection[key], stress[key]);
+  }
+  assert.equal(projection.model.binding.quantity.sizeDisposition,
+    "SMALLER_SIZE_MODELED_NOT_A_FRESH_EXECUTABLE_QUOTE");
+  assert.equal(projection.model.binding.sourceQuote.responseSha256,
+    result.quoteCandidate.sourceResponse.sha256);
+  assert.ok(projection.model.binding.currency.assumption.startsWith("1_USDC_EQUALS_1_MODELED_USD"));
+  assert.equal(projection.model.resultContract.actualCostCoverage, "UNKNOWN");
+  const again = await quotedNet();
+  assert.equal(again.model.digest, projection.model.digest);
+});
+
+test("QUOTED_NET_V1 $80 debit boundary: gross 7718c adds ceil(231.54)+50 = 282c", async () => {
+  const projection = await quotedNet();
+  assert.equal(projection.quoteValue.grossBeforeExtraScenarioCostsCents, "7718");
+  assert.equal(projection.costsCents.slippageCents, "232");
+  assert.equal(projection.costsCents.networkCents, "50");
+  assert.equal(projection.quoteValue.totalExtraScenarioCostsCents, "282");
+  assert.equal(projection.amountProjection.modeledAllInCents, "8000");
+  assert.equal(projection.model.binding.result.totalExtraCents, "282");
+});
+
+test("QUOTED_NET_V1 exit rounds credits down, and tiny exits are refused", async () => {
+  const {exitRequest, body} = exitFixture("3000000", "3703702");
+  const exit = (await adapterFor(body).adapter.getPaperQuote(exitRequest, {
+    reviewScenario: reviewScenario(QN)})).scenarioProjection;
+  assert.equal(exit.side, "EXIT");
+  assert.equal(exit.quoteValue.grossBeforeExtraScenarioCostsCents, "370");
+  assert.equal(exit.costsCents.slippageCents, "12");
+  assert.equal(exit.costsCents.networkCents, "50");
+  assert.equal(exit.quoteValue.afterExtraScenarioCostsCents, "308");
+  assert.equal(exit.model.binding.quantity.sizeDisposition, "QUOTED_AMOUNT");
+  assert.deepEqual(verifyPaperQuotedNetProjection(exit), {valid: true, reasons: []});
+
+  const tiny = exitFixture("10000", "12345");
+  const refused = (await adapterFor(tiny.body).adapter.getPaperQuote(tiny.exitRequest, {
+    reviewScenario: reviewScenario(QN)})).scenarioProjection;
+  assert.equal(refused.status, "BLOCKED");
+  assert.deepEqual(refused.reasons, ["SCENARIO_COSTS_EXCEED_ROUNDED_EXIT_CREDIT"]);
+  assert.equal(refused.actualCostCoverage, "UNKNOWN");
+  assert.equal("model" in refused, false);
+});
+
+test("QUOTED_NET_V1 amount bounds refuse dust and amounts that are not the quoted amount", async () => {
+  const dust = await quotedNet({inAmount: "1", outAmount: "3", otherAmountThreshold: "1"},
+    {}, request({amountAtoms: "1"}));
+  assert.equal(dust.status, "REVIEW_PROJECTION_ONLY");
+  assert.equal(dust.model.binding.quantity.sizeDisposition, "QUOTED_AMOUNT");
+  assert.equal(dust.model.binding.quantity.modeledInputAtoms, "1");
+  const unquoted = await quotedNet({}, {}, request({amountAtoms: "90000000"}));
+  assert.notEqual(unquoted?.status, "REVIEW_PROJECTION_ONLY");
+  assert.equal(unquoted?.actualCostCoverage, "UNKNOWN");
+});
+
+test("QUOTED_NET_V1 refuses missing disposition, wrong mint/decimals, and altered parameters", async () => {
+  const missing = reviewScenario(QN);
+  delete missing.zeroChargeDisposition;
+  const stub = {
+    evidenceId: "x", evidenceSha256: "a".repeat(64), scenarioConfigSha256: "b".repeat(64),
+    identity: {...IDENTITY}, reviewerRef: "x", purpose: "OFFLINE_SCENARIO_REVIEW_ONLY",
+    decision: "APPROVE_SCENARIO_REVIEW_ONLY", recordedAt: NOW - 2_500
+  };
+  const configs = [
+    missing,
+    ...[
+      {usdcMint: SYNTHETIC_MINT},
+      {usdcDecimals: 9},
+      {identity: {...IDENTITY, quote: SYNTHETIC_MINT}},
+      {adverseAdjustmentBps: 301},
+      {networkReserveCents: "49"},
+      {feeCents: "1"},
+      {usdcUsdMicrosPerToken: "999999"},
+      {zeroChargeDisposition: "ACTUAL_ZERO_VERIFIED"}
+    ].map(overrides => reviewScenario(QN, {...overrides, reviewEvidence: stub}))
+  ];
+  for (const config of configs) {
+    const result = await adapterFor(entryResponse().body).adapter.getPaperQuote(
+      request(), {reviewScenario: config});
+    assert.equal(result.scenarioProjection.status, "BLOCKED");
+    assert.equal(result.scenarioProjection.actualCostCoverage, "UNKNOWN");
+    assert.equal("model" in result.scenarioProjection, false);
+  }
+  const wrongDecimals = await quotedNet({}, {}, request({quoteDecimals: 9}));
+  assert.notEqual(wrongDecimals?.status, "REVIEW_PROJECTION_ONLY");
+});
+
+test("QUOTED_NET_V1 digest detects every mutated binding component", async () => {
+  const projection = await quotedNet();
+  assert.equal(verifyPaperQuotedNetProjection(projection).valid, true);
+  const mutations = [
+    p => { p.model.digest = "0".repeat(64); },
+    p => { p.model.binding.parameters.adverseAdjustmentBps.value = 1; },
+    p => { p.model.binding.parameters.networkReserveCents.value = "0"; },
+    p => { delete p.model.binding.dispositions.spreadCents; },
+    p => { p.model.binding.dispositions.feeCents = "VERIFIED_INCLUDED"; },
+    p => { p.model.binding.currency.microUsdPerToken = "999999"; },
+    p => { p.model.binding.candidateIdentity.pool = SYNTHETIC_MINT; },
+    p => { p.model.binding.sourceQuote.responseSha256 = "b".repeat(64); },
+    p => { p.model.binding.quantity.modeledBaseAtoms = "1"; },
+    p => { p.model.binding.side = "EXIT"; },
+    p => { p.costsCents.slippageCents = "1"; },
+    p => { p.actualCostCoverage = "COMPLETE"; },
+    p => { p.executionRealistic = true; },
+    p => { p.provenance = "OBSERVED"; }
+  ];
+  for (const mutate of mutations) {
+    const copy = structuredClone(projection);
+    mutate(copy);
+    assert.equal(verifyPaperQuotedNetProjection(copy).valid, false);
+  }
+  assert.equal(verifyPaperQuotedNetProjection(null).valid, false);
+  const different = await quotedNet({
+    inAmount: "100000000", outAmount: "70000000", otherAmountThreshold: "1"
+  });
+  assert.notEqual(different.model.digest, projection.model.digest);
+});
+
+test("QUOTED_NET_V1 verifier rejects every mutated, missing, or extra exposed duplicate field", async () => {
+  const {exitRequest, body} = exitFixture("3000000", "3703702");
+  const exit = (await adapterFor(body).adapter.getPaperQuote(exitRequest, {
+    reviewScenario: reviewScenario(QN)})).scenarioProjection;
+  const entry = await quotedNet();
+  const costKeys = ["feeCents", "spreadCents", "slippageCents", "priceImpactCents", "networkCents"];
+  const mutations = [];
+  for (const key of costKeys) {
+    mutations.push(p => { p.costsCents[key] = "999999"; });
+    mutations.push(p => { delete p.costsCents[key]; });
+    mutations.push(p => { p.costDisposition[key] = "VERIFIED_INCLUDED"; });
+    mutations.push(p => { delete p.costDisposition[key]; });
+  }
+  mutations.push(p => { p.costsCents.extraCents = "0"; });
+  mutations.push(p => { p.costDisposition.extra = "X"; });
+  for (const key of ["sourceQuotedInputAtoms", "maximumModeledInputAtoms", "sourceQuotedBaseAtoms",
+    "maximumModeledBaseAtoms", "entryAllInLimitCents", "dynamicRiskCaps", "modeledAllInCents", "basis"]) {
+    mutations.push(p => { p.amountProjection[key] = "999999999999"; });
+    mutations.push(p => { delete p.amountProjection[key]; });
+  }
+  mutations.push(p => { p.amountProjection.extra = "1"; });
+  for (const key of ["grossBeforeExtraScenarioCostsCents", "direction",
+    "totalExtraScenarioCostsCents", "afterExtraScenarioCostsCents", "label"]) {
+    mutations.push(p => { p.quoteValue[key] = "1"; });
+    mutations.push(p => { delete p.quoteValue[key]; });
+  }
+  for (const key of ["priceMicros", "priceRounding", "rawExactQuotePerBase", "receiptTime", "source",
+    "costBasis", "pnl", "identity", "side", "scenario", "providerFieldsRetainedSeparately",
+    "sourceProvenance", "integrationBoundary", "scenarioCostCoverage"]) {
+    mutations.push(p => { p[key] = key === "priceMicros" ? 1 : "mutated"; });
+    mutations.push(p => { delete p[key]; });
+  }
+  mutations.push(p => { p.unexpectedTopLevel = true; });
+  mutations.push(p => { p.scenario.adverseAdjustmentBps = 1; });
+  mutations.push(p => { p.scenario.configurationSha256 = "c".repeat(64); });
+  mutations.push(p => { p.scenario.extra = 1; });
+  mutations.push(p => { delete p.scenario.zeroChargeDisposition; });
+  mutations.push(p => { p.model.assumptions.pop(); });
+  mutations.push(p => { p.model.resultContract.authority = "GRANTED"; });
+  mutations.push(p => { p.model.extra = 1; });
+  for (const key of ["authorizationEligible", "integrationEligible", "executionRealistic"]) {
+    mutations.push(p => { p[key] = true; });
+  }
+  for (const base of [entry, exit]) {
+    assert.equal(verifyPaperQuotedNetProjection(base).valid, true);
+    for (const [index, mutate] of mutations.entries()) {
+      const copy = structuredClone(base);
+      mutate(copy);
+      assert.equal(verifyPaperQuotedNetProjection(copy).valid, false, `mutation ${index} accepted`);
+    }
+  }
+});
+
+test("QUOTED_NET_V1 verifier does not trust a caller-recomputed digest over altered binding", async () => {
+  const projection = await quotedNet();
+  const bindingMutations = [
+    b => { b.parameters.feeCents.value = "999999"; },
+    b => { b.parameters.adverseAdjustmentBps.value = 1; },
+    b => { delete b.dispositions.spreadCents; },
+    b => { b.dispositions.priceImpactCents = "VERIFIED_INCLUDED"; },
+    b => { b.quantity.modeledBaseAtoms = (BigInt(b.quantity.modeledBaseAtoms) + 1n).toString(); },
+    b => { b.quantity.sizeDisposition = "QUOTED_AMOUNT"; },
+    b => { b.result.grossCents = "1"; },
+    b => { b.result.slippageCents = "1"; },
+    b => { b.sourceQuote.outAmount = "1"; },
+    Object.assign(b => { b.sourceQuote.responseSha256 = "d".repeat(64); }, {pinnedOnly: true}),
+    b => { b.candidateIdentity.mint = SYNTHETIC_POOL; },
+    b => { b.currency.assumption = "OBSERVED_FX"; },
+    b => { b.extra = true; },
+    b => { b.status = "APPROVED"; }
+  ];
+  for (const mutate of bindingMutations) {
+    const copy = structuredClone(projection);
+    mutate(copy.model.binding);
+    copy.model.digest = paperQuotedNetModelDigest(copy.model.binding);
+    const pinned = {expectedDigest: projection.model.digest};
+    assert.equal(verifyPaperQuotedNetProjection(copy, pinned).valid, false);
+    // Quote-identity fields (response hash/request id/expiry) are caller-asserted inputs;
+    // only a pinned digest can detect their substitution.
+    if (!mutate.pinnedOnly) {
+      assert.equal(verifyPaperQuotedNetProjection(copy).valid, false);
+    }
+  }
+  const pinnedOk = verifyPaperQuotedNetProjection(projection, {expectedDigest: projection.model.digest});
+  assert.equal(pinnedOk.valid, true);
+  assert.equal(verifyPaperQuotedNetProjection(projection, {expectedDigest: "e".repeat(64)}).valid, false);
+  const enlarged = structuredClone(projection);
+  enlarged.amountProjection.maximumModeledBaseAtoms =
+    (BigInt(enlarged.amountProjection.maximumModeledBaseAtoms) + 1n).toString();
+  assert.equal(verifyPaperQuotedNetProjection(enlarged).valid, false);
+});
+
+test("QUOTED_NET_V1 never charges provider fee, impact, threshold, slippage, or lamports again", async () => {
+  const plain = await quotedNet();
+  assert.equal(plain.costsCents.feeCents, "0");
+  assert.equal(plain.costsCents.spreadCents, "0");
+  assert.equal(plain.costsCents.priceImpactCents, "0");
+  assert.equal(plain.providerFieldsRetainedSeparately.feeBps, 2);
+  assert.equal(plain.providerFieldsRetainedSeparately.priceImpact.value, 0.02);
+  assert.equal(plain.providerFieldsRetainedSeparately.networkFeesLamports.signature, 5000);
+  assert.equal(plain.providerFieldsRetainedSeparately.slippageToleranceBps, 50);
+  assert.equal(plain.quoteValue.totalExtraScenarioCostsCents,
+    (BigInt(plain.costsCents.slippageCents) + 50n).toString());
+});
+
+test("existing BASELINE and STRESS projections gain no model fields and omission stays null", async () => {
+  for (const name of ["BASELINE", "STRESS"]) {
+    const r = (await adapterFor(entryResponse().body).adapter.getPaperQuote(
+      request(), {reviewScenario: reviewScenario(name)})).scenarioProjection;
+    assert.equal(r.status, "REVIEW_PROJECTION_ONLY");
+    assert.equal("model" in r, false);
+    assert.equal("provenance" in r, false);
+  }
+  const none = await adapterFor(entryResponse().body).adapter.getPaperQuote(request());
+  assert.equal(none.scenarioProjection, null);
+  assert.equal(none.authorizationEligible, false);
+  assert.notEqual(reviewScenarioConfigSha256(reviewScenario(QN)),
+    reviewScenarioConfigSha256(reviewScenario("STRESS")));
 });

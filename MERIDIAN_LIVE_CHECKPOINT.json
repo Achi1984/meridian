@@ -138,6 +138,34 @@
       },
       "nextStep": "COMPLETE_OPEN_CLOUD_BROWSER_LIVE_ACCEPTANCE_FOR_1077_AND_1078; REVIEW_SEPARATE_RELIABILITY_SOURCE_PACKET"
     },
+    "paperQuotedNetV1Delivery20261104": {
+      "recordedDate": "2026-11-04",
+      "scope": "SOURCE_ONLY_MODELED_PAPER_COST_MODEL_NO_ROUTING_OR_AUTHORITY_CHANGE",
+      "issue": 1220,
+      "branch": "paper-quoted-net-v1-1220",
+      "base": "041f45e4fd93d7a0c40e4e912e3f4b535e09d0a4",
+      "head": "SEE_DRAFT_PR_BODY_EXACT_HEAD",
+      "disjointFrom": "runtime1218/PR1219",
+      "model": {
+        "id": "MERIDIAN_PAPER_QUOTED_NET_V1",
+        "version": "1",
+        "status": "PROPOSED_FOR_INDEPENDENT_REVIEW",
+        "provenance": "MODELED",
+        "actualCostCoverage": "UNKNOWN",
+        "executionRealistic": false,
+        "authority": "NONE",
+        "defaultDisabled": true,
+        "parameters": "300bp_ADVERSE_CEIL_PLUS_50_US_CENTS_PER_SIDE_PROPOSED_UNCALIBRATED_NOT_WORST_CASE"
+      },
+      "ownerApprovalReceipt": {
+        "mailbox": "942/6639026463",
+        "quote": "Ja meine Freigabe hast du",
+        "scope": "MODELED_PAPER_METHODOLOGY_DEVELOPMENT_ONLY",
+        "notAuthorized": "LIVE_ACTIVATION_EMPIRICAL_COST_CLAIMS_AUTOMATIC_NUMERIC_PRESET_ADOPTION"
+      },
+      "state": "PARTIAL_DRAFT_PR_FROZEN_AFTER_PUSH",
+      "nextStep": "INDEPENDENT_NUMERIC_REVIEW_THEN_SEPARATE_RUN_POLICY_BOUND_PARAMETER_ADOPTION_BY_RUNTIME_WRITER"
+    },
     "paperObservation20261101": {
       "recordedDate": "2026-11-01",
       "scope": "SOURCE_STATUS_ONLY_NO_RUNTIME_OR_AUTHORITY_CHANGE",
