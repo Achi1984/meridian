@@ -685,7 +685,7 @@ function validateCostReceipt(value, snapshot, now) {
   if (receipt.quoteObservedAt !== observedAt) reasons.push("COST_QUOTE_TIME_MISMATCH");
   if (receipt.observedAt !== observedAt) reasons.push("COST_TIME_NOT_BOUND_TO_QUOTE_RECEIPT");
   if (!validTime(now) || now < observedAt) reasons.push("COST_CLOCK_INVALID");
-  else if (now > route.expiresAt) reasons.push("COST_QUOTE_EXPIRED");
+  else if (now >= route.expiresAt) reasons.push("COST_QUOTE_EXPIRED");
   if (unsafeReasons.length > 0) reasons.push("COST_QUOTE_NOT_CAUSAL_AND_IDENTITY_BOUND");
   if (receipt.amountUnit !== "MICRO_USD") reasons.push("COST_UNIT_UNSUPPORTED");
   if (receipt.routeAmountBasis !== ROUTE_AMOUNT_BASIS) reasons.push("COST_ROUTE_BASIS_OVERLAPS_COMPONENTS");
@@ -779,9 +779,10 @@ function validateCostReceipt(value, snapshot, now) {
   };
 }
 
-function abortableTransport(transport, getExternalSignal, digest) {
+function abortableTransport(transport, getExternalSignal, acquireDigest) {
   return async (url, init) => {
     const external = getExternalSignal();
+    const digest = acquireDigest();
     const controller = new AbortController();
     const abort = () => controller.abort();
     const signals = [init.signal, external].filter(Boolean);
@@ -813,15 +814,17 @@ function abortableTransport(transport, getExternalSignal, digest) {
           try {
             const chunk = await reader.read();
             if (chunk.done) {
-              digest.complete = true;
+              if (!digest.fenced) digest.complete = true;
               cleanup();
               stream.close();
             } else {
-              if (chunk.value instanceof Uint8Array) {
-                digest.hash.update(chunk.value);
-                digest.byteLength += chunk.value.byteLength;
-              } else {
-                digest.invalid = true;
+              if (!digest.fenced) {
+                if (chunk.value instanceof Uint8Array) {
+                  digest.hash.update(chunk.value);
+                  digest.byteLength += chunk.value.byteLength;
+                } else {
+                  digest.invalid = true;
+                }
               }
               stream.enqueue(chunk.value);
             }
@@ -880,13 +883,8 @@ export function createMarketQuoteAdapter({
     enabled: true,
     clock,
     timeoutMs,
-    transport: abortableTransport(transport, () => externalSignal, {
-      get hash() { return digest.hash; },
-      get byteLength() { return digest.byteLength; },
-      set byteLength(value) { digest.byteLength = value; },
-      set complete(value) { digest.complete = value; },
-      set invalid(value) { digest.invalid = value; }
-    })
+    transport: abortableTransport(transport, () => externalSignal,
+      () => digest ?? {fenced: true})
   });
 
   return Object.freeze({
@@ -937,7 +935,10 @@ export function createMarketQuoteAdapter({
       inFlight = true;
       requestsStarted += 1;
       externalSignal = signal ?? null;
-      digest = {hash: createHash("sha256"), byteLength: 0, complete: false, invalid: false};
+      const requestDigest = {
+        hash: createHash("sha256"), byteLength: 0, complete: false, invalid: false, fenced: false
+      };
+      digest = requestDigest;
       try {
         const amountMint = request.side === "ENTRY" ? request.identity.quote : request.identity.mint;
         const outputMint = request.side === "ENTRY" ? request.identity.mint : request.identity.quote;
@@ -964,10 +965,10 @@ export function createMarketQuoteAdapter({
         const scenarioProjection = projectReviewScenario(
           request, observed, reasons, parsedScenario
         );
-        const sourceResponse = digest.complete && !digest.invalid ? {
+        const sourceResponse = requestDigest.complete && !requestDigest.invalid ? {
           status: "OBSERVED_RAW_BODY_DIGEST",
-          sha256: digest.hash.digest("hex"),
-          byteLength: digest.byteLength,
+          sha256: requestDigest.hash.digest("hex"),
+          byteLength: requestDigest.byteLength,
           provenance: "SHA256_OF_BYTES_READ_BY_ADAPTER; NOT_PROVIDER_AUTHENTICATED"
         } : {status: "UNAVAILABLE", sha256: null, byteLength: null};
         candidate.sourceResponse = sourceResponse;
@@ -1009,6 +1010,8 @@ export function createMarketQuoteAdapter({
         return emptyResult("UNAVAILABLE", ["QUOTE_ADAPTER_ERROR"], request,
           unavailableScenario(parsedScenario, "SCENARIO_QUOTE_ADAPTER_ERROR"));
       } finally {
+        requestDigest.fenced = true;
+        digest = null;
         inFlight = false;
         externalSignal = null;
       }

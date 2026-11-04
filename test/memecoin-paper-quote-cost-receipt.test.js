@@ -179,6 +179,77 @@ test("quotes with stale causal references cannot carry a valid cost receipt", as
   assert.ok(rejected.reasons.includes("COST_QUOTE_NOT_CAUSAL_AND_IDENTITY_BOUND"));
 });
 
+test("exact quote expiry refuses a cost receipt", async () => {
+  let now = NOW;
+  const {adapter, result} = await quoted({clock: () => now});
+  const expiresAt = result.quoteCandidate.route.expiresAt;
+  now = expiresAt - 1;
+  assert.equal(verdict(adapter, result).status, "STRUCTURALLY_VALID_UNAUTHENTICATED");
+  now = expiresAt;
+  assert.ok(verdict(adapter, result).reasons.includes("COST_QUOTE_EXPIRED"));
+});
+
+test("a late timed-out request cannot mutate a later request's raw-body digest", async () => {
+  const fixture = syntheticOrderResponse({inputMint: SYNTHETIC_QUOTE, outputMint: SYNTHETIC_MINT});
+  const bytesB = Buffer.from(JSON.stringify(fixture.body));
+  const lateA = Buffer.from("late-bytes-from-timed-out-request-A");
+  let releaseA;
+  const gateA = new Promise(resolve => { releaseA = resolve; });
+  let releaseB;
+  const gateB = new Promise(resolve => { releaseB = resolve; });
+  let calls = 0;
+  let now = NOW;
+  const adapter = createMarketQuoteAdapter({
+    enabled: true,
+    timeoutMs: 20,
+    clock: () => now,
+    transport: async () => {
+      calls += 1;
+      if (calls === 1) {
+        let reads = 0;
+        return {
+          status: 200, redirected: false, url: "",
+          headers: new Headers({"content-type": "application/json"}),
+          body: {
+            getReader() {
+              return {
+                read: async () => {
+                  reads += 1;
+                  if (reads === 1) {
+                    await gateA;
+                    return {done: false, value: new Uint8Array(lateA)};
+                  }
+                  return {done: true};
+                },
+                cancel: () => new Promise(() => {}),
+                releaseLock() {}
+              };
+            }
+          }
+        };
+      }
+      await gateB;
+      return new Response(bytesB, {status: 200, headers: {"content-type": "application/json"}});
+    }
+  });
+  const first = await adapter.getPaperQuote(request());
+  assert.ok(first.reasons.includes("REQUEST_TIMEOUT"));
+  now = NOW + 5_000;
+  const second = adapter.getPaperQuote(request({
+    candidateSampledAt: now - 2_000, authorizedAt: now - 1_000
+  }));
+  releaseA();
+  await new Promise(resolve => setTimeout(resolve, 5));
+  releaseB();
+  const result = await second;
+  assert.ok(result.quoteCandidate, result.reasons.join());
+  assert.equal(result.quoteCandidate.sourceResponse.status, "OBSERVED_RAW_BODY_DIGEST");
+  assert.equal(result.quoteCandidate.sourceResponse.sha256,
+    createHash("sha256").update(bytesB).digest("hex"));
+  assert.equal(result.quoteCandidate.sourceResponse.byteLength, bytesB.length);
+  assert.equal(calls, 2);
+});
+
 test("a disabled adapter rejects every cost receipt", () => {
   const rejected = createMarketQuoteAdapter().validateCostReceipt({}, {});
   assert.deepEqual(rejected.reasons, ["ADAPTER_DISABLED"]);

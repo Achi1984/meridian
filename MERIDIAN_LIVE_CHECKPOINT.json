@@ -3548,7 +3548,7 @@
         "docs/strategy-lab/memecoin-paper/MARKET_QUOTE_ADAPTER.md"
       ],
       "frozenOutOfScope": "PR1211 runtime, pipeline, composition and handoff files untouched; this entry may conflict textually with PR1211 and is resolved sequentially",
-      "focusedTests": "node --test test/memecoin-paper-quote-cost-receipt.test.js test/memecoin-paper-market-quote-adapter.test.js => 61 pass 0 fail at the pre-checkpoint source; hosted CI owns full regression",
+      "focusedTests": "node --test test/memecoin-paper-quote-cost-receipt.test.js test/memecoin-paper-market-quote-adapter.test.js => 63 tests, 63 pass, 0 fail after review fixes (per-request digest fenced against late timed-out requests; exact expiry refuses); hosted CI owns full regression",
       "receiptStatus": "STRUCTURALLY_VALID_UNAUTHENTICATED_AT_MOST",
       "quoteCandidateCosts": "UNKNOWN_UNCHANGED",
       "authorizationEligible": false,
