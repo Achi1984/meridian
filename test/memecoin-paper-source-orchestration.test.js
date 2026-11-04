@@ -179,20 +179,64 @@ test("composition blocks unapproved source candidates before quotes and preserve
   assert.equal(control.report.persistence, "ACKNOWLEDGED");
 });
 
-test("runtime fixture adapter does not generate provider handoff envelopes", async t => {
+test("runtime handoff persists and evaluates an acquired UNKNOWN envelope under one budget", async t => {
   const parent = await mkdtemp(path.join(os.tmpdir(), "paper-runtime-source-warmup-"));
   t.after(() => rm(parent, {recursive: true, force: true}));
   const store = new EvidenceWarmupStore(path.join(parent, "warmup"), {enabled: true});
-  const clock = createSyntheticClock({wallStart: Date.now(), monotonicStart: 100});
-  assert.throws(() => createPaperRuntimeSourceAdapter({
+  const fixture = makeHandoffFixture();
+  const clock = createSyntheticClock({wallStart: fixture.assembledAt, monotonicStart: 100});
+  const used = {requests: 0, bytes: 0, work: 0};
+  const budget = {
+    reserveRequest() {
+      if (used.requests >= 40 || used.work >= 1_000) {
+        throw Object.assign(new Error("global request budget exhausted"), {code: "GLOBAL_BUDGET"});
+      }
+      used.requests += 1;
+      used.work += 1;
+      return bytes => {
+        if (used.bytes + bytes > 1_000_000) {
+          throw Object.assign(new Error("global byte budget exhausted"), {code: "GLOBAL_BUDGET"});
+        }
+        used.bytes += bytes;
+      };
+    },
+    recordWork(units = 1) {
+      used.work += units;
+      if (used.work > 1_000) throw Object.assign(new Error("global work budget exhausted"), {
+        code: "GLOBAL_BUDGET"
+      });
+    }
+  };
+  const acquiredEnvelope = await makeBirdeyeObservation(fixture, {}, {budget});
+  const adapter = createPaperRuntimeSourceAdapter({
     sourcePolicySha256: PAPER_RUNTIME_SOURCE_POLICY_SHA256,
     fixtureMode: "SYNTHETIC_TEST_ONLY",
     clock,
     variant: "BASE",
     fixtureBehavior: "NONE",
     warmupStore: store
-  }), /options must be exact bounded data/);
-  assert.notEqual((await store.read("runtime-source-fixture")).status, "AVAILABLE");
+  });
+  const result = await adapter.acquireCandidates({
+    signal: new AbortController().signal,
+    remaining: {requests: 40, bytes: 1_000_000, work: 1_000, timeMs: 10_000},
+    deadlineAt: clock.wallClock() + 10_000,
+    recordRequest() {},
+    recordWork() {},
+    budget,
+    acquiredEnvelope
+  });
+  assert.equal(result.status, "SYNTHETIC_FIXTURE_ONLY");
+  assert.equal(result.warmup.status, "OFFLINE_EVALUATED");
+  assert.equal(result.warmup.trust, "UNKNOWN");
+  assert.equal(result.warmup.completeness, "UNKNOWN");
+  assert.equal(result.pipeline.executionAuthorized, false);
+  assert.ok(used.requests > 1);
+  assert.ok(used.bytes > 0);
+  assert.ok(used.work >= used.requests);
+  const readback = await store.read(`paper-runtime-${fixture.candidateT}`);
+  assert.equal(readback.status, "AVAILABLE");
+  assert.equal(readback.document.records[0].trust, "UNKNOWN");
+  assert.equal(readback.document.records[0].completeness, "UNKNOWN");
 });
 
 test("warmup persistence shares the run budget and reserves before store operations", async () => {
