@@ -726,3 +726,51 @@ test("wallet qualification returns unavailable for hostile or malformed rows wit
     assert.equal(out.admissionGranted, false);
   }
 });
+
+test("wallet qualification rejects nonenumerable fields without reading them", () => {
+  const hidden = qrt(70);
+  Object.defineProperty(hidden, "basisUnits", {value: 1n, enumerable: false});
+  const hiddenCost = qrt(71);
+  Object.defineProperty(hiddenCost.costs, "feesUnits", {value: 1n, enumerable: false});
+  for (const row of [hidden, hiddenCost]) {
+    const out = qrun([...qten(), row]);
+    assert.equal(out.status, "UNAVAILABLE");
+    assert.deepEqual(out.reasons, ["ROUNDTRIP_SCHEMA_INVALID"]);
+  }
+});
+
+test("wallet qualification rejects accessor array elements without invoking them", () => {
+  let calls = 0;
+  const refs = ["a80", "b80"];
+  Object.defineProperty(refs, 1, {enumerable: true, get() { calls += 1; return "b80"; }});
+  const outer = qten();
+  Object.defineProperty(outer, 3, {enumerable: true, get() { calls += 1; return qrt(3); }});
+  for (const rows of [[...qten(), qrt(80, {executionRefs: refs})], outer]) {
+    const out = qrun(rows);
+    assert.equal(out.status, "UNAVAILABLE");
+    assert.deepEqual(out.reasons, ["ROUNDTRIP_SCHEMA_INVALID"]);
+  }
+  assert.equal(calls, 0);
+});
+
+test("wallet qualification flags the same executions relabeled under another mint", () => {
+  const rows = qten();
+  const relabeled = {...qrt(0), id: "rt-relabel", mint: QMINTS[1], mintRelationGroup: "g1"};
+  const out = qrun([...rows, relabeled]);
+  assert.equal(out.status, "REVIEW_REQUIRED");
+  assert.ok(out.reasons.includes("DUPLICATE_EXECUTION_CONFLICT"));
+  assert.equal(out.netResultUnits, null);
+  const newGroup = qrun([...rows, {...relabeled, mint: QMINTS[2], mintRelationGroup: "fresh"}]);
+  assert.ok(newGroup.reasons.includes("DUPLICATE_EXECUTION_CONFLICT"));
+});
+
+test("wallet qualification rejects accessor elements on the top-level array without invoking them", () => {
+  let calls = 0;
+  const rows = qten();
+  Object.defineProperty(rows, 9, {enumerable: true, get() { calls += 1; return qrt(9); }});
+  assert.equal(qrun(rows).status, "UNAVAILABLE");
+  const hole = qten();
+  delete hole[2];
+  assert.equal(qrun(hole).status, "UNAVAILABLE");
+  assert.equal(calls, 0);
+});

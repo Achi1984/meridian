@@ -1064,9 +1064,23 @@ function plainData(value, keys) {
   const proto = Object.getPrototypeOf(value);
   if (proto !== Object.prototype && proto !== null) return false;
   const own = Reflect.ownKeys(value);
-  return own.length <= keys.length && own.every(key =>
-    typeof key === "string" && keys.includes(key) &&
-    "value" in Object.getOwnPropertyDescriptor(value, key));
+  return own.length <= keys.length && own.every(key => {
+    if (typeof key !== "string" || !keys.includes(key)) return false;
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    return "value" in descriptor && descriptor.enumerable === true;
+  });
+}
+
+// Dense array of own enumerable data elements; checked without invoking accessors.
+function plainArray(value, maxLength) {
+  if (!Array.isArray(value) || value.length > maxLength) return false;
+  const own = Reflect.ownKeys(value);
+  if (own.length !== value.length + 1) return false;
+  for (let i = 0; i < value.length; i += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, String(i));
+    if (!descriptor || !("value" in descriptor) || descriptor.enumerable !== true) return false;
+  }
+  return true;
 }
 
 function scalarData(value) {
@@ -1081,8 +1095,7 @@ function roundtripShapeValid(row) {
     const value = row[key];
     if (key === "executionRefs") {
       if (value === undefined) continue;
-      if (!Array.isArray(value) || value.length > MAX_QUALIFICATION_REFS) return false;
-      if (Object.keys(value).length !== value.length || !value.every(scalarData)) return false;
+      if (!plainArray(value, MAX_QUALIFICATION_REFS) || !value.every(scalarData)) return false;
     } else if (key === "costs") {
       if (value === undefined) continue;
       if (!plainData(value, COST_FIELDS) || !Object.keys(value).every(field => scalarData(value[field]))) {
@@ -1139,7 +1152,7 @@ export function evaluateWalletQualificationDiagnostics({
     return qualificationResult("UNAVAILABLE", ["ROUNDTRIPS_OVERSIZED"]);
   }
   const startExclusive = cutoff - rules.windowDays * DAY_MS;
-  if (Object.keys(roundtrips).length !== roundtrips.length || !roundtrips.every(roundtripShapeValid)) {
+  if (!plainArray(roundtrips, MAX_QUALIFICATION_ROUNDTRIPS) || !roundtrips.every(roundtripShapeValid)) {
     return qualificationResult("UNAVAILABLE", ["ROUNDTRIP_SCHEMA_INVALID"]);
   }
   const review = new Set();
@@ -1161,7 +1174,7 @@ export function evaluateWalletQualificationDiagnostics({
     if (Array.isArray(row.executionRefs)) {
       for (const ref of row.executionRefs) {
         if (typeof ref !== "string") continue;
-        const key = `${row.wallet}|${row.mint}|${ref}`;
+        const key = `${row.wallet}|${ref}`;
         if (refOwner.has(key) && refOwner.get(key) !== content) refConflict = true;
         refOwner.set(key, content);
       }
