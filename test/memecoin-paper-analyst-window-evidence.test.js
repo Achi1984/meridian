@@ -688,3 +688,41 @@ test("wallet qualification bounds inputs and rejects bad subjects", () => {
   assert.equal(qrun(qten(), QPOLICY, {asOf: "nope"}).status, "UNAVAILABLE");
   assert.equal(qrun(qten(), QPOLICY, {wallet: "x"}).status, "UNAVAILABLE");
 });
+
+test("wallet qualification rejects same executions under different ids", () => {
+  const rows = qten();
+  const clone = {...qrt(0), id: "rt-clone"};
+  assert.equal(qrun([...rows, clone]).eligibleRoundtripCount, 10);
+  const inflated = qrun([...rows, {...qrt(0), id: "rt-inflate", basisUnits: 1}]);
+  assert.equal(inflated.status, "REVIEW_REQUIRED");
+  assert.ok(inflated.reasons.includes("DUPLICATE_EXECUTION_CONFLICT"));
+  const partial = qrun([...rows, {...qrt(0), id: "rt-partial", executionRefs: ["a0", "zzz"], evidenceRef: "other"}]);
+  assert.ok(partial.reasons.includes("DUPLICATE_EXECUTION_CONFLICT"));
+});
+
+test("wallet qualification cannot relabel one mint into unrelated groups", () => {
+  const rows = Array.from({length: 10}, (_, i) => qrt(i, {mint: QMINTS[0], mintRelationGroup: `g${i % 5}`}));
+  const out = qrun(rows);
+  assert.equal(out.status, "REVIEW_REQUIRED");
+  assert.ok(out.reasons.includes("MINT_GROUP_CONFLICT"));
+  const shared = qrun(qten().map(r => ({...r, mintRelationGroup: "one"})));
+  assert.equal(shared.unrelatedMintCount, 1);
+});
+
+test("wallet qualification returns unavailable for hostile or malformed rows without throwing", () => {
+  const circular = qrt(60);
+  circular.costs.self = circular;
+  const getter = qrt(61);
+  Object.defineProperty(getter, "basisUnits", {enumerable: true, get() { throw new Error("boom"); }});
+  const bad = [
+    qrt(62, {basisUnits: 1n}), circular, getter, {...qrt(63), extra: {deep: 1}},
+    qrt(64, {executionRefs: [{x: 1}, "b"]}), qrt(65, {id: "x".repeat(10_000)}),
+    Object.assign(Object.create({inherited: 1}), qrt(66)), "row", null
+  ];
+  for (const row of bad) {
+    const out = qrun([...qten(), row]);
+    assert.equal(out.status, "UNAVAILABLE");
+    assert.deepEqual(out.reasons, ["ROUNDTRIP_SCHEMA_INVALID"]);
+    assert.equal(out.admissionGranted, false);
+  }
+});

@@ -1053,6 +1053,57 @@ function qualificationPolicy(policy) {
   return policy;
 }
 
+const ROUNDTRIP_KEYS = Object.freeze([
+  "id", "wallet", "mint", "mintRelationGroup", "executionRefs", "evidenceRef", "complete",
+  "openedAt", "closedAt", "unit", "realizedProceedsUnits", "basisUnits", "costs",
+  "selfTransfer", "sameMintBundle"
+]);
+
+function plainData(value, keys) {
+  if (!isRecord(value)) return false;
+  const proto = Object.getPrototypeOf(value);
+  if (proto !== Object.prototype && proto !== null) return false;
+  const own = Reflect.ownKeys(value);
+  return own.length <= keys.length && own.every(key =>
+    typeof key === "string" && keys.includes(key) &&
+    "value" in Object.getOwnPropertyDescriptor(value, key));
+}
+
+function scalarData(value) {
+  return value === undefined || value === null || typeof value === "boolean" ||
+    typeof value === "number" || (typeof value === "string" && value.length <= MAX_QUALIFICATION_ID);
+}
+
+// Structural check only: no getters, extra keys, bigint, nesting beyond refs/costs.
+function roundtripShapeValid(row) {
+  if (!plainData(row, ROUNDTRIP_KEYS)) return false;
+  for (const key of Object.keys(row)) {
+    const value = row[key];
+    if (key === "executionRefs") {
+      if (value === undefined) continue;
+      if (!Array.isArray(value) || value.length > MAX_QUALIFICATION_REFS) return false;
+      if (Object.keys(value).length !== value.length || !value.every(scalarData)) return false;
+    } else if (key === "costs") {
+      if (value === undefined) continue;
+      if (!plainData(value, COST_FIELDS) || !Object.keys(value).every(field => scalarData(value[field]))) {
+        return false;
+      }
+    } else if (!scalarData(value)) return false;
+  }
+  return true;
+}
+
+function canonicalRoundtrip(row, includeId) {
+  return JSON.stringify([
+    includeId ? row.id : null, row.wallet, row.mint, row.mintRelationGroup,
+    Array.isArray(row.executionRefs) ? [...row.executionRefs].sort() : null,
+    row.evidenceRef, row.complete, row.openedAt, row.closedAt, row.unit,
+    row.realizedProceedsUnits, row.basisUnits,
+    isRecord(row.costs) ? COST_FIELDS.map(field => row.costs[field]) : null,
+    row.selfTransfer, row.sameMintBundle
+  ]);
+}
+
 function qualificationResult(status, reasons, fields = {}) {
   return deepFreeze({
     diagnosticVersion: WALLET_QUALIFICATION_DIAGNOSTIC_VERSION,
@@ -1088,17 +1139,36 @@ export function evaluateWalletQualificationDiagnostics({
     return qualificationResult("UNAVAILABLE", ["ROUNDTRIPS_OVERSIZED"]);
   }
   const startExclusive = cutoff - rules.windowDays * DAY_MS;
+  if (Object.keys(roundtrips).length !== roundtrips.length || !roundtrips.every(roundtripShapeValid)) {
+    return qualificationResult("UNAVAILABLE", ["ROUNDTRIP_SCHEMA_INVALID"]);
+  }
   const review = new Set();
-  const seen = new Map();
+  const seenIds = new Map();
+  const seenContent = new Set();
+  const refOwner = new Map();
+  const mintGroup = new Map();
   const eligible = [];
   for (const row of roundtrips) {
-    if (!isRecord(row) || !boundedId(row.id)) { review.add("ROUNDTRIP_MALFORMED"); continue; }
-    const canonical = JSON.stringify(row);
-    if (seen.has(row.id)) {
-      if (seen.get(row.id) !== canonical) review.add("DUPLICATE_ID_CONFLICT");
+    if (!boundedId(row.id)) { review.add("ROUNDTRIP_MALFORMED"); continue; }
+    const withId = canonicalRoundtrip(row, true);
+    if (seenIds.has(row.id)) {
+      if (seenIds.get(row.id) !== withId) review.add("DUPLICATE_ID_CONFLICT");
       continue;
     }
-    seen.set(row.id, canonical);
+    seenIds.set(row.id, withId);
+    const content = canonicalRoundtrip(row, false);
+    let refConflict = false;
+    if (Array.isArray(row.executionRefs)) {
+      for (const ref of row.executionRefs) {
+        if (typeof ref !== "string") continue;
+        const key = `${row.wallet}|${row.mint}|${ref}`;
+        if (refOwner.has(key) && refOwner.get(key) !== content) refConflict = true;
+        refOwner.set(key, content);
+      }
+    }
+    if (refConflict) review.add("DUPLICATE_EXECUTION_CONFLICT");
+    if (seenContent.has(content)) continue;
+    seenContent.add(content);
     if (row.wallet !== wallet) { review.add("WALLET_MISMATCH"); continue; }
     if (!isSolanaPublicKey(row.mint)) { review.add("MINT_INVALID"); continue; }
     const opened = timestampValue(row.openedAt);
@@ -1129,22 +1199,27 @@ export function evaluateWalletQualificationDiagnostics({
       review.add("EXCLUSION_FACT_AMBIGUOUS"); continue;
     }
     if (!boundedId(row.mintRelationGroup)) { review.add("MINT_RELATIONSHIP_UNKNOWN"); continue; }
+    if (mintGroup.has(row.mint) && mintGroup.get(row.mint) !== row.mintRelationGroup) {
+      review.add("MINT_GROUP_CONFLICT"); continue;
+    }
+    mintGroup.set(row.mint, row.mintRelationGroup);
     if (row.mint === candidateMint || row.selfTransfer || row.sameMintBundle) continue;
-    eligible.push({group: row.mintRelationGroup, net: proceeds - basis - costs});
+    eligible.push({mint: row.mint, group: row.mintRelationGroup, net: proceeds - basis - costs});
   }
   if (review.size > 0) return qualificationResult("REVIEW_REQUIRED", [...review]);
   const net = eligible.reduce((sum, row) => sum + row.net, 0n);
   const groups = new Set(eligible.map(row => row.group));
+  const mints = new Set(eligible.map(row => row.mint));
   const netString = net.toString();
   const met = {
     roundtrips: eligible.length >= rules.minRoundtrips,
-    unrelatedMints: groups.size >= rules.minUnrelatedMints,
+    unrelatedMints: Math.min(groups.size, mints.size) >= rules.minUnrelatedMints,
     positiveNet: net > 0n
   };
   const reasons = Object.entries(met).filter(([, ok]) => !ok).map(([key]) => `THRESHOLD_NOT_MET_${key}`);
   return qualificationResult(reasons.length ? "THRESHOLDS_NOT_MET" : "THRESHOLDS_MET_UNVERIFIED", reasons, {
     eligibleRoundtripCount: eligible.length,
-    unrelatedMintCount: groups.size,
+    unrelatedMintCount: Math.min(groups.size, mints.size),
     netResultUnits: netString,
     accountingUnit: rules.accountingUnit,
     thresholdsMet: met,
