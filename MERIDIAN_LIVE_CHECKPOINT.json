@@ -3595,9 +3595,17 @@
         "source-bound USD cost policy"
       ],
       "realPathAcquisition": "EXTERNAL_READ_ONLY_INPUT_DIAGNOSTIC_ONLY_UNKNOWN_TRUST_ZERO_ELIGIBLE_NO_NETWORK; APPROVED_TRANSPORT_AND_REVIEWER_AUTHENTICITY_UNRESOLVED",
-      "mainReconciled": "041f45e4fd93d7a0c40e4e912e3f4b535e09d0a4",
+      "mainReconciled": "f801045fb555ff2609ce97e6e03e92fe53aa2654",
+      "priorMainReconciled": "041f45e4fd93d7a0c40e4e912e3f4b535e09d0a4",
+      "reconciliation": {
+        "issue1215": "COMPLETE; postchecks Safety 41890692755, Runtime 41890693024, Coordinator 41890692764, Pages 41890691861 all SUCCESS",
+        "pr1221": "MERGED to main f801045; final GREEN 6639495880, 4357/4357; receipt 1221/6639780794 postchecks pending",
+        "ownerScopedPilotFreeze": "942/6639696006",
+        "evidenceFeasibility": "6639714343",
+        "fallbackConstraint": "6639775827"
+      },
       "reviewCorrection": "PR1219 comment 6639237977 incorporated; P2 descriptor-safe detached diagnostic copy (own __proto__ preserved) and deterministic post-entry deadline held-publication tests applied",
-      "costModule": "NOT_EDITED_OWNED_BY_1220",
+      "costModule": "NOT_EDITED_BY_1219; reviewed cost model merged via PR1221",
       "productionRuntime": "DEFAULT_DISABLED_NO_NETWORK_NO_ELIGIBLE_CANDIDATES",
       "providerCallsOrKeys": false,
       "hostRegistryWorkflowSpendOrActivation": false,
