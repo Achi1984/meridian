@@ -239,6 +239,44 @@ test("runtime handoff persists and evaluates an acquired UNKNOWN envelope under 
   assert.equal(readback.document.records[0].completeness, "UNKNOWN");
 });
 
+test("non-warmup runtime evaluation propagates caller cancellation into the pipeline", async () => {
+  const clock = createSyntheticClock({wallStart: Date.now(), monotonicStart: 100});
+  let markDispatched;
+  const dispatched = new Promise(resolve => { markDispatched = resolve; });
+  let requests = 0;
+  const budget = {
+    reserveRequest() {
+      requests += 1;
+      if (requests === 1) markDispatched();
+      return () => {};
+    }
+  };
+  const adapter = createPaperRuntimeSourceAdapter({
+    sourcePolicySha256: PAPER_RUNTIME_SOURCE_POLICY_SHA256,
+    fixtureMode: "SYNTHETIC_TEST_ONLY",
+    clock,
+    variant: "BASE",
+    fixtureBehavior: "WAIT_FOR_STOP"
+  });
+  const controller = new AbortController();
+  const deadlineAt = clock.wallClock() + 5_000;
+  const pending = adapter.acquireCandidates({
+    signal: controller.signal,
+    remaining: {requests: 40, bytes: 1_000_000, work: 1_000, timeMs: 5_000},
+    deadlineAt,
+    recordRequest() {},
+    recordWork() {},
+    budget
+  });
+  await dispatched;
+  const abortAt = performance.now();
+  controller.abort();
+  const result = await pending;
+  assert.equal(result.status, "UNKNOWN");
+  assert.equal(result.reason, "STOPPED");
+  assert.ok(performance.now() - abortAt < 150);
+});
+
 test("expired held persistence cannot read back or overwrite a later runtime evaluation", async t => {
   const parent = await mkdtemp(path.join(os.tmpdir(), "paper-runtime-source-held-publish-"));
   t.after(() => rm(parent, {recursive: true, force: true}));

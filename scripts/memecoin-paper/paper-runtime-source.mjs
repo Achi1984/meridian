@@ -341,7 +341,7 @@ export async function acquireSyntheticRuntimeFixture(clock, {
         if (signal?.aborted) resolve();
         else signal?.addEventListener("abort", resolve, {once: true});
       });
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise(resolve => setTimeout(resolve, 250));
     }
     if (signal?.aborted) throw Object.assign(new Error("fixture acquisition cancelled"), {code: "STOPPED"});
     const body = JSON.parse(request.body);
@@ -489,7 +489,7 @@ export async function acquireSyntheticRuntimeFixture(clock, {
     });
     evaluation = warmup.evaluation ?? null;
   } else {
-    evaluation = await pipeline.evaluate(evaluationRequest);
+    evaluation = await pipeline.evaluate({...evaluationRequest, signal});
   }
   if (signal?.aborted || clock.wallClock() >= deadlineAt) {
     return {
