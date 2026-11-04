@@ -53,6 +53,111 @@ function priceRecord(identity, atMs, {
     completeness, payload};
 }
 
+function barrier() {
+  let release;
+  const promise = new Promise(resolve => { release = resolve; });
+  return {promise, release};
+}
+
+async function bounded(promise, message) {
+  let timer;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(message)), 5_000);
+      })
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function startWithControlledDeadline(start, timeoutMs) {
+  const performanceNow = Object.getOwnPropertyDescriptor(performance, "now");
+  const originalNow = performance.now;
+  const originalSetTimeout = globalThis.setTimeout;
+  let elapsed = 0;
+  let fireDeadline;
+  let interceptTimer = true;
+  Object.defineProperty(performance, "now", {
+    configurable: true,
+    value: () => elapsed
+  });
+  const restoreClock = () => {
+    if (performanceNow) Object.defineProperty(performance, "now", performanceNow);
+    else {
+      delete performance.now;
+      if (performance.now !== originalNow) throw new Error("monotonic clock was not restored");
+    }
+  };
+  globalThis.setTimeout = function(callback, delay, ...args) {
+    if (interceptTimer && delay === timeoutMs && !fireDeadline) {
+      fireDeadline = () => {
+        if (elapsed >= timeoutMs) return;
+        elapsed = timeoutMs;
+        callback(...args);
+      };
+      return -1;
+    }
+    return Reflect.apply(originalSetTimeout, this, [callback, delay, ...args]);
+  };
+  let promise;
+  try {
+    promise = start();
+  } catch (error) {
+    restoreClock();
+    throw error;
+  } finally {
+    interceptTimer = false;
+    globalThis.setTimeout = originalSetTimeout;
+  }
+  return {
+    promise,
+    expire() {
+      if (!fireDeadline) throw new Error("operation deadline timer was not captured");
+      fireDeadline();
+    },
+    restoreClock
+  };
+}
+
+async function drainSteps(steps, message) {
+  const errors = [];
+  for (const step of steps) {
+    try {
+      await step();
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+  if (errors.length) throw new AggregateError(errors, message);
+}
+
+async function runWithBoundedDrain(run, drain) {
+  let failure;
+  const cleanupErrors = [];
+  try {
+    await run();
+  } catch (error) {
+    failure = error;
+  } finally {
+    try {
+      await drain();
+    } catch (error) {
+      cleanupErrors.push(error);
+    }
+  }
+  if (failure && cleanupErrors.length) {
+    throw new AggregateError([failure, ...cleanupErrors], "test and cleanup both failed");
+  }
+  if (failure) throw failure;
+  if (cleanupErrors.length === 1) throw cleanupErrors[0];
+  if (cleanupErrors.length > 1) {
+    throw new AggregateError(cleanupErrors, "test cleanup failed");
+  }
+}
+
 test("warmup is disabled by default and publishes immutable digest-verified records", async t => {
   const {root} = await temporaryStore(t);
   const disabled = new EvidenceWarmupStore(root);
@@ -530,19 +635,44 @@ test("cancelled or expired link and directory-sync waits stay UNKNOWN and block 
     records: [priceRecord(identity, 10_000)]};
   const actualLink = (await import("node:fs/promises")).link;
   let linkCalls = 0;
+  let linkHookStarted = false;
+  const linkEntered = barrier();
+  const linkSettled = barrier();
+  const releaseLateLink = barrier();
   const lateLink = new EvidenceWarmupStore(root, {
     enabled: true,
     limits: {maxElapsedMs: 15},
     fsOps: {
       link: async (...args) => {
         linkCalls += 1;
-        await actualLink(...args);
-        await new Promise(resolve => setTimeout(resolve, 60));
+        linkHookStarted = true;
+        try {
+          await actualLink(...args);
+          linkEntered.release();
+          await releaseLateLink.promise;
+        } finally {
+          linkSettled.release();
+        }
       }
     }
   });
-  assert.equal((await lateLink.publish(bundle)).reason, "DEADLINE");
-  await new Promise(resolve => setTimeout(resolve, 80));
+  const lateLinkDeadline = startWithControlledDeadline(() => lateLink.publish(bundle), 15);
+  const lateLinkPublish = lateLinkDeadline.promise;
+  await runWithBoundedDrain(async () => {
+    await bounded(linkEntered.promise, "late link was not entered");
+    lateLinkDeadline.expire();
+    assert.equal((await bounded(lateLinkPublish, "deadline did not settle")).reason, "DEADLINE");
+  }, async () => {
+    await drainSteps([
+      () => lateLinkDeadline.expire(),
+      () => releaseLateLink.release(),
+      () => bounded(lateLinkPublish, "late-link publication did not settle"),
+      () => linkHookStarted
+        ? bounded(linkSettled.promise, "late link did not settle after release")
+        : undefined,
+      () => lateLinkDeadline.restoreClock()
+    ], "late-link cleanup failed");
+  });
   assert.equal((await lateLink.publish(bundle)).status, "UNKNOWN");
   assert.equal((await lateLink.read(bundle.datasetId)).status, "UNKNOWN");
   assert.equal(linkCalls, 1);
@@ -550,6 +680,10 @@ test("cancelled or expired link and directory-sync waits stay UNKNOWN and block 
   const syncRoot = path.join(root, "late-sync");
   const controller = new AbortController();
   let syncCalls = 0;
+  let syncHookStarted = false;
+  const syncEntered = barrier();
+  const syncSettled = barrier();
+  const releaseLateSync = barrier();
   const actualOpen = open;
   const lateSync = new EvidenceWarmupStore(syncRoot, {
     enabled: true,
@@ -564,8 +698,14 @@ test("cancelled or expired link and directory-sync waits stay UNKNOWN and block 
             if (key === "sync") {
               return async (...methodArgs) => {
                 syncCalls += 1;
-                await value.apply(target, methodArgs);
-                await new Promise(resolve => setTimeout(resolve, 60));
+                syncHookStarted = true;
+                try {
+                  await value.apply(target, methodArgs);
+                  syncEntered.release();
+                  await releaseLateSync.promise;
+                } finally {
+                  syncSettled.release();
+                }
               };
             }
             return typeof value === "function" ? value.bind(target) : value;
@@ -574,29 +714,69 @@ test("cancelled or expired link and directory-sync waits stay UNKNOWN and block 
       }
     }
   });
-  setTimeout(() => controller.abort(), 20);
-  assert.equal((await lateSync.publish({...bundle, datasetId: "late-sync"},
-    {signal: controller.signal})).reason, "CANCELLED");
+  const lateSyncDeadline = startWithControlledDeadline(() =>
+    lateSync.publish({...bundle, datasetId: "late-sync"}, {signal: controller.signal}), 1_000);
+  const lateSyncPublish = lateSyncDeadline.promise;
+  await runWithBoundedDrain(async () => {
+    await bounded(syncEntered.promise, "directory sync was not entered");
+    controller.abort();
+    assert.equal((await bounded(lateSyncPublish, "cancelled sync did not settle")).reason, "CANCELLED");
+  }, async () => {
+    await drainSteps([
+      () => controller.abort(),
+      () => releaseLateSync.release(),
+      () => bounded(lateSyncPublish, "cancelled sync publication did not settle"),
+      () => syncHookStarted
+        ? bounded(syncSettled.promise, "directory sync did not settle after release")
+        : undefined,
+      () => lateSyncDeadline.restoreClock()
+    ], "directory-sync cleanup failed");
+  });
   assert.equal(syncCalls, 1);
   assert.equal((await lateSync.publish({...bundle, datasetId: "late-sync"})).status, "UNKNOWN");
 
   const cancelRoot = path.join(root, "cancel-link");
   const cancelController = new AbortController();
   let cancelLinkCalls = 0;
+  let cancelLinkHookStarted = false;
+  const cancelLinkEntered = barrier();
+  const cancelLinkSettled = barrier();
+  const releaseCancelLink = barrier();
   const cancelLink = new EvidenceWarmupStore(cancelRoot, {
     enabled: true,
     limits: {maxElapsedMs: 1_000},
     fsOps: {
       link: async (...args) => {
         cancelLinkCalls += 1;
-        await actualLink(...args);
-        await new Promise(resolve => setTimeout(resolve, 60));
+        cancelLinkHookStarted = true;
+        try {
+          await actualLink(...args);
+          cancelLinkEntered.release();
+          await releaseCancelLink.promise;
+        } finally {
+          cancelLinkSettled.release();
+        }
       }
     }
   });
-  setTimeout(() => cancelController.abort(), 20);
-  assert.equal((await cancelLink.publish({...bundle, datasetId: "cancel-link"},
-    {signal: cancelController.signal})).reason, "CANCELLED");
+  const cancelLinkDeadline = startWithControlledDeadline(() =>
+    cancelLink.publish({...bundle, datasetId: "cancel-link"}, {signal: cancelController.signal}), 1_000);
+  const cancelLinkPublish = cancelLinkDeadline.promise;
+  await runWithBoundedDrain(async () => {
+    await bounded(cancelLinkEntered.promise, "cancel link was not entered");
+    cancelController.abort();
+    assert.equal((await bounded(cancelLinkPublish, "cancelled link did not settle")).reason, "CANCELLED");
+  }, async () => {
+    await drainSteps([
+      () => cancelController.abort(),
+      () => releaseCancelLink.release(),
+      () => bounded(cancelLinkPublish, "cancel-link publication did not settle"),
+      () => cancelLinkHookStarted
+        ? bounded(cancelLinkSettled.promise, "cancel link did not settle after release")
+        : undefined,
+      () => cancelLinkDeadline.restoreClock()
+    ], "cancel-link cleanup failed");
+  });
   assert.equal(cancelLinkCalls, 1);
   assert.equal((await cancelLink.publish({...bundle, datasetId: "cancel-link"})).status, "UNKNOWN");
 });

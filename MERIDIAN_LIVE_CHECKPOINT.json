@@ -3503,6 +3503,37 @@
       "providerOrHostActivation": false,
       "mergeAuthorizedOrPerformed": false,
       "finalSourceFrozenPendingHostedCiAndNarrowDeltaReview": true
+    },
+    "paperHostBatch1210Recovery20261103": {
+      "opId": "meridian-1210-recovery-20261103-r1",
+      "recordedDate": "2026-11-03",
+      "scope": "TEST_DETERMINISM_AND_CHECKPOINT_ONLY; EXISTING_1210_BATCH_IMPLEMENTATION_UNCHANGED",
+      "integratedMainSha": "c24c339b763f48f64c2b018f2e12bb38d24efcf8",
+      "integrationMergeCommit": "7352e117cfe6bdb78f6a15dfb9f01f3f9b6fe5f1",
+      "mainPostchecks": {
+        "safety": {
+          "runId": 41721478876,
+          "jobId": 126215081465,
+          "result": "FAILED",
+          "tests": "4253_PASS_1_FAIL",
+          "failure": "test/memecoin-paper-evidence-warmup.test.js:580 expected syncCalls 1 actual 0"
+        },
+        "runtime": {"runId": 41721478956, "result": "SUCCESS"},
+        "coordinator": {"runId": 41721478852, "result": "SUCCESS"},
+        "pages": {"runId": 41721477385, "result": "SUCCESS"}
+      },
+      "diagnosis": "15MS_DEADLINE_OR_20MS_CANCELLATION_COULD_PRECEDE_TARGET_OPERATION_DURING_ASYNC_SETUP; TEST_USES_SCOPED_CONTROLLABLE_TIMER_AND_MONOTONIC_CLOCK_TO_TRIGGER_ONLY_AFTER_LINK_ENTRY; ALL_SCENARIOS_BOUNDEDLY_DRAIN_PUBLICATION_AND_ENTERED_HOOKS_DURING_CLEANUP",
+      "historical1210EvidenceOnly": {
+        "independentReviewCommentId": 6614915599,
+        "ciRunId": 41710068330,
+        "appliesTo": "PRE_INTEGRATION_HEAD_E113864C_ONLY_NOT_EXPANDED_RECOVERY_CANDIDATE"
+      },
+      "recoveryIntegration": "PENDING_FOCUSED_TESTS_HOSTED_CI_AND_EXPANDED_SCOPE_REVIEW",
+      "hostAcceptance": "NOT_ASSESSED",
+      "productionIntegration": "BLOCKED_NOT_IMPLEMENTED",
+      "issue1207": "OPEN",
+      "keys": "DEFERRED_NO_KEY_USE",
+      "providerOrHostActivation": false
     }
   }
 }
