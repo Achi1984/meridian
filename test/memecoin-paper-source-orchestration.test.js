@@ -239,6 +239,83 @@ test("runtime handoff persists and evaluates an acquired UNKNOWN envelope under 
   assert.equal(readback.document.records[0].completeness, "UNKNOWN");
 });
 
+test("expired held persistence cannot read back or overwrite a later runtime evaluation", async t => {
+  const parent = await mkdtemp(path.join(os.tmpdir(), "paper-runtime-source-held-publish-"));
+  t.after(() => rm(parent, {recursive: true, force: true}));
+  const firstFixture = makeHandoffFixture();
+  const clock = createSyntheticClock({wallStart: firstFixture.assembledAt, monotonicStart: 100});
+  const store = new EvidenceWarmupStore(path.join(parent, "warmup"), {enabled: true});
+  const publish = store.publish.bind(store);
+  const read = store.read.bind(store);
+  let releasePublish;
+  let enteredPublish;
+  let holdFirstPublish = true;
+  const publishEntered = new Promise(resolve => { enteredPublish = resolve; });
+  const heldPublish = new Promise(resolve => { releasePublish = resolve; });
+  const readIds = [];
+  store.publish = async (input, options) => {
+    if (holdFirstPublish) {
+      holdFirstPublish = false;
+      enteredPublish();
+      await heldPublish;
+      if (options?.signal?.aborted) return {status: "UNKNOWN", reason: "CANCELLED"};
+    }
+    return publish(input, options);
+  };
+  store.read = async datasetId => {
+    readIds.push(datasetId);
+    return read(datasetId);
+  };
+  const budgetState = {requests: 0, bytes: 0, work: 0};
+  const budget = {
+    reserveRequest() {
+      budgetState.requests += 1;
+      budgetState.work += 1;
+      return bytes => { budgetState.bytes += bytes; };
+    },
+    recordWork(units = 1) { budgetState.work += units; }
+  };
+  const adapter = createPaperRuntimeSourceAdapter({
+    sourcePolicySha256: PAPER_RUNTIME_SOURCE_POLICY_SHA256,
+    fixtureMode: "SYNTHETIC_TEST_ONLY",
+    clock,
+    variant: "BASE",
+    fixtureBehavior: "NONE",
+    warmupStore: store
+  });
+  const acquire = async (fixture, timeoutMs) => {
+    const envelope = await makeBirdeyeObservation(fixture, {}, {budget});
+    return adapter.acquireCandidates({
+      signal: new AbortController().signal,
+      remaining: {requests: 100, bytes: 1_000_000, work: 2_000, timeMs: timeoutMs},
+      deadlineAt: clock.wallClock() + timeoutMs,
+      recordRequest() {},
+      recordWork() {},
+      budget,
+      acquiredEnvelope: envelope
+    });
+  };
+
+  const first = acquire(firstFixture, 300);
+  await publishEntered;
+  const expired = await first;
+  assert.equal(expired.status, "UNKNOWN");
+  assert.match(expired.reason, /DEADLINE/);
+  assert.deepEqual(readIds, []);
+
+  const laterFixture = makeHandoffFixture({candidateT: firstFixture.candidateT + 1_000});
+  clock.advance(1_000);
+  const later = await acquire(laterFixture, 10_000);
+  assert.equal(later.status, "SYNTHETIC_FIXTURE_ONLY");
+  assert.equal(later.warmup.status, "OFFLINE_EVALUATED");
+  const readsAfterLaterEvaluation = [...readIds];
+  assert.equal(readsAfterLaterEvaluation.length, 1);
+  releasePublish();
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.deepEqual(readIds, readsAfterLaterEvaluation);
+  assert.notEqual((await read(`paper-runtime-${firstFixture.candidateT}`)).status, "AVAILABLE");
+});
+
 test("warmup persistence shares the run budget and reserves before store operations", async () => {
   const fixture = makeHandoffFixture();
   const {observation, request} = await makeBirdeyeObservation(fixture);
@@ -278,7 +355,7 @@ test("warmup persistence shares the run budget and reserves before store operati
     ? call : "bytes"), ["reserve", "bytes", "publish", "reserve", "read", "bytes"]);
 });
 
-test("runtime quote result released after abort cannot enter the audit", async () => {
+test("expired held runtime quote cannot contaminate a later evaluation", async () => {
   const clock = createSyntheticClock({wallStart: Date.now(), monotonicStart: 100});
   const adapter = createPaperRuntimeSourceAdapter({
     sourcePolicySha256: PAPER_RUNTIME_SOURCE_POLICY_SHA256,
@@ -287,30 +364,40 @@ test("runtime quote result released after abort cannot enter the audit", async (
     variant: "BASE",
     fixtureBehavior: "WAIT_FOR_QUOTE_SETTLE"
   });
+  const firstDeadline = clock.wallClock() + 10_000;
   const acquired = await adapter.acquireCandidates({
     signal: new AbortController().signal,
     remaining: {requests: 40, bytes: 1_000_000, work: 1_000, timeMs: 10_000},
-    deadlineAt: clock.wallClock() + 10_000,
+    deadlineAt: firstDeadline,
     recordRequest() {},
     recordWork() {}
   });
-  const controller = new AbortController();
+  clock.jumpWall(firstDeadline - clock.wallClock() - 20);
+  const quoteStartedAt = performance.now();
   const pending = adapter.quote({
     candidate: acquired.candidate,
     purpose: "ENTRY",
     now: clock.wallClock(),
-    signal: controller.signal
+    signal: new AbortController().signal
   });
-  await new Promise(resolve => setTimeout(resolve, 5));
-  controller.abort();
-  const quote = await Promise.race([
-    pending,
-    new Promise(resolve => setTimeout(() => resolve("TIMEOUT"), 100))
-  ]);
+  const quote = await pending;
+  assert.ok(performance.now() - quoteStartedAt < 80);
   assert.equal(quote, null);
   assert.equal(acquired.runtimeAudit.quotes.length, 0);
-  await new Promise(resolve => setTimeout(resolve, 30));
+
+  const laterDeadline = clock.wallClock() + 10_000;
+  const later = await adapter.acquireCandidates({
+    signal: new AbortController().signal,
+    remaining: {requests: 40, bytes: 1_000_000, work: 1_000, timeMs: 10_000},
+    deadlineAt: laterDeadline,
+    recordRequest() {},
+    recordWork() {}
+  });
+  assert.equal(later.status, "SYNTHETIC_FIXTURE_ONLY");
+  const laterAuditBeforeRelease = structuredClone(later.runtimeAudit);
+  await new Promise(resolve => setTimeout(resolve, 120));
   assert.equal(acquired.runtimeAudit.quotes.length, 0);
+  assert.deepEqual(later.runtimeAudit, laterAuditBeforeRelease);
 });
 
 test("forged provider receipt cannot publish or reach the evaluation", async () => {

@@ -450,7 +450,7 @@ export async function acquireSyntheticRuntimeFixture(clock, {
   chargeWork(1);
   const evaluationRequest = {
     providerCandidate: completeFixture.candidate,
-    evidence: {},
+    evidence: acquiredEnvelope ? {} : completeFixture.evidence,
     candidateT,
     policy: fixture.policy,
     poolProof: fixture.poolProof,
@@ -597,11 +597,11 @@ export async function acquireSyntheticRuntimeFixture(clock, {
       if (clock.wallClock() >= deadlineAt) {
         throw Object.assign(new Error("fixture quote deadline reached"), {code: "DEADLINE"});
       }
-      if (waitForQuoteSettle) await new Promise(resolve => setTimeout(resolve, 25));
+      const chargeBytes = activeBudget?.reserveRequest?.();
+      if (waitForQuoteSettle) await new Promise(resolve => setTimeout(resolve, 100));
       if (quoteSignal?.aborted || signal?.aborted) {
         throw Object.assign(new Error("fixture quote cancelled"), {code: "STOPPED"});
       }
-      const chargeBytes = activeBudget?.reserveRequest?.();
       const request = new URL(url);
       const inputMint = request.searchParams.get("inputMint");
       const outputMint = request.searchParams.get("outputMint");
@@ -667,7 +667,26 @@ export async function acquireSyntheticRuntimeFixture(clock, {
     const side = String(purpose).toUpperCase() === "ENTRY" ? "ENTRY" : "EXIT";
     const amountAtoms = side === "ENTRY" ? "10000000" : String(position?.tokenAtoms ?? "");
     const authorizedAt = side === "ENTRY" ? now : positionOpenedAt;
-    const adapterResult = await quoteAdapter.getPaperQuote({
+    const remainingQuoteMs = Math.max(0, Math.min(
+      deadlineAt - clock.wallClock(),
+      quoteBudget?.remaining?.().timeMs ?? Number.MAX_SAFE_INTEGER
+    ));
+    if (remainingQuoteMs < 1) return null;
+    const quoteController = new AbortController();
+    const abortQuote = () => quoteController.abort();
+    for (const sourceSignal of [quoteSignal, signal]) {
+      if (sourceSignal?.aborted) quoteController.abort();
+      else sourceSignal?.addEventListener("abort", abortQuote, {once: true});
+    }
+    if (quoteController.signal.aborted) {
+      for (const sourceSignal of [quoteSignal, signal]) {
+        sourceSignal?.removeEventListener("abort", abortQuote);
+      }
+      return null;
+    }
+    let quoteTimer;
+    let quoteAbortListener;
+    const quotePending = quoteAdapter.getPaperQuote({
       identity: {
         chainId: candidate.chainId,
         mint: candidate.mint,
@@ -681,10 +700,30 @@ export async function acquireSyntheticRuntimeFixture(clock, {
       candidateSampledAt: candidate.sampledAt,
       ...(side === "ENTRY" ? {authorizedAt} : {positionOpenedAt: authorizedAt}),
       slippageBps: 50
-    }, {signal: quoteSignal ?? signal});
-    if (signal?.aborted || quoteSignal?.aborted || clock.wallClock() >= deadlineAt) {
+    }, {signal: quoteController.signal});
+    const quoteResult = await Promise.race([
+      quotePending.then(result => ({result}), () => ({failed: true})),
+      new Promise(resolve => {
+        quoteTimer = setTimeout(() => {
+          quoteController.abort();
+          resolve({timedOut: true});
+        }, remainingQuoteMs);
+      }),
+      new Promise(resolve => {
+        quoteAbortListener = () => resolve({aborted: true});
+        quoteController.signal.addEventListener("abort", quoteAbortListener, {once: true});
+      })
+    ]);
+    clearTimeout(quoteTimer);
+    quoteController.signal.removeEventListener("abort", quoteAbortListener);
+    for (const sourceSignal of [quoteSignal, signal]) {
+      sourceSignal?.removeEventListener("abort", abortQuote);
+    }
+    if (quoteResult.timedOut || quoteResult.failed || quoteController.signal.aborted ||
+        signal?.aborted || quoteSignal?.aborted || clock.wallClock() >= deadlineAt) {
       return null;
     }
+    const adapterResult = quoteResult.result;
     const sourceQuote = adapterResult.quoteCandidate;
     const identity = adapterResult.request?.identity;
     const route = sourceQuote?.routeAmounts;

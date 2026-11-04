@@ -3551,6 +3551,37 @@
       "hostedExactHeadCi": "NOT_DISPATCHED",
       "independentFinalReview": "PENDING",
       "nextGate": "COMPLETE_REMAINING_R3_SOURCE_CHANGES_AND_FOCUSED_TESTS_BEFORE_HOSTED_CI"
+    },
+    "paperSourceOrchestration1211RevisionR3Completion20261104": {
+      "opId": "meridian-1211-r3-completion-20261104-r2",
+      "recordedDate": "2026-11-04",
+      "issue": 1207,
+      "pullRequest": 1211,
+      "branch": "copilot/issue1207-source-orchestration",
+      "startingHead": "53a000da37705bcf5e13957fa4ff6f0981d79a83",
+      "baseSha": "c24c339b763f48f64c2b018f2e12bb38d24efcf8",
+      "scope": "SYNTHETIC_ACQUIRED_ENVELOPE_RUNTIME_HANDOFF_AND_BOUNDED_LATE_RESULT_FENCING",
+      "state": "IMPLEMENTED_FOCUSED_TESTS_PASSING_HOSTED_CI_AND_FINAL_REVIEW_PENDING",
+      "implemented": [
+        "runtime source adapter carries acquired UNKNOWN-trust envelopes through immutable warmup publication, readback, and synthetic evaluation using one run-scoped budget capability",
+        "persistence timeout returns before a held callback is released and late publication cannot start readback or replace a later evaluation",
+        "quote requests reserve before dispatch and race the shared deadline plus caller cancellation; late quote responses cannot mutate runtime audits",
+        "production runtime remains disabled and synthetic-only envelope injection is unavailable in production mode"
+      ],
+      "focusedTests": {
+        "test/memecoin-paper-source-orchestration.test.js": "7_PASS_0_FAIL",
+        "test/memecoin-paper-source-pipeline.test.js": "24_PASS_0_FAIL",
+        "test/memecoin-paper-provider-warmup-handoff.test.js": "13_PASS_0_FAIL"
+      },
+      "verification": "FOCUSED_SUITES_ONLY_NO_FULL_SUITE",
+      "codeql": "PENDING_AFTER_COMMIT",
+      "productionIntegration": "BLOCKED_AUTHENTICATED_TRUST_ARCHIVE_CENSUS_METRICS_QUOTE_PROVENANCE_USD_PRICE_AND_COST_CONTRACTS",
+      "providerCallsOrKeys": false,
+      "hostRegistryWorkflowSpendOrActivation": false,
+      "issue1207": "OPEN",
+      "hostedExactHeadCi": "NOT_DISPATCHED_PER_REQUEST",
+      "independentFinalReview": "PENDING",
+      "nextGate": "COMMIT_AND_SECRET_SCAN_THEN_CODEQL_AND_REPORT_EXACT_HEAD; FREEZE_FOR_HOSTED_CI"
     }
   }
 }
