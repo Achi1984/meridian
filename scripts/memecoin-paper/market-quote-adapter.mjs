@@ -1,5 +1,6 @@
 import {createHash} from "node:crypto";
 import {PAPER_LEDGER_POLICY} from "./ledger.mjs";
+import {normalizeExactCosts} from "../memecoin-paper-execution-evidence/normalize.mjs";
 import {createJupiterV2QuoteAdapter} from "../memecoin-paper-route-quotes/jupiter-v2.mjs";
 
 const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
@@ -587,9 +588,201 @@ function buildCandidate(request, observation) {
   return {candidate, reasons};
 }
 
-function abortableTransport(transport, getExternalSignal) {
+const COST_RECEIPT_SCHEMA = "memecoin-paper-quote-cost-receipt-v1";
+const WRAPPED_SOL_MINT = "So11111111111111111111111111111111111111112";
+const LAMPORTS_PER_SOL = 1_000_000_000n;
+const MICRO_USD_PER_USD = 1_000_000n;
+const ROUTE_AMOUNT_BASIS = "GROSS_BEFORE_ALL_COSTS";
+const INCLUSION_BASIS = Object.freeze({
+  fee: "EXPLICIT_PROTOCOL_AND_PLATFORM_FEE_ONLY",
+  spread: "BID_ASK_SPREAD_ONLY",
+  slippage: "REALIZED_SHORTFALL_VS_QUOTED_PRICE_ONLY",
+  priceImpact: "DEPTH_IMPACT_VS_MID_BENCHMARK_ONLY",
+  network: "PAYER_SETTLED_LAMPORTS_ONLY"
+});
+const RECEIPT_KEYS = Object.freeze([
+  "schemaVersion", "evidenceLabel", "evidenceId", "source", "responseSha256",
+  "responseByteLength", "quoteRequestId", "identity", "side", "quoteObservedAt",
+  "observedAt", "amountUnit", "routeAmountBasis", "inclusion", "conversions",
+  "network", "microUsd"
+]);
+const CONVERSION_KEYS = Object.freeze([
+  "mint", "decimals", "microUsdPerWholeToken", "observedAt", "method", "evidenceSha256"
+]);
+
+function costRejection(reasons) {
+  return {
+    status: "REJECTED",
+    reasons: [...new Set(reasons)],
+    costsCents: null,
+    totalCents: null,
+    provenance: "CALLER_ASSERTED_NOT_SOURCE_VERIFIED",
+    authorizationEligible: false
+  };
+}
+
+function validConversion(value, expected, receiptTime, reasons, label) {
+  let conversion;
+  try {
+    conversion = copyPlainRecord(value, CONVERSION_KEYS, label);
+  } catch {
+    reasons.push(`COST_CONVERSION_MISSING_OR_MALFORMED:${label}`);
+    return null;
+  }
+  if (conversion.mint !== expected.mint || conversion.decimals !== expected.decimals) {
+    reasons.push(`COST_CONVERSION_IDENTITY_MISMATCH:${label}`);
+  }
+  if (typeof conversion.microUsdPerWholeToken !== "string" ||
+      !INTEGER.test(conversion.microUsdPerWholeToken) ||
+      BigInt(conversion.microUsdPerWholeToken) <= 0n) {
+    reasons.push(`COST_CONVERSION_UNITS_INVALID:${label}`);
+  }
+  if (conversion.method !== "MEASURED_SOURCE_RECEIPT" ||
+      typeof conversion.evidenceSha256 !== "string" || !SHA256.test(conversion.evidenceSha256)) {
+    reasons.push(`COST_CONVERSION_NOT_MEASURED_AND_DIGEST_BOUND:${label}`);
+  }
+  if (!validTime(conversion.observedAt) || conversion.observedAt > receiptTime) {
+    reasons.push(`COST_CONVERSION_TIME_INVALID_OR_FUTURE:${label}`);
+  } else if (receiptTime - conversion.observedAt > MAX_CAUSAL_AGE_MS) {
+    reasons.push(`COST_CONVERSION_STALE:${label}`);
+  }
+  return conversion;
+}
+
+function validateCostReceipt(value, snapshot, now) {
+  const reasons = [];
+  let receipt;
+  try {
+    receipt = copyPlainRecord(value, RECEIPT_KEYS, "cost receipt");
+  } catch {
+    return costRejection(["COST_RECEIPT_MALFORMED_OR_UNSUPPORTED_FIELD"]);
+  }
+  if (RECEIPT_KEYS.some(key => !Object.hasOwn(receipt, key))) {
+    return costRejection(["COST_RECEIPT_FIELD_MISSING"]);
+  }
+  const {request, route, observedAt, response, unsafeReasons} = snapshot;
+  if (receipt.schemaVersion !== COST_RECEIPT_SCHEMA) reasons.push("COST_RECEIPT_SCHEMA_UNSUPPORTED");
+  if (typeof receipt.evidenceId !== "string" || !SAFE_ID.test(receipt.evidenceId) ||
+      typeof receipt.evidenceLabel !== "string" || !SAFE_ID.test(receipt.evidenceLabel)) {
+    reasons.push("COST_RECEIPT_LABEL_OR_ID_INVALID");
+  }
+  if (receipt.source !== SOURCE) reasons.push("COST_SOURCE_MISMATCH");
+  if (typeof receipt.responseSha256 !== "string" || !SHA256.test(receipt.responseSha256)) {
+    reasons.push("COST_RESPONSE_DIGEST_MISSING_OR_MALFORMED");
+  } else if (!response.complete || receipt.responseSha256 !== response.sha256 ||
+             receipt.responseByteLength !== response.byteLength) {
+    reasons.push("COST_RESPONSE_DIGEST_MISMATCH");
+  }
+  if (receipt.quoteRequestId !== route.requestId) reasons.push("COST_REQUEST_ID_MISMATCH");
+  if (receipt.side !== request.side) reasons.push("COST_SIDE_MISMATCH");
+  try {
+    const identity = copyPlainRecord(receipt.identity,
+      ["chainId", "mint", "pool", "quote", "decimals"], "identity");
+    if (!sameIdentity(identity, request.identity)) reasons.push("COST_IDENTITY_MISMATCH");
+  } catch {
+    reasons.push("COST_IDENTITY_MISMATCH");
+  }
+  if (receipt.quoteObservedAt !== observedAt) reasons.push("COST_QUOTE_TIME_MISMATCH");
+  if (receipt.observedAt !== observedAt) reasons.push("COST_TIME_NOT_BOUND_TO_QUOTE_RECEIPT");
+  if (!validTime(now) || now < observedAt) reasons.push("COST_CLOCK_INVALID");
+  else if (now >= route.expiresAt) reasons.push("COST_QUOTE_EXPIRED");
+  if (unsafeReasons.length > 0) reasons.push("COST_QUOTE_NOT_CAUSAL_AND_IDENTITY_BOUND");
+  if (receipt.amountUnit !== "MICRO_USD") reasons.push("COST_UNIT_UNSUPPORTED");
+  if (receipt.routeAmountBasis !== ROUTE_AMOUNT_BASIS) reasons.push("COST_ROUTE_BASIS_OVERLAPS_COMPONENTS");
+  try {
+    const inclusion = copyPlainRecord(receipt.inclusion, COSTS, "inclusion");
+    for (const component of COSTS) {
+      if (inclusion[component] !== INCLUSION_BASIS[component]) {
+        reasons.push(`COST_INCLUSION_BASIS_UNSUPPORTED:${component}`);
+      }
+    }
+  } catch {
+    reasons.push("COST_INCLUSION_BASIS_MISSING_OR_MALFORMED");
+  }
+
+  let conversions = null;
+  try {
+    conversions = copyPlainRecord(receipt.conversions, ["quote", "sol"], "conversions");
+  } catch {
+    reasons.push("COST_CONVERSIONS_MISSING_OR_MALFORMED");
+  }
+  const quoteConversion = conversions && validConversion(conversions.quote,
+    {mint: request.identity.quote, decimals: request.quoteDecimals}, observedAt, reasons, "quote");
+  const solConversion = conversions && validConversion(conversions.sol,
+    {mint: WRAPPED_SOL_MINT, decimals: 9}, observedAt, reasons, "sol");
+
+  let microUsd = null;
+  try {
+    microUsd = copyPlainRecord(receipt.microUsd, COSTS, "microUsd");
+    for (const component of COSTS) {
+      if (!Object.hasOwn(microUsd, component)) reasons.push(`COST_COMPONENT_MISSING:${component}`);
+      else if (typeof microUsd[component] !== "string" || !INTEGER.test(microUsd[component])) {
+        reasons.push(`COST_COMPONENT_NOT_EXACT_MICRO_USD_INTEGER_STRING:${component}`);
+      }
+    }
+  } catch {
+    reasons.push("COST_COMPONENTS_MISSING_OR_UNSUPPORTED");
+  }
+
+  let network = null;
+  try {
+    network = copyPlainRecord(receipt.network, ["lamports", "payerSettled"], "network");
+  } catch {
+    reasons.push("COST_NETWORK_BASIS_MISSING_OR_MALFORMED");
+  }
+  if (network && (typeof network.lamports !== "string" || !INTEGER.test(network.lamports) ||
+      network.payerSettled !== true)) {
+    reasons.push("COST_NETWORK_NOT_PAYER_SETTLED_LAMPORTS");
+  } else if (network && microUsd && typeof microUsd.network === "string" &&
+             INTEGER.test(microUsd.network) && solConversion &&
+             typeof solConversion.microUsdPerWholeToken === "string" &&
+             INTEGER.test(solConversion.microUsdPerWholeToken) &&
+             BigInt(solConversion.microUsdPerWholeToken) > 0n &&
+             ceilDiv(BigInt(network.lamports) * BigInt(solConversion.microUsdPerWholeToken),
+               LAMPORTS_PER_SOL) !== BigInt(microUsd.network)) {
+    reasons.push("COST_NETWORK_USD_CONVERSION_INCONSISTENT");
+  }
+  if (reasons.length > 0 || !quoteConversion) return costRejection(reasons);
+
+  const normalized = normalizeExactCosts({
+    source: receipt.source,
+    binding: {...request.identity},
+    observedAt: receipt.observedAt,
+    microUsd
+  }, {
+    identity: request.identity,
+    quoteSource: SOURCE,
+    quoteObservedAt: observedAt,
+    now
+  });
+  if (normalized.status !== "NORMALIZED_UNVERIFIED") return costRejection(normalized.reasons);
+  return {
+    status: "STRUCTURALLY_VALID_UNAUTHENTICATED",
+    reasons: [],
+    evidenceLabel: receipt.evidenceLabel,
+    evidenceId: receipt.evidenceId,
+    costsCents: normalized.costsCents,
+    totalCents: normalized.totalCents,
+    rounding: normalized.rounding,
+    conversionProvenance: {
+      quoteMint: quoteConversion.mint,
+      quoteMicroUsdPerWholeToken: quoteConversion.microUsdPerWholeToken,
+      quoteEvidenceSha256: quoteConversion.evidenceSha256,
+      quoteObservedAt: quoteConversion.observedAt,
+      solEvidenceSha256: solConversion.evidenceSha256,
+      solObservedAt: solConversion.observedAt
+    },
+    responseSha256: receipt.responseSha256,
+    provenance: "CALLER_ASSERTED_NOT_SOURCE_VERIFIED",
+    authorizationEligible: false,
+    executionRealistic: false
+  };
+}
+
+function abortableTransport(transport, getExternalSignal, acquireDigest) {
   return async (url, init) => {
     const external = getExternalSignal();
+    const digest = acquireDigest();
     const controller = new AbortController();
     const abort = () => controller.abort();
     const signals = [init.signal, external].filter(Boolean);
@@ -600,7 +793,7 @@ function abortableTransport(transport, getExternalSignal) {
     let response;
     try {
       response = await transport(url, {...init, signal: controller.signal});
-      if (!response?.body?.getReader || signals.length === 0) return response;
+      if (!response?.body?.getReader) return response;
       const reader = response.body.getReader();
       let done = false;
       const cleanup = () => {
@@ -621,9 +814,18 @@ function abortableTransport(transport, getExternalSignal) {
           try {
             const chunk = await reader.read();
             if (chunk.done) {
+              if (!digest.fenced) digest.complete = true;
               cleanup();
               stream.close();
             } else {
+              if (!digest.fenced) {
+                if (chunk.value instanceof Uint8Array) {
+                  digest.hash.update(chunk.value);
+                  digest.byteLength += chunk.value.byteLength;
+                } else {
+                  digest.invalid = true;
+                }
+              }
               stream.enqueue(chunk.value);
             }
           } catch (error) {
@@ -660,6 +862,9 @@ export function createMarketQuoteAdapter({
     return Object.freeze({
       async getPaperQuote() {
         return emptyResult("DISABLED", ["ADAPTER_DISABLED"]);
+      },
+      validateCostReceipt() {
+        return costRejection(["ADAPTER_DISABLED"]);
       }
     });
   }
@@ -672,14 +877,28 @@ export function createMarketQuoteAdapter({
   let externalSignal = null;
   let inFlight = false;
   let requestsStarted = 0;
+  let digest = null;
+  const issued = new WeakMap();
   const source = createJupiterV2QuoteAdapter({
     enabled: true,
     clock,
     timeoutMs,
-    transport: abortableTransport(transport, () => externalSignal)
+    transport: abortableTransport(transport, () => externalSignal,
+      () => digest ?? {fenced: true})
   });
 
   return Object.freeze({
+    validateCostReceipt(quoteResult, receipt) {
+      const snapshot = isRecord(quoteResult) ? issued.get(quoteResult) : undefined;
+      if (!snapshot) return costRejection(["COST_QUOTE_RESULT_NOT_ISSUED_BY_THIS_ADAPTER"]);
+      let now;
+      try {
+        now = clock();
+      } catch {
+        return costRejection(["COST_CLOCK_INVALID"]);
+      }
+      return validateCostReceipt(receipt, snapshot, now);
+    },
     async getPaperQuote(value, {signal, reviewScenario} = {}) {
       if (signal !== undefined && (!signal || typeof signal.aborted !== "boolean" ||
           typeof signal.addEventListener !== "function" ||
@@ -716,6 +935,10 @@ export function createMarketQuoteAdapter({
       inFlight = true;
       requestsStarted += 1;
       externalSignal = signal ?? null;
+      const requestDigest = {
+        hash: createHash("sha256"), byteLength: 0, complete: false, invalid: false, fenced: false
+      };
+      digest = requestDigest;
       try {
         const amountMint = request.side === "ENTRY" ? request.identity.quote : request.identity.mint;
         const outputMint = request.side === "ENTRY" ? request.identity.mint : request.identity.quote;
@@ -742,7 +965,14 @@ export function createMarketQuoteAdapter({
         const scenarioProjection = projectReviewScenario(
           request, observed, reasons, parsedScenario
         );
-        return {
+        const sourceResponse = requestDigest.complete && !requestDigest.invalid ? {
+          status: "OBSERVED_RAW_BODY_DIGEST",
+          sha256: requestDigest.hash.digest("hex"),
+          byteLength: requestDigest.byteLength,
+          provenance: "SHA256_OF_BYTES_READ_BY_ADAPTER; NOT_PROVIDER_AUTHENTICATED"
+        } : {status: "UNAVAILABLE", sha256: null, byteLength: null};
+        candidate.sourceResponse = sourceResponse;
+        const result = {
           status: "UNAVAILABLE",
           reasons: [...new Set([...observed.reasons, ...reasons])],
           provider: "Jupiter",
@@ -761,10 +991,27 @@ export function createMarketQuoteAdapter({
           authorizationEligible: false,
           scenarioProjection
         };
+        issued.set(result, {
+          request,
+          route: {requestId: observed.route.requestId ?? null, expiresAt: observed.route.expiresAt},
+          observedAt: observed.route.observedAt,
+          response: {
+            complete: sourceResponse.sha256 !== null,
+            sha256: sourceResponse.sha256,
+            byteLength: sourceResponse.byteLength
+          },
+          unsafeReasons: reasons.filter(reason => [
+            "SELECTED_POOL_ROUTE_NOT_IDENTITY_BOUND", "POST_RESPONSE_CHRONOLOGY_INVALID",
+            "CAUSAL_REFERENCE_STALE", "QUOTE_EXPIRED"
+          ].includes(reason))
+        });
+        return result;
       } catch {
         return emptyResult("UNAVAILABLE", ["QUOTE_ADAPTER_ERROR"], request,
           unavailableScenario(parsedScenario, "SCENARIO_QUOTE_ADAPTER_ERROR"));
       } finally {
+        requestDigest.fenced = true;
+        digest = null;
         inFlight = false;
         externalSignal = null;
       }

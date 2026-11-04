@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import {createHash} from "node:crypto";
 import {mkdtemp, open, rm} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -12,7 +13,9 @@ import {
   createPaperRuntimeSourceAdapter,
   PAPER_RUNTIME_SOURCE_POLICY_SHA256
 } from "../scripts/memecoin-paper/paper-runtime-source.mjs";
+import {canonicalCheckpointBytes} from "../scripts/memecoin-paper/checkpoint-store.mjs";
 import {
+  WARMUP_RESPONSE_INTEGRITY_VERSION,
   createPaperProviderWarmupHandoff,
   preflightPaperProduction,
   summarizeHeliusDiagnostic
@@ -22,6 +25,7 @@ import {
   makeBirdeyeObservation,
   makeHandoffFixture,
   makeHeliusDiagnostic,
+  makeIntegrityInput,
   makeSyntheticHistoryPipeline
 } from "./fixtures/memecoin-paper-provider-warmup-handoff/synthetic.mjs";
 
@@ -591,4 +595,360 @@ test("Helius history and GPA remain bounded diagnostics, never historical or cen
     assert.equal(diagnostic.censusEligible, false);
     assert.equal(diagnostic.warmupRecord, null);
   }
+});
+
+const sha = value => createHash("sha256").update(value).digest("hex");
+
+async function integrityCase(t) {
+  const fixture = makeHandoffFixture();
+  const {store, root} = await temporaryStore(t);
+  const {observation, request, rawBodies} = await makeBirdeyeObservation(fixture);
+  const raw = rawBodies[0];
+  return {fixture, store, root, observation, request, raw,
+    input: makeIntegrityInput(fixture, observation, request, raw)};
+}
+
+function countingStore(store, hooks = {}) {
+  const counts = {publishes: 0, reads: 0};
+  return {counts, store: {
+    async publish(...args) { counts.publishes += 1; return store.publish(...args); },
+    async read(...args) {
+      counts.reads += 1;
+      const result = await store.read(...args);
+      return hooks.afterRead ? hooks.afterRead(result) : result;
+    }
+  }};
+}
+
+// Re-bind an observation to different raw bytes so only the byte-level checks can refuse it.
+function rebound(observation, raw) {
+  const next = structuredClone(observation);
+  const hash = sha(raw);
+  next.receipts[0].responseSha256 = hash;
+  next.receipts[0].responseBytes = raw.byteLength;
+  next.receipt.payloadSha256 = hash;
+  next.receipt.id = `${next.source}:${next.mint}:${next.sourceAtMs}:${hash}`;
+  return next;
+}
+
+test("exact raw bytes yield INTEGRITY_MATCH only; legacy input is NOT_CHECKED; no trust is granted", async t => {
+  const c = await integrityCase(t);
+  const result = await handoff(c.store, c.fixture).runOffline({
+    ...runRequest(c.fixture, c.observation, c.request), integrity: c.input
+  });
+  assert.equal(result.status, "OFFLINE_EVALUATED");
+  assert.deepEqual(result.integrity, {
+    status: "INTEGRITY_MATCH",
+    bindingSha256: c.input.bindingSha256,
+    responseSha256: sha(c.raw),
+    sourceAuthentication: "NOT_ESTABLISHED",
+    trust: "UNKNOWN",
+    completeness: "UNKNOWN",
+    authorization: false
+  });
+  assert.equal(result.trust, "UNKNOWN");
+  assert.equal(result.evaluation.executionAuthorized, false);
+  assert.equal(result.evaluation.realDataEntryEligible, false);
+  assert.equal(result.coverage.exactAvailable.prices.length, 0);
+  const {document} = await new EvidenceWarmupStore(c.root).read("provider-handoff-test");
+  const stored = document.records[0].integrity;
+  assert.equal(stored.version, WARMUP_RESPONSE_INTEGRITY_VERSION);
+  assert.equal(stored.bindingSha256, c.input.bindingSha256);
+  assert.equal(await createWarmupPriceSource(document).readObservation({
+    mint: c.fixture.candidate.mint, atMs: c.fixture.candidateT, denomination: "USD"
+  }), null);
+  const serialized = JSON.stringify(result) + JSON.stringify(document);
+  assert.equal(serialized.includes(c.raw.toString("utf8")), false);
+  assert.equal(serialized.includes("responseBytes\":{"), false);
+  assert.equal(JSON.stringify(Object.keys(stored).sort()), JSON.stringify([
+    "authorization", "bindingSha256", "completeness", "observationSha256", "policySha256",
+    "responseBytes", "responseSha256", "sourceAuthentication", "status", "trust", "version"
+  ]));
+
+  const legacy = await temporaryStore(t);
+  const old = await handoff(legacy.store, c.fixture).runOffline(
+    runRequest(c.fixture, c.observation, c.request));
+  assert.equal(old.integrity.status, "NOT_CHECKED");
+  assert.equal(old.integrity.sourceAuthentication, "NOT_ESTABLISHED");
+  assert.equal(old.integrity.authorization, false);
+  const legacyDoc = (await new EvidenceWarmupStore(legacy.root)
+    .read("provider-handoff-test")).document;
+  assert.equal(Object.hasOwn(legacyDoc.records[0], "integrity"), false);
+});
+
+async function refused(t, mutate, reason) {
+  const c = await integrityCase(t);
+  const counted = countingStore(c.store);
+  const next = mutate(c) ?? {};
+  const result = await handoff(counted.store, c.fixture).runOffline({
+    ...runRequest(c.fixture, next.observation ?? c.observation, c.request),
+    integrity: next.input ?? c.input
+  });
+  assert.equal(result.status, "UNKNOWN");
+  assert.equal(result.reason, reason);
+  assert.deepEqual(counted.counts, {publishes: 0, reads: 0});
+}
+
+test("mutated raw bytes or observation refuse before publication", async t => {
+  await refused(t, c => {
+    const raw = Buffer.from(c.raw);
+    raw[raw.indexOf("4".charCodeAt(0))] = "5".charCodeAt(0);
+    return {input: {...c.input, responseBytes: raw}};
+  }, "INTEGRITY_WIRE_DIGEST_MISMATCH");
+  await refused(t, c => {
+    const observation = structuredClone(c.observation);
+    observation.valueUsd *= 2;
+    observation.data.value = observation.valueUsd;
+    return {observation, input: makeIntegrityInput(c.fixture, observation, c.request, c.raw)};
+  }, "INTEGRITY_VALUE_MISMATCH");
+  await refused(t, c => {
+    const observation = structuredClone(c.observation);
+    observation.data.updateUnixTime += 1;
+    return {observation, input: makeIntegrityInput(c.fixture, observation, c.request, c.raw)};
+  }, "PROVIDER_OBSERVATION_UNBOUND");
+  await refused(t, c => {
+    const observation = structuredClone(c.observation);
+    observation.data.extra = 1;
+    return {observation, input: makeIntegrityInput(c.fixture, observation, c.request, c.raw)};
+  }, "INTEGRITY_VALUE_MISMATCH");
+  await refused(t, c => ({input: {...c.input, observationSha256: "a".repeat(64)}}),
+    "INTEGRITY_OBSERVATION_DIGEST_MISMATCH");
+  await refused(t, c => {
+    const observation = structuredClone(c.observation);
+    observation.provenanceNote = "changed";
+    return {observation, input: c.input};
+  }, "INTEGRITY_OBSERVATION_DIGEST_MISMATCH");
+});
+
+test("re-hashed failed, scaled, malformed, or oversized responses refuse", async t => {
+  const variants = [
+    [{success: false, data: {value: 0.00042, updateUnixTime: 0, isScaledUiToken: false}},
+      "INTEGRITY_VALUE_MISMATCH"],
+    [null, "INTEGRITY_RESPONSE_INVALID"]
+  ];
+  for (const [body, reason] of variants) {
+    await refused(t, c => {
+      const parsed = JSON.parse(c.raw.toString("utf8"));
+      const raw = body === null ? Buffer.from("{not json") : Buffer.from(JSON.stringify(
+        {...body, data: {...body.data, updateUnixTime: parsed.data.updateUnixTime}}));
+      const observation = rebound(c.observation, raw);
+      return {observation, input: makeIntegrityInput(c.fixture, observation, c.request, raw)};
+    }, reason);
+  }
+  await refused(t, c => {
+    const parsed = JSON.parse(c.raw.toString("utf8"));
+    parsed.data.isScaledUiToken = true;
+    const raw = Buffer.from(JSON.stringify(parsed));
+    const observation = rebound(c.observation, raw);
+    return {observation, input: makeIntegrityInput(c.fixture, observation, c.request, raw)};
+  }, "INTEGRITY_VALUE_MISMATCH");
+  await refused(t, c => {
+    const raw = Buffer.alloc(65_537, 32);
+    const observation = rebound(c.observation, raw);
+    return {observation, input: makeIntegrityInput(c.fixture, observation, c.request, raw)};
+  }, "INTEGRITY_BYTES_LIMIT");
+  await refused(t, c => ({input: {...c.input, responseBytes: new Uint8Array(0)}}),
+    "INTEGRITY_BYTES_LIMIT");
+});
+
+test("binding mismatches in identity, purpose, time, units, and policy refuse", async t => {
+  const binding = (c, change = {}, policy) => {
+    const wire = c.observation.receipts[0];
+    const body = canonicalCheckpointBytes({
+      version: WARMUP_RESPONSE_INTEGRITY_VERSION,
+      identity: {...c.fixture.identity, ...change.identity},
+      request: {...c.request, ...change.request},
+      source: c.observation.source,
+      method: "historical_price_unix",
+      methodologyVersion: c.observation.methodologyVersion,
+      policySha256: policy ?? PAPER_RUNTIME_SOURCE_POLICY_SHA256,
+      observationSha256: sha(canonicalCheckpointBytes(c.observation)),
+      responseSha256: wire.responseSha256,
+      responseBytes: wire.responseBytes
+    });
+    return sha(Buffer.concat([
+      Buffer.from("meridian:paper-warmup-response-binding:v1\n"), body
+    ]));
+  };
+  assert.equal(binding(await integrityCase(t)), (await integrityCase(t)).input.bindingSha256,
+    "test reproduction must match the module before negative variants are meaningful");
+  const variants = [
+    {identity: {pool: "other-pool"}}, {identity: {quote: "other-quote"}},
+    {request: {purpose: "other-purpose"}}, {request: {atMs: 1_000}},
+    {request: {denomination: "EUR"}}
+  ];
+  for (const change of variants) {
+    await refused(t, c => ({input: {...c.input, bindingSha256: binding(c, change)}}),
+      "INTEGRITY_BINDING_MISMATCH");
+  }
+  await refused(t, c => ({input: {...c.input, bindingSha256: binding(c, {}, "b".repeat(64))}}),
+    "INTEGRITY_BINDING_MISMATCH");
+  await refused(t, c => ({input: {...c.input, bindingSha256: "0".repeat(64)}}),
+    "INTEGRITY_BINDING_MISMATCH");
+});
+
+test("malformed or forged integrity input refuses without echoing bytes", async t => {
+  const forged = [
+    c => ({...c.input, status: "REVIEWED"}),
+    c => ({...c.input, reviewed: true}),
+    c => ({...c.input, approved: true, complete: true, trust: "REVIEWED"}),
+    c => ({...c.input, sourceAuthentication: "ESTABLISHED"}),
+    c => ({...c.input, version: "paper-warmup-response-integrity-v0"}),
+    c => ({...c.input, responseBytes: c.raw.toString("utf8")}),
+    c => ({...c.input, responseBytes: Array.from(c.raw)}),
+    c => ({...c.input, bindingSha256: "not-a-hash"}),
+    () => ({input: null}),
+    () => ({input: "x"})
+  ];
+  for (const make of forged) {
+    const c = await integrityCase(t);
+    const counted = countingStore(c.store);
+    let made = make(c);
+    if (made && Object.hasOwn(made, "input") && Object.keys(made).length === 1) made = made.input;
+    const result = await handoff(counted.store, c.fixture).runOffline({
+      ...runRequest(c.fixture, c.observation, c.request), integrity: made
+    });
+    assert.equal(result.reason, "INTEGRITY_INPUT_INVALID");
+    assert.equal(JSON.stringify(result).includes(c.raw.toString("utf8")), false);
+    assert.deepEqual(counted.counts, {publishes: 0, reads: 0});
+  }
+});
+
+test("integrity receipt tampering after immutable readback is refused", async t => {
+  const tampers = [
+    record => { record.integrity.trust = "REVIEWED"; },
+    record => { record.integrity.authorization = true; },
+    record => { record.integrity.sourceAuthentication = "ESTABLISHED"; },
+    record => { record.integrity.approved = true; },
+    record => { record.integrity.bindingSha256 = "c".repeat(64); },
+    record => { record.payload.valueUsd *= 2; record.payload.data.value *= 2; },
+    record => { delete record.integrity; }
+  ];
+  for (const tamper of tampers) {
+    const c = await integrityCase(t);
+    let evaluations = 0;
+    const counted = countingStore(c.store, {afterRead(readback) {
+      const document = structuredClone(readback.document);
+      tamper(document.records[0]);
+      return {...readback, document};
+    }});
+    const result = await handoff(counted.store, c.fixture).runOffline({
+      ...runRequest(c.fixture, c.observation, c.request, {
+        enabled: true, mode: "SYNTHETIC_TEST_ONLY",
+        async evaluate() { evaluations += 1; }
+      }),
+      integrity: c.input
+    });
+    assert.equal(result.status, "UNKNOWN");
+    assert.match(result.reason, /^(INTEGRITY|WARMUP)_READBACK_MISMATCH$/);
+    assert.equal(evaluations, 0);
+  }
+  const c = await integrityCase(t);
+  const counted = countingStore(c.store, {afterRead(readback) {
+    const document = structuredClone(readback.document);
+    document.records[0].integrity = {status: "INTEGRITY_MATCH"};
+    return {...readback, document};
+  }});
+  const legacy = await handoff(counted.store, c.fixture).runOffline(
+    runRequest(c.fixture, c.observation, c.request));
+  assert.equal(legacy.reason, "INTEGRITY_READBACK_MISMATCH");
+});
+
+test("cancellation and deadline around integrity-bound publication stop evaluation", async t => {
+  const before = await integrityCase(t);
+  const controller = new AbortController();
+  controller.abort();
+  const stopped = countingStore(before.store);
+  const early = await handoff(stopped.store, before.fixture).runOffline({
+    ...runRequest(before.fixture, before.observation, before.request),
+    integrity: before.input,
+    signal: controller.signal
+  });
+  assert.equal(early.reason, "CANCELLED");
+  assert.deepEqual(stopped.counts, {publishes: 0, reads: 0});
+
+  const after = await integrityCase(t);
+  const late = new AbortController();
+  let evaluations = 0;
+  const counted = countingStore(after.store, {afterRead(readback) {
+    late.abort();
+    return readback;
+  }});
+  const cancelled = await handoff(counted.store, after.fixture).runOffline({
+    ...runRequest(after.fixture, after.observation, after.request, {
+      enabled: true, mode: "SYNTHETIC_TEST_ONLY",
+      async evaluate() { evaluations += 1; }
+    }),
+    integrity: after.input,
+    signal: late.signal
+  });
+  assert.equal(cancelled.status, "UNKNOWN");
+  assert.equal(cancelled.reason, "CANCELLED");
+  assert.equal(evaluations, 0);
+
+  const slow = await integrityCase(t);
+  const deadline = await handoff({
+    async publish() { await new Promise(resolve => setTimeout(resolve, 50)); },
+    async read() { throw new Error("must not read"); }
+  }, slow.fixture, {limits: {maxElapsedMs: 10}}).runOffline({
+    ...runRequest(slow.fixture, slow.observation, slow.request),
+    integrity: slow.input
+  });
+  assert.equal(deadline.reason, "DEADLINE");
+});
+
+test("responseBytes cannot spoof size or run code via own properties, subclasses, or accessors", async t => {
+  const hostile = [];
+  const oversized = new Uint8Array(65_537);
+  Object.defineProperty(oversized, "byteLength", {value: 1});
+  hostile.push([oversized, "INTEGRITY_BYTES_LIMIT"]);
+  const oversizedLength = new Uint8Array(65_537);
+  Object.defineProperty(oversizedLength, "length", {value: 1});
+  hostile.push([oversizedLength, "INTEGRITY_BYTES_LIMIT"]);
+  let executed = false;
+  class Sub extends Uint8Array {
+    get byteLength() { executed = true; return 1; }
+  }
+  hostile.push([new Sub(65_537), "INTEGRITY_INPUT_INVALID"]);
+  const forgedBuffer = Buffer.alloc(65_537);
+  Object.defineProperty(forgedBuffer, "byteLength", {value: 1});
+  hostile.push([forgedBuffer, "INTEGRITY_BYTES_LIMIT"]);
+  const forgedBufferLength = Buffer.alloc(65_537);
+  Object.defineProperty(forgedBufferLength, "length", {value: 1});
+  hostile.push([forgedBufferLength, "INTEGRITY_BYTES_LIMIT"]);
+  class SubBuffer extends Buffer {}
+  hostile.push([Object.setPrototypeOf(Buffer.alloc(4), SubBuffer.prototype),
+    "INTEGRITY_INPUT_INVALID"]);
+  const accessor = new Uint8Array(4);
+  Object.defineProperty(accessor, "byteLength", {get() { executed = true; return 1; }});
+  hostile.push([accessor, "INTEGRITY_INPUT_INVALID"]);
+  const buffered = new Uint8Array(4);
+  Object.defineProperty(buffered, "buffer", {value: new ArrayBuffer(70_000)});
+  hostile.push([buffered, "INTEGRITY_INPUT_INVALID"]);
+  const proto = new Uint8Array(4);
+  Object.setPrototypeOf(proto, {__proto__: Uint8Array.prototype,
+    get byteLength() { executed = true; return 1; }});
+  hostile.push([proto, "INTEGRITY_INPUT_INVALID"]);
+  for (const [responseBytes, reason] of hostile) {
+    const c = await integrityCase(t);
+    const counted = countingStore(c.store);
+    const result = await handoff(counted.store, c.fixture).runOffline({
+      ...runRequest(c.fixture, c.observation, c.request),
+      integrity: {...c.input, responseBytes}
+    });
+    assert.equal(result.status, "UNKNOWN");
+    assert.equal(result.reason, reason);
+    assert.deepEqual(counted.counts, {publishes: 0, reads: 0});
+  }
+  assert.equal(executed, false);
+
+  const c = await integrityCase(t);
+  const padded = new Uint8Array(c.raw.length + 10);
+  padded.set(c.raw, 5);
+  const window = new Uint8Array(padded.buffer, 5, c.raw.length);
+  const ok = await handoff(c.store, c.fixture).runOffline({
+    ...runRequest(c.fixture, c.observation, c.request),
+    integrity: {...c.input, responseBytes: window}
+  });
+  assert.equal(ok.integrity.status, "INTEGRITY_MATCH");
 });

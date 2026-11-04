@@ -620,25 +620,85 @@ test("timeout and termination during a child are fenced and preserve partial out
 test("a child that emits output after the global deadline cannot become a late success", async t => {
   const harness = await fixture(t);
   let dispatches = 0;
+  let clock = 0;
+  let deadlineCallback = null;
+  let child = null;
+  const kills = [];
+  let markSpawned;
+  const spawned = new Promise(resolve => { markSpawned = resolve; });
   const spawnImpl = () => {
     dispatches += 1;
-    const child = new EventEmitter();
+    child = new EventEmitter();
     child.stdout = new PassThrough();
     child.stderr = new PassThrough();
-    child.kill = () => true;
-    setTimeout(() => {
+    child.kill = signal => { kills.push(signal); return true; };
+    markSpawned();
+    return child;
+  };
+  // Capture only the batch's own initial deadline timer, synchronously, so slow setup
+  // cannot consume it before dispatch; the deadline is fired explicitly below.
+  const realSetTimeout = globalThis.setTimeout;
+  let running;
+  globalThis.setTimeout = (callback, delay, ...rest) => {
+    if (delay === 15 && deadlineCallback === null) {
+      deadlineCallback = callback;
+      return realSetTimeout(() => {}, 60_000);
+    }
+    return realSetTimeout(callback, delay, ...rest);
+  };
+  try {
+    running = execute(harness, {timeoutMs: 15, spawnImpl, monotonicNow: () => clock});
+  } finally {
+    globalThis.setTimeout = realSetTimeout;
+  }
+  const drain = async () => {
+    for (let turn = 0; turn < 5; turn += 1) await new Promise(resolve => setImmediate(resolve));
+  };
+  // Real-time watchdog, independent of the captured deadline timer, so a missed spawn or
+  // result fails the test instead of hanging it.
+  const bounded = async (promise, label) => {
+    let watchdog;
+    try {
+      return await Promise.race([
+        promise,
+        new Promise((_, reject) => {
+          watchdog = realSetTimeout(() => reject(new Error(`${label} watchdog`)), 5_000);
+        })
+      ]);
+    } finally {
+      clearTimeout(watchdog);
+    }
+  };
+  let deadlineFired = false;
+  const fireDeadlineOnce = () => {
+    if (deadlineFired || typeof deadlineCallback !== "function") return;
+    deadlineFired = true;
+    clock = 15;
+    deadlineCallback();
+  };
+  let result;
+  try {
+    assert.equal(typeof deadlineCallback, "function");
+    await bounded(spawned, "spawn");
+    await drain();
+    fireDeadlineOnce();
+    result = await bounded(running, "result");
+  } finally {
+    fireDeadlineOnce();
+    if (child) {
       child.stdout.end(JSON.stringify({status: "PASS"}));
       child.stderr.end();
       child.emit("exit", 0, null);
       child.emit("close", 0, null);
-    }, 60);
-    return child;
-  };
-  const result = await execute(harness, {timeoutMs: 15, spawnImpl});
+    }
+    await bounded(running.catch(() => {}), "release").catch(() => {});
+    await drain();
+  }
   assert.equal(result.status, "UNKNOWN");
   assert.equal(result.code, "BATCH_DEADLINE_EXCEEDED");
+  assert.equal(result.executionStarted, true);
   assert.equal(dispatches, 1);
-  await new Promise(resolve => setTimeout(resolve, 80));
+  assert.ok(kills.includes("SIGTERM"));
   await assert.rejects(lstat(path.join(
     harness.storageRoot, IDENTITY.runId, "pipeline_quote", "PIPELINE_QUOTE.stdout"
   )), {code: "ENOENT"});
