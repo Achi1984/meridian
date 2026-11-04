@@ -23,8 +23,8 @@ import {
 
 const RPC_SOURCE = "Solana JSON-RPC";
 
-export function makeHandoffFixture() {
-  return makeFixture({buyCount: 0, sellCount: 0});
+export function makeHandoffFixture(options = {}) {
+  return makeFixture({buyCount: 0, sellCount: 0, ...options});
 }
 
 export async function makeBirdeyeObservation(fixture, overrides = {}, {
@@ -32,7 +32,8 @@ export async function makeBirdeyeObservation(fixture, overrides = {}, {
   isScaledUiToken = false,
   updateUnixTime,
   success = true,
-  omitUpdateUnixTime = false
+  omitUpdateUnixTime = false,
+  budget
 } = {}) {
   const calls = [];
   const request = {
@@ -47,6 +48,7 @@ export async function makeBirdeyeObservation(fixture, overrides = {}, {
     secret: SYNTHETIC_PROVIDER_SECRET,
     clock: () => fixture.assembledAt,
     transport: async wireRequest => {
+      const chargeBytes = budget?.reserveRequest?.();
       calls.push(wireRequest);
       const url = new URL(wireRequest.url);
       const requestedTime = Number(url.searchParams.get("unixtime"));
@@ -60,7 +62,29 @@ export async function makeBirdeyeObservation(fixture, overrides = {}, {
         success
       });
       if (omitUpdateUnixTime) delete response.data.updateUnixTime;
-      return jsonResponse(response, {url: wireRequest.url});
+      const result = jsonResponse(response, {url: wireRequest.url});
+      if (chargeBytes) {
+        const reader = result.body.getReader();
+        return {
+          ...result,
+          body: new ReadableStream({
+            async pull(controller) {
+              const {done, value: chunk} = await reader.read();
+              if (done) {
+                controller.close();
+                reader.releaseLock();
+                return;
+              }
+              chargeBytes(chunk.byteLength);
+              controller.enqueue(chunk);
+            },
+            cancel(reason) {
+              return reader.cancel(reason);
+            }
+          })
+        };
+      }
+      return result;
     }
   });
   return {

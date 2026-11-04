@@ -180,7 +180,8 @@ function sourcePipeline(fixture, {
   limits = {},
   clock = () => fixture.assembledAt,
   latency = 0,
-  beforeResponse
+  beforeResponse,
+  budget
 } = {}) {
   const harness = rpcHarness(fixture, {latency, beforeResponse});
   return createPaperSourcePipeline({
@@ -190,6 +191,7 @@ function sourcePipeline(fixture, {
     transport: harness.transport,
     clock,
     limits,
+    budget,
     ...(collector ? {
       historySlotCollector: request => collector(request, fixture.assembledAt)
     } : {})
@@ -505,6 +507,56 @@ test("request, byte, work, and shared collector budgets are cumulative", async t
   });
 });
 
+test("shared source budget reserves before dispatch and accumulates across pipeline stages", async () => {
+  const fixture = makeFixture({buyCount: 0, sellCount: 0});
+  let dispatches = 0;
+  const exhausted = createPaperSourcePipeline({
+    enabled: true,
+    mode: "SYNTHETIC_TEST_ONLY",
+    slotRange: {startInclusive: 490_000, endInclusive: 490_006},
+    clock: () => fixture.assembledAt,
+    transport: () => { dispatches += 1; },
+    budget: {
+      reserveRequest() {
+        throw Object.assign(new Error("budget exhausted"), {code: "GLOBAL_BUDGET"});
+      }
+    }
+  });
+  const baseRequest = {
+    providerCandidate: fixture.candidate,
+    candidateT: fixture.candidateT,
+    policy: fixture.policy,
+    poolProof: fixture.poolProof,
+    censusSource: fixture.censusSource,
+    priceSource: fixture.priceSource,
+    marketPairEvidence: fixture.marketPairEvidence,
+    smartWalletAllowlist: fixture.smartWalletAllowlist,
+    reviewEvidence: reviews(fixture.candidateT)
+  };
+  await exhausted.evaluate(baseRequest);
+  assert.equal(dispatches, 0);
+
+  const totals = {requests: 0, bytes: 0, work: 0};
+  const budget = {
+    reserveRequest() {
+      totals.requests += 1;
+      totals.work += 1;
+      return bytes => { totals.bytes += bytes; };
+    },
+    recordWork(units = 1) { totals.work += units; }
+  };
+  const pipeline = sourcePipeline(fixture, {collector: fixtureCollector, budget});
+  const result = await pipeline.evaluate({
+    ...baseRequest,
+    censusSource: fixture.censusSource,
+    priceSource: fixture.priceSource
+  });
+  assert.equal(result.status, "PARTIAL");
+  assert.ok(totals.requests > 1);
+  assert.ok(totals.bytes > 0);
+  assert.ok(totals.work >= totals.requests);
+});
+
 test("time limits and abort prevent an unsettled RPC callback from escaping", async t => {
   const fixture = makeFixture({buyCount: 0, sellCount: 0});
   const hanging = rpcHarness(fixture, {hang: true});
@@ -763,6 +815,54 @@ test("overlapping pipeline evaluations are explicitly rejected", async () => {
   assert.equal(result.auditReceipts.acquisition.length, 1);
 });
 
+test("cancellation during a late source read cannot return a canonical evaluation", async () => {
+  const fixture = makeFixture({buyCount: 0, sellCount: 0});
+  const controller = new AbortController();
+  let release;
+  let announce;
+  const started = new Promise(resolve => { announce = resolve; });
+  const gate = new Promise(resolve => { release = resolve; });
+  const priceSource = {
+    async readObservation(request) {
+      announce();
+      await gate;
+      return fixture.priceSource.readObservation(request);
+    }
+  };
+  const pipeline = sourcePipeline(fixture, {collector: fixtureCollector});
+  const request = {
+    providerCandidate: fixture.candidate,
+    policy: fixture.policy,
+    poolProof: fixture.poolProof,
+    priceSource,
+    censusSource: fixture.censusSource,
+    marketPairEvidence: fixture.marketPairEvidence,
+    smartWalletAllowlist: fixture.smartWalletAllowlist,
+    reviewEvidence: reviews(fixture.candidateT),
+    signal: controller.signal
+  };
+  const pending = pipeline.evaluate(request);
+  await started;
+  controller.abort();
+  const result = await Promise.race([
+    pending,
+    new Promise(resolve => setTimeout(() => resolve(null), 100))
+  ]);
+  assert.ok(result, "cancelled evaluation must settle before its source callback");
+  assert.equal(result.status, "UNKNOWN");
+  assert.equal(result.reason, "CANCELLED");
+  assert.equal(result.candidate, null);
+  assert.equal(result.executionAuthorized, false);
+  assert.equal(result.realDataEntryEligible, false);
+  release();
+  const retry = await pipeline.evaluate({
+    ...request,
+    signal: undefined,
+    priceSource: fixture.priceSource
+  });
+  assert.notEqual(retry.reason, "EVALUATION_IN_PROGRESS");
+});
+
 test("price and census source receipts completed after prefetch start are accepted only after assembly", async () => {
   const fixture = makeFixture({buyCount: 0, sellCount: 0});
   let now = fixture.assembledAt;
@@ -822,7 +922,7 @@ test("price and census source receipts completed after prefetch start are accept
   assert.equal(result.executionAuthorized, false);
 });
 
-test("late collector completion after timeout cannot overwrite the next evaluation audit", async () => {
+test("late collector completion after cancellation cannot overwrite the next evaluation audit", async () => {
   const fixture = makeFixture({buyCount: 0, sellCount: 0});
   let releaseFirst;
   let releaseSecond;
@@ -832,6 +932,7 @@ test("late collector completion after timeout cannot overwrite the next evaluati
   const secondStarted = new Promise(resolve => { announceSecond = resolve; });
   const firstPending = new Promise(resolve => { releaseFirst = resolve; });
   const secondPending = new Promise(resolve => { releaseSecond = resolve; });
+  const controller = new AbortController();
   let collectorCall = 0;
   const collector = request => {
     collectorCall += 1;
@@ -843,10 +944,10 @@ test("late collector completion after timeout cannot overwrite the next evaluati
       }));
     }
     announceSecond();
-    return secondPending.then(() => ({
-      ...fixtureCollector(request, fixture.assembledAt),
-      coverage: {...fixtureCollector(request, fixture.assembledAt).coverage, auditMarker: "B"}
-    }));
+    return secondPending.then(() => {
+      const result = fixtureCollector(request, fixture.assembledAt);
+      return {...result, coverage: {...result.coverage, auditMarker: "B"}};
+    });
   };
   const pipeline = sourcePipeline(fixture, {
     collector,
@@ -858,24 +959,90 @@ test("late collector completion after timeout cannot overwrite the next evaluati
     candidateT: fixture.candidateT,
     policy: fixture.policy,
     poolProof: fixture.poolProof,
+    reviewEvidence: reviews(fixture.candidateT),
+    signal: controller.signal
+  };
+
+  const firstEvaluation = pipeline.evaluate(request);
+  await firstStarted;
+  controller.abort();
+  const first = await firstEvaluation;
+  assert.equal(first.reason, "CANCELLED");
+  assert.equal(first.auditReceipts.acquisition.length, 0);
+
+  const secondEvaluation = pipeline.evaluate({...request, signal: undefined});
+  await secondStarted;
+  releaseFirst();
+  await new Promise(resolve => setImmediate(resolve));
+  releaseSecond();
+  const second = await secondEvaluation;
+  assert.equal(second.auditReceipts.acquisition[0]?.collectorCoverage.auditMarker, "B");
+});
+
+test("internal deadline fences late collector completion without caller abort", async () => {
+  const fixture = makeFixture({buyCount: 0, sellCount: 0});
+  let releaseFirst;
+  let releaseSecond;
+  let announceFirst;
+  let announceSecond;
+  const firstStarted = new Promise(resolve => { announceFirst = resolve; });
+  const secondStarted = new Promise(resolve => { announceSecond = resolve; });
+  const firstPending = new Promise(resolve => { releaseFirst = resolve; });
+  const secondPending = new Promise(resolve => { releaseSecond = resolve; });
+  let collectorCall = 0;
+  let priceReads = 0;
+  let censusReads = 0;
+  const collector = request => {
+    collectorCall += 1;
+    if (collectorCall === 1) {
+      announceFirst();
+      return firstPending.then(() => {
+        const result = fixtureCollector(request, fixture.assembledAt);
+        return {...result, coverage: {...result.coverage, auditMarker: "A"}};
+      });
+    }
+    announceSecond();
+    return secondPending.then(() => {
+      const result = fixtureCollector(request, fixture.assembledAt);
+      return {...result, coverage: {...result.coverage, auditMarker: "B"}};
+    });
+  };
+  const pipeline = sourcePipeline(fixture, {
+    collector,
+    limits: {maxElapsedMs: 40, maxDurationMs: 40, requestTimeoutMs: 20}
+  });
+  const request = {
+    providerCandidate: fixture.candidate,
+    evidence: {},
+    candidateT: fixture.candidateT,
+    policy: fixture.policy,
+    poolProof: fixture.poolProof,
+    priceSource: {readObservation: async args => {
+      priceReads += 1;
+      return fixture.priceSource.readObservation(args);
+    }},
+    censusSource: {readSnapshots: async args => {
+      censusReads += 1;
+      return fixture.censusSource.readSnapshots(args);
+    }},
     reviewEvidence: reviews(fixture.candidateT)
   };
 
   const firstEvaluation = pipeline.evaluate(request);
   await firstStarted;
   const first = await firstEvaluation;
-  assert.equal(first.auditReceipts.acquisition[0]?.collectorCoverage.auditMarker, undefined);
-  assert.equal(first.auditReceipts.acquisition[0]?.sourceReceipts.collector.length, 0);
+  assert.equal(first.reason, "DEADLINE");
+  assert.equal(first.auditReceipts.acquisition.length, 0);
 
   const secondEvaluation = pipeline.evaluate(request);
   await secondStarted;
   releaseFirst();
   await new Promise(resolve => setImmediate(resolve));
-  const second = await secondEvaluation;
-  assert.notEqual(second.analystEvidence.status, "COMPLETE");
-  assert.equal(second.auditReceipts.acquisition[0]?.collectorCoverage.auditMarker, undefined);
-  assert.equal(second.auditReceipts.acquisition[0]?.sourceReceipts.collector.length, 0);
-  assert.equal(second.auditReceipts.acquisition[0]?.counters.requests, 7);
-  assert.equal(second.auditReceipts.acquisition[0]?.reason, "TIME_LIMIT");
+  assert.equal(priceReads, 0);
+  assert.equal(censusReads, 0);
   releaseSecond();
+  const second = await secondEvaluation;
+  assert.equal(second.auditReceipts.acquisition[0]?.collectorCoverage.auditMarker, "B");
+  assert.equal(priceReads > 0, true);
+  assert.equal(censusReads > 0, true);
 });

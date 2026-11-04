@@ -343,7 +343,7 @@ export function offlineFixtureAdapters(options = {}) {
     runtimeAudits
   };
   const adapters = Object.freeze({
-    async acquireCandidates({now, signal, deadlineAt, remaining, recordRequest, recordWork}) {
+    async acquireCandidates({now, signal, deadlineAt, remaining, recordRequest, recordWork, budget}) {
       if (fault === "DISCONNECT") throw Object.assign(new Error("fixture disconnect"), {code: "DISCONNECTED"});
       if (fault === "CALLBACK_TIMEOUT") {
         await new Promise(resolve => setTimeout(resolve, 30));
@@ -375,7 +375,7 @@ export function offlineFixtureAdapters(options = {}) {
               : fault === "PIPELINE_QUOTE_DEADLINE" ? "EXPIRE_DURING_REQUEST" : "NONE"
           });
           acquired = await sourceAdapter.acquireCandidates({
-            signal, remaining, recordRequest, recordWork, deadlineAt
+            signal, remaining, recordRequest, recordWork, deadlineAt, budget
           });
           acquired.quoteAdapter = sourceAdapter;
         } catch (error) {
@@ -420,7 +420,7 @@ export function offlineFixtureAdapters(options = {}) {
       }
       return [row];
     },
-    async entryQuote({candidate: token, now, signal}) {
+    async entryQuote({candidate: token, now, signal, budget}) {
       entryCount += 1;
       const runtimeQuote = runtimeFixturesByMint.get(token.mint);
       if (runtimeQuote) {
@@ -428,7 +428,8 @@ export function offlineFixtureAdapters(options = {}) {
           candidate: token,
           purpose: "ENTRY",
           now,
-          signal
+          signal,
+          budget
         });
       }
       const result = fixtureQuote(token, `fixture-entry-${entryCount}`, now, 10_000);
@@ -437,7 +438,7 @@ export function offlineFixtureAdapters(options = {}) {
       clock.advance();
       return result;
     },
-    async exitQuote({candidate: token, now, purpose, position, positionOpenedAt, signal}) {
+    async exitQuote({candidate: token, now, purpose, position, positionOpenedAt, signal, budget}) {
       if (fault === "NO_MARK" && purpose === "risk-mark") return null;
       const runtimeQuote = runtimeFixturesByMint.get(token.mint);
       if (runtimeQuote) {
@@ -447,7 +448,8 @@ export function offlineFixtureAdapters(options = {}) {
           position,
           positionOpenedAt,
           now,
-          signal
+          signal,
+          budget
         });
       }
       exitCount += 1;
@@ -707,6 +709,48 @@ export function createPaperPilotComposition(options = {}) {
     );
     if (remainingMs <= 0) throw Object.assign(new Error("composition deadline reached"), {code: "DEADLINE"});
     accountRequest({bytes: 0, events: 0});
+    const budget = Object.freeze({
+      check() {
+        if (abort.signal.aborted) {
+          throw Object.assign(new Error("shared source budget stopped"), {code: "STOPPED"});
+        }
+        const time = readTime();
+        if (config.budgets.durationMs - time.elapsedMs <= 0 ||
+            compositionDeadlineAt - time.wall <= 0) {
+          throw Object.assign(new Error("shared source budget deadline reached"), {code: "DEADLINE"});
+        }
+      },
+      remaining() {
+        const time = readTime();
+        return Object.freeze({
+          requests: config.budgets.requests - counters.requests,
+          bytes: config.budgets.bytes - counters.bytes,
+          work: config.budgets.events - counters.events,
+          timeMs: Math.max(0, Math.floor(Math.min(
+            config.budgets.durationMs - time.elapsedMs,
+            compositionDeadlineAt - time.wall
+          )))
+        });
+      },
+      reserveRequest() {
+        this.check();
+        accountRequest({bytes: 0, events: 1});
+        return bytes => {
+          this.check();
+          if (!Number.isSafeInteger(bytes) || bytes < 0 ||
+              counters.bytes + bytes > config.budgets.bytes) {
+            throw Object.assign(new Error("shared source byte budget exhausted"), {
+              code: "GLOBAL_BUDGET"
+            });
+          }
+          counters.bytes += bytes;
+        };
+      },
+      recordWork(count = 1) {
+        this.check();
+        chargeWork(count);
+      }
+    });
     let timer;
     let timedOut = false;
     let timeoutCode = "CALLBACK_TIMEOUT";
@@ -726,7 +770,8 @@ export function createPaperPilotComposition(options = {}) {
         timeMs: Math.max(0, Math.floor(remainingMs))
       }),
       recordRequest: accountRequest,
-      recordWork: chargeWork
+      recordWork: chargeWork,
+      budget
     }));
     const timeoutMs = Math.min(config.budgets.callbackTimeoutMs, remainingMs);
     if (remainingMs <= config.budgets.callbackTimeoutMs) timeoutCode = "DEADLINE";

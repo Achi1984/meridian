@@ -3504,6 +3504,94 @@
       "mergeAuthorizedOrPerformed": false,
       "finalSourceFrozenPendingHostedCiAndNarrowDeltaReview": true
     },
+    "paperSourceOrchestration1211Revision20261104": {
+      "opId": "meridian-1211-orchestration-r2",
+      "recordedDate": "2026-11-04",
+      "issue": 1207,
+      "pullRequest": 1211,
+      "branch": "copilot/issue1207-source-orchestration",
+      "startingHead": "037d6aa51ed569c2507c1e59a4c5e122122c33e7",
+      "baseSha": "c24c339b763f48f64c2b018f2e12bb38d24efcf8",
+      "scope": "SYNTHETIC_SOURCE_ORCHESTRATION_AND_CANCELLATION_HARDENING_NO_PRODUCTION_AUTHORITY",
+      "state": "IMPLEMENTED_FOCUSED_TESTS_PENDING_FINAL_HEAD_HOSTED_CI_AND_REVIEW",
+      "baselineReleaseSafetyFailure": "PRESERVED_HISTORICAL_NOT_REPAIRED_OR_RELABELED",
+      "providerCallsOrKeys": false,
+      "hostRegistryWorkflowSpendOrActivation": false,
+      "issue1207": "OPEN",
+      "hostedExactHeadCi": "PENDING",
+      "independentFinalReview": "PENDING",
+      "nextGate": "FOCUSED_VALIDATION_AND_EXACT_HEAD_DELTA_REPORT_THEN_HOSTED_CI; NO_AUTO_CLOSE_OR_PRODUCTION_ADMISSION"
+    },
+    "paperSourceOrchestration1211RevisionR3": {
+      "opId": "meridian-1211-bounded-orchestration-r3",
+      "recordedDate": "2026-11-04",
+      "issue": 1207,
+      "pullRequest": 1211,
+      "branch": "copilot/issue1207-source-orchestration",
+      "startingHead": "ba200cd6fc2bdd1383b203fafc9100a2651b69f9",
+      "scope": "PARTIAL_EVALUATION_TIMEOUT_FENCING_AND_SHARED_BUDGET_HARDENING",
+      "state": "INCOMPLETE_RUNTIME_ACQUIRED_ENVELOPE_HANDOFF_NOT_IMPLEMENTED",
+      "focusedTests": "43_PASS_0_FAIL_ACROSS_SOURCE_ORCHESTRATION_PIPELINE_AND_WARMUP_HANDOFF",
+      "implemented": [
+        "evaluation-local abort controller and generation fence for internal deadline and caller cancellation",
+        "late collector completion cannot advance a timed-out evaluation or affect a later evaluation",
+        "shared request and response-byte budget is reserved before transport, collector, price, and census callbacks",
+        "warmup publication/readback use shared request reservations; publication and readback bytes are charged once at their respective boundaries",
+        "runtime warmupStore fixture-generation seam removed; generated envelopes remain at the test boundary and use the existing handoff"
+      ],
+      "remaining": [
+        "connect actual acquired envelopes to the runtime-owned warmup handoff and evaluation flow",
+        "verify end-to-end cross-stage accounting through runtime acquisition, warmup persistence/readback, history, Analyst readers, and quotes",
+        "add held-callback timeout regressions at persistence and quote boundaries"
+      ],
+      "productionRuntime": "DEFAULT_DISABLED_NO_NETWORK",
+      "providerCallsOrKeys": false,
+      "hostRegistryWorkflowSpendOrActivation": false,
+      "issue1207": "OPEN",
+      "hostedExactHeadCi": "NOT_DISPATCHED",
+      "independentFinalReview": "PENDING",
+      "nextGate": "COMPLETE_REMAINING_R3_SOURCE_CHANGES_AND_FOCUSED_TESTS_BEFORE_HOSTED_CI"
+    },
+    "paperSourceOrchestration1211RevisionR3Completion20261104": {
+      "opId": "meridian-1211-r3-completion-20261104-r2",
+      "recordedDate": "2026-11-04",
+      "issue": 1207,
+      "pullRequest": 1211,
+      "branch": "copilot/issue1207-source-orchestration",
+      "startingHead": "53a000da37705bcf5e13957fa4ff6f0981d79a83",
+      "baseSha": "c24c339b763f48f64c2b018f2e12bb38d24efcf8",
+      "scope": "SYNTHETIC_ACQUIRED_ENVELOPE_RUNTIME_HANDOFF_AND_BOUNDED_LATE_RESULT_FENCING",
+      "state": "MAIN_INTEGRATED_FOCUSED_TESTS_PASSING_HOSTED_CI_AND_INDEPENDENT_FINAL_REVIEW_PENDING",
+      "implemented": [
+        "runtime source adapter carries acquired UNKNOWN-trust envelopes through immutable warmup publication, readback, and synthetic evaluation using one run-scoped budget capability",
+        "persistence timeout returns before a held callback is released and late publication cannot start readback or replace a later evaluation",
+        "quote requests reserve before dispatch and race the shared deadline plus caller cancellation; late quote responses cannot mutate runtime audits",
+        "production runtime remains disabled and synthetic-only envelope injection is unavailable in production mode"
+      ],
+      "focusedTests": {
+        "test/memecoin-paper-source-orchestration.test.js": "8_PASS_0_FAIL",
+        "test/memecoin-paper-source-pipeline.test.js": "24_PASS_0_FAIL",
+        "test/memecoin-paper-provider-warmup-handoff.test.js": "13_PASS_0_FAIL",
+        "test/memecoin-paper-evidence-warmup.test.js": "12_PASS_0_FAIL",
+        "test/memecoin-paper-host-acceptance-batch.test.js": "17_PASS_0_FAIL"
+      },
+      "mainIntegration": {
+        "mainSha": "e51d488ee0a71d194f69ed59e4734fdfb2b6d93d",
+        "postchecks": "SAFETY_RUNTIME_COORDINATOR_PAGES_ALL_SUCCESS",
+        "independentReviewCommentId": 6632860862,
+        "canonicalReceipt": "6614426670"
+      },
+      "issue1211Acceptance": "PENDING",
+      "verification": "FOCUSED_SUITES_ONLY_NO_FULL_SUITE",
+      "codeql": "SKIPPED_DATABASE_TOO_LARGE",
+      "productionIntegration": "BLOCKED_AUTHENTICATED_TRUST_ARCHIVE_CENSUS_METRICS_QUOTE_PROVENANCE_USD_PRICE_AND_COST_CONTRACTS",
+      "providerCallsOrKeys": false,
+      "hostRegistryWorkflowSpendOrActivation": false,
+      "issue1207": "OPEN",
+      "hostedExactHeadCi": "PENDING_ONE_HOSTED_FULL_CI_AFTER_FREEZE",
+      "independentFinalReview": "PENDING",
+      "nextGate": "FREEZE_FOR_ONE_HOSTED_FULL_CI_AND_INDEPENDENT_CLAUDE_REVIEW; NO_AUTO_CLOSE_OR_PRODUCTION_ADMISSION"
+    },
     "paperHostBatch1210Recovery20261103": {
       "opId": "meridian-1210-recovery-20261103-r1",
       "recordedDate": "2026-11-03",
@@ -3534,6 +3622,37 @@
       "issue1207": "OPEN",
       "keys": "DEFERRED_NO_KEY_USE",
       "providerOrHostActivation": false
+    },
+    "paperSourceOrchestration1211CiBudgetRepair20261104": {
+      "opId": "meridian-1211-ci-budget-20261104-r1",
+      "recordedDate": "2026-11-04",
+      "issue": 1207,
+      "pullRequest": 1211,
+      "startingHead": "c0df799e1183e47dcf0a098d97190ef21849ee4e",
+      "failedCi": {
+        "runId": 41852567141,
+        "attempt": 2,
+        "jobId": 126698450011,
+        "result": "FAILED",
+        "tests": "4282_PASS_1_FAIL_0_CANCELLED_0_SKIPPED",
+        "failure": "test/memecoin-paper-pilot-composition.test.js:459 repeated fixture acquisition request allowance 40 exhausted; expected FINISHED, got UNKNOWN"
+      },
+      "diagnosis": {
+        "localReproduction": "UNKNOWN_GLOBAL_BUDGET_AT_40_REQUESTS_IN_249MS_BELOW_1000MS_CALLBACK_TIMEOUT",
+        "minimumSuccessfulRequestLimit": 55,
+        "measuredSuccessfulRequests": 55,
+        "derivation": "2_ACQUISITIONS_X_25_REQUESTS_PLUS_3_SOURCE_POLLS_PLUS_2_QUOTES",
+        "repair": "HAPPY_PATH_TEST_LIMIT_64_NINE_REQUESTS_HEADROOM",
+        "explicitExhaustionControl": "UNCHANGED_10_REQUESTS_REMAINS_UNKNOWN_GLOBAL_BUDGET"
+      },
+      "focusedTest": "node --test test/memecoin-paper-pilot-composition.test.js",
+      "focusedResult": "22_PASS_0_FAIL",
+      "hostedCi": "NOT_RERUN_PER_REQUEST",
+      "issue1207": "OPEN",
+      "productionRuntime": "DEFAULT_DISABLED",
+      "providerCallsOrKeys": false,
+      "hostRegistryWorkflowSpendOrActivation": false,
+      "nextGate": "COMMIT_NARROW_TEST_ALLOWANCE_AND_CHECKPOINT; REPORT_FINAL_HEAD; NO_BLIND_CI_RERUN"
     }
   }
 }

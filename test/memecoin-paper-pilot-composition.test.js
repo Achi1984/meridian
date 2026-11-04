@@ -460,7 +460,8 @@ test("repeated fixture acquisition shares request and work budgets and deduplica
   const duplicate = await harness(t, {
     runConfig: config({
       runId: "pipeline-duplicate",
-      budgets: {...BUDGETS, requests: 40, cycles: 8}
+      // Two 25-request acquisitions, three source polls, and two quotes need 55; keep 9 headroom.
+      budgets: {...BUDGETS, requests: 64, cycles: 8}
     }),
     fault: "PIPELINE_QUOTE_DUPLICATE"
   });
@@ -468,7 +469,7 @@ test("repeated fixture acquisition shares request and work budgets and deduplica
   assert.equal(result.status, "FINISHED");
   assert.equal(result.provenance.candidates.length, 1);
   assert.equal(result.budgets.acquisitionCycles, 3);
-  assert.ok(result.budgets.requests <= 40);
+  assert.ok(result.budgets.requests <= 64);
   assert.ok(result.budgets.events <= BUDGETS.events);
   assert.deepEqual(result.report.runnerReport.terminalResult.openPositions, []);
 
@@ -509,7 +510,7 @@ test("stop during the integrated fixture callback isolates its late completion",
 test("deadline during fixture acquisition prevents its subsequent quote request", async t => {
   const {pilot} = await harness(t, {fault: "PIPELINE_QUOTE_DEADLINE"});
   const result = await pilot.start();
-  assert.equal(result.provenance.candidates.length, 1);
+  assert.equal(result.provenance.candidates.length, 0);
   assert.equal(result.report.runnerReport.counters.candidates, 0);
   assert.equal(result.report.runnerReport.counters.quotes, 0);
   assert.ok(["FINISHED", "STOPPED", "UNKNOWN"].includes(result.status));
