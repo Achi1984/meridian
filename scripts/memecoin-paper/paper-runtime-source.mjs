@@ -172,9 +172,32 @@ function reviewedFixtureEvidence(fixture, candidateT) {
   };
 }
 
+
+export const PAPER_RUNTIME_EVIDENCE_REQUIREMENTS = Object.freeze([
+  "SOURCE_APPROVAL", "SOURCE_TIME", "COMPLETENESS", "REVIEWER_AUTHORITY", "COST_EVIDENCE"
+]);
+
+// Acceptance authority is an unresolved policy boundary: no module path may grant it,
+// so a non-synthetic evaluation never yields eligible candidates.
+export function resolveRuntimeCandidateArray(result, {synthetic = false} = {}) {
+  const refusals = PAPER_RUNTIME_EVIDENCE_REQUIREMENTS.map(requirement => ({
+    requirement,
+    status: "NOT_ACCEPTED",
+    reason: requirement === "REVIEWER_AUTHORITY" || requirement === "SOURCE_APPROVAL"
+      ? "ACCEPTANCE_AUTHORITY_UNRESOLVED" : "EVIDENCE_NOT_ACCEPTED"
+  }));
+  if (!synthetic) return {candidates: [], refusals};
+  const rows = Array.isArray(result) ? result
+    : result?.fixtureOnly === true && Array.isArray(result.candidates) ? result.candidates : null;
+  if (!rows || rows.some(row => row === null || typeof row !== "object" || Array.isArray(row))) {
+    return {candidates: [], refusals};
+  }
+  return {candidates: rows.slice(), refusals: []};
+}
+
 async function evaluateAcquiredEnvelope({
   envelope,
-  fixture,
+  identity,
   pipeline,
   evaluationRequest,
   store,
@@ -193,7 +216,7 @@ async function evaluateAcquiredEnvelope({
     store,
     datasetId: `paper-runtime-${candidateT}`,
     runId: `paper-runtime-run-${candidateT}`,
-    identity: fixture.identity,
+    identity,
     clock: () => clock.wallClock(),
     limits: {maxElapsedMs: Math.max(1, Math.min(10_000, remaining.timeMs))}
   });
@@ -203,7 +226,7 @@ async function evaluateAcquiredEnvelope({
     pipeline,
     evaluationRequest,
     priceEndpoints: [{
-      mint: fixture.candidate.mint,
+      mint: identity.mint,
       atMs: candidateT,
       denomination: "USD"
     }],
@@ -475,7 +498,7 @@ export async function acquireSyntheticRuntimeFixture(clock, {
     }
     warmup = await evaluateAcquiredEnvelope({
       envelope: acquiredEnvelope,
-      fixture,
+      identity: fixture.identity,
       pipeline,
       evaluationRequest,
       store: warmupStore,
@@ -507,13 +530,6 @@ export async function acquireSyntheticRuntimeFixture(clock, {
       candidate: null,
       pipeline: evaluation,
       quote: null,
-      warmup: warmup ? {
-        status: warmup.status,
-        reason: warmup.reason ?? null,
-        datasetDigest: warmup.datasetDigest ?? null,
-        trust: warmup.trust ?? "UNKNOWN",
-        completeness: warmup.completeness ?? "UNKNOWN"
-      } : null,
       warmup: warmup ? {
         status: warmup.status,
         reason: warmup.reason ?? null,
@@ -885,6 +901,10 @@ export function createPaperRuntimeSourceAdapter(options = {}) {
           fixtureOnly: true
         };
       },
+      async acquireCandidateArray(input) {
+        const result = await this.acquireCandidates(input);
+        return resolveRuntimeCandidateArray(result, {synthetic: true}).candidates;
+      },
       async quote(request, quoteOptions) {
         const candidate = request?.candidate;
         const fixture = fixtures.get(candidate?.mint);
@@ -904,6 +924,9 @@ export function createPaperRuntimeSourceAdapter(options = {}) {
     mode: "EXTERNAL_READ_ONLY_INPUT"
   });
   const quoteAdapter = createMarketQuoteAdapter({enabled: false});
+  // Only module-issued candidates may reach quotes; the registry is never populated while
+  // the source policy is unapproved.
+  const issuedCandidates = new WeakMap();
 
   return Object.freeze({
     async acquireCandidates({signal, remaining} = {}) {
@@ -926,6 +949,7 @@ export function createPaperRuntimeSourceAdapter(options = {}) {
         reason: "SOURCE_POLICY_UNAPPROVED",
         candidates: [],
         unresolved: [...PAPER_SOURCE_POLICY.missingRequirements],
+        refusals: resolveRuntimeCandidateArray(null).refusals,
         pipelineVersion: PAPER_SOURCE_PIPELINE_VERSION,
         pipelineEnabled: pipeline.enabled,
         quoteAdapterStatus: "DISABLED",
@@ -934,6 +958,16 @@ export function createPaperRuntimeSourceAdapter(options = {}) {
       };
     },
     async quote(request, options) {
+      const candidate = request?.candidate;
+      const issued = candidate && typeof candidate === "object" ? issuedCandidates.get(candidate) : null;
+      if (!issued || ["chainId", "mint", "pool", "quote", "sampledAt"].some(key =>
+        candidate[key] !== issued[key])) {
+        return {
+          status: "UNAVAILABLE",
+          reasons: ["CANDIDATE_NOT_MODULE_ISSUED"],
+          authorizationEligible: false
+        };
+      }
       return quoteAdapter.getPaperQuote(request, options);
     }
   });

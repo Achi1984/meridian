@@ -3552,6 +3552,28 @@
       "independentFinalReview": "PENDING",
       "nextGate": "COMPLETE_REMAINING_R3_SOURCE_CHANGES_AND_FOCUSED_TESTS_BEFORE_HOSTED_CI"
     },
+    "paperSourceRuntimeComposition1218Draft20261104": {
+      "recordedDate": "2026-11-04",
+      "issue": 1218,
+      "parentIssue": 1207,
+      "branch": "copilot/issue-1218-source-runtime-composition",
+      "baseSha": "9694144218815109aed8fd46e4f5f3360ea72232",
+      "scope": "FIXTURE_NEUTRAL_HANDOFF_IDENTITY_CANONICAL_ARRAY_REFUSAL_AUDIT_AND_ISSUED_CANDIDATE_QUOTE_BINDING",
+      "state": "IMPLEMENTED_FOCUSED_TESTS_PASSING_HOSTED_CI_AND_REVIEW_PENDING",
+      "unresolvedPolicy": [
+        "source approval and provider authenticity",
+        "reviewer identity and acceptance authority",
+        "complete archival coverage",
+        "source-bound USD cost policy"
+      ],
+      "realPathAcquisition": "BLOCKED_BY_UNAPPROVED_POLICY_AND_SYNTHETIC_ONLY_HANDOFF_PIPELINE_MODE",
+      "productionRuntime": "DEFAULT_DISABLED_NO_NETWORK_NO_ELIGIBLE_CANDIDATES",
+      "providerCallsOrKeys": false,
+      "hostRegistryWorkflowSpendOrActivation": false,
+      "issue1207": "OPEN",
+      "mergeAuthorizedOrPerformed": false,
+      "preservedHistoriesRoutingLastSeen": true
+    },
     "paperSourceOrchestration1211RevisionR3Completion20261104": {
       "opId": "meridian-1211-r3-completion-20261104-r2",
       "recordedDate": "2026-11-04",
