@@ -32,8 +32,33 @@ const SCENARIO_CASES = Object.freeze({
     scenarioId: "MEMECOIN_PAPER_QUOTE_ADVERSE_V1_STRESS",
     adverseAdjustmentBps: 300,
     networkReserveCents: "50"
+  }),
+  QUOTED_NET_V1: Object.freeze({
+    scenarioId: "MERIDIAN_PAPER_QUOTED_NET_V1",
+    adverseAdjustmentBps: 300,
+    networkReserveCents: "50"
   })
 });
+const QUOTED_NET_CASE = "QUOTED_NET_V1";
+const QUOTED_NET_MODEL = Object.freeze({
+  id: "MERIDIAN_PAPER_QUOTED_NET_V1",
+  version: "1",
+  status: "PROPOSED_FOR_INDEPENDENT_REVIEW",
+  provenance: "MODELED",
+  formula: "additionalModeledCents = ceil(ledgerGrossCents * adverseAdjustmentBps / 10000) + networkReserveCents",
+  currencyAssumption: "1_USDC_EQUALS_1_MODELED_USD_UNSUPPORTED_BY_MARKET_ACCOUNTING_ASSUMPTION; NOT_OBSERVED_FX; NOT_DEPEG_PROTECTION",
+  parameterStatus: "PROPOSED_UNCALIBRATED_NOT_GUARANTEED_WORST_CASE_REAL_COST",
+  dispositions: Object.freeze({
+    feeCents: "NO_INCREMENTAL_CHARGE_UNDER_SCENARIO_BASIS",
+    spreadCents: "NO_INCREMENTAL_CHARGE_UNDER_SCENARIO_BASIS",
+    slippageCents: "MODELED_ADVERSE_ADJUSTMENT_ROUNDED_UP",
+    priceImpactCents: "NO_INCREMENTAL_CHARGE_UNDER_SCENARIO_BASIS",
+    networkCents: "MODELED_FIXED_USD_RESERVE_PER_SIDE"
+  })
+});
+const MODEL_DISPOSITION_KEYS = Object.freeze([
+  "feeCents", "spreadCents", "slippageCents", "priceImpactCents", "networkCents"
+]);
 const PAPER_ENTRY_LIMIT_CENTS = BigInt(PAPER_LEDGER_POLICY.maxEntryCents);
 const MICRO_USD_PER_CENT = 10_000n;
 const BPS = 10_000n;
@@ -74,6 +99,19 @@ function copyPlainRecord(value, keys, label) {
 function sameIdentity(actual, expected) {
   return ["chainId", "mint", "pool", "quote", "decimals"]
     .every(key => actual?.[key] === expected?.[key]);
+}
+
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (isRecord(value)) {
+    return `{${Object.keys(value).sort().map(key =>
+      `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value ?? null);
+}
+
+export function paperQuotedNetModelDigest(binding) {
+  return createHash("sha256").update(canonicalJson(binding)).digest("hex");
 }
 
 function ceilDiv(numerator, denominator) {
@@ -241,7 +279,7 @@ function maximumEntryBaseAtoms(routeBaseAtoms, priceMicros, baseScale, adjustmen
   return low;
 }
 
-function projectReviewScenario(request, observation, candidateReasons, parsedScenario) {
+function projectReviewScenario(request, observation, candidateReasons, parsedScenario, sourceResponse) {
   if (parsedScenario?.error) {
     return blockedScenarioProjection(["SCENARIO_CONFIGURATION_INVALID"]);
   }
@@ -320,6 +358,84 @@ function projectReviewScenario(request, observation, candidateReasons, parsedSce
       return blockedScenarioProjection(["SCENARIO_COSTS_EXCEED_ROUNDED_EXIT_CREDIT"]);
     }
     quoteValueAfterCostsCents = grossQuoteCents - totalScenarioCosts;
+  }
+
+  let model;
+  if (config.scenario === QUOTED_NET_CASE) {
+    if (!sourceResponse?.sha256 || route.inAmount !== request.amountAtoms) {
+      return blockedScenarioProjection(["SCENARIO_QUOTED_AMOUNT_OR_RESPONSE_BINDING_MISSING"]);
+    }
+    const modeledInputAtoms = request.side === "ENTRY" ? modeledQuoteAtoms : modeledBaseAtoms;
+    const binding = {
+      modelId: QUOTED_NET_MODEL.id,
+      modelVersion: QUOTED_NET_MODEL.version,
+      status: QUOTED_NET_MODEL.status,
+      provenance: QUOTED_NET_MODEL.provenance,
+      parameterStatus: QUOTED_NET_MODEL.parameterStatus,
+      formula: QUOTED_NET_MODEL.formula,
+      scenarioConfigSha256: parsed.sha256,
+      parameters: {
+        adverseAdjustmentBps: {value: config.adverseAdjustmentBps, unit: "basis_points_of_ledger_gross_cents_ceil"},
+        networkReserveCents: {value: config.networkReserveCents, unit: "us_cents_per_side"},
+        feeCents: {value: config.feeCents, unit: "additional_us_cents"},
+        spreadCents: {value: config.spreadCents, unit: "additional_us_cents"},
+        priceImpactCents: {value: config.priceImpactCents, unit: "additional_us_cents"}
+      },
+      currency: {
+        mint: config.usdcMint,
+        decimals: config.usdcDecimals,
+        microUsdPerToken: config.usdcUsdMicrosPerToken,
+        assumption: QUOTED_NET_MODEL.currencyAssumption
+      },
+      quoteBasis: config.quoteBasis,
+      dispositions: {...QUOTED_NET_MODEL.dispositions},
+      candidateIdentity: {...request.identity},
+      side: request.side,
+      quantity: {
+        modeledBaseAtoms: modeledBaseAtoms.toString(),
+        modeledInputAtoms: modeledInputAtoms.toString(),
+        sourceQuotedBaseAtoms: baseAtoms.toString(),
+        sourceQuotedInputAtoms: route.inAmount,
+        sizeDisposition: modeledBaseAtoms === baseAtoms
+          ? "QUOTED_AMOUNT"
+          : "SMALLER_SIZE_MODELED_NOT_A_FRESH_EXECUTABLE_QUOTE"
+      },
+      sourceQuote: {
+        source: SOURCE,
+        requestId: route.requestId ?? null,
+        observedAt: receivedAt,
+        expiresAt: route.expiresAt,
+        inAmount: route.inAmount,
+        outAmount: route.outAmount,
+        responseSha256: sourceResponse.sha256,
+        responseByteLength: sourceResponse.byteLength
+      },
+      result: {
+        priceMicros: priceMicros.toString(),
+        grossCents: grossQuoteCents.toString(),
+        slippageCents: slippageCents.toString(),
+        networkCents: config.networkReserveCents,
+        totalExtraCents: totalScenarioCosts.toString(),
+        afterCents: quoteValueAfterCostsCents.toString()
+      }
+    };
+    model = {
+      binding,
+      digest: paperQuotedNetModelDigest(binding),
+      assumptions: [
+        "Numeric parameters are proposed, uncalibrated, and not guaranteed worst-case real costs.",
+        "Fee, spread, and price impact add 0 under the explicit QUOTED_NET basis; actual zero or independently verified inclusion is not asserted.",
+        "1 USDC = 1 MODELED_USD is an unsupported-by-market accounting assumption, not observed FX or depeg protection.",
+        "Provider fee, platform fee, price impact, minimum output, slippage tolerance, and lamports are retained separately and never charged again.",
+        "Smaller-size projections are modeled, not fresh executable quotes."
+      ],
+      resultContract: {
+        provenance: "MODELED",
+        actualCostCoverage: "UNKNOWN",
+        executionRealistic: false,
+        authority: "NONE_POLICY_BOUND_ACCEPTANCE_REQUIRES_INDEPENDENT_RUN_POLICY_BINDING"
+      }
+    };
   }
 
   const costsCents = {
@@ -404,6 +520,7 @@ function projectReviewScenario(request, observation, candidateReasons, parsedSce
       priceImpact: route.priceImpact,
       slippageToleranceBps: route.slippageBps
     },
+    ...(model ? {model, provenance: "MODELED"} : {}),
     authorizationEligible: false,
     executionRealistic: false,
     integrationEligible: false,
@@ -962,15 +1079,15 @@ export function createMarketQuoteAdapter({
             unavailableScenario(parsedScenario, "SCENARIO_SOURCE_QUOTE_NOT_CAUSAL_AND_BOUND"));
         }
         const {candidate, reasons} = buildCandidate(request, observed);
-        const scenarioProjection = projectReviewScenario(
-          request, observed, reasons, parsedScenario
-        );
         const sourceResponse = requestDigest.complete && !requestDigest.invalid ? {
           status: "OBSERVED_RAW_BODY_DIGEST",
           sha256: requestDigest.hash.digest("hex"),
           byteLength: requestDigest.byteLength,
           provenance: "SHA256_OF_BYTES_READ_BY_ADAPTER; NOT_PROVIDER_AUTHENTICATED"
         } : {status: "UNAVAILABLE", sha256: null, byteLength: null};
+        const scenarioProjection = projectReviewScenario(
+          request, observed, reasons, parsedScenario, sourceResponse
+        );
         candidate.sourceResponse = sourceResponse;
         const result = {
           status: "UNAVAILABLE",
@@ -1017,4 +1134,58 @@ export function createMarketQuoteAdapter({
       }
     }
   });
+}
+
+export function verifyPaperQuotedNetProjection(projection) {
+  const reasons = [];
+  const model = projection?.model;
+  const binding = model?.binding;
+  if (!isRecord(model) || !isRecord(binding) || projection.status !== "REVIEW_PROJECTION_ONLY") {
+    return {valid: false, reasons: ["MODEL_MISSING"]};
+  }
+  const check = (ok, reason) => { if (!ok) reasons.push(reason); };
+  let digestOk = false;
+  try {
+    digestOk = model.digest === paperQuotedNetModelDigest(binding);
+  } catch {
+    digestOk = false;
+  }
+  check(digestOk, "MODEL_DIGEST_MISMATCH");
+  check(binding.modelId === QUOTED_NET_MODEL.id && binding.modelVersion === QUOTED_NET_MODEL.version &&
+    binding.status === QUOTED_NET_MODEL.status && binding.provenance === "MODELED",
+  "MODEL_IDENTITY_MISMATCH");
+  const dispositions = binding.dispositions;
+  check(isRecord(dispositions) &&
+    Object.keys(dispositions).length === MODEL_DISPOSITION_KEYS.length &&
+    MODEL_DISPOSITION_KEYS.every(key => dispositions[key] === QUOTED_NET_MODEL.dispositions[key]),
+  "MODEL_DISPOSITION_MISSING_OR_ALTERED");
+  const p = binding.parameters;
+  check(p?.adverseAdjustmentBps?.value === 300 && p.networkReserveCents?.value === "50" &&
+    p.feeCents?.value === "0" && p.spreadCents?.value === "0" && p.priceImpactCents?.value === "0",
+  "MODEL_PARAMETERS_MISMATCH");
+  check(binding.currency?.mint === SOLANA_USDC_MINT && binding.currency.decimals === 6 &&
+    binding.currency.microUsdPerToken === "1000000" &&
+    binding.currency.assumption === QUOTED_NET_MODEL.currencyAssumption,
+  "MODEL_CURRENCY_ASSUMPTION_MISMATCH");
+  const r = binding.result;
+  const costs = projection.costsCents;
+  check(isRecord(r) && isRecord(costs) && r.slippageCents === costs.slippageCents &&
+    r.networkCents === costs.networkCents &&
+    r.grossCents === projection.quoteValue?.grossBeforeExtraScenarioCostsCents &&
+    r.totalExtraCents === projection.quoteValue?.totalExtraScenarioCostsCents &&
+    r.afterCents === projection.quoteValue?.afterExtraScenarioCostsCents &&
+    r.priceMicros === String(projection.priceMicros),
+  "MODEL_RESULT_PROJECTION_MISMATCH");
+  check(sameIdentity(binding.candidateIdentity, projection.identity) &&
+    binding.side === projection.side &&
+    binding.scenarioConfigSha256 === projection.scenario?.configurationSha256,
+  "MODEL_BINDING_PROJECTION_MISMATCH");
+  check(typeof binding.sourceQuote?.responseSha256 === "string" &&
+    SHA256.test(binding.sourceQuote.responseSha256),
+  "MODEL_SOURCE_QUOTE_UNBOUND");
+  check(projection.actualCostCoverage === "UNKNOWN" && projection.provenance === "MODELED" &&
+    projection.executionRealistic === false && projection.authorizationEligible === false &&
+    projection.integrationEligible === false,
+  "MODEL_AUTHORITY_OR_COVERAGE_OVERSTATED");
+  return {valid: reasons.length === 0, reasons};
 }

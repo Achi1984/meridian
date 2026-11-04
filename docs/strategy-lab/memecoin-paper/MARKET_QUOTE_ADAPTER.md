@@ -295,6 +295,40 @@ checks bind claims to bytes and clocks the module observed, nothing more.
 time, how a Jupiter net-amount quote may map to the required gross basis, and
 whether modeled costs may ever be labeled separately from measured costs.
 
+## Proposed `MERIDIAN_PAPER_QUOTED_NET_V1` (modeled, review pending)
+
+Issue #1220. A third scenario case, `QUOTED_NET_V1` (`scenarioId`
+`MERIDIAN_PAPER_QUOTED_NET_V1`), extends the same projection and shared
+BigInt arithmetic; `BASELINE`/`STRESS` output is unchanged. Status:
+`PROPOSED_FOR_INDEPENDENT_REVIEW`. The owner approved the transparent modeled
+methodology (mailbox 942/6639026463); the numeric values below are proposed,
+uncalibrated, and **not** guaranteed worst-case real costs. Adoption requires a
+separate independent review and run-policy binding.
+
+- Additional modeled cost per side on ledger gross `G` cents:
+  `ceil(G * 300 / 10000) + 50` (300 bp adverse adjustment, 50 US cents network
+  reserve). Example: `G = 7718` -> `ceil(231.54) + 50 = 282` cents, all-in 8000.
+- Fee, spread, and price impact add `0` under the explicit QUOTED_NET basis;
+  this is never an assertion of actual zero or verified inclusion. Provider
+  `feeBps`, `platformFee`, `priceImpact`, `minOut`, slippage tolerance, and
+  lamports are retained separately and never charged again.
+- Fixed native Solana USDC mint, 6 decimals. `1 USDC = 1 MODELED_USD` is an
+  unsupported-by-market accounting assumption, not observed FX or depeg
+  protection.
+- Requires a causal quote issued by the same adapter whose `inAmount` equals the
+  requested amount and whose raw response digest was read. Entry sizes below the
+  quoted amount are labeled `SMALLER_SIZE_MODELED_NOT_A_FRESH_EXECUTABLE_QUOTE`;
+  missing or contradictory input returns `BLOCKED` with no `model`.
+- Result contract (for the runtime policy writer): `projection.model.binding`
+  (every parameter with units, currency assumption, five dispositions,
+  candidate identity, side, quantity, source-quote identity incl. response
+  SHA-256, and computed cents), `projection.model.digest =
+  paperQuotedNetModelDigest(binding)` (SHA-256 of sorted-key canonical JSON),
+  `provenance: "MODELED"`, `actualCostCoverage: "UNKNOWN"`,
+  `executionRealistic: false`, no authority. `verifyPaperQuotedNetProjection`
+  recomputes the digest and rejects mutation or overstated authority. It does
+  not authenticate the provider or reviewer.
+
 ## Offline validation
 
 `node --test test/memecoin-paper-quote-cost-receipt.test.js` additionally covers
