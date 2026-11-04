@@ -173,6 +173,17 @@ function reviewedFixtureEvidence(fixture, candidateT) {
 }
 
 
+// No exported issuer exists: candidates become module-issued only through a future
+// approved acquisition path, never through caller data.
+const ISSUED_RUNTIME_CANDIDATES = new WeakMap();
+
+export function isIssuedRuntimeCandidate(candidate) {
+  const issued = candidate !== null && typeof candidate === "object"
+    ? ISSUED_RUNTIME_CANDIDATES.get(candidate) : null;
+  return Boolean(issued) && ["chainId", "mint", "pool", "quote", "sampledAt"]
+    .every(key => candidate[key] === issued[key]);
+}
+
 export const PAPER_RUNTIME_EVIDENCE_REQUIREMENTS = Object.freeze([
   "SOURCE_APPROVAL", "SOURCE_TIME", "COMPLETENESS", "REVIEWER_AUTHORITY", "COST_EVIDENCE"
 ]);
@@ -829,9 +840,105 @@ export async function acquireSyntheticRuntimeFixture(clock, {
   };
 }
 
+const DIAGNOSTIC_KEYS = ["evaluationRequest", "observation", "request", "slotRange"];
+
+function validateDiagnosticInput(input, warmupStore) {
+  const valid = input !== null && typeof input === "object" && !Array.isArray(input) &&
+    Object.getPrototypeOf(input) === Object.prototype &&
+    Object.getOwnPropertySymbols(input).length === 0 &&
+    Object.getOwnPropertyNames(input).sort().join(",") === DIAGNOSTIC_KEYS.join(",") &&
+    DIAGNOSTIC_KEYS.every(key =>
+      Object.hasOwn(Object.getOwnPropertyDescriptor(input, key), "value")) &&
+    hasDataMethod(warmupStore, "publish") && hasDataMethod(warmupStore, "read");
+  if (!valid) throw new TypeError("diagnostic input must be exact bounded data with a warmup store");
+  return input;
+}
+
+// Supplied observations are normalized and evaluated in EXTERNAL_READ_ONLY_INPUT mode with a
+// transport that refuses every request: no network, UNKNOWN trust, and never a candidate.
+async function runExternalDiagnostic({
+  diagnostic, warmupStore, signal, remaining, recordRequest, recordWork, deadlineAt, budget
+}) {
+  const refuse = status => ({
+    status,
+    mode: "EXTERNAL_READ_ONLY_INPUT",
+    trust: "UNKNOWN",
+    completeness: "UNKNOWN",
+    eligibleCandidates: 0,
+    executionAuthorized: false,
+    networkAccessed: false
+  });
+  if (!remaining || !Number.isSafeInteger(remaining.work) || !Number.isSafeInteger(remaining.timeMs) ||
+      !Number.isSafeInteger(remaining.requests) || !Number.isSafeInteger(remaining.bytes) ||
+      typeof recordRequest !== "function" || typeof recordWork !== "function" ||
+      !Number.isSafeInteger(deadlineAt) || remaining.requests < 1 || remaining.bytes < 1 ||
+      remaining.work < 1 || remaining.timeMs < 1) {
+    return {...refuse("REFUSED"), reason: "GLOBAL_BUDGET"};
+  }
+  try {
+    const candidate = diagnostic.evaluationRequest?.providerCandidate;
+    const atMs = diagnostic.request?.atMs;
+    const pipeline = createPaperSourcePipeline({
+      enabled: true,
+      mode: "EXTERNAL_READ_ONLY_INPUT",
+      slotRange: diagnostic.slotRange,
+      transport: async () => {
+        throw Object.assign(new Error("diagnostic transport is disabled"), {code: "NETWORK_DISABLED"});
+      },
+      clock: () => Date.now(),
+      limits: {
+        maxRequests: Math.max(1, remaining.requests),
+        maxBytesPerResponse: Math.min(1_048_576, Math.max(1, Math.floor(remaining.bytes / 3))),
+        maxBytesPerRun: Math.max(1, remaining.bytes),
+        maxWorkUnits: Math.max(1, remaining.work),
+        maxDurationMs: Math.max(1, remaining.timeMs),
+        requestTimeoutMs: Math.min(1_000, Math.max(1, remaining.timeMs))
+      },
+      budget
+    });
+    const {createPaperProviderWarmupHandoff} = await import("./provider-warmup-handoff/index.mjs");
+    const handoff = createPaperProviderWarmupHandoff({
+      enabled: true,
+      store: warmupStore,
+      datasetId: `paper-diagnostic-${atMs}`,
+      runId: `paper-diagnostic-run-${atMs}`,
+      identity: {
+        chainId: candidate?.chainId, mint: candidate?.mint,
+        pool: candidate?.pool, quote: candidate?.quote
+      },
+      clock: () => Date.now(),
+      limits: {maxElapsedMs: Math.max(1, Math.min(10_000, remaining.timeMs))}
+    });
+    const result = await handoff.runOffline({
+      observation: diagnostic.observation,
+      request: diagnostic.request,
+      pipeline,
+      evaluationRequest: diagnostic.evaluationRequest,
+      priceEndpoints: [{mint: candidate?.mint, atMs, denomination: "USD"}],
+      signal, remaining, recordRequest, recordWork, deadlineAt, budget
+    });
+    return {
+      ...refuse(result.status),
+      reason: result.reason ?? null,
+      datasetDigest: result.datasetDigest ?? null,
+      pipelineStatus: result.evaluation?.status ?? null,
+      pipelineReason: result.evaluation?.reason ?? null,
+      pipelineCandidateAvailable: Boolean(result.evaluation?.candidate),
+      realDataEntryEligible: false
+    };
+  } catch (error) {
+    return {
+      ...refuse("REFUSED"),
+      reason: typeof error?.code === "string" && /^[A-Z0-9_]{1,48}$/.test(error.code)
+        ? error.code : "INVALID_DIAGNOSTIC_INPUT"
+    };
+  }
+}
+
 export function createPaperRuntimeSourceAdapter(options = {}) {
   const allowedOptions = [
-    "sourcePolicySha256", "fixtureMode", "clock", "variant", "fixtureBehavior", "warmupStore"
+    "sourcePolicySha256", "fixtureMode", "clock", "variant", "fixtureBehavior", "warmupStore",
+    "diagnosticInput"
   ];
   if (!options || typeof options !== "object" || Array.isArray(options) ||
       ![Object.prototype, null].includes(Object.getPrototypeOf(options)) ||
@@ -849,6 +956,7 @@ export function createPaperRuntimeSourceAdapter(options = {}) {
     fixtureBehavior = "NONE"
   } = options;
   const warmupStore = options.warmupStore;
+  const {diagnosticInput} = options;
   if (sourcePolicySha256 !== PAPER_RUNTIME_SOURCE_POLICY_SHA256) {
     throw new TypeError("source policy digest does not match the module-owned policy");
   }
@@ -916,20 +1024,23 @@ export function createPaperRuntimeSourceAdapter(options = {}) {
     });
   }
 
-  if (Object.keys(options).sort().join(",") !== "sourcePolicySha256") {
+  const productionKeys = Object.keys(options).sort().join(",");
+  if (productionKeys !== "sourcePolicySha256" &&
+      productionKeys !== "diagnosticInput,sourcePolicySha256,warmupStore") {
     throw new TypeError("production runtime source options are not injectable");
   }
+  const diagnostic = diagnosticInput === undefined ? null
+    : validateDiagnosticInput(diagnosticInput, warmupStore);
   const pipeline = createPaperSourcePipeline({
     enabled: false,
     mode: "EXTERNAL_READ_ONLY_INPUT"
   });
   const quoteAdapter = createMarketQuoteAdapter({enabled: false});
-  // Only module-issued candidates may reach quotes; the registry is never populated while
-  // the source policy is unapproved.
-  const issuedCandidates = new WeakMap();
 
   return Object.freeze({
-    async acquireCandidates({signal, remaining} = {}) {
+    async acquireCandidates({
+      signal, remaining, recordRequest, recordWork, deadlineAt, budget
+    } = {}) {
       if (signal?.aborted) {
         return {status: "UNKNOWN", reason: "STOPPED", candidates: [], unresolved: []};
       }
@@ -944,9 +1055,17 @@ export function createPaperRuntimeSourceAdapter(options = {}) {
           unresolved: [...PAPER_SOURCE_POLICY.missingRequirements]
         };
       }
+      const diagnosticResult = diagnostic
+        ? await runExternalDiagnostic({
+          diagnostic, warmupStore, signal, remaining, recordRequest, recordWork, deadlineAt, budget
+        }) : null;
+      if (signal?.aborted) {
+        return {status: "UNKNOWN", reason: "STOPPED", candidates: [], unresolved: []};
+      }
       return {
         status: "UNKNOWN",
         reason: "SOURCE_POLICY_UNAPPROVED",
+        ...(diagnosticResult ? {diagnostic: diagnosticResult} : {}),
         candidates: [],
         unresolved: [...PAPER_SOURCE_POLICY.missingRequirements],
         refusals: resolveRuntimeCandidateArray(null).refusals,
@@ -958,10 +1077,7 @@ export function createPaperRuntimeSourceAdapter(options = {}) {
       };
     },
     async quote(request, options) {
-      const candidate = request?.candidate;
-      const issued = candidate && typeof candidate === "object" ? issuedCandidates.get(candidate) : null;
-      if (!issued || ["chainId", "mint", "pool", "quote", "sampledAt"].some(key =>
-        candidate[key] !== issued[key])) {
+      if (!isIssuedRuntimeCandidate(request?.candidate)) {
         return {
           status: "UNAVAILABLE",
           reasons: ["CANDIDATE_NOT_MODULE_ISSUED"],

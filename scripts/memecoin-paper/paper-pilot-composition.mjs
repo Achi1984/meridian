@@ -19,6 +19,8 @@ import {createPaperExecutionStep} from "./execution-step.mjs";
 import {PAPER_LEDGER_POLICY} from "./ledger.mjs";
 import {
   createPaperRuntimeSourceAdapter,
+  isIssuedRuntimeCandidate,
+  resolveRuntimeCandidateArray,
   PAPER_RUNTIME_SOURCE_POLICY,
   PAPER_RUNTIME_SOURCE_POLICY_SHA256
 } from "./paper-runtime-source.mjs";
@@ -390,7 +392,7 @@ export function offlineFixtureAdapters(options = {}) {
           runtimeFixturesByMint.set(acquired.candidate.mint, request =>
             acquired.quoteAdapter.quote(request));
         }
-        return acquired.candidate ? [acquired.candidate] : [];
+        return resolveRuntimeCandidateArray(acquired, {synthetic: true}).candidates;
       }
       if (fault === "CLOCK_JUMP") clock.jumpWall(100);
       if (fault === "NO_CANDIDATES") return [];
@@ -535,13 +537,13 @@ function publicError(error) {
 export function createPaperPilotComposition(options = {}) {
   if (!onlyDataKeys(options, [
         "config", "dataDirectory", "adapters", "clock", "signal", "externalReadOnlyInput",
-        "onTestInitialized", "onTestEntry"
+        "onTestInitialized", "onTestEntry", "sourceDiagnostic"
       ])) {
     throw new TypeError("composition factory options must be bounded data");
   }
   let {
     config, dataDirectory, adapters, clock, signal, externalReadOnlyInput, onTestInitialized,
-    onTestEntry
+    onTestEntry, sourceDiagnostic
   } = options;
   if (onTestInitialized !== undefined && typeof onTestInitialized !== "function") {
     throw new TypeError("test initialization observer must be a function");
@@ -565,6 +567,11 @@ export function createPaperPilotComposition(options = {}) {
   }
   const externalMode = config.mode === "EXTERNAL_READ_ONLY_INPUT";
   const sourceMode = config.mode === "SOURCE_BACKED_PAPER";
+  if (sourceDiagnostic !== undefined &&
+      (!sourceMode || !onlyDataKeys(sourceDiagnostic, ["input", "warmupStore"]) ||
+        !Object.hasOwn(sourceDiagnostic, "input") || !Object.hasOwn(sourceDiagnostic, "warmupStore"))) {
+    throw new TypeError("source diagnostic requires source-backed mode, bounded input, and a warmup store");
+  }
   let boundedExternalInput = null;
   let externalInputBytes = 0;
   if (externalMode) {
@@ -599,7 +606,11 @@ export function createPaperPilotComposition(options = {}) {
     }
     clock = createExternalReceiptClock();
     const sourceAdapter = createPaperRuntimeSourceAdapter({
-      sourcePolicySha256: config.sourcePolicySha256
+      sourcePolicySha256: config.sourcePolicySha256,
+      ...(sourceDiagnostic ? {
+        diagnosticInput: sourceDiagnostic.input,
+        warmupStore: sourceDiagnostic.warmupStore
+      } : {})
     });
     adapters = Object.freeze({
       acquireCandidates: sourceAdapter.acquireCandidates,
@@ -1068,15 +1079,24 @@ export function createPaperPilotComposition(options = {}) {
               pipelineVersion: acquisition.result.pipelineVersion ?? null,
               pipelineEnabled: acquisition.result.pipelineEnabled === true,
               quoteAdapterStatus: acquisition.result.quoteAdapterStatus ?? "UNKNOWN",
+              ...(isRecord(acquisition.result.diagnostic) ? {
+                diagnostic: structuredClone(acquisition.result.diagnostic),
+                refusals: structuredClone(acquisition.result.refusals ?? [])
+              } : {}),
               unresolved: Array.isArray(acquisition.result.unresolved)
                 ? acquisition.result.unresolved.slice() : []
             };
             sourceUnknownReason = acquisition.result.reason;
             return {done: true, outcome: "UNKNOWN", reason: acquisition.result.reason};
           }
-          if (!Array.isArray(acquisition.result)) {
+          const resolvedCandidates = sourceMode && isRecord(acquisition.result)
+            ? resolveRuntimeCandidateArray(acquisition.result).candidates
+            : acquisition.result;
+          if (!Array.isArray(resolvedCandidates) ||
+              (sourceMode && resolvedCandidates.some(item => !isIssuedRuntimeCandidate(item)))) {
             return candidateSourceFailure("CANDIDATE_BOUND");
           }
+          acquisition.result = resolvedCandidates;
           if (!acquisition.result.length) {
             return {done: true};
           }
