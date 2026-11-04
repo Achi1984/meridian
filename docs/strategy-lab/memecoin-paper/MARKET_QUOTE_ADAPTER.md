@@ -377,5 +377,8 @@ entry position. The fixture runtime rechecks deadline and cancellation after
 the issuer clock advances, before audit append or return. Integration tests
 cover issuer → composition → step → checkpoint → ledger entry/mark/exit,
 checkpoint restart replay (PAPER_FILL/PAPER_EXIT provenance and digests) and
-changed-event/changed-quote replay rejection. Still pending: a deterministic
-direct regression for a deadline falling inside the issuer clock advance.
+changed-event/changed-quote replay rejection. A direct regression drives
+`acquireSyntheticRuntimeFixture` with a forwarding spy around the real fixture
+adapter: issuance succeeds while the owned clock crosses the deadline, and the
+quote returns null with `runtimeAudit.quotes` unchanged (verified to fail with
+the post-issuance fence removed).

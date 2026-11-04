@@ -9,8 +9,12 @@ import {fileURLToPath} from "node:url";
 import {
   createPaperPilotComposition, createSyntheticClock, offlineFixtureAdapters
 } from "../scripts/memecoin-paper/paper-pilot-composition.mjs";
-import {reviewScenarioConfigSha256} from "../scripts/memecoin-paper/market-quote-adapter.mjs";
-import {PAPER_RUNTIME_SOURCE_POLICY_SHA256} from "../scripts/memecoin-paper/paper-runtime-source.mjs";
+import {
+  createFixtureMarketQuoteAdapter, reviewScenarioConfigSha256
+} from "../scripts/memecoin-paper/market-quote-adapter.mjs";
+import {
+  acquireSyntheticRuntimeFixture, PAPER_RUNTIME_SOURCE_POLICY_SHA256
+} from "../scripts/memecoin-paper/paper-runtime-source.mjs";
 import {SYNTHETIC_MINT, SYNTHETIC_POOL, SYNTHETIC_QUOTE} from "../scripts/memecoin-paper/synthetic-fixtures.mjs";
 import {canonicalCheckpointBytes, CheckpointStore} from "../scripts/memecoin-paper/checkpoint-store.mjs";
 import {PaperCheckpointSession} from "../scripts/memecoin-paper/checkpoint-session.mjs";
@@ -444,6 +448,67 @@ test("modeled quotes flow issuer to composition, step, durable checkpoint and le
   await replayed.close();
   assert.equal(result.report.persistence, "ACKNOWLEDGED");
   assert.deepEqual(result.report.runnerReport.terminalResult.openPositions, []);
+});
+
+test("a deadline crossed while the real issuer succeeds returns null with no audit change", async () => {
+  const clock = clockHarness();
+  const deadlineAt = clock.wallClock() + 20_000;
+  const policy = modeledPolicy("modeled-late-issuance", {runEndAt: clock.wallClock() + 60_000});
+  const host = {policy, requests: 0, transport: null};
+  let stepMs = 1;
+  const realAdapter = createFixtureMarketQuoteAdapter({
+    clock: () => {
+      clock.advance(stepMs);
+      return clock.wallClock();
+    },
+    transport: (...args) => host.transport(...args),
+    timeoutMs: 1_000,
+    maxRequests: 100
+  });
+  let issueCalls = 0;
+  let before = null;
+  let after = null;
+  let issuedOk = null;
+  host.adapter = {
+    getPaperQuote: (...args) => realAdapter.getPaperQuote(...args),
+    issueModeledQuote(...args) {
+      issueCalls += 1;
+      before = clock.wallClock();
+      assert.ok(before < deadlineAt - 1);
+      clock.advance(deadlineAt - 1 - before);
+      before = clock.wallClock();
+      stepMs = 20;
+      try {
+        const result = realAdapter.issueModeledQuote(...args);
+        issuedOk = result.ok;
+        return result;
+      } finally {
+        stepMs = 1;
+        after = clock.wallClock();
+      }
+    }
+  };
+  const signal = new AbortController().signal;
+  const acquired = await acquireSyntheticRuntimeFixture(clock, {
+    signal,
+    remaining: {requests: 100, bytes: 1_000_000, work: 5_000, timeMs: 20_000},
+    recordRequest() {},
+    recordWork() {},
+    deadlineAt,
+    variant: "BASE",
+    modeledHost: host
+  });
+  clock.advance(deadlineAt - 5_000 - clock.wallClock());
+  const auditBefore = structuredClone(acquired.runtimeAudit.quotes);
+  const quote = await acquired.quote({
+    candidate: acquired.candidate, purpose: "ENTRY", now: clock.wallClock(), signal
+  });
+  assert.equal(issueCalls, 1);
+  assert.equal(issuedOk, true);
+  assert.ok(before < deadlineAt);
+  assert.ok(after >= deadlineAt);
+  assert.equal(quote, null);
+  assert.deepEqual(acquired.runtimeAudit.quotes, auditBefore);
 });
 
 test("modeled policy is fixture-only, run-bound, and cannot be supplied to source or external modes", async t => {
