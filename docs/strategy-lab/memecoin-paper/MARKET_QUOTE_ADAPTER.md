@@ -251,7 +251,56 @@ price/costs remain unavailable, and `authorizationEligible`,
 projection is not passed to the runner or Paper consumer, and existing hard
 filters and cost gates are not weakened.
 
+## Cost and USD receipt validation (structure only)
+
+`createMarketQuoteAdapter(...).validateCostReceipt(quoteResult, receipt)` checks a
+caller-supplied `memecoin-paper-quote-cost-receipt-v1` against a quote result
+that this same adapter instance issued (tracked privately; copies are refused).
+It reuses `normalizeExactCosts`; it adds no runner, readiness wrapper, provider
+call, price, or conversion. Every quote candidate also carries
+`sourceResponse.sha256`/`byteLength`, hashed from the exact bytes the adapter
+read (not provider-authenticated).
+
+Required receipt bindings: `source`, `responseSha256` and `responseByteLength`
+equal to the observed body; `quoteRequestId`, `side`, and the full identity
+(chain, mint, pool, quote, decimals); `quoteObservedAt` and `observedAt` both
+equal to the adapter's post-response receipt time; validation time not before
+that and not past quote expiry; the quote must have no chronology, staleness,
+expiry, or pool-binding reason.
+
+Exactly five nonoverlapping components, each an exact non-negative integer
+string in micro-USD (`fee`, `spread`, `slippage`, `priceImpact`, `network`;
+numbers, decimals, negatives, cents, missing or extra keys are rejected). The
+`inclusion` map must state the single supported disjoint basis per component,
+and `routeAmountBasis` must be `GROSS_BEFORE_ALL_COSTS`; a net-of-cost route
+basis or any other inclusion wording is refused as double-count risk. Separate
+`quote` (the identity's quote mint and decimals) and `sol` (wrapped SOL, 9
+decimals) conversions must each be `MEASURED_SOURCE_RECEIPT` with a positive
+integer micro-USD per whole token, an evidence digest, and an observation
+time not after the receipt and within 5 minutes; assumed USD parity is refused.
+`network` must be payer-settled lamports and its micro-USD must equal
+`ceil(lamports * solMicroUsd / 1e9)`.
+
+A passing receipt returns `STRUCTURALLY_VALID_UNAUTHENTICATED` with cents
+rounded up per component by the existing normalizer. That is the maximum: the
+quote candidate's `costs` stay `UNKNOWN`, `priceMicros` stays null, and
+`authorizationEligible`/`executionRealistic` stay false, so admission is still
+refused. Receipts cannot be authenticated by this module and tests use only the
+`SYNTHETIC_FIXTURE_ONLY` label.
+
+**Implementation limits:** no real source emits a realized five-component
+receipt, a measured USDC/USD or SOL/USD conversion, or an attested time; the
+checks bind claims to bytes and clocks the module observed, nothing more.
+**Unresolved decisions:** the real cost source and its authentication, trusted
+time, how a Jupiter net-amount quote may map to the required gross basis, and
+whether modeled costs may ever be labeled separately from measured costs.
+
 ## Offline validation
+
+`node --test test/memecoin-paper-quote-cost-receipt.test.js` additionally covers
+the digest, the valid synthetic receipt, and rejection of forged, missing,
+stale, future, identity-mismatched, wrong-unit, missing-conversion, overlapping,
+and missing-component receipts.
 
 `node --test test/memecoin-paper-market-quote-adapter.test.js` runs only
 generated synthetic fixtures and injected transports. It verifies inert

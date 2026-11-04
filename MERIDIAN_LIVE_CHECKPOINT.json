@@ -3534,6 +3534,29 @@
       "issue1207": "OPEN",
       "keys": "DEFERRED_NO_KEY_USE",
       "providerOrHostActivation": false
+    },
+    "paperQuoteCostReceipts1212_20261104": {
+      "opId": "meridian-cost-receipts-20261104-r1",
+      "issue": 1212,
+      "parentIssue": 1207,
+      "recordedDate": "2026-11-04",
+      "baseMainSha": "e51d488ee0a71d194f69ed59e4734fdfb2b6d93d",
+      "scope": "VALIDATION_INFRASTRUCTURE_ONLY; market-quote-adapter raw-body digest and validateCostReceipt; NO_SOURCE_APPROVAL",
+      "files": [
+        "scripts/memecoin-paper/market-quote-adapter.mjs",
+        "test/memecoin-paper-quote-cost-receipt.test.js",
+        "docs/strategy-lab/memecoin-paper/MARKET_QUOTE_ADAPTER.md"
+      ],
+      "frozenOutOfScope": "PR1211 runtime, pipeline, composition and handoff files untouched; this entry may conflict textually with PR1211 and is resolved sequentially",
+      "focusedTests": "node --test test/memecoin-paper-quote-cost-receipt.test.js test/memecoin-paper-market-quote-adapter.test.js => 61 pass 0 fail at the pre-checkpoint source; hosted CI owns full regression",
+      "receiptStatus": "STRUCTURALLY_VALID_UNAUTHENTICATED_AT_MOST",
+      "quoteCandidateCosts": "UNKNOWN_UNCHANGED",
+      "authorizationEligible": false,
+      "unresolvedDecisions": "REAL_FIVE_COMPONENT_SOURCE; MEASURED_USDC_AND_SOL_USD_SOURCE; TRUSTED_TIME; PROVIDER_AUTHENTICITY; GROSS_VS_NET_ROUTE_BASIS",
+      "productionIntegration": "BLOCKED_NOT_IMPLEMENTED",
+      "issue1207": "OPEN",
+      "keys": "DEFERRED_NO_KEY_USE",
+      "providerOrHostActivation": false
     }
   }
 }
