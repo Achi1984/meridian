@@ -19,6 +19,12 @@ completeness; warmup readers must keep them unavailable. Helius history and GPA
 responses are diagnostics only and cannot produce historical completeness or
 census records.
 
+When a run-scoped budget capability is supplied, each store request is reserved
+before dispatch. Publication bytes count the canonical serialized input once;
+readback bytes count the serialized read result once. Provider response bytes are
+counted while the response body is consumed and are not counted again as stored
+bytes.
+
 End-to-end offline proof uses a synthetic transport, the existing
 `source-shaped` history fixture, and the real paper pipeline in
 `SYNTHETIC_TEST_ONLY`. A canonical unavailable metric must remain unavailable;

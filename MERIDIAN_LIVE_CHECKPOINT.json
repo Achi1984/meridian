@@ -3529,17 +3529,19 @@
       "pullRequest": 1211,
       "branch": "copilot/issue1207-source-orchestration",
       "startingHead": "ba200cd6fc2bdd1383b203fafc9100a2651b69f9",
-      "scope": "PARTIAL_EVALUATION_TIMEOUT_FENCING_AND_SHARED_PIPELINE_BUDGET_HARDENING",
+      "scope": "PARTIAL_EVALUATION_TIMEOUT_FENCING_AND_SHARED_BUDGET_HARDENING",
       "state": "INCOMPLETE_RUNTIME_ACQUIRED_ENVELOPE_HANDOFF_NOT_IMPLEMENTED",
-      "focusedTests": "42_PASS_0_FAIL_ACROSS_SOURCE_ORCHESTRATION_PIPELINE_AND_WARMUP_HANDOFF",
+      "focusedTests": "43_PASS_0_FAIL_ACROSS_SOURCE_ORCHESTRATION_PIPELINE_AND_WARMUP_HANDOFF",
       "implemented": [
         "evaluation-local abort controller and generation fence for internal deadline and caller cancellation",
         "late collector completion cannot advance a timed-out evaluation or affect a later evaluation",
-        "shared request and response-byte budget is reserved before transport, collector, price, and census callbacks"
+        "shared request and response-byte budget is reserved before transport, collector, price, and census callbacks",
+        "warmup publication/readback use shared request reservations; publication and readback bytes are charged once at their respective boundaries",
+        "runtime warmupStore fixture-generation seam removed; generated envelopes remain at the test boundary and use the existing handoff"
       ],
       "remaining": [
-        "remove fixture generation from runtime warmupStore path and reuse an internal handoff routine with acquired envelopes",
-        "thread the same shared capability through warmup persistence/readback and quote paths end-to-end",
+        "connect actual acquired envelopes to the runtime-owned warmup handoff and evaluation flow",
+        "verify end-to-end cross-stage accounting through runtime acquisition, warmup persistence/readback, history, Analyst readers, and quotes",
         "add held-callback timeout regressions at persistence and quote boundaries"
       ],
       "productionRuntime": "DEFAULT_DISABLED_NO_NETWORK",

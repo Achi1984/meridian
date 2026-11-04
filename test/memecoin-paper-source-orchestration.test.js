@@ -179,79 +179,59 @@ test("composition blocks unapproved source candidates before quotes and preserve
   assert.equal(control.report.persistence, "ACKNOWLEDGED");
 });
 
-test("runtime adapter orchestrates generated acquisition, UNKNOWN warmup persistence, and evaluation under one budget", async t => {
+test("runtime fixture adapter does not generate provider handoff envelopes", async t => {
   const parent = await mkdtemp(path.join(os.tmpdir(), "paper-runtime-source-warmup-"));
   t.after(() => rm(parent, {recursive: true, force: true}));
   const store = new EvidenceWarmupStore(path.join(parent, "warmup"), {enabled: true});
   const clock = createSyntheticClock({wallStart: Date.now(), monotonicStart: 100});
-  const adapter = createPaperRuntimeSourceAdapter({
+  assert.throws(() => createPaperRuntimeSourceAdapter({
     sourcePolicySha256: PAPER_RUNTIME_SOURCE_POLICY_SHA256,
     fixtureMode: "SYNTHETIC_TEST_ONLY",
     clock,
     variant: "BASE",
     fixtureBehavior: "NONE",
     warmupStore: store
-  });
-  const used = {requests: 0, bytes: 0, work: 0};
-  const result = await adapter.acquireCandidates({
-    signal: new AbortController().signal,
-    remaining: {requests: 20, bytes: 1_000_000, work: 100, timeMs: 10_000},
-    deadlineAt: clock.wallClock() + 10_000,
-    recordRequest({bytes, events}) {
-      used.requests += 1;
-      used.bytes += bytes;
-      used.work += events;
-      assert.ok(used.requests <= 20);
-      assert.ok(used.bytes <= 1_000_000);
-      assert.ok(used.work <= 100);
-    },
-    recordWork(units) {
-      used.work += units;
-      assert.ok(used.work <= 100);
-    }
-  });
-  assert.equal(result.status, "SYNTHETIC_FIXTURE_ONLY");
-  assert.equal(result.warmup.status, "OFFLINE_EVALUATED");
-  assert.equal(result.warmup.trust, "UNKNOWN");
-  assert.equal(result.warmup.completeness, "UNKNOWN");
-  assert.equal(result.pipeline.analysis.status, "BLOCKED");
-  assert.equal(result.pipeline.executionAuthorized, false);
-  assert.ok(used.requests >= 3);
-  assert.ok(used.bytes > 0);
-  assert.ok(used.work > 0);
-  const readback = await store.read("runtime-source-fixture");
-  assert.equal(readback.status, "AVAILABLE");
-  assert.equal(readback.document.records[0].trust, "UNKNOWN");
-  assert.equal(readback.document.records[0].completeness, "UNKNOWN");
-  assert.equal(await adapter.quote({
-    candidate: result.candidate,
-    purpose: "ENTRY",
-    now: clock.wallClock()
-  }), null);
+  }), /options must be exact bounded data/);
+  assert.notEqual((await store.read("runtime-source-fixture")).status, "AVAILABLE");
+});
 
-  let publishes = 0;
-  const exhaustedAdapter = createPaperRuntimeSourceAdapter({
-    sourcePolicySha256: PAPER_RUNTIME_SOURCE_POLICY_SHA256,
-    fixtureMode: "SYNTHETIC_TEST_ONLY",
-    clock,
-    variant: "BASE",
-    fixtureBehavior: "NONE",
-    warmupStore: {
-      async publish() { publishes += 1; },
-      async read() { assert.fail("budget exhaustion must prevent readback"); }
+test("warmup persistence shares the run budget and reserves before store operations", async () => {
+  const fixture = makeHandoffFixture();
+  const {observation, request} = await makeBirdeyeObservation(fixture);
+  const calls = [];
+  const budget = {
+    reserveRequest() {
+      calls.push("reserve");
+      return bytes => calls.push(`bytes:${bytes}`);
     }
+  };
+  const store = {
+    async publish() { calls.push("publish"); return {status: "PUBLISHED", datasetId: "budget-test", digest: "a".repeat(64)}; },
+    async read() { calls.push("read"); return {status: "UNKNOWN"}; }
+  };
+  const handoff = createPaperProviderWarmupHandoff({
+    enabled: true,
+    store,
+    datasetId: "budget-test",
+    runId: "budget-test-run",
+    identity: fixture.identity,
+    clock: () => fixture.assembledAt
   });
-  const exhausted = await exhaustedAdapter.acquireCandidates({
+  const result = await handoff.runOffline({
+    observation,
+    request,
+    pipeline: makeSyntheticHistoryPipeline(fixture),
+    evaluationRequest: evaluationRequest(fixture),
     signal: new AbortController().signal,
-    remaining: {requests: 10, bytes: 1, work: 10, timeMs: 10_000},
-    deadlineAt: clock.wallClock() + 10_000,
-    recordRequest() {
-      throw Object.assign(new Error("global byte budget exhausted"), {code: "GLOBAL_BUDGET"});
-    },
-    recordWork() {}
+    remaining: {requests: 10, bytes: 1_000_000, work: 20, timeMs: 10_000},
+    recordRequest() {},
+    recordWork() {},
+    deadlineAt: fixture.assembledAt + 10_000,
+    budget
   });
-  assert.equal(exhausted.reason, "GLOBAL_BUDGET");
-  assert.equal(publishes, 0);
+  assert.equal(result.reason, "WARMUP_READBACK_MISMATCH");
+  assert.deepEqual(calls.map(call => call === "reserve" || call === "publish" || call === "read"
+    ? call : "bytes"), ["reserve", "bytes", "publish", "reserve", "read", "bytes"]);
 });
 
 test("runtime quote result released after abort cannot enter the audit", async () => {

@@ -169,11 +169,12 @@ function operationDeadline(timeoutMs, signal) {
   };
 }
 
-function sharedBudget({remaining, recordRequest, recordWork, deadlineAt, clock, signal}) {
+function sharedBudget({remaining, recordRequest, recordWork, deadlineAt, clock, signal, budget}) {
   if (remaining === undefined && recordRequest === undefined &&
-      recordWork === undefined && deadlineAt === undefined) return null;
+      recordWork === undefined && deadlineAt === undefined && budget === undefined) return null;
   if (!isRecord(remaining) || typeof recordRequest !== "function" ||
       typeof recordWork !== "function" || !Number.isSafeInteger(deadlineAt) ||
+      (budget !== undefined && typeof budget.reserveRequest !== "function") ||
       !["requests", "bytes", "work", "timeMs"].every(key =>
         Number.isSafeInteger(remaining[key]) && remaining[key] >= 0)) {
     throw new TypeError("shared handoff budget is invalid");
@@ -227,6 +228,11 @@ function sharedBudget({remaining, recordRequest, recordWork, deadlineAt, clock, 
       requests += 1;
       bytes += byteCount;
       work += events;
+    },
+    reserveRequest() {
+      check();
+      if (budget) return budget.reserveRequest();
+      return null;
     },
     work(units = 1) {
       check();
@@ -495,7 +501,8 @@ export function createPaperProviderWarmupHandoff({
       remaining,
       recordRequest,
       recordWork,
-      deadlineAt
+      deadlineAt,
+      budget
     } = {}) {
       const context = {datasetId, runId};
       if (!enabled) return {status: "DISABLED", ...context,
@@ -510,7 +517,7 @@ export function createPaperProviderWarmupHandoff({
       let shared;
       try {
         shared = sharedBudget({
-          remaining, recordRequest, recordWork, deadlineAt, clock, signal
+          remaining, recordRequest, recordWork, deadlineAt, clock, signal, budget
         });
       } catch {
         return unavailable("GLOBAL_BUDGET", context);
@@ -596,7 +603,10 @@ export function createPaperProviderWarmupHandoff({
           },
           records: [record]
         };
-        shared?.request(Buffer.byteLength(JSON.stringify(publicationInput)));
+        const publicationBytes = Buffer.byteLength(JSON.stringify(publicationInput));
+        const publicationCharge = shared?.reserveRequest();
+        if (publicationCharge) publicationCharge(publicationBytes);
+        else shared?.request(publicationBytes);
         const publication = await deadline.run(() => store.publish(
           publicationInput, {signal: deadline.signal}
         ));
@@ -611,11 +621,16 @@ export function createPaperProviderWarmupHandoff({
         }
         const remaining = deadline.remaining();
         if (remaining < 1) return unavailable(deadline.reason() ?? "DEADLINE", context);
+        const readbackCharge = shared?.reserveRequest();
         const readback = await deadline.run(() => store.read(datasetId, {
           signal: deadline.signal,
           timeoutMs: Math.max(1, Math.min(remaining, DEFAULT_WARMUP_LIMITS.maxElapsedMs))
         }));
-        shared?.request(Buffer.byteLength(JSON.stringify(readback)));
+        if (readbackCharge) {
+          readbackCharge(Buffer.byteLength(JSON.stringify(readback)));
+        } else {
+          shared?.request(Buffer.byteLength(JSON.stringify(readback)));
+        }
         if (deadline.reason()) return unavailable(deadline.reason(), context);
         const dataset = readback?.document;
         const persistedRecord = dataset?.records?.length === 1 ? dataset.records[0] : null;

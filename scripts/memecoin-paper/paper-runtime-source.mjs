@@ -58,17 +58,6 @@ const FIXTURE_COST_CONTRACT = Object.freeze({
   })
 });
 
-function hasDataMethod(value, name) {
-  let owner = value;
-  while (owner !== null && owner !== Object.prototype) {
-    const descriptor = Object.getOwnPropertyDescriptor(owner, name);
-    if (descriptor) return Object.hasOwn(descriptor, "value") &&
-      typeof descriptor.value === "function";
-    owner = Object.getPrototypeOf(owner);
-  }
-  return false;
-}
-
 function fixtureAddress(index) {
   const alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
   const bytes = Buffer.alloc(32);
@@ -182,7 +171,6 @@ export async function acquireSyntheticRuntimeFixture(clock, {
   expireDuringRequest = false,
   deadlineAt,
   variant = "BASE",
-  warmupStore,
   budget
 } = {}) {
   if (!clock || typeof clock.wallClock !== "function" || typeof clock.advance !== "function") {
@@ -230,106 +218,6 @@ export async function acquireSyntheticRuntimeFixture(clock, {
   if (remaining.requests < 1 || remaining.bytes < 1 ||
       remaining.work < 1 || remaining.timeMs < 1) {
     return {status: "UNKNOWN", reason: "GLOBAL_BUDGET", candidate: null, pipeline: null, quote: null};
-  }
-  if (warmupStore) {
-    const [
-      {makeHandoffFixture, makeBirdeyeObservation, evaluationRequest, makeSyntheticHistoryPipeline},
-      {createPaperProviderWarmupHandoff}
-    ] = await Promise.all([
-      import("../../test/fixtures/memecoin-paper-provider-warmup-handoff/synthetic.mjs"),
-      import("./provider-warmup-handoff/index.mjs")
-    ]);
-    const fixture = makeHandoffFixture();
-    const {observation, request, calls} = await makeBirdeyeObservation(fixture);
-    if (signal?.aborted || clock.wallClock() >= deadlineAt) {
-      return {
-        status: "UNKNOWN",
-        reason: signal?.aborted ? "STOPPED" : "DEADLINE",
-        candidate: null,
-        pipeline: null,
-        quote: null
-      };
-    }
-    if (calls.length !== 1 || observation.status !== "SOURCE_BOUND") {
-      return {
-        status: "UNKNOWN",
-        reason: "PROVIDER_OBSERVATION_UNBOUND",
-        candidate: null,
-        pipeline: null,
-        quote: null
-      };
-    }
-    const responseBytes = observation.receipts?.[0]?.responseBytes;
-    if (!Number.isSafeInteger(responseBytes) || responseBytes < 0) {
-      return {
-        status: "UNKNOWN",
-        reason: "PROVIDER_RESPONSE_SIZE_UNKNOWN",
-        candidate: null,
-        pipeline: null,
-        quote: null
-      };
-    }
-    try {
-      recordRequest({bytes: responseBytes, events: 1});
-    } catch (error) {
-      return {
-        status: "UNKNOWN",
-        reason: error?.code === "STOPPED" ? "STOPPED" : "GLOBAL_BUDGET",
-        candidate: null,
-        pipeline: null,
-        quote: null
-      };
-    }
-    const handoff = createPaperProviderWarmupHandoff({
-      enabled: true,
-      store: warmupStore,
-      datasetId: "runtime-source-fixture",
-      runId: "runtime-source-fixture-run",
-      identity: fixture.identity,
-      clock: () => fixture.assembledAt,
-      limits: {maxElapsedMs: Math.max(1, Math.min(10_000, remaining.timeMs))}
-    });
-    const result = await handoff.runOffline({
-      observation,
-      request,
-      pipeline: makeSyntheticHistoryPipeline(fixture),
-      evaluationRequest: evaluationRequest(fixture),
-      priceEndpoints: [{
-        mint: fixture.candidate.mint,
-        atMs: fixture.candidateT,
-        denomination: "USD"
-      }],
-      signal,
-      remaining,
-      recordRequest,
-      recordWork,
-      deadlineAt
-    });
-    if (signal?.aborted || clock.wallClock() >= deadlineAt) {
-      return {
-        status: "UNKNOWN",
-        reason: signal?.aborted ? "STOPPED" : "DEADLINE",
-        candidate: null,
-        pipeline: null,
-        quote: null
-      };
-    }
-    const evaluation = result.evaluation ?? null;
-    return {
-      status: evaluation?.candidate ? "SYNTHETIC_FIXTURE_ONLY" : "UNKNOWN",
-      reason: evaluation?.analysis?.status === "BLOCKED"
-        ? "WARMUP_EVALUATION_BLOCKED" : result.reason ?? null,
-      candidate: evaluation?.candidate ?? null,
-      pipeline: evaluation,
-      quote: null,
-      warmup: {
-        status: result.status,
-        reason: result.reason ?? null,
-        datasetDigest: result.datasetDigest ?? null,
-        trust: result.trust ?? "UNKNOWN",
-        completeness: result.completeness ?? "UNKNOWN"
-      }
-    };
   }
   const [{makeFixture}, {createPaperSourcePipeline}, {ANALYST_WINDOW_METRICS},
     {createMarketQuoteAdapter}, {syntheticOrderResponse}] = await Promise.all([
@@ -593,7 +481,6 @@ export async function acquireSyntheticRuntimeFixture(clock, {
       return clock.wallClock();
     },
     transport: async (url, {signal: quoteSignal} = {}) => {
-      const chargeBytes = activeBudget?.reserveRequest?.();
       if (quoteSignal?.aborted || signal?.aborted) {
         throw Object.assign(new Error("fixture quote cancelled"), {code: "STOPPED"});
       }
@@ -604,6 +491,7 @@ export async function acquireSyntheticRuntimeFixture(clock, {
       if (quoteSignal?.aborted || signal?.aborted) {
         throw Object.assign(new Error("fixture quote cancelled"), {code: "STOPPED"});
       }
+      const chargeBytes = activeBudget?.reserveRequest?.();
       const request = new URL(url);
       const inputMint = request.searchParams.get("inputMint");
       const outputMint = request.searchParams.get("outputMint");
@@ -771,7 +659,7 @@ export async function acquireSyntheticRuntimeFixture(clock, {
 
 export function createPaperRuntimeSourceAdapter(options = {}) {
   const allowedOptions = [
-    "sourcePolicySha256", "fixtureMode", "clock", "variant", "fixtureBehavior", "warmupStore"
+    "sourcePolicySha256", "fixtureMode", "clock", "variant", "fixtureBehavior"
   ];
   if (!options || typeof options !== "object" || Array.isArray(options) ||
       ![Object.prototype, null].includes(Object.getPrototypeOf(options)) ||
@@ -788,22 +676,16 @@ export function createPaperRuntimeSourceAdapter(options = {}) {
     variant = "BASE",
     fixtureBehavior = "NONE"
   } = options;
-  const warmupStore = options.warmupStore;
   if (sourcePolicySha256 !== PAPER_RUNTIME_SOURCE_POLICY_SHA256) {
     throw new TypeError("source policy digest does not match the module-owned policy");
   }
 
   if (fixtureMode !== undefined) {
-    const expectedFixtureKeys = warmupStore === undefined
-      ? ["clock", "fixtureBehavior", "fixtureMode", "sourcePolicySha256", "variant"]
-      : ["clock", "fixtureBehavior", "fixtureMode", "sourcePolicySha256", "variant", "warmupStore"];
+    const expectedFixtureKeys = ["clock", "fixtureBehavior", "fixtureMode", "sourcePolicySha256", "variant"];
     if (fixtureMode !== "SYNTHETIC_TEST_ONLY" ||
         Object.keys(options).sort().join(",") !== expectedFixtureKeys.sort().join(",") ||
         !clock || typeof clock.wallClock !== "function" ||
         typeof clock.advance !== "function" ||
-        (warmupStore !== undefined &&
-          (fixtureBehavior !== "NONE" || !hasDataMethod(warmupStore, "publish") ||
-            !hasDataMethod(warmupStore, "read"))) ||
         !["BASE", "MISSING_QUOTE", "MISSING_COSTS", "WRONG_IDENTITY",
           "FUTURE_EVIDENCE", "WRONG_QUOTE_IDENTITY"].includes(variant) ||
         !["NONE", "WAIT_FOR_STOP", "EXPIRE_DURING_REQUEST", "WAIT_FOR_QUOTE_SETTLE"]
@@ -818,7 +700,6 @@ export function createPaperRuntimeSourceAdapter(options = {}) {
           waitForStop: fixtureBehavior === "WAIT_FOR_STOP",
           waitForQuoteSettle: fixtureBehavior === "WAIT_FOR_QUOTE_SETTLE",
           expireDuringRequest: fixtureBehavior === "EXPIRE_DURING_REQUEST",
-          warmupStore,
           budget
         });
         if (signal?.aborted) {
