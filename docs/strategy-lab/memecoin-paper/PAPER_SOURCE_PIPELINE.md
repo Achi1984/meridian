@@ -115,6 +115,59 @@ proves plumbing only; its output remains `SYNTHETIC_FIXTURE_ONLY`, does not
 change the production constructor or policy, and grants no production trust or
 entry authority.
 
+## Source-orchestration partial checkpoint
+
+For `meridian-source-orchestration-20261103-r1`, the verified starting
+revision was `c24c339b763f48f64c2b018f2e12bb38d24efcf8`, with a clean
+worktree. PR #1208 was merged at that revision. PR #1210 was open and owned the
+host batch, its recovery tests, and the shared live checkpoint; none of those
+files is changed here. The separately diagnosed baseline Safety failure remains
+a historical failure, not a passed check or a repair by this packet.
+
+The intended transition is **PENDING** exact-head hosted CI and independent
+final review, not production admission. The r2 follow-up adds one `currentWork`
+entry to the shared live checkpoint while preserving its prior history,
+routing, flags, and `lastSeenCommentId`. The entry records the baseline Safety
+failure as historical and not repaired. Issue #1207 remains open; no merge or
+production activation is implied.
+
+This packet remains **partial**, not production source admission. The runtime
+adapter now has a synthetic-only orchestration path joining a generated
+Birdeye response, immutable UNKNOWN-trust warmup publication/readback, and the
+canonical synthetic-mode pipeline. Its returned candidate remains blocked and
+has no quote function. A separate real composition test verifies that the
+default source-backed runtime stops before entry quotes, while the existing
+synthetic-only composition control still exercises quote and ledger paths. The
+generated history is not evidence of an archive guarantee, and its fixture-only
+one-cent cost schedule grants no real-data authority.
+
+Pipeline history, Analyst source assembly, and canonical evaluation now race
+against cancellation and one elapsed deadline. Cached source results are
+discarded after cancellation, and late runtime quote results are fenced before
+they can enter the audit or composition handoff. Existing composition request,
+byte, work, and deadline callbacks are reused across runtime-source acquisition
+and quote calls; the warmup handoff accepts those callbacks for its generated
+provider response, publication, readback, and evaluation boundary.
+Warmup bytes are counted once at each boundary: provider response bytes,
+serialized publication input, and serialized readback output. Reusing the
+published observation through warmup readers does not charge those bytes again.
+
+Remaining implementation blockers include wiring shared accounting callbacks
+through every warmup history/census/price reader so underlying response requests
+and bytes are charged exactly once before subsequent evaluation, plus a trusted
+production intake/transport/clock/policy boundary. The minimal next step is to
+pass one run-scoped accounting object into those reader interfaces and have each
+source report raw response bytes and work at the existing acquisition
+boundary; it must not reset per stage or candidate. A production composition
+also needs a module-owned authenticated
+candidate/transport/time/policy boundary, complete archive and comparable
+census guarantees, wallet/developer/rug/bundle/LP sources, and immutable
+quote-response provenance. Quote-token/base-token ratios are not USD prices;
+all five USD cost components remain UNKNOWN without source-bound conversions,
+payer/settlement evidence, and a proven nonoverlapping gross/net basis.
+Caller `REVIEWED`, approval flags, and finite pagination cannot supply these
+guarantees. The runtime adapter remains disabled with `trustedUtc` unchanged.
+
 ## Accepted interface dependency
 
 The accepted history-window bridge from PR #1182 is present at the merged

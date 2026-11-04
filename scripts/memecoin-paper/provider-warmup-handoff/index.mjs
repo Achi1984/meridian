@@ -169,6 +169,85 @@ function operationDeadline(timeoutMs, signal) {
   };
 }
 
+function sharedBudget({remaining, recordRequest, recordWork, deadlineAt, clock, signal, budget}) {
+  if (remaining === undefined && recordRequest === undefined &&
+      recordWork === undefined && deadlineAt === undefined && budget === undefined) return null;
+  if (!isRecord(remaining) || typeof recordRequest !== "function" ||
+      typeof recordWork !== "function" || !Number.isSafeInteger(deadlineAt) ||
+      (budget !== undefined && typeof budget.reserveRequest !== "function") ||
+      !["requests", "bytes", "work", "timeMs"].every(key =>
+        Number.isSafeInteger(remaining[key]) && remaining[key] >= 0)) {
+    throw new TypeError("shared handoff budget is invalid");
+  }
+  let requests = 0;
+  let bytes = 0;
+  let work = 0;
+  const check = () => {
+    if (signal?.aborted) throw Object.assign(new Error("shared budget stopped"), {
+      code: "CANCELLED"
+    });
+    let now;
+    try {
+      now = clock();
+    } catch {
+      throw Object.assign(new Error("shared budget clock is invalid"), {
+        code: "INVALID_CAPTURE_CLOCK"
+      });
+    }
+    if (!validTime(now) || now >= deadlineAt) {
+      throw Object.assign(new Error("shared budget deadline reached"), {code: "DEADLINE"});
+    }
+    if (remaining.timeMs < 1) {
+      throw Object.assign(new Error("shared source budget exhausted"), {
+        code: "GLOBAL_BUDGET"
+      });
+    }
+  };
+  return {
+    remainingTime() {
+      check();
+      let now;
+      try {
+        now = clock();
+      } catch {
+        return 0;
+      }
+      return Math.max(0, Math.min(remaining.timeMs, deadlineAt - now));
+    },
+    request(byteCount, events = 1) {
+      check();
+      if (!Number.isSafeInteger(byteCount) || byteCount < 0 ||
+          !Number.isSafeInteger(events) || events < 0 ||
+          requests + 1 > remaining.requests || bytes + byteCount > remaining.bytes ||
+          work + events > remaining.work) {
+        throw Object.assign(new Error("shared source budget exhausted"), {
+          code: "GLOBAL_BUDGET"
+        });
+      }
+      recordRequest({bytes: byteCount, events});
+      requests += 1;
+      bytes += byteCount;
+      work += events;
+    },
+    reserveRequest() {
+      check();
+      if (budget) return budget.reserveRequest();
+      return null;
+    },
+    work(units = 1) {
+      check();
+      if (!Number.isSafeInteger(units) || units < 1 ||
+          work + units > remaining.work) {
+        throw Object.assign(new Error("shared source work budget exhausted"), {
+          code: "GLOBAL_BUDGET"
+        });
+      }
+      recordWork(units);
+      work += units;
+    }
+  };
+}
+
 function exactRequest(input, identity, now, maxNodes) {
   let value;
   try {
@@ -418,7 +497,12 @@ export function createPaperProviderWarmupHandoff({
       evaluationRequest,
       priceEndpoints = [],
       censusEndpoints = [],
-      signal
+      signal,
+      remaining,
+      recordRequest,
+      recordWork,
+      deadlineAt,
+      budget
     } = {}) {
       const context = {datasetId, runId};
       if (!enabled) return {status: "DISABLED", ...context,
@@ -430,7 +514,24 @@ export function createPaperProviderWarmupHandoff({
           !Array.isArray(censusEndpoints) || censusEndpoints.length > 2) {
         return unavailable("OFFLINE_PIPELINE_REQUIRED", context);
       }
-      const deadline = operationDeadline(boundedLimits.maxElapsedMs, signal);
+      let shared;
+      try {
+        shared = sharedBudget({
+          remaining, recordRequest, recordWork, deadlineAt, clock, signal, budget
+        });
+      } catch {
+        return unavailable("GLOBAL_BUDGET", context);
+      }
+      let maxElapsedMs;
+      try {
+        maxElapsedMs = Math.max(1, Math.min(
+          boundedLimits.maxElapsedMs,
+          shared?.remainingTime() ?? boundedLimits.maxElapsedMs
+        ));
+      } catch (error) {
+        return unavailable(error?.code ?? "GLOBAL_BUDGET", context);
+      }
+      const deadline = operationDeadline(maxElapsedMs, signal);
       try {
         let stop = deadline.reason();
         if (stop) return unavailable(stop, context);
@@ -486,7 +587,7 @@ export function createPaperProviderWarmupHandoff({
           completeness: "UNKNOWN",
           payload: normalized.observation
         };
-        const publication = await deadline.run(() => store.publish({
+        const publicationInput = {
           datasetId,
           identity: boundIdentity,
           capturedAt,
@@ -501,7 +602,14 @@ export function createPaperProviderWarmupHandoff({
             runId
           },
           records: [record]
-        }, {signal: deadline.signal}));
+        };
+        const publicationBytes = Buffer.byteLength(JSON.stringify(publicationInput));
+        const publicationCharge = shared?.reserveRequest();
+        if (publicationCharge) publicationCharge(publicationBytes);
+        else shared?.request(publicationBytes);
+        const publication = await deadline.run(() => store.publish(
+          publicationInput, {signal: deadline.signal}
+        ));
         if (deadline.reason()) return unavailable(deadline.reason(), context);
         if (!["PUBLISHED", "DUPLICATE"].includes(publication?.status) ||
             publication.datasetId !== datasetId || !HASH.test(publication.digest ?? "")) {
@@ -513,10 +621,16 @@ export function createPaperProviderWarmupHandoff({
         }
         const remaining = deadline.remaining();
         if (remaining < 1) return unavailable(deadline.reason() ?? "DEADLINE", context);
+        const readbackCharge = shared?.reserveRequest();
         const readback = await deadline.run(() => store.read(datasetId, {
           signal: deadline.signal,
           timeoutMs: Math.max(1, Math.min(remaining, DEFAULT_WARMUP_LIMITS.maxElapsedMs))
         }));
+        if (readbackCharge) {
+          readbackCharge(Buffer.byteLength(JSON.stringify(readback)));
+        } else {
+          shared?.request(Buffer.byteLength(JSON.stringify(readback)));
+        }
         if (deadline.reason()) return unavailable(deadline.reason(), context);
         const dataset = readback?.document;
         const persistedRecord = dataset?.records?.length === 1 ? dataset.records[0] : null;
@@ -549,6 +663,7 @@ export function createPaperProviderWarmupHandoff({
         }));
         if (unavailablePrice !== null) return unavailable("UNKNOWN_PRICE_BECAME_USABLE", context);
         if (deadline.reason()) return unavailable(deadline.reason(), context);
+        shared?.work();
         const evaluation = await deadline.run(() => pipeline.evaluate({
           ...normalizedEvaluation,
           priceSource,
@@ -570,8 +685,8 @@ export function createPaperProviderWarmupHandoff({
           coverage,
           evaluation
         };
-      } catch {
-        const reason = deadline.reason() ?? "HANDOFF_UNKNOWN";
+      } catch (error) {
+        const reason = deadline.reason() ?? error?.code ?? "HANDOFF_UNKNOWN";
         return unavailable(reason, context);
       } finally {
         deadline.close();
