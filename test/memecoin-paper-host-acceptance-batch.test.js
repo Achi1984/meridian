@@ -654,23 +654,44 @@ test("a child that emits output after the global deadline cannot become a late s
   const drain = async () => {
     for (let turn = 0; turn < 5; turn += 1) await new Promise(resolve => setImmediate(resolve));
   };
+  // Real-time watchdog, independent of the captured deadline timer, so a missed spawn or
+  // result fails the test instead of hanging it.
+  const bounded = async (promise, label) => {
+    let watchdog;
+    try {
+      return await Promise.race([
+        promise,
+        new Promise((_, reject) => {
+          watchdog = realSetTimeout(() => reject(new Error(`${label} watchdog`)), 5_000);
+        })
+      ]);
+    } finally {
+      clearTimeout(watchdog);
+    }
+  };
+  let deadlineFired = false;
+  const fireDeadlineOnce = () => {
+    if (deadlineFired || typeof deadlineCallback !== "function") return;
+    deadlineFired = true;
+    clock = 15;
+    deadlineCallback();
+  };
   let result;
   try {
     assert.equal(typeof deadlineCallback, "function");
-    await spawned;
+    await bounded(spawned, "spawn");
     await drain();
-    clock = 15;
-    deadlineCallback();
-    result = await running;
+    fireDeadlineOnce();
+    result = await bounded(running, "result");
   } finally {
-    clock = 15;
+    fireDeadlineOnce();
     if (child) {
       child.stdout.end(JSON.stringify({status: "PASS"}));
       child.stderr.end();
       child.emit("exit", 0, null);
       child.emit("close", 0, null);
     }
-    await running.catch(() => {});
+    await bounded(running.catch(() => {}), "release").catch(() => {});
     await drain();
   }
   assert.equal(result.status, "UNKNOWN");
