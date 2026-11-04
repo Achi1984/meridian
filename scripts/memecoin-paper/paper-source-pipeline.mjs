@@ -25,6 +25,53 @@ function validTime(value) {
     Number.isFinite(new Date(value).getTime());
 }
 
+function budgetedTransport(transport, budget) {
+  if (!budget || typeof budget.reserveRequest !== "function" ||
+      typeof transport !== "function") return transport;
+  return async (request, options) => {
+    const chargeBytes = budget.reserveRequest();
+    const response = await transport(request, options);
+    if (!response?.body?.getReader) return response;
+    const reader = response.body.getReader();
+    const body = new ReadableStream({
+      async pull(controller) {
+        try {
+          const {done, value} = await reader.read();
+          if (done) {
+            controller.close();
+            reader.releaseLock();
+            return;
+          }
+          chargeBytes(value.byteLength);
+          controller.enqueue(value);
+        } catch (error) {
+          controller.error(error);
+          void reader.cancel(error).catch(() => {});
+        }
+      },
+      cancel(reason) {
+        return reader.cancel(reason);
+      }
+    });
+    return {
+      status: response.status,
+      headers: response.headers,
+      redirected: response.redirected,
+      url: response.url,
+      body
+    };
+  };
+}
+
+function serializedBytes(value) {
+  try {
+    const serialized = JSON.stringify(value);
+    return typeof serialized === "string" ? Buffer.byteLength(serialized) : 0;
+  } catch {
+    return null;
+  }
+}
+
 function containsFixtureTrust(value, seen = new WeakSet(), budget = {nodes: 0}) {
   if (value === "SYNTHETIC_FIXTURE_ONLY") return true;
   if (typeof value !== "object" || value === null || seen.has(value)) return false;
@@ -72,14 +119,16 @@ function unavailable(reason, request = {}) {
   };
 }
 
-function awaitBounded(operation, signal, deadlineAt) {
+function awaitBounded(operation, evaluation) {
+  const {signal, deadlineAt, isCurrent, abort} = evaluation;
   if (signal?.aborted) {
     return Promise.reject(Object.assign(new Error("source evaluation cancelled"), {
-      code: "CANCELLED"
+      code: signal.reason?.code ?? "CANCELLED"
     }));
   }
   const remainingMs = deadlineAt - performance.now();
   if (remainingMs <= 0) {
+    abort("DEADLINE");
     return Promise.reject(Object.assign(new Error("source evaluation deadline reached"), {
       code: "DEADLINE"
     }));
@@ -87,21 +136,30 @@ function awaitBounded(operation, signal, deadlineAt) {
   let timer;
   let abortListener;
   const pending = Promise.resolve().then(() => {
-    if (signal?.aborted) {
+    if (!isCurrent()) {
       throw Object.assign(new Error("source evaluation cancelled"), {code: "CANCELLED"});
     }
     return operation();
+  }).then(value => {
+    if (performance.now() >= deadlineAt) abort("DEADLINE");
+    if (!isCurrent()) {
+      throw Object.assign(new Error("source evaluation stopped"), {
+        code: signal.reason?.code ?? "CANCELLED"
+      });
+    }
+    return value;
   });
   void pending.catch(() => {});
   const stopped = new Promise((_, reject) => {
     timer = setTimeout(() => {
+      abort("DEADLINE");
       reject(Object.assign(new Error("source evaluation deadline reached"), {
         code: "DEADLINE"
       }));
     }, remainingMs);
     if (signal) {
-      abortListener = () => reject(Object.assign(new Error("source evaluation cancelled"), {
-        code: "CANCELLED"
+      abortListener = () => reject(Object.assign(new Error("source evaluation stopped"), {
+        code: signal.reason?.code ?? "CANCELLED"
       }));
       signal.addEventListener("abort", abortListener, {once: true});
       if (signal.aborted) abortListener();
@@ -165,14 +223,14 @@ function receiptSummary(result, timeEvidence, collector) {
   };
 }
 
-function cachedSource(source, method, keyOf, signal) {
+function cachedSource(source, method, keyOf, evaluation, budget) {
   const cache = new Map();
   const descriptor = source && Object.getOwnPropertyDescriptor(source, method);
   const read = descriptor && Object.hasOwn(descriptor, "value") ? descriptor.value : null;
   if (typeof read !== "function") return null;
   return Object.freeze({
     async [method](request) {
-      if (signal?.aborted) return null;
+      if (!evaluation.isCurrent()) return null;
       let key;
       try {
         key = keyOf(request);
@@ -180,12 +238,21 @@ function cachedSource(source, method, keyOf, signal) {
         return null;
       }
       if (!cache.has(key)) {
-        cache.set(key, Promise.resolve().then(() => signal?.aborted
-          ? null : read.call(source, {...request, signal})));
+        cache.set(key, Promise.resolve().then(async () => {
+          if (!evaluation.isCurrent()) return null;
+          const chargeBytes = budget?.reserveRequest?.();
+          if (budget && !chargeBytes) return null;
+          const result = await read.call(source, {...request, signal: evaluation.signal});
+          if (!evaluation.isCurrent()) return null;
+          const bytes = serializedBytes(result);
+          if (bytes === null) return null;
+          chargeBytes?.(bytes);
+          return result;
+        }));
       }
       try {
         const result = await cache.get(key);
-        return signal?.aborted ? null : result;
+        return evaluation.isCurrent() ? result : null;
       } catch {
         return null;
       }
@@ -198,18 +265,31 @@ function createHistorySource({
   timeBoundarySource,
   collector,
   limits,
-  acquisition
+  acquisition,
+  evaluation,
+  budget,
+  customCollector
 }) {
   const observedTimeBoundarySource = Object.freeze({
     async readWindow(request) {
-      const result = await timeBoundarySource.readWindow(request);
-      acquisition.timeEvidence = result;
+      const result = await timeBoundarySource.readWindow({
+        ...request,
+        signal: evaluation.signal
+      });
+      if (evaluation.isCurrent()) acquisition.timeEvidence = result;
       return result;
     }
   });
   const observedCollector = async request => {
-    const result = await collector(request);
-    acquisition.collector = result;
+    const chargeBytes = customCollector ? budget?.reserveRequest?.() : null;
+    if (customCollector && budget && !chargeBytes) return null;
+    const result = await collector({...request, signal: evaluation.signal, budget});
+    if (customCollector && chargeBytes) {
+      const bytes = serializedBytes(result);
+      if (bytes === null) return null;
+      chargeBytes(bytes);
+    }
+    if (evaluation.isCurrent()) acquisition.collector = result;
     return result;
   };
   return createHistoryWindowSource({
@@ -227,17 +307,19 @@ export function createPaperSourcePipeline({
   transport,
   clock,
   limits = {},
-  historySlotCollector
+  historySlotCollector,
+  budget
 } = {}) {
   if (!MODES.has(mode)) throw new TypeError("paper source pipeline mode is unsupported");
   if (historySlotCollector !== undefined &&
       (mode !== "SYNTHETIC_TEST_ONLY" || typeof historySlotCollector !== "function")) {
     throw new TypeError("custom history collectors are limited to synthetic test mode");
   }
+  const boundedTransport = budgetedTransport(transport, budget);
   const timeBoundarySource = createTimeBoundarySource({
     enabled,
     slotRange,
-    transport,
+    transport: boundedTransport,
     clock,
     limits
   });
@@ -245,13 +327,14 @@ export function createPaperSourcePipeline({
     subjects: request.subjects,
     startSlot: request.startSlot,
     endSlot: request.endSlot,
-    transport,
+    transport: boundedTransport,
     clock,
     signal: request.signal,
     limits: request.limits
   }));
   const reportedLimits = Object.freeze({...DEFAULT_TIME_BOUNDARY_LIMITS, ...limits});
   let evaluationActive = false;
+  let evaluationGeneration = 0;
 
   return Object.freeze({
     enabled,
@@ -285,8 +368,34 @@ export function createPaperSourcePipeline({
         candidateT, assembledAt, decisionAt, holdUntil
       });
       evaluationActive = true;
+      const generation = ++evaluationGeneration;
+      const controller = new AbortController();
+      const runFence = {
+        signal: controller.signal,
+        deadlineAt: performance.now() + reportedLimits.maxElapsedMs,
+        isCurrent: () => evaluationActive && evaluationGeneration === generation &&
+          !controller.signal.aborted,
+        abort: code => {
+          if (!controller.signal.aborted) {
+            controller.abort(Object.assign(new Error(
+              code === "DEADLINE" ? "source evaluation deadline reached" :
+                "source evaluation cancelled"
+            ), {code}));
+          }
+        }
+      };
+      const callerAbort = () => runFence.abort(
+        signal?.reason?.code === "DEADLINE" ? "DEADLINE" : "CANCELLED"
+      );
+      if (signal) {
+        signal.addEventListener("abort", callerAbort, {once: true});
+        if (signal.aborted) callerAbort();
+      }
+      const deadlineTimer = setTimeout(
+        () => runFence.abort("DEADLINE"),
+        Math.max(0, runFence.deadlineAt - performance.now())
+      );
       try {
-        const deadlineAt = performance.now() + reportedLimits.maxElapsedMs;
         if (typeof clock !== "function" || !isRecord(providerCandidate) ||
             !validTime(candidateT) || providerCandidate.sampledAt !== candidateT ||
             !isRecord(evidence) || !isRecord(reviewEvidence)) {
@@ -328,7 +437,10 @@ export function createPaperSourcePipeline({
           timeBoundarySource,
           collector,
           limits: bridgeLimitsFor(reportedLimits),
-          acquisition
+          acquisition,
+          evaluation: runFence,
+          budget,
+          customCollector: Boolean(historySlotCollector)
         });
         let prefetchedHistory = null;
         if (isRecord(policy) && policy.windowsMs?.swaps1h === 3_600_000 &&
@@ -339,16 +451,21 @@ export function createPaperSourcePipeline({
               poolProof,
               startExclusiveMs: candidateT - policy.windowsMs.swaps1h,
               endInclusiveMs: candidateT,
-              signal
-            }), signal, deadlineAt);
+              signal: runFence.signal
+            }), runFence);
           } catch (error) {
-            if (error?.code === "CANCELLED" || error?.code === "DEADLINE") {
-              return unavailable(error.code, {candidateT, holdUntil});
+            if (error?.code === "CANCELLED" || error?.code === "DEADLINE" ||
+                !runFence.isCurrent()) {
+              return unavailable(controller.signal.reason?.code ?? error?.code ?? "CANCELLED", {
+                candidateT, holdUntil
+              });
             }
             prefetchedHistory = null;
           }
-          if (signal?.aborted) {
-            return unavailable("CANCELLED", {candidateT, holdUntil});
+          if (!runFence.isCurrent()) {
+            return unavailable(controller.signal.reason?.code ?? "CANCELLED", {
+              candidateT, holdUntil
+            });
           }
           acquisitionReceipts.push(receiptSummary(
             prefetchedHistory, acquisition.timeEvidence, acquisition.collector
@@ -377,7 +494,8 @@ export function createPaperSourcePipeline({
             request?.atMs,
             request?.denomination
           ]),
-          signal
+          runFence,
+          budget
         );
         const cachedCensusSource = cachedSource(
           prefetchCensusSource,
@@ -391,11 +509,12 @@ export function createPaperSourcePipeline({
             request?.endAtMs,
             request?.policy
           ]),
-          signal
+          runFence,
+          budget
         );
         const cachedHistorySource = prefetchedHistory === null ? null : Object.freeze({
           async readWindow(request) {
-            if (signal?.aborted) return null;
+            if (!runFence.isCurrent()) return null;
             if (request?.identity?.chainId !== identity.chainId ||
                 request?.identity?.mint !== identity.mint ||
                 request?.identity?.pool !== identity.pool ||
@@ -420,17 +539,22 @@ export function createPaperSourcePipeline({
             smartWalletAllowlist,
             sourcePrefetchOnly: true,
             syntheticHistorySourceOverride: mode === "SYNTHETIC_TEST_ONLY"
-          }), signal, deadlineAt);
+          }), runFence);
         } catch (error) {
-          if (error?.code === "CANCELLED" || error?.code === "DEADLINE") {
-            return unavailable(error.code, {candidateT, assembledAt: sourceAssembly, holdUntil});
+          if (error?.code === "CANCELLED" || error?.code === "DEADLINE" ||
+              !runFence.isCurrent()) {
+            return unavailable(controller.signal.reason?.code ?? error?.code ?? "CANCELLED", {
+              candidateT, assembledAt: sourceAssembly, holdUntil
+            });
           }
           return unavailable("ANALYST_SOURCE_PREFETCH_UNKNOWN", {
             candidateT, assembledAt: sourceAssembly, holdUntil
           });
         }
-        if (signal?.aborted) {
-          return unavailable("CANCELLED", {candidateT, assembledAt: sourceAssembly, holdUntil});
+        if (!runFence.isCurrent()) {
+          return unavailable(controller.signal.reason?.code ?? "CANCELLED", {
+            candidateT, assembledAt: sourceAssembly, holdUntil
+          });
         }
 
         let actualAssembledAt;
@@ -475,10 +599,11 @@ export function createPaperSourcePipeline({
             marketPairEvidence,
             smartWalletAllowlist,
             syntheticHistorySourceOverride: mode === "SYNTHETIC_TEST_ONLY"
-          }), signal, deadlineAt);
+          }), runFence);
         } catch (error) {
-          if (error?.code === "CANCELLED" || error?.code === "DEADLINE") {
-            return unavailable(error.code, {
+          if (error?.code === "CANCELLED" || error?.code === "DEADLINE" ||
+              !runFence.isCurrent()) {
+            return unavailable(controller.signal.reason?.code ?? error?.code ?? "CANCELLED", {
               candidateT, assembledAt: actualAssembledAt, decisionAt: analystCutoff, holdUntil
             });
           }
@@ -486,8 +611,8 @@ export function createPaperSourcePipeline({
             candidateT, assembledAt: actualAssembledAt, decisionAt: analystCutoff, holdUntil
           });
         }
-        if (signal?.aborted) {
-          return unavailable("CANCELLED", {
+        if (!runFence.isCurrent()) {
+          return unavailable(controller.signal.reason?.code ?? "CANCELLED", {
             candidateT, assembledAt: actualAssembledAt, decisionAt: analystCutoff, holdUntil
           });
         }
@@ -512,10 +637,11 @@ export function createPaperSourcePipeline({
             reviewEvidence: acceptedReviewEvidence,
             now: actualDecisionAt,
             holdUntil
-          }), signal, deadlineAt);
+          }), runFence);
         } catch (error) {
-          if (error?.code === "CANCELLED" || error?.code === "DEADLINE") {
-            return unavailable(error.code, {
+          if (error?.code === "CANCELLED" || error?.code === "DEADLINE" ||
+              !runFence.isCurrent()) {
+            return unavailable(controller.signal.reason?.code ?? error?.code ?? "CANCELLED", {
               candidateT, assembledAt: actualAssembledAt, decisionAt: actualDecisionAt, holdUntil
             });
           }
@@ -523,8 +649,8 @@ export function createPaperSourcePipeline({
             candidateT, assembledAt: actualAssembledAt, decisionAt: actualDecisionAt, holdUntil
           });
         }
-        if (signal?.aborted) {
-          return unavailable("CANCELLED", {
+        if (!runFence.isCurrent()) {
+          return unavailable(controller.signal.reason?.code ?? "CANCELLED", {
             candidateT, assembledAt: actualAssembledAt, decisionAt: actualDecisionAt, holdUntil
           });
         }
@@ -550,6 +676,9 @@ export function createPaperSourcePipeline({
           realDataEntryEligible: false
         };
       } finally {
+        clearTimeout(deadlineTimer);
+        if (signal) signal.removeEventListener("abort", callerAbort);
+        runFence.abort("COMPLETE");
         evaluationActive = false;
       }
     }

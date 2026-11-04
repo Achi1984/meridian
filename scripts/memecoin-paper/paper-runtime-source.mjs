@@ -182,7 +182,8 @@ export async function acquireSyntheticRuntimeFixture(clock, {
   expireDuringRequest = false,
   deadlineAt,
   variant = "BASE",
-  warmupStore
+  warmupStore,
+  budget
 } = {}) {
   if (!clock || typeof clock.wallClock !== "function" || typeof clock.advance !== "function") {
     throw new TypeError("synthetic runtime fixture requires the module synthetic clock");
@@ -213,6 +214,7 @@ export async function acquireSyntheticRuntimeFixture(clock, {
     usedWork += units;
   };
   const chargeRequest = bytes => {
+    if (budget) return;
     if (signal?.aborted || !Number.isSafeInteger(bytes) || bytes < 0 ||
         usedRequests + 1 > remaining.requests || usedBytes + bytes > remaining.bytes ||
         usedWork + 1 > remaining.work) {
@@ -475,7 +477,8 @@ export async function acquireSyntheticRuntimeFixture(clock, {
       maxDurationMs: Math.max(1, remaining.timeMs),
       requestTimeoutMs: Math.min(1_000, Math.max(1, remaining.timeMs))
     },
-    historySlotCollector
+    historySlotCollector,
+    budget
   });
   const reviewEvidence = Object.fromEntries(ANALYST_WINDOW_METRICS.map(key => [key, {
     status: "REVIEWED",
@@ -582,6 +585,7 @@ export async function acquireSyntheticRuntimeFixture(clock, {
     };
   };
 
+  let activeBudget = budget;
   const quoteAdapter = createMarketQuoteAdapter({
     enabled: true,
     clock: () => {
@@ -589,6 +593,7 @@ export async function acquireSyntheticRuntimeFixture(clock, {
       return clock.wallClock();
     },
     transport: async (url, {signal: quoteSignal} = {}) => {
+      const chargeBytes = activeBudget?.reserveRequest?.();
       if (quoteSignal?.aborted || signal?.aborted) {
         throw Object.assign(new Error("fixture quote cancelled"), {code: "STOPPED"});
       }
@@ -633,8 +638,16 @@ export async function acquireSyntheticRuntimeFixture(clock, {
       });
       quoteAdapterRequests += 1;
       const response = JSON.stringify(quoteBody.body);
-      chargeRequest(Buffer.byteLength(response));
-      return new Response(response, {
+      const responseBytes = new TextEncoder().encode(response);
+      if (!activeBudget) chargeRequest(responseBytes.byteLength);
+      const body = chargeBytes ? new ReadableStream({
+        pull(controller) {
+          chargeBytes(responseBytes.byteLength);
+          controller.enqueue(responseBytes);
+          controller.close();
+        }
+      }) : response;
+      return new Response(body, {
         status: variant === "MISSING_QUOTE" ? 503 : 200,
         headers: {"content-type": "application/json"}
       });
@@ -644,13 +657,15 @@ export async function acquireSyntheticRuntimeFixture(clock, {
   });
   let quoteAdapterRequests = 0;
   const quote = async ({
-    candidate, purpose, position, positionOpenedAt, now, signal: quoteSignal
+    candidate, purpose, position, positionOpenedAt, now, signal: quoteSignal,
+    budget: quoteBudget
   }) => {
     if (quoteSignal?.aborted || signal?.aborted || clock.wallClock() >= deadlineAt ||
         usedRequests >= remaining.requests || usedBytes >= remaining.bytes ||
         usedWork >= remaining.work) {
       return null;
     }
+    activeBudget = quoteBudget ?? budget;
     const side = String(purpose).toUpperCase() === "ENTRY" ? "ENTRY" : "EXIT";
     const amountAtoms = side === "ENTRY" ? "10000000" : String(position?.tokenAtoms ?? "");
     const authorizedAt = side === "ENTRY" ? now : positionOpenedAt;
@@ -797,13 +812,14 @@ export function createPaperRuntimeSourceAdapter(options = {}) {
     }
     const fixtures = new Map();
     return Object.freeze({
-      async acquireCandidates({signal, remaining, recordRequest, recordWork, deadlineAt} = {}) {
+      async acquireCandidates({signal, remaining, recordRequest, recordWork, deadlineAt, budget} = {}) {
         const acquired = await acquireSyntheticRuntimeFixture(clock, {
           signal, remaining, recordRequest, recordWork, deadlineAt, variant,
           waitForStop: fixtureBehavior === "WAIT_FOR_STOP",
           waitForQuoteSettle: fixtureBehavior === "WAIT_FOR_QUOTE_SETTLE",
           expireDuringRequest: fixtureBehavior === "EXPIRE_DURING_REQUEST",
-          warmupStore
+          warmupStore,
+          budget
         });
         if (signal?.aborted) {
           return {status: "UNKNOWN", reason: "STOPPED", candidates: [], fixtureOnly: true};

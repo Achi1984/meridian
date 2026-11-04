@@ -3521,6 +3521,34 @@
       "hostedExactHeadCi": "PENDING",
       "independentFinalReview": "PENDING",
       "nextGate": "FOCUSED_VALIDATION_AND_EXACT_HEAD_DELTA_REPORT_THEN_HOSTED_CI; NO_AUTO_CLOSE_OR_PRODUCTION_ADMISSION"
+    },
+    "paperSourceOrchestration1211RevisionR3": {
+      "opId": "meridian-1211-bounded-orchestration-r3",
+      "recordedDate": "2026-11-04",
+      "issue": 1207,
+      "pullRequest": 1211,
+      "branch": "copilot/issue1207-source-orchestration",
+      "startingHead": "ba200cd6fc2bdd1383b203fafc9100a2651b69f9",
+      "scope": "PARTIAL_EVALUATION_TIMEOUT_FENCING_AND_SHARED_PIPELINE_BUDGET_HARDENING",
+      "state": "INCOMPLETE_RUNTIME_ACQUIRED_ENVELOPE_HANDOFF_NOT_IMPLEMENTED",
+      "focusedTests": "42_PASS_0_FAIL_ACROSS_SOURCE_ORCHESTRATION_PIPELINE_AND_WARMUP_HANDOFF",
+      "implemented": [
+        "evaluation-local abort controller and generation fence for internal deadline and caller cancellation",
+        "late collector completion cannot advance a timed-out evaluation or affect a later evaluation",
+        "shared request and response-byte budget is reserved before transport, collector, price, and census callbacks"
+      ],
+      "remaining": [
+        "remove fixture generation from runtime warmupStore path and reuse an internal handoff routine with acquired envelopes",
+        "thread the same shared capability through warmup persistence/readback and quote paths end-to-end",
+        "add held-callback timeout regressions at persistence and quote boundaries"
+      ],
+      "productionRuntime": "DEFAULT_DISABLED_NO_NETWORK",
+      "providerCallsOrKeys": false,
+      "hostRegistryWorkflowSpendOrActivation": false,
+      "issue1207": "OPEN",
+      "hostedExactHeadCi": "NOT_DISPATCHED",
+      "independentFinalReview": "PENDING",
+      "nextGate": "COMPLETE_REMAINING_R3_SOURCE_CHANGES_AND_FOCUSED_TESTS_BEFORE_HOSTED_CI"
     }
   }
 }
