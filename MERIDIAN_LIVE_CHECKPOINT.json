@@ -3561,7 +3561,7 @@
       "startingHead": "53a000da37705bcf5e13957fa4ff6f0981d79a83",
       "baseSha": "c24c339b763f48f64c2b018f2e12bb38d24efcf8",
       "scope": "SYNTHETIC_ACQUIRED_ENVELOPE_RUNTIME_HANDOFF_AND_BOUNDED_LATE_RESULT_FENCING",
-      "state": "IMPLEMENTED_FOCUSED_TESTS_PASSING_HOSTED_CI_AND_FINAL_REVIEW_PENDING",
+      "state": "MAIN_INTEGRATED_FOCUSED_TESTS_PASSING_HOSTED_CI_AND_INDEPENDENT_FINAL_REVIEW_PENDING",
       "implemented": [
         "runtime source adapter carries acquired UNKNOWN-trust envelopes through immutable warmup publication, readback, and synthetic evaluation using one run-scoped budget capability",
         "persistence timeout returns before a held callback is released and late publication cannot start readback or replace a later evaluation",
@@ -3569,19 +3569,59 @@
         "production runtime remains disabled and synthetic-only envelope injection is unavailable in production mode"
       ],
       "focusedTests": {
-        "test/memecoin-paper-source-orchestration.test.js": "7_PASS_0_FAIL",
+        "test/memecoin-paper-source-orchestration.test.js": "8_PASS_0_FAIL",
         "test/memecoin-paper-source-pipeline.test.js": "24_PASS_0_FAIL",
-        "test/memecoin-paper-provider-warmup-handoff.test.js": "13_PASS_0_FAIL"
+        "test/memecoin-paper-provider-warmup-handoff.test.js": "13_PASS_0_FAIL",
+        "test/memecoin-paper-evidence-warmup.test.js": "12_PASS_0_FAIL",
+        "test/memecoin-paper-host-acceptance-batch.test.js": "17_PASS_0_FAIL"
       },
+      "mainIntegration": {
+        "mainSha": "e51d488ee0a71d194f69ed59e4734fdfb2b6d93d",
+        "postchecks": "SAFETY_RUNTIME_COORDINATOR_PAGES_ALL_SUCCESS",
+        "independentReviewCommentId": 6632860862,
+        "canonicalReceipt": "6614426670"
+      },
+      "issue1211Acceptance": "PENDING",
       "verification": "FOCUSED_SUITES_ONLY_NO_FULL_SUITE",
       "codeql": "SKIPPED_DATABASE_TOO_LARGE",
       "productionIntegration": "BLOCKED_AUTHENTICATED_TRUST_ARCHIVE_CENSUS_METRICS_QUOTE_PROVENANCE_USD_PRICE_AND_COST_CONTRACTS",
       "providerCallsOrKeys": false,
       "hostRegistryWorkflowSpendOrActivation": false,
       "issue1207": "OPEN",
-      "hostedExactHeadCi": "NOT_DISPATCHED_PER_REQUEST",
+      "hostedExactHeadCi": "PENDING_ONE_HOSTED_FULL_CI_AFTER_FREEZE",
       "independentFinalReview": "PENDING",
-      "nextGate": "REPORT_EXACT_HEAD_AND_FREEZE_FOR_HOSTED_CI; NO_HOSTED_CI_DISPATCH"
+      "nextGate": "FREEZE_FOR_ONE_HOSTED_FULL_CI_AND_INDEPENDENT_CLAUDE_REVIEW; NO_AUTO_CLOSE_OR_PRODUCTION_ADMISSION"
+    },
+    "paperHostBatch1210Recovery20261103": {
+      "opId": "meridian-1210-recovery-20261103-r1",
+      "recordedDate": "2026-11-03",
+      "scope": "TEST_DETERMINISM_AND_CHECKPOINT_ONLY; EXISTING_1210_BATCH_IMPLEMENTATION_UNCHANGED",
+      "integratedMainSha": "c24c339b763f48f64c2b018f2e12bb38d24efcf8",
+      "integrationMergeCommit": "7352e117cfe6bdb78f6a15dfb9f01f3f9b6fe5f1",
+      "mainPostchecks": {
+        "safety": {
+          "runId": 41721478876,
+          "jobId": 126215081465,
+          "result": "FAILED",
+          "tests": "4253_PASS_1_FAIL",
+          "failure": "test/memecoin-paper-evidence-warmup.test.js:580 expected syncCalls 1 actual 0"
+        },
+        "runtime": {"runId": 41721478956, "result": "SUCCESS"},
+        "coordinator": {"runId": 41721478852, "result": "SUCCESS"},
+        "pages": {"runId": 41721477385, "result": "SUCCESS"}
+      },
+      "diagnosis": "15MS_DEADLINE_OR_20MS_CANCELLATION_COULD_PRECEDE_TARGET_OPERATION_DURING_ASYNC_SETUP; TEST_USES_SCOPED_CONTROLLABLE_TIMER_AND_MONOTONIC_CLOCK_TO_TRIGGER_ONLY_AFTER_LINK_ENTRY; ALL_SCENARIOS_BOUNDEDLY_DRAIN_PUBLICATION_AND_ENTERED_HOOKS_DURING_CLEANUP",
+      "historical1210EvidenceOnly": {
+        "independentReviewCommentId": 6614915599,
+        "ciRunId": 41710068330,
+        "appliesTo": "PRE_INTEGRATION_HEAD_E113864C_ONLY_NOT_EXPANDED_RECOVERY_CANDIDATE"
+      },
+      "recoveryIntegration": "PENDING_FOCUSED_TESTS_HOSTED_CI_AND_EXPANDED_SCOPE_REVIEW",
+      "hostAcceptance": "NOT_ASSESSED",
+      "productionIntegration": "BLOCKED_NOT_IMPLEMENTED",
+      "issue1207": "OPEN",
+      "keys": "DEFERRED_NO_KEY_USE",
+      "providerOrHostActivation": false
     }
   }
 }
