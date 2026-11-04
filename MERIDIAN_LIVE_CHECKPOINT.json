@@ -3653,6 +3653,36 @@
       "providerCallsOrKeys": false,
       "hostRegistryWorkflowSpendOrActivation": false,
       "nextGate": "COMMIT_NARROW_TEST_ALLOWANCE_AND_CHECKPOINT; REPORT_FINAL_HEAD; NO_BLIND_CI_RERUN"
+    },
+    "walletQualificationDiagnostics1214": {
+      "opId": "meridian-wallet-diagnostics-20261104-r1",
+      "recordedDate": "2026-11-04",
+      "issue": 1214,
+      "parentIssue": 1207,
+      "parentIssueState": "OPEN",
+      "pullRequest": 1216,
+      "pullRequestState": "DRAFT",
+      "branch": "issue-1214-wallet-qualification-diagnostics",
+      "baseSha": "e52cb697008111866d759f6d74b9c2242816c201",
+      "implementationHead": "43422b6be92ed14c867512a42deff5a6bb3ea9f0",
+      "scope": "PURE_OFFLINE_BOUNDED_WALLET_QUALIFICATION_DIAGNOSTICS_EXPLICIT_PROPOSED_POLICY_ONLY",
+      "files": [
+        "scripts/memecoin-paper/analyst-window-evidence.mjs",
+        "test/memecoin-paper-analyst-window-evidence.test.js",
+        "docs/strategy-lab/memecoin-paper/score-spec.md"
+      ],
+      "status": "IMPLEMENTED_FOCUSED_TESTED_NOT_REVIEWED_NOT_MERGED_NOT_LIVE",
+      "focusedTest": "node --test test/memecoin-paper-analyst-window-evidence.test.js",
+      "focusedTestResult": "22_PASS_0_FAIL",
+      "reviewed": false,
+      "merged": false,
+      "live": false,
+      "verifiedAdmissionGranted": false,
+      "allowlistAdmitted": false,
+      "liveDefaultsAdopted": false,
+      "disjointFrom": ["1212costs", "1213provider-handoff"],
+      "providersKeysHostWorkflowsSpendActivation": false,
+      "nextGate": "EXACT_HEAD_REVIEW_AND_EXPLICIT_OWNER_DECISION; POLICY_REVIEWER_ACCOUNTING_DECISIONS_SEPARATE"
     }
   }
 }
