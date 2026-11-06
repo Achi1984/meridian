@@ -172,9 +172,43 @@ function reviewedFixtureEvidence(fixture, candidateT) {
   };
 }
 
+
+// No exported issuer exists: candidates become module-issued only through a future
+// approved acquisition path, never through caller data.
+const ISSUED_RUNTIME_CANDIDATES = new WeakMap();
+
+export function isIssuedRuntimeCandidate(candidate) {
+  const issued = candidate !== null && typeof candidate === "object"
+    ? ISSUED_RUNTIME_CANDIDATES.get(candidate) : null;
+  return Boolean(issued) && ["chainId", "mint", "pool", "quote", "sampledAt"]
+    .every(key => candidate[key] === issued[key]);
+}
+
+export const PAPER_RUNTIME_EVIDENCE_REQUIREMENTS = Object.freeze([
+  "SOURCE_APPROVAL", "SOURCE_TIME", "COMPLETENESS", "REVIEWER_AUTHORITY", "COST_EVIDENCE"
+]);
+
+// Acceptance authority is an unresolved policy boundary: no module path may grant it,
+// so a non-synthetic evaluation never yields eligible candidates.
+export function resolveRuntimeCandidateArray(result, {synthetic = false} = {}) {
+  const refusals = PAPER_RUNTIME_EVIDENCE_REQUIREMENTS.map(requirement => ({
+    requirement,
+    status: "NOT_ACCEPTED",
+    reason: requirement === "REVIEWER_AUTHORITY" || requirement === "SOURCE_APPROVAL"
+      ? "ACCEPTANCE_AUTHORITY_UNRESOLVED" : "EVIDENCE_NOT_ACCEPTED"
+  }));
+  if (!synthetic) return {candidates: [], refusals};
+  const rows = Array.isArray(result) ? result
+    : result?.fixtureOnly === true && Array.isArray(result.candidates) ? result.candidates : null;
+  if (!rows || rows.some(row => row === null || typeof row !== "object" || Array.isArray(row))) {
+    return {candidates: [], refusals};
+  }
+  return {candidates: rows.slice(), refusals: []};
+}
+
 async function evaluateAcquiredEnvelope({
   envelope,
-  fixture,
+  identity,
   pipeline,
   evaluationRequest,
   store,
@@ -193,7 +227,7 @@ async function evaluateAcquiredEnvelope({
     store,
     datasetId: `paper-runtime-${candidateT}`,
     runId: `paper-runtime-run-${candidateT}`,
-    identity: fixture.identity,
+    identity,
     clock: () => clock.wallClock(),
     limits: {maxElapsedMs: Math.max(1, Math.min(10_000, remaining.timeMs))}
   });
@@ -203,7 +237,7 @@ async function evaluateAcquiredEnvelope({
     pipeline,
     evaluationRequest,
     priceEndpoints: [{
-      mint: fixture.candidate.mint,
+      mint: identity.mint,
       atMs: candidateT,
       denomination: "USD"
     }],
@@ -475,7 +509,7 @@ export async function acquireSyntheticRuntimeFixture(clock, {
     }
     warmup = await evaluateAcquiredEnvelope({
       envelope: acquiredEnvelope,
-      fixture,
+      identity: fixture.identity,
       pipeline,
       evaluationRequest,
       store: warmupStore,
@@ -507,13 +541,6 @@ export async function acquireSyntheticRuntimeFixture(clock, {
       candidate: null,
       pipeline: evaluation,
       quote: null,
-      warmup: warmup ? {
-        status: warmup.status,
-        reason: warmup.reason ?? null,
-        datasetDigest: warmup.datasetDigest ?? null,
-        trust: warmup.trust ?? "UNKNOWN",
-        completeness: warmup.completeness ?? "UNKNOWN"
-      } : null,
       warmup: warmup ? {
         status: warmup.status,
         reason: warmup.reason ?? null,
@@ -813,9 +840,143 @@ export async function acquireSyntheticRuntimeFixture(clock, {
   };
 }
 
+const DIAGNOSTIC_KEYS = ["evaluationRequest", "observation", "request", "slotRange"];
+
+// Detached copy built from own data descriptors only: accessors are rejected without being
+// invoked, and later caller mutation cannot reach the copy.
+export function detachDiagnosticData(value, state = {nodes: 0}, depth = 0) {
+  if (depth > 24 || ++state.nodes > 20_000) throw new TypeError("diagnostic input exceeds bounds");
+  if (value === null || ["string", "boolean"].includes(typeof value)) return value;
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) throw new TypeError("diagnostic number is not finite");
+    return value;
+  }
+  if (typeof value !== "object") throw new TypeError("diagnostic value type is unsupported");
+  const array = Array.isArray(value);
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== (array ? Array.prototype : Object.prototype) &&
+      !(prototype === null && !array)) {
+    throw new TypeError("diagnostic value must be plain data");
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const keys = Reflect.ownKeys(descriptors);
+  if (keys.some(key => typeof key !== "string")) throw new TypeError("diagnostic symbols are unsupported");
+  const copy = array ? [] : {};
+  for (const key of keys) {
+    if (array && key === "length") continue;
+    const descriptor = descriptors[key];
+    if (!Object.hasOwn(descriptor, "value") || !descriptor.enumerable) {
+      throw new TypeError("diagnostic accessors are unsupported");
+    }
+    if (array && !/^(0|[1-9][0-9]*)$/.test(key)) throw new TypeError("diagnostic array shape is invalid");
+    Object.defineProperty(copy, key, {
+      value: detachDiagnosticData(descriptor.value, state, depth + 1),
+      enumerable: true, writable: true, configurable: true
+    });
+  }
+  if (array && Object.keys(copy).length !== value.length) {
+    throw new TypeError("diagnostic arrays must be dense");
+  }
+  return copy;
+}
+
+function validateDiagnosticInput(input, warmupStore) {
+  const valid = input !== null && typeof input === "object" && !Array.isArray(input) &&
+    Object.getPrototypeOf(input) === Object.prototype &&
+    Object.getOwnPropertySymbols(input).length === 0 &&
+    Object.getOwnPropertyNames(input).sort().join(",") === DIAGNOSTIC_KEYS.join(",") &&
+    DIAGNOSTIC_KEYS.every(key =>
+      Object.hasOwn(Object.getOwnPropertyDescriptor(input, key), "value")) &&
+    hasDataMethod(warmupStore, "publish") && hasDataMethod(warmupStore, "read");
+  if (!valid) throw new TypeError("diagnostic input must be exact bounded data with a warmup store");
+  return Object.freeze(detachDiagnosticData(input));
+}
+
+// Supplied observations are normalized and evaluated in EXTERNAL_READ_ONLY_INPUT mode with a
+// transport that refuses every request: no network, UNKNOWN trust, and never a candidate.
+async function runExternalDiagnostic({
+  diagnostic, warmupStore, signal, remaining, recordRequest, recordWork, deadlineAt, budget
+}) {
+  const refuse = status => ({
+    status,
+    mode: "EXTERNAL_READ_ONLY_INPUT",
+    trust: "UNKNOWN",
+    completeness: "UNKNOWN",
+    eligibleCandidates: 0,
+    executionAuthorized: false,
+    networkAccessed: false
+  });
+  if (!remaining || !Number.isSafeInteger(remaining.work) || !Number.isSafeInteger(remaining.timeMs) ||
+      !Number.isSafeInteger(remaining.requests) || !Number.isSafeInteger(remaining.bytes) ||
+      typeof recordRequest !== "function" || typeof recordWork !== "function" ||
+      !Number.isSafeInteger(deadlineAt) || remaining.requests < 1 || remaining.bytes < 1 ||
+      remaining.work < 1 || remaining.timeMs < 1) {
+    return {...refuse("REFUSED"), reason: "GLOBAL_BUDGET"};
+  }
+  try {
+    const candidate = diagnostic.evaluationRequest?.providerCandidate;
+    const atMs = diagnostic.request?.atMs;
+    const pipeline = createPaperSourcePipeline({
+      enabled: true,
+      mode: "EXTERNAL_READ_ONLY_INPUT",
+      slotRange: diagnostic.slotRange,
+      transport: async () => {
+        throw Object.assign(new Error("diagnostic transport is disabled"), {code: "NETWORK_DISABLED"});
+      },
+      clock: () => Date.now(),
+      limits: {
+        maxRequests: Math.max(1, remaining.requests),
+        maxBytesPerResponse: Math.min(1_048_576, Math.max(1, Math.floor(remaining.bytes / 3))),
+        maxBytesPerRun: Math.max(1, remaining.bytes),
+        maxWorkUnits: Math.max(1, remaining.work),
+        maxDurationMs: Math.max(1, remaining.timeMs),
+        requestTimeoutMs: Math.min(1_000, Math.max(1, remaining.timeMs))
+      },
+      budget
+    });
+    const {createPaperProviderWarmupHandoff} = await import("./provider-warmup-handoff/index.mjs");
+    const handoff = createPaperProviderWarmupHandoff({
+      enabled: true,
+      store: warmupStore,
+      datasetId: `paper-diagnostic-${atMs}`,
+      runId: `paper-diagnostic-run-${atMs}`,
+      identity: {
+        chainId: candidate?.chainId, mint: candidate?.mint,
+        pool: candidate?.pool, quote: candidate?.quote
+      },
+      clock: () => Date.now(),
+      limits: {maxElapsedMs: Math.max(1, Math.min(10_000, remaining.timeMs))}
+    });
+    const result = await handoff.runOffline({
+      observation: diagnostic.observation,
+      request: diagnostic.request,
+      pipeline,
+      evaluationRequest: diagnostic.evaluationRequest,
+      priceEndpoints: [{mint: candidate?.mint, atMs, denomination: "USD"}],
+      signal, remaining, recordRequest, recordWork, deadlineAt, budget
+    });
+    return {
+      ...refuse(result.status),
+      reason: result.reason ?? null,
+      datasetDigest: result.datasetDigest ?? null,
+      pipelineStatus: result.evaluation?.status ?? null,
+      pipelineReason: result.evaluation?.reason ?? null,
+      pipelineCandidateAvailable: Boolean(result.evaluation?.candidate),
+      realDataEntryEligible: false
+    };
+  } catch (error) {
+    return {
+      ...refuse("REFUSED"),
+      reason: typeof error?.code === "string" && /^[A-Z0-9_]{1,48}$/.test(error.code)
+        ? error.code : "INVALID_DIAGNOSTIC_INPUT"
+    };
+  }
+}
+
 export function createPaperRuntimeSourceAdapter(options = {}) {
   const allowedOptions = [
-    "sourcePolicySha256", "fixtureMode", "clock", "variant", "fixtureBehavior", "warmupStore"
+    "sourcePolicySha256", "fixtureMode", "clock", "variant", "fixtureBehavior", "warmupStore",
+    "diagnosticInput"
   ];
   if (!options || typeof options !== "object" || Array.isArray(options) ||
       ![Object.prototype, null].includes(Object.getPrototypeOf(options)) ||
@@ -833,6 +994,7 @@ export function createPaperRuntimeSourceAdapter(options = {}) {
     fixtureBehavior = "NONE"
   } = options;
   const warmupStore = options.warmupStore;
+  const {diagnosticInput} = options;
   if (sourcePolicySha256 !== PAPER_RUNTIME_SOURCE_POLICY_SHA256) {
     throw new TypeError("source policy digest does not match the module-owned policy");
   }
@@ -885,6 +1047,10 @@ export function createPaperRuntimeSourceAdapter(options = {}) {
           fixtureOnly: true
         };
       },
+      async acquireCandidateArray(input) {
+        const result = await this.acquireCandidates(input);
+        return resolveRuntimeCandidateArray(result, {synthetic: true}).candidates;
+      },
       async quote(request, quoteOptions) {
         const candidate = request?.candidate;
         const fixture = fixtures.get(candidate?.mint);
@@ -896,9 +1062,13 @@ export function createPaperRuntimeSourceAdapter(options = {}) {
     });
   }
 
-  if (Object.keys(options).sort().join(",") !== "sourcePolicySha256") {
+  const productionKeys = Object.keys(options).sort().join(",");
+  if (productionKeys !== "sourcePolicySha256" &&
+      productionKeys !== "diagnosticInput,sourcePolicySha256,warmupStore") {
     throw new TypeError("production runtime source options are not injectable");
   }
+  const diagnostic = diagnosticInput === undefined ? null
+    : validateDiagnosticInput(diagnosticInput, warmupStore);
   const pipeline = createPaperSourcePipeline({
     enabled: false,
     mode: "EXTERNAL_READ_ONLY_INPUT"
@@ -906,7 +1076,9 @@ export function createPaperRuntimeSourceAdapter(options = {}) {
   const quoteAdapter = createMarketQuoteAdapter({enabled: false});
 
   return Object.freeze({
-    async acquireCandidates({signal, remaining} = {}) {
+    async acquireCandidates({
+      signal, remaining, recordRequest, recordWork, deadlineAt, budget
+    } = {}) {
       if (signal?.aborted) {
         return {status: "UNKNOWN", reason: "STOPPED", candidates: [], unresolved: []};
       }
@@ -921,11 +1093,20 @@ export function createPaperRuntimeSourceAdapter(options = {}) {
           unresolved: [...PAPER_SOURCE_POLICY.missingRequirements]
         };
       }
+      const diagnosticResult = diagnostic
+        ? await runExternalDiagnostic({
+          diagnostic, warmupStore, signal, remaining, recordRequest, recordWork, deadlineAt, budget
+        }) : null;
+      if (signal?.aborted) {
+        return {status: "UNKNOWN", reason: "STOPPED", candidates: [], unresolved: []};
+      }
       return {
         status: "UNKNOWN",
         reason: "SOURCE_POLICY_UNAPPROVED",
+        ...(diagnosticResult ? {diagnostic: diagnosticResult} : {}),
         candidates: [],
         unresolved: [...PAPER_SOURCE_POLICY.missingRequirements],
+        refusals: resolveRuntimeCandidateArray(null).refusals,
         pipelineVersion: PAPER_SOURCE_PIPELINE_VERSION,
         pipelineEnabled: pipeline.enabled,
         quoteAdapterStatus: "DISABLED",
@@ -934,6 +1115,13 @@ export function createPaperRuntimeSourceAdapter(options = {}) {
       };
     },
     async quote(request, options) {
+      if (!isIssuedRuntimeCandidate(request?.candidate)) {
+        return {
+          status: "UNAVAILABLE",
+          reasons: ["CANDIDATE_NOT_MODULE_ISSUED"],
+          authorizationEligible: false
+        };
+      }
       return quoteAdapter.getPaperQuote(request, options);
     }
   });
