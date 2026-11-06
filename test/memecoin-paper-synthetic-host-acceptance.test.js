@@ -440,7 +440,8 @@ test("delayed parent setup exhausts the inherited child deadline without a fresh
 
   for (const inheritedDeadline of [
     childEnv.PAPER_SYNTHETIC_ACCEPTANCE_DEADLINE_HR_NS,
-    "invalid-deadline"
+    "invalid-deadline",
+    "9".repeat(33)
   ]) {
     let childOutput = "";
     assert.equal(await main({

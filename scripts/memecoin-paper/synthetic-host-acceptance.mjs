@@ -34,7 +34,8 @@ function requireProof(condition) {
 }
 
 function parseAcceptanceDeadline(value) {
-  requireProof(typeof value === "string" && /^(0|[1-9][0-9]*)$/.test(value));
+  requireProof(typeof value === "string" && value.length <= 32 &&
+    /^(0|[1-9][0-9]*)$/.test(value));
   const deadline = BigInt(value);
   requireProof(deadline > 0n);
   const remainingNs = deadline - process.hrtime.bigint();
