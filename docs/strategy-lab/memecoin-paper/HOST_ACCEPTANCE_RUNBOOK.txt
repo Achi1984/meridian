@@ -137,21 +137,36 @@ use or reuse `host-acceptance-batch`.
 Exact host command (uses the already prepared private SYNTHETIC_ROOT above):
 
   signal_rc=0
-  PAPER_SYNTHETIC_ACCEPTANCE_ENABLED=true \
+  signal_receipt=$(PAPER_SYNTHETIC_ACCEPTANCE_ENABLED=true \
   PAPER_SYNTHETIC_ACCEPTANCE_SIGNAL_DRILL=true \
   PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT="$SYNTHETIC_ROOT" \
-    node "$REPO/scripts/memecoin-paper/synthetic-host-acceptance.mjs" || signal_rc=$?
+    node "$REPO/scripts/memecoin-paper/synthetic-host-acceptance.mjs") || signal_rc=$?
+  printf '%s\n' "$signal_receipt"
   test "$signal_rc" -eq 2
+  SIGNAL_RECEIPT="$signal_receipt" node --input-type=module -e '
+  import {readFile} from "node:fs/promises";
+  import path from "node:path";
+  import {isVerifiedRealSignalDrillReceipt} from "./scripts/memecoin-paper/synthetic-host-acceptance.mjs";
+  import {canonicalCheckpointBytes} from "./scripts/memecoin-paper/checkpoint-store.mjs";
+  const receipt = JSON.parse(process.env.SIGNAL_RECEIPT);
+  if (!isVerifiedRealSignalDrillReceipt(receipt)) throw new Error("verified signal drill receipt required");
+  const saved = await readFile(path.join(process.env.SYNTHETIC_ROOT,
+    receipt.drillId, "signal-drill-result.json"));
+  if (!canonicalCheckpointBytes(receipt).equals(saved)) throw new Error("durable signal receipt mismatch");
+  '
 
 Expected: exit 2 and status UNKNOWN because the single open position remains
 unvalued, with contractChecks PASS and signalDrill.status VERIFIED. The result
 records the acknowledged fill, actual post-fill SIGTERM observation, exactly
-one signal attempt, monotonic signal-to-exit duration, child PID/exit evidence,
+one signal attempt, parent monotonic send-to-exit duration stamped at child exit,
+child PID/exit evidence,
 ACKNOWLEDGED checkpoint, byte-exact export readback and terminal restart
 denial. It does not promote the export evaluation from UNKNOWN. A handshake,
 signal, exit, storage or budget timeout/ambiguity is UNKNOWN; preserve every
 artifact and the run directory, do not retry, remove locks, or clean up the
-claim. This proof is never run implicitly by PIPELINE_QUOTE or ACTIVE_STOP.
+claim. Exit code 2 alone is insufficient: the durable receipt must pass the
+verified-signal predicate above. This proof is never run implicitly by
+PIPELINE_QUOTE or ACTIVE_STOP.
 
 One 60-second monotonic acceptance-operation budget spans preparation (including
 CLI TLS/auth-file reads), the pilot, restart verification, immutable readback,

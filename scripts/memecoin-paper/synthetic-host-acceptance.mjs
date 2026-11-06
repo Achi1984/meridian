@@ -31,6 +31,26 @@ function requireProof(condition) {
   if (!condition) throw new Error("synthetic acceptance contract not satisfied");
 }
 
+export function isVerifiedRealSignalDrillReceipt(value) {
+  const signal = value?.signalDrill;
+  return value?.status === "UNKNOWN" && value.contractChecks === "PASS" &&
+    value.proof === "SYNTHETIC_REAL_SIGTERM" &&
+    value.evaluation === "UNKNOWN" && value.outcome === "OPEN_UNVALUED_TERMINAL_POSITION" &&
+    value.hostAcceptance === "NOT_ASSESSED" && value.providerTrust === "NOT_ASSESSED" &&
+    value.liveExecution === false && value.networkAccessed === false &&
+    signal?.status === "VERIFIED" && signal.signal === "SIGTERM" &&
+    Number.isSafeInteger(signal.targetPid) && signal.targetPid > 0 &&
+    signal.signalSentExactlyOnce === true && signal.signalObservedAfterFill === true &&
+    signal.fillAcknowledged === true && Number.isFinite(signal.sendToExitMs) &&
+    signal.sendToExitMs >= 0 &&
+    /^[a-f0-9]{64}$/.test(signal.fillCheckpointSha256) &&
+    /^[a-f0-9]{64}$/.test(signal.fillReceiptSha256) &&
+    Number.isSafeInteger(signal.fillCheckpointSequence) && signal.fillCheckpointSequence >= 0 &&
+    signal.childExit?.code === 2 && signal.childExit.signal === null &&
+    signal.checkpointPersistence === "ACKNOWLEDGED" && signal.restartDenied === true &&
+    signal.immutableReadback === true && signal.openUnvaluedPositions === 1;
+}
+
 function acceptanceOperation({
   timeoutMs = MAX_ACCEPTANCE_MS, monotonicNow = () => performance.now(),
   fileSystem = {}, signalSource = process
@@ -427,27 +447,46 @@ function childHandshakeWait(child, timeoutMs) {
   };
 }
 
-function childExitWait(child) {
+function childExitWait(child, monotonicNow = () => performance.now()) {
   let removeListeners = () => {};
+  let observedExit = null;
   const promise = new Promise((resolve, reject) => {
-    const finish = action => {
+    const finish = (action, value) => {
       removeListeners();
-      action();
+      action(value);
     };
-    const onExit = (code, signal) => finish(() => resolve({code, signal}));
-    const onError = error => finish(() => reject(error));
+    const onExit = (code, signal) => {
+      observedExit = {code, signal, observedAtMonotonicMs: monotonicNow()};
+      finish(resolve, observedExit);
+    };
+    const onError = error => finish(reject, error);
     removeListeners = () => {
       child.removeListener("exit", onExit);
       child.removeListener("error", onError);
     };
     if (child.exitCode !== null || child.signalCode !== null) {
-      resolve({code: child.exitCode, signal: child.signalCode});
+      observedExit = {
+        code: child.exitCode, signal: child.signalCode, observedAtMonotonicMs: monotonicNow()
+      };
+      resolve(observedExit);
     } else {
       child.once("exit", onExit);
       child.once("error", onError);
     }
   });
-  return {promise, cancel: () => removeListeners()};
+  promise.catch(() => {});
+  return {
+    promise, cancel: () => removeListeners(),
+    get observedExit() { return observedExit; },
+    signalAttempted: false
+  };
+}
+
+function sendChildSigtermOnce(child, exitWait, killChild) {
+  requireProof(typeof killChild === "function" && !exitWait.signalAttempted &&
+    !exitWait.observedExit && child.exitCode === null && child.signalCode === null);
+  exitWait.signalAttempted = true;
+  requireProof(killChild(child, "SIGTERM") === true);
 }
 
 function detachChild(child) {
@@ -461,7 +500,7 @@ function parseCanonical(bytes) {
   return value;
 }
 
-async function realSignalDrill({dataRoot}, operation) {
+async function realSignalDrill({dataRoot, spawnChild, killChild}, operation) {
   let directory;
   let child;
   let handshakeWait;
@@ -488,7 +527,7 @@ async function realSignalDrill({dataRoot}, operation) {
       protocol: "synthetic-real-sigterm/v1", drillId, status: "STARTED"
     }), operation);
 
-    child = spawn(process.execPath, [fileURLToPath(import.meta.url)], {
+    child = spawnChild(process.execPath, [fileURLToPath(import.meta.url)], {
       env: {
         PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
         PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT: directory,
@@ -498,6 +537,7 @@ async function realSignalDrill({dataRoot}, operation) {
       stdio: ["ignore", "ignore", "ignore", "ipc"]
     });
     handshakeWait = childHandshakeWait(child, REAL_SIGNAL_HANDSHAKE_MS);
+    exitWait = childExitWait(child);
     requireProof(Number.isSafeInteger(child.pid) && child.pid > 0);
     await writeNew(directory, "child-started.json", canonicalCheckpointBytes({
       pid: child.pid, executable: process.execPath, entrypoint: fileURLToPath(import.meta.url)
@@ -526,23 +566,23 @@ async function realSignalDrill({dataRoot}, operation) {
       acknowledgement.receiptSha256 === handshake.receiptSha256 &&
       acknowledgement.checkpointSha256 === handshake.checkpointSha256 &&
       acknowledgement.checkpointSequence === handshake.checkpointSequence);
+    requireProof(!exitWait.observedExit && child.exitCode === null && child.signalCode === null);
 
     await writeNew(directory, "signal-request.json", canonicalCheckpointBytes({
-      pid: child.pid, signal: "SIGTERM", runId: handshake.runId,
-      acknowledgementSha256: handshake.acknowledgementSha256, attempts: 1
+      pid: child.pid, signal: "SIGTERM", status: "READY",
+      runId: handshake.runId, acknowledgementSha256: handshake.acknowledgementSha256
     }), operation);
-    exitWait = childExitWait(child);
+    requireProof(!exitWait.observedExit && child.exitCode === null && child.signalCode === null);
     const signalSentAtMonotonicMs = performance.now();
-    const delivered = process.kill(child.pid, "SIGTERM");
-    requireProof(delivered);
+    sendChildSigtermOnce(child, exitWait, killChild);
     await writeNew(directory, "signal-sent.json", canonicalCheckpointBytes({
-      pid: child.pid, signal: "SIGTERM", signalSentAtMonotonicMs
+      pid: child.pid, signal: "SIGTERM", signalSentAtMonotonicMs, attempts: 1
     }), operation);
     const exit = await operation.wait(() => exitWait.promise);
     childExited = true;
-    const signalToExitMs = performance.now() - signalSentAtMonotonicMs;
+    const sendToExitMs = exit.observedAtMonotonicMs - signalSentAtMonotonicMs;
     requireProof(exit.code === 2 && exit.signal === null &&
-      Number.isFinite(signalToExitMs) && signalToExitMs >= 0);
+      Number.isFinite(sendToExitMs) && sendToExitMs >= 0);
 
     const childSummary = parseCanonical(await operation.read(
       path.join(childDirectory, "summary.json"), 64 * 1024
@@ -616,8 +656,8 @@ async function realSignalDrill({dataRoot}, operation) {
       entryFills: evaluation.evidence.entryFills, exits: evaluation.evidence.exits,
       signalDrill: {
         status: "VERIFIED", signal: "SIGTERM", targetPid: child.pid,
-        signalSentExactlyOnce: true, signalObservedAfterFill: true,
-        fillAcknowledged: true, signalToExitMs,
+        signalSentExactlyOnce: exitWait.signalAttempted, signalObservedAfterFill: true,
+        fillAcknowledged: true, sendToExitMs,
         fillCheckpointSequence: handshake.checkpointSequence,
         fillCheckpointSha256: handshake.checkpointSha256,
         fillReceiptSha256: handshake.receiptSha256,
@@ -628,6 +668,7 @@ async function realSignalDrill({dataRoot}, operation) {
       hostAcceptance: "NOT_ASSESSED", providerTrust: "NOT_ASSESSED",
       liveExecution: false, networkAccessed: false
     };
+    requireProof(isVerifiedRealSignalDrillReceipt(summary));
     await writeNew(directory, "signal-drill-result.json", canonicalCheckpointBytes(summary), operation);
     return {summary};
   } catch {
@@ -654,7 +695,8 @@ async function authorization(filename, operation) {
 }
 
 export async function main({
-  env = process.env, stdout = process.stdout, signalSource = process, ...operationOptions
+  env = process.env, stdout = process.stdout, signalSource = process,
+  spawnChild = spawn, killChild = (child, signal) => child.kill(signal), ...operationOptions
 } = {}) {
   if (env.PAPER_SYNTHETIC_ACCEPTANCE_ENABLED === undefined ||
       env.PAPER_SYNTHETIC_ACCEPTANCE_ENABLED === "false") {
@@ -695,7 +737,7 @@ export async function main({
       const {summary} = await withAcceptanceOperation(
         {...operationOptions, signalSource},
         operation => realSignalDrill({
-          dataRoot: env.PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT
+          dataRoot: env.PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT, spawnChild, killChild
         }, operation)
       );
       stdout.write(`${JSON.stringify(summary)}\n`);
