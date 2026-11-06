@@ -310,6 +310,84 @@ test("real SIGTERM drill refuses a child that exited before its one-shot signal"
   assert.equal(signals.eventNames().length, 0);
 });
 
+test("startup child exit during delayed start receipt publication stays UNKNOWN under strict rejection mode", async t => {
+  const dataRoot = await mkdtemp(path.join(os.tmpdir(), "synthetic-real-signal-startup-reject-"));
+  t.after(() => rm(dataRoot, {recursive: true, force: true}));
+  const moduleUrl = new URL(
+    "../scripts/memecoin-paper/synthetic-host-acceptance.mjs", import.meta.url
+  ).href;
+  const script = `
+    import {spawn} from "node:child_process";
+    import {lstat, mkdir, open, readdir, realpath} from "node:fs/promises";
+    import path from "node:path";
+    const {main} = await import(${JSON.stringify(moduleUrl)});
+    let child;
+    let releaseStartedSync;
+    const childExited = new Promise(resolve => { releaseStartedSync = resolve; });
+    const fileSystem = {
+      lstat, mkdir, realpath,
+      async open(filename, ...args) {
+        const handle = await open(filename, ...args);
+        return {
+          writeFile: (...values) => handle.writeFile(...values),
+          async sync() {
+            await handle.sync();
+            if (path.basename(filename) === "child-started.json") await childExited;
+          },
+          stat: (...values) => handle.stat(...values),
+          read: (...values) => handle.read(...values),
+          close: (...values) => handle.close(...values)
+        };
+      }
+    };
+    let killCalls = 0;
+    let output = "";
+    const code = await main({
+      env: {
+        PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
+        PAPER_SYNTHETIC_ACCEPTANCE_SIGNAL_DRILL: "true",
+        PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT: process.env.SIGNAL_ROOT
+      },
+      fileSystem,
+      spawnChild() {
+        child = spawn(process.execPath, ["-e", "process.exit(17)"], {
+          stdio: ["ignore", "ignore", "ignore", "ipc"]
+        });
+        child.once("exit", releaseStartedSync);
+        return child;
+      },
+      killChild(target, signal) {
+        killCalls += 1;
+        return target.kill(signal);
+      },
+      stdout: {write(value) { output += value; }}
+    });
+    console.log(JSON.stringify({
+      code, killCalls, childExitCode: child.exitCode, output,
+      files: await readdir(path.join(process.env.SIGNAL_ROOT, (await readdir(process.env.SIGNAL_ROOT))[0]))
+    }));
+  `;
+  const execution = spawnSync(process.execPath, [
+    "--unhandled-rejections=strict", "--input-type=module", "-e", script
+  ], {
+    encoding: "utf8", env: {...process.env, SIGNAL_ROOT: dataRoot}
+  });
+  assert.equal(execution.error, undefined);
+  assert.equal(execution.status, 0, execution.stderr);
+  const result = JSON.parse(execution.stdout.trim());
+  assert.equal(result.code, 2);
+  assert.equal(result.killCalls, 0);
+  assert.equal(result.childExitCode, 17);
+  assert.equal(JSON.parse(result.output).status, "UNKNOWN");
+  assert.ok(result.files.includes("child-started.json"));
+  assert.ok(result.files.includes("signal-drill-result.json"));
+  assert.equal(result.files.includes("signal-request.json"), false);
+  const [drillName] = await readdir(dataRoot);
+  assert.deepEqual(JSON.parse(await readFile(
+    path.join(dataRoot, drillName, "signal-drill-result.json"), "utf8"
+  )), JSON.parse(result.output));
+});
+
 test("real SIGTERM send-to-exit timing excludes delayed signal receipt fsync", {timeout: 10_000}, async t => {
   const dataRoot = await mkdtemp(path.join(os.tmpdir(), "synthetic-real-signal-delayed-receipt-"));
   t.after(() => rm(dataRoot, {recursive: true, force: true}));

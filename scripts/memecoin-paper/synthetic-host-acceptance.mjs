@@ -438,6 +438,7 @@ function childHandshakeWait(child, timeoutMs) {
     child.once("exit", onExit);
     timer = setTimeout(() => finish(reject, new Error("fill acknowledgement timed out")), timeoutMs);
   });
+  promise.catch(() => {});
   return {
     promise,
     cancel() {
