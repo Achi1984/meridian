@@ -8,6 +8,99 @@ independent reviewer accepts the source and an operator separately records any
 real image/volume/TLS observations. Never label the controller proof as a
 synthetic quote proof, and never label either proof as provider readiness.
 
+Receipt-backed Northflank volume-repair observation
+--------------------------------------------------
+
+The owner-reported observation in
+https://github.com/Achi1984/meridian/issues/942#issuecomment-6639696006 records
+one completed helper publication and repair. Treat this as a historical platform
+receipt, not authorization to repeat it or evidence that the worker passed
+post-remount acceptance.
+
+Platform observations from that receipt:
+
+- The owner approved a per-build Dockerfile override for build
+  `spotless-rice-8786` at source `f801045fb555ff2609ce97e6e03e92fe53aa2654`,
+  using `/Dockerfile.paper-volume-protection`, work directory `/`, and x86.
+  BuildKit reported an uploaded manifest with digest
+  `sha256:c01de3bdd24034c058d338e4b49bce69b1adf87f7d4bbbeff8c2fc39c5c425fd`.
+  The normal build path was restored to `/Dockerfile.paper`; the running worker
+  was not replaced by the helper image. The existing helper image build procedure
+  is in [VOLUME_PROTECTION.md](./VOLUME_PROTECTION.md#review-and-build).
+- For the single repair run, the worker was scaled to zero and the existing
+  `meridian-paper-data` volume was handed exclusively to the
+  `meridian-paper-volume-repair` job. Its internal build source was
+  `meridian-paper-observer/main/spotless-rice-8786`; that source was not the
+  volume-holding job.
+- Run `eb6b9d17-7666-4c46-a944-6b93ea7018b7` reported `PROTECTION_APPLIED`,
+  null `failureCode`, volume owner/group `0:1000`, mode `03775`, final process
+  UID/GID `1000:1000`, zero supplementary groups, and exit 0. The job invoked
+  `--repair` once and exited 0; it did not use `--keepalive`. These are
+  helper-time results only. The documented Northflank command for a separately
+  authorized helper activation remains in
+  [VOLUME_PROTECTION.md](./VOLUME_PROTECTION.md#approved-activation).
+- The finished job was detached, the volume was reattached to the original
+  worker, and that worker resumed at one instance. The receipt reports
+  `luminous-taste-567` / source `661cf1cb82cfdd716f4f0283a54dc13de2907d70`,
+  Running 1/1, zero restarts, with CI/CD off.
+- The original worker's read-only `HOST_LAYOUT_READ_ONLY` observation at
+  `2026-11-06T16:47:28Z` reported runtime UID/GID `1000:1000`; mount owner/group
+  `0:1000`, mode `03775`, directory, no symlink, and `realPathMatches: true`.
+  It reported `mountIdentity: UNVERIFIED`, the probed data child as `ENOENT`,
+  and writes `0`. This is a worker-side metadata observation, not verified
+  volume identity.
+- Subsequent 2026-11-06 direct stats on the original worker confirmed
+  `/var/data/meridian-paper/synthetic-acceptance` and
+  `/var/data/meridian-paper/controller-acceptance` each at UID/GID `1000:1000`,
+  mode `02700`. Both were created fresh under `umask 077`. These are directory
+  metadata observations only; they did not by themselves constitute
+  bootstrap-validator acceptance. The mount identity remains `UNVERIFIED`.
+- The earlier Resources readback showed a 60-second termination grace, below
+  the required 65 seconds. After owner approval to change it to 65 seconds and
+  restart the worker once, Resources was reloaded and read back at 65 seconds.
+  The worker reported Running 1/1 on a new pod with zero restarts; the volume
+  was Bound, ReadWriteOnce, and attached once. The historical 60-second value
+  and current 65-second readback are distinct observations.
+- Later on 2026-11-06, the owner-approved worker switch selected build
+  `wacky-cheese-7139` from `f801045fb555ff2609ce97e6e03e92fe53aa2654`, built
+  with `/Dockerfile.paper` and digest
+  `sha256:86a81e00fd28c45f8abbc759d38f2aa81a003045a94304278b41f92be098767a`.
+  On the deployed worker running as UID 1000, the
+  `validatePaperExportStorageRoot` bootstrap validator passed independently for
+  both `synthetic-acceptance` and `controller-acceptance`. The attached-volume
+  view reported `meridian-paper-data` Bound, ReadWriteOnce, one mount. This
+  supersedes the earlier snapshot below that this build was published but not
+  deployed and that bootstrap validation was still pending; it does not change
+  the separate `mountIdentity: UNVERIFIED` observation.
+- The single foreground synthetic batch `paper-smoke-20261106-01` then ran on
+  the deployed `wacky-cheese-7139` worker with the protected volume and no
+  inherited environment beyond `PATH` plus explicit batch settings. It exited
+  0 in 13.98 seconds. `PIPELINE_QUOTE` recorded one entry and one exit,
+  evaluation PASS, and immutable readback. `ACTIVE_STOP` recorded one entry,
+  zero exits, accepted API stop, restart denied, immutable readback, and the
+  expected UNKNOWN/open unvalued terminal position. Controller no-entry
+  recorded expected UNKNOWN with export and status persistence ACKNOWLEDGED.
+  The batch reported `networkAccessed=false`, `liveExecution=false`, and
+  `hostAcceptance=NOT_ASSESSED`; its claim and three result directories were
+  preserved. This was one synthetic batch, not provider qualification or an OS
+  SIGTERM observation.
+
+Acceptance still requiring independent evidence:
+
+- Replacement-volume identity/readback remains open: the platform attachment
+  view and worker metadata do not bind the mount to an independently verified
+  physical volume identity. Preserve that distinction from the helper's
+  repair-time readback and the subsequent directory bootstrap passes.
+- The 65-second Resources readback satisfies the configured grace threshold,
+  and the 13.98-second synthetic batch completed, but neither establishes actual
+  OS SIGTERM delivery/timing or application checkpoint/export behavior during
+  Northflank termination. Keep the application-level shutdown drill open.
+- Provider qualification remains unestablished. The synthetic batch explicitly
+  reported `hostAcceptance=NOT_ASSESSED`; it made no network requests and did
+  not establish provider trust, real-data quality, or live readiness. Do not
+  infer provider qualification or live admission from the bootstrap passes or
+  synthetic smoke.
+
 Commands below assume a Linux operator shell with Node 20+, and this checkout:
   export REPO=/home/runner/work/meridian/meridian
   cd "$REPO"
