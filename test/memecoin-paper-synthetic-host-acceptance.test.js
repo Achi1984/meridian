@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import {spawn} from "node:child_process";
-import {createHash} from "node:crypto";
+import {createHash, randomUUID} from "node:crypto";
 import {EventEmitter} from "node:events";
 import {
   chmod, lstat, mkdir, mkdtemp, open, readFile, readdir, realpath, rm, symlink, writeFile
@@ -68,7 +68,7 @@ async function root(t) {
   return directory;
 }
 
-function startForegroundChild(dataRoot, claimId, timeoutMs = 60_000) {
+function startForegroundChild(dataRoot, claimId, waitTimeoutMs = 60_000, finalizationTimeoutMs = 60_000) {
   const child = spawn(process.execPath, [
     path.resolve("scripts/memecoin-paper/synthetic-host-acceptance.mjs")
   ], {
@@ -76,7 +76,8 @@ function startForegroundChild(dataRoot, claimId, timeoutMs = 60_000) {
       PATH: process.env.PATH,
       PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
       PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND: "true",
-      PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND_TIMEOUT_MS: String(timeoutMs),
+      PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND_WAIT_TIMEOUT_MS: String(waitTimeoutMs),
+      PAPER_SYNTHETIC_ACCEPTANCE_FINALIZATION_TIMEOUT_MS: String(finalizationTimeoutMs),
       PAPER_SYNTHETIC_ACCEPTANCE_CLAIM_ID: claimId,
       PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT: dataRoot
     },
@@ -94,9 +95,26 @@ function startForegroundChild(dataRoot, claimId, timeoutMs = 60_000) {
   return {child, closed, stdout: () => stdout, stderr: () => stderr};
 }
 
+async function armForegroundRoot(dataRoot, claimId, runId = `synthetic-${randomUUID()}`) {
+  const rootInfo = await lstat(dataRoot);
+  const arm = {
+    protocol: "synthetic-platform-foreground-arm/v1",
+    status: "ARMED",
+    claimId,
+    runId,
+    armId: randomUUID(),
+    dataRoot,
+    rootDevice: rootInfo.dev
+  };
+  const armPath = path.join(dataRoot, `foreground-arm-${claimId}.json`);
+  const armBytes = canonicalCheckpointBytes(arm);
+  await writeFile(armPath, armBytes, {flag: "wx", mode: 0o600});
+  return {arm, armPath, armBytes};
+}
+
 async function waitForForegroundReadiness(dataRoot, claimId, timeoutMs = 10_000) {
   const deadline = performance.now() + timeoutMs;
-  const claimPath = path.join(dataRoot, "foreground-claims", `${claimId}.json`);
+  const claimPath = path.join(dataRoot, `foreground-claim-${claimId}.json`);
   while (performance.now() < deadline) {
     try {
       const claim = JSON.parse(await readFile(claimPath, "utf8"));
@@ -140,6 +158,19 @@ async function waitForForegroundOutput(run, status, timeoutMs = 2_000) {
     await new Promise(resolve => setTimeout(resolve, 5));
   }
   throw new Error(`foreground ${status} output timed out`);
+}
+
+async function waitForForegroundAnyOutput(run, statuses, timeoutMs = 5_000) {
+  const deadline = performance.now() + timeoutMs;
+  while (performance.now() < deadline) {
+    const records = run.stdout().trim().split(/\r?\n/).filter(Boolean).map(line => {
+      try { return JSON.parse(line); } catch { return null; }
+    });
+    const match = records.find(record => statuses.includes(record?.status));
+    if (match) return match;
+    await new Promise(resolve => setTimeout(resolve, 5));
+  }
+  throw new Error(`foreground ${statuses.join("/")} output timed out`);
 }
 
 test("import and default-disabled CLI have no side effects; invalid enable is sanitized", async t => {
@@ -344,6 +375,7 @@ test("foreground SIGTERM records readiness and an identical replacement only rea
   {timeout: 20_000}, async t => {
     const dataRoot = await root(t);
     const claimId = "foreground-success-001";
+    await armForegroundRoot(dataRoot, claimId);
     const run = startForegroundChild(dataRoot, claimId);
     t.after(async () => {
       if (run.child.exitCode === null && run.child.signalCode === null) {
@@ -386,10 +418,14 @@ test("foreground SIGTERM records readiness and an identical replacement only rea
       directory, "receiver", hash(Buffer.from(claim.runId)), "export.json"
     )), exportBytes);
     const originalTree = await snapshotTree(dataRoot);
-
     const replacement = startForegroundChild(dataRoot, claimId);
-    assert.deepEqual(await replacement.closed, {code: 2, signal: null}, replacement.stderr());
-    const readback = JSON.parse(replacement.stdout().trim());
+    t.after(async () => {
+      if (replacement.child.exitCode === null && replacement.child.signalCode === null) {
+        replacement.child.kill("SIGTERM");
+        await replacement.closed;
+      }
+    });
+    const readback = await waitForForegroundOutput(replacement, "UNKNOWN");
     assert.equal(readback.status, "UNKNOWN");
     assert.equal(readback.mode, "READ_ONLY_REPLACEMENT");
     assert.equal(readback.readback, "VERIFIED");
@@ -401,12 +437,296 @@ test("foreground SIGTERM records readiness and an identical replacement only rea
     assert.equal(readback.restartDenied, true);
     assert.equal(readback.immutableReadback, true);
     assert.equal(readback.exportSha256, summary.exportSha256);
+    assert.equal(replacement.child.exitCode, null, "replacement must hold inertly after readback");
+    await new Promise(resolve => setTimeout(resolve, 200));
     assert.deepEqual(await snapshotTree(dataRoot), originalTree);
+    assert.equal(replacement.child.kill("SIGTERM"), true);
+    assert.deepEqual(await replacement.closed, {code: 0, signal: null}, replacement.stderr());
+  });
+
+test("the same command on a different unarmed root remains inert without creating artifacts",
+  {timeout: 15_000}, async t => {
+    const originalRoot = await root(t);
+    const replacementRoot = await root(t);
+    const claimId = "foreground-root-bound-arm";
+    await armForegroundRoot(originalRoot, claimId);
+    const original = startForegroundChild(originalRoot, claimId);
+    const replacement = startForegroundChild(replacementRoot, claimId);
+    for (const run of [original, replacement]) {
+      t.after(async () => {
+        if (run.child.exitCode === null && run.child.signalCode === null) {
+          run.child.kill("SIGTERM");
+          await run.closed;
+        }
+      });
+    }
+    const {claim, directory} = await waitForForegroundReadiness(originalRoot, claimId);
+    const replacementOutput = await waitForForegroundOutput(replacement, "UNKNOWN");
+    assert.equal(replacementOutput.mode, "INERT_UNARMED");
+    assert.equal(replacementOutput.readback, "NOT_ATTEMPTED");
+    assert.deepEqual(await readdir(replacementRoot), []);
+    assert.equal(replacement.child.exitCode, null);
+    await new Promise(resolve => setTimeout(resolve, 200));
+    assert.deepEqual(await readdir(replacementRoot), []);
+    assert.equal(replacement.child.kill("SIGTERM"), true);
+    assert.deepEqual(await replacement.closed, {code: 0, signal: null}, replacement.stderr());
+
+    assert.equal(original.child.kill("SIGTERM"), true);
+    assert.deepEqual(await original.closed, {code: 2, signal: null}, original.stderr());
+    const summary = foregroundOutputRecords(original).at(-1);
+    assert.equal(summary.runId, claim.runId);
+    assert.equal(summary.entryFills, 1);
+    assert.equal(await readFile(path.join(directory, "result.report.json")).then(() => true), true);
+  });
+
+test("concurrent foreground starts consume one arm exclusively and execute at most one fill",
+  {timeout: 15_000}, async t => {
+    const dataRoot = await root(t);
+    const claimId = "foreground-concurrent-claim";
+    await armForegroundRoot(dataRoot, claimId);
+    const runs = [startForegroundChild(dataRoot, claimId), startForegroundChild(dataRoot, claimId)];
+    for (const run of runs) {
+      t.after(async () => {
+        if (run.child.exitCode === null && run.child.signalCode === null) {
+          run.child.kill("SIGTERM");
+          await run.closed;
+        }
+      });
+    }
+    const receipts = await Promise.all(runs.map(run =>
+      waitForForegroundAnyOutput(run, ["READY", "UNKNOWN"])));
+    assert.equal(receipts.filter(item => item.status === "READY").length, 1);
+    assert.equal(receipts.filter(item => item.status === "UNKNOWN").length, 1);
+    const activeIndex = receipts.findIndex(item => item.status === "READY");
+    const loserIndex = 1 - activeIndex;
+    assert.equal(runs[loserIndex].child.exitCode, null);
+    const beforeHold = await snapshotTree(dataRoot);
+    await new Promise(resolve => setTimeout(resolve, 200));
+    assert.deepEqual(await snapshotTree(dataRoot), beforeHold);
+    assert.equal(runs[activeIndex].child.kill("SIGTERM"), true);
+    assert.deepEqual(await runs[activeIndex].closed, {code: 2, signal: null}, runs[activeIndex].stderr());
+    const summary = foregroundOutputRecords(runs[activeIndex]).at(-1);
+    assert.equal(summary.entryFills, 1);
+    assert.equal(runs[loserIndex].child.exitCode, null);
+    assert.equal(runs[loserIndex].child.kill("SIGTERM"), true);
+    assert.deepEqual(await runs[loserIndex].closed, {code: 0, signal: null}, runs[loserIndex].stderr());
+    const claim = JSON.parse(await readFile(path.join(
+      dataRoot, `foreground-claim-${claimId}.json`
+    ), "utf8"));
+    const report = JSON.parse(await readFile(path.join(dataRoot, claim.runId, "result.report.json"), "utf8"));
+    assert.equal(report.runnerReport.operationResults.filter(
+      item => item.method === "executeEntry" && item.status === "FILLED_PAPER"
+    ).length, 1);
+  });
+
+test("failure after arm consumption cannot rearm or start a fill on replacement", async t => {
+  const dataRoot = await root(t);
+  const claimId = "foreground-consumed-before-claim";
+  await armForegroundRoot(dataRoot, claimId);
+  const signals = new EventEmitter();
+  const probe = filesystemProbe(async call => {
+    if (call.method === "open" && path.basename(call.filename) ===
+        `foreground-claim-${claimId}.json`) {
+      const error = new Error("simulated crash after arm consumption");
+      error.code = "EIO";
+      throw error;
+    }
+    return call.action();
+  });
+  let output = "";
+  const outputReady = deferred();
+  const failedStart = main({
+    env: {
+      PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_CLAIM_ID: claimId,
+      PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT: dataRoot
+    },
+    signalSource: signals, fileSystem: probe.fileSystem,
+    stdout: {write(value) { output += value; outputReady.resolve(); }}
+  });
+  await outputReady.promise;
+  const failedReceipt = JSON.parse(output.trim());
+  assert.equal(failedReceipt.status, "UNKNOWN");
+  assert.equal(failedReceipt.mode, "INERT_CLAIM_NOT_ACQUIRED");
+  signals.emit("SIGTERM");
+  assert.equal(await failedStart, 0);
+  await assert.rejects(readFile(path.join(
+    dataRoot, `foreground-claim-${claimId}.json`
+  )), {code: "ENOENT"});
+  const beforeReplacement = await snapshotTree(dataRoot);
+  assert.ok(beforeReplacement[`foreground-arm-consumed-${claimId}.json`]);
+  const replacement = startForegroundChild(dataRoot, claimId);
+  const receipt = await waitForForegroundOutput(replacement, "UNKNOWN");
+  assert.equal(receipt.mode, "INERT_CONSUMED_ARM");
+  assert.equal(replacement.child.exitCode, null);
+  assert.deepEqual(await snapshotTree(dataRoot), beforeReplacement);
+  replacement.child.kill("SIGTERM");
+  assert.deepEqual(await replacement.closed, {code: 0, signal: null}, replacement.stderr());
+  assert.deepEqual(await snapshotTree(dataRoot), beforeReplacement);
+});
+
+test("delayed operator SIGTERM starts a fresh bounded finalization phase", {timeout: 10_000}, async t => {
+  const dataRoot = await root(t);
+  const claimId = "foreground-delayed-signal";
+  await armForegroundRoot(dataRoot, claimId);
+  const signals = new EventEmitter();
+  const finalWriteEntered = deferred();
+  const releaseFinalWrite = deferred();
+  t.after(() => releaseFinalWrite.resolve());
+  const probe = filesystemProbe(async call => {
+    if (path.basename(call.filename) === "result.report.json" && call.method === "writeFile") {
+      finalWriteEntered.resolve();
+      await releaseFinalWrite.promise;
+    }
+    return call.action();
+  });
+  let output = "";
+  const started = performance.now();
+  const pending = main({
+    env: {
+      PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND_WAIT_TIMEOUT_MS: "3000",
+      PAPER_SYNTHETIC_ACCEPTANCE_FINALIZATION_TIMEOUT_MS: "1500",
+      PAPER_SYNTHETIC_ACCEPTANCE_CLAIM_ID: claimId,
+      PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT: dataRoot
+    },
+    signalSource: signals, fileSystem: probe.fileSystem,
+    stdout: {write(value) {
+      output += value;
+      if (value.includes('"status":"READY"')) {
+        setTimeout(() => signals.emit("SIGTERM"), 2_500);
+      }
+    }}
+  });
+  await finalWriteEntered.promise;
+  await new Promise(resolve => setTimeout(resolve, 900));
+  releaseFinalWrite.resolve();
+  assert.equal(await pending, 2);
+  assert.ok(performance.now() - started > 3_000,
+    "finalization must succeed even when total time exceeds the operator-wait phase");
+  const [ready, summary] = output.trim().split(/\r?\n/).map(line => JSON.parse(line));
+  assert.equal(ready.status, "READY");
+  assert.equal(summary.proof, "SYNTHETIC_PLATFORM_FOREGROUND");
+  assert.equal(summary.signalObservation.afterReady, true);
+  assert.equal(summary.stopAccepted, true);
+  await drainProbe(probe);
+});
+
+test("post-SIGTERM finalization phase timeout returns UNKNOWN and preserves partial evidence",
+  {timeout: 8_000}, async t => {
+    const dataRoot = await root(t);
+    const claimId = "foreground-finalization-timeout";
+    await armForegroundRoot(dataRoot, claimId);
+    const signals = new EventEmitter();
+    const finalWriteEntered = deferred();
+    const releaseFinalWrite = deferred();
+    t.after(() => releaseFinalWrite.resolve());
+    const probe = filesystemProbe(async call => {
+      if (path.basename(call.filename) === "result.report.json" && call.method === "writeFile") {
+        finalWriteEntered.resolve();
+        await releaseFinalWrite.promise;
+      }
+      return call.action();
+    });
+    let output = "";
+    const pending = main({
+      env: {
+        PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
+        PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND: "true",
+        PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND_WAIT_TIMEOUT_MS: "5000",
+        PAPER_SYNTHETIC_ACCEPTANCE_FINALIZATION_TIMEOUT_MS: "200",
+        PAPER_SYNTHETIC_ACCEPTANCE_CLAIM_ID: claimId,
+        PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT: dataRoot
+      },
+      signalSource: signals, fileSystem: probe.fileSystem,
+      stdout: {write(value) {
+        output += value;
+        if (value.includes('"status":"READY"')) signals.emit("SIGTERM");
+      }}
+    });
+    await finalWriteEntered.promise;
+    const result = await pending;
+    assert.equal(result, 2);
+    assert.equal(JSON.parse(output.trim().split(/\r?\n/).at(-1)).status, "UNKNOWN");
+    releaseFinalWrite.resolve();
+    await drainProbe(probe);
+    const claim = JSON.parse(await readFile(path.join(
+      dataRoot, `foreground-claim-${claimId}.json`
+    ), "utf8"));
+    const runDirectory = path.join(dataRoot, claim.runId);
+    assert.equal(await readFile(path.join(runDirectory, "readiness.json")).then(() => true), true);
+    assert.equal(await readFile(path.join(runDirectory, "summary.json")).then(() => true).catch(() => false), false);
+  });
+
+test("bounded replacement readback timeout holds inertly without writes until SIGTERM",
+  {timeout: 8_000}, async t => {
+    const dataRoot = await root(t);
+    const claimId = "foreground-readback-timeout";
+    await armForegroundRoot(dataRoot, claimId);
+    const original = startForegroundChild(dataRoot, claimId);
+    t.after(async () => {
+      if (original.child.exitCode === null && original.child.signalCode === null) {
+        original.child.kill("SIGKILL");
+        await original.closed;
+      }
+    });
+    const {directory} = await waitForForegroundReadiness(dataRoot, claimId);
+    await waitForForegroundOutput(original, "READY");
+    original.child.kill("SIGTERM");
+    await original.closed;
+
+    const signals = new EventEmitter();
+    const entered = deferred();
+    const release = deferred();
+    t.after(() => {
+      release.resolve();
+      signals.emit("SIGTERM");
+    });
+    const probe = filesystemProbe(async call => {
+      if (call.method === "read" && path.basename(call.filename) === "checkpoint.json") {
+        entered.resolve();
+        await release.promise;
+      }
+      return call.action();
+    });
+    let output = "";
+    let outputReceived;
+    const outputReady = new Promise(resolve => { outputReceived = resolve; });
+    let settled = false;
+    const pending = main({
+      env: {
+        PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
+        PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND: "true",
+        PAPER_SYNTHETIC_ACCEPTANCE_READBACK_TIMEOUT_MS: "1000",
+        PAPER_SYNTHETIC_ACCEPTANCE_CLAIM_ID: claimId,
+        PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT: dataRoot
+      },
+      signalSource: signals, fileSystem: probe.fileSystem,
+      stdout: {write(value) { output += value; outputReceived(); }}
+    }).finally(() => { settled = true; });
+    await entered.promise;
+    await outputReady;
+    assert.equal(JSON.parse(output.trim()).status, "UNKNOWN");
+    await new Promise(resolve => setTimeout(resolve, 100));
+    assert.equal(settled, false, "timed-out replacement must remain alive in inert hold");
+    const beforeRelease = await snapshotTree(dataRoot);
+    release.resolve();
+    await drainProbe(probe);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(await snapshotTree(dataRoot), beforeRelease);
+    signals.emit("SIGTERM");
+    assert.equal(await pending, 0);
+    assert.equal(settled, true);
+    assert.deepEqual(await snapshotTree(dataRoot), beforeRelease);
+    assert.equal(await readFile(path.join(directory, "result.report.json")).then(() => true), true);
   });
 
 test("SIGTERM during readiness durability is never reported as post-ready", async t => {
   const dataRoot = await root(t);
   const claimId = "foreground-signal-during-ready";
+  await armForegroundRoot(dataRoot, claimId);
   const signals = new EventEmitter();
   let signalInjected = false;
   const probe = filesystemProbe(async call => {
@@ -435,24 +755,66 @@ test("SIGTERM during readiness durability is never reported as post-ready", asyn
   assert.equal(receipt.status, "UNKNOWN");
   assert.equal(receipt.signalObservation, undefined);
   assert.equal(output.includes('"status":"READY"'), false);
-  const [claim] = await readdir(path.join(dataRoot, "foreground-claims"));
-  const claimRecord = JSON.parse(await readFile(path.join(dataRoot, "foreground-claims", claim), "utf8"));
+  const claimRecord = JSON.parse(await readFile(
+    path.join(dataRoot, `foreground-claim-${claimId}.json`), "utf8"
+  ));
   const runDirectory = path.join(dataRoot, claimRecord.runId);
   assert.equal(await readFile(path.join(runDirectory, "readiness.json")).then(() => true), true);
   const beforeReplacement = await snapshotTree(dataRoot);
   const replacement = startForegroundChild(dataRoot, claimId);
-  assert.deepEqual(await replacement.closed, {code: 2, signal: null}, replacement.stderr());
-  const readback = foregroundOutputRecords(replacement).at(-1);
+  t.after(async () => {
+    if (replacement.child.exitCode === null && replacement.child.signalCode === null) {
+      replacement.child.kill("SIGTERM");
+      await replacement.closed;
+    }
+  });
+  const readback = await waitForForegroundOutput(replacement, "UNKNOWN");
   assert.equal(readback.status, "UNKNOWN");
   assert.equal(readback.mode, "READ_ONLY_REPLACEMENT");
   assert.equal(readback.readback, "UNKNOWN");
+  assert.equal(replacement.child.exitCode, null);
+  assert.equal(replacement.child.kill("SIGTERM"), true);
+  assert.deepEqual(await replacement.closed, {code: 0, signal: null}, replacement.stderr());
   assert.deepEqual(await snapshotTree(dataRoot), beforeReplacement);
+});
+
+test("foreground SIGTERM before the pilot listener is installed is latched and cannot be lost", async t => {
+  const dataRoot = await root(t);
+  const claimId = `early-signal-${randomUUID()}`;
+  const {arm} = await armForegroundRoot(dataRoot, claimId);
+  const consumedPath = path.join(dataRoot, `foreground-arm-consumed-${claimId}.json`);
+  const signals = new EventEmitter();
+  const probe = filesystemProbe(async ({method, filename, action}) => {
+    const value = await action();
+    if (method === "sync" && filename === consumedPath) signals.emit("SIGTERM");
+    return value;
+  });
+  let output = "";
+  const code = await main({
+    env: {
+      PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_CLAIM_ID: claimId,
+      PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT: dataRoot
+    },
+    signalSource: signals, stdout: {write: value => { output += value; }},
+    fileSystem: probe.fileSystem, timeoutMs: 10_000
+  });
+  assert.equal(code, 2);
+  assert.equal(JSON.parse(output.trim()).status, "UNKNOWN");
+  assert.equal(JSON.parse(await readFile(path.join(dataRoot,
+    `foreground-claim-${claimId}.json`), "utf8")).runId, arm.runId);
+  assert.equal(await readdir(path.join(dataRoot, arm.runId)).then(entries =>
+    entries.includes("readiness.json")), false);
+  assert.equal(signals.eventNames().length, 0);
+  await drainProbe(probe);
 });
 
 test("foreground timeout leaves a permanent claim; replacement does not replay incomplete work",
   {timeout: 15_000}, async t => {
     const dataRoot = await root(t);
     const claimId = "foreground-timeout-001";
+    await armForegroundRoot(dataRoot, claimId);
     const run = startForegroundChild(dataRoot, claimId, 1_500);
     t.after(async () => {
       if (run.child.exitCode === null && run.child.signalCode === null) {
@@ -461,6 +823,7 @@ test("foreground timeout leaves a permanent claim; replacement does not replay i
       }
     });
     const {claim, directory} = await waitForForegroundReadiness(dataRoot, claimId);
+    await waitForForegroundOutput(run, "READY");
     assert.deepEqual(await run.closed, {code: 2, signal: null}, run.stderr());
     assert.equal(foregroundOutputRecords(run).at(-1).status, "UNKNOWN");
     assert.equal(await readFile(path.join(directory, "readiness.json")).then(() => true), true);
@@ -468,12 +831,20 @@ test("foreground timeout leaves a permanent claim; replacement does not replay i
     const beforeReplacement = await snapshotTree(dataRoot);
 
     const replacement = startForegroundChild(dataRoot, claimId);
-    assert.deepEqual(await replacement.closed, {code: 2, signal: null}, replacement.stderr());
-    const readback = foregroundOutputRecords(replacement).at(-1);
+    t.after(async () => {
+      if (replacement.child.exitCode === null && replacement.child.signalCode === null) {
+        replacement.child.kill("SIGTERM");
+        await replacement.closed;
+      }
+    });
+    const readback = await waitForForegroundOutput(replacement, "UNKNOWN");
     assert.equal(readback.status, "UNKNOWN");
     assert.equal(readback.mode, "READ_ONLY_REPLACEMENT");
     assert.equal(readback.readback, "UNKNOWN");
     assert.equal(readback.runId, claim.runId);
+    assert.equal(replacement.child.exitCode, null);
+    assert.equal(replacement.child.kill("SIGTERM"), true);
+    assert.deepEqual(await replacement.closed, {code: 0, signal: null}, replacement.stderr());
     assert.deepEqual(await snapshotTree(dataRoot), beforeReplacement);
   });
 
@@ -483,6 +854,7 @@ test("foreground replacement reports UNKNOWN and preserves tampered or missing e
       await t.test(mutation, async subtest => {
         const dataRoot = await root(subtest);
         const claimId = `foreground-${mutation}`;
+        await armForegroundRoot(dataRoot, claimId);
         const run = startForegroundChild(dataRoot, claimId);
         subtest.after(async () => {
           if (run.child.exitCode === null && run.child.signalCode === null) {
@@ -491,6 +863,7 @@ test("foreground replacement reports UNKNOWN and preserves tampered or missing e
           }
         });
         const {directory} = await waitForForegroundReadiness(dataRoot, claimId);
+        await waitForForegroundOutput(run, "READY");
         assert.equal(run.child.kill("SIGTERM"), true);
         assert.deepEqual(await run.closed, {code: 2, signal: null}, run.stderr());
         if (mutation === "tampered-export") {
@@ -503,11 +876,19 @@ test("foreground replacement reports UNKNOWN and preserves tampered or missing e
         }
         const beforeReplacement = await snapshotTree(dataRoot);
         const replacement = startForegroundChild(dataRoot, claimId);
-        assert.deepEqual(await replacement.closed, {code: 2, signal: null}, replacement.stderr());
-        const readback = foregroundOutputRecords(replacement).at(-1);
+        subtest.after(async () => {
+          if (replacement.child.exitCode === null && replacement.child.signalCode === null) {
+            replacement.child.kill("SIGTERM");
+            await replacement.closed;
+          }
+        });
+        const readback = await waitForForegroundOutput(replacement, "UNKNOWN");
         assert.equal(readback.status, "UNKNOWN");
         assert.equal(readback.mode, "READ_ONLY_REPLACEMENT");
         assert.equal(readback.readback, "UNKNOWN");
+        assert.equal(replacement.child.exitCode, null);
+        assert.equal(replacement.child.kill("SIGTERM"), true);
+        assert.deepEqual(await replacement.closed, {code: 0, signal: null}, replacement.stderr());
         assert.deepEqual(await snapshotTree(dataRoot), beforeReplacement);
       });
     }

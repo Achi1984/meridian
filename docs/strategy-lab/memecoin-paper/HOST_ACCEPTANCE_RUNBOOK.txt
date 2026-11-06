@@ -304,40 +304,92 @@ Local/source-only verification (no host or service signal):
 
   node --test test/memecoin-paper-synthetic-host-acceptance.test.js
 
-The tests signal only their isolated child processes. They exercise success,
-timeout, same-command replacement readback, tampering, and missing evidence.
-Passing these tests proves local process and filesystem behavior only. It does
-not prove platform event provenance, service/pod identity, volume identity,
-image deployment, platform termination timing, or hosted durability.
+The tests signal only their isolated child processes. They exercise delayed
+operator signal and separate phase deadlines, exclusive arm consumption,
+same-command replacement hold/readback, unarmed alternate roots, concurrency,
+tampering, and missing evidence. Passing these tests proves local process and
+filesystem behavior only. It does not prove platform event provenance,
+service/pod identity, volume identity, image deployment, platform termination
+timing, or hosted durability.
 
 Future host rehearsal — separate approval required; this source-only change
 does not authorize a Northflank action. Preserve the existing volume, all old
 claims/runs, and the previous service command/entrypoint before any separately
 approved rehearsal. Use the already verified private synthetic data child and
 the reviewed immutable image digest; do not use or alter the batch claim or any
-old claim. The worker must run as its existing unprivileged UID. Set custom
-entrypoint `node`, command
+old claim. The worker must run as its existing unprivileged UID. First, on the
+original attached data volume, provision exactly one arm for this new claim ID.
+The arm is a canonical, mode-0600 file created exclusively before the worker is
+started; its data-root path and filesystem device number must match at use. The
+worker never creates or repairs an arm. Example after the separately approved
+volume is attached:
+
+  PAPER_SYNTHETIC_ACCEPTANCE_CLAIM_ID=<new unique safe ID> \
+  PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT=/var/data/meridian-paper/synthetic-acceptance \
+  node --input-type=module <<'JS'
+  import {createHash, randomUUID} from 'node:crypto';
+  import {lstat, open} from 'node:fs/promises';
+  import path from 'node:path';
+  import {canonicalCheckpointBytes} from './scripts/memecoin-paper/checkpoint-store.mjs';
+  const dataRoot = process.env.PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT;
+  const claimId = process.env.PAPER_SYNTHETIC_ACCEPTANCE_CLAIM_ID;
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(claimId) || claimId.includes('..'))
+    throw new Error('invalid claim ID');
+  const rootInfo = await lstat(dataRoot);
+  const arm = {
+    protocol: 'synthetic-platform-foreground-arm/v1', status: 'ARMED', claimId,
+    runId: `synthetic-${randomUUID()}`, armId: randomUUID(), dataRoot, rootDevice: rootInfo.dev
+  };
+  const bytes = canonicalCheckpointBytes(arm);
+  const filename = path.join(dataRoot, `foreground-arm-${claimId}.json`);
+  const file = await open(filename, 'wx', 0o600);
+  try { await file.writeFile(bytes); await file.sync(); } finally { await file.close(); }
+  const directory = await open(dataRoot, 'r');
+  try { await directory.sync(); } finally { await directory.close(); }
+  console.log(JSON.stringify({claimId, runId: arm.runId,
+    armSha256: createHash('sha256').update(bytes).digest('hex')}));
+  JS
+
+The arm is single-use: the foreground process first creates a durable exclusive
+`foreground-arm-consumed-<claim>.json` marker, then its permanent claim. A crash
+after consumption cannot rearm or restart the fill. Keep the arm, consumed marker,
+claim, and run evidence; do not copy the arm to another volume or delete it to
+retry. This file binding is not a physical volume identity proof.
+
+Set custom entrypoint `node`, command
 `scripts/memecoin-paper/synthetic-host-acceptance.mjs`, and only these explicit
 environment values:
 
   PAPER_SYNTHETIC_ACCEPTANCE_ENABLED=true
   PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND=true
-  PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND_TIMEOUT_MS=60000
+  PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND_WAIT_TIMEOUT_MS=60000
+  PAPER_SYNTHETIC_ACCEPTANCE_FINALIZATION_TIMEOUT_MS=60000
+  PAPER_SYNTHETIC_ACCEPTANCE_READBACK_TIMEOUT_MS=15000
   PAPER_SYNTHETIC_ACCEPTANCE_CLAIM_ID=<new unique safe ID>
   PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT=/var/data/meridian-paper/synthetic-acceptance
 
 Keep the worker private, offline, credential-free, with no HTTPS options or
-provider settings. Configure and independently read back a termination grace of
-at least 65 seconds. Use one unique claim ID for one attempt only. The first
-process stays foreground after it prints one `READY` JSON receipt; readiness is
-the durable `foreground-claims/<claim>.json` plus the run's `readiness.json`.
-That receipt is worker output, not proof of a platform event. The
-platform replacement must use the identical command, claim ID, image digest,
-service, and attached volume. It must report `mode: READ_ONLY_REPLACEMENT` and
-`readback: VERIFIED`; it must not create another fill or modify any evidence.
-An UNKNOWN readback, missing marker, timeout, mismatch, or ambiguous state is
-terminal for that claim: preserve the complete tree and do not retry it, clear
-it, or substitute a fresh claim as a way to repair the evidence.
+provider settings. The readiness/operator phase is bounded separately from
+post-signal finalization. A delayed signal uses the remaining readiness/operator
+phase only; the finalization budget starts once, at SIGTERM observation, and is
+not extended or restarted. Configure and independently read back a termination
+grace of at least 65 seconds. Use one unique claim ID for one attempt only. The
+first process stays foreground after it prints one `READY` JSON receipt;
+readiness is `foreground-claim-<claim>.json` plus the run's `readiness.json`.
+That receipt is worker output, not proof of a platform event. The platform
+replacement must use the identical command, claim ID, image digest, service, and
+attached volume. With complete evidence it reports
+`mode: READ_ONLY_REPLACEMENT` and `readback: VERIFIED`; it must not create
+another fill or modify evidence.
+
+Every replacement holds the process inert after its bounded readback, whether
+verified or UNKNOWN, until the platform sends SIGTERM to the idle process. It
+does not exit and induce restart churn, rearm, or write new evidence; after that
+normal platform stop it exits cleanly. If readback is incomplete, missing, timed
+out, or tampered, it emits UNKNOWN and holds without repair. A fresh root without
+the pre-provisioned arm emits UNKNOWN, performs no writes, and holds inert.
+Preserve all artifacts and do not retry, clear claims/consumed markers, copy an
+arm, or substitute a new claim as a way to repair evidence.
 
 The worker can report only that its own process handler observed SIGTERM after
 readiness. It deliberately does not report platform-event provenance,
