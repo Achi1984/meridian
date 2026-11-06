@@ -136,24 +136,26 @@ use or reuse `host-acceptance-batch`.
 
 Exact host command (uses the already prepared private SYNTHETIC_ROOT above):
 
-  signal_rc=0
-  signal_receipt=$(PAPER_SYNTHETIC_ACCEPTANCE_ENABLED=true \
-  PAPER_SYNTHETIC_ACCEPTANCE_SIGNAL_DRILL=true \
-  PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT="$SYNTHETIC_ROOT" \
-    node "$REPO/scripts/memecoin-paper/synthetic-host-acceptance.mjs") || signal_rc=$?
-  printf '%s\n' "$signal_receipt"
-  test "$signal_rc" -eq 2
-  SIGNAL_RECEIPT="$signal_receipt" node --input-type=module -e '
-  import {readFile} from "node:fs/promises";
-  import path from "node:path";
-  import {isVerifiedRealSignalDrillReceipt} from "./scripts/memecoin-paper/synthetic-host-acceptance.mjs";
-  import {canonicalCheckpointBytes} from "./scripts/memecoin-paper/checkpoint-store.mjs";
-  const receipt = JSON.parse(process.env.SIGNAL_RECEIPT);
-  if (!isVerifiedRealSignalDrillReceipt(receipt)) throw new Error("verified signal drill receipt required");
-  const saved = await readFile(path.join(process.env.SYNTHETIC_ROOT,
-    receipt.drillId, "signal-drill-result.json"));
-  if (!canonicalCheckpointBytes(receipt).equals(saved)) throw new Error("durable signal receipt mismatch");
-  '
+  (
+    signal_rc=0
+    signal_receipt=$(PAPER_SYNTHETIC_ACCEPTANCE_ENABLED=true \
+    PAPER_SYNTHETIC_ACCEPTANCE_SIGNAL_DRILL=true \
+    PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT="$SYNTHETIC_ROOT" \
+      node "$REPO/scripts/memecoin-paper/synthetic-host-acceptance.mjs") || signal_rc=$?
+    printf '%s\n' "$signal_receipt"
+    test "$signal_rc" -eq 2 || exit 1
+    SIGNAL_RECEIPT="$signal_receipt" node --input-type=module -e '
+    import {readFile} from "node:fs/promises";
+    import path from "node:path";
+    import {isVerifiedRealSignalDrillReceipt} from "./scripts/memecoin-paper/synthetic-host-acceptance.mjs";
+    import {canonicalCheckpointBytes} from "./scripts/memecoin-paper/checkpoint-store.mjs";
+    const receipt = JSON.parse(process.env.SIGNAL_RECEIPT);
+    if (!isVerifiedRealSignalDrillReceipt(receipt)) throw new Error("verified signal drill receipt required");
+    const saved = await readFile(path.join(process.env.SYNTHETIC_ROOT,
+      receipt.drillId, "signal-drill-result.json"));
+    if (!canonicalCheckpointBytes(receipt).equals(saved)) throw new Error("durable signal receipt mismatch");
+    '
+  )
 
 Expected: exit 2 and status UNKNOWN because the single open position remains
 unvalued, with contractChecks PASS and signalDrill.status VERIFIED. The result

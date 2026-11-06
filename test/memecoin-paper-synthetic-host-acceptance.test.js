@@ -320,13 +320,15 @@ test("real SIGTERM send-to-exit timing excludes delayed signal receipt fsync", {
   let child;
   let sendAt;
   let exitAt;
-  let delayedReceiptMs;
+  const signalClockReads = [];
+  let signalClock = 10_000;
+  let signalReceiptSyncCompletedAt;
   const probe = filesystemProbe(async call => {
     const result = await call.action();
     if (call.method === "sync" && path.basename(call.filename) === "signal-sent.json") {
       receiptSyncEntered.resolve();
       await releaseReceiptSync.promise;
-      delayedReceiptMs = performance.now() - exitAt;
+      signalReceiptSyncCompletedAt = performance.now();
     }
     return result;
   });
@@ -351,19 +353,48 @@ test("real SIGTERM send-to-exit timing excludes delayed signal receipt fsync", {
       });
       return target.kill(signal);
     },
+    signalMonotonicNow: () => {
+      const observedAt = signalClock;
+      signalClock += 25;
+      signalClockReads.push(observedAt);
+      return observedAt;
+    },
     stdout: {write: value => { output += value; }}
   });
   await receiptSyncEntered.promise;
   await childExited.promise;
-  await new Promise(resolve => setTimeout(resolve, 150));
   releaseReceiptSync.resolve();
   const code = await drill;
   const summary = JSON.parse(output);
   assert.equal(code, 2);
   assert.equal(summary.signalDrill.status, "VERIFIED");
-  assert.ok(delayedReceiptMs >= 100);
-  assert.ok(summary.signalDrill.sendToExitMs < delayedReceiptMs);
-  assert.ok(Math.abs(summary.signalDrill.sendToExitMs - (exitAt - sendAt)) < 25);
+  assert.deepEqual(signalClockReads, [10_000, 10_025]);
+  assert.equal(summary.signalDrill.sendToExitMs, signalClockReads[1] - signalClockReads[0]);
+  assert.ok(exitAt > sendAt);
+  assert.ok(exitAt < signalReceiptSyncCompletedAt);
+});
+
+test("runbook host subshell fails on unexpected drill exit before receipt verification", async () => {
+  const runbook = await readFile(
+    path.resolve("docs/strategy-lab/memecoin-paper/HOST_ACCEPTANCE_RUNBOOK.txt"), "utf8"
+  );
+  const section = runbook.split("Exact host command (uses the already prepared private SYNTHETIC_ROOT above):")[1]
+    ?.split("Expected: exit 2 and status UNKNOWN")[0];
+  assert.ok(section);
+  assert.ok(section.indexOf('test "$signal_rc" -eq 2 || exit 1') <
+    section.indexOf("SIGNAL_RECEIPT="));
+  const script = '( signal_rc=0; signal_receipt=$(exit "$CHILD_EXIT") || signal_rc=$?; ' +
+    'test "$signal_rc" -eq 2 || exit 1; printf "VERIFIER_RAN\\n" )';
+  const unexpected = spawnSync("bash", ["-c", script], {
+    encoding: "utf8", env: {...process.env, CHILD_EXIT: "7"}
+  });
+  assert.equal(unexpected.status, 1);
+  assert.equal(unexpected.stdout, "");
+  const expected = spawnSync("bash", ["-c", script], {
+    encoding: "utf8", env: {...process.env, CHILD_EXIT: "2"}
+  });
+  assert.equal(expected.status, 0);
+  assert.equal(expected.stdout.trim(), "VERIFIER_RAN");
 });
 
 test("runbook receipt gate rejects ambiguous or incomplete drill results", () => {

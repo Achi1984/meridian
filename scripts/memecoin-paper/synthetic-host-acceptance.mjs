@@ -500,7 +500,7 @@ function parseCanonical(bytes) {
   return value;
 }
 
-async function realSignalDrill({dataRoot, spawnChild, killChild}, operation) {
+async function realSignalDrill({dataRoot, spawnChild, killChild, signalMonotonicNow}, operation) {
   let directory;
   let child;
   let handshakeWait;
@@ -537,7 +537,7 @@ async function realSignalDrill({dataRoot, spawnChild, killChild}, operation) {
       stdio: ["ignore", "ignore", "ignore", "ipc"]
     });
     handshakeWait = childHandshakeWait(child, REAL_SIGNAL_HANDSHAKE_MS);
-    exitWait = childExitWait(child);
+    exitWait = childExitWait(child, signalMonotonicNow);
     requireProof(Number.isSafeInteger(child.pid) && child.pid > 0);
     await writeNew(directory, "child-started.json", canonicalCheckpointBytes({
       pid: child.pid, executable: process.execPath, entrypoint: fileURLToPath(import.meta.url)
@@ -573,7 +573,7 @@ async function realSignalDrill({dataRoot, spawnChild, killChild}, operation) {
       runId: handshake.runId, acknowledgementSha256: handshake.acknowledgementSha256
     }), operation);
     requireProof(!exitWait.observedExit && child.exitCode === null && child.signalCode === null);
-    const signalSentAtMonotonicMs = performance.now();
+    const signalSentAtMonotonicMs = signalMonotonicNow();
     sendChildSigtermOnce(child, exitWait, killChild);
     await writeNew(directory, "signal-sent.json", canonicalCheckpointBytes({
       pid: child.pid, signal: "SIGTERM", signalSentAtMonotonicMs, attempts: 1
@@ -696,7 +696,8 @@ async function authorization(filename, operation) {
 
 export async function main({
   env = process.env, stdout = process.stdout, signalSource = process,
-  spawnChild = spawn, killChild = (child, signal) => child.kill(signal), ...operationOptions
+  spawnChild = spawn, killChild = (child, signal) => child.kill(signal),
+  signalMonotonicNow = () => performance.now(), ...operationOptions
 } = {}) {
   if (env.PAPER_SYNTHETIC_ACCEPTANCE_ENABLED === undefined ||
       env.PAPER_SYNTHETIC_ACCEPTANCE_ENABLED === "false") {
@@ -737,7 +738,8 @@ export async function main({
       const {summary} = await withAcceptanceOperation(
         {...operationOptions, signalSource},
         operation => realSignalDrill({
-          dataRoot: env.PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT, spawnChild, killChild
+          dataRoot: env.PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT, spawnChild, killChild,
+          signalMonotonicNow
         }, operation)
       );
       stdout.write(`${JSON.stringify(summary)}\n`);
