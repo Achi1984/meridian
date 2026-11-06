@@ -4,7 +4,8 @@
   "protocol": "STREAM-SAFE-V8",
   "mailboxIssue": 942,
   "lead": "CHATGPT",
-  "reviewer": "CLAUDE",
+  "reviewer": "INDEPENDENT_GITHUB_REVIEW_AGENT",
+  "sourceReviewDecision": "https://github.com/Achi1984/meridian/issues/942#issuecomment-6694067544",
   "mailboxPolicy": {
     "previousMailboxIssue": 639,
     "allowedCommentKinds": [

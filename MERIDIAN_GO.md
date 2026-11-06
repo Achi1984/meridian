@@ -1,3 +1,5 @@
+> **Source reviews from 2026-11-06.** The lead requests an independent GitHub review agent who did not write the branch. Apply the current [source review protocol](MERIDIAN_CROSS_MODEL_PROTOCOL.md) and [owner decision](https://github.com/Achi1984/meridian/issues/942#issuecomment-6694067544). Earlier Claude review instructions below describe the previous route.
+
 > **Current Paper observation and development status — 2026-11-01**
 > Source main is `24757a2fdb43e6d68a6001b3a25ae86c9bad066b`. PR #1118 is COMPLETE
 > at prior main `0fc051c59bad28931bc2ff5b3de81858cbde07a8`, with all four
@@ -118,7 +120,7 @@ Authoritative receipt: #1061/comment6535067336.
   agents when dispatch works; use isolated direct connector implementation when it is blocked.
   Distinguish assigned, queued, running and delivered states.
 - Authors run focused meaningful tests. Hosted CI runs the full final candidate suite, then
-  Claude performs one independent final review of the stable successful candidate. Supply exact
+  an independent GitHub review agent performs one final review of the stable successful candidate. Supply exact
   head/base, synthetic merge binding, totals/steps, scope and residual risks together.
   Changed source needs applicable new validation; unchanged source does not need redundant review.
   Required main postchecks, guarded merges and live acceptance remain mandatory.
@@ -199,7 +201,7 @@ When the user says **Go Meridian**, continue MERIDIAN autonomously from the real
 
 ## Roles
 - ChatGPT: Lead architect, implementer and merge owner; Christoph/Achi1984 is Project Owner.
-- Claude: independent read-only reviewer/challenger. Exact-head review before critical merge.
+- Independent GitHub review agent: reviews the full source diff against the exact head/base and successful CI, separately from the branch writer.
 - Claude may use the read-only surfaces granted by the mailbox workflow, but may not edit/write repository content or mutate GitHub except the requested mailbox response comment.
 
 ## STREAM-SAFE-V8 — recoverable work packages
@@ -309,7 +311,7 @@ Immediately publish `FINAL_MERGE_STATUS` after each merge. Do not merge another 
 
 Owner instruction 2026-10-15T19:57:13+02:00, execution Go19:58:27:
 - Record each required owner action as NEEDS_USER_DECISION in the active mailbox; resolve that same comment in place with the actual quote, timestamp and observed outcome. Never invent historical click times or quotations.
-- Before requesting Claude review, run the relevant suite locally with the exact CI toolchain (publisher: ordinary CPython3.14.2 plus the hash-pinned dependency lock), then wait for successful exact-head CI. Partial scope or absent evidence requires NEEDS_MORE_EVIDENCE, never GREEN_LIGHT.
+- Before requesting source review, run the relevant suite locally with the exact CI toolchain (publisher: ordinary CPython3.14.2 plus the hash-pinned dependency lock), then wait for successful exact-head CI. Partial scope or absent evidence requires NEEDS_MORE_EVIDENCE, never GREEN_LIGHT.
 - Canonical review verdicts are GREEN_LIGHT, REVISION_REQUIRED, NEEDS_MORE_EVIDENCE. GREEN_LIGHT requires the full requested scope to be read and all mandatory exact-head checks successful. Historical labels are evidence, not current verdict producers.
 - For credential/mutation code with an attempt marker, first run a reviewed read-only preflight against the real target. Record a failed owner attempt and known/unknown remote state before proposing recovery. Marker recovery and a second attempt each require separate concrete owner approval.
 - Refresh MERIDIAN_LIVE_CHECKPOINT.json, docs/MERIDIAN_CHAT_HANDOFF.md, MERIDIAN_HANDOFF.md and docs/handover/GO-MERIDIAN.md after each merge block. Keep creation provenance, distinguish current evidence from historical snapshots, and never claim the current publication commit before readback.
