@@ -401,7 +401,9 @@ async function runAcceptance({
         checkpointSequence,
         checkpointSha256
       });
+      requireProof(!foregroundSignalObserved);
       await writeNew(directory, "readiness.json", readyBytes, operation);
+      requireProof(!foregroundSignalObserved);
       if (onForegroundReady) {
         await operation.wait(() => onForegroundReady({
           claimId: foregroundClaimId, runId,

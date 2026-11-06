@@ -404,6 +404,51 @@ test("foreground SIGTERM records readiness and an identical replacement only rea
     assert.deepEqual(await snapshotTree(dataRoot), originalTree);
   });
 
+test("SIGTERM during readiness durability is never reported as post-ready", async t => {
+  const dataRoot = await root(t);
+  const claimId = "foreground-signal-during-ready";
+  const signals = new EventEmitter();
+  let signalInjected = false;
+  const probe = filesystemProbe(async call => {
+    const result = await call.action();
+    if (!signalInjected && call.method === "sync" &&
+        path.basename(call.filename) === "readiness.json") {
+      signalInjected = true;
+      signals.emit("SIGTERM");
+    }
+    return result;
+  });
+  let output = "";
+  const code = await main({
+    env: {
+      PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_CLAIM_ID: claimId,
+      PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT: dataRoot
+    },
+    signalSource: signals, fileSystem: probe.fileSystem,
+    stdout: {write: value => { output += value; }}
+  });
+  assert.equal(code, 2);
+  assert.equal(signalInjected, true);
+  const receipt = JSON.parse(output.trim());
+  assert.equal(receipt.status, "UNKNOWN");
+  assert.equal(receipt.signalObservation, undefined);
+  assert.equal(output.includes('"status":"READY"'), false);
+  const [claim] = await readdir(path.join(dataRoot, "foreground-claims"));
+  const claimRecord = JSON.parse(await readFile(path.join(dataRoot, "foreground-claims", claim), "utf8"));
+  const runDirectory = path.join(dataRoot, claimRecord.runId);
+  assert.equal(await readFile(path.join(runDirectory, "readiness.json")).then(() => true), true);
+  const beforeReplacement = await snapshotTree(dataRoot);
+  const replacement = startForegroundChild(dataRoot, claimId);
+  assert.deepEqual(await replacement.closed, {code: 2, signal: null}, replacement.stderr());
+  const readback = foregroundOutputRecords(replacement).at(-1);
+  assert.equal(readback.status, "UNKNOWN");
+  assert.equal(readback.mode, "READ_ONLY_REPLACEMENT");
+  assert.equal(readback.readback, "UNKNOWN");
+  assert.deepEqual(await snapshotTree(dataRoot), beforeReplacement);
+});
+
 test("foreground timeout leaves a permanent claim; replacement does not replay incomplete work",
   {timeout: 15_000}, async t => {
     const dataRoot = await root(t);
