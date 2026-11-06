@@ -360,6 +360,8 @@ function createForegroundHold(signalSource) {
   let released = false;
   let observedSignal;
   let foregroundSignalHandler;
+  let foregroundInterruptHandler;
+  let interrupted = false;
   const keepAlive = setInterval(() => {}, 60_000);
   const stopped = new Promise(resolve => { release = resolve; });
   const onTerm = () => {
@@ -375,8 +377,13 @@ function createForegroundHold(signalSource) {
     clearInterval(keepAlive);
     release();
   };
+  const onInterrupt = () => {
+    interrupted = true;
+    foregroundInterruptHandler?.();
+    stop();
+  };
   signalSource.once("SIGTERM", onTerm);
-  signalSource.once("SIGINT", stop);
+  signalSource.once("SIGINT", onInterrupt);
   return {
     wait: () => stopped,
     subscribeSignal(handler) {
@@ -386,10 +393,17 @@ function createForegroundHold(signalSource) {
         if (foregroundSignalHandler === handler) foregroundSignalHandler = undefined;
       };
     },
+    subscribeInterrupt(handler) {
+      foregroundInterruptHandler = handler;
+      if (interrupted) handler();
+      return () => {
+        if (foregroundInterruptHandler === handler) foregroundInterruptHandler = undefined;
+      };
+    },
     dispose() {
       clearInterval(keepAlive);
       signalSource.removeListener("SIGTERM", onTerm);
-      signalSource.removeListener("SIGINT", stop);
+      signalSource.removeListener("SIGINT", onInterrupt);
     }
   };
 }
@@ -1317,25 +1331,32 @@ export async function main({
         readbackTimeoutMs <= MAX_REPLACEMENT_READBACK_MS);
       attempted = true;
       const hold = createForegroundHold(signalSource);
+      let unsubscribeInterrupt;
       try {
         const result = await withAcceptanceOperation({
           ...operationOptions, signalSource: new EventEmitter(),
           timeoutMs: waitTimeoutMs, maxTimeoutMs: MAX_FOREGROUND_PHASE_MS,
           finalizationTimeoutMs, readbackTimeoutMs, allowPhaseTransition: true
-        }, operation => runForegroundAcceptance({
-          dataRoot: env.PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT,
-          claimId: env.PAPER_SYNTHETIC_ACCEPTANCE_CLAIM_ID, signalSource, signalGate: hold,
-          onReady: marker => stdout.write(`${JSON.stringify({
-            status: "READY", proof: "SYNTHETIC_PLATFORM_FOREGROUND", ...marker
-          })}\n`),
-          operation
-        }));
+        }, operation => {
+          unsubscribeInterrupt = hold.subscribeInterrupt(operation.abort);
+          return runForegroundAcceptance({
+            dataRoot: env.PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT,
+            claimId: env.PAPER_SYNTHETIC_ACCEPTANCE_CLAIM_ID,
+            signalSource, signalGate: hold,
+            onReady: marker => stdout.write(`${JSON.stringify({
+              status: "READY", proof: "SYNTHETIC_PLATFORM_FOREGROUND", ...marker
+            })}\n`),
+            operation
+          });
+        });
+        unsubscribeInterrupt?.();
         stdout.write(`${JSON.stringify(result.summary)}\n`);
         if (result.hold) {
           await hold.wait();
           return 0;
         }
       } finally {
+        unsubscribeInterrupt?.();
         hold.dispose();
       }
       return 2;

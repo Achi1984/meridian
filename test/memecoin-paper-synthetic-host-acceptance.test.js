@@ -476,6 +476,115 @@ test("foreground SIGTERM records readiness and an identical replacement only rea
     assert.deepEqual(await snapshotTree(dataRoot), originalTree);
   });
 
+for (const stage of ["preparation", "after READY", "finalization"]) {
+  test(`foreground SIGINT during ${stage} cancels without SIGTERM proof or terminal success`,
+    {timeout: 15_000}, async t => {
+      const dataRoot = await root(t);
+      const claimId = `foreground-sigint-${stage.toLowerCase().replaceAll(" ", "-")}`;
+      await armForegroundRoot(dataRoot, claimId);
+      const before = await snapshotTree(dataRoot);
+      const signals = new EventEmitter();
+      const entered = deferred();
+      const release = deferred();
+      t.after(() => release.resolve());
+      let termObserved = false;
+      const probe = filesystemProbe(async call => {
+        const blockedPreparation = stage === "preparation" &&
+          call.method === "lstat" && call.filename === dataRoot;
+        const blockedFinalization = stage === "finalization" && termObserved &&
+          call.method === "read" && path.basename(call.filename) === "checkpoint.json";
+        if (blockedPreparation || blockedFinalization) {
+          entered.resolve();
+          await release.promise;
+        }
+        return call.action();
+      });
+      const records = [];
+      const unknownReceipt = deferred();
+      const pending = main({
+        env: {
+          PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
+          PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND: "true",
+          PAPER_SYNTHETIC_ACCEPTANCE_CLAIM_ID: claimId,
+          PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT: dataRoot
+        },
+        signalSource: signals, fileSystem: probe.fileSystem,
+        stdout: {write(value) {
+          const record = JSON.parse(value);
+          records.push(record);
+          if (record.status === "READY") {
+            if (stage === "after READY") signals.emit("SIGINT");
+            if (stage === "finalization") {
+              termObserved = true;
+              signals.emit("SIGTERM");
+            }
+          }
+          if (record.status === "UNKNOWN") unknownReceipt.resolve();
+        }}
+      });
+
+      if (stage === "preparation") {
+        await entered.promise;
+        signals.emit("SIGINT");
+      } else if (stage === "finalization") {
+        await entered.promise;
+        signals.emit("SIGINT");
+      }
+
+      await unknownReceipt.promise;
+      assert.equal(await pending, stage === "preparation" ? 0 : 2);
+      assert.ok(records.some(record => record.status === "UNKNOWN"));
+      assert.equal(records.some(record => record.status === "PASS"), false);
+      assert.equal(records.some(record =>
+        record.signalObservation?.status === "OBSERVED"), false);
+
+      const callsBeforeRelease = probe.calls.filter(call => call.method !== "close");
+      release.resolve();
+      await drainProbe(probe);
+      await new Promise(resolve => setImmediate(resolve));
+      assert.deepEqual(probe.calls.filter(call => call.method !== "close"), callsBeforeRelease);
+
+      if (stage === "preparation") {
+        assert.deepEqual(await snapshotTree(dataRoot), before);
+        assert.equal(signals.eventNames().length, 0);
+        return;
+      }
+      const [runId] = await readdir(dataRoot).then(entries =>
+        entries.filter(entry => entry.startsWith("synthetic-")));
+      assert.ok(runId);
+      const runFiles = await readdir(path.join(dataRoot, runId));
+      assert.equal(runFiles.includes("summary.json"), false);
+      assert.equal(runFiles.includes("readiness.json"), stage === "finalization" ||
+        stage === "after READY");
+      assert.equal(signals.eventNames().length, 0);
+    });
+}
+
+test("idle foreground replacement exits cleanly on SIGINT without mutation", async t => {
+  const dataRoot = await root(t);
+  const before = await snapshotTree(dataRoot);
+  const signals = new EventEmitter();
+  const outputReady = deferred();
+  let output = "";
+  const pending = main({
+    env: {
+      PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_CLAIM_ID: "idle-sigint-replacement",
+      PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT: dataRoot
+    },
+    signalSource: signals,
+    stdout: {write(value) { output += value; outputReady.resolve(); }}
+  });
+  await outputReady.promise;
+  assert.equal(JSON.parse(output.trim()).status, "UNKNOWN");
+  assert.equal(JSON.parse(output.trim()).mode, "INERT_UNARMED");
+  signals.emit("SIGINT");
+  assert.equal(await pending, 0);
+  assert.equal(signals.eventNames().length, 0);
+  assert.deepEqual(await snapshotTree(dataRoot), before);
+});
+
 test("the same command on a different unarmed root remains inert without creating artifacts",
   {timeout: 15_000}, async t => {
     const originalRoot = await root(t);
