@@ -108,7 +108,7 @@ not add stop/trading logic. The pre-existing PIPELINE_QUOTE_STOP_AFTER_ENTRY
 fixture actually stops after quote acquisition BEFORE execution and therefore
 cannot prove this boundary. No terminal liquidation/valuation is invented.
 
-Both proofs require ACKNOWLEDGED checkpoint persistence, terminal restart
+The PIPELINE_QUOTE and ACTIVE_STOP proofs require ACKNOWLEDGED checkpoint persistence, terminal restart
 RESTART_NOT_ALLOWED without checkpoint mutation, exact canonical result.report
 publication and byte-exact immutable receiver readback. The evaluator receives
 the independently computed config digest and pinned paper-pilot-composition/3
@@ -119,6 +119,56 @@ records remain under SYNTHETIC_ROOT/<runId>. No raw report or secret is logged.
 Use the printed runId to locate these artifacts; do not merge two runs' evidence.
 An interrupted run/missing summary is UNKNOWN. Preserve it; never reuse its
 directory, resume it, remove locks, or retry its transfer.
+
+Proof A2 — REAL OS SIGTERM after a durable synthetic fill
+--------------------------------------------------------
+
+This is a separate, explicit opt-in drill. It starts the same executable as one
+dedicated child with an allowlisted environment and offline fixture adapters.
+The child durably records the FILLED_PAPER receipt before sending an IPC
+acknowledgement. The parent waits at most 25 seconds, verifies that file, then
+sends OS SIGTERM exactly once to that child's PID. The child's existing process
+SIGTERM handler calls the existing pilot stop path. No fill hook calls stop/abort,
+no synthetic signal is emitted, and no service PID, process group, provider or
+market network is used. Each invocation creates a new private `real-signal-<UUID>` directory
+under SYNTHETIC_ROOT, then a separate synthetic run directory beneath it. Never
+use or reuse `host-acceptance-batch`.
+
+Exact host command (uses the already prepared private SYNTHETIC_ROOT above):
+
+  (
+    signal_rc=0
+    signal_receipt=$(PAPER_SYNTHETIC_ACCEPTANCE_ENABLED=true \
+    PAPER_SYNTHETIC_ACCEPTANCE_SIGNAL_DRILL=true \
+    PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT="$SYNTHETIC_ROOT" \
+      node "$REPO/scripts/memecoin-paper/synthetic-host-acceptance.mjs") || signal_rc=$?
+    printf '%s\n' "$signal_receipt"
+    test "$signal_rc" -eq 2 || exit 1
+    SIGNAL_RECEIPT="$signal_receipt" node --input-type=module -e '
+    import {readFile} from "node:fs/promises";
+    import path from "node:path";
+    import {isVerifiedRealSignalDrillReceipt} from "./scripts/memecoin-paper/synthetic-host-acceptance.mjs";
+    import {canonicalCheckpointBytes} from "./scripts/memecoin-paper/checkpoint-store.mjs";
+    const receipt = JSON.parse(process.env.SIGNAL_RECEIPT);
+    if (!isVerifiedRealSignalDrillReceipt(receipt)) throw new Error("verified signal drill receipt required");
+    const saved = await readFile(path.join(process.env.SYNTHETIC_ROOT,
+      receipt.drillId, "signal-drill-result.json"));
+    if (!canonicalCheckpointBytes(receipt).equals(saved)) throw new Error("durable signal receipt mismatch");
+    '
+  )
+
+Expected: exit 2 and status UNKNOWN because the single open position remains
+unvalued, with contractChecks PASS and signalDrill.status VERIFIED. The result
+records the acknowledged fill, actual post-fill SIGTERM observation, exactly
+one signal attempt, parent monotonic send-to-exit duration stamped at child exit,
+child PID/exit evidence,
+ACKNOWLEDGED checkpoint, byte-exact export readback and terminal restart
+denial. It does not promote the export evaluation from UNKNOWN. A handshake,
+signal, exit, storage or budget timeout/ambiguity is UNKNOWN; preserve every
+artifact and the run directory, do not retry, remove locks, or clean up the
+claim. Exit code 2 alone is insufficient: the durable receipt must pass the
+verified-signal predicate above. This proof is never run implicitly by
+PIPELINE_QUOTE or ACTIVE_STOP.
 
 One 60-second monotonic acceptance-operation budget spans preparation (including
 CLI TLS/auth-file reads), the pilot, restart verification, immutable readback,
@@ -139,8 +189,8 @@ budget. During preparation or finalization those signals cancel the acceptance
 operation immediately, return sanitized UNKNOWN (exit 2), and prevent further
 publication/upload. Handlers remain installed until finalization ends.
 The deterministic ACTIVE_STOP proof is an API-stop proof, not an OS-signal timing
-claim. Focused tests separately deliver SIGTERM to an active filled composition.
-Allow at least 65 seconds of process termination grace for the 60-second total
+claim. Proof A2 is the separate real-process signal drill. Allow at least 65
+seconds of process termination grace for the 60-second total
 budget plus scheduling margin; do not SIGKILL during checkpoint/export
 publication. Slow durable storage remains UNKNOWN and requires reconciliation,
 never a retry or a new operation budget for the same run.
