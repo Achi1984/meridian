@@ -26,9 +26,23 @@ const BUDGETS = Object.freeze({
 const digest = bytes => createHash("sha256").update(bytes).digest("hex");
 const MAX_ACCEPTANCE_MS = 60_000;
 const REAL_SIGNAL_HANDSHAKE_MS = 25_000;
+const NS_PER_MS = 1_000_000n;
+const ACCEPTANCE_DEADLINE_ENV = "PAPER_SYNTHETIC_ACCEPTANCE_DEADLINE_HR_NS";
 
 function requireProof(condition) {
   if (!condition) throw new Error("synthetic acceptance contract not satisfied");
+}
+
+function parseAcceptanceDeadline(value) {
+  requireProof(typeof value === "string" && /^(0|[1-9][0-9]*)$/.test(value));
+  const deadline = BigInt(value);
+  requireProof(deadline > 0n);
+  const remainingNs = deadline - process.hrtime.bigint();
+  requireProof(remainingNs <= BigInt(MAX_ACCEPTANCE_MS) * NS_PER_MS);
+  return {
+    deadlineMonotonicNs: deadline,
+    timeoutMs: remainingNs <= 0n ? 0 : Number(remainingNs / NS_PER_MS)
+  };
 }
 
 export function isVerifiedRealSignalDrillReceipt(value) {
@@ -53,7 +67,7 @@ export function isVerifiedRealSignalDrillReceipt(value) {
 
 function acceptanceOperation({
   timeoutMs = MAX_ACCEPTANCE_MS, monotonicNow = () => performance.now(),
-  fileSystem = {}, signalSource = process
+  fileSystem = {}, signalSource = process, deadlineMonotonicNs
 } = {}) {
   requireProof(Number.isSafeInteger(timeoutMs) && timeoutMs > 0 && timeoutMs <= MAX_ACCEPTANCE_MS);
   const fs = {lstat, mkdir, open, realpath, ...fileSystem};
@@ -63,12 +77,16 @@ function acceptanceOperation({
   const start = monotonicNow();
   requireProof(Number.isFinite(start));
   const deadline = start + timeoutMs;
+  const absoluteDeadline = deadlineMonotonicNs ??
+    process.hrtime.bigint() + BigInt(timeoutMs) * NS_PER_MS;
+  requireProof(typeof absoluteDeadline === "bigint" && absoluteDeadline > 0n);
   let previous = start;
   let stopPilot;
   const cancel = () => controller.abort(failure);
   const check = () => {
     const now = monotonicNow();
-    if (!Number.isFinite(now) || now < previous || now >= deadline) cancel();
+    if (!Number.isFinite(now) || now < previous || now >= deadline ||
+        process.hrtime.bigint() >= absoluteDeadline) cancel();
     previous = now;
     if (controller.signal.aborted) throw failure;
   };
@@ -78,7 +96,8 @@ function acceptanceOperation({
   };
   signalSource.on("SIGINT", onSignal);
   signalSource.on("SIGTERM", onSignal);
-  const timer = setTimeout(cancel, timeoutMs);
+  const remainingMs = Number((absoluteDeadline - process.hrtime.bigint()) / NS_PER_MS);
+  const timer = setTimeout(cancel, Math.max(0, Math.min(timeoutMs, remainingMs)));
   const cleanup = handle => {
     // Closing is best effort; a stalled close must not extend the operation.
     try { Promise.resolve(handle.close()).catch(() => {}); } catch {}
@@ -135,6 +154,7 @@ function acceptanceOperation({
   };
   return {
     check, wait, open: openFile, signal: controller.signal,
+    deadlineMonotonicNs: absoluteDeadline,
     lstat: filename => wait(() => fs.lstat(filename)),
     realpath: filename => wait(() => fs.realpath(filename)),
     mkdir: (...args) => wait(() => fs.mkdir(...args)),
@@ -533,7 +553,8 @@ async function realSignalDrill({dataRoot, spawnChild, killChild, signalMonotonic
         PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
         PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT: directory,
         PAPER_SYNTHETIC_ACCEPTANCE_PROOF: "REAL_SIGNAL_CHILD",
-        PAPER_SYNTHETIC_ACCEPTANCE_SIGNAL_CHILD: "true"
+        PAPER_SYNTHETIC_ACCEPTANCE_SIGNAL_CHILD: "true",
+        [ACCEPTANCE_DEADLINE_ENV]: operation.deadlineMonotonicNs.toString()
       },
       stdio: ["ignore", "ignore", "ignore", "ipc"]
     });
@@ -714,11 +735,13 @@ export async function main({
     if (env.PAPER_SYNTHETIC_ACCEPTANCE_SIGNAL_CHILD === "true") {
       requireProof(env.PAPER_SYNTHETIC_ACCEPTANCE_SIGNAL_DRILL !== "true" &&
         env.PAPER_SYNTHETIC_ACCEPTANCE_HTTPS_ENABLED !== "true" &&
-        env.PAPER_SYNTHETIC_ACCEPTANCE_PROOF === "REAL_SIGNAL_CHILD" &&
-        typeof process.send === "function");
+        env.PAPER_SYNTHETIC_ACCEPTANCE_PROOF === "REAL_SIGNAL_CHILD");
       attempted = true;
+      const inheritedDeadline = parseAcceptanceDeadline(env[ACCEPTANCE_DEADLINE_ENV]);
+      requireProof(inheritedDeadline.timeoutMs > 0);
+      requireProof(typeof process.send === "function");
       const {summary} = await withAcceptanceOperation(
-        {...operationOptions, signalSource},
+        {...operationOptions, signalSource, ...inheritedDeadline},
         operation => runAcceptance({
           dataRoot: env.PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT,
           proof: "REAL_SIGNAL_CHILD",

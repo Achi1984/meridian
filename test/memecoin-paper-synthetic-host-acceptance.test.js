@@ -388,6 +388,80 @@ test("startup child exit during delayed start receipt publication stays UNKNOWN 
   )), JSON.parse(result.output));
 });
 
+test("delayed parent setup exhausts the inherited child deadline without a fresh window", async t => {
+  const dataRoot = await root(t);
+  const entered = deferred();
+  const release = deferred();
+  const timeoutMs = 250;
+  const probe = filesystemProbe(async ({method, filename, action}) => {
+    const result = await action();
+    if (method === "sync" && path.basename(filename) === "child-started.json") {
+      entered.resolve();
+      await release.promise;
+    }
+    return result;
+  });
+  const fakeChild = Object.assign(new EventEmitter(), {
+    pid: 12345, exitCode: null, signalCode: null, connected: false, unref() {}
+  });
+  const signals = new EventEmitter();
+  let childEnv;
+  let killCalls = 0;
+  let output = "";
+  const startedAt = process.hrtime.bigint();
+  const pending = main({
+    env: {
+      PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_SIGNAL_DRILL: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT: dataRoot
+    },
+    timeoutMs, signalSource: signals, fileSystem: probe.fileSystem,
+    spawnChild(_executable, _args, options) {
+      childEnv = options.env;
+      return fakeChild;
+    },
+    killChild() {
+      killCalls += 1;
+      return true;
+    },
+    stdout: {write: value => { output += value; }}
+  });
+  await entered.promise;
+  assert.equal(await pending, 2);
+  release.resolve();
+  await drainProbe(probe);
+
+  assert.equal(JSON.parse(output).status, "UNKNOWN");
+  assert.equal(killCalls, 0);
+  const deadlineNs = BigInt(childEnv.PAPER_SYNTHETIC_ACCEPTANCE_DEADLINE_HR_NS);
+  assert.ok(deadlineNs > startedAt);
+  assert.ok(deadlineNs - startedAt <= BigInt(timeoutMs) * 1_000_000n + 5_000_000n);
+  assert.ok(deadlineNs <= process.hrtime.bigint(), "the delayed parent setup must exhaust the budget");
+
+  for (const inheritedDeadline of [
+    childEnv.PAPER_SYNTHETIC_ACCEPTANCE_DEADLINE_HR_NS,
+    "invalid-deadline"
+  ]) {
+    let childOutput = "";
+    assert.equal(await main({
+      env: {
+        ...childEnv,
+        PAPER_SYNTHETIC_ACCEPTANCE_DEADLINE_HR_NS: inheritedDeadline
+      },
+      signalSource: new EventEmitter(),
+      stdout: {write: value => { childOutput += value; }}
+    }), 2);
+    assert.deepEqual(JSON.parse(childOutput), {
+      status: "UNKNOWN", code: "SYNTHETIC_ACCEPTANCE_FAILED"
+    });
+  }
+  const [drillName] = await readdir(dataRoot);
+  const drillFiles = await readdir(path.join(dataRoot, drillName));
+  assert.equal(drillFiles.includes("signal-request.json"), false);
+  assert.equal(drillFiles.some(filename => filename.startsWith("synthetic-")), false);
+  assert.equal(signals.eventNames().length, 0);
+});
+
 test("real SIGTERM send-to-exit timing excludes delayed signal receipt fsync", {timeout: 10_000}, async t => {
   const dataRoot = await mkdtemp(path.join(os.tmpdir(), "synthetic-real-signal-delayed-receipt-"));
   t.after(() => rm(dataRoot, {recursive: true, force: true}));
