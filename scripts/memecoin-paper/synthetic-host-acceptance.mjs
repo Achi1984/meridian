@@ -809,9 +809,8 @@ async function runForegroundAcceptance({
   requireProof(validForegroundClaimId(claimId) && typeof dataRoot === "string" &&
     path.isAbsolute(dataRoot) && path.normalize(dataRoot) === dataRoot);
   operation.beginReadbackDiscovery();
-  let rootInfo;
   try {
-    rootInfo = await operation.lstat(dataRoot);
+    const rootInfo = await operation.lstat(dataRoot);
     if (!isPrivateDirectory(rootInfo) || await operation.realpath(dataRoot) !== dataRoot) {
       return {
         summary: {
