@@ -408,6 +408,92 @@ test("child crashes distinguish unpublished data from ambiguous publication", as
   }
 });
 
+test("paper fill resumes after process interruption without booking the event twice", {timeout: 10_000}, async t => {
+  const candidate = candidateFor("So11111111111111111111111111111111111111112", START);
+  const authorization = authorizeInput(candidate, START);
+  const quote = {
+    ...entryQuote(candidate, START + 2000),
+    costs: {...ZERO_COSTS, feeCents: 7, spreadCents: 3, slippageCents: 2}
+  };
+  const fillInputs = {
+    authorizationId: authorization.authorizationId,
+    quote,
+    now: START + 2000,
+    marks: []
+  };
+  const payload = JSON.stringify({
+    runId: "checkpoint-test",
+    startedAt: START,
+    authorization,
+    fill: fillInputs
+  });
+
+  const uninterruptedDirectory = await tempDirectory(t);
+  const uninterrupted = await openSession(uninterruptedDirectory);
+  assert.equal((await uninterrupted.session.authorizeEntry("authorize-1", authorization)).status, "AUTHORIZED");
+  const uninterruptedFill = await uninterrupted.session.executeEntry("fill-1", fillInputs);
+  assert.equal(uninterruptedFill.status, "FILLED_PAPER");
+  const uninterruptedSnapshot = uninterrupted.session.snapshot();
+  await uninterrupted.session.close();
+
+  const interruptedDirectory = await tempDirectory(t);
+  const child = spawn(process.execPath, [CHILD_FIXTURE, interruptedDirectory, "execute-and-hold", payload], {
+    stdio: ["ignore", "ignore", "pipe", "ipc"]
+  });
+  let childStderr = "";
+  child.stderr.setEncoding("utf8").on("data", chunk => { childStderr += chunk; });
+  const exited = once(child, "exit");
+  t.after(async () => {
+    if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+    await exited.catch(() => {});
+  });
+  const childResult = await Promise.race([
+    once(child, "message").then(([value]) => value),
+    exited.then(([code, signal]) => {
+      throw new Error(`fill process exited before durable completion: ${code ?? signal}\n${childStderr}`);
+    })
+  ]);
+  assert.equal(childResult.authorizationStatus, "AUTHORIZED");
+  assert.deepEqual(childResult.fillResult, uninterruptedFill);
+  assert.equal(child.kill("SIGKILL"), true);
+  assert.deepEqual(await exited, [null, "SIGKILL"]);
+  await rm(path.join(interruptedDirectory, ".checkpoint-lock"));
+
+  const resumedStore = await CheckpointStore.open(interruptedDirectory);
+  const resumed = await PaperCheckpointSession.open({store: resumedStore});
+  const resumedBeforeRetry = resumed.snapshot();
+  const ledgerEvidence = snapshot => ({
+    cashCents: snapshot.summary.cashCents,
+    positions: snapshot.summary.openPositions.map(position => ({
+      mint: position.mint,
+      tokenAtoms: position.tokenAtoms
+    })),
+    entryFeesCents: snapshot.summary.costs.entry.feeCents,
+    executionIds: snapshot.auditEvents
+      .filter(event => event.type === "PAPER_FILL")
+      .map(event => event.eventId)
+  });
+  assert.deepEqual(ledgerEvidence(resumedBeforeRetry), ledgerEvidence(uninterruptedSnapshot));
+  assert.equal(resumedBeforeRetry.summary.costs.entry.feeCents, "7");
+  assert.deepEqual(ledgerEvidence(resumedBeforeRetry).executionIds, [quote.eventId]);
+
+  assert.deepEqual(await resumed.executeEntry("retry-after-resume", fillInputs), uninterruptedFill);
+  assert.deepEqual(resumed.snapshot(), resumedBeforeRetry);
+  assert.equal(resumed.snapshot().auditEvents.filter(event => event.type === "PAPER_FILL").length, 1);
+  await resumed.close();
+
+  const incompleteDirectory = await tempDirectory(t);
+  const incompleteChild = spawn(process.execPath, [
+    CHILD_FIXTURE, incompleteDirectory, "execute-before-ack", payload
+  ], {stdio: "ignore"});
+  const [incompleteCode] = await once(incompleteChild, "exit");
+  assert.equal(incompleteCode, 74);
+  await rm(path.join(incompleteDirectory, ".checkpoint-lock"));
+  const incompleteStore = await CheckpointStore.open(incompleteDirectory);
+  assert.equal((await incompleteStore.reconcilePending()).status, "UNKNOWN");
+  await assert.rejects(PaperCheckpointSession.open({store: incompleteStore}), {code: "CHECKPOINT_UNKNOWN"});
+});
+
 
 test("restore rejects internally rehashed backward command time before replay", async t => {
   const directory = await tempDirectory(t);
