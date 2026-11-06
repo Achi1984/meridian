@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import {spawn} from "node:child_process";
 import {createHash} from "node:crypto";
 import {EventEmitter} from "node:events";
 import {
@@ -9,7 +10,7 @@ import path from "node:path";
 import {spawnSync} from "node:child_process";
 import test from "node:test";
 import {
-  main, runSyntheticHostAcceptance, transferSyntheticAcceptance
+  isVerifiedRealSignalDrillReceipt, main, runSyntheticHostAcceptance, transferSyntheticAcceptance
 } from "../scripts/memecoin-paper/synthetic-host-acceptance.mjs";
 import {
   createPaperPilotComposition, createSyntheticClock, offlineFixtureAdapters
@@ -185,6 +186,529 @@ test("active SIGTERM after a durable fill uses the existing stop API; observer i
     config: {...config, mode: "EXTERNAL_READ_ONLY_INPUT"}, onTestEntry() {}
   }), /synthetic-only/);
   assert.throws(() => createPaperPilotComposition({config, onTestEntry: true}), /function/);
+});
+
+test("real SIGTERM drill targets its dedicated child after a durable fill", {timeout: 65_000}, async t => {
+  const dataRoot = await mkdtemp(path.join(os.tmpdir(), "synthetic-real-signal-"));
+  let verified = false;
+  t.after(async () => {
+    if (verified) await rm(dataRoot, {recursive: true, force: true});
+    else t.diagnostic(`preserved ambiguous real-signal evidence at ${dataRoot}`);
+  });
+  const child = spawn(process.execPath, [
+    path.resolve("scripts/memecoin-paper/synthetic-host-acceptance.mjs")
+  ], {
+    env: {
+      PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_SIGNAL_DRILL: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT: dataRoot
+    },
+    stdio: ["ignore", "pipe", "pipe"]
+  });
+  let stdout = "";
+  let stderr = "";
+  child.stdout.setEncoding("utf8").on("data", value => { stdout += value; });
+  child.stderr.setEncoding("utf8").on("data", value => { stderr += value; });
+  const exit = await new Promise((resolve, reject) => {
+    child.once("error", reject);
+    child.once("close", (code, signal) => resolve({code, signal}));
+  });
+  assert.equal(exit.code, 2, stderr);
+  assert.equal(exit.signal, null);
+  const summary = JSON.parse(stdout.trim());
+  assert.equal(summary.status, "UNKNOWN");
+  assert.equal(summary.contractChecks, "PASS");
+  assert.equal(summary.proof, "SYNTHETIC_REAL_SIGTERM");
+  assert.equal(summary.signalDrill.status, "VERIFIED");
+  assert.equal(summary.signalDrill.signal, "SIGTERM");
+  assert.equal(summary.signalDrill.signalSentExactlyOnce, true);
+  assert.equal(summary.signalDrill.signalObservedAfterFill, true);
+  assert.equal(summary.signalDrill.fillAcknowledged, true);
+  assert.ok(Number.isSafeInteger(summary.signalDrill.fillCheckpointSequence));
+  assert.match(summary.signalDrill.fillCheckpointSha256, /^[0-9a-f]{64}$/);
+  assert.match(summary.signalDrill.fillReceiptSha256, /^[0-9a-f]{64}$/);
+  assert.ok(Number.isFinite(summary.signalDrill.sendToExitMs));
+  assert.ok(summary.signalDrill.sendToExitMs >= 0);
+  assert.deepEqual(summary.signalDrill.childExit, {code: 2, signal: null});
+  assert.equal(summary.signalDrill.checkpointPersistence, "ACKNOWLEDGED");
+  assert.equal(summary.signalDrill.restartDenied, true);
+  assert.equal(summary.signalDrill.immutableReadback, true);
+  assert.equal(summary.signalDrill.openUnvaluedPositions, 1);
+  assert.equal(summary.hostAcceptance, "NOT_ASSESSED");
+  assert.equal(summary.liveExecution, false);
+  assert.equal(isVerifiedRealSignalDrillReceipt(summary), true);
+  assert.equal(isVerifiedRealSignalDrillReceipt({
+    ...summary, contractChecks: "UNKNOWN"
+  }), false);
+  assert.equal(isVerifiedRealSignalDrillReceipt({
+    ...summary, signalDrill: {...summary.signalDrill, status: "UNKNOWN"}
+  }), false);
+
+  const [drillName] = await readdir(dataRoot);
+  assert.match(drillName, /^real-signal-/);
+  const drillDirectory = path.join(dataRoot, drillName);
+  const result = JSON.parse(await readFile(path.join(drillDirectory, "signal-drill-result.json"), "utf8"));
+  assert.deepEqual(result, summary);
+  assert.equal(JSON.parse(await readFile(path.join(drillDirectory, "signal-request.json"), "utf8")).status, "READY");
+  assert.equal(JSON.parse(await readFile(path.join(drillDirectory, "signal-sent.json"), "utf8")).attempts, 1);
+  const childRunId = summary.runId;
+  const childDirectory = path.join(drillDirectory, childRunId);
+  const acknowledgement = JSON.parse(await readFile(
+    path.join(childDirectory, "fill-acknowledged.json"), "utf8"
+  ));
+  assert.equal(acknowledgement.status, "FILLED_PAPER");
+  assert.equal(acknowledgement.runId, childRunId);
+  assert.equal(acknowledgement.checkpointSequence, summary.signalDrill.fillCheckpointSequence);
+  assert.equal(acknowledgement.checkpointSha256, summary.signalDrill.fillCheckpointSha256);
+  verified = true;
+});
+
+test("real SIGTERM drill refuses a child that exited before its one-shot signal", {timeout: 10_000}, async t => {
+  const dataRoot = await mkdtemp(path.join(os.tmpdir(), "synthetic-real-signal-early-exit-"));
+  t.after(() => rm(dataRoot, {recursive: true, force: true}));
+  const signals = new EventEmitter();
+  const requestSynced = deferred();
+  let child;
+  let harnessKillCalls = 0;
+  const probe = filesystemProbe(async call => {
+    const result = await call.action();
+    if (call.method === "sync" && path.basename(call.filename) === "signal-request.json") {
+      child.once("exit", () => requestSynced.resolve());
+      assert.equal(child.kill("SIGTERM"), true);
+      await requestSynced.promise;
+    }
+    return result;
+  });
+  let output = "";
+  const code = await main({
+    env: {
+      PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_SIGNAL_DRILL: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT: dataRoot
+    },
+    signalSource: signals,
+    fileSystem: probe.fileSystem,
+    spawnChild: (...args) => {
+      child = spawn(...args);
+      return child;
+    },
+    killChild: (...args) => {
+      harnessKillCalls += 1;
+      return child.kill(...args);
+    },
+    stdout: {write: value => { output += value; }}
+  });
+  assert.equal(code, 2);
+  assert.equal(harnessKillCalls, 0);
+  assert.equal(JSON.parse(output).status, "UNKNOWN");
+  assert.equal(JSON.parse(output).signalDrill, undefined);
+  const [drillName] = await readdir(dataRoot);
+  assert.equal(JSON.parse(await readFile(
+    path.join(dataRoot, drillName, "signal-request.json"), "utf8"
+  )).status, "READY");
+  await assert.rejects(readFile(path.join(dataRoot, drillName, "signal-sent.json")), {code: "ENOENT"});
+  assert.equal(signals.eventNames().length, 0);
+});
+
+test("startup child exit during delayed start receipt publication stays UNKNOWN under strict rejection mode", async t => {
+  const dataRoot = await mkdtemp(path.join(os.tmpdir(), "synthetic-real-signal-startup-reject-"));
+  t.after(() => rm(dataRoot, {recursive: true, force: true}));
+  const moduleUrl = new URL(
+    "../scripts/memecoin-paper/synthetic-host-acceptance.mjs", import.meta.url
+  ).href;
+  const script = `
+    import {spawn} from "node:child_process";
+    import {lstat, mkdir, open, readdir, realpath} from "node:fs/promises";
+    import path from "node:path";
+    const {main} = await import(${JSON.stringify(moduleUrl)});
+    let child;
+    let releaseStartedSync;
+    const childExited = new Promise(resolve => { releaseStartedSync = resolve; });
+    const fileSystem = {
+      lstat, mkdir, realpath,
+      async open(filename, ...args) {
+        const handle = await open(filename, ...args);
+        return {
+          writeFile: (...values) => handle.writeFile(...values),
+          async sync() {
+            await handle.sync();
+            if (path.basename(filename) === "child-started.json") await childExited;
+          },
+          stat: (...values) => handle.stat(...values),
+          read: (...values) => handle.read(...values),
+          close: (...values) => handle.close(...values)
+        };
+      }
+    };
+    let killCalls = 0;
+    let output = "";
+    const code = await main({
+      env: {
+        PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
+        PAPER_SYNTHETIC_ACCEPTANCE_SIGNAL_DRILL: "true",
+        PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT: process.env.SIGNAL_ROOT
+      },
+      fileSystem,
+      spawnChild() {
+        child = spawn(process.execPath, ["-e", "process.exit(17)"], {
+          stdio: ["ignore", "ignore", "ignore", "ipc"]
+        });
+        child.once("exit", releaseStartedSync);
+        return child;
+      },
+      killChild(target, signal) {
+        killCalls += 1;
+        return target.kill(signal);
+      },
+      stdout: {write(value) { output += value; }}
+    });
+    console.log(JSON.stringify({
+      code, killCalls, childExitCode: child.exitCode, output,
+      files: await readdir(path.join(process.env.SIGNAL_ROOT, (await readdir(process.env.SIGNAL_ROOT))[0]))
+    }));
+  `;
+  const execution = spawnSync(process.execPath, [
+    "--unhandled-rejections=strict", "--input-type=module", "-e", script
+  ], {
+    encoding: "utf8", env: {...process.env, SIGNAL_ROOT: dataRoot}
+  });
+  assert.equal(execution.error, undefined);
+  assert.equal(execution.status, 0, execution.stderr);
+  const result = JSON.parse(execution.stdout.trim());
+  assert.equal(result.code, 2);
+  assert.equal(result.killCalls, 0);
+  assert.equal(result.childExitCode, 17);
+  assert.equal(JSON.parse(result.output).status, "UNKNOWN");
+  assert.ok(result.files.includes("child-started.json"));
+  assert.ok(result.files.includes("signal-drill-result.json"));
+  assert.equal(result.files.includes("signal-request.json"), false);
+  const [drillName] = await readdir(dataRoot);
+  assert.deepEqual(JSON.parse(await readFile(
+    path.join(dataRoot, drillName, "signal-drill-result.json"), "utf8"
+  )), JSON.parse(result.output));
+});
+
+test("parent deadline includes delayed child-started receipt publication", {timeout: 10_000}, async t => {
+  const dataRoot = await root(t);
+  const receiptSyncEntered = deferred();
+  const releaseReceiptSync = deferred();
+  t.after(() => releaseReceiptSync.resolve());
+  const signals = new EventEmitter();
+  const probe = filesystemProbe(async call => {
+    const result = await call.action();
+    if (call.method === "sync" && path.basename(call.filename) === "child-started.json") {
+      receiptSyncEntered.resolve();
+      await releaseReceiptSync.promise;
+    }
+    return result;
+  });
+  const fakeChild = Object.assign(new EventEmitter(), {
+    pid: 12345, exitCode: null, signalCode: null, connected: false, unref() {}
+  });
+  let childEnv;
+  let killCalls = 0;
+  let output = "";
+  const pending = main({
+    env: {
+      PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_SIGNAL_DRILL: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT: dataRoot
+    },
+    timeoutMs: 750, signalSource: signals, fileSystem: probe.fileSystem,
+    spawnChild(_executable, _args, options) {
+      childEnv = options.env;
+      return fakeChild;
+    },
+    killChild() {
+      killCalls += 1;
+      return true;
+    },
+    stdout: {write: value => { output += value; }}
+  });
+  let enteredTimer;
+  try {
+    await Promise.race([
+      receiptSyncEntered.promise,
+      new Promise((_, reject) => {
+        enteredTimer = setTimeout(() => reject(new Error("child start receipt was not published")), 5_000);
+      })
+    ]);
+  } finally {
+    clearTimeout(enteredTimer);
+  }
+  let operationTimer;
+  try {
+    assert.equal(await Promise.race([
+      pending,
+      new Promise((_, reject) => {
+        operationTimer = setTimeout(() => reject(new Error("parent exceeded its bounded deadline")), 5_000);
+      })
+    ]), 2);
+  } finally {
+    clearTimeout(operationTimer);
+  }
+  releaseReceiptSync.resolve();
+  await drainProbe(probe);
+
+  assert.equal(JSON.parse(output).status, "UNKNOWN");
+  assert.equal(killCalls, 0);
+  const childDeadline = BigInt(childEnv.PAPER_SYNTHETIC_ACCEPTANCE_DEADLINE_HR_NS);
+  assert.ok(childDeadline <= process.hrtime.bigint(),
+    "the deadline forwarded at spawn must already be exhausted after delayed parent setup");
+  const [drillName] = await readdir(dataRoot);
+  const files = await readdir(path.join(dataRoot, drillName));
+  assert.ok(files.includes("child-started.json"));
+  assert.equal(files.includes("signal-request.json"), false);
+  assert.equal(files.includes("signal-sent.json"), false);
+  assert.equal(signals.eventNames().length, 0);
+});
+
+test("real IPC child enforces its inherited deadline after fill instead of receiving a fresh budget",
+  {timeout: 30_000}, async t => {
+    const entrypoint = path.resolve("scripts/memecoin-paper/synthetic-host-acceptance.mjs");
+    const children = [];
+    const shortBudgetMs = 3_000;
+    const startChild = (dataRoot, deadlineNs) => {
+      const child = spawn(process.execPath, [entrypoint], {
+        env: {
+          ...process.env,
+          PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
+          PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT: dataRoot,
+          PAPER_SYNTHETIC_ACCEPTANCE_PROOF: "REAL_SIGNAL_CHILD",
+          PAPER_SYNTHETIC_ACCEPTANCE_SIGNAL_CHILD: "true",
+          PAPER_SYNTHETIC_ACCEPTANCE_SIGNAL_DRILL: "false",
+          PAPER_SYNTHETIC_ACCEPTANCE_HTTPS_ENABLED: "false",
+          PAPER_SYNTHETIC_ACCEPTANCE_DEADLINE_HR_NS: deadlineNs
+        },
+        stdio: ["ignore", "pipe", "pipe", "ipc"]
+      });
+      let stdout = "";
+      let stderr = "";
+      child.stdout.setEncoding("utf8").on("data", value => { stdout += value; });
+      child.stderr.setEncoding("utf8").on("data", value => { stderr += value; });
+      const closed = new Promise((resolve, reject) => {
+        child.once("error", reject);
+        child.once("close", (code, signal) => resolve({code, signal}));
+      });
+      closed.catch(() => {});
+      children.push({child, closed});
+      t.after(async () => {
+        if (child.exitCode === null && child.signalCode === null) {
+          child.kill("SIGKILL");
+          await Promise.race([
+            closed,
+            new Promise(resolve => setTimeout(resolve, 2_000))
+          ]);
+        }
+      });
+      return {child, closed, stderr: () => stderr, stdout: () => stdout};
+    };
+    const receiveFill = (child, timeoutMs) => new Promise((resolve, reject) => {
+      const finish = (action, value) => {
+        clearTimeout(timer);
+        child.removeListener("message", onMessage);
+        child.removeListener("exit", onExit);
+        action(value);
+      };
+      const onMessage = message => finish(resolve, message);
+      const onExit = (code, signal) => finish(reject,
+        new Error(`child exited before fill acknowledgement (${code}, ${signal})`));
+      const timer = setTimeout(() => finish(reject, new Error("fill acknowledgement timed out")), timeoutMs);
+      child.once("message", onMessage);
+      child.once("exit", onExit);
+    });
+    const closeWithin = (child, timeoutMs) => new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        child.removeListener("close", onClose);
+        reject(new Error("child did not exit within the inherited deadline watchdog"));
+      }, timeoutMs);
+      const onClose = (code, signal) => {
+        clearTimeout(timer);
+        resolve({code, signal});
+      };
+      child.once("close", onClose);
+    });
+    const assertFillHandshake = async run => {
+      const handshake = await receiveFill(run.child, 10_000);
+      assert.equal(handshake.status, "FILLED_PAPER");
+      assert.equal(handshake.pid, run.child.pid);
+      assert.match(handshake.receiptSha256, /^[0-9a-f]{64}$/);
+      return handshake;
+    };
+
+    const dataRoot = await root(t);
+    const startedAt = process.hrtime.bigint();
+    const inheritedDeadline = startedAt + BigInt(shortBudgetMs) * 1_000_000n;
+    const run = startChild(dataRoot, inheritedDeadline.toString());
+    await assertFillHandshake(run);
+    assert.ok(process.hrtime.bigint() < inheritedDeadline,
+      "the child must reach its fill handshake while the inherited budget remains valid");
+    assert.equal(run.child.exitCode, null, "the child must wait after fill when no SIGTERM is sent");
+    const exit = await closeWithin(run.child, 10_000);
+    const exitedAt = process.hrtime.bigint();
+    assert.deepEqual(exit, {code: 2, signal: null}, run.stderr());
+    assert.ok(exitedAt <= inheritedDeadline + 1_000_000_000n,
+      "the child must exit near the parent's deadline, not after a new 60-second window");
+    assert.deepEqual(JSON.parse(run.stdout()), {
+      status: "UNKNOWN", code: "SYNTHETIC_ACCEPTANCE_FAILED"
+    });
+    const [runId] = await readdir(dataRoot);
+    const childFiles = await readdir(path.join(dataRoot, runId));
+    assert.ok(childFiles.includes("fill-acknowledged.json"));
+    assert.equal(childFiles.includes("summary.json"), false);
+
+    const freshBudgetRoot = await root(t);
+    const freshBudgetStartedAt = process.hrtime.bigint();
+    const freshBudgetDeadline = freshBudgetStartedAt + 60_000_000_000n;
+    const freshBudgetRun = startChild(freshBudgetRoot, freshBudgetDeadline.toString());
+    await assertFillHandshake(freshBudgetRun);
+    const originalBudgetCutoff = freshBudgetStartedAt + BigInt(shortBudgetMs) * 1_000_000n;
+    const remainingMs = Number((originalBudgetCutoff - process.hrtime.bigint()) / 1_000_000n);
+    if (remainingMs > 0) await new Promise(resolve => setTimeout(resolve, remainingMs));
+    assert.equal(freshBudgetRun.child.exitCode, null,
+      "working IPC does not make a fresh child deadline equivalent to inheriting the parent's deadline");
+    freshBudgetRun.child.kill("SIGKILL");
+    const killed = await closeWithin(freshBudgetRun.child, 2_000);
+    assert.deepEqual(killed, {code: null, signal: "SIGKILL"});
+
+    for (const [label, invalidDeadline] of [
+      ["expired", (process.hrtime.bigint() - 1_000_000n).toString()],
+      ["malformed", "invalid-deadline"],
+      ["overlong", "9".repeat(33)]
+    ]) {
+      const invalidRoot = await root(t);
+      const invalidRun = startChild(invalidRoot, invalidDeadline);
+      const invalidExit = await closeWithin(invalidRun.child, 2_000);
+      assert.deepEqual(invalidExit, {code: 2, signal: null}, label);
+      assert.deepEqual(JSON.parse(invalidRun.stdout()), {
+        status: "UNKNOWN", code: "SYNTHETIC_ACCEPTANCE_FAILED"
+      }, label);
+      assert.deepEqual(await readdir(invalidRoot), [], `${label} metadata must not start child work`);
+    }
+    assert.equal(children.length, 5);
+  });
+
+test("real SIGTERM send-to-exit timing excludes delayed signal receipt fsync", {timeout: 10_000}, async t => {
+  const dataRoot = await mkdtemp(path.join(os.tmpdir(), "synthetic-real-signal-delayed-receipt-"));
+  t.after(() => rm(dataRoot, {recursive: true, force: true}));
+  const signals = new EventEmitter();
+  const childExited = deferred();
+  const receiptSyncEntered = deferred();
+  const releaseReceiptSync = deferred();
+  let child;
+  let sendAt;
+  let exitAt;
+  const signalClockReads = [];
+  let signalClock = 10_000;
+  let signalReceiptSyncCompletedAt;
+  const probe = filesystemProbe(async call => {
+    const result = await call.action();
+    if (call.method === "sync" && path.basename(call.filename) === "signal-sent.json") {
+      receiptSyncEntered.resolve();
+      await releaseReceiptSync.promise;
+      signalReceiptSyncCompletedAt = performance.now();
+    }
+    return result;
+  });
+  let output = "";
+  const drill = main({
+    env: {
+      PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_SIGNAL_DRILL: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT: dataRoot
+    },
+    signalSource: signals,
+    fileSystem: probe.fileSystem,
+    spawnChild: (...args) => {
+      child = spawn(...args);
+      return child;
+    },
+    killChild: (target, signal) => {
+      sendAt = performance.now();
+      target.once("exit", () => {
+        exitAt = performance.now();
+        childExited.resolve();
+      });
+      return target.kill(signal);
+    },
+    signalMonotonicNow: () => {
+      const observedAt = signalClock;
+      signalClock += 25;
+      signalClockReads.push(observedAt);
+      return observedAt;
+    },
+    stdout: {write: value => { output += value; }}
+  });
+  await receiptSyncEntered.promise;
+  await childExited.promise;
+  releaseReceiptSync.resolve();
+  const code = await drill;
+  const summary = JSON.parse(output);
+  assert.equal(code, 2);
+  assert.equal(summary.signalDrill.status, "VERIFIED");
+  assert.deepEqual(signalClockReads, [10_000, 10_025]);
+  assert.equal(summary.signalDrill.sendToExitMs, signalClockReads[1] - signalClockReads[0]);
+  assert.ok(exitAt > sendAt);
+  assert.ok(exitAt < signalReceiptSyncCompletedAt);
+});
+
+test("runbook host subshell gates verifier on the actual drill exit code", async () => {
+  const runbook = await readFile(
+    path.resolve("docs/strategy-lab/memecoin-paper/HOST_ACCEPTANCE_RUNBOOK.txt"), "utf8"
+  );
+  const section = runbook.split("Exact host command (uses the already prepared private SYNTHETIC_ROOT above):")[1]
+    ?.split("Expected: exit 2 and status UNKNOWN")[0];
+  assert.ok(section);
+  const command = section.match(/^  \(\n([\s\S]*?)^  \)$/m)?.[0];
+  assert.ok(command, "documented host subshell must be present");
+  const script = command.split("\n").map(line => line.replace(/^  /, "")).join("\n");
+  const shim = `
+    node() {
+      case " $* " in
+        *" --input-type=module "*) printf 'VERIFIER\\n'; return 0 ;;
+        *) printf 'CASE\\n'; return "$CASE" ;;
+      esac
+    }
+    export REPO="$PWD" SYNTHETIC_ROOT=/tmp/synthetic-runbook-test
+    ${script}
+  `;
+  for (const [childExit, expectedStatus, expectedOutput] of [
+    ["0", 1, "CASE"],
+    ["7", 1, "CASE"],
+    ["2", 0, "CASE\nVERIFIER"]
+  ]) {
+    const result = spawnSync("bash", ["-c", shim], {
+      encoding: "utf8", env: {...process.env, CASE: childExit}
+    });
+    assert.equal(result.status, expectedStatus, result.stderr);
+    assert.equal(result.stdout.trim(), expectedOutput);
+  }
+});
+
+test("runbook receipt gate rejects ambiguous or incomplete drill results", () => {
+  const verified = {
+    status: "UNKNOWN", contractChecks: "PASS", proof: "SYNTHETIC_REAL_SIGTERM",
+    evaluation: "UNKNOWN", outcome: "OPEN_UNVALUED_TERMINAL_POSITION",
+    hostAcceptance: "NOT_ASSESSED", providerTrust: "NOT_ASSESSED",
+    liveExecution: false, networkAccessed: false,
+    signalDrill: {
+      status: "VERIFIED", signal: "SIGTERM", targetPid: 123,
+      signalSentExactlyOnce: true, signalObservedAfterFill: true, fillAcknowledged: true,
+      sendToExitMs: 1, fillCheckpointSequence: 3, fillCheckpointSha256: "a".repeat(64),
+      fillReceiptSha256: "b".repeat(64), childExit: {code: 2, signal: null},
+      checkpointPersistence: "ACKNOWLEDGED", restartDenied: true,
+      immutableReadback: true, openUnvaluedPositions: 1
+    }
+  };
+  assert.equal(isVerifiedRealSignalDrillReceipt(verified), true);
+  for (const invalid of [
+    {...verified, contractChecks: "FAIL"},
+    {...verified, signalDrill: {...verified.signalDrill, status: "UNKNOWN"}},
+    {...verified, signalDrill: {...verified.signalDrill, signalSentExactlyOnce: false}},
+    {...verified, signalDrill: {...verified.signalDrill, immutableReadback: false}}
+  ]) {
+    assert.equal(isVerifiedRealSignalDrillReceipt(invalid), false);
+  }
 });
 
 test("HTTPS UNKNOWN never retries or reads; wrong scope and digest cannot pass", async t => {

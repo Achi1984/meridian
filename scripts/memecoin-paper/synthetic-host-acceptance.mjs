@@ -1,8 +1,9 @@
 import {createHash, randomUUID} from "node:crypto";
+import {spawn} from "node:child_process";
 import {lstat, mkdir, open, realpath} from "node:fs/promises";
 import path from "node:path";
 import {performance} from "node:perf_hooks";
-import {pathToFileURL} from "node:url";
+import {fileURLToPath, pathToFileURL} from "node:url";
 import {canonicalCheckpointBytes} from "./checkpoint-store.mjs";
 import {
   createPaperPilotComposition, createSyntheticClock, offlineFixtureAdapters
@@ -17,21 +18,57 @@ import {
 import {evaluateMemecoinPaperRunExport} from "../memecoin-paper-simulated-evaluation/index.mjs";
 
 const PRODUCER_REVISION = "paper-pilot-composition/3";
-const PROOFS = new Set(["PIPELINE_QUOTE", "ACTIVE_STOP"]);
+const PROOFS = new Set(["PIPELINE_QUOTE", "ACTIVE_STOP", "REAL_SIGNAL_CHILD"]);
 const BUDGETS = Object.freeze({
   requests: 40, bytes: 1_000_000, events: 128, candidates: 4, cycles: 8,
   durationMs: 20_000, callbackTimeoutMs: 1_000, maxWallClockUncertaintyMs: 10
 });
 const digest = bytes => createHash("sha256").update(bytes).digest("hex");
 const MAX_ACCEPTANCE_MS = 60_000;
+const REAL_SIGNAL_HANDSHAKE_MS = 25_000;
+const NS_PER_MS = 1_000_000n;
+const ACCEPTANCE_DEADLINE_ENV = "PAPER_SYNTHETIC_ACCEPTANCE_DEADLINE_HR_NS";
 
 function requireProof(condition) {
   if (!condition) throw new Error("synthetic acceptance contract not satisfied");
 }
 
+function parseAcceptanceDeadline(value) {
+  requireProof(typeof value === "string" && value.length <= 32 &&
+    /^(0|[1-9][0-9]*)$/.test(value));
+  const deadline = BigInt(value);
+  requireProof(deadline > 0n);
+  const remainingNs = deadline - process.hrtime.bigint();
+  requireProof(remainingNs <= BigInt(MAX_ACCEPTANCE_MS) * NS_PER_MS);
+  return {
+    deadlineMonotonicNs: deadline,
+    timeoutMs: remainingNs <= 0n ? 0 : Number(remainingNs / NS_PER_MS)
+  };
+}
+
+export function isVerifiedRealSignalDrillReceipt(value) {
+  const signal = value?.signalDrill;
+  return value?.status === "UNKNOWN" && value.contractChecks === "PASS" &&
+    value.proof === "SYNTHETIC_REAL_SIGTERM" &&
+    value.evaluation === "UNKNOWN" && value.outcome === "OPEN_UNVALUED_TERMINAL_POSITION" &&
+    value.hostAcceptance === "NOT_ASSESSED" && value.providerTrust === "NOT_ASSESSED" &&
+    value.liveExecution === false && value.networkAccessed === false &&
+    signal?.status === "VERIFIED" && signal.signal === "SIGTERM" &&
+    Number.isSafeInteger(signal.targetPid) && signal.targetPid > 0 &&
+    signal.signalSentExactlyOnce === true && signal.signalObservedAfterFill === true &&
+    signal.fillAcknowledged === true && Number.isFinite(signal.sendToExitMs) &&
+    signal.sendToExitMs >= 0 &&
+    /^[a-f0-9]{64}$/.test(signal.fillCheckpointSha256) &&
+    /^[a-f0-9]{64}$/.test(signal.fillReceiptSha256) &&
+    Number.isSafeInteger(signal.fillCheckpointSequence) && signal.fillCheckpointSequence >= 0 &&
+    signal.childExit?.code === 2 && signal.childExit.signal === null &&
+    signal.checkpointPersistence === "ACKNOWLEDGED" && signal.restartDenied === true &&
+    signal.immutableReadback === true && signal.openUnvaluedPositions === 1;
+}
+
 function acceptanceOperation({
   timeoutMs = MAX_ACCEPTANCE_MS, monotonicNow = () => performance.now(),
-  fileSystem = {}, signalSource = process
+  fileSystem = {}, signalSource = process, deadlineMonotonicNs
 } = {}) {
   requireProof(Number.isSafeInteger(timeoutMs) && timeoutMs > 0 && timeoutMs <= MAX_ACCEPTANCE_MS);
   const fs = {lstat, mkdir, open, realpath, ...fileSystem};
@@ -41,12 +78,16 @@ function acceptanceOperation({
   const start = monotonicNow();
   requireProof(Number.isFinite(start));
   const deadline = start + timeoutMs;
+  const absoluteDeadline = deadlineMonotonicNs ??
+    process.hrtime.bigint() + BigInt(timeoutMs) * NS_PER_MS;
+  requireProof(typeof absoluteDeadline === "bigint" && absoluteDeadline > 0n);
   let previous = start;
   let stopPilot;
   const cancel = () => controller.abort(failure);
   const check = () => {
     const now = monotonicNow();
-    if (!Number.isFinite(now) || now < previous || now >= deadline) cancel();
+    if (!Number.isFinite(now) || now < previous || now >= deadline ||
+        process.hrtime.bigint() >= absoluteDeadline) cancel();
     previous = now;
     if (controller.signal.aborted) throw failure;
   };
@@ -56,7 +97,8 @@ function acceptanceOperation({
   };
   signalSource.on("SIGINT", onSignal);
   signalSource.on("SIGTERM", onSignal);
-  const timer = setTimeout(cancel, timeoutMs);
+  const remainingMs = Number((absoluteDeadline - process.hrtime.bigint()) / NS_PER_MS);
+  const timer = setTimeout(cancel, Math.max(0, Math.min(timeoutMs, remainingMs)));
   const cleanup = handle => {
     // Closing is best effort; a stalled close must not extend the operation.
     try { Promise.resolve(handle.close()).catch(() => {}); } catch {}
@@ -113,6 +155,7 @@ function acceptanceOperation({
   };
   return {
     check, wait, open: openFile, signal: controller.signal,
+    deadlineMonotonicNs: absoluteDeadline,
     lstat: filename => wait(() => fs.lstat(filename)),
     realpath: filename => wait(() => fs.realpath(filename)),
     mkdir: (...args) => wait(() => fs.mkdir(...args)),
@@ -207,9 +250,27 @@ export async function runSyntheticHostAcceptance(options = {}) {
   return withAcceptanceOperation(options, operation => runAcceptance(options, operation));
 }
 
+function waitForSignalAfterEntry(signalSource, signal, notifyParent) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (action, value) => {
+      if (settled) return;
+      settled = true;
+      signalSource.removeListener("SIGTERM", onSignal);
+      signal.removeEventListener("abort", onAbort);
+      action(value);
+    };
+    const onSignal = () => finish(resolve);
+    const onAbort = () => finish(reject, signal.reason ?? new Error("signal drill ended"));
+    signalSource.once("SIGTERM", onSignal);
+    signal.addEventListener("abort", onAbort, {once: true});
+    if (signal.aborted) onAbort();
+    else Promise.resolve().then(notifyParent).catch(error => finish(reject, error));
+  });
+}
+
 async function runAcceptance({
-  dataRoot, proof = "PIPELINE_QUOTE",
-  httpsOptions
+  dataRoot, proof = "PIPELINE_QUOTE", httpsOptions, signalSource = process, sendHandshake
 }, operation) {
   requireProof(PROOFS.has(proof) && typeof dataRoot === "string" &&
     path.isAbsolute(dataRoot) && path.normalize(dataRoot) === dataRoot);
@@ -246,8 +307,48 @@ async function runAcceptance({
     });
   };
   let stopAccepted = false;
+  const signalProof = {observedAfterFill: false, receiptSha256: null};
   const stop = () => { stopAccepted = pilot.stop() || stopAccepted; };
-  const pilot = makePilot(proof === "ACTIVE_STOP" ? stop : undefined);
+  const onTestEntry = proof === "ACTIVE_STOP" ? stop
+    : proof === "REAL_SIGNAL_CHILD" ? async entry => {
+      requireProof(typeof sendHandshake === "function" &&
+        entry?.status === "FILLED_PAPER" && entry.receipt);
+      const checkpointBytes = await operation.read(
+        path.join(dataDirectory, "checkpoint.json"), 8 * 1024 * 1024
+      );
+      const checkpoint = parseCanonical(checkpointBytes);
+      const checkpointSequence = entry.receipt.sequence;
+      requireProof(Number.isSafeInteger(checkpointSequence) && checkpointSequence >= 0 &&
+        checkpoint.sequence === checkpointSequence && Array.isArray(checkpoint.records) &&
+        checkpointSequence < checkpoint.records.length);
+      const checkpointRecord = checkpoint.records?.[checkpointSequence];
+      const acknowledgedCheckpoint = {
+        formatVersion: checkpoint.formatVersion,
+        runHeader: checkpoint.runHeader,
+        records: checkpoint.records?.slice(0, checkpointSequence + 1),
+        sequence: checkpointSequence
+      };
+      const checkpointSha256 = digest(canonicalCheckpointBytes(acknowledgedCheckpoint));
+      requireProof(
+        checkpointSha256 === digest(checkpointBytes) &&
+        entry.receipt.hash === checkpointSha256 &&
+        checkpointRecord?.method === "executeEntry" &&
+        checkpointRecord.resultDigest === entry.receipt.resultDigest &&
+        checkpointRecord.runId === runId);
+      const receiptSha256 = digest(canonicalCheckpointBytes(entry.receipt));
+      const acknowledgement = {
+        protocol: "synthetic-real-sigterm/v1", runId, status: entry.status, receiptSha256,
+        checkpointSha256, checkpointSequence
+      };
+      const acknowledgementBytes = canonicalCheckpointBytes(acknowledgement);
+      await writeNew(directory, "fill-acknowledged.json", acknowledgementBytes, operation);
+      signalProof.receiptSha256 = receiptSha256;
+      await waitForSignalAfterEntry(signalSource, operation.signal, () => sendHandshake({
+        ...acknowledgement, acknowledgementSha256: digest(acknowledgementBytes), pid: process.pid
+      }));
+      signalProof.observedAfterFill = true;
+    } : undefined;
+  const pilot = makePilot(onTestEntry);
   operation.setPilotStop(stop);
   let result;
   try {
@@ -259,15 +360,19 @@ async function runAcceptance({
   await writeNew(directory, "result.report.json", exportBytes, operation);
   const evaluation = evaluateMemecoinPaperRunExport(exportBytes, expected);
   const operations = result.report.runnerReport?.operationResults ?? [];
-  const expectedOverall = proof === "ACTIVE_STOP" ? "UNKNOWN" : "PASS";
+  const stoppingProof = proof === "ACTIVE_STOP" || proof === "REAL_SIGNAL_CHILD";
+  const expectedOverall = stoppingProof ? "UNKNOWN" : "PASS";
   requireProof(evaluation.overall === expectedOverall &&
     !evaluation.checks.some(item => item.status === "FAIL") &&
     result.report.persistence === "ACKNOWLEDGED" &&
     operations.some(item => item.method === "executeEntry" && item.status === "FILLED_PAPER"));
-  if (proof === "ACTIVE_STOP") {
+  if (stoppingProof) {
     requireProof(stopAccepted && result.status === "STOPPED" &&
       evaluation.outcome === "OPEN_UNVALUED_TERMINAL_POSITION" &&
-      result.report.runnerReport.reason === "SHUTDOWN");
+      result.report.runnerReport.reason === "SHUTDOWN" &&
+      result.report.runnerReport.terminalResult.openPositions.length === 1 &&
+      result.report.runnerReport.terminalResult.openPositions[0].markStatus === "VALUATION_UNAVAILABLE");
+    if (proof === "REAL_SIGNAL_CHILD") requireProof(signalProof.observedAfterFill);
   } else {
     requireProof(result.status === "FINISHED" &&
       evaluation.outcome === "SIMULATED_ENTRY_EXIT_COMPLETE" &&
@@ -315,10 +420,294 @@ async function runAcceptance({
     byteLength: exportBytes.length, evaluation: evaluation.overall, outcome: evaluation.outcome,
     entryFills: evaluation.evidence.entryFills, exits: evaluation.evidence.exits,
     stopAccepted, restartDenied: true, immutableReadback: true, https: remote,
+    ...(proof === "REAL_SIGNAL_CHILD" ? {
+      signalProof: {
+        observedAfterFill: signalProof.observedAfterFill,
+        receiptSha256: signalProof.receiptSha256,
+        lifecycleStatus: result.status,
+        runnerReason: result.report.runnerReport.reason
+      }
+    } : {}),
     hostAcceptance: "NOT_ASSESSED", providerTrust: "NOT_ASSESSED", liveExecution: false
   };
   await writeNew(directory, "summary.json", canonicalCheckpointBytes(summary), operation);
   return {summary, result, exportBytes, directory};
+}
+
+function childHandshakeWait(child, timeoutMs) {
+  let removeListeners = () => {};
+  let timer;
+  const promise = new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (action, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      removeListeners();
+      action(value);
+    };
+    const onMessage = message => finish(resolve, message);
+    const onError = error => finish(reject, error);
+    const onExit = () => finish(reject, new Error("signal drill child exited before fill acknowledgement"));
+    removeListeners = () => {
+      child.removeListener("message", onMessage);
+      child.removeListener("error", onError);
+      child.removeListener("exit", onExit);
+    };
+    child.once("message", onMessage);
+    child.once("error", onError);
+    child.once("exit", onExit);
+    timer = setTimeout(() => finish(reject, new Error("fill acknowledgement timed out")), timeoutMs);
+  });
+  promise.catch(() => {});
+  return {
+    promise,
+    cancel() {
+      clearTimeout(timer);
+      removeListeners();
+    }
+  };
+}
+
+function childExitWait(child, monotonicNow = () => performance.now()) {
+  let removeListeners = () => {};
+  let observedExit = null;
+  const promise = new Promise((resolve, reject) => {
+    const finish = (action, value) => {
+      removeListeners();
+      action(value);
+    };
+    const onExit = (code, signal) => {
+      observedExit = {code, signal, observedAtMonotonicMs: monotonicNow()};
+      finish(resolve, observedExit);
+    };
+    const onError = error => finish(reject, error);
+    removeListeners = () => {
+      child.removeListener("exit", onExit);
+      child.removeListener("error", onError);
+    };
+    if (child.exitCode !== null || child.signalCode !== null) {
+      observedExit = {
+        code: child.exitCode, signal: child.signalCode, observedAtMonotonicMs: monotonicNow()
+      };
+      resolve(observedExit);
+    } else {
+      child.once("exit", onExit);
+      child.once("error", onError);
+    }
+  });
+  promise.catch(() => {});
+  return {
+    promise, cancel: () => removeListeners(),
+    get observedExit() { return observedExit; },
+    signalAttempted: false
+  };
+}
+
+function sendChildSigtermOnce(child, exitWait, killChild) {
+  requireProof(typeof killChild === "function" && !exitWait.signalAttempted &&
+    !exitWait.observedExit && child.exitCode === null && child.signalCode === null);
+  exitWait.signalAttempted = true;
+  requireProof(killChild(child, "SIGTERM") === true);
+}
+
+function detachChild(child) {
+  if (child.connected) child.disconnect();
+  child.unref();
+}
+
+function parseCanonical(bytes) {
+  const value = JSON.parse(new TextDecoder("utf-8", {fatal: true}).decode(bytes));
+  requireProof(canonicalCheckpointBytes(value).equals(bytes));
+  return value;
+}
+
+async function realSignalDrill({dataRoot, spawnChild, killChild, signalMonotonicNow}, operation) {
+  let directory;
+  let child;
+  let handshakeWait;
+  let exitWait;
+  let childExited = false;
+  let drillId;
+  try {
+    requireProof(typeof dataRoot === "string" && path.isAbsolute(dataRoot) &&
+      path.normalize(dataRoot) === dataRoot);
+    const info = await operation.lstat(dataRoot);
+    requireProof(info.isDirectory() && !info.isSymbolicLink() &&
+      info.uid === process.getuid() && [0o700, 0o2700].includes(info.mode & 0o7777) &&
+      await operation.realpath(dataRoot) === dataRoot);
+    drillId = `real-signal-${randomUUID()}`;
+    directory = path.join(dataRoot, drillId);
+    await operation.mkdir(directory, {mode: 0o700});
+    const rootHandle = await operation.open(dataRoot, "r");
+    try {
+      await rootHandle.sync();
+    } finally {
+      await rootHandle.close();
+    }
+    await writeNew(directory, "drill-started.json", canonicalCheckpointBytes({
+      protocol: "synthetic-real-sigterm/v1", drillId, status: "STARTED"
+    }), operation);
+
+    child = spawnChild(process.execPath, [fileURLToPath(import.meta.url)], {
+      env: {
+        PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
+        PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT: directory,
+        PAPER_SYNTHETIC_ACCEPTANCE_PROOF: "REAL_SIGNAL_CHILD",
+        PAPER_SYNTHETIC_ACCEPTANCE_SIGNAL_CHILD: "true",
+        [ACCEPTANCE_DEADLINE_ENV]: operation.deadlineMonotonicNs.toString()
+      },
+      stdio: ["ignore", "ignore", "ignore", "ipc"]
+    });
+    handshakeWait = childHandshakeWait(child, REAL_SIGNAL_HANDSHAKE_MS);
+    exitWait = childExitWait(child, signalMonotonicNow);
+    requireProof(Number.isSafeInteger(child.pid) && child.pid > 0);
+    await writeNew(directory, "child-started.json", canonicalCheckpointBytes({
+      pid: child.pid, executable: process.execPath, entrypoint: fileURLToPath(import.meta.url)
+    }), operation);
+    const handshake = await operation.wait(() => handshakeWait.promise);
+    requireProof(handshake && handshake.protocol === "synthetic-real-sigterm/v1" &&
+      handshake.status === "FILLED_PAPER" && handshake.pid === child.pid &&
+      typeof handshake.runId === "string" && /^synthetic-[0-9a-f-]{36}$/.test(handshake.runId) &&
+      /^[0-9a-f]{64}$/.test(handshake.acknowledgementSha256) &&
+      /^[0-9a-f]{64}$/.test(handshake.receiptSha256) &&
+      /^[0-9a-f]{64}$/.test(handshake.checkpointSha256) &&
+      Number.isSafeInteger(handshake.checkpointSequence) && handshake.checkpointSequence >= 0);
+
+    const childDirectory = path.join(directory, handshake.runId);
+    const childInfo = await operation.lstat(childDirectory);
+    requireProof(childInfo.isDirectory() && !childInfo.isSymbolicLink() &&
+      childInfo.uid === process.getuid() && [0o700, 0o2700].includes(childInfo.mode & 0o7777) &&
+      await operation.realpath(childDirectory) === childDirectory);
+    const acknowledgementBytes = await operation.read(
+      path.join(childDirectory, "fill-acknowledged.json"), 16 * 1024
+    );
+    const acknowledgement = parseCanonical(acknowledgementBytes);
+    requireProof(digest(acknowledgementBytes) === handshake.acknowledgementSha256 &&
+      acknowledgement.protocol === handshake.protocol && acknowledgement.runId === handshake.runId &&
+      acknowledgement.status === handshake.status &&
+      acknowledgement.receiptSha256 === handshake.receiptSha256 &&
+      acknowledgement.checkpointSha256 === handshake.checkpointSha256 &&
+      acknowledgement.checkpointSequence === handshake.checkpointSequence);
+    requireProof(!exitWait.observedExit && child.exitCode === null && child.signalCode === null);
+
+    await writeNew(directory, "signal-request.json", canonicalCheckpointBytes({
+      pid: child.pid, signal: "SIGTERM", status: "READY",
+      runId: handshake.runId, acknowledgementSha256: handshake.acknowledgementSha256
+    }), operation);
+    requireProof(!exitWait.observedExit && child.exitCode === null && child.signalCode === null);
+    const signalSentAtMonotonicMs = signalMonotonicNow();
+    sendChildSigtermOnce(child, exitWait, killChild);
+    await writeNew(directory, "signal-sent.json", canonicalCheckpointBytes({
+      pid: child.pid, signal: "SIGTERM", signalSentAtMonotonicMs, attempts: 1
+    }), operation);
+    const exit = await operation.wait(() => exitWait.promise);
+    childExited = true;
+    const sendToExitMs = exit.observedAtMonotonicMs - signalSentAtMonotonicMs;
+    requireProof(exit.code === 2 && exit.signal === null &&
+      Number.isFinite(sendToExitMs) && sendToExitMs >= 0);
+
+    const childSummary = parseCanonical(await operation.read(
+      path.join(childDirectory, "summary.json"), 64 * 1024
+    ));
+    const configBytes = await operation.read(path.join(childDirectory, "config.json"), 16 * 1024);
+    const configSha256 = digest(configBytes);
+    const expected = {
+      runId: handshake.runId, configSha256, producerRevision: PRODUCER_REVISION
+    };
+    const exportBytes = await operation.read(path.join(childDirectory, "result.report.json"), 8 * 1024 * 1024);
+    const report = parseCanonical(exportBytes);
+    const checkpointBytes = await operation.read(
+      path.join(childDirectory, "state", "checkpoint.json"), 8 * 1024 * 1024
+    );
+    const checkpoint = parseCanonical(checkpointBytes);
+    const readbackBytes = await operation.read(path.join(
+      childDirectory, "receiver", digest(Buffer.from(handshake.runId, "utf8")), "export.json"
+    ), 8 * 1024 * 1024);
+    const evaluation = evaluateMemecoinPaperRunExport(exportBytes, expected);
+    const operations = report.runnerReport?.operationResults ?? [];
+    const openPositions = report.runnerReport?.terminalResult?.openPositions ?? [];
+    const entryOperation = operations.find(item =>
+      item.method === "executeEntry" && item.status === "FILLED_PAPER");
+    const entryReceipt = entryOperation?.receipt;
+    const acknowledgedCheckpoint = {
+      formatVersion: checkpoint.formatVersion,
+      runHeader: checkpoint.runHeader,
+      records: checkpoint.records?.slice(0, handshake.checkpointSequence + 1),
+      sequence: handshake.checkpointSequence
+    };
+    const acknowledgedRecord = checkpoint.records?.[handshake.checkpointSequence];
+    requireProof(childSummary.status === "UNKNOWN" && childSummary.contractChecks === "PASS" &&
+      childSummary.proof === "SYNTHETIC_REAL_SIGNAL_CHILD" &&
+      childSummary.configSha256 === configSha256 &&
+      childSummary.evaluation === "UNKNOWN" &&
+      childSummary.outcome === "OPEN_UNVALUED_TERMINAL_POSITION" &&
+      childSummary.entryFills === 1 && childSummary.exits === 0 &&
+      childSummary.stopAccepted === true && childSummary.restartDenied === true &&
+      childSummary.immutableReadback === true &&
+      childSummary.signalProof?.observedAfterFill === true &&
+      childSummary.signalProof?.lifecycleStatus === "STOPPED" &&
+      childSummary.signalProof?.runnerReason === "SHUTDOWN" &&
+      childSummary.signalProof?.receiptSha256 === handshake.receiptSha256 &&
+      digest(canonicalCheckpointBytes(acknowledgedCheckpoint)) === handshake.checkpointSha256 &&
+      acknowledgedRecord?.method === "executeEntry" &&
+      acknowledgedRecord.resultDigest === entryReceipt?.resultDigest &&
+      entryReceipt?.runId === handshake.runId &&
+      entryReceipt?.sequence === handshake.checkpointSequence &&
+      entryReceipt?.hash === handshake.checkpointSha256 &&
+      digest(canonicalCheckpointBytes(entryReceipt)) === handshake.receiptSha256 &&
+      report.persistence === "ACKNOWLEDGED" &&
+      report.checkpointSha256 === digest(checkpointBytes) &&
+      checkpointBytes.equals(canonicalCheckpointBytes(report.checkpoint)) &&
+      readbackBytes.equals(exportBytes) &&
+      report.runnerReport?.reason === "SHUTDOWN" &&
+      operations.filter(item => item.method === "executeEntry" && item.status === "FILLED_PAPER").length === 1 &&
+      !operations.some(item => item.method === "observeExitQuote" && item.status === "CLOSED_PAPER") &&
+      openPositions.length === 1 &&
+      openPositions[0].markStatus === "VALUATION_UNAVAILABLE" &&
+      evaluation.overall === "UNKNOWN" &&
+      evaluation.outcome === "OPEN_UNVALUED_TERMINAL_POSITION" &&
+      !evaluation.checks.some(item => item.status === "FAIL") &&
+      childSummary.exportSha256 === digest(exportBytes) &&
+      childSummary.byteLength === exportBytes.length);
+
+    const summary = {
+      status: "UNKNOWN", contractChecks: "PASS", proof: "SYNTHETIC_REAL_SIGTERM",
+      drillId, runId: handshake.runId, configSha256, producerRevision: PRODUCER_REVISION,
+      exportSha256: digest(exportBytes), byteLength: exportBytes.length,
+      evaluation: evaluation.overall, outcome: evaluation.outcome,
+      entryFills: evaluation.evidence.entryFills, exits: evaluation.evidence.exits,
+      signalDrill: {
+        status: "VERIFIED", signal: "SIGTERM", targetPid: child.pid,
+        signalSentExactlyOnce: exitWait.signalAttempted, signalObservedAfterFill: true,
+        fillAcknowledged: true, sendToExitMs,
+        fillCheckpointSequence: handshake.checkpointSequence,
+        fillCheckpointSha256: handshake.checkpointSha256,
+        fillReceiptSha256: handshake.receiptSha256,
+        childExit: {code: exit.code, signal: exit.signal},
+        checkpointPersistence: "ACKNOWLEDGED", restartDenied: true,
+        immutableReadback: true, openUnvaluedPositions: openPositions.length
+      },
+      hostAcceptance: "NOT_ASSESSED", providerTrust: "NOT_ASSESSED",
+      liveExecution: false, networkAccessed: false
+    };
+    requireProof(isVerifiedRealSignalDrillReceipt(summary));
+    await writeNew(directory, "signal-drill-result.json", canonicalCheckpointBytes(summary), operation);
+    return {summary};
+  } catch {
+    const summary = {status: "UNKNOWN", code: "REAL_SIGNAL_DRILL_FAILED", drillId};
+    if (directory && !operation.signal.aborted) {
+      try {
+        await writeNew(directory, "signal-drill-result.json", canonicalCheckpointBytes(summary), operation);
+      } catch {}
+    }
+    return {summary};
+  } finally {
+    handshakeWait?.cancel();
+    exitWait?.cancel();
+    if (child && !childExited) detachChild(child);
+    else if (child?.connected) child.disconnect();
+  }
 }
 
 async function authorization(filename, operation) {
@@ -329,7 +718,9 @@ async function authorization(filename, operation) {
 }
 
 export async function main({
-  env = process.env, stdout = process.stdout, signalSource = process, ...operationOptions
+  env = process.env, stdout = process.stdout, signalSource = process,
+  spawnChild = spawn, killChild = (child, signal) => child.kill(signal),
+  signalMonotonicNow = () => performance.now(), ...operationOptions
 } = {}) {
   if (env.PAPER_SYNTHETIC_ACCEPTANCE_ENABLED === undefined ||
       env.PAPER_SYNTHETIC_ACCEPTANCE_ENABLED === "false") {
@@ -339,7 +730,46 @@ export async function main({
   let attempted = false;
   try {
     requireProof(env.PAPER_SYNTHETIC_ACCEPTANCE_ENABLED === "true" &&
-      [undefined, "false", "true"].includes(env.PAPER_SYNTHETIC_ACCEPTANCE_HTTPS_ENABLED));
+      [undefined, "false", "true"].includes(env.PAPER_SYNTHETIC_ACCEPTANCE_HTTPS_ENABLED) &&
+      [undefined, "false", "true"].includes(env.PAPER_SYNTHETIC_ACCEPTANCE_SIGNAL_DRILL) &&
+      [undefined, "false", "true"].includes(env.PAPER_SYNTHETIC_ACCEPTANCE_SIGNAL_CHILD));
+    if (env.PAPER_SYNTHETIC_ACCEPTANCE_SIGNAL_CHILD === "true") {
+      requireProof(env.PAPER_SYNTHETIC_ACCEPTANCE_SIGNAL_DRILL !== "true" &&
+        env.PAPER_SYNTHETIC_ACCEPTANCE_HTTPS_ENABLED !== "true" &&
+        env.PAPER_SYNTHETIC_ACCEPTANCE_PROOF === "REAL_SIGNAL_CHILD");
+      attempted = true;
+      const inheritedDeadline = parseAcceptanceDeadline(env[ACCEPTANCE_DEADLINE_ENV]);
+      requireProof(inheritedDeadline.timeoutMs > 0);
+      requireProof(typeof process.send === "function");
+      const {summary} = await withAcceptanceOperation(
+        {...operationOptions, signalSource, ...inheritedDeadline},
+        operation => runAcceptance({
+          dataRoot: env.PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT,
+          proof: "REAL_SIGNAL_CHILD",
+          signalSource,
+          sendHandshake: message => new Promise((resolve, reject) => {
+            process.send(message, error => error ? reject(error) : resolve());
+          })
+        }, operation)
+      );
+      stdout.write(`${JSON.stringify(summary)}\n`);
+      return summary.status === "PASS" ? 0 : 2;
+    }
+    if (env.PAPER_SYNTHETIC_ACCEPTANCE_SIGNAL_DRILL === "true") {
+      requireProof(env.PAPER_SYNTHETIC_ACCEPTANCE_SIGNAL_CHILD !== "true" &&
+        env.PAPER_SYNTHETIC_ACCEPTANCE_HTTPS_ENABLED !== "true" &&
+        env.PAPER_SYNTHETIC_ACCEPTANCE_PROOF === undefined);
+      attempted = true;
+      const {summary} = await withAcceptanceOperation(
+        {...operationOptions, signalSource},
+        operation => realSignalDrill({
+          dataRoot: env.PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT, spawnChild, killChild,
+          signalMonotonicNow
+        }, operation)
+      );
+      stdout.write(`${JSON.stringify(summary)}\n`);
+      return summary.status === "PASS" ? 0 : 2;
+    }
     const {summary} = await withAcceptanceOperation(
       {...operationOptions, signalSource},
       async operation => {
@@ -380,4 +810,7 @@ export async function main({
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   process.exitCode = await main();
+  if (process.env.PAPER_SYNTHETIC_ACCEPTANCE_SIGNAL_CHILD === "true" && process.connected) {
+    process.disconnect();
+  }
 }

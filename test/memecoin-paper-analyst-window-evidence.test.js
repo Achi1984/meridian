@@ -444,6 +444,107 @@ test("missing momentum endpoints, census mismatch, missing pair and unreviewed a
   assert.equal((await packet(unreviewed)).metrics.qualifiedSmartWallets, undefined);
 });
 
+test("holder growth requires cursor-exhausted unique comparable finalized census endpoints", async t => {
+  const withSnapshots = mutate => {
+    const fixture = makeFixture();
+    const readSnapshots = fixture.censusSource.readSnapshots.bind(fixture.censusSource);
+    fixture.censusSource.readSnapshots = async request => {
+      const census = await readSnapshots(request);
+      mutate(census.snapshots);
+      return census;
+    };
+    return fixture;
+  };
+  const finalizedSlots = snapshots => {
+    snapshots.forEach((snapshot, index) => {
+      snapshot.slot = 500_000 + index;
+      snapshot.provenanceType = "ONCHAIN_SLOT";
+      snapshot.commitment = "finalized";
+    });
+    const [start, end] = snapshots;
+    end.owners = [
+      ...start.owners.slice(0, -1),
+      ...end.owners.slice(start.owners.length),
+      {owner: base58(Buffer.alloc(32, 99)), balanceAtoms: "1"}
+    ];
+  };
+
+  const complete = withSnapshots(finalizedSlots);
+  const completeEvidence = await packet(complete);
+  assert.equal(completeEvidence.metrics.holderGrowthPct1h.value, 15);
+  assert.deepEqual(completeEvidence.metrics.holderGrowthPct1h.coverage.endpointProvenance, [
+    {slot: 500_000, type: "ONCHAIN_SLOT"},
+    {slot: 500_001, type: "ONCHAIN_SLOT"}
+  ]);
+
+  await t.test("an open or missing pagination cursor cannot establish growth", async () => {
+    for (const [mutate, reason] of [
+      [snapshots => { snapshots[0].coverage.cursorExhausted = false; },
+        "CENSUS_PROVIDER_CURSOR_EXHAUSTION_UNPROVEN"],
+      [snapshots => { delete snapshots[1].coverage.cursorExhausted; },
+        "CENSUS_PROVIDER_CURSOR_EXHAUSTION_UNPROVEN"],
+      [snapshots => { snapshots[1].coverage.truncated = true; },
+        "CENSUS_ENDPOINT_INVALID_OR_INCOMPLETE"]
+    ]) {
+      const fixture = withSnapshots(snapshots => {
+        finalizedSlots(snapshots);
+        mutate(snapshots);
+      });
+      const evidence = await packet(fixture);
+      assert.equal(evidence.metrics.holderGrowthPct1h, undefined);
+      assert.equal(evidence.unavailableMetrics.holderGrowthPct1h.reason, reason);
+    }
+  });
+
+  await t.test("repeated owner rows cannot be hidden by owner deduplication", async () => {
+    for (const balanceAtoms of ["1", "2"]) {
+      const fixture = withSnapshots(snapshots => {
+        finalizedSlots(snapshots);
+        snapshots[1].owners.push({
+          ...snapshots[1].owners[0],
+          balanceAtoms
+        });
+      });
+      assert.equal((await packet(fixture)).metrics.holderGrowthPct1h, undefined);
+    }
+    for (const balances of [["0", "0"], ["0", "1"]]) {
+      const fixture = withSnapshots(snapshots => {
+        finalizedSlots(snapshots);
+        const [owner] = snapshots[1].owners;
+        owner.balanceAtoms = balances[0];
+        snapshots[1].owners.push({...owner, balanceAtoms: balances[1]});
+      });
+      assert.equal((await packet(fixture)).metrics.holderGrowthPct1h, undefined);
+    }
+  });
+
+  await t.test("same, mixed-provenance, non-finalized, or backwards slots are incomparable", async () => {
+    for (const [mutate, reason] of [
+      [snapshots => { delete snapshots[1].commitment; },
+        "CENSUS_ENDPOINT_INVALID_OR_INCOMPLETE"],
+      [snapshots => {
+        snapshots[1].slot = null;
+        snapshots[1].provenanceType = "OFFCHAIN_TIMESTAMP_NO_SOLANA_SLOT";
+        delete snapshots[1].commitment;
+      }, "CENSUS_ENDPOINT_SLOTS_INCOMPARABLE"],
+      [snapshots => { snapshots[0].slot = {toString: null, valueOf: null}; },
+        "CENSUS_ENDPOINT_SLOTS_INCOMPARABLE"],
+      [snapshots => { snapshots[1].slot = snapshots[0].slot; },
+        "CENSUS_ENDPOINT_SLOTS_INCOMPARABLE"],
+      [snapshots => { snapshots[1].slot = snapshots[0].slot - 1; },
+        "CENSUS_ENDPOINT_SLOTS_INCOMPARABLE"]
+    ]) {
+      const fixture = withSnapshots(snapshots => {
+        finalizedSlots(snapshots);
+        mutate(snapshots);
+      });
+      const evidence = await packet(fixture);
+      assert.equal(evidence.metrics.holderGrowthPct1h, undefined);
+      assert.equal(evidence.unavailableMetrics.holderGrowthPct1h.reason, reason);
+    }
+  });
+});
+
 test("incomplete or stale source identity cannot be upgraded by the adapter", async () => {
   const fixture = makeFixture({
     poolProofOverride: null

@@ -656,7 +656,7 @@ export function createPaperProviderWarmupHandoff({
       if (!enabled) return {status: "DISABLED", ...context,
         sourcePolicySha256: PAPER_RUNTIME_SOURCE_POLICY_SHA256};
       if (!pipeline || pipeline.enabled !== true ||
-          pipeline.mode !== "SYNTHETIC_TEST_ONLY" ||
+          !["SYNTHETIC_TEST_ONLY", "EXTERNAL_READ_ONLY_INPUT"].includes(pipeline.mode) ||
           typeof pipeline.evaluate !== "function" ||
           !Array.isArray(priceEndpoints) || priceEndpoints.length > 10 ||
           !Array.isArray(censusEndpoints) || censusEndpoints.length > 2) {
@@ -845,6 +845,7 @@ export function createPaperProviderWarmupHandoff({
         if (deadline.reason()) return unavailable(deadline.reason(), context);
         return {
           status: "OFFLINE_EVALUATED",
+          pipelineMode: pipeline.mode,
           datasetId,
           runId,
           sourcePolicySha256: PAPER_RUNTIME_SOURCE_POLICY_SHA256,

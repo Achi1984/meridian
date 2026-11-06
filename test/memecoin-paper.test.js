@@ -12,7 +12,8 @@ import {
 } from "../scripts/memecoin-paper/adapters.mjs";
 import {
   PaperLedger,
-  PAPER_LEDGER_POLICY
+  PAPER_LEDGER_POLICY,
+  paperModeledQuoteDigest
 } from "../scripts/memecoin-paper/ledger.mjs";
 import {runSyntheticReplay} from "../scripts/memecoin-paper/replay.mjs";
 import {
@@ -1019,4 +1020,150 @@ test("forward UTC time across Vienna DST fallback is admitted without day regres
   assert.equal(ledger.day, "2026-10-25");
   assert.equal(ledger.riskSnapshot({now: Date.parse("2026-10-25T23:00:00Z"), marks: []}).status, "PASS");
   assert.equal(ledger.day, "2026-10-26");
+});
+
+const MODELED_RUN = "modeled-run-1";
+
+function modeledQuote(candidate, now, {
+  side, base, cap = "8000000000", price, observedAt, eventId, costs, runId = MODELED_RUN
+}) {
+  const quote = {
+    ...(side === "ENTRY" ? fillQuote(candidate, now) : exitQuote(candidate, observedAt, price)),
+    eventId, observedAt, priceMicros: price, costs, decimals: candidate.decimals
+  };
+  const facts = {
+    schema: "PAPER_MODELED_QUOTE_V1", provenance: "MODELED", actualCostCoverage: "UNKNOWN",
+    executionRealistic: false, runId, runStartedAt: now - 1000, runEndAt: now + EIGHT_HOURS,
+    sourcePolicySha256: "b".repeat(64), modelId: "MERIDIAN_PAPER_QUOTED_NET_V1", modelVersion: "1",
+    modelDigest: "d".repeat(64), scenarioConfigSha256: "e".repeat(64),
+    usdAssumption: "1_USDC_EQUALS_1_MODELED_USD_UNSUPPORTED_BY_MARKET_ACCOUNTING_ASSUMPTION",
+    side, baseAtoms: base, sourceCapBaseAtoms: cap, adverseAdjustmentBps: 300,
+    networkReserveCents: "50", responseSha256: "f".repeat(64), expiresAt: observedAt + 15_000,
+    sourceObservedAt: observedAt, digest: ""
+  };
+  quote.modeled = facts;
+  facts.digest = paperModeledQuoteDigest(facts, quote, candidate.decimals);
+  return quote;
+}
+
+// 6e9 atoms at 10000 micros (decimals 6): gross 6000c, slippage ceil(6000*300/10000)=180c, reserve 50c.
+const ENTRY_COSTS = {feeCents: "0", spreadCents: "0", slippageCents: "180", priceImpactCents: "0", networkCents: "50"};
+// 6e9 atoms at 20000 micros: gross floor = 12000c, slippage 360c, reserve 50c.
+const EXIT_COSTS = {feeCents: "0", spreadCents: "0", slippageCents: "360", priceImpactCents: "0", networkCents: "50"};
+
+function modeledEntry(now = Date.now()) {
+  const candidate = syntheticCandidate(now);
+  const ledger = new PaperLedger({now, runId: MODELED_RUN});
+  const auth = authorize(ledger, candidate, now);
+  const quote = modeledQuote(candidate, now, {
+    side: "ENTRY", base: "6000000000", price: 10_000, observedAt: now + 2000,
+    eventId: "entry-modeled-1", costs: ENTRY_COSTS
+  });
+  return {now, candidate, ledger, auth, quote};
+}
+
+test("modeled entry commits exactly the modeled quantity and labels the fill MODELED", () => {
+  const {now, ledger, auth, quote} = modeledEntry();
+  const fill = ledger.executeEntry(auth, quote, {now: now + 2000});
+  assert.equal(fill.status, "FILLED_PAPER");
+  assert.equal(fill.tokenAtoms, "6000000000");
+  assert.equal(fill.allInCents, "6230");
+  assert.equal(fill.provenance, "MODELED");
+  assert.equal(fill.actualCostCoverage, "UNKNOWN");
+  assert.equal(fill.modeledDigest, quote.modeled.digest);
+  assert.equal(ledger.summary().cashCents, "93770");
+  assert.deepEqual(ledger.executeEntry(auth, quote, {now: now + 2000}), fill);
+  assert.equal(ledger.summary().cashCents, "93770");
+});
+
+test("altered event identity or modeled binding cannot duplicate or re-bind a modeled fill", () => {
+  const {now, candidate, ledger, auth, quote} = modeledEntry();
+  const fill = ledger.executeEntry(auth, quote, {now: now + 2000});
+  assert.equal(fill.status, "FILLED_PAPER");
+  const renamed = ledger.executeEntry(auth, {...quote, eventId: "entry-modeled-2"}, {now: now + 2000});
+  assert.notEqual(renamed.status, "FILLED_PAPER");
+  const smaller = modeledQuote(candidate, now, {
+    side: "ENTRY", base: "5000000000", price: 10_000, observedAt: now + 2000,
+    eventId: quote.eventId, costs: {...ENTRY_COSTS, slippageCents: "150"}
+  });
+  assert.equal(ledger.executeEntry(auth, smaller, {now: now + 2000}).status, "REJECT");
+  assert.equal(ledger.positions.size, 1);
+  assert.equal(ledger.summary().cashCents, "93770");
+});
+
+test("modeled entry is never resized when the risk budget no longer fits", () => {
+  const now = Date.now();
+  const candidate = syntheticCandidate(now);
+  const ledger = new PaperLedger({now, runId: MODELED_RUN});
+  const auth = authorize(ledger, candidate, now);
+  // 8e9 atoms: gross 8000c + slippage 240c + reserve 50c = 8290c exceeds the 8000c limit.
+  const quote = modeledQuote(candidate, now, {
+    side: "ENTRY", base: "8000000000", price: 10_000, observedAt: now + 2000, eventId: "entry-big",
+    costs: {...ENTRY_COSTS, slippageCents: "240"}
+  });
+  const result = ledger.executeEntry(auth, quote, {now: now + 2000});
+  assert.equal(result.status, "UNFILLED");
+  assert.equal(ledger.positions.size, 0);
+  assert.equal(ledger.summary().cashCents, "100000");
+});
+
+test("modeled entry refuses forged digests, a foreign run, and expired quotes without mutation", () => {
+  const {now, candidate, ledger, auth, quote} = modeledEntry();
+  const forged = {...quote, modeled: {...quote.modeled, baseAtoms: "5999999999"}};
+  assert.notEqual(ledger.executeEntry(auth, forged, {now: now + 2000}).status, "FILLED_PAPER");
+  const foreign = modeledQuote(candidate, now, {
+    side: "ENTRY", base: "6000000000", price: 10_000, observedAt: now + 2000, eventId: "entry-foreign",
+    costs: ENTRY_COSTS, runId: "another-run"
+  });
+  assert.notEqual(ledger.executeEntry(auth, foreign, {now: now + 2000}).status, "FILLED_PAPER");
+  assert.notEqual(ledger.executeEntry(auth, quote, {now: now + 2000 + 15_001}).status, "FILLED_PAPER");
+  assert.equal(ledger.positions.size, 0);
+  assert.equal(ledger.summary().cashCents, "100000");
+});
+
+test("full-position cap: an insufficient exit quote refuses before any high-water, stop, or time mutation", () => {
+  const {now, candidate, ledger, auth, quote} = modeledEntry();
+  assert.equal(ledger.executeEntry(auth, quote, {now: now + 2000}).status, "FILLED_PAPER");
+  const before = structuredClone(
+    (({highWaterPriceMicros, stopPriceMicros, trailingActive, lastObservedAt}) =>
+      ({highWaterPriceMicros: String(highWaterPriceMicros), stopPriceMicros: String(stopPriceMicros),
+        trailingActive, lastObservedAt}))(ledger.positions.get(candidate.mint)));
+  const auditBefore = ledger.auditEvents().length;
+  const short = modeledQuote(candidate, now, {
+    side: "EXIT", base: "5000000000", cap: "5000000000", price: 20_000, observedAt: now + 5000,
+    eventId: "exit-short", costs: {...EXIT_COSTS, slippageCents: "300"}
+  });
+  const refused = ledger.observeExitQuote(short, {now: now + 5000});
+  assert.equal(refused.status, "VALUATION_UNAVAILABLE");
+  const position = ledger.positions.get(candidate.mint);
+  assert.deepEqual({
+    highWaterPriceMicros: String(position.highWaterPriceMicros), stopPriceMicros: String(position.stopPriceMicros),
+    trailingActive: position.trailingActive, lastObservedAt: position.lastObservedAt
+  }, before);
+  assert.equal(ledger.auditEvents().length, auditBefore);
+  const legacy = ledger.observeExitQuote(exitQuote(candidate, now + 5000, 20_000, {eventId: "exit-legacy"}),
+    {now: now + 5000});
+  assert.equal(legacy.status, "VALUATION_UNAVAILABLE");
+  assert.equal(ledger.positions.get(candidate.mint).highWaterPriceMicros, 10_000n);
+
+  const full = modeledQuote(candidate, now, {
+    side: "EXIT", base: "6000000000", cap: "6000000000", price: 20_000, observedAt: now + 5000,
+    eventId: "exit-full", costs: EXIT_COSTS
+  });
+  assert.equal(ledger.observeExitQuote(full, {now: now + 5000}).status, "MARKED");
+  assert.equal(ledger.positions.get(candidate.mint).highWaterPriceMicros, 20_000n);
+});
+
+test("a modeled quote cannot be used on a legacy position and legacy digests are unchanged", () => {
+  const now = Date.now();
+  const candidate = syntheticCandidate(now);
+  const ledger = new PaperLedger({now, runId: MODELED_RUN});
+  const auth = authorize(ledger, candidate, now);
+  assert.equal(ledger.executeEntry(auth, fillQuote(candidate, now), {now: now + 2000}).status, "FILLED_PAPER");
+  const modeledExit = modeledQuote(candidate, now, {
+    side: "EXIT", base: "8000000000", cap: "8000000000", price: 20_000, observedAt: now + 5000,
+    eventId: "exit-modeled-on-legacy", costs: {...EXIT_COSTS, slippageCents: "480"}
+  });
+  assert.equal(ledger.observeExitQuote(modeledExit, {now: now + 5000}).status, "VALUATION_UNAVAILABLE");
+  assert.equal(ledger.positions.get(candidate.mint).highWaterPriceMicros, 10_000n);
 });

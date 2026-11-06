@@ -19,6 +19,8 @@ import {createPaperExecutionStep} from "./execution-step.mjs";
 import {PAPER_LEDGER_POLICY} from "./ledger.mjs";
 import {
   createPaperRuntimeSourceAdapter,
+  isIssuedRuntimeCandidate,
+  resolveRuntimeCandidateArray,
   PAPER_RUNTIME_SOURCE_POLICY,
   PAPER_RUNTIME_SOURCE_POLICY_SHA256
 } from "./paper-runtime-source.mjs";
@@ -322,14 +324,33 @@ function checkpointExportReadback(readback, config, bindingReceipt, externalInpu
 }
 
 export function offlineFixtureAdapters(options = {}) {
-  if (!onlyDataKeys(options, ["clock", "fault"])) {
-    throw new TypeError("only a clock and named offline fixture fault may be selected");
+  if (!onlyDataKeys(options, ["clock", "fault", "modeledPolicy"])) {
+    throw new TypeError("only a clock, named offline fixture fault, and modeled fixture policy may be selected");
   }
   const clock = options.clock ?? createSyntheticClock();
   const fault = options.fault ?? "NONE";
   if (!syntheticClocks.has(clock) || !FIXTURE_FAULTS.has(fault)) {
     throw new TypeError("only bounded built-in offline fixture scenarios are supported");
   }
+  if (options.modeledPolicy !== undefined && !fault.startsWith("PIPELINE_QUOTE")) {
+    throw new TypeError("modeled fixture policy requires a pipeline quote fixture scenario");
+  }
+  const pipelineVariant = fault === "PIPELINE_QUOTE_MISSING_QUOTE" ? "MISSING_QUOTE"
+    : fault === "PIPELINE_QUOTE_MISSING_COSTS" ? "MISSING_COSTS"
+      : fault === "PIPELINE_QUOTE_ROUTE_IDENTITY" ? "WRONG_QUOTE_IDENTITY"
+        : fault === "PIPELINE_QUOTE_WRONG_IDENTITY" ? "WRONG_IDENTITY"
+          : fault === "PIPELINE_QUOTE_FUTURE_EVIDENCE" ? "FUTURE_EVIDENCE" : "BASE";
+  const pipelineBehavior = fault === "PIPELINE_QUOTE_WAIT" ? "WAIT_FOR_STOP"
+    : fault === "PIPELINE_QUOTE_DEADLINE" ? "EXPIRE_DURING_REQUEST" : "NONE";
+  // The modeled source owns one issuer adapter whose clock is bound here, once.
+  const modeledSource = options.modeledPolicy === undefined ? null : createPaperRuntimeSourceAdapter({
+    sourcePolicySha256: PAPER_RUNTIME_SOURCE_POLICY_SHA256,
+    fixtureMode: "SYNTHETIC_TEST_ONLY",
+    clock,
+    variant: pipelineVariant,
+    fixtureBehavior: pipelineBehavior,
+    modeledPolicy: options.modeledPolicy
+  });
   let exitCount = 0;
   let entryCount = 0;
   let pipelineFixtureCalls = 0;
@@ -340,7 +361,8 @@ export function offlineFixtureAdapters(options = {}) {
     fault,
     sourceMode: "SYNTHETIC_TEST_ONLY",
     runtimeFixturesByMint,
-    runtimeAudits
+    runtimeAudits,
+    modeledAuthority: modeledSource?.modeledQuoteAuthority() ?? null
   };
   const adapters = Object.freeze({
     async acquireCandidates({now, signal, deadlineAt, remaining, recordRequest, recordWork, budget}) {
@@ -361,18 +383,12 @@ export function offlineFixtureAdapters(options = {}) {
         if (pipelineFixtureCalls > (fault === "PIPELINE_QUOTE_DUPLICATE" ? 2 : 1)) return [];
         let acquired;
         try {
-          const variant = fault === "PIPELINE_QUOTE_MISSING_QUOTE" ? "MISSING_QUOTE"
-            : fault === "PIPELINE_QUOTE_MISSING_COSTS" ? "MISSING_COSTS"
-              : fault === "PIPELINE_QUOTE_ROUTE_IDENTITY" ? "WRONG_QUOTE_IDENTITY"
-                : fault === "PIPELINE_QUOTE_WRONG_IDENTITY" ? "WRONG_IDENTITY"
-                  : fault === "PIPELINE_QUOTE_FUTURE_EVIDENCE" ? "FUTURE_EVIDENCE" : "BASE";
-          const sourceAdapter = createPaperRuntimeSourceAdapter({
+          const sourceAdapter = modeledSource ?? createPaperRuntimeSourceAdapter({
             sourcePolicySha256: PAPER_RUNTIME_SOURCE_POLICY_SHA256,
             fixtureMode: "SYNTHETIC_TEST_ONLY",
             clock,
-            variant,
-            fixtureBehavior: fault === "PIPELINE_QUOTE_WAIT" ? "WAIT_FOR_STOP"
-              : fault === "PIPELINE_QUOTE_DEADLINE" ? "EXPIRE_DURING_REQUEST" : "NONE"
+            variant: pipelineVariant,
+            fixtureBehavior: pipelineBehavior
           });
           acquired = await sourceAdapter.acquireCandidates({
             signal, remaining, recordRequest, recordWork, deadlineAt, budget
@@ -390,7 +406,7 @@ export function offlineFixtureAdapters(options = {}) {
           runtimeFixturesByMint.set(acquired.candidate.mint, request =>
             acquired.quoteAdapter.quote(request));
         }
-        return acquired.candidate ? [acquired.candidate] : [];
+        return resolveRuntimeCandidateArray(acquired, {synthetic: true}).candidates;
       }
       if (fault === "CLOCK_JUMP") clock.jumpWall(100);
       if (fault === "NO_CANDIDATES") return [];
@@ -535,13 +551,13 @@ function publicError(error) {
 export function createPaperPilotComposition(options = {}) {
   if (!onlyDataKeys(options, [
         "config", "dataDirectory", "adapters", "clock", "signal", "externalReadOnlyInput",
-        "onTestInitialized", "onTestEntry"
+        "onTestInitialized", "onTestEntry", "sourceDiagnostic"
       ])) {
     throw new TypeError("composition factory options must be bounded data");
   }
   let {
     config, dataDirectory, adapters, clock, signal, externalReadOnlyInput, onTestInitialized,
-    onTestEntry
+    onTestEntry, sourceDiagnostic
   } = options;
   if (onTestInitialized !== undefined && typeof onTestInitialized !== "function") {
     throw new TypeError("test initialization observer must be a function");
@@ -565,6 +581,11 @@ export function createPaperPilotComposition(options = {}) {
   }
   const externalMode = config.mode === "EXTERNAL_READ_ONLY_INPUT";
   const sourceMode = config.mode === "SOURCE_BACKED_PAPER";
+  if (sourceDiagnostic !== undefined &&
+      (!sourceMode || !onlyDataKeys(sourceDiagnostic, ["input", "warmupStore"]) ||
+        !Object.hasOwn(sourceDiagnostic, "input") || !Object.hasOwn(sourceDiagnostic, "warmupStore"))) {
+    throw new TypeError("source diagnostic requires source-backed mode, bounded input, and a warmup store");
+  }
   let boundedExternalInput = null;
   let externalInputBytes = 0;
   if (externalMode) {
@@ -599,7 +620,11 @@ export function createPaperPilotComposition(options = {}) {
     }
     clock = createExternalReceiptClock();
     const sourceAdapter = createPaperRuntimeSourceAdapter({
-      sourcePolicySha256: config.sourcePolicySha256
+      sourcePolicySha256: config.sourcePolicySha256,
+      ...(sourceDiagnostic ? {
+        diagnosticInput: sourceDiagnostic.input,
+        warmupStore: sourceDiagnostic.warmupStore
+      } : {})
     });
     adapters = Object.freeze({
       acquireCandidates: sourceAdapter.acquireCandidates,
@@ -960,6 +985,8 @@ export function createPaperPilotComposition(options = {}) {
     session = await PaperCheckpointSession.open({store, runId: config.runId, startedAt: config.startedAt});
     const executionStep = createPaperExecutionStep({
       session, store, runId: config.runId, startedAt: config.startedAt, endAt: deadlineAt,
+      ...(offlineFixtureAdaptersBySource.get(adapters)?.modeledAuthority
+        ? {modeledQuoteAuthority: offlineFixtureAdaptersBySource.get(adapters).modeledAuthority} : {}),
       limits: {
         maxEvents: Math.min(256, config.budgets.events),
         maxCommands: Math.min(512, Math.max(1, config.budgets.events - 1)),
@@ -1068,15 +1095,24 @@ export function createPaperPilotComposition(options = {}) {
               pipelineVersion: acquisition.result.pipelineVersion ?? null,
               pipelineEnabled: acquisition.result.pipelineEnabled === true,
               quoteAdapterStatus: acquisition.result.quoteAdapterStatus ?? "UNKNOWN",
+              ...(isRecord(acquisition.result.diagnostic) ? {
+                diagnostic: structuredClone(acquisition.result.diagnostic),
+                refusals: structuredClone(acquisition.result.refusals ?? [])
+              } : {}),
               unresolved: Array.isArray(acquisition.result.unresolved)
                 ? acquisition.result.unresolved.slice() : []
             };
             sourceUnknownReason = acquisition.result.reason;
             return {done: true, outcome: "UNKNOWN", reason: acquisition.result.reason};
           }
-          if (!Array.isArray(acquisition.result)) {
+          const resolvedCandidates = sourceMode && isRecord(acquisition.result)
+            ? resolveRuntimeCandidateArray(acquisition.result).candidates
+            : acquisition.result;
+          if (!Array.isArray(resolvedCandidates) ||
+              (sourceMode && resolvedCandidates.some(item => !isIssuedRuntimeCandidate(item)))) {
             return candidateSourceFailure("CANDIDATE_BOUND");
           }
+          acquisition.result = resolvedCandidates;
           if (!acquisition.result.length) {
             return {done: true};
           }
@@ -1242,7 +1278,8 @@ export function createPaperPilotComposition(options = {}) {
         receipt: result?.receipt ? {...result.receipt} : null
       });
       if (method === "executeEntry" && result?.status === "FILLED_PAPER" && result.receipt) {
-        onTestEntry?.();
+        const observed = onTestEntry?.(result);
+        if (observed instanceof Promise) await observed;
       }
       return result;
     }])));
