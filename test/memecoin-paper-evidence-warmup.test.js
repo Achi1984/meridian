@@ -311,6 +311,60 @@ test("census reader requires both exact same-identity policy endpoints", async t
   });
   assert.equal(exact.status, "COMPLETE");
   assert.equal(exact.synthetic, true);
+  const withFinalizedSlots = (startSlot, endSlot) => ({
+    ...dataset,
+    records: dataset.records.map((record, index) => record.kind !== "census" ? record : ({
+      ...record,
+      payload: {
+        ...record.payload,
+        slot: index === 0 ? startSlot : endSlot,
+        commitment: "finalized",
+        provenanceType: "ONCHAIN_SLOT"
+      }
+    }))
+  });
+  const distinctSlotsDataset = withFinalizedSlots(41, 42);
+  const distinctSlots = await createWarmupCensusSource(distinctSlotsDataset).readSnapshots({
+    identity: fixture.identity,
+    startAtMs: start.observedAt,
+    endAtMs: end.observedAt,
+    policy
+  });
+  assert.equal(distinctSlots.status, "COMPLETE");
+  assert.deepEqual(distinctSlots.snapshots.map(snapshot => snapshot.slot), [41, 42]);
+  assert.deepEqual(warmupCoverage(distinctSlotsDataset, {
+    identity: fixture.identity,
+    censusEndpoints: [
+      {atMs: start.observedAt, policyVersion: policy.version},
+      {atMs: end.observedAt, policyVersion: policy.version}
+    ]
+  }).exactAvailable.census.length, 2);
+
+  const conflictingSameSlotDataset = withFinalizedSlots(42, 42);
+  const conflictingSnapshots = conflictingSameSlotDataset.records
+    .filter(record => record.kind === "census").map(record => record.payload);
+  assert.deepEqual(conflictingSnapshots.map(snapshot => snapshot.owners.length), [20, 23]);
+  const conflictingSameSlot = await createWarmupCensusSource(conflictingSameSlotDataset).readSnapshots({
+    identity: fixture.identity,
+    startAtMs: start.observedAt,
+    endAtMs: end.observedAt,
+    policy
+  });
+  assert.equal(conflictingSameSlot.status, "WARMUP");
+  assert.equal(conflictingSameSlot.reason, "CENSUS_ENDPOINTS_INCOMPARABLE");
+  assert.deepEqual(conflictingSameSlot.coverage.exactEndpoints.available, []);
+  assert.deepEqual(conflictingSameSlot.coverage.exactEndpoints.missing,
+    [start.observedAt, end.observedAt]);
+  const conflictingCoverage = warmupCoverage(conflictingSameSlotDataset, {
+    identity: fixture.identity,
+    censusEndpoints: [
+      {atMs: start.observedAt, policyVersion: policy.version},
+      {atMs: end.observedAt, policyVersion: policy.version}
+    ]
+  });
+  assert.deepEqual(conflictingCoverage.exactAvailable.census, []);
+  assert.equal(conflictingCoverage.exactMissing.census.length, 2);
+
   const openCursorDataset = {...dataset, records: dataset.records.map(record =>
     record.kind === "census" ? {...record, payload: {...record.payload,
       coverage: {...record.payload.coverage, cursorExhausted: false}}} : record)};

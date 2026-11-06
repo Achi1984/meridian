@@ -694,6 +694,17 @@ function usableCensusRecord(record, {identity, atMs, policyVersion}, capturedAt)
     validSlot && validReceipt(snapshot.receipt, snapshot.source, snapshot.receivedAt);
 }
 
+function comparableCensusSnapshots(start, end) {
+  if (start.provenanceType !== end.provenanceType) return false;
+  if (start.slot === null || end.slot === null) {
+    return start.slot === null && end.slot === null &&
+      start.provenanceType === "OFFCHAIN_TIMESTAMP_NO_SOLANA_SLOT";
+  }
+  return Number.isSafeInteger(start.slot) && Number.isSafeInteger(end.slot) &&
+    start.commitment === "finalized" && end.commitment === "finalized" &&
+    end.slot > start.slot;
+}
+
 function exactMatches(records, predicate) {
   const matches = [];
   for (const record of records) {
@@ -753,13 +764,17 @@ export function createWarmupCensusSource(dataset) {
           coverage: {complete: false, truncated: false, exactEndpoints}, snapshots: []};
       }
       const pair = snapshots.map(matches => matches[0].payload);
-      const valid = pair[0].source === pair[1].source &&
+      const samePolicy = pair[0].source === pair[1].source &&
         pair.every((snapshot, index) =>
           snapshot.aggregation === policy?.aggregation &&
           snapshot.denominatorPolicy === policy?.denominatorPolicy &&
           JSON.stringify(snapshot.exclusions) === JSON.stringify(policy?.exclusions));
-      if (!valid) {
-        return {status: "WARMUP", reason: "CENSUS_IDENTITY_OR_POLICY_MISMATCH",
+      if (!samePolicy || !comparableCensusSnapshots(pair[0], pair[1])) {
+        exactEndpoints.available = [];
+        exactEndpoints.missing = requested;
+        const reason = samePolicy ? "CENSUS_ENDPOINTS_INCOMPARABLE"
+          : "CENSUS_IDENTITY_OR_POLICY_MISMATCH";
+        return {status: "WARMUP", reason,
           coverage: {complete: false, truncated: false, exactEndpoints}, snapshots: []};
       }
       return {status: "COMPLETE", identity, coverage: {complete: true,
@@ -796,15 +811,16 @@ export function warmupCoverage(dataset, {identity, priceEndpoints = [], censusEn
         identity, atMs: endpoint.atMs, policyVersion: endpoint.policyVersion
       }, capturedAt);
   });
-  if (censusEndpoints.length === 2 &&
-      censusEndpoints[0].policyVersion === censusEndpoints[1].policyVersion &&
-      censusAvailable.every(Boolean)) {
+  if (censusEndpoints.length === 2 && censusAvailable.every(Boolean)) {
     const [start, end] = censusRecordsByEndpoint.map(matches => matches[0]);
-    const samePolicy = start.source === end.source &&
+    const samePolicy = censusEndpoints[0].policyVersion === censusEndpoints[1].policyVersion &&
+      start.source === end.source &&
       start.payload.aggregation === end.payload.aggregation &&
       start.payload.denominatorPolicy === end.payload.denominatorPolicy &&
       JSON.stringify(start.payload.exclusions) === JSON.stringify(end.payload.exclusions);
-    if (!samePolicy) censusAvailable.fill(false);
+    if (!samePolicy || !comparableCensusSnapshots(start.payload, end.payload)) {
+      censusAvailable.fill(false);
+    }
   }
   const availableCensusEndpoints = censusEndpoints.filter((_, index) => censusAvailable[index]);
   return deepFreeze({
