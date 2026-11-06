@@ -340,6 +340,20 @@ test("census reader requires both exact same-identity policy endpoints", async t
     ]
   }).exactAvailable.census.length, 2);
 
+  const duplicateOwnerDataset = structuredClone(distinctSlotsDataset);
+  const endOwners = duplicateOwnerDataset.records[1].payload.owners;
+  endOwners.push({...endOwners[0]});
+  const duplicateResult = await createWarmupCensusSource(duplicateOwnerDataset).readSnapshots({
+    identity: fixture.identity, startAtMs: start.observedAt, endAtMs: end.observedAt, policy
+  });
+  assert.equal(duplicateResult.status, "WARMUP");
+  assert.deepEqual(duplicateResult.coverage.exactEndpoints.missing, [end.observedAt]);
+  const duplicateCoverage = warmupCoverage(duplicateOwnerDataset, {
+    identity: fixture.identity,
+    censusEndpoints: [start, end].map(snapshot => ({atMs: snapshot.observedAt, policyVersion: policy.version}))
+  });
+  assert.deepEqual(duplicateCoverage.exactMissing.census, [{atMs: end.observedAt, policyVersion: policy.version}]);
+
   const conflictingSameSlotDataset = withFinalizedSlots(42, 42);
   const conflictingSnapshots = conflictingSameSlotDataset.records
     .filter(record => record.kind === "census").map(record => record.payload);

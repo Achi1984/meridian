@@ -278,6 +278,28 @@ function censusPolicyReady(policy) {
     typeof policy.reviewReceiptId === "string" && policy.reviewReceiptId.trim().length > 0;
 }
 
+export function comparableCensusSlots(start, end) {
+  if (start.provenanceType !== end.provenanceType) return false;
+  if (start.slot === null) return end.slot === null;
+  return Number.isSafeInteger(start.slot) && Number.isSafeInteger(end.slot) &&
+    end.slot > start.slot;
+}
+
+export function countCensusOwners(rows, chargeWork) {
+  if (!Array.isArray(rows) || rows.length > MAX_CENSUS_ROWS) return null;
+  const seenOwners = new Set();
+  let count = 0;
+  for (const entry of rows) {
+    if (chargeWork && !chargeWork(1)) return null;
+    if (!isRecord(entry) || !isSolanaPublicKey(entry.owner) ||
+        seenOwners.has(entry.owner) || typeof entry.balanceAtoms !== "string" ||
+        !DECIMAL_INTEGER.test(entry.balanceAtoms ?? "")) return null;
+    seenOwners.add(entry.owner);
+    if (entry.balanceAtoms !== "0") count += 1;
+  }
+  return count;
+}
+
 function ownerCount(snapshot, policy, endpoint, assembledAt, identity, chargeWork) {
   if (!isRecord(snapshot) || snapshot.status !== "COMPLETE" ||
       !sameIdentity(snapshot.identity, identity) ||
@@ -291,7 +313,6 @@ function ownerCount(snapshot, policy, endpoint, assembledAt, identity, chargeWor
       typeof snapshot.denominatorAtoms !== "string" ||
       !DECIMAL_INTEGER.test(snapshot.denominatorAtoms ?? "") ||
       BigInt(snapshot.denominatorAtoms) <= 0n ||
-      !Array.isArray(snapshot.owners) || snapshot.owners.length > MAX_CENSUS_ROWS ||
       !validTime(snapshot.receivedAt) || snapshot.receivedAt < snapshot.observedAt ||
       snapshot.receivedAt > assembledAt ||
       snapshot.receivedAt !== snapshot.receipt?.receivedAt ||
@@ -301,17 +322,7 @@ function ownerCount(snapshot, policy, endpoint, assembledAt, identity, chargeWor
         : !Number.isSafeInteger(snapshot.slot) || snapshot.slot < 0 ||
           snapshot.provenanceType !== "ONCHAIN_SLOT" ||
           snapshot.commitment !== "finalized")) return null;
-  const seenOwners = new Set();
-  const owners = new Set();
-  for (const entry of snapshot.owners) {
-    if (!chargeWork(1)) return null;
-    if (!isRecord(entry) || !isSolanaPublicKey(entry.owner) ||
-        seenOwners.has(entry.owner) || typeof entry.balanceAtoms !== "string" ||
-        !DECIMAL_INTEGER.test(entry.balanceAtoms ?? "")) return null;
-    seenOwners.add(entry.owner);
-    if (BigInt(entry.balanceAtoms) > 0n) owners.add(entry.owner);
-  }
-  return owners.size;
+  return countCensusOwners(snapshot.owners, chargeWork);
 }
 
 function validPair(pair, identity, candidateT, assembledAt) {
@@ -736,11 +747,7 @@ export async function buildAnalystWindowEvidence({
       const endCount = ownerCount(
         pair[1], censusPolicy, candidateT, sourceReceiptCutoff, identity, chargeCensus
       );
-      const comparableSlots = pair[0]?.provenanceType === pair[1]?.provenanceType &&
-        (pair[0]?.slot === null
-          ? pair[1]?.slot === null
-          : Number.isSafeInteger(pair[0]?.slot) && Number.isSafeInteger(pair[1]?.slot) &&
-            pair[1].slot > pair[0].slot);
+      const comparableSlots = comparableCensusSlots(pair[0], pair[1]);
       if (pair[0]?.source !== pair[1]?.source) {
         holderGrowthUnavailableReason = "CENSUS_SOURCE_CHANGED_BETWEEN_ENDPOINTS";
       } else if (!pair.every(snapshot => snapshot.coverage?.cursorExhausted === true)) {

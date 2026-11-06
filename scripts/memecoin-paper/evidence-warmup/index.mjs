@@ -2,6 +2,7 @@ import {createHash} from "node:crypto";
 import {constants} from "node:fs";
 import * as fsPromises from "node:fs/promises";
 import path from "node:path";
+import {comparableCensusSlots, countCensusOwners} from "../analyst-window-evidence.mjs";
 import {acquireOwnerCensus} from "../owner-census.mjs";
 
 export const EVIDENCE_WARMUP_SCHEMA = "MERIDIAN_PAPER_EVIDENCE_WARMUP_V1";
@@ -687,22 +688,11 @@ function usableCensusRecord(record, {identity, atMs, policyVersion}, capturedAt)
     /^(0|[1-9]\d{0,39})$/.test(snapshot.denominatorAtoms) &&
     BigInt(snapshot.denominatorAtoms) > 0n && Array.isArray(snapshot.exclusions) &&
     snapshot.exclusions.every(value => typeof value === "string" && value.length > 0) &&
-    Array.isArray(snapshot.owners) && snapshot.owners.length <= 25_000 &&
     snapshot.receivedAt === record.receivedAt &&
     snapshot.receivedAt >= snapshot.observedAt &&
     snapshot.receivedAt <= capturedAt &&
-    validSlot && validReceipt(snapshot.receipt, snapshot.source, snapshot.receivedAt);
-}
-
-function comparableCensusSnapshots(start, end) {
-  if (start.provenanceType !== end.provenanceType) return false;
-  if (start.slot === null || end.slot === null) {
-    return start.slot === null && end.slot === null &&
-      start.provenanceType === "OFFCHAIN_TIMESTAMP_NO_SOLANA_SLOT";
-  }
-  return Number.isSafeInteger(start.slot) && Number.isSafeInteger(end.slot) &&
-    start.commitment === "finalized" && end.commitment === "finalized" &&
-    end.slot > start.slot;
+    validSlot && validReceipt(snapshot.receipt, snapshot.source, snapshot.receivedAt) &&
+    countCensusOwners(snapshot.owners) !== null;
 }
 
 function exactMatches(records, predicate) {
@@ -769,7 +759,7 @@ export function createWarmupCensusSource(dataset) {
           snapshot.aggregation === policy?.aggregation &&
           snapshot.denominatorPolicy === policy?.denominatorPolicy &&
           JSON.stringify(snapshot.exclusions) === JSON.stringify(policy?.exclusions));
-      if (!samePolicy || !comparableCensusSnapshots(pair[0], pair[1])) {
+      if (!samePolicy || !comparableCensusSlots(pair[0], pair[1])) {
         exactEndpoints.available = [];
         exactEndpoints.missing = requested;
         const reason = samePolicy ? "CENSUS_ENDPOINTS_INCOMPARABLE"
@@ -818,7 +808,7 @@ export function warmupCoverage(dataset, {identity, priceEndpoints = [], censusEn
       start.payload.aggregation === end.payload.aggregation &&
       start.payload.denominatorPolicy === end.payload.denominatorPolicy &&
       JSON.stringify(start.payload.exclusions) === JSON.stringify(end.payload.exclusions);
-    if (!samePolicy || !comparableCensusSnapshots(start.payload, end.payload)) {
+    if (!samePolicy || !comparableCensusSlots(start.payload, end.payload)) {
       censusAvailable.fill(false);
     }
   }
