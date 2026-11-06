@@ -1,6 +1,66 @@
 import {createHash} from "node:crypto";
 import {canonicalCheckpointBytes} from "./checkpoint-store.mjs";
-import {createMarketQuoteAdapter} from "./market-quote-adapter.mjs";
+import {
+  copyModeledPolicy, createFixtureMarketQuoteAdapter, createMarketQuoteAdapter,
+  reviewScenarioConfigSha256
+} from "./market-quote-adapter.mjs";
+import {SYNTHETIC_MINT, SYNTHETIC_POOL, SYNTHETIC_QUOTE} from "./synthetic-fixtures.mjs";
+
+const MODELED_FIXTURE_USD_ASSUMPTION =
+  "1_USDC_EQUALS_1_MODELED_USD_UNSUPPORTED_BY_MARKET_ACCOUNTING_ASSUMPTION; NOT_OBSERVED_FX; NOT_DEPEG_PROTECTION";
+
+function fixtureScenario(now) {
+  const config = {
+    optIn: true,
+    scenarioId: "MERIDIAN_PAPER_QUOTED_NET_V1",
+    scenarioVersion: "1",
+    scenario: "QUOTED_NET_V1",
+    identity: {chainId: "solana", mint: SYNTHETIC_MINT, pool: SYNTHETIC_POOL, quote: SYNTHETIC_QUOTE, decimals: 6},
+    usdcMint: SYNTHETIC_QUOTE,
+    usdcDecimals: 6,
+    usdcUsdMicrosPerToken: "1000000",
+    quoteBasis: "QUOTED_ROUTE_AMOUNTS_AS_MODELED_NET_SWAP_BASIS",
+    adverseAdjustmentBps: 300,
+    networkReserveCents: "50",
+    feeCents: "0",
+    spreadCents: "0",
+    priceImpactCents: "0",
+    zeroChargeDisposition: "NO_INCREMENTAL_CHARGE_UNDER_SCENARIO_BASIS"
+  };
+  const sha = reviewScenarioConfigSha256(config);
+  return {
+    sha,
+    config: {
+      ...config,
+      reviewEvidence: {
+        evidenceId: "synthetic-fixture-scenario-review",
+        evidenceSha256: "a".repeat(64),
+        scenarioConfigSha256: sha,
+        identity: {...config.identity},
+        reviewerRef: "synthetic-fixture-asserted-reviewer",
+        purpose: "OFFLINE_SCENARIO_REVIEW_ONLY",
+        decision: "APPROVE_SCENARIO_REVIEW_ONLY",
+        recordedAt: now
+      }
+    }
+  };
+}
+
+// Fixture-only host: the adapter's clock is bound once at construction to the module synthetic
+// clock; the transport slot is filled by the acquisition that owns the synthetic response.
+function createModeledHost(policy, clock) {
+  const host = {policy, requests: 0, transport: null, scenarioSha: fixtureScenario(0).sha};
+  host.adapter = createFixtureMarketQuoteAdapter({
+    clock: () => {
+      clock.advance(host.requests > 0 ? 2_000 : 1);
+      return clock.wallClock();
+    },
+    transport: (...args) => host.transport(...args),
+    timeoutMs: 1_000,
+    maxRequests: 100
+  });
+  return host;
+}
 import {
   createPaperSourcePipeline,
   PAPER_SOURCE_PIPELINE_VERSION
@@ -262,7 +322,8 @@ export async function acquireSyntheticRuntimeFixture(clock, {
   variant = "BASE",
   budget,
   acquiredEnvelope,
-  warmupStore
+  warmupStore,
+  modeledHost
 } = {}) {
   if (!clock || typeof clock.wallClock !== "function" || typeof clock.advance !== "function") {
     throw new TypeError("synthetic runtime fixture requires the module synthetic clock");
@@ -611,7 +672,12 @@ export async function acquireSyntheticRuntimeFixture(clock, {
   };
 
   let activeBudget = budget;
-  const quoteAdapter = createMarketQuoteAdapter({
+  const buildQuoteAdapter = options => {
+    if (!modeledHost) return createMarketQuoteAdapter(options);
+    modeledHost.transport = options.transport;
+    return modeledHost.adapter;
+  };
+  const quoteAdapter = buildQuoteAdapter({
     enabled: true,
     clock: () => {
       clock.advance(quoteAdapterRequests > 0 ? 2_000 : 1);
@@ -662,6 +728,7 @@ export async function acquireSyntheticRuntimeFixture(clock, {
         requestId: `synthetic-runtime-order-${quoteAdapterRequests + 1}`
       });
       quoteAdapterRequests += 1;
+      if (modeledHost) modeledHost.requests += 1;
       const response = JSON.stringify(quoteBody.body);
       const responseBytes = new TextEncoder().encode(response);
       if (!activeBudget) chargeRequest(responseBytes.byteLength);
@@ -727,7 +794,8 @@ export async function acquireSyntheticRuntimeFixture(clock, {
       candidateSampledAt: candidate.sampledAt,
       ...(side === "ENTRY" ? {authorizedAt} : {positionOpenedAt: authorizedAt}),
       slippageBps: 50
-    }, {signal: quoteController.signal});
+    }, {signal: quoteController.signal,
+      ...(modeledHost ? {reviewScenario: fixtureScenario(0).config} : {})});
     const quoteResult = await Promise.race([
       quotePending.then(result => ({result}), () => ({failed: true})),
       new Promise(resolve => {
@@ -791,6 +859,23 @@ export async function acquireSyntheticRuntimeFixture(clock, {
           costs: {...FIXTURE_COST_CONTRACT.costs}
         };
         if (variant === "MISSING_COSTS") delete paperQuote.costs.networkCents;
+      }
+    }
+    if (modeledHost && paperQuote) {
+      const issued = quoteAdapter.issueModeledQuote(adapterResult, {
+        identity: {
+          chainId: candidate.chainId, mint: candidate.mint, pool: candidate.pool,
+          quote: candidate.quote, decimals: candidate.decimals
+        },
+        side,
+        amountAtoms,
+        policy: modeledHost.policy
+      });
+      paperQuote = issued.ok ? {...issued.quote, eventId: paperQuote.eventId} : null;
+      // The fixture issuer clock advances during issuance; no audit or return after cancel/deadline.
+      if (quoteController.signal.aborted || signal?.aborted || quoteSignal?.aborted ||
+          clock.wallClock() >= deadlineAt) {
+        return null;
       }
     }
     const auditQuote = {
@@ -976,7 +1061,7 @@ async function runExternalDiagnostic({
 export function createPaperRuntimeSourceAdapter(options = {}) {
   const allowedOptions = [
     "sourcePolicySha256", "fixtureMode", "clock", "variant", "fixtureBehavior", "warmupStore",
-    "diagnosticInput"
+    "diagnosticInput", "modeledPolicy"
   ];
   if (!options || typeof options !== "object" || Array.isArray(options) ||
       ![Object.prototype, null].includes(Object.getPrototypeOf(options)) ||
@@ -1000,9 +1085,20 @@ export function createPaperRuntimeSourceAdapter(options = {}) {
   }
 
   if (fixtureMode !== undefined) {
-    const expectedFixtureKeys = warmupStore === undefined
-      ? ["clock", "fixtureBehavior", "fixtureMode", "sourcePolicySha256", "variant"]
-      : ["clock", "fixtureBehavior", "fixtureMode", "sourcePolicySha256", "variant", "warmupStore"];
+    const expectedFixtureKeys = ["clock", "fixtureBehavior", "fixtureMode", "sourcePolicySha256", "variant",
+      ...(warmupStore === undefined ? [] : ["warmupStore"]),
+      ...(options.modeledPolicy === undefined ? [] : ["modeledPolicy"])];
+    let modeledHost = null;
+    if (options.modeledPolicy !== undefined && fixtureMode === "SYNTHETIC_TEST_ONLY" &&
+        clock && typeof clock.wallClock === "function" && typeof clock.advance === "function") {
+      const policy = copyModeledPolicy(options.modeledPolicy);
+      if (policy.sourcePolicySha256 !== PAPER_RUNTIME_SOURCE_POLICY_SHA256 ||
+          policy.scenarioConfigSha256 !== fixtureScenario(0).sha ||
+          policy.usdAssumption !== MODELED_FIXTURE_USD_ASSUMPTION) {
+        throw new TypeError("modeled policy does not match the fixture source policy and scenario");
+      }
+      modeledHost = createModeledHost(policy, clock);
+    }
     if (fixtureMode !== "SYNTHETIC_TEST_ONLY" ||
         Object.keys(options).sort().join(",") !== expectedFixtureKeys.sort().join(",") ||
         !clock || typeof clock.wallClock !== "function" ||
@@ -1018,6 +1114,10 @@ export function createPaperRuntimeSourceAdapter(options = {}) {
     }
     const fixtures = new Map();
     return Object.freeze({
+      modeledQuoteAuthority() {
+        return modeledHost
+          ? Object.freeze({adapter: modeledHost.adapter, policy: modeledHost.policy}) : null;
+      },
       async acquireCandidates({
         signal,
         remaining,
@@ -1034,7 +1134,8 @@ export function createPaperRuntimeSourceAdapter(options = {}) {
           expireDuringRequest: fixtureBehavior === "EXPIRE_DURING_REQUEST",
           budget,
           acquiredEnvelope,
-          warmupStore
+          warmupStore,
+          modeledHost
         });
         if (signal?.aborted) {
           return {status: "UNKNOWN", reason: "STOPPED", candidates: [], fixtureOnly: true};

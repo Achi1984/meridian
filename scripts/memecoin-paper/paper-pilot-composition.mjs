@@ -324,14 +324,33 @@ function checkpointExportReadback(readback, config, bindingReceipt, externalInpu
 }
 
 export function offlineFixtureAdapters(options = {}) {
-  if (!onlyDataKeys(options, ["clock", "fault"])) {
-    throw new TypeError("only a clock and named offline fixture fault may be selected");
+  if (!onlyDataKeys(options, ["clock", "fault", "modeledPolicy"])) {
+    throw new TypeError("only a clock, named offline fixture fault, and modeled fixture policy may be selected");
   }
   const clock = options.clock ?? createSyntheticClock();
   const fault = options.fault ?? "NONE";
   if (!syntheticClocks.has(clock) || !FIXTURE_FAULTS.has(fault)) {
     throw new TypeError("only bounded built-in offline fixture scenarios are supported");
   }
+  if (options.modeledPolicy !== undefined && !fault.startsWith("PIPELINE_QUOTE")) {
+    throw new TypeError("modeled fixture policy requires a pipeline quote fixture scenario");
+  }
+  const pipelineVariant = fault === "PIPELINE_QUOTE_MISSING_QUOTE" ? "MISSING_QUOTE"
+    : fault === "PIPELINE_QUOTE_MISSING_COSTS" ? "MISSING_COSTS"
+      : fault === "PIPELINE_QUOTE_ROUTE_IDENTITY" ? "WRONG_QUOTE_IDENTITY"
+        : fault === "PIPELINE_QUOTE_WRONG_IDENTITY" ? "WRONG_IDENTITY"
+          : fault === "PIPELINE_QUOTE_FUTURE_EVIDENCE" ? "FUTURE_EVIDENCE" : "BASE";
+  const pipelineBehavior = fault === "PIPELINE_QUOTE_WAIT" ? "WAIT_FOR_STOP"
+    : fault === "PIPELINE_QUOTE_DEADLINE" ? "EXPIRE_DURING_REQUEST" : "NONE";
+  // The modeled source owns one issuer adapter whose clock is bound here, once.
+  const modeledSource = options.modeledPolicy === undefined ? null : createPaperRuntimeSourceAdapter({
+    sourcePolicySha256: PAPER_RUNTIME_SOURCE_POLICY_SHA256,
+    fixtureMode: "SYNTHETIC_TEST_ONLY",
+    clock,
+    variant: pipelineVariant,
+    fixtureBehavior: pipelineBehavior,
+    modeledPolicy: options.modeledPolicy
+  });
   let exitCount = 0;
   let entryCount = 0;
   let pipelineFixtureCalls = 0;
@@ -342,7 +361,8 @@ export function offlineFixtureAdapters(options = {}) {
     fault,
     sourceMode: "SYNTHETIC_TEST_ONLY",
     runtimeFixturesByMint,
-    runtimeAudits
+    runtimeAudits,
+    modeledAuthority: modeledSource?.modeledQuoteAuthority() ?? null
   };
   const adapters = Object.freeze({
     async acquireCandidates({now, signal, deadlineAt, remaining, recordRequest, recordWork, budget}) {
@@ -363,18 +383,12 @@ export function offlineFixtureAdapters(options = {}) {
         if (pipelineFixtureCalls > (fault === "PIPELINE_QUOTE_DUPLICATE" ? 2 : 1)) return [];
         let acquired;
         try {
-          const variant = fault === "PIPELINE_QUOTE_MISSING_QUOTE" ? "MISSING_QUOTE"
-            : fault === "PIPELINE_QUOTE_MISSING_COSTS" ? "MISSING_COSTS"
-              : fault === "PIPELINE_QUOTE_ROUTE_IDENTITY" ? "WRONG_QUOTE_IDENTITY"
-                : fault === "PIPELINE_QUOTE_WRONG_IDENTITY" ? "WRONG_IDENTITY"
-                  : fault === "PIPELINE_QUOTE_FUTURE_EVIDENCE" ? "FUTURE_EVIDENCE" : "BASE";
-          const sourceAdapter = createPaperRuntimeSourceAdapter({
+          const sourceAdapter = modeledSource ?? createPaperRuntimeSourceAdapter({
             sourcePolicySha256: PAPER_RUNTIME_SOURCE_POLICY_SHA256,
             fixtureMode: "SYNTHETIC_TEST_ONLY",
             clock,
-            variant,
-            fixtureBehavior: fault === "PIPELINE_QUOTE_WAIT" ? "WAIT_FOR_STOP"
-              : fault === "PIPELINE_QUOTE_DEADLINE" ? "EXPIRE_DURING_REQUEST" : "NONE"
+            variant: pipelineVariant,
+            fixtureBehavior: pipelineBehavior
           });
           acquired = await sourceAdapter.acquireCandidates({
             signal, remaining, recordRequest, recordWork, deadlineAt, budget
@@ -971,6 +985,8 @@ export function createPaperPilotComposition(options = {}) {
     session = await PaperCheckpointSession.open({store, runId: config.runId, startedAt: config.startedAt});
     const executionStep = createPaperExecutionStep({
       session, store, runId: config.runId, startedAt: config.startedAt, endAt: deadlineAt,
+      ...(offlineFixtureAdaptersBySource.get(adapters)?.modeledAuthority
+        ? {modeledQuoteAuthority: offlineFixtureAdaptersBySource.get(adapters).modeledAuthority} : {}),
       limits: {
         maxEvents: Math.min(256, config.budgets.events),
         maxCommands: Math.min(512, Math.max(1, config.budgets.events - 1)),
