@@ -274,7 +274,7 @@ export function makeFixture({
     exclusions: [...censusPolicy.exclusions],
     denominatorPolicy: censusPolicy.denominatorPolicy,
     denominatorAtoms: "1000000000",
-    coverage: {complete: true, truncated: false},
+    coverage: {complete: true, truncated: false, cursorExhausted: true},
     owners: Array.from({length: count}, (_, index) => ({
       owner: key(400_000 + index),
       balanceAtoms: "1"
