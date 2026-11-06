@@ -452,27 +452,37 @@ test("real SIGTERM send-to-exit timing excludes delayed signal receipt fsync", {
   assert.ok(exitAt < signalReceiptSyncCompletedAt);
 });
 
-test("runbook host subshell fails on unexpected drill exit before receipt verification", async () => {
+test("runbook host subshell gates verifier on the actual drill exit code", async () => {
   const runbook = await readFile(
     path.resolve("docs/strategy-lab/memecoin-paper/HOST_ACCEPTANCE_RUNBOOK.txt"), "utf8"
   );
   const section = runbook.split("Exact host command (uses the already prepared private SYNTHETIC_ROOT above):")[1]
     ?.split("Expected: exit 2 and status UNKNOWN")[0];
   assert.ok(section);
-  assert.ok(section.indexOf('test "$signal_rc" -eq 2 || exit 1') <
-    section.indexOf("SIGNAL_RECEIPT="));
-  const script = '( signal_rc=0; signal_receipt=$(exit "$CHILD_EXIT") || signal_rc=$?; ' +
-    'test "$signal_rc" -eq 2 || exit 1; printf "VERIFIER_RAN\\n" )';
-  const unexpected = spawnSync("bash", ["-c", script], {
-    encoding: "utf8", env: {...process.env, CHILD_EXIT: "7"}
-  });
-  assert.equal(unexpected.status, 1);
-  assert.equal(unexpected.stdout, "");
-  const expected = spawnSync("bash", ["-c", script], {
-    encoding: "utf8", env: {...process.env, CHILD_EXIT: "2"}
-  });
-  assert.equal(expected.status, 0);
-  assert.equal(expected.stdout.trim(), "VERIFIER_RAN");
+  const command = section.match(/^  \(\n([\s\S]*?)^  \)$/m)?.[0];
+  assert.ok(command, "documented host subshell must be present");
+  const script = command.split("\n").map(line => line.replace(/^  /, "")).join("\n");
+  const shim = `
+    node() {
+      case " $* " in
+        *" --input-type=module "*) printf 'VERIFIER\\n'; return 0 ;;
+        *) printf 'CASE\\n'; return "$CASE" ;;
+      esac
+    }
+    export REPO="$PWD" SYNTHETIC_ROOT=/tmp/synthetic-runbook-test
+    ${script}
+  `;
+  for (const [childExit, expectedStatus, expectedOutput] of [
+    ["0", 1, "CASE"],
+    ["7", 1, "CASE"],
+    ["2", 0, "CASE\nVERIFIER"]
+  ]) {
+    const result = spawnSync("bash", ["-c", shim], {
+      encoding: "utf8", env: {...process.env, CASE: childExit}
+    });
+    assert.equal(result.status, expectedStatus, result.stderr);
+    assert.equal(result.stdout.trim(), expectedOutput);
+  }
 });
 
 test("runbook receipt gate rejects ambiguous or incomplete drill results", () => {
