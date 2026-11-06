@@ -3580,6 +3580,39 @@
       "independentFinalReview": "PENDING",
       "nextGate": "COMPLETE_REMAINING_R3_SOURCE_CHANGES_AND_FOCUSED_TESTS_BEFORE_HOSTED_CI"
     },
+    "paperSourceRuntimeComposition1218Draft20261104": {
+      "recordedDate": "2026-11-04",
+      "issue": 1218,
+      "parentIssue": 1207,
+      "branch": "copilot/issue-1218-source-runtime-composition",
+      "baseSha": "9694144218815109aed8fd46e4f5f3360ea72232",
+      "scope": "FIXTURE_NEUTRAL_HANDOFF_IDENTITY_CANONICAL_ARRAY_REFUSAL_AUDIT_AND_ISSUED_CANDIDATE_QUOTE_BINDING",
+      "state": "IMPLEMENTED_FOCUSED_TESTS_PASSING_HOSTED_CI_AND_REVIEW_PENDING",
+      "unresolvedPolicy": [
+        "source approval and provider authenticity",
+        "reviewer identity and acceptance authority",
+        "complete archival coverage",
+        "source-bound USD cost policy"
+      ],
+      "realPathAcquisition": "EXTERNAL_READ_ONLY_INPUT_DIAGNOSTIC_ONLY_UNKNOWN_TRUST_ZERO_ELIGIBLE_NO_NETWORK; APPROVED_TRANSPORT_AND_REVIEWER_AUTHENTICITY_UNRESOLVED",
+      "mainReconciled": "f801045fb555ff2609ce97e6e03e92fe53aa2654",
+      "priorMainReconciled": "041f45e4fd93d7a0c40e4e912e3f4b535e09d0a4",
+      "reconciliation": {
+        "issue1215": "COMPLETE; postchecks Safety 41890692755, Runtime 41890693024, Coordinator 41890692764, Pages 41890691861 all SUCCESS",
+        "pr1221": "MERGED to main f801045; final GREEN 6639495880, 4357/4357; receipt 1221/6639780794 postchecks pending",
+        "ownerScopedPilotFreeze": "942/6639696006",
+        "evidenceFeasibility": "6639714343",
+        "fallbackConstraint": "6639775827"
+      },
+      "reviewCorrection": "PR1219 comment 6639237977 incorporated; P2 descriptor-safe detached diagnostic copy (own __proto__ preserved) and deterministic post-entry deadline held-publication tests applied",
+      "costModule": "NOT_EDITED_BY_1219; reviewed cost model merged via PR1221",
+      "productionRuntime": "DEFAULT_DISABLED_NO_NETWORK_NO_ELIGIBLE_CANDIDATES",
+      "providerCallsOrKeys": false,
+      "hostRegistryWorkflowSpendOrActivation": false,
+      "issue1207": "OPEN",
+      "mergeAuthorizedOrPerformed": false,
+      "preservedHistoriesRoutingLastSeen": true
+    },
     "paperSourceOrchestration1211RevisionR3Completion20261104": {
       "opId": "meridian-1211-r3-completion-20261104-r2",
       "recordedDate": "2026-11-04",
@@ -3799,6 +3832,24 @@
       "issue1207": "OPEN",
       "providersKeysHostWorkflowsSpendActivation": false,
       "nextGate": "COMBINED_HEAD_HOSTED_CI_THEN_FINAL_INDEPENDENT_REVIEW; LEAD_VERIFIES_MERGE_BEFORE_CLOSING_1212_1214_1216_1217"
+    },
+    "paperModeledExecution1222_20261105": {
+      "opId": "meridian-modeled-execution-1222-r1",
+      "issue": 1222,
+      "parentIssue": 1207,
+      "baseSha": "4b197126465863ee231e0cb0a78f25bc4a76510d",
+      "branch": "copilot/issue-1222-modeled-execution",
+      "scope": "FIXTURE_ONLY; run-bound QUOTED_NET_V1 modeled quote through issuer, composition, step, ledger; exact modeled quantity; full-position source cap; MODELED/UNKNOWN/executionRealistic=false",
+      "state": "WIP_DRAFT_NOT_READY",
+      "passing": "adapter+ledger 81/81 (prior); execution-step + pilot-composition 80/80 at 91f61fc (modeled issuer-to-ledger entry/mark/exit, restart replay, changed-policy and changed-event refusals); new direct late-issuance deadline regression 1/1; with the post-issuance fence disabled it fails 0/1 as expected (fence restored)",
+      "missing": "hosted CI for the new head; independent final review; main reconciliation after 1219 merges",
+      "unresolvedPolicy": "approved network transport; reviewer authenticity; archival coverage; numeric model uncalibrated",
+      "parentPullRequest1219": "FROZEN_UNCHANGED",
+      "approved": false,
+      "merged": false,
+      "live": false,
+      "issue1207": "OPEN",
+      "providersKeysHostWorkflowsSpendActivation": false
     }
   }
 }

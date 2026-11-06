@@ -9,7 +9,15 @@ import {fileURLToPath} from "node:url";
 import {
   createPaperPilotComposition, createSyntheticClock, offlineFixtureAdapters
 } from "../scripts/memecoin-paper/paper-pilot-composition.mjs";
-import {canonicalCheckpointBytes} from "../scripts/memecoin-paper/checkpoint-store.mjs";
+import {
+  createFixtureMarketQuoteAdapter, reviewScenarioConfigSha256
+} from "../scripts/memecoin-paper/market-quote-adapter.mjs";
+import {
+  acquireSyntheticRuntimeFixture, PAPER_RUNTIME_SOURCE_POLICY_SHA256
+} from "../scripts/memecoin-paper/paper-runtime-source.mjs";
+import {SYNTHETIC_MINT, SYNTHETIC_POOL, SYNTHETIC_QUOTE} from "../scripts/memecoin-paper/synthetic-fixtures.mjs";
+import {canonicalCheckpointBytes, CheckpointStore} from "../scripts/memecoin-paper/checkpoint-store.mjs";
+import {PaperCheckpointSession} from "../scripts/memecoin-paper/checkpoint-session.mjs";
 import {createBoundedExternalReadOnlyInput} from "../scripts/memecoin-paper/execution-runner.mjs";
 import {
   evaluateMemecoinPaperRunExport
@@ -84,7 +92,7 @@ test("disabled by default and rejects non-synthetic activation configuration", a
     clock: clockHarness()
   }), /only module-generated offline fixture adapters may run/);
   assert.throws(() => offlineFixtureAdapters({candidate: {source: "SYNTHETIC_FIXTURE_ONLY"}}),
-    /only a clock and named offline fixture fault/);
+    /only a clock, named offline fixture fault, and modeled fixture policy/);
   let getterCalls = 0;
   const accessorConfig = {};
   Object.defineProperty(accessorConfig, "enabled", {
@@ -108,7 +116,7 @@ test("disabled by default and rejects non-synthetic activation configuration", a
     get() { getterCalls += 1; return "NONE"; }
   });
   assert.throws(() => offlineFixtureAdapters(fixtureOptions),
-    /only a clock and named offline fixture fault/);
+    /only a clock, named offline fixture fault, and modeled fixture policy/);
   assert.equal(getterCalls, 0);
 });
 
@@ -380,6 +388,147 @@ test("synthetic runtime fixture carries adapter quotes through entry, risk, exit
   assert.equal(evaluation.evidence.exits, 1);
   assert.equal(evaluation.outcome, "SIMULATED_ENTRY_EXIT_COMPLETE");
   assert.equal(evaluation.claims.liveExecution, false);
+});
+
+const EIGHT_HOURS = 8 * 60 * 60 * 1000;
+const MODELED_ASSUMPTION =
+  "1_USDC_EQUALS_1_MODELED_USD_UNSUPPORTED_BY_MARKET_ACCOUNTING_ASSUMPTION; NOT_OBSERVED_FX; NOT_DEPEG_PROTECTION";
+
+function modeledPolicy(runId, overrides = {}) {
+  const identity = {chainId: "solana", mint: SYNTHETIC_MINT, pool: SYNTHETIC_POOL, quote: SYNTHETIC_QUOTE, decimals: 6};
+  const scenarioConfigSha256 = reviewScenarioConfigSha256({
+    optIn: true, scenarioId: "MERIDIAN_PAPER_QUOTED_NET_V1", scenarioVersion: "1", scenario: "QUOTED_NET_V1",
+    identity, usdcMint: SYNTHETIC_QUOTE, usdcDecimals: 6, usdcUsdMicrosPerToken: "1000000",
+    quoteBasis: "QUOTED_ROUTE_AMOUNTS_AS_MODELED_NET_SWAP_BASIS", adverseAdjustmentBps: 300,
+    networkReserveCents: "50", feeCents: "0", spreadCents: "0", priceImpactCents: "0",
+    zeroChargeDisposition: "NO_INCREMENTAL_CHARGE_UNDER_SCENARIO_BASIS"
+  });
+  return {
+    runId, runStartedAt: START, runEndAt: START + EIGHT_HOURS,
+    sourcePolicySha256: PAPER_RUNTIME_SOURCE_POLICY_SHA256, modelVersion: "1",
+    scenarioConfigSha256, usdAssumption: MODELED_ASSUMPTION, ...overrides
+  };
+}
+
+test("modeled quotes flow issuer to composition, step, durable checkpoint and ledger entry, mark and exit", async t => {
+  const runId = "modeled-composition";
+  const clock = clockHarness();
+  const {directory, pilot} = await harness(t, {
+    clock,
+    adapters: offlineFixtureAdapters({clock, fault: "PIPELINE_QUOTE", modeledPolicy: modeledPolicy(runId)}),
+    runConfig: config({runId, budgets: {...BUDGETS, requests: 40, cycles: 8}})
+  });
+  const result = await pilot.start();
+  const ops = result.report.runnerReport.operationResults;
+  const entry = ops.find(item => item.method === "executeEntry");
+  const exit = ops.find(item => item.method === "observeExitQuote" && item.status === "CLOSED_PAPER");
+  assert.equal(entry.status, "FILLED_PAPER");
+  assert.match(entry.receipt.resultDigest, /^[0-9a-f]{64}$/);
+  assert.match(exit.receipt.resultDigest, /^[0-9a-f]{64}$/);
+  const checkpointJson = await checkpoint(directory);
+  const records = checkpointJson.records;
+  const entryRecord = records.find(item => item.method === "executeEntry");
+  const exitRecord = records.find(item => item.method === "observeExitQuote" &&
+    item.resultDigest === exit.receipt.resultDigest);
+  assert.equal(entryRecord.resultDigest, entry.receipt.resultDigest);
+  assert.equal(entryRecord.inputs.quote.modeled.baseAtoms, "2000000");
+  assert.equal(entryRecord.inputs.quote.modeled.executionRealistic, false);
+  assert.equal(exitRecord.inputs.quote.modeled.baseAtoms, "2000000");
+  const store = await CheckpointStore.open(directory);
+  const replayed = await PaperCheckpointSession.open({store});
+  const events = replayed.snapshot().auditEvents;
+  const fill = events.find(item => item.type === "PAPER_FILL");
+  const closed = events.find(item => item.type === "PAPER_EXIT");
+  assert.equal(fill.tokenAtoms, "2000000");
+  assert.equal(fill.provenance, "MODELED");
+  assert.equal(fill.actualCostCoverage, "UNKNOWN");
+  assert.equal(fill.modeledDigest, entryRecord.inputs.quote.modeled.digest);
+  assert.equal(closed.provenance, "MODELED");
+  assert.equal(closed.modeledDigest, exitRecord.inputs.quote.modeled.digest);
+  await replayed.close();
+  assert.equal(result.report.persistence, "ACKNOWLEDGED");
+  assert.deepEqual(result.report.runnerReport.terminalResult.openPositions, []);
+});
+
+test("a deadline crossed while the real issuer succeeds returns null with no audit change", async () => {
+  const clock = clockHarness();
+  const deadlineAt = clock.wallClock() + 20_000;
+  const policy = modeledPolicy("modeled-late-issuance", {runEndAt: clock.wallClock() + 60_000});
+  const host = {policy, requests: 0, transport: null};
+  let stepMs = 1;
+  const realAdapter = createFixtureMarketQuoteAdapter({
+    clock: () => {
+      clock.advance(stepMs);
+      return clock.wallClock();
+    },
+    transport: (...args) => host.transport(...args),
+    timeoutMs: 1_000,
+    maxRequests: 100
+  });
+  let issueCalls = 0;
+  let before = null;
+  let after = null;
+  let issuedOk = null;
+  host.adapter = {
+    getPaperQuote: (...args) => realAdapter.getPaperQuote(...args),
+    issueModeledQuote(...args) {
+      issueCalls += 1;
+      before = clock.wallClock();
+      assert.ok(before < deadlineAt - 1);
+      clock.advance(deadlineAt - 1 - before);
+      before = clock.wallClock();
+      stepMs = 20;
+      try {
+        const result = realAdapter.issueModeledQuote(...args);
+        issuedOk = result.ok;
+        return result;
+      } finally {
+        stepMs = 1;
+        after = clock.wallClock();
+      }
+    }
+  };
+  const signal = new AbortController().signal;
+  const acquired = await acquireSyntheticRuntimeFixture(clock, {
+    signal,
+    remaining: {requests: 100, bytes: 1_000_000, work: 5_000, timeMs: 20_000},
+    recordRequest() {},
+    recordWork() {},
+    deadlineAt,
+    variant: "BASE",
+    modeledHost: host
+  });
+  clock.advance(deadlineAt - 5_000 - clock.wallClock());
+  const auditBefore = structuredClone(acquired.runtimeAudit.quotes);
+  const quote = await acquired.quote({
+    candidate: acquired.candidate, purpose: "ENTRY", now: clock.wallClock(), signal
+  });
+  assert.equal(issueCalls, 1);
+  assert.equal(issuedOk, true);
+  assert.ok(before < deadlineAt);
+  assert.ok(after >= deadlineAt);
+  assert.equal(quote, null);
+  assert.deepEqual(acquired.runtimeAudit.quotes, auditBefore);
+});
+
+test("modeled policy is fixture-only, run-bound, and cannot be supplied to source or external modes", async t => {
+  assert.throws(() => offlineFixtureAdapters({modeledPolicy: modeledPolicy("x")}),
+    /modeled|fault|selected/);
+  assert.throws(() => offlineFixtureAdapters({
+    clock: clockHarness(), fault: "NONE", modeledPolicy: modeledPolicy("x")
+  }), /modeled|fault|selected/);
+  assert.throws(() => offlineFixtureAdapters({
+    clock: clockHarness(), fault: "PIPELINE_QUOTE", modeledPolicy: modeledPolicy("x", {sourcePolicySha256: "0".repeat(64)})
+  }));
+  const clock = clockHarness();
+  const {pilot} = await harness(t, {
+    clock,
+    adapters: offlineFixtureAdapters({clock, fault: "PIPELINE_QUOTE", modeledPolicy: modeledPolicy("other-run")}),
+    runConfig: config({runId: "modeled-mismatch", budgets: {...BUDGETS, requests: 40, cycles: 8}})
+  });
+  const result = await pilot.start().catch(error => ({thrown: error}));
+  const ops = result.report?.runnerReport?.operationResults ?? [];
+  assert.equal(ops.some(item => item.method === "executeEntry" && item.status === "FILLED_PAPER"), false);
 });
 
 test("valid entry quote stopped or expired before execution is explicitly unconsumed", async t => {

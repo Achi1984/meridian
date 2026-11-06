@@ -8,9 +8,10 @@ import {CheckpointStore} from "../scripts/memecoin-paper/checkpoint-store.mjs";
 import {PaperCheckpointSession} from "../scripts/memecoin-paper/checkpoint-session.mjs";
 import {normalizeExactCosts} from "../scripts/memecoin-paper-execution-evidence/normalize.mjs";
 import {
-  createMarketQuoteAdapter, paperQuotedNetModelDigest, reviewScenarioConfigSha256,
-  verifyPaperQuotedNetProjection
+  createFixtureMarketQuoteAdapter, createMarketQuoteAdapter, isFixtureMarketQuoteAdapter,
+  paperQuotedNetModelDigest, reviewScenarioConfigSha256, verifyPaperQuotedNetProjection
 } from "../scripts/memecoin-paper/market-quote-adapter.mjs";
+import {verifyPaperModeledQuote} from "../scripts/memecoin-paper/ledger.mjs";
 import {
   SYNTHETIC_MINT, SYNTHETIC_POOL, SYNTHETIC_QUOTE, SYNTHETIC_SOURCE
 } from "../scripts/memecoin-paper/synthetic-fixtures.mjs";
@@ -1308,4 +1309,124 @@ test("existing BASELINE and STRESS projections gain no model fields and omission
   assert.equal(none.authorizationEligible, false);
   assert.notEqual(reviewScenarioConfigSha256(reviewScenario(QN)),
     reviewScenarioConfigSha256(reviewScenario("STRESS")));
+});
+
+const MODELED_POLICY = Object.freeze({
+  runId: RUN, runStartedAt: NOW - 10_000, runEndAt: NOW + 3_600_000,
+  sourcePolicySha256: "b".repeat(64), modelVersion: "1",
+  scenarioConfigSha256: reviewScenarioConfigSha256(reviewScenario(QN)),
+  usdAssumption: "1_USDC_EQUALS_1_MODELED_USD_UNSUPPORTED_BY_MARKET_ACCOUNTING_ASSUMPTION; NOT_OBSERVED_FX; NOT_DEPEG_PROTECTION"
+});
+
+async function modeledIssue({clock = {t: NOW}, policy = MODELED_POLICY, fixture = true, mutate} = {}) {
+  const factory = fixture ? createFixtureMarketQuoteAdapter : createMarketQuoteAdapter;
+  const adapter = factory({
+    enabled: true, clock: () => clock.t,
+    transport: async () => response(entryResponse().body)
+  });
+  const original = await adapter.getPaperQuote(request(), {reviewScenario: reviewScenario(QN)});
+  if (mutate) mutate(original);
+  const expected = {identity: IDENTITY, side: "ENTRY", amountAtoms: "100000000", policy};
+  return {adapter, original, clock, expected, issue: () => adapter.issueModeledQuote(original, expected)};
+}
+
+test("fixture adapter issues a frozen MODELED quote with independently computed exact facts", async () => {
+  const {adapter, issue} = await modeledIssue();
+  const result = issue();
+  assert.equal(result.ok, true);
+  const q = result.quote;
+  assert.equal(Object.isFrozen(q), true);
+  assert.equal(Object.isFrozen(q.modeled), true);
+  // $77.18 gross at 5.862538 USDC/token: 13.164946 tokens; ceil(7718*300/10000)=232; reserve 50; 7718+232+50=8000.
+  assert.equal(q.modeled.baseAtoms, "13164946");
+  assert.equal(q.modeled.sourceCapBaseAtoms, "17057460");
+  assert.equal(q.priceMicros, 5862538);
+  assert.deepEqual(q.costs, {feeCents: "0", spreadCents: "0", slippageCents: "232",
+    priceImpactCents: "0", networkCents: "50"});
+  assert.equal(q.modeled.runId, RUN);
+  assert.equal(q.modeled.provenance, "MODELED");
+  assert.equal(q.modeled.actualCostCoverage, "UNKNOWN");
+  assert.equal(q.modeled.executionRealistic, false);
+  assert.equal(q.modeled.adverseAdjustmentBps, 300);
+  assert.equal(q.modeled.networkReserveCents, "50");
+  assert.equal(q.modeled.scenarioConfigSha256, MODELED_POLICY.scenarioConfigSha256);
+  assert.equal(q.fixtureOnly, true);
+  assert.equal(q.source, SYNTHETIC_SOURCE);
+  const verified = verifyPaperModeledQuote(q, {runId: RUN, side: "ENTRY", now: NOW, decimals: 6});
+  assert.equal(verified.ok, true);
+  assert.equal(verified.baseAtoms, 13164946n);
+  assert.equal(verified.capAtoms, 17057460n);
+  assert.equal(adapter.confirmModeledQuote(q), true);
+  // eventId is bound by the ledger/replay payload, not by issuer identity.
+  assert.equal(adapter.confirmModeledQuote({...q, eventId: "other-event-id"}), true);
+});
+
+test("modeled issuance refuses altered facts, clones, foreign issuers, and non-fixture adapters", async () => {
+  const good = await modeledIssue();
+  const q = good.issue().quote;
+  const verify = quote => verifyPaperModeledQuote(quote, {runId: RUN, side: "ENTRY", now: NOW, decimals: 6});
+  const smaller = {...q, modeled: {...q.modeled, baseAtoms: "13164945"}};
+  assert.equal(good.adapter.confirmModeledQuote(smaller), false);
+  assert.deepEqual(verify(smaller), {ok: false, reason: "modeled digest does not match the quote"});
+  const repriced = {...q, priceMicros: q.priceMicros + 1};
+  assert.equal(good.adapter.confirmModeledQuote(repriced), false);
+  const recosted = {...q, costs: {...q.costs, networkCents: "1"}};
+  assert.equal(good.adapter.confirmModeledQuote(recosted), false);
+  assert.deepEqual(verify(recosted), {ok: false, reason: "modeled costs do not recompute from the carried facts"});
+  const overCap = {...q, modeled: {...q.modeled, baseAtoms: "17057461"}};
+  assert.deepEqual(verify(overCap), {ok: false, reason: "modeled quantity exceeds the source quote cap"});
+  assert.deepEqual(verifyPaperModeledQuote(q, {runId: "other-run", side: "ENTRY", now: NOW, decimals: 6}),
+    {ok: false, reason: "modeled facts do not match this run, model, or side"});
+  assert.equal((await modeledIssue()).adapter.confirmModeledQuote(q), false);
+
+  const cloned = await modeledIssue();
+  assert.deepEqual(cloned.adapter.issueModeledQuote(structuredClone(cloned.original), cloned.expected),
+    {ok: false, reason: "RESULT_NOT_ISSUED_BY_THIS_ADAPTER"});
+
+  const mutated = await modeledIssue({mutate: original => {
+    original.scenarioProjection = {...original.scenarioProjection, priceMicros: 1};
+  }});
+  assert.deepEqual(mutated.issue(), {ok: false, reason: "RESULT_MUTATED_AFTER_ISSUANCE"});
+
+  const production = await modeledIssue({fixture: false});
+  assert.equal(isFixtureMarketQuoteAdapter(production.adapter), false);
+  assert.deepEqual(production.issue(), {ok: false, reason: "ADAPTER_HAS_NO_FIXTURE_AUTHORITY"});
+  assert.deepEqual(createMarketQuoteAdapter().issueModeledQuote({}, {}),
+    {ok: false, reason: "ADAPTER_DISABLED"});
+  assert.equal(createMarketQuoteAdapter().confirmModeledQuote(q), false);
+});
+
+test("modeled issuance uses only the constructor clock; stale quotes and forged expected.now stay refused", async () => {
+  const WINDOW = {ok: false, reason: "QUOTE_OUTSIDE_RUN_WINDOW_OR_EXPIRED"};
+  const stale = await modeledIssue();
+  stale.clock.t = NOW + 6 * 60_000;
+  assert.deepEqual(stale.issue(), WINDOW);
+  const forged = {...stale.expected, now: NOW, expectedNow: NOW, observedAt: NOW};
+  assert.deepEqual(stale.adapter.issueModeledQuote(stale.original, forged), WINDOW);
+
+  const early = await modeledIssue();
+  early.clock.t = NOW - 1;
+  assert.deepEqual(early.issue(), WINDOW);
+
+  const afterRun = await modeledIssue({policy: {...MODELED_POLICY, runEndAt: NOW + 1000}});
+  afterRun.clock.t = NOW + 1001;
+  assert.deepEqual(afterRun.issue(), WINDOW);
+});
+
+test("modeled issuance refuses wrong side, amount, identity, window, model, and config", async () => {
+  const MISMATCH = {ok: false, reason: "RESULT_DOES_NOT_MATCH_EXPECTED_IDENTITY_SIDE_AMOUNT_OR_POLICY"};
+  const attempt = async patch => {
+    const fresh = await modeledIssue();
+    return fresh.adapter.issueModeledQuote(fresh.original, {...fresh.expected, ...patch});
+  };
+  assert.deepEqual(await attempt({side: "EXIT"}), MISMATCH);
+  assert.deepEqual(await attempt({amountAtoms: "99999999"}), MISMATCH);
+  assert.deepEqual(await attempt({identity: {...IDENTITY, pool: SYNTHETIC_QUOTE}}), MISMATCH);
+  assert.deepEqual(await attempt({policy: {...MODELED_POLICY, scenarioConfigSha256: "c".repeat(64)}}), MISMATCH);
+  assert.deepEqual(await attempt({policy: {...MODELED_POLICY, runStartedAt: NOW + 5, runEndAt: NOW + 9}}),
+    {ok: false, reason: "QUOTE_OUTSIDE_RUN_WINDOW_OR_EXPIRED"});
+  assert.deepEqual(await attempt({policy: {...MODELED_POLICY, modelVersion: "2"}}),
+    {ok: false, reason: "MODELED_ISSUANCE_FAILED"});
+  assert.deepEqual(await attempt({policy: undefined}), {ok: false, reason: "MODELED_ISSUANCE_FAILED"});
+  assert.equal((await attempt({})).ok, true);
 });

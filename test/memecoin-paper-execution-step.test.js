@@ -10,6 +10,10 @@ import {
   canonicalCheckpointBytes, CheckpointStore, MAX_CHECKPOINT_BYTES
 } from "../scripts/memecoin-paper/checkpoint-store.mjs";
 import {createPaperExecutionStep} from "../scripts/memecoin-paper/execution-step.mjs";
+import {
+  createFixtureMarketQuoteAdapter, reviewScenarioConfigSha256
+} from "../scripts/memecoin-paper/market-quote-adapter.mjs";
+import {syntheticOrderResponse} from "./fixtures/memecoin-paper-route-quotes/jupiter-v2-order.mjs";
 import {START, END, RUN, candidate, authorization, quote, entry} from "./fixtures/memecoin-paper-execution-step/scenario.mjs";
 
 async function setup(t, {limits, wrapStore, wrapSession, storeOptions, runId = RUN} = {}) {
@@ -724,4 +728,162 @@ test("backward time, invalid run bounds and attempts to loosen capacity are reje
     {limits: {maxPendingAuthorizations: 4}}, {limits: {unrecognized: 1}}]) {
     assert.throws(() => createPaperExecutionStep({session, store, runId: RUN, startedAt: START, endAt: END, ...patch}));
   }
+});
+
+const USD_ASSUMPTION =
+  "1_USDC_EQUALS_1_MODELED_USD_UNSUPPORTED_BY_MARKET_ACCOUNTING_ASSUMPTION; NOT_OBSERVED_FX; NOT_DEPEG_PROTECTION";
+
+function modeledKit() {
+  const token = candidate();
+  const identity = {chainId: token.chainId, mint: token.mint, pool: token.pool, quote: token.quote, decimals: 6};
+  const scenario = {
+    optIn: true, scenarioId: "MERIDIAN_PAPER_QUOTED_NET_V1", scenarioVersion: "1", scenario: "QUOTED_NET_V1",
+    identity, usdcMint: token.quote, usdcDecimals: 6, usdcUsdMicrosPerToken: "1000000",
+    quoteBasis: "QUOTED_ROUTE_AMOUNTS_AS_MODELED_NET_SWAP_BASIS", adverseAdjustmentBps: 300,
+    networkReserveCents: "50", feeCents: "0", spreadCents: "0", priceImpactCents: "0",
+    zeroChargeDisposition: "NO_INCREMENTAL_CHARGE_UNDER_SCENARIO_BASIS"
+  };
+  const sha = reviewScenarioConfigSha256(scenario);
+  scenario.reviewEvidence = {
+    evidenceId: "step-review", evidenceSha256: "a".repeat(64), scenarioConfigSha256: sha,
+    identity: {...identity}, reviewerRef: "independent-methodology-review",
+    purpose: "OFFLINE_SCENARIO_REVIEW_ONLY", decision: "APPROVE_SCENARIO_REVIEW_ONLY", recordedAt: START
+  };
+  const policy = {
+    runId: RUN, runStartedAt: START, runEndAt: END, sourcePolicySha256: "b".repeat(64),
+    modelVersion: "1", scenarioConfigSha256: sha, usdAssumption: USD_ASSUMPTION
+  };
+  const clock = {t: START + 2000};
+  let body = syntheticOrderResponse({inputMint: token.quote, outputMint: token.mint}).body;
+  const adapter = createFixtureMarketQuoteAdapter({
+    clock: () => clock.t,
+    transport: async () => new Response(JSON.stringify(body), {
+      status: 200, headers: {"content-type": "application/json"}
+    })
+  });
+  const issue = async (side, amountAtoms, at, overrides = {}, eventId = "entry") => {
+    clock.t = at;
+    body = side === "ENTRY"
+      ? syntheticOrderResponse({inputMint: token.quote, outputMint: token.mint}).body
+      : syntheticOrderResponse({inputMint: token.mint, outputMint: token.quote, inAmount: amountAtoms,
+        outAmount: "65824730", otherAmountThreshold: "1"}).body;
+    const request = {identity, side, amountAtoms, quoteDecimals: 6, candidateSampledAt: START,
+      slippageBps: 50, ...(side === "ENTRY" ? {authorizedAt: START + 1000} : {positionOpenedAt: START + 2000})};
+    const result = await adapter.getPaperQuote(request, {reviewScenario: scenario});
+    const issued = adapter.issueModeledQuote(result, {identity, side, amountAtoms, policy: {...policy, ...overrides}});
+    return {issued, eventId, at};
+  };
+  return {token, adapter, policy, issue, clock};
+}
+
+async function modeledSetup(t, kit) {
+  const context = await setup(t);
+  const step = createPaperExecutionStep({
+    session: context.session, store: context.store, runId: RUN, startedAt: START, endAt: END,
+    modeledQuoteAuthority: {adapter: kit.adapter, policy: kit.policy}
+  });
+  return {...context, step};
+}
+
+test("modeled entry, exit and restart: exact quantity, bound policy, replayed provenance and digest", async t => {
+  const kit = modeledKit();
+  const {step, session, store, directory} = await modeledSetup(t, kit);
+  const auth = await step.authorizeEntry(authorization());
+  const entryIssue = await kit.issue("ENTRY", "100000000", START + 2000);
+  assert.equal(entryIssue.issued.ok, true);
+  const entryQuote = {...entryIssue.issued.quote, eventId: "entry"};
+  const fill = await step.executeEntry({eventId: "entry", authorizationId: auth.authorizationId,
+    quote: entryQuote, now: START + 2000, marks: []});
+  assert.equal(fill.status, "FILLED_PAPER");
+  assert.equal(fill.tokenAtoms, "13164946");
+  assert.equal(fill.provenance, "MODELED");
+
+  const exitIssue = await kit.issue("EXIT", "13164946", START + 5000);
+  assert.equal(exitIssue.issued.ok, true);
+  const exitQuote = {...exitIssue.issued.quote, eventId: "exit"};
+  const closed = await step.observeExitQuote({eventId: "exit", quote: exitQuote, now: START + 5000});
+  assert.equal(closed.status, "CLOSED_PAPER");
+  assert.equal(closed.provenance, "MODELED");
+  assert.equal(closed.actualCostCoverage, "UNKNOWN");
+  const sequence = session.metadata.sequence;
+  const live = session.snapshot();
+
+  await session.close();
+  const reopenedStore = await CheckpointStore.open(directory);
+  const reopened = await PaperCheckpointSession.open({store: reopenedStore});
+  assert.equal(reopened.metadata.sequence, sequence);
+  const replay = reopened.snapshot();
+  assert.deepEqual(replay.summary, live.summary);
+  assert.deepEqual(replay.auditEvents, live.auditEvents);
+  const records = JSON.parse((await reopenedStore.readCheckpoint()).bytes).records;
+  const entryRecord = records.find(item => item.method === "executeEntry");
+  const exitRecord = records.find(item => item.method === "observeExitQuote");
+  assert.equal(entryRecord.inputs.quote.modeled.digest, entryQuote.modeled.digest);
+  assert.equal(exitRecord.inputs.quote.modeled.digest, exitQuote.modeled.digest);
+  assert.match(entryRecord.resultDigest, /^[0-9a-f]{64}$/);
+  const entryAudit = replay.auditEvents.find(item => item.type === "PAPER_FILL");
+  const exitAudit = replay.auditEvents.find(item => item.type === "PAPER_EXIT");
+  assert.equal(entryAudit.tokenAtoms, "13164946");
+  assert.equal(entryAudit.provenance, "MODELED");
+  assert.equal(entryAudit.actualCostCoverage, "UNKNOWN");
+  assert.equal(entryAudit.modeledDigest, entryQuote.modeled.digest);
+  assert.equal(exitAudit.provenance, "MODELED");
+  assert.equal(exitAudit.modeledDigest, exitQuote.modeled.digest);
+  assert.equal(entryQuote.modeled.executionRealistic, false);
+  await reopened.close();
+});
+
+test("a valid issuer quote under a changed policy is refused before any state mutation", async t => {
+  for (const override of [{sourcePolicySha256: "c".repeat(64)}, {runEndAt: END - 1}, {runStartedAt: START + 1}]) {
+    const kit = modeledKit();
+    const {step, session} = await modeledSetup(t, kit);
+    const auth = await step.authorizeEntry(authorization());
+    const before = session.metadata.sequence;
+    const issue = await kit.issue("ENTRY", "100000000", START + 2000, override);
+    assert.equal(issue.issued.ok, true);
+    const result = await step.executeEntry({eventId: "entry", authorizationId: auth.authorizationId,
+      quote: {...issue.issued.quote, eventId: "entry"}, now: START + 2000, marks: []});
+    assert.equal(result.status, "REJECT");
+    assert.equal(session.metadata.sequence, before);
+    assert.equal(session.snapshot().summary.cashCents, "100000");
+  }
+});
+
+test("changed event identity or altered modeled quote cannot duplicate or re-bind a modeled fill", async t => {
+  const kit = modeledKit();
+  const {step, session} = await modeledSetup(t, kit);
+  const auth = await step.authorizeEntry(authorization());
+  const issue = await kit.issue("ENTRY", "100000000", START + 2000);
+  const quote = {...issue.issued.quote, eventId: "entry"};
+  const input = {eventId: "entry", authorizationId: auth.authorizationId, quote, now: START + 2000, marks: []};
+  assert.equal((await step.executeEntry(input)).status, "FILLED_PAPER");
+  const sequence = session.metadata.sequence;
+  const cash = session.snapshot().summary.cashCents;
+
+  const renamed = await step.executeEntry({...input, eventId: "entry-2", quote: {...quote, eventId: "entry-2"}});
+  assert.equal(renamed.status, "REJECT");
+  const altered = await step.executeEntry({...input,
+    quote: {...quote, modeled: {...quote.modeled, baseAtoms: "13164945"}}});
+  assert.equal(altered.status, "REJECT");
+  assert.equal(session.metadata.sequence, sequence);
+  assert.equal(session.snapshot().summary.cashCents, cash);
+  assert.equal(session.snapshot().summary.openPositions.length, 1);
+});
+
+test("a partial exit quote and an unmodeled quote are refused before mutating the modeled position", async t => {
+  const kit = modeledKit();
+  const {step, session} = await modeledSetup(t, kit);
+  const auth = await step.authorizeEntry(authorization());
+  const entryIssue = await kit.issue("ENTRY", "100000000", START + 2000);
+  await step.executeEntry({eventId: "entry", authorizationId: auth.authorizationId,
+    quote: {...entryIssue.issued.quote, eventId: "entry"}, now: START + 2000, marks: []});
+  const sequence = session.metadata.sequence;
+  const partial = await kit.issue("EXIT", "13000000", START + 5000);
+  assert.equal(partial.issued.ok, true);
+  assert.equal((await step.observeExitQuote({eventId: "exit-partial",
+    quote: {...partial.issued.quote, eventId: "exit-partial"}, now: START + 5000})).status, "REJECT");
+  assert.equal((await step.observeExitQuote({eventId: "exit-legacy",
+    quote: quote(candidate(), "exit-legacy", START + 5000, 5_000_000), now: START + 5000})).status, "REJECT");
+  assert.equal(session.metadata.sequence, sequence);
+  assert.equal(session.snapshot().summary.openPositions.length, 1);
 });
