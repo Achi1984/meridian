@@ -527,6 +527,8 @@ test("holder growth requires cursor-exhausted unique comparable finalized census
         snapshots[1].provenanceType = "OFFCHAIN_TIMESTAMP_NO_SOLANA_SLOT";
         delete snapshots[1].commitment;
       }, "CENSUS_ENDPOINT_SLOTS_INCOMPARABLE"],
+      [snapshots => { snapshots[0].slot = {toString: null, valueOf: null}; },
+        "CENSUS_ENDPOINT_SLOTS_INCOMPARABLE"],
       [snapshots => { snapshots[1].slot = snapshots[0].slot; },
         "CENSUS_ENDPOINT_SLOTS_INCOMPARABLE"],
       [snapshots => { snapshots[1].slot = snapshots[0].slot - 1; },

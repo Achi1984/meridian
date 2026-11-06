@@ -739,7 +739,8 @@ export async function buildAnalystWindowEvidence({
       const comparableSlots = pair[0]?.provenanceType === pair[1]?.provenanceType &&
         (pair[0]?.slot === null
           ? pair[1]?.slot === null
-          : Number.isSafeInteger(pair[1]?.slot) && pair[1].slot > pair[0].slot);
+          : Number.isSafeInteger(pair[0]?.slot) && Number.isSafeInteger(pair[1]?.slot) &&
+            pair[1].slot > pair[0].slot);
       if (pair[0]?.source !== pair[1]?.source) {
         holderGrowthUnavailableReason = "CENSUS_SOURCE_CHANGED_BETWEEN_ENDPOINTS";
       } else if (!pair.every(snapshot => snapshot.coverage?.cursorExhausted === true)) {
