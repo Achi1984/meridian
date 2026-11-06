@@ -672,7 +672,7 @@ function usableCensusRecord(record, {identity, atMs, policyVersion}, capturedAt)
   const validSlot = snapshot.slot === null
     ? snapshot.provenanceType === "OFFCHAIN_TIMESTAMP_NO_SOLANA_SLOT"
     : Number.isSafeInteger(snapshot.slot) && snapshot.slot >= 0 &&
-      snapshot.provenanceType === "ONCHAIN_SLOT";
+      snapshot.provenanceType === "ONCHAIN_SLOT" && snapshot.commitment === "finalized";
   return record.kind === "census" && exactIdentity(record, identity) &&
     record.observedAt === atMs && record.policyVersion === policyVersion &&
     record.completeness === "COMPLETE" && reviewedOrSynthetic(record, snapshot) &&
@@ -680,6 +680,7 @@ function usableCensusRecord(record, {identity, atMs, policyVersion}, capturedAt)
     exactIdentity({identity: snapshot.identity}, identity) &&
     snapshot.observedAt === atMs && snapshot.censusPolicyVersion === policyVersion &&
     snapshot.coverage?.complete === true && snapshot.coverage?.truncated === false &&
+    snapshot.coverage?.cursorExhausted === true &&
     snapshot.aggregation === "DISTINCT_POSITIVE_BALANCE_OWNER" &&
     typeof snapshot.denominatorPolicy === "string" && snapshot.denominatorPolicy.length > 0 &&
     typeof snapshot.denominatorAtoms === "string" &&

@@ -283,6 +283,7 @@ function ownerCount(snapshot, policy, endpoint, assembledAt, identity, chargeWor
       !sameIdentity(snapshot.identity, identity) ||
       snapshot.observedAt !== endpoint || snapshot.coverage?.complete !== true ||
       snapshot.coverage?.truncated !== false ||
+      snapshot.coverage?.cursorExhausted !== true ||
       snapshot.censusPolicyVersion !== policy.version ||
       snapshot.aggregation !== policy.aggregation ||
       snapshot.denominatorPolicy !== policy.denominatorPolicy ||
@@ -298,13 +299,14 @@ function ownerCount(snapshot, policy, endpoint, assembledAt, identity, chargeWor
       (snapshot.slot === null
         ? snapshot.provenanceType !== "OFFCHAIN_TIMESTAMP_NO_SOLANA_SLOT"
         : !Number.isSafeInteger(snapshot.slot) || snapshot.slot < 0 ||
-          snapshot.provenanceType !== "ONCHAIN_SLOT")) return null;
+          snapshot.provenanceType !== "ONCHAIN_SLOT" ||
+          snapshot.commitment !== "finalized")) return null;
   const owners = new Set();
   for (const entry of snapshot.owners) {
     if (!chargeWork(1)) return null;
     if (!isRecord(entry) || !isSolanaPublicKey(entry.owner) ||
-        typeof entry.balanceAtoms !== "string" ||
-        !DECIMAL_INTEGER.test(entry.balanceAtoms ?? "")) return null;
+    owners.has(entry.owner) || typeof entry.balanceAtoms !== "string" ||
+    !DECIMAL_INTEGER.test(entry.balanceAtoms ?? "")) return null;
     if (BigInt(entry.balanceAtoms) > 0n) owners.add(entry.owner);
   }
   return owners.size;
@@ -714,6 +716,7 @@ export async function buildAnalystWindowEvidence({
   }
 
   const censusPolicy = policy.censusPolicy;
+  let holderGrowthUnavailableReason = "MATCHED_COMPLETE_CENSUS_ENDPOINTS_UNAVAILABLE";
   if (censusPolicyReady(censusPolicy) && typeof censusSource?.readSnapshots === "function") {
     const census = await budget.read(censusSource.readSnapshots.bind(censusSource), {
       identity, startAtMs: startHolders, endAtMs: candidateT, policy: censusPolicy
@@ -731,8 +734,18 @@ export async function buildAnalystWindowEvidence({
       const endCount = ownerCount(
         pair[1], censusPolicy, candidateT, sourceReceiptCutoff, identity, chargeCensus
       );
+      const comparableSlots = pair[0]?.provenanceType === pair[1]?.provenanceType &&
+        (pair[0]?.slot === null
+          ? pair[1]?.slot === null
+          : Number.isSafeInteger(pair[1]?.slot) && pair[1].slot >= pair[0].slot);
       if (pair[0]?.source !== pair[1]?.source) {
-        unavailableMetrics.holderGrowthPct1h = noMetric("CENSUS_SOURCE_CHANGED_BETWEEN_ENDPOINTS");
+        holderGrowthUnavailableReason = "CENSUS_SOURCE_CHANGED_BETWEEN_ENDPOINTS";
+      } else if (!pair.every(snapshot => snapshot.coverage?.cursorExhausted === true)) {
+        holderGrowthUnavailableReason = "CENSUS_PROVIDER_CURSOR_EXHAUSTION_UNPROVEN";
+      } else if (!comparableSlots) {
+        holderGrowthUnavailableReason = "CENSUS_ENDPOINT_SLOTS_INCOMPARABLE";
+      } else if (startCount === null || endCount === null) {
+        holderGrowthUnavailableReason = "CENSUS_ENDPOINT_INVALID_OR_INCOMPLETE";
       }
       receipts.census = pair.filter(snapshot => isRecord(snapshot) &&
         validReceipt(snapshot.source, snapshot.receipt, sourceReceiptCutoff)).map(snapshot => ({
@@ -744,7 +757,7 @@ export async function buildAnalystWindowEvidence({
         slot: snapshot.slot,
         provenanceType: snapshot.provenanceType
       }));
-      if (pair[0]?.source === pair[1]?.source &&
+      if (pair[0]?.source === pair[1]?.source && comparableSlots &&
           startCount !== null && endCount !== null && startCount > 0) {
         const value = ((endCount - startCount) / startCount) * 100;
         if (Number.isFinite(value)) {
@@ -773,7 +786,7 @@ export async function buildAnalystWindowEvidence({
     }
   }
   if (!metrics.holderGrowthPct1h) unavailableMetrics.holderGrowthPct1h = noMetric(
-    "MATCHED_COMPLETE_CENSUS_ENDPOINTS_UNAVAILABLE"
+    holderGrowthUnavailableReason
   );
 
   if (validPair(marketPairEvidence, identity, candidateT, assembledAt) &&

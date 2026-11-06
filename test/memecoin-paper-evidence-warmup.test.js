@@ -311,6 +311,17 @@ test("census reader requires both exact same-identity policy endpoints", async t
   });
   assert.equal(exact.status, "COMPLETE");
   assert.equal(exact.synthetic, true);
+  const openCursorDataset = {...dataset, records: dataset.records.map(record =>
+    record.kind === "census" ? {...record, payload: {...record.payload,
+      coverage: {...record.payload.coverage, cursorExhausted: false}}} : record)};
+  const openCursor = await createWarmupCensusSource(openCursorDataset).readSnapshots({
+    identity: fixture.identity,
+    startAtMs: start.observedAt,
+    endAtMs: end.observedAt,
+    policy
+  });
+  assert.equal(openCursor.status, "WARMUP");
+  assert.equal(openCursor.reason, "EXACT_CENSUS_ENDPOINT_UNAVAILABLE");
   const missing = await source.readSnapshots({
     identity: fixture.identity,
     startAtMs: start.observedAt - 1,
