@@ -307,10 +307,11 @@ Local/source-only verification (no host or service signal):
 The tests signal only their isolated child processes. They exercise delayed
 operator signal and separate phase deadlines, exclusive arm consumption,
 same-command replacement hold/readback, unarmed alternate roots, concurrency,
-tampering, and missing evidence. Passing these tests proves local process and
-filesystem behavior only. It does not prove platform event provenance,
-service/pod identity, volume identity, image deployment, platform termination
-timing, or hosted durability.
+tampering, missing evidence, initial root failures/timeouts, monotonic deadline
+boundaries, and readback after a changed local filesystem device number. Passing
+these tests proves local process and filesystem behavior only. It does not prove
+platform event provenance, service/pod identity, volume identity, image
+deployment, platform termination timing, or hosted durability.
 
 Future host rehearsal — separate approval required; this source-only change
 does not authorize a Northflank action. Preserve the existing volume, all old
@@ -320,25 +321,27 @@ the reviewed immutable image digest; do not use or alter the batch claim or any
 old claim. The worker must run as its existing unprivileged UID. First, on the
 original attached data volume, provision exactly one arm for this new claim ID.
 The arm is a canonical, mode-0600 file created exclusively before the worker is
-started; its data-root path and filesystem device number must match at use. The
-worker never creates or repairs an arm. Example after the separately approved
+started and binds the claim, run, arm ID, and data-root path. The worker never
+creates or repairs an arm. It validates the private canonical path and exact
+arm/claim/receipt bytes; it does not treat the current filesystem device number
+as a stable volume identifier. The same attached volume must be established
+independently from platform evidence. Example after the separately approved
 volume is attached:
 
   PAPER_SYNTHETIC_ACCEPTANCE_CLAIM_ID=<new unique safe ID> \
   PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT=/var/data/meridian-paper/synthetic-acceptance \
   node --input-type=module <<'JS'
   import {createHash, randomUUID} from 'node:crypto';
-  import {lstat, open} from 'node:fs/promises';
+  import {open} from 'node:fs/promises';
   import path from 'node:path';
   import {canonicalCheckpointBytes} from './scripts/memecoin-paper/checkpoint-store.mjs';
   const dataRoot = process.env.PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT;
   const claimId = process.env.PAPER_SYNTHETIC_ACCEPTANCE_CLAIM_ID;
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(claimId) || claimId.includes('..'))
     throw new Error('invalid claim ID');
-  const rootInfo = await lstat(dataRoot);
   const arm = {
     protocol: 'synthetic-platform-foreground-arm/v1', status: 'ARMED', claimId,
-    runId: `synthetic-${randomUUID()}`, armId: randomUUID(), dataRoot, rootDevice: rootInfo.dev
+    runId: `synthetic-${randomUUID()}`, armId: randomUUID(), dataRoot
   };
   const bytes = canonicalCheckpointBytes(arm);
   const filename = path.join(dataRoot, `foreground-arm-${claimId}.json`);
@@ -354,7 +357,12 @@ The arm is single-use: the foreground process first creates a durable exclusive
 `foreground-arm-consumed-<claim>.json` marker, then its permanent claim. A crash
 after consumption cannot rearm or restart the fill. Keep the arm, consumed marker,
 claim, and run evidence; do not copy the arm to another volume or delete it to
-retry. This file binding is not a physical volume identity proof.
+retry. Older arm/claim records may include a `rootDevice` field; it remains
+historical record content covered by the byte digests, not a current-volume
+identity check. The worker reports platform provenance as `NOT_ASSESSED` even
+when local readback succeeds. Require independent Northflank before/after
+evidence for the same immutable volume ID and attachment, service, distinct pod
+IDs, and pinned image digest before making any operational claim.
 
 Set custom entrypoint `node`, command
 `scripts/memecoin-paper/synthetic-host-acceptance.mjs`, and only these explicit

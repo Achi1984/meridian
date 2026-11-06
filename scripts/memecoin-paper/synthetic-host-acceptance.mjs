@@ -691,7 +691,7 @@ function isPrivateDirectory(info) {
     info.uid === process.getuid() && [0o700, 0o2700].includes(info.mode & 0o7777);
 }
 
-async function verifyForegroundEvidence({dataRoot, claimId, claimBytes, operation, rootDevice}) {
+async function verifyForegroundEvidence({dataRoot, claimId, claimBytes, operation}) {
   const claim = parseCanonical(claimBytes);
   const claimSha256 = digest(claimBytes);
   const {arm: armPath, consumed: consumedPath} = foregroundPaths(dataRoot, claimId);
@@ -703,10 +703,10 @@ async function verifyForegroundEvidence({dataRoot, claimId, claimBytes, operatio
   const armSha256 = digest(armBytes);
   requireProof(claim.protocol === FOREGROUND_CLAIM_PROTOCOL &&
     claim.status === "CLAIMED" && claim.claimId === claimId && validForegroundRunId(runId) &&
-    claim.armSha256 === armSha256 && claim.rootDevice === rootDevice &&
+    claim.armSha256 === armSha256 &&
     arm.protocol === FOREGROUND_ARM_PROTOCOL && arm.status === "ARMED" &&
     arm.claimId === claimId && arm.runId === runId && arm.dataRoot === dataRoot &&
-    arm.rootDevice === rootDevice && /^[0-9a-f-]{36}$/.test(arm.armId) &&
+    /^[0-9a-f-]{36}$/.test(arm.armId) &&
     consumed.protocol === "synthetic-platform-foreground-arm-consumed/v1" &&
     consumed.status === "CONSUMED" && consumed.claimId === claimId &&
     consumed.runId === runId && consumed.armSha256 === armSha256);
@@ -809,8 +809,27 @@ async function runForegroundAcceptance({
   requireProof(validForegroundClaimId(claimId) && typeof dataRoot === "string" &&
     path.isAbsolute(dataRoot) && path.normalize(dataRoot) === dataRoot);
   operation.beginReadbackDiscovery();
-  const rootInfo = await operation.lstat(dataRoot);
-  requireProof(isPrivateDirectory(rootInfo) && await operation.realpath(dataRoot) === dataRoot);
+  let rootInfo;
+  try {
+    rootInfo = await operation.lstat(dataRoot);
+    if (!isPrivateDirectory(rootInfo) || await operation.realpath(dataRoot) !== dataRoot) {
+      return {
+        summary: {
+          status: "UNKNOWN", mode: "INERT_ROOT_UNAVAILABLE", readback: "UNKNOWN",
+          claimId, platformProvenance: "NOT_ASSESSED"
+        },
+        hold: true
+      };
+    }
+  } catch {
+    return {
+      summary: {
+        status: "UNKNOWN", mode: "INERT_ROOT_UNAVAILABLE", readback: "UNKNOWN",
+        claimId, platformProvenance: "NOT_ASSESSED"
+      },
+      hold: true
+    };
+  }
   const {arm: armPath, consumed: consumedPath, claim: claimPath} =
     foregroundPaths(dataRoot, claimId);
   let claimExists = false;
@@ -834,7 +853,7 @@ async function runForegroundAcceptance({
     try {
       claimBytes = await operation.read(claimPath, 16 * 1024);
       const readback = await verifyForegroundEvidence({
-        dataRoot, claimId, claimBytes, operation, rootDevice: rootInfo.dev
+        dataRoot, claimId, claimBytes, operation
       });
       return {
         summary: readback,
@@ -905,7 +924,7 @@ async function runForegroundAcceptance({
   const runId = arm.runId;
   if (arm.protocol !== FOREGROUND_ARM_PROTOCOL || arm.status !== "ARMED" ||
       arm.claimId !== claimId || !validForegroundRunId(runId) ||
-      arm.dataRoot !== dataRoot || arm.rootDevice !== rootInfo.dev ||
+      arm.dataRoot !== dataRoot ||
       !/^[0-9a-f-]{36}$/.test(arm.armId)) {
     return {
       summary: {
@@ -953,7 +972,7 @@ async function runForegroundAcceptance({
   }
   const newClaimBytes = canonicalCheckpointBytes({
     protocol: FOREGROUND_CLAIM_PROTOCOL, status: "CLAIMED",
-    claimId, runId, armSha256, rootDevice: rootInfo.dev
+    claimId, runId, armSha256
   });
   try {
     await writeNew(dataRoot, path.basename(claimPath), newClaimBytes, operation);

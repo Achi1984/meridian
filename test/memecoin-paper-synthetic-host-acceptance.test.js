@@ -96,15 +96,13 @@ function startForegroundChild(dataRoot, claimId, waitTimeoutMs = 60_000, finaliz
 }
 
 async function armForegroundRoot(dataRoot, claimId, runId = `synthetic-${randomUUID()}`) {
-  const rootInfo = await lstat(dataRoot);
   const arm = {
     protocol: "synthetic-platform-foreground-arm/v1",
     status: "ARMED",
     claimId,
     runId,
     armId: randomUUID(),
-    dataRoot,
-    rootDevice: rootInfo.dev
+    dataRoot
   };
   const armPath = path.join(dataRoot, `foreground-arm-${claimId}.json`);
   const armBytes = canonicalCheckpointBytes(arm);
@@ -442,6 +440,40 @@ test("foreground SIGTERM records readiness and an identical replacement only rea
     assert.deepEqual(await snapshotTree(dataRoot), originalTree);
     assert.equal(replacement.child.kill("SIGTERM"), true);
     assert.deepEqual(await replacement.closed, {code: 0, signal: null}, replacement.stderr());
+
+    const changedDeviceSignals = new EventEmitter();
+    const changedDeviceProbe = filesystemProbe(async call => {
+      const info = await call.action();
+      if (call.method !== "lstat" || call.filename !== dataRoot) return info;
+      return {
+        dev: info.dev + 1,
+        uid: info.uid,
+        mode: info.mode,
+        isDirectory: () => info.isDirectory(),
+        isSymbolicLink: () => info.isSymbolicLink()
+      };
+    });
+    let changedDeviceOutput = "";
+    let outputReceived;
+    const outputReady = new Promise(resolve => { outputReceived = resolve; });
+    const changedDeviceReadback = main({
+      env: {
+        PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
+        PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND: "true",
+        PAPER_SYNTHETIC_ACCEPTANCE_CLAIM_ID: claimId,
+        PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT: dataRoot
+      },
+      signalSource: changedDeviceSignals, fileSystem: changedDeviceProbe.fileSystem,
+      stdout: {write(value) { changedDeviceOutput += value; outputReceived(); }}
+    });
+    await outputReady;
+    const changedDeviceReceipt = JSON.parse(changedDeviceOutput.trim());
+    assert.equal(changedDeviceReceipt.readback, "VERIFIED");
+    assert.equal(changedDeviceReceipt.platformProvenance, "NOT_ASSESSED");
+    assert.deepEqual(await snapshotTree(dataRoot), originalTree);
+    changedDeviceSignals.emit("SIGTERM");
+    assert.equal(await changedDeviceReadback, 0);
+    assert.deepEqual(await snapshotTree(dataRoot), originalTree);
   });
 
 test("the same command on a different unarmed root remains inert without creating artifacts",
@@ -478,6 +510,97 @@ test("the same command on a different unarmed root remains inert without creatin
     assert.equal(summary.entryFills, 1);
     assert.equal(await readFile(path.join(directory, "result.report.json")).then(() => true), true);
   });
+
+test("missing, unsafe, or unreadable replacement roots hold inertly without writes", async t => {
+  for (const kind of ["missing", "unsafe", "unreadable"]) {
+    await t.test(kind, async subtest => {
+      const base = await root(subtest);
+      const dataRoot = kind === "missing" ? path.join(base, "missing-root") : base;
+      if (kind === "unsafe") await chmod(dataRoot, 0o755);
+      const before = await snapshotTree(base);
+      const signals = new EventEmitter();
+      const probe = filesystemProbe(async call => {
+        if (kind === "unreadable" && call.method === "lstat" && call.filename === dataRoot) {
+          const error = new Error("private root is unavailable");
+          error.code = "EACCES";
+          throw error;
+        }
+        return call.action();
+      });
+      let output = "";
+      const outputReady = deferred();
+      const pending = main({
+        env: {
+          PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
+          PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND: "true",
+          PAPER_SYNTHETIC_ACCEPTANCE_CLAIM_ID: `root-${kind}`,
+          PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT: dataRoot
+        },
+        signalSource: signals, fileSystem: probe.fileSystem,
+        stdout: {write(value) { output += value; outputReady.resolve(); }}
+      });
+      await outputReady.promise;
+      const receipt = JSON.parse(output.trim());
+      assert.equal(receipt.status, "UNKNOWN");
+      assert.equal(receipt.mode, "INERT_ROOT_UNAVAILABLE");
+      assert.equal(receipt.platformProvenance, "NOT_ASSESSED");
+      assert.equal(probe.calls.some(call =>
+        ["open", "mkdir", "writeFile", "sync"].includes(call.method)), false);
+      assert.deepEqual(await snapshotTree(base), before);
+      signals.emit("SIGTERM");
+      assert.equal(await pending, 0);
+      assert.equal(signals.eventNames().length, 0);
+      assert.deepEqual(await snapshotTree(base), before);
+    });
+  }
+});
+
+test("stalled initial root lookup times out into an inert hold", async t => {
+  const dataRoot = await root(t);
+  const before = await snapshotTree(dataRoot);
+  const signals = new EventEmitter();
+  const entered = deferred();
+  const release = deferred();
+  t.after(() => {
+    release.resolve();
+    signals.emit("SIGTERM");
+  });
+  const probe = filesystemProbe(async call => {
+    if (call.method === "lstat" && call.filename === dataRoot) {
+      entered.resolve();
+      await release.promise;
+    }
+    return call.action();
+  });
+  let output = "";
+  const outputReady = deferred();
+  let settled = false;
+  const pending = main({
+    env: {
+      PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_READBACK_TIMEOUT_MS: "500",
+      PAPER_SYNTHETIC_ACCEPTANCE_CLAIM_ID: "stalled-root-lookup",
+      PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT: dataRoot
+    },
+    signalSource: signals, fileSystem: probe.fileSystem,
+    stdout: {write(value) { output += value; outputReady.resolve(); }}
+  }).finally(() => { settled = true; });
+  await entered.promise;
+  await outputReady.promise;
+  assert.equal(JSON.parse(output.trim()).status, "UNKNOWN");
+  assert.equal(settled, false);
+  assert.equal(probe.calls.some(call =>
+    ["open", "mkdir", "writeFile", "sync"].includes(call.method)), false);
+  release.resolve();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(await snapshotTree(dataRoot), before);
+  signals.emit("SIGTERM");
+  assert.equal(await pending, 0);
+  assert.equal(settled, true);
+  assert.equal(signals.eventNames().length, 0);
+  assert.deepEqual(await snapshotTree(dataRoot), before);
+});
 
 test("concurrent foreground starts consume one arm exclusively and execute at most one fill",
   {timeout: 15_000}, async t => {
@@ -614,29 +737,28 @@ test("delayed operator SIGTERM starts a fresh bounded finalization phase", {time
   await drainProbe(probe);
 });
 
-test("SIGTERM observed after the operator deadline cannot start finalization", {timeout: 10_000},
-  async t => {
+test("injected monotonic expiry at synchronous SIGTERM cannot start finalization", async t => {
     const dataRoot = await root(t);
     const claimId = "foreground-late-operator-signal";
     await armForegroundRoot(dataRoot, claimId);
     const signals = new EventEmitter();
-    const started = performance.now();
+    let monotonicNow = 0;
     let output = "";
     const code = await main({
       env: {
         PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
         PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND: "true",
-        PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND_WAIT_TIMEOUT_MS: "2500",
+        PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND_WAIT_TIMEOUT_MS: "1000",
         PAPER_SYNTHETIC_ACCEPTANCE_FINALIZATION_TIMEOUT_MS: "1000",
         PAPER_SYNTHETIC_ACCEPTANCE_CLAIM_ID: claimId,
         PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT: dataRoot
       },
+      monotonicNow: () => monotonicNow,
       signalSource: signals,
       stdout: {write(value) {
         output += value;
         if (value.includes('"status":"READY"')) {
-          const lateSignalAt = started + 2_700;
-          while (performance.now() < lateSignalAt) {}
+          monotonicNow = 1_001;
           signals.emit("SIGTERM");
         }
       }}
@@ -646,12 +768,59 @@ test("SIGTERM observed after the operator deadline cannot start finalization", {
     assert.equal(ready.status, "READY");
     assert.equal(summary.status, "UNKNOWN");
     assert.equal(summary.signalObservation, undefined);
+    assert.equal(summary.code, "SYNTHETIC_ACCEPTANCE_FAILED");
     const claim = JSON.parse(await readFile(
       path.join(dataRoot, `foreground-claim-${claimId}.json`), "utf8"
     ));
     await assert.rejects(readFile(path.join(dataRoot, claim.runId, "summary.json")), {code: "ENOENT"});
-    assert.ok(performance.now() - started >= 2_700);
   });
+
+test("readback transition rejects injected expiry before replacing discovery deadline", async t => {
+  const dataRoot = await root(t);
+  const claimId = "foreground-readback-transition-expiry";
+  await armForegroundRoot(dataRoot, claimId);
+  const claimPath = path.join(dataRoot, `foreground-claim-${claimId}.json`);
+  await writeFile(claimPath, "{}", {mode: 0o600});
+  const signals = new EventEmitter();
+  let monotonicNow = 0;
+  let claimLookupReturned = false;
+  let skippedPostLookupCheck = false;
+  const probe = filesystemProbe(async call => {
+    const value = await call.action();
+    if (call.method === "lstat" && call.filename === claimPath) claimLookupReturned = true;
+    return value;
+  });
+  let output = "";
+  const outputReady = deferred();
+  const pending = main({
+    env: {
+      PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_READBACK_TIMEOUT_MS: "1000",
+      PAPER_SYNTHETIC_ACCEPTANCE_CLAIM_ID: claimId,
+      PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT: dataRoot
+    },
+    monotonicNow: () => {
+      if (!claimLookupReturned) return monotonicNow;
+      if (!skippedPostLookupCheck) {
+        skippedPostLookupCheck = true;
+        return monotonicNow;
+      }
+      return 1_001;
+    },
+    signalSource: signals, fileSystem: probe.fileSystem,
+    stdout: {write(value) { output += value; outputReady.resolve(); }}
+  });
+  await outputReady.promise;
+  const receipt = JSON.parse(output.trim());
+  assert.equal(receipt.status, "UNKNOWN");
+  assert.equal(receipt.code, "SYNTHETIC_ACCEPTANCE_FAILED");
+  assert.equal(probe.calls.some(call => ["open", "mkdir", "writeFile", "sync"].includes(call.method)), false);
+  const beforeStop = await snapshotTree(dataRoot);
+  signals.emit("SIGTERM");
+  assert.equal(await pending, 0);
+  assert.deepEqual(await snapshotTree(dataRoot), beforeStop);
+});
 
 test("post-SIGTERM finalization phase timeout returns UNKNOWN and preserves partial evidence",
   {timeout: 8_000}, async t => {
