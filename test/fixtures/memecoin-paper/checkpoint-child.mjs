@@ -5,15 +5,18 @@ const [directory, crashPhase, payloadText] = process.argv.slice(2);
 const startedAt = Date.parse("2026-01-01T10:00:00Z");
 if (!directory || !crashPhase) process.exit(2);
 
-if (crashPhase === "hold") {
+function holdForParent() {
   if (!process.send) throw new Error("hold fixture requires an IPC parent");
-  await CheckpointStore.open(directory);
-  // A pending Promise alone does not keep Node alive. The message listener
-  // references the IPC channel until the parent terminates the lock holder.
+  // The message listener keeps the IPC channel alive while the parent holds the child.
   process.on("message", message => {
     if (message === "ping") process.send("holding");
   });
   process.once("disconnect", () => process.exit(75));
+}
+
+if (crashPhase === "hold") {
+  await CheckpointStore.open(directory);
+  holdForParent();
   process.send("ready");
   await new Promise(() => {});
 }
@@ -38,7 +41,7 @@ if (crashPhase === "execute-and-hold" || crashPhase === "execute-before-ack") {
   const session = await PaperCheckpointSession.open({store});
   const fillResult = await session.executeEntry("fill-1", fill);
   if (crashPhase === "execute-before-ack") process.exit(4);
-  if (!process.send) throw new Error("execute-and-hold fixture requires an IPC parent");
+  holdForParent();
   process.send({authorizationStatus: authorizationResult.status, fillResult});
   await new Promise(() => {});
 }
