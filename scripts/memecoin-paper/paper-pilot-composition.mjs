@@ -1242,7 +1242,8 @@ export function createPaperPilotComposition(options = {}) {
         receipt: result?.receipt ? {...result.receipt} : null
       });
       if (method === "executeEntry" && result?.status === "FILLED_PAPER" && result.receipt) {
-        onTestEntry?.();
+        const observed = onTestEntry?.(result);
+        if (observed instanceof Promise) await observed;
       }
       return result;
     }])));

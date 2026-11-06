@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import {spawn} from "node:child_process";
 import {createHash} from "node:crypto";
 import {EventEmitter} from "node:events";
 import {
@@ -185,6 +186,73 @@ test("active SIGTERM after a durable fill uses the existing stop API; observer i
     config: {...config, mode: "EXTERNAL_READ_ONLY_INPUT"}, onTestEntry() {}
   }), /synthetic-only/);
   assert.throws(() => createPaperPilotComposition({config, onTestEntry: true}), /function/);
+});
+
+test("real SIGTERM drill targets its dedicated child after a durable fill", {timeout: 65_000}, async t => {
+  const dataRoot = await mkdtemp(path.join(os.tmpdir(), "synthetic-real-signal-"));
+  let verified = false;
+  t.after(async () => {
+    if (verified) await rm(dataRoot, {recursive: true, force: true});
+    else t.diagnostic(`preserved ambiguous real-signal evidence at ${dataRoot}`);
+  });
+  const child = spawn(process.execPath, [
+    path.resolve("scripts/memecoin-paper/synthetic-host-acceptance.mjs")
+  ], {
+    env: {
+      PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_SIGNAL_DRILL: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT: dataRoot
+    },
+    stdio: ["ignore", "pipe", "pipe"]
+  });
+  let stdout = "";
+  let stderr = "";
+  child.stdout.setEncoding("utf8").on("data", value => { stdout += value; });
+  child.stderr.setEncoding("utf8").on("data", value => { stderr += value; });
+  const exit = await new Promise((resolve, reject) => {
+    child.once("error", reject);
+    child.once("close", (code, signal) => resolve({code, signal}));
+  });
+  assert.equal(exit.code, 2, stderr);
+  assert.equal(exit.signal, null);
+  const summary = JSON.parse(stdout.trim());
+  assert.equal(summary.status, "UNKNOWN");
+  assert.equal(summary.contractChecks, "PASS");
+  assert.equal(summary.proof, "SYNTHETIC_REAL_SIGTERM");
+  assert.equal(summary.signalDrill.status, "VERIFIED");
+  assert.equal(summary.signalDrill.signal, "SIGTERM");
+  assert.equal(summary.signalDrill.signalSentExactlyOnce, true);
+  assert.equal(summary.signalDrill.signalObservedAfterFill, true);
+  assert.equal(summary.signalDrill.fillAcknowledged, true);
+  assert.ok(Number.isSafeInteger(summary.signalDrill.fillCheckpointSequence));
+  assert.match(summary.signalDrill.fillCheckpointSha256, /^[0-9a-f]{64}$/);
+  assert.match(summary.signalDrill.fillReceiptSha256, /^[0-9a-f]{64}$/);
+  assert.ok(Number.isFinite(summary.signalDrill.signalToExitMs));
+  assert.ok(summary.signalDrill.signalToExitMs >= 0);
+  assert.deepEqual(summary.signalDrill.childExit, {code: 2, signal: null});
+  assert.equal(summary.signalDrill.checkpointPersistence, "ACKNOWLEDGED");
+  assert.equal(summary.signalDrill.restartDenied, true);
+  assert.equal(summary.signalDrill.immutableReadback, true);
+  assert.equal(summary.signalDrill.openUnvaluedPositions, 1);
+  assert.equal(summary.hostAcceptance, "NOT_ASSESSED");
+  assert.equal(summary.liveExecution, false);
+
+  const [drillName] = await readdir(dataRoot);
+  assert.match(drillName, /^real-signal-/);
+  const drillDirectory = path.join(dataRoot, drillName);
+  const result = JSON.parse(await readFile(path.join(drillDirectory, "signal-drill-result.json"), "utf8"));
+  assert.deepEqual(result, summary);
+  assert.equal(JSON.parse(await readFile(path.join(drillDirectory, "signal-request.json"), "utf8")).attempts, 1);
+  const childRunId = summary.runId;
+  const childDirectory = path.join(drillDirectory, childRunId);
+  const acknowledgement = JSON.parse(await readFile(
+    path.join(childDirectory, "fill-acknowledged.json"), "utf8"
+  ));
+  assert.equal(acknowledgement.status, "FILLED_PAPER");
+  assert.equal(acknowledgement.runId, childRunId);
+  assert.equal(acknowledgement.checkpointSequence, summary.signalDrill.fillCheckpointSequence);
+  assert.equal(acknowledgement.checkpointSha256, summary.signalDrill.fillCheckpointSha256);
+  verified = true;
 });
 
 test("HTTPS UNKNOWN never retries or reads; wrong scope and digest cannot pass", async t => {
