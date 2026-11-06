@@ -662,6 +662,76 @@ test("stalled arm open stays within discovery deadline and late completion canno
     assert.deepEqual(await snapshotTree(dataRoot), before);
   });
 
+test("expired late consumed-arm open leaves a fail-closed marker for its replacement", async t => {
+  const dataRoot = await root(t);
+  const claimId = "late-consumed-arm-open";
+  await armForegroundRoot(dataRoot, claimId);
+  const before = await snapshotTree(dataRoot);
+  const consumedPath = path.join(dataRoot, `foreground-arm-consumed-${claimId}.json`);
+  const entered = deferred();
+  const release = deferred();
+  const outputReady = deferred();
+  const signals = new EventEmitter();
+  let monotonicNow = 0;
+  let output = "";
+  const probe = filesystemProbe(async call => {
+    const value = await call.action();
+    if (call.method === "open" && call.filename === consumedPath) {
+      entered.resolve();
+      await release.promise;
+    }
+    return value;
+  });
+  const pending = main({
+    env: {
+      PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_CLAIM_ID: claimId,
+      PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT: dataRoot
+    },
+    signalSource: signals, fileSystem: probe.fileSystem,
+    monotonicNow: () => monotonicNow,
+    stdout: {write(value) { output += value; outputReady.resolve(); }}
+  });
+  await entered.promise;
+  assert.equal((await lstat(consumedPath)).size, 0);
+
+  monotonicNow = 60_001;
+  release.resolve();
+  await outputReady.promise;
+  assert.equal(JSON.parse(output.trim()).status, "UNKNOWN");
+  assert.equal(await pending, 2);
+  await drainProbe(probe);
+  assert.equal((await lstat(consumedPath)).size, 0);
+  const afterLateOpen = await snapshotTree(dataRoot);
+  assert.notDeepEqual(afterLateOpen, before);
+  assert.equal(probe.calls.some(call =>
+    ["writeFile", "sync"].includes(call.method)), false);
+
+  const replacementSignals = new EventEmitter();
+  const replacementOutput = deferred();
+  let replacementReceipt = "";
+  const replacement = main({
+    env: {
+      PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_CLAIM_ID: claimId,
+      PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT: dataRoot
+    },
+    signalSource: replacementSignals,
+    stdout: {write(value) { replacementReceipt += value; replacementOutput.resolve(); }}
+  });
+  await replacementOutput.promise;
+  assert.equal(JSON.parse(replacementReceipt.trim()).mode, "INERT_CONSUMED_ARM");
+  await new Promise(resolve => setTimeout(resolve, 25));
+  assert.deepEqual(await snapshotTree(dataRoot), afterLateOpen);
+
+  replacementSignals.emit("SIGTERM");
+  assert.equal(await replacement, 0);
+  assert.equal(replacementSignals.eventNames().length, 0);
+  assert.deepEqual(await snapshotTree(dataRoot), afterLateOpen);
+});
+
 test("concurrent foreground starts consume one arm exclusively and execute at most one fill",
   {timeout: 15_000}, async t => {
     const dataRoot = await root(t);
