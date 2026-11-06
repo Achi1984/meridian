@@ -8,6 +8,58 @@ independent reviewer accepts the source and an operator separately records any
 real image/volume/TLS observations. Never label the controller proof as a
 synthetic quote proof, and never label either proof as provider readiness.
 
+Receipt-backed Northflank volume-repair observation
+--------------------------------------------------
+
+The owner-reported observation in
+https://github.com/Achi1984/meridian/issues/942#issuecomment-6639696006 records
+one completed helper publication and repair. Treat this as a historical platform
+receipt, not authorization to repeat it or evidence that the worker passed
+post-remount acceptance.
+
+Platform observations from that receipt:
+
+- The owner approved a per-build Dockerfile override for build
+  `spotless-rice-8786` at source `f801045fb555ff2609ce97e6e03e92fe53aa2654`,
+  using `/Dockerfile.paper-volume-protection`, work directory `/`, and x86.
+  BuildKit reported an uploaded manifest with digest
+  `sha256:c01de3bdd24034c058d338e4b49bce69b1adf87f7d4bbbeff8c2fc39c5c425fd`.
+  The normal build path was restored to `/Dockerfile.paper`; the running worker
+  was not replaced by the helper image. The existing helper image build procedure
+  is in [VOLUME_PROTECTION.md](./VOLUME_PROTECTION.md#review-and-build).
+- For the single repair run, the worker was scaled to zero and the existing
+  `meridian-paper-data` volume was handed exclusively to the run-specific
+  `meridian-paper-observer` service on `main`, using build `spotless-rice-8786`.
+  The helper used `--repair`; the Northflank entrypoint and command form are the
+  ones documented in [VOLUME_PROTECTION.md](./VOLUME_PROTECTION.md#approved-activation).
+- Run `eb6b9d17-7666-4c46-a944-6b93ea7018b7` reported `PROTECTION_APPLIED`,
+  null `failureCode`, volume owner/group `0:1000`, mode `03775`, final process
+  UID/GID `1000:1000`, zero supplementary groups, and exit 0. These are
+  helper-time results only.
+- The finished job was detached, the volume was reattached to the original
+  worker, and that worker resumed at one instance. The receipt reports
+  `luminous-taste-567` / source `661cf1cb82cfdd716f4f0283a54dc13de2907d70`,
+  Running 1/1, zero restarts, with CI/CD off.
+
+Acceptance still requiring independent evidence:
+
+- From the restored original worker, independently verify that the expected
+  volume is mounted at `/var/data/meridian-paper` and that the post-remount
+  mount-root metadata is exactly UID 0, GID 1000, mode `03775`. The helper's
+  repair-time descriptor/path readback is helper-time evidence only. The
+  separately documented helper `--verify` command
+  ([VOLUME_PROTECTION.md](./VOLUME_PROTECTION.md#readback-and-return-to-normal-image))
+  is also not a substitute for worker-side proof after remount. Preserve the
+  output and bind it to the original worker and volume identity; if unavailable
+  or ambiguous, leave it unaccepted. Do not mount the volume concurrently on
+  another active service.
+- The receipt does not establish a configured termination-grace value. For the
+  existing 60-second host-acceptance batch, retain the at-least-65-second
+  platform termination-grace criterion in
+  [HOST_ACCEPTANCE_BATCH.md](./HOST_ACCEPTANCE_BATCH.md#northflank-one-shot-configuration);
+  verify and record the actual setting separately before that batch. Do not
+  infer it from the helper's successful exit.
+
 Commands below assume a Linux operator shell with Node 20+, and this checkout:
   export REPO=/home/runner/work/meridian/meridian
   cd "$REPO"
