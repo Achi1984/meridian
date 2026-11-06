@@ -53,32 +53,53 @@ Platform observations from that receipt:
   `/var/data/meridian-paper/synthetic-acceptance` and
   `/var/data/meridian-paper/controller-acceptance` each at UID/GID `1000:1000`,
   mode `02700`. Both were created fresh under `umask 077`. These are directory
-  metadata observations only; they do not constitute bootstrap-validator
-  acceptance. The mount identity remains `UNVERIFIED`.
+  metadata observations only; they did not by themselves constitute
+  bootstrap-validator acceptance. The mount identity remains `UNVERIFIED`.
 - The earlier Resources readback showed a 60-second termination grace, below
   the required 65 seconds. After owner approval to change it to 65 seconds and
   restart the worker once, Resources was reloaded and read back at 65 seconds.
   The worker reported Running 1/1 on a new pod with zero restarts; the volume
   was Bound, ReadWriteOnce, and attached once. The historical 60-second value
   and current 65-second readback are distinct observations.
+- Later on 2026-11-06, the owner-approved worker switch selected build
+  `wacky-cheese-7139` from `f801045fb555ff2609ce97e6e03e92fe53aa2654`, built
+  with `/Dockerfile.paper` and digest
+  `sha256:86a81e00fd28c45f8abbc759d38f2aa81a003045a94304278b41f92be098767a`.
+  On the deployed worker running as UID 1000, the
+  `validatePaperExportStorageRoot` bootstrap validator passed independently for
+  both `synthetic-acceptance` and `controller-acceptance`. The attached-volume
+  view reported `meridian-paper-data` Bound, ReadWriteOnce, one mount. This
+  supersedes the earlier snapshot below that this build was published but not
+  deployed and that bootstrap validation was still pending; it does not change
+  the separate `mountIdentity: UNVERIFIED` observation.
+- The single foreground synthetic batch `paper-smoke-20261106-01` then ran on
+  the deployed `wacky-cheese-7139` worker with the protected volume and no
+  inherited environment beyond `PATH` plus explicit batch settings. It exited
+  0 in 13.98 seconds. `PIPELINE_QUOTE` recorded one entry and one exit,
+  evaluation PASS, and immutable readback. `ACTIVE_STOP` recorded one entry,
+  zero exits, accepted API stop, restart denied, immutable readback, and the
+  expected UNKNOWN/open unvalued terminal position. Controller no-entry
+  recorded expected UNKNOWN with export and status persistence ACKNOWLEDGED.
+  The batch reported `networkAccessed=false`, `liveExecution=false`, and
+  `hostAcceptance=NOT_ASSESSED`; its claim and three result directories were
+  preserved. This was one synthetic batch, not provider qualification or an OS
+  SIGTERM observation.
 
 Acceptance still requiring independent evidence:
 
-- `mountIdentity` remains `UNVERIFIED`; neither helper readback nor directory
-  stats establish the platform volume identity. The 65-second Resources
-  readback satisfies the configured grace threshold, but does not prove the
-  application's shutdown behavior. Keep the application-level shutdown drill
-  open; do not infer it from the helper's successful exit or the platform
-  setting.
-- Bootstrap-validator acceptance remains open. The deployed worker image did
-  not contain `/app/scripts/memecoin-paper-export-host.mjs`, so the validator
-  was not run. A separate worker-image build, `wacky-cheese-7139`, was later
-  published from `f801045fb555ff2609ce97e6e03e92fe53aa2654` using
-  `/Dockerfile.paper`; its manifest was
-  `sha256:86a81e00fd28c45f8abbc759d38f2aa81a003045a94304278b41f92be098767a`.
-  Build logs confirmed the utility was copied, but this build was not deployed
-  and does not provide validator results. Do not claim validator acceptance or
-  live admission from build publication or direct stat output.
+- Replacement-volume identity/readback remains open: the platform attachment
+  view and worker metadata do not bind the mount to an independently verified
+  physical volume identity. Preserve that distinction from the helper's
+  repair-time readback and the subsequent directory bootstrap passes.
+- The 65-second Resources readback satisfies the configured grace threshold,
+  and the 13.98-second synthetic batch completed, but neither establishes actual
+  OS SIGTERM delivery/timing or application checkpoint/export behavior during
+  Northflank termination. Keep the application-level shutdown drill open.
+- Provider qualification remains unestablished. The synthetic batch explicitly
+  reported `hostAcceptance=NOT_ASSESSED`; it made no network requests and did
+  not establish provider trust, real-data quality, or live readiness. Do not
+  infer provider qualification or live admission from the bootstrap passes or
+  synthetic smoke.
 
 Commands below assume a Linux operator shell with Node 20+, and this checkout:
   export REPO=/home/runner/work/meridian/meridian
