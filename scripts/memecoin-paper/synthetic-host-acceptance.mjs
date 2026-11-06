@@ -895,7 +895,6 @@ async function runForegroundAcceptance({
       hold: true
     };
   }
-  operation.endReadbackDiscovery();
   let armBytes;
   try {
     armBytes = await operation.read(armPath, 16 * 1024);
@@ -953,6 +952,7 @@ async function runForegroundAcceptance({
       };
     }
   }
+  operation.endReadbackDiscovery();
   const armSha256 = digest(armBytes);
   const consumedBytes = canonicalCheckpointBytes({
     protocol: "synthetic-platform-foreground-arm-consumed/v1",

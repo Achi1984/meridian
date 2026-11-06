@@ -602,6 +602,66 @@ test("stalled initial root lookup times out into an inert hold", async t => {
   assert.deepEqual(await snapshotTree(dataRoot), before);
 });
 
+test("stalled arm open stays within discovery deadline and late completion cannot consume it",
+  async t => {
+    const dataRoot = await root(t);
+    const claimId = "stalled-arm-open";
+    await armForegroundRoot(dataRoot, claimId);
+    const armPath = path.join(dataRoot, `foreground-arm-${claimId}.json`);
+    const before = await snapshotTree(dataRoot);
+    const signals = new EventEmitter();
+    const entered = deferred();
+    const release = deferred();
+    t.after(() => {
+      release.resolve();
+      signals.emit("SIGTERM");
+    });
+    const probe = filesystemProbe(async call => {
+      if (call.method === "open" && call.filename === armPath) {
+        entered.resolve();
+        await release.promise;
+      }
+      return call.action();
+    });
+    let output = "";
+    const outputReady = deferred();
+    let settled = false;
+    const pending = main({
+      env: {
+        PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
+        PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND: "true",
+        PAPER_SYNTHETIC_ACCEPTANCE_READBACK_TIMEOUT_MS: "500",
+        PAPER_SYNTHETIC_ACCEPTANCE_CLAIM_ID: claimId,
+        PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT: dataRoot
+      },
+      signalSource: signals, fileSystem: probe.fileSystem,
+      stdout: {write(value) { output += value; outputReady.resolve(); }}
+    }).finally(() => { settled = true; });
+    await entered.promise;
+    await outputReady.promise;
+    const receipt = JSON.parse(output.trim());
+    assert.equal(receipt.status, "UNKNOWN");
+    assert.equal(receipt.code, "SYNTHETIC_ACCEPTANCE_FAILED");
+    assert.equal(settled, false, "timed-out arm acquisition must keep the process inert");
+    assert.equal(probe.calls.some(call =>
+      ["mkdir", "writeFile", "sync"].includes(call.method)), false);
+    assert.deepEqual(await snapshotTree(dataRoot), before);
+
+    release.resolve();
+    await drainProbe(probe);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(settled, false);
+    assert.equal(probe.calls.some(call =>
+      ["mkdir", "writeFile", "sync"].includes(call.method)), false);
+    assert.deepEqual(await snapshotTree(dataRoot), before);
+
+    signals.emit("SIGTERM");
+    assert.equal(await pending, 0);
+    assert.equal(settled, true);
+    assert.equal(signals.eventNames().length, 0);
+    assert.deepEqual(await snapshotTree(dataRoot), before);
+  });
+
 test("concurrent foreground starts consume one arm exclusively and execute at most one fill",
   {timeout: 15_000}, async t => {
     const dataRoot = await root(t);

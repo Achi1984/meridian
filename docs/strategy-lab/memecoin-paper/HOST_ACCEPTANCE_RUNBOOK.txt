@@ -308,10 +308,11 @@ The tests signal only their isolated child processes. They exercise delayed
 operator signal and separate phase deadlines, exclusive arm consumption,
 same-command replacement hold/readback, unarmed alternate roots, concurrency,
 tampering, missing evidence, initial root failures/timeouts, monotonic deadline
-boundaries, and readback after a changed local filesystem device number. Passing
-these tests proves local process and filesystem behavior only. It does not prove
-platform event provenance, service/pod identity, volume identity, image
-deployment, platform termination timing, or hosted durability.
+boundaries, stalled arm-open completion, and readback after a changed local
+filesystem device number. Passing these tests proves local process and filesystem
+behavior only. It does not prove platform event provenance, service/pod identity,
+volume identity, image deployment, platform termination timing, or hosted
+durability.
 
 Future host rehearsal — separate approval required; this source-only change
 does not authorize a Northflank action. Preserve the existing volume, all old
