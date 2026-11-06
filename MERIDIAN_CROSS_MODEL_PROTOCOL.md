@@ -1,6 +1,6 @@
-# MERIDIAN — Cross-Model Protocol (ChatGPT ⇄ Claude)
+# MERIDIAN — Cross-Model Protocol
 
-Ergänzt `MERIDIAN_ORCHESTRATION.md` (Single-Writer) und `MERIDIAN_AGENT_WORKFLOW.md` (Main/Sub/Review). Gilt, sobald zwei Modelle am selben Repo arbeiten können.
+Ergänzt `MERIDIAN_ORCHESTRATION.md` (Single-Writer) und `MERIDIAN_AGENT_WORKFLOW.md` (Main/Sub/Review). Für Source-Reviews gilt die [Owner-Entscheidung vom 6. November 2026](https://github.com/Achi1984/meridian/issues/942#issuecomment-6694067544), beginnend mit #1231 und #1229.
 
 ## 1. Grundsatz: genau ein Lead
 - Zu jedem Zeitpunkt gibt es genau einen Lead, eingetragen in `MERIDIAN_LEAD_LEASE.json` auf `main`.
@@ -11,15 +11,15 @@ Ergänzt `MERIDIAN_ORCHESTRATION.md` (Single-Writer) und `MERIDIAN_AGENT_WORKFLO
 | Rolle | Modell | Darf |
 |---|---|---|
 | Lead / Orchestrator / Implementation | ChatGPT | alles aus Abschnitt 1 |
-| Independent Review + Research + QA | Claude | lesen, Tests lokal ausführen, Reviews liefern, `review/*`-Branches nur auf Anweisung des Leads |
+| Independent Source Review | unabhängiger GitHub-Review-Agent | vollständigen Diff und erfolgreiche CI prüfen, Befunde mit Prüfnachweisen im PR dokumentieren |
 
-Begründung: Der Review muss unabhängig sein; ein zweites Modell findet systematisch andere Fehler (Look-ahead, Accounting, Datenlecks). Rollentausch nur per Lease-Wechsel (Abschnitt 4).
+Der Lead wählt für jeden PR einen Reviewer, der den Branch nicht bearbeitet hat. Lead-Wechsel folgen Abschnitt 4.
 
 ## 3. Ablauf pro Änderung
 1. Lead prüft vor jedem Write `main`-SHA und offene PRs.
-2. Lead öffnet PR mit: Ziel, Research-Stage, PnL berührt (ja/nein), `Review requested: Claude`.
-3. Claude liest den vollständigen angeforderten Scope am exakten PR-HEAD-SHA; der Lead fragt erst nach abgeschlossener, erfolgreicher Exact-Head-CI an. Requests und Ergänzungsrequests verwenden `@claude`, eine Leerzeile, `CROSS_MODEL_REQUEST <id>` und eigene Metadatenzeilen `exact_head_sha`, `exact_base_sha`, `pr`; kein `FOLLOWUP`. Jedes GREEN_LIGHT muss einen Abschnitt `Executed checks` mit den tatsächlich ausgeführten read-only Befehlen und Ergebnissen enthalten. Kann ein für Scope/Request verpflichtender Check nicht laufen, ist GREEN_LIGHT verboten; Ergebnis ist NEEDS_MORE_EVIDENCE mit Begründung; nachgewiesene Codefehler erhalten REVISION_REQUIRED.
-4. Merge nur bei abgeschlossener erfolgreicher CI und abschließendem Claude GREEN_LIGHT auf genau diesem SHA. SOURCE_GREEN/CI_PENDING plus Lead-CI-Prüfung ersetzt dieses Abschlussreview nicht. Nach CI-Ende nötigenfalls einen kurzen Exact-Head-Abschluss-Request stellen. Neuer Commit = altes GREEN_LIGHT ungültig. Owner bestätigt am 2026-10-23: „C claude bleibt“ (Entscheidung #639/6371484899).
+2. Der Lead dokumentiert Ziel, Research-Stage, PnL-Auswirkung und den Namen des unabhängigen GitHub-Review-Agenten im PR.
+3. Nach erfolgreicher CI für die konkreten Head- und Base-SHAs fordert der Lead ein Review des vollständigen Diffs im PR an. Der Auftrag nennt beide SHAs, CI-Lauf und Umfang. Der Reviewer dokumentiert tatsächlich ausgeführte Prüfungen, Ergebnisse, Befunde und ausstehende Nachweise. Fehlende Nachweise ergeben NEEDS_MORE_EVIDENCE, nachgewiesene Fehler REVISION_REQUIRED.
+4. Der Lead akzeptiert das abschließende GREEN_LIGHT des unabhängigen Reviewers für genau dieses Head/Base-Paar und die erfolgreiche CI. Ein Request, eine Reaktion, Schweigen oder ein Eigenreview des Branch-Autors belegt keine Abnahme. Ein geändertes Paar erfordert eine erneute Bindung der Nachweise. Der Lead mergt einzeln mit erwarteter Head-SHA und prüft Safety, Runtime, Coordinator und Pages auf dem Merge-Commit. Host-Deployment und Pilotstart erfordern gesonderte Freigaben.
 5. Jeder Source-Merge benötigt das vollständige unabhängige Review des gesamten angeforderten Scopes nach der geltenden Owner-Merge-Delegation. Ein GREEN_LIGHT mit selbst gemeldeter Scope-, Receipt- oder Prüflücke zählt nicht: erst eine vollständige Ergänzung am selben Head/Base einholen.
 6. Max. 3 Review-Loops, danach entscheidet der User.
 
@@ -38,18 +38,21 @@ Notfall: Ist der Lead nicht erreichbar, darf nur der User den Lease überschreib
 
 ## 6. User-Kommandos
 - Normalbetrieb: nichts.
-- „Claude, review PR #N“ → Review.
+- „Review PR #N“ → unabhängigen GitHub-Review-Agenten für den PR anfordern.
 - „Übergib an Claude/ChatGPT“ → Abschnitt 4.
 
 ## 7. Technische Voraussetzungen
 - Verbindliche Mailbox ist `MERIDIAN_LIVE_CHECKPOINT.json.mailboxIssue`; dieser owner-freigegebene Rollover-Kandidat routet gemeinsam mit den Workflows nach **#942**. **#639** bleibt bis zum Merge der vorherige Kanal und wird erst nach erfolgreichem Smoke archiviert; historische Belege bleiben erhalten.
 - Mailbox-Inhalt: nur `CROSS_MODEL_REQUEST`, `CROSS_MODEL_RESPONSE`, `CROSS_MODEL_STATUS NEEDS_USER_DECISION`, `CROSS_MODEL_STATUS RESOLVED`, terminale `SUPERSEDED`/`FAILED`-Status und finale Merge-Status. INTENT/Fortschritt lebt pro aktivem PR in genau einem editierten Statuskommentar.
 - Rollover bei >200 Kommentaren: Nachfolger anlegen, Workflow-Trigger + `mailboxIssue` gemeinsam per reviewed Infra-PR umstellen, Smoke im Nachfolger, dann Vorgänger schließen.
+
+Die folgenden Claude-spezifischen Berechtigungen und das Token betreffen ausschließlich den bestehenden Mailbox-Workflow. Für Source-Reviews gilt Abschnitt 3.
+
 - Claude bleibt reviewer-only: `contents/pull-requests/actions: read`; `issues: write` nur für die angeforderte Review-Antwort und das Update des exakt im Checkpoint gepinnten Watchdog-Statuskommentars. Edit/Write, Commit/Push/PR/Merge, Locks/Stages und Workflow-Dispatch bleiben verboten.
 - Erlaubte read-only Prüfung: `gh api` zur Prüfung nur GET; einzige Watchdog-Ausnahme ist PATCH des zuvor validierten, im Checkpoint gepinnten Statuskommentars, `gh pr view/diff`, `gh run view`, Git-Inspektion, `node --test`, Continuity Audit, Frozen Guard und Orchestration Validator.
 - `CLAUDE_CODE_OAUTH_TOKEN` muss vorhanden sein; ohne Secret fail-closed. ChatGPT bleibt Lead/Merge-Owner.
 
-## 8. Automatischer Mailbox-Loop
+## 8. Bestehender Claude-Mailbox-Loop (historischer Transport)
 1. Lead liest `mailboxIssue` aus dem Live Checkpoint und postet dort `@claude CROSS_MODEL_REQUEST <id>`.
 2. Workflow startet nur für diese Mailbox, `Achi1984` und `CROSS_MODEL_REQUEST`.
 3. Claude prüft exakten SHA/Base, CI und relevante lokale read-only Tests/Audits und postet `CROSS_MODEL_RESPONSE <id>` in derselben Mailbox.
@@ -62,7 +65,7 @@ Notfall: Ist der Lead nicht erreichbar, darf nur der User den Lease überschreib
 
 The owner housekeeping contract in `MERIDIAN_GO.md` is binding: canonical verdicts, full-scope and exact-head-CI review gates, in-place decision resolution, real read-only credential preflight, separate recovery/retry approvals, and same-PR checkpoint updates. Resolve the active mailbox from the live checkpoint: this rollover candidate selects #942, predecessor #639. Archive #639 only after the successor smoke succeeds; prior mailbox statements and receipts describe history. Watchdog status uses the checkpoint-pinned single comment, separate from requested review responses. WIP maximum3active work packages is approved by owner2026-10-15T20:16:49+02:00, decision6199107184.
 
-## Owner-Prozesskorrektur — 2026-10-17
+## Owner-Prozesskorrektur — 2026-10-17 (damaliger Mailbox-Transport)
 
 Verbindlicher Owner-Auftrag 20:24:05 Europe/Vienna, Bezug #639/comment6238072184:
 - Review erst nach **completed SUCCESS** aller relevanten exact-head CI-Gates anfordern; laufende CI ist kein Anlass für einen vorgezogenen Request.
