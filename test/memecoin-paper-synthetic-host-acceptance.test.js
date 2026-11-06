@@ -388,6 +388,206 @@ test("startup child exit during delayed start receipt publication stays UNKNOWN 
   )), JSON.parse(result.output));
 });
 
+test("parent deadline includes delayed child-started receipt publication", {timeout: 10_000}, async t => {
+  const dataRoot = await root(t);
+  const receiptSyncEntered = deferred();
+  const releaseReceiptSync = deferred();
+  t.after(() => releaseReceiptSync.resolve());
+  const signals = new EventEmitter();
+  const probe = filesystemProbe(async call => {
+    const result = await call.action();
+    if (call.method === "sync" && path.basename(call.filename) === "child-started.json") {
+      receiptSyncEntered.resolve();
+      await releaseReceiptSync.promise;
+    }
+    return result;
+  });
+  const fakeChild = Object.assign(new EventEmitter(), {
+    pid: 12345, exitCode: null, signalCode: null, connected: false, unref() {}
+  });
+  let childEnv;
+  let killCalls = 0;
+  let output = "";
+  const pending = main({
+    env: {
+      PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_SIGNAL_DRILL: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT: dataRoot
+    },
+    timeoutMs: 750, signalSource: signals, fileSystem: probe.fileSystem,
+    spawnChild(_executable, _args, options) {
+      childEnv = options.env;
+      return fakeChild;
+    },
+    killChild() {
+      killCalls += 1;
+      return true;
+    },
+    stdout: {write: value => { output += value; }}
+  });
+  let enteredTimer;
+  try {
+    await Promise.race([
+      receiptSyncEntered.promise,
+      new Promise((_, reject) => {
+        enteredTimer = setTimeout(() => reject(new Error("child start receipt was not published")), 5_000);
+      })
+    ]);
+  } finally {
+    clearTimeout(enteredTimer);
+  }
+  let operationTimer;
+  try {
+    assert.equal(await Promise.race([
+      pending,
+      new Promise((_, reject) => {
+        operationTimer = setTimeout(() => reject(new Error("parent exceeded its bounded deadline")), 5_000);
+      })
+    ]), 2);
+  } finally {
+    clearTimeout(operationTimer);
+  }
+  releaseReceiptSync.resolve();
+  await drainProbe(probe);
+
+  assert.equal(JSON.parse(output).status, "UNKNOWN");
+  assert.equal(killCalls, 0);
+  const childDeadline = BigInt(childEnv.PAPER_SYNTHETIC_ACCEPTANCE_DEADLINE_HR_NS);
+  assert.ok(childDeadline <= process.hrtime.bigint(),
+    "the deadline forwarded at spawn must already be exhausted after delayed parent setup");
+  const [drillName] = await readdir(dataRoot);
+  const files = await readdir(path.join(dataRoot, drillName));
+  assert.ok(files.includes("child-started.json"));
+  assert.equal(files.includes("signal-request.json"), false);
+  assert.equal(files.includes("signal-sent.json"), false);
+  assert.equal(signals.eventNames().length, 0);
+});
+
+test("real IPC child enforces its inherited deadline after fill instead of receiving a fresh budget",
+  {timeout: 30_000}, async t => {
+    const entrypoint = path.resolve("scripts/memecoin-paper/synthetic-host-acceptance.mjs");
+    const children = [];
+    const shortBudgetMs = 3_000;
+    const startChild = (dataRoot, deadlineNs) => {
+      const child = spawn(process.execPath, [entrypoint], {
+        env: {
+          ...process.env,
+          PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
+          PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT: dataRoot,
+          PAPER_SYNTHETIC_ACCEPTANCE_PROOF: "REAL_SIGNAL_CHILD",
+          PAPER_SYNTHETIC_ACCEPTANCE_SIGNAL_CHILD: "true",
+          PAPER_SYNTHETIC_ACCEPTANCE_SIGNAL_DRILL: "false",
+          PAPER_SYNTHETIC_ACCEPTANCE_HTTPS_ENABLED: "false",
+          PAPER_SYNTHETIC_ACCEPTANCE_DEADLINE_HR_NS: deadlineNs
+        },
+        stdio: ["ignore", "pipe", "pipe", "ipc"]
+      });
+      let stdout = "";
+      let stderr = "";
+      child.stdout.setEncoding("utf8").on("data", value => { stdout += value; });
+      child.stderr.setEncoding("utf8").on("data", value => { stderr += value; });
+      const closed = new Promise((resolve, reject) => {
+        child.once("error", reject);
+        child.once("close", (code, signal) => resolve({code, signal}));
+      });
+      closed.catch(() => {});
+      children.push({child, closed});
+      t.after(async () => {
+        if (child.exitCode === null && child.signalCode === null) {
+          child.kill("SIGKILL");
+          await Promise.race([
+            closed,
+            new Promise(resolve => setTimeout(resolve, 2_000))
+          ]);
+        }
+      });
+      return {child, closed, stderr: () => stderr, stdout: () => stdout};
+    };
+    const receiveFill = (child, timeoutMs) => new Promise((resolve, reject) => {
+      const finish = (action, value) => {
+        clearTimeout(timer);
+        child.removeListener("message", onMessage);
+        child.removeListener("exit", onExit);
+        action(value);
+      };
+      const onMessage = message => finish(resolve, message);
+      const onExit = (code, signal) => finish(reject,
+        new Error(`child exited before fill acknowledgement (${code}, ${signal})`));
+      const timer = setTimeout(() => finish(reject, new Error("fill acknowledgement timed out")), timeoutMs);
+      child.once("message", onMessage);
+      child.once("exit", onExit);
+    });
+    const closeWithin = (child, timeoutMs) => new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        child.removeListener("close", onClose);
+        reject(new Error("child did not exit within the inherited deadline watchdog"));
+      }, timeoutMs);
+      const onClose = (code, signal) => {
+        clearTimeout(timer);
+        resolve({code, signal});
+      };
+      child.once("close", onClose);
+    });
+    const assertFillHandshake = async run => {
+      const handshake = await receiveFill(run.child, 10_000);
+      assert.equal(handshake.status, "FILLED_PAPER");
+      assert.equal(handshake.pid, run.child.pid);
+      assert.match(handshake.receiptSha256, /^[0-9a-f]{64}$/);
+      return handshake;
+    };
+
+    const dataRoot = await root(t);
+    const startedAt = process.hrtime.bigint();
+    const inheritedDeadline = startedAt + BigInt(shortBudgetMs) * 1_000_000n;
+    const run = startChild(dataRoot, inheritedDeadline.toString());
+    await assertFillHandshake(run);
+    assert.ok(process.hrtime.bigint() < inheritedDeadline,
+      "the child must reach its fill handshake while the inherited budget remains valid");
+    assert.equal(run.child.exitCode, null, "the child must wait after fill when no SIGTERM is sent");
+    const exit = await closeWithin(run.child, 10_000);
+    const exitedAt = process.hrtime.bigint();
+    assert.deepEqual(exit, {code: 2, signal: null}, run.stderr());
+    assert.ok(exitedAt <= inheritedDeadline + 1_000_000_000n,
+      "the child must exit near the parent's deadline, not after a new 60-second window");
+    assert.deepEqual(JSON.parse(run.stdout()), {
+      status: "UNKNOWN", code: "SYNTHETIC_ACCEPTANCE_FAILED"
+    });
+    const [runId] = await readdir(dataRoot);
+    const childFiles = await readdir(path.join(dataRoot, runId));
+    assert.ok(childFiles.includes("fill-acknowledged.json"));
+    assert.equal(childFiles.includes("summary.json"), false);
+
+    const freshBudgetRoot = await root(t);
+    const freshBudgetStartedAt = process.hrtime.bigint();
+    const freshBudgetDeadline = freshBudgetStartedAt + 60_000_000_000n;
+    const freshBudgetRun = startChild(freshBudgetRoot, freshBudgetDeadline.toString());
+    await assertFillHandshake(freshBudgetRun);
+    const originalBudgetCutoff = freshBudgetStartedAt + BigInt(shortBudgetMs) * 1_000_000n;
+    const remainingMs = Number((originalBudgetCutoff - process.hrtime.bigint()) / 1_000_000n);
+    if (remainingMs > 0) await new Promise(resolve => setTimeout(resolve, remainingMs));
+    assert.equal(freshBudgetRun.child.exitCode, null,
+      "working IPC does not make a fresh child deadline equivalent to inheriting the parent's deadline");
+    freshBudgetRun.child.kill("SIGKILL");
+    const killed = await closeWithin(freshBudgetRun.child, 2_000);
+    assert.deepEqual(killed, {code: null, signal: "SIGKILL"});
+
+    for (const [label, invalidDeadline] of [
+      ["expired", (process.hrtime.bigint() - 1_000_000n).toString()],
+      ["malformed", "invalid-deadline"],
+      ["overlong", "9".repeat(33)]
+    ]) {
+      const invalidRoot = await root(t);
+      const invalidRun = startChild(invalidRoot, invalidDeadline);
+      const invalidExit = await closeWithin(invalidRun.child, 2_000);
+      assert.deepEqual(invalidExit, {code: 2, signal: null}, label);
+      assert.deepEqual(JSON.parse(invalidRun.stdout()), {
+        status: "UNKNOWN", code: "SYNTHETIC_ACCEPTANCE_FAILED"
+      }, label);
+      assert.deepEqual(await readdir(invalidRoot), [], `${label} metadata must not start child work`);
+    }
+    assert.equal(children.length, 5);
+  });
+
 test("real SIGTERM send-to-exit timing excludes delayed signal receipt fsync", {timeout: 10_000}, async t => {
   const dataRoot = await mkdtemp(path.join(os.tmpdir(), "synthetic-real-signal-delayed-receipt-"));
   t.after(() => rm(dataRoot, {recursive: true, force: true}));
