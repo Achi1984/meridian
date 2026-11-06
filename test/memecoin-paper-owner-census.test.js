@@ -202,6 +202,41 @@ test("fixed mint-filtered request reconciles supply and aggregates by actual tok
   assert.equal(result.filterEvidence.verified, false);
 });
 
+test("separate finalized owner snapshots retain split accounts but cannot prove historical completeness", async () => {
+  const firstSlot = await acquire({
+    slot: 100,
+    mintSlot: "100",
+    accounts: [
+      tokenAccount({owner: key(8), amount: 40n}),
+      tokenAccount({owner: key(8), amount: 10n}),
+      tokenAccount({owner: key(9), amount: 50n})
+    ]
+  });
+  const nextSlot = await acquire({
+    slot: 101,
+    mintSlot: "101",
+    accounts: [
+      tokenAccount({owner: key(8), amount: 40n}),
+      tokenAccount({owner: key(9), amount: 50n}),
+      tokenAccount({owner: key(10), amount: 10n})
+    ]
+  });
+
+  assert.equal(firstSlot.provenance.commitment, "finalized");
+  assert.equal(nextSlot.provenance.commitment, "finalized");
+  assert.equal(firstSlot.rawCensus.ownerCount, 2);
+  assert.equal(firstSlot.rawCensus.owners.find(item => item.owner === key(8)).amountAtoms, "50");
+  assert.equal(nextSlot.rawCensus.ownerCount, 3);
+  assert.equal(nextSlot.rawCensus.owners.some(item => item.owner === key(8) &&
+    item.amountAtoms === "10"), false);
+  assert.equal(nextSlot.rawCensus.owners.some(item => item.owner === key(10)), true);
+  for (const snapshot of [firstSlot, nextSlot]) {
+    assert.equal(snapshot.status, "UNKNOWN");
+    assert.equal(snapshot.coverage.complete, false);
+    assert.equal(snapshot.executionAuthorized, false);
+  }
+});
+
 test("caller PASS, verified flags, and address lists cannot create pool exclusions or reduce owners", async () => {
   const poolOwner = IDENTITY.pool;
   const evidence = {

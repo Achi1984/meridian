@@ -2,6 +2,7 @@ import {createHash} from "node:crypto";
 import {constants} from "node:fs";
 import * as fsPromises from "node:fs/promises";
 import path from "node:path";
+import {comparableCensusSlots, countCensusOwners} from "../analyst-window-evidence.mjs";
 import {acquireOwnerCensus} from "../owner-census.mjs";
 
 export const EVIDENCE_WARMUP_SCHEMA = "MERIDIAN_PAPER_EVIDENCE_WARMUP_V1";
@@ -672,7 +673,7 @@ function usableCensusRecord(record, {identity, atMs, policyVersion}, capturedAt)
   const validSlot = snapshot.slot === null
     ? snapshot.provenanceType === "OFFCHAIN_TIMESTAMP_NO_SOLANA_SLOT"
     : Number.isSafeInteger(snapshot.slot) && snapshot.slot >= 0 &&
-      snapshot.provenanceType === "ONCHAIN_SLOT";
+      snapshot.provenanceType === "ONCHAIN_SLOT" && snapshot.commitment === "finalized";
   return record.kind === "census" && exactIdentity(record, identity) &&
     record.observedAt === atMs && record.policyVersion === policyVersion &&
     record.completeness === "COMPLETE" && reviewedOrSynthetic(record, snapshot) &&
@@ -680,17 +681,18 @@ function usableCensusRecord(record, {identity, atMs, policyVersion}, capturedAt)
     exactIdentity({identity: snapshot.identity}, identity) &&
     snapshot.observedAt === atMs && snapshot.censusPolicyVersion === policyVersion &&
     snapshot.coverage?.complete === true && snapshot.coverage?.truncated === false &&
+    snapshot.coverage?.cursorExhausted === true &&
     snapshot.aggregation === "DISTINCT_POSITIVE_BALANCE_OWNER" &&
     typeof snapshot.denominatorPolicy === "string" && snapshot.denominatorPolicy.length > 0 &&
     typeof snapshot.denominatorAtoms === "string" &&
     /^(0|[1-9]\d{0,39})$/.test(snapshot.denominatorAtoms) &&
     BigInt(snapshot.denominatorAtoms) > 0n && Array.isArray(snapshot.exclusions) &&
     snapshot.exclusions.every(value => typeof value === "string" && value.length > 0) &&
-    Array.isArray(snapshot.owners) && snapshot.owners.length <= 25_000 &&
     snapshot.receivedAt === record.receivedAt &&
     snapshot.receivedAt >= snapshot.observedAt &&
     snapshot.receivedAt <= capturedAt &&
-    validSlot && validReceipt(snapshot.receipt, snapshot.source, snapshot.receivedAt);
+    validSlot && validReceipt(snapshot.receipt, snapshot.source, snapshot.receivedAt) &&
+    countCensusOwners(snapshot.owners) !== null;
 }
 
 function exactMatches(records, predicate) {
@@ -752,13 +754,17 @@ export function createWarmupCensusSource(dataset) {
           coverage: {complete: false, truncated: false, exactEndpoints}, snapshots: []};
       }
       const pair = snapshots.map(matches => matches[0].payload);
-      const valid = pair[0].source === pair[1].source &&
+      const samePolicy = pair[0].source === pair[1].source &&
         pair.every((snapshot, index) =>
           snapshot.aggregation === policy?.aggregation &&
           snapshot.denominatorPolicy === policy?.denominatorPolicy &&
           JSON.stringify(snapshot.exclusions) === JSON.stringify(policy?.exclusions));
-      if (!valid) {
-        return {status: "WARMUP", reason: "CENSUS_IDENTITY_OR_POLICY_MISMATCH",
+      if (!samePolicy || !comparableCensusSlots(pair[0], pair[1])) {
+        exactEndpoints.available = [];
+        exactEndpoints.missing = requested;
+        const reason = samePolicy ? "CENSUS_ENDPOINTS_INCOMPARABLE"
+          : "CENSUS_IDENTITY_OR_POLICY_MISMATCH";
+        return {status: "WARMUP", reason,
           coverage: {complete: false, truncated: false, exactEndpoints}, snapshots: []};
       }
       return {status: "COMPLETE", identity, coverage: {complete: true,
@@ -795,15 +801,16 @@ export function warmupCoverage(dataset, {identity, priceEndpoints = [], censusEn
         identity, atMs: endpoint.atMs, policyVersion: endpoint.policyVersion
       }, capturedAt);
   });
-  if (censusEndpoints.length === 2 &&
-      censusEndpoints[0].policyVersion === censusEndpoints[1].policyVersion &&
-      censusAvailable.every(Boolean)) {
+  if (censusEndpoints.length === 2 && censusAvailable.every(Boolean)) {
     const [start, end] = censusRecordsByEndpoint.map(matches => matches[0]);
-    const samePolicy = start.source === end.source &&
+    const samePolicy = censusEndpoints[0].policyVersion === censusEndpoints[1].policyVersion &&
+      start.source === end.source &&
       start.payload.aggregation === end.payload.aggregation &&
       start.payload.denominatorPolicy === end.payload.denominatorPolicy &&
       JSON.stringify(start.payload.exclusions) === JSON.stringify(end.payload.exclusions);
-    if (!samePolicy) censusAvailable.fill(false);
+    if (!samePolicy || !comparableCensusSlots(start.payload, end.payload)) {
+      censusAvailable.fill(false);
+    }
   }
   const availableCensusEndpoints = censusEndpoints.filter((_, index) => censusAvailable[index]);
   return deepFreeze({
