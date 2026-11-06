@@ -338,6 +338,62 @@ test("Helius account cursor cycles, contradictions, context drift and quotas rem
   });
 });
 
+test("issue #1227: Helius pages reject repeated accounts and leave cross-read disappearance UNKNOWN", async t => {
+  await t.test("identical account repeated on a later page invalidates the census", async () => {
+    let calls = 0;
+    const account = syntheticAccount({pubkey: SYNTHETIC_OWNER_A});
+    const source = helius(rpcTransport(async () => {
+      calls += 1;
+      return {
+        context: {slot: 90},
+        value: {
+          accounts: [account],
+          paginationKey: calls === 1 ? "next" : null
+        }
+      };
+    }));
+    const result = await source.getProgramAccountsV2({programId: SYNTHETIC_PROGRAM});
+
+    assert.equal(result.reason, "DUPLICATE_ACCOUNT");
+    assert.equal(result.data.accounts, 1);
+    assert.equal(result.data.paginationTerminatedByNull, false);
+    assert.equal(result.coverage.observedCompleteness, "UNKNOWN");
+  });
+
+  await t.test("a formerly present account absent in a later finalized read is not historical proof", async () => {
+    let calls = 0;
+    const source = helius(rpcTransport(async () => {
+      calls += 1;
+      return {
+        context: {slot: 89 + calls},
+        value: {
+          accounts: calls === 1
+            ? [
+              syntheticAccount({pubkey: SYNTHETIC_OWNER_A}),
+              syntheticAccount({pubkey: SYNTHETIC_OWNER_B, owner: SYNTHETIC_OWNER_B})
+            ]
+            : [syntheticAccount({pubkey: SYNTHETIC_OWNER_B, owner: SYNTHETIC_OWNER_B})],
+          paginationKey: null
+        }
+      };
+    }));
+    const earlier = await source.getProgramAccountsV2({programId: SYNTHETIC_PROGRAM});
+    const later = await source.getProgramAccountsV2({programId: SYNTHETIC_PROGRAM});
+
+    assert.equal(earlier.status, "CAPTURED");
+    assert.deepEqual(earlier.data.contextSlots, [90]);
+    assert.equal(earlier.data.accounts, 2);
+    assert.equal(later.status, "CAPTURED");
+    assert.deepEqual(later.data.contextSlots, [91]);
+    assert.equal(later.data.accounts, 1);
+    for (const snapshot of [earlier, later]) {
+      assert.equal(snapshot.data.paginationTerminatedByNull, true);
+      assert.equal(snapshot.coverage.observedCompleteness, "UNKNOWN");
+      assert.equal(snapshot.coverage.frozenSnapshot, false);
+    }
+  });
+});
+
 test("provider URLs, redirects, and secrets are constrained and redacted", async t => {
   await t.test("redirect rejected", async () => {
     const source = helius(async request => jsonRpcResponse(request, [], {

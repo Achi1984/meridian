@@ -518,21 +518,27 @@ test("holder growth requires cursor-exhausted unique comparable finalized census
     }
   });
 
-  await t.test("non-finalized, mixed-provenance, or backwards slots are incomparable", async () => {
-    for (const mutate of [
-      snapshots => { delete snapshots[1].commitment; },
-      snapshots => {
+  await t.test("same, mixed-provenance, non-finalized, or backwards slots are incomparable", async () => {
+    for (const [mutate, reason] of [
+      [snapshots => { delete snapshots[1].commitment; },
+        "CENSUS_ENDPOINT_INVALID_OR_INCOMPLETE"],
+      [snapshots => {
         snapshots[1].slot = null;
         snapshots[1].provenanceType = "OFFCHAIN_TIMESTAMP_NO_SOLANA_SLOT";
         delete snapshots[1].commitment;
-      },
-      snapshots => { snapshots[1].slot = snapshots[0].slot - 1; }
+      }, "CENSUS_ENDPOINT_SLOTS_INCOMPARABLE"],
+      [snapshots => { snapshots[1].slot = snapshots[0].slot; },
+        "CENSUS_ENDPOINT_SLOTS_INCOMPARABLE"],
+      [snapshots => { snapshots[1].slot = snapshots[0].slot - 1; },
+        "CENSUS_ENDPOINT_SLOTS_INCOMPARABLE"]
     ]) {
       const fixture = withSnapshots(snapshots => {
         finalizedSlots(snapshots);
         mutate(snapshots);
       });
-      assert.equal((await packet(fixture)).metrics.holderGrowthPct1h, undefined);
+      const evidence = await packet(fixture);
+      assert.equal(evidence.metrics.holderGrowthPct1h, undefined);
+      assert.equal(evidence.unavailableMetrics.holderGrowthPct1h.reason, reason);
     }
   });
 });
