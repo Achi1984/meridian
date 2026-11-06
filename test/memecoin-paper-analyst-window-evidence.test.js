@@ -507,6 +507,15 @@ test("holder growth requires cursor-exhausted unique comparable finalized census
       });
       assert.equal((await packet(fixture)).metrics.holderGrowthPct1h, undefined);
     }
+    for (const balances of [["0", "0"], ["0", "1"]]) {
+      const fixture = withSnapshots(snapshots => {
+        finalizedSlots(snapshots);
+        const [owner] = snapshots[1].owners;
+        owner.balanceAtoms = balances[0];
+        snapshots[1].owners.push({...owner, balanceAtoms: balances[1]});
+      });
+      assert.equal((await packet(fixture)).metrics.holderGrowthPct1h, undefined);
+    }
   });
 
   await t.test("non-finalized, mixed-provenance, or backwards slots are incomparable", async () => {

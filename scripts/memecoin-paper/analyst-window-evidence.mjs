@@ -301,12 +301,14 @@ function ownerCount(snapshot, policy, endpoint, assembledAt, identity, chargeWor
         : !Number.isSafeInteger(snapshot.slot) || snapshot.slot < 0 ||
           snapshot.provenanceType !== "ONCHAIN_SLOT" ||
           snapshot.commitment !== "finalized")) return null;
+  const seenOwners = new Set();
   const owners = new Set();
   for (const entry of snapshot.owners) {
     if (!chargeWork(1)) return null;
     if (!isRecord(entry) || !isSolanaPublicKey(entry.owner) ||
-    owners.has(entry.owner) || typeof entry.balanceAtoms !== "string" ||
+    seenOwners.has(entry.owner) || typeof entry.balanceAtoms !== "string" ||
     !DECIMAL_INTEGER.test(entry.balanceAtoms ?? "")) return null;
+    seenOwners.add(entry.owner);
     if (BigInt(entry.balanceAtoms) > 0n) owners.add(entry.owner);
   }
   return owners.size;
