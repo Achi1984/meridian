@@ -1,5 +1,6 @@
 import {createHash, randomUUID} from "node:crypto";
 import {spawn} from "node:child_process";
+import {EventEmitter} from "node:events";
 import {lstat, mkdir, open, realpath} from "node:fs/promises";
 import path from "node:path";
 import {performance} from "node:perf_hooks";
@@ -18,7 +19,7 @@ import {
 import {evaluateMemecoinPaperRunExport} from "../memecoin-paper-simulated-evaluation/index.mjs";
 
 const PRODUCER_REVISION = "paper-pilot-composition/3";
-const PROOFS = new Set(["PIPELINE_QUOTE", "ACTIVE_STOP", "REAL_SIGNAL_CHILD"]);
+const PROOFS = new Set(["PIPELINE_QUOTE", "ACTIVE_STOP", "REAL_SIGNAL_CHILD", "PLATFORM_FOREGROUND"]);
 const BUDGETS = Object.freeze({
   requests: 40, bytes: 1_000_000, events: 128, candidates: 4, cycles: 8,
   durationMs: 20_000, callbackTimeoutMs: 1_000, maxWallClockUncertaintyMs: 10
@@ -270,7 +271,8 @@ function waitForSignalAfterEntry(signalSource, signal, notifyParent) {
 }
 
 async function runAcceptance({
-  dataRoot, proof = "PIPELINE_QUOTE", httpsOptions, signalSource = process, sendHandshake
+  dataRoot, proof = "PIPELINE_QUOTE", httpsOptions, signalSource = process, sendHandshake,
+  requestedRunId, foregroundClaimId, foregroundClaimSha256, onForegroundReady
 }, operation) {
   requireProof(PROOFS.has(proof) && typeof dataRoot === "string" &&
     path.isAbsolute(dataRoot) && path.normalize(dataRoot) === dataRoot);
@@ -278,7 +280,8 @@ async function runAcceptance({
   requireProof(info.isDirectory() && !info.isSymbolicLink() &&
     info.uid === process.getuid() && [0o700, 0o2700].includes(info.mode & 0o7777) &&
     await operation.realpath(dataRoot) === dataRoot);
-  const runId = `synthetic-${randomUUID()}`;
+  const runId = requestedRunId ?? `synthetic-${randomUUID()}`;
+  requireProof(/^synthetic-[a-f0-9-]{36}$/.test(runId));
   const directory = path.join(dataRoot, runId);
   await operation.mkdir(directory, {mode: 0o700});
   const rootHandle = await operation.open(dataRoot, "r");
@@ -309,6 +312,24 @@ async function runAcceptance({
   let stopAccepted = false;
   const signalProof = {observedAfterFill: false, receiptSha256: null};
   const stop = () => { stopAccepted = pilot.stop() || stopAccepted; };
+  let foregroundSignalResolve;
+  let foregroundSignalReject;
+  let foregroundSignalObserved = false;
+  const foregroundSignal = proof === "PLATFORM_FOREGROUND"
+    ? new Promise((resolve, reject) => {
+      foregroundSignalResolve = resolve;
+      foregroundSignalReject = reject;
+    })
+    : null;
+  foregroundSignal?.catch(() => {});
+  const onForegroundSignal = () => {
+    foregroundSignalObserved = true;
+    stop();
+    foregroundSignalResolve();
+  };
+  const onForegroundAbort = () => foregroundSignalReject(
+    operation.signal.reason ?? new Error("foreground acceptance ended")
+  );
   const onTestEntry = proof === "ACTIVE_STOP" ? stop
     : proof === "REAL_SIGNAL_CHILD" ? async entry => {
       requireProof(typeof sendHandshake === "function" &&
@@ -347,20 +368,80 @@ async function runAcceptance({
         ...acknowledgement, acknowledgementSha256: digest(acknowledgementBytes), pid: process.pid
       }));
       signalProof.observedAfterFill = true;
+    } : proof === "PLATFORM_FOREGROUND" ? async entry => {
+      requireProof(entry?.status === "FILLED_PAPER" && entry.receipt);
+      const checkpointBytes = await operation.read(
+        path.join(dataDirectory, "checkpoint.json"), 8 * 1024 * 1024
+      );
+      const checkpoint = parseCanonical(checkpointBytes);
+      const checkpointSequence = entry.receipt.sequence;
+      requireProof(Number.isSafeInteger(checkpointSequence) && checkpointSequence >= 0 &&
+        checkpoint.sequence === checkpointSequence && Array.isArray(checkpoint.records) &&
+        checkpointSequence < checkpoint.records.length);
+      const acknowledgedCheckpoint = {
+        formatVersion: checkpoint.formatVersion,
+        runHeader: checkpoint.runHeader,
+        records: checkpoint.records.slice(0, checkpointSequence + 1),
+        sequence: checkpointSequence
+      };
+      const checkpointSha256 = digest(canonicalCheckpointBytes(acknowledgedCheckpoint));
+      requireProof(checkpointSha256 === digest(checkpointBytes) &&
+        entry.receipt.hash === checkpointSha256 &&
+        checkpoint.records[checkpointSequence]?.method === "executeEntry" &&
+        checkpoint.records[checkpointSequence]?.resultDigest === entry.receipt.resultDigest &&
+        checkpoint.records[checkpointSequence]?.runId === runId);
+      const receiptSha256 = digest(canonicalCheckpointBytes(entry.receipt));
+      const readyBytes = canonicalCheckpointBytes({
+        protocol: "synthetic-platform-foreground/v1",
+        status: "READY",
+        claimId: foregroundClaimId,
+        claimSha256: foregroundClaimSha256,
+        runId,
+        fillReceiptSha256: receiptSha256,
+        checkpointSequence,
+        checkpointSha256
+      });
+      await writeNew(directory, "readiness.json", readyBytes, operation);
+      if (onForegroundReady) {
+        await operation.wait(() => onForegroundReady({
+          claimId: foregroundClaimId, runId,
+          readinessSha256: digest(readyBytes),
+          checkpointSequence, checkpointSha256
+        }));
+      }
+      signalProof.receiptSha256 = receiptSha256;
+      signalProof.checkpointSha256 = checkpointSha256;
+      signalProof.checkpointSequence = checkpointSequence;
+      await foregroundSignal;
+      requireProof(foregroundSignalObserved);
+      signalProof.observedAfterFill = true;
     } : undefined;
   const pilot = makePilot(onTestEntry);
   operation.setPilotStop(stop);
+  if (foregroundSignal) {
+    signalSource.once("SIGTERM", onForegroundSignal);
+    operation.signal.addEventListener("abort", onForegroundAbort, {once: true});
+    if (operation.signal.aborted) onForegroundAbort();
+  }
   let result;
   try {
-    result = await operation.wait(() => pilot.start());
+    result = await operation.wait(() => {
+      requireProof(!foregroundSignalObserved);
+      return pilot.start();
+    });
   } finally {
     operation.setPilotStop(null);
+    if (foregroundSignal) {
+      signalSource.removeListener("SIGTERM", onForegroundSignal);
+      operation.signal.removeEventListener("abort", onForegroundAbort);
+    }
   }
   const exportBytes = canonicalCheckpointBytes(result.report);
   await writeNew(directory, "result.report.json", exportBytes, operation);
   const evaluation = evaluateMemecoinPaperRunExport(exportBytes, expected);
   const operations = result.report.runnerReport?.operationResults ?? [];
-  const stoppingProof = proof === "ACTIVE_STOP" || proof === "REAL_SIGNAL_CHILD";
+  const stoppingProof = proof === "ACTIVE_STOP" || proof === "REAL_SIGNAL_CHILD" ||
+    proof === "PLATFORM_FOREGROUND";
   const expectedOverall = stoppingProof ? "UNKNOWN" : "PASS";
   requireProof(evaluation.overall === expectedOverall &&
     !evaluation.checks.some(item => item.status === "FAIL") &&
@@ -372,7 +453,9 @@ async function runAcceptance({
       result.report.runnerReport.reason === "SHUTDOWN" &&
       result.report.runnerReport.terminalResult.openPositions.length === 1 &&
       result.report.runnerReport.terminalResult.openPositions[0].markStatus === "VALUATION_UNAVAILABLE");
-    if (proof === "REAL_SIGNAL_CHILD") requireProof(signalProof.observedAfterFill);
+    if (proof === "REAL_SIGNAL_CHILD" || proof === "PLATFORM_FOREGROUND") {
+      requireProof(signalProof.observedAfterFill);
+    }
   } else {
     requireProof(result.status === "FINISHED" &&
       evaluation.outcome === "SIMULATED_ENTRY_EXIT_COMPLETE" &&
@@ -428,10 +511,222 @@ async function runAcceptance({
         runnerReason: result.report.runnerReport.reason
       }
     } : {}),
+    ...(proof === "PLATFORM_FOREGROUND" ? {
+      foregroundClaimId, foregroundClaimSha256,
+      signalObservation: {
+        status: "OBSERVED", signal: "SIGTERM", afterReady: true,
+        source: "PROCESS_SIGNAL_HANDLER", platformProvenance: "NOT_ASSESSED"
+      },
+      networkAccessed: false,
+      signalProof: {
+        observedAfterFill: signalProof.observedAfterFill,
+        fillReceiptSha256: signalProof.receiptSha256,
+        fillCheckpointSequence: signalProof.checkpointSequence,
+        fillCheckpointSha256: signalProof.checkpointSha256,
+        lifecycleStatus: result.status,
+        runnerReason: result.report.runnerReport.reason
+      }
+    } : {}),
     hostAcceptance: "NOT_ASSESSED", providerTrust: "NOT_ASSESSED", liveExecution: false
   };
   await writeNew(directory, "summary.json", canonicalCheckpointBytes(summary), operation);
   return {summary, result, exportBytes, directory};
+}
+
+function validForegroundClaimId(value) {
+  return typeof value === "string" && value.length <= 64 &&
+    /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value) && !value.includes("..");
+}
+
+function foregroundRunId(claimId) {
+  const hex = digest(Buffer.from(`synthetic-platform-foreground/v1\0${claimId}`)).slice(0, 32);
+  return `synthetic-${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+function isPrivateDirectory(info) {
+  return info.isDirectory() && !info.isSymbolicLink() &&
+    info.uid === process.getuid() && [0o700, 0o2700].includes(info.mode & 0o7777);
+}
+
+async function syncDirectory(directory, operation) {
+  const handle = await operation.open(directory, "r");
+  try {
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
+}
+
+async function verifyForegroundEvidence({dataRoot, claimId, claimBytes, operation}) {
+  const claim = parseCanonical(claimBytes);
+  const claimSha256 = digest(claimBytes);
+  const runId = foregroundRunId(claimId);
+  requireProof(claim.protocol === "synthetic-platform-foreground-claim/v1" &&
+    claim.status === "CLAIMED" && claim.claimId === claimId && claim.runId === runId);
+  const directory = path.join(dataRoot, runId);
+  const info = await operation.lstat(directory);
+  requireProof(isPrivateDirectory(info) && await operation.realpath(directory) === directory);
+  const readinessBytes = await operation.read(path.join(directory, "readiness.json"), 16 * 1024);
+  const readiness = parseCanonical(readinessBytes);
+  const configBytes = await operation.read(path.join(directory, "config.json"), 16 * 1024);
+  const config = parseCanonical(configBytes);
+  const expected = {
+    runId, configSha256: digest(configBytes), producerRevision: PRODUCER_REVISION
+  };
+  const summary = parseCanonical(await operation.read(path.join(directory, "summary.json"), 64 * 1024));
+  const exportBytes = await operation.read(path.join(directory, "result.report.json"), 8 * 1024 * 1024);
+  const report = parseCanonical(exportBytes);
+  const checkpointBytes = await operation.read(
+    path.join(directory, "state", "checkpoint.json"), 8 * 1024 * 1024
+  );
+  const checkpoint = parseCanonical(checkpointBytes);
+  const readbackBytes = await operation.read(path.join(
+    directory, "receiver", digest(Buffer.from(runId, "utf8")), "export.json"
+  ), 8 * 1024 * 1024);
+  const evaluation = evaluateMemecoinPaperRunExport(exportBytes, expected);
+  const operations = report.runnerReport?.operationResults ?? [];
+  const openPositions = report.runnerReport?.terminalResult?.openPositions ?? [];
+  const entryOperation = operations.find(item =>
+    item.method === "executeEntry" && item.status === "FILLED_PAPER");
+  const receipt = entryOperation?.receipt;
+  const sequence = readiness.checkpointSequence;
+  const acknowledgedCheckpoint = {
+    formatVersion: checkpoint.formatVersion,
+    runHeader: checkpoint.runHeader,
+    records: checkpoint.records?.slice(0, sequence + 1),
+    sequence
+  };
+  const record = checkpoint.records?.[sequence];
+  requireProof(config.runId === runId && config.mode === "SYNTHETIC_TEST_ONLY" &&
+    readiness.protocol === "synthetic-platform-foreground/v1" &&
+    readiness.status === "READY" && readiness.claimId === claimId &&
+    readiness.claimSha256 === claimSha256 && readiness.runId === runId &&
+    Number.isSafeInteger(sequence) && sequence >= 0 &&
+    /^[0-9a-f]{64}$/.test(readiness.checkpointSha256) &&
+    /^[0-9a-f]{64}$/.test(readiness.fillReceiptSha256) &&
+    digest(canonicalCheckpointBytes(acknowledgedCheckpoint)) === readiness.checkpointSha256 &&
+    digest(canonicalCheckpointBytes(receipt)) === readiness.fillReceiptSha256 &&
+    record?.method === "executeEntry" && record.resultDigest === receipt?.resultDigest &&
+    record.runId === runId && receipt?.runId === runId &&
+    receipt.sequence === sequence && receipt.hash === readiness.checkpointSha256 &&
+    summary.status === "UNKNOWN" && summary.contractChecks === "PASS" &&
+    summary.proof === "SYNTHETIC_PLATFORM_FOREGROUND" &&
+    summary.foregroundClaimId === claimId && summary.foregroundClaimSha256 === claimSha256 &&
+    summary.runId === runId && summary.configSha256 === expected.configSha256 &&
+    summary.producerRevision === PRODUCER_REVISION &&
+    summary.evaluation === "UNKNOWN" && summary.outcome === "OPEN_UNVALUED_TERMINAL_POSITION" &&
+    summary.entryFills === 1 && summary.exits === 0 && summary.stopAccepted === true &&
+    summary.restartDenied === true && summary.immutableReadback === true &&
+    summary.signalObservation?.status === "OBSERVED" &&
+    summary.signalObservation?.signal === "SIGTERM" &&
+    summary.signalObservation?.afterReady === true &&
+    summary.signalObservation?.source === "PROCESS_SIGNAL_HANDLER" &&
+    summary.signalObservation?.platformProvenance === "NOT_ASSESSED" &&
+    summary.hostAcceptance === "NOT_ASSESSED" &&
+    summary.providerTrust === "NOT_ASSESSED" && summary.liveExecution === false &&
+    summary.networkAccessed === false &&
+    summary.signalProof?.observedAfterFill === true &&
+    summary.signalProof?.fillReceiptSha256 === readiness.fillReceiptSha256 &&
+    summary.signalProof?.fillCheckpointSequence === sequence &&
+    summary.signalProof?.fillCheckpointSha256 === readiness.checkpointSha256 &&
+    summary.signalProof?.lifecycleStatus === "STOPPED" &&
+    summary.signalProof?.runnerReason === "SHUTDOWN" &&
+    !Object.hasOwn(summary.signalObservation, "signalToExitMs") &&
+    report.persistence === "ACKNOWLEDGED" &&
+    report.checkpointSha256 === digest(checkpointBytes) &&
+    checkpointBytes.equals(canonicalCheckpointBytes(report.checkpoint)) &&
+    report.runnerReport?.reason === "SHUTDOWN" &&
+    operations.filter(item => item.method === "executeEntry" && item.status === "FILLED_PAPER").length === 1 &&
+    !operations.some(item => item.method === "observeExitQuote" && item.status === "CLOSED_PAPER") &&
+    openPositions.length === 1 && openPositions[0].markStatus === "VALUATION_UNAVAILABLE" &&
+    evaluation.overall === "UNKNOWN" &&
+    evaluation.outcome === "OPEN_UNVALUED_TERMINAL_POSITION" &&
+    !evaluation.checks.some(item => item.status === "FAIL") &&
+    summary.exportSha256 === digest(exportBytes) && summary.byteLength === exportBytes.length &&
+    readbackBytes.equals(exportBytes));
+  return {
+    status: "UNKNOWN", mode: "READ_ONLY_REPLACEMENT", readback: "VERIFIED",
+    claimId, runId, claimSha256, readinessSha256: digest(readinessBytes),
+    fillCount: evaluation.evidence.entryFills,
+    checkpointSequence: sequence, checkpointSha256: readiness.checkpointSha256,
+    restartDenied: true, immutableReadback: true,
+    exportSha256: digest(exportBytes), byteLength: exportBytes.length,
+    signalObservation: "PROCESS_SIGTERM_OBSERVED",
+    platformProvenance: "NOT_ASSESSED"
+  };
+}
+
+async function runForegroundAcceptance({dataRoot, claimId, signalSource, onReady, operation}) {
+  requireProof(validForegroundClaimId(claimId) && typeof dataRoot === "string" &&
+    path.isAbsolute(dataRoot) && path.normalize(dataRoot) === dataRoot);
+  const rootInfo = await operation.lstat(dataRoot);
+  requireProof(isPrivateDirectory(rootInfo) && await operation.realpath(dataRoot) === dataRoot);
+  const runId = foregroundRunId(claimId);
+  const claimDirectory = path.join(dataRoot, "foreground-claims");
+  const claimPath = path.join(claimDirectory, `${claimId}.json`);
+  const runDirectory = path.join(dataRoot, runId);
+  let claimDirectoryExists = true;
+  let claimExists = true;
+  try {
+    const info = await operation.lstat(claimDirectory);
+    requireProof(isPrivateDirectory(info) && await operation.realpath(claimDirectory) === claimDirectory);
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+    claimDirectoryExists = false;
+  }
+  if (claimDirectoryExists) {
+    try {
+      await operation.lstat(claimPath);
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+      claimExists = false;
+    }
+  } else {
+    claimExists = false;
+  }
+  if (claimExists) {
+    try {
+      const claimBytes = await operation.read(claimPath, 16 * 1024);
+      return {summary: await verifyForegroundEvidence({dataRoot, claimId, claimBytes, operation})};
+    } catch {
+      return {summary: {
+        status: "UNKNOWN", mode: "READ_ONLY_REPLACEMENT", readback: "UNKNOWN",
+        claimId, runId, platformProvenance: "NOT_ASSESSED"
+      }};
+    }
+  }
+  try {
+    await operation.lstat(runDirectory);
+    return {summary: {
+      status: "UNKNOWN", mode: "READ_ONLY_REPLACEMENT", readback: "UNKNOWN",
+      claimId, runId, code: "CLAIM_MISSING", platformProvenance: "NOT_ASSESSED"
+    }};
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+  if (!claimDirectoryExists) {
+    await operation.mkdir(claimDirectory, {mode: 0o700});
+    await syncDirectory(dataRoot, operation);
+  }
+  const claimBytes = canonicalCheckpointBytes({
+    protocol: "synthetic-platform-foreground-claim/v1",
+    status: "CLAIMED", claimId, runId
+  });
+  try {
+    await writeNew(claimDirectory, `${claimId}.json`, claimBytes, operation);
+  } catch {
+    return {summary: {
+      status: "UNKNOWN", mode: "CLAIM_NOT_ACQUIRED", readback: "UNKNOWN",
+      claimId, runId, platformProvenance: "NOT_ASSESSED"
+    }};
+  }
+  const {summary, ...artifacts} = await runAcceptance({
+    dataRoot, proof: "PLATFORM_FOREGROUND", signalSource,
+    requestedRunId: runId, foregroundClaimId: claimId,
+    foregroundClaimSha256: digest(claimBytes),
+    onForegroundReady: onReady
+  }, operation);
+  return {summary, ...artifacts};
 }
 
 function childHandshakeWait(child, timeoutMs) {
@@ -732,7 +1027,32 @@ export async function main({
     requireProof(env.PAPER_SYNTHETIC_ACCEPTANCE_ENABLED === "true" &&
       [undefined, "false", "true"].includes(env.PAPER_SYNTHETIC_ACCEPTANCE_HTTPS_ENABLED) &&
       [undefined, "false", "true"].includes(env.PAPER_SYNTHETIC_ACCEPTANCE_SIGNAL_DRILL) &&
-      [undefined, "false", "true"].includes(env.PAPER_SYNTHETIC_ACCEPTANCE_SIGNAL_CHILD));
+      [undefined, "false", "true"].includes(env.PAPER_SYNTHETIC_ACCEPTANCE_SIGNAL_CHILD) &&
+      [undefined, "false", "true"].includes(env.PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND));
+    if (env.PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND === "true") {
+      requireProof(env.PAPER_SYNTHETIC_ACCEPTANCE_SIGNAL_DRILL !== "true" &&
+        env.PAPER_SYNTHETIC_ACCEPTANCE_SIGNAL_CHILD !== "true" &&
+        env.PAPER_SYNTHETIC_ACCEPTANCE_HTTPS_ENABLED !== "true" &&
+        env.PAPER_SYNTHETIC_ACCEPTANCE_PROOF === undefined &&
+        validForegroundClaimId(env.PAPER_SYNTHETIC_ACCEPTANCE_CLAIM_ID));
+      const timeoutValue = env.PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND_TIMEOUT_MS ?? "60000";
+      requireProof(/^[1-9][0-9]{0,4}$/.test(timeoutValue));
+      const timeoutMs = Number(timeoutValue);
+      requireProof(Number.isSafeInteger(timeoutMs) && timeoutMs <= MAX_ACCEPTANCE_MS);
+      attempted = true;
+      const {summary} = await withAcceptanceOperation({
+        ...operationOptions, signalSource: new EventEmitter(), timeoutMs
+      }, operation => runForegroundAcceptance({
+        dataRoot: env.PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT,
+        claimId: env.PAPER_SYNTHETIC_ACCEPTANCE_CLAIM_ID, signalSource,
+        onReady: marker => stdout.write(`${JSON.stringify({
+          status: "READY", proof: "SYNTHETIC_PLATFORM_FOREGROUND", ...marker
+        })}\n`),
+        operation
+      }));
+      stdout.write(`${JSON.stringify(summary)}\n`);
+      return 2;
+    }
     if (env.PAPER_SYNTHETIC_ACCEPTANCE_SIGNAL_CHILD === "true") {
       requireProof(env.PAPER_SYNTHETIC_ACCEPTANCE_SIGNAL_DRILL !== "true" &&
         env.PAPER_SYNTHETIC_ACCEPTANCE_HTTPS_ENABLED !== "true" &&

@@ -68,6 +68,80 @@ async function root(t) {
   return directory;
 }
 
+function startForegroundChild(dataRoot, claimId, timeoutMs = 60_000) {
+  const child = spawn(process.execPath, [
+    path.resolve("scripts/memecoin-paper/synthetic-host-acceptance.mjs")
+  ], {
+    env: {
+      PATH: process.env.PATH,
+      PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND_TIMEOUT_MS: String(timeoutMs),
+      PAPER_SYNTHETIC_ACCEPTANCE_CLAIM_ID: claimId,
+      PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT: dataRoot
+    },
+    stdio: ["ignore", "pipe", "pipe"]
+  });
+  let stdout = "";
+  let stderr = "";
+  child.stdout.setEncoding("utf8").on("data", value => { stdout += value; });
+  child.stderr.setEncoding("utf8").on("data", value => { stderr += value; });
+  const closed = new Promise((resolve, reject) => {
+    child.once("error", reject);
+    child.once("close", (code, signal) => resolve({code, signal}));
+  });
+  closed.catch(() => {});
+  return {child, closed, stdout: () => stdout, stderr: () => stderr};
+}
+
+async function waitForForegroundReadiness(dataRoot, claimId, timeoutMs = 10_000) {
+  const deadline = performance.now() + timeoutMs;
+  const claimPath = path.join(dataRoot, "foreground-claims", `${claimId}.json`);
+  while (performance.now() < deadline) {
+    try {
+      const claim = JSON.parse(await readFile(claimPath, "utf8"));
+      const directory = path.join(dataRoot, claim.runId);
+      const bytes = await readFile(path.join(directory, "readiness.json"));
+      return {claim, directory, readiness: JSON.parse(bytes)};
+    } catch (error) {
+      if (error.code !== "ENOENT" && !(error instanceof SyntaxError)) throw error;
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+  }
+  throw new Error("foreground readiness timed out");
+}
+
+async function snapshotTree(directory) {
+  const result = {};
+  const visit = async current => {
+    for (const entry of await readdir(current, {withFileTypes: true})) {
+      const filename = path.join(current, entry.name);
+      const relative = path.relative(directory, filename);
+      if (entry.isDirectory()) await visit(filename);
+      else result[relative] = (await readFile(filename)).toString("base64");
+    }
+  };
+  await visit(directory);
+  return result;
+}
+
+function foregroundOutputRecords(run) {
+  return run.stdout().trim().split(/\r?\n/).map(line => JSON.parse(line));
+}
+
+async function waitForForegroundOutput(run, status, timeoutMs = 2_000) {
+  const deadline = performance.now() + timeoutMs;
+  while (performance.now() < deadline) {
+    const records = run.stdout().trim().split(/\r?\n/).filter(Boolean).map(line => {
+      try { return JSON.parse(line); } catch { return null; }
+    });
+    const match = records.find(record => record?.status === status);
+    if (match) return match;
+    await new Promise(resolve => setTimeout(resolve, 5));
+  }
+  throw new Error(`foreground ${status} output timed out`);
+}
+
 test("import and default-disabled CLI have no side effects; invalid enable is sanitized", async t => {
   const dataRoot = await root(t);
   const signals = new EventEmitter();
@@ -76,7 +150,10 @@ test("import and default-disabled CLI have no side effects; invalid enable is sa
     [{PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "false"}, 0, "DISABLED"],
     [{PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "secret-invalid-enable"}, 2, "BLOCKED"],
     [{PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
-      PAPER_SYNTHETIC_ACCEPTANCE_HTTPS_ENABLED: "secret-invalid-https"}, 2, "BLOCKED"]
+      PAPER_SYNTHETIC_ACCEPTANCE_HTTPS_ENABLED: "secret-invalid-https"}, 2, "BLOCKED"],
+    [{PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_CLAIM_ID: "../unsafe"}, 2, "BLOCKED"]
   ]) {
     let output = "";
     assert.equal(await main({
@@ -262,6 +339,134 @@ test("real SIGTERM drill targets its dedicated child after a durable fill", {tim
   assert.equal(acknowledgement.checkpointSha256, summary.signalDrill.fillCheckpointSha256);
   verified = true;
 });
+
+test("foreground SIGTERM records readiness and an identical replacement only reads the original evidence",
+  {timeout: 20_000}, async t => {
+    const dataRoot = await root(t);
+    const claimId = "foreground-success-001";
+    const run = startForegroundChild(dataRoot, claimId);
+    t.after(async () => {
+      if (run.child.exitCode === null && run.child.signalCode === null) {
+        run.child.kill("SIGKILL");
+        await run.closed;
+      }
+    });
+    const {claim, directory, readiness} = await waitForForegroundReadiness(dataRoot, claimId);
+    assert.equal(readiness.status, "READY");
+    assert.equal(readiness.claimId, claimId);
+    assert.equal(readiness.runId, claim.runId);
+    assert.match(readiness.checkpointSha256, /^[0-9a-f]{64}$/);
+    const readyOutput = await waitForForegroundOutput(run, "READY");
+    assert.equal(readyOutput.status, "READY");
+    assert.equal(readyOutput.runId, claim.runId);
+    assert.equal(readyOutput.checkpointSha256, readiness.checkpointSha256);
+    assert.equal(run.child.kill("SIGTERM"), true);
+    assert.deepEqual(await run.closed, {code: 2, signal: null}, run.stderr());
+    const summary = foregroundOutputRecords(run).at(-1);
+    assert.equal(summary.status, "UNKNOWN");
+    assert.equal(summary.proof, "SYNTHETIC_PLATFORM_FOREGROUND");
+    assert.equal(summary.runId, claim.runId);
+    assert.equal(summary.entryFills, 1);
+    assert.equal(summary.exits, 0);
+    assert.equal(summary.stopAccepted, true);
+    assert.equal(summary.restartDenied, true);
+    assert.equal(summary.immutableReadback, true);
+    assert.equal(summary.signalObservation.status, "OBSERVED");
+    assert.equal(summary.signalObservation.afterReady, true);
+    assert.equal(summary.signalObservation.platformProvenance, "NOT_ASSESSED");
+    assert.equal(Object.hasOwn(summary.signalObservation, "signalToExitMs"), false);
+    assert.equal(summary.signalProof.fillCheckpointSha256, readiness.checkpointSha256);
+    assert.equal(summary.signalProof.fillCheckpointSequence, readiness.checkpointSequence);
+    assert.equal(summary.hostAcceptance, "NOT_ASSESSED");
+    assert.equal(summary.liveExecution, false);
+    assert.equal(summary.networkAccessed, false);
+    const exportBytes = await readFile(path.join(directory, "result.report.json"));
+    assert.equal(summary.exportSha256, hash(exportBytes));
+    assert.deepEqual(await readFile(path.join(
+      directory, "receiver", hash(Buffer.from(claim.runId)), "export.json"
+    )), exportBytes);
+    const originalTree = await snapshotTree(dataRoot);
+
+    const replacement = startForegroundChild(dataRoot, claimId);
+    assert.deepEqual(await replacement.closed, {code: 2, signal: null}, replacement.stderr());
+    const readback = JSON.parse(replacement.stdout().trim());
+    assert.equal(readback.status, "UNKNOWN");
+    assert.equal(readback.mode, "READ_ONLY_REPLACEMENT");
+    assert.equal(readback.readback, "VERIFIED");
+    assert.equal(readback.runId, claim.runId);
+    assert.equal(readback.fillCount, 1);
+    assert.equal(readback.readinessSha256, readyOutput.readinessSha256);
+    assert.equal(readback.checkpointSha256, readiness.checkpointSha256);
+    assert.equal(readback.checkpointSequence, readiness.checkpointSequence);
+    assert.equal(readback.restartDenied, true);
+    assert.equal(readback.immutableReadback, true);
+    assert.equal(readback.exportSha256, summary.exportSha256);
+    assert.deepEqual(await snapshotTree(dataRoot), originalTree);
+  });
+
+test("foreground timeout leaves a permanent claim; replacement does not replay incomplete work",
+  {timeout: 15_000}, async t => {
+    const dataRoot = await root(t);
+    const claimId = "foreground-timeout-001";
+    const run = startForegroundChild(dataRoot, claimId, 1_500);
+    t.after(async () => {
+      if (run.child.exitCode === null && run.child.signalCode === null) {
+        run.child.kill("SIGKILL");
+        await run.closed;
+      }
+    });
+    const {claim, directory} = await waitForForegroundReadiness(dataRoot, claimId);
+    assert.deepEqual(await run.closed, {code: 2, signal: null}, run.stderr());
+    assert.equal(foregroundOutputRecords(run).at(-1).status, "UNKNOWN");
+    assert.equal(await readFile(path.join(directory, "readiness.json")).then(() => true), true);
+    await assert.rejects(readFile(path.join(directory, "summary.json")), {code: "ENOENT"});
+    const beforeReplacement = await snapshotTree(dataRoot);
+
+    const replacement = startForegroundChild(dataRoot, claimId);
+    assert.deepEqual(await replacement.closed, {code: 2, signal: null}, replacement.stderr());
+    const readback = foregroundOutputRecords(replacement).at(-1);
+    assert.equal(readback.status, "UNKNOWN");
+    assert.equal(readback.mode, "READ_ONLY_REPLACEMENT");
+    assert.equal(readback.readback, "UNKNOWN");
+    assert.equal(readback.runId, claim.runId);
+    assert.deepEqual(await snapshotTree(dataRoot), beforeReplacement);
+  });
+
+test("foreground replacement reports UNKNOWN and preserves tampered or missing evidence",
+  {timeout: 25_000}, async t => {
+    for (const mutation of ["tampered-export", "missing-readiness"]) {
+      await t.test(mutation, async subtest => {
+        const dataRoot = await root(subtest);
+        const claimId = `foreground-${mutation}`;
+        const run = startForegroundChild(dataRoot, claimId);
+        subtest.after(async () => {
+          if (run.child.exitCode === null && run.child.signalCode === null) {
+            run.child.kill("SIGKILL");
+            await run.closed;
+          }
+        });
+        const {directory} = await waitForForegroundReadiness(dataRoot, claimId);
+        assert.equal(run.child.kill("SIGTERM"), true);
+        assert.deepEqual(await run.closed, {code: 2, signal: null}, run.stderr());
+        if (mutation === "tampered-export") {
+          const filename = path.join(directory, "result.report.json");
+          const bytes = await readFile(filename);
+          bytes[0] ^= 1;
+          await writeFile(filename, bytes);
+        } else {
+          await rm(path.join(directory, "readiness.json"));
+        }
+        const beforeReplacement = await snapshotTree(dataRoot);
+        const replacement = startForegroundChild(dataRoot, claimId);
+        assert.deepEqual(await replacement.closed, {code: 2, signal: null}, replacement.stderr());
+        const readback = foregroundOutputRecords(replacement).at(-1);
+        assert.equal(readback.status, "UNKNOWN");
+        assert.equal(readback.mode, "READ_ONLY_REPLACEMENT");
+        assert.equal(readback.readback, "UNKNOWN");
+        assert.deepEqual(await snapshotTree(dataRoot), beforeReplacement);
+      });
+    }
+  });
 
 test("real SIGTERM drill refuses a child that exited before its one-shot signal", {timeout: 10_000}, async t => {
   const dataRoot = await mkdtemp(path.join(os.tmpdir(), "synthetic-real-signal-early-exit-"));

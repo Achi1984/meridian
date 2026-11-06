@@ -288,6 +288,85 @@ budget plus scheduling margin; do not SIGKILL during checkpoint/export
 publication. Slow durable storage remains UNKNOWN and requires reconciliation,
 never a retry or a new operation budget for the same run.
 
+Proof A3 — platform-initiated stop of the foreground synthetic worker
+--------------------------------------------------------------------
+
+This opt-in path is distinct from A2. A2 starts an IPC child and its parent sends
+SIGTERM; A3 runs the synthetic harness itself in the foreground, has no parent,
+does not spawn a signal sender, and uses no IPC. It listens for SIGTERM only
+after installing a permanent claim, running the offline fixture pipeline, and
+fsyncing a unique run-bound readiness marker after the acknowledged fill. The
+existing stop API then produces the terminal checkpoint/export, restart denial,
+and immutable receiver readback. Default worker behavior and ordinary A2 are
+unchanged.
+
+Local/source-only verification (no host or service signal):
+
+  node --test test/memecoin-paper-synthetic-host-acceptance.test.js
+
+The tests signal only their isolated child processes. They exercise success,
+timeout, same-command replacement readback, tampering, and missing evidence.
+Passing these tests proves local process and filesystem behavior only. It does
+not prove platform event provenance, service/pod identity, volume identity,
+image deployment, platform termination timing, or hosted durability.
+
+Future host rehearsal — separate approval required; this source-only change
+does not authorize a Northflank action. Preserve the existing volume, all old
+claims/runs, and the previous service command/entrypoint before any separately
+approved rehearsal. Use the already verified private synthetic data child and
+the reviewed immutable image digest; do not use or alter the batch claim or any
+old claim. The worker must run as its existing unprivileged UID. Set custom
+entrypoint `node`, command
+`scripts/memecoin-paper/synthetic-host-acceptance.mjs`, and only these explicit
+environment values:
+
+  PAPER_SYNTHETIC_ACCEPTANCE_ENABLED=true
+  PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND=true
+  PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND_TIMEOUT_MS=60000
+  PAPER_SYNTHETIC_ACCEPTANCE_CLAIM_ID=<new unique safe ID>
+  PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT=/var/data/meridian-paper/synthetic-acceptance
+
+Keep the worker private, offline, credential-free, with no HTTPS options or
+provider settings. Configure and independently read back a termination grace of
+at least 65 seconds. Use one unique claim ID for one attempt only. The first
+process stays foreground after it prints one `READY` JSON receipt; readiness is
+the durable `foreground-claims/<claim>.json` plus the run's `readiness.json`.
+That receipt is worker output, not proof of a platform event. The
+platform replacement must use the identical command, claim ID, image digest,
+service, and attached volume. It must report `mode: READ_ONLY_REPLACEMENT` and
+`readback: VERIFIED`; it must not create another fill or modify any evidence.
+An UNKNOWN readback, missing marker, timeout, mismatch, or ambiguous state is
+terminal for that claim: preserve the complete tree and do not retry it, clear
+it, or substitute a fresh claim as a way to repair the evidence.
+
+The worker can report only that its own process handler observed SIGTERM after
+readiness. It deliberately does not report platform-event provenance,
+signal-to-exit duration, a platform timestamp, or volume identity. For any
+future host conclusion, retain independent before/after platform evidence that
+binds all of the following:
+
+- exact immutable volume ID and its attachment to the same service before and
+  after replacement;
+- same service ID and distinct old/new pod IDs;
+- same pinned `sha256:` image digest and the independently read-back 65-second
+  termination-grace setting;
+- original pod's platform SIGTERM/termination event time and independently
+  observed process/pod exit time, no more than 65 seconds apart;
+- original claim/run ID and exact readiness, checkpoint, export SHA-256 and
+  byte length, plus replacement's read-only verified readback of those same
+  bytes.
+
+Capture platform event time and observed exit from the platform's independent
+event/status surfaces, not from worker JSON or application logs. If any identity,
+attachment, event timestamp, observed exit, or byte-level readback is missing or
+ambiguous, report host result UNKNOWN and preserve evidence. Do not infer the
+event or timing from a process-handler receipt.
+
+Rollback only after independently establishing that no worker is active: restore
+the saved prior command/entrypoint and service settings, leave the same volume
+attached, and preserve the new claim and all old artifacts unchanged. Never
+delete claims, checkpoints, exports, or locks to make a rollback/retry pass.
+
 Proof B — CONTROLLER SOURCE-POLICY NO-ENTRY lifecycle, NOT synthetic quote proof
 -----------------------------------------------------------------------------
 
