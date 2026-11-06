@@ -2059,7 +2059,9 @@ process.stdout.write(JSON.stringify(runBatch({
         descendants = []
         descendant_identity = []
         descendant_pre_cleanup_states = []
+        descendant_return_states = []
         descendant_exit_states = []
+        signal_timeline = []
         for path in (ack_marker, parent_marker, parent_fds_marker, descendant_marker, descendant_term_marker):
             if path.exists():
                 path.unlink()
@@ -2068,6 +2070,8 @@ process.stdout.write(JSON.stringify(runBatch({
         claim = self.claim("trial-d", "d" * 64, self.data)
         started = time.monotonic()
         original_popen = subprocess.Popen
+        original_killpg = supervisor.os.killpg
+        original_run_batch = supervisor.run_batch
         children = []
         thread = None
         result = []
@@ -2079,8 +2083,41 @@ process.stdout.write(JSON.stringify(runBatch({
                 children.append(child)
             return child
 
+        def record_signal(pgid, received_signal):
+            try:
+                original_killpg(pgid, received_signal)
+            except BaseException as error:
+                signal_timeline.append({
+                    "elapsed_ms": round((time.monotonic() - started) * 1000, 3),
+                    "event": "process_group_signal",
+                    "pgrp": pgid,
+                    "signal": received_signal.name,
+                    "result": type(error).__name__,
+                })
+                raise
+            signal_timeline.append({
+                "elapsed_ms": round((time.monotonic() - started) * 1000, 3),
+                "event": "process_group_signal",
+                "pgrp": pgid,
+                "signal": received_signal.name,
+                "result": "sent",
+            })
+
+        def observe_return(*args, **kwargs):
+            settled = original_run_batch(*args, **kwargs)
+            descendant_return_states.extend(
+                _classify_pid_state(identity["pid"], identity["start_ticks"])
+                for identity in descendant_identity)
+            signal_timeline.append({
+                "elapsed_ms": round((time.monotonic() - started) * 1000, 3),
+                "event": "supervisor_return",
+            })
+            return settled
+
         try:
-            with patch.object(supervisor.subprocess, "Popen", side_effect=spawn):
+            with patch.object(supervisor.subprocess, "Popen", side_effect=spawn), \
+                    patch.object(supervisor.os, "killpg", side_effect=record_signal), \
+                    patch.object(supervisor, "run_batch", side_effect=observe_return):
                 thread, result, failure = self.run_in_thread(
                     claim, {"path_seconds": 1.0, "batch_seconds": 4.0})
                 observed_parent_exit = None
@@ -2147,12 +2184,18 @@ process.stdout.write(JSON.stringify(runBatch({
                 "descendant_count": len(descendants),
                 "descendant_identity": descendant_identity,
                 "descendant_pre_cleanup_states": descendant_pre_cleanup_states,
+                "descendant_return_states": descendant_return_states,
                 "descendant_exit_states": descendant_exit_states,
+                "signal_timeline": signal_timeline,
                 "child_returncode": None if not children else children[0].poll(),
             }, sort_keys=True, separators=(",", ":"))
             self.assertEqual(settled["state"], "timed_out", diagnostic)
             self.assertEqual(settled["reason"], "DEADLINE_EXCEEDED", diagnostic)
             self.assertEqual(ack_marker.read_text(), f"{'d'*64}:0", diagnostic)
+            self.assertEqual(len(descendant_return_states), len(descendant_identity), diagnostic)
+            for state in descendant_return_states:
+                self.assertIn(state.get("classification"), ("dead", "zombie", "pid_reused"), diagnostic)
+                self.assertNotEqual(state.get("classification"), "live", diagnostic)
             for state in descendant_exit_states:
                 self.assertIn(state.get("classification"), ("dead", "zombie", "pid_reused"), diagnostic)
                 self.assertNotEqual(state.get("classification"), "live", diagnostic)
