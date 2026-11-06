@@ -351,3 +351,34 @@ stress projections including cost non-overlap, rounding, configuration/evidence
 binding, size caps, and identity stability across recreated adapters. It makes
 no network request and does not claim that synthetic responses are real market
 evidence.
+
+## Modeled quote handoff (fixture-only, work in progress)
+
+A module-owned fixture adapter (`createFixtureMarketQuoteAdapter`) can issue a
+frozen `PAPER_MODELED_QUOTE_V1` quote from its own QUOTED_NET_V1 projection via
+`issueModeledQuote`. Issuance validates the original issued object (not a
+clone), the run window and the policy against the constructor-owned clock; no
+caller timestamp is ever authoritative. The quote is labelled `MODELED`,
+`actualCostCoverage: UNKNOWN`, `executionRealistic: false`. The ledger commits
+exactly the modeled base quantity (never resized; refused if it exceeds the
+risk budget), binds the modeled facts into entry and exit replay digests, and
+refuses any mark or exit whose modeled base does not equal the full position
+before mutating high-water, stop or observation time. `eventId` is excluded
+from issuer confirmation only because the ledger binds event identity and the
+full payload separately. Real and external modes gain no authority.
+
+Unresolved policy: approved network transport, reviewer authenticity,
+archival coverage, and numeric model calibration.
+
+The step retains an immutable configured policy and refuses (before any state
+mutation) any issuer quote whose run, window, source policy, model, scenario
+config or USD assumption differs, and any exit whose bindings differ from the
+entry position. The fixture runtime rechecks deadline and cancellation after
+the issuer clock advances, before audit append or return. Integration tests
+cover issuer → composition → step → checkpoint → ledger entry/mark/exit,
+checkpoint restart replay (PAPER_FILL/PAPER_EXIT provenance and digests) and
+changed-event/changed-quote replay rejection. A direct regression drives
+`acquireSyntheticRuntimeFixture` with a forwarding spy around the real fixture
+adapter: issuance succeeds while the owned clock crosses the deadline, and the
+quote returns null with `runtimeAudit.quotes` unchanged (verified to fail with
+the post-issuance fence removed).
