@@ -98,11 +98,18 @@ function acceptanceOperation({
   let phaseTransitioned = false;
   let phase = "initial";
   let timer;
+  let discoveryTimer;
+  let discoveryActive = false;
+  let discoveryStart;
+  let discoveryDeadline;
+  let discoveryAbsoluteDeadline;
   const cancel = () => controller.abort(failure);
   const check = () => {
     const now = monotonicNow();
+    const nowNs = process.hrtime.bigint();
     if (!Number.isFinite(now) || now < previous || now >= deadline ||
-        process.hrtime.bigint() >= absoluteDeadline) cancel();
+        nowNs >= absoluteDeadline ||
+        (discoveryActive && (now >= discoveryDeadline || nowNs >= discoveryAbsoluteDeadline))) cancel();
     previous = now;
     if (controller.signal.aborted) throw failure;
   };
@@ -185,13 +192,36 @@ function acceptanceOperation({
     beginFinalization(signalAt) {
       beginPhase(finalizationTimeoutMs, "finalization", signalAt);
     },
+    beginReadbackDiscovery() {
+      requireProof(allowPhaseTransition && phase === "initial" &&
+        !phaseTransitioned && !discoveryActive && !controller.signal.aborted);
+      discoveryStart = {monotonicMs: monotonicNow(), monotonicNs: process.hrtime.bigint()};
+      requireProof(Number.isFinite(discoveryStart.monotonicMs));
+      discoveryDeadline = discoveryStart.monotonicMs + readbackTimeoutMs;
+      discoveryAbsoluteDeadline = discoveryStart.monotonicNs +
+        BigInt(readbackTimeoutMs) * NS_PER_MS;
+      discoveryActive = true;
+      phase = "readback-discovery";
+      discoveryTimer = setTimeout(cancel, Math.max(0,
+        Math.min(readbackTimeoutMs, Number(
+          (discoveryAbsoluteDeadline - process.hrtime.bigint()) / NS_PER_MS
+        ))));
+    },
+    endReadbackDiscovery() {
+      requireProof(discoveryActive && phase === "readback-discovery");
+      check();
+      clearTimeout(discoveryTimer);
+      discoveryActive = false;
+      phase = "initial";
+    },
     beginReadback() {
-      beginPhase(readbackTimeoutMs, "readback");
+      beginPhase(readbackTimeoutMs, "readback", discoveryActive ? discoveryStart : undefined);
     },
     get phase() { return phase; },
     abort: cancel,
     dispose() {
       clearTimeout(timer);
+      clearTimeout(discoveryTimer);
       signalSource.removeListener("SIGINT", onSignal);
       signalSource.removeListener("SIGTERM", onSignal);
       cancel();
@@ -200,15 +230,27 @@ function acceptanceOperation({
   function beginPhase(durationMs, nextPhase, phaseStart = {
     monotonicMs: monotonicNow(), monotonicNs: process.hrtime.bigint()
   }) {
+    if (!controller.signal.aborted) check();
     requireProof(allowPhaseTransition && !phaseTransitioned && !controller.signal.aborted &&
       Number.isSafeInteger(durationMs) && durationMs > 0 && durationMs <= MAX_ACCEPTANCE_MS);
     requireProof(Number.isFinite(phaseStart.monotonicMs) &&
       typeof phaseStart.monotonicNs === "bigint" && phaseStart.monotonicNs > 0n);
+    if (phaseStart.monotonicMs >= deadline || phaseStart.monotonicNs >= absoluteDeadline ||
+        (discoveryActive &&
+          (phaseStart.monotonicMs >= discoveryDeadline ||
+           phaseStart.monotonicNs >= discoveryAbsoluteDeadline))) {
+      cancel();
+      throw failure;
+    }
     phaseTransitioned = true;
     phase = nextPhase;
     previous = Math.max(previous, phaseStart.monotonicMs);
     deadline = phaseStart.monotonicMs + durationMs;
     absoluteDeadline = phaseStart.monotonicNs + BigInt(durationMs) * NS_PER_MS;
+    if (discoveryActive) {
+      clearTimeout(discoveryTimer);
+      discoveryActive = false;
+    }
     armTimer(durationMs);
   }
 }
@@ -223,7 +265,7 @@ async function withAcceptanceOperation(options, action) {
     if (operation.signal.aborted) {
       return {
         summary: {status: "UNKNOWN", code: "SYNTHETIC_ACCEPTANCE_FAILED"},
-        ...(operation.phase === "readback" ? {hold: true} : {})
+        ...(["readback", "readback-discovery"].includes(operation.phase) ? {hold: true} : {})
       };
     }
     throw error;
@@ -766,15 +808,15 @@ async function runForegroundAcceptance({
 }) {
   requireProof(validForegroundClaimId(claimId) && typeof dataRoot === "string" &&
     path.isAbsolute(dataRoot) && path.normalize(dataRoot) === dataRoot);
+  operation.beginReadbackDiscovery();
   const rootInfo = await operation.lstat(dataRoot);
   requireProof(isPrivateDirectory(rootInfo) && await operation.realpath(dataRoot) === dataRoot);
   const {arm: armPath, consumed: consumedPath, claim: claimPath} =
     foregroundPaths(dataRoot, claimId);
-  let claimBytes;
+  let claimExists = false;
   try {
     await operation.lstat(claimPath);
-    operation.beginReadback();
-    claimBytes = await operation.read(claimPath, 16 * 1024);
+    claimExists = true;
   } catch (error) {
     if (error.code !== "ENOENT") {
       return {
@@ -786,8 +828,11 @@ async function runForegroundAcceptance({
       };
     }
   }
-  if (claimBytes) {
+  if (claimExists) {
+    operation.beginReadback();
+    let claimBytes;
     try {
+      claimBytes = await operation.read(claimPath, 16 * 1024);
       const readback = await verifyForegroundEvidence({
         dataRoot, claimId, claimBytes, operation, rootDevice: rootInfo.dev
       });
@@ -801,16 +846,16 @@ async function runForegroundAcceptance({
       return {
         summary: {
           status: "UNKNOWN", mode: "READ_ONLY_REPLACEMENT", readback: "UNKNOWN",
-          claimId, runId: claimedRunId,
-          platformProvenance: "NOT_ASSESSED"
+          claimId, runId: claimedRunId, platformProvenance: "NOT_ASSESSED"
         },
         hold: true
       };
     }
   }
-  let consumed;
+  let consumedExists = false;
   try {
-    consumed = await operation.read(consumedPath, 16 * 1024);
+    await operation.lstat(consumedPath);
+    consumedExists = true;
   } catch (error) {
     if (error.code !== "ENOENT") {
       return {
@@ -822,7 +867,8 @@ async function runForegroundAcceptance({
       };
     }
   }
-  if (consumed) {
+  if (consumedExists) {
+    operation.beginReadback();
     return {
       summary: {
         status: "UNKNOWN", mode: "INERT_CONSUMED_ARM", readback: "NOT_ATTEMPTED",
@@ -831,6 +877,7 @@ async function runForegroundAcceptance({
       hold: true
     };
   }
+  operation.endReadbackDiscovery();
   let armBytes;
   try {
     armBytes = await operation.read(armPath, 16 * 1024);

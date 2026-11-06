@@ -614,6 +614,45 @@ test("delayed operator SIGTERM starts a fresh bounded finalization phase", {time
   await drainProbe(probe);
 });
 
+test("SIGTERM observed after the operator deadline cannot start finalization", {timeout: 10_000},
+  async t => {
+    const dataRoot = await root(t);
+    const claimId = "foreground-late-operator-signal";
+    await armForegroundRoot(dataRoot, claimId);
+    const signals = new EventEmitter();
+    const started = performance.now();
+    let output = "";
+    const code = await main({
+      env: {
+        PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
+        PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND: "true",
+        PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND_WAIT_TIMEOUT_MS: "2500",
+        PAPER_SYNTHETIC_ACCEPTANCE_FINALIZATION_TIMEOUT_MS: "1000",
+        PAPER_SYNTHETIC_ACCEPTANCE_CLAIM_ID: claimId,
+        PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT: dataRoot
+      },
+      signalSource: signals,
+      stdout: {write(value) {
+        output += value;
+        if (value.includes('"status":"READY"')) {
+          const lateSignalAt = started + 2_700;
+          while (performance.now() < lateSignalAt) {}
+          signals.emit("SIGTERM");
+        }
+      }}
+    });
+    assert.equal(code, 2);
+    const [ready, summary] = output.trim().split(/\r?\n/).map(line => JSON.parse(line));
+    assert.equal(ready.status, "READY");
+    assert.equal(summary.status, "UNKNOWN");
+    assert.equal(summary.signalObservation, undefined);
+    const claim = JSON.parse(await readFile(
+      path.join(dataRoot, `foreground-claim-${claimId}.json`), "utf8"
+    ));
+    await assert.rejects(readFile(path.join(dataRoot, claim.runId, "summary.json")), {code: "ENOENT"});
+    assert.ok(performance.now() - started >= 2_700);
+  });
+
 test("post-SIGTERM finalization phase timeout returns UNKNOWN and preserves partial evidence",
   {timeout: 8_000}, async t => {
     const dataRoot = await root(t);
@@ -660,7 +699,7 @@ test("post-SIGTERM finalization phase timeout returns UNKNOWN and preserves part
     assert.equal(await readFile(path.join(runDirectory, "summary.json")).then(() => true).catch(() => false), false);
   });
 
-test("bounded replacement readback timeout holds inertly without writes until SIGTERM",
+test("bounded replacement claim-discovery timeout holds inertly without writes until SIGTERM",
   {timeout: 8_000}, async t => {
     const dataRoot = await root(t);
     const claimId = "foreground-readback-timeout";
@@ -685,7 +724,8 @@ test("bounded replacement readback timeout holds inertly without writes until SI
       signals.emit("SIGTERM");
     });
     const probe = filesystemProbe(async call => {
-      if (call.method === "read" && path.basename(call.filename) === "checkpoint.json") {
+      if (call.method === "lstat" &&
+          path.basename(call.filename) === `foreground-claim-${claimId}.json`) {
         entered.resolve();
         await release.promise;
       }
