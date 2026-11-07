@@ -21,8 +21,34 @@ const MAX_MANIFEST_BYTES = 64 * 1024;
 const MAX_RETAINED_RESPONSE_BYTES = 64 * 1024 * 1024;
 const MAX_RESPONSE_BYTES = SPOT_PAPER_PILOT_LIMITS.maxResponseBytes;
 const MAX_CYCLES = 60;
+const MAX_REQUESTS = 120;
 const isInteger = Number.isSafeInteger;
 const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
+const statusRank = { PASS: 0, UNKNOWN: 1, FAILED: 2 };
+
+function worsenStatus(current, next) {
+  return statusRank[next] > statusRank[current] ? next : current;
+}
+
+function canonicalErrorGapCycle(event) {
+  if (event?.type !== "data_gap" || event.dataGap === "MISSED_DECISION_WINDOW") return null;
+  const match = /^gap:([1-9]\d*):([1-9]\d*):(.+)$/.exec(event.id ?? "");
+  if (!match) return null;
+  const cycle = Number(match[1]);
+  const requests = Number(match[2]);
+  if (!isInteger(cycle) || cycle > MAX_CYCLES ||
+      !isInteger(requests) || requests > MAX_REQUESTS || event.reason !== match[3] ||
+      (event.cycle !== undefined && event.cycle !== cycle)) return null;
+  return cycle;
+}
+
+function cycleForEvent(event) {
+  if (event?.type === "data_gap" && event.dataGap !== "MISSED_DECISION_WINDOW") {
+    return canonicalErrorGapCycle(event);
+  }
+  if (!isInteger(event?.cycle)) return null;
+  return event.cycle;
+}
 
 function identityStatus(readback, provenance) {
   if (!readback || !provenance) return "UNKNOWN";
@@ -114,28 +140,6 @@ function eventHasReplayCandles(event) {
     Boolean(event.acceptedOhlc);
 }
 
-function cycleForEvent(event) {
-  if (event?.type === "data_gap" &&
-      event.dataGap !== "MISSED_DECISION_WINDOW") {
-    const match = /^gap:(\d+):(\d+):([^\r\n]{1,120})$/.exec(event.id ?? "");
-    if (!match) return null;
-    const [, cycleText, requestsText, reason] = match;
-    const cycle = Number(cycleText);
-    const requests = Number(requestsText);
-    if (!isInteger(cycle) || cycle < 1 || !isInteger(requests) || requests < 1 ||
-        event.reason !== reason || !isInteger(event.at) ||
-        Object.hasOwn(event, "cycle") || Object.hasOwn(event, "fills")) return null;
-    return cycle;
-  }
-  return isInteger(event?.cycle) ? event.cycle : null;
-}
-
-function eventFills(event) {
-  if (Array.isArray(event.fills)) return event.fills;
-  return event.type === "data_gap" &&
-    event.dataGap !== "MISSED_DECISION_WINDOW" ? [] : null;
-}
-
 function quoteAtFill(event, responseBodies) {
   const ticker = event.ticker ?? event.acceptedTicker;
   if (!ticker) return { status: "UNKNOWN", code: "MISSING_FILL_QUOTE" };
@@ -158,10 +162,9 @@ function quoteAtFill(event, responseBodies) {
 }
 
 function verifyFills(event, responseBodies, signalStatus) {
-  const fills = eventFills(event);
-  if (!fills) return { status: "FAILED", code: "INVALID_FILL_CLAIMS" };
+  if (!Array.isArray(event.fills)) return { status: "FAILED", code: "INVALID_FILL_CLAIMS" };
   let sampledStops = 0;
-  for (const fill of fills) {
+  for (const fill of event.fills) {
     const stop = fill?.side === "SELL" && fill.reason === "SAMPLED_2PCT_BID_STOP";
     if (stop) sampledStops++;
     const quoteResult = quoteAtFill(event, responseBodies);
@@ -220,17 +223,17 @@ export function replaySpotPaperSignals({ readback, provenance, responseBodies } 
 
   const events = readback.events;
   const cycleEvents = Array.isArray(events) ? events.slice(1, -1) : [];
-  const cyclesValid = isInteger(readback.checkpoint?.cycle) &&
-    readback.checkpoint.cycle >= 0 && readback.checkpoint.cycle <= MAX_CYCLES &&
-    cycleEvents.length === readback.checkpoint.cycle &&
-    cycleEvents.every((event, index) => cycleForEvent(event) === index + 1);
   const shapeValid = readback.reconciliation === "TERMINAL_REPORT_AVAILABLE" &&
     readback.resumed === false && readback.executionImpact === false &&
     readback.eventCount === events?.length && Array.isArray(events) &&
     events.length >= 2 && events.length <= MAX_CYCLES + 2 &&
+    events.every(event => event && typeof event === "object" && !Array.isArray(event)) &&
     events[0]?.id === "run-start" && events.at(-1)?.id === "run-terminal" &&
     events.filter(event => event.id === "run-terminal").length === 1 &&
-    cyclesValid;
+    isInteger(readback.checkpoint?.cycle) &&
+    readback.checkpoint.cycle >= 0 && readback.checkpoint.cycle <= MAX_CYCLES &&
+    cycleEvents.length === readback.checkpoint.cycle &&
+    cycleEvents.every((event, index) => cycleForEvent(event) === index + 1);
   if (!shapeValid) {
     return {
       outcome: "UNKNOWN", identity, signalReplay: "UNKNOWN",
@@ -242,7 +245,7 @@ export function replaySpotPaperSignals({ readback, provenance, responseBodies } 
   }
   const bodies = responseBodies ?? {};
   const references = new Map();
-  for (const event of cycleEvents) {
+  for (const event of events) {
     for (const reference of [event.ohlc, event.ticker,
       event.acceptedOhlc, event.acceptedTicker]) {
       if (reference?.sha256) references.set(reference.sha256, reference);
@@ -285,22 +288,27 @@ export function replaySpotPaperSignals({ readback, provenance, responseBodies } 
   let signalStatus = "PASS";
   let fillStatus = "PASS";
   let unknownEvidence = discrepancies.length > 0;
-  for (const event of cycleEvents) {
+  for (const event of events) {
     const cycle = cycleForEvent(event);
+    if (cycle === null) continue;
     if (cycle !== lastCycle + 1) {
       discrepancies.push("CYCLE_ORDER_MISMATCH");
-      signalStatus = "FAILED";
+      signalStatus = worsenStatus(signalStatus, "FAILED");
       break;
     }
     lastCycle = cycle;
+    const runnerErrorGap = event.type === "data_gap" &&
+      event.dataGap !== "MISSED_DECISION_WINDOW";
+    const replayEvent = runnerErrorGap && event.fills === undefined ?
+      { ...event, fills: [] } : event;
     if (!eventHasReplayCandles(event)) {
       if (event.signals?.length) {
         discrepancies.push("SIGNALS_WITHOUT_CLOSED_CANDLES");
-        signalStatus = "FAILED";
+        signalStatus = worsenStatus(signalStatus, "FAILED");
       }
       if (event.fills?.length) {
         discrepancies.push("FILLS_WITHOUT_MARKET_EVIDENCE");
-        fillStatus = "FAILED";
+        fillStatus = worsenStatus(fillStatus, "FAILED");
       }
       continue;
     }
@@ -308,8 +316,10 @@ export function replaySpotPaperSignals({ readback, provenance, responseBodies } 
     const ohlc = readOhlc(ohlcReference, bodies);
     if (ohlc.status !== "PASS") {
       discrepancies.push(ohlc.code);
-      if (ohlc.status === "UNKNOWN") unknownEvidence = true;
-      else signalStatus = "FAILED";
+      if (ohlc.status === "UNKNOWN") {
+        unknownEvidence = true;
+        signalStatus = worsenStatus(signalStatus, "UNKNOWN");
+      } else signalStatus = worsenStatus(signalStatus, "FAILED");
       continue;
     }
     const provisional = event.type === "data_gap" &&
@@ -321,7 +331,7 @@ export function replaySpotPaperSignals({ readback, provenance, responseBodies } 
       discrepancies.push(error.message === "CONFLICTING_CLOSED_CANDLE" ?
         error.message : error.message === "CLOSED_CANDLE_GAP" ?
           error.message : "STRATEGY_REPLAY_FAILED");
-      signalStatus = "FAILED";
+      signalStatus = worsenStatus(signalStatus, "FAILED");
       continue;
     }
     if (startupCutoff === "UNKNOWN" && state.cutoffAt === null) {
@@ -329,18 +339,18 @@ export function replaySpotPaperSignals({ readback, provenance, responseBodies } 
         advanced.signals.length === 0 ? "PASS" : "FAILED";
       if (startupCutoff === "FAILED") discrepancies.push("INVALID_STARTUP_CUTOFF");
     }
-    const signalCheck = verifySignals(event, advanced, ohlc);
+    const signalCheck = verifySignals(replayEvent, advanced, ohlc);
     if (signalCheck.status !== "PASS") {
       discrepancies.push(signalCheck.code);
-      signalStatus = signalCheck.status;
+      signalStatus = worsenStatus(signalStatus, signalCheck.status);
     } else {
       replayedSignals += signalCheck.count;
     }
-    const fillCheck = verifyFills(event, bodies, signalCheck.status);
+    const fillCheck = verifyFills(replayEvent, bodies, signalCheck.status);
     if (fillCheck.status !== "PASS") {
       discrepancies.push(fillCheck.code);
       if (fillCheck.status === "UNKNOWN") unknownEvidence = true;
-      else fillStatus = "FAILED";
+      fillStatus = worsenStatus(fillStatus, fillCheck.status);
     } else {
       sampledStopCount += fillCheck.sampledStops;
     }
@@ -349,9 +359,7 @@ export function replaySpotPaperSignals({ readback, provenance, responseBodies } 
 
   if (!stateMatches(state, readback.checkpoint.strategy)) {
     discrepancies.push("FINAL_STRATEGY_STATE_MISMATCH");
-    if (signalStatus !== "FAILED") {
-      signalStatus = unknownEvidence ? "UNKNOWN" : "FAILED";
-    }
+    signalStatus = worsenStatus(signalStatus, unknownEvidence ? "UNKNOWN" : "FAILED");
   }
   if (startupCutoff === "UNKNOWN") {
     discrepancies.push("STARTUP_CUTOFF_UNAVAILABLE");
@@ -413,8 +421,8 @@ export async function main(argv = process.argv.slice(2)) {
     try {
       raw = await boundedRead(join(runDirectory, reference.path), MAX_RESPONSE_BYTES);
     } catch (error) {
-      if (error?.code === "ENOENT") continue;
-      throw error;
+      if (error.code !== "ENOENT") throw error;
+      continue;
     }
     const bytes = Buffer.from(raw, "utf8");
     totalBytes += bytes.byteLength;

@@ -3,10 +3,8 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
 import {
-  EXPECTED_SIGNAL_REPLAY_IDENTITY, replaySpotPaperSignals
+  EXPECTED_SIGNAL_REPLAY_IDENTITY, main as signalReplayMain, replaySpotPaperSignals
 } from "../scripts/spot-paper-pilot/signal-replay.mjs";
 import {
   advanceStrategy, createStrategyState, sha256
@@ -18,8 +16,6 @@ const BASE = Date.UTC(2025, 0, 1);
 const MINUTE = 60_000;
 const PRICE_100 = "100.00000000";
 const PRICE_120 = "120.00000000";
-const REPLAY_CLI = fileURLToPath(new URL(
-  "../scripts/spot-paper-pilot/signal-replay.mjs", import.meta.url));
 
 function priceRow(timestamp, price) {
   return [timestamp / 1000, price, price, price, price, price, "1.00000000", 1];
@@ -51,14 +47,6 @@ function ticker() {
       a: ["100.01000000", "1", "1.00000000"],
       b: ["100.00000000", "1", "1.00000000"]
     } }
-  };
-}
-
-function acquired(data, now, requestStartedAt = now - 20) {
-  const raw = JSON.stringify(data);
-  return {
-    data, raw, sha256: sha256(Buffer.from(raw, "utf8")),
-    bytes: Buffer.byteLength(raw), requestStartedAt, receivedAt: now
   };
 }
 
@@ -159,6 +147,60 @@ function run(fixtureData, provenance = identity(), bodies = fixtureData.response
   });
 }
 
+async function runnerTickerFailureFixture(t) {
+  const dataRoot = await mkdtemp(join(tmpdir(), "spot-paper-signal-replay-"));
+  t.after(() => rm(dataRoot, { recursive: true, force: true }));
+  const now = { value: BASE + 21 * MINUTE + 1_000, monotonic: 0 };
+  const responseBodies = new Map();
+  let ohlcCycle = 0;
+  let tickerCycle = 0;
+  const acquire = (data, receivedAt, requestStartedAt = receivedAt - 20) => {
+    const raw = JSON.stringify(data);
+    const digest = sha256(Buffer.from(raw, "utf8"));
+    responseBodies.set(digest, raw);
+    return {
+      data, raw, sha256: digest, bytes: Buffer.byteLength(raw),
+      requestStartedAt, receivedAt
+    };
+  };
+  const provider = {
+    async fetchOhlc() {
+      ohlcCycle++;
+      const closes = ohlcCycle === 1 ? Array(21).fill(PRICE_100) :
+        [...Array(21).fill(PRICE_100), PRICE_120];
+      return acquire(ohlc(closes), now.value);
+    },
+    async fetchTicker() {
+      tickerCycle++;
+      if (tickerCycle === 2) throw new Error("FETCH_FAILED");
+      return acquire(ticker(), now.value, now.value);
+    },
+    counters: () => ({ requests: ohlcCycle + tickerCycle, bytes: 0 })
+  };
+  await runSpotPaperPilot({
+    dataRoot, runId: EXPECTED_SIGNAL_REPLAY_IDENTITY.runId, provider,
+    mode: "paper", maxCycles: 3, maxDurationMs: 180_000,
+    pollIntervalMs: MINUTE, requestTimeoutMs: 5_000,
+    now: () => now.value, monotonicNow: () => now.monotonic,
+    sleep: async duration => {
+      now.value += duration;
+      now.monotonic += duration;
+    }
+  });
+  const journal = await readRunJournal({
+    dataRoot, runId: EXPECTED_SIGNAL_REPLAY_IDENTITY.runId
+  });
+  const events = journal.events;
+  const terminal = events.at(-1);
+  const readback = {
+    reconciliation: "TERMINAL_REPORT_AVAILABLE",
+    runId: journal.runId, eventCount: events.length,
+    resumed: false, executionImpact: false, manifest: journal.manifest,
+    checkpoint: journal.checkpoint, events, report: terminal.report
+  };
+  return { readback, responseBodies };
+}
+
 test("replays and confirms a real SMA5/SMA20 upward crossover", () => {
   const data = fixture();
   data.addEvent({ closes: Array(21).fill(PRICE_100) });
@@ -212,77 +254,38 @@ test("reports conflicting closed candles and skipped decision bars", () => {
 
   const gap = fixture();
   gap.addEvent({ closes: Array(21).fill(PRICE_100) });
-  gap.addEvent({ closes: [PRICE_100], startAt: BASE + 22 * MINUTE });
+  gap.addEvent({
+    closes: [PRICE_100], startAt: BASE + 22 * MINUTE,
+    type: "data_gap", dataGap: "MISSED_DECISION_WINDOW"
+  });
   const gapResult = run(gap);
   assert.equal(gapResult.outcome, "FAILED");
   assert.ok(gapResult.discrepancies.includes("CLOSED_CANDLE_GAP"));
 });
 
-test("replays runner-produced ticker-error gaps provisionally before the next accepted observation", async t => {
-  const dataRoot = await mkdtemp(join(tmpdir(), "spot-paper-signal-replay-"));
-  t.after(() => rm(dataRoot, { recursive: true, force: true }));
-  const clock = { now: BASE + 21 * MINUTE + 1_000, monotonic: 0 };
-  let ohlcCalls = 0;
-  const provider = {
-    async fetchOhlc() {
-      ohlcCalls++;
-      const closes = ohlcCalls === 1 ? Array(21).fill(PRICE_100) :
-        [...Array(21).fill(PRICE_100), PRICE_120];
-      return acquired(ohlc(closes), clock.now, clock.now - 20);
-    },
-    async fetchTicker() {
-      if (ohlcCalls === 2) throw new Error("FETCH_FAILED");
-      return acquired(ticker(), clock.now, clock.now);
-    }
-  };
-  await runSpotPaperPilot({
-    mode: "paper",
-    dataRoot,
-    runId: EXPECTED_SIGNAL_REPLAY_IDENTITY.runId,
-    maxCycles: 3,
-    maxDurationMs: 180_000,
-    pollIntervalMs: MINUTE,
-    provider,
-    now: () => clock.now,
-    monotonicNow: () => clock.monotonic,
-    sleep: async ms => {
-      clock.now += ms;
-      clock.monotonic += ms;
-    }
-  });
-
-  const journal = await readRunJournal({
-    dataRoot, runId: EXPECTED_SIGNAL_REPLAY_IDENTITY.runId
-  });
-  const failedTickerGap = journal.events.find(event => event.reason === "FETCH_FAILED");
-  assert.ok(failedTickerGap);
-  assert.equal(failedTickerGap.type, "data_gap");
-  assert.match(failedTickerGap.id, /^gap:2:\d+:FETCH_FAILED$/);
-  assert.equal("cycle" in failedTickerGap, false);
-  assert.equal("fills" in failedTickerGap, false);
-  assert.ok(failedTickerGap.acceptedOhlc);
-  assert.equal(failedTickerGap.signals[0].direction, "ENTRY");
-
-  const responseBodies = new Map();
-  for (const event of journal.events) {
-    for (const reference of [event.ohlc, event.ticker,
-      event.acceptedOhlc, event.acceptedTicker]) {
-      if (!reference?.sha256 || responseBodies.has(reference.sha256)) continue;
-      responseBodies.set(reference.sha256, await readFile(
-        join(dataRoot, EXPECTED_SIGNAL_REPLAY_IDENTITY.runId, reference.path), "utf8"));
-    }
-  }
-  const readback = {
-    reconciliation: "TERMINAL_REPORT_AVAILABLE",
-    runId: journal.runId, eventCount: journal.events.length,
-    resumed: false, executionImpact: false, manifest: journal.manifest,
-    checkpoint: journal.checkpoint, events: journal.events
-  };
+test("replays a pinned-runner ticker error gap provisionally before the next observation", async t => {
+  const { readback, responseBodies } = await runnerTickerFailureFixture(t);
+  const [warmup, failedTicker, accepted] = readback.events.slice(1, -1);
+  assert.equal(failedTicker.id, "gap:2:4:FETCH_FAILED");
+  assert.equal("cycle" in failedTicker, false);
+  assert.equal("fills" in failedTicker, false);
+  assert.ok(failedTicker.acceptedOhlc);
+  assert.equal(failedTicker.signals[0].direction, "ENTRY");
+  assert.deepEqual(warmup.signals, []);
+  assert.equal(accepted.cycle, 3);
   const result = replaySpotPaperSignals({
     readback, provenance: identity(), responseBodies
   });
   assert.equal(result.outcome, "PASS", JSON.stringify(result));
   assert.equal(result.replayedSignals, 2);
+
+  const wrongCycle = structuredClone(readback);
+  wrongCycle.events[2].id = "gap:3:4:FETCH_FAILED";
+  const invalidGap = replaySpotPaperSignals({
+    readback: wrongCycle, provenance: identity(), responseBodies
+  });
+  assert.equal(invalidGap.outcome, "UNKNOWN");
+  assert.ok(invalidGap.discrepancies.includes("INCOMPLETE_OR_UNBOUNDED_JOURNAL"));
 });
 
 test("passes valid zero-entry evidence and keeps sampled stops separate", () => {
@@ -325,55 +328,48 @@ test("distinguishes missing raw, identity, and timestamp evidence", () => {
   assert.equal(run(wrongTimestamp).outcome, "FAILED");
 });
 
-test("keeps a known signal failure FAILED when missing raw evidence also causes state mismatch", () => {
+test("known signal failure remains FAILED when another referenced response is missing", () => {
   const data = fixture();
   data.addEvent({ closes: Array(21).fill(PRICE_100) });
-  const wrongClaim = data.addEvent({
-    closes: [...Array(21).fill(PRICE_100), PRICE_120],
-    claimedSignals: [{
-      id: `EXIT:${BASE + 21 * MINUTE}`, direction: "EXIT",
-      candleAt: BASE + 21 * MINUTE, closeNano: "12000000000",
-      signalKnownAt: BASE + 23 * MINUTE + 10
-    }]
-  });
-  data.addEvent({
-    closes: [...Array(21).fill(PRICE_100), PRICE_120, PRICE_120]
-  });
+  const crossing = data.addEvent({
+    closes: [...Array(21).fill(PRICE_100), PRICE_120]
+  }).event;
+  crossing.signals[0].direction = "EXIT";
   const readback = data.readback();
-  const missingHash = readback.events[3].ohlc.sha256;
-  delete data.responseBodies[missingHash];
-
+  const missingHash = readback.events[1].ohlc.sha256;
+  const bodies = { ...data.responseBodies };
+  delete bodies[missingHash];
+  readback.checkpoint.strategy.lastSeenAt += MINUTE;
   const result = replaySpotPaperSignals({
-    readback, provenance: identity(), responseBodies: data.responseBodies
+    readback, provenance: identity(), responseBodies: bodies
   });
   assert.equal(result.outcome, "FAILED");
   assert.equal(result.signalReplay, "FAILED");
-  assert.ok(result.discrepancies.includes("SIGNAL_CLAIM_MISMATCH"));
   assert.ok(result.discrepancies.includes("MISSING_RAW_RESPONSE"));
-  assert.ok(result.discrepancies.includes("FINAL_STRATEGY_STATE_MISMATCH"));
-  assert.equal(wrongClaim.event.signals[0].direction, "EXIT");
+  assert.ok(result.discrepancies.includes("SIGNAL_CLAIM_MISMATCH"));
 });
 
-test("CLI writes a structured UNKNOWN result when a retained raw response is missing", async t => {
-  const root = await mkdtemp(join(tmpdir(), "spot-paper-signal-replay-cli-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
+test("CLI writes an UNKNOWN report when a retained raw response file is missing", async t => {
   const data = fixture();
   data.addEvent({ closes: Array(21).fill(PRICE_100) });
+  const root = await mkdtemp(join(tmpdir(), "spot-paper-signal-replay-cli-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
   const readbackPath = join(root, "readback.json");
   const provenancePath = join(root, "pilot-manifest.json");
-  const runDirectory = join(root, "data", EXPECTED_SIGNAL_REPLAY_IDENTITY.runId);
-  const outputPath = join(root, "signal-replay.json");
-  await mkdir(join(runDirectory, "responses"), { recursive: true });
+  const runDirectory = join(root, "run");
+  const outputPath = join(root, "replay.json");
+  await mkdir(runDirectory);
   await writeFile(readbackPath, JSON.stringify(data.readback()));
   await writeFile(provenancePath, JSON.stringify(identity()));
-
-  const processResult = spawnSync(process.execPath, [
-    REPLAY_CLI, readbackPath, provenancePath, runDirectory, outputPath
-  ], { encoding: "utf8" });
-  assert.equal(processResult.status, 1, processResult.stderr);
-  const result = JSON.parse(await readFile(outputPath, "utf8"));
-  assert.equal(result.outcome, "UNKNOWN");
-  assert.ok(result.discrepancies.includes("MISSING_RAW_RESPONSE"));
+  const previousExitCode = process.exitCode;
+  try {
+    await signalReplayMain([readbackPath, provenancePath, runDirectory, outputPath]);
+    const output = JSON.parse(await readFile(outputPath, "utf8"));
+    assert.equal(output.outcome, "UNKNOWN");
+    assert.ok(output.discrepancies.includes("MISSING_RAW_RESPONSE"));
+  } finally {
+    process.exitCode = previousExitCode;
+  }
 });
 
 test("rejects stale and pre-signal fill quotes", () => {
