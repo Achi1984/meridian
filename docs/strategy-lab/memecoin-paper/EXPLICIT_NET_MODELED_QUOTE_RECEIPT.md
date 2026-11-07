@@ -1,7 +1,7 @@
 # Explicit-net modeled-quote continuation receipt
 
-**Issue routing:** closes #1245; parent #1207; follow-on to merged #1244.  
-**Base:** `c23aaf5327650256a645d33fffb7d5ee4c816b2a`.  
+**Issue routing:** closes #1245; parent #1207; follow-on to merged #1244.
+**Base:** `c23aaf5327650256a645d33fffb7d5ee4c816b2a`.
 **History:** #1244 established `EXPLICIT_NET_V1` as a projection-only stage (receipt #1244/comment6706445075). This additive continuation binds that existing projection through the fixture adapter, execution step, and ledger; it does not replace the earlier projection or its review boundary.
 
 ## Scope and evidence boundary
