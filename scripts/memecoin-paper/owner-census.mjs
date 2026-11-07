@@ -1,3 +1,6 @@
+import {createHash} from "node:crypto";
+import {decodeMintSafetyEvidence} from "../memecoin-paper-token-safety/decode.mjs";
+
 const RPC_URL = "https://api.mainnet-beta.solana.com";
 const RPC_METHOD = "getProgramAccounts";
 const RPC_SOURCE = "Solana JSON-RPC getProgramAccounts";
@@ -23,6 +26,19 @@ const MAX_BOUNDS = Object.freeze({
   maxEvidenceAgeMs: 3_600_000
 });
 const BOUND_KEYS = Object.keys(MAX_BOUNDS);
+export const PROSPECTIVE_CENSUS_BOUNDS = Object.freeze({
+  maxAttempts: 3,
+  maxRequests: 6,
+  maxResponseBytes: 2_097_152,
+  maxAccounts: MAX_BOUNDS.maxAccounts,
+  maxDecodeWork: MAX_BOUNDS.maxDecodeWork,
+  maxElapsedMs: MAX_BOUNDS.maxElapsedMs
+});
+const NATIVE_MINTS = new Set([
+  "11111111111111111111111111111111",
+  "So11111111111111111111111111111111111111112",
+  "So11111111111111111111111111111111111111111"
+]);
 
 class CensusFailure extends Error {
   constructor(code, details = {}) {
@@ -210,6 +226,7 @@ function createDeadline(parentSignal, timeoutMs) {
       return result;
     },
     reasonCode: () => reasonCode,
+    elapsedMs: () => performance.now() - startedMonotonicAt,
     close() {
       clearTimeout(timer);
       parentSignal?.removeEventListener("abort", onParentAbort);
@@ -315,7 +332,7 @@ function canonicalAccountData(data) {
   return bytes;
 }
 
-function decodeTokenAccount(item, identity, programId) {
+function decodeTokenAccount(item, identity, programId, rejectNative = false) {
   if (!isRecord(item) || !decodeBase58(item.pubkey) || !isRecord(item.account) ||
       item.account.owner !== programId || item.account.executable !== false) {
     fail("MALFORMED_PROGRAM_ACCOUNT");
@@ -327,6 +344,7 @@ function decodeTokenAccount(item, identity, programId) {
     if (option !== 0 && option !== 1) fail("MALFORMED_TOKEN_ACCOUNT");
   }
   if (bytes[108] !== 1 && bytes[108] !== 2) fail("MALFORMED_TOKEN_ACCOUNT");
+  if (rejectNative && bytes.readUInt32LE(109) !== 0) fail("NATIVE_TOKEN_ACCOUNT_EXCLUDED");
   const owner = encodeBase58(bytes.subarray(32, 64));
   if (!decodeBase58(owner)) fail("MALFORMED_TOKEN_ACCOUNT");
   return {
@@ -336,11 +354,12 @@ function decodeTokenAccount(item, identity, programId) {
   };
 }
 
-async function ownerTotals(accounts, identity, programId, bounds, deadline) {
+async function ownerTotals(accounts, identity, programId, bounds, deadline,
+  {work = {decodeWork: 0}, rejectNative = false} = {}) {
   if (accounts.length > bounds.maxAccounts) fail("ACCOUNT_COUNT_LIMIT");
   const seenAccounts = new Set();
   const owners = new Map();
-  let decodeWork = 0;
+  let zeroBalanceAccountCount = 0;
   let sum = 0n;
   for (let index = 0; index < accounts.length; index += 1) {
     if (index > 0 && index % DECODE_BATCH_SIZE === 0) {
@@ -355,9 +374,10 @@ async function ownerTotals(accounts, identity, programId, bounds, deadline) {
     if (typeof encoded !== "string" || encoded.length > 4 * Math.ceil(TOKEN_ACCOUNT_BYTES / 3)) {
       fail("UNSUPPORTED_ACCOUNT_LAYOUT");
     }
-    decodeWork += item.pubkey.length + 64 + Math.ceil(encoded.length * 3 / 4);
-    if (decodeWork > bounds.maxDecodeWork) fail("DECODE_WORK_LIMIT");
-    const account = decodeTokenAccount(item, identity, programId);
+    work.decodeWork += item.pubkey.length + 64 + Math.ceil(encoded.length * 3 / 4);
+    if (work.decodeWork > bounds.maxDecodeWork) fail("DECODE_WORK_LIMIT");
+    const account = decodeTokenAccount(item, identity, programId, rejectNative);
+    if (account.amount === 0n) zeroBalanceAccountCount += 1;
     owners.set(account.owner, (owners.get(account.owner) ?? 0n) + account.amount);
     sum += account.amount;
   }
@@ -365,7 +385,8 @@ async function ownerTotals(accounts, identity, programId, bounds, deadline) {
     fail("AMOUNT_OVERFLOW");
   }
   deadline.check();
-  return {owners, sum, accountCount: accounts.length, decodeWork};
+  return {owners, sum, accountCount: accounts.length, decodeWork: work.decodeWork,
+    zeroBalanceAccountCount};
 }
 
 function sortOwners(ownerMap) {
@@ -447,6 +468,256 @@ function makeRequestPlan(identity, programId) {
     pagination: false,
     retry: false
   };
+}
+
+function prospectiveBounds(input = {}) {
+  if (!isRecord(input) || Object.keys(input).some(key =>
+    !Object.hasOwn(PROSPECTIVE_CENSUS_BOUNDS, key))) fail("INVALID_BOUNDS");
+  const bounds = {...PROSPECTIVE_CENSUS_BOUNDS, ...input};
+  for (const [key, ceiling] of Object.entries(PROSPECTIVE_CENSUS_BOUNDS)) {
+    if (!Number.isSafeInteger(bounds[key]) || bounds[key] < 1 || bounds[key] > ceiling) {
+      fail("INVALID_BOUNDS");
+    }
+  }
+  return bounds;
+}
+
+function rawBytes(bytes) {
+  return {
+    encoding: "base64",
+    byteLength: bytes.length,
+    bytes: Buffer.from(bytes).toString("base64"),
+    sha256: createHash("sha256").update(bytes).digest("hex")
+  };
+}
+
+function prospectiveRpc(bytes) {
+  let payload;
+  try {
+    payload = JSON.parse(new TextDecoder("utf-8", {fatal: true}).decode(bytes));
+  } catch { fail("INVALID_JSON"); }
+  if (!isRecord(payload) || payload.jsonrpc !== "2.0" || payload.id !== 1 ||
+      Object.hasOwn(payload, "error") || !isRecord(payload.result) ||
+      Object.keys(payload.result).some(key => !["context", "value"].includes(key)) ||
+      !isRecord(payload.result.context) ||
+      !Number.isSafeInteger(payload.result.context.slot) || payload.result.context.slot < 0) {
+    fail("INVALID_RPC_RESPONSE");
+  }
+  return payload.result;
+}
+
+export async function captureProspectiveOwnerCensus({
+  enabled = false, identity, bounds: inputBounds, transport, clock, signal
+} = {}) {
+  if (enabled !== true) return {status: "DISABLED", executionAuthorized: false};
+  let boundIdentity = null;
+  let bounds;
+  let deadline;
+  let startedAt = null;
+  let endedAt = null;
+  let attempts = 0;
+  let requests = 0;
+  let responseBytes = 0;
+  let requestBytes = 0;
+  const work = {decodeWork: 0};
+  const exchanges = [];
+  const pairs = [];
+  let lastWallTime = null;
+  const wallTime = () => {
+    const now = parseTime(clock());
+    if (now === null || (lastWallTime !== null && now < lastWallTime)) fail("INVALID_CLOCK");
+    lastWallTime = now;
+    if (startedAt !== null && now - startedAt >= bounds.maxElapsedMs) fail("TIMEOUT");
+    return now;
+  };
+  const consumed = () => ({
+    attempts, requests, requestBytes, responseBytes, decodeWork: work.decodeWork,
+    elapsedMs: deadline?.elapsedMs() ?? 0,
+    acquisitionWallElapsedMs: startedAt === null || endedAt === null ? null : endedAt - startedAt
+  });
+  const resultDetails = () => ({
+    requests, responseBytes, bounds,
+    requestPlan: boundIdentity ? makeRequestPlan(boundIdentity, LEGACY_TOKEN_PROGRAM) : undefined
+  });
+  try {
+    boundIdentity = validateIdentity(identity);
+    if (NATIVE_MINTS.has(boundIdentity.mint)) fail("NATIVE_MINT_EXCLUDED");
+    bounds = prospectiveBounds(inputBounds);
+    if (typeof transport !== "function" || typeof clock !== "function" ||
+        (signal !== undefined && (!signal || typeof signal.addEventListener !== "function" ||
+          typeof signal.removeEventListener !== "function" || typeof signal.aborted !== "boolean"))) {
+      fail("INVALID_TRANSPORT_OR_CLOCK");
+    }
+    startedAt = wallTime();
+    deadline = createDeadline(signal, bounds.maxElapsedMs);
+    const requestRpc = async (method, params) => {
+      deadline.check();
+      wallTime();
+      if (requests >= bounds.maxRequests) fail("REQUEST_LIMIT");
+      const request = Object.freeze({
+        ...makeRequest(boundIdentity, LEGACY_TOKEN_PROGRAM),
+        body: JSON.stringify({jsonrpc: "2.0", id: 1, method, params})
+      });
+      const requestStartedAt = wallTime();
+      let response;
+      let bodyReadStarted = false;
+      try {
+        response = await deadline.wait(Promise.resolve().then(() => {
+          deadline.check();
+          requests += 1;
+          requestBytes += Buffer.byteLength(request.body);
+          return transport(request, {
+            credentials: "omit", redirect: "error", signal: deadline.signal
+          });
+        }).then(received => {
+          try { deadline.check(); } catch (error) {
+            cancelBody(received?.body);
+            throw error;
+          }
+          response = received;
+          return received;
+        }));
+        validateResponseTarget(response);
+        const contentLength = response.headers?.get("content-length");
+        const contentEncoding = response.headers?.get("content-encoding") ?? null;
+        const compareDeliveredLength = contentLength != null &&
+          (contentEncoding === null || contentEncoding.trim().toLowerCase() === "identity");
+        if (contentLength !== undefined && contentLength !== null &&
+            (!/^\d{1,16}$/.test(contentLength) ||
+             !Number.isSafeInteger(Number(contentLength)))) fail("INVALID_RESPONSE_HEADERS");
+        if (compareDeliveredLength && Number(contentLength) > bounds.maxResponseBytes - responseBytes) {
+          fail("RESPONSE_BYTE_LIMIT");
+        }
+        bodyReadStarted = true;
+        const previousBytes = responseBytes;
+        const streamed = await readBoundedBody(response, bounds.maxResponseBytes - previousBytes,
+          deadline, count => { responseBytes = previousBytes + count; });
+        const responseEndedAt = wallTime();
+        if (compareDeliveredLength && Number(contentLength) !== streamed.byteCount) {
+          fail("TRUNCATED_RESPONSE");
+        }
+        exchanges.push({
+          attempt: attempts, rpcMethod: method, requestStartedAt, responseEndedAt,
+          request: {...request, body: rawBytes(Buffer.from(request.body, "utf8"))},
+          response: {
+            status: response.status, contentEncoding, contentLength: contentLength ?? null,
+            contentLengthComparedToDeliveredBody: compareDeliveredLength,
+            bodyByteBasis: "TRANSPORT_DELIVERED_BYTES",
+            originalWireBytesCaptured: false,
+            body: rawBytes(streamed.bytes)
+          }
+        });
+        deadline.check();
+        if (!Number.isInteger(response.status) || response.status < 200 || response.status >= 300) {
+          fail(response.status === 429 ? "RATE_LIMITED" : "HTTP_ERROR");
+        }
+        const rpc = prospectiveRpc(streamed.bytes);
+        deadline.check();
+        return rpc;
+      } finally {
+        if (!bodyReadStarted) cancelBody(response?.body);
+      }
+    };
+    while (attempts < bounds.maxAttempts) {
+      if (requests + 2 > bounds.maxRequests) fail("REQUEST_LIMIT");
+      attempts += 1;
+      const census = await requestRpc("getProgramAccounts", [LEGACY_TOKEN_PROGRAM, {
+        commitment: "finalized", encoding: "base64", withContext: true,
+        filters: [{memcmp: {offset: 0, bytes: boundIdentity.mint}}]
+      }]);
+      if (!Array.isArray(census.value)) fail("INVALID_RPC_RESPONSE");
+      const totals = await ownerTotals(census.value, boundIdentity, LEGACY_TOKEN_PROGRAM,
+        bounds, deadline, {work, rejectNative: true});
+      const mintRpc = await requestRpc("getAccountInfo", [boundIdentity.mint, {
+        commitment: "finalized", encoding: "base64", minContextSlot: census.context.slot
+      }]);
+      const pair = {
+        attempt: attempts, censusSlot: String(census.context.slot),
+        mintSlot: String(mintRpc.context.slot), sameSlot: census.context.slot === mintRpc.context.slot
+      };
+      pairs.push(pair);
+      if (!pair.sameSlot) continue;
+      if (!isRecord(mintRpc.value) || mintRpc.value.owner !== LEGACY_TOKEN_PROGRAM) {
+        fail("UNSUPPORTED_TOKEN_PROGRAM");
+      }
+      if (mintRpc.value.executable !== false) fail("MALFORMED_MINT_ACCOUNT");
+      const data = mintRpc.value.data;
+      if (!Array.isArray(data) || data.length !== 2 || data[1] !== "base64" ||
+          typeof data[0] !== "string" || data[0].length !== 112) fail("UNSUPPORTED_MINT_LAYOUT");
+      work.decodeWork += data[0].length + 82 + boundIdentity.mint.length;
+      if (work.decodeWork > bounds.maxDecodeWork) fail("DECODE_WORK_LIMIT");
+      const mintBytes = Buffer.from(data[0], "base64");
+      if (mintBytes.length !== 82 || mintBytes.toString("base64") !== data[0]) {
+        fail("UNSUPPORTED_MINT_LAYOUT");
+      }
+      const mintEvidence = decodeMintSafetyEvidence({
+        chainId: "solana", expectedMint: boundIdentity.mint,
+        requestedMint: boundIdentity.mint, accountPubkey: boundIdentity.mint,
+        observedAt: wallTime(), rpcResult: mintRpc
+      });
+      if (mintEvidence.status !== "DECODED_UNVERIFIED") fail("MINT_EVIDENCE_INVALID");
+      const mint = validateMintEvidence(mintEvidence, boundIdentity);
+      if (totals.sum !== mint.supply) fail("SUPPLY_MISMATCH");
+      const owners = sortOwners(totals.owners);
+      deadline.check();
+      endedAt = wallTime();
+      const result = unknownResult(boundIdentity,
+        "SAME_SLOT_RECONCILED_BUT_SOURCE_COMPLETENESS_IS_UNAUTHENTICATED",
+        {...resultDetails(), slot: pair.censusSlot, observedAt: endedAt});
+      result.requestPlan = {
+        ...result.requestPlan, requestCount: requests, retry: "SLOT_MISMATCH_ONLY",
+        maxAttempts: bounds.maxAttempts, rpcMethods: ["getProgramAccounts", "getAccountInfo"],
+        exactSlotSelector: false
+      };
+      result.provenance.decodeWork = work.decodeWork;
+      result.provenance.retries = attempts - 1;
+      result.accountCoverage = "RECONCILED_RPC_RESPONSE_ONLY";
+      result.rawCensus = {
+        accountCount: totals.accountCount,
+        zeroBalanceAccountCount: totals.zeroBalanceAccountCount,
+        positiveOwnerCount: owners.filter(owner => BigInt(owner.amountAtoms) > 0n).length,
+        distinctOwnerCount: owners.length,
+        observedAmountAtoms: totals.sum.toString(), mintSupplyAtoms: mint.supply.toString(),
+        owners
+      };
+      result.coverage.supplyReconciled = true;
+      result.coverage.sourceCompletenessAuthenticated = false;
+      result.authorizationEligible = false;
+      result.hardGateEligible = false;
+      deadline.check();
+      endedAt = wallTime();
+      result.observedAt = endedAt;
+      result.filterEvidence.observedAt = endedAt;
+      result.capture = {
+        schema: "MERIDIAN_PROSPECTIVE_SAME_SLOT_CENSUS_V1",
+        status: "RECONCILED_DIAGNOSTIC_ONLY",
+        slot: pair.censusSlot, acquisitionStartedAt: startedAt, acquisitionEndedAt: endedAt,
+        timeBasis: "LOCAL_ACQUISITION_TIME_NOT_HISTORICAL_STATE_TIME",
+        bounds, consumed: consumed(), pairs, exchanges
+      };
+      deadline.check();
+      return result;
+    }
+    fail("SLOT_RACE_EXHAUSTED");
+  } catch (error) {
+    try {
+      const now = parseTime(typeof clock === "function" ? clock() : null);
+      if (now !== null && startedAt !== null && now >= lastWallTime) endedAt = now;
+    } catch {}
+    const reason = error instanceof CensusFailure ? error.code
+      : deadline?.reasonCode() ?? "CENSUS_FAILED";
+    return {
+      ...unknownResult(boundIdentity, reason, {requests, responseBytes, bounds}),
+      authorizationEligible: false, hardGateEligible: false,
+      capture: {
+        status: "FAILED", acquisitionStartedAt: startedAt, acquisitionEndedAt: endedAt,
+        timeBasis: "LOCAL_ACQUISITION_TIME_NOT_HISTORICAL_STATE_TIME",
+        bounds: bounds ?? null, consumed: consumed(), pairs, exchanges
+      }
+    };
+  } finally {
+    deadline?.close();
+  }
 }
 
 export async function acquireOwnerCensus({

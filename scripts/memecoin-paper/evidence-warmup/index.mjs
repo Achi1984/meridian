@@ -3,7 +3,7 @@ import {constants} from "node:fs";
 import * as fsPromises from "node:fs/promises";
 import path from "node:path";
 import {comparableCensusSlots, countCensusOwners} from "../analyst-window-evidence.mjs";
-import {acquireOwnerCensus} from "../owner-census.mjs";
+import {acquireOwnerCensus, captureProspectiveOwnerCensus} from "../owner-census.mjs";
 
 export const EVIDENCE_WARMUP_SCHEMA = "MERIDIAN_PAPER_EVIDENCE_WARMUP_V1";
 export const DEFAULT_WARMUP_LIMITS = Object.freeze({
@@ -866,4 +866,51 @@ export async function acquireAndPublishOwnerCensus({
   return {status: publication?.status ?? "UNKNOWN", censusStatus: result.status,
     censusTrust: "UNAUTHENTICATED_RPC_RESPONSE", observedAtBasis: record.observedAtBasis,
     publication};
+}
+
+export async function acquireAndPublishProspectiveOwnerCensus({
+  enabled = false, store, datasetId, phase, identity, bounds, transport, clock, signal,
+  versions = {}
+} = {}) {
+  if (enabled !== true || store?.enabled !== true) return {status: "DISABLED"};
+  if (!["T0", "T1"].includes(phase) || !DATASET_ID.test(datasetId ?? "") ||
+      typeof store.publish !== "function" || typeof store.read !== "function") {
+    return {status: "UNKNOWN", reason: "INVALID_PROSPECTIVE_PUBLICATION"};
+  }
+  const result = await captureProspectiveOwnerCensus({
+    enabled: true, identity, bounds, transport, clock, signal
+  });
+  if (result.capture?.status !== "RECONCILED_DIAGNOSTIC_ONLY") {
+    return {status: "UNKNOWN", reason: result.reason, census: result, publication: null};
+  }
+  const receivedAt = result.capture.acquisitionEndedAt;
+  const record = {
+    kind: "local-census-acquisition",
+    identity: result.boundIdentity,
+    observedAt: receivedAt,
+    observedAtBasis: "LOCAL_ACQUISITION_TIME",
+    receivedAt,
+    source: result.source,
+    trust: "UNKNOWN",
+    completeness: "UNKNOWN",
+    payload: {...result, capture: {...result.capture, phase}}
+  };
+  const publication = await store.publish({
+    datasetId, identity: result.boundIdentity, capturedAt: receivedAt, records: [record],
+    versions, budgets: result.capture.consumed
+  }, {signal});
+  if (!["PUBLISHED", "DUPLICATE"].includes(publication?.status)) {
+    return {status: publication?.status ?? "UNKNOWN", publication, executionAuthorized: false};
+  }
+  const readback = await store.read(datasetId, {signal});
+  if (readback.status !== "AVAILABLE" || readback.digest !== publication.digest) {
+    return {status: "UNKNOWN", reason: "PROSPECTIVE_READBACK_FAILED", publication,
+      executionAuthorized: false};
+  }
+  return {
+    status: publication.status, publication, phase, slot: result.capture.slot,
+    censusStatus: "UNKNOWN", censusTrust: "UNAUTHENTICATED_RPC_RESPONSE",
+    observedAtBasis: "LOCAL_ACQUISITION_TIME", executionAuthorized: false,
+    realDataEntryEligible: false
+  };
 }
