@@ -334,49 +334,45 @@ separate independent review and run-policy binding.
   caller-asserted inputs; pass `{expectedDigest}` to pin them. It does
   not authenticate the provider or reviewer.
 
-  ## `EXPLICIT_GROSS_V1` (review-only; no adopted numeric preset)
+## `EXPLICIT_NET_V1` (review-only; no adopted numeric preset)
 
-  The versioned `EXPLICIT_GROSS_V1` variant reuses `getPaperQuote`'s
-  `reviewScenario` parser and projection arithmetic. It requires `quoteBasis:
-  "GROSS_BEFORE_ALL_COSTS"`, a complete `explicitAssumptions` record with a value,
-  unit, and rationale for every numeric input, a measured quote-mint USD
-  conversion, gross-basis evidence, and the same offline review-evidence binding.
-  There are no numeric defaults or approved operating values. A zero fee, spread,
-  slippage, impact, or network input also requires a component-specific
-  `zeroCostAssumptions` rationale; zero never means empirically free execution.
+The versioned `EXPLICIT_NET_V1` variant reuses `getPaperQuote`'s
+`reviewScenario` parser and projection flow, with the existing
+`QUOTED_ROUTE_AMOUNTS_AS_MODELED_NET_SWAP_BASIS`. It does not infer a gross
+amount or use caller declarations to reinterpret Jupiter's route amounts. A
+complete `explicitAssumptions` record is required: fee, spread, adverse
+slippage, price impact, and network assumptions each have a numeric value,
+unit, rationale, and a single disposition. There are no numeric defaults or
+approved operating values; explicit zero is a documented modeled assumption,
+not evidence of free execution.
 
-  The five cost categories are separate: explicit fee cents, spread cents, adverse
-  slippage basis points, impact cents, and network cents. Their inclusion map must
-  name each category once as `EXCLUDED_FROM_GROSS`; any missing, overlapping, or
-  net-basis declaration blocks projection. `grossBasisEvidence` binds the declared
-  basis to the candidate identity, side, requested amount, canonical request
-  digest (`paperExplicitGrossRequestDigest`), quote request id, route amounts, and
-  the exact response-body SHA-256. These checks establish structural consistency
-  only. Evidence hashes, the Jupiter response, local time, and caller declarations
-  are not authenticated; this model does not turn Jupiter's route amounts into
-  proven gross amounts. Without a matching gross-basis declaration and evidence
-  reference, projection is blocked.
+The five categories remain separate and additive to the quoted-net amount.
+Provider-reported fee, platform fee, price impact, minimum output, slippage
+tolerance, and lamports remain separate observations and are not automatically
+charged a second time. Missing or overlapping dispositions block projection.
+The variant is bound to the candidate identity, request, exact source response
+digest, quote, all assumptions, conversion, and recomputed output; these
+structural checks do not authenticate the provider or caller.
 
-  `quoteUsdConversion` uses the existing `validConversion` contract: exact quote
-  mint/decimals, positive integer micro-USD per whole token, method
-  `MEASURED_SOURCE_RECEIPT`, evidence digest, and a conversion time no later than
-  and within five minutes of the quote receipt. Assumed USDC/USD parity is not
-  accepted. Entry sizing rounds the USD price and gross debit up, each adverse
-  slippage amount up, and applies the tightest of 8,000 cents, 8% of supplied
-  equity (rounded down), and supplied available cash. A smaller result is labeled
-  `SMALLER_SIZE_MODELED_NOT_A_FRESH_EXECUTABLE_QUOTE`. Exit uses the full
-  requested quantity, rounds gross credit down, and blocks when modeled costs
-  exceed proceeds.
+`quoteUsdConversion` uses the existing `validConversion` contract: exact quote
+mint/decimals, positive integer micro-USD per whole token, method
+`MEASURED_SOURCE_RECEIPT`, evidence digest, and a conversion time no later than
+and within five minutes of the quote receipt. Assumed USDC/USD parity is not
+accepted. Entry sizing conservatively rounds price, adverse slippage, and
+all-in debit up, and applies the tightest of 8,000 cents, 8% of supplied equity
+(rounded down), and supplied available cash. A smaller result is labeled
+`SMALLER_SIZE_MODELED_NOT_A_FRESH_EXECUTABLE_QUOTE`. Exit uses the full
+requested quantity, rounds quoted-net credit down, and blocks when modeled
+costs exceed proceeds.
 
-  The canonical model digest binds the version, every assumption and unit, the
-  conversion, review and gross-basis evidence, request, response hash, quote, and
-  recomputed output. `verifyPaperExplicitGrossProjection(projection,
-  {expectedDigest})` revalidates the arithmetic and exposed fields; an expected
-  digest pins the exact caller-supplied inputs. A valid result is still only
-  `REVIEW_PROJECTION_ONLY`, `MODELED`, `actualCostCoverage: "UNKNOWN"`, and
-  `executionRealistic: false`. `issueModeledQuote` accepts only the existing
-  QUOTED_NET model and refuses this variant. Nothing is routed to the ledger,
-  admission path, or runtime.
+The canonical model digest binds the model version, every assumption and unit,
+the conversion, review evidence, request, response hash, quote basis, quote,
+and recomputed output. `verifyPaperExplicitNetProjection(projection,
+{expectedDigest})` revalidates arithmetic and exposed fields; an expected
+digest pins the exact caller-supplied inputs. A valid result is still only
+`REVIEW_PROJECTION_ONLY`, `MODELED`, `actualCostCoverage: "UNKNOWN"`, and
+`executionRealistic: false`. `issueModeledQuote` refuses this explicit variant.
+Nothing is routed to the ledger, admission path, or runtime.
 
   ## Offline validation
 

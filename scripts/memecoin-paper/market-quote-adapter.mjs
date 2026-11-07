@@ -20,8 +20,7 @@ const SCENARIO_CONFIG_KEYS = Object.freeze([
   "optIn", "scenarioId", "scenarioVersion", "scenario", "identity", "usdcMint",
   "usdcDecimals", "usdcUsdMicrosPerToken", "quoteBasis", "adverseAdjustmentBps",
   "networkReserveCents", "feeCents", "spreadCents", "priceImpactCents",
-  "zeroChargeDisposition", "reviewEvidence", "explicitAssumptions",
-  "quoteUsdConversion", "grossBasisEvidence"
+  "zeroChargeDisposition", "reviewEvidence", "explicitAssumptions", "quoteUsdConversion"
 ]);
 const SCENARIO_CASES = Object.freeze({
   BASELINE: Object.freeze({
@@ -39,42 +38,48 @@ const SCENARIO_CASES = Object.freeze({
     adverseAdjustmentBps: 300,
     networkReserveCents: "50"
   }),
-  EXPLICIT_GROSS_V1: Object.freeze({
-    scenarioId: "MERIDIAN_PAPER_EXPLICIT_GROSS_V1"
+  EXPLICIT_NET_V1: Object.freeze({
+    scenarioId: "MERIDIAN_PAPER_EXPLICIT_NET_V1"
   })
 });
 const QUOTED_NET_CASE = "QUOTED_NET_V1";
-const EXPLICIT_GROSS_CASE = "EXPLICIT_GROSS_V1";
-const EXPLICIT_GROSS_MODEL = Object.freeze({
-  id: "MERIDIAN_PAPER_EXPLICIT_GROSS_V1",
+const EXPLICIT_NET_CASE = "EXPLICIT_NET_V1";
+const EXPLICIT_NET_MODEL = Object.freeze({
+  id: "MERIDIAN_PAPER_EXPLICIT_NET_V1",
   version: "1",
   status: "REVIEW_ONLY",
   provenance: "MODELED"
 });
-const EXPLICIT_GROSS_ASSUMPTION_KEYS = Object.freeze([
+const EXPLICIT_NET_ASSUMPTION_KEYS = Object.freeze([
   "feeCents", "spreadCents", "slippageBps", "priceImpactCents", "networkCents",
-  "equityCents", "availableCashCents", "units", "rationales", "zeroCostAssumptions"
+  "equityCents", "availableCashCents", "units", "rationales", "zeroCostAssumptions",
+  "dispositions"
 ]);
-const EXPLICIT_GROSS_UNITS = Object.freeze({
+const EXPLICIT_NET_UNITS = Object.freeze({
   feeCents: "US_CENTS_PER_SIDE",
   spreadCents: "US_CENTS_PER_SIDE",
-  slippageBps: "BASIS_POINTS_OF_GROSS_USD_VALUE",
+  slippageBps: "BASIS_POINTS_OF_QUOTED_NET_USD_VALUE",
   priceImpactCents: "US_CENTS_PER_SIDE",
   networkCents: "US_CENTS_PER_SIDE",
   equityCents: "US_CENTS",
   availableCashCents: "US_CENTS"
 });
-const GROSS_INCLUSION = Object.freeze(Object.fromEntries(
-  COSTS.map(component => [component, "EXCLUDED_FROM_GROSS"])
-));
-const EXPLICIT_GROSS_ASSUMPTIONS = Object.freeze([
+const EXPLICIT_NET_DISPOSITIONS = Object.freeze({
+  fee: Object.freeze({zero: NO_INCREMENTAL_CHARGE, nonzero: "ADDITIONAL_MODELED_FEE_PENALTY_NOT_OBSERVED"}),
+  spread: Object.freeze({zero: NO_INCREMENTAL_CHARGE, nonzero: "ADDITIONAL_MODELED_SPREAD_PENALTY_NOT_OBSERVED"}),
+  slippage: Object.freeze({zero: NO_INCREMENTAL_CHARGE, nonzero: "ADDITIONAL_MODELED_ADVERSE_ADJUSTMENT_ROUNDED_UP"}),
+  priceImpact: Object.freeze({zero: NO_INCREMENTAL_CHARGE, nonzero: "ADDITIONAL_MODELED_IMPACT_PENALTY_NOT_OBSERVED"}),
+  network: Object.freeze({zero: NO_INCREMENTAL_CHARGE, nonzero: "ADDITIONAL_MODELED_NETWORK_RESERVE_NOT_SETTLED_COST"})
+});
+const EXPLICIT_NET_ASSUMPTIONS = Object.freeze([
   "All numeric inputs and units are caller-supplied modeled assumptions; no numeric preset is adopted.",
-  "Gross basis and component inclusion declarations are structurally bound, not source-authenticated.",
+  "Jupiter route amounts use the existing modeled net-swap basis; they are not proven gross amounts.",
+  "Nonzero category amounts are additional modeled penalties, not provider-reported costs or settled charges.",
+  "Zero incremental charges under this basis are not assertions of economically zero execution costs.",
   "USD conversion requires a causal measured-source receipt; no stablecoin parity is inferred.",
-  "Any explicit zero requires its own documented modeled rationale and is not evidence of free execution.",
-  "A smaller entry size is modeled from the source quote and is not a fresh executable quote."
+  "A smaller entry size is modeled, not a fresh executable quote."
 ]);
-const EXPLICIT_GROSS_RESULT_CONTRACT = Object.freeze({
+const EXPLICIT_NET_RESULT_CONTRACT = Object.freeze({
   provenance: "MODELED",
   actualCostCoverage: "UNKNOWN",
   executionRealistic: false,
@@ -164,44 +169,47 @@ export function paperQuotedNetModelDigest(binding) {
   return createHash("sha256").update(canonicalJson(binding)).digest("hex");
 }
 
-export const paperExplicitGrossModelDigest = paperQuotedNetModelDigest;
+export const paperExplicitNetModelDigest = paperQuotedNetModelDigest;
 
 function ceilDiv(numerator, denominator) {
   return (numerator + denominator - 1n) / denominator;
 }
 
-function normalizeExplicitGrossAssumptions(value) {
-  const raw = copyPlainRecord(value, EXPLICIT_GROSS_ASSUMPTION_KEYS,
-    "explicit gross assumptions");
-  if (Object.keys(raw).length !== EXPLICIT_GROSS_ASSUMPTION_KEYS.length ||
-      EXPLICIT_GROSS_ASSUMPTION_KEYS.some(key => !Object.hasOwn(raw, key))) {
-    throw new TypeError("explicit gross assumptions require every value and unit");
+function normalizeExplicitNetAssumptions(value) {
+  const raw = copyPlainRecord(value, EXPLICIT_NET_ASSUMPTION_KEYS,
+    "explicit net assumptions");
+  if (Object.keys(raw).length !== EXPLICIT_NET_ASSUMPTION_KEYS.length ||
+      EXPLICIT_NET_ASSUMPTION_KEYS.some(key => !Object.hasOwn(raw, key))) {
+    throw new TypeError("explicit net assumptions require every value, unit, rationale, and disposition");
   }
-  const units = copyPlainRecord(raw.units, Object.keys(EXPLICIT_GROSS_UNITS),
-    "explicit gross assumption units");
-  const rationales = copyPlainRecord(raw.rationales, Object.keys(EXPLICIT_GROSS_UNITS),
-    "explicit gross assumption rationales");
+  const units = copyPlainRecord(raw.units, Object.keys(EXPLICIT_NET_UNITS),
+    "explicit net assumption units");
+  const rationales = copyPlainRecord(raw.rationales, Object.keys(EXPLICIT_NET_UNITS),
+    "explicit net assumption rationales");
   const zeroCostAssumptions = copyPlainRecord(raw.zeroCostAssumptions,
     COSTS, "explicit zero-cost assumptions");
-  if (Object.keys(units).length !== Object.keys(EXPLICIT_GROSS_UNITS).length ||
-      Object.keys(rationales).length !== Object.keys(EXPLICIT_GROSS_UNITS).length ||
-      Object.entries(EXPLICIT_GROSS_UNITS).some(([key, unit]) => units[key] !== unit) ||
+  const dispositions = copyPlainRecord(raw.dispositions, COSTS,
+    "explicit net category dispositions");
+  if (Object.keys(units).length !== Object.keys(EXPLICIT_NET_UNITS).length ||
+      Object.keys(rationales).length !== Object.keys(EXPLICIT_NET_UNITS).length ||
+      Object.keys(dispositions).length !== COSTS.length ||
+      Object.entries(EXPLICIT_NET_UNITS).some(([key, unit]) => units[key] !== unit) ||
       Object.values(rationales).some(value =>
         typeof value !== "string" || value.trim().length < 8 || value.length > 256)) {
-    throw new TypeError("explicit gross assumption units or rationales are incomplete");
+    throw new TypeError("explicit net assumption units or rationales are incomplete");
   }
   const result = {};
   for (const key of ["feeCents", "spreadCents", "priceImpactCents",
     "networkCents", "equityCents", "availableCashCents"]) {
     if (typeof raw[key] !== "string" || !INTEGER.test(raw[key])) {
-      throw new TypeError(`explicit gross ${key} must be a non-negative integer string`);
+      throw new TypeError(`explicit net ${key} must be a non-negative integer string`);
     }
     result[key] = raw[key];
   }
   if (typeof raw.slippageBps !== "string" || !INTEGER.test(raw.slippageBps) ||
       BigInt(raw.slippageBps) > BPS ||
       BigInt(raw.equityCents) <= 0n) {
-    throw new TypeError("explicit gross slippage or equity is outside its supported range");
+    throw new TypeError("explicit net slippage or equity is outside its supported range");
   }
   result.slippageBps = raw.slippageBps;
   for (const component of COSTS) {
@@ -218,19 +226,30 @@ function normalizeExplicitGrossAssumptions(value) {
     } else if (Object.hasOwn(zeroCostAssumptions, component)) {
       throw new TypeError(`zero-cost assumption supplied for nonzero ${component}`);
     }
+    const expectedDisposition = isZero
+      ? EXPLICIT_NET_DISPOSITIONS[component].zero
+      : EXPLICIT_NET_DISPOSITIONS[component].nonzero;
+    if (dispositions[component] !== expectedDisposition) {
+      throw new TypeError(`explicit ${component} disposition contradicts its modeled assumption`);
+    }
   }
   if (Object.keys(zeroCostAssumptions).some(component => !COSTS.includes(component))) {
     throw new TypeError("explicit zero-cost assumptions contain an unsupported component");
   }
+  if (COSTS.some(component => !Object.hasOwn(dispositions, component))) {
+    throw new TypeError("explicit net category dispositions are incomplete");
+  }
   result.equityCents = raw.equityCents;
   result.availableCashCents = raw.availableCashCents;
-  result.units = Object.fromEntries(Object.keys(EXPLICIT_GROSS_UNITS)
+  result.units = Object.fromEntries(Object.keys(EXPLICIT_NET_UNITS)
     .map(key => [key, units[key]]));
-  result.rationales = Object.fromEntries(Object.keys(EXPLICIT_GROSS_UNITS)
+  result.rationales = Object.fromEntries(Object.keys(EXPLICIT_NET_UNITS)
     .map(key => [key, rationales[key]]));
   result.zeroCostAssumptions = Object.fromEntries(COSTS
     .filter(component => Object.hasOwn(zeroCostAssumptions, component))
     .map(component => [component, zeroCostAssumptions[component]]));
+  result.dispositions = Object.fromEntries(COSTS
+    .map(component => [component, dispositions[component]]));
   return result;
 }
 
@@ -242,41 +261,6 @@ function normalizeQuoteUsdConversion(value) {
     throw new TypeError("quote USD conversion requires every measured field");
   }
   return conversion;
-}
-
-function normalizeGrossBasisEvidence(value) {
-  const evidence = copyPlainRecord(value, [
-    "schemaVersion", "evidenceId", "evidenceSha256", "identity", "side",
-    "amountAtoms", "requestSha256", "routeAmountBasis", "inclusion"
-  ], "gross basis evidence");
-  evidence.identity = copyPlainRecord(evidence.identity,
-    ["chainId", "mint", "pool", "quote", "decimals"], "gross basis identity");
-  evidence.inclusion = copyPlainRecord(evidence.inclusion, COSTS,
-    "gross basis inclusion");
-  if (Object.keys(evidence).length !== 9 ||
-      Object.keys(evidence.identity).length !== 5 ||
-      ["chainId", "mint", "pool", "quote", "decimals"]
-        .some(key => !Object.hasOwn(evidence.identity, key)) ||
-      evidence.schemaVersion !== "memecoin-paper-gross-basis-evidence-v1" ||
-      typeof evidence.evidenceId !== "string" || !SAFE_ID.test(evidence.evidenceId) ||
-      typeof evidence.evidenceSha256 !== "string" || !SHA256.test(evidence.evidenceSha256) ||
-      !["ENTRY", "EXIT"].includes(evidence.side) ||
-      typeof evidence.amountAtoms !== "string" || !INTEGER.test(evidence.amountAtoms) ||
-      typeof evidence.requestSha256 !== "string" || !SHA256.test(evidence.requestSha256) ||
-      evidence.routeAmountBasis !== ROUTE_AMOUNT_BASIS ||
-      Object.keys(evidence.inclusion).length !== COSTS.length ||
-      COSTS.some(component => evidence.inclusion[component] !== GROSS_INCLUSION[component])) {
-    throw new TypeError("gross basis evidence is incomplete or overlapping");
-  }
-  if (evidence.identity.chainId !== "solana" ||
-      typeof evidence.identity.mint !== "string" || !BASE58.test(evidence.identity.mint) ||
-      typeof evidence.identity.pool !== "string" || !BASE58.test(evidence.identity.pool) ||
-      typeof evidence.identity.quote !== "string" || !BASE58.test(evidence.identity.quote) ||
-      !Number.isInteger(evidence.identity.decimals) ||
-      evidence.identity.decimals < 0 || evidence.identity.decimals > 18) {
-    throw new TypeError("gross basis identity is invalid");
-  }
-  return evidence;
 }
 
 function scenarioConfig(value) {
@@ -325,20 +309,16 @@ function scenarioConfig(value) {
     throw new TypeError("review scenario configuration is unsupported or inconsistent");
   }
   let canonical;
-  if (raw.scenario === EXPLICIT_GROSS_CASE) {
+  if (raw.scenario === EXPLICIT_NET_CASE) {
     const explicitKeys = [
       "optIn", "scenarioId", "scenarioVersion", "scenario", "identity", "quoteBasis",
-      "explicitAssumptions", "quoteUsdConversion", "grossBasisEvidence", "reviewEvidence"
+      "explicitAssumptions", "quoteUsdConversion", "reviewEvidence"
     ];
     if (Object.keys(raw).some(key => !explicitKeys.includes(key)) ||
         explicitKeys.filter(key => key !== "reviewEvidence")
           .some(key => !Object.hasOwn(raw, key)) ||
-        raw.quoteBasis !== ROUTE_AMOUNT_BASIS) {
-      throw new TypeError("explicit gross configuration is incomplete or contains net-basis fields");
-    }
-    const grossBasisEvidence = normalizeGrossBasisEvidence(raw.grossBasisEvidence);
-    if (!sameIdentity(grossBasisEvidence.identity, raw.identity)) {
-      throw new TypeError("gross basis evidence identity does not match the scenario");
+        raw.quoteBasis !== QUOTED_NET_BASIS) {
+      throw new TypeError("explicit net configuration is incomplete or contradicts the quoted-net basis");
     }
     canonical = {
       optIn: raw.optIn,
@@ -353,15 +333,14 @@ function scenarioConfig(value) {
         decimals: raw.identity.decimals
       },
       quoteBasis: raw.quoteBasis,
-      explicitAssumptions: normalizeExplicitGrossAssumptions(raw.explicitAssumptions),
-      quoteUsdConversion: normalizeQuoteUsdConversion(raw.quoteUsdConversion),
-      grossBasisEvidence
+      explicitAssumptions: normalizeExplicitNetAssumptions(raw.explicitAssumptions),
+      quoteUsdConversion: normalizeQuoteUsdConversion(raw.quoteUsdConversion)
     };
   } else {
     const requiredKeys = SCENARIO_CONFIG_KEYS.filter(key =>
-      !["reviewEvidence", "explicitAssumptions", "quoteUsdConversion", "grossBasisEvidence"].includes(key));
+      !["reviewEvidence", "explicitAssumptions", "quoteUsdConversion"].includes(key));
     if (requiredKeys.some(key => !Object.hasOwn(raw, key)) ||
-        ["explicitAssumptions", "quoteUsdConversion", "grossBasisEvidence"]
+        ["explicitAssumptions", "quoteUsdConversion"]
           .some(key => Object.hasOwn(raw, key)) ||
         raw.identity.quote !== SOLANA_USDC_MINT ||
         raw.usdcMint !== SOLANA_USDC_MINT || raw.usdcDecimals !== 6 ||
@@ -489,7 +468,7 @@ function projectReviewScenario(request, observation, candidateReasons, parsedSce
   if (!parsed) return null;
   const {config} = parsed;
   if (!sameIdentity(config.identity, request.identity) ||
-      (config.scenario !== EXPLICIT_GROSS_CASE &&
+      (config.scenario !== EXPLICIT_NET_CASE &&
        config.usdcDecimals !== request.quoteDecimals)) {
     return blockedScenarioProjection(["SCENARIO_IDENTITY_OR_DECIMALS_MISMATCH"]);
   }
@@ -508,8 +487,8 @@ function projectReviewScenario(request, observation, candidateReasons, parsedSce
   if (!reviewEvidence) {
     return blockedScenarioProjection(["SCENARIO_REVIEW_EVIDENCE_MISSING_UNAPPROVED_OR_MISMATCHED"]);
   }
-  if (config.scenario === EXPLICIT_GROSS_CASE) {
-    return projectExplicitGrossScenario(
+  if (config.scenario === EXPLICIT_NET_CASE) {
+    return projectExplicitNetScenario(
       request, observation, parsedScenario.parsed,
       sourceResponse
     );
@@ -726,7 +705,7 @@ function projectReviewScenario(request, observation, candidateReasons, parsedSce
   };
 }
 
-function explicitGrossRequestBinding(request) {
+function explicitNetRequestBinding(request) {
   return {
     identity: {...request.identity},
     side: request.side,
@@ -738,17 +717,17 @@ function explicitGrossRequestBinding(request) {
   };
 }
 
-export function paperExplicitGrossRequestDigest(value) {
+export function paperExplicitNetRequestDigest(value) {
   const request = copyRequest(value);
   return createHash("sha256")
-    .update(canonicalJson(explicitGrossRequestBinding(request))).digest("hex");
+    .update(canonicalJson(explicitNetRequestBinding(request))).digest("hex");
 }
 
-function modeledCostsAtGross(grossCents, assumptions) {
+function modeledCostsAtNetBasis(netBasisCents, assumptions) {
   const costs = {
     feeCents: BigInt(assumptions.feeCents),
     spreadCents: BigInt(assumptions.spreadCents),
-    slippageCents: ceilDiv(grossCents * BigInt(assumptions.slippageBps), BPS),
+    slippageCents: ceilDiv(netBasisCents * BigInt(assumptions.slippageBps), BPS),
     priceImpactCents: BigInt(assumptions.priceImpactCents),
     networkCents: BigInt(assumptions.networkCents)
   };
@@ -758,16 +737,16 @@ function modeledCostsAtGross(grossCents, assumptions) {
   };
 }
 
-function deriveExplicitGrossProjection(binding) {
+function deriveExplicitNetProjection(binding) {
   try {
     if (!isRecord(binding) || !exactKeys(binding, [
       "modelId", "modelVersion", "status", "provenance", "scenarioConfigSha256",
       "scenarioConfiguration", "reviewEvidenceRecord", "candidateIdentity", "side",
-      "request", "sourceQuote", "grossBasisEvidence", "quoteUsdConversion", "result"
-    ]) || binding.modelId !== EXPLICIT_GROSS_MODEL.id ||
-        binding.modelVersion !== EXPLICIT_GROSS_MODEL.version ||
-        binding.status !== EXPLICIT_GROSS_MODEL.status ||
-        binding.provenance !== EXPLICIT_GROSS_MODEL.provenance ||
+      "request", "sourceQuote", "quoteUsdConversion", "quoteBasis", "result"
+    ]) || binding.modelId !== EXPLICIT_NET_MODEL.id ||
+        binding.modelVersion !== EXPLICIT_NET_MODEL.version ||
+        binding.status !== EXPLICIT_NET_MODEL.status ||
+        binding.provenance !== EXPLICIT_NET_MODEL.provenance ||
         typeof binding.scenarioConfigSha256 !== "string" ||
         !SHA256.test(binding.scenarioConfigSha256)) {
       return null;
@@ -779,6 +758,8 @@ function deriveExplicitGrossProjection(binding) {
     });
     if (parsed.sha256 !== binding.scenarioConfigSha256 ||
         canonicalJson(parsed.config) !== canonicalJson(binding.scenarioConfiguration) ||
+        binding.quoteBasis !== QUOTED_NET_BASIS ||
+        binding.quoteBasis !== parsed.config.quoteBasis ||
         canonicalJson(parsed.config.quoteUsdConversion) !== canonicalJson(binding.quoteUsdConversion)) {
       return null;
     }
@@ -786,11 +767,11 @@ function deriveExplicitGrossProjection(binding) {
     const requestBinding = copyPlainRecord(binding.request, [
       "identity", "side", "amountAtoms", "quoteDecimals", "candidateSampledAt",
       "causalAt", "slippageBps", "sha256"
-    ], "explicit gross request binding");
+    ], "explicit net request binding");
     const identity = copyPlainRecord(binding.candidateIdentity,
-      ["chainId", "mint", "pool", "quote", "decimals"], "explicit gross candidate identity");
+      ["chainId", "mint", "pool", "quote", "decimals"], "explicit net candidate identity");
     requestBinding.identity = copyPlainRecord(requestBinding.identity,
-      ["chainId", "mint", "pool", "quote", "decimals"], "explicit gross request identity");
+      ["chainId", "mint", "pool", "quote", "decimals"], "explicit net request identity");
     if (!exactKeys(requestBinding, [
       "identity", "side", "amountAtoms", "quoteDecimals", "candidateSampledAt",
       "causalAt", "slippageBps", "sha256"
@@ -810,7 +791,7 @@ function deriveExplicitGrossProjection(binding) {
         : {positionOpenedAt: requestBinding.causalAt})
     };
     const request = copyRequest(requestInput);
-    const normalizedRequest = explicitGrossRequestBinding(request);
+    const normalizedRequest = explicitNetRequestBinding(request);
     const requestSha256 = createHash("sha256")
       .update(canonicalJson(normalizedRequest)).digest("hex");
     if (requestBinding.sha256 !== requestSha256 ||
@@ -821,9 +802,10 @@ function deriveExplicitGrossProjection(binding) {
     const sourceQuote = copyPlainRecord(binding.sourceQuote, [
       "source", "requestId", "observedAt", "expiresAt", "inAmount", "outAmount",
       "responseSha256", "responseByteLength"
-    ], "explicit gross source quote");
+    ], "explicit net source quote");
     if (Object.keys(sourceQuote).length !== 8 || sourceQuote.source !== SOURCE ||
-        typeof sourceQuote.requestId !== "string" || !SAFE_ID.test(sourceQuote.requestId) ||
+        !(sourceQuote.requestId === null ||
+          (typeof sourceQuote.requestId === "string" && SAFE_ID.test(sourceQuote.requestId))) ||
         !validTime(sourceQuote.observedAt) || !validTime(sourceQuote.expiresAt) ||
         sourceQuote.expiresAt <= sourceQuote.observedAt ||
         typeof sourceQuote.inAmount !== "string" || !INTEGER.test(sourceQuote.inAmount) ||
@@ -838,22 +820,6 @@ function deriveExplicitGrossProjection(binding) {
         sourceQuote.observedAt - request.candidateSampledAt > MAX_CAUSAL_AGE_MS ||
         sourceQuote.observedAt -
           (binding.side === "ENTRY" ? request.authorizedAt : request.positionOpenedAt) > MAX_CAUSAL_AGE_MS) {
-      return null;
-    }
-
-    const expectedBasisEvidence = {
-      ...parsed.config.grossBasisEvidence,
-      quoteRequestId: sourceQuote.requestId,
-      responseSha256: sourceQuote.responseSha256,
-      routeInAmount: sourceQuote.inAmount,
-      routeOutAmount: sourceQuote.outAmount
-    };
-    if (canonicalJson(expectedBasisEvidence) !== canonicalJson(binding.grossBasisEvidence) ||
-        !sameIdentity(expectedBasisEvidence.identity, identity) ||
-        expectedBasisEvidence.side !== binding.side ||
-        expectedBasisEvidence.amountAtoms !== request.amountAtoms ||
-        expectedBasisEvidence.requestSha256 !== requestSha256 ||
-        expectedBasisEvidence.routeAmountBasis !== ROUTE_AMOUNT_BASIS) {
       return null;
     }
 
@@ -893,7 +859,7 @@ function deriveExplicitGrossProjection(binding) {
       while (low < high) {
         const middle = (low + high + 1n) / 2n;
         const gross = grossCentsAtPrice(middle, priceMicros, baseScale, "ENTRY");
-        const {total} = modeledCostsAtGross(gross, assumptions);
+        const {total} = modeledCostsAtNetBasis(gross, assumptions);
         if (gross + total <= entryBudget) low = middle;
         else high = middle - 1n;
       }
@@ -907,7 +873,7 @@ function deriveExplicitGrossProjection(binding) {
     const grossCents = grossCentsAtPrice(
       modeledBaseAtoms, priceMicros, baseScale, binding.side
     );
-    const {costs, total} = modeledCostsAtGross(grossCents, assumptions);
+    const {costs, total} = modeledCostsAtNetBasis(grossCents, assumptions);
     if (isEntry && grossCents + total > entryBudget) return null;
     if (!isEntry && total > grossCents) return null;
     const afterCents = isEntry ? grossCents + total : grossCents - total;
@@ -916,7 +882,7 @@ function deriveExplicitGrossProjection(binding) {
       ? "SMALLER_SIZE_MODELED_NOT_A_FRESH_EXECUTABLE_QUOTE" : "QUOTED_AMOUNT";
     const result = {
       priceMicros: priceMicros.toString(),
-      grossCents: grossCents.toString(),
+      quotedNetBasisCents: grossCents.toString(),
       costsCents: Object.fromEntries(Object.entries(costs)
         .map(([key, amount]) => [key, amount.toString()])),
       totalCostsCents: total.toString(),
@@ -950,7 +916,7 @@ function deriveExplicitGrossProjection(binding) {
         approvalPurpose: "OFFLINE_SCENARIO_REVIEW_ONLY",
         approvalEvidence: reviewEvidence,
         approvalEvidenceProvenance: "CALLER_ASSERTED_NOT_AUTHENTICATED",
-        quoteBasis: ROUTE_AMOUNT_BASIS,
+        quoteBasis: QUOTED_NET_BASIS,
         quoteUsdConversion: {
           mint: conversion.mint,
           decimals: conversion.decimals,
@@ -976,7 +942,7 @@ function deriveExplicitGrossProjection(binding) {
       priceRounding: isEntry
         ? "ceil_exact_USD_per_token_microUSD" : "floor_exact_USD_per_token_microUSD",
       amountProjection: {
-        basis: "GROSS_ROUTE_CAP_WITH_MODELED_ALL_IN_COSTS; NOT_AN_EXECUTABLE_EXACT_SIZE_ROUTE",
+        basis: "QUOTED_NET_ROUTE_AMOUNT_VALUE_WITH_ADDITIONAL_MODELED_COSTS; NOT_AN_EXECUTABLE_EXACT_SIZE_ROUTE",
         sourceQuotedInputAtoms: sourceQuote.inAmount,
         maximumModeledInputAtoms: result.modeledInputAtoms,
         sourceQuotedBaseAtoms: result.sourceQuotedBaseAtoms,
@@ -988,17 +954,20 @@ function deriveExplicitGrossProjection(binding) {
         modeledAllInCents: isEntry ? result.afterCents : null,
         sizeDisposition: result.sizeDisposition
       },
-      costBasis: ROUTE_AMOUNT_BASIS,
+      costBasis: QUOTED_NET_BASIS,
       costsCents: modeledCosts,
-      costDisposition: Object.fromEntries([
-        ["feeCents", "fee"], ["spreadCents", "spread"], ["slippageCents", "slippage"],
-        ["priceImpactCents", "priceImpact"], ["networkCents", "network"]
-      ].map(([key]) => [key, "MODELED_EXPLICIT_ASSUMPTION_NOT_OBSERVED"])),
+      costDisposition: {
+        feeCents: assumptions.dispositions.fee,
+        spreadCents: assumptions.dispositions.spread,
+        slippageCents: assumptions.dispositions.slippage,
+        priceImpactCents: assumptions.dispositions.priceImpact,
+        networkCents: assumptions.dispositions.network
+      },
       quoteValue: {
-        grossBeforeAllCostsCents: result.grossCents,
+        quotedNetRouteAmountBasisCents: result.quotedNetBasisCents,
         direction: isEntry ? "DEBIT_ROUNDED_UP" : "CREDIT_ROUNDED_DOWN",
-        totalModeledCostsCents: result.totalCostsCents,
-        afterModeledCostsCents: result.afterCents,
+        totalAdditionalModeledCostsCents: result.totalCostsCents,
+        afterAdditionalModeledCostsCents: result.afterCents,
         label: "MODELED_SINGLE_SIDE_QUOTE_VALUE_NOT_PNL"
       },
       pnl: {
@@ -1019,27 +988,20 @@ function deriveExplicitGrossProjection(binding) {
   }
 }
 
-function projectExplicitGrossScenario(request, observation, parsed, sourceResponse) {
+function projectExplicitNetScenario(request, observation, parsed, sourceResponse) {
   const {config} = parsed;
   const route = observation.route;
   const observedAt = route?.observedAt;
   if (!route ||
       !sameIdentity(config.identity, request.identity) ||
       route.inAmount !== request.amountAtoms ||
-      typeof route.requestId !== "string" || !SAFE_ID.test(route.requestId) ||
       !sourceResponse?.sha256 || !SHA256.test(sourceResponse.sha256)) {
-    return blockedScenarioProjection(["EXPLICIT_GROSS_QUOTE_BINDING_MISSING_OR_AMBIGUOUS"]);
+    return blockedScenarioProjection(["EXPLICIT_NET_QUOTE_BINDING_MISSING_OR_AMBIGUOUS"]);
   }
 
-  const requestBinding = explicitGrossRequestBinding(request);
+  const requestBinding = explicitNetRequestBinding(request);
   const requestSha256 = createHash("sha256")
     .update(canonicalJson(requestBinding)).digest("hex");
-  const evidence = config.grossBasisEvidence;
-  if (!sameIdentity(evidence.identity, request.identity) ||
-      evidence.side !== request.side || evidence.amountAtoms !== request.amountAtoms ||
-      evidence.requestSha256 !== requestSha256) {
-    return blockedScenarioProjection(["EXPLICIT_GROSS_BASIS_EVIDENCE_BINDING_MISMATCH"]);
-  }
 
   const conversionReasons = [];
   const conversion = validConversion(config.quoteUsdConversion, {
@@ -1047,14 +1009,14 @@ function projectExplicitGrossScenario(request, observation, parsed, sourceRespon
     decimals: request.quoteDecimals
   }, observedAt, conversionReasons, "quote");
   if (!conversion || conversionReasons.length > 0) {
-    return blockedScenarioProjection(["EXPLICIT_GROSS_USD_CONVERSION_INVALID", ...conversionReasons]);
+    return blockedScenarioProjection(["EXPLICIT_NET_USD_CONVERSION_INVALID", ...conversionReasons]);
   }
 
   const binding = {
-    modelId: EXPLICIT_GROSS_MODEL.id,
-    modelVersion: EXPLICIT_GROSS_MODEL.version,
-    status: EXPLICIT_GROSS_MODEL.status,
-    provenance: EXPLICIT_GROSS_MODEL.provenance,
+    modelId: EXPLICIT_NET_MODEL.id,
+    modelVersion: EXPLICIT_NET_MODEL.version,
+    status: EXPLICIT_NET_MODEL.status,
+    provenance: EXPLICIT_NET_MODEL.provenance,
     scenarioConfigSha256: parsed.sha256,
     scenarioConfiguration: config,
     reviewEvidenceRecord: parsed.reviewEvidence,
@@ -1063,7 +1025,7 @@ function projectExplicitGrossScenario(request, observation, parsed, sourceRespon
     request: {...requestBinding, sha256: requestSha256},
     sourceQuote: {
       source: SOURCE,
-      requestId: route.requestId,
+      requestId: route.requestId ?? null,
       observedAt,
       expiresAt: route.expiresAt,
       inAmount: route.inAmount,
@@ -1071,28 +1033,22 @@ function projectExplicitGrossScenario(request, observation, parsed, sourceRespon
       responseSha256: sourceResponse.sha256,
       responseByteLength: sourceResponse.byteLength
     },
-    grossBasisEvidence: {
-      ...evidence,
-      quoteRequestId: route.requestId,
-      responseSha256: sourceResponse.sha256,
-      routeInAmount: route.inAmount,
-      routeOutAmount: route.outAmount
-    },
+    quoteBasis: QUOTED_NET_BASIS,
     quoteUsdConversion: conversion,
     result: null
   };
-  const derived = deriveExplicitGrossProjection(binding);
-  if (!derived) return blockedScenarioProjection(["EXPLICIT_GROSS_PROJECTION_REVALIDATION_FAILED"]);
+  const derived = deriveExplicitNetProjection(binding);
+  if (!derived) return blockedScenarioProjection(["EXPLICIT_NET_PROJECTION_REVALIDATION_FAILED"]);
   binding.result = derived.result;
-  const finalProjection = deriveExplicitGrossProjection(binding);
-  if (!finalProjection) return blockedScenarioProjection(["EXPLICIT_GROSS_PROJECTION_REVALIDATION_FAILED"]);
+  const finalProjection = deriveExplicitNetProjection(binding);
+  if (!finalProjection) return blockedScenarioProjection(["EXPLICIT_NET_PROJECTION_REVALIDATION_FAILED"]);
   return {
     ...finalProjection.projection,
     model: {
       binding,
-      digest: paperExplicitGrossModelDigest(binding),
-      assumptions: [...EXPLICIT_GROSS_ASSUMPTIONS],
-      resultContract: {...EXPLICIT_GROSS_RESULT_CONTRACT}
+      digest: paperExplicitNetModelDigest(binding),
+      assumptions: [...EXPLICIT_NET_ASSUMPTIONS],
+      resultContract: {...EXPLICIT_NET_RESULT_CONTRACT}
     }
   };
 }
@@ -2119,7 +2075,7 @@ export function verifyPaperQuotedNetProjection(projection, {expectedDigest} = {}
   return {valid: reasons.length === 0, reasons};
 }
 
-export function verifyPaperExplicitGrossProjection(projection, {expectedDigest} = {}) {
+export function verifyPaperExplicitNetProjection(projection, {expectedDigest} = {}) {
   const reasons = [];
   const model = projection?.model;
   const binding = model?.binding;
@@ -2130,30 +2086,30 @@ export function verifyPaperExplicitGrossProjection(projection, {expectedDigest} 
   const check = (ok, reason) => { if (!ok) reasons.push(reason); };
   let digestOk = false;
   try {
-    digestOk = model.digest === paperExplicitGrossModelDigest(binding);
+    digestOk = model.digest === paperExplicitNetModelDigest(binding);
   } catch {
     digestOk = false;
   }
   check(digestOk, "MODEL_DIGEST_MISMATCH");
   check(expectedDigest === undefined || model.digest === expectedDigest,
     "MODEL_DIGEST_NOT_THE_PINNED_DIGEST");
-  check(binding.modelId === EXPLICIT_GROSS_MODEL.id &&
-    binding.modelVersion === EXPLICIT_GROSS_MODEL.version &&
-    binding.status === EXPLICIT_GROSS_MODEL.status &&
-    binding.provenance === EXPLICIT_GROSS_MODEL.provenance,
+  check(binding.modelId === EXPLICIT_NET_MODEL.id &&
+    binding.modelVersion === EXPLICIT_NET_MODEL.version &&
+    binding.status === EXPLICIT_NET_MODEL.status &&
+    binding.provenance === EXPLICIT_NET_MODEL.provenance,
   "MODEL_IDENTITY_MISMATCH");
   check(exactKeys(model, ["binding", "digest", "assumptions", "resultContract"]) &&
-    canonicalJson(model.assumptions) === canonicalJson(EXPLICIT_GROSS_ASSUMPTIONS) &&
-    canonicalJson(model.resultContract) === canonicalJson(EXPLICIT_GROSS_RESULT_CONTRACT),
+    canonicalJson(model.assumptions) === canonicalJson(EXPLICIT_NET_ASSUMPTIONS) &&
+    canonicalJson(model.resultContract) === canonicalJson(EXPLICIT_NET_RESULT_CONTRACT),
   "MODEL_ASSUMPTIONS_OR_RESULT_CONTRACT_ALTERED");
-  const expected = isRecord(binding.result) ? deriveExplicitGrossProjection(binding) : null;
+  const expected = isRecord(binding.result) ? deriveExplicitNetProjection(binding) : null;
   check(expected !== null, "MODEL_BINDING_NOT_RECOMPUTED_FROM_QUOTE");
   if (expected) {
     const expectedModel = {
       binding,
-      digest: paperExplicitGrossModelDigest(binding),
-      assumptions: [...EXPLICIT_GROSS_ASSUMPTIONS],
-      resultContract: {...EXPLICIT_GROSS_RESULT_CONTRACT}
+      digest: paperExplicitNetModelDigest(binding),
+      assumptions: [...EXPLICIT_NET_ASSUMPTIONS],
+      resultContract: {...EXPLICIT_NET_RESULT_CONTRACT}
     };
     check(canonicalJson(projection) === canonicalJson({
       ...expected.projection,
