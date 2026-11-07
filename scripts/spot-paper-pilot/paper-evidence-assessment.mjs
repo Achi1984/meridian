@@ -34,6 +34,7 @@ const EXPECTED_MANIFEST = Object.freeze({
   warmupCandles: 21
 });
 const NOTIONAL_DIVISOR = 100_000_000_000_000n;
+const TERMINAL_WRITE_GRACE_MS = 5_000;
 
 const isInteger = value => Number.isSafeInteger(value);
 const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
@@ -86,6 +87,9 @@ function verifyLedger(events, checkpoint, report, responseBodies) {
   const parsedQuotes = new Map();
   try {
     for (const event of events) {
+      const needsMarketEvidence = event.type === "observation" ||
+        (event.type === "data_gap" && event.dataGap === "MISSED_DECISION_WINDOW");
+      if (needsMarketEvidence && (!event.ohlc || !event.ticker)) return false;
       if (!event.ohlc || !event.ticker) continue;
       if (!rawReferenceValid(event.ohlc) || !rawReferenceValid(event.ticker) ||
           !isInteger(event.signalKnownAt) ||
@@ -194,7 +198,11 @@ function verifyLedger(events, checkpoint, report, responseBodies) {
       })) return false;
   const unrealized = report.position ?
     report.lastMark?.netExitCents - report.position.entryCostCents : 0;
-  const expectedEquity = cash + (report.position ? report.lastMark?.netExitCents : 0);
+  const openEntryCost = report.position?.entryCostCents ?? 0;
+  const expectedCash = EXPECTED_MANIFEST.initialCashCents +
+    report.realizedPnlCents - openEntryCost;
+  const expectedEquity = EXPECTED_MANIFEST.initialCashCents +
+    report.realizedPnlCents + report.unrealizedPnlCents;
   const latestObservation = events.filter(event => event.ohlc && event.ticker).at(-1);
   const lastQuote = latestObservation && parsedQuotes.get(latestObservation.id);
   const markValid = !report.position || Boolean(lastQuote && report.lastMark &&
@@ -212,15 +220,19 @@ function verifyLedger(events, checkpoint, report, responseBodies) {
           BigInt(EXPECTED_MANIFEST.feeBpsPerSide), 10_000n)) &&
     report.lastMark.unrealizedPnlCents === unrealized &&
     report.lastMark.ageMs === report.endedAt - report.lastMark.receivedAt);
-  return markValid && isInteger(unrealized) && unrealized === report.unrealizedPnlCents &&
+  return markValid && isInteger(openEntryCost) && isInteger(expectedCash) &&
+    expectedCash === report.cashCents &&
+    isInteger(unrealized) && unrealized === report.unrealizedPnlCents &&
     isInteger(expectedEquity) && expectedEquity === report.equityCents &&
-    EXPECTED_MANIFEST.initialCashCents + report.realizedPnlCents +
-      report.unrealizedPnlCents === report.equityCents &&
     (report.position ?
       report.positionStatus === "OPEN_UNRESOLVED_AT_TERMINAL" &&
         report.lastMark && isInteger(report.lastMark.ageMs) && report.lastMark.ageMs >= 0 :
       report.positionStatus === "FLAT" && report.lastMark === null &&
-        report.unrealizedPnlCents === 0);
+        report.unrealizedPnlCents === 0 &&
+        (fills.length > 0 ||
+          (report.cashCents === EXPECTED_MANIFEST.initialCashCents &&
+            report.equityCents === EXPECTED_MANIFEST.initialCashCents &&
+            report.feesCents === 0 && report.realizedPnlCents === 0)));
 }
 
 export function assessPaperEvidence({
@@ -265,6 +277,12 @@ export function assessPaperEvidence({
     const signals = [...new Map(events.flatMap(event => event.signals ?? [])
       .map(signal => [signal.id, signal])).values()];
     const checkpoint = readback.checkpoint;
+    const acceptedObservations = observations;
+    const elapsedValid = isInteger(report.startedAt) && isInteger(report.endedAt) &&
+      report.endedAt >= report.startedAt &&
+      report.endedAt - report.startedAt <=
+        EXPECTED_MANIFEST.maxDurationMs + TERMINAL_WRITE_GRACE_MS;
+    const elapsedMs = elapsedValid ? report.endedAt - report.startedAt : null;
     if (!isInteger(report.observations) || report.observations !== observations ||
         !isInteger(report.dataGaps) || report.dataGaps !== dataGaps ||
         !isInteger(report.requests) || report.requests < observations * 2 ||
@@ -281,7 +299,8 @@ export function assessPaperEvidence({
         events.length !== checkpoint.cycle + 2 ||
         (report.stopReason === "CYCLE_LIMIT" &&
           checkpoint.cycle !== EXPECTED_MANIFEST.maxCycles) ||
-        report.requests > checkpoint.cycle * 2) {
+        report.requests > checkpoint.cycle * 2 ||
+        !elapsedValid) {
       failures.push("COUNTER_OR_SIGNAL_RECONCILIATION_FAILED");
     }
     if (!verifyLedger(events, checkpoint, report, responseBodies)) {
@@ -289,10 +308,31 @@ export function assessPaperEvidence({
     }
   }
 
-  const completed = terminalVerified && failures.length === 0 &&
-    paperExitCode === 0 && report.operationalStatus === "COMPLETED_BOUNDED" &&
-    ["CYCLE_LIMIT", "DURATION_LIMIT"].includes(report.stopReason);
-  const outcome = !terminalVerified ? "UNKNOWN" : completed ? "COMPLETED" : "FAILED";
+  const acceptedObservations = Array.isArray(events) ?
+    events.filter(event => event.type === "observation").length : null;
+  const elapsedMs = isInteger(report?.startedAt) && isInteger(report?.endedAt) &&
+    report.endedAt >= report.startedAt ? report.endedAt - report.startedAt : null;
+  const evidenceAccepted = terminalVerified && failures.length === 0 &&
+    paperExitCode === 0 && acceptedObservations > 0;
+  const fullDuration = evidenceAccepted &&
+    report.operationalStatus === "COMPLETED_BOUNDED" &&
+    report.stopReason === "DURATION_LIMIT" &&
+    elapsedMs >= EXPECTED_MANIFEST.maxDurationMs &&
+    elapsedMs <= EXPECTED_MANIFEST.maxDurationMs + TERMINAL_WRITE_GRACE_MS;
+  const boundedStop = ["CYCLE_LIMIT", "DURATION_LIMIT"].includes(report?.stopReason);
+  const riskStop = ["SAMPLED_2PCT_BID_STOP", "SESSION_LOSS_LIMIT", "SIGNAL"]
+    .includes(report?.stopReason);
+  const outcome = !terminalVerified ? "UNKNOWN" :
+    !evidenceAccepted ? "FAILED" : fullDuration ? "COMPLETED" :
+      boundedStop || riskStop ? "PARTIAL" : "FAILED";
+  const durationStatus = !terminalVerified ? "UNKNOWN" :
+    !evidenceAccepted ? "FAILED_DATA_ACCEPTANCE" :
+      fullDuration ? "FULL_DURATION" :
+        report?.stopReason === "CYCLE_LIMIT" ? "PARTIAL_CYCLE_LIMIT" :
+          report?.stopReason === "DURATION_LIMIT" ? "PARTIAL_DURATION" :
+            riskStop ? "PARTIAL_RISK_STOP" : "PARTIAL_STOP";
+  const cycles = isInteger(readback?.checkpoint?.cycle) ?
+    readback.checkpoint.cycle : null;
   const reasons = Array.isArray(events) ? events
     .filter(event => event.type === "data_gap" && (event.reason || event.dataGap))
     .map(event => event.reason ?? event.dataGap) : [];
@@ -300,21 +340,33 @@ export function assessPaperEvidence({
   if (report?.stopReason) reasons.push(report.stopReason);
   if (paperExitCode !== 0) reasons.push("PAPER_PROCESS_EXIT_NONZERO_OR_UNKNOWN");
   if (failures.length) reasons.push(...failures);
-  const hasFills = Array.isArray(report?.fills) && report.fills.length > 0;
   const markAgeMs = report?.lastMark?.ageMs ?? null;
 
   return {
     outcome,
+    durationStatus,
     terminalVerified,
-    boundedTermination: completed,
+    boundedTermination: evidenceAccepted && boundedStop,
     executionImpact: false,
-    dataAcceptance: completed && report.observations > 0 ?
-      "DATA_ACCEPTED" : completed ? "FAILED_DATA_ACCEPTANCE" : "NOT_ASSESSED",
-    fillPathValidated: completed && hasFills,
+    dataAcceptance: evidenceAccepted ? "DATA_ACCEPTED" :
+      terminalVerified ? "FAILED_DATA_ACCEPTANCE" : "NOT_ASSESSED",
+    quoteAccountingReconciliation: terminalVerified && failures.length === 0 &&
+      acceptedObservations > 0,
+    signalReplay: "NOT_PERFORMED",
     profitability: "NOT_ASSESSED",
     runId: readback?.runId ?? report?.runId ?? null,
     sourceSha: provenance?.acceptedSourceSha ?? null,
-    observations: report?.observations ?? null,
+    startedAt: report?.startedAt ?? null,
+    endedAt: report?.endedAt ?? null,
+    elapsedMs,
+    durationCoverage: elapsedMs === null ? null :
+      Math.min(1, elapsedMs / EXPECTED_MANIFEST.maxDurationMs),
+    cycles,
+    cycleCoverage: cycles === null ? null : cycles / EXPECTED_MANIFEST.maxCycles,
+    acceptedObservations,
+    observationCoverage: cycles === null || cycles === 0 ? null :
+      acceptedObservations / cycles,
+    observations: acceptedObservations,
     dataGaps: report?.dataGaps ?? null,
     requests: report?.requests ?? null,
     deliveredBytes: report?.deliveredBytes ?? null,
@@ -336,7 +388,9 @@ export function assessPaperEvidence({
     stopReason: report?.stopReason ?? null,
     reasons: [...new Set(reasons)],
     limitations: [
-      "No trades are forced; zero fills are valid and do not validate the fill path.",
+      "No trades are forced; zero fills are valid.",
+      "Strategy signal replay is not performed; recorded fills do not validate the strategy fill path.",
+      "A bounded cycle, risk, or early duration stop is a partial run, not a completed one-hour trial.",
       "Profitability is not assessed, regardless of fills, PnL, or terminal equity."
     ]
   };
@@ -376,8 +430,8 @@ async function main(argv) {
   });
   await writeFile(outputPath, `${JSON.stringify(assessment, null, 2)}\n`, { flag: "wx" });
   process.stdout.write(`${JSON.stringify(assessment)}\n`);
-  if (assessment.outcome !== "COMPLETED" ||
-      assessment.dataAcceptance !== "DATA_ACCEPTED") process.exitCode = 1;
+  if (assessment.outcome !== "COMPLETED" &&
+      assessment.outcome !== "PARTIAL") process.exitCode = 1;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

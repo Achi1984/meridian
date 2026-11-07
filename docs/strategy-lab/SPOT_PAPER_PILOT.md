@@ -240,12 +240,17 @@ minutes. It makes no authenticated exchange requests and has no secrets, wallet,
 real-order, schedule, or dashboard dependency.
 
 The read-only assessment requires matching terminal and readback reports,
-verified journal/raw-response hashes, accepted-source and fresh-run binding,
-counter/signal equality, integer-cent/satoshi fill and ledger reconciliation,
-and any fill's causal post-signal quote and modeled price. It reports fills,
-fees, cash, equity, position/mark age, counters, signals, stop/data-gap reasons,
-and keeps `UNKNOWN`, `FAILED`, and `COMPLETED` distinct. A zero-fill run can be
-operationally complete but does not validate a fill path; profitability always
+verified journal/raw-response hashes for every accepted observation and
+missed-decision-window event, accepted-source and fresh-run binding,
+counter/signal equality, and integer-cent/satoshi quote/accounting reconciliation.
+Request-error gaps can lack response references. Strategy signal replay is
+`NOT_PERFORMED`; quote and accounting reconciliation does not validate the
+strategy fill path. It reports start/end/elapsed time, duration/cycle/observation
+coverage, fills, fees, cash, equity, position/mark age, counters, signals, and
+stop/data-gap reasons. It distinguishes a full-duration run from partial cycle,
+early-duration, and risk stops, and preserves `UNKNOWN`, `FAILED`, and
+`COMPLETED` evidence outcomes. At least one accepted observation is required;
+zero fills remain valid but do not validate a fill path. Profitability always
 remains `NOT_ASSESSED`. No trades are forced.
 
 After lead review of the exact build and manifest, the exact manual dispatch is:

@@ -123,7 +123,7 @@ function acquisition(data, nowMs, requestStartedAt = nowMs - 20) {
     bytes: Buffer.byteLength(raw), requestStartedAt, receivedAt: nowMs };
 }
 
-function paperEvidenceFixture({ withFill = false } = {}) {
+function paperEvidenceFixture({ withFill = false, fillInGap = false } = {}) {
   const startedAt = BASE + 21 * MINUTE + 1_000;
   const receivedAt = startedAt + 30;
   const endedAt = startedAt + 3_600_000;
@@ -209,11 +209,21 @@ function paperEvidenceFixture({ withFill = false } = {}) {
     lastMark: ledger.lastMark, requests: 2,
     deliveredBytes: Buffer.byteLength(ohlcRaw) + Buffer.byteLength(tickerRaw)
   };
-  const events = [
-    { id: "run-start", type: "start" },
-    event,
-    { id: "run-terminal", type: "terminal", report }
-  ];
+  const events = [{ id: "run-start", type: "start" }];
+  if (fillInGap) {
+    events.push({ ...event, id: "observation:1", signals: [], fills: [] });
+    events.push({
+      ...event, id: "gap:2", type: "data_gap", cycle: 2,
+      dataGap: "MISSED_DECISION_WINDOW"
+    });
+    report.observations = 1;
+    report.dataGaps = 1;
+    report.requests = 4;
+    report.deliveredBytes *= 2;
+  } else {
+    events.push(event);
+  }
+  events.push({ id: "run-terminal", type: "terminal", report });
   const readback = {
     reconciliation: "TERMINAL_REPORT_AVAILABLE", runId: report.runId,
     eventCount: events.length, resumed: false, executionImpact: false,
@@ -228,8 +238,8 @@ function paperEvidenceFixture({ withFill = false } = {}) {
       }
     },
     checkpoint: {
-      ledger, counters: { requests: 2, bytes: report.deliveredBytes },
-      cycle: 1, stopReason: "DURATION_LIMIT"
+      ledger, counters: { requests: report.requests, bytes: report.deliveredBytes },
+      cycle: fillInGap ? 2 : 1, stopReason: "DURATION_LIMIT"
     },
     events, report
   };
@@ -259,22 +269,29 @@ test("paper evidence accepts zero fills without validating a fill path or profit
     provenance: fixture.provenance, responseBodies: fixture.responseBodies
   });
   assert.equal(assessment.outcome, "COMPLETED");
+  assert.equal(assessment.durationStatus, "FULL_DURATION");
   assert.equal(assessment.dataAcceptance, "DATA_ACCEPTED");
-  assert.equal(assessment.fillPathValidated, false);
+  assert.equal(assessment.quoteAccountingReconciliation, true);
+  assert.equal(assessment.signalReplay, "NOT_PERFORMED");
   assert.equal(assessment.profitability, "NOT_ASSESSED");
+  assert.equal(assessment.elapsedMs, 3_600_000);
+  assert.equal(assessment.durationCoverage, 1);
+  assert.equal(assessment.cycles, 1);
+  assert.equal(assessment.acceptedObservations, 1);
   assert.equal(assessment.observations, 1);
   assert.deepEqual(assessment.fills, []);
   assert.equal(assessment.positionStatus, "FLAT");
 });
 
-test("paper evidence reconciles recorded quotes, integer fills, and explicit stale open marks", () => {
+test("paper evidence reconciles recorded quotes, integer fills, and explicit stale open marks without strategy claims", () => {
   const fixture = paperEvidenceFixture({ withFill: true });
   const assessment = assessPaperEvidence({
     paperExitCode: 0, paperReport: fixture.report, readback: fixture.readback,
     provenance: fixture.provenance, responseBodies: fixture.responseBodies
   });
   assert.equal(assessment.outcome, "COMPLETED");
-  assert.equal(assessment.fillPathValidated, true);
+  assert.equal(assessment.quoteAccountingReconciliation, true);
+  assert.equal(assessment.signalReplay, "NOT_PERFORMED");
   assert.equal(assessment.profitability, "NOT_ASSESSED");
   assert.equal(assessment.openPositionAssessment, "OPEN_MARK_STALE");
   assert.equal(assessment.markAgeMs, fixture.report.endedAt - fixture.report.lastMark.receivedAt);
@@ -286,7 +303,131 @@ test("paper evidence reconciles recorded quotes, integer fills, and explicit sta
     provenance: altered.provenance, responseBodies: altered.responseBodies
   });
   assert.equal(rejected.outcome, "FAILED");
-  assert.equal(rejected.fillPathValidated, false);
+  assert.equal(rejected.quoteAccountingReconciliation, false);
+});
+
+test("paper evidence requires raw market receipts for observations and missed-window gaps", () => {
+  const fixture = paperEvidenceFixture();
+  for (const fields of [["ohlc"], ["ticker"], ["ohlc", "ticker"]]) {
+    const altered = structuredClone(fixture);
+    for (const field of fields) delete altered.readback.events[1][field];
+    const assessment = assessPaperEvidence({
+      paperExitCode: 0, paperReport: altered.report, readback: altered.readback,
+      provenance: altered.provenance, responseBodies: altered.responseBodies
+    });
+    assert.equal(assessment.outcome, "FAILED", fields.join("+"));
+    assert.equal(assessment.dataAcceptance, "FAILED_DATA_ACCEPTANCE", fields.join("+"));
+    assert.equal(assessment.quoteAccountingReconciliation, false, fields.join("+"));
+  }
+
+  const missedWindow = paperEvidenceFixture({ withFill: true, fillInGap: true });
+  const assessment = assessPaperEvidence({
+    paperExitCode: 0, paperReport: missedWindow.report,
+    readback: missedWindow.readback, provenance: missedWindow.provenance,
+    responseBodies: missedWindow.responseBodies
+  });
+  assert.equal(assessment.outcome, "COMPLETED");
+  assert.equal(assessment.dataGaps, 1);
+  assert.equal(assessment.quoteAccountingReconciliation, true);
+  assert.equal(assessment.signalReplay, "NOT_PERFORMED");
+});
+
+test("paper evidence reports partial runtime and accepted-observation coverage honestly", () => {
+  const fixture = paperEvidenceFixture();
+  fixture.report.endedAt -= 60_000;
+  const mark = fixture.readback.checkpoint.ledger.lastMark;
+  if (mark) mark.ageMs = fixture.report.endedAt - mark.receivedAt;
+  const assessment = assessPaperEvidence({
+    paperExitCode: 0, paperReport: fixture.report, readback: fixture.readback,
+    provenance: fixture.provenance, responseBodies: fixture.responseBodies
+  });
+  assert.equal(assessment.outcome, "PARTIAL");
+  assert.equal(assessment.durationStatus, "PARTIAL_DURATION");
+  assert.equal(assessment.elapsedMs, 3_540_000);
+  assert.equal(assessment.durationCoverage, 3_540_000 / 3_600_000);
+  assert.equal(assessment.observationCoverage, 1);
+
+  const cycleLimit = paperEvidenceFixture();
+  const firstObservation = cycleLimit.readback.events[1];
+  const startEvent = cycleLimit.readback.events[0];
+  const cycleEvents = [startEvent];
+  for (let cycle = 1; cycle <= 60; cycle++) {
+    cycleEvents.push({
+      ...firstObservation,
+      id: `observation:${cycle}`,
+      cycle
+    });
+  }
+  cycleLimit.report.stopReason = "CYCLE_LIMIT";
+  cycleLimit.report.observations = 60;
+  cycleLimit.report.requests = 120;
+  cycleLimit.report.deliveredBytes *= 60;
+  cycleLimit.report.endedAt = cycleLimit.report.startedAt + 59 * MINUTE;
+  cycleEvents.push({ id: "run-terminal", type: "terminal", report: cycleLimit.report });
+  cycleLimit.readback.events = cycleEvents;
+  cycleLimit.readback.eventCount = cycleEvents.length;
+  cycleLimit.readback.report = cycleLimit.report;
+  cycleLimit.readback.checkpoint = {
+    ...cycleLimit.readback.checkpoint,
+    counters: { requests: 120, bytes: cycleLimit.report.deliveredBytes },
+    cycle: 60,
+    stopReason: "CYCLE_LIMIT"
+  };
+  const cycleAssessment = assessPaperEvidence({
+    paperExitCode: 0, paperReport: cycleLimit.report,
+    readback: cycleLimit.readback, provenance: cycleLimit.provenance,
+    responseBodies: cycleLimit.responseBodies
+  });
+  assert.equal(cycleAssessment.outcome, "PARTIAL");
+  assert.equal(cycleAssessment.durationStatus, "PARTIAL_CYCLE_LIMIT");
+  assert.equal(cycleAssessment.elapsedMs, 59 * MINUTE);
+  assert.equal(cycleAssessment.cycleCoverage, 1);
+  assert.equal(cycleAssessment.observationCoverage, 1);
+
+  const riskStop = paperEvidenceFixture();
+  riskStop.report.operationalStatus = "STOPPED_WITH_LIMITATION";
+  riskStop.report.stopReason = "SESSION_LOSS_LIMIT";
+  riskStop.readback.checkpoint.stopReason = "SESSION_LOSS_LIMIT";
+  const riskAssessment = assessPaperEvidence({
+    paperExitCode: 0, paperReport: riskStop.report, readback: riskStop.readback,
+    provenance: riskStop.provenance, responseBodies: riskStop.responseBodies
+  });
+  assert.equal(riskAssessment.outcome, "PARTIAL");
+  assert.equal(riskAssessment.durationStatus, "PARTIAL_RISK_STOP");
+});
+
+test("paper evidence leaves request-error gaps reference-optional", () => {
+  const fixture = paperEvidenceFixture();
+  const events = [
+    fixture.readback.events[0],
+    { id: "gap:1:1:HTTP_429", type: "data_gap", reason: "HTTP_429", at: BASE },
+    fixture.readback.events.at(-1)
+  ];
+  fixture.report.operationalStatus = "STOPPED_WITH_LIMITATION";
+  fixture.report.stopReason = "INVALID_DATA";
+  fixture.report.observations = 0;
+  fixture.report.dataGaps = 1;
+  fixture.report.requests = 1;
+  fixture.report.deliveredBytes = 0;
+  fixture.report.signals = [];
+  fixture.readback.events = events;
+  fixture.readback.eventCount = events.length;
+  fixture.readback.checkpoint = {
+    ...fixture.readback.checkpoint,
+    counters: { requests: 1, bytes: 0 },
+    cycle: 1,
+    stopReason: "INVALID_DATA"
+  };
+  const assessment = assessPaperEvidence({
+    paperExitCode: 0, paperReport: fixture.report, readback: fixture.readback,
+    provenance: fixture.provenance, responseBodies: fixture.responseBodies
+  });
+  assert.equal(assessment.outcome, "FAILED");
+  assert.equal(assessment.dataAcceptance, "FAILED_DATA_ACCEPTANCE");
+  assert.equal(assessment.observations, 0);
+  assert.equal(assessment.dataGaps, 1);
+  assert.ok(assessment.reasons.includes("HTTP_429"));
+  assert.ok(!assessment.reasons.includes("INTEGER_LEDGER_OR_CAUSAL_FILL_RECONCILIATION_FAILED"));
 });
 
 test("paper evidence keeps failed and unknown outcomes distinct and binds the accepted source", () => {
@@ -331,7 +472,9 @@ test("paper evidence CLI verifies local response bodies without provider request
     provenancePath, runDirectory, assessmentPath
   ], { encoding: "utf8" });
   assert.equal(JSON.parse(output).outcome, "COMPLETED");
-  assert.equal(JSON.parse(await readFile(assessmentPath, "utf8")).fillPathValidated, true);
+  const assessment = JSON.parse(await readFile(assessmentPath, "utf8"));
+  assert.equal(assessment.quoteAccountingReconciliation, true);
+  assert.equal(assessment.signalReplay, "NOT_PERFORMED");
 });
 
 test("one-hour paper workflow is owner-only, manual, one-shot, pinned, and bounded", () => {
