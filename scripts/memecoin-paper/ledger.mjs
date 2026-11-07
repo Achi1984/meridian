@@ -1,3 +1,5 @@
+import {createHash} from "node:crypto";
+
 const INITIAL_CAPITAL_CENTS = 100_000n;
 const MAX_ENTRY_CENTS = 8_000n;
 const MAX_POSITIONS = 3;
@@ -69,6 +71,118 @@ function digest(fields) {
   return JSON.stringify(fields, (_key, value) => typeof value === "bigint" ? value.toString() : value);
 }
 
+const MODELED_SCHEMA = "PAPER_MODELED_QUOTE_V1";
+const MODELED_MODEL_ID = "MERIDIAN_PAPER_QUOTED_NET_V1";
+const MODELED_KEYS = Object.freeze([
+  "schema", "provenance", "actualCostCoverage", "executionRealistic", "runId",
+  "runStartedAt", "runEndAt", "sourcePolicySha256", "modelId", "modelVersion",
+  "modelDigest", "scenarioConfigSha256", "usdAssumption", "side", "baseAtoms",
+  "sourceCapBaseAtoms", "adverseAdjustmentBps", "networkReserveCents",
+  "responseSha256", "expiresAt", "sourceObservedAt", "digest"
+]);
+const COST_KEYS = Object.freeze(["feeCents", "spreadCents", "slippageCents", "priceImpactCents", "networkCents"]);
+const INTEGER_TEXT = /^(0|[1-9]\d{0,39})$/;
+const SHA256_TEXT = /^[a-f0-9]{64}$/;
+
+function canonicalText(value, depth = 0) {
+  if (depth > 8) throw new RangeError("canonical value is too deep");
+  if (Array.isArray(value)) return `[${value.map(item => canonicalText(item, depth + 1)).join(",")}]`;
+  if (value !== null && typeof value === "object") {
+    return `{${Object.keys(value).sort().map(key =>
+      `${JSON.stringify(key)}:${canonicalText(value[key], depth + 1)}`).join(",")}}`;
+  }
+  return typeof value === "bigint" ? JSON.stringify(value.toString()) : JSON.stringify(value ?? null);
+}
+
+function safeCanonical(value) {
+  try {
+    return canonicalText(value);
+  } catch {
+    return "UNSERIALIZABLE";
+  }
+}
+
+export function paperModeledQuoteDigest(facts, quote, decimals) {
+  const {digest: _ignored, ...rest} = facts;
+  const economics = {
+    mint: quote.mint, chainId: quote.chainId, pool: quote.pool, quote: quote.quote, decimals,
+    observedAt: quote.observedAt, priceMicros: quote.priceMicros, source: quote.source,
+    costs: Object.fromEntries(COST_KEYS.map(key => [key, String(quote.costs?.[key])]))
+  };
+  return createHash("sha256").update(canonicalText({facts: rest, economics})).digest("hex");
+}
+
+// Pure arithmetic and binding check; issuer provenance is confirmed separately by the step.
+export function verifyPaperModeledQuote(quote, {runId, side, now, decimals}) {
+  const fail = reason => ({ok: false, reason});
+  try {
+    const facts = quote?.modeled;
+    if (!facts || typeof facts !== "object" || Array.isArray(facts) ||
+        Object.keys(facts).sort().join(",") !== [...MODELED_KEYS].sort().join(",")) {
+      return fail("modeled facts are missing or malformed");
+    }
+    if (facts.schema !== MODELED_SCHEMA || facts.provenance !== "MODELED" ||
+        facts.actualCostCoverage !== "UNKNOWN" || facts.executionRealistic !== false ||
+        facts.modelId !== MODELED_MODEL_ID || facts.modelVersion !== "1" ||
+        facts.runId !== runId || facts.side !== side) {
+      return fail("modeled facts do not match this run, model, or side");
+    }
+    for (const key of ["sourcePolicySha256", "modelDigest", "scenarioConfigSha256", "responseSha256", "digest"]) {
+      if (typeof facts[key] !== "string" || !SHA256_TEXT.test(facts[key])) return fail("modeled digest field is invalid");
+    }
+    if (typeof facts.usdAssumption !== "string" || facts.usdAssumption.length === 0 ||
+        facts.usdAssumption.length > 256) {
+      return fail("modeled currency assumption is invalid");
+    }
+    for (const key of ["runStartedAt", "runEndAt", "expiresAt", "sourceObservedAt"]) {
+      if (!Number.isSafeInteger(facts[key]) || facts[key] < 0) return fail("modeled time field is invalid");
+    }
+    for (const key of ["baseAtoms", "sourceCapBaseAtoms", "networkReserveCents"]) {
+      if (typeof facts[key] !== "string" || !INTEGER_TEXT.test(facts[key])) return fail("modeled amount field is invalid");
+    }
+    if (!Number.isInteger(facts.adverseAdjustmentBps) || facts.adverseAdjustmentBps < 0 ||
+        facts.adverseAdjustmentBps > 10_000) {
+      return fail("modeled adjustment is invalid");
+    }
+    const base = BigInt(facts.baseAtoms);
+    if (base <= 0n || base > BigInt(facts.sourceCapBaseAtoms)) {
+      return fail("modeled quantity exceeds the source quote cap");
+    }
+    if (!Number.isSafeInteger(quote.observedAt) || quote.observedAt !== facts.sourceObservedAt ||
+        !Number.isSafeInteger(now) || facts.runStartedAt > facts.sourceObservedAt ||
+        facts.sourceObservedAt > facts.runEndAt || facts.sourceObservedAt > now ||
+        now > facts.runEndAt || now > facts.expiresAt) {
+      return fail("modeled quote is outside its run window or expired");
+    }
+    if (!Number.isSafeInteger(quote.priceMicros) || quote.priceMicros <= 0) return fail("modeled price is invalid");
+    const scale = decimalScale(decimals);
+    const price = BigInt(quote.priceMicros);
+    const numerator = base * price;
+    const denominator = scale * 10_000n;
+    const gross = side === "ENTRY" ? (numerator + denominator - 1n) / denominator : numerator / denominator;
+    const adjustment = BigInt(facts.adverseAdjustmentBps);
+    const slippage = (gross * adjustment + BPS - 1n) / BPS;
+    const expected = {
+      feeCents: 0n, spreadCents: 0n, slippageCents: slippage,
+      priceImpactCents: 0n, networkCents: BigInt(facts.networkReserveCents)
+    };
+    const carried = sumCosts(quote.costs, "modeled").values;
+    if (COST_KEYS.some(key => carried[key] !== expected[key])) {
+      return fail("modeled costs do not recompute from the carried facts");
+    }
+    if (facts.digest !== paperModeledQuoteDigest(facts, quote, decimals)) {
+      return fail("modeled digest does not match the quote");
+    }
+    return {ok: true, baseAtoms: base, capAtoms: BigInt(facts.sourceCapBaseAtoms), digest: facts.digest};
+  } catch {
+    return fail("modeled facts could not be verified");
+  }
+}
+
+function modeledPayload(quote) {
+  return quote?.modeled === undefined ? {} : {modeled: safeCanonical(quote.modeled)};
+}
+
 function exitPayloadDigest(eventId, quote) {
   return digest({
     eventId,
@@ -81,8 +195,22 @@ function exitPayloadDigest(eventId, quote) {
     costs: quote?.costs,
     source: quote?.source,
     mode: quote?.mode,
-    executable: quote?.executable
+    executable: quote?.executable,
+    ...modeledPayload(quote)
   });
+}
+
+// Runs before any high-water, trailing-stop, or observation-time mutation.
+function positionQuoteGate(position, quote, now, runId) {
+  if (!position.modeled) {
+    return quote?.modeled === undefined ? null : "modeled quote cannot value a legacy position";
+  }
+  const verified = verifyPaperModeledQuote(quote, {runId, side: "EXIT", now, decimals: position.decimals});
+  if (!verified.ok) return verified.reason;
+  if (verified.baseAtoms !== position.tokenAtoms) {
+    return "modeled exit quote does not cover the exact full position quantity";
+  }
+  return null;
 }
 
 function viennaDay(value) {
@@ -93,12 +221,14 @@ function viennaDay(value) {
   return `${map.year}-${map.month}-${map.day}`;
 }
 
-function computeMark(position, mark, now) {
+function computeMark(position, mark, now, runId) {
   if (!quoteIdentityValid(mark, position) || !Number.isSafeInteger(mark.priceMicros) ||
       mark.priceMicros <= 0 || !Number.isSafeInteger(time(mark.observedAt)) ||
       now - time(mark.observedAt) < 0 || now - time(mark.observedAt) > MAX_QUOTE_AGE_MS) {
     return {status: "VALUATION_UNAVAILABLE", reason: "mark is missing, stale, future-dated, or identity-mismatched"};
   }
+  const modeledFailure = positionQuoteGate(position, mark, now, runId);
+  if (modeledFailure) return {status: "VALUATION_UNAVAILABLE", reason: modeledFailure};
   let costs;
   try {
     costs = sumCosts(mark.costs, "exit").total;
@@ -122,6 +252,7 @@ function computeMark(position, mark, now) {
 
 export class PaperLedger {
   #latestCommandTime;
+  #runFinished;
   constructor({initialCapitalCents = INITIAL_CAPITAL_CENTS, now = Date.now(), runId = "synthetic-only"} = {}) {
     this.initialCapitalCents = moneyCents(initialCapitalCents, "initialCapitalCents");
     if (this.initialCapitalCents !== INITIAL_CAPITAL_CENTS) {
@@ -149,6 +280,7 @@ export class PaperLedger {
     if (!this.day) throw new TypeError("valid initialization time is required");
     this.dailyOpeningEquityCents = this.initialCapitalCents;
     this.dailyLossTripped = false;
+    this.#runFinished = false;
     if (typeof runId !== "string" || !SAFE_ID.test(runId)) throw new TypeError("runId must be a bounded safe identifier");
     this.runId = runId;
     this.newWorkAllowed = true;
@@ -237,7 +369,7 @@ export class PaperLedger {
     for (const [mint, position] of this.positions) {
       const mark = marksByMint.get(mint);
       if (!mark) return {status: "VALUATION_UNAVAILABLE", equityCents: null, reason: `missing mark for ${mint}`};
-      const valuation = computeMark(position, mark, parsedNow);
+      const valuation = computeMark(position, mark, parsedNow, this.runId);
       if (valuation.status !== "PASS") {
         return {status: "VALUATION_UNAVAILABLE", equityCents: null, reason: valuation.reason};
       }
@@ -434,7 +566,8 @@ export class PaperLedger {
       },
       observedAt: quote.observedAt, priceMicros: quote.priceMicros,
       decimals: quote.decimals, costs: quote.costs, source: quote.source,
-      executable: quote.executable, mode: quote.mode
+      executable: quote.executable, mode: quote.mode,
+      ...modeledPayload(quote)
     };
     const eventDigest = digest(eventPayload);
     if (this.eventDigests.has(eventId)) {
@@ -475,6 +608,15 @@ export class PaperLedger {
         !Number.isSafeInteger(quote.priceMicros) || quote.priceMicros <= 0) {
       return {status: "UNFILLED", reason: "later identity-bound hypothetical executable quote is unavailable"};
     }
+    let modeledEntry = null;
+    if (quote.modeled !== undefined) {
+      modeledEntry = verifyPaperModeledQuote(quote, {
+        runId: this.runId, side: "ENTRY", now: currentTime, decimals: auth.decimals
+      });
+      if (!modeledEntry.ok) {
+        return {status: "UNFILLED", reason: `modeled entry quote refused: ${modeledEntry.reason}`};
+      }
+    }
     const gate = this.#updateDailyGate({now: currentTime, marks});
     if (gate.status === "EQUITY_UNKNOWN") {
       return {status: "UNFILLED", reason: "fresh complete marks/equity are required; reservation retained"};
@@ -504,10 +646,15 @@ export class PaperLedger {
     const maxNotional = currentLimit - costs.total;
     if (maxNotional <= 0n) return {status: "UNFILLED", reason: "entry costs exceed current risk budget"};
     const notionalDenominator = scale * 10_000n;
-    const tokenAtoms = maxNotional * notionalDenominator / BigInt(quote.priceMicros);
+    const tokenAtoms = modeledEntry
+      ? modeledEntry.baseAtoms
+      : maxNotional * notionalDenominator / BigInt(quote.priceMicros);
     const rawNotional = tokenAtoms * BigInt(quote.priceMicros);
     const notional = (rawNotional + notionalDenominator - 1n) / notionalDenominator;
     const allIn = notional + costs.total;
+    if (modeledEntry && allIn > currentLimit) {
+      return {status: "UNFILLED", reason: "modeled quantity exceeds the current risk budget; it is never resized"};
+    }
     if (tokenAtoms <= 0n || allIn > currentLimit || allIn > this.cashCents) {
       return {status: "UNFILLED", reason: "conservative base-unit rounding leaves no affordable fill"};
     }
@@ -550,7 +697,8 @@ export class PaperLedger {
       entryCosts: costs.values,
       entryObservedAt: new Date(fillTime).toISOString(),
       lastObservedAt: new Date(fillTime).toISOString(),
-      executionRealistic: false
+      executionRealistic: false,
+      ...(modeledEntry ? {modeled: true, modeledDigest: modeledEntry.digest} : {})
     };
     const result = Object.freeze({
       status: "FILLED_PAPER",
@@ -564,7 +712,10 @@ export class PaperLedger {
       entryPriceMicros: String(quote.priceMicros),
       initialStopPriceMicros: stopPriceMicros.toString(),
       executionMode: "SIMULATED_ONLY",
-      executionRealistic: false
+      executionRealistic: false,
+      ...(modeledEntry ? {
+        provenance: "MODELED", actualCostCoverage: "UNKNOWN", modeledDigest: modeledEntry.digest
+      } : {})
     });
     this.cashCents -= allIn;
     this.positions.set(auth.mint, position);
@@ -624,7 +775,8 @@ export class PaperLedger {
       reason,
       executionMode: "SIMULATED_ONLY",
       executionRealistic: false,
-      gapThroughStop
+      gapThroughStop,
+      ...(position.modeled ? {provenance: "MODELED", actualCostCoverage: "UNKNOWN", modeledDigest: quote.modeled.digest} : {})
     });
     this.cashCents += proceeds;
     this.realizedGrossPnlCents += grossPnl;
@@ -648,7 +800,8 @@ export class PaperLedger {
       if (!quote || !quoteIdentityValid(quote, position) || observed === null ||
           observed <= time(position.lastObservedAt) || observed > nowTime ||
           nowTime - observed > MAX_QUOTE_AGE_MS ||
-          !Number.isSafeInteger(quote.priceMicros) || quote.priceMicros <= 0) {
+          !Number.isSafeInteger(quote.priceMicros) || quote.priceMicros <= 0 ||
+          positionQuoteGate(position, quote, nowTime, this.runId)) {
         requests.push({mint, status: "UNFILLED", reason: "risk-reducing quote unavailable; position remains open"});
         continue;
       }
@@ -694,6 +847,10 @@ export class PaperLedger {
         current - observed > MAX_QUOTE_AGE_MS ||
         !Number.isSafeInteger(quote.priceMicros) || quote.priceMicros <= 0) {
       return {status: "VALUATION_UNAVAILABLE", reason: "exit quote is stale, non-monotonic, or identity-mismatched"};
+    }
+    const modeledFailure = positionQuoteGate(position, quote, current, this.runId);
+    if (modeledFailure) {
+      return {status: "VALUATION_UNAVAILABLE", reason: `exit quote refused: ${modeledFailure}`};
     }
     const price = BigInt(quote.priceMicros);
     const highWater = price > position.highWaterPriceMicros ? price : position.highWaterPriceMicros;
@@ -742,12 +899,13 @@ export class PaperLedger {
     }
     const clockFailure = this.#admitTime(end);
     if (clockFailure) return clockFailure;
-    this.newWorkAllowed = false;
-    if (end - start > 8 * 60 * 60 * 1000) {
-      return {status: "INVALID_RUN_WINDOW", entriesAllowed: false, reason: "eight-hour run limit exceeded"};
+    if (this.#runFinished) {
+      return {status: "REJECT", reason: "run already finished", entriesAllowed: false};
     }
+    this.newWorkAllowed = false;
     const valued = this.#snapshotEquity({now: end, marks});
     const remaining = [...this.positions.keys()];
+    this.#runFinished = true;
     this.#record({type: "RUN_FINISHED", observedAt: new Date(end).toISOString(), openMints: remaining});
     return {
       status: "FINISHED",
@@ -801,7 +959,8 @@ export class PaperLedger {
           .map(([key, amount]) => [key, amount.toString()])),
         stopPriceMicros: position.stopPriceMicros.toString(),
         trailingActive: position.trailingActive,
-        highWaterPriceMicros: position.highWaterPriceMicros.toString()
+        highWaterPriceMicros: position.highWaterPriceMicros.toString(),
+        ...(position.modeled ? {modeled: true} : {})
       })),
       eventCount: this.events.length,
       auditTruncated: this.auditTruncated,

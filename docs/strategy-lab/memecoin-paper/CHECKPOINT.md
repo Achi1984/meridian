@@ -23,10 +23,13 @@ Commands require stable IDs and all time, quote, and marks inputs explicitly.
 They are serialized as bounded canonical bytes, chained by sequence and
 predecessor SHA-256, then acknowledged only after file and directory fsync,
 atomic same-directory publication, bounded exact readback, and pending-marker
-cleanup. The run deadline is fixed at `startedAt + 8 hours`; the wrapper checks
-it when a command is invoked, not with a wall-clock watchdog. Duplicate command
-IDs with the same complete payload return the committed result; changed payloads
-are rejected. Authorization references are reconstructed in command order and
+cleanup. The run deadline is fixed at `startedAt + 8 hours`; nonterminal
+eligibility is checked when a command is invoked, not with a wall-clock watchdog.
+An explicit `finishRun` may record a later actual monotonic timestamp; guarded
+late nonterminal commands are reduced to terminal bookkeeping, never risk or
+entry work. Terminal accounting is recorded at most once. Duplicate command IDs
+with the same complete payload return the committed result; changed payloads are
+rejected. Authorization references are reconstructed in command order and
 passed to the ledger as its original returned objects.
 
 `riskSnapshot` is replayed as a mutating ledger command. Rejected and unknown

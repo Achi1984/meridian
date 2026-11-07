@@ -10,7 +10,7 @@ import sys
 import tempfile
 import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parent
 PROJECT_ROOT = ROOT.parents[1]
@@ -349,8 +349,8 @@ class HistoricalOneShotTests(unittest.TestCase):
             "spawn=supervisor._spawn_guarded_worker\n"
             "def capture(*args,**kwargs):\n"
             " process=spawn(*args,**kwargs)\n"
-            f" Path({str(worker_pid)!r}).write_text(str(process.pid))\n"
-            " return process\n"
+            + self._pid_marker_source(worker_pid, "process.pid", indent=" ")
+            + " return process\n"
             "supervisor._spawn_guarded_worker=capture\n"
             "popen=supervisor.subprocess.Popen\n"
             "def add_test_input(*args,**kwargs):\n"
@@ -368,19 +368,20 @@ class HistoricalOneShotTests(unittest.TestCase):
             [sys.executable, "-B", str(helper)], cwd=PROJECT_ROOT,
             stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             start_new_session=True)
-        deadline = time.monotonic() + 15
-        while time.monotonic() < deadline and not worker_pid.exists():
-            if parent.poll() is not None:
-                stdout, stderr = parent.communicate(timeout=5)
-                self.fail(f"launcher exited before the guarded Node worker started: "
-                          f"{stdout[-1024:]!r} {stderr[-1024:]!r}")
-            time.sleep(0.02)
-        self.assertTrue(worker_pid.exists(), "guarded worker was not launched")
-        pid = int(worker_pid.read_text())
-        os.kill(parent.pid, signal.SIGTERM)
-        _stdout, _stderr = parent.communicate(timeout=10)
-        self.assertEqual(parent.returncode, 1)
-        self._assert_not_running(pid)
+        pid = None
+        try:
+            pid = self._wait_pid_marker(worker_pid, parent, timeout=15)
+            os.kill(parent.pid, signal.SIGTERM)
+            _stdout, _stderr = parent.communicate(timeout=10)
+            self.assertEqual(parent.returncode, 1)
+            self._assert_not_running(pid)
+        finally:
+            try:
+                supervisor._terminate_group(parent, immediate=True)
+            finally:
+                for stream in (parent.stdout, parent.stderr):
+                    stream.close()
+                self._cleanup_worker(pid, worker_pid)
         with patch.object(journal, "HISTORICAL_PROFILE_PATH", profile), \
                 patch.dict(os.environ, {"MERIDIAN_HISTORICAL_TEST_MODE": "1"}):
             current = journal.inspect_b1(
@@ -429,72 +430,178 @@ class HistoricalOneShotTests(unittest.TestCase):
                     os.close(write_fd)
 
     def test_parent_sigterm_and_sigkill_before_and_after_guard_readiness(self):
-        worker = self.root / "sleeping-worker.py"
-        worker_marker = self.root / "worker-started"
-        worker.write_text(
-            "import os,time\n"
-            f"open({str(worker_marker)!r},'w').write(str(os.getpid()))\n"
-            "while True: time.sleep(1)\n")
-        real_python = str(Path(sys.executable).resolve())
-
         for before_ready in (False, True):
             for signum in (signal.SIGTERM, signal.SIGKILL):
                 with self.subTest(before_ready=before_ready, signal=signum):
-                    self._parent_death_case(
-                        worker, worker_marker, real_python, before_ready, signum)
-                    worker_marker.unlink(missing_ok=True)
+                    self._parent_death_case(before_ready, signum)
 
-    def _parent_death_case(self, worker, worker_marker, real_python, before_ready, signum):
-        parent_ready = self.root / f"parent-ready-{before_ready}-{signum}"
-        prelaunch = self.root / f"prelaunch-{before_ready}-{signum}"
-        wrapper = self.root / f"python-wrapper-{before_ready}-{signum}"
+    def _pid_marker_source(self, marker, pid, indent=""):
+        source = (
+            f"marker=Path({str(marker)!r})\n"
+            f"marker.with_suffix('.tmp').write_text(str({pid})+'\\n')\n"
+            "marker.with_suffix('.tmp').replace(marker)\n")
+        return "".join(indent + line + "\n" for line in source.splitlines())
+
+    def _wait_pid_marker(self, marker, parent, timeout=5):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if parent.poll() is not None:
+                self.fail("worker parent exited before its synchronization marker")
+            try:
+                value = marker.read_text()
+            except FileNotFoundError:
+                value = ""
+            if value.endswith("\n"):
+                self.assertTrue(value[:-1].isascii() and value[:-1].isdecimal(),
+                                f"invalid PID marker: {value!r}")
+                pid = int(value)
+                self.assertGreater(pid, 1, "invalid worker PID")
+                return pid
+            time.sleep(0.01)
+        self.fail(f"worker did not reach the expected launch boundary: {marker}")
+
+    def _cleanup_worker(self, pid, marker):
+        if pid is None:
+            try:
+                value = marker.read_text()
+                if value.endswith("\n") and value[:-1].isascii() and value[:-1].isdecimal():
+                    pid = int(value)
+            except (OSError, ValueError):
+                pass
+        if pid is not None and pid > 1:
+            try:
+                os.killpg(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            self._assert_not_running(pid)
+
+    def _parent_death_case(self, before_ready, signum):
+        case = self.root / f"parent-death-{before_ready}-{signum}"
+        case.mkdir()
+        worker = case / "sleeping-worker.py"
+        worker_marker = case / "worker-started"
+        worker.write_text(
+            "import os,time\nfrom pathlib import Path\n"
+            + self._pid_marker_source(worker_marker, "os.getpid()")
+            + "while True: time.sleep(1)\n")
+        real_python = str(Path(sys.executable).resolve())
+        parent_ready = case / "parent-ready"
+        prelaunch = case / "prelaunch"
+        gate_timeout = case / "gate-timeout"
+        wrapper = case / "python-wrapper"
+        gate_read, gate_write = os.pipe()
         wrapper.write_text(
             f"#!{real_python}\n"
-            "import os,sys,time\n"
-            f"open({str(prelaunch)!r},'w').write(str(os.getpid()))\n"
-            "time.sleep(1.5)\n"
+            "import os,select,sys\nfrom pathlib import Path\n"
+            + self._pid_marker_source(prelaunch, "os.getpid()")
+            + f"gate={gate_read}\n"
+            "if not select.select([gate],[],[],5)[0]:\n"
+            f" Path({str(gate_timeout)!r}).touch()\n"
+            " sys.exit(121)\n"
+            "if os.read(gate,1)!=b'G': sys.exit(122)\n"
+            "os.close(gate)\n"
             f"os.execv({real_python!r}, [{real_python!r}, *sys.argv[1:]])\n")
         wrapper.chmod(0o700)
-        helper = self.root / f"parent-{before_ready}-{signum}.py"
+        helper = case / "parent.py"
         source = (
-            "import os,sys,time\n"
+            "import os,sys,time\nfrom pathlib import Path\n"
             f"sys.path.insert(0,{str(ROOT)!r})\n"
             "import supervisor\n"
             f"worker={str(worker)!r}\n"
             f"real_python={real_python!r}\n"
-        )
-        if before_ready:
-            source += f"supervisor.sys.executable={str(wrapper)!r}\n"
-        source += (
+            f"supervisor.sys.executable={str(wrapper)!r}\n"
             "process=supervisor._spawn_guarded_worker(\n"
             " real_python, worker, env={'PATH':os.path.dirname(real_python),'LANG':'C.UTF-8'},\n"
-            " pass_fds=(), batch_deadline=time.monotonic()+5)\n"
-            f"open({str(parent_ready)!r},'w').write(str(process.pid))\n"
-            "while True: time.sleep(1)\n")
+            f" pass_fds=({gate_read},), batch_deadline=time.monotonic()+5)\n"
+            + self._pid_marker_source(parent_ready, "process.pid")
+            + "while True: time.sleep(1)\n")
         helper.write_text(source)
-        parent = subprocess.Popen(
-            [sys.executable, "-B", str(helper)], cwd=PROJECT_ROOT,
-            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            start_new_session=True)
-        signal_file = prelaunch if before_ready else parent_ready
-        deadline = time.monotonic() + 5
-        while time.monotonic() < deadline and not signal_file.exists():
-            if parent.poll() is not None:
-                self.fail("worker parent exited before its synchronization marker")
-            time.sleep(0.01)
-        self.assertTrue(signal_file.exists(), "worker did not reach the expected launch boundary")
-        worker_pid = int(signal_file.read_text())
-        if not before_ready:
-            deadline = time.monotonic() + 5
-            while time.monotonic() < deadline and not worker_marker.exists():
-                if parent.poll() is not None:
-                    self.fail("guarded direct worker exited before its readiness marker")
-                time.sleep(0.01)
-            self.assertTrue(worker_marker.exists(), "direct worker did not start after guard readiness")
-        os.kill(parent.pid, signum)
-        parent.wait(timeout=5)
-        self._assert_not_running(worker_pid)
-        self.assertEqual(worker_marker.exists(), not before_ready)
+        parent = None
+        worker_pid = None
+        try:
+            parent = subprocess.Popen(
+                [sys.executable, "-B", str(helper)], cwd=PROJECT_ROOT,
+                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                start_new_session=True, pass_fds=(gate_read,))
+            worker_pid = self._wait_pid_marker(prelaunch, parent)
+            if not before_ready:
+                os.write(gate_write, b"G")
+                self.assertEqual(self._wait_pid_marker(parent_ready, parent), worker_pid)
+                self.assertEqual(self._wait_pid_marker(worker_marker, parent), worker_pid)
+            os.kill(parent.pid, signum)
+            parent.wait(timeout=5)
+            self.assertEqual(parent.returncode, -signum)
+            if before_ready:
+                self.assertFalse(parent_ready.exists())
+                os.write(gate_write, b"G")
+            self._assert_not_running(worker_pid)
+            self.assertFalse(gate_timeout.exists(), "prelaunch gate timed out")
+            self.assertEqual(worker_marker.exists(), not before_ready)
+        finally:
+            try:
+                if parent is not None:
+                    supervisor._terminate_group(parent, immediate=True)
+            finally:
+                os.close(gate_read)
+                os.close(gate_write)
+                self._cleanup_worker(worker_pid, prelaunch)
+
+    def test_pid_marker_waits_for_complete_publication(self):
+        marker = self.root / "partial-marker"
+        parent = Mock()
+        parent.poll.return_value = None
+        with patch.object(Path, "read_text", side_effect=["", "12", "123\n"]) as read:
+            self.assertEqual(self._wait_pid_marker(marker, parent), 123)
+        self.assertEqual(read.call_count, 3)
+
+        marker.write_text("12")
+        with self.assertRaisesRegex(AssertionError, "expected launch boundary"):
+            self._wait_pid_marker(marker, parent, timeout=0.03)
+        for value in ("invalid\n", "0\n", "-1\n"):
+            marker.write_text(value)
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(AssertionError, "invalid .*PID"):
+                    self._wait_pid_marker(marker, parent)
+
+    def test_cleanup_does_not_signal_invalid_pid_markers(self):
+        marker = self.root / "invalid-marker"
+        with patch.object(os, "killpg") as kill:
+            self._cleanup_worker(None, marker)
+            for value in ("", "12", "invalid\n", "0\n", "-1\n"):
+                with self.subTest(value=value):
+                    marker.write_text(value)
+                    self._cleanup_worker(None, marker)
+            kill.assert_not_called()
+
+    def test_parent_death_handshake_failure_cleans_up_processes(self):
+        wait_marker = self._wait_pid_marker
+        popen = subprocess.Popen
+        for failed_marker in ("prelaunch", "parent-ready", "worker-started"):
+            with self.subTest(marker=failed_marker), \
+                    tempfile.TemporaryDirectory(dir=self.root) as directory, \
+                    patch.object(self, "root", Path(directory)):
+                parents = []
+
+                def capture_parent(*args, **kwargs):
+                    parent = popen(*args, **kwargs)
+                    parents.append(parent)
+                    return parent
+
+                def fail_handshake(marker, parent):
+                    pid = wait_marker(marker, parent)
+                    if marker.name == failed_marker:
+                        self.fail("injected handshake failure")
+                    return pid
+
+                with patch.object(self, "_wait_pid_marker", side_effect=fail_handshake), \
+                        patch.object(subprocess, "Popen", side_effect=capture_parent):
+                    with self.assertRaisesRegex(AssertionError, "injected handshake failure"):
+                        self._parent_death_case(False, signal.SIGTERM)
+                case = self.root / f"parent-death-False-{signal.SIGTERM}"
+                self._assert_not_running(int((case / "prelaunch").read_text()))
+                self.assertEqual(len(parents), 1)
+                self.assertIsNotNone(parents[0].returncode)
+                self.assertFalse(Path(f"/proc/{parents[0].pid}").exists())
 
     def _assert_not_running(self, pid):
         deadline = time.monotonic() + 5

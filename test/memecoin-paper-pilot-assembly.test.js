@@ -70,6 +70,7 @@ async function createHarness(t, {
   deadlineOvershootMs = 0,
   runShortTimers = false,
   wallClockRegressionAfterDispatch = false,
+  controllerSummaryTransform,
   openCheckpointStore,
   openCheckpointSession,
   onFirstCheckpoint
@@ -108,7 +109,7 @@ async function createHarness(t, {
     createPilotRunControl(options) {
       const checkpoint = options.callbacks.checkpoint;
       const report = options.callbacks.report;
-      return importedAssembly.createPilotRunControl({
+      const control = importedAssembly.createPilotRunControl({
         ...options,
         callbacks: {
           ...options.callbacks,
@@ -127,6 +128,13 @@ async function createHarness(t, {
           }
         }
       });
+      return {
+        ...control,
+        async start() {
+          const summary = await control.start();
+          return controllerSummaryTransform ? controllerSummaryTransform(summary) : summary;
+        }
+      };
     }
   };
   const runnerOptions = {
@@ -150,6 +158,19 @@ async function createHarness(t, {
     get reportInput() { return reportInput; },
     get controllerReportSummary() { return controllerReportSummary; }
   };
+}
+
+async function assertPersistedFailureEvidence(harness, expectedCode) {
+  const [terminal, report, audit] = await Promise.all([
+    readFile(path.join(harness.dataDirectory, "terminal.json"), "utf8").then(JSON.parse),
+    readPilotReport(harness.dataDirectory),
+    readFile(path.join(harness.dataDirectory, "observation-audit.json"), "utf8").then(JSON.parse)
+  ]);
+  assert.equal(terminal.failureCode, expectedCode);
+  assert.equal(terminal.observation.failureCode, expectedCode);
+  assert.equal(report.observation.failureCode, expectedCode);
+  assert.equal(audit.terminal.failureCode, expectedCode);
+  assert.equal(audit.terminal.runStatus, terminal.status);
 }
 
 test("pinned modules import without I/O and match the approved source pins", async () => {
@@ -237,6 +258,7 @@ for (const delayMs of [250, 30_000]) {
     assert.equal(checkpoint.records.at(-1).method, "finishRun");
     const report = await readPilotReport(harness.dataDirectory);
     assert.equal(report.status, "AVAILABLE");
+    await assertPersistedFailureEvidence(harness, null);
     assert.equal(report.report.experiment.source, "READ_ONLY_PAPER_CHECKPOINT");
     assert.equal(report.report.experiment.reportStatus, "FINISHED");
     assert.equal(report.report.experiment.operationalStatus, "NOT_EVIDENCED");
@@ -260,11 +282,32 @@ test("deadline beyond bounded wall-clock settlement remains UNKNOWN", async t =>
   const terminal = await harness.runner.start();
   assert.equal(terminal.status, "UNKNOWN");
   assert.equal(terminal.failureCode, "DEADLINE_FINALIZATION_TIME_UNKNOWN");
+  await assertPersistedFailureEvidence(harness, "DEADLINE_FINALIZATION_TIME_UNKNOWN");
   assert.equal(harness.network.calls, 640);
   const checkpoint = JSON.parse(await readFile(
     path.join(harness.dataDirectory, "checkpoint", "checkpoint.json"), "utf8"
   ));
   assert.equal(checkpoint.sequence, 480);
+  assert.equal(checkpoint.records.some(record => record.method === "finishRun"), false);
+});
+
+test("unbound terminal checkpoint acknowledgement reconciles late failure evidence", async t => {
+  const harness = await createHarness(t, {
+    controllerSummaryTransform(summary) {
+      return {
+        ...summary,
+        checkpointAcknowledgement: {...summary.checkpointAcknowledgement, hash: "f".repeat(64)}
+      };
+    }
+  });
+  const terminal = await harness.runner.start();
+
+  assert.equal(terminal.status, "UNKNOWN");
+  assert.equal(terminal.failureCode, "CONTROLLER_CHECKPOINT_ACK_UNBOUND");
+  await assertPersistedFailureEvidence(harness, "CONTROLLER_CHECKPOINT_ACK_UNBOUND");
+  const checkpoint = JSON.parse(await readFile(
+    path.join(harness.dataDirectory, "checkpoint", "checkpoint.json"), "utf8"
+  ));
   assert.equal(checkpoint.records.some(record => record.method === "finishRun"), false);
 });
 
@@ -323,7 +366,30 @@ test("actual checkpoint uncertainty is terminal and does not retry the write", a
   assert.ok(reads >= 3);
 });
 
-test("unsettled checkpoint work blocks terminal session I/O and late completion", async t => {
+test("callback rejection without an explicit code preserves the controller error name", async t => {
+  for (const ErrorClass of [Error, TypeError]) {
+    const harness = await createHarness(t, {
+      openCheckpointSession: async options => {
+        const session = await PaperCheckpointSession.open(options);
+        return {
+          get metadata() { return session.metadata; },
+          snapshot: () => session.snapshot(),
+          riskSnapshot() { throw new ErrorClass("synthetic checkpoint rejection"); },
+          finishRun: (...args) => session.finishRun(...args),
+          close: () => session.close()
+        };
+      }
+    });
+    const terminal = await harness.runner.start();
+    assert.equal(terminal.status, "UNKNOWN");
+    assert.equal(harness.controllerReportSummary.failureCode, ErrorClass.name);
+    assert.equal((await readPilotReport(harness.dataDirectory)).status, "AVAILABLE");
+    await assertPersistedFailureEvidence(harness, ErrorClass.name);
+  }
+});
+
+for (const rejectStart of [false, true]) {
+test(`unsettled checkpoint work blocks terminal session I/O and late completion (start rejects: ${rejectStart})`, async t => {
   let releaseCheckpoint;
   let enteredCheckpoint;
   const checkpointGate = new Promise(resolve => { releaseCheckpoint = resolve; });
@@ -377,12 +443,26 @@ test("unsettled checkpoint work blocks terminal session I/O and late completion"
     io.projections += 1;
     return originalProjector(input);
   };
+  if (rejectStart) {
+    const createControl = harness.assembly.createPilotRunControl;
+    harness.assembly.createPilotRunControl = options => {
+      const control = createControl(options);
+      return {
+        ...control,
+        async start() {
+          await control.start();
+          throw new Error("synthetic control start rejection with checkpoint work pending");
+        }
+      };
+    };
+  }
   const running = harness.runner.start();
   await entered;
   const readbacksAtPending = io.readbacks;
   assert.equal((await harness.runner.stop()).status, "STOP_REQUESTED");
   const terminal = await running;
   assert.equal(terminal.status, "UNKNOWN");
+  assert.equal(terminal.failureCode, "CALLBACK_WORK_UNSETTLED");
   assert.equal(terminal.reason.includes("did not settle"), true);
   assert.equal(io.readbacks, readbacksAtPending);
   assert.equal(io.closes, 0);
@@ -393,7 +473,18 @@ test("unsettled checkpoint work blocks terminal session I/O and late completion"
   assert.equal(report.status, "AUDIT_ONLY");
   assert.equal(report.runStatus, "UNKNOWN");
   assert.equal(report.observationAudit.state, "RUNNING");
+  assert.equal(report.observationAudit.terminal, null);
   assert.match(report.text, /Audit state: RUNNING/);
+  await assert.rejects(readFile(path.join(harness.dataDirectory, "terminal.json"), "utf8"), {
+    code: "ENOENT"
+  });
+  for (const file of ["operator-report.json", "operator-report.md"]) {
+    await assert.rejects(readFile(path.join(harness.dataDirectory, file)), {code: "ENOENT"});
+  }
+  await assert.rejects(
+    createPilotOnline(harness.runnerOptions).start(),
+    /persistent run state already exists/
+  );
   releaseCheckpoint();
   await harness.firstCheckpoint;
   assert.equal(terminal.status, "UNKNOWN");
@@ -408,6 +499,7 @@ test("unsettled checkpoint work blocks terminal session I/O and late completion"
   assert.equal(io.overlappingCloses, 0);
   assert.equal(io.projections, 0);
 });
+}
 
 test("actual controller honors operator stop before the full deadline", async t => {
   const harness = await createHarness(t, {paused: true});
