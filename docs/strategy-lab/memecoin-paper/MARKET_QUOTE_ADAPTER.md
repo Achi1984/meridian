@@ -334,9 +334,53 @@ separate independent review and run-policy binding.
   caller-asserted inputs; pass `{expectedDigest}` to pin them. It does
   not authenticate the provider or reviewer.
 
-## Offline validation
+  ## `EXPLICIT_GROSS_V1` (review-only; no adopted numeric preset)
 
-`node --test test/memecoin-paper-quote-cost-receipt.test.js` additionally covers
+  The versioned `EXPLICIT_GROSS_V1` variant reuses `getPaperQuote`'s
+  `reviewScenario` parser and projection arithmetic. It requires `quoteBasis:
+  "GROSS_BEFORE_ALL_COSTS"`, a complete `explicitAssumptions` record with a value,
+  unit, and rationale for every numeric input, a measured quote-mint USD
+  conversion, gross-basis evidence, and the same offline review-evidence binding.
+  There are no numeric defaults or approved operating values. A zero fee, spread,
+  slippage, impact, or network input also requires a component-specific
+  `zeroCostAssumptions` rationale; zero never means empirically free execution.
+
+  The five cost categories are separate: explicit fee cents, spread cents, adverse
+  slippage basis points, impact cents, and network cents. Their inclusion map must
+  name each category once as `EXCLUDED_FROM_GROSS`; any missing, overlapping, or
+  net-basis declaration blocks projection. `grossBasisEvidence` binds the declared
+  basis to the candidate identity, side, requested amount, canonical request
+  digest (`paperExplicitGrossRequestDigest`), quote request id, route amounts, and
+  the exact response-body SHA-256. These checks establish structural consistency
+  only. Evidence hashes, the Jupiter response, local time, and caller declarations
+  are not authenticated; this model does not turn Jupiter's route amounts into
+  proven gross amounts. Without a matching gross-basis declaration and evidence
+  reference, projection is blocked.
+
+  `quoteUsdConversion` uses the existing `validConversion` contract: exact quote
+  mint/decimals, positive integer micro-USD per whole token, method
+  `MEASURED_SOURCE_RECEIPT`, evidence digest, and a conversion time no later than
+  and within five minutes of the quote receipt. Assumed USDC/USD parity is not
+  accepted. Entry sizing rounds the USD price and gross debit up, each adverse
+  slippage amount up, and applies the tightest of 8,000 cents, 8% of supplied
+  equity (rounded down), and supplied available cash. A smaller result is labeled
+  `SMALLER_SIZE_MODELED_NOT_A_FRESH_EXECUTABLE_QUOTE`. Exit uses the full
+  requested quantity, rounds gross credit down, and blocks when modeled costs
+  exceed proceeds.
+
+  The canonical model digest binds the version, every assumption and unit, the
+  conversion, review and gross-basis evidence, request, response hash, quote, and
+  recomputed output. `verifyPaperExplicitGrossProjection(projection,
+  {expectedDigest})` revalidates the arithmetic and exposed fields; an expected
+  digest pins the exact caller-supplied inputs. A valid result is still only
+  `REVIEW_PROJECTION_ONLY`, `MODELED`, `actualCostCoverage: "UNKNOWN"`, and
+  `executionRealistic: false`. `issueModeledQuote` accepts only the existing
+  QUOTED_NET model and refuses this variant. Nothing is routed to the ledger,
+  admission path, or runtime.
+
+  ## Offline validation
+
+  `node --test test/memecoin-paper-quote-cost-receipt.test.js` additionally covers
 the digest, the valid synthetic receipt, and rejection of forged, missing,
 stale, future, identity-mismatched, wrong-unit, missing-conversion, overlapping,
 and missing-component receipts.

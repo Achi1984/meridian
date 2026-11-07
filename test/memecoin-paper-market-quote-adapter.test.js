@@ -9,7 +9,8 @@ import {PaperCheckpointSession} from "../scripts/memecoin-paper/checkpoint-sessi
 import {normalizeExactCosts} from "../scripts/memecoin-paper-execution-evidence/normalize.mjs";
 import {
   createFixtureMarketQuoteAdapter, createMarketQuoteAdapter, isFixtureMarketQuoteAdapter,
-  paperQuotedNetModelDigest, reviewScenarioConfigSha256, verifyPaperQuotedNetProjection
+  paperExplicitGrossModelDigest, paperExplicitGrossRequestDigest, paperQuotedNetModelDigest,
+  reviewScenarioConfigSha256, verifyPaperExplicitGrossProjection, verifyPaperQuotedNetProjection
 } from "../scripts/memecoin-paper/market-quote-adapter.mjs";
 import {verifyPaperModeledQuote} from "../scripts/memecoin-paper/ledger.mjs";
 import {
@@ -116,6 +117,78 @@ function reviewScenario(caseName = "BASELINE", overrides = {}) {
     decision: "APPROVE_SCENARIO_REVIEW_ONLY",
     recordedAt: NOW - 2_500
   };
+  return config;
+}
+
+function explicitGrossScenario(req = request(), overrides = {}) {
+  const config = {
+    optIn: true,
+    scenarioId: "MERIDIAN_PAPER_EXPLICIT_GROSS_V1",
+    scenarioVersion: "1",
+    scenario: "EXPLICIT_GROSS_V1",
+    identity: {...req.identity},
+    quoteBasis: "GROSS_BEFORE_ALL_COSTS",
+    explicitAssumptions: {
+      feeCents: "20",
+      spreadCents: "10",
+      slippageBps: "50",
+      priceImpactCents: "15",
+      networkCents: "25",
+      equityCents: "100000",
+      availableCashCents: "100000",
+      units: {
+        feeCents: "US_CENTS_PER_SIDE",
+        spreadCents: "US_CENTS_PER_SIDE",
+        slippageBps: "BASIS_POINTS_OF_GROSS_USD_VALUE",
+        priceImpactCents: "US_CENTS_PER_SIDE",
+        networkCents: "US_CENTS_PER_SIDE",
+        equityCents: "US_CENTS",
+        availableCashCents: "US_CENTS"
+      },
+      rationales: Object.fromEntries([
+        "feeCents", "spreadCents", "slippageBps", "priceImpactCents",
+        "networkCents", "equityCents", "availableCashCents"
+      ].map(key => [key, `Synthetic fixture assumption for ${key}.`])),
+      zeroCostAssumptions: {}
+    },
+    quoteUsdConversion: {
+      mint: req.identity.quote,
+      decimals: req.quoteDecimals,
+      microUsdPerWholeToken: "1000000",
+      observedAt: NOW - 2_500,
+      method: "MEASURED_SOURCE_RECEIPT",
+      evidenceSha256: "c".repeat(64)
+    },
+    grossBasisEvidence: {
+      schemaVersion: "memecoin-paper-gross-basis-evidence-v1",
+      evidenceId: "gross-basis-1",
+      evidenceSha256: "d".repeat(64),
+      identity: {...req.identity},
+      side: req.side,
+      amountAtoms: req.amountAtoms,
+      requestSha256: paperExplicitGrossRequestDigest(req),
+      routeAmountBasis: "GROSS_BEFORE_ALL_COSTS",
+      inclusion: Object.fromEntries([
+        "fee", "spread", "slippage", "priceImpact", "network"
+      ].map(component => [component, "EXCLUDED_FROM_GROSS"]))
+    },
+    ...overrides
+  };
+  config.reviewEvidence ??= {
+    evidenceId: "gross-method-review-1",
+    evidenceSha256: "e".repeat(64),
+    scenarioConfigSha256: reviewScenarioConfigSha256(config),
+    identity: {...req.identity},
+    reviewerRef: "synthetic-methodology-review",
+    purpose: "OFFLINE_SCENARIO_REVIEW_ONLY",
+    decision: "APPROVE_SCENARIO_REVIEW_ONLY",
+    recordedAt: NOW - 2_000
+  };
+  return config;
+}
+
+function refreshExplicitGrossReviewEvidence(config) {
+  config.reviewEvidence.scenarioConfigSha256 = reviewScenarioConfigSha256(config);
   return config;
 }
 
@@ -1309,6 +1382,209 @@ test("existing BASELINE and STRESS projections gain no model fields and omission
   assert.equal(none.authorizationEligible, false);
   assert.notEqual(reviewScenarioConfigSha256(reviewScenario(QN)),
     reviewScenarioConfigSha256(reviewScenario("STRESS")));
+});
+
+test("EXPLICIT_GROSS_V1 binds all assumptions, gross-basis evidence, measured conversion, quote, and output", async () => {
+  const config = explicitGrossScenario();
+  const first = await adapterFor(entryResponse().body).adapter.getPaperQuote(
+    request(), {reviewScenario: config});
+  const projection = first.scenarioProjection;
+
+  assert.equal(projection.status, "REVIEW_PROJECTION_ONLY");
+  assert.equal(projection.scenario.case, "EXPLICIT_GROSS_V1");
+  assert.equal(projection.costBasis, "GROSS_BEFORE_ALL_COSTS");
+  assert.equal(projection.provenance, "MODELED");
+  assert.equal(projection.actualCostCoverage, "UNKNOWN");
+  assert.equal(projection.executionRealistic, false);
+  assert.equal(projection.authorizationEligible, false);
+  assert.equal(projection.integrationEligible, false);
+  assert.equal(first.costEvidence.status, "UNKNOWN");
+  assert.equal(projection.scenario.quoteUsdConversion.provenance,
+    "STRUCTURALLY_VALID_UNAUTHENTICATED");
+  assert.equal(projection.model.binding.grossBasisEvidence.responseSha256,
+    first.quoteCandidate.sourceResponse.sha256);
+  assert.equal(projection.model.binding.grossBasisEvidence.quoteRequestId,
+    first.quoteCandidate.route.requestId);
+  assert.equal(projection.model.binding.request.sha256,
+    paperExplicitGrossRequestDigest(request()));
+  assert.equal(projection.model.digest,
+    paperExplicitGrossModelDigest(projection.model.binding));
+  assert.deepEqual(verifyPaperExplicitGrossProjection(projection), {valid: true, reasons: []});
+  assert.equal(projection.amountProjection.sizeDisposition,
+    "SMALLER_SIZE_MODELED_NOT_A_FRESH_EXECUTABLE_QUOTE");
+  assert.ok(BigInt(projection.amountProjection.modeledAllInCents) <= 8_000n);
+  assert.equal(projection.quoteValue.afterModeledCostsCents,
+    projection.amountProjection.modeledAllInCents);
+
+  const again = await adapterFor(entryResponse().body).adapter.getPaperQuote(
+    request(), {reviewScenario: config});
+  assert.equal(again.scenarioProjection.model.digest, projection.model.digest);
+});
+
+test("EXPLICIT_GROSS_V1 requires each numeric input, unit, zero rationale, conversion, and gross evidence field", async () => {
+  const missing = [
+    config => { delete config.optIn; },
+    config => { delete config.scenarioId; },
+    config => { delete config.scenarioVersion; },
+    config => { delete config.scenario; },
+    config => { delete config.identity; },
+    config => { delete config.quoteBasis; },
+    config => { delete config.explicitAssumptions; },
+    config => { delete config.quoteUsdConversion; },
+    config => { delete config.grossBasisEvidence; },
+    ...["feeCents", "spreadCents", "slippageBps", "priceImpactCents", "networkCents",
+      "equityCents", "availableCashCents", "units", "rationales", "zeroCostAssumptions"]
+      .map(key => config => { delete config.explicitAssumptions[key]; }),
+    ...["feeCents", "spreadCents", "slippageBps", "priceImpactCents", "networkCents",
+      "equityCents", "availableCashCents"]
+      .map(key => config => { delete config.explicitAssumptions.units[key]; }),
+    ...["feeCents", "spreadCents", "slippageBps", "priceImpactCents", "networkCents",
+      "equityCents", "availableCashCents"]
+      .map(key => config => { delete config.explicitAssumptions.rationales[key]; }),
+    ...["mint", "decimals", "microUsdPerWholeToken", "observedAt", "method", "evidenceSha256"]
+      .map(key => config => { delete config.quoteUsdConversion[key]; }),
+    ...["schemaVersion", "evidenceId", "evidenceSha256", "identity", "side",
+      "amountAtoms", "requestSha256", "routeAmountBasis", "inclusion"]
+      .map(key => config => { delete config.grossBasisEvidence[key]; }),
+    ...["chainId", "mint", "pool", "quote", "decimals"]
+      .map(key => config => { delete config.grossBasisEvidence.identity[key]; }),
+    ...["fee", "spread", "slippage", "priceImpact", "network"]
+      .map(key => config => { delete config.grossBasisEvidence.inclusion[key]; })
+  ];
+  for (const mutate of missing) {
+    const config = explicitGrossScenario();
+    mutate(config);
+    assert.throws(() => reviewScenarioConfigSha256(config));
+  }
+
+  const zeroWithoutRationale = explicitGrossScenario();
+  zeroWithoutRationale.explicitAssumptions.feeCents = "0";
+  assert.throws(() => reviewScenarioConfigSha256(zeroWithoutRationale));
+  zeroWithoutRationale.explicitAssumptions.zeroCostAssumptions.fee =
+    "Explicit synthetic fee omission assumption.";
+  assert.doesNotThrow(() => reviewScenarioConfigSha256(zeroWithoutRationale));
+
+  const unexpectedZeroRationale = explicitGrossScenario();
+  unexpectedZeroRationale.explicitAssumptions.zeroCostAssumptions.fee =
+    "Fee is not zero in this scenario.";
+  assert.throws(() => reviewScenarioConfigSha256(unexpectedZeroRationale));
+
+  const noReviewEvidence = explicitGrossScenario();
+  delete noReviewEvidence.reviewEvidence;
+  const result = await adapterFor(entryResponse().body).adapter.getPaperQuote(
+    request(), {reviewScenario: noReviewEvidence});
+  assert.equal(result.scenarioProjection.status, "BLOCKED");
+});
+
+test("EXPLICIT_GROSS_V1 rejects net-basis and overlapping gross declarations", async () => {
+  const netBasis = explicitGrossScenario();
+  netBasis.quoteBasis = "QUOTED_ROUTE_AMOUNTS_AS_MODELED_NET_SWAP_BASIS";
+  assert.throws(() => reviewScenarioConfigSha256(netBasis));
+
+  const overlapping = explicitGrossScenario();
+  overlapping.grossBasisEvidence.inclusion.slippage = "INCLUDED_IN_GROSS";
+  assert.throws(() => reviewScenarioConfigSha256(overlapping));
+
+  const mismatchedRequest = explicitGrossScenario();
+  mismatchedRequest.grossBasisEvidence.requestSha256 = "f".repeat(64);
+  refreshExplicitGrossReviewEvidence(mismatchedRequest);
+  const result = await adapterFor(entryResponse().body).adapter.getPaperQuote(
+    request(), {reviewScenario: mismatchedRequest});
+  assert.equal(result.scenarioProjection.status, "BLOCKED");
+  assert.ok(result.scenarioProjection.reasons.includes(
+    "EXPLICIT_GROSS_BASIS_EVIDENCE_BINDING_MISMATCH"));
+});
+
+test("EXPLICIT_GROSS_V1 rejects stale/future conversion and detects changed quote, FX, assumptions, and digest", async () => {
+  for (const observedAt of [NOW - 6 * 60_000, NOW + 1]) {
+    const config = explicitGrossScenario();
+    config.quoteUsdConversion.observedAt = observedAt;
+    refreshExplicitGrossReviewEvidence(config);
+    const result = await adapterFor(entryResponse().body).adapter.getPaperQuote(
+      request(), {reviewScenario: config});
+    assert.equal(result.scenarioProjection.status, "BLOCKED");
+    assert.ok(result.scenarioProjection.reasons.some(reason =>
+      reason.includes("CONVERSION") || reason.includes("COST_CONVERSION")));
+  }
+
+  const projection = (await adapterFor(entryResponse().body).adapter.getPaperQuote(
+    request(), {reviewScenario: explicitGrossScenario()})).scenarioProjection;
+  const pinned = projection.model.digest;
+  for (const mutate of [
+    p => { p.model.binding.sourceQuote.responseSha256 = "a".repeat(64); },
+    p => { p.model.binding.quoteUsdConversion.microUsdPerWholeToken = "999999"; },
+    p => { p.model.binding.scenarioConfiguration.explicitAssumptions.feeCents = "21"; }
+  ]) {
+    const changed = structuredClone(projection);
+    mutate(changed);
+    assert.equal(verifyPaperExplicitGrossProjection(changed).valid, false);
+    changed.model.digest = paperExplicitGrossModelDigest(changed.model.binding);
+    assert.equal(verifyPaperExplicitGrossProjection(changed, {expectedDigest: pinned}).valid, false);
+  }
+  assert.equal(verifyPaperExplicitGrossProjection(projection, {expectedDigest: pinned}).valid, true);
+});
+
+test("EXPLICIT_GROSS_V1 applies the tightest equity/cash/entry cap with conservative rounding", async () => {
+  const req = request();
+  const config = explicitGrossScenario(req);
+  config.explicitAssumptions.equityCents = "10001";
+  config.explicitAssumptions.availableCashCents = "1234";
+  config.explicitAssumptions.slippageBps = "1";
+  refreshExplicitGrossReviewEvidence(config);
+  const projection = (await adapterFor(entryResponse().body).adapter.getPaperQuote(
+    req, {reviewScenario: config})).scenarioProjection;
+  assert.equal(projection.status, "REVIEW_PROJECTION_ONLY");
+  assert.equal(projection.amountProjection.equityLimitCents, "800");
+  assert.equal(projection.amountProjection.availableCashCents, "1234");
+  assert.equal(projection.amountProjection.effectiveEntryBudgetCents, "800");
+  assert.ok(BigInt(projection.amountProjection.modeledAllInCents) <= 800n);
+  assert.equal(projection.costsCents.slippageCents,
+    ((BigInt(projection.quoteValue.grossBeforeAllCostsCents) + 9_999n) / 10_000n).toString());
+  const nextBaseAtoms = BigInt(projection.amountProjection.maximumModeledBaseAtoms) + 1n;
+  const nextGross = (nextBaseAtoms * BigInt(projection.priceMicros) + 9_999_999_999n) /
+    10_000_000_000n;
+  const nextSlippage = (nextGross + 9_999n) / 10_000n;
+  const nextAllIn = nextGross + nextSlippage + 20n + 10n + 15n + 25n;
+  assert.ok(nextAllIn > BigInt(projection.amountProjection.effectiveEntryBudgetCents));
+
+  const cashLimited = explicitGrossScenario(req);
+  cashLimited.explicitAssumptions.equityCents = "1000000";
+  cashLimited.explicitAssumptions.availableCashCents = "1234";
+  refreshExplicitGrossReviewEvidence(cashLimited);
+  const cashProjection = (await adapterFor(entryResponse().body).adapter.getPaperQuote(
+    req, {reviewScenario: cashLimited})).scenarioProjection;
+  assert.equal(cashProjection.amountProjection.effectiveEntryBudgetCents, "1234");
+  assert.ok(BigInt(cashProjection.amountProjection.modeledAllInCents) <= 1234n);
+});
+
+test("EXPLICIT_GROSS_V1 evaluates the full sell amount and blocks costs above proceeds", async () => {
+  const {exitRequest, body} = exitFixture("3000000", "3703702");
+  const config = explicitGrossScenario(exitRequest);
+  config.explicitAssumptions.networkCents = "1000";
+  refreshExplicitGrossReviewEvidence(config);
+  const projection = (await adapterFor(body).adapter.getPaperQuote(
+    exitRequest, {reviewScenario: config})).scenarioProjection;
+  assert.equal(projection.status, "BLOCKED");
+  assert.deepEqual(projection.reasons, ["EXPLICIT_GROSS_PROJECTION_REVALIDATION_FAILED"]);
+});
+
+test("EXPLICIT_GROSS_V1 cannot issue a modeled ledger quote", async () => {
+  const adapter = createFixtureMarketQuoteAdapter({
+    enabled: true,
+    clock: () => NOW,
+    transport: async () => response(entryResponse().body)
+  });
+  const original = await adapter.getPaperQuote(request(), {
+    reviewScenario: explicitGrossScenario()
+  });
+  const issued = adapter.issueModeledQuote(original, {
+    identity: IDENTITY,
+    side: "ENTRY",
+    amountAtoms: "100000000",
+    policy: MODELED_POLICY
+  });
+  assert.deepEqual(issued, {ok: false, reason: "MODEL_PROJECTION_INVALID"});
+  assert.equal(adapter.confirmModeledQuote(issued.quote), false);
 });
 
 const MODELED_POLICY = Object.freeze({
