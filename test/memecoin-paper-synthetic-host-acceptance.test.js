@@ -1883,6 +1883,29 @@ test("real IPC child enforces its inherited deadline after fill instead of recei
       };
       child.once("close", onClose);
     });
+    const waitForChildAliveThrough = (run, deadlineNs) => new Promise((resolve, reject) => {
+      let timer;
+      const finish = (action, value) => {
+        clearTimeout(timer);
+        run.child.removeListener("exit", onExit);
+        action(value);
+      };
+      const onExit = (code, signal) => finish(reject, new Error(
+        `child exited before its own-start-plus-budget cutoff (${code}, ${signal}); ` +
+        `stdout=${run.stdout().slice(-1_000)} stderr=${run.stderr().slice(-1_000)}`
+      ));
+      const remainingNs = deadlineNs - process.hrtime.bigint();
+      if (remainingNs <= 0n) {
+        resolve();
+        return;
+      }
+      run.child.once("exit", onExit);
+      if (run.child.exitCode !== null || run.child.signalCode !== null) {
+        onExit(run.child.exitCode, run.child.signalCode);
+        return;
+      }
+      timer = setTimeout(() => finish(resolve), Math.ceil(Number(remainingNs) / 1_000_000));
+    });
     const assertFillHandshake = async (run, startedAt, deadlineNs) => {
       const handshake = await receiveFill(run, shortBudgetMs + 2_000, startedAt, deadlineNs);
       assert.equal(handshake.status, "FILLED_PAPER");
@@ -1946,8 +1969,12 @@ test("real IPC child enforces its inherited deadline after fill instead of recei
       assertFillHandshake(freshBudgetRun, freshBudgetStartedAt, freshBudgetDeadline)
     ]);
     assert.equal(freshChildRunId, freshHandshake.runId);
+    const freshBudgetCutoff = freshBudgetStartedAt + BigInt(shortBudgetMs) * 1_000_000n;
+    await waitForChildAliveThrough(freshBudgetRun, freshBudgetCutoff);
     assert.equal(freshBudgetRun.child.exitCode, null,
       "working IPC does not make a fresh child deadline equivalent to inheriting the parent's deadline");
+    assert.equal(freshBudgetRun.child.signalCode, null,
+      "the fresh-budget child must remain alive through its own-start-plus-budget cutoff");
     freshBudgetRun.child.kill("SIGKILL");
     const killed = await closeWithin(freshBudgetRun.child, 2_000);
     assert.deepEqual(killed, {code: null, signal: "SIGKILL"});
