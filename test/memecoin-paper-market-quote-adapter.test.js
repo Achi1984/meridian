@@ -9,7 +9,8 @@ import {PaperCheckpointSession} from "../scripts/memecoin-paper/checkpoint-sessi
 import {normalizeExactCosts} from "../scripts/memecoin-paper-execution-evidence/normalize.mjs";
 import {
   createFixtureMarketQuoteAdapter, createMarketQuoteAdapter, isFixtureMarketQuoteAdapter,
-  paperQuotedNetModelDigest, reviewScenarioConfigSha256, verifyPaperQuotedNetProjection
+  paperExplicitNetModelDigest, paperQuotedNetModelDigest, reviewScenarioConfigSha256,
+  verifyPaperExplicitNetProjection, verifyPaperQuotedNetProjection
 } from "../scripts/memecoin-paper/market-quote-adapter.mjs";
 import {verifyPaperModeledQuote} from "../scripts/memecoin-paper/ledger.mjs";
 import {
@@ -116,6 +117,76 @@ function reviewScenario(caseName = "BASELINE", overrides = {}) {
     decision: "APPROVE_SCENARIO_REVIEW_ONLY",
     recordedAt: NOW - 2_500
   };
+  return config;
+}
+
+function explicitNetScenario(req = request(), overrides = {}) {
+  const categories = ["fee", "spread", "slippage", "priceImpact", "network"];
+  const amounts = {
+    feeCents: "11",
+    spreadCents: "13",
+    slippageBps: "250",
+    priceImpactCents: "17",
+    networkCents: "37"
+  };
+  const dispositions = Object.fromEntries(categories.map(component => [
+    component, component === "slippage"
+      ? "ADDITIONAL_MODELED_ADVERSE_ADJUSTMENT_ROUNDED_UP"
+      : `ADDITIONAL_MODELED_${component === "priceImpact" ? "IMPACT" : component.toUpperCase()}_` +
+        (component === "network" ? "RESERVE_NOT_SETTLED_COST" : "PENALTY_NOT_OBSERVED")
+  ]));
+  const config = {
+    optIn: true,
+    scenarioId: "MERIDIAN_PAPER_EXPLICIT_NET_V1",
+    scenarioVersion: "1",
+    scenario: "EXPLICIT_NET_V1",
+    identity: {...req.identity},
+    quoteBasis: "QUOTED_ROUTE_AMOUNTS_AS_MODELED_NET_SWAP_BASIS",
+    explicitAssumptions: {
+      ...amounts,
+      equityCents: "100000",
+      availableCashCents: "100000",
+      units: {
+        feeCents: "US_CENTS_PER_SIDE",
+        spreadCents: "US_CENTS_PER_SIDE",
+        slippageBps: "BASIS_POINTS_OF_QUOTED_NET_USD_VALUE",
+        priceImpactCents: "US_CENTS_PER_SIDE",
+        networkCents: "US_CENTS_PER_SIDE",
+        equityCents: "US_CENTS",
+        availableCashCents: "US_CENTS"
+      },
+      rationales: Object.fromEntries([
+        "feeCents", "spreadCents", "slippageBps", "priceImpactCents",
+        "networkCents", "equityCents", "availableCashCents"
+      ].map(key => [key, `Synthetic TEST-ONLY modeled assumption for ${key}.`])),
+      zeroCostAssumptions: {},
+      dispositions
+    },
+    quoteUsdConversion: {
+      mint: req.identity.quote,
+      decimals: req.quoteDecimals,
+      microUsdPerWholeToken: "1000000",
+      observedAt: NOW - 2_500,
+      method: "MEASURED_SOURCE_RECEIPT",
+      evidenceSha256: "c".repeat(64)
+    },
+    ...overrides
+  };
+  config.reviewEvidence ??= {
+    evidenceId: "explicit-net-method-review-1",
+    evidenceSha256: "e".repeat(64),
+    scenarioConfigSha256: reviewScenarioConfigSha256(config),
+    identity: {...req.identity},
+    reviewerRef: "synthetic-methodology-review",
+    purpose: "OFFLINE_SCENARIO_REVIEW_ONLY",
+    decision: "APPROVE_SCENARIO_REVIEW_ONLY",
+    recordedAt: NOW - 2_000
+  };
+  return config;
+}
+
+function refreshExplicitNetReviewEvidence(config) {
+  config.reviewEvidence.scenarioConfigSha256 = reviewScenarioConfigSha256(config);
   return config;
 }
 
@@ -1307,8 +1378,208 @@ test("existing BASELINE and STRESS projections gain no model fields and omission
   const none = await adapterFor(entryResponse().body).adapter.getPaperQuote(request());
   assert.equal(none.scenarioProjection, null);
   assert.equal(none.authorizationEligible, false);
+  const mixed = reviewScenario("BASELINE");
+  mixed.explicitAssumptions = {};
+  assert.throws(() => reviewScenarioConfigSha256(mixed));
   assert.notEqual(reviewScenarioConfigSha256(reviewScenario(QN)),
     reviewScenarioConfigSha256(reviewScenario("STRESS")));
+});
+
+function explicitEntryRequest() {
+  return request({identity: {...IDENTITY, decimals: 0}, amountAtoms: "100000000"});
+}
+
+function explicitEntryBody() {
+  return entryResponse({
+    inAmount: "100000000",
+    outAmount: "100",
+    otherAmountThreshold: "99"
+  }).body;
+}
+
+async function explicitEntryProjection(equityCents, availableCashCents) {
+  const req = explicitEntryRequest();
+  const config = explicitNetScenario(req);
+  config.explicitAssumptions.equityCents = equityCents;
+  config.explicitAssumptions.availableCashCents = availableCashCents;
+  config.quoteUsdConversion.microUsdPerWholeToken = "800000";
+  refreshExplicitNetReviewEvidence(config);
+  return (await adapterFor(explicitEntryBody()).adapter.getPaperQuote(
+    req, {reviewScenario: config})).scenarioProjection;
+}
+
+test("EXPLICIT_NET_V1 binds explicit modeled assumptions, causal FX, quote bytes, and recomputed output", async () => {
+  const projection = await explicitEntryProjection("50000", "3500");
+  assert.equal(projection.status, "REVIEW_PROJECTION_ONLY");
+  assert.equal(projection.scenario.case, "EXPLICIT_NET_V1");
+  assert.equal(projection.costBasis, "QUOTED_ROUTE_AMOUNTS_AS_MODELED_NET_SWAP_BASIS");
+  assert.equal(projection.provenance, "MODELED");
+  assert.equal(projection.actualCostCoverage, "UNKNOWN");
+  assert.equal(projection.executionRealistic, false);
+  assert.equal(projection.authorizationEligible, false);
+  assert.equal(projection.integrationEligible, false);
+  assert.equal(projection.model.binding.quoteBasis,
+    "QUOTED_ROUTE_AMOUNTS_AS_MODELED_NET_SWAP_BASIS");
+  assert.equal(projection.model.binding.sourceQuote.responseSha256.length, 64);
+  assert.equal(projection.model.binding.request.sha256.length, 64);
+  assert.equal(projection.model.digest, paperExplicitNetModelDigest(projection.model.binding));
+  assert.deepEqual(verifyPaperExplicitNetProjection(projection), {valid: true, reasons: []});
+  assert.equal(projection.amountProjection.sizeDisposition,
+    "SMALLER_SIZE_MODELED_NOT_A_FRESH_EXECUTABLE_QUOTE");
+  assert.deepEqual(projection.costsCents,
+    {feeCents: "11", spreadCents: "13", slippageCents: "82",
+      priceImpactCents: "17", networkCents: "37"});
+  assert.equal(projection.quoteValue.quotedNetRouteAmountBasisCents, "3280");
+  assert.equal(projection.quoteValue.totalAdditionalModeledCostsCents, "160");
+  assert.equal(projection.quoteValue.afterAdditionalModeledCostsCents, "3440");
+  assert.equal(projection.amountProjection.modeledAllInCents, "3440");
+  assert.deepEqual(projection.costDisposition, {
+    feeCents: "ADDITIONAL_MODELED_FEE_PENALTY_NOT_OBSERVED",
+    spreadCents: "ADDITIONAL_MODELED_SPREAD_PENALTY_NOT_OBSERVED",
+    slippageCents: "ADDITIONAL_MODELED_ADVERSE_ADJUSTMENT_ROUNDED_UP",
+    priceImpactCents: "ADDITIONAL_MODELED_IMPACT_PENALTY_NOT_OBSERVED",
+    networkCents: "ADDITIONAL_MODELED_NETWORK_RESERVE_NOT_SETTLED_COST"
+  });
+  const repeated = await explicitEntryProjection("50000", "3500");
+  assert.equal(repeated.model.digest, projection.model.digest);
+});
+
+test("EXPLICIT_NET_V1 requires every numeric input, unit, rationale, disposition, and conversion field", async () => {
+  const missing = [
+    config => { delete config.optIn; },
+    config => { delete config.scenarioId; },
+    config => { delete config.scenarioVersion; },
+    config => { delete config.scenario; },
+    config => { delete config.identity; },
+    config => { delete config.quoteBasis; },
+    config => { delete config.explicitAssumptions; },
+    config => { delete config.quoteUsdConversion; },
+    ...["feeCents", "spreadCents", "slippageBps", "priceImpactCents", "networkCents",
+      "equityCents", "availableCashCents", "units", "rationales", "zeroCostAssumptions",
+      "dispositions"].map(key => config => { delete config.explicitAssumptions[key]; }),
+    ...["feeCents", "spreadCents", "slippageBps", "priceImpactCents", "networkCents",
+      "equityCents", "availableCashCents"].map(key => config => {
+      delete config.explicitAssumptions.units[key];
+    }),
+    ...["feeCents", "spreadCents", "slippageBps", "priceImpactCents", "networkCents",
+      "equityCents", "availableCashCents"].map(key => config => {
+      delete config.explicitAssumptions.rationales[key];
+    }),
+    ...["fee", "spread", "slippage", "priceImpact", "network"].map(key => config => {
+      delete config.explicitAssumptions.dispositions[key];
+    }),
+    ...["mint", "decimals", "microUsdPerWholeToken", "observedAt", "method",
+      "evidenceSha256"].map(key => config => { delete config.quoteUsdConversion[key]; })
+  ];
+  for (const mutate of missing) {
+    const config = explicitNetScenario();
+    mutate(config);
+    assert.throws(() => reviewScenarioConfigSha256(config));
+  }
+  const netToGross = explicitNetScenario();
+  netToGross.quoteBasis = "GROSS_BEFORE_ALL_COSTS";
+  assert.throws(() => reviewScenarioConfigSha256(netToGross));
+
+  const zeroFee = explicitNetScenario();
+  zeroFee.explicitAssumptions.feeCents = "0";
+  assert.throws(() => reviewScenarioConfigSha256(zeroFee));
+  zeroFee.explicitAssumptions.zeroCostAssumptions.fee =
+    "TEST-ONLY modeled no-incremental-fee disposition.";
+  zeroFee.explicitAssumptions.dispositions.fee = "NO_INCREMENTAL_CHARGE_UNDER_SCENARIO_BASIS";
+  assert.doesNotThrow(() => reviewScenarioConfigSha256(zeroFee));
+  zeroFee.explicitAssumptions.dispositions.fee = "REALIZED_SHORTFALL";
+  assert.throws(() => reviewScenarioConfigSha256(zeroFee));
+});
+
+test("EXPLICIT_NET_V1 rejects stale/future FX and revalidation detects quote, FX, and assumption changes", async () => {
+  for (const observedAt of [NOW - 6 * 60_000, NOW + 1]) {
+    const config = explicitNetScenario();
+    config.quoteUsdConversion.observedAt = observedAt;
+    refreshExplicitNetReviewEvidence(config);
+    const result = await adapterFor(entryResponse().body).adapter.getPaperQuote(
+      request(), {reviewScenario: config});
+    assert.equal(result.scenarioProjection.status, "BLOCKED");
+  }
+  const projection = await explicitEntryProjection("50000", "3500");
+  const pinned = projection.model.digest;
+  for (const mutate of [
+    p => { p.model.binding.sourceQuote.responseSha256 = "a".repeat(64); },
+    p => { p.model.binding.quoteUsdConversion.microUsdPerWholeToken = "999999"; },
+    p => { p.model.binding.scenarioConfiguration.explicitAssumptions.feeCents = "12"; }
+  ]) {
+    const changed = structuredClone(projection);
+    mutate(changed);
+    assert.equal(verifyPaperExplicitNetProjection(changed).valid, false);
+    changed.model.digest = paperExplicitNetModelDigest(changed.model.binding);
+    assert.equal(verifyPaperExplicitNetProjection(changed, {expectedDigest: pinned}).valid, false);
+  }
+  assert.equal(verifyPaperExplicitNetProjection(projection, {expectedDigest: pinned}).valid, true);
+});
+
+test("EXPLICIT_NET_V1 sizes entries against the lower of the $80, equity, and cash budgets", async () => {
+  const first = await explicitEntryProjection("50000", "3500");
+  assert.equal(first.amountProjection.effectiveEntryBudgetCents, "3500");
+  assert.equal(first.amountProjection.maximumModeledBaseAtoms, "41");
+  assert.equal(first.quoteValue.quotedNetRouteAmountBasisCents, "3280");
+  assert.equal(first.costsCents.slippageCents, "82");
+  assert.equal(first.quoteValue.totalAdditionalModeledCostsCents, "160");
+  assert.equal(first.quoteValue.afterAdditionalModeledCostsCents, "3440");
+  assert.ok(3360 + 84 + 78 > 3500);
+
+  const second = await explicitEntryProjection("40000", "10000");
+  assert.equal(second.amountProjection.effectiveEntryBudgetCents, "3200");
+  assert.equal(second.amountProjection.maximumModeledBaseAtoms, "38");
+  assert.equal(second.quoteValue.quotedNetRouteAmountBasisCents, "3040");
+  assert.equal(second.costsCents.slippageCents, "76");
+  assert.equal(second.quoteValue.totalAdditionalModeledCostsCents, "154");
+  assert.equal(second.quoteValue.afterAdditionalModeledCostsCents, "3194");
+  assert.ok(3120 + 78 + 78 > 3200);
+});
+
+test("EXPLICIT_NET_V1 sells all seven tokens and rounds the USD credit and additional costs conservatively", async () => {
+  const identity = {...IDENTITY, decimals: 0};
+  const exitRequest = request({
+    identity, side: "EXIT", amountAtoms: "7", positionOpenedAt: NOW - 1_000
+  });
+  delete exitRequest.authorizedAt;
+  const body = syntheticOrderResponse({
+    inputMint: SYNTHETIC_MINT, outputMint: SYNTHETIC_QUOTE,
+    inAmount: "7", outAmount: "3333333", otherAmountThreshold: "1"
+  }).body;
+  const config = explicitNetScenario(exitRequest);
+  config.quoteUsdConversion.microUsdPerWholeToken = "900000";
+  config.explicitAssumptions.equityCents = "1";
+  config.explicitAssumptions.availableCashCents = "1";
+  refreshExplicitNetReviewEvidence(config);
+  const projection = (await adapterFor(body).adapter.getPaperQuote(
+    exitRequest, {reviewScenario: config})).scenarioProjection;
+  assert.equal(projection.status, "REVIEW_PROJECTION_ONLY");
+  assert.equal(projection.priceMicros, 428571);
+  assert.equal(projection.amountProjection.maximumModeledBaseAtoms, "7");
+  assert.equal(projection.amountProjection.effectiveEntryBudgetCents, null);
+  assert.equal(projection.quoteValue.quotedNetRouteAmountBasisCents, "299");
+  assert.equal(projection.costsCents.slippageCents, "8");
+  assert.equal(projection.quoteValue.totalAdditionalModeledCostsCents, "86");
+  assert.equal(projection.quoteValue.afterAdditionalModeledCostsCents, "213");
+});
+
+test("EXPLICIT_NET_V1 cannot issue a modeled ledger quote", async () => {
+  const adapter = createFixtureMarketQuoteAdapter({
+    enabled: true,
+    clock: () => NOW,
+    transport: async () => response(entryResponse().body)
+  });
+  const original = await adapter.getPaperQuote(request(), {
+    reviewScenario: explicitNetScenario()
+  });
+  const issued = adapter.issueModeledQuote(original, {
+    identity: IDENTITY,
+    side: "ENTRY",
+    amountAtoms: "100000000",
+    policy: MODELED_POLICY
+  });
+  assert.deepEqual(issued, {ok: false, reason: "MODEL_PROJECTION_INVALID"});
+  assert.equal(adapter.confirmModeledQuote(issued.quote), false);
 });
 
 const MODELED_POLICY = Object.freeze({

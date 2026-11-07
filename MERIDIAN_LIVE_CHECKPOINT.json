@@ -167,6 +167,54 @@
       "state": "PARTIAL_DRAFT_PR_FROZEN_AFTER_PUSH",
       "nextStep": "INDEPENDENT_NUMERIC_REVIEW_THEN_SEPARATE_RUN_POLICY_BOUND_PARAMETER_ADOPTION_BY_RUNTIME_WRITER"
     },
+    "paperExplicitGrossV1Delivery20261107": {
+      "recordedDate": "2026-11-07",
+      "scope": "ADDITIVE_SOURCE_ONLY_REVIEW_PROJECTION_NO_RUNTIME_ROUTING_OR_LEDGER_AUTHORITY",
+      "issue": 1243,
+      "pullRequest": 1244,
+      "branch": "copilot/extend-paper-cost-projection",
+      "base": "10243a5d6120fa0f977965158152656fa939025a",
+      "head": "SEE_DRAFT_PR_BODY_EXACT_HEAD",
+      "model": {
+        "id": "MERIDIAN_PAPER_EXPLICIT_GROSS_V1",
+        "version": "1",
+        "quoteBasis": "GROSS_BEFORE_ALL_COSTS",
+        "numericPreset": "NONE_ALL_ASSUMPTIONS_REQUIRED",
+        "actualCostCoverage": "UNKNOWN",
+        "executionRealistic": false,
+        "authority": "NONE_REVIEW_PROJECTION_ONLY"
+      },
+      "productionBoundary": "GROSS_BASIS_AND_CONVERSION_REMAIN_UNAUTHENTICATED; NO_PROVIDER_ACQUISITION_OR_RUNTIME_ACTIVATION",
+      "state": "DRAFT_PENDING_INDEPENDENT_REVIEW_AND_HOSTED_CI",
+      "nextStep": "INDEPENDENT_REVIEW_AND_HOSTED_CI; NO_MERGE_OR_ACTIVATION"
+    },
+    "paperExplicitNetV1Correction20261107": {
+      "recordedDate": "2026-11-07",
+      "scope": "CORRECTION_TO_GROSS_BASIS_PROPOSAL; ADDITIVE_SOURCE_ONLY_REVIEW_PROJECTION",
+      "issue": 1243,
+      "pullRequest": 1244,
+      "branch": "copilot/extend-paper-cost-projection",
+      "supersedes": "paperExplicitGrossV1Delivery20261107",
+      "model": {
+        "id": "MERIDIAN_PAPER_EXPLICIT_NET_V1",
+        "version": "1",
+        "quoteBasis": "QUOTED_ROUTE_AMOUNTS_AS_MODELED_NET_SWAP_BASIS",
+        "numericPreset": "NONE_ALL_ASSUMPTIONS_REQUIRED",
+        "additionalModeledCostCategories": [
+          "FEE",
+          "SPREAD",
+          "ADVERSE_SLIPPAGE",
+          "PRICE_IMPACT",
+          "NETWORK"
+        ],
+        "actualCostCoverage": "UNKNOWN",
+        "executionRealistic": false,
+        "authority": "NONE_REVIEW_PROJECTION_ONLY"
+      },
+      "productionBoundary": "JUPITER_ROUTE_AMOUNTS_ARE_NOT_PROVEN_GROSS; CONVERSION_AND_ASSUMPTIONS_REMAIN_UNAUTHENTICATED; NO_RUNTIME_ACTIVATION",
+      "state": "DRAFT_PENDING_INDEPENDENT_REVIEW_AND_HOSTED_CI",
+      "nextStep": "INDEPENDENT_REVIEW_AND_HOSTED_CI; NO_MERGE_OR_ACTIVATION"
+    },
     "paperObservation20261101": {
       "recordedDate": "2026-11-01",
       "scope": "SOURCE_STATUS_ONLY_NO_RUNTIME_OR_AUTHORITY_CHANGE",

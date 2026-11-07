@@ -20,7 +20,7 @@ const SCENARIO_CONFIG_KEYS = Object.freeze([
   "optIn", "scenarioId", "scenarioVersion", "scenario", "identity", "usdcMint",
   "usdcDecimals", "usdcUsdMicrosPerToken", "quoteBasis", "adverseAdjustmentBps",
   "networkReserveCents", "feeCents", "spreadCents", "priceImpactCents",
-  "zeroChargeDisposition", "reviewEvidence"
+  "zeroChargeDisposition", "reviewEvidence", "explicitAssumptions", "quoteUsdConversion"
 ]);
 const SCENARIO_CASES = Object.freeze({
   BASELINE: Object.freeze({
@@ -37,9 +37,54 @@ const SCENARIO_CASES = Object.freeze({
     scenarioId: "MERIDIAN_PAPER_QUOTED_NET_V1",
     adverseAdjustmentBps: 300,
     networkReserveCents: "50"
+  }),
+  EXPLICIT_NET_V1: Object.freeze({
+    scenarioId: "MERIDIAN_PAPER_EXPLICIT_NET_V1"
   })
 });
 const QUOTED_NET_CASE = "QUOTED_NET_V1";
+const EXPLICIT_NET_CASE = "EXPLICIT_NET_V1";
+const EXPLICIT_NET_MODEL = Object.freeze({
+  id: "MERIDIAN_PAPER_EXPLICIT_NET_V1",
+  version: "1",
+  status: "REVIEW_ONLY",
+  provenance: "MODELED"
+});
+const EXPLICIT_NET_ASSUMPTION_KEYS = Object.freeze([
+  "feeCents", "spreadCents", "slippageBps", "priceImpactCents", "networkCents",
+  "equityCents", "availableCashCents", "units", "rationales", "zeroCostAssumptions",
+  "dispositions"
+]);
+const EXPLICIT_NET_UNITS = Object.freeze({
+  feeCents: "US_CENTS_PER_SIDE",
+  spreadCents: "US_CENTS_PER_SIDE",
+  slippageBps: "BASIS_POINTS_OF_QUOTED_NET_USD_VALUE",
+  priceImpactCents: "US_CENTS_PER_SIDE",
+  networkCents: "US_CENTS_PER_SIDE",
+  equityCents: "US_CENTS",
+  availableCashCents: "US_CENTS"
+});
+const EXPLICIT_NET_DISPOSITIONS = Object.freeze({
+  fee: Object.freeze({zero: NO_INCREMENTAL_CHARGE, nonzero: "ADDITIONAL_MODELED_FEE_PENALTY_NOT_OBSERVED"}),
+  spread: Object.freeze({zero: NO_INCREMENTAL_CHARGE, nonzero: "ADDITIONAL_MODELED_SPREAD_PENALTY_NOT_OBSERVED"}),
+  slippage: Object.freeze({zero: NO_INCREMENTAL_CHARGE, nonzero: "ADDITIONAL_MODELED_ADVERSE_ADJUSTMENT_ROUNDED_UP"}),
+  priceImpact: Object.freeze({zero: NO_INCREMENTAL_CHARGE, nonzero: "ADDITIONAL_MODELED_IMPACT_PENALTY_NOT_OBSERVED"}),
+  network: Object.freeze({zero: NO_INCREMENTAL_CHARGE, nonzero: "ADDITIONAL_MODELED_NETWORK_RESERVE_NOT_SETTLED_COST"})
+});
+const EXPLICIT_NET_ASSUMPTIONS = Object.freeze([
+  "All numeric inputs and units are caller-supplied modeled assumptions; no numeric preset is adopted.",
+  "Jupiter route amounts use the existing modeled net-swap basis; they are not proven gross amounts.",
+  "Nonzero category amounts are additional modeled penalties, not provider-reported costs or settled charges.",
+  "Zero incremental charges under this basis are not assertions of economically zero execution costs.",
+  "USD conversion requires a causal measured-source receipt; no stablecoin parity is inferred.",
+  "A smaller entry size is modeled, not a fresh executable quote."
+]);
+const EXPLICIT_NET_RESULT_CONTRACT = Object.freeze({
+  provenance: "MODELED",
+  actualCostCoverage: "UNKNOWN",
+  executionRealistic: false,
+  authority: "NONE_REVIEW_PROJECTION_ONLY"
+});
 const QUOTED_NET_MODEL = Object.freeze({
   id: "MERIDIAN_PAPER_QUOTED_NET_V1",
   version: "1",
@@ -124,16 +169,102 @@ export function paperQuotedNetModelDigest(binding) {
   return createHash("sha256").update(canonicalJson(binding)).digest("hex");
 }
 
+export const paperExplicitNetModelDigest = paperQuotedNetModelDigest;
+
 function ceilDiv(numerator, denominator) {
   return (numerator + denominator - 1n) / denominator;
 }
 
+function normalizeExplicitNetAssumptions(value) {
+  const raw = copyPlainRecord(value, EXPLICIT_NET_ASSUMPTION_KEYS,
+    "explicit net assumptions");
+  if (Object.keys(raw).length !== EXPLICIT_NET_ASSUMPTION_KEYS.length ||
+      EXPLICIT_NET_ASSUMPTION_KEYS.some(key => !Object.hasOwn(raw, key))) {
+    throw new TypeError("explicit net assumptions require every value, unit, rationale, and disposition");
+  }
+  const units = copyPlainRecord(raw.units, Object.keys(EXPLICIT_NET_UNITS),
+    "explicit net assumption units");
+  const rationales = copyPlainRecord(raw.rationales, Object.keys(EXPLICIT_NET_UNITS),
+    "explicit net assumption rationales");
+  const zeroCostAssumptions = copyPlainRecord(raw.zeroCostAssumptions,
+    COSTS, "explicit zero-cost assumptions");
+  const dispositions = copyPlainRecord(raw.dispositions, COSTS,
+    "explicit net category dispositions");
+  if (Object.keys(units).length !== Object.keys(EXPLICIT_NET_UNITS).length ||
+      Object.keys(rationales).length !== Object.keys(EXPLICIT_NET_UNITS).length ||
+      Object.keys(dispositions).length !== COSTS.length ||
+      Object.entries(EXPLICIT_NET_UNITS).some(([key, unit]) => units[key] !== unit) ||
+      Object.values(rationales).some(value =>
+        typeof value !== "string" || value.trim().length < 8 || value.length > 256)) {
+    throw new TypeError("explicit net assumption units or rationales are incomplete");
+  }
+  const result = {};
+  for (const key of ["feeCents", "spreadCents", "priceImpactCents",
+    "networkCents", "equityCents", "availableCashCents"]) {
+    if (typeof raw[key] !== "string" || !INTEGER.test(raw[key])) {
+      throw new TypeError(`explicit net ${key} must be a non-negative integer string`);
+    }
+    result[key] = raw[key];
+  }
+  if (typeof raw.slippageBps !== "string" || !INTEGER.test(raw.slippageBps) ||
+      BigInt(raw.slippageBps) > BPS ||
+      BigInt(raw.equityCents) <= 0n) {
+    throw new TypeError("explicit net slippage or equity is outside its supported range");
+  }
+  result.slippageBps = raw.slippageBps;
+  for (const component of COSTS) {
+    const key = component === "priceImpact" ? "priceImpactCents" :
+      component === "network" ? "networkCents" : `${component}Cents`;
+    const isZero = component === "slippage"
+      ? raw.slippageBps === "0" : raw[key] === "0";
+    if (isZero) {
+      const rationale = zeroCostAssumptions[component];
+      if (typeof rationale !== "string" || rationale.trim().length < 8 ||
+          rationale.length > 256) {
+        throw new TypeError(`zero ${component} cost requires a documented modeled assumption`);
+      }
+    } else if (Object.hasOwn(zeroCostAssumptions, component)) {
+      throw new TypeError(`zero-cost assumption supplied for nonzero ${component}`);
+    }
+    const expectedDisposition = isZero
+      ? EXPLICIT_NET_DISPOSITIONS[component].zero
+      : EXPLICIT_NET_DISPOSITIONS[component].nonzero;
+    if (dispositions[component] !== expectedDisposition) {
+      throw new TypeError(`explicit ${component} disposition contradicts its modeled assumption`);
+    }
+  }
+  if (Object.keys(zeroCostAssumptions).some(component => !COSTS.includes(component))) {
+    throw new TypeError("explicit zero-cost assumptions contain an unsupported component");
+  }
+  if (COSTS.some(component => !Object.hasOwn(dispositions, component))) {
+    throw new TypeError("explicit net category dispositions are incomplete");
+  }
+  result.equityCents = raw.equityCents;
+  result.availableCashCents = raw.availableCashCents;
+  result.units = Object.fromEntries(Object.keys(EXPLICIT_NET_UNITS)
+    .map(key => [key, units[key]]));
+  result.rationales = Object.fromEntries(Object.keys(EXPLICIT_NET_UNITS)
+    .map(key => [key, rationales[key]]));
+  result.zeroCostAssumptions = Object.fromEntries(COSTS
+    .filter(component => Object.hasOwn(zeroCostAssumptions, component))
+    .map(component => [component, zeroCostAssumptions[component]]));
+  result.dispositions = Object.fromEntries(COSTS
+    .map(component => [component, dispositions[component]]));
+  return result;
+}
+
+function normalizeQuoteUsdConversion(value) {
+  const conversion = copyPlainRecord(value, [
+    "mint", "decimals", "microUsdPerWholeToken", "observedAt", "method", "evidenceSha256"
+  ], "quote USD conversion");
+  if (Object.keys(conversion).length !== 6) {
+    throw new TypeError("quote USD conversion requires every measured field");
+  }
+  return conversion;
+}
+
 function scenarioConfig(value) {
   const raw = copyPlainRecord(value, SCENARIO_CONFIG_KEYS, "review scenario");
-  const requiredKeys = SCENARIO_CONFIG_KEYS.filter(key => key !== "reviewEvidence");
-  if (requiredKeys.some(key => !Object.hasOwn(raw, key))) {
-    throw new TypeError("review scenario requires every explicit configuration field");
-  }
   raw.identity = copyPlainRecord(raw.identity,
     ["chainId", "mint", "pool", "quote", "decimals"], "scenario identity");
   if (Object.hasOwn(raw, "reviewEvidence")) {
@@ -166,46 +297,86 @@ function scenarioConfig(value) {
   }
   const scenario = typeof raw.scenario === "string" &&
     Object.hasOwn(SCENARIO_CASES, raw.scenario) ? SCENARIO_CASES[raw.scenario] : null;
-  if (raw.optIn !== true || !scenario || raw.scenarioId !== scenario.scenarioId ||
+  if (raw.optIn !== true || !scenario ||
+      raw.scenarioId !== scenario.scenarioId ||
       raw.scenarioVersion !== SCENARIO_VERSION ||
       raw.identity.chainId !== "solana" ||
       typeof raw.identity.mint !== "string" || !BASE58.test(raw.identity.mint) ||
       typeof raw.identity.pool !== "string" || !BASE58.test(raw.identity.pool) ||
-      raw.identity.quote !== SOLANA_USDC_MINT ||
+      typeof raw.identity.quote !== "string" || !BASE58.test(raw.identity.quote) ||
       !Number.isInteger(raw.identity.decimals) || raw.identity.decimals < 0 ||
-      raw.identity.decimals > 18 || raw.usdcMint !== SOLANA_USDC_MINT ||
-      raw.usdcDecimals !== 6 || raw.usdcUsdMicrosPerToken !== "1000000" ||
-      raw.quoteBasis !== QUOTED_NET_BASIS ||
-      raw.adverseAdjustmentBps !== scenario.adverseAdjustmentBps ||
-      raw.networkReserveCents !== scenario.networkReserveCents ||
-      raw.feeCents !== "0" || raw.spreadCents !== "0" ||
-      raw.priceImpactCents !== "0" ||
-      raw.zeroChargeDisposition !== NO_INCREMENTAL_CHARGE) {
+      raw.identity.decimals > 18) {
     throw new TypeError("review scenario configuration is unsupported or inconsistent");
   }
-  const canonical = {
-    optIn: raw.optIn,
-    scenarioId: raw.scenarioId,
-    scenarioVersion: raw.scenarioVersion,
-    scenario: raw.scenario,
-    identity: {
-      chainId: raw.identity.chainId,
-      mint: raw.identity.mint,
-      pool: raw.identity.pool,
-      quote: raw.identity.quote,
-      decimals: raw.identity.decimals
-    },
-    usdcMint: raw.usdcMint,
-    usdcDecimals: raw.usdcDecimals,
-    usdcUsdMicrosPerToken: raw.usdcUsdMicrosPerToken,
-    quoteBasis: raw.quoteBasis,
-    adverseAdjustmentBps: raw.adverseAdjustmentBps,
-    networkReserveCents: raw.networkReserveCents,
-    feeCents: raw.feeCents,
-    spreadCents: raw.spreadCents,
-    priceImpactCents: raw.priceImpactCents,
-    zeroChargeDisposition: raw.zeroChargeDisposition
-  };
+  let canonical;
+  if (raw.scenario === EXPLICIT_NET_CASE) {
+    const explicitKeys = [
+      "optIn", "scenarioId", "scenarioVersion", "scenario", "identity", "quoteBasis",
+      "explicitAssumptions", "quoteUsdConversion", "reviewEvidence"
+    ];
+    if (Object.keys(raw).some(key => !explicitKeys.includes(key)) ||
+        explicitKeys.filter(key => key !== "reviewEvidence")
+          .some(key => !Object.hasOwn(raw, key)) ||
+        raw.quoteBasis !== QUOTED_NET_BASIS) {
+      throw new TypeError("explicit net configuration is incomplete or contradicts the quoted-net basis");
+    }
+    canonical = {
+      optIn: raw.optIn,
+      scenarioId: raw.scenarioId,
+      scenarioVersion: raw.scenarioVersion,
+      scenario: raw.scenario,
+      identity: {
+        chainId: raw.identity.chainId,
+        mint: raw.identity.mint,
+        pool: raw.identity.pool,
+        quote: raw.identity.quote,
+        decimals: raw.identity.decimals
+      },
+      quoteBasis: raw.quoteBasis,
+      explicitAssumptions: normalizeExplicitNetAssumptions(raw.explicitAssumptions),
+      quoteUsdConversion: normalizeQuoteUsdConversion(raw.quoteUsdConversion)
+    };
+  } else {
+    const requiredKeys = SCENARIO_CONFIG_KEYS.filter(key =>
+      !["reviewEvidence", "explicitAssumptions", "quoteUsdConversion"].includes(key));
+    if (requiredKeys.some(key => !Object.hasOwn(raw, key)) ||
+        ["explicitAssumptions", "quoteUsdConversion"]
+          .some(key => Object.hasOwn(raw, key)) ||
+        raw.identity.quote !== SOLANA_USDC_MINT ||
+        raw.usdcMint !== SOLANA_USDC_MINT || raw.usdcDecimals !== 6 ||
+        raw.usdcUsdMicrosPerToken !== "1000000" ||
+        raw.quoteBasis !== QUOTED_NET_BASIS ||
+        raw.adverseAdjustmentBps !== scenario.adverseAdjustmentBps ||
+        raw.networkReserveCents !== scenario.networkReserveCents ||
+        raw.feeCents !== "0" || raw.spreadCents !== "0" ||
+        raw.priceImpactCents !== "0" ||
+        raw.zeroChargeDisposition !== NO_INCREMENTAL_CHARGE) {
+      throw new TypeError("review scenario configuration is unsupported or inconsistent");
+    }
+    canonical = {
+      optIn: raw.optIn,
+      scenarioId: raw.scenarioId,
+      scenarioVersion: raw.scenarioVersion,
+      scenario: raw.scenario,
+      identity: {
+        chainId: raw.identity.chainId,
+        mint: raw.identity.mint,
+        pool: raw.identity.pool,
+        quote: raw.identity.quote,
+        decimals: raw.identity.decimals
+      },
+      usdcMint: raw.usdcMint,
+      usdcDecimals: raw.usdcDecimals,
+      usdcUsdMicrosPerToken: raw.usdcUsdMicrosPerToken,
+      quoteBasis: raw.quoteBasis,
+      adverseAdjustmentBps: raw.adverseAdjustmentBps,
+      networkReserveCents: raw.networkReserveCents,
+      feeCents: raw.feeCents,
+      spreadCents: raw.spreadCents,
+      priceImpactCents: raw.priceImpactCents,
+      zeroChargeDisposition: raw.zeroChargeDisposition
+    };
+  }
   const encoded = JSON.stringify(canonical);
   if (Buffer.byteLength(encoded) > 8_192) {
     throw new RangeError("review scenario exceeds configuration capacity");
@@ -297,7 +468,8 @@ function projectReviewScenario(request, observation, candidateReasons, parsedSce
   if (!parsed) return null;
   const {config} = parsed;
   if (!sameIdentity(config.identity, request.identity) ||
-      config.usdcDecimals !== request.quoteDecimals) {
+      (config.scenario !== EXPLICIT_NET_CASE &&
+       config.usdcDecimals !== request.quoteDecimals)) {
     return blockedScenarioProjection(["SCENARIO_IDENTITY_OR_DECIMALS_MISMATCH"]);
   }
   const route = observation.route;
@@ -314,6 +486,12 @@ function projectReviewScenario(request, observation, candidateReasons, parsedSce
   const reviewEvidence = validateReviewEvidence(parsed.reviewEvidence, parsed, receivedAt);
   if (!reviewEvidence) {
     return blockedScenarioProjection(["SCENARIO_REVIEW_EVIDENCE_MISSING_UNAPPROVED_OR_MISMATCHED"]);
+  }
+  if (config.scenario === EXPLICIT_NET_CASE) {
+    return projectExplicitNetScenario(
+      request, observation, parsedScenario.parsed,
+      sourceResponse
+    );
   }
 
   const baseAtoms = BigInt(request.side === "ENTRY" ? route.outAmount : route.inAmount);
@@ -524,6 +702,354 @@ function projectReviewScenario(request, observation, candidateReasons, parsedSce
     executionRealistic: false,
     integrationEligible: false,
     integrationBoundary: "Independent review evidence verification, size-cap enforcement, and unchanged Paper hard/risk gates are required."
+  };
+}
+
+function explicitNetRequestBinding(request) {
+  return {
+    identity: {...request.identity},
+    side: request.side,
+    amountAtoms: request.amountAtoms,
+    quoteDecimals: request.quoteDecimals,
+    candidateSampledAt: request.candidateSampledAt,
+    causalAt: request.side === "ENTRY" ? request.authorizedAt : request.positionOpenedAt,
+    slippageBps: request.slippageBps
+  };
+}
+
+export function paperExplicitNetRequestDigest(value) {
+  const request = copyRequest(value);
+  return createHash("sha256")
+    .update(canonicalJson(explicitNetRequestBinding(request))).digest("hex");
+}
+
+function modeledCostsAtNetBasis(netBasisCents, assumptions) {
+  const costs = {
+    feeCents: BigInt(assumptions.feeCents),
+    spreadCents: BigInt(assumptions.spreadCents),
+    slippageCents: ceilDiv(netBasisCents * BigInt(assumptions.slippageBps), BPS),
+    priceImpactCents: BigInt(assumptions.priceImpactCents),
+    networkCents: BigInt(assumptions.networkCents)
+  };
+  return {
+    costs,
+    total: Object.values(costs).reduce((sum, amount) => sum + amount, 0n)
+  };
+}
+
+function deriveExplicitNetProjection(binding) {
+  try {
+    if (!isRecord(binding) || !exactKeys(binding, [
+      "modelId", "modelVersion", "status", "provenance", "scenarioConfigSha256",
+      "scenarioConfiguration", "reviewEvidenceRecord", "candidateIdentity", "side",
+      "request", "sourceQuote", "quoteUsdConversion", "quoteBasis", "result"
+    ]) || binding.modelId !== EXPLICIT_NET_MODEL.id ||
+        binding.modelVersion !== EXPLICIT_NET_MODEL.version ||
+        binding.status !== EXPLICIT_NET_MODEL.status ||
+        binding.provenance !== EXPLICIT_NET_MODEL.provenance ||
+        typeof binding.scenarioConfigSha256 !== "string" ||
+        !SHA256.test(binding.scenarioConfigSha256)) {
+      return null;
+    }
+
+    const parsed = scenarioConfig({
+      ...binding.scenarioConfiguration,
+      reviewEvidence: binding.reviewEvidenceRecord
+    });
+    if (parsed.sha256 !== binding.scenarioConfigSha256 ||
+        canonicalJson(parsed.config) !== canonicalJson(binding.scenarioConfiguration) ||
+        binding.quoteBasis !== QUOTED_NET_BASIS ||
+        binding.quoteBasis !== parsed.config.quoteBasis ||
+        canonicalJson(parsed.config.quoteUsdConversion) !== canonicalJson(binding.quoteUsdConversion)) {
+      return null;
+    }
+
+    const requestBinding = copyPlainRecord(binding.request, [
+      "identity", "side", "amountAtoms", "quoteDecimals", "candidateSampledAt",
+      "causalAt", "slippageBps", "sha256"
+    ], "explicit net request binding");
+    const identity = copyPlainRecord(binding.candidateIdentity,
+      ["chainId", "mint", "pool", "quote", "decimals"], "explicit net candidate identity");
+    requestBinding.identity = copyPlainRecord(requestBinding.identity,
+      ["chainId", "mint", "pool", "quote", "decimals"], "explicit net request identity");
+    if (!exactKeys(requestBinding, [
+      "identity", "side", "amountAtoms", "quoteDecimals", "candidateSampledAt",
+      "causalAt", "slippageBps", "sha256"
+    ]) || !sameIdentity(identity, requestBinding.identity) ||
+        requestBinding.side !== binding.side || !["ENTRY", "EXIT"].includes(binding.side)) {
+      return null;
+    }
+    const requestInput = {
+      identity,
+      side: binding.side,
+      amountAtoms: requestBinding.amountAtoms,
+      quoteDecimals: requestBinding.quoteDecimals,
+      candidateSampledAt: requestBinding.candidateSampledAt,
+      slippageBps: requestBinding.slippageBps,
+      ...(binding.side === "ENTRY"
+        ? {authorizedAt: requestBinding.causalAt}
+        : {positionOpenedAt: requestBinding.causalAt})
+    };
+    const request = copyRequest(requestInput);
+    const normalizedRequest = explicitNetRequestBinding(request);
+    const requestSha256 = createHash("sha256")
+      .update(canonicalJson(normalizedRequest)).digest("hex");
+    if (requestBinding.sha256 !== requestSha256 ||
+        !sameIdentity(identity, parsed.config.identity)) {
+      return null;
+    }
+
+    const sourceQuote = copyPlainRecord(binding.sourceQuote, [
+      "source", "requestId", "observedAt", "expiresAt", "inAmount", "outAmount",
+      "responseSha256", "responseByteLength"
+    ], "explicit net source quote");
+    if (Object.keys(sourceQuote).length !== 8 || sourceQuote.source !== SOURCE ||
+        !(sourceQuote.requestId === null ||
+          (typeof sourceQuote.requestId === "string" && SAFE_ID.test(sourceQuote.requestId))) ||
+        !validTime(sourceQuote.observedAt) || !validTime(sourceQuote.expiresAt) ||
+        sourceQuote.expiresAt <= sourceQuote.observedAt ||
+        typeof sourceQuote.inAmount !== "string" || !INTEGER.test(sourceQuote.inAmount) ||
+        BigInt(sourceQuote.inAmount) <= 0n ||
+        typeof sourceQuote.outAmount !== "string" || !INTEGER.test(sourceQuote.outAmount) ||
+        BigInt(sourceQuote.outAmount) <= 0n ||
+        typeof sourceQuote.responseSha256 !== "string" || !SHA256.test(sourceQuote.responseSha256) ||
+        !Number.isSafeInteger(sourceQuote.responseByteLength) || sourceQuote.responseByteLength <= 0 ||
+        sourceQuote.inAmount !== request.amountAtoms ||
+        sourceQuote.observedAt <= request.candidateSampledAt ||
+        sourceQuote.observedAt <= (binding.side === "ENTRY" ? request.authorizedAt : request.positionOpenedAt) ||
+        sourceQuote.observedAt - request.candidateSampledAt > MAX_CAUSAL_AGE_MS ||
+        sourceQuote.observedAt -
+          (binding.side === "ENTRY" ? request.authorizedAt : request.positionOpenedAt) > MAX_CAUSAL_AGE_MS) {
+      return null;
+    }
+
+    const conversionReasons = [];
+    const conversion = validConversion(binding.quoteUsdConversion, {
+      mint: identity.quote,
+      decimals: request.quoteDecimals
+    }, sourceQuote.observedAt, conversionReasons, "quote");
+    if (!conversion || conversionReasons.length > 0) return null;
+    const reviewEvidence = validateReviewEvidence(
+      binding.reviewEvidenceRecord, parsed, sourceQuote.observedAt
+    );
+    if (!reviewEvidence) return null;
+
+    const isEntry = binding.side === "ENTRY";
+    const sourceBaseAtoms = BigInt(isEntry ? sourceQuote.outAmount : sourceQuote.inAmount);
+    const sourceQuoteAtoms = BigInt(isEntry ? sourceQuote.inAmount : sourceQuote.outAmount);
+    const baseScale = 10n ** BigInt(identity.decimals);
+    const quoteScale = 10n ** BigInt(request.quoteDecimals);
+    const priceNumerator = sourceQuoteAtoms *
+      BigInt(conversion.microUsdPerWholeToken) * baseScale;
+    const priceDenominator = sourceBaseAtoms * quoteScale;
+    const priceMicros = isEntry
+      ? ceilDiv(priceNumerator, priceDenominator)
+      : priceNumerator / priceDenominator;
+    if (priceMicros <= 0n || priceMicros > BigInt(Number.MAX_SAFE_INTEGER)) return null;
+
+    const assumptions = parsed.config.explicitAssumptions;
+    const equityCap = BigInt(assumptions.equityCents) * 8n / 100n;
+    const availableCash = BigInt(assumptions.availableCashCents);
+    const entryBudget = [PAPER_ENTRY_LIMIT_CENTS, equityCap, availableCash]
+      .reduce((minimum, amount) => amount < minimum ? amount : minimum);
+    let modeledBaseAtoms = isEntry ? sourceBaseAtoms : BigInt(request.amountAtoms);
+    if (isEntry) {
+      let low = 0n;
+      let high = sourceBaseAtoms;
+      while (low < high) {
+        const middle = (low + high + 1n) / 2n;
+        const gross = grossCentsAtPrice(middle, priceMicros, baseScale, "ENTRY");
+        const {total} = modeledCostsAtNetBasis(gross, assumptions);
+        if (gross + total <= entryBudget) low = middle;
+        else high = middle - 1n;
+      }
+      modeledBaseAtoms = low;
+      if (modeledBaseAtoms <= 0n) return null;
+    }
+    const modeledQuoteAtoms = isEntry
+      ? ceilDiv(sourceQuoteAtoms * modeledBaseAtoms, sourceBaseAtoms)
+      : sourceQuoteAtoms;
+    if (modeledQuoteAtoms > sourceQuoteAtoms) return null;
+    const grossCents = grossCentsAtPrice(
+      modeledBaseAtoms, priceMicros, baseScale, binding.side
+    );
+    const {costs, total} = modeledCostsAtNetBasis(grossCents, assumptions);
+    if (isEntry && grossCents + total > entryBudget) return null;
+    if (!isEntry && total > grossCents) return null;
+    const afterCents = isEntry ? grossCents + total : grossCents - total;
+    const modeledInputAtoms = isEntry ? modeledQuoteAtoms : modeledBaseAtoms;
+    const sizeDisposition = isEntry && modeledBaseAtoms !== sourceBaseAtoms
+      ? "SMALLER_SIZE_MODELED_NOT_A_FRESH_EXECUTABLE_QUOTE" : "QUOTED_AMOUNT";
+    const result = {
+      priceMicros: priceMicros.toString(),
+      quotedNetBasisCents: grossCents.toString(),
+      costsCents: Object.fromEntries(Object.entries(costs)
+        .map(([key, amount]) => [key, amount.toString()])),
+      totalCostsCents: total.toString(),
+      afterCents: afterCents.toString(),
+      effectiveEntryBudgetCents: entryBudget.toString(),
+      modeledBaseAtoms: modeledBaseAtoms.toString(),
+      modeledInputAtoms: modeledInputAtoms.toString(),
+      sourceQuotedBaseAtoms: sourceBaseAtoms.toString(),
+      sourceQuotedInputAtoms: sourceQuote.inAmount,
+      sizeDisposition
+    };
+    if (binding.result !== null &&
+        canonicalJson(result) !== canonicalJson(binding.result)) return null;
+
+    const modeledCosts = {
+      feeCents: result.costsCents.feeCents,
+      spreadCents: result.costsCents.spreadCents,
+      slippageCents: result.costsCents.slippageCents,
+      priceImpactCents: result.costsCents.priceImpactCents,
+      networkCents: result.costsCents.networkCents
+    };
+    const projection = {
+      status: "REVIEW_PROJECTION_ONLY",
+      scenarioCostCoverage: "COMPLETE",
+      actualCostCoverage: "UNKNOWN",
+      scenario: {
+        id: parsed.config.scenarioId,
+        version: parsed.config.scenarioVersion,
+        case: parsed.config.scenario,
+        configurationSha256: parsed.sha256,
+        approvalPurpose: "OFFLINE_SCENARIO_REVIEW_ONLY",
+        approvalEvidence: reviewEvidence,
+        approvalEvidenceProvenance: "CALLER_ASSERTED_NOT_AUTHENTICATED",
+        quoteBasis: QUOTED_NET_BASIS,
+        quoteUsdConversion: {
+          mint: conversion.mint,
+          decimals: conversion.decimals,
+          microUsdPerWholeToken: conversion.microUsdPerWholeToken,
+          observedAt: conversion.observedAt,
+          method: conversion.method,
+          evidenceSha256: conversion.evidenceSha256,
+          provenance: "STRUCTURALLY_VALID_UNAUTHENTICATED"
+        },
+        assumptions
+      },
+      identity,
+      source: SOURCE,
+      sourceProvenance: "INJECTED_TRANSPORT_NOT_AUTHENTICATED",
+      side: binding.side,
+      receiptTime: sourceQuote.observedAt,
+      receiptTimeProvenance: "INJECTED_LOCAL_CLOCK_AFTER_RESPONSE_BODY; NOT_AUTHENTICATED",
+      priceMicros: Number(priceMicros),
+      rawExactQuotePerBase: exactPriceRatio(request, {
+        inAmount: sourceQuote.inAmount,
+        outAmount: sourceQuote.outAmount
+      }),
+      priceRounding: isEntry
+        ? "ceil_exact_USD_per_token_microUSD" : "floor_exact_USD_per_token_microUSD",
+      amountProjection: {
+        basis: "QUOTED_NET_ROUTE_AMOUNT_VALUE_WITH_ADDITIONAL_MODELED_COSTS; NOT_AN_EXECUTABLE_EXACT_SIZE_ROUTE",
+        sourceQuotedInputAtoms: sourceQuote.inAmount,
+        maximumModeledInputAtoms: result.modeledInputAtoms,
+        sourceQuotedBaseAtoms: result.sourceQuotedBaseAtoms,
+        maximumModeledBaseAtoms: result.modeledBaseAtoms,
+        entryAllInLimitCents: isEntry ? PAPER_ENTRY_LIMIT_CENTS.toString() : null,
+        equityLimitCents: isEntry ? equityCap.toString() : null,
+        availableCashCents: isEntry ? availableCash.toString() : null,
+        effectiveEntryBudgetCents: isEntry ? entryBudget.toString() : null,
+        modeledAllInCents: isEntry ? result.afterCents : null,
+        sizeDisposition: result.sizeDisposition
+      },
+      costBasis: QUOTED_NET_BASIS,
+      costsCents: modeledCosts,
+      costDisposition: {
+        feeCents: assumptions.dispositions.fee,
+        spreadCents: assumptions.dispositions.spread,
+        slippageCents: assumptions.dispositions.slippage,
+        priceImpactCents: assumptions.dispositions.priceImpact,
+        networkCents: assumptions.dispositions.network
+      },
+      quoteValue: {
+        quotedNetRouteAmountBasisCents: result.quotedNetBasisCents,
+        direction: isEntry ? "DEBIT_ROUNDED_UP" : "CREDIT_ROUNDED_DOWN",
+        totalAdditionalModeledCostsCents: result.totalCostsCents,
+        afterAdditionalModeledCostsCents: result.afterCents,
+        label: "MODELED_SINGLE_SIDE_QUOTE_VALUE_NOT_PNL"
+      },
+      pnl: {
+        status: "NOT_COMPUTED_SINGLE_SIDE_PROJECTION",
+        beforeExtraScenarioCostsCents: null,
+        afterExtraScenarioCostsCents: null,
+        reason: "A paired entry, exit, identity-bound marks, and scenario configuration are required."
+      },
+      provenance: "MODELED",
+      authorizationEligible: false,
+      executionRealistic: false,
+      integrationEligible: false,
+      integrationBoundary: "Independent evidence verification and unchanged Paper hard/risk gates are required."
+    };
+    return {result, projection};
+  } catch {
+    return null;
+  }
+}
+
+function projectExplicitNetScenario(request, observation, parsed, sourceResponse) {
+  const {config} = parsed;
+  const route = observation.route;
+  const observedAt = route?.observedAt;
+  if (!route ||
+      !sameIdentity(config.identity, request.identity) ||
+      route.inAmount !== request.amountAtoms ||
+      !sourceResponse?.sha256 || !SHA256.test(sourceResponse.sha256)) {
+    return blockedScenarioProjection(["EXPLICIT_NET_QUOTE_BINDING_MISSING_OR_AMBIGUOUS"]);
+  }
+
+  const requestBinding = explicitNetRequestBinding(request);
+  const requestSha256 = createHash("sha256")
+    .update(canonicalJson(requestBinding)).digest("hex");
+
+  const conversionReasons = [];
+  const conversion = validConversion(config.quoteUsdConversion, {
+    mint: request.identity.quote,
+    decimals: request.quoteDecimals
+  }, observedAt, conversionReasons, "quote");
+  if (!conversion || conversionReasons.length > 0) {
+    return blockedScenarioProjection(["EXPLICIT_NET_USD_CONVERSION_INVALID", ...conversionReasons]);
+  }
+
+  const binding = {
+    modelId: EXPLICIT_NET_MODEL.id,
+    modelVersion: EXPLICIT_NET_MODEL.version,
+    status: EXPLICIT_NET_MODEL.status,
+    provenance: EXPLICIT_NET_MODEL.provenance,
+    scenarioConfigSha256: parsed.sha256,
+    scenarioConfiguration: config,
+    reviewEvidenceRecord: parsed.reviewEvidence,
+    candidateIdentity: {...request.identity},
+    side: request.side,
+    request: {...requestBinding, sha256: requestSha256},
+    sourceQuote: {
+      source: SOURCE,
+      requestId: route.requestId ?? null,
+      observedAt,
+      expiresAt: route.expiresAt,
+      inAmount: route.inAmount,
+      outAmount: route.outAmount,
+      responseSha256: sourceResponse.sha256,
+      responseByteLength: sourceResponse.byteLength
+    },
+    quoteBasis: QUOTED_NET_BASIS,
+    quoteUsdConversion: conversion,
+    result: null
+  };
+  const derived = deriveExplicitNetProjection(binding);
+  if (!derived) return blockedScenarioProjection(["EXPLICIT_NET_PROJECTION_REVALIDATION_FAILED"]);
+  binding.result = derived.result;
+  const finalProjection = deriveExplicitNetProjection(binding);
+  if (!finalProjection) return blockedScenarioProjection(["EXPLICIT_NET_PROJECTION_REVALIDATION_FAILED"]);
+  return {
+    ...finalProjection.projection,
+    model: {
+      binding,
+      digest: paperExplicitNetModelDigest(binding),
+      assumptions: [...EXPLICIT_NET_ASSUMPTIONS],
+      resultContract: {...EXPLICIT_NET_RESULT_CONTRACT}
+    }
   };
 }
 
@@ -1545,6 +2071,50 @@ export function verifyPaperQuotedNetProjection(projection, {expectedDigest} = {}
     check(exactKeys(projection.providerFieldsRetainedSeparately, ["feeBps", "feeMint",
       "platformFee", "networkFeesLamports", "priceImpact", "slippageToleranceBps"]),
     "MODEL_PROVIDER_FIELDS_MISMATCH");
+  }
+  return {valid: reasons.length === 0, reasons};
+}
+
+export function verifyPaperExplicitNetProjection(projection, {expectedDigest} = {}) {
+  const reasons = [];
+  const model = projection?.model;
+  const binding = model?.binding;
+  if (!isRecord(model) || !isRecord(binding) ||
+      projection.status !== "REVIEW_PROJECTION_ONLY") {
+    return {valid: false, reasons: ["MODEL_MISSING"]};
+  }
+  const check = (ok, reason) => { if (!ok) reasons.push(reason); };
+  let digestOk = false;
+  try {
+    digestOk = model.digest === paperExplicitNetModelDigest(binding);
+  } catch {
+    digestOk = false;
+  }
+  check(digestOk, "MODEL_DIGEST_MISMATCH");
+  check(expectedDigest === undefined || model.digest === expectedDigest,
+    "MODEL_DIGEST_NOT_THE_PINNED_DIGEST");
+  check(binding.modelId === EXPLICIT_NET_MODEL.id &&
+    binding.modelVersion === EXPLICIT_NET_MODEL.version &&
+    binding.status === EXPLICIT_NET_MODEL.status &&
+    binding.provenance === EXPLICIT_NET_MODEL.provenance,
+  "MODEL_IDENTITY_MISMATCH");
+  check(exactKeys(model, ["binding", "digest", "assumptions", "resultContract"]) &&
+    canonicalJson(model.assumptions) === canonicalJson(EXPLICIT_NET_ASSUMPTIONS) &&
+    canonicalJson(model.resultContract) === canonicalJson(EXPLICIT_NET_RESULT_CONTRACT),
+  "MODEL_ASSUMPTIONS_OR_RESULT_CONTRACT_ALTERED");
+  const expected = isRecord(binding.result) ? deriveExplicitNetProjection(binding) : null;
+  check(expected !== null, "MODEL_BINDING_NOT_RECOMPUTED_FROM_QUOTE");
+  if (expected) {
+    const expectedModel = {
+      binding,
+      digest: paperExplicitNetModelDigest(binding),
+      assumptions: [...EXPLICIT_NET_ASSUMPTIONS],
+      resultContract: {...EXPLICIT_NET_RESULT_CONTRACT}
+    };
+    check(canonicalJson(projection) === canonicalJson({
+      ...expected.projection,
+      model: expectedModel
+    }), "MODEL_EXPOSED_FIELDS_MISMATCH");
   }
   return {valid: reasons.length === 0, reasons};
 }
