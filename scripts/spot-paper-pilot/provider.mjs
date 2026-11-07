@@ -8,7 +8,7 @@ function abortError(signal) {
   return signal?.reason ?? new Error("REQUEST_ABORTED");
 }
 
-async function readBoundedBody(response, counters, maxBytes, signal, readerRef, assertActive) {
+async function readBoundedBody(response, counters, maxBytes, readerRef, assertActive) {
   const reader = response.body?.getReader();
   if (!reader) throw new Error("EMPTY_HTTP_BODY");
   readerRef.reader = reader;
@@ -66,18 +66,25 @@ export function createKrakenProvider({
   const counters = { requests: 0, bytes: 0 };
 
   async function get(path, params, runtime = {}) {
+    const clock = runtime.monotonicNow ?? monotonicNow;
+    const startedMono = clock();
+    const runDeadline = runtime.deadlineAt ?? deadlineAt ?? Infinity;
+    if (!Number.isFinite(startedMono) || startedMono < 0 || startedMono >= runDeadline) {
+      throw new Error("REQUEST_TIMEOUT");
+    }
+    if (runtime.signal?.aborted || signal?.aborted) {
+      throw new Error("REQUEST_ABORTED");
+    }
     if (counters.requests >= maxRequests) throw new Error("REQUEST_BUDGET_EXHAUSTED");
-    counters.requests++;
     const requestStartedAt = now();
     if (!Number.isSafeInteger(requestStartedAt) || requestStartedAt < 0) {
       throw new Error("INVALID_CLOCK");
     }
+    counters.requests++;
     const url = new URL(path, API_ORIGIN);
     for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
-    const clock = runtime.monotonicNow ?? monotonicNow;
-    const startedMono = clock();
     const effectiveDeadline = Math.min(
-      runtime.deadlineAt ?? deadlineAt ?? Infinity,
+      runDeadline,
       startedMono + requestTimeoutMs
     );
     const parentSignals = [signal, runtime.signal].filter(Boolean);
@@ -131,7 +138,7 @@ export function createKrakenProvider({
       if (!response.ok) {
         if (response.body) {
           await readBoundedBody(
-            response, counters, maxBytes, controller.signal, readerRef, assertActive);
+            response, counters, maxBytes, readerRef, assertActive);
         }
         if (response.status === 429) throw new Error("HTTP_429");
         throw new Error(`HTTP_${response.status}`);
@@ -140,7 +147,7 @@ export function createKrakenProvider({
         throw new Error("INVALID_CONTENT_TYPE");
       }
       const rawBytes = await readBoundedBody(
-        response, counters, maxBytes, controller.signal, readerRef, assertActive);
+        response, counters, maxBytes, readerRef, assertActive);
       const receivedAt = now();
       if (!Number.isSafeInteger(receivedAt) || receivedAt < requestStartedAt) {
         throw new Error("CLOCK_MOVED_BACKWARDS");
@@ -193,7 +200,6 @@ export function createKrakenProvider({
       if (abortListener) controller.signal.removeEventListener("abort", abortListener);
       for (const parent of parentSignals) parent.removeEventListener("abort", cancelFromParent);
       if (!completed) cleanupResponse(response);
-      if (timedOut && response) cleanupResponse(response);
     }
   }
 

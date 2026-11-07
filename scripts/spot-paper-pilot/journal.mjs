@@ -34,8 +34,8 @@ function contextFor(options = {}) {
 async function bounded(operation, context, cleanupLateResult) {
   const assertActive = () => {
     if (context.signal?.aborted) throw unknownError(context.signal.reason ?? new Error("aborted"));
-    if (!Number.isFinite(context.deadlineAt - context.monotonicNow()) ||
-        context.monotonicNow() >= context.deadlineAt) {
+    const now = context.monotonicNow();
+    if (!Number.isFinite(now) || now >= context.deadlineAt) {
       throw unknownError(new Error("deadline exceeded"));
     }
   };
@@ -78,24 +78,23 @@ async function bounded(operation, context, cleanupLateResult) {
   }
 }
 
-function cleanupContext(context) {
+function cleanupContext() {
+  const now = performance.now();
   return {
-    monotonicNow: context.monotonicNow,
-    deadlineAt: context.monotonicNow() + CLEANUP_GRACE_MS,
+    monotonicNow: () => performance.now(),
+    deadlineAt: now + CLEANUP_GRACE_MS,
     signal: null
   };
 }
 
-async function closeHandle(handle, context) {
+async function closeHandle(handle) {
   if (!handle) return;
-  try {
-    await bounded(() => handle.close(), cleanupContext(context));
-  } catch {}
+  await bounded(() => handle.close(), cleanupContext());
 }
 
 function openHandle(path, flags, mode, io, context) {
   return bounded(() => io.open(path, flags, mode),
-    context, handle => closeHandle(handle, context));
+    context, handle => closeHandle(handle));
 }
 
 async function syncDirectory(path, io, context) {
@@ -103,7 +102,7 @@ async function syncDirectory(path, io, context) {
   try {
     await bounded(() => handle.sync(), context);
   } finally {
-    await closeHandle(handle, context);
+    await closeHandle(handle);
   }
 }
 
@@ -113,7 +112,7 @@ async function writeSynced(path, bytes, io, context, exclusive = false) {
     await bounded(() => handle.writeFile(bytes), context);
     await bounded(() => handle.sync(), context);
   } finally {
-    await closeHandle(handle, context);
+    await closeHandle(handle);
   }
 }
 
@@ -209,7 +208,7 @@ export async function createRunJournal({
   } catch (error) {
     throw unknownError(error);
   } finally {
-    await closeHandle(lock, context);
+    await closeHandle(lock);
   }
   await syncDirectory(runDirectory, io, context);
   const responseDirectory = join(runDirectory, "responses");
