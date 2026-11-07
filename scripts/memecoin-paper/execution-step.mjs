@@ -118,16 +118,26 @@ export function createPaperExecutionStep({session, store, runId, startedAt, endA
   const policyMatches = facts => facts.runId === modeledPolicy.runId &&
     facts.runStartedAt === modeledPolicy.runStartedAt && facts.runEndAt === modeledPolicy.runEndAt &&
     facts.sourcePolicySha256 === modeledPolicy.sourcePolicySha256 &&
-    facts.modelVersion === modeledPolicy.modelVersion &&
-    facts.scenarioConfigSha256 === modeledPolicy.scenarioConfigSha256 &&
-    facts.usdAssumption === modeledPolicy.usdAssumption;
+    (modeledPolicy.schema === "PAPER_MODELED_POLICY_V2"
+      ? facts.schema === "PAPER_MODELED_QUOTE_V2" &&
+        facts.modelId === modeledPolicy.modelId &&
+        facts.modelVersion === modeledPolicy.modelVersion &&
+        facts.methodologyDigest === modeledPolicy.methodologyDigest
+      : facts.schema === "PAPER_MODELED_QUOTE_V1" &&
+        facts.modelId === "MERIDIAN_PAPER_QUOTED_NET_V1" &&
+        facts.modelVersion === modeledPolicy.modelVersion &&
+        facts.scenarioConfigSha256 === modeledPolicy.scenarioConfigSha256 &&
+        facts.usdAssumption === modeledPolicy.usdAssumption);
   const modeledOk = (quote, position) => {
     if (!modeledAdapter) return quote?.modeled === undefined;
     return quote?.modeled !== undefined && policyMatches(quote.modeled) &&
       modeledAdapter.confirmModeledQuote(quote) === true &&
       (position === undefined || (quote.modeled.baseAtoms === position.modeledTokenAtoms &&
-        quote.modeled.scenarioConfigSha256 === position.modeledScenarioConfigSha256 &&
-        quote.modeled.sourcePolicySha256 === position.modeledSourcePolicySha256));
+        quote.modeled.sourcePolicySha256 === position.modeledSourcePolicySha256 &&
+        (modeledPolicy.schema === "PAPER_MODELED_POLICY_V2"
+          ? quote.modeled.methodologyDigest === position.modeledMethodologyDigest &&
+            quote.modeled.scenarioBinding?.request?.causalAt === position.modeledOpenedAt
+          : quote.modeled.scenarioConfigSha256 === position.modeledScenarioConfigSha256)));
   };
   const bounds = {
     maxEvents: MAX_RECORDS - 2,
@@ -234,6 +244,9 @@ export function createPaperExecutionStep({session, store, runId, startedAt, endA
       if (!auth || input.quote.eventId !== input.eventId ||
           !completeQuote(input.quote, auth.candidate, input.now, auth.candidate.source) ||
           !modeledOk(input.quote) ||
+          (modeledPolicy?.schema === "PAPER_MODELED_POLICY_V2" &&
+            (input.quote.modeled.scenarioBinding?.request?.causalAt !== auth.now ||
+             input.quote.modeled.scenarioBinding?.request?.candidateSampledAt !== auth.candidate.sampledAt)) ||
           input.quote.observedAt <= auth.now || input.quote.observedAt <= auth.candidate.sampledAt) {
         return reject("live authorization and strictly later fully bound quote/costs required");
       }
@@ -290,7 +303,12 @@ export function createPaperExecutionStep({session, store, runId, startedAt, endA
         ...authorizations.get(input.authorizationId).candidate,
         ...(modeledAdapter ? {
           modeledTokenAtoms: result.tokenAtoms,
-          modeledScenarioConfigSha256: input.quote.modeled.scenarioConfigSha256,
+          ...(modeledPolicy.schema === "PAPER_MODELED_POLICY_V2"
+            ? {
+              modeledMethodologyDigest: input.quote.modeled.methodologyDigest,
+              modeledOpenedAt: input.quote.modeled.sourceObservedAt
+            }
+            : {modeledScenarioConfigSha256: input.quote.modeled.scenarioConfigSha256}),
           modeledSourcePolicySha256: input.quote.modeled.sourcePolicySha256
         } : {})
       });

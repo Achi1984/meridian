@@ -73,6 +73,8 @@ function digest(fields) {
 
 const MODELED_SCHEMA = "PAPER_MODELED_QUOTE_V1";
 const MODELED_MODEL_ID = "MERIDIAN_PAPER_QUOTED_NET_V1";
+const EXPLICIT_NET_SCHEMA = "PAPER_MODELED_QUOTE_V2";
+const EXPLICIT_NET_MODEL_ID = "MERIDIAN_PAPER_EXPLICIT_NET_V1";
 const MODELED_KEYS = Object.freeze([
   "schema", "provenance", "actualCostCoverage", "executionRealistic", "runId",
   "runStartedAt", "runEndAt", "sourcePolicySha256", "modelId", "modelVersion",
@@ -83,6 +85,400 @@ const MODELED_KEYS = Object.freeze([
 const COST_KEYS = Object.freeze(["feeCents", "spreadCents", "slippageCents", "priceImpactCents", "networkCents"]);
 const INTEGER_TEXT = /^(0|[1-9]\d{0,39})$/;
 const SHA256_TEXT = /^[a-f0-9]{64}$/;
+const EXPLICIT_NET_COST_KEYS = Object.freeze([
+  "feeCents", "spreadCents", "slippageCents", "priceImpactCents", "networkCents"
+]);
+const EXPLICIT_NET_UNITS = Object.freeze({
+  feeCents: "US_CENTS_PER_SIDE",
+  spreadCents: "US_CENTS_PER_SIDE",
+  slippageBps: "BASIS_POINTS_OF_QUOTED_NET_USD_VALUE",
+  priceImpactCents: "US_CENTS_PER_SIDE",
+  networkCents: "US_CENTS_PER_SIDE",
+  equityCents: "US_CENTS",
+  availableCashCents: "US_CENTS"
+});
+const EXPLICIT_NET_DISPOSITIONS = Object.freeze({
+  fee: ["NO_INCREMENTAL_CHARGE_UNDER_SCENARIO_BASIS", "ADDITIONAL_MODELED_FEE_PENALTY_NOT_OBSERVED"],
+  spread: ["NO_INCREMENTAL_CHARGE_UNDER_SCENARIO_BASIS", "ADDITIONAL_MODELED_SPREAD_PENALTY_NOT_OBSERVED"],
+  slippage: ["NO_INCREMENTAL_CHARGE_UNDER_SCENARIO_BASIS", "ADDITIONAL_MODELED_ADVERSE_ADJUSTMENT_ROUNDED_UP"],
+  priceImpact: ["NO_INCREMENTAL_CHARGE_UNDER_SCENARIO_BASIS", "ADDITIONAL_MODELED_IMPACT_PENALTY_NOT_OBSERVED"],
+  network: ["NO_INCREMENTAL_CHARGE_UNDER_SCENARIO_BASIS", "ADDITIONAL_MODELED_NETWORK_RESERVE_NOT_SETTLED_COST"]
+});
+
+function exactRecord(value, keys) {
+  return value !== null && typeof value === "object" && !Array.isArray(value) &&
+    Object.keys(value).sort().join(",") === [...keys].sort().join(",");
+}
+
+function sha256Canonical(value) {
+  return createHash("sha256").update(canonicalText(value)).digest("hex");
+}
+
+function explicitNetScenarioConfigHash(config) {
+  const assumptions = config.explicitAssumptions;
+  const normalizedAssumptions = {
+    feeCents: assumptions.feeCents,
+    spreadCents: assumptions.spreadCents,
+    priceImpactCents: assumptions.priceImpactCents,
+    networkCents: assumptions.networkCents,
+    equityCents: assumptions.equityCents,
+    availableCashCents: assumptions.availableCashCents,
+    slippageBps: assumptions.slippageBps,
+    units: Object.fromEntries(Object.keys(EXPLICIT_NET_UNITS)
+      .map(key => [key, assumptions.units[key]])),
+    rationales: Object.fromEntries(Object.keys(EXPLICIT_NET_UNITS)
+      .map(key => [key, assumptions.rationales[key]])),
+    zeroCostAssumptions: Object.fromEntries(["fee", "spread", "slippage", "priceImpact", "network"]
+      .filter(component => Object.hasOwn(assumptions.zeroCostAssumptions, component))
+      .map(component => [component, assumptions.zeroCostAssumptions[component]])),
+    dispositions: Object.fromEntries(["fee", "spread", "slippage", "priceImpact", "network"]
+      .map(component => [component, assumptions.dispositions[component]]))
+  };
+  return createHash("sha256").update(JSON.stringify({
+    optIn: config.optIn,
+    scenarioId: config.scenarioId,
+    scenarioVersion: config.scenarioVersion,
+    scenario: config.scenario,
+    identity: {
+      chainId: config.identity.chainId,
+      mint: config.identity.mint,
+      pool: config.identity.pool,
+      quote: config.identity.quote,
+      decimals: config.identity.decimals
+    },
+    quoteBasis: config.quoteBasis,
+    explicitAssumptions: normalizedAssumptions,
+    quoteUsdConversion: {
+      mint: config.quoteUsdConversion.mint,
+      decimals: config.quoteUsdConversion.decimals,
+      microUsdPerWholeToken: config.quoteUsdConversion.microUsdPerWholeToken,
+      observedAt: config.quoteUsdConversion.observedAt,
+      method: config.quoteUsdConversion.method,
+      evidenceSha256: config.quoteUsdConversion.evidenceSha256
+    }
+  })).digest("hex");
+}
+
+function explicitNetMethodology(binding) {
+  const config = binding.scenarioConfiguration;
+  const assumptions = config.explicitAssumptions;
+  return {
+    modelId: EXPLICIT_NET_MODEL_ID,
+    modelVersion: "1",
+    scenarioId: config.scenarioId,
+    scenarioVersion: config.scenarioVersion,
+    scenario: config.scenario,
+    identity: config.identity,
+    quoteBasis: config.quoteBasis,
+    explicitAssumptions: {
+      feeCents: assumptions.feeCents,
+      spreadCents: assumptions.spreadCents,
+      slippageBps: assumptions.slippageBps,
+      priceImpactCents: assumptions.priceImpactCents,
+      networkCents: assumptions.networkCents,
+      units: assumptions.units,
+      rationales: assumptions.rationales,
+      zeroCostAssumptions: assumptions.zeroCostAssumptions,
+      dispositions: assumptions.dispositions
+    }
+  };
+}
+
+function ceilDivide(numerator, denominator) {
+  return (numerator + denominator - 1n) / denominator;
+}
+
+function explicitNetGross(baseAtoms, priceMicros, decimals, side) {
+  const numerator = BigInt(baseAtoms) * BigInt(priceMicros);
+  const denominator = decimalScale(decimals) * 10_000n;
+  return side === "ENTRY" ? ceilDivide(numerator, denominator) : numerator / denominator;
+}
+
+function explicitNetCosts(grossCents, assumptions) {
+  const costs = {
+    feeCents: BigInt(assumptions.feeCents),
+    spreadCents: BigInt(assumptions.spreadCents),
+    slippageCents: ceilDivide(grossCents * BigInt(assumptions.slippageBps), BPS),
+    priceImpactCents: BigInt(assumptions.priceImpactCents),
+    networkCents: BigInt(assumptions.networkCents)
+  };
+  return {costs, total: Object.values(costs).reduce((sum, amount) => sum + amount, 0n)};
+}
+
+function verifyExplicitNetModeledQuote(quote, {runId, side, now, decimals}) {
+  const fail = reason => ({ok: false, reason});
+  try {
+    const facts = quote?.modeled;
+    const keys = [
+      "schema", "provenance", "actualCostCoverage", "executionRealistic", "runId",
+      "runStartedAt", "runEndAt", "sourcePolicySha256", "modelId", "modelVersion",
+      "modelDigest", "methodologyDigest", "scenarioConfigSha256", "side", "baseAtoms",
+      "sourceCapBaseAtoms", "responseSha256", "expiresAt", "sourceObservedAt",
+      "scenarioBinding", "digest"
+    ];
+    if (!exactRecord(facts, keys) ||
+        facts.schema !== EXPLICIT_NET_SCHEMA || facts.provenance !== "MODELED" ||
+        facts.actualCostCoverage !== "UNKNOWN" || facts.executionRealistic !== false ||
+        facts.modelId !== EXPLICIT_NET_MODEL_ID || facts.modelVersion !== "1" ||
+        facts.runId !== runId || facts.side !== side) {
+      return fail("modeled facts do not match this run, model, or side");
+    }
+    for (const key of ["sourcePolicySha256", "modelDigest", "methodologyDigest",
+      "scenarioConfigSha256", "responseSha256", "digest"]) {
+      if (typeof facts[key] !== "string" || !SHA256_TEXT.test(facts[key])) {
+        return fail("modeled digest field is invalid");
+      }
+    }
+    for (const key of ["runStartedAt", "runEndAt", "expiresAt", "sourceObservedAt"]) {
+      if (!Number.isSafeInteger(facts[key]) || facts[key] < 0) return fail("modeled time field is invalid");
+    }
+    if (typeof facts.baseAtoms !== "string" || !INTEGER_TEXT.test(facts.baseAtoms) ||
+        typeof facts.sourceCapBaseAtoms !== "string" || !INTEGER_TEXT.test(facts.sourceCapBaseAtoms)) {
+      return fail("modeled amount field is invalid");
+    }
+
+    const binding = facts.scenarioBinding;
+    if (!exactRecord(binding, [
+      "modelId", "modelVersion", "status", "provenance", "scenarioConfigSha256",
+      "scenarioConfiguration", "reviewEvidenceRecord", "candidateIdentity", "side",
+      "request", "sourceQuote", "quoteUsdConversion", "quoteBasis", "result"
+    ]) || binding.modelId !== EXPLICIT_NET_MODEL_ID || binding.modelVersion !== "1" ||
+        binding.status !== "REVIEW_ONLY" || binding.provenance !== "MODELED" ||
+        binding.side !== side || binding.scenarioConfigSha256 !== facts.scenarioConfigSha256 ||
+        sha256Canonical(binding) !== facts.modelDigest) {
+      return fail("explicit net scenario binding is invalid");
+    }
+    const config = binding.scenarioConfiguration;
+    const configKeys = [
+      "optIn", "scenarioId", "scenarioVersion", "scenario", "identity",
+      "quoteBasis", "explicitAssumptions", "quoteUsdConversion"
+    ];
+    if (!exactRecord(config, configKeys) || config.optIn !== true ||
+        config.scenarioId !== EXPLICIT_NET_MODEL_ID || config.scenarioVersion !== "1" ||
+        config.scenario !== "EXPLICIT_NET_V1" ||
+        config.quoteBasis !== "QUOTED_ROUTE_AMOUNTS_AS_MODELED_NET_SWAP_BASIS" ||
+        binding.quoteBasis !== config.quoteBasis ||
+        explicitNetScenarioConfigHash(config) !== facts.scenarioConfigSha256) {
+      return fail("explicit net scenario configuration is invalid");
+    }
+    const identity = config.identity;
+    const identityKeys = ["chainId", "mint", "pool", "quote", "decimals"];
+    if (!exactRecord(identity, identityKeys) || identity.chainId !== "solana" ||
+        !quoteIdentityValid(quote, identity) || !exactRecord(binding.candidateIdentity, identityKeys) ||
+        canonicalText(binding.candidateIdentity) !== canonicalText(identity) ||
+        !exactRecord(binding.request?.identity, identityKeys) ||
+        canonicalText(binding.request.identity) !== canonicalText(identity) ||
+        !Number.isInteger(identity.decimals) || identity.decimals !== decimals ||
+        quote.mode !== "HYPOTHETICAL" || quote.executable !== true) {
+      return fail("explicit net quote identity is invalid");
+    }
+
+    const assumptions = config.explicitAssumptions;
+    const assumptionKeys = [
+      "feeCents", "spreadCents", "slippageBps", "priceImpactCents", "networkCents",
+      "equityCents", "availableCashCents", "units", "rationales",
+      "zeroCostAssumptions", "dispositions"
+    ];
+    const assumptionStringKeys = [
+      "feeCents", "spreadCents", "slippageBps", "priceImpactCents", "networkCents",
+      "equityCents", "availableCashCents"
+    ];
+    if (!exactRecord(assumptions, assumptionKeys) ||
+        assumptionStringKeys.some(key => typeof assumptions[key] !== "string" ||
+          !INTEGER_TEXT.test(assumptions[key])) ||
+        BigInt(assumptions.equityCents) <= 0n || BigInt(assumptions.slippageBps) > BPS ||
+        !exactRecord(assumptions.units, Object.keys(EXPLICIT_NET_UNITS)) ||
+        !exactRecord(assumptions.rationales, Object.keys(EXPLICIT_NET_UNITS)) ||
+        !exactRecord(assumptions.dispositions, ["fee", "spread", "slippage", "priceImpact", "network"]) ||
+        Object.entries(EXPLICIT_NET_UNITS).some(([key, unit]) => assumptions.units[key] !== unit) ||
+        Object.values(assumptions.rationales).some(value =>
+          typeof value !== "string" || value.trim().length < 8 || value.length > 256)) {
+      return fail("explicit net assumptions, units, or rationales are invalid");
+    }
+    const components = ["fee", "spread", "slippage", "priceImpact", "network"];
+    const costValue = component => component === "slippage" ? assumptions.slippageBps :
+      component === "priceImpact" ? assumptions.priceImpactCents :
+        component === "network" ? assumptions.networkCents : assumptions[`${component}Cents`];
+    const zeroComponents = components.filter(component => costValue(component) === "0");
+    if (!exactRecord(assumptions.zeroCostAssumptions, zeroComponents) ||
+        components.some(component => {
+          const disposition = costValue(component) === "0"
+            ? EXPLICIT_NET_DISPOSITIONS[component][0]
+            : EXPLICIT_NET_DISPOSITIONS[component][1];
+          return assumptions.dispositions[component] !== disposition ||
+            (costValue(component) === "0" &&
+              (typeof assumptions.zeroCostAssumptions[component] !== "string" ||
+                assumptions.zeroCostAssumptions[component].trim().length < 8 ||
+                assumptions.zeroCostAssumptions[component].length > 256));
+        })) {
+      return fail("explicit net cost dispositions are invalid");
+    }
+    const method = explicitNetMethodology(binding);
+    if (sha256Canonical(method) !== facts.methodologyDigest) {
+      return fail("explicit net methodology digest does not match");
+    }
+
+    const request = binding.request;
+    const requestKeys = [
+      "identity", "side", "amountAtoms", "quoteDecimals", "candidateSampledAt",
+      "causalAt", "slippageBps", "sha256"
+    ];
+    if (!exactRecord(request, requestKeys) || request.side !== side ||
+        typeof request.amountAtoms !== "string" || !INTEGER_TEXT.test(request.amountAtoms) ||
+        BigInt(request.amountAtoms) <= 0n ||
+        !Number.isInteger(request.quoteDecimals) || request.quoteDecimals < 0 ||
+        request.quoteDecimals > 18 || !Number.isSafeInteger(request.candidateSampledAt) ||
+        !Number.isSafeInteger(request.causalAt) || !Number.isInteger(request.slippageBps) ||
+        request.slippageBps < 0 || request.slippageBps > 10_000) {
+      return fail("explicit net request binding is invalid");
+    }
+    const requestWithoutDigest = {
+      identity: request.identity, side: request.side, amountAtoms: request.amountAtoms,
+      quoteDecimals: request.quoteDecimals, candidateSampledAt: request.candidateSampledAt,
+      causalAt: request.causalAt, slippageBps: request.slippageBps
+    };
+    if (sha256Canonical(requestWithoutDigest) !== request.sha256) {
+      return fail("explicit net request digest does not match");
+    }
+
+    const sourceQuote = binding.sourceQuote;
+    const sourceQuoteKeys = [
+      "source", "requestId", "observedAt", "expiresAt", "inAmount", "outAmount",
+      "responseSha256", "responseByteLength"
+    ];
+    const conversion = binding.quoteUsdConversion;
+    const conversionKeys = [
+      "mint", "decimals", "microUsdPerWholeToken", "observedAt", "method", "evidenceSha256"
+    ];
+    if (!exactRecord(sourceQuote, sourceQuoteKeys) ||
+        sourceQuote.source !== "Jupiter Swap API V2 /order" ||
+        !(sourceQuote.requestId === null ||
+          (typeof sourceQuote.requestId === "string" && SAFE_ID.test(sourceQuote.requestId))) ||
+        !Number.isSafeInteger(sourceQuote.observedAt) ||
+        !Number.isSafeInteger(sourceQuote.expiresAt) ||
+        sourceQuote.expiresAt <= sourceQuote.observedAt ||
+        sourceQuote.inAmount !== request.amountAtoms ||
+        typeof sourceQuote.outAmount !== "string" || !INTEGER_TEXT.test(sourceQuote.outAmount) ||
+        BigInt(sourceQuote.outAmount) <= 0n ||
+        !Number.isSafeInteger(sourceQuote.responseByteLength) || sourceQuote.responseByteLength <= 0 ||
+        sourceQuote.responseSha256 !== facts.responseSha256 ||
+        !exactRecord(conversion, conversionKeys) ||
+        canonicalText(conversion) !== canonicalText(config.quoteUsdConversion) ||
+        conversion.mint !== identity.quote || conversion.decimals !== request.quoteDecimals ||
+        typeof conversion.microUsdPerWholeToken !== "string" ||
+        !INTEGER_TEXT.test(conversion.microUsdPerWholeToken) ||
+        BigInt(conversion.microUsdPerWholeToken) <= 0n ||
+        conversion.method !== "MEASURED_SOURCE_RECEIPT" ||
+        typeof conversion.evidenceSha256 !== "string" || !SHA256_TEXT.test(conversion.evidenceSha256) ||
+        !Number.isSafeInteger(conversion.observedAt) ||
+        conversion.observedAt > sourceQuote.observedAt ||
+        sourceQuote.observedAt - conversion.observedAt > MAX_QUOTE_AGE_MS ||
+        sourceQuote.observedAt <= request.candidateSampledAt ||
+        sourceQuote.observedAt <= request.causalAt ||
+        sourceQuote.observedAt - request.candidateSampledAt > MAX_QUOTE_AGE_MS ||
+        sourceQuote.observedAt - request.causalAt > MAX_QUOTE_AGE_MS ||
+        sourceQuote.observedAt !== facts.sourceObservedAt ||
+        sourceQuote.expiresAt !== facts.expiresAt) {
+      return fail("explicit net source quote or causal FX receipt is invalid");
+    }
+    const reviewEvidence = binding.reviewEvidenceRecord;
+    if (!exactRecord(reviewEvidence, [
+      "evidenceId", "evidenceSha256", "scenarioConfigSha256", "identity",
+      "reviewerRef", "purpose", "decision", "recordedAt"
+    ]) || typeof reviewEvidence.evidenceId !== "string" || !SAFE_ID.test(reviewEvidence.evidenceId) ||
+        typeof reviewEvidence.evidenceSha256 !== "string" || !SHA256_TEXT.test(reviewEvidence.evidenceSha256) ||
+        reviewEvidence.scenarioConfigSha256 !== facts.scenarioConfigSha256 ||
+        !exactRecord(reviewEvidence.identity, ["chainId", "mint", "pool", "quote", "decimals"]) ||
+        canonicalText(reviewEvidence.identity) !== canonicalText(identity) ||
+        typeof reviewEvidence.reviewerRef !== "string" || !SAFE_ID.test(reviewEvidence.reviewerRef) ||
+        reviewEvidence.purpose !== "OFFLINE_SCENARIO_REVIEW_ONLY" ||
+        reviewEvidence.decision !== "APPROVE_SCENARIO_REVIEW_ONLY" ||
+        !Number.isSafeInteger(reviewEvidence.recordedAt) ||
+        reviewEvidence.recordedAt > sourceQuote.observedAt) {
+      return fail("explicit net review evidence binding is invalid");
+    }
+    if (facts.runStartedAt > facts.runEndAt ||
+        sourceQuote.observedAt < facts.runStartedAt ||
+        sourceQuote.observedAt > facts.runEndAt ||
+        !Number.isSafeInteger(now) || now < sourceQuote.observedAt ||
+        now > facts.runEndAt || now > sourceQuote.expiresAt ||
+        quote.observedAt !== sourceQuote.observedAt) {
+      return fail("modeled quote is outside its run window or expired");
+    }
+
+    const entry = side === "ENTRY";
+    const sourceBaseAtoms = BigInt(entry ? sourceQuote.outAmount : sourceQuote.inAmount);
+    const sourceQuoteAtoms = BigInt(entry ? sourceQuote.inAmount : sourceQuote.outAmount);
+    const priceNumerator = sourceQuoteAtoms * BigInt(conversion.microUsdPerWholeToken) *
+      decimalScale(identity.decimals);
+    const priceDenominator = sourceBaseAtoms * 10n ** BigInt(request.quoteDecimals);
+    const expectedPrice = entry
+      ? ceilDivide(priceNumerator, priceDenominator) : priceNumerator / priceDenominator;
+    if (expectedPrice <= 0n || expectedPrice > BigInt(Number.MAX_SAFE_INTEGER) ||
+        BigInt(quote.priceMicros) !== expectedPrice ||
+        facts.baseAtoms !== (binding.result?.modeledBaseAtoms ?? "") ||
+        facts.sourceCapBaseAtoms !== sourceBaseAtoms.toString() ||
+        BigInt(facts.baseAtoms) <= 0n || BigInt(facts.baseAtoms) > sourceBaseAtoms) {
+      return fail("explicit net price or modeled quantity does not recompute");
+    }
+    const budget = [
+      BigInt(PAPER_LEDGER_POLICY.maxEntryCents),
+      BigInt(assumptions.equityCents) * 8n / 100n,
+      BigInt(assumptions.availableCashCents)
+    ].reduce((minimum, amount) => amount < minimum ? amount : minimum);
+    let expectedBase = entry ? sourceBaseAtoms : BigInt(request.amountAtoms);
+    if (entry) {
+      let low = 0n;
+      let high = sourceBaseAtoms;
+      while (low < high) {
+        const middle = (low + high + 1n) / 2n;
+        const gross = explicitNetGross(middle, expectedPrice, identity.decimals, "ENTRY");
+        const {total} = explicitNetCosts(gross, assumptions);
+        if (gross + total <= budget) low = middle;
+        else high = middle - 1n;
+      }
+      expectedBase = low;
+    }
+    if (expectedBase <= 0n || expectedBase !== BigInt(facts.baseAtoms) ||
+        (!entry && expectedBase !== sourceBaseAtoms)) {
+      return fail("explicit net modeled quantity does not match its projection budget or source cap");
+    }
+    const expectedQuoteAtoms = entry
+      ? ceilDivide(sourceQuoteAtoms * expectedBase, sourceBaseAtoms) : sourceQuoteAtoms;
+    const gross = explicitNetGross(expectedBase, expectedPrice, identity.decimals, side);
+    const {costs, total} = explicitNetCosts(gross, assumptions);
+    if ((!entry && total > gross) || (entry && gross + total > budget) ||
+        quote.costs === undefined ||
+        EXPLICIT_NET_COST_KEYS.some(key => BigInt(quote.costs[key]) !== costs[key])) {
+      return fail("explicit net costs do not recompute from the carried assumptions");
+    }
+    const result = {
+      priceMicros: expectedPrice.toString(),
+      quotedNetBasisCents: gross.toString(),
+      costsCents: Object.fromEntries(Object.entries(costs)
+        .map(([key, amount]) => [key, amount.toString()])),
+      totalCostsCents: total.toString(),
+      afterCents: (entry ? gross + total : gross - total).toString(),
+      effectiveEntryBudgetCents: budget.toString(),
+      modeledBaseAtoms: expectedBase.toString(),
+      modeledInputAtoms: (entry ? expectedQuoteAtoms : expectedBase).toString(),
+      sourceQuotedBaseAtoms: sourceBaseAtoms.toString(),
+      sourceQuotedInputAtoms: sourceQuote.inAmount,
+      sizeDisposition: entry && expectedBase !== sourceBaseAtoms
+        ? "SMALLER_SIZE_MODELED_NOT_A_FRESH_EXECUTABLE_QUOTE" : "QUOTED_AMOUNT"
+    };
+    if (canonicalText(binding.result) !== canonicalText(result) ||
+        canonicalText(quote.costs) !== canonicalText(result.costsCents) ||
+        !Number.isSafeInteger(quote.priceMicros) || quote.decimals !== identity.decimals ||
+        !quoteIdentityValid(quote, identity) ||
+        facts.digest !== paperModeledQuoteDigest(facts, quote, decimals)) {
+      return fail("explicit net modeled quote digest or result does not match");
+    }
+    return {ok: true, baseAtoms: expectedBase, capAtoms: sourceBaseAtoms, digest: facts.digest};
+  } catch {
+    return fail("explicit net modeled facts could not be verified");
+  }
+}
 
 function canonicalText(value, depth = 0) {
   if (depth > 8) throw new RangeError("canonical value is too deep");
@@ -115,6 +511,9 @@ export function paperModeledQuoteDigest(facts, quote, decimals) {
 // Pure arithmetic and binding check; issuer provenance is confirmed separately by the step.
 export function verifyPaperModeledQuote(quote, {runId, side, now, decimals}) {
   const fail = reason => ({ok: false, reason});
+  if (quote?.modeled?.schema === EXPLICIT_NET_SCHEMA) {
+    return verifyExplicitNetModeledQuote(quote, {runId, side, now, decimals});
+  }
   try {
     const facts = quote?.modeled;
     if (!facts || typeof facts !== "object" || Array.isArray(facts) ||

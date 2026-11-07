@@ -9,7 +9,8 @@ import {PaperCheckpointSession} from "../scripts/memecoin-paper/checkpoint-sessi
 import {normalizeExactCosts} from "../scripts/memecoin-paper-execution-evidence/normalize.mjs";
 import {
   createFixtureMarketQuoteAdapter, createMarketQuoteAdapter, isFixtureMarketQuoteAdapter,
-  paperExplicitNetModelDigest, paperQuotedNetModelDigest, reviewScenarioConfigSha256,
+  paperExplicitNetMethodologyDigest, paperExplicitNetModelDigest, paperQuotedNetModelDigest,
+  reviewScenarioConfigSha256,
   verifyPaperExplicitNetProjection, verifyPaperQuotedNetProjection
 } from "../scripts/memecoin-paper/market-quote-adapter.mjs";
 import {verifyPaperModeledQuote} from "../scripts/memecoin-paper/ledger.mjs";
@@ -1397,12 +1398,12 @@ function explicitEntryBody() {
   }).body;
 }
 
-async function explicitEntryProjection(equityCents, availableCashCents) {
+async function explicitEntryProjection(equityCents, availableCashCents, fxRate = "800000") {
   const req = explicitEntryRequest();
   const config = explicitNetScenario(req);
   config.explicitAssumptions.equityCents = equityCents;
   config.explicitAssumptions.availableCashCents = availableCashCents;
-  config.quoteUsdConversion.microUsdPerWholeToken = "800000";
+  config.quoteUsdConversion.microUsdPerWholeToken = fxRate;
   refreshExplicitNetReviewEvidence(config);
   return (await adapterFor(explicitEntryBody()).adapter.getPaperQuote(
     req, {reviewScenario: config})).scenarioProjection;
@@ -1442,6 +1443,9 @@ test("EXPLICIT_NET_V1 binds explicit modeled assumptions, causal FX, quote bytes
   });
   const repeated = await explicitEntryProjection("50000", "3500");
   assert.equal(repeated.model.digest, projection.model.digest);
+  const refreshed = await explicitEntryProjection("60000", "4000", "850000");
+  assert.equal(paperExplicitNetMethodologyDigest(refreshed), paperExplicitNetMethodologyDigest(projection));
+  assert.notEqual(refreshed.model.digest, projection.model.digest);
 });
 
 test("EXPLICIT_NET_V1 requires every numeric input, unit, rationale, disposition, and conversion field", async () => {
@@ -1505,7 +1509,11 @@ test("EXPLICIT_NET_V1 rejects stale/future FX and revalidation detects quote, FX
   for (const mutate of [
     p => { p.model.binding.sourceQuote.responseSha256 = "a".repeat(64); },
     p => { p.model.binding.quoteUsdConversion.microUsdPerWholeToken = "999999"; },
-    p => { p.model.binding.scenarioConfiguration.explicitAssumptions.feeCents = "12"; }
+    p => { p.model.binding.scenarioConfiguration.explicitAssumptions.feeCents = "12"; },
+    p => { p.model.binding.scenarioConfiguration.explicitAssumptions.units.feeCents = "USD"; },
+    p => { p.model.binding.scenarioConfiguration.explicitAssumptions.dispositions.network = "OBSERVED"; },
+    p => { p.model.binding.sourceQuote.outAmount = "1"; },
+    p => { p.model.binding.request.identity.pool = SYNTHETIC_QUOTE; }
   ]) {
     const changed = structuredClone(projection);
     mutate(changed);
@@ -1561,25 +1569,75 @@ test("EXPLICIT_NET_V1 sells all seven tokens and rounds the USD credit and addit
   assert.equal(projection.costsCents.slippageCents, "8");
   assert.equal(projection.quoteValue.totalAdditionalModeledCostsCents, "86");
   assert.equal(projection.quoteValue.afterAdditionalModeledCostsCents, "213");
+
+  const tinyConfig = explicitNetScenario(exitRequest);
+  tinyConfig.quoteUsdConversion.microUsdPerWholeToken = "900000";
+  refreshExplicitNetReviewEvidence(tinyConfig);
+  const tinyBody = syntheticOrderResponse({
+    inputMint: SYNTHETIC_MINT, outputMint: SYNTHETIC_QUOTE,
+    inAmount: "7", outAmount: "1", otherAmountThreshold: "1"
+  }).body;
+  const tiny = (await adapterFor(tinyBody).adapter.getPaperQuote(
+    exitRequest, {reviewScenario: tinyConfig})).scenarioProjection;
+  assert.equal(tiny.status, "BLOCKED");
 });
 
-test("EXPLICIT_NET_V1 cannot issue a modeled ledger quote", async () => {
+test("EXPLICIT_NET_V1 fixture issuance creates a distinct V2 facts variant", async () => {
   const adapter = createFixtureMarketQuoteAdapter({
     enabled: true,
     clock: () => NOW,
     transport: async () => response(entryResponse().body)
   });
+  const config = explicitNetScenario();
   const original = await adapter.getPaperQuote(request(), {
-    reviewScenario: explicitNetScenario()
+    reviewScenario: config
   });
+  const policy = {
+    schema: "PAPER_MODELED_POLICY_V2",
+    runId: RUN,
+    runStartedAt: MODELED_POLICY.runStartedAt,
+    runEndAt: MODELED_POLICY.runEndAt,
+    sourcePolicySha256: MODELED_POLICY.sourcePolicySha256,
+    modelId: "MERIDIAN_PAPER_EXPLICIT_NET_V1",
+    modelVersion: "1",
+    methodologyDigest: paperExplicitNetMethodologyDigest(original.scenarioProjection)
+  };
   const issued = adapter.issueModeledQuote(original, {
     identity: IDENTITY,
     side: "ENTRY",
     amountAtoms: "100000000",
-    policy: MODELED_POLICY
+    policy
   });
-  assert.deepEqual(issued, {ok: false, reason: "MODEL_PROJECTION_INVALID"});
-  assert.equal(adapter.confirmModeledQuote(issued.quote), false);
+  assert.equal(issued.ok, true);
+  assert.equal(issued.quote.modeled.schema, "PAPER_MODELED_QUOTE_V2");
+  assert.equal(issued.quote.modeled.methodologyDigest, policy.methodologyDigest);
+  assert.equal(issued.quote.modeled.scenarioConfigSha256,
+    original.scenarioProjection.model.binding.scenarioConfigSha256);
+  assert.equal(adapter.confirmModeledQuote(issued.quote), true);
+  assert.equal(verifyPaperModeledQuote(issued.quote, {
+    runId: RUN, side: "ENTRY", now: NOW, decimals: IDENTITY.decimals
+  }).ok, true);
+  const copied = structuredClone(original);
+  assert.deepEqual(adapter.issueModeledQuote(copied, {
+    identity: IDENTITY, side: "ENTRY", amountAtoms: "100000000", policy
+  }), {ok: false, reason: "RESULT_NOT_ISSUED_BY_THIS_ADAPTER"});
+  const alteredQuote = {...issued.quote, modeled: {...issued.quote.modeled, methodologyDigest: "f".repeat(64)}};
+  assert.equal(adapter.confirmModeledQuote(alteredQuote), false);
+  assert.equal(verifyPaperModeledQuote(alteredQuote, {
+    runId: RUN, side: "ENTRY", now: NOW, decimals: IDENTITY.decimals
+  }).ok, false);
+  assert.equal(adapter.issueModeledQuote(original, {
+    identity: IDENTITY, side: "ENTRY", amountAtoms: "100000000", policy: MODELED_POLICY
+  }).ok, false);
+  const production = createMarketQuoteAdapter({
+    enabled: true, clock: () => NOW,
+    transport: async () => response(entryResponse().body)
+  });
+  const productionResult = await production.getPaperQuote(request(), {reviewScenario: config});
+  assert.equal(productionResult.scenarioProjection.status, "REVIEW_PROJECTION_ONLY");
+  assert.deepEqual(production.issueModeledQuote(productionResult, {
+    identity: IDENTITY, side: "ENTRY", amountAtoms: "100000000", policy
+  }), {ok: false, reason: "ADAPTER_HAS_NO_FIXTURE_AUTHORITY"});
 });
 
 const MODELED_POLICY = Object.freeze({

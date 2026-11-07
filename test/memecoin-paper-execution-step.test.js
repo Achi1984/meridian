@@ -11,7 +11,8 @@ import {
 } from "../scripts/memecoin-paper/checkpoint-store.mjs";
 import {createPaperExecutionStep} from "../scripts/memecoin-paper/execution-step.mjs";
 import {
-  createFixtureMarketQuoteAdapter, reviewScenarioConfigSha256
+  createFixtureMarketQuoteAdapter, paperExplicitNetMethodologyDigest,
+  reviewScenarioConfigSha256
 } from "../scripts/memecoin-paper/market-quote-adapter.mjs";
 import {syntheticOrderResponse} from "./fixtures/memecoin-paper-route-quotes/jupiter-v2-order.mjs";
 import {START, END, RUN, candidate, authorization, quote, entry} from "./fixtures/memecoin-paper-execution-step/scenario.mjs";
@@ -776,6 +777,126 @@ function modeledKit() {
   return {token, adapter, policy, issue, clock};
 }
 
+function explicitNetScenario(identity, {equityCents, availableCashCents, fxRate, fxObservedAt, recordedAt}) {
+  const dispositions = {
+    fee: "ADDITIONAL_MODELED_FEE_PENALTY_NOT_OBSERVED",
+    spread: "ADDITIONAL_MODELED_SPREAD_PENALTY_NOT_OBSERVED",
+    slippage: "ADDITIONAL_MODELED_ADVERSE_ADJUSTMENT_ROUNDED_UP",
+    priceImpact: "ADDITIONAL_MODELED_IMPACT_PENALTY_NOT_OBSERVED",
+    network: "ADDITIONAL_MODELED_NETWORK_RESERVE_NOT_SETTLED_COST"
+  };
+  const config = {
+    optIn: true,
+    scenarioId: "MERIDIAN_PAPER_EXPLICIT_NET_V1",
+    scenarioVersion: "1",
+    scenario: "EXPLICIT_NET_V1",
+    identity: {...identity},
+    quoteBasis: "QUOTED_ROUTE_AMOUNTS_AS_MODELED_NET_SWAP_BASIS",
+    explicitAssumptions: {
+      feeCents: "11",
+      spreadCents: "13",
+      slippageBps: "250",
+      priceImpactCents: "17",
+      networkCents: "37",
+      equityCents,
+      availableCashCents,
+      units: {
+        feeCents: "US_CENTS_PER_SIDE",
+        spreadCents: "US_CENTS_PER_SIDE",
+        slippageBps: "BASIS_POINTS_OF_QUOTED_NET_USD_VALUE",
+        priceImpactCents: "US_CENTS_PER_SIDE",
+        networkCents: "US_CENTS_PER_SIDE",
+        equityCents: "US_CENTS",
+        availableCashCents: "US_CENTS"
+      },
+      rationales: Object.fromEntries([
+        "feeCents", "spreadCents", "slippageBps", "priceImpactCents",
+        "networkCents", "equityCents", "availableCashCents"
+      ].map(key => [key, `Synthetic execution-test assumption for ${key}.`])),
+      zeroCostAssumptions: {},
+      dispositions
+    },
+    quoteUsdConversion: {
+      mint: identity.quote,
+      decimals: 6,
+      microUsdPerWholeToken: fxRate,
+      observedAt: fxObservedAt,
+      method: "MEASURED_SOURCE_RECEIPT",
+      evidenceSha256: "c".repeat(64)
+    }
+  };
+  config.reviewEvidence = {
+    evidenceId: "explicit-step-review",
+    evidenceSha256: "e".repeat(64),
+    scenarioConfigSha256: reviewScenarioConfigSha256(config),
+    identity: {...identity},
+    reviewerRef: "synthetic-methodology-review",
+    purpose: "OFFLINE_SCENARIO_REVIEW_ONLY",
+    decision: "APPROVE_SCENARIO_REVIEW_ONLY",
+    recordedAt
+  };
+  return config;
+}
+
+function explicitNetModeledKit() {
+  const token = candidate();
+  const identity = {
+    chainId: token.chainId, mint: token.mint, pool: token.pool, quote: token.quote, decimals: 6
+  };
+  const clock = {t: START + 2000};
+  const baseScenario = explicitNetScenario(identity, {
+    equityCents: "50000", availableCashCents: "3500", fxRate: "800000",
+    fxObservedAt: START + 1500, recordedAt: START + 1250
+  });
+  const policy = {
+    schema: "PAPER_MODELED_POLICY_V2",
+    runId: RUN,
+    runStartedAt: START,
+    runEndAt: END,
+    sourcePolicySha256: "b".repeat(64),
+    modelId: "MERIDIAN_PAPER_EXPLICIT_NET_V1",
+    modelVersion: "1",
+    methodologyDigest: paperExplicitNetMethodologyDigest(baseScenario)
+  };
+  let body = syntheticOrderResponse({
+    inputMint: token.quote, outputMint: token.mint
+  }).body;
+  const adapter = createFixtureMarketQuoteAdapter({
+    clock: () => clock.t,
+    transport: async () => new Response(JSON.stringify(body), {
+      status: 200, headers: {"content-type": "application/json"}
+    })
+  });
+  let modeledOpenedAt = null;
+  const issue = async (side, amountAtoms, at, {
+    equityCents = "90000", availableCashCents = "95000", fxRate = "900000"
+  } = {}) => {
+    clock.t = at;
+    body = side === "ENTRY"
+      ? syntheticOrderResponse({inputMint: token.quote, outputMint: token.mint}).body
+      : syntheticOrderResponse({
+        inputMint: token.mint, outputMint: token.quote, inAmount: amountAtoms,
+        outAmount: (BigInt(amountAtoms) * 100_000_000n / 17_057_460n).toString(),
+        otherAmountThreshold: "1"
+      }).body;
+    const config = explicitNetScenario(identity, {
+      equityCents, availableCashCents, fxRate,
+      fxObservedAt: at - 500, recordedAt: at - 750
+    });
+    const request = {
+      identity, side, amountAtoms, quoteDecimals: 6,
+      candidateSampledAt: side === "ENTRY" ? START : at - 2000,
+      slippageBps: 50,
+      ...(side === "ENTRY" ? {authorizedAt: at - 1000} : {positionOpenedAt: modeledOpenedAt})
+    };
+    const result = await adapter.getPaperQuote(request, {reviewScenario: config});
+    const issued = adapter.issueModeledQuote(result, {identity, side, amountAtoms, policy});
+    if (issued.ok && side === "ENTRY") modeledOpenedAt = issued.quote.modeled.sourceObservedAt;
+    return {issued, result};
+  };
+  return {token, identity, adapter, policy, issue, clock};
+}
+
 async function modeledSetup(t, kit) {
   const context = await setup(t);
   const step = createPaperExecutionStep({
@@ -831,6 +952,114 @@ test("modeled entry, exit and restart: exact quantity, bound policy, replayed pr
   assert.equal(exitAudit.modeledDigest, exitQuote.modeled.digest);
   assert.equal(entryQuote.modeled.executionRealistic, false);
   await reopened.close();
+});
+
+test("explicit-net fixture execution rebinds fresh FX and budgets under stable methodology", async t => {
+  const kit = explicitNetModeledKit();
+  const {step, session} = await modeledSetup(t, kit);
+  const auth = await step.authorizeEntry(authorization());
+  const entryIssue = await kit.issue("ENTRY", "100000000", START + 2000, {
+    equityCents: "50000", availableCashCents: "3500", fxRate: "800000"
+  });
+  assert.equal(entryIssue.issued.ok, true);
+  const entryQuote = {...entryIssue.issued.quote, eventId: "explicit-entry"};
+  const sequence = session.metadata.sequence;
+  for (const [index, mutate] of [
+    facts => { facts.methodologyDigest = "d".repeat(64); },
+    facts => { facts.scenarioBinding.quoteUsdConversion.microUsdPerWholeToken = "1"; },
+    facts => { facts.scenarioBinding.scenarioConfiguration.explicitAssumptions.units.feeCents = "USD"; },
+    facts => { facts.scenarioBinding.scenarioConfiguration.explicitAssumptions.dispositions.network = "OBSERVED"; },
+    facts => { facts.scenarioBinding.sourceQuote.outAmount = "1"; },
+    facts => { facts.scenarioBinding.request.identity.pool = kit.token.mint; },
+    facts => { facts.responseSha256 = "f".repeat(64); },
+    facts => { facts.modelDigest = "a".repeat(64); },
+    facts => { facts.runId = "other-run"; },
+    facts => { facts.sourcePolicySha256 = "c".repeat(64); }
+  ].entries()) {
+    const modeled = structuredClone(entryQuote.modeled);
+    mutate(modeled);
+    const eventId = `explicit-invalid-${index}`;
+    const refused = await step.executeEntry({
+      eventId, authorizationId: auth.authorizationId,
+      quote: {...entryQuote, eventId, modeled}, now: START + 2000, marks: []
+    });
+    assert.equal(refused.status, "REJECT");
+    assert.equal(session.metadata.sequence, sequence);
+    assert.equal(session.snapshot().summary.cashCents, "100000");
+  }
+  const fill = await step.executeEntry({
+    eventId: "explicit-entry", authorizationId: auth.authorizationId,
+    quote: entryQuote, now: START + 2000, marks: []
+  });
+  assert.equal(fill.status, "FILLED_PAPER", JSON.stringify(fill));
+  assert.equal(fill.provenance, "MODELED");
+  assert.equal(entryQuote.modeled.schema, "PAPER_MODELED_QUOTE_V2");
+
+  const exitIssue = await kit.issue("EXIT", fill.tokenAtoms, START + 5000, {
+    equityCents: "90000", availableCashCents: "95000", fxRate: "750000"
+  });
+  assert.equal(exitIssue.issued.ok, true);
+  const exitQuote = {...exitIssue.issued.quote, eventId: "explicit-exit"};
+  assert.notEqual(entryQuote.modeled.scenarioConfigSha256, exitQuote.modeled.scenarioConfigSha256);
+  assert.notEqual(entryQuote.modeled.modelDigest, exitQuote.modeled.modelDigest);
+  assert.equal(entryQuote.modeled.methodologyDigest, exitQuote.modeled.methodologyDigest);
+  const closed = await step.observeExitQuote({
+    eventId: "explicit-exit", quote: exitQuote, now: START + 5000
+  });
+  assert.equal(closed.status, "CLOSED_PAPER");
+  assert.equal(closed.provenance, "MODELED");
+  assert.equal(closed.actualCostCoverage, "UNKNOWN");
+  assert.equal(session.snapshot().summary.openPositions.length, 0);
+});
+
+test("explicit-net entry sized to an earlier budget is not resized to current ledger equity", async t => {
+  const kit = explicitNetModeledKit();
+  const {step, session} = await modeledSetup(t, kit);
+  const firstAuth = await step.authorizeEntry(authorization("authorize-first"));
+  const firstIssue = await kit.issue("ENTRY", "100000000", START + 2000, {
+    equityCents: "100000", availableCashCents: "100000", fxRate: "800000"
+  });
+  assert.equal(firstIssue.issued.ok, true);
+  const firstFill = await step.executeEntry({
+    eventId: "budget-first-entry", authorizationId: firstAuth.authorizationId,
+    quote: {...firstIssue.issued.quote, eventId: "budget-first-entry"},
+    now: START + 2000, marks: []
+  });
+  assert.equal(firstFill.status, "FILLED_PAPER", JSON.stringify(firstFill));
+  assert.equal(firstFill.allInCents, firstIssue.issued.quote.modeled.scenarioBinding.result.afterCents);
+
+  const firstExit = await kit.issue("EXIT", firstFill.tokenAtoms, START + 5000, {
+    equityCents: "100000", availableCashCents: "100000", fxRate: "750000"
+  });
+  assert.equal(firstExit.issued.ok, true);
+  const closed = await step.observeExitQuote({
+    eventId: "budget-first-exit",
+    quote: {...firstExit.issued.quote, eventId: "budget-first-exit"},
+    now: START + 5000
+  });
+  assert.equal(closed.status, "CLOSED_PAPER");
+  const cashAfterExit = session.snapshot().summary.cashCents;
+  assert.ok(BigInt(cashAfterExit) < 100_000n);
+  assert.ok(100_000n - BigInt(cashAfterExit) < 3_000n);
+
+  const secondAuth = await step.authorizeEntry(authorization("authorize-second", {
+    now: START + 6000
+  }));
+  assert.equal(secondAuth.status, "AUTHORIZED");
+  const oversized = await kit.issue("ENTRY", "100000000", START + 7000, {
+    equityCents: "100000", availableCashCents: "100000", fxRate: "800000"
+  });
+  assert.equal(oversized.issued.ok, true);
+  assert.equal(oversized.issued.quote.modeled.baseAtoms, firstIssue.issued.quote.modeled.baseAtoms);
+  const refused = await step.executeEntry({
+    eventId: "budget-second-entry", authorizationId: secondAuth.authorizationId,
+    quote: {...oversized.issued.quote, eventId: "budget-second-entry"},
+    now: START + 7000, marks: []
+  });
+  assert.equal(refused.status, "UNFILLED");
+  assert.match(refused.reason, /current risk budget/);
+  assert.equal(session.snapshot().summary.cashCents, cashAfterExit);
+  assert.equal(session.snapshot().summary.openPositions.length, 0);
 });
 
 test("a valid issuer quote under a changed policy is refused before any state mutation", async t => {

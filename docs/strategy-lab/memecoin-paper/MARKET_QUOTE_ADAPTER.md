@@ -371,8 +371,33 @@ and recomputed output. `verifyPaperExplicitNetProjection(projection,
 {expectedDigest})` revalidates arithmetic and exposed fields; an expected
 digest pins the exact caller-supplied inputs. A valid result is still only
 `REVIEW_PROJECTION_ONLY`, `MODELED`, `actualCostCoverage: "UNKNOWN"`, and
-`executionRealistic: false`. `issueModeledQuote` refuses this explicit variant.
-Nothing is routed to the ledger, admission path, or runtime.
+`executionRealistic: false`.
+
+The fixture-only modeled handoff now accepts this variant through a strict
+`PAPER_MODELED_POLICY_V2` / `PAPER_MODELED_QUOTE_V2` pair. This deliberately
+extends the projection-only boundary recorded for #1244: only the same
+module-owned fixture adapter may issue from its original unchanged result after
+`verifyPaperExplicitNetProjection` succeeds. Copies, altered results, caller
+flags, digests, and supplied review claims do not create issuer authority.
+
+The policy pins run/window, source-policy hash, model/version, identity and a
+stable methodology digest. That digest covers the five numeric cost assumptions,
+their units, rationales and dispositions, quote basis, and fixed identity, but
+not the per-quote FX receipt or supplied equity/cash budgets. Each issued quote
+separately carries the complete scenario binding and digest, including fresh
+causal FX, budgets, request/side/quantity, quote expiry and observed time, exact
+response-byte digest, and modeled output. Ledger verification recomputes the
+conversion, conservative price/gross rounding, all five additional costs and
+dispositions, and the source-capped quantity. The existing ledger remains
+authoritative for its current all-in entry limit, equity, available cash,
+reservations, position count, daily-loss gate, and stops; it refuses an
+oversized projection instead of resizing it.
+
+This handoff is an offline synthetic fixture execution path only. The ordinary
+enabled adapter cannot issue V2 facts; default source behavior remains disabled
+and no-network. This adds no source-policy admission, production authority, or
+live-data execution and does not change `actualCostCoverage: "UNKNOWN"` or
+`executionRealistic: false`.
 
   ## Offline validation
 
@@ -412,8 +437,9 @@ archival coverage, and numeric model calibration.
 
 The step retains an immutable configured policy and refuses (before any state
 mutation) any issuer quote whose run, window, source policy, model, scenario
-config or USD assumption differs, and any exit whose bindings differ from the
-entry position. The fixture runtime rechecks deadline and cancellation after
+config/currency assumption (V1), or stable methodology (V2) differs, and any
+exit whose identity, quantity, or stable methodology differs from the entry
+position. The fixture runtime rechecks deadline and cancellation after
 the issuer clock advances, before audit append or return. Integration tests
 cover issuer → composition → step → checkpoint → ledger entry/mark/exit,
 checkpoint restart replay (PAPER_FILL/PAPER_EXIT provenance and digests) and

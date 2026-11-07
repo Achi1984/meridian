@@ -260,7 +260,14 @@ function normalizeQuoteUsdConversion(value) {
   if (Object.keys(conversion).length !== 6) {
     throw new TypeError("quote USD conversion requires every measured field");
   }
-  return conversion;
+  return {
+    mint: conversion.mint,
+    decimals: conversion.decimals,
+    microUsdPerWholeToken: conversion.microUsdPerWholeToken,
+    observedAt: conversion.observedAt,
+    method: conversion.method,
+    evidenceSha256: conversion.evidenceSha256
+  };
 }
 
 function scenarioConfig(value) {
@@ -390,6 +397,45 @@ function scenarioConfig(value) {
 
 export function reviewScenarioConfigSha256(value) {
   return scenarioConfig(value).sha256;
+}
+
+function explicitNetMethodologyBinding(config) {
+  const assumptions = config.explicitAssumptions;
+  return {
+    modelId: EXPLICIT_NET_MODEL.id,
+    modelVersion: EXPLICIT_NET_MODEL.version,
+    scenarioId: config.scenarioId,
+    scenarioVersion: config.scenarioVersion,
+    scenario: config.scenario,
+    identity: config.identity,
+    quoteBasis: config.quoteBasis,
+    explicitAssumptions: {
+      feeCents: assumptions.feeCents,
+      spreadCents: assumptions.spreadCents,
+      slippageBps: assumptions.slippageBps,
+      priceImpactCents: assumptions.priceImpactCents,
+      networkCents: assumptions.networkCents,
+      units: assumptions.units,
+      rationales: assumptions.rationales,
+      zeroCostAssumptions: assumptions.zeroCostAssumptions,
+      dispositions: assumptions.dispositions
+    }
+  };
+}
+
+export function paperExplicitNetMethodologyDigest(value) {
+  const binding = value?.model?.binding ?? value?.binding ?? value;
+  const parsed = binding?.scenarioConfiguration
+    ? scenarioConfig({
+      ...binding.scenarioConfiguration,
+      reviewEvidence: binding.reviewEvidenceRecord
+    })
+    : scenarioConfig(value);
+  if (parsed.config.scenario !== EXPLICIT_NET_CASE) {
+    throw new TypeError("explicit net methodology is required");
+  }
+  return createHash("sha256")
+    .update(canonicalJson(explicitNetMethodologyBinding(parsed.config))).digest("hex");
 }
 
 function validateReviewEvidence(value, config, observedAt) {
@@ -1509,6 +1555,12 @@ const POLICY_KEYS = Object.freeze([
   "runId", "runStartedAt", "runEndAt", "sourcePolicySha256", "modelVersion",
   "scenarioConfigSha256", "usdAssumption"
 ]);
+const EXPLICIT_NET_POLICY_SCHEMA = "PAPER_MODELED_POLICY_V2";
+const EXPLICIT_NET_FACTS_SCHEMA = "PAPER_MODELED_QUOTE_V2";
+const EXPLICIT_NET_POLICY_KEYS = Object.freeze([
+  "schema", "runId", "runStartedAt", "runEndAt", "sourcePolicySha256", "modelId",
+  "modelVersion", "methodologyDigest"
+]);
 
 function deepFreeze(value) {
   if (value !== null && typeof value === "object" && !Object.isFrozen(value)) {
@@ -1519,6 +1571,21 @@ function deepFreeze(value) {
 }
 
 export function copyModeledPolicy(value) {
+  if (value?.schema === EXPLICIT_NET_POLICY_SCHEMA) {
+    const policy = copyPlainRecord(value, EXPLICIT_NET_POLICY_KEYS, "modeled policy");
+    if (!exactKeys(policy, EXPLICIT_NET_POLICY_KEYS) ||
+        policy.schema !== EXPLICIT_NET_POLICY_SCHEMA ||
+        typeof policy.runId !== "string" || !SAFE_ID.test(policy.runId) ||
+        !validTime(policy.runStartedAt) || !validTime(policy.runEndAt) ||
+        policy.runEndAt <= policy.runStartedAt ||
+        typeof policy.sourcePolicySha256 !== "string" || !SHA256.test(policy.sourcePolicySha256) ||
+        policy.modelId !== EXPLICIT_NET_MODEL.id ||
+        policy.modelVersion !== EXPLICIT_NET_MODEL.version ||
+        typeof policy.methodologyDigest !== "string" || !SHA256.test(policy.methodologyDigest)) {
+      throw new TypeError("explicit net modeled policy is incomplete or outside the supported model");
+    }
+    return Object.freeze({...policy});
+  }
   const policy = copyPlainRecord(value, POLICY_KEYS, "modeled policy");
   if (POLICY_KEYS.some(key => !Object.hasOwn(policy, key)) ||
       typeof policy.runId !== "string" || !SAFE_ID.test(policy.runId) ||
@@ -1750,18 +1817,32 @@ function issueModeled({adapter, issued, handoffs, clock, original, expected, max
     }
     const policy = copyModeledPolicy(expected?.policy);
     const projection = snapshot.projection;
-    const verified = verifyPaperQuotedNetProjection(projection);
+    const isExplicitNet = projection.model?.binding?.modelId === EXPLICIT_NET_MODEL.id;
+    const verified = isExplicitNet
+      ? verifyPaperExplicitNetProjection(projection)
+      : verifyPaperQuotedNetProjection(projection);
     if (!verified.valid) return refuse("MODEL_PROJECTION_INVALID");
     const binding = projection.model.binding;
+    if (isExplicitNet && (snapshot.unsafeReasons.length > 0 ||
+        !snapshot.response.complete ||
+        snapshot.response.sha256 !== binding.sourceQuote.responseSha256 ||
+        snapshot.response.byteLength !== binding.sourceQuote.responseByteLength)) {
+      return refuse("MODEL_PROJECTION_INVALID");
+    }
     const request = snapshot.request;
     const side = expected?.side;
+    const policyMatches = isExplicitNet
+      ? policy.schema === EXPLICIT_NET_POLICY_SCHEMA &&
+        policy.modelId === binding.modelId && policy.modelVersion === binding.modelVersion &&
+        policy.methodologyDigest === paperExplicitNetMethodologyDigest(binding)
+      : policy.schema === undefined && binding.scenarioConfigSha256 === policy.scenarioConfigSha256 &&
+        binding.modelVersion === policy.modelVersion &&
+        binding.currency.assumption === policy.usdAssumption;
     if ((side !== "ENTRY" && side !== "EXIT") || request.side !== side ||
         typeof expected.amountAtoms !== "string" || request.amountAtoms !== expected.amountAtoms ||
         !sameIdentity(request.identity, expected.identity) ||
         !sameIdentity(projection.identity, expected.identity) ||
-        binding.scenarioConfigSha256 !== policy.scenarioConfigSha256 ||
-        binding.modelVersion !== policy.modelVersion ||
-        binding.currency.assumption !== policy.usdAssumption) {
+        !policyMatches) {
       return refuse("RESULT_DOES_NOT_MATCH_EXPECTED_IDENTITY_SIDE_AMOUNT_OR_POLICY");
     }
     const observedAt = binding.sourceQuote.observedAt;
@@ -1774,7 +1855,29 @@ function issueModeled({adapter, issued, handoffs, clock, original, expected, max
     }
     if (handoffs.size >= maxRequests) return refuse("HANDOFF_BUDGET_EXHAUSTED");
     const costs = projection.costsCents;
-    const facts = {
+    const facts = isExplicitNet ? {
+      schema: EXPLICIT_NET_FACTS_SCHEMA,
+      provenance: "MODELED",
+      actualCostCoverage: "UNKNOWN",
+      executionRealistic: false,
+      runId: policy.runId,
+      runStartedAt: policy.runStartedAt,
+      runEndAt: policy.runEndAt,
+      sourcePolicySha256: policy.sourcePolicySha256,
+      modelId: binding.modelId,
+      modelVersion: binding.modelVersion,
+      modelDigest: projection.model.digest,
+      methodologyDigest: policy.methodologyDigest,
+      scenarioConfigSha256: binding.scenarioConfigSha256,
+      side,
+      baseAtoms: projection.amountProjection.maximumModeledBaseAtoms,
+      sourceCapBaseAtoms: projection.amountProjection.sourceQuotedBaseAtoms,
+      responseSha256: binding.sourceQuote.responseSha256,
+      expiresAt,
+      sourceObservedAt: observedAt,
+      scenarioBinding: binding,
+      digest: ""
+    } : {
       schema: "PAPER_MODELED_QUOTE_V1",
       provenance: "MODELED",
       actualCostCoverage: "UNKNOWN",
