@@ -579,10 +579,13 @@ export async function captureProspectiveOwnerCensus({
         }));
         validateResponseTarget(response);
         const contentLength = response.headers?.get("content-length");
+        const contentEncoding = response.headers?.get("content-encoding") ?? null;
+        const compareDeliveredLength = contentLength != null &&
+          (contentEncoding === null || contentEncoding.trim().toLowerCase() === "identity");
         if (contentLength !== undefined && contentLength !== null &&
             (!/^\d{1,16}$/.test(contentLength) ||
              !Number.isSafeInteger(Number(contentLength)))) fail("INVALID_RESPONSE_HEADERS");
-        if (contentLength != null && Number(contentLength) > bounds.maxResponseBytes - responseBytes) {
+        if (compareDeliveredLength && Number(contentLength) > bounds.maxResponseBytes - responseBytes) {
           fail("RESPONSE_BYTE_LIMIT");
         }
         bodyReadStarted = true;
@@ -590,13 +593,19 @@ export async function captureProspectiveOwnerCensus({
         const streamed = await readBoundedBody(response, bounds.maxResponseBytes - previousBytes,
           deadline, count => { responseBytes = previousBytes + count; });
         const responseEndedAt = wallTime();
-        if (contentLength != null && Number(contentLength) !== streamed.byteCount) {
+        if (compareDeliveredLength && Number(contentLength) !== streamed.byteCount) {
           fail("TRUNCATED_RESPONSE");
         }
         exchanges.push({
           attempt: attempts, rpcMethod: method, requestStartedAt, responseEndedAt,
           request: {...request, body: rawBytes(Buffer.from(request.body, "utf8"))},
-          response: {status: response.status, body: rawBytes(streamed.bytes)}
+          response: {
+            status: response.status, contentEncoding, contentLength: contentLength ?? null,
+            contentLengthComparedToDeliveredBody: compareDeliveredLength,
+            bodyByteBasis: "TRANSPORT_DELIVERED_BYTES",
+            originalWireBytesCaptured: false,
+            body: rawBytes(streamed.bytes)
+          }
         });
         deadline.check();
         if (!Number.isInteger(response.status) || response.status < 200 || response.status >= 300) {

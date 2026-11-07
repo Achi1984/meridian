@@ -4,6 +4,7 @@ import {mkdtemp, readFile, rm, open} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import {gzipSync, gunzipSync, brotliCompressSync, brotliDecompressSync} from "node:zlib";
 import {
   captureProspectiveOwnerCensus,
   PROSPECTIVE_CENSUS_BOUNDS
@@ -267,6 +268,113 @@ test("HTTP errors, truncated bodies and provider pagination markers cannot recon
   }
 });
 
+test("fetch-style decompressed gzip/br responses preserve delivered bytes and encoding headers", async t => {
+  for (const [encoding, compress, decompress] of [
+    ["gzip", gzipSync, gunzipSync],
+    ["br", brotliCompressSync, brotliDecompressSync]
+  ]) {
+    await t.test(encoding, async () => {
+      const compressedLengths = [];
+      const fixture = offline({responseFor: (_, body) => {
+        const compressed = compress(Buffer.from(body));
+        compressedLengths.push(String(compressed.length));
+        assert.notEqual(compressed.length, Buffer.byteLength(body));
+        return new Response(decompress(compressed), {headers: {
+          "content-encoding": encoding, "content-length": String(compressed.length)
+        }});
+      }});
+      const result = await capture(fixture);
+      diagnostic(result);
+      assert.equal(fixture.requests.length, 2);
+      assert.equal(result.capture.consumed.responseBytes,
+        fixture.bodies.reduce((sum, body) => sum + Buffer.byteLength(body), 0));
+      for (const [index, exchange] of result.capture.exchanges.entries()) {
+        assert.equal(exchange.response.contentEncoding, encoding);
+        assert.equal(exchange.response.contentLength, compressedLengths[index]);
+        assert.equal(exchange.response.contentLengthComparedToDeliveredBody, false);
+        assert.equal(exchange.response.bodyByteBasis, "TRANSPORT_DELIVERED_BYTES");
+        assert.equal(exchange.response.originalWireBytesCaptured, false);
+        const delivered = Buffer.from(exchange.response.body.bytes, "base64");
+        assert.equal(delivered.toString(), fixture.bodies[index]);
+        assert.equal(exchange.response.body.byteLength, delivered.length);
+        assert.equal(exchange.response.body.sha256, hash(delivered));
+      }
+    });
+  }
+  const sizing = await capture(offline());
+  const limit = sizing.capture.consumed.responseBytes;
+  const largerWireLength = offline({responseFor: (_, body) => new Response(body, {
+    headers: {"content-encoding": "gzip", "content-length": String(limit + 1)}
+  })});
+  diagnostic(await capture(largerWireLength, {bounds: {maxResponseBytes: limit}}));
+});
+
+test("identity lengths retain equality/preflight checks and encoded bodies retain delivered-byte caps", async () => {
+  for (const encoding of [undefined, "identity", " IDENTITY "]) {
+    const headers = encoding === undefined ? {} : {"content-encoding": encoding};
+    const fixture = offline({responseFor: (_, body) => new Response(body, {
+      headers: {...headers, "content-length": String(Buffer.byteLength(body))}
+    })});
+    const result = await capture(fixture);
+    diagnostic(result);
+    assert.ok(result.capture.exchanges.every(exchange =>
+      exchange.response.contentLengthComparedToDeliveredBody === true));
+    const truncated = offline({responseFor: (_, body) => new Response(body, {
+      headers: {...headers, "content-length": String(Buffer.byteLength(body) + 1)}
+    })});
+    assert.equal((await capture(truncated)).reason, "TRUNCATED_RESPONSE");
+    assert.equal(truncated.requests.length, 1);
+    let read = false;
+    let cancelled = false;
+    const oversized = offline({responseFor: () => ({
+      status: 200,
+      headers: new Headers({...headers, "content-length": "101"}),
+      body: {
+        getReader() { read = true; throw new Error("must reject before reading"); },
+        cancel() { cancelled = true; }
+      }
+    })});
+    assert.equal((await capture(oversized, {bounds: {maxResponseBytes: 100}})).reason,
+      "RESPONSE_BYTE_LIMIT");
+    assert.equal(read, false);
+    assert.equal(cancelled, true);
+  }
+  let cancelled = false;
+  const oversizedDecoded = offline({responseFor: (_, body) => {
+    const delivered = Buffer.from(body + " ".repeat(10_000));
+    const compressed = gzipSync(delivered);
+    assert.ok(compressed.length < 1000);
+    return {
+      status: 200,
+      headers: new Headers({
+        "content-encoding": "gzip", "content-length": String(compressed.length)
+      }),
+      body: {getReader: () => ({
+        read: async () => ({done: false, value: gunzipSync(compressed)}),
+        cancel() { cancelled = true; }, releaseLock() {}
+      })}
+    };
+  }});
+  const failure = await capture(oversizedDecoded, {bounds: {maxResponseBytes: 1000}});
+  assert.equal(failure.reason, "RESPONSE_BYTE_LIMIT");
+  assert.ok(failure.capture.consumed.responseBytes > 1000);
+  assert.equal(failure.rawCensus, null);
+  assert.equal(oversizedDecoded.requests.length, 1);
+  assert.equal(cancelled, true);
+  for (const [reason, responseFor] of [
+    ["INVALID_JSON", (_, body) => new Response(body.slice(0, -1), {
+      headers: {"content-encoding": "br", "content-length": "10"}
+    })],
+    ["INVALID_RESPONSE_HEADERS", (_, body) => new Response(body, {
+      headers: {"content-encoding": "gzip", "content-length": "invalid"}
+    })]
+  ]) {
+    const fixture = offline({responseFor});
+    assert.equal((await capture(fixture)).reason, reason);
+    assert.equal(fixture.requests.length, 1);
+  }
+});
+
 test("time, byte, decode and request budgets are shared across all attempts", async () => {
   assert.equal((await capture(offline(), {bounds: {maxAttempts: 4}})).reason, "INVALID_BOUNDS");
   assert.equal((await capture(offline(), {bounds: {maxRequests: 7}})).reason, "INVALID_BOUNDS");
@@ -395,7 +503,12 @@ test("immutable raw evidence readback, T0/T1 separate roots, and unchanged exact
   const parent = await temporary(t);
   const root = path.join(parent, "T0");
   const store = new EvidenceWarmupStore(root, {enabled: true});
-  const fixture = offline();
+  const fixture = offline({responseFor: (_, body) => {
+    const compressed = gzipSync(Buffer.from(body));
+    return new Response(gunzipSync(compressed), {headers: {
+      "content-encoding": "gzip", "content-length": String(compressed.length)
+    }});
+  }});
   assert.equal((await publish(store, fixture, {enabled: false})).status, "DISABLED");
   assert.equal(fixture.requests.length, 0);
   assert.equal((await publish(store, fixture, {phase: "historical"})).reason,
@@ -415,6 +528,12 @@ test("immutable raw evidence readback, T0/T1 separate roots, and unchanged exact
   assert.equal(record.trust, "UNKNOWN");
   assert.equal(Object.isFrozen(record.payload.capture.exchanges), true);
   for (const exchange of record.payload.capture.exchanges) {
+    assert.equal(exchange.response.contentEncoding, "gzip");
+    assert.equal(exchange.response.contentLengthComparedToDeliveredBody, false);
+    assert.equal(exchange.response.bodyByteBasis, "TRANSPORT_DELIVERED_BYTES");
+    assert.equal(exchange.response.originalWireBytesCaptured, false);
+    assert.equal(exchange.response.contentLength, String(gzipSync(
+      Buffer.from(exchange.response.body.bytes, "base64")).length));
     assert.equal(hash(Buffer.from(exchange.response.body.bytes, "base64")),
       exchange.response.body.sha256);
   }

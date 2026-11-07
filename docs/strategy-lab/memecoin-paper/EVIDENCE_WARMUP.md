@@ -107,7 +107,8 @@ attempt; other failures do not retry. Availability and same-slot success are
 not guaranteed.
 
 `PROSPECTIVE_CENSUS_BOUNDS` caps an acquisition at three attempts/six requests,
-2 MiB cumulative response bytes, 20,000 accounts per response, 4,000,000 cumulative
+2 MiB cumulative transport-delivered response bytes (including automatically
+decompressed bodies), 20,000 accounts per response, 4,000,000 cumulative
 decode-work units and one 30-second monotonic deadline shared by every attempt,
 body read, decode and reconciliation. Callers may lower these caps, never raise
 them. Cancellation and late-response fencing also apply. The response-byte cap
@@ -125,8 +126,10 @@ aggregate balances, separately from `distinctOwnerCount`, `accountCount` and
 `zeroBalanceAccountCount`. Frozen initialized accounts retain their balances.
 
 A successful immutable `local-census-acquisition` record contains the complete
-JSON-RPC request/response **body bytes**, losslessly base64 encoded with individual
-SHA-256 hashes and lengths, request metadata/HTTP status, all completed attempt
+JSON-RPC request body bytes and **transport-delivered response body bytes**,
+losslessly base64 encoded with individual SHA-256 hashes and lengths,
+request metadata/HTTP status, `content-encoding`/`content-length` headers,
+all completed attempt
 exchanges and slot pairs, the accepted slot, actual acquisition start/end wall
 times, configured bounds and consumed request/byte/decode/monotonic-elapsed
 budgets. Failed or incomplete acquisitions are not published. Publication success
@@ -134,6 +137,16 @@ requires digest-matching readback; hashes detect local byte changes, not provide
 authentication. Reacquisition produces a new record, not an overwrite. Use
 **separate private store roots for T0 and T1**; `phase` must be exactly `"T0"` or
 `"T1"`, and the one-dataset-per-root invariant prevents combining or replacing them.
+
+Response evidence is explicitly labeled `TRANSPORT_DELIVERED_BYTES` with
+`originalWireBytesCaptured: false`: an injected fetch-style transport may already
+have decompressed gzip/br bodies while retaining the compressed Content-Length.
+The recorded hashes cover the delivered bytes, not original compressed wire bytes
+or HTTP framing. Content-Length preflight/equality checks apply only when
+Content-Encoding is absent or `identity`, when the header describes the delivered
+representation. Other encodings skip those length comparisons but never the hard
+cumulative streaming cap on delivered bytes; malformed length headers and invalid
+or truncated delivered JSON still fail closed.
 
 The result stays `UNKNOWN` with `RECONCILED_DIAGNOSTIC_ONLY` capture status:
 same-slot supply conservation supports positive-balance reconciliation of the
