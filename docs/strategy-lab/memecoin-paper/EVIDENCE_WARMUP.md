@@ -84,6 +84,78 @@ selected by this package. The resulting RPC census remains `UNKNOWN` with
 `UNAUTHENTICATED_RPC_RESPONSE`. Its `observedAt` is stored only as
 `LOCAL_ACQUISITION_TIME`, never as a historical census endpoint.
 
+### Prospective same-slot classic SPL capture (implementation only)
+
+The separate opt-in API
+`acquireAndPublishProspectiveOwnerCensus({enabled: true, store, datasetId,
+phase: "T0", identity, transport, clock, signal, bounds, versions})` performs
+acquisition rather than checking readiness. `store` must also be explicitly
+enabled. `captureProspectiveOwnerCensus` in the owner-census module exposes the
+same bounded acquisition without persistence. The existing archival/mint-evidence
+API is unchanged. No CLI, default/global fetch, scheduler, fallback provider,
+credentials, or live acquisition is added or authorized.
+
+The injected transport receives the existing public Solana RPC request target
+with credentials omitted and redirects rejected. It must return a Response-like
+object with a readable byte stream and must not silently paginate, slice, truncate,
+retry, or switch providers. Each attempt sends unpaginated finalized
+`getProgramAccounts`, `withContext: true`, base64 encoding and the mint memcmp,
+then finalized `getAccountInfo(mint, {minContextSlot: S, ...})`.
+**`minContextSlot` is only a lower bound, not an exact-slot selector.** Only equal
+response slots reconcile. A mismatch discards that pair and starts a fresh full
+attempt; other failures do not retry. Availability and same-slot success are
+not guaranteed.
+
+`PROSPECTIVE_CENSUS_BOUNDS` caps an acquisition at three attempts/six requests,
+2 MiB cumulative response bytes, 20,000 accounts per response, 4,000,000 cumulative
+decode-work units and one 30-second monotonic deadline shared by every attempt,
+body read, decode and reconciliation. Callers may lower these caps, never raise
+them. Cancellation and late-response fencing also apply. The response-byte cap
+leaves room for base64 raw bodies and diagnostic owners in the existing 8 MiB
+store; store byte/work limits still apply independently. Publication/readback use
+the existing bounded filesystem operations and fail-closed pending-marker protocol.
+
+Only the classic Token program is supported. Native SOL, both native mint
+addresses (including wrapped SOL), Token-2022, extensions, malformed accounts,
+duplicate token-account addresses and nonzero native-option tags are rejected.
+Classic mint data must be exactly 82 bytes and token accounts exactly 165 bytes.
+Raw balances and supply are decoded as BigInt; the sum must equal the same-slot
+mint supply exactly. `positiveOwnerCount` counts distinct owners with positive
+aggregate balances, separately from `distinctOwnerCount`, `accountCount` and
+`zeroBalanceAccountCount`. Frozen initialized accounts retain their balances.
+
+A successful immutable `local-census-acquisition` record contains the complete
+JSON-RPC request/response **body bytes**, losslessly base64 encoded with individual
+SHA-256 hashes and lengths, request metadata/HTTP status, all completed attempt
+exchanges and slot pairs, the accepted slot, actual acquisition start/end wall
+times, configured bounds and consumed request/byte/decode/monotonic-elapsed
+budgets. Failed or incomplete acquisitions are not published. Publication success
+requires digest-matching readback; hashes detect local byte changes, not provider
+authentication. Reacquisition produces a new record, not an overwrite. Use
+**separate private store roots for T0 and T1**; `phase` must be exactly `"T0"` or
+`"T1"`, and the one-dataset-per-root invariant prevents combining or replacing them.
+
+The result stays `UNKNOWN` with `RECONCILED_DIAGNOSTIC_ONLY` capture status:
+same-slot supply conservation supports positive-balance reconciliation of the
+returned accounts, not authenticated source completeness. Omitted zero accounts
+cannot be detected from supply conservation, and an unauthenticated provider can
+misrepresent both responses. Acquisition wall time is explicitly
+`LOCAL_ACQUISITION_TIME_NOT_HISTORICAL_STATE_TIME`, never an exact historical
+state timestamp. These records cannot satisfy the existing exact-window census
+reader or hard-gate admission. Pool exclusions, developer attribution, bundle/rug
+facts and source authentication remain UNKNOWN/unestablished. No source-trust
+policy, dashboard, pilot, live execution or HEDGE state changes.
+
+Offline focused validation:
+
+```sh
+node --test /home/runner/work/meridian/meridian/test/memecoin-paper-prospective-owner-census.test.js /home/runner/work/meridian/meridian/test/memecoin-paper-owner-census.test.js /home/runner/work/meridian/meridian/test/memecoin-paper-evidence-warmup.test.js
+```
+
+RPC semantics: [getProgramAccounts](https://solana.com/docs/rpc/http/getprogramaccounts),
+[getAccountInfo](https://solana.com/docs/rpc/http/getaccountinfo),
+[Solana Cookbook](https://solanacookbook.com/guides/get-program-accounts.html).
+
 ## Exact Analyst handoff
 
 After a successful `read`, inject the readers into the existing Analyst
