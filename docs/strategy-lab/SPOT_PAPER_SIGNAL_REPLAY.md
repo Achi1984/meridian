@@ -27,7 +27,10 @@ The replay uses the pilot's existing `createStrategyState` and
 checks the startup cutoff and reported signal IDs, direction, candle time, and
 close. Accepted observations and `MISSED_DECISION_WINDOW` gaps commit replayed
 strategy state; data-error gaps with accepted OHLC and provisional signals are
-checked without committing state. Fill quote checks are limited to freshness,
+recognized by their canonical `gap:<cycle>:<requests>:<code>` journal ID,
+checked without committing state, and may omit both a cycle field and fills.
+An unavailable raw-response file produces `UNKNOWN` in the output report.
+Fill quote checks are limited to freshness,
 closed-candle age, signal ordering, and signal linkage. A sampled stop sell is
 counted separately and is not an SMA signal.
 
