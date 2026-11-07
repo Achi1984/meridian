@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, open as openFile, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -232,6 +232,63 @@ test("provider bounds fetch and body reads that ignore abort, and cleans late re
     deadlineAt: performance.now() + 30, monotonicNow: () => performance.now()
   }), /REQUEST_TIMEOUT/);
   assert.equal(cancelCalled, true);
+});
+
+test("provider cancels and releases reader on parent abort and cancels invalid response bodies", async () => {
+  const controller = new AbortController();
+  let releaseCalls = 0;
+  let cancelCalls = 0;
+  let readStarted;
+  const started = new Promise(resolve => { readStarted = resolve; });
+  const bodyResponse = {
+    ok: true, status: 200,
+    headers: { get: name => name === "content-type" ? "application/json" : null },
+    body: {
+      getReader: () => ({
+        read: () => {
+          readStarted();
+          return new Promise(() => {});
+        },
+        cancel: async () => { cancelCalls++; },
+        releaseLock: () => { releaseCalls++; }
+      }),
+      cancel: async () => { cancelCalls++; }
+    }
+  };
+  const provider = createKrakenProvider({ fetchImpl: async () => bodyResponse });
+  const pending = provider.fetchOhlc({
+    signal: controller.signal, deadlineAt: performance.now() + 2_000,
+    monotonicNow: () => performance.now()
+  });
+  await started;
+  controller.abort(new Error("test abort"));
+  await assert.rejects(pending, /test abort/);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.ok(cancelCalls >= 1);
+  assert.ok(releaseCalls >= 1);
+
+  let bodyCancelCalls = 0;
+  const invalidType = createKrakenProvider({ fetchImpl: async () => ({
+    ok: true, status: 200, headers: { get: () => "text/plain" },
+    body: { cancel: async () => { bodyCancelCalls++; } }
+  }) });
+  await assert.rejects(invalidType.fetchOhlc(), /INVALID_CONTENT_TYPE/);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(bodyCancelCalls, 1);
+});
+
+test("provider rejects a response resolved after its monotonic deadline", async () => {
+  let monotonic = 10;
+  const provider = createKrakenProvider({
+    monotonicNow: () => monotonic,
+    fetchImpl: async () => {
+      monotonic = 101;
+      return new Response("{}", { headers: { "content-type": "application/json" } });
+    }
+  });
+  await assert.rejects(provider.fetchOhlc({
+    deadlineAt: 100, monotonicNow: () => monotonic
+  }), /REQUEST_TIMEOUT/);
 });
 
 test("OHLC parser excludes Kraken's unfinished row and rejects stale, gapped, out-of-order, and wrong-pair data", () => {
@@ -600,6 +657,31 @@ test("runner bounds an injected provider that ignores abort and discards its lat
   assert.equal(report.fills.length, 0);
 });
 
+test("runner rejects a provider result resolved after the monotonic run deadline", async t => {
+  const dataRoot = await temporaryRoot(t);
+  const clock = { value: INITIAL_NOW, monotonic: 0 };
+  let tickerCalls = 0;
+  const provider = {
+    async fetchOhlc() {
+      clock.monotonic = 5_001;
+      return acquisition(ohlcData(Array(21).fill(PRICE_100)), clock.value, clock.value);
+    },
+    async fetchTicker() {
+      tickerCalls++;
+      assert.fail("ticker must not start after run deadline");
+    }
+  };
+  const config = runnerConfig({
+    dataRoot, runId: "late-monotonic-result", provider, cycles: 1,
+    durationMs: 5_000, requestTimeoutMs: 5_000, clock
+  });
+  const report = await runSpotPaperPilot(config);
+  assert.equal(report.stopReason, "DURATION_LIMIT");
+  assert.equal(report.observations, 0);
+  assert.equal(report.fills.length, 0);
+  assert.equal(tickerCalls, 0);
+});
+
 test("CLI refuses observe and paper modes without explicit network opt-in", async t => {
   const dataRoot = await temporaryRoot(t);
   await assert.rejects(pilotCli([
@@ -749,6 +831,96 @@ test("journal rejects concurrent append and fences the late ambiguous commit", a
     /JOURNAL_UNKNOWN/);
   const reconciled = await readRunJournal({ dataRoot, runId: "concurrent-append" });
   assert.equal(reconciled.reconciliationStatus, "UNKNOWN_CANDIDATE_NOT_VISIBLE");
+});
+
+test("journal closes handles after abort during late open and write", async t => {
+  const dataRoot = await temporaryRoot(t);
+  const wrapHandle = (handle, onClose, onWrite = () => null) => new Proxy(handle, {
+    get(target, property) {
+      if (property === "close") return async (...args) => {
+        onClose();
+        return target.close(...args);
+      };
+      if (property === "writeFile") return async (...args) => {
+        const intercepted = onWrite(...args);
+        if (intercepted) return intercepted;
+        return target.writeFile(...args);
+      };
+      const value = Reflect.get(target, property, target);
+      return typeof value === "function" ? value.bind(target) : value;
+    }
+  });
+
+  const openController = new AbortController();
+  let delayPendingOpen = false;
+  let openCloseAttempts = 0;
+  let markOpenStarted;
+  const openStarted = new Promise(resolve => { markOpenStarted = resolve; });
+  const openJournal = await createRunJournal({
+    dataRoot, runId: "abort-during-open", manifest: { startedAt: INITIAL_NOW },
+    signal: openController.signal,
+    io: {
+      open: async (path, ...args) => {
+        if (delayPendingOpen && path.endsWith("journal.pending")) {
+          markOpenStarted();
+          await new Promise(resolve => setTimeout(resolve, 30));
+        }
+        return wrapHandle(await openFile(path, ...args), () => openCloseAttempts++);
+      }
+    }
+  });
+  delayPendingOpen = true;
+  const openAppend = openJournal.append({ id: "late-open", type: "event" }, {});
+  await openStarted;
+  openController.abort(new Error("abort open"));
+  await assert.rejects(openAppend, /JOURNAL_UNKNOWN/);
+  await new Promise(resolve => setTimeout(resolve, 60));
+  assert.ok(openCloseAttempts >= 1);
+  assert.equal(openJournal.poisoned, true);
+
+  const writeController = new AbortController();
+  let blockPendingWrite = false;
+  let writeCloseAttempts = 0;
+  let markWriteStarted;
+  const writeStarted = new Promise(resolve => { markWriteStarted = resolve; });
+  const writeJournal = await createRunJournal({
+    dataRoot, runId: "abort-during-write", manifest: { startedAt: INITIAL_NOW },
+    signal: writeController.signal,
+    io: {
+      open: async (path, ...args) => wrapHandle(await openFile(path, ...args),
+        () => writeCloseAttempts++, () => {
+          if (blockPendingWrite && path.endsWith("journal.pending")) {
+            markWriteStarted();
+            return new Promise(() => {});
+          }
+          return null;
+        })
+    }
+  });
+  blockPendingWrite = true;
+  const writeAppend = writeJournal.append({ id: "blocked-write", type: "event" }, {});
+  await writeStarted;
+  writeController.abort(new Error("abort write"));
+  await assert.rejects(writeAppend, /JOURNAL_UNKNOWN/);
+  assert.ok(writeCloseAttempts >= 1);
+  assert.equal(writeJournal.poisoned, true);
+});
+
+test("journal checks the monotonic deadline again before acknowledging a late commit", async t => {
+  const dataRoot = await temporaryRoot(t);
+  let monotonic = 10;
+  const journal = await createRunJournal({
+    dataRoot, runId: "late-journal-ack", manifest: { startedAt: INITIAL_NOW },
+    phase: async (name, marker) => {
+      if (name === "after-readback" && marker.nextSequence === 1) monotonic = 101;
+    }
+  });
+  await assert.rejects(journal.append({ id: "late", type: "event" }, {}, {
+    deadlineAt: 100, monotonicNow: () => monotonic
+  }), /JOURNAL_UNKNOWN/);
+  assert.equal(journal.poisoned, true);
+  assert.equal((await readRunJournal({ dataRoot, runId: "late-journal-ack" }))
+    .reconciliationStatus, "UNKNOWN_CANDIDATE_VISIBLE_ACK_UNCONFIRMED");
 });
 
 test("journal bounds initialization, response persistence and close; unresolved writes remain read-only", async t => {

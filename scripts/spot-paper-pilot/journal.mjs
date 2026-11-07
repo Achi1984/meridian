@@ -5,6 +5,7 @@ import { dirname, join, resolve } from "node:path";
 
 const SCHEMA = "SPOT_PAPER_PILOT_JOURNAL_V1";
 const DEFAULT_IO_TIMEOUT_MS = 5_000;
+const CLEANUP_GRACE_MS = 1_000;
 
 function digest(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
@@ -37,7 +38,20 @@ async function bounded(operation, context) {
   }
   let timer;
   let abortListener;
-  const task = Promise.resolve().then(operation);
+  const task = Promise.resolve().then(() => {
+    const now = context.monotonicNow();
+    if (!Number.isFinite(now) || now >= context.deadlineAt || context.signal?.aborted) {
+      throw unknownError(context.signal?.reason ?? new Error("deadline exceeded"));
+    }
+    return operation();
+  }).then(value => {
+    const now = context.monotonicNow();
+    if (!Number.isFinite(now) || now >= context.deadlineAt || context.signal?.aborted) {
+      throw unknownError(context.signal?.reason ?? new Error("deadline exceeded"));
+    }
+    return value;
+  });
+  task.catch(() => {});
   const timeout = new Promise((_, reject) => {
     timer = setTimeout(() => reject(unknownError(new Error("deadline exceeded"))), remaining);
   });
@@ -53,23 +67,43 @@ async function bounded(operation, context) {
   }
 }
 
+function cleanupContext(context) {
+  const now = context.monotonicNow();
+  return { monotonicNow: context.monotonicNow,
+    deadlineAt: (Number.isFinite(now) ? now : 0) + CLEANUP_GRACE_MS };
+}
+
+async function closeHandle(handle, context) {
+  await bounded(() => handle.close(), cleanupContext(context));
+}
+
+async function openHandle(path, flags, mode, io, context) {
+  const opening = Promise.resolve().then(() => io.open(path, flags, mode));
+  opening.catch(() => {});
+  try {
+    return await bounded(() => opening, context);
+  } catch (error) {
+    void opening.then(handle => closeHandle(handle, context).catch(() => {}), () => {});
+    throw error;
+  }
+}
+
 async function syncDirectory(path, io, context) {
-  const handle = await bounded(() => io.open(path, constants.O_RDONLY), context);
+  const handle = await openHandle(path, constants.O_RDONLY, undefined, io, context);
   try {
     await bounded(() => handle.sync(), context);
   } finally {
-    await bounded(() => handle.close(), context);
+    await closeHandle(handle, context);
   }
 }
 
 async function writeSynced(path, bytes, io, context, exclusive = false) {
-  const handle = await bounded(() =>
-    io.open(path, exclusive ? "wx" : "w", 0o600), context);
+  const handle = await openHandle(path, exclusive ? "wx" : "w", 0o600, io, context);
   try {
     await bounded(() => handle.writeFile(bytes), context);
     await bounded(() => handle.sync(), context);
   } finally {
-    await bounded(() => handle.close(), context);
+    await closeHandle(handle, context);
   }
 }
 
@@ -158,14 +192,14 @@ export async function createRunJournal({
   await bounded(() => io.mkdir(runDirectory, { mode: 0o700 }), context);
   await syncDirectory(root, io, context);
   const lockPath = join(runDirectory, "writer.lock");
-  const lock = await bounded(() => io.open(lockPath, "wx", 0o600), context);
+  const lock = await openHandle(lockPath, "wx", 0o600, io, context);
   try {
     await bounded(() => lock.writeFile(JSON.stringify({ pid: process.pid, runId }) + "\n"), context);
     await bounded(() => lock.sync(), context);
   } catch (error) {
     throw unknownError(error);
   } finally {
-    await bounded(() => lock.close(), context);
+    await closeHandle(lock, context);
   }
   await syncDirectory(runDirectory, io, context);
   const responseDirectory = join(runDirectory, "responses");

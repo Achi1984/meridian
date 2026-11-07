@@ -86,9 +86,22 @@ function boundedTask(operation, {
     return Promise.reject(new Error(timeoutCode));
   }
   if (signal?.aborted) return Promise.reject(signal.reason ?? new Error("ABORTED"));
+  const ensureActive = () => {
+    if (signal?.aborted) throw signal.reason ?? new Error("ABORTED");
+    const now = monotonicNow();
+    if (!Number.isFinite(now) || now >= deadlineAt) {
+      throw new Error(timeoutCode);
+    }
+  };
   let timer;
   let abortListener;
-  const task = Promise.resolve().then(operation);
+  const task = Promise.resolve().then(() => {
+    ensureActive();
+    return operation();
+  }).then(value => {
+    ensureActive();
+    return value;
+  });
   task.catch(() => {});
   return new Promise((resolve, reject) => {
     const cleanup = () => {

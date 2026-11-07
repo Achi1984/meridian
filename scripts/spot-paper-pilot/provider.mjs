@@ -4,6 +4,11 @@ import { SPOT_PAPER_PILOT_LIMITS } from "./core.mjs";
 const API_ORIGIN = "https://api.kraken.com";
 const REQUEST_TIMEOUT_MS = SPOT_PAPER_PILOT_LIMITS.requestTimeoutMs;
 
+function assertRequestActive(clock, deadlineAt, signal) {
+  if (signal.aborted) throw signal.reason ?? new Error("REQUEST_ABORTED");
+  if (clock() >= deadlineAt) throw new Error("REQUEST_TIMEOUT");
+}
+
 async function readBoundedBody(response, counters, maxBytes, signal, readerRef) {
   const reader = response.body?.getReader();
   if (!reader) throw new Error("EMPTY_HTTP_BODY");
@@ -59,18 +64,25 @@ export function createKrakenProvider({
   const counters = { requests: 0, bytes: 0 };
 
   async function get(path, params, runtime = {}) {
+    const clock = runtime.monotonicNow ?? monotonicNow;
+    const startedMono = clock();
+    const runDeadline = runtime.deadlineAt ?? deadlineAt ?? Infinity;
+    if (!Number.isFinite(startedMono) || startedMono < 0 || startedMono >= runDeadline) {
+      throw new Error("REQUEST_TIMEOUT");
+    }
+    if (runtime.signal?.aborted || signal?.aborted) {
+      throw new Error("REQUEST_ABORTED");
+    }
     if (counters.requests >= maxRequests) throw new Error("REQUEST_BUDGET_EXHAUSTED");
-    counters.requests++;
     const requestStartedAt = now();
     if (!Number.isSafeInteger(requestStartedAt) || requestStartedAt < 0) {
       throw new Error("INVALID_CLOCK");
     }
+    counters.requests++;
     const url = new URL(path, API_ORIGIN);
     for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
-    const clock = runtime.monotonicNow ?? monotonicNow;
-    const startedMono = clock();
     const effectiveDeadline = Math.min(
-      runtime.deadlineAt ?? deadlineAt ?? Infinity,
+      runDeadline,
       startedMono + requestTimeoutMs
     );
     const remaining = effectiveDeadline - startedMono;
@@ -86,20 +98,23 @@ export function createKrakenProvider({
     let response = null;
     const readerRef = { reader: null };
     let timedOut = false;
+    let completed = false;
     let timer;
     let abortListener;
     const cleanupResponse = value => {
       if (value?.body) void value.body.cancel().catch(() => {});
     };
     const work = (async () => {
+      assertRequestActive(clock, effectiveDeadline, controller.signal);
       response = await fetchImpl(url, {
         method: "GET", headers: { accept: "application/json" },
         redirect: "error", signal: controller.signal
       });
       if (controller.signal.aborted) {
         cleanupResponse(response);
-        throw new Error("REQUEST_ABORTED");
+        throw controller.signal.reason ?? new Error("REQUEST_ABORTED");
       }
+      assertRequestActive(clock, effectiveDeadline, controller.signal);
       if (!response.ok) {
         if (response.body) {
           await readBoundedBody(response, counters, maxBytes, controller.signal, readerRef);
@@ -112,6 +127,7 @@ export function createKrakenProvider({
       }
       const rawBytes = await readBoundedBody(
         response, counters, maxBytes, controller.signal, readerRef);
+      assertRequestActive(clock, effectiveDeadline, controller.signal);
       const receivedAt = now();
       if (!Number.isSafeInteger(receivedAt) || receivedAt < requestStartedAt) {
         throw new Error("CLOCK_MOVED_BACKWARDS");
@@ -123,6 +139,7 @@ export function createKrakenProvider({
       } catch {
         throw new Error("INVALID_JSON_RESPONSE");
       }
+      assertRequestActive(clock, effectiveDeadline, controller.signal);
       return {
         data, raw, sha256: createHash("sha256").update(rawBytes).digest("hex"),
         bytes: rawBytes.byteLength, requestStartedAt, receivedAt
@@ -139,7 +156,7 @@ export function createKrakenProvider({
       }, remaining);
     });
     try {
-      return await Promise.race([
+      const result = await Promise.race([
         work,
         timeout,
         new Promise((_, reject) => {
@@ -149,11 +166,30 @@ export function createKrakenProvider({
           else controller.signal.addEventListener("abort", abortListener, { once: true });
         })
       ]);
+      assertRequestActive(clock, effectiveDeadline, controller.signal);
+      completed = true;
+      return result;
     } finally {
       clearTimeout(timer);
       if (abortListener) controller.signal.removeEventListener("abort", abortListener);
       for (const parent of parentSignals) parent.removeEventListener("abort", cancelFromParent);
-      if (timedOut && response) cleanupResponse(response);
+      if (!completed || timedOut || controller.signal.aborted) {
+        const reader = readerRef.reader;
+        if (reader) {
+          let cancellation;
+          try {
+            cancellation = reader.cancel();
+          } catch {}
+          Promise.resolve(cancellation).catch(() => {}).finally(() => {
+            try { reader.releaseLock(); } catch {}
+          });
+          try { reader.releaseLock(); } catch {}
+        } else {
+          cleanupResponse(response);
+        }
+      } else if (readerRef.reader) {
+        try { readerRef.reader.releaseLock(); } catch {}
+      }
     }
   }
 
