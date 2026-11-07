@@ -1328,14 +1328,24 @@ function deferred() {
   return {promise, resolve, reject};
 }
 
-async function transferAfterOwnerSettles(options, attempts = 50) {
+async function transferAfterOwnerSettles(options, deadlineMs = 1_000) {
+  const startedAt = Date.now();
+  const deadline = startedAt + deadlineMs;
   let result;
-  for (let attempt = 0; attempt < attempts; attempt++) {
+  let attempts = 0;
+  let busyResults = 0;
+  while (Date.now() < deadline) {
+    attempts++;
     result = await transferPostRunReport(options);
     if (result.reason !== "transfer_busy") return result;
+    busyResults++;
     await new Promise(resolve => setImmediate(resolve));
   }
-  return result;
+  assert.fail(
+    `transfer owner did not settle before deadline: result=${JSON.stringify(result)}; ` +
+    `reason=${result?.reason ?? "unknown"}; attempts=${attempts}; busyResults=${busyResults}; ` +
+    `elapsedMs=${Date.now() - startedAt}; deadlineMs=${deadlineMs}`
+  );
 }
 
 function rowFor(input) {
