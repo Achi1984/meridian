@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {spawn} from "node:child_process";
 import {createHash, randomUUID} from "node:crypto";
 import {EventEmitter} from "node:events";
+import {watch as watchFileSystem} from "node:fs";
 import {
   chmod, lstat, mkdir, mkdtemp, open, readFile, readdir, realpath, rm, symlink, writeFile
 } from "node:fs/promises";
@@ -66,6 +67,63 @@ async function root(t) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "synthetic-acceptance-"));
   t.after(() => rm(directory, {force: true, recursive: true}));
   return directory;
+}
+
+function waitForRealSignalChildDirectory(dataRoot, timeoutMs, signal) {
+  return new Promise((resolve, reject) => {
+    const watchers = new Map();
+    let timer;
+    let settled = false;
+    const onAbort = () => finish(reject, signal.reason ?? new Error("child phase wait cancelled"));
+    const finish = (action, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      signal.removeEventListener("abort", onAbort);
+      for (const watcher of watchers.values()) watcher.close();
+      action(value);
+    };
+    const watchDirectory = directory => {
+      if (watchers.has(directory)) return;
+      const watcher = watchFileSystem(directory, {encoding: "utf8"}, () => { void inspect(); });
+      watcher.once("error", error => finish(reject, error));
+      watchers.set(directory, watcher);
+    };
+    const inspect = async () => {
+      if (settled) return;
+      try {
+        const entries = await readdir(dataRoot, {withFileTypes: true});
+        const directRun = entries.find(entry => entry.isDirectory() &&
+          /^synthetic-[a-f0-9-]{36}$/.test(entry.name));
+        if (directRun) {
+          finish(resolve, directRun.name);
+          return;
+        }
+        const drillDirectories = entries
+          .filter(entry => entry.isDirectory() && /^real-signal-/.test(entry.name));
+        for (const drill of drillDirectories) {
+          const drillDirectory = path.join(dataRoot, drill.name);
+          watchDirectory(drillDirectory);
+          const run = (await readdir(drillDirectory, {withFileTypes: true}))
+            .find(entry => entry.isDirectory() &&
+              /^synthetic-[a-f0-9-]{36}$/.test(entry.name));
+          if (run) {
+            finish(resolve, run.name);
+            return;
+          }
+        }
+      } catch (error) {
+        finish(reject, error);
+      }
+    };
+    watchDirectory(dataRoot);
+    timer = setTimeout(() => finish(
+      reject, new Error("real IPC child did not create its run directory before the watchdog")
+    ), timeoutMs);
+    signal.addEventListener("abort", onAbort, {once: true});
+    if (signal.aborted) onAbort();
+    void inspect();
+  });
 }
 
 function startForegroundChild(dataRoot, claimId, waitTimeoutMs = 60_000, finalizationTimeoutMs = 60_000) {
@@ -1749,10 +1807,10 @@ test("parent deadline includes delayed child-started receipt publication", {time
 });
 
 test("real IPC child enforces its inherited deadline after fill instead of receiving a fresh budget",
-  {timeout: 30_000}, async t => {
+  {timeout: 45_000}, async t => {
     const entrypoint = path.resolve("scripts/memecoin-paper/synthetic-host-acceptance.mjs");
     const children = [];
-    const shortBudgetMs = 3_000;
+    const shortBudgetMs = 10_000;
     const startChild = (dataRoot, deadlineNs) => {
       const child = spawn(process.execPath, [entrypoint], {
         env: {
@@ -1788,19 +1846,31 @@ test("real IPC child enforces its inherited deadline after fill instead of recei
       });
       return {child, closed, stderr: () => stderr, stdout: () => stdout};
     };
-    const receiveFill = (child, timeoutMs) => new Promise((resolve, reject) => {
+    const receiveFill = (run, timeoutMs, startedAt, deadlineNs) => new Promise((resolve, reject) => {
+      const {child} = run;
       const finish = (action, value) => {
         clearTimeout(timer);
         child.removeListener("message", onMessage);
         child.removeListener("exit", onExit);
         action(value);
       };
+      const diagnostics = () => {
+        const elapsedMs = Number((process.hrtime.bigint() - startedAt) / 1_000_000n);
+        const remainingMs = Number(deadlineNs - process.hrtime.bigint()) / 1_000_000;
+        return `elapsedMs=${elapsedMs} inheritedRemainingMs=${remainingMs.toFixed(1)} ` +
+          `stdout=${run.stdout().slice(-1_000)} stderr=${run.stderr().slice(-1_000)}`;
+      };
       const onMessage = message => finish(resolve, message);
       const onExit = (code, signal) => finish(reject,
-        new Error(`child exited before fill acknowledgement (${code}, ${signal})`));
-      const timer = setTimeout(() => finish(reject, new Error("fill acknowledgement timed out")), timeoutMs);
+        new Error(`child exited before fill acknowledgement (${code}, ${signal}); ${diagnostics()}`));
+      const timer = setTimeout(() => finish(reject,
+        new Error(`fill acknowledgement timed out; ${diagnostics()}`)), timeoutMs);
       child.once("message", onMessage);
-      child.once("exit", onExit);
+      if (child.exitCode !== null || child.signalCode !== null) {
+        onExit(child.exitCode, child.signalCode);
+      } else {
+        child.once("exit", onExit);
+      }
     });
     const closeWithin = (child, timeoutMs) => new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -1813,19 +1883,64 @@ test("real IPC child enforces its inherited deadline after fill instead of recei
       };
       child.once("close", onClose);
     });
-    const assertFillHandshake = async run => {
-      const handshake = await receiveFill(run.child, 10_000);
+    const waitForChildAliveThrough = (run, deadlineNs) => new Promise((resolve, reject) => {
+      let timer;
+      const finish = (action, value) => {
+        clearTimeout(timer);
+        run.child.removeListener("exit", onExit);
+        action(value);
+      };
+      const onExit = (code, signal) => finish(reject, new Error(
+        `child exited before its own-start-plus-budget cutoff (${code}, ${signal}); ` +
+        `stdout=${run.stdout().slice(-1_000)} stderr=${run.stderr().slice(-1_000)}`
+      ));
+      const remainingNs = deadlineNs - process.hrtime.bigint();
+      if (remainingNs <= 0n) {
+        resolve();
+        return;
+      }
+      run.child.once("exit", onExit);
+      if (run.child.exitCode !== null || run.child.signalCode !== null) {
+        onExit(run.child.exitCode, run.child.signalCode);
+        return;
+      }
+      timer = setTimeout(() => finish(resolve), Math.ceil(Number(remainingNs) / 1_000_000));
+    });
+    const assertFillHandshake = async (run, startedAt, deadlineNs) => {
+      const handshake = await receiveFill(run, shortBudgetMs + 2_000, startedAt, deadlineNs);
       assert.equal(handshake.status, "FILLED_PAPER");
       assert.equal(handshake.pid, run.child.pid);
       assert.match(handshake.receiptSha256, /^[0-9a-f]{64}$/);
       return handshake;
+    };
+    const awaitChildRunDirectory = async (run, dataRoot) => {
+      const controller = new AbortController();
+      try {
+        return await Promise.race([
+          waitForRealSignalChildDirectory(
+            dataRoot, shortBudgetMs + 2_000, controller.signal
+          ),
+          run.closed.then(({code, signal}) => {
+            throw new Error(
+              `child exited before its run-directory phase (${code}, ${signal}); ` +
+              `stdout=${run.stdout().slice(-1_000)} stderr=${run.stderr().slice(-1_000)}`
+            );
+          })
+        ]);
+      } finally {
+        controller.abort();
+      }
     };
 
     const dataRoot = await root(t);
     const startedAt = process.hrtime.bigint();
     const inheritedDeadline = startedAt + BigInt(shortBudgetMs) * 1_000_000n;
     const run = startChild(dataRoot, inheritedDeadline.toString());
-    await assertFillHandshake(run);
+    const [childRunId, handshake] = await Promise.all([
+      awaitChildRunDirectory(run, dataRoot),
+      assertFillHandshake(run, startedAt, inheritedDeadline)
+    ]);
+    assert.equal(childRunId, handshake.runId);
     assert.ok(process.hrtime.bigint() < inheritedDeadline,
       "the child must reach its fill handshake while the inherited budget remains valid");
     assert.equal(run.child.exitCode, null, "the child must wait after fill when no SIGTERM is sent");
@@ -1843,15 +1958,23 @@ test("real IPC child enforces its inherited deadline after fill instead of recei
     assert.equal(childFiles.includes("summary.json"), false);
 
     const freshBudgetRoot = await root(t);
+    const originalBudgetCutoff = inheritedDeadline;
     const freshBudgetStartedAt = process.hrtime.bigint();
+    assert.ok(freshBudgetStartedAt > originalBudgetCutoff,
+      "the fresh-budget control starts after the inherited deadline has expired");
     const freshBudgetDeadline = freshBudgetStartedAt + 60_000_000_000n;
     const freshBudgetRun = startChild(freshBudgetRoot, freshBudgetDeadline.toString());
-    await assertFillHandshake(freshBudgetRun);
-    const originalBudgetCutoff = freshBudgetStartedAt + BigInt(shortBudgetMs) * 1_000_000n;
-    const remainingMs = Number((originalBudgetCutoff - process.hrtime.bigint()) / 1_000_000n);
-    if (remainingMs > 0) await new Promise(resolve => setTimeout(resolve, remainingMs));
+    const [freshChildRunId, freshHandshake] = await Promise.all([
+      awaitChildRunDirectory(freshBudgetRun, freshBudgetRoot),
+      assertFillHandshake(freshBudgetRun, freshBudgetStartedAt, freshBudgetDeadline)
+    ]);
+    assert.equal(freshChildRunId, freshHandshake.runId);
+    const freshBudgetCutoff = freshBudgetStartedAt + BigInt(shortBudgetMs) * 1_000_000n;
+    await waitForChildAliveThrough(freshBudgetRun, freshBudgetCutoff);
     assert.equal(freshBudgetRun.child.exitCode, null,
       "working IPC does not make a fresh child deadline equivalent to inheriting the parent's deadline");
+    assert.equal(freshBudgetRun.child.signalCode, null,
+      "the fresh-budget child must remain alive through its own-start-plus-budget cutoff");
     freshBudgetRun.child.kill("SIGKILL");
     const killed = await closeWithin(freshBudgetRun.child, 2_000);
     assert.deepEqual(killed, {code: null, signal: "SIGKILL"});
