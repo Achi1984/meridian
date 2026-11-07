@@ -392,7 +392,9 @@ test("foreground SIGTERM records readiness and an identical replacement only rea
     assert.equal(readyOutput.checkpointSha256, readiness.checkpointSha256);
     assert.equal(run.child.kill("SIGTERM"), true);
     assert.deepEqual(await run.closed, {code: 2, signal: null}, run.stderr());
-    const summary = foregroundOutputRecords(run).at(-1);
+    const records = foregroundOutputRecords(run);
+    assert.equal(records.filter(record => record.status === "READY").length, 1);
+    const summary = records.at(-1);
     assert.equal(summary.status, "UNKNOWN");
     assert.equal(summary.proof, "SYNTHETIC_PLATFORM_FOREGROUND");
     assert.equal(summary.runId, claim.runId);
@@ -435,6 +437,7 @@ test("foreground SIGTERM records readiness and an identical replacement only rea
     assert.equal(readback.restartDenied, true);
     assert.equal(readback.immutableReadback, true);
     assert.equal(readback.exportSha256, summary.exportSha256);
+    assert.equal(foregroundOutputRecords(replacement).some(record => record.status === "READY"), false);
     assert.equal(replacement.child.exitCode, null, "replacement must hold inertly after readback");
     await new Promise(resolve => setTimeout(resolve, 200));
     assert.deepEqual(await snapshotTree(dataRoot), originalTree);
@@ -976,6 +979,176 @@ test("delayed operator SIGTERM starts a fresh bounded finalization phase", {time
   await drainProbe(probe);
 });
 
+test("slow preparation does not consume the bounded operator wait", async t => {
+  const dataRoot = await root(t);
+  const claimId = "foreground-slow-preparation";
+  await armForegroundRoot(dataRoot, claimId);
+  const signals = new EventEmitter();
+  let monotonicNow = 0;
+  const probe = filesystemProbe(async call => {
+    const value = await call.action();
+    if (path.basename(call.filename) === "config.json" && call.method === "writeFile") {
+      monotonicNow = 59_500;
+    }
+    return value;
+  });
+  let output = "";
+  const code = await main({
+    env: {
+      PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_CLAIM_ID: claimId,
+      PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT: dataRoot
+    },
+    monotonicNow: () => monotonicNow,
+    signalSource: signals, fileSystem: probe.fileSystem,
+    stdout: {write(value) {
+      output += value;
+      if (value.includes('"status":"READY"')) {
+        monotonicNow = 60_001;
+        signals.emit("SIGTERM");
+      }
+    }}
+  });
+  assert.equal(code, 2);
+  const [ready, summary] = output.trim().split(/\r?\n/).map(line => JSON.parse(line));
+  assert.equal(ready.status, "READY");
+  assert.equal(summary.proof, "SYNTHETIC_PLATFORM_FOREGROUND");
+  assert.equal(summary.signalObservation.afterReady, true);
+  assert.equal(summary.stopAccepted, true);
+  await drainProbe(probe);
+});
+
+test("stalled foreground preparation expires before READY and preserves the one-shot claim",
+  {timeout: 5_000}, async t => {
+    const dataRoot = await root(t);
+    const claimId = "foreground-stalled-preparation";
+    const {arm} = await armForegroundRoot(dataRoot, claimId);
+    const signals = new EventEmitter();
+    const entered = deferred();
+    const release = deferred();
+    t.after(() => release.resolve());
+    const probe = filesystemProbe(async call => {
+      if (path.basename(call.filename) === "config.json" && call.method === "writeFile") {
+        entered.resolve();
+        await release.promise;
+        throw new Error("preparation write remains stalled");
+      }
+      return call.action();
+    });
+    let output = "";
+    const pending = main({
+      env: {
+        PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
+        PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND: "true",
+        PAPER_SYNTHETIC_ACCEPTANCE_CLAIM_ID: claimId,
+        PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT: dataRoot
+      },
+      preparationTimeoutMs: 200,
+      signalSource: signals, fileSystem: probe.fileSystem,
+      stdout: {write(value) { output += value; }}
+    });
+    await entered.promise;
+    assert.equal(await pending, 2);
+    assert.deepEqual(JSON.parse(output.trim()), {
+      status: "UNKNOWN", code: "SYNTHETIC_ACCEPTANCE_FAILED"
+    });
+    release.resolve();
+    await drainProbe(probe);
+    assert.equal(output.includes('"status":"READY"'), false);
+    assert.equal(await readFile(path.join(dataRoot, `foreground-claim-${claimId}.json`), "utf8")
+      .then(() => true), true);
+    await assert.rejects(readFile(path.join(dataRoot, arm.runId, "readiness.json")), {code: "ENOENT"});
+    assert.equal(signals.eventNames().length, 0);
+  });
+
+test("foreground operator wait accepts a valid SIGTERM after 60 seconds with the opt-in 300-second bound",
+  async t => {
+    const dataRoot = await root(t);
+    const claimId = "foreground-extended-operator-wait";
+    await armForegroundRoot(dataRoot, claimId);
+    const signals = new EventEmitter();
+    let monotonicNow = 0;
+    let output = "";
+    const code = await main({
+      env: {
+        PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
+        PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND: "true",
+        PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND_WAIT_TIMEOUT_MS: "300000",
+        PAPER_SYNTHETIC_ACCEPTANCE_CLAIM_ID: claimId,
+        PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT: dataRoot
+      },
+      monotonicNow: () => monotonicNow,
+      signalSource: signals,
+      stdout: {write(value) {
+        output += value;
+        if (value.includes('"status":"READY"')) {
+          monotonicNow = 60_001;
+          signals.emit("SIGTERM");
+        }
+      }}
+    });
+    assert.equal(code, 2);
+    const [ready, summary] = output.trim().split(/\r?\n/).map(line => JSON.parse(line));
+    assert.equal(ready.status, "READY");
+    assert.equal(summary.proof, "SYNTHETIC_PLATFORM_FOREGROUND");
+    assert.equal(summary.signalObservation.afterReady, true);
+    assert.equal(summary.stopAccepted, true);
+  });
+
+test("a real SIGTERM after 60 seconds of READY wait succeeds with the 300-second opt-in",
+  {timeout: 75_000}, async t => {
+    const dataRoot = await root(t);
+    const claimId = "foreground-real-delayed-sigterm";
+    await armForegroundRoot(dataRoot, claimId);
+    const run = startForegroundChild(dataRoot, claimId, 300_000);
+    t.after(async () => {
+      if (run.child.exitCode === null && run.child.signalCode === null) {
+        run.child.kill("SIGKILL");
+        await run.closed;
+      }
+    });
+    const ready = await waitForForegroundOutput(run, "READY");
+    const readyAt = performance.now();
+    await new Promise(resolve => setTimeout(resolve, 60_100));
+    assert.ok(performance.now() - readyAt >= 60_000);
+    assert.equal(run.child.kill("SIGTERM"), true);
+    assert.deepEqual(await run.closed, {code: 2, signal: null}, run.stderr());
+    const records = foregroundOutputRecords(run);
+    const summary = records.at(-1);
+    assert.equal(ready.status, "READY");
+    assert.equal(summary.proof, "SYNTHETIC_PLATFORM_FOREGROUND");
+    assert.equal(summary.signalObservation.afterReady, true);
+    assert.equal(summary.stopAccepted, true);
+  });
+
+test("operator wait rejects non-finite, non-positive, and over-cap durations before touching the root",
+  async t => {
+    const dataRoot = await root(t);
+    for (const [index, timeout] of ["0", "NaN", "Infinity", "300001"].entries()) {
+      const claimId = `invalid-wait-${index}`;
+      const signals = new EventEmitter();
+      let output = "";
+      const result = await main({
+        env: {
+          PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
+          PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND: "true",
+          PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND_WAIT_TIMEOUT_MS: timeout,
+          PAPER_SYNTHETIC_ACCEPTANCE_CLAIM_ID: claimId,
+          PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT: dataRoot
+        },
+        signalSource: signals,
+        stdout: {write(value) { output += value; }}
+      });
+      assert.equal(result, 2);
+      assert.deepEqual(JSON.parse(output.trim()), {
+        status: "BLOCKED", code: "SYNTHETIC_ACCEPTANCE_FAILED"
+      });
+      assert.deepEqual(signals.eventNames(), []);
+      assert.deepEqual(await readdir(dataRoot), []);
+    }
+  });
+
 test("injected monotonic expiry at synchronous SIGTERM cannot start finalization", async t => {
     const dataRoot = await root(t);
     const claimId = "foreground-late-operator-signal";
@@ -1013,6 +1186,39 @@ test("injected monotonic expiry at synchronous SIGTERM cannot start finalization
     ));
     await assert.rejects(readFile(path.join(dataRoot, claim.runId, "summary.json")), {code: "ENOENT"});
   });
+
+test("SIGTERM exactly at the operator-wait deadline cannot start finalization", async t => {
+  const dataRoot = await root(t);
+  const claimId = "foreground-exact-operator-deadline";
+  await armForegroundRoot(dataRoot, claimId);
+  const signals = new EventEmitter();
+  let monotonicNow = 0;
+  let output = "";
+  const code = await main({
+    env: {
+      PAPER_SYNTHETIC_ACCEPTANCE_ENABLED: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND: "true",
+      PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND_WAIT_TIMEOUT_MS: "1000",
+      PAPER_SYNTHETIC_ACCEPTANCE_CLAIM_ID: claimId,
+      PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT: dataRoot
+    },
+    monotonicNow: () => monotonicNow,
+    signalSource: signals,
+    stdout: {write(value) {
+      output += value;
+      if (value.includes('"status":"READY"')) {
+        monotonicNow = 1_000;
+        signals.emit("SIGTERM");
+      }
+    }}
+  });
+  assert.equal(code, 2);
+  const [ready, summary] = output.trim().split(/\r?\n/).map(line => JSON.parse(line));
+  assert.equal(ready.status, "READY");
+  assert.equal(summary.status, "UNKNOWN");
+  assert.equal(summary.signalObservation, undefined);
+  assert.equal(summary.code, "SYNTHETIC_ACCEPTANCE_FAILED");
+});
 
 test("readback transition rejects injected expiry before replacing discovery deadline", async t => {
   const dataRoot = await root(t);
