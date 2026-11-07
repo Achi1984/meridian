@@ -57,6 +57,11 @@ function canonicalAmount(value) {
   return amount <= U64_MAX ? amount : null;
 }
 
+function canonicalUiAmount(value) {
+  return typeof value === "string" && value.length <= 128 &&
+    /^(?:0|[1-9]\d{0,126})(?:\.\d{1,128})?$/.test(value);
+}
+
 function output(reason, fields = {}) {
   return {
     status: "DIAGNOSTIC_ONLY",
@@ -160,8 +165,8 @@ export function diagnoseAlchemyHolderResponse({
 
   const result = payload.result;
   if (!isPublicKey(result.mint) || parseSlot(result.slot) === null ||
-      typeof result.sortBy !== "string" || result.sortBy.length === 0 ||
-      result.sortBy.length > 64 || !Array.isArray(result.holders)) {
+      !["balance_desc", "balance_asc"].includes(result.sortBy) ||
+      !Array.isArray(result.holders)) {
     return output("INVALID_RESULT_SCHEMA", {...base, workUnits});
   }
   const holderRowCount = result.holders.length;
@@ -216,8 +221,7 @@ export function diagnoseAlchemyHolderResponse({
   for (const row of result.holders) {
     if (!isRecord(row) || !exactKeys(row, ["holder", "owner", "balanceRaw", "balanceUi"]) ||
         !isPublicKey(row.holder) || !isPublicKey(row.owner) ||
-        typeof row.balanceUi !== "number" || !Number.isFinite(row.balanceUi) ||
-        row.balanceUi < 0) {
+        !canonicalUiAmount(row.balanceUi)) {
       return output("INVALID_HOLDER_ROW", {
         ...base, responseMint: result.mint, responseSlot: responseSlot.toString(),
         sortBy: result.sortBy, holderRowCount, capSaturated, workUnits
@@ -230,7 +234,8 @@ export function diagnoseAlchemyHolderResponse({
         sortBy: result.sortBy, holderRowCount, capSaturated, workUnits
       });
     }
-    workUnits += row.holder.length + row.owner.length + row.balanceRaw.length + 1;
+    workUnits += row.holder.length + row.owner.length +
+      row.balanceRaw.length + row.balanceUi.length + 1;
     if (workUnits > limits.maxWorkUnits) {
       return output("WORK_LIMIT", {
         ...base, responseMint: result.mint, responseSlot: responseSlot.toString(),

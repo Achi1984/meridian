@@ -11,8 +11,23 @@ const OWNER_A = "11111111111111111111111111111111";
 const OWNER_B = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const HOLDER_A = "SysvarRent111111111111111111111111111111111";
 const HOLDER_B = "SysvarC1ock11111111111111111111111111111111";
+const SOURCE_SHAPED_RESPONSE = {
+  jsonrpc: "2.0",
+  id: 1,
+  result: {
+    mint: MINT,
+    slot: "123",
+    sortBy: "balance_desc",
+    holders: [{
+      holder: HOLDER_A,
+      owner: OWNER_A,
+      balanceRaw: "974620712305381",
+      balanceUi: "974620712.305381"
+    }]
+  }
+};
 
-function row(holder = HOLDER_A, owner = OWNER_A, balanceRaw = "10", balanceUi = 10) {
+function row(holder = HOLDER_A, owner = OWNER_A, balanceRaw = "10", balanceUi = "10") {
   return {holder, owner, balanceRaw, balanceUi};
 }
 
@@ -20,7 +35,7 @@ function envelope(holders = [row()]) {
   return {
     jsonrpc: "2.0",
     id: 1,
-    result: {mint: MINT, slot: "123", sortBy: "balance", holders}
+    result: {mint: MINT, slot: "123", sortBy: "balance_desc", holders}
   };
 }
 
@@ -45,7 +60,7 @@ function assertNoAuthority(result) {
 }
 
 test("validates the documented Alchemy RPC response shape and computes its raw digest", () => {
-  const bytes = raw();
+  const bytes = raw(SOURCE_SHAPED_RESPONSE);
   const result = diagnose(bytes, {
     expectedSha256: createHash("sha256").update(bytes).digest("hex")
   });
@@ -59,15 +74,15 @@ test("validates the documented Alchemy RPC response shape and computes its raw d
   assert.equal(result.holderRowCount, 1);
   assert.equal(result.uniqueTokenAccountCount, 1);
   assert.equal(result.ownerCount, 1);
-  assert.equal(result.observedBalanceRawTotal, "10");
+  assert.equal(result.observedBalanceRawTotal, "974620712305381");
   assertNoAuthority(result);
 });
 
 test("aggregates split token accounts per owner using raw integer balances", () => {
   const result = diagnose(raw(envelope([
-    row(HOLDER_A, OWNER_A, "4", 999.5),
-    row(HOLDER_B, OWNER_A, "6", 0.0001),
-    row("Vote111111111111111111111111111111111111111", OWNER_B, "5", 5)
+    row(HOLDER_A, OWNER_A, "4", "999.5"),
+    row(HOLDER_B, OWNER_A, "6", "0.0001"),
+    row("Vote111111111111111111111111111111111111111", OWNER_B, "5", "5.000")
   ])));
 
   assert.equal(result.observedBalanceRawTotal, "15");
@@ -90,7 +105,7 @@ test("deduplicates identical token-account rows without double counting", () => 
 });
 
 test("rejects conflicting duplicate token-account rows", () => {
-  const result = diagnose(raw(envelope([row(), row(HOLDER_A, OWNER_B, "10", 10)])));
+  const result = diagnose(raw(envelope([row(), row(HOLDER_A, OWNER_B, "10", "10")])));
 
   assert.equal(result.reason, "CONFLICTING_DUPLICATE");
   assert.equal(result.owners, null);
@@ -141,7 +156,10 @@ test("rejects malformed holder schemas, public keys, and non-canonical amounts",
     [row(HOLDER_A, OWNER_A, "1e2"), "INVALID_BALANCE_RAW"],
     [row(HOLDER_A, OWNER_A, "18446744073709551616"), "INVALID_BALANCE_RAW"],
     [{...row(), extra: "unexpected"}, "INVALID_HOLDER_ROW"],
-    [row(HOLDER_A, OWNER_A, "1", Number.NaN), "INVALID_HOLDER_ROW"]
+    [row(HOLDER_A, OWNER_A, "1", 1), "INVALID_HOLDER_ROW"],
+    [row(HOLDER_A, OWNER_A, "1", "1e2"), "INVALID_HOLDER_ROW"],
+    [row(HOLDER_A, OWNER_A, "1", "-1"), "INVALID_HOLDER_ROW"],
+    [row(HOLDER_A, OWNER_A, "1", "1".repeat(129)), "INVALID_HOLDER_ROW"]
   ];
 
   for (const [holder, reason] of cases) {
@@ -149,6 +167,21 @@ test("rejects malformed holder schemas, public keys, and non-canonical amounts",
     assert.equal(result.reason, reason);
     assertNoAuthority(result);
   }
+});
+
+test("accepts only documented holder sort options", () => {
+  const descending = diagnose(raw(envelope([row()])));
+  const ascending = diagnose(raw({
+    ...envelope(), result: {...envelope().result, sortBy: "balance_asc"}
+  }));
+  const unsupported = diagnose(raw({
+    ...envelope(), result: {...envelope().result, sortBy: "balance"}
+  }));
+
+  assert.equal(descending.reason, "CHECKS_MATCH_SOURCE_COMPLETENESS_UNKNOWN");
+  assert.equal(ascending.reason, "CHECKS_MATCH_SOURCE_COMPLETENESS_UNKNOWN");
+  assert.equal(unsupported.reason, "INVALID_RESULT_SCHEMA");
+  for (const result of [descending, ascending, unsupported]) assertNoAuthority(result);
 });
 
 test("enforces the raw byte boundary before parsing", () => {
