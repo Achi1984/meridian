@@ -288,6 +288,146 @@ budget plus scheduling margin; do not SIGKILL during checkpoint/export
 publication. Slow durable storage remains UNKNOWN and requires reconciliation,
 never a retry or a new operation budget for the same run.
 
+Proof A3 — platform-initiated stop of the foreground synthetic worker
+--------------------------------------------------------------------
+
+This opt-in path is distinct from A2. A2 starts an IPC child and its parent sends
+SIGTERM; A3 runs the synthetic harness itself in the foreground, has no parent,
+does not spawn a signal sender, and uses no IPC. It listens for SIGTERM only
+after installing a permanent claim, running the offline fixture pipeline, and
+fsyncing a unique run-bound readiness marker after the acknowledged fill. The
+existing stop API then produces the terminal checkpoint/export, restart denial,
+and immutable receiver readback. Default worker behavior and ordinary A2 are
+unchanged.
+
+Local/source-only verification (no host or service signal):
+
+  node --test test/memecoin-paper-synthetic-host-acceptance.test.js
+
+The tests signal only their isolated child processes. They exercise delayed
+operator signal and separate phase deadlines, exclusive arm consumption,
+same-command replacement hold/readback, unarmed alternate roots, concurrency,
+tampering, missing evidence, initial root failures/timeouts, monotonic deadline
+boundaries, stalled arm-open completion, and readback after a changed local
+filesystem device number. Passing these tests proves local process and filesystem
+behavior only. It does not prove platform event provenance, service/pod identity,
+volume identity, image deployment, platform termination timing, or hosted
+durability.
+
+Future host rehearsal — separate approval required; this source-only change
+does not authorize a Northflank action. Preserve the existing volume, all old
+claims/runs, and the previous service command/entrypoint before any separately
+approved rehearsal. Use the already verified private synthetic data child and
+the reviewed immutable image digest; do not use or alter the batch claim or any
+old claim. The worker must run as its existing unprivileged UID. First, on the
+original attached data volume, provision exactly one arm for this new claim ID.
+The arm is a canonical, mode-0600 file created exclusively before the worker is
+started and binds the claim, run, arm ID, and data-root path. The worker never
+creates or repairs an arm. It validates the private canonical path and exact
+arm/claim/receipt bytes; it does not treat the current filesystem device number
+as a stable volume identifier. The same attached volume must be established
+independently from platform evidence. Example after the separately approved
+volume is attached:
+
+  PAPER_SYNTHETIC_ACCEPTANCE_CLAIM_ID=<new unique safe ID> \
+  PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT=/var/data/meridian-paper/synthetic-acceptance \
+  node --input-type=module <<'JS'
+  import {createHash, randomUUID} from 'node:crypto';
+  import {open} from 'node:fs/promises';
+  import path from 'node:path';
+  import {canonicalCheckpointBytes} from './scripts/memecoin-paper/checkpoint-store.mjs';
+  const dataRoot = process.env.PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT;
+  const claimId = process.env.PAPER_SYNTHETIC_ACCEPTANCE_CLAIM_ID;
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(claimId) || claimId.includes('..'))
+    throw new Error('invalid claim ID');
+  const arm = {
+    protocol: 'synthetic-platform-foreground-arm/v1', status: 'ARMED', claimId,
+    runId: `synthetic-${randomUUID()}`, armId: randomUUID(), dataRoot
+  };
+  const bytes = canonicalCheckpointBytes(arm);
+  const filename = path.join(dataRoot, `foreground-arm-${claimId}.json`);
+  const file = await open(filename, 'wx', 0o600);
+  try { await file.writeFile(bytes); await file.sync(); } finally { await file.close(); }
+  const directory = await open(dataRoot, 'r');
+  try { await directory.sync(); } finally { await directory.close(); }
+  console.log(JSON.stringify({claimId, runId: arm.runId,
+    armSha256: createHash('sha256').update(bytes).digest('hex')}));
+  JS
+
+The arm is single-use: the foreground process first creates a durable exclusive
+`foreground-arm-consumed-<claim>.json` marker, then its permanent claim. A crash
+after consumption cannot rearm or restart the fill. Keep the arm, consumed marker,
+claim, and run evidence; do not copy the arm to another volume or delete it to
+retry. Older arm/claim records may include a `rootDevice` field; it remains
+historical record content covered by the byte digests, not a current-volume
+identity check. The worker reports platform provenance as `NOT_ASSESSED` even
+when local readback succeeds. Require independent Northflank before/after
+evidence for the same immutable volume ID and attachment, service, distinct pod
+IDs, and pinned image digest before making any operational claim.
+
+Set custom entrypoint `node`, command
+`scripts/memecoin-paper/synthetic-host-acceptance.mjs`, and only these explicit
+environment values:
+
+  PAPER_SYNTHETIC_ACCEPTANCE_ENABLED=true
+  PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND=true
+  PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND_WAIT_TIMEOUT_MS=60000
+  PAPER_SYNTHETIC_ACCEPTANCE_FINALIZATION_TIMEOUT_MS=60000
+  PAPER_SYNTHETIC_ACCEPTANCE_READBACK_TIMEOUT_MS=15000
+  PAPER_SYNTHETIC_ACCEPTANCE_CLAIM_ID=<new unique safe ID>
+  PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT=/var/data/meridian-paper/synthetic-acceptance
+
+Keep the worker private, offline, credential-free, with no HTTPS options or
+provider settings. The readiness/operator phase is bounded separately from
+post-signal finalization. A delayed signal uses the remaining readiness/operator
+phase only; the finalization budget starts once, at SIGTERM observation, and is
+not extended or restarted. Configure and independently read back a termination
+grace of at least 65 seconds. Use one unique claim ID for one attempt only. The
+first process stays foreground after it prints one `READY` JSON receipt;
+readiness is `foreground-claim-<claim>.json` plus the run's `readiness.json`.
+That receipt is worker output, not proof of a platform event. The platform
+replacement must use the identical command, claim ID, image digest, service, and
+attached volume. With complete evidence it reports
+`mode: READ_ONLY_REPLACEMENT` and `readback: VERIFIED`; it must not create
+another fill or modify evidence.
+
+Every replacement holds the process inert after its bounded readback, whether
+verified or UNKNOWN, until the platform sends SIGTERM to the idle process. It
+does not exit and induce restart churn, rearm, or write new evidence; after that
+normal platform stop it exits cleanly. If readback is incomplete, missing, timed
+out, or tampered, it emits UNKNOWN and holds without repair. A fresh root without
+the pre-provisioned arm emits UNKNOWN, performs no writes, and holds inert.
+Preserve all artifacts and do not retry, clear claims/consumed markers, copy an
+arm, or substitute a new claim as a way to repair evidence.
+
+The worker can report only that its own process handler observed SIGTERM after
+readiness. It deliberately does not report platform-event provenance,
+signal-to-exit duration, a platform timestamp, or volume identity. For any
+future host conclusion, retain independent before/after platform evidence that
+binds all of the following:
+
+- exact immutable volume ID and its attachment to the same service before and
+  after replacement;
+- same service ID and distinct old/new pod IDs;
+- same pinned `sha256:` image digest and the independently read-back 65-second
+  termination-grace setting;
+- original pod's platform SIGTERM/termination event time and independently
+  observed process/pod exit time, no more than 65 seconds apart;
+- original claim/run ID and exact readiness, checkpoint, export SHA-256 and
+  byte length, plus replacement's read-only verified readback of those same
+  bytes.
+
+Capture platform event time and observed exit from the platform's independent
+event/status surfaces, not from worker JSON or application logs. If any identity,
+attachment, event timestamp, observed exit, or byte-level readback is missing or
+ambiguous, report host result UNKNOWN and preserve evidence. Do not infer the
+event or timing from a process-handler receipt.
+
+Rollback only after independently establishing that no worker is active: restore
+the saved prior command/entrypoint and service settings, leave the same volume
+attached, and preserve the new claim and all old artifacts unchanged. Never
+delete claims, checkpoints, exports, or locks to make a rollback/retry pass.
+
 Proof B — CONTROLLER SOURCE-POLICY NO-ENTRY lifecycle, NOT synthetic quote proof
 -----------------------------------------------------------------------------
 
