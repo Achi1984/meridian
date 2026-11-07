@@ -8,6 +8,10 @@ import {
 import {
   DEFAULT_SIGNAL_REPLAY_PROFILE_ID, getSignalReplayProfile
 } from "./evidence-profiles.mjs";
+import {
+  expectedDispatchFromEnvironment, FOUR_HOUR_DISPATCH_PROFILE_ID,
+  verifyFourHourDispatchIdentity
+} from "./dispatch-identity.mjs";
 
 const DEFAULT_REPLAY_PROFILE = getSignalReplayProfile();
 const HISTORICAL_IDENTITY = Object.fromEntries(
@@ -49,8 +53,14 @@ function cycleForEvent(event, profile) {
   return event.cycle;
 }
 
-function identityStatus(readback, provenance, profile) {
+function identityStatus(readback, provenance, profile, expectedDispatch) {
   if (!readback || !provenance) return "UNKNOWN";
+  if (profile.profileId === FOUR_HOUR_DISPATCH_PROFILE_ID) {
+    const dispatchIdentity = verifyFourHourDispatchIdentity({
+      expectedDispatch, provenance, runIds: [readback.runId]
+    });
+    if (dispatchIdentity !== "PASS") return dispatchIdentity;
+  }
   const expected = profile.identity;
   const identityMatches = expected.kind === "fixed" ?
     provenance.workflowSha === expected.workflowSha &&
@@ -219,11 +229,11 @@ function stateMatches(left, right) {
 
 export function replaySpotPaperSignals({
   readback, provenance, responseBodies,
-  profileId = DEFAULT_SIGNAL_REPLAY_PROFILE_ID
+  profileId = DEFAULT_SIGNAL_REPLAY_PROFILE_ID, expectedDispatch
 } = {}) {
   const profile = getSignalReplayProfile(profileId);
   const discrepancies = [];
-  const identity = identityStatus(readback, provenance, profile);
+  const identity = identityStatus(readback, provenance, profile, expectedDispatch);
   if (identity !== "PASS") {
     return {
       outcome: identity,
@@ -437,7 +447,7 @@ async function boundedRead(path, maxBytes) {
   return bytes.toString("utf8");
 }
 
-export async function main(argv = process.argv.slice(2)) {
+export async function main(argv = process.argv.slice(2), environment = process.env) {
   const [
     readbackPath, provenancePath, runDirectory, outputPath,
     profileId = DEFAULT_SIGNAL_REPLAY_PROFILE_ID
@@ -483,7 +493,8 @@ export async function main(argv = process.argv.slice(2)) {
     responseBodies.set(hash, raw);
   }
   const result = replaySpotPaperSignals({
-    readback, provenance, responseBodies, profileId
+    readback, provenance, responseBodies, profileId,
+    expectedDispatch: expectedDispatchFromEnvironment(environment)
   });
   await writeFile(outputPath, `${JSON.stringify(result, null, 2)}\n`, { flag: "wx" });
   process.stdout.write(`${JSON.stringify(result)}\n`);

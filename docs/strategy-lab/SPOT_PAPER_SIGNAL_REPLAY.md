@@ -39,6 +39,19 @@ node scripts/spot-paper-pilot/signal-replay.mjs \
 
 The new profile is for offline replay only. It does not dispatch, resume, or
 modify a run, and its distinct bounds do not loosen the historical default.
+For this profile, `MERIDIAN_EXPECTED_DISPATCH_*` environment values are also
+required. They must come from an independently root-verified GitHub Actions run
+tuple (repository, workflow path, ref, workflow commit SHA, run ID, number, and
+attempt), not from `pilot-manifest.json`. The four-hour workflow supplies them
+directly from GitHub's `github` context. Offline replay without the tuple returns
+`UNKNOWN`; if any trusted tuple field disagrees with the retained provenance or
+readback run ID, it returns `FAILED`. The expected tuple binds the reviewed
+workflow commit at dispatch time, avoiding a circular compile-time workflow-SHA
+pin.
+
+The original run reconciliation is recorded in
+[`SPOT_PAPER_PILOT_42395522899_RECONCILIATION.md`](SPOT_PAPER_PILOT_42395522899_RECONCILIATION.md);
+this replay contract does not duplicate its result.
 
 The replay uses the pilot's existing `createStrategyState` and
 `advanceStrategy` behavior over retained chronological closed candles. It

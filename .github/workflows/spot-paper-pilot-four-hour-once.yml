@@ -17,6 +17,14 @@ jobs:
       github.run_attempt == 1
     runs-on: ubuntu-24.04
     timeout-minutes: 270
+    env:
+      MERIDIAN_EXPECTED_DISPATCH_REPOSITORY: ${{ github.repository }}
+      MERIDIAN_EXPECTED_DISPATCH_WORKFLOW_PATH: .github/workflows/spot-paper-pilot-four-hour-once.yml
+      MERIDIAN_EXPECTED_DISPATCH_REF: ${{ github.ref }}
+      MERIDIAN_EXPECTED_DISPATCH_WORKFLOW_SHA: ${{ github.sha }}
+      MERIDIAN_EXPECTED_DISPATCH_RUN_ID: ${{ github.run_id }}
+      MERIDIAN_EXPECTED_DISPATCH_RUN_NUMBER: ${{ github.run_number }}
+      MERIDIAN_EXPECTED_DISPATCH_RUN_ATTEMPT: ${{ github.run_attempt }}
     steps:
       - name: Checkout workflow and offline assessors
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
@@ -56,11 +64,14 @@ jobs:
           const manifest = {
             schemaVersion: "SPOT_PAPER_PILOT_DISPATCH_MANIFEST_V1",
             profileId: "BTC_EUR_PAPER_4H_V1",
+            repository: process.env.MERIDIAN_EXPECTED_DISPATCH_REPOSITORY,
+            workflowPath: process.env.MERIDIAN_EXPECTED_DISPATCH_WORKFLOW_PATH,
+            ref: process.env.MERIDIAN_EXPECTED_DISPATCH_REF,
             acceptedSourceSha,
-            workflowSha: process.env.GITHUB_SHA,
-            workflowRunId: process.env.GITHUB_RUN_ID,
-            workflowRunNumber: Number(process.env.GITHUB_RUN_NUMBER),
-            workflowRunAttempt: Number(process.env.GITHUB_RUN_ATTEMPT),
+            workflowSha: process.env.MERIDIAN_EXPECTED_DISPATCH_WORKFLOW_SHA,
+            workflowRunId: process.env.MERIDIAN_EXPECTED_DISPATCH_RUN_ID,
+            workflowRunNumber: Number(process.env.MERIDIAN_EXPECTED_DISPATCH_RUN_NUMBER),
+            workflowRunAttempt: Number(process.env.MERIDIAN_EXPECTED_DISPATCH_RUN_ATTEMPT),
             runId,
             model: "BTC_EUR_SMA5_SMA20_V1",
             mode: "paper",
@@ -91,9 +102,9 @@ jobs:
           {
             printf 'profile_id=%s\n' 'BTC_EUR_PAPER_4H_V1'
             printf 'accepted_source_sha=%s\n' "$source_sha"
-            printf 'workflow_sha=%s\n' "$GITHUB_SHA"
-            printf 'workflow_run_id=%s\n' "$GITHUB_RUN_ID"
-            printf 'workflow_run_attempt=%s\n' "$GITHUB_RUN_ATTEMPT"
+            printf 'workflow_sha=%s\n' "$MERIDIAN_EXPECTED_DISPATCH_WORKFLOW_SHA"
+            printf 'workflow_run_id=%s\n' "$MERIDIAN_EXPECTED_DISPATCH_RUN_ID"
+            printf 'workflow_run_attempt=%s\n' "$MERIDIAN_EXPECTED_DISPATCH_RUN_ATTEMPT"
             printf 'run_id=%s\n' "$run_id"
             printf 'environment=%s\n' "$(uname -srmo)"
             printf 'node=%s\n' "$(node --version)"

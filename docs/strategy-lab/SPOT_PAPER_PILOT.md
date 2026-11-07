@@ -335,15 +335,36 @@ The cycle limit can end the run around 239 minutes, so the assessor reports the
 measured elapsed time and classifies that as partial rather than automatically
 claiming a full four-hour observation.
 
+The prior 60-cycle experiment's retained reconciliation and replay are recorded
+once in [the #1268 evidence report](SPOT_PAPER_PILOT_42395522899_RECONCILIATION.md);
+this four-hour preparation does not duplicate that result.
+
 The workflow retains its generated dispatch manifest, CLI output, read-only
 readback, journal, raw responses, assessment, offline signal replay, metadata,
 and SHA-256 manifest in a 14-day artifact, including failed attempts. The
 offline tools accept only the versioned profile IDs declared in
 `scripts/spot-paper-pilot/evidence-profiles.mjs`; omitting the selector retains
 the original one-hour assessment and strict historical replay identity.
-Example replay for the new profile:
+For the four-hour profile, the workflow gives both offline tools the trusted
+repository, workflow path, ref, workflow commit SHA, run ID, run number, and
+attempt directly through runner environment values from GitHub's `github`
+context. The tools compare this tuple with the retained dispatch manifest and
+run/readback IDs; they never derive the expected tuple from that manifest.
+Offline replay requires a root-verified expected-dispatch tuple obtained
+independently from the GitHub Actions run (for example, its run page/API). Do not
+copy expected values out of the evidence artifact's `pilot-manifest.json`.
+Missing tuple values produce `UNKNOWN`; a mismatch produces `FAILED`. Supply the
+verified values through the `MERIDIAN_EXPECTED_DISPATCH_*` environment variables
+before invoking the new profile:
 
 ```sh
+export MERIDIAN_EXPECTED_DISPATCH_REPOSITORY=Achi1984/meridian
+export MERIDIAN_EXPECTED_DISPATCH_WORKFLOW_PATH=.github/workflows/spot-paper-pilot-four-hour-once.yml
+export MERIDIAN_EXPECTED_DISPATCH_REF=refs/heads/main
+export MERIDIAN_EXPECTED_DISPATCH_WORKFLOW_SHA='verified workflow commit SHA'
+export MERIDIAN_EXPECTED_DISPATCH_RUN_ID='verified Actions run ID'
+export MERIDIAN_EXPECTED_DISPATCH_RUN_NUMBER=1
+export MERIDIAN_EXPECTED_DISPATCH_RUN_ATTEMPT=1
 node scripts/spot-paper-pilot/signal-replay.mjs \
   readback.stdout.json pilot-manifest.json \
   data/spot-paper-<workflow-run-id>-1 signal-replay.json BTC_EUR_PAPER_4H_V1

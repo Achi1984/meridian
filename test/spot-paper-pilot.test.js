@@ -261,6 +261,15 @@ function fourHourPaperFixture({ withFill = false } = {}) {
   const fixture = paperEvidenceFixture({ withFill });
   const profile = getPaperEvidenceProfile("BTC_EUR_PAPER_4H_V1");
   const runId = "spot-paper-987654321-1";
+  const expectedDispatch = {
+    repository: "Achi1984/meridian",
+    workflowPath: ".github/workflows/spot-paper-pilot-four-hour-once.yml",
+    ref: "refs/heads/main",
+    workflowSha: "b".repeat(40),
+    workflowRunId: "987654321",
+    workflowRunNumber: 1,
+    workflowRunAttempt: 1
+  };
   fixture.report.runId = runId;
   fixture.readback.runId = runId;
   fixture.readback.manifest.limits = {
@@ -273,11 +282,9 @@ function fourHourPaperFixture({ withFill = false } = {}) {
     pollIntervalMs: profile.pollIntervalMs
   };
   fixture.provenance = {
-    ...fixture.provenance, ...profile,
-    workflowSha: "b".repeat(40),
-    workflowRunId: "987654321",
-    runId
+    ...fixture.provenance, ...profile, ...expectedDispatch, runId
   };
+  fixture.expectedDispatch = expectedDispatch;
   return fixture;
 }
 
@@ -336,7 +343,8 @@ test("four-hour allowlisted assessment reports partial duration, unresolved inve
   const assessment = assessPaperEvidence({
     paperExitCode: 0, paperReport: fixture.report, readback: fixture.readback,
     provenance: fixture.provenance, responseBodies: fixture.responseBodies,
-    profileId: "BTC_EUR_PAPER_4H_V1"
+    profileId: "BTC_EUR_PAPER_4H_V1",
+    expectedDispatch: fixture.expectedDispatch
   });
   assert.equal(assessment.outcome, "COMPLETED", JSON.stringify(assessment));
   assert.equal(assessment.profileId, "BTC_EUR_PAPER_4H_V1");
@@ -357,7 +365,8 @@ test("four-hour allowlisted assessment reports partial duration, unresolved inve
   const rejectedRun = assessPaperEvidence({
     paperExitCode: 0, paperReport: wrongRun.report, readback: wrongRun.readback,
     provenance: wrongRun.provenance, responseBodies: wrongRun.responseBodies,
-    profileId: "BTC_EUR_PAPER_4H_V1"
+    profileId: "BTC_EUR_PAPER_4H_V1",
+    expectedDispatch: wrongRun.expectedDispatch
   });
   assert.equal(rejectedRun.outcome, "FAILED");
 
@@ -366,7 +375,8 @@ test("four-hour allowlisted assessment reports partial duration, unresolved inve
   const rejectedMode = assessPaperEvidence({
     paperExitCode: 0, paperReport: wrongMode.report, readback: wrongMode.readback,
     provenance: wrongMode.provenance, responseBodies: wrongMode.responseBodies,
-    profileId: "BTC_EUR_PAPER_4H_V1"
+    profileId: "BTC_EUR_PAPER_4H_V1",
+    expectedDispatch: wrongMode.expectedDispatch
   });
   assert.equal(rejectedMode.outcome, "FAILED");
 
@@ -375,9 +385,44 @@ test("four-hour allowlisted assessment reports partial duration, unresolved inve
   const rejectedBounds = assessPaperEvidence({
     paperExitCode: 0, paperReport: exceeded.report, readback: exceeded.readback,
     provenance: exceeded.provenance, responseBodies: exceeded.responseBodies,
-    profileId: "BTC_EUR_PAPER_4H_V1"
+    profileId: "BTC_EUR_PAPER_4H_V1",
+    expectedDispatch: exceeded.expectedDispatch
   });
   assert.equal(rejectedBounds.outcome, "FAILED");
+  const missingExpectation = assessPaperEvidence({
+    paperExitCode: 0, paperReport: fixture.report, readback: fixture.readback,
+    provenance: fixture.provenance, responseBodies: fixture.responseBodies,
+    profileId: "BTC_EUR_PAPER_4H_V1"
+  });
+  assert.equal(missingExpectation.outcome, "UNKNOWN");
+  assert.equal(missingExpectation.dispatchIdentity, "UNKNOWN");
+  assert.equal(missingExpectation.dataAcceptance, "NOT_ASSESSED");
+
+  const coordinatedTampering = structuredClone(fixture);
+  const forgedDispatch = {
+    ...coordinatedTampering.expectedDispatch,
+    workflowSha: "c".repeat(40),
+    workflowRunId: "987654322"
+  };
+  forgedDispatch.workflowRunNumber = 1;
+  forgedDispatch.workflowRunAttempt = 1;
+  coordinatedTampering.expectedDispatch = fixture.expectedDispatch;
+  coordinatedTampering.provenance = {
+    ...coordinatedTampering.provenance, ...forgedDispatch,
+    runId: "spot-paper-987654322-1"
+  };
+  coordinatedTampering.report.runId = "spot-paper-987654322-1";
+  coordinatedTampering.readback.runId = "spot-paper-987654322-1";
+  const rejectedCoordinatedTampering = assessPaperEvidence({
+    paperExitCode: 0, paperReport: coordinatedTampering.report,
+    readback: coordinatedTampering.readback,
+    provenance: coordinatedTampering.provenance,
+    responseBodies: coordinatedTampering.responseBodies,
+    profileId: "BTC_EUR_PAPER_4H_V1",
+    expectedDispatch: coordinatedTampering.expectedDispatch
+  });
+  assert.equal(rejectedCoordinatedTampering.outcome, "FAILED");
+  assert.equal(rejectedCoordinatedTampering.dispatchIdentity, "FAILED");
   assert.throws(() => assessPaperEvidence({
     paperExitCode: 0, paperReport: fixture.report, readback: fixture.readback,
     provenance: fixture.provenance, responseBodies: fixture.responseBodies,
@@ -677,12 +722,23 @@ test("paper evidence CLI verifies local response bodies without provider request
   await writeFile(fourHourPaperPath, JSON.stringify(fourHour.report));
   await writeFile(fourHourReadbackPath, JSON.stringify(fourHour.readback));
   await writeFile(fourHourProvenancePath, JSON.stringify(fourHour.provenance));
+  const expectedDispatchEnvironment = Object.fromEntries(
+    Object.entries(fourHour.expectedDispatch).map(([field, value]) => [
+      `MERIDIAN_EXPECTED_DISPATCH_${field.replace(/^workflowRunId$/, "runId")
+        .replace(/^workflowRunNumber$/, "runNumber")
+        .replace(/^workflowRunAttempt$/, "runAttempt").replace(/[A-Z]/g,
+        letter => `_${letter}`).toUpperCase()}`, String(value)
+    ]));
   const fourHourOutput = execFileSync(process.execPath, [
     PAPER_ASSESSMENT_PATH, fourHourPaperPath, fourHourReadbackPath, "0",
     fourHourProvenancePath, fourHourRun, fourHourAssessmentPath, "BTC_EUR_PAPER_4H_V1"
-  ], { encoding: "utf8" });
+  ], {
+    encoding: "utf8",
+    env: { ...process.env, ...expectedDispatchEnvironment }
+  });
   assert.equal(JSON.parse(fourHourOutput).profileId, "BTC_EUR_PAPER_4H_V1");
   assert.equal(JSON.parse(fourHourOutput).durationStatus, "PARTIAL_BOUNDED_DURATION");
+  assert.equal(JSON.parse(fourHourOutput).dispatchIdentity, "PASS");
 });
 
 test("one-hour paper workflow is owner-only, manual, one-shot, pinned, and bounded", () => {
@@ -738,6 +794,15 @@ test("four-hour paper workflow is a fixed owner-only one-shot with bounded retai
   ]) assert.ok(FOUR_HOUR_PAPER_WORKFLOW.includes(required), required);
   assert.equal((FOUR_HOUR_PAPER_WORKFLOW.match(
     /actions\/checkout@11bd71901bbe5b1630ceea73d27597364c9af683/g) || []).length, 2);
+  for (const trustedContext of [
+    "MERIDIAN_EXPECTED_DISPATCH_REPOSITORY: ${{ github.repository }}",
+    "MERIDIAN_EXPECTED_DISPATCH_REF: ${{ github.ref }}",
+    "MERIDIAN_EXPECTED_DISPATCH_WORKFLOW_SHA: ${{ github.sha }}",
+    "MERIDIAN_EXPECTED_DISPATCH_RUN_ID: ${{ github.run_id }}",
+    "MERIDIAN_EXPECTED_DISPATCH_RUN_NUMBER: ${{ github.run_number }}",
+    "MERIDIAN_EXPECTED_DISPATCH_RUN_ATTEMPT: ${{ github.run_attempt }}",
+    "MERIDIAN_EXPECTED_DISPATCH_WORKFLOW_PATH: .github/workflows/spot-paper-pilot-four-hour-once.yml"
+  ]) assert.ok(FOUR_HOUR_PAPER_WORKFLOW.includes(trustedContext), trustedContext);
   assert.match(FOUR_HOUR_PAPER_WORKFLOW,
     /actions\/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020/);
   assert.match(FOUR_HOUR_PAPER_WORKFLOW,

@@ -7,6 +7,10 @@ import {
 import {
   DEFAULT_PAPER_EVIDENCE_PROFILE_ID, getPaperEvidenceProfile
 } from "./evidence-profiles.mjs";
+import {
+  expectedDispatchFromEnvironment, FOUR_HOUR_DISPATCH_PROFILE_ID,
+  verifyFourHourDispatchIdentity
+} from "./dispatch-identity.mjs";
 
 export const ACCEPTED_PAPER_SOURCE_SHA = "81edf0b5dc3d455c2c1e1906791d56c731bea0c9";
 const EXPECTED_MANIFEST = getPaperEvidenceProfile();
@@ -247,7 +251,7 @@ function verifyLedger(events, checkpoint, report, parsedQuotes) {
 
 export function assessPaperEvidence({
   paperExitCode, paperReport, readback, provenance, responseBodies,
-  profileId = DEFAULT_PAPER_EVIDENCE_PROFILE_ID
+  profileId = DEFAULT_PAPER_EVIDENCE_PROFILE_ID, expectedDispatch
 }) {
   const expected = getPaperEvidenceProfile(profileId);
   const report = readback?.report;
@@ -259,9 +263,15 @@ export function assessPaperEvidence({
     terminal?.id === "run-terminal" && same(terminal.report, report) &&
     same(paperReport, report) && report?.schemaVersion === "SPOT_PAPER_PILOT_REPORT_V1";
   const failures = [];
+  const dispatchIdentity = profileId === FOUR_HOUR_DISPATCH_PROFILE_ID ?
+    verifyFourHourDispatchIdentity({
+      expectedDispatch, provenance,
+      runIds: [readback?.runId, report?.runId].filter(value => value !== undefined)
+    }) : "PASS";
   let marketEvidence = { valid: false, acceptedObservations: 0, parsedQuotes: new Map() };
 
   if (terminalVerified) {
+    if (dispatchIdentity === "FAILED") failures.push("TRUSTED_DISPATCH_IDENTITY_MISMATCH");
     if (!verifyProvenance(provenance, report.runId, expected) ||
         provenance.runId !== report.runId) {
       failures.push("SOURCE_OR_FRESH_RUN_BINDING_FAILED");
@@ -325,11 +335,14 @@ export function assessPaperEvidence({
   }
 
   const bounded = terminalVerified && failures.length === 0 &&
+    dispatchIdentity === "PASS" &&
     paperExitCode === 0 && report.operationalStatus === "COMPLETED_BOUNDED" &&
     ["CYCLE_LIMIT", "DURATION_LIMIT"].includes(report.stopReason);
   const completed = bounded && marketEvidence.valid &&
     marketEvidence.acceptedObservations > 0;
-  const outcome = !terminalVerified ? "UNKNOWN" : completed ? "COMPLETED" : "FAILED";
+  const outcome = dispatchIdentity === "FAILED" ? "FAILED" :
+    !terminalVerified || dispatchIdentity === "UNKNOWN" ?
+      "UNKNOWN" : completed ? "COMPLETED" : "FAILED";
   const reasons = Array.isArray(events) ? events
     .filter(event => event.type === "data_gap" && (event.reason || event.dataGap))
     .map(event => event.reason ?? event.dataGap) : [];
@@ -345,7 +358,8 @@ export function assessPaperEvidence({
     elapsedMs / expected.maxDurationMs;
   const riskStop = ["SAMPLED_2PCT_BID_STOP", "SESSION_LOSS_LIMIT"]
     .includes(report?.stopReason);
-  const runClassification = !terminalVerified ? "UNKNOWN" :
+  const runClassification = dispatchIdentity === "FAILED" ? "FAILED_EVIDENCE" :
+    !terminalVerified || dispatchIdentity === "UNKNOWN" ? "UNKNOWN" :
     riskStop ? "RISK_STOP" : failures.length || paperExitCode !== 0 ?
       "FAILED_EVIDENCE" : completed && report.stopReason === "DURATION_LIMIT" &&
         elapsedMs >= expected.maxDurationMs ?
@@ -376,6 +390,7 @@ export function assessPaperEvidence({
   return {
     outcome,
     profileId: expected.profileId,
+    dispatchIdentity,
     runClassification,
     terminalVerified,
     boundedTermination: bounded,
@@ -430,6 +445,7 @@ export function assessPaperEvidence({
     ],
     validationCriteria: {
       pinnedSourceAndFreshRun: terminalVerified &&
+        dispatchIdentity === "PASS" &&
         !failures.includes("SOURCE_OR_FRESH_RUN_BINDING_FAILED"),
       requestedModeAndBounds: terminalVerified &&
         !failures.includes("ENGINE_MANIFEST_MISMATCH") &&
@@ -445,7 +461,7 @@ export function assessPaperEvidence({
   };
 }
 
-async function main(argv) {
+async function main(argv, environment = process.env) {
   const [
     paperPath, readbackPath, exitCodeText, provenancePath, runDirectory, outputPath,
     profileId = DEFAULT_PAPER_EVIDENCE_PROFILE_ID
@@ -478,7 +494,8 @@ async function main(argv) {
   }
   const paperExitCode = /^\d+$/.test(exitCodeText) ? Number(exitCodeText) : null;
   const assessment = assessPaperEvidence({
-    paperExitCode, paperReport, readback, provenance, responseBodies, profileId
+    paperExitCode, paperReport, readback, provenance, responseBodies, profileId,
+    expectedDispatch: expectedDispatchFromEnvironment(environment)
   });
   await writeFile(outputPath, `${JSON.stringify(assessment, null, 2)}\n`, { flag: "wx" });
   process.stdout.write(`${JSON.stringify(assessment)}\n`);

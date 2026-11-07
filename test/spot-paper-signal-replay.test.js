@@ -64,9 +64,15 @@ function identity(profileId) {
       workflowRunAttempt: 1,
       runId: "spot-paper-987654321-1"
     };
+  const dispatchFields = profileId === "BTC_EUR_PAPER_4H_V1" ? {
+    repository: "Achi1984/meridian",
+    workflowPath: ".github/workflows/spot-paper-pilot-four-hour-once.yml",
+    ref: "refs/heads/main"
+  } : {};
   return {
     ...profileFields,
     ...dynamicIdentity,
+    ...dispatchFields,
     ...(profileId ? { profileId: profile.profileId } : {})
   };
 }
@@ -172,6 +178,15 @@ function run(fixtureData, provenance = identity(), bodies = fixtureData.response
 
 function fourHourReplayEvidence(fixtureData) {
   const provenance = identity("BTC_EUR_PAPER_4H_V1");
+  const expectedDispatch = {
+    repository: "Achi1984/meridian",
+    workflowPath: ".github/workflows/spot-paper-pilot-four-hour-once.yml",
+    ref: "refs/heads/main",
+    workflowSha: provenance.workflowSha,
+    workflowRunId: provenance.workflowRunId,
+    workflowRunNumber: provenance.workflowRunNumber,
+    workflowRunAttempt: provenance.workflowRunAttempt
+  };
   const readback = fixtureData.readback();
   readback.runId = provenance.runId;
   readback.manifest.limits = {
@@ -179,7 +194,10 @@ function fourHourReplayEvidence(fixtureData) {
     pollIntervalMs: 60_000, requestTimeoutMs: 5_000,
     maxBytes: 67_108_864, maxResponseBytes: 262_144
   };
-  return { readback, provenance, responseBodies: fixtureData.responseBodies };
+  return {
+    readback, provenance, responseBodies: fixtureData.responseBodies,
+    expectedDispatch
+  };
 }
 
 async function runnerTickerFailureFixture(t) {
@@ -409,6 +427,22 @@ test("four-hour allowlisted replay binds fresh identity and rejects source, mode
   assert.throws(() => replaySpotPaperSignals({
     ...evidence, profileId: "caller-controlled-profile"
   }), /UNKNOWN_SIGNAL_REPLAY_PROFILE/);
+
+  const missingExpectation = { ...evidence, expectedDispatch: undefined };
+  assert.equal(replaySpotPaperSignals({
+    ...missingExpectation, profileId: "BTC_EUR_PAPER_4H_V1"
+  }).outcome, "UNKNOWN");
+
+  const coordinatedTampering = structuredClone(evidence);
+  coordinatedTampering.provenance.workflowSha = "c".repeat(40);
+  coordinatedTampering.provenance.workflowRunId = "987654322";
+  coordinatedTampering.provenance.runId = "spot-paper-987654322-1";
+  coordinatedTampering.readback.runId = "spot-paper-987654322-1";
+  const rejectedCoordinatedTampering = replaySpotPaperSignals({
+    ...coordinatedTampering, profileId: "BTC_EUR_PAPER_4H_V1"
+  });
+  assert.equal(rejectedCoordinatedTampering.outcome, "FAILED");
+  assert.equal(rejectedCoordinatedTampering.identity, "FAILED");
 });
 
 test("known signal failure remains FAILED when another referenced response is missing", () => {
@@ -466,6 +500,7 @@ test("CLI selects the allowlisted four-hour profile for retained evidence", asyn
   const runDirectory = join(root, "run");
   const responseDirectory = join(runDirectory, "responses");
   const outputPath = join(root, "replay.json");
+  const missingContextOutputPath = join(root, "replay-missing-context.json");
   await mkdir(responseDirectory, { recursive: true });
   await writeFile(readbackPath, JSON.stringify(evidence.readback));
   await writeFile(provenancePath, JSON.stringify(evidence.provenance));
@@ -475,8 +510,22 @@ test("CLI selects the allowlisted four-hour profile for retained evidence", asyn
   const previousExitCode = process.exitCode;
   try {
     await signalReplayMain([
+      readbackPath, provenancePath, runDirectory, missingContextOutputPath,
+      "BTC_EUR_PAPER_4H_V1"
+    ], {});
+    assert.equal(JSON.parse(await readFile(missingContextOutputPath, "utf8")).outcome,
+      "UNKNOWN");
+    process.exitCode = previousExitCode;
+    const expectedEnvironment = Object.fromEntries(
+      Object.entries(evidence.expectedDispatch).map(([field, value]) => [
+        `MERIDIAN_EXPECTED_DISPATCH_${field.replace(/^workflowRunId$/, "runId")
+          .replace(/^workflowRunNumber$/, "runNumber")
+          .replace(/^workflowRunAttempt$/, "runAttempt").replace(/[A-Z]/g,
+          letter => `_${letter}`).toUpperCase()}`, String(value)
+      ]));
+    await signalReplayMain([
       readbackPath, provenancePath, runDirectory, outputPath, "BTC_EUR_PAPER_4H_V1"
-    ]);
+    ], expectedEnvironment);
     const output = JSON.parse(await readFile(outputPath, "utf8"));
     assert.equal(output.outcome, "PASS");
     assert.equal(output.profileId, "BTC_EUR_PAPER_4H_V1");
