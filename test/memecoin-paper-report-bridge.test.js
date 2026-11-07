@@ -450,5 +450,6 @@ test('bridge remains bounded and the browser controller owns its fixed authentic
   assert.doesNotMatch(bootstrap, /createPaperReportConnector/);
   assert.match(controller, /\/api\/private\/paper-report/);
   assert.doesNotMatch(controller, /setInterval|localStorage|sessionStorage|indexedDB|document\.cookie/);
-  assert.doesNotMatch(gateway, /paper-report/);
+  assert.match(gateway, /handleReportGatewayRequest/);
+  assert.match(gateway, /handleSpotPaperReportGatewayRequest/);
 });

@@ -34,6 +34,37 @@ gateway route or report transfer. It does not claim that a report is present or
 that live data was read. The separate backend/transfer review and an approved
 transferred report are prerequisites for an available response.
 
+## BTC/EUR spot-paper connection
+
+The BTC/EUR card is a separate read-only contract and does not use or weaken the
+memecoin report validator. It uses
+`GET /api/private/spot-paper-report` and
+`POST /api/private/spot-paper-report/upload`, with the existing read bearer for
+GET, a distinct upload bearer for POST, a bounded canonical transfer envelope,
+and isolated immutable storage. The fixed accepted run identity is
+`spot-paper-42395522899-1`.
+
+The spot route fails closed unless all of
+`MERIDIAN_SPOT_PAPER_REPORT_ENABLED`,
+`MERIDIAN_SPOT_PAPER_REPORT_DEPLOYMENT_VERIFIED`, and
+`MERIDIAN_SPOT_PAPER_REPORT_UPLOAD_APPROVED` are explicitly `true`. A separate
+upload-token hash and the existing read-token configuration are also required.
+The new table migration must be applied. No route deployment, env configuration,
+secret, report transfer, or hosted verification was performed here.
+
+The checked-in reconciliation and replay records do not contain the original
+terminal readback, provenance, or paper assessment payload. The generated
+preview is therefore disconnected and does not represent that run. Before any
+transfer, retrieve those exact retained inputs through the approved operator
+process, regenerate current assessment/replay fields with the offline tools
+documented in `PAPER_REPORT_BRIDGE.md`, and provide the independently
+root-verified first-hour Actions dispatch tuple to
+`scripts/spot-paper-report-bridge/create-dto.mjs`. Review and approve the exact
+generated DTO, transfer it once to the fixed upload route, and verify immutable
+GET readback. Do not reconstruct missing fields from the reconciliation
+document, hand-edit evidence, or treat signal replay as the original
+assessment's signal-replay result.
+
 After merging and publishing to Pages, verify that both imported bridge modules
 are served with a JavaScript MIME type (for example `text/javascript` or
 `application/javascript`), not `application/octet-stream`:

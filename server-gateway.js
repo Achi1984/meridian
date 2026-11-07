@@ -28,6 +28,11 @@ import {
   writeReportRouteEarlyResponse,
   writeReportRouteResponse
 } from "./report-transfer-gateway.mjs";
+import {
+  handleSpotPaperReportGatewayRequest,
+  spotPaperReportGatewayConfig,
+  writeSpotPaperReportRouteResponse
+} from "./spot-paper-report-gateway.mjs";
 
 const { Pool } = pg;
 const RELEASE=JSON.parse(await fs.readFile(new URL("./version.json",import.meta.url),"utf8"));
@@ -45,6 +50,7 @@ const PRIVATE_STATE_KEY = "private_dashboard_v1";
 const ASSET_WATCH_SHARE_STATE_KEY = "asset_watch_share_v1";
 const DATABASE_URL = process.env.DATABASE_URL || "";
 const PAPER_REPORT_CONFIG = reportTransferGatewayConfig();
+const SPOT_PAPER_REPORT_CONFIG = spotPaperReportGatewayConfig();
 const PIONEX_BOT_READ_CONFIGURED=!!(
   String(process.env.PIONEX_BOT_READ_API_KEY||process.env.PIONEX_API_KEY||'').trim() &&
   String(process.env.PIONEX_BOT_READ_API_SECRET||process.env.PIONEX_API_SECRET||'').trim()
@@ -130,6 +136,7 @@ async function readJsonBody(req,maxBytes=131072){
 let privatePool=null;
 let privatePaperReportPool=null;
 let privatePaperReportStore=null;
+let privateSpotPaperReportStore=null;
 function pool(){
   if(!DATABASE_URL)return null;
   if(!privatePool)privatePool=new Pool({connectionString:DATABASE_URL,ssl:{rejectUnauthorized:false}});
@@ -150,6 +157,15 @@ function paperReportStore(){
     privatePaperReportStore=createPrivateReportStore(paperReportPool());
   }
   return privatePaperReportStore;
+}
+function spotPaperReportStore(){
+  if(!DATABASE_URL)return null;
+  if(!privateSpotPaperReportStore){
+    privateSpotPaperReportStore=createPrivateReportStore(paperReportPool(),{
+      tableName:"meridian_spot_paper_reports"
+    });
+  }
+  return privateSpotPaperReportStore;
 }
 async function stateGet(key){
   const p=pool(); if(!p)return null;
@@ -326,6 +342,7 @@ const server=http.createServer(async(req,res)=>{
     res.once("close",abortReportOnClose);
     if(req.aborted||res.destroyed)abortReport();
     let reportRoute;
+    let spotPaperReportRoute;
     try{
       reportRoute=await handleReportGatewayRequest(req,{
         config:PAPER_REPORT_CONFIG,
@@ -333,12 +350,23 @@ const server=http.createServer(async(req,res)=>{
         authorizedRead,
         signal:reportController.signal
       });
+      if(!reportRoute){
+        spotPaperReportRoute=await handleSpotPaperReportGatewayRequest(req,{
+          config:SPOT_PAPER_REPORT_CONFIG,
+          getStore:spotPaperReportStore,
+          authorizedRead,
+          signal:reportController.signal
+        });
+      }
     }finally{
       req.removeListener("aborted",abortReport);
       res.removeListener("close",abortReportOnClose);
     }
     if(reportRoute){
       return writeReportRouteResponse(req,res,reportRoute,origin,writeJson);
+    }
+    if(spotPaperReportRoute){
+      return writeSpotPaperReportRouteResponse(req,res,spotPaperReportRoute,origin,writeJson);
     }
     if(req.method==="GET"&&u.pathname==="/gateway-health"){
       const [current,shareState,m15,h1,h4,d1]=await Promise.all([
