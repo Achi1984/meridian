@@ -149,14 +149,25 @@ export function createSyntheticClock(options = {}) {
     throw new TypeError("synthetic clock values are outside their bounds");
   }
   const performanceStart = performance.now();
+  let pausedAt;
+  let pausedDuration = 0;
   let wallOffset = 0;
   let monotonicOffset = 0;
   const clock = Object.freeze({
     wallClock() {
-      return Math.floor(wallStart + performance.now() - performanceStart + wallOffset);
+      return Math.floor(wallStart + elapsed() + wallOffset);
     },
     monotonicClock() {
-      return monotonicStart + performance.now() - performanceStart + monotonicOffset;
+      return monotonicStart + elapsed() + monotonicOffset;
+    },
+    pause() {
+      pausedAt ??= performance.now();
+    },
+    resume() {
+      if (pausedAt !== undefined) {
+        pausedDuration += performance.now() - pausedAt;
+        pausedAt = undefined;
+      }
     },
     advance(milliseconds = 1) {
       if (!Number.isSafeInteger(milliseconds) || milliseconds < 0 || milliseconds > EIGHT_HOURS_MS) {
@@ -172,6 +183,9 @@ export function createSyntheticClock(options = {}) {
       wallOffset += milliseconds;
     }
   });
+  function elapsed() {
+    return (pausedAt ?? performance.now()) - performanceStart - pausedDuration;
+  }
   syntheticClocks.set(clock, {source: "SYNTHETIC_FIXTURE_CLOCK", uncertaintyMs: 0});
   return clock;
 }

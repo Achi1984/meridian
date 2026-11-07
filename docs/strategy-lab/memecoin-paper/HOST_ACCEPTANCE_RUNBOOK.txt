@@ -304,15 +304,15 @@ Local/source-only verification (no host or service signal):
 
   node --test test/memecoin-paper-synthetic-host-acceptance.test.js
 
-The tests signal only their isolated child processes. They exercise delayed
-operator signal and separate phase deadlines, exclusive arm consumption,
-same-command replacement hold/readback, unarmed alternate roots, concurrency,
-tampering, missing evidence, initial root failures/timeouts, monotonic deadline
-boundaries, stalled arm-open completion, and readback after a changed local
-filesystem device number. Passing these tests proves local process and filesystem
-behavior only. It does not prove platform event provenance, service/pod identity,
-volume identity, image deployment, platform termination timing, or hosted
-durability.
+The tests signal only their isolated child processes. They exercise slow and
+stalled preparation, delayed operator signals and separate phase deadlines,
+exclusive arm consumption, same-command replacement hold/readback, unarmed
+alternate roots, concurrency, tampering, missing evidence, initial root
+failures/timeouts, monotonic deadline boundaries, stalled arm-open completion,
+and readback after a changed local filesystem device number. Passing these tests
+proves local process and filesystem behavior only. It does not prove platform
+event provenance, service/pod identity, volume identity, image deployment,
+platform termination timing, or hosted durability.
 
 Future host rehearsal — separate approval required; this source-only change
 does not authorize a Northflank action. Preserve the existing volume, all old
@@ -371,23 +371,29 @@ environment values:
 
   PAPER_SYNTHETIC_ACCEPTANCE_ENABLED=true
   PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND=true
-  PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND_WAIT_TIMEOUT_MS=60000
+  PAPER_SYNTHETIC_ACCEPTANCE_FOREGROUND_WAIT_TIMEOUT_MS=300000
   PAPER_SYNTHETIC_ACCEPTANCE_FINALIZATION_TIMEOUT_MS=60000
   PAPER_SYNTHETIC_ACCEPTANCE_READBACK_TIMEOUT_MS=15000
   PAPER_SYNTHETIC_ACCEPTANCE_CLAIM_ID=<new unique safe ID>
   PAPER_SYNTHETIC_ACCEPTANCE_DATA_ROOT=/var/data/meridian-paper/synthetic-acceptance
 
 Keep the worker private, offline, credential-free, with no HTTPS options or
-provider settings. The readiness/operator phase is bounded separately from
-post-signal finalization. A delayed signal uses the remaining readiness/operator
-phase only; the finalization budget starts once, at SIGTERM observation, and is
-not extended or restarted. Configure and independently read back a termination
-grace of at least 65 seconds. Use one unique claim ID for one attempt only. The
-first process stays foreground after it prints one `READY` JSON receipt;
-readiness is `foreground-claim-<claim>.json` plus the run's `readiness.json`.
-That receipt is worker output, not proof of a platform event. The platform
-replacement must use the identical command, claim ID, image digest, service, and
-attached volume. With complete evidence it reports
+provider settings. The preparation phase is independently bounded at 60 seconds.
+The operator wait starts only after the worker has durably written, synced, and
+read back the run's `readiness.json`; its default is 60 seconds and this explicit
+300-second value is the hard maximum. Pre-open the current worker logs, the
+single replacement/restart control, and the service/pod health view before
+starting the worker. On the one durable `READY` JSON receipt, take that restart
+action exactly once and check health; do not wait for a repeated/replayed READY
+or try again with this claim. The worker remains foreground while waiting.
+Post-SIGTERM finalization is independently bounded to 60 seconds and readback
+remains bounded to 15 seconds. The finalization budget starts once, at SIGTERM
+observation, and is not extended or restarted. Configure and independently read
+back a termination grace of at least 65 seconds. Use one unique claim ID for one
+attempt only. Readiness is `foreground-claim-<claim>.json` plus the run's
+`readiness.json`; the receipt is worker output, not proof of a platform event.
+The platform replacement must use the identical command, claim ID, image
+digest, service, and attached volume. With complete evidence it reports
 `mode: READ_ONLY_REPLACEMENT` and `readback: VERIFIED`; it must not create
 another fill or modify evidence.
 

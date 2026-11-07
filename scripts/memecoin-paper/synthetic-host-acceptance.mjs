@@ -27,6 +27,7 @@ const BUDGETS = Object.freeze({
 const digest = bytes => createHash("sha256").update(bytes).digest("hex");
 const MAX_ACCEPTANCE_MS = 60_000;
 const MAX_FOREGROUND_PHASE_MS = 60_000;
+const MAX_FOREGROUND_OPERATOR_WAIT_MS = 300_000;
 const MAX_REPLACEMENT_READBACK_MS = 15_000;
 const REAL_SIGNAL_HANDSHAKE_MS = 25_000;
 const NS_PER_MS = 1_000_000n;
@@ -75,11 +76,14 @@ function acceptanceOperation({
   timeoutMs = MAX_ACCEPTANCE_MS, monotonicNow = () => performance.now(),
   fileSystem = {}, signalSource = process, deadlineMonotonicNs,
   maxTimeoutMs = MAX_ACCEPTANCE_MS, finalizationTimeoutMs = MAX_ACCEPTANCE_MS,
+  operatorWaitTimeoutMs = timeoutMs,
   readbackTimeoutMs = MAX_REPLACEMENT_READBACK_MS,
   allowPhaseTransition = false
 } = {}) {
   requireProof(Number.isSafeInteger(timeoutMs) && timeoutMs > 0 && timeoutMs <= maxTimeoutMs &&
     Number.isSafeInteger(maxTimeoutMs) && maxTimeoutMs <= MAX_FOREGROUND_PHASE_MS &&
+    Number.isSafeInteger(operatorWaitTimeoutMs) && operatorWaitTimeoutMs > 0 &&
+    operatorWaitTimeoutMs <= MAX_FOREGROUND_OPERATOR_WAIT_MS &&
     Number.isSafeInteger(finalizationTimeoutMs) && finalizationTimeoutMs > 0 &&
     finalizationTimeoutMs <= MAX_ACCEPTANCE_MS);
   const fs = {lstat, mkdir, open, realpath, ...fileSystem};
@@ -95,7 +99,7 @@ function acceptanceOperation({
   requireProof(typeof absoluteDeadline === "bigint" && absoluteDeadline > 0n);
   let previous = start;
   let stopPilot;
-  let phaseTransitioned = false;
+  let readbackDiscoveryStarted = false;
   let phase = "initial";
   let timer;
   let discoveryTimer;
@@ -190,17 +194,21 @@ function acceptanceOperation({
     )),
     setPilotStop: stop => { stopPilot = stop; },
     beginFinalization(signalAt) {
-      beginPhase(finalizationTimeoutMs, "finalization", signalAt);
+      beginPhase(finalizationTimeoutMs, "finalization", signalAt, "operator-wait");
+    },
+    beginOperatorWait() {
+      beginPhase(operatorWaitTimeoutMs, "operator-wait", undefined, "initial");
     },
     beginReadbackDiscovery() {
-      requireProof(allowPhaseTransition && phase === "initial" &&
-        !phaseTransitioned && !discoveryActive && !controller.signal.aborted);
+      requireProof(allowPhaseTransition && phase === "initial" && !readbackDiscoveryStarted &&
+        !discoveryActive && !controller.signal.aborted);
       discoveryStart = {monotonicMs: monotonicNow(), monotonicNs: process.hrtime.bigint()};
       requireProof(Number.isFinite(discoveryStart.monotonicMs));
       discoveryDeadline = discoveryStart.monotonicMs + readbackTimeoutMs;
       discoveryAbsoluteDeadline = discoveryStart.monotonicNs +
         BigInt(readbackTimeoutMs) * NS_PER_MS;
       discoveryActive = true;
+      readbackDiscoveryStarted = true;
       phase = "readback-discovery";
       discoveryTimer = setTimeout(cancel, Math.max(0,
         Math.min(readbackTimeoutMs, Number(
@@ -215,7 +223,8 @@ function acceptanceOperation({
       phase = "initial";
     },
     beginReadback() {
-      beginPhase(readbackTimeoutMs, "readback", discoveryActive ? discoveryStart : undefined);
+      beginPhase(readbackTimeoutMs, "readback", discoveryActive ? discoveryStart : undefined,
+        "readback-discovery");
     },
     get phase() { return phase; },
     abort: cancel,
@@ -227,12 +236,13 @@ function acceptanceOperation({
       cancel();
     }
   };
-  function beginPhase(durationMs, nextPhase, phaseStart = {
-    monotonicMs: monotonicNow(), monotonicNs: process.hrtime.bigint()
-  }) {
+  function beginPhase(durationMs, nextPhase, phaseStart, previousPhase) {
     if (!controller.signal.aborted) check();
-    requireProof(allowPhaseTransition && !phaseTransitioned && !controller.signal.aborted &&
-      Number.isSafeInteger(durationMs) && durationMs > 0 && durationMs <= MAX_ACCEPTANCE_MS);
+    const phaseMaximumMs = nextPhase === "operator-wait"
+      ? MAX_FOREGROUND_OPERATOR_WAIT_MS : MAX_ACCEPTANCE_MS;
+    requireProof(allowPhaseTransition && phase === previousPhase && !controller.signal.aborted &&
+      Number.isSafeInteger(durationMs) && durationMs > 0 && durationMs <= phaseMaximumMs);
+    phaseStart ??= {monotonicMs: monotonicNow(), monotonicNs: process.hrtime.bigint()};
     requireProof(Number.isFinite(phaseStart.monotonicMs) &&
       typeof phaseStart.monotonicNs === "bigint" && phaseStart.monotonicNs > 0n);
     if (phaseStart.monotonicMs >= deadline || phaseStart.monotonicNs >= absoluteDeadline ||
@@ -242,7 +252,6 @@ function acceptanceOperation({
       cancel();
       throw failure;
     }
-    phaseTransitioned = true;
     phase = nextPhase;
     previous = Math.max(previous, phaseStart.monotonicMs);
     deadline = phaseStart.monotonicMs + durationMs;
@@ -355,7 +364,7 @@ function waitForSignalAfterEntry(signalSource, signal, notifyParent) {
   });
 }
 
-function createForegroundHold(signalSource) {
+function createForegroundHold(signalSource, monotonicNow = () => performance.now()) {
   let release;
   let released = false;
   let observedSignal;
@@ -366,7 +375,7 @@ function createForegroundHold(signalSource) {
   const stopped = new Promise(resolve => { release = resolve; });
   const onTerm = () => {
     observedSignal ??= {
-      monotonicMs: performance.now(), monotonicNs: process.hrtime.bigint()
+      monotonicMs: monotonicNow(), monotonicNs: process.hrtime.bigint()
     };
     foregroundSignalHandler?.(observedSignal);
     stop();
@@ -440,8 +449,10 @@ async function runAcceptance({
   await writeNew(directory, "config.json", configBytes, operation);
   const dataDirectory = path.join(directory, "state");
   await operation.mkdir(dataDirectory, {mode: 0o700});
+  let foregroundClock;
   const makePilot = onTestEntry => {
     const clock = createSyntheticClock({wallStart: config.startedAt + 5_000});
+    if (proof === "PLATFORM_FOREGROUND") foregroundClock = clock;
     return createPaperPilotComposition({
       config, dataDirectory, clock,
       adapters: offlineFixtureAdapters({clock, fault: "PIPELINE_QUOTE"}),
@@ -465,6 +476,7 @@ async function runAcceptance({
   const onForegroundSignal = signalAt => {
     if (foregroundSignalObserved) return;
     foregroundSignalObserved = true;
+    foregroundClock?.resume();
     if (!operation.signal.aborted) {
       try { operation.beginFinalization(signalAt); } catch { operation.abort(); }
     }
@@ -472,9 +484,10 @@ async function runAcceptance({
     if (!readinessCommitted && !accepted) operation.abort();
     foregroundSignalResolve();
   };
-  const onForegroundAbort = () => foregroundSignalReject(
-    operation.signal.reason ?? new Error("foreground acceptance ended")
-  );
+  const onForegroundAbort = () => {
+    foregroundClock?.resume();
+    foregroundSignalReject(operation.signal.reason ?? new Error("foreground acceptance ended"));
+  };
   const onTestEntry = proof === "ACTIVE_STOP" ? stop
     : proof === "REAL_SIGNAL_CHILD" ? async entry => {
       requireProof(typeof sendHandshake === "function" &&
@@ -549,6 +562,8 @@ async function runAcceptance({
       requireProof(!foregroundSignalObserved);
       await writeNew(directory, "readiness.json", readyBytes, operation);
       requireProof(!foregroundSignalObserved);
+      operation.beginOperatorWait();
+      foregroundClock?.pause();
       readinessCommitted = true;
       if (onForegroundReady) {
         await operation.wait(() => onForegroundReady({
@@ -1293,7 +1308,8 @@ async function authorization(filename, operation) {
 export async function main({
   env = process.env, stdout = process.stdout, signalSource = process,
   spawnChild = spawn, killChild = (child, signal) => child.kill(signal),
-  signalMonotonicNow = () => performance.now(), ...operationOptions
+  signalMonotonicNow = () => performance.now(),
+  preparationTimeoutMs = MAX_FOREGROUND_PHASE_MS, ...operationOptions
 } = {}) {
   if (env.PAPER_SYNTHETIC_ACCEPTANCE_ENABLED === undefined ||
       env.PAPER_SYNTHETIC_ACCEPTANCE_ENABLED === "false") {
@@ -1319,24 +1335,28 @@ export async function main({
         env.PAPER_SYNTHETIC_ACCEPTANCE_FINALIZATION_TIMEOUT_MS ?? "60000";
       const readbackTimeoutValue =
         env.PAPER_SYNTHETIC_ACCEPTANCE_READBACK_TIMEOUT_MS ?? String(MAX_REPLACEMENT_READBACK_MS);
-      requireProof(/^[1-9][0-9]{0,4}$/.test(waitTimeoutValue) &&
+      requireProof(/^[1-9][0-9]{0,6}$/.test(waitTimeoutValue) &&
         /^[1-9][0-9]{0,4}$/.test(finalizationTimeoutValue) &&
         /^[1-9][0-9]{0,4}$/.test(readbackTimeoutValue));
       const waitTimeoutMs = Number(waitTimeoutValue);
       const finalizationTimeoutMs = Number(finalizationTimeoutValue);
       const readbackTimeoutMs = Number(readbackTimeoutValue);
-      requireProof(Number.isSafeInteger(waitTimeoutMs) && waitTimeoutMs <= MAX_FOREGROUND_PHASE_MS &&
+      requireProof(Number.isFinite(waitTimeoutMs) && Number.isSafeInteger(waitTimeoutMs) &&
+        waitTimeoutMs <= MAX_FOREGROUND_OPERATOR_WAIT_MS &&
+        Number.isSafeInteger(preparationTimeoutMs) && preparationTimeoutMs > 0 &&
+        preparationTimeoutMs <= MAX_FOREGROUND_PHASE_MS &&
         Number.isSafeInteger(finalizationTimeoutMs) && finalizationTimeoutMs <= MAX_ACCEPTANCE_MS &&
         Number.isSafeInteger(readbackTimeoutMs) &&
         readbackTimeoutMs <= MAX_REPLACEMENT_READBACK_MS);
       attempted = true;
-      const hold = createForegroundHold(signalSource);
+      const hold = createForegroundHold(signalSource, operationOptions.monotonicNow);
       let unsubscribeInterrupt;
       try {
         const result = await withAcceptanceOperation({
           ...operationOptions, signalSource: new EventEmitter(),
-          timeoutMs: waitTimeoutMs, maxTimeoutMs: MAX_FOREGROUND_PHASE_MS,
-          finalizationTimeoutMs, readbackTimeoutMs, allowPhaseTransition: true
+          timeoutMs: preparationTimeoutMs, maxTimeoutMs: MAX_FOREGROUND_PHASE_MS,
+          operatorWaitTimeoutMs: waitTimeoutMs, finalizationTimeoutMs, readbackTimeoutMs,
+          allowPhaseTransition: true
         }, operation => {
           unsubscribeInterrupt = hold.subscribeInterrupt(operation.abort);
           return runForegroundAcceptance({
