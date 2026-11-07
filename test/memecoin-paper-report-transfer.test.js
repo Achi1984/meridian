@@ -1411,6 +1411,20 @@ test("dedicated report pool requires verified TLS and rejects connection-string 
       /invalid private report database URL/
     );
   }
+  const tabPrefixedUrl = "\tpostgres://localhost/report?sslmode=no-verify";
+  assert.deepEqual(
+    new Client({
+      connectionString: tabPrefixedUrl,
+      ssl: {rejectUnauthorized: true}
+    }).connectionParameters.ssl,
+    {rejectUnauthorized: false}
+  );
+  assert.throws(
+    () => createPrivatePaperReportPoolOptions(tabPrefixedUrl, {
+      allowSecureSslmodeHint: true
+    }),
+    /invalid private report database URL/
+  );
   assert.throws(
     () => new Client(createPrivatePaperReportPoolOptions(
       "postgres ://localhost/report?sslmode=no-verify",
