@@ -20,6 +20,7 @@ const PRICE_100 = "100.00000000";
 const PRICE_120 = "120.00000000";
 const CLI_PATH = fileURLToPath(new URL("../scripts/spot-paper-pilot/cli.mjs", import.meta.url));
 
+
 function priceRow(timestamp, price) {
   return [timestamp, price, price, price, price, price, "1.00000000", 1];
 }
@@ -70,14 +71,22 @@ async function temporaryRoot(t) {
 }
 
 function runnerConfig({ dataRoot, runId, provider, mode = "paper", cycles = 1,
-  now = INITIAL_NOW, signal, sleep } = {}) {
-  const clock = { value: now };
+  now = INITIAL_NOW, signal, sleep, durationMs, requestTimeoutMs,
+  terminalReportGraceMs, journalOptions, clock: suppliedClock } = {}) {
+  const clock = suppliedClock ?? { value: now, monotonic: 0 };
   return {
     dataRoot, runId, provider, mode, maxCycles: cycles,
-    maxDurationMs: Math.min(8 * 60 * 60 * 1000, cycles * 60_000 + 1),
+    maxDurationMs: durationMs ?? Math.min(8 * 60 * 60 * 1000, cycles * 60_000 + 1),
+    requestTimeoutMs,
+    terminalReportGraceMs,
+    journalOptions,
     pollIntervalMs: 60_000,
     now: () => clock.value,
-    sleep: sleep ?? (async ms => { clock.value += ms; }),
+    monotonicNow: () => clock.monotonic,
+    sleep: sleep ?? (async ms => {
+      clock.value += ms;
+      clock.monotonic += ms;
+    }),
     signal,
     clock
   };
@@ -188,8 +197,45 @@ test("compressed body receipt uses decoded body bytes, while its wire Content-Le
   assert.equal(result.bytes, Buffer.byteLength(raw));
 });
 
+test("provider bounds fetch and body reads that ignore abort, and cleans late responses", async () => {
+  let resolveFetch;
+  const provider = createKrakenProvider({
+    fetchImpl: () => new Promise(resolve => { resolveFetch = resolve; })
+  });
+  const deadlineAt = performance.now() + 30;
+  await assert.rejects(provider.fetchOhlc({
+    deadlineAt, monotonicNow: () => performance.now()
+  }), /REQUEST_TIMEOUT/);
+  const late = new Response("{}", { headers: { "content-type": "application/json" } });
+  resolveFetch(late);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(late.bodyUsed, true);
+
+  let cancelCalled = false;
+  const readerResponse = {
+    ok: true, status: 200,
+    headers: { get: name => name === "content-type" ? "application/json" : null },
+    body: {
+      getReader: () => ({
+        read: () => new Promise(() => {}),
+        cancel: () => {
+          cancelCalled = true;
+          return new Promise(() => {});
+        }
+      }),
+      cancel: () => Promise.resolve()
+    }
+  };
+  const readerProvider = createKrakenProvider({ fetchImpl: async () => readerResponse });
+  await assert.rejects(readerProvider.fetchOhlc({
+    deadlineAt: performance.now() + 30, monotonicNow: () => performance.now()
+  }), /REQUEST_TIMEOUT/);
+  assert.equal(cancelCalled, true);
+});
+
 test("OHLC parser excludes Kraken's unfinished row and rejects stale, gapped, out-of-order, and wrong-pair data", () => {
   const data = ohlcData(Array(21).fill(PRICE_100));
+  data.result.last = data.result.last + 17;
   const parsed = parseKrakenOhlc(acquisition(data, INITIAL_NOW), INITIAL_NOW);
   assert.equal(parsed.candles.length, 21);
   assert.equal(parsed.latestClosedAt, BASE + 20 * MINUTE);
@@ -320,15 +366,15 @@ test("sampled stop exits at modeled bid less slippage and leaves no claimed live
 
 test("runner integrates injected data, SMA, paper ledger, raw-response journal and read-only report", async t => {
   const dataRoot = await temporaryRoot(t);
-  const clock = { value: INITIAL_NOW };
+  const clock = { value: INITIAL_NOW, monotonic: 0 };
   const candles = [Array(21).fill(PRICE_100), [...Array(21).fill(PRICE_100), PRICE_120]];
   const provider = providerFor(clock, candles.map(ohlcData), [tickerData(), tickerData()]);
   const config = runnerConfig({ dataRoot, runId: "e2e-paper", provider, cycles: 2 });
   config.now = () => clock.value;
-  config.sleep = async ms => { clock.value += ms; };
+  config.sleep = async ms => { clock.value += ms; clock.monotonic += ms; };
   const report = await runSpotPaperPilot(config);
   assert.equal(report.mode, "paper");
-  assert.equal(report.stopReason, "CYCLE_LIMIT");
+  assert.equal(report.stopReason, "CYCLE_LIMIT", JSON.stringify(report));
   assert.equal(report.profitability, "NOT_ASSESSED");
   assert.equal(report.executionImpact, false);
   assert.equal(report.fills.length, 1);
@@ -393,10 +439,10 @@ test("429 creates a gap and waits for the bounded next poll instead of retrying 
   };
   const config = runnerConfig({ dataRoot, runId: "rate-limited", provider, cycles: 2 });
   config.now = () => clock.value;
-  config.sleep = async ms => { clock.value += ms; };
+  config.sleep = async ms => { clock.value += ms; clock.monotonic += ms; };
   const report = await runSpotPaperPilot(config);
   assert.equal(report.dataGaps, 1);
-  assert.equal(report.requests, 3);
+  assert.equal(report.requests, 3, JSON.stringify(report));
   assert.equal(starts[1] - starts[0], 60_000);
 });
 
@@ -420,12 +466,43 @@ test("stale quote after a new-bar signal cannot create a fill", async t => {
   };
   const config = runnerConfig({ dataRoot, runId: "stale-quote", provider, cycles: 2 });
   config.now = () => clock.value;
-  config.sleep = async ms => { clock.value += ms; };
+  config.sleep = async ms => { clock.value += ms; clock.monotonic += ms; };
   const report = await runSpotPaperPilot(config);
   assert.equal(report.stopReason, "INVALID_DATA");
   assert.equal(report.fills.length, 0);
   assert.equal(report.cashCents, SPOT_PAPER_PILOT_LIMITS.initialCashCents);
   assert.equal(report.dataGaps, 1);
+});
+
+test("runner bounds an injected provider that ignores abort and discards its late response", async t => {
+  const dataRoot = await temporaryRoot(t);
+  let resolveOhlc;
+  let observedSignal;
+  let tickerCalls = 0;
+  const provider = {
+    fetchOhlc({ signal }) {
+      observedSignal = signal;
+      signal.addEventListener("abort", () => {}, { once: true });
+      return new Promise(resolve => { resolveOhlc = resolve; });
+    },
+    fetchTicker() {
+      tickerCalls++;
+      assert.fail("ticker must not start after timed out OHLC");
+    }
+  };
+  const config = runnerConfig({
+    dataRoot, runId: "late-provider-response", provider,
+    cycles: 1, durationMs: 500, requestTimeoutMs: 30
+  });
+  const report = await runSpotPaperPilot(config);
+  assert.equal(observedSignal.aborted, true);
+  assert.equal(tickerCalls, 0);
+  assert.equal(report.fills.length, 0);
+  assert.equal(report.cashCents, SPOT_PAPER_PILOT_LIMITS.initialCashCents);
+  assert.equal(report.dataGaps, 1);
+  resolveOhlc(acquisition(ohlcData(Array(21).fill(PRICE_100)), INITIAL_NOW));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(report.fills.length, 0);
 });
 
 test("CLI refuses observe and paper modes without explicit network opt-in", async t => {
@@ -481,4 +558,166 @@ test("journal event IDs deduplicate identical records, reject conflicts, and det
   await (await import("node:fs/promises")).writeFile(path, contents.slice(0, -1));
   await assert.rejects(readRunJournal({ dataRoot, runId: "dedupe" }),
     /JOURNAL_CHECKSUM_MISMATCH|INVALID_JOURNAL_JSON/);
+});
+
+test("journal readback ACK loss fences writes and read-only reconciliation reports UNKNOWN", async t => {
+  const dataRoot = await temporaryRoot(t);
+  const journal = await createRunJournal({
+    dataRoot, runId: "ack-lost", manifest: { startedAt: INITIAL_NOW },
+    phase: async (name, marker) => {
+      if (name === "after-readback" && marker.nextSequence === 1) {
+        throw new Error("ack channel failed");
+      }
+    }
+  });
+  await assert.rejects(journal.append({ id: "commit-1", type: "observation" }, {}),
+    /JOURNAL_UNKNOWN/);
+  assert.equal(journal.poisoned, true);
+  await assert.rejects(journal.append({ id: "commit-2", type: "observation" }, {}),
+    /JOURNAL_UNKNOWN/);
+  const reconciled = await readRunJournal({ dataRoot, runId: "ack-lost" });
+  assert.equal(reconciled.sequence, 1);
+  assert.equal(reconciled.events.length, 1);
+  assert.equal(reconciled.reconciliationStatus,
+    "UNKNOWN_CANDIDATE_VISIBLE_ACK_UNCONFIRMED");
+});
+
+test("runner reports ambiguous signal-ledger persistence as UNKNOWN without another effect", async t => {
+  const dataRoot = await temporaryRoot(t);
+  const clock = { value: INITIAL_NOW, monotonic: 0 };
+  let ohlcCalls = 0;
+  let tickerCalls = 0;
+  const closes = [Array(21).fill(PRICE_100),
+    [...Array(21).fill(PRICE_100), PRICE_120]];
+  const committedSequences = [];
+  const provider = {
+    async fetchOhlc() {
+      return acquisition(ohlcData(closes[Math.min(ohlcCalls++, 1)]), clock.value);
+    },
+    async fetchTicker() {
+      tickerCalls++;
+      return acquisition(tickerData(), clock.value);
+    }
+  };
+  const config = runnerConfig({
+    dataRoot, runId: "unknown-fill-commit", provider, cycles: 2,
+    durationMs: 120_000, requestTimeoutMs: 30,
+    clock,
+    journalOptions: {
+      phase: async (name, marker) => {
+        if (name === "after-readback") committedSequences.push(marker.nextSequence);
+        if (name === "after-readback" && marker.nextSequence === 3) {
+          throw new Error("simulated acknowledgement loss");
+        }
+      }
+    }
+  });
+  config.sleep = async ms => { clock.value += ms; clock.monotonic += ms; };
+  await assert.rejects(runSpotPaperPilot(config), /JOURNAL_UNKNOWN/);
+  assert.deepEqual(committedSequences, [0, 1, 2, 3]);
+  assert.equal(ohlcCalls, 2);
+  assert.equal(tickerCalls, 2);
+  const reconciled = await readRunJournal({ dataRoot, runId: "unknown-fill-commit" });
+  assert.equal(reconciled.events.filter(event => event.type === "terminal").length, 0);
+  assert.equal(reconciled.events.at(-1).fills.length, 1);
+  assert.equal(reconciled.reconciliationStatus,
+    "UNKNOWN_CANDIDATE_VISIBLE_ACK_UNCONFIRMED");
+});
+
+test("journal rejects concurrent append and fences the late ambiguous commit", async t => {
+  const dataRoot = await temporaryRoot(t);
+  let entered;
+  const enteredPhase = new Promise(resolve => { entered = resolve; });
+  const monotonicNow = () => performance.now();
+  const journal = await createRunJournal({
+    dataRoot, runId: "concurrent-append", manifest: { startedAt: INITIAL_NOW },
+    phase: async (name, marker) => {
+      if (name === "after-file-sync" && marker.nextSequence === 1) {
+        entered();
+        return new Promise(() => {});
+      }
+    }
+  });
+  const deadlineAt = monotonicNow() + 2_000;
+  const first = journal.append({ id: "first", type: "observation" }, {},
+    { deadlineAt, monotonicNow });
+  const didEnterPhase = await Promise.race([
+    enteredPhase.then(() => true),
+    first.then(() => false, () => false)
+  ]);
+  assert.equal(didEnterPhase, true);
+  await assert.rejects(journal.append({ id: "second", type: "observation" }, {}),
+    /JOURNAL_BUSY/);
+  await assert.rejects(first, /JOURNAL_UNKNOWN/);
+  assert.equal(journal.poisoned, true);
+  await assert.rejects(journal.append({ id: "third", type: "observation" }, {}),
+    /JOURNAL_UNKNOWN/);
+  const reconciled = await readRunJournal({ dataRoot, runId: "concurrent-append" });
+  assert.equal(reconciled.reconciliationStatus, "UNKNOWN_CANDIDATE_NOT_VISIBLE");
+});
+
+test("journal bounds initialization, response persistence and close; unresolved writes remain read-only", async t => {
+  const dataRoot = await temporaryRoot(t);
+  const monotonicNow = () => performance.now();
+  await assert.rejects(createRunJournal({
+    dataRoot, runId: "hung-init", manifest: { startedAt: INITIAL_NOW },
+    deadlineAt: monotonicNow() + 1_000, monotonicNow,
+    phase: async name => {
+      if (name === "before-pending") return new Promise(() => {});
+    }
+  }), /JOURNAL_UNKNOWN/);
+  assert.equal((await readRunJournal({ dataRoot, runId: "hung-init" }))
+    .reconciliationStatus, "UNKNOWN_WRITER_OR_INTERRUPTED");
+
+  const response = acquisition(tickerData(), INITIAL_NOW);
+  const responseJournal = await createRunJournal({
+    dataRoot, runId: "hung-response", manifest: { startedAt: INITIAL_NOW },
+    phase: async name => {
+      if (name === "response-after-sync") return new Promise(() => {});
+    }
+  });
+  await assert.rejects(responseJournal.persistResponse(response, {
+    deadlineAt: monotonicNow() + 40, monotonicNow
+  }), /JOURNAL_UNKNOWN/);
+  await assert.rejects(responseJournal.append({ id: "must-not-commit" }, {}),
+    /JOURNAL_UNKNOWN/);
+  assert.equal((await readRunJournal({ dataRoot, runId: "hung-response" }))
+    .reconciliationStatus, "UNKNOWN_WRITER_OR_INTERRUPTED");
+
+  const closeJournal = await createRunJournal({
+    dataRoot, runId: "hung-close", manifest: { startedAt: INITIAL_NOW },
+    phase: async name => {
+      if (name === "close-before-unlock") return new Promise(() => {});
+    }
+  });
+  await assert.rejects(closeJournal.close({
+    deadlineAt: monotonicNow() + 40, monotonicNow
+  }), /JOURNAL_UNKNOWN/);
+  assert.equal(closeJournal.poisoned, true);
+  assert.equal((await readRunJournal({ dataRoot, runId: "hung-close" }))
+    .reconciliationStatus, "UNKNOWN_WRITER_OR_INTERRUPTED");
+});
+
+test("terminal report write is bounded by the separate stop grace and remains UNKNOWN if late", async t => {
+  const dataRoot = await temporaryRoot(t);
+  const clock = { value: INITIAL_NOW };
+  const provider = providerFor(clock,
+    [ohlcData(Array(21).fill(PRICE_100))], [tickerData()]);
+  const config = runnerConfig({
+    dataRoot, runId: "hung-terminal", provider, mode: "observe",
+    cycles: 1, durationMs: 500, requestTimeoutMs: 30, terminalReportGraceMs: 40,
+    journalOptions: {
+      phase: async (name, marker) => {
+        if (name === "after-readback" && marker.nextSequence === 3) {
+          return new Promise(() => {});
+        }
+      }
+    }
+  });
+  config.now = () => clock.value;
+  await assert.rejects(runSpotPaperPilot(config), /JOURNAL_UNKNOWN/);
+  const reconciled = await readRunJournal({ dataRoot, runId: "hung-terminal" });
+  assert.equal(reconciled.events.at(-1).type, "terminal");
+  assert.equal(reconciled.reconciliationStatus,
+    "UNKNOWN_CANDIDATE_VISIBLE_ACK_UNCONFIRMED");
 });

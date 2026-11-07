@@ -22,10 +22,16 @@ function validateConfig(config) {
       SPOT_PAPER_PILOT_LIMITS.maxCycles, "MAX_CYCLES"),
     maxDurationMs: integer(config.maxDurationMs ?? SPOT_PAPER_PILOT_LIMITS.maxDurationMs, 1,
       SPOT_PAPER_PILOT_LIMITS.maxDurationMs, "DURATION"),
+    requestTimeoutMs: integer(config.requestTimeoutMs ??
+      SPOT_PAPER_PILOT_LIMITS.requestTimeoutMs, 1,
+      SPOT_PAPER_PILOT_LIMITS.requestTimeoutMs, "REQUEST_TIMEOUT"),
+    terminalReportGraceMs: integer(config.terminalReportGraceMs ??
+      TERMINAL_REPORT_GRACE_MS, 1, TERMINAL_REPORT_GRACE_MS, "TERMINAL_GRACE"),
     pollIntervalMs: integer(config.pollIntervalMs ?? SPOT_PAPER_PILOT_LIMITS.minPollIntervalMs,
       SPOT_PAPER_PILOT_LIMITS.minPollIntervalMs, SPOT_PAPER_PILOT_LIMITS.maxDurationMs,
       "POLL_INTERVAL"),
     now: config.now ?? Date.now,
+    monotonicNow: config.monotonicNow ?? (() => performance.now()),
     sleep: config.sleep ?? ((ms, signal) => new Promise((resolve, reject) => {
       if (signal?.aborted) return reject(signal.reason ?? new Error("ABORTED"));
       const onAbort = () => {
@@ -72,17 +78,36 @@ function shouldStopOnDataError(code) {
     code !== "HTTP_429";
 }
 
-function waitForAbortable(sleep, ms, signal) {
-  if (!signal) return sleep(ms);
-  if (signal.aborted) return Promise.reject(signal.reason ?? new Error("ABORTED"));
+function boundedTask(operation, {
+  deadlineAt, monotonicNow, signal, timeoutCode, onTimeout
+}) {
+  const remaining = deadlineAt - monotonicNow();
+  if (!Number.isFinite(remaining) || remaining <= 0) {
+    return Promise.reject(new Error(timeoutCode));
+  }
+  if (signal?.aborted) return Promise.reject(signal.reason ?? new Error("ABORTED"));
+  let timer;
+  let abortListener;
+  const task = Promise.resolve().then(operation);
+  task.catch(() => {});
   return new Promise((resolve, reject) => {
-    const cleanup = () => signal.removeEventListener("abort", onAbort);
-    const onAbort = () => {
-      cleanup();
-      reject(signal.reason ?? new Error("ABORTED"));
+    const cleanup = () => {
+      clearTimeout(timer);
+      if (abortListener) signal.removeEventListener("abort", abortListener);
     };
-    signal.addEventListener("abort", onAbort, { once: true });
-    Promise.resolve(sleep(ms, signal)).then(value => {
+    timer = setTimeout(() => {
+      onTimeout?.();
+      cleanup();
+      reject(new Error(timeoutCode));
+    }, remaining);
+    if (signal) {
+      abortListener = () => {
+        cleanup();
+        reject(signal.reason ?? new Error("ABORTED"));
+      };
+      signal.addEventListener("abort", abortListener, { once: true });
+    }
+    task.then(value => {
       cleanup();
       resolve(value);
     }, error => {
@@ -92,14 +117,32 @@ function waitForAbortable(sleep, ms, signal) {
   });
 }
 
-function withinDeadline(promise, timeoutMs) {
-  let timer;
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => {
-      timer = setTimeout(() => reject(new Error("TERMINAL_REPORT_DEADLINE")), timeoutMs);
-    })
-  ]).finally(() => clearTimeout(timer));
+function boundedProviderCall(method, context) {
+  const controller = new AbortController();
+  const requestDeadlineAt = Math.min(context.deadlineAt,
+    context.monotonicNow() + context.requestTimeoutMs);
+  const timeoutCode = requestDeadlineAt >= context.deadlineAt ?
+    "DURATION_LIMIT" : "REQUEST_TIMEOUT";
+  const onParentAbort = () => controller.abort(
+    context.signal.reason ?? new Error("RUN_ABORTED"));
+  if (context.signal?.aborted) onParentAbort();
+  else context.signal?.addEventListener("abort", onParentAbort, { once: true });
+  return boundedTask(
+    () => method({ ...context, signal: controller.signal }),
+    { ...context, deadlineAt: requestDeadlineAt, signal: controller.signal, timeoutCode,
+      onTimeout: () => controller.abort(new Error(timeoutCode)) }
+  ).finally(() => {
+    context.signal?.removeEventListener("abort", onParentAbort);
+    if (!controller.signal.aborted) controller.abort(new Error("REQUEST_FINISHED"));
+  });
+}
+
+function awaitJournal(operation, options, timeoutCode = "JOURNAL_UNKNOWN") {
+  return boundedTask(operation, { ...options, timeoutCode });
+}
+
+function isUnknownPersistence(error) {
+  return error?.code === "JOURNAL_UNKNOWN" || error?.message === "JOURNAL_UNKNOWN";
 }
 
 function syncTransportCounters(provider, counters) {
@@ -118,6 +161,18 @@ export async function runSpotPaperPilot(input) {
       typeof config.provider.fetchTicker !== "function") throw new Error("PROVIDER_REQUIRED");
   const startedAt = config.now();
   integer(startedAt, 0, Number.MAX_SAFE_INTEGER, "CLOCK");
+  const monotonicStart = config.monotonicNow();
+  if (!Number.isFinite(monotonicStart) || monotonicStart < 0) {
+    throw new Error("INVALID_MONOTONIC_CLOCK");
+  }
+  const runDeadlineAt = monotonicStart + config.maxDurationMs;
+  const runController = new AbortController();
+  const onExternalAbort = () =>
+    runController.abort(config.signal.reason ?? new Error("SIGNAL"));
+  if (config.signal?.aborted) onExternalAbort();
+  else config.signal?.addEventListener("abort", onExternalAbort, { once: true });
+  const runContext = { deadlineAt: runDeadlineAt, monotonicNow: config.monotonicNow,
+    signal: runController.signal, requestTimeoutMs: config.requestTimeoutMs };
   const maxRequests = Math.min(config.maxCycles * 2, SPOT_PAPER_PILOT_LIMITS.maxRequests);
   const manifest = {
     schemaVersion: "SPOT_PAPER_PILOT_MANIFEST_V1",
@@ -126,12 +181,13 @@ export async function runSpotPaperPilot(input) {
     pair: SPOT_PAPER_PILOT_LIMITS.pair,
     limits: { maxCycles: config.maxCycles, maxRequests,
       maxBytes: SPOT_PAPER_PILOT_LIMITS.maxBytes, maxResponseBytes: SPOT_PAPER_PILOT_LIMITS.maxResponseBytes,
-      requestTimeoutMs: SPOT_PAPER_PILOT_LIMITS.requestTimeoutMs,
+      requestTimeoutMs: config.requestTimeoutMs,
       maxDurationMs: config.maxDurationMs, pollIntervalMs: config.pollIntervalMs }
   };
-  const journal = await createRunJournal({
-    dataRoot: config.dataRoot, runId: config.runId, manifest
-  });
+  const journal = await awaitJournal(() => createRunJournal({
+    ...config.journalOptions, dataRoot: config.dataRoot, runId: config.runId,
+    manifest, ...runContext
+  }), runContext);
   let strategy = createStrategyState();
   let ledger = createLedger();
   const counters = { requests: 0, bytes: 0 };
@@ -139,16 +195,24 @@ export async function runSpotPaperPilot(input) {
   let entriesBlocked = false;
   let cycle = 0;
   let lastPollStartedAt = null;
+  let lastPollMonotonicAt = null;
+  let terminalOutcomeUnknown = false;
   try {
     try {
-      await journal.append({ id: "run-start", type: "start", at: startedAt },
-    { strategy, ledger, counters, cycle });
+      await awaitJournal(() => journal.append({ id: "run-start", type: "start", at: startedAt },
+        { strategy, ledger, counters, cycle }, runContext), runContext);
     } catch (error) {
-      throw new Error("JOURNAL_WRITE_FAILED", { cause: error });
+      terminalOutcomeUnknown = isUnknownPersistence(error);
+      throw new Error(terminalOutcomeUnknown ? "JOURNAL_UNKNOWN" : "JOURNAL_WRITE_FAILED",
+        { cause: error });
     }
     while (cycle < config.maxCycles) {
       if (config.signal?.aborted) {
         stopReason = "SIGNAL";
+        break;
+      }
+      if (config.monotonicNow() >= runDeadlineAt) {
+        stopReason = "DURATION_LIMIT";
         break;
       }
       const pollStartedAt = config.now();
@@ -157,18 +221,29 @@ export async function runSpotPaperPilot(input) {
         stopReason = "CLOCK_ERROR";
         break;
       }
-      if (pollStartedAt - startedAt >= config.maxDurationMs) {
-        stopReason = "DURATION_LIMIT";
-        break;
-      }
-      if (lastPollStartedAt !== null) {
-        const remaining = config.pollIntervalMs - (pollStartedAt - lastPollStartedAt);
+      if (lastPollMonotonicAt !== null) {
+        const remaining = config.pollIntervalMs -
+          (config.monotonicNow() - lastPollMonotonicAt);
         if (remaining > 0) {
+          const sleepController = new AbortController();
+          const onSleepAbort = () => sleepController.abort(
+            runContext.signal.reason ?? new Error("RUN_ABORTED"));
+          if (runContext.signal.aborted) onSleepAbort();
+          else runContext.signal.addEventListener("abort", onSleepAbort, { once: true });
           try {
-            await waitForAbortable(config.sleep, remaining, config.signal);
+            await boundedTask(
+              () => config.sleep(Math.ceil(remaining), sleepController.signal),
+              { ...runContext, signal: sleepController.signal,
+                timeoutCode: "DURATION_LIMIT",
+                onTimeout: () => sleepController.abort(new Error("DURATION_LIMIT")) });
           } catch {
-            stopReason = "SIGNAL";
+            stopReason = config.signal?.aborted ? "SIGNAL" : "DURATION_LIMIT";
             break;
+          } finally {
+            runContext.signal.removeEventListener("abort", onSleepAbort);
+            if (!sleepController.signal.aborted) {
+              sleepController.abort(new Error("SLEEP_FINISHED"));
+            }
           }
           if (config.signal?.aborted) {
             stopReason = "SIGNAL";
@@ -177,16 +252,20 @@ export async function runSpotPaperPilot(input) {
         }
       }
       lastPollStartedAt = config.now();
-      if (!Number.isSafeInteger(lastPollStartedAt) || lastPollStartedAt < pollStartedAt) {
+      const actualPollMono = config.monotonicNow();
+      if (!Number.isSafeInteger(lastPollStartedAt) || lastPollStartedAt < pollStartedAt ||
+          !Number.isFinite(actualPollMono) ||
+          (lastPollMonotonicAt !== null && actualPollMono < lastPollMonotonicAt)) {
         stopReason = "CLOCK_ERROR";
         break;
       }
-      if (lastPollStartedAt - startedAt >= config.maxDurationMs) {
+      lastPollMonotonicAt = actualPollMono;
+      if (actualPollMono >= runDeadlineAt) {
         stopReason = "DURATION_LIMIT";
         break;
       }
-      if (config.maxDurationMs - (lastPollStartedAt - startedAt) <
-          2 * SPOT_PAPER_PILOT_LIMITS.requestTimeoutMs) {
+      if (runDeadlineAt - actualPollMono <
+          2 * config.requestTimeoutMs) {
         stopReason = "DURATION_LIMIT";
         break;
       }
@@ -200,18 +279,23 @@ export async function runSpotPaperPilot(input) {
           throw new Error("REQUEST_BUDGET_EXHAUSTED");
         }
         counters.requests++;
-        ohlcResponse = validateAcquisition(await config.provider.fetchOhlc(), counters);
+        ohlcResponse = validateAcquisition(await boundedProviderCall(
+          runtime => config.provider.fetchOhlc(runtime), runContext), counters);
         const parsedOhlc = parseKrakenOhlc(ohlcResponse, config.now());
         try {
-          storedOhlc = await journal.persistResponse(ohlcResponse);
+          storedOhlc = await awaitJournal(
+            () => journal.persistResponse(ohlcResponse, runContext), runContext);
         } catch (error) {
-          throw new Error("JOURNAL_WRITE_FAILED", { cause: error });
+          terminalOutcomeUnknown ||= isUnknownPersistence(error);
+          throw new Error(terminalOutcomeUnknown ? "JOURNAL_UNKNOWN" : "JOURNAL_WRITE_FAILED",
+            { cause: error });
         }
         if (counters.requests >= maxRequests) {
           throw new Error("REQUEST_BUDGET_EXHAUSTED");
         }
         counters.requests++;
-        tickerResponse = validateAcquisition(await config.provider.fetchTicker(), counters);
+        tickerResponse = validateAcquisition(await boundedProviderCall(
+          runtime => config.provider.fetchTicker(runtime), runContext), counters);
         const quoteAt = config.now();
         const quote = parseKrakenTicker(tickerResponse, quoteAt);
         const candleAgeAtQuote = quoteAt - (parsedOhlc.latestClosedAt + 60_000);
@@ -219,23 +303,19 @@ export async function runSpotPaperPilot(input) {
           throw new Error("STALE_OHLC");
         }
         try {
-          storedTicker = await journal.persistResponse(tickerResponse);
+          storedTicker = await awaitJournal(
+            () => journal.persistResponse(tickerResponse, runContext), runContext);
         } catch (error) {
-          throw new Error("JOURNAL_WRITE_FAILED", { cause: error });
+          terminalOutcomeUnknown ||= isUnknownPersistence(error);
+          throw new Error(terminalOutcomeUnknown ? "JOURNAL_UNKNOWN" : "JOURNAL_WRITE_FAILED",
+            { cause: error });
         }
         const effectAt = config.now();
         if (!Number.isSafeInteger(effectAt) || effectAt < quoteAt) {
           throw new Error("CLOCK_MOVED_BACKWARDS");
         }
-        if (config.signal?.aborted || effectAt - startedAt >= config.maxDurationMs) {
+        if (config.signal?.aborted || config.monotonicNow() >= runDeadlineAt) {
           const reason = config.signal?.aborted ? "SIGNAL" : "DURATION_LIMIT";
-          const event = { id: `gap:${cycle}:pre-effect:${reason}`, type: "data_gap",
-            reason, at: effectAt, acceptedOhlc: storedOhlc, acceptedTicker: storedTicker };
-          try {
-            await journal.append(event, { strategy, ledger, counters, cycle, entriesBlocked });
-          } catch (error) {
-            throw new Error("JOURNAL_WRITE_FAILED", { cause: error });
-          }
           stopReason = reason;
           break;
         }
@@ -264,12 +344,14 @@ export async function runSpotPaperPilot(input) {
         };
         let result;
         try {
-          result = await journal.append(event, {
+          result = await awaitJournal(() => journal.append(event, {
             strategy: advanced.state, ledger: nextLedger.ledger, counters, cycle,
             entriesBlocked: entriesBlocked || nextLedger.lossLimitReached
-          });
+          }, runContext), runContext);
         } catch (error) {
-          throw new Error("JOURNAL_WRITE_FAILED", { cause: error });
+          terminalOutcomeUnknown ||= isUnknownPersistence(error);
+          throw new Error(terminalOutcomeUnknown ? "JOURNAL_UNKNOWN" : "JOURNAL_WRITE_FAILED",
+            { cause: error });
         }
         if (!result.duplicate) {
           strategy = advanced.state;
@@ -282,16 +364,30 @@ export async function runSpotPaperPilot(input) {
         }
       } catch (error) {
         syncTransportCounters(config.provider, counters);
-        if (error?.message === "JOURNAL_WRITE_FAILED") throw error;
+        if (error?.message === "JOURNAL_WRITE_FAILED" || error?.message === "JOURNAL_UNKNOWN") {
+          throw error;
+        }
         if (config.signal?.aborted) {
           stopReason = "SIGNAL";
+          break;
+        }
+        if (error?.message === "DURATION_LIMIT" || config.monotonicNow() >= runDeadlineAt) {
+          stopReason = "DURATION_LIMIT";
           break;
         }
         const code = errorCode(error);
         const gap = { id: `gap:${cycle}:${counters.requests}:${code}`,
         type: "data_gap", reason: code, at: config.now(),
         acceptedOhlc: storedOhlc, acceptedTicker: storedTicker };
-        await journal.append(gap, { strategy, ledger, counters, cycle, entriesBlocked });
+        try {
+          await awaitJournal(
+            () => journal.append(gap, { strategy, ledger, counters, cycle, entriesBlocked },
+              runContext), runContext);
+        } catch (writeError) {
+          terminalOutcomeUnknown ||= isUnknownPersistence(writeError);
+          throw new Error(terminalOutcomeUnknown ? "JOURNAL_UNKNOWN" : "JOURNAL_WRITE_FAILED",
+            { cause: writeError });
+        }
         if (shouldStopOnDataError(code)) {
           stopReason = code.startsWith("CLOCK_") ? "CLOCK_ERROR" :
             code === "REQUEST_BUDGET_EXHAUSTED" ? "REQUEST_LIMIT" : "INVALID_DATA";
@@ -312,20 +408,30 @@ export async function runSpotPaperPilot(input) {
     report.entriesBlocked = entriesBlocked;
     report.requests = counters.requests;
     report.deliveredBytes = counters.bytes;
+    const terminalDeadlineAt = config.monotonicNow() + config.terminalReportGraceMs;
+    const terminalContext = { deadlineAt: terminalDeadlineAt,
+      monotonicNow: config.monotonicNow, signal: null };
     try {
-      const terminalWrite = journal.append(
+      await awaitJournal(() => journal.append(
         { id: "run-terminal", type: "terminal", at: endedAt, report },
-        { strategy, ledger, counters, cycle, stopReason, entriesBlocked });
-      if (stopReason === "SIGNAL") {
-        await withinDeadline(terminalWrite, TERMINAL_REPORT_GRACE_MS);
-      } else {
-        await terminalWrite;
-      }
+        { strategy, ledger, counters, cycle, stopReason, entriesBlocked }, terminalContext),
+      terminalContext);
     } catch (error) {
-      throw new Error("JOURNAL_WRITE_FAILED", { cause: error });
+      terminalOutcomeUnknown ||= isUnknownPersistence(error);
+      throw new Error(terminalOutcomeUnknown ? "JOURNAL_UNKNOWN" : "JOURNAL_WRITE_FAILED",
+        { cause: error });
     }
+    await awaitJournal(() => journal.close(terminalContext), terminalContext);
     return report;
   } finally {
-    await journal.close();
+    config.signal?.removeEventListener("abort", onExternalAbort);
+    if (journal && !terminalOutcomeUnknown && !journal.poisoned) {
+      if (journal.snapshot().events.at(-1)?.type !== "terminal") {
+        const closeDeadline = config.monotonicNow() + config.terminalReportGraceMs;
+        await awaitJournal(() => journal.close({
+          deadlineAt: closeDeadline, monotonicNow: config.monotonicNow, signal: null
+        }), { deadlineAt: closeDeadline, monotonicNow: config.monotonicNow, signal: null });
+      }
+    }
   }
 }

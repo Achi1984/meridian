@@ -113,10 +113,12 @@ The OHLC/Ticker response shapes and unfinished final OHLC row follow Kraken's
 and [Ticker reference](https://docs.kraken.com/api-reference/market-data/get-ticker-information).
 No provider request is made by tests.
 
-Transport is GET-only, timeout is 5 seconds, maximum response body is 256 KiB,
+Transport is GET-only, timeout is at most 5 seconds, maximum response body is 256 KiB,
 and maximum delivered response bytes per run is 64 MiB. Runs are limited to
 480 cycles, 960 total requests, and 8 hours, with at least 60 seconds between
-poll starts. There are no hidden retries or fallback providers. HTTP 429 is
+poll starts. One shared monotonic deadline bounds run initialization, polling,
+provider calls, and all journal I/O; stop handling gets a separate five-second
+terminal-write grace. There are no hidden retries or fallback providers. HTTP 429 is
 recorded as a gap; the next attempt, if any, waits for the normal minimum poll
 interval and remains within the same budgets. A malformed response terminates
 the run without simulated effects. Stop signals cancel in-flight fetches and
@@ -131,11 +133,17 @@ Each unique run ID owns a private directory. An exclusive writer claim prevents
 another writer, and an existing directory is never silently resumed. Raw
 accepted response bodies are stored separately by SHA-256 under `responses/`;
 event records include those hashes, response sizes, and acquisition intervals.
-`journal.json` is a checksummed atomic snapshot containing deduplicated event
-IDs and a checkpoint with strategy/ledger state. Persistence succeeds before a
-simulated fill is applied to the runner state or included in its returned
-report. `report` verifies the snapshot and referenced response hashes but does
-not resume or repair it.
+Response writes and journal snapshots require exact persisted readback before
+acknowledgement. Journal publication is serialized and fenced by a
+predecessor-bound pending marker; failure or timeout after a mutation begins is
+reported as `JOURNAL_UNKNOWN`, poisons the writer, and leaves the lock/pending
+marker for read-only reconciliation. The reader distinguishes a visible
+candidate with unconfirmed acknowledgement from a still-visible predecessor;
+neither case resumes or retries. `journal.json` is a checksummed atomic snapshot
+containing deduplicated event IDs and a checkpoint with strategy/ledger state.
+Persistence succeeds before a simulated fill is applied to the runner state or
+included in its returned report. `report` verifies the snapshot and referenced
+response hashes but does not resume or repair it.
 
 Reports include observations, data gaps, signals, simulated fills and fees,
 cash, position state, realized/unrealized PnL, terminal mark and age, stop

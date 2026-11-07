@@ -105,7 +105,6 @@ export function parseKrakenOhlc(acquired, nowMs) {
   const rows = pairPayload(result, PAIR_KEYS, "OHLC", true);
   if (!Array.isArray(rows) || rows.length < 2) throw new Error("INSUFFICIENT_OHLC_ROWS");
   const candles = rows.map(row => parseCandle(row, receivedAt));
-  if (result.last !== candles.at(-1).timestamp / 1000) throw new Error("INVALID_OHLC_LAST");
   for (let i = 1; i < candles.length; i++) {
     if (candles[i].timestamp <= candles[i - 1].timestamp) throw new Error("OHLC_OUT_OF_ORDER");
     if (candles[i].timestamp - candles[i - 1].timestamp !== 60_000) {

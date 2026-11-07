@@ -66,7 +66,9 @@ export async function main(argv = process.argv.slice(2)) {
     const journal = await readRunJournal(config);
     const terminal = journal.events.find(event => event.id === "run-terminal");
     process.stdout.write(JSON.stringify({
-      reconciliation: terminal ? "TERMINAL_REPORT_AVAILABLE" : "INCOMPLETE_READ_ONLY",
+      reconciliation: journal.reconciliationStatus !== "READ_ONLY_VERIFIED" ?
+        journal.reconciliationStatus :
+        terminal ? "TERMINAL_REPORT_AVAILABLE" : "INCOMPLETE_READ_ONLY",
       runId: journal.runId, eventCount: journal.events.length,
       checkpoint: journal.checkpoint, report: terminal?.report ?? null,
       resumed: false, executionImpact: false
