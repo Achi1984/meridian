@@ -34,12 +34,13 @@ const EXPECTED_MANIFEST = Object.freeze({
   warmupCandles: 21
 });
 const NOTIONAL_DIVISOR = 100_000_000_000_000n;
-const TERMINAL_WRITE_GRACE_MS = 5_000;
 
 const isInteger = value => Number.isSafeInteger(value);
 const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
 const roundHalfUp = (numerator, denominator) =>
   (numerator * 2n + denominator) / (2n * denominator);
+const requiresRawMarketEvidence = event => event.type === "observation" ||
+  (event.type === "data_gap" && event.dataGap === "MISSED_DECISION_WINDOW");
 const rawReferenceValid = record => record &&
   /^[a-f0-9]{64}$/.test(record.sha256) &&
   record.path === `responses/${record.sha256}.json` &&
@@ -76,38 +77,46 @@ function verifyProvenance(provenance, runId) {
     provenance[key] === value);
 }
 
-function verifyLedger(events, checkpoint, report, responseBodies) {
-  if (!Array.isArray(events) || !checkpoint?.ledger || !report ||
-      !responseBodies || typeof responseBodies !== "object") return false;
-  const fills = [];
-  let cash = EXPECTED_MANIFEST.initialCashCents;
-  let fees = 0;
-  let realized = 0;
-  let position = null;
+function verifyMarketEvidence(events, responseBodies) {
+  if (!Array.isArray(events) || !responseBodies || typeof responseBodies !== "object") {
+    return { valid: false, acceptedObservations: 0, parsedQuotes: new Map() };
+  }
+  let valid = true;
+  let acceptedObservations = 0;
   const parsedQuotes = new Map();
-  try {
-    for (const event of events) {
-      const needsMarketEvidence = event.type === "observation" ||
-        (event.type === "data_gap" && event.dataGap === "MISSED_DECISION_WINDOW");
-      if (needsMarketEvidence && (!event.ohlc || !event.ticker)) return false;
-      if (!event.ohlc || !event.ticker) continue;
-      if (!rawReferenceValid(event.ohlc) || !rawReferenceValid(event.ticker) ||
-          !isInteger(event.signalKnownAt) ||
-          event.ticker.requestStartedAt < event.signalKnownAt) return false;
+  for (const event of events) {
+    const required = requiresRawMarketEvidence(event);
+    if (!event.ohlc || !event.ticker) {
+      if (required) valid = false;
+      continue;
+    }
+    if (!rawReferenceValid(event.ohlc) || !rawReferenceValid(event.ticker) ||
+        !isInteger(event.signalKnownAt) ||
+        event.ticker.requestStartedAt < event.signalKnownAt) {
+      valid = false;
+      continue;
+    }
+    try {
       const ohlcRaw = responseBodies[event.ohlc.sha256];
       const tickerRaw = responseBodies[event.ticker.sha256];
       if (typeof ohlcRaw !== "string" || typeof tickerRaw !== "string" ||
           Buffer.byteLength(ohlcRaw, "utf8") !== event.ohlc.bytes ||
           Buffer.byteLength(tickerRaw, "utf8") !== event.ticker.bytes ||
           sha256(Buffer.from(ohlcRaw, "utf8")) !== event.ohlc.sha256 ||
-          sha256(Buffer.from(tickerRaw, "utf8")) !== event.ticker.sha256) return false;
+          sha256(Buffer.from(tickerRaw, "utf8")) !== event.ticker.sha256) {
+        valid = false;
+        continue;
+      }
       const ohlc = parseKrakenOhlc({
         raw: ohlcRaw, sha256: event.ohlc.sha256,
         requestStartedAt: event.ohlc.requestStartedAt,
         receivedAt: event.ohlc.receivedAt,
         data: JSON.parse(ohlcRaw)
       }, event.ohlc.receivedAt);
-      if (ohlc.latestClosedAt !== event.ohlc.latestClosedAt) return false;
+      if (ohlc.latestClosedAt !== event.ohlc.latestClosedAt) {
+        valid = false;
+        continue;
+      }
       const quote = parseKrakenTicker({
         raw: tickerRaw, sha256: event.ticker.sha256,
         requestStartedAt: event.ticker.requestStartedAt,
@@ -118,8 +127,32 @@ function verifyLedger(events, checkpoint, report, responseBodies) {
           event.ohlc.ageMs > EXPECTED_MANIFEST.maxCandleAgeMs ||
           !isInteger(event.ticker.acquisitionAgeMs) ||
           event.ticker.acquisitionAgeMs < 0 ||
-          event.ticker.acquisitionAgeMs > EXPECTED_MANIFEST.maxQuoteAgeMs) return false;
+          event.ticker.acquisitionAgeMs > EXPECTED_MANIFEST.maxQuoteAgeMs) {
+        valid = false;
+        continue;
+      }
       parsedQuotes.set(event.id, quote);
+      if (event.type === "observation") acceptedObservations++;
+    } catch {
+      valid = false;
+    }
+  }
+  return { valid, acceptedObservations, parsedQuotes };
+}
+
+function verifyLedger(events, checkpoint, report, parsedQuotes) {
+  if (!Array.isArray(events) || !checkpoint?.ledger || !report ||
+      !(parsedQuotes instanceof Map)) return false;
+  const fills = [];
+  let cash = EXPECTED_MANIFEST.initialCashCents;
+  let fees = 0;
+  let realized = 0;
+  let position = null;
+  try {
+    for (const event of events) {
+      if (!event.fills?.length) continue;
+      const quote = parsedQuotes.get(event.id);
+      if (!quote || !event.ohlc || !event.ticker) return false;
       const eventSignals = Array.isArray(event.signals) ? event.signals : [];
       for (const fill of event.fills ?? []) {
         if (!isInteger(fill.quantitySat) || fill.quantitySat <= 0 ||
@@ -141,10 +174,11 @@ function verifyLedger(events, checkpoint, report, responseBodies) {
         if (BigInt(fill.priceNano) !== expectedPrice ||
             (fill.side === "BUY" &&
               quote.spreadBps > EXPECTED_MANIFEST.maxEntrySpreadBps)) return false;
-        const causalSignal = eventSignals.find(signal =>
+        const causalSignal = fill.side !== "SELL" ||
+          fill.reason !== "SAMPLED_2PCT_BID_STOP" ? eventSignals.find(signal =>
           fill.id === `${fill.side === "BUY" ? "entry" : "exit"}:${signal.id}` &&
           fill.signalAt === signal.candleAt &&
-          signal.direction === (fill.side === "BUY" ? "ENTRY" : "EXIT"));
+          signal.direction === (fill.side === "BUY" ? "ENTRY" : "EXIT")) : null;
         if (fill.side === "BUY") {
           if (!causalSignal || position) return false;
           const cost = fill.grossCents + fill.feeCents;
@@ -181,7 +215,8 @@ function verifyLedger(events, checkpoint, report, responseBodies) {
   }
 
   const ledger = checkpoint.ledger;
-  if (!same(fills, report.fills) || !same(ledger.fills, report.fills) ||
+  if (ledger.initialCashCents !== EXPECTED_MANIFEST.initialCashCents ||
+      !same(fills, report.fills) || !same(ledger.fills, report.fills) ||
       cash !== report.cashCents || fees !== report.feesCents ||
       realized !== report.realizedPnlCents ||
       ledger.cashCents !== report.cashCents || ledger.feesCents !== report.feesCents ||
@@ -198,12 +233,9 @@ function verifyLedger(events, checkpoint, report, responseBodies) {
       })) return false;
   const unrealized = report.position ?
     report.lastMark?.netExitCents - report.position.entryCostCents : 0;
-  const openEntryCost = report.position?.entryCostCents ?? 0;
-  const expectedCash = EXPECTED_MANIFEST.initialCashCents +
-    report.realizedPnlCents - openEntryCost;
-  const expectedEquity = EXPECTED_MANIFEST.initialCashCents +
-    report.realizedPnlCents + report.unrealizedPnlCents;
-  const latestObservation = events.filter(event => event.ohlc && event.ticker).at(-1);
+  const expectedEquity = cash + (report.position ? report.lastMark?.netExitCents : 0);
+  const latestObservation = events.filter(event => event.type === "observation" ||
+    event.dataGap === "MISSED_DECISION_WINDOW").at(-1);
   const lastQuote = latestObservation && parsedQuotes.get(latestObservation.id);
   const markValid = !report.position || Boolean(lastQuote && report.lastMark &&
     report.lastMark.bidNano === lastQuote.bidNano &&
@@ -220,19 +252,17 @@ function verifyLedger(events, checkpoint, report, responseBodies) {
           BigInt(EXPECTED_MANIFEST.feeBpsPerSide), 10_000n)) &&
     report.lastMark.unrealizedPnlCents === unrealized &&
     report.lastMark.ageMs === report.endedAt - report.lastMark.receivedAt);
-  return markValid && isInteger(openEntryCost) && isInteger(expectedCash) &&
-    expectedCash === report.cashCents &&
-    isInteger(unrealized) && unrealized === report.unrealizedPnlCents &&
+  return markValid && isInteger(unrealized) && unrealized === report.unrealizedPnlCents &&
     isInteger(expectedEquity) && expectedEquity === report.equityCents &&
+    EXPECTED_MANIFEST.initialCashCents + report.realizedPnlCents +
+      report.unrealizedPnlCents === report.equityCents &&
+    EXPECTED_MANIFEST.initialCashCents + report.realizedPnlCents -
+    (report.position?.entryCostCents ?? 0) === report.cashCents &&
     (report.position ?
       report.positionStatus === "OPEN_UNRESOLVED_AT_TERMINAL" &&
         report.lastMark && isInteger(report.lastMark.ageMs) && report.lastMark.ageMs >= 0 :
       report.positionStatus === "FLAT" && report.lastMark === null &&
-        report.unrealizedPnlCents === 0 &&
-        (fills.length > 0 ||
-          (report.cashCents === EXPECTED_MANIFEST.initialCashCents &&
-            report.equityCents === EXPECTED_MANIFEST.initialCashCents &&
-            report.feesCents === 0 && report.realizedPnlCents === 0)));
+        report.unrealizedPnlCents === 0);
 }
 
 export function assessPaperEvidence({
@@ -247,6 +277,7 @@ export function assessPaperEvidence({
     terminal?.id === "run-terminal" && same(terminal.report, report) &&
     same(paperReport, report) && report?.schemaVersion === "SPOT_PAPER_PILOT_REPORT_V1";
   const failures = [];
+  let marketEvidence = { valid: false, acceptedObservations: 0, parsedQuotes: new Map() };
 
   if (terminalVerified) {
     if (!verifyProvenance(provenance, report.runId) ||
@@ -266,6 +297,13 @@ export function assessPaperEvidence({
         manifest.limits?.maxResponseBytes !== EXPECTED_MANIFEST.maxResponseBytes) {
       failures.push("ENGINE_MANIFEST_MISMATCH");
     }
+    const elapsedMs = report.endedAt - report.startedAt;
+    if (!isInteger(report.startedAt) || !isInteger(report.endedAt) ||
+        report.startedAt !== manifest?.startedAt || report.endedAt < report.startedAt ||
+        elapsedMs > EXPECTED_MANIFEST.maxDurationMs + 5_000 ||
+        terminal.at !== report.endedAt) {
+      failures.push("RUNTIME_BOUND_OR_TIMESTAMP_INVALID");
+    }
     if (report.mode !== "paper" || report.pair !== EXPECTED_MANIFEST.pair ||
         report.executionImpact !== false || report.liveTrading !== false ||
         report.autoPromotion !== false || report.profitability !== "NOT_ASSESSED" ||
@@ -274,15 +312,11 @@ export function assessPaperEvidence({
     }
     const observations = events.filter(event => event.type === "observation").length;
     const dataGaps = events.filter(event => event.type === "data_gap").length;
+    marketEvidence = verifyMarketEvidence(events, responseBodies);
+    if (!marketEvidence.valid) failures.push("REQUIRED_RAW_MARKET_EVIDENCE_INVALID");
     const signals = [...new Map(events.flatMap(event => event.signals ?? [])
       .map(signal => [signal.id, signal])).values()];
     const checkpoint = readback.checkpoint;
-    const acceptedObservations = observations;
-    const elapsedValid = isInteger(report.startedAt) && isInteger(report.endedAt) &&
-      report.endedAt >= report.startedAt &&
-      report.endedAt - report.startedAt <=
-        EXPECTED_MANIFEST.maxDurationMs + TERMINAL_WRITE_GRACE_MS;
-    const elapsedMs = elapsedValid ? report.endedAt - report.startedAt : null;
     if (!isInteger(report.observations) || report.observations !== observations ||
         !isInteger(report.dataGaps) || report.dataGaps !== dataGaps ||
         !isInteger(report.requests) || report.requests < observations * 2 ||
@@ -299,40 +333,20 @@ export function assessPaperEvidence({
         events.length !== checkpoint.cycle + 2 ||
         (report.stopReason === "CYCLE_LIMIT" &&
           checkpoint.cycle !== EXPECTED_MANIFEST.maxCycles) ||
-        report.requests > checkpoint.cycle * 2 ||
-        !elapsedValid) {
+        report.requests > checkpoint.cycle * 2) {
       failures.push("COUNTER_OR_SIGNAL_RECONCILIATION_FAILED");
     }
-    if (!verifyLedger(events, checkpoint, report, responseBodies)) {
+    if (!verifyLedger(events, checkpoint, report, marketEvidence.parsedQuotes)) {
       failures.push("INTEGER_LEDGER_OR_CAUSAL_FILL_RECONCILIATION_FAILED");
     }
   }
 
-  const acceptedObservations = Array.isArray(events) ?
-    events.filter(event => event.type === "observation").length : null;
-  const elapsedMs = isInteger(report?.startedAt) && isInteger(report?.endedAt) &&
-    report.endedAt >= report.startedAt ? report.endedAt - report.startedAt : null;
-  const evidenceAccepted = terminalVerified && failures.length === 0 &&
-    paperExitCode === 0 && acceptedObservations > 0;
-  const fullDuration = evidenceAccepted &&
-    report.operationalStatus === "COMPLETED_BOUNDED" &&
-    report.stopReason === "DURATION_LIMIT" &&
-    elapsedMs >= EXPECTED_MANIFEST.maxDurationMs &&
-    elapsedMs <= EXPECTED_MANIFEST.maxDurationMs + TERMINAL_WRITE_GRACE_MS;
-  const boundedStop = ["CYCLE_LIMIT", "DURATION_LIMIT"].includes(report?.stopReason);
-  const riskStop = ["SAMPLED_2PCT_BID_STOP", "SESSION_LOSS_LIMIT", "SIGNAL"]
-    .includes(report?.stopReason);
-  const outcome = !terminalVerified ? "UNKNOWN" :
-    !evidenceAccepted ? "FAILED" : fullDuration ? "COMPLETED" :
-      boundedStop || riskStop ? "PARTIAL" : "FAILED";
-  const durationStatus = !terminalVerified ? "UNKNOWN" :
-    !evidenceAccepted ? "FAILED_DATA_ACCEPTANCE" :
-      fullDuration ? "FULL_DURATION" :
-        report?.stopReason === "CYCLE_LIMIT" ? "PARTIAL_CYCLE_LIMIT" :
-          report?.stopReason === "DURATION_LIMIT" ? "PARTIAL_DURATION" :
-            riskStop ? "PARTIAL_RISK_STOP" : "PARTIAL_STOP";
-  const cycles = isInteger(readback?.checkpoint?.cycle) ?
-    readback.checkpoint.cycle : null;
+  const bounded = terminalVerified && failures.length === 0 &&
+    paperExitCode === 0 && report.operationalStatus === "COMPLETED_BOUNDED" &&
+    ["CYCLE_LIMIT", "DURATION_LIMIT"].includes(report.stopReason);
+  const completed = bounded && marketEvidence.valid &&
+    marketEvidence.acceptedObservations > 0;
+  const outcome = !terminalVerified ? "UNKNOWN" : completed ? "COMPLETED" : "FAILED";
   const reasons = Array.isArray(events) ? events
     .filter(event => event.type === "data_gap" && (event.reason || event.dataGap))
     .map(event => event.reason ?? event.dataGap) : [];
@@ -341,32 +355,47 @@ export function assessPaperEvidence({
   if (paperExitCode !== 0) reasons.push("PAPER_PROCESS_EXIT_NONZERO_OR_UNKNOWN");
   if (failures.length) reasons.push(...failures);
   const markAgeMs = report?.lastMark?.ageMs ?? null;
+  const elapsedMs = isInteger(report?.startedAt) && isInteger(report?.endedAt) &&
+    report.endedAt >= report.startedAt ? report.endedAt - report.startedAt : null;
+  const cycles = isInteger(readback?.checkpoint?.cycle) ? readback.checkpoint.cycle : null;
+  const durationCoverage = elapsedMs === null ? null :
+    elapsedMs / EXPECTED_MANIFEST.maxDurationMs;
+  const riskStop = ["SAMPLED_2PCT_BID_STOP", "SESSION_LOSS_LIMIT"]
+    .includes(report?.stopReason);
+  const runClassification = !terminalVerified ? "UNKNOWN" :
+    riskStop ? "RISK_STOP" : failures.length || paperExitCode !== 0 ?
+      "FAILED_EVIDENCE" : completed && report.stopReason === "DURATION_LIMIT" &&
+        elapsedMs >= EXPECTED_MANIFEST.maxDurationMs -
+          2 * EXPECTED_MANIFEST.requestTimeoutMs ?
+        "COMPLETED_HOUR" : completed ? "PARTIAL_BOUNDED_RUN" :
+          bounded ? "FAILED_DATA_ACCEPTANCE" : "STOPPED_OR_LIMITED";
 
   return {
     outcome,
-    durationStatus,
+    runClassification,
     terminalVerified,
-    boundedTermination: evidenceAccepted && boundedStop,
+    boundedTermination: bounded,
+    startedAt: report?.startedAt ?? null,
+    endedAt: report?.endedAt ?? null,
+    elapsedMs,
+    cycleCount: cycles,
+    cycleCoverage: cycles === null ? null : cycles / EXPECTED_MANIFEST.maxCycles,
+    acceptedObservationCoverage: cycles ? marketEvidence.acceptedObservations / cycles : null,
+    gapCoverage: cycles && isInteger(report?.dataGaps) ? report.dataGaps / cycles : null,
+    durationCoverage,
+    acceptedObservations: marketEvidence.acceptedObservations,
     executionImpact: false,
-    dataAcceptance: evidenceAccepted ? "DATA_ACCEPTED" :
-      terminalVerified ? "FAILED_DATA_ACCEPTANCE" : "NOT_ASSESSED",
-    quoteAccountingReconciliation: terminalVerified && failures.length === 0 &&
-      acceptedObservations > 0,
+    dataAcceptance: bounded && failures.length === 0 &&
+      marketEvidence.acceptedObservations > 0 ?
+      "DATA_ACCEPTED" : bounded && failures.length === 0 ?
+        "FAILED_DATA_ACCEPTANCE" : "NOT_ASSESSED",
+    quoteAccountingReconciled: terminalVerified && failures.length === 0 &&
+      marketEvidence.valid && marketEvidence.acceptedObservations > 0,
     signalReplay: "NOT_PERFORMED",
     profitability: "NOT_ASSESSED",
     runId: readback?.runId ?? report?.runId ?? null,
     sourceSha: provenance?.acceptedSourceSha ?? null,
-    startedAt: report?.startedAt ?? null,
-    endedAt: report?.endedAt ?? null,
-    elapsedMs,
-    durationCoverage: elapsedMs === null ? null :
-      Math.min(1, elapsedMs / EXPECTED_MANIFEST.maxDurationMs),
-    cycles,
-    cycleCoverage: cycles === null ? null : cycles / EXPECTED_MANIFEST.maxCycles,
-    acceptedObservations,
-    observationCoverage: cycles === null || cycles === 0 ? null :
-      acceptedObservations / cycles,
-    observations: acceptedObservations,
+    observations: report?.observations ?? null,
     dataGaps: report?.dataGaps ?? null,
     requests: report?.requests ?? null,
     deliveredBytes: report?.deliveredBytes ?? null,
@@ -388,9 +417,8 @@ export function assessPaperEvidence({
     stopReason: report?.stopReason ?? null,
     reasons: [...new Set(reasons)],
     limitations: [
-      "No trades are forced; zero fills are valid.",
-      "Strategy signal replay is not performed; recorded fills do not validate the strategy fill path.",
-      "A bounded cycle, risk, or early duration stop is a partial run, not a completed one-hour trial.",
+      "No SMA signal replay is performed; quote and accounting reconciliation does not validate strategy signals or fill-path behavior.",
+      "No trades are forced; zero fills are valid but do not validate the strategy fill path.",
       "Profitability is not assessed, regardless of fills, PnL, or terminal equity."
     ]
   };
@@ -430,8 +458,8 @@ async function main(argv) {
   });
   await writeFile(outputPath, `${JSON.stringify(assessment, null, 2)}\n`, { flag: "wx" });
   process.stdout.write(`${JSON.stringify(assessment)}\n`);
-  if (assessment.outcome !== "COMPLETED" &&
-      assessment.outcome !== "PARTIAL") process.exitCode = 1;
+  if (assessment.outcome !== "COMPLETED" ||
+      assessment.dataAcceptance !== "DATA_ACCEPTED") process.exitCode = 1;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

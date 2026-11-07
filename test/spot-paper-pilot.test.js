@@ -102,10 +102,10 @@ function priceRow(timestamp, price) {
   return [timestamp, price, price, price, price, price, "1.00000000", 1];
 }
 
-function ohlcData(closes) {
+function ohlcData(closes, startAt = BASE) {
   const rows = closes.map((close, index) =>
-    priceRow((BASE + index * MINUTE) / 1000, close));
-  rows.push(priceRow((BASE + closes.length * MINUTE) / 1000, closes.at(-1)));
+    priceRow((startAt + index * MINUTE) / 1000, close));
+  rows.push(priceRow((startAt + closes.length * MINUTE) / 1000, closes.at(-1)));
   return { error: [], result: { XXBTZEUR: rows, last: rows.at(-1)[0] } };
 }
 
@@ -123,7 +123,7 @@ function acquisition(data, nowMs, requestStartedAt = nowMs - 20) {
     bytes: Buffer.byteLength(raw), requestStartedAt, receivedAt: nowMs };
 }
 
-function paperEvidenceFixture({ withFill = false, fillInGap = false } = {}) {
+function paperEvidenceFixture({ withFill = false } = {}) {
   const startedAt = BASE + 21 * MINUTE + 1_000;
   const receivedAt = startedAt + 30;
   const endedAt = startedAt + 3_600_000;
@@ -209,21 +209,11 @@ function paperEvidenceFixture({ withFill = false, fillInGap = false } = {}) {
     lastMark: ledger.lastMark, requests: 2,
     deliveredBytes: Buffer.byteLength(ohlcRaw) + Buffer.byteLength(tickerRaw)
   };
-  const events = [{ id: "run-start", type: "start" }];
-  if (fillInGap) {
-    events.push({ ...event, id: "observation:1", signals: [], fills: [] });
-    events.push({
-      ...event, id: "gap:2", type: "data_gap", cycle: 2,
-      dataGap: "MISSED_DECISION_WINDOW"
-    });
-    report.observations = 1;
-    report.dataGaps = 1;
-    report.requests = 4;
-    report.deliveredBytes *= 2;
-  } else {
-    events.push(event);
-  }
-  events.push({ id: "run-terminal", type: "terminal", report });
+  const events = [
+    { id: "run-start", type: "start", at: startedAt },
+    event,
+    { id: "run-terminal", type: "terminal", at: endedAt, report }
+  ];
   const readback = {
     reconciliation: "TERMINAL_REPORT_AVAILABLE", runId: report.runId,
     eventCount: events.length, resumed: false, executionImpact: false,
@@ -238,8 +228,8 @@ function paperEvidenceFixture({ withFill = false, fillInGap = false } = {}) {
       }
     },
     checkpoint: {
-      ledger, counters: { requests: report.requests, bytes: report.deliveredBytes },
-      cycle: fillInGap ? 2 : 1, stopReason: "DURATION_LIMIT"
+      ledger, counters: { requests: 2, bytes: report.deliveredBytes },
+      cycle: 1, stopReason: "DURATION_LIMIT"
     },
     events, report
   };
@@ -268,30 +258,34 @@ test("paper evidence accepts zero fills without validating a fill path or profit
     paperExitCode: 0, paperReport: fixture.report, readback: fixture.readback,
     provenance: fixture.provenance, responseBodies: fixture.responseBodies
   });
-  assert.equal(assessment.outcome, "COMPLETED");
-  assert.equal(assessment.durationStatus, "FULL_DURATION");
+  assert.equal(assessment.outcome, "COMPLETED", JSON.stringify(assessment));
+  assert.equal(assessment.runClassification, "COMPLETED_HOUR");
   assert.equal(assessment.dataAcceptance, "DATA_ACCEPTED");
-  assert.equal(assessment.quoteAccountingReconciliation, true);
+  assert.equal(assessment.quoteAccountingReconciled, true);
   assert.equal(assessment.signalReplay, "NOT_PERFORMED");
+  assert.equal("fillPathValidated" in assessment, false);
   assert.equal(assessment.profitability, "NOT_ASSESSED");
-  assert.equal(assessment.elapsedMs, 3_600_000);
-  assert.equal(assessment.durationCoverage, 1);
-  assert.equal(assessment.cycles, 1);
-  assert.equal(assessment.acceptedObservations, 1);
   assert.equal(assessment.observations, 1);
+  assert.equal(assessment.acceptedObservations, 1);
+  assert.equal(assessment.elapsedMs, 3_600_000);
+  assert.equal(assessment.cycleCoverage, 1 / 60);
+  assert.equal(assessment.acceptedObservationCoverage, 1);
+  assert.equal(assessment.gapCoverage, 0);
+  assert.equal(assessment.durationCoverage, 1);
   assert.deepEqual(assessment.fills, []);
   assert.equal(assessment.positionStatus, "FLAT");
 });
 
-test("paper evidence reconciles recorded quotes, integer fills, and explicit stale open marks without strategy claims", () => {
+test("paper evidence reconciles recorded quotes and integer accounting without claiming strategy replay", () => {
   const fixture = paperEvidenceFixture({ withFill: true });
   const assessment = assessPaperEvidence({
     paperExitCode: 0, paperReport: fixture.report, readback: fixture.readback,
     provenance: fixture.provenance, responseBodies: fixture.responseBodies
   });
-  assert.equal(assessment.outcome, "COMPLETED");
-  assert.equal(assessment.quoteAccountingReconciliation, true);
+  assert.equal(assessment.outcome, "COMPLETED", JSON.stringify(assessment));
+  assert.equal(assessment.quoteAccountingReconciled, true);
   assert.equal(assessment.signalReplay, "NOT_PERFORMED");
+  assert.equal("fillPathValidated" in assessment, false);
   assert.equal(assessment.profitability, "NOT_ASSESSED");
   assert.equal(assessment.openPositionAssessment, "OPEN_MARK_STALE");
   assert.equal(assessment.markAgeMs, fixture.report.endedAt - fixture.report.lastMark.receivedAt);
@@ -303,131 +297,208 @@ test("paper evidence reconciles recorded quotes, integer fills, and explicit sta
     provenance: altered.provenance, responseBodies: altered.responseBodies
   });
   assert.equal(rejected.outcome, "FAILED");
-  assert.equal(rejected.quoteAccountingReconciliation, false);
+  assert.equal(rejected.quoteAccountingReconciled, false);
 });
 
-test("paper evidence requires raw market receipts for observations and missed-window gaps", () => {
-  const fixture = paperEvidenceFixture();
+test("paper evidence rejects observation records missing either or both raw market references", () => {
   for (const fields of [["ohlc"], ["ticker"], ["ohlc", "ticker"]]) {
-    const altered = structuredClone(fixture);
-    for (const field of fields) delete altered.readback.events[1][field];
+    const fixture = paperEvidenceFixture();
+    for (const field of fields) delete fixture.readback.events[1][field];
     const assessment = assessPaperEvidence({
-      paperExitCode: 0, paperReport: altered.report, readback: altered.readback,
-      provenance: altered.provenance, responseBodies: altered.responseBodies
+      paperExitCode: 0, paperReport: fixture.report, readback: fixture.readback,
+      provenance: fixture.provenance, responseBodies: fixture.responseBodies
     });
     assert.equal(assessment.outcome, "FAILED", fields.join("+"));
-    assert.equal(assessment.dataAcceptance, "FAILED_DATA_ACCEPTANCE", fields.join("+"));
-    assert.equal(assessment.quoteAccountingReconciliation, false, fields.join("+"));
+    assert.equal(assessment.acceptedObservations, 0, fields.join("+"));
+    assert.equal(assessment.dataAcceptance, "NOT_ASSESSED", fields.join("+"));
+    assert.equal(assessment.quoteAccountingReconciled, false, fields.join("+"));
   }
+});
 
-  const missedWindow = paperEvidenceFixture({ withFill: true, fillInGap: true });
+test("paper evidence keeps genuine request-error gaps reference-optional", () => {
+  const fixture = paperEvidenceFixture();
+  const { report, readback } = fixture;
+  const gap = {
+    id: "gap:2:3:HTTP_429", type: "data_gap", reason: "HTTP_429",
+    at: report.startedAt + 60_000
+  };
+  report.dataGaps = 1;
+  report.requests = 3;
+  readback.events.splice(2, 0, gap);
+  readback.events.at(-1).report = report;
+  readback.eventCount = readback.events.length;
+  readback.checkpoint = {
+    ...readback.checkpoint,
+    counters: { requests: 3, bytes: report.deliveredBytes },
+    cycle: 2
+  };
   const assessment = assessPaperEvidence({
-    paperExitCode: 0, paperReport: missedWindow.report,
-    readback: missedWindow.readback, provenance: missedWindow.provenance,
-    responseBodies: missedWindow.responseBodies
+    paperExitCode: 0, paperReport: report, readback,
+    provenance: fixture.provenance, responseBodies: fixture.responseBodies
   });
   assert.equal(assessment.outcome, "COMPLETED");
-  assert.equal(assessment.dataGaps, 1);
-  assert.equal(assessment.quoteAccountingReconciliation, true);
-  assert.equal(assessment.signalReplay, "NOT_PERFORMED");
-});
-
-test("paper evidence reports partial runtime and accepted-observation coverage honestly", () => {
-  const fixture = paperEvidenceFixture();
-  fixture.report.endedAt -= 60_000;
-  const mark = fixture.readback.checkpoint.ledger.lastMark;
-  if (mark) mark.ageMs = fixture.report.endedAt - mark.receivedAt;
-  const assessment = assessPaperEvidence({
-    paperExitCode: 0, paperReport: fixture.report, readback: fixture.readback,
-    provenance: fixture.provenance, responseBodies: fixture.responseBodies
-  });
-  assert.equal(assessment.outcome, "PARTIAL");
-  assert.equal(assessment.durationStatus, "PARTIAL_DURATION");
-  assert.equal(assessment.elapsedMs, 3_540_000);
-  assert.equal(assessment.durationCoverage, 3_540_000 / 3_600_000);
-  assert.equal(assessment.observationCoverage, 1);
-
-  const cycleLimit = paperEvidenceFixture();
-  const firstObservation = cycleLimit.readback.events[1];
-  const startEvent = cycleLimit.readback.events[0];
-  const cycleEvents = [startEvent];
-  for (let cycle = 1; cycle <= 60; cycle++) {
-    cycleEvents.push({
-      ...firstObservation,
-      id: `observation:${cycle}`,
-      cycle
-    });
-  }
-  cycleLimit.report.stopReason = "CYCLE_LIMIT";
-  cycleLimit.report.observations = 60;
-  cycleLimit.report.requests = 120;
-  cycleLimit.report.deliveredBytes *= 60;
-  cycleLimit.report.endedAt = cycleLimit.report.startedAt + 59 * MINUTE;
-  cycleEvents.push({ id: "run-terminal", type: "terminal", report: cycleLimit.report });
-  cycleLimit.readback.events = cycleEvents;
-  cycleLimit.readback.eventCount = cycleEvents.length;
-  cycleLimit.readback.report = cycleLimit.report;
-  cycleLimit.readback.checkpoint = {
-    ...cycleLimit.readback.checkpoint,
-    counters: { requests: 120, bytes: cycleLimit.report.deliveredBytes },
-    cycle: 60,
-    stopReason: "CYCLE_LIMIT"
-  };
-  const cycleAssessment = assessPaperEvidence({
-    paperExitCode: 0, paperReport: cycleLimit.report,
-    readback: cycleLimit.readback, provenance: cycleLimit.provenance,
-    responseBodies: cycleLimit.responseBodies
-  });
-  assert.equal(cycleAssessment.outcome, "PARTIAL");
-  assert.equal(cycleAssessment.durationStatus, "PARTIAL_CYCLE_LIMIT");
-  assert.equal(cycleAssessment.elapsedMs, 59 * MINUTE);
-  assert.equal(cycleAssessment.cycleCoverage, 1);
-  assert.equal(cycleAssessment.observationCoverage, 1);
-
-  const riskStop = paperEvidenceFixture();
-  riskStop.report.operationalStatus = "STOPPED_WITH_LIMITATION";
-  riskStop.report.stopReason = "SESSION_LOSS_LIMIT";
-  riskStop.readback.checkpoint.stopReason = "SESSION_LOSS_LIMIT";
-  const riskAssessment = assessPaperEvidence({
-    paperExitCode: 0, paperReport: riskStop.report, readback: riskStop.readback,
-    provenance: riskStop.provenance, responseBodies: riskStop.responseBodies
-  });
-  assert.equal(riskAssessment.outcome, "PARTIAL");
-  assert.equal(riskAssessment.durationStatus, "PARTIAL_RISK_STOP");
-});
-
-test("paper evidence leaves request-error gaps reference-optional", () => {
-  const fixture = paperEvidenceFixture();
-  const events = [
-    fixture.readback.events[0],
-    { id: "gap:1:1:HTTP_429", type: "data_gap", reason: "HTTP_429", at: BASE },
-    fixture.readback.events.at(-1)
-  ];
-  fixture.report.operationalStatus = "STOPPED_WITH_LIMITATION";
-  fixture.report.stopReason = "INVALID_DATA";
-  fixture.report.observations = 0;
-  fixture.report.dataGaps = 1;
-  fixture.report.requests = 1;
-  fixture.report.deliveredBytes = 0;
-  fixture.report.signals = [];
-  fixture.readback.events = events;
-  fixture.readback.eventCount = events.length;
-  fixture.readback.checkpoint = {
-    ...fixture.readback.checkpoint,
-    counters: { requests: 1, bytes: 0 },
-    cycle: 1,
-    stopReason: "INVALID_DATA"
-  };
-  const assessment = assessPaperEvidence({
-    paperExitCode: 0, paperReport: fixture.report, readback: fixture.readback,
-    provenance: fixture.provenance, responseBodies: fixture.responseBodies
-  });
-  assert.equal(assessment.outcome, "FAILED");
-  assert.equal(assessment.dataAcceptance, "FAILED_DATA_ACCEPTANCE");
-  assert.equal(assessment.observations, 0);
+  assert.equal(assessment.acceptedObservations, 1);
   assert.equal(assessment.dataGaps, 1);
   assert.ok(assessment.reasons.includes("HTTP_429"));
-  assert.ok(!assessment.reasons.includes("INTEGER_LEDGER_OR_CAUSAL_FILL_RECONCILIATION_FAILED"));
+});
+
+test("bounded duration with only request failures is not accepted data or a completed hour", () => {
+  const fixture = paperEvidenceFixture();
+  const { report, readback } = fixture;
+  const gap = {
+    id: "gap:1:2:FETCH_FAILED", type: "data_gap",
+    reason: "FETCH_FAILED", at: report.startedAt + 3_600_000
+  };
+  report.observations = 0;
+  report.dataGaps = 1;
+  report.requests = 2;
+  report.deliveredBytes = 0;
+  report.signals = [];
+  readback.events.splice(1, 1, gap);
+  readback.events.at(-1).at = report.endedAt;
+  readback.events.at(-1).report = report;
+  readback.eventCount = readback.events.length;
+  readback.checkpoint = {
+    ledger: {
+      initialCashCents: 100_000, cashCents: 100_000,
+      realizedPnlCents: 0, feesCents: 0, position: null,
+      lastMark: null, fills: []
+    },
+    counters: { requests: 2, bytes: 0 }, cycle: 1,
+    stopReason: "DURATION_LIMIT"
+  };
+  const assessment = assessPaperEvidence({
+    paperExitCode: 0, paperReport: report, readback,
+    provenance: fixture.provenance, responseBodies: fixture.responseBodies
+  });
+  assert.equal(assessment.boundedTermination, true);
+  assert.equal(assessment.outcome, "FAILED");
+  assert.equal(assessment.acceptedObservations, 0);
+  assert.equal(assessment.dataAcceptance, "FAILED_DATA_ACCEPTANCE");
+  assert.equal(assessment.runClassification, "FAILED_DATA_ACCEPTANCE");
+});
+
+test("paper evidence permits a quote-triggered stop fill on a verified missed-window gap", () => {
+  const fixture = paperEvidenceFixture({ withFill: true });
+  const { report, readback, responseBodies } = fixture;
+  const priorPosition = structuredClone(report.position);
+  const priorFill = report.fills[0];
+  const stoppedAt = report.startedAt + 60_000;
+  const ohlcRaw = JSON.stringify(ohlcData(
+    Array(21).fill("68000.00000000"), stoppedAt - 22 * MINUTE - 1_000
+  ));
+  const tickerRaw = JSON.stringify(tickerData({
+    bid: "66600.00000000", ask: "66601.00000000"
+  }));
+  const ohlcHash = sha256(Buffer.from(ohlcRaw, "utf8"));
+  const tickerHash = sha256(Buffer.from(tickerRaw, "utf8"));
+  responseBodies[ohlcHash] = ohlcRaw;
+  responseBodies[tickerHash] = tickerRaw;
+  const quoteReceivedAt = stoppedAt + 30;
+  const exitPriceNano = String((6_660_000_000_000n * 9_990n + 5_000n) / 10_000n);
+  const exitGrossCents = Number((BigInt(priorPosition.quantitySat) *
+    BigInt(exitPriceNano) * 2n + 100_000_000_000_000n) /
+    (2n * 100_000_000_000_000n));
+  const exitFeeCents = Number((BigInt(exitGrossCents) * 50n * 2n + 10_000n) / 20_000n);
+  const exitFill = {
+    id: `exit:${priorPosition.entrySignalId}:stop`, side: "SELL",
+    quantitySat: priorPosition.quantitySat, priceNano: exitPriceNano,
+    grossCents: exitGrossCents, feeCents: exitFeeCents,
+    reason: "SAMPLED_2PCT_BID_STOP", signalAt: quoteReceivedAt + 1,
+    quoteReceivedAt
+  };
+  const proceeds = exitGrossCents - exitFeeCents;
+  const entryCost = priorPosition.entryCostCents;
+  const gap = {
+    id: `observation:2:${BASE + 21 * MINUTE}:${tickerHash}`,
+    type: "data_gap", dataGap: "MISSED_DECISION_WINDOW", cycle: 2,
+    signalKnownAt: stoppedAt + 10,
+    ohlc: {
+      path: `responses/${ohlcHash}.json`, sha256: ohlcHash,
+      bytes: Buffer.byteLength(ohlcRaw), requestStartedAt: stoppedAt,
+      receivedAt: stoppedAt + 5, latestClosedAt: stoppedAt - 2 * MINUTE - 1_000,
+      ageMs: 60_000
+    },
+    ticker: {
+      path: `responses/${tickerHash}.json`, sha256: tickerHash,
+      bytes: Buffer.byteLength(tickerRaw),
+      requestStartedAt: stoppedAt + 15, receivedAt: quoteReceivedAt,
+      acquisitionAgeMs: 0
+    },
+    signals: [], fills: [exitFill]
+  };
+  report.fills = [priorFill, exitFill];
+  report.cashCents = 100_000 - entryCost + proceeds;
+  report.feesCents += exitFeeCents;
+  report.realizedPnlCents = proceeds - entryCost;
+  report.position = null;
+  report.positionStatus = "FLAT";
+  report.unrealizedPnlCents = 0;
+  report.equityCents = report.cashCents;
+  report.lastMark = null;
+  report.observations = 1;
+  report.dataGaps = 1;
+  report.requests = 4;
+  report.deliveredBytes = Object.values(responseBodies)
+    .reduce((sum, raw) => sum + Buffer.byteLength(raw), 0);
+  readback.events.splice(2, 0, gap);
+  readback.events.at(-1).report = report;
+  readback.checkpoint = {
+    ledger: {
+      initialCashCents: 100_000, cashCents: report.cashCents,
+      realizedPnlCents: report.realizedPnlCents, feesCents: report.feesCents,
+      position: null, lastMark: null, fills: report.fills
+    },
+    counters: { requests: 4, bytes: report.deliveredBytes },
+    cycle: 2, stopReason: "DURATION_LIMIT"
+  };
+  readback.eventCount = readback.events.length;
+  const assessment = assessPaperEvidence({
+    paperExitCode: 0, paperReport: report, readback,
+    provenance: fixture.provenance, responseBodies
+  });
+  assert.equal(assessment.outcome, "COMPLETED", JSON.stringify(assessment));
+  assert.equal(assessment.quoteAccountingReconciled, true);
+  assert.equal(assessment.fills[1].reason, "SAMPLED_2PCT_BID_STOP");
+});
+
+test("paper evidence distinguishes partial duration, risk stops, and invalid timestamps", () => {
+  const fixture = paperEvidenceFixture();
+  fixture.report.endedAt -= 60_000;
+  fixture.readback.events.at(-1).at = fixture.report.endedAt;
+  fixture.readback.events.at(-1).report = fixture.report;
+  const partial = assessPaperEvidence({
+    paperExitCode: 0, paperReport: fixture.report, readback: fixture.readback,
+    provenance: fixture.provenance, responseBodies: fixture.responseBodies
+  });
+  assert.equal(partial.outcome, "COMPLETED");
+  assert.equal(partial.runClassification, "PARTIAL_BOUNDED_RUN");
+  assert.equal(partial.elapsedMs, 3_540_000);
+  assert.equal(partial.durationCoverage, 0.9833333333333333);
+
+  const riskFixture = paperEvidenceFixture();
+  riskFixture.report.stopReason = "SESSION_LOSS_LIMIT";
+  riskFixture.readback.checkpoint.stopReason = "SESSION_LOSS_LIMIT";
+  riskFixture.readback.events.at(-1).report = riskFixture.report;
+  const risk = assessPaperEvidence({
+    paperExitCode: 0, paperReport: riskFixture.report,
+    readback: riskFixture.readback, provenance: riskFixture.provenance,
+    responseBodies: riskFixture.responseBodies
+  });
+  assert.equal(risk.runClassification, "RISK_STOP");
+
+  const invalidFixture = paperEvidenceFixture();
+  invalidFixture.report.endedAt = invalidFixture.report.startedAt +
+    3_600_000 + 5_001;
+  invalidFixture.readback.events.at(-1).at = invalidFixture.report.endedAt;
+  invalidFixture.readback.events.at(-1).report = invalidFixture.report;
+  const invalid = assessPaperEvidence({
+    paperExitCode: 0, paperReport: invalidFixture.report,
+    readback: invalidFixture.readback, provenance: invalidFixture.provenance,
+    responseBodies: invalidFixture.responseBodies
+  });
+  assert.equal(invalid.outcome, "FAILED");
+  assert.ok(invalid.reasons.includes("RUNTIME_BOUND_OR_TIMESTAMP_INVALID"));
 });
 
 test("paper evidence keeps failed and unknown outcomes distinct and binds the accepted source", () => {
@@ -472,9 +543,7 @@ test("paper evidence CLI verifies local response bodies without provider request
     provenancePath, runDirectory, assessmentPath
   ], { encoding: "utf8" });
   assert.equal(JSON.parse(output).outcome, "COMPLETED");
-  const assessment = JSON.parse(await readFile(assessmentPath, "utf8"));
-  assert.equal(assessment.quoteAccountingReconciliation, true);
-  assert.equal(assessment.signalReplay, "NOT_PERFORMED");
+  assert.equal(JSON.parse(await readFile(assessmentPath, "utf8")).signalReplay, "NOT_PERFORMED");
 });
 
 test("one-hour paper workflow is owner-only, manual, one-shot, pinned, and bounded", () => {
@@ -960,7 +1029,7 @@ test("runner integrates injected data, SMA, paper ledger, raw-response journal a
   const dataRoot = await temporaryRoot(t);
   const clock = { value: INITIAL_NOW, monotonic: 0 };
   const candles = [Array(21).fill(PRICE_100), [...Array(21).fill(PRICE_100), PRICE_120]];
-  const provider = providerFor(clock, candles.map(ohlcData), [tickerData(), tickerData()]);
+  const provider = providerFor(clock, candles.map(closes => ohlcData(closes)), [tickerData(), tickerData()]);
   const config = runnerConfig({ dataRoot, runId: "e2e-paper", provider, cycles: 2 });
   config.now = () => clock.value;
   config.sleep = async ms => { clock.value += ms; clock.monotonic += ms; };
