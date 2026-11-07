@@ -5,23 +5,26 @@ import {
   advanceStrategy, createStrategyState, parseKrakenOhlc, parseKrakenTicker,
   sha256, SPOT_PAPER_PILOT_LIMITS
 } from "./core.mjs";
+import {
+  DEFAULT_SIGNAL_REPLAY_PROFILE_ID, getSignalReplayProfile
+} from "./evidence-profiles.mjs";
+import {
+  expectedDispatchFromEnvironment, FOUR_HOUR_DISPATCH_PROFILE_ID,
+  verifyFourHourDispatchIdentity
+} from "./dispatch-identity.mjs";
 
+const DEFAULT_REPLAY_PROFILE = getSignalReplayProfile();
+const HISTORICAL_IDENTITY = Object.fromEntries(
+  Object.entries(DEFAULT_REPLAY_PROFILE.identity).filter(([key]) => key !== "kind"));
 export const EXPECTED_SIGNAL_REPLAY_IDENTITY = Object.freeze({
-  acceptedSourceSha: "81edf0b5dc3d455c2c1e1906791d56c731bea0c9",
-  workflowSha: "ddae14f01583196dfc9e9da906dcd03d41d58369",
-  workflowRunId: "42395522899",
-  workflowRunNumber: 1,
-  workflowRunAttempt: 1,
-  runId: "spot-paper-42395522899-1",
-  model: "BTC_EUR_SMA5_SMA20_V1"
+  acceptedSourceSha: DEFAULT_REPLAY_PROFILE.acceptedSourceSha,
+  ...HISTORICAL_IDENTITY,
+  model: DEFAULT_REPLAY_PROFILE.model
 });
 
 const MAX_JOURNAL_BYTES = 16 * 1024 * 1024;
 const MAX_MANIFEST_BYTES = 64 * 1024;
-const MAX_RETAINED_RESPONSE_BYTES = 64 * 1024 * 1024;
 const MAX_RESPONSE_BYTES = SPOT_PAPER_PILOT_LIMITS.maxResponseBytes;
-const MAX_CYCLES = 60;
-const MAX_REQUESTS = 120;
 const isInteger = Number.isSafeInteger;
 const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
 const statusRank = { PASS: 0, UNKNOWN: 1, FAILED: 2 };
@@ -30,41 +33,61 @@ function worsenStatus(current, next) {
   return statusRank[next] > statusRank[current] ? next : current;
 }
 
-function canonicalErrorGapCycle(event) {
+function canonicalErrorGapCycle(event, profile) {
   if (event?.type !== "data_gap" || event.dataGap === "MISSED_DECISION_WINDOW") return null;
   const match = /^gap:([1-9]\d*):([1-9]\d*):(.+)$/.exec(event.id ?? "");
   if (!match) return null;
   const cycle = Number(match[1]);
   const requests = Number(match[2]);
-  if (!isInteger(cycle) || cycle > MAX_CYCLES ||
-      !isInteger(requests) || requests > MAX_REQUESTS || event.reason !== match[3] ||
+  if (!isInteger(cycle) || cycle > profile.maxCycles ||
+      !isInteger(requests) || requests > profile.maxRequests || event.reason !== match[3] ||
       (event.cycle !== undefined && event.cycle !== cycle)) return null;
   return cycle;
 }
 
-function cycleForEvent(event) {
+function cycleForEvent(event, profile) {
   if (event?.type === "data_gap" && event.dataGap !== "MISSED_DECISION_WINDOW") {
-    return canonicalErrorGapCycle(event);
+    return canonicalErrorGapCycle(event, profile);
   }
   if (!isInteger(event?.cycle)) return null;
   return event.cycle;
 }
 
-function identityStatus(readback, provenance) {
+function identityStatus(readback, provenance, profile, expectedDispatch) {
   if (!readback || !provenance) return "UNKNOWN";
-  const expected = EXPECTED_SIGNAL_REPLAY_IDENTITY;
-  const valid = readback.runId === expected.runId &&
-    readback.manifest?.model === expected.model &&
-    readback.manifest?.mode === "paper" &&
-    readback.manifest?.pair === SPOT_PAPER_PILOT_LIMITS.pair &&
-    provenance.schemaVersion === "SPOT_PAPER_PILOT_DISPATCH_MANIFEST_V1" &&
-    provenance.acceptedSourceSha === expected.acceptedSourceSha &&
+  if (profile.profileId === FOUR_HOUR_DISPATCH_PROFILE_ID) {
+    const dispatchIdentity = verifyFourHourDispatchIdentity({
+      expectedDispatch, provenance, runIds: [readback.runId]
+    });
+    if (dispatchIdentity !== "PASS") return dispatchIdentity;
+  }
+  const expected = profile.identity;
+  const identityMatches = expected.kind === "fixed" ?
     provenance.workflowSha === expected.workflowSha &&
-    String(provenance.workflowRunId) === expected.workflowRunId &&
-    provenance.workflowRunNumber === expected.workflowRunNumber &&
-    provenance.workflowRunAttempt === expected.workflowRunAttempt &&
-    provenance.runId === expected.runId &&
-    provenance.model === expected.model;
+      String(provenance.workflowRunId) === expected.workflowRunId &&
+      provenance.workflowRunNumber === expected.workflowRunNumber &&
+      provenance.workflowRunAttempt === expected.workflowRunAttempt &&
+      provenance.runId === expected.runId :
+    /^[a-f0-9]{40}$/.test(provenance.workflowSha ?? "") &&
+      /^\d+$/.test(String(provenance.workflowRunId ?? "")) &&
+      provenance.workflowRunNumber === 1 && provenance.workflowRunAttempt === 1 &&
+      provenance.runId ===
+        `spot-paper-${provenance.workflowRunId}-${provenance.workflowRunAttempt}`;
+  const profileMatches = profile.profileId === DEFAULT_SIGNAL_REPLAY_PROFILE_ID ||
+    provenance.profileId === profile.profileId;
+  const profileFieldsMatch = Object.entries(profile).every(([key, value]) =>
+    key === "profileId" || key === "identity" || provenance[key] === value);
+  const valid = identityMatches && profileMatches &&
+    profileFieldsMatch &&
+    readback.runId === provenance.runId &&
+    readback.manifest?.model === profile.model &&
+    readback.manifest?.mode === profile.mode &&
+    readback.manifest?.pair === profile.pair &&
+    provenance.schemaVersion === profile.schemaVersion &&
+    provenance.acceptedSourceSha === profile.acceptedSourceSha &&
+    provenance.runId === readback.runId &&
+    provenance.model === profile.model && provenance.mode === profile.mode &&
+    provenance.pair === profile.pair;
   return valid ? "PASS" : "FAILED";
 }
 
@@ -204,12 +227,17 @@ function stateMatches(left, right) {
     same(left.closes, right.closes));
 }
 
-export function replaySpotPaperSignals({ readback, provenance, responseBodies } = {}) {
+export function replaySpotPaperSignals({
+  readback, provenance, responseBodies,
+  profileId = DEFAULT_SIGNAL_REPLAY_PROFILE_ID, expectedDispatch
+} = {}) {
+  const profile = getSignalReplayProfile(profileId);
   const discrepancies = [];
-  const identity = identityStatus(readback, provenance);
+  const identity = identityStatus(readback, provenance, profile, expectedDispatch);
   if (identity !== "PASS") {
     return {
       outcome: identity,
+      profileId: profile.profileId,
       identity,
       signalReplay: identity === "PASS" ? "PASS" : "NOT_ASSESSED",
       fillCausality: "NOT_ASSESSED",
@@ -223,22 +251,45 @@ export function replaySpotPaperSignals({ readback, provenance, responseBodies } 
 
   const events = readback.events;
   const cycleEvents = Array.isArray(events) ? events.slice(1, -1) : [];
+  const limits = readback.manifest?.limits;
+  const manifestIdentityMatches =
+    readback.manifest?.schemaVersion === "SPOT_PAPER_PILOT_MANIFEST_V1" &&
+    readback.manifest.mode === profile.mode &&
+    readback.manifest.model === profile.model &&
+    readback.manifest.pair === profile.pair;
+  const profileManifestMatches = manifestIdentityMatches &&
+    (profile.profileId === DEFAULT_SIGNAL_REPLAY_PROFILE_ID ||
+    limits?.maxCycles === profile.maxCycles &&
+    limits?.maxRequests === profile.maxRequests &&
+    limits?.maxDurationMs === profile.maxDurationMs &&
+    limits?.pollIntervalMs === profile.pollIntervalMs &&
+    limits?.requestTimeoutMs === profile.requestTimeoutMs &&
+    limits?.maxBytes === profile.maxBytes &&
+    limits?.maxResponseBytes === profile.maxResponseBytes);
   const shapeValid = readback.reconciliation === "TERMINAL_REPORT_AVAILABLE" &&
     readback.resumed === false && readback.executionImpact === false &&
     readback.eventCount === events?.length && Array.isArray(events) &&
-    events.length >= 2 && events.length <= MAX_CYCLES + 2 &&
+    events.length >= 2 && events.length <= profile.maxCycles + 2 &&
     events.every(event => event && typeof event === "object" && !Array.isArray(event)) &&
     events[0]?.id === "run-start" && events.at(-1)?.id === "run-terminal" &&
     events.filter(event => event.id === "run-terminal").length === 1 &&
     isInteger(readback.checkpoint?.cycle) &&
-    readback.checkpoint.cycle >= 0 && readback.checkpoint.cycle <= MAX_CYCLES &&
+    readback.checkpoint.cycle >= 0 && readback.checkpoint.cycle <= profile.maxCycles &&
+    isInteger(readback.checkpoint?.counters?.requests) &&
+    readback.checkpoint.counters.requests >= 0 &&
+    readback.checkpoint.counters.requests <= profile.maxRequests &&
+    isInteger(readback.checkpoint?.counters?.bytes) &&
+    readback.checkpoint.counters.bytes >= 0 &&
+    readback.checkpoint.counters.bytes <= profile.maxBytes &&
     cycleEvents.length === readback.checkpoint.cycle &&
-    cycleEvents.every((event, index) => cycleForEvent(event) === index + 1);
+    cycleEvents.every((event, index) => cycleForEvent(event, profile) === index + 1) &&
+    profileManifestMatches;
   if (!shapeValid) {
     return {
+      profileId: profile.profileId,
       outcome: "UNKNOWN", identity, signalReplay: "UNKNOWN",
       fillCausality: "UNKNOWN", startupCutoff: "UNKNOWN",
-      supportedClaim: "No replay claim; retained journal is incomplete or outside bounds.",
+      supportedClaim: "No replay claim; retained journal is incomplete, mismatched, or outside bounds.",
       replayedSignals: 0, sampledStopCount: 0,
       discrepancies: ["INCOMPLETE_OR_UNBOUNDED_JOURNAL"]
     };
@@ -251,8 +302,9 @@ export function replaySpotPaperSignals({ readback, provenance, responseBodies } 
       if (reference?.sha256) references.set(reference.sha256, reference);
     }
   }
-  if (references.size > MAX_CYCLES * 4) {
+  if (references.size > profile.maxCycles * 4) {
     return {
+      profileId: profile.profileId,
       outcome: "UNKNOWN", identity, signalReplay: "UNKNOWN",
       fillCausality: "UNKNOWN", startupCutoff: "UNKNOWN",
       supportedClaim: "No replay claim; retained response set exceeds bounds.",
@@ -266,12 +318,13 @@ export function replaySpotPaperSignals({ readback, provenance, responseBodies } 
     if (raw.status === "PASS") totalBytes += Buffer.byteLength(raw.body, "utf8");
     else discrepancies.push(raw.code);
   }
-  if (totalBytes > MAX_RETAINED_RESPONSE_BYTES) {
+  if (totalBytes > profile.maxBytes) {
     discrepancies.push("RESPONSE_BYTE_LIMIT_EXCEEDED");
   }
   if (discrepancies.some(code => code === "INVALID_RAW_REFERENCE" ||
       code === "RAW_RESPONSE_MISMATCH" || code === "RESPONSE_BYTE_LIMIT_EXCEEDED")) {
     return {
+      profileId: profile.profileId,
       outcome: "FAILED", identity, signalReplay: "FAILED",
       fillCausality: "UNKNOWN", startupCutoff: "UNKNOWN",
       supportedClaim: "No replay claim; retained response integrity or bounds failed.",
@@ -289,7 +342,7 @@ export function replaySpotPaperSignals({ readback, provenance, responseBodies } 
   let fillStatus = "PASS";
   let unknownEvidence = discrepancies.length > 0;
   for (const event of events) {
-    const cycle = cycleForEvent(event);
+    const cycle = cycleForEvent(event, profile);
     if (cycle === null) continue;
     if (cycle !== lastCycle + 1) {
       discrepancies.push("CYCLE_ORDER_MISMATCH");
@@ -369,6 +422,7 @@ export function replaySpotPaperSignals({ readback, provenance, responseBodies } 
   const outcome = signalStatus === "FAILED" || fillStatus === "FAILED" ||
     startupCutoff === "FAILED" ? "FAILED" : unknownEvidence ? "UNKNOWN" : "PASS";
   return {
+    profileId: profile.profileId,
     outcome,
     identity,
     signalReplay: signalStatus,
@@ -393,11 +447,15 @@ async function boundedRead(path, maxBytes) {
   return bytes.toString("utf8");
 }
 
-export async function main(argv = process.argv.slice(2)) {
-  const [readbackPath, provenancePath, runDirectory, outputPath] = argv;
+export async function main(argv = process.argv.slice(2), environment = process.env) {
+  const [
+    readbackPath, provenancePath, runDirectory, outputPath,
+    profileId = DEFAULT_SIGNAL_REPLAY_PROFILE_ID
+  ] = argv;
   if (!readbackPath || !provenancePath || !runDirectory || !outputPath) {
-    throw new Error("Usage: signal-replay.mjs <readback.json> <pilot-manifest.json> <run-directory> <replay.json>");
+    throw new Error("Usage: signal-replay.mjs <readback.json> <pilot-manifest.json> <run-directory> <replay.json> [profile-id]");
   }
+  const profile = getSignalReplayProfile(profileId);
   const readback = JSON.parse(await boundedRead(readbackPath, MAX_JOURNAL_BYTES));
   const provenance = JSON.parse(await boundedRead(provenancePath, MAX_MANIFEST_BYTES));
   const responseBodies = new Map();
@@ -410,13 +468,15 @@ export async function main(argv = process.argv.slice(2)) {
       }
     }
   }
-  if (references.size > MAX_CYCLES * 4) throw new Error("RESPONSE_REFERENCE_LIMIT_EXCEEDED");
+  if (references.size > profile.maxCycles * 4) throw new Error("RESPONSE_REFERENCE_LIMIT_EXCEEDED");
   let totalBytes = 0;
   for (const [hash, reference] of references) {
     if (!/^[a-f0-9]{64}$/.test(hash) ||
         reference.path !== `responses/${hash}.json` ||
         !isInteger(reference.bytes) || reference.bytes < 1 ||
-        reference.bytes > MAX_RESPONSE_BYTES) throw new Error("INVALID_RAW_REFERENCE");
+        reference.bytes > Math.min(MAX_RESPONSE_BYTES, profile.maxResponseBytes)) {
+      throw new Error("INVALID_RAW_REFERENCE");
+    }
     let raw;
     try {
       raw = await boundedRead(join(runDirectory, reference.path), MAX_RESPONSE_BYTES);
@@ -427,12 +487,15 @@ export async function main(argv = process.argv.slice(2)) {
     const bytes = Buffer.from(raw, "utf8");
     totalBytes += bytes.byteLength;
     if (bytes.byteLength !== reference.bytes || sha256(bytes) !== hash ||
-        totalBytes > MAX_RETAINED_RESPONSE_BYTES) {
+        totalBytes > profile.maxBytes) {
       throw new Error("RAW_RESPONSE_MISMATCH_OR_LIMIT");
     }
     responseBodies.set(hash, raw);
   }
-  const result = replaySpotPaperSignals({ readback, provenance, responseBodies });
+  const result = replaySpotPaperSignals({
+    readback, provenance, responseBodies, profileId,
+    expectedDispatch: expectedDispatchFromEnvironment(environment)
+  });
   await writeFile(outputPath, `${JSON.stringify(result, null, 2)}\n`, { flag: "wx" });
   process.stdout.write(`${JSON.stringify(result)}\n`);
   if (result.outcome !== "PASS") process.exitCode = 1;

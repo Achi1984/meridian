@@ -10,6 +10,9 @@ import { createKrakenProvider } from "../scripts/spot-paper-pilot/provider.mjs";
 import { assessObservationEvidence } from "../scripts/spot-paper-pilot/evidence-assessment.mjs";
 import { assessPaperEvidence, ACCEPTED_PAPER_SOURCE_SHA } from
   "../scripts/spot-paper-pilot/paper-evidence-assessment.mjs";
+import {
+  DEFAULT_PAPER_EVIDENCE_PROFILE_ID, getPaperEvidenceProfile
+} from "../scripts/spot-paper-pilot/evidence-profiles.mjs";
 import { createRunJournal, readRunJournal } from "../scripts/spot-paper-pilot/journal.mjs";
 import { runSpotPaperPilot } from "../scripts/spot-paper-pilot/runner.mjs";
 import { main as pilotCli } from "../scripts/spot-paper-pilot/cli.mjs";
@@ -29,6 +32,8 @@ const OBSERVE_WORKFLOW = readFileSync(new URL(
   "../.github/workflows/spot-paper-pilot-observe-only.yml", import.meta.url), "utf8");
 const PAPER_WORKFLOW = readFileSync(new URL(
   "../.github/workflows/spot-paper-pilot-paper-once.yml", import.meta.url), "utf8");
+const FOUR_HOUR_PAPER_WORKFLOW = readFileSync(new URL(
+  "../.github/workflows/spot-paper-pilot-four-hour-once.yml", import.meta.url), "utf8");
 
 test("manual observation assessment separates bounded completion from data acceptance", () => {
   const report = {
@@ -225,7 +230,7 @@ function paperEvidenceFixture({ withFill = false } = {}) {
         maxCycles: 60, maxRequests: 120, maxBytes: 67_108_864,
         maxResponseBytes: 262_144, requestTimeoutMs: 5_000,
         maxDurationMs: 3_600_000, pollIntervalMs: 60_000
-      }
+      },
     },
     checkpoint: {
       ledger, counters: { requests: 2, bytes: report.deliveredBytes },
@@ -252,6 +257,37 @@ function paperEvidenceFixture({ withFill = false } = {}) {
   return { report, readback, provenance, responseBodies };
 }
 
+function fourHourPaperFixture({ withFill = false } = {}) {
+  const fixture = paperEvidenceFixture({ withFill });
+  const profile = getPaperEvidenceProfile("BTC_EUR_PAPER_4H_V1");
+  const runId = "spot-paper-987654321-1";
+  const expectedDispatch = {
+    repository: "Achi1984/meridian",
+    workflowPath: ".github/workflows/spot-paper-pilot-four-hour-once.yml",
+    ref: "refs/heads/main",
+    workflowSha: "b".repeat(40),
+    workflowRunId: "987654321",
+    workflowRunNumber: 1,
+    workflowRunAttempt: 1
+  };
+  fixture.report.runId = runId;
+  fixture.readback.runId = runId;
+  fixture.readback.manifest.limits = {
+    maxCycles: profile.maxCycles,
+    maxRequests: profile.maxRequests,
+    maxBytes: profile.maxBytes,
+    maxResponseBytes: profile.maxResponseBytes,
+    requestTimeoutMs: profile.requestTimeoutMs,
+    maxDurationMs: profile.maxDurationMs,
+    pollIntervalMs: profile.pollIntervalMs
+  };
+  fixture.provenance = {
+    ...fixture.provenance, ...profile, ...expectedDispatch, runId
+  };
+  fixture.expectedDispatch = expectedDispatch;
+  return fixture;
+}
+
 test("paper evidence accepts zero fills without validating a fill path or profitability", () => {
   const fixture = paperEvidenceFixture();
   const assessment = assessPaperEvidence({
@@ -259,6 +295,7 @@ test("paper evidence accepts zero fills without validating a fill path or profit
     provenance: fixture.provenance, responseBodies: fixture.responseBodies
   });
   assert.equal(assessment.outcome, "COMPLETED", JSON.stringify(assessment));
+  assert.equal(assessment.profileId, DEFAULT_PAPER_EVIDENCE_PROFILE_ID);
   assert.equal(assessment.runClassification, "COMPLETED_HOUR");
   assert.equal(assessment.dataAcceptance, "DATA_ACCEPTED");
   assert.equal(assessment.quoteAccountingReconciled, true);
@@ -282,6 +319,7 @@ test("paper evidence reconciles recorded quotes and integer accounting without c
     paperExitCode: 0, paperReport: fixture.report, readback: fixture.readback,
     provenance: fixture.provenance, responseBodies: fixture.responseBodies
   });
+
   assert.equal(assessment.outcome, "COMPLETED", JSON.stringify(assessment));
   assert.equal(assessment.quoteAccountingReconciled, true);
   assert.equal(assessment.signalReplay, "NOT_PERFORMED");
@@ -298,6 +336,98 @@ test("paper evidence reconciles recorded quotes and integer accounting without c
   });
   assert.equal(rejected.outcome, "FAILED");
   assert.equal(rejected.quoteAccountingReconciled, false);
+});
+
+test("four-hour allowlisted assessment reports partial duration, unresolved inventory, and per-fill costs", () => {
+  const fixture = fourHourPaperFixture({ withFill: true });
+  const assessment = assessPaperEvidence({
+    paperExitCode: 0, paperReport: fixture.report, readback: fixture.readback,
+    provenance: fixture.provenance, responseBodies: fixture.responseBodies,
+    profileId: "BTC_EUR_PAPER_4H_V1",
+    expectedDispatch: fixture.expectedDispatch
+  });
+  assert.equal(assessment.outcome, "COMPLETED", JSON.stringify(assessment));
+  assert.equal(assessment.profileId, "BTC_EUR_PAPER_4H_V1");
+  assert.equal(assessment.runClassification, "PARTIAL_BOUNDED_RUN");
+  assert.equal(assessment.elapsedMs, 3_600_000);
+  assert.equal(assessment.durationCoverage, 0.25);
+  assert.equal(assessment.durationStatus, "PARTIAL_BOUNDED_DURATION");
+  assert.equal(assessment.validationCriteria.fullRequestedDuration, false);
+  assert.equal(assessment.openPositionAssessment, "OPEN_MARK_STALE");
+  assert.equal(assessment.fillCostReport.fills.length, 1);
+  assert.equal(assessment.fillCostReport.grossTurnoverCents,
+    fixture.report.fills[0].grossCents);
+  assert.equal(assessment.fillCostReport.feesCents, fixture.report.fills[0].feeCents);
+  assert.equal(assessment.profitability, "NOT_ASSESSED");
+
+  const wrongRun = structuredClone(fixture);
+  wrongRun.provenance.workflowRunId = "987654322";
+  const rejectedRun = assessPaperEvidence({
+    paperExitCode: 0, paperReport: wrongRun.report, readback: wrongRun.readback,
+    provenance: wrongRun.provenance, responseBodies: wrongRun.responseBodies,
+    profileId: "BTC_EUR_PAPER_4H_V1",
+    expectedDispatch: wrongRun.expectedDispatch
+  });
+  assert.equal(rejectedRun.outcome, "FAILED");
+
+  const wrongMode = structuredClone(fixture);
+  wrongMode.provenance.mode = "observe";
+  const rejectedMode = assessPaperEvidence({
+    paperExitCode: 0, paperReport: wrongMode.report, readback: wrongMode.readback,
+    provenance: wrongMode.provenance, responseBodies: wrongMode.responseBodies,
+    profileId: "BTC_EUR_PAPER_4H_V1",
+    expectedDispatch: wrongMode.expectedDispatch
+  });
+  assert.equal(rejectedMode.outcome, "FAILED");
+
+  const exceeded = structuredClone(fixture);
+  exceeded.readback.manifest.limits.maxCycles = 241;
+  const rejectedBounds = assessPaperEvidence({
+    paperExitCode: 0, paperReport: exceeded.report, readback: exceeded.readback,
+    provenance: exceeded.provenance, responseBodies: exceeded.responseBodies,
+    profileId: "BTC_EUR_PAPER_4H_V1",
+    expectedDispatch: exceeded.expectedDispatch
+  });
+  assert.equal(rejectedBounds.outcome, "FAILED");
+  const missingExpectation = assessPaperEvidence({
+    paperExitCode: 0, paperReport: fixture.report, readback: fixture.readback,
+    provenance: fixture.provenance, responseBodies: fixture.responseBodies,
+    profileId: "BTC_EUR_PAPER_4H_V1"
+  });
+  assert.equal(missingExpectation.outcome, "UNKNOWN");
+  assert.equal(missingExpectation.dispatchIdentity, "UNKNOWN");
+  assert.equal(missingExpectation.dataAcceptance, "NOT_ASSESSED");
+
+  const coordinatedTampering = structuredClone(fixture);
+  const forgedDispatch = {
+    ...coordinatedTampering.expectedDispatch,
+    workflowSha: "c".repeat(40),
+    workflowRunId: "987654322"
+  };
+  forgedDispatch.workflowRunNumber = 1;
+  forgedDispatch.workflowRunAttempt = 1;
+  coordinatedTampering.expectedDispatch = fixture.expectedDispatch;
+  coordinatedTampering.provenance = {
+    ...coordinatedTampering.provenance, ...forgedDispatch,
+    runId: "spot-paper-987654322-1"
+  };
+  coordinatedTampering.report.runId = "spot-paper-987654322-1";
+  coordinatedTampering.readback.runId = "spot-paper-987654322-1";
+  const rejectedCoordinatedTampering = assessPaperEvidence({
+    paperExitCode: 0, paperReport: coordinatedTampering.report,
+    readback: coordinatedTampering.readback,
+    provenance: coordinatedTampering.provenance,
+    responseBodies: coordinatedTampering.responseBodies,
+    profileId: "BTC_EUR_PAPER_4H_V1",
+    expectedDispatch: coordinatedTampering.expectedDispatch
+  });
+  assert.equal(rejectedCoordinatedTampering.outcome, "FAILED");
+  assert.equal(rejectedCoordinatedTampering.dispatchIdentity, "FAILED");
+  assert.throws(() => assessPaperEvidence({
+    paperExitCode: 0, paperReport: fixture.report, readback: fixture.readback,
+    provenance: fixture.provenance, responseBodies: fixture.responseBodies,
+    profileId: "constructor"
+  }), /UNKNOWN_PAPER_EVIDENCE_PROFILE/);
 });
 
 test("paper evidence rejects observation records missing either or both raw market references", () => {
@@ -577,6 +707,38 @@ test("paper evidence CLI verifies local response bodies without provider request
   ], { encoding: "utf8" });
   assert.equal(JSON.parse(output).outcome, "COMPLETED");
   assert.equal(JSON.parse(await readFile(assessmentPath, "utf8")).signalReplay, "NOT_PERFORMED");
+
+  const fourHour = fourHourPaperFixture();
+  const fourHourRun = join(root, "four-hour-run");
+  const fourHourResponses = join(fourHourRun, "responses");
+  await mkdir(fourHourResponses, { recursive: true });
+  for (const [hash, raw] of Object.entries(fourHour.responseBodies)) {
+    await writeFile(join(fourHourResponses, `${hash}.json`), raw);
+  }
+  const fourHourPaperPath = join(root, "four-hour-paper.json");
+  const fourHourReadbackPath = join(root, "four-hour-readback.json");
+  const fourHourProvenancePath = join(root, "four-hour-manifest.json");
+  const fourHourAssessmentPath = join(root, "four-hour-assessment.json");
+  await writeFile(fourHourPaperPath, JSON.stringify(fourHour.report));
+  await writeFile(fourHourReadbackPath, JSON.stringify(fourHour.readback));
+  await writeFile(fourHourProvenancePath, JSON.stringify(fourHour.provenance));
+  const expectedDispatchEnvironment = Object.fromEntries(
+    Object.entries(fourHour.expectedDispatch).map(([field, value]) => [
+      `MERIDIAN_EXPECTED_DISPATCH_${field.replace(/^workflowRunId$/, "runId")
+        .replace(/^workflowRunNumber$/, "runNumber")
+        .replace(/^workflowRunAttempt$/, "runAttempt").replace(/[A-Z]/g,
+        letter => `_${letter}`).toUpperCase()}`, String(value)
+    ]));
+  const fourHourOutput = execFileSync(process.execPath, [
+    PAPER_ASSESSMENT_PATH, fourHourPaperPath, fourHourReadbackPath, "0",
+    fourHourProvenancePath, fourHourRun, fourHourAssessmentPath, "BTC_EUR_PAPER_4H_V1"
+  ], {
+    encoding: "utf8",
+    env: { ...process.env, ...expectedDispatchEnvironment }
+  });
+  assert.equal(JSON.parse(fourHourOutput).profileId, "BTC_EUR_PAPER_4H_V1");
+  assert.equal(JSON.parse(fourHourOutput).durationStatus, "PARTIAL_BOUNDED_DURATION");
+  assert.equal(JSON.parse(fourHourOutput).dispatchIdentity, "PASS");
 });
 
 test("one-hour paper workflow is owner-only, manual, one-shot, pinned, and bounded", () => {
@@ -604,6 +766,49 @@ test("one-hour paper workflow is owner-only, manual, one-shot, pinned, and bound
   assert.match(PAPER_WORKFLOW, /actions\/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02/);
   assert.match(PAPER_WORKFLOW, /if: always\(\)[\s\S]*?Retain evidence, including failed attempts/);
   assert.doesNotMatch(PAPER_WORKFLOW, /secrets\.|--mode observe|schedule:|pull_request:/);
+});
+
+test("four-hour paper workflow is a fixed owner-only one-shot with bounded retained evidence", () => {
+  const trigger = FOUR_HOUR_PAPER_WORKFLOW.match(/^on:\n([\s\S]*?)(?=^permissions:)/m)?.[1];
+  assert.equal(trigger.trim(), "workflow_dispatch:");
+  assert.doesNotMatch(trigger, /schedule:|pull_request:|push:|inputs:/);
+  for (const required of [
+    "github.actor == 'Achi1984'",
+    "github.triggering_actor == 'Achi1984'",
+    "github.ref == 'refs/heads/main'",
+    "github.run_number == 1",
+    "github.run_attempt == 1",
+    "timeout-minutes: 270",
+    "contents: read",
+    "ref: 81edf0b5dc3d455c2c1e1906791d56c731bea0c9",
+    "BTC_EUR_PAPER_4H_V1",
+    "--mode paper --network",
+    "--max-cycles 240",
+    "--max-duration-ms 14400000",
+    "--poll-interval-ms 60000",
+    "actual_elapsed_wall_ms",
+    "assessment.json",
+    "signal-replay.json",
+    "SHA256SUMS",
+    "retention-days: 14"
+  ]) assert.ok(FOUR_HOUR_PAPER_WORKFLOW.includes(required), required);
+  assert.equal((FOUR_HOUR_PAPER_WORKFLOW.match(
+    /actions\/checkout@11bd71901bbe5b1630ceea73d27597364c9af683/g) || []).length, 2);
+  for (const trustedContext of [
+    "MERIDIAN_EXPECTED_DISPATCH_REPOSITORY: ${{ github.repository }}",
+    "MERIDIAN_EXPECTED_DISPATCH_REF: ${{ github.ref }}",
+    "MERIDIAN_EXPECTED_DISPATCH_WORKFLOW_SHA: ${{ github.sha }}",
+    "MERIDIAN_EXPECTED_DISPATCH_RUN_ID: ${{ github.run_id }}",
+    "MERIDIAN_EXPECTED_DISPATCH_RUN_NUMBER: ${{ github.run_number }}",
+    "MERIDIAN_EXPECTED_DISPATCH_RUN_ATTEMPT: ${{ github.run_attempt }}",
+    "MERIDIAN_EXPECTED_DISPATCH_WORKFLOW_PATH: .github/workflows/spot-paper-pilot-four-hour-once.yml"
+  ]) assert.ok(FOUR_HOUR_PAPER_WORKFLOW.includes(trustedContext), trustedContext);
+  assert.match(FOUR_HOUR_PAPER_WORKFLOW,
+    /actions\/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020/);
+  assert.match(FOUR_HOUR_PAPER_WORKFLOW,
+    /actions\/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02/);
+  assert.match(FOUR_HOUR_PAPER_WORKFLOW, /if: always\(\)[\s\S]*?Retain evidence, including failed attempts/);
+  assert.doesNotMatch(FOUR_HOUR_PAPER_WORKFLOW, /secrets\.|schedule:|pull_request:|inputs:/);
 });
 
 function providerFor(clock, ohlcValues, tickerValues) {

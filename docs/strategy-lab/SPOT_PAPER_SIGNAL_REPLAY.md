@@ -16,11 +16,42 @@ node scripts/spot-paper-pilot/signal-replay.mjs \
 The checker is pinned to source
 `81edf0b5dc3d455c2c1e1906791d56c731bea0c9`, workflow
 `ddae14f01583196dfc9e9da906dcd03d41d58369`, and run
-`42395522899` attempt 1. A different or missing identity is not replayed.
+`42395522899` attempt 1. A different or missing identity is not replayed by
+default; the default profile and its exact historical identity remain unchanged.
 Reads are limited to a 16 MiB readback, 64 KiB manifest, at most 240 referenced
 responses, at most 256 KiB per response, and 64 MiB total response bytes. No
 provider, network, scheduler, workflow, runtime, or activation interface is
 used.
+
+The separately allowlisted `BTC_EUR_PAPER_4H_V1` profile supports the new
+first-dispatch BTC/EUR paper identity with exactly 240 cycles, 480 requests,
+14,400,000 ms, 60,000 ms polling, a 5,000 ms request timeout, 64 MiB of
+responses, and 256 KiB per response. It still requires a valid fresh run ID,
+first run/attempt, the pinned runtime source, paper mode, and matching engine
+manifest. Profile selection is an optional final CLI argument; any profile
+name not in `evidence-profiles.mjs` is rejected:
+
+```sh
+node scripts/spot-paper-pilot/signal-replay.mjs \
+  readback.stdout.json pilot-manifest.json \
+  data/spot-paper-<workflow-run-id>-1 signal-replay.json BTC_EUR_PAPER_4H_V1
+```
+
+The new profile is for offline replay only. It does not dispatch, resume, or
+modify a run, and its distinct bounds do not loosen the historical default.
+For this profile, `MERIDIAN_EXPECTED_DISPATCH_*` environment values are also
+required. They must come from an independently root-verified GitHub Actions run
+tuple (repository, workflow path, ref, workflow commit SHA, run ID, number, and
+attempt), not from `pilot-manifest.json`. The four-hour workflow supplies them
+directly from GitHub's `github` context. Offline replay without the tuple returns
+`UNKNOWN`; if any trusted tuple field disagrees with the retained provenance or
+readback run ID, it returns `FAILED`. The expected tuple binds the reviewed
+workflow commit at dispatch time, avoiding a circular compile-time workflow-SHA
+pin.
+
+The original run reconciliation is recorded in
+[`SPOT_PAPER_PILOT_42395522899_RECONCILIATION.md`](SPOT_PAPER_PILOT_42395522899_RECONCILIATION.md);
+this replay contract does not duplicate its result.
 
 The replay uses the pilot's existing `createStrategyState` and
 `advanceStrategy` behavior over retained chronological closed candles. It
