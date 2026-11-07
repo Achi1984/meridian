@@ -86,6 +86,64 @@ BTC/EUR uses a separate fixed route, table, and versioned DTO:
 
 ## Remaining deployment and transfer prerequisites
 
+The observed Northflank preflight found `DATABASE_URL` with an `sslmode` query
+parameter, while Node TLS verification was enabled and no report-specific CA was
+configured. The dedicated report pool can now normalize a secure URL hint only
+when `MERIDIAN_PAPER_REPORT_NORMALIZE_SECURE_SSLMODE=true` is explicitly set.
+It accepts only the exact, single lowercase values `require`, `verify-ca`, or
+`verify-full`, removes the hint before `pg` sees the URL, and always enforces
+certificate-chain and hostname verification with the configured or system CA.
+The default remains to reject every TLS URL override; `sslmode=disable`,
+`prefer`, `allow`, unknown/mixed-case/duplicate values, other TLS URL parameters,
+and `NODE_TLS_REJECT_UNAUTHORIZED=0` remain rejected. This setting affects only
+the dedicated Paper report pool, not the gateway pool or global database URL.
+
+For an operator-approved, read-only connectivity/table preflight, run from the
+repository root. The command prints only verification status and whether the
+spot-report table exists; errors are redacted. Keep shell tracing disabled and
+provide `DATABASE_URL` and any private CA through the deployment's secret
+environment, never as command-line values:
+
+```sh
+MERIDIAN_PAPER_REPORT_NORMALIZE_SECURE_SSLMODE=true \
+node --input-type=module -e '
+import pg from "pg";
+import {createPrivatePaperReportPoolOptions} from "./private-report-store.mjs";
+let pool;
+try {
+  pool = new pg.Pool(createPrivatePaperReportPoolOptions(process.env.DATABASE_URL));
+  const result = await pool.query(
+    "SELECT to_regclass($1) IS NOT NULL AS table_present",
+    ["public.meridian_spot_paper_reports"]
+  );
+  console.log(JSON.stringify({
+    tls_verification: "required",
+    table_present: result.rows[0].table_present
+  }));
+} catch {
+  console.error("private_report_preflight_failed");
+  process.exitCode = 1;
+} finally {
+  await pool?.end().catch(() => {});
+}'
+```
+
+The currently outstanding deployment gaps are `MERIDIAN_READ_TOKEN_SHA256`
+(the raw read token exists, but `authorizedRead` requires its configured
+SHA-256 hash), `MERIDIAN_SPOT_PAPER_REPORT_UPLOAD_TOKEN_SHA256` (the separate
+upload-token hash), and all three explicit route gates:
+`MERIDIAN_SPOT_PAPER_REPORT_ENABLED`,
+`MERIDIAN_SPOT_PAPER_REPORT_DEPLOYMENT_VERIFIED`, and
+`MERIDIAN_SPOT_PAPER_REPORT_UPLOAD_APPROVED`. Do not add a raw-token read fallback
+or reuse the existing read/write token for upload. This change makes no hosted
+environment changes, dispatches, uploads, or active Paper runtime changes.
+
+For the observed Northflank database, the root applied the reviewed
+`migrations/20261107_meridian_spot_paper_reports.sql` transactionally after the
+read-only probe; `COMMIT` succeeded and the post-commit check reported
+`table_present=true`. This is deployment evidence only, not an action by this
+change; independently confirm migration state for any other target.
+
 1. The repository retains the reconciliation summary and signal-replay result,
    but not the original terminal readback, provenance manifest, or paper
    assessment payload. The UI fixture is explicitly offline; it is not a
@@ -99,10 +157,10 @@ BTC/EUR uses a separate fixed route, table, and versioned DTO:
 3. Independently review and approve that exact DTO and its transfer method.
    Supply the dedicated upload token through the deployment's approved secret
    channel; do not reuse or publish the read token.
-4. Apply the dedicated migration, collect deployment verification evidence, and
-   only then configure the three explicit feature gates and separate upload
-   token hash. Transfer the approved DTO once to the fixed upload route; verify
-   immutable readback and the DTO digest.
+4. Confirm the dedicated migration is applied and collect deployment
+   verification evidence; only then configure the three explicit feature gates
+   and separate upload token hash. Transfer the approved DTO once to the fixed
+   upload route; verify immutable readback and the DTO digest.
 5. Confirm the authenticated GET, CORS allowlist, no-store response, browser
    cache identity, and manual-only read behavior in the target deployment.
 

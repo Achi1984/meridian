@@ -6,36 +6,64 @@ export const PAPER_REPORT_POOL_OPTIONS = Object.freeze({
   idle_in_transaction_session_timeout: 4_500
 });
 
-const SSL_CONNECTION_PARAMETERS = new Set(["ssl", "sslmode", "sslcert", "sslkey", "sslrootcert"]);
+const SECURE_SSLMODE_HINTS = new Set(["require", "verify-ca", "verify-full"]);
 
-function assertNoConnectionStringTlsOverrides(connectionString) {
-  const value = String(connectionString || "");
-  let hasTlsOverride = false;
+function normalizeConnectionStringTlsOverrides(connectionString, allowSecureSslmodeHint) {
+  const rawValue = String(connectionString || "");
+  if (/[\x00-\x1f\x7f]/.test(rawValue)) {
+    throw new TypeError("invalid private report database URL");
+  }
+  const value = rawValue.trim();
   if (/^postgres(?:ql)?:\/\//i.test(value)) {
     try {
       const url = new URL(value);
-      hasTlsOverride = [...url.searchParams.keys()]
-        .some(name => SSL_CONNECTION_PARAMETERS.has(name.toLowerCase()));
+      const rawTlsNames = url.search.slice(1).split("&")
+        .map(parameter => parameter.split("=", 1)[0])
+        .filter(Boolean)
+        .filter(name => {
+          let decoded;
+          try {
+            decoded = decodeURIComponent(name.replace(/\+/g, " "));
+          } catch {
+            return /^(?:ssl|tls)/i.test(name);
+          }
+          return /^(?:ssl|tls)/i.test(decoded);
+        });
+      if (rawTlsNames.length === 0) return value;
+      if (allowSecureSslmodeHint && rawTlsNames.length === 1 &&
+          rawTlsNames[0] === "sslmode" &&
+          url.searchParams.getAll("sslmode").length === 1 &&
+          SECURE_SSLMODE_HINTS.has(url.searchParams.get("sslmode"))) {
+        url.searchParams.delete("sslmode");
+        return url.toString();
+      }
     } catch {
       throw new TypeError("invalid private report database URL");
     }
   } else {
-    hasTlsOverride = [...value.matchAll(/(?:^|\s)(ssl|sslmode|sslcert|sslkey|sslrootcert)\s*=/gi)]
-      .length > 0;
+    if ([...value.matchAll(/(?:^|\s)(?:ssl|tls)[a-z0-9_]*\s*=/gi)]
+      .length > 0) {
+      throw new TypeError("private report database URL must not override TLS options");
+    }
+    if (value.includes("://")) {
+      throw new TypeError("invalid private report database URL");
+    }
+    return value;
   }
-  if (hasTlsOverride) {
-    throw new TypeError("private report database URL must not override TLS options");
-  }
+  throw new TypeError("private report database URL must not override TLS options");
 }
 
 export function createPrivatePaperReportPoolOptions(connectionString, {
   ca = process.env.MERIDIAN_PAPER_REPORT_DATABASE_CA || "",
-  nodeTlsRejectUnauthorized = process.env.NODE_TLS_REJECT_UNAUTHORIZED
+  nodeTlsRejectUnauthorized = process.env.NODE_TLS_REJECT_UNAUTHORIZED,
+  allowSecureSslmodeHint =
+    process.env.MERIDIAN_PAPER_REPORT_NORMALIZE_SECURE_SSLMODE === "true"
 } = {}) {
   if (typeof connectionString !== "string" || !connectionString.trim()) {
     throw new TypeError("private report database URL is required");
   }
-  assertNoConnectionStringTlsOverrides(connectionString);
+  const normalizedConnectionString =
+    normalizeConnectionStringTlsOverrides(connectionString, allowSecureSslmodeHint);
   if (nodeTlsRejectUnauthorized === "0") {
     throw new TypeError("private report database TLS verification is disabled");
   }
@@ -48,7 +76,7 @@ export function createPrivatePaperReportPoolOptions(connectionString, {
     throw new TypeError("invalid private report database CA certificate");
   }
   return {
-    connectionString,
+    connectionString: normalizedConnectionString,
     ssl: {rejectUnauthorized: true, ...(trustedCa ? {ca: trustedCa} : {})},
     ...PAPER_REPORT_POOL_OPTIONS
   };
