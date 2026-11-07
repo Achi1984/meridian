@@ -29,7 +29,7 @@ class Element {
   click() { this.onclick?.({target: this}); }
 }
 
-function dto() {
+function dto(identity = getAcceptedSpotPaperIdentity()) {
   return {
     schemaVersion: 'BTC_EUR_SPOT_PAPER_DASHBOARD_V1',
     identity: {
@@ -65,12 +65,15 @@ function dto() {
     fillCount: 7,
     openInventory: {status: 'OPEN_UNRESOLVED_AT_TERMINAL', quantitySat: '146122'},
     duration: {
-      elapsedMs: 3_542_902,
-      requestedMs: 3_600_000,
-      coverage: 3_542_902 / 3_600_000,
+      elapsedMs: identity.maxDurationMs - 57_098,
+      requestedMs: identity.maxDurationMs,
+      coverage: (identity.maxDurationMs - 57_098) / identity.maxDurationMs,
       status: 'PARTIAL_BOUNDED_DURATION'
     },
-    coverage: {observations: 60, acceptedObservations: 60, dataGaps: 0, requests: 120},
+    coverage: {
+      observations: identity.maxCycles, acceptedObservations: identity.maxCycles,
+      dataGaps: 0, requests: identity.maxRequests
+    },
     verification: {
       terminalReadback: 'PASS',
       assessment: 'COMPLETED',
@@ -131,8 +134,30 @@ function harness({fetchImpl = async () => new Response(null, {status: 503}), unl
 
 const envelope = report => ({
   schema: SPOT_PAPER_REPORT_ENVELOPE_SCHEMA,
-  runId: identity.runId,
+  runId: report.identity.runId,
   report
+});
+
+test('manual refresh displays only the exact accepted four-hour snapshot and labels its run', async () => {
+  const report = dto(getAcceptedSpotPaperIdentity('spot-paper-42404743386-1'));
+  let requests = 0;
+  const app = harness({fetchImpl: async (url, options) => {
+    requests++;
+    assert.equal(url, SPOT_PAPER_REPORT_ENDPOINT);
+    assert.equal(options.method, 'GET');
+    return new Response(JSON.stringify(envelope(report)), {
+      status: 200, headers: {'content-type': 'application/json'}
+    });
+  }});
+  app.controller.setActive(true);
+  assert.equal(requests, 0);
+  await app.controller.refresh();
+  assert.equal(requests, 1);
+  assert.match(app.root.textContent, /Paper-Lauf4 Stunden/);
+  assert.match(app.root.textContent, /42404743386/);
+  assert.match(app.root.textContent, /BTC_EUR_PAPER_4H_V1/);
+  assert.match(app.root.textContent, /kein Nachweis eines laufenden Workers/);
+  app.controller.dispose();
 });
 
 test('spot-paper cockpit renders an exact EUR completed snapshot with technical details collapsed', () => {

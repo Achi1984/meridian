@@ -217,8 +217,8 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         assert.equal(intercepted.count(),2,'unlock after restoration does not start a report read');
         await intercepted.close();
         await evaluate(`(async()=>{
-          const model=await import('./paper-cockpit-model.js?v=B16-M11-FIX12');
-          const view=await import('./paper-cockpit-view.js?v=B16-M11-FIX12');
+          const model=await import('./paper-cockpit-model.js?v=B16-M11-FIX13');
+          const view=await import('./paper-cockpit-view.js?v=B16-M11-FIX13');
           const report=model.getDemoPaperCockpitReport();
           const demoReport=model.getDemoPaperCockpitReport();
           report.experiment.id='run-'+('R'.repeat(220));

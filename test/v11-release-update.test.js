@@ -35,7 +35,7 @@ test('release identity requires exactly five coherent approved local entries',()
 });
 
 test('served index is recognized without a second manually maintained version manifest',()=>{
-  assert.equal(readReleaseHtml(readFileSync(new URL('../v11/index.html',import.meta.url),'utf8')),'B16-M11-FIX12');
+  assert.equal(readReleaseHtml(readFileSync(new URL('../v11/index.html',import.meta.url),'utf8')),'B16-M11-FIX13');
 });
 
 test('locked safe tab checks only public HTML without credentials and reloads a newer release once',async()=>{

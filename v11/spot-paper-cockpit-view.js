@@ -1,4 +1,4 @@
-import {presentSpotPaperCockpit} from './spot-paper-cockpit-model.js?v=B16-M11-FIX12';
+import {presentSpotPaperCockpit} from './spot-paper-cockpit-model.js?v=B16-M11-FIX13';
 
 const views = new WeakMap();
 
@@ -104,6 +104,8 @@ function renderReport(reportRoot, dto, document, options) {
   const summary = document.createElement('div');
   summary.className = 'trust-grid';
   field(document, summary, 'Snapshot', 'Abgeschlossen (begrenzt)');
+  field(document, summary, 'Paper-Lauf',
+    model.duration.requestedMs === 14_400_000 ? '4 Stunden' : '1 Stunde');
   field(document, summary, 'Abgeschlossen am', timestamp(model.snapshot.completedAt));
   field(document, summary, 'Aktualität', freshnessStatus(model.freshness.status));
   reportRoot.append(summary);

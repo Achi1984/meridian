@@ -39,7 +39,8 @@ function exactKeys(value, keys) {
 }
 
 export function spotPaperReportGatewayConfig(env = process.env) {
-  const identity = getAcceptedSpotPaperIdentity();
+  const identity = getAcceptedSpotPaperIdentity(env.MERIDIAN_SPOT_PAPER_REPORT_RUN_ID);
+  if (!identity) throw new TypeError('invalid spot-paper report run selection');
   const readTokenHashes = [];
   const readHash = String(env.MERIDIAN_READ_TOKEN_SHA256 ?? '').trim().toLowerCase();
   if (readHash) readTokenHashes.push(readHash);
@@ -59,10 +60,11 @@ export function spotPaperReportGatewayConfig(env = process.env) {
 }
 
 function configured(config) {
+  const identity = getAcceptedSpotPaperIdentity(config?.expectedRunId ?? null);
   return config?.enabled === true &&
     config.uploadApproved === true &&
-    config.expectedRunId === getAcceptedSpotPaperIdentity().runId &&
-    HASH.test(config.expectedConfigHash ?? '') &&
+    !!identity &&
+    config.expectedConfigHash === digest(Buffer.from(canonicalJson(identity), 'utf8')) &&
     HASH.test(config.uploadTokenHash ?? '') &&
     Array.isArray(config.readTokenHashes) && config.readTokenHashes.length > 0 &&
     config.readTokenHashes.every(hash => HASH.test(hash) && hash !== config.uploadTokenHash);

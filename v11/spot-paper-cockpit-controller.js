@@ -1,7 +1,7 @@
-import {appAccess} from './app-access.js?v=B16-M11-FIX12';
-import {createSpotPaperReportConnector} from './spot-paper-report-connector.js?v=B16-M11-FIX12';
-import {presentSpotPaperCockpit} from './spot-paper-cockpit-model.js?v=B16-M11-FIX12';
-import {renderSpotPaperCockpit} from './spot-paper-cockpit-view.js?v=B16-M11-FIX12';
+import {appAccess} from './app-access.js?v=B16-M11-FIX13';
+import {createSpotPaperReportConnector} from './spot-paper-report-connector.js?v=B16-M11-FIX13';
+import {presentSpotPaperCockpit} from './spot-paper-cockpit-model.js?v=B16-M11-FIX13';
+import {renderSpotPaperCockpit} from './spot-paper-cockpit-view.js?v=B16-M11-FIX13';
 
 export const SPOT_PAPER_REPORT_ENDPOINT =
   'https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/spot-paper-report';

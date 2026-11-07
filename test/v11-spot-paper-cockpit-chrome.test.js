@@ -16,7 +16,7 @@ const chrome = [process.env.CHROME_BIN, '/usr/bin/google-chrome', '/usr/bin/chro
 const token = 'synthetic-browser-gate-password';
 const accepted = getAcceptedSpotPaperIdentity();
 
-function dto() {
+function dto(accepted = getAcceptedSpotPaperIdentity()) {
   return {
     schemaVersion: 'BTC_EUR_SPOT_PAPER_DASHBOARD_V1',
     identity: {
@@ -52,12 +52,15 @@ function dto() {
     fillCount: 7,
     openInventory: {status: 'OPEN_UNRESOLVED_AT_TERMINAL', quantitySat: '146122'},
     duration: {
-      elapsedMs: 3_542_902,
-      requestedMs: 3_600_000,
-      coverage: 3_542_902 / 3_600_000,
+      elapsedMs: accepted.maxDurationMs - 57_098,
+      requestedMs: accepted.maxDurationMs,
+      coverage: (accepted.maxDurationMs - 57_098) / accepted.maxDurationMs,
       status: 'PARTIAL_BOUNDED_DURATION'
     },
-    coverage: {observations: 60, acceptedObservations: 60, dataGaps: 0, requests: 120},
+    coverage: {
+      observations: accepted.maxCycles, acceptedObservations: accepted.maxCycles,
+      dataGaps: 0, requests: accepted.maxRequests
+    },
     verification: {
       terminalReadback: 'PASS',
       assessment: 'COMPLETED',
@@ -82,11 +85,11 @@ function assertNamedTestPassed(output) {
   assert.ok(success, `the named browser test must pass:\n${output}`);
 }
 
-async function interceptReport(call) {
+async function interceptReport(call, accepted) {
   const responseBody = Buffer.from(JSON.stringify({
     schema: SPOT_PAPER_REPORT_ENVELOPE_SCHEMA,
     runId: accepted.runId,
-    report: dto()
+    report: dto(accepted)
   })).toString('base64');
   let reads = 0;
   let failure;
@@ -144,9 +147,10 @@ test(name, {timeout: 180_000}, async () => {
   assert.ok(chrome, 'Chrome is required for the BTC/EUR cockpit browser test');
   const hosted = await startV11StaticServer();
   try {
+    for (const identity of [accepted, getAcceptedSpotPaperIdentity('spot-paper-42404743386-1')])
     await withMobileChrome(chrome, 390, hosted.url, async call => {
       await unlockAppThroughGate(call);
-      const intercepted = await interceptReport(call);
+      const intercepted = await interceptReport(call, identity);
       try {
         const evaluate = async expression => {
           const result = await call('Runtime.evaluate', {
@@ -171,6 +175,10 @@ test(name, {timeout: 180_000}, async () => {
         })()`);
         assert.equal(intercepted.reads(), 1,
           `only the explicit manual refresh reads the report: ${JSON.stringify(diagnostics)}`);
+        assert.ok(diagnostics.text.includes(identity.workflowRunId));
+        assert.ok(diagnostics.text.includes(identity.profileId));
+        assert.ok(diagnostics.text.includes(identity.maxDurationMs === 14_400_000 ?
+          '4 Stunden' : '1 Stunde'));
         const visible = await evaluate(`(()=>{
           const root=document.querySelector('#spot-paper-cockpit-root');
           return {

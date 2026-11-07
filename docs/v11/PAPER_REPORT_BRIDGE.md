@@ -65,14 +65,16 @@ that validator is not used for BTC/EUR.
 BTC/EUR uses a separate fixed route, table, and versioned DTO:
 
 - `GET /api/private/spot-paper-report` requires the existing read bearer and
-  serves only the pinned run `spot-paper-42395522899-1`.
+  serves only the explicitly configured approved run, defaulting to
+  `spot-paper-42395522899-1`.
 - `POST /api/private/spot-paper-report/upload` requires a distinct upload
   bearer, a canonical bounded `BTC_EUR_SPOT_PAPER_REPORT_TRANSFER_V1` envelope,
   and immutable storage. It does not accept a path or run selector.
 - The display DTO is `BTC_EUR_SPOT_PAPER_DASHBOARD_V1`. Its adapter binds the
   terminal readback to the paper assessment and separate signal-replay result,
-  and accepts only the pinned source SHA, workflow SHA, attempt, run, and 1-hour
-  profile. It does not translate BTC/EUR into the memecoin report schema.
+  and accepts only the two exact registry identities below, each with its own
+  workflow path, profiles and bounds. It does not translate BTC/EUR into the
+  memecoin report schema or infer trusted dispatch from artifact contents.
 - The spot route is disabled unless all three gates are explicitly true:
   `MERIDIAN_SPOT_PAPER_REPORT_ENABLED`,
   `MERIDIAN_SPOT_PAPER_REPORT_DEPLOYMENT_VERIFIED`, and
@@ -80,7 +82,12 @@ BTC/EUR uses a separate fixed route, table, and versioned DTO:
   `MERIDIAN_SPOT_PAPER_REPORT_UPLOAD_TOKEN_SHA256` and the existing read-token
   configuration. No values are configured or deployed by this change.
 - Gateway storage requires applying
-  `migrations/20261107_meridian_spot_paper_reports.sql`. The frontend read is
+  `migrations/20261107_meridian_spot_paper_reports.sql`, followed by the reviewed
+  forward migration `migrations/20261108_meridian_spot_paper_reports_two_runs.sql`
+  for four-hour support. The forward migration changes only the approved run-ID
+  check and repeats PUBLIC revocation; it does not delete or rewrite the
+  first-hour row, primary key, hashes, envelope or timestamp. Neither migration
+  is executed by this PR. The frontend read is
   manual, uses `appAccess`, and remains unavailable until an approved report is
   transferred and the route is separately enabled.
 
@@ -240,7 +247,100 @@ workflow, change a runtime, enable deployment flags, or transfer the DTO. It
 must fail if the retained inputs are incomplete or if the tools return
 UNKNOWN/FAILED. Do not reconstruct missing values from reconciliation prose,
 hand-edit evidence to add profile/PASS fields, or substitute the active
-four-hour run `42404743386`.
+four-hour run `42404743386` in the first-hour procedure.
+
+## Exact four-hour report preparation and explicit selection
+
+This is report-delivery development only. The lead verified dispatch for run
+`42404743386` while it was **IN_PROGRESS**. This PR contains no terminal result
+or actual four-hour evidence; generated tests are synthetic. Do not wait on,
+restart, dispatch, reconfigure or otherwise alter that worker.
+
+The immutable registry in `scripts/spot-paper-report-bridge/contract.mjs`
+admits exactly:
+
+| Report run ID | Workflow SHA / path | Assessment / replay profiles | Duration / cycles / requests |
+| --- | --- | --- | --- |
+| `spot-paper-42395522899-1` | `ddae14f01583196dfc9e9da906dcd03d41d58369` / `.github/workflows/spot-paper-pilot-paper-once.yml` | `BTC_EUR_PAPER_1H_V1` / `BTC_EUR_RUN_42395522899_V1` | `3600000ms` / `60` / `120` |
+| `spot-paper-42404743386-1` | `a960aecb467f5ab647ecfa7a1532e51ad810d6e0` / `.github/workflows/spot-paper-pilot-four-hour-once.yml` | `BTC_EUR_PAPER_4H_V1` / `BTC_EUR_PAPER_4H_V1` | `14400000ms` / `240` / `480` |
+
+Both require repository `Achi1984/meridian`, ref `refs/heads/main`, run number 1,
+attempt 1, and runtime source `81edf0b5dc3d455c2c1e1906791d56c731bea0c9`.
+The first-hour identity/config hash, DTO schema and canonical transfer envelope
+remain unchanged. No other run, source, workflow, path or attempt is admitted.
+
+After **separate independent terminal acceptance**, retrieve the four-hour
+archive, verify its retained checksums, and use a fresh private output directory.
+Require complete readback, provenance, raw responses and a zero paper exit
+status. Do not reconstruct missing inputs or copy PASS fields from another run.
+Prepare `$OUT/expected-dispatch.json` independently from the verified Actions
+metadata with the same seven fields shown above and the exact four-hour values
+in the table. The provenance must also contain matching repository, workflow
+path, ref and `BTC_EUR_PAPER_4H_V1` profile.
+
+From the repository root, the offline tools use the existing main profiles:
+
+```sh
+set -euo pipefail
+umask 077
+INPUT=/approved/private/spot-paper-pilot-42404743386-1
+OUT="$(mktemp -d)"
+RUN_ID=spot-paper-42404743386-1
+PAPER_EXIT_STATUS="$(awk -F= '$1 == "paper_exit_status" {print $2}' "$INPUT/metadata.txt")"
+[[ "$PAPER_EXIT_STATUS" == 0 ]]
+
+# Supply only after independent metadata verification, never from an artifact.
+export MERIDIAN_EXPECTED_DISPATCH_REPOSITORY=Achi1984/meridian
+export MERIDIAN_EXPECTED_DISPATCH_WORKFLOW_PATH=.github/workflows/spot-paper-pilot-four-hour-once.yml
+export MERIDIAN_EXPECTED_DISPATCH_REF=refs/heads/main
+export MERIDIAN_EXPECTED_DISPATCH_WORKFLOW_SHA=a960aecb467f5ab647ecfa7a1532e51ad810d6e0
+export MERIDIAN_EXPECTED_DISPATCH_RUN_ID=42404743386
+export MERIDIAN_EXPECTED_DISPATCH_RUN_NUMBER=1
+export MERIDIAN_EXPECTED_DISPATCH_RUN_ATTEMPT=1
+
+node scripts/spot-paper-pilot/cli.mjs \
+--mode report --data-root "$INPUT/data" --run-id "$RUN_ID" \
+> "$OUT/readback.stdout.json"
+node scripts/spot-paper-pilot/paper-evidence-assessment.mjs \
+"$INPUT/paper.stdout.json" "$OUT/readback.stdout.json" \
+"$PAPER_EXIT_STATUS" "$INPUT/pilot-manifest.json" \
+"$INPUT/data/$RUN_ID" "$OUT/assessment.json" BTC_EUR_PAPER_4H_V1
+node scripts/spot-paper-pilot/signal-replay.mjs \
+"$OUT/readback.stdout.json" "$INPUT/pilot-manifest.json" \
+"$INPUT/data/$RUN_ID" "$OUT/signal-replay.json" BTC_EUR_PAPER_4H_V1
+```
+
+Create the independently verified dispatch JSON in that output directory, then
+use the existing `create-dto.mjs` command above with these four-hour inputs.
+Require assessment `COMPLETED`, replay `PASS`, matching terminal readback and
+bound checks. A terminal cycle-limited run can have partial duration; full
+duration must be classified consistently. Neither status asserts profitability.
+Freeze and independently approve the DTO and its canonical SHA-256 transfer
+digest before any import.
+
+For a **separately approved** gateway deployment, apply/review the forward
+migration and set the server-only `MERIDIAN_SPOT_PAPER_REPORT_RUN_ID` to the exact
+report ID `spot-paper-42404743386-1`. The setting controls both upload and GET;
+absence selects the first-hour run, while empty, numeric-only, unknown or
+mixed-attempt values fail configuration. The existing three gates and distinct
+upload/read token policies are still required. A selected run with no imported
+row returns 404, never another run. There is no URL/query selector, automatic
+newest-run preference, polling or runtime control.
+
+Import only the independently approved DTO, wrapped as
+`{"schema":"BTC_EUR_SPOT_PAPER_REPORT_TRANSFER_V1","runId":"spot-paper-42404743386-1","report":<approved DTO>}`,
+serialized as canonical JSON (recursively sorted object keys, no whitespace).
+Use the existing fixed upload route through the separately reviewed secret
+channel. Verify the receipt digest, authenticated GET identity and exact DTO;
+identical imports are idempotent and conflicting content returns 409.
+Confirm the first-hour row and digest are unchanged; switching explicitly back
+to `spot-paper-42395522899-1` reads that retained row.
+
+The manual-refresh UI labels the approved duration and preserves exact run
+details in the collapsed verification panel. Its `B16-M11-FIX13` module cache
+identity must be served coherently. Credentials, flags, migration execution,
+report import and the actual server switch are **outside this PR**, as are all
+worker/runtime changes and real trading.
 
 ## Post-run acceptance procedure
 
@@ -275,7 +375,10 @@ four-hour run `42404743386`.
 ## Focused tests
 
 ```sh
-node --test test/memecoin-paper-report-bridge.test.js
+node --test test/spot-paper-report-bridge.test.js \
+  test/spot-paper-report-gateway.test.js test/spot-paper-report-connector.test.js \
+  test/v11-spot-paper-cockpit.test.js test/v11-spot-paper-cockpit-chrome.test.js \
+  test/v11-module-cache-identity.test.js test/v11-terminal-entry.test.js
 ```
 
 Tests create reports from generated fixtures and exercise the real report
