@@ -157,9 +157,63 @@ Reports include observations, data gaps, signals, simulated fills and fees,
 cash, position state, realized/unrealized PnL, terminal mark and age, stop
 reason, and explicit limitations.
 
-The next deployment seam is external to this change: lead review of the exact
-source/build and a concrete manifest; an operator-selected durable local volume
-and fresh run ID; then an explicitly approved bounded `observe` invocation.
-Only after reviewing that report should a separate decision consider a bounded
-`paper` invocation. No workflow, deploy configuration, existing strategy gate,
-dashboard, or operational activation is changed here.
+## Manual bounded observation evidence
+
+The `.github/workflows/spot-paper-pilot-observe-only.yml` workflow is manual
+only and permits only its first dispatch and first attempt. After it has been
+reviewed and merged, an authorized operator can dispatch its fixed observation
+once from the repository root with:
+
+```sh
+gh workflow run spot-paper-pilot-observe-only.yml --ref main
+```
+
+The workflow has no runtime inputs. It checks out accepted source
+`81edf0b5dc3d455c2c1e1906791d56c731bea0c9`, creates a fresh private directory
+and run ID, and executes exactly:
+
+```sh
+node approved-source/scripts/spot-paper-pilot/cli.mjs \
+  --mode observe --network \
+  --data-root "$RUNNER_TEMP/spot-paper-pilot-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT/data" \
+  --run-id "spot-observe-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" \
+  --max-cycles 2 --max-duration-ms 120000 --poll-interval-ms 60000
+```
+
+It then runs only read-only `--mode report` reconciliation. A terminal report
+and verified readback establish bounded completion, but data acceptance also
+requires at least one accepted observation. A zero-observation run therefore
+fails data acceptance even when its process exits zero and its terminal report
+is clean. The evidence artifact includes command/environment/timing metadata,
+raw CLI and readback reports, journal and response files, assessment, and
+SHA-256 hashes. Artifacts are retained for 14 days, including on failure. The
+workflow is not run automatically or from pull requests; do not dispatch before
+the exact workflow/source has been reviewed. This does not authorize paper mode.
+
+### First bounded attempt
+
+One attempt was made on the accepted source in an isolated agent-runtime
+directory; it was not a GitHub Actions run and no GitHub artifact was available
+for it. Environment: Linux `7.0.0-1017-azure` x86_64, Node `v22.23.4`.
+Start: `2026-11-07T15:28:17Z`; end: `2026-11-07T15:29:17Z`; CLI exit status: `0`.
+It made 2 requests (maximum 4), delivered 0 bytes, accepted 0 observations,
+and recorded 2 `fetch failed` data gaps. The report ended with
+`COMPLETED_BOUNDED` / `CYCLE_LIMIT`; read-only reconciliation returned
+`TERMINAL_REPORT_AVAILABLE` with 4 events. This is clean bounded termination,
+but **failed data acceptance** and is not market-data evidence. No retry or
+fallback was performed.
+
+The temporary run ID was
+`gha-agent-btc-eur-20261107T152816Z-4231`. SHA-256 evidence file hashes:
+
+| File | SHA-256 |
+| --- | --- |
+| `metadata.txt` | `ce16c6961c8ebeb4fa51f08d2c014c8cc93694c533a5083aec5c4caeabc369d7` |
+| `observe.stdout.json` | `1aad9dcfe9f173c563d2d1ea8e9f006160f5dc0dddbaa3d4a5a44063f05097a9` |
+| `observe.stderr.txt` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+| `readback.stdout.json` | `0b69399982d09f048eb058857d851304333ed2f6d22acf9291ec58e162836a08` |
+| `readback.stderr.txt` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+| `data/<run-id>/journal.json` | `c7dd4973b48ec5cdf26625330c98500c65846423abad9baa0dca7699034eae41` |
+
+This single attempt does not justify changing the provider's 5-second timeout,
+freshness, strategy, or paper/execution gates. No paper invocation was made.
