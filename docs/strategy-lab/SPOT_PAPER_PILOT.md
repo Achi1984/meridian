@@ -190,6 +190,101 @@ SHA-256 hashes. Artifacts are retained for 14 days, including on failure. The
 workflow is not run automatically or from pull requests; do not dispatch before
 the exact workflow/source has been reviewed. This does not authorize paper mode.
 
+## Prepared one-hour paper trial (not dispatched)
+
+The separate `.github/workflows/spot-paper-pilot-paper-once.yml` is a manual,
+first-run-only paper workflow. It requires the repository owner as both actor
+and triggering actor, `main`, run number 1, and attempt 1. It checks out the
+accepted source `81edf0b5dc3d455c2c1e1906791d56c731bea0c9`, uses a fresh private
+directory and a new run ID, does not resume or retry, and retains evidence for
+14 days even on failure. The completed observation workflow above remains
+untouched and is not reused.
+
+The concrete fixed dispatch manifest is:
+
+```json
+{
+  "schemaVersion": "SPOT_PAPER_PILOT_DISPATCH_MANIFEST_V1",
+  "acceptedSourceSha": "81edf0b5dc3d455c2c1e1906791d56c731bea0c9",
+  "model": "BTC_EUR_SMA5_SMA20_V1",
+  "mode": "paper",
+  "pair": "BTC/EUR",
+  "maxCycles": 60,
+  "maxRequests": 120,
+  "maxDurationMs": 3600000,
+  "pollIntervalMs": 60000,
+  "requestTimeoutMs": 5000,
+  "maxBytes": 67108864,
+  "maxResponseBytes": 262144,
+  "maxQuoteAgeMs": 10000,
+  "maxCandleAgeMs": 120000,
+  "initialCashCents": 100000,
+  "maxExposureCents": 10000,
+  "maxOpenPositions": 1,
+  "maxSessionLossCents": 2000,
+  "stopLossBps": 200,
+  "maxEntrySpreadBps": 50,
+  "feeBpsPerSide": 50,
+  "slippageBpsPerSide": 10,
+  "smaFast": 5,
+  "smaSlow": 20,
+  "warmupCandles": 21
+}
+```
+
+The run-specific artifact adds the workflow SHA, run ID, run number and attempt.
+The runner's journal manifest must independently reconcile to `paper`, BTC/EUR,
+60 cycles, 120 requests, 3,600,000 ms, 60,000 ms polling, a 5,000 ms request
+timeout, and the existing response-size bounds. The workflow timeout is 65
+minutes. It makes no authenticated exchange requests and has no secrets, wallet,
+real-order, schedule, or dashboard dependency.
+
+The read-only assessment requires matching terminal and readback reports,
+verified journal/raw-response hashes, accepted-source and fresh-run binding,
+counter/signal equality, integer-cent/satoshi fill and ledger reconciliation,
+and any fill's causal post-signal quote and modeled price. It reports fills,
+fees, cash, equity, position/mark age, counters, signals, stop/data-gap reasons,
+and keeps `UNKNOWN`, `FAILED`, and `COMPLETED` distinct. A zero-fill run can be
+operationally complete but does not validate a fill path; profitability always
+remains `NOT_ASSESSED`. No trades are forced.
+
+After lead review of the exact build and manifest, the exact manual dispatch is:
+
+```sh
+gh workflow run spot-paper-pilot-paper-once.yml --ref main
+```
+
+This workflow was prepared only; it has not been dispatched. Do not dispatch it
+until the lead's exact-build review. No paper network run is performed in the
+agent environment.
+
+### Accepted one-shot observation receipt
+
+The observation dispatch used source
+`81edf0b5dc3d455c2c1e1906791d56c731bea0c9` and workflow commit
+`a85fe4a7caa8d7a0dfffadbcd07105cc115799d1`. Run `42387606347`, attempt 1,
+completed successfully as `spot-observe-42387606347-1`. Artifact
+`13580461219` (`spot-paper-pilot-42387606347-1`) is available through
+2026-11-21 and its SHA-256 is
+`7660b8dd9d2038387b0756117518e72e0d3a6f05c7dba7efd19c5726177577e1`.
+The archive's `SHA256SUMS` entries all verified; the journal bound all four
+stored response bodies to their names and bytes:
+
+| Stored response SHA-256 | Bytes |
+| --- | ---: |
+| `11395153841ef7bab731b990447defd43f282b327339aca91df55895a04611ff` | 56,426 |
+| `6069669be3812ede50ff9bfa380dc201c86e9cfbb9fb4537d8f2564ec5afa4b1` | 305 |
+| `8f7de362a4d256aa18084be73ac06b98d9dc5c7b154432b216bf7ae84a1e08db` | 56,426 |
+| `a6a0d5728a98eb35be1b4c9e9460d468c543786ffc908528dbf8f2956a75ac45` | 305 |
+
+The journal manifest was `observe`, BTC/EUR, 2 cycles, 4 requests, 120,000 ms,
+60,000 ms polling and a 5,000 ms request timeout. The terminal report and
+readback agreed: `COMPLETED_BOUNDED` / `CYCLE_LIMIT`, 2 observations, 0 data
+gaps, 4 requests and 113,462 delivered bytes; assessment was `DATA_ACCEPTED`.
+There were no signals or fills; fees were 0 cents, cash/equity were 100,000
+cents, and position was flat. This validates only the bounded observation and
+its data receipt—not a fill path or profitability.
+
 ### First bounded attempt
 
 One attempt was made on the accepted source in an isolated agent-runtime

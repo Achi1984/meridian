@@ -70,7 +70,8 @@ export async function main(argv = process.argv.slice(2)) {
         journal.reconciliationStatus :
         terminal ? "TERMINAL_REPORT_AVAILABLE" : "INCOMPLETE_READ_ONLY",
       runId: journal.runId, eventCount: journal.events.length,
-      checkpoint: journal.checkpoint, report: terminal?.report ?? null,
+      manifest: journal.manifest, checkpoint: journal.checkpoint,
+      events: journal.events, report: terminal?.report ?? null,
       resumed: false, executionImpact: false
     }, null, 2) + "\n");
     return;

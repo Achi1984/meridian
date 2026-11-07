@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, open as openFile, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, open as openFile, readFile, rm, writeFile } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,6 +8,8 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { createKrakenProvider } from "../scripts/spot-paper-pilot/provider.mjs";
 import { assessObservationEvidence } from "../scripts/spot-paper-pilot/evidence-assessment.mjs";
+import { assessPaperEvidence, ACCEPTED_PAPER_SOURCE_SHA } from
+  "../scripts/spot-paper-pilot/paper-evidence-assessment.mjs";
 import { createRunJournal, readRunJournal } from "../scripts/spot-paper-pilot/journal.mjs";
 import { runSpotPaperPilot } from "../scripts/spot-paper-pilot/runner.mjs";
 import { main as pilotCli } from "../scripts/spot-paper-pilot/cli.mjs";
@@ -21,8 +23,12 @@ const INITIAL_NOW = BASE + 21 * MINUTE + 1_000;
 const PRICE_100 = "100.00000000";
 const PRICE_120 = "120.00000000";
 const CLI_PATH = fileURLToPath(new URL("../scripts/spot-paper-pilot/cli.mjs", import.meta.url));
+const PAPER_ASSESSMENT_PATH = fileURLToPath(new URL(
+  "../scripts/spot-paper-pilot/paper-evidence-assessment.mjs", import.meta.url));
 const OBSERVE_WORKFLOW = readFileSync(new URL(
   "../.github/workflows/spot-paper-pilot-observe-only.yml", import.meta.url), "utf8");
+const PAPER_WORKFLOW = readFileSync(new URL(
+  "../.github/workflows/spot-paper-pilot-paper-once.yml", import.meta.url), "utf8");
 
 test("manual observation assessment separates bounded completion from data acceptance", () => {
   const report = {
@@ -116,6 +122,244 @@ function acquisition(data, nowMs, requestStartedAt = nowMs - 20) {
   return { data, raw, sha256: sha256(Buffer.from(raw, "utf8")),
     bytes: Buffer.byteLength(raw), requestStartedAt, receivedAt: nowMs };
 }
+
+function paperEvidenceFixture({ withFill = false } = {}) {
+  const startedAt = BASE + 21 * MINUTE + 1_000;
+  const receivedAt = startedAt + 30;
+  const endedAt = startedAt + 3_600_000;
+  const signalId = `ENTRY:${BASE + 20 * MINUTE}`;
+  const signal = {
+    id: signalId, direction: "ENTRY", candleAt: BASE + 20 * MINUTE,
+    closeNano: "6800000000000", signalKnownAt: startedAt + 10
+  };
+  const ohlcRaw = JSON.stringify(ohlcData(Array(21).fill("68000.00000000")));
+  const tickerRaw = JSON.stringify(tickerData({
+    bid: "67999.00000000", ask: "68000.00000000"
+  }));
+  const ohlcHash = sha256(Buffer.from(ohlcRaw, "utf8"));
+  const tickerHash = sha256(Buffer.from(tickerRaw, "utf8"));
+  const responseBodies = { [ohlcHash]: ohlcRaw, [tickerHash]: tickerRaw };
+  const event = {
+    id: `observation:1:${BASE + 20 * MINUTE}:${tickerHash}`,
+    type: "observation", cycle: 1, signalKnownAt: signal.signalKnownAt,
+    ohlc: {
+      path: `responses/${ohlcHash}.json`, sha256: ohlcHash,
+      bytes: Buffer.byteLength(ohlcRaw), requestStartedAt: startedAt,
+      receivedAt: startedAt + 5, latestClosedAt: BASE + 20 * MINUTE, ageMs: 1_000
+    },
+    ticker: {
+      path: `responses/${tickerHash}.json`, sha256: tickerHash,
+      bytes: Buffer.byteLength(tickerRaw), requestStartedAt: startedAt + 15,
+      receivedAt, acquisitionAgeMs: 0
+    },
+    signals: withFill ? [signal] : [], fills: []
+  };
+  let ledger = {
+    initialCashCents: 100_000, cashCents: 100_000, realizedPnlCents: 0,
+    feesCents: 0, position: null, lastMark: null, fills: []
+  };
+  if (withFill) {
+    const adjustedPrice = (BigInt("6800000000000") * 10_010n + 5_000n) / 10_000n;
+    const grossCents = Number((100_000n * adjustedPrice * 2n +
+      100_000_000_000_000n) / (2n * 100_000_000_000_000n));
+    const feeCents = Number((BigInt(grossCents) * 50n * 2n + 10_000n) / 20_000n);
+    const entryCostCents = grossCents + feeCents;
+    const fill = {
+      id: `entry:${signalId}`, side: "BUY", quantitySat: 100_000,
+      priceNano: String(adjustedPrice), grossCents, feeCents,
+      reason: "SMA5_UP_CROSS", signalAt: signal.candleAt, quoteReceivedAt: receivedAt
+    };
+    const stopPriceNano = String((adjustedPrice * 9_800n + 5_000n) / 10_000n);
+    const exitPriceNano = String((BigInt("6799900000000") * 9_990n + 5_000n) / 10_000n);
+    const exitGrossCents = Number((100_000n * BigInt(exitPriceNano) * 2n +
+      100_000_000_000_000n) / (2n * 100_000_000_000_000n));
+    const exitFeeCents = Number((BigInt(exitGrossCents) * 50n * 2n + 10_000n) / 20_000n);
+    const netExitCents = exitGrossCents - exitFeeCents;
+    const unrealizedPnlCents = netExitCents - entryCostCents;
+    event.signals = [signal];
+    event.fills = [fill];
+    ledger = {
+      initialCashCents: 100_000, cashCents: 100_000 - entryCostCents,
+      realizedPnlCents: 0, feesCents: feeCents,
+      position: {
+        quantitySat: 100_000, entryPriceNano: String(adjustedPrice),
+        entryGrossCents: grossCents, entryFeeCents: feeCents, entryCostCents,
+        entrySignalId: signalId, stopPriceNano
+      },
+      lastMark: {
+        bidNano: "6799900000000", exitPriceNano, receivedAt, ageMs: endedAt - receivedAt,
+        unrealizedPnlCents, netExitCents
+      },
+      fills: [fill]
+    };
+  }
+  const report = {
+    schemaVersion: "SPOT_PAPER_PILOT_REPORT_V1",
+    model: "BTC_EUR_SMA5_SMA20_V1", runId: "spot-paper-12345-1",
+    mode: "paper", pair: "BTC/EUR", operationalStatus: "COMPLETED_BOUNDED",
+    profitability: "NOT_ASSESSED", executionImpact: false, liveTrading: false,
+    autoPromotion: false, startedAt, endedAt, stopReason: "DURATION_LIMIT",
+    observations: 1, dataGaps: 0, signals: event.signals, fills: ledger.fills,
+    feesCents: ledger.feesCents, cashCents: ledger.cashCents,
+    position: ledger.position,
+    positionStatus: ledger.position ? "OPEN_UNRESOLVED_AT_TERMINAL" : "FLAT",
+    realizedPnlCents: ledger.realizedPnlCents,
+    unrealizedPnlCents: ledger.lastMark?.unrealizedPnlCents ?? 0,
+    equityCents: ledger.cashCents + (ledger.lastMark?.netExitCents ?? 0),
+    lastMark: ledger.lastMark, requests: 2,
+    deliveredBytes: Buffer.byteLength(ohlcRaw) + Buffer.byteLength(tickerRaw)
+  };
+  const events = [
+    { id: "run-start", type: "start" },
+    event,
+    { id: "run-terminal", type: "terminal", report }
+  ];
+  const readback = {
+    reconciliation: "TERMINAL_REPORT_AVAILABLE", runId: report.runId,
+    eventCount: events.length, resumed: false, executionImpact: false,
+    manifest: {
+      schemaVersion: "SPOT_PAPER_PILOT_MANIFEST_V1",
+      model: "BTC_EUR_SMA5_SMA20_V1", mode: "paper", pair: "BTC/EUR",
+      startedAt,
+      limits: {
+        maxCycles: 60, maxRequests: 120, maxBytes: 67_108_864,
+        maxResponseBytes: 262_144, requestTimeoutMs: 5_000,
+        maxDurationMs: 3_600_000, pollIntervalMs: 60_000
+      }
+    },
+    checkpoint: {
+      ledger, counters: { requests: 2, bytes: report.deliveredBytes },
+      cycle: 1, stopReason: "DURATION_LIMIT"
+    },
+    events, report
+  };
+  const provenance = {
+    schemaVersion: "SPOT_PAPER_PILOT_DISPATCH_MANIFEST_V1",
+    acceptedSourceSha: ACCEPTED_PAPER_SOURCE_SHA,
+    workflowSha: "a".repeat(40), workflowRunId: "12345",
+    workflowRunNumber: 1, workflowRunAttempt: 1, runId: report.runId,
+    model: "BTC_EUR_SMA5_SMA20_V1", mode: "paper", pair: "BTC/EUR",
+    maxCycles: 60, maxRequests: 120, maxDurationMs: 3_600_000,
+    pollIntervalMs: 60_000, requestTimeoutMs: 5_000,
+    maxBytes: 67_108_864, maxResponseBytes: 262_144,
+    maxOpenPositions: 1,
+    maxQuoteAgeMs: 10_000, maxCandleAgeMs: 120_000,
+    initialCashCents: 100_000, maxExposureCents: 10_000,
+    maxSessionLossCents: 2_000, stopLossBps: 200, maxEntrySpreadBps: 50,
+    feeBpsPerSide: 50, slippageBpsPerSide: 10, smaFast: 5, smaSlow: 20,
+    warmupCandles: 21
+  };
+  return { report, readback, provenance, responseBodies };
+}
+
+test("paper evidence accepts zero fills without validating a fill path or profitability", () => {
+  const fixture = paperEvidenceFixture();
+  const assessment = assessPaperEvidence({
+    paperExitCode: 0, paperReport: fixture.report, readback: fixture.readback,
+    provenance: fixture.provenance, responseBodies: fixture.responseBodies
+  });
+  assert.equal(assessment.outcome, "COMPLETED");
+  assert.equal(assessment.dataAcceptance, "DATA_ACCEPTED");
+  assert.equal(assessment.fillPathValidated, false);
+  assert.equal(assessment.profitability, "NOT_ASSESSED");
+  assert.equal(assessment.observations, 1);
+  assert.deepEqual(assessment.fills, []);
+  assert.equal(assessment.positionStatus, "FLAT");
+});
+
+test("paper evidence reconciles recorded quotes, integer fills, and explicit stale open marks", () => {
+  const fixture = paperEvidenceFixture({ withFill: true });
+  const assessment = assessPaperEvidence({
+    paperExitCode: 0, paperReport: fixture.report, readback: fixture.readback,
+    provenance: fixture.provenance, responseBodies: fixture.responseBodies
+  });
+  assert.equal(assessment.outcome, "COMPLETED");
+  assert.equal(assessment.fillPathValidated, true);
+  assert.equal(assessment.profitability, "NOT_ASSESSED");
+  assert.equal(assessment.openPositionAssessment, "OPEN_MARK_STALE");
+  assert.equal(assessment.markAgeMs, fixture.report.endedAt - fixture.report.lastMark.receivedAt);
+
+  const altered = structuredClone(fixture);
+  altered.readback.events[1].ticker.requestStartedAt = fixture.report.startedAt;
+  const rejected = assessPaperEvidence({
+    paperExitCode: 0, paperReport: altered.report, readback: altered.readback,
+    provenance: altered.provenance, responseBodies: altered.responseBodies
+  });
+  assert.equal(rejected.outcome, "FAILED");
+  assert.equal(rejected.fillPathValidated, false);
+});
+
+test("paper evidence keeps failed and unknown outcomes distinct and binds the accepted source", () => {
+  const fixture = paperEvidenceFixture();
+  const unknown = assessPaperEvidence({
+    paperExitCode: 1, paperReport: fixture.report,
+    readback: { ...fixture.readback, reconciliation: "INCOMPLETE_READ_ONLY" },
+    provenance: fixture.provenance, responseBodies: fixture.responseBodies
+  });
+  assert.equal(unknown.outcome, "UNKNOWN");
+  assert.equal(unknown.terminalVerified, false);
+
+  const wrongSource = {
+    ...fixture.provenance, acceptedSourceSha: "b".repeat(40)
+  };
+  const failed = assessPaperEvidence({
+    paperExitCode: 0, paperReport: fixture.report, readback: fixture.readback,
+    provenance: wrongSource, responseBodies: fixture.responseBodies
+  });
+  assert.equal(failed.outcome, "FAILED");
+  assert.ok(failed.reasons.includes("SOURCE_OR_FRESH_RUN_BINDING_FAILED"));
+});
+
+test("paper evidence CLI verifies local response bodies without provider requests", async t => {
+  const root = await temporaryRoot(t);
+  const fixture = paperEvidenceFixture({ withFill: true });
+  const runDirectory = join(root, fixture.report.runId);
+  const responseDirectory = join(runDirectory, "responses");
+  await mkdir(responseDirectory, { recursive: true });
+  for (const [hash, raw] of Object.entries(fixture.responseBodies)) {
+    await writeFile(join(responseDirectory, `${hash}.json`), raw);
+  }
+  const paperPath = join(root, "paper.json");
+  const readbackPath = join(root, "readback.json");
+  const provenancePath = join(root, "manifest.json");
+  const assessmentPath = join(root, "assessment.json");
+  await writeFile(paperPath, JSON.stringify(fixture.report));
+  await writeFile(readbackPath, JSON.stringify(fixture.readback));
+  await writeFile(provenancePath, JSON.stringify(fixture.provenance));
+  const output = execFileSync(process.execPath, [
+    PAPER_ASSESSMENT_PATH, paperPath, readbackPath, "0",
+    provenancePath, runDirectory, assessmentPath
+  ], { encoding: "utf8" });
+  assert.equal(JSON.parse(output).outcome, "COMPLETED");
+  assert.equal(JSON.parse(await readFile(assessmentPath, "utf8")).fillPathValidated, true);
+});
+
+test("one-hour paper workflow is owner-only, manual, one-shot, pinned, and bounded", () => {
+  const trigger = PAPER_WORKFLOW.match(/^on:\n([\s\S]*?)(?=^permissions:)/m)?.[1];
+  assert.equal(trigger.trim(), "workflow_dispatch:");
+  assert.doesNotMatch(trigger, /schedule:|pull_request:|push:|inputs:/);
+  for (const required of [
+    "github.actor == 'Achi1984'",
+    "github.triggering_actor == 'Achi1984'",
+    "github.ref == 'refs/heads/main'",
+    "github.run_number == 1",
+    "github.run_attempt == 1",
+    "timeout-minutes: 65",
+    "contents: read",
+    "ref: 81edf0b5dc3d455c2c1e1906791d56c731bea0c9",
+    "--mode paper --network",
+    "--max-cycles 60",
+    "--max-duration-ms 3600000",
+    "--poll-interval-ms 60000",
+    "node scripts/spot-paper-pilot/cli.mjs",
+    "retention-days: 14"
+  ]) assert.ok(PAPER_WORKFLOW.includes(required), required);
+  assert.equal((PAPER_WORKFLOW.match(/actions\/checkout@11bd71901bbe5b1630ceea73d27597364c9af683/g) || []).length, 2);
+  assert.match(PAPER_WORKFLOW, /actions\/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020/);
+  assert.match(PAPER_WORKFLOW, /actions\/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02/);
+  assert.match(PAPER_WORKFLOW, /if: always\(\)[\s\S]*?Retain evidence, including failed attempts/);
+  assert.doesNotMatch(PAPER_WORKFLOW, /secrets\.|--mode observe|schedule:|pull_request:/);
+});
 
 function providerFor(clock, ohlcValues, tickerValues) {
   let ohlcIndex = 0;
@@ -609,6 +853,8 @@ test("runner integrates injected data, SMA, paper ledger, raw-response journal a
   assert.equal(readOnly.reconciliation, "TERMINAL_REPORT_AVAILABLE");
   assert.equal(readOnly.resumed, false);
   assert.equal(readOnly.report.stopReason, "CYCLE_LIMIT");
+  assert.equal(readOnly.manifest.mode, "paper");
+  assert.equal(readOnly.events.at(-1).id, "run-terminal");
 });
 
 test("runner reports a valid zero-entry observe run without promoting warmup bars", async t => {
