@@ -713,10 +713,12 @@ test("runner bounds an injected provider that ignores abort and discards its lat
 test("runner rejects provider success resolved after its shared monotonic deadline", async t => {
   const dataRoot = await temporaryRoot(t);
   const clock = { value: INITIAL_NOW, monotonic: 0 };
+  let ohlcCalls = 0;
   let tickerCalls = 0;
   const provider = {
     async fetchOhlc() {
-      clock.monotonic = 5_001;
+      ohlcCalls++;
+      clock.monotonic = 15_001;
       return acquisition(ohlcData(Array(21).fill(PRICE_100)), clock.value, clock.value);
     },
     async fetchTicker() {
@@ -726,10 +728,11 @@ test("runner rejects provider success resolved after its shared monotonic deadli
   };
   const config = runnerConfig({
     dataRoot, runId: "late-monotonic-result", provider, cycles: 1,
-    durationMs: 5_000, requestTimeoutMs: 5_000, clock
+    durationMs: 15_000, requestTimeoutMs: 5_000, clock
   });
   const report = await runSpotPaperPilot(config);
   assert.equal(report.stopReason, "DURATION_LIMIT");
+  assert.equal(ohlcCalls, 1);
   assert.equal(report.observations, 0);
   assert.equal(report.fills.length, 0);
   assert.equal(tickerCalls, 0);
@@ -1010,6 +1013,8 @@ test("journal closes handles returned by an open that resolves after abort", asy
   let releaseOpen;
   const openGate = new Promise(resolve => { releaseOpen = resolve; });
   let closeAttempts = 0;
+  let markCloseFinished;
+  const closeFinished = new Promise(resolve => { markCloseFinished = resolve; });
   const io = {
     async open(path, flags, mode) {
       if (path === temp) {
@@ -1022,7 +1027,9 @@ test("journal closes handles returned by an open that resolves after abort", asy
         sync: (...args) => handle.sync(...args),
         close: async (...args) => {
           closeAttempts++;
-          return handle.close(...args);
+          const result = await handle.close(...args);
+          markCloseFinished();
+          return result;
         }
       };
     }
@@ -1035,7 +1042,17 @@ test("journal closes handles returned by an open that resolves after abort", asy
   controller.abort();
   await assert.rejects(opening, /JOURNAL_UNKNOWN/);
   releaseOpen();
-  await new Promise(resolve => setTimeout(resolve, 30));
+  let closeWatchdog;
+  try {
+    await Promise.race([
+      closeFinished,
+      new Promise((_, reject) => {
+        closeWatchdog = setTimeout(() => reject(new Error("late-open handle was not closed")), 1_000);
+      })
+    ]);
+  } finally {
+    clearTimeout(closeWatchdog);
+  }
   assert.equal(closeAttempts, 1);
   await assert.rejects(readFile(join(dataRoot, "late-open-abort", "writer.lock")),
     /ENOENT/);
