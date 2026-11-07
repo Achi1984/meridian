@@ -315,3 +315,63 @@ The temporary run ID was
 
 This single attempt does not justify changing the provider's 5-second timeout,
 freshness, strategy, or paper/execution gates. No paper invocation was made.
+
+## Prepared four-hour bounded validation (not dispatched)
+
+The separate `.github/workflows/spot-paper-pilot-four-hour-once.yml` is a
+workflow-dispatch-only preparation. It uses the same fixed owner, triggering
+actor, `main`, first-run, and first-attempt gates as the one-hour workflow; it
+has no inputs, schedule, secrets, or write permissions. The runtime checkout is
+still pinned to `81edf0b5dc3d455c2c1e1906791d56c731bea0c9`. Model, pair, virtual
+EUR 1,000 balance, EUR 100 entry cap, spot-only 1x exposure, SMA(5/20), 50 bps
+per-side fee, and 10 bps per-side slippage are unchanged.
+
+Its fixed profile `BTC_EUR_PAPER_4H_V1` permits at most 240 cycles, 480
+requests, 14,400,000 ms, one cycle start per 60 seconds, 64 MiB total response
+bytes, 256 KiB per response, and 5,000 ms per request. A fresh unique run
+directory is created for every authorized dispatch; it cannot resume or retry.
+The 270-minute job timeout leaves bounded room beyond the requested four hours.
+The cycle limit can end the run around 239 minutes, so the assessor reports the
+measured elapsed time and classifies that as partial rather than automatically
+claiming a full four-hour observation.
+
+The workflow retains its generated dispatch manifest, CLI output, read-only
+readback, journal, raw responses, assessment, offline signal replay, metadata,
+and SHA-256 manifest in a 14-day artifact, including failed attempts. The
+offline tools accept only the versioned profile IDs declared in
+`scripts/spot-paper-pilot/evidence-profiles.mjs`; omitting the selector retains
+the original one-hour assessment and strict historical replay identity.
+Example replay for the new profile:
+
+```sh
+node scripts/spot-paper-pilot/signal-replay.mjs \
+  readback.stdout.json pilot-manifest.json \
+  data/spot-paper-<workflow-run-id>-1 signal-replay.json BTC_EUR_PAPER_4H_V1
+```
+
+Operational review criteria are:
+
+1. The dispatch provenance, pinned source, fresh run ID, `paper` mode, and
+   journal limits exactly match the selected profile; the read-only terminal
+   report must reconcile to its journal and counters.
+2. Referenced raw responses must match their recorded byte lengths and SHA-256
+   values. Missing evidence is `UNKNOWN`; integrity, identity, mode, budget,
+   or accounting mismatches are failures. At least one public observation is
+   required for data acceptance. Every gap and its coverage/reason still needs
+   review; gaps are reported, not silently counted as accepted observations.
+3. Record the actual elapsed time and stop reason. Only elapsed time reaching
+   14,400,000 ms is a full-duration run. A 240-cycle stop before that is partial.
+   Any unresolved terminal position remains explicitly unresolved and requires
+   mark-age review; it is not treated as closed.
+4. Review the offline replay outcome and signal/fill causality separately from
+   the operational assessment. Fill-cost output reports each fill's gross
+   turnover and fee in EUR cents; total turnover sums each side, so both sides
+   of a round trip count.
+5. Strategy performance and profitability remain `NOT_ASSESSED`. This short
+   sample is not a basis for optimization, promotion, or hypothetical profit
+   claims.
+
+This workflow is prepared only and has not been dispatched. It requires full
+hosted CI and an independent root review of the workflow and retained-evidence
+contract before any dispatch. No runtime, provider, or model code is changed by
+this preparation.

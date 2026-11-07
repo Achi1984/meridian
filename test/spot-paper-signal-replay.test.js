@@ -9,6 +9,8 @@ import {
 import {
   advanceStrategy, createStrategyState, sha256
 } from "../scripts/spot-paper-pilot/core.mjs";
+import { getSignalReplayProfile } from
+  "../scripts/spot-paper-pilot/evidence-profiles.mjs";
 import { readRunJournal } from "../scripts/spot-paper-pilot/journal.mjs";
 import { runSpotPaperPilot } from "../scripts/spot-paper-pilot/runner.mjs";
 
@@ -50,12 +52,22 @@ function ticker() {
   };
 }
 
-function identity() {
+function identity(profileId) {
+  const profile = getSignalReplayProfile(profileId);
+  const profileFields = Object.fromEntries(Object.entries(profile)
+    .filter(([key]) => key !== "profileId" && key !== "identity"));
+  const dynamicIdentity = profile.identity.kind === "fixed" ?
+    profile.identity : {
+      workflowSha: "b".repeat(40),
+      workflowRunId: "987654321",
+      workflowRunNumber: 1,
+      workflowRunAttempt: 1,
+      runId: "spot-paper-987654321-1"
+    };
   return {
-    schemaVersion: "SPOT_PAPER_PILOT_DISPATCH_MANIFEST_V1",
-    ...EXPECTED_SIGNAL_REPLAY_IDENTITY,
-    mode: "paper",
-    pair: "BTC/EUR"
+    ...profileFields,
+    ...dynamicIdentity,
+    ...(profileId ? { profileId: profile.profileId } : {})
   };
 }
 
@@ -121,9 +133,20 @@ function fixture() {
         reconciliation: "TERMINAL_REPORT_AVAILABLE",
         runId: EXPECTED_SIGNAL_REPLAY_IDENTITY.runId,
         eventCount: events.length, resumed: false, executionImpact: false,
-        manifest: { model: EXPECTED_SIGNAL_REPLAY_IDENTITY.model,
-          mode: "paper", pair: "BTC/EUR" },
-        checkpoint: { cycle, strategy: state },
+        manifest: {
+          schemaVersion: "SPOT_PAPER_PILOT_MANIFEST_V1",
+          model: EXPECTED_SIGNAL_REPLAY_IDENTITY.model,
+          mode: "paper", pair: "BTC/EUR",
+          limits: {
+            maxCycles: 60, maxRequests: 120, maxDurationMs: 3_600_000,
+            pollIntervalMs: 60_000, requestTimeoutMs: 5_000,
+            maxBytes: 67_108_864, maxResponseBytes: 262_144
+          }
+        },
+        checkpoint: {
+          cycle, strategy: state,
+          counters: { requests: cycle * 2, bytes: 0 }
+        },
         events
       };
     },
@@ -145,6 +168,18 @@ function run(fixtureData, provenance = identity(), bodies = fixtureData.response
   return replaySpotPaperSignals({
     readback: fixtureData.readback(), provenance, responseBodies: bodies
   });
+}
+
+function fourHourReplayEvidence(fixtureData) {
+  const provenance = identity("BTC_EUR_PAPER_4H_V1");
+  const readback = fixtureData.readback();
+  readback.runId = provenance.runId;
+  readback.manifest.limits = {
+    maxCycles: 240, maxRequests: 480, maxDurationMs: 14_400_000,
+    pollIntervalMs: 60_000, requestTimeoutMs: 5_000,
+    maxBytes: 67_108_864, maxResponseBytes: 262_144
+  };
+  return { readback, provenance, responseBodies: fixtureData.responseBodies };
 }
 
 async function runnerTickerFailureFixture(t) {
@@ -328,6 +363,54 @@ test("distinguishes missing raw, identity, and timestamp evidence", () => {
   assert.equal(run(wrongTimestamp).outcome, "FAILED");
 });
 
+test("four-hour allowlisted replay binds fresh identity and rejects source, mode, and cap mismatches", () => {
+  const data = fixture();
+  data.addEvent({ closes: Array(21).fill(PRICE_100) });
+  const evidence = fourHourReplayEvidence(data);
+  const result = replaySpotPaperSignals({ ...evidence, profileId: "BTC_EUR_PAPER_4H_V1" });
+  assert.equal(result.outcome, "PASS", JSON.stringify(result));
+  assert.equal(result.profileId, "BTC_EUR_PAPER_4H_V1");
+
+  for (const change of [
+    provenance => { provenance.runId = "spot-paper-987654322-1"; },
+    provenance => { provenance.acceptedSourceSha = "0".repeat(40); },
+    provenance => { provenance.mode = "observe"; }
+  ]) {
+    const altered = structuredClone(evidence);
+    change(altered.provenance);
+    assert.equal(replaySpotPaperSignals({
+      ...altered, profileId: "BTC_EUR_PAPER_4H_V1"
+    }).outcome, "FAILED");
+  }
+
+  const exceeded = structuredClone(evidence);
+  exceeded.readback.manifest.limits.maxCycles = 241;
+  const capResult = replaySpotPaperSignals({
+    ...exceeded, profileId: "BTC_EUR_PAPER_4H_V1"
+  });
+  assert.equal(capResult.outcome, "UNKNOWN");
+  assert.ok(capResult.discrepancies.includes("INCOMPLETE_OR_UNBOUNDED_JOURNAL"));
+
+  const missing = { ...evidence, responseBodies: { ...evidence.responseBodies } };
+  delete missing.responseBodies[evidence.readback.events[1].ohlc.sha256];
+  assert.equal(replaySpotPaperSignals({
+    ...missing, profileId: "BTC_EUR_PAPER_4H_V1"
+  }).outcome, "UNKNOWN");
+
+  const failureData = fixture();
+  failureData.addEvent({ closes: Array(21).fill(PRICE_100) });
+  failureData.addEvent({ closes: [...Array(21).fill(PRICE_100), PRICE_120] });
+  const failedAndMissing = fourHourReplayEvidence(failureData);
+  failedAndMissing.readback.events[2].signals[0].direction = "EXIT";
+  delete failedAndMissing.responseBodies[failedAndMissing.readback.events[1].ohlc.sha256];
+  assert.equal(replaySpotPaperSignals({
+    ...failedAndMissing, profileId: "BTC_EUR_PAPER_4H_V1"
+  }).outcome, "FAILED");
+  assert.throws(() => replaySpotPaperSignals({
+    ...evidence, profileId: "caller-controlled-profile"
+  }), /UNKNOWN_SIGNAL_REPLAY_PROFILE/);
+});
+
 test("known signal failure remains FAILED when another referenced response is missing", () => {
   const data = fixture();
   data.addEvent({ closes: Array(21).fill(PRICE_100) });
@@ -367,6 +450,36 @@ test("CLI writes an UNKNOWN report when a retained raw response file is missing"
     const output = JSON.parse(await readFile(outputPath, "utf8"));
     assert.equal(output.outcome, "UNKNOWN");
     assert.ok(output.discrepancies.includes("MISSING_RAW_RESPONSE"));
+  } finally {
+    process.exitCode = previousExitCode;
+  }
+});
+
+test("CLI selects the allowlisted four-hour profile for retained evidence", async t => {
+  const data = fixture();
+  data.addEvent({ closes: Array(21).fill(PRICE_100) });
+  const evidence = fourHourReplayEvidence(data);
+  const root = await mkdtemp(join(tmpdir(), "spot-paper-signal-replay-4h-cli-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const readbackPath = join(root, "readback.json");
+  const provenancePath = join(root, "pilot-manifest.json");
+  const runDirectory = join(root, "run");
+  const responseDirectory = join(runDirectory, "responses");
+  const outputPath = join(root, "replay.json");
+  await mkdir(responseDirectory, { recursive: true });
+  await writeFile(readbackPath, JSON.stringify(evidence.readback));
+  await writeFile(provenancePath, JSON.stringify(evidence.provenance));
+  for (const [hash, raw] of Object.entries(evidence.responseBodies)) {
+    await writeFile(join(responseDirectory, `${hash}.json`), raw);
+  }
+  const previousExitCode = process.exitCode;
+  try {
+    await signalReplayMain([
+      readbackPath, provenancePath, runDirectory, outputPath, "BTC_EUR_PAPER_4H_V1"
+    ]);
+    const output = JSON.parse(await readFile(outputPath, "utf8"));
+    assert.equal(output.outcome, "PASS");
+    assert.equal(output.profileId, "BTC_EUR_PAPER_4H_V1");
   } finally {
     process.exitCode = previousExitCode;
   }

@@ -1,0 +1,237 @@
+name: BTC/EUR bounded four-hour paper validation
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  paper:
+    if: >-
+      github.repository == 'Achi1984/meridian' &&
+      github.actor == 'Achi1984' &&
+      github.triggering_actor == 'Achi1984' &&
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main' &&
+      github.run_number == 1 &&
+      github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 270
+    steps:
+      - name: Checkout workflow and offline assessors
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Checkout accepted paper runtime
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: 81edf0b5dc3d455c2c1e1906791d56c731bea0c9
+          path: approved-source
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+
+      - name: Prepare fresh run and fixed four-hour manifest
+        id: prepare
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          evidence_dir="$RUNNER_TEMP/spot-paper-pilot-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          mkdir -m 700 "$evidence_dir"
+          mkdir -m 700 "$evidence_dir/data"
+          run_id="spot-paper-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          if [[ -e "$evidence_dir/data/$run_id" ]]; then
+            echo "Fresh run directory already exists." >&2
+            exit 1
+          fi
+          source_sha="$(git -C approved-source rev-parse HEAD)"
+          node --input-type=module - "$evidence_dir/pilot-manifest.json" "$source_sha" "$run_id" <<'NODE'
+          import { writeFile } from "node:fs/promises";
+          const [path, acceptedSourceSha, runId] = process.argv.slice(2);
+          const manifest = {
+            schemaVersion: "SPOT_PAPER_PILOT_DISPATCH_MANIFEST_V1",
+            profileId: "BTC_EUR_PAPER_4H_V1",
+            acceptedSourceSha,
+            workflowSha: process.env.GITHUB_SHA,
+            workflowRunId: process.env.GITHUB_RUN_ID,
+            workflowRunNumber: Number(process.env.GITHUB_RUN_NUMBER),
+            workflowRunAttempt: Number(process.env.GITHUB_RUN_ATTEMPT),
+            runId,
+            model: "BTC_EUR_SMA5_SMA20_V1",
+            mode: "paper",
+            pair: "BTC/EUR",
+            maxCycles: 240,
+            maxRequests: 480,
+            maxDurationMs: 14400000,
+            pollIntervalMs: 60000,
+            requestTimeoutMs: 5000,
+            maxBytes: 67108864,
+            maxResponseBytes: 262144,
+            maxOpenPositions: 1,
+            maxQuoteAgeMs: 10000,
+            maxCandleAgeMs: 120000,
+            initialCashCents: 100000,
+            maxExposureCents: 10000,
+            maxSessionLossCents: 2000,
+            stopLossBps: 200,
+            maxEntrySpreadBps: 50,
+            feeBpsPerSide: 50,
+            slippageBpsPerSide: 10,
+            smaFast: 5,
+            smaSlow: 20,
+            warmupCandles: 21
+          };
+          await writeFile(path, `${JSON.stringify(manifest, null, 2)}\n`, { flag: "wx", mode: 0o600 });
+          NODE
+          {
+            printf 'profile_id=%s\n' 'BTC_EUR_PAPER_4H_V1'
+            printf 'accepted_source_sha=%s\n' "$source_sha"
+            printf 'workflow_sha=%s\n' "$GITHUB_SHA"
+            printf 'workflow_run_id=%s\n' "$GITHUB_RUN_ID"
+            printf 'workflow_run_attempt=%s\n' "$GITHUB_RUN_ATTEMPT"
+            printf 'run_id=%s\n' "$run_id"
+            printf 'environment=%s\n' "$(uname -srmo)"
+            printf 'node=%s\n' "$(node --version)"
+            printf 'command=node approved-source/scripts/spot-paper-pilot/cli.mjs --mode paper --network --data-root %s/data --run-id %s --max-cycles 240 --max-duration-ms 14400000 --poll-interval-ms 60000\n' "$evidence_dir" "$run_id"
+          } > "$evidence_dir/metadata.txt"
+          echo "evidence_dir=$evidence_dir" >> "$GITHUB_OUTPUT"
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+
+      - name: Run one fixed bounded paper simulation
+        id: paper
+        shell: bash
+        env:
+          EVIDENCE_DIR: ${{ steps.prepare.outputs.evidence_dir }}
+          RUN_ID: ${{ steps.prepare.outputs.run_id }}
+        run: |
+          set -euo pipefail
+          start_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          start_ms="$(date +%s%3N)"
+          printf 'start_utc=%s\n' "$start_utc" >> "$EVIDENCE_DIR/metadata.txt"
+          set +e
+          node approved-source/scripts/spot-paper-pilot/cli.mjs \
+            --mode paper --network \
+            --data-root "$EVIDENCE_DIR/data" \
+            --run-id "$RUN_ID" \
+            --max-cycles 240 \
+            --max-duration-ms 14400000 \
+            --poll-interval-ms 60000 \
+            > "$EVIDENCE_DIR/paper.stdout.json" \
+            2> "$EVIDENCE_DIR/paper.stderr.txt"
+          exit_code=$?
+          end_ms="$(date +%s%3N)"
+          set -e
+          printf 'paper_exit_status=%s\nactual_elapsed_wall_ms=%s\nend_utc=%s\n' \
+            "$exit_code" "$((end_ms - start_ms))" \
+            "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$EVIDENCE_DIR/metadata.txt"
+          echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
+          exit "$exit_code"
+
+      - name: Read-only terminal report and journal reconciliation
+        if: always()
+        shell: bash
+        env:
+          EVIDENCE_DIR: ${{ steps.prepare.outputs.evidence_dir }}
+          RUN_ID: ${{ steps.prepare.outputs.run_id }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$EVIDENCE_DIR" || -z "$RUN_ID" ]]; then
+            echo "Fresh evidence directory was not prepared." >&2
+            exit 1
+          fi
+          set +e
+          node scripts/spot-paper-pilot/cli.mjs \
+            --mode report \
+            --data-root "$EVIDENCE_DIR/data" \
+            --run-id "$RUN_ID" \
+            > "$EVIDENCE_DIR/readback.stdout.json" \
+            2> "$EVIDENCE_DIR/readback.stderr.txt"
+          exit_code=$?
+          set -e
+          printf 'readback_exit_status=%s\n' "$exit_code" >> "$EVIDENCE_DIR/metadata.txt"
+          exit "$exit_code"
+
+      - name: Assess retained evidence under the four-hour profile
+        if: always()
+        env:
+          EVIDENCE_DIR: ${{ steps.prepare.outputs.evidence_dir }}
+          PAPER_EXIT_CODE: ${{ steps.paper.outputs.exit_code }}
+          RUN_ID: ${{ steps.prepare.outputs.run_id }}
+        run: |
+          if [[ -z "$EVIDENCE_DIR" || -z "$RUN_ID" ]]; then
+            echo "Fresh evidence directory was not prepared." >&2
+            exit 1
+          fi
+          node scripts/spot-paper-pilot/paper-evidence-assessment.mjs \
+            "$EVIDENCE_DIR/paper.stdout.json" \
+            "$EVIDENCE_DIR/readback.stdout.json" \
+            "$PAPER_EXIT_CODE" \
+            "$EVIDENCE_DIR/pilot-manifest.json" \
+            "$EVIDENCE_DIR/data/$RUN_ID" \
+            "$EVIDENCE_DIR/assessment.json" \
+            BTC_EUR_PAPER_4H_V1
+
+      - name: Replay retained signals offline
+        if: always()
+        shell: bash
+        env:
+          EVIDENCE_DIR: ${{ steps.prepare.outputs.evidence_dir }}
+          RUN_ID: ${{ steps.prepare.outputs.run_id }}
+        run: |
+          if [[ -z "$EVIDENCE_DIR" || -z "$RUN_ID" ||
+                ! -f "$EVIDENCE_DIR/readback.stdout.json" ||
+                ! -f "$EVIDENCE_DIR/pilot-manifest.json" ]]; then
+            echo "Replay inputs are unavailable." >&2
+            exit 1
+          fi
+          set +e
+          node scripts/spot-paper-pilot/signal-replay.mjs \
+            "$EVIDENCE_DIR/readback.stdout.json" \
+            "$EVIDENCE_DIR/pilot-manifest.json" \
+            "$EVIDENCE_DIR/data/$RUN_ID" \
+            "$EVIDENCE_DIR/signal-replay.json" \
+            BTC_EUR_PAPER_4H_V1
+          exit_code=$?
+          set -e
+          printf 'signal_replay_exit_status=%s\n' "$exit_code" \
+            >> "$EVIDENCE_DIR/metadata.txt"
+          exit "$exit_code"
+
+      - name: Finalize summary and evidence hashes
+        if: always()
+        shell: bash
+        env:
+          EVIDENCE_DIR: ${{ steps.prepare.outputs.evidence_dir }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$EVIDENCE_DIR" ]]; then
+            echo "No evidence directory was prepared." >&2
+            exit 1
+          fi
+          if [[ -f "$EVIDENCE_DIR/assessment.json" ]]; then
+            printf 'assessment=%s\n' "$(tr '\n' ' ' < "$EVIDENCE_DIR/assessment.json")" \
+              >> "$EVIDENCE_DIR/metadata.txt"
+          fi
+          if [[ -f "$EVIDENCE_DIR/signal-replay.json" ]]; then
+            printf 'signal_replay=%s\n' "$(tr '\n' ' ' < "$EVIDENCE_DIR/signal-replay.json")" \
+              >> "$EVIDENCE_DIR/metadata.txt"
+          fi
+          (
+            cd "$EVIDENCE_DIR"
+            find . -type f ! -name SHA256SUMS -print0 |
+              sort -z | xargs -0 sha256sum > SHA256SUMS
+          )
+
+      - name: Retain evidence, including failed attempts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: spot-paper-pilot-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/spot-paper-pilot-${{ github.run_id }}-${{ github.run_attempt }}/
+          if-no-files-found: warn
+          retention-days: 14

@@ -4,35 +4,12 @@ import { pathToFileURL } from "node:url";
 import {
   parseKrakenOhlc, parseKrakenTicker, sha256, SPOT_PAPER_PILOT_LIMITS
 } from "./core.mjs";
+import {
+  DEFAULT_PAPER_EVIDENCE_PROFILE_ID, getPaperEvidenceProfile
+} from "./evidence-profiles.mjs";
 
 export const ACCEPTED_PAPER_SOURCE_SHA = "81edf0b5dc3d455c2c1e1906791d56c731bea0c9";
-
-const EXPECTED_MANIFEST = Object.freeze({
-  schemaVersion: "SPOT_PAPER_PILOT_DISPATCH_MANIFEST_V1",
-  model: "BTC_EUR_SMA5_SMA20_V1",
-  mode: "paper",
-  pair: "BTC/EUR",
-  maxCycles: 60,
-  maxRequests: 120,
-  maxDurationMs: 3_600_000,
-  pollIntervalMs: 60_000,
-  requestTimeoutMs: 5_000,
-  maxBytes: 67_108_864,
-  maxResponseBytes: 262_144,
-  maxOpenPositions: 1,
-  maxQuoteAgeMs: 10_000,
-  maxCandleAgeMs: 120_000,
-  initialCashCents: 100_000,
-  maxExposureCents: 10_000,
-  maxSessionLossCents: 2_000,
-  stopLossBps: 200,
-  maxEntrySpreadBps: 50,
-  feeBpsPerSide: 50,
-  slippageBpsPerSide: 10,
-  smaFast: 5,
-  smaSlow: 20,
-  warmupCandles: 21
-});
+const EXPECTED_MANIFEST = getPaperEvidenceProfile();
 const NOTIONAL_DIVISOR = 100_000_000_000_000n;
 const TERMINAL_WRITE_GRACE_MS = 5_000;
 
@@ -65,17 +42,19 @@ function engineBoundsMatch() {
     SPOT_PAPER_PILOT_LIMITS.warmupCandles === EXPECTED_MANIFEST.warmupCandles;
 }
 
-function verifyProvenance(provenance, runId) {
+function verifyProvenance(provenance, runId, expected) {
   if (!provenance || provenance.schemaVersion !== EXPECTED_MANIFEST.schemaVersion ||
-      provenance.acceptedSourceSha !== ACCEPTED_PAPER_SOURCE_SHA ||
+      provenance.acceptedSourceSha !== expected.acceptedSourceSha ||
       !/^[a-f0-9]{40}$/.test(provenance.workflowSha ?? "") ||
       !/^\d+$/.test(String(provenance.workflowRunId ?? "")) ||
       provenance.workflowRunNumber !== 1 || provenance.workflowRunAttempt !== 1 ||
+      (expected.profileId !== DEFAULT_PAPER_EVIDENCE_PROFILE_ID &&
+        provenance.profileId !== expected.profileId) ||
       runId !== `spot-paper-${provenance.workflowRunId}-${provenance.workflowRunAttempt}`) {
     return false;
   }
-  return Object.entries(EXPECTED_MANIFEST).every(([key, value]) =>
-    provenance[key] === value);
+  return Object.entries(expected).every(([key, value]) =>
+    key === "profileId" || provenance[key] === value);
 }
 
 function verifyMarketEvidence(events, responseBodies) {
@@ -267,8 +246,10 @@ function verifyLedger(events, checkpoint, report, parsedQuotes) {
 }
 
 export function assessPaperEvidence({
-  paperExitCode, paperReport, readback, provenance, responseBodies
+  paperExitCode, paperReport, readback, provenance, responseBodies,
+  profileId = DEFAULT_PAPER_EVIDENCE_PROFILE_ID
 }) {
+  const expected = getPaperEvidenceProfile(profileId);
   const report = readback?.report;
   const events = readback?.events;
   const terminal = Array.isArray(events) ? events.at(-1) : null;
@@ -281,31 +262,32 @@ export function assessPaperEvidence({
   let marketEvidence = { valid: false, acceptedObservations: 0, parsedQuotes: new Map() };
 
   if (terminalVerified) {
-    if (!verifyProvenance(provenance, report.runId) ||
+    if (!verifyProvenance(provenance, report.runId, expected) ||
         provenance.runId !== report.runId) {
       failures.push("SOURCE_OR_FRESH_RUN_BINDING_FAILED");
     }
     const manifest = readback.manifest;
     if (!manifest || manifest.schemaVersion !== "SPOT_PAPER_PILOT_MANIFEST_V1" ||
-        manifest.mode !== "paper" || manifest.model !== EXPECTED_MANIFEST.model ||
-        manifest.pair !== EXPECTED_MANIFEST.pair || manifest.startedAt !== report.startedAt ||
-        manifest.limits?.maxCycles !== EXPECTED_MANIFEST.maxCycles ||
-        manifest.limits?.maxRequests !== EXPECTED_MANIFEST.maxRequests ||
-        manifest.limits?.maxDurationMs !== EXPECTED_MANIFEST.maxDurationMs ||
-        manifest.limits?.pollIntervalMs !== EXPECTED_MANIFEST.pollIntervalMs ||
-        manifest.limits?.requestTimeoutMs !== EXPECTED_MANIFEST.requestTimeoutMs ||
-        manifest.limits?.maxBytes !== EXPECTED_MANIFEST.maxBytes ||
-        manifest.limits?.maxResponseBytes !== EXPECTED_MANIFEST.maxResponseBytes) {
+        manifest.mode !== expected.mode || manifest.model !== expected.model ||
+        manifest.pair !== expected.pair || manifest.startedAt !== report.startedAt ||
+        manifest.limits?.maxCycles !== expected.maxCycles ||
+        manifest.limits?.maxRequests !== expected.maxRequests ||
+        manifest.limits?.maxDurationMs !== expected.maxDurationMs ||
+        manifest.limits?.pollIntervalMs !== expected.pollIntervalMs ||
+        manifest.limits?.requestTimeoutMs !== expected.requestTimeoutMs ||
+        manifest.limits?.maxBytes !== expected.maxBytes ||
+        manifest.limits?.maxResponseBytes !== expected.maxResponseBytes) {
       failures.push("ENGINE_MANIFEST_MISMATCH");
     }
     const elapsedMs = report.endedAt - report.startedAt;
     if (!isInteger(report.startedAt) || !isInteger(report.endedAt) ||
         report.startedAt !== manifest?.startedAt || report.endedAt < report.startedAt ||
-        elapsedMs > EXPECTED_MANIFEST.maxDurationMs + TERMINAL_WRITE_GRACE_MS ||
+        elapsedMs > expected.maxDurationMs + TERMINAL_WRITE_GRACE_MS ||
         terminal.at !== report.endedAt) {
       failures.push("RUNTIME_BOUND_OR_TIMESTAMP_INVALID");
     }
-    if (report.mode !== "paper" || report.pair !== EXPECTED_MANIFEST.pair ||
+    if (report.model !== expected.model || report.mode !== expected.mode ||
+        report.pair !== expected.pair ||
         report.executionImpact !== false || report.liveTrading !== false ||
         report.autoPromotion !== false || report.profitability !== "NOT_ASSESSED" ||
         !engineBoundsMatch()) {
@@ -321,19 +303,19 @@ export function assessPaperEvidence({
     if (!isInteger(report.observations) || report.observations !== observations ||
         !isInteger(report.dataGaps) || report.dataGaps !== dataGaps ||
         !isInteger(report.requests) || report.requests < observations * 2 ||
-        report.requests > EXPECTED_MANIFEST.maxRequests ||
+        report.requests > expected.maxRequests ||
         !isInteger(report.deliveredBytes) || report.deliveredBytes < 0 ||
-        report.deliveredBytes > EXPECTED_MANIFEST.maxBytes ||
+        report.deliveredBytes > expected.maxBytes ||
         !same(report.signals, signals) ||
         checkpoint?.counters?.requests !== report.requests ||
         checkpoint?.counters?.bytes !== report.deliveredBytes ||
         checkpoint?.stopReason !== report.stopReason ||
         !isInteger(checkpoint?.cycle) || checkpoint.cycle < 0 ||
-        checkpoint.cycle > EXPECTED_MANIFEST.maxCycles ||
+        checkpoint.cycle > expected.maxCycles ||
         checkpoint.cycle !== observations + dataGaps ||
         events.length !== checkpoint.cycle + 2 ||
         (report.stopReason === "CYCLE_LIMIT" &&
-          checkpoint.cycle !== EXPECTED_MANIFEST.maxCycles) ||
+         checkpoint.cycle !== expected.maxCycles) ||
         report.requests > checkpoint.cycle * 2) {
       failures.push("COUNTER_OR_SIGNAL_RECONCILIATION_FAILED");
     }
@@ -360,18 +342,40 @@ export function assessPaperEvidence({
     report.endedAt >= report.startedAt ? report.endedAt - report.startedAt : null;
   const cycles = isInteger(readback?.checkpoint?.cycle) ? readback.checkpoint.cycle : null;
   const durationCoverage = elapsedMs === null ? null :
-    elapsedMs / EXPECTED_MANIFEST.maxDurationMs;
+    elapsedMs / expected.maxDurationMs;
   const riskStop = ["SAMPLED_2PCT_BID_STOP", "SESSION_LOSS_LIMIT"]
     .includes(report?.stopReason);
   const runClassification = !terminalVerified ? "UNKNOWN" :
     riskStop ? "RISK_STOP" : failures.length || paperExitCode !== 0 ?
       "FAILED_EVIDENCE" : completed && report.stopReason === "DURATION_LIMIT" &&
-        elapsedMs >= EXPECTED_MANIFEST.maxDurationMs ?
-        "COMPLETED_HOUR" : completed ? "PARTIAL_BOUNDED_RUN" :
+        elapsedMs >= expected.maxDurationMs ?
+        expected.maxDurationMs === 3_600_000 ? "COMPLETED_HOUR" :
+          "COMPLETED_FOUR_HOURS" : completed ? "PARTIAL_BOUNDED_RUN" :
           bounded ? "FAILED_DATA_ACCEPTANCE" : "STOPPED_OR_LIMITED";
+  const fills = Array.isArray(report?.fills) ? report.fills : [];
+  const fillRows = fills.map(fill => ({
+    id: fill?.id ?? null,
+    side: fill?.side ?? null,
+    turnoverCents: isInteger(fill?.grossCents) && fill.grossCents >= 0 ?
+      fill.grossCents : null,
+    feeCents: isInteger(fill?.feeCents) && fill.feeCents >= 0 ?
+      fill.feeCents : null
+  }));
+  const validFillAccounting = fillRows.every(fill =>
+    fill.turnoverCents !== null && fill.feeCents !== null);
+  const fillCostReport = {
+    turnoverDefinition: "Sum of gross simulated notional on each fill; both sides of a round trip count.",
+    fills: fillRows,
+    grossTurnoverCents: validFillAccounting ?
+      fillRows.reduce((total, fill) => total + fill.turnoverCents, 0) : null,
+    feesCents: validFillAccounting ?
+      fillRows.reduce((total, fill) => total + fill.feeCents, 0) : null
+  };
+  const fullDuration = elapsedMs !== null && elapsedMs >= expected.maxDurationMs;
 
   return {
     outcome,
+    profileId: expected.profileId,
     runClassification,
     terminalVerified,
     boundedTermination: bounded,
@@ -379,10 +383,12 @@ export function assessPaperEvidence({
     endedAt: report?.endedAt ?? null,
     elapsedMs,
     cycleCount: cycles,
-    cycleCoverage: cycles === null ? null : cycles / EXPECTED_MANIFEST.maxCycles,
+    cycleCoverage: cycles === null ? null : cycles / expected.maxCycles,
     acceptedObservationCoverage: cycles ? marketEvidence.acceptedObservations / cycles : null,
     gapCoverage: cycles && isInteger(report?.dataGaps) ? report.dataGaps / cycles : null,
     durationCoverage,
+    durationStatus: elapsedMs === null ? "UNKNOWN" :
+      fullDuration ? "FULL_REQUESTED_DURATION" : "PARTIAL_BOUNDED_DURATION",
     acceptedObservations: marketEvidence.acceptedObservations,
     executionImpact: false,
     dataAcceptance: bounded && failures.length === 0 &&
@@ -401,6 +407,7 @@ export function assessPaperEvidence({
     deliveredBytes: report?.deliveredBytes ?? null,
     signals: report?.signals ?? [],
     fills: report?.fills ?? [],
+    fillCostReport,
     feesCents: report?.feesCents ?? null,
     cashCents: report?.cashCents ?? null,
     equityCents: report?.equityCents ?? null,
@@ -420,15 +427,32 @@ export function assessPaperEvidence({
       "No SMA signal replay is performed; quote and accounting reconciliation does not validate strategy signals or fill-path behavior.",
       "No trades are forced; zero fills are valid but do not validate the strategy fill path.",
       "Profitability is not assessed, regardless of fills, PnL, or terminal equity."
-    ]
+    ],
+    validationCriteria: {
+      pinnedSourceAndFreshRun: terminalVerified &&
+        !failures.includes("SOURCE_OR_FRESH_RUN_BINDING_FAILED"),
+      requestedModeAndBounds: terminalVerified &&
+        !failures.includes("ENGINE_MANIFEST_MISMATCH") &&
+        !failures.includes("REPORT_SAFETY_OR_IDENTITY_MISMATCH") &&
+        !failures.includes("RUNTIME_BOUND_OR_TIMESTAMP_INVALID") &&
+        !failures.includes("COUNTER_OR_SIGNAL_RECONCILIATION_FAILED"),
+      retainedEvidenceAndAccounting: terminalVerified && failures.length === 0 &&
+        marketEvidence.valid && Boolean(terminalVerified),
+      acceptedPublicObservations: completed && marketEvidence.acceptedObservations > 0,
+      fullRequestedDuration: fullDuration,
+      strategyPerformance: "NOT_ASSESSED"
+    }
   };
 }
 
 async function main(argv) {
-  const [paperPath, readbackPath, exitCodeText, provenancePath, runDirectory, outputPath] = argv;
+  const [
+    paperPath, readbackPath, exitCodeText, provenancePath, runDirectory, outputPath,
+    profileId = DEFAULT_PAPER_EVIDENCE_PROFILE_ID
+  ] = argv;
   if (!paperPath || !readbackPath || exitCodeText === undefined ||
       !provenancePath || !runDirectory || !outputPath) {
-    throw new Error("Usage: paper-evidence-assessment.mjs <paper.json> <readback.json> <exit-code> <manifest.json> <run-directory> <assessment.json>");
+    throw new Error("Usage: paper-evidence-assessment.mjs <paper.json> <readback.json> <exit-code> <manifest.json> <run-directory> <assessment.json> [profile-id]");
   }
   const readJson = async path => {
     try {
@@ -454,7 +478,7 @@ async function main(argv) {
   }
   const paperExitCode = /^\d+$/.test(exitCodeText) ? Number(exitCodeText) : null;
   const assessment = assessPaperEvidence({
-    paperExitCode, paperReport, readback, provenance, responseBodies
+    paperExitCode, paperReport, readback, provenance, responseBodies, profileId
   });
   await writeFile(outputPath, `${JSON.stringify(assessment, null, 2)}\n`, { flag: "wx" });
   process.stdout.write(`${JSON.stringify(assessment)}\n`);
