@@ -561,12 +561,14 @@ test("preflight deadline returns UNKNOWN, retains ownership, and blocks late dis
 
   statusGate.resolve({status: "FINISHED", runId: RUN_ID, configHash: fixture.hash});
   let next;
-  for (let attempt = 0; attempt < 20; attempt++) {
+  const settleDeadline = Date.now() + 1_000;
+  do {
     next = await transferPostRunReport(options);
     if (next.reason !== "transfer_busy") break;
     await new Promise(resolve => setImmediate(resolve));
-  }
-  assert.equal(next.status, "TRANSFERRED");
+  } while (Date.now() < settleDeadline);
+  assert.equal(next.status, "TRANSFERRED",
+    `retry result ${JSON.stringify(next)}; statusReads=${statusReads}; sends=${sends}`);
   assert.equal(statusReads, 2);
   assert.equal(sends, 1);
 });
