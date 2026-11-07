@@ -1409,6 +1409,36 @@ async function explicitEntryProjection(equityCents, availableCashCents, fxRate =
     req, {reviewScenario: config})).scenarioProjection;
 }
 
+async function explicitExitProjection({
+  positionAgeMs = 302_001,
+  candidateAgeMs = 2_000,
+  fxAgeMs = 500,
+  positionOpenedAt = NOW - positionAgeMs,
+  sourceQuoteOverrides = {}
+} = {}) {
+  const req = request({
+    side: "EXIT",
+    amountAtoms: "100000000",
+    candidateSampledAt: NOW - candidateAgeMs,
+    positionOpenedAt
+  });
+  delete req.authorizedAt;
+  const config = explicitNetScenario(req);
+  config.quoteUsdConversion.observedAt = NOW - fxAgeMs;
+  refreshExplicitNetReviewEvidence(config);
+  const body = syntheticOrderResponse({
+    inputMint: SYNTHETIC_MINT,
+    outputMint: SYNTHETIC_QUOTE,
+    inAmount: req.amountAtoms,
+    outAmount: "17057460",
+    otherAmountThreshold: "1",
+    ...sourceQuoteOverrides
+  }).body;
+  return (await adapterFor(body).adapter.getPaperQuote(req, {
+    reviewScenario: config
+  })).scenarioProjection;
+}
+
 test("EXPLICIT_NET_V1 binds explicit modeled assumptions, causal FX, quote bytes, and recomputed output", async () => {
   const projection = await explicitEntryProjection("50000", "3500");
   assert.equal(projection.status, "REVIEW_PROJECTION_ONLY");
@@ -1582,6 +1612,36 @@ test("EXPLICIT_NET_V1 sells all seven tokens and rounds the USD credit and addit
   assert.equal(tiny.status, "BLOCKED");
 });
 
+test("EXPLICIT_NET_V1 keeps position opening causal while enforcing fresh exit evidence", async () => {
+  for (const positionAgeMs of [300_000, 300_001, 302_001]) {
+    const projection = await explicitExitProjection({positionAgeMs});
+    assert.equal(projection.status, "REVIEW_PROJECTION_ONLY");
+    assert.equal(projection.model.binding.request.causalAt, NOW - positionAgeMs);
+    assert.equal(projection.model.binding.sourceQuote.observedAt, NOW);
+    assert.deepEqual(verifyPaperExplicitNetProjection(projection), {valid: true, reasons: []});
+  }
+
+  assert.equal((await explicitExitProjection({candidateAgeMs: 300_001})).status, "BLOCKED");
+  assert.equal((await explicitExitProjection({fxAgeMs: 300_001})).status, "BLOCKED");
+  assert.equal((await explicitExitProjection({candidateAgeMs: 300_000})).status, "REVIEW_PROJECTION_ONLY");
+  assert.equal((await explicitExitProjection({fxAgeMs: 300_000})).status, "REVIEW_PROJECTION_ONLY");
+  assert.equal((await explicitExitProjection({positionOpenedAt: NOW + 1})).status, "BLOCKED");
+  assert.equal((await explicitExitProjection({
+    sourceQuoteOverrides: {
+      router: "jupiterz",
+      expireAt: String(Math.floor((NOW - 1_000) / 1_000))
+    }
+  })).status, "BLOCKED");
+
+  const staleAuthorization = request({
+    authorizedAt: NOW - 300_001,
+    candidateSampledAt: NOW - 2_000
+  });
+  const staleAuthConfig = explicitNetScenario(staleAuthorization);
+  assert.equal((await adapterFor(explicitEntryBody()).adapter.getPaperQuote(
+    staleAuthorization, {reviewScenario: staleAuthConfig})).scenarioProjection.status, "BLOCKED");
+});
+
 test("EXPLICIT_NET_V1 fixture issuance creates a distinct V2 facts variant", async () => {
   const adapter = createFixtureMarketQuoteAdapter({
     enabled: true,
@@ -1638,6 +1698,20 @@ test("EXPLICIT_NET_V1 fixture issuance creates a distinct V2 facts variant", asy
   assert.deepEqual(production.issueModeledQuote(productionResult, {
     identity: IDENTITY, side: "ENTRY", amountAtoms: "100000000", policy
   }), {ok: false, reason: "ADAPTER_HAS_NO_FIXTURE_AUTHORITY"});
+
+  let time = NOW;
+  const expiringAdapter = createFixtureMarketQuoteAdapter({
+    enabled: true,
+    clock: () => time,
+    transport: async () => response(entryResponse().body)
+  });
+  const freshResult = await expiringAdapter.getPaperQuote(request(), {
+    reviewScenario: config
+  });
+  time = freshResult.scenarioProjection.model.binding.sourceQuote.expiresAt + 1;
+  assert.deepEqual(expiringAdapter.issueModeledQuote(freshResult, {
+    identity: IDENTITY, side: "ENTRY", amountAtoms: "100000000", policy
+  }), {ok: false, reason: "QUOTE_OUTSIDE_RUN_WINDOW_OR_EXPIRED"});
 });
 
 const MODELED_POLICY = Object.freeze({

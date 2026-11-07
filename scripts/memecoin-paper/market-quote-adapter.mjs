@@ -864,8 +864,8 @@ function deriveExplicitNetProjection(binding) {
         sourceQuote.observedAt <= request.candidateSampledAt ||
         sourceQuote.observedAt <= (binding.side === "ENTRY" ? request.authorizedAt : request.positionOpenedAt) ||
         sourceQuote.observedAt - request.candidateSampledAt > MAX_CAUSAL_AGE_MS ||
-        sourceQuote.observedAt -
-          (binding.side === "ENTRY" ? request.authorizedAt : request.positionOpenedAt) > MAX_CAUSAL_AGE_MS) {
+        (binding.side === "ENTRY" &&
+          sourceQuote.observedAt - request.authorizedAt > MAX_CAUSAL_AGE_MS)) {
       return null;
     }
 
@@ -1207,7 +1207,7 @@ function exactPriceRatio(request, route) {
   };
 }
 
-function buildCandidate(request, observation) {
+function buildCandidate(request, observation, {explicitNetExit = false} = {}) {
   const {route, routeBinding} = observation;
   const routeIsBound = routeBinding?.status === "SINGLE_POOL_MATCH";
   const receivedAt = route.observedAt;
@@ -1222,7 +1222,8 @@ function buildCandidate(request, observation) {
   if (!validTime(receivedAt) || receivedAt <= causalAt ||
       receivedAt <= request.candidateSampledAt) reasons.push("POST_RESPONSE_CHRONOLOGY_INVALID");
   if (validTime(receivedAt) &&
-      (receivedAt - causalAt > MAX_CAUSAL_AGE_MS ||
+      ((request.side === "ENTRY" || !explicitNetExit) &&
+       receivedAt - causalAt > MAX_CAUSAL_AGE_MS ||
        receivedAt - request.candidateSampledAt > MAX_CAUSAL_AGE_MS)) {
     reasons.push("CAUSAL_REFERENCE_STALE");
   }
@@ -1726,6 +1727,8 @@ function buildMarketQuoteAdapter({
       try {
         const amountMint = request.side === "ENTRY" ? request.identity.quote : request.identity.mint;
         const outputMint = request.side === "ENTRY" ? request.identity.mint : request.identity.quote;
+        const explicitNetExit = request.side === "EXIT" &&
+          parsedScenario?.parsed.config.scenario === EXPLICIT_NET_CASE;
         const observed = await source.getQuote({
           identity: request.identity,
           inputMint: amountMint,
@@ -1735,7 +1738,9 @@ function buildMarketQuoteAdapter({
           amount: request.amountAtoms,
           slippageBps: request.slippageBps,
           candidateSampledAt: request.candidateSampledAt,
-          authorizedAt: request.side === "ENTRY" ? request.authorizedAt : request.positionOpenedAt
+          ...(explicitNetExit
+            ? {side: "EXIT", positionOpenedAt: request.positionOpenedAt}
+            : {authorizedAt: request.side === "ENTRY" ? request.authorizedAt : request.positionOpenedAt})
         });
         if (signal?.aborted) {
           return emptyResult("UNAVAILABLE", ["REQUEST_CANCELLED"], request,
@@ -1745,7 +1750,7 @@ function buildMarketQuoteAdapter({
           return emptyResult("UNAVAILABLE", observed.reasons, request,
             unavailableScenario(parsedScenario, "SCENARIO_SOURCE_QUOTE_NOT_CAUSAL_AND_BOUND"));
         }
-        const {candidate, reasons} = buildCandidate(request, observed);
+        const {candidate, reasons} = buildCandidate(request, observed, {explicitNetExit});
         const sourceResponse = requestDigest.complete && !requestDigest.invalid ? {
           status: "OBSERVED_RAW_BODY_DIGEST",
           sha256: requestDigest.hash.digest("hex"),

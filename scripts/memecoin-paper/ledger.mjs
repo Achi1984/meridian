@@ -376,7 +376,8 @@ function verifyExplicitNetModeledQuote(quote, {runId, side, now, decimals}) {
         sourceQuote.observedAt <= request.candidateSampledAt ||
         sourceQuote.observedAt <= request.causalAt ||
         sourceQuote.observedAt - request.candidateSampledAt > MAX_QUOTE_AGE_MS ||
-        sourceQuote.observedAt - request.causalAt > MAX_QUOTE_AGE_MS ||
+        (side === "ENTRY" &&
+          sourceQuote.observedAt - request.causalAt > MAX_QUOTE_AGE_MS) ||
         sourceQuote.observedAt !== facts.sourceObservedAt ||
         sourceQuote.expiresAt !== facts.expiresAt) {
       return fail("explicit net source quote or causal FX receipt is invalid");

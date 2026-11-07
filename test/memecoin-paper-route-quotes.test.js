@@ -272,6 +272,47 @@ test("future chronology, expired provider quote, and mismatched mint fail closed
   assert.ok(mismatchResult.reasons.includes("RESPONSE_MINT_MISMATCH"));
 });
 
+test("side-aware exit causality accepts a long-held position without weakening legacy request shape", async () => {
+  const exitRequest = request({
+    side: "EXIT",
+    inputMint: SYNTHETIC_MINT,
+    outputMint: SYNTHETIC_QUOTE,
+    candidateSampledAt: NOW - 2_000,
+    positionOpenedAt: NOW - 302_001
+  });
+  delete exitRequest.authorizedAt;
+  const result = await adapterFor(syntheticOrderResponse({
+    inputMint: SYNTHETIC_MINT,
+    outputMint: SYNTHETIC_QUOTE
+  }).body).adapter.getQuote(exitRequest);
+  assert.ok(result.route);
+  assert.equal(result.route.observedAt, NOW);
+  assert.equal(result.normalization.reasons.includes("QUOTE_NOT_LATER_THAN_POSITION_OPEN"), false);
+
+  const futureOpen = request({
+    side: "EXIT",
+    inputMint: SYNTHETIC_MINT,
+    outputMint: SYNTHETIC_QUOTE,
+    positionOpenedAt: NOW + 1
+  });
+  delete futureOpen.authorizedAt;
+  const futureOpenResult = await adapterFor(syntheticOrderResponse({
+    inputMint: SYNTHETIC_MINT, outputMint: SYNTHETIC_QUOTE
+  }).body).adapter.getQuote(futureOpen);
+  assert.ok(futureOpenResult.reasons.includes("REQUEST_CHRONOLOGY_INVALID"));
+
+  const mixedCausality = request({
+    side: "EXIT",
+    inputMint: SYNTHETIC_MINT,
+    outputMint: SYNTHETIC_QUOTE,
+    positionOpenedAt: NOW - 302_001
+  });
+  const mixedCausalityResult = await adapterFor(syntheticOrderResponse({
+    inputMint: SYNTHETIC_MINT, outputMint: SYNTHETIC_QUOTE
+  }).body).adapter.getQuote(mixedCausality);
+  assert.ok(mixedCausalityResult.reasons.includes("REQUEST_CHRONOLOGY_INVALID"));
+});
+
 test("oversized base-unit integers are rejected without rounding", async () => {
   let requests = 0;
   const adapter = createJupiterV2QuoteAdapter({

@@ -75,7 +75,8 @@ function copyDataRecord(value, allowedKeys, errorCode) {
 function snapshotRequest(request) {
   const snapshot = copyDataRecord(request, [
     "identity", "inputMint", "outputMint", "inputDecimals", "outputDecimals",
-    "amount", "slippageBps", "candidateSampledAt", "authorizedAt"
+    "amount", "slippageBps", "candidateSampledAt", "authorizedAt", "side",
+    "positionOpenedAt"
   ], "REQUEST_SCHEMA_INVALID");
   if (isRecord(snapshot.identity)) {
     snapshot.identity = copyDataRecord(snapshot.identity,
@@ -108,9 +109,26 @@ function validateRequest(request) {
       request.slippageBps < 0 || request.slippageBps > 10_000) {
     throw invalid("REQUEST_SLIPPAGE_INVALID");
   }
-  if (!validTime(request.candidateSampledAt) || !validTime(request.authorizedAt)) {
+  const legacyEntry = request.side === undefined &&
+    !Object.hasOwn(request, "positionOpenedAt") && validTime(request.authorizedAt);
+  const entry = request.side === "ENTRY" &&
+    !Object.hasOwn(request, "positionOpenedAt") && validTime(request.authorizedAt);
+  const exit = request.side === "EXIT" &&
+    !Object.hasOwn(request, "authorizedAt") && validTime(request.positionOpenedAt);
+  if (!validTime(request.candidateSampledAt) ||
+      !(legacyEntry || entry || exit)) {
     throw invalid("REQUEST_CHRONOLOGY_INVALID");
   }
+}
+
+function causalReferenceAt(request) {
+  return request.side === "EXIT" ? request.positionOpenedAt : request.authorizedAt;
+}
+
+function normalizationChronology(request) {
+  return request.side === "EXIT"
+    ? {side: "EXIT", positionOpenedAt: request.positionOpenedAt}
+    : {authorizedAt: request.authorizedAt, ...(request.side === "ENTRY" ? {side: "ENTRY"} : {})};
 }
 
 function parseResponseJson(bytes) {
@@ -468,11 +486,11 @@ function unknownCostEvidence() {
   };
 }
 
-function normalizeUnavailable(identity, sampleAt, authorizedAt, now) {
+function normalizeUnavailable(identity, sampleAt, chronology, now) {
   return normalizeHypotheticalQuote(null, {
     identity,
     candidateSampledAt: sampleAt,
-    authorizedAt,
+    ...chronology,
     now
   });
 }
@@ -496,7 +514,7 @@ function normalizeObservedRoute(request, route) {
   }, {
     identity: request.identity,
     candidateSampledAt: request.candidateSampledAt,
-    authorizedAt: request.authorizedAt,
+    ...normalizationChronology(request),
     now: route.observedAt
   });
 }
@@ -521,7 +539,8 @@ function resultBase(reasons, request, now) {
     routeBinding: null,
     costEvidence: unknownCostEvidence(),
     normalization: normalizeUnavailable(
-      request?.identity, request?.candidateSampledAt, request?.authorizedAt, now
+      request?.identity, request?.candidateSampledAt,
+      request ? normalizationChronology(request) : {}, now
     ),
     authorizationEligible: false
   };
@@ -587,7 +606,7 @@ export function createJupiterV2QuoteAdapter({
         validateRequest(snapshot);
         beforeRequest = clock();
         if (!validTime(beforeRequest) || beforeRequest <= snapshot.candidateSampledAt ||
-            beforeRequest <= snapshot.authorizedAt) {
+            beforeRequest <= causalReferenceAt(snapshot)) {
           throw invalid("REQUEST_CHRONOLOGY_INVALID");
         }
         if (lastRequestAt !== null) {
@@ -663,7 +682,8 @@ export function createJupiterV2QuoteAdapter({
         const route = validateResponse(body, snapshot);
         const observedAt = clock();
         if (!validTime(observedAt) || observedAt < beforeRequest) throw invalid("CLOCK_INVALID");
-        if (observedAt <= snapshot.candidateSampledAt || observedAt <= snapshot.authorizedAt) {
+        if (observedAt <= snapshot.candidateSampledAt ||
+            observedAt <= causalReferenceAt(snapshot)) {
           throw invalid("QUOTE_CHRONOLOGY_INVALID");
         }
         const providerExpiresAt = route.providerExpiresAt;
@@ -709,7 +729,8 @@ export function createJupiterV2QuoteAdapter({
         const code = timeoutExpired ? "REQUEST_TIMEOUT" : error?.code ?? "TRANSPORT_ERROR";
         const failed = resultBase([code], snapshot, beforeRequest);
         failed.normalization = normalizeUnavailable(
-          snapshot.identity, snapshot.candidateSampledAt, snapshot.authorizedAt, beforeRequest
+          snapshot.identity, snapshot.candidateSampledAt,
+          normalizationChronology(snapshot), beforeRequest
         );
         return failed;
       } finally {

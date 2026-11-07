@@ -869,7 +869,8 @@ function explicitNetModeledKit() {
   });
   let modeledOpenedAt = null;
   const issue = async (side, amountAtoms, at, {
-    equityCents = "90000", availableCashCents = "95000", fxRate = "900000"
+    equityCents = "90000", availableCashCents = "95000", fxRate = "900000",
+    positionOpenedAt = modeledOpenedAt
   } = {}) => {
     clock.t = at;
     body = side === "ENTRY"
@@ -887,7 +888,7 @@ function explicitNetModeledKit() {
       identity, side, amountAtoms, quoteDecimals: 6,
       candidateSampledAt: side === "ENTRY" ? START : at - 2000,
       slippageBps: 50,
-      ...(side === "ENTRY" ? {authorizedAt: at - 1000} : {positionOpenedAt: modeledOpenedAt})
+      ...(side === "ENTRY" ? {authorizedAt: at - 1000} : {positionOpenedAt})
     };
     const result = await adapter.getPaperQuote(request, {reviewScenario: config});
     const issued = adapter.issueModeledQuote(result, {identity, side, amountAtoms, policy});
@@ -995,7 +996,8 @@ test("explicit-net fixture execution rebinds fresh FX and budgets under stable m
   assert.equal(fill.provenance, "MODELED");
   assert.equal(entryQuote.modeled.schema, "PAPER_MODELED_QUOTE_V2");
 
-  const exitIssue = await kit.issue("EXIT", fill.tokenAtoms, START + 5000, {
+  const delayedExitAt = START + 302_001;
+  const exitIssue = await kit.issue("EXIT", fill.tokenAtoms, delayedExitAt, {
     equityCents: "90000", availableCashCents: "95000", fxRate: "750000"
   });
   assert.equal(exitIssue.issued.ok, true);
@@ -1004,12 +1006,45 @@ test("explicit-net fixture execution rebinds fresh FX and budgets under stable m
   assert.notEqual(entryQuote.modeled.modelDigest, exitQuote.modeled.modelDigest);
   assert.equal(entryQuote.modeled.methodologyDigest, exitQuote.modeled.methodologyDigest);
   const closed = await step.observeExitQuote({
-    eventId: "explicit-exit", quote: exitQuote, now: START + 5000
+    eventId: "explicit-exit", quote: exitQuote, now: delayedExitAt
   });
   assert.equal(closed.status, "CLOSED_PAPER");
   assert.equal(closed.provenance, "MODELED");
   assert.equal(closed.actualCostCoverage, "UNKNOWN");
   assert.equal(session.snapshot().summary.openPositions.length, 0);
+  const afterCloseSequence = session.metadata.sequence;
+  assert.deepEqual(await step.observeExitQuote({
+    eventId: "explicit-exit", quote: exitQuote, now: delayedExitAt
+  }), closed);
+  assert.equal(session.metadata.sequence, afterCloseSequence);
+});
+
+test("explicit-net exit must bind the actual opening time and retains fresh quote/FX requirements", async t => {
+  const kit = explicitNetModeledKit();
+  const {step, session} = await modeledSetup(t, kit);
+  const auth = await step.authorizeEntry(authorization());
+  const entryIssue = await kit.issue("ENTRY", "100000000", START + 2000, {
+    equityCents: "50000", availableCashCents: "3500", fxRate: "800000"
+  });
+  const fill = await step.executeEntry({
+    eventId: "opening-entry", authorizationId: auth.authorizationId,
+    quote: {...entryIssue.issued.quote, eventId: "opening-entry"},
+    now: START + 2000, marks: []
+  });
+  assert.equal(fill.status, "FILLED_PAPER");
+  const sequence = session.metadata.sequence;
+
+  const wrongOpen = await kit.issue("EXIT", fill.tokenAtoms, START + 302_001, {
+    positionOpenedAt: START + 2001
+  });
+  assert.equal(wrongOpen.issued.ok, true);
+  assert.equal((await step.observeExitQuote({
+    eventId: "wrong-open-exit",
+    quote: {...wrongOpen.issued.quote, eventId: "wrong-open-exit"},
+    now: START + 302_001
+  })).status, "REJECT");
+  assert.equal(session.metadata.sequence, sequence);
+  assert.equal(session.snapshot().summary.openPositions.length, 1);
 });
 
 test("explicit-net entry sized to an earlier budget is not resized to current ledger equity", async t => {
