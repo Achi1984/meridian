@@ -75,12 +75,16 @@ function assertActive(signal) {
 }
 
 export function createPrivateReportStore(db, {
+  tableName = "meridian_paper_reports",
   maxConcurrent = PAPER_REPORT_STORE_LIMITS.maxConcurrent,
   operationTimeoutMs = PAPER_REPORT_STORE_LIMITS.operationTimeoutMs,
   schedule = setTimeout,
   cancelSchedule = clearTimeout
 } = {}) {
   if (!db || typeof db.connect !== "function" || typeof db.query !== "function") return null;
+  if (!["meridian_paper_reports", "meridian_spot_paper_reports"].includes(tableName)) {
+    throw new TypeError("invalid private report table");
+  }
   if (!Number.isSafeInteger(maxConcurrent) || maxConcurrent < 1 || maxConcurrent > 2 ||
       !Number.isSafeInteger(operationTimeoutMs) || operationTimeoutMs < 1 ||
       operationTimeoutMs > 10_000 || typeof schedule !== "function" ||
@@ -226,7 +230,7 @@ export function createPrivateReportStore(db, {
         async (client, activeSignal, markWrite) => {
           markWrite();
           const inserted = await client.query(
-            `INSERT INTO meridian_paper_reports
+            `INSERT INTO ${tableName}
                (run_id, config_hash, content_sha256, envelope)
              VALUES ($1, $2, $3, $4::jsonb)
              ON CONFLICT (run_id) DO NOTHING
@@ -238,7 +242,7 @@ export function createPrivateReportStore(db, {
 
           const existing = await client.query(
             `SELECT config_hash, content_sha256
-               FROM meridian_paper_reports
+               FROM ${tableName}
               WHERE run_id = $1
               FOR SHARE`,
             [runId]
@@ -259,7 +263,7 @@ export function createPrivateReportStore(db, {
         async (client, activeSignal) => {
           const result = await client.query(
             `SELECT run_id, config_hash, content_sha256, envelope
-               FROM meridian_paper_reports
+               FROM ${tableName}
               WHERE run_id = $1`,
             [runId]
           );

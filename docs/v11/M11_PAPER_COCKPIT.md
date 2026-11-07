@@ -2,19 +2,23 @@
 
 ## Owned paths
 
-This delivery owns the read-only Paper cockpit panel and its focused verification:
+This delivery owns read-only Paper cards and their focused verification:
 
 - `v11/paper-cockpit-model.js` — injected report reader, DTO presentation adapter, and generated demo fixture.
 - `v11/paper-cockpit-view.js` — accessible text-only cockpit rendering.
+- `v11/spot-paper-cockpit-*` — separate BTC/EUR DTO, manual reader, and card.
+- `scripts/spot-paper-report-bridge/contract.mjs` — versioned BTC/EUR display and transfer contracts.
+- `spot-paper-report-gateway.mjs` — separate disabled-by-default authenticated route.
+- `migrations/20261107_meridian_spot_paper_reports.sql` — isolated immutable report table.
 - `v11/strategy-workspace-bootstrap.js` — mounts the panel at the top of the existing Strategies workspace.
-- `test/v11-paper-cockpit.test.js` — report-shaped DTO and evidence-state tests.
+- `test/v11-spot-paper-cockpit.test.js` and `test/spot-paper-report-*.test.js` — generated BTC/EUR contract, gateway, and cockpit tests.
 - `test/v11-module-cache-identity.test.js` — served V11 module graph assertion.
 - `docs/v11/M11_PAPER_COCKPIT.md` — scope and connection contract.
 
-The cockpit uses the existing M11 Strategies navigation; it adds no new route.
-The panel is independent of the readiness panel below it. No worker, filesystem,
-gateway, authentication, report-producer, workflow, or runtime-control path is
-owned or changed here.
+The cards use existing M11 Strategies navigation and add no dashboard route.
+BTC/EUR has a separate gateway route and table; the memecoin validator is
+unchanged. No worker, filesystem, report producer, workflow, or runtime-control
+path is changed.
 
 ## Evidence shown
 
@@ -54,39 +58,38 @@ node, refresh control, and generated-demo disclosure mounted so focus and
 disclosure state remain stable. Locking and navigation still clear private
 report data.
 
-## Current connection status and future contract
+## Connection status and contract
 
-No runtime report endpoint is connected. The page makes no request, does not
-poll, and does not read a worker file or checkpoint directory. Its main panel
-therefore reports unavailable data. The collapsed generated example is
-synthetic, visibly labelled, and is not production telemetry. There are no
-start, stop, trade, or authorization controls and no unauthenticated route was
-added.
+The memecoin connector uses the existing authenticated report route on explicit
+manual refresh; its route implementation does not prove deployment or report
+availability. The BTC/EUR card also makes only an explicit manual GET through
+`appAccess`. It shows a completed report snapshot, not worker liveness, and its
+generated preview explicitly says it is not connected live data.
 
-`createPaperCockpitAdapter({readReport})` is the explicit injection boundary.
-A future connector must be supplied by a separately reviewed owner and must:
+The BTC/EUR endpoint is not available by default. It requires the separate
+spot-report migration, deployment verification, an approved report transfer,
+and explicit `MERIDIAN_SPOT_PAPER_REPORT_ENABLED`,
+`MERIDIAN_SPOT_PAPER_REPORT_DEPLOYMENT_VERIFIED`, and
+`MERIDIAN_SPOT_PAPER_REPORT_UPLOAD_APPROVED` gates. The upload route requires a
+dedicated upload token; the browser GET uses the existing read token. This
+change does not configure or deploy any of these.
 
-1. Read a bounded `MEMECOIN_PAPER_OPERATOR_REPORT_V1` DTO through an
-   authenticated, read-only application boundary; never expose worker
-   filesystem paths to the browser.
-2. Preserve report identity, mode/provenance, run window, status, evidence
-   timestamps, coverage/truncation, exact amount strings, and unavailable
-   values without deriving missing counts, fills, marks, or PnL.
-3. Keep `CALLER_LABEL_ONLY_NOT_AUTHENTICATED` and durability limits visible;
-   a report projection or non-terminal lock cannot establish source
-   authenticity, durable storage, or current liveness.
-4. Define an explicit observation freshness policy before supplying a
-   display-only stale threshold. The UI must not poll until a real, authorized
-   read endpoint and its request lifecycle are reviewed.
+The repository includes the first-run reconciliation summary and separate
+signal-replay JSON, but not the retained terminal readback, provenance, or paper
+assessment payload. Therefore no verified terminal report DTO can be generated
+from the checked-in material. Unknown or absent amounts remain UNKNOWN; the
+fixture preview does not use or invent historical run values.
 
-The injection callback is an interface contract, not a proof of read-only
-behavior. No live data, worker availability, Northflank connection, or
-production telemetry is claimed by this package.
+The spot adapter accepts only the versioned BTC/EUR schema and pins run,
+source, workflow, and profile identity. It preserves exact cent strings and
+keeps the original assessment's `signalReplay: NOT_PERFORMED` distinct from the
+separate replay result. Neither reports profitability, strategy quality, or a
+current running worker.
 
 ## Focused verification
 
 ```sh
-node --test test/v11-paper-cockpit.test.js test/v11-module-cache-identity.test.js
+node --test test/v11-paper-cockpit.test.js test/v11-spot-paper-cockpit.test.js test/spot-paper-report-bridge.test.js test/spot-paper-report-gateway.test.js test/v11-module-cache-identity.test.js
 ```
 
 The tests use only generated report-shaped objects. They do not access a

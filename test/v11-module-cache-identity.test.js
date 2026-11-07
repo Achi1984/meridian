@@ -6,6 +6,7 @@ import {test} from 'node:test';
 const v11Root=new URL('../v11/',import.meta.url);
 const indexUrl=new URL('index.html',v11Root);
 const bridgeRoot=new URL('../scripts/memecoin-paper-report-bridge/',v11Root);
+const spotBridgeRoot=new URL('../scripts/spot-paper-report-bridge/',v11Root);
 const CACHE_ID='?v=B16-M11-FIX12';
 const diskPath=url=>fileURLToPath(new URL(url.pathname,url));
 const readModule=url=>readFileSync(diskPath(url),'utf8');
@@ -20,6 +21,7 @@ const expectedModules=[
   'depot-current-model.js','depot-history-model.js','depot-history-view.js','depot-portfolio-state.js','depot-read-bootstrap.js',
   'depot-read-client.js','depot-read-model.js','depot-read-view.js',
   'ledger-manual-client.js','ledger-manual-model.js','ledger-manual-view.js','ledger-review-client.js','ledger-review-model.js','ledger-review-view.js','paper-cockpit-controller.js','paper-cockpit-model.js','paper-cockpit-view.js','paper-readiness-view.js','paper-readiness.js','paper-report-connector.js','pionex-history-model.js','release-update.js','research-evidence.js',
+  'spot-paper-cockpit-controller.js','spot-paper-cockpit-model.js','spot-paper-cockpit-view.js','spot-paper-report-connector.js',
   'strategy-arena.js','strategy-catalog.js','strategy-workspace-bootstrap.js'
 ];
 
@@ -38,6 +40,10 @@ function scanGraph(entries,{root=v11Root,read=readModule,fileExists=exists,impor
       const name=`bridge:${url.pathname.slice(bridgeRoot.pathname.length)}`;
       if(!identities.has(name))identities.set(name,new Set());
       identities.get(name).add(href);
+    }else if(url.pathname.startsWith(spotBridgeRoot.pathname)){
+      const name=`spot-bridge:${url.pathname.slice(spotBridgeRoot.pathname.length)}`;
+      if(!identities.has(name))identities.set(name,new Set());
+      identities.get(name).add(href);
     }
     for(const specifier of specifiers(read(url))){
       let target=new URL(specifier,url);
@@ -50,6 +56,10 @@ function scanGraph(entries,{root=v11Root,read=readModule,fileExists=exists,impor
         if(target.pathname.startsWith(bridgeRoot.pathname)){
           assert.equal(target.search,CACHE_ID,`report bridge module must use ${CACHE_ID}`);
           external.add(`../scripts/memecoin-paper-report-bridge/${target.pathname.slice(bridgeRoot.pathname.length)}${target.search}`);
+          visit(target);
+        }else if(target.pathname.startsWith(spotBridgeRoot.pathname)){
+          assert.equal(target.search,CACHE_ID,`spot-paper bridge module must use ${CACHE_ID}`);
+          external.add(`../scripts/spot-paper-report-bridge/${target.pathname.slice(spotBridgeRoot.pathname.length)}${target.search}`);
           visit(target);
         }else external.add(specifier);
         continue;
@@ -88,6 +98,7 @@ test('served M11 and Paper bridge module graph shares one versioned identity',()
     '../ledger-manual-snapshot.js','../portfolio-data-contract.js','../public/js/m11-agent-status.js',
     '../research/strategy-paper-arena.js','../scripts/memecoin-paper-report-bridge/contract.mjs?v=B16-M11-FIX12',
     '../scripts/memecoin-paper-report-bridge/index.mjs?v=B16-M11-FIX12',
+    '../scripts/spot-paper-report-bridge/contract.mjs?v=B16-M11-FIX12',
     '../v8-clean/live-price-core-r18.js'
   ]);
   assert.ok(graph.references.get('app-access.js')>=4,'status shares the existing central access module');

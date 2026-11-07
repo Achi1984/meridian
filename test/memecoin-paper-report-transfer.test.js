@@ -1653,7 +1653,7 @@ test("gateway route is fixed, upload precedes the read guard, and existing route
   assert.match(reportRoutes, /pathname === "\/api\/private\/paper-report\/upload"/);
   assert.match(reportRoutes, /pathname === "\/api\/private\/paper-report"/);
   assert.match(reportRoutes, /authorizedRead\(req\)/);
-  assert.doesNotMatch(source, /paper-report/);
+  assert.match(source, /handleSpotPaperReportGatewayRequest\(req/);
   for (const route of [
     "/api/private/dashboard",
     "/api/private/paper-execution-audit-v2",
