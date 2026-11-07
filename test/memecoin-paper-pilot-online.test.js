@@ -134,9 +134,16 @@ test("bounded online composition produces only a receipt-bound no-entry report",
   assert.equal(report.observationAudit.state, "TERMINAL");
   assert.equal(report.report.trading.status, "NO_ENTRY_OBSERVED");
   assert.equal(report.observation.filterOutcomes.UNKNOWN, 1);
+  assert.equal(report.observation.failureCode, null);
   assert.equal(report.observation.entryAuthorizations, 0);
+  assert.equal(report.observationAudit.terminal.failureCode, null);
   assert.equal(report.observationAudit.summary.candidates.filterOutcomes.UNKNOWN, 1);
   assert.equal(report.observationAudit.records.providerRequests[0].status, "RECEIVED");
+  const persistedTerminal = JSON.parse(await readFile(
+    path.join(harness.dataDirectory, "terminal.json"), "utf8"
+  ));
+  assert.equal(persistedTerminal.failureCode, null);
+  assert.equal(persistedTerminal.observation.failureCode, null);
   assert.match(report.text, /Bounded observation audit/);
   assert.match(report.text, /Observation only/);
   assert.match(report.text, /Executable quote and validated cost evidence: UNAVAILABLE/);
@@ -145,18 +152,144 @@ test("bounded online composition produces only a receipt-bound no-entry report",
   assert.equal(checkpoint.records.at(-1).method, "finishRun");
 });
 
-test("audit terminal preserves a controller failure code omitted from local failure state", async t => {
+test("controller failure status and code reconcile across terminal evidence", async t => {
   const harness = await createHarness(t, {
     fakeAssemblyOptions: {summaryFailureCode: "MONOTONIC_CLOCK_INVALID"}
   });
+  const createControl = harness.assembly.createPilotRunControl;
+  harness.assembly.createPilotRunControl = options => {
+    const control = createControl(options);
+    return {
+      ...control,
+      async start() {
+        return {...await control.start(), status: "UNKNOWN"};
+      }
+    };
+  };
+
+  const result = await harness.runner.start();
+  const audit = JSON.parse(await readFile(
+    path.join(harness.dataDirectory, "observation-audit.json"), "utf8"
+  ));
+  const terminal = JSON.parse(await readFile(
+    path.join(harness.dataDirectory, "terminal.json"), "utf8"
+  ));
+  const report = await readPilotReport(harness.dataDirectory);
+
+  assert.equal(result.status, "UNKNOWN");
+  assert.equal(terminal.controllerStatus, "UNKNOWN");
+  assert.equal(terminal.failureCode, "MONOTONIC_CLOCK_INVALID");
+  assert.equal(terminal.observation.failureCode, "MONOTONIC_CLOCK_INVALID");
+  assert.equal(report.observation.failureCode, "MONOTONIC_CLOCK_INVALID");
+  assert.equal(audit.terminal.controllerStatus, "UNKNOWN");
+  assert.equal(audit.terminal.runStatus, terminal.status);
+  assert.equal(audit.terminal.failureCode, terminal.failureCode);
+  assert.equal(audit.terminal.failureCode, "MONOTONIC_CLOCK_INVALID");
+});
+
+test("unavailable controller failure status remains UNKNOWN across terminal evidence", async t => {
+  const harness = await createHarness(t);
+  const createControl = harness.assembly.createPilotRunControl;
+  harness.assembly.createPilotRunControl = options => {
+    const control = createControl(options);
+    return {
+      ...control,
+      async start() {
+        const summary = await control.start();
+        return {...summary, status: "UNKNOWN", failureCode: undefined};
+      }
+    };
+  };
 
   const terminal = await harness.runner.start();
+  const report = await readPilotReport(harness.dataDirectory);
   const audit = JSON.parse(await readFile(
     path.join(harness.dataDirectory, "observation-audit.json"), "utf8"
   ));
 
-  assert.equal(terminal.observation.failureCode, "MONOTONIC_CLOCK_INVALID");
-  assert.equal(audit.terminal.failureCode, "MONOTONIC_CLOCK_INVALID");
+  assert.equal(terminal.status, "UNKNOWN");
+  assert.equal(terminal.failureCode, "UNKNOWN");
+  assert.equal(terminal.observation.failureCode, "UNKNOWN");
+  assert.equal(report.observation.failureCode, "UNKNOWN");
+  assert.equal(audit.terminal.failureCode, "UNKNOWN");
+});
+
+test("missing terminal failure evidence is unavailable rather than null", async t => {
+  const harness = await createHarness(t);
+  assert.equal((await harness.runner.start()).status, "FINISHED");
+  const terminalPath = path.join(harness.dataDirectory, "terminal.json");
+  const terminal = JSON.parse(await readFile(terminalPath, "utf8"));
+  delete terminal.failureCode;
+  await writeFile(terminalPath, canonicalJson(terminal));
+
+  const status = await readPilotStatus(harness.dataDirectory);
+  const report = await readPilotReport(harness.dataDirectory);
+  assert.equal(status.status, "UNKNOWN");
+  assert.equal(status.failureCode, "UNKNOWN");
+  assert.equal(report.status, "UNKNOWN");
+});
+
+test("conflicting terminal and observation failure codes are unavailable", async t => {
+  const harness = await createHarness(t, {
+    fakeAssemblyOptions: {summaryFailureCode: "MONOTONIC_CLOCK_INVALID"}
+  });
+  assert.equal((await harness.runner.start()).status, "UNKNOWN");
+  const terminalPath = path.join(harness.dataDirectory, "terminal.json");
+  const terminal = JSON.parse(await readFile(terminalPath, "utf8"));
+  terminal.observation.failureCode = "CONTROLLER_REPORT_CALLBACK_MISSING";
+  await writeFile(terminalPath, canonicalJson(terminal));
+
+  const status = await readPilotStatus(harness.dataDirectory);
+  const report = await readPilotReport(harness.dataDirectory);
+  assert.equal(status.status, "UNKNOWN");
+  assert.equal(status.failureCode, "UNKNOWN");
+  assert.equal(report.status, "UNKNOWN");
+});
+
+test("literal UNKNOWN report and audit cannot conceal invalid raw terminal failure evidence", async t => {
+  const harness = await createHarness(t, {
+    fakeAssemblyOptions: {summaryFailureCode: "UNKNOWN"}
+  });
+  assert.equal((await harness.runner.start()).status, "UNKNOWN");
+  assert.equal((await readPilotReport(harness.dataDirectory)).status, "AVAILABLE");
+  const terminalPath = path.join(harness.dataDirectory, "terminal.json");
+  const persisted = JSON.parse(await readFile(terminalPath, "utf8"));
+  for (const field of ["top", "observation"]) {
+    for (const value of [undefined, null, "MONOTONIC_CLOCK_INVALID", "bad text", {}, "x".repeat(49)]) {
+      const terminal = structuredClone(persisted);
+      const record = field === "top" ? terminal : terminal.observation;
+      if (value === undefined) delete record.failureCode;
+      else record.failureCode = value;
+      await writeFile(terminalPath, canonicalJson(terminal));
+
+      const status = await readPilotStatus(harness.dataDirectory);
+      assert.equal(status.status, "UNKNOWN");
+      assert.equal(status.failureCode, "UNKNOWN");
+      assert.match(status.reason, /terminal failure evidence/);
+      assert.equal((await readPilotReport(harness.dataDirectory)).status, "UNKNOWN");
+    }
+  }
+  const terminal = structuredClone(persisted);
+  delete terminal.failureCode;
+  delete terminal.observation.failureCode;
+  await writeFile(terminalPath, canonicalJson(terminal));
+  assert.match((await readPilotStatus(harness.dataDirectory)).reason, /terminal failure evidence/);
+  assert.equal((await readPilotReport(harness.dataDirectory)).status, "UNKNOWN");
+});
+
+test("operator report failure code must match persisted terminal evidence", async t => {
+  const harness = await createHarness(t, {
+    fakeAssemblyOptions: {summaryFailureCode: "MONOTONIC_CLOCK_INVALID"}
+  });
+  assert.equal((await harness.runner.start()).status, "UNKNOWN");
+  const reportPath = path.join(harness.dataDirectory, "operator-report.json");
+  const persisted = JSON.parse(await readFile(reportPath, "utf8"));
+  persisted.observation.failureCode = null;
+  await writeFile(reportPath, canonicalJson(persisted));
+
+  const report = await readPilotReport(harness.dataDirectory);
+  assert.equal(report.status, "UNKNOWN");
+  assert.match(report.reason, /provenance and identity contract/);
 });
 
 test("generated 159-candidate observation persists every blocked reason without ledger entries", async t => {
@@ -332,6 +465,96 @@ test("audit persistence failure is reported as UNKNOWN and does not claim succes
   assert.equal((await readPilotReport(harness.dataDirectory)).status, "UNKNOWN");
 });
 
+test("late audit persistence failure replaces UNKNOWN evidence and invalidates report availability", async t => {
+  let auditPath;
+  const harness = await createHarness(t, {
+    fakeAssemblyOptions: {
+      summaryFailureCode: "UNKNOWN",
+      onReportInput() {
+        unlinkSync(auditPath);
+        mkdirSync(auditPath);
+      }
+    }
+  });
+  auditPath = path.join(harness.dataDirectory, "observation-audit.json");
+
+  const result = await harness.runner.start();
+  const persisted = JSON.parse(await readFile(path.join(harness.dataDirectory, "terminal.json"), "utf8"));
+  const reportRecord = JSON.parse(await readFile(
+    path.join(harness.dataDirectory, "operator-report.json"), "utf8"
+  ));
+  const report = await readPilotReport(harness.dataDirectory);
+
+  assert.equal(result.status, "UNKNOWN");
+  assert.equal(result.failureCode, "OBSERVATION_AUDIT_WRITE_FAILED");
+  assert.equal(persisted.failureCode, "OBSERVATION_AUDIT_WRITE_FAILED");
+  assert.equal(persisted.observation.failureCode, "OBSERVATION_AUDIT_WRITE_FAILED");
+  assert.equal(persisted.observationAuditStatus, "FAILED");
+  assert.equal(persisted.observationAuditFailureCode, "OBSERVATION_AUDIT_WRITE_FAILED");
+  assert.equal(persisted.reportStatus, "UNKNOWN");
+  assert.equal(reportRecord.observation.failureCode, "UNKNOWN");
+  assert.equal(report.status, "UNKNOWN");
+});
+
+test("caught filesystem persistence code replaces UNKNOWN failure evidence consistently", async t => {
+  let reportPath;
+  const harness = await createHarness(t, {
+    fakeAssemblyOptions: {
+      summaryFailureCode: "UNKNOWN",
+      onReportInput() {
+        mkdirSync(reportPath);
+      }
+    }
+  });
+  reportPath = path.join(harness.dataDirectory, "operator-report.json");
+
+  const terminal = await harness.runner.start();
+  const persisted = JSON.parse(await readFile(path.join(harness.dataDirectory, "terminal.json"), "utf8"));
+  const audit = JSON.parse(await readFile(path.join(harness.dataDirectory, "observation-audit.json"), "utf8"));
+  assert.equal(terminal.failureCode, "EISDIR");
+  assert.equal(persisted.failureCode, "EISDIR");
+  assert.equal(persisted.observation.failureCode, "EISDIR");
+  assert.equal(audit.terminal.failureCode, "EISDIR");
+});
+
+test("caught persistence code preserves an earlier concrete failure code", async t => {
+  const harness = await createHarness(t, {
+    fakeAssemblyOptions: {
+      summaryFailureCode: "EARLIER_CONTROLLER_FAILURE",
+      onReportInput() {
+        throw Object.assign(new Error("report persistence failed"), {code: "EIO"});
+      }
+    }
+  });
+
+  const terminal = await harness.runner.start();
+  const persisted = JSON.parse(await readFile(path.join(harness.dataDirectory, "terminal.json"), "utf8"));
+  const audit = JSON.parse(await readFile(path.join(harness.dataDirectory, "observation-audit.json"), "utf8"));
+  assert.equal(terminal.failureCode, "EARLIER_CONTROLLER_FAILURE");
+  assert.equal(persisted.failureCode, "EARLIER_CONTROLLER_FAILURE");
+  assert.equal(persisted.observation.failureCode, "EARLIER_CONTROLLER_FAILURE");
+  assert.equal(audit.terminal.failureCode, "EARLIER_CONTROLLER_FAILURE");
+});
+
+test("invalid caught persistence code cannot replace UNKNOWN failure evidence", async t => {
+  const harness = await createHarness(t, {
+    fakeAssemblyOptions: {
+      summaryFailureCode: "UNKNOWN",
+      onReportInput() {
+        throw Object.assign(new Error("report persistence failed"), {code: "EIO https://hostile.example"});
+      }
+    }
+  });
+
+  const terminal = await harness.runner.start();
+  const persisted = JSON.parse(await readFile(path.join(harness.dataDirectory, "terminal.json"), "utf8"));
+  const audit = JSON.parse(await readFile(path.join(harness.dataDirectory, "observation-audit.json"), "utf8"));
+  assert.equal(terminal.failureCode, "UNKNOWN");
+  assert.equal(persisted.failureCode, "UNKNOWN");
+  assert.equal(persisted.observation.failureCode, "UNKNOWN");
+  assert.equal(audit.terminal.failureCode, "UNKNOWN");
+});
+
 test("failed terminal audit update exposes an earlier snapshot as incomplete, never audit-only success", async t => {
   const harness = await createHarness(t);
   assert.equal((await harness.runner.start()).status, "FINISHED");
@@ -343,6 +566,7 @@ test("failed terminal audit update exposes an earlier snapshot as incomplete, ne
   audit.terminal = null;
   terminal.status = "UNKNOWN";
   terminal.failureCode = "OBSERVATION_AUDIT_WRITE_FAILED";
+  terminal.observation.failureCode = "OBSERVATION_AUDIT_WRITE_FAILED";
   terminal.observationAuditStatus = "FAILED";
   terminal.observationAuditFailureCode = "OBSERVATION_AUDIT_WRITE_FAILED";
   await writeFile(auditPath, canonicalJson(audit));
@@ -425,6 +649,9 @@ test("persisted terminal audits must match durable terminal state", async t => {
     },
     audit => {
       audit.terminal.runStatus = "UNKNOWN";
+    },
+    audit => {
+      audit.terminal.failureCode = "UNKNOWN";
     }
   ]) {
     const harness = await createHarness(t);

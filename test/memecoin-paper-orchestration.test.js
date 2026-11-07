@@ -68,14 +68,15 @@ test("Vienna 2999/3000-cent gate revokes a reservation and survives reopen", asy
   assert.deepEqual(await run(dir, "vienna-daily-gate"), report);
 });
 
-test("manual exact eight-hour finish succeeds, a new command 1 ms late is guarded", async t => {
+test("manual exact finish and a late command produce one terminal accounting event", async t => {
   const exact = await run(await directory(t));
   const lateDir = await directory(t);
   const late = await run(lateDir, "manual-late");
   assert.equal(named(exact, "boundary").status, "FINISHED");
-  assert.equal(named(late, "boundary").status, "INVALID_RUN_WINDOW");
+  assert.equal(named(late, "boundary").status, "FINISHED");
   assert.equal(named(late, "boundary").entriesAllowed, false);
   assert.equal(late.snapshot.summary.cashCents, exact.snapshot.summary.cashCents);
+  assert.equal(late.snapshot.auditEvents.filter(event => event.type === "RUN_FINISHED").length, 1);
   assert.deepEqual(await run(lateDir, "manual-late"), late);
 });
 

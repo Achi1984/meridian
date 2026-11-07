@@ -238,7 +238,7 @@ test("journaled riskSnapshot restores the fixed 2999/3000-cent gate and rejected
   await resumed.close();
 });
 
-test("fixed start and eight-hour deadline are replayed and enforced on invocation", async t => {
+test("fixed deadline allows one terminal finish and replays its terminal latch", async t => {
   const directory = await tempDirectory(t);
   const {session} = await openSession(directory);
   const finished = await session.finishRun("finish-at-deadline", {
@@ -250,7 +250,9 @@ test("fixed start and eight-hour deadline are replayed and enforced on invocatio
     now: START + EIGHT_HOURS + 1,
     marks: []
   });
-  assert.equal(late.status, "INVALID_RUN_WINDOW");
+  assert.equal(late.status, "REJECT");
+  assert.equal(late.reason, "run already finished");
+  assert.equal(session.snapshot().auditEvents.filter(event => event.type === "RUN_FINISHED").length, 1);
   await session.close();
 
   const resumed = await openSession(directory);
@@ -258,7 +260,9 @@ test("fixed start and eight-hour deadline are replayed and enforced on invocatio
     now: START + EIGHT_HOURS + 2,
     marks: []
   });
-  assert.equal(lateSnapshot.status, "INVALID_RUN_WINDOW");
+  assert.equal(lateSnapshot.status, "REJECT");
+  assert.equal(lateSnapshot.reason, "run already finished");
+  assert.equal(resumed.session.snapshot().auditEvents.filter(event => event.type === "RUN_FINISHED").length, 1);
   await resumed.session.close();
 
   const mismatchedStore = await CheckpointStore.open(directory);
@@ -267,6 +271,40 @@ test("fixed start and eight-hour deadline are replayed and enforced on invocatio
     runId: "checkpoint-test",
     startedAt: START + 1
   }), {code: "CHECKPOINT_INCOMPATIBLE"});
+});
+
+test("delayed finish persists actual time and replay cannot account for it twice", async t => {
+  const directory = await tempDirectory(t);
+  const {session, store} = await openSession(directory);
+  const finishedAt = START + EIGHT_HOURS + 60_000;
+  const input = {now: finishedAt, marks: []};
+  const result = await session.finishRun("delayed-finish", input);
+  assert.equal(result.status, "FINISHED");
+  assert.equal(result.elapsedMs, EIGHT_HOURS + 60_000);
+  assert.equal(session.snapshot().auditEvents.filter(event => event.type === "RUN_FINISHED").length, 1);
+
+  const readback = await store.readCheckpoint();
+  assert.equal(readback.status, "OK");
+  assert.equal(createHash("sha256").update(readback.bytes).digest("hex"), session.metadata.hash);
+  const checkpoint = JSON.parse(readback.bytes);
+  const record = checkpoint.records.at(-1);
+  assert.equal(record.method, "finishRun");
+  assert.equal(record.inputs.now, finishedAt);
+  assert.equal(record.runStart, START);
+  await session.close();
+
+  const reopened = await openSession(directory);
+  const sequence = reopened.session.metadata.sequence;
+  assert.deepEqual(await reopened.session.finishRun("delayed-finish", input), result);
+  assert.equal(reopened.session.metadata.sequence, sequence);
+  const repeated = await reopened.session.finishRun("second-finish", {
+    now: finishedAt + 1000,
+    marks: []
+  });
+  assert.equal(repeated.status, "REJECT");
+  assert.equal(repeated.reason, "run already finished");
+  assert.equal(reopened.session.snapshot().auditEvents.filter(event => event.type === "RUN_FINISHED").length, 1);
+  await reopened.session.close();
 });
 
 test("pre-publication failure keeps the old checkpoint and requires explicit reopen", async t => {
@@ -368,6 +406,92 @@ test("child crashes distinguish unpublished data from ambiguous publication", as
     }
     await store.close();
   }
+});
+
+test("paper fill resumes after process interruption without booking the event twice", {timeout: 10_000}, async t => {
+  const candidate = candidateFor("So11111111111111111111111111111111111111112", START);
+  const authorization = authorizeInput(candidate, START);
+  const quote = {
+    ...entryQuote(candidate, START + 2000),
+    costs: {...ZERO_COSTS, feeCents: 7, spreadCents: 3, slippageCents: 2}
+  };
+  const fillInputs = {
+    authorizationId: authorization.authorizationId,
+    quote,
+    now: START + 2000,
+    marks: []
+  };
+  const payload = JSON.stringify({
+    runId: "checkpoint-test",
+    startedAt: START,
+    authorization,
+    fill: fillInputs
+  });
+
+  const uninterruptedDirectory = await tempDirectory(t);
+  const uninterrupted = await openSession(uninterruptedDirectory);
+  assert.equal((await uninterrupted.session.authorizeEntry("authorize-1", authorization)).status, "AUTHORIZED");
+  const uninterruptedFill = await uninterrupted.session.executeEntry("fill-1", fillInputs);
+  assert.equal(uninterruptedFill.status, "FILLED_PAPER");
+  const uninterruptedSnapshot = uninterrupted.session.snapshot();
+  await uninterrupted.session.close();
+
+  const interruptedDirectory = await tempDirectory(t);
+  const child = spawn(process.execPath, [CHILD_FIXTURE, interruptedDirectory, "execute-and-hold", payload], {
+    stdio: ["ignore", "ignore", "pipe", "ipc"]
+  });
+  let childStderr = "";
+  child.stderr.setEncoding("utf8").on("data", chunk => { childStderr += chunk; });
+  const exited = once(child, "exit");
+  t.after(async () => {
+    if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+    await exited.catch(() => {});
+  });
+  const childResult = await Promise.race([
+    once(child, "message").then(([value]) => value),
+    exited.then(([code, signal]) => {
+      throw new Error(`fill process exited before durable completion: ${code ?? signal}\n${childStderr}`);
+    })
+  ]);
+  assert.equal(childResult.authorizationStatus, "AUTHORIZED");
+  assert.deepEqual(childResult.fillResult, uninterruptedFill);
+  assert.equal(child.kill("SIGKILL"), true);
+  assert.deepEqual(await exited, [null, "SIGKILL"]);
+  await rm(path.join(interruptedDirectory, ".checkpoint-lock"));
+
+  const resumedStore = await CheckpointStore.open(interruptedDirectory);
+  const resumed = await PaperCheckpointSession.open({store: resumedStore});
+  const resumedBeforeRetry = resumed.snapshot();
+  const ledgerEvidence = snapshot => ({
+    cashCents: snapshot.summary.cashCents,
+    positions: snapshot.summary.openPositions.map(position => ({
+      mint: position.mint,
+      tokenAtoms: position.tokenAtoms
+    })),
+    entryFeesCents: snapshot.summary.costs.entry.feeCents,
+    executionIds: snapshot.auditEvents
+      .filter(event => event.type === "PAPER_FILL")
+      .map(event => event.eventId)
+  });
+  assert.deepEqual(ledgerEvidence(resumedBeforeRetry), ledgerEvidence(uninterruptedSnapshot));
+  assert.equal(resumedBeforeRetry.summary.costs.entry.feeCents, "7");
+  assert.deepEqual(ledgerEvidence(resumedBeforeRetry).executionIds, [quote.eventId]);
+
+  assert.deepEqual(await resumed.executeEntry("retry-after-resume", fillInputs), uninterruptedFill);
+  assert.deepEqual(resumed.snapshot(), resumedBeforeRetry);
+  assert.equal(resumed.snapshot().auditEvents.filter(event => event.type === "PAPER_FILL").length, 1);
+  await resumed.close();
+
+  const incompleteDirectory = await tempDirectory(t);
+  const incompleteChild = spawn(process.execPath, [
+    CHILD_FIXTURE, incompleteDirectory, "execute-before-ack", payload
+  ], {stdio: "ignore"});
+  const [incompleteCode] = await once(incompleteChild, "exit");
+  assert.equal(incompleteCode, 74);
+  await rm(path.join(incompleteDirectory, ".checkpoint-lock"));
+  const incompleteStore = await CheckpointStore.open(incompleteDirectory);
+  assert.equal((await incompleteStore.reconcilePending()).status, "UNKNOWN");
+  await assert.rejects(PaperCheckpointSession.open({store: incompleteStore}), {code: "CHECKPOINT_UNKNOWN"});
 });
 
 

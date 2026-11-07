@@ -1,4 +1,6 @@
-> **Current routing and review rule — owner decision 2026-10-23**
+> **Source reviews from 2026-11-06.** The lead requests an independent GitHub review agent who did not write the branch. Apply the current [source review protocol](MERIDIAN_CROSS_MODEL_PROTOCOL.md) and [owner decision](https://github.com/Achi1984/meridian/issues/942#issuecomment-6694067544). Earlier Claude review instructions below describe the previous route.
+
+> **Historical routing and review rule — owner decision 2026-10-23**
 > Resolve `mailboxIssue` from the live `MERIDIAN_LIVE_CHECKPOINT.json` before posting.
 > This reviewed rollover candidate selects #942, predecessor #639, watchdog status
 > comment6371625947, threshold200. Before merge the live checkpoint still selects #639;
@@ -264,7 +266,7 @@ The repository enforces this with `scripts/release-coordinator.mjs`, the Release
 
 - UI/presentation terminal releases have no daily count cap. Additional same-day UI releases do not require a cadence-specific exception.
 - The Project Owner explicitly removed the one-UI-release-per-day limit on 2026-10-11 at 20:47:32 Vienna: "Wir werden die Grenze 1UI Veröffentlichen aufheben" (mailbox #571 comment 6112437050). This removes only the daily cap and its same-day exception gate; it grants no additional merge, deployment or execution authority.
-- Every UI release still requires Project Owner approval under the applicable policy, all normal exact-head CI, independent Claude review, expected-head merge protection and Single-Writer safeguards. Required post-merge checks must succeed before dependent work continues.
+- Every UI release still requires Project Owner approval under the applicable policy, all normal exact-head CI, independent GitHub source review, expected-head merge protection and Single-Writer safeguards. Required post-merge checks must succeed before dependent work continues.
 - Before every `@claude` request, check the authoritative mailbox for the same Request-ID + exact head. If an unanswered matching request exists, do not repost. If a matching response exists, do not repost.
 - Any change to autonomy rules, release cadence, watchdog/workflow behavior, scheduler behavior or 24/7 operating rules requires `CROSS_MODEL_STATUS NEEDS_USER_DECISION @Achi1984` plus an explicit user answer before merge. Post-hoc authorization is invalid.
 - Current 24/7 MERIDIAN operation is explicitly user-authorized. Quota control comes from state-change detection, deduplication and staggered scheduling, not quiet hours.

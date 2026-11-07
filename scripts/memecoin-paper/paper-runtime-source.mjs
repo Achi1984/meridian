@@ -1,0 +1,1229 @@
+import {createHash} from "node:crypto";
+import {canonicalCheckpointBytes} from "./checkpoint-store.mjs";
+import {
+  copyModeledPolicy, createFixtureMarketQuoteAdapter, createMarketQuoteAdapter,
+  reviewScenarioConfigSha256
+} from "./market-quote-adapter.mjs";
+import {SYNTHETIC_MINT, SYNTHETIC_POOL, SYNTHETIC_QUOTE} from "./synthetic-fixtures.mjs";
+
+const MODELED_FIXTURE_USD_ASSUMPTION =
+  "1_USDC_EQUALS_1_MODELED_USD_UNSUPPORTED_BY_MARKET_ACCOUNTING_ASSUMPTION; NOT_OBSERVED_FX; NOT_DEPEG_PROTECTION";
+
+function fixtureScenario(now) {
+  const config = {
+    optIn: true,
+    scenarioId: "MERIDIAN_PAPER_QUOTED_NET_V1",
+    scenarioVersion: "1",
+    scenario: "QUOTED_NET_V1",
+    identity: {chainId: "solana", mint: SYNTHETIC_MINT, pool: SYNTHETIC_POOL, quote: SYNTHETIC_QUOTE, decimals: 6},
+    usdcMint: SYNTHETIC_QUOTE,
+    usdcDecimals: 6,
+    usdcUsdMicrosPerToken: "1000000",
+    quoteBasis: "QUOTED_ROUTE_AMOUNTS_AS_MODELED_NET_SWAP_BASIS",
+    adverseAdjustmentBps: 300,
+    networkReserveCents: "50",
+    feeCents: "0",
+    spreadCents: "0",
+    priceImpactCents: "0",
+    zeroChargeDisposition: "NO_INCREMENTAL_CHARGE_UNDER_SCENARIO_BASIS"
+  };
+  const sha = reviewScenarioConfigSha256(config);
+  return {
+    sha,
+    config: {
+      ...config,
+      reviewEvidence: {
+        evidenceId: "synthetic-fixture-scenario-review",
+        evidenceSha256: "a".repeat(64),
+        scenarioConfigSha256: sha,
+        identity: {...config.identity},
+        reviewerRef: "synthetic-fixture-asserted-reviewer",
+        purpose: "OFFLINE_SCENARIO_REVIEW_ONLY",
+        decision: "APPROVE_SCENARIO_REVIEW_ONLY",
+        recordedAt: now
+      }
+    }
+  };
+}
+
+// Fixture-only host: the adapter's clock is bound once at construction to the module synthetic
+// clock; the transport slot is filled by the acquisition that owns the synthetic response.
+function createModeledHost(policy, clock) {
+  const host = {policy, requests: 0, transport: null, scenarioSha: fixtureScenario(0).sha};
+  host.adapter = createFixtureMarketQuoteAdapter({
+    clock: () => {
+      clock.advance(host.requests > 0 ? 2_000 : 1);
+      return clock.wallClock();
+    },
+    transport: (...args) => host.transport(...args),
+    timeoutMs: 1_000,
+    maxRequests: 100
+  });
+  return host;
+}
+import {
+  createPaperSourcePipeline,
+  PAPER_SOURCE_PIPELINE_VERSION
+} from "./paper-source-pipeline.mjs";
+
+const PAPER_SOURCE_POLICY = Object.freeze({
+  schemaVersion: "memecoin-paper-source-policy/v1",
+  enabled: false,
+  providers: Object.freeze([
+    Object.freeze({
+      name: "DexScreener public API",
+      origin: "https://api.dexscreener.com",
+      methods: Object.freeze(["GET /latest/dex/pairs/solana/{pool}"]),
+      approved: false
+    }),
+    Object.freeze({
+      name: "Solana mainnet public JSON-RPC",
+      origin: "https://api.mainnet-beta.solana.com",
+      methods: Object.freeze([
+        "getAccountInfo", "getBlocks", "getBlockTime", "getProgramAccounts",
+        "getSignaturesForAddress", "getSlot", "getTokenLargestAccounts",
+        "getTokenSupply", "getTransaction"
+      ]),
+      approved: false
+    }),
+    Object.freeze({
+      name: "Jupiter Swap API V2",
+      origin: "https://api.jup.ag",
+      methods: Object.freeze(["GET /swap/v2/order"]),
+      approved: false
+    })
+  ]),
+  missingRequirements: Object.freeze([
+    "provider authenticity and source-time attestation",
+    "complete historical archive and evidence census",
+    "reviewed LP, developer, rug, bundled-supply, and wallet policies",
+    "source-bound price and all five nonoverlapping USD cost components",
+    "independent approval of this exact provider policy"
+  ])
+});
+
+export const PAPER_RUNTIME_SOURCE_POLICY = PAPER_SOURCE_POLICY;
+export const PAPER_RUNTIME_SOURCE_POLICY_SHA256 = createHash("sha256")
+  .update(canonicalCheckpointBytes(PAPER_SOURCE_POLICY))
+  .digest("hex");
+
+const FIXTURE_COST_CONTRACT = Object.freeze({
+  version: "SYNTHETIC_FIXED_CENT_SCHEDULE_V1",
+  costs: Object.freeze({
+    feeCents: 1,
+    spreadCents: 1,
+    slippageCents: 1,
+    priceImpactCents: 1,
+    networkCents: 1
+  })
+});
+
+function hasDataMethod(value, name) {
+  let owner = value;
+  while (owner !== null && owner !== Object.prototype) {
+    const descriptor = Object.getOwnPropertyDescriptor(owner, name);
+    if (descriptor) return Object.hasOwn(descriptor, "value") &&
+      typeof descriptor.value === "function";
+    owner = Object.getPrototypeOf(owner);
+  }
+  return false;
+}
+
+function fixtureAddress(index) {
+  const alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+  const bytes = Buffer.alloc(32);
+  bytes.writeUInt32BE(index, 28);
+  let number = BigInt(`0x${bytes.toString("hex")}`);
+  let encoded = "";
+  while (number > 0n) {
+    const digit = Number(number % 58n);
+    number /= 58n;
+    encoded = alphabet[digit] + encoded;
+  }
+  return "1".repeat(32 - encoded.length) + encoded;
+}
+
+function reviewedFixtureEvidence(fixture, candidateT) {
+  const candidate = structuredClone(fixture.candidate);
+  const identity = {
+    chainId: candidate.chainId,
+    mint: candidate.mint,
+    pool: candidate.pool,
+    quote: candidate.quote
+  };
+  candidate.tokenSupplyAtoms = "1000000000";
+  candidate.evidence.tokenDecimals.coverage = {
+    complete: true,
+    amountAtoms: candidate.tokenSupplyAtoms,
+    mintAccountMatch: true,
+    accountSlot: 490_004
+  };
+  candidate.evidence.tokenDecimals.slot = 490_004;
+
+  const reviewed = (value, id, coverage = {complete: true}) => ({
+    value,
+    source: "SYNTHETIC_FIXTURE_ONLY",
+    sourceVersion: "synthetic-runtime-evidence-v1",
+    identity,
+    observedAt: candidateT,
+    slot: 490_004,
+    coverage,
+    review: {
+      status: "REVIEWED",
+      reviewerId: "synthetic-runtime-reviewer",
+      reviewId: `runtime-${id}`,
+      reviewedAt: candidateT - 1
+    }
+  });
+  const selectedPoolAccount = fixture.poolProof.baseVault;
+  const burnedAccount = fixture.poolProof.quoteVault;
+  const owners = Array.from({length: 50}, (_, index) => fixtureAddress(700_000 + index));
+  const accounts = [
+    {account: selectedPoolAccount, owner: selectedPoolAccount, amountAtoms: "100000000", classification: "selected_pool"},
+    {account: burnedAccount, owner: burnedAccount, amountAtoms: "100000000", classification: "burned_supply"},
+    ...owners.map(owner => ({
+      account: owner,
+      owner,
+      amountAtoms: "16000000",
+      classification: "holder"
+    }))
+  ];
+  return {
+    candidate,
+    evidence: {
+      lpProtection: reviewed({
+        pool: candidate.pool,
+        model: "burn",
+        burnEvidenceId: "synthetic-runtime-burn-proof"
+      }, "lp"),
+      ownerCensus: reviewed({
+        pool: candidate.pool,
+        supplyAtoms: candidate.tokenSupplyAtoms,
+        context: {
+          ...identity,
+          slot: 490_004,
+          observedAt: candidateT,
+          commitment: "finalized"
+        },
+        selectedPoolTokenAccounts: [selectedPoolAccount],
+        burnedTokenAccounts: [burnedAccount],
+        accounts
+      }, "owners", {
+        complete: true,
+        exclusions: ["selected_pool", "burned_supply"],
+        ownerResolutionComplete: true,
+        accountCoverageComplete: true,
+        supplyContextPolicy: "same-finalized-slot",
+        burnedSupplyAtoms: "100000000"
+      }),
+      developerAttribution: reviewed({
+        method: "documented",
+        developerOwners: [owners[0]],
+        evidenceIds: ["synthetic-developer-attribution"]
+      }, "developer"),
+      priorRug: reviewed({
+        found: false,
+        historyCoverage: "complete"
+      }, "rug"),
+      bundledLaunch: reviewed({
+        bundledSupplyAtoms: "50000000"
+      }, "bundle", {complete: true, bundleDetectionComplete: true})
+    }
+  };
+}
+
+
+// No exported issuer exists: candidates become module-issued only through a future
+// approved acquisition path, never through caller data.
+const ISSUED_RUNTIME_CANDIDATES = new WeakMap();
+
+export function isIssuedRuntimeCandidate(candidate) {
+  const issued = candidate !== null && typeof candidate === "object"
+    ? ISSUED_RUNTIME_CANDIDATES.get(candidate) : null;
+  return Boolean(issued) && ["chainId", "mint", "pool", "quote", "sampledAt"]
+    .every(key => candidate[key] === issued[key]);
+}
+
+export const PAPER_RUNTIME_EVIDENCE_REQUIREMENTS = Object.freeze([
+  "SOURCE_APPROVAL", "SOURCE_TIME", "COMPLETENESS", "REVIEWER_AUTHORITY", "COST_EVIDENCE"
+]);
+
+// Acceptance authority is an unresolved policy boundary: no module path may grant it,
+// so a non-synthetic evaluation never yields eligible candidates.
+export function resolveRuntimeCandidateArray(result, {synthetic = false} = {}) {
+  const refusals = PAPER_RUNTIME_EVIDENCE_REQUIREMENTS.map(requirement => ({
+    requirement,
+    status: "NOT_ACCEPTED",
+    reason: requirement === "REVIEWER_AUTHORITY" || requirement === "SOURCE_APPROVAL"
+      ? "ACCEPTANCE_AUTHORITY_UNRESOLVED" : "EVIDENCE_NOT_ACCEPTED"
+  }));
+  if (!synthetic) return {candidates: [], refusals};
+  const rows = Array.isArray(result) ? result
+    : result?.fixtureOnly === true && Array.isArray(result.candidates) ? result.candidates : null;
+  if (!rows || rows.some(row => row === null || typeof row !== "object" || Array.isArray(row))) {
+    return {candidates: [], refusals};
+  }
+  return {candidates: rows.slice(), refusals: []};
+}
+
+async function evaluateAcquiredEnvelope({
+  envelope,
+  identity,
+  pipeline,
+  evaluationRequest,
+  store,
+  clock,
+  signal,
+  remaining,
+  recordRequest,
+  recordWork,
+  deadlineAt,
+  budget
+}) {
+  const {createPaperProviderWarmupHandoff} = await import("./provider-warmup-handoff/index.mjs");
+  const candidateT = envelope?.request?.atMs;
+  const handoff = createPaperProviderWarmupHandoff({
+    enabled: true,
+    store,
+    datasetId: `paper-runtime-${candidateT}`,
+    runId: `paper-runtime-run-${candidateT}`,
+    identity,
+    clock: () => clock.wallClock(),
+    limits: {maxElapsedMs: Math.max(1, Math.min(10_000, remaining.timeMs))}
+  });
+  return handoff.runOffline({
+    observation: envelope.observation,
+    request: envelope.request,
+    pipeline,
+    evaluationRequest,
+    priceEndpoints: [{
+      mint: identity.mint,
+      atMs: candidateT,
+      denomination: "USD"
+    }],
+    signal,
+    remaining,
+    recordRequest,
+    recordWork,
+    deadlineAt,
+    budget
+  });
+}
+
+export async function acquireSyntheticRuntimeFixture(clock, {
+  signal,
+  remaining,
+  recordRequest,
+  recordWork,
+  waitForStop = false,
+  waitForQuoteSettle = false,
+  expireDuringRequest = false,
+  deadlineAt,
+  variant = "BASE",
+  budget,
+  acquiredEnvelope,
+  warmupStore,
+  modeledHost
+} = {}) {
+  if (!clock || typeof clock.wallClock !== "function" || typeof clock.advance !== "function") {
+    throw new TypeError("synthetic runtime fixture requires the module synthetic clock");
+  }
+  if (typeof recordRequest !== "function" || typeof recordWork !== "function") {
+    throw new TypeError("synthetic runtime fixture requires shared budget callbacks");
+  }
+  if (!remaining || !Number.isSafeInteger(remaining.requests) ||
+      !Number.isSafeInteger(remaining.bytes) || !Number.isSafeInteger(remaining.work) ||
+      !Number.isSafeInteger(remaining.timeMs) || !Number.isSafeInteger(deadlineAt)) {
+    throw new TypeError("synthetic runtime fixture requires shared remaining budgets");
+  }
+  if (!["BASE", "MISSING_QUOTE", "MISSING_COSTS", "WRONG_IDENTITY",
+    "FUTURE_EVIDENCE", "WRONG_QUOTE_IDENTITY"].includes(variant)) {
+    throw new TypeError("synthetic runtime fixture variant is unsupported");
+  }
+  let usedRequests = 0;
+  let usedBytes = 0;
+  let usedWork = 0;
+  const chargeWork = units => {
+    if (signal?.aborted || !Number.isSafeInteger(units) || units < 1 ||
+        usedWork + units > remaining.work) {
+      throw Object.assign(new Error("synthetic source work budget exhausted"), {
+        code: signal?.aborted ? "STOPPED" : "GLOBAL_BUDGET"
+      });
+    }
+    recordWork(units);
+    usedWork += units;
+  };
+  const chargeRequest = bytes => {
+    if (budget) return;
+    if (signal?.aborted || !Number.isSafeInteger(bytes) || bytes < 0 ||
+        usedRequests + 1 > remaining.requests || usedBytes + bytes > remaining.bytes ||
+        usedWork + 1 > remaining.work) {
+      throw Object.assign(new Error("synthetic source request budget exhausted"), {
+        code: signal?.aborted ? "STOPPED" : "GLOBAL_BUDGET"
+      });
+    }
+    recordRequest({bytes, events: 1});
+    usedRequests += 1;
+    usedBytes += bytes;
+    usedWork += 1;
+  };
+  if (remaining.requests < 1 || remaining.bytes < 1 ||
+      remaining.work < 1 || remaining.timeMs < 1) {
+    return {status: "UNKNOWN", reason: "GLOBAL_BUDGET", candidate: null, pipeline: null, quote: null};
+  }
+  const [{makeFixture}, {createPaperSourcePipeline}, {ANALYST_WINDOW_METRICS},
+    {createMarketQuoteAdapter}, {syntheticOrderResponse}] = await Promise.all([
+    import("../../test/fixtures/memecoin-paper-analyst-window-evidence/source-shaped.mjs"),
+    import("./paper-source-pipeline.mjs"),
+    import("./analyst-window-evidence.mjs"),
+    import("./market-quote-adapter.mjs"),
+    import("../../test/fixtures/memecoin-paper-route-quotes/jupiter-v2-order.mjs")
+  ]);
+  const requestedCandidateT = acquiredEnvelope?.request?.atMs;
+  const candidateT = Number.isSafeInteger(requestedCandidateT)
+    ? requestedCandidateT : clock.wallClock() - 1_000;
+  const fixture = makeFixture({candidateT, buyCount: 5, sellCount: 2, includeBoundaryRows: false});
+  const completeFixture = reviewedFixtureEvidence(fixture, candidateT);
+  const orderedTransactions = [...fixture.transactions]
+    .sort((left, right) => left.blockTime - right.blockTime ||
+      left.signature.localeCompare(right.signature));
+  const firstTransactionSlot = 490_002;
+  const lastTransactionSlot = firstTransactionSlot + orderedTransactions.length - 1;
+  const endBoundarySlot = lastTransactionSlot + 1;
+  const afterBoundarySlot = endBoundarySlot + 1;
+  const marketPairEvidence = variant === "WRONG_IDENTITY"
+    ? {
+        ...fixture.marketPairEvidence,
+        identity: {...fixture.identity, mint: "Vote111111111111111111111111111111111111111"}
+      }
+    : variant === "FUTURE_EVIDENCE"
+      ? {...fixture.marketPairEvidence, observedAt: candidateT + 1_000}
+      : fixture.marketPairEvidence;
+  const slotTimes = new Map([
+    [490_000, Math.floor((candidateT - 3_601_000) / 1_000)],
+    [490_001, Math.floor((candidateT - 3_600_000) / 1_000)],
+    ...orderedTransactions.map((row, index) =>
+      [firstTransactionSlot + index, row.blockTime]),
+    [endBoundarySlot, Math.floor(candidateT / 1_000)],
+    [afterBoundarySlot, Math.floor((candidateT + 1_000) / 1_000)]
+  ]);
+  const collectorRows = orderedTransactions.map((row, index) => {
+    const slot = firstTransactionSlot + index;
+    return {
+      ...row,
+      slot,
+      subjectAddresses: [fixture.identity.pool],
+      status: "SUCCESS",
+      version: "legacy"
+    };
+  });
+  const collectorSignatures = collectorRows.map(row => ({
+    signature: row.signature,
+    slot: row.slot,
+    blockTime: row.blockTime,
+    err: null,
+    errorStatus: null,
+    subjectAddresses: [fixture.identity.pool]
+  }));
+  const rpcMethods = [];
+  const transport = async request => {
+    if (expireDuringRequest) clock.advance(remaining.timeMs + 1);
+    if (clock.wallClock() >= deadlineAt) {
+      throw Object.assign(new Error("synthetic runtime deadline reached"), {code: "DEADLINE"});
+    }
+    if (waitForStop) {
+      await new Promise(resolve => {
+        if (signal?.aborted) resolve();
+        else signal?.addEventListener("abort", resolve, {once: true});
+      });
+      await new Promise(resolve => setTimeout(resolve, 250));
+    }
+    if (signal?.aborted) throw Object.assign(new Error("fixture acquisition cancelled"), {code: "STOPPED"});
+    const body = JSON.parse(request.body);
+    rpcMethods.push(body.method);
+    const result = body.method === "getSlot" ? 490_016
+      : body.method === "getBlocks" ? [...slotTimes.keys()]
+        : body.method === "getBlockTime" ? slotTimes.get(body.params[0]) ?? null
+          : null;
+    const response = JSON.stringify({jsonrpc: "2.0", id: body.id, result});
+    chargeRequest(Buffer.byteLength(response));
+    return new Response(response, {
+      status: 200,
+      headers: {"content-type": "application/json"}
+    });
+  };
+  const historySlotCollector = request => {
+    if (signal?.aborted) throw Object.assign(new Error("fixture acquisition cancelled"), {code: "STOPPED"});
+    const transactions = collectorRows.filter(row =>
+      row.slot >= request.startSlot && row.slot <= request.endSlot);
+    const signatures = collectorSignatures.filter(row =>
+      row.slot >= request.startSlot && row.slot <= request.endSlot);
+    const payload = JSON.stringify({
+      fixture: "SYNTHETIC_FIXTURE_ONLY",
+      signatures: signatures.length,
+      transactions: transactions.length
+    });
+    chargeRequest(Buffer.byteLength(payload));
+    return {
+      sourceVersion: "solana-launch-history-source-v1",
+      source: "Solana JSON-RPC",
+      rpcOrigin: "https://api.mainnet-beta.solana.com",
+      commitment: "finalized",
+      declaredSubjects: request.subjects,
+      slotInterval: {startInclusive: request.startSlot, endInclusive: request.endSlot},
+      signatures,
+      transactions,
+      events: [{
+        origin: "https://api.mainnet-beta.solana.com",
+        method: "getSlot",
+        requestStartedAt: clock.wallClock(),
+        responseReceivedAt: clock.wallClock(),
+        responseBytes: Buffer.byteLength(payload),
+        responseSha256: createHash("sha256").update(payload).digest("hex"),
+        status: "RESPONSE_RECEIVED"
+      }],
+      counters: {
+        requests: 1,
+        bytes: Buffer.byteLength(payload),
+        workUnits: 1 + transactions.length,
+        signatures: signatures.length,
+        successfulTransactions: transactions.length
+      },
+      coverage: {
+        scope: "declared-subjects-and-inclusive-slot-interval-only",
+        finalizedAnchor: {status: "CAPTURED", slot: request.endSlot + 10},
+        sourceHistoryCompleteness: "COMPLETE",
+        complete: true,
+        signaturePagesComplete: true,
+        successfulTransactionRetrievalComplete: true,
+        terminationReason: "DECLARED_INTERVAL_COVERED",
+        subjects: [{
+          address: request.identity.pool,
+          signatureCoverageComplete: true,
+          terminationReason: "SOURCE_EXHAUSTED"
+        }]
+      }
+    };
+  };
+  const pipeline = createPaperSourcePipeline({
+    enabled: true,
+    mode: "SYNTHETIC_TEST_ONLY",
+    slotRange: {startInclusive: 490_000, endInclusive: afterBoundarySlot},
+    transport,
+    clock: () => clock.wallClock(),
+    limits: {
+      maxRequests: Math.max(1, remaining.requests),
+      maxBytesPerResponse: Math.min(1_048_576, Math.max(1, Math.floor(remaining.bytes / 3))),
+      maxBytesPerRun: Math.max(1, remaining.bytes),
+      maxWorkUnits: Math.max(1, remaining.work),
+      maxDurationMs: Math.max(1, remaining.timeMs),
+      requestTimeoutMs: Math.min(1_000, Math.max(1, remaining.timeMs))
+    },
+    historySlotCollector,
+    budget
+  });
+  const reviewEvidence = Object.fromEntries(ANALYST_WINDOW_METRICS.map(key => [key, {
+    status: "REVIEWED",
+    reviewerId: "offline-fixture-reviewer",
+    reviewId: `offline-${key}`,
+    reviewedAt: candidateT - 1
+  }]));
+  const censusSource = Object.freeze({
+    async readSnapshots(request) {
+      if (signal?.aborted) throw Object.assign(new Error("fixture acquisition cancelled"), {code: "STOPPED"});
+      chargeWork(1);
+      return fixture.censusSource.readSnapshots(request);
+    }
+  });
+  const priceSource = Object.freeze({
+    async readObservation(request) {
+      if (signal?.aborted) throw Object.assign(new Error("fixture acquisition cancelled"), {code: "STOPPED"});
+      chargeWork(1);
+      return fixture.priceSource.readObservation(request);
+    }
+  });
+  chargeWork(1);
+  const evaluationRequest = {
+    providerCandidate: completeFixture.candidate,
+    evidence: acquiredEnvelope ? {} : completeFixture.evidence,
+    candidateT,
+    policy: fixture.policy,
+    poolProof: fixture.poolProof,
+    censusSource,
+    priceSource,
+    marketPairEvidence,
+    smartWalletAllowlist: fixture.smartWalletAllowlist,
+    reviewEvidence,
+    holdUntil: candidateT + 8 * 60 * 60 * 1_000
+  };
+  let warmup = null;
+  let evaluation;
+  if (acquiredEnvelope) {
+    if (!warmupStore) {
+      return {
+        status: "UNKNOWN",
+        reason: "WARMUP_STORE_REQUIRED",
+        candidate: null,
+        pipeline: null,
+        quote: null
+      };
+    }
+    warmup = await evaluateAcquiredEnvelope({
+      envelope: acquiredEnvelope,
+      identity: fixture.identity,
+      pipeline,
+      evaluationRequest,
+      store: warmupStore,
+      clock,
+      signal,
+      remaining,
+      recordRequest,
+      recordWork,
+      deadlineAt,
+      budget
+    });
+    evaluation = warmup.evaluation ?? null;
+  } else {
+    evaluation = await pipeline.evaluate({...evaluationRequest, signal});
+  }
+  if (signal?.aborted || clock.wallClock() >= deadlineAt) {
+    return {
+      status: "UNKNOWN",
+      reason: signal?.aborted ? "STOPPED" : "DEADLINE",
+      candidate: null,
+      pipeline: null,
+      quote: null
+    };
+  }
+  if (!evaluation?.candidate) {
+    return {
+      status: "UNKNOWN",
+      reason: warmup?.reason ?? evaluation?.reason ?? "PIPELINE_CANDIDATE_UNAVAILABLE",
+      candidate: null,
+      pipeline: evaluation,
+      quote: null,
+      warmup: warmup ? {
+        status: warmup.status,
+        reason: warmup.reason ?? null,
+        datasetDigest: warmup.datasetDigest ?? null,
+        trust: warmup.trust ?? "UNKNOWN",
+        completeness: warmup.completeness ?? "UNKNOWN"
+      } : null
+    };
+  }
+  const runtimeCandidate = evaluation.candidate;
+  const runtimeAudit = {
+    source: "SYNTHETIC_FIXTURE_ONLY",
+    candidateT: evaluation.candidateT,
+    assembledAt: evaluation.assembledAt,
+    decisionAt: evaluation.decisionAt,
+    identity: {
+      chainId: evaluation.candidate.chainId,
+      mint: evaluation.candidate.mint,
+      pool: evaluation.candidate.pool,
+      quote: evaluation.candidate.quote,
+      decimals: evaluation.candidate.decimals
+    },
+    pipeline: {
+      status: evaluation.status,
+      filtersStatus: evaluation.filters?.status ?? "UNKNOWN",
+      filtersAccepted: evaluation.filters?.accepted === true,
+      analystStatus: evaluation.analysis?.status ?? "UNKNOWN",
+      analystEvidenceSha256: createHash("sha256")
+        .update(canonicalCheckpointBytes(runtimeCandidate.analystEvidence)).digest("hex"),
+      sourceIdentityValid: ["chainId", "mint", "pool", "quote"].every(key =>
+        marketPairEvidence?.identity?.[key] === runtimeCandidate[key]),
+      marketPairChronologyValid: Number.isSafeInteger(marketPairEvidence?.observedAt) &&
+        marketPairEvidence.observedAt <= evaluation.candidateT,
+      syntheticAnalystEvidence: "SYNTHETIC_FIXTURE_ONLY",
+      acquisitionReceiptIds: evaluation.auditReceipts.acquisition
+        .map(item => item.receipt?.id).filter(Boolean).slice(0, 64)
+    },
+    quotes: []
+  };
+  if (warmup) {
+    runtimeAudit.warmup = {
+      status: warmup.status,
+      datasetDigest: warmup.datasetDigest ?? null,
+      trust: warmup.trust ?? "UNKNOWN",
+      completeness: warmup.completeness ?? "UNKNOWN"
+    };
+  }
+  if (!runtimeAudit.pipeline.sourceIdentityValid || !runtimeAudit.pipeline.marketPairChronologyValid) {
+    return {
+      status: "UNKNOWN",
+      reason: runtimeAudit.pipeline.sourceIdentityValid
+        ? "FUTURE_SOURCE_EVIDENCE" : "SOURCE_IDENTITY_MISMATCH",
+      candidate: null,
+      pipeline: evaluation,
+      quote: null,
+      runtimeAudit
+    };
+  }
+  const attachRuntime = () => {
+    runtimeCandidate.syntheticRuntime = {
+      label: "SYNTHETIC_FIXTURE_ONLY",
+      pipeline: runtimeAudit.pipeline,
+      candidateT: runtimeAudit.candidateT,
+      assembledAt: runtimeAudit.assembledAt,
+      decisionAt: runtimeAudit.decisionAt,
+      identity: runtimeAudit.identity
+    };
+  };
+
+  let activeBudget = budget;
+  const buildQuoteAdapter = options => {
+    if (!modeledHost) return createMarketQuoteAdapter(options);
+    modeledHost.transport = options.transport;
+    return modeledHost.adapter;
+  };
+  const quoteAdapter = buildQuoteAdapter({
+    enabled: true,
+    clock: () => {
+      clock.advance(quoteAdapterRequests > 0 ? 2_000 : 1);
+      return clock.wallClock();
+    },
+    transport: async (url, {signal: quoteSignal} = {}) => {
+      if (quoteSignal?.aborted || signal?.aborted) {
+        throw Object.assign(new Error("fixture quote cancelled"), {code: "STOPPED"});
+      }
+      if (clock.wallClock() >= deadlineAt) {
+        throw Object.assign(new Error("fixture quote deadline reached"), {code: "DEADLINE"});
+      }
+      const chargeBytes = activeBudget?.reserveRequest?.();
+      if (waitForQuoteSettle) await new Promise(resolve => setTimeout(resolve, 100));
+      if (quoteSignal?.aborted || signal?.aborted) {
+        throw Object.assign(new Error("fixture quote cancelled"), {code: "STOPPED"});
+      }
+      const request = new URL(url);
+      const inputMint = request.searchParams.get("inputMint");
+      const outputMint = request.searchParams.get("outputMint");
+      const amountAtoms = BigInt(request.searchParams.get("amount") ?? "0");
+      const entry = inputMint === fixture.candidate.quote;
+      const priceMicros = entry ? 5_000_000n : quoteAdapterRequests === 0 ? 5_000_000n : 4_500_000n;
+      const inputDecimals = 6n;
+      const outputDecimals = 6n;
+      const outputAtoms = entry
+        ? amountAtoms * 10n ** outputDecimals / priceMicros
+        : amountAtoms * priceMicros / 10n ** inputDecimals;
+      const wrongIdentity = variant === "WRONG_QUOTE_IDENTITY";
+      const quoteBody = syntheticOrderResponse({
+        inputMint,
+        outputMint,
+        inAmount: amountAtoms.toString(),
+        outAmount: outputAtoms.toString(),
+        otherAmountThreshold: outputAtoms.toString(),
+        routePlan: [{
+          swapInfo: {
+            ammKey: wrongIdentity ? fixture.poolProof.baseVault : fixture.candidate.pool,
+            label: "Synthetic AMM",
+            inputMint,
+            outputMint,
+            inAmount: amountAtoms.toString(),
+            outAmount: outputAtoms.toString()
+          },
+          percent: 100,
+          bps: 10_000
+        }],
+        requestId: `synthetic-runtime-order-${quoteAdapterRequests + 1}`
+      });
+      quoteAdapterRequests += 1;
+      if (modeledHost) modeledHost.requests += 1;
+      const response = JSON.stringify(quoteBody.body);
+      const responseBytes = new TextEncoder().encode(response);
+      if (!activeBudget) chargeRequest(responseBytes.byteLength);
+      const body = chargeBytes ? new ReadableStream({
+        pull(controller) {
+          chargeBytes(responseBytes.byteLength);
+          controller.enqueue(responseBytes);
+          controller.close();
+        }
+      }) : response;
+      return new Response(body, {
+        status: variant === "MISSING_QUOTE" ? 503 : 200,
+        headers: {"content-type": "application/json"}
+      });
+    },
+    timeoutMs: 1_000,
+    maxRequests: Math.max(1, Math.min(100, remaining.requests))
+  });
+  let quoteAdapterRequests = 0;
+  const quote = async ({
+    candidate, purpose, position, positionOpenedAt, now, signal: quoteSignal,
+    budget: quoteBudget
+  }) => {
+    if (quoteSignal?.aborted || signal?.aborted || clock.wallClock() >= deadlineAt ||
+        usedRequests >= remaining.requests || usedBytes >= remaining.bytes ||
+        usedWork >= remaining.work) {
+      return null;
+    }
+    activeBudget = quoteBudget ?? budget;
+    const side = String(purpose).toUpperCase() === "ENTRY" ? "ENTRY" : "EXIT";
+    const amountAtoms = side === "ENTRY" ? "10000000" : String(position?.tokenAtoms ?? "");
+    const authorizedAt = side === "ENTRY" ? now : positionOpenedAt;
+    const remainingQuoteMs = Math.max(0, Math.min(
+      deadlineAt - clock.wallClock(),
+      quoteBudget?.remaining?.().timeMs ?? Number.MAX_SAFE_INTEGER
+    ));
+    if (remainingQuoteMs < 1) return null;
+    const quoteController = new AbortController();
+    const abortQuote = () => quoteController.abort();
+    for (const sourceSignal of [quoteSignal, signal]) {
+      if (sourceSignal?.aborted) quoteController.abort();
+      else sourceSignal?.addEventListener("abort", abortQuote, {once: true});
+    }
+    if (quoteController.signal.aborted) {
+      for (const sourceSignal of [quoteSignal, signal]) {
+        sourceSignal?.removeEventListener("abort", abortQuote);
+      }
+      return null;
+    }
+    let quoteTimer;
+    let quoteAbortListener;
+    const quotePending = quoteAdapter.getPaperQuote({
+      identity: {
+        chainId: candidate.chainId,
+        mint: candidate.mint,
+        pool: candidate.pool,
+        quote: candidate.quote,
+        decimals: candidate.decimals
+      },
+      side,
+      amountAtoms,
+      quoteDecimals: 6,
+      candidateSampledAt: candidate.sampledAt,
+      ...(side === "ENTRY" ? {authorizedAt} : {positionOpenedAt: authorizedAt}),
+      slippageBps: 50
+    }, {signal: quoteController.signal,
+      ...(modeledHost ? {reviewScenario: fixtureScenario(0).config} : {})});
+    const quoteResult = await Promise.race([
+      quotePending.then(result => ({result}), () => ({failed: true})),
+      new Promise(resolve => {
+        quoteTimer = setTimeout(() => {
+          quoteController.abort();
+          resolve({timedOut: true});
+        }, remainingQuoteMs);
+      }),
+      new Promise(resolve => {
+        quoteAbortListener = () => resolve({aborted: true});
+        quoteController.signal.addEventListener("abort", quoteAbortListener, {once: true});
+      })
+    ]);
+    clearTimeout(quoteTimer);
+    quoteController.signal.removeEventListener("abort", quoteAbortListener);
+    for (const sourceSignal of [quoteSignal, signal]) {
+      sourceSignal?.removeEventListener("abort", abortQuote);
+    }
+    if (quoteResult.timedOut || quoteResult.failed || quoteController.signal.aborted ||
+        signal?.aborted || quoteSignal?.aborted || clock.wallClock() >= deadlineAt) {
+      return null;
+    }
+    const adapterResult = quoteResult.result;
+    const sourceQuote = adapterResult.quoteCandidate;
+    const identity = adapterResult.request?.identity;
+    const route = sourceQuote?.routeAmounts;
+    const routeIdentityValid = sourceQuote?.route?.binding?.status === "SINGLE_POOL_MATCH" &&
+      sourceQuote.route.binding.selectedPool === candidate.pool &&
+      sourceQuote.identity?.chainId === candidate.chainId &&
+      sourceQuote.identity?.mint === candidate.mint &&
+      sourceQuote.identity?.pool === candidate.pool &&
+      sourceQuote.identity?.quote === candidate.quote &&
+      route?.inputMint === (side === "ENTRY" ? candidate.quote : candidate.mint) &&
+      route?.outputMint === (side === "ENTRY" ? candidate.mint : candidate.quote);
+    const quoteAt = sourceQuote?.receiptTime?.observedAt;
+    const causalAt = authorizedAt;
+    let paperQuote = null;
+    if (routeIdentityValid && Number.isSafeInteger(quoteAt) && quoteAt > causalAt &&
+        quoteAt > candidate.sampledAt && quoteAt <= clock.wallClock() &&
+        sourceQuote?.status === "UNAVAILABLE" && adapterResult.authorizationEligible === false) {
+      const quoteAtoms = BigInt(side === "ENTRY" ? route.inputAtoms : route.outputAtoms);
+      const baseAtoms = BigInt(side === "ENTRY" ? route.outputAtoms : route.inputAtoms);
+      const numerator = quoteAtoms * 10n ** BigInt(candidate.decimals) * 1_000_000n;
+      const denominator = baseAtoms * 10n ** 6n;
+      const priceMicros = denominator > 0n ? numerator / denominator : 0n;
+      if (priceMicros > 0n && priceMicros <= BigInt(Number.MAX_SAFE_INTEGER)) {
+        paperQuote = {
+          eventId: sourceQuote.eventId,
+          fixtureOnly: true,
+          chainId: candidate.chainId,
+          mint: candidate.mint,
+          pool: candidate.pool,
+          quote: candidate.quote,
+          decimals: candidate.decimals,
+          source: "SYNTHETIC_FIXTURE_ONLY",
+          observedAt: quoteAt,
+          priceMicros: Number(priceMicros),
+          mode: "HYPOTHETICAL",
+          executable: true,
+          costBasis: FIXTURE_COST_CONTRACT.version,
+          costs: {...FIXTURE_COST_CONTRACT.costs}
+        };
+        if (variant === "MISSING_COSTS") delete paperQuote.costs.networkCents;
+      }
+    }
+    if (modeledHost && paperQuote) {
+      const issued = quoteAdapter.issueModeledQuote(adapterResult, {
+        identity: {
+          chainId: candidate.chainId, mint: candidate.mint, pool: candidate.pool,
+          quote: candidate.quote, decimals: candidate.decimals
+        },
+        side,
+        amountAtoms,
+        policy: modeledHost.policy
+      });
+      paperQuote = issued.ok ? {...issued.quote, eventId: paperQuote.eventId} : null;
+      // The fixture issuer clock advances during issuance; no audit or return after cancel/deadline.
+      if (quoteController.signal.aborted || signal?.aborted || quoteSignal?.aborted ||
+          clock.wallClock() >= deadlineAt) {
+        return null;
+      }
+    }
+    const auditQuote = {
+      purpose: side === "ENTRY" ? "entry"
+        : String(purpose).includes("risk-exit") || purpose === "RISK_EXIT" ? "risk-exit" : "risk-mark",
+      adapterStatus: adapterResult.status,
+      adapterReasons: (adapterResult.reasons ?? []).slice(0, 16),
+      adapterSourceProvenance: adapterResult.sourceProvenance ?? null,
+      adapterAuthorizationEligible: adapterResult.authorizationEligible === true,
+      adapterCostStatus: adapterResult.costEvidence?.status ?? "UNKNOWN",
+      adapterEventId: sourceQuote?.eventId ?? null,
+      observedAt: quoteAt ?? null,
+      receiptAt: clock.wallClock(),
+      routeIdentityValid,
+      causalAt: Number.isSafeInteger(causalAt) ? causalAt : null,
+      chronologyValid: Number.isSafeInteger(quoteAt) && quoteAt > causalAt &&
+        quoteAt > candidate.sampledAt && quoteAt <= clock.wallClock(),
+      identity: identity ?? null,
+      selectedPool: sourceQuote?.route?.binding?.selectedPool ?? null,
+      paperFillEligible: Boolean(paperQuote &&
+        Object.keys(FIXTURE_COST_CONTRACT.costs).every(key => Object.hasOwn(paperQuote.costs, key))),
+      paperPriceMicros: paperQuote?.priceMicros ?? null,
+      costBasis: paperQuote?.costBasis ?? null,
+      costs: paperQuote?.costs ?? null,
+      disposition: paperQuote &&
+        Object.keys(FIXTURE_COST_CONTRACT.costs).every(key => Object.hasOwn(paperQuote.costs, key))
+        ? "PENDING" : "NOT_FILL_ELIGIBLE"
+    };
+    runtimeAudit.quotes.push(auditQuote);
+    return paperQuote;
+  };
+  attachRuntime();
+  return {
+    status: evaluation.status,
+    reason: evaluation.filters?.status === "PASS" ? null : "FIXTURE_EVIDENCE_NOT_ENTRY_AUTHORITY",
+    candidate: runtimeCandidate,
+    pipeline: evaluation,
+    quote,
+    runtimeAudit,
+    warmup: warmup ? {
+      status: warmup.status,
+      reason: warmup.reason ?? null,
+      datasetDigest: warmup.datasetDigest ?? null,
+      trust: warmup.trust ?? "UNKNOWN",
+      completeness: warmup.completeness ?? "UNKNOWN"
+    } : null
+  };
+}
+
+const DIAGNOSTIC_KEYS = ["evaluationRequest", "observation", "request", "slotRange"];
+
+// Detached copy built from own data descriptors only: accessors are rejected without being
+// invoked, and later caller mutation cannot reach the copy.
+export function detachDiagnosticData(value, state = {nodes: 0}, depth = 0) {
+  if (depth > 24 || ++state.nodes > 20_000) throw new TypeError("diagnostic input exceeds bounds");
+  if (value === null || ["string", "boolean"].includes(typeof value)) return value;
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) throw new TypeError("diagnostic number is not finite");
+    return value;
+  }
+  if (typeof value !== "object") throw new TypeError("diagnostic value type is unsupported");
+  const array = Array.isArray(value);
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== (array ? Array.prototype : Object.prototype) &&
+      !(prototype === null && !array)) {
+    throw new TypeError("diagnostic value must be plain data");
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const keys = Reflect.ownKeys(descriptors);
+  if (keys.some(key => typeof key !== "string")) throw new TypeError("diagnostic symbols are unsupported");
+  const copy = array ? [] : {};
+  for (const key of keys) {
+    if (array && key === "length") continue;
+    const descriptor = descriptors[key];
+    if (!Object.hasOwn(descriptor, "value") || !descriptor.enumerable) {
+      throw new TypeError("diagnostic accessors are unsupported");
+    }
+    if (array && !/^(0|[1-9][0-9]*)$/.test(key)) throw new TypeError("diagnostic array shape is invalid");
+    Object.defineProperty(copy, key, {
+      value: detachDiagnosticData(descriptor.value, state, depth + 1),
+      enumerable: true, writable: true, configurable: true
+    });
+  }
+  if (array && Object.keys(copy).length !== value.length) {
+    throw new TypeError("diagnostic arrays must be dense");
+  }
+  return copy;
+}
+
+function validateDiagnosticInput(input, warmupStore) {
+  const valid = input !== null && typeof input === "object" && !Array.isArray(input) &&
+    Object.getPrototypeOf(input) === Object.prototype &&
+    Object.getOwnPropertySymbols(input).length === 0 &&
+    Object.getOwnPropertyNames(input).sort().join(",") === DIAGNOSTIC_KEYS.join(",") &&
+    DIAGNOSTIC_KEYS.every(key =>
+      Object.hasOwn(Object.getOwnPropertyDescriptor(input, key), "value")) &&
+    hasDataMethod(warmupStore, "publish") && hasDataMethod(warmupStore, "read");
+  if (!valid) throw new TypeError("diagnostic input must be exact bounded data with a warmup store");
+  return Object.freeze(detachDiagnosticData(input));
+}
+
+// Supplied observations are normalized and evaluated in EXTERNAL_READ_ONLY_INPUT mode with a
+// transport that refuses every request: no network, UNKNOWN trust, and never a candidate.
+async function runExternalDiagnostic({
+  diagnostic, warmupStore, signal, remaining, recordRequest, recordWork, deadlineAt, budget
+}) {
+  const refuse = status => ({
+    status,
+    mode: "EXTERNAL_READ_ONLY_INPUT",
+    trust: "UNKNOWN",
+    completeness: "UNKNOWN",
+    eligibleCandidates: 0,
+    executionAuthorized: false,
+    networkAccessed: false
+  });
+  if (!remaining || !Number.isSafeInteger(remaining.work) || !Number.isSafeInteger(remaining.timeMs) ||
+      !Number.isSafeInteger(remaining.requests) || !Number.isSafeInteger(remaining.bytes) ||
+      typeof recordRequest !== "function" || typeof recordWork !== "function" ||
+      !Number.isSafeInteger(deadlineAt) || remaining.requests < 1 || remaining.bytes < 1 ||
+      remaining.work < 1 || remaining.timeMs < 1) {
+    return {...refuse("REFUSED"), reason: "GLOBAL_BUDGET"};
+  }
+  try {
+    const candidate = diagnostic.evaluationRequest?.providerCandidate;
+    const atMs = diagnostic.request?.atMs;
+    const pipeline = createPaperSourcePipeline({
+      enabled: true,
+      mode: "EXTERNAL_READ_ONLY_INPUT",
+      slotRange: diagnostic.slotRange,
+      transport: async () => {
+        throw Object.assign(new Error("diagnostic transport is disabled"), {code: "NETWORK_DISABLED"});
+      },
+      clock: () => Date.now(),
+      limits: {
+        maxRequests: Math.max(1, remaining.requests),
+        maxBytesPerResponse: Math.min(1_048_576, Math.max(1, Math.floor(remaining.bytes / 3))),
+        maxBytesPerRun: Math.max(1, remaining.bytes),
+        maxWorkUnits: Math.max(1, remaining.work),
+        maxDurationMs: Math.max(1, remaining.timeMs),
+        requestTimeoutMs: Math.min(1_000, Math.max(1, remaining.timeMs))
+      },
+      budget
+    });
+    const {createPaperProviderWarmupHandoff} = await import("./provider-warmup-handoff/index.mjs");
+    const handoff = createPaperProviderWarmupHandoff({
+      enabled: true,
+      store: warmupStore,
+      datasetId: `paper-diagnostic-${atMs}`,
+      runId: `paper-diagnostic-run-${atMs}`,
+      identity: {
+        chainId: candidate?.chainId, mint: candidate?.mint,
+        pool: candidate?.pool, quote: candidate?.quote
+      },
+      clock: () => Date.now(),
+      limits: {maxElapsedMs: Math.max(1, Math.min(10_000, remaining.timeMs))}
+    });
+    const result = await handoff.runOffline({
+      observation: diagnostic.observation,
+      request: diagnostic.request,
+      pipeline,
+      evaluationRequest: diagnostic.evaluationRequest,
+      priceEndpoints: [{mint: candidate?.mint, atMs, denomination: "USD"}],
+      signal, remaining, recordRequest, recordWork, deadlineAt, budget
+    });
+    return {
+      ...refuse(result.status),
+      reason: result.reason ?? null,
+      datasetDigest: result.datasetDigest ?? null,
+      pipelineStatus: result.evaluation?.status ?? null,
+      pipelineReason: result.evaluation?.reason ?? null,
+      pipelineCandidateAvailable: Boolean(result.evaluation?.candidate),
+      realDataEntryEligible: false
+    };
+  } catch (error) {
+    return {
+      ...refuse("REFUSED"),
+      reason: typeof error?.code === "string" && /^[A-Z0-9_]{1,48}$/.test(error.code)
+        ? error.code : "INVALID_DIAGNOSTIC_INPUT"
+    };
+  }
+}
+
+export function createPaperRuntimeSourceAdapter(options = {}) {
+  const allowedOptions = [
+    "sourcePolicySha256", "fixtureMode", "clock", "variant", "fixtureBehavior", "warmupStore",
+    "diagnosticInput", "modeledPolicy"
+  ];
+  if (!options || typeof options !== "object" || Array.isArray(options) ||
+      ![Object.prototype, null].includes(Object.getPrototypeOf(options)) ||
+      Object.getOwnPropertySymbols(options).length !== 0 ||
+      Object.getOwnPropertyNames(options).some(key => !allowedOptions.includes(key)) ||
+      Object.getOwnPropertyNames(options).some(key =>
+        !Object.hasOwn(Object.getOwnPropertyDescriptor(options, key) ?? {}, "value"))) {
+    throw new TypeError("runtime source adapter options must be exact bounded data");
+  }
+  const {
+    sourcePolicySha256,
+    fixtureMode,
+    clock,
+    variant = "BASE",
+    fixtureBehavior = "NONE"
+  } = options;
+  const warmupStore = options.warmupStore;
+  const {diagnosticInput} = options;
+  if (sourcePolicySha256 !== PAPER_RUNTIME_SOURCE_POLICY_SHA256) {
+    throw new TypeError("source policy digest does not match the module-owned policy");
+  }
+
+  if (fixtureMode !== undefined) {
+    const expectedFixtureKeys = ["clock", "fixtureBehavior", "fixtureMode", "sourcePolicySha256", "variant",
+      ...(warmupStore === undefined ? [] : ["warmupStore"]),
+      ...(options.modeledPolicy === undefined ? [] : ["modeledPolicy"])];
+    let modeledHost = null;
+    if (options.modeledPolicy !== undefined && fixtureMode === "SYNTHETIC_TEST_ONLY" &&
+        clock && typeof clock.wallClock === "function" && typeof clock.advance === "function") {
+      const policy = copyModeledPolicy(options.modeledPolicy);
+      if (policy.sourcePolicySha256 !== PAPER_RUNTIME_SOURCE_POLICY_SHA256 ||
+          policy.scenarioConfigSha256 !== fixtureScenario(0).sha ||
+          policy.usdAssumption !== MODELED_FIXTURE_USD_ASSUMPTION) {
+        throw new TypeError("modeled policy does not match the fixture source policy and scenario");
+      }
+      modeledHost = createModeledHost(policy, clock);
+    }
+    if (fixtureMode !== "SYNTHETIC_TEST_ONLY" ||
+        Object.keys(options).sort().join(",") !== expectedFixtureKeys.sort().join(",") ||
+        !clock || typeof clock.wallClock !== "function" ||
+        typeof clock.advance !== "function" ||
+        (warmupStore !== undefined &&
+          (fixtureBehavior !== "NONE" || !hasDataMethod(warmupStore, "publish") ||
+            !hasDataMethod(warmupStore, "read"))) ||
+        !["BASE", "MISSING_QUOTE", "MISSING_COSTS", "WRONG_IDENTITY",
+          "FUTURE_EVIDENCE", "WRONG_QUOTE_IDENTITY"].includes(variant) ||
+        !["NONE", "WAIT_FOR_STOP", "EXPIRE_DURING_REQUEST", "WAIT_FOR_QUOTE_SETTLE"]
+          .includes(fixtureBehavior)) {
+      throw new TypeError("fixture runtime source requires exact synthetic-only dependencies");
+    }
+    const fixtures = new Map();
+    return Object.freeze({
+      modeledQuoteAuthority() {
+        return modeledHost
+          ? Object.freeze({adapter: modeledHost.adapter, policy: modeledHost.policy}) : null;
+      },
+      async acquireCandidates({
+        signal,
+        remaining,
+        recordRequest,
+        recordWork,
+        deadlineAt,
+        budget,
+        acquiredEnvelope
+      } = {}) {
+        const acquired = await acquireSyntheticRuntimeFixture(clock, {
+          signal, remaining, recordRequest, recordWork, deadlineAt, variant,
+          waitForStop: fixtureBehavior === "WAIT_FOR_STOP",
+          waitForQuoteSettle: fixtureBehavior === "WAIT_FOR_QUOTE_SETTLE",
+          expireDuringRequest: fixtureBehavior === "EXPIRE_DURING_REQUEST",
+          budget,
+          acquiredEnvelope,
+          warmupStore,
+          modeledHost
+        });
+        if (signal?.aborted) {
+          return {status: "UNKNOWN", reason: "STOPPED", candidates: [], fixtureOnly: true};
+        }
+        if (acquired.candidate) fixtures.set(acquired.candidate.mint, acquired);
+        return {
+          ...acquired,
+          status: acquired.candidate ? "SYNTHETIC_FIXTURE_ONLY" : acquired.status,
+          candidates: acquired.candidate ? [acquired.candidate] : [],
+          fixtureOnly: true
+        };
+      },
+      async acquireCandidateArray(input) {
+        const result = await this.acquireCandidates(input);
+        return resolveRuntimeCandidateArray(result, {synthetic: true}).candidates;
+      },
+      async quote(request, quoteOptions) {
+        const candidate = request?.candidate;
+        const fixture = fixtures.get(candidate?.mint);
+        if (!fixture?.quote || !candidate ||
+            ["chainId", "mint", "pool", "quote", "decimals"].some(key =>
+              candidate[key] !== fixture.candidate[key])) return null;
+        return fixture.quote(request, quoteOptions);
+      }
+    });
+  }
+
+  const productionKeys = Object.keys(options).sort().join(",");
+  if (productionKeys !== "sourcePolicySha256" &&
+      productionKeys !== "diagnosticInput,sourcePolicySha256,warmupStore") {
+    throw new TypeError("production runtime source options are not injectable");
+  }
+  const diagnostic = diagnosticInput === undefined ? null
+    : validateDiagnosticInput(diagnosticInput, warmupStore);
+  const pipeline = createPaperSourcePipeline({
+    enabled: false,
+    mode: "EXTERNAL_READ_ONLY_INPUT"
+  });
+  const quoteAdapter = createMarketQuoteAdapter({enabled: false});
+
+  return Object.freeze({
+    async acquireCandidates({
+      signal, remaining, recordRequest, recordWork, deadlineAt, budget
+    } = {}) {
+      if (signal?.aborted) {
+        return {status: "UNKNOWN", reason: "STOPPED", candidates: [], unresolved: []};
+      }
+      if (!remaining || !Number.isSafeInteger(remaining.requests) ||
+          remaining.requests < 0 || !Number.isSafeInteger(remaining.bytes) ||
+          remaining.bytes < 0 || !Number.isSafeInteger(remaining.candidates) ||
+          remaining.candidates < 0) {
+        return {
+          status: "UNKNOWN",
+          reason: "GLOBAL_BUDGET",
+          candidates: [],
+          unresolved: [...PAPER_SOURCE_POLICY.missingRequirements]
+        };
+      }
+      const diagnosticResult = diagnostic
+        ? await runExternalDiagnostic({
+          diagnostic, warmupStore, signal, remaining, recordRequest, recordWork, deadlineAt, budget
+        }) : null;
+      if (signal?.aborted) {
+        return {status: "UNKNOWN", reason: "STOPPED", candidates: [], unresolved: []};
+      }
+      return {
+        status: "UNKNOWN",
+        reason: "SOURCE_POLICY_UNAPPROVED",
+        ...(diagnosticResult ? {diagnostic: diagnosticResult} : {}),
+        candidates: [],
+        unresolved: [...PAPER_SOURCE_POLICY.missingRequirements],
+        refusals: resolveRuntimeCandidateArray(null).refusals,
+        pipelineVersion: PAPER_SOURCE_PIPELINE_VERSION,
+        pipelineEnabled: pipeline.enabled,
+        quoteAdapterStatus: "DISABLED",
+        implementationStatus: "BLOCKED_NOT_IMPLEMENTED",
+        networkAccessed: false
+      };
+    },
+    async quote(request, options) {
+      if (!isIssuedRuntimeCandidate(request?.candidate)) {
+        return {
+          status: "UNAVAILABLE",
+          reasons: ["CANDIDATE_NOT_MODULE_ISSUED"],
+          authorizationEligible: false
+        };
+      }
+      return quoteAdapter.getPaperQuote(request, options);
+    }
+  });
+}
