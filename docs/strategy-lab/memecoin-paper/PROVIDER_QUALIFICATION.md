@@ -12,12 +12,20 @@ or make the Paper runtime live-ready. All positive fixtures in
 | Helius `getTransactionsForAddress` | Helius RPC identity is retained. The request explicitly asks for full JSON transaction details, supports versions through 0, and sends provided slot/block-time bounds as provider filters. Each result extracts its signature from `transaction.signatures[0]`, retains its original slot and `blockTime`, and binds a raw response SHA-256 receipt. | **UNKNOWN.** Provider filters, result-page length, finalized data, or an explicit null `paginationToken` do not prove complete address attribution or archival history. Repeated cursors, contradictory rows, null metadata, unsupported versions, and quota failures remain unavailable. | Not a timestamp-observation adapter; the provider's `blockTime`, including null, is preserved without substitution. | **NOT APPROVED.** |
 | Helius `getProgramAccountsV2` | The request specifies finalized `jsonParsed` data with `withContext: true`; response context slots, `value.accounts`, cursors, and raw response hashes are retained. Parsed token-account owners and raw amounts are grouped by owner. `minContextSlot` is a lower bound, not a frozen multi-page snapshot. | **UNKNOWN.** Only `value.paginationKey: null` terminates pagination; short pages do not. Cursor cycles, contradictory accounts, context-slot drift, and quota failures remain unavailable. The owner aggregation sums its decoded rows; it is not a mint-supply reconciliation. | Not applicable. | **NOT APPROVED.** |
 | Birdeye `historical_price_unix` | Birdeye endpoint identity, mint, USD denomination, purpose, raw receipt hash, returned `data.updateUnixTime`, and `isScaledUiToken` are retained. A value is exposed only for `success: true`, `isScaledUiToken: false`, and exact equality between returned seconds and requested milliseconds. | **UNKNOWN.** One response is not proof of series coverage or token support. Failed responses, unsupported/missing scaling semantics, missing/near/future timestamps, and non-second-aligned requests are unavailable. No parity fallback or client token scaling is applied. | Exact request/response timestamp equality is enforced for accepted observations. The requested timestamp is never substituted for the provider timestamp. | **NOT APPROVED.** |
+| Alchemy `getTokenHoldersAtSlot` | The offline diagnostic accepts bounded raw response bytes and an explicit mint/slot, hashes those bytes, validates the documented holder rows, and aggregates canonical raw amounts by owner. | **UNKNOWN.** The 10,000-row cap has no published completeness certificate or cursor; a shorter result, digest match, or optional same-slot mint-supply match does not establish completeness or authenticity. | The returned slot is checked against the requested slot; this does not establish exact wall-clock capture time. `minContextSlot` is not historical-state proof. | **NOT APPROVED.** |
 
 `CAPTURED` means only that the bounded Helius acquisition reached its endpoint
 termination condition. It is not a completeness state. Birdeye's exact
 timestamp-match receipt is not a source-trust or policy-approval decision.
 Each adapter's `qualification` fields keep provider identity, documented method
 scope, observed completeness, timestamp fidelity, and policy approval distinct.
+
+The Alchemy diagnostic is offline-only and does not collect or admit provider
+data. Historical mint reads require paid account-archive access. Prospective T0
+and T1 captures require separate immutable roots; existing
+`local-census-acquisition` records are not eligible as exact-time warmup census.
+A one-hour timer or supply match does not establish completeness. The HEDGE
+budget remains frozen. This diagnostic prepares future sample inspection only.
 
 The adapters accept an injected secret and transport. They use fixed provider
 origins and allowlisted methods/paths, disable redirects, do not retry, and
