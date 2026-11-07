@@ -3,6 +3,8 @@ FROM node:20-alpine
 WORKDIR /app
 
 COPY --chown=node:node scripts/memecoin-paper/ ./scripts/memecoin-paper/
+COPY --chown=node:node scripts/memecoin-paper-report-bridge/ ./scripts/memecoin-paper-report-bridge/
+COPY --chown=node:node scripts/memecoin-paper-report-transfer/ ./scripts/memecoin-paper-report-transfer/
 COPY --chown=node:node scripts/memecoin-paper-token-safety/ ./scripts/memecoin-paper-token-safety/
 COPY --chown=node:node scripts/memecoin-paper-execution-evidence/normalize.mjs ./scripts/memecoin-paper-execution-evidence/normalize.mjs
 COPY --chown=node:node scripts/memecoin-paper-route-quotes/jupiter-v2.mjs ./scripts/memecoin-paper-route-quotes/jupiter-v2.mjs
