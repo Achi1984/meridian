@@ -1,11 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, open as openFile, readFile, rm } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { createKrakenProvider } from "../scripts/spot-paper-pilot/provider.mjs";
+import { assessObservationEvidence } from "../scripts/spot-paper-pilot/evidence-assessment.mjs";
 import { createRunJournal, readRunJournal } from "../scripts/spot-paper-pilot/journal.mjs";
 import { runSpotPaperPilot } from "../scripts/spot-paper-pilot/runner.mjs";
 import { main as pilotCli } from "../scripts/spot-paper-pilot/cli.mjs";
@@ -19,7 +21,76 @@ const INITIAL_NOW = BASE + 21 * MINUTE + 1_000;
 const PRICE_100 = "100.00000000";
 const PRICE_120 = "120.00000000";
 const CLI_PATH = fileURLToPath(new URL("../scripts/spot-paper-pilot/cli.mjs", import.meta.url));
+const OBSERVE_WORKFLOW = readFileSync(new URL(
+  "../.github/workflows/spot-paper-pilot-observe-only.yml", import.meta.url), "utf8");
 
+test("manual observation assessment separates bounded completion from data acceptance", () => {
+  const report = {
+    schemaVersion: "SPOT_PAPER_PILOT_REPORT_V1",
+    runId: "spot-observe-123-1", mode: "observe", pair: "BTC/EUR",
+    operationalStatus: "COMPLETED_BOUNDED", stopReason: "CYCLE_LIMIT",
+    observations: 0, dataGaps: 2, requests: 2, deliveredBytes: 0,
+    executionImpact: false, liveTrading: false, autoPromotion: false, fills: []
+  };
+  const readback = {
+    reconciliation: "TERMINAL_REPORT_AVAILABLE", runId: report.runId,
+    eventCount: 4, checkpoint: { stopReason: report.stopReason },
+    resumed: false, executionImpact: false, report
+  };
+  const observeReport = {
+    schemaVersion: "SPOT_PAPER_PILOT_REPORT_V1", runId: report.runId,
+    mode: "observe", observations: report.observations,
+    dataGaps: report.dataGaps, requests: report.requests,
+    deliveredBytes: report.deliveredBytes
+  };
+  const empty = assessObservationEvidence({
+    observeExitCode: 0, observeReport, readback
+  });
+  assert.equal(empty.cleanBoundedTermination, true);
+  assert.equal(empty.terminalVerified, true);
+  assert.equal(empty.accepted, false);
+  assert.equal(empty.outcome, "FAILED_DATA_ACCEPTANCE");
+
+  const accepted = assessObservationEvidence({
+    observeExitCode: 0, observeReport: { ...observeReport, observations: 1 },
+    readback: { ...readback, report: { ...report, observations: 1 } }
+  });
+  assert.equal(accepted.accepted, true);
+  assert.equal(accepted.outcome, "DATA_ACCEPTED");
+
+  const unverified = assessObservationEvidence({
+    observeExitCode: 0, observeReport,
+    readback: { ...readback, reconciliation: "INCOMPLETE_READ_ONLY" }
+  });
+  assert.equal(unverified.cleanBoundedTermination, false);
+  assert.equal(unverified.accepted, false);
+});
+
+test("manual observation workflow is fixed, owner-dispatched, and retains failed evidence", () => {
+  const trigger = OBSERVE_WORKFLOW.match(/^on:\n([\s\S]*?)(?=^permissions:)/m)?.[1];
+  assert.equal(trigger.trim(), "workflow_dispatch:");
+  assert.doesNotMatch(trigger, /schedule:|pull_request:|push:|inputs:/);
+  for (const required of [
+    "github.actor == 'Achi1984'",
+    "github.triggering_actor == 'Achi1984'",
+    "github.ref == 'refs/heads/main'",
+    "github.run_number == 1",
+    "github.run_attempt == 1",
+    "timeout-minutes: 5",
+    "contents: read",
+    "ref: 81edf0b5dc3d455c2c1e1906791d56c731bea0c9",
+    "--mode observe --network",
+    "--max-cycles 2",
+    "--max-duration-ms 120000",
+    "--poll-interval-ms 60000",
+    "retention-days: 14"
+  ]) assert.ok(OBSERVE_WORKFLOW.includes(required), required);
+  assert.equal((OBSERVE_WORKFLOW.match(/actions\/checkout@11bd71901bbe5b1630ceea73d27597364c9af683/g) || []).length, 2);
+  assert.match(OBSERVE_WORKFLOW, /actions\/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020/);
+  assert.match(OBSERVE_WORKFLOW, /actions\/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02/);
+  assert.match(OBSERVE_WORKFLOW, /if: always\(\)[\s\S]*?Retain evidence, including failed attempts/);
+  assert.doesNotMatch(OBSERVE_WORKFLOW, /secrets\.|--mode paper|schedule:|pull_request:/);
+});
 
 function priceRow(timestamp, price) {
   return [timestamp, price, price, price, price, price, "1.00000000", 1];
