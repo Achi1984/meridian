@@ -1,0 +1,64 @@
+{
+  "schemaVersion": "SPOT_PAPER_SIGNAL_REPLAY_EVIDENCE_V1",
+  "verifiedDate": "2026-11-07",
+  "artifact": {
+    "workflowRunId": "42395522899",
+    "workflowRunAttempt": 1,
+    "artifactId": "13585515926",
+    "name": "spot-paper-pilot-42395522899-1",
+    "bytes": 864609,
+    "sha256": "9523a42d2b725a360425ff7452715b12a8b5e16b12b91995c617b3c38c3aebb4"
+  },
+  "identity": {
+    "acceptedSourceSha": "81edf0b5dc3d455c2c1e1906791d56c731bea0c9",
+    "workflowSha": "ddae14f01583196dfc9e9da906dcd03d41d58369",
+    "runId": "spot-paper-42395522899-1",
+    "model": "BTC_EUR_SMA5_SMA20_V1"
+  },
+  "integrity": {
+    "sha256SumsEntries": 128,
+    "sha256SumsAllVerified": true,
+    "uniqueReferencedResponses": 120,
+    "referencedResponseBytes": 3404502,
+    "missingReferencedResponses": 0,
+    "mismatchedReferencedResponses": 0,
+    "readbackReconstructedFromJournalMatches": true
+  },
+  "inputDigests": {
+    "SHA256SUMS": "5155500e0587b2e4a8b36779651944e604ac2724261cd3d92ce35cd59b9fb792",
+    "data/spot-paper-42395522899-1/journal.json": "3a9c3124173e50b24869a61a06b555cb8aed6688d153a50586266f69e73abccb",
+    "readback.stdout.json": "53a32d3921bd2252ab027898a4bfc7cf609e7c66de6eff0fdfdaa136b7e1bd40",
+    "pilot-manifest.json": "46d3b49d6216ff7488e16e3cc73cda61480e64ad7f418f6d38cea44982ff30ab",
+    "assessment.json": "55bbb4ab572490b1110cf792c0af6588ca66761c167cdcd74ea7864f4a37408b"
+  },
+  "checker": {
+    "path": "scripts/spot-paper-pilot/signal-replay.mjs",
+    "sha256": "8f168c1ca20d9a3ac18b0e1725ddaa49057c8afb273b51f4c01e4071024f3555",
+    "corePath": "scripts/spot-paper-pilot/core.mjs",
+    "coreSha256": "55f91f9e81f20a146eb46201e01cadd26c8b7cd8127f15170537b1cf4ee5edc1",
+    "nodeVersion": "v22.23.4",
+    "workingDirectory": "/home/runner/work/meridian/meridian",
+    "command": "node scripts/spot-paper-pilot/signal-replay.mjs /tmp/meridian-42395522899/retained/readback.stdout.json /tmp/meridian-42395522899/retained/pilot-manifest.json /tmp/meridian-42395522899/retained/data/spot-paper-42395522899-1 /tmp/meridian-42395522899/signal-replay.json"
+  },
+  "readOnlyReconstruction": {
+    "command": "node /home/runner/work/meridian/meridian/scripts/spot-paper-pilot/cli.mjs --mode report --data-root /tmp/meridian-42395522899/retained/data --run-id spot-paper-42395522899-1",
+    "outputSha256": "53a32d3921bd2252ab027898a4bfc7cf609e7c66de6eff0fdfdaa136b7e1bd40",
+    "matchesRetainedReadback": true
+  },
+  "result": {
+    "outcome": "PASS",
+    "identity": "PASS",
+    "signalReplay": "PASS",
+    "fillCausality": "PASS",
+    "startupCutoff": "PASS",
+    "supportedClaim": "Replayed 8 claimed SMA signal(s) against retained closed candles; this does not assess profitability.",
+    "replayedSignals": 8,
+    "sampledStopCount": 0,
+    "discrepancies": []
+  },
+  "limitations": [
+    "The retained original assessment remains unchanged and reports signalReplay NOT_PERFORMED.",
+    "This replay does not assess profitability, strategy quality, or a full-hour run.",
+    "No new paper run, provider call, scheduler, activation, or real trading was performed."
+  ]
+}
