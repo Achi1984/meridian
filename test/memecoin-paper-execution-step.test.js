@@ -870,11 +870,15 @@ function explicitNetModeledKit() {
   let modeledOpenedAt = null;
   const issue = async (side, amountAtoms, at, {
     equityCents = "90000", availableCashCents = "95000", fxRate = "900000",
-    positionOpenedAt = modeledOpenedAt
+    positionOpenedAt = modeledOpenedAt, sourceOutAmount = "17057460",
+    sourceThreshold = "16972172", authorizedAt
   } = {}) => {
     clock.t = at;
     body = side === "ENTRY"
-      ? syntheticOrderResponse({inputMint: token.quote, outputMint: token.mint}).body
+      ? syntheticOrderResponse({
+        inputMint: token.quote, outputMint: token.mint, inAmount: amountAtoms,
+        outAmount: sourceOutAmount, otherAmountThreshold: sourceThreshold
+      }).body
       : syntheticOrderResponse({
         inputMint: token.mint, outputMint: token.quote, inAmount: amountAtoms,
         outAmount: (BigInt(amountAtoms) * 100_000_000n / 17_057_460n).toString(),
@@ -888,7 +892,7 @@ function explicitNetModeledKit() {
       identity, side, amountAtoms, quoteDecimals: 6,
       candidateSampledAt: side === "ENTRY" ? START : at - 2000,
       slippageBps: 50,
-      ...(side === "ENTRY" ? {authorizedAt: at - 1000} : {positionOpenedAt})
+      ...(side === "ENTRY" ? {authorizedAt: authorizedAt ?? at - 1000} : {positionOpenedAt})
     };
     const result = await adapter.getPaperQuote(request, {reviewScenario: config});
     const issued = adapter.issueModeledQuote(result, {identity, side, amountAtoms, policy});
@@ -952,6 +956,96 @@ test("modeled entry, exit and restart: exact quantity, bound policy, replayed pr
   assert.equal(exitAudit.provenance, "MODELED");
   assert.equal(exitAudit.modeledDigest, exitQuote.modeled.digest);
   assert.equal(entryQuote.modeled.executionRealistic, false);
+  await reopened.close();
+});
+
+test("V2 fixture entry and exit replay preserve one effect and read-only ledger provenance", async t => {
+  const kit = explicitNetModeledKit();
+  const {step, session, store, directory} = await modeledSetup(t, kit);
+  const auth = await step.authorizeEntry(authorization());
+  const entryIssue = await kit.issue("ENTRY", "100000000", START + 2000, {
+    equityCents: "50000", availableCashCents: "3500", fxRate: "800000"
+  });
+  assert.equal(entryIssue.issued.ok, true);
+  const entryQuote = {...entryIssue.issued.quote, eventId: "v2-entry"};
+  const entryInput = {
+    eventId: "v2-entry", authorizationId: auth.authorizationId,
+    quote: entryQuote, now: START + 2000, marks: []
+  };
+  const fill = await step.executeEntry(entryInput);
+  assert.equal(fill.status, "FILLED_PAPER");
+  assert.equal(fill.provenance, "MODELED");
+  const afterEntry = session.metadata.sequence;
+  assert.deepEqual(await step.executeEntry(entryInput), fill);
+  for (const mutate of [
+    modeled => { modeled.scenarioBinding.scenarioConfiguration.explicitAssumptions.feeCents = "12"; },
+    modeled => { modeled.methodologyDigest = "d".repeat(64); }
+  ]) {
+    const modeled = structuredClone(entryQuote.modeled);
+    mutate(modeled);
+    assert.equal((await step.executeEntry({
+      ...entryInput, quote: {...entryQuote, modeled}
+    })).status, "REJECT");
+  }
+  const alteredCosts = structuredClone(entryQuote);
+  alteredCosts.costs.networkCents = String(BigInt(alteredCosts.costs.networkCents) + 1n);
+  assert.equal((await step.executeEntry({...entryInput, quote: alteredCosts})).status, "REJECT");
+  assert.equal(session.metadata.sequence, afterEntry);
+  assert.equal(session.snapshot().summary.openPositions.length, 1);
+  assert.equal(session.snapshot().summary.openPositions[0].tokenAtoms, fill.tokenAtoms);
+
+  const exitIssue = await kit.issue("EXIT", fill.tokenAtoms, START + 5000, {
+    equityCents: "90000", availableCashCents: "95000", fxRate: "750000"
+  });
+  assert.equal(exitIssue.issued.ok, true);
+  const exitQuote = {...exitIssue.issued.quote, eventId: "v2-exit"};
+  const exitInput = {eventId: "v2-exit", quote: exitQuote, now: START + 5000};
+  const closed = await step.observeExitQuote(exitInput);
+  assert.equal(closed.status, "CLOSED_PAPER");
+  assert.equal(closed.provenance, "MODELED");
+  const afterExit = session.metadata.sequence;
+  assert.deepEqual(await step.observeExitQuote(exitInput), closed);
+  const alteredExit = structuredClone(exitQuote);
+  alteredExit.modeled.scenarioBinding.scenarioConfiguration.explicitAssumptions.networkCents = "38";
+  assert.equal((await step.observeExitQuote({...exitInput, quote: alteredExit})).status, "REJECT");
+  assert.equal(session.metadata.sequence, afterExit);
+
+  const live = session.snapshot();
+  assert.equal(live.summary.openPositions.length, 0);
+  assert.equal(live.auditEvents.filter(event => event.type === "PAPER_FILL").length, 1);
+  assert.equal(live.auditEvents.filter(event => event.type === "PAPER_EXIT").length, 1);
+  const entryAudit = live.auditEvents.find(event => event.type === "PAPER_FILL");
+  const exitAudit = live.auditEvents.find(event => event.type === "PAPER_EXIT");
+  assert.equal(entryAudit.tokenAtoms, fill.tokenAtoms);
+  assert.equal(entryAudit.provenance, "MODELED");
+  assert.equal(entryAudit.modeledDigest, entryQuote.modeled.digest);
+  assert.equal(exitAudit.provenance, "MODELED");
+  assert.equal(exitAudit.modeledDigest, exitQuote.modeled.digest);
+
+  const beforeClose = await store.readCheckpoint();
+  const records = JSON.parse(beforeClose.bytes).records;
+  const entryRecord = records.find(record => record.method === "executeEntry");
+  const exitRecord = records.find(record => record.method === "observeExitQuote");
+  assert.equal(entryRecord.inputs.quote.modeled.digest, entryQuote.modeled.digest);
+  assert.equal(exitRecord.inputs.quote.modeled.digest, exitQuote.modeled.digest);
+  assert.equal(entryRecord.resultDigest, fill.receipt.resultDigest);
+  assert.equal(exitRecord.resultDigest, closed.receipt.resultDigest);
+
+  await session.close();
+  const reopenedStore = await CheckpointStore.open(directory);
+  const reopened = await PaperCheckpointSession.open({store: reopenedStore});
+  const replay = reopened.snapshot();
+  assert.deepEqual(replay, live);
+  assert.equal(replay.summary.cashCents, live.summary.cashCents);
+  assert.equal(replay.summary.openPositions.length, live.summary.openPositions.length);
+  assert.deepEqual(replay.auditEvents, live.auditEvents);
+  assert.equal(replay.auditEvents.find(event => event.type === "PAPER_FILL").tokenAtoms, fill.tokenAtoms);
+  const replayedCheckpoint = await reopenedStore.readCheckpoint();
+  assert.deepEqual(replayedCheckpoint.bytes, beforeClose.bytes);
+  assert.deepEqual(
+    JSON.parse(replayedCheckpoint.bytes).records.map(record => record.resultDigest),
+    records.map(record => record.resultDigest)
+  );
   await reopened.close();
 });
 
@@ -1095,6 +1189,40 @@ test("explicit-net entry sized to an earlier budget is not resized to current le
   assert.match(refused.reason, /current risk budget/);
   assert.equal(session.snapshot().summary.cashCents, cashAfterExit);
   assert.equal(session.snapshot().summary.openPositions.length, 0);
+
+  const pending = await step.riskSnapshot({
+    eventId: "budget-reservation-pending", now: START + 18_000, marks: []
+  });
+  assert.equal(pending.reservedPositions, 1);
+  assert.equal(pending.openPositions, 0);
+  const smallerIssue = await kit.issue("ENTRY", "50000000", START + 20_000, {
+    equityCents: "100000", availableCashCents: "100000", fxRate: "800000",
+    sourceOutAmount: "8528730", sourceThreshold: "8480000", authorizedAt: START + 6000
+  });
+  assert.equal(smallerIssue.issued.ok, true, JSON.stringify(smallerIssue));
+  assert.ok(BigInt(smallerIssue.issued.quote.modeled.baseAtoms) <
+    BigInt(oversized.issued.quote.modeled.baseAtoms));
+  const smallerInput = {
+    eventId: "budget-smaller-entry", authorizationId: secondAuth.authorizationId,
+    quote: {...smallerIssue.issued.quote, eventId: "budget-smaller-entry"},
+    now: START + 20_000, marks: []
+  };
+  const smallerFill = await step.executeEntry(smallerInput);
+  assert.equal(smallerFill.status, "FILLED_PAPER", JSON.stringify(smallerFill));
+  assert.equal(smallerFill.tokenAtoms, smallerIssue.issued.quote.modeled.baseAtoms);
+  assert.equal(session.snapshot().summary.cashCents,
+    (BigInt(cashAfterExit) - BigInt(smallerFill.allInCents)).toString());
+  const cashAfterRetry = session.snapshot().summary.cashCents;
+  const retrySequence = session.metadata.sequence;
+  assert.deepEqual(await step.executeEntry(smallerInput), smallerFill);
+  assert.equal(session.metadata.sequence, retrySequence);
+  assert.equal(session.snapshot().summary.cashCents, cashAfterRetry);
+  const consumed = await step.riskSnapshot({
+    eventId: "budget-reservation-consumed", now: START + 21_000, marks: []
+  });
+  assert.equal(consumed.reservedPositions, 0);
+  assert.equal(consumed.openPositions, 1);
+  assert.equal(consumed.cashCents.toString(), cashAfterRetry);
 });
 
 test("a valid issuer quote under a changed policy is refused before any state mutation", async t => {
