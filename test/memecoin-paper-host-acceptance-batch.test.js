@@ -106,6 +106,22 @@ function options(harness, extra = {}) {
   };
 }
 
+function deferred() {
+  let resolve;
+  const promise = new Promise(value => { resolve = value; });
+  return {promise, resolve};
+}
+
+function boundedWait(promise, timeoutMs, message) {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+    })
+  ]).finally(() => clearTimeout(timer));
+}
+
 function fakeSpawn({stdout = "{}", stderr = "", code = 0, signal = null, onKill} = {}) {
   return () => {
     const child = new EventEmitter();
@@ -526,16 +542,18 @@ test("late filesystem completion cannot dispatch a proof or clear the claim", as
 for (const delayedOperation of ["stat", "read"]) {
   test(`cancellation during delayed ${delayedOperation} closes the opened evidence handle`, async t => {
     const harness = await fixture(t);
+    const operationEntered = deferred();
+    const releaseOperation = deferred();
+    const closeCompleted = deferred();
+    const signalSource = new EventEmitter();
     let closeAttempts = 0;
-    let delayed = false;
     const delayedFs = {
       open: async (filename, ...args) => {
         const handle = await open(filename, ...args);
         if (path.basename(filename) !== "config.json") return handle;
         const delay = async () => {
-          if (delayed) return;
-          delayed = true;
-          await new Promise(resolve => setTimeout(resolve, 500));
+          operationEntered.resolve();
+          await releaseOperation.promise;
         };
         return {
           stat: async () => {
@@ -548,13 +566,18 @@ for (const delayedOperation of ["stat", "read"]) {
           },
           close: async () => {
             closeAttempts += 1;
-            return handle.close();
+            try {
+              return await handle.close();
+            } finally {
+              closeCompleted.resolve();
+            }
           }
         };
       }
     };
-    const result = await execute(harness, {
-      timeoutMs: 150,
+    const pending = execute(harness, {
+      timeoutMs: 60_000,
+      signalSource,
       fileSystem: delayedFs,
       spawnImpl: (_command, _args, childOptions) => fakeSpawn({
         stdout: JSON.stringify(validPipelineChild(
@@ -563,10 +586,26 @@ for (const delayedOperation of ["stat", "read"]) {
         code: 0
       })()
     });
+    let cancelled = false;
+    let result;
+    try {
+      await boundedWait(operationEntered.promise, 10_000,
+        `${delayedOperation} was not entered before the watchdog`);
+      signalSource.emit("SIGTERM");
+      cancelled = true;
+      result = await boundedWait(pending, 10_000,
+        "batch cancellation did not return before the watchdog");
+    } finally {
+      if (!cancelled) signalSource.emit("SIGTERM");
+      releaseOperation.resolve();
+      await boundedWait(pending, 10_000,
+        "batch operation did not settle after releasing the delayed filesystem call");
+    }
     assert.equal(result.status, "UNKNOWN");
-    assert.equal(result.code, "BATCH_DEADLINE_EXCEEDED");
-    await new Promise(resolve => setTimeout(resolve, 550));
-    assert.ok(closeAttempts > 0, "the descriptor close should be attempted after abort");
+    assert.equal(result.code, "BATCH_CANCELLED");
+    await boundedWait(closeCompleted.promise, 10_000,
+      "the opened evidence descriptor was not closed before the watchdog");
+    assert.equal(closeAttempts, 1, "the descriptor close should complete exactly once");
     const proofDirectory = path.join(
       harness.storageRoot, IDENTITY.runId, "pipeline_quote"
     );
