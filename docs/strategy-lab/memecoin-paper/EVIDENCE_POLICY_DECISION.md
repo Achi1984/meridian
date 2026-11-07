@@ -1,9 +1,19 @@
-# Live Paper evidence policy — decision proposal v1.0
+# Live Paper evidence policy — decision proposal v1.1
 
-**Status: PROPOSAL FOR LEAD REVIEW — NOT ADOPTED.** This document recommends
-definitions for four unresolved evidence families. It changes no code, accepted
-gate, score threshold, source configuration, or operating authority. It is not
-an activation request. Lead review must precede asking the owner to decide.
+**Status: REVIEW REVISION v1.1 — PROPOSAL FOR LEAD REVIEW — NOT ADOPTED.**
+This corrects the v1.0 draft in response to review; it recommends definitions
+for four unresolved evidence families. It changes no code, accepted gate, score
+threshold, source configuration, or operating authority. It is not an
+activation request. Lead review must precede asking the owner to decide.
+
+> **Material limitation:** the proposed launch-role holdings proxy is narrower
+> than “developer-associated holdings.” It can miss other addresses controlled
+> by the same person, including tokens transferred to an unproven related
+> wallet. This is a material reduction in protection; keeping the numeric 3%
+> limit does **not** preserve the current gate's intended coverage. Owner
+> approval of this proposal alone does not clear a gate or make the experiment
+> eligible. Named RPC trust and bundle-supply measurement remain separate
+> unresolved owner decisions.
 
 ## Recommendation and minimum scope
 
@@ -20,10 +30,14 @@ only the following narrow evidence scope:
 - Treat direct on-chain launch roles as role evidence, not proof of a person's
   identity, beneficial ownership, or a complete developer roster. Unless a
   finite, reviewed attribution set is accepted, the existing developer
-  holdings gate remains `UNKNOWN`.
+  holdings gate remains `UNKNOWN`. Even if accepted, the proxy misses
+  unproven related addresses and is materially narrower than the current
+  developer-holdings intent.
 - Bound prior-history screening to the 90×24-hour UTC interval before candidate
-  time and only the finite, reviewed role-address set. A result can describe that
-  window; it cannot mean “never rugged.”
+  time and only the finite, reviewed role-address set for a negative screen.
+  Known, credible, attributable qualifying positive evidence outside that
+  interval still rejects. A negative result can describe only its complete
+  90-day window; it cannot mean “never rugged.”
 - Require source-verified bundle membership before calling any transaction a
   bundle. The existing bundle-supply gate stays `UNKNOWN` until both membership
   coverage and an owner-approved supply numerator are available. Same-slot
@@ -41,6 +55,21 @@ adapters still lack the required authentication, coverage, or policy decisions.
 Missing, truncated, unsupported, or ambiguous evidence remains `UNKNOWN`; a
 measured threshold breach remains `REJECT`. A bounded scan can establish “no
 qualifying event in the completely screened scope,” never universal absence.
+
+### Decisions that remain blockers after proposal approval
+
+1. The owner must name the RPC operator/endpoint and approve its identity,
+   finalized-response, and untruncated-completeness trust basis before same-slot
+   census diagnostics can become gate evidence.
+2. The owner must approve a bundle-supply numerator/denominator and acceptable
+   source for exact-signature bundle membership. Without both, the bundle gate
+   remains `UNKNOWN`, even if the other proposal definitions are accepted.
+3. The owner must explicitly accept or reject the material narrowing of the
+   developer gate to the launch-role proxy. If not accepted, that gate remains
+   `UNKNOWN`; if accepted, the proxy still must not be described as a complete
+   human developer roster.
+
+None of these decisions authorizes source use, acquisition, or a Paper run.
 
 ## Time, identity, and source-trust rules
 
@@ -137,7 +166,12 @@ This is narrower than a claim about “all developer wallets.” If a complete
 reviewed role scope or trusted complete census is unavailable, the developer
 gate is `UNKNOWN`, not 0%. If the owner does not accept launch-role addresses as
 the operational proxy for the existing developer gate, it remains `UNKNOWN`;
-do not rename the proxy as proven developer identity.
+do not rename the proxy as proven developer identity. This is a material
+narrowing: tokens moved to another address controlled by the same person escape
+the proxy unless that address is independently established as a launch role.
+Holding the numeric 3% limit unchanged does not preserve the breadth of the
+intended developer-protection gate. This proposal does not claim that protection
+is equivalent.
 
 ### Evidence and outcomes
 
@@ -177,14 +211,19 @@ same-slot census. Do not duplicate the token normalizer, census collector, or
 
 For each address in the accepted finite launch-role set, screen historical
 events in `[T − 90×24 hours, T)`, inclusive at the start and exclusive at `T`,
-using UTC epoch time.
+using UTC epoch time. This is a bounded **negative-screen** window, not a
+discard rule for older positive evidence. Any independently reviewed,
+attributable qualifying rug evidence for an address in that accepted role set,
+already available or discovered outside that interval, remains eligible to
+trigger `REJECT`; do not suppress a known older event because it falls outside
+the negative-screen window.
 Screen only the supported token/pool models and projects directly attributable
 to those role addresses. Use finalized transactions and source event times;
 the actual acquisition interval is recorded separately. The existing
 launch-history limits (10 declared subjects, 20 pages per subject, 2,000
 signatures and 1,000 transactions per invocation) remain hard bounds; do not
-raise them to force a negative finding. If a limit prevents interval closure,
-return `UNKNOWN`.
+raise them to force a negative finding. If a limit prevents interval closure and
+no qualifying positive event has been established, return `UNKNOWN`.
 
 For this proposal, raw facts such as a prior authority, a mint, a token transfer,
 low price, price collapse, a pool-creator match, or a same-slot cluster are not
@@ -198,15 +237,17 @@ a “rug.” A positive prior-rug finding requires both:
    and outcome evidence. A liquidity withdrawal or price collapse alone is
    insufficient; price collapse is not proof of intent.
 
-The reducer returns `REJECT` only for a complete, source-trusted, in-scope
-screen containing such a reviewed qualifying event. It may return `PASS` only
-as `NO_QUALIFYING_EVENT_IN_COMPLETE_90D_SCOPE` when every declared subject and
-the complete 90-day interval have accepted source coverage and no qualifying
-event is present. That result says nothing about earlier events, other
+The reducer is monotonic for positive evidence: one credible, source-trusted,
+directly attributable, independently reviewed qualifying event returns
+`REJECT`, even when other subjects, transactions, or unrelated history are
+incomplete. Full coverage is required only to return the negative result
+`PASS: NO_QUALIFYING_EVENT_IN_COMPLETE_90D_SCOPE`, and only when every declared
+subject and the complete 90-day interval have accepted source coverage with no
+qualifying event. That result says nothing about earlier events, other
 addresses/projects, unobserved chains, or universal absence of rugs. If the
-source cannot establish complete history for this finite query, the negative
-result is `UNKNOWN`. Current RPC cursor exhaustion alone does not establish
-archival completeness.
+source cannot establish complete history for this finite query and no
+qualifying positive event is established, the result is `UNKNOWN`. Current RPC
+cursor exhaustion alone does not establish archival completeness.
 
 ### Evidence and outcomes
 
@@ -217,23 +258,27 @@ event-time/slot mapping; pool state before/after any alleged extraction;
 outcome evidence; and an independent reviewer disposition bound to those exact
 records.
 
-- **PASS example:** a reviewed role set contains one key; the approved source
-  attests complete, finalized coverage for its entire prior 90-day history;
-  all supported prior projects and relevant pool events are reconciled; there
-  is no independently reviewed qualifying event. Result:
+- **PASS example (negative only):** a reviewed role set contains one key; the
+  approved source attests complete, finalized coverage for its entire prior
+  90-day history; all supported prior projects and relevant pool events are
+  reconciled; there is no independently reviewed qualifying event. Result:
   `NO_QUALIFYING_EVENT_IN_COMPLETE_90D_SCOPE`, not “no rugs ever.”
 - **UNKNOWN example:** `getSignaturesForAddress` reaches its finite cursor/page
-  bound before the 90-day start, an older transaction cannot be retrieved, or
-  the source only has non-archival coverage. Empty returned rows or a
+  bound before the 90-day start, or the source only has non-archival coverage,
+  and no qualifying positive event is established. Empty returned rows or a
   price-collapse chart cannot turn this into a pass.
 - **REJECT example:** the same directly attributed launch-role key has an
   independently reviewed prior event record, bound to successful supported
   pool transactions and outcome evidence, satisfying the approved
-  deceptive-extraction disposition.
+  deceptive-extraction disposition. This remains `REJECT` even if another
+  address's history is incomplete or this known event predates the 90-day
+  negative-screen interval.
 
-**Failure:** incomplete subjects, truncation, missing timestamps, failed or
-unsupported transactions, unknown attribution, missing outcome evidence,
-unreviewed event classification, or untrusted source returns `UNKNOWN`.
+**Failure:** absent a qualifying positive event for an accepted role address,
+incomplete subjects, truncation, missing timestamps, failed or unsupported
+transactions, unknown attribution, missing outcome evidence, unreviewed event
+classification, or untrusted source returns `UNKNOWN`, not a clean-history
+result. A qualifying positive event is not downgraded by unrelated gaps.
 Disagreement over intent remains `UNKNOWN`; do not infer intent from a price
 series.
 
@@ -248,10 +293,23 @@ separately from reviewer disposition. Do not map the existing
 
 A bundle is proven only when an independently trusted bundle source returns a
 bundle identifier/status that binds the exact successful member signatures.
-The candidate launch scope is the mint's initialization slot and successful
-candidate-pool swap transactions in that slot. Require complete transaction
-coverage for that slot and an independently source-verified membership result
-for the relevant signatures. Same-slot transactions, temporal clustering,
+Do not anchor the bundle window to mint initialization. For the supported
+Raydium CPMM model, anchor it to the selected pool's successful finalized
+`initialize` instruction: the instruction must name the exact selected pool,
+and its pool/mint/vault/LP-mint identities must reconcile with the pinned
+Raydium CPMM pool-state decoder. Then identify the first successful supported
+candidate-token swap for that exact pool. Require complete transaction coverage
+from pool initialization through that first swap to establish the trading
+anchor; mint creation may precede pool creation by any duration.
+
+The finite launch window is the inclusive slot range
+`[poolInitializeSlot, poolInitializeSlot + 32]` (at most 33 slot numbers).
+Enumerate produced/skipped slots and all transactions relevant to the selected
+pool in that range. The first successful supported swap must occur within the
+range; otherwise the proposed launch-bundle measure is `UNKNOWN`, not an empty
+bundle result. A bundle candidate is only a successful supported swap in this
+pool/window whose exact signature appears in independently trusted,
+source-verified bundle membership. Same-slot transactions, temporal clustering,
 common funders, and top-holder overlap are not bundle membership.
 
 Proof of membership still does not determine “bundled-launch supply.” A
@@ -260,50 +318,65 @@ supply, retained ownership, or a non-duplicated bundle allocation. To preserve
 the existing hard gate without inventing a misleading denominator, keep the
 percentage and its 10% limit unchanged but leave the gate `UNKNOWN` until the
 owner separately accepts a numerator/denominator rule and complete source
-coverage. Recommended future numerator for decision is the raw candidate-token
-balance, at end of the initialization slot, of unique owners that received
-candidate tokens in a verified bundle-member launch swap; denominator is
-same-slot raw mint supply. This requires complete token-account ownership and
-within-slot balance/transfer reconstruction, including deduplication. It is a
-proposed bundle-associated-holder measure, not an already accepted definition
-of “bundled supply,” and must not be implemented without owner approval. It may
-include unrelated same-slot holdings of a bundle recipient, so it is a
-conservative owner-exposure proxy, not a tracing claim that each counted unit
-originated in the bundle.
+coverage. Recommended future numerator for decision is the end-of-window raw
+candidate-token balance of distinct owners that received candidate tokens in a
+verified bundle-member swap in the finite pool window; denominator is raw mint
+supply at the same end slot. This requires complete token-account ownership and
+account-change coverage through the end slot, including within-window transfers
+and deduplication. This is a proposed bundle-recipient owner-exposure proxy,
+not an accepted definition of “bundled-launch supply” and not a claim that every
+counted unit originated in a bundle. It may include other holdings of a
+recipient. Do not apply the existing 10% threshold to it without explicit
+owner approval of that measurement rule.
 
 ### Evidence and outcomes
 
-Required records: exact mint initialization transaction/slot; every relevant
-successful pool transaction and complete slot coverage; a trusted bundle
-response binding bundle ID/status to exact member signatures; decoded token
-flows; all same-slot token-account owner/balance changes and supply; the
-proposed independent owner aggregation; and an owner-approved versioned
+Required records: exact supported pool initialization transaction/slot and
+reconciled pool/mint/vault/LP-mint state; first successful supported swap
+transaction/slot and complete signature/transaction coverage from initialization
+through it; all produced/skipped slots and all pool-address transaction
+dispositions in the 33-slot maximum window; a trusted bundle response binding
+bundle ID/status to exact member signatures; decoded token flows; complete
+end-slot token-account owner/balance state and same-slot supply; the proposed
+independent owner aggregation; and an owner-approved versioned
 numerator/denominator policy.
 
 - **PASS example (conditional on that additional decision):** complete
-  initialization-slot history and bundle-membership records identify the exact
-  successful bundle members; their recipient owners are resolved and deduped
-  from complete same-slot records; the approved bundle-associated-holder
-  numerator is 8% of same-slot supply. Only after the owner accepts this
-  measure would the unchanged 10% gate pass.
-- **UNKNOWN example:** several unrelated buys share a slot with initialization,
-  but no trusted response binds their signatures to a bundle ID. Record the
-  transactions as same-slot purchases only; bundle membership and bundled
-  supply remain `UNKNOWN`.
+  pool initialization is verified at slot 150, the first supported swap at
+  slot 151, complete coverage establishes all relevant transactions through
+  slot 182, and trusted membership binds exact swap signatures. Under a
+  separately approved owner-exposure numerator, deduped recipient-owner
+  balances are 8% of raw supply at slot 182. Only then could the unchanged 10%
+  gate pass.
+- **UNKNOWN example:** mint initialization is at slot 100, but the selected
+  pool is initialized at slot 150 and first trades at slot 151. A scan anchored
+  only at mint initialization does not establish this pool's launch window.
+  Correct pool anchoring still requires verifying pool initialization and
+  complete coverage to its first swap; if either is missing, result is
+  `UNKNOWN`.
+- **UNKNOWN example:** several unrelated buys share a slot with pool
+  initialization, but no trusted response binds their signatures to a bundle
+  ID. Record them as same-slot purchases only; membership and supply remain
+  `UNKNOWN`.
 - **UNKNOWN example:** membership is proven, but recipient balances or
-  within-slot transfers are incomplete, or no numerator definition is accepted.
+  end-of-window transfers are incomplete, the first swap cannot be established,
+  or no numerator definition is accepted.
   Do not substitute gross swap volume or cluster size.
 
 **Failure:** missing bundle source/status, signature mismatch, incomplete slot
-coverage, untrusted response, unknown owner, ambiguous transfer accounting, or
-unapproved supply semantics returns `UNKNOWN`. If no source can provide
+coverage, unsupported pool initialization/swap model, untrusted response,
+unknown owner, ambiguous transfer accounting, or unapproved supply semantics
+returns `UNKNOWN`. If no source can provide
 faithful bundle proof, explicitly retain this blocker; do not relabel launch
 clustering as bundles or treat “no bundle record received” as zero bundles.
 
 **Future code seam:** a separate injected bundle-membership source and a
-versioned reducer beside `classifyLaunchHistory()`. No current source or
-classifier produces trusted bundle membership; do not change the existing
-hard-gate adapter to accept same-slot observations.
+versioned reducer beside `classifyLaunchHistory()`, plus a pinned historical
+Raydium CPMM initializer decoder that binds the initialize transaction to the
+selected pool and its decoded state. The existing pool-state decoder does not
+establish the historical initialize transaction or first swap. No current
+source or classifier produces trusted bundle membership; do not change the
+existing hard-gate adapter to accept same-slot observations.
 
 ## 4. Qualified-wallet selection and accounting
 
@@ -326,9 +399,10 @@ Inputs per wallet and mint: successful supported swap signature, slot and
 source event time; wallet owner and token-account identities; raw base-unit
 input/output and decimals; quote asset and amount; exact historical USD
 observations and methodology; each explicit cost component; transfer rows;
-complete opening/closing positions at the 90-day boundaries; candidate-mint
-identity; and verified bundle facts. All amounts use exact integer base units
-and exact monetary units. No nearest-price, peg, or missing-cost substitution.
+complete opening positions at the start and closing positions at `T`; candidate-
+mint identity; and verified bundle facts. All amounts use exact integer base
+units and exact monetary units. No nearest-price, peg, or missing-cost
+substitution.
 
 Use FIFO lots separately for each exact wallet-owner key and mint:
 
@@ -337,26 +411,40 @@ Use FIFO lots separately for each exact wallet-owner key and mint:
   value plus explicit acquisition costs.
 - Successful swap sells consume eligible lots FIFO. A lot counts as one
   completed round trip only when all its acquired units are closed by
-  successful swaps within the interval. Partial sales accumulate against that
-  lot; a still-open remainder does not count. One lot counts once, regardless
-  of the number of sell transactions. A sale closing several lots may close
-  each distinct buy lot, not create extra lots.
-- Realized net result is matched sale proceeds less matched basis and all
-  explicit costs on the matched buy/sell quantities. The aggregate across
-  qualifying closed lots must be strictly positive. Fees/costs must be
-  consistently allocated to partial fills and independently supported; no
-  missing cost is zero.
+  successful swaps within the interval. Count these completed buy lots
+  separately from the P&L calculation below. Partial sales accumulate against
+  the lot; an open remainder means it is not a completed round trip. One lot
+  counts once, regardless of the number of sell transactions. A sale closing
+  several lots may close each distinct buy lot, not create extra lots.
+- Calculate aggregate realized net result over **all eligible realized
+  portions** in the interval, not only fully closed lots. Include realized
+  portions from partially closed lots and from opening inventory when its
+  acquisition basis is fully known; include matched proceeds, basis, and
+  explicit buy/sell costs for each disposed quantity. Do not include
+  unrealized value for units still held. Allocate integer cost remainders
+  deterministically (cumulative proportional allocation, with the final
+  allocation receiving the exact remainder) so partial fills reconcile exactly.
+  The aggregate must be strictly positive after costs.
+- An unknown basis or cost that affects any realized eligible portion, opening
+  inventory consumed by a sale, or the completed-round-trip count makes
+  qualification `UNKNOWN`; do not omit it to improve the result. Fees/costs
+  must be independently supported; no missing cost is zero.
 - Transfers are not buys or sells and realize no P&L. A transfer between token
   accounts with the same exact owner key moves the same lot unchanged. Units
   transferred to or from a different owner key are excluded from qualification;
   do not infer a shared wallet from a common payer or cluster. A sale of
   transferred-in units cannot complete a qualifying lot without its eligible
-  acquisition basis.
+  acquisition basis. If a cross-owner transfer is sold and its basis or
+  disposition cannot be reconciled, qualification is `UNKNOWN`, not a silent
+  exclusion of that realized effect.
 - At the 90-day opening boundary, represent any verified opening balance as
-  non-qualifying inventory with unknown/out-of-window basis. FIFO sales consume
-  that older inventory before in-window lots. Never assume an absent initial
-  position is zero. Missing opening balances, gaps in signatures/transactions,
-  or uncertain transfer provenance make affected qualification `UNKNOWN`.
+  inventory that does not count toward the 10 round trips. FIFO sales consume
+  that older inventory before in-window lots; its realized portions still enter
+  aggregate P&L when the exact basis and costs are known. Unknown opening
+  inventory consumed by a sale makes the aggregate `UNKNOWN`. Never assume an
+  absent initial position is zero. Missing opening balances, gaps in
+  signatures/transactions, or uncertain transfer provenance make affected
+  qualification `UNKNOWN`.
 - Count a mint only once regardless of pools, quote pairs, or repeat trades.
   For this proposal, 5 unrelated mints means 5 distinct mint pubkeys, each with
   at least one counted completed round trip, its own successful initialization
@@ -374,27 +462,33 @@ Use FIFO lots separately for each exact wallet-owner key and mint:
 
 Required records: exact wallet key (no address-cluster inference); full
 `[T−90×24 hours, T)` finalized event coverage and opening balances; complete
-signature/transaction binding; supported swap decoding; transfer classification; FIFO
-lot ledger; exact historical prices, quote conversion and costs; mint
-independence evidence; bundle disposition; and dated, independent,
-versioned qualification review. Overlapping wallet entries are deduplicated by
-exact public key and count once in the Analyst window.
+signature/transaction binding; supported swap decoding; transfer classification;
+FIFO lot ledger; exact historical prices, quote conversion and costs; mint
+independence evidence; bundle disposition; and dated, independent, versioned
+qualification review. Overlapping wallet entries are deduplicated by exact
+public key and count once in the Analyst window.
 
 - **PASS example:** one reviewed wallet has complete opening and event
-  coverage, 12 closed FIFO buy lots across 6 distinct independently initialized
-  mints, no transfer-derived lots, proven exclusion of the candidate mint and
-  bundled-launch lots, all explicit costs and historical USD values, and
-  positive aggregate realized net result. The dated list is effective at `T`.
-  This meets the existing proposed criteria; it is not evidence that the wallet
-  predicts returns.
+  coverage, 12 completed FIFO buy lots across 6 distinct independently
+  initialized mints, no transfer-derived lots, proven exclusion of the candidate
+  mint and bundled-launch lots, all explicit costs and historical USD values,
+  and positive aggregate realized net result after including partial-sale
+  realizations. The dated list is effective at `T`. This meets the existing
+  proposed criteria; it is not evidence that the wallet predicts returns.
+- **NOT QUALIFIED example:** the wallet has +USD 10 net from completed lots but
+  −USD 100 realized on an eligible partially closed lot. Aggregate realized
+  result is −USD 90, so the positive-after-cost criterion fails even though
+  the completed-round-trip count may pass.
 - **UNKNOWN example:** the wallet has 10 apparent buy/sell cycles, but opening
   balances at `T−90d` are missing, transferred-in units cannot be costed, a
-  cost or historical price is missing, a relevant mint's bundle status is
-  unknown, or only 4 mints can be shown unrelated. Do not count transactions,
-  assume zero opening inventory, or relax the existing thresholds.
+  cost or historical price is missing for realized eligible portions, a
+  relevant mint's bundle status is unknown, or only 4 mints can be shown
+  unrelated. Do not count transactions, assume zero opening inventory, omit
+  partial-sale losses, or relax the existing thresholds.
 
 **Failure:** insufficient qualifying lots/mints or nonpositive fully evidenced
-net result does not qualify the wallet. Incomplete evidence, ambiguous
+net result over all eligible realized portions does not qualify the wallet.
+Incomplete evidence, unknown basis that impacts the aggregate, ambiguous
 accounting, missing costs, unknown mint relation, unavailable bundle proof, or
 missing dated review returns `UNKNOWN`/unavailable, not a negative P&L
 substitution. No allowlist entry means the current real `qualifiedSmartWallets`
@@ -409,15 +503,15 @@ allowlist; do not treat diagnostic output as qualification.
 
 ## Current contract versus this proposal
 
-| Topic | Current accepted/proposed contract | Decision proposal v1.0 |
+| Topic | Current accepted/proposed contract | Decision proposal v1.1 |
 |---|---|---|
 | Pair age | 30 minutes–72 hours using pair creation, not mint age | No change |
-| Developer holdings | At most 3%; “developer-associated” attribution is unresolved | Defines a narrow launch-role proxy; not a developer identity claim; gate remains `UNKNOWN` until complete reviewed scope and trusted census |
-| Prior rug | Credible evidence rejects; unknown history is not clean | Proposes a 90-day, finite address/project scope and reviewed positive event; negative means only no qualifying event in complete scope |
-| Bundled launch | At most 10%; bundle meaning/source unresolved | Requires exact independently verified bundle membership; percent remains unresolved until owner accepts a supply measure; same-slot clustering never passes |
-| Qualified wallet | Proposed 90d / 10 round trips / 5 unrelated mints / positive after-cost result | Same criteria and Analyst thresholds; adds explicit FIFO, transfer, opening-position, mint-independence, and bundle accounting |
+| Developer holdings | At most 3%; “developer-associated” attribution is unresolved | Materially narrows attribution to reviewed launch-role addresses; unproven controlled addresses and their transferred balances escape the proxy; unchanged 3% does not preserve coverage; gate remains `UNKNOWN` unless owner accepts the limitation and evidence is complete |
+| Prior rug | Credible evidence rejects; unknown history is not clean | Full coverage of the 90-day finite scope is required only for a negative result; any known credible attributable qualifying positive, including older evidence, rejects despite unrelated gaps |
+| Bundled launch | At most 10%; bundle meaning/source unresolved | Anchor at selected supported pool initialize and first supported swap; inspect only inclusive 33-slot window; exact-signature bundle proof required; supply measure and trusted source remain separate owner decisions; same-slot clustering never passes |
+| Qualified wallet | Proposed 90d / 10 round trips / 5 unrelated mints / positive after-cost result | Same criteria and Analyst thresholds; count completed lots separately from aggregate all eligible realized portions, including partial-sale losses; adds FIFO, transfer, opening-position, mint-independence, and bundle accounting |
 | Analyst score | Existing six inputs, score threshold 70, no missing-component redistribution | No changes; unavailable evidence stays unavailable |
-| Source trust | Hashes and caller receipts are not authentication | Explicit trusted RPC/source decision required before diagnostic evidence may be gate-eligible |
+| Source trust | Hashes and caller receipts are not authentication | Explicit named RPC trust/completeness decision remains unresolved; proposal acceptance alone does not make diagnostics gate-eligible |
 
 Repository evidence for the existing boundaries and implementation seams:
 
@@ -464,6 +558,9 @@ proposal.
 - Solana [Create a Mint](https://solana.com/docs/tokens/basics/create-mint)
   and [SPL Token Program](https://spl.solana.com/token) for mint initialization
   and authority instruction semantics.
+- The pinned [Raydium CPMM initializer](https://github.com/raydium-io/raydium-cp-swap/blob/3d69122790e97cd6aff24e8ba95940793773f58c/programs/cp-swap/src/instructions/initialize.rs)
+  documents the supported pool initialization instruction/layout; the current
+  repository pool-state decoder does not decode its historical transaction.
 - Jito [Low Latency Transaction Send](https://docs.jito.wtf/lowlatencytxnsend/)
   for Jito's documented bundle submission/identifier context. A Solana slot or
   RPC transaction history is not a bundle-membership receipt.
@@ -471,29 +568,41 @@ proposal.
 ## Exact owner decision text for lead review
 
 If lead review accepts this proposal, the following is the recommended owner
-decision to request. It adopts definitions only; it is not permission to
-activate acquisition or a Paper run:
+decision to request. It makes the developer-proxy narrowing explicit and adopts
+definitions only; it does not resolve source-trust or bundle-measurement
+blockers and is not permission to activate acquisition or a Paper run:
 
-> “I approve Evidence Policy Decision Proposal v1.0 for implementation and
+> “I approve Evidence Policy Decision Proposal v1.1 for implementation and
 > review only, subject to these limits: pair age remains 30 minutes–72 hours
 > from pair creation; all existing hard-gate and Analyst thresholds remain
-> unchanged. The developer measure is only the complete, reviewed set of
-> directly evidenced launch-role addresses and is not a claim of beneficial
-> ownership or a complete human developer roster; otherwise that gate stays
-> UNKNOWN. Prior-rug review is limited to the preceding 90 days for that
-> accepted address/project scope; a complete negative means only
-> `NO_QUALIFYING_EVENT_IN_COMPLETE_90D_SCOPE`. A price collapse, shared funder,
-> or same-slot activity is not proof of a rug, common control, or bundle. Bundle
-> membership requires independently trusted exact-signature bundle evidence;
-> bundled-launch supply stays UNKNOWN until I separately approve its numerator
-> and denominator. Qualified wallets retain the existing 90-day, 10 completed
-> round-trip, 5 unrelated-mint, positive-after-cost criteria, with the
-> documented FIFO, transfer, opening-position, mint-independence, candidate-
-> mint, and bundle exclusions. I separately approve the named RPC source and
-> its trust/completeness basis before same-slot diagnostics can be used as
-> gate evidence. Nothing in this decision approves a provider request,
-> credential, paid service, live acquisition, run, activation, or readiness
-> claim; missing or unsupported evidence continues to block.”
+> unchanged. I understand and accept that the launch-role holdings measure is
+> materially narrower than all developer-associated holdings: it can miss
+> other addresses under the same human controller, and balances transferred
+> to an address outside the proven role set are not counted. The unchanged 3%
+> limit does not preserve the prior intended breadth of protection; this
+> definition is only a limited proxy, not a complete developer roster. A
+> negative prior-rug result requires complete coverage only for the preceding
+> 90×24-hour UTC interval
+> and finite reviewed address/project scope, and means only
+> `NO_QUALIFYING_EVENT_IN_COMPLETE_90D_SCOPE`; known credible attributable
+> qualifying positive evidence, including evidence older than 90 days, remains
+> REJECT even if unrelated history is incomplete. A price collapse, shared
+> funder, or same-slot activity is not proof of a rug, common control, or bundle.
+> Bundle membership requires independently trusted exact-signature evidence
+> within the selected supported pool's verified initialize-to-first-swap
+> 33-slot window. This statement does not approve or select a bundle source or
+> numerator/denominator; the bundled-launch supply gate remains UNKNOWN.
+> Qualified wallets retain the existing 90-day, 10 completed round-trip,
+> 5 unrelated-mint, positive-after-cost criteria; completed round-trip count
+> is separate from aggregate P&L, which includes all eligible realized portions
+> and costs, including partial-sale losses. FIFO, transfer, opening-position,
+> mint-independence, candidate-mint, and bundle exclusions remain as specified.
+> This statement does not name or approve an RPC source or its trust/
+> completeness basis; same-slot diagnostics remain ineligible as gate evidence
+> until that separate decision is made. Nothing in this decision approves a
+> provider request, credential, paid service, live acquisition, run,
+> activation, or readiness claim; missing or unsupported evidence continues
+> to block.”
 
 No owner decision has been made by publishing this proposal. Until separately
 decided and implemented, all current code behavior and `UNKNOWN` dispositions
