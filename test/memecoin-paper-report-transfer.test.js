@@ -1372,11 +1372,49 @@ test("dedicated report pool requires verified TLS and rejects connection-string 
   const defaults = createPrivatePaperReportPoolOptions("postgres://localhost/report");
   assert.deepEqual(defaults.ssl, {rejectUnauthorized: true});
   assert.equal(defaults.max, PAPER_REPORT_POOL_OPTIONS.max);
+  assert.throws(
+    () => createPrivatePaperReportPoolOptions("postgres://localhost/report?sslmode=require"),
+    /must not override TLS options/
+  );
+  for (const sslmode of ["require", "verify-ca", "verify-full"]) {
+    const options = createPrivatePaperReportPoolOptions(
+      `postgres://localhost/report?application_name=paper&sslmode=${sslmode}`,
+      {allowSecureSslmodeHint: true}
+    );
+    assert.equal(new URL(options.connectionString).searchParams.has("sslmode"), false);
+    assert.deepEqual([...new URL(options.connectionString).searchParams.keys()], ["application_name"]);
+    assert.equal(new URL(options.connectionString).searchParams.get("application_name"), "paper");
+    assert.deepEqual(options.ssl, {rejectUnauthorized: true});
+  }
+  const optInKey = "MERIDIAN_PAPER_REPORT_NORMALIZE_SECURE_SSLMODE";
+  const priorOptIn = process.env[optInKey];
+  try {
+    process.env[optInKey] = "true";
+    const options = createPrivatePaperReportPoolOptions(
+      "postgres://localhost/report?sslmode=verify-full"
+    );
+    assert.equal(new URL(options.connectionString).searchParams.has("sslmode"), false);
+    assert.deepEqual(options.ssl, {rejectUnauthorized: true});
+  } finally {
+    if (priorOptIn === undefined) delete process.env[optInKey];
+    else process.env[optInKey] = priorOptIn;
+  }
   for (const connectionString of [
     "postgres://localhost/report?sslmode=require",
     "postgres://localhost/report?sslmode=disable",
+    "postgres://localhost/report?sslmode=prefer",
+    "postgres://localhost/report?sslmode=allow",
+    "postgres://localhost/report?sslmode=unknown",
+    "postgres://localhost/report?sslmode=Require",
+    "postgres://localhost/report?SSLMODE=require",
+    "postgres://localhost/report?sslmode=require&sslmode=verify-full",
+    "postgres://localhost/report?sslmode=require&SSLMODE=verify-full",
+    "postgres://localhost/report?sslmode=require&sslrootcert=%2Ftmp%2Fca.pem",
+    "postgres://localhost/report?sslcert=%2Ftmp%2Fclient.pem",
     "postgres://localhost/report?ssl=no-verify",
     "postgres://localhost/report?sslrootcert=%2Ftmp%2Fca.pem",
+    "postgres://localhost/report?sslpassword=secret",
+    "postgres://localhost/report?tlsmode=verify-full",
     "host=localhost dbname=report sslmode='require'",
     "host=localhost dbname=report ssl=no-verify",
     "host=localhost dbname=report sslcert=/tmp/client.pem"
@@ -1386,10 +1424,31 @@ test("dedicated report pool requires verified TLS and rejects connection-string 
       /must not override TLS options/
     );
   }
+  for (const connectionString of [
+    "postgres://localhost/report?sslmode=disable",
+    "postgres://localhost/report?sslmode=prefer",
+    "postgres://localhost/report?sslmode=Require",
+    "postgres://localhost/report?sslmode=require&sslmode=verify-full",
+    "postgres://localhost/report?sslmode=require&sslcert=%2Ftmp%2Fclient.pem"
+  ]) {
+    assert.throws(
+      () => createPrivatePaperReportPoolOptions(connectionString, {
+        allowSecureSslmodeHint: true
+      }),
+      /must not override TLS options/
+    );
+  }
   assert.throws(
     () => createPrivatePaperReportPoolOptions("postgres://localhost/report", {
       nodeTlsRejectUnauthorized: "0"
     }),
+    /TLS verification is disabled/
+  );
+  assert.throws(
+    () => createPrivatePaperReportPoolOptions(
+      "postgres://localhost/report?sslmode=verify-full",
+      {allowSecureSslmodeHint: true, nodeTlsRejectUnauthorized: "0"}
+    ),
     /TLS verification is disabled/
   );
   const ca = "-----BEGIN CERTIFICATE-----\nsynthetic CA\n-----END CERTIFICATE-----";

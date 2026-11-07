@@ -248,15 +248,19 @@ credential or enabling the worker transfer:
    or public artifacts.
 
 The dedicated report database pool requires TLS certificate-chain and hostname
-verification. Its `DATABASE_URL` must not contain `sslmode`, `sslcert`, `sslkey`,
-or `sslrootcert` parameters, because node-postgres connection-string parsing can
-replace the supplied TLS settings. The database hostname must match the server
-certificate SAN and its chain must be trusted by the Node.js runtime. For a
-private CA, provide its PEM certificate bundle through
-`MERIDIAN_PAPER_REPORT_DATABASE_CA`; the bundle is limited to 64 KiB. Do not set
-`NODE_TLS_REJECT_UNAUTHORIZED=0`. Incompatible TLS configuration fails closed
-when the report pool is first constructed. These settings affect only the
-dedicated report pool; the pre-existing gateway pool is unchanged.
+verification. By default, its `DATABASE_URL` must not contain TLS parameters,
+because node-postgres connection-string parsing can replace the supplied TLS
+settings. For the explicit, report-pool-only exception for a Northflank URL hint,
+set `MERIDIAN_PAPER_REPORT_NORMALIZE_SECURE_SSLMODE=true`; it accepts only one
+exact lowercase `sslmode=require`, `verify-ca`, or `verify-full` URL parameter
+and removes it before passing the URL to `pg`. Every constructed report pool
+still uses `rejectUnauthorized: true`. All other TLS URL parameters and
+`NODE_TLS_REJECT_UNAUTHORIZED=0` remain rejected. The database hostname must
+match the server certificate SAN and its chain must be trusted by the Node.js
+runtime. For a private CA, provide its PEM certificate bundle through
+`MERIDIAN_PAPER_REPORT_DATABASE_CA`; the bundle is limited to 64 KiB. These
+settings affect only the dedicated report pool; the pre-existing gateway pool
+and global `DATABASE_URL` are unchanged.
 
 To roll back, first set the transfer-enabled flag false on the worker and
 upload-enabled flag false on the gateway, then remove the worker secret and
