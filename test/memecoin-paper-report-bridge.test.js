@@ -435,16 +435,20 @@ test('dispose aborts a pending browser request and returns a distinct state', as
   assert.equal(signal.aborted, true);
 });
 
-test('bridge remains disconnected from filesystem, route, listener, and bootstrap wiring', () => {
+test('bridge remains bounded and the browser controller owns its fixed authenticated read', () => {
   const bridgeSource = readFileSync(new URL(
     '../scripts/memecoin-paper-report-bridge/index.mjs', import.meta.url
   ), 'utf8');
   const connectorSource = readFileSync(new URL('../v11/paper-report-connector.js', import.meta.url), 'utf8');
   const bootstrap = readFileSync(new URL('../v11/strategy-workspace-bootstrap.js', import.meta.url), 'utf8');
+  const controller = readFileSync(new URL('../v11/paper-cockpit-controller.js', import.meta.url), 'utf8');
   const gateway = readFileSync(new URL('../server-gateway.js', import.meta.url), 'utf8');
 
   assert.doesNotMatch(bridgeSource, /node:fs|createServer|\.listen\s*\(|\bfetch\s*\(|setInterval/);
   assert.doesNotMatch(connectorSource, /createServer|\.listen\s*\(|\bfetch\s*\(|setInterval/);
-  assert.doesNotMatch(bootstrap, /paper-report-connector|createPaperReportConnector/);
+  assert.match(bootstrap, /paper-cockpit-controller/);
+  assert.doesNotMatch(bootstrap, /createPaperReportConnector/);
+  assert.match(controller, /\/api\/private\/paper-report/);
+  assert.doesNotMatch(controller, /setInterval|localStorage|sessionStorage|indexedDB|document\.cookie/);
   assert.doesNotMatch(gateway, /paper-report/);
 });

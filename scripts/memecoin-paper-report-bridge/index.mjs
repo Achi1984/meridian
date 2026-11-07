@@ -132,13 +132,16 @@ export async function readBoundedPaperResponse(response, signal) {
   const body = response?.body;
   let reader = null;
   let abort;
+  let cancellation = null;
   const cancel = () => {
+    if (cancellation !== null) return cancellation;
     try {
       const pending = reader ? reader.cancel() : body?.cancel?.();
-      return Promise.resolve(pending).catch(() => {});
+      cancellation = Promise.resolve(pending).catch(() => {});
     } catch {
-      return Promise.resolve();
+      cancellation = Promise.resolve();
     }
+    return cancellation;
   };
   const chunks = [];
   let size = 0;
