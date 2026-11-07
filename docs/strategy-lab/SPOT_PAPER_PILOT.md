@@ -120,7 +120,10 @@ poll starts. There are no hidden retries or fallback providers. HTTP 429 is
 recorded as a gap; the next attempt, if any, waits for the normal minimum poll
 interval and remains within the same budgets. A malformed response terminates
 the run without simulated effects. Stop signals cancel in-flight fetches and
-attempt a terminal report; if durable storage fails, success is not asserted.
+attempt a terminal report within a five-second write grace. If that write times
+out or durable storage fails, its commit is treated as ambiguous and success is
+not asserted. The response hashes bind stored response bytes; they do not
+authenticate Kraken as the origin.
 
 ## Journal, report and deployment seam
 

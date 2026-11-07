@@ -3,6 +3,8 @@ import { applyPaperObservation, advanceStrategy, buildReport, createLedger,
   SPOT_PAPER_PILOT_LIMITS, SPOT_PAPER_PILOT_VERSION } from "./core.mjs";
 import { createRunJournal } from "./journal.mjs";
 
+const TERMINAL_REPORT_GRACE_MS = 5_000;
+
 const integer = (value, min, max, name) => {
   if (!Number.isSafeInteger(value) || value < min || value > max) {
     throw new Error(`INVALID_${name}`);
@@ -90,6 +92,16 @@ function waitForAbortable(sleep, ms, signal) {
   });
 }
 
+function withinDeadline(promise, timeoutMs) {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error("TERMINAL_REPORT_DEADLINE")), timeoutMs);
+    })
+  ]).finally(() => clearTimeout(timer));
+}
+
 function syncTransportCounters(provider, counters) {
   const reported = provider.counters?.();
   if (Number.isSafeInteger(reported?.requests)) {
@@ -170,6 +182,11 @@ export async function runSpotPaperPilot(input) {
         break;
       }
       if (lastPollStartedAt - startedAt >= config.maxDurationMs) {
+        stopReason = "DURATION_LIMIT";
+        break;
+      }
+      if (config.maxDurationMs - (lastPollStartedAt - startedAt) <
+          2 * SPOT_PAPER_PILOT_LIMITS.requestTimeoutMs) {
         stopReason = "DURATION_LIMIT";
         break;
       }
@@ -296,8 +313,14 @@ export async function runSpotPaperPilot(input) {
     report.requests = counters.requests;
     report.deliveredBytes = counters.bytes;
     try {
-      await journal.append({ id: "run-terminal", type: "terminal", at: endedAt, report },
+      const terminalWrite = journal.append(
+        { id: "run-terminal", type: "terminal", at: endedAt, report },
         { strategy, ledger, counters, cycle, stopReason, entriesBlocked });
+      if (stopReason === "SIGNAL") {
+        await withinDeadline(terminalWrite, TERMINAL_REPORT_GRACE_MS);
+      } else {
+        await terminalWrite;
+      }
     } catch (error) {
       throw new Error("JOURNAL_WRITE_FAILED", { cause: error });
     }
