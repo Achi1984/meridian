@@ -501,6 +501,39 @@ test("paper evidence distinguishes partial duration, risk stops, and invalid tim
   assert.ok(invalid.reasons.includes("RUNTIME_BOUND_OR_TIMESTAMP_INVALID"));
 });
 
+test("reaching sixty cycles before sixty elapsed minutes remains partial", () => {
+  const fixture = paperEvidenceFixture();
+  const { report, readback } = fixture;
+  const start = readback.events[0];
+  const observation = readback.events[1];
+  const cycles = Array.from({ length: 60 }, (_, index) => ({
+    ...observation, id: `observation:${index + 1}`, cycle: index + 1
+  }));
+  report.stopReason = "CYCLE_LIMIT";
+  report.observations = 60;
+  report.requests = 120;
+  report.deliveredBytes *= 60;
+  report.endedAt = report.startedAt + 59 * MINUTE;
+  const terminal = { id: "run-terminal", type: "terminal", at: report.endedAt, report };
+  readback.events = [start, ...cycles, terminal];
+  readback.eventCount = readback.events.length;
+  readback.report = report;
+  readback.checkpoint = {
+    ...readback.checkpoint,
+    counters: { requests: 120, bytes: report.deliveredBytes },
+    cycle: 60, stopReason: "CYCLE_LIMIT"
+  };
+  const assessment = assessPaperEvidence({
+    paperExitCode: 0, paperReport: report, readback,
+    provenance: fixture.provenance, responseBodies: fixture.responseBodies
+  });
+  assert.equal(assessment.outcome, "COMPLETED");
+  assert.equal(assessment.runClassification, "PARTIAL_BOUNDED_RUN");
+  assert.equal(assessment.cycleCoverage, 1);
+  assert.equal(assessment.elapsedMs, 59 * MINUTE);
+  assert.equal(assessment.durationCoverage, 59 / 60);
+});
+
 test("paper evidence keeps failed and unknown outcomes distinct and binds the accepted source", () => {
   const fixture = paperEvidenceFixture();
   const unknown = assessPaperEvidence({

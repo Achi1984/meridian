@@ -34,6 +34,7 @@ const EXPECTED_MANIFEST = Object.freeze({
   warmupCandles: 21
 });
 const NOTIONAL_DIVISOR = 100_000_000_000_000n;
+const TERMINAL_WRITE_GRACE_MS = 5_000;
 
 const isInteger = value => Number.isSafeInteger(value);
 const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
@@ -300,7 +301,7 @@ export function assessPaperEvidence({
     const elapsedMs = report.endedAt - report.startedAt;
     if (!isInteger(report.startedAt) || !isInteger(report.endedAt) ||
         report.startedAt !== manifest?.startedAt || report.endedAt < report.startedAt ||
-        elapsedMs > EXPECTED_MANIFEST.maxDurationMs + 5_000 ||
+        elapsedMs > EXPECTED_MANIFEST.maxDurationMs + TERMINAL_WRITE_GRACE_MS ||
         terminal.at !== report.endedAt) {
       failures.push("RUNTIME_BOUND_OR_TIMESTAMP_INVALID");
     }
@@ -365,8 +366,7 @@ export function assessPaperEvidence({
   const runClassification = !terminalVerified ? "UNKNOWN" :
     riskStop ? "RISK_STOP" : failures.length || paperExitCode !== 0 ?
       "FAILED_EVIDENCE" : completed && report.stopReason === "DURATION_LIMIT" &&
-        elapsedMs >= EXPECTED_MANIFEST.maxDurationMs -
-          2 * EXPECTED_MANIFEST.requestTimeoutMs ?
+        elapsedMs >= EXPECTED_MANIFEST.maxDurationMs ?
         "COMPLETED_HOUR" : completed ? "PARTIAL_BOUNDED_RUN" :
           bounded ? "FAILED_DATA_ACCEPTANCE" : "STOPPED_OR_LIMITED";
 
