@@ -1,4 +1,4 @@
-import {buildLedgerManualModel} from './ledger-manual-model.js?v=B16-M11-FIX11';
+import {buildLedgerManualModel} from './ledger-manual-model.js?v=B16-M11-FIX12';
 const BASE='https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/';
 const PRICES='https://data-api.binance.vision/api/v3/ticker/price';
 export function createLedgerManualClient({getToken,onChange=()=>{},onLock=()=>{},fetchImpl=globalThis.fetch,now=Date.now}={}){

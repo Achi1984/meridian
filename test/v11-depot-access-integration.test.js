@@ -4,7 +4,7 @@ import {createAppAccess} from '../v11/app-access.js';
 import {createDepotReadView} from '../v11/depot-read-view.js';
 import {createDepotReadClient} from '../v11/depot-read-client.js';
 import {mountDepotReadAccess} from '../v11/depot-read-bootstrap.js';
-import {subscribeDepotPortfolio} from '../v11/depot-portfolio-state.js?v=B16-M11-FIX11';
+import {subscribeDepotPortfolio} from '../v11/depot-portfolio-state.js?v=B16-M11-FIX12';
 class Node {
   constructor(document,tag){this.ownerDocument=document;this.tagName=tag;this.children=[];this.dataset={};this.attrs={};this.listeners=new Map();this.text='';}
   set textContent(value){this.text=String(value);this.children=[];}
@@ -271,5 +271,4 @@ test('Pionex-only view excludes mixed history and rejects aggregate models',()=>
   render({status:'fresh',model:{...model,source:'SERVER_PORTFOLIO_CURRENT',spotUsd:2000}});
   assert.equal(h.command.dataset.state,'unavailable');assert.doesNotMatch(h.text(),/3.450,00/);v.dispose();
 });
-
 

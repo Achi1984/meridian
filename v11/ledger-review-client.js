@@ -1,5 +1,5 @@
-import {ledgerReviewHoldings} from './ledger-review-model.js?v=B16-M11-FIX11';
-import {parseDepotReadCredential} from './depot-read-client.js?v=B16-M11-FIX11';
+import {ledgerReviewHoldings} from './ledger-review-model.js?v=B16-M11-FIX12';
+import {parseDepotReadCredential} from './depot-read-client.js?v=B16-M11-FIX12';
 const BASE='https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/';
 export function createLedgerReviewClient({getToken,onChange=()=>{},onLock=()=>{},fetchImpl=globalThis.fetch}={}){
   let pending=null,rows=null,reviewToken=null,generation=0,disposed=false,status=null;
@@ -57,4 +57,3 @@ export function createLedgerReviewClient({getToken,onChange=()=>{},onLock=()=>{}
     },
     dispose(){lock();disposed=true;}};
 }
-

@@ -1,6 +1,6 @@
-import {appAccess} from './app-access.js?v=B16-M11-FIX11';
-import {createBotReadClient} from './bot-read-client.js?v=B16-M11-FIX11';
-import {createBotReadView,renderCommandBotOverview} from './bot-read-view.js?v=B16-M11-FIX11';
+import {appAccess} from './app-access.js?v=B16-M11-FIX12';
+import {createBotReadClient} from './bot-read-client.js?v=B16-M11-FIX12';
+import {createBotReadView,renderCommandBotOverview} from './bot-read-view.js?v=B16-M11-FIX12';
 
 // Mounting controls never starts a request. Only the view's manual refresh can read.
 export function mountBotReadAccess(document,window,{
@@ -54,4 +54,3 @@ export function mountBotReadAccess(document,window,{
 }
 
 if(typeof document!=='undefined'&&typeof window!=='undefined')mountBotReadAccess(document,window);
-

@@ -7,6 +7,10 @@ import {fileURLToPath} from 'node:url';
 import {withMobileChrome} from './helpers/v11-cdp.mjs';
 import {unlockAppThroughGate} from './helpers/v11-app-access-browser.mjs';
 import {startV11StaticServer} from './helpers/v11-static-server.mjs';
+import {projectOperatorReport} from '../scripts/memecoin-paper/operator-report.mjs';
+import {reportFixtures} from './fixtures/memecoin-paper-operator-report/scenarios.mjs';
+import {PAPER_REPORT_ENVELOPE_SCHEMA} from '../scripts/memecoin-paper-report-bridge/index.mjs';
+import {PAPER_REPORT_ENDPOINT} from '../v11/paper-cockpit-controller.js';
 
 const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium'].find(path=>path&&existsSync(path));
 const sizes=[
@@ -15,14 +19,70 @@ const sizes=[
   {width:1440,height:900,mobile:false}
 ];
 const evidence=process.env.V11_PAPER_COCKPIT_EVIDENCE_DIR;
+const PAPER_PASSWORD='synthetic-browser-gate-password';
+
+function runFlaggedBrowserTest(name,timeout){
+  const env={...process.env};delete env.NODE_TEST_CONTEXT;
+  return spawnSync(process.execPath,['--experimental-websocket','--test',
+    `--test-name-pattern=^${name}$`,fileURLToPath(import.meta.url)],
+    {env,encoding:'utf8',timeout});
+}
+
+function assertNamedTestPassed(output,name){
+  const result=output.split(/\r?\n/).map(line=>{
+    const match=/^ok (\d+) - (.+?)(?:\s+# (.*))?$/.exec(line);
+    if(!match||match[2]!==name)return null;
+    return {ordinal:Number(match[1]),directive:match[3]};
+  }).find(Boolean);
+  assert.ok(result&&Number.isSafeInteger(result.ordinal)&&result.ordinal>0,
+    `flagged child must report the named browser regression as a TAP success:\n${output}`);
+  assert.doesNotMatch(result.directive||'',/^SKIP(?:\s|$)/,
+    'the named browser regression must execute rather than skip');
+}
+
+async function interceptGeneratedPaperReport(call,report){
+  const body=Buffer.from(JSON.stringify({
+    schema:PAPER_REPORT_ENVELOPE_SCHEMA,runId:report.experiment.id,report
+  })).toString('base64');
+  let reads=0,failure=null;
+  const off=call.onEvent('Fetch.requestPaused',event=>{
+    void (async()=>{
+      assert.equal(event.request.url,PAPER_REPORT_ENDPOINT);
+      if(event.request.method==='OPTIONS'){
+        await call('Fetch.fulfillRequest',{requestId:event.requestId,responseCode:204,responseHeaders:[
+          {name:'Access-Control-Allow-Origin',value:'*'},
+          {name:'Access-Control-Allow-Methods',value:'GET'},
+          {name:'Access-Control-Allow-Headers',value:'accept,authorization'},
+          {name:'Access-Control-Max-Age',value:'0'}]});
+        return;
+      }
+      assert.equal(event.request.method,'GET');
+      const authorization=Object.entries(event.request.headers||{})
+        .find(([name])=>name.toLowerCase()==='authorization')?.[1];
+      assert.equal(authorization,'Bearer '+PAPER_PASSWORD);
+      reads++;
+      await call('Fetch.fulfillRequest',{requestId:event.requestId,responseCode:200,responseHeaders:[
+        {name:'Access-Control-Allow-Origin',value:'*'},
+        {name:'Content-Type',value:'application/json; charset=utf-8'},
+        {name:'Cache-Control',value:'no-store'}],body});
+    })().catch(error=>{failure=error;});
+  });
+  await call('Fetch.enable',{patterns:[{urlPattern:PAPER_REPORT_ENDPOINT+'*',requestStage:'Request'}]});
+  return {
+    count:()=>reads,
+    assertHealthy(){if(failure)throw failure;},
+    async close(){off();await call('Fetch.disable');}
+  };
+}
 
 test('M11 Paper cockpit demo is responsive and keyboard accessible at five widths',{timeout:240000},async()=>{
   if(typeof WebSocket!=='function'){
-    const env={...process.env};delete env.NODE_TEST_CONTEXT;
-    const child=spawnSync(process.execPath,['--experimental-websocket',fileURLToPath(import.meta.url)],
-      {env,encoding:'utf8',timeout:235000});
+    const child=runFlaggedBrowserTest(
+      'M11 Paper cockpit demo is responsive and keyboard accessible at five widths',235000);
     assert.equal(child.status,0,String(child.stdout).slice(-2500)+String(child.stderr).slice(-1000));
-    const rows=child.stdout.split('\n').filter(line=>line.startsWith('V11_PAPER_COCKPIT_SIZE '));
+    assertNamedTestPassed(child.stdout,
+      'M11 Paper cockpit demo is responsive and keyboard accessible at five widths');
+    const rows=child.stdout.split('\n').filter(line=>/^(?:# )?V11_PAPER_COCKPIT_SIZE /.test(line));
     assert.equal(rows.length,sizes.length);rows.forEach(row=>console.log(row));return;
   }
   assert.ok(chrome,'Chrome required; cockpit browser acceptance cannot be skipped');
@@ -44,14 +104,121 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         await call('Emulation.setDeviceMetricsOverride',{width:size.width,height:size.height,
           deviceScaleFactor:1,mobile:size.mobile,screenWidth:size.width,screenHeight:size.height});
         await unlockAppThroughGate(call);
+        const report=projectOperatorReport(reportFixtures.readOnlyCheckpoint());
+        report.evidence.observedThrough=new Date(Date.now()-298000).toISOString();
+        report.valuation.cashCents='90071992547409931234';
+        const intercepted=await interceptGeneratedPaperReport(call,report);
         await evaluate(`document.querySelector('#nav button[data-v="strategies"]').click()`);
+        assert.equal(intercepted.count(),0,'unlock and navigation do not read a Paper report');
         for(let attempt=0;attempt<150;attempt++){
           if(await evaluate(`document.querySelector('#paper-cockpit-root.paper-cockpit') !== null`))break;
           await new Promise(resolve=>setTimeout(resolve,10));
         }
+        const liveRead=await evaluate(`(()=>{
+          const button=document.querySelector('#paper-cockpit-root button');
+          return button?{text:button.textContent,height:button.getBoundingClientRect().height,
+            disabled:button.disabled}:null;
+        })()`);
+        assert.ok(liveRead,'native browser module graph mounts the real controller');
+        assert.equal(liveRead.height>=44,true,'manual report read target is at least 44px');
+        assert.equal(intercepted.count(),0,'controller mount remains a no-read operation');
+        assert.equal(await evaluate(`(()=>{
+          const button=document.querySelector('#paper-cockpit-root button');
+          button.focus();
+          button.click();
+          button.click();
+          return document.activeElement===document.querySelector('#paper-cockpit-root button');
+        })()`),true,'same-turn refresh activation preserves focus');
+        for(let attempt=0;attempt<150;attempt++){
+          if(await evaluate(`document.querySelector('#paper-cockpit-root').textContent.includes('Observation-only')`))break;
+          await new Promise(resolve=>setTimeout(resolve,10));
+        }
+        intercepted.assertHealthy();
+        assert.equal(intercepted.count(),1,'same-turn activations produce exactly one generated-report GET');
+        assert.equal(await evaluate(`document.activeElement===document.querySelector('#paper-cockpit-root button')`),true,
+          'refresh completion preserves keyboard focus');
+        const delivered=await evaluate(`(()=>{
+          const root=document.querySelector('#paper-cockpit-root');
+          return {report:root.textContent.includes('Observation-only'),
+            exactCash:root.textContent.includes('90071992547409931234 cents'),
+            terminal:root.textContent.includes('Terminal report: INCOMPLETE'),
+            noWorkerClaim:!root.textContent.includes('RUNNING')};
+        })()`);
+        assert.deepEqual(delivered,{report:true,exactCash:true,terminal:true,noWorkerClaim:true});
+        if(size.width===sizes[0].width){
+          await evaluate(`(()=>{
+          const root=document.querySelector('#paper-cockpit-root');
+          const details=document.querySelector('#paper-cockpit-root > details');
+          window.paperCockpitFreshnessRefs={
+            details,summary:details.querySelector(':scope > summary'),
+            button:root.querySelector('button'),liveRegion:root.querySelector('[role="status"]')
+          };
+          details.open=true;
+          window.paperCockpitFreshnessRefs.summary.focus();
+        })()`);
+          for(let attempt=0;attempt<400;attempt++){
+            if(await evaluate(`document.querySelector('#paper-cockpit-root').dataset.state==='stale'`))break;
+            await new Promise(resolve=>setTimeout(resolve,10));
+          }
+          assert.deepEqual(await evaluate(`(()=>{
+            const root=document.querySelector('#paper-cockpit-root');
+            const details=document.querySelector('#paper-cockpit-root > details');
+            const summary=details.querySelector(':scope > summary');
+            const refs=window.paperCockpitFreshnessRefs;
+            return {state:root.dataset.state,open:details.open,
+              sameDetails:details===refs.details,sameSummary:summary===refs.summary,
+              sameButton:root.querySelector('button')===refs.button,
+              sameLiveRegion:root.querySelector('[role="status"]')===refs.liveRegion,
+              focusedSummary:document.activeElement===refs.summary,
+              status:refs.liveRegion.textContent};
+          })()`),{state:'stale',open:true,sameDetails:true,sameSummary:true,
+            sameButton:true,sameLiveRegion:true,focusedSummary:true,
+            status:'The report is stale under the shared display-only freshness policy.'},
+          'the freshness deadline updates the mounted live region and preserves disclosure focus without a read');
+          assert.equal(intercepted.count(),1,'freshness revalidation does not issue another request');
+        }
+        await evaluate(`document.querySelector('#nav').click()`);
+        assert.equal(await evaluate(`document.querySelector('#paper-cockpit-root').textContent.includes('Observation-only')`),true,
+          'clicking navigation whitespace does not deactivate the visible Strategies report');
+        await evaluate(`document.querySelector('#nav button[data-v="command"]').click()`);
+        assert.equal(await evaluate(`!document.querySelector('#paper-cockpit-root').textContent.includes('Observation-only')`),true,
+          'navigation clears private report DOM');
+        await evaluate(`document.querySelector('#nav button[data-v="strategies"]').click()`);
+        assert.equal(intercepted.count(),1,'returning to the cockpit does not read automatically');
+        await evaluate(`document.querySelector('#paper-cockpit-root button').focus()`);
+        await key('Enter','Enter',13);
+        for(let attempt=0;attempt<150;attempt++){
+          if(await evaluate(`document.querySelector('#paper-cockpit-root').textContent.includes('Observation-only')`))break;
+          await new Promise(resolve=>setTimeout(resolve,10));
+        }
+        assert.equal(intercepted.count(),2,'keyboard activation performs one explicit refresh');
+        assert.equal(await evaluate(`document.activeElement===document.querySelector('#paper-cockpit-root button')`),true,
+          'keyboard activation retains focus after the result renders');
+        const restored=await evaluate(`(()=>{
+          window.dispatchEvent(new Event('pagehide'));
+          window.dispatchEvent(new Event('pageshow'));
+          const root=document.querySelector('#paper-cockpit-root');
+          return {state:root.dataset.state,button:!!root.querySelector('button'),
+            privateData:root.textContent.includes('Observation-only')||
+              root.textContent.includes('90071992547409931234')};
+        })()`);
+        assert.deepEqual(restored,{state:'auth-required',button:true,privateData:false},
+          'pageshow restores the selected cockpit affordance but not private data');
+        assert.equal(intercepted.count(),2,'navigation restoration never starts a read');
+        await unlockAppThroughGate(call);
+        assert.deepEqual(await evaluate(`(()=>{
+          const root=document.querySelector('#paper-cockpit-root');
+          return {appHidden:document.getElementById('app').hidden,state:root.dataset.state,
+            button:!!root.querySelector('button'),
+            privateData:root.textContent.includes('Observation-only')||
+              root.textContent.includes('90071992547409931234')};
+        })()`),{appHidden:false,state:'ready',button:true,privateData:false},
+        'unlock after restoration keeps Strategies active without restoring the cleared report');
+        assert.equal(intercepted.count(),2,'unlock after restoration does not start a report read');
+        await intercepted.close();
         await evaluate(`(async()=>{
-          const model=await import('./paper-cockpit-model.js?v=B16-M11-FIX11');
-          const view=await import('./paper-cockpit-view.js?v=B16-M11-FIX11');
+          const model=await import('./paper-cockpit-model.js?v=B16-M11-FIX12');
+          const view=await import('./paper-cockpit-view.js?v=B16-M11-FIX12');
           const report=model.getDemoPaperCockpitReport();
           const demoReport=model.getDemoPaperCockpitReport();
           report.experiment.id='run-'+('R'.repeat(220));
@@ -65,7 +232,11 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
           demoReport.trading.noTradeReasons=[{
             gate:'demo-gate-'+('G'.repeat(96)),status:'UNKNOWN',reason:'demo-reason-'+('R'.repeat(220))
           }];
-          view.renderPaperCockpit(document.getElementById('paper-cockpit-root'),report,document,{demoReport});
+          view.renderPaperCockpit(document.getElementById('paper-cockpit-root'),report,document,{
+            demoReport,state:'ready',message:'Manual one-shot report read.',
+            onRefresh:()=>{},loading:false
+          });
+
           return true;
         })()`);
         const before=await evaluate(`(()=>{
@@ -82,6 +253,7 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
             demoOpen:demo.open,summaryText:summary.innerText.trim(),
             accessibleName:summary.getAttribute('aria-label'),
             summaryHeight:summary.getBoundingClientRect().height,
+            refreshHeight:root.querySelector('button').getBoundingClientRect().height,
             cashLabel:cash.querySelector('span').textContent,cashTone:cash.querySelector('span').className,
             pnlLabel:pnl.querySelector('span').textContent,pnlTone:pnl.querySelector('span').className,
             reservationText:[...root.querySelectorAll('p')].find(item=>item.textContent.includes('Reported reservation count'))?.textContent,
@@ -95,6 +267,7 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         assert.ok(before.panelScrollWidth<=before.panelWidth+1,
           'cockpit panel overflow at '+size.width+': '+JSON.stringify(before));
         assert.equal(before.demoOpen,false);
+        assert.ok(before.refreshHeight>=44,'manual refresh target below 44px: '+JSON.stringify(before));
         assert.ok(before.summaryHeight>=44,'demo summary target below 44px: '+JSON.stringify(before));
         assert.ok(before.accessibleName.includes(before.summaryText),
           'accessible name must contain its visible label: '+JSON.stringify(before));
@@ -111,6 +284,9 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
           return document.activeElement===document.getElementById('app-main');
         })()`);
         assert.equal(focus,true);
+        await key('Tab','Tab',9);
+        const refreshTab=await evaluate(`document.activeElement===document.querySelector('#paper-cockpit-root button')`);
+        assert.equal(refreshTab,true,'native Tab focuses the manual report read affordance');
         await key('Tab','Tab',9);
         const tabState=await evaluate(`(()=>{
           const summary=document.querySelector('#paper-cockpit-root > details > summary');
@@ -175,6 +351,7 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
           width:size.width,viewport:before.viewport,documentWidth:before.documentWidth,
           panelWidth:before.panelWidth,panelScrollWidth:before.panelScrollWidth,
           summaryHeight:before.summaryHeight,nativeTab:tabState.focused,
+          refreshHeight:before.refreshHeight,
           enterOpen:true,spaceClose:true,spaceReopen:true,cash:before.cashLabel,
           cashTone:before.cashTone,pnl:before.pnlLabel,pnlTone:before.pnlTone,
           expandedDocumentWidth:reopened.documentWidth,expandedBodyWidth:reopened.bodyWidth,
@@ -188,4 +365,81 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
   }finally{
     await hosted.close();
   }
+});
+
+test('early Strategies navigation remains active when its module bootstrap initializes',{timeout:60000},async()=>{
+  if(typeof WebSocket!=='function'){
+    const name='early Strategies navigation remains active when its module bootstrap initializes';
+    const child=runFlaggedBrowserTest(name,55000);
+    assert.equal(child.status,0,String(child.stdout).slice(-2500)+String(child.stderr).slice(-1000));
+    assertNamedTestPassed(child.stdout,name);
+    return;
+  }
+  assert.ok(chrome,'Chrome required; early navigation race cannot be skipped');
+  const hosted=await startV11StaticServer();
+  try{
+    let resolveEarlyBootstrap;
+    let rejectEarlyBootstrap;
+    const earlyBootstrapPaused=new Promise((resolve,reject)=>{
+      resolveEarlyBootstrap=resolve;
+      rejectEarlyBootstrap=reject;
+    });
+    await withMobileChrome(chrome,375,hosted.url,async call=>{
+      await earlyBootstrapPaused;
+      const report=projectOperatorReport(reportFixtures.readOnlyCheckpoint());
+      const intercepted=await interceptGeneratedPaperReport(call,report);
+      try{
+        const earlyClick=await call('Runtime.evaluate',{expression:'window.__paperCockpitEarlyNavigation===true',
+          returnByValue:true});
+        assert.equal(earlyClick.result?.value,true,'Strategies was selected before the module bootstrap loaded');
+        const beforeUnlock=await call('Runtime.evaluate',{expression:`(()=>{
+          const root=document.querySelector('#paper-cockpit-root');
+          return {selected:document.querySelector('#nav button[aria-current="page"]')?.dataset.v,
+            state:root?.dataset.state,button:!!root?.querySelector('button')};
+        })()`,returnByValue:true});
+        assert.deepEqual(beforeUnlock.result?.value,{selected:'strategies',state:'auth-required',button:true});
+        await unlockAppThroughGate(call);
+        const afterUnlock=await call('Runtime.evaluate',{expression:`(()=>{
+          const root=document.querySelector('#paper-cockpit-root');
+          return {selected:document.querySelector('#nav button[aria-current="page"]')?.dataset.v,
+            state:root?.dataset.state,button:!!root?.querySelector('button')};
+        })()`,returnByValue:true});
+        assert.deepEqual(afterUnlock.result?.value,{selected:'strategies',state:'ready',button:true});
+        assert.equal(intercepted.count(),0,'early selection and unlock never start a report read');
+      }finally{await intercepted.close();}
+    },844,async call=>{
+      let removeListener;
+      removeListener=call.onEvent('Fetch.requestPaused',event=>{
+        void(async()=>{
+          let failure;
+          try{
+            let selected=false;
+            for(let attempt=0;attempt<50&&!selected;attempt++){
+              const clicked=await call('Runtime.evaluate',{expression:`(()=>{
+                const button=document.querySelector('#nav button[data-v="strategies"]');
+                if(!button)return false;
+                button.click();
+                const active=button.getAttribute('aria-current')==='page';
+                if(active)window.__paperCockpitEarlyNavigation=true;
+                return active;
+              })()`,returnByValue:true});
+              selected=clicked.result?.value===true;
+              if(!selected)await new Promise(resolve=>setTimeout(resolve,10));
+            }
+            if(!selected)failure=Error('the core navigation handler did not activate Strategies before bootstrap');
+          }catch(error){failure=error;}
+          try{
+            await call('Fetch.continueRequest',{requestId:event.requestId});
+            await call('Fetch.disable');
+          }catch(error){failure??=error;}
+          removeListener();
+          if(failure)rejectEarlyBootstrap(failure);
+          else resolveEarlyBootstrap();
+        })().catch(rejectEarlyBootstrap);
+      });
+      await call('Fetch.enable',{patterns:[{
+        urlPattern:'*strategy-workspace-bootstrap.js*',requestStage:'Request'
+      }]});
+    });
+  }finally{await hosted.close();}
 });

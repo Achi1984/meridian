@@ -1,7 +1,7 @@
 import {
   getDemoPaperCockpitReport,
   presentPaperCockpitReport
-} from './paper-cockpit-model.js?v=B16-M11-FIX11';
+} from './paper-cockpit-model.js?v=B16-M11-FIX12';
 
 const unavailable = 'Nicht verfügbar';
 const shown = value => Number.isSafeInteger(value) && value >= 0 ? String(value) : 'UNKNOWN';
@@ -138,8 +138,9 @@ function renderReport(root, report, document, options = {}) {
   return true;
 }
 
-export function renderPaperCockpit(root, report = null, document = root?.ownerDocument, options = {}) {
-  if (!root || !document) return null;
+const cockpitViews = new WeakMap();
+
+function createCockpitView(root, document) {
   root.replaceChildren();
   root.className = 'card paper-cockpit';
   root.setAttribute('style', 'min-width:0;max-width:100%;overflow-wrap:anywhere');
@@ -148,14 +149,71 @@ export function renderPaperCockpit(root, report = null, document = root?.ownerDo
   const readonlyLabel = node(document, root, 'p',
     'Nur lesend · keine Start-, Stopp- oder Handelsaktionen.', 'limited');
   readonlyLabel.setAttribute('style', 'max-width:100%;white-space:normal;overflow-wrap:anywhere');
-  const available = renderReport(root, report, document, options);
-
+  const controls = node(document, root, 'div');
+  const status = node(document, root, 'p');
+  status.setAttribute('role', 'status');
+  status.setAttribute('aria-live', 'polite');
+  status.setAttribute('aria-atomic', 'true');
+  const report = node(document, root, 'div');
   const demo = document.createElement('details');
   demo.className = 'card card-muted';
   const summary = node(document, demo, 'summary', 'Generated demo fixture · synthetic only');
   summary.setAttribute('aria-label', 'Generated demo fixture · synthetic only anzeigen; keine Live-Daten');
-  node(document, demo, 'p', 'Das folgende Beispiel ist künstlich erzeugt und keine Beobachtung oder Produktions-Telemetrie.', 'caption');
-  renderReport(demo, options.demoReport ?? getDemoPaperCockpitReport(), document);
+  const demoContent = node(document, demo, 'div');
   root.append(demo);
+  return {
+    controls,
+    status,
+    report,
+    demo,
+    demoContent,
+    refreshButton: null,
+    onRefresh: null
+  };
+}
+
+export function renderPaperCockpit(root, report = null, document = root?.ownerDocument, options = {}) {
+  if (!root || !document) return null;
+  let view = cockpitViews.get(root);
+  if (!view || !Array.from(root.children || []).includes(view.status)) {
+    view = createCockpitView(root, document);
+    cockpitViews.set(root, view);
+  }
+  root.setAttribute('data-state', options.state || 'unavailable');
+  if (typeof options.onRefresh === 'function') {
+    view.onRefresh = options.onRefresh;
+    if (!view.refreshButton) {
+      view.refreshButton = node(document, view.controls, 'button',
+        'Paper report manuell laden / aktualisieren');
+      view.refreshButton.type = 'button';
+      view.refreshButton.addEventListener('click', () => view.onRefresh?.());
+    }
+    view.refreshButton.setAttribute('aria-disabled', String(options.loading === true));
+    view.refreshButton.setAttribute('aria-busy', String(options.loading === true));
+    view.refreshButton.setAttribute('style',
+      'min-width:44px;min-height:44px;max-width:100%;padding:10px 12px;white-space:normal;overflow-wrap:anywhere');
+  } else {
+    view.onRefresh = null;
+    view.refreshButton = null;
+    view.controls.replaceChildren();
+  }
+  view.status.textContent = options.message || 'Reportstatus unbekannt.';
+  const freshnessPolicy = options.freshnessPolicy;
+  const reportOptions = freshnessPolicy
+    ? {now: options.now ?? freshnessPolicy.now(), staleAfterMs: freshnessPolicy.staleAfterMs}
+    : options;
+  if (options.preserveDemoState !== true) view.demo.open = false;
+  view.report.replaceChildren();
+  const available = renderReport(view.report, report, document, reportOptions);
+  if (available) {
+    const model = presentPaperCockpitReport(report, reportOptions);
+    node(document, view.report, 'p',
+      `Terminal report: ${model.experiment.status} · not evidence of current worker liveness.`, 'caption');
+  }
+
+  view.demoContent.replaceChildren();
+  node(document, view.demoContent, 'p',
+    'Das folgende Beispiel ist künstlich erzeugt und keine Beobachtung oder Produktions-Telemetrie.', 'caption');
+  renderReport(view.demoContent, options.demoReport ?? getDemoPaperCockpitReport(), document);
   return {status: available ? 'REPORT_PRESENTED' : 'UNAVAILABLE'};
 }
