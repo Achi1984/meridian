@@ -6,6 +6,7 @@ import {mkdtemp, mkdir, rename, rm, symlink, writeFile} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import {readFileSync} from "node:fs";
+import {Client} from "pg";
 import test from "node:test";
 import {createObservationAudit} from "../scripts/memecoin-paper/observation-audit.mjs";
 import {projectOperatorReport} from "../scripts/memecoin-paper/operator-report.mjs";
@@ -1384,7 +1385,49 @@ test("dedicated report pool requires verified TLS and rejects connection-string 
     assert.equal(new URL(options.connectionString).searchParams.has("sslmode"), false);
     assert.deepEqual([...new URL(options.connectionString).searchParams.keys()], ["application_name"]);
     assert.equal(new URL(options.connectionString).searchParams.get("application_name"), "paper");
-    assert.deepEqual(options.ssl, {rejectUnauthorized: true});
+    const client = new Client(options);
+    assert.deepEqual(client.connectionParameters.ssl, {rejectUnauthorized: true});
+  }
+  for (const whitespace of [" ", "   "]) {
+    const options = createPrivatePaperReportPoolOptions(
+      `${whitespace}postgres://localhost/report?sslmode=verify-full${whitespace}`,
+      {allowSecureSslmodeHint: true}
+    );
+    const client = new Client(options);
+    assert.deepEqual(client.connectionParameters.ssl, {rejectUnauthorized: true});
+    assert.equal(client.connectionParameters.connectionString, undefined);
+  }
+  for (const connectionString of [
+    "\tpostgres://localhost/report?sslmode=no-verify",
+    " \tpostgres://localhost/report?sslmode=verify-full",
+    "pos\ttgres://localhost/report?sslmode=verify-full",
+    "post\rgres://localhost/report?sslmode=verify-full",
+    "post\ngres://localhost/report?sslmode=verify-full"
+  ]) {
+    assert.throws(
+      () => createPrivatePaperReportPoolOptions(connectionString, {
+        allowSecureSslmodeHint: true
+      }),
+      /invalid private report database URL/
+    );
+  }
+  assert.throws(
+    () => new Client(createPrivatePaperReportPoolOptions(
+      "postgres ://localhost/report?sslmode=no-verify",
+      {allowSecureSslmodeHint: true}
+    )),
+    /invalid private report database URL/
+  );
+  for (const connectionString of [
+    " postgres://localhost/report?sslmode=disable ",
+    " postgres://localhost/report?sslmode=no-verify "
+  ]) {
+    assert.throws(
+      () => new Client(createPrivatePaperReportPoolOptions(connectionString, {
+        allowSecureSslmodeHint: true
+      })),
+      /must not override TLS options/
+    );
   }
   const optInKey = "MERIDIAN_PAPER_REPORT_NORMALIZE_SECURE_SSLMODE";
   const priorOptIn = process.env[optInKey];

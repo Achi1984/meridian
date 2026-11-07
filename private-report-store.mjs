@@ -9,7 +9,11 @@ export const PAPER_REPORT_POOL_OPTIONS = Object.freeze({
 const SECURE_SSLMODE_HINTS = new Set(["require", "verify-ca", "verify-full"]);
 
 function normalizeConnectionStringTlsOverrides(connectionString, allowSecureSslmodeHint) {
-  const value = String(connectionString || "");
+  const rawValue = String(connectionString || "");
+  if (/[\x00-\x1f\x7f]/.test(rawValue)) {
+    throw new TypeError("invalid private report database URL");
+  }
+  const value = rawValue.trim();
   if (/^postgres(?:ql)?:\/\//i.test(value)) {
     try {
       const url = new URL(value);
@@ -40,6 +44,9 @@ function normalizeConnectionStringTlsOverrides(connectionString, allowSecureSslm
     if ([...value.matchAll(/(?:^|\s)(?:ssl|tls)[a-z0-9_]*\s*=/gi)]
       .length > 0) {
       throw new TypeError("private report database URL must not override TLS options");
+    }
+    if (value.includes("://")) {
+      throw new TypeError("invalid private report database URL");
     }
     return value;
   }
