@@ -361,6 +361,8 @@ function scenarioConfig(value) {
     const requiredKeys = SCENARIO_CONFIG_KEYS.filter(key =>
       !["reviewEvidence", "explicitAssumptions", "quoteUsdConversion", "grossBasisEvidence"].includes(key));
     if (requiredKeys.some(key => !Object.hasOwn(raw, key)) ||
+        ["explicitAssumptions", "quoteUsdConversion", "grossBasisEvidence"]
+          .some(key => Object.hasOwn(raw, key)) ||
         raw.identity.quote !== SOLANA_USDC_MINT ||
         raw.usdcMint !== SOLANA_USDC_MINT || raw.usdcDecimals !== 6 ||
         raw.usdcUsdMicrosPerToken !== "1000000" ||

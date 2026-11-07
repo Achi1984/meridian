@@ -1380,6 +1380,9 @@ test("existing BASELINE and STRESS projections gain no model fields and omission
   const none = await adapterFor(entryResponse().body).adapter.getPaperQuote(request());
   assert.equal(none.scenarioProjection, null);
   assert.equal(none.authorizationEligible, false);
+  const mixed = reviewScenario("BASELINE");
+  mixed.explicitAssumptions = {};
+  assert.throws(() => reviewScenarioConfigSha256(mixed));
   assert.notEqual(reviewScenarioConfigSha256(reviewScenario(QN)),
     reviewScenarioConfigSha256(reviewScenario("STRESS")));
 });
