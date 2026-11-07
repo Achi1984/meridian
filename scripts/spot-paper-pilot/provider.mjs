@@ -4,22 +4,26 @@ import { SPOT_PAPER_PILOT_LIMITS } from "./core.mjs";
 const API_ORIGIN = "https://api.kraken.com";
 const REQUEST_TIMEOUT_MS = SPOT_PAPER_PILOT_LIMITS.requestTimeoutMs;
 
-async function readBoundedBody(response, counters, maxBytes, signal, readerRef) {
+function abortError(signal) {
+  return signal?.reason ?? new Error("REQUEST_ABORTED");
+}
+
+async function readBoundedBody(response, counters, maxBytes, signal, readerRef, assertActive) {
   const reader = response.body?.getReader();
   if (!reader) throw new Error("EMPTY_HTTP_BODY");
   readerRef.reader = reader;
   const chunks = [];
   let length = 0;
   for (;;) {
-    if (signal.aborted) throw new Error("REQUEST_ABORTED");
+    assertActive();
     const { done, value } = await reader.read();
-    if (signal.aborted) throw new Error("REQUEST_ABORTED");
+    assertActive();
     if (done) break;
     length += value.byteLength;
     counters.bytes += value.byteLength;
     if (length > SPOT_PAPER_PILOT_LIMITS.maxResponseBytes ||
         counters.bytes > maxBytes) {
-      void reader.cancel().catch(() => {});
+      try { void Promise.resolve(reader.cancel()).catch(() => {}); } catch {}
       throw new Error(length > SPOT_PAPER_PILOT_LIMITS.maxResponseBytes ?
         "RESPONSE_BYTE_LIMIT" : "RUN_BYTE_LIMIT");
     }
@@ -32,7 +36,10 @@ async function readBoundedBody(response, counters, maxBytes, signal, readerRef) 
       advertised >= 0 && advertised !== length) {
     throw new Error("TRUNCATED_HTTP_BODY");
   }
-  return Buffer.concat(chunks, length);
+  const body = Buffer.concat(chunks, length);
+  reader.releaseLock();
+  readerRef.reader = null;
+  return body;
 }
 
 export function createKrakenProvider({
@@ -73,10 +80,14 @@ export function createKrakenProvider({
       runtime.deadlineAt ?? deadlineAt ?? Infinity,
       startedMono + requestTimeoutMs
     );
-    const remaining = effectiveDeadline - startedMono;
-    if (!Number.isFinite(remaining) || remaining <= 0) throw new Error("REQUEST_TIMEOUT");
     const parentSignals = [signal, runtime.signal].filter(Boolean);
     const controller = new AbortController();
+    const remaining = effectiveDeadline - startedMono;
+    if (!Number.isFinite(remaining) || remaining <= 0 ||
+        parentSignals.some(parent => parent.aborted)) {
+      throw parentSignals.some(parent => parent.aborted) ?
+        abortError(parentSignals.find(parent => parent.aborted)) : new Error("REQUEST_TIMEOUT");
+    }
     const cancelFromParent = () => controller.abort(
       parentSignals.find(item => item.aborted)?.reason ?? new Error("REQUEST_ABORTED"));
     for (const parent of parentSignals) {
@@ -86,23 +97,41 @@ export function createKrakenProvider({
     let response = null;
     const readerRef = { reader: null };
     let timedOut = false;
+    let completed = false;
     let timer;
     let abortListener;
     const cleanupResponse = value => {
-      if (value?.body) void value.body.cancel().catch(() => {});
+      if (readerRef.reader) {
+        const reader = readerRef.reader;
+        let cancellation;
+        try { cancellation = reader.cancel(); } catch {}
+        try { reader.releaseLock?.(); } catch {}
+        if (cancellation) void Promise.resolve(cancellation).catch(() => {}).finally(() => {
+          try { reader.releaseLock?.(); } catch {}
+        });
+      } else if (value?.body) {
+        try { void Promise.resolve(value.body.cancel()).catch(() => {}); } catch {}
+      }
+    };
+    const assertActive = () => {
+      if (controller.signal.aborted) throw abortError(controller.signal);
+      if (clock() >= effectiveDeadline) throw new Error("REQUEST_TIMEOUT");
     };
     const work = (async () => {
+      assertActive();
       response = await fetchImpl(url, {
         method: "GET", headers: { accept: "application/json" },
         redirect: "error", signal: controller.signal
       });
       if (controller.signal.aborted) {
         cleanupResponse(response);
-        throw new Error("REQUEST_ABORTED");
+        throw abortError(controller.signal);
       }
+      assertActive();
       if (!response.ok) {
         if (response.body) {
-          await readBoundedBody(response, counters, maxBytes, controller.signal, readerRef);
+          await readBoundedBody(
+            response, counters, maxBytes, controller.signal, readerRef, assertActive);
         }
         if (response.status === 429) throw new Error("HTTP_429");
         throw new Error(`HTTP_${response.status}`);
@@ -111,11 +140,12 @@ export function createKrakenProvider({
         throw new Error("INVALID_CONTENT_TYPE");
       }
       const rawBytes = await readBoundedBody(
-        response, counters, maxBytes, controller.signal, readerRef);
+        response, counters, maxBytes, controller.signal, readerRef, assertActive);
       const receivedAt = now();
       if (!Number.isSafeInteger(receivedAt) || receivedAt < requestStartedAt) {
         throw new Error("CLOCK_MOVED_BACKWARDS");
       }
+      assertActive();
       const raw = new TextDecoder("utf-8", { fatal: true }).decode(rawBytes);
       let data;
       try {
@@ -123,23 +153,25 @@ export function createKrakenProvider({
       } catch {
         throw new Error("INVALID_JSON_RESPONSE");
       }
+      assertActive();
       return {
         data, raw, sha256: createHash("sha256").update(rawBytes).digest("hex"),
         bytes: rawBytes.byteLength, requestStartedAt, receivedAt
       };
     })();
-    work.then(() => {}, () => {});
+    work.then(() => {
+      if (completed) cleanupResponse(response);
+    }, () => {});
     const timeout = new Promise((_, reject) => {
       timer = setTimeout(() => {
         timedOut = true;
         controller.abort(new Error("REQUEST_TIMEOUT"));
-        if (readerRef.reader) void readerRef.reader.cancel().catch(() => {});
         cleanupResponse(response);
         reject(new Error("REQUEST_TIMEOUT"));
       }, remaining);
     });
     try {
-      return await Promise.race([
+      const result = await Promise.race([
         work,
         timeout,
         new Promise((_, reject) => {
@@ -149,10 +181,18 @@ export function createKrakenProvider({
           else controller.signal.addEventListener("abort", abortListener, { once: true });
         })
       ]);
+      if (controller.signal.aborted || clock() >= effectiveDeadline) {
+        cleanupResponse(response);
+        throw controller.signal.aborted ? abortError(controller.signal) :
+          new Error("REQUEST_TIMEOUT");
+      }
+      completed = true;
+      return result;
     } finally {
       clearTimeout(timer);
       if (abortListener) controller.signal.removeEventListener("abort", abortListener);
       for (const parent of parentSignals) parent.removeEventListener("abort", cancelFromParent);
+      if (!completed) cleanupResponse(response);
       if (timedOut && response) cleanupResponse(response);
     }
   }

@@ -5,6 +5,7 @@ import { dirname, join, resolve } from "node:path";
 
 const SCHEMA = "SPOT_PAPER_PILOT_JOURNAL_V1";
 const DEFAULT_IO_TIMEOUT_MS = 5_000;
+const CLEANUP_GRACE_MS = 1_000;
 
 function digest(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
@@ -30,14 +31,28 @@ function contextFor(options = {}) {
   };
 }
 
-async function bounded(operation, context) {
+async function bounded(operation, context, cleanupLateResult) {
+  const assertActive = () => {
+    if (context.signal?.aborted) throw unknownError(context.signal.reason ?? new Error("aborted"));
+    if (!Number.isFinite(context.deadlineAt - context.monotonicNow()) ||
+        context.monotonicNow() >= context.deadlineAt) {
+      throw unknownError(new Error("deadline exceeded"));
+    }
+  };
+  assertActive();
   const remaining = context.deadlineAt - context.monotonicNow();
-  if (!Number.isFinite(remaining) || remaining <= 0 || context.signal?.aborted) {
-    throw unknownError(context.signal?.reason ?? new Error("deadline exceeded"));
-  }
   let timer;
   let abortListener;
-  const task = Promise.resolve().then(operation);
+  let finished = false;
+  const task = Promise.resolve().then(() => {
+    assertActive();
+    return operation();
+  });
+  task.then(value => {
+    if (finished && cleanupLateResult) {
+      void Promise.resolve().then(() => cleanupLateResult(value)).catch(() => {});
+    }
+  }, () => {});
   const timeout = new Promise((_, reject) => {
     timer = setTimeout(() => reject(unknownError(new Error("deadline exceeded"))), remaining);
   });
@@ -46,30 +61,59 @@ async function bounded(operation, context) {
     context.signal.addEventListener("abort", abortListener, { once: true });
   }) : new Promise(() => {});
   try {
-    return await Promise.race([task, timeout, aborted]);
+    const result = await Promise.race([task, timeout, aborted]);
+    try {
+      assertActive();
+    } catch (error) {
+      if (cleanupLateResult) {
+        void Promise.resolve().then(() => cleanupLateResult(result)).catch(() => {});
+      }
+      throw error;
+    }
+    return result;
   } finally {
+    finished = true;
     clearTimeout(timer);
     if (abortListener) context.signal.removeEventListener("abort", abortListener);
   }
 }
 
+function cleanupContext(context) {
+  return {
+    monotonicNow: context.monotonicNow,
+    deadlineAt: context.monotonicNow() + CLEANUP_GRACE_MS,
+    signal: null
+  };
+}
+
+async function closeHandle(handle, context) {
+  if (!handle) return;
+  try {
+    await bounded(() => handle.close(), cleanupContext(context));
+  } catch {}
+}
+
+function openHandle(path, flags, mode, io, context) {
+  return bounded(() => io.open(path, flags, mode),
+    context, handle => closeHandle(handle, context));
+}
+
 async function syncDirectory(path, io, context) {
-  const handle = await bounded(() => io.open(path, constants.O_RDONLY), context);
+  const handle = await openHandle(path, constants.O_RDONLY, undefined, io, context);
   try {
     await bounded(() => handle.sync(), context);
   } finally {
-    await bounded(() => handle.close(), context);
+    await closeHandle(handle, context);
   }
 }
 
 async function writeSynced(path, bytes, io, context, exclusive = false) {
-  const handle = await bounded(() =>
-    io.open(path, exclusive ? "wx" : "w", 0o600), context);
+  const handle = await openHandle(path, exclusive ? "wx" : "w", 0o600, io, context);
   try {
     await bounded(() => handle.writeFile(bytes), context);
     await bounded(() => handle.sync(), context);
   } finally {
-    await bounded(() => handle.close(), context);
+    await closeHandle(handle, context);
   }
 }
 
@@ -158,14 +202,14 @@ export async function createRunJournal({
   await bounded(() => io.mkdir(runDirectory, { mode: 0o700 }), context);
   await syncDirectory(root, io, context);
   const lockPath = join(runDirectory, "writer.lock");
-  const lock = await bounded(() => io.open(lockPath, "wx", 0o600), context);
+  const lock = await openHandle(lockPath, "wx", 0o600, io, context);
   try {
     await bounded(() => lock.writeFile(JSON.stringify({ pid: process.pid, runId }) + "\n"), context);
     await bounded(() => lock.sync(), context);
   } catch (error) {
     throw unknownError(error);
   } finally {
-    await bounded(() => lock.close(), context);
+    await closeHandle(lock, context);
   }
   await syncDirectory(runDirectory, io, context);
   const responseDirectory = join(runDirectory, "responses");

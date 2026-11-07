@@ -81,14 +81,23 @@ function shouldStopOnDataError(code) {
 function boundedTask(operation, {
   deadlineAt, monotonicNow, signal, timeoutCode, onTimeout
 }) {
-  const remaining = deadlineAt - monotonicNow();
-  if (!Number.isFinite(remaining) || remaining <= 0) {
-    return Promise.reject(new Error(timeoutCode));
+  const assertActive = () => {
+    if (signal?.aborted) throw signal.reason ?? new Error("ABORTED");
+    const remaining = deadlineAt - monotonicNow();
+    if (!Number.isFinite(remaining) || remaining <= 0) throw new Error(timeoutCode);
+  };
+  try {
+    assertActive();
+  } catch (error) {
+    return Promise.reject(error);
   }
-  if (signal?.aborted) return Promise.reject(signal.reason ?? new Error("ABORTED"));
+  const remaining = deadlineAt - monotonicNow();
   let timer;
   let abortListener;
-  const task = Promise.resolve().then(operation);
+  const task = Promise.resolve().then(() => {
+    assertActive();
+    return operation();
+  });
   task.catch(() => {});
   return new Promise((resolve, reject) => {
     const cleanup = () => {
@@ -109,7 +118,13 @@ function boundedTask(operation, {
     }
     task.then(value => {
       cleanup();
-      resolve(value);
+      try {
+        assertActive();
+        resolve(value);
+      } catch (error) {
+        onTimeout?.();
+        reject(error);
+      }
     }, error => {
       cleanup();
       reject(error);

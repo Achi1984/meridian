@@ -130,7 +130,10 @@ the run without simulated effects. Stop signals cancel in-flight fetches and
 attempt a terminal report within a five-second write grace. If that write times
 out or durable storage fails, its commit is treated as ambiguous and success is
 not asserted. The response hashes bind stored response bytes; they do not
-authenticate Kraken as the origin.
+authenticate Kraken as the origin. Provider and journal operations also recheck
+the monotonic deadline when awaited work resolves. On timeout or abort, owned
+network readers are cancelled without waiting indefinitely, and journal handles
+are given a separate bounded close attempt, including handles from late opens.
 
 ## Journal, report and deployment seam
 
