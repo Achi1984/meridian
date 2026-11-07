@@ -38,7 +38,7 @@ function dto() {
     },
     snapshot: {
       status: 'COMPLETED_BOUNDED',
-      completedAt: '2026-11-07T18:16:08.581Z',
+      completedAt: new Date().toISOString(),
       stopReason: 'CYCLE_LIMIT'
     },
     startingBalanceCents: '100000',
@@ -175,16 +175,17 @@ test(name, {timeout: 180_000}, async () => {
           const root=document.querySelector('#spot-paper-cockpit-root');
           return {
             title:root.textContent.includes('BTC/EUR Paper – echte Marktdaten, simulierte Trades'),
-            snapshot:root.textContent.includes('2026-11-07T18:16:08.581Z'),
-            negative:root.textContent.includes('−357 cents'),
+            snapshot:root.textContent.includes('Abgeschlossen (begrenzt)'),
+            negative:root.textContent.includes('−3,57 €'),
             inventory:root.textContent.includes('146122 sat'),
             noRunning:!root.textContent.includes('RUNNING'),
+            noDisconnectedPreview:root.querySelector('.spot-paper-fixture').hidden,
             state:root.dataset.state
           };
         })()`);
         assert.deepEqual(visible, {
           title: true, snapshot: true, negative: true, inventory: true,
-          noRunning: true, state: 'stale'
+          noRunning: true, noDisconnectedPreview: true, state: 'terminal'
         });
       } finally {
         await intercepted.close();

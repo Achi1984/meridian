@@ -91,10 +91,11 @@ BTC/EUR uses a separate fixed route, table, and versioned DTO:
    assessment payload. The UI fixture is explicitly offline; it is not a
    reconstructed or live report.
 2. Obtain the retained readback, provenance manifest, assessment, and replay
-   output through the separately approved operator process. Run
-   `createSpotPaperDashboardDto({readback, provenance, assessment, signalReplay})`
-   from `scripts/spot-paper-report-bridge/contract.mjs`; it must return a DTO.
-   Do not fill missing source fields from the reconciliation summary.
+   output through the separately approved operator process. Regenerate the
+   current assessment and replay outputs offline, then create the
+   DTO with `scripts/spot-paper-report-bridge/create-dto.mjs`. The creator also
+   requires a separately supplied, root-verified dispatch tuple; it never
+   defaults that tuple from the evidence manifest.
 3. Independently review and approve that exact DTO and its transfer method.
    Supply the dedicated upload token through the deployment's approved secret
    channel; do not reuse or publish the read token.
@@ -107,6 +108,81 @@ BTC/EUR uses a separate fixed route, table, and versioned DTO:
 
 No retained payload was uploaded, no credential was added, and no deployment
 or active Paper run was changed for this integration.
+
+## Offline regeneration for the pinned first-hour run
+
+The original archived outputs predate the current `profileId` fields. Do not
+edit those outputs to add profile or PASS values. Retrieve the original
+`paper.stdout.json`, `pilot-manifest.json`, `metadata.txt`, and retained
+`data/spot-paper-42395522899-1` directory using the approved operator process;
+verify the archive's `SHA256SUMS` before continuing. These files are not included
+in this repository. Run the following in a clean output directory with the
+repository's offline assessment and replay tools:
+
+```sh
+set -euo pipefail
+INPUT=/approved/private/spot-paper-pilot-42395522899-1
+OUT="$(mktemp -d)"
+RUN_ID=spot-paper-42395522899-1
+PAPER_EXIT_STATUS="$(awk -F= '$1 == "paper_exit_status" {print $2}' "$INPUT/metadata.txt")"
+[[ "$PAPER_EXIT_STATUS" =~ ^[0-9]+$ ]]
+
+node scripts/spot-paper-pilot/cli.mjs \
+  --mode report --data-root "$INPUT/data" --run-id "$RUN_ID" \
+  > "$OUT/readback.stdout.json"
+printf '%s  %s\n' \
+  53a32d3921bd2252ab027898a4bfc7cf609e7c66de6eff0fdfdaa136b7e1bd40 \
+  "$OUT/readback.stdout.json" | sha256sum --check
+
+node scripts/spot-paper-pilot/paper-evidence-assessment.mjs \
+  "$INPUT/paper.stdout.json" "$OUT/readback.stdout.json" \
+  "$PAPER_EXIT_STATUS" "$INPUT/pilot-manifest.json" \
+  "$INPUT/data/$RUN_ID" "$OUT/assessment.json" BTC_EUR_PAPER_1H_V1
+node scripts/spot-paper-pilot/signal-replay.mjs \
+  "$OUT/readback.stdout.json" "$INPUT/pilot-manifest.json" \
+  "$INPUT/data/$RUN_ID" "$OUT/signal-replay.json" \
+  BTC_EUR_RUN_42395522899_V1
+```
+
+Before creating the DTO, obtain the repository, workflow path, ref, workflow
+commit SHA, run ID, run number, and attempt independently from the root-verified
+GitHub Actions run metadata (not from the artifact's manifest or replay JSON).
+Write those values to `$OUT/expected-dispatch.json` without copying or editing
+any artifact file. The required first-hour identity is pinned to source
+`81edf0b5dc3d455c2c1e1906791d56c731bea0c9`, workflow
+`ddae14f01583196dfc9e9da906dcd03d41d58369`, run `42395522899`, run number 1,
+attempt 1, and `refs/heads/main`; a mismatch or absent value must stop DTO
+creation. For example, the independently prepared JSON has this shape:
+
+```json
+{
+  "repository": "Achi1984/meridian",
+  "workflowPath": ".github/workflows/spot-paper-pilot-paper-once.yml",
+  "ref": "refs/heads/main",
+  "workflowSha": "<independently verified workflow commit SHA>",
+  "workflowRunId": "42395522899",
+  "workflowRunNumber": 1,
+  "workflowRunAttempt": 1
+}
+```
+
+Then create a new, private output file. The command rejects stale/mismatched
+assessment, replay, readback, provenance, or independent dispatch inputs and
+does not overwrite an existing output:
+
+```sh
+node scripts/spot-paper-report-bridge/create-dto.mjs \
+  "$OUT/readback.stdout.json" "$INPUT/pilot-manifest.json" \
+  "$OUT/assessment.json" "$OUT/signal-replay.json" \
+  "$OUT/expected-dispatch.json" "$OUT/btc-eur-dashboard-dto.json"
+```
+
+This procedure is offline; it does not call a provider, dispatch or resume a
+workflow, change a runtime, enable deployment flags, or transfer the DTO. It
+must fail if the retained inputs are incomplete or if the tools return
+UNKNOWN/FAILED. Do not reconstruct missing values from reconciliation prose,
+hand-edit evidence to add profile/PASS fields, or substitute the active
+four-hour run `42404743386`.
 
 ## Post-run acceptance procedure
 

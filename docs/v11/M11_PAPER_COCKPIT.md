@@ -86,6 +86,12 @@ keeps the original assessment's `signalReplay: NOT_PERFORMED` distinct from the
 separate replay result. Neither reports profitability, strategy quality, or a
 current running worker.
 
+Connected balances and PnL are formatted from integer cents as exact German
+EUR values; missing amounts remain `Unbekannt`. The visible financial summary
+uses German labels and readable elapsed durations. Source/workflow identifiers
+and verification enums remain in a collapsed technical-details disclosure.
+When a valid report is displayed, the offline preview disclosure is hidden.
+
 ## Focused verification
 
 ```sh

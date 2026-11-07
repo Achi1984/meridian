@@ -63,6 +63,29 @@ function isAcceptedIdentity(provenance, runId) {
     provenance.smaFast === 5 && provenance.smaSlow === 20;
 }
 
+export function verifySpotPaperDispatchIdentity(expectedDispatch, provenance) {
+  if (!record(expectedDispatch) || !record(provenance)) return 'UNKNOWN';
+  const expected = {
+    repository: 'Achi1984/meridian',
+    workflowPath: '.github/workflows/spot-paper-pilot-paper-once.yml',
+    ref: 'refs/heads/main',
+    workflowSha: ACCEPTED.workflowSha,
+    workflowRunId: ACCEPTED.workflowRunId,
+    workflowRunNumber: ACCEPTED.workflowRunNumber,
+    workflowRunAttempt: ACCEPTED.workflowRunAttempt
+  };
+  const matches = Object.keys(expectedDispatch).sort().join(',') ===
+    Object.keys(expected).sort().join(',') &&
+    Object.entries(expected).every(([key, value]) =>
+      expectedDispatch[key] === value) &&
+    provenance.workflowSha === expectedDispatch.workflowSha &&
+    String(provenance.workflowRunId) === String(expectedDispatch.workflowRunId) &&
+    provenance.workflowRunNumber === expectedDispatch.workflowRunNumber &&
+    provenance.workflowRunAttempt === expectedDispatch.workflowRunAttempt &&
+    provenance.runId === ACCEPTED.runId;
+  return matches ? 'PASS' : 'FAILED';
+}
+
 function terminalReadbackMatches(readback, report) {
   if (!record(readback) || readback.reconciliation !== 'TERMINAL_REPORT_AVAILABLE' ||
       readback.resumed !== false || readback.executionImpact !== false ||
@@ -147,10 +170,12 @@ export function createSpotPaperDashboardDto({
   readback,
   provenance,
   assessment,
-  signalReplay
+  signalReplay,
+  expectedDispatch
 } = {}) {
   const report = readback?.report;
   if (!record(report) || report.schemaVersion !== 'SPOT_PAPER_PILOT_REPORT_V1' ||
+      verifySpotPaperDispatchIdentity(expectedDispatch, provenance) !== 'PASS' ||
       !isAcceptedIdentity(provenance, readback?.runId) ||
       !terminalReadbackMatches(readback, report) ||
       !assessmentMatches(assessment, report, readback, provenance) ||
@@ -353,7 +378,9 @@ export async function readBoundedSpotPaperResponse(response, signal) {
       throw error;
     }
     if (response?.status !== 200 || response?.ok !== true) {
-      throw new Error('source_unavailable');
+      const error = new Error('source_unavailable');
+      error.code = 'SOURCE_UNAVAILABLE';
+      throw error;
     }
     if (!/^application\/json(?:\s*;|$)/i.test(response.headers?.get?.('content-type') ?? '')) {
       throw new Error('invalid_content_type');

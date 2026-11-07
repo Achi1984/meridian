@@ -135,28 +135,48 @@ const envelope = report => ({
   report
 });
 
-test('spot-paper cockpit renders a completed snapshot without implying a running worker', () => {
+test('spot-paper cockpit renders an exact EUR completed snapshot with technical details collapsed', () => {
   const report = dto();
+  report.unrealizedPnlCents = '99525';
   const {root, document} = harness();
   renderSpotPaperCockpit(root, envelope(report).report, document, {
     now: NOW, staleAfterMs: 60_000
   });
   assert.match(root.textContent, /BTC\/EUR Paper – echte Marktdaten, simulierte Trades/);
-  assert.match(root.textContent, /2026-11-07T18:16:08.581Z/);
-  assert.match(root.textContent, /Starting balance100000 cents/);
-  assert.match(root.textContent, /Cash89643 cents/);
-  assert.match(root.textContent, /Realized PnL−357 cents/);
-  assert.match(root.textContent, /BUY count4/);
-  assert.match(root.textContent, /SELL count3/);
-  assert.match(root.textContent, /OPEN_UNRESOLVED_AT_TERMINAL/);
+  assert.match(root.textContent, /07\.11\.2026, 18:16:08 UTC/);
+  assert.match(root.textContent, /Startguthaben1\.000,00 €/);
+  assert.match(root.textContent, /Eigenkapital995,25 €/);
+  assert.match(root.textContent, /Realisierter Gewinn\/Verlust−3,57 €/);
+  assert.match(root.textContent, /Unrealisierter Gewinn\/Verlust\+995,25 €/);
+  assert.match(root.textContent, /Käufe4/);
+  assert.match(root.textContent, /Verkäufe3/);
+  assert.match(root.textContent, /Offen, am Ende ungelöst/);
   assert.match(root.textContent, /146122 sat/);
-  assert.match(root.textContent, /3542902 ms of 3600000 ms/);
-  assert.match(root.textContent, /0 data gaps/);
-  assert.match(root.textContent, /assessment signal replay NOT_PERFORMED · separate replay PASS/);
+  assert.match(root.textContent, /59 Min\. 2 Sek\. 902 ms von 1 Std\. \(98,41 %; teilweise\)/);
+  assert.match(root.textContent, /0 Datenlücken/);
   assert.doesNotMatch(root.textContent, /\bRUNNING\b/);
   const visit = element => [element, ...element.children.flatMap(visit)];
-  const pnl = visit(root).find(item => item.textContent === '−357 cents');
+  const pnl = visit(root).find(item => item.textContent === '−3,57 €');
   assert.equal(pnl.className, 'tone-danger');
+  const positivePnl = visit(root).find(item => item.textContent === '+995,25 €');
+  assert.equal(positivePnl.className, 'tone-safe');
+  const reportRoot = visit(root).find(item => item.tagName === 'DIV' &&
+    item.children.some(child => child.className?.includes('spot-paper-technical-details')));
+  const technical = visit(root).find(item => item.className?.includes('spot-paper-technical-details'));
+  assert.ok(technical);
+  assert.equal(technical.open, undefined);
+  assert.doesNotMatch(reportRoot.children.slice(0, -1).map(item => item.textContent).join(' '),
+    /81edf0|ddae14|NOT_PERFORMED|NOT_ASSESSED|COMPLETED_BOUNDED|42395522899/);
+  assert.match(technical.textContent, /Assessment-Signal-Replay NOT_PERFORMED · separater Replay PASS/);
+  assert.match(technical.textContent, /81edf0b5dc3d455c2c1e1906791d56c731bea0c9/);
+});
+
+test('spot-paper EUR formatting preserves integer cents beyond Number precision', () => {
+  const report = dto();
+  report.cashCents = '90071992547409931234';
+  const {root, document} = harness();
+  renderSpotPaperCockpit(root, report, document);
+  assert.match(root.textContent, /Bargeld900\.719\.925\.474\.099\.312,34 €/);
 });
 
 test('spot-paper cockpit keeps missing values unknown, stale separate, and preview explicitly offline', async () => {
@@ -167,8 +187,8 @@ test('spot-paper cockpit keeps missing values unknown, stale separate, and previ
       status: 200, headers: {'content-type': 'application/json'}
     })
   });
-  assert.match(h.root.textContent, /Fixture preview · keine verbundenen Live-Daten/);
-  assert.match(h.root.textContent, /kein freigegebener, übertragener Terminalreport/);
+  assert.match(h.root.textContent, /Offline-Vorschau · keine Reportdaten/);
+  assert.match(h.root.textContent, /nicht mit einem Paper-Run verbunden/);
   h.controller.setActive(true);
   assert.equal(h.root.attrs['data-state'], 'ready');
   assert.equal(h.find('button').hidden, false);
@@ -177,8 +197,11 @@ test('spot-paper cockpit keeps missing values unknown, stale separate, and previ
   h.find('button').click();
   await new Promise(resolve => setTimeout(resolve, 0));
   assert.equal(h.root.attrs['data-state'], 'stale');
-  assert.match(h.root.textContent, /CashUNKNOWN · missing is not zero/);
-  assert.match(h.root.textContent, /AktualitätSTALE/);
+  assert.match(h.root.textContent, /BargeldUnbekannt/);
+  assert.match(h.root.textContent, /AktualitätVeraltet/);
+  const visit = element => [element, ...element.children.flatMap(visit)];
+  const fixture = visit(h.root).find(item => item.className?.includes('spot-paper-fixture'));
+  assert.equal(fixture.hidden, true, 'a connected report removes the disconnected preview notice');
   h.controller.dispose();
 });
 
@@ -238,7 +261,38 @@ test('spot-paper cockpit rejects a mismatched report identity without presenting
   h.controller.setActive(true);
   await h.controller.refresh();
   assert.equal(h.root.attrs['data-state'], 'rejected');
-  assert.match(h.root.textContent, /response was rejected/);
-  assert.doesNotMatch(h.root.textContent, /99525 cents|−357 cents/);
+  assert.match(h.root.textContent, /Antwort wurde abgelehnt/);
+  assert.doesNotMatch(h.root.textContent, /995,25 €|−3,57 €/);
+  h.controller.dispose();
+});
+
+test('spot-paper cockpit distinguishes unavailable HTTP 503 from a rejected malformed 200', async () => {
+  for (const [response, expectedState, expectedMessage] of [
+    [new Response(null, {status: 503}), 'unavailable', /Kein freigegebener BTC\/EUR-Bericht verfügbar/],
+    [new Response('{invalid', {status: 200, headers: {'content-type': 'application/json'}}),
+      'rejected', /Antwort wurde abgelehnt/]
+  ]) {
+    const h = harness({fetchImpl: async () => response});
+    h.controller.setActive(true);
+    await h.controller.refresh();
+    assert.equal(h.root.attrs['data-state'], expectedState);
+    assert.match(h.root.textContent, expectedMessage);
+    h.controller.dispose();
+  }
+});
+
+test('spot-paper fresh terminal reports receive the completed-snapshot message', async () => {
+  const fresh = dto();
+  fresh.snapshot.completedAt = new Date(NOW - 1_000).toISOString();
+  const h = harness({
+    fetchImpl: async () => new Response(JSON.stringify(envelope(fresh)), {
+      status: 200, headers: {'content-type': 'application/json'}
+    })
+  });
+  h.controller.setActive(true);
+  await h.controller.refresh();
+  assert.equal(h.root.attrs['data-state'], 'terminal');
+  assert.match(h.root.textContent, /Abgeschlossener BTC\/EUR-Paper-Snapshot/);
+  assert.doesNotMatch(h.root.textContent, /UNKNOWN fallback|kein freigegebener.*Report verbunden/);
   h.controller.dispose();
 });

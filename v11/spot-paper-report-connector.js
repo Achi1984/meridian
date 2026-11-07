@@ -35,7 +35,6 @@ export function createSpotPaperReportConnector({
       if (work.returned && active === work) active = null;
     };
     const source = Promise.resolve().then(() => transport({signal: controller.signal}));
-    source.then(release, release);
     const projected = source.then(async response => {
       try {
         const envelope = await readBoundedSpotPaperResponse(response, controller.signal);
@@ -46,10 +45,12 @@ export function createSpotPaperReportConnector({
         return outcome('AVAILABLE', envelope.report);
       } catch (error) {
         if (controller.signal.aborted || disposed) return outcome(disposed ? 'DISPOSED' : 'ABORTED');
-        return outcome(error?.code === 'AUTH_REQUIRED' ? 'AUTH_REQUIRED' : 'REJECTED',
+        return outcome(error?.code === 'AUTH_REQUIRED' ? 'AUTH_REQUIRED' :
+          error?.code === 'SOURCE_UNAVAILABLE' ? 'UNAVAILABLE' : 'REJECTED',
           null, error?.message || 'INVALID_RESPONSE');
       }
     }, error => outcome(error?.code === 'AUTH_REQUIRED' ? 'AUTH_REQUIRED' : 'UNAVAILABLE'));
+    projected.then(release, release);
     let timer;
     let timerSet = false;
     const timeout = new Promise(resolve => {

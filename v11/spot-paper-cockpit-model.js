@@ -1,11 +1,18 @@
 import {isSpotPaperDashboardDto} from '../scripts/spot-paper-report-bridge/contract.mjs?v=B16-M11-FIX12';
 
 function amount(value, signed = false) {
-  if (value === null) return {label: 'UNKNOWN · missing is not zero', tone: 'tone-muted'};
-  if (!signed || value === '0') return {label: `${value} cents`, tone: 'tone-muted'};
+  if (value === null) return {label: 'Unbekannt', tone: 'tone-muted'};
   const negative = value.startsWith('-');
+  const digits = negative ? value.slice(1) : value;
+  const whole = digits.slice(0, -2) || '0';
+  const groupedWhole = [];
+  for (let end = whole.length; end > 0; end -= 3) {
+    groupedWhole.push(whole.slice(Math.max(0, end - 3), end));
+  }
+  const formatted = `${groupedWhole.reverse().join('.')},${digits.slice(-2).padStart(2, '0')} €`;
+  if (!signed || value === '0') return {label: formatted, tone: 'tone-muted'};
   return {
-    label: `${negative ? '−' : '+'}${negative ? value.slice(1) : value} cents`,
+    label: `${negative ? '−' : '+'}${formatted}`,
     tone: negative ? 'tone-danger' : 'tone-safe'
   };
 }

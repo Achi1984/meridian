@@ -23,6 +23,48 @@ function amountValue(value) {
   return value.label;
 }
 
+function timestamp(value) {
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ?
+    `${new Intl.DateTimeFormat('de-DE', {
+      dateStyle: 'medium', timeStyle: 'medium', timeZone: 'UTC'
+    }).format(date)} UTC` : 'Unbekannt';
+}
+
+function duration(milliseconds) {
+  if (!Number.isSafeInteger(milliseconds) || milliseconds < 0) return 'Unbekannt';
+  let seconds = Math.floor(milliseconds / 1000);
+  const days = Math.floor(seconds / 86_400);
+  seconds %= 86_400;
+  const hours = Math.floor(seconds / 3_600);
+  seconds %= 3_600;
+  const minutes = Math.floor(seconds / 60);
+  seconds %= 60;
+  const parts = [];
+  if (days) parts.push(`${days} Tg.`);
+  if (hours) parts.push(`${hours} Std.`);
+  if (minutes) parts.push(`${minutes} Min.`);
+  if (seconds || parts.length === 0) parts.push(`${seconds} Sek.`);
+  const millisecondsPart = milliseconds % 1000;
+  if (millisecondsPart) parts.push(`${millisecondsPart} ms`);
+  return parts.join(' ');
+}
+
+function durationStatus(status) {
+  return status === 'FULL_REQUESTED_DURATION' ? 'vollständig' :
+    status === 'PARTIAL_BOUNDED_DURATION' ? 'teilweise' : 'unbekannt';
+}
+
+function inventoryStatus(status) {
+  return status === 'OPEN_UNRESOLVED_AT_TERMINAL' ? 'Offen, am Ende ungelöst' :
+    status === 'FLAT' ? 'Keine offene Position' : 'Unbekannt';
+}
+
+function freshnessStatus(status) {
+  return status === 'STALE' ? 'Veraltet' :
+    status === 'WITHIN_DISPLAY_POLICY' ? 'Innerhalb der Anzeigegrenze' : 'Unbekannt';
+}
+
 function createView(root, document) {
   root.replaceChildren();
   root.className = 'card paper-cockpit spot-paper-cockpit';
@@ -40,13 +82,13 @@ function createView(root, document) {
   status.setAttribute('aria-atomic', 'true');
   const report = node(document, root, 'div');
   const fixture = document.createElement('details');
-  fixture.className = 'card card-muted';
-  node(document, fixture, 'summary', 'Fixture preview · keine verbundenen Live-Daten');
+  fixture.className = 'card card-muted spot-paper-fixture';
+  node(document, fixture, 'summary', 'Offline-Vorschau · keine Reportdaten');
   const fixtureContent = node(document, fixture, 'div');
   node(document, fixtureContent, 'p',
-    'Diese Vorschau enthält keine Run-Werte. Im Repository liegen kein freigegebener, übertragener Terminalreport und keine Live-Verbindung; fehlende Werte bleiben UNKNOWN.');
+    'Diese Vorschau enthält keine Laufdaten; sie ist nicht mit einem Paper-Run verbunden. Fehlende Werte bleiben unbekannt.');
   node(document, fixtureContent, 'p',
-    'Die historische BTC/EUR-Reconciliation und der separate Signal-Replay sind keine laufende Beobachtung oder aktuelle Marktdaten.', 'caption');
+    'Die historische BTC/EUR-Abstimmung und der separate Signal-Replay sind keine laufende Beobachtung oder aktuelle Marktdaten.', 'caption');
   root.append(fixture);
   return {refresh, status, report, fixture};
 }
@@ -56,48 +98,64 @@ function renderReport(reportRoot, dto, document, options) {
   reportRoot.replaceChildren();
   if (!model.available) {
     node(document, reportRoot, 'p',
-      'Kein freigegebener BTC/EUR Paper-Report verbunden. Run status und alle Kennzahlen sind UNKNOWN; fehlende Daten sind nicht null.');
+      'Kein freigegebener BTC/EUR-Paper-Report verbunden. Snapshot und Kennzahlen sind unbekannt; fehlende Daten sind nicht null.');
     return;
   }
   const summary = document.createElement('div');
   summary.className = 'trust-grid';
-  field(document, summary, 'Snapshot', model.snapshot.status);
-  field(document, summary, 'Abgeschlossen', model.snapshot.completedAt);
-  field(document, summary, 'Aktualität', model.freshness.status);
-  field(document, summary, 'Run ID', model.identity.runId);
+  field(document, summary, 'Snapshot', 'Abgeschlossen (begrenzt)');
+  field(document, summary, 'Abgeschlossen am', timestamp(model.snapshot.completedAt));
+  field(document, summary, 'Aktualität', freshnessStatus(model.freshness.status));
   reportRoot.append(summary);
 
   const amounts = document.createElement('div');
   amounts.className = 'trust-grid';
-  field(document, amounts, 'Starting balance', amountValue(model.startingBalance));
-  field(document, amounts, 'Cash', amountValue(model.cash));
-  field(document, amounts, 'Equity', amountValue(model.equity));
-  field(document, amounts, 'Realized PnL', amountValue(model.realizedPnl), model.realizedPnl.tone);
-  field(document, amounts, 'Unrealized PnL', amountValue(model.unrealizedPnl), model.unrealizedPnl.tone);
-  field(document, amounts, 'Fees', amountValue(model.fees));
+  field(document, amounts, 'Startguthaben', amountValue(model.startingBalance));
+  field(document, amounts, 'Bargeld', amountValue(model.cash));
+  field(document, amounts, 'Eigenkapital', amountValue(model.equity));
+  field(document, amounts, 'Realisierter Gewinn/Verlust', amountValue(model.realizedPnl), model.realizedPnl.tone);
+  field(document, amounts, 'Unrealisierter Gewinn/Verlust', amountValue(model.unrealizedPnl), model.unrealizedPnl.tone);
+  field(document, amounts, 'Gebühren', amountValue(model.fees));
   reportRoot.append(amounts);
 
   const trades = document.createElement('div');
   trades.className = 'trust-grid';
-  field(document, trades, 'BUY count', String(model.buys));
-  field(document, trades, 'SELL count', String(model.sells));
-  field(document, trades, 'Fill count', String(model.fills));
-  field(document, trades, 'Open inventory', model.inventory.status);
-  field(document, trades, 'Inventory quantity', model.inventory.quantitySat === null ?
-    'UNKNOWN' : `${model.inventory.quantitySat} sat`);
+  field(document, trades, 'Käufe', String(model.buys));
+  field(document, trades, 'Verkäufe', String(model.sells));
+  field(document, trades, 'Ausführungen', String(model.fills));
+  field(document, trades, 'Offene Position', inventoryStatus(model.inventory.status));
+  field(document, trades, 'Bestand', model.inventory.quantitySat === null ?
+    'Unbekannt' : `${model.inventory.quantitySat} sat`);
   reportRoot.append(trades);
-
-  const durationPct = (model.duration.coverage * 100).toFixed(2);
+  const durationPct = (model.duration.coverage * 100).toLocaleString('de-DE', {
+    minimumFractionDigits: 2, maximumFractionDigits: 2
+  });
   node(document, reportRoot, 'p',
-    `Actual duration: ${model.duration.elapsedMs} ms of ${model.duration.requestedMs} ms (${durationPct}%) · ${model.duration.status}.`, 'caption');
+    `Tatsächliche Dauer: ${duration(model.duration.elapsedMs)} von ${duration(model.duration.requestedMs)} (${durationPct} %; ${durationStatus(model.duration.status)}).`, 'caption');
   node(document, reportRoot, 'p',
-    `Coverage: ${model.coverage.acceptedObservations} accepted observations · ${model.coverage.observations} observations · ${model.coverage.dataGaps} data gaps · ${model.coverage.requests} requests.`, 'caption');
+    `Abdeckung: ${model.coverage.acceptedObservations} akzeptierte Beobachtungen von ${model.coverage.observations} · ${model.coverage.dataGaps} Datenlücken · ${model.coverage.requests} Anfragen.`, 'caption');
   node(document, reportRoot, 'p',
-    `Verification: terminal readback ${model.verification.terminalReadback} · assessment ${model.verification.assessment} · assessment signal replay ${model.verification.assessmentSignalReplay} · separate replay ${model.verification.signalReplay} · profitability ${model.verification.profitability}.`, 'caption');
-  node(document, reportRoot, 'p',
-    `Accepted source ${model.identity.sourceSha} · workflow ${model.identity.workflowSha} · dispatch run ${model.identity.workflowRunId} attempt ${model.identity.workflowRunAttempt} (${model.identity.workflowRunNumber}).`, 'caption');
-  node(document, reportRoot, 'p',
-    'Abgeschlossener Report-Snapshot; kein Nachweis eines laufenden Workers. Ein offener Bestand bleibt als offen ausgewiesen und wird nicht automatisch geschlossen.', 'caption');
+    'Abgeschlossener Snapshot; kein Nachweis eines laufenden Workers. Eine offene Position bleibt ausgewiesen und wird nicht automatisch geschlossen.', 'caption');
+  const technical = document.createElement('details');
+  technical.className = 'card card-muted spot-paper-technical-details';
+  node(document, technical, 'summary', 'Technische Details und Verifikation');
+  const identity = document.createElement('div');
+  identity.className = 'trust-grid';
+  field(document, identity, 'Run-ID', model.identity.runId);
+  field(document, identity, 'Quell-SHA', model.identity.sourceSha);
+  field(document, identity, 'Workflow-SHA', model.identity.workflowSha);
+  field(document, identity, 'Workflow-Run-ID', model.identity.workflowRunId);
+  field(document, identity, 'Workflow-Run-Nummer', String(model.identity.workflowRunNumber));
+  field(document, identity, 'Workflow-Versuch', String(model.identity.workflowRunAttempt));
+  field(document, identity, 'Profil', model.identity.profileId);
+  field(document, identity, 'Modell / Markt', `${model.identity.model} · ${model.identity.pair}`);
+  field(document, identity, 'Dispatch-Identität', 'PASS');
+  technical.append(identity);
+  node(document, technical, 'p',
+    `Verifikation: Terminal-Readback ${model.verification.terminalReadback} · Assessment ${model.verification.assessment} · Assessment-Signal-Replay ${model.verification.assessmentSignalReplay} · separater Replay ${model.verification.signalReplay} · Profitabilität ${model.verification.profitability}.`, 'caption');
+  node(document, technical, 'p',
+    `Beendigungsgrund ${model.snapshot.stopReason} · Laufzeitstatus ${model.duration.status} · Snapshot-Status ${model.snapshot.status}.`, 'caption');
+  reportRoot.append(technical);
 }
 
 export function renderSpotPaperCockpit(root, dto, document = root?.ownerDocument, options = {}) {
@@ -114,8 +172,9 @@ export function renderSpotPaperCockpit(root, dto, document = root?.ownerDocument
   view.refresh.setAttribute('style',
     'min-width:44px;min-height:44px;max-width:100%;padding:10px 12px;white-space:normal;overflow-wrap:anywhere');
   view.refresh.onclick = typeof options.onRefresh === 'function' ? options.onRefresh : null;
-  view.status.textContent = options.message || 'BTC/EUR report status UNKNOWN.';
+  view.status.textContent = options.message || 'Status des BTC/EUR-Berichts unbekannt.';
   root.setAttribute('data-state', options.state || 'unavailable');
+  view.fixture.hidden = presentSpotPaperCockpit(dto, options).available;
   view.fixture.open = options.preserveFixtureState === true && view.fixture.open;
   renderReport(view.report, dto, document, options);
   return {status: presentSpotPaperCockpit(dto, options).available ? 'REPORT_PRESENTED' : 'UNAVAILABLE'};

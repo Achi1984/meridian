@@ -285,6 +285,12 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         })()`);
         assert.equal(focus,true);
         await key('Tab','Tab',9);
+        assert.equal(await evaluate(`document.activeElement===document.querySelector('#spot-paper-cockpit-root button')`),
+          true,'Strategies card exposes its manual BTC/EUR refresh before the legacy Paper card');
+        await key('Tab','Tab',9);
+        assert.equal(await evaluate(`document.activeElement===document.querySelector('#spot-paper-cockpit-root > details > summary')`),
+          true,'offline fixture disclosure follows the BTC/EUR refresh affordance');
+        await key('Tab','Tab',9);
         const refreshTab=await evaluate(`document.activeElement===document.querySelector('#paper-cockpit-root button')`);
         assert.equal(refreshTab,true,'native Tab focuses the manual report read affordance');
         await key('Tab','Tab',9);

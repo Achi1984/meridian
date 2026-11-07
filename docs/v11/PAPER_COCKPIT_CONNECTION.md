@@ -56,11 +56,13 @@ The checked-in reconciliation and replay records do not contain the original
 terminal readback, provenance, or paper assessment payload. The generated
 preview is therefore disconnected and does not represent that run. Before any
 transfer, retrieve those exact retained inputs through the approved operator
-process, require
-`createSpotPaperDashboardDto({readback, provenance, assessment, signalReplay})`
-to return a DTO, review and approve that DTO, transfer it once to the fixed
-upload route, and verify immutable GET readback. Do not reconstruct missing
-fields from the reconciliation document or treat signal replay as the original
+process, regenerate current assessment/replay fields with the offline tools
+documented in `PAPER_REPORT_BRIDGE.md`, and provide the independently
+root-verified first-hour Actions dispatch tuple to
+`scripts/spot-paper-report-bridge/create-dto.mjs`. Review and approve the exact
+generated DTO, transfer it once to the fixed upload route, and verify immutable
+GET readback. Do not reconstruct missing fields from the reconciliation
+document, hand-edit evidence, or treat signal replay as the original
 assessment's signal-replay result.
 
 After merging and publishing to Pages, verify that both imported bridge modules

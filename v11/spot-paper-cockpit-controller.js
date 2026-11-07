@@ -7,13 +7,14 @@ export const SPOT_PAPER_REPORT_ENDPOINT =
   'https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/spot-paper-report';
 
 const messages = {
-  'auth-required': 'Unlock Meridian before requesting the private BTC/EUR report.',
-  ready: 'No BTC/EUR report requested. Use the button for a one-shot read.',
-  loading: 'The one-shot BTC/EUR report read is in progress.',
-  rejected: 'The BTC/EUR response was rejected and is not displayed.',
-  stale: 'The completed BTC/EUR snapshot is stale under the display-only policy.',
-  unknown: 'BTC/EUR freshness or snapshot data is UNKNOWN; no running state is inferred.',
-  unavailable: 'No approved BTC/EUR report is connected.'
+  'auth-required': 'Vor dem Abruf des privaten BTC/EUR-Berichts Meridian entsperren.',
+  ready: 'Kein BTC/EUR-Bericht abgerufen. Für einen einmaligen Abruf die Schaltfläche verwenden.',
+  loading: 'Der einmalige Abruf des BTC/EUR-Berichts läuft.',
+  terminal: 'Abgeschlossener BTC/EUR-Paper-Snapshot. Daraus wird kein laufender Worker abgeleitet.',
+  rejected: 'Die BTC/EUR-Antwort wurde abgelehnt und wird nicht angezeigt.',
+  stale: 'Der abgeschlossene BTC/EUR-Snapshot ist nach der reinen Anzeigegrenze veraltet.',
+  unknown: 'Aktualität oder Snapshot-Daten sind unbekannt; ein Laufstatus wird nicht abgeleitet.',
+  unavailable: 'Kein freigegebener BTC/EUR-Bericht verfügbar.'
 };
 
 function initialState(access, enabled) {

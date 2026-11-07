@@ -4,7 +4,8 @@ import {
   createSpotPaperDashboardDto,
   isSpotPaperDashboardDto,
   isSpotPaperReportEnvelope,
-  SPOT_PAPER_REPORT_ENVELOPE_SCHEMA
+  SPOT_PAPER_REPORT_ENVELOPE_SCHEMA,
+  verifySpotPaperDispatchIdentity
 } from '../scripts/spot-paper-report-bridge/contract.mjs';
 
 const reportFixture = () => ({
@@ -146,7 +147,16 @@ function evidenceFixture() {
     replayedSignals: 8,
     discrepancies: []
   };
-  return {readback, provenance, assessment, signalReplay};
+  const expectedDispatch = {
+    repository: 'Achi1984/meridian',
+    workflowPath: '.github/workflows/spot-paper-pilot-paper-once.yml',
+    ref: 'refs/heads/main',
+    workflowSha: 'ddae14f01583196dfc9e9da906dcd03d41d58369',
+    workflowRunId: '42395522899',
+    workflowRunNumber: 1,
+    workflowRunAttempt: 1
+  };
+  return {readback, provenance, assessment, signalReplay, expectedDispatch};
 }
 
 test('spot-paper DTO binds terminal report, assessment, replay, and accepted dispatch identity', () => {
@@ -186,6 +196,24 @@ test('spot-paper DTO rejects unaccepted source/workflow identity and mismatched 
   const replayMismatch = evidenceFixture();
   replayMismatch.signalReplay.outcome = 'UNKNOWN';
   assert.equal(createSpotPaperDashboardDto(replayMismatch), null);
+
+  const missingDispatch = evidenceFixture();
+  delete missingDispatch.expectedDispatch;
+  assert.equal(createSpotPaperDashboardDto(missingDispatch), null);
+
+  const untrustedDispatch = evidenceFixture();
+  untrustedDispatch.expectedDispatch.workflowRunId = '42404743386';
+  assert.equal(createSpotPaperDashboardDto(untrustedDispatch), null);
+});
+
+test('spot-paper dispatch verification requires independent accepted Actions identity', () => {
+  const evidence = evidenceFixture();
+  assert.equal(verifySpotPaperDispatchIdentity(
+    evidence.expectedDispatch, evidence.provenance), 'PASS');
+  assert.equal(verifySpotPaperDispatchIdentity(null, evidence.provenance), 'UNKNOWN');
+  assert.equal(verifySpotPaperDispatchIdentity({
+    ...evidence.expectedDispatch, workflowPath: '.github/workflows/spot-paper-pilot-four-hour-once.yml'
+  }, evidence.provenance), 'FAILED');
 });
 
 test('spot-paper DTO preserves missing amounts as unavailable and rejects malformed cents', () => {
