@@ -145,6 +145,8 @@ export function normalizeHypotheticalQuote(quote, {
   identity,
   candidateSampledAt,
   authorizedAt,
+  side,
+  positionOpenedAt,
   now,
   maxAgeMs = MAX_QUOTE_AGE_MS
 } = {}) {
@@ -196,19 +198,29 @@ export function normalizeHypotheticalQuote(quote, {
 
   const quoteTime = timestamp(quote.observedAt);
   const sampleTime = timestamp(candidateSampledAt);
-  const authorizationTime = timestamp(authorizedAt);
+  const isExit = side === "EXIT";
+  const causalTime = timestamp(isExit ? positionOpenedAt : authorizedAt);
   const currentTime = timestamp(now);
   if (quoteTime === null) reasons.push("QUOTE_TIME_INVALID");
   if (sampleTime === null) reasons.push("CANDIDATE_SAMPLE_TIME_INVALID");
-  if (authorizationTime === null) reasons.push("AUTHORIZATION_TIME_INVALID");
+  if (side !== undefined && !["ENTRY", "EXIT"].includes(side)) {
+    reasons.push("QUOTE_SIDE_INVALID");
+  }
+  if (isExit && authorizedAt !== undefined) reasons.push("EXIT_AUTHORIZATION_TIME_UNSUPPORTED");
+  if (side === "ENTRY" && positionOpenedAt !== undefined) {
+    reasons.push("ENTRY_POSITION_OPEN_TIME_UNSUPPORTED");
+  }
+  if (causalTime === null) {
+    reasons.push(isExit ? "POSITION_OPEN_TIME_INVALID" : "AUTHORIZATION_TIME_INVALID");
+  }
   if (currentTime === null || !Number.isSafeInteger(maxAgeMs) || maxAgeMs < 0) {
     reasons.push("QUOTE_CLOCK_INVALID");
   }
   if (quoteTime !== null && sampleTime !== null && quoteTime <= sampleTime) {
     reasons.push("QUOTE_NOT_LATER_THAN_CANDIDATE_SAMPLE");
   }
-  if (quoteTime !== null && authorizationTime !== null && quoteTime <= authorizationTime) {
-    reasons.push("QUOTE_NOT_LATER_THAN_AUTHORIZATION");
+  if (quoteTime !== null && causalTime !== null && quoteTime <= causalTime) {
+    reasons.push(isExit ? "QUOTE_NOT_LATER_THAN_POSITION_OPEN" : "QUOTE_NOT_LATER_THAN_AUTHORIZATION");
   }
   if (quoteTime !== null && currentTime !== null) {
     if (quoteTime > currentTime) reasons.push("QUOTE_FUTURE_DATED");
