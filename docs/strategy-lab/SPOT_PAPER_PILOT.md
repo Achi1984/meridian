@@ -83,6 +83,9 @@ exact build and approves a concrete manifest.
   blocked at the EUR 20 modeled session-loss threshold. A sampled 2% stop
   compares the executable bid to the modeled entry; it is not a guaranteed
   loss bound.
+- Decimal market-data fields are bounded to 90,071,992.54740991; notional and
+  ledger results must remain safe integers in cents. Overflow is rejected before
+  the quote is persisted or any simulated ledger effect is committed.
 - Entries are rejected above a 50 bps spread. Exits do not use that entry-only
   filter. Invalid or stale observations cannot create fills. An open terminal
   position remains explicitly unresolved with its last mark and terminal mark
@@ -106,7 +109,9 @@ or gapped candles, stale closed bars, invalid/crossed quotes, stale ticker
 acquisition, and a backwards clock. Kraken's final OHLC row is treated as
 unfinished and excluded. Ticker has no exchange event timestamp: the journal
 stores request start and response receipt, and the report makes no event-time
-claim.
+claim. The runner determines a strategy signal before requesting its execution
+quote, records the signal-known time, and rejects quotes whose request began
+before that time, even if the quote otherwise meets the freshness bound.
 
 The OHLC/Ticker response shapes and unfinished final OHLC row follow Kraken's
 [OHLC reference](https://docs.kraken.com/api-reference/market-data/get-ohlc-data)

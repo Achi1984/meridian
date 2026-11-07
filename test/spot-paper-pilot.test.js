@@ -58,7 +58,8 @@ function providerFor(clock, ohlcValues, tickerValues) {
     async fetchTicker() {
       const value = tickerValues[Math.min(tickerIndex++, tickerValues.length - 1)];
       if (value instanceof Error) throw value;
-      return acquisition(typeof value === "function" ? value() : value, clock.value);
+      return acquisition(typeof value === "function" ? value() : value,
+        clock.value, clock.value);
     },
     counters: () => ({ requests: ohlcIndex + tickerIndex, bytes: 0 })
   };
@@ -346,6 +347,29 @@ test("integer EUR/BTC paper ledger reconciles costs and exits even when the entr
   assert.deepEqual(noEntry.fills, []);
 });
 
+test("extreme quotes overflow safely without mutating an open paper position", () => {
+  const entryQuote = parseKrakenTicker(acquisition(tickerData({
+    bid: "0.00000001", ask: "0.00000001"
+  }), INITIAL_NOW), INITIAL_NOW);
+  const entry = applyPaperObservation(createLedger(), {
+    signal: { id: "ENTRY:overflow", direction: "ENTRY", candleAt: 1 },
+    quote: entryQuote, nowMs: INITIAL_NOW
+  });
+  const before = structuredClone(entry.ledger);
+  const extreme = "999999999999999999999999999999.00000000";
+  assert.throws(() => parseKrakenTicker(acquisition(
+    tickerData({ bid: extreme, ask: extreme }), INITIAL_NOW), INITIAL_NOW),
+  /INVALID_TICKER_(BID|ASK)/);
+  const boundedExtreme = parseKrakenTicker(acquisition(tickerData({
+    bid: "90000000.00000000", ask: "90000000.00000000"
+  }), INITIAL_NOW + 1), INITIAL_NOW + 1);
+  assert.throws(() => applyPaperObservation(entry.ledger, {
+    quote: boundedExtreme,
+    nowMs: INITIAL_NOW + 1
+  }), /NOTIONAL_OVERFLOW/);
+  assert.deepEqual(entry.ledger, before);
+});
+
 test("sampled stop exits at modeled bid less slippage and leaves no claimed live execution", () => {
   const initialQuote = parseKrakenTicker(acquisition(tickerData(), INITIAL_NOW), INITIAL_NOW);
   const entry = applyPaperObservation(createLedger(), {
@@ -392,6 +416,9 @@ test("runner integrates injected data, SMA, paper ledger, raw-response journal a
   assert.equal(journal.checkpoint.ledger.cashCents, report.cashCents);
   assert.equal(journal.events.at(-1).report.stopReason, "CYCLE_LIMIT");
   assert.notEqual(report.fills[0].priceNano, report.signals[0].closeNano);
+  const signaled = observations[1];
+  assert.equal(signaled.signals[0].signalKnownAt, signaled.signalKnownAt);
+  assert.ok(signaled.acquiredAt.ticker[0] >= signaled.signalKnownAt);
   await assert.rejects(runSpotPaperPilot(config), /EEXIST/);
 
   const readOnly = JSON.parse(execFileSync(process.execPath, [CLI_PATH,
@@ -421,6 +448,69 @@ test("runner reports a valid zero-entry observe run without promoting warmup bar
   assert.equal(report.profitability, "NOT_ASSESSED");
 });
 
+test("observe records a causal signal without creating paper fills", async t => {
+  const dataRoot = await temporaryRoot(t);
+  const clock = { value: INITIAL_NOW };
+  const provider = providerFor(clock, [
+    ohlcData(Array(21).fill(PRICE_100)),
+    ohlcData([...Array(21).fill(PRICE_100), PRICE_120])
+  ], [tickerData(), tickerData()]);
+  const config = runnerConfig({
+    dataRoot, runId: "observe-no-fills", provider, mode: "observe", cycles: 2
+  });
+  config.now = () => clock.value;
+  config.sleep = async ms => { clock.value += ms; clock.monotonic += ms; };
+  const report = await runSpotPaperPilot(config);
+  assert.equal(report.signals.length, 1);
+  assert.ok(Number.isSafeInteger(report.signals[0].signalKnownAt));
+  assert.deepEqual(report.fills, []);
+  assert.equal(report.cashCents, SPOT_PAPER_PILOT_LIMITS.initialCashCents);
+});
+
+test("runner rejects a mark overflow before persisting its quote or changing the open ledger", async t => {
+  const dataRoot = await temporaryRoot(t);
+  const clock = { value: INITIAL_NOW };
+  let ohlcCalls = 0;
+  let tickerCalls = 0;
+  let overflowTicker;
+  const warmup = ohlcData(Array(21).fill(PRICE_100));
+  const crossover = ohlcData([...Array(21).fill(PRICE_100), PRICE_120]);
+  const provider = {
+    async fetchOhlc() {
+      const data = ohlcCalls++ === 0 ? warmup : crossover;
+      return acquisition(data, clock.value, clock.value);
+    },
+    async fetchTicker() {
+      const call = tickerCalls++;
+      const data = call === 1 ? tickerData({
+        bid: "0.00000001", ask: "0.00000001"
+      }) : call === 2 ? tickerData({
+        bid: "90000000.00000000", ask: "90000000.00000000"
+      }) : tickerData();
+      const response = acquisition(data, clock.value, clock.value);
+      if (call === 2) overflowTicker = response;
+      return response;
+    }
+  };
+  const config = runnerConfig({
+    dataRoot, runId: "mark-overflow", provider, cycles: 3
+  });
+  config.now = () => clock.value;
+  config.sleep = async ms => { clock.value += ms; clock.monotonic += ms; };
+  const report = await runSpotPaperPilot(config);
+  assert.equal(report.stopReason, "INVALID_DATA");
+  assert.equal(report.fills.length, 1);
+  assert.ok(report.position);
+  assert.equal(report.dataGaps, 1);
+  const journal = await readRunJournal({ dataRoot, runId: "mark-overflow" });
+  const overflow = journal.events.find(event => event.reason === "NOTIONAL_OVERFLOW");
+  assert.ok(overflow);
+  assert.equal(overflow.acceptedTicker, null);
+  assert.equal(journal.checkpoint.ledger.fills.length, 1);
+  await assert.rejects(readFile(join(dataRoot, "mark-overflow", "responses",
+    `${overflowTicker.sha256}.json`)), /ENOENT/);
+});
+
 test("429 creates a gap and waits for the bounded next poll instead of retrying immediately", async t => {
   const dataRoot = await temporaryRoot(t);
   const clock = { value: INITIAL_NOW };
@@ -434,7 +524,7 @@ test("429 creates a gap and waits for the bounded next poll instead of retrying 
       return acquisition(ohlcData(Array(21).fill(PRICE_100)), clock.value);
     },
     async fetchTicker() {
-      return acquisition(tickerData(), clock.value);
+      return acquisition(tickerData(), clock.value, clock.value);
     }
   };
   const config = runnerConfig({ dataRoot, runId: "rate-limited", provider, cycles: 2 });
@@ -446,7 +536,7 @@ test("429 creates a gap and waits for the bounded next poll instead of retrying 
   assert.equal(starts[1] - starts[0], 60_000);
 });
 
-test("stale quote after a new-bar signal cannot create a fill", async t => {
+test("fresh but pre-signal quote after a new-bar signal cannot create a fill", async t => {
   const dataRoot = await temporaryRoot(t);
   const clock = { value: INITIAL_NOW };
   let ohlcCalls = 0;
@@ -460,8 +550,8 @@ test("stale quote after a new-bar signal cannot create a fill", async t => {
     async fetchTicker() {
       tickerCalls++;
       return tickerCalls === 1 ?
-        acquisition(tickerData(), clock.value) :
-        acquisition(tickerData(), clock.value - 10_001, clock.value - 10_021);
+        acquisition(tickerData(), clock.value, clock.value) :
+        acquisition(tickerData(), clock.value, clock.value - 100);
     }
   };
   const config = runnerConfig({ dataRoot, runId: "stale-quote", provider, cycles: 2 });
@@ -472,6 +562,11 @@ test("stale quote after a new-bar signal cannot create a fill", async t => {
   assert.equal(report.fills.length, 0);
   assert.equal(report.cashCents, SPOT_PAPER_PILOT_LIMITS.initialCashCents);
   assert.equal(report.dataGaps, 1);
+  const journal = await readRunJournal({ dataRoot, runId: "stale-quote" });
+  const refusal = journal.events.find(event => event.reason === "TICKER_PREDATES_SIGNAL");
+  assert.ok(refusal);
+  assert.ok(Number.isSafeInteger(refusal.signalKnownAt));
+  assert.ok(refusal.signals[0].signalKnownAt >= refusal.signalKnownAt);
 });
 
 test("runner bounds an injected provider that ignores abort and discards its late response", async t => {
@@ -596,7 +691,7 @@ test("runner reports ambiguous signal-ledger persistence as UNKNOWN without anot
     },
     async fetchTicker() {
       tickerCalls++;
-      return acquisition(tickerData(), clock.value);
+      return acquisition(tickerData(), clock.value, clock.value);
     }
   };
   const config = runnerConfig({

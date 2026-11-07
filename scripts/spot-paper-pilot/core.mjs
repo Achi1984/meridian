@@ -26,6 +26,7 @@ export const SPOT_PAPER_PILOT_LIMITS = Object.freeze({
 
 const PRICE_SCALE = 100_000_000n;
 const NOTIONAL_DIVISOR = 100_000_000_000_000n;
+const MAX_SUPPORTED_DECIMAL_NANO = BigInt(Number.MAX_SAFE_INTEGER);
 const PAIR_KEYS = new Set(["XXBTZEUR", "XBTEUR"]);
 const decimalPattern = /^(?:0|[1-9]\d*)(?:\.\d{1,8})?$/;
 
@@ -34,11 +35,13 @@ export function sha256(value) {
 }
 
 function decimalNano(value, name) {
-  if (typeof value !== "string" || !decimalPattern.test(value)) {
+  if (typeof value !== "string" || value.length > 17 || !decimalPattern.test(value)) {
     throw new Error(`INVALID_${name}`);
   }
   const [whole, fraction = ""] = value.split(".");
-  return BigInt(whole) * PRICE_SCALE + BigInt(fraction.padEnd(8, "0"));
+  const nano = BigInt(whole) * PRICE_SCALE + BigInt(fraction.padEnd(8, "0"));
+  if (nano > MAX_SUPPORTED_DECIMAL_NANO) throw new Error(`INVALID_${name}`);
+  return nano;
 }
 
 function time(value, name) {
@@ -216,12 +219,35 @@ function roundHalfUp(numerator, denominator) {
   return (numerator * 2n + denominator) / (2n * denominator);
 }
 
+function safeIntegerFromBigInt(value, name) {
+  if (value > BigInt(Number.MAX_SAFE_INTEGER) || value < BigInt(Number.MIN_SAFE_INTEGER)) {
+    throw new Error(`${name}_OVERFLOW`);
+  }
+  return Number(value);
+}
+
+function safeAdd(left, right, name) {
+  if (!Number.isSafeInteger(left) || !Number.isSafeInteger(right)) {
+    throw new Error(`${name}_OVERFLOW`);
+  }
+  return safeIntegerFromBigInt(BigInt(left) + BigInt(right), name);
+}
+
 function notionalCents(quantitySat, priceNano) {
-  return Number(roundHalfUp(BigInt(quantitySat) * BigInt(priceNano), NOTIONAL_DIVISOR));
+  if ((typeof quantitySat === "number" && !Number.isSafeInteger(quantitySat)) ||
+      (typeof priceNano === "number" && !Number.isSafeInteger(priceNano))) {
+    throw new Error("NOTIONAL_OVERFLOW");
+  }
+  const quantity = BigInt(quantitySat);
+  const price = BigInt(priceNano);
+  if (quantity < 0n || price <= 0n) throw new Error("INVALID_NOTIONAL_INPUT");
+  return safeIntegerFromBigInt(roundHalfUp(quantity * price, NOTIONAL_DIVISOR), "NOTIONAL");
 }
 
 function feeCents(notional) {
-  return Number(roundHalfUp(BigInt(notional) * BigInt(SPOT_PAPER_PILOT_LIMITS.feeBpsPerSide), 10_000n));
+  if (!Number.isSafeInteger(notional) || notional < 0) throw new Error("INVALID_FEE_INPUT");
+  return safeIntegerFromBigInt(roundHalfUp(
+    BigInt(notional) * BigInt(SPOT_PAPER_PILOT_LIMITS.feeBpsPerSide), 10_000n), "FEE");
 }
 
 function adjustedPrice(priceNano, bps) {
@@ -229,17 +255,17 @@ function adjustedPrice(priceNano, bps) {
 }
 
 function quantityForBudget(maxSpendCents, priceNano) {
-  let low = 0;
+  let low = 0n;
   const maximum = BigInt(maxSpendCents) * NOTIONAL_DIVISOR / BigInt(priceNano);
-  let high = Number(maximum > BigInt(Number.MAX_SAFE_INTEGER) ?
-    BigInt(Number.MAX_SAFE_INTEGER) : maximum);
+  let high = maximum > BigInt(Number.MAX_SAFE_INTEGER) ?
+    BigInt(Number.MAX_SAFE_INTEGER) : maximum;
   while (low < high) {
-    const middle = Math.ceil((low + high) / 2);
+    const middle = (low + high + 1n) / 2n;
     const gross = notionalCents(middle, priceNano);
-    if (gross + feeCents(gross) <= maxSpendCents) low = middle;
-    else high = middle - 1;
+    if (safeAdd(gross, feeCents(gross), "ENTRY_COST") <= maxSpendCents) low = middle;
+    else high = middle - 1n;
   }
-  return low;
+  return safeIntegerFromBigInt(low, "QUANTITY");
 }
 
 function markPosition(position, quote) {
@@ -247,7 +273,8 @@ function markPosition(position, quote) {
   const grossCents = notionalCents(position.quantitySat, exitPriceNano);
   const exitFeeCents = feeCents(grossCents);
   return { exitPriceNano, grossCents, exitFeeCents,
-    unrealizedPnlCents: grossCents - exitFeeCents - position.entryCostCents };
+    unrealizedPnlCents: safeIntegerFromBigInt(
+      BigInt(grossCents) - BigInt(exitFeeCents) - BigInt(position.entryCostCents), "PNL") };
 }
 
 export function createLedger() {
@@ -267,7 +294,8 @@ export function applyPaperObservation(previous, { signal = null, quote, nowMs, s
         unrealizedPnlCents: mark.unrealizedPnlCents,
         netExitCents: mark.grossCents - mark.exitFeeCents };
   }
-  const sessionPnl = ledger.realizedPnlCents + (mark?.unrealizedPnlCents ?? 0);
+  const sessionPnl = safeAdd(ledger.realizedPnlCents,
+    mark?.unrealizedPnlCents ?? 0, "SESSION_PNL");
   const lossLimitReached = sessionPnl <= -SPOT_PAPER_PILOT_LIMITS.maxSessionLossCents;
   if (ledger.position && mark &&
       BigInt(quote.bidNano) <= BigInt(ledger.position.stopPriceNano)) {
@@ -276,9 +304,12 @@ export function applyPaperObservation(previous, { signal = null, quote, nowMs, s
       quantitySat: ledger.position.quantitySat, priceNano: mark.exitPriceNano,
       grossCents: mark.grossCents, feeCents: mark.exitFeeCents, reason: stopReason,
       signalAt: nowMs, quoteReceivedAt: quote.receivedAt };
-    ledger.cashCents += mark.grossCents - mark.exitFeeCents;
-    ledger.realizedPnlCents += mark.unrealizedPnlCents;
-    ledger.feesCents += mark.exitFeeCents;
+    ledger.cashCents = safeAdd(ledger.cashCents,
+      safeIntegerFromBigInt(BigInt(mark.grossCents) - BigInt(mark.exitFeeCents), "EXIT_PROCEEDS"),
+      "CASH");
+    ledger.realizedPnlCents = safeAdd(
+      ledger.realizedPnlCents, mark.unrealizedPnlCents, "REALIZED_PNL");
+    ledger.feesCents = safeAdd(ledger.feesCents, mark.exitFeeCents, "FEES");
     ledger.position = null;
     ledger.lastMark = null;
     ledger.fills.push(fill);
@@ -288,9 +319,12 @@ export function applyPaperObservation(previous, { signal = null, quote, nowMs, s
       quantitySat: ledger.position.quantitySat, priceNano: mark.exitPriceNano,
       grossCents: mark.grossCents, feeCents: mark.exitFeeCents, reason: "SMA20_DOWN_CROSS",
       signalAt: signal.candleAt, quoteReceivedAt: quote.receivedAt };
-    ledger.cashCents += mark.grossCents - mark.exitFeeCents;
-    ledger.realizedPnlCents += mark.unrealizedPnlCents;
-    ledger.feesCents += mark.exitFeeCents;
+    ledger.cashCents = safeAdd(ledger.cashCents,
+      safeIntegerFromBigInt(BigInt(mark.grossCents) - BigInt(mark.exitFeeCents), "EXIT_PROCEEDS"),
+      "CASH");
+    ledger.realizedPnlCents = safeAdd(
+      ledger.realizedPnlCents, mark.unrealizedPnlCents, "REALIZED_PNL");
+    ledger.feesCents = safeAdd(ledger.feesCents, mark.exitFeeCents, "FEES");
     ledger.position = null;
     ledger.lastMark = null;
     ledger.fills.push(fill);
@@ -302,15 +336,17 @@ export function applyPaperObservation(previous, { signal = null, quote, nowMs, s
       Math.min(ledger.cashCents, SPOT_PAPER_PILOT_LIMITS.maxExposureCents), entryPriceNano);
     const grossCents = notionalCents(quantitySat, entryPriceNano);
     const entryFeeCents = feeCents(grossCents);
-    if (quantitySat > 0 && grossCents + entryFeeCents <= ledger.cashCents &&
-        grossCents + entryFeeCents <= SPOT_PAPER_PILOT_LIMITS.maxExposureCents) {
+    const entryCostCents = safeAdd(grossCents, entryFeeCents, "ENTRY_COST");
+    if (quantitySat > 0 && entryCostCents <= ledger.cashCents &&
+        entryCostCents <= SPOT_PAPER_PILOT_LIMITS.maxExposureCents) {
       const fill = { id: `entry:${signal.id}`, side: "BUY", quantitySat,
         priceNano: entryPriceNano, grossCents, feeCents: entryFeeCents,
         reason: "SMA5_UP_CROSS", signalAt: signal.candleAt, quoteReceivedAt: quote.receivedAt };
-      ledger.cashCents -= grossCents + entryFeeCents;
-      ledger.feesCents += entryFeeCents;
+      ledger.cashCents = safeIntegerFromBigInt(
+        BigInt(ledger.cashCents) - BigInt(entryCostCents), "CASH");
+      ledger.feesCents = safeAdd(ledger.feesCents, entryFeeCents, "FEES");
       ledger.position = { quantitySat, entryPriceNano, entryGrossCents: grossCents,
-        entryFeeCents, entryCostCents: grossCents + entryFeeCents,
+        entryFeeCents, entryCostCents,
         entrySignalId: signal.id,
         stopPriceNano: String(roundHalfUp(BigInt(entryPriceNano) *
           BigInt(10_000 - SPOT_PAPER_PILOT_LIMITS.stopLossBps), 10_000n)) };
@@ -330,7 +366,8 @@ export function applyPaperObservation(previous, { signal = null, quote, nowMs, s
 export function buildReport({ runId, mode, state, ledger, events, stopReason, startedAt, endedAt }) {
   const observations = events.filter(event => event.type === "observation").length;
   const dataGaps = events.filter(event => event.type === "data_gap").length;
-  const signals = events.flatMap(event => event.signals ?? []);
+  const signals = [...new Map(events.flatMap(event => event.signals ?? [])
+    .map(signal => [signal.id, signal])).values()];
   const unrealized = ledger.lastMark?.unrealizedPnlCents ?? 0;
   const lastMark = ledger.lastMark ? { ...ledger.lastMark,
     ageMs: endedAt === null ? null : endedAt - ledger.lastMark.receivedAt } : null;
@@ -347,7 +384,7 @@ export function buildReport({ runId, mode, state, ledger, events, stopReason, st
     cashCents: ledger.cashCents, position: ledger.position,
     positionStatus: ledger.position ? "OPEN_UNRESOLVED_AT_TERMINAL" : "FLAT",
     realizedPnlCents: ledger.realizedPnlCents, unrealizedPnlCents: unrealized,
-    equityCents: ledger.cashCents + (lastMark?.netExitCents ?? 0),
+    equityCents: safeAdd(ledger.cashCents, lastMark?.netExitCents ?? 0, "EQUITY"),
     lastMark,
     limitations: [
       "Experimental operations baseline only; no alpha or profitability claim.",

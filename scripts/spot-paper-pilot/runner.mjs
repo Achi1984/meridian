@@ -74,7 +74,7 @@ function errorCode(error) {
 }
 
 function shouldStopOnDataError(code) {
-  return /^(INVALID_|STALE_|OHLC_|UNEXPECTED_|INSUFFICIENT_|CONFLICTING_|CLOSED_CANDLE_|CLOCK_|RESPONSE_BYTE_LIMIT|RUN_BYTE_LIMIT|REQUEST_BUDGET_EXHAUSTED|TICKER_|EMPTY_|TRUNCATED_|HTTP_4\d\d$)/.test(code) &&
+  return /^(INVALID_|STALE_|OHLC_|UNEXPECTED_|INSUFFICIENT_|CONFLICTING_|CLOSED_CANDLE_|CLOCK_|RESPONSE_BYTE_LIMIT|RUN_BYTE_LIMIT|REQUEST_BUDGET_EXHAUSTED|TICKER_|EMPTY_|TRUNCATED_|(?:NOTIONAL|ENTRY_COST|PNL|SESSION_PNL|CASH|FEES|EQUITY)_OVERFLOW|HTTP_4\d\d$)/.test(code) &&
     code !== "HTTP_429";
 }
 
@@ -274,6 +274,8 @@ export async function runSpotPaperPilot(input) {
       let tickerResponse = null;
       let storedOhlc = null;
       let storedTicker = null;
+      let decisionSignalKnownAt = null;
+      let decisionSignals = [];
       try {
         if (counters.requests >= maxRequests) {
           throw new Error("REQUEST_BUDGET_EXHAUSTED");
@@ -290,25 +292,31 @@ export async function runSpotPaperPilot(input) {
           throw new Error(terminalOutcomeUnknown ? "JOURNAL_UNKNOWN" : "JOURNAL_WRITE_FAILED",
             { cause: error });
         }
+        const advanced = advanceStrategy(strategy, parsedOhlc.candles);
+        const missed = Boolean(advanced.missedDecisionWindow);
+        const signalKnownAt = config.now();
+        if (!Number.isSafeInteger(signalKnownAt) ||
+            signalKnownAt < ohlcResponse.receivedAt) {
+          throw new Error("CLOCK_ERROR");
+        }
+        const signals = advanced.signals.map(signal => ({ ...signal, signalKnownAt }));
+        decisionSignalKnownAt = signalKnownAt;
+        decisionSignals = signals;
+        const signal = signals.at(-1) ?? null;
         if (counters.requests >= maxRequests) {
           throw new Error("REQUEST_BUDGET_EXHAUSTED");
         }
         counters.requests++;
         tickerResponse = validateAcquisition(await boundedProviderCall(
           runtime => config.provider.fetchTicker(runtime), runContext), counters);
+        if (tickerResponse.requestStartedAt < signalKnownAt) {
+          throw new Error("TICKER_PREDATES_SIGNAL");
+        }
         const quoteAt = config.now();
         const quote = parseKrakenTicker(tickerResponse, quoteAt);
         const candleAgeAtQuote = quoteAt - (parsedOhlc.latestClosedAt + 60_000);
         if (candleAgeAtQuote < 0 || candleAgeAtQuote > SPOT_PAPER_PILOT_LIMITS.maxCandleAgeMs) {
           throw new Error("STALE_OHLC");
-        }
-        try {
-          storedTicker = await awaitJournal(
-            () => journal.persistResponse(tickerResponse, runContext), runContext);
-        } catch (error) {
-          terminalOutcomeUnknown ||= isUnknownPersistence(error);
-          throw new Error(terminalOutcomeUnknown ? "JOURNAL_UNKNOWN" : "JOURNAL_WRITE_FAILED",
-            { cause: error });
         }
         const effectAt = config.now();
         if (!Number.isSafeInteger(effectAt) || effectAt < quoteAt) {
@@ -324,22 +332,28 @@ export async function runSpotPaperPilot(input) {
         if (candleAgeAtEffect < 0 || candleAgeAtEffect > SPOT_PAPER_PILOT_LIMITS.maxCandleAgeMs) {
           throw new Error("STALE_OHLC");
         }
-        const advanced = advanceStrategy(strategy, parsedOhlc.candles);
-        const missed = Boolean(advanced.missedDecisionWindow);
-        const signal = advanced.signals.at(-1) ?? null;
         const nextLedger = config.mode === "paper" ?
           applyPaperObservation(ledger, {
             signal, quote: effectQuote, nowMs: effectAt, stopped: entriesBlocked
           }) : { ledger, fills: [], stopReason: null, lossLimitReached: false };
+        try {
+          storedTicker = await awaitJournal(
+            () => journal.persistResponse(tickerResponse, runContext), runContext);
+        } catch (error) {
+          terminalOutcomeUnknown ||= isUnknownPersistence(error);
+          throw new Error(terminalOutcomeUnknown ? "JOURNAL_UNKNOWN" : "JOURNAL_WRITE_FAILED",
+            { cause: error });
+        }
         const event = {
           id: `observation:${cycle}:${parsedOhlc.latestClosedAt}:${effectQuote.sha256}`,
           type: missed ? "data_gap" : "observation",
           cycle, acquiredAt: { ohlc: [ohlcResponse.requestStartedAt, ohlcResponse.receivedAt],
             ticker: [tickerResponse.requestStartedAt, tickerResponse.receivedAt] },
+          signalKnownAt,
           ohlc: { ...storedOhlc, latestClosedAt: parsedOhlc.latestClosedAt, ageMs: parsedOhlc.ageMs },
           ticker: { ...storedTicker,
             acquisitionAgeMs: effectQuote.ageMs },
-          signals: advanced.signals, fills: nextLedger.fills,
+          signals, fills: nextLedger.fills,
           dataGap: missed ? "MISSED_DECISION_WINDOW" : null
         };
         let result;
@@ -378,7 +392,8 @@ export async function runSpotPaperPilot(input) {
         const code = errorCode(error);
         const gap = { id: `gap:${cycle}:${counters.requests}:${code}`,
         type: "data_gap", reason: code, at: config.now(),
-        acceptedOhlc: storedOhlc, acceptedTicker: storedTicker };
+        acceptedOhlc: storedOhlc, acceptedTicker: storedTicker,
+        signalKnownAt: decisionSignalKnownAt, signals: decisionSignals };
         try {
           await awaitJournal(
             () => journal.append(gap, { strategy, ledger, counters, cycle, entriesBlocked },
