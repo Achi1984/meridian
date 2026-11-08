@@ -288,7 +288,8 @@ export async function assessHostEvidence({
         JSON.stringify(hostManifest) !== JSON.stringify(HOST_LAUNCH_MANIFEST)) {
       throw new Error("PACKAGED_LAUNCH_MANIFEST_MISMATCH");
     }
-    const sourceDigest = await runtimeSourceDigest(ROOT, context, { open: io.open });
+    const sourceDigest = await boundedIo(
+      () => runtimeSourceDigest(ROOT, context, { open: io.open }), context);
     if (sourceDigest !== hostManifest.runtimeSourceSha256) {
       throw new Error("RUNTIME_SOURCE_DIGEST_MISMATCH");
     }
@@ -377,8 +378,10 @@ export async function assessHostEvidence({
       signalReplay
     };
     if (Buffer.byteLength(JSON.stringify(result)) > MAX_OUTPUT_BYTES) {
+      assertActive(context);
       return unknownResult("ASSESSMENT_OUTPUT_LIMIT");
     }
+    assertActive(context);
     return result;
   } catch (error) {
     const code = /^[A-Z0-9_]+$/.test(error.message ?? "") ?

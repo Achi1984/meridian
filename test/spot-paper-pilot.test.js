@@ -813,6 +813,102 @@ test("host assessment CLI bounds delayed open, stat, read, close, realpath, and 
   }
 });
 
+test("host assessment bounds late and stalled runtime-source close operations", async t => {
+  const sourcePath = fileURLToPath(new URL(
+    "../scripts/spot-paper-pilot/core.mjs", import.meta.url));
+  for (const stall of [false, true]) {
+    const evidence = await hostAssessmentFixture(t);
+    let closeStarted = false;
+    let releaseClose;
+    const controller = new AbortController();
+    const io = {
+      open: async (path, ...args) => {
+        const handle = await openFile(path, ...args);
+        if (path === sourcePath) {
+          const close = handle.close.bind(handle);
+          handle.close = () => {
+            closeStarted = true;
+            if (stall) {
+              return new Promise(resolve => {
+                releaseClose = async () => {
+                  await close();
+                  resolve();
+                };
+              });
+            }
+            return new Promise((resolve, reject) => {
+              setTimeout(() => close().then(resolve, reject), 600);
+            });
+          };
+        }
+        return handle;
+      }
+    };
+    const startedAt = performance.now();
+    const result = await assessHostEvidence({
+      evidenceDir: evidence.evidenceDir,
+      expectedHostContext: evidence.expectedHostContext,
+      context: {
+        deadlineAt: performance.now() + 100,
+        monotonicNow: () => performance.now(),
+        controller,
+        signal: controller.signal,
+        pendingOperations: new Set()
+      },
+      io
+    });
+    assert.ok(performance.now() - startedAt < 400, `stall=${stall}`);
+    assert.equal(result.outcome, "UNKNOWN", JSON.stringify(result));
+    assert.equal(result.reason, "HOST_ASSESSMENT_DEADLINE_EXCEEDED");
+    assert.equal(closeStarted, true);
+    if (stall) await releaseClose();
+  }
+});
+
+test("exported assessment cannot return COMPLETED after synchronous replay expires the deadline", async t => {
+  const firstEvidence = await hostAssessmentFixture(t);
+  let firstClockCalls = 0;
+  const firstDeadlineAt = performance.now() + 60_000;
+  const firstController = new AbortController();
+  const successful = await assessHostEvidence({
+    evidenceDir: firstEvidence.evidenceDir,
+    expectedHostContext: firstEvidence.expectedHostContext,
+    context: {
+      deadlineAt: firstDeadlineAt,
+      monotonicNow: () => {
+        firstClockCalls++;
+        return performance.now();
+      },
+      controller: firstController,
+      signal: firstController.signal,
+      pendingOperations: new Set()
+    }
+  });
+  assert.equal(successful.outcome, "COMPLETED");
+
+  const expiredEvidence = await hostAssessmentFixture(t);
+  let clockCalls = 0;
+  const deadlineAt = performance.now() + 60_000;
+  const expiredController = new AbortController();
+  const expired = await assessHostEvidence({
+    evidenceDir: expiredEvidence.evidenceDir,
+    expectedHostContext: expiredEvidence.expectedHostContext,
+    context: {
+      deadlineAt,
+      monotonicNow: () => {
+        clockCalls++;
+        return clockCalls >= firstClockCalls ? deadlineAt : performance.now();
+      },
+      controller: expiredController,
+      signal: expiredController.signal,
+      pendingOperations: new Set()
+    }
+  });
+  assert.equal(clockCalls, firstClockCalls);
+  assert.equal(expired.outcome, "UNKNOWN", JSON.stringify(expired));
+  assert.equal(expired.reason, "HOST_ASSESSMENT_DEADLINE_EXCEEDED");
+});
+
 test("host assessment output publication preserves pre-existing output on collision", async t => {
   const evidence = await hostAssessmentFixture(t);
   await writeFile(evidence.contextPath, JSON.stringify(evidence.expectedHostContext));
