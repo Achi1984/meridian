@@ -13,10 +13,6 @@ let paperCockpit = null;
 let spotPaperCockpit = null;
 let spotPaperHost8hDashboard = null;
 if(catalogRoot?.parentNode){
-  const host8hRoot=document.createElement('section');
-  host8hRoot.id='spot-paper-host8h-root';
-  catalogRoot.parentNode.insertBefore(host8hRoot,catalogRoot);
-  spotPaperHost8hDashboard=mountSpotPaperHost8hDashboard(host8hRoot,document,window);
   const spotPaperRoot=document.createElement('section');
   spotPaperRoot.id='spot-paper-cockpit-root';
   catalogRoot.parentNode.insertBefore(spotPaperRoot,catalogRoot);
@@ -29,6 +25,10 @@ if(catalogRoot?.parentNode){
   readinessRoot.id='paper-readiness-root';
   catalogRoot.parentNode.insertBefore(readinessRoot,catalogRoot);
   renderPaperReadiness(readinessRoot);
+  const host8hRoot=document.createElement('section');
+  host8hRoot.id='spot-paper-host8h-root';
+  catalogRoot.parentNode.insertBefore(host8hRoot,catalogRoot);
+  spotPaperHost8hDashboard=mountSpotPaperHost8hDashboard(host8hRoot,document,window);
 }
 let loaded = false;
 let loading = false;

@@ -11,6 +11,7 @@ import {projectOperatorReport} from '../scripts/memecoin-paper/operator-report.m
 import {reportFixtures} from './fixtures/memecoin-paper-operator-report/scenarios.mjs';
 import {PAPER_REPORT_ENVELOPE_SCHEMA} from '../scripts/memecoin-paper-report-bridge/index.mjs';
 import {PAPER_REPORT_ENDPOINT} from '../v11/paper-cockpit-controller.js';
+import {SPOT_PAPER_HOST8H_REPORT_ENDPOINT} from '../v11/spot-paper-host8h-controller.js';
 
 const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium'].find(path=>path&&existsSync(path));
 const sizes=[
@@ -44,10 +45,11 @@ async function interceptGeneratedPaperReport(call,report){
   const body=Buffer.from(JSON.stringify({
     schema:PAPER_REPORT_ENVELOPE_SCHEMA,runId:report.experiment.id,report
   })).toString('base64');
-  let reads=0,failure=null;
+  let reads=0,host8hReads=0,failure=null;
   const off=call.onEvent('Fetch.requestPaused',event=>{
     void (async()=>{
-      assert.equal(event.request.url,PAPER_REPORT_ENDPOINT);
+      assert.ok([PAPER_REPORT_ENDPOINT,SPOT_PAPER_HOST8H_REPORT_ENDPOINT].includes(event.request.url),
+        'only the exact approved Paper and host8h endpoints are intercepted');
       if(event.request.method==='OPTIONS'){
         await call('Fetch.fulfillRequest',{requestId:event.requestId,responseCode:204,responseHeaders:[
           {name:'Access-Control-Allow-Origin',value:'*'},
@@ -57,6 +59,18 @@ async function interceptGeneratedPaperReport(call,report){
         return;
       }
       assert.equal(event.request.method,'GET');
+      if(event.request.url===SPOT_PAPER_HOST8H_REPORT_ENDPOINT){
+        const authorization=Object.entries(event.request.headers||{})
+          .find(([name])=>name.toLowerCase()==='authorization')?.[1];
+        assert.equal(authorization,'Bearer '+PAPER_PASSWORD);
+        host8hReads++;
+        await call('Fetch.fulfillRequest',{requestId:event.requestId,responseCode:503,responseHeaders:[
+          {name:'Access-Control-Allow-Origin',value:'*'},
+          {name:'Content-Type',value:'application/json; charset=utf-8'},
+          {name:'Cache-Control',value:'no-store'}],
+        body:Buffer.from(JSON.stringify({error:'host8h_transport_not_provisioned'})).toString('base64')});
+        return;
+      }
       const authorization=Object.entries(event.request.headers||{})
         .find(([name])=>name.toLowerCase()==='authorization')?.[1];
       assert.equal(authorization,'Bearer '+PAPER_PASSWORD);
@@ -67,9 +81,13 @@ async function interceptGeneratedPaperReport(call,report){
         {name:'Cache-Control',value:'no-store'}],body});
     })().catch(error=>{failure=error;});
   });
-  await call('Fetch.enable',{patterns:[{urlPattern:PAPER_REPORT_ENDPOINT+'*',requestStage:'Request'}]});
+  await call('Fetch.enable',{patterns:[
+    {urlPattern:PAPER_REPORT_ENDPOINT+'*',requestStage:'Request'},
+    {urlPattern:SPOT_PAPER_HOST8H_REPORT_ENDPOINT+'*',requestStage:'Request'}
+  ]});
   return {
     count:()=>reads,
+    host8hCount:()=>host8hReads,
     assertHealthy(){if(failure)throw failure;},
     async close(){off();await call('Fetch.disable');}
   };
@@ -135,6 +153,7 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         }
         intercepted.assertHealthy();
         assert.equal(intercepted.count(),1,'same-turn activations produce exactly one generated-report GET');
+        assert.ok(intercepted.host8hCount()>0,'the host8h dashboard receives only the intercepted unavailable fixture');
         assert.equal(await evaluate(`document.activeElement===document.querySelector('#paper-cockpit-root button')`),true,
           'refresh completion preserves keyboard focus');
         const delivered=await evaluate(`(()=>{
