@@ -609,12 +609,13 @@ proposal.
   guarantee. A Solana slot or RPC transaction history is not a
   bundle-membership receipt.
 
-## Exact owner decision text for lead review
+## Historical alternative owner-decision text
 
-If lead review accepts this proposal, the following is the recommended owner
-decision to request. It approves definitions for implementation/review only;
-it does not make any source trusted, clear an evidence gate, or permit
-acquisition or a Paper run:
+The following bundled v1.1 text is retained as a historical alternative only.
+It is **not** the current recommendation, an accepted roadmap, or an owner
+decision to request: in particular, it offers acceptance of the narrower
+launch-role proxy. The three decision cards at the end of this annex supersede
+it for current lead review.
 
 > “I approve Evidence Policy Decision Proposal v1.1 for implementation and
 > review only, subject to these limits: pair age remains 30 minutes–72 hours
@@ -667,7 +668,7 @@ not evidence that its gates are ready. Other pool programs, unsupported token
 programs/layouts, and unsupported swaps stay `UNKNOWN`/no-entry; do not broaden
 the pilot by treating them as equivalent.
 
-The following four evidence decisions still block even this scope:
+These four evidence groups still block even this proposed scope:
 
 ### 1. Developer attribution and prior-rug history
 
@@ -699,11 +700,12 @@ The following four evidence decisions still block even this scope:
   preserves unknown archive/truncation status; page/cursor exhaustion is not a
   complete-history guarantee. Provider selection, entitlement, access, and cost
   are unverified.
-- **Minimal owner decision:** accept or reject the materially narrower exact
-  launch-role proxy, including that transfers to another controlled but
-  unproven address escape it; separately approve the finite attribution/history
-  source and review rule. Until then, developer and negative-rug results remain
-  `UNKNOWN` (except separately substantiated positive evidence, which rejects).
+- **Eligibility dependency:** a reviewed finite attribution/history source and
+  rule are still missing. A launch-role proxy would materially narrow protection:
+  transfers to another controlled but unproven address escape it. Until an owner
+  separately decides that tradeoff and evidence exists, developer and
+  negative-rug results remain `UNKNOWN` (except separately substantiated
+  positive evidence, which rejects).
 
 ### 2. Launch-bundle source and supply denominator
 
@@ -732,11 +734,11 @@ The following four evidence decisions still block even this scope:
   It does not itself reconcile bundle recipients, transfers, and the proposed
   denominator. Repository documentation says historical account reads require
   Alchemy Account Archive access; actual entitlement and price are unverified.
-- **Minimal owner decision:** name an acceptable source that proves exact
-  historical bundle membership and full-window coverage, then approve a
-  versioned numerator, denominator, transfer treatment, and source-trust basis.
-  If no faithful bundle proof is available, retain `UNKNOWN`; do not call
-  same-slot clustering a bundle or count no response as zero bundles.
+- **Eligibility dependency:** an acceptable source proving exact historical
+  bundle membership and full-window coverage, plus an approved versioned
+  numerator, denominator, transfer treatment, and source-trust basis, are
+  missing. If no faithful bundle proof is available, retain `UNKNOWN`; do not
+  call same-slot clustering a bundle or count no response as zero bundles.
 
 ### 3. Exact one-hour owner snapshots and chain time
 
@@ -762,12 +764,11 @@ The following four evidence decisions still block even this scope:
   not a frozen historical snapshot. Archive access, completeness, current
   entitlement, and cost are unverified; repository notes identify paid Alchemy
   archive access for historical reads.
-- **Minimal owner decision:** retain exact endpoint semantics and require a
-  source that can prove complete state at both exact endpoints with an accepted
-  chain-time binding, or explicitly leave `holderGrowthPct1h` unavailable. A
-  prospective interval/duration/slot-lag metric would be a separately versioned
-  methodology decision; it is not a substitute under this proposal. No endpoint
-  evidence means `UNKNOWN`, not zero growth.
+- **Eligibility dependency:** a source proving complete state at both exact
+  endpoints with accepted chain-time binding is missing. Until then,
+  `holderGrowthPct1h` is unavailable. A prospective interval/duration/slot-lag
+  metric would be a separately versioned methodology decision, not a substitute
+  under this proposal. No endpoint evidence means `UNKNOWN`, not zero growth.
 
 ### 4. Smart-wallet history and USD valuation
 
@@ -799,11 +800,11 @@ The following four evidence decisions still block even this scope:
   feeds exist. No parity assumption or nearest-price fallback is allowed.
   Provider coverage, entitlement, access, current pricing, and explicit cost
   inputs are unverified.
-- **Minimal owner decision:** decide whether to adopt the already proposed
-  qualification definition and membership timing, and name acceptable
-  history, valuation, and cost evidence with coverage rules. Until independently
-  reviewed evidence and the effective allowlist exist, real
-  `qualifiedSmartWallets` remains unavailable.
+- **Eligibility dependency:** adoption of the proposed qualification definition
+  and membership timing, and acceptable history, valuation, and cost evidence
+  with coverage rules, remain undecided. Until independently reviewed evidence
+  and an effective allowlist exist, real `qualifiedSmartWallets` remains
+  unavailable.
 
 **Review disposition:** these are source/method choices for lead review before
 an owner decision, not an owner approval record. Official API documentation
@@ -813,6 +814,46 @@ provider has been queried or selected, no credential or paid service is
 authorized, and all unresolved or unsupported evidence remains `UNKNOWN` and
 no-entry. No thresholds, active policy, readiness layers, or implementation
 scope change.
+
+### Current owner decision cards — recommendations for lead review
+
+These are the only owner decisions requested by this annex. None authorizes a
+provider query or operational run.
+
+1. **Keep the protection unchanged; do not adopt the developer proxy now.**
+   Recommendation: retain the current accepted developer-protection contract
+   and leave its unresolved gate `UNKNOWN`, rather than treating launch-role
+   keys as a complete developer set. Preserve the existing prior-rug rule:
+   credible attributable positive evidence rejects, while a negative result
+   requires complete coverage of the finite 90-day screen and is not universal
+   absence. **Protection consequence:** this avoids the proxy's known coverage
+   loss, including balances transferred to another controlled but unproven
+   address, but does not make the unresolved gate pass or claim missing evidence
+   is clean.
+2. **Approve only the bounded diagnostic candidate scope, not acquisition or
+   activation.** Recommendation: if later authorized, consider a finite,
+   explicitly selected Solana mint/pool list limited to classic SPL Token and
+   the currently supported Raydium CPMM model, with the existing pair-age and
+   all other #996 gates unchanged. Unsupported models and unresolved gates
+   remain `UNKNOWN`/no-entry. **Protection and cost consequence:** this scope
+   does not clear developer, bundle, exact owner-snapshot, wallet, or source
+   trust blockers and authorizes no Paper entry. Preserve the previously approved
+   explicit-net modeled-cost work as projection-only
+   (`EXPLICIT_NET_MODELED_QUOTE_RECEIPT.md` and `MARKET_QUOTE_ADAPTER.md`):
+   keep `MODELED` provenance, actual-cost coverage `UNKNOWN`, and execution
+   realism false. Do not treat its uncalibrated numeric assumptions as measured
+   or guaranteed costs. Numeric cost parameters and real-source guarantees
+   remain for a concrete later decision.
+3. **Defer source and spending approval until lead supplies a verified
+   comparison.** Recommendation: lead first provides evidence-backed capability,
+   sample/completeness, entitlement, and cost comparisons for the candidate
+   methods; the owner should not be asked to invent a provider or guarantee.
+   **Cost consequence:** HEDGE remains **NOT QUALIFIED**, its budget remains
+   frozen, and no further provider requests, credentials, subscription, or
+   acquisition are authorized. Any later source decision must name its trust
+   and coverage basis; unavailable evidence remains `UNKNOWN`. After selection,
+   #1207 should implement only the semantics actually selected through existing
+   collectors/composition seams, with no parallel duplicate source composition.
 
 No owner decision has been made by publishing this proposal. Until separately
 decided and implemented, all current code behavior and `UNKNOWN` dispositions
