@@ -27,8 +27,13 @@ const MAX_PENDING_BYTES = 16 * 1024;
 const CHILD_SHUTDOWN_GRACE_MS = 7_000;
 const CHILD_REAP_GRACE_MS = 1_000;
 
-const manifestBytes = await readFile(MANIFEST_PATH);
-export const HOST_LAUNCH_MANIFEST = JSON.parse(manifestBytes.toString("utf8"));
+let bundledManifest = null;
+try {
+  const manifestBytes = await readBoundedRegularFile(MANIFEST_PATH, 16_384,
+    "INVALID_LAUNCH_MANIFEST_FILE", "LAUNCH_MANIFEST_TOO_LARGE");
+  bundledManifest = JSON.parse(manifestBytes.toString("utf8"));
+} catch {}
+export const HOST_LAUNCH_MANIFEST = bundledManifest;
 
 export async function runtimeSourceDigest(root = ROOT) {
   const hash = createHash("sha256");
@@ -69,10 +74,14 @@ async function readBoundedRegularFile(path, maxBytes, invalidCode, largeCode) {
 }
 
 function sameCanonicalManifest(candidate) {
-  return JSON.stringify(candidate) === JSON.stringify(HOST_LAUNCH_MANIFEST);
+  return HOST_LAUNCH_MANIFEST !== null &&
+    JSON.stringify(candidate) === JSON.stringify(HOST_LAUNCH_MANIFEST);
 }
 
 export async function validateLaunchManifest(candidate, root = ROOT) {
+  if (HOST_LAUNCH_MANIFEST === null) {
+    throw new Error("PACKAGED_LAUNCH_MANIFEST_UNAVAILABLE");
+  }
   if (!candidate || typeof candidate !== "object" || Array.isArray(candidate) ||
       !sameCanonicalManifest(candidate)) {
     throw new Error("UNTRUSTED_OR_MALFORMED_LAUNCH_MANIFEST");
