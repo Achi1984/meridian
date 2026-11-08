@@ -44,8 +44,10 @@ export function verifyExpectedHostContext({
     return { status: "FAILED", reason: "EXPECTED_HOST_CONTEXT_MISMATCH" };
   }
 
-  const imageAvailable = Object.hasOwn(hostState, "imageDigest");
-  const hostIdentityAvailable = Object.hasOwn(hostState, "hostIdentity");
+  const imageAvailable = hostState.imageDigest !== undefined &&
+    hostState.imageDigest !== null;
+  const hostIdentityAvailable = hostState.hostIdentity !== undefined &&
+    hostState.hostIdentity !== null;
   if ((imageAvailable && expected.imageDigest !== hostState.imageDigest) ||
       (!imageAvailable && expected.imageDigest !== null) ||
       (hostIdentityAvailable && expected.hostIdentity !== hostState.hostIdentity) ||

@@ -91,22 +91,26 @@ async function readHostReadback(evidenceDir, hostManifest, deadlineAt) {
   const runDirectory = join(evidenceDir, "runtime", hostManifest.runId);
   const journalPath = join(runDirectory, "journal.json");
   const pendingPath = join(runDirectory, "journal.pending");
+  assertActive(deadlineAt);
   const pending = await lstat(pendingPath).then(() => true, error => {
     if (error.code === "ENOENT") return false;
     throw error;
   });
+  assertActive(deadlineAt);
   if (pending) throw new Error("JOURNAL_PENDING_PUBLICATION");
   const firstJournalBytes = await readBoundedFile(journalPath, MAX_JOURNAL_BYTES, deadlineAt);
+  const journalDeadlineAt = Math.min(
+    deadlineAt, performance.now() + INSPECTION_TIMEOUT_MS);
   const journal = await readRunJournal({
     dataRoot: join(evidenceDir, "runtime"),
     runId: hostManifest.runId,
-    deadlineAt: Math.min(deadlineAt, performance.now() + INSPECTION_TIMEOUT_MS),
+    deadlineAt: journalDeadlineAt,
     monotonicNow: () => performance.now(),
     io: {
       lstat: async path => {
-        assertActive(deadlineAt);
+        assertActive(journalDeadlineAt);
         const info = await lstat(path);
-        assertActive(deadlineAt);
+        assertActive(journalDeadlineAt);
         return info;
       },
       readFile: async path => {
@@ -115,7 +119,7 @@ async function readHostReadback(evidenceDir, hostManifest, deadlineAt) {
           name === "journal.pending" ? 16_384 : /^[a-f0-9]{64}\.json$/.test(name) ?
             hostManifest.maxResponseBytes : 0;
         if (!limit) throw new Error("INVALID_JOURNAL_FILE_REFERENCE");
-        return readBoundedFile(path, limit, deadlineAt);
+        return readBoundedFile(path, limit, journalDeadlineAt);
       }
     }
   });
@@ -211,6 +215,11 @@ export async function assessHostEvidence({
     if (hostInspection.status !== "VERIFIED_TERMINAL" ||
         hostInspection.verifiedTerminal !== true) {
       return unknownResult(hostInspection.reason ?? "HOST_TERMINAL_EVIDENCE_UNVERIFIED");
+    }
+    const stateBytesAfterInspection = await readBoundedFile(
+      join(directory, "host-state.json"), MAX_STATE_BYTES, deadlineAt);
+    if (!stateBytes.equals(stateBytesAfterInspection)) {
+      throw new Error("HOST_STATE_CHANGED_DURING_ASSESSMENT");
     }
 
     const readback = await readHostReadback(directory, hostManifest, deadlineAt);

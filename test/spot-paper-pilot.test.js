@@ -572,6 +572,7 @@ test("host eight-hour assessment binds a clean terminal journal and reports only
   assert.equal(result.assessment.runClassification, "COMPLETED_EIGHT_HOURS");
   assert.equal(result.assessment.durationStatus, "FULL_REQUESTED_DURATION");
   assert.equal(result.assessment.elapsedMs, 28_800_000);
+  assert.equal(result.assessment.sourceSha, evidence.hostManifest.runtimeSourceSha256);
   assert.equal(result.assessment.positionStatus, "FLAT");
   assert.equal(result.assessment.feesCents, 0);
   assert.equal(result.assessment.profitability, "NOT_ASSESSED");
@@ -583,6 +584,32 @@ test("host eight-hour assessment binds a clean terminal journal and reports only
   assert.equal(result.clockAuthenticity, "UNATTESTED");
   assert.equal(result.providerAuthenticity, "UNATTESTED");
   assert.equal(result.launchReadiness, "NOT_ASSESSED");
+});
+
+test("available image and host identity fields require matching context and remain unattested", async t => {
+  const evidence = await hostAssessmentFixture(t);
+  const statePath = join(evidence.evidenceDir, "host-state.json");
+  const state = JSON.parse(await readFile(statePath, "utf8"));
+  state.imageDigest = `sha256:${"a".repeat(64)}`;
+  state.hostIdentity = "synthetic-host-01";
+  await writeFile(statePath, JSON.stringify(state));
+  const expectedHostContext = {
+    ...evidence.expectedHostContext,
+    imageDigest: state.imageDigest,
+    hostIdentity: state.hostIdentity
+  };
+  const result = await assessHostEvidence({
+    evidenceDir: evidence.evidenceDir, expectedHostContext
+  });
+  assert.equal(result.outcome, "COMPLETED", JSON.stringify(result));
+  assert.equal(result.imageIdentity, "CONTENT_BOUND_UNATTESTED");
+  assert.equal(result.hostIdentity, "CONTENT_BOUND_UNATTESTED");
+
+  const mismatch = await assessHostEvidence({
+    evidenceDir: evidence.evidenceDir,
+    expectedHostContext: { ...expectedHostContext, imageDigest: `sha256:${"b".repeat(64)}` }
+  });
+  assert.equal(mismatch.outcome, "FAILED");
 });
 
 test("missing and forged host expectations fail closed without GitHub identity", async t => {
@@ -647,6 +674,16 @@ test("host assessment rejects interruptions, failed children, pending journals, 
     assert.equal((await assessHostEvidence({
       evidenceDir: evidence.evidenceDir,
       expectedHostContext: evidence.expectedHostContext
+    })).outcome, "UNKNOWN");
+  }
+
+  for (const journalContent of ["{not-json", Buffer.alloc(8 * 1024 * 1024 + 1)]) {
+    const invalid = await hostAssessmentFixture(t);
+    await writeFile(join(invalid.evidenceDir, "runtime",
+      invalid.hostManifest.runId, "journal.json"), journalContent);
+    assert.equal((await assessHostEvidence({
+      evidenceDir: invalid.evidenceDir,
+      expectedHostContext: invalid.expectedHostContext
     })).outcome, "UNKNOWN");
   }
 

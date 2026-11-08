@@ -441,7 +441,8 @@ export function assessPaperEvidence({
     signalReplay: "NOT_PERFORMED",
     profitability: "NOT_ASSESSED",
     runId: readback?.runId ?? report?.runId ?? null,
-    sourceSha: provenance?.acceptedSourceSha ?? null,
+    sourceSha: isHostProfile ? hostManifest?.runtimeSourceSha256 ?? null :
+      provenance?.acceptedSourceSha ?? null,
     observations: report?.observations ?? null,
     dataGaps: report?.dataGaps ?? null,
     requests: report?.requests ?? null,
