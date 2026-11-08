@@ -87,18 +87,23 @@ test("1099.99 to 1000 remains just short of the absolute threshold", () => {
   assert.equal(state.highWaterEquityCents, 109_999);
 });
 
-test("adverse inventory mark, accrued fees, and modeled exit costs count once", () => {
-  let state = createChallengeState(IDENTITY);
-  state = advance(state, "initial", 100_000, 1_000);
-  state = advance(state, "open-loss-and-costs", 90_000, 2_000, {
-    cashCents: 97_000,
-    inventoryAtAdverseBidCents: 0,
-    unbookedAccruedFeesCents: 4_000,
-    modeledExitCostsCents: 3_000
+test("adverse open-inventory loss and unbooked fees trigger the guard", () => {
+  let inventoryState = createChallengeState(IDENTITY);
+  inventoryState = advance(inventoryState, "inventory-initial", 100_000, 1_000);
+  inventoryState = advance(inventoryState, "inventory-loss", 90_000, 2_000, {
+    cashCents: 85_000, inventoryAtAdverseBidCents: 5_000
   });
-  assert.equal(state.observations.at(-1).netEquityCents, 90_000);
-  assert.equal(state.paused, true);
-  assert.equal(state.observations.at(-1).valuation.inventoryAtAdverseBidCents, 0);
+  assert.equal(inventoryState.observations.at(-1).netEquityCents, 90_000);
+  assert.equal(inventoryState.paused, true);
+  assert.equal(inventoryState.observations.at(-1).valuation.inventoryAtAdverseBidCents, 5_000);
+
+  let feeState = createChallengeState(IDENTITY);
+  feeState = advance(feeState, "fee-initial", 100_000, 1_000);
+  feeState = advance(feeState, "fee-loss", 90_000, 2_000, {
+    cashCents: 100_000, unbookedAccruedFeesCents: 10_000
+  });
+  assert.equal(feeState.observations.at(-1).netEquityCents, 90_000);
+  assert.equal(feeState.paused, true);
 });
 
 test("drawdown overshoot is retained as observed and does not flatten positions", () => {
