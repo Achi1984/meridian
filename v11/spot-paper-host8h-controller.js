@@ -1,9 +1,9 @@
-import {appAccess} from './app-access.js?v=B16-M11-FIX13';
-import {renderSpotPaperHost8h} from './spot-paper-host8h-view.js?v=B16-M11-FIX13';
+import {appAccess} from './app-access.js?v=B16-M11-FIX14';
+import {renderSpotPaperHost8h} from './spot-paper-host8h-view.js?v=B16-M11-FIX14';
 import {
   presentSpotPaperHost8h,
   SPOT_PAPER_HOST8H_MAX_INPUT_BYTES
-} from './spot-paper-host8h-model.js?v=B16-M11-FIX13';
+} from './spot-paper-host8h-model.js?v=B16-M11-FIX14';
 
 export const SPOT_PAPER_HOST8H_REPORT_ENDPOINT =
   'https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/spot-paper-host8h-report';
@@ -11,16 +11,14 @@ const TIMEOUT_MS = 5_000;
 const MAX_BACKOFF_MS = 30_000;
 
 const messages = {
-  'auth-required': 'Vor dem Abruf des privaten Host8h-Berichts Meridian entsperren.',
-  ready: 'Host8h-Status wurde noch nicht abgerufen.',
-  loading: 'Der authentifizierte Host8h-Statusabruf läuft.',
-  unavailable: 'Host8h-Transport nicht verfügbar; keine aktuellen Laufdaten werden angezeigt.',
-  'transport-not-provisioned':
-    'Host8h-Transport nicht provisioniert: Lead muss den separaten Host8h-Upload, die isolierte Reporttabelle und die drei Host8h-Gateway-Freigaben einrichten.',
-  'summary-not-found':
-    'Host8h-Transport erreichbar, aber noch kein Summary hochgeladen; Host-Volume-Exporter und Upload-Credential müssen separat provisioniert werden.',
-  rejected: 'Host8h-Antwort abgelehnt; keine nicht geprüften Kennzahlen werden angezeigt.',
-  stale: 'Letzter Host8h-Snapshot ist veraltet; keine aktuelle Hostbeobachtung.'
+  'auth-required': 'Meridian entsperren, um deine Paper-Daten anzusehen.',
+  ready: 'Paper-Daten wurden noch nicht abgerufen.',
+  loading: 'Paper-Daten werden geladen …',
+  unavailable: 'Paper-Daten sind gerade nicht erreichbar. Bitte später erneut versuchen.',
+  'transport-not-provisioned': 'Paper-Daten noch nicht verbunden.',
+  'summary-not-found': 'Die Verbindung steht. Der erste Paper-Bericht fehlt noch.',
+  rejected: 'Der Paper-Bericht konnte nicht geprüft werden. Bitte erneut laden.',
+  stale: 'Der letzte Paper-Bericht ist veraltet.'
 };
 
 async function boundedJson(response, signal) {
@@ -107,6 +105,7 @@ export function mountSpotPaperHost8hDashboard(root, document, window, {
     throw new TypeError('Host8h dashboard dependencies are invalid');
   }
   let active = false;
+  let restoreActiveOnPageShow = false;
   let disposed = false;
   let loading = false;
   let snapshot = null;
@@ -186,8 +185,8 @@ export function mountSpotPaperHost8hDashboard(root, document, window, {
     }
     if (retryBlocked() && errorState !== 'ready' && errorState !== 'loading') {
       const notice = document.createElement('p');
-      notice.textContent = `Erneuter Abruf ist nach der Backoff-Grenze in ${Math.ceil(
-        (retryAt - now()) / 1000)} s verfügbar.`;
+      notice.textContent = `Erneut laden in ${Math.ceil(
+        (retryAt - now()) / 1000)} Sekunden.`;
       notice.className = 'caption';
       root.append(notice);
     }
@@ -283,7 +282,7 @@ export function mountSpotPaperHost8hDashboard(root, document, window, {
         loading = false;
         errorState = 'ready';
         snapshotNotice =
-          'Rückschritt verworfen; der zuletzt angenommene Host8h-Snapshot bleibt maßgeblich.';
+          'Ein älterer oder widersprüchlicher Bericht wurde verworfen. Der letzte geprüfte Stand bleibt sichtbar.';
         render();
         return;
       }
@@ -331,18 +330,29 @@ export function mountSpotPaperHost8hDashboard(root, document, window, {
   }
 
   function pagehide() {
+    restoreActiveOnPageShow = active;
     active = false;
     clearPrivate();
     access.lock();
   }
 
+  function pageshow() {
+    if (disposed || !restoreActiveOnPageShow) return;
+    restoreActiveOnPageShow = false;
+    active = true;
+    errorState = enabled ? (access.isUnlocked() ? 'ready' : 'auth-required') : 'unavailable';
+    render(); // Restoration alone never restores credentials, snapshots or performs a read.
+  }
+
   const unregister = access.registerReader(clearPrivate, render);
   const unsubscribe = access.subscribe(onAccess);
   window.addEventListener('pagehide', pagehide);
+  window.addEventListener('pageshow', pageshow);
   render();
   return Object.freeze({
     setActive(value) {
       if (disposed) return;
+      restoreActiveOnPageShow = false;
       const next = value === true;
       if (active === next) return;
       active = next;
@@ -362,6 +372,7 @@ export function mountSpotPaperHost8hDashboard(root, document, window, {
       unregister();
       unsubscribe();
       window.removeEventListener('pagehide', pagehide);
+      window.removeEventListener('pageshow', pageshow);
       root.replaceChildren();
     }
   });

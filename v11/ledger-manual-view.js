@@ -1,9 +1,9 @@
-import {createLedgerManualClient} from './ledger-manual-client.js?v=B16-M11-FIX13';
-import {parseLedgerManualText} from './ledger-manual-model.js?v=B16-M11-FIX13';
+import {createLedgerManualClient} from './ledger-manual-client.js?v=B16-M11-FIX14';
+import {parseLedgerManualText} from './ledger-manual-model.js?v=B16-M11-FIX14';
 const messages={locked:'App entsperren, um Ledger-Bestände zu laden.',loading:'Ledger-Bestände und öffentliche Kurse werden geladen.',
   ready:'Manuell erfasste Mengen; keine automatische Wallet-Abfrage.',saving:'Ledger-Mengen werden gespeichert.',
   saved:'Gespeichert. Ledger neu laden, um den gespeicherten Stand mit aktuellen Kursen anzuzeigen.',
-  unavailable:'Ledger-Stand nicht verfügbar. Pionex bleibt unabhängig.',conflict:'Depot wurde zwischenzeitlich geändert. Vor erneutem Speichern neu laden.',
+  unavailable:'Ledger-Stand konnte nicht geladen oder geprüft werden. Bitte erneut laden; fehlende Daten bedeuten keinen Nullbestand. Pionex bleibt unabhängig.',conflict:'Depot wurde zwischenzeitlich geändert. Vor erneutem Speichern neu laden.',
   write_denied:'Schreibberechtigung nicht bestätigt. Neu laden und den separaten Schreibschlüssel prüfen.',
   write_unknown:'Speicherergebnis unbekannt. Nicht erneut senden; zuerst neu laden und gespeicherten Stand vergleichen.'};
 export function mountLedgerManual(root,{access,createClient=createLedgerManualClient}={}){
@@ -29,7 +29,12 @@ export function mountLedgerManual(root,{access,createClient=createLedgerManualCl
     status.textContent=messages[s.status]||messages.unavailable;content.replaceChildren();
     if(s.status==='locked'){quantities.value='';observed.value='';key.value='';editor.open=false;}
     if(s.status==='saving')key.value='';
-    if(!ready||!s.model)return;
+    if(!ready)return;
+    if(!s.model){
+      status.textContent='Noch kein manueller Ledger-Mengenstand gespeichert. Das bestätigt weder ein leeres Wallet noch einen Wert von null.';
+      content.append(el('p','Unter „Ledger-Mengen erfassen oder ersetzen“ kannst du deine geprüften Mengen und deren Bestandszeit erfassen. Es erfolgt keine automatische Wallet-Abfrage.'));
+      return;
+    }
     const m=s.model;content.append(el('p','Mengenstand: '+new Date(m.observedAt).toLocaleString('de-AT')));
     const list=el('ul');for(const row of m.holdings){
       list.append(el('li',row.symbol+': '+row.quantity+' · '+(row.value===null?'Bewertung nicht verfügbar':new Intl.NumberFormat('de-AT',{maximumFractionDigits:2,minimumFractionDigits:2}).format(row.value)+' USDT')));

@@ -1,6 +1,6 @@
-import {appAccess} from './app-access.js?v=B16-M11-FIX13';
-import {createBotReadClient} from './bot-read-client.js?v=B16-M11-FIX13';
-import {createBotReadView,renderCommandBotOverview} from './bot-read-view.js?v=B16-M11-FIX13';
+import {appAccess} from './app-access.js?v=B16-M11-FIX14';
+import {createBotReadClient} from './bot-read-client.js?v=B16-M11-FIX14';
+import {createBotReadView,renderCommandBotOverview} from './bot-read-view.js?v=B16-M11-FIX14';
 
 // Mounting controls never starts a request. Only the view's manual refresh can read.
 export function mountBotReadAccess(document,window,{
@@ -11,7 +11,7 @@ export function mountBotReadAccess(document,window,{
   if(!root)return null;
   const commandRoot=document.getElementById('command-bot-overview');
   const commandStatus=document.getElementById('command-bots-status');
-  let client,view,unregister=()=>{},disposed=false,expiryTimer=null,expiryGeneration=0;
+  let client,view,unregister=()=>{},unsubscribe=()=>{},disposed=false,expiryTimer=null,expiryGeneration=0;
   function cancelExpiry(){
     expiryGeneration++;
     if(expiryTimer!==null){cancelSchedule(expiryTimer);expiryTimer=null;}
@@ -40,8 +40,9 @@ export function mountBotReadAccess(document,window,{
           unregister();cancelExpiry();reader.dispose();
         }};
       }});
+    unsubscribe=access.subscribe(s=>{if(!disposed&&s?.status==='unlocked')view?.revalidate();});
   }catch{
-    cancelExpiry();unregister();
+    cancelExpiry();unregister();unsubscribe();
     try{client?.dispose();}catch{}
     root.textContent='Botansicht nicht verfügbar. Bitte Seite neu laden.';
     renderCommandBotOverview(commandRoot,{status:'unavailable'},null,commandStatus);
@@ -49,7 +50,7 @@ export function mountBotReadAccess(document,window,{
   }
   return {dispose(){
     if(disposed)return;
-    disposed=true;access.lock();cancelExpiry();unregister();view.dispose();client=null;
+    disposed=true;unsubscribe();access.lock();cancelExpiry();unregister();view.dispose();client=null;
   }};
 }
 

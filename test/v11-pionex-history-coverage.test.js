@@ -46,6 +46,7 @@ test('Pionex limited history is visibly labelled, preserves chart and clears the
   assert.match(root.textContent,/Begrenzter Verlauf/);assert.match(root.textContent,/höchstens 2\.200 der neuesten/);
   assert.match(root.textContent,/Ältere Punkte sind nicht enthalten/);
   assert.equal(nodes(root,'circle').length,2);assert.equal(nodes(root,'polyline').length,1);
+  assert.match(root.textContent,/Letzter gespeicherter Verlaufspunkt \(lokale Zeit\)/);assert.match(root.textContent,/vom separat angezeigten Bewertungsstand abweichen/);
   assert.match(root.textContent,/Keine P\/L- oder Renditeberechnung/);
   const buttons=nodes(root,'button');buttons[2].events.click();assert.equal(selected(),'1w');
   view.render(buildPionexHistoryModel(payload(points,{truncated:false}),{now}),'1w');

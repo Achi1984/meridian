@@ -406,12 +406,12 @@ function dashboardDependencies(fetchImpl, {
 } = {}) {
   const root = new Element();
   const document = {createElement: () => new Element()};
-  const listeners = new Set();
+  const listeners = new Set(), readers = new Set();
   const access = {
     getToken: () => unlocked ? READ_TOKEN : null,
     isUnlocked: () => unlocked,
-    lock: () => { unlocked = false; },
-    registerReader: () => () => {},
+    lock: () => { unlocked = false; for(const clear of readers)clear(); for(const listener of listeners)listener({status:'locked'}); },
+    registerReader: clear => { readers.add(clear); return () => readers.delete(clear); },
     subscribe: listener => {
       listeners.add(listener);
       listener({status: unlocked ? 'unlocked' : 'locked'});
@@ -438,7 +438,9 @@ function dashboardDependencies(fetchImpl, {
       timer.cancelled = true;
     }
   });
-  return {root, controller, timers};
+  return {root, controller, timers, access, windowListeners,
+    unlock(){unlocked=true;for(const listener of listeners)listener({status:'unlocked'});},
+    fire(name){windowListeners.get(name)?.();}};
 }
 
 function response(body, status = 200) {
@@ -483,7 +485,8 @@ test('Dashboard reports missing provisioning and cancels in-flight reads when in
   }, 503));
   unavailable.controller.setActive(true);
   await new Promise(resolve => setImmediate(resolve));
-  assert.match(unavailable.root.textContent, /nicht provisioniert/);
+  assert.match(unavailable.root.textContent, /Paper-Daten noch nicht verbunden/);
+  assert.doesNotMatch(unavailable.root.textContent, /provisioniert|Upload-Credential|Gateway-Freigaben|injizierter UI-Snapshot/);
   unavailable.controller.dispose();
 
   let resolveResponse;
@@ -511,13 +514,13 @@ test('Dashboard distinguishes a missing summary from a missing route on bounded 
     response({error: 'host8h_report_not_found'}, 404));
   missingSummary.controller.setActive(true);
   await new Promise(resolve => setImmediate(resolve));
-  assert.match(missingSummary.root.textContent, /noch kein Summary hochgeladen/);
+  assert.match(missingSummary.root.textContent, /Der erste Paper-Bericht fehlt noch/);
   missingSummary.controller.dispose();
 
   const missingRoute = dashboardDependencies(async () => response({error: 'not_found'}, 404));
   missingRoute.controller.setActive(true);
   await new Promise(resolve => setImmediate(resolve));
-  assert.match(missingRoute.root.textContent, /nicht provisioniert/);
+  assert.match(missingRoute.root.textContent, /Paper-Daten noch nicht verbunden/);
   missingRoute.controller.dispose();
 });
 
@@ -543,8 +546,8 @@ test('Dashboard freshness expires locally and cancels its timer when inactive', 
   timer.cancelled = true;
   timer.callback();
   assert.equal(deps.root.getAttribute('data-state'), 'stale');
-  assert.match(deps.root.textContent, /Snapshot veraltet/);
-  assert.equal(deps.root.textContent.includes('nicht provisioniert'), false);
+  assert.match(deps.root.textContent, /Bericht veraltet/);
+  assert.equal(deps.root.textContent.includes('Paper-Daten noch nicht verbunden'), false);
   assert.equal(calls, 1, 'freshness expiry is local and does not poll the endpoint');
   deps.controller.dispose();
 
@@ -581,9 +584,10 @@ test('Dashboard rejects out-of-order and terminal-to-running snapshots without r
   clock = NOW + 2_000;
   await deps.controller.refresh();
   assert.equal(deps.root.getAttribute('data-state'), 'verified_terminal');
-  assert.match(deps.root.textContent, /Rückschritt verworfen/);
-  assert.match(deps.root.textContent, /Abgeschlossen · Assessment verifiziert/);
-  assert.match(deps.root.textContent, /Zuletzt beobachtet08\.11\.2026, 14:00:00 UTC/);
+  assert.match(deps.root.textContent, /widersprüchlicher Bericht wurde verworfen/);
+  assert.match(deps.root.textContent, /Lauf beendet · Abschluss geprüft/);
+  assert.ok(deps.root.textContent.includes('Zuletzt beobachtet' + new Intl.DateTimeFormat('de-DE', {dateStyle:'medium', timeStyle:'medium'}).format(new Date('2026-11-08T14:00:00.000Z')) + ' (lokal)'));
+  assert.ok(deps.root.textContent.includes('Beobachtungszeit (UTC)2026-11-08T14:00:00.000Z'));
   assert.ok(deps.root.textContent.includes('Datenlücken10'));
   assert.notEqual(deps.root.textContent, terminalText);
   deps.controller.dispose();
@@ -602,8 +606,8 @@ test('Dashboard rejects out-of-order and terminal-to-running snapshots without r
   const acceptedText = outOfOrder.root.textContent;
   await outOfOrder.controller.refresh();
   assert.equal(outOfOrder.root.getAttribute('data-state'), 'running_observed');
-  assert.match(outOfOrder.root.textContent, /Rückschritt verworfen/);
-  assert.match(outOfOrder.root.textContent, /Zuletzt beobachtet08\.11\.2026, 14:00:00 UTC/);
+  assert.match(outOfOrder.root.textContent, /widersprüchlicher Bericht wurde verworfen/);
+  assert.ok(outOfOrder.root.textContent.includes('Beobachtungszeit (UTC)2026-11-08T14:00:00.000Z'));
   assert.notEqual(outOfOrder.root.textContent, acceptedText);
   outOfOrder.controller.dispose();
 
@@ -623,8 +627,8 @@ test('Dashboard rejects out-of-order and terminal-to-running snapshots without r
   clock = NOW + 2_000;
   await sequenceRegression.controller.refresh();
   assert.equal(sequenceRegression.root.getAttribute('data-state'), 'running_observed');
-  assert.match(sequenceRegression.root.textContent, /Rückschritt verworfen/);
-  assert.match(sequenceRegression.root.textContent, /Zuletzt beobachtet08\.11\.2026, 14:00:00 UTC/);
+  assert.match(sequenceRegression.root.textContent, /widersprüchlicher Bericht wurde verworfen/);
+  assert.ok(sequenceRegression.root.textContent.includes('Beobachtungszeit (UTC)2026-11-08T14:00:00.000Z'));
   sequenceRegression.controller.dispose();
 });
 
@@ -676,4 +680,37 @@ test('host8h database upsert refuses sequence regression despite a later timesta
   assert.match(insert, /observed_at = EXCLUDED\.observed_at[\s\S]*journal_sequence < EXCLUDED\.journal_sequence/);
   assert.match(insert, /IS DISTINCT FROM\s+'VERIFIED_TERMINAL'[\s\S]*EXCLUDED\.envelope #>>/);
   assert.match(statements.find(sql => sql.startsWith('SELECT config_hash')), /envelope/);
+});
+
+
+test('Dashboard restores selected tab after pageshow but requires re-unlock before a new read', async () => {
+  let reads=0,resolveLate,signal;
+  const deps=dashboardDependencies((_url,options)=>{
+    reads++;signal=options.signal;
+    if(reads===1)return new Promise(resolve=>{resolveLate=resolve;});
+    return Promise.resolve(response({schema:SPOT_PAPER_HOST8H_ENVELOPE_SCHEMA,runId:identity.runId,report:summary()}));
+  });
+  deps.controller.setActive(true);assert.equal(reads,1);
+  deps.fire('pagehide');assert.equal(signal.aborted,true);assert.equal(deps.access.isUnlocked(),false);
+  deps.fire('pageshow');assert.equal(reads,1);assert.equal(deps.root.getAttribute('data-state'),'auth-required');
+  resolveLate(response({schema:SPOT_PAPER_HOST8H_ENVELOPE_SCHEMA,runId:identity.runId,report:summary()}));
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.doesNotMatch(deps.root.textContent,/Eigenkapital|Netto-Gewinn/);
+  deps.unlock();await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(reads,2);assert.equal(deps.root.getAttribute('data-state'),'running_observed');
+  deps.fire('pageshow');assert.equal(reads,2,'duplicate pageshow does not poll');
+  deps.controller.dispose();assert.equal(deps.windowListeners.size,0);
+  deps.fire('pagehide');deps.fire('pageshow');deps.unlock();assert.equal(reads,2);assert.equal(deps.root.textContent,'');
+});
+
+test('Dashboard pageshow never activates a previously inactive or explicitly deselected tab', async () => {
+  for(const deselect of [false,true]){
+    let reads=0;
+    const deps=dashboardDependencies(async()=>{reads++;return response({error:'host8h_transport_not_provisioned'},503);});
+    if(deselect){deps.controller.setActive(true);await new Promise(resolve=>setImmediate(resolve));}
+    deps.fire('pagehide');
+    if(deselect)deps.controller.setActive(false);
+    deps.fire('pageshow');deps.unlock();await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(reads,deselect?1:0);deps.controller.dispose();
+  }
 });

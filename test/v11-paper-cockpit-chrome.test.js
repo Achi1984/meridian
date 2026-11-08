@@ -5,7 +5,7 @@ import {join} from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {withMobileChrome} from './helpers/v11-cdp.mjs';
-import {unlockAppThroughGate} from './helpers/v11-app-access-browser.mjs';
+import {unlockAppThroughGate,VERIFY_ENDPOINT} from './helpers/v11-app-access-browser.mjs';
 import {startV11StaticServer} from './helpers/v11-static-server.mjs';
 import {projectOperatorReport} from '../scripts/memecoin-paper/operator-report.mjs';
 import {reportFixtures} from './fixtures/memecoin-paper-operator-report/scenarios.mjs';
@@ -45,9 +45,10 @@ async function interceptGeneratedPaperReport(call,report){
   const body=Buffer.from(JSON.stringify({
     schema:PAPER_REPORT_ENVELOPE_SCHEMA,runId:report.experiment.id,report
   })).toString('base64');
-  let reads=0,host8hReads=0,failure=null;
+  let reads=0,host8hReads=0,failure=null,verificationOwned=false;
   const off=call.onEvent('Fetch.requestPaused',event=>{
     void (async()=>{
+      if(verificationOwned&&event.request.url===VERIFY_ENDPOINT)return;
       assert.ok([PAPER_REPORT_ENDPOINT,SPOT_PAPER_HOST8H_REPORT_ENDPOINT].includes(event.request.url),
         'only the exact approved Paper and host8h endpoints are intercepted');
       if(event.request.method==='OPTIONS'){
@@ -89,6 +90,11 @@ async function interceptGeneratedPaperReport(call,report){
     count:()=>reads,
     host8hCount:()=>host8hReads,
     assertHealthy(){if(failure)throw failure;},
+    async unlockApp(){
+      verificationOwned=true;
+      try{await unlockAppThroughGate(call,{additionalFetchUrls:[PAPER_REPORT_ENDPOINT,SPOT_PAPER_HOST8H_REPORT_ENDPOINT]});}
+      finally{verificationOwned=false;}
+    },
     async close(){off();await call('Fetch.disable');}
   };
 }
@@ -132,6 +138,16 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
           if(await evaluate(`document.querySelector('#paper-cockpit-root.paper-cockpit') !== null`))break;
           await new Promise(resolve=>setTimeout(resolve,10));
         }
+        assert.equal(await evaluate(`document.getElementById('paper-history-section').open`),false,
+          'previous reports start collapsed');
+        assert.equal(await evaluate(`(()=>{
+          const summary=document.querySelector('#paper-history-section > summary');summary.focus();
+          return document.activeElement===summary;
+        })()`),true,'history disclosure is keyboard focusable');
+        await key('Enter','Enter',13);
+        assert.equal(await evaluate(`document.getElementById('paper-history-section').open`),true,
+          'native Enter opens previous reports before reading or measuring them');
+        assert.equal(intercepted.count(),0,'opening previous reports does not fetch a report');
         const liveRead=await evaluate(`(()=>{
           const button=document.querySelector('#paper-cockpit-root button');
           return button?{text:button.textContent,height:button.getBoundingClientRect().height,
@@ -224,7 +240,7 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         assert.deepEqual(restored,{state:'auth-required',button:true,privateData:false},
           'pageshow restores the selected cockpit affordance but not private data');
         assert.equal(intercepted.count(),2,'navigation restoration never starts a read');
-        await unlockAppThroughGate(call);
+        await intercepted.unlockApp();
         assert.deepEqual(await evaluate(`(()=>{
           const root=document.querySelector('#paper-cockpit-root');
           return {appHidden:document.getElementById('app').hidden,state:root.dataset.state,
@@ -234,10 +250,22 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         })()`),{appHidden:false,state:'ready',button:true,privateData:false},
         'unlock after restoration keeps Strategies active without restoring the cleared report');
         assert.equal(intercepted.count(),2,'unlock after restoration does not start a report read');
+        // Host8h automatically reads after re-unlock. Keep its generated 503
+        // intercepted until settled; this state has no retry backoff and its
+        // enabled refresh must remain the first native Tab target below.
+        for(let attempt=0;attempt<150;attempt++){
+          if(await evaluate(`document.querySelector('#spot-paper-host8h-root')?.dataset.state==='transport-not-provisioned' &&
+            document.querySelector('#spot-paper-host8h-root button')?.disabled===false`))break;
+          await new Promise(resolve=>setTimeout(resolve,10));
+        }
+        intercepted.assertHealthy();
+        assert.equal(await evaluate(`document.querySelector('#spot-paper-host8h-root')?.dataset.state==='transport-not-provisioned' &&
+          document.querySelector('#spot-paper-host8h-root button')?.disabled===false`),true,
+          'generated host8h transport result settles with an enabled keyboard refresh before interception ends');
         await intercepted.close();
         await evaluate(`(async()=>{
-          const model=await import('./paper-cockpit-model.js?v=B16-M11-FIX13');
-          const view=await import('./paper-cockpit-view.js?v=B16-M11-FIX13');
+          const model=await import('./paper-cockpit-model.js?v=B16-M11-FIX14');
+          const view=await import('./paper-cockpit-view.js?v=B16-M11-FIX14');
           const report=model.getDemoPaperCockpitReport();
           const demoReport=model.getDemoPaperCockpitReport();
           report.experiment.id='run-'+('R'.repeat(220));
@@ -303,6 +331,15 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
           return document.activeElement===document.getElementById('app-main');
         })()`);
         assert.equal(focus,true);
+        await key('Tab','Tab',9);
+        assert.equal(await evaluate(`document.activeElement===document.querySelector('#spot-paper-host8h-root button')`),
+          true,'the primary Paper status refresh is first in Strategies');
+        await key('Tab','Tab',9);
+        assert.equal(await evaluate(`document.activeElement===document.querySelector('#spot-paper-host8h-root > details > summary')`),
+          true,'primary Paper source details follow its refresh');
+        await key('Tab','Tab',9);
+        assert.equal(await evaluate(`document.activeElement===document.querySelector('#paper-history-section > summary')`),
+          true,'the history disclosure precedes its expanded report controls');
         await key('Tab','Tab',9);
         assert.equal(await evaluate(`document.activeElement===document.querySelector('#spot-paper-cockpit-root button')`),
           true,'Strategies card exposes its manual BTC/EUR refresh before the legacy Paper card');
@@ -423,7 +460,7 @@ test('early Strategies navigation remains active when its module bootstrap initi
             state:root?.dataset.state,button:!!root?.querySelector('button')};
         })()`,returnByValue:true});
         assert.deepEqual(beforeUnlock.result?.value,{selected:'strategies',state:'auth-required',button:true});
-        await unlockAppThroughGate(call);
+        await intercepted.unlockApp();
         const afterUnlock=await call('Runtime.evaluate',{expression:`(()=>{
           const root=document.querySelector('#paper-cockpit-root');
           return {selected:document.querySelector('#nav button[aria-current="page"]')?.dataset.v,
@@ -431,6 +468,16 @@ test('early Strategies navigation remains active when its module bootstrap initi
         })()`,returnByValue:true});
         assert.deepEqual(afterUnlock.result?.value,{selected:'strategies',state:'ready',button:true});
         assert.equal(intercepted.count(),0,'early selection and unlock never start a report read');
+        let hostSettled=false;
+        for(let attempt=0;attempt<150;attempt++){
+          const state=await call('Runtime.evaluate',{expression:`document.querySelector('#spot-paper-host8h-root')?.dataset.state==='transport-not-provisioned' && document.querySelector('#spot-paper-host8h-root button')?.disabled===false`,returnByValue:true});
+          hostSettled=state.result?.value===true;
+          if(hostSettled)break;
+          await new Promise(resolve=>setTimeout(resolve,10));
+        }
+        intercepted.assertHealthy();
+        assert.equal(hostSettled,true,'early-navigation host report settles before interception ends');
+        assert.ok(intercepted.host8hCount()>0,'early-navigation host report uses the generated fixture');
       }finally{await intercepted.close();}
     },844,async call=>{
       let removeListener;
