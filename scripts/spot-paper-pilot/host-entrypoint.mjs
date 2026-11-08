@@ -2,8 +2,8 @@
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { constants } from "node:fs";
-import { access, lstat, mkdir, open, readFile, rename } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { access, lstat, mkdir, open, rename } from "node:fs/promises";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { SPOT_PAPER_PILOT_LIMITS, SPOT_PAPER_PILOT_VERSION } from "./core.mjs";
 import { readRunJournal } from "./journal.mjs";
@@ -26,50 +26,116 @@ const MAX_REPORT_BYTES = 256 * 1024;
 const MAX_PENDING_BYTES = 16 * 1024;
 const CHILD_SHUTDOWN_GRACE_MS = 7_000;
 const CHILD_REAP_GRACE_MS = 1_000;
+const activeInspections = new Map();
 
 let bundledManifest = null;
 try {
   const manifestBytes = await readBoundedRegularFile(MANIFEST_PATH, 16_384,
-    "INVALID_LAUNCH_MANIFEST_FILE", "LAUNCH_MANIFEST_TOO_LARGE");
+    "INVALID_LAUNCH_MANIFEST_FILE", "LAUNCH_MANIFEST_TOO_LARGE",
+    createInspectionContext());
   bundledManifest = JSON.parse(manifestBytes.toString("utf8"));
 } catch {}
 export const HOST_LAUNCH_MANIFEST = bundledManifest;
 
-export async function runtimeSourceDigest(root = ROOT) {
+function createInspectionContext(timeoutMs = JOURNAL_READ_TIMEOUT_MS) {
+  const now = performance.now();
+  const controller = new AbortController();
+  return {
+    deadlineAt: now + Math.min(timeoutMs, JOURNAL_READ_TIMEOUT_MS),
+    monotonicNow: () => performance.now(),
+    controller,
+    signal: controller.signal
+  };
+}
+
+function assertInspectionActive(context) {
+  if (context.signal?.aborted) {
+    throw new Error(context.signal.reason?.message ?? "INSPECTION_ABORTED");
+  }
+  if (!Number.isFinite(context.monotonicNow()) ||
+      context.monotonicNow() >= context.deadlineAt) {
+    throw new Error("INSPECTION_DEADLINE_EXCEEDED");
+  }
+}
+
+async function boundedInspection(operation, context, cleanupLateResult) {
+  assertInspectionActive(context);
+  const task = Promise.resolve().then(() => {
+    assertInspectionActive(context);
+    return operation();
+  });
+  let timedOut = false;
+  task.then(value => {
+    if (timedOut && cleanupLateResult) {
+      void Promise.resolve().then(() => cleanupLateResult(value)).catch(() => {});
+    }
+  }, () => {});
+  let timer;
+  let abortListener;
+  const remainingMs = Math.max(0, context.deadlineAt - context.monotonicNow());
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      timedOut = true;
+      const error = new Error("INSPECTION_DEADLINE_EXCEEDED");
+      context.controller.abort(error);
+      reject(error);
+    }, remainingMs);
+  });
+  const aborted = context.signal ? new Promise((_, reject) => {
+    abortListener = () =>
+      reject(new Error(context.signal.reason?.message ?? "INSPECTION_ABORTED"));
+    context.signal.addEventListener("abort", abortListener, { once: true });
+  }) : new Promise(() => {});
+  try {
+    const result = await Promise.race([task, timeout, aborted]);
+    assertInspectionActive(context);
+    return result;
+  } finally {
+    clearTimeout(timer);
+    if (abortListener) context.signal.removeEventListener("abort", abortListener);
+  }
+}
+
+export async function runtimeSourceDigest(root = ROOT, context = createInspectionContext(), io = {}) {
   const hash = createHash("sha256");
   for (const relativePath of RUNTIME_SOURCE_FILES) {
+    assertInspectionActive(context);
     hash.update(relativePath).update("\0");
-    hash.update(await readFile(join(root, relativePath)));
+    hash.update(await readBoundedRegularFile(join(root, relativePath), 1024 * 1024,
+      "INVALID_RUNTIME_SOURCE_FILE", "RUNTIME_SOURCE_FILE_TOO_LARGE", context, io));
+    assertInspectionActive(context);
   }
   return hash.digest("hex");
 }
 
-async function readBoundedRegularFile(path, maxBytes, invalidCode, largeCode) {
+async function readBoundedRegularFile(path, maxBytes, invalidCode, largeCode,
+  context = createInspectionContext(), io = {}) {
   const flags = constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) |
     (constants.O_NONBLOCK ?? 0);
   let handle;
   try {
-    handle = await open(path, flags);
+    handle = await boundedInspection(() => (io.open ?? open)(path, flags), context,
+      lateHandle => lateHandle.close());
   } catch (error) {
     if (error.code === "ELOOP") throw new Error(invalidCode);
     throw error;
   }
   try {
-    const info = await handle.stat();
+    const info = await boundedInspection(() => handle.stat(), context);
     if (!info.isFile()) throw new Error(invalidCode);
     if (info.size > maxBytes) throw new Error(largeCode);
     const buffer = Buffer.allocUnsafe(maxBytes + 1);
     let length = 0;
     while (length < buffer.byteLength) {
-      const { bytesRead } = await handle.read(buffer, length,
-        buffer.byteLength - length, length);
+      const { bytesRead } = await boundedInspection(
+        () => handle.read(buffer, length, buffer.byteLength - length, length), context);
       if (bytesRead === 0) break;
       length += bytesRead;
     }
     if (length > maxBytes) throw new Error(largeCode);
     return buffer.subarray(0, length);
   } finally {
-    await handle.close();
+    await handle.close().catch(() => {});
   }
 }
 
@@ -206,12 +272,12 @@ function childAlive(pid) {
   }
 }
 
-async function readHostState(evidenceDir) {
-  const dir = await lstat(evidenceDir);
+async function readHostState(evidenceDir, context, io) {
+  const dir = await boundedInspection(() => (io.lstat ?? lstat)(evidenceDir), context);
   if (!dir.isDirectory() || dir.isSymbolicLink()) throw new Error("INVALID_EVIDENCE_DIRECTORY");
   const statePath = join(evidenceDir, HOST_STATE_FILE);
   const bytes = await readBoundedRegularFile(statePath, 16_384,
-    "INVALID_HOST_STATE_FILE", "HOST_STATE_TOO_LARGE");
+    "INVALID_HOST_STATE_FILE", "HOST_STATE_TOO_LARGE", context, io);
   const state = JSON.parse(bytes.toString("utf8"));
   if (state?.schemaVersion !== "SPOT_PAPER_HOST_STATE_V1" ||
       state.runId !== HOST_LAUNCH_MANIFEST.runId ||
@@ -222,12 +288,31 @@ async function readHostState(evidenceDir) {
   return state;
 }
 
-async function readBoundedRunJournal(evidenceDir) {
+async function readBoundedRunJournal(evidenceDir, context, io) {
   const runDirectory = join(evidenceDir, "runtime", HOST_LAUNCH_MANIFEST.runId);
   const journalPath = join(runDirectory, "journal.json");
+  const checkedLstat = path =>
+    boundedInspection(() => (io.lstat ?? lstat)(path), context);
+  const readJournalFile = path => {
+    const name = basename(path);
+    if (name === "journal.json") {
+      return readBoundedRegularFile(path, MAX_JOURNAL_BYTES,
+        "INVALID_JOURNAL_FILE", "JOURNAL_SIZE_LIMIT", context, io);
+    }
+    if (name === "journal.pending") {
+      return readBoundedRegularFile(path, MAX_PENDING_BYTES,
+        "INVALID_JOURNAL_PENDING_FILE", "JOURNAL_PENDING_SIZE_LIMIT", context, io);
+    }
+    if (/^[a-f0-9]{64}\.json$/.test(name)) {
+      return readBoundedRegularFile(path, HOST_LAUNCH_MANIFEST.maxResponseBytes,
+        "INVALID_RESPONSE_FILE", "JOURNAL_RESPONSE_SIZE_LIMIT", context, io);
+    }
+    throw new Error("INVALID_JOURNAL_FILE_REFERENCE");
+  };
   for (const directory of [dirname(runDirectory), runDirectory]) {
+    assertInspectionActive(context);
     try {
-      const directoryInfo = await lstat(directory);
+      const directoryInfo = await checkedLstat(directory);
       if (!directoryInfo.isDirectory() || directoryInfo.isSymbolicLink()) {
         throw new Error("INVALID_JOURNAL_DIRECTORY");
       }
@@ -236,14 +321,15 @@ async function readBoundedRunJournal(evidenceDir) {
     }
   }
   try {
-    const journalInfo = await lstat(journalPath);
+    const journalInfo = await checkedLstat(journalPath);
     if (!journalInfo.isFile() || journalInfo.isSymbolicLink() ||
         journalInfo.size > MAX_JOURNAL_BYTES) {
       throw new Error("JOURNAL_SIZE_LIMIT");
     }
+    const journalBytes = await readJournalFile(journalPath);
     let envelope;
     try {
-      envelope = JSON.parse((await readFile(journalPath)).toString("utf8"));
+      envelope = JSON.parse(journalBytes.toString("utf8"));
     } catch {
       throw new Error("INVALID_JOURNAL_JSON");
     }
@@ -265,7 +351,8 @@ async function readBoundedRunJournal(evidenceDir) {
               !/^responses\/[a-f0-9]{64}\.json$/.test(response.path)) {
             throw new Error("INVALID_RESPONSE_REFERENCE");
           }
-          const responseInfo = await lstat(join(runDirectory, response.path));
+          assertInspectionActive(context);
+          const responseInfo = await checkedLstat(join(runDirectory, response.path));
           if (!responseInfo.isFile() || responseInfo.isSymbolicLink() ||
               responseInfo.size !== response.bytes) {
             throw new Error("INVALID_RESPONSE_FILE");
@@ -283,7 +370,7 @@ async function readBoundedRunJournal(evidenceDir) {
     if (error.code !== "ENOENT") throw error;
   }
   try {
-    const pendingInfo = await lstat(join(runDirectory, "journal.pending"));
+    const pendingInfo = await checkedLstat(join(runDirectory, "journal.pending"));
     if (!pendingInfo.isFile() || pendingInfo.size > MAX_PENDING_BYTES) {
       throw new Error("JOURNAL_PENDING_SIZE_LIMIT");
     }
@@ -293,8 +380,10 @@ async function readBoundedRunJournal(evidenceDir) {
   return readRunJournal({
     dataRoot: join(evidenceDir, "runtime"),
     runId: HOST_LAUNCH_MANIFEST.runId,
-    deadlineAt: performance.now() + JOURNAL_READ_TIMEOUT_MS,
-    monotonicNow: () => performance.now()
+    deadlineAt: context.deadlineAt,
+    monotonicNow: context.monotonicNow,
+    signal: context.signal,
+    io: { lstat: checkedLstat, readFile: readJournalFile }
   });
 }
 
@@ -344,23 +433,19 @@ function journalMatchesLaunch(journal) {
     Buffer.byteLength(JSON.stringify(report)) <= MAX_REPORT_BYTES;
 }
 
-export async function inspectHostRun(evidenceDir, { includeReport = false } = {}) {
+async function inspectHostRunWithContext(evidenceDir, { includeReport, context, io }) {
+  assertInspectionActive(context);
   const absent = { status: "DISABLED", verifiedTerminal: false };
   try {
-    await lstat(evidenceDir);
+    await boundedInspection(() => (io.lstat ?? lstat)(evidenceDir), context);
   } catch (error) {
     if (error.code === "ENOENT") return absent;
-    return { status: "INCOMPLETE_UNKNOWN", verifiedTerminal: false, reason: "EVIDENCE_DIRECTORY_UNREADABLE" };
+    throw error;
   }
   let state;
   let journal;
-  let journalError = null;
-  try {
-    state = await readHostState(evidenceDir);
-  } catch (error) {
-    return { status: "INCOMPLETE_UNKNOWN", verifiedTerminal: false, reason: error.message };
-  }
-  if (await runtimeSourceDigest() !== state.runtimeSourceSha256) {
+  state = await readHostState(evidenceDir, context, io);
+  if (await runtimeSourceDigest(ROOT, context, io) !== state.runtimeSourceSha256) {
     return {
       status: "INCOMPLETE_UNKNOWN",
       verifiedTerminal: false,
@@ -376,11 +461,15 @@ export async function inspectHostRun(evidenceDir, { includeReport = false } = {}
       note: "Process presence is observed only; execution health and terminal evidence are unverified."
     };
   }
+  let journalError = null;
   try {
-    journal = await readBoundedRunJournal(evidenceDir);
+    journal = await readBoundedRunJournal(evidenceDir, context, io);
   } catch (error) {
+    if (context.signal.aborted ||
+        error.message === "INSPECTION_DEADLINE_EXCEEDED") throw error;
     journalError = error.message;
   }
+  assertInspectionActive(context);
   const terminalVerified = state.status === "CHILD_EXITED" &&
     state.childExitCode === 0 && state.childSignal === null &&
     state.interruptedBy === null && journal?.reconciliationStatus === "READ_ONLY_VERIFIED" &&
@@ -402,8 +491,38 @@ export async function inspectHostRun(evidenceDir, { includeReport = false } = {}
     reason: state.interruptedBy ? `INTERRUPTED_${state.interruptedBy}` :
       journalError ?? (journal && !journalMatchesLaunch(journal) ?
         "TERMINAL_EVIDENCE_MISMATCH" : "CHILD_OR_JOURNAL_INCOMPLETE"),
-    report: includeReport && journal?.events?.at(-1)?.report ? journal.events.at(-1).report : undefined
   };
+}
+
+export async function inspectHostRun(evidenceDir, {
+  includeReport = false, timeoutMs = JOURNAL_READ_TIMEOUT_MS, io = {}
+} = {}) {
+  const context = createInspectionContext(timeoutMs);
+  const key = resolve(evidenceDir);
+  if (activeInspections.has(key)) {
+    return {
+      status: "INCOMPLETE_UNKNOWN",
+      verifiedTerminal: false,
+      reason: "VERIFICATION_ALREADY_IN_PROGRESS"
+    };
+  }
+  const verification = Promise.resolve().then(() =>
+    inspectHostRunWithContext(evidenceDir, { includeReport, context, io }));
+  activeInspections.set(key, verification);
+  verification.then(
+    () => { if (activeInspections.get(key) === verification) activeInspections.delete(key); },
+    () => { if (activeInspections.get(key) === verification) activeInspections.delete(key); }
+  );
+  try {
+    return await boundedInspection(() => verification, context);
+  } catch (error) {
+    if (!context.signal.aborted) context.controller.abort(error);
+    return {
+      status: "INCOMPLETE_UNKNOWN",
+      verifiedTerminal: false,
+      reason: error.message ?? "INSPECTION_FAILED"
+    };
+  }
 }
 
 export async function launchHostRun({

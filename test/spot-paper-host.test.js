@@ -1,8 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { spawn } from "node:child_process";
-import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { appendFile, lstat, mkdtemp, mkdir, open, readFile, rename, rm,
+  symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -183,6 +185,111 @@ test("synthetic no-network child terminates with reconciled bounded evidence; re
   assert.equal(report.status, "VERIFIED_TERMINAL");
   assert.equal(JSON.parse(output).report.stopReason, "DURATION_LIMIT");
   assert.equal(await readFile(journalPath, "utf8"), journalBefore);
+});
+
+test("journal reads reject growth after descriptor stat and replacement by symlink", async t => {
+  const parent = await temporaryDirectory(t);
+  const growingDir = join(parent, "growing");
+  await launchWithInline(growingDir, syntheticTerminalSource(growingDir));
+  const growingJournal = join(growingDir, "runtime", HOST_LAUNCH_MANIFEST.runId, "journal.json");
+  let grew = false;
+  const grown = await inspectHostRun(growingDir, {
+    io: {
+      open: async (path, ...args) => {
+        const handle = await open(path, ...args);
+        if (path === growingJournal && !grew) {
+          grew = true;
+          const stat = handle.stat.bind(handle);
+          handle.stat = async (...statArgs) => {
+            const info = await stat(...statArgs);
+            await appendFile(path, Buffer.alloc(8 * 1024 * 1024 + 1));
+            return info;
+          };
+        }
+        return handle;
+      }
+    }
+  });
+  assert.equal(grown.status, "INCOMPLETE_UNKNOWN");
+  assert.equal(grown.reason, "JOURNAL_SIZE_LIMIT");
+
+  const replacedDir = join(parent, "replaced");
+  await launchWithInline(replacedDir, syntheticTerminalSource(replacedDir));
+  const replacedJournal = join(replacedDir, "runtime", HOST_LAUNCH_MANIFEST.runId, "journal.json");
+  const backupJournal = `${replacedJournal}.original`;
+  let replaced = false;
+  const replacement = await inspectHostRun(replacedDir, {
+    io: {
+      lstat: async path => {
+        const info = await lstat(path);
+        if (path === replacedJournal && !replaced) {
+          replaced = true;
+          await rename(path, backupJournal);
+          await symlink(backupJournal, path);
+        }
+        return info;
+      }
+    }
+  });
+  assert.equal(replacement.status, "INCOMPLETE_UNKNOWN");
+  assert.equal(replacement.reason, "INVALID_JOURNAL_FILE");
+});
+
+test("inspection deadline covers slow preflight and blocks overlapping verification", async t => {
+  const parent = await temporaryDirectory(t);
+  const evidenceDir = join(parent, "slow");
+  await mkdir(evidenceDir);
+  let preflightCalls = 0;
+  const startedAt = Date.now();
+  const io = {
+    lstat: async path => {
+      if (path === evidenceDir) {
+        preflightCalls++;
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+      return lstat(path);
+    }
+  };
+  const first = await inspectHostRun(evidenceDir, { timeoutMs: 25, io });
+  assert.equal(first.status, "INCOMPLETE_UNKNOWN");
+  assert.equal(first.reason, "INSPECTION_DEADLINE_EXCEEDED");
+  assert.ok(Date.now() - startedAt < 250);
+
+  const overlapping = await inspectHostRun(evidenceDir, { timeoutMs: 25, io });
+  assert.equal(overlapping.status, "INCOMPLETE_UNKNOWN");
+  assert.equal(overlapping.reason, "VERIFICATION_ALREADY_IN_PROGRESS");
+  assert.equal(preflightCalls, 1);
+  await new Promise(resolve => setTimeout(resolve, 320));
+  assert.equal(preflightCalls, 1);
+});
+
+test("oversized reports are omitted from every unverified output", async t => {
+  const parent = await temporaryDirectory(t);
+  const evidenceDir = join(parent, "oversized-report");
+  await launchWithInline(evidenceDir, syntheticTerminalSource(evidenceDir));
+  const journalPath = join(evidenceDir, "runtime", HOST_LAUNCH_MANIFEST.runId, "journal.json");
+  const envelope = JSON.parse(await readFile(journalPath, "utf8"));
+  envelope.payload.events.at(-1).report.padding = "x".repeat(300_000);
+  envelope.sha256 = createHash("sha256")
+    .update(JSON.stringify(envelope.payload)).digest("hex");
+  await writeFile(journalPath, JSON.stringify(envelope));
+  const statePath = join(evidenceDir, "host-state.json");
+  const state = JSON.parse(await readFile(statePath, "utf8"));
+  state.childExitCode = 1;
+  await writeFile(statePath, JSON.stringify(state));
+
+  const result = await inspectHostRun(evidenceDir, { includeReport: true });
+  assert.equal(result.status, "INCOMPLETE_UNKNOWN");
+  assert.equal(result.verifiedTerminal, false);
+  assert.equal(Object.hasOwn(result, "report"), false);
+  assert.ok(Buffer.byteLength(JSON.stringify(result)) < 1024);
+  let output = "";
+  const commandResult = await main(["report", "--evidence-dir", evidenceDir], {
+    stdout: { write: value => { output += value; } }
+  });
+  assert.equal(commandResult.status, "INCOMPLETE_UNKNOWN");
+  assert.equal(Object.hasOwn(JSON.parse(output), "report"), false);
+  assert.ok(Buffer.byteLength(output) < 1024);
 });
 
 test("live PID is only running-observed and signal shutdown remains incomplete", async t => {
