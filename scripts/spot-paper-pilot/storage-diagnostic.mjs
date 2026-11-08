@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import {createHash, randomUUID} from "node:crypto";
 import {
-  closeSync, constants, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync,
-  realpathSync, renameSync, statfsSync, writeFileSync
+  closeSync, constants, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync,
+  readFileSync, realpathSync, renameSync, statfsSync, writeFileSync
 } from "node:fs";
 import {isAbsolute, resolve, sep} from "node:path";
 import {fileURLToPath, pathToFileURL} from "node:url";
@@ -100,6 +100,7 @@ export function runStorageDiagnostic(mountPath, dependencies = {}) {
   const temporaryPath = resolve(childPath, "probe.pending");
   const finalPath = resolve(childPath, "probe.bin");
   let descriptor;
+  let writtenInfo;
   try {
     assertActive(context);
     descriptor = openSync(temporaryPath,
@@ -107,12 +108,32 @@ export function runStorageDiagnostic(mountPath, dependencies = {}) {
       (constants.O_NOFOLLOW ?? 0), 0o600);
     writeFileSync(descriptor, payload);
     fsyncSync(descriptor);
+    writtenInfo = fstatSync(descriptor);
   } finally {
     if (descriptor !== undefined) closeSync(descriptor);
   }
   assertActive(context);
+  try {
+    lstatSync(finalPath);
+    throw new Error("PROBE_DESTINATION_COLLISION");
+  } catch (error) {
+    if (error.message === "PROBE_DESTINATION_COLLISION") throw error;
+    if (error.code !== "ENOENT") throw error;
+  }
   renameSync(temporaryPath, finalPath);
-  const readback = readFileSync(finalPath);
+  const readbackDescriptor = openSync(finalPath, constants.O_RDONLY |
+    (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0));
+  let readback;
+  try {
+    const readbackInfo = fstatSync(readbackDescriptor);
+    if (!readbackInfo.isFile() || readbackInfo.dev !== writtenInfo.dev ||
+        readbackInfo.ino !== writtenInfo.ino) {
+      throw new Error("READBACK_IDENTITY_MISMATCH");
+    }
+    readback = readFileSync(readbackDescriptor);
+  } finally {
+    closeSync(readbackDescriptor);
+  }
   if (!readback.equals(payload)) throw new Error("READBACK_MISMATCH");
   syncDirectory(childPath);
   assertActive(context);
