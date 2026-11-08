@@ -94,6 +94,58 @@ a timeout, missing/corrupt/pending journal, ambiguous write, signal, or
 nonzero child exit remains incomplete/unknown. Never relaunch to resolve
 unknown evidence.
 
+## Offline eight-hour assessment
+
+The eight-hour path is offline only. It reads the current checked-in launch
+manifest, verifies its runtime-source digest, independently reinspects
+`host-state.json` and the retained journal, and passes the journal's response
+bodies through the existing paper accounting and signal-replay validators.
+Child stdout is ignored; the terminal report is taken from the independently
+read terminal journal event and must match the verified host report.
+
+Before any launch, prepare and retain an expected-context JSON file separately
+from the evidence directory, using values reviewed independently of run
+artifacts:
+
+```json
+{
+  "schemaVersion": "SPOT_PAPER_HOST_EXPECTED_CONTEXT_V1",
+  "profileId": "BTC_EUR_PAPER_HOST_8H_V1",
+  "hostRunId": "btc-eur-paper-host-8h-001",
+  "launchManifestSha256": "<sha256 of the exact reviewed manifest bytes>",
+  "runtimeSourceSha256": "<runtimeSourceSha256 from the reviewed manifest>",
+  "imageDigest": null,
+  "hostIdentity": null
+}
+```
+
+In this package, host state does not record an image digest or host identity;
+leave those values `null`. If such fields are present in retained host state,
+the independent context must match them. Operator-provided strings are not
+attestations. The current host path can verify content binding only and reports
+image/host identity as unavailable; source/image provenance, host identity,
+clock correctness, and provider authenticity remain unattested and must be
+verified independently before any launch. This assessment does not establish
+launch readiness.
+
+Run the assessment from a checkout containing the current package. Keep both
+the expected-context input and output outside the retained evidence directory:
+
+```sh
+node scripts/spot-paper-pilot/host-evidence-assessment.mjs \
+  /srv/meridian/btc-eur-paper-001 \
+  /srv/meridian/reviewed/expected-host-context.json \
+  /srv/meridian/reviewed/host-assessment.json
+```
+
+Use `-` in place of the expected-context path only to produce an `UNKNOWN`
+result when no independent expectation is available. The command performs no
+provider or network requests and fails closed on missing, pending, corrupt,
+oversized, interrupted, mismatched, or mixed-profile evidence. It reports
+actual elapsed duration and coverage: reaching the 480-cycle cap before eight
+hours is partial, not full-duration. It preserves flat/open inventory, fees,
+and PnL accounting, but makes no profitability claim.
+
 For an operator stop, send `SIGTERM` to the host container/process. The parent
 forwards `SIGTERM` to the spot CLI; the CLI attempts its existing bounded
 terminal journal write (five-second grace). The parent escalates to
@@ -118,19 +170,20 @@ Before any separately approved launch, the host operator must confirm:
   incomplete runs.
 
 The host manifest's `runtimeSourceSha256` fingerprints the exact existing
-runtime source files used by the wrapper. It is a content binding, not a GitHub
-workflow identity, a signed image identity, or independently verified host
-provenance. Do not substitute or forge a GitHub run/workflow identity.
+runtime source files used by the wrapper. The offline assessment's expected
+context binds the host run, exact reviewed manifest bytes, and source fingerprint
+to retained content. This is not a GitHub workflow identity, signed image
+identity, or independently verified host provenance. Do not substitute or
+forge a GitHub run/workflow identity.
 
-Existing paper assessment profiles cover one hour and four hours only. They
-must not be treated as accepting eight-hour evidence; the recorded four-hour
-run and its reconciliation remain unchanged. Before activation, an independent
-host provenance and eight-hour assessment profile must be specified and
-reviewed, including how it binds the host/image/source, fixed manifest, run
-identity, and terminal evidence. There is no fallback to the one- or
-four-hour profiles. A verified terminal status from this host package means
-only that the fixed local run terminated with reconciled evidence; it does not
-mean its data or strategy was accepted, profitable, or production-ready.
+The `BTC_EUR_PAPER_HOST_8H_V1` profile accepts only this package's exact
+manifest and bounds; it is separate from the unchanged one-hour and four-hour
+profiles and GitHub-dispatch checks. A successful offline assessment means that
+the retained content passed those checks and the existing accounting/replay
+validators. It does not authenticate the real host, source/image, clock, or
+provider; it does not establish launch readiness, strategy profitability, or
+production readiness. Real host/source authenticity remains a separate
+prerequisite before any launch.
 
 No eight-hour job is configured in GitHub Actions. Actions may build the image
 and run offline tests only; actual hosting configuration and acceptance remain

@@ -6,8 +6,10 @@ import {
   sha256, SPOT_PAPER_PILOT_LIMITS
 } from "./core.mjs";
 import {
-  DEFAULT_SIGNAL_REPLAY_PROFILE_ID, getSignalReplayProfile
+  DEFAULT_SIGNAL_REPLAY_PROFILE_ID, HOST_EIGHT_HOUR_PROFILE_ID,
+  getSignalReplayProfile
 } from "./evidence-profiles.mjs";
+import { verifyExpectedHostContext } from "./host-context.mjs";
 import {
   expectedDispatchFromEnvironment, FOUR_HOUR_DISPATCH_PROFILE_ID,
   verifyFourHourDispatchIdentity
@@ -53,7 +55,14 @@ function cycleForEvent(event, profile) {
   return event.cycle;
 }
 
-function identityStatus(readback, provenance, profile, expectedDispatch) {
+function identityStatus(readback, provenance, profile, expectedDispatch, {
+  expectedHostContext, hostManifest, hostManifestSha256, hostState
+} = {}) {
+  if (profile.profileId === HOST_EIGHT_HOUR_PROFILE_ID) {
+    return verifyExpectedHostContext({
+      expectedHostContext, hostManifest, hostManifestSha256, hostState, readback
+    }).status;
+  }
   if (!readback || !provenance) return "UNKNOWN";
   if (profile.profileId === FOUR_HOUR_DISPATCH_PROFILE_ID) {
     const dispatchIdentity = verifyFourHourDispatchIdentity({
@@ -229,16 +238,27 @@ function stateMatches(left, right) {
 
 export function replaySpotPaperSignals({
   readback, provenance, responseBodies,
-  profileId = DEFAULT_SIGNAL_REPLAY_PROFILE_ID, expectedDispatch
+  profileId = DEFAULT_SIGNAL_REPLAY_PROFILE_ID, expectedDispatch,
+  expectedHostContext, hostManifest, hostManifestSha256, hostState
 } = {}) {
-  const profile = getSignalReplayProfile(profileId);
+  const isHostProfile = profileId === HOST_EIGHT_HOUR_PROFILE_ID;
+  const profile = getSignalReplayProfile(profileId, { hostManifest });
   const discrepancies = [];
-  const identity = identityStatus(readback, provenance, profile, expectedDispatch);
+  const identity = identityStatus(readback, provenance, profile, expectedDispatch, {
+    expectedHostContext, hostManifest, hostManifestSha256, hostState
+  });
+  const hostDisclosure = isHostProfile ? {
+    identityBinding: "CONTENT_BOUND",
+    hostAuthenticity: "UNATTESTED",
+    clockAuthenticity: "UNATTESTED",
+    providerAuthenticity: "UNATTESTED"
+  } : {};
   if (identity !== "PASS") {
     return {
       outcome: identity,
       profileId: profile.profileId,
       identity,
+      ...hostDisclosure,
       signalReplay: identity === "PASS" ? "PASS" : "NOT_ASSESSED",
       fillCausality: "NOT_ASSESSED",
       startupCutoff: "NOT_ASSESSED",
@@ -288,6 +308,7 @@ export function replaySpotPaperSignals({
     return {
       profileId: profile.profileId,
       outcome: "UNKNOWN", identity, signalReplay: "UNKNOWN",
+      ...hostDisclosure,
       fillCausality: "UNKNOWN", startupCutoff: "UNKNOWN",
       supportedClaim: "No replay claim; retained journal is incomplete, mismatched, or outside bounds.",
       replayedSignals: 0, sampledStopCount: 0,
@@ -306,6 +327,7 @@ export function replaySpotPaperSignals({
     return {
       profileId: profile.profileId,
       outcome: "UNKNOWN", identity, signalReplay: "UNKNOWN",
+      ...hostDisclosure,
       fillCausality: "UNKNOWN", startupCutoff: "UNKNOWN",
       supportedClaim: "No replay claim; retained response set exceeds bounds.",
       replayedSignals: 0, sampledStopCount: 0,
@@ -425,6 +447,7 @@ export function replaySpotPaperSignals({
     profileId: profile.profileId,
     outcome,
     identity,
+    ...hostDisclosure,
     signalReplay: signalStatus,
     fillCausality: fillStatus,
     startupCutoff,
