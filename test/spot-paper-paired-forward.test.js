@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, rm } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { mkdtemp, mkdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -9,6 +10,7 @@ import {
   runSpotPaperPairedSynthetic,
   pairedConfigDigest, pairedResearchSourceDigest,
   SPOT_PAPER_PAIRED, SPOT_PAPER_PAIRED_SOURCE_ID,
+  SPOT_PAPER_PAIRED_ACCEPTED_RESEARCH_SOURCE_SHA256,
   SPOT_PAPER_PAIRED_SYNTHETIC_SOURCE_ID,
   SPOT_PAPER_PAIRED_INTEGRATION, SPOT_PAPER_RESEARCH_COMPARISON_ID
 } from "../scripts/spot-paper-paired/forward.mjs";
@@ -20,15 +22,19 @@ import { createSpotPaperPairedKrakenProvider } from
 const MINUTE = 60_000;
 const BASE = Date.UTC(2025, 0, 1);
 const PRICE = "30000.00000000";
+const researchExportsAvailable =
+  existsSync(new URL("../scripts/spot-paper-research/comparison.mjs", import.meta.url)) &&
+  existsSync(new URL("../scripts/spot-paper-research/entry-confirmation.mjs", import.meta.url)) &&
+  SPOT_PAPER_PAIRED_ACCEPTED_RESEARCH_SOURCE_SHA256 !== null;
 
 function row(timestamp, price = PRICE) {
   return [timestamp, price, price, price, price, price, "1.00000000", 1];
 }
 
-function ohlc(wall) {
+function ohlc(wall, candleCount = 22) {
   const endMinute = Math.floor(wall / MINUTE) * MINUTE;
-  const start = endMinute - 21 * MINUTE;
-  const candles = Array.from({ length: 22 }, (_, index) =>
+  const start = endMinute - (candleCount - 1) * MINUTE;
+  const candles = Array.from({ length: candleCount }, (_, index) =>
     row((start + index * MINUTE) / 1000));
   return { error: [], result: { XXBTZEUR: candles, last: candles.at(-1)[0] } };
 }
@@ -55,6 +61,7 @@ async function fixture(t, options = {}) {
   const providerCounts = { requests: 0, bytes: 0 };
   const order = [];
   let challengerApplyCount = 0;
+  let replayObservations = null;
   const provider = {
     sourceId: SPOT_PAPER_PAIRED_SYNTHETIC_SOURCE_ID,
     async fetchOhlc() {
@@ -63,7 +70,7 @@ async function fixture(t, options = {}) {
       const started = wall;
       const received = started + 5;
       wall = received;
-      const response = receipt(ohlc(wall), started, received);
+      const response = receipt(ohlc(wall, options.candleCount ?? 22), started, received);
       providerCounts.bytes += response.bytes;
       return response;
     },
@@ -73,8 +80,12 @@ async function fixture(t, options = {}) {
       tickerRequests++;
       const started = wall + (options.predatingTicker ? -1 : 1);
       const received = options.futureTicker ? started + 2_000 : started + 1;
-      const response = receipt(options.stopLossSecondCycle && tickerRequests === 2 ?
-        ticker("29000.00000000", "29001.00000000") : ticker(), started, received);
+      const tickerData = options.sessionLossOnSecondCycle ?
+        ticker(tickerRequests === 2 ? "29700.00000000" : "29000.00000000",
+          tickerRequests === 2 ? "29701.00000000" : "29001.00000000") :
+        options.stopLossSecondCycle && tickerRequests === 2 ?
+          ticker("29000.00000000", "29001.00000000") : ticker();
+      const response = receipt(tickerData, started, received);
       providerCounts.bytes += response.bytes;
       if (!options.futureTicker) {
         wall = received + (options.staleTickerAt === tickerRequests ? 11_000 : 0);
@@ -108,6 +119,11 @@ async function fixture(t, options = {}) {
   challengerArm.apply = args => {
     challengerApplyCount++;
     const result = applyChallenge(args);
+    if (options.sessionLossOnSecondCycle && args.cycle === 2) {
+      result.stopReason = "SESSION_LOSS_LIMIT";
+      result.state.stopped = true;
+      result.riskState.lossLimitReached = true;
+    }
     if (options.stopArm && args.cycle === 1) {
       result.stopReason = "SESSION_LOSS_LIMIT";
       result.state.stopped = true;
@@ -119,6 +135,7 @@ async function fixture(t, options = {}) {
   };
   const comparisonExports = {
     compareSpotPaperStrategies(observations) {
+      replayObservations = structuredClone(observations);
       return { schemaVersion: "SPOT_PAPER_SMA_COMPARISON_V1",
         status: "COMPARISON_AVAILABLE", observationCount: observations.length,
         ...(options.staleComparisonMark ? { arms: {
@@ -173,6 +190,7 @@ async function fixture(t, options = {}) {
   return { config, order, provider, get wall() { return wall; },
     get mono() { return mono; },
     get challengerApplyCount() { return challengerApplyCount; },
+    get replayObservations() { return replayObservations; },
     dataRoot };
 }
 
@@ -200,6 +218,9 @@ test("paired orchestration requests one shared ticker after all three decisions"
       "ohlc", "decide:baseline", "decide:challenger", "decide:cash", "ticker"
     ]);
   }
+  assert.ok(setup.replayObservations.every(observation =>
+    observation.decisionAt < observation.effectAt &&
+    observation.at === observation.effectAt));
 });
 
 test("missing research exports or comparison engine block integration before feed access", async t => {
@@ -259,14 +280,26 @@ test("shared request, byte, and monotonic deadline bounds apply to the whole run
   assert.equal(deadlineReport.requests, 1);
 });
 
-test("per-arm termination preserves account state and trading stops without stopping shared marks", async t => {
-  const setup = await fixture(t, { stopArm: true });
+test("per-arm loss termination preserves an open position and never trades again", async t => {
+  const setup = await fixture(t, {
+    sessionLossOnSecondCycle: true, enterOnCycleOne: true,
+    maxCycles: 3, maxRequests: 6
+  });
   const report = await runSpotPaperPairedSynthetic(setup.config);
   const challenger = report.arms.find(arm => arm.role === "challenger");
   assert.equal(challenger.tradingStatus, "STOPPED");
+  assert.equal(challenger.stopReason, "SESSION_LOSS_LIMIT");
+  assert.equal(challenger.stoppedAt, setup.replayObservations[1].effectAt);
   assert.equal(setup.challengerApplyCount, 2);
-  assert.equal(report.cycles, 2);
+  assert.equal(challenger.fills.length, 1);
+  assert.equal(challenger.valuation.openPositions.length, 1);
+  assert.equal(challenger.valuation.netEquityCents, null);
+  assert.equal(challenger.decisions[2].skippedReason, "ARM_STOPPED");
+  assert.equal(challenger.riskStates[2].stopReason, "SESSION_LOSS_LIMIT");
+  assert.equal(report.cycles, 3);
   assert.equal(report.commonHorizon.available, true);
+  assert.equal(report.comparison.status, "UNAVAILABLE");
+  assert.equal(report.comparison.reason, "STOPPED_ARM_MARK_NOT_AT_SHARED_HORIZON");
 });
 
 test("candidate quote-triggered stop fills remain causal after strategy annotation", async t => {
@@ -412,3 +445,65 @@ test("research source pin hashes the exact sorted paths and file bytes", () => {
   ]));
   assert.equal(actual, expected);
 });
+
+test("actual #1299 exports preserve decision/effect time and accept long provider snapshots",
+  { skip: !researchExportsAvailable }, async t => {
+    const [comparison, confirmation] = await Promise.all([
+      import("../scripts/spot-paper-research/comparison.mjs"),
+      import("../scripts/spot-paper-research/entry-confirmation.mjs")
+    ]);
+    const [comparisonBytes, entryConfirmationBytes] = await Promise.all([
+      readFile(new URL("../scripts/spot-paper-research/comparison.mjs", import.meta.url)),
+      readFile(new URL("../scripts/spot-paper-research/entry-confirmation.mjs", import.meta.url))
+    ]);
+    assert.equal(pairedResearchSourceDigest({ comparisonBytes, entryConfirmationBytes }),
+      SPOT_PAPER_PAIRED_ACCEPTED_RESEARCH_SOURCE_SHA256);
+    const decisionAt = BASE + 32 * MINUTE;
+    const effectAt = decisionAt + 2;
+    const candles = Array.from({ length: 21 }, (_, index) => ({
+      timestamp: BASE + index * MINUTE, closeNano: "30000000000000"
+    }));
+    const seeded = confirmation.advanceEntryConfirmation(
+      confirmation.createEntryConfirmationState(), candles, {
+        nowMs: decisionAt, held: false
+      }).state;
+    seeded.pending = {
+      crossCandleAt: candles.at(-2).timestamp,
+      lastConfirmedAt: candles.at(-1).timestamp,
+      crossSignalId: "seeded-cross"
+    };
+    seeded.cooldownUntil = decisionAt + 1;
+    const nextCandles = [...candles, {
+      timestamp: candles.at(-1).timestamp + MINUTE,
+      closeNano: "30000000000000"
+    }];
+    const beforeExpiry = confirmation.advanceEntryConfirmation(seeded, nextCandles, {
+      nowMs: decisionAt, held: false
+    });
+    const afterExpiry = confirmation.advanceEntryConfirmation(seeded, nextCandles, {
+      nowMs: effectAt, held: false
+    });
+    assert.equal(beforeExpiry.signals.length, 0);
+    assert.equal(afterExpiry.signals.at(-1)?.direction, "ENTRY");
+
+    const setup = await fixture(t, { candleCount: 32, maxCycles: 1, maxRequests: 2 });
+    setup.config.arms[1] = createChallengerArm(confirmation, "challenger-eur");
+    setup.config.challengerExports = confirmation;
+    setup.config.comparisonExports = comparison;
+    setup.config.comparisonEngine = {
+      id: SPOT_PAPER_RESEARCH_COMPARISON_ID,
+      compare: comparison.compareSpotPaperStrategies
+    };
+    setup.config.configSha256 = pairedConfigDigest(setup.config);
+    const report = await runSpotPaperPairedSynthetic(setup.config);
+    const journal = await readRunJournal({
+      dataRoot: setup.dataRoot, runId: setup.config.runId
+    });
+    const observation = journal.events.find(event => event.type === "shared_observation");
+    assert.ok(observation.decisionAt < observation.effectAt);
+    assert.equal(report.comparison.status, "COMPARISON_AVAILABLE");
+    const challenger = report.arms.find(arm => arm.role === "challenger");
+    const replay = report.comparison.arms.challenger;
+    assert.deepEqual(challenger.fills, replay.fills);
+    assert.equal(challenger.valuation.netEquityCents, replay.finalNetEquityCents);
+  });

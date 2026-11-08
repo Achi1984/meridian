@@ -239,6 +239,14 @@ export function createBaselineArm(accountId = "baseline") {
       };
     },
     apply({ state, decision, quote, at, stopped }) {
+      if (stopped || state.stopped) {
+        return {
+          state: clone(state), fills: [], stopReason: state.stopReason ?? null,
+          stoppedAt: state.stoppedAt ?? null,
+          riskState: { stopped: true, reason: state.stopReason ?? null,
+            stoppedAt: state.stoppedAt ?? null }
+        };
+      }
       const result = applyPaperObservation(state.ledger, {
         signal: decision, quote, nowMs: at, stopped: stopped || state.stopped
       });
@@ -247,6 +255,7 @@ export function createBaselineArm(accountId = "baseline") {
           stopped: state.stopped || Boolean(result.stopReason) },
         fills: result.fills,
         stopReason: result.stopReason,
+        stoppedAt: result.stopReason ? at : null,
         riskState: { lossLimitReached: result.lossLimitReached }
       };
     },
@@ -286,6 +295,14 @@ export function createChallengerArm(researchExports, accountId = "challenger") {
       };
     },
     apply({ state, decision, quote, at, stopped }) {
+      if (stopped || state.stopped) {
+        return {
+          state: clone(state), fills: [], stopReason: state.stopReason ?? null,
+          stoppedAt: state.stoppedAt ?? null,
+          riskState: { stopped: true, reason: state.stopReason ?? null,
+            stoppedAt: state.stoppedAt ?? null }
+        };
+      }
       const result = applyPaperObservation(state.ledger, {
         signal: decision, quote, nowMs: at, stopped: stopped || state.stopped
       });
@@ -310,6 +327,7 @@ export function createChallengerArm(researchExports, accountId = "challenger") {
           stopped: state.stopped || Boolean(result.stopReason) },
         fills: candidateFills,
         stopReason: result.stopReason,
+        stoppedAt: result.stopReason ? at : null,
         riskState: { lossLimitReached: result.lossLimitReached }
       };
     },
@@ -487,6 +505,45 @@ function comparisonHasStaleOpenMark(comparison, lastQuote) {
   });
 }
 
+function comparisonMatchesForward(comparison, arms, states, fills, summaries, terminalAt) {
+  if (comparison?.status !== "COMPARISON_AVAILABLE" || !isRecord(comparison.arms)) {
+    return false;
+  }
+  const fillIdentity = fill => ({
+    id: fill.id, side: fill.side, quantitySat: fill.quantitySat,
+    priceNano: fill.priceNano, grossCents: fill.grossCents,
+    feeCents: fill.feeCents, ledgerReason: fill.ledgerReason ?? fill.reason,
+    signalAt: fill.signalAt, quoteReceivedAt: fill.quoteReceivedAt,
+    executionAt: fill.executionAt
+  });
+  return arms.every((arm, index) => {
+    const replay = comparison.arms[arm.role];
+    const state = states[index];
+    const ledger = state.ledger ?? { cashCents: state.cashCents, feesCents: 0 };
+    const summary = summaries[index];
+    const replayFills = replay?.fills;
+    const position = state.ledger?.position ?? null;
+    const replayInventory = replay?.unresolvedTerminalInventory ?? null;
+    const terminalMatches = replay?.terminalAt ===
+      (state.stopped ? state.stoppedAt : terminalAt);
+    return isRecord(replay) && Array.isArray(replayFills) &&
+      replay.initialCashCents === SPOT_PAPER_PAIRED.initialCashCents &&
+      replay.finalCashCents === ledger.cashCents &&
+      replay.finalNetEquityCents === summary.netEquityCents &&
+      replay.feesCents === summary.feesCents &&
+      replay.grossTurnoverCents === summary.turnoverCents &&
+      replay.stopped === Boolean(state.stopped) &&
+      (replay.stopReason ?? null) === (state.stopReason ?? null) &&
+      terminalMatches &&
+      replayFills.length === fills[index].length &&
+      replayFills.every((fill, fillIndex) =>
+        same(fillIdentity(fill), fillIdentity(fills[index][fillIndex]))) &&
+      Boolean(replayInventory) === Boolean(position) &&
+      (!position || (replayInventory.quantitySat === position.quantitySat &&
+        replayInventory.entrySignalId === position.entrySignalId));
+  });
+}
+
 async function runPairedForward(input, testOnly) {
   const config = validateConfig({ ...input });
   assert(config.testOnly === testOnly, "RUN_MODE_MISMATCH");
@@ -635,6 +692,14 @@ async function runPairedForward(input, testOnly) {
           "DECISION_PRECEDES_OBSERVATION");
         cycleDecisions = config.arms.map((arm, index) => {
           const before = clone(states[index]);
+          if (before.stopped) {
+            return {
+              state: before, decision: null, decidedAt: decisionAt,
+              skippedReason: "ARM_STOPPED",
+              metadata: { stoppedAt: before.stoppedAt ?? null,
+                stopReason: before.stopReason ?? null }
+            };
+          }
           const result = arm.decide({
             state: clone(before), candles: clone(parsedOhlc.candles),
             observedAt: parsedOhlc.latestClosedAt, at: decisionAt, cycle
@@ -686,6 +751,15 @@ async function runPairedForward(input, testOnly) {
         const effects = config.arms.map((arm, index) => {
           const before = clone(states[index]);
           const decision = cycleDecisions[index];
+          if (before.stopped) {
+            return {
+              state: before, fills: [], stopReason: before.stopReason ?? null,
+              stoppedAt: before.stoppedAt ?? null, skipped: true,
+              riskState: { stopped: true, reason: before.stopReason ?? null,
+                stopReason: before.stopReason ?? null,
+                stoppedAt: before.stoppedAt ?? null }
+            };
+          }
           const result = arm.apply({
             state: clone(decision.state ?? before), decision: clone(decision.decision),
             quote: clone(effectQuote), at: effectAt, stopped: Boolean(before.stopped), cycle
@@ -705,13 +779,17 @@ async function runPairedForward(input, testOnly) {
             } else {
               assert(fill.signalAt <= quote.requestStartedAt, "NON_CAUSAL_FILL");
             }
-            if (before.stopped) assert(fill.side !== "BUY", "ENTRY_AFTER_ARM_STOP");
           }
           return result;
         });
         const nextStates = effects.map((effect, index) => {
           const state = clone(effect.state);
-          if (states[index].stopped || effect.stopReason) state.stopped = true;
+          if (states[index].stopped || effect.stopReason) {
+            state.stopped = true;
+            state.stopReason ??= states[index].stopReason ?? effect.stopReason;
+            state.stoppedAt ??= states[index].stoppedAt ??
+              effect.stoppedAt ?? effectAt;
+          }
           return state;
         });
         const nextSummaries = config.arms.map((arm, index) => ({ ...arm.summarize({
@@ -745,18 +823,23 @@ async function runPairedForward(input, testOnly) {
           ticker: null,
           decisions: cycleDecisions.map((decision, index) => ({
             role: config.arms[index].role, decidedAt: decision.decidedAt,
-            decision: decision.decision, metadata: decision.metadata ?? null
+            decision: decision.decision, skippedReason: decision.skippedReason ?? null,
+            metadata: decision.metadata ?? null
           })),
           fills: effects.map((effect, index) => ({
             role: config.arms[index].role, fills: effect.fills
           })),
           riskStates: effects.map((effect, index) => ({
             role: config.arms[index].role, state: effect.riskState,
-            stopReason: effect.stopReason ?? null
+            stopReason: nextStates[index].stopReason ?? effect.stopReason ?? null,
+            stoppedAt: nextStates[index].stoppedAt ?? null,
+            skipped: Boolean(effect.skipped)
           })),
           valuations: nextSummaries.map((summary, index) => ({
             role: config.arms[index].role, ...summary
           })),
+          decisionAt: Math.max(...cycleDecisions.map(item => item.decidedAt)),
+          effectAt,
           observedAt: effectAt
         };
         observation.ticker = { ...storedTicker, acquisitionAgeMs: quote.ageMs };
@@ -766,12 +849,21 @@ async function runPairedForward(input, testOnly) {
         states.splice(0, states.length, ...nextStates);
         cycleDecisions.forEach((decision, index) => decisions[index].push(decision));
         effects.forEach((effect, index) => {
-          fills[index].push(...effect.fills);
-          riskStates[index].push(effect.riskState);
+          fills[index].push(...effect.fills.map(fill => ({ ...fill, executionAt: effectAt })));
+          riskStates[index].push({
+            ...effect.riskState,
+            ...(nextStates[index].stopped ? {
+              stopReason: nextStates[index].stopReason,
+              stoppedAt: nextStates[index].stoppedAt
+            } : {})
+          });
           valuationStates[index].push(nextSummaries[index]);
         });
         observations.push(observation);
-        replayObservations.push({ at: effectAt, ohlc: ohlcResponse, ticker: tickerResponse });
+        replayObservations.push({
+          at: effectAt, decisionAt: Math.max(...cycleDecisions.map(item => item.decidedAt)),
+          effectAt, ohlc: ohlcResponse, ticker: tickerResponse
+        });
         lastQuote = quote;
         previousObservationAt = tickerResponse.receivedAt;
         previousCycleEnd = config.monotonicNow();
@@ -793,7 +885,8 @@ async function runPairedForward(input, testOnly) {
           responses: { ohlc: storedOhlc, ticker: storedTicker },
           decisions: cycleDecisions.map((decision, index) => ({
             role: config.arms[index].role, decidedAt: decision.decidedAt,
-            decision: decision.decision, metadata: decision.metadata ?? null
+            decision: decision.decision, skippedReason: decision.skippedReason ?? null,
+            metadata: decision.metadata ?? null
           }))
         }, { states, counters, cycle, stopReason }, {
           deadlineAt: config.monotonicNow() + 5_000,
@@ -813,9 +906,10 @@ async function runPairedForward(input, testOnly) {
     const commonHorizonAvailable = Boolean(lastQuote &&
       endedAt >= lastQuote.receivedAt &&
       endedAt - lastQuote.receivedAt <= SPOT_PAPER_PAIRED.maxQuoteAgeMs);
+    const sharedHorizonAt = replayObservations.at(-1)?.effectAt ?? null;
     const summaries = config.arms.map((arm, index) => ({ ...arm.summarize({
       state: states[index], quote: lastQuote, valuationAvailable: commonHorizonAvailable,
-      terminalAt: endedAt
+      terminalAt: sharedHorizonAt ?? endedAt
     }), slippageCents: slippageTotals[index],
       sampledDrawdownCents: maxDrawdown[index] }));
     summaries.forEach(summary => {
@@ -846,6 +940,21 @@ async function runPairedForward(input, testOnly) {
         status: "UNAVAILABLE", reason: "STOPPED_ARM_MARK_NOT_AT_SHARED_HORIZON"
       };
     }
+    if (summaries.some((summary, index) => states[index].stopped &&
+        summary.openPositions.length > 0 && summary.netEquityCents === null)) {
+      comparison = {
+        schemaVersion: "SPOT_PAPER_SMA_COMPARISON_V1",
+        status: "UNAVAILABLE", reason: "STOPPED_ARM_MARK_NOT_AT_SHARED_HORIZON"
+      };
+    }
+    if (comparison.status === "COMPARISON_AVAILABLE" &&
+        !comparisonMatchesForward(comparison, config.arms, states, fills, summaries,
+          replayObservations.at(-1)?.effectAt ?? null)) {
+      comparison = {
+        schemaVersion: "SPOT_PAPER_SMA_COMPARISON_V1",
+        status: "UNAVAILABLE", reason: "REPLAY_FORWARD_ACCOUNT_MISMATCH"
+      };
+    }
     validateJson(comparison, "INVALID_COMPARISON_RESULT");
     const report = {
       schemaVersion: "SPOT_PAPER_PAIRED_REPORT_V1",
@@ -866,11 +975,13 @@ async function runPairedForward(input, testOnly) {
         "CONFIGURED_DURATION_REACHED" : "PARTIAL",
       cycles: cycle, requests: counters.requests, deliveredBytes: counters.bytes,
       commonHorizon: { available: commonHorizonAvailable,
-        quoteReceivedAt: lastQuote?.receivedAt ?? null },
+        quoteReceivedAt: lastQuote?.receivedAt ?? null, effectAt: sharedHorizonAt },
       assumptions: manifest.assumptions,
       arms: config.arms.map((arm, index) => ({
         role: arm.role, modelId: arm.modelId, accountId: arm.accountId,
         tradingStatus: states[index].stopped ? "STOPPED" : "ACTIVE",
+        stopReason: states[index].stopReason ?? null,
+        stoppedAt: states[index].stoppedAt ?? null,
         decisions: decisions[index], fills: fills[index],
         riskStates: riskStates[index], valuation: summaries[index]
       })),

@@ -97,14 +97,34 @@ Only the lead-reviewed digest from the accepted commit may replace the current
 For every accepted observation the journal records one causally ordered shared
 OHLC/ticker pair and separate arm decisions, fills, risk states and valuations.
 An arm-specific stop latches trading off for that arm but continues preserving
-its account state and processing shared marks. It does not fabricate a
-liquidation. A common-horizon value is available only when the last shared quote
-is still fresh at terminal reporting; otherwise remaining marked equity and the
-comparison result are unknown, not compared against a stale mark. Reports carry costs, net/marked
+its account state without invoking later decision or effect callbacks. The original
+stop reason and effect timestamp remain attached to that account; later quotes
+cannot trigger a sell or other fill. There is no separate mark-only API in the
+reused ledger, so a stopped open position is not advanced to later marks. It does
+not fabricate a liquidation. A common-horizon value is available only when that
+position has a valid mark at the shared horizon; otherwise remaining marked
+equity and the comparison result are unknown, not compared against a stale mark.
+Terminal summaries and the replay use the final shared observation's `effectAt`
+as their stated horizon; the report separately records whether that quote was
+still fresh when terminal persistence began.
+Reports carry costs, net/marked
 equity, sampled drawdown from starting capital, exposure, turnover, open
 positions, unresolved observations, and the shared-horizon status. The cash
 control is not evidence of alpha; fewer challenger trades alone do not show
 improvement.
+
+Each persisted shared observation and replay input now carries distinct
+`decisionAt` and `effectAt` timestamps; the legacy replay `at` remains the
+effect-time alias for source compatibility. Decisions are made before the ticker
+request, while fills and risk effects occur only after its causal quote. The
+currently inspected #1299 draft comparison consumes `observation.at` for both
+decision and effect processing, so it does not yet honor this distinction. The
+adapter keeps the accepted research-source pin `null`; it must not be bound until
+the accepted engine supports the explicit timestamp contract and the actual-export
+cooldown/parity test passes. An available replay is also reconciled against the
+forward fills, costs, account balances/equity, stop state, and remaining inventory;
+any mismatch makes the comparison unavailable rather than publishing an unrelated
+replay as the executed ledger.
 
 Any invalid/stale/future/pre-decision quote or shared-feed error stops the
 paired run. Ambiguous journal writes are terminal unknown and must not be
@@ -138,6 +158,15 @@ node --test test/spot-paper-paired-forward.test.js
 The tests inject an in-memory provider and synthetic account/comparison
 callbacks. They make no network or order calls and establish only feed/lifecycle
 contract behavior. They do not prove #1299 integration or launch readiness.
+An actual-export integration test is enabled only when both #1299 source files
+are present and their digest is explicitly pinned. It checks the cooldown
+decision/effect boundary, runs the actual comparison on a provider-shaped
+snapshot longer than 21 candles, and requires the replay to reconcile with the
+forward ledger. The test is skipped in this checkout because those sources are
+absent and the accepted source pin is null. The inspected draft currently
+rejects such a snapshot and reads one timestamp for both decision and effect;
+full multi-cycle cooldown decision/fill/equity parity remains blocked on the
+accepted #1299 engine supporting both timestamps.
 
 ## Lead review identity and future host work
 
@@ -161,12 +190,18 @@ That stopped run and its existing evidence remain untouched; its captured
 snapshot is development evidence, not untouched validation.
 
 The remaining minimal work is to bind the accepted #1299 export API in a
-disabled composition entrypoint confined to `scripts/spot-paper-paired/`,
-review that exact source/config/image identity, and independently approve any
-future host and egress arrangement. No deployment change is part of this
-adapter. For a future approved run, retain the entire new evidence tree and use
-a separately reviewed, read-only status/report, byte-preserving packaging,
-authenticated retrieval, hash verification, and offline assessment sequence.
+disabled composition entrypoint confined to `scripts/spot-paper-paired/`; map
+SIGTERM to an `AbortSignal` and allow the bounded journal shutdown; define the
+host-specific read-only status/report and byte-preserving retrieval commands;
+then review the exact source/config/image/evidence identity and independently
+approve any future host and egress arrangement. No deployment change or launch
+command is part of this adapter. The exact focused validation command is
+`node --test test/spot-paper-paired-forward.test.js`; the exact future host
+command cannot be fixed until the host composition and retrieval mechanism are
+selected and reviewed. For a future approved run, retain the entire new evidence
+tree and use a separately reviewed, read-only status/report, byte-preserving
+packaging, authenticated retrieval, hash verification, and offline assessment
+sequence.
 The existing
 [BTC/EUR post-run retrieval runbook](../operations/BTC_EUR_8H_POSTRUN_20261108.md)
 describes that sequence for the old run identity only; it is not approval or
