@@ -182,28 +182,36 @@ function replayNormalized(identity, observations) {
   return state;
 }
 
+function validateJournalLength(observations, { requireCapacity = false } = {}) {
+  if (!Array.isArray(observations)) throw new Error("INVALID_OBSERVATION_JOURNAL");
+  if (observations.length > POLICY.maxJournalObservations ||
+      (requireCapacity && observations.length >= POLICY.maxJournalObservations)) {
+    throw new Error("OBSERVATION_JOURNAL_LIMIT_REACHED");
+  }
+}
+
 export function createChallengeState(identity) {
   return freezeDeep(initialState(validateIdentity(identity)));
 }
 
 export function replayChallengeState({ campaignId, currency, policyVersion, observations } = {}) {
   const identity = validateIdentity({ campaignId, currency, policyVersion });
-  if (!Array.isArray(observations)) throw new Error("INVALID_OBSERVATION_JOURNAL");
+  validateJournalLength(observations);
   return freezeDeep(replayNormalized(identity, observations));
 }
 
-function validateState(state) {
+function validateState(state, { requireCapacity = false } = {}) {
   assertRecord(state, STATE_KEYS, "STATE");
   if (state.schemaVersion !== STATE_SCHEMA) throw new Error("INVALID_STATE");
   const identity = validateIdentity(state);
-  if (!Array.isArray(state.observations)) throw new Error("INVALID_STATE");
+  validateJournalLength(state.observations, { requireCapacity });
   const replayed = replayNormalized(identity, state.observations);
   if (stableJson(replayed) !== stableJson(state)) throw new Error("STATE_REPLAY_MISMATCH");
   return replayed;
 }
 
 export function advanceChallengeState(previousState, inputObservation) {
-  const previous = validateState(previousState);
+  const previous = validateState(previousState, { requireCapacity: true });
   const observation = normalizeObservation(inputObservation, previous);
   return freezeDeep(advanceValidated(previous, observation));
 }
@@ -217,6 +225,9 @@ export function getExposureGate(state, nowMs) {
   }
   if (!Number.isSafeInteger(nowMs) || nowMs < 0) {
     return { allowed: false, reason: "INVALID_CLOCK" };
+  }
+  if (validated.lastObservationAtMs !== null && nowMs < validated.lastObservationAtMs) {
+    return { allowed: false, reason: "CLOCK_BEFORE_LAST_OBSERVATION" };
   }
   if (validated.paused) return { allowed: false, reason: "DRAWDOWN_PAUSED" };
   const latest = validated.observations.at(-1);

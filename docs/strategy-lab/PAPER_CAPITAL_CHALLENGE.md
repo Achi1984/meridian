@@ -39,6 +39,8 @@ Missing, stale, future-dated, unsafe, or currency-mismatched valuations fail
 closed and cannot update the peak.
 Valuations must be no older than the policy's 10-second maximum age; that bound
 is an admission constraint, not evidence that any future feed meets it.
+The exposure gate also rejects a supplied current time earlier than the latest
+observation time; this check applies even though execution remains disabled.
 
 `netEquityCents`, `cashCents`, inventory value, accrued fees, and modeled exit
 costs are all denominated in USD cents. `netEquityCents` must equal:
@@ -72,14 +74,22 @@ fail closed rather than invent a quote, mark, or fill.
 
 The state is derived by replaying the complete ordered observation ledger;
 snapshots with caller-supplied high-water or pause fields are not accepted as
-resume input. Persisting and recovering that ledger durably is not implemented
-here. The replay guard cannot prevent an operator from deliberately starting
-a new empty state; durable campaign identity, append-only journal wiring, and
-restart admission are required before any operational use. The pause is based
-on sampled observations, not a guaranteed maximum-loss bound: gaps, adverse
-price moves, fees, and liquidation costs can produce larger losses before the
-next accepted valuation. Such overshoots must remain visible and must not be
-reset or hidden.
+resume input. This offline implementation accepts at most 256 observations per
+replayable journal. Replay input longer than 256 is rejected before replay;
+attempting to advance a state already containing 256 observations is rejected
+before state replay or append. No history is truncated and no high-water mark
+or pause may be reset to work around this bound. At the limit, processing must
+stop and remain fail-closed. A future, separately reviewed durable journal
+must preserve the complete history and carry forward verified campaign
+identity, high-water mark, and pause before any safe continuation can be
+designed; that continuation is not implemented here. Persisting and recovering
+the ledger durably is not implemented here. The replay guard cannot prevent an
+operator from deliberately starting a new empty state; durable campaign
+identity, append-only journal wiring, and restart admission are required before
+any operational use. The pause is based on sampled observations, not a
+guaranteed maximum-loss bound: gaps, adverse price moves, fees, and liquidation
+costs can produce larger losses before the next accepted valuation. Such
+overshoots must remain visible and must not be reset or hidden.
 
 ## Offline optimization protocol
 

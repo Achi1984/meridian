@@ -137,6 +137,18 @@ test("missing and stale valuations fail closed and cannot advance the high-water
     "STALE_OR_MISSING_VALUATION");
 });
 
+test("exposure gate rejects a clock earlier than the observation even while disabled", () => {
+  const state = advanceChallengeState(createChallengeState(IDENTITY),
+    observation("future-observation", 100_000, BASE + 2_000, {
+      asOfMs: BASE + 1_000,
+      bidQuoteAtMs: BASE + 1_000,
+      maxAgeMs: 10_000
+    }));
+  assert.equal(getExposureGate(state, BASE + 1_500).reason,
+    "CLOCK_BEFORE_LAST_OBSERVATION");
+  assert.equal(getExposureGate(state, BASE + 2_000).reason, "POLICY_DISABLED");
+});
+
 test("restart replay preserves the peak and pause across strategy versions", () => {
   let state = createChallengeState(IDENTITY);
   state = advance(state, "initial", 100_000, 1_000);
@@ -198,4 +210,27 @@ test("EUR, unsafe numbers, inconsistent equity, and forged resume snapshots are 
   assert.equal(getExposureGate(changedSnapshot, BASE + 1_000).reason, "INVALID_STATE");
   assert.throws(() => advanceChallengeState(changedSnapshot,
     observation("resume", 100_000, BASE + 1_000)), /STATE_REPLAY_MISMATCH/);
+});
+
+test("journal bound is enforced before replay and never truncates history", () => {
+  const observations = Array.from({ length: POLICY.maxJournalObservations }, (_, index) =>
+    observation(`bounded-${index}`, 100_000, BASE + (index + 1) * 1_000));
+  const state = replayChallengeState({
+    ...IDENTITY, policyVersion: POLICY.version, observations
+  });
+  assert.equal(state.observations.length, POLICY.maxJournalObservations);
+  assert.equal(state.highWaterEquityCents, POLICY.initialCapitalCents);
+  assert.equal(state.paused, false);
+
+  assert.throws(() => replayChallengeState({
+    ...IDENTITY,
+    policyVersion: POLICY.version,
+    observations: [...observations, null]
+  }), /OBSERVATION_JOURNAL_LIMIT_REACHED/);
+
+  const forgedAtLimit = { ...state, highWaterEquityCents: 90_000 };
+  assert.throws(() => advanceChallengeState(forgedAtLimit, null),
+    /OBSERVATION_JOURNAL_LIMIT_REACHED/);
+  assert.equal(state.observations.length, POLICY.maxJournalObservations);
+  assert.equal(state.highWaterEquityCents, POLICY.initialCapitalCents);
 });
