@@ -73,7 +73,7 @@ async function boundedIo(operation, context, cleanupLateResult) {
       startCleanup(context, () => cleanupLateResult(value));
     }
   };
-  task.then(cleanupLate, () => cleanupLate(undefined));
+  task.then(cleanupLate, () => {});
   const timeout = new Promise((_, reject) => {
     const remaining = Math.max(0, context.deadlineAt - context.monotonicNow());
     const timer = setTimeout(() => {
@@ -404,7 +404,6 @@ async function assertExternalInputPath(evidenceDir, inputPath, label, context, i
 async function publishOutput(outputPath, outputBytes, context, io) {
   const temporaryPath = join(dirname(outputPath), `.${basename(outputPath)}.${randomUUID()}.tmp`);
   let published = false;
-  let linkStarted = false;
   const remove = path => (io.unlink ?? unlink)(path).catch(error => {
     if (error.code !== "ENOENT") throw error;
   });
@@ -412,17 +411,14 @@ async function publishOutput(outputPath, outputBytes, context, io) {
     await boundedIo(
       () => (io.writeFile ?? writeFile)(temporaryPath, outputBytes, { flag: "wx" }),
       context, () => remove(temporaryPath));
-    await boundedIo(() => {
-      linkStarted = true;
-      return (io.link ?? link)(temporaryPath, outputPath);
-    },
+    await boundedIo(() => (io.link ?? link)(temporaryPath, outputPath),
       context, () => remove(outputPath));
     published = true;
     await boundedIo(() => remove(temporaryPath), context);
     assertActive(context);
   } catch (error) {
     startCleanup(context, () => remove(temporaryPath));
-    if (published || linkStarted) {
+    if (published) {
       startCleanup(context, () => remove(outputPath));
     }
     throw error;

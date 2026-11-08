@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  mkdir, mkdtemp, open as openFile, readFile, realpath as realpathFile, rm, writeFile
+  mkdir, mkdtemp, open as openFile, readFile, readdir, realpath as realpathFile, rm, writeFile
 } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -700,20 +700,30 @@ test("host assessment CLI bounds delayed open, stat, read, close, realpath, and 
   const delayed = (operation, delayMs) => new Promise((resolve, reject) => {
     setTimeout(() => Promise.resolve().then(operation).then(resolve, reject), delayMs);
   });
+  const openState = {};
   const cases = [
     {
       name: "open",
-      timeoutMs: 40,
-      delayMs: 180,
+      timeoutMs: 200,
+      delayMs: 400,
       io: {
-        open: async (path, ...args) => path === evidence.contextPath ?
-          delayed(async () => openFile(path, ...args), 180) : openFile(path, ...args)
+        open: async (path, ...args) => {
+          openState.openCalls = (openState.openCalls ?? 0) + 1;
+          const handle = await delayed(async () => openFile(path, ...args), 400);
+          openState.lateHandleReturned = true;
+          const close = handle.close.bind(handle);
+          handle.close = () => {
+            openState.lateHandleClosed = true;
+            return close();
+          };
+          return handle;
+        }
       }
     },
     {
       name: "stat",
-      timeoutMs: 40,
-      delayMs: 180,
+      timeoutMs: 100,
+      delayMs: 400,
       io: {
         open: async (path, ...args) => {
           const handle = await openFile(path, ...args);
@@ -728,8 +738,8 @@ test("host assessment CLI bounds delayed open, stat, read, close, realpath, and 
     },
     {
       name: "read",
-      timeoutMs: 40,
-      delayMs: 180,
+      timeoutMs: 100,
+      delayMs: 400,
       io: {
         open: async (path, ...args) => {
           const handle = await openFile(path, ...args);
@@ -743,8 +753,8 @@ test("host assessment CLI bounds delayed open, stat, read, close, realpath, and 
     },
     {
       name: "close",
-      timeoutMs: 40,
-      delayMs: 180,
+      timeoutMs: 100,
+      delayMs: 400,
       io: {
         open: async (path, ...args) => {
           const handle = await openFile(path, ...args);
@@ -758,8 +768,8 @@ test("host assessment CLI bounds delayed open, stat, read, close, realpath, and 
     },
     {
       name: "realpath",
-      timeoutMs: 40,
-      delayMs: 180,
+      timeoutMs: 100,
+      delayMs: 400,
       io: { realpath: path => delayed(() => realpathFile(path), 180) }
     },
     {
@@ -788,7 +798,30 @@ test("host assessment CLI bounds delayed open, stat, read, close, realpath, and 
     assert.deepEqual(output, [], scenario.name);
     await new Promise(resolve => setTimeout(resolve, scenario.delayMs + 30));
     await assert.rejects(readFile(outputPath), { code: "ENOENT" }, scenario.name);
+    if (scenario.name === "open") {
+      assert.deepEqual({
+        openCalls: openState.openCalls,
+        lateHandleReturned: openState.lateHandleReturned,
+        lateHandleClosed: openState.lateHandleClosed
+      }, { openCalls: 1, lateHandleReturned: true, lateHandleClosed: true });
+    }
+    if (scenario.name === "write") {
+      const leftovers = (await readdir(evidence.root))
+        .filter(name => name.startsWith(".delayed-write.json.") && name.endsWith(".tmp"));
+      assert.deepEqual(leftovers, []);
+    }
   }
+});
+
+test("host assessment output publication preserves pre-existing output on collision", async t => {
+  const evidence = await hostAssessmentFixture(t);
+  await writeFile(evidence.contextPath, JSON.stringify(evidence.expectedHostContext));
+  const output = Buffer.from("preserve existing output");
+  await writeFile(evidence.assessmentPath, output);
+  await assert.rejects(hostEvidenceAssessmentMain([
+    evidence.evidenceDir, evidence.contextPath, evidence.assessmentPath
+  ], { stdout: { write() {} } }), { code: "EEXIST" });
+  assert.deepEqual(await readFile(evidence.assessmentPath), output);
 });
 
 test("host assessment rejects interruptions, failed children, pending journals, and old-profile mixes", async t => {
