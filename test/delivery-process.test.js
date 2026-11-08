@@ -11,7 +11,13 @@ test('release safety has one PR trigger, main-only pushes, and cancellation isol
   assert.match(triggers,/format\('pr-\{0\}', github\.event\.pull_request\.number\)/);
   assert.match(triggers,/format\('run-\{0\}', github\.run_id\)/);
   assert.match(triggers,/cancel-in-progress: \$\{\{ github\.event_name == 'pull_request' \}\}/);
-  assert.match(workflow,/run: node --test test\/\*\.test\.js/);
+  const regressionStep=workflow.split('      - name: Research and auth regression tests\n')[1]?.split('      - name: ')[0];
+  assert.ok(regressionStep,'the regression hard gate remains present');
+  assert.match(regressionStep,/shell: bash\n\s+run: \|/);
+  assert.match(regressionStep,/for test_file in test\/\*\.test\.js; do/);
+  assert.match(regressionStep,/node --test "\$\{other_tests\[@\]\}"\n\s+node --test test\/research-supervisor\.test\.js/);
+  // release-safety-test-partition.test.js executes this block and verifies
+  // exact discovery coverage, no duplicate execution and failure propagation.
   for(const gate of ['Frozen research lineage','Meridian continuity audit','Public privacy regression','High-confidence secret scan','Assert paper-only invariant'])assert.ok(workflow.includes(gate));
 });
 
