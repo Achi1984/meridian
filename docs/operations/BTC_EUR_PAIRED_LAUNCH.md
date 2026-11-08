@@ -48,25 +48,29 @@ results are recorded below.
 
 | Build identity | Recorded value |
 | --- | --- |
+| Reviewed source commit and image revision label | `43a1a6eff84a26d711dcc76e9e59653420b0d293` |
 | Dockerfile SHA-256 | `e92f25066d313a51b95072cfbdb88811ada781bd787587be54753ffc25fee22b` |
 | Resolved base image | `node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293` |
-| Local image ID | `sha256:f50c5d63e248adc37209eae980239a063a617565f462dc70dc442788c77fe590` |
-| Local tag | `meridian-spot-paper-paired:5f25f771` |
+| Accepted #1299 research-source SHA-256 | `4c60b1ccccbd495d93006a6838593423c27caac8104a0239fa23fd97a716f82d` |
+| Local image ID | `sha256:fb9325c17c84a05cfb5e09a7d70bbfe0e25e14882a8a1a53afd4ee2f390590e7` |
+| Local tag | `meridian-spot-paper-paired:43a1a6eff84a` |
 | Registry digest | Not available; image was not pushed |
 
-The initial candidate build smoke checks passed:
+The merged-source local build and smoke checks passed:
 
-- `docker run --rm --network none meridian-spot-paper-paired:5f25f771`
-  returned `DISABLED`; no feed access was possible.
+- The exact-tag default command ran with `--network none` and returned
+  `DISABLED` / `NO_RUN_REQUESTED`; no feed acquisition was invoked.
 - Direct imports of all nine packaged host, paired, baseline, provider,
-  packaging, and #1299 research modules succeeded with networking disabled;
-  provider counters remained unused.
-- A bind-mounted file write succeeded as UID 1000 (`node`).
-- Docker SIGTERM reached Node's paired host signal helper; its AbortSignal
-  handler wrote `SIGTERM` to the writable mount and the process exited within
-  the 10-second Docker stop grace.
-- The exact #1301 paired-forward and paired-host test files passed 22/22,
-  including the 480-cycle integration against actual #1299 exports.
+  packaging, and #1299 research modules succeeded with networking disabled.
+- A temporary bind mount accepted a file written as UID 1000 (`node`); the
+  sandbox did not permit `chown` on its temporary directory, so the smoke mount
+  was made writable with mode `0777`. Northflank volume ownership/writability
+  must still be verified independently.
+- Docker SIGTERM reached Node's paired-host abort helper; it wrote the
+  `SIGTERM` marker and exited with status 0 inside the 10-second stop timeout.
+- The exact paired-forward and paired-host tests passed 22/22, including
+  synthetic status/export/package commands and 480-cycle integration against
+  actual merged #1299 exports.
 
 The updated #1301 actual-export 480-cycle fixture measured:
 
@@ -86,14 +90,15 @@ as `VERIFIED_COMPLETE`; the separate operator-interrupted synthetic case stayed
 `INTERRUPTED` with unavailable deltas. The evaluator was not packaged in this
 image because it remains an independently run consumer.
 
-#1301 merged as `a64eef5f614bdba3cf284d9a5209aa606dd8e87d`; final-head CI
-`42528020776` succeeded. The current branch contains that main commit and the
-accepted research pin. #1304's single-export CLI at `5700feb6f1b82257b18e5c50f527a3e2f80d175a`
-has accepted source review and CI `42528821318` succeeded, but it has not yet
-merged to main. Before final package acceptance, require the current branch's
-final-head CI and rebuild the image from the merged reviewed source. No
-registry repository or digest, Northflank job/instance/volume IDs, region, or
-compute size is available from this preparation.
+#1301 merged as `a64eef5f614bdba3cf284d9a5209aa606dd8e87d`; final CI
+`42528020776` succeeded. The current image is built from source commit
+`43a1a6eff84a26d711dcc76e9e59653420b0d293` with the accepted research pin.
+#1304's single-export CLI at
+`5700feb6f1b82257b18e5c50f527a3e2f80d175a` has accepted source review and CI
+`42528821318` succeeded, but remains unmerged at this revision. The current
+branch's final-head CI is still required. No registry repository or digest,
+Northflank job/instance/volume IDs, region, or compute size is available from
+this preparation.
 
 ## Frozen run
 
