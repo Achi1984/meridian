@@ -214,13 +214,25 @@ test("EUR, unsafe numbers, inconsistent equity, and forged resume snapshots are 
 
 test("journal bound is enforced before replay and never truncates history", () => {
   const observations = Array.from({ length: POLICY.maxJournalObservations }, (_, index) =>
-    observation(`bounded-${index}`, 100_000, BASE + (index + 1) * 1_000));
+    observation(`bounded-${index}`, index === 0 ? 100_000 : 90_000,
+      BASE + (index + 1) * 1_000));
   const state = replayChallengeState({
     ...IDENTITY, policyVersion: POLICY.version, observations
   });
   assert.equal(state.observations.length, POLICY.maxJournalObservations);
   assert.equal(state.highWaterEquityCents, POLICY.initialCapitalCents);
-  assert.equal(state.paused, false);
+  assert.equal(state.paused, true);
+  assert.equal(state.pauseObservationId, "bounded-1");
+
+  const exactDuplicate = advanceChallengeState(state, observations.at(-1));
+  assert.deepEqual(exactDuplicate, state);
+  assert.equal(exactDuplicate.observations.length, POLICY.maxJournalObservations);
+
+  const contradictoryDuplicate = structuredClone(observations.at(-1));
+  contradictoryDuplicate.netEquityCents = 89_999;
+  contradictoryDuplicate.valuation.cashCents = 89_999;
+  assert.throws(() => advanceChallengeState(state, contradictoryDuplicate),
+    /CONTRADICTORY_DUPLICATE_OBSERVATION/);
 
   assert.throws(() => replayChallengeState({
     ...IDENTITY,
@@ -228,9 +240,12 @@ test("journal bound is enforced before replay and never truncates history", () =
     observations: [...observations, null]
   }), /OBSERVATION_JOURNAL_LIMIT_REACHED/);
 
-  const forgedAtLimit = { ...state, highWaterEquityCents: 90_000 };
-  assert.throws(() => advanceChallengeState(forgedAtLimit, null),
+  const newObservation = observation("beyond-bound", 110_000,
+    BASE + (POLICY.maxJournalObservations + 1) * 1_000);
+  assert.throws(() => advanceChallengeState(state, newObservation),
     /OBSERVATION_JOURNAL_LIMIT_REACHED/);
   assert.equal(state.observations.length, POLICY.maxJournalObservations);
   assert.equal(state.highWaterEquityCents, POLICY.initialCapitalCents);
+  assert.equal(state.paused, true);
+  assert.equal(state.pauseObservationId, "bounded-1");
 });

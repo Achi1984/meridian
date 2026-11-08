@@ -141,7 +141,10 @@ function normalizeObservation(input, identity) {
   };
 }
 
-function advanceValidated(previous, observation) {
+function advanceValidated(previous, observation, { duplicateChecked = false } = {}) {
+  if (duplicateChecked) {
+    return advanceNewObservation(previous, observation);
+  }
   const duplicate = previous.observations.find(item => item.id === observation.id);
   if (duplicate) {
     if (stableJson(duplicate) !== stableJson(observation)) {
@@ -149,6 +152,10 @@ function advanceValidated(previous, observation) {
     }
     return previous;
   }
+  return advanceNewObservation(previous, observation);
+}
+
+function advanceNewObservation(previous, observation) {
   if (previous.lastObservationAtMs !== null &&
       observation.observedAtMs <= previous.lastObservationAtMs) {
     throw new Error("OBSERVATION_OUT_OF_ORDER");
@@ -200,20 +207,28 @@ export function replayChallengeState({ campaignId, currency, policyVersion, obse
   return freezeDeep(replayNormalized(identity, observations));
 }
 
-function validateState(state, { requireCapacity = false } = {}) {
+function validateState(state) {
   assertRecord(state, STATE_KEYS, "STATE");
   if (state.schemaVersion !== STATE_SCHEMA) throw new Error("INVALID_STATE");
   const identity = validateIdentity(state);
-  validateJournalLength(state.observations, { requireCapacity });
+  validateJournalLength(state.observations);
   const replayed = replayNormalized(identity, state.observations);
   if (stableJson(replayed) !== stableJson(state)) throw new Error("STATE_REPLAY_MISMATCH");
   return replayed;
 }
 
 export function advanceChallengeState(previousState, inputObservation) {
-  const previous = validateState(previousState, { requireCapacity: true });
+  const previous = validateState(previousState);
   const observation = normalizeObservation(inputObservation, previous);
-  return freezeDeep(advanceValidated(previous, observation));
+  const duplicate = previous.observations.find(item => item.id === observation.id);
+  if (duplicate) {
+    if (stableJson(duplicate) !== stableJson(observation)) {
+      throw new Error("CONTRADICTORY_DUPLICATE_OBSERVATION");
+    }
+    return freezeDeep(previous);
+  }
+  validateJournalLength(previous.observations, { requireCapacity: true });
+  return freezeDeep(advanceValidated(previous, observation, { duplicateChecked: true }));
 }
 
 export function getExposureGate(state, nowMs) {
