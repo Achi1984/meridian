@@ -12,6 +12,8 @@ const IDENTITY = { campaignId: POLICY.campaignId, currency: POLICY.currency };
 function observation(id, netEquityCents, observedAtMs, overrides = {}) {
   const {
     currency = "USD",
+    monetaryUnit = POLICY.monetaryUnit,
+    marketPair = POLICY.marketPair,
     strategyVersion = "strategy-v1",
     status = "FRESH",
     asOfMs = observedAtMs,
@@ -29,7 +31,8 @@ function observation(id, netEquityCents, observedAtMs, overrides = {}) {
   return {
     id, campaignId, currency, strategyVersion, observedAtMs, netEquityCents,
     valuation: {
-      status, currency: valuationCurrency, method, asOfMs, bidQuoteAtMs, maxAgeMs,
+      status, currency: valuationCurrency, monetaryUnit, marketPair, method,
+      asOfMs, bidQuoteAtMs, maxAgeMs,
       quoteSourceId, cashCents, inventoryAtAdverseBidCents,
       unbookedAccruedFeesCents, modeledExitCostsCents
     }
@@ -42,6 +45,8 @@ function advance(state, id, equity, offset, overrides) {
 
 test("policy is an isolated, immutable, disabled USD paper campaign", () => {
   assert.equal(POLICY.currency, "USD");
+  assert.equal(POLICY.monetaryUnit, "USD_CENTS");
+  assert.equal(POLICY.marketPair, "BTC/USD");
   assert.equal(POLICY.initialCapitalCents, 100_000);
   assert.equal(POLICY.maxDrawdownCents, 10_000);
   assert.equal(POLICY.enabled, false);
@@ -172,6 +177,17 @@ test("EUR, unsafe numbers, inconsistent equity, and forged resume snapshots are 
   assert.throws(() => advanceChallengeState(state,
     observation("eur", 100_000, BASE + 1_000, { currency: "EUR" })),
   /CURRENCY_MISMATCH/);
+  assert.throws(() => advanceChallengeState(state,
+    observation("valuation-eur", 100_000, BASE + 1_000, { valuationCurrency: "EUR" })),
+  /CURRENCY_MISMATCH/);
+  for (const marketPair of ["BTC/EUR", "BTC/USDT", "BTC/USDC"]) {
+    assert.throws(() => advanceChallengeState(state,
+      observation(`pair-${marketPair.replace("/", "-")}`, 100_000, BASE + 1_000, { marketPair })),
+    /MARKET_PAIR_MISMATCH/);
+  }
+  assert.throws(() => advanceChallengeState(state,
+    observation("non-usd-cents", 100_000, BASE + 1_000, { monetaryUnit: "USDT_CENTS" })),
+  /MISSING_OR_UNSUPPORTED_VALUATION/);
   assert.throws(() => advanceChallengeState(state,
     observation("unsafe", Number.MAX_SAFE_INTEGER + 1, BASE + 1_000)),
   /INVALID_/);

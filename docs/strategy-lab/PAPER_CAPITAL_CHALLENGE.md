@@ -9,10 +9,14 @@ and does not change that pilot, its evidence, or its deployment.
 
 The versioned policy in
 `scripts/paper-capital-challenge/policy.mjs` fixes a distinct campaign identity,
-USD 1,000.00 initial capital, and a USD 100.00 absolute high-water drawdown
-threshold. It is paper-only, disabled, and prohibits leverage, borrowing,
-top-ups, and resets. EUR is not USD; no implicit or 1:1 FX conversion is
-permitted. Future integration must admit actual USD-denominated valuations.
+BTC/USD as its only market pair, USD 1,000.00 initial capital, and a USD 100.00
+absolute high-water drawdown threshold. All account, equity, fee, cost, and
+PnL amounts are USD cents (`USD_CENTS`); they are not EUR cents, stablecoin
+units, or converted values. It is paper-only, disabled, and prohibits leverage,
+borrowing, top-ups, and resets. EUR is not USD; no implicit or 1:1 FX conversion
+is permitted. USDT and USDC are also not USD. Future integration must admit
+genuine USD-denominated BTC/USD quotes and must not relabel BTC/EUR, BTC/USDT,
+or BTC/USDC as BTC/USD.
 
 The guard is deliberately not wired to a strategy or execution path. Its
 exposure gate remains closed while the policy is disabled. A threshold pause
@@ -24,15 +28,20 @@ does not authorize an order or verify an execution.
 
 Each uniquely identified observation is bound to the exact campaign and USD
 currency, includes its strategy version and observation time, and supplies a
-fresh valuation with a source identifier and quote/valuation timestamps. New
-observations must be strictly ordered by observation time. An exact repeated
-observation ID is idempotent; reusing an ID with different content or adding a
-new out-of-order observation is rejected. Missing, stale, future-dated, unsafe,
-or currency-mismatched valuations fail closed and cannot update the peak.
+fresh BTC/USD valuation with a source identifier and quote/valuation
+timestamps. The guard rejects other declared pairs and monetary units. These
+are caller-supplied identity claims, not authenticated quote evidence; a future
+adapter must validate that the source's native quote currency is USD and that
+the bid is executable. New observations must be strictly ordered by
+observation time. An exact repeated observation ID is idempotent; reusing an ID
+with different content or adding a new out-of-order observation is rejected.
+Missing, stale, future-dated, unsafe, or currency-mismatched valuations fail
+closed and cannot update the peak.
 Valuations must be no older than the policy's 10-second maximum age; that bound
 is an admission constraint, not evidence that any future feed meets it.
 
-`netEquityCents` must equal:
+`netEquityCents`, `cashCents`, inventory value, accrued fees, and modeled exit
+costs are all denominated in USD cents. `netEquityCents` must equal:
 
 ```
 cashCents
@@ -41,9 +50,10 @@ cashCents
 - modeledExitCostsCents
 ```
 
-`cashCents` is cash after already-booked costs. Inventory is valued at the
-executable adverse bid, before the separately reported costs. Accrued fees
-must include only fees not already reflected in cash or inventory value;
+`cashCents` is USD cash after already-booked costs. BTC inventory is valued in
+USD cents at the executable adverse BTC/USD bid, before the separately reported
+costs. Accrued fees include only fees not already reflected in cash or inventory
+value;
 modeled exit costs must include only additional liquidation costs not already
 included in the bid mark or accrued fees. Each cost is included once. The
 valuation method and component sum are checked by the guard, which does not
@@ -106,7 +116,9 @@ without admitted historical data, no historical claim is justified.
 
 - **USD feed and admission:** no USD market source, executable bid validation,
   timestamp admission, source provenance, or independent quote verification
-  is connected to this policy.
+  is connected to this policy. Future quote admission must prove native USD
+  denomination for BTC/USD and reject EUR, USDT, and USDC; a pair label alone
+  is not proof.
 - **Ledger and durable journal:** no separate USD cash/position ledger,
   append-only campaign journal, durable recovery, restart identity admission,
   or operator review workflow is wired.

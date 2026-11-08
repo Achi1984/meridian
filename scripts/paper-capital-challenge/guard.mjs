@@ -11,7 +11,8 @@ const OBSERVATION_KEYS = [
   "netEquityCents", "valuation"
 ];
 const VALUATION_KEYS = [
-  "status", "currency", "method", "asOfMs", "bidQuoteAtMs", "maxAgeMs",
+  "status", "currency", "monetaryUnit", "marketPair", "method",
+  "asOfMs", "bidQuoteAtMs", "maxAgeMs",
   "quoteSourceId", "cashCents", "inventoryAtAdverseBidCents",
   "unbookedAccruedFeesCents", "modeledExitCostsCents"
 ];
@@ -96,8 +97,10 @@ function normalizeObservation(input, identity) {
   const observedAtMs = safeInteger(observation.observedAtMs, "OBSERVATION_TIME", { min: 0 });
   const netEquityCents = safeInteger(observation.netEquityCents, "NET_EQUITY");
   const valuation = assertRecord(observation.valuation, VALUATION_KEYS, "VALUATION");
+  if (valuation.currency !== POLICY.currency) throw new Error("CURRENCY_MISMATCH");
+  if (valuation.marketPair !== POLICY.marketPair) throw new Error("MARKET_PAIR_MISMATCH");
   if (valuation.status !== "FRESH" ||
-      valuation.currency !== POLICY.currency ||
+      valuation.monetaryUnit !== POLICY.monetaryUnit ||
       valuation.method !== "CASH_PLUS_EXECUTABLE_ADVERSE_BID") {
     throw new Error("MISSING_OR_UNSUPPORTED_VALUATION");
   }
@@ -129,7 +132,8 @@ function normalizeObservation(input, identity) {
     id, campaignId: identity.campaignId, currency: POLICY.currency, strategyVersion,
     observedAtMs, netEquityCents,
     valuation: {
-      status: "FRESH", currency: POLICY.currency,
+      status: "FRESH", currency: POLICY.currency, monetaryUnit: POLICY.monetaryUnit,
+      marketPair: POLICY.marketPair,
       method: "CASH_PLUS_EXECUTABLE_ADVERSE_BID",
       asOfMs, bidQuoteAtMs, maxAgeMs, quoteSourceId, cashCents,
       inventoryAtAdverseBidCents, unbookedAccruedFeesCents, modeledExitCostsCents
