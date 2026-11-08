@@ -2,6 +2,7 @@ import {CAMPAIGN_SOURCE, renderStrategyCatalog} from './strategy-catalog.js?v=B1
 import {createStrategyArenaView} from './strategy-arena.js?v=B16-M11-FIX13';
 import {mountPaperCockpit} from './paper-cockpit-controller.js?v=B16-M11-FIX13';
 import {mountSpotPaperCockpit} from './spot-paper-cockpit-controller.js?v=B16-M11-FIX13';
+import {mountSpotPaperHost8hDashboard} from './spot-paper-host8h-controller.js?v=B16-M11-FIX13';
 import {renderPaperReadiness} from './paper-readiness-view.js?v=B16-M11-FIX13';
 
 const catalogRoot = document.getElementById('strategy-catalog');
@@ -10,6 +11,7 @@ const arenaRoot = document.getElementById('strategy-arena-root');
 const arena = createStrategyArenaView(arenaRoot);
 let paperCockpit = null;
 let spotPaperCockpit = null;
+let spotPaperHost8hDashboard = null;
 if(catalogRoot?.parentNode){
   const spotPaperRoot=document.createElement('section');
   spotPaperRoot.id='spot-paper-cockpit-root';
@@ -23,6 +25,10 @@ if(catalogRoot?.parentNode){
   readinessRoot.id='paper-readiness-root';
   catalogRoot.parentNode.insertBefore(readinessRoot,catalogRoot);
   renderPaperReadiness(readinessRoot);
+  const host8hRoot=document.createElement('section');
+  host8hRoot.id='spot-paper-host8h-root';
+  catalogRoot.parentNode.insertBefore(host8hRoot,catalogRoot);
+  spotPaperHost8hDashboard=mountSpotPaperHost8hDashboard(host8hRoot,document,window);
 }
 let loaded = false;
 let loading = false;
@@ -54,6 +60,7 @@ document.getElementById('nav')?.addEventListener('click',event=>{
   const button=event.target.closest?.('button[data-v]');
   if(button) paperCockpit?.setActive(button.dataset.v==='strategies');
   if(button) spotPaperCockpit?.setActive(button.dataset.v==='strategies');
+  if(button) spotPaperHost8hDashboard?.setActive(button.dataset.v==='strategies');
   if (button?.dataset.v==='strategies') loadWorkspace();
 });
 
@@ -68,5 +75,6 @@ document.addEventListener('click',event=>{
 if (document.querySelector('#nav button[data-v="strategies"][aria-current="page"]')) {
   paperCockpit?.setActive(true);
   spotPaperCockpit?.setActive(true);
+  spotPaperHost8hDashboard?.setActive(true);
   loadWorkspace();
 }

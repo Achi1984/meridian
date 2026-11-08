@@ -28,8 +28,16 @@ function staticServer(){
   const requests=[];
   const server=createServer((request,response)=>{
     const url=new URL(request.url,'http://localhost');
-    requests.push({method:request.method,path:url.pathname});
+    const authorization=request.headers.authorization;
+    const authorized=typeof authorization==='string'&&authorization.startsWith('Bearer ')&&authorization.length>7;
+    requests.push({method:request.method,path:url.pathname,authorized});
     if(request.method!=='GET'){response.writeHead(405);response.end();return;}
+    if(url.pathname==='/host8h-summary'){
+      response.writeHead(authorized?503:401,
+        {'content-type':'application/json','cache-control':'no-store'});
+      response.end(JSON.stringify({error:authorized?
+        'host8h_transport_not_provisioned':'unauthorized'}));return;
+    }
     if(url.pathname==='/app-access'){
       response.writeHead(200,{'content-type':'application/json','cache-control':'no-store'});
       response.end(JSON.stringify({version:'7.64-CANONICAL-PORTFOLIO-HISTORY-V3',points:[]}));return;
@@ -45,6 +53,12 @@ function staticServer(){
       let body=readFileSync(path);
       if(path===join(v11,'app-access.js')){
         body=body.toString().replace('https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/portfolio-history?range=1w','/app-access');
+      }
+      if(path===join(v11,'spot-paper-host8h-controller.js')){
+        const production='https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/spot-paper-host8h-report';
+        body=body.toString();
+        assert.equal(body.split(production).length,2,'only the exact host8h endpoint is rewritten for the offline browser fixture');
+        body=body.replace(production,'/host8h-summary');
       }
       const type=path.endsWith('.html')?'text/html; charset=utf-8':
         path.endsWith('.json')?'application/json; charset=utf-8':'text/javascript; charset=utf-8';
@@ -1210,6 +1224,10 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         assert.equal(await evaluate(`document.documentElement.scrollWidth<=innerWidth+1`),true);
         const requestPaths=hosted.requests.map(request=>request.path);
         assert.ok(!requestPaths.some(path=>/\/v10\/|\/api\/|\/klines|\/ticker|\/market/i.test(path)));
+        const host8hReads=hosted.requests.filter(request=>request.path==='/host8h-summary');
+        assert.ok(host8hReads.length>0,'host8h uses only the local unavailable transport fixture');
+        assert.ok(host8hReads.every(request=>request.method==='GET'&&request.authorized),
+           'the local host8h fixture requires the authenticated read-only request');
         return {width:size.width,sourceFetches:requestPaths.filter(path=>path==='/docs/strategy-lab/campaign-20261013.json').length,
           families:catalog.families,models:arena.cards,overflow:catalog.overflow,synthetic:true,
           explorerPaths:44,selectionLimit:2,quarterlyValues:'producer-exact',importReset:true,

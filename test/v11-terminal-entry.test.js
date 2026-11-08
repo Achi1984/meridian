@@ -908,7 +908,7 @@ test('Terminal öffnen preserves the reviewed history-close baseline and stays o
   assert.equal(gitBlob(restored),preimageBlob,'all source bytes except terminal-entry insertions, the checked viewport pair and exact Depot/revision deltas must match the reviewed history-close baseline');
 });
 
-const moduleNames=['ledger-manual-client.js','ledger-manual-model.js','ledger-manual-view.js','paper-cockpit-controller.js','paper-cockpit-model.js','paper-cockpit-view.js','paper-report-connector.js','paper-readiness.js','paper-readiness-view.js','release-update.js','ledger-review-client.js','ledger-review-model.js','ledger-review-view.js','app-access-bootstrap.js','app-access.js','agent-status-bootstrap.js','agent-status-client.js','bot-read-bootstrap.js','bot-read-client.js','bot-read-view.js','bot-read-model.js','bot-overview-model.js','depot-read-bootstrap.js','depot-read-client.js','depot-read-model.js','depot-read-view.js','depot-history-model.js','pionex-history-model.js','depot-history-view.js','depot-current-model.js','depot-portfolio-state.js','spot-paper-cockpit-controller.js','spot-paper-cockpit-model.js','spot-paper-cockpit-view.js','spot-paper-report-connector.js','strategy-workspace-bootstrap.js','strategy-catalog.js','research-evidence.js','strategy-arena.js','arena-inspection-report.js','arena-historical-result.js','arena-historical-export.js','arena-result-view.js'];
+const moduleNames=['ledger-manual-client.js','ledger-manual-model.js','ledger-manual-view.js','paper-cockpit-controller.js','paper-cockpit-model.js','paper-cockpit-view.js','paper-report-connector.js','paper-readiness.js','paper-readiness-view.js','release-update.js','ledger-review-client.js','ledger-review-model.js','ledger-review-view.js','app-access-bootstrap.js','app-access.js','agent-status-bootstrap.js','agent-status-client.js','bot-read-bootstrap.js','bot-read-client.js','bot-read-view.js','bot-read-model.js','bot-overview-model.js','depot-read-bootstrap.js','depot-read-client.js','depot-read-model.js','depot-read-view.js','depot-history-model.js','pionex-history-model.js','depot-history-view.js','depot-current-model.js','depot-portfolio-state.js','spot-paper-cockpit-controller.js','spot-paper-cockpit-model.js','spot-paper-cockpit-view.js','spot-paper-host8h-controller.js','spot-paper-host8h-model.js','spot-paper-host8h-view.js','spot-paper-report-connector.js','strategy-workspace-bootstrap.js','strategy-catalog.js','research-evidence.js','strategy-arena.js','arena-inspection-report.js','arena-historical-result.js','arena-historical-export.js','arena-result-view.js'];
 function deploymentServer(){
   const inlineScript=html.match(/<script>([\s\S]*?)<\/script>/i)?.[1];
   assert.ok(inlineScript,'actual UI-only navigation script');
@@ -917,7 +917,7 @@ function deploymentServer(){
   const statusCss=readFileSync(new URL('../public/css/m11-agent-status.css',import.meta.url),'utf8');
   const policies=new Map(),requests=[],modules=new Map(),pending=new Set();
   let reads=0,aborts=0,depotReads=0,depotAborts=0,authReads=0,mode='fresh';
-  const endpoint='/meridian/__test/bot-snapshot',depotEndpoint='/meridian/__test/portfolio-history',pionexEndpoint='/meridian/__test/pionex-history',currentEndpoint='/meridian/__test/depot-current',priceEndpoint='/meridian/__test/depot-prices',authEndpoint='/meridian/__test/app-access';
+  const endpoint='/meridian/__test/bot-snapshot',depotEndpoint='/meridian/__test/portfolio-history',pionexEndpoint='/meridian/__test/pionex-history',currentEndpoint='/meridian/__test/depot-current',priceEndpoint='/meridian/__test/depot-prices',authEndpoint='/meridian/__test/app-access',host8hEndpoint='/meridian/__test/host8h-report';
   for(const name of moduleNames){
     let body=readFileSync(new URL('../v11/'+name,import.meta.url),'utf8');
     if(name==='bot-read-client.js'){
@@ -934,6 +934,11 @@ function deploymentServer(){
       const production='https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/portfolio-history?range=1w';
       assert.equal(body.split(production).length,2,'exact app-verification endpoint replaced only in served test copy');
       body=body.replace(production,authEndpoint);
+    }
+    if(name==='spot-paper-host8h-controller.js'){
+      const production='https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/spot-paper-host8h-report';
+      assert.equal(body.split(production).length,2,'exact host8h endpoint replaced only in served test copy');
+      body=body.replace(production,host8hEndpoint);
     }
     modules.set('/meridian/v11/'+name,body);
   }
@@ -958,6 +963,11 @@ function deploymentServer(){
       if(!request.headers.authorization){response.writeHead(401);response.end('{}');return;}
       response.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});
       response.end(JSON.stringify({version:'7.64-CANONICAL-PORTFOLIO-HISTORY-V3',points:[]}));return;
+    }
+    if(path===host8hEndpoint){
+      if(!request.headers.authorization){response.writeHead(401,{'Content-Type':'application/json'});response.end('{}');return;}
+      response.writeHead(503,{'Content-Type':'application/json','Cache-Control':'no-store'});
+      response.end(JSON.stringify({error:'host8h_transport_not_provisioned'}));return;
     }
     if(path===endpoint){
       reads++;
@@ -1014,7 +1024,7 @@ function deploymentServer(){
       [...modules.keys()].map(path=>origin+path+(path.startsWith('/meridian/v11/')||
         path.startsWith('/meridian/scripts/memecoin-paper-report-bridge/')||
         path.startsWith('/meridian/scripts/spot-paper-report-bridge/')?'?v=B16-M11-FIX13':'')).join(' '):"'none'";
-    const policy=`default-src 'none'; script-src ${scriptSource}; style-src 'unsafe-inline'${preview?' '+origin+statusCssPath:''}; connect-src ${preview?origin+endpoint+' '+origin+depotEndpoint+' '+origin+pionexEndpoint+' '+origin+currentEndpoint+' '+origin+priceEndpoint+' '+origin+authEndpoint+' '+origin+'/meridian/v11/index.html '+origin+'/meridian/docs/strategy-lab/campaign-20261013.json':"'none'"}; worker-src 'none'; child-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'none'`;
+    const policy=`default-src 'none'; script-src ${scriptSource}; style-src 'unsafe-inline'${preview?' '+origin+statusCssPath:''}; connect-src ${preview?origin+endpoint+' '+origin+depotEndpoint+' '+origin+pionexEndpoint+' '+origin+currentEndpoint+' '+origin+priceEndpoint+' '+origin+authEndpoint+' '+origin+host8hEndpoint+' '+origin+'/meridian/v11/index.html '+origin+'/meridian/docs/strategy-lab/campaign-20261013.json':"'none'"}; worker-src 'none'; child-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'none'`;
     policies.set(path,policy);
     response.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Content-Security-Policy':policy});response.end(preview?html:terminal);
   });
@@ -1022,7 +1032,7 @@ function deploymentServer(){
     server.once('error',reject);server.listen(0,'127.0.0.1',()=>resolve({
       base:`http://127.0.0.1:${server.address().port}/meridian/`,policies,requests,
       metrics:()=>({reads,aborts,depotReads,depotAborts,authReads,pending:pending.size}),setMode:value=>{mode=value;},
-      allowedPaths:new Set(['/meridian/v11/','/meridian/v11/index.html','/meridian/v10/',endpoint,depotEndpoint,pionexEndpoint,currentEndpoint,priceEndpoint,authEndpoint,statusCssPath,...modules.keys()]),
+      allowedPaths:new Set(['/meridian/v11/','/meridian/v11/index.html','/meridian/v10/',endpoint,depotEndpoint,pionexEndpoint,currentEndpoint,priceEndpoint,authEndpoint,host8hEndpoint,statusCssPath,...modules.keys()]),
       close:()=>new Promise((done,fail)=>{for(const response of pending)response.destroy();server.close(error=>error?fail(error):done());server.closeAllConnections();})
     }));
   });
