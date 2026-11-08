@@ -21,7 +21,8 @@ const expectedModules=[
   'depot-current-model.js','depot-history-model.js','depot-history-view.js','depot-portfolio-state.js','depot-read-bootstrap.js',
   'depot-read-client.js','depot-read-model.js','depot-read-view.js',
   'ledger-manual-client.js','ledger-manual-model.js','ledger-manual-view.js','ledger-review-client.js','ledger-review-model.js','ledger-review-view.js','paper-cockpit-controller.js','paper-cockpit-model.js','paper-cockpit-view.js','paper-readiness-view.js','paper-readiness.js','paper-report-connector.js','pionex-history-model.js','release-update.js','research-evidence.js',
-  'spot-paper-cockpit-controller.js','spot-paper-cockpit-model.js','spot-paper-cockpit-view.js','spot-paper-report-connector.js',
+  'spot-paper-cockpit-controller.js','spot-paper-cockpit-model.js','spot-paper-cockpit-view.js',
+  'spot-paper-host8h-controller.js','spot-paper-host8h-model.js','spot-paper-host8h-view.js','spot-paper-report-connector.js',
   'strategy-arena.js','strategy-catalog.js','strategy-workspace-bootstrap.js'
 ];
 

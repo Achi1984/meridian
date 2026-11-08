@@ -2,7 +2,7 @@ import {
   createSpotPaperHost8hAdapter,
   presentSpotPaperHost8h,
   SPOT_PAPER_HOST8H_REQUESTED_DURATION_MS
-} from './spot-paper-host8h-model.js';
+} from './spot-paper-host8h-model.js?v=B16-M11-FIX13';
 
 function node(document, parent, tag, text = '', className = '') {
   const element = document.createElement(tag);
@@ -62,6 +62,7 @@ function durationStatus(value) {
 
 function inventoryStatus(value) {
   if (value === 'FLAT') return 'Keine offene Position';
+  if (value === 'OPEN_PROVISIONAL') return 'Offen · Zwischenstand';
   if (value === 'OPEN_UNRESOLVED_AT_TERMINAL') return 'Am Laufende noch offen';
   return 'Unbekannt';
 }
@@ -74,7 +75,9 @@ function statusText(model) {
   }
   switch (model.status) {
     case 'RUNNING_OBSERVED':
-      return 'Laufender Prozess beobachtet; Ausführung und Gesundheit sind nicht verifiziert.';
+      return model.metrics?.provisional ?
+        'Laufender Prozess beobachtet · Zwischenstand aus dem letzten geprüften Journal-Snapshot; nicht terminal verifiziert.' :
+        'Laufender Prozess beobachtet; Ausführung und Gesundheit sind nicht verifiziert.';
     case 'VERIFIED_TERMINAL':
       return model.completed ? 'Abgeschlossen · Assessment verifiziert.' :
         'Terminal-Readback verifiziert; Assessment nicht als abgeschlossen bestätigt.';
@@ -91,7 +94,7 @@ function statusText(model) {
   }
 }
 
-function renderModel(root, model, document) {
+function renderModel(root, model, document, options = {}) {
   root.replaceChildren();
   root.className = 'card paper-cockpit spot-paper-host8h';
   root.setAttribute('style', 'min-width:0;max-width:100%;overflow-wrap:anywhere');
@@ -100,11 +103,21 @@ function renderModel(root, model, document) {
   root.setAttribute('aria-labelledby', heading.id);
   node(document, root, 'p',
     'Nur Anzeige · keine Verbindung, Start-, Stopp-, Order- oder Handelsaktionen.', 'caption');
-  const status = node(document, root, 'p', statusText(model), model.statusTone);
+  const status = node(document, root, 'p', options.message || statusText(model), model.statusTone);
   status.setAttribute('role', 'status');
   status.setAttribute('aria-live', 'polite');
   status.setAttribute('aria-atomic', 'true');
-  root.setAttribute('data-state', model.status?.toLowerCase() || 'unavailable');
+  root.setAttribute('data-state', options.state || model.status?.toLowerCase() || 'unavailable');
+  if (typeof options.onRefresh === 'function') {
+    const refresh = node(document, root, 'button', 'Host8h-Status aktualisieren');
+    refresh.type = 'button';
+    refresh.disabled = options.loading === true || options.retryBlocked === true;
+    refresh.setAttribute('aria-disabled', String(refresh.disabled));
+    refresh.setAttribute('aria-busy', String(options.loading === true));
+    refresh.setAttribute('style',
+      'min-width:44px;min-height:44px;max-width:100%;padding:10px 12px;white-space:normal;overflow-wrap:anywhere');
+    refresh.onclick = options.onRefresh;
+  }
   node(document, root, 'p',
     'Ein injizierter UI-Snapshot ist nicht unabhängig authentifiziert und belegt keine Host- oder Prozessgesundheit.',
     'caption');
@@ -115,7 +128,13 @@ function renderModel(root, model, document) {
     field(document, summary, 'Quelle', model.source || 'Unbekannt');
     field(document, summary, 'Zuletzt beobachtet', timestamp(model.observedAt));
     field(document, summary, 'Aktualität', freshness(model.freshness?.status));
+    field(document, summary, 'Instrument / Modus',
+      `${model.identity?.pair || 'Unbekannt'} · Paper`);
+    field(document, summary, 'Modell / Hebel / Richtung',
+      `${model.identity?.model || 'Unbekannt'} · ${model.identity?.leverage ?? 'Unbekannt'}x · ${model.identity?.positionMode || 'Unbekannt'}`);
+    field(document, summary, 'Währung', model.identity?.currency || 'Unbekannt');
     root.append(summary);
+    field(document, root, 'USD-Challenge', 'NOT_STARTED');
   } else {
     node(document, root, 'p',
       'Offline-Vorschau · keine Laufdaten verbunden. Fehlende Werte sind unbekannt, nicht null.',
@@ -137,22 +156,28 @@ function renderModel(root, model, document) {
     field(document, run, 'Beobachtungen', metrics.observations);
     field(document, run, 'Datenlücken', metrics.dataGaps);
     field(document, run, 'Anfragen', metrics.requests);
+    field(document, run, 'Fills', metrics.fills);
+    field(document, run, 'Geschlossene Trades', metrics.closedTrades);
     root.append(run);
     const money = document.createElement('div');
     money.className = 'trust-grid';
-    field(document, money, 'Gebühren', metrics.fees?.label);
+    field(document, money, 'Gebuchte Modellgebühren', metrics.fees?.label);
+    field(document, money, 'Geschätzte Ausstiegsgebühr', metrics.estimatedExitFee?.label);
+    field(document, money, 'Geschätzter Ausstiegs-Slippage', metrics.estimatedExitSlippage?.label);
     field(document, money, 'Bargeld', metrics.cash?.label);
     field(document, money, 'Eigenkapital', metrics.equity?.label);
     field(document, money, 'Realisierter Gewinn/Verlust', metrics.realizedPnl?.label,
       metrics.realizedPnl?.tone);
     field(document, money, 'Unrealisierter Gewinn/Verlust', metrics.unrealizedPnl?.label,
       metrics.unrealizedPnl?.tone);
+    field(document, money, 'Gesamter Gewinn/Verlust', metrics.totalPnl?.label,
+      metrics.totalPnl?.tone);
     field(document, money, 'Offene Position', inventoryStatus(metrics.inventory.status));
     field(document, money, 'Bestand', metrics.inventory.quantitySat === null ?
       'Unbekannt' : `${metrics.inventory.quantitySat} sat`);
     root.append(money);
     node(document, root, 'p',
-      `Dauerstatus: ${durationStatus(metrics.durationStatus)} · keine Profitabilitätsaussage.`,
+      `Dauerstatus: ${durationStatus(metrics.durationStatus)} · Modellannahmen je Seite: 50 bps Gebühr und 10 bps Slippage, keine verifizierten Börsenkosten. Geschätzte zukünftige Ausstiegskosten sind separat und werden nicht erneut vom PnL abgezogen.`,
       'caption');
   }
 
@@ -174,7 +199,7 @@ function renderModel(root, model, document) {
 
 export function renderSpotPaperHost8h(root, input, document = root?.ownerDocument, options = {}) {
   if (!root || !document) return null;
-  return renderModel(root, presentSpotPaperHost8h(input, options), document);
+  return renderModel(root, presentSpotPaperHost8h(input, options), document, options);
 }
 
 export function createSpotPaperHost8hPreview({readSnapshot} = {}) {
@@ -182,7 +207,7 @@ export function createSpotPaperHost8hPreview({readSnapshot} = {}) {
   return Object.freeze({
     async render(root, document = root?.ownerDocument, options = {}) {
       if (!root || !document) return null;
-      return renderModel(root, await adapter.read(options), document);
+      return renderModel(root, await adapter.read(options), document, options);
     }
   });
 }

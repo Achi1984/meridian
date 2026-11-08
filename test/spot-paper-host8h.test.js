@@ -15,7 +15,12 @@ const NOW = Date.parse('2026-11-08T14:00:00.000Z');
 const identity = {
   runId: 'btc-eur-paper-host-8h-001',
   profileId: 'BTC_EUR_PAPER_HOST_8H_V1',
-  sourceSha: '1e0204c8ac2c611940bdebbf61ae396a0282eb7d31cc52be7e51ef4036a961fd'
+  sourceSha: '1e0204c8ac2c611940bdebbf61ae396a0282eb7d31cc52be7e51ef4036a961fd',
+  model: 'BTC_EUR_SMA5_SMA20_V1',
+  pair: 'BTC/EUR',
+  currency: 'EUR',
+  leverage: 1,
+  positionMode: 'LONG_ONLY'
 };
 
 function input(status = 'RUNNING_OBSERVED') {
@@ -109,7 +114,7 @@ test('verified terminal assessment presents only actual partial metrics with cle
   assert.match(root.textContent, /Akzeptierte Beobachtungsabdeckung96,59 %/);
   assert.match(root.textContent, /Zyklen205/);
   assert.match(root.textContent, /Datenlücken7/);
-  assert.match(root.textContent, /Gebühren1,25 €/);
+  assert.match(root.textContent, /Gebuchte Modellgebühren1,25 €/);
   assert.match(root.textContent, /Realisierter Gewinn\/Verlust−0,75 €/);
   assert.match(root.textContent, /Unrealisierter Gewinn\/Verlust\+0,50 €/);
   assert.match(root.textContent, /Offene PositionAm Laufende noch offen/);

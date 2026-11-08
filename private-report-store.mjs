@@ -110,7 +110,11 @@ export function createPrivateReportStore(db, {
   cancelSchedule = clearTimeout
 } = {}) {
   if (!db || typeof db.connect !== "function" || typeof db.query !== "function") return null;
-  if (!["meridian_paper_reports", "meridian_spot_paper_reports"].includes(tableName)) {
+  if (![
+    "meridian_paper_reports",
+    "meridian_spot_paper_reports",
+    "meridian_spot_paper_host8h_reports"
+  ].includes(tableName)) {
     throw new TypeError("invalid private report table");
   }
   if (!Number.isSafeInteger(maxConcurrent) || maxConcurrent < 1 || maxConcurrent > 2 ||
@@ -251,6 +255,57 @@ export function createPrivateReportStore(db, {
   }
 
   return Object.freeze({
+    putLatest({runId, configHash, digest, envelope, observedAt, journalSequence, signal}) {
+      if (tableName !== "meridian_spot_paper_host8h_reports" ||
+          typeof observedAt !== "string" || !Number.isSafeInteger(journalSequence) ||
+          journalSequence < 0) {
+        return Promise.reject(storeError("INVALID_LATEST_REPORT"));
+      }
+      return runBounded("write", signal, internalSignal => withTransaction(
+        internalSignal,
+        "write",
+        async (client, activeSignal, markWrite) => {
+          markWrite();
+          const inserted = await client.query(
+            `INSERT INTO ${tableName}
+               (run_id, config_hash, content_sha256, envelope, observed_at, journal_sequence)
+             VALUES ($1, $2, $3, $4::jsonb, $5::timestamptz, $6)
+             ON CONFLICT (run_id) DO UPDATE
+               SET config_hash = EXCLUDED.config_hash,
+                   content_sha256 = EXCLUDED.content_sha256,
+                   envelope = EXCLUDED.envelope,
+                   observed_at = EXCLUDED.observed_at,
+                   journal_sequence = EXCLUDED.journal_sequence
+             WHERE (${tableName}.observed_at < EXCLUDED.observed_at
+                    AND ${tableName}.journal_sequence <= EXCLUDED.journal_sequence)
+                OR (${tableName}.observed_at = EXCLUDED.observed_at
+                    AND ${tableName}.journal_sequence < EXCLUDED.journal_sequence)
+             RETURNING run_id`,
+            [runId, configHash, digest, JSON.stringify(envelope), observedAt, journalSequence]
+          );
+          assertActive(activeSignal);
+          if (inserted.rowCount === 1) return "INSERTED";
+
+          const existing = await client.query(
+            `SELECT config_hash, content_sha256, observed_at, journal_sequence
+               FROM ${tableName}
+              WHERE run_id = $1
+              FOR SHARE`,
+            [runId]
+          );
+          const row = existing.rows[0];
+          if (!row) throw storeError("PAPER_REPORT_OUTCOME_UNKNOWN");
+          if (row.config_hash !== configHash) return "CONFLICT";
+          if (row.content_sha256 === digest &&
+              new Date(row.observed_at).toISOString() === observedAt &&
+              row.journal_sequence === journalSequence) return "IDENTICAL";
+          if (new Date(row.observed_at).getTime() > Date.parse(observedAt) ||
+              row.journal_sequence > journalSequence) return "STALE";
+          return "CONFLICT";
+        }
+      ));
+    },
+
     insertImmutable({runId, configHash, digest, envelope, signal}) {
       return runBounded("write", signal, internalSignal => withTransaction(
         internalSignal,
