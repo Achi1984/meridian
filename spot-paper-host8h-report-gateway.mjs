@@ -196,6 +196,15 @@ async function upload(req, {config, getStore, readBody, now, signal}) {
       return unavailable(error);
     }
     if (saved === 'STALE') return response(409, {error: 'host8h_snapshot_out_of_order'});
+    if (saved === 'TERMINAL_REGRESSION') {
+      return response(409, {error: 'host8h_terminal_regression_rejected'});
+    }
+    if (saved === 'CONFLICT') {
+      return response(409, {error: 'host8h_snapshot_conflict'});
+    }
+    if (saved !== 'IDENTICAL' && saved !== 'INSERTED') {
+      return unavailable(new Error('STORE_OUTCOME_UNKNOWN'));
+    }
     return response(saved === 'IDENTICAL' ? 200 : 201, {
       ok: true, runId: envelope.runId, observedAt: report.observedAt,
       idempotent: saved === 'IDENTICAL'

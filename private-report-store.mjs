@@ -276,10 +276,13 @@ export function createPrivateReportStore(db, {
                    envelope = EXCLUDED.envelope,
                    observed_at = EXCLUDED.observed_at,
                    journal_sequence = EXCLUDED.journal_sequence
-             WHERE (${tableName}.observed_at < EXCLUDED.observed_at
-                    AND ${tableName}.journal_sequence <= EXCLUDED.journal_sequence)
-                OR (${tableName}.observed_at = EXCLUDED.observed_at
-                    AND ${tableName}.journal_sequence < EXCLUDED.journal_sequence)
+             WHERE ((${tableName}.observed_at < EXCLUDED.observed_at
+                     AND ${tableName}.journal_sequence <= EXCLUDED.journal_sequence)
+                 OR (${tableName}.observed_at = EXCLUDED.observed_at
+                     AND ${tableName}.journal_sequence < EXCLUDED.journal_sequence))
+             AND (${tableName}.envelope #>> '{report,snapshot,status}' IS DISTINCT FROM
+                    'VERIFIED_TERMINAL'
+                  OR EXCLUDED.envelope #>> '{report,snapshot,status}' = 'VERIFIED_TERMINAL')
              RETURNING run_id`,
             [runId, configHash, digest, JSON.stringify(envelope), observedAt, journalSequence]
           );
@@ -287,7 +290,7 @@ export function createPrivateReportStore(db, {
           if (inserted.rowCount === 1) return "INSERTED";
 
           const existing = await client.query(
-            `SELECT config_hash, content_sha256, observed_at, journal_sequence
+            `SELECT config_hash, content_sha256, observed_at, journal_sequence, envelope
                FROM ${tableName}
               WHERE run_id = $1
               FOR SHARE`,
@@ -296,6 +299,13 @@ export function createPrivateReportStore(db, {
           const row = existing.rows[0];
           if (!row) throw storeError("PAPER_REPORT_OUTCOME_UNKNOWN");
           if (row.config_hash !== configHash) return "CONFLICT";
+          const previousEnvelope = typeof row.envelope === "string"
+            ? JSON.parse(row.envelope)
+            : row.envelope;
+          if (previousEnvelope?.report?.snapshot?.status === "VERIFIED_TERMINAL" &&
+              envelope?.report?.snapshot?.status !== "VERIFIED_TERMINAL") {
+            return "TERMINAL_REGRESSION";
+          }
           if (row.content_sha256 === digest &&
               new Date(row.observed_at).toISOString() === observedAt &&
               row.journal_sequence === journalSequence) return "IDENTICAL";

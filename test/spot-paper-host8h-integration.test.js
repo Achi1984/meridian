@@ -163,7 +163,12 @@ const authorizedRead = req => req.headers.authorization === 'Bearer ' + READ_TOK
 
 class Store {
   row = null;
+  conflictNext = false;
   async putLatest(input) {
+    if (this.conflictNext) {
+      this.conflictNext = false;
+      return 'CONFLICT';
+    }
     if (!this.row) {
       this.row = {
         run_id: input.runId,
@@ -176,9 +181,28 @@ class Store {
       return 'INSERTED';
     }
     if (this.row.content_sha256 === input.digest) return 'IDENTICAL';
+    const previousStatus = this.row.envelope.report.snapshot.status;
+    const nextStatus = input.envelope.report.snapshot.status;
+    if (previousStatus === 'VERIFIED_TERMINAL' && nextStatus !== 'VERIFIED_TERMINAL') {
+      return 'TERMINAL_REGRESSION';
+    }
     if (Date.parse(this.row.observed_at) > Date.parse(input.observedAt) ||
         (this.row.observed_at === input.observedAt &&
           this.row.journal_sequence > input.journalSequence)) return 'STALE';
+    if (Date.parse(this.row.observed_at) < Date.parse(input.observedAt) &&
+        this.row.journal_sequence <= input.journalSequence ||
+        this.row.observed_at === input.observedAt &&
+          this.row.journal_sequence < input.journalSequence) {
+      this.row = {
+        run_id: input.runId,
+        config_hash: input.configHash,
+        content_sha256: input.digest,
+        observed_at: input.observedAt,
+        journal_sequence: input.journalSequence,
+        envelope: structuredClone(input.envelope)
+      };
+      return 'INSERTED';
+    }
     return 'CONFLICT';
   }
   async get(runId) { return this.row?.run_id === runId ? this.row : null; }
@@ -300,6 +324,16 @@ test('host8h gateway isolates admission, requires separate upload auth, and reje
   old.sourceEvidence.journalSequence = 1;
   assert.equal((await upload(old)).status, 409);
   assert.equal((await upload(summary())).status, 200);
+  store.conflictNext = true;
+  const conflict = await upload(summary());
+  assert.equal(conflict.status, 409);
+  assert.equal(conflict.body.error, 'host8h_snapshot_conflict');
+  assert.equal((await upload(summary('VERIFIED_TERMINAL'))).status, 201);
+  const terminalRow = structuredClone(store.row);
+  const regression = await upload(summary());
+  assert.equal(regression.status, 409);
+  assert.equal(regression.body.error, 'host8h_terminal_regression_rejected');
+  assert.deepEqual(store.row, terminalRow, 'terminal state and provenance survive a running replay');
   const legacy = await handleSpotPaperHost8hReportGatewayRequest(
     request('GET', '/api/private/spot-paper-report', READ_TOKEN), deps
   );
@@ -331,7 +365,9 @@ class Element {
   getAttribute(name) { return this.attributes[name] ?? null; }
 }
 
-function dashboardDependencies(fetchImpl, {unlocked = true} = {}) {
+function dashboardDependencies(fetchImpl, {
+  unlocked = true, now = () => NOW, staleAfterMs = 5 * 60 * 1000
+} = {}) {
   const root = new Element();
   const document = {createElement: () => new Element()};
   const listeners = new Set();
@@ -355,15 +391,15 @@ function dashboardDependencies(fetchImpl, {unlocked = true} = {}) {
   const controller = mountSpotPaperHost8hDashboard(root, document, window, {
     access,
     fetchImpl,
-    now: () => NOW,
+    now,
+    staleAfterMs,
     schedule: (callback, delay) => {
-      const timer = {callback, delay};
+      const timer = {callback, delay, cancelled: false};
       timers.push(timer);
       return timer;
     },
     cancelSchedule: timer => {
-      const index = timers.indexOf(timer);
-      if (index >= 0) timers.splice(index, 1);
+      timer.cancelled = true;
     }
   });
   return {root, controller, timers};
@@ -434,6 +470,128 @@ test('Dashboard reports missing provisioning and cancels in-flight reads when in
   pending.controller.dispose();
 });
 
+test('Dashboard distinguishes a missing summary from a missing route on bounded 404s', async () => {
+  const missingSummary = dashboardDependencies(async () =>
+    response({error: 'host8h_report_not_found'}, 404));
+  missingSummary.controller.setActive(true);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.match(missingSummary.root.textContent, /noch kein Summary hochgeladen/);
+  missingSummary.controller.dispose();
+
+  const missingRoute = dashboardDependencies(async () => response({error: 'not_found'}, 404));
+  missingRoute.controller.setActive(true);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.match(missingRoute.root.textContent, /nicht provisioniert/);
+  missingRoute.controller.dispose();
+});
+
+test('Dashboard freshness expires locally and cancels its timer when inactive', async () => {
+  let clock = NOW;
+  const freshnessWindow = 60_000;
+  let calls = 0;
+  const deps = dashboardDependencies(async () => {
+    calls++;
+    return response({
+      schema: SPOT_PAPER_HOST8H_ENVELOPE_SCHEMA,
+      runId: identity.runId,
+      report: summary()
+    });
+  }, {now: () => clock, staleAfterMs: freshnessWindow});
+  deps.controller.setActive(true);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(deps.root.getAttribute('data-state'), 'running_observed');
+  const timer = deps.timers.find(candidate =>
+    !candidate.cancelled && candidate.delay === freshnessWindow + 1);
+  assert.ok(timer, 'a one-shot local timer is scheduled for the freshness boundary');
+  clock = NOW + freshnessWindow + 1;
+  timer.cancelled = true;
+  timer.callback();
+  assert.equal(deps.root.getAttribute('data-state'), 'stale');
+  assert.match(deps.root.textContent, /Snapshot veraltet/);
+  assert.equal(deps.root.textContent.includes('nicht provisioniert'), false);
+  assert.equal(calls, 1, 'freshness expiry is local and does not poll the endpoint');
+  deps.controller.dispose();
+
+  const active = dashboardDependencies(async () => response({
+    schema: SPOT_PAPER_HOST8H_ENVELOPE_SCHEMA,
+    runId: identity.runId,
+    report: summary()
+  }));
+  active.controller.setActive(true);
+  await new Promise(resolve => setImmediate(resolve));
+  const pendingTimer = active.timers.find(candidate =>
+    !candidate.cancelled && candidate.delay === 5 * 60 * 1000 + 1);
+  assert.ok(pendingTimer);
+  active.controller.setActive(false);
+  assert.equal(pendingTimer.cancelled, true);
+  active.controller.dispose();
+});
+
+test('Dashboard rejects out-of-order and terminal-to-running snapshots without replacement', async () => {
+  const responses = [
+    summary('VERIFIED_TERMINAL'),
+    {...summary(), observedAt: new Date(NOW + 1_000).toISOString()}
+  ];
+  let clock = NOW;
+  const deps = dashboardDependencies(async () => response({
+    schema: SPOT_PAPER_HOST8H_ENVELOPE_SCHEMA,
+    runId: identity.runId,
+    report: responses.shift()
+  }), {now: () => clock});
+  deps.controller.setActive(true);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(deps.root.getAttribute('data-state'), 'verified_terminal');
+  const terminalText = deps.root.textContent;
+  clock = NOW + 2_000;
+  await deps.controller.refresh();
+  assert.equal(deps.root.getAttribute('data-state'), 'verified_terminal');
+  assert.match(deps.root.textContent, /Rückschritt verworfen/);
+  assert.match(deps.root.textContent, /Abgeschlossen · Assessment verifiziert/);
+  assert.match(deps.root.textContent, /Zuletzt beobachtet08\.11\.2026, 14:00:00 UTC/);
+  assert.ok(deps.root.textContent.includes('Datenlücken10'));
+  assert.notEqual(deps.root.textContent, terminalText);
+  deps.controller.dispose();
+
+  const orderedResponses = [
+    summary(),
+    {...summary(), observedAt: '2026-11-08T13:59:00.000Z'}
+  ];
+  const outOfOrder = dashboardDependencies(async () => response({
+    schema: SPOT_PAPER_HOST8H_ENVELOPE_SCHEMA,
+    runId: identity.runId,
+    report: orderedResponses.shift()
+  }));
+  outOfOrder.controller.setActive(true);
+  await new Promise(resolve => setImmediate(resolve));
+  const acceptedText = outOfOrder.root.textContent;
+  await outOfOrder.controller.refresh();
+  assert.equal(outOfOrder.root.getAttribute('data-state'), 'running_observed');
+  assert.match(outOfOrder.root.textContent, /Rückschritt verworfen/);
+  assert.match(outOfOrder.root.textContent, /Zuletzt beobachtet08\.11\.2026, 14:00:00 UTC/);
+  assert.notEqual(outOfOrder.root.textContent, acceptedText);
+  outOfOrder.controller.dispose();
+
+  const sequenceResponses = [
+    summary(),
+    {...summary(), observedAt: new Date(NOW + 1_000).toISOString(),
+      sourceEvidence: {...summary().sourceEvidence, journalSequence: 2}}
+  ];
+  clock = NOW;
+  const sequenceRegression = dashboardDependencies(async () => response({
+    schema: SPOT_PAPER_HOST8H_ENVELOPE_SCHEMA,
+    runId: identity.runId,
+    report: sequenceResponses.shift()
+  }), {now: () => clock});
+  sequenceRegression.controller.setActive(true);
+  await new Promise(resolve => setImmediate(resolve));
+  clock = NOW + 2_000;
+  await sequenceRegression.controller.refresh();
+  assert.equal(sequenceRegression.root.getAttribute('data-state'), 'running_observed');
+  assert.match(sequenceRegression.root.textContent, /Rückschritt verworfen/);
+  assert.match(sequenceRegression.root.textContent, /Zuletzt beobachtet08\.11\.2026, 14:00:00 UTC/);
+  sequenceRegression.controller.dispose();
+});
+
 test('host8h database upsert refuses sequence regression despite a later timestamp', async () => {
   const statements = [];
   const client = {
@@ -445,7 +603,8 @@ test('host8h database upsert refuses sequence regression despite a later timesta
           config_hash: 'c'.repeat(64),
           content_sha256: 'd'.repeat(64),
           observed_at: new Date(NOW).toISOString(),
-          journal_sequence: 9
+          journal_sequence: 9,
+          envelope: {report: {snapshot: {status: 'RUNNING_OBSERVED'}}}
         }]};
       }
       return {rowCount: 0, rows: []};
@@ -468,4 +627,6 @@ test('host8h database upsert refuses sequence regression despite a later timesta
   const insert = statements.find(sql => sql.startsWith('INSERT INTO'));
   assert.match(insert, /observed_at < EXCLUDED\.observed_at[\s\S]*journal_sequence <= EXCLUDED\.journal_sequence/);
   assert.match(insert, /observed_at = EXCLUDED\.observed_at[\s\S]*journal_sequence < EXCLUDED\.journal_sequence/);
+  assert.match(insert, /IS DISTINCT FROM\s+'VERIFIED_TERMINAL'[\s\S]*EXCLUDED\.envelope #>>/);
+  assert.match(statements.find(sql => sql.startsWith('SELECT config_hash')), /envelope/);
 });

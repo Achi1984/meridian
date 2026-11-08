@@ -1,6 +1,7 @@
 import {appAccess} from './app-access.js?v=B16-M11-FIX13';
 import {renderSpotPaperHost8h} from './spot-paper-host8h-view.js?v=B16-M11-FIX13';
 import {
+  presentSpotPaperHost8h,
   SPOT_PAPER_HOST8H_MAX_INPUT_BYTES
 } from './spot-paper-host8h-model.js?v=B16-M11-FIX13';
 
@@ -23,7 +24,6 @@ const messages = {
 };
 
 async function boundedJson(response, signal) {
-  if (response.status === 404) throw new Error('TRANSPORT_NOT_PROVISIONED');
   const contentType = String(response.headers?.get?.('content-type') || '');
   if (!/^application\/json(?:\s*;\s*charset=utf-8)?$/i.test(contentType)) {
     throw new Error('INVALID_CONTENT_TYPE');
@@ -116,6 +116,14 @@ export function mountSpotPaperHost8hDashboard(root, document, window, {
   let retryTimer = null;
   let request = null;
   let generation = 0;
+  let freshnessTimer = null;
+  let snapshotNotice = null;
+
+  function clearFreshness() {
+    if (freshnessTimer === null) return;
+    cancelSchedule(freshnessTimer);
+    freshnessTimer = null;
+  }
 
   function clearRetry() {
     if (retryTimer === null) return;
@@ -126,7 +134,9 @@ export function mountSpotPaperHost8hDashboard(root, document, window, {
   function clearPrivate() {
     generation++;
     loading = false;
+    clearFreshness();
     snapshot = null;
+    snapshotNotice = null;
     request?.abort();
     request = null;
     clearRetry();
@@ -158,10 +168,12 @@ export function mountSpotPaperHost8hDashboard(root, document, window, {
 
   function render() {
     if (disposed) return;
+    clearFreshness();
     const canRead = enabled && active && access.isUnlocked();
     const result = renderSpotPaperHost8h(root, snapshot, document, {
       now: now(),
       staleAfterMs,
+      previousObservedAt: snapshot?.observedAt ?? null,
       loading,
       retryBlocked: retryBlocked(),
       onRefresh: canRead ? refresh : null,
@@ -178,6 +190,25 @@ export function mountSpotPaperHost8hDashboard(root, document, window, {
         (retryAt - now()) / 1000)} s verfügbar.`;
       notice.className = 'caption';
       root.append(notice);
+    }
+    if (snapshotNotice) {
+      const notice = document.createElement('p');
+      notice.textContent = snapshotNotice;
+      notice.className = 'caption';
+      root.append(notice);
+    }
+    if (active && snapshot) {
+      const observedAt = Date.parse(snapshot.observedAt);
+      const currentTime = now();
+      if (Number.isFinite(observedAt) && Number.isSafeInteger(currentTime) &&
+          observedAt <= currentTime && currentTime - observedAt <= staleAfterMs) {
+        const delay = Math.min(staleAfterMs - (currentTime - observedAt) + 1,
+          2_147_483_647);
+        freshnessTimer = schedule(() => {
+          freshnessTimer = null;
+          render();
+        }, Math.max(1, delay));
+      }
     }
     return result;
   }
@@ -239,11 +270,29 @@ export function mountSpotPaperHost8hDashboard(root, document, window, {
       if (timedOut) throw new Error('REQUEST_TIMEOUT');
       if (controller.signal.aborted || id !== generation || !active ||
           !access.isUnlocked() || access.getToken() !== token) return;
+      const candidate = presentSpotPaperHost8h(report, {
+        now: now(), staleAfterMs, previousObservedAt: snapshot?.observedAt ?? null
+      });
+      const previousSequence = snapshot?.sourceEvidence?.journalSequence;
+      const nextSequence = report.sourceEvidence?.journalSequence;
+      const terminalRegression = snapshot?.snapshot?.status === 'VERIFIED_TERMINAL' &&
+        report.snapshot.status !== 'VERIFIED_TERMINAL';
+      if (!candidate.available || candidate.status === 'OUT_OF_ORDER' ||
+          Number.isSafeInteger(previousSequence) && Number.isSafeInteger(nextSequence) &&
+            nextSequence < previousSequence || terminalRegression) {
+        loading = false;
+        errorState = 'ready';
+        snapshotNotice =
+          'Rückschritt verworfen; der zuletzt angenommene Host8h-Snapshot bleibt maßgeblich.';
+        render();
+        return;
+      }
       snapshot = report;
       loading = false;
       errorCount = 0;
       retryAt = 0;
       errorState = 'ready';
+      snapshotNotice = null;
     } catch (error) {
       if (id !== generation || disposed || !active) return;
       if (controller.signal.aborted && !timedOut) return;
