@@ -162,6 +162,13 @@ test(name, {timeout: 180_000}, async () => {
         await evaluate(`document.querySelector('#nav button[data-v="strategies"]').click()`);
         assert.equal(await evaluate(`!!document.querySelector('#spot-paper-cockpit-root')`), true);
         assert.equal(intercepted.reads(), 0, 'unlock and navigation do not read the report');
+        assert.equal(await evaluate(`document.getElementById('paper-history-section').open`), false,
+          'previous reports start collapsed');
+        await evaluate(`document.querySelector('#paper-history-section > summary').click()`);
+        assert.equal(await evaluate(`document.getElementById('paper-history-section').open &&
+          document.querySelector('#spot-paper-cockpit-root button').getBoundingClientRect().height >= 44`), true,
+          'opening history exposes a usable manual report control');
+        assert.equal(intercepted.reads(), 0, 'opening history does not read the report');
         await evaluate(`document.querySelector('#spot-paper-cockpit-root button').click()`);
         for (let attempt = 0; attempt < 150; attempt++) {
           if (await evaluate(`document.querySelector('#spot-paper-cockpit-root').textContent.includes('OPEN_UNRESOLVED_AT_TERMINAL')`)) break;

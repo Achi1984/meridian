@@ -132,6 +132,16 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
           if(await evaluate(`document.querySelector('#paper-cockpit-root.paper-cockpit') !== null`))break;
           await new Promise(resolve=>setTimeout(resolve,10));
         }
+        assert.equal(await evaluate(`document.getElementById('paper-history-section').open`),false,
+          'previous reports start collapsed');
+        assert.equal(await evaluate(`(()=>{
+          const summary=document.querySelector('#paper-history-section > summary');summary.focus();
+          return document.activeElement===summary;
+        })()`),true,'history disclosure is keyboard focusable');
+        await key('Enter','Enter',13);
+        assert.equal(await evaluate(`document.getElementById('paper-history-section').open`),true,
+          'native Enter opens previous reports before reading or measuring them');
+        assert.equal(intercepted.count(),0,'opening previous reports does not fetch a report');
         const liveRead=await evaluate(`(()=>{
           const button=document.querySelector('#paper-cockpit-root button');
           return button?{text:button.textContent,height:button.getBoundingClientRect().height,
@@ -303,6 +313,15 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
           return document.activeElement===document.getElementById('app-main');
         })()`);
         assert.equal(focus,true);
+        await key('Tab','Tab',9);
+        assert.equal(await evaluate(`document.activeElement===document.querySelector('#spot-paper-host8h-root button')`),
+          true,'the primary Paper status refresh is first in Strategies');
+        await key('Tab','Tab',9);
+        assert.equal(await evaluate(`document.activeElement===document.querySelector('#spot-paper-host8h-root > details > summary')`),
+          true,'primary Paper source details follow its refresh');
+        await key('Tab','Tab',9);
+        assert.equal(await evaluate(`document.activeElement===document.querySelector('#paper-history-section > summary')`),
+          true,'the history disclosure precedes its expanded report controls');
         await key('Tab','Tab',9);
         assert.equal(await evaluate(`document.activeElement===document.querySelector('#spot-paper-cockpit-root button')`),
           true,'Strategies card exposes its manual BTC/EUR refresh before the legacy Paper card');
