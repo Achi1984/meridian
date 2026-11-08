@@ -172,7 +172,7 @@ function inspectionContext() {
 }
 
 export async function inspectSpotPaperPairedRun({ dataRoot, runId } = {}, {
-  includeReport = false
+  includeReport = false, includeJournal = false
 } = {}) {
   const { runDirectory } = validateLocation(dataRoot, runId);
   const rootInfo = await lstat(dataRoot).catch(error => {
@@ -219,6 +219,15 @@ export async function inspectSpotPaperPairedRun({ dataRoot, runId } = {}, {
   const verifiedTerminal = !lock && !pending &&
     journal.reconciliationStatus === "READ_ONLY_VERIFIED" &&
     terminal?.report?.runId === runId;
+  const journalExport = includeJournal ? {
+    schemaVersion: journal.schemaVersion,
+    runId: journal.runId,
+    sequence: journal.sequence,
+    checkpoint: journal.checkpoint,
+    manifest: journal.manifest,
+    events: journal.events,
+    reconciliationStatus: journal.reconciliationStatus
+  } : undefined;
   return {
     schemaVersion: "SPOT_PAPER_PAIRED_HOST_STATUS_V1",
     status: verifiedTerminal ? "TERMINAL_JOURNAL_VERIFIED" :
@@ -227,13 +236,14 @@ export async function inspectSpotPaperPairedRun({ dataRoot, runId } = {}, {
     writerLockPresent: lock, pendingPublication: pending,
     reconciliationStatus: journal.reconciliationStatus,
     sequence: journal.sequence,
-    report: includeReport && terminal ? terminal.report : undefined
+    report: includeReport && terminal ? terminal.report : undefined,
+    journalExport
   };
 }
 
 function parseArgs(argv) {
   const [command = "disabled", ...rest] = argv;
-  assert(["disabled", "run", "status", "report", "package"].includes(command),
+  assert(["disabled", "run", "status", "report", "export", "package"].includes(command),
     "UNKNOWN_HOST_COMMAND");
   const values = {};
   for (let index = 0; index < rest.length; index++) {
@@ -289,10 +299,24 @@ export async function main(argv = process.argv.slice(2), {
     };
   } else if (command === "run") {
     result = await runSpotPaperPairedHost({ dataRoot, runId }, { signalSource });
-  } else if (command === "status" || command === "report") {
+  } else if (command === "status" || command === "report" || command === "export") {
     result = await inspectSpotPaperPairedRun({ dataRoot, runId }, {
-      includeReport: command === "report"
+      includeReport: command !== "status",
+      includeJournal: command === "export"
     });
+    if (command === "export") {
+      result = {
+        schemaVersion: "SPOT_PAPER_PAIRED_HOST_EXPORT_V1",
+        runId: result.runId,
+        status: result.status,
+        verifiedTerminal: result.verifiedTerminal,
+        reconciliationStatus: result.reconciliationStatus,
+        report: result.report ?? null,
+        journal: result.journalExport ?? null
+      };
+      assert(Buffer.byteLength(JSON.stringify(result), "utf8") <=
+        MAX_JOURNAL_BYTES * 2, "HOST_EXPORT_BYTE_LIMIT");
+    }
   } else {
     const evidenceDir = validateLocation(dataRoot, runId).runDirectory;
     const lockPresent = await lstat(join(evidenceDir, "writer.lock"))

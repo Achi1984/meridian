@@ -1,16 +1,16 @@
 # BTC/EUR paired shared-feed forward adapter
 
-**Status: synthetic integration verified against reviewed candidate source;
-production launch remains blocked and no launch/readiness claim is made.** Lead
-reviewed #1299 candidate `adf5c0a6e7b7d93bfd106dd6136c40a8e15a6373` is still a
-separate, unmerged dependency and its files are not in this checkout. Its exact
-candidate exports are `createEntryConfirmationState`,
+**Status: actual-export synthetic integration passes against merged #1299;
+production launch remains blocked and no launch/readiness claim is made.** The
+reviewed #1299 source `adf5c0a6e7b7d93bfd106dd6136c40a8e15a6373` is merged to
+`main` at `4f5c4a3c8489129c514cd57c4b71f37ee05bcddf`. Its exports are
+`createEntryConfirmationState`,
 `advanceEntryConfirmation`, `recordEntryConfirmationSell`, and
 `compareSpotPaperStrategies`. The multi-cycle test binds these actual exports
-from an isolated temporary composition of that exact candidate; no strategy
-simulator or mock comparison engine is used. This verifies synthetic integration
-only, not live acceptance or operational readiness. The accepted research-source
-pin remains `null` until Lead accepts the integrated adapter.
+from this checkout; no strategy simulator, temporary overlay, or mock comparison
+engine is used. This verifies synthetic integration only, not live acceptance or
+operational readiness. The accepted research-source pin remains `null` until
+Lead accepts the integrated adapter.
 
 ## Frozen experiment contract
 
@@ -75,9 +75,9 @@ request data. The separate `runSpotPaperPairedSynthetic` path accepts only the
 `SYNTHETIC_TEST_ONLY` feed identity and labels its report `testOnly`. It cannot
 be used as a live-feed substitute or evidence of integration.
 
-After #1299 is accepted and present at its exact reviewed commit, calculate the
-source pin from the two research exports with this deterministic command (run
-from that checkout; path names are included in the hash):
+After Lead accepts this paired integration, calculate the production source pin
+from the merged #1299 research exports with this deterministic command (run
+from the repository root; path names are included in the hash):
 
 ```sh
 node --input-type=module -e '
@@ -149,28 +149,24 @@ identifiers to a paired run.
 
 ## Offline validation command
 
-Run the focused synthetic acceptance suite from the repository root:
+Run the focused acceptance suite from the repository root:
 
 ```sh
 node --test test/spot-paper-paired-forward.test.js
 ```
 
 The synthetic contract tests use an in-memory feed and make no network or order
-calls. The actual-export integration acceptance test is not skipped and does not
-depend on the production accepted-source pin. It imports the research sources
-from the checkout and fails with `RESEARCH_INTEGRATION_SOURCE_MISSING` if they
-are absent. For this intermediate branch validation it was run against temporary
-files extracted byte-for-byte from candidate
-`adf5c0a6e7b7d93bfd106dd6136c40a8e15a6373`; those files were not added to or
-changed in this branch. Before that dependency merges the ordinary test command
-will report the missing source explicitly. After merge, the same test runs as a
-normal required test without a skip or production pin.
+calls. The actual-export integration test imports the merged research sources
+from the checkout and does not depend on the production accepted-source pin.
+It exercises 480 cycles, provider-shaped long snapshots, buys and sells, the
+decision/quote cooldown boundary, stopped inventory valuation, and replay-to-
+forward account reconciliation.
 
 ## Lead review identity and future host work
 
-The host CLI has a fail-closed run command, read-only status/report commands,
-and bounded byte-preserving packaging. No run was launched. After #1299 is
-accepted, lead review must bind all of the following
+The host CLI has a fail-closed run command, read-only status/report/export
+commands, and bounded byte-preserving packaging. No run was launched. Lead
+review must bind all of the following
 before any separate operating approval:
 
 | Identity | Required review value |
@@ -196,6 +192,7 @@ node scripts/spot-paper-paired/host.mjs disabled
 node scripts/spot-paper-paired/host.mjs run --data-root /evidence-root --run-id <new-unique-run-id>
 node scripts/spot-paper-paired/host.mjs status --data-root /evidence-root --run-id <run-id>
 node scripts/spot-paper-paired/host.mjs report --data-root /evidence-root --run-id <run-id>
+node scripts/spot-paper-paired/host.mjs export --data-root /evidence-root --run-id <run-id>
 node scripts/spot-paper-paired/host.mjs package --data-root /evidence-root --run-id <run-id> --archive /tmp/<run-id>.tar --manifest /tmp/<run-id>.manifest.json --retrieval-window-ms 300000
 ```
 
@@ -209,6 +206,34 @@ because the production pin is null. The other commands are read-only except
 maintenance process open for the requested retrieval window. They do not verify
 that a remote writer process has stopped: an operator must independently verify
 terminal state before running inspection/package on a mounted evidence volume.
+
+`export` emits one bounded `SPOT_PAPER_PAIRED_HOST_EXPORT_V1` JSON object with
+top-level `status`, `verifiedTerminal`, `reconciliationStatus`, `report`, and
+`journal`. `report` is the standalone `SPOT_PAPER_PAIRED_REPORT_V1` terminal
+report (or `null` when no terminal report exists). `journal` is the validated
+`readRunJournal` payload, including `manifest`, ordered `events`, and its
+`reconciliationStatus`; the terminal event's report must equal the top-level
+report. The export has no host filesystem path and is capped at twice the
+8 MiB journal limit. Consumers should preserve the original packaged evidence
+as well: this JSON export is a read-only structural view, not a byte-exact
+journal copy or independent authentication. A non-verified status remains
+non-verified in the export and must not be relabeled as complete.
+
+The paired terminal report's consumer-facing fields are `runId`, `pair`,
+`models`, `sourceSha256`, `configSha256`, `researchSourceSha256`,
+`integrationStatus`, `outcome`, `stopReason`, `startedAt`, `endedAt`,
+`elapsedMs`, `coverage`, `cycles`, `requests`, `deliveredBytes`,
+`commonHorizon`, `assumptions`, `arms`, and `comparison`. Each arm exposes
+`role`, `modelId`, `accountId`, `tradingStatus`, `stopReason`, `stoppedAt`,
+`decisions`, `fills`, `riskStates`, and `valuation`; valuation includes
+`feesCents`, `slippageCents`, `modeledCostsCents`, `netEquityCents`,
+`markedEquityCents`, `sampledDrawdownCents`, `exposureCents`, `turnoverCents`,
+`openPositions`, `unresolvedObservations`, and `markAgeMs`. Comparison arm
+state distinguishes `tradingStoppedAt` from `valuationAt`. These are canonical
+producer fields; dashboard consumers should map them through the shared #1302
+DTO rather than inventing a parallel report schema. `elapsedMs` is a finite
+monotonic duration and may be fractional; consumers must not require integer
+milliseconds.
 
 For Northflank retrieval, use a separately reviewed maintenance Job with the
 evidence volume mounted read-only and the exact `node` host command above; use
@@ -253,16 +278,12 @@ verification. Never reuse
 `btc-eur-paper-host-8h-001`, its image, volume or evidence. No deployment or
 host-provider mutation is part of this change.
 
-The focused commands are `node --test test/spot-paper-paired-forward.test.js`
-and `node --test test/spot-paper-paired-host.test.js`. The multi-cycle
-actual-export test passed against the exact #1299 candidate in the temporary
-isolated composition; the candidate's hosted workflow run `42523447964` on
-`adf5c0a6e7b7d93bfd106dd6136c40a8e15a6373` completed successfully. The candidate
-is not yet merged, so the checked-in acceptance test reports
-`RESEARCH_INTEGRATION_SOURCE_MISSING` when run without the temporary source
-composition. After merge, update this branch from main and rerun the same test
-commands as normal required tests; final-head hosted CI remains required. These
-synthetic and host-helper tests do not establish live acceptance or readiness.
+The actual-export test passed as an ordinary non-skipped test after updating
+this branch from `main` at `4f5c4a3c8489129c514cd57c4b71f37ee05bcddf`.
+Paired forward tests: 18 passed; host tests: 4 passed; merged #1299 research
+tests: 14 passed. The research commit's hosted workflow run `42523447964`
+completed successfully. These synthetic and host-helper tests do not establish
+live acceptance or readiness; final-head hosted CI remains required.
 The existing
 [BTC/EUR post-run retrieval runbook](../operations/BTC_EUR_8H_POSTRUN_20261108.md)
 describes that sequence for the old run identity only; it is not approval or

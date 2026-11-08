@@ -54,6 +54,13 @@ test("paired host defaults are the frozen adapter bounds and integration stays b
     dataRoot, runId: "paired-host-blocked"
   });
   assert.equal(missing.status, "NOT_FOUND");
+  const missingExport = await main([
+    "export", "--data-root", dataRoot, "--run-id", "paired-host-blocked"
+  ], { output });
+  assert.equal(missingExport.status, "NOT_FOUND");
+  assert.equal(missingExport.verifiedTerminal, false);
+  assert.equal(missingExport.report, null);
+  assert.equal(missingExport.journal, null);
 });
 
 test("host composition rejects an existing evidence path before integration or feed access", async t => {
@@ -64,7 +71,7 @@ test("host composition rejects an existing evidence path before integration or f
   }), /EVIDENCE_PATH_ALREADY_EXISTS/);
 });
 
-test("read-only status/report and package commands reuse paired journal helpers", async t => {
+test("read-only status/report/export and package commands reuse paired journal helpers", async t => {
   const dataRoot = await rootFixture(t);
   const runId = "paired-host-evidence";
   await completedJournal(dataRoot, runId);
@@ -76,6 +83,16 @@ test("read-only status/report and package commands reuse paired journal helpers"
   const report = await main(["report", "--data-root", dataRoot, "--run-id", runId],
     { output });
   assert.equal(report.report.runId, runId);
+  const exported = await main(["export", "--data-root", dataRoot, "--run-id", runId],
+    { output });
+  assert.equal(exported.schemaVersion, "SPOT_PAPER_PAIRED_HOST_EXPORT_V1");
+  assert.equal(exported.status, "TERMINAL_JOURNAL_VERIFIED");
+  assert.equal(exported.verifiedTerminal, true);
+  assert.equal(exported.reconciliationStatus, "READ_ONLY_VERIFIED");
+  assert.deepEqual(exported.report,
+    exported.journal.events.at(-1).report);
+  assert.equal(exported.journal.reconciliationStatus, "READ_ONLY_VERIFIED");
+  assert.equal(Object.hasOwn(exported, "runDirectory"), false);
   const archivePath = join(dataRoot, `${runId}.tar`);
   const manifestPath = join(dataRoot, `${runId}.manifest.json`);
   const packaged = await main([
