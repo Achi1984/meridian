@@ -21,7 +21,11 @@ const RUNTIME_SOURCE_FILES = [
 const HOST_STATE_FILE = "host-state.json";
 const HOST_LOCK_FILE = "host.lock";
 const JOURNAL_READ_TIMEOUT_MS = 5_000;
+const MAX_JOURNAL_BYTES = 8 * 1024 * 1024;
+const MAX_REPORT_BYTES = 256 * 1024;
+const MAX_PENDING_BYTES = 16 * 1024;
 const CHILD_SHUTDOWN_GRACE_MS = 7_000;
+const CHILD_REAP_GRACE_MS = 1_000;
 
 const manifestBytes = await readFile(MANIFEST_PATH);
 export const HOST_LAUNCH_MANIFEST = JSON.parse(manifestBytes.toString("utf8"));
@@ -176,10 +180,88 @@ async function readHostState(evidenceDir) {
   return state;
 }
 
+async function readBoundedRunJournal(evidenceDir) {
+  const runDirectory = join(evidenceDir, "runtime", HOST_LAUNCH_MANIFEST.runId);
+  const journalPath = join(runDirectory, "journal.json");
+  for (const directory of [dirname(runDirectory), runDirectory]) {
+    try {
+      const directoryInfo = await lstat(directory);
+      if (!directoryInfo.isDirectory() || directoryInfo.isSymbolicLink()) {
+        throw new Error("INVALID_JOURNAL_DIRECTORY");
+      }
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
+  }
+  try {
+    const journalInfo = await lstat(journalPath);
+    if (!journalInfo.isFile() || journalInfo.isSymbolicLink() ||
+        journalInfo.size > MAX_JOURNAL_BYTES) {
+      throw new Error("JOURNAL_SIZE_LIMIT");
+    }
+    let envelope;
+    try {
+      envelope = JSON.parse((await readFile(journalPath)).toString("utf8"));
+    } catch {
+      throw new Error("INVALID_JOURNAL_JSON");
+    }
+    const events = envelope?.payload?.events;
+    if (Array.isArray(events)) {
+      if (events.length > HOST_LAUNCH_MANIFEST.maxCycles + 2) {
+        throw new Error("JOURNAL_EVENT_LIMIT");
+      }
+      const responses = new Map();
+      for (const event of events) {
+        for (const response of [event.ohlc, event.ticker, event.acceptedOhlc, event.acceptedTicker]) {
+          if (!response?.path) continue;
+          if (!Number.isSafeInteger(response.bytes) || response.bytes < 0 ||
+              response.bytes > HOST_LAUNCH_MANIFEST.maxResponseBytes) {
+            throw new Error("JOURNAL_RESPONSE_SIZE_LIMIT");
+          }
+          if (typeof response.sha256 !== "string" ||
+              response.path !== `responses/${response.sha256}.json` ||
+              !/^responses\/[a-f0-9]{64}\.json$/.test(response.path)) {
+            throw new Error("INVALID_RESPONSE_REFERENCE");
+          }
+          const responseInfo = await lstat(join(runDirectory, response.path));
+          if (!responseInfo.isFile() || responseInfo.isSymbolicLink() ||
+              responseInfo.size !== response.bytes) {
+            throw new Error("INVALID_RESPONSE_FILE");
+          }
+          responses.set(response.path, response.bytes);
+        }
+      }
+      const responseBytes = [...responses.values()].reduce((sum, bytes) => sum + bytes, 0);
+      if (responses.size > HOST_LAUNCH_MANIFEST.maxRequests ||
+          responseBytes > HOST_LAUNCH_MANIFEST.maxBytes) {
+        throw new Error("JOURNAL_RESPONSE_BUDGET_EXCEEDED");
+      }
+    }
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+  try {
+    const pendingInfo = await lstat(join(runDirectory, "journal.pending"));
+    if (!pendingInfo.isFile() || pendingInfo.size > MAX_PENDING_BYTES) {
+      throw new Error("JOURNAL_PENDING_SIZE_LIMIT");
+    }
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+  return readRunJournal({
+    dataRoot: join(evidenceDir, "runtime"),
+    runId: HOST_LAUNCH_MANIFEST.runId,
+    deadlineAt: performance.now() + JOURNAL_READ_TIMEOUT_MS,
+    monotonicNow: () => performance.now()
+  });
+}
+
 function journalMatchesLaunch(journal) {
   const limits = journal?.manifest?.limits;
   const report = journal?.events?.at(-1)?.report;
   const terminal = journal?.events?.at(-1);
+  const start = journal?.events?.[0];
+  const counters = journal?.checkpoint?.counters;
   return journal?.runId === HOST_LAUNCH_MANIFEST.runId &&
     journal.manifest?.schemaVersion === "SPOT_PAPER_PILOT_MANIFEST_V1" &&
     journal.manifest?.model === HOST_LAUNCH_MANIFEST.model &&
@@ -192,23 +274,32 @@ function journalMatchesLaunch(journal) {
     limits?.maxBytes === HOST_LAUNCH_MANIFEST.maxBytes &&
     limits?.maxResponseBytes === HOST_LAUNCH_MANIFEST.maxResponseBytes &&
     limits?.requestTimeoutMs === HOST_LAUNCH_MANIFEST.requestTimeoutMs &&
+    start?.id === "run-start" && start?.type === "start" &&
     terminal?.id === "run-terminal" && terminal?.type === "terminal" &&
+    terminal.at === report?.endedAt &&
+    journal.checkpoint?.stopReason === report?.stopReason &&
     report?.schemaVersion === "SPOT_PAPER_PILOT_REPORT_V1" &&
     report.runId === HOST_LAUNCH_MANIFEST.runId &&
     report.model === HOST_LAUNCH_MANIFEST.model &&
     report.mode === "paper" && report.pair === HOST_LAUNCH_MANIFEST.pair &&
     report.operationalStatus === "COMPLETED_BOUNDED" &&
-    report.stopReason === terminal.report?.stopReason &&
     ["CYCLE_LIMIT", "DURATION_LIMIT"].includes(report.stopReason) &&
     report.profitability === "NOT_ASSESSED" &&
     report.executionImpact === false && report.liveTrading === false &&
     report.autoPromotion === false &&
     Number.isSafeInteger(report.startedAt) && Number.isSafeInteger(report.endedAt) &&
-    report.endedAt >= report.startedAt &&
-    Number.isSafeInteger(report.requests) && report.requests <= HOST_LAUNCH_MANIFEST.maxRequests &&
-    Number.isSafeInteger(report.deliveredBytes) && report.deliveredBytes <= HOST_LAUNCH_MANIFEST.maxBytes &&
+    report.startedAt === start.at && report.endedAt >= report.startedAt &&
+    Number.isSafeInteger(report.observations) && report.observations >= 0 &&
+    Number.isSafeInteger(report.dataGaps) && report.dataGaps >= 0 &&
+    Number.isSafeInteger(report.requests) && report.requests >= 0 &&
+    report.requests <= HOST_LAUNCH_MANIFEST.maxRequests &&
+    report.requests === counters?.requests &&
+    Number.isSafeInteger(report.deliveredBytes) && report.deliveredBytes >= 0 &&
+    report.deliveredBytes <= HOST_LAUNCH_MANIFEST.maxBytes &&
+    report.deliveredBytes === counters?.bytes &&
     Number.isSafeInteger(journal.checkpoint?.cycle) &&
-    journal.checkpoint.cycle <= HOST_LAUNCH_MANIFEST.maxCycles;
+    journal.checkpoint.cycle <= HOST_LAUNCH_MANIFEST.maxCycles &&
+    Buffer.byteLength(JSON.stringify(report)) <= MAX_REPORT_BYTES;
 }
 
 export async function inspectHostRun(evidenceDir, { includeReport = false } = {}) {
@@ -227,6 +318,14 @@ export async function inspectHostRun(evidenceDir, { includeReport = false } = {}
   } catch (error) {
     return { status: "INCOMPLETE_UNKNOWN", verifiedTerminal: false, reason: error.message };
   }
+  if (await runtimeSourceDigest() !== state.runtimeSourceSha256) {
+    return {
+      status: "INCOMPLETE_UNKNOWN",
+      verifiedTerminal: false,
+      runId: state.runId,
+      reason: "RUNTIME_SOURCE_DIGEST_MISMATCH"
+    };
+  }
   if (state.status === "RUNNING" && childAlive(state.childPid)) {
     return {
       status: "RUNNING_OBSERVED",
@@ -236,12 +335,7 @@ export async function inspectHostRun(evidenceDir, { includeReport = false } = {}
     };
   }
   try {
-    journal = await readRunJournal({
-      dataRoot: join(evidenceDir, "runtime"),
-      runId: HOST_LAUNCH_MANIFEST.runId,
-      deadlineAt: performance.now() + JOURNAL_READ_TIMEOUT_MS,
-      monotonicNow: () => performance.now()
-    });
+    journal = await readBoundedRunJournal(evidenceDir);
   } catch (error) {
     journalError = error.message;
   }
@@ -278,9 +372,12 @@ export async function launchHostRun({
   await ensureEvidencePathAvailable(evidenceDir);
   await mkdir(evidenceDir, { mode: 0o700 });
   const lock = await open(join(evidenceDir, HOST_LOCK_FILE), "wx", 0o600);
-  await lock.writeFile(`${JSON.stringify({ runId: manifest.runId, pid: process.pid })}\n`);
-  await lock.sync();
-  await lock.close();
+  try {
+    await lock.writeFile(`${JSON.stringify({ runId: manifest.runId, pid: process.pid })}\n`);
+    await lock.sync();
+  } finally {
+    await lock.close();
+  }
   let state = {
     schemaVersion: "SPOT_PAPER_HOST_STATE_V1",
     runId: manifest.runId,
@@ -296,6 +393,7 @@ export async function launchHostRun({
 
   let child;
   let stopTimer;
+  let reapTimer;
   let exitResolved = false;
   let settleExit;
   const exitPromise = new Promise(resolvePromise => {
@@ -314,6 +412,9 @@ export async function launchHostRun({
     stopTimer = setTimeout(() => {
       if (!exitResolved) {
         try { child.kill("SIGKILL"); } catch {}
+        reapTimer = setTimeout(() => {
+          onExit({ error: new Error("CHILD_TERMINATION_UNCONFIRMED") });
+        }, CHILD_REAP_GRACE_MS);
       }
     }, shutdownGraceMs);
   };
@@ -354,7 +455,7 @@ export async function launchHostRun({
     if (stopTimer) clearTimeout(stopTimer);
     state = {
       ...state,
-      status: exitResult.error ? "CHILD_SPAWN_FAILED" : "CHILD_EXITED",
+      status: exitResult.error && !child.pid ? "CHILD_SPAWN_FAILED" : "CHILD_EXITED",
       childExitCode: exitResult.code ?? null,
       childSignal: exitResult.signal ?? null,
       childError: exitResult.error?.message ?? null
@@ -380,6 +481,7 @@ export async function launchHostRun({
     throw error;
   } finally {
     if (stopTimer) clearTimeout(stopTimer);
+    if (reapTimer) clearTimeout(reapTimer);
     signalSource.removeListener("SIGINT", onInterrupt);
     signalSource.removeListener("SIGTERM", onTerminate);
   }
