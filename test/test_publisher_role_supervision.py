@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -46,20 +47,24 @@ class SupervisionTests(unittest.TestCase):
         try:
             with patch.object(m,'ROOT',private_root): yield private_root
         finally: private.cleanup()
-    def factory(self,*,hang=None,fail=None,exit_error=False,suppress=False,nonzero=False):
+    def factory(self,*,hang=None,fail=None,exit_error=False,suppress=False,nonzero=False,ready_fd=None):
         parent=self.parent; root=self.root; jroot=self.jroot
+        def hang_at(name):
+            (root/'ready').write_text(name)
+            if ready_fd is not None: os.write(ready_fd,b'.')
+            time.sleep(5)
         @contextlib.contextmanager
         def factory(phase):
             assert os.getpid()!=parent
             (root/'worker').write_text(str(os.getpid()))
             if hang=='factory':
-                (root/'ready').write_text(hang); time.sleep(5)
+                hang_at(hang)
             with journal.LocalRoleJournal(jroot) as handle:
                 class Services(f.Services):
                     def hit(self,name):
                         super().hit(name)
                         if hang==name:
-                            (root/'ready').write_text(name); time.sleep(5)
+                            hang_at(name)
                         if fail==name: raise RuntimeError('synthetic failure')
                     def phase(self,token): phase(token)
                     def claim(self,binding):
@@ -73,6 +78,40 @@ class SupervisionTests(unittest.TestCase):
                 if nonzero: os._exit(7)
                 if exit_error: raise RuntimeError('synthetic context failure')
         return factory
+    @contextlib.contextmanager
+    def connect_deadline_after_ready(self):
+        # Drive the phase deadline only after the selected real-child operation
+        # is entered. A loaded runner must not turn a prewrite test into a test
+        # that merely times out earlier during journal setup. Fork, phase ACKs,
+        # claim I/O, SIGKILL and reaping remain real; only this case's clock and
+        # select timeout are injected. The outer real watchdog stays armed.
+        rd,wr=os.pipe()
+        expired_at=None
+        load=m.load_supervisor
+        def clock():
+            return 0.0 if expired_at is None else 1.0+time.monotonic()-expired_at
+        def wait(readers,writers,errors,seconds):
+            nonlocal expired_at
+            ready,writable,exceptional=select.select([*readers,rd],writers,errors,1.0)
+            if rd in ready:
+                self.assertEqual(os.read(rd,1),b'.')
+                self.assertIsNotNone(seconds,'target work entered an unbounded phase')
+                self.assertGreater(seconds,0)
+                self.assertLessEqual(seconds,BUDGETS['connect'])
+                expired_at=time.monotonic()
+                return [],[],[]
+            return ready,writable,exceptional
+        def synchronized_supervisor():
+            supervisor=load()
+            supervisor.time=SimpleNamespace(monotonic=clock,sleep=time.sleep)
+            supervisor.select=SimpleNamespace(select=wait)
+            return supervisor
+        try:
+            with patch.object(m,'load_supervisor',side_effect=synchronized_supervisor):
+                yield wr
+            self.assertIsNotNone(expired_at,'selected operation never reached its deadline barrier')
+        finally:
+            os.close(rd); os.close(wr)
     def run_worker(self,factory=None):
         events=deque(maxlen=64); started=time.monotonic()
         self.worker_pids=[]
@@ -156,7 +195,9 @@ class SupervisionTests(unittest.TestCase):
                 # Separate private root per case; consumed slots must never be reset.
                 self.jroot=self.root/step; self.jroot.mkdir(mode=0o700)
                 (self.root/'ready').unlink(missing_ok=True)
-                started=time.monotonic(); result=self.run_worker(self.factory(hang=step))
+                started=time.monotonic()
+                with self.connect_deadline_after_ready() as ready_fd:
+                    result=self.run_worker(self.factory(hang=step,ready_fd=ready_fd))
                 self.assert_reaped()
                 elapsed=time.monotonic()-started
                 print(f'bounded step={step} ready={(self.root/"ready").exists()} '
