@@ -823,10 +823,11 @@ provider query or operational run.
 1. **Keep the protection unchanged; do not adopt the developer proxy now.**
    Recommendation: retain the current accepted developer-protection contract
    and leave its unresolved gate `UNKNOWN`, rather than treating launch-role
-   keys as a complete developer set. Preserve the existing prior-rug rule:
-   credible attributable positive evidence rejects, while a negative result
-   requires complete coverage of the finite 90-day screen and is not universal
-   absence. **Protection consequence:** this avoids the proxy's known coverage
+   keys as a complete developer set. Preserve the current accepted prior-rug
+   requirements. The proposed finite 90-day negative-screen scope remains
+   unadopted and requires a separate explicit decision; credible attributable
+   positive evidence must not be dismissed because it falls outside that
+   proposed window. **Protection consequence:** this avoids the proxy's known coverage
    loss, including balances transferred to another controlled but unproven
    address, but does not make the unresolved gate pass or claim missing evidence
    is clean.
