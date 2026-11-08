@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, open as openFile, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  mkdir, mkdtemp, open as openFile, readFile, realpath as realpathFile, rm, writeFile
+} from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -413,6 +415,19 @@ test("paper evidence accepts zero fills without validating a fill path or profit
   assert.equal(assessment.profileId, DEFAULT_PAPER_EVIDENCE_PROFILE_ID);
   assert.equal("expectedHostContext" in assessment, false);
   assert.equal(assessment.runClassification, "COMPLETED_HOUR");
+  assert.deepEqual(Object.keys(assessment).sort(), [
+    "acceptedObservationCoverage", "acceptedObservations", "boundedTermination",
+    "cashCents", "cycleCount", "cycleCoverage", "dataAcceptance", "dataGaps",
+    "deliveredBytes", "dispatchIdentity", "durationCoverage", "durationStatus",
+    "elapsedMs", "endedAt", "equityCents", "executionImpact", "feesCents",
+    "fillCostReport", "fills", "gapCoverage", "lastMark", "limitations",
+    "markAgeMs", "observations", "openPositionAssessment", "outcome",
+    "position", "positionStatus", "profitability", "profileId",
+    "quoteAccountingReconciled", "realizedPnlCents", "reasons", "requests",
+    "runClassification", "runId", "signals", "signalReplay", "sourceSha",
+    "startedAt", "stopReason", "terminalVerified", "unrealizedPnlCents",
+    "validationCriteria"
+  ].sort());
   assert.equal(assessment.dataAcceptance, "DATA_ACCEPTED");
   assert.equal(assessment.quoteAccountingReconciled, true);
   assert.equal(assessment.signalReplay, "NOT_PERFORMED");
@@ -464,6 +479,19 @@ test("four-hour allowlisted assessment reports partial duration, unresolved inve
   });
   assert.equal(assessment.outcome, "COMPLETED", JSON.stringify(assessment));
   assert.equal(assessment.profileId, "BTC_EUR_PAPER_4H_V1");
+  assert.deepEqual(Object.keys(assessment).sort(), [
+    "acceptedObservationCoverage", "acceptedObservations", "boundedTermination",
+    "cashCents", "cycleCount", "cycleCoverage", "dataAcceptance", "dataGaps",
+    "deliveredBytes", "dispatchIdentity", "durationCoverage", "durationStatus",
+    "elapsedMs", "endedAt", "equityCents", "executionImpact", "feesCents",
+    "fillCostReport", "fills", "gapCoverage", "lastMark", "limitations",
+    "markAgeMs", "observations", "openPositionAssessment", "outcome",
+    "position", "positionStatus", "profitability", "profileId",
+    "quoteAccountingReconciled", "realizedPnlCents", "reasons", "requests",
+    "runClassification", "runId", "signals", "signalReplay", "sourceSha",
+    "startedAt", "stopReason", "terminalVerified", "unrealizedPnlCents",
+    "validationCriteria"
+  ].sort());
   assert.equal("expectedHostContext" in assessment, false);
   assert.equal(assessment.runClassification, "PARTIAL_BOUNDED_RUN");
   assert.equal(assessment.elapsedMs, 3_600_000);
@@ -663,6 +691,103 @@ test("host assessment CLI requires external context and accepts a separately sup
     assert.deepEqual(JSON.parse(await readFile(evidence.assessmentPath, "utf8")), result);
   } finally {
     process.exitCode = previousExitCode;
+  }
+});
+
+test("host assessment CLI bounds delayed open, stat, read, close, realpath, and output I/O", async t => {
+  const evidence = await hostAssessmentFixture(t);
+  await writeFile(evidence.contextPath, JSON.stringify(evidence.expectedHostContext));
+  const delayed = (operation, delayMs) => new Promise((resolve, reject) => {
+    setTimeout(() => Promise.resolve().then(operation).then(resolve, reject), delayMs);
+  });
+  const cases = [
+    {
+      name: "open",
+      timeoutMs: 40,
+      delayMs: 180,
+      io: {
+        open: async (path, ...args) => path === evidence.contextPath ?
+          delayed(async () => openFile(path, ...args), 180) : openFile(path, ...args)
+      }
+    },
+    {
+      name: "stat",
+      timeoutMs: 40,
+      delayMs: 180,
+      io: {
+        open: async (path, ...args) => {
+          const handle = await openFile(path, ...args);
+          if (path === evidence.contextPath) {
+            const stat = handle.stat.bind(handle);
+            handle.stat = (...statArgs) =>
+              delayed(() => stat(...statArgs), 180);
+          }
+          return handle;
+        }
+      }
+    },
+    {
+      name: "read",
+      timeoutMs: 40,
+      delayMs: 180,
+      io: {
+        open: async (path, ...args) => {
+          const handle = await openFile(path, ...args);
+          if (path === evidence.contextPath) {
+            const read = handle.read.bind(handle);
+            handle.read = (...readArgs) => delayed(() => read(...readArgs), 180);
+          }
+          return handle;
+        }
+      }
+    },
+    {
+      name: "close",
+      timeoutMs: 40,
+      delayMs: 180,
+      io: {
+        open: async (path, ...args) => {
+          const handle = await openFile(path, ...args);
+          if (path === evidence.contextPath) {
+            const close = handle.close.bind(handle);
+            handle.close = () => delayed(() => close(), 180);
+          }
+          return handle;
+        }
+      }
+    },
+    {
+      name: "realpath",
+      timeoutMs: 40,
+      delayMs: 180,
+      io: { realpath: path => delayed(() => realpathFile(path), 180) }
+    },
+    {
+      name: "write",
+      timeoutMs: 800,
+      delayMs: 1_000,
+      io: {
+        writeFile: (path, ...args) => path.endsWith(".tmp") ?
+          delayed(() => writeFile(path, ...args), 1_000) : writeFile(path, ...args)
+      }
+    }
+  ];
+
+  for (const scenario of cases) {
+    const outputPath = join(evidence.root, `delayed-${scenario.name}.json`);
+    const output = [];
+    const startedAt = performance.now();
+    await assert.rejects(hostEvidenceAssessmentMain([
+      evidence.evidenceDir, evidence.contextPath, outputPath
+    ], {
+      timeoutMs: scenario.timeoutMs,
+      io: scenario.io,
+      stdout: { write: value => output.push(value) }
+    }), /HOST_ASSESSMENT_DEADLINE_EXCEEDED/);
+    assert.ok(performance.now() - startedAt < scenario.timeoutMs + 300, scenario.name);
+    assert.deepEqual(output, [], scenario.name);
+    await new Promise(resolve => setTimeout(resolve, scenario.delayMs + 30));
+    await assert.rejects(readFile(outputPath), { code: "ENOENT" }, scenario.name);
   }
 });
 
