@@ -59,6 +59,7 @@ function validateRelativePath(value) {
       Buffer.byteLength(segment, "utf8") > 100)) {
     throw packageError("UNSAFE_EVIDENCE_PATH");
   }
+  if (/^[A-Za-z]:/.test(segments[0])) throw packageError("UNSAFE_EVIDENCE_PATH");
   const nameLength = Buffer.byteLength(segments.at(-1), "utf8");
   const prefixLength = Buffer.byteLength(segments.slice(0, -1).join("/"), "utf8");
   if (nameLength > 100 || prefixLength > 155) {
@@ -72,6 +73,9 @@ function metadata(info) {
     dev: String(info.dev),
     ino: String(info.ino),
     mode: String(info.mode),
+    uid: String(info.uid),
+    gid: String(info.gid),
+    nlink: String(info.nlink),
     size: String(info.size),
     mtimeNs: String(info.mtimeNs),
     ctimeNs: String(info.ctimeNs)
@@ -119,6 +123,10 @@ function category(relativePath, type, size) {
 }
 
 async function scanTree(root, context, io) {
+  const rootInfo = await (io.lstat ?? lstat)(root, {bigint: true});
+  if (rootInfo.isSymbolicLink() || !rootInfo.isDirectory()) {
+    throw packageError("INVALID_EVIDENCE_ROOT");
+  }
   const entries = [];
   const totals = {files: 0, directories: 0, totalBytes: 0, responseBytes: 0,
     responseFiles: 0, journalBytes: 0, metadataBytes: 0};
@@ -196,7 +204,15 @@ async function scanTree(root, context, io) {
   };
   await visit(root, "", 0);
   entries.sort((left, right) => left.path < right.path ? -1 : left.path > right.path ? 1 : 0);
-  return {entries, totals};
+  return {entries, rootInfo: metadata(rootInfo), totals};
+}
+
+function sameTree(left, right) {
+  return sameMetadata(left.rootInfo, right.rootInfo) &&
+    left.entries.length === right.entries.length &&
+    left.entries.every((entry, index) => entry.path === right.entries[index].path &&
+      entry.type === right.entries[index].type &&
+      sameMetadata(entry.info, right.entries[index].info));
 }
 
 async function readFileSnapshot(root, entry, context, io) {
@@ -452,16 +468,17 @@ export async function packageHostEvidence({
     });
   }
   const final = await scanTree(evidenceRoot, context, io);
-  if (initial.entries.length !== final.entries.length ||
-      initial.entries.some((entry, index) => entry.path !== final.entries[index].path ||
-        entry.type !== final.entries[index].type ||
-        !sameMetadata(entry.info, final.entries[index].info))) {
+  if (!sameTree(initial, final)) {
     throw packageError("EVIDENCE_CHANGED_DURING_PACKAGE");
   }
 
   const archiveBytes = buildTar(initial.entries, fileBytes);
   if (!verifyTarRoundTrip(archiveBytes, initial.entries, fileBytes)) {
     throw packageError("ARCHIVE_ROUND_TRIP_MISMATCH");
+  }
+  const afterArchive = await scanTree(evidenceRoot, context, io);
+  if (!sameTree(initial, afterArchive)) {
+    throw packageError("EVIDENCE_CHANGED_DURING_PACKAGE");
   }
   const manifestBytes = Buffer.from(`${JSON.stringify({
     schemaVersion: "SPOT_PAPER_HOST_EVIDENCE_MANIFEST_V1",
