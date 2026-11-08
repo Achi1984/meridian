@@ -10,59 +10,62 @@ does not read actual holdings.
 
 Import `mountSpotPaperPairedPanel` from
 `/home/runner/work/meridian/meridian/v11/spot-paper-paired-controller.js` and
-pass the existing container plus an explicitly supplied DTO and projector:
+pass the existing container plus a sanitized shared dashboard DTO:
 
 ```js
 import {mountSpotPaperPairedPanel} from './spot-paper-paired-controller.js';
 
 const panel = mountSpotPaperPairedPanel(container, {
-  dto: sanitizedReport,
-  projectReport: sharedPairedReportProjector,
+  dto: pairedDashboardDto,
   document
 });
 ```
 
-For a host-managed loading transition, call `panel.setLoading(true|false)`;
-pass new DTO data with `panel.render(nextDto)`.
+The panel imports and invokes `projectSpotPaperPairedDashboard` itself. It does
+not define a parallel DTO or accept an alternate projector. For a host-managed
+loading transition, call `panel.setLoading(true|false)`; pass new DTO data with
+`panel.render(nextDto)`.
 
-`projectReport(dto)` is the seam for the shared validation/projection export
-owned by issue #1302. Its result is a presentation projection, not an
-alternative report schema: it supplies `status`, `identity.runId`,
-`observedAt`, `feed`, `freshness`, `coverage.actualDurationMs`, role-keyed
-`arms`, and `comparison`. The feed projection must explicitly confirm the
-shared BTC/EUR source and no-leverage mode. Each arm supplies its own `runId`,
-metric value/reason pairs, and `positionStatus`, keeping the old baseline run
-distinct from challenger and cash evidence; `comparison` supplies an explicit
-`valid` flag, the shared `horizonKey`, and precomputed net-PnL deltas. The
-panel does not infer a report identity, valuation, comparison horizon, or
-delta.
+The canonical DTO uses `evidenceStatus`, `evidenceQualification`, `timing`,
+`identity`, `assumptions`, `arms`, and direction-labelled `deltas`. Its
+verified-complete status means structural reconciliation only, not independent
+authentication. Run-stop and valuation timestamps are kept distinct and
+rendered in the `Europe/Vienna` time zone. Freshness is explicitly “Unbekannt”:
+the shared DTO has no freshness timestamp/policy. The UI does not synthesize a
+freshness or live-health claim.
 
-As of this preparation, the #1302 branch has only its initial-plan commit and
-does not yet publish its DTO or validation exports. Therefore actual DTO
-integration is pending; the focused tests use only an explicitly marked
-synthetic fixture and an injected projection function. The `test.todo` in
-`test/v11-spot-paper-paired-panel.test.js` must be replaced with a test against
-the actual #1302 exports before integration is accepted. No production demo or
-fallback report is provided.
+The model, controller, tests, and browser preview all use the shared
+`projectSpotPaperPairedDashboard` export. Tests exercise a visibly synthetic
+payload accepted by that real projector, including the canonical statuses,
+reasons, run timings, arm metrics, and signed/unavailable deltas. No
+production demo or fallback report is provided.
+The contract currently resides in the separate #1304 candidate; this panel
+must be composed with that package (or run after it reaches the base branch).
+The integration test imports the actual owner export directly and intentionally
+fails to load when that dependency is absent; it does not skip or recreate the
+contract.
 
 ## Display and evidence boundaries
 
-The panel preserves `RUNNING`, `INTERRUPTED`, `VERIFIED_COMPLETE`, and
-`UNKNOWN`; displays the observed data time, freshness, actual coverage against
-the requested eight hours, and all three arm summaries; and only shows
-challenger/cash deltas when the shared projector explicitly validates a
-matching horizon for every arm. Missing or invalid metrics remain
-“Unbekannt” with a reason when supplied. Negative PnL uses a minus sign, loss
-text, and the danger tone; positive PnL uses a plus sign, gain text, and the
-safe tone. No winner or profitability badge is rendered.
+The panel preserves `VERIFIED_COMPLETE`, `INTERRUPTED`, `RUNNING_SNAPSHOT`, and
+`CORRUPT_UNKNOWN`; displays observed coverage against the requested eight
+hours, run-stopped time separately from valuation time, and all three arm
+summaries; and shows deltas only when the shared evaluator marks them
+`AVAILABLE`. Delta direction follows the canonical names:
+challenger-minus-baseline, baseline-minus-cash, and challenger-minus-cash.
+Missing or invalid metrics remain “Unbekannt” with the shared reason code.
+Negative PnL uses a minus sign, loss text, and the danger tone; positive PnL
+uses a plus sign, gain text, and the safe tone. No winner or profitability
+badge is rendered.
 
 Fees and slippage are modeled costs, not an exchange statement. An eight-hour
 sample and sampled drawdown are limited evidence, not a claim about future
-performance. The UI has no fetch, polling, start, stop, or trading action.
-The host supplies the DTO and projector; neither is fetched or fabricated by
+performance. Leverage is not represented by the sanitized dashboard DTO and
+is therefore shown as unknown. The UI has no fetch, polling, start, stop, or
+trading action. The host supplies the DTO; it is not fetched or fabricated by
 this panel.
 
-Run the focused presentation tests with:
+Run the focused shared-DTO presentation tests with:
 
 ```sh
 node --test test/v11-spot-paper-paired-panel.test.js
@@ -71,5 +74,5 @@ node --test test/v11-spot-paper-paired-panel.test.js
 The mobile browser test records screenshots to
 `V11_SPOT_PAPER_PAIRED_EVIDENCE_DIR`, `V11_PAPER_COCKPIT_EVIDENCE_DIR`, or
 `V11_A2_EVIDENCE_DIR` when one of those variables is set. Synthetic fixtures
-are shown only when the caller explicitly requests `preview: true`; loading
-state is likewise host-driven and does not imply a run is active.
+are visibly labelled from `syntheticFixture: true`; loading state is
+host-driven and does not imply a run is active.

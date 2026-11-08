@@ -8,11 +8,11 @@ import {fileURLToPath} from 'node:url';
 import {withMobileChrome} from './helpers/v11-cdp.mjs';
 import {startV11StaticServer} from './helpers/v11-static-server.mjs';
 import {
-  presentSpotPaperPairedReport
-} from '../v11/spot-paper-paired-model.js';
-import {
-  mountSpotPaperPairedPanel
-} from '../v11/spot-paper-paired-controller.js';
+  projectSpotPaperPairedDashboard,
+  SPOT_PAPER_PAIRED_DASHBOARD_SCHEMA
+} from '../scripts/spot-paper-paired-report/contract.mjs';
+import {presentSpotPaperPairedReport} from '../v11/spot-paper-paired-model.js';
+import {mountSpotPaperPairedPanel} from '../v11/spot-paper-paired-controller.js';
 import {renderSpotPaperPaired} from '../v11/spot-paper-paired-view.js';
 
 class Element {
@@ -36,244 +36,234 @@ function harness() {
   return {root: new Element(document, 'section'), document};
 }
 
-function amount(value, reason) {
-  return {value, reason};
-}
+const startAt = Date.UTC(2026, 10, 8, 12);
+const roles = [
+  ['baseline', 'BTC_EUR_SMA5_SMA20_V1'],
+  ['challenger', 'BTC_EUR_SMA_CONFIRM2_COOLDOWN10_RESEARCH_V1'],
+  ['cash', 'CASH_CONTROL_V1']
+];
 
-function projected(overrides = {}) {
-  const horizonKey = 'same-8h-window';
-  const arm = (pnl, positionStatus = 'STOPPED_FLAT') => ({
-    horizonKey,
-    netEquityCents: amount('100125'),
-    netPnlCents: amount(pnl),
-    feesCents: amount('125'),
-    turnoverCents: amount('250000'),
-    trades: amount(2),
-    exposureCents: amount('0'),
-    sampledDrawdownCents: amount('250'),
-    positionStatus
-  });
+function arm(role, overrides = {}) {
+  const [, modelId] = roles.find(([name]) => name === role);
   return {
-    status: 'VERIFIED_COMPLETE',
-    identity: {runId: 'synthetic-fixture-run-01'},
-    observedAt: '2026-11-08T12:00:00.000Z',
-    freshness: {status: 'FRESH'},
-    coverage: {actualDurationMs: 28_800_000},
-    feed: {pair: 'BTC/EUR', shared: true, noLeverage: true},
-    arms: {
-      baseline: {...arm('-125'), runId: 'baseline-stopped-synthetic-01'},
-      challenger: {...arm('250'), runId: 'confirm2-cooldown10-synthetic-01'},
-      cash: {...arm('0'), runId: 'cash-control-synthetic-01'}
-    },
-    comparison: {
-      valid: true,
-      horizonKey,
-      challengerVsBaselineNetPnlCents: amount('375'),
-      cashVsBaselineNetPnlCents: amount('125')
+    role,
+    modelId,
+    tradingStoppedAt: startAt + 28_750_000,
+    stopReason: role === 'baseline' ? 'SAMPLED_2PCT_BID_STOP' : null,
+    inventoryStatus: role === 'challenger' ? 'OPEN' : 'FLAT',
+    cashCents: 90_000,
+    netEquityCents: 100_000,
+    netPnlCents: 0,
+    bookedFeesCents: 125,
+    modeledSlippageCents: 25,
+    hypotheticalExitFeeCents: null,
+    hypotheticalExitSlippageCents: null,
+    turnoverCents: 25_000,
+    fillCount: role === 'baseline' ? 2 : 0,
+    exposureCents: role === 'challenger' ? 10_000 : 0,
+    sampledDrawdownCents: 250,
+    relativeDrawdownBps: 25,
+    unresolvedObservations: 0,
+    metricReasons: {
+      hypotheticalExitFeeCents: 'NOT_REPORTED_BY_REPORT_SCHEMA',
+      hypotheticalExitSlippageCents: 'NOT_REPORTED_BY_REPORT_SCHEMA'
     },
     ...overrides
   };
 }
 
-const fixtureDto = Object.freeze({fixtureOnly: 'SYNTHETIC_FIXTURE'});
-const syntheticProjector = () => projected();
+function delta(status, netPnlCents = null, reason = 'NOT_COMPARABLE') {
+  return {
+    status,
+    reason: status === 'UNAVAILABLE' ? reason : null,
+    netEquityCents: status === 'AVAILABLE' ? netPnlCents : null,
+    netPnlCents: status === 'AVAILABLE' ? netPnlCents : null
+  };
+}
+
+function dto(overrides = {}) {
+  const models = roles.map(([role, modelId]) => ({role, modelId}));
+  const emptyDelta = delta('AVAILABLE', 0);
+  return {
+    schemaVersion: SPOT_PAPER_PAIRED_DASHBOARD_SCHEMA,
+    evidenceStatus: 'VERIFIED_COMPLETE',
+    evidenceQualification: 'STRUCTURALLY_RECONCILED_NOT_INDEPENDENTLY_AUTHENTICATED',
+    reasonCode: 'UNKNOWN',
+    syntheticFixture: true,
+    independentAuthentication: 'NOT_ESTABLISHED',
+    identity: {
+      runId: 'paired-synthetic-001',
+      pair: 'BTC/EUR',
+      sourceSha256: '1'.repeat(64),
+      configSha256: '2'.repeat(64),
+      researchSourceSha256: '3'.repeat(64),
+      models
+    },
+    timing: {
+      requestedDurationMs: 28_800_000,
+      observedCoverageMs: 28_799_000,
+      actualElapsedMs: 28_800_000,
+      runStoppedAt: startAt + 28_800_000,
+      valuationAt: startAt + 28_799_000,
+      requestedCycles: 480,
+      attemptedCycles: 480,
+      completedCycles: 479,
+      stopReason: 'CYCLE_LIMIT'
+    },
+    assumptions: {feeBpsPerSide: 50, slippageBpsPerSide: 10, ratesVerified: false},
+    arms: {
+      baseline: arm('baseline', {netPnlCents: -125, netEquityCents: 99_875}),
+      challenger: arm('challenger', {netPnlCents: 250, netEquityCents: 100_250}),
+      cash: arm('cash', {
+        inventoryStatus: 'FLAT',
+        cashCents: 100_000,
+        netPnlCents: 0,
+        netEquityCents: 100_000,
+        bookedFeesCents: 0,
+        modeledSlippageCents: 0,
+        turnoverCents: 0,
+        fillCount: 0
+      })
+    },
+    deltas: {
+      status: 'AVAILABLE',
+      reason: null,
+      challengerMinusBaseline: delta('AVAILABLE', 375),
+      baselineMinusCash: delta('AVAILABLE', -125),
+      challengerMinusCash: delta('AVAILABLE', 250)
+    },
+    decision: 'NO_WINNER_OR_PROMOTION',
+    ...overrides
+  };
+}
+
 const visit = element => [element, ...element.children.flatMap(visit)];
 
-test('requires an injected shared DTO projector and has no production fixture fallback', () => {
-  const absent = presentSpotPaperPairedReport(fixtureDto);
-  assert.equal(absent.available, false);
-  assert.equal(absent.status, 'UNKNOWN');
-  assert.match(absent.reason, /noch nicht verbunden/);
-
-  const {root, document} = harness();
-  mountSpotPaperPairedPanel(root, {dto: fixtureDto, document});
-  assert.match(root.textContent, /UNKNOWN/);
-  assert.match(root.textContent, /Keine Berichtsdaten verbunden/);
-  assert.doesNotMatch(root.textContent, /synthetic-fixture-run-01|1\.001,25/);
-
-  const loading = harness();
-  renderSpotPaperPaired(loading.root, null, loading.document, {loading: true});
-  assert.match(loading.root.textContent, /Bericht wird geladen/);
-  assert.equal(loading.root.attrs['data-state'], 'loading');
-
-  const mountLoading = harness();
-  const panel = mountSpotPaperPairedPanel(mountLoading.root, {
-    dto: fixtureDto,
-    document: mountLoading.document,
-    projectReport: syntheticProjector,
-    loading: true,
-    preview: true
-  });
-  assert.match(mountLoading.root.textContent, /Bericht wird geladen/);
-  panel.setLoading(false);
-  assert.match(mountLoading.root.textContent, /VERIFIED_COMPLETE/);
-  panel.dispose();
-  assert.equal(mountLoading.root.children.length, 0);
-  assert.equal(panel.render(), null);
-
-  const failed = harness();
-  renderSpotPaperPaired(failed.root, fixtureDto, failed.document, {
-    projectReport() { throw new Error('fixture validation failure'); }
-  });
-  assert.match(failed.root.textContent, /Fehler: Bericht konnte nicht validiert werden/);
-  assert.equal(failed.root.attrs['data-state'], 'error');
-});
-
-test('shows signed PnL, EUR units, virtual capital, freshness and run identity', () => {
-  const model = presentSpotPaperPairedReport(fixtureDto, {
-    projectReport: syntheticProjector
-  });
+test('binds the shared projector and maps its canonical evidence DTO', () => {
+  const input = dto();
+  const shared = projectSpotPaperPairedDashboard(input);
+  assert.ok(shared, 'the canonical shared projector accepts the fixture');
+  const model = presentSpotPaperPairedReport(input);
+  assert.equal(model.available, true);
   assert.equal(model.status, 'VERIFIED_COMPLETE');
-  assert.equal(model.arms.baseline.metrics.netPnlCents.label, '−1,25 € Verlust');
-  assert.equal(model.arms.challenger.metrics.netPnlCents.label, '+2,50 € Gewinn');
-  assert.equal(model.arms.cash.metrics.netPnlCents.label, '0,00 €');
+  assert.equal(model.qualification,
+    'STRUCTURALLY_RECONCILED_NOT_INDEPENDENTLY_AUTHENTICATED');
+  assert.equal(model.authentication, 'NOT_ESTABLISHED');
+  assert.equal(model.identity.pair, 'BTC/EUR');
+  assert.equal(model.freshness.status, 'UNKNOWN');
+  assert.match(model.freshness.reason, /nicht geliefert/);
 
   const {root, document} = harness();
-  renderSpotPaperPaired(root, fixtureDto, document, {
-    projectReport: syntheticProjector,
-    preview: true
-  });
-  assert.match(root.textContent, /SYNTHETIC FIXTURE · nur Vorschau/);
-  assert.match(root.textContent, /RUNNING|INTERRUPTED|VERIFIED_COMPLETE/);
-  assert.match(root.textContent, /3\.000,00 €/);
-  assert.match(root.textContent, /Echte Bestände: nicht Teil dieses Panels/);
-  assert.match(root.textContent, /1\.001,25 €/);
+  renderSpotPaperPaired(root, input, document);
+  assert.match(root.textContent, /SYNTHETIC FIXTURE/);
+  assert.match(root.textContent, /VERIFIED_COMPLETE/);
+  assert.match(root.textContent, /nicht unabhängig authentifiziert/);
+  assert.match(root.textContent, /NOT_ESTABLISHED/);
+  assert.match(root.textContent, /Angeforderte Abdeckung8 Std\./);
+  assert.match(root.textContent, /Beobachtete gemeinsame Abdeckung7 Std\. 59 Min\. 59 Sek\./);
+  assert.match(root.textContent, /08\.11\.2026, 20:59:59 \(Europe\/Wien\)/);
+  assert.match(root.textContent, /08\.11\.2026, 21:00:00 \(Europe\/Wien\)/);
   assert.match(root.textContent, /−1,25 € Verlust/);
   assert.match(root.textContent, /\+2,50 € Gewinn/);
-  assert.match(root.textContent, /8 Std\. von 8 Std\. angefordert/);
-  assert.match(root.textContent, /von 8 Std\. angefordert/);
-  assert.match(root.textContent, /synthetic-fixture-run-01/);
-  assert.match(root.textContent, /baseline-stopped-synthetic-01/);
-  assert.match(root.textContent, /confirm2-cooldown10-synthetic-01/);
-  assert.match(root.textContent, /cash-control-synthetic-01/);
-  assert.match(root.textContent, /UTC/);
-  assert.match(root.textContent, /modellierte Kosten/);
-  assert.match(root.textContent, /8-Stunden-Sample/);
-  assert.doesNotMatch(root.textContent, /Gewinner:/);
+  assert.match(root.textContent, /Gebuchte Gebühren1,25 €/);
+  assert.match(root.textContent, /Modellierter Slippage0,25 €/);
+  assert.match(root.textContent, /Fills2/);
+  assert.match(root.textContent, /Fills0/);
+  assert.match(root.textContent, /Position offen/);
+  assert.match(root.textContent, /Sitzungsverlust-Limit|Stichproben-Stopp/);
+  assert.match(root.textContent, /Unbekannt — NOT_REPORTED_BY_REPORT_SCHEMA/);
+  assert.match(root.textContent, /Challenger minus Baseline · Netto-PnL\+3,75 € Gewinn/);
+  assert.match(root.textContent, /Baseline minus Cash · Netto-PnL−1,25 € Verlust/);
+  assert.match(root.textContent, /Challenger minus Cash · Netto-PnL\+2,50 € Gewinn/);
+  assert.match(root.textContent, /AktualitätUnbekannt/);
+  assert.match(root.textContent, /Hebel: Unbekannt/);
+  assert.doesNotMatch(root.textContent, /echte Bestände:/i);
   assert.equal(root.attrs.role, 'region');
+  assert.equal(root.attrs['data-state'], 'verified_complete');
   const status = visit(root).find(item => item.attrs['aria-live'] === 'polite');
   assert.equal(status.attrs.role, 'status');
-  const negative = visit(root).find(item => item.textContent === '−1,25 € Verlust');
-  const positive = visit(root).find(item => item.textContent === '+2,50 € Gewinn');
-  assert.equal(negative.className, 'tone-danger');
-  assert.equal(positive.className, 'tone-safe');
   assert.equal(visit(root).some(item =>
     ['BUTTON', 'INPUT', 'SELECT', 'FORM'].includes(item.tagName)), false);
+  const loss = visit(root).find(item => item.textContent === '−1,25 € Verlust');
+  const gain = visit(root).find(item => item.textContent === '+2,50 € Gewinn');
+  assert.equal(loss.className, 'tone-danger');
+  assert.equal(gain.className, 'tone-safe');
 });
 
-test('unknown and invalid values retain reasons and are never rendered as zero', () => {
-  const report = projected({
-    status: 'NOT_A_STATUS',
-    observedAt: null,
-    freshness: {status: 'STALE', reason: 'Beobachtung zu alt'},
-    coverage: {actualDurationMs: null, reason: 'Host-Sample fehlt'},
-    arms: {
-      baseline: {
-        ...projected().arms.baseline,
-        netPnlCents: amount(null, 'PnL-Nachweis fehlt'),
-        feesCents: amount('-1', 'Gebührenwert ungültig'),
-        trades: amount(null, 'Trade-Zähler fehlt')
-      },
-      challenger: projected().arms.challenger,
-      cash: projected().arms.cash
-    }
-  });
-  const model = presentSpotPaperPairedReport(fixtureDto, {
-    projectReport: () => report
-  });
-  assert.equal(model.status, 'UNKNOWN');
-  assert.equal(model.freshness.status, 'STALE');
-  assert.equal(model.arms.baseline.metrics.netPnlCents.value, null);
-  assert.equal(model.arms.baseline.metrics.feesCents.value, null);
-  assert.equal(model.arms.baseline.metrics.trades.value, null);
-
-  const {root, document} = harness();
-  renderSpotPaperPaired(root, fixtureDto, document, {
-    projectReport: () => report,
-    preview: true
-  });
-  assert.match(root.textContent, /Unbekannt — PnL-Nachweis fehlt/);
-  assert.match(root.textContent, /Unbekannt — Gebührenwert ungültig/);
-  assert.match(root.textContent, /Unbekannt — Trade-Zähler fehlt/);
-  assert.match(root.textContent, /Host-Sample fehlt/);
-  assert.match(root.textContent, /Veraltet/);
-  assert.doesNotMatch(root.textContent, /Gebühren0,00 €|Trades0(?!\d)/);
-});
-
-test('only explicitly compatible shared horizons display supplied deltas', () => {
-  const report = projected({
-    arms: {
-      ...projected().arms,
-      challenger: {...projected().arms.challenger, horizonKey: 'different-window'}
-    }
-  });
-  const model = presentSpotPaperPairedReport(fixtureDto, {
-    projectReport: () => report
-  });
-  assert.equal(model.comparison.comparable, false);
-  assert.equal(model.comparison.deltas, null);
-  assert.match(model.comparison.reason, /Auswertungshorizont/);
-  const {root, document} = harness();
-  renderSpotPaperPaired(root, fixtureDto, document, {
-    projectReport: () => report,
-    preview: true
-  });
-  assert.match(root.textContent, /DifferenzenNicht angezeigt/);
-  assert.doesNotMatch(root.textContent, /Challenger minus Baseline/);
-
-  const matching = presentSpotPaperPairedReport(fixtureDto, {
-    projectReport: syntheticProjector
-  });
-  assert.equal(matching.comparison.comparable, true);
-  assert.equal(matching.comparison.deltas.challengerVsBaseline.label, '+3,75 € Gewinn');
-});
-
-test('faithfully presents interrupted, open-inventory and verified terminal states', () => {
-  for (const [status, positionStatus, expected] of [
-    ['RUNNING', 'OPEN', 'RUNNING · Lauf läuft'],
-    ['INTERRUPTED', 'STOPPED_OPEN', 'INTERRUPTED · Lauf unterbrochen'],
-    ['VERIFIED_COMPLETE', 'STOPPED_FLAT', 'VERIFIED_COMPLETE · Abschluss geprüft'],
-    ['UNKNOWN', 'UNKNOWN', 'UNKNOWN · Status unbekannt']
+test('uses canonical interrupted and running snapshot statuses without promotion', () => {
+  for (const [evidenceStatus, expected] of [
+    ['INTERRUPTED', 'INTERRUPTED · unterbrochener Lauf'],
+    ['RUNNING_SNAPSHOT', 'RUNNING_SNAPSHOT · vorläufiger Zwischenstand'],
+    ['CORRUPT_UNKNOWN', 'CORRUPT_UNKNOWN · unbekannt oder fehlerhaft']
   ]) {
-    const report = projected({
-      status,
-      arms: {
-        ...projected().arms,
-        challenger: {
-          ...projected().arms.challenger,
-          positionStatus
-        }
-      }
-    });
     const {root, document} = harness();
-    renderSpotPaperPaired(root, fixtureDto, document, {
-      projectReport: () => report,
-      preview: true
-    });
+    renderSpotPaperPaired(root, dto({evidenceStatus}), document);
     assert.ok(root.textContent.includes(expected));
-    assert.ok(root.textContent.includes(`Position: ${positionStatus}`));
+    assert.ok(root.textContent.includes('NO_WINNER_OR_PROMOTION'));
   }
 });
 
-test('zero trades remain distinct from missing trade evidence', () => {
-  const report = projected({
+test('unavailable deltas and missing values retain DTO reason codes', () => {
+  const unknown = {
+    status: 'UNAVAILABLE',
+    reason: 'COMMON_HORIZON_MARK_UNAVAILABLE',
+    challengerMinusBaseline: delta('UNAVAILABLE', null, 'COMMON_HORIZON_MARK_UNAVAILABLE'),
+    baselineMinusCash: delta('UNAVAILABLE', null, 'COMMON_HORIZON_MARK_UNAVAILABLE'),
+    challengerMinusCash: delta('UNAVAILABLE', null, 'COMMON_HORIZON_MARK_UNAVAILABLE')
+  };
+  const input = dto({
     arms: {
-      ...projected().arms,
-      baseline: {
-        ...projected().arms.baseline,
-        trades: amount(0),
-        positionStatus: 'STOPPED_FLAT'
-      }
-    }
+      ...dto().arms,
+      challenger: arm('challenger', {
+        netEquityCents: null,
+        netPnlCents: null,
+        bookedFeesCents: null,
+        metricReasons: {
+          netEquityCents: 'COMMON_HORIZON_MARK_UNAVAILABLE',
+          netPnlCents: 'COMMON_HORIZON_MARK_UNAVAILABLE',
+          bookedFeesCents: 'METRIC_MISSING'
+        }
+      })
+    },
+    deltas: unknown
   });
+  const model = presentSpotPaperPairedReport(input);
+  assert.equal(model.arms.challenger.metrics.netPnlCents.value, null);
+  assert.equal(model.arms.challenger.metrics.fillCount.value, 0);
+  assert.equal(model.deltaStatus, 'UNAVAILABLE');
+
   const {root, document} = harness();
-  renderSpotPaperPaired(root, fixtureDto, document, {
-    projectReport: () => report,
-    preview: true
+  renderSpotPaperPaired(root, input, document);
+  assert.match(root.textContent, /Netto-PnLUnbekannt — COMMON_HORIZON_MARK_UNAVAILABLE/);
+  assert.match(root.textContent, /Gebuchte GebührenUnbekannt — METRIC_MISSING/);
+  assert.match(root.textContent, /Differenzen nicht verfügbar — COMMON_HORIZON_MARK_UNAVAILABLE/);
+  assert.match(root.textContent, /Fills0/);
+  const unknownPnl = visit(root).find(item =>
+    item.textContent === 'Unbekannt — COMMON_HORIZON_MARK_UNAVAILABLE');
+  assert.ok(unknownPnl);
+});
+
+test('unknown or invalid DTOs fail closed and loading remains host-controlled', () => {
+  assert.equal(presentSpotPaperPairedReport({schemaVersion: 'wrong'}).available, false);
+  const bad = dto();
+  bad.evidenceQualification = 'CLAIMED_AUTHENTICATED';
+  assert.equal(presentSpotPaperPairedReport(bad).available, false);
+
+  const loading = harness();
+  const panel = mountSpotPaperPairedPanel(loading.root, {
+    dto: dto(),
+    document: loading.document,
+    loading: true
   });
-  assert.match(root.textContent, /Trades0/);
-  assert.match(root.textContent, /Position: STOPPED_FLAT/);
-  assert.doesNotMatch(root.textContent, /Gewinner:|Profitabilität bestätigt/);
+  assert.match(loading.root.textContent, /Bericht wird geladen/);
+  assert.equal(loading.root.attrs['data-state'], 'loading');
+  panel.setLoading(false);
+  assert.match(loading.root.textContent, /VERIFIED_COMPLETE/);
+  panel.render(dto({evidenceStatus: 'INTERRUPTED'}));
+  assert.match(loading.root.textContent, /INTERRUPTED/);
+  panel.dispose();
+  assert.equal(loading.root.children.length, 0);
+  assert.equal(panel.render(), null);
 });
 
 test('panel source has no implicit network, timer, storage, or HTML injection paths', () => {
@@ -286,11 +276,11 @@ test('panel source has no implicit network, timer, storage, or HTML injection pa
     /\bfetch\s*\(|\bsetInterval\s*\(|\bsetTimeout\s*\(|localStorage|sessionStorage|indexedDB|\.innerHTML\s*=/);
 });
 
-test('mobile Chrome renders the paired panel without horizontal overflow', {
+test('mobile Chrome renders canonical synthetic DTO without horizontal overflow', {
   timeout: 180_000
 }, async () => {
   if (typeof WebSocket !== 'function') {
-    const name = 'mobile Chrome renders the paired panel without horizontal overflow';
+    const name = 'mobile Chrome renders canonical synthetic DTO without horizontal overflow';
     const env = {...process.env};
     delete env.NODE_TEST_CONTEXT;
     const child = spawnSync(process.execPath, ['--experimental-websocket', '--test',
@@ -315,10 +305,7 @@ test('mobile Chrome renders the paired panel without horizontal overflow', {
   try {
     for (const width of [320, 390]) {
       const metrics = await withMobileChrome(chrome, width, hosted.url, async call => {
-        const browserFixture = projected();
-        browserFixture.arms.baseline.feesCents = amount(null, 'Modellkosten fehlen');
-        browserFixture.arms.challenger.horizonKey = 'different-horizon';
-        const fixture = JSON.stringify(browserFixture);
+        const fixture = JSON.stringify(dto());
         const expression = `(async()=>{
           const {mountSpotPaperPairedPanel}=await import(
             './spot-paper-paired-controller.js?v=B16-M11-FIX14');
@@ -327,13 +314,7 @@ test('mobile Chrome renders the paired panel without horizontal overflow', {
           document.documentElement.style.margin='0';
           document.body.style.margin='0';
           document.body.replaceChildren(root);
-          mountSpotPaperPairedPanel(root,{
-            dto:{fixtureOnly:'SYNTHETIC_FIXTURE'},
-            projectReport:()=>(${fixture}),
-            preview:true
-          });
-          const label=root.getAttribute('aria-labelledby');
-          const heading=document.getElementById(label);
+          mountSpotPaperPairedPanel(root,{dto:${fixture}});
           return {
             width:innerWidth,
             viewport:document.documentElement.clientWidth,
@@ -341,14 +322,12 @@ test('mobile Chrome renders the paired panel without horizontal overflow', {
             bodyWidth:document.body.scrollWidth,
             panelWidth:root.clientWidth,
             panelScrollWidth:root.scrollWidth,
-            heading:heading?.textContent,
-            labelled:!!heading,
+            heading:document.getElementById(root.getAttribute('aria-labelledby'))?.textContent,
+            labelled:!!document.getElementById(root.getAttribute('aria-labelledby')),
             status:root.querySelector('[role="status"]')?.textContent,
-            controls:root.querySelectorAll('button,input,select,form').length,
+            synthetic:root.textContent.includes('SYNTHETIC FIXTURE'),
             loss:root.textContent.includes('−1,25 € Verlust'),
-            syntheticLabel:root.textContent.includes('SYNTHETIC FIXTURE · nur Vorschau'),
-            unknown:root.textContent.includes('Unbekannt — Modellkosten fehlen') &&
-              root.textContent.includes('Nicht angezeigt'),
+            controls:root.querySelectorAll('button,input,select,form').length,
             armCount:root.querySelectorAll('[aria-label$="Arm"]').length
           };
         })()`;
@@ -367,12 +346,10 @@ test('mobile Chrome renders the paired panel without horizontal overflow', {
         assert.equal(result.labelled, true);
         assert.match(result.heading, /Gepaarter Paper-Vergleich/);
         assert.match(result.status, /VERIFIED_COMPLETE/);
-        assert.equal(result.controls, 0);
+        assert.equal(result.synthetic, true);
         assert.equal(result.loss, true);
-        assert.equal(result.syntheticLabel, true);
-        assert.equal(result.unknown, true);
+        assert.equal(result.controls, 0);
         assert.equal(result.armCount, 3);
-        assert.ok(result.heading);
         const image = await call('Page.captureScreenshot', {format: 'png'});
         writeFileSync(join(evidence, `paired-paper-${width}.png`),
           Buffer.from(image.data, 'base64'));
@@ -384,5 +361,3 @@ test('mobile Chrome renders the paired panel without horizontal overflow', {
     await hosted.close();
   }
 });
-
-test.todo('Bind and integrate the actual #1302 shared sanitized DTO exports once published');

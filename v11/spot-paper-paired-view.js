@@ -1,20 +1,43 @@
 import {
   ARM_DEFINITIONS,
+  MONEY_FIELDS,
   presentSpotPaperPairedReport
 } from './spot-paper-paired-model.js?v=B16-M11-FIX14';
 
 let panelSequence = 0;
+const MONEY_LABELS = new Map(MONEY_FIELDS.map(([key, label]) => [key, label]));
+const COUNT_LABELS = new Map([
+  ['fillCount', 'Fills'],
+  ['unresolvedObservations', 'Ungeklärte Beobachtungen']
+]);
+const STOP_REASON_LABELS = Object.freeze({
+  SAMPLED_2PCT_BID_STOP: 'Stichproben-Stopp (2 % Bid)',
+  SESSION_LOSS_LIMIT: 'Sitzungsverlust-Limit',
+  CYCLE_LIMIT: 'Zyklus-Limit',
+  DURATION_LIMIT: 'Zeitlimit',
+  OPERATOR_STOP: 'Manueller Stopp',
+  REQUEST_LIMIT: 'Anfragelimit',
+  SHARED_FEED_FAILURE: 'Gemeinsamer Feed fehlgeschlagen',
+  UNKNOWN: 'Unbekannt'
+});
 
-function duration(value) {
-  if (!Number.isSafeInteger(value) || value < 0) return 'Unbekannt';
-  const hours = Math.floor(value / 3_600_000);
-  const minutes = Math.floor(value % 3_600_000 / 60_000);
-  const seconds = Math.floor(value % 60_000 / 1000);
-  const parts = [];
-  if (hours) parts.push(`${hours} Std.`);
-  if (minutes) parts.push(`${minutes} Min.`);
-  if (seconds || parts.length === 0) parts.push(`${seconds} Sek.`);
-  return parts.join(' ');
+function stopReason(code) {
+  return code ? `${STOP_REASON_LABELS[code] || 'Unbekannt'} (${code})` :
+    'Unbekannt — kein Stopp-Grund';
+}
+
+function qualificationLabel(value) {
+  return value === 'STRUCTURALLY_RECONCILED_NOT_INDEPENDENTLY_AUTHENTICATED' ?
+    'Strukturell abgeglichen; nicht unabhängig authentifiziert' : value;
+}
+
+function authenticationLabel(value) {
+  return value === 'NOT_ESTABLISHED' ?
+    'Nicht festgestellt (NOT_ESTABLISHED)' : value;
+}
+
+function freshnessLabel(freshness) {
+  return freshness.status === 'UNKNOWN' ? 'Unbekannt' : freshness.status;
 }
 
 function node(document, parent, tag, text = '', className = '') {
@@ -25,42 +48,18 @@ function node(document, parent, tag, text = '', className = '') {
   return element;
 }
 
-function dateTime(value) {
-  const date = new Date(value);
-  return Number.isFinite(date.getTime()) ?
-    `${new Intl.DateTimeFormat('de-DE', {
-      dateStyle: 'medium', timeStyle: 'medium', timeZone: 'UTC'
-    }).format(date)} UTC` : 'Unbekannt';
-}
-
-function statusLabel(status) {
-  switch (status) {
-    case 'RUNNING': return 'RUNNING · Lauf läuft';
-    case 'INTERRUPTED': return 'INTERRUPTED · Lauf unterbrochen';
-    case 'VERIFIED_COMPLETE': return 'VERIFIED_COMPLETE · Abschluss geprüft';
-    default: return 'UNKNOWN · Status unbekannt';
-  }
-}
-
-function freshnessLabel(freshness) {
-  switch (freshness.status) {
-    case 'FRESH':
-    case 'WITHIN_DISPLAY_POLICY': return 'Aktuell gemäß Anzeigegrenze';
-    case 'STALE': return 'Veraltet';
-    default: return 'Unbekannt';
-  }
-}
-
-function field(document, parent, label, metric) {
+function field(document, parent, label, value, tone = 'tone-muted') {
   const cell = document.createElement('div');
   cell.setAttribute('style',
     'display:grid;grid-template-columns:minmax(0,1fr);gap:3px;min-width:0;overflow-wrap:anywhere');
   node(document, cell, 'strong', label);
-  const value = node(document, cell, 'span', metric.label, metric.tone);
-  if (metric.value === null) {
-    value.setAttribute('aria-label', `${label}: ${metric.label}`);
-  }
+  node(document, cell, 'span', value, tone);
   parent.append(cell);
+}
+
+function inventoryLabel(status) {
+  return ({FLAT: 'Keine offene Position', OPEN: 'Position offen', UNKNOWN: 'Unbekannt'})[status] ||
+    'Unbekannt';
 }
 
 function renderArm(document, parent, arm, definition) {
@@ -69,26 +68,28 @@ function renderArm(document, parent, arm, definition) {
   card.setAttribute('style',
     'border:1px solid currentColor;border-radius:12px;padding:12px;min-width:0;overflow-wrap:anywhere');
   node(document, card, 'h3', definition.label);
-  node(document, card, 'p', 'Virtuelles Startkapital: 1.000,00 €');
-  node(document, card, 'p', `Run-ID: ${arm.runId || 'Unbekannt — Arm-Run-ID fehlt'}`);
+  field(document, card, 'Modell-ID', arm.modelId || 'Unbekannt');
+  field(document, card, 'Virtuelles Startkapital', '1.000,00 €');
   const metrics = document.createElement('div');
   metrics.setAttribute('style',
-    'display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:10px;margin:0');
-  for (const [key, label] of [
-    ['netEquityCents', 'Eigenkapital netto'],
-    ['netPnlCents', 'Netto-PnL'],
-    ['feesCents', 'Gebühren'],
-    ['turnoverCents', 'Umsatz'],
-    ['trades', 'Trades'],
-    ['exposureCents', 'Exposure'],
-    ['sampledDrawdownCents', 'Stichproben-Drawdown']
-  ]) field(document, metrics, label, arm.metrics[key]);
+    'display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:10px;min-width:0');
+  for (const [key, label] of MONEY_LABELS) {
+    const item = arm.metrics[key];
+    field(document, metrics, label, item.label, item.tone);
+  }
+  for (const [key, label] of COUNT_LABELS) {
+    const item = arm.metrics[key];
+    field(document, metrics, label, item.label, item.tone);
+  }
   card.append(metrics);
-  node(document, card, 'p', `Position: ${arm.positionStatus}`);
+  field(document, card, 'Bestand', inventoryLabel(arm.inventoryStatus));
+  field(document, card, 'Handel gestoppt', arm.tradingStoppedAtLabel ||
+    'Unbekannt — Stoppzeit nicht angegeben');
+  field(document, card, 'Stopp-Grund', stopReason(arm.stopReason));
   parent.append(card);
 }
 
-function renderModel(root, model, document, options = {}) {
+function renderModel(root, model, document, {loading = false} = {}) {
   root.replaceChildren();
   root.setAttribute('style',
     'box-sizing:border-box;display:grid;gap:12px;min-width:0;max-width:100%;padding:12px;overflow-wrap:anywhere');
@@ -96,68 +97,69 @@ function renderModel(root, model, document, options = {}) {
   const heading = node(document, root, 'h2', 'Gepaarter Paper-Vergleich · BTC/EUR');
   heading.id = `spot-paper-paired-heading-${++panelSequence}`;
   root.setAttribute('aria-labelledby', heading.id);
-  if (options.preview === true) {
-    node(document, root,
-      'p', 'SYNTHETIC FIXTURE · nur Vorschau, keine Produktionsdaten.', 'caption');
+  if (model.syntheticFixture) {
+    node(document, root, 'p',
+      'SYNTHETIC FIXTURE · nur Vorschau, keine Produktionsdaten.', 'caption');
   }
   node(document, root, 'p',
-    'Drei getrennte virtuelle Arme mit je 1.000,00 € · virtuelles Gesamtkapital 3.000,00 €.',
+    'Drei virtuelle Arme mit je 1.000,00 € · virtuelles Gesamtkapital 3.000,00 €.',
     'caption');
   node(document, root, 'p',
-    `Feed: ${model.feed?.pair || 'BTC/EUR'} · ${model.feed?.shared ?
-      'gemeinsamer Feed bestätigt' :
-      `gemeinsamer Feed unbekannt — ${model.feed?.reason || 'Bestätigung fehlt'}`} · ${
-      model.feed?.noLeverage ? 'ohne Hebelwirkung bestätigt' :
-        'Hebelstatus unbekannt — Bestätigung fehlt'}`,
+    `Paar: ${model.identity?.pair || 'Unbekannt'} · Hebel: Unbekannt — nicht im Dashboard-DTO enthalten.`,
     'caption');
-  node(document, root,
-    'p', 'Echte Bestände: nicht Teil dieses Panels; es werden keine Kontobestände gelesen.',
+  node(document, root, 'p',
+    'Virtuelle Werte sind strikt von tatsächlichen Beständen getrennt; dieses Panel liest keine Kontobestände.',
     'caption');
   const status = node(document, root, 'p',
-    options.loading === true ? 'Bericht wird geladen …' :
-      model.available ? `${statusLabel(model.status)}${
-        model.reason ? ` — ${model.reason}` : ''}` :
-        `UNKNOWN · ${model.reason}`, 'paired-status');
+    loading ? 'Bericht wird geladen …' :
+      model.available ? model.statusLabel :
+        `${model.status} · gemeinsamer Report-Projektor oder DTO nicht verfügbar.`,
+    'paired-status');
   status.setAttribute('role', 'status');
   status.setAttribute('aria-live', 'polite');
   status.setAttribute('aria-atomic', 'true');
-  root.setAttribute('data-state', options.loading === true ? 'loading' :
-    model.available ? model.status.toLowerCase() : model.state);
+  root.setAttribute('data-state', loading ? 'loading' : model.state);
 
   if (!model.available) {
-    node(document, root, 'p', options.loading === true ?
+    node(document, root, 'p', loading ?
       'Berichtsdaten werden für das Panel vorbereitet.' :
-      model.state === 'error' ?
-        'Fehler: Bericht konnte nicht validiert werden. Fehlende Werte bleiben unbekannt.' :
-        'Keine Berichtsdaten verbunden. Fehlende Werte bleiben unbekannt.');
+      'Fehler: gemeinsamer Bericht konnte nicht geprüft werden. Fehlende Werte bleiben unbekannt.');
     return {status: model.status};
   }
 
-  const identity = document.createElement('div');
-  identity.setAttribute('style',
-    'display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));gap:10px;margin:0');
-  field(document, identity, 'Run-ID', model.identity.runId ?
-    {label: model.identity.runId, value: model.identity.runId, tone: 'tone-muted'} :
-    {label: 'Unbekannt — Run-ID fehlt', value: null, tone: 'tone-muted'});
-  field(document, identity, 'Datenzeitpunkt', model.observedAt ?
-    {label: dateTime(model.observedAt), value: model.observedAt, tone: 'tone-muted'} :
-    {label: 'Unbekannt — Datenzeitpunkt fehlt', value: null, tone: 'tone-muted'});
-  field(document, identity, 'Evidenz-Aktualität', {
-    label: `${freshnessLabel(model.freshness)}${model.freshness.reason ?
-      ` — ${model.freshness.reason}` : ''}`,
-    value: model.freshness.status,
-    tone: model.freshness.status === 'STALE' ? 'tone-danger' : 'tone-muted'
-  });
-  const requestedDuration = duration(model.coverage.requestedDurationMs);
-  const coverage = model.coverage.actualDurationMs === null ?
-    `Unbekannt — ${model.coverage.reason || 'Abdeckungswert fehlt'}` :
-    `${duration(model.coverage.actualDurationMs)} von ${requestedDuration} angefordert`;
-  field(document, identity, `Tatsächliche Abdeckung · angefordert ${requestedDuration}`, {
-    label: coverage,
-    value: model.coverage.actualDurationMs,
-    tone: 'tone-muted'
-  });
-  root.append(identity);
+  const qualification = document.createElement('div');
+  qualification.setAttribute('style',
+    'display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));gap:10px;min-width:0');
+  field(document, qualification, 'Evidenz-Qualifikation',
+    qualificationLabel(model.qualification));
+  field(document, qualification, 'Unabhängige Authentifizierung',
+    authenticationLabel(model.authentication));
+  field(document, qualification, 'Evidenz-Grund', model.reasonCode);
+  field(document, qualification, 'Aktualität',
+    `${freshnessLabel(model.freshness)} — ${model.freshness.reason}`);
+  field(document, qualification, 'Run-ID', model.identity.runId);
+  field(document, qualification, 'Datenzeitpunkt · Bewertung in Europe/Wien',
+    model.timing.valuationAtLabel || 'Unbekannt — Bewertungszeitpunkt fehlt');
+  root.append(qualification);
+
+  const timing = document.createElement('div');
+  timing.setAttribute('style',
+    'display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));gap:10px;min-width:0');
+  field(document, timing, 'Angeforderte Abdeckung', elapsed(model.timing.requestedDurationMs));
+  field(document, timing, 'Beobachtete gemeinsame Abdeckung',
+    model.timing.observedCoverageLabel || 'Unbekannt — OBSERVED_COVERAGE_UNAVAILABLE');
+  field(document, timing, 'Tatsächlich verstrichene Laufzeit',
+    model.timing.actualElapsedLabel || 'Unbekannt — ACTUAL_ELAPSED_UNAVAILABLE');
+  field(document, timing, 'Run-Stoppzeit · Europe/Wien',
+    model.timing.runStoppedAtLabel || 'Unbekannt — RUN_STOP_TIME_UNAVAILABLE');
+  field(document, timing, 'Abgeschlossene Zyklen',
+    model.timing.completedCycles === null ? 'Unbekannt — COMPLETED_CYCLES_UNAVAILABLE' :
+      String(model.timing.completedCycles));
+  field(document, timing, 'Versuchte Zyklen',
+    model.timing.attemptedCycles === null ? 'Unbekannt — ATTEMPTED_CYCLES_UNAVAILABLE' :
+      String(model.timing.attemptedCycles));
+  field(document, timing, 'Run-Stopp-Grund', stopReason(model.timing.stopReason));
+  root.append(timing);
 
   const cards = document.createElement('div');
   cards.setAttribute('style',
@@ -167,27 +169,46 @@ function renderModel(root, model, document, options = {}) {
   }
   root.append(cards);
 
-  const comparison = document.createElement('section');
-  comparison.setAttribute('aria-label', 'Vergleichsdifferenzen');
-  node(document, comparison, 'h3', 'Differenzen');
-  if (!model.comparison.comparable) {
-    node(document, comparison, 'p',
-      `Nicht angezeigt · ${model.comparison.reason}`);
-  } else {
-    field(document, comparison, 'Challenger minus Baseline · Netto-PnL',
-      model.comparison.deltas.challengerVsBaseline);
-    field(document, comparison, 'Cash minus Baseline · Netto-PnL',
-      model.comparison.deltas.cashVsBaseline);
+  const deltas = document.createElement('section');
+  deltas.setAttribute('aria-label', 'Vergleichsdifferenzen');
+  node(document, deltas, 'h3', 'Differenzen · gemeinsame Bewertung');
+  if (model.deltaStatus !== 'AVAILABLE') {
+    node(document, deltas, 'p',
+      `Differenzen nicht verfügbar — ${model.deltaReason || 'DELTA_UNAVAILABLE'}`);
   }
-  root.append(comparison);
+  field(document, deltas, 'Challenger minus Baseline · Netto-PnL',
+    model.deltas.challengerMinusBaseline.netPnl.label,
+    model.deltas.challengerMinusBaseline.netPnl.tone);
+  field(document, deltas, 'Baseline minus Cash · Netto-PnL',
+    model.deltas.baselineMinusCash.netPnl.label,
+    model.deltas.baselineMinusCash.netPnl.tone);
+  field(document, deltas, 'Challenger minus Cash · Netto-PnL',
+    model.deltas.challengerMinusCash.netPnl.label,
+    model.deltas.challengerMinusCash.netPnl.tone);
+  field(document, deltas, 'Auswertungsentscheidung', model.decision);
+  root.append(deltas);
+
+  field(document, root, 'Modellgebühren',
+    `${model.assumptions.feeBpsPerSide} bp Gebühr und ${model.assumptions.slippageBpsPerSide} bp Slippage je Seite; Sätze nicht verifiziert.`);
   node(document, root,
-    'p', 'Gebühren und Slippage sind modellierte Kosten, keine Börsenabrechnung. Ein einzelner 8-Stunden-Sample belegt keine künftige Performance. Es gibt keine Gewinner- oder Profitabilitätswertung.',
+    'p', 'Gebuchte Gebühren und modellierter Slippage werden separat ausgewiesen und nicht erneut vom Netto-PnL abgezogen. 8-Stunden-Sample und Stichproben-Drawdown sind begrenzte Evidenz, keine Aussage über künftige Performance. Kein Gewinner- oder Profitabilitäts-Badge.',
     'caption');
   return {status: model.status};
 }
 
-export function renderSpotPaperPaired(root, dto, document = root?.ownerDocument, options = {}) {
+function elapsed(ms) {
+  if (!Number.isSafeInteger(ms) || ms < 0) return 'Unbekannt';
+  const hours = Math.floor(ms / 3_600_000);
+  const minutes = Math.floor(ms % 3_600_000 / 60_000);
+  const seconds = Math.floor(ms % 60_000 / 1000);
+  const parts = [];
+  if (hours) parts.push(`${hours} Std.`);
+  if (minutes) parts.push(`${minutes} Min.`);
+  if (seconds || parts.length === 0) parts.push(`${seconds} Sek.`);
+  return parts.join(' ');
+}
+
+export function renderSpotPaperPaired(root, input, document = root?.ownerDocument, options = {}) {
   if (!root || !document) return null;
-  const model = presentSpotPaperPairedReport(dto, options);
-  return renderModel(root, model, document, options);
+  return renderModel(root, presentSpotPaperPairedReport(input), document, options);
 }
