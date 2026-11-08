@@ -468,6 +468,16 @@ test('early Strategies navigation remains active when its module bootstrap initi
         })()`,returnByValue:true});
         assert.deepEqual(afterUnlock.result?.value,{selected:'strategies',state:'ready',button:true});
         assert.equal(intercepted.count(),0,'early selection and unlock never start a report read');
+        let hostSettled=false;
+        for(let attempt=0;attempt<150;attempt++){
+          const state=await call('Runtime.evaluate',{expression:`document.querySelector('#spot-paper-host8h-root')?.dataset.state==='transport-not-provisioned' && document.querySelector('#spot-paper-host8h-root button')?.disabled===false`,returnByValue:true});
+          hostSettled=state.result?.value===true;
+          if(hostSettled)break;
+          await new Promise(resolve=>setTimeout(resolve,10));
+        }
+        intercepted.assertHealthy();
+        assert.equal(hostSettled,true,'early-navigation host report settles before interception ends');
+        assert.ok(intercepted.host8hCount()>0,'early-navigation host report uses the generated fixture');
       }finally{await intercepted.close();}
     },844,async call=>{
       let removeListener;
