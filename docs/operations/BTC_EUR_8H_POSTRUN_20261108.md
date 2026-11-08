@@ -225,21 +225,21 @@ Prior transport rehearsals are limited proofs, not pilot results:
                files[name] = member
            elif member.type == tarfile.DIRTYPE:
                directories.add(name)
+               if len(directories) > 256:
+                   raise ValueError("archive directory-count limit exceeded")
            else:
                raise ValueError("archive contains a link or special member")
 
        if set(files) != set(expected):
            raise ValueError("archive regular-file set differs from manifest")
-       required_directories = set()
-       for name in expected:
+       for name in all_names:
            parts = name.split("/")
-           required_directories.update(
-               "/".join(parts[:index]) for index in range(1, len(parts))
-           )
-       if not directories.issubset(required_directories):
-           raise ValueError("archive contains an unexpected directory")
-       if files.keys() & required_directories:
-           raise ValueError("regular-file member is an ancestor of another path")
+           for index in range(1, len(parts)):
+               parent = "/".join(parts[:index])
+               if parent in files:
+                   raise ValueError("regular-file member is an ancestor")
+               if parent not in directories:
+                   raise ValueError("archive member is missing a directory ancestor")
 
        for name, entry in expected.items():
            member = files[name]
@@ -263,8 +263,11 @@ Prior transport rehearsals are limited proofs, not pilot results:
    ```
 
    The validator rejects duplicate names, absolute or unsafe path components,
-   links/special members, extra regular files, and directories not needed by a
-   manifest path. It compares the exact regular-file path set and hashes every
+   links/special members, extra regular files, and file/directory or ancestor
+   conflicts. It accepts up to 256 safe, unique directories, including empty
+   directories such as `runtime/<runId>/responses/` when a failed run produced
+   no responses; each nested member must still have explicit directory
+   ancestors. It compares the exact regular-file path set and hashes every
    member before producing the NUL-delimited allowlist. The package tool's own
    round-trip verification is not a substitute for validating the downloaded
    bytes. Any validator error stops the procedure before extraction.
