@@ -5,7 +5,9 @@ import {appendFile, lstat, mkdir, mkdtemp, open, readFile, rm, symlink, writeFil
 import {tmpdir} from "node:os";
 import path from "node:path";
 import test from "node:test";
-import {EVIDENCE_PACKAGE_LIMITS, packageHostEvidence} from "../scripts/spot-paper-pilot/package-host-evidence.mjs";
+import {
+  EVIDENCE_PACKAGE_LIMITS, main, packageHostEvidence
+} from "../scripts/spot-paper-pilot/package-host-evidence.mjs";
 
 async function temporaryDirectory(t) {
   const directory = await mkdtemp(path.join(tmpdir(), "spot-paper-evidence-package-"));
@@ -19,6 +21,9 @@ async function fixture(root) {
   await writeFile(path.join(root, "host.lock"), Buffer.from("partial lock\n"));
   await writeFile(path.join(root, "host-state.json"), Buffer.from("{incomplete"));
   await writeFile(path.join(run, "journal.pending"), Buffer.from("{truncated journal"));
+  await writeFile(path.join(run,
+    "journal.json.54321.123e4567-e89b-12d3-a456-426614174000.tmp"),
+  Buffer.alloc(1_250_000, 0x5a));
   await writeFile(path.join(run, "responses", `${"a".repeat(64)}.json`),
     Buffer.from([0, 0xff, 0x7f, 0x0a, 0xc3]));
   return run;
@@ -44,6 +49,8 @@ test("incomplete and corrupt regular evidence round-trips byte-exactly with a ha
     ["host.lock", Buffer.from("partial lock\n")],
     ["host-state.json", Buffer.from("{incomplete")],
     ["runtime/btc-eur-paper-host-8h-001/journal.pending", Buffer.from("{truncated journal")],
+    ["runtime/btc-eur-paper-host-8h-001/journal.json.54321.123e4567-e89b-12d3-a456-426614174000.tmp",
+      Buffer.alloc(1_250_000, 0x5a)],
     [`runtime/btc-eur-paper-host-8h-001/responses/${"a".repeat(64)}.json`,
       Buffer.from([0, 0xff, 0x7f, 0x0a, 0xc3])]
   ]);
@@ -52,6 +59,7 @@ test("incomplete and corrupt regular evidence round-trips byte-exactly with a ha
   assert.equal(result.scope, "BYTE_PRESERVATION_ONLY");
   assert.equal(result.operationalReadiness, "NOT_ASSESSED");
   assert.equal(result.roundTripVerified, true);
+  assert.equal(result.maxPayloadChunkBytes, 64 * 1024);
   assert.equal(result.fileCount, original.size);
   assert.equal(result.directoryCount, 3);
   const records = JSON.parse(await readFile(manifest, "utf8"));
@@ -66,7 +74,9 @@ test("incomplete and corrupt regular evidence round-trips byte-exactly with a ha
   const listed = spawnSync("tar", ["-tf", archive], {encoding: "utf8"});
   assert.equal(listed.status, 0, listed.stderr);
   for (const [relative, bytes] of original) {
-    const extracted = spawnSync("tar", ["-xOf", archive, relative], {encoding: null});
+    const extracted = spawnSync("tar", ["-xOf", archive, relative], {
+      encoding: null, maxBuffer: 2 * 1024 * 1024
+    });
     assert.equal(extracted.status, 0, extracted.stderr?.toString());
     assert.deepEqual(extracted.stdout, bytes);
   }
@@ -114,6 +124,16 @@ test("package enforces response, metadata, count, depth, time, and archive bound
   await assert.rejects(packageFixture(root, output), /EVIDENCE_METADATA_BYTES_LIMIT/);
 
   await rm(path.join(root, "metadata.bin"));
+  const journalRoot = path.join(root, "journal-candidates");
+  await mkdir(journalRoot);
+  await Promise.all(["a", "b"].map((suffix, index) => writeFile(
+    path.join(journalRoot,
+      `journal.json.${index}.123e4567-e89b-12d3-a456-426614174000.tmp`),
+    Buffer.alloc(4_500_000, suffix.charCodeAt(0))
+  )));
+  await assert.rejects(packageFixture(root, output), /EVIDENCE_TOTAL_BYTES_LIMIT/);
+  await rm(journalRoot, {recursive: true});
+
   const responseRoot = path.join(root, "responses");
   await mkdir(responseRoot);
   await Promise.all(Array.from({length: EVIDENCE_PACKAGE_LIMITS.maxResponseFiles + 1},
@@ -213,4 +233,26 @@ test("package detects input mutation while reading and publishes no archive", as
     io
   }), /EVIDENCE_CHANGED_DURING_PACKAGE/);
   await assert.rejects(readFile(archive), {code: "ENOENT"});
+});
+
+test("successful maintenance package can hold the job open for one bounded download window", async t => {
+  const parent = await temporaryDirectory(t);
+  const root = path.join(parent, "evidence");
+  const output = path.join(parent, "review");
+  await mkdir(root);
+  await mkdir(output);
+  await writeFile(path.join(root, "journal.pending"), "partial");
+  let stdout = "";
+  const started = Date.now();
+  const result = await main([
+    root, path.join(output, "held.tar"), path.join(output, "held.json"),
+    "--retrieval-window-ms", "25"
+  ], {stdout: {write: value => {stdout += value;}}});
+  assert.ok(Date.now() - started >= 20);
+  assert.equal(result.retrievalWindowMs, 25);
+  assert.equal(JSON.parse(stdout).status, "PACKAGED_BYTES_ONLY");
+  await assert.rejects(main([
+    root, path.join(output, "bad.tar"), path.join(output, "bad.json"),
+    "--retrieval-window-ms", "300001"
+  ]), /INVALID_RETRIEVAL_WINDOW/);
 });

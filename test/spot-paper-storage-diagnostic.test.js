@@ -36,6 +36,7 @@ test("storage diagnostic makes one bounded exclusive probe and returns structure
     observedAtUtc: "2026-11-08T12:00:00.000Z",
     workLimitBytes: 512,
     timeLimitMs: 10_000,
+    deadlineEnforcement: "COOPERATIVE_BETWEEN_OPERATIONS",
     operationalReadiness: "NOT_ASSESSED"
   });
   assert.equal(bytes.byteLength <= 512, true);
@@ -65,4 +66,20 @@ test("storage diagnostic rejects unnormalized and symlink mount paths before wri
   await import("node:fs/promises").then(fs => fs.symlink(mount, link));
   assert.throws(() => runStorageDiagnostic(link, options()),
     /MOUNT_ANCESTRY_NOT_REAL_DIRECTORY/);
+});
+
+test("storage diagnostic checks the cooperative deadline after final stat and result work", async t => {
+  const mount = await temporaryDirectory(t);
+  let monotonic = 0;
+  let wallSamples = 0;
+  assert.throws(() => runStorageDiagnostic(mount, options({
+    timeoutMs: 100,
+    monotonicNow: () => monotonic,
+    now: () => {
+      wallSamples += 1;
+      if (wallSamples === 2) monotonic = 100;
+      return new Date("2026-11-08T12:00:00.000Z");
+    }
+  })), {code: "DEADLINE_EXCEEDED"});
+  assert.equal(wallSamples, 2);
 });

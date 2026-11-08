@@ -140,6 +140,9 @@ export function runStorageDiagnostic(mountPath, dependencies = {}) {
 
   const free = statfsSync(mount, {bigint: true});
   const freeBytes = free.bavail * free.bsize;
+  const probeSha256 = createHash("sha256").update(readback).digest("hex");
+  const observedAtUtc = now().toISOString();
+  assertActive(context);
   return {
     schemaVersion: "SPOT_PAPER_STORAGE_DIAGNOSTIC_V1",
     status: "PASS",
@@ -148,11 +151,12 @@ export function runStorageDiagnostic(mountPath, dependencies = {}) {
     probePath: finalPath,
     runtimeUid: uid,
     probeBytes: readback.byteLength,
-    probeSha256: createHash("sha256").update(readback).digest("hex"),
+    probeSha256,
     freeBytes: freeBytes.toString(),
-    observedAtUtc: now().toISOString(),
+    observedAtUtc,
     workLimitBytes: MAX_PROBE_BYTES,
     timeLimitMs: dependencies.timeoutMs ?? MAX_OPERATION_MS,
+    deadlineEnforcement: "COOPERATIVE_BETWEEN_OPERATIONS",
     operationalReadiness: "NOT_ASSESSED"
   };
 }

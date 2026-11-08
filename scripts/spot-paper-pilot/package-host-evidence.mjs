@@ -2,7 +2,7 @@
 import {createHash} from "node:crypto";
 import {constants} from "node:fs";
 import {
-  lstat, open, readdir, realpath, unlink
+  lstat, open, opendir, realpath, unlink
 } from "node:fs/promises";
 import path from "node:path";
 import {pathToFileURL} from "node:url";
@@ -14,20 +14,24 @@ export const EVIDENCE_PACKAGE_LIMITS = Object.freeze({
   maxResponseBytes: 64 * 1024 * 1024,
   maxResponseFileBytes: 256 * 1024,
   maxJournalBytes: 8 * 1024 * 1024,
+  maxJournalCandidateBytes: 8 * 1024 * 1024,
+  maxJournalPendingBytes: 16 * 1024,
   maxMetadataBytes: 1024 * 1024,
-  maxTotalBytes: 73 * 1024 * 1024,
+  maxTotalBytes: 81 * 1024 * 1024 + 16 * 1024,
   maxFiles: 1024,
   maxDirectories: 256,
   maxDepth: 8,
-  maxArchiveBytes: 80 * 1024 * 1024,
+  maxArchiveBytes: 84 * 1024 * 1024,
   maxManifestBytes: 1024 * 1024,
-  maxOperationMs: 60_000
+  maxOperationMs: 60_000,
+  maxRetrievalWindowMs: 300_000
 });
 
 const BLOCK_BYTES = 512;
 const READ_BYTES = 64 * 1024;
+const MAX_TREE_ENTRIES =
+  EVIDENCE_PACKAGE_LIMITS.maxFiles + EVIDENCE_PACKAGE_LIMITS.maxDirectories;
 const ZERO_BLOCK = Buffer.alloc(BLOCK_BYTES);
-const MAX_INPUT_BYTES = EVIDENCE_PACKAGE_LIMITS.maxTotalBytes;
 const {O_NOFOLLOW = 0, O_NONBLOCK = 0, O_DIRECTORY = 0} = constants;
 
 function packageError(code) {
@@ -113,11 +117,23 @@ function category(relativePath, type, size) {
     }
     return "response";
   }
-  if (parts.at(-1) === "journal.json") {
-    if (size > EVIDENCE_PACKAGE_LIMITS.maxJournalBytes) {
-      throw packageError("JOURNAL_SIZE_LIMIT");
+  const name = parts.at(-1);
+  if (name === "journal.json" || /^journal\.json\..+\.tmp$/.test(name)) {
+    const category = name === "journal.json" ? "journal" : "journalCandidate";
+    const limit = category === "journal" ?
+      EVIDENCE_PACKAGE_LIMITS.maxJournalBytes :
+      EVIDENCE_PACKAGE_LIMITS.maxJournalCandidateBytes;
+    if (size > limit) {
+      throw packageError(category === "journal" ?
+        "JOURNAL_SIZE_LIMIT" : "JOURNAL_CANDIDATE_SIZE_LIMIT");
     }
-    return "journal";
+    return category;
+  }
+  if (name === "journal.pending") {
+    if (size > EVIDENCE_PACKAGE_LIMITS.maxJournalPendingBytes) {
+      throw packageError("JOURNAL_PENDING_SIZE_LIMIT");
+    }
+    return "journalPending";
   }
   return "metadata";
 }
@@ -129,10 +145,18 @@ async function scanTree(root, context, io) {
   }
   const entries = [];
   const totals = {files: 0, directories: 0, totalBytes: 0, responseBytes: 0,
-    responseFiles: 0, journalBytes: 0, metadataBytes: 0};
+    responseFiles: 0, journalBytes: 0, journalCandidateBytes: 0,
+    journalPendingBytes: 0, metadataBytes: 0};
   const visit = async (directory, prefix, depth) => {
     active(context);
-    const names = await (io.readdir ?? readdir)(directory, {encoding: "buffer"});
+    const names = [];
+    const dir = await (io.opendir ?? opendir)(directory, {encoding: "buffer"});
+    for await (const dirent of dir) {
+      if (names.length >= MAX_TREE_ENTRIES) {
+        throw packageError("EVIDENCE_DIRECTORY_ENTRY_LIMIT");
+      }
+      names.push(dirent.name);
+    }
     names.sort(Buffer.compare);
     for (const rawName of names) {
       active(context);
@@ -178,6 +202,10 @@ async function scanTree(root, context, io) {
         totals.responseBytes += size;
       } else if (entry.category === "journal") {
         totals.journalBytes += size;
+      } else if (entry.category === "journalCandidate") {
+        totals.journalCandidateBytes += size;
+      } else if (entry.category === "journalPending") {
+        totals.journalPendingBytes += size;
       } else {
         totals.metadataBytes += size;
       }
@@ -194,7 +222,9 @@ async function scanTree(root, context, io) {
         throw packageError("EVIDENCE_METADATA_BYTES_LIMIT");
       }
       if (totals.totalBytes > EVIDENCE_PACKAGE_LIMITS.maxTotalBytes ||
-          totals.journalBytes > EVIDENCE_PACKAGE_LIMITS.maxJournalBytes) {
+          totals.journalBytes > EVIDENCE_PACKAGE_LIMITS.maxJournalBytes ||
+          totals.journalCandidateBytes > EVIDENCE_PACKAGE_LIMITS.maxJournalCandidateBytes ||
+          totals.journalPendingBytes > EVIDENCE_PACKAGE_LIMITS.maxJournalPendingBytes) {
         throw packageError("EVIDENCE_TOTAL_BYTES_LIMIT");
       }
       if (segments.length > EVIDENCE_PACKAGE_LIMITS.maxDepth) {
@@ -213,46 +243,6 @@ function sameTree(left, right) {
     left.entries.every((entry, index) => entry.path === right.entries[index].path &&
       entry.type === right.entries[index].type &&
       sameMetadata(entry.info, right.entries[index].info));
-}
-
-async function readFileSnapshot(root, entry, context, io) {
-  active(context);
-  const filename = path.join(root, ...entry.path.split("/"));
-  const handle = await (io.open ?? open)(filename,
-    constants.O_RDONLY | O_NOFOLLOW | O_NONBLOCK);
-  try {
-    const first = await handle.stat({bigint: true});
-    if (!first.isFile() || !sameMetadata(entry.info, metadata(first))) {
-      throw packageError("EVIDENCE_CHANGED_DURING_PACKAGE");
-    }
-    const limit = entry.category === "response" ?
-      EVIDENCE_PACKAGE_LIMITS.maxResponseFileBytes :
-      entry.category === "journal" ? EVIDENCE_PACKAGE_LIMITS.maxJournalBytes :
-        EVIDENCE_PACKAGE_LIMITS.maxMetadataBytes;
-    const chunks = [];
-    let length = 0;
-    const hash = createHash("sha256");
-    for (;;) {
-      active(context);
-      const buffer = Buffer.alloc(Math.min(READ_BYTES, limit - length + 1));
-      const {bytesRead} = await handle.read(buffer, 0, buffer.length, null);
-      if (bytesRead === 0) break;
-      length += bytesRead;
-      if (length > limit || length > MAX_INPUT_BYTES) {
-        throw packageError("EVIDENCE_FILE_GREW_DURING_PACKAGE");
-      }
-      const chunk = buffer.subarray(0, bytesRead);
-      chunks.push(chunk);
-      hash.update(chunk);
-    }
-    const last = await handle.stat({bigint: true});
-    if (length !== entry.size || !sameMetadata(entry.info, metadata(last))) {
-      throw packageError("EVIDENCE_CHANGED_DURING_PACKAGE");
-    }
-    return {bytes: Buffer.concat(chunks, length), sha256: hash.digest("hex")};
-  } finally {
-    await handle.close();
-  }
 }
 
 function writeText(buffer, value, offset, length) {
@@ -299,27 +289,89 @@ function padLength(size) {
   return (BLOCK_BYTES - (size % BLOCK_BYTES)) % BLOCK_BYTES;
 }
 
-function buildTar(entries, fileBytes) {
-  const chunks = [];
-  let length = 0;
-  const add = chunk => {
-    length += chunk.byteLength;
-    if (length > EVIDENCE_PACKAGE_LIMITS.maxArchiveBytes) {
+function limitForCategory(category) {
+  if (category === "response") return EVIDENCE_PACKAGE_LIMITS.maxResponseFileBytes;
+  if (category === "journal") return EVIDENCE_PACKAGE_LIMITS.maxJournalBytes;
+  if (category === "journalCandidate") {
+    return EVIDENCE_PACKAGE_LIMITS.maxJournalCandidateBytes;
+  }
+  if (category === "journalPending") return EVIDENCE_PACKAGE_LIMITS.maxJournalPendingBytes;
+  return EVIDENCE_PACKAGE_LIMITS.maxMetadataBytes;
+}
+
+async function writeArchiveChunk(handle, bytes, context, byteCounter) {
+  let offset = 0;
+  while (offset < bytes.byteLength) {
+    active(context);
+    const {bytesWritten} = await handle.write(bytes, offset, bytes.byteLength - offset, null);
+    if (bytesWritten <= 0) throw packageError("ARCHIVE_WRITE_FAILED");
+    byteCounter.bytes += bytesWritten;
+    if (byteCounter.bytes > EVIDENCE_PACKAGE_LIMITS.maxArchiveBytes) {
       throw packageError("ARCHIVE_SIZE_LIMIT");
     }
-    chunks.push(chunk);
-  };
+    offset += bytesWritten;
+  }
+}
+
+async function copyEvidenceFile(root, entry, context, io, archiveHandle, byteCounter) {
+  active(context);
+  const filename = path.join(root, ...entry.path.split("/"));
+  const handle = await (io.open ?? open)(filename,
+    constants.O_RDONLY | O_NOFOLLOW | O_NONBLOCK);
+  try {
+    const first = await handle.stat({bigint: true});
+    if (!first.isFile() || !sameMetadata(entry.info, metadata(first))) {
+      throw packageError("EVIDENCE_CHANGED_DURING_PACKAGE");
+    }
+    const limit = limitForCategory(entry.category);
+    const fileHash = createHash("sha256");
+    let length = 0;
+    for (;;) {
+      active(context);
+      const buffer = Buffer.alloc(Math.min(READ_BYTES, limit - length + 1));
+      const {bytesRead} = await handle.read(buffer, 0, buffer.length, null);
+      if (bytesRead === 0) break;
+      length += bytesRead;
+      if (length > limit || length > EVIDENCE_PACKAGE_LIMITS.maxTotalBytes) {
+        throw packageError("EVIDENCE_FILE_GREW_DURING_PACKAGE");
+      }
+      const chunk = buffer.subarray(0, bytesRead);
+      fileHash.update(chunk);
+      await writeArchiveChunk(archiveHandle, chunk, context, byteCounter);
+    }
+    const last = await handle.stat({bigint: true});
+    if (length !== entry.size || !sameMetadata(entry.info, metadata(last))) {
+      throw packageError("EVIDENCE_CHANGED_DURING_PACKAGE");
+    }
+    return fileHash.digest("hex");
+  } finally {
+    await handle.close();
+  }
+}
+
+async function writeTarArchive(root, entries, context, io, archiveHandle) {
+  const byteCounter = {bytes: 0};
+  const manifestEntries = [];
   for (const entry of entries) {
-    const bytes = entry.type === "file" ? fileBytes.get(entry.path) : null;
-    add(tarHeader(entry.path, entry.type, bytes?.byteLength ?? 0));
-    if (bytes) {
-      add(bytes);
-      if (padLength(bytes.byteLength)) add(Buffer.alloc(padLength(bytes.byteLength)));
+    active(context);
+    await writeArchiveChunk(archiveHandle,
+      tarHeader(entry.path, entry.type, entry.type === "file" ? entry.size : 0),
+      context, byteCounter);
+    if (entry.type !== "file") continue;
+    const sha256 = await copyEvidenceFile(
+      root, entry, context, io, archiveHandle, byteCounter);
+    manifestEntries.push({path: entry.path, sizeBytes: entry.size, sha256});
+    const padding = padLength(entry.size);
+    if (padding) {
+      await writeArchiveChunk(archiveHandle, Buffer.alloc(padding), context, byteCounter);
     }
   }
-  add(ZERO_BLOCK);
-  add(ZERO_BLOCK);
-  return Buffer.concat(chunks, length);
+  await writeArchiveChunk(archiveHandle, ZERO_BLOCK, context, byteCounter);
+  await writeArchiveChunk(archiveHandle, ZERO_BLOCK, context, byteCounter);
+  active(context);
+  await archiveHandle.sync();
+  active(context);
+  return {archiveBytes: byteCounter.bytes, manifestEntries};
 }
 
 function readText(buffer, start, length) {
@@ -336,54 +388,95 @@ function readOctal(buffer, start, length) {
   return number;
 }
 
-function verifyTarRoundTrip(tarBytes, entries, fileBytes) {
-  const expected = new Map(entries.map(entry => [entry.path, entry]));
-  const seen = new Set();
+async function readExactly(handle, length, position, context) {
+  const buffer = Buffer.alloc(length);
   let offset = 0;
-  while (offset + BLOCK_BYTES <= tarBytes.byteLength) {
-    const header = tarBytes.subarray(offset, offset + BLOCK_BYTES);
-    if (header.equals(ZERO_BLOCK)) {
-      if (!tarBytes.subarray(offset).equals(Buffer.alloc(tarBytes.byteLength - offset)) ||
-          tarBytes.byteLength - offset !== BLOCK_BYTES * 2) {
-        throw packageError("INVALID_TAR_END");
-      }
-      if (seen.size !== expected.size) throw packageError("ARCHIVE_ROUND_TRIP_MISMATCH");
-      return true;
-    }
-    const expectedChecksum = readOctal(header, 148, 8);
-    const checksumHeader = Buffer.from(header);
-    checksumHeader.fill(0x20, 148, 156);
-    const actualChecksum = checksumHeader.reduce((sum, byte) => sum + byte, 0);
-    if (expectedChecksum !== actualChecksum) throw packageError("INVALID_TAR_CHECKSUM");
-    const name = readText(header, 0, 100);
-    const prefix = readText(header, 345, 155);
-    const relativePath = prefix ? `${prefix}/${name}` : name;
-    validateRelativePath(relativePath);
-    const type = header[156] === 0x35 ? "directory" :
-      header[156] === 0x30 || header[156] === 0 ? "file" : null;
-    const entry = expected.get(relativePath);
-    if (!entry || entry.type !== type || seen.has(relativePath)) {
-      throw packageError("ARCHIVE_ROUND_TRIP_MISMATCH");
-    }
-    seen.add(relativePath);
-    const size = readOctal(header, 124, 12);
-    if (type === "directory") {
-      if (size !== 0) throw packageError("INVALID_TAR_DIRECTORY");
-      offset += BLOCK_BYTES;
-      continue;
-    }
-    const bytesStart = offset + BLOCK_BYTES;
-    const bytesEnd = bytesStart + size;
-    if (size !== entry.size || bytesEnd > tarBytes.byteLength) {
-      throw packageError("ARCHIVE_ROUND_TRIP_MISMATCH");
-    }
-    const sourceBytes = fileBytes.get(relativePath);
-    if (!sourceBytes || !tarBytes.subarray(bytesStart, bytesEnd).equals(sourceBytes)) {
-      throw packageError("ARCHIVE_ROUND_TRIP_MISMATCH");
-    }
-    offset = bytesEnd + padLength(size);
+  while (offset < length) {
+    active(context);
+    const {bytesRead} = await handle.read(buffer, offset, length - offset, position + offset);
+    if (bytesRead <= 0) throw packageError("INVALID_TAR_END");
+    offset += bytesRead;
   }
-  throw packageError("INVALID_TAR_END");
+  return buffer;
+}
+
+async function verifyTarRoundTrip(archivePath, entries, manifestEntries, context, io) {
+  const handle = await (io.open ?? open)(archivePath,
+    constants.O_RDONLY | O_NOFOLLOW | O_NONBLOCK);
+  try {
+    const archiveInfo = await handle.stat();
+    if (!archiveInfo.isFile() ||
+        archiveInfo.size > EVIDENCE_PACKAGE_LIMITS.maxArchiveBytes) {
+      throw packageError("ARCHIVE_SIZE_LIMIT");
+    }
+    const expectedFiles = new Map(manifestEntries.map(entry => [entry.path, entry]));
+    const archiveHash = createHash("sha256");
+    let offset = 0;
+    for (const entry of entries) {
+      const header = await readExactly(handle, BLOCK_BYTES, offset, context);
+      archiveHash.update(header);
+      const expectedChecksum = readOctal(header, 148, 8);
+      const checksumHeader = Buffer.from(header);
+      checksumHeader.fill(0x20, 148, 156);
+      if (expectedChecksum !== checksumHeader.reduce((sum, byte) => sum + byte, 0)) {
+        throw packageError("INVALID_TAR_CHECKSUM");
+      }
+      const name = readText(header, 0, 100);
+      const prefix = readText(header, 345, 155);
+      const relativePath = prefix ? `${prefix}/${name}` : name;
+      const type = header[156] === 0x35 ? "directory" :
+        header[156] === 0x30 || header[156] === 0 ? "file" : null;
+      const size = readOctal(header, 124, 12);
+      if (relativePath !== entry.path || type !== entry.type ||
+          size !== (entry.type === "file" ? entry.size : 0)) {
+        throw packageError("ARCHIVE_ROUND_TRIP_MISMATCH");
+      }
+      offset += BLOCK_BYTES;
+      if (entry.type !== "file") continue;
+
+      const expected = expectedFiles.get(entry.path);
+      if (!expected) throw packageError("ARCHIVE_ROUND_TRIP_MISMATCH");
+      const fileHash = createHash("sha256");
+      let remaining = size;
+      while (remaining > 0) {
+        const chunk = await readExactly(handle, Math.min(READ_BYTES, remaining), offset, context);
+        fileHash.update(chunk);
+        archiveHash.update(chunk);
+        offset += chunk.byteLength;
+        remaining -= chunk.byteLength;
+      }
+      if (fileHash.digest("hex") !== expected.sha256) {
+        throw packageError("ARCHIVE_ROUND_TRIP_MISMATCH");
+      }
+      const padding = padLength(size);
+      if (padding) {
+        const bytes = await readExactly(handle, padding, offset, context);
+        if (!bytes.equals(Buffer.alloc(padding))) throw packageError("INVALID_TAR_PADDING");
+        archiveHash.update(bytes);
+        offset += padding;
+      }
+    }
+    const end = await readExactly(handle, BLOCK_BYTES * 2, offset, context);
+    if (!end.equals(Buffer.alloc(BLOCK_BYTES * 2))) throw packageError("INVALID_TAR_END");
+    archiveHash.update(end);
+    offset += end.byteLength;
+    if (offset !== archiveInfo.size) throw packageError("INVALID_TAR_END");
+    const after = await handle.stat();
+    if (after.dev !== archiveInfo.dev || after.ino !== archiveInfo.ino ||
+        after.size !== archiveInfo.size || after.mtimeMs !== archiveInfo.mtimeMs ||
+        after.ctimeMs !== archiveInfo.ctimeMs) {
+      throw packageError("ARCHIVE_CHANGED_DURING_VERIFICATION");
+    }
+    active(context);
+    const archiveSha256 = archiveHash.digest("hex");
+    active(context);
+    return {
+      archiveBytes: offset,
+      archiveSha256
+    };
+  } finally {
+    await handle.close();
+  }
 }
 
 async function outputLocation(filename, evidenceRoot, io, context) {
@@ -400,13 +493,15 @@ async function outputLocation(filename, evidenceRoot, io, context) {
   return finalPath;
 }
 
-async function syncDirectory(directory) {
+async function syncDirectory(directory, context) {
+  active(context);
   const handle = await open(directory, constants.O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
   try {
     await handle.sync();
   } finally {
     await handle.close();
   }
+  active(context);
 }
 
 async function writeExclusive(filename, bytes, context, io) {
@@ -456,50 +551,68 @@ export async function packageHostEvidence({
   if (archiveOutput === manifestOutput) throw packageError("OUTPUT_PATHS_MUST_DIFFER");
 
   const initial = await scanTree(evidenceRoot, context, io);
-  const fileBytes = new Map();
-  const manifestEntries = [];
-  for (const entry of initial.entries) {
-    active(context);
-    if (entry.type !== "file") continue;
-    const captured = await readFileSnapshot(evidenceRoot, entry, context, io);
-    fileBytes.set(entry.path, captured.bytes);
-    manifestEntries.push({
-      path: entry.path, sizeBytes: entry.size, sha256: captured.sha256
-    });
-  }
-  const final = await scanTree(evidenceRoot, context, io);
-  if (!sameTree(initial, final)) {
-    throw packageError("EVIDENCE_CHANGED_DURING_PACKAGE");
-  }
-
-  const archiveBytes = buildTar(initial.entries, fileBytes);
-  if (!verifyTarRoundTrip(archiveBytes, initial.entries, fileBytes)) {
-    throw packageError("ARCHIVE_ROUND_TRIP_MISMATCH");
-  }
-  const afterArchive = await scanTree(evidenceRoot, context, io);
-  if (!sameTree(initial, afterArchive)) {
-    throw packageError("EVIDENCE_CHANGED_DURING_PACKAGE");
-  }
-  const manifestBytes = Buffer.from(`${JSON.stringify({
-    schemaVersion: "SPOT_PAPER_HOST_EVIDENCE_MANIFEST_V1",
-    preservation: "BYTE_EXACT",
-    entries: manifestEntries
-  }, null, 2)}\n`);
-  if (manifestBytes.byteLength > EVIDENCE_PACKAGE_LIMITS.maxManifestBytes) {
-    throw packageError("MANIFEST_SIZE_LIMIT");
-  }
-  active(context);
   const created = [];
+  let archiveHandle;
   try {
-    await writeExclusive(archiveOutput, archiveBytes, context, io);
+    active(context);
+    archiveHandle = await (io.open ?? open)(archiveOutput,
+      constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | O_NOFOLLOW, 0o600);
     created.push(archiveOutput);
+    const written = await writeTarArchive(
+      evidenceRoot, initial.entries, context, io, archiveHandle);
+    await archiveHandle.close();
+    archiveHandle = null;
+
+    const afterWrite = await scanTree(evidenceRoot, context, io);
+    if (!sameTree(initial, afterWrite)) {
+      throw packageError("EVIDENCE_CHANGED_DURING_PACKAGE");
+    }
+    const verified = await verifyTarRoundTrip(
+      archiveOutput, initial.entries, written.manifestEntries, context, io);
+    const afterVerification = await scanTree(evidenceRoot, context, io);
+    if (!sameTree(initial, afterVerification)) {
+      throw packageError("EVIDENCE_CHANGED_DURING_PACKAGE");
+    }
+
+    const manifestBytes = Buffer.from(`${JSON.stringify({
+      schemaVersion: "SPOT_PAPER_HOST_EVIDENCE_MANIFEST_V1",
+      preservation: "BYTE_EXACT",
+      entries: written.manifestEntries
+    }, null, 2)}\n`);
+    if (manifestBytes.byteLength > EVIDENCE_PACKAGE_LIMITS.maxManifestBytes) {
+      throw packageError("MANIFEST_SIZE_LIMIT");
+    }
+    active(context);
     await writeExclusive(manifestOutput, manifestBytes, context, io);
     created.push(manifestOutput);
-    await syncDirectory(path.dirname(archiveOutput));
+    await syncDirectory(path.dirname(archiveOutput), context);
     if (path.dirname(manifestOutput) !== path.dirname(archiveOutput)) {
-      await syncDirectory(path.dirname(manifestOutput));
+      await syncDirectory(path.dirname(manifestOutput), context);
     }
+    active(context);
+    return {
+      schemaVersion: "SPOT_PAPER_HOST_EVIDENCE_PACKAGE_V1",
+      status: "PACKAGED_BYTES_ONLY",
+      scope: "BYTE_PRESERVATION_ONLY",
+      archivePath: archiveOutput,
+      archiveBytes: verified.archiveBytes,
+      archiveSha256: verified.archiveSha256,
+      manifestPath: manifestOutput,
+      manifestBytes: manifestBytes.byteLength,
+      fileCount: initial.totals.files,
+      directoryCount: initial.totals.directories,
+      totalInputBytes: initial.totals.totalBytes,
+      maxPayloadChunkBytes: READ_BYTES,
+      deadlineEnforcement: "COOPERATIVE_BETWEEN_OPERATIONS",
+      roundTripVerified: true,
+      operationalReadiness: "NOT_ASSESSED"
+    };
   } catch (error) {
+    if (archiveHandle) {
+      try {
+        await archiveHandle.close();
+      } catch {}
+    }
     for (const filename of created.reverse()) {
       try {
         await (io.unlink ?? unlink)(filename);
@@ -507,27 +620,21 @@ export async function packageHostEvidence({
     }
     throw error;
   }
-  return {
-    schemaVersion: "SPOT_PAPER_HOST_EVIDENCE_PACKAGE_V1",
-    status: "PACKAGED_BYTES_ONLY",
-    scope: "BYTE_PRESERVATION_ONLY",
-    archivePath: archiveOutput,
-    archiveBytes: archiveBytes.byteLength,
-    archiveSha256: createHash("sha256").update(archiveBytes).digest("hex"),
-    manifestPath: manifestOutput,
-    manifestBytes: manifestBytes.byteLength,
-    fileCount: initial.totals.files,
-    directoryCount: initial.totals.directories,
-    totalInputBytes: initial.totals.totalBytes,
-    roundTripVerified: true,
-    operationalReadiness: "NOT_ASSESSED"
-  };
 }
 
 export async function main(argv = process.argv.slice(2), dependencies = {}) {
-  if (argv.length !== 3) {
+  if (argv.length !== 3 && argv.length !== 5) {
     throw packageError(
-      "USAGE: package-host-evidence.mjs <absolute-evidence-dir> <absolute-archive.tar> <absolute-manifest.json>");
+      "USAGE: package-host-evidence.mjs <absolute-evidence-dir> <absolute-archive.tar> <absolute-manifest.json> [--retrieval-window-ms <1..300000>]");
+  }
+  let retrievalWindowMs = 0;
+  if (argv.length === 5) {
+    retrievalWindowMs = Number(argv[4]);
+    if (argv[3] !== "--retrieval-window-ms" ||
+        !Number.isSafeInteger(retrievalWindowMs) || retrievalWindowMs < 1 ||
+        retrievalWindowMs > EVIDENCE_PACKAGE_LIMITS.maxRetrievalWindowMs) {
+      throw packageError("INVALID_RETRIEVAL_WINDOW");
+    }
   }
   const result = await packageHostEvidence({
     evidenceDir: argv[0],
@@ -535,8 +642,12 @@ export async function main(argv = process.argv.slice(2), dependencies = {}) {
     manifestPath: argv[2],
     ...dependencies
   });
-  (dependencies.stdout ?? process.stdout).write(`${JSON.stringify(result)}\n`);
-  return result;
+  const commandResult = {...result, retrievalWindowMs};
+  (dependencies.stdout ?? process.stdout).write(`${JSON.stringify(commandResult)}\n`);
+  if (retrievalWindowMs > 0) {
+    await new Promise(resolve => setTimeout(resolve, retrievalWindowMs));
+  }
+  return commandResult;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
