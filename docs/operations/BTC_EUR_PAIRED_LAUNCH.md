@@ -41,16 +41,18 @@ There is no need to copy its modules into this image.
 | Entry and position | Maximum EUR 100 entry per account; no leverage or short positions |
 | Cost assumptions | 50 bp fee and 10 bp adverse slippage per side; modeled assumptions, not verified rates |
 | Run bounds | Eight hours, 480 cycles, 960 shared public requests total |
-| Existing data bounds | 64 MiB total response bytes, 256 KiB per response, five-second request timeout, at least 60 seconds between cycle starts |
+| Existing data bounds | 64 MiB total response bytes, 256 KiB per response, five-second request timeout, at least 60 seconds between cycle starts, ticker age at most 10 seconds, closed-candle age at most 120 seconds |
 | External deadline | 8 hours 2 minutes, with a 60-second termination grace period |
 | Retry/restart | One attempt; no schedule, retries, restarts, or autoresume |
 
-The host code stops at its eight-hour duration bound, bounds requests at five
-seconds, and gives terminal/persistence journal operations five-second
-deadlines. The external 8h02m timeout leaves two minutes beyond the internal
-run bound for bounded completion and platform scheduling; allow the separate
-60-second grace period after the platform sends SIGTERM. SIGTERM is delivered
-directly to Node by the exec-form image entrypoint. Do not wrap it in a shell.
+The host code stops at its eight-hour duration bound and bounds requests at
+five seconds. On SIGTERM it can have one in-flight request (at most five
+seconds) and up to three terminal/persistence journal operations (five seconds
+each), a 20-second bounded cleanup budget. The external 8h02m timeout leaves
+two minutes beyond the internal run bound for that cleanup and platform
+scheduling; allow the separate 60-second grace period after the platform sends
+SIGTERM. SIGTERM is delivered directly to Node by the exec-form image
+entrypoint. Do not wrap it in a shell.
 
 ## Build and immutable image record
 
@@ -74,12 +76,16 @@ registry push:
 docker run --rm --network none "${IMAGE_TAG}"
 ```
 
-It must print `DISABLED`; it must not request feed data. Do not use a mutable tag
-for the Northflank job. After an independently approved registry push, record
-the full repository digest from `docker image inspect --format
-'{{json .RepoDigests}}' "${IMAGE_TAG}"`, then configure the job with that exact
-`repository@sha256:...` reference. This task does not push an image and no
-registry path or image digest is available yet.
+It must print `DISABLED`; it must not request feed data. Do not use a mutable
+tag for the Northflank job. After an independently approved registry push,
+record the full repository digest:
+
+```sh
+docker image inspect --format '{{json .RepoDigests}}' "${IMAGE_TAG}"
+```
+
+Configure the job with that exact `repository@sha256:...` reference. This task
+does not push an image and no registry path or image digest is available yet.
 
 Record these immutable build and deployment identities in the launch approval:
 
@@ -141,6 +147,10 @@ report --data-root /evidence-root --run-id btc-eur-paired-host-8h-001
 export --data-root /evidence-root --run-id btc-eur-paired-host-8h-001
 ```
 
+Give the status/report/export-only maintenance invocation a finite 60-second
+external timeout; host journal inspection is bounded to five seconds. Apply
+the longer retrieval timeout below only to packaging and native file download.
+
 `export` emits a bounded `SPOT_PAPER_PAIRED_HOST_EXPORT_V1` JSON document to
 stdout, including report and validated journal payload. Capture and preserve
 the complete output only if the platform returns it without truncation. An
@@ -156,11 +166,12 @@ sizes, plus the complete host export-to-#1304 evaluator path and interrupted
 evidence tests. Do not launch while that end-to-end correction is unresolved.
 
 After that gate passes, run `package` as a separate read-only-volume
-maintenance invocation. The host writes only in its pre-created
-`/tmp/spot-paper-paired-package` directory, which is writable as `node`. Use a
-390-second external timeout: 60 seconds for bounded packaging, the maximum
-300-second native-download hold, and 30 seconds for exit. The helper also
-enforces an 84 MiB archive ceiling. Exact arguments:
+maintenance invocation. Reserve at least 90 MiB of writable temporary space
+for the maximum 84 MiB archive, bounded manifest, and margin. The host writes
+only in its pre-created `/tmp/spot-paper-paired-package` directory, which is
+writable as `node`. Use a 390-second external timeout: 60 seconds for bounded
+packaging, the maximum 300-second native-download hold, and 30 seconds for
+exit. The helper also enforces an 84 MiB archive ceiling. Exact arguments:
 
 ```text
 package --data-root /evidence-root --run-id btc-eur-paired-host-8h-001 --archive /tmp/spot-paper-paired-package/btc-eur-paired-host-8h-001.tar --manifest /tmp/spot-paper-paired-package/btc-eur-paired-host-8h-001.manifest.json --retrieval-window-ms 300000
