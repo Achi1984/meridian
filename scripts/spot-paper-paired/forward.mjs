@@ -1005,7 +1005,12 @@ async function runPairedForward(input, testOnly) {
         tradingStatus: states[index].stopped ? "STOPPED" : "ACTIVE",
         stopReason: states[index].stopReason ?? null,
         stoppedAt: states[index].stoppedAt ?? null,
-        decisions: decisions[index], fills: fills[index],
+        decisions: decisions[index].map(decision => {
+          const summary = { ...decision };
+          delete summary.state;
+          return summary;
+        }),
+        fills: fills[index],
         riskStates: riskStates[index], valuation: summaries[index]
       })),
       comparison,

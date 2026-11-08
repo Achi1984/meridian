@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
-import { mkdtemp, mkdir, readFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -17,6 +17,7 @@ import { sha256 } from "../scripts/spot-paper-pilot/core.mjs";
 import { readRunJournal } from "../scripts/spot-paper-pilot/journal.mjs";
 import { createSpotPaperPairedKrakenProvider } from
   "../scripts/spot-paper-paired/feed.mjs";
+import { main as pairedHostMain } from "../scripts/spot-paper-paired/host.mjs";
 
 const MINUTE = 60_000;
 const BASE = Date.UTC(2025, 0, 1);
@@ -401,6 +402,17 @@ test("operator interruption is not full-duration completion", async t => {
   assert.equal(report.stopReason, "OPERATOR_STOP");
   assert.equal(report.outcome, "INTERRUPTED_OR_STOPPED");
   assert.equal(report.fullEightHourCompletion, false);
+  const output = { write() {} };
+  const inspected = await pairedHostMain([
+    "report", "--data-root", setup.dataRoot, "--run-id", setup.config.runId
+  ], { output });
+  const exported = await pairedHostMain([
+    "export", "--data-root", setup.dataRoot, "--run-id", setup.config.runId
+  ], { output });
+  assert.equal(inspected.status, "TERMINAL_JOURNAL_VERIFIED");
+  assert.equal(inspected.report.outcome, "INTERRUPTED_OR_STOPPED");
+  assert.equal(exported.journal.reconciliationStatus, "READ_ONLY_VERIFIED");
+  assert.equal(exported.report.fullEightHourCompletion, false);
 });
 
 test("ambiguous persistence failure stops without a terminal success record", async t => {
@@ -532,6 +544,54 @@ test("actual #1299 exports integrate multi-cycle buys, exits, cooldown, stopped 
       processingDelayCycle: cooldownCycle + 1, processingDelayMs,
       quoteDelayCycle: cooldownCycle + 1
     });
+    const journalPath = join(setup.dataRoot, setup.config.runId, "journal.json");
+    const journalFileBytes = (await stat(journalPath)).size;
+    const journalExportBytes = Buffer.byteLength(JSON.stringify(journal), "utf8");
+    const reportBytes = Buffer.byteLength(JSON.stringify(report), "utf8");
+    const reportArrayBytes = Object.fromEntries(report.arms.map(arm => [arm.role, {
+      decisions: Buffer.byteLength(JSON.stringify(arm.decisions), "utf8"),
+      fills: Buffer.byteLength(JSON.stringify(arm.fills), "utf8"),
+      riskStates: Buffer.byteLength(JSON.stringify(arm.riskStates), "utf8"),
+      valuation: Buffer.byteLength(JSON.stringify(arm.valuation), "utf8")
+    }]));
+    const output = { write() {} };
+    const hostReport = await pairedHostMain([
+      "report", "--data-root", setup.dataRoot, "--run-id", setup.config.runId
+    ], { output });
+    const hostExport = await pairedHostMain([
+      "export", "--data-root", setup.dataRoot, "--run-id", setup.config.runId
+    ], { output });
+    const reportWrapperBytes = Buffer.byteLength(JSON.stringify(hostReport), "utf8");
+    const hostExportBytes = Buffer.byteLength(JSON.stringify(hostExport), "utf8");
+    const archivePath = join(setup.dataRoot, `${setup.config.runId}.tar`);
+    const manifestPath = join(setup.dataRoot, `${setup.config.runId}.manifest.json`);
+    const packaged = await pairedHostMain([
+      "package", "--data-root", setup.dataRoot, "--run-id", setup.config.runId,
+      "--archive", archivePath, "--manifest", manifestPath
+    ], { output });
+    t.diagnostic(JSON.stringify({
+      runId: report.runId, cycles: report.cycles,
+      journalFileBytes, journalExportBytes, reportBytes,
+      reportArrayBytes,
+      reportWrapperBytes, hostExportBytes, archiveBytes: packaged.archiveBytes,
+      packageStatus: packaged.status
+    }));
+    assert.equal(report.cycles, 480);
+    assert.equal(hostReport.status, "TERMINAL_JOURNAL_VERIFIED");
+    assert.equal(hostExport.verifiedTerminal, true);
+    assert.equal(hostExport.journal.reconciliationStatus, "READ_ONLY_VERIFIED");
+    assert.deepEqual(hostExport.report, report);
+    assert.equal(packaged.status, "PACKAGED_BYTES_ONLY");
+    assert.equal(packaged.roundTripVerified, true);
+    assert.ok(journalFileBytes <= 8 * 1024 * 1024);
+    assert.ok(reportBytes <= 8 * 1024 * 1024);
+    assert.ok(reportWrapperBytes <= 8 * 1024 * 1024);
+    assert.ok(hostExportBytes <= 16 * 1024 * 1024);
+    assert.equal(journal.events.filter(event =>
+      event.type === "shared_observation").length, 480);
+    assert.ok(journal.checkpoint.states.every(Boolean));
+    assert.ok(report.arms.every(arm =>
+      arm.decisions.every(decision => !Object.hasOwn(decision, "state"))));
     assert.ok(observations.length > 10);
     assert.ok(observations.every(observation =>
       observation.decisionAt < observation.ticker.requestStartedAt &&

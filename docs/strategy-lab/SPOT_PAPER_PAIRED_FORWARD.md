@@ -225,7 +225,10 @@ The paired terminal report's consumer-facing fields are `runId`, `pair`,
 `elapsedMs`, `coverage`, `cycles`, `requests`, `deliveredBytes`,
 `commonHorizon`, `assumptions`, `arms`, and `comparison`. Each arm exposes
 `role`, `modelId`, `accountId`, `tradingStatus`, `stopReason`, `stoppedAt`,
-`decisions`, `fills`, `riskStates`, and `valuation`; valuation includes
+`decisions`, `fills`, `riskStates`, and `valuation`. Decision summaries omit
+their per-cycle internal `state` snapshots; complete causal decisions and
+structured account state remain in journal events/checkpoints, avoiding an
+O(cycles²) duplicate in the terminal report. Valuation includes
 `feesCents`, `slippageCents`, `modeledCostsCents`, `netEquityCents`,
 `markedEquityCents`, `sampledDrawdownCents`, `exposureCents`, `turnoverCents`,
 `openPositions`, `unresolvedObservations`, and `markAgeMs`. Comparison arm
@@ -234,6 +237,51 @@ producer fields; dashboard consumers should map them through the shared #1302
 DTO rather than inventing a parallel report schema. `elapsedMs` is a finite
 monotonic duration and may be fractional; consumers must not require integer
 milliseconds.
+
+The canonical report-evaluation chain uses these two host commands and passes
+only the helper-validated journal payload to the #1304 evaluator:
+
+```sh
+node scripts/spot-paper-paired/host.mjs report \
+  --data-root "$PAIRED_DATA_ROOT" --run-id "$PAIRED_RUN_ID" \
+  > "$STAGE/report-wrapper.json"
+node scripts/spot-paper-paired/host.mjs export \
+  --data-root "$PAIRED_DATA_ROOT" --run-id "$PAIRED_RUN_ID" \
+  > "$STAGE/paired-export.json"
+node --input-type=module -e '
+import {isDeepStrictEqual} from "node:util";
+import {readFile, writeFile} from "node:fs/promises";
+const [reportPath, exportPath, journalPath] = process.argv.slice(1);
+const [report, paired] = await Promise.all([
+  readFile(reportPath, "utf8").then(JSON.parse),
+  readFile(exportPath, "utf8").then(JSON.parse)
+]);
+if (report.schemaVersion !== "SPOT_PAPER_PAIRED_HOST_STATUS_V1" ||
+    report.status !== "TERMINAL_JOURNAL_VERIFIED" ||
+    report.verifiedTerminal !== true ||
+    paired.schemaVersion !== "SPOT_PAPER_PAIRED_HOST_EXPORT_V1" ||
+    paired.status !== report.status || paired.verifiedTerminal !== true ||
+    paired.reconciliationStatus !== "READ_ONLY_VERIFIED" ||
+    !isDeepStrictEqual(report.report, paired.report) ||
+    !isDeepStrictEqual(report.report, paired.journal?.events?.at(-1)?.report) ||
+    paired.journal?.reconciliationStatus !== paired.reconciliationStatus) {
+  throw new Error("PAIRED_EXPORT_NOT_RECONCILED");
+}
+await writeFile(journalPath, `${JSON.stringify(paired.journal)}\n`,
+  {flag: "wx", mode: 0o600});
+' "$STAGE/report-wrapper.json" "$STAGE/paired-export.json" \
+  "$STAGE/journal-export.json"
+node scripts/spot-paper-paired-report/cli.mjs \
+  "$EXPECTED_IDENTITY_JSON" "$STAGE/report-wrapper.json" \
+  "$STAGE/journal-export.json"
+```
+
+Run this only after independently confirming the writer is stopped. The
+extraction writes no reconciliation marker; it checks that report and export
+agree and preserves the exact helper-produced journal payload/status. The
+evaluator still independently checks expected identity, journal reconciliation,
+terminal report/checkpoint, and accounting, and labels its result structural,
+not independently authenticated.
 
 For Northflank retrieval, use a separately reviewed maintenance Job with the
 evidence volume mounted read-only and the exact `node` host command above; use
@@ -278,12 +326,33 @@ verification. Never reuse
 `btc-eur-paper-host-8h-001`, its image, volume or evidence. No deployment or
 host-provider mutation is part of this change.
 
-The actual-export test passed as an ordinary non-skipped test after updating
-this branch from `main` at `4f5c4a3c8489129c514cd57c4b71f37ee05bcddf`.
-Paired forward tests: 18 passed; host tests: 4 passed; merged #1299 research
-tests: 14 passed. The research commit's hosted workflow run `42523447964`
-completed successfully. These synthetic and host-helper tests do not establish
-live acceptance or readiness; final-head hosted CI remains required.
+The 480-cycle synthetic run against actual #1299 exports measured these bytes
+for one provider-shaped fixture (not a theoretical maximum):
+
+| Artifact | Measured | Existing bound |
+| --- | ---: | ---: |
+| Persisted `journal.json` | 1,627,285 | 8 MiB |
+| `readRunJournal` export payload | 1,627,241 | 16 MiB evaluator input |
+| Standalone terminal report | 279,371 | 8 MiB evaluator input |
+| Host `report` wrapper | 279,688 | 8 MiB evaluator input |
+| Combined host `export` | 1,906,788 | 16 MiB |
+| Byte-preserving evidence archive | 4,319,232 | 84 MiB |
+
+This measured reduction comes from omitting each decision's cumulative internal
+account `state` snapshot from the terminal report; causal decisions, risk,
+fills, valuations, and structured state remain in journal events/checkpoints.
+The same test runs host `report`, `export`, and `package` on that 480-cycle
+evidence. The candidate #1304 file CLI evaluated these report/export artifacts
+as `VERIFIED_COMPLETE`; a separate operator-interrupted synthetic fixture
+remained `INTERRUPTED` with unavailable deltas. The evaluator was composed
+temporarily from candidate `1feea98a1fd2c602fccb1824c71d19e253c28376`; this is
+cross-PR synthetic compatibility validation, not a dependency pin or live
+acceptance. The paired adapter/research identities were based on adapter
+candidate `bb00a41f3eb65ece13ec0cfcb54b02ef710edb01` and #1299 reviewed source
+`adf5c0a6e7b7d93bfd106dd6136c40a8e15a6373` (merged as
+`4f5c4a3c8489129c514cd57c4b71f37ee05bcddf`). These synthetic and host-helper
+tests do not establish live acceptance or readiness. The production pin remains
+`null`.
 The existing
 [BTC/EUR post-run retrieval runbook](../operations/BTC_EUR_8H_POSTRUN_20261108.md)
 describes that sequence for the old run identity only; it is not approval or
