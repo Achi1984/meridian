@@ -1,4 +1,4 @@
-import {DEPOT_WINDOWS} from './depot-history-model.js?v=B16-M11-FIX13';
+import {DEPOT_WINDOWS} from './depot-history-model.js?v=B16-M11-FIX14';
 export function createDepotHistoryView(root,{onRange,pionexOnly=false}={}){
   const money=x=>pionexOnly?new Intl.NumberFormat('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}).format(x)+' USD/USDT':new Intl.NumberFormat('de-DE',{style:'currency',currency:'USD'}).format(x);
   const name=pionexOnly?'Pionex-Verlauf':'Depotverlauf';
@@ -39,7 +39,8 @@ export function createDepotHistoryView(root,{onRange,pionexOnly=false}={}){
     if(pionexOnly)output.append(el('p','Nur bestätigtes Pionex-Eigenkapital. Zeitachse: Quellenzeit; Speicherung erfolgt später. Kein Gesamtvermögen.'));
     output.append(svg,el('p',`${model.points.length} Messpunkte · Min. ${money(low)} · Max. ${money(high)}`));
     const first=model.points[0],last=model.points.at(-1);
-    output.append(el('p',`Erster Punkt: ${new Date(first.timestamp).toLocaleString('de-AT')} · ${money(first.totalUsd)}`),el('p',`Letzter Punkt: ${new Date(last.timestamp).toLocaleString('de-AT')} · ${money(last.totalUsd)}`));
+    output.append(el('p',`Erster Punkt: ${new Date(first.timestamp).toLocaleString('de-AT')} · ${money(first.totalUsd)}`),el('p',`Letzter gespeicherter Verlaufspunkt (lokale Zeit): ${new Date(last.timestamp).toLocaleString('de-AT')} · ${money(last.totalUsd)}`));
+    output.append(el('p','Der letzte Verlaufspunkt ist eine gespeicherte Messung und kann vom separat angezeigten Bewertungsstand abweichen.'));
     output.append(el('p',model.gaps?'Datenlücken: unterbrochene oder ausgeschlossene Messungen werden nicht verbunden.':'Gespeicherte Bewertungen; vor dem ersten und nach dem letzten Punkt bleibt die Kurve offen.'));
     output.append(el('p','Ein- und Auszahlungen können den Verlauf verändern. Keine P/L- oder Renditeberechnung; keine Cashflowbereinigung.'));
   }

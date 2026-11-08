@@ -62,6 +62,8 @@ test('Ledger UI separates quantities and prices, only explicit submit writes, lo
   const all=(node)=>[node,...node.children.flatMap(all)],nodes=all(root),load=nodes.find(n=>n.tag==='button'),form=nodes.find(n=>n.tag==='form');
   const qty=nodes.find(n=>n.tag==='textarea'),date=nodes.find(n=>n.type==='datetime-local'),key=nodes.find(n=>n.type==='password');
   assert.equal(loads,0);assert.equal(saves,0);load.events.click();assert.equal(loads,1);
+  emit({status:'ready',model:null});assert.match(root.textContent,/Noch kein manueller Ledger-Mengenstand gespeichert/);assert.match(root.textContent,/weder ein leeres Wallet noch einen Wert von null/);assert.doesNotMatch(root.textContent,/Ledger-Bewertung: 0/);
+  emit({status:'unavailable'});assert.match(root.textContent,/konnte nicht geladen oder geprüft/);assert.doesNotMatch(root.textContent,/Noch kein manueller/);
   emit({status:'ready',model:buildLedgerManualModel(snapshot(),{tickers:[{symbol:'BTCUSDT',price:'100'}],pricesAt:now,now})});
   assert.match(root.textContent,/20,00 USDT/);assert.match(root.textContent,/kein Gesamtvermögen/);
   qty.value='BTC;0.2';date.value='2026-01-01T01:00';key.value='write-fixture';form.events.submit({preventDefault(){}});

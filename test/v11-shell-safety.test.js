@@ -40,18 +40,18 @@ test('A0: exactly one decision and unknown data fail closed',()=>{
  assert.match(html,/Gesamtwert nicht verifiziert/);
  assert.match(html,/Fehlende Daten sind keine Entwarnung/);
  assert.equal((html.match(/class="command-source-details"/g)||[]).length,1);
- assert.match(html,/NICHT PRODUKTIV/);
+ assert.match(html,/LESEANSICHT · KEINE HANDELSSTEUERUNG/);
 });
 
 test('A0: no live imports, network, credentials, orders or PWA bootstrap',()=>{
  assert.deepEqual([...html.matchAll(/<script\b[^>]*>/gi)].map(match=>match[0]),[
    '<script>',
    '<script type="importmap">',
-   '<script type="module" src="./app-access-bootstrap.js?v=B16-M11-FIX13">',
-   '<script type="module" src="./bot-read-bootstrap.js?v=B16-M11-FIX13">',
-   '<script type="module" src="./depot-read-bootstrap.js?v=B16-M11-FIX13">',
-   '<script type="module" src="./strategy-workspace-bootstrap.js?v=B16-M11-FIX13">',
-   '<script type="module" src="./agent-status-bootstrap.js?v=B16-M11-FIX13">'
+   '<script type="module" src="./app-access-bootstrap.js?v=B16-M11-FIX14">',
+   '<script type="module" src="./bot-read-bootstrap.js?v=B16-M11-FIX14">',
+   '<script type="module" src="./depot-read-bootstrap.js?v=B16-M11-FIX14">',
+   '<script type="module" src="./strategy-workspace-bootstrap.js?v=B16-M11-FIX14">',
+   '<script type="module" src="./agent-status-bootstrap.js?v=B16-M11-FIX14">'
  ],'one navigation script, one fixed module import map and five approved module entries');
  assert.match(html,/<script>/,'script must have no attributes');
  const agentStatusStylesheet='<link rel="stylesheet" href="../public/css/m11-agent-status.css">';
@@ -59,8 +59,8 @@ test('A0: no live imports, network, credentials, orders or PWA bootstrap',()=>{
  assert.doesNotMatch(html.replace(agentStatusStylesheet,''),/<(?:img|base|object|embed|source|video|audio|link)\b|<meta[^>]*http-equiv=["']refresh|\bon[a-z]+\s*=|javascript:|url\s*\(/i);
  assert.equal(scripts.length,1,'navigation-only inline script');
  for(const module of ['app-access-bootstrap.js','bot-read-bootstrap.js','depot-read-bootstrap.js','strategy-workspace-bootstrap.js','agent-status-bootstrap.js'])
-  assert.ok(html.includes(`<script type="module" src="./${module}?v=B16-M11-FIX13"></script>`));
- assert.match(html,/<script type="importmap">[\s\S]*contract\.mjs\?v=B16-M11-FIX13/);
+  assert.ok(html.includes(`<script type="module" src="./${module}?v=B16-M11-FIX14"></script>`));
+ assert.match(html,/<script type="importmap">[\s\S]*contract\.mjs\?v=B16-M11-FIX14/);
  assert.equal((html.match(/<form\b/g)||[]).length,1,'one app-opening form');
  assert.equal((html.match(/type="password"/g)||[]).length,1,'one masked app password input');
  const withoutGate=html.replace(/<form id="app-access-form">[\s\S]*?<\/form>/,'')

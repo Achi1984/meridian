@@ -26,7 +26,7 @@ test('actual readiness projection separates source preparation, unmet gates and 
   const original=JSON.stringify(model);
   assert.deepEqual(renderPaperReadiness(root,model),{status:'NOT_READY'});
   assert.equal(JSON.stringify(model),original);
-  for(const label of ['Technik vorhanden','Noch zu bauen / prüfen','Betriebsparameter festlegen','Nächster Schritt','kein laufender Paper-Betrieb'])assert.ok(root.textContent.includes(label));
+  for(const label of ['Technik vorhanden','Noch zu bauen / prüfen','Betriebsparameter festlegen','Nächster Schritt','keine Aussage zum aktuellen Paper-Lauf'])assert.ok(root.textContent.includes(label));
   for(const row of [...model.prepared,...model.gates,...model.choices]){
     assert.ok(root.textContent.includes(row.label));
     assert.ok(root.textContent.includes(row.detail));
@@ -70,7 +70,7 @@ test('untrusted labels, details and source references remain inert text; impleme
 test('readiness mounts once in the existing workspace without a new fetch or activation handler',()=>{
   const source=readFileSync(new URL('../v11/strategy-workspace-bootstrap.js',import.meta.url),'utf8');
   assert.equal((source.match(/renderPaperReadiness\(readinessRoot\)/g)||[]).length,1);
-  assert.match(source,/insertBefore\(readinessRoot,catalogRoot\)/);
+  assert.match(source,/research\.append\(readinessRoot\)/);
   const view=readFileSync(new URL('../v11/paper-readiness-view.js',import.meta.url),'utf8');
   assert.doesNotMatch(view,/\bfetch\s*\(|\bsetInterval\s*\(|localStorage|sessionStorage|\.innerHTML\s*=/);
 });

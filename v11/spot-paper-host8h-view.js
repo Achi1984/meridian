@@ -2,7 +2,7 @@ import {
   createSpotPaperHost8hAdapter,
   presentSpotPaperHost8h,
   SPOT_PAPER_HOST8H_REQUESTED_DURATION_MS
-} from './spot-paper-host8h-model.js?v=B16-M11-FIX13';
+} from './spot-paper-host8h-model.js?v=B16-M11-FIX14';
 
 function node(document, parent, tag, text = '', className = '') {
   const element = document.createElement(tag);
@@ -71,26 +71,26 @@ function statusText(model) {
   if (!model.available) {
     return model.status === 'IDENTITY_MISMATCH' ?
       'Identität stimmt nicht mit dem freigegebenen 8-Stunden-Profil überein.' :
-      'Kein Host-Snapshot verfügbar.';
+      'Paper-Daten noch nicht verbunden.';
   }
   switch (model.status) {
     case 'RUNNING_OBSERVED':
       return model.metrics?.provisional ?
-        'Laufender Prozess beobachtet · Zwischenstand aus dem letzten geprüften Journal-Snapshot; nicht terminal verifiziert.' :
-        'Laufender Prozess beobachtet; Ausführung und Gesundheit sind nicht verifiziert.';
+        'Zwischenstand des Paper-Laufs · Abschluss noch nicht geprüft.' :
+        'Paper-Lauf beobachtet · noch keine geprüften Ergebnisse.';
     case 'VERIFIED_TERMINAL':
-      return model.completed ? 'Abgeschlossen · Assessment verifiziert.' :
-        'Terminal-Readback verifiziert; Assessment nicht als abgeschlossen bestätigt.';
+      return model.completed ? 'Lauf beendet · Abschluss geprüft.' :
+        'Laufende geprüft · Ergebnis noch nicht abschließend bestätigt.';
     case 'INCOMPLETE_UNKNOWN':
-      return 'Unvollständig oder unbekannt; kein Abschlussnachweis.';
+      return 'Daten unvollständig · Abschluss noch nicht bestätigt.';
     case 'FAILED':
-      return 'Assessment fehlgeschlagen; Ergebnisse nicht als abgeschlossen bestätigt.';
+      return 'Prüfung fehlgeschlagen · kein bestätigtes Ergebnis.';
     case 'STALE':
-      return 'Snapshot veraltet; der gespeicherte Host-Status ist keine aktuelle Beobachtung.';
+      return 'Bericht veraltet · keine aktuelle Beobachtung.';
     case 'OUT_OF_ORDER':
-      return 'Älterer Snapshot verworfen; die letzte neuere Beobachtung bleibt maßgeblich.';
+      return 'Älterer Bericht verworfen · der neuere Stand bleibt maßgeblich.';
     default:
-      return 'Host-Status nicht verfügbar.';
+      return 'Paper-Status nicht verfügbar.';
   }
 }
 
@@ -98,18 +98,17 @@ function renderModel(root, model, document, options = {}) {
   root.replaceChildren();
   root.className = 'card paper-cockpit spot-paper-host8h';
   root.setAttribute('style', 'min-width:0;max-width:100%;overflow-wrap:anywhere');
-  const heading = node(document, root, 'h2', 'BTC/EUR Paper · 8 Stunden');
+  const heading = node(document, root, 'h2', 'Paper-Bot · BTC/EUR');
   heading.id = 'spot-paper-host8h-heading';
   root.setAttribute('aria-labelledby', heading.id);
-  node(document, root, 'p',
-    'Nur Anzeige · keine Verbindung, Start-, Stopp-, Order- oder Handelsaktionen.', 'caption');
+  node(document, root, 'p', 'Simulierter Handel · kein Echtgeld', 'caption');
   const status = node(document, root, 'p', options.message || statusText(model), model.statusTone);
   status.setAttribute('role', 'status');
   status.setAttribute('aria-live', 'polite');
   status.setAttribute('aria-atomic', 'true');
   root.setAttribute('data-state', options.state || model.status?.toLowerCase() || 'unavailable');
   if (typeof options.onRefresh === 'function') {
-    const refresh = node(document, root, 'button', 'Host8h-Status aktualisieren');
+    const refresh = node(document, root, 'button', 'Paper-Daten aktualisieren');
     refresh.type = 'button';
     refresh.disabled = options.loading === true || options.retryBlocked === true;
     refresh.setAttribute('aria-disabled', String(refresh.disabled));
@@ -118,81 +117,82 @@ function renderModel(root, model, document, options = {}) {
       'min-width:44px;min-height:44px;max-width:100%;padding:10px 12px;white-space:normal;overflow-wrap:anywhere');
     refresh.onclick = options.onRefresh;
   }
-  node(document, root, 'p',
-    'Ein injizierter UI-Snapshot ist nicht unabhängig authentifiziert und belegt keine Host- oder Prozessgesundheit.',
-    'caption');
-
-  if (model.available) {
-    const summary = document.createElement('div');
-    summary.className = 'trust-grid';
-    field(document, summary, 'Quelle', model.source || 'Unbekannt');
-    field(document, summary, 'Zuletzt beobachtet', timestamp(model.observedAt));
-    field(document, summary, 'Aktualität', freshness(model.freshness?.status));
-    field(document, summary, 'Instrument / Modus',
-      `${model.identity?.pair || 'Unbekannt'} · Paper`);
-    field(document, summary, 'Modell / Hebel / Richtung',
-      `${model.identity?.model || 'Unbekannt'} · ${model.identity?.leverage ?? 'Unbekannt'}x · ${model.identity?.positionMode || 'Unbekannt'}`);
-    field(document, summary, 'Währung', model.identity?.currency || 'Unbekannt');
-    root.append(summary);
-    field(document, root, 'USD-Challenge', 'NOT_STARTED');
-  } else {
-    node(document, root, 'p',
-      'Offline-Vorschau · keine Laufdaten verbunden. Fehlende Werte sind unbekannt, nicht null.',
-      'caption');
-  }
 
   const metrics = model.metrics;
   if (metrics) {
+    const money = document.createElement('div');
+    money.className = 'trust-grid';
+    field(document, money, 'Eigenkapital', metrics.equity?.label);
+    field(document, money, 'Netto-Gewinn/Verlust', metrics.totalPnl?.label, metrics.totalPnl?.tone);
+    field(document, money, 'Gebuchte Modellgebühren', metrics.fees?.label);
+    field(document, money, 'Offene Position', inventoryStatus(metrics.inventory.status));
+    root.append(money);
+    node(document, root, 'p', metrics.provisional ?
+      'Zwischenstand · Ergebnisse können sich bis zum Laufende ändern.' :
+      'Geprüfter Laufbericht · kein Nachweis zukünftiger Gewinne.', 'caption');
+  }
+  if (model.available) {
+    const summary = document.createElement('div');
+    summary.className = 'trust-grid';
+    field(document, summary, 'Zuletzt beobachtet', timestamp(model.observedAt));
+    field(document, summary, 'Aktualität', freshness(model.freshness?.status));
+    if (metrics) field(document, summary, 'Tatsächliche Dauer',
+      `${duration(metrics.elapsedMs)} von ${duration(SPOT_PAPER_HOST8H_REQUESTED_DURATION_MS)}`);
+    field(document, summary, 'Modus', 'BTC/EUR · 1× · nur Long');
+    root.append(summary);
+  } else if (!options.message) {
+    node(document, root, 'p', 'Noch keine geprüften Laufdaten. Fehlende Werte bleiben unbekannt.', 'caption');
+  }
+
+  const details = document.createElement('details');
+  details.className = 'card card-muted spot-paper-host8h-details';
+  const disclosure = node(document, details, 'summary', 'Details zum Lauf und zur Datenquelle');
+  disclosure.setAttribute('style', 'min-height:44px;padding:10px 0;box-sizing:border-box;cursor:pointer');
+  if (metrics) {
+    const money = document.createElement('div');
+    money.className = 'trust-grid';
+    field(document, money, 'Bargeld', metrics.cash?.label);
+    field(document, money, 'Realisierter Gewinn/Verlust', metrics.realizedPnl?.label, metrics.realizedPnl?.tone);
+    field(document, money, 'Unrealisierter Gewinn/Verlust', metrics.unrealizedPnl?.label, metrics.unrealizedPnl?.tone);
+    field(document, money, 'Geschätzte Ausstiegsgebühr', metrics.estimatedExitFee?.label);
+    field(document, money, 'Geschätzter Ausstiegs-Slippage', metrics.estimatedExitSlippage?.label);
+    field(document, money, 'Bestand', metrics.inventory.quantitySat === null ?
+      'Unbekannt' : `${metrics.inventory.quantitySat} sat`);
+    details.append(money);
+    node(document, details, 'p',
+      'Modellannahmen je Seite: 50 bps Gebühr und 10 bps Slippage, keine verifizierten Börsenkosten. Geschätzte zukünftige Ausstiegskosten sind separat und werden nicht erneut vom PnL abgezogen.', 'caption');
     const run = document.createElement('div');
     run.className = 'trust-grid';
-    field(document, run, 'Tatsächliche Dauer',
-      `${duration(metrics.elapsedMs)} von ${duration(SPOT_PAPER_HOST8H_REQUESTED_DURATION_MS)}`);
+    field(document, run, 'Dauerstatus', durationStatus(metrics.durationStatus));
     field(document, run, 'Dauerabdeckung', percent(metrics.durationCoverage));
     field(document, run, 'Zyklen', metrics.cycleCount);
     field(document, run, 'Zyklusabdeckung', percent(metrics.cycleCoverage));
     field(document, run, 'Akzeptierte Beobachtungen', metrics.acceptedObservations);
-    field(document, run, 'Akzeptierte Beobachtungsabdeckung',
-      percent(metrics.acceptedObservationCoverage));
+    field(document, run, 'Akzeptierte Beobachtungsabdeckung', percent(metrics.acceptedObservationCoverage));
     field(document, run, 'Beobachtungen', metrics.observations);
     field(document, run, 'Datenlücken', metrics.dataGaps);
     field(document, run, 'Anfragen', metrics.requests);
     field(document, run, 'Fills', metrics.fills);
     field(document, run, 'Geschlossene Trades', metrics.closedTrades);
-    root.append(run);
-    const money = document.createElement('div');
-    money.className = 'trust-grid';
-    field(document, money, 'Gebuchte Modellgebühren', metrics.fees?.label);
-    field(document, money, 'Geschätzte Ausstiegsgebühr', metrics.estimatedExitFee?.label);
-    field(document, money, 'Geschätzter Ausstiegs-Slippage', metrics.estimatedExitSlippage?.label);
-    field(document, money, 'Bargeld', metrics.cash?.label);
-    field(document, money, 'Eigenkapital', metrics.equity?.label);
-    field(document, money, 'Realisierter Gewinn/Verlust', metrics.realizedPnl?.label,
-      metrics.realizedPnl?.tone);
-    field(document, money, 'Unrealisierter Gewinn/Verlust', metrics.unrealizedPnl?.label,
-      metrics.unrealizedPnl?.tone);
-    field(document, money, 'Gesamter Gewinn/Verlust', metrics.totalPnl?.label,
-      metrics.totalPnl?.tone);
-    field(document, money, 'Offene Position', inventoryStatus(metrics.inventory.status));
-    field(document, money, 'Bestand', metrics.inventory.quantitySat === null ?
-      'Unbekannt' : `${metrics.inventory.quantitySat} sat`);
-    root.append(money);
-    node(document, root, 'p',
-      `Dauerstatus: ${durationStatus(metrics.durationStatus)} · Modellannahmen je Seite: 50 bps Gebühr und 10 bps Slippage, keine verifizierten Börsenkosten. Geschätzte zukünftige Ausstiegskosten sind separat und werden nicht erneut vom PnL abgezogen.`,
-      'caption');
+    details.append(run);
   }
-
-  const details = document.createElement('details');
-  details.className = 'card card-muted spot-paper-host8h-details';
-  node(document, details, 'summary', 'Technische Herkunft und Statusdetails');
   const identity = document.createElement('div');
   identity.className = 'trust-grid';
+  field(document, identity, 'Quelle', model.source || 'Unbekannt');
   field(document, identity, 'Run-ID', model.identity?.runId);
   field(document, identity, 'Profil', model.identity?.profileId);
   field(document, identity, 'Quell-Fingerprint', model.identity?.sourceSha);
+  field(document, identity, 'Modell', model.identity?.model);
+  field(document, identity, 'Währung', model.identity?.currency);
   field(document, identity, 'Host-Status', model.hostStatus);
   field(document, identity, 'Assessment', model.assessmentOutcome || 'Unbekannt');
   field(document, identity, 'Stop-Grund', model.reportStopReason);
+  field(document, identity, 'USD-Challenge', 'Noch nicht gestartet');
   details.append(identity);
+  node(document, details, 'p',
+    options.preview === true ?
+      'Offline-Vorschau: Die bereitgestellten Daten sind nicht unabhängig authentifiziert.' :
+      'Angezeigt wird der letzte geprüfte Bericht. Er belegt keine aktuelle Prozessgesundheit.', 'caption');
   root.append(details);
   return {status: model.status};
 }
@@ -207,7 +207,7 @@ export function createSpotPaperHost8hPreview({readSnapshot} = {}) {
   return Object.freeze({
     async render(root, document = root?.ownerDocument, options = {}) {
       if (!root || !document) return null;
-      return renderModel(root, await adapter.read(options), document, options);
+      return renderModel(root, await adapter.read(options), document, {...options, preview: true});
     }
   });
 }

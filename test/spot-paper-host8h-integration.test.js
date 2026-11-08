@@ -483,7 +483,8 @@ test('Dashboard reports missing provisioning and cancels in-flight reads when in
   }, 503));
   unavailable.controller.setActive(true);
   await new Promise(resolve => setImmediate(resolve));
-  assert.match(unavailable.root.textContent, /nicht provisioniert/);
+  assert.match(unavailable.root.textContent, /Paper-Daten noch nicht verbunden/);
+  assert.doesNotMatch(unavailable.root.textContent, /provisioniert|Upload-Credential|Gateway-Freigaben|injizierter UI-Snapshot/);
   unavailable.controller.dispose();
 
   let resolveResponse;
@@ -511,13 +512,13 @@ test('Dashboard distinguishes a missing summary from a missing route on bounded 
     response({error: 'host8h_report_not_found'}, 404));
   missingSummary.controller.setActive(true);
   await new Promise(resolve => setImmediate(resolve));
-  assert.match(missingSummary.root.textContent, /noch kein Summary hochgeladen/);
+  assert.match(missingSummary.root.textContent, /Der erste Paper-Bericht fehlt noch/);
   missingSummary.controller.dispose();
 
   const missingRoute = dashboardDependencies(async () => response({error: 'not_found'}, 404));
   missingRoute.controller.setActive(true);
   await new Promise(resolve => setImmediate(resolve));
-  assert.match(missingRoute.root.textContent, /nicht provisioniert/);
+  assert.match(missingRoute.root.textContent, /Paper-Daten noch nicht verbunden/);
   missingRoute.controller.dispose();
 });
 
@@ -543,8 +544,8 @@ test('Dashboard freshness expires locally and cancels its timer when inactive', 
   timer.cancelled = true;
   timer.callback();
   assert.equal(deps.root.getAttribute('data-state'), 'stale');
-  assert.match(deps.root.textContent, /Snapshot veraltet/);
-  assert.equal(deps.root.textContent.includes('nicht provisioniert'), false);
+  assert.match(deps.root.textContent, /Bericht veraltet/);
+  assert.equal(deps.root.textContent.includes('Paper-Daten noch nicht verbunden'), false);
   assert.equal(calls, 1, 'freshness expiry is local and does not poll the endpoint');
   deps.controller.dispose();
 
@@ -581,8 +582,8 @@ test('Dashboard rejects out-of-order and terminal-to-running snapshots without r
   clock = NOW + 2_000;
   await deps.controller.refresh();
   assert.equal(deps.root.getAttribute('data-state'), 'verified_terminal');
-  assert.match(deps.root.textContent, /Rückschritt verworfen/);
-  assert.match(deps.root.textContent, /Abgeschlossen · Assessment verifiziert/);
+  assert.match(deps.root.textContent, /widersprüchlicher Bericht wurde verworfen/);
+  assert.match(deps.root.textContent, /Lauf beendet · Abschluss geprüft/);
   assert.match(deps.root.textContent, /Zuletzt beobachtet08\.11\.2026, 14:00:00 UTC/);
   assert.ok(deps.root.textContent.includes('Datenlücken10'));
   assert.notEqual(deps.root.textContent, terminalText);
@@ -602,7 +603,7 @@ test('Dashboard rejects out-of-order and terminal-to-running snapshots without r
   const acceptedText = outOfOrder.root.textContent;
   await outOfOrder.controller.refresh();
   assert.equal(outOfOrder.root.getAttribute('data-state'), 'running_observed');
-  assert.match(outOfOrder.root.textContent, /Rückschritt verworfen/);
+  assert.match(outOfOrder.root.textContent, /widersprüchlicher Bericht wurde verworfen/);
   assert.match(outOfOrder.root.textContent, /Zuletzt beobachtet08\.11\.2026, 14:00:00 UTC/);
   assert.notEqual(outOfOrder.root.textContent, acceptedText);
   outOfOrder.controller.dispose();
@@ -623,7 +624,7 @@ test('Dashboard rejects out-of-order and terminal-to-running snapshots without r
   clock = NOW + 2_000;
   await sequenceRegression.controller.refresh();
   assert.equal(sequenceRegression.root.getAttribute('data-state'), 'running_observed');
-  assert.match(sequenceRegression.root.textContent, /Rückschritt verworfen/);
+  assert.match(sequenceRegression.root.textContent, /widersprüchlicher Bericht wurde verworfen/);
   assert.match(sequenceRegression.root.textContent, /Zuletzt beobachtet08\.11\.2026, 14:00:00 UTC/);
   sequenceRegression.controller.dispose();
 });

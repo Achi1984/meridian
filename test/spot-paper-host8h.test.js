@@ -107,7 +107,7 @@ test('contradictory terminal evidence cannot display completed or verified metri
     assert.equal(model.metrics, null);
     const {root, document} = harness();
     renderSpotPaperHost8h(root, value, document, {now: NOW, staleAfterMs: 60_000});
-    assert.doesNotMatch(root.textContent, /Abgeschlossen · Assessment verifiziert/);
+    assert.doesNotMatch(root.textContent, /Lauf beendet · Abschluss geprüft/);
   }
   for (const outcome of ['FAILED', 'UNKNOWN']) {
     const value = input('VERIFIED_TERMINAL');
@@ -130,9 +130,9 @@ test('running host observation is not a terminal report or completed result', ()
   assert.equal(model.completed, false);
   const {root, document} = harness();
   renderSpotPaperHost8h(root, input(), document, {now: NOW, staleAfterMs: 60_000});
-  assert.match(root.textContent, /Laufender Prozess beobachtet/);
-  assert.match(root.textContent, /nicht unabhängig authentifiziert/);
-  assert.doesNotMatch(root.textContent, /Abgeschlossen ·|0,00 €|100 %/);
+  assert.match(root.textContent, /Paper-Lauf beobachtet/);
+  assert.match(root.textContent, /keine aktuelle Prozessgesundheit/);
+  assert.doesNotMatch(root.textContent, /Lauf beendet ·|0,00 €|100 %/);
 });
 
 test('verified terminal assessment presents only actual partial metrics with clear units', () => {
@@ -142,7 +142,7 @@ test('verified terminal assessment presents only actual partial metrics with cle
   snapshot.assessment = assessment();
   const {root, document} = harness();
   renderSpotPaperHost8h(root, snapshot, document, {now: NOW, staleAfterMs: 120_000});
-  assert.match(root.textContent, /Abgeschlossen · Assessment verifiziert/);
+  assert.match(root.textContent, /Lauf beendet · Abschluss geprüft/);
   assert.match(root.textContent, /3 Std\. 25 Min\. von 8 Std\./);
   assert.match(root.textContent, /42,71 %/);
   assert.match(root.textContent, /Zyklusabdeckung42,71 %/);
@@ -155,6 +155,16 @@ test('verified terminal assessment presents only actual partial metrics with cle
   assert.match(root.textContent, /Offene PositionAm Laufende noch offen/);
   assert.match(root.textContent, /123456789 sat/);
   assert.match(root.textContent, /BTC_EUR_PAPER_HOST_8H_V1/);
+  const primary = root.children.filter(child => child.tagName !== 'DETAILS')
+    .map(child => child.textContent).join('');
+  for (const label of ['Eigenkapital', 'Netto-Gewinn/Verlust', 'Gebuchte Modellgebühren', 'Offene Position', 'Zuletzt beobachtet']) {
+    assert.ok(primary.includes(label));
+  }
+  assert.doesNotMatch(primary, /Zyklen|Quell-Fingerprint|Assessment|Ausstiegsgebühr|injiziert/i);
+  const details = root.children.find(child => child.tagName === 'DETAILS');
+  assert.equal(details.attrs.open, undefined);
+  assert.match(details.textContent, /Zyklen205/);
+
   const visit = element => [element, ...element.children.flatMap(visit)];
   assert.equal(visit(root).find(item => item.textContent === '−0,75 €').className,
     'tone-danger');
@@ -190,8 +200,8 @@ test('unverified, failed, disabled, stale, and incomplete snapshots stay non-gre
 
   const {root, document} = harness();
   renderSpotPaperHost8h(root, input('INCOMPLETE_UNKNOWN'), document);
-  assert.match(root.textContent, /kein Abschlussnachweis/);
-  assert.doesNotMatch(root.textContent, /Abgeschlossen ·|100 %|0,00 €/);
+  assert.match(root.textContent, /Abschluss noch nicht bestätigt/);
+  assert.doesNotMatch(root.textContent, /Lauf beendet ·|100 %|0,00 €/);
 });
 
 test('identity mismatch, wrong profile, malformed and oversized snapshots are unavailable', () => {
@@ -243,7 +253,7 @@ test('injected preview has no default live data and rejects out-of-order observa
   const firstView = harness();
   const emptyResult = await empty.render(firstView.root, firstView.document);
   assert.equal(emptyResult.status, 'UNAVAILABLE');
-  assert.match(firstView.root.textContent, /Offline-Vorschau · keine Laufdaten/);
+  assert.match(firstView.root.textContent, /Noch keine geprüften Laufdaten/);
 
   const snapshots = [input(), {
     ...input(), observedAt: '2026-11-08T13:58:00.000Z'
@@ -255,8 +265,8 @@ test('injected preview has no default live data and rejects out-of-order observa
   await preview.render(root, document, {now: NOW, staleAfterMs: 60_000});
   const second = await preview.render(root, document, {now: NOW, staleAfterMs: 60_000});
   assert.equal(second.status, 'OUT_OF_ORDER');
-  assert.match(root.textContent, /Älterer Snapshot verworfen/);
-  assert.doesNotMatch(root.textContent, /Abgeschlossen ·|100 %/);
+  assert.match(root.textContent, /Älterer Bericht verworfen/);
+  assert.doesNotMatch(root.textContent, /Lauf beendet ·|100 %/);
 });
 
 test('adapter read failure is unavailable and future timestamps have unknown freshness', async () => {

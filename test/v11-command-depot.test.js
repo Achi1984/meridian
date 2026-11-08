@@ -23,6 +23,9 @@ test('Command shares validated value, stored fallback labels and every clearing 
  const view=createDepotReadView(root,{commandRoot:command,getToken:()=>null,createClient:o=>{publish=o.onChange;return {refresh(){},lock(){},revalidate(){},dispose(){}};}});
  const state={status:'fresh',model:{status:'FRESH_SNAPSHOT',readOnly:true,executionAllowed:false,totalUsd:0,spotUsd:0,tradingUsd:0,snapshotAt:'2026-10-13T21:00:00Z',sourceAt:'2026-10-13T21:00:00Z',source:'SERVER_PORTFOLIO_CURRENT'}};
  publish(state);assert.match(fields.get('.portfolio-value').textContent,/0,00/);assert.match(fields.get('.portfolio-description').textContent,/Serverseitige/);
+ const timeNodes=node=>[...(node.tagName==='time'?[node]:[]),...node.children.flatMap(timeNodes)];
+ assert.match(root.textContent,/Bewertungsstand \(lokale Zeit\)/);assert.match(root.textContent,/Verwendete Quelle \(lokale Zeit\)/);
+ assert.equal(timeNodes(root)[0].dateTime,state.model.snapshotAt);assert.equal(timeNodes(root)[0].textContent,new Date(state.model.snapshotAt).toLocaleString('de-AT'));
  publish({...state,model:{...state.model,source:'STORED'}});assert.match(fields.get('.portfolio-description').textContent,/Gespeicherte/);
  for(const status of ['loading','locked','stale','unavailable']){publish(state);publish({status});assert.equal(fields.get('.portfolio-value').textContent,'—');assert.doesNotMatch(fields.get('.caption').textContent,/21:00/);}
  publish({...state,model:{...state.model,totalUsd:null}});assert.equal(fields.get('.portfolio-value').textContent,'—');

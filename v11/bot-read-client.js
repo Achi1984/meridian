@@ -1,4 +1,4 @@
-import {buildBotReadModel} from './bot-read-model.js?v=B16-M11-FIX13';
+import {buildBotReadModel} from './bot-read-model.js?v=B16-M11-FIX14';
 
 const ENDPOINT = 'https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/asset-watch';
 // Exact canonical gateway links only. Never use a supplied URL as a fetch target.
@@ -55,7 +55,7 @@ async function readBounded(response, signal) {
 export function createBotReadClient({getToken, onChange = () => {}, fetchImpl = globalThis.fetch,
   now = Date.now, schedule = setTimeout, cancelSchedule = clearTimeout} = {}) {
   let generation = 0, pending = null, disposed = false, snapshot = null, snapshotToken = null,
-    pendingToken = null, readIdentity = null;
+    pendingToken = null, readIdentity = null, attempted = false;
   const token = () => {
     try {
       const value = getToken();
@@ -80,12 +80,13 @@ export function createBotReadClient({getToken, onChange = () => {}, fetchImpl = 
     if(status==='fresh')emit(status,model,readIdentity);
     else {wipe();emit(status,model);}
   };
-  function lock() { stop(); wipe(); emit('locked'); }
+  function lock() { stop(); wipe(); attempted = false; emit('locked'); }
   async function refresh() {
     if (disposed) return;
     stop(); wipe();
     const credential = token();
     if (!credential) { emit('locked'); return; }
+    attempted = true;
     const id = generation, controller = new AbortController();
     pending = controller;
     pendingToken = credential;
@@ -133,7 +134,7 @@ export function createBotReadClient({getToken, onChange = () => {}, fetchImpl = 
         (pendingToken && credential !== pendingToken)) { lock(); return; }
     if (snapshot) {
       try { project(); } catch { wipe(); emit('unavailable'); }
-    }
+    } else if (!attempted && !pending) emit('not_loaded');
   }
   function dispose() {
     if (disposed) return;
