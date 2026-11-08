@@ -123,6 +123,9 @@ test("reviewed manifest pins source, identity, and existing upper bounds", async
   const malformedPath = join(parent, "malformed.json");
   await writeFile(malformedPath, "{not-json");
   await assert.rejects(readLaunchManifest(malformedPath), /MALFORMED_LAUNCH_MANIFEST/);
+  const oversizedPath = join(parent, "oversized.json");
+  await writeFile(oversizedPath, Buffer.alloc(16_385));
+  await assert.rejects(readLaunchManifest(oversizedPath), /LAUNCH_MANIFEST_TOO_LARGE/);
 });
 
 test("preflight is read-only and never starts a child", async t => {

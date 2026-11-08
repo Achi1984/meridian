@@ -78,8 +78,15 @@ export async function validateLaunchManifest(candidate, root = ROOT) {
 export async function readLaunchManifest(path = MANIFEST_PATH, root = ROOT) {
   let bytes;
   try {
+    const info = await lstat(path);
+    if (!info.isFile() || info.isSymbolicLink()) {
+      throw new Error("INVALID_LAUNCH_MANIFEST_FILE");
+    }
+    if (info.size > 16_384) throw new Error("LAUNCH_MANIFEST_TOO_LARGE");
     bytes = await readFile(path);
-  } catch {
+  } catch (error) {
+    if (error.message === "LAUNCH_MANIFEST_TOO_LARGE" ||
+        error.message === "INVALID_LAUNCH_MANIFEST_FILE") throw error;
     throw new Error("LAUNCH_MANIFEST_UNAVAILABLE");
   }
   if (bytes.byteLength > 16_384) throw new Error("LAUNCH_MANIFEST_TOO_LARGE");
@@ -168,7 +175,11 @@ function childAlive(pid) {
 async function readHostState(evidenceDir) {
   const dir = await lstat(evidenceDir);
   if (!dir.isDirectory() || dir.isSymbolicLink()) throw new Error("INVALID_EVIDENCE_DIRECTORY");
-  const bytes = await readFile(join(evidenceDir, HOST_STATE_FILE));
+  const statePath = join(evidenceDir, HOST_STATE_FILE);
+  const stateInfo = await lstat(statePath);
+  if (!stateInfo.isFile() || stateInfo.isSymbolicLink()) throw new Error("INVALID_HOST_STATE_FILE");
+  if (stateInfo.size > 16_384) throw new Error("HOST_STATE_TOO_LARGE");
+  const bytes = await readFile(statePath);
   if (bytes.byteLength > 16_384) throw new Error("HOST_STATE_TOO_LARGE");
   const state = JSON.parse(bytes.toString("utf8"));
   if (state?.schemaVersion !== "SPOT_PAPER_HOST_STATE_V1" ||
