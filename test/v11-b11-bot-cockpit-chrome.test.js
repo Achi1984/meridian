@@ -217,7 +217,7 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
             root:document.getElementById('bot-read-root').innerText,errors:window.__botErrors})`);
           assert.equal(initial.width,size.width);assert.equal(initial.height,size.height);
           assert.equal(initial.reads,0);assert.equal(initial.releaseChecks,1,'one public version check, no private bot read');assert.equal(initial.overflow,false);assert.equal(initial.navTargets,true);
-          assert.equal(initial.botState,'locked',JSON.stringify(initial));
+          assert.equal(initial.botState,'not_loaded',JSON.stringify(initial));
           assert.match(initial.portfolio,/1\.234,56 USD/);assert.match(initial.portfolio,/Aktuell/);
           assert.match(initial.portfolio,/Pionex-Wert; kein Gesamtvermögen/);
           assert.match(initial.portfolio,/Stand \(lokale Zeit\)/);assert.match(initial.portfolio,/Quellzeit \(lokale Zeit\)/);

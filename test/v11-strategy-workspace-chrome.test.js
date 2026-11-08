@@ -397,6 +397,8 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
             text:panel.innerText,groups:groups.map(node=>({id:node.dataset.paperReadiness,open:node.open,
               height:node.querySelector('summary').getBoundingClientRect().height})),
             interactiveActions:panel.querySelectorAll('button,input,select,form,a').length,
+            scopeWraps:getComputedStyle(panel.querySelector('.limited')).whiteSpace==='normal',
+            scopeFits:panel.querySelector('.limited').getBoundingClientRect().right<=panel.getBoundingClientRect().right,
             overflow:panel.scrollWidth>panel.clientWidth+1||document.documentElement.scrollWidth>innerWidth+1,
             requests:performance.getEntriesByType('resource').length};
         })()`);
@@ -412,6 +414,8 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         assert.deepEqual(paperReadiness.groups.map(row=>row.id),['prepared','gates','choices']);
         assert.ok(paperReadiness.groups.every(row=>!row.open&&row.height>=44));
         assert.equal(paperReadiness.interactiveActions,0);
+        assert.equal(paperReadiness.scopeWraps,true);
+        assert.equal(paperReadiness.scopeFits,true);
         assert.equal(paperReadiness.overflow,false);
         await evaluate(`document.querySelector('[data-paper-readiness="choices"] summary').focus()`);
         await key('Enter','Enter',13);

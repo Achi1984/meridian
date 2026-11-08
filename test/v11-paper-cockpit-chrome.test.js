@@ -5,7 +5,7 @@ import {join} from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {withMobileChrome} from './helpers/v11-cdp.mjs';
-import {unlockAppThroughGate} from './helpers/v11-app-access-browser.mjs';
+import {unlockAppThroughGate,VERIFY_ENDPOINT} from './helpers/v11-app-access-browser.mjs';
 import {startV11StaticServer} from './helpers/v11-static-server.mjs';
 import {projectOperatorReport} from '../scripts/memecoin-paper/operator-report.mjs';
 import {reportFixtures} from './fixtures/memecoin-paper-operator-report/scenarios.mjs';
@@ -45,9 +45,10 @@ async function interceptGeneratedPaperReport(call,report){
   const body=Buffer.from(JSON.stringify({
     schema:PAPER_REPORT_ENVELOPE_SCHEMA,runId:report.experiment.id,report
   })).toString('base64');
-  let reads=0,host8hReads=0,failure=null;
+  let reads=0,host8hReads=0,failure=null,verificationOwned=false;
   const off=call.onEvent('Fetch.requestPaused',event=>{
     void (async()=>{
+      if(verificationOwned&&event.request.url===VERIFY_ENDPOINT)return;
       assert.ok([PAPER_REPORT_ENDPOINT,SPOT_PAPER_HOST8H_REPORT_ENDPOINT].includes(event.request.url),
         'only the exact approved Paper and host8h endpoints are intercepted');
       if(event.request.method==='OPTIONS'){
@@ -89,6 +90,11 @@ async function interceptGeneratedPaperReport(call,report){
     count:()=>reads,
     host8hCount:()=>host8hReads,
     assertHealthy(){if(failure)throw failure;},
+    async unlockApp(){
+      verificationOwned=true;
+      try{await unlockAppThroughGate(call,{additionalFetchUrls:[PAPER_REPORT_ENDPOINT,SPOT_PAPER_HOST8H_REPORT_ENDPOINT]});}
+      finally{verificationOwned=false;}
+    },
     async close(){off();await call('Fetch.disable');}
   };
 }
@@ -234,7 +240,7 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         assert.deepEqual(restored,{state:'auth-required',button:true,privateData:false},
           'pageshow restores the selected cockpit affordance but not private data');
         assert.equal(intercepted.count(),2,'navigation restoration never starts a read');
-        await unlockAppThroughGate(call);
+        await intercepted.unlockApp();
         assert.deepEqual(await evaluate(`(()=>{
           const root=document.querySelector('#paper-cockpit-root');
           return {appHidden:document.getElementById('app').hidden,state:root.dataset.state,
@@ -454,7 +460,7 @@ test('early Strategies navigation remains active when its module bootstrap initi
             state:root?.dataset.state,button:!!root?.querySelector('button')};
         })()`,returnByValue:true});
         assert.deepEqual(beforeUnlock.result?.value,{selected:'strategies',state:'auth-required',button:true});
-        await unlockAppThroughGate(call);
+        await intercepted.unlockApp();
         const afterUnlock=await call('Runtime.evaluate',{expression:`(()=>{
           const root=document.querySelector('#paper-cockpit-root');
           return {selected:document.querySelector('#nav button[aria-current="page"]')?.dataset.v,

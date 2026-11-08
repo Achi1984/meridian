@@ -1,14 +1,20 @@
 import assert from 'node:assert/strict';
 
-const VERIFY_ENDPOINT='https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/portfolio-history?range=1w';
+export const VERIFY_ENDPOINT='https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/portfolio-history?range=1w';
 const TEST_PASSWORD='synthetic-browser-gate-password';
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 
-export async function unlockAppThroughGate(call){
+export async function unlockAppThroughGate(call,{additionalFetchUrls=[]}={}){
+ const additional=new Set(additionalFetchUrls);
+ assert.ok(Array.isArray(additionalFetchUrls)&&additional.size===additionalFetchUrls.length);
+ for(const url of additional)assert.ok(typeof url==='string'&&url.startsWith('https://')&&!url.includes('*')&&url!==VERIFY_ENDPOINT,
+  'additional interception must identify exact HTTPS URLs owned by another fixture listener');
+ const patterns=urls=>urls.map(url=>({urlPattern:url,requestStage:'Request'}));
  let verified=false,failure=null,off;
  const body=Buffer.from(JSON.stringify({version:'browser-access-verification'})).toString('base64');
  off=call.onEvent('Fetch.requestPaused',event=>{
   void (async()=>{
+   if(additional.has(event.request.url))return; // The existing exact-route fixture owns this event.
    if(event.request.url!==VERIFY_ENDPOINT)throw Error('Unexpected app verification URL');
    if(event.request.method==='OPTIONS'){
     await call('Fetch.fulfillRequest',{requestId:event.requestId,responseCode:204,responseHeaders:[
@@ -29,7 +35,7 @@ export async function unlockAppThroughGate(call){
    verified=true;
   })().catch(error=>{failure=error;});
  });
- await call('Fetch.enable',{patterns:[{urlPattern:VERIFY_ENDPOINT,requestStage:'Request'}]});
+ await call('Fetch.enable',{patterns:patterns([VERIFY_ENDPOINT,...additional])});
  try{
   const initial=await call('Runtime.evaluate',{expression:`({
    hidden:document.getElementById('app').hidden,
@@ -68,6 +74,7 @@ export async function unlockAppThroughGate(call){
    JSON.stringify(finalState.result.value)+'; verified='+verified+'; failure='+(failure?.message||'none'));
  }finally{
   off();
-  await call('Fetch.disable');
+  if(additional.size)await call('Fetch.enable',{patterns:patterns([...additional])});
+  else await call('Fetch.disable');
  }
 }

@@ -43,7 +43,9 @@ export function renderPaperReadiness(root,model=getPaperReadiness(),document=roo
   root.setAttribute('aria-labelledby','paper-readiness-heading');
   root.setAttribute('style','min-width:0;overflow-wrap:anywhere');
   add(document,root,'h2','Weitere Paper-Modelle · Planungsstand').id='paper-readiness-heading';
-  add(document,root,'p','Historischer Planungsstand · keine Aussage zum aktuellen Paper-Lauf','limited');
+  const scope=add(document,root,'p','Historischer Planungsstand · keine Aussage zum aktuellen Paper-Lauf','limited');
+  // Unlike short status badges, this explanation must wrap inside nested mobile cards.
+  scope.setAttribute('style','max-width:100%;white-space:normal;overflow-wrap:anywhere');
   const valid=model?.schemaVersion==='MERIDIAN_PAPER_READINESS/1'&&
     model.scope==='SOURCE_PREPARATION_ONLY'&&model.status==='NOT_READY'&&
     model.paperAuthorized===false&&model.liveAuthorized===false&&model.canStart===false&&

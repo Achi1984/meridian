@@ -60,14 +60,14 @@ for(const width of [320,375,390,430]){
  assert.equal(x.dpr,1);assert.ok(x.body<=width+1&&x.root<=width+1,'overflow '+width);
  assert.equal(x.decision,1);assert.equal(x.nav.length,5);
  assert.match(x.decisionBackground,/125deg.*rgb\(27, 53, 80\)/,'A1 gradient must survive CSS cascade');
- assert.deepEqual(x.sourceLabels,['Noch nicht geladen','Gesperrt','Unbekannt'],'unrefreshed readers retain their actual states without verifying sources');
+ assert.deepEqual(x.sourceLabels,['Noch nicht geladen','Noch nicht geladen','Unbekannt'],'unrefreshed readers retain their actual states without verifying sources');
  assert.equal(x.commandBotsAccent,x.attentionColor,'unknown BOTS surface uses attention, not category status');
  assert.notEqual(x.commandBotsAccent,x.positiveColor,'unknown BOTS surface cannot imply positive verification');
  assert.equal(x.obsoleteBotsPlaceholderAbsent,true,'removed Bot placeholder must stay absent');
  assert.equal(x.botReadMounted,true,'Bot reader mounts before a manual read');
- assert.equal(x.botReadState,'locked','Bot reader is locked before refresh');
- assert.equal(x.botCards,0,'locked Bot reader has no snapshot cards');
- assert.equal(x.botSnapshotCountVisible,false,'locked Bot reader does not claim a snapshot count');
+ assert.equal(x.botReadState,'not_loaded','unlocked Bot reader awaits manual refresh');
+ assert.equal(x.botCards,0,'unrefreshed Bot reader has no snapshot cards');
+ assert.equal(x.botSnapshotCountVisible,false,'unrefreshed Bot reader does not claim a snapshot count');
  assert.equal(x.confirmedActiveCountVisible,false,'snapshot data does not imply a confirmed running-bot count');
  assert.match(x.unknownBotsBackground,/rgb\(53, 43, 24\)/,'unknown BOTS trust-cell uses amber dark background');
  assert.equal(x.stateColor,'rgb(240, 202, 133)','A2 unknown-state color stays independent');

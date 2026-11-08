@@ -38,6 +38,9 @@ test('actual readiness projection separates source preparation, unmet gates and 
     'source readiness must not offer activation, parameter submission or untrusted navigation');
   assert.equal(root.attrs['aria-labelledby'],nodes.find(node=>node.tagName==='h2').id);
   assert.ok(root.attrs.style.includes('overflow-wrap:anywhere'));
+  const scope=nodes.find(node=>node.className==='limited');
+  assert.match(scope.attrs.style,/max-width:100%/);
+  assert.match(scope.attrs.style,/white-space:normal/);
 });
 
 test('unknown and authority-bearing projections cannot become ready or show stale source rows',()=>{
