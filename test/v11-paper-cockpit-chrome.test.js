@@ -217,8 +217,8 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         assert.equal(intercepted.count(),2,'unlock after restoration does not start a report read');
         await intercepted.close();
         await evaluate(`(async()=>{
-          const model=await import('./paper-cockpit-model.js?v=B16-M11-FIX12');
-          const view=await import('./paper-cockpit-view.js?v=B16-M11-FIX12');
+          const model=await import('./paper-cockpit-model.js?v=B16-M11-FIX13');
+          const view=await import('./paper-cockpit-view.js?v=B16-M11-FIX13');
           const report=model.getDemoPaperCockpitReport();
           const demoReport=model.getDemoPaperCockpitReport();
           report.experiment.id='run-'+('R'.repeat(220));
@@ -284,6 +284,12 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
           return document.activeElement===document.getElementById('app-main');
         })()`);
         assert.equal(focus,true);
+        await key('Tab','Tab',9);
+        assert.equal(await evaluate(`document.activeElement===document.querySelector('#spot-paper-cockpit-root button')`),
+          true,'Strategies card exposes its manual BTC/EUR refresh before the legacy Paper card');
+        await key('Tab','Tab',9);
+        assert.equal(await evaluate(`document.activeElement===document.querySelector('#spot-paper-cockpit-root > details > summary')`),
+          true,'offline fixture disclosure follows the BTC/EUR refresh affordance');
         await key('Tab','Tab',9);
         const refreshTab=await evaluate(`document.activeElement===document.querySelector('#paper-cockpit-root button')`);
         assert.equal(refreshTab,true,'native Tab focuses the manual report read affordance');

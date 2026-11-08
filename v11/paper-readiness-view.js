@@ -1,4 +1,4 @@
-import {getPaperReadiness} from './paper-readiness.js?v=B16-M11-FIX12';
+import {getPaperReadiness} from './paper-readiness.js?v=B16-M11-FIX13';
 
 const statusLabels = Object.freeze({
   UNVERIFIED:'Noch zu prüfen',

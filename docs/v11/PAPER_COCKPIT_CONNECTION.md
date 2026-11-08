@@ -34,13 +34,49 @@ gateway route or report transfer. It does not claim that a report is present or
 that live data was read. The separate backend/transfer review and an approved
 transferred report are prerequisites for an available response.
 
+## BTC/EUR spot-paper connection
+
+The BTC/EUR card is a separate read-only contract and does not use or weaken the
+memecoin report validator. It uses
+`GET /api/private/spot-paper-report` and
+`POST /api/private/spot-paper-report/upload`, with the existing read bearer for
+GET, a distinct upload bearer for POST, a bounded canonical transfer envelope,
+and isolated immutable storage. The exact registry retains
+`spot-paper-42395522899-1` as the default and admits only the additional
+`spot-paper-42404743386-1`. Selection is server-only through
+`MERIDIAN_SPOT_PAPER_REPORT_RUN_ID`; the browser has no selector or newer-run
+preference. The summary labels the approved 1-hour or 4-hour duration.
+
+The spot route fails closed unless all of
+`MERIDIAN_SPOT_PAPER_REPORT_ENABLED`,
+`MERIDIAN_SPOT_PAPER_REPORT_DEPLOYMENT_VERIFIED`, and
+`MERIDIAN_SPOT_PAPER_REPORT_UPLOAD_APPROVED` are explicitly `true`. A separate
+upload-token hash and the existing read-token configuration are also required.
+The reviewed forward migration must be applied separately for four-hour import
+without rewriting the first-hour row. No route deployment, env configuration,
+secret, report transfer, or hosted verification was performed here.
+
+The checked-in reconciliation and replay records do not contain the original
+terminal readback, provenance, or paper assessment payload. The generated
+preview is therefore disconnected and does not represent that run. Before any
+transfer, retrieve those exact retained inputs through the approved operator
+process, regenerate current assessment/replay fields with the offline tools
+documented in `PAPER_REPORT_BRIDGE.md`, and provide the independently
+root-verified Actions dispatch tuple for that exact run to
+`scripts/spot-paper-report-bridge/create-dto.mjs`. Review and approve the exact
+generated DTO, transfer it once to the fixed upload route, and verify immutable
+GET readback. Do not reconstruct missing fields from the reconciliation
+document, hand-edit evidence, or treat signal replay as the original
+assessment's signal-replay result.
+
 After merging and publishing to Pages, verify that both imported bridge modules
 are served with a JavaScript MIME type (for example `text/javascript` or
 `application/javascript`), not `application/octet-stream`:
 
 ```sh
-curl -sSI 'https://<published-pages-origin>/scripts/memecoin-paper-report-bridge/index.mjs?v=B16-M11-FIX12'
-curl -sSI 'https://<published-pages-origin>/scripts/memecoin-paper-report-bridge/contract.mjs?v=B16-M11-FIX12'
+curl -sSI 'https://<published-pages-origin>/scripts/memecoin-paper-report-bridge/index.mjs?v=B16-M11-FIX13'
+curl -sSI 'https://<published-pages-origin>/scripts/memecoin-paper-report-bridge/contract.mjs?v=B16-M11-FIX13'
+curl -sSI 'https://<published-pages-origin>/scripts/spot-paper-report-bridge/contract.mjs?v=B16-M11-FIX13'
 ```
 
 Then open the published M11 page, unlock through the existing access gate,

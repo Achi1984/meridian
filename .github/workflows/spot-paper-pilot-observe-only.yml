@@ -1,0 +1,142 @@
+name: BTC/EUR bounded observe-only evidence
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  observe:
+    if: >-
+      github.repository == 'Achi1984/meridian' &&
+      github.actor == 'Achi1984' &&
+      github.triggering_actor == 'Achi1984' &&
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main' &&
+      github.run_number == 1 &&
+      github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout workflow and evidence assessment code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Checkout accepted observation source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: 81edf0b5dc3d455c2c1e1906791d56c731bea0c9
+          path: approved-source
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+
+      - name: Prepare fresh private evidence directory
+        id: prepare
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/spot-paper-pilot-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          mkdir -m 700 "$evidence_dir"
+          run_id="spot-observe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          {
+            printf 'accepted_source_sha=%s\n' '81edf0b5dc3d455c2c1e1906791d56c731bea0c9'
+            printf 'workflow_sha=%s\n' "$GITHUB_SHA"
+            printf 'workflow_run_id=%s\n' "$GITHUB_RUN_ID"
+            printf 'workflow_run_attempt=%s\n' "$GITHUB_RUN_ATTEMPT"
+            printf 'run_id=%s\n' "$run_id"
+            printf 'environment=%s\n' "$(uname -srmo)"
+            printf 'node=%s\n' "$(node --version)"
+            printf 'command=node approved-source/scripts/spot-paper-pilot/cli.mjs --mode observe --network --data-root %s/data --run-id %s --max-cycles 2 --max-duration-ms 120000 --poll-interval-ms 60000\n' "$evidence_dir" "$run_id"
+          } > "$evidence_dir/metadata.txt"
+          echo "evidence_dir=$evidence_dir" >> "$GITHUB_OUTPUT"
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+
+      - name: Run one fixed bounded observation
+        id: observe
+        shell: bash
+        env:
+          EVIDENCE_DIR: ${{ steps.prepare.outputs.evidence_dir }}
+          RUN_ID: ${{ steps.prepare.outputs.run_id }}
+        run: |
+          set -euo pipefail
+          start_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          printf 'start_utc=%s\n' "$start_utc" >> "$EVIDENCE_DIR/metadata.txt"
+          set +e
+          node approved-source/scripts/spot-paper-pilot/cli.mjs \
+            --mode observe --network \
+            --data-root "$EVIDENCE_DIR/data" \
+            --run-id "$RUN_ID" \
+            --max-cycles 2 \
+            --max-duration-ms 120000 \
+            --poll-interval-ms 60000 \
+            > "$EVIDENCE_DIR/observe.stdout.json" \
+            2> "$EVIDENCE_DIR/observe.stderr.txt"
+          exit_code=$?
+          set -e
+          printf 'observe_exit_status=%s\nend_utc=%s\n' "$exit_code" \
+            "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$EVIDENCE_DIR/metadata.txt"
+          echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
+          exit "$exit_code"
+
+      - name: Read-only terminal report and journal reconciliation
+        if: always()
+        shell: bash
+        env:
+          EVIDENCE_DIR: ${{ steps.prepare.outputs.evidence_dir }}
+          RUN_ID: ${{ steps.prepare.outputs.run_id }}
+        run: |
+          set -euo pipefail
+          set +e
+          node approved-source/scripts/spot-paper-pilot/cli.mjs \
+            --mode report \
+            --data-root "$EVIDENCE_DIR/data" \
+            --run-id "$RUN_ID" \
+            > "$EVIDENCE_DIR/readback.stdout.json" \
+            2> "$EVIDENCE_DIR/readback.stderr.txt"
+          exit_code=$?
+          set -e
+          printf 'readback_exit_status=%s\n' "$exit_code" >> "$EVIDENCE_DIR/metadata.txt"
+          exit "$exit_code"
+
+      - name: Require verified terminal and accepted observation
+        if: always()
+        env:
+          EVIDENCE_DIR: ${{ steps.prepare.outputs.evidence_dir }}
+          OBSERVE_EXIT_CODE: ${{ steps.observe.outputs.exit_code }}
+        run: |
+          node scripts/spot-paper-pilot/evidence-assessment.mjs \
+            "$EVIDENCE_DIR/observe.stdout.json" \
+            "$EVIDENCE_DIR/readback.stdout.json" \
+            "$OBSERVE_EXIT_CODE" \
+            "$EVIDENCE_DIR/assessment.json"
+
+      - name: Finalize summary and evidence hashes
+        if: always()
+        shell: bash
+        env:
+          EVIDENCE_DIR: ${{ steps.prepare.outputs.evidence_dir }}
+        run: |
+          set -euo pipefail
+          if [[ -f "$EVIDENCE_DIR/assessment.json" ]]; then
+            printf 'assessment=%s\n' "$(tr '\n' ' ' < "$EVIDENCE_DIR/assessment.json")" \
+              >> "$EVIDENCE_DIR/metadata.txt"
+          fi
+          (
+            cd "$EVIDENCE_DIR"
+            find . -type f ! -name SHA256SUMS -print0 |
+              sort -z | xargs -0 sha256sum > SHA256SUMS
+          )
+
+      - name: Retain evidence, including failed attempts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: spot-paper-pilot-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/spot-paper-pilot-${{ github.run_id }}-${{ github.run_attempt }}/
+          if-no-files-found: warn
+          retention-days: 14
