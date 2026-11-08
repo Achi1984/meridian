@@ -63,7 +63,18 @@ jobs:
       - name: Research and auth regression tests
         env:
           V11_A2_EVIDENCE_DIR: artifacts/v11-visual-qa
-        run: node --test test/*.test.js
+        shell: bash
+        run: |
+          # Keep deadline-sensitive subprocess supervision out of the broad
+          # test runner's parallel workload; every discovered file runs once.
+          other_tests=()
+          for test_file in test/*.test.js; do
+            if [[ "$test_file" != "test/research-supervisor.test.js" ]]; then
+              other_tests+=("$test_file")
+            fi
+          done
+          node --test "${other_tests[@]}"
+          node --test test/research-supervisor.test.js
       - name: Release authority consistency
         run: |
           node scripts/release-sync.mjs --check
