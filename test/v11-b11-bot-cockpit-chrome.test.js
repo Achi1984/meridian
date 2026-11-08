@@ -391,8 +391,8 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           assert.match(commandMetadata,/Quelle: Pionex Bot API · Richtung: Long 3 · Short 2 · Neutral 1 · Unbekannt 1/);
           const exactCommandTimestamp=commandMetadata.match(/\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z/)?.[0];
           assert.ok(exactCommandTimestamp);
-          assert.ok(fresh.command.includes(new Intl.DateTimeFormat('de-DE',{dateStyle:'medium',timeStyle:'short',
-            timeZone:'UTC'}).format(new Date(exactCommandTimestamp))+' UTC'),fresh.command);
+          const localCommandTimestamp=await evaluate(`new Intl.DateTimeFormat('de-DE',{dateStyle:'medium',timeStyle:'short'}).format(new Date(${JSON.stringify(exactCommandTimestamp)}))+' (lokale Zeit)'`);
+          assert.ok(fresh.command.includes(localCommandTimestamp),fresh.command);
           assert.ok(['bot-symbol-search','bot-direction-filter','bot-category-filter','bot-sort-filter',
             'bot-tp-filter','bot-pnl-filter','bot-read-refresh','bot-read-lock'].every(id=>fresh.touch.some(([,targetId])=>targetId===id)),
             'visible search, selects and bot actions remain measured '+JSON.stringify(fresh.touch));

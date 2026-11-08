@@ -406,12 +406,12 @@ function dashboardDependencies(fetchImpl, {
 } = {}) {
   const root = new Element();
   const document = {createElement: () => new Element()};
-  const listeners = new Set();
+  const listeners = new Set(), readers = new Set();
   const access = {
     getToken: () => unlocked ? READ_TOKEN : null,
     isUnlocked: () => unlocked,
-    lock: () => { unlocked = false; },
-    registerReader: () => () => {},
+    lock: () => { unlocked = false; for(const clear of readers)clear(); for(const listener of listeners)listener({status:'locked'}); },
+    registerReader: clear => { readers.add(clear); return () => readers.delete(clear); },
     subscribe: listener => {
       listeners.add(listener);
       listener({status: unlocked ? 'unlocked' : 'locked'});
@@ -438,7 +438,9 @@ function dashboardDependencies(fetchImpl, {
       timer.cancelled = true;
     }
   });
-  return {root, controller, timers};
+  return {root, controller, timers, access, windowListeners,
+    unlock(){unlocked=true;for(const listener of listeners)listener({status:'unlocked'});},
+    fire(name){windowListeners.get(name)?.();}};
 }
 
 function response(body, status = 200) {
@@ -678,4 +680,37 @@ test('host8h database upsert refuses sequence regression despite a later timesta
   assert.match(insert, /observed_at = EXCLUDED\.observed_at[\s\S]*journal_sequence < EXCLUDED\.journal_sequence/);
   assert.match(insert, /IS DISTINCT FROM\s+'VERIFIED_TERMINAL'[\s\S]*EXCLUDED\.envelope #>>/);
   assert.match(statements.find(sql => sql.startsWith('SELECT config_hash')), /envelope/);
+});
+
+
+test('Dashboard restores selected tab after pageshow but requires re-unlock before a new read', async () => {
+  let reads=0,resolveLate,signal;
+  const deps=dashboardDependencies((_url,options)=>{
+    reads++;signal=options.signal;
+    if(reads===1)return new Promise(resolve=>{resolveLate=resolve;});
+    return Promise.resolve(response({schema:SPOT_PAPER_HOST8H_ENVELOPE_SCHEMA,runId:identity.runId,report:summary()}));
+  });
+  deps.controller.setActive(true);assert.equal(reads,1);
+  deps.fire('pagehide');assert.equal(signal.aborted,true);assert.equal(deps.access.isUnlocked(),false);
+  deps.fire('pageshow');assert.equal(reads,1);assert.equal(deps.root.getAttribute('data-state'),'auth-required');
+  resolveLate(response({schema:SPOT_PAPER_HOST8H_ENVELOPE_SCHEMA,runId:identity.runId,report:summary()}));
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.doesNotMatch(deps.root.textContent,/Eigenkapital|Netto-Gewinn/);
+  deps.unlock();await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(reads,2);assert.equal(deps.root.getAttribute('data-state'),'running_observed');
+  deps.fire('pageshow');assert.equal(reads,2,'duplicate pageshow does not poll');
+  deps.controller.dispose();assert.equal(deps.windowListeners.size,0);
+  deps.fire('pagehide');deps.fire('pageshow');deps.unlock();assert.equal(reads,2);assert.equal(deps.root.textContent,'');
+});
+
+test('Dashboard pageshow never activates a previously inactive or explicitly deselected tab', async () => {
+  for(const deselect of [false,true]){
+    let reads=0;
+    const deps=dashboardDependencies(async()=>{reads++;return response({error:'host8h_transport_not_provisioned'},503);});
+    if(deselect){deps.controller.setActive(true);await new Promise(resolve=>setImmediate(resolve));}
+    deps.fire('pagehide');
+    if(deselect)deps.controller.setActive(false);
+    deps.fire('pageshow');deps.unlock();await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(reads,deselect?1:0);deps.controller.dispose();
+  }
 });

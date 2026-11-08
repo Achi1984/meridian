@@ -105,6 +105,7 @@ export function mountSpotPaperHost8hDashboard(root, document, window, {
     throw new TypeError('Host8h dashboard dependencies are invalid');
   }
   let active = false;
+  let restoreActiveOnPageShow = false;
   let disposed = false;
   let loading = false;
   let snapshot = null;
@@ -329,18 +330,29 @@ export function mountSpotPaperHost8hDashboard(root, document, window, {
   }
 
   function pagehide() {
+    restoreActiveOnPageShow = active;
     active = false;
     clearPrivate();
     access.lock();
   }
 
+  function pageshow() {
+    if (disposed || !restoreActiveOnPageShow) return;
+    restoreActiveOnPageShow = false;
+    active = true;
+    errorState = enabled ? (access.isUnlocked() ? 'ready' : 'auth-required') : 'unavailable';
+    render(); // Restoration alone never restores credentials, snapshots or performs a read.
+  }
+
   const unregister = access.registerReader(clearPrivate, render);
   const unsubscribe = access.subscribe(onAccess);
   window.addEventListener('pagehide', pagehide);
+  window.addEventListener('pageshow', pageshow);
   render();
   return Object.freeze({
     setActive(value) {
       if (disposed) return;
+      restoreActiveOnPageShow = false;
       const next = value === true;
       if (active === next) return;
       active = next;
@@ -360,6 +372,7 @@ export function mountSpotPaperHost8hDashboard(root, document, window, {
       unregister();
       unsubscribe();
       window.removeEventListener('pagehide', pagehide);
+      window.removeEventListener('pageshow', pageshow);
       root.replaceChildren();
     }
   });
