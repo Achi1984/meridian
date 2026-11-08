@@ -8,9 +8,10 @@ reviewed #1299 source `adf5c0a6e7b7d93bfd106dd6136c40a8e15a6373` is merged to
 `advanceEntryConfirmation`, `recordEntryConfirmationSell`, and
 `compareSpotPaperStrategies`. The multi-cycle test binds these actual exports
 from this checkout; no strategy simulator, temporary overlay, or mock comparison
-engine is used. This verifies synthetic integration only, not live acceptance or
-operational readiness. The accepted research-source pin remains `null` until
-Lead accepts the integrated adapter.
+engine is used. This verifies synthetic integration only, not live operational readiness. Lead
+accepted the integrated adapter and its research source; the exact merged #1299
+source digest is pinned below. That source acceptance does not authorize or
+establish a live run.
 
 ## Frozen experiment contract
 
@@ -68,16 +69,18 @@ bound by the pinned digest, production execution is blocked. The local host
 composition CLI is under `scripts/spot-paper-paired/host.mjs`; it makes no
 deployment changes and does not bypass this gate.
 
-The live `runSpotPaperPaired` entrypoint is additionally fail-closed while
-`SPOT_PAPER_PAIRED_ACCEPTED_RESEARCH_SOURCE_SHA256` is `null`; it requires the
-exact accepted research-source digest before it can create an evidence path or
-request data. The separate `runSpotPaperPairedSynthetic` path accepts only the
+The live `runSpotPaperPaired` entrypoint requires
+`SPOT_PAPER_PAIRED_ACCEPTED_RESEARCH_SOURCE_SHA256` to match the exact accepted
+research-source digest before it can create an evidence path or request data.
+The separate `runSpotPaperPairedSynthetic` path accepts only the
 `SYNTHETIC_TEST_ONLY` feed identity and labels its report `testOnly`. It cannot
 be used as a live-feed substitute or evidence of integration.
 
-After Lead accepts this paired integration, calculate the production source pin
-from the merged #1299 research exports with this deterministic command (run
-from the repository root; path names are included in the hash):
+The accepted production source pin in
+`scripts/spot-paper-paired/forward.mjs` is
+`4c60b1ccccbd495d93006a6838593423c27caac8104a0239fa23fd97a716f82d`. Verify
+it against the merged #1299 research exports with this deterministic command
+(run from the repository root; path names are included in the hash):
 
 ```sh
 node --input-type=module -e '
@@ -92,9 +95,9 @@ console.log(hash.digest("hex"));
 '
 ```
 
-Only the lead-reviewed digest from the accepted/merged commit may replace the
-current `null` source pin. The reviewed candidate source is sufficient for
-isolated synthetic testing, not permission to set the production pin.
+The pinned digest covers the exact accepted/merged #1299 bytes; changed source
+bytes fail closed. It does not imply live readiness or replace the separate
+launch, image, and evidence prerequisites.
 
 For every accepted observation the journal records one causally ordered shared
 OHLC/ticker pair and separate arm decisions, fills, risk states and valuations.
@@ -238,48 +241,20 @@ DTO rather than inventing a parallel report schema. `elapsedMs` is a finite
 monotonic duration and may be fractional; consumers must not require integer
 milliseconds.
 
-The canonical report-evaluation chain uses these two host commands and passes
-only the helper-validated journal payload to the #1304 evaluator:
+The canonical report-evaluation chain uses the single bounded host export and
+passes that complete document directly to the #1304 evaluator:
 
 ```sh
-node scripts/spot-paper-paired/host.mjs report \
-  --data-root "$PAIRED_DATA_ROOT" --run-id "$PAIRED_RUN_ID" \
-  > "$STAGE/report-wrapper.json"
 node scripts/spot-paper-paired/host.mjs export \
   --data-root "$PAIRED_DATA_ROOT" --run-id "$PAIRED_RUN_ID" \
   > "$STAGE/paired-export.json"
-node --input-type=module -e '
-import {isDeepStrictEqual} from "node:util";
-import {readFile, writeFile} from "node:fs/promises";
-const [reportPath, exportPath, journalPath] = process.argv.slice(1);
-const [report, paired] = await Promise.all([
-  readFile(reportPath, "utf8").then(JSON.parse),
-  readFile(exportPath, "utf8").then(JSON.parse)
-]);
-if (report.schemaVersion !== "SPOT_PAPER_PAIRED_HOST_STATUS_V1" ||
-    report.status !== "TERMINAL_JOURNAL_VERIFIED" ||
-    report.verifiedTerminal !== true ||
-    paired.schemaVersion !== "SPOT_PAPER_PAIRED_HOST_EXPORT_V1" ||
-    paired.status !== report.status || paired.verifiedTerminal !== true ||
-    paired.reconciliationStatus !== "READ_ONLY_VERIFIED" ||
-    !isDeepStrictEqual(report.report, paired.report) ||
-    !isDeepStrictEqual(report.report, paired.journal?.events?.at(-1)?.report) ||
-    paired.journal?.reconciliationStatus !== paired.reconciliationStatus) {
-  throw new Error("PAIRED_EXPORT_NOT_RECONCILED");
-}
-await writeFile(journalPath, `${JSON.stringify(paired.journal)}\n`,
-  {flag: "wx", mode: 0o600});
-' "$STAGE/report-wrapper.json" "$STAGE/paired-export.json" \
-  "$STAGE/journal-export.json"
 node scripts/spot-paper-paired-report/cli.mjs \
-  "$EXPECTED_IDENTITY_JSON" "$STAGE/report-wrapper.json" \
-  "$STAGE/journal-export.json"
+  "$EXPECTED_IDENTITY_JSON" "$STAGE/paired-export.json"
 ```
 
 Run this only after independently confirming the writer is stopped. The
-extraction writes no reconciliation marker; it checks that report and export
-agree and preserves the exact helper-produced journal payload/status. The
-evaluator still independently checks expected identity, journal reconciliation,
+host export is produced by the read-only, journal-validating helper. The
+evaluator independently checks expected identity, journal reconciliation,
 terminal report/checkpoint, and accounting, and labels its result structural,
 not independently authenticated.
 
@@ -351,8 +326,11 @@ acceptance. The paired adapter/research identities were based on adapter
 candidate `bb00a41f3eb65ece13ec0cfcb54b02ef710edb01` and #1299 reviewed source
 `adf5c0a6e7b7d93bfd106dd6136c40a8e15a6373` (merged as
 `4f5c4a3c8489129c514cd57c4b71f37ee05bcddf`). These synthetic and host-helper
-tests do not establish live acceptance or readiness. The production pin remains
-`null`.
+tests do not establish live readiness. Lead accepted the integrated source and
+the production pin is `4c60b1ccccbd495d93006a6838593423c27caac8104a0239fa23fd97a716f82d`.
+The corrected #1304 evaluator candidate `5700feb6f1b82257b18e5c50f527a3e2f80d175a`
+accepts the single `SPOT_PAPER_PAIRED_HOST_EXPORT_V1` artifact directly; repeat
+the evaluator compatibility check with that CLI after it is merged to main.
 The existing
 [BTC/EUR post-run retrieval runbook](../operations/BTC_EUR_8H_POSTRUN_20261108.md)
 describes that sequence for the old run identity only; it is not approval or
