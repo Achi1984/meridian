@@ -148,15 +148,15 @@ Prior transport rehearsals are limited proofs, not pilot results:
    downloaded manifest, command outcome, and hashes with the local review
    record. Do not download files from the original writer instance.
 
-7. **Validate the manifest and every archive member before assessment.** Use
-   local `jq` and GNU `tar` to validate relative paths, the complete regular-file
-   member set, and member types before extraction:
+7. **Validate the manifest and every archive member before extraction.** Use
+   local `jq` and Python's standard-library TAR reader to validate each relative
+   path component, the exact regular-file member set, member types, and member
+   sizes/hashes before extraction:
 
    ```sh
    set -euo pipefail
    archive="$stage/archive/btc-eur-paper-001.tar"
    manifest="$stage/manifest/btc-eur-paper-001.manifest.json"
-   files="$stage/manifest/member-paths.txt"
    jq -e '
      .schemaVersion == "SPOT_PAPER_HOST_EVIDENCE_MANIFEST_V1" and
      .preservation == "BYTE_EXACT" and
@@ -165,34 +165,114 @@ Prior transport rehearsals are limited proofs, not pilot results:
      all(.entries[];
        (.path | type == "string" and length > 0 and
          (startswith("/") | not) and (contains("\\") | not) and
-         all(split("/"); . != "" and . != "." and . != "..") and
+         all(split("/")[]; . != "" and . != "." and . != "..") and
          ((split("/")[0] | test("^[A-Za-z]:") | not))) and
        (.sizeBytes | type == "number" and . >= 0 and floor == .) and
        (.sha256 | test("^[0-9a-f]{64}$"))
      )
    ' "$manifest" > /dev/null
-   jq -r '.entries[].path' "$manifest" | LC_ALL=C sort > "$files"
-   archive_file_count="$(tar -tvf "$archive" | awk '
-     substr($0, 1, 1) == "-" { files++ }
-     substr($0, 1, 1) != "-" && substr($0, 1, 1) != "d" { invalid = 1 }
-     END { if (invalid) exit 1; print files + 0 }
-   ')"
-   manifest_file_count="$(jq '.entries | length' "$manifest")"
-   test "$archive_file_count" = "$manifest_file_count"
+   files0="$stage/manifest/member-paths.nul"
+   python3 - "$archive" "$manifest" > "$files0" <<'PY'
+   import hashlib
+   import json
+   import os
+   import re
+   import sys
+   import tarfile
+
+   archive_path, manifest_path = sys.argv[1:]
+   if os.path.getsize(archive_path) > 84 * 1024 * 1024:
+       raise SystemExit("archive size limit exceeded")
+   if os.path.getsize(manifest_path) > 1024 * 1024:
+       raise SystemExit("manifest size limit exceeded")
+   with open(manifest_path, encoding="utf-8") as source:
+       manifest = json.load(source)
+   entries = manifest["entries"]
+   if len(entries) > 1024:
+       raise SystemExit("manifest file-count limit exceeded")
+
+   def safe_path(value):
+       if (not isinstance(value, str) or not value or value.startswith("/") or
+               "\\" in value or any(ord(char) < 32 or ord(char) == 127 for char in value)):
+           raise ValueError("unsafe archive path")
+       parts = value.split("/")
+       if (any(part in ("", ".", "..") for part in parts) or
+               re.match(r"^[A-Za-z]:", parts[0]) or len(parts) > 8 or
+               any(len(part.encode("utf-8")) > 100 for part in parts) or
+               len("/".join(parts[:-1]).encode("utf-8")) > 155):
+           raise ValueError("unsafe archive path")
+       return value
+
+   expected = {}
+   for entry in entries:
+       name = safe_path(entry["path"])
+       if name in expected:
+           raise ValueError("duplicate manifest path")
+       expected[name] = entry
+
+   files = {}
+   directories = set()
+   all_names = set()
+   with tarfile.open(archive_path, mode="r:") as archive:
+       for member in archive:
+           if len(all_names) >= 1280:
+               raise ValueError("archive member-count limit exceeded")
+           name = safe_path(member.name)
+           if name in all_names:
+               raise ValueError("duplicate archive member")
+           all_names.add(name)
+           if member.type in (tarfile.REGTYPE, tarfile.AREGTYPE):
+               files[name] = member
+           elif member.type == tarfile.DIRTYPE:
+               directories.add(name)
+           else:
+               raise ValueError("archive contains a link or special member")
+
+       if set(files) != set(expected):
+           raise ValueError("archive regular-file set differs from manifest")
+       required_directories = set()
+       for name in expected:
+           parts = name.split("/")
+           required_directories.update(
+               "/".join(parts[:index]) for index in range(1, len(parts))
+           )
+       if not directories.issubset(required_directories):
+           raise ValueError("archive contains an unexpected directory")
+       if files.keys() & required_directories:
+           raise ValueError("regular-file member is an ancestor of another path")
+
+       for name, entry in expected.items():
+           member = files[name]
+           if member.size != entry["sizeBytes"]:
+               raise ValueError("archive member size differs from manifest")
+           content = archive.extractfile(member)
+           if content is None:
+               raise ValueError("archive regular member has no content")
+           digest = hashlib.sha256()
+           size = 0
+           with content:
+               for chunk in iter(lambda: content.read(64 * 1024), b""):
+                   size += len(chunk)
+                   digest.update(chunk)
+           if size != entry["sizeBytes"] or digest.hexdigest() != entry["sha256"]:
+               raise ValueError("archive member hash or size differs from manifest")
+
+   for name in expected:
+       sys.stdout.buffer.write(name.encode("utf-8") + b"\0")
+   PY
    ```
 
-   The manifest must not contain duplicate, absolute, empty, `.` or `..` path
-   components. The TAR listing may contain only regular files (`-`) and
-   directories (`d`), and its regular-file count must equal the manifest entry
-   count. The package implementation rejects symlinks, special files, and
-   escaping/unsupported paths, and its result is round-trip verified; these
-   checks must still be repeated on the downloaded bytes. Stop on any mismatch;
-   never assess an unverified archive.
+   The validator rejects duplicate names, absolute or unsafe path components,
+   links/special members, extra regular files, and directories not needed by a
+   manifest path. It compares the exact regular-file path set and hashes every
+   member before producing the NUL-delimited allowlist. The package tool's own
+   round-trip verification is not a substitute for validating the downloaded
+   bytes. Any validator error stops the procedure before extraction.
 
-8. **Extract validated regular files into a new isolated directory.** The
-   manifest path list is used as the extraction allowlist. Create a private,
-   previously nonexistent destination; `--keep-old-files` makes extraction fail
-   rather than overwrite:
+8. **Extract only validated regular files into a new isolated directory.** Use
+   GNU tar's NUL-delimited, verbatim file-list mode so names cannot be
+   reinterpreted as options or line-delimited paths. Create a private,
+   previously nonexistent destination; `--keep-old-files` prevents overwrite:
 
    ```sh
    extracted="$stage/extracted"
@@ -200,20 +280,38 @@ Prior transport rehearsals are limited proofs, not pilot results:
    mkdir -m 700 "$extracted"
    tar --extract --file "$archive" --directory "$extracted" \
      --no-same-owner --no-same-permissions --keep-old-files \
-     --files-from "$files"
-   while IFS=$'\t' read -r size path; do
-     actual_size="$(wc -c < "$extracted/$path" | tr -d '[:space:]')"
-     test "$actual_size" = "$size"
-   done < <(jq -r '.entries[] | [.sizeBytes, .path] | @tsv' "$manifest")
-   jq -r '.entries[] | "\(.sha256)  \(.path)"' "$manifest" |
-     (cd "$extracted" && sha256sum -c -)
+     --null --verbatim-files-from --files-from "$files0"
+   python3 - "$extracted" "$manifest" <<'PY'
+   import hashlib
+   import json
+   import os
+   import stat
+   import sys
+
+   root, manifest_path = sys.argv[1:]
+   with open(manifest_path, encoding="utf-8") as source:
+       entries = json.load(source)["entries"]
+   for entry in entries:
+       path = os.path.join(root, *entry["path"].split("/"))
+       info = os.lstat(path)
+       if not stat.S_ISREG(info.st_mode) or info.st_size != entry["sizeBytes"]:
+           raise SystemExit("extracted member type or size mismatch")
+       digest = hashlib.sha256()
+       with open(path, "rb") as member:
+           for chunk in iter(lambda: member.read(64 * 1024), b""):
+               digest.update(chunk)
+       if digest.hexdigest() != entry["sha256"]:
+           raise SystemExit("extracted member hash mismatch")
+   PY
    ```
 
-   Every command must succeed. The archive hash binds the downloaded TAR to the
-   package result; the manifest path allowlist, matching regular-file count,
-   and per-file size/hash checks verify all regular members. Do not extract
-   links, special files, or unlisted members. Preserve the archive and manifest
-   separately; never extract into or over the original evidence volume.
+   Every command must succeed. The pre-extraction validator checks the exact
+   member set and bytes; the second check confirms each extracted path remains a
+   regular file with the manifest size/hash. The fresh isolated destination,
+   NUL-delimited verbatim allowlist, and no-overwrite option prevent path-list
+   option injection and replacement of existing files. Preserve the archive
+   and manifest separately; never extract into or over the original evidence
+   volume.
 
 9. **Run the existing offline assessor with independently retained context.**
    Context `#1279/6722005612` was prepared before launch and kept independently
