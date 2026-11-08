@@ -39,6 +39,35 @@ export async function runtimeSourceDigest(root = ROOT) {
   return hash.digest("hex");
 }
 
+async function readBoundedRegularFile(path, maxBytes, invalidCode, largeCode) {
+  const flags = constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) |
+    (constants.O_NONBLOCK ?? 0);
+  let handle;
+  try {
+    handle = await open(path, flags);
+  } catch (error) {
+    if (error.code === "ELOOP") throw new Error(invalidCode);
+    throw error;
+  }
+  try {
+    const info = await handle.stat();
+    if (!info.isFile()) throw new Error(invalidCode);
+    if (info.size > maxBytes) throw new Error(largeCode);
+    const buffer = Buffer.allocUnsafe(maxBytes + 1);
+    let length = 0;
+    while (length < buffer.byteLength) {
+      const { bytesRead } = await handle.read(buffer, length,
+        buffer.byteLength - length, length);
+      if (bytesRead === 0) break;
+      length += bytesRead;
+    }
+    if (length > maxBytes) throw new Error(largeCode);
+    return buffer.subarray(0, length);
+  } finally {
+    await handle.close();
+  }
+}
+
 function sameCanonicalManifest(candidate) {
   return JSON.stringify(candidate) === JSON.stringify(HOST_LAUNCH_MANIFEST);
 }
@@ -78,12 +107,8 @@ export async function validateLaunchManifest(candidate, root = ROOT) {
 export async function readLaunchManifest(path = MANIFEST_PATH, root = ROOT) {
   let bytes;
   try {
-    const info = await lstat(path);
-    if (!info.isFile() || info.isSymbolicLink()) {
-      throw new Error("INVALID_LAUNCH_MANIFEST_FILE");
-    }
-    if (info.size > 16_384) throw new Error("LAUNCH_MANIFEST_TOO_LARGE");
-    bytes = await readFile(path);
+    bytes = await readBoundedRegularFile(path, 16_384,
+      "INVALID_LAUNCH_MANIFEST_FILE", "LAUNCH_MANIFEST_TOO_LARGE");
   } catch (error) {
     if (error.message === "LAUNCH_MANIFEST_TOO_LARGE" ||
         error.message === "INVALID_LAUNCH_MANIFEST_FILE") throw error;
@@ -176,11 +201,8 @@ async function readHostState(evidenceDir) {
   const dir = await lstat(evidenceDir);
   if (!dir.isDirectory() || dir.isSymbolicLink()) throw new Error("INVALID_EVIDENCE_DIRECTORY");
   const statePath = join(evidenceDir, HOST_STATE_FILE);
-  const stateInfo = await lstat(statePath);
-  if (!stateInfo.isFile() || stateInfo.isSymbolicLink()) throw new Error("INVALID_HOST_STATE_FILE");
-  if (stateInfo.size > 16_384) throw new Error("HOST_STATE_TOO_LARGE");
-  const bytes = await readFile(statePath);
-  if (bytes.byteLength > 16_384) throw new Error("HOST_STATE_TOO_LARGE");
+  const bytes = await readBoundedRegularFile(statePath, 16_384,
+    "INVALID_HOST_STATE_FILE", "HOST_STATE_TOO_LARGE");
   const state = JSON.parse(bytes.toString("utf8"));
   if (state?.schemaVersion !== "SPOT_PAPER_HOST_STATE_V1" ||
       state.runId !== HOST_LAUNCH_MANIFEST.runId ||

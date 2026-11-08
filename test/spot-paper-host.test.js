@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { spawn } from "node:child_process";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -126,6 +126,15 @@ test("reviewed manifest pins source, identity, and existing upper bounds", async
   const oversizedPath = join(parent, "oversized.json");
   await writeFile(oversizedPath, Buffer.alloc(16_385));
   await assert.rejects(readLaunchManifest(oversizedPath), /LAUNCH_MANIFEST_TOO_LARGE/);
+  const symlinkPath = join(parent, "manifest-link.json");
+  await symlink(MANIFEST_PATH, symlinkPath);
+  await assert.rejects(readLaunchManifest(symlinkPath), /INVALID_LAUNCH_MANIFEST_FILE/);
+  const evidenceDir = join(parent, "symlink-state");
+  await mkdir(evidenceDir);
+  await symlink(MANIFEST_PATH, join(evidenceDir, "host-state.json"));
+  const state = await inspectHostRun(evidenceDir);
+  assert.equal(state.status, "INCOMPLETE_UNKNOWN");
+  assert.equal(state.reason, "INVALID_HOST_STATE_FILE");
 });
 
 test("preflight is read-only and never starts a child", async t => {
