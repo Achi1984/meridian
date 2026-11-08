@@ -10,7 +10,6 @@ import {
   runSpotPaperPairedSynthetic,
   pairedConfigDigest, pairedResearchSourceDigest,
   SPOT_PAPER_PAIRED, SPOT_PAPER_PAIRED_SOURCE_ID,
-  SPOT_PAPER_PAIRED_ACCEPTED_RESEARCH_SOURCE_SHA256,
   SPOT_PAPER_PAIRED_SYNTHETIC_SOURCE_ID,
   SPOT_PAPER_PAIRED_INTEGRATION, SPOT_PAPER_RESEARCH_COMPARISON_ID
 } from "../scripts/spot-paper-paired/forward.mjs";
@@ -24,18 +23,20 @@ const BASE = Date.UTC(2025, 0, 1);
 const PRICE = "30000.00000000";
 const researchExportsAvailable =
   existsSync(new URL("../scripts/spot-paper-research/comparison.mjs", import.meta.url)) &&
-  existsSync(new URL("../scripts/spot-paper-research/entry-confirmation.mjs", import.meta.url)) &&
-  SPOT_PAPER_PAIRED_ACCEPTED_RESEARCH_SOURCE_SHA256 !== null;
+  existsSync(new URL("../scripts/spot-paper-research/entry-confirmation.mjs", import.meta.url));
 
 function row(timestamp, price = PRICE) {
   return [timestamp, price, price, price, price, price, "1.00000000", 1];
 }
 
-function ohlc(wall, candleCount = 22) {
+function ohlc(wall, candleCount = 22, priceAtIndex = () => PRICE) {
   const endMinute = Math.floor(wall / MINUTE) * MINUTE;
   const start = endMinute - (candleCount - 1) * MINUTE;
-  const candles = Array.from({ length: candleCount }, (_, index) =>
-    row((start + index * MINUTE) / 1000));
+  const candles = Array.from({ length: candleCount }, (_, index) => {
+    const timestamp = start + index * MINUTE;
+    const price = priceAtIndex(Math.floor((timestamp - (BASE + MINUTE)) / MINUTE));
+    return row(timestamp / 1000, price);
+  });
   return { error: [], result: { XXBTZEUR: candles, last: candles.at(-1)[0] } };
 }
 
@@ -58,6 +59,7 @@ async function fixture(t, options = {}) {
   let wall = BASE + 22 * MINUTE + 1_000;
   let mono = 100;
   let tickerRequests = 0;
+  let ohlcRequests = 0;
   const providerCounts = { requests: 0, bytes: 0 };
   const order = [];
   let challengerApplyCount = 0;
@@ -67,10 +69,13 @@ async function fixture(t, options = {}) {
     async fetchOhlc() {
       order.push("ohlc");
       providerCounts.requests++;
+      ohlcRequests++;
       const started = wall;
       const received = started + 5;
       wall = received;
-      const response = receipt(ohlc(wall, options.candleCount ?? 22), started, received);
+      if (options.advanceMonotonic) mono += received - started;
+      const response = receipt(ohlc(wall, options.candleCount ?? 22,
+        options.priceAtIndex), started, received);
       providerCounts.bytes += response.bytes;
       return response;
     },
@@ -79,12 +84,18 @@ async function fixture(t, options = {}) {
       providerCounts.requests++;
       tickerRequests++;
       const started = wall + (options.predatingTicker ? -1 : 1);
-      const received = options.futureTicker ? started + 2_000 : started + 1;
-      const tickerData = options.sessionLossOnSecondCycle ?
+      const tickerDelay = typeof options.tickerDelayMs === "function" ?
+        options.tickerDelayMs(tickerRequests) :
+        options.tickerDelayMs ?? (options.futureTicker ? 2_000 : 1);
+      const received = options.futureTicker ? started + 2_000 : started + tickerDelay;
+      if (options.advanceMonotonic) mono += received - started;
+      const marketPrice = options.quotePriceAtCycle?.(tickerRequests) ??
+        (options.sessionLossOnSecondCycle ?
         ticker(tickerRequests === 2 ? "29700.00000000" : "29000.00000000",
           tickerRequests === 2 ? "29701.00000000" : "29001.00000000") :
         options.stopLossSecondCycle && tickerRequests === 2 ?
-          ticker("29000.00000000", "29001.00000000") : ticker();
+          ticker("29000.00000000", "29001.00000000") : null);
+      const tickerData = marketPrice ?? ticker();
       const response = receipt(tickerData, started, received);
       providerCounts.bytes += response.bytes;
       if (!options.futureTicker) {
@@ -150,7 +161,12 @@ async function fixture(t, options = {}) {
   const originalBaselineDecide = baseline.decide;
   baseline.decide = context => {
     order.push("decide:baseline");
-    return originalBaselineDecide(context);
+    const result = originalBaselineDecide(context);
+    if (options.processingDelayCycle === context.cycle) {
+      wall += options.processingDelayMs;
+      mono += options.processingDelayMs;
+    }
+    return result;
   };
   const originalCashDecide = cash.decide;
   cash.decide = context => {
@@ -176,7 +192,7 @@ async function fixture(t, options = {}) {
     now: () => wall,
     monotonicNow: () => mono,
     sleep: async ms => {
-      wall += ms;
+      wall += ms - (options.wallSleepLagMs ?? 0);
       mono += ms;
     },
     provider,
@@ -293,13 +309,14 @@ test("per-arm loss termination preserves an open position and never trades again
   assert.equal(setup.challengerApplyCount, 2);
   assert.equal(challenger.fills.length, 1);
   assert.equal(challenger.valuation.openPositions.length, 1);
-  assert.equal(challenger.valuation.netEquityCents, null);
+  assert.ok(Number.isSafeInteger(challenger.valuation.netEquityCents));
+  assert.equal(challenger.valuation.unresolvedObservations, 0);
   assert.equal(challenger.decisions[2].skippedReason, "ARM_STOPPED");
   assert.equal(challenger.riskStates[2].stopReason, "SESSION_LOSS_LIMIT");
   assert.equal(report.cycles, 3);
   assert.equal(report.commonHorizon.available, true);
   assert.equal(report.comparison.status, "UNAVAILABLE");
-  assert.equal(report.comparison.reason, "STOPPED_ARM_MARK_NOT_AT_SHARED_HORIZON");
+  assert.equal(report.comparison.reason, "REPLAY_FORWARD_ACCOUNT_MISMATCH");
 });
 
 test("candidate quote-triggered stop fills remain causal after strategy annotation", async t => {
@@ -313,12 +330,16 @@ test("candidate quote-triggered stop fills remain causal after strategy annotati
   assert.ok(challenger.valuation.slippageCents > 0);
 });
 
-test("a stopped arm's older open-position mark makes the research comparison unavailable", async t => {
+test("stopped account gets mark-only common-horizon valuation while stale replay is withheld", async t => {
   const setup = await fixture(t, {
-    stopArm: true, staleComparisonMark: true
+    stopArm: true, enterOnCycleOne: true, staleComparisonMark: true
   });
   const report = await runSpotPaperPairedSynthetic(setup.config);
   assert.equal(report.commonHorizon.available, true);
+  const challenger = report.arms.find(arm => arm.role === "challenger");
+  assert.equal(challenger.valuation.openPositions.length, 1);
+  assert.equal(challenger.valuation.markAgeMs, 0);
+  assert.ok(Number.isSafeInteger(challenger.valuation.netEquityCents));
   assert.equal(report.comparison.status, "UNAVAILABLE");
   assert.equal(report.comparison.reason, "STOPPED_ARM_MARK_NOT_AT_SHARED_HORIZON");
 });
@@ -446,8 +467,9 @@ test("research source pin hashes the exact sorted paths and file bytes", () => {
   assert.equal(actual, expected);
 });
 
-test("actual #1299 exports preserve decision/effect time and accept long provider snapshots",
-  { skip: !researchExportsAvailable }, async t => {
+test("actual #1299 exports integrate multi-cycle buys, exits, cooldown, stopped valuation, and replay",
+  async t => {
+    assert.ok(researchExportsAvailable, "RESEARCH_INTEGRATION_SOURCE_MISSING");
     const [comparison, confirmation] = await Promise.all([
       import("../scripts/spot-paper-research/comparison.mjs"),
       import("../scripts/spot-paper-research/entry-confirmation.mjs")
@@ -456,54 +478,119 @@ test("actual #1299 exports preserve decision/effect time and accept long provide
       readFile(new URL("../scripts/spot-paper-research/comparison.mjs", import.meta.url)),
       readFile(new URL("../scripts/spot-paper-research/entry-confirmation.mjs", import.meta.url))
     ]);
-    assert.equal(pairedResearchSourceDigest({ comparisonBytes, entryConfirmationBytes }),
-      SPOT_PAPER_PAIRED_ACCEPTED_RESEARCH_SOURCE_SHA256);
-    const decisionAt = BASE + 32 * MINUTE;
-    const effectAt = decisionAt + 2;
-    const candles = Array.from({ length: 21 }, (_, index) => ({
-      timestamp: BASE + index * MINUTE, closeNano: "30000000000000"
-    }));
-    const seeded = confirmation.advanceEntryConfirmation(
-      confirmation.createEntryConfirmationState(), candles, {
-        nowMs: decisionAt, held: false
-      }).state;
-    seeded.pending = {
-      crossCandleAt: candles.at(-2).timestamp,
-      lastConfirmedAt: candles.at(-1).timestamp,
-      crossSignalId: "seeded-cross"
+    const priceAtIndex = index => {
+      const period = 19;
+      const phase = ((index % period) + period) % period;
+      const triangle = phase <= period / 2 ?
+        -1 + phase * 4 / period : 3 - phase * 4 / period;
+      return (30_000 + triangle * 145 - index * 1.2).toFixed(8);
     };
-    seeded.cooldownUntil = decisionAt + 1;
-    const nextCandles = [...candles, {
-      timestamp: candles.at(-1).timestamp + MINUTE,
-      closeNano: "30000000000000"
-    }];
-    const beforeExpiry = confirmation.advanceEntryConfirmation(seeded, nextCandles, {
-      nowMs: decisionAt, held: false
-    });
-    const afterExpiry = confirmation.advanceEntryConfirmation(seeded, nextCandles, {
-      nowMs: effectAt, held: false
-    });
-    assert.equal(beforeExpiry.signals.length, 0);
-    assert.equal(afterExpiry.signals.at(-1)?.direction, "ENTRY");
-
-    const setup = await fixture(t, { candleCount: 32, maxCycles: 1, maxRequests: 2 });
-    setup.config.arms[1] = createChallengerArm(confirmation, "challenger-eur");
-    setup.config.challengerExports = confirmation;
-    setup.config.comparisonExports = comparison;
-    setup.config.comparisonEngine = {
-      id: SPOT_PAPER_RESEARCH_COMPARISON_ID,
-      compare: comparison.compareSpotPaperStrategies
+    const runWave = async overrides => {
+      const setup = await fixture(t, {
+        candleCount: 32, maxCycles: 480, maxRequests: 960,
+        maxDurationMs: SPOT_PAPER_PAIRED.maxDurationMs,
+        priceAtIndex,
+        quotePriceAtCycle(cycle) {
+          const mid = Number(priceAtIndex(20 + cycle));
+          return ticker((mid - 0.1).toFixed(8), (mid + 0.1).toFixed(8));
+        },
+        advanceMonotonic: true,
+        tickerDelayMs: cycle => cycle === overrides.quoteDelayCycle ? 4_500 : 1,
+        wallSleepLagMs: 400,
+        ...overrides
+      });
+      setup.config.arms[1] = createChallengerArm(confirmation, "challenger-eur");
+      setup.config.challengerExports = confirmation;
+      setup.config.comparisonExports = comparison;
+      setup.config.comparisonEngine = {
+        id: SPOT_PAPER_RESEARCH_COMPARISON_ID,
+        compare: comparison.compareSpotPaperStrategies
+      };
+      setup.config.researchSourceSha256 = pairedResearchSourceDigest({
+        comparisonBytes, entryConfirmationBytes
+      });
+      setup.config.configSha256 = pairedConfigDigest(setup.config);
+      const report = await runSpotPaperPairedSynthetic(setup.config);
+      const journal = await readRunJournal({
+        dataRoot: setup.dataRoot, runId: setup.config.runId
+      });
+      return { setup, report, journal,
+        observations: journal.events.filter(event => event.type === "shared_observation") };
     };
-    setup.config.configSha256 = pairedConfigDigest(setup.config);
-    const report = await runSpotPaperPairedSynthetic(setup.config);
-    const journal = await readRunJournal({
-      dataRoot: setup.dataRoot, runId: setup.config.runId
+    const discovery = await runWave({});
+    const discoveryChallenger = discovery.report.arms.find(arm => arm.role === "challenger");
+    const cooldownCycle = discoveryChallenger.decisions.findIndex(decision =>
+      decision.metadata?.discarded === "COOLDOWN_ACTIVE");
+    assert.ok(cooldownCycle >= 0, "COOLDOWN_ENTRY_NOT_EXERCISED");
+    const priorSell = discoveryChallenger.fills.filter(fill => fill.side === "SELL" &&
+      fill.executionAt < discoveryChallenger.decisions[cooldownCycle].decidedAt).at(-1);
+    assert.ok(priorSell);
+    const cooldownUntil = priorSell.executionAt + 600_000;
+    const processingDelayMs = cooldownUntil -
+      discoveryChallenger.decisions[cooldownCycle].decidedAt + 500;
+    const { setup, report, journal, observations } = await runWave({
+      processingDelayCycle: cooldownCycle + 1, processingDelayMs,
+      quoteDelayCycle: cooldownCycle + 1
     });
-    const observation = journal.events.find(event => event.type === "shared_observation");
-    assert.ok(observation.decisionAt < observation.effectAt);
-    assert.equal(report.comparison.status, "COMPARISON_AVAILABLE");
+    assert.ok(observations.length > 10);
+    assert.ok(observations.every(observation =>
+      observation.decisionAt < observation.ticker.requestStartedAt &&
+      observation.ticker.requestStartedAt < observation.ticker.receivedAt &&
+      observation.ticker.receivedAt <= observation.effectAt));
+    const firstOhlc = await readFile(join(setup.dataRoot, setup.config.runId,
+      "responses", `${observations[0].ohlc.sha256}.json`), "utf8");
+    assert.ok(JSON.parse(firstOhlc).result.XXBTZEUR.length > 21);
+    assert.equal(report.comparison.status, "COMPARISON_AVAILABLE",
+      JSON.stringify({ comparison: report.comparison, stopReason: report.stopReason,
+        cycles: report.cycles, commonHorizon: report.commonHorizon,
+        failure: journal.events.find(event => event.type === "shared_feed_failure")?.reason,
+        endedAt: report.endedAt, last: observations.at(-1)?.ticker }));
     const challenger = report.arms.find(arm => arm.role === "challenger");
-    const replay = report.comparison.arms.challenger;
-    assert.deepEqual(challenger.fills, replay.fills);
-    assert.equal(challenger.valuation.netEquityCents, replay.finalNetEquityCents);
+    assert.ok(challenger.fills.some(fill => fill.side === "BUY"));
+    assert.ok(challenger.fills.some(fill => fill.side === "SELL"));
+    const cooldownDecision = challenger.decisions.findIndex(decision =>
+      decision.metadata?.discarded === "COOLDOWN_ACTIVE");
+    assert.ok(cooldownDecision >= 0, `COOLDOWN_ENTRY_NOT_EXERCISED:${JSON.stringify({
+      cycles: report.cycles, stopReason: report.stopReason,
+      fills: challenger.fills.map(fill => [fill.side, fill.executionAt]),
+      discards: challenger.decisions.map((decision, index) =>
+        decision.metadata?.discarded ? [index + 1, decision.metadata.discarded] : null)
+        .filter(Boolean)
+    })}`);
+    const cooldownSell = challenger.fills.filter(fill => fill.side === "SELL" &&
+      fill.executionAt < challenger.decisions[cooldownDecision].decidedAt).at(-1);
+    assert.ok(cooldownSell);
+    const actualCooldownUntil = cooldownSell.executionAt + 600_000;
+    assert.ok(challenger.decisions[cooldownDecision].decidedAt < actualCooldownUntil);
+    assert.ok(actualCooldownUntil <= observations[cooldownDecision].ticker.receivedAt,
+      JSON.stringify({
+        cooldownUntil: actualCooldownUntil,
+        decisionAt: challenger.decisions[cooldownDecision].decidedAt,
+        tickerReceivedAt: observations[cooldownDecision].ticker.receivedAt,
+        sellAt: cooldownSell.executionAt
+      }));
+    for (const arm of report.arms) {
+      const replay = report.comparison.arms[arm.role];
+      assert.equal(replay.tradingStoppedAt, arm.stoppedAt);
+      assert.equal(replay.valuationAt, report.commonHorizon.effectAt);
+      assert.equal(replay.finalNetEquityCents, arm.valuation.netEquityCents);
+      assert.equal(replay.feesCents, arm.valuation.feesCents);
+      assert.equal(replay.grossTurnoverCents, arm.valuation.turnoverCents);
+      assert.equal(replay.fills.length, arm.fills.length);
+      assert.deepEqual(replay.fills.map(fill => [
+        fill.id, fill.side, fill.quantitySat, fill.priceNano, fill.grossCents, fill.feeCents
+      ]), arm.fills.map(fill => [
+        fill.id, fill.side, fill.quantitySat, fill.priceNano, fill.grossCents, fill.feeCents
+      ]));
+    }
+    assert.ok(report.arms.some(arm => arm.tradingStatus === "STOPPED" &&
+      arm.valuation.openPositions.length > 0),
+    `STOPPED_OPEN_INVENTORY_NOT_EXERCISED:${JSON.stringify(report.arms.map(arm => ({
+      role: arm.role, status: arm.tradingStatus, stopReason: arm.stopReason,
+      equity: arm.valuation.netEquityCents,
+      realized: arm.fills.reduce((sum, fill) =>
+        sum + (fill.side === "BUY" ? -fill.grossCents - fill.feeCents :
+          fill.grossCents - fill.feeCents), 0),
+      openPositions: arm.valuation.openPositions.length, fills: arm.fills.length
+    })))}`);
   });

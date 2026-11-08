@@ -1,15 +1,16 @@
 # BTC/EUR paired shared-feed forward adapter
 
-**Status: integration blocked; no launch or readiness claim.** This change
-provides a bounded feed/lifecycle boundary and offline contract tests only.
-PR #1299 remains a draft and its exports are not in this checkout. Its current
-draft head exposes `createEntryConfirmationState`,
+**Status: synthetic integration verified against reviewed candidate source;
+production launch remains blocked and no launch/readiness claim is made.** Lead
+reviewed #1299 candidate `adf5c0a6e7b7d93bfd106dd6136c40a8e15a6373` is still a
+separate, unmerged dependency and its files are not in this checkout. Its exact
+candidate exports are `createEntryConfirmationState`,
 `advanceEntryConfirmation`, `recordEntryConfirmationSell`, and
-`compareSpotPaperStrategies`; this adapter binds those exact exports through an
-explicit host-supplied export object. Do not substitute a simulator, mock
-adapter, or other comparison engine for the accepted exports. The test-only
-adapters exercise ordering and safety boundaries; they are not a strategy
-integration, evidence, or technical acceptance.
+`compareSpotPaperStrategies`. The multi-cycle test binds these actual exports
+from an isolated temporary composition of that exact candidate; no strategy
+simulator or mock comparison engine is used. This verifies synthetic integration
+only, not live acceptance or operational readiness. The accepted research-source
+pin remains `null` until Lead accepts the integrated adapter.
 
 ## Frozen experiment contract
 
@@ -63,9 +64,9 @@ shared-observation inputs; it is not replaced by a new comparison engine.
 The live entrypoint creates only the fixed public Kraken provider after the
 source pin passes; caller-supplied providers, strategies, and comparison
 engines are rejected or ignored. Until the accepted #1299 source is present and
-bound by the pinned digest, integration is blocked. There is no CLI, deployment
-configuration, or launch entrypoint. A test double is not an allowed substitute
-for any missing export.
+bound by the pinned digest, production execution is blocked. The local host
+composition CLI is under `scripts/spot-paper-paired/host.mjs`; it makes no
+deployment changes and does not bypass this gate.
 
 The live `runSpotPaperPaired` entrypoint is additionally fail-closed while
 `SPOT_PAPER_PAIRED_ACCEPTED_RESEARCH_SOURCE_SHA256` is `null`; it requires the
@@ -91,19 +92,22 @@ console.log(hash.digest("hex"));
 '
 ```
 
-Only the lead-reviewed digest from the accepted commit may replace the current
-`null` source pin. Do not copy a digest from the current draft head.
+Only the lead-reviewed digest from the accepted/merged commit may replace the
+current `null` source pin. The reviewed candidate source is sufficient for
+isolated synthetic testing, not permission to set the production pin.
 
 For every accepted observation the journal records one causally ordered shared
 OHLC/ticker pair and separate arm decisions, fills, risk states and valuations.
 An arm-specific stop latches trading off for that arm but continues preserving
 its account state without invoking later decision or effect callbacks. The original
 stop reason and effect timestamp remain attached to that account; later quotes
-cannot trigger a sell or other fill. There is no separate mark-only API in the
-reused ledger, so a stopped open position is not advanced to later marks. It does
-not fabricate a liquidation. A common-horizon value is available only when that
-position has a valid mark at the shared horizon; otherwise remaining marked
-equity and the comparison result are unknown, not compared against a stale mark.
+cannot trigger a sell or other fill. A separate valuation clone reuses
+`applyPaperObservation` with entries and stop exits disabled, asserts no fills and
+unchanged inventory, and stores only the new mark; the stopped trading ledger is
+never mutated. It does not fabricate a liquidation. A common-horizon value is
+available only when that position has a valid mark at the shared horizon;
+otherwise remaining marked equity and the comparison result are unknown, not
+compared against a stale mark.
 Terminal summaries and the replay use the final shared observation's `effectAt`
 as their stated horizon; the report separately records whether that quote was
 still fresh when terminal persistence began.
@@ -113,28 +117,25 @@ positions, unresolved observations, and the shared-horizon status. The cash
 control is not evidence of alpha; fewer challenger trades alone do not show
 improvement.
 
-Each persisted shared observation and replay input now carries distinct
-`decisionAt` and `effectAt` timestamps; the legacy replay `at` remains the
-effect-time alias for source compatibility. Decisions are made before the ticker
-request, while fills and risk effects occur only after its causal quote. The
-currently inspected #1299 draft comparison consumes `observation.at` for both
-decision and effect processing, so it does not yet honor this distinction. The
-adapter keeps the accepted research-source pin `null`; it must not be bound until
-the accepted engine supports the explicit timestamp contract and the actual-export
-cooldown/parity test passes. An available replay is also reconciled against the
-forward fills, costs, account balances/equity, stop state, and remaining inventory;
-any mismatch makes the comparison unavailable rather than publishing an unrelated
-replay as the executed ledger.
+Each persisted shared observation and replay input carries distinct `decisionAt`
+and `effectAt` timestamps; legacy replay `at` is the effect-time alias. The
+reviewed candidate accepts `decisionAt` for cooldown decisions and allows up to
+720 candles per snapshot. The actual-export test uses a provider-shaped 32-row
+snapshot over 480 shared cycles, actual buys and sells, and a cooldown-expiry
+boundary where `decisionAt < cooldownUntil <= ticker.receivedAt`. It verifies
+fills, costs, common-horizon equity, trading-stop timestamps, valuation
+timestamps, and stopped open inventory against the actual comparison output.
+Stopped accounts keep their account ledger and stop metadata unchanged; a
+mark-only clone of the existing ledger calculation updates valuation at each
+shared quote without recording fills or modifying inventory. The comparator
+uses the same mark-only rule. Any account/replay mismatch makes the comparison
+unavailable rather than publishing an unrelated replay as the executed ledger.
 
 Any invalid/stale/future/pre-decision quote or shared-feed error stops the
 paired run. Ambiguous journal writes are terminal unknown and must not be
 retried, resumed, or overwritten. A caller/operator stop is recorded as
 interrupted, never as a completed eight-hour run. There is no auto-promotion,
 authenticated provider, order, wallet, or real-execution path.
-
-The future host must map `SIGTERM` to the runner's supplied `AbortSignal`, allow
-its separate five-second terminal-journal grace to finish, and retain the
-interrupted report. No signal-handling host entrypoint is included here.
 
 For a future approved run, the retrieval sequence is: independently confirm
 the writer is stopped; inspect status/report read-only; preserve the complete
@@ -143,9 +144,8 @@ and manifest with bounded byte-preserving tooling; retrieve both files using the
 separately approved host's native download path; verify archive and member
 hashes; then perform an offline assessment against independently reviewed
 source/config/evidence identities. Never repair, delete, resume, or overwrite
-ambiguous evidence. The paired host's concrete status/package command remains
-part of the documented host-composition work; do not apply the old runbook's
-fixed run/image/volume identifiers to a paired run.
+ambiguous evidence. Do not apply the old runbook's fixed run/image/volume
+identifiers to a paired run.
 
 ## Offline validation command
 
@@ -155,23 +155,22 @@ Run the focused synthetic acceptance suite from the repository root:
 node --test test/spot-paper-paired-forward.test.js
 ```
 
-The tests inject an in-memory provider and synthetic account/comparison
-callbacks. They make no network or order calls and establish only feed/lifecycle
-contract behavior. They do not prove #1299 integration or launch readiness.
-An actual-export integration test is enabled only when both #1299 source files
-are present and their digest is explicitly pinned. It checks the cooldown
-decision/effect boundary, runs the actual comparison on a provider-shaped
-snapshot longer than 21 candles, and requires the replay to reconcile with the
-forward ledger. The test is skipped in this checkout because those sources are
-absent and the accepted source pin is null. The inspected draft currently
-rejects such a snapshot and reads one timestamp for both decision and effect;
-full multi-cycle cooldown decision/fill/equity parity remains blocked on the
-accepted #1299 engine supporting both timestamps.
+The synthetic contract tests use an in-memory feed and make no network or order
+calls. The actual-export integration acceptance test is not skipped and does not
+depend on the production accepted-source pin. It imports the research sources
+from the checkout and fails with `RESEARCH_INTEGRATION_SOURCE_MISSING` if they
+are absent. For this intermediate branch validation it was run against temporary
+files extracted byte-for-byte from candidate
+`adf5c0a6e7b7d93bfd106dd6136c40a8e15a6373`; those files were not added to or
+changed in this branch. Before that dependency merges the ordinary test command
+will report the missing source explicitly. After merge, the same test runs as a
+normal required test without a skip or production pin.
 
 ## Lead review identity and future host work
 
-There is deliberately no command to launch the paired experiment in this
-change. After #1299 is accepted, lead review must bind all of the following
+The host CLI has a fail-closed run command, read-only status/report commands,
+and bounded byte-preserving packaging. No run was launched. After #1299 is
+accepted, lead review must bind all of the following
 before any separate operating approval:
 
 | Identity | Required review value |
@@ -189,19 +188,81 @@ configuration, or evidence run are assigned here. Do not reuse
 That stopped run and its existing evidence remain untouched; its captured
 snapshot is development evidence, not untouched validation.
 
-The remaining minimal work is to bind the accepted #1299 export API in a
-disabled composition entrypoint confined to `scripts/spot-paper-paired/`; map
-SIGTERM to an `AbortSignal` and allow the bounded journal shutdown; define the
-host-specific read-only status/report and byte-preserving retrieval commands;
-then review the exact source/config/image/evidence identity and independently
-approve any future host and egress arrangement. No deployment change or launch
-command is part of this adapter. The exact focused validation command is
-`node --test test/spot-paper-paired-forward.test.js`; the exact future host
-command cannot be fixed until the host composition and retrieval mechanism are
-selected and reviewed. For a future approved run, retain the entire new evidence
-tree and use a separately reviewed, read-only status/report, byte-preserving
-packaging, authenticated retrieval, hash verification, and offline assessment
-sequence.
+The minimal host composition and concrete local commands are now in
+`scripts/spot-paper-paired/host.mjs`:
+
+```sh
+node scripts/spot-paper-paired/host.mjs disabled
+node scripts/spot-paper-paired/host.mjs run --data-root /evidence-root --run-id <new-unique-run-id>
+node scripts/spot-paper-paired/host.mjs status --data-root /evidence-root --run-id <run-id>
+node scripts/spot-paper-paired/host.mjs report --data-root /evidence-root --run-id <run-id>
+node scripts/spot-paper-paired/host.mjs package --data-root /evidence-root --run-id <run-id> --archive /tmp/<run-id>.tar --manifest /tmp/<run-id>.manifest.json --retrieval-window-ms 300000
+```
+
+The `run` command requires an existing absolute evidence root, a fresh run ID,
+and rejects an existing output path. It computes the source/config identities
+from frozen defaults and maps SIGTERM to the runner's `AbortSignal`; today it
+fails closed with `RESEARCH_INTEGRATION_NOT_ACCEPTED` before network access
+because the production pin is null. The other commands are read-only except
+`package`, which exclusively creates outputs via the existing verified
+`packageHostEvidence` helper, refuses writer-lock/pending state, and holds the
+maintenance process open for the requested retrieval window. They do not verify
+that a remote writer process has stopped: an operator must independently verify
+terminal state before running inspection/package on a mounted evidence volume.
+
+For Northflank retrieval, use a separately reviewed maintenance Job with the
+evidence volume mounted read-only and the exact `node` host command above; use
+the maintenance Job ID and exact instance name returned by that run, never the
+old writer's identity. Download both `/tmp/<run-id>.tar` and
+`/tmp/<run-id>.manifest.json` with `northflank download job file` into separate
+empty local directories; for example:
+
+```sh
+set -euo pipefail
+umask 077
+: "${PAIRED_RUN_ID:?set the new paired run ID}"
+: "${PAIRED_MAINTENANCE_JOB_ID:?set the separate maintenance Job ID}"
+: "${PAIRED_MAINTENANCE_INSTANCE_NAME:?set the exact maintenance instance name}"
+: "${EXPECTED_ARCHIVE_SHA256:?set archiveSha256 from this package result}"
+stage="$(mktemp -d)"
+mkdir "$stage/archive" "$stage/manifest"
+northflank download job file \
+  --projectId meridian \
+  --jobId "$PAIRED_MAINTENANCE_JOB_ID" \
+  --instanceName "$PAIRED_MAINTENANCE_INSTANCE_NAME" \
+  --remotePath "/tmp/${PAIRED_RUN_ID}.tar" \
+  --localPath "$stage/archive"
+northflank download job file \
+  --projectId meridian \
+  --jobId "$PAIRED_MAINTENANCE_JOB_ID" \
+  --instanceName "$PAIRED_MAINTENANCE_INSTANCE_NAME" \
+  --remotePath "/tmp/${PAIRED_RUN_ID}.manifest.json" \
+  --localPath "$stage/manifest"
+printf '%s  %s\n' "$EXPECTED_ARCHIVE_SHA256" \
+  "$stage/archive/${PAIRED_RUN_ID}.tar" | sha256sum -c -
+```
+
+Validate every archive member against the downloaded manifest before
+extraction, using the bounded Python/TAR validation sequence in the linked
+post-run runbook. Give the one-shot maintenance process one attempt, no
+schedule/restart/retry, at least 84 MiB temporary storage, and a 390-second
+external timeout (60-second package budget + 300-second retrieval hold + 30-second
+exit margin). The package helper enforces the 60-second cooperative package
+bound, 84 MiB archive ceiling, exclusive new outputs and byte-exact round-trip
+verification. Never reuse
+`btc-eur-paper-host-8h-001`, its image, volume or evidence. No deployment or
+host-provider mutation is part of this change.
+
+The focused commands are `node --test test/spot-paper-paired-forward.test.js`
+and `node --test test/spot-paper-paired-host.test.js`. The multi-cycle
+actual-export test passed against the exact #1299 candidate in the temporary
+isolated composition; the candidate's hosted workflow run `42523447964` on
+`adf5c0a6e7b7d93bfd106dd6136c40a8e15a6373` completed successfully. The candidate
+is not yet merged, so the checked-in acceptance test reports
+`RESEARCH_INTEGRATION_SOURCE_MISSING` when run without the temporary source
+composition. After merge, update this branch from main and rerun the same test
+commands as normal required tests; final-head hosted CI remains required. These
+synthetic and host-helper tests do not establish live acceptance or readiness.
 The existing
 [BTC/EUR post-run retrieval runbook](../operations/BTC_EUR_8H_POSTRUN_20261108.md)
 describes that sequence for the old run identity only; it is not approval or

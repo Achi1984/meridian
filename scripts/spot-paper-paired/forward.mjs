@@ -220,6 +220,20 @@ function summarizeLedger(state, valuationAvailable, terminalAt) {
   };
 }
 
+function markLedgerWithoutTrading(ledger, quote, at) {
+  if (!ledger.position) return clone(ledger);
+  const valuationInput = clone(ledger);
+  valuationInput.position.stopPriceNano = "0";
+  const result = applyPaperObservation(valuationInput, {
+    quote, nowMs: at, stopped: true
+  });
+  assert(result.fills.length === 0 && result.ledger.position?.quantitySat ===
+    ledger.position.quantitySat &&
+    result.ledger.position.entrySignalId === ledger.position.entrySignalId,
+  "MARK_ONLY_CHANGED_ACCOUNT");
+  return result.ledger;
+}
+
 export function createBaselineArm(accountId = "baseline") {
   return {
     role: "baseline",
@@ -227,7 +241,7 @@ export function createBaselineArm(accountId = "baseline") {
     accountId,
     accountContract: SPOT_PAPER_PAIRED_ACCOUNT_CONTRACT,
     initialize: () => ({ strategy: createStrategyState(), ledger: createLedger(),
-      stopped: false }),
+      valuationLedger: createLedger(), stopped: false }),
     decide({ state, candles, at }) {
       const advanced = advanceStrategy(state.strategy, candles);
       return {
@@ -280,10 +294,10 @@ export function createChallengerArm(researchExports, accountId = "challenger") {
     accountContract: SPOT_PAPER_PAIRED_ACCOUNT_CONTRACT,
     researchExports,
     initialize: () => ({ strategy: researchExports.createEntryConfirmationState(),
-      ledger: createLedger(), stopped: false }),
+      ledger: createLedger(), valuationLedger: createLedger(), stopped: false }),
     decide({ state, candles, at }) {
       const advanced = researchExports.advanceEntryConfirmation(state.strategy, candles, {
-        nowMs: at, held: Boolean(state.ledger.position)
+        decisionAt: at, held: Boolean(state.ledger.position)
       });
       return {
         state: { ...state, strategy: advanced.state },
@@ -519,13 +533,14 @@ function comparisonMatchesForward(comparison, arms, states, fills, summaries, te
   return arms.every((arm, index) => {
     const replay = comparison.arms[arm.role];
     const state = states[index];
-    const ledger = state.ledger ?? { cashCents: state.cashCents, feesCents: 0 };
+    const ledger = state.valuationLedger ?? state.ledger ??
+      { cashCents: state.cashCents, feesCents: 0 };
     const summary = summaries[index];
     const replayFills = replay?.fills;
-    const position = state.ledger?.position ?? null;
+    const position = ledger.position ?? null;
     const replayInventory = replay?.unresolvedTerminalInventory ?? null;
-    const terminalMatches = replay?.terminalAt ===
-      (state.stopped ? state.stoppedAt : terminalAt);
+    const stopTimeMatches = (replay?.tradingStoppedAt ?? null) ===
+      (state.stoppedAt ?? null);
     return isRecord(replay) && Array.isArray(replayFills) &&
       replay.initialCashCents === SPOT_PAPER_PAIRED.initialCashCents &&
       replay.finalCashCents === ledger.cashCents &&
@@ -534,7 +549,7 @@ function comparisonMatchesForward(comparison, arms, states, fills, summaries, te
       replay.grossTurnoverCents === summary.turnoverCents &&
       replay.stopped === Boolean(state.stopped) &&
       (replay.stopReason ?? null) === (state.stopReason ?? null) &&
-      terminalMatches &&
+      stopTimeMatches && replay.valuationAt === terminalAt &&
       replayFills.length === fills[index].length &&
       replayFills.every((fill, fillIndex) =>
         same(fillIdentity(fill), fillIdentity(fills[index][fillIndex]))) &&
@@ -784,6 +799,9 @@ async function runPairedForward(input, testOnly) {
         });
         const nextStates = effects.map((effect, index) => {
           const state = clone(effect.state);
+          state.valuationLedger = states[index].stopped ?
+            markLedgerWithoutTrading(states[index].ledger, effectQuote, effectAt) :
+            clone(state.ledger ?? state.valuationLedger);
           if (states[index].stopped || effect.stopReason) {
             state.stopped = true;
             state.stopReason ??= states[index].stopReason ?? effect.stopReason;
@@ -793,7 +811,10 @@ async function runPairedForward(input, testOnly) {
           return state;
         });
         const nextSummaries = config.arms.map((arm, index) => ({ ...arm.summarize({
-          state: nextStates[index], quote, valuationAvailable: true, terminalAt: effectAt
+          state: nextStates[index].valuationLedger ?
+            { ...nextStates[index], ledger: nextStates[index].valuationLedger } :
+            nextStates[index],
+          quote, valuationAvailable: true, terminalAt: effectAt
         }) }));
         nextSummaries.forEach((summary, index) => {
           assert(isRecord(summary) && Number.isSafeInteger(summary.feesCents) &&
@@ -908,7 +929,9 @@ async function runPairedForward(input, testOnly) {
       endedAt - lastQuote.receivedAt <= SPOT_PAPER_PAIRED.maxQuoteAgeMs);
     const sharedHorizonAt = replayObservations.at(-1)?.effectAt ?? null;
     const summaries = config.arms.map((arm, index) => ({ ...arm.summarize({
-      state: states[index], quote: lastQuote, valuationAvailable: commonHorizonAvailable,
+      state: states[index].valuationLedger ?
+        { ...states[index], ledger: states[index].valuationLedger } : states[index],
+      quote: lastQuote, valuationAvailable: commonHorizonAvailable,
       terminalAt: sharedHorizonAt ?? endedAt
     }), slippageCents: slippageTotals[index],
       sampledDrawdownCents: maxDrawdown[index] }));
