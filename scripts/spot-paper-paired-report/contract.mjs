@@ -22,6 +22,8 @@ const ARM_STOP_REASONS = new Set([
 const isRecord = value => value !== null && typeof value === 'object' &&
   !Array.isArray(value);
 const isInteger = Number.isSafeInteger;
+const finiteDuration = value => value === null ||
+  typeof value === 'number' && Number.isFinite(value);
 
 const nullableInteger = value => value === null || isInteger(value);
 const safeCode = value => typeof value === 'string' && REASON_CODE.test(value) ?
@@ -130,13 +132,16 @@ export function sanitizeSpotPaperPairedDashboardDto(input) {
   ];
   const timing = {};
   for (const key of timingKeys) {
-    if (!nullableInteger(input.timing[key])) return null;
+    if (key === 'actualElapsedMs' ?
+      !finiteDuration(input.timing[key]) : !nullableInteger(input.timing[key])) return null;
     timing[key] = input.timing[key];
   }
   if (timing.requestedDurationMs !== 28_800_000 ||
       timing.requestedCycles !== 480 ||
       timing.observedCoverageMs !== null && timing.observedCoverageMs < 0 ||
-      timing.actualElapsedMs !== null && timing.actualElapsedMs < 0 ||
+      timing.actualElapsedMs !== null &&
+        (timing.actualElapsedMs < 0 ||
+          timing.actualElapsedMs > 28_805_000) ||
       timing.attemptedCycles !== null &&
         (timing.attemptedCycles < 0 || timing.attemptedCycles > 480) ||
       timing.completedCycles !== null &&

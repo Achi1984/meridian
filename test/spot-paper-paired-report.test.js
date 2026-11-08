@@ -6,11 +6,13 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {test} from 'node:test';
 import {
+  exportReadOnlyPairedJournal,
   evaluatePairedPaperEvidence,
   evaluatePairedPaperFiles,
   readBoundedJsonFile,
   SPOT_PAPER_PAIRED_MAX_JOURNAL_BYTES
 } from '../scripts/spot-paper-paired-report/evaluate.mjs';
+import {createRunJournal} from '../scripts/spot-paper-pilot/journal.mjs';
 import {
   SPOT_PAPER_PAIRED_EXPECTED_IDENTITY_SCHEMA
 } from '../scripts/spot-paper-paired-report/contract.mjs';
@@ -95,7 +97,7 @@ function fixture() {
     elapsedMs: 28_800_000,
     wallClockElapsedMs: 28_800_000,
     failureReason: null,
-    fullEightHourCompletion: true,
+    fullEightHourCompletion: false,
     coverage: 'CONFIGURED_DURATION_REACHED',
     cycles: 480,
     requests: 960,
@@ -145,7 +147,12 @@ function fixture() {
     models: structuredClone(models),
     comparisonEngineId: expectedIdentity.comparisonEngineId,
     assumptions: structuredClone(report.assumptions),
-    limits: {maxCycles: 480, maxRequests: 960, maxDurationMs: 28_800_000}
+    limits: {
+      maxCycles: 480, maxRequests: 960,
+      maxBytes: 64 * 1024 * 1024, maxResponseBytes: 256 * 1024,
+      maxDurationMs: 28_800_000, requestTimeoutMs: 5_000,
+      pollIntervalMs: 60_000
+    }
   };
   const events = [
     {id: 'paired-start', type: 'start', at: report.startedAt},
@@ -221,6 +228,52 @@ test('projects a compatible synthetic terminal run without winner or cost double
   ]);
   assert.equal(JSON.stringify(output).includes('accountId'), false);
   assert.equal(JSON.stringify(output).includes('failureReason'), false);
+});
+
+test('preserves fractional performance-clock milliseconds without threshold rounding', () => {
+  for (const [elapsedMs, completed, coverage] of [
+    [28_800_000 - 0.25, false, 'PARTIAL'],
+    [28_800_000 + 0.25, true, 'CONFIGURED_DURATION_REACHED']
+  ]) {
+    const input = fixture();
+    input.report.stopReason = 'DURATION_LIMIT';
+    input.report.elapsedMs = elapsedMs;
+    input.report.fullEightHourCompletion = completed;
+    input.report.coverage = coverage;
+    input.journal.checkpoint.stopReason = input.report.stopReason;
+    input.journal.events.at(-1).report = structuredClone(input.report);
+    const output = evaluatePairedPaperEvidence(input);
+    assert.equal(output.evidenceStatus, 'VERIFIED_COMPLETE');
+    assert.equal(output.timing.actualElapsedMs, elapsedMs);
+    assert.equal(output.reasonCode, 'TERMINAL_REPORT_RECONCILED');
+  }
+});
+
+test('accepts #1301 host report wrappers only alongside reconciled journal evidence', () => {
+  const input = fixture();
+  input.report = {
+    schemaVersion: 'SPOT_PAPER_PAIRED_HOST_STATUS_V1',
+    status: 'TERMINAL_JOURNAL_VERIFIED',
+    runId: input.expectedIdentity.runId,
+    verifiedTerminal: true,
+    report: input.report
+  };
+  assert.equal(evaluatePairedPaperEvidence(input).evidenceStatus,
+    'VERIFIED_COMPLETE');
+
+  const running = fixture();
+  running.report = {
+    schemaVersion: 'SPOT_PAPER_PAIRED_HOST_STATUS_V1',
+    status: 'WRITER_LOCK_PRESENT',
+    runId: running.expectedIdentity.runId,
+    verifiedTerminal: false
+  };
+  running.journal.events.pop();
+  running.journal.sequence = running.journal.events.length;
+  assert.equal(evaluatePairedPaperEvidence(running).evidenceStatus,
+    'RUNNING_SNAPSHOT');
+  assert.equal(evaluatePairedPaperEvidence(running).reasonCode,
+    'WRITER_LOCK_PRESENT_SNAPSHOT_ONLY');
 });
 
 test('retains a verified interrupted report and keeps stop time separate from valuation time', () => {
@@ -416,6 +469,7 @@ test('checks journal checksums and enforces bounded, regular, read-only input fi
   const checked = evaluatePairedPaperEvidence({
     ...input, journal: envelope
   });
+
   assert.equal(checked.evidenceStatus, 'VERIFIED_COMPLETE');
 
   const corrupt = structuredClone(envelope);
@@ -453,6 +507,38 @@ test('checks journal checksums and enforces bounded, regular, read-only input fi
     assert.equal((await evaluatePairedPaperFiles({
       expectedIdentityPath, reportPath, journalPath
     })).reasonCode, 'REPORT_FILE_INVALID_OR_OVERSIZED');
+  } finally {
+    await rm(directory, {recursive: true, force: true});
+  }
+});
+
+test('exports read-only journal evidence through the CLI using the shared journal reader', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'spot-paired-journal-export-'));
+  const dataRoot = join(directory, 'evidence');
+  const runId = 'export-readonly-001';
+  try {
+    const journal = await createRunJournal({
+      dataRoot,
+      runId,
+      manifest: {schemaVersion: 'SPOT_PAPER_PAIRED_MANIFEST_V1', runId}
+    });
+    await journal.append(
+      {id: 'paired-start', type: 'start', at: 1_000},
+      {states: [], counters: {requests: 0, bytes: 0}, cycle: 0}
+    );
+    await journal.close();
+    const direct = await exportReadOnlyPairedJournal({dataRoot, runId});
+    assert.equal(direct.reconciliationStatus, 'READ_ONLY_VERIFIED');
+    assert.equal(direct.sequence, 1);
+
+    const cli = spawnSync(process.execPath, [
+      'scripts/spot-paper-paired-report/cli.mjs',
+      'export-journal', dataRoot, runId
+    ], {encoding: 'utf8'});
+    assert.equal(cli.status, 0, cli.stderr);
+    const exported = JSON.parse(cli.stdout);
+    assert.equal(exported.reconciliationStatus, 'READ_ONLY_VERIFIED');
+    assert.equal(exported.events[0].id, 'paired-start');
   } finally {
     await rm(directory, {recursive: true, force: true});
   }

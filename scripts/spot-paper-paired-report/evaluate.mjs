@@ -1,7 +1,8 @@
 import {createHash} from 'node:crypto';
 import {constants} from 'node:fs';
-import {open} from 'node:fs/promises';
-import {resolve} from 'node:path';
+import {lstat, open, readFile, realpath} from 'node:fs/promises';
+import {basename, join, resolve} from 'node:path';
+import {readRunJournal} from '../spot-paper-pilot/journal.mjs';
 import {
   createUnknownSpotPaperPairedDashboard,
   projectSpotPaperPairedDashboard,
@@ -12,7 +13,7 @@ import {
 
 export const SPOT_PAPER_PAIRED_REPORT_SCHEMA = 'SPOT_PAPER_PAIRED_REPORT_V1';
 export const SPOT_PAPER_PAIRED_JOURNAL_SCHEMA = 'SPOT_PAPER_PILOT_JOURNAL_V1';
-export const SPOT_PAPER_PAIRED_MAX_REPORT_BYTES = 1024 * 1024;
+export const SPOT_PAPER_PAIRED_MAX_REPORT_BYTES = 8 * 1024 * 1024;
 export const SPOT_PAPER_PAIRED_MAX_JOURNAL_BYTES = 16 * 1024 * 1024;
 export const SPOT_PAPER_PAIRED_MAX_IDENTITY_BYTES = 16 * 1024;
 
@@ -21,6 +22,9 @@ const MAX_CYCLES = 480;
 const MAX_REQUESTS = 960;
 const MAX_BYTES = 64 * 1024 * 1024;
 const MAX_QUOTE_AGE_MS = 10_000;
+const MAX_PENDING_BYTES = 16 * 1024;
+const MAX_RESPONSE_BYTES = 256 * 1024;
+const MAX_EXPORT_IO_MS = 5_000;
 const HASH = /^[a-f0-9]{64}$/;
 const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 const MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
@@ -35,6 +39,24 @@ function stableJson(value) {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
   return `{${Object.keys(value).sort().map(key =>
     `${JSON.stringify(key)}:${stableJson(value[key])}`).join(',')}}`;
+}
+
+function reportInput(input, expectedIdentity) {
+  if (!isRecord(input) ||
+      input.schemaVersion !== 'SPOT_PAPER_PAIRED_HOST_STATUS_V1') {
+    return {report: input, snapshotStatus: null};
+  }
+  if (input.runId !== expectedIdentity?.runId ||
+      !['TERMINAL_JOURNAL_VERIFIED', 'WRITER_LOCK_PRESENT',
+        'INCOMPLETE_UNKNOWN', 'NOT_FOUND'].includes(input.status)) {
+    return {invalid: true};
+  }
+  const snapshotStatus = input.status === 'WRITER_LOCK_PRESENT' ?
+    'RUNNING_SNAPSHOT' : null;
+  return {
+    report: isRecord(input.report) ? input.report : null,
+    snapshotStatus
+  };
 }
 
 function fail(reasonCode) {
@@ -108,6 +130,7 @@ function getJournalPayload(journal) {
 
 function identityMatches(report, payload, expected) {
   const manifest = payload.manifest;
+  const limits = manifest?.limits;
   return report.runId === expected.runId &&
     report.pair === expected.pair &&
     report.sourceSha256 === expected.sourceSha256 &&
@@ -128,9 +151,26 @@ function identityMatches(report, payload, expected) {
     manifest.assumptions?.feeBpsPerSide === 50 &&
     manifest.assumptions?.slippageBpsPerSide === 10 &&
     manifest.assumptions?.ratesVerified === false &&
-    manifest.limits?.maxCycles === MAX_CYCLES &&
-    manifest.limits?.maxRequests === MAX_REQUESTS &&
-    manifest.limits?.maxDurationMs === MAX_DURATION_MS;
+    isRecord(limits) &&
+    isInteger(limits.maxCycles) && limits.maxCycles > 0 &&
+      limits.maxCycles <= MAX_CYCLES && report.cycles <= limits.maxCycles &&
+    isInteger(limits.maxRequests) && limits.maxRequests > 0 &&
+      limits.maxRequests <= MAX_REQUESTS && report.requests <= limits.maxRequests &&
+    isInteger(limits.maxBytes) && limits.maxBytes > 0 &&
+      limits.maxBytes <= MAX_BYTES && report.deliveredBytes <= limits.maxBytes &&
+    isInteger(limits.maxResponseBytes) && limits.maxResponseBytes > 0 &&
+      limits.maxResponseBytes <= MAX_RESPONSE_BYTES &&
+    isInteger(limits.maxDurationMs) && limits.maxDurationMs > 0 &&
+      limits.maxDurationMs <= MAX_DURATION_MS &&
+      report.elapsedMs <= limits.maxDurationMs + 5_000 &&
+      report.fullEightHourCompletion ===
+        (report.stopReason === 'DURATION_LIMIT' &&
+          report.elapsedMs >= MAX_DURATION_MS) &&
+      report.coverage === (report.elapsedMs >= limits.maxDurationMs ?
+        'CONFIGURED_DURATION_REACHED' : 'PARTIAL') &&
+    isInteger(limits.requestTimeoutMs) && limits.requestTimeoutMs > 0 &&
+      limits.requestTimeoutMs <= 5_000 &&
+    isInteger(limits.pollIntervalMs) && limits.pollIntervalMs >= 60_000;
 }
 
 function reportIsValid(report, expected) {
@@ -138,7 +178,8 @@ function reportIsValid(report, expected) {
       report.schemaVersion !== SPOT_PAPER_PAIRED_REPORT_SCHEMA) return 'UNKNOWN_REPORT_SCHEMA';
   if (!isInteger(report.startedAt) || !isInteger(report.endedAt) ||
       report.startedAt < 0 || report.endedAt < report.startedAt ||
-      !isInteger(report.elapsedMs) || report.elapsedMs < 0 ||
+      typeof report.elapsedMs !== 'number' || !Number.isFinite(report.elapsedMs) ||
+      report.elapsedMs < 0 ||
       report.elapsedMs > MAX_DURATION_MS + 5_000 ||
       report.wallClockElapsedMs !== report.endedAt - report.startedAt ||
       report.endedAt - report.startedAt > MAX_DURATION_MS + 5_000 ||
@@ -315,6 +356,11 @@ function validateTerminalJournal(journal, report, expected) {
 
 function safeNumber(value) {
   return isInteger(value) ? value : null;
+}
+
+function safeDuration(value) {
+  return typeof value === 'number' && Number.isFinite(value) &&
+      value >= 0 && value <= MAX_DURATION_MS + 5_000 ? value : null;
 }
 
 function validateAccounting(report) {
@@ -555,7 +601,7 @@ function buildDto(report, expected, status, reasonCode, reportValid = true) {
       deltas = {status: 'AVAILABLE', reason: null, ...candidate};
     }
   }
-  const elapsed = safeNumber(report?.elapsedMs);
+  const elapsed = safeDuration(report?.elapsedMs);
   const coverage = isInteger(report?.startedAt) && isInteger(horizon) ?
     horizon - report.startedAt : null;
   const dto = {
@@ -603,14 +649,25 @@ function runningSnapshotDto(journal, expected, status, reason) {
     createUnknownSpotPaperPairedDashboard('DTO_PROJECTION_FAILED');
 }
 
-export function evaluatePairedPaperEvidence({expectedIdentity, report, journal} = {}) {
+export function evaluatePairedPaperEvidence({expectedIdentity, report: rawReport, journal} = {}) {
   if (!validExpectedIdentity(expectedIdentity)) return fail('EXPECTED_IDENTITY_INVALID');
+  const normalizedReport = reportInput(rawReport, expectedIdentity);
+  if (normalizedReport.invalid) return fail('REPORT_WRAPPER_INVALID');
+  const report = normalizedReport.report;
+  if (normalizedReport.snapshotStatus === 'RUNNING_SNAPSHOT') {
+    return runningSnapshotDto(journal, expectedIdentity, 'RUNNING_SNAPSHOT',
+      'WRITER_LOCK_PRESENT_SNAPSHOT_ONLY');
+  }
   if (report !== null && report !== undefined &&
       (!isRecord(report) || report.schemaVersion !== SPOT_PAPER_PAIRED_REPORT_SCHEMA)) {
     return fail('UNKNOWN_REPORT_SCHEMA');
   }
   if (report === null || report === undefined) {
     const journalInfo = getJournalPayload(journal);
+    if (normalizedReport.snapshotStatus === 'RUNNING_SNAPSHOT') {
+      return runningSnapshotDto(journal, expectedIdentity, 'RUNNING_SNAPSHOT',
+        'WRITER_LOCK_PRESENT_SNAPSHOT_ONLY');
+    }
     if (journalInfo?.snapshotStatus === 'RUNNING_SNAPSHOT') {
       return runningSnapshotDto(journal, expectedIdentity, 'RUNNING_SNAPSHOT',
         'TERMINAL_REPORT_NOT_YET_AVAILABLE');
@@ -682,4 +739,59 @@ export async function evaluatePairedPaperFiles({
     return fail('JOURNAL_FILE_INVALID_OR_OVERSIZED');
   }
   return evaluatePairedPaperEvidence({expectedIdentity, report, journal});
+}
+
+function boundedJournalIo() {
+  function fileLimit(path) {
+    const name = basename(path);
+    if (name === 'journal.json') return SPOT_PAPER_PAIRED_MAX_JOURNAL_BYTES;
+    if (name === 'journal.pending') return MAX_PENDING_BYTES;
+    if (/^[a-f0-9]{64}\.json$/.test(name)) return MAX_RESPONSE_BYTES;
+    return null;
+  }
+  async function checkedInfo(path) {
+    const info = await lstat(path);
+    if (info.isSymbolicLink()) throw new Error('JOURNAL_EXPORT_SYMLINK');
+    const limit = fileLimit(path);
+    if (limit !== null && (!info.isFile() || info.size > limit)) {
+      throw new Error('JOURNAL_EXPORT_FILE_LIMIT');
+    }
+    return info;
+  }
+  return {
+    lstat: checkedInfo,
+    async readFile(path) {
+      await checkedInfo(path);
+      const bytes = await readFile(path);
+      const limit = fileLimit(path);
+      if (limit !== null && bytes.byteLength > limit) {
+        throw new Error('JOURNAL_EXPORT_FILE_LIMIT');
+      }
+      return bytes;
+    }
+  };
+}
+
+export async function exportReadOnlyPairedJournal({dataRoot, runId} = {}) {
+  if (typeof dataRoot !== 'string' || !dataRoot.startsWith('/') ||
+      resolve(dataRoot) !== dataRoot ||
+      !RUN_ID.test(runId ?? '')) throw new Error('INVALID_JOURNAL_EXPORT_LOCATION');
+  const rootInfo = await lstat(dataRoot);
+  if (!rootInfo.isDirectory() || rootInfo.isSymbolicLink() ||
+      await realpath(dataRoot) !== dataRoot) {
+    throw new Error('INVALID_JOURNAL_EXPORT_ROOT');
+  }
+  const monotonicNow = () => performance.now();
+  const journal = await readRunJournal({
+    dataRoot,
+    runId,
+    deadlineAt: monotonicNow() + MAX_EXPORT_IO_MS,
+    monotonicNow,
+    io: boundedJournalIo()
+  });
+  if (Buffer.byteLength(JSON.stringify(journal), 'utf8') >
+      SPOT_PAPER_PAIRED_MAX_JOURNAL_BYTES) {
+    throw new Error('JOURNAL_EXPORT_SIZE_LIMIT');
+  }
+  return journal;
 }

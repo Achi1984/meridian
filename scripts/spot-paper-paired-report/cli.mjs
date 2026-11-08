@@ -1,8 +1,30 @@
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {evaluatePairedPaperFiles} from './evaluate.mjs';
+import {
+  evaluatePairedPaperFiles,
+  exportReadOnlyPairedJournal
+} from './evaluate.mjs';
 
 export async function main(argv = process.argv.slice(2)) {
+  if (argv[0] === 'export-journal') {
+    if (argv.length !== 3) {
+      process.stderr.write(
+        'Usage: node scripts/spot-paper-paired-report/cli.mjs export-journal <absolute-data-root> <run-id>\n'
+      );
+      process.exitCode = 2;
+      return;
+    }
+    try {
+      const journal = await exportReadOnlyPairedJournal({
+        dataRoot: argv[1], runId: argv[2]
+      });
+      process.stdout.write(`${JSON.stringify(journal, null, 2)}\n`);
+    } catch {
+      process.stderr.write('JOURNAL_EXPORT_FAILED\n');
+      process.exitCode = 1;
+    }
+    return;
+  }
   const [expectedIdentityPath, reportPath, journalPath] = argv;
   if (!expectedIdentityPath || !reportPath || !journalPath || argv.length !== 3) {
     process.stderr.write(

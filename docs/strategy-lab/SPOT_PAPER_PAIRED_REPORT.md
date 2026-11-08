@@ -83,18 +83,36 @@ reviewed run/config packet. It must contain exactly the identity values to bind:
 `role`, `modelId`, and `accountId`. Do not populate it from an unreviewed
 report. Account IDs are used only for matching and are excluded from the DTO.
 
-Supply the standalone report JSON and the read-only export produced from
-`readRunJournal` (the returned journal payload plus `reconciliationStatus`).
-The evaluator checks regular, non-symlink files with these byte limits:
-16 KiB expected identity, 1 MiB report, and 16 MiB journal export. It performs
-no writes. From the repository root, run:
+Supply the report JSON and read-only journal export. The #1301 `report` command
+emits a `SPOT_PAPER_PAIRED_HOST_STATUS_V1` wrapper; pass it directly as the
+report input. To produce the journal export without editing or asserting status
+fields, use the evaluator's bounded read-only export command on the same
+evidence directory:
 
 ```sh
+node scripts/spot-paper-paired/host.mjs report \
+  --data-root /absolute/path/evidence-root --run-id "$RUN_ID" \
+  > /absolute/path/report-wrapper.json
+node scripts/spot-paper-paired-report/cli.mjs export-journal \
+  /absolute/path/evidence-root "$RUN_ID" \
+  > /absolute/path/journal-export.json
 node scripts/spot-paper-paired-report/cli.mjs \
   /absolute/path/expected-identity.json \
-  /absolute/path/report.json \
+  /absolute/path/report-wrapper.json \
   /absolute/path/journal-export.json
 ```
+
+`export-journal` calls the existing `readRunJournal` helper with bounded,
+symlink-rejecting reads; it writes only its JSON result to stdout. It does not
+modify the evidence tree or claim that a writer is stopped. A host wrapper's
+`verifiedTerminal` boolean is not independently trusted: terminal acceptance
+requires the exported journal's read-only reconciliation status and exact
+terminal report/checkpoint match as well. A host status with a writer lock is
+projected as `RUNNING_SNAPSHOT`, never final evidence.
+
+The evaluator checks regular, non-symlink files with these byte limits:
+16 KiB expected identity, 8 MiB report wrapper, and 16 MiB journal export. It
+performs no writes.
 
 The CLI prints only the sanitized DTO. An invalid or oversized input produces
 `CORRUPT_UNKNOWN` and a nonzero exit; it never includes paths, provider bodies,
@@ -110,6 +128,10 @@ run termination, while each arm's `tradingStoppedAt` preserves its own stop.
 `attemptedCycles` follows the producer counter; `completedCycles` counts
 committed shared observations, so a failed final cycle is not counted as
 completed.
+`actualElapsedMs` preserves the producer's finite fractional
+`performance.now()` duration without rounding; the eight-hour completion check
+compares that raw value with the requested duration, so fractional values are
+never rounded across the completion boundary.
 These timestamps are intentionally distinct. Deltas are emitted only when the
 research comparison is available at the same horizon and its account metrics
 reconcile with all three forward-report accounts. A missing/stale open-position
@@ -124,7 +146,7 @@ cost to net PnL.
 
 ## Tests and integration limits
 
-Run the focused synthetic contract suite:
+Run the focused contract suite:
 
 ```sh
 node --test test/spot-paper-paired-report.test.js
@@ -132,14 +154,15 @@ node --test test/spot-paper-paired-report.test.js
 
 Fixtures are synthetic and labelled `testOnly`; they validate this projection
 and fail-closed behavior, not a strategy result or accepted live integration.
-The report contract was checked against draft PR #1301 at candidate
-`1cc81a56840668308d07a17478dc7d640fa25a8b`. Actual research-export integration
-is not complete: the reviewed #1299 candidate
-`adf5c0a6e7b7d93bfd106dd6136c40a8e15a6373` requires
-`advanceEntryConfirmation(..., {decisionAt, held})`, while the inspected #1301
-candidate still calls it with `nowMs`. Its production source pin remains null.
-The incompatible candidate cannot produce valid multi-cycle actual-export
-evidence, so no stub comparison is described as integration acceptance. Once
-the #1301 adapter binds the reviewed API and its actual-export cooldown,
-multi-cycle, stop, and account-reconciliation tests pass, run the evaluator
-against that candidate's real generated report and `readRunJournal` export.
+In an isolated temporary composition, #1301 candidate
+`bb00a41f3eb65ece13ec0cfcb54b02ef710edb01` was run with actual #1299 exports
+from merged commit `4f5c4a3c8489129c514cd57c4b71f37ee05bcddf`. Its synthetic
+completed multi-cycle trade run and interrupted multi-cycle trade run were
+passed through the real host report wrapper, this CLI's read-only journal
+export command, and this file evaluator CLI; metrics and deltas reconciled.
+No research simulator, hand-edited wrapper, or production source pin was used.
+The host report wrapper's own 8 MiB journal bound means this validation used a
+bounded 120-cycle run for file-CLI composition; the producer's separate
+480-cycle actual-export/cooldown test also passed in the same isolated
+candidate. Structural reconciliation is not independent authentication, live
+acceptance, or readiness.
