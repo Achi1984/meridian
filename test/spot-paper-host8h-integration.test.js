@@ -594,6 +594,7 @@ test('Dashboard rejects out-of-order and terminal-to-running snapshots without r
 
 test('host8h database upsert refuses sequence regression despite a later timestamp', async () => {
   const statements = [];
+  let storedStatus = 'RUNNING_OBSERVED';
   const client = {
     async query(sql) {
       statements.push(sql);
@@ -604,7 +605,7 @@ test('host8h database upsert refuses sequence regression despite a later timesta
           content_sha256: 'd'.repeat(64),
           observed_at: new Date(NOW).toISOString(),
           journal_sequence: 9,
-          envelope: {report: {snapshot: {status: 'RUNNING_OBSERVED'}}}
+          envelope: {report: {snapshot: {status: storedStatus}}}
         }]};
       }
       return {rowCount: 0, rows: []};
@@ -624,6 +625,16 @@ test('host8h database upsert refuses sequence regression despite a later timesta
     journalSequence: 8
   });
   assert.equal(result, 'STALE');
+  storedStatus = 'VERIFIED_TERMINAL';
+  const terminalRegression = await store.putLatest({
+    runId: identity.runId,
+    configHash: 'c'.repeat(64),
+    digest: 'e'.repeat(64),
+    envelope: {report: {snapshot: {status: 'RUNNING_OBSERVED'}}},
+    observedAt: new Date(NOW + 60_000).toISOString(),
+    journalSequence: 8
+  });
+  assert.equal(terminalRegression, 'TERMINAL_REGRESSION');
   const insert = statements.find(sql => sql.startsWith('INSERT INTO'));
   assert.match(insert, /observed_at < EXCLUDED\.observed_at[\s\S]*journal_sequence <= EXCLUDED\.journal_sequence/);
   assert.match(insert, /observed_at = EXCLUDED\.observed_at[\s\S]*journal_sequence < EXCLUDED\.journal_sequence/);
