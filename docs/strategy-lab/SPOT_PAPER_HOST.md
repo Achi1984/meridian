@@ -94,6 +94,119 @@ a timeout, missing/corrupt/pending journal, ambiguous write, signal, or
 nonzero child exit remains incomplete/unknown. Never relaunch to resolve
 unknown evidence.
 
+## Storage diagnostic and byte-preserving evidence package
+
+The standalone storage diagnostic is inert unless invoked with an explicit
+absolute mount path. Run it as the image's unprivileged `node` user against the
+mounted volume, never as root:
+
+```text
+Custom entrypoint: node
+Custom command: scripts/spot-paper-pilot/storage-diagnostic.mjs --mount /var/lib/meridian/spot-paper-host
+```
+
+It creates one new `meridian-storage-probe-<UUID>` child, exclusively creates
+one fixed-size probe file, writes and syncs it, renames and reads it back,
+syncs the child directory, then reports its SHA-256, free bytes, and UTC time
+in one small JSON line. The probe is retained. A collision, non-root failure,
+or other error does not retry, remove evidence, change ownership/permissions,
+read environment values, or make a network request. Its 512-byte work ceiling
+and 10-second operation deadline apply to this short probe only; filesystem
+calls are not hard-real-time guarantees. The deadline is cooperative and checked
+between operations; synchronous filesystem calls cannot be interrupted. A
+separately approved host Job also needs an external platform timeout.
+
+The offline packaging command reads only the selected evidence tree. It never
+calls the host assessment or journal parser, so partial locks, pending journals,
+truncated files, and corrupt regular-file bytes are retained without repair or
+success requirements. The archive is uncompressed USTAR; its companion JSON
+manifest lists each regular file's relative path, byte length, and SHA-256.
+The output reports `PACKAGED_BYTES_ONLY` / `BYTE_PRESERVATION_ONLY`, always
+leaves operational readiness `NOT_ASSESSED`, and does not mean
+`VERIFIED_TERMINAL`.
+
+The tool rejects symlinks, special files, unsupported/escaping paths, input
+mutation, and output collisions. It does not normalize or omit files. The
+explicit ceilings admit at most 960 response files (256 KiB each, 64 MiB total),
+an 8 MiB `journal.json`, an 8 MiB writer-temporary
+`journal.json.<pid>.<uuid>.tmp`, a 16 KiB `journal.pending`, 1 MiB of other
+metadata, 1,024 regular files, 256 directories, depth eight, an 84 MiB archive,
+an aggregate 81 MiB + 16 KiB input ceiling, and a 60-second cooperative
+monotonic work deadline. Input bytes stream through at most 64 KiB payload
+buffers; the tool does not retain whole-file or whole-archive buffers. These
+are packaging bounds, not a claim that the input is valid.
+Both output paths must be absolute, outside the evidence tree, and not already
+present:
+
+```text
+Custom entrypoint: node
+Custom command: scripts/spot-paper-pilot/package-host-evidence.mjs /var/lib/meridian/spot-paper-host/btc-eur-paper-001 /tmp/btc-eur-paper-001.tar /tmp/btc-eur-paper-001.manifest.json --retrieval-window-ms 300000
+```
+
+### Authenticated Northflank-native download handoff
+
+No artifact-download route or transport has been exercised for this host.
+Current transport status is **UNVERIFIED**. Do not send archive bytes through
+logs, base64, chat, a public HTTP endpoint, or the Memecoin `FINISHED`-only
+256 KiB DTO / one-hour or four-hour spot gateways.
+
+After the writer has exited, an operator must make a separate bounded,
+one-attempt Northflank maintenance Job from the reviewed spot image. The
+packager's `--retrieval-window-ms 300000` option keeps the successful process
+alive for five minutes after it prints the small package result, providing a
+live Job from which to download. There is no public server or retry. Mount the
+same persistent volume read-only at `/var/lib/meridian/spot-paper-host`; use
+the image's unprivileged `node` user, custom entrypoint `node`, and the
+packaging command above with outputs under `/tmp`. Disable schedules/restarts/
+retries and expose no public port. Do not run this job while a writer may still
+be active. Its volume mount is read-only; the package and manifest are written
+only to the Job's temporary filesystem. Use a single 390-second Job timeout
+(60-second package ceiling + 300-second retrieval window + 30-second exit
+margin), with no automatic retry, and reserve at least 84 MiB for its
+temporary archive. The package deadline is cooperative; the platform timeout
+bounds blocking operations and the full process lifecycle.
+
+Before attempting the full package, use Northflank's authenticated CLI file
+copy to download the small retained `probe.bin` from the mounted volume, then
+compare its downloaded SHA-256 with the value reported by the storage
+diagnostic. Use the operator's authenticated Northflank CLI session. The
+Northflank Overview → Local access → Download panel provides a CLI instruction
+and copy-command control; it is not a browser file download and does not
+authenticate the CLI session. No authenticated CLI session has been used here.
+The platform-confirmed native command form uses `--jobId`:
+
+```sh
+northflank download job file --projectId meridian --jobId meridian-btc-paper-host-8h \
+  --remotePath /var/lib/meridian/spot-paper-host/meridian-storage-probe-<UUID>/probe.bin \
+  --localPath ./probe.bin
+sha256sum ./probe.bin
+```
+
+Only after that small download and hash comparison succeeds should the operator
+use the same authenticated file-copy mechanism to fetch the TAR and manifest
+from `/tmp` in the maintenance Job:
+
+```sh
+northflank download job file --projectId meridian --jobId meridian-btc-paper-host-8h \
+  --remotePath /tmp/btc-eur-paper-001.tar \
+  --localPath ./btc-eur-paper-001.tar
+northflank download job file --projectId meridian --jobId meridian-btc-paper-host-8h \
+  --remotePath /tmp/btc-eur-paper-001.manifest.json \
+  --localPath ./btc-eur-paper-001.manifest.json
+sha256sum ./btc-eur-paper-001.tar
+```
+
+Compare the downloaded TAR hash with the packager's small `archiveSha256`
+result; retain the manifest and verify the listed file hashes offline.
+Northflank describes this file-copy workflow in
+[Copy files](https://northflank.com/docs/v1/api/copy-files) and
+[Transfer data to and from containers](https://northflank.com/docs/v1/application/run/transfer-data-to-and-from-containers).
+This source package has not established that the current account, project,
+Job type, or image supports the transfer. Until the real probe is downloaded
+and hash-compared, transport remains **UNVERIFIED**. If native download is
+unavailable, operator authorization for that native transfer is the remaining
+prerequisite; a local archive alone is **not** a completed download.
+
 ## Offline eight-hour assessment
 
 The eight-hour path is offline only. It reads the current checked-in launch
@@ -157,6 +270,10 @@ continuation loop.
 ## Host readiness and evidence boundary
 
 Before any separately approved launch, the host operator must confirm:
+
+The general restricted-egress requirement below remains in force except for
+the single owner-accepted, non-reusable exception documented in
+[`SPOT_PAPER_HOST_DEPLOYMENT_EXCEPTION.md`](SPOT_PAPER_HOST_DEPLOYMENT_EXCEPTION.md).
 
 - a durable, private volume with adequate space for up to 64 MiB of response
   bodies plus journal/checkpoint and atomic-write overhead;
