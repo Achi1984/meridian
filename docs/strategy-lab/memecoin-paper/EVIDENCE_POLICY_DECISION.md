@@ -647,6 +647,173 @@ acquisition or a Paper run:
 > request, credential, paid service, live acquisition, run, activation, or
 > readiness claim.”
 
+## Annex: source and coverage decision card
+
+This annex completes the v1.1 review record; it does not revise or adopt the
+proposal. The owner-approved roadmap—BTC operation completion plus the existing
+Solana data-integration track, with at most two major tracks—sets priorities
+only. It neither adopts v1.1 nor accepts the narrower launch-role proxy. This is
+not a request for a duplicate bot, wrapper, provider query, or purchase.
+
+### Recommended bounded Solana pilot scope
+
+If and when separately authorized, limit the initial evidence pilot to one
+explicitly allowlisted Solana mainnet mint and one exact Raydium CPMM pool per
+candidate, using classic SPL Token only and the existing 30-minute–72-hour
+`pairCreatedAt` pair-age interval. The checked-in pool and swap decoders support
+Raydium CPMM; the launch-history classifier supports classic SPL Token
+instructions. This is the narrowest scope those relevant seams can represent,
+not evidence that its gates are ready. Other pool programs, unsupported token
+programs/layouts, and unsupported swaps stay `UNKNOWN`/no-entry; do not broaden
+the pilot by treating them as equivalent.
+
+The following four evidence decisions still block even this scope:
+
+### 1. Developer attribution and prior-rug history
+
+- **Reuse and evidence:** `scripts/memecoin-paper/launch-history-source.mjs`
+  already captures bounded finalized signature/transaction history;
+  `launch-history-classifier.mjs` records classic-SPL initialization authority
+  and mint-to facts; `history-window-bridge.mjs` and
+  `history-time-boundary-source.mjs` provide the existing history/time-boundary
+  seams; `owner-census.mjs` supplies the prospective balance handoff. The
+  classifier currently does not establish a complete role set, beneficial
+  identity, authority-change history, or any rug result. Evidence would need a
+  reviewed finite role scope, direct successful instruction/signature facts,
+  trusted source-bound event time, complete relevant census, and a separate
+  reviewed outcome disposition. A shared funder, pool creator, same-slot buyer, or
+  transfer is not proof of control. A price collapse is not proof of a rug.
+  Credible attributable positive rug evidence rejects even if unrelated history
+  is incomplete or the event is older than 90 days; a negative result requires
+  complete coverage of the defined 90-day scope and means only
+  `NO_QUALIFYING_EVENT_IN_COMPLETE_90D_SCOPE`.
+- **Candidate capability and limit:** Solana
+  [`getSignaturesForAddress`](https://solana.com/docs/rpc/http/getsignaturesforaddress),
+  [`getTransaction`](https://solana.com/docs/rpc/http/gettransaction), and
+  [`getBlockTime`](https://solana.com/docs/rpc/http/getblocktime) expose
+  address history, transaction instructions, and estimated slot time.
+  [Helius `getTransactionsForAddress`](https://www.helius.dev/docs/api-reference/rpc/http/gettransactionsforaddress)
+  is a provider-specific transaction-history candidate. Neither raw history
+  interface identifies all controlled addresses, proves a human identity or
+  rug intent, or establishes archival completeness. The checked-in collector
+  preserves unknown archive/truncation status; page/cursor exhaustion is not a
+  complete-history guarantee. Provider selection, entitlement, access, and cost
+  are unverified.
+- **Minimal owner decision:** accept or reject the materially narrower exact
+  launch-role proxy, including that transfers to another controlled but
+  unproven address escape it; separately approve the finite attribution/history
+  source and review rule. Until then, developer and negative-rug results remain
+  `UNKNOWN` (except separately substantiated positive evidence, which rejects).
+
+### 2. Launch-bundle source and supply denominator
+
+- **Reuse and evidence:** reuse `launch-history-source.mjs`,
+  `cpmm-swap-observations.mjs`, and `evidence-sources/raydium-cpmm.mjs`.
+  The current pool decoder binds supported pool state; it does not decode the
+  historical initialization transaction or prove the first swap. The classifier
+  explicitly returns bundle `UNKNOWN` for same-slot observations. Required
+  evidence remains a decoded initialization of the exact selected pool, complete
+  finalized transaction coverage of `S…S+32`, the first supported swap, trusted
+  exact-signature bundle membership and landed status, plus end-slot owner and
+  supply accounting with transfers reconciled. The proposed recipient-balance
+  numerator over same-slot mint supply remains unadopted; gross swap output is
+  not supply.
+- **Candidate capability and limit:** Jito's official
+  [bundle submission/status documentation](https://docs.jito.wtf/lowlatencytxnsend/)
+  describes bundle submission and identifiers, a possible source for validating
+  known bundle IDs and their member signatures. It is not evidence of a complete
+  retrospective index for arbitrary pool transactions across the proposed
+  window; no Jito ID or status source is currently integrated, and Jito access,
+  retention, and cost are unverified. Alchemy's
+  [`getTokenHoldersAtSlot`](https://www.alchemy.com/docs/chains/solana/solana-api-endpoints/get-token-holders-at-slot)
+  is a candidate for historical holder balances at a slot, but the current
+  repository qualification is an offline diagnostic only, capped at 10,000
+  rows; it does not paginate or establish complete enumeration/authentication.
+  It does not itself reconcile bundle recipients, transfers, and the proposed
+  denominator. Repository documentation says historical account reads require
+  Alchemy Account Archive access; actual entitlement and price are unverified.
+- **Minimal owner decision:** name an acceptable source that proves exact
+  historical bundle membership and full-window coverage, then approve a
+  versioned numerator, denominator, transfer treatment, and source-trust basis.
+  If no faithful bundle proof is available, retain `UNKNOWN`; do not call
+  same-slot clustering a bundle or count no response as zero bundles.
+
+### 3. Exact one-hour owner snapshots and chain time
+
+- **Reuse and evidence:** reuse `owner-census.mjs` and its bounded prospective
+  capture, `evidence-warmup`, and `analyst-window-evidence.mjs`. The Analyst
+  reader requires `ownerCount` snapshots with `observedAt` exactly
+  `candidateT−60m` and `candidateT`, matching owner aggregation, exclusions,
+  denominator, and complete coverage. The #1252 capture records local
+  acquisition intervals and same-slot reconciliation; it does not turn
+  acquisition time into historical state time. Slot equality, supply
+  reconciliation, and response digests do not authenticate the RPC or prove
+  omitted-account completeness.
+- **Candidate capability and limit:** Solana
+  [`getBlockTime`](https://solana.com/docs/rpc/http/getblocktime) returns an
+  estimated Unix time for a slot, not an exact arbitrary wall-clock endpoint.
+  Alchemy [`getTokenHoldersAtSlot`](https://www.alchemy.com/docs/chains/solana/solana-api-endpoints/get-token-holders-at-slot)
+  can be evaluated for historical slot balances; its checked-in diagnostic
+  does not establish complete census coverage, and a slot snapshot plus
+  estimated `getBlockTime` does not meet the current exact `observedAt` equality
+  by itself. Helius
+  [`getProgramAccountsV2`](https://www.helius.dev/docs/rpc/guides/getprogramaccountsv2)
+  offers paginated program-account enumeration, but `minContextSlot` is a floor,
+  not a frozen historical snapshot. Archive access, completeness, current
+  entitlement, and cost are unverified; repository notes identify paid Alchemy
+  archive access for historical reads.
+- **Minimal owner decision:** retain exact endpoint semantics and require a
+  source that can prove complete state at both exact endpoints with an accepted
+  chain-time binding, or explicitly leave `holderGrowthPct1h` unavailable. A
+  prospective interval/duration/slot-lag metric would be a separately versioned
+  methodology decision; it is not a substitute under this proposal. No endpoint
+  evidence means `UNKNOWN`, not zero growth.
+
+### 4. Smart-wallet history and USD valuation
+
+- **Reuse and evidence:** reuse `launch-history-source.mjs`,
+  `history-window-bridge.mjs`, `cpmm-swap-observations.mjs`, and the offline
+  `evaluateWalletQualificationDiagnostics` seam in
+  `analyst-window-evidence.mjs`; retain the existing reviewed, versioned
+  allowlist handoff. The diagnostic checks supplied rows; it is not a history
+  collector, FIFO lot builder, source authenticator, or allowlist admission.
+  A qualification record needs complete 90-day opening
+  positions and event coverage, supported swaps and transfer accounting,
+  deterministic FIFO basis, every eligible partial/full realized portion,
+  explicit costs, exact token and quote USD observations, mint-independence and
+  bundle facts, and dated independent review. Keep 90 days, 10 completed
+  round trips, 5 unrelated mints, positive aggregate after-cost result, and
+  `AS_OF_CANDIDATE_CUTOFF` membership unchanged. Missing basis, cost, valuation,
+  opening inventory, or relationship evidence remains unavailable, never zero.
+- **Candidate capability and limit:** Helius
+  [`getTransactionsForAddress`](https://www.helius.dev/docs/api-reference/rpc/http/gettransactionsforaddress)
+  and Solana transaction-history methods can supply transaction records, but
+  do not prove complete archival history, opening positions, attributable
+  wallets, or FIFO accounting. Birdeye
+  [`historical_price_unix`](https://data.birdeye.so/docs/data-api/price-ohlcv/get-defi-historical-price-unix)
+  is an existing adapter candidate for a timestamped USD observation; the
+  checked-in qualification accepts only exact returned/requested timestamps,
+  while the provider documentation may resolve to a nearby time. Pyth's
+  [History API](https://docs.pyth.network/pro/api/history) is another documented
+  historical-feed candidate, not proof that the required memecoin and quote
+  feeds exist. No parity assumption or nearest-price fallback is allowed.
+  Provider coverage, entitlement, access, current pricing, and explicit cost
+  inputs are unverified.
+- **Minimal owner decision:** decide whether to adopt the already proposed
+  qualification definition and membership timing, and name acceptable
+  history, valuation, and cost evidence with coverage rules. Until independently
+  reviewed evidence and the effective allowlist exist, real
+  `qualifiedSmartWallets` remains unavailable.
+
+**Review disposition:** these are source/method choices for lead review before
+an owner decision, not an owner approval record. Official API documentation
+shows method capabilities only; it does not establish present availability,
+account access, price, historical coverage, completeness, or source trust. No
+provider has been queried or selected, no credential or paid service is
+authorized, and all unresolved or unsupported evidence remains `UNKNOWN` and
+no-entry. No thresholds, active policy, readiness layers, or implementation
+scope change.
+
 No owner decision has been made by publishing this proposal. Until separately
 decided and implemented, all current code behavior and `UNKNOWN` dispositions
 remain unchanged.
