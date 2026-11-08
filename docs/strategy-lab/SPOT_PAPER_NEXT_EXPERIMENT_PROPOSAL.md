@@ -1,6 +1,7 @@
 # BTC/USD next paper experiment proposal
 
-**Status: proposal only; no run, strategy result, or operating approval.**
+**Status: proposal template only; not a completed preregistration, run result, or
+operating approval.**
 The future experiment proposed here is a separate BTC/USD paper campaign.
 Historical and current BTC/EUR runs and their assessment remain BTC/EUR, with
 EUR-denominated accounting; they are not converted, relabeled, or reused as USD
@@ -17,8 +18,9 @@ The assessment target is exactly:
 
 | Identity | Bound value |
 | --- | --- |
-| Host run | `btc-eur-paper-host-8h-001` |
-| Northflank Job | `e7916ab3-3b3e-43f8-a07a-27204c066c15` |
+| Host run ID | `btc-eur-paper-host-8h-001` |
+| Northflank run ID | `e7916ab3-3b3e-43f8-a07a-27204c066c15` |
+| Northflank Job ID | `meridian-btc-paper-host-8h` |
 | Source | `473943fb20d8ef25a5822c89a5abfb216437d782` |
 | Start receipt | [Issue #1279 start receipt](https://github.com/Achi1984/meridian/issues/1279#issuecomment-6722330496) |
 | Profile/model | `BTC_EUR_PAPER_HOST_8H_V1` / `BTC_EUR_SMA5_SMA20_V1` |
@@ -63,7 +65,7 @@ cannot be reused or inherited by a future run.
 | --- | --- | --- |
 | 1-hour | `spot-paper-42395522899-1`, `BTC_EUR_PAPER_1H_V1`; the retained reconciliation reports 60 cycles and 3,542,902 ms, ending at the cycle limit | A partial bounded run, not a full hour; its signal replay does not assess profitability. See [reconciliation](SPOT_PAPER_PILOT_42395522899_RECONCILIATION.md). |
 | 4-hour | `BTC_EUR_PAPER_4H_V1`; a distinct workflow/profile documented in the [pilot preparation](SPOT_PAPER_PILOT.md) | Keep its dispatch and outcome separate; do not transfer its identity or result to the host run. |
-| 8-hour host | `btc-eur-paper-host-8h-001`, `BTC_EUR_PAPER_HOST_8H_V1`; Northflank Job and source are bound above | Current assessment target; outcomes remain PENDING until independently assessed. |
+| 8-hour host | `btc-eur-paper-host-8h-001`, `BTC_EUR_PAPER_HOST_8H_V1`; Northflank run `e7916ab3-3b3e-43f8-a07a-27204c066c15`, Job `meridian-btc-paper-host-8h`, and source bound above | Current assessment target; outcomes remain PENDING until independently assessed. |
 
 These are different run identities and evidence scopes. Never rank their PnL
 naively by nominal duration: coverage, observations, gaps, fills, inventory,
@@ -131,7 +133,7 @@ Freeze the comparison before the relevant evaluation outcomes:
 | --- | --- |
 | Strategy | SMA(5/20) crossover logic may serve as a frozen comparator only after an independently validated BTC/USD adapter/profile/ledger integration. BTC/USD spot, one-minute closed candles, warm-up, cutoff, execution delay, and no shorting/leverage must be specified and frozen for that integration. Do not copy the EUR pilot's capital, entry cap, session-loss threshold, fee, slippage, or spread settings as USD operating values. |
 | Control | USD cash/no-trade from the same USD 1,000 starting capital, over the same UTC window and identical accepted BTC/USD observation timestamps. It submits no virtual fills and remains USD cash; no asset return or FX conversion is imputed to cash. |
-| Drawdown pause | Maintain USD net liquidation equity including cash and open inventory at the preregistered adverse executable mark, with applicable accrued fees and modeled exit costs counted exactly once. Track the lifetime net-equity high-water mark across sessions and strategy versions. A decline of USD 100 or more from that high-water mark latches a pause on new exposure; no automatic flatten or resume is implied. Missing or stale valuations cannot advance the high-water mark or authorize entries. The sampled threshold is not a guaranteed maximum loss: gaps, fees, and price moves can overshoot and remain reportable. |
+| Drawdown pause | Maintain USD net liquidation equity including cash and open inventory at the preregistered adverse executable mark, with applicable accrued fees and modeled exit costs counted exactly once. Track the lifetime net-equity high-water mark across sessions and strategy versions. A decline of USD 100 or more from that high-water mark latches a pause on new exposure; no automatic flatten or resume is implied. Missing or stale valuations cannot advance the high-water mark or authorize entries. The sampled threshold is not a guaranteed maximum loss or an infrastructure-spending cap: gaps, fees, and price moves can overshoot and remain reportable. |
 | Shared assumptions | Strategy and control share USD capital, window, BTC/USD input observations, warm-up/cutoff, decision and execution-delay rules, validated spread/slippage/fee assumptions, and valuation timestamps/mark-age rules. Explicitly preregister costs in USD and their evidence; do not treat the BTC/EUR pilot's 50 bps fee, 10 bps slippage, or 50 bps entry-spread filter as verified USD-market assumptions. |
 | Window | Maximum 86,400,000 ms from the separately recorded start boundary. Record actual elapsed time and stop reason. Do not call a shorter run a full 24-hour evaluation. |
 | Reporting | Report strategy and control net return/PnL, marked-equity drawdown and high-water/pause state, turnover, fees and modeled costs, exposure, USD cash/inventory, and terminal mark/mark age. Every capital, fee, cost, PnL, control, and reporting amount uses USD explicitly. State denominators and valuation method. Preregister cost sensitivity in USD using evidenced or explicitly modeled BTC/USD assumptions and distinguish fixed-fill arithmetic from changed-fill counterfactuals. Undefined statistics remain undefined; do not replace them with zero or fabricate values. |
@@ -145,6 +147,14 @@ the paper observations independent or establish general strategy quality.
 
 ## Operating, egress, and cost conditions
 
+- **Outstanding before any operational use — PENDING:** validate a native-USD
+  feed and executable valuation/liquidity evidence; verify venue-, account-, and
+  instrument-specific fee and execution assumptions; establish separate durable
+  USD cash/position history and restart admission; demonstrate support beyond
+  bounded observation history; and freeze baseline/candidate parameters,
+  training/validation/forward date boundaries, selection rule, and a
+  USD-denominated cost worksheet. Until these are independently reviewed, this
+  document remains a proposal template, not a completed preregistration.
 - **Published EEA fee comparison, checked 2026-11-08 (context only; no
   parameter change):** OKX's [EEA spot-fee adjustment notice](https://www.okx.com/en-eu/help/important-notice-upcoming-spot-fee-adjustment-eea),
   effective 2026-09-25, lists regular spot-only fees of 0.10% maker / 0.20%
@@ -191,6 +201,7 @@ the paper observations independent or establish general strategy quality.
 - [Retained one-hour reconciliation](SPOT_PAPER_PILOT_42395522899_RECONCILIATION.md)
 - [Offline signal replay boundaries](SPOT_PAPER_SIGNAL_REPLAY.md)
 - [Eight-hour host evidence/export/assessment process](SPOT_PAPER_HOST.md)
+- [BTC/EUR post-run retrieval and assessment runbook](../operations/BTC_EUR_8H_POSTRUN_20261108.md)
 - [One-run host egress exception](SPOT_PAPER_HOST_DEPLOYMENT_EXCEPTION.md)
 - [Readiness packet and decision gates](PAPER_READINESS_NEXT_PACKET.md)
 - [Arena assumptions and diagnostic-only limits](PAPER_ARENA_PROTOCOL_20261016.md)
