@@ -411,6 +411,7 @@ test("paper evidence accepts zero fills without validating a fill path or profit
   });
   assert.equal(assessment.outcome, "COMPLETED", JSON.stringify(assessment));
   assert.equal(assessment.profileId, DEFAULT_PAPER_EVIDENCE_PROFILE_ID);
+  assert.equal("expectedHostContext" in assessment, false);
   assert.equal(assessment.runClassification, "COMPLETED_HOUR");
   assert.equal(assessment.dataAcceptance, "DATA_ACCEPTED");
   assert.equal(assessment.quoteAccountingReconciled, true);
@@ -463,6 +464,7 @@ test("four-hour allowlisted assessment reports partial duration, unresolved inve
   });
   assert.equal(assessment.outcome, "COMPLETED", JSON.stringify(assessment));
   assert.equal(assessment.profileId, "BTC_EUR_PAPER_4H_V1");
+  assert.equal("expectedHostContext" in assessment, false);
   assert.equal(assessment.runClassification, "PARTIAL_BOUNDED_RUN");
   assert.equal(assessment.elapsedMs, 3_600_000);
   assert.equal(assessment.durationCoverage, 0.25);

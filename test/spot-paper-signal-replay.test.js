@@ -388,6 +388,7 @@ test("four-hour allowlisted replay binds fresh identity and rejects source, mode
   const result = replaySpotPaperSignals({ ...evidence, profileId: "BTC_EUR_PAPER_4H_V1" });
   assert.equal(result.outcome, "PASS", JSON.stringify(result));
   assert.equal(result.profileId, "BTC_EUR_PAPER_4H_V1");
+  assert.equal("identityBinding" in result, false);
 
   for (const change of [
     provenance => { provenance.runId = "spot-paper-987654322-1"; },

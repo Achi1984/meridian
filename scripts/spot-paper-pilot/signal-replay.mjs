@@ -247,15 +247,18 @@ export function replaySpotPaperSignals({
   const identity = identityStatus(readback, provenance, profile, expectedDispatch, {
     expectedHostContext, hostManifest, hostManifestSha256, hostState
   });
+  const hostDisclosure = isHostProfile ? {
+    identityBinding: "CONTENT_BOUND",
+    hostAuthenticity: "UNATTESTED",
+    clockAuthenticity: "UNATTESTED",
+    providerAuthenticity: "UNATTESTED"
+  } : {};
   if (identity !== "PASS") {
     return {
       outcome: identity,
       profileId: profile.profileId,
       identity,
-      identityBinding: isHostProfile ? "CONTENT_BOUND" : "WORKFLOW_IDENTITY",
-      hostAuthenticity: isHostProfile ? "UNATTESTED" : "NOT_APPLICABLE",
-      clockAuthenticity: isHostProfile ? "UNATTESTED" : "NOT_ASSESSED",
-      providerAuthenticity: isHostProfile ? "UNATTESTED" : "NOT_ASSESSED",
+      ...hostDisclosure,
       signalReplay: identity === "PASS" ? "PASS" : "NOT_ASSESSED",
       fillCausality: "NOT_ASSESSED",
       startupCutoff: "NOT_ASSESSED",
@@ -305,10 +308,7 @@ export function replaySpotPaperSignals({
     return {
       profileId: profile.profileId,
       outcome: "UNKNOWN", identity, signalReplay: "UNKNOWN",
-      identityBinding: isHostProfile ? "CONTENT_BOUND" : "WORKFLOW_IDENTITY",
-      hostAuthenticity: isHostProfile ? "UNATTESTED" : "NOT_APPLICABLE",
-      clockAuthenticity: isHostProfile ? "UNATTESTED" : "NOT_ASSESSED",
-      providerAuthenticity: isHostProfile ? "UNATTESTED" : "NOT_ASSESSED",
+      ...hostDisclosure,
       fillCausality: "UNKNOWN", startupCutoff: "UNKNOWN",
       supportedClaim: "No replay claim; retained journal is incomplete, mismatched, or outside bounds.",
       replayedSignals: 0, sampledStopCount: 0,
@@ -327,10 +327,7 @@ export function replaySpotPaperSignals({
     return {
       profileId: profile.profileId,
       outcome: "UNKNOWN", identity, signalReplay: "UNKNOWN",
-      identityBinding: isHostProfile ? "CONTENT_BOUND" : "WORKFLOW_IDENTITY",
-      hostAuthenticity: isHostProfile ? "UNATTESTED" : "NOT_APPLICABLE",
-      clockAuthenticity: isHostProfile ? "UNATTESTED" : "NOT_ASSESSED",
-      providerAuthenticity: isHostProfile ? "UNATTESTED" : "NOT_ASSESSED",
+      ...hostDisclosure,
       fillCausality: "UNKNOWN", startupCutoff: "UNKNOWN",
       supportedClaim: "No replay claim; retained response set exceeds bounds.",
       replayedSignals: 0, sampledStopCount: 0,
@@ -450,10 +447,7 @@ export function replaySpotPaperSignals({
     profileId: profile.profileId,
     outcome,
     identity,
-    identityBinding: isHostProfile ? "CONTENT_BOUND" : "WORKFLOW_IDENTITY",
-    hostAuthenticity: isHostProfile ? "UNATTESTED" : "NOT_APPLICABLE",
-    clockAuthenticity: isHostProfile ? "UNATTESTED" : "NOT_ASSESSED",
-    providerAuthenticity: isHostProfile ? "UNATTESTED" : "NOT_ASSESSED",
+    ...hostDisclosure,
     signalReplay: signalStatus,
     fillCausality: fillStatus,
     startupCutoff,

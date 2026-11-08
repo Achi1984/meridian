@@ -276,6 +276,16 @@ export function assessPaperEvidence({
       runIds: [readback?.runId, report?.runId].filter(value => value !== undefined)
     }) : isHostProfile ? "NOT_APPLICABLE" : "PASS";
   const contextStatus = isHostProfile ? hostContextVerification.status : dispatchIdentity;
+  const hostDisclosure = isHostProfile ? {
+    expectedHostContext: hostContextVerification.status,
+    hostContextBinding: hostContextVerification.binding ?? "NOT_VERIFIED",
+    imageIdentity: hostContextVerification.imageIdentity ?? "NOT_VERIFIED",
+    hostIdentity: hostContextVerification.hostIdentity ?? "NOT_VERIFIED",
+    sourceAuthenticity: "UNATTESTED",
+    clockAuthenticity: "UNATTESTED",
+    providerAuthenticity: "UNATTESTED",
+    launchReadiness: "NOT_ASSESSED"
+  } : {};
   let marketEvidence = { valid: false, acceptedObservations: 0, parsedQuotes: new Map() };
 
   if (terminalVerified) {
@@ -409,14 +419,7 @@ export function assessPaperEvidence({
     outcome,
     profileId: expected.profileId,
     dispatchIdentity,
-    expectedHostContext: hostContextVerification?.status ?? "NOT_APPLICABLE",
-    hostContextBinding: hostContextVerification?.binding ?? "NOT_APPLICABLE",
-    imageIdentity: hostContextVerification?.imageIdentity ?? "NOT_APPLICABLE",
-    hostIdentity: hostContextVerification?.hostIdentity ?? "NOT_APPLICABLE",
-    sourceAuthenticity: isHostProfile ? "UNATTESTED" : "NOT_APPLICABLE",
-    clockAuthenticity: isHostProfile ? "UNATTESTED" : "NOT_ASSESSED",
-    providerAuthenticity: isHostProfile ? "UNATTESTED" : "NOT_ASSESSED",
-    launchReadiness: "NOT_ASSESSED",
+    ...hostDisclosure,
     runClassification,
     terminalVerified,
     boundedTermination: bounded,
