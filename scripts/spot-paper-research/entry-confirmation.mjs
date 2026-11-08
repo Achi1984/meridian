@@ -27,14 +27,14 @@ export function createEntryConfirmationState() {
 }
 
 export function advanceEntryConfirmation(previous, candles, {
-  nowMs, held = false
+  decisionAt, held = false
 } = {}) {
   if (!previous || !Array.isArray(previous.strategy?.closes) ||
       previous.strategy.closes.length > 21 ||
       (previous.strategy.cutoffAt !== null && !validTime(previous.strategy.cutoffAt)) ||
       (previous.strategy.lastSeenAt !== null && !validTime(previous.strategy.lastSeenAt)) ||
       typeof previous.strategy.warmupComplete !== "boolean" ||
-      !Array.isArray(candles) || typeof held !== "boolean" || !validTime(nowMs) ||
+      !Array.isArray(candles) || typeof held !== "boolean" || !validTime(decisionAt) ||
       !validTime(previous.cooldownUntil) ||
       (previous.pending !== null &&
        (!validTime(previous.pending.crossCandleAt) ||
@@ -71,7 +71,7 @@ export function advanceEntryConfirmation(previous, candles, {
       signals: [{
         id: `${SPOT_PAPER_ENTRY_CONFIRMATION_ID}:EXIT:${candle.timestamp}`,
         direction: "EXIT", candleAt: candle.timestamp, closeNano: candle.closeNano,
-        strategyReason: "BASELINE_IMMEDIATE_DOWN_CROSS"
+        decisionAt, strategyReason: "BASELINE_IMMEDIATE_DOWN_CROSS"
       }],
       newCandleCount: 1
     };
@@ -83,7 +83,7 @@ export function advanceEntryConfirmation(previous, candles, {
     return { state, signals: [], newCandleCount: 1 };
   }
 
-  if (nowMs < state.cooldownUntil) {
+  if (decisionAt < state.cooldownUntil) {
     const discarded = direction === "ENTRY" ? "COOLDOWN_ACTIVE" : null;
     state.pending = null;
     return { state, signals: [], newCandleCount: 1, discarded };
@@ -113,6 +113,7 @@ export function advanceEntryConfirmation(previous, candles, {
     signals: [{
       id: `${SPOT_PAPER_ENTRY_CONFIRMATION_ID}:ENTRY_CONFIRM2:${candle.timestamp}`,
       direction: "ENTRY", candleAt: candle.timestamp, closeNano: candle.closeNano,
+      decisionAt,
       confirmationStartedAt: pending.crossCandleAt,
       confirmedAt: candle.timestamp,
       crossSignalId: pending.crossSignalId,

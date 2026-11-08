@@ -64,7 +64,8 @@ records of this form:
 
 ```js
 {
-  at, // integer observation/effect time in epoch milliseconds
+  decisionAt, // decision time before acquiring the quote
+  at, // quote observation/effect time in epoch milliseconds
   ohlc: { data, raw, sha256, requestStartedAt, receivedAt },
   ticker: { data, raw, sha256, requestStartedAt, receivedAt }
 }
@@ -72,18 +73,31 @@ records of this form:
 
 Each raw body must match its SHA-256 and decoded data. The existing BTC/EUR
 parsers validate closed candles, ticker book, staleness, and numeric bounds.
-Ticker acquisition must start no earlier than the OHLC receipt (the latest
-possible signal-knowledge point for either arm); each OHLC acquisition must also
-follow the prior observation. An absent, stale, invalid, or noncausal quote
+The required ordering is
+`ohlc.receivedAt <= decisionAt <= ticker.requestStartedAt <= ticker.receivedAt <= at`.
+Each OHLC acquisition must also follow the prior observation. Entry confirmation
+and cooldown eligibility use `decisionAt`; SELL cooldown starts at the fill
+effect time `at`. Thus a quote received after expiry cannot retroactively make
+an earlier decision eligible. An absent, stale, invalid, or noncausal quote
 returns `UNAVAILABLE`, not a candle-close fill or a future quote.
 
 The comparison has a 64 MiB total input/response-byte bound, a 256 KiB
-per-response bound, at most 21 closed candles per snapshot, and a 20,640-unit
-work bound. It fails closed for evidence gaps rather than fabricating a mark or
-signal. A missed decision window recognized by the shared strategy core is
-counted and handled without backdating fills. An arm that reaches the baseline
-stop/loss terminal condition stops processing just as the runner does; its
-open inventory remains unresolved with its last mark, if any.
+per-response bound, at most 720 closed candles per snapshot, and a fixed
+work-unit bound over every candle in every complete provider snapshot. The
+entire validated candle list is passed to the existing strategy state machine;
+it is never sliced to the 21-candle rolling state size, so gaps and conflicting
+overlaps remain visible. It fails closed for evidence gaps rather than
+fabricating a mark or signal. A missed decision window recognized by the shared
+strategy core is counted and handled without backdating fills.
+
+An arm that reaches the baseline stop/loss terminal condition stops trading
+immediately and retains its actual position and account state. The remaining
+shared stream is used only to mark that state, never to generate later fills.
+Reports distinguish the arm's `tradingStoppedAt` from the common valuation
+horizon; an open stopped position without a valid fresh mark at that common
+horizon makes the comparison unavailable. No position is flattened for
+comparison. Sampled equity drawdown reports maximum cents drawdown and maximum
+relative drawdown independently.
 
 All arms use EUR 1,000 initial cash, the EUR 100 maximum all-in entry, the same
 quotes, quote/candle freshness, 50 bps entry-spread filter, 50 bps per-side
@@ -91,14 +105,16 @@ fee, and 10 bps per-side adverse slippage. The two strategy arms call the
 existing `createStrategyState`, `advanceStrategy`, `createLedger`, and
 `applyPaperObservation` implementations. The cash arm performs no trades.
 
-The available report includes cash and marked net equity, realized/unrealized
-PnL, fees, two-sided gross turnover, fills, completed/open roundtrips, holding
-durations, exits, rejected entries, discarded cooldown opportunities, data
-gaps, unresolved terminal inventory, and sampled equity drawdown including
-initial capital. Exposure is the sum of `[observationAt, nextObservationAt)`
-intervals where the arm was already holding at the left endpoint; there is no
-pre-first-observation or post-terminal extrapolation. Costs are counted once
-from the shared ledger. Missing terminal mark data is unknown, not zero.
+The available report includes cash and common-horizon marked net equity,
+realized/unrealized PnL, fees, two-sided gross turnover, fills, completed/open
+roundtrips, holding durations, exits, rejected entries, discarded cooldown
+opportunities, data gaps, unresolved terminal inventory, and sampled equity
+drawdown including initial capital. Exposure is the sum of
+`[observationAt, nextObservationAt)` intervals where the position was open at
+the left endpoint, including a stopped open position through the common
+valuation horizon; there is no pre-first-observation or post-horizon
+extrapolation. Costs are counted once from the shared ledger. Missing common
+horizon mark data is unknown, not zero.
 
 ## Validation and future selection
 

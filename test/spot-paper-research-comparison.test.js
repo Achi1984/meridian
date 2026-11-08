@@ -4,9 +4,12 @@ import {
   advanceStrategy, applyPaperObservation, createLedger, createStrategyState,
   parseKrakenOhlc, parseKrakenTicker, sha256
 } from "../scripts/spot-paper-pilot/core.mjs";
-import { compareSpotPaperStrategies } from
+import { compareSpotPaperStrategies, maximumSampledEquityDrawdown } from
   "../scripts/spot-paper-research/comparison.mjs";
-import { SPOT_PAPER_ENTRY_CONFIRMATION_ID } from
+import {
+  advanceEntryConfirmation, createEntryConfirmationState,
+  recordEntryConfirmationSell, SPOT_PAPER_ENTRY_CONFIRMATION_ID
+} from
   "../scripts/spot-paper-research/entry-confirmation.mjs";
 
 const BASE = Date.UTC(2025, 0, 1);
@@ -43,7 +46,14 @@ function tickerData(mid) {
   };
 }
 
-function stream(closes) {
+function closedCandles(closes, offset = 0) {
+  return closes.map((close, index) => ({
+    timestamp: BASE + (offset + index) * MINUTE,
+    closeNano: String(BigInt(close) * 100_000_000n)
+  }));
+}
+
+function stream(closes, quoteMids = {}) {
   const observations = [];
   for (let count = 21; count <= closes.length; count++) {
     if (count !== 21 && count <= 21) continue;
@@ -53,11 +63,26 @@ function stream(closes) {
     const at = ohlcReceivedAt + 100;
     const ohlc = acquisition(ohlcData(window, latestAt - (window.length - 1) * MINUTE),
       ohlcReceivedAt - 100, ohlcReceivedAt);
-    const ticker = acquisition(tickerData(closes[count - 1]),
+    const ticker = acquisition(tickerData(quoteMids[count - 1] ?? closes[count - 1]),
       ohlcReceivedAt + 1, ohlcReceivedAt + 20);
-    observations.push({ at, ohlc, ticker });
+    observations.push({ at, decisionAt: ohlcReceivedAt, ohlc, ticker });
   }
   return observations;
+}
+
+function snapshots(closedSnapshots) {
+  return closedSnapshots.map((closes, index) => {
+    const latestAt = BASE + (closes.length - 1) * MINUTE;
+    const ohlcReceivedAt = latestAt + MINUTE + 1_000;
+    const at = ohlcReceivedAt + 100;
+    return {
+      at, decisionAt: ohlcReceivedAt,
+      ohlc: acquisition(ohlcData(closes, BASE), ohlcReceivedAt - 100, ohlcReceivedAt),
+      ticker: acquisition(tickerData(closes.at(-1)), ohlcReceivedAt + 1,
+        ohlcReceivedAt + 20),
+      cycle: index + 1
+    };
+  });
 }
 
 function fillSummary(fills) {
@@ -93,7 +118,7 @@ test("three-arm comparison preserves baseline ledger parity on a synthetic trend
   assert.equal(baseline.feesCents, ledger.feesCents);
   assert.equal(baseline.finalNetEquityCents,
     ledger.cashCents + ledger.lastMark.netExitCents);
-  assert.equal(baseline.positionStatus, "OPEN_UNRESOLVED_AT_TERMINAL");
+  assert.equal(baseline.positionStatus, "OPEN_UNRESOLVED_AT_HORIZON");
 });
 
 test("confirmation can miss trend gains while cash control stays unchanged", () => {
@@ -108,8 +133,8 @@ test("confirmation can miss trend gains while cash control stays unchanged", () 
   assert.equal(challenger.fills[0].ledgerReason, "SMA5_UP_CROSS");
   assert.equal(challenger.fills[0].signalAt, BASE + 22 * MINUTE);
   assert.ok(baseline.finalNetEquityCents > challenger.finalNetEquityCents);
-  assert.equal(challenger.positionStatus, "OPEN_UNRESOLVED_AT_TERMINAL");
-  assert.equal(challenger.unresolvedTerminalInventory.markAgeAtTerminalMs, 80);
+  assert.equal(challenger.positionStatus, "OPEN_UNRESOLVED_AT_HORIZON");
+  assert.equal(challenger.unresolvedTerminalInventory.markAgeAtEvaluationMs, 80);
 
   assert.equal(cash.finalCashCents, 100_000);
   assert.equal(cash.finalNetEquityCents, 100_000);
@@ -136,6 +161,37 @@ test("whipsaw stop exits are immediate and terminate each affected arm", () => {
     stream(closes)[2].at);
 });
 
+test("stopped open inventory is marked at common horizon without later fills or liquidation", () => {
+  const closes = [...Array(21).fill(100),
+    ...Array(10).fill([102, 102, 100, 98.8, 98.8, 100]).flat()];
+  const quoteMids = {};
+  for (let index = 20; index < closes.length; index++) quoteMids[index] = 100;
+  for (const index of [26, 32, 38, 44, 50, 56, 62]) quoteMids[index] = 98.2;
+  quoteMids[60] = 99;
+  quoteMids[61] = 99;
+  for (let index = 62; index < closes.length; index++) quoteMids[index] = 80;
+  const observations = stream(closes, quoteMids);
+  const comparison = compareSpotPaperStrategies(observations);
+  assert.equal(comparison.status, "COMPARISON_AVAILABLE");
+
+  const stopped = comparison.arms.baseline;
+  assert.equal(stopped.stopReason, "SESSION_LOSS_LIMIT");
+  assert.ok(stopped.tradingStoppedAt < comparison.commonHorizonAt);
+  assert.equal(stopped.positionStatus, "OPEN_UNRESOLVED_AT_HORIZON");
+  assert.ok(stopped.unresolvedTerminalInventory.quantitySat > 0);
+  assert.equal(stopped.valuationAt, comparison.commonHorizonAt);
+  assert.equal(stopped.valuationStatus, "MARKED_AT_COMMON_HORIZON");
+  assert.equal(stopped.unresolvedTerminalInventory.lastMark.receivedAt,
+    observations.at(-1).ticker.receivedAt);
+  assert.equal(stopped.unresolvedTerminalInventory.markAgeAtEvaluationMs,
+    comparison.commonHorizonAt - observations.at(-1).ticker.receivedAt);
+  assert.equal(stopped.valuationObservationCount, observations.length);
+  assert.equal(stopped.fills.at(-1).side, "BUY");
+  assert.ok(stopped.fills.every(fill => fill.executionAt <= stopped.tradingStoppedAt));
+  assert.equal(stopped.finalNetEquityCents,
+    stopped.initialCashCents + stopped.realizedPnlCents + stopped.unrealizedPnlCents);
+});
+
 test("all ledger costs and turnover reconcile once and sampled drawdown includes initial capital", () => {
   const comparison = compareSpotPaperStrategies(
     stream([...Array(21).fill(100), 120, 130, 140, 150]));
@@ -149,9 +205,69 @@ test("all ledger costs and turnover reconcile once and sampled drawdown includes
     assert.equal(arm.equityIncludesInitialCapitalSample, true);
     assert.ok(arm.timeExposure.exposureMs >= 0);
     assert.match(arm.timeExposure.convention, /\[observationAt, nextObservationAt\)/);
+    assert.equal(arm.valuationAt, comparison.commonHorizonAt);
+    assert.equal(arm.valuationStatus, "MARKED_AT_COMMON_HORIZON");
   }
   assert.ok(comparison.arms.baseline.feesCents > 0);
   assert.ok(comparison.arms.baseline.grossTurnoverCents > 0);
+});
+
+test("OHLC snapshots longer than strategy state are fully admitted and replayed", () => {
+  const first = Array(30).fill(100);
+  const comparison = compareSpotPaperStrategies(snapshots([
+    first, [...first, 120], [...first, 120, 130]
+  ]));
+  assert.equal(comparison.status, "COMPARISON_AVAILABLE");
+  assert.equal(comparison.arms.baseline.observationCount, 3);
+  assert.equal(comparison.arms.challenger.observationCount, 3);
+  assert.equal(comparison.arms.baseline.fills[0].side, "BUY");
+  assert.equal(comparison.arms.challenger.fills[0].side, "BUY");
+  assert.equal(comparison.arms.challenger.fills[0].signalAt, BASE + 31 * MINUTE);
+  assert.equal(comparison.input.workUnits, (30 * 2 + 1) + (31 * 2 + 1) + (32 * 2 + 1));
+
+  const conflicting = snapshots([first, [...first, 120]]);
+  const conflictData = structuredClone(conflicting[1].ohlc.data);
+  const row = conflictData.result.XXBTZEUR[29];
+  conflictData.result.XXBTZEUR[29] =
+    [row[0], "101.00000000", "101.00000000", "101.00000000",
+      "101.00000000", "101.00000000", row[6], row[7]];
+  conflicting[1].ohlc = acquisition(conflictData,
+    conflicting[1].ohlc.requestStartedAt, conflicting[1].ohlc.receivedAt);
+  assert.equal(compareSpotPaperStrategies(conflicting).status, "UNAVAILABLE");
+  assert.equal(compareSpotPaperStrategies(conflicting).reason,
+    "CONFLICTING_CLOSED_CANDLE");
+
+  const tooMany = Array(721).fill(100);
+  const rejected = compareSpotPaperStrategies(snapshots([tooMany]));
+  assert.equal(rejected.status, "UNAVAILABLE");
+  assert.equal(rejected.reason, "CANDLE_SNAPSHOT_LIMIT");
+});
+
+test("cooldown eligibility uses decision time before the quote, not fill effect time", () => {
+  const warm = Array(21).fill(100);
+  const warmState = advanceEntryConfirmation(createEntryConfirmationState(),
+    closedCandles(warm), { decisionAt: BASE + 22 * MINUTE }).state;
+  const cooldownUntil = BASE + 25 * MINUTE;
+  const stateDuringCooldown = recordEntryConfirmationSell(
+    warmState, cooldownUntil - 600_000);
+  const decisionAt = cooldownUntil - 1;
+  const tickerRequestStartedAt = cooldownUntil + 1;
+  const cross = advanceEntryConfirmation(stateDuringCooldown,
+    closedCandles([...Array(20).fill(100), 120], 1), {
+      decisionAt
+    });
+  assert.equal(decisionAt < cooldownUntil, true);
+  assert.equal(tickerRequestStartedAt > cooldownUntil, true);
+  assert.deepEqual(cross.signals, []);
+  assert.equal(cross.discarded, "COOLDOWN_ACTIVE");
+  assert.equal(cross.state.pending, null);
+});
+
+test("maximum absolute and relative drawdown are calculated independently", () => {
+  assert.deepEqual(maximumSampledEquityDrawdown([10_000, 7_000, 20_000, 16_000]), {
+    maxDrawdownCents: 4_000,
+    maxRelativeDrawdownBps: 3_000
+  });
 });
 
 test("missing causal or fresh quote evidence makes the comparison unavailable", () => {
@@ -160,6 +276,11 @@ test("missing causal or fresh quote evidence makes the comparison unavailable", 
   preSignal[0].ticker.requestStartedAt = preSignal[0].ohlc.receivedAt - 1;
   assert.equal(compareSpotPaperStrategies(preSignal).status, "UNAVAILABLE");
   assert.equal(compareSpotPaperStrategies(preSignal).reason, "MISSING_CAUSAL_QUOTE");
+
+  const postQuoteDecision = structuredClone(observations);
+  postQuoteDecision[0].decisionAt = postQuoteDecision[0].ticker.requestStartedAt + 1;
+  assert.equal(compareSpotPaperStrategies(postQuoteDecision).status, "UNAVAILABLE");
+  assert.equal(compareSpotPaperStrategies(postQuoteDecision).reason, "MISSING_CAUSAL_QUOTE");
 
   const stale = structuredClone(observations);
   stale[0].at = stale[0].ohlc.receivedAt + 10_003;

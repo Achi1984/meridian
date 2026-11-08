@@ -12,7 +12,8 @@ export const SPOT_PAPER_RESEARCH_LIMITS = Object.freeze({
   maxCycles: Math.min(480, SPOT_PAPER_PILOT_LIMITS.maxCycles),
   maxInputBytes: SPOT_PAPER_PILOT_LIMITS.maxBytes,
   maxResponseBytes: SPOT_PAPER_PILOT_LIMITS.maxResponseBytes,
-  maxWorkUnits: 480 * (SPOT_PAPER_PILOT_LIMITS.warmupCandles * 2 + 1)
+  maxCandlesPerSnapshot: 720,
+  maxWorkUnits: 480 * (720 * 2 + 1)
 });
 
 const BASELINE_ID = "BTC_EUR_SMA5_SMA20_V1";
@@ -104,9 +105,11 @@ function makeArm(strategyId, candidate = false) {
     strategyId, candidate, strategy: candidate ?
       createEntryConfirmationState() : createStrategyState(),
     ledger: createLedger(), stopped: false, stopReason: null, terminalAt: null,
-    previousAt: null, exposureMs: 0, equitySamples: [SPOT_PAPER_PILOT_LIMITS.initialCashCents],
+    previousAt: null, commonValuationAt: null,
+    commonValuationStatus: "NOT_VALUED",
+    exposureMs: 0, equitySamples: [SPOT_PAPER_PILOT_LIMITS.initialCashCents],
     grossTurnoverCents: 0, rejectedEntries: {}, discardedOpportunities: {},
-    dataGaps: 0, fills: [], observationCount: 0
+    dataGaps: 0, fills: [], observationCount: 0, valuationCount: 0
   };
 }
 
@@ -151,47 +154,62 @@ function roundTrips(fills, terminalAt) {
   };
 }
 
-function maximumDrawdown(samples) {
+export function maximumSampledEquityDrawdown(samples) {
+  if (!Array.isArray(samples) || !samples.length ||
+      samples.some(equity => !isInteger(equity))) {
+    throw new Error("INVALID_EQUITY_SAMPLES");
+  }
   let peak = samples[0];
   let maxDrawdownCents = 0;
-  let drawdownBps = 0;
+  let maxRelativeNumerator = 0n;
+  let maxRelativeDenominator = 1n;
   for (const equity of samples.slice(1)) {
     if (!isInteger(equity)) continue;
     peak = Math.max(peak, equity);
     const drawdown = peak - equity;
-    if (drawdown > maxDrawdownCents) {
-      maxDrawdownCents = drawdown;
-      drawdownBps = peak > 0 ?
-        Number((BigInt(drawdown) * 10_000n + BigInt(peak) / 2n) / BigInt(peak)) :
-        null;
+    if (drawdown > maxDrawdownCents) maxDrawdownCents = drawdown;
+    if (peak > 0 && BigInt(drawdown) * maxRelativeDenominator >
+        maxRelativeNumerator * BigInt(peak)) {
+      maxRelativeNumerator = BigInt(drawdown);
+      maxRelativeDenominator = BigInt(peak);
     }
   }
-  return { maxDrawdownCents, maxDrawdownBps: drawdownBps };
+  const maxRelativeDrawdownBps = Number(
+    (maxRelativeNumerator * 10_000n * 2n + maxRelativeDenominator) /
+      (maxRelativeDenominator * 2n));
+  return { maxDrawdownCents, maxRelativeDrawdownBps };
 }
 
 function reportArm(arm) {
-  const terminalAt = arm.terminalAt ?? arm.previousAt;
   const netEquityCents = equityCents(arm.ledger);
+  const horizon = arm.commonValuationAt;
   const feesCents = arm.ledger.feesCents;
   const realizedPnlCents = arm.ledger.realizedPnlCents;
   const unrealizedPnlCents = arm.ledger.position ?
     arm.ledger.lastMark?.unrealizedPnlCents ?? null : 0;
-  const trips = roundTrips(arm.fills, terminalAt);
-  const drawdown = maximumDrawdown(arm.equitySamples);
+  const trips = roundTrips(arm.fills, horizon);
+  let drawdown = null;
+  try {
+    drawdown = maximumSampledEquityDrawdown(arm.equitySamples);
+  } catch {
+    drawdown = null;
+  }
   const inventory = arm.ledger.position ? {
     quantitySat: arm.ledger.position.quantitySat,
     entryPriceNano: arm.ledger.position.entryPriceNano,
     entrySignalId: arm.ledger.position.entrySignalId,
     lastMark: arm.ledger.lastMark,
-    markAgeAtTerminalMs: arm.ledger.lastMark && terminalAt !== null ?
-      terminalAt - arm.ledger.lastMark.receivedAt : null
+    markAgeAtEvaluationMs: arm.ledger.lastMark && horizon !== null ?
+      horizon - arm.ledger.lastMark.receivedAt : null
   } : null;
   return {
     strategyId: arm.strategyId,
     stopped: arm.stopped,
     stopReason: arm.stopReason,
-    terminalAt,
-    positionStatus: inventory ? "OPEN_UNRESOLVED_AT_TERMINAL" : "FLAT",
+    tradingStoppedAt: arm.terminalAt,
+    valuationAt: arm.commonValuationAt,
+    valuationStatus: arm.commonValuationStatus,
+    positionStatus: inventory ? "OPEN_UNRESOLVED_AT_HORIZON" : "FLAT",
     unresolvedTerminalInventory: inventory,
     initialCashCents: arm.ledger.initialCashCents,
     finalCashCents: arm.ledger.cashCents,
@@ -219,10 +237,11 @@ function reportArm(arm) {
       exposureFraction: arm.previousAt === arm.firstAt ? 0 :
         arm.exposureMs / (arm.previousAt - arm.firstAt)
     },
-    maxSampledEquityDrawdownCents: drawdown.maxDrawdownCents,
-    maxSampledEquityDrawdownBps: drawdown.maxDrawdownBps,
+    maxSampledEquityDrawdownCents: drawdown?.maxDrawdownCents ?? null,
+    maxSampledEquityRelativeDrawdownBps: drawdown?.maxRelativeDrawdownBps ?? null,
     equityIncludesInitialCapitalSample: true,
-    observationCount: arm.observationCount
+    observationCount: arm.observationCount,
+    valuationObservationCount: arm.valuationCount
   };
 }
 
@@ -251,8 +270,11 @@ function applyArmObservation(arm, observation, quote, advanced) {
     arm.terminalAt = at;
   }
   arm.previousAt = at;
+  arm.commonValuationAt = at;
+  arm.commonValuationStatus = "MARKED_AT_COMMON_HORIZON";
   if (arm.firstAt === undefined) arm.firstAt = at;
   arm.observationCount++;
+  arm.valuationCount++;
   const equity = equityCents(arm.ledger);
   arm.equitySamples.push(equity);
 }
@@ -264,7 +286,7 @@ function applyCandidateObservation(arm, observation, parsed, quote) {
     arm.exposureMs += at - arm.previousAt;
   }
   const advanced = advanceEntryConfirmation(arm.strategy, parsed.candles, {
-    nowMs: at, held: Boolean(arm.ledger.position)
+    decisionAt: observation.decisionAt, held: Boolean(arm.ledger.position)
   });
   arm.strategy = advanced.state;
   if (advanced.missedDecisionWindow) arm.dataGaps++;
@@ -289,8 +311,11 @@ function applyCandidateObservation(arm, observation, parsed, quote) {
     arm.terminalAt = at;
   }
   arm.previousAt = at;
+  arm.commonValuationAt = at;
+  arm.commonValuationStatus = "MARKED_AT_COMMON_HORIZON";
   if (arm.firstAt === undefined) arm.firstAt = at;
   arm.observationCount++;
+  arm.valuationCount++;
   arm.equitySamples.push(equityCents(arm.ledger));
 }
 
@@ -298,8 +323,39 @@ function applyCashObservation(arm, at) {
   if (arm.previousAt !== null && arm.previousAt === at) return;
   if (arm.firstAt === undefined) arm.firstAt = at;
   arm.previousAt = at;
+  arm.commonValuationAt = at;
+  arm.commonValuationStatus = "MARKED_AT_COMMON_HORIZON";
   arm.observationCount++;
+  arm.valuationCount++;
   arm.equitySamples.push(arm.ledger.cashCents);
+}
+
+function markStoppedArm(arm, observation, quote) {
+  const { at } = observation;
+  if (arm.previousAt !== null && arm.ledger.position) {
+    arm.exposureMs += at - arm.previousAt;
+    try {
+      const valuationLedger = structuredClone(arm.ledger);
+      valuationLedger.position.stopPriceNano = "0";
+      const marked = applyPaperObservation(valuationLedger, {
+        quote, nowMs: at, stopped: true
+      });
+      if (marked.ledger.position) {
+        arm.ledger.lastMark = marked.ledger.lastMark;
+        arm.commonValuationStatus = "MARKED_AT_COMMON_HORIZON";
+      } else {
+        arm.commonValuationStatus = "UNKNOWN_COMMON_HORIZON_MARK";
+      }
+    } catch {
+      arm.commonValuationStatus = "UNKNOWN_COMMON_HORIZON_MARK";
+    }
+  } else if (arm.commonValuationStatus !== "UNKNOWN_COMMON_HORIZON_MARK") {
+    arm.commonValuationStatus = "MARKED_AT_COMMON_HORIZON";
+  }
+  arm.previousAt = at;
+  arm.commonValuationAt = at;
+  arm.valuationCount++;
+  arm.equitySamples.push(equityCents(arm.ledger));
 }
 
 export function compareSpotPaperStrategies(observations) {
@@ -326,6 +382,8 @@ export function compareSpotPaperStrategies(observations) {
     const observation = observations[index];
     if (!observation || typeof observation !== "object" ||
         !isInteger(observation.at) || observation.at < 0 ||
+        !isInteger(observation.decisionAt) ||
+        observation.decisionAt < 0 ||
         (previousAt !== null && observation.at <= previousAt)) {
       return unavailable("INVALID_OBSERVATION_TIME", index + 1);
     }
@@ -335,17 +393,19 @@ export function compareSpotPaperStrategies(observations) {
     try {
       checkAcquisition(observation.ohlc, "OHLC", byteCounter);
       checkAcquisition(observation.ticker, "TICKER", byteCounter);
-      if (observation.ohlc.receivedAt > observation.at ||
+      if (observation.ohlc.receivedAt > observation.decisionAt ||
+          observation.decisionAt > observation.ticker.requestStartedAt ||
+          observation.ticker.requestStartedAt > observation.ticker.receivedAt ||
+          observation.ticker.receivedAt > observation.at ||
           (index > 0 && observation.ohlc.requestStartedAt < observations[index - 1].at) ||
-          observation.ticker.requestStartedAt < observation.ohlc.receivedAt ||
-          observation.ticker.receivedAt > observation.at) {
+          observation.decisionAt > observation.at) {
         return unavailable(index > 0 &&
           observation.ohlc.requestStartedAt < observations[index - 1].at ?
           "NON_CHRONOLOGICAL_ACQUISITION" : "MISSING_CAUSAL_QUOTE", index + 1);
       }
       parsed = parseKrakenOhlc(observation.ohlc, observation.at);
-      if (parsed.candles.length > SPOT_PAPER_PILOT_LIMITS.warmupCandles) {
-        return unavailable("CANDLE_WORK_LIMIT", index + 1);
+      if (parsed.candles.length > SPOT_PAPER_RESEARCH_LIMITS.maxCandlesPerSnapshot) {
+        return unavailable("CANDLE_SNAPSHOT_LIMIT", index + 1);
       }
       quote = parseKrakenTicker(observation.ticker, observation.at);
       workUnits += parsed.candles.length * 2 + 1;
@@ -369,26 +429,44 @@ export function compareSpotPaperStrategies(observations) {
       } catch (error) {
         return unavailable(error.message ?? "BASELINE_REPLAY_GAP", cycle);
       }
+    } else {
+      markStoppedArm(baseline, observation, quote);
     }
-    try {
-      applyCandidateObservation(challenger, observation, parsed, quote);
-    } catch (error) {
-      return unavailable(error.message ?? "CHALLENGER_REPLAY_GAP", cycle);
+    if (!challenger.stopped) {
+      try {
+        applyCandidateObservation(challenger, observation, parsed, quote);
+      } catch (error) {
+        return unavailable(error.message ?? "CHALLENGER_REPLAY_GAP", cycle);
+      }
+    } else {
+      markStoppedArm(challenger, observation, quote);
     }
     applyCashObservation(cash, observation.at);
   }
 
+  const commonHorizonAt = observations.at(-1).at;
   const arms = {
     baseline: reportArm(baseline),
     challenger: reportArm(challenger),
     cash: reportArm(cash)
   };
+  if (Object.values(arms).some(arm =>
+    arm.valuationAt !== commonHorizonAt ||
+    arm.valuationStatus !== "MARKED_AT_COMMON_HORIZON" ||
+    (arm.unresolvedTerminalInventory &&
+     (!arm.unresolvedTerminalInventory.lastMark ||
+      arm.unresolvedTerminalInventory.markAgeAtEvaluationMs >
+        SPOT_PAPER_PILOT_LIMITS.maxQuoteAgeMs)))) {
+    return unavailable("COMMON_HORIZON_VALUATION_UNKNOWN");
+  }
   for (const arm of Object.values(arms)) {
     const totalPnl = arm.unrealizedPnlCents === null ? null :
       addSafe(arm.realizedPnlCents, arm.unrealizedPnlCents);
     const expectedEquity = totalPnl === null ? null :
       addSafe(arm.initialCashCents, totalPnl);
     if (arm.finalNetEquityCents === null ||
+        arm.maxSampledEquityDrawdownCents === null ||
+        arm.maxSampledEquityRelativeDrawdownBps === null ||
         expectedEquity !== arm.finalNetEquityCents ||
         !isInteger(arm.feesCents) ||
         arm.grossTurnoverCents !== arm.fills.reduce((sum, fill) => sum + fill.grossCents, 0) ||
@@ -401,6 +479,7 @@ export function compareSpotPaperStrategies(observations) {
   return {
     schemaVersion: "SPOT_PAPER_SMA_COMPARISON_V1",
     status: "COMPARISON_AVAILABLE",
+    commonHorizonAt,
     researchOnly: true,
     profitability: "NOT_ASSESSED",
     executionImpact: false,

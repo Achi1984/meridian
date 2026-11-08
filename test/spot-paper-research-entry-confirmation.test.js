@@ -20,7 +20,7 @@ function candles(values, offset = 0) {
 
 function warmedState(values = Array(21).fill(100)) {
   const first = advanceEntryConfirmation(createEntryConfirmationState(),
-    candles(values), { nowMs: BASE + 22 * MINUTE });
+    candles(values), { decisionAt: BASE + 22 * MINUTE });
   return first.state;
 }
 
@@ -28,30 +28,30 @@ test("entry confirmation requires a fresh cross and a second distinct closed can
   let state = warmedState();
   const warm = candles(Array(21).fill(100));
   assert.deepEqual(advanceEntryConfirmation(createEntryConfirmationState(), warm, {
-    nowMs: BASE + 22 * MINUTE
+    decisionAt: BASE + 22 * MINUTE
   }).signals, []);
 
   const crossing = candles([...Array(20).fill(100), 120], 1);
-  const first = advanceEntryConfirmation(state, crossing, { nowMs: BASE + 23 * MINUTE });
+  const first = advanceEntryConfirmation(state, crossing, { decisionAt: BASE + 23 * MINUTE });
   state = first.state;
   assert.deepEqual(first.signals, []);
   assert.equal(state.pending.crossCandleAt, BASE + 21 * MINUTE);
 
   const backfill = advanceEntryConfirmation(state, candles(Array(21).fill(100)), {
-    nowMs: BASE + 24 * MINUTE
+    decisionAt: BASE + 24 * MINUTE
   });
   assert.equal(backfill.newCandleCount, 0);
   assert.deepEqual(backfill.signals, []);
   assert.deepEqual(backfill.state.pending, state.pending);
 
-  const duplicate = advanceEntryConfirmation(state, crossing, { nowMs: BASE + 24 * MINUTE });
+  const duplicate = advanceEntryConfirmation(state, crossing, { decisionAt: BASE + 24 * MINUTE });
   assert.equal(duplicate.newCandleCount, 0);
   assert.deepEqual(duplicate.signals, []);
   assert.deepEqual(duplicate.state.pending, state.pending);
 
   const confirmation = candles([...Array(19).fill(100), 120, 130], 2);
   const second = advanceEntryConfirmation(state, confirmation, {
-    nowMs: BASE + 24 * MINUTE
+    decisionAt: BASE + 24 * MINUTE
   });
   assert.equal(second.signals.length, 1);
   assert.equal(second.signals[0].direction, "ENTRY");
@@ -67,26 +67,26 @@ test("equality cancels confirmation and missed decision windows cannot confirm o
   const state = warmedState(Array(21).fill(99));
   const crossing = candles([...Array(20).fill(99), 120], 1);
   const pending = advanceEntryConfirmation(state, crossing, {
-    nowMs: BASE + 23 * MINUTE
+    decisionAt: BASE + 23 * MINUTE
   });
   assert.ok(pending.state.pending);
 
   const equal = candles([...Array(19).fill(99), 120, 78], 2);
   const equalResult = advanceEntryConfirmation(pending.state, equal, {
-    nowMs: BASE + 24 * MINUTE
+    decisionAt: BASE + 24 * MINUTE
   });
   assert.equal(equalResult.signals.length, 0);
   assert.equal(equalResult.state.pending, null);
 
   const missed = candles([...Array(19).fill(99), 120, 130, 140], 2);
   const missedResult = advanceEntryConfirmation(pending.state, missed, {
-    nowMs: BASE + 25 * MINUTE
+    decisionAt: BASE + 25 * MINUTE
   });
   assert.equal(missedResult.missedDecisionWindow, true);
   assert.equal(missedResult.state.pending, null);
   const continued = candles([...Array(19).fill(99), 120, 130, 140, 150], 2);
   assert.deepEqual(advanceEntryConfirmation(missedResult.state, continued, {
-    nowMs: BASE + 26 * MINUTE
+    decisionAt: BASE + 26 * MINUTE
   }).signals, []);
 });
 
@@ -98,7 +98,7 @@ test("cooldown discards active opportunities, allows a new cross at expiry, and 
 
   const atBoundary = advanceEntryConfirmation(
     recordEntryConfirmationSell(warmedState(warmValues), boundary - ENTRY_COOLDOWN_MS),
-    crossed, { nowMs: boundary }
+    crossed, { decisionAt: boundary }
   );
   assert.equal(atBoundary.state.cooldownUntil, boundary);
   assert.equal(atBoundary.state.pending.crossCandleAt, BASE + 21 * MINUTE);
@@ -106,19 +106,19 @@ test("cooldown discards active opportunities, allows a new cross at expiry, and 
   const oneMillisecondBefore = advanceEntryConfirmation(
     recordEntryConfirmationSell(warmedState(warmValues),
       boundary - ENTRY_COOLDOWN_MS + 1),
-    crossed, { nowMs: boundary }
+    crossed, { decisionAt: boundary }
   );
   assert.equal(oneMillisecondBefore.discarded, "COOLDOWN_ACTIVE");
   assert.equal(oneMillisecondBefore.state.pending, null);
   const stillAbove = candles([...Array(19).fill(80), 120, 130], 2);
   assert.deepEqual(advanceEntryConfirmation(oneMillisecondBefore.state, stillAbove, {
-    nowMs: boundary + 1
+    decisionAt: boundary + 1
   }).signals, []);
 
   let state = atBoundary.state;
   const confirmation = candles([...Array(19).fill(80), 120, 130], 2);
   const entry = advanceEntryConfirmation(state, confirmation, {
-    nowMs: boundary + MINUTE
+    decisionAt: boundary + MINUTE
   });
   assert.equal(entry.signals[0].direction, "ENTRY");
 
@@ -131,10 +131,10 @@ test("held-position downward crosses exit immediately regardless of entry contro
   const up = candles([...Array(20).fill(100), 120], 1);
   const next = candles([...Array(19).fill(100), 120, 130], 2);
   let state = advanceEntryConfirmation(createEntryConfirmationState(), warm, {
-    nowMs: BASE + 22 * MINUTE
+    decisionAt: BASE + 22 * MINUTE
   }).state;
-  state = advanceEntryConfirmation(state, up, { nowMs: BASE + 23 * MINUTE }).state;
-  state = advanceEntryConfirmation(state, next, { nowMs: BASE + 24 * MINUTE }).state;
+  state = advanceEntryConfirmation(state, up, { decisionAt: BASE + 23 * MINUTE }).state;
+  state = advanceEntryConfirmation(state, next, { decisionAt: BASE + 24 * MINUTE }).state;
   state = recordEntryConfirmationSell(state, BASE + 24 * MINUTE);
 
   const full = [...Array(21).fill(100), 120, 130, ...Array(8).fill(80)];
@@ -142,7 +142,7 @@ test("held-position downward crosses exit immediately regardless of entry contro
   for (let index = 23; index < full.length; index++) {
     exit = advanceEntryConfirmation(state,
       candles(full.slice(index - 20, index + 1), index - 20), {
-        nowMs: BASE + (index + 2) * MINUTE, held: true
+        decisionAt: BASE + (index + 2) * MINUTE, held: true
       });
     state = exit.state;
     if (exit.signals.length) break;
