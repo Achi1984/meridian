@@ -159,10 +159,12 @@ export function presentSpotPaperPairedReport(dto, {projectReport} = {}) {
   const requestedDurationMs = 28_800_000;
   const freshness = FRESHNESS_VALUES.has(projected.freshness?.status) ?
     projected.freshness.status : 'UNKNOWN';
+  const status = STATUS_VALUES.has(projected.status) ? projected.status : 'UNKNOWN';
   return {
     available: true,
-    status: STATUS_VALUES.has(projected.status) ? projected.status : 'UNKNOWN',
-    reason: safeText(projected.statusReason),
+    status,
+    reason: safeText(projected.statusReason) ||
+      (status === 'UNKNOWN' ? 'Laufstatus fehlt oder ist unbekannt' : null),
     identity: {runId: safeText(projected.identity?.runId)},
     observedAt: safeText(projected.observedAt, 48),
     feed: {

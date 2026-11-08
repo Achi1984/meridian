@@ -96,6 +96,21 @@ test('requires an injected shared DTO projector and has no production fixture fa
   assert.match(loading.root.textContent, /Bericht wird geladen/);
   assert.equal(loading.root.attrs['data-state'], 'loading');
 
+  const mountLoading = harness();
+  const panel = mountSpotPaperPairedPanel(mountLoading.root, {
+    dto: fixtureDto,
+    document: mountLoading.document,
+    projectReport: syntheticProjector,
+    loading: true,
+    preview: true
+  });
+  assert.match(mountLoading.root.textContent, /Bericht wird geladen/);
+  panel.setLoading(false);
+  assert.match(mountLoading.root.textContent, /VERIFIED_COMPLETE/);
+  panel.dispose();
+  assert.equal(mountLoading.root.children.length, 0);
+  assert.equal(panel.render(), null);
+
   const failed = harness();
   renderSpotPaperPaired(failed.root, fixtureDto, failed.document, {
     projectReport() { throw new Error('fixture validation failure'); }

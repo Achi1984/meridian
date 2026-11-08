@@ -106,8 +106,9 @@ function renderModel(root, model, document, options = {}) {
   node(document, root, 'p',
     `Feed: ${model.feed?.pair || 'BTC/EUR'} · ${model.feed?.shared ?
       'gemeinsamer Feed bestätigt' :
-      `gemeinsamer Feed unbekannt${model.feed?.reason ? ` — ${model.feed.reason}` : ''}`} · ${
-      model.feed?.noLeverage ? 'ohne Hebelwirkung bestätigt' : 'Hebelstatus unbekannt'}`,
+      `gemeinsamer Feed unbekannt — ${model.feed?.reason || 'Bestätigung fehlt'}`} · ${
+      model.feed?.noLeverage ? 'ohne Hebelwirkung bestätigt' :
+        'Hebelstatus unbekannt — Bestätigung fehlt'}`,
     'caption');
   node(document, root,
     'p', 'Echte Bestände: nicht Teil dieses Panels; es werden keine Kontobestände gelesen.',
@@ -147,10 +148,11 @@ function renderModel(root, model, document, options = {}) {
     value: model.freshness.status,
     tone: model.freshness.status === 'STALE' ? 'tone-danger' : 'tone-muted'
   });
+  const requestedDuration = duration(model.coverage.requestedDurationMs);
   const coverage = model.coverage.actualDurationMs === null ?
     `Unbekannt — ${model.coverage.reason || 'Abdeckungswert fehlt'}` :
-    `${duration(model.coverage.actualDurationMs)} von 8 Std. angefordert`;
-  field(document, identity, 'Tatsächliche Abdeckung · angefordert 8 Std.', {
+    `${duration(model.coverage.actualDurationMs)} von ${requestedDuration} angefordert`;
+  field(document, identity, `Tatsächliche Abdeckung · angefordert ${requestedDuration}`, {
     label: coverage,
     value: model.coverage.actualDurationMs,
     tone: 'tone-muted'

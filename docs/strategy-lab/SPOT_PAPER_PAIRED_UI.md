@@ -22,6 +22,9 @@ const panel = mountSpotPaperPairedPanel(container, {
 });
 ```
 
+For a host-managed loading transition, call `panel.setLoading(true|false)`;
+pass new DTO data with `panel.render(nextDto)`.
+
 `projectReport(dto)` is the seam for the shared validation/projection export
 owned by issue #1302. Its result is a presentation projection, not an
 alternative report schema: it supplies `status`, `identity.runId`,
