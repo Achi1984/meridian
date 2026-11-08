@@ -1,7 +1,8 @@
 # BTC/EUR paired-paper one-shot host launch
 
-This is a prepared launch plan, not deployment or permission to run it. It does
-not modify the existing spot-paper image, the stopped
+The owner's one-shot PAPER execution approval is already recorded. This change
+prepares and validates the package only; it does not deploy or launch it. It
+does not modify the existing spot-paper image, the stopped
 `btc-eur-paper-host-8h-001` evidence, or its volume.
 
 ## Source and acceptance gates
@@ -11,25 +12,80 @@ journal helpers it imports, and the reviewed #1299 research exports:
 
 - #1299 research source: `adf5c0a6e7b7d93bfd106dd6136c40a8e15a6373`
 - merged #1299 source commit: `4f5c4a3c8489129c514cd57c4b71f37ee05bcddf`
-- #1301 source inspected for isolated composition: `3308394a2bd1e9d3d022da48f90a246cb3a20546`
-
-At preparation time #1301 is still an open draft and these paired files are not
-in this checkout. The Dockerfile must be built from a checkout updated after
-#1301 is merged, not from this branch alone. Until then, only the temporary
-composition recorded in the PR validation can be built. Require the merged
-#1301 actual-export tests and final-head CI before accepting the image.
+- #1301 reviewed host candidate: `5f25f771cd45dab41ec642660cce18cbdb324ef3`
 
 The production research pin in `scripts/spot-paper-paired/forward.mjs` must
-remain `null` until Lead separately accepts the integrated adapter after those
-tests. This image's default command is `disabled`; the explicit `run` command
-currently fails closed with `RESEARCH_INTEGRATION_NOT_ACCEPTED` before feed
-access. Do not edit the pin or treat this launch plan as authorization.
+remain `null`; do not edit it. The image's default command is `disabled`; its
+explicit `run` command fails closed with `RESEARCH_INTEGRATION_NOT_ACCEPTED`
+before feed access while the pin is null.
 
 The image includes `status`, `report`, `export`, and byte-preserving `package`
 commands from the paired host. It does not include or invoke the separate #1304
-offline evaluator. Use that evaluator only from its separately reviewed,
-compatible checkout after it is merged and after export integration passes.
-There is no need to copy its modules into this image.
+offline evaluator. A temporary composition with #1304 candidate
+`1feea98a1fd2c602fccb1824c71d19e253c28376` completed the report/export evaluator
+CLI case and preserved the interrupted case as `INTERRUPTED` with unavailable
+deltas. This is cross-PR synthetic compatibility evidence, not a merged
+dependency or live acceptance; keep evaluator modules out of this image.
+
+### Candidate image and smoke evidence
+
+The image was built from an isolated temporary context containing only the
+paired host files from #1301 `5f25f771cd45dab41ec642660cce18cbdb324ef3`, the
+merged #1299 research exports above, required baseline/journal/provider/
+packaging modules, and this Dockerfile. It was not built from the older #1301
+candidate `3308394a2bd1e9d3d022da48f90a246cb3a20546` or the full repository.
+
+| Build identity | Recorded value |
+| --- | --- |
+| Dockerfile SHA-256 | `e92f25066d313a51b95072cfbdb88811ada781bd787587be54753ffc25fee22b` |
+| Resolved base image | `node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293` |
+| Local image ID | `sha256:f50c5d63e248adc37209eae980239a063a617565f462dc70dc442788c77fe590` |
+| Local tag | `meridian-spot-paper-paired:5f25f771` |
+| Registry digest | Not available; image was not pushed |
+
+The local build and smoke checks passed:
+
+- `docker run --rm --network none meridian-spot-paper-paired:5f25f771`
+  returned `DISABLED`; no feed access was possible.
+- Direct imports of all nine packaged host, paired, baseline, provider,
+  packaging, and #1299 research modules succeeded with networking disabled;
+  provider counters remained unused.
+- With a writable evidence mount, `run --data-root /evidence-root --run-id
+  paired-live-pin-check` failed with `RESEARCH_INTEGRATION_NOT_ACCEPTED` and
+  created no run directory.
+- A bind-mounted file write succeeded as UID 1000 (`node`).
+- Docker SIGTERM reached Node's paired host signal helper; its AbortSignal
+  handler wrote `SIGTERM` to the writable mount and the process exited within
+  the 10-second Docker stop grace.
+- The exact #1301 paired-forward and paired-host test files passed 22/22,
+  including the 480-cycle integration against actual #1299 exports.
+
+The updated #1301 candidate's actual-export 480-cycle fixture measured:
+
+| Artifact | Measured bytes | Applicable bound |
+| --- | ---: | ---: |
+| Persisted journal | 1,627,285 | 8 MiB |
+| Read-only journal export payload | 1,627,241 | 16 MiB evaluator input |
+| Standalone terminal report | 279,371 | 8 MiB evaluator input |
+| Host report wrapper | 279,688 | 8 MiB evaluator input |
+| Combined host export | 1,906,788 | 16 MiB |
+| Byte-preserving archive | 4,319,232 | 84 MiB |
+
+These are measured sizes for the exercised provider-shaped fixture, not a
+worst-case guarantee. The temporary #1304 CLI composition at
+`1feea98a1fd2c602fccb1824c71d19e253c28376` accepted the completed report/export
+as `VERIFIED_COMPLETE`; the separate operator-interrupted synthetic case stayed
+`INTERRUPTED` with unavailable deltas. The evaluator was not packaged in this
+image because it remains an independently run consumer.
+
+At the last status check, #1301 was open, no longer draft, and not merged;
+final-head CI run `42528020776` completed successfully. #1304 remained
+unmerged and draft. Before package acceptance, update this branch from main
+after #1301 merges, rebuild and rerun the image smoke checks from that merged
+source, and require final-head CI plus the compatible #1304 evaluator
+integration on merged sources. No registry repository or digest, Northflank
+job/instance/volume IDs, region, or compute size was available in this
+preparation.
 
 ## Frozen run
 
@@ -56,9 +112,9 @@ entrypoint. Do not wrap it in a shell.
 
 ## Build and immutable image record
 
-After #1301 is merged and the required tests pass, build from the exact reviewed
-main commit. Use the already approved registry repository if one exists; its
-name is not established by this change.
+After the reviewed #1301 source is merged to main and final-head tests pass,
+build again from the exact reviewed main commit. Use the existing approved
+registry repository if one exists; its name is not established by this change.
 
 ```sh
 SOURCE_COMMIT="$(git rev-parse HEAD)"
@@ -87,7 +143,7 @@ docker image inspect --format '{{json .RepoDigests}}' "${IMAGE_TAG}"
 Configure the job with that exact `repository@sha256:...` reference. This task
 does not push an image and no registry path or image digest is available yet.
 
-Record these immutable build and deployment identities in the launch approval:
+Record these immutable build and deployment identities in the run record:
 
 - reviewed source commit (`git rev-parse HEAD`) and Dockerfile SHA-256;
 - merged #1301 commit, #1299 commit above, and accepted research-source SHA-256;
@@ -105,8 +161,9 @@ reuse identifiers from the old stopped run.
 
 In the existing `meridian` project, create one unscheduled one-shot Job using
 the immutable image digest above. Reuse the already approved region and size if
-they are available in that project. If either is unknown, stop for the owner;
-this plan does not select or create new infrastructure identifiers.
+they are available in that project. If either is unknown, resolve those
+existing allocations before launch; this plan does not select or create new
+infrastructure identifiers.
 
 Allocate a **new, separate durable volume** for this run. Mount its root
 read/write at `/evidence-root`, and ensure the mount is writable by the image's
@@ -129,10 +186,11 @@ exactly as this vector; keep the image entrypoint unchanged:
 ]
 ```
 
-This Job must not be created or launched until the source, research pin, image
-digest, mount ownership, owner approval, and full-size export gate above are
-independently accepted. The null research pin is a hard stop, not an operator
-override.
+This Job must not be created or launched until the source is merged, Lead has
+accepted the integrated adapter/research pin, immutable image digest is
+available, mount ownership is verified, and the remaining technical
+prerequisites above pass. The already-recorded owner PAPER approval does not
+override any technical gate. The null research pin is a hard stop.
 
 ## Stop, inspect, export, and retrieve
 
@@ -157,13 +215,14 @@ the complete output only if the platform returns it without truncation. An
 incomplete export is not a valid evaluator input; retain the raw volume and
 stop rather than reconstructing or editing evidence.
 
-The #1301/#1304 full-480-cycle serialized-size and retrieval correction is
-still a review gate. The current host uses an 8 MiB journal-inspection bound and
-a 16 MiB export ceiling; neither alone demonstrates that a full run fits the
-host, output transport, and evaluator together. Before accepting this image for
-use, require measured 480-cycle journal, report, export, archive, and manifest
-sizes, plus the complete host export-to-#1304 evaluator path and interrupted
-evidence tests. Do not launch while that end-to-end correction is unresolved.
+The candidate #1301 source addresses the 480-cycle size issue by omitting
+cumulative decision-state snapshots from the terminal report while preserving
+causal decisions and structured states in the journal. Its 480-cycle measured
+sizes and synthetic evaluator completed/interrupted results are recorded above
+in this runbook. The remaining requirement is to
+repeat/confirm the bounded image and evaluator path on merged #1301/#1304
+sources and final-head CI; the candidate measurements do not establish a
+worst-case maximum or live readiness.
 
 After that gate passes, run `package` as a separate read-only-volume
 maintenance invocation. Reserve at least 90 MiB of writable temporary space
