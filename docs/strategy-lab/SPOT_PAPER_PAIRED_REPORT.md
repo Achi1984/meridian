@@ -25,7 +25,8 @@ boundary. The projector returns only this minimal shape:
   },
   timing: {
     requestedDurationMs, observedCoverageMs, actualElapsedMs,
-    runStoppedAt, valuationAt, requestedCycles, completedCycles, stopReason
+    runStoppedAt, valuationAt, requestedCycles, attemptedCycles,
+    completedCycles, stopReason
   },
   assumptions: {feeBpsPerSide, slippageBpsPerSide, ratesVerified},
   arms: {
@@ -69,6 +70,9 @@ reviewed. A running snapshot is never final evidence. Since the current
 `UNKNOWN_WRITER_OR_INTERRUPTED`, a running label requires an explicit
 `snapshotStatus: "RUNNING_SNAPSHOT"` in the supplied export; absent that
 distinction the evaluator fails closed as unknown.
+For a running snapshot, completed cycles count journaled shared observations;
+attempted cycles stay null because the journal checkpoint has no live attempt
+counter.
 
 ## Expected identity and local evaluation
 
@@ -103,6 +107,9 @@ when included, and the expected identity against both report and manifest.
 The requested horizon is eight hours/480 cycles. `observedCoverageMs` ends at
 the common valuation observation; `actualElapsedMs` and `runStoppedAt` describe
 run termination, while each arm's `tradingStoppedAt` preserves its own stop.
+`attemptedCycles` follows the producer counter; `completedCycles` counts
+committed shared observations, so a failed final cycle is not counted as
+completed.
 These timestamps are intentionally distinct. Deltas are emitted only when the
 research comparison is available at the same horizon and its account metrics
 reconcile with all three forward-report accounts. A missing/stale open-position

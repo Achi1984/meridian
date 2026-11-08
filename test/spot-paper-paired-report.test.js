@@ -150,7 +150,7 @@ function fixture() {
   const events = [
     {id: 'paired-start', type: 'start', at: report.startedAt},
     ...Array.from({length: report.cycles}, (_, index) => ({
-      id: `shared:${index + 1}`,
+      id: `shared:${index + 1}:${'b'.repeat(64)}`,
       type: 'shared_observation',
       cycle: index + 1,
       decisionAt: report.startedAt + (index + 1) * 60_000,
@@ -206,6 +206,9 @@ test('projects a compatible synthetic terminal run without winner or cost double
   assert.equal(output.deltas.challengerMinusBaseline.netPnlCents, -400);
   assert.equal(output.deltas.challengerMinusCash.netPnlCents, -500);
   assert.equal(output.timing.requestedDurationMs, 28_800_000);
+  assert.equal(output.timing.requestedCycles, 480);
+  assert.equal(output.timing.attemptedCycles, 480);
+  assert.equal(output.timing.completedCycles, 480);
   assert.equal(output.timing.observedCoverageMs, 28_800_000);
   assert.equal(output.timing.runStoppedAt, 28_801_000);
   assert.equal(output.timing.valuationAt, 28_801_000);
@@ -234,6 +237,65 @@ test('retains a verified interrupted report and keeps stop time separate from va
   assert.equal(output.timing.valuationAt, 28_801_000);
 });
 
+test('separates attempted from completed cycles when a shared-feed cycle fails', () => {
+  const input = fixture();
+  const {report, journal} = input;
+  const lastObservation = journal.events[1];
+  report.outcome = 'INTERRUPTED_OR_STOPPED';
+  report.stopReason = 'SHARED_FEED_FAILURE';
+  report.cycles = 2;
+  report.requests = 3;
+  report.endedAt = 62_000;
+  report.elapsedMs = 61_000;
+  report.wallClockElapsedMs = 61_000;
+  report.fullEightHourCompletion = false;
+  report.coverage = 'PARTIAL';
+  report.commonHorizon = {available: true, quoteReceivedAt: 61_000, effectAt: 61_000};
+  report.comparison.status = 'UNAVAILABLE';
+  for (const item of report.arms) {
+    item.decisions = item.decisions.slice(0, 1);
+    item.riskStates = item.riskStates.slice(0, 1);
+  }
+  report.arms[0].tradingStatus = 'ACTIVE';
+  report.arms[0].stopReason = null;
+  report.arms[0].stoppedAt = null;
+  journal.events = [
+    journal.events[0],
+    lastObservation,
+    {
+      id: 'shared-failure:2:SHARED_FEED_FAILURE',
+      type: 'shared_feed_failure',
+      cycle: 2,
+      reason: 'synthetic provider failure'
+    },
+    {
+      id: 'paired-terminal',
+      type: 'terminal',
+      at: report.endedAt,
+      report: structuredClone(report)
+    }
+  ];
+  journal.sequence = journal.events.length;
+  journal.checkpoint.cycle = 2;
+  journal.checkpoint.stopReason = report.stopReason;
+  journal.checkpoint.counters = {requests: 3, bytes: report.deliveredBytes};
+  const output = evaluatePairedPaperEvidence(input);
+  assert.equal(output.evidenceStatus, 'INTERRUPTED');
+  assert.equal(output.timing.attemptedCycles, 2);
+  assert.equal(output.timing.completedCycles, 1);
+  assert.equal(output.timing.valuationAt, 61_000);
+
+  const reordered = structuredClone(input);
+  reordered.journal.events = [
+    reordered.journal.events[0],
+    reordered.journal.events[2],
+    reordered.journal.events[1],
+    reordered.journal.events[3]
+  ];
+  assert.equal(evaluatePairedPaperEvidence(reordered).reasonCode,
+    'JOURNAL_REPORT_MISMATCH');
+});
+
 test('labels a reported running snapshot as provisional and not final evidence', () => {
   const input = fixture();
   input.report = null;
@@ -244,6 +306,8 @@ test('labels a reported running snapshot as provisional and not final evidence',
   assert.equal(output.evidenceStatus, 'RUNNING_SNAPSHOT');
   assert.equal(output.reasonCode, 'TERMINAL_REPORT_NOT_YET_AVAILABLE');
   assert.equal(output.arms.baseline.netEquityCents, null);
+  assert.equal(output.timing.attemptedCycles, null);
+  assert.equal(output.timing.completedCycles, 480);
 });
 
 test('rejects forged or mismatched run/source identity and terminal report copies', () => {

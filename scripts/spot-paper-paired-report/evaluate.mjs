@@ -196,6 +196,11 @@ function reportIsValid(report, expected) {
         arm.modelId !== expected.models[index].modelId ||
         arm.accountId !== expected.models[index].accountId ||
         !['ACTIVE', 'STOPPED'].includes(arm.tradingStatus) ||
+        arm.stoppedAt !== null &&
+          (!isInteger(arm.stoppedAt) || arm.stoppedAt < report.startedAt ||
+            arm.stoppedAt > report.endedAt) ||
+        arm.tradingStatus === 'STOPPED' &&
+          (arm.stoppedAt === null || typeof arm.stopReason !== 'string') ||
         !Array.isArray(arm.fills) || !isRecord(arm.valuation)) {
       return 'INVALID_ARM_REPORT';
     }
@@ -230,6 +235,10 @@ function validateTerminalJournal(journal, report, expected) {
   const terminal = payload.events.at(-1);
   const observations = payload.events.filter(event =>
     event?.type === 'shared_observation');
+  const failures = payload.events.filter(event =>
+    event?.type === 'shared_feed_failure');
+  const failureIndex = payload.events.findIndex(event =>
+    event?.type === 'shared_feed_failure');
   const validResponseRef = response => isRecord(response) &&
     typeof response.path === 'string' &&
     /^responses\/[a-f0-9]{64}\.json$/.test(response.path) &&
@@ -241,11 +250,11 @@ function validateTerminalJournal(journal, report, expected) {
   let priorEffectAt = null;
   const observationStreamValid = observations.every((event, index) => {
     const valid = event?.cycle === index + 1 &&
-      event.id === `shared:${index + 1}` &&
       isInteger(event.decisionAt) && isInteger(event.effectAt) &&
       event.decisionAt <= event.effectAt && event.observedAt === event.effectAt &&
       (priorEffectAt === null || event.effectAt > priorEffectAt) &&
       validResponseRef(event.ohlc) && validResponseRef(event.ticker) &&
+      event.id === `shared:${index + 1}:${event.ticker.sha256}` &&
       eventRoles(event.decisions) && eventRoles(event.fills) &&
       eventRoles(event.riskStates) && eventRoles(event.valuations) &&
       event.fills.every(item => Array.isArray(item.fills));
@@ -253,8 +262,8 @@ function validateTerminalJournal(journal, report, expected) {
     return valid;
   });
   const reportArmsReconcile = report.arms.every(arm =>
-    Array.isArray(arm.decisions) && arm.decisions.length === report.cycles &&
-    Array.isArray(arm.riskStates) && arm.riskStates.length === report.cycles);
+    Array.isArray(arm.decisions) && arm.decisions.length === observations.length &&
+    Array.isArray(arm.riskStates) && arm.riskStates.length === observations.length);
   const fillCountsReconcile = SPOT_PAPER_PAIRED_ROLES.every((role, index) =>
     report.arms[index].fills.length === observations.reduce((sum, event) => {
       const group = Array.isArray(event.fills) ?
@@ -268,18 +277,40 @@ function validateTerminalJournal(journal, report, expected) {
       payload.checkpoint.stopReason !== report.stopReason ||
       payload.checkpoint.counters?.requests !== report.requests ||
       payload.checkpoint.counters?.bytes !== report.deliveredBytes ||
-      observations.length !== report.cycles ||
+      observations.length > report.cycles ||
+      report.cycles - observations.length > 1 ||
+      failures.length > 1 ||
+      failures.length === 1 &&
+        (failureIndex !== observations.length + 1 ||
+          failures[0].cycle !== observations.length + 1 ||
+          failures[0].cycle !== report.cycles ||
+          failures[0].id !==
+            `shared-failure:${report.cycles}:${report.stopReason}`) ||
+      observations.length < report.cycles &&
+        failures.length === 0 &&
+        !['OPERATOR_STOP', 'DURATION_LIMIT'].includes(report.stopReason) ||
+      observations.length === report.cycles && failures.length !== 0 ||
       payload.events[0]?.type !== 'start' ||
       payload.events[0]?.id !== 'paired-start' ||
+      payload.events.length !== observations.length + failures.length + 2 ||
+      failures.length === 1 &&
+        payload.events.at(-2)?.type !== 'shared_feed_failure' ||
       !observationStreamValid ||
       report.cycles > 0 &&
-        priorEffectAt !== report.commonHorizon.effectAt ||
-      report.cycles === 0 && report.commonHorizon.effectAt !== null ||
+        observations.length > 0 &&
+          priorEffectAt !== report.commonHorizon.effectAt ||
+      observations.length === 0 && report.commonHorizon.effectAt !== null ||
       !reportArmsReconcile || !fillCountsReconcile ||
       !identityMatches(report, payload, expected)) {
     return {error: 'JOURNAL_REPORT_MISMATCH'};
   }
-  return {status: 'TERMINAL_RECONCILED', payload, reconciliationStatus};
+  return {
+    status: 'TERMINAL_RECONCILED',
+    payload,
+    reconciliationStatus,
+    attemptedCycles: report.cycles,
+    completedCycles: observations.length
+  };
 }
 
 function safeNumber(value) {
@@ -542,7 +573,8 @@ function buildDto(report, expected, status, reasonCode, reportValid = true) {
       runStoppedAt: safeNumber(report?.endedAt),
       valuationAt: safeNumber(horizon),
       requestedCycles: MAX_CYCLES,
-      completedCycles: safeNumber(report?.cycles),
+      attemptedCycles: safeNumber(report?.cycles),
+      completedCycles: safeNumber(reportValid ? report._completedCycles : null),
       stopReason: report?.stopReason ?? 'UNKNOWN'
     },
     assumptions: {feeBpsPerSide: 50, slippageBpsPerSide: 10, ratesVerified: false},
@@ -564,6 +596,9 @@ function runningSnapshotDto(journal, expected, status, reason) {
   if (isInteger(payload?.manifest?.startedAt)) {
     result.timing.runStoppedAt = null;
   }
+  result.timing.attemptedCycles = null;
+  result.timing.completedCycles = Array.isArray(payload?.events) ?
+    payload.events.filter(event => event?.type === 'shared_observation').length : null;
   return projectSpotPaperPairedDashboard(result) ??
     createUnknownSpotPaperPairedDashboard('DTO_PROJECTION_FAILED');
 }
@@ -602,7 +637,8 @@ export function evaluatePairedPaperEvidence({expectedIdentity, report, journal} 
     'VERIFIED_COMPLETE' : 'INTERRUPTED';
   const reason = status === 'VERIFIED_COMPLETE' ?
     'TERMINAL_REPORT_RECONCILED' : 'INTERRUPTED_TERMINAL_RECONCILED';
-  return buildDto(report, expectedIdentity, status, reason);
+  return buildDto({...report, _completedCycles: terminal.completedCycles},
+    expectedIdentity, status, reason);
 }
 
 export async function readBoundedJsonFile(path, maxBytes) {

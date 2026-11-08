@@ -16,6 +16,9 @@ const HASH = /^[a-f0-9]{64}$/;
 const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 const MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const REASON_CODE = /^[A-Z][A-Z0-9_]{0,63}$/;
+const ARM_STOP_REASONS = new Set([
+  'SAMPLED_2PCT_BID_STOP', 'SESSION_LOSS_LIMIT'
+]);
 const isRecord = value => value !== null && typeof value === 'object' &&
   !Array.isArray(value);
 const isInteger = Number.isSafeInteger;
@@ -78,7 +81,8 @@ function safeArm(arm, role, identityModel) {
   ]) {
     if (metrics[name] !== null && metrics[name] < 0) return null;
   }
-  const stopReason = arm.stopReason === null ? null : safeCode(arm.stopReason);
+  if (arm.stopReason !== null && !ARM_STOP_REASONS.has(arm.stopReason)) return null;
+  const stopReason = arm.stopReason;
   if (!nullableInteger(arm.tradingStoppedAt)) return null;
   return {
     role,
@@ -121,7 +125,8 @@ export function sanitizeSpotPaperPairedDashboardDto(input) {
 
   const timingKeys = [
     'requestedDurationMs', 'observedCoverageMs', 'actualElapsedMs',
-    'runStoppedAt', 'valuationAt', 'requestedCycles', 'completedCycles'
+    'runStoppedAt', 'valuationAt', 'requestedCycles', 'attemptedCycles',
+    'completedCycles'
   ];
   const timing = {};
   for (const key of timingKeys) {
@@ -132,8 +137,12 @@ export function sanitizeSpotPaperPairedDashboardDto(input) {
       timing.requestedCycles !== 480 ||
       timing.observedCoverageMs !== null && timing.observedCoverageMs < 0 ||
       timing.actualElapsedMs !== null && timing.actualElapsedMs < 0 ||
+      timing.attemptedCycles !== null &&
+        (timing.attemptedCycles < 0 || timing.attemptedCycles > 480) ||
       timing.completedCycles !== null &&
-        (timing.completedCycles < 0 || timing.completedCycles > 480)) return null;
+        (timing.completedCycles < 0 || timing.completedCycles > 480 ||
+          timing.attemptedCycles !== null &&
+            timing.completedCycles > timing.attemptedCycles)) return null;
   if (!['CYCLE_LIMIT', 'DURATION_LIMIT', 'OPERATOR_STOP',
     'REQUEST_LIMIT', 'SHARED_FEED_FAILURE', 'UNKNOWN'].includes(
     input.timing.stopReason)) return null;
@@ -249,6 +258,7 @@ export function createUnknownSpotPaperPairedDashboard(reasonCode = 'UNKNOWN') {
       runStoppedAt: null,
       valuationAt: null,
       requestedCycles: 480,
+      attemptedCycles: null,
       completedCycles: null,
       stopReason: 'UNKNOWN'
     },
