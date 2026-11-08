@@ -438,6 +438,7 @@ def _deadline_diagnostic(elapsed, result, current, completed):
 
 
 class ResearchSupervisorTests(unittest.TestCase):
+    _direct_b1_json = None
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.database = str(Path(self.temporary.name) / "research.sqlite")
@@ -1162,8 +1163,13 @@ connection.close()
             raise AssertionError(result.stderr)
         return json.loads(result.stdout)
 
-    @staticmethod
-    def direct_b1_result():
+    @classmethod
+    def direct_b1_result(cls):
+        # The reference computation is identical in every consumer. Preserve its
+        # immutable serialized result, but decode a fresh tree for tests that
+        # deliberately corrupt nested fields. Real supervisor runs stay separate.
+        if cls._direct_b1_json is not None:
+            return json.loads(cls._direct_b1_json)
         code = r'''
 import {readFileSync} from 'node:fs';
 import {createSyntheticSeries} from './test/fixtures/b1-7/synthetic-series.mjs';
@@ -1185,7 +1191,9 @@ process.stdout.write(JSON.stringify(runBatch({
             cwd=PROJECT_ROOT, capture_output=True, text=True, timeout=120)
         if result.returncode:
             raise AssertionError(result.stderr)
-        return json.loads(result.stdout)
+        decoded = json.loads(result.stdout)
+        cls._direct_b1_json = result.stdout
+        return decoded
 
     def test_b1_persistent_session_matches_direct_generated_fixture_result(self):
         direct = self.direct_b1_result()
@@ -1386,6 +1394,7 @@ process.stdout.write(JSON.stringify(runBatch({
 
     def test_b1_summary_rejects_coerced_counts_and_substituted_control_identity(self):
         direct = self.direct_b1_result()
+        original_control_id = direct["controlRealization"][0]["variantId"]
         profile = journal._b1_profile()
         summary = {key: value for key, value in direct.items()
                    if key not in ("paths", "controlDefinitions")}
@@ -1398,6 +1407,12 @@ process.stdout.write(JSON.stringify(runBatch({
         summary["controlRealization"][0]["variantId"] = "substituted-control"
         with self.assertRaisesRegex(journal.JournalError, "RESULT_SCHEMA_INVALID"):
             journal._validate_b1_summary(summary, profile)
+
+        # Corruption in one consumer must not leak into the cached reference or
+        # require another expensive, identical engine computation.
+        with patch.object(subprocess, "run", side_effect=AssertionError("reference recomputed")):
+            fresh = self.direct_b1_result()
+        self.assertEqual(fresh["controlRealization"][0]["variantId"], original_control_id)
 
     def test_b1_insufficient_evidence_schema_is_valid_but_never_completed(self):
         direct = self.direct_b1_result()
