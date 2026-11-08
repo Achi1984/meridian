@@ -12,28 +12,39 @@ journal helpers it imports, and the reviewed #1299 research exports:
 
 - #1299 research source: `adf5c0a6e7b7d93bfd106dd6136c40a8e15a6373`
 - merged #1299 source commit: `4f5c4a3c8489129c514cd57c4b71f37ee05bcddf`
-- #1301 reviewed host candidate: `5f25f771cd45dab41ec642660cce18cbdb324ef3`
+- merged #1301 source commit: `a64eef5f614bdba3cf284d9a5209aa606dd8e87d`
+- #1304 single-export evaluator candidate: `5700feb6f1b82257b18e5c50f527a3e2f80d175a` (accepted source, not merged to main at this revision)
 
-The production research pin in `scripts/spot-paper-paired/forward.mjs` must
-remain `null`; do not edit it. The image's default command is `disabled`; its
-explicit `run` command fails closed with `RESEARCH_INTEGRATION_NOT_ACCEPTED`
-before feed access while the pin is null.
+The accepted research pin in `scripts/spot-paper-paired/forward.mjs` is
+`4c60b1ccccbd495d93006a6838593423c27caac8104a0239fa23fd97a716f82d`. It was
+computed by `pairedResearchSourceDigest` from the exact merged #1299 source
+bytes and is intentionally unchanged by the paired host. Independent byte
+identities:
+
+| Source | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `scripts/spot-paper-research/comparison.mjs` | 19,018 | `482092145488d6a9fe3fd4230648fac85fb3036fe2f256f6ff1c2e18d00b617f` |
+| `scripts/spot-paper-research/entry-confirmation.mjs` | 4,518 | `0107759a690a8ce20ae6cb61c59ed3ef2fad0c7093f5efb6df0be37b61334f8b` |
+
+The image's default command remains `disabled` and performs no feed request.
+The explicit `run` command is capable of public feed access when invoked; this
+task does not invoke it, acquire data, launch a host, or deploy an image.
 
 The image includes `status`, `report`, `export`, and byte-preserving `package`
-commands from the paired host. It does not include or invoke the separate #1304
-offline evaluator. A temporary composition with #1304 candidate
-`1feea98a1fd2c602fccb1824c71d19e253c28376` completed the report/export evaluator
-CLI case and preserved the interrupted case as `INTERRUPTED` with unavailable
-deltas. This is cross-PR synthetic compatibility evidence, not a merged
-dependency or live acceptance; keep evaluator modules out of this image.
+commands from the paired host. It does not include the separate #1304 offline
+evaluator. The new single-export evaluator CLI from #1304 candidate
+`5700feb6f1b82257b18e5c50f527a3e2f80d175a` takes the combined host-export
+artifact directly; it removes the earlier report-wrapper/journal-extraction
+chain. Keep evaluator modules out of this image.
 
 ### Candidate image and smoke evidence
 
-The image was built from an isolated temporary context containing only the
-paired host files from #1301 `5f25f771cd45dab41ec642660cce18cbdb324ef3`, the
-merged #1299 research exports above, required baseline/journal/provider/
-packaging modules, and this Dockerfile. It was not built from the older #1301
-candidate `3308394a2bd1e9d3d022da48f90a246cb3a20546` or the full repository.
+The first candidate image was built from an isolated temporary context
+containing only #1301 `5f25f771cd45dab41ec642660cce18cbdb324ef3`, merged #1299
+exports, required baseline/journal/provider/packaging modules, and this
+Dockerfile. After #1301 merged, the image was rebuilt from the complete merged
+checkout with the accepted pin set. The current build identities and smoke
+results are recorded below.
 
 | Build identity | Recorded value |
 | --- | --- |
@@ -43,16 +54,13 @@ candidate `3308394a2bd1e9d3d022da48f90a246cb3a20546` or the full repository.
 | Local tag | `meridian-spot-paper-paired:5f25f771` |
 | Registry digest | Not available; image was not pushed |
 
-The local build and smoke checks passed:
+The initial candidate build smoke checks passed:
 
 - `docker run --rm --network none meridian-spot-paper-paired:5f25f771`
   returned `DISABLED`; no feed access was possible.
 - Direct imports of all nine packaged host, paired, baseline, provider,
   packaging, and #1299 research modules succeeded with networking disabled;
   provider counters remained unused.
-- With a writable evidence mount, `run --data-root /evidence-root --run-id
-  paired-live-pin-check` failed with `RESEARCH_INTEGRATION_NOT_ACCEPTED` and
-  created no run directory.
 - A bind-mounted file write succeeded as UID 1000 (`node`).
 - Docker SIGTERM reached Node's paired host signal helper; its AbortSignal
   handler wrote `SIGTERM` to the writable mount and the process exited within
@@ -60,7 +68,7 @@ The local build and smoke checks passed:
 - The exact #1301 paired-forward and paired-host test files passed 22/22,
   including the 480-cycle integration against actual #1299 exports.
 
-The updated #1301 candidate's actual-export 480-cycle fixture measured:
+The updated #1301 actual-export 480-cycle fixture measured:
 
 | Artifact | Measured bytes | Applicable bound |
 | --- | ---: | ---: |
@@ -78,14 +86,14 @@ as `VERIFIED_COMPLETE`; the separate operator-interrupted synthetic case stayed
 `INTERRUPTED` with unavailable deltas. The evaluator was not packaged in this
 image because it remains an independently run consumer.
 
-At the last status check, #1301 was open, no longer draft, and not merged;
-final-head CI run `42528020776` completed successfully. #1304 remained
-unmerged and draft. Before package acceptance, update this branch from main
-after #1301 merges, rebuild and rerun the image smoke checks from that merged
-source, and require final-head CI plus the compatible #1304 evaluator
-integration on merged sources. No registry repository or digest, Northflank
-job/instance/volume IDs, region, or compute size was available in this
-preparation.
+#1301 merged as `a64eef5f614bdba3cf284d9a5209aa606dd8e87d`; final-head CI
+`42528020776` succeeded. The current branch contains that main commit and the
+accepted research pin. #1304's single-export CLI at `5700feb6f1b82257b18e5c50f527a3e2f80d175a`
+has accepted source review and CI `42528821318` succeeded, but it has not yet
+merged to main. Before final package acceptance, require the current branch's
+final-head CI and rebuild the image from the merged reviewed source. No
+registry repository or digest, Northflank job/instance/volume IDs, region, or
+compute size is available from this preparation.
 
 ## Frozen run
 
@@ -112,9 +120,9 @@ entrypoint. Do not wrap it in a shell.
 
 ## Build and immutable image record
 
-After the reviewed #1301 source is merged to main and final-head tests pass,
-build again from the exact reviewed main commit. Use the existing approved
-registry repository if one exists; its name is not established by this change.
+After final-head tests pass, build from the exact reviewed merged source commit.
+Use the existing approved registry repository if one exists; its name is not
+established by this change.
 
 ```sh
 SOURCE_COMMIT="$(git rev-parse HEAD)"
@@ -186,11 +194,11 @@ exactly as this vector; keep the image entrypoint unchanged:
 ]
 ```
 
-This Job must not be created or launched until the source is merged, Lead has
-accepted the integrated adapter/research pin, immutable image digest is
-available, mount ownership is verified, and the remaining technical
-prerequisites above pass. The already-recorded owner PAPER approval does not
-override any technical gate. The null research pin is a hard stop.
+This Job must not be created or launched until the exact reviewed source and
+immutable image digest are recorded, mount ownership is verified, and remaining
+technical prerequisites above pass. The already-recorded owner PAPER approval
+covers the future bounded paper operation; it does not replace those technical
+checks.
 
 ## Stop, inspect, export, and retrieve
 
@@ -209,20 +217,35 @@ Give the status/report/export-only maintenance invocation a finite 60-second
 external timeout; host journal inspection is bounded to five seconds. Apply
 the longer retrieval timeout below only to packaging and native file download.
 
-`export` emits a bounded `SPOT_PAPER_PAIRED_HOST_EXPORT_V1` JSON document to
-stdout, including report and validated journal payload. Capture and preserve
-the complete output only if the platform returns it without truncation. An
-incomplete export is not a valid evaluator input; retain the raw volume and
-stop rather than reconstructing or editing evidence.
+`export` emits one bounded `SPOT_PAPER_PAIRED_HOST_EXPORT_V1` JSON document
+containing the report and validated journal payload. The canonical evaluator
+consumes that file directly; do not extract, transform, or hand-edit a separate
+report or journal:
+
+```sh
+node scripts/spot-paper-paired/host.mjs export \
+  --data-root /evidence-root --run-id btc-eur-paired-host-8h-001 \
+  > /tmp/spot-paper-paired-package/host-export.json
+node scripts/spot-paper-paired-report/cli.mjs \
+  /absolute/path/expected-identity.json \
+  /tmp/spot-paper-paired-package/host-export.json
+```
+
+The second command requires #1304 candidate
+`5700feb6f1b82257b18e5c50f527a3e2f80d175a` (or its merged successor), which
+accepts exactly one host-export artifact plus the independently prepared
+expected-identity file. Do not copy candidate evaluator files into the paired
+image. Capture and preserve the complete export; if the host output is truncated
+or the evaluator reports `CORRUPT_UNKNOWN`, retain raw evidence and stop.
 
 The candidate #1301 source addresses the 480-cycle size issue by omitting
 cumulative decision-state snapshots from the terminal report while preserving
 causal decisions and structured states in the journal. Its 480-cycle measured
 sizes and synthetic evaluator completed/interrupted results are recorded above
-in this runbook. The remaining requirement is to
-repeat/confirm the bounded image and evaluator path on merged #1301/#1304
-sources and final-head CI; the candidate measurements do not establish a
-worst-case maximum or live readiness.
+in this runbook. The remaining technical acceptance is final-head CI for this branch and
+reconfirmation using #1304's merged single-export CLI when it reaches main.
+The candidate measurements do not establish a worst-case maximum or live
+readiness.
 
 After that gate passes, run `package` as a separate read-only-volume
 maintenance invocation. Reserve at least 90 MiB of writable temporary space
