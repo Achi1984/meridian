@@ -1,5 +1,5 @@
 import {createHash} from "node:crypto";
-import {lstat} from "node:fs/promises";
+import {lstat, mkdir, realpath} from "node:fs/promises";
 import path from "node:path";
 import {
   canonicalCheckpointBytes, CheckpointStore
@@ -90,6 +90,15 @@ async function assertDirectory(directory, {mustNotExist = false} = {}) {
   }
 }
 
+async function assertTrustedParent(directory) {
+  const parent = path.dirname(directory);
+  const info = await lstat(parent).catch(() => null);
+  if (!info?.isDirectory() || info.isSymbolicLink() ||
+      await realpath(parent).catch(() => null) !== parent) {
+    throw new Error("UNTRUSTED_HISTORY_PARENT");
+  }
+}
+
 async function decodeCheckpoint(result) {
   if (result.status !== "OK") return result;
   let checkpoint;
@@ -170,7 +179,8 @@ export async function reconcileChallengeHistory(directory) {
   await assertDirectory(directory);
   await validateStoreFiles(directory, {requireCheckpoint: false});
   const store = new CheckpointStore(directory, {maxBytes: MAX_HISTORY_BYTES});
-  return store.reconcilePending();
+  const result = await store.reconcilePending();
+  return result.status === "OK" ? decodeCheckpoint(result) : result;
 }
 
 export class ChallengeHistoryStore {
@@ -190,10 +200,19 @@ export class ChallengeHistoryStore {
 
   static async createNew(directory, {onPhase} = {}) {
     await assertDirectory(directory, {mustNotExist: true});
-    const store = await CheckpointStore.open(directory, {
-      maxBytes: MAX_HISTORY_BYTES,
-      onPhase
-    });
+    await assertTrustedParent(directory);
+    if (onPhase !== undefined && typeof onPhase !== "function") {
+      throw new TypeError("history phase hook must be a function");
+    }
+    if (onPhase) await onPhase("before-create-directory", {directory});
+    try {
+      await mkdir(directory);
+    } catch (error) {
+      if (error.code === "EEXIST") throw new Error("HISTORY_ALREADY_EXISTS");
+      throw error;
+    }
+    await assertDirectory(directory);
+    const store = await CheckpointStore.open(directory, {maxBytes: MAX_HISTORY_BYTES, onPhase});
     try {
       const existing = await store.readCheckpoint();
       if (existing.status !== "ABSENT") throw new Error("HISTORY_ALREADY_EXISTS");
@@ -291,7 +310,8 @@ export class ChallengeHistoryStore {
 
   async reconcilePending() {
     this.#assertOpen();
-    return this.#store.reconcilePending();
+    const result = await this.#store.reconcilePending();
+    return result.status === "OK" ? decodeCheckpoint(result) : result;
   }
 
   async close() {

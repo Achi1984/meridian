@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
+import {createHash} from "node:crypto";
 import {spawn} from "node:child_process";
 import {once} from "node:events";
-import {mkdtemp, readFile, rm, writeFile} from "node:fs/promises";
+import {
+  mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile
+} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import {fileURLToPath} from "node:url";
@@ -120,6 +123,27 @@ test("create-new and reopen-existing never initialize missing or existing histor
   }), /INVALID_EXPECTED_TIP/);
 });
 
+test("create-new claims the leaf atomically and refuses symlink parents", async t => {
+  const directory = await tempDirectory(t);
+  const historyDirectory = historyPath(directory);
+  await assert.rejects(ChallengeHistoryStore.createNew(historyDirectory, {
+    async onPhase(phase) {
+      if (phase === "before-create-directory") await mkdir(historyDirectory);
+    }
+  }), /HISTORY_ALREADY_EXISTS/);
+  assert.deepEqual(await readdir(historyDirectory), []);
+
+  const trustedTarget = path.join(directory, "trusted-target");
+  await mkdir(trustedTarget);
+  const linkedParent = path.join(directory, "linked-parent");
+  await symlink(trustedTarget, linkedParent);
+  await assert.rejects(ChallengeHistoryStore.createNew(path.join(linkedParent, "history")),
+    /UNTRUSTED_HISTORY_PARENT/);
+  assert.deepEqual((await readdir(directory)).sort(), [
+    "history", "linked-parent", "trusted-target"
+  ]);
+});
+
 test("corrupt, truncated, and unexpected identity histories fail closed", async t => {
   for (const mutation of [
     bytes => bytes.subarray(0, Math.max(1, bytes.length - 7)),
@@ -150,6 +174,52 @@ test("corrupt, truncated, and unexpected identity histories fail closed", async 
       expectedTip: tip
     }));
   }
+});
+
+test("both reconciliation APIs domain-validate generic OK results without clearing claims", async t => {
+  for (const mutation of [
+    checkpoint => { checkpoint.currency = "EUR"; },
+    checkpoint => { checkpoint.policyVersion = "unexpected-policy"; },
+    checkpoint => { checkpoint.records[1].predecessorHash = "a".repeat(64); }
+  ]) {
+    const directory = await tempDirectory(t);
+    const store = await ChallengeHistoryStore.createNew(historyPath(directory));
+    const tip = (await store.append(observation("valid", 100_000, 1_000))).tip;
+    const file = path.join(historyPath(directory), "checkpoint.json");
+    const checkpoint = JSON.parse(await readFile(file, "utf8"));
+    mutation(checkpoint);
+    await writeFile(file, canonicalCheckpointBytes(checkpoint));
+
+    assert.equal((await reconcileChallengeHistory(historyPath(directory))).status, "CORRUPT");
+    assert.equal((await store.reconcilePending()).status, "CORRUPT");
+    await assert.rejects(ChallengeHistoryStore.reopenExisting(historyPath(directory), {
+      expectedTip: tip
+    }), {code: "CHECKPOINT_BUSY"});
+    await store.close();
+  }
+});
+
+test("reconciliation preserves NOT_PUBLISHED without clearing pending data or writer claim", async t => {
+  const directory = await tempDirectory(t);
+  const store = await ChallengeHistoryStore.createNew(historyPath(directory));
+  const tip = store.tip;
+  const pending = {
+    version: 1,
+    expectedSequence: tip.revision,
+    expectedHash: tip.digest,
+    sequence: tip.revision + 1,
+    candidateHash: createHash("sha256").update("synthetic candidate").digest("hex")
+  };
+  const pendingPath = path.join(historyPath(directory), ".checkpoint-pending");
+  await writeFile(pendingPath, canonicalCheckpointBytes(pending));
+
+  assert.equal((await reconcileChallengeHistory(historyPath(directory))).status, "NOT_PUBLISHED");
+  assert.equal((await store.reconcilePending()).status, "NOT_PUBLISHED");
+  assert.deepEqual(JSON.parse(await readFile(pendingPath, "utf8")), pending);
+  await assert.rejects(ChallengeHistoryStore.reopenExisting(historyPath(directory), {
+    expectedTip: tip
+  }), {code: "CHECKPOINT_BUSY"});
+  await store.close();
 });
 
 test("independently retained expected tip detects stale history and rollback", async t => {
@@ -220,11 +290,11 @@ test("exclusive writer and stale receipt admission reject concurrent updates", a
   await current.close();
 });
 
-test("phase-injected write, fsync-boundary, and rename failures block further writes", async t => {
+test("phase hooks at commit boundaries block writes without simulating fsync syscall failures", async t => {
   for (const [phase, label] of [
-    ["after-pending", "write"],
-    ["after-file-sync", "fsync"],
-    ["before-rename", "rename"]
+    ["after-pending", "pending-write boundary"],
+    ["after-file-sync", "file-sync boundary"],
+    ["before-rename", "pre-rename boundary"]
   ]) {
     const directory = await tempDirectory(t);
     const store = await ChallengeHistoryStore.createNew(historyPath(directory));
@@ -239,7 +309,8 @@ test("phase-injected write, fsync-boundary, and rename failures block further wr
       }
     });
     inject = true;
-    await assert.rejects(writer.append(observation(`failed-${label}`, 100_000, 1_000)),
+    await assert.rejects(writer.append(observation(
+      `failed-${phase.replaceAll("-", "_")}`, 100_000, 1_000)),
       {code: "HISTORY_COMMIT_FAILED"});
     assert.throws(() => writer.state, /HISTORY_RECOVERY_REQUIRED/);
     await assert.rejects(writer.close(), /HISTORY_RECOVERY_REQUIRED/);

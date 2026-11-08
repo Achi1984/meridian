@@ -95,7 +95,10 @@ overshoots must remain visible and must not be reset or hidden.
 `scripts/paper-capital-challenge/history-store.mjs` provides an offline local
 filesystem store for the complete replayable observation history. Call
 `ChallengeHistoryStore.createNew(directory)` only for a new campaign directory;
-it fails if the directory already exists. Restart uses the distinct
+it atomically claims the new leaf and fails if the directory already exists.
+Its parent must already exist as a trusted, fully resolved, non-symlink
+directory; the API does not provide hostile-host path confinement. Restart
+uses the distinct
 `ChallengeHistoryStore.reopenExisting(directory, {expectedTip})` operation. It
 requires an existing history and an exact expected tip, and never initializes
 missing history or accepts a caller-supplied state snapshot. The returned state
