@@ -584,7 +584,8 @@ test('Dashboard rejects out-of-order and terminal-to-running snapshots without r
   assert.equal(deps.root.getAttribute('data-state'), 'verified_terminal');
   assert.match(deps.root.textContent, /widersprüchlicher Bericht wurde verworfen/);
   assert.match(deps.root.textContent, /Lauf beendet · Abschluss geprüft/);
-  assert.match(deps.root.textContent, /Zuletzt beobachtet08\.11\.2026, 14:00:00 UTC/);
+  assert.ok(deps.root.textContent.includes('Zuletzt beobachtet' + new Intl.DateTimeFormat('de-DE', {dateStyle:'medium', timeStyle:'medium'}).format(new Date('2026-11-08T14:00:00.000Z')) + ' (lokal)'));
+  assert.ok(deps.root.textContent.includes('Beobachtungszeit (UTC)2026-11-08T14:00:00.000Z'));
   assert.ok(deps.root.textContent.includes('Datenlücken10'));
   assert.notEqual(deps.root.textContent, terminalText);
   deps.controller.dispose();

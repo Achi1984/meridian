@@ -24,8 +24,8 @@ function timestamp(value) {
   const date = new Date(value);
   return Number.isFinite(date.getTime()) ?
     `${new Intl.DateTimeFormat('de-DE', {
-      dateStyle: 'medium', timeStyle: 'medium', timeZone: 'UTC'
-    }).format(date)} UTC` : 'Unbekannt';
+      dateStyle: 'medium', timeStyle: 'medium'
+    }).format(date)} (lokal)` : 'Unbekannt';
 }
 
 function duration(value) {
@@ -80,7 +80,7 @@ function statusText(model) {
         'Paper-Lauf beobachtet · noch keine geprüften Ergebnisse.';
     case 'VERIFIED_TERMINAL':
       return model.completed ? 'Lauf beendet · Abschluss geprüft.' :
-        'Laufende geprüft · Ergebnis noch nicht abschließend bestätigt.';
+        'Laufende bestätigt · Ergebnis noch nicht abschließend geprüft.';
     case 'INCOMPLETE_UNKNOWN':
       return 'Daten unvollständig · Abschluss noch nicht bestätigt.';
     case 'FAILED':
@@ -179,6 +179,7 @@ function renderModel(root, model, document, options = {}) {
   const identity = document.createElement('div');
   identity.className = 'trust-grid';
   field(document, identity, 'Quelle', model.source || 'Unbekannt');
+  field(document, identity, 'Beobachtungszeit (UTC)', model.observedAt || 'Unbekannt');
   field(document, identity, 'Run-ID', model.identity?.runId);
   field(document, identity, 'Profil', model.identity?.profileId);
   field(document, identity, 'Quell-Fingerprint', model.identity?.sourceSha);
