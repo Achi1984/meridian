@@ -149,6 +149,12 @@ function advanceValidated(previous, observation) {
       observation.observedAtMs <= previous.lastObservationAtMs) {
     throw new Error("OBSERVATION_OUT_OF_ORDER");
   }
+  const previousObservation = previous.observations.at(-1);
+  if (previousObservation &&
+      (observation.valuation.asOfMs < previousObservation.valuation.asOfMs ||
+       observation.valuation.bidQuoteAtMs < previousObservation.valuation.bidQuoteAtMs)) {
+    throw new Error("VALUATION_OUT_OF_ORDER");
+  }
   const highWaterEquityCents = Math.max(
     previous.highWaterEquityCents, observation.netEquityCents);
   const breached = BigInt(highWaterEquityCents) -
@@ -212,7 +218,10 @@ export function getExposureGate(state, nowMs) {
   const latest = validated.observations.at(-1);
   if (!latest) return { allowed: false, reason: "NO_FRESH_VALUATION" };
   const ageMs = nowMs - latest.valuation.asOfMs;
-  if (ageMs < 0 || ageMs > latest.valuation.maxAgeMs) {
+  const bidAgeMs = nowMs - latest.valuation.bidQuoteAtMs;
+  if (ageMs < 0 || bidAgeMs < 0 ||
+      ageMs > latest.valuation.maxAgeMs ||
+      bidAgeMs > latest.valuation.maxAgeMs) {
     return { allowed: false, reason: "STALE_OR_MISSING_VALUATION" };
   }
   if (!POLICY.enabled || !POLICY.executionEnabled) {
