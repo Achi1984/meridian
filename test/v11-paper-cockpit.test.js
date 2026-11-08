@@ -228,12 +228,15 @@ test('zero fills and missing fill evidence are distinct; empty and absent positi
   assert.doesNotMatch(second.root.textContent, /Paper entry fills evidenced: 0/);
 });
 
-test('strategy workspace mounts the read-only cockpit once above the existing readiness card', () => {
+test('strategy workspace mounts legacy cockpit once in history and readiness in research', () => {
   const source = readFileSync(new URL('../v11/strategy-workspace-bootstrap.js', import.meta.url), 'utf8');
   assert.equal((source.match(/mountPaperCockpit\(paperRoot,document,window\)/g) || []).length, 1);
   assert.ok(source.indexOf("import {mountPaperCockpit}") < source.indexOf("import {renderPaperReadiness}"));
-  assert.ok(source.indexOf('insertBefore(paperRoot,catalogRoot)') <
-    source.indexOf('insertBefore(readinessRoot,catalogRoot)'));
+  assert.match(source,/const history=collapsedSection\('paper-history-section','Frühere Paper-Berichte'\)/);
+  assert.match(source,/history\.append\(paperRoot\)/);
+  assert.match(source,/const research=collapsedSection\('paper-research-section','Strategieforschung und weitere Paper-Modelle'\)/);
+  assert.match(source,/research\.append\(readinessRoot\)/);
+  assert.ok(source.indexOf('history.append(paperRoot)') < source.indexOf('research.append(readinessRoot)'));
   assert.equal((source.match(/\bfetch\s*\(/g) || []).length, 1, 'only the existing local strategy catalog fetch remains');
   assert.doesNotMatch(source, /\bsetInterval\s*\(|\bsetTimeout\s*\(/);
 });

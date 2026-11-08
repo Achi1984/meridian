@@ -1,4 +1,4 @@
-import {getPaperReadiness} from './paper-readiness.js?v=B16-M11-FIX13';
+import {getPaperReadiness} from './paper-readiness.js?v=B16-M11-FIX14';
 
 const statusLabels = Object.freeze({
   UNVERIFIED:'Noch zu prüfen',
@@ -42,8 +42,10 @@ export function renderPaperReadiness(root,model=getPaperReadiness(),document=roo
   root.className='card paper-readiness';
   root.setAttribute('aria-labelledby','paper-readiness-heading');
   root.setAttribute('style','min-width:0;overflow-wrap:anywhere');
-  add(document,root,'h2','Paperbots vorbereiten').id='paper-readiness-heading';
-  add(document,root,'p','Vorbereitung · kein laufender Paper-Betrieb','limited');
+  add(document,root,'h2','Weitere Paper-Modelle · Planungsstand').id='paper-readiness-heading';
+  const scope=add(document,root,'p','Historischer Planungsstand · keine Aussage zum aktuellen Paper-Lauf','limited');
+  // Unlike short status badges, this explanation must wrap inside nested mobile cards.
+  scope.setAttribute('style','max-width:100%;white-space:normal;overflow-wrap:anywhere');
   const valid=model?.schemaVersion==='MERIDIAN_PAPER_READINESS/1'&&
     model.scope==='SOURCE_PREPARATION_ONLY'&&model.status==='NOT_READY'&&
     model.paperAuthorized===false&&model.liveAuthorized===false&&model.canStart===false&&
@@ -54,7 +56,7 @@ export function renderPaperReadiness(root,model=getPaperReadiness(),document=roo
     return {status:'UNKNOWN'};
   }
   add(document,root,'p',model.summary);
-  add(document,root,'p','Paperstart gesperrt · Echtgeldhandel nicht freigegeben.');
+  add(document,root,'p','Für diese Forschungsmodelle: Paperstart gesperrt · Echtgeldhandel nicht freigegeben.');
   const qualification=model.gates.find(row=>row.id==='qualification');
   if(qualification){
     add(document,root,'p',`${text(qualification.label)}${qualification.assessment?.sourceCheckedOn ? ` · Quellenstand ${text(qualification.assessment.sourceCheckedOn)}` : ''}`);

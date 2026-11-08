@@ -1,5 +1,5 @@
-import {createDepotHistoryView} from './depot-history-view.js?v=B16-M11-FIX13';
-import {publishDepotPortfolioState} from './depot-portfolio-state.js?v=B16-M11-FIX13';
+import {createDepotHistoryView} from './depot-history-view.js?v=B16-M11-FIX14';
+import {publishDepotPortfolioState} from './depot-portfolio-state.js?v=B16-M11-FIX14';
 // DOM text only. Neither credentials nor raw response bodies are rendered.
 const LABELS={
   locked:['Gesperrt','App mit Meridian-Passwort öffnen, dann Depot manuell aktualisieren.'],
@@ -86,8 +86,8 @@ export function createDepotReadView(root,{getToken,createClient,commandRoot=null
     for(const [label,value] of [['Spot laut Depotquelle',m.spotUsd],['Pionex-Gesamteigenkapital',m.tradingUsd]])
       breakdown.append(el('dt',label),el('dd',money(value)));
     if(!pionexOnly)details.append(breakdown);
-    for(const [label,value] of [['Bewertung (UTC)',m.snapshotAt],['Pionex-Quelle (UTC)',m.sourceAt]]){
-      const line=el('p',label+': '),time=el('time',value);time.dateTime=value;line.append(time);details.append(line);
+    for(const [label,value] of [['Bewertungsstand (lokale Zeit)',m.snapshotAt],['Verwendete Quelle (lokale Zeit)',m.sourceAt]]){
+      const line=el('p',label+': '),time=el('time',new Date(value).toLocaleString('de-AT'));time.dateTime=value;time.title='UTC: '+value;line.append(time);details.append(line);
     }
     details.append(el('p',current&&pionexOnly?'Quelle: bestätigte Pionex-Bewertung aus serverseitigen Daten. Bot-Kapital und P/L werden nicht addiert.':current?'Quelle: serverseitige Depotdaten; soweit erforderlich mit öffentlichen Kursen bewertet. Zeitangabe zeigt die älteste verwendete Quelle; keine Bestätigung aller Konten.':'Quelle: gespeicherte Meridian-Depothistorie. Bestandsdetails und einzelne Börsenfristen sind hier nicht enthalten.'));
     if(m.excludedIncompletePoints>0)details.append(el('p','Die Historie enthält Datenlücken. Unvollständige Bewertungen wurden ausgelassen.'));

@@ -145,67 +145,22 @@ Custom command: scripts/spot-paper-pilot/package-host-evidence.mjs /var/lib/meri
 
 ### Authenticated Northflank-native download handoff
 
-No artifact-download route or transport has been exercised for this host.
-Current transport status is **UNVERIFIED**. Do not send archive bytes through
-logs, base64, chat, a public HTTP endpoint, or the Memecoin `FINISHED`-only
-256 KiB DTO / one-hour or four-hour spot gateways.
+Native file retrieval was verified for a small retained file
+([PR #1282, comment 6721975395](https://github.com/Achi1984/meridian/pull/1282#issuecomment-6721975395))
+and a small TAR plus manifest
+([issue #1279, comment 6722023990](https://github.com/Achi1984/meridian/issues/1279#issuecomment-6722023990)).
+Those rehearsals do not establish retrieval or assessment of the eight-hour
+pilot output. For the active pilot's exact identities, post-run sequence,
+bounded maintenance run, `--jobId`/`--instanceName` selection, destination
+directory semantics for `--localPath`, archive/member verification, and
+assessment procedure, follow the
+[BTC/EUR eight-hour post-run runbook](../operations/BTC_EUR_8H_POSTRUN_20261108.md).
 
-After the writer has exited, an operator must make a separate bounded,
-one-attempt Northflank maintenance Job from the reviewed spot image. The
-packager's `--retrieval-window-ms 300000` option keeps the successful process
-alive for five minutes after it prints the small package result, providing a
-live Job from which to download. There is no public server or retry. Mount the
-same persistent volume read-only at `/var/lib/meridian/spot-paper-host`; use
-the image's unprivileged `node` user, custom entrypoint `node`, and the
-packaging command above with outputs under `/tmp`. Disable schedules/restarts/
-retries and expose no public port. Do not run this job while a writer may still
-be active. Its volume mount is read-only; the package and manifest are written
-only to the Job's temporary filesystem. Use a single 390-second Job timeout
-(60-second package ceiling + 300-second retrieval window + 30-second exit
-margin), with no automatic retry, and reserve at least 84 MiB for its
-temporary archive. The package deadline is cooperative; the platform timeout
-bounds blocking operations and the full process lifecycle.
-
-Before attempting the full package, use Northflank's authenticated CLI file
-copy to download the small retained `probe.bin` from the mounted volume, then
-compare its downloaded SHA-256 with the value reported by the storage
-diagnostic. Use the operator's authenticated Northflank CLI session. The
-Northflank Overview → Local access → Download panel provides a CLI instruction
-and copy-command control; it is not a browser file download and does not
-authenticate the CLI session. No authenticated CLI session has been used here.
-The platform-confirmed native command form uses `--jobId`:
-
-```sh
-northflank download job file --projectId meridian --jobId meridian-btc-paper-host-8h \
-  --remotePath /var/lib/meridian/spot-paper-host/meridian-storage-probe-<UUID>/probe.bin \
-  --localPath ./probe.bin
-sha256sum ./probe.bin
-```
-
-Only after that small download and hash comparison succeeds should the operator
-use the same authenticated file-copy mechanism to fetch the TAR and manifest
-from `/tmp` in the maintenance Job:
-
-```sh
-northflank download job file --projectId meridian --jobId meridian-btc-paper-host-8h \
-  --remotePath /tmp/btc-eur-paper-001.tar \
-  --localPath ./btc-eur-paper-001.tar
-northflank download job file --projectId meridian --jobId meridian-btc-paper-host-8h \
-  --remotePath /tmp/btc-eur-paper-001.manifest.json \
-  --localPath ./btc-eur-paper-001.manifest.json
-sha256sum ./btc-eur-paper-001.tar
-```
-
-Compare the downloaded TAR hash with the packager's small `archiveSha256`
-result; retain the manifest and verify the listed file hashes offline.
-Northflank describes this file-copy workflow in
-[Copy files](https://northflank.com/docs/v1/api/copy-files) and
-[Transfer data to and from containers](https://northflank.com/docs/v1/application/run/transfer-data-to-and-from-containers).
-This source package has not established that the current account, project,
-Job type, or image supports the transfer. Until the real probe is downloaded
-and hash-compared, transport remains **UNVERIFIED**. If native download is
-unavailable, operator authorization for that native transfer is the remaining
-prerequisite; a local archive alone is **not** a completed download.
+The actual volume mount in the reviewed Northflank run is `/evidence-root`;
+the path to preserve is `/evidence-root/btc-eur-paper-001`. Older generic
+`/var/lib/...` and `--localPath ./file` examples in this guide are not the
+observed deployment values or CLI destination semantics. Do not start a
+maintenance instance until the writer is independently confirmed stopped.
 
 ## Offline eight-hour assessment
 

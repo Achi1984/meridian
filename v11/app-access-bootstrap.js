@@ -1,5 +1,5 @@
-import {mountReleaseUpdate} from './release-update.js?v=B16-M11-FIX13';
-import {appAccess} from './app-access.js?v=B16-M11-FIX13';
+import {mountReleaseUpdate} from './release-update.js?v=B16-M11-FIX14';
+import {appAccess} from './app-access.js?v=B16-M11-FIX14';
 
 export function mountAppAccess(document,window,{access=appAccess}={}){
   const app=document.getElementById('app');

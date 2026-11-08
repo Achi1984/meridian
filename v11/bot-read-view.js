@@ -1,10 +1,11 @@
 // Inactive component: mount explicitly with the existing read-client factory.
 // No network, credentials, storage or engine imports belong to this renderer.
-import {buildBotOverviewModel} from './bot-overview-model.js?v=B16-M11-FIX13';
-import {subscribeDepotPortfolio} from './depot-portfolio-state.js?v=B16-M11-FIX13';
+import {buildBotOverviewModel} from './bot-overview-model.js?v=B16-M11-FIX14';
+import {subscribeDepotPortfolio} from './depot-portfolio-state.js?v=B16-M11-FIX14';
 
 const LABELS = {
   locked: ['Gesperrt', 'App mit Meridian-Passwort öffnen, dann Bots manuell aktualisieren.'],
+  not_loaded: ['Noch nicht geladen', 'Zugang geöffnet. Bots manuell aktualisieren.'],
   loading: ['Wird geladen', 'Der aktuelle Bot-Snapshot wird geprüft.'],
   fresh: ['Aktueller Snapshot · nur lesend', ''],
   stale: ['Daten veraltet', 'Botdetails werden ausgeblendet. Bitte Bots manuell aktualisieren.'],
@@ -193,8 +194,8 @@ function appendDataSummary(root,data){
 }
 function appendExpiry(root,data){
   if(!Number.isSafeInteger(data.expiresAt)||data.expiresAt<=0||data.expiresAt>8640000000000000)return;
-  const document=root.ownerDocument,line=element(document,'p','Snapshot gültig bis (UTC): '),time=element(document,'time',new Date(data.expiresAt).toISOString());
-  time.setAttribute('datetime',new Date(data.expiresAt).toISOString());line.append(time);root.append(line);
+  const document=root.ownerDocument,line=element(document,'p','Snapshot gültig bis (lokale Zeit): '),time=element(document,'time',new Date(data.expiresAt).toLocaleString('de-AT'));
+  time.setAttribute('datetime',new Date(data.expiresAt).toISOString());time.setAttribute('title','UTC: '+new Date(data.expiresAt).toISOString());line.append(time);root.append(line);
 }
 
 // Keep the empty live region attached before populating it, then retain its identity.
@@ -232,9 +233,9 @@ export function renderBotReadState(root, state, filters = {}) {
   section.setAttribute('data-state',data.status);
   status.replaceChildren(element(document,'strong',LABELS[data.status][0]));
   if(data.status==='fresh'){
-    const context=element(document,'p','Snapshot-Zeit (UTC): ');
-    const stamp=element(document,'time',data.snapshotAt);
-    stamp.setAttribute('datetime',data.snapshotAt);
+    const context=element(document,'p','Snapshot-Zeit (lokale Zeit): ');
+    const stamp=element(document,'time',new Date(data.snapshotAt).toLocaleString('de-AT'));
+    stamp.setAttribute('datetime',data.snapshotAt);stamp.setAttribute('title','UTC: '+data.snapshotAt);
     context.append(stamp,element(document,'span',' · bestätigt keinen laufenden Bot-Prozess.'));
     status.append(context);
   }else status.append(element(document,'p',LABELS[data.status][1]));
@@ -413,8 +414,7 @@ export function renderCommandBotOverview(root, data, onJump, statusRoot=null) {
   const sources={PIONEX_BOT_API:'Pionex Bot API',PIONEX_WALLET_BOT_DETAIL:'Pionex Wallet Botdetail'};
   const timestamp=typeof data.snapshotAt==='string'&&Number.isFinite(Date.parse(data.snapshotAt))
     ?data.snapshotAt:null;
-  const localizedTime=timestamp?new Intl.DateTimeFormat('de-DE',{dateStyle:'medium',timeStyle:'short',
-    timeZone:'UTC'}).format(new Date(timestamp))+' UTC':'Zeit unbekannt';
+  const localizedTime=timestamp?new Intl.DateTimeFormat('de-AT',{dateStyle:'medium',timeStyle:'short'}).format(new Date(timestamp))+' (lokale Zeit)':'Zeit unbekannt';
   const count=Number.isSafeInteger(data.count)&&data.count>=0?data.count:'Unbekannt';
   const distribution=data.distribution||{};
   const distributionCount=key=>Number.isSafeInteger(distribution[key])&&distribution[key]>=0
@@ -490,13 +490,14 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
     portfolio.append(value);
     if(valid){
       const source=model.source==='SERVER_PIONEX_CURRENT'?'Serverseitige Pionex-Bewertung':model.source==='SERVER_PORTFOLIO_CURRENT'?'Serverseitige Depotbewertung':'Gespeicherte Depotbewertung';
-      const asOf=element(document,'time',model.snapshotAt);asOf.setAttribute('datetime',model.snapshotAt);
-      const sourceAt=element(document,'time',model.sourceAt);sourceAt.setAttribute('datetime',model.sourceAt);
+      const asOf=element(document,'time',new Date(model.snapshotAt).toLocaleString('de-AT'));asOf.setAttribute('datetime',model.snapshotAt);asOf.setAttribute('title','UTC: '+model.snapshotAt);
+      const sourceAt=element(document,'time',new Date(model.sourceAt).toLocaleString('de-AT'));sourceAt.setAttribute('datetime',model.sourceAt);sourceAt.setAttribute('title','UTC: '+model.sourceAt);
       const expires=Number.isSafeInteger(model.expiresAt)?new Date(model.expiresAt).toISOString():'unbekannt';
-      const expiry=element(document,'time',expires);if(expires!=='unbekannt')expiry.setAttribute('datetime',expires);
-      portfolio.append(element(document,'p','Aktuell · '+source+' · Stand (UTC): '),asOf,
-        element(document,'p','Quellzeit (UTC): '),sourceAt,
-        element(document,'p','Gültig bis (UTC): '),expiry,
+      const expiry=element(document,'time',expires==='unbekannt'?expires:new Date(expires).toLocaleString('de-AT'));
+      if(expires!=='unbekannt'){expiry.setAttribute('datetime',expires);expiry.setAttribute('title','UTC: '+expires);}
+      portfolio.append(element(document,'p','Aktuell · '+source+' · Stand (lokale Zeit): '),asOf,
+        element(document,'p','Quellzeit (lokale Zeit): '),sourceAt,
+        element(document,'p','Gültig bis (lokale Zeit): '),expiry,
         element(document,'p','Pionex-Wert; kein Gesamtvermögen. Bot-Kapital und P/L bleiben getrennt und werden nicht addiert.'));
     }else{
       const labels={locked:'Gesperrt · Depotdaten ausgeblendet.',not_loaded:'Noch nicht geladen · Depot manuell aktualisieren.',

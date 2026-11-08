@@ -12,17 +12,17 @@ const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium
 const MOON_BOT_REF='f00df00df00df00df00d';
 const v11Root=fileURLToPath(new URL('../v11/',import.meta.url));
 const source=readFileSync(join(v11Root,'index.html'),'utf8');
-const bootstrap='<script type="module" src="./bot-read-bootstrap.js?v=B16-M11-FIX13"></script>';
+const bootstrap='<script type="module" src="./bot-read-bootstrap.js?v=B16-M11-FIX14"></script>';
 const fixtureScript=`<script>
 window.__botReadMode='fresh';window.__botReads=0;window.__resolveBotRead=null;window.__botErrors=[];
 window.__appAccessReads=0;window.__releaseChecks=0;
 const nativeFetch=window.fetch.bind(window);
-window.__portfolioReady=import('./depot-portfolio-state.js?v=B16-M11-FIX13').then(({publishDepotPortfolioState})=>
+window.__portfolioReady=import('./depot-portfolio-state.js?v=B16-M11-FIX14').then(({publishDepotPortfolioState})=>
  publishDepotPortfolioState({status:'fresh',model:{status:'FRESH_SNAPSHOT',readOnly:true,executionAllowed:false,
   totalUsd:1234.56,snapshotAt:new Date().toISOString(),sourceAt:new Date().toISOString(),
   source:'SERVER_PIONEX_CURRENT',expiresAt:Date.now()+60000}}));
 window.__publishPortfolio=async state=>{
- const {publishDepotPortfolioState}=await import('./depot-portfolio-state.js?v=B16-M11-FIX13');
+ const {publishDepotPortfolioState}=await import('./depot-portfolio-state.js?v=B16-M11-FIX14');
  publishDepotPortfolioState(state);
 };
 window.addEventListener('error',event=>window.__botErrors.push(event.message));
@@ -217,10 +217,10 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
             root:document.getElementById('bot-read-root').innerText,errors:window.__botErrors})`);
           assert.equal(initial.width,size.width);assert.equal(initial.height,size.height);
           assert.equal(initial.reads,0);assert.equal(initial.releaseChecks,1,'one public version check, no private bot read');assert.equal(initial.overflow,false);assert.equal(initial.navTargets,true);
-          assert.equal(initial.botState,'locked',JSON.stringify(initial));
+          assert.equal(initial.botState,'not_loaded',JSON.stringify(initial));
           assert.match(initial.portfolio,/1\.234,56 USD/);assert.match(initial.portfolio,/Aktuell/);
           assert.match(initial.portfolio,/Pionex-Wert; kein Gesamtvermögen/);
-          assert.match(initial.portfolio,/Stand \(UTC\)/);assert.match(initial.portfolio,/Quellzeit \(UTC\)/);
+          assert.match(initial.portfolio,/Stand \(lokale Zeit\)/);assert.match(initial.portfolio,/Quellzeit \(lokale Zeit\)/);
           assert.equal(initial.portfolioTimes.length,3,JSON.stringify(initial.portfolioTimes));
           assert.doesNotMatch(initial.portfolio,/1\.360,13/,'bot capital is not added to the confirmed total');
           await evaluate(`window.__publishPortfolio({status:'stale'})`);
@@ -391,8 +391,8 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           assert.match(commandMetadata,/Quelle: Pionex Bot API · Richtung: Long 3 · Short 2 · Neutral 1 · Unbekannt 1/);
           const exactCommandTimestamp=commandMetadata.match(/\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z/)?.[0];
           assert.ok(exactCommandTimestamp);
-          assert.ok(fresh.command.includes(new Intl.DateTimeFormat('de-DE',{dateStyle:'medium',timeStyle:'short',
-            timeZone:'UTC'}).format(new Date(exactCommandTimestamp))+' UTC'),fresh.command);
+          const localCommandTimestamp=await evaluate(`new Intl.DateTimeFormat('de-DE',{dateStyle:'medium',timeStyle:'short'}).format(new Date(${JSON.stringify(exactCommandTimestamp)}))+' (lokale Zeit)'`);
+          assert.ok(fresh.command.includes(localCommandTimestamp),fresh.command);
           assert.ok(['bot-symbol-search','bot-direction-filter','bot-category-filter','bot-sort-filter',
             'bot-tp-filter','bot-pnl-filter','bot-read-refresh','bot-read-lock'].every(id=>fresh.touch.some(([,targetId])=>targetId===id)),
             'visible search, selects and bot actions remain measured '+JSON.stringify(fresh.touch));
