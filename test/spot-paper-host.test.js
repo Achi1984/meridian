@@ -255,12 +255,53 @@ test("inspection deadline covers slow preflight and blocks overlapping verificat
   assert.equal(first.reason, "INSPECTION_DEADLINE_EXCEEDED");
   assert.ok(Date.now() - startedAt < 250);
 
+  await new Promise(resolve => setTimeout(resolve, 10));
   const overlapping = await inspectHostRun(evidenceDir, { timeoutMs: 25, io });
   assert.equal(overlapping.status, "INCOMPLETE_UNKNOWN");
   assert.equal(overlapping.reason, "VERIFICATION_ALREADY_IN_PROGRESS");
   assert.equal(preflightCalls, 1);
   await new Promise(resolve => setTimeout(resolve, 320));
   assert.equal(preflightCalls, 1);
+
+  const openEvidenceDir = join(parent, "slow-open");
+  await launchWithInline(openEvidenceDir, syntheticTerminalSource(openEvidenceDir));
+  const statePath = join(openEvidenceDir, "host-state.json");
+  let openCalls = 0;
+  let closeCalls = 0;
+  const slowOpenIo = {
+    open: async (path, ...args) => {
+      const handle = await open(path, ...args);
+      if (path === statePath) {
+        openCalls++;
+        const close = handle.close.bind(handle);
+        handle.close = async (...closeArgs) => {
+          closeCalls++;
+          return close(...closeArgs);
+        };
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+      return handle;
+    }
+  };
+  const slowOpen = await inspectHostRun(openEvidenceDir, {
+    timeoutMs: 25,
+    io: slowOpenIo
+  });
+  assert.equal(slowOpen.status, "INCOMPLETE_UNKNOWN");
+  assert.equal(slowOpen.reason, "INSPECTION_DEADLINE_EXCEEDED");
+  assert.equal(openCalls, 1);
+  await new Promise(resolve => setTimeout(resolve, 10));
+  const openOverlap = await inspectHostRun(openEvidenceDir, {
+    timeoutMs: 25,
+    io: slowOpenIo
+  });
+  assert.equal(openOverlap.status, "INCOMPLETE_UNKNOWN");
+  assert.equal(openOverlap.reason, "VERIFICATION_ALREADY_IN_PROGRESS");
+  assert.equal(openCalls, 1);
+  assert.equal(closeCalls, 0);
+  await new Promise(resolve => setTimeout(resolve, 320));
+  assert.equal(openCalls, 1);
+  assert.equal(closeCalls, 1);
 });
 
 test("oversized reports are omitted from every unverified output", async t => {

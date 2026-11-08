@@ -44,7 +44,9 @@ function createInspectionContext(timeoutMs = JOURNAL_READ_TIMEOUT_MS) {
     deadlineAt: now + Math.min(timeoutMs, JOURNAL_READ_TIMEOUT_MS),
     monotonicNow: () => performance.now(),
     controller,
-    signal: controller.signal
+    signal: controller.signal,
+    pendingOperations: new Set(),
+    onOperationSettled: null
   };
 }
 
@@ -65,11 +67,24 @@ async function boundedInspection(operation, context, cleanupLateResult) {
     return operation();
   });
   let timedOut = false;
-  task.then(value => {
-    if (timedOut && cleanupLateResult) {
-      void Promise.resolve().then(() => cleanupLateResult(value)).catch(() => {});
+  const trackedTask = task.then(async value => {
+    if ((timedOut || context.signal.aborted ||
+        context.monotonicNow() >= context.deadlineAt) && cleanupLateResult) {
+      await cleanupLateResult(value);
     }
-  }, () => {});
+    return value;
+  });
+  context.pendingOperations.add(trackedTask);
+  trackedTask.then(
+    () => {
+      context.pendingOperations.delete(trackedTask);
+      context.onOperationSettled?.();
+    },
+    () => {
+      context.pendingOperations.delete(trackedTask);
+      context.onOperationSettled?.();
+    }
+  );
   let timer;
   let abortListener;
   const remainingMs = Math.max(0, context.deadlineAt - context.monotonicNow());
@@ -87,7 +102,7 @@ async function boundedInspection(operation, context, cleanupLateResult) {
     context.signal.addEventListener("abort", abortListener, { once: true });
   }) : new Promise(() => {});
   try {
-    const result = await Promise.race([task, timeout, aborted]);
+    const result = await Promise.race([trackedTask, timeout, aborted]);
     assertInspectionActive(context);
     return result;
   } finally {
@@ -506,12 +521,26 @@ export async function inspectHostRun(evidenceDir, {
       reason: "VERIFICATION_ALREADY_IN_PROGRESS"
     };
   }
+  const reservation = { verificationSettled: false };
+  const releaseReservationIfSettled = () => {
+    if (reservation.verificationSettled && context.pendingOperations.size === 0 &&
+        activeInspections.get(key) === reservation) {
+      activeInspections.delete(key);
+    }
+  };
+  context.onOperationSettled = releaseReservationIfSettled;
+  activeInspections.set(key, reservation);
   const verification = Promise.resolve().then(() =>
     inspectHostRunWithContext(evidenceDir, { includeReport, context, io }));
-  activeInspections.set(key, verification);
   verification.then(
-    () => { if (activeInspections.get(key) === verification) activeInspections.delete(key); },
-    () => { if (activeInspections.get(key) === verification) activeInspections.delete(key); }
+    () => {
+      reservation.verificationSettled = true;
+      releaseReservationIfSettled();
+    },
+    () => {
+      reservation.verificationSettled = true;
+      releaseReservationIfSettled();
+    }
   );
   try {
     return await boundedInspection(() => verification, context);
