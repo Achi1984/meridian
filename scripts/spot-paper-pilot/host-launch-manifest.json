@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "SPOT_PAPER_HOST_LAUNCH_V1",
+  "runId": "btc-eur-paper-host-8h-001",
+  "runtimeSourceSha256": "1e0204c8ac2c611940bdebbf61ae396a0282eb7d31cc52be7e51ef4036a961fd",
+  "model": "BTC_EUR_SMA5_SMA20_V1",
+  "mode": "paper",
+  "pair": "BTC/EUR",
+  "maxCycles": 480,
+  "maxRequests": 960,
+  "maxDurationMs": 28800000,
+  "pollIntervalMs": 60000,
+  "maxBytes": 67108864,
+  "maxResponseBytes": 262144,
+  "requestTimeoutMs": 5000
+}

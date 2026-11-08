@@ -1,0 +1,12 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+COPY --chown=node:node scripts/spot-paper-pilot/ ./scripts/spot-paper-pilot/
+RUN mkdir -p /var/lib/meridian/spot-paper-host && \
+    chown -R node:node /var/lib/meridian/spot-paper-host
+
+ENV NODE_ENV=production
+USER node
+
+ENTRYPOINT ["node", "scripts/spot-paper-pilot/host-entrypoint.mjs"]
