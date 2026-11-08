@@ -145,6 +145,30 @@ the paper observations independent or establish general strategy quality.
 
 ## Operating, egress, and cost conditions
 
+- **Published EEA fee comparison, checked 2026-11-08 (context only; no
+  parameter change):** OKX's [EEA spot-fee adjustment notice](https://www.okx.com/en-eu/help/important-notice-upcoming-spot-fee-adjustment-eea),
+  effective 2026-09-25, lists regular spot-only fees of 0.10% maker / 0.20%
+  taker. OKX's [EEA fee table](https://www.okx.com/en-gb/help/what-are-the-new-trading-fees-for-eea-users)
+  lists regular spot fees of 0.08% maker / 0.10% taker for accounts with
+  X-Perps. Its older spot-only 0.20% / 0.35% table is superseded by the
+  September 25 notice. These published schedules are comparison scenarios,
+  not verified account-specific or instrument-specific rates, actual incurred
+  fees, or authorization to change venue. The cited notice was searchable but
+  direct page retrieval was unavailable for this review; confirm the current
+  official schedule with the applicable account before any integration.
+- The existing BTC/EUR pilot uses Kraken quotes and a modeled 0.50% fee per
+  side; it is not an OKX run and its fee assumption or ledger is unchanged.
+  Taker is the relevant comparison for its immediate bid/ask modeled execution.
+  Do not assume maker fills by selecting the lower maker rate. The modeled
+  0.10% per-side slippage and observed spread remain separate, unverified
+  assumptions; do not tune costs down to manufacture profit. Account-specific
+  effective tier, BTC/USD instrument availability, and applicability of an EEA
+  account schedule to any future USD integration remain unverified.
+- Any optional fixed-fill fee sensitivity is counterfactual arithmetic only:
+  holding fills and marks fixed under a different fee does not imply the same
+  position quantities, strategy decisions, or fills would result. Preserve the
+  original ledger and results; do not rerun or overwrite them to present a lower
+  fee scenario as observed performance.
 - No activation, manifest creation, extra data acquisition, restart, real order,
   or change to scripts, workflows, dashboards, or runtime is authorized by this
   proposal.
