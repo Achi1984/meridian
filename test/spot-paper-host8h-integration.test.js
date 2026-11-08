@@ -605,7 +605,7 @@ test('Dashboard rejects out-of-order and terminal-to-running snapshots without r
   await outOfOrder.controller.refresh();
   assert.equal(outOfOrder.root.getAttribute('data-state'), 'running_observed');
   assert.match(outOfOrder.root.textContent, /widersprüchlicher Bericht wurde verworfen/);
-  assert.match(outOfOrder.root.textContent, /Zuletzt beobachtet08\.11\.2026, 14:00:00 UTC/);
+  assert.ok(outOfOrder.root.textContent.includes('Beobachtungszeit (UTC)2026-11-08T14:00:00.000Z'));
   assert.notEqual(outOfOrder.root.textContent, acceptedText);
   outOfOrder.controller.dispose();
 
@@ -626,7 +626,7 @@ test('Dashboard rejects out-of-order and terminal-to-running snapshots without r
   await sequenceRegression.controller.refresh();
   assert.equal(sequenceRegression.root.getAttribute('data-state'), 'running_observed');
   assert.match(sequenceRegression.root.textContent, /widersprüchlicher Bericht wurde verworfen/);
-  assert.match(sequenceRegression.root.textContent, /Zuletzt beobachtet08\.11\.2026, 14:00:00 UTC/);
+  assert.ok(sequenceRegression.root.textContent.includes('Beobachtungszeit (UTC)2026-11-08T14:00:00.000Z'));
   sequenceRegression.controller.dispose();
 });
 
