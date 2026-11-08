@@ -4,7 +4,7 @@ export const SPOT_PAPER_REPORT_TRANSFER_SCHEMA = 'BTC_EUR_SPOT_PAPER_REPORT_TRAN
 export const SPOT_PAPER_REPORT_MAX_BYTES = 2 * 1024 * 1024;
 export const SPOT_PAPER_REPORT_TIMEOUT_MS = 5_000;
 
-const ACCEPTED = Object.freeze({
+const FIRST_HOUR = Object.freeze({
   runId: 'spot-paper-42395522899-1',
   sourceSha: '81edf0b5dc3d455c2c1e1906791d56c731bea0c9',
   workflowSha: 'ddae14f01583196dfc9e9da906dcd03d41d58369',
@@ -21,6 +21,27 @@ const ACCEPTED = Object.freeze({
   maxRequests: 120
 });
 
+export const SPOT_PAPER_REPORT_REGISTRY = Object.freeze({
+  [FIRST_HOUR.runId]: Object.freeze({
+    identity: FIRST_HOUR,
+    workflowPath: '.github/workflows/spot-paper-pilot-paper-once.yml'
+  }),
+  'spot-paper-42404743386-1': Object.freeze({
+    identity: Object.freeze({
+      ...FIRST_HOUR,
+      runId: 'spot-paper-42404743386-1',
+      workflowSha: 'a960aecb467f5ab647ecfa7a1532e51ad810d6e0',
+      workflowRunId: '42404743386',
+      profileId: 'BTC_EUR_PAPER_4H_V1',
+      replayProfileId: 'BTC_EUR_PAPER_4H_V1',
+      maxDurationMs: 14_400_000,
+      maxCycles: 240,
+      maxRequests: 480
+    }),
+    workflowPath: '.github/workflows/spot-paper-pilot-four-hour-once.yml'
+  })
+});
+
 const record = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const integer = value => Number.isSafeInteger(value);
 const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
@@ -32,7 +53,10 @@ const timestamp = value => {
 };
 
 function isAcceptedIdentity(provenance, runId) {
-  return record(provenance) &&
+  const ACCEPTED = getAcceptedSpotPaperIdentity(runId);
+  return !!ACCEPTED && record(provenance) &&
+    (provenance.profileId === undefined && ACCEPTED === FIRST_HOUR ||
+      provenance.profileId === ACCEPTED.profileId) &&
     provenance.schemaVersion === 'SPOT_PAPER_PILOT_DISPATCH_MANIFEST_V1' &&
     provenance.acceptedSourceSha === ACCEPTED.sourceSha &&
     provenance.workflowSha === ACCEPTED.workflowSha &&
@@ -65,9 +89,11 @@ function isAcceptedIdentity(provenance, runId) {
 
 export function verifySpotPaperDispatchIdentity(expectedDispatch, provenance) {
   if (!record(expectedDispatch) || !record(provenance)) return 'UNKNOWN';
+  const ACCEPTED = getAcceptedSpotPaperIdentity(provenance.runId);
+  if (!ACCEPTED) return 'FAILED';
   const expected = {
     repository: 'Achi1984/meridian',
-    workflowPath: '.github/workflows/spot-paper-pilot-paper-once.yml',
+    workflowPath: SPOT_PAPER_REPORT_REGISTRY[ACCEPTED.runId].workflowPath,
     ref: 'refs/heads/main',
     workflowSha: ACCEPTED.workflowSha,
     workflowRunId: ACCEPTED.workflowRunId,
@@ -78,6 +104,9 @@ export function verifySpotPaperDispatchIdentity(expectedDispatch, provenance) {
     Object.keys(expected).sort().join(',') &&
     Object.entries(expected).every(([key, value]) =>
       expectedDispatch[key] === value) &&
+    ['repository', 'workflowPath', 'ref'].every(key =>
+      provenance[key] === expected[key] ||
+      ACCEPTED === FIRST_HOUR && provenance[key] === undefined) &&
     provenance.workflowSha === expectedDispatch.workflowSha &&
     String(provenance.workflowRunId) === String(expectedDispatch.workflowRunId) &&
     provenance.workflowRunNumber === expectedDispatch.workflowRunNumber &&
@@ -86,7 +115,7 @@ export function verifySpotPaperDispatchIdentity(expectedDispatch, provenance) {
   return matches ? 'PASS' : 'FAILED';
 }
 
-function terminalReadbackMatches(readback, report) {
+function terminalReadbackMatches(readback, report, ACCEPTED) {
   if (!record(readback) || readback.reconciliation !== 'TERMINAL_REPORT_AVAILABLE' ||
       readback.resumed !== false || readback.executionImpact !== false ||
       readback.runId !== report.runId || !Array.isArray(readback.events) ||
@@ -118,11 +147,27 @@ function terminalReadbackMatches(readback, report) {
     readback.manifest.limits?.maxDurationMs === ACCEPTED.maxDurationMs;
 }
 
-function assessmentMatches(assessment, report, readback, provenance) {
+function assessmentMatches(assessment, report, readback, provenance, ACCEPTED) {
+  const fullDuration = report.endedAt - report.startedAt >= ACCEPTED.maxDurationMs;
+  const classification = fullDuration && report.stopReason === 'DURATION_LIMIT' ?
+    ACCEPTED === FIRST_HOUR ? 'COMPLETED_HOUR' : 'COMPLETED_FOUR_HOURS' :
+    'PARTIAL_BOUNDED_RUN';
+  const reconciliation = {
+    requests: report.requests,
+    cycleCount: report.observations + report.dataGaps,
+    durationCoverage: (report.endedAt - report.startedAt) / ACCEPTED.maxDurationMs,
+    stopReason: report.stopReason,
+    signals: report.signals
+  };
   return record(assessment) &&
+    Object.entries(reconciliation).every(([key, value]) =>
+      ACCEPTED === FIRST_HOUR && assessment[key] === undefined ||
+      same(assessment[key], value)) &&
     assessment.outcome === 'COMPLETED' &&
     assessment.profileId === ACCEPTED.profileId &&
-    assessment.runClassification === 'PARTIAL_BOUNDED_RUN' &&
+    assessment.runClassification === classification &&
+    assessment.durationStatus === (fullDuration ?
+      'FULL_REQUESTED_DURATION' : 'PARTIAL_BOUNDED_DURATION') &&
     assessment.dispatchIdentity === 'PASS' &&
     assessment.terminalVerified === true &&
     assessment.boundedTermination === true &&
@@ -135,7 +180,7 @@ function assessmentMatches(assessment, report, readback, provenance) {
     assessment.validationCriteria?.requestedModeAndBounds === true &&
     assessment.validationCriteria?.retainedEvidenceAndAccounting === true &&
     assessment.validationCriteria?.acceptedPublicObservations === true &&
-    assessment.validationCriteria?.fullRequestedDuration === false &&
+    assessment.validationCriteria?.fullRequestedDuration === fullDuration &&
     assessment.validationCriteria?.strategyPerformance === 'NOT_ASSESSED' &&
     assessment.runId === report.runId &&
     assessment.sourceSha === provenance.acceptedSourceSha &&
@@ -154,7 +199,7 @@ function assessmentMatches(assessment, report, readback, provenance) {
     same(assessment.position, report.position);
 }
 
-function replayMatches(replay, report) {
+function replayMatches(replay, report, ACCEPTED) {
   return record(replay) &&
     replay.profileId === ACCEPTED.replayProfileId &&
     replay.outcome === 'PASS' &&
@@ -174,12 +219,13 @@ export function createSpotPaperDashboardDto({
   expectedDispatch
 } = {}) {
   const report = readback?.report;
-  if (!record(report) || report.schemaVersion !== 'SPOT_PAPER_PILOT_REPORT_V1' ||
+  const ACCEPTED = getAcceptedSpotPaperIdentity(readback?.runId ?? null);
+  if (!ACCEPTED || !record(report) || report.schemaVersion !== 'SPOT_PAPER_PILOT_REPORT_V1' ||
       verifySpotPaperDispatchIdentity(expectedDispatch, provenance) !== 'PASS' ||
       !isAcceptedIdentity(provenance, readback?.runId) ||
-      !terminalReadbackMatches(readback, report) ||
-      !assessmentMatches(assessment, report, readback, provenance) ||
-      !replayMatches(signalReplay, report) ||
+      !terminalReadbackMatches(readback, report, ACCEPTED) ||
+      !assessmentMatches(assessment, report, readback, provenance, ACCEPTED) ||
+      !replayMatches(signalReplay, report, ACCEPTED) ||
       report.model !== ACCEPTED.model || report.mode !== 'paper' ||
       report.pair !== ACCEPTED.pair || report.executionImpact !== false ||
       report.liveTrading !== false || report.autoPromotion !== false ||
@@ -189,9 +235,14 @@ export function createSpotPaperDashboardDto({
       report.endedAt < report.startedAt || !integer(report.dataGaps) ||
       !integer(report.observations) || !integer(report.requests) ||
       !integer(report.deliveredBytes) ||
+      report.deliveredBytes < 0 || report.deliveredBytes > provenance.maxBytes ||
       !Array.isArray(report.fills) || !Array.isArray(report.signals) ||
+      report.requests < report.observations * 2 ||
+      report.requests > (report.observations + report.dataGaps) * 2 ||
       report.requests > ACCEPTED.maxRequests ||
       report.observations + report.dataGaps > ACCEPTED.maxCycles ||
+      (report.stopReason === 'CYCLE_LIMIT' &&
+        report.observations + report.dataGaps !== ACCEPTED.maxCycles) ||
       !integer(assessment.acceptedObservations) || assessment.acceptedObservations < 1 ||
       assessment.acceptedObservations > report.observations ||
       (report.position ? report.positionStatus !== 'OPEN_UNRESOLVED_AT_TERMINAL' :
@@ -291,6 +342,8 @@ export function isSpotPaperDashboardDto(dto) {
       !exact(dto.verification, ['terminalReadback', 'assessment', 'assessmentSignalReplay',
         'signalReplay', 'profitability']) || !record(dto.openInventory)) return false;
   const identity = dto.identity;
+  const ACCEPTED = getAcceptedSpotPaperIdentity(identity.runId);
+  if (!ACCEPTED) return false;
   const completedAt = Date.parse(dto.snapshot.completedAt);
   const inventoryValid = dto.openInventory.status === 'OPEN_UNRESOLVED_AT_TERMINAL' ?
     Object.keys(dto.openInventory).sort().join(',') === 'quantitySat,status' &&
@@ -331,8 +384,15 @@ export function isSpotPaperDashboardDto(dto) {
     typeof dto.duration.coverage === 'number' && Number.isFinite(dto.duration.coverage) &&
     dto.duration.coverage === dto.duration.elapsedMs / dto.duration.requestedMs &&
     ['PARTIAL_BOUNDED_DURATION', 'FULL_REQUESTED_DURATION'].includes(dto.duration.status) &&
+    dto.duration.status === (dto.duration.elapsedMs >= ACCEPTED.maxDurationMs ?
+      'FULL_REQUESTED_DURATION' : 'PARTIAL_BOUNDED_DURATION') &&
+    (dto.snapshot.stopReason !== 'CYCLE_LIMIT' ||
+      dto.coverage.observations + dto.coverage.dataGaps === ACCEPTED.maxCycles) &&
+    dto.coverage.acceptedObservations > 0 &&
     dto.coverage.acceptedObservations <= dto.coverage.observations &&
     dto.coverage.observations + dto.coverage.dataGaps <= ACCEPTED.maxCycles &&
+    dto.coverage.requests >= dto.coverage.observations * 2 &&
+    dto.coverage.requests <= (dto.coverage.observations + dto.coverage.dataGaps) * 2 &&
     dto.coverage.requests <= ACCEPTED.maxRequests &&
     dto.verification.terminalReadback === 'PASS' &&
     dto.verification.assessment === 'COMPLETED' &&
@@ -346,12 +406,13 @@ export function isSpotPaperReportEnvelope(envelope) {
   return record(envelope) &&
     Object.keys(envelope).sort().join(',') === 'report,runId,schema' &&
     envelope.schema === SPOT_PAPER_REPORT_ENVELOPE_SCHEMA &&
-    envelope.runId === ACCEPTED.runId &&
+    envelope.runId === envelope.report?.identity?.runId &&
     isSpotPaperDashboardDto(envelope.report);
 }
 
-export function getAcceptedSpotPaperIdentity() {
-  return ACCEPTED;
+export function getAcceptedSpotPaperIdentity(runId = FIRST_HOUR.runId) {
+  return typeof runId === 'string' && Object.hasOwn(SPOT_PAPER_REPORT_REGISTRY, runId) ?
+    SPOT_PAPER_REPORT_REGISTRY[runId].identity : null;
 }
 
 export async function readBoundedSpotPaperResponse(response, signal) {
