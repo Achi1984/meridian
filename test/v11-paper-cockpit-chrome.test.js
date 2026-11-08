@@ -244,6 +244,18 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         })()`),{appHidden:false,state:'ready',button:true,privateData:false},
         'unlock after restoration keeps Strategies active without restoring the cleared report');
         assert.equal(intercepted.count(),2,'unlock after restoration does not start a report read');
+        // Host8h automatically reads after re-unlock. Keep its generated 503
+        // intercepted until settled; this state has no retry backoff and its
+        // enabled refresh must remain the first native Tab target below.
+        for(let attempt=0;attempt<150;attempt++){
+          if(await evaluate(`document.querySelector('#spot-paper-host8h-root')?.dataset.state==='transport-not-provisioned' &&
+            document.querySelector('#spot-paper-host8h-root button')?.disabled===false`))break;
+          await new Promise(resolve=>setTimeout(resolve,10));
+        }
+        intercepted.assertHealthy();
+        assert.equal(await evaluate(`document.querySelector('#spot-paper-host8h-root')?.dataset.state==='transport-not-provisioned' &&
+          document.querySelector('#spot-paper-host8h-root button')?.disabled===false`),true,
+          'generated host8h transport result settles with an enabled keyboard refresh before interception ends');
         await intercepted.close();
         await evaluate(`(async()=>{
           const model=await import('./paper-cockpit-model.js?v=B16-M11-FIX14');
